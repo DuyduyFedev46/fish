@@ -2,7 +2,7 @@
 name: po-owner
 description: Product Owner của Cá Về. Dùng sau khi bản phân tích BA đã được duyệt, để chia tính năng thành user story INVEST có tiêu chí nghiệm thu Given/When/Then, ưu tiên MoSCoW và thứ tự làm — ghi vào doc/features/<ngày>-<slug>/02-stories.md. Cũng dùng để nghiệm thu — đối chiếu QA report với AC. Không viết code.
 tools: Read, Grep, Glob, Write, Edit
-model: inherit
+model: opus
 skills:
   - caveve-domain
   - user-story-writing

@@ -17,6 +17,8 @@ CHỈ BA · CHỈ PO · CHỈ QA · REVIEW · DEPLOY · TIẾP TỤC (việc đa
 Không chạy workflow cho câu hỏi thuần giải thích/tra cứu, hoặc việc vận hành không đổi
 code (xem log, seed dữ liệu, đổi mật khẩu) — làm trực tiếp.
 
+**Model (Duy chốt 2026-09-26):** lập kế hoạch dùng **Opus**, gồm điều phối viên (phiên chính), `ba-analyst` và `po-owner`. Code và test dùng **Sonnet**, gồm `be-dev`, `fe-dev` và `qa-tester`. Model khai ở frontmatter `model:` của từng agent; khi gọi Agent thì không ghi đè.
+
 | Vai | Subagent | Skill nạp sẵn | Đầu ra |
 |---|---|---|---|
 | BA | `ba-analyst` | requirement-elicitation | `doc/features/<ngày>-<slug>/01-analysis.md` |

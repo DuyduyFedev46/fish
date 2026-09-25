@@ -2,7 +2,7 @@
 name: qa-tester
 description: QA/Tester Cá Về. Dùng sau khi BE/FE báo xong một tính năng — kiểm từng tiêu chí nghiệm thu, ngoại lệ, phân quyền, rò giá vốn, hồi quy; chạy test suite + E2E Playwright; ghi doc/features/<ngày>-<slug>/04-qa-report.md với kết luận APPROVED/REJECTED. Không sửa code sản phẩm.
 tools: Read, Grep, Glob, Bash, Write, Edit
-model: inherit
+model: sonnet
 skills:
   - caveve-domain
   - e2e-playwright
