@@ -1,0 +1,211 @@
+/* Màn Nhân sự (UI4) — danh sách hàng thoáng kiểu Linear, chi tiết/tạo/sửa trong tấm bên.
+   Chỉ token trong shared/ui/tokens.css. Lớp toàn cục chỉ dùng qua :global khi bọc lớp chung (.btn, .field, .check-row).
+   Tên lớp thường trong TSX (staff-list, staff-open, group-tag, staff-actions, confirm-danger, cred-*) là móc cho e2e,
+   không có style ở globals.css. */
+
+/* ---------- Đầu màn: lọc phân đoạn · tìm · thêm ---------- */
+.bar{display:flex;flex-wrap:wrap;align-items:center;gap:var(--space-2)}
+.bar > :global(.seg){flex:1 1 100%}
+.bar > :global(.seg) button{flex:1}
+.bar > :global(.toolbar){flex:1 1 100%;min-width:0}
+.bar > :global(.btn.primary){flex:1 1 100%}
+/* ≥640px: hàng 1 = lọc (trái) + Thêm (phải), hàng 2 = tìm rộng hết */
+@media (min-width:640px){
+  .bar > :global(.seg){flex:none}
+  .bar > :global(.seg) button{flex:none;padding:0 var(--space-3)}
+  .bar > :global(.btn.primary){flex:none;margin-left:auto}
+}
+/* Nội dung đủ rộng (máy tính 3 cột): một hàng lọc · tìm · Thêm */
+@media (min-width:1240px){
+  .bar > :global(.toolbar){order:2;flex:1 1 0;flex-wrap:nowrap}
+  .bar > :global(.btn.primary){order:3;margin-left:0}
+}
+
+/* ---------- Danh sách ----------
+   UI5: phẳng như bảng ở Tổng quan/Đơn/Kho (DESIGN.md "Section" + "Data table"): tiêu đề .sect-h chung, hàng ngăn bằng
+   đường mảnh, tràn 12px hai bên để chữ thẳng tiêu đề và nền hover có chỗ thở. Không đóng khung. */
+.list{container-type:inline-size;min-width:0}
+.rowsWrap{margin-inline:calc(-1 * var(--space-3));border-top:1px solid var(--border)}
+.rows{list-style:none;margin-block:0;padding:0}
+.row{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;position:relative;border-bottom:1px solid var(--border)}
+
+.open{
+  display:grid;grid-template-columns:32px minmax(0,1fr);grid-template-areas:"av name" "av meta";
+  column-gap:var(--space-3);row-gap:var(--space-1);align-items:center;
+  width:100%;min-height:64px;padding:var(--space-3) var(--space-2) var(--space-3) var(--space-3);
+  border:0;background:transparent;color:inherit;font:inherit;text-align:left;
+  transition:background-color var(--dur-fast) ease;
+}
+.open:focus-visible{outline-offset:-2px}
+.row{transition:background-color var(--dur-fast) ease}
+.row:has(.open:active){background:var(--surface-3)}
+@media (hover:hover) and (pointer:fine){.row:hover{background:var(--surface-2)}}
+
+.avatar{
+  grid-area:av;align-self:start;margin-top:var(--space-0-5);
+  width:32px;height:32px;border-radius:var(--radius-full);display:grid;place-items:center;
+  background:var(--surface-3);color:var(--ink-2);font-size:var(--text-sm);font-weight:var(--weight-semibold);
+}
+.name{grid-area:name;display:flex;align-items:baseline;gap:var(--space-2);min-width:0}
+.name b{font-weight:var(--weight-semibold);color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.name small{font-family:var(--font-mono);font-size:var(--text-xs);color:var(--ink-3);white-space:nowrap}
+.meta{grid-area:meta;display:flex;flex-wrap:wrap;align-items:center;gap:var(--space-1) var(--space-2);min-width:0}
+.tags{min-width:0}
+.none{font-size:var(--text-xs);color:var(--ink-3)}
+.seen{display:none}
+
+.off .name b{color:var(--ink-2)}
+.off .avatar{background:transparent;box-shadow:inset 0 0 0 1px var(--border-strong);color:var(--ink-3)}
+
+/* Nút gọi: điện thoại = icon 44×44; rộng = số điện thoại */
+.call{
+  display:inline-flex;align-items:center;justify-content:center;gap:var(--space-1-5);
+  min-width:var(--tap);min-height:var(--tap);margin-right:var(--space-2);border-radius:var(--radius-md);
+  color:var(--ink-2);text-decoration:none;
+  transition:background-color var(--dur-fast) ease,color var(--dur-fast) ease;
+}
+.call :global(.mi){font-size:18px}
+.call:active{background:var(--surface-3)}
+@media (hover:hover) and (pointer:fine){.call:hover{color:var(--accent-text);background:var(--surface-3)}}
+.callNum{display:none}
+.noCall{width:var(--tap);margin-right:var(--space-2)}
+
+/* ---------- Nhãn nhóm, trạng thái: dùng .tag và .status chung (globals.css); ở đây chỉ bố cục ---------- */
+.status{display:inline-flex;align-items:center;gap:var(--space-2);font-size:var(--text-xs);color:var(--ink-2);font-weight:var(--weight-medium)}
+.statusLine:global(.status){font-size:inherit}
+
+/* Rộng — đặt SAU luật gốc của .status/.tag để thắng khi cùng độ ưu tiên.
+   Rộng (≥ 600px bề ngang danh sách): 4 cột người · nhóm · trạng thái · gọi */
+@container (min-width:600px){
+  .open{
+    grid-template-columns:32px minmax(0,1.25fr) minmax(0,1.2fr) 148px;
+    grid-template-areas:"av name tags status";
+    min-height:60px;
+  }
+  .avatar{align-self:center;margin-top:0}
+  .name{flex-direction:column;align-items:flex-start;gap:0}
+  .meta{display:contents}
+  .tags{grid-area:tags}
+  .status{grid-area:status;flex-direction:column;align-items:flex-start;gap:0}
+  .seen{display:block;font-size:var(--text-xs);color:var(--ink-3);padding-left:calc(8px + var(--space-2))}
+  .call{min-width:128px;justify-content:flex-start;padding:0 var(--space-3);font-variant-numeric:tabular-nums}
+  .call :global(.mi){display:none}
+  .callNum{display:inline}
+  .noCall{width:128px;padding:0 var(--space-3);color:var(--ink-3)}
+}
+
+/* ---------- Tải: khung xương dùng vạch .sk chung; rỗng dùng .state chung ---------- */
+.skel{display:flex;align-items:center;gap:var(--space-3);padding:var(--space-3);min-height:64px;border-bottom:1px solid var(--border)}
+.boneAv:global(.sk){width:32px;height:32px;border-radius:var(--radius-full);flex:none}
+.boneLines{display:flex;flex-direction:column;gap:var(--space-2);flex:1}
+.boneSub:global(.sk){height:8px}
+
+/* ---------- Nội dung tấm bên ---------- */
+.swap{display:flex;flex-direction:column;flex:1 0 auto}
+.swap:focus,.pane:focus{outline:none}
+.lead{margin:0;color:var(--ink)}
+.pane{display:flex;flex-direction:column;gap:var(--space-4);flex:1 0 auto;animation:paneIn var(--dur-base) var(--ease-out)}
+@keyframes paneIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+.pane :global(.field){margin-bottom:0}
+.pane :global(.alert-box){margin-bottom:0}
+
+/* Thanh nút dưới đáy tấm: dính đáy khi form dài (tay cái), nút chính bên phải */
+.footer:global(.form-actions){
+  position:sticky;bottom:0;z-index:1;margin:auto calc(-1 * var(--space-4)) calc(-1 * var(--space-4));
+  padding:var(--space-3) var(--space-4) calc(var(--space-3) + env(safe-area-inset-bottom));
+  background:var(--surface);border-top:1px solid var(--border);
+}
+@media (min-width:640px){
+  .footer:global(.form-actions){margin:auto calc(-1 * var(--space-5)) calc(-1 * var(--space-5));padding:var(--space-3) var(--space-5)}
+}
+@media (min-width:768px){
+  .footer:global(.form-actions){margin:auto calc(-1 * var(--space-6)) calc(-1 * var(--space-5));padding:var(--space-3) var(--space-6) var(--space-4);justify-content:flex-end}
+  .footer:global(.form-actions) :global(.btn){flex:0 1 auto}
+}
+
+/* Đầu chi tiết: avatar + tên đăng nhập + trạng thái */
+.profile{display:flex;align-items:center;gap:var(--space-3)}
+.avatarLg{width:44px;height:44px;border-radius:var(--radius-full);display:grid;place-items:center;flex:none;background:var(--surface-3);color:var(--ink-2);font-size:var(--text-lg);font-weight:var(--weight-semibold)}
+.profileText{display:flex;flex-direction:column;gap:var(--space-0-5);min-width:0}
+.profileText code{font-family:var(--font-mono);font-size:var(--text-sm);color:var(--ink);overflow-wrap:anywhere}
+
+/* Thuộc tính kiểu Notion: nhãn trái xám, giá trị phải */
+.props{margin:0;display:flex;flex-direction:column;border-top:1px solid var(--border)}
+.prop{display:grid;grid-template-columns:128px minmax(0,1fr);gap:var(--space-3);align-items:center;min-height:44px;padding:var(--space-1) 0;border-bottom:1px solid var(--border)}
+.prop dt{font-size:var(--text-sm);color:var(--ink-3)}
+.prop dd{margin:0;min-width:0;font-size:var(--text-base);overflow-wrap:anywhere}
+.prop dd .tags{padding:var(--space-1) 0}
+.tel{display:inline-flex;align-items:center;min-height:var(--tap);color:var(--accent-text);text-decoration:none;font-variant-numeric:tabular-nums}
+@media (hover:hover) and (pointer:fine){.tel:hover{text-decoration:underline}}
+.muted{color:var(--ink-3)}
+
+/* Danh sách thao tác: nhóm hàng như trang cài đặt; nguy hiểm tách riêng */
+.actions{display:flex;flex-direction:column;gap:var(--space-3)}
+.actionGroup{display:flex;flex-direction:column;border:1px solid var(--border);border-radius:var(--radius-md);overflow:hidden}
+.action{
+  display:flex;align-items:center;gap:var(--space-3);min-height:var(--tap);padding:0 var(--space-3);
+  border:0;background:var(--surface);color:var(--ink);font:inherit;font-weight:var(--weight-medium);text-align:left;
+  transition:background-color var(--dur-fast) ease;
+}
+.action + .action{border-top:1px solid var(--border)}
+.action :global(.mi){font-size:18px;color:var(--ink-3)}
+.action:active{background:var(--surface-3)}
+.action:focus-visible{outline-offset:-2px}
+@media (hover:hover) and (pointer:fine){.action:hover{background:var(--surface-2)}}
+.actionDanger{color:var(--crit)}
+.actionDanger :global(.mi){color:var(--crit)}
+@media (hover:hover) and (pointer:fine){.actionDanger:hover{background:var(--crit-soft)}}
+.actionDanger:active{background:var(--crit-soft)}
+.dangerNote{margin:calc(-1 * var(--space-1)) 0 0;font-size:var(--text-xs);color:var(--ink-3)}
+
+/* ---------- Xác nhận nguy hiểm ---------- */
+.confirm{display:flex;flex-direction:column;gap:var(--space-3)}
+.confirmIcon{width:40px;height:40px;border-radius:var(--radius-full);display:grid;place-items:center;background:var(--crit-soft);color:var(--crit)}
+.confirmIcon :global(.mi){font-size:22px}
+.confirmWarn .confirmIcon{background:var(--warn-soft);color:var(--warn)}
+.confirm h3{font-size:var(--text-lg)}
+.confirm p{margin:0;color:var(--ink-2)}
+.consequences{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:var(--space-2)}
+.consequences li{display:flex;gap:var(--space-2);align-items:flex-start;color:var(--ink-2);font-size:var(--text-sm);line-height:var(--leading-normal)}
+.consequences li :global(.mi){font-size:16px;margin-top:2px;color:var(--ink-3)}
+
+/* ---------- Form ---------- */
+.section{display:flex;flex-direction:column;gap:var(--space-4)}
+.section + .section{padding-top:var(--space-5);border-top:1px solid var(--border)}
+.req{color:var(--crit);margin-left:var(--space-0-5)}
+.readonly{margin:0;display:flex;align-items:center;flex-wrap:wrap;gap:var(--space-1) var(--space-2);font-size:var(--text-sm);color:var(--ink-3)}
+.readonly code{font-family:var(--font-mono);color:var(--ink);background:var(--surface-2);padding:var(--space-0-5) var(--space-1-5);border-radius:var(--radius-xs)}
+
+/* Chọn nhóm: thẻ ô chọn gọn (giữ .check-row để e2e đo vùng bấm) */
+.groups{border:0;padding:0;margin:0;min-width:0;display:flex;flex-direction:column;gap:var(--space-2)}
+.groups legend{font-size:var(--text-sm);font-weight:var(--weight-medium);color:var(--ink-2);padding:0;margin-bottom:var(--space-2)}
+.groups :global(.check-row){
+  align-items:center;gap:var(--space-3);padding:var(--space-2-5) var(--space-3);min-height:56px;
+  transition:border-color var(--dur-fast) ease,background-color var(--dur-fast) ease,transform var(--dur-fast) var(--ease-out);
+}
+.groups :global(.check-row):active{transform:scale(.99)}
+.groups :global(.check-row) input{margin:0}
+.groups :global(.check-row):has(input:focus-visible){outline:2px solid var(--focus);outline-offset:2px}
+@media (hover:hover) and (pointer:fine){.groups :global(.check-row):not(:has(input:checked)):hover{background:var(--surface-2)}}
+.groups:disabled :global(.check-row){opacity:.6;cursor:not-allowed}
+.diff{display:flex;flex-wrap:wrap;gap:var(--space-1) var(--space-3);font-size:var(--text-sm);color:var(--ink-2);min-height:20px}
+.diff b{font-weight:var(--weight-semibold);color:var(--ink)}
+
+/* Công cụ mật khẩu tạm: nằm riêng một dòng dưới ô */
+.pwTools{flex:1 1 100%;display:flex;flex-wrap:wrap;gap:var(--space-2)}
+.pwTools :global(.btn){flex:1 1 auto;min-height:var(--tap)}
+@media (min-width:640px){.pwTools :global(.btn){flex:none}}
+
+/* Nút sao chép có phản hồi */
+.copied:global(.btn){color:var(--good);border-color:var(--good)}
+
+/* ---------- Thông tin đăng nhập vừa tạo / đặt lại ---------- */
+.cred{display:flex;flex-direction:column;border:1px solid var(--border);border-radius:var(--radius-md);overflow:hidden}
+.credRow{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:var(--space-2);padding:var(--space-2) var(--space-2) var(--space-2) var(--space-3);background:var(--surface-2)}
+.credRow + .credRow{border-top:1px solid var(--border)}
+.credLabel{display:block;font-size:var(--text-xs);color:var(--ink-3);font-weight:var(--weight-medium)}
+.credValue{display:block;font-family:var(--font-mono);font-size:var(--text-lg);color:var(--ink);overflow-wrap:anywhere;user-select:all}
+.success{display:flex;flex-direction:column;align-items:flex-start;gap:var(--space-2)}
+.successIcon{width:40px;height:40px;border-radius:var(--radius-full);display:grid;place-items:center;background:var(--good-soft);color:var(--good)}
+.success h3{font-size:var(--text-lg)}
+.success p{margin:0;color:var(--ink-2)}
