@@ -30,3 +30,21 @@ next-env.d.ts
 
 # Claude Code: cấu hình cá nhân trên máy
 .claude/settings.local.json
+
+# Ảnh / asset: không đưa lên git (Duy yêu cầu 2026-09-25). Ảnh chụp test giữ ở máy.
+**/shots/
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.webp
+*.svg
+*.ico
+*.mp4
+*.webm
+*.mov
+*.pdf
+*.woff
+*.woff2
+*.ttf
+*.otf
