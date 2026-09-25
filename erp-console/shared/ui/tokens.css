@@ -1,0 +1,102 @@
+/* Token thiết kế Cá Về — bản chạy thật của DESIGN.md (gốc repo). Đổi giá trị ở DESIGN.md trước rồi chép sang đây.
+   Đây là file DUY NHẤT trong erp-console được chứa mã màu; mọi CSS/component khác chỉ dùng var(--…).
+   Sáng/tối: theo máy (prefers-color-scheme) hoặc ép bằng <html data-theme="light|dark"> (ThemeToggle). */
+
+:root{
+  /* ---- Màu: light ---- */
+  --canvas:#FBFBFC; --sidebar:#F4F4F6;
+  --surface:#FFFFFF; --surface-2:#F4F4F6; --surface-3:#EBEBEF;
+  --border:#E4E4E9; --border-strong:#D4D4DB; --border-input:#8C8C98;
+  --ink:#17171C; --ink-2:#4E4E58; --ink-3:#686874;
+  --accent:#1F66D1; --accent-hover:#1A57B5; --accent-text:#1A5BC0; --accent-soft:#EBF2FE; --on-accent:#FFFFFF;
+  --focus:#1F66D1;
+  --good:#157F3D; --good-soft:#E9F7EE;
+  --warn:#A85A07; --warn-soft:#FDF3E3;
+  --crit:#C0312B; --crit-hover:#A82823; --crit-soft:#FCEDEC; --on-crit:#FFFFFF;
+  --info:var(--accent-text); --info-soft:var(--accent-soft);
+  --scrim:rgba(15,15,20,.40);
+  --selection:rgba(31,102,209,.18);
+
+  /* ---- Bóng (chỉ cho thứ nổi trên nội dung) ---- */
+  --shadow-xs:0 1px 1px rgba(16,16,24,.04);
+  --shadow-sm:0 1px 2px rgba(16,16,24,.05),0 4px 12px rgba(16,16,24,.04);
+  --shadow-md:0 2px 6px rgba(16,16,24,.06),0 12px 32px rgba(16,16,24,.10);
+  --shadow-lg:0 4px 12px rgba(16,16,24,.08),0 24px 64px rgba(16,16,24,.18);
+
+  /* ---- Chữ ---- */
+  --font-sans:"Inter",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  --text-2xs:11px; --text-xs:12px; --text-sm:13px; --text-base:14px; --text-md:15px;
+  --text-lg:17px; --text-xl:20px; --text-2xl:24px; --text-input:16px;
+  --weight-regular:400; --weight-medium:500; --weight-semibold:600;
+  --leading-tight:1.25; --leading-snug:1.4; --leading-normal:1.5;
+  --tracking-tight:-.01em; --tracking-caps:.06em;
+
+  /* ---- Khoảng cách (bước 4px) ---- */
+  --space-0-5:2px; --space-1:4px; --space-1-5:6px; --space-2:8px; --space-2-5:10px; --space-3:12px;
+  --space-4:16px; --space-5:20px; --space-6:24px; --space-8:32px; --space-10:40px; --space-12:48px;
+
+  /* ---- Bo góc ---- */
+  --radius-xs:4px; --radius-sm:6px; --radius-md:8px; --radius-lg:10px; --radius-xl:14px; --radius-full:999px;
+
+  /* ---- Kích thước khung ---- */
+  --tap:44px;
+  --rail-left-w:240px; --rail-right-w:320px;
+  --topbar-h:56px; --bottom-nav-h:60px;
+  --content-max:1280px;
+
+  /* ---- Chuyển động ---- */
+  --dur-fast:120ms; --dur-base:180ms; --dur-slow:240ms;
+  --ease-out:cubic-bezier(.23,1,.32,1);
+  --ease-drawer:cubic-bezier(.32,.72,0,1);
+  --press-scale:.97;
+
+  /* ---- Lớp (z-index) ---- */
+  --z-sticky:5; --z-topbar:10; --z-scrim:30; --z-drawer:40; --z-drawer-left:41; --z-toast:50; --z-sheet:60;
+
+  color-scheme:light;
+}
+
+/* ---- Màu: dark (dùng chung cho "theo máy" và "ép tối") ---- */
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --canvas:#111113; --sidebar:#151518;
+    --surface:#1A1A1E; --surface-2:#222227; --surface-3:#2B2B31;
+    --border:#2A2A30; --border-strong:#3A3A42; --border-input:#6B6B77;
+    --ink:#EDEDF0; --ink-2:#AEAEB8; --ink-3:#9696A1;
+    --accent:#2F6FDB; --accent-hover:#285FC4; --accent-text:#7FB0FA; --accent-soft:#1A2740; --on-accent:#FFFFFF;
+    --focus:#5B95F2;
+    --good:#5CC98A; --good-soft:#15271D;
+    --warn:#E3AA4B; --warn-soft:#2A2114;
+    --crit:#F2807A; --crit-hover:#F59590; --crit-soft:#2E1817; --on-crit:#1A0B0A;
+    --scrim:rgba(0,0,0,.55);
+    --selection:rgba(91,149,242,.30);
+    --shadow-xs:0 1px 1px rgba(0,0,0,.30);
+    --shadow-sm:0 1px 2px rgba(0,0,0,.40),0 4px 12px rgba(0,0,0,.30);
+    --shadow-md:0 2px 6px rgba(0,0,0,.45),0 12px 32px rgba(0,0,0,.45);
+    --shadow-lg:0 4px 12px rgba(0,0,0,.50),0 24px 64px rgba(0,0,0,.55);
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --canvas:#111113; --sidebar:#151518;
+  --surface:#1A1A1E; --surface-2:#222227; --surface-3:#2B2B31;
+  --border:#2A2A30; --border-strong:#3A3A42; --border-input:#6B6B77;
+  --ink:#EDEDF0; --ink-2:#AEAEB8; --ink-3:#9696A1;
+  --accent:#2F6FDB; --accent-hover:#285FC4; --accent-text:#7FB0FA; --accent-soft:#1A2740; --on-accent:#FFFFFF;
+  --focus:#5B95F2;
+  --good:#5CC98A; --good-soft:#15271D;
+  --warn:#E3AA4B; --warn-soft:#2A2114;
+  --crit:#F2807A; --crit-hover:#F59590; --crit-soft:#2E1817; --on-crit:#1A0B0A;
+  --scrim:rgba(0,0,0,.55);
+  --selection:rgba(91,149,242,.30);
+  --shadow-xs:0 1px 1px rgba(0,0,0,.30);
+  --shadow-sm:0 1px 2px rgba(0,0,0,.40),0 4px 12px rgba(0,0,0,.30);
+  --shadow-md:0 2px 6px rgba(0,0,0,.45),0 12px 32px rgba(0,0,0,.45);
+  --shadow-lg:0 4px 12px rgba(0,0,0,.50),0 24px 64px rgba(0,0,0,.55);
+  color-scheme:dark;
+}
+
+@media (min-width:768px){
+  :root{ --tap:40px; }
+}

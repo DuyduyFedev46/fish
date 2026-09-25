@@ -1,0 +1,4 @@
+# Deps chỉ dùng để test, không cần khi deploy.
+-r requirements.txt
+pytest==8.3.4
+respx==0.22.0

@@ -1,0 +1,32 @@
+# OS / editor
+.DS_Store
+*.log
+firebase-debug.log
+
+# Env & secrets (chỉ giữ .env.example)
+.env
+.env.*
+!.env.example
+*.pem
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+db.sqlite3
+db.sqlite3-journal
+backend/staticfiles/
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+next-env.d.ts
+
+# Firebase / Cloud
+.firebase/
+
+# Claude Code: cấu hình cá nhân trên máy
+.claude/settings.local.json

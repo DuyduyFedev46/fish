@@ -1,0 +1,58 @@
+/* Lớp nổi dùng chung (làm ở UI4, đưa lên shared/ui ở UI5): tấm bên (SideSheet) và thông báo nổi (Toast).
+   Chỉ dùng token của ./tokens.css. Bọc/ghi đè ./Sheet bằng :global trong phạm vi .side. Toast nằm lớp --z-toast
+   (trên ngăn kéo, dưới hộp thoại). */
+
+/* ---------- SideSheet ----------
+   Điện thoại (<768px): tấm trượt từ đáy, bo 2 góc trên, cao tối đa 92dvh.
+   ≥768px: tấm bên phải cao hết màn (kiểu Linear/Notion), trượt từ phải. Đóng cũng có chuyển động (ra nhanh hơn vào). */
+.side :global(.sheet-wrap){align-items:flex-end;justify-content:center;padding:0}
+.side :global(.sheet-scrim){animation:fadeIn var(--dur-base) var(--ease-out)}
+.side :global(.sheet){
+  width:100%;max-height:92dvh;border:0;border-radius:var(--radius-xl) var(--radius-xl) 0 0;
+  display:flex;flex-direction:column;
+  animation:slideUp var(--dur-slow) var(--ease-drawer);
+}
+.side :global(.sheet-h){flex:none}
+.side :global(.sheet-b){flex:1 0 auto;display:flex;flex-direction:column}
+.side[data-closing]{pointer-events:none}
+.side[data-closing] :global(.sheet){animation:slideDown var(--dur-base) var(--ease-out) forwards}
+.side[data-closing] :global(.sheet-scrim){animation:fadeOut var(--dur-base) var(--ease-out) forwards}
+
+@media (min-width:768px){
+  .side :global(.sheet-wrap){justify-content:flex-end;align-items:stretch}
+  .side :global(.sheet){
+    width:min(480px,100%);height:100%;max-height:none;border-radius:0;
+    border-left:1px solid var(--border);
+    animation-name:slideIn;
+  }
+  .side :global(.sheet-h){min-height:var(--topbar-h)}
+  .side :global(.sheet-b){padding:var(--space-5) var(--space-6)}
+  .side[data-closing] :global(.sheet){animation-name:slideOut}
+}
+
+@keyframes slideUp{from{transform:translateY(100%)}to{transform:none}}
+@keyframes slideDown{from{transform:none}to{transform:translateY(100%)}}
+@keyframes slideIn{from{transform:translateX(100%)}to{transform:none}}
+@keyframes slideOut{from{transform:none}to{transform:translateX(100%)}}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+@keyframes fadeOut{from{opacity:1}to{opacity:0}}
+
+/* ---------- Toast ----------
+   Nổi trên nội dung, dưới ngón cái: trên điện thoại nằm ngay trên menu đáy; ≥768px giữa đáy màn.
+   Dùng lại .alert-box.ok (màu trạng thái "thành công"), thêm bóng vì là lớp nổi (DESIGN.md: bóng chỉ cho thứ nổi). */
+.toast:global(.alert-box){
+  position:fixed;z-index:var(--z-toast);
+  left:var(--space-3);right:var(--space-3);
+  bottom:calc(var(--bottom-nav-h) + env(safe-area-inset-bottom) + var(--space-3));
+  margin:0;align-items:center;
+  box-shadow:var(--shadow-md);
+  animation:toastIn var(--dur-base) var(--ease-out);
+}
+@media (min-width:768px){
+  .toast:global(.alert-box){
+    left:50%;right:auto;bottom:var(--space-6);
+    translate:-50% 0;
+    width:max-content;max-width:min(520px, calc(100vw - var(--space-12)));
+  }
+}
+@keyframes toastIn{from{opacity:0;transform:translateY(8px) scale(.98)}to{opacity:1;transform:none}}
