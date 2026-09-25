@@ -1,5 +1,5 @@
 # Deploy lần 1: ERP console mới + tài khoản & phân quyền
-> Điều phối viên · 2026-09-24 · Trạng thái: **ĐÃ DUYỆT** (2026-09-24, Duy) — chạy sau khi QA lần 4 APPROVED; dừng ở bước 5 để hỏi Duy
+> Điều phối viên · 2026-09-24 · Trạng thái: **ĐÃ CHẠY 2026-09-25**. Bước 1–7 xong. Ở bước 5, Duy chọn gỡ 51 bản ghi demo cũ rồi seed bộ mẫu mới (6 mặt hàng, 6 lô, 6 đơn, 3 hoá đơn). Còn bước 8, Duy làm.
 
 Phạm vi: S1–S9, S41, S42, S46, S47, S48, D1, sửa lỗi QA lần 2. QA lần 3 **APPROVED**.
 Backend 369 test xanh (gồm sửa theo code review; QA lần 4 xác nhận trước khi chạy). Shop (`frontend/`) không đổi code nên **không deploy lại**.
