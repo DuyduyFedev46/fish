@@ -81,6 +81,9 @@ urlpatterns = [
     path("reports/period/", PeriodPnlView.as_view()),
     # Internal (adapter)
     path("internal/payments/sepay-webhook/", SepayWebhookInternalView.as_view()),
+    # S11: contract viết không có "/" cuối — nhận cả hai dạng (router tự có dạng có "/").
+    path("sales/orders/<int:pk>/confirm-payment",
+         SalesOrderViewSet.as_view({"post": "confirm_payment"})),
     # Back-office (router)
     path("", include(router.urls)),
 ]

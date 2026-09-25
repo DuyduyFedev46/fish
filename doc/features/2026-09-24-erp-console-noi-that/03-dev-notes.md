@@ -1292,3 +1292,347 @@ và `notfound` (chỉ `after`: trang 404 của bản build; lần chụp `before
 - **B10:** dark `--accent-hover` đổi `#3D7CE6` → `#285FC4` (chữ trắng 5.96:1, đạt AA) ở `erp-console/shared/ui/tokens.css` (2 chỗ) và `DESIGN.md`.
 - **B11:** `features/overview/components/OverviewScreen.tsx`: nhãn "Cần chú ý" đếm theo `kpis.near_expiry`, không theo `alerts.length` (BE giới hạn 6 dòng).
 - Kiểm: `tsc` sạch; e2e `s8_views` (mock) 46/46; build thật không chứa mock.
+
+## Lô L7 — S10, S11 (BE) · 2026-09-25
+
+### Kết quả kiểm chứng
+- `cd backend && .venv/bin/python manage.py test` → **Ran 409 tests, OK** (mốc trước 369; +40 test mới: 23 S10, 17 S11).
+- `makemigrations --check --dry-run` → `No changes detected` (**không có migration mới**, không đổi schema). `manage.py check` → 0 issue.
+- `cd adapter && .venv/bin/python -m pytest -q` → **10 passed** (adapter không sửa).
+
+### File đã sửa / thêm
+- `backend/apps/sales/orders/api.py` — list có lọc/tìm/phân trang 20; chi tiết theo contract; action `confirm-payment` (S11); `cancel` giờ trả **hình chi tiết mới**.
+- `backend/apps/sales/orders/serializers.py` — viết lại: `SalesOrderListSerializer`, `SalesOrderDetailSerializer`, `AllocationSerializer` (`CostFieldSerializerMixin`, `sensitive_fields=("unit_cost",)`).
+- `backend/apps/sales/orders/services.py` — `available_actions(order, user)` (luật + quyền).
+- `backend/apps/sales/payments/services.py` — tách lõi chung `_record_payment` (webhook + tay); `confirm_payment` giữ nguyên chữ ký/hành vi; thêm `confirm_payment_manual`, `payment_outcome`, `parse_positive_amount`, `MANUAL_CONFIRMABLE_STATUSES`.
+- `backend/apps/sales/payments/internal_api.py` — webhook dùng `services.parse_positive_amount` (bỏ bản chép `_parse_amount`), hành vi không đổi.
+- `backend/apps/sales/payments/api.py` — **gỡ** action `POST /api/sales/invoices/{id}/confirm-payment/` (A2, S11-AC8).
+- `backend/apps/sales/refunds/services.py` — tách `refundable_amount(invoice)` (BR-HT-04) để `create_refund` và `available_actions` dùng chung.
+- `backend/apps/sales/utils.py` — `money_str` (`540000.00` → `"540000"`), `kg_str` (`2` → `"2.000"`).
+- `backend/apps/common/api.py` — `StandardPagination` (20 dòng/trang; `PAGE_SIZE` toàn cục 50 không đổi).
+- `backend/config/api_urls.py` — thêm route không có `/` cuối `sales/orders/<pk>/confirm-payment` (contract viết không `/`); dạng có `/` do router sinh.
+- Test: `apps/sales/orders/tests/test_s10_api.py`, `apps/sales/payments/tests/test_s11_confirm_manual.py`; sửa 1 assert ở `apps/common/tests/test_s5_scope_nv_giao.py` (`phone` → `customer.phone` vì chi tiết đơn đổi hình theo S10).
+- README: `backend/README.md` (bản đồ module, số test), `apps/sales/orders/README.md`, `apps/sales/payments/README.md`.
+
+### Contract thực tế
+```
+GET /api/sales/orders/?status=BOOKED,PAID&date_from=2026-09-01&date_to=2026-09-24&q=0901&page=1
+200 {"count": 25, "next": "http://…/api/sales/orders/?…&page=2", "previous": null, "results": [
+  {"id": 1, "code": "SO260925-1A2B3C", "status": "BOOKED", "status_label": "Giữ chỗ",
+   "customer_name": "Chị Hoa", "customer_phone": "0901234567", "total_amount": "540000",
+   "created_at": "2026-09-25T09:10:00+07:00", "reserved_until": "2026-09-25T09:40:00+07:00",
+   "delivery_status": null, "needs_attention": false}]}
+400 {"detail": "Tham số date_from phải là ngày dạng YYYY-MM-DD.", "code": "INVALID_FILTER"}
+401 chưa đăng nhập · 403 thiếu sales.view_salesorder
+```
+- `status`: nhiều giá trị cách dấu phẩy; giá trị lạ → không khớp đơn nào (không báo lỗi). `date_from`/`date_to`: theo **ngày tạo đơn, giờ VN**, gồm cả hai đầu. `q`: khớp một phần mã đơn (không phân biệt hoa thường) **hoặc** SĐT nhận hàng **hoặc** SĐT khách.
+- `customer_phone` = SĐT nhận hàng trên đơn (`SalesOrder.phone`). `delivery_status` = trạng thái phiếu giao mới nhất, `null` khi chưa có.
+- `needs_attention` = có giao dịch `UNDERPAID`/`ORPHAN` gắn đơn **hoặc** có phiếu giao `FAILED` (giả định dev, xem "Còn nợ").
+```
+GET /api/sales/orders/1/        (Chủ; Quản lý/NV kho giống hệt nhưng KHÔNG có key allocations[].unit_cost)
+200 {"id": 1, "code": "SO260925-1A2B3C", "status": "PROCESSING", "status_label": "Đang xử lý",
+  "total_amount": "540000", "created_at": "…", "reserved_until": "2026-09-25T09:40:00+07:00",
+  "customer": {"name": "Chị Hoa", "phone": "0901234567", "address": "12 Lê Lợi, Vũng Tàu"},
+  "lines": [{"no": 1, "item_code": "TOM-SU-1", "item_name": "Tôm sú loại 1", "qty_kg": "2.000",
+             "unit_price": "270000", "discount": "0", "line_total": "540000"}],
+  "allocations": [{"line_no": 1, "batch_id": "TOM-SU-1-260925-AB12C", "qty_kg": "2.000", "unit_cost": "180000"}],
+  "invoice": {"id": 1, "code": "INV260925-9F8E7D", "issued_at": "…"},
+  "payments": [{"id": 1, "bank_txn_id": "FT2626712345", "amount": "540000", "match_status": "MATCHED",
+                "source": "MANUAL", "received_at": "…"}],
+  "delivery": {"id": 1, "code": "GH-INV260925-9F8E7D-A1B2C", "status": "PREPARING",
+               "assigned_to": {"id": 12, "display_name": "Anh Tư", "phone": "0908111222"}, "failed_attempts": 0},
+  "refunds": [{"id": 5, "amount": "540000", "status": "PENDING", "bank_txn_ref": ""}],
+  "available_actions": ["cancel", "create_refund"]}
+404 ngoài phạm vi (nv_giao, S5) hoặc không tồn tại
+```
+- Đơn chưa có hoá đơn: `invoice: null`, `delivery: null`, `refunds: []`; `allocations` lấy từ **giữ chỗ theo lô** (`SalesOrderLineBatch`). Đã có hoá đơn: lấy từ **phân bổ lô đã bán** (`SalesInvoiceLineBatch`, nguồn giá vốn BR-BH-06).
+- `assigned_to` = `null` khi chưa gán; không có hồ sơ nhân viên → `display_name` = username, `phone` = "".
+- Thêm so với JSON mẫu (không bớt key nào): `status_label`, `total_amount`, `created_at`, `reserved_until` ở chi tiết; `payments[].source` (`WEBHOOK`/`MANUAL`).
+- `available_actions` (thứ tự cố định): `confirm_payment` = đơn BOOKED **hoặc AUTO_CANCELLED** + `sales.confirm_payment_manual` (chỉ Chủ); `cancel` = PAID/PROCESSING có hoá đơn + `sales.cancel_paid_order` (Chủ, Quản lý); `create_refund` = có hoá đơn, còn tiền hoàn được (BR-HT-04) + `sales.create_refund` (Chủ, Quản lý). NV kho, NV giao: `[]`.
+```
+POST /api/sales/orders/1/confirm-payment      (có hay không có "/" cuối đều được)
+{"bank_txn_id": "FT2626712345", "amount": "540000"}     // amount bỏ trống/null/"" = tổng đơn; nhận chuỗi hoặc số
+200 {"result": "PAID", "duplicate": false, "order_status": "PROCESSING", "invoice_id": 1, "delivery_note_code": "GH-INV260925-9F8E7D-A1B2C"}
+200 {"result": "UNDERPAID", "duplicate": false, "order_status": "BOOKED", "paid_total": "300000", "missing": "240000"}
+200 {"result": "ORPHAN", "duplicate": false, "order_status": "AUTO_CANCELLED"}
+200 {… kết quả hiện tại của giao dịch đã ghi …, "duplicate": true}     // cùng bank_txn_id, cùng đơn (kể cả webhook ghi trước)
+400 {"code": "BR-TT-08", "detail": "Thiếu mã giao dịch ngân hàng."}
+400 {"code": "BR-TT-08", "detail": "Số tiền phải là số lớn hơn 0."}                       // 0, âm, "abc", "NaN"
+400 {"code": "BR-TT-08", "detail": "Mã giao dịch ngân hàng dài quá 100 ký tự."}
+400 {"code": "BR-TT-08", "detail": "Đơn không ở trạng thái Giữ chỗ/Tự huỷ."}
+400 {"code": "BR-TT-03", "detail": "Mã giao dịch này đã được ghi nhận cho giao dịch khác, không dùng lại (BR-TT-03)."}
+401 chưa đăng nhập · 403 thiếu sales.confirm_payment_manual (kiểm TRƯỚC khi tra đơn) · 404 đơn không tồn tại
+POST /api/sales/invoices/{id}/confirm-payment[/] → 404 (đã gỡ)
+```
+
+### Rule BR đã cài
+- **BR-TT-08** (mới): xác nhận tay gắn vào ĐƠN, chỉ đơn Giữ chỗ/Tự huỷ, bắt buộc mã GD, số tiền > 0 (mặc định = tổng đơn). Chạy **chung lõi** `_record_payment` với webhook: đủ tiền → hoá đơn + trừ kho theo lô đã giữ + PROCESSING + phiếu giao PREPARING (signal cũ); thiếu → UNDERPAID (BR-TT-04); đơn Tự huỷ → ORPHAN, không khôi phục, kho không đổi (BR-TT-05). `source=MANUAL`.
+- **BR-TT-03**: kiểm trùng mã GD **sau khi khoá dòng đơn** (`select_for_update`) → hai lần bấm/webhook đồng thời cho cùng đơn xếp hàng, lần sau thấy giao dịch lần trước: 1 giao dịch, 1 hoá đơn, 1 AuditLog. Kiểm trạng thái đơn của nhánh tay cũng nằm dưới khoá.
+- **BR-TT-07 / BR-PQ-04**: `require_perm("sales.confirm_payment_manual")`; AuditLog `confirm_payment_manual`, actor = Chủ, object = đơn, `changes` = `bank_txn_id`, `amount`, `match_status`, `source`, `status {from,to}`. Lần gọi trùng **không** ghi AuditLog thêm. Đường webhook không ghi AuditLog (như cũ).
+- **BR-PQ-15**: `allocations[].unit_cost` không có key khi thiếu `inventory.view_costprice` — test quét đệ quy JSON (list + chi tiết, đơn BOOKED và đơn đã có hoá đơn) với `quan_ly`, `nv_kho`, `nv_giao`.
+- **BR-PQ-12 / S5**: phạm vi NV giao giữ nguyên (list chỉ đơn phiếu mình, chi tiết ngoài phạm vi 404); người không có `view_salesorder` → 403.
+
+### Giả định dev tự đặt (cần PO/BA xác nhận)
+1. `available_actions` có `confirm_payment` cả với đơn **AUTO_CANCELLED** (endpoint nhận trạng thái này theo contract; kết quả ORPHAN vào hàng chờ). Đây là đúng tình huống E-05: webhook lỗi → đơn tự huỷ → Lộc thấy tiền trên sao kê. Nếu PO muốn nút chỉ hiện ở đơn Giữ chỗ thì chỉ cần sửa `available_actions`.
+2. Mã GD đã được ghi cho **đơn khác** (hoặc giao dịch UNMATCHED chưa gắn đơn) → 400 `BR-TT-03`, không trả `duplicate:true` (tránh hiện kết quả của đơn khác). Gắn giao dịch UNMATCHED vào đơn là việc của S12.
+3. `paid_total` = tổng các giao dịch MATCHED + UNDERPAID của đơn; `missing` = tổng đơn − `paid_total` (không âm). Luật khớp vẫn theo **từng** giao dịch (BR-TT-04 như cũ): hai lần chuyển thiếu cộng lại đủ vẫn là UNDERPAID, chờ S12 ("xác nhận khi khách đã bù").
+4. `duplicate:true` trả **trạng thái hiện tại** của đơn (vd lần đầu UNDERPAID, sau đó đơn tự huỷ → `order_status` đổi), không phải ảnh chụp lúc ghi.
+5. `needs_attention` tạm tính = có giao dịch UNDERPAID/ORPHAN hoặc phiếu giao FAILED. Khi S12 thêm `resolution_*` phải loại giao dịch đã đóng; S21 (`needs_decision`) có thể thay tiêu chí phiếu giao.
+6. Lọc ngày theo `created_at` (thời điểm đặt), không theo ngày thanh toán.
+
+### Còn nợ
+- N-6 (tiền chuyển lần hai cho đơn đã PROCESSING vẫn ghi MATCHED) và N-7 (adapter `transactionDate` hỏng → 500; webhook nhận `received_at` chỉ có ngày) **chưa làm**, theo chỉ đạo để lô sau. Nhánh tay không dính N-6 vì chặn đơn không ở Giữ chỗ/Tự huỷ.
+- `POST …/cancel` giờ trả hình **chi tiết mới** (S10) thay cho serializer cũ; S14 sẽ viết lại contract huỷ, FE chưa dùng.
+- Chưa kiểm đồng thời thật trên Postgres (hai lần bấm cùng lúc): logic dựa vào `select_for_update` trên đơn; SQLite trong test chạy tuần tự. Trường hợp hiếm: cùng mã GD gửi đồng thời cho **hai đơn khác nhau** vẫn có thể chạm `unique` → 500 (gộp vào N-8).
+- Test S11 viết trước code nhưng chỉ lượt chạy đỏ của S10 được ghi lại (S11 đỏ vì endpoint chưa có, không chạy riêng trước khi cài).
+- BR-TT-08 cần BA đưa vào `business-process-spec.md` (cùng nhóm nợ N-4).
+- Chưa commit, chưa deploy.
+
+## Lô L7 — S10, S11 (FE) · 2026-09-25
+
+Chỉ `erp-console/`. Làm song song BE, dựng mock theo contract trong story, rồi **khớp lại theo contract thực tế** ở mục
+"Lô L7 — S10, S11 (BE)" ngay trên (mã `SO…`/`INV…`/`GH-…`, `payments[].source`, câu lỗi BR-TT-08/BR-TT-03 thật, `INVALID_FILTER`,
+luật `available_actions`, `needs_attention`, `duplicate` trả trạng thái hiện tại). Rule thực thi phía màn: BR-BH-03 (đếm lùi giữ chỗ
+theo `reserved_until`), BR-BH-06 + BR-PQ-15 (phân bổ lô, giá vốn chỉ khi có key), BR-TT-03/04/05/07/08 (xác nhận tay, kết quả do BE),
+BR-PQ-12 (menu/ViewGuard). Không mã BR mới.
+Skill: `caveve-ui`, `impeccable` (`context` + craft-floor; không bật hooks; không có công cụ hỏi đáp trong phiên subagent → không
+phỏng vấn, làm theo brief), `emil-design-eng`, `baseline-ui`, `fixing-accessibility`, `nextjs-shop-patterns`.
+
+### Kết quả kiểm chứng
+- `./node_modules/.bin/tsc --noEmit` sạch. `npm run build` **thật** (không mock) sạch trong repo; `out/` không chứa
+  `__caveMock|demo1234|Chế độ mock|mockOrdersApi|cave_erp_mock_orders` (0 file).
+- E2E mock (bản build `NEXT_PUBLIC_USE_MOCK=1` trong scratchpad, `http.server` 127.0.0.1:3131): **mới** `e2e/s10_s11_orders.py` **68/68**;
+  hồi quy `s7_shell` **25/25** · `s8_views` **45/45** · `s41_s47_staff` **72/72** · `s48_password` **41/41**.
+- `impeccable detect --json features/orders shared/lib/nav.ts` → `[]`. Grep hex/`rgba(` ngoài `tokens.css` = 0; `style={{` = 0.
+- Server chạy có giới hạn thời gian (`perl alarm`), đã kill theo PID; `lsof -i tcp:3131` sạch.
+
+### Trang / component / hàm
+- **Menu Đơn** (`shared/lib/nav.ts`): bỏ điều kiện tạm `reports.view_dashboard` (TODO(S10), lệch L-13) → `sales.view_salesorder`
+  và **không** phải người chỉ thuộc `nv_giao` (S7-AC2, L-4). NV kho bị gỡ `view_dashboard` giờ vào thẳng màn Đơn.
+- **Danh sách** (`features/orders/components/OrdersScreen.tsx`): thay list 8 đơn của dashboard bằng `GET /api/sales/orders/`.
+  Tìm (gửi `q` lên BE, trễ 300 ms) · lọc trạng thái (`select`: Mọi trạng thái / Chưa xong = `BOOKED,PAID,PROCESSING` / từng trạng thái /
+  Đã huỷ = `CANCELLED,AUTO_CANCELLED`) · lọc ngày (Mọi ngày / Hôm nay / 7 / 30 ngày / Chọn khoảng — ngày theo giờ VN; khoảng ngược
+  báo tại ô, không gọi API) · 20 dòng + **"Tải thêm đơn"** (`?page=n`, không trùng dòng) · đầu khối "Đang hiện 20 / 45 đơn".
+  Mỗi dòng là **một nút** (bấm đâu cũng mở chi tiết, ≥ 44 px): ≥ 640 px vùng chứa = 5 cột (mã mono · khách + đuôi SĐT + dấu
+  "Cần chú ý" · đặt lúc · giá trị căn phải tabular · trạng thái chấm + dòng phụ "còn N′" / trạng thái phiếu giao); hẹp hơn = 2 dòng.
+  Trạng thái: khung chờ đúng hình, lỗi (Thử lại; 403 icon khoá + câu BE), rỗng ("Chưa có đơn nào" + Làm mới), không khớp lọc
+  ("Bỏ lọc"), làm mới lỗi giữ danh sách cũ + dải lỗi, tải thêm lỗi báo dưới danh sách.
+- **Chi tiết** (`OrderDetailSheet.tsx`, `OrderDetailView.tsx`) trong `shared/ui/SideSheet` (phải 480 px trên máy tính, tấm đáy trên
+  điện thoại): đầu đơn (mã, trạng thái, tổng tiền lớn, giờ đặt) · khung **đếm lùi giữ chỗ `mm:ss`** mỗi giây (S10-AC5, hổ phách; hết
+  giờ → đỏ) · thuộc tính kiểu Notion (Khách, SĐT `tel:`, Địa chỉ, Hoá đơn) · Hàng (kg × giá, giảm, tổng) · Phân bổ lô (mã lô, kg,
+  dòng hàng; **"Vốn …/kg" chỉ khi JSON có key `unit_cost` VÀ `me.can_view_cost`**) · Thanh toán (chấm trạng thái, số tiền, mã GD,
+  giờ, nguồn Tự động/Xác nhận tay) · Giao hàng (mã phiếu, trạng thái, người giao + nút gọi, số lần thất bại) · Hoàn tiền · Dòng thời
+  gian. Thanh nút dính đáy tấm theo `available_actions`. Tải/lỗi (Thử lại)/404 trong tấm.
+- **S11** (`ConfirmPaymentForm.tsx`): bước riêng trong tấm, tiêu đề đổi "Xác nhận đã nhận tiền · SO…". Câu hỏi nêu **số tiền + mã
+  đơn**, khách + tổng đơn; ô mã GD (mono, bắt buộc, focus sẵn) và số tiền (mặc định = tổng đơn, chỉ giữ chữ số, đọc lại "540.000 ₫",
+  báo "Ít/Nhiều hơn tổng đơn …"); danh sách hậu quả (đơn Tự huỷ: "KHÔNG khôi phục đơn"). Nút gửi ghi số tiền "Xác nhận đã nhận 540.000 ₫";
+  điện thoại: nút chính một hàng riêng dưới cùng. **Chống bấm đúp**: khoá theo ref + nút tắt + tấm không đóng khi đang gửi (e2e bấm đúp → 1 POST).
+  Ô trống → báo tại ô, không gọi API; lỗi BE (BR-TT-08, BR-TT-03, 403) hiện **nguyên văn** trên thanh nút. Xong: về chi tiết, dòng báo
+  kết quả theo `result` (PAID xanh; UNDERPAID/ORPHAN hổ phách; `duplicate` thêm "đã được ghi trước đó"), focus vào dòng báo, tải lại
+  chi tiết, sửa dòng trong danh sách tại chỗ; **đóng tấm → toast** (chỉ PAID). Huỷ bước → focus về nút "Xác nhận đã nhận tiền".
+- Hàm API mới (`features/orders/api.ts`): `listOrders(params, page)`, `getOrder(id)`, `confirmPayment(id, {bank_txn_id, amount})`,
+  mỗi hàm kèm nhánh mock `mockOrdersApi`. Kiểu ở `types.ts`; nhãn trạng thái lồng (phiếu giao, giao dịch, phiếu hoàn) ở `labels.ts`;
+  câu FE ở `messages.ts`; `useOrderList.ts`, `useNow.ts`; `orders.module.css` (chỉ token).
+- Mock (`features/orders/mock.ts`): 45 đơn (mới → cũ), phạm vi NV giao (404 ngoài phạm vi), `unit_cost` theo quyền, `available_actions`
+  và luật confirm-payment như BE (403 trước khi tra đơn, BR-TT-03 khác đơn → 400, cùng đơn → `duplicate` + trạng thái hiện tại,
+  khớp theo **từng** giao dịch). `__caveMock.orders(mode)`, `resetOrders()`, `orderJson(user, id)`. `shared/lib/beErrors.mock.ts` thêm
+  `TT_*`, `INVALID_FILTER` (chép câu BE thật).
+- README: `erp-console/README.md`, `features/orders/README.md`.
+
+### E2E
+- Mới `e2e/s10_s11_orders.py` (68 kiểm): S10-AC1 (20 dòng/trang, lọc `status=BOOKED`, ngày hôm nay), tải thêm/không trùng, S10-AC2
+  (`q=0901234`), bỏ lọc, S10-AC3/AC4 (key `unit_cost` theo quyền + hiển thị), S10-AC5 (mm:ss chạy), S10-AC6 (giao1: không menu, gõ URL
+  bị chặn, không gọi API), S10-AC7 (360 sáng/tối: không cuộn ngang ở danh sách/chi tiết/bước xác nhận, vùng bấm ≥ 44 px), S11-AC1
+  (PAID, chi tiết + dòng danh sách cập nhật, toast), AC2 (UNDERPAID, không toast), AC3 (ORPHAN), AC4 (bấm đúp → 1 POST), AC5 (trùng
+  mã webhook), AC6 (amount 0 → câu BE), AC7 (Quản lý không có nút), BR-TT-03 (mã của đơn khác), lỗi/rỗng/403/lỗi chi tiết.
+- **Đổi `e2e/s8_views.py` theo hành vi mới (không nới)**: (1) khối Đơn bám `ul.order-list > li` (20 dòng), vẫn kiểm đếm lùi "còn N′" và
+  tìm theo SĐT (`0901234` → 1 dòng, BE lọc) thay cho "8 dòng + 4561" của list dashboard; (2) vòng "403 ổn định" bỏ màn Đơn (màn Đơn không
+  còn gọi summary); (3) kho1 thiếu `view_dashboard`: trang đầu là `/orders/`, menu **có** "Đơn & tiền", chỉ `/inventory/` còn bị chặn
+  (đúng ý TODO(S10)); (4) phần so bản HTML cũ (chỉ chạy khi có `LEGACY_BASE`, bản cũ đã xoá) bỏ so màn Đơn. Tổng 46 → 45 kiểm vì bớt 1 đường dẫn bị chặn.
+
+### Ảnh (`shots/`)
+`s10-list-{360,1280}-{light,dark}`, `s10-detail-{360,1280}-{light,dark}`, `s10-detail-1280-quanly` (không giá vốn, không nút),
+`s10-detail-bottom-{360,1280}-light` (thanh toán, giao hàng thất bại, dòng thời gian), `s10-state-{fail,empty}-1280-light`,
+`s11-confirm-{360,1280}-{light,dark}`, `s11-result-{360,1280}-{light,dark}`, `s11-error-1280-light` (câu BE nguyên văn).
+
+### Lệch contract / cần BE, PO biết
+1. **Chưa có `timeline`** trong chi tiết (story yêu cầu "dòng thời gian trạng thái", contract không có). FE nhận `timeline?:
+   [{at, label, status?, actor?}]` nếu BE trả; không có thì **ghép** từ `created_at`, `payments[].received_at`, `invoice.issued_at` + dòng
+   "Hiện tại: <trạng thái>", có chú thích "Ghép từ các mốc giờ…". Thiếu mốc huỷ/tự huỷ/giao xong/hoàn tiền (chi tiết không có giờ của
+   phiếu giao, phiếu hoàn). Đề xuất BE thêm `timeline` từ AuditLog.
+2. Phiếu giao / giao dịch / phiếu hoàn chỉ có **mã** trạng thái → FE dịch bằng bảng chép nguyên TextChoices BE (`labels.ts`); BE trả
+   `*_label` thì FE ưu tiên.
+3. Tìm: contract thật khớp mã đơn hoặc SĐT, **không** khớp tên khách → ô tìm ghi "Tìm mã đơn hoặc SĐT…" (brief có "khách"; muốn tìm
+   theo tên thì BE thêm `customer_name` vào `q`).
+4. `available_actions` có `cancel` (S14), `create_refund` (S15) nhưng chưa có màn → FE **chưa vẽ nút** (bảng `ACTION_UI` chỉ có
+   `confirm_payment`); nối ở L9.
+5. Nút xác nhận hiện cả ở đơn **Tự huỷ** (giả định 1 của BE) — FE theo `available_actions`, bước xác nhận đổi hậu quả sang "không
+   khôi phục đơn". PO chốt chỉ Giữ chỗ thì chỉ BE sửa.
+6. FE gọi `…/confirm-payment/` (có `/`); BE nhận cả hai dạng.
+7. S10-AC7 "mỗi đơn là một thẻ": điện thoại là **hàng danh sách 2 dòng** ngăn đường mảnh (DESIGN.md: không thẻ, không lồng khung,
+   như Tổng quan/Kho/Nhân sự) — đủ ý "mỗi đơn một khối bấm được", không cuộn ngang.
+
+### Còn nợ
+- Bộ lọc và đơn đang mở chưa lên URL (không chia sẻ/không giữ khi tải lại trang) — như #19 UI5.
+- Chưa chạy E2E trên **backend thật** cho S10/S11 (chỉ mock theo contract thật); nên thêm vào `s41_s47_real.py`-kiểu khi có seed đơn.
+- Chưa kiểm trên máy thật (điện thoại): bàn phím số của ô số tiền, `select` gốc của iOS.
+- Chưa commit, chưa deploy.
+
+### Khớp "Lô L7 — bổ sung (BE)" (FE, 2026-09-25) — đóng lệch 1–3 ở trên
+- **Tìm theo tên khách**: ô tìm đổi thành "Tìm mã đơn, tên khách hoặc SĐT…" (BE lọc, bỏ dấu). Để chữ gợi ý không bị cắt ở 1280 px
+  (3 cột), dưới 1400 px ô tìm một hàng, hai ô lọc xuống hàng dưới.
+- **Nhãn BE**: `payments[].match_status_label`, `payments[].source_label`, `delivery.status_label`, `refunds[].status_label` được ưu tiên;
+  `labels.ts` chỉ còn là dự phòng (nhãn nguồn dự phòng đổi theo BE: "Webhook SePay"). Danh sách vẫn dịch `delivery_status` (chỉ có mã).
+- **Dòng thời gian**: kiểu `OrderTimelineEntry = {at, kind, label, actor_display}` (`kind` tập đóng 13 mã). FE dùng NGUYÊN mảng BE
+  (không sắp lại/ghép thêm), mỗi mốc = icon tròn theo `kind` (trung tính; `delivery_failed`/`cancelled`/`auto_cancelled` hổ phách,
+  `delivered`/`refund_confirmed` xanh lá; `kind` lạ → icon mặc định) · nhãn BE · "giờ · người" (`actor_display`), cuối là "Hiện tại: <trạng
+  thái>". Phần "ghép" chỉ còn chạy khi BE **không** có key `timeline` (có chú thích "Ghép tạm…").
+- Mock (`features/orders/mock.ts`): `q` khớp tên bỏ dấu (`fold` như BE `fold_text`), thêm 4 key nhãn, dựng `timeline` như BE (xác nhận
+  tay → `actor_display` = người bấm; đặt đơn/hoá đơn/phiếu giao = "Hệ thống"; phiếu giao đổi trạng thái/thất bại/giao xong = người giao;
+  tự huỷ, huỷ + phiếu hoàn, đã hoàn).
+- E2E `s10_s11_orders.py` **75/75** (+7: tìm "chi hoa" → Chị Hoa; timeline sau xác nhận đúng thứ tự `kind` và người; không còn "Ghép tạm";
+  mock có 3 nhãn BE; hiện "Webhook SePay"; timeline đơn giao thất bại có người giao; đếm mã GD ở danh sách thanh toán vì timeline cũng
+  nhắc mã). `s8_views` **45/45** (chỉ đổi chữ gợi ý ô tìm). `tsc` sạch, build thật sạch, `out/` 0 dấu mock, hex = 0, `impeccable detect` `[]`.
+  Server 3131 có giới hạn thời gian, đã kill, `lsof` sạch. Ảnh `shots/s10-*`, `s11-*` chụp lại (có `s10-detail-bottom-*` = timeline mới).
+- Lệch còn lại: không. Còn nợ như trên.
+
+### Sửa B13 phía FE (QA L7, 2026-09-25) — S11-AC6, BR-TT-08
+- `ConfirmPaymentForm.tsx`: ô số tiền đọc bằng `parseAmount` (dấu nghìn `.`/`,`/khoảng trắng; phần lẻ 1–2 chữ số hoặc `0,xxx` bị bỏ vì VND không có số lẻ). Các trường hợp âm, 0 (kể cả `0,004`/`0.001`), có chữ (`1e20`) hoặc quá 12 chữ số phần nguyên đều báo lỗi ngay tại ô (có `aria-invalid`, focus vào ô), **không gửi POST** và ẩn câu lỗi BE cũ. 999.999.999.999 vẫn hợp lệ. Ô mã GD có `maxLength` 100 và placeholder "Mã FT… trên sao kê" (giữ chữ hướng dẫn cũ); mã tự trim khi rời ô và khi gửi. Lỗi BE vẫn hiện nguyên văn. Câu thông báo mới nằm trong `messages.ts`.
+- Mock (`features/orders/mock.ts`): số tiền được làm tròn 2 chữ số lẻ; ≤ 0 hoặc ≥ 1e12 → 400 `TT_AMOUNT_INVALID`, không ghi giao dịch. Thêm `__caveMock.confirmJson(user, id, body)` để e2e gọi thẳng luật "BE". **Lệch:** BE chưa chốt câu báo "quá lớn" nên mock đang dùng chung câu "Số tiền phải là số lớn hơn 0." Khi BE chốt thì thêm key vào `shared/lib/beErrors.mock.ts` (lượt này chưa đụng vì ngoài phạm vi).
+- E2E `s10_s11_orders.py` **90/90** (+15 so với 75, thay ca cũ "amount 0 → câu BE"). Các ca mới: 15 và 14 chữ số, `1e20`, `0`, `0,004`, `0.001`, `-5`, `-540000` → báo lỗi tại ô, 0 POST; sửa ô thì lỗi mất; 12 chữ số hợp lệ; `100000,5` → 100000; maxlength/placeholder/trim; mock gọi thẳng → 400, không thêm giao dịch. `tsc` sạch, build thật sạch, `out/` 0 dấu mock, hex = 0. Server 3131 chạy dưới `perl alarm` và đã kill theo PID, `lsof` sạch.
+- Ảnh: `shots/s11-amount-toobig-{1280-light,360-light,360-dark}.png`, `s11-error-1280-light.png` (chụp lại, giờ là câu BR-TT-03).
+
+## Lô L7 — bổ sung (BE) · 2026-09-25
+
+Đóng lệch 1–3 ở mục "Lô L7 — S10, S11 (FE) › Lệch contract". **Chỉ thêm key/khả năng**, không bớt/đổi key nào của contract S10/S11.
+Rule: BR-PQ-04/05 (AuditLog làm nguồn dòng thời gian), BR-PQ-07 (actor=None → "Hệ thống"), BR-PQ-11 (hoá đơn/phiếu giao do Hệ thống),
+BR-PQ-12/S5 (phạm vi NV giao giữ nguyên khi tìm theo tên), BR-PQ-15 (không giá vốn trong timeline). Không mã BR mới.
+
+### Kết quả kiểm chứng
+- RED trước: 12/14 test mới đỏ đúng lý do (`KeyError: 'timeline'`, `'match_status_label'`, tìm tên ra `[]`); 2 test hồi quy (mã đơn/SĐT, 403) xanh sẵn là chủ đích.
+- `cd backend && .venv/bin/python manage.py test` → **Ran 424 tests, OK** (mốc 409 + 15 mới ở `apps/sales/orders/tests/test_l7_bosung.py`).
+- `makemigrations --check --dry-run` → `No changes detected` (không migration, không đổi schema). `manage.py check` → 0 issue.
+- Test đếm query S10 (`test_s10_list_va_chi_tiet_khong_n_cong_1`) vẫn xanh: timeline thêm đúng 1 query AuditLog/đơn, không N+1.
+
+### File đã sửa / thêm
+- `backend/apps/sales/orders/api.py` — `q` khớp thêm tên khách (`_customer_ids_by_name`); prefetch thêm `refunds__created_by/confirmed_by__staff_profile`, `delivery_notes__returns`.
+- `backend/apps/sales/orders/serializers.py` — `payments[].match_status_label`, `payments[].source_label`, `delivery.status_label`, `refunds[].status_label` (lấy từ TextChoices); field `timeline`.
+- `backend/apps/sales/orders/timeline.py` (mới) — `build_timeline(order)` ghép chứng từ + AuditLog.
+- `backend/apps/sales/utils.py` — `fold_text` (bỏ dấu, `đ→d`, casefold), `vnd_display` (`540000` → `"540.000 ₫"`).
+- Test: mới `apps/sales/orders/tests/test_l7_bosung.py` (15); `test_s10_api.py` — assert `refunds` so khớp nguyên dict nên thêm `status_label` vào kỳ vọng (key mới, không đổi key cũ).
+- README: `backend/README.md` (số test), `apps/sales/orders/README.md`.
+
+### Contract thêm (chi tiết đơn `GET /api/sales/orders/{id}/`)
+```
+GET /api/sales/orders/?q=dat nguyen      → khớp khách "Anh Đạt Nguyễn" (cũng khớp "ĐẠT", "Dat"); vẫn khớp mã đơn / SĐT như cũ
+200 { …các key S10 giữ nguyên…,
+  "payments": [{"id": 1, "bank_txn_id": "FT2626712345", "amount": "540000",
+                "match_status": "MATCHED", "match_status_label": "Khớp — đã xác nhận",
+                "source": "WEBHOOK", "source_label": "Webhook SePay", "received_at": "…"}],
+  "delivery": {"id": 1, "code": "GH-INV260925-9F8E7D-A1B2C", "status": "COMPLETED", "status_label": "Hoàn tất",
+               "assigned_to": {…}, "failed_attempts": 1},
+  "refunds": [{"id": 5, "amount": "100000", "status": "REFUNDED", "status_label": "Đã hoàn", "bank_txn_ref": "FTREF1"}],
+  "timeline": [
+    {"at": "2026-09-25T09:10:00+07:00", "kind": "order_placed",      "label": "Khách đặt đơn SO260925-1A2B3C (540.000 ₫)", "actor_display": "Hệ thống"},
+    {"at": "2026-09-25T09:12:03+07:00", "kind": "payment_received",  "label": "Nhận 540.000 ₫ · Webhook SePay · Khớp — đã xác nhận (mã GD FT2626712345)", "actor_display": "Hệ thống"},
+    {"at": "2026-09-25T09:12:03+07:00", "kind": "invoice_issued",    "label": "Xuất hoá đơn INV260925-9F8E7D", "actor_display": "Hệ thống"},
+    {"at": "2026-09-25T09:12:03+07:00", "kind": "delivery_created",  "label": "Tạo phiếu giao GH-INV260925-9F8E7D-A1B2C (Soạn hàng)", "actor_display": "Hệ thống"},
+    {"at": "2026-09-25T10:00:00+07:00", "kind": "delivery_status",   "label": "Phiếu giao GH-…: Soạn hàng → Chờ lấy hàng", "actor_display": "Anh Tư"},
+    {"at": "2026-09-25T10:20:00+07:00", "kind": "delivery_status",   "label": "Phiếu giao GH-…: Chờ lấy hàng → Đang giao", "actor_display": "Anh Tư"},
+    {"at": "2026-09-25T11:00:00+07:00", "kind": "delivery_failed",   "label": "Giao thất bại lần 1 (GH-…)", "actor_display": "Anh Tư"},
+    {"at": "2026-09-25T11:05:00+07:00", "kind": "return_to_warehouse","label": "Mang hàng về kho 2.000 kg — chờ duyệt", "actor_display": "Anh Tư"},
+    {"at": "2026-09-25T11:30:00+07:00", "kind": "return_approved",   "label": "Duyệt hàng về kho: Tái nhập", "actor_display": "Chị Quản"},
+    {"at": "2026-09-25T14:00:00+07:00", "kind": "delivered",         "label": "Giao hàng thành công (GH-…)", "actor_display": "Anh Tư"},
+    {"at": "2026-09-25T15:00:00+07:00", "kind": "refund_created",    "label": "Tạo phiếu hoàn 100.000 ₫ — Thiếu cân", "actor_display": "Chị Quản"},
+    {"at": "2026-09-25T16:00:00+07:00", "kind": "refund_confirmed",  "label": "Đã hoàn 100.000 ₫ (mã GD FTREF1)", "actor_display": "Anh Lộc"}
+  ]}
+```
+- `kind` (tập đóng): `order_placed`, `payment_received`, `invoice_issued`, `delivery_created`, `delivery_status`, `delivered`,
+  `delivery_failed`, `return_to_warehouse`, `return_approved`, `auto_cancelled`, `cancelled`, `refund_created`, `refund_confirmed`.
+  Nhãn ví dụ `auto_cancelled`: "Tự huỷ vì quá hạn giữ chỗ, đã nhả hàng giữ"; `cancelled`: "Huỷ đơn, hoàn hàng về lô gốc — lý do: Khách đổi ý".
+- `at` tăng dần; cùng thời điểm giữ thứ tự nghiệp vụ (đặt → tiền → hoá đơn → phiếu giao → …). Đơn Giữ chỗ chỉ có `order_placed`.
+- `actor_display` = `StaffProfile.display_name`, không có hồ sơ → username, `actor=None` → `"Hệ thống"`. `payment_received` qua webhook = Hệ thống;
+  xác nhận tay = người trong AuditLog `confirm_payment_manual` (khớp `bank_txn_id`), không sinh dòng thứ hai. `order_placed`, `invoice_issued`,
+  `delivery_created` luôn "Hệ thống" (BR-PQ-11).
+- Timeline **có ở mọi người xem được chi tiết** (kể cả NV kho, NV giao trong phạm vi): nhãn chỉ gồm mã chứng từ, tiền khách trả/được hoàn,
+  số kg, lý do huỷ/hoàn, tên người — không `changes` thô, không giá vốn, không mật khẩu.
+
+### Giả định dev tự đặt (cần PO/BA xác nhận)
+1. Tìm tên khách quét tên ở Python (`fold_text`) để chạy giống nhau trên SQLite (test) và Postgres (prod) mà **không** cần extension
+   `unaccent` / migration. Đủ nhanh với vài nghìn khách; nếu bảng khách lớn → chuyển sang cột tên đã chuẩn hoá có index (cần migration).
+2. Không có dòng cho `create_refund`/`confirm_refund` từ AuditLog — lấy thẳng từ `Refund` (người tạo/xác nhận, giờ) để khỏi trùng.
+   Phiếu hoàn `FAILED` chưa có service nào đặt nên chưa có `kind` riêng.
+3. Lý do huỷ (`AuditLog.note` của `cancel_paid_order`) và lý do hoàn (`Refund.reason`) hiện nguyên văn cho mọi người xem chi tiết.
+   Nếu PO muốn ẩn với NV kho/NV giao thì chỉ cần lọc ở `timeline.py`.
+4. Hiện tại `delivery` chỉ là phiếu giao mới nhất, nhưng `timeline` gồm **mọi** phiếu giao của hoá đơn.
+
+### Còn nợ
+- FE hiện nhận `timeline?: [{at, label, status?, actor?}]` → cần đổi sang `actor_display` (và có thể dùng `kind` để chọn icon);
+  FE ưu tiên `*_label` BE thay bảng `labels.ts`; ô tìm có thể đổi lại "Tìm mã đơn, SĐT hoặc tên khách…".
+- AuditLog chưa gắn chỉ mục `(model_name, object_id)` — 1 query/chi tiết, ổn ở quy mô hiện tại; thêm index nếu bảng AuditLog lớn (cần migration).
+- Chưa commit, chưa deploy.
+
+## Sửa lỗi QA L7 (BE) · vòng sửa 1/2 · 2026-09-25
+
+Sửa B12 (High) và B13 (Medium) trong mục "QA lô L7" của `04-qa-report.md`. Làm theo TDD: 12 test BE mới và 5 test adapter mới, tất cả chạy đỏ trước khi sửa.
+
+### File đã sửa
+- `backend/apps/sales/payments/services.py`
+  - Thêm `normalize_bank_txn_id`.
+  - Thêm `validate_amount`. `parse_positive_amount` giờ bọc hàm này.
+  - Thêm hằng `AMOUNT_QUANT` và `AMOUNT_MAX`, suy từ field `amount` của model.
+  - `confirm_payment_manual` và `_record_payment` chuẩn hoá mã giao dịch.
+- `backend/apps/sales/payments/internal_api.py`: webhook chuẩn hoá mã giao dịch bằng **cùng hàm** trên, kiểm số tiền bằng `validate_amount`.
+- `backend/apps/sales/payments/tests/test_qa_l7_fix.py`: file mới, 12 test.
+- `adapter/app/sepay.py`: thêm `normalize_bank_txn_id` (giống hệt bên Django) và `pick_bank_txn_id`.
+- `adapter/app/main.py`: sửa cách chuyển lỗi 4xx của Django về SePay.
+- `adapter/app/schemas.py`, `adapter/README.md`: sửa docstring và giả định cho khớp.
+- `adapter/tests/test_webhook.py`: thêm 5 test. Sửa kỳ vọng `bank_txn_id` của test cũ từ `"92704"` thành `"FT24012345678"`.
+
+### Rule đã cài
+- **B12 · BR-TT-03**
+  - Adapter lấy `bank_txn_id` = `referenceCode` (mã FT… in trên sao kê) sau khi chuẩn hoá: bỏ **mọi** khoảng trắng (cả khoảng trắng ở giữa), rồi viết hoa.
+  - Chỉ khi `referenceCode` trống (null, `""`, toàn khoảng trắng) mới lùi về `str(id)` của SePay.
+  - `id` SePay vẫn nằm trong `raw` và được lưu ở `PaymentTransaction.raw_payload`, **nên không đổi schema**.
+  - Django chuẩn hoá mã ở cả hai đường vào: xác nhận tay và webhook nội bộ.
+    - Chuẩn hoá thêm một lần trong `_record_payment`, là lõi chung của mọi đường ghi (kể cả `confirm_payment` mà seed dùng).
+    - Mã được lưu, so trùng và ghi AuditLog đều ở dạng chuẩn. Ví dụ Chủ gõ `" ft 880003 "` thì lưu `FT880003`.
+- **B13 · BR-TT-08**
+  - Số tiền được làm tròn về 0,01 ₫ theo `ROUND_HALF_UP`.
+  - Từ chối khi số tiền không hữu hạn, ≤ 0 sau khi làm tròn (vd `0.001`, `0.004`), hoặc vượt miền cột: `max_digits=14`, `decimal_places=2`, tức tối đa 999.999.999.999,99.
+  - Số khổng lồ (`1e999999`) bị chặn trước bước `quantize`, nên không phát sinh `InvalidOperation` và không bao giờ trả 500.
+  - Đường tay: trả 400 `BR-TT-08`. Thông điệp là "Số tiền phải là số lớn hơn 0." hoặc "Số tiền quá lớn (tối đa 999.999.999.999,99 ₫)."
+  - Đường webhook: trả 400 `WEBHOOK_INVALID_INPUT` và không ghi giao dịch, kể cả ở nhánh không khớp đơn.
+  - Adapter:
+    - Django trả 400/404/409/422 → adapter trả **đúng mã đó**, `detail` = body Django, không retry.
+    - Django trả 401/403 (token nội bộ sai, tức cấu hình phía mình) → vẫn trả 502, để SePay gửi lại sau khi sửa cấu hình thay vì mất khoản tiền.
+    - 5xx và lỗi mạng: giữ như cũ (retry rồi 502).
+
+### Contract thay đổi
+- **Adapter → Django** (`POST /api/internal/payments/sepay-webhook/`): shape body không đổi. Riêng giá trị `bank_txn_id` đổi từ `"92704"` (id SePay) thành `"FT24012345678"` (referenceCode chuẩn hoá).
+- **Django (cả hai đường)**
+  - `bank_txn_id` trong response, trong list/chi tiết đơn (`payments[].bank_txn_id`) và trong timeline luôn ở dạng chuẩn hoá (viết hoa, không khoảng trắng). Shape JSON không đổi.
+  - `amount` lưu đã làm tròn 0,01.
+- **Adapter → SePay**: lỗi dữ liệu trả 400 thay cho 502, ví dụ:
+  ```json
+  {"detail": {"detail": "Số tiền (amount) không hợp lệ — Số tiền quá lớn (tối đa 999.999.999.999,99 ₫).", "code": "WEBHOOK_INVALID_INPUT"}}
+  ```
+- FE không cần đổi gì. Gợi ý của QA (thêm `maxLength` ~12 chữ số cho ô số tiền) là việc của FE, BE đã chặn.
+
+### Migration
+Không có. `makemigrations --check --dry-run`: No changes detected.
+
+### Kiểm chứng
+- `manage.py test`: Ran 436 tests, OK (trước là 424, thêm 12).
+- `manage.py check`: 0 issues.
+- `adapter pytest -q`: 15 passed (trước là 10, thêm 5).
+
+### Giả định và còn nợ
+- Dữ liệu cũ:
+  - Adapter chưa lên production, nên không cần chuyển dữ liệu.
+  - Mã cũ trên production (`DEMO-SO…`) vốn đã viết hoa và không có khoảng trắng, nên vẫn khớp.
+  - Nếu production đã có giao dịch tay với mã viết thường, Chủ gõ lại sẽ thành mã chuẩn hoá khác bản cũ. Chưa kiểm tra dữ liệu production vì không được truy cập.
+- Chuẩn hoá ở adapter và ở Django là hai bản code giống nhau, vì adapter không import được Django. Django luôn chuẩn hoá lại, nên nguồn sự thật là Django.
+- Test "webhook rồi tay" ở Django giả lập body đúng shape adapter gửi. Adapter pytest kiểm riêng phần map `referenceCode` → `bank_txn_id`. Chưa có test tích hợp chạy thật hai tiến trình; phần này nhờ QA chạy lại `api_l7.py` / `api_extra.py`.
+- N-6 (tiền về cho đơn không còn BOOKED vẫn ghi MATCHED) chưa sửa, vì cần PO/BA chốt. B12 được chặn bằng mã trùng, không đụng N-6.
+- Chưa commit, chưa deploy.

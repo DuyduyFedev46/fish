@@ -45,8 +45,10 @@ adapter/
     Django phản hồi, status `200`.
   - Django lỗi mạng/timeout hoặc trả 5xx -> thử lại nhẹ (mặc định 2 lần,
     cấu hình qua `DJANGO_REQUEST_RETRIES`) rồi mới trả `502` (để SePay gửi
-    lại webhook). Django trả 4xx -> coi là lỗi không tạm thời, trả `502`
-    ngay không retry.
+    lại webhook). Django trả 4xx -> lỗi không tạm thời, không retry:
+    400/404/409/422 (dữ liệu sai, vd số tiền ngoài miền) -> trả lại đúng mã đó
+    kèm body Django trong `detail` để SePay không gửi lại mãi (QA L7 · B13);
+    401/403 (token nội bộ sai = cấu hình phía mình) -> `502`.
 
 ## Cấu hình (env / `.env`)
 
@@ -85,7 +87,9 @@ Test dùng `respx` để mock lời gọi `httpx` sang Django — không cần D
 chạy. Bao gồm: webhook hợp lệ forward đúng shape + header; fallback rút
 order_code bằng regex khi SePay không tự nhận diện được `code`; sai/thiếu
 secret -> 401; payload rác / body không phải JSON -> 400; Django trả 5xx hoặc
-lỗi mạng -> 502 (có retry nhẹ); giao dịch `out` bị bỏ qua không forward.
+lỗi mạng -> 502 (có retry nhẹ); Django 400 -> 400 không retry, 401 -> 502;
+`bank_txn_id` = referenceCode chuẩn hoá, lùi về `id`; giao dịch `out` bị bỏ qua
+không forward.
 
 ## Giả định về payload SePay (ghi rõ vì không có tài khoản SePay thật để đối chiếu)
 
@@ -109,8 +113,10 @@ Payload tham khảo từ tài liệu công khai của SePay
 }
 ```
 
-- `bank_txn_id` = `str(id)` — `id` là số nguyên duy nhất phía SePay cho mỗi
-  giao dịch, đủ ổn định để Django idempotent theo đó.
+- `bank_txn_id` = `referenceCode` (mã FT… ngân hàng, in trên sao kê — chính mã
+  Chủ gõ khi xác nhận tay) đã chuẩn hoá: bỏ mọi khoảng trắng, viết hoa (giống
+  hệt `normalize_bank_txn_id` bên Django). Lùi về `str(id)` chỉ khi
+  `referenceCode` trống. `id` SePay luôn nằm trong `raw` (QA L7 · B12).
 - `order_code`: ưu tiên field `code` — giả định Lộc cấu hình sẵn trên
   dashboard SePay (mục Cấu hình chung) một tiền tố/mã hoá đơn để SePay tự
   nhận diện mã đơn hàng trong nội dung chuyển khoản và trả về ở field này

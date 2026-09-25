@@ -5,8 +5,6 @@ Xác thực bằng service token riêng (X-Internal-Token), tách khỏi auth c�
 Bên thứ 3 (SePay) không bao giờ nối thẳng — luôn qua adapter rồi vào đây (ecosystem-l1 §3).
 """
 import hmac
-from decimal import Decimal, InvalidOperation
-
 from django.conf import settings
 from django.utils.dateparse import parse_datetime
 from rest_framework.permissions import AllowAny
@@ -19,7 +17,7 @@ from apps.sales.models import PaymentTransaction, SalesOrder
 from . import services
 
 WEBHOOK_INVALID_INPUT = "WEBHOOK_INVALID_INPUT"
-BANK_TXN_ID_MAX_LENGTH = PaymentTransaction._meta.get_field("bank_txn_id").max_length  # 100
+BANK_TXN_ID_MAX_LENGTH = services.BANK_TXN_ID_MAX_LENGTH  # 100
 
 
 def _invalid(detail):
@@ -32,19 +30,6 @@ def _token_ok(token):
     if not expected:
         return False
     return hmac.compare_digest(str(token).encode("utf-8"), expected.encode("utf-8"))
-
-
-def _parse_amount(raw):
-    """R1 (review): số tiền phải là số hữu hạn > 0 — chặn 'NaN'/'Infinity'/âm/0/kiểu lạ."""
-    if raw is None or isinstance(raw, (bool, list, dict)):
-        return None
-    try:
-        amount = Decimal(str(raw).strip())
-    except (InvalidOperation, TypeError, ValueError):
-        return None
-    if not amount.is_finite() or amount <= 0:
-        return None
-    return amount
 
 
 def _existing_response(payment):
@@ -67,15 +52,16 @@ class SepayWebhookInternalView(APIView):
             return Response({"detail": "Sai service token."}, status=401)
 
         d = request.data if isinstance(request.data, dict) else {}
-        bank_txn_id = str(d.get("bank_txn_id") or "").strip()
+        bank_txn_id = services.normalize_bank_txn_id(d.get("bank_txn_id"))  # B12
         order_code = str(d.get("order_code") or "").strip()
         if not bank_txn_id:
             return _invalid("Thiếu bank_txn_id.")
         if len(bank_txn_id) > BANK_TXN_ID_MAX_LENGTH:
             return _invalid(f"bank_txn_id dài quá {BANK_TXN_ID_MAX_LENGTH} ký tự.")
-        amount = _parse_amount(d.get("amount"))
-        if amount is None:
-            return _invalid("Số tiền (amount) không hợp lệ — phải là số hữu hạn lớn hơn 0.")
+        try:
+            amount = services.validate_amount(d.get("amount"))  # R1 (review) + B13
+        except ValueError as exc:
+            return _invalid(f"Số tiền (amount) không hợp lệ — {exc}")
         # QA lần 2 · N3: validate trước khi ghi — thiếu/sai received_at trước đây lọt xuống DB
         # (NOT NULL) thành 500. Adapter luôn gửi ISO 8601 nên hành vi khi đủ trường không đổi.
         try:

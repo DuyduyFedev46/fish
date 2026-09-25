@@ -323,6 +323,34 @@ def cancel_paid_order(*, order, actor, reason=""):
     return o
 
 
+# --- S10: thao tác được phép trên đơn (luật + quyền) --------------------------
+
+def available_actions(*, order, user):
+    """
+    Danh sách thao tác `user` làm được trên `order` Ở TRẠNG THÁI HIỆN TẠI (quy ước contract
+    `available_actions`). BE tính cả luật lẫn quyền; console chỉ đọc để hiện nút.
+
+    - confirm_payment: đơn Giữ chỗ/Tự huỷ (BR-TT-08) + `sales.confirm_payment_manual` (BR-TT-07).
+    - cancel         : đơn PAID/PROCESSING đã có hoá đơn (P-07) + `sales.cancel_paid_order`.
+    - create_refund  : có hoá đơn, còn tiền chưa hoàn (BR-HT-04) + `sales.create_refund`.
+    """
+    from apps.sales.payments.services import MANUAL_CONFIRMABLE_STATUSES
+    from apps.sales.refunds.services import refundable_amount
+
+    actions = []
+    invoice = getattr(order, "invoice", None)
+    if (order.status in MANUAL_CONFIRMABLE_STATUSES
+            and user.has_perm("sales.confirm_payment_manual")):
+        actions.append("confirm_payment")
+    if (order.status in (SalesOrder.Status.PAID, SalesOrder.Status.PROCESSING)
+            and invoice is not None and user.has_perm("sales.cancel_paid_order")):
+        actions.append("cancel")
+    if (invoice is not None and user.has_perm("sales.create_refund")
+            and refundable_amount(invoice=invoice) > ZERO):
+        actions.append("create_refund")
+    return actions
+
+
 # --- nội bộ -----------------------------------------------------------------
 
 def _get_item(item_code):

@@ -19,7 +19,7 @@ python manage.py createsuperuser
 python manage.py runserver      # /admin/ và /api/
 ```
 
-Chạy test: `python manage.py test` (291 test, ~10 giây). Một module:
+Chạy test: `python manage.py test` (424 test, ~16 giây). Một module:
 `python manage.py test apps.sales.orders`. Sản phẩm dùng **PostgreSQL** (`DATABASE_URL=postgres://…`).
 
 ## Cấu trúc thư mục — chia theo MODULE TÍNH NĂNG
@@ -50,8 +50,8 @@ Module gọi module khác **qua services** của module đó. Route tập trung 
 | | `stock/` | nền P-04…P-09 | `inventory/warehouses/`, `inventory/ledger/`, `inventory/stock-entries/` |
 | | `stocktake/` | P-09 | `inventory/reconciliations/` (+ `approve`) |
 | | `returns/` | P-08 | `inventory/returns/` (+ `approve`) |
-| `sales` | `orders/` | P-05, P-07 (huỷ đơn) | Shop `shop/orders/`; `sales/orders/` (+ `cancel`) |
-| | `payments/` | P-05 | `internal/payments/sepay-webhook/`; `sales/invoices/` (+ `confirm-payment`), `sales/payments/` |
+| `sales` | `orders/` | P-05, P-07 (huỷ đơn) | Shop `shop/orders/`; `sales/orders/` (lọc/tìm/chi tiết + `cancel`, `confirm-payment`) |
+| | `payments/` | P-05 | `internal/payments/sepay-webhook/`; `sales/invoices/` (chỉ đọc), `sales/payments/`; service xác nhận tay cho `sales/orders/{id}/confirm-payment` |
 | | `refunds/` | P-07 | `sales/refunds/` (+ `create`, `confirm`) |
 | | `customers/` | P-05 (7.1) | `sales/customers/` |
 | `delivery` | (phẳng) | P-06, P-08 | `delivery/notes/` (+ `status`) |

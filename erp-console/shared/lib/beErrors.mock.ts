@@ -69,6 +69,19 @@ export const BE_ERRORS = {
     code: "AUTH_MUST_CHANGE_PASSWORD",
     detail: "Bạn cần đặt mật khẩu mới trước khi dùng hệ thống (BR-PQ-19).",
   },
+
+  // ---- S11 POST /api/sales/orders/{id}/confirm-payment (contract THỰC TẾ BE L7, 03-dev-notes.md "Lô L7 — S10, S11 (BE)") ----
+  TT_TXN_REQUIRED: { status: 400, code: "BR-TT-08", detail: "Thiếu mã giao dịch ngân hàng." },
+  TT_AMOUNT_INVALID: { status: 400, code: "BR-TT-08", detail: "Số tiền phải là số lớn hơn 0." },
+  TT_TXN_TOO_LONG: { status: 400, code: "BR-TT-08", detail: "Mã giao dịch ngân hàng dài quá 100 ký tự." },
+  TT_WRONG_STATUS: { status: 400, code: "BR-TT-08", detail: "Đơn không ở trạng thái Giữ chỗ/Tự huỷ." },
+  TT_TXN_OTHER: {
+    status: 400,
+    code: "BR-TT-03",
+    detail: "Mã giao dịch này đã được ghi nhận cho giao dịch khác, không dùng lại (BR-TT-03).",
+  },
+  // ---- S10 GET /api/sales/orders/ — tham số lọc sai ----
+  INVALID_FILTER: { status: 400, code: "INVALID_FILTER", detail: "Tham số {param} phải là ngày dạng YYYY-MM-DD." },
 } satisfies Record<string, Entry>;
 
 export type BeErrorKey = keyof typeof BE_ERRORS;

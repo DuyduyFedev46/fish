@@ -15,6 +15,7 @@ from rest_framework.exceptions import (
     NotAuthenticated,
     PermissionDenied,
 )
+from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import DjangoModelPermissions
 from rest_framework.response import Response
 from rest_framework.views import exception_handler as drf_exception_handler
@@ -86,6 +87,12 @@ def require_perm(user, perm: str):
     """Chặn ở tầng service-call trong view cho custom action (Tầng 2)."""
     if not (user and user.has_perm(perm)):
         raise PermissionDenied(f"Thiếu quyền: {perm}")
+
+
+class StandardPagination(PageNumberPagination):
+    """Phân trang theo quy ước contract console: 20 dòng/trang, `?page=` (02-stories.md)."""
+
+    page_size = 20
 
 
 class BusinessValidationError(APIException):

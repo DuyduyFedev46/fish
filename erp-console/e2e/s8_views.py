@@ -138,16 +138,16 @@ with sync_playwright() as p:
     page.get_by_role("button", name="Xoá tìm").click()
     ok("Xoá tìm → hiện lại đủ lô", page.locator(".screen tbody tr").count() == len(new_inv))
 
-    # Đơn
+    # Đơn — L7/S10: màn Đơn thôi đọc 8 đơn của dashboard, chuyển sang GET /api/sales/orders/ (danh sách ul.order-list,
+    # BE tìm theo mã/SĐT). Kiểm đầy đủ ở e2e/s10_s11_orders.py; ở đây giữ các ý S8: có đếm lùi giữ chỗ, tìm theo SĐT.
     page.locator(".nav a", has_text="Đơn & tiền").click()
     page.wait_for_url("**/orders/")
-    expect(page.locator(".screen tbody tr")).to_have_count(8)
-    new_orders = table_rows(page, ".screen tbody", skip=(4,))
-    countdown = page.eval_on_selector_all(".screen tbody tr td:nth-child(5)", "t => t.map(x => x.textContent)")
-    ok("Đơn: cột giữ chỗ còn có đếm lùi cho đơn BOOKED", any("′" in c for c in countdown), str(countdown))
-    page.get_by_placeholder("Tìm mã đơn, khách, 4 số cuối SĐT…").fill("4561")
-    expect(page.locator(".screen tbody tr")).to_have_count(1)
-    ok("Đơn: tìm theo 4 số cuối SĐT", page.locator(".screen tbody tr").count() == 1)
+    expect(page.locator("ul.order-list > li")).to_have_count(20)
+    countdown = page.locator("ul.order-list > li").all_inner_texts()
+    ok("Đơn: đơn BOOKED có đếm lùi giữ chỗ còn", any("còn" in c and "′" in c for c in countdown), str(countdown[:3]))
+    page.get_by_placeholder("Tìm mã đơn, tên khách hoặc SĐT…").fill("0901234")
+    expect(page.locator("ul.order-list > li")).to_have_count(1)
+    ok("Đơn: tìm theo SĐT (BE lọc)", page.locator("ul.order-list > li").count() == 1)
     page.screenshot(path=f"{SHOTS}/s8-desktop-1280-orders-chu.png")
 
     summary_json = page.evaluate("() => window.__caveMock.dashboardJson('loc')")
@@ -195,7 +195,8 @@ with sync_playwright() as p:
     # ("Failed to fetch RSC payload" do prefetch bị huỷ bởi page.goto trước đó) — lần đó app khởi động lại nên gọi /me
     # là đúng; chỉ chấm các lần điều hướng mềm (dấu window.__softNav còn).
     soft = []
-    for label, url in [("Kho & lô", "inventory"), ("Đơn & tiền", "orders"), ("Tổng quan", "overview"), ("Kho & lô", "inventory")]:
+    # L7: màn Đơn không còn đọc summary (S10) → bỏ khỏi vòng này.
+    for label, url in [("Kho & lô", "inventory"), ("Tổng quan", "overview"), ("Kho & lô", "inventory")]:
         clear_log(page)
         page.evaluate("() => { window.__softNav = true; }")
         page.locator(".nav a", has_text=label).click()
@@ -218,11 +219,12 @@ with sync_playwright() as p:
     page.wait_for_load_state("networkidle")
     page.evaluate("() => window.__caveMock.patchUser('kho1', {denied_perms: ['reports.view_dashboard']})")
     login(page, "kho1")
-    page.wait_for_url("**/deliveries/")
+    # L7/S10: menu Đơn chỉ còn đòi sales.view_salesorder (bỏ điều kiện tạm view_dashboard, TODO(S10)) → trang đầu là Đơn.
+    page.wait_for_url("**/orders/")
     labels = [l.split("\n")[-1].strip() for l in page.locator(".nav a").all_inner_texts()]
-    ok("Review #1 kho1 thiếu view_dashboard: menu KHÔNG có Tổng quan / Đơn & tiền / Kho & lô",
-       labels == ["Giao hàng", "Việc giao của tôi", "Mua hàng", "Kiểm kê", "Danh mục & giá"], str(labels))
-    for path in ["/orders/", "/inventory/"]:
+    ok("Review #1 kho1 thiếu view_dashboard: menu KHÔNG có Tổng quan / Kho & lô; CÓ Đơn & tiền (S10 có endpoint riêng)",
+       labels == ["Đơn & tiền", "Giao hàng", "Việc giao của tôi", "Mua hàng", "Kiểm kê", "Danh mục & giá"], str(labels))
+    for path in ["/inventory/"]:
         page.goto(BASE + path)
         page.wait_for_load_state("networkidle")
         expect(page.get_by_text("Bạn không có quyền xem mục này")).to_be_visible()
@@ -301,7 +303,7 @@ with sync_playwright() as p:
     for path, shot in [("/overview/", "overview"), ("/orders/", "orders"), ("/inventory/", "inventory")]:
         if path != "/overview/":
             page.goto(BASE + path)
-            expect(page.locator(".screen tbody tr").first).to_be_visible()
+            expect(page.locator("ul.order-list > li" if path == "/orders/" else ".screen tbody tr").first).to_be_visible()
             fonts_ready(page)
         ok(f"360 {path} không cuộn ngang", no_hscroll(page) <= 360, str(no_hscroll(page)))
         small = page.evaluate(SMALL_TAPS_JS)
@@ -349,7 +351,6 @@ with sync_playwright() as p:
                     [("revenue", "#kRev"), ("pending", "#kPending"), ("near", "#kNear"), ("inventory", "#kInv")]}
         old_ov_orders = table_rows(page, "#ovOrders")
         old_ov_batches = table_rows(page, "#ovBatches")
-        old_orders = table_rows(page, "#tbOrders", skip=(4,))
         old_inv = table_rows(page, "#tbInv")
         old_alerts = page.eval_on_selector_all("#ovAlerts .alert", "els => els.map(e => { const c = e.cloneNode(true); c.querySelectorAll('.mi').forEach(i => i.remove()); return c.textContent; })")
         old_feed = page.eval_on_selector_all("#feed .fev", "els => els.map(e => e.querySelector('p').textContent + '|' + e.querySelector('time').textContent)")
@@ -367,7 +368,7 @@ with sync_playwright() as p:
         ok("AC1 Tổng quan: bảng lô trùng", new_ov_batches == old_ov_batches, f"\nmới={new_ov_batches[:2]}\ncũ={old_ov_batches[:2]}")
         ok("AC1 cận hạn trùng", alert_norm(new_alerts) == alert_norm(old_alerts), f"\nmới={new_alerts}\ncũ={old_alerts}")
         ok("AC1 8 dòng sổ kho trùng", feed_norm(new_feed) == feed_norm(old_feed), f"\nmới={new_feed}\ncũ={old_feed}")
-        ok("AC1 màn Đơn trùng (trừ cột đếm lùi)", new_orders == old_orders, f"\nmới={new_orders[:2]}\ncũ={old_orders[:2]}")
+        # L7/S10: màn Đơn không còn là bản chép 8 đơn của bản cũ (đọc /api/sales/orders/) → bỏ so sánh màn Đơn.
         ok("AC1 màn Kho & lô trùng", new_inv == old_inv, f"\nmới={new_inv[:2]}\ncũ={old_inv[:2]}")
     else:
         print("SKIP AC1 so với bản cũ (không có LEGACY_BASE)")

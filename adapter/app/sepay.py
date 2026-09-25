@@ -56,10 +56,31 @@ def is_incoming_transfer(payload: SePayWebhookPayload) -> bool:
     return payload.transfer_type.strip().lower() == "in"
 
 
+def normalize_bank_txn_id(raw: object) -> str:
+    """
+    Dạng chuẩn mã giao dịch ngân hàng: bỏ MỌI khoảng trắng, viết hoa. PHẢI giống hệt
+    Django `apps.sales.payments.services.normalize_bank_txn_id` (Django chuẩn hoá lại lần
+    nữa, đây chỉ để body gửi đi đã sạch).
+    """
+    if raw is None:
+        return ""
+    return "".join(str(raw).split()).upper()
+
+
+def pick_bank_txn_id(payload: SePayWebhookPayload) -> str:
+    """
+    QA L7 · B12 / BR-TT-03: dùng `referenceCode` (mã FT… ngân hàng in trên sao kê — đúng
+    mã Chủ gõ khi xác nhận tay) làm bank_txn_id, để webhook đến muộn trùng với giao dịch
+    Chủ đã ghi. Chỉ lùi về `id` nội bộ SePay khi referenceCode trống. `id` SePay vẫn nằm
+    trong `raw` (Django lưu raw_payload) để đối soát.
+    """
+    return normalize_bank_txn_id(payload.reference_code) or str(payload.id)
+
+
 def to_internal_payload(payload: SePayWebhookPayload, order_code_regex: str) -> InternalPaymentPayload:
     """Map payload SePay -> body nội bộ đúng Contract B."""
     return InternalPaymentPayload(
-        bank_txn_id=str(payload.id),
+        bank_txn_id=pick_bank_txn_id(payload),
         order_code=extract_order_code(payload, order_code_regex),
         amount=payload.transfer_amount,
         received_at=parse_transaction_date(payload.transaction_date),

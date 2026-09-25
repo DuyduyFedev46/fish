@@ -1010,3 +1010,285 @@ ui_behave.py (hover, focus, ngăn kéo, tấm, phím tab, reduced-motion) → 45
 kill PID · lsof 8000/3000/3101/3102 · ps                 → sạch
 ```
 Script, log, ảnh: scratchpad `qa5/` (`api_matrix.py`, `erp_matrix.py`, `admin_matrix.py`, `acct_flow.py`, `shop_e2e.py`, `ui_gate.py`, `ui_behave.py`, `ui_gate.detail.json`, `*.out`, `shots/`). Không sửa code sản phẩm, không sửa `erp-console/e2e/*`, không thêm test vào repo.
+
+---
+
+# QA lô L7 — S10 (danh sách & chi tiết đơn) + S11 (Chủ xác nhận đã nhận tiền) · lần 1 · 2026-09-25
+
+## Kết luận: REJECTED — mọi AC S10/S11 đạt trên backend thật, không rò giá vốn, không vượt quyền, hồi quy xanh. Nhưng đường tiền còn 2 lỗi chặn: (B12 High) Chủ xác nhận tay bằng mã trên sao kê (FT…), sau đó webhook SePay về, thì cùng một khoản tiền bị ghi thành 2 giao dịch; (B13 Medium) số tiền quá lớn trả 500, số tiền dưới 0,005 bị ghi thành giao dịch 0 ₫.
+
+## Tổng: 392 phép kiểm tự động trên BE + console thật (API 241 + UI 151) · ✅ 386 · ❌ 5 (B12 ×2, B13 ×3) · ⏸ 1 (đồng thời thật, cần Postgres) · hồi quy 424 test BE + 10 adapter + 5 bản build + e2e 342/342
+
+Môi trường:
+- DB là SQLite tạm trong scratchpad `qa7/`. `seed.orig.sqlite3` dựng qua migrate → `bootstrap_masterdata` → `seed_demo` → 10 tài khoản (như lần 5) → `seed_orders.py`.
+  - `seed_orders.py` gán phiếu giao đơn 118 cho `giao1`, 117 cho `giao2`, rồi tạo thêm 46 đơn: 30 BOOKED (2 đơn đã chuyển thiếu), 10 PROCESSING, 9 AUTO_CANCELLED, 1 CANCELLED (do Lộc huỷ, lý do "Khách đổi ý"), 1 PAID, 1 COMPLETED. Đơn trải trên 10 ngày.
+  - Có khách "Chị Hoa" 0901234567 và "Anh Đạt Nguyễn".
+  - Có hai đơn dò giá vốn: A (BOOKED) giữ chỗ trên 2 lô, gồm lô `LO-QA5-COST` giá vốn 91234.56; B (PROCESSING) đã bán từ `LO-QA5-COST`.
+- DB được chép lại từ bản gốc trước mỗi kịch bản. `backend/db.sqlite3` không bị đụng (mtime vẫn 13/09).
+- Máy chủ:
+  - Django `runserver` :8000.
+  - **Adapter FastAPI thật** (uvicorn) :8100, `DJANGO_INTERNAL_URL=:8000`.
+  - Console build thật (`NEXT_PUBLIC_API_BASE=http://127.0.0.1:8000`, 0 mock) :3102.
+  - Console build mock :3101.
+  - Shop `next dev` :3000 trỏ BE thật.
+  - Mọi server chạy dưới `perl alarm`. Xong thì kill theo PID. `lsof` trên 8000/8100/3000/3101/3102 sạch, `ps` = 0.
+
+## Theo AC
+
+| Mã AC | Kết quả | Bằng chứng |
+|---|---|---|
+| S10-AC1 lọc `status=BOOKED` + ngày, 20 dòng/trang | ✅ | `api_l7.py`: chỉ BOOKED, chỉ ngày hôm nay theo giờ VN, count khớp DB. Trang 1 = 20 dòng, trang 2 không trùng. `page=99`/`abc` → 404. Duyệt hết trang = tổng DB, sắp mới → cũ. UI: lọc "Giữ chỗ" + "Hôm nay" khớp DB. "Tải thêm đơn" tới hết: 58/58 dòng, không trùng, hết nút |
+| S10-AC2 `q=0901234` | ✅ | API + UI ra đúng Chị Hoa. Thêm: đuôi mã đơn viết thường; tên không dấu `chi hoa`, `CHỊ HOA`, `dat nguyen`, `ĐẠT`, `Dat`, `thuy`, `quan oc` đều đúng người; `%`, `_` không 500 |
+| S10-AC3 Quản lý / NV kho không có key `unit_cost` | ✅ | `ql1`, `ql9`, `kho1`, `khoonly`: đơn A (giữ chỗ 2 lô) và đơn B (đã bán) có `batch_id`/`qty_kg`/`line_no`, **không có key** `unit_cost`. UI: 0 `.alloc-cost` |
+| S10-AC4 Chủ có `unit_cost` | ✅ | `loc`: `LO-QA5-COST` `unit_cost="91234.56"` ở cả A (từ giữ chỗ) và B (từ phân bổ đã bán). Superuser cũng thấy. UI hiện "Vốn …/kg" |
+| S10-AC5 đếm lùi mm:ss | ✅ | BE trả `reserved_until`. UI hiện `mm:ss` và số đổi sau ≤5 s (`ui_l7.py`) |
+| S10-AC6 thiếu `view_salesorder` → 403, không menu | ✅ | `moi1`: list 403, chi tiết 403, UI về /no-role/, gõ /orders/ 0 GET đơn. Ẩn danh: API 401, UI về /login/. `giao1`/`giao2` không có menu, gõ /orders/ thấy "Bạn không có quyền xem mục này", 0 GET `sales/orders` |
+| S10-AC7 360: mỗi đơn một khối, chi tiết một cột, không cuộn ngang | ✅ | 360/1280 × sáng/tối: 0 cuộn ngang ở danh sách, chi tiết, bước xác nhận. Vùng bấm ≥44 px ở cả ba màn (360). Danh sách là hàng 2 dòng thay cho thẻ, theo lệch 7 dev đã ghi (DESIGN.md), vẫn đạt ý AC |
+| S11-AC1 đủ tiền → PAID | ✅ | Kết quả `PAID`, `duplicate:false`, PROCESSING, `invoice_id`, `delivery_note_code` GH-… DB: 1 giao dịch `MANUAL`/`MATCHED`, 1 hoá đơn, phiếu giao PREPARING. Kho: mỗi lô đã giữ trừ `reserved −q`, `available −q`, thêm 1 dòng SALE tham chiếu mã hoá đơn. AuditLog `confirm_payment_manual`: actor = `loc`, `changes` có mã GD, `source=MANUAL`, `status BOOKED→PROCESSING`. UI: như trên + toast khi đóng tấm |
+| S11-AC2 thiếu tiền → UNDERPAID | ✅ | `paid_total`/`missing` đúng. Đơn vẫn BOOKED, kho không đổi, 0 hoá đơn. Giao dịch UNDERPAID/MANUAL, có AuditLog. List `needs_attention=true`, vẫn còn nút. Chuyển bù đủ bằng mã khác thì vẫn UNDERPAID, `missing 0`, đúng giả định dev 3 (chờ S12). UI: "Đã ghi nhận 51.000 ₫, còn thiếu 66.500 ₫" (`qa7-s11-underpaid-1280.png`) |
+| S11-AC3 đơn tự huỷ → ORPHAN | ✅ | Đơn tự huỷ bằng job `cancel_expired_orders` thật, sau đó xác nhận tay: kết quả `ORPHAN`, đơn vẫn AUTO_CANCELLED, kho và sổ kho không đổi, 0 hoá đơn, giao dịch ORPHAN/MANUAL. Timeline: `auto_cancelled` = Hệ thống, `payment_received` = Lộc. UI nêu "không khôi phục" (`qa7-s11-orphan-1280.png`) |
+| S11-AC4 gửi lại y hệt / bấm đúp | ✅ | API gửi lại (có và không có `/`, kể cả khác số tiền) → `duplicate:true`, vẫn 1 giao dịch, 1 hoá đơn, 1 AuditLog, kho không đổi. **UI bấm đúp → đúng 1 POST** |
+| S11-AC5 webhook đã ghi rồi Chủ xác nhận tay cùng mã | ✅ theo chữ AC / ❌ trên đường thật (B12) | Gửi webhook qua **adapter thật** (`Authorization: Apikey`, `id=880001`) → MATCHED, PROCESSING. Xác nhận tay `880001` → `duplicate:true`, 0 AuditLog tay, timeline 1 dòng tiền = Hệ thống. Webhook gửi lại → không ghi thêm. Webhook UNDERPAID rồi xác nhận tay cùng mã → duplicate UNDERPAID. **Nhưng** adapter ghi `bank_txn_id` = `id` của SePay, còn màn hướng dẫn Chủ chép mã FT… trên sao kê → xem B12 |
+| S11-AC6 thiếu mã / số tiền ≤0 → 400 | ✅ (biên ❌ B13) | 400 `BR-TT-08` với: thiếu hoặc rỗng mã, mã toàn khoảng trắng, mã `null`, mã 101 ký tự; số tiền `0`, `0.00`, `-5`, `-540000`, `abc`, `NaN`, `±Infinity`, `1e`, `true`, `[]`, `{}`. Số tiền bỏ trống = tổng đơn → PAID. Số tiền kiểu số → PAID. UI: mã trống báo tại ô, 0 POST; số tiền 0 hiện câu BE. Biên số rất lớn / rất nhỏ: xem B13 |
+| S11-AC7 Quản lý → 403, không nút | ✅ | 403 với `ql1`, `ql9`, `kho1`, `khoonly`, `giao1` (cả đơn của phiếu mình), `giao2`, `moi1`. `ql1` gọi đơn không tồn tại → 403, tức quyền được kiểm trước khi tra đơn. Ẩn danh 401. Không ghi gì. `available_actions` của 4 vai không có `confirm_payment`, UI Quản lý không có nút |
+| S11-AC8 action cũ đã gỡ | ✅ | `POST /api/sales/invoices/{id}/confirm-payment[/]` → 404/405, không ghi |
+| BR-TT-03 mã đã dùng cho đơn khác | ✅ | 400 `BR-TT-03`, không trả `result`/`invoice_id` của đơn kia, đơn không đổi. Mã UNMATCHED (webhook không có mã đơn) → 400 `BR-TT-03`, giao dịch không bị gắn. UI hiện nguyên văn câu BE và ở lại form |
+| BR-TT-08 trạng thái đơn | ✅ | PROCESSING, CANCELLED, COMPLETED, PAID → 400 "Đơn không ở trạng thái Giữ chỗ/Tự huỷ", không ghi. Đơn không tồn tại → 404 |
+
+## Ngoại lệ & biên
+
+| Ca | Kết quả |
+|---|---|
+| 4 POST đồng thời cùng mã, cùng đơn | ⏸ Dữ liệu đúng: 1 giao dịch, 1 hoá đơn, 1 AuditLog. Nhưng 3/4 lần gọi trả 500 `database is locked`: SQLite không có `select_for_update`. Không có Postgres trên máy nên không kiểm được tuần tự hoá thật (dev đã ghi ở "Còn nợ"). Không tính là lỗi sản phẩm |
+| Xác nhận tay bằng mã FT…, webhook cùng khoản về sau | ❌ **B12** (2 giao dịch MATCHED) |
+| Đơn tự huỷ: xác nhận tay ORPHAN, webhook cùng khoản về sau | ❌ **B12** (2 dòng ORPHAN trong hàng chờ) |
+| Xác nhận tay bằng mã FT… sau khi webhook đã khớp | ✅ 400 (đơn đã PROCESSING), không ghi |
+| Số tiền `1e20` hoặc 15 chữ số (API, UI, webhook) | ❌ **B13** (500 / UI "Lỗi máy chủ (500)" / adapter 502) |
+| Số tiền `0.001`, `0.004` (API, webhook) | ❌ **B13** (ghi giao dịch 0 ₫ UNDERPAID) |
+| 12 chữ số (999.999.999.999), chuyển dư | ✅ PAID (theo luật cũ BR-TT-04) |
+| Lọc: `status` lạ → 0 dòng · ngày sai → 400 `INVALID_FILTER` · khoảng ngày ngược → 0 dòng · 1 ngày trong quá khứ đúng số | ✅ |
+| `q` kết hợp `status` (AND) | ✅ |
+
+## Phân quyền (API + UI thật, 360 và 1280)
+
+| Vai | Menu "Đơn & tiền" | List | Chi tiết | `unit_cost` | Nút xác nhận / `available_actions` (BOOKED · AUTO_CANCELLED · PROCESSING · CANCELLED · COMPLETED) | POST confirm |
+|---|---|---|---|---|---|---|
+| chu `loc` | có | 200, 58 đơn | 200 | có | có · `[confirm_payment]` · `[confirm_payment]` · `[cancel, create_refund]` · `[create_refund]` · `[create_refund]` | 200 |
+| quan_ly `ql1`, `ql9` | có | 200, tất cả | 200 | không key | không · `[]` · `[]` · `[cancel, create_refund]` · `[create_refund]` · `[create_refund]` | 403 |
+| nv_kho+nv_giao `kho1` / nv_kho `khoonly` | có | 200, tất cả | 200 | không key | không · `[]` ×5 | 403 |
+| nv_giao `giao1` / `giao2` | không; gõ URL bị chặn, 0 GET | 200, chỉ đơn của phiếu mình (118 / 117) | 200 đơn mình, 404 đơn khác và đơn chưa giao | không key | `[]` | 403 (kể cả đơn mình) |
+| không nhóm `moi1` | /no-role/ | 403 | 403 | — | — | 403 |
+| superuser `admin` | /no-role/ (như lần 5) | 200 | 200 | có | như Chủ | 200 |
+| chưa đăng nhập | về /login/ | 401 | 401 | — | — | 401 |
+
+NV giao tìm theo tên hoặc SĐT của đơn ngoài phạm vi → 0 dòng.
+
+## Rò giá vốn
+
+| Phạm vi | Vai | Kết quả |
+|---|---|---|
+| JSON: mọi trang list + chi tiết **mọi** đơn thấy được (gồm `timeline`, `payments`, `delivery`, `refunds`), quét đệ quy key `*cost*`/`*profit*`/`purchase_rate`… và giá trị 81234/91234 | ql1, ql9, kho1, khoonly (58 đơn) · giao1, giao2 (1 đơn) | ✅ 0 hit. `allocations[].unit_cost` không có mặt ở giá trị giá vốn demo nào. Đối chứng: Chủ quét ra `unit_cost` và 91234.56 |
+| JSON console nhận qua trình duyệt khi duyệt list + 2 chi tiết | 4 vai × 2 cỡ | ✅ 0 hit |
+| HTML ERP chi tiết A và B (1280 + 360) | 4 vai | ✅ 0 `.alloc-cost`, 0 "91.235"/"91234", 0 "Vốn …". Đối chứng: Chủ thấy |
+| Timeline | 3 vai | ✅ Chỉ có mã chứng từ, tiền khách trả, tên người, lý do. Không có `changes` thô, `password` hay `"from"` |
+| Shop | khách | ✅ `shop_e2e.py` 6/6 |
+
+## Chứng từ & AuditLog
+
+- `DELETE` / `PATCH` đơn, giao dịch, hoá đơn với `loc` và `admin` → 403/405. Chứng từ còn nguyên.
+- Xác nhận tay ghi đúng 1 AuditLog `confirm_payment_manual` (actor = người bấm) cho PAID, UNDERPAID, ORPHAN. Lần gọi trùng không ghi thêm. Nhánh webhook không ghi (như thiết kế).
+- Timeline ghi đúng người:
+  - xác nhận tay = "Lộc";
+  - webhook, đặt đơn, hoá đơn, phiếu giao, tự huỷ = "Hệ thống";
+  - huỷ đơn = "Lộc — lý do: Khách đổi ý".
+  - Ba vai xem cùng một timeline.
+
+## Giao diện (console thật)
+
+| Tiêu chí | Kết quả |
+|---|---|
+| Không cuộn ngang: danh sách / chi tiết / bước xác nhận × 360/1280 × sáng/tối | ✅ 12/12 |
+| Vùng bấm ≥44 px (360) ở danh sách, chi tiết, bước xác nhận × sáng/tối | ✅ 6/6 |
+| Focus: mở tấm → focus trong tấm. 25 Tab ở chi tiết và 12–15 Tab ở bước xác nhận không thoát tấm. Esc → focus về đúng dòng đã mở. Huỷ bước → focus về nút "Xác nhận đã nhận tiền". Mở bước → focus vào ô mã GD | ✅ (1280 sáng/tối, 360 sáng/tối) |
+| Console trình duyệt không lỗi đỏ (trừ 400/401/403 cố ý) | ✅ |
+| Ảnh | `qa7/shots/qa7-{list,detail,confirm}-{360,1280}-{light,dark}.png`, `qa7-s11-{paid,underpaid,orphan,brtt03,bigamount}-1280.png`, `qa7-perm-<vai>-<cỡ>.png` |
+
+## Hồi quy
+
+| Ca | Kết quả |
+|---|---|
+| `backend manage.py test` | ✅ Ran 424 tests, OK (17,7 s) · `makemigrations --check` No changes detected |
+| `adapter pytest -q` | ✅ 10 passed |
+| erp-console: `tsc --noEmit` · `npm run build` repo · build thật trỏ :8000 · build mock | ✅ exit 0 ×4. `out/` repo: 0 file chứa `__caveMock/demo1234/Chế độ mock/mockOrdersApi/cave_erp_mock_orders`. Build thật: 0 dấu mock |
+| `frontend npm run build` | ✅ exit 0 |
+| e2e mock: `s7_shell` · `s8_views` · `s10_s11_orders` · `s41_s47_staff` · `s48_password` | ✅ 25/25 · 45/45 · 75/75 · 72/72 · 41/41 |
+| e2e BE thật `s41_s47_real.py` ×2 (DB reset) | ✅ 39/39 · 39/39 |
+| `shop_e2e.py` (Shop :3000 → BE thật) | ✅ 6/6: bấm đúp đặt hàng → 1 POST, HTML không giá vốn |
+| Webhook cũ (không mã đơn → UNMATCHED; gửi lại → không ghi thêm) | ✅ qua adapter thật |
+
+## Lỗi
+
+### B12 — Xác nhận tay rồi webhook SePay về sau: cùng một khoản tiền bị ghi 2 giao dịch · High · S11-AC4/AC5, BR-TT-03
+- **Tái hiện** (BE :8000 + adapter thật :8100):
+  1. Shop tạo đơn `SO…` 117.500 ₫ (BOOKED).
+  2. Chủ bấm "Xác nhận đã nhận tiền". Theo chữ hướng dẫn trên màn ("Chép từ tin nhắn hoặc sao kê ngân hàng, vd FT2626712345"), Chủ nhập `FT880003`, 117.500 → `PAID`.
+  3. SePay gửi webhook muộn cho đúng khoản đó: `POST :8100/webhook/sepay` với `{"id": 880003, "referenceCode": "FT880003", "code": "SO…", "transferAmount": 117500, …}`.
+- **Mong đợi:** BR-TT-03 nhận ra là cùng một giao dịch ngân hàng. Không ghi thêm, hoặc ít nhất đưa vào hàng chờ cho Chủ.
+- **Thực tế:** adapter gửi `bank_txn_id = str(payload.id)` = `"880003"`, không phải `referenceCode`. Django không thấy trùng, ghi thêm giao dịch thứ hai `('880003', WEBHOOK, MATCHED, 117500)` cạnh `('FT880003', MANUAL, MATCHED, 117500)`.
+  - Đơn đã tự huỷ: tay → ORPHAN rồi webhook → **2 dòng ORPHAN** cho cùng một khoản (`FT880004` + `880004`).
+  - Hoá đơn và kho **không** bị nhân đôi.
+- **Ảnh hưởng:**
+  - Sổ giao dịch tiền vào ghi gấp đôi số tiền khách đã trả. `paid_total` và hàng chờ S12 sẽ sai.
+  - Với ORPHAN, S12/S13 sẽ cho lập phiếu hoàn cho cả hai dòng, tức hoàn tiền hai lần (tiền rời túi).
+  - Đây đúng là tình huống chính của S11 (E-05: webhook không về kịp). S11-AC5 chỉ đạt khi Chủ gõ đúng `id` nội bộ của SePay, mà Chủ không nhìn thấy mã này trên sao kê. Báo cáo lãi lỗ không bị ảnh hưởng (tính theo hoá đơn).
+  - Liên quan N-6 (đơn đã PROCESSING nhận tiền lần hai vẫn ghi MATCHED), nhưng nguyên nhân gốc mới: **mã GD của webhook và của Chủ khác hệ**.
+- **Gợi ý** (cần Duy/BA chốt): adapter dùng `referenceCode` (mã ngân hàng FT…) làm `bank_txn_id`, lùi về `id` khi trống, giữ `id` trong `raw`. Contract S10/S11 cũng lấy ví dụ `bank_txn_id` = `FT…` cho cả giao dịch WEBHOOK. Kèm theo, chốt N-6: tiền về cho đơn không còn BOOKED thì vào hàng chờ, không ghi MATCHED.
+
+### B13 — Số tiền ngoài miền của cột `amount` (14 chữ số, 2 lẻ): quá lớn → 500, quá nhỏ → giao dịch 0 ₫ · Medium · S11-AC6, BR-TT-08
+- **Tái hiện:**
+  - (a) `POST /api/sales/orders/{id}/confirm-payment {"bank_txn_id":"X1","amount":"123456789012345"}` (hoặc `"1e20"`, `"99999999999999"`) → **500** `decimal.InvalidOperation`. Trên UI: gõ 15 chữ số vào ô "Số tiền đã nhận" (ô chỉ lọc chữ số, không giới hạn độ dài) → thanh nút báo "Lỗi máy chủ (500). Thử lại sau." (`qa7-s11-bigamount-1280.png`).
+  - (a) Qua webhook: adapter `transferAmount: 100000000000000` → Django 500, adapter thử lại 3 lần rồi trả **502**, nên SePay sẽ gửi lại mãi.
+  - (b) `{"bank_txn_id":"X2","amount":"0.001"}` (hoặc `0.004`) → 200 `UNDERPAID`. DB có giao dịch **amount = 0**, MANUAL, UNDERPAID, nằm trong hàng chờ. Webhook `transferAmount: 0.001` qua adapter cho kết quả tương tự.
+- **Mong đợi:** 400 `BR-TT-08` ("Số tiền phải là số lớn hơn 0" / "quá lớn"). Không bao giờ ghi giao dịch 0 ₫.
+- **Thực tế:** như trên. Không có dữ liệu rác ở (a), vì transaction rollback.
+- **Ảnh hưởng:**
+  - (a) Chủ gõ nhầm thì gặp lỗi 500 khó hiểu. Webhook lỗi thì bị gửi lại liên tục.
+  - (b) Có một khoản 0 ₫ "thiếu tiền" treo trong hàng chờ, trái BR-TT-08 (> 0).
+  - Không mất tiền, không sai kho.
+- **Gợi ý:** `parse_positive_amount` (dùng chung cho tay và webhook) nên quantize về 0,01, sau đó từ chối số ≤ 0 và số vượt `max_digits`. FE nên thêm `maxLength` (vd 12 chữ số).
+
+### Ghi nhận (không chặn)
+- S10-AC7 ghi "mỗi đơn là một thẻ"; điện thoại hiện hàng 2 dòng (lệch 7 của FE, theo DESIGN.md). Ý AC đạt: mỗi đơn là một khối bấm được, ≥44 px, không cuộn ngang. PO nên chốt lại câu chữ AC.
+- Giả định dev còn chờ PO/BA: nút xác nhận hiện cả ở đơn Tự huỷ (1); mã UNMATCHED → 400 thay vì gắn đơn (2); khớp tiền theo **từng** giao dịch nên hai lần chuyển thiếu cộng đủ vẫn UNDERPAID (3). QA đã kiểm và thấy hành vi đúng như các giả định mô tả.
+- Chưa kiểm: đồng thời thật trên Postgres; máy điện thoại thật (bàn phím số, `select` iOS).
+- Còn từ trước: B1, B7 (adapter), B8, B9.
+
+## Lệnh đã chạy (kèm output tóm tắt)
+```
+backend manage.py test                                    → Ran 424 tests in 17.745s OK
+makemigrations --check --dry-run                          → No changes detected
+adapter pytest -q                                         → 10 passed
+builds.sh: realsrc(:8000) / mocksrc / tsc / repo build / frontend build → exit 0 ×5 · grep mock trong out/ repo = 0, realsrc = 0
+DATABASE_URL=sqlite:///qa7/seed.orig.sqlite3 migrate · bootstrap_masterdata · seed_demo · shell<qa5/seed_users.py · shell<seed_orders.py
+  → 52 đơn: BOOKED 30 · PROCESSING 10 · AUTO_CANCELLED 9 · CANCELLED 1 · PAID 1 · COMPLETED 1 (+ đơn tạo trong kịch bản)
+be.sh (reset DB + runserver :8000) · ad.sh (uvicorn adapter :8100) · http.server 3102 (thật) / 3101 (mock)
+api_l7.py                                                 → 241 · PASS 236 · FAIL 5 (1 ⏸ SQLite lock, B12 ×2, B13 ×2)
+  (lượt đầu 234/241: thêm 2 lỗi kịch bản — kỳ vọng phiếu 118 DELIVERING trong khi seed là PREPARING; so "117500" với "117500.00" — đã sửa, chạy lại trên DB sạch)
+api_extra.py (webhook biên qua adapter)                   → 1e14 → 502 (Django 500) · 0.001 → giao dịch 0 ₫ UNDERPAID
+ui_l7.py (console thật, 9 vai × 2 cỡ + luồng Chủ + 4 tổ hợp cỡ/theme) → 151 · PASS 150 · FAIL 1 (B13)
+  (lượt đầu dừng ở hàm tìm với q rỗng; lượt 2 có 8 FAIL giả do tên khách dò "Cô Dò Vốn A" chứa chữ "Vốn" — đã siết regex, chạy lại trên DB sạch)
+tl_check.py                                               → timeline đơn huỷ: cancelled = Lộc + lý do, giống nhau với loc/ql1/khoonly
+e2e mock s7/s8/s10_s11/s41_s47_staff/s48 (:3101)           → 25/25 · 45/45 · 75/75 · 72/72 · 41/41
+e2e/s41_s47_real.py ×2 (SEED=e2e, DB reset, :3102)        → 39/39 · 39/39
+qa5/shop_e2e.py (Shop next dev :3000 → BE)                → 6/6
+kill PID + pkill theo lệnh · lsof 8000/8100/3000/3101/3102 → sạch · ps = 0 · backend/db.sqlite3 mtime 13/09 (không đụng)
+```
+Script, log, ảnh ở scratchpad `qa7/`: `seed_orders.py`, `api_l7.py`, `api_extra.py`, `ui_l7.py`, `tl_check.py`, `be.sh`, `ad.sh`, `builds.sh`, `*.out`, `shots/`. Không sửa code sản phẩm, không sửa `erp-console/e2e/*`, không thêm test vào repo.
+
+---
+
+# QA lô L7 — lần 2 (vòng sửa 1/2) · xác nhận sửa B12 + B13 · 2026-09-25
+
+## Kết luận: APPROVED — đã sửa B12 (High) và B13 (Medium) trên backend thật, adapter thật (uvicorn) và console build thật. Cùng một khoản tiền không còn bị ghi 2 lần. Số tiền ngoài miền bị chặn ở UI (tại ô, 0 POST), API tay (400 `BR-TT-08`), webhook nội bộ và adapter (400, không 502, không ghi giao dịch). Hồi quy xanh, không rò giá vốn. Còn **B7** (có từ trước, ngoài B12/B13): adapter trả 500 khi `transferAmount` ≤ 0. B7 vẫn chặn việc deploy adapter như đã ghi ở lần trước, không chặn lô L7.
+
+## Tổng: 527 phép kiểm tự động (API 344 + UI 170 + token sai 13) · ✅ 521 · ❌ 4 (B7, có từ trước) · ⏸ 1 (4 POST đồng thời, cần Postgres) · 1 phép kiểm do script đếm sai, đã đối chiếu log và tính là ✅ · hồi quy 436 test BE + 15 adapter + 5 bản build + e2e 90/90 · 45/45 · 39/39 · 6/6
+
+Môi trường giống lần 1:
+- DB: `seed.orig.sqlite3` (hoặc `e2e.orig.sqlite3` cho `s41_s47_real`), chép lại trước mỗi kịch bản.
+- Máy chủ: Django `runserver` :8000, adapter FastAPI thật :8100 (`DJANGO_INTERNAL_URL=:8000`), thêm một adapter :8101 dùng token nội bộ sai.
+- Console: build thật lại từ mã hiện tại (`NEXT_PUBLIC_API_BASE=http://127.0.0.1:8000`, 0 mock) :3102, build mock :3101. Shop `next dev` :3000.
+- Mọi server chạy dưới `perl alarm`, kill theo PID. `lsof` trên 8000/8100/8101/3000/3101/3102 sạch, `ps` = 0. `backend/db.sqlite3` không bị đụng (mtime 13/09).
+
+Script lần 1 được sinh lại thành `api_l7b.py` / `ui_l7b.py` (qua `r2/mk.py`, `r2/mkui.py`). Có 3 loại thay đổi:
+- Thêm mục B12/B13 (`r2/b12b13.py`).
+- Sửa kỳ vọng cũ gắn với hành vi lỗi: webhook giờ lưu `FT…` thay cho `id` SePay. Ca "tay bằng FT… sau webhook → 400" đổi thành "→ duplicate".
+- Siết ca biên: trước chỉ yêu cầu "không 500", giờ yêu cầu "400 BR-TT-08".
+
+## B12 — cùng một khoản tiền, mã FT… ở cả hai đường (BR-TT-03 · S11-AC4/AC5)
+
+| Ca | Kết quả | Bằng chứng |
+|---|---|---|
+| Webhook qua adapter (`id=880001`, `referenceCode=FT880001`) → `bank_txn_id` lưu = `FT880001`, không có dòng `880001`. `id` SePay vẫn nằm trong `raw_payload` | ✅ | `api_l7b.py` S11-AC5 |
+| Webhook trước → xác nhận tay cùng mã viết khác: `" ft880001 "`, `"Ft 8800 01"`, `" ft990101 "`, `"fT 9901 11"`, `"\tFT990121\n"` → `duplicate:true` PAID. 1 giao dịch WEBHOOK, 1 hoá đơn, 0 AuditLog tay, timeline 1 dòng tiền = Hệ thống | ✅ | B12-a[0..2], S11-AC5 |
+| Webhook UNDERPAID → tay `ft880002` → duplicate UNDERPAID, không ghi | ✅ | |
+| Tay trước `" ft 990201 "` → lưu `FT990201`, AuditLog ghi mã dạng chuẩn. Webhook cùng khoản về sau (kể cả gửi lại với `referenceCode=" ft990201 "`) → 200, **vẫn 1 giao dịch, 1 hoá đơn**. Chi tiết đơn có 1 dòng tiền, timeline 1 `payment_received` = Lộc | ✅ | B12-b · ca lần 1 `FT880003` giờ ✅ |
+| Đơn tự huỷ: tay ORPHAN → webhook → **chỉ 1 ORPHAN** (`FT880004`, `FT990301`). Chiều ngược lại: webhook ORPHAN → tay `ft 990311` → duplicate ORPHAN, 1 dòng, 0 AuditLog | ✅ | B12-c, B12-c2 · ca lần 1 `FT880004` giờ ✅ |
+| `referenceCode` = `""`, `"   "`, `null`, hoặc không có key → lùi về `id` (`990401`/`990403`/`990410`/`990402`). Tay bằng `id` → duplicate | ✅ | B12-d |
+| UI thật: Chủ gõ `"  ft 770008 "` → PAID, lưu `FT770008`. Webhook 770008 qua adapter → 200, vẫn 1 giao dịch. Mở lại chi tiết: 1 dòng tiền, 1 `payment_received` | ✅ | `ui_l7b.py`, `qa7r2-b12-detail-1280.png` |
+| Tay bằng `id` SePay `880001` sau khi webhook đã lưu `FT880001` → 400 (đơn đã PROCESSING), không ghi | ✅ | Đổi hành vi có chủ ý: Chủ không nhìn thấy `id` SePay |
+| BR-TT-03: mã của đơn khác / mã UNMATCHED (`ft880005`, viết thường) → 400 `BR-TT-03`, không gắn | ✅ | |
+
+## B13 — số tiền ngoài miền (BR-TT-08 · S11-AC6)
+
+| Đường | Giá trị | Kết quả |
+|---|---|---|
+| **UI** console thật 1280 | `123456789012345`, `99999999999999`, `1000000000000` → "Số tiền quá lớn: tối đa 12 chữ số…" · `1e20` → "Chỉ nhập chữ số…" · `0,001`, `0.001`, `0` → "…từ 1 ₫ trở lên…" · `-5`, `-540000` → "…không được âm…" | ✅ 9/9: lỗi tại ô, `aria-invalid=true`, focus về ô, **0 POST**, không có "Lỗi máy chủ", DB không ghi. Sửa ô thì lỗi mất (`qa7r2-b13-toobig-1280.png`) |
+| UI 360/1280 × sáng/tối | 15 chữ số | ✅ 4/4: lỗi tại ô, 0 POST, không cuộn ngang (`qa7r2-b13-{360,1280}-{light,dark}.png`) |
+| UI số hợp lệ lớn nhất | `999.999.999.999` | ✅ 1 POST → PAID, lưu 999999999999 |
+| **API tay** | `123456789012345`, `99999999999999`, `1e20`, `1e999999`, `1000000000000`, `999999999999.995`, số JSON `1e20`, `100000000000000` | ✅ 400 `BR-TT-08` "Số tiền quá lớn (tối đa 999.999.999.999,99 ₫)." |
+| API tay | `0.001`, `0.004`, `0,001`, `0`, `0.00`, `-5`, `-540000`, `-0.001`, `1e-30`, số JSON `0.001` | ✅ 400 `BR-TT-08` "Số tiền phải là số lớn hơn 0." Không có giao dịch nào, **0 dòng amount ≤ 0 trong DB** |
+| API tay hợp lệ | `999999999999.99` → PAID, lưu đúng · `999999999999` → PAID · `0.005` → làm tròn 0.01, UNDERPAID · `1000.456` → lưu 1000.46 | ✅ |
+| **Webhook nội bộ Django** (`X-Internal-Token`), cả khi có mã đơn và khi không có mã đơn | `1e20`, `123456789012345`, `100000000000000`, `1e999999`, `999999999999.995`, `0.001`, `0.004`, số `0.001`, `0`, `-5`, `NaN`, `Infinity` | ✅ 24/24: 400 `WEBHOOK_INVALID_INPUT`, không ghi (nhánh UNMATCHED cũng không ghi). `999999999999.99` → 200 MATCHED |
+| **Qua adapter thật** | `transferAmount` = `1e14`, `1e20` (số và chuỗi), `123456789012345`, `999999999999.995`, `0.001`, `0.004`, `"0.001"` | ✅ 8/8: **400** (không 502). Body = lỗi Django, không ghi. Mỗi webhook chỉ 1 lần "Django lỗi" trong log adapter, tức không retry |
+| Qua adapter | `999999999999`, `999999999999.99` | ✅ 200 MATCHED |
+| Qua adapter | `transferAmount` = `0`, `-5`, `"0"`, `-0.001` | ❌ **500** (không phải 502), không ghi, đơn không đổi. Đây là **B7** (lần trước), ngoài B12/B13 — xem mục Lỗi |
+
+## Chấp nhận có chủ ý: token nội bộ sai → adapter 502 (`badtok_r2.py`)
+
+| Ca | Kết quả |
+|---|---|
+| Adapter :8101 với `INTERNAL_SERVICE_TOKEN` sai → webhook hợp lệ | ✅ 502 "Gọi Django nội bộ thất bại: Django trả HTTP 401…". Không có giao dịch, đơn vẫn BOOKED |
+| Không retry với 401 | ✅ Log adapter có đúng 1 dòng "Django lỗi (lần 1/3)" cho mỗi webhook. Script đếm "2 lần gọi" là sai: nó đếm cả dòng `Unauthorized:` lẫn dòng access log của cùng một request |
+| SePay gửi lại sau khi sửa cấu hình (gửi cùng webhook qua adapter đúng token) | ✅ 200 MATCHED, đúng 1 giao dịch. Hành vi đúng như dev-notes mô tả: không mất khoản tiền |
+| Sai secret SePay | ✅ 401 |
+
+## Phân quyền · Rò giá vốn · Chứng từ (chạy lại toàn bộ trong `api_l7b.py` / `ui_l7b.py`)
+- Phân quyền: kết quả giống hệt bảng lần 1 cho 9 vai + ẩn danh, cả API và UI 360/1280. Riêng S11-AC7 (403 cho `ql1`, `ql9`, `kho1`, `khoonly`, `giao1`, `giao2`, `moi1`; ẩn danh 401): ✅.
+- Rò giá vốn: quét đệ quy mọi trang list và chi tiết **81 đơn** (gồm timeline, payments) cho `ql1`, `ql9`, `kho1`, `khoonly`, và 1 đơn cho `giao1`/`giao2` → **0 key/giá trị**. Đối chứng: Chủ thấy `unit_cost` 91234.56. Trên UI: 0 `.alloc-cost`, JSON qua trình duyệt 0 hit. Shop 6/6.
+- Chứng từ: DELETE/PATCH → 403/405, chứng từ còn nguyên. AuditLog `confirm_payment_manual` ghi đúng 1 lần mỗi lần xác nhận tay thật, lần duplicate không ghi.
+
+## Hồi quy
+
+| Ca | Kết quả |
+|---|---|
+| `backend manage.py test` | ✅ Ran 436 tests, OK (16,3 s) · `makemigrations --check --dry-run` No changes detected |
+| `adapter pytest -q` | ✅ 15 passed |
+| erp-console `tsc --noEmit` · `npm run build` repo · build thật :8000 · build mock · `frontend npm run build` | ✅ exit 0 ×5. `out/` repo + build thật: 0 file chứa dấu mock |
+| e2e mock `s10_s11_orders.py` · `s8_views.py` (:3101) | ✅ 90/90 · 45/45 |
+| e2e BE thật `s41_s47_real.py` (SEED=e2e, :3102) | ✅ 39/39 |
+| `qa5/shop_e2e.py` (Shop :3000 → BE thật) | ✅ 6/6 (bấm đúp → 1 đơn, HTML không giá vốn) |
+| Toàn bộ S10/S11 của lần 1 trong `api_l7b.py` / `ui_l7b.py` | ✅ (trừ ⏸ đồng thời trên SQLite, giống lần 1) |
+
+## Lỗi
+
+**B12 và B13 đã đóng.** Không có lỗi mới do lượt sửa này gây ra.
+
+### B7 (còn mở, có từ trước) — Adapter trả 500 khi `transferAmount` ≤ 0 · Medium · chặn deploy adapter, không chặn L7
+- **Tái hiện:** chạy `ad.sh` rồi `POST :8100/webhook/sepay` với `Authorization: Apikey qa7-sepay` và payload hợp lệ có `transferAmount` là `0`, `-5`, `"0"` hoặc `-0.001`.
+- **Mong đợi:** 400 "Payload SePay không hợp lệ", tức cùng nhóm với các ca B13 khác qua adapter.
+- **Thực tế:** 500. Log: `TypeError: Object of type ValueError is not JSON serializable`, tại `HTTPException(detail={"errors": exc.errors()})` ở `adapter/app/main.py`.
+- **Ảnh hưởng:** không ghi giao dịch, đơn không đổi, không mất tiền. SePay nhận 5xx nên sẽ gửi lại. Lượt này có sửa `main.py` và nói "adapter không 502" cho B13, nhưng chưa đụng tới B7.
+- **Gợi ý:** như lần trước, dùng `exc.errors(include_context=False)` và thêm test adapter đi hết endpoint cho 0 / −5 / NaN trần.
+
+### Ghi nhận (không chặn)
+- BE và FE lệch nhau ở số lẻ. BE nhận `0.005` (làm tròn thành 0,01 ₫ → UNDERPAID) và lưu `1000.456` thành 1000,46. FE cắt phần lẻ và đòi ≥ 1 ₫. Không sai BR-TT-08 (> 0 sau khi làm tròn) và không có giao dịch 0 ₫. PO nên chốt có cho phép số lẻ dưới 1 ₫ ở đường tay/webhook hay không.
+- Chuẩn hoá mã chỉ bỏ khoảng trắng và đổi sang chữ hoa. Mã gõ kèm dấu gạch (`FT-880003`) vẫn được coi là mã khác. Dev-notes chưa hứa xử lý ca này, nên QA chỉ ghi lại.
+- Khi Django trả 400, `detail` của adapter lồng body Django (`{"detail": {"detail": …, "code": …}}`). Cách này đúng contract dev ghi.
+- Còn từ trước: B1, B8, B9. N-6 chưa chốt: tiền về cho đơn không còn BOOKED vẫn ghi MATCHED nếu **khác mã**.
+
+## Lệnh đã chạy (kèm output tóm tắt)
+```
+backend manage.py test                              → Ran 436 tests in 16.277s OK
+makemigrations --check --dry-run                    → No changes detected
+adapter pytest -q                                   → 15 passed, 1 warning
+builds.sh (realsrc :8000 / mocksrc / tsc / repo build / frontend build) → exit 0 ×5 · grep dấu mock trong out/ repo + realsrc = 0
+be.sh (reset seed) + ad.sh (adapter :8100)          → api_l7b.py: 344 · PASS 339 · FAIL 5 (⏸ SQLite lock ×1, B7 ×4)
+adapter :8101 token sai + badtok_r2.py              → 13 · PASS 12 · 1 script đếm sai (log adapter: 1 lần gọi/webhook) → 502, không ghi; SePay gửi lại qua adapter đúng → 200, 1 giao dịch
+be.sh + http.server 3102 (realsrc/out) + ui_l7b.py  → 170 · PASS 170
+  (lượt đầu 161/170: 9 FAIL giả do script kiểm "500" not in text trong khi tổng đơn là "117.500 ₫" — đã đổi thành "Lỗi máy chủ", chạy lại trên DB sạch)
+http.server 3101 (mocksrc/out): e2e s10_s11_orders · s8_views → 90/90 · 45/45
+SEED=e2e be.sh: e2e s41_s47_real.py (:3102)          → 39/39
+be.sh + Shop next dev :3000 + qa5/shop_e2e.py       → 6/6
+kill PID (be, ad, ad_bad, fe-real, fe-mock, shop) + pkill next dev · lsof 8000/8100/8101/3000/3101/3102 → sạch · ps = 0 · backend/db.sqlite3 mtime 13/09
+```
+Script, log, ảnh ở scratchpad `qa7/`: `api_l7b.py`, `ui_l7b.py`, `badtok_r2.py`, `r2/{mk.py,mkui.py,b12b13.py}`, `r2/*.out`, `shots/qa7r2-*.png`. Không sửa code sản phẩm, không sửa `erp-console/e2e/*`, không thêm test vào repo.

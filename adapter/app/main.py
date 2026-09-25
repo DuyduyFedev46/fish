@@ -9,7 +9,10 @@ X-Internal-Token. Idempotency theo bank_txn_id là việc của Django
 Cô lập lỗi theo yêu cầu:
 - payload sai (không parse được theo schema SePay) -> 400
 - thiếu/sai secret webhook -> 401
-- Django lỗi (mạng/timeout/4xx/5xx sau khi retry nhẹ) -> 502
+- Django trả 4xx do DỮ LIỆU (400/404/409/422, vd số tiền ngoài miền — QA L7 · B13) ->
+  trả lại đúng mã đó + body Django, không retry, để SePay không gửi lại mãi
+- Django 401/403 (token nội bộ sai = cấu hình phía mình), mạng/timeout/5xx -> 502
+  (SePay gửi lại sau, không nuốt mất khoản tiền)
 """
 
 from __future__ import annotations
@@ -57,13 +60,24 @@ def _verify_sepay_secret(authorization: str | None, settings: Settings) -> None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Sai SePay webhook secret")
 
 
+# 4xx do dữ liệu webhook → trả nguyên cho SePay; 401/403 là lỗi cấu hình nội bộ → 502.
+_PASS_THROUGH_4XX = {400, 404, 409, 422}
+
+
+def _json_or_text(response: httpx.Response):
+    try:
+        return response.json()
+    except ValueError:
+        return response.text
+
+
 async def _forward_to_django(body: dict, settings: Settings) -> dict:
     """
     POST body nội bộ tới Django, kèm X-Internal-Token. Retry nhẹ (mặc định 2
     lần thêm, tổng 3 lần thử) khi lỗi mạng/timeout hoặc Django trả 5xx — để
     SePay không phải retry ngay lập tức khi lỗi chỉ là tạm thời phía Django.
-    Lỗi 4xx từ Django coi là không tạm thời (payload/token sai) -> không retry.
-    Mọi trường hợp thất bại cuối cùng -> raise HTTPException 502.
+    Lỗi 4xx từ Django coi là không tạm thời -> không retry. 400/404/409/422 (dữ liệu sai)
+    -> HTTPException cùng mã; còn lại thất bại cuối cùng -> HTTPException 502.
     """
     url = f"{settings.django_internal_url.rstrip('/')}/api/internal/payments/sepay-webhook/"
     headers = {"X-Internal-Token": settings.internal_service_token}
@@ -89,8 +103,11 @@ async def _forward_to_django(body: dict, settings: Settings) -> dict:
             last_error = f"Django trả HTTP {response.status_code}: {response.text}"
             logger.warning("Django lỗi (lần %s/%s): %s", attempt, attempts, last_error)
 
+            if response.status_code in _PASS_THROUGH_4XX:
+                # B13: dữ liệu sai vĩnh viễn -> trả đúng mã 4xx, không retry, không 502.
+                raise HTTPException(status_code=response.status_code, detail=_json_or_text(response))
             if response.status_code < 500:
-                # 4xx: lỗi không tạm thời (vd token/payload sai) -> retry vô ích.
+                # 401/403/...: token/cấu hình sai -> retry vô ích, trả 502 bên dưới.
                 break
 
     raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Gọi Django nội bộ thất bại: {last_error}")

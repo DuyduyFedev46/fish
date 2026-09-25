@@ -22,8 +22,10 @@ thực tế SePay gửi (POST JSON, transferType="in" khi có tiền vào tài k
 
 GIẢ ĐỊNH quan trọng (ghi rõ vì không có tài khoản SePay thật để đối chiếu 1:1
 lúc build; chỉnh lại schema này nếu Lộc gửi payload thật khác):
-- `id` là số nguyên, duy nhất phía SePay cho mỗi giao dịch -> dùng làm
-  `bank_txn_id` chuyển cho Django (đủ ổn định để Django idempotent theo đó).
+- `bank_txn_id` gửi Django = `referenceCode` (mã FT… ngân hàng in trên sao kê, cũng là
+  mã Chủ gõ khi xác nhận tay) đã chuẩn hoá (bỏ khoảng trắng, viết hoa) — QA L7 · B12.
+  `id` (số nguyên nội bộ SePay, KHÔNG in trên sao kê) chỉ là dự phòng khi referenceCode
+  trống; luôn được giữ trong `raw`.
 - `code`: khi Cảng Cá Lộc cấu hình sẵn "mã hoá đơn"/tiền tố nhận diện trên
   dashboard SePay (mục Cấu hình chung), SePay tự nhận diện mã đơn hàng nằm
   trong nội dung chuyển khoản và trả về ở field này (xem ví dụ trên: SePay tự

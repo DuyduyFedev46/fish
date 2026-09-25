@@ -16,6 +16,17 @@ from apps.sales.utils import now as _now
 
 # --- P-07: hoàn tiền ---------------------------------------------------------
 
+def refundable_amount(*, invoice):
+    """BR-HT-04: còn hoàn được = đã thu (số tiền hoá đơn, BR-BC-01) − các phiếu hoàn chưa thất bại."""
+    prior = (
+        invoice.refunds.exclude(status=Refund.Status.FAILED)
+        .aggregate(total=Sum("amount"))
+        .get("total")
+        or ZERO
+    )
+    return invoice.amount - prior
+
+
 def create_refund(*, invoice, amount, is_partial, reason, actor):
     """
     Tạo phiếu hoàn PENDING (BR-HT-01). BR-HT-04: số hoàn không vượt (đã thu − đã hoàn
@@ -26,14 +37,7 @@ def create_refund(*, invoice, amount, is_partial, reason, actor):
         raise BusinessError("Số tiền hoàn phải > 0.")
 
     with transaction.atomic():
-        collected = invoice.amount  # đã thu = số tiền hoá đơn (BR-BC-01)
-        prior = (
-            invoice.refunds.exclude(status=Refund.Status.FAILED)
-            .aggregate(total=Sum("amount"))
-            .get("total")
-            or ZERO
-        )
-        if amount > (collected - prior):
+        if amount > refundable_amount(invoice=invoice):
             raise BusinessError(
                 "Số tiền hoàn vượt quá số đã thu trừ các lần hoàn trước (BR-HT-04)."
             )

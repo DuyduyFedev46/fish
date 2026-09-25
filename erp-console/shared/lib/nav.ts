@@ -79,16 +79,15 @@ export const NAV: NavItem[] = [
   {
     key: "orders",
     summary: "Danh sách đơn, xác nhận thanh toán, huỷ và hoàn tiền.",
-    plannedIn: "S8, S10",
+    plannedIn: "S10, S11",
     href: "/orders/",
     label: "Đơn & tiền",
     short: "Đơn",
     icon: "receipt_long",
     section: "Điều hành",
-    // Code review trước deploy 1: màn Đơn hiện đọc TẠM /api/dashboard/summary/ (đòi reports.view_dashboard) → cần CẢ hai
-    // quyền, không thì menu hiện mà mở ra bị 403.
-    // TODO(S10): khi màn Đơn chuyển sang endpoint đơn riêng (S10) thì bỏ điều kiện viewDashboard.
-    visible: (me) => has(me, PERM.viewSalesOrder) && has(me, PERM.viewDashboard) && !onlyDelivery(me),
+    // S10 (L7): màn Đơn đọc endpoint riêng GET /api/sales/orders/ (đòi sales.view_salesorder) → bỏ điều kiện tạm
+    // reports.view_dashboard của code review trước deploy 1. Vẫn ẩn với người CHỈ thuộc nv_giao (S7-AC2, L-4).
+    visible: (me) => has(me, PERM.viewSalesOrder) && !onlyDelivery(me),
   },
   {
     key: "deliveries",

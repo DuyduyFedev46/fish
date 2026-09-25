@@ -46,7 +46,7 @@ class S5ScopeTests(TestCase):
         c = client_for(self.giao1)
         resp = c.get(f"/api/sales/orders/{self.d1.pk}/")
         self.assertEqual(resp.status_code, 200)
-        self.assertEqual(resp.json()["phone"], "0900000001")
+        self.assertEqual(resp.json()["customer"]["phone"], "0900000001")  # S10: SĐT nằm trong customer
         self.assertEqual(c.get(f"/api/sales/customers/{self.c1.pk}/").status_code, 200)
 
     def test_s5_ac3_danh_sach_khach_chi_khach_cua_don_minh(self):

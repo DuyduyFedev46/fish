@@ -25,7 +25,7 @@ erp-console/
     staff/                S41/S42 Nhân viên: danh sách, tạo, sửa, đổi nhóm, cho nghỉ/làm lại, đặt lại mật khẩu
       api.ts mock.ts types.ts messages.ts components/ README.md
     overview/             S8 Tổng quan: KPI, 8 đơn gần nhất, cận hạn, tồn theo lô
-    orders/               S8 Đơn (8 đơn gần nhất, giữ chỗ còn lại) — S10 mở rộng
+    orders/               S10 danh sách + chi tiết đơn (GET /api/sales/orders/), S11 Chủ xác nhận đã nhận tiền
     inventory/            S8 Kho & lô + tab "Hoạt động" (sổ kho) của cột phải — S25 mở rộng
                           (mỗi module: api.ts mock.ts types.ts components/ README.md)
   shared/                 dùng chung, KHÔNG phụ thuộc features/
@@ -46,7 +46,7 @@ erp-console/
                           tokens.css (TOKEN THIẾT KẾ theo DESIGN.md ở gốc repo — file DUY NHẤT được chứa mã màu),
                           globals.css (style chung, chỉ dùng var(--…))
   e2e/                    kịch bản Playwright (Python): trên bản build mock s7_shell.py, s8_views.py, s41_s47_staff.py,
-                          s48_password.py; trên BACKEND THẬT s41_s47_real.py (có cả S48; so chữ UI với response thật).
+                          s48_password.py, s10_s11_orders.py; trên BACKEND THẬT s41_s47_real.py (có cả S48; so chữ UI với response thật).
                           Quy ước: không `wait_for_timeout` — chờ điều kiện (URL, phần tử, localStorage, `aria-busy`,
                           `__caveMock.pending() === 0` trước khi đổi dữ liệu mock)
 ```

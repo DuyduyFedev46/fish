@@ -1,7 +1,7 @@
 import { ViewGuard } from "@/features/auth/components/ViewGuard";
 import { OrdersScreen } from "@/features/orders/components/OrdersScreen";
 
-// S8: Đơn (8 đơn gần nhất). S10 mở rộng thành danh sách đầy đủ + thao tác tiền.
+// S10: danh sách + chi tiết đơn (GET /api/sales/orders/); S11: Chủ xác nhận đã nhận tiền trong chi tiết.
 export default function Page() {
   return (
     <ViewGuard view="orders">
