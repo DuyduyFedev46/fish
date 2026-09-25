@@ -18,6 +18,7 @@ export type ViewKey =
   | "overview"
   | "orders"
   | "payments"
+  | "refunds"
   | "deliveries"
   | "my-deliveries"
   | "inventory"
@@ -55,6 +56,9 @@ export const PERM = {
   viewSalesOrder: "sales.view_salesorder",
   /** S11/S12: chỉ Chủ — xác nhận tiền tay, xử lý hàng chờ thanh toán lệch (BR-TT-07, BR-TT-09). */
   confirmPaymentManual: "sales.confirm_payment_manual",
+  /** S16: xem danh sách phiếu hoàn (Chủ, Quản lý có — nv_kho/nv_giao không). Nút xác nhận/thất bại/thử lại theo
+   * `available_actions` của từng phiếu (chỉ Chủ có sales.confirm_refund, S16-AC7). */
+  viewRefund: "sales.view_refund",
   viewDeliveryNote: "delivery.view_deliverynote",
   viewBatch: "inventory.view_batch",
   viewPurchaseReceipt: "purchasing.view_purchasereceipt",
@@ -110,6 +114,20 @@ export const NAV: NavItem[] = [
     // S12-AC7: chỉ người có sales.confirm_payment_manual (Chủ). Quản lý/NV kho có view_paymenttransaction nhưng BE trả 403
     // cho GET ?resolution_status=OPEN → menu con không hiện.
     visible: (me) => has(me, PERM.viewSalesOrder) && has(me, PERM.confirmPaymentManual) && !onlyDelivery(me),
+  },
+  {
+    key: "refunds",
+    summary: "Phiếu hoàn đang chờ Chủ chuyển khoản: xác nhận, báo thất bại, thử lại.",
+    plannedIn: "S16",
+    href: "/orders/refunds/",
+    label: "Phiếu hoàn chờ chuyển",
+    short: "Phiếu hoàn",
+    icon: "currency_exchange",
+    section: "Điều hành",
+    parent: "orders",
+    // S16-AC7: Quản lý có sales.view_refund nên VẪN thấy danh sách, chỉ không có nút (available_actions của từng
+    // phiếu không có confirm/mark_failed/retry vì thiếu sales.confirm_refund) — khớp cách BE tính available_actions.
+    visible: (me) => has(me, PERM.viewRefund) && !onlyDelivery(me),
   },
   {
     key: "deliveries",

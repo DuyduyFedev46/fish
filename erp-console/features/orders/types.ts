@@ -244,14 +244,13 @@ export type ResolveResult = {
   overpaid_amount?: string;
 };
 
-/** Body POST /api/sales/refunds/create — S13 gửi `payment_transaction` (không kèm `sales_invoice`, BR-HT-01). */
-export type CreateRefundInput = {
-  payment_transaction: number;
-  amount: string;
-  reason: string;
-  /** Chống tạo trùng khi bấm đúp / gửi lại: cùng một lần mở form = cùng một mã. */
-  request_id: string;
-};
+/**
+ * Body POST /api/sales/refunds/create — đúng MỘT trong hai nguồn (BR-HT-01): S13 gửi `payment_transaction` (khoản
+ * không có hoá đơn); S15 gửi `sales_invoice` + `is_partial` (huỷ đơn / hoàn một phần đơn có hoá đơn).
+ */
+export type CreateRefundInput =
+  | { payment_transaction: number; amount: string; reason: string; request_id: string }
+  | { sales_invoice: number; amount: string; is_partial: boolean; reason: string; request_id: string };
 
 /** 201 phiếu mới · 200 + `duplicate: true` khi cùng `request_id` (phiếu đã tạo trước đó). */
 export type CreateRefundResult = {
@@ -266,3 +265,63 @@ export type CreateRefundResult = {
   request_id?: string | null;
   duplicate?: boolean;
 };
+
+// ---------------------------------------------------------------------------------------------------------------------
+// S14 — Huỷ đơn đã thanh toán theo trạng thái phiếu giao (POST /api/sales/orders/{id}/cancel)
+// Khớp contract THỰC TẾ ở 03-dev-notes.md "Lô L9 — S14, S15, S16 (BE)" khi mục đó xuất hiện.
+
+/** OTHER bắt buộc `note` (S14-AC6). */
+export type CancelReasonCode = "CUSTOMER_CHANGED_MIND" | "DAMAGED_WHEN_PACKING" | "GIVE_UP_AFTER_FAILED" | "OTHER";
+
+export type CancelOrderInput = { reason_code: CancelReasonCode; note: string };
+
+/** 200 của POST …/cancel. `stock_restored=false` khi phiếu giao đã Giao thất bại (Q8b — không hoàn kho). */
+export type CancelOrderResult = {
+  order_status: string;
+  stock_restored: boolean;
+  delivery_status: string | null;
+  /** Gợi ý số tiền hoàn toàn phần — điền sẵn cho nút "Tạo phiếu hoàn toàn phần" (S14-AC7, mở S15). */
+  suggest_refund_amount: string;
+  invoice_id: number | null;
+};
+
+// ---------------------------------------------------------------------------------------------------------------------
+// S16 — Phiếu hoàn chờ chuyển: xác nhận, báo thất bại, thử lại (GET /api/sales/refunds/?status=PENDING,FAILED,
+// POST …/{id}/confirm | mark-failed | retry). Khớp contract THỰC TẾ ở 03-dev-notes.md "Lô L9 — S14, S15, S16 (BE)".
+
+export type RefundQueueStatus = "PENDING" | "REFUNDED" | "FAILED";
+/** Thao tác một phiếu hoàn làm được ở trạng thái hiện tại — BE tính cả luật lẫn quyền (chỉ Chủ có confirm_refund). */
+export type RefundQueueAction = "confirm" | "mark_failed" | "retry" | string;
+
+/** Một dòng của GET /api/sales/refunds/?status=PENDING,FAILED. */
+export type RefundQueueItem = {
+  id: number;
+  amount: string;
+  status: RefundQueueStatus | string;
+  status_label?: string;
+  /** Có khi phiếu gắn `sales_invoice`; null/rỗng khi gắn thẳng giao dịch không hoá đơn (S13). */
+  order_code?: string | null;
+  customer_name?: string;
+  customer_phone?: string;
+  /** Mã GD của khoản tiền VÀO ban đầu (không phải mã GD hoàn) — để Lộc đối chiếu số tài khoản trên sao kê (Q13). */
+  source_bank_txn_id?: string;
+  reason?: string;
+  created_by?: string;
+  created_at?: string;
+  /** Lý do lần báo thất bại gần nhất (BR-HT-09). */
+  failure_reason?: string;
+  bank_txn_ref?: string;
+  confirmed_at?: string;
+  available_actions: RefundQueueAction[];
+};
+
+export type ConfirmRefundInput = { bank_txn_ref: string };
+/** 200 của POST …/confirm. */
+export type ConfirmRefundResult = { status: string; status_label?: string; confirmed_at?: string };
+
+export type MarkRefundFailedInput = { reason: string };
+/** 200 của POST …/mark-failed. */
+export type MarkRefundFailedResult = { status: string; status_label?: string };
+
+/** 200 của POST …/retry (thân rỗng). */
+export type RetryRefundResult = { status: string; status_label?: string };

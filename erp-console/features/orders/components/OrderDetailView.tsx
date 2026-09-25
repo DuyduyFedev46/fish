@@ -25,15 +25,17 @@ import {
   REFUND_STATUS,
   labelOf,
 } from "../labels";
-import { ORDERS_MSG } from "../messages";
+import { ORDERS_MSG, QUEUE_MSG } from "../messages";
 import type { OrderAction, OrderDetail, OrderListItem, OrderTimelineEntry } from "../types";
 import { mmss, useNow } from "../useNow";
 import type { ResultNote } from "./OrderDetailSheet";
 import s from "../orders.module.css";
 
-/** Thao tác FE đã nối (L7). Mã khác trong `available_actions` (cancel — S14, create_refund — S15) chưa có màn → không vẽ nút. */
+/** Thao tác FE đã nối theo `available_actions`. Mã lạ → không vẽ nút. */
 const ACTION_UI: Partial<Record<OrderAction, { label: string; icon: string }>> = {
   confirm_payment: { label: ORDERS_MSG.confirmAction, icon: "payments" },
+  cancel: { label: ORDERS_MSG.cancelAction, icon: "cancel" },
+  create_refund: { label: QUEUE_MSG.actRefund, icon: "currency_exchange" },
 };
 
 type Props = {
@@ -139,6 +141,16 @@ export function OrderDetailView({ order: o, fallback, refreshing, refreshError, 
             )}
           </span>
         </div>
+      )}
+      {note?.cancelSuggestRefund && (
+        <button
+          type="button"
+          className={`btn primary ${s.cancelRefundCta} cancel-refund-cta`}
+          onClick={() => onAction("create_refund")}
+        >
+          <Icon name="currency_exchange" />
+          {ORDERS_MSG.cancelSuggestRefund(note.cancelSuggestRefund)}
+        </button>
       )}
       {refreshError && (
         <div className="alert-box err" role="alert">

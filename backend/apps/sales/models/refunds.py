@@ -54,6 +54,8 @@ class Refund(models.Model):
         help_text="Bắt buộc khi chuyển sang Đã hoàn (BR-HT-03).",
     )
     reason = models.TextField("Lý do", blank=True)
+    # S16 (BR-HT-09): lý do Chủ báo chuyển khoản thất bại — chỉ đổi qua `mark-failed`/`retry`.
+    failure_reason = models.TextField("Lý do thất bại", blank=True, default="")
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="refunds_created",
         verbose_name="Người tạo phiếu",

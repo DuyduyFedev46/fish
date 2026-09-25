@@ -113,6 +113,34 @@ export const BE_ERRORS = {
   HT_TXN_RESOLVED: { status: 400, code: "BR-TT-09", detail: "Giao dịch đã được xử lý, không lập phiếu hoàn." },
   // ---- S10 GET /api/sales/orders/ — tham số lọc sai ----
   INVALID_FILTER: { status: 400, code: "INVALID_FILTER", detail: "Tham số {param} phải là ngày dạng YYYY-MM-DD." },
+
+  // ---- S14 POST /api/sales/orders/{id}/cancel (contract story; BE lô L9 chưa chốt — chép lại khi mục
+  // "Lô L9 — S14, S15, S16 (BE)" xuất hiện ở 03-dev-notes.md) ----
+  GH_CANCEL_DELIVERING: {
+    status: 400,
+    code: "BR-GH-07",
+    detail: "Phiếu giao đang Đang giao — báo giao thất bại trước khi huỷ.",
+  },
+  GH_CANCEL_COMPLETED: {
+    status: 400,
+    code: "BR-GH-05",
+    detail: "Đơn đã giao hoàn tất — chỉ còn cách lập phiếu hoàn.",
+  },
+  /** {batch} = mã lô đã chốt không hoàn kho được. */
+  LO_BATCH_CLOSED: { status: 400, code: "BR-LO-05", detail: "Lô {batch} đã chốt, không hoàn kho được." },
+  HT_CANCEL_REASON_INVALID: { status: 400, code: "BR-HT-05", detail: "Lý do huỷ không hợp lệ." },
+  /** S14-AC6: reason_code=OTHER bắt buộc note — contract không cho câu chính xác, FE tạm suy ra. */
+  HT_CANCEL_NOTE_REQUIRED: { status: 400, code: "BR-HT-05", detail: 'Chọn lý do "Khác" thì phải nhập ghi chú.' },
+  HT_CANCEL_INVALID_STATUS: { status: 400, code: "BR-HT-05", detail: "Chỉ huỷ được đơn đã thanh toán, chưa giao xong." },
+
+  // ---- S16 POST /api/sales/refunds/{id}/confirm | mark-failed | retry (contract story; BE lô L9 chưa chốt) ----
+  HT_CONFIRM_TXN_REQUIRED: { status: 400, code: "BR-HT-03", detail: "Bắt buộc nhập mã giao dịch hoàn." },
+  HT_ALREADY_DONE: { status: 400, code: "BR-HT-09", detail: "Phiếu đã hoàn, không đổi trạng thái được." },
+  /** mark-failed/retry không đúng trạng thái hiện tại (chỉ PENDING mới mark-failed được, chỉ FAILED mới retry được). */
+  HT_WRONG_REFUND_STATUS: { status: 400, code: "BR-HT-09", detail: "Phiếu không ở trạng thái phù hợp cho thao tác này." },
+  HT_MARK_FAILED_REASON_REQUIRED: { status: 400, code: "BR-HT-09", detail: "Nhập lý do chuyển thất bại." },
+  /** S16-AC6: retry mà số còn hoàn được đã bị khoản khác lấp đầy trong lúc chờ. */
+  HT_RETRY_NO_ROOM: { status: 400, code: "BR-HT-04", detail: "Không còn hoàn được: số tiền còn lại đã dùng hết." },
 } satisfies Record<string, Entry>;
 
 export type BeErrorKey = keyof typeof BE_ERRORS;

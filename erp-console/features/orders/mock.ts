@@ -85,6 +85,9 @@ const PERM_CONFIRM = "sales.confirm_payment_manual";
 const PERM_CANCEL = "sales.cancel_paid_order";
 const PERM_REFUND = "sales.create_refund";
 const PERM_COST = "inventory.view_costprice";
+const PERM_VIEW_REFUND = "sales.view_refund";
+const PERM_CONFIRM_REFUND = "sales.confirm_refund";
+const REFUND_MODE_KEY = "cave_erp_mock_refunds_mode";
 
 /** Giao dịch trong kho mock: field nội bộ (người xác nhận tay, xử lý hàng chờ, nội dung CK) — BE chỉ trả một phần. */
 type Pay = OrderPayment & {
@@ -97,7 +100,25 @@ type Pay = OrderPayment & {
   resolved_at?: string | null;
   resolution_note?: string;
 };
-type MockRefund = QueueRefund & { txnId: number; reason: string; request_id: string };
+/** Phiếu hoàn gắn `payment_transaction` (S13). S16 bổ sung: người lập/lúc lập/xác nhận/lý do thất bại. */
+type MockRefund = QueueRefund & {
+  txnId: number;
+  reason: string;
+  request_id: string;
+  created_by: string;
+  created_at: string;
+  confirmed_at: string | null;
+  failure_reason: string;
+};
+/** Phiếu hoàn gắn `sales_invoice` (S15) — sống trong `Order.refunds`; field nội bộ, `detail()` chỉ lộ phần công khai. */
+type MockOrderRefund = OrderRefund & {
+  reason: string;
+  request_id: string;
+  created_by: string;
+  created_at: string;
+  confirmed_at: string | null;
+  failure_reason: string;
+};
 
 type Line = { item_code: string; item_name: string; qty: number; price: number; discount: number; batches: [string, number, number][] };
 type Delivery = { id: number; code: string; status: string; assigned_to: number | null; failed_attempts: number };
@@ -113,8 +134,10 @@ type Order = {
   /** `actor` = tên người xác nhận tay (nội bộ mock, không trả ra) — nguồn `actor_display` của timeline. */
   payments: Pay[];
   delivery: Delivery | null;
-  refunds: OrderRefund[];
+  refunds: MockOrderRefund[];
   needs_attention: boolean;
+  /** S14 (thử BR-LO-05): lô của đơn này giả lập đã CHỐT — cancel trả lỗi "không hoàn kho được". Bật qua devtool. */
+  batchClosed?: boolean;
 };
 type Txn = { orderId: number; result: ConfirmPaymentResult };
 type Store = {
@@ -290,11 +313,18 @@ function seed(): Store {
       if (tag === "failed") o.needs_attention = true;
     }
     if (status === "CANCELLED") {
+      const pending = tag === "refund-pending";
       o.refunds.push({
         id: ++refId,
         amount: money(total),
-        status: tag === "refund-pending" ? "PENDING" : "REFUNDED",
-        bank_txn_ref: tag === "refund-pending" ? "" : `HT26267${pad(refId, 4)}`,
+        status: pending ? "PENDING" : "REFUNDED",
+        bank_txn_ref: pending ? "" : `HT26267${pad(refId, 4)}`,
+        reason: CANCEL_REASON,
+        request_id: `seed-order-refund-${refId}`,
+        created_by: "Lộc",
+        created_at: isoVN(createdMs + 30 * 60_000),
+        confirmed_at: pending ? null : isoVN(createdMs + 90 * 60_000),
+        failure_reason: "",
       });
     }
     if (tag === "under") {
@@ -362,10 +392,20 @@ function seed(): Store {
   txns["FT2626700091"] = { orderId: 0, result: { result: "UNMATCHED", duplicate: false, order_status: "" } };
   txns["FT2626700092"] = { orderId: 0, result: { result: "UNMATCHED", duplicate: false, order_status: "" } };
   const txnRefunds: MockRefund[] = [
-    { id: 30, txnId: 870, amount: "0", status: "REFUNDED", bank_txn_ref: "HT2626700028", reason: "Tiền về sau khi đơn tự huỷ", request_id: "seed-30" },
+    {
+      id: 30, txnId: 870, amount: "0", status: "REFUNDED", bank_txn_ref: "HT2626700028",
+      reason: "Tiền về sau khi đơn tự huỷ", request_id: "seed-30",
+      created_by: "Lộc", created_at: isoVN(now - 20 * 3600_000), confirmed_at: isoVN(now - 19 * 3600_000), failure_reason: "",
+    },
   ];
   const o128 = orders.find((x) => x.id === 128);
   if (o128) txnRefunds[0].amount = money(orderTotal(o128));
+  // S16: một phiếu Thất bại sẵn có để thử "Thử lại" ngay khi mở màn (BR-HT-09).
+  txnRefunds.push({
+    id: 31, txnId: 881, amount: "80000", status: "FAILED", bank_txn_ref: "",
+    reason: "Tiền không khớp đơn nào", request_id: "seed-31",
+    created_by: "Lộc", created_at: isoVN(now - 3 * 3600_000), confirmed_at: null, failure_reason: "Sai số tài khoản",
+  });
   return { seededAt: now, orders, txns, seq: 60, unmatched, txnRefunds };
 }
 
@@ -422,7 +462,9 @@ const DELIVERY_LABEL: Record<string, string> = {
   DELIVERING: "Đang giao",
   COMPLETED: "Hoàn tất",
   FAILED: "Giao thất bại",
+  CANCELLED: "Đã huỷ theo đơn",
 };
+const CANCEL_REASON_CODES = new Set(["CUSTOMER_CHANGED_MIND", "DAMAGED_WHEN_PACKING", "GIVE_UP_AFTER_FAILED", "OTHER"]);
 const MATCH_LABEL: Record<string, string> = {
   MATCHED: "Khớp — đã xác nhận",
   UNDERPAID: "Thiếu tiền — chờ Chủ",
@@ -578,7 +620,9 @@ function detail(me: Me, o: Order): OrderDetail {
           failed_attempts: o.delivery.failed_attempts,
         }
       : null,
-    refunds: o.refunds.map((r) => ({ ...r, status_label: REFUND_LABEL[r.status] })),
+    // Chỉ lộ field công khai (contract S10) — reason/request_id/created_by/created_at/confirmed_at/failure_reason
+    // là bookkeeping nội bộ cho S16, không nằm trong OrderRefund.
+    refunds: o.refunds.map((r) => ({ id: r.id, amount: r.amount, status: r.status, status_label: REFUND_LABEL[r.status], bank_txn_ref: r.bank_txn_ref })),
     timeline: timelineOf(o),
     available_actions: actions(me, o),
   };

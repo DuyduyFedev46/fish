@@ -8,4 +8,8 @@ chi tiết có dòng hàng, phân bổ lô (`unit_cost` chỉ với `view_costpr
 (`services.available_actions` — luật + quyền). S11: `POST …/{id}/confirm-payment` (chỉ Chủ) gọi `payments.services.confirm_payment_manual`.
 L7 bổ sung: `q` tìm thêm theo tên khách (không dấu, không phân biệt hoa thường — `utils.fold_text`); chi tiết thêm
 `*_label` (phiếu giao, giao dịch, phiếu hoàn) và `timeline` (`timeline.py` — ghép chứng từ + AuditLog, không giá vốn).
+L9 (S14): `cancel` nhận `{"reason_code", "note"}` (`CUSTOMER_CHANGED_MIND|DAMAGED_WHEN_PACKING|GIVE_UP_AFTER_FAILED|OTHER`,
+OTHER bắt buộc `note`); chặn khi phiếu giao Đang giao (BR-GH-07) hoặc Hoàn tất (BR-GH-05). Hoàn kho lô gốc CHỈ khi hàng còn
+ở kho (Soạn hàng/Chờ lấy) — phiếu Giao thất bại thì KHÔNG hoàn kho (Q8b, tránh cộng kho hai lần với luồng duyệt hàng hoàn
+P-08). `available_actions.cancel` cũng ẩn theo cùng luật. `timeline` thêm `refund_failed`/`refund_retry` (S16).
 File chính: `services.py`, `shop_api.py`, `api.py`, `timeline.py`, `tasks.py`; `tests/base.py` là dữ liệu nền cho test payments/refunds.

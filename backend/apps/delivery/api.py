@@ -26,6 +26,18 @@ class DeliveryNoteViewSet(DocumentViewSet):
             return qs
         return qs.filter(assigned_to=user)  # nv_giao: chỉ phiếu của mình
 
+    def filter_queryset(self, queryset):
+        queryset = super().filter_queryset(queryset)
+        if self.action == "list":
+            # S14-AC2: lọc theo trạng thái (nhiều, cách dấu phẩy) — CANCELLED không nằm
+            # trong nhóm trạng thái hoạt động nên tự vắng mặt khi FE lọc PREPARING,...
+            statuses = [
+                s.strip() for s in self.request.query_params.get("status", "").split(",") if s.strip()
+            ]
+            if statuses:
+                queryset = queryset.filter(status__in=statuses)
+        return queryset
+
     @action(detail=True, methods=["post"], url_path="status")
     def set_status(self, request, pk=None):
         note = self.get_object()  # đã bị get_queryset lọc theo phạm vi

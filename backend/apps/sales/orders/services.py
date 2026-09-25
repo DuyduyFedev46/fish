@@ -22,6 +22,7 @@ from django.utils import timezone
 from apps.catalog.models import Item, ItemPrice, PricingRule
 from apps.common.audit import record_audit
 from apps.common.exceptions import BusinessError
+from apps.delivery.models import DeliveryNote
 from apps.inventory.batches import services as batches
 from apps.inventory.models import Batch, StockLedgerEntry
 from apps.inventory.stock import services as stock
@@ -288,12 +289,32 @@ def cancel_unpaid_expired(*, now=None):
 
 # --- P-07: huỷ đơn đã thanh toán --------------------------------------------
 
-def cancel_paid_order(*, order, actor, reason=""):
+# S14 (BR-GH-07): lý do huỷ đơn đã thanh toán. OTHER bắt buộc `note` đi kèm (kiểm ở API).
+CANCEL_REASON_LABELS = {
+    "CUSTOMER_CHANGED_MIND": "Khách đổi ý",
+    "DAMAGED_WHEN_PACKING": "Hư hỏng khi soạn hàng",
+    "GIVE_UP_AFTER_FAILED": "Bỏ giao sau khi thất bại",
+    "OTHER": "Khác",
+}
+CANCEL_REASON_CODES = set(CANCEL_REASON_LABELS)
+
+# Trạng thái phiếu giao còn giữ hàng TẠI KHO — huỷ ở đây thì hoàn kho được ngay.
+_STOCK_STILL_IN_WAREHOUSE = (DeliveryNote.Status.PREPARING, DeliveryNote.Status.READY)
+
+
+def cancel_paid_order(*, order, actor, reason="", reason_code=""):
     """
-    Huỷ đơn đã thanh toán (BR-HT-05): hoàn kho về ĐÚNG lô gốc theo SalesInvoiceLineBatch
-    (record_movement CANCEL_RESTORE +qty). Kho và tiền là hai sổ tách nhau — hoàn tiền
-    đi riêng qua create_refund/confirm_refund. Doanh thu KHÔNG đảo ở đây (BR-HT-06:
-    đảo tại thời điểm tạo phiếu hoàn, vào kỳ phát sinh hoàn).
+    Huỷ đơn đã thanh toán (BR-HT-05, BR-GH-07): chặn khi phiếu giao đang Đang giao
+    (BR-GH-07) hoặc đã Hoàn tất (BR-GH-05, không quay lui — chỉ còn cách lập phiếu hoàn).
+
+    Hoàn kho về ĐÚNG lô gốc theo SalesInvoiceLineBatch (record_movement CANCEL_RESTORE
+    +qty) CHỈ khi hàng còn ở kho (phiếu Soạn hàng/Chờ lấy hàng). Phiếu Giao thất bại thì
+    hàng đang ở người giao hoặc chờ duyệt hàng hoàn (P-08) — KHÔNG hoàn kho ở đây, để tránh
+    cộng kho hai lần khi hàng hoàn đó sau này được duyệt nhập lại (Q8b).
+
+    Kho và tiền là hai sổ tách nhau — hoàn tiền đi riêng qua create_refund/confirm_refund.
+    Doanh thu KHÔNG đảo ở đây (BR-HT-06: đảo tại thời điểm tạo phiếu hoàn, vào kỳ phát
+    sinh hoàn). Trả dict {"order", "stock_restored", "delivery_note"}.
     """
     with transaction.atomic():
         o = SalesOrder.objects.select_for_update().get(pk=order.pk)
@@ -303,24 +324,53 @@ def cancel_paid_order(*, order, actor, reason=""):
         if invoice is None:
             raise BusinessError("Đơn đã thanh toán nhưng chưa có hoá đơn — không thể hoàn kho.")
 
-        for inv_line in invoice.lines.all():
-            for silb in inv_line.batch_allocations.select_related("batch"):
-                stock.record_movement(
-                    batch=silb.batch,
-                    qty_change=silb.qty,  # +qty: hoàn về lô gốc (BR-HV-01 tinh thần)
-                    movement_type=StockLedgerEntry.MovementType.CANCEL_RESTORE,
-                    reference=f"cancel {o.code}",
-                    actor=actor,
+        note = (
+            DeliveryNote.objects.select_for_update()
+            .filter(sales_invoice=invoice)
+            .order_by("-id")
+            .first()
+        )
+        if note is not None:
+            if note.status == DeliveryNote.Status.DELIVERING:
+                raise BusinessError(
+                    "Phiếu giao đang Đang giao — báo giao thất bại trước khi huỷ.",
+                    code="BR-GH-07",
+                )
+            if note.status == DeliveryNote.Status.COMPLETED:
+                raise BusinessError(
+                    "Đơn đã giao hoàn tất — chỉ còn cách lập phiếu hoàn.", code="BR-GH-05",
                 )
 
+        stock_restored = note is None or note.status in _STOCK_STILL_IN_WAREHOUSE
+        if stock_restored:
+            for inv_line in invoice.lines.all():
+                for silb in inv_line.batch_allocations.select_related("batch"):
+                    stock.record_movement(
+                        batch=silb.batch,
+                        qty_change=silb.qty,  # +qty: hoàn về lô gốc (BR-HV-01 tinh thần)
+                        movement_type=StockLedgerEntry.MovementType.CANCEL_RESTORE,
+                        reference=f"cancel {o.code}",
+                        actor=actor,
+                    )
+
+        old_status = o.status
         o.status = SalesOrder.Status.CANCELLED
         o.save(update_fields=["status"])
+
+        if note is not None:
+            note.status = DeliveryNote.Status.CANCELLED
+            note.save(update_fields=["status"])
+
         record_audit(
             "cancel_paid_order", actor=actor, obj=o,
-            changes={"status": {"from": SalesOrder.Status.PROCESSING, "to": o.status}},
+            changes={
+                "status": {"from": old_status, "to": o.status},
+                "stock_restored": stock_restored,
+                "reason_code": reason_code,
+            },
             note=reason,
         )
-    return o
+    return {"order": o, "stock_restored": stock_restored, "delivery_note": note}
 
 
 # --- S10: thao tác được phép trên đơn (luật + quyền) --------------------------
@@ -343,12 +393,23 @@ def available_actions(*, order, user):
             and user.has_perm("sales.confirm_payment_manual")):
         actions.append("confirm_payment")
     if (order.status in (SalesOrder.Status.PAID, SalesOrder.Status.PROCESSING)
-            and invoice is not None and user.has_perm("sales.cancel_paid_order")):
+            and invoice is not None and user.has_perm("sales.cancel_paid_order")
+            and _cancellable_delivery_status(invoice)):
         actions.append("cancel")
     if (invoice is not None and user.has_perm("sales.create_refund")
             and refundable_amount(invoice=invoice) > ZERO):
         actions.append("create_refund")
     return actions
+
+
+def _cancellable_delivery_status(invoice):
+    """BR-GH-07/05: không cho huỷ khi phiếu giao đang Đang giao hoặc đã Hoàn tất/Đã huỷ."""
+    notes = list(invoice.delivery_notes.all())  # Meta.ordering = -created_at,-id -> mới nhất trước
+    if not notes:
+        return True
+    return notes[0].status not in (
+        DeliveryNote.Status.DELIVERING, DeliveryNote.Status.COMPLETED, DeliveryNote.Status.CANCELLED,
+    )
 
 
 # --- nội bộ -----------------------------------------------------------------

@@ -1,11 +1,14 @@
 "use client";
 
-// S13 — Lập phiếu hoàn cho khoản tiền KHÔNG có hoá đơn (về sau khi đơn tự huỷ, chuyển thiếu mà khách không bù, không khớp
-// đơn, chuyển thừa — P5). Gửi `payment_transaction` (không kèm `sales_invoice`, BR-HT-01). Số tiền mặc định = số còn được
-// hoàn (`refundable_amount` BE tính; thiếu thì = số tiền của khoản), đọc bằng parseAmount dùng chung với S11 — sai thì báo
-// tại ô, không gửi. Vượt số còn hoàn thì nhắc tại ô nhưng vẫn cho gửi: BE là lớp chặn (BR-HT-04, câu nguyên văn — S13-AC3).
-// Lý do bắt buộc (ghi vào phiếu + nhật ký), điền sẵn theo loại lệch. `request_id` sinh một lần mỗi lần mở form: bấm đúp /
-// gửi lại sau lỗi mạng không tạo phiếu thứ hai. Phiếu tạo ra ở trạng thái Chờ hoàn — tiền CHƯA rời túi (xác nhận ở S16).
+// Lập phiếu hoàn — dùng chung cho HAI nguồn tiền (đúng một trong hai, BR-HT-01):
+//  - S13: khoản tiền KHÔNG có hoá đơn (về sau khi đơn tự huỷ, chuyển thiếu mà khách không bù, không khớp đơn, chuyển
+//    thừa — P5) → gửi `payment_transaction`.
+//  - S15: đơn CÓ hoá đơn (huỷ đơn đã thanh toán, hoàn toàn phần/một phần) → gửi `sales_invoice` + `is_partial`.
+// Số tiền mặc định = số còn được hoàn (`max` do nơi gọi tính — BE mới là lớp chặn thật, BR-HT-04), đọc bằng parseAmount
+// dùng chung với S11 — sai thì báo tại ô, không gửi. Vượt số còn hoàn thì nhắc tại ô nhưng vẫn cho gửi: BE trả lỗi nguyên
+// văn (S13-AC3). Lý do bắt buộc (ghi vào phiếu + nhật ký), điền sẵn theo nơi gọi. `request_id` sinh một lần mỗi lần mở
+// form: bấm đúp / gửi lại sau lỗi mạng không tạo phiếu thứ hai. Phiếu tạo ra ở trạng thái Chờ hoàn — tiền CHƯA rời túi
+// (xác nhận ở S16).
 
 import { useEffect, useId, useRef, useState } from "react";
 import { vnd } from "@/shared/lib/format";
@@ -13,12 +16,20 @@ import { Icon } from "@/shared/ui/Icon";
 import { AMOUNT_MSG, digits, parseAmount, type AmountProblem } from "../amount";
 import { createRefund } from "../api";
 import { QUEUE_MSG } from "../messages";
-import type { CreateRefundResult, PaymentQueueItem } from "../types";
+import type { CreateRefundInput, CreateRefundResult } from "../types";
 import { Consequences, FormFooter, FormHead, NoteField, useSubmit } from "./QueueFormParts";
 import s from "../orders.module.css";
 
+/** Nguồn tiền của phiếu hoàn (đúng một trong hai — BR-HT-01). `invoiceTotal` chỉ dùng để tính `is_partial`. */
+export type RefundTarget = { kind: "payment"; id: number } | { kind: "invoice"; id: number; invoiceTotal: string };
+
 type Props = {
-  item: PaymentQueueItem;
+  target: RefundTarget;
+  /** Số tiền tối đa còn được hoàn — mặc định điền sẵn ô số tiền; BE vẫn quyết (BR-HT-04). */
+  refundableMax: string;
+  reasonDefault: string;
+  /** Dòng phụ dưới câu hỏi (mã GD/khoản hoặc mã đơn/khách). */
+  subLabel: React.ReactNode;
   onBusy: (b: boolean) => void;
   onCancel: () => void;
   onDone: (r: CreateRefundResult) => void;
@@ -40,11 +51,11 @@ function newRequestId(): string {
   return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
 }
 
-export function RefundForm({ item, onBusy, onCancel, onDone }: Props) {
+export function RefundForm({ target, refundableMax, reasonDefault, subLabel, onBusy, onCancel, onDone }: Props) {
   const id = useId();
-  const max = digits(item.refundable_amount ?? item.amount);
+  const max = digits(refundableMax);
   const [amountRaw, setAmountRaw] = useState(max);
-  const [reason, setReason] = useState(QUEUE_MSG.refundReasonDefault[item.match_status] || "");
+  const [reason, setReason] = useState(reasonDefault);
   const [amountErr, setAmountErr] = useState<AmountProblem | null>(null);
   const [reasonErr, setReasonErr] = useState(false);
   const requestId = useRef<string>("");
@@ -75,10 +86,17 @@ export function RefundForm({ item, onBusy, onCancel, onDone }: Props) {
       reasonRef.current?.focus();
       return;
     }
-    void sub.run(
-      () => createRefund({ payment_transaction: item.id, amount: check.value, reason: r, request_id: requestId.current }),
-      onDone,
-    );
+    const body: CreateRefundInput =
+      target.kind === "payment"
+        ? { payment_transaction: target.id, amount: check.value, reason: r, request_id: requestId.current }
+        : {
+            sales_invoice: target.id,
+            amount: check.value,
+            is_partial: Number(check.value) < Number(target.invoiceTotal),
+            reason: r,
+            request_id: requestId.current,
+          };
+    void sub.run(() => createRefund(body), onDone);
   };
 
   return (
@@ -96,12 +114,7 @@ export function RefundForm({ item, onBusy, onCancel, onDone }: Props) {
         icon="currency_exchange"
         tone="warn"
         question={amount ? QUEUE_MSG.refundQuestion(amount) : QUEUE_MSG.refundQuestionNoAmount}
-        sub={
-          <>
-            {item.bank_txn_id} · {vnd(item.amount)}
-            {item.order ? ` · ${item.order.code}` : ""}
-          </>
-        }
+        sub={subLabel}
       />
 
       <div className="field">
@@ -165,7 +178,10 @@ export function RefundForm({ item, onBusy, onCancel, onDone }: Props) {
         items={[
           { icon: "schedule", text: QUEUE_MSG.refundConsequence1 },
           { icon: "pending", text: QUEUE_MSG.refundConsequence2 },
-          { icon: "monitoring", text: QUEUE_MSG.refundConsequence3 },
+          {
+            icon: "monitoring",
+            text: target.kind === "invoice" ? QUEUE_MSG.refundConsequence3Invoice : QUEUE_MSG.refundConsequence3,
+          },
           { icon: "history", text: QUEUE_MSG.consequenceAudit },
         ]}
       />

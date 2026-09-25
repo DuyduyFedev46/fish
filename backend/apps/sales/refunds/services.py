@@ -34,8 +34,10 @@ def refundable_amount(*, invoice):
 
 REFUND_AMOUNT_CODE = "BR-HT-04"
 REFUND_SOURCE_CODE = "BR-HT-01"
+REFUND_STATUS_CODE = "BR-HT-09"  # S16: phiếu hoàn sai trạng thái để đổi (confirm/mark-failed/retry)
 REFUND_AMOUNT_INVALID_MSG = "Số tiền hoàn phải lớn hơn 0."
 REFUND_AMOUNT_MIN_MSG = "Số tiền hoàn tối thiểu 1đ."
+REFUND_ALREADY_REFUNDED_MSG = "Phiếu đã hoàn, không đổi trạng thái được."
 
 
 def parse_refund_amount(raw):
@@ -158,9 +160,11 @@ def create_invoice_refund(*, invoice, amount, is_partial, reason, actor, request
         dup = find_duplicate(request_id=request_id, invoice=invoice)
         if dup is not None:
             return dup, True
-        if amount > refundable_amount(invoice=invoice):
+        remaining = refundable_amount(invoice=invoice)
+        if amount > remaining:
             raise BusinessError(
-                "Số tiền hoàn vượt quá số đã thu trừ các lần hoàn trước (BR-HT-04)."
+                f"Vượt số đã thu: còn được hoàn tối đa {vnd_short(remaining)}.",
+                code=REFUND_AMOUNT_CODE,
             )
 
         refund = Refund.objects.create(
@@ -180,6 +184,12 @@ def create_invoice_refund(*, invoice, amount, is_partial, reason, actor, request
     return refund, False
 
 
+def _block_if_already_refunded(r):
+    """BR-HT-09: phiếu Đã hoàn là điểm không quay lui — confirm/mark-failed/retry đều chặn."""
+    if r.status == Refund.Status.REFUNDED:
+        raise BusinessError(REFUND_ALREADY_REFUNDED_MSG, code=REFUND_STATUS_CODE)
+
+
 def confirm_refund(*, refund, bank_txn_ref, actor):
     """
     Xác nhận đã hoàn (PENDING -> REFUNDED). BẮT BUỘC bank_txn_ref (BR-HT-03) — không cho
@@ -191,10 +201,11 @@ def confirm_refund(*, refund, bank_txn_ref, actor):
 
     with transaction.atomic():
         r = Refund.objects.select_for_update().get(pk=refund.pk)
-        if r.status == Refund.Status.REFUNDED:
-            raise BusinessError("Phiếu hoàn đã ở trạng thái Đã hoàn.")
+        _block_if_already_refunded(r)
         if r.status not in (Refund.Status.PENDING, Refund.Status.FAILED):
-            raise BusinessError("Chỉ xác nhận hoàn cho phiếu đang chờ / thất bại.")
+            raise BusinessError(
+                "Chỉ xác nhận hoàn cho phiếu đang chờ / thất bại.", code=REFUND_STATUS_CODE,
+            )
 
         old_status = r.status
         r.status = Refund.Status.REFUNDED
@@ -214,3 +225,78 @@ def confirm_refund(*, refund, bank_txn_ref, actor):
 
             mark_payment_refunded(payment=r.payment_transaction, refund=r, actor=actor)
     return r
+
+
+# --- S16: phiếu hoàn chờ chuyển — báo thất bại / thử lại (BR-HT-09) ----------
+
+def mark_refund_failed(*, refund, reason, actor):
+    """
+    PENDING -> FAILED: Chủ báo chuyển khoản thất bại (vd sai số tài khoản). Giải phóng lại
+    số tiền của phiếu này cho lần hoàn khác (BR-HT-04: `refundable_amount`/
+    `payment_refundable_amount` loại phiếu FAILED khỏi tổng đã hoàn). Ghi AuditLog.
+    """
+    with transaction.atomic():
+        r = Refund.objects.select_for_update().get(pk=refund.pk)
+        _block_if_already_refunded(r)
+        if r.status != Refund.Status.PENDING:
+            raise BusinessError(
+                "Chỉ báo thất bại được khi phiếu đang Chờ hoàn.", code=REFUND_STATUS_CODE,
+            )
+        old_status = r.status
+        r.status = Refund.Status.FAILED
+        r.failure_reason = reason or ""
+        r.save(update_fields=["status", "failure_reason"])
+        record_audit(
+            "mark_refund_failed", actor=actor, obj=r,
+            changes={"status": {"from": old_status, "to": r.status}},
+            note=reason or "",
+        )
+    return r
+
+
+def retry_refund(*, refund, actor):
+    """
+    FAILED -> PENDING: Chủ thử chuyển lại. Vì phiếu FAILED không tính vào tổng đã hoàn
+    (BR-HT-04), lúc thử lại phải kiểm lại số còn hoàn — trong lúc chờ, một phiếu khác có
+    thể đã lấp đầy phần còn trống (S16-AC6). Ghi AuditLog.
+    """
+    with transaction.atomic():
+        r = Refund.objects.select_for_update().get(pk=refund.pk)
+        _block_if_already_refunded(r)
+        if r.status != Refund.Status.FAILED:
+            raise BusinessError(
+                "Chỉ thử lại được khi phiếu đang Thất bại.", code=REFUND_STATUS_CODE,
+            )
+        if r.sales_invoice_id:
+            remaining = refundable_amount(invoice=r.sales_invoice)
+        else:
+            remaining = payment_refundable_amount(payment=r.payment_transaction)
+        if r.amount > remaining:
+            raise BusinessError(
+                f"Vượt số tiền còn được hoàn: tối đa {vnd_short(remaining)}.",
+                code=REFUND_AMOUNT_CODE,
+            )
+        old_status = r.status
+        r.status = Refund.Status.PENDING
+        r.failure_reason = ""
+        r.save(update_fields=["status", "failure_reason"])
+        record_audit(
+            "retry_refund", actor=actor, obj=r,
+            changes={"status": {"from": old_status, "to": r.status}},
+        )
+    return r
+
+
+def refund_available_actions(*, refund, user):
+    """
+    Thao tác trên một phiếu hoàn ở hàng chờ (`available_actions`): confirm/mark_failed khi
+    Chờ hoàn; retry khi Thất bại. Mọi thao tác đòi `confirm_refund` (chỉ Chủ — BR-HT-07,
+    ranh giới "tiền rời túi").
+    """
+    if not user.has_perm("sales.confirm_refund"):
+        return []
+    if refund.status == Refund.Status.PENDING:
+        return ["confirm", "mark_failed"]
+    if refund.status == Refund.Status.FAILED:
+        return ["retry"]
+    return []

@@ -1954,3 +1954,153 @@ Story gọi là **menu con** "Hàng chờ thanh toán" của "Đơn & tiền" (S
 - Xác nhận / báo thất bại phiếu hoàn (S16) chưa có màn; e2e giả lập bằng `__caveMock.confirmRefund`.
 - Bộ lọc và khoản đang mở chưa lên URL (như #19 UI5); chưa chạy E2E trên backend thật cho S12/S13; chưa thử trên điện thoại thật.
 - Chưa commit, chưa deploy.
+
+## Lô L9 — S14, S15, S16 (BE) · 2026-09-26
+
+S14 (huỷ đơn đã thanh toán theo trạng thái phiếu giao, BR-GH-07 mới), S15 (tạo phiếu hoàn từ đơn,
+chống tạo trùng — tái dùng `request_id`/S13 đã có từ L8, chỉ viết lại thông điệp), S16 (phiếu hoàn
+chờ chuyển: `confirm`/`mark-failed`/`retry`, BR-HT-09 mới). TDD: viết đỏ trước cho từng AC (404/thiếu
+field/200 thay vì 400/message sai), rồi cài tối thiểu cho xanh. Chỉ sửa `backend/`.
+
+### Kết quả kiểm chứng
+- `cd backend && .venv/bin/python manage.py test` → **Ran 536 tests, OK** (mốc 512, cộng 24: 8 ở
+  S14, 6 ở S15, 10 ở S16 gồm 1 test timeline).
+- `makemigrations --check --dry-run` → `No changes detected` (sau khi thêm `delivery/0003` và
+  `sales/0004`). `manage.py check` → 0 issue.
+- `cd adapter && .venv/bin/python -m pytest -q` → **41 passed** (không đụng adapter ở lô này).
+
+### File đã sửa / thêm
+- `backend/apps/delivery/models.py`: thêm `DeliveryNote.Status.CANCELLED` ("Đã huỷ theo đơn") —
+  không tới qua state machine `advance_status` mà do `cancel_paid_order` gán thẳng.
+- `backend/apps/delivery/migrations/0003_alter_deliverynote_status.py` (mới): mở rộng `choices`
+  của `status` (giữ nguyên cột, không đổi kiểu — an toàn lùi).
+- `backend/apps/delivery/api.py`: `DeliveryNoteViewSet.filter_queryset` thêm lọc `?status=` (nhiều
+  giá trị, dấu phẩy) — cần để S14-AC2 (phiếu CANCELLED tự vắng mặt khi lọc trạng thái hoạt động).
+  Bảng điều phối đầy đủ (nhóm theo cột, `needs_decision`, `assigned_to=none|me|id`) vẫn là S17/S18,
+  **chưa làm** ở lô này.
+- `backend/apps/sales/models/refunds.py`: thêm `Refund.failure_reason` (TextField, blank).
+- `backend/apps/sales/migrations/0004_refund_failure_reason.py` (mới).
+- `backend/apps/sales/orders/services.py`:
+  - `cancel_paid_order` viết lại: nhận thêm `reason_code=""`; khoá dòng `DeliveryNote` mới nhất của
+    hoá đơn cùng lúc với đơn; chặn **BR-GH-07** (đang Đang giao) và **BR-GH-05** (đã Hoàn tất); chỉ
+    hoàn kho khi phiếu còn ở kho (Soạn hàng/Chờ lấy) — phiếu Giao thất bại thì **không** hoàn kho
+    (Q8b, tránh cộng kho hai lần với luồng duyệt hàng hoàn P-08 sau này); gán `DeliveryNote.CANCELLED`
+    khi huỷ thành công; trả `dict {"order", "stock_restored", "delivery_note"}` thay vì chỉ `order`
+    (không phá caller cũ — không ai dùng giá trị trả về trước lô này).
+  - Thêm hằng `CANCEL_REASON_LABELS`/`CANCEL_REASON_CODES` (4 lý do S14).
+  - `available_actions`: `"cancel"` giờ cũng kiểm trạng thái phiếu giao (`_cancellable_delivery_status`)
+    — ẩn khi Đang giao/Hoàn tất/Đã huỷ, khớp luật cancel thật.
+- `backend/apps/sales/orders/api.py`: action `cancel` nhận `{"reason_code", "note"}`, validate enum +
+  OTHER bắt buộc `note`, ghép thành câu lý do lưu AuditLog; trả đúng contract S14 (`order_status`,
+  `stock_restored`, `delivery_status`, `suggest_refund_amount`, `invoice_id`).
+- `backend/apps/sales/orders/timeline.py`: nhãn `cancelled` phân biệt hoàn kho hay không
+  (`stock_restored` trong `changes`); thêm xử lý `Refund` AuditLog → kind mới `refund_failed`,
+  `refund_retry` (S16).
+- `backend/apps/sales/refunds/services.py`:
+  - `create_invoice_refund`: viết lại thông điệp vượt số còn hoàn thành
+    `"Vượt số đã thu: còn được hoàn tối đa <X>đ."` (nợ để lại từ L8, khớp câu S15).
+  - Thêm `REFUND_STATUS_CODE = "BR-HT-09"`, `_block_if_already_refunded` (dùng chung cho
+    confirm/mark-failed/retry — REFUNDED là điểm không quay lui).
+  - Hàm mới: `mark_refund_failed` (PENDING→FAILED, lưu `failure_reason`), `retry_refund`
+    (FAILED→PENDING, kiểm lại số còn hoàn tại thời điểm thử lại vì phiếu FAILED không tính vào tổng
+    đã hoàn — S16-AC6), `refund_available_actions` (luật + quyền `confirm_refund`).
+- `backend/apps/sales/refunds/serializers.py`: `RefundSerializer` thêm `order_code`, `customer_name`,
+  `customer_phone`, `source_bank_txn_id`, `failure_reason`, `available_actions` (chỉ thêm field, không
+  đổi field cũ — response `create`/`confirm` cũ của S13/S15 không đổi kiểu dữ liệu).
+- `backend/apps/sales/refunds/api.py`: `filter_queryset` lọc `?status=` (nhiều giá trị); thêm
+  `select_related` cho order/customer qua cả hai nhánh; action mới `mark-failed` (url_path có gạch
+  ngang), `retry`, cả hai đòi `sales.confirm_refund` (custom_perm_actions).
+- `backend/apps/sales/admin.py`: khoá thêm `failure_reason` trong `RefundAdmin.locked_fields`.
+- `backend/README.md` (số test); `backend/apps/delivery/README.md`; `backend/apps/sales/orders/README.md`;
+  `backend/apps/sales/refunds/README.md`.
+- Test mới: `apps/sales/orders/tests/test_s14_cancel_paid_order.py` (8),
+  `apps/sales/refunds/tests/test_s15_refund_from_order.py` (6),
+  `apps/sales/refunds/tests/test_s16_refund_queue.py` (10).
+
+### Contract thực tế
+```
+POST /api/sales/orders/{id}/cancel/
+{"reason_code": "CUSTOMER_CHANGED_MIND", "note": ""}
+200 {"order_status": "CANCELLED", "stock_restored": true, "delivery_status": "CANCELLED",
+     "suggest_refund_amount": "540000", "invoice_id": 55}
+    // phiếu giao FAILED + GIVE_UP_AFTER_FAILED: "stock_restored": false, tồn lô không đổi
+400 {"code": "BR-GH-07", "detail": "Phiếu giao đang Đang giao — báo giao thất bại trước khi huỷ."}
+400 {"code": "BR-GH-05", "detail": "Đơn đã giao hoàn tất — chỉ còn cách lập phiếu hoàn."}
+400 {"code": "BR-HT-05", "detail": "Lý do huỷ không hợp lệ."}                              // reason_code sai/thiếu
+400 {"code": "BR-HT-05", "detail": "Bắt buộc nhập ghi chú khi chọn lý do khác (OTHER)."}
+403 thiếu sales.cancel_paid_order
+
+POST /api/sales/refunds/create/   (nhánh sales_invoice, S15 — nhánh payment_transaction giữ nguyên S13)
+{"sales_invoice": 55, "amount": "540000", "is_partial": false, "reason": "Huỷ đơn — khách đổi ý",
+ "request_id": "b2e0…uuid"}
+201 {"id": 5, "status": "PENDING", "amount": "540000", "sales_invoice": 55, ...}
+200 {..., "duplicate": true}                                          // cùng request_id (Q12)
+400 {"code": "BR-HT-04", "detail": "Vượt số đã thu: còn được hoàn tối đa 240.000đ."}
+400 {"code": "BR-HT-04", "detail": "Số tiền hoàn phải lớn hơn 0."}
+403 thiếu sales.create_refund
+
+GET /api/sales/refunds/?status=PENDING,FAILED
+200 {"count": 1, "next": null, "previous": null, "results": [
+  {"id": 5, "sales_invoice": 55, "payment_transaction": null, "amount": "540000", "is_partial": false,
+   "method": "MANUAL_TRANSFER", "status": "PENDING", "status_label": "Chờ hoàn", "bank_txn_ref": "",
+   "reason": "Huỷ đơn — khách đổi ý", "created_by": 3, "confirmed_by": null,
+   "created_at": "...", "confirmed_at": null, "request_id": null,
+   "order_code": "SO260925-...", "customer_name": "Chị Hoa", "customer_phone": "0901234567",
+   "source_bank_txn_id": "FT2626712345", "failure_reason": "", "available_actions": ["confirm", "mark_failed"]}]}
+    // phiếu FAILED: "available_actions": ["retry"], "failure_reason": "Sai số tài khoản"
+    // REFUNDED không nằm trong hàng chờ (không match ?status=PENDING,FAILED)
+
+POST /api/sales/refunds/5/confirm/       {"bank_txn_ref": "FT2626799999"} → 200 {"status": "REFUNDED", ...}
+POST /api/sales/refunds/5/mark-failed/   {"reason": "Sai số tài khoản"}    → 200 {"status": "FAILED", "failure_reason": "Sai số tài khoản", ...}
+POST /api/sales/refunds/5/retry/         {}                                → 200 {"status": "PENDING", "failure_reason": "", ...}
+400 {"code": "BR-HT-03", "detail": "Bắt buộc nhập mã giao dịch chuyển khoản (BR-HT-03)."}   // confirm thiếu bank_txn_ref
+400 {"code": "BR-HT-09", "detail": "Phiếu đã hoàn, không đổi trạng thái được."}             // REFUNDED: cả 3 action
+400 {"code": "BR-HT-09", "detail": "Chỉ báo thất bại được khi phiếu đang Chờ hoàn."}
+400 {"code": "BR-HT-09", "detail": "Chỉ thử lại được khi phiếu đang Thất bại."}
+400 {"code": "BR-HT-04", "detail": "Vượt số tiền còn được hoàn: tối đa 140.000đ."}          // retry, phiếu khác đã lấp đầy
+403 thiếu sales.confirm_refund (Quản lý — cả 3 action; GET list vẫn xem được, chỉ available_actions rỗng)
+```
+Route dùng router mặc định (có `/` cuối), giống `confirm` đã có — không thêm `path()` riêng trong
+`config/api_urls.py`.
+
+### Rule BR đã cài
+- **BR-GH-07** (mới, S14): huỷ đơn khi phiếu giao đang Đang giao → 400, phải báo giao thất bại trước.
+- **BR-GH-05** (S14): phiếu giao Hoàn tất là điểm không quay lui — huỷ đơn lúc đó chỉ còn lập phiếu hoàn.
+- **Q8b** (S14-AC3): phiếu Giao thất bại → huỷ đơn KHÔNG hoàn kho (`stock_restored=false`). Hàng chỉ về
+  kho thật khi NV giao ghi `return_to_warehouse` và Quản lý/Chủ duyệt (`apply_return`, P-08) — tránh
+  cộng kho hai lần đúng rủi ro BA đã nêu.
+- **BR-HT-09** (mới, S16): phiếu hoàn REFUNDED không đổi trạng thái được nữa qua bất kỳ action nào.
+  PENDING→FAILED (`mark-failed`, lưu lý do) và FAILED→PENDING (`retry`, tính lại BR-HT-04 vì phiếu
+  FAILED tạm thời không tính vào "đã hoàn"). Mỗi bước một AuditLog (`mark_refund_failed`/`retry_refund`).
+- **BR-HT-07** (nhắc lại): `confirm`/`mark-failed`/`retry` đều đòi `sales.confirm_refund` — chỉ Chủ (tiền
+  rời túi khỏi vựa). `create_refund`/`cancel_paid_order` vẫn của cả Chủ và Quản lý (việc khách phải chờ).
+- **S15 / BR-HT-01/04**: không có rule mới — tái dùng nguyên `create_invoice_refund`/`find_duplicate`
+  (`request_id`) đã cài từ L8; chỉ sửa câu thông báo vượt số còn hoàn cho khớp chữ story.
+
+### Giả định dev tự đặt (cần PO/BA xác nhận)
+1. **`reason_code` không hợp lệ/thiếu → 400 `BR-HT-05`** (mã BR-HT-05 dùng cho lỗi validate lý do huỷ,
+   chưa có trong bảng mã — đặt tạm cùng nhóm BR-HT vì cùng quy trình P-07). Story không nêu rõ mã cho
+   trường hợp này, chỉ nêu 400 khi OTHER thiếu note.
+2. **Chỉ một `DeliveryNote` mỗi hoá đơn** (đúng thực tế hiện tại — signal tạo đúng 1 phiếu khi xuất hoá
+   đơn, không có luồng tạo phiếu thứ hai). `cancel_paid_order` lấy phiếu **mới nhất** (`order_by("-id")`)
+   phòng hờ, nhưng chưa gặp trường hợp nhiều phiếu.
+3. **`available_actions.retry`** không tính trước số còn hoàn (giống giả định #1 của L8 cho hàng chờ
+   thanh toán) — có thể liệt kê `retry` nhưng bấm vào vẫn 400 `BR-HT-04` nếu vừa có phiếu khác lấp đầy.
+   FE chỉ đọc danh sách, không tự suy luật, nên không cần sửa nếu BA đổi ý.
+4. **`retry` xoá `failure_reason`** (về `""`) vì phiếu không còn Thất bại; lịch sử lý do cũ vẫn còn trong
+   `AuditLog.changes`/`note` của `mark_refund_failed`.
+5. **`created_by` trên dòng hàng chờ refund vẫn là ID** (không đổi thành username) để không phá contract
+   `create`/`confirm` đã có từ S13/L8 (ví dụ mẫu trong `02-stories.md` ghi `"created_by": "ql1"` — lệch
+   với thực tế, giống các lệch đã ghi nhận L-x ở các lô trước).
+6. **Bảng điều phối giao hàng đầy đủ (nhóm cột, `needs_decision`, gán/đổi NV giao) là S17/S18, chưa làm.**
+   Lô này chỉ thêm lọc `?status=` tối thiểu vào `DeliveryNoteViewSet` để chứng minh S14-AC2 (phiếu
+   CANCELLED vắng mặt khi lọc trạng thái hoạt động).
+
+### Còn nợ
+- S17 (bảng điều phối giao hàng: nhóm cột, `needs_decision`, `assigned_to=none|me|id`) và S18 (gán/đổi
+  NV giao) chưa làm — nằm ngoài phạm vi lô này.
+- Chưa kiểm đồng thời thật trên Postgres cho `retry` (N-8 cũ) — race giữa hai lần `retry`/`create_refund`
+  cùng lúc chỉ được test bằng SQLite tuần tự (khoá dòng `select_for_update` đã có nhưng chưa đo trên DB
+  thật).
+- `business-process-spec.md` chưa có BR-GH-07, BR-HT-09 (BA cập nhật khi duyệt, cùng nợ N-4 cũ).
+- Chưa commit, chưa deploy.
