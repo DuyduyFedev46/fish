@@ -32,6 +32,7 @@ Skill UI/UX cài nguyên bản (giữ LICENSE): pbakaus/impeccable, emilkowalski
 ibelick/ui-skills, vercel web-design-guidelines. Hướng thiết kế + chọn skill: `caveve-ui`.
 
 ## Luật chung
-- Không commit/push/deploy khi Duy chưa yêu cầu.
+- **Git:** mỗi khi xong một tính năng (một lô đã QA APPROVED) thì commit và `git push origin main` lên github.com/DuyduyFedev46/fish. Đây là quy ước Duy đặt ngày 2026-09-25. Repo đang công khai nên không bao giờ commit `.env` hay bí mật.
+- Không deploy khi Duy chưa yêu cầu.
 - Không báo "xong"/"test xanh" khi chưa chạy lệnh kiểm chứng trong lượt đó.
 - Không rò giá vốn, không xoá chứng từ, không lật quyết định trong `doc/decisions.md`.

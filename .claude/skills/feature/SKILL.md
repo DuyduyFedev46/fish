@@ -76,6 +76,14 @@ Giao `qa-tester` với danh sách story đã làm.
   2 vòng → dừng, báo Duy tình trạng + lỗi còn lại.
 - **APPROVED** → sang bước 5.
 
+## 4b. Commit & push (Duy yêu cầu)
+Khi lô đã QA APPROVED:
+1. Tự chạy lại test/build.
+2. `git add -A`, rồi commit với message tiếng Việt có mã story. Cuối message thêm dòng Co-Authored-By.
+3. `git push origin main`.
+
+Trước khi push, kiểm `git status` không có `.env`, DB hay bí mật nào.
+
 ## 5. Review & nghiệm thu
 - Chạy `/code-review` (hoặc `/security-review` nếu đụng phân quyền, thanh toán, webhook,
   giá vốn) trên phần đã đổi; sửa lỗi xác thực được qua `be-dev`/`fe-dev`.
@@ -99,4 +107,4 @@ Cho bug nhỏ / chỉnh sửa rõ ràng, 1 story:
 ## Nguyên tắc điều phối
 - Mỗi lượt giao việc: nêu rõ đường dẫn hồ sơ, mã story, phạm vi file được sửa, đầu ra cần trả.
 - Giữ chat ngắn: kết quả chi tiết nằm trong `doc/features/…`, chat chỉ tóm tắt + link file.
-- Không commit/push/deploy khi Duy chưa yêu cầu.
+- Commit + push sau mỗi lô đã qua QA (bước 4b). Deploy chỉ làm khi Duy nói rõ.
