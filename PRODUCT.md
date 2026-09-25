@@ -24,7 +24,7 @@ nhân viên nội bộ → tính đúng giá vốn và lãi lỗ theo từng lô
 
 ## Positioning
 
-Giá vốn và lãi lỗ **theo lô** là nguồn sự thật (landed cost gồm đá, vận chuyển, bốc vác); xuất kho FIFO theo lô. Một vựa, một kho. (suy luận: đây là điểm khác so với phần mềm bán hàng chung chung)
+Giá vốn và lãi lỗ **theo lô** là nguồn sự thật (landed cost gồm đá, vận chuyển, bốc vác); xuất kho FEFO theo lô, tức lô hạn dùng sớm nhất ra trước (Duy chốt 2026-09-26). Một vựa, một kho. (suy luận: đây là điểm khác so với phần mềm bán hàng chung chung)
 
 ## Operating Context
 

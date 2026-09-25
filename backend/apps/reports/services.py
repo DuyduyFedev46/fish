@@ -95,7 +95,8 @@ def period_pnl(*, year, month):
       hoá đơn trong kỳ (BR-BC-02) — KHÔNG tính lại theo landed_unit_cost hiện hành,
       khác với `batch_pnl`.
     - hoàn tiền: Σ Refund.amount có status=REFUNDED và confirmed_at thuộc tháng
-      (BR-BC-03/BR-HT-06) — ghi vào kỳ phát sinh hoàn, không sửa ngược kỳ cũ.
+      (BR-BC-03/BR-HT-06) — ghi vào kỳ phát sinh hoàn, không sửa ngược kỳ cũ. Chỉ phiếu
+      gắn hoá đơn (S13-AC5).
     """
     if not year or not month:
         raise BusinessError("Thiếu năm/tháng để tính báo cáo theo kỳ.")
@@ -111,8 +112,11 @@ def period_pnl(*, year, month):
             for alloc in line.batch_allocations.all():
                 cogs += alloc.qty * alloc.unit_cost
 
+    # S13-AC5: phiếu hoàn gắn giao dịch KHÔNG có hoá đơn (tiền về sau huỷ / thiếu / thừa) chưa
+    # từng ghi doanh thu (BR-TT-06) → không trừ vào lãi kỳ; chỉ trả lại tiền khách.
     refunds_qs = Refund.objects.filter(
         status=Refund.Status.REFUNDED, confirmed_at__year=year, confirmed_at__month=month,
+        sales_invoice__isnull=False,
     )
     refunds = sum((r.amount for r in refunds_qs), ZERO)
 

@@ -58,3 +58,8 @@ def vnd_display(amount):
     """Tiền hiển thị trong câu chữ: 540000 → "540.000 ₫" (không float, bất biến #7)."""
     d = Decimal(amount).quantize(Decimal("1"), rounding=ROUND_HALF_UP)
     return f"{int(d):,}".replace(",", ".") + " ₫"
+
+
+def vnd_short(amount):
+    """Tiền trong thông điệp lỗi theo contract: 300000 → "300.000đ" (S12/S13)."""
+    return vnd_display(amount).replace(" ₫", "đ")

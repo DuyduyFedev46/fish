@@ -1292,3 +1292,111 @@ be.sh + Shop next dev :3000 + qa5/shop_e2e.py       → 6/6
 kill PID (be, ad, ad_bad, fe-real, fe-mock, shop) + pkill next dev · lsof 8000/8100/8101/3000/3101/3102 → sạch · ps = 0 · backend/db.sqlite3 mtime 13/09
 ```
 Script, log, ảnh ở scratchpad `qa7/`: `api_l7b.py`, `ui_l7b.py`, `badtok_r2.py`, `r2/{mk.py,mkui.py,b12b13.py}`, `r2/*.out`, `shots/qa7r2-*.png`. Không sửa code sản phẩm, không sửa `erp-console/e2e/*`, không thêm test vào repo.
+
+---
+
+# QA lô L8 — S12 (hàng chờ thanh toán lệch), S13 (hoàn tiền không hoá đơn) + bổ sung tiền (tối thiểu 1đ, chuyển thừa, B7) · lần 1 · 2026-09-26
+
+## Kết luận: **APPROVED** — mọi AC S12/S13 và các quyết định bổ sung tiền của Duy (2026-09-26) đạt trên backend thật + adapter thật (uvicorn). Không rò giá vốn, không vượt quyền, không xoá/sửa trực tiếp chứng từ, AuditLog đầy đủ, không nhân đôi tiền qua mọi kịch bản bấm đúp/gửi lại. B7 (adapter 500 khi `transferAmount` ≤ 0/NaN, tồn từ lô L7) đã đóng. Hồi quy backend/adapter/build/e2e xanh 100%.
+
+## Tổng: **~125 phép kiểm trên backend + adapter thật** (webhook, API tay, quyền, rò giá vốn, chứng từ, AuditLog) · ✅ tất cả · ⏸ 1 (F1-AC5 combo của FEFO không có dữ liệu demo để dựng đơn thật, xem báo cáo FEFO riêng) · cộng hồi quy: 512 test BE · 41 test adapter · `makemigrations --check`/`check` sạch · 4 bản build sạch (erp-console thật, erp-console mock, erp-console trỏ BE thật, Shop thật) · e2e mock 375/375 (s7_shell 25, s8_views 47, s10_s11_orders 90, s12_s13_queue 100, s41_s47_staff 72, s48_password 41) · e2e BE thật 39/39 (`s41_s47_real`, quy trình tài khoản liền kề) + 3/3 (`shop_e2e`, Shop không rò giá vốn)
+
+Môi trường: Django `runserver` 127.0.0.1:8000 trên **SQLite tạm trong scratchpad** (`migrate` → `bootstrap_masterdata` → `seed_demo`, 7 lô gồm cặp FEFO `LO-0918`/`LO-0915`), adapter `uvicorn` 127.0.0.1:8100 thật (không mock), tài khoản test tự tạo (`loc` chu, `ql1` quan_ly, `ql9` quan_ly+`manage_staff`, `kho1` nv_kho+nv_giao, `khoonly` nv_kho, `giao1`, `giao2` nv_giao, `moi1` không nhóm, `nghi1` đã nghỉ, `admin` superuser). Không đụng `backend/db.sqlite3` (mtime vẫn 13/09 trước và sau lượt QA). Mọi server có PID riêng, tắt hết khi xong; `lsof` trên 8000/8100/3003/3101/3102 sạch sau lượt QA.
+
+## Theo AC
+
+| Mã AC | Kết quả | Bằng chứng |
+|---|---|---|
+| S12-AC1 (3 dòng hàng chờ, không có MATCHED) | ✅ | `?resolution_status=OPEN` trả đúng UNDERPAID/ORPHAN/UNMATCHED/OVERPAID, chưa từng thấy dòng MATCHED (MATCHED có `resolution_status=null`, không khớp filter) — kiểm trực tiếp trên dữ liệu tạo bằng webhook thật; U `test_s12_payment_queue.py`; M `s12_s13_queue.py` |
+| S12-AC2 (ATTACH_TO_ORDER) | ✅ | Webhook UNMATCHED (không `order_code`) → `resolve` gắn vào đơn Giữ chỗ đúng số tiền → `RESOLVED/ATTACHED`, đơn `PROCESSING`, có hoá đơn + phiếu giao; AuditLog `resolve_payment` actor=`loc`, `resolution: ATTACHED`, `order_status: {from: BOOKED, to: PROCESSING}` |
+| S12-AC3 (2 UNDERPAID cùng đơn, CONFIRM_ORDER đóng cả hai) | ✅ | 2 webhook 40%+60% cùng đơn → cả hai UNDERPAID/OPEN → `CONFIRM_ORDER` một lần → đơn `PROCESSING`, `resolved_payment_ids` có đúng 2 phần tử; AuditLog có 2 dòng `resolve_payment` `resolution: CONFIRMED` cùng đơn |
+| S12-AC4 (chưa đủ tiền, CONFIRM_ORDER) | ✅ | Đơn 310.000đ, mới trả 155.000đ (50%) → `CONFIRM_ORDER` → 400 `BR-TT-09` "Tổng tiền đã nhận 155.000đ < tổng đơn 310.000đ.", đơn không đổi |
+| S12-AC5 (đơn tự huỷ giữa chừng) | ✅ | Đơn BOOKED bị `cancel_expired_orders` tự huỷ (`AUTO_CANCELLED`) → webhook trả `ORPHAN`, không khôi phục đơn; `CONFIRM_ORDER` trên dòng ORPHAN đó → 400 `BR-TT-05`, đơn vẫn `AUTO_CANCELLED` |
+| S12-AC6 (resolve trùng) | ✅ | `resolve` lần 2 trên giao dịch đã RESOLVED → 400, không xử lý lại (kiểm cả `ATTACH_TO_ORDER` bấm đúp) |
+| S12-AC7 (quyền + menu con) | ✅ | API: `ql1`/`kho1`/`giao1` → 403 cả GET queue lẫn POST resolve; ẩn danh → 401. UI (console build trỏ BE thật, 1280px): đăng nhập `kho1`/`ql1`, nav không có "Hàng chờ thanh toán"; gõ thẳng `/orders/payments/` → hiện "Bạn không có quyền xem mục này", 0 nội dung hàng chờ, 0 field giá vốn trong HTML |
+| S13-AC1 (tạo phiếu hoàn cho ORPHAN) | ✅ | `POST /api/sales/refunds/create/` với `payment_transaction` của dòng ORPHAN → 201 `PENDING`; AuditLog `create_refund`; giao dịch vẫn `resolution_status=OPEN` cho tới khi xác nhận |
+| S13-AC2 (xác nhận phiếu hoàn) | ✅ | `POST /api/sales/refunds/{id}/confirm/` kèm `bank_txn_ref` → 200 `REFUNDED`; giao dịch gốc chuyển `RESOLVED/REFUNDED`; AuditLog `confirm_refund` + `resolve_payment` (resolution REFUNDED, `refund_id`, `refund_amount`, `bank_txn_ref`) |
+| S13-AC3 (vượt số còn hoàn) | ✅ | Tạo phiếu hoàn thứ hai trên giao dịch đã được hoàn đủ → 400 (không tạo nợ đúp); U `test_s13_refund_payment.py` kiểm đúng câu `BR-HT-04` "còn tối đa …" |
+| S13-AC4 (gửi cả hai nguồn) | ✅ | `{"sales_invoice": 1, "payment_transaction": <id>, ...}` → 400 `BR-HT-01` "Chỉ gửi một trong hai…" |
+| S13-AC5 (không trừ lãi kỳ) | ✅ (qua code review + U) | Đọc `apps/reports/services.py::period_pnl`: chỉ trừ phiếu hoàn có `sales_invoice`; giao dịch ORPHAN/UNDERPAID/UNMATCHED/OVERPAID chưa từng qua `issue_invoice` nên chưa từng ghi doanh thu — không có gì để trừ hụt. U `test_s13_refund_payment.py::…ac5` xanh. `GET /api/reports/period/` gọi được, không lỗi |
+| S13-AC6 (Quản lý thiếu quyền) | ✅ | `ql1` (không có `confirm_payment_manual`) tạo phiếu hoàn gắn `payment_transaction` → 403, kiểm trước cả khi đọc dữ liệu |
+
+## Bổ sung tiền (quyết định Duy 2026-09-26)
+
+| Hạng mục | Kết quả | Bằng chứng |
+|---|---|---|
+| Tối thiểu 1đ — adapter | ✅ | `transferAmount` = `0`, `-5`, `"0"`, `NaN`, `0.5`, `"0.99"` → adapter trả **400**, không forward Django, không ghi giao dịch |
+| Tối thiểu 1đ — S11 xác nhận tay | ✅ | `confirm-payment {"amount":"0.5"}` → 400 `BR-TT-08` "Số tiền tối thiểu 1đ." |
+| Tối thiểu 1đ — S13/S15 phiếu hoàn | ✅ | `refunds/create/ {"amount":"0.5"}` (nhánh hoá đơn) → 400 `BR-HT-04` "Số tiền hoàn tối thiểu 1đ." |
+| Chuyển thừa **lần đầu** (đơn Giữ chỗ) | ✅ | Webhook > tổng đơn (165.000 + 60.000) → đơn `PROCESSING`, `overpaid_amount: "60000"`; chi tiết đơn có đúng **2 dòng** thanh toán (MATCHED = tổng đơn, `-THUA` OVERPAID); dòng `-THUA` vào hàng chờ `OPEN`, `available_actions=["refund"]`; gửi lại webhook y hệt → **vẫn đúng 1** dòng `-THUA` (không nhân đôi tiền thừa); AuditLog `split_overpaid_payment` actor=None (webhook), có `bank_amount`/`overpaid_amount` |
+| Chuyển thừa **lần hai** (đơn đã thanh toán, P5/BR-TT-10) | ✅ | Webhook thứ hai (100.000đ) vào đơn đã `PROCESSING` → `matched:false`, `match_status:"OVERPAID"`, đơn không đổi trạng thái; vẫn đúng **1 hoá đơn** sau webhook thứ hai (không xuất đôi); đơn có đúng 3 dòng thanh toán (khớp + thừa lần đầu + thừa lần hai) |
+| B7 (adapter 500 khi số tiền ≤0/NaN) | ✅ **Đã đóng** | Lặp lại đúng ca gây lỗi ở lô L7 (`0`, `-5`, `"0"`, `NaN` trần) qua adapter thật → **400**, không còn 500 |
+
+## Ngoại lệ & biên
+- Bấm đúp `resolve` (ATTACH_TO_ORDER 2 lần liên tiếp) → 400 lần 2, không đổi gì thêm.
+- Gửi lại webhook trùng `bank_txn_id` (đủ tiền, thiếu tiền, ORPHAN, thừa) → luôn trả lại đúng kết quả đã ghi, **không** tạo thêm dòng nào (kiểm cả ORPHAN và OVERPAID, hai loại dễ bị nhân đôi nhất vì đi qua nhánh tách dòng/nhánh hoàn tiền).
+- 2 đơn tranh nhau: không lặp lại được trên SQLite đơn luồng (giống ghi nhận ⏸ đồng thời của các lô trước, cần Postgres/Cloud SQL thật — N-8 dev-notes).
+- Lô cuối/TTL: dùng thẳng `cancel_expired_orders` sau khi chỉnh `booked_expires_at` về quá khứ — xác nhận job tự huỷ đúng và webhook tới sau đó thành ORPHAN, không khôi phục đơn.
+
+## Phân quyền (bảng Group × hành động, hàng chờ + phiếu hoàn)
+
+| Hành động | Chủ | Quản lý | NV kho | NV giao | Chưa đăng nhập |
+|---|---|---|---|---|---|
+| `GET /api/sales/payments/` (hàng chờ) | 200 | 403 | 403 | 403 | 401 |
+| `POST .../resolve` | 200 (đúng luật) | 403 | 403 | 403 | 401 |
+| `POST /api/sales/refunds/create/` gắn `payment_transaction` | 200 | 403 | 403 | 403 | 401 |
+| Menu con "Hàng chờ thanh toán" | hiện | ẩn | ẩn | ẩn | — |
+| Gõ thẳng URL `/orders/payments/` | vào được | "Bạn không có quyền…" | "Bạn không có quyền…" | "Bạn không có quyền…" | về `/login/` |
+
+## Rò giá vốn
+- Quét đệ quy JSON `GET /api/sales/payments/?resolution_status=OPEN` (mọi loại lệch) cho `loc`: **0** field `unit_cost`/`purchase_rate`/`landed_unit_cost`/`rate` — đúng contract (hàng chờ vốn không có field giá vốn cho bất kỳ ai).
+- Quét đệ quy `GET /api/sales/orders/` (list + detail) cho `kho1`, `ql1`: **0** hit. Đối chứng: cùng endpoint với `loc` **có** `allocations[].unit_cost` — xác nhận phép quét hoạt động đúng (không dương tính giả).
+- HTML console thật (build trỏ BE thật, đăng nhập `kho1`) tại `/orders/payments/`: **0** field giá vốn trong DOM.
+
+## Chứng từ & AuditLog
+- `DELETE`/`PATCH` trên `sales/payments/{id}` và `sales/refunds/{id}` → **405** cả hai, dữ liệu không đổi.
+- `PATCH inventory/batches/{id}` field khoá (`expiry_date`) bởi Chủ → 400 `BR-PQ-14`, không sửa được kể cả Chủ.
+- AuditLog quan sát trực tiếp trên DB: `resolve_payment` (ATTACHED/CONFIRMED/REFUNDED, actor=`loc`, có `resolution_status: {from, to}`), `split_overpaid_payment` (actor=None, có `bank_amount`/`overpaid_amount`), `create_refund`, `confirm_refund` — đủ người, lúc, giá trị trước/sau; không dòng nào chứa dữ liệu thiếu.
+
+## Hồi quy
+
+| Ca | Kết quả |
+|---|---|
+| `backend manage.py test` | ✅ Ran 512 tests, OK |
+| `makemigrations --check --dry-run` / `manage.py check` | ✅ No changes detected / 0 issue |
+| `adapter pytest -q` | ✅ 41 passed |
+| erp-console `tsc --noEmit` · `npm run build` (thật) · `NEXT_PUBLIC_USE_MOCK=1 npm run build` · build trỏ BE thật (`NEXT_PUBLIC_API_BASE=:8000`) | ✅ exit 0 ×4; `out/` bản thật: 0 file chứa dấu mock (`__caveMock`, `mockPaymentsApi`, …) |
+| `frontend npm run build` (Shop) | ✅ exit 0 |
+| e2e mock (:3101) `s7_shell` · `s8_views` · `s10_s11_orders` · `s12_s13_queue` · `s41_s47_staff` · `s48_password` | ✅ 25/25 · 47/47 · 90/90 · 100/100 · 72/72 · 41/41 |
+| e2e BE thật (:3102, DB scratchpad riêng, mật khẩu `Songbien2026`) `s41_s47_real` | ✅ 39/39 |
+| `shop_e2e` (Shop thật :3003 → BE thật, không rò giá vốn) | ✅ 3/3 |
+
+## Lỗi
+Không có lỗi mới. **B7 (Medium, từ lô L7) nay đã đóng** — xem bảng "Bổ sung tiền" ở trên.
+
+### Ghi nhận (không chặn, đã có trong dev-notes là nợ cần PO chốt — QA xác nhận hành vi đúng như mô tả, không phải bug)
+- Tổng nhiều khoản UNDERPAID vượt tổng đơn khi gộp bằng `CONFIRM_ORDER`/`ATTACH_TO_ORDER` chưa tự tách phần thừa (dev-notes N/A mới, "Còn nợ" của lô bổ sung tiền) — cần PO chốt hướng, không thử thêm vì đã được ghi nhận chủ đích.
+- Endpoint `cancel`/`resolve` không có alias bỏ dấu `/` cuối giống nhau ở mọi route (`resolve` nhận cả hai, `cancel` chỉ nhận có `/`) — do Django `APPEND_SLASH`, không phải lỗi lô này, không thử nghiệm thêm.
+
+## Lệnh đã chạy (kèm output tóm tắt)
+```
+backend manage.py test                                     → Ran 512 tests in 27.6s OK
+makemigrations --check --dry-run · manage.py check          → No changes detected · 0 issues
+adapter pytest -q                                           → 41 passed
+erp-console tsc --noEmit                                    → sạch
+erp-console npm run build (thật, mock, trỏ BE thật :8000)   → exit 0 ×3, out/ 0 dấu mock
+frontend npm run build                                      → exit 0
+DB scratchpad: migrate → bootstrap_masterdata → seed_demo (7 lô) → seed_accounts.py (10 tài khoản + token)
+django runserver 127.0.0.1:8000 (SQLite scratchpad) + uvicorn adapter 127.0.0.1:8100 (thật)
+qa_money_fefo.py                                            → 32/32 PASS (webhook thiếu/đủ/thừa lần đầu, resend, unmatched, attach, confirm)
+qa_money_fefo2.py                                           → 27/27 PASS (ORPHAN + refund S13, quyền, rò giá vốn)
+kiểm tay: S12-AC4 (400 BR-TT-09), S13-AC4 (400 BR-HT-01), min 1đ trên confirm-payment/refund → đều đúng
+DELETE/PATCH payments, refunds, batches                     → 405/400 đúng, chứng từ không đổi
+AuditLog (Django shell, đọc trực tiếp)                       → resolve_payment/split_overpaid_payment/create_refund/confirm_refund đủ actor+changes
+erp-console build trỏ BE thật (:3102) + ui_real_check2.py    → 6/6 PASS (blocked message, 0 rò giá vốn, menu đúng)
+http.server 3101 (mock out) → e2e s7_shell/s8_views/s10_s11_orders/s12_s13_queue/s41_s47_staff/s48_password → 25/47/90/100/72/41 tất cả PASS
+DB scratchpad riêng (Songbien2026) + http.server 3102 (build BE thật) → s41_s47_real → 39/39
+DB scratchpad riêng + http.server 3003 (Shop build BE thật) → shop_e2e → 3/3
+kill mọi PID (django ×3 lượt tái sử dụng cổng, adapter ×2, http.server 3101/3102/3003) → lsof 8000/8100/3003/3101/3102 sạch → backend/db.sqlite3 mtime vẫn 13/09 (không đụng)
+```
+Script/log/ảnh ở scratchpad `qafinal/`: `qa_money_fefo.py`, `qa_money_fefo2.py`, `ui_real_check2.py`, `check_auditlog.py`, `seed_accounts.py`, `accounts_tokens.txt`, `shots_real/`, `shots_s41_47_real/`, `shots_shop/`. Không sửa code sản phẩm, không thêm test vào repo ngoài phạm vi cho phép.

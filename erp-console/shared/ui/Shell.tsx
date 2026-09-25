@@ -13,7 +13,7 @@ import { Icon } from "./Icon";
 import { RightRail } from "./RightRail";
 import { ThemeToggle } from "./ThemeToggle";
 import { useDrawerFocus } from "./useDrawerFocus";
-import { ACCOUNT_HREF, ACCOUNT_LABEL, NAV, visibleNav, type NavItem, type Viewer } from "@/shared/lib/nav";
+import { ACCOUNT_HREF, ACCOUNT_LABEL, navMatch, visibleNav, type NavItem, type Viewer } from "@/shared/lib/nav";
 
 export type ShellProps = {
   viewer: Viewer;
@@ -29,13 +29,18 @@ export type ShellProps = {
   children: React.ReactNode;
 };
 
-function isActive(pathname: string, item: NavItem): boolean {
-  return pathname === item.href || pathname.startsWith(item.href) || pathname + "/" === item.href;
+/**
+ * Mục đang chọn = mục khớp đường dẫn DÀI NHẤT (S12: "/orders/payments/" chọn mục con, không chọn "Đơn & tiền").
+ * Menu đáy không có mục con → mục cha sáng khi đang ở mục con của nó.
+ */
+function isActive(current: NavItem | undefined, item: NavItem, withParent = false): boolean {
+  if (!current) return false;
+  return current.key === item.key || (withParent && current.parent === item.key);
 }
 
 function titleFor(pathname: string): string {
   if (pathname === ACCOUNT_HREF || pathname + "/" === ACCOUNT_HREF) return ACCOUNT_LABEL;
-  const item = NAV.find((n) => isActive(pathname, n));
+  const item = navMatch(pathname);
   return item ? item.label : "Cá Về";
 }
 
@@ -52,6 +57,9 @@ export function Shell({ viewer, userName, roleText, onLogout, accountHref, assis
 
   const items = visibleNav(viewer);
   const sections = Array.from(new Set(items.map((i) => i.section)));
+  const current = navMatch(pathname, items);
+  // Menu đáy chỉ có mục chính; mục con vào qua tab con trong màn cha.
+  const topItems = items.filter((i) => !i.parent);
 
   // Đổi trang → đóng ngăn kéo
   useEffect(() => {
@@ -73,9 +81,9 @@ export function Shell({ viewer, userName, roleText, onLogout, accountHref, assis
   }, [leftOpen, rightOpen]);
 
   // Menu đáy: ≤5 mục thì hiện hết; nhiều hơn thì 4 mục đầu + "Thêm" (mở menu đầy đủ).
-  const overflow = items.length > 5;
-  const bottomItems = overflow ? items.slice(0, 4) : items;
-  const showBottom = items.length >= 2;
+  const overflow = topItems.length > 5;
+  const bottomItems = overflow ? topItems.slice(0, 4) : topItems;
+  const showBottom = topItems.length >= 2;
 
   const doLogout = async () => {
     setLoggingOut(true);
@@ -112,8 +120,8 @@ export function Shell({ viewer, userName, roleText, onLogout, accountHref, assis
                   <Link
                     key={i.key}
                     href={i.href}
-                    className={isActive(pathname, i) ? "active" : undefined}
-                    aria-current={isActive(pathname, i) ? "page" : undefined}
+                    className={[i.parent ? "sub" : "", isActive(current, i) ? "active" : ""].filter(Boolean).join(" ") || undefined}
+                    aria-current={isActive(current, i) ? "page" : undefined}
                   >
                     <Icon name={i.icon} />
                     {i.label}
@@ -203,8 +211,8 @@ export function Shell({ viewer, userName, roleText, onLogout, accountHref, assis
               <Link
                 key={i.key}
                 href={i.href}
-                className={isActive(pathname, i) ? "active" : undefined}
-                aria-current={isActive(pathname, i) ? "page" : undefined}
+                className={isActive(current, i, true) ? "active" : undefined}
+                aria-current={isActive(current, i) ? "page" : isActive(current, i, true) ? "true" : undefined}
               >
                 <Icon name={i.icon} />
                 <span className="lbl">{i.short}</span>

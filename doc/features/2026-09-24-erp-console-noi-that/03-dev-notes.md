@@ -1636,3 +1636,321 @@ Không có. `makemigrations --check --dry-run`: No changes detected.
 - Test "webhook rồi tay" ở Django giả lập body đúng shape adapter gửi. Adapter pytest kiểm riêng phần map `referenceCode` → `bank_txn_id`. Chưa có test tích hợp chạy thật hai tiến trình; phần này nhờ QA chạy lại `api_l7.py` / `api_extra.py`.
 - N-6 (tiền về cho đơn không còn BOOKED vẫn ghi MATCHED) chưa sửa, vì cần PO/BA chốt. B12 được chặn bằng mã trùng, không đụng N-6.
 - Chưa commit, chưa deploy.
+
+## Lô L8 — S12, S13 (BE) · 2026-09-25
+
+Gồm S12 (hàng chờ thanh toán lệch), S13 (hoàn tiền cho khoản tiền không có hoá đơn), P5/N-6 (tiền chuyển thừa vào hàng chờ) và B7 (adapter 500 khi `transferAmount` ≤ 0/NaN). Làm theo TDD: 35 test BE mới và 17 ca adapter mới, tất cả chạy đỏ trước khi cài (đỏ đúng lý do: 404 route chưa có, thiếu field `resolution_status`/`OVERPAID`, 200 thay vì 403, adapter 500).
+
+### Kết quả kiểm chứng
+- `cd backend && .venv/bin/python manage.py test` → **Ran 471 tests, OK** (mốc 436, thêm 35: 22 ở S12, 13 ở S13).
+- `makemigrations --check --dry-run` → `No changes detected` (sau khi thêm `sales/0003`). `manage.py check` → 0 issue.
+- `cd adapter && .venv/bin/python -m pytest -q` → **32 passed** (mốc 15, thêm 17 ca tham số hoá của B7).
+- Migration chạy thử trên SQLite trong scratchpad: `0002 → 0003 → 0002 → 0003` đều qua. Dữ liệu cũ ORPHAN được backfill thành `OPEN`, MATCHED giữ `null`.
+
+### File đã sửa / thêm
+- `backend/apps/sales/models/payments.py`: thêm `MatchStatus.OVERPAID`, `ResolutionStatus`, `Resolution`, các field `resolution_status` (null = khớp), `resolution`, `resolved_by` (PROTECT), `resolved_at`, `resolution_note`.
+- `backend/apps/sales/models/refunds.py`: `sales_invoice` cho phép null; thêm `payment_transaction` (PROTECT, null), `request_id` (UUID, unique, null); thêm CheckConstraint `refund_exactly_one_source`.
+- `backend/apps/sales/migrations/0003_payment_resolution_refund_source.py` (mới): schema và RunPython backfill `OPEN` cho UNDERPAID/ORPHAN/UNMATCHED. Lý do ghi ở docstring.
+- `backend/apps/sales/payments/services.py`:
+  - `_record_payment`: tiền về cho đơn không còn BOOKED/huỷ thì ghi `OVERPAID`, không còn ghi MATCHED (N-6). Đặt `resolution_status` ngay khi ghi.
+  - Hàm mới: `initial_resolution_status`, `order_paid_total` (dùng chung cho S11 `paid_total` và hàng chờ), `payment_available_actions`, `resolve_payment` (`_attach_to_order`, `_confirm_order`, `_issue_and_close`), `mark_payment_refunded`.
+- `backend/apps/sales/payments/internal_api.py`: giao dịch UNMATCHED từ webhook vào hàng chờ với `resolution_status=OPEN`.
+- `backend/apps/sales/payments/api.py`: `PaymentTransactionViewSet` đòi `confirm_payment_manual` ở **mọi** action. Thêm lọc `resolution_status`/`match_status` (nhiều giá trị, cách dấu phẩy), phân trang 20 dòng, action `resolve`.
+- `backend/apps/sales/payments/serializers.py`: viết lại `PaymentTransactionSerializer` theo dòng hàng chờ.
+- `backend/apps/sales/refunds/services.py`: thêm `parse_refund_amount`, `parse_request_id`, `find_duplicate`, `payment_refundable_amount`, `create_refund_for_payment`, `create_invoice_refund` (trả `(refund, duplicate)`, khoá dòng hoá đơn). `create_refund` giữ chữ ký cũ và bọc hàm mới. `confirm_refund` gọi `mark_payment_refunded` khi phiếu gắn giao dịch.
+- `backend/apps/sales/refunds/api.py`: `create` nhận đúng một trong `sales_invoice`/`payment_transaction`, xử lý `request_id`, không còn 500 khi thiếu key hoặc số tiền sai.
+- `backend/apps/sales/refunds/serializers.py`: thêm `payment_transaction`, `request_id`. `amount` ra dạng chuỗi `"300000"`. Mọi field chỉ đọc.
+- `backend/apps/sales/orders/api.py`: `needs_attention` = có giao dịch `resolution_status=OPEN` (giao dịch đã xử lý bị loại, gồm cả OVERPAID) hoặc phiếu giao FAILED. Bỏ hằng `ATTENTION_PAYMENT_STATUSES`.
+- `backend/apps/reports/services.py`: `period_pnl` chỉ trừ phiếu hoàn **gắn hoá đơn** (S13-AC5).
+- `backend/apps/sales/admin.py`: khoá các field `resolution_*` và `resolved_by`, cùng `payment_transaction` và `request_id` của phiếu hoàn (S9).
+- `backend/apps/sales/utils.py`: thêm `vnd_short` (`300000` → `"300.000đ"`, dùng trong thông điệp lỗi).
+- `backend/config/api_urls.py`: thêm route `sales/payments/<pk>/resolve` không có `/` cuối.
+- Test mới: `apps/sales/payments/tests/test_s12_payment_queue.py` (22), `apps/sales/refunds/tests/test_s13_refund_payment.py` (13).
+- README: `backend/README.md` (số test), `apps/sales/payments/README.md`, `apps/sales/refunds/README.md`.
+- Adapter:
+  - `adapter/app/main.py`: lỗi 400 dùng `exc.errors(include_context=False, include_input=False, include_url=False)` (B7).
+  - `adapter/app/schemas.py`: `transferAmount` đặt `allow_inf_nan=False`, validator kiểm `is_finite()`. Thêm `parse_sepay_datetime` và validator `transactionDate`.
+  - `adapter/app/sepay.py`: dùng `parse_sepay_datetime`.
+  - `adapter/tests/test_webhook.py`: thêm 3 test tham số hoá, tổng 17 ca.
+  - `adapter/README.md`.
+
+### Contract thực tế
+```
+GET /api/sales/payments/?resolution_status=OPEN          (nhiều giá trị: OPEN,RESOLVED; lọc thêm match_status=UNDERPAID,ORPHAN…; ?page=)
+200 {"count": 3, "next": null, "previous": null, "results": [
+  {"id": 88, "bank_txn_id": "FTUNDER", "amount": "300000", "received_at": "2026-09-25T10:00:00+07:00",
+   "match_status": "UNDERPAID", "match_status_label": "Thiếu tiền — chờ Chủ",
+   "source": "WEBHOOK", "source_label": "Webhook SePay",
+   "order": {"id": 101, "code": "SO260925-1A2B3C", "status": "BOOKED", "total_amount": "540000", "paid_total": "300000"},
+   "resolution_status": "OPEN", "resolution": "", "resolution_label": "", "resolved_by": null, "resolved_at": null,
+   "resolution_note": "", "refundable_amount": "300000", "available_actions": ["refund"]},
+  {"id": 89, "bank_txn_id": "FTNOCODE", "amount": "540000", …, "match_status": "UNMATCHED", "order": null,
+   "resolution_status": "OPEN", …, "available_actions": ["attach_to_order", "refund"]},
+  {"id": 90, …, "match_status": "OVERPAID", "match_status_label": "Chuyển thừa — đơn đã thanh toán, chờ Chủ",
+   "order": {"id": 77, …, "status": "PROCESSING", …}, "available_actions": ["refund"]}]}
+GET /api/sales/payments/88/          → 200 một dòng như trên (giao dịch khớp: resolution_status null, available_actions [])
+401 chưa đăng nhập · 403 thiếu sales.confirm_payment_manual (Quản lý, NV kho, NV giao — cả list, chi tiết và resolve)
+
+POST /api/sales/payments/88/resolve        (có hay không có "/" cuối đều được)
+{"action": "ATTACH_TO_ORDER", "order_id": 101, "note": "Khách ghi sai nội dung CK"}
+{"action": "CONFIRM_ORDER", "note": "Khách đã chuyển bù FT..."}
+200 {"payment_id": 88, "resolution_status": "RESOLVED", "resolution": "CONFIRMED", "order_status": "PROCESSING",
+     "invoice_id": 55, "delivery_note_code": "GH-INV260925-9F8E7D-A1B2C", "resolved_payment_ids": [87, 88]}
+200 {"payment_id": 89, "resolution_status": "OPEN", "resolution": "", "order_status": "BOOKED", "resolved_payment_ids": []}
+    // gắn khoản CHƯA đủ tiền: giao dịch được gắn đơn, thành UNDERPAID, vẫn chờ bù
+400 {"code": "BR-TT-05", "detail": "Đơn đã tự huỷ, chỉ còn cách hoàn tiền."}              // hoặc "Đơn đã huỷ, …"
+400 {"code": "BR-TT-09", "detail": "Tổng tiền đã nhận 300.000đ < tổng đơn 540.000đ."}
+400 {"code": "BR-TT-09", "detail": "Giao dịch đã được xử lý, không xử lý lại."}           // bấm đúp / đã đóng
+400 {"code": "BR-TT-09", "detail": "Cách xử lý không hợp lệ: ATTACH_TO_ORDER hoặc CONFIRM_ORDER (hoàn tiền thì tạo phiếu hoàn)."}
+400 {"code": "BR-TT-09", "detail": "Thiếu hoặc sai order_id." | "Không tìm thấy đơn để gắn." | "Chỉ gắn đơn cho giao dịch không khớp đơn."
+     | "Đơn không ở trạng thái Giữ chỗ (đã thanh toán hoặc đang xử lý)." | "Giao dịch chưa gắn đơn — gắn đơn trước (ATTACH_TO_ORDER)."
+     | "Chỉ xác nhận đơn từ giao dịch thiếu tiền." | "Giao dịch đang có phiếu hoàn — không dùng để xác nhận đơn."}
+403 thiếu sales.confirm_payment_manual · 404 giao dịch không tồn tại
+```
+```
+POST /api/sales/refunds/create/        (S13, gắn giao dịch; nhánh hoá đơn giữ nguyên, có thêm request_id)
+{"payment_transaction": 88, "amount": "300000", "reason": "Tiền về sau khi đơn tự huỷ", "request_id": "6f1c…uuid"}
+201 {"id": 9, "sales_invoice": null, "payment_transaction": 88, "amount": "300000", "is_partial": false,
+     "method": "MANUAL_TRANSFER", "status": "PENDING", "status_label": "Chờ hoàn", "bank_txn_ref": "", "reason": "…",
+     "created_by": 3, "confirmed_by": null, "created_at": "…", "confirmed_at": null, "request_id": "6f1c…uuid"}
+200 {… phiếu đã tạo …, "duplicate": true}                                   // cùng request_id
+400 {"code": "BR-HT-04", "detail": "Vượt số tiền còn được hoàn: tối đa 100.000đ."}
+400 {"code": "BR-HT-04", "detail": "Số tiền hoàn phải lớn hơn 0."}          // 0, âm, "abc", "", null, "NaN" (cả nhánh hoá đơn)
+400 {"code": "BR-HT-01", "detail": "Chỉ gửi một trong hai: sales_invoice hoặc payment_transaction."}
+400 {"code": "BR-HT-01", "detail": "Thiếu sales_invoice hoặc payment_transaction."}
+400 {"code": "BR-HT-01", "detail": "Giao dịch đã khớp hoá đơn — lập phiếu hoàn từ hoá đơn." | "Giao dịch không tồn tại."
+     | "request_id phải là UUID." | "request_id đã dùng cho phiếu hoàn khác."}
+400 {"code": "BR-TT-09", "detail": "Giao dịch đã được xử lý, không lập phiếu hoàn."}
+403 thiếu sales.create_refund; gắn payment_transaction mà thiếu sales.confirm_payment_manual (Quản lý) → 403, kiểm TRƯỚC dữ liệu
+POST /api/sales/refunds/9/confirm/ {"bank_txn_ref": "FTREF01"} → 200 {… "status": "REFUNDED" …}; giao dịch 88 → RESOLVED/REFUNDED
+```
+- `GET /api/sales/refunds/` có thêm `payment_transaction` và `request_id`. `amount` đổi từ `"300000.00"` sang `"300000"`, đúng quy ước contract. Trước lô này FE chưa đọc endpoint này.
+- Webhook nội bộ, khi tiền chuyển lần hai cho đơn đã thanh toán, trả `{"matched": false, "order_status": "PROCESSING", "match_status": "OVERPAID"}`. Trước đây trả `matched: true` / `MATCHED`.
+- Adapter: `transferAmount` ≤ 0 (`0`, `"0"`, `"-0"`, `-0.001`, `"0.00"`, `-5`), `NaN`/`Infinity` (dạng số trần hoặc chuỗi), `null`, chữ, hoặc `transactionDate` không parse được → **400** `{"detail": {"message": "Payload SePay không hợp lệ", "errors": [{"type", "loc", "msg"}]}}`, không forward Django. Trước đây các ca này trả 500.
+
+### Rule BR đã cài
+- **BR-TT-09** (mới, S12): giao dịch lệch vào hàng chờ `OPEN` ngay khi ghi. Chỉ đóng được qua ba đường, và mỗi đường ghi người, lúc, cách, ghi chú và AuditLog:
+  - gắn đơn (`resolve_payment` ATTACHED);
+  - xác nhận khi khách đã bù (CONFIRMED);
+  - xác nhận phiếu hoàn gắn giao dịch (REFUNDED).
+
+  AuditLog: `resolve_payment` ghi một dòng cho mỗi giao dịch được đóng. `attach_payment` ghi khi gắn đơn mà chưa đủ tiền.
+- **BR-TT-10** (mới, P5, đóng N-6): tiền về cho đơn đã thanh toán hoặc đang xử lý thì ghi `OVERPAID`. Không xuất hoá đơn lần hai, không trừ kho. Giao dịch vào hàng chờ, chỉ còn thao tác `refund`. **Cần BA thêm BR-TT-09/10 vào `business-process-spec.md`** (cùng BR-TT-08, nợ N-4).
+- **Q9 / BR-TT-04:** `CONFIRM_ORDER` chỉ chạy khi đơn còn Giữ chỗ và tổng đã trả ≥ tổng đơn. Tổng đã trả gồm các giao dịch MATCHED/UNDERPAID, **trừ** giao dịch đã hoàn hoặc đang có phiếu hoàn chưa Thất bại. Khi chạy, mọi khoản thiếu còn mở của đơn chuyển sang RESOLVED/CONFIRMED. Hoá đơn có `issued_at` = lúc Chủ xác nhận (BR-TT-06) và `payment_txn_ref` = các mã GD nối bằng dấu phẩy.
+- **BR-TT-05:** đơn đã tự huỷ hoặc đã huỷ thì trả 400 và không khôi phục đơn.
+- **BR-TT-07:** hàng chờ (xem, xử lý, và tạo phiếu hoàn gắn giao dịch) chỉ dành cho người có `confirm_payment_manual`, tức là Chủ.
+- **BR-HT-01/04 (S13):** phiếu hoàn gắn **đúng một** chứng từ. Có ràng buộc ở cả DB lẫn API. Số hoàn ≤ tiền giao dịch − các phiếu chưa Thất bại. Chỉ giao dịch còn OPEN mới lập phiếu hoàn trực tiếp được; giao dịch khớp thì phải hoàn theo hoá đơn.
+- **BR-BC-03 / BR-TT-06 (S13-AC5):** lãi kỳ không trừ phiếu hoàn không có hoá đơn.
+- **Chống bấm đúp:**
+  - `resolve`: khoá theo thứ tự đơn → giao dịch, cùng thứ tự với webhook nên không khoá chéo. Kiểm `OPEN` dưới khoá, nên lần gọi thứ hai nhận 400.
+  - Tạo phiếu hoàn: khoá dòng giao dịch hoặc hoá đơn, rồi kiểm `request_id` và số còn hoàn.
+- **BR-PQ-15:** endpoint hàng chờ không có field giá vốn. Có test quét đệ quy JSON.
+
+### Giả định dev tự đặt (cần PO/BA xác nhận)
+1. **`available_actions` của dòng thiếu tiền chỉ có `confirm_order` khi tổng đã đủ.** JSON mẫu S12 có `confirm_order` ở dòng 300k/540k, nhưng bấm vào sẽ luôn nhận 400. Làm theo quy ước chung ("thao tác làm được ở trạng thái hiện tại"). FE chỉ đọc list nên không phải sửa.
+2. `ATTACH_TO_ORDER` chỉ áp cho giao dịch **UNMATCHED** (chưa gắn đơn), và chỉ gắn vào đơn **Giữ chỗ**. Gắn mà chưa đủ tiền: giao dịch thành UNDERPAID của đơn đó, vẫn OPEN để chờ bù. Gắn mà đủ tiền (tính cả các khoản thiếu đã có của đơn) thì xác nhận đơn luôn. `match_status` được đánh giá lại khi gắn: một mình khoản này đủ thì MATCHED, không thì UNDERPAID. Dữ kiện "lúc nhận không khớp" còn trong AuditLog.
+3. `resolution_status = null` nghĩa là giao dịch khớp (không thuộc hàng chờ). Contract chỉ nêu OPEN/RESOLVED.
+4. Phiếu hoàn gắn giao dịch **được xác nhận** thì giao dịch chuyển RESOLVED/REFUNDED ngay, kể cả khi mới hoàn **một phần**. Làm đúng câu chữ trong S13. Phần còn lại (nếu có) không còn nút `refund`, vì giao dịch đã đóng.
+5. `request_id` được cài luôn cho **cả nhánh hoá đơn**, vì hai nhánh dùng chung endpoint và schema S15. Tức là S15-AC4 đã chạy được. Nếu bỏ trống thì không chống trùng (giữ tương thích).
+6. Nhánh hoá đơn: `sales_invoice` không tồn tại giờ trả **400** `BR-HT-01` thay cho 404, và thiếu key giờ trả 400 thay cho 500. Số tiền sai trả 400 `BR-HT-04` "Số tiền hoàn phải lớn hơn 0." (câu S15). Thông điệp vượt số đã thu của nhánh hoá đơn giữ như cũ; S15 sẽ viết lại.
+7. B7 xử lý luôn N-7 phía adapter, vì cùng endpoint và cùng lớp lỗi: `transactionDate` hỏng giờ trả 400 thay vì 500.
+
+### Còn nợ
+- Dữ liệu cũ trên production: giao dịch "lần hai" đã lỡ ghi MATCHED trước lô này (N-6) **không** được tự nhận ra, vẫn là MATCHED/null. Chưa kiểm dữ liệu production. Nếu cần, chạy một truy vấn tìm đơn có từ 2 giao dịch MATCHED trở lên, rồi Chủ xử lý tay.
+- Tiền về **nhiều hơn** tổng đơn ở lần đầu (đơn BOOKED) vẫn ghi MATCHED, phần thừa không vào hàng chờ. P5 chỉ nói về đơn đã thanh toán. Cần PO chốt.
+- Lùi migration `0003` trên Postgres sẽ **lỗi** nếu đã có phiếu hoàn không hoá đơn, vì cột `sales_invoice` không quay lại NOT NULL được. Lùi trên DB chưa có dữ liệu S13 thì chạy được.
+- Hàng chờ tốn khoảng 5–6 query mỗi dòng (tổng đã trả, số còn hoàn, available_actions). Với 20 dòng/trang thì ổn; nếu hàng chờ dài có thể annotate sau.
+- S16 (`mark-failed`, `retry`, list `?status=` có `order_code`, `source_bank_txn_id`) **chưa làm**. Phiếu FAILED trong test được đặt thẳng ở model.
+- Chưa kiểm đồng thời thật trên Postgres (N-8). SQLite trong test chạy tuần tự.
+- Chưa commit, chưa deploy.
+
+## Lô L8 — bổ sung tiền (BE) · 2026-09-26
+
+Theo "Quyết định của Duy về tiền (2026-09-26, sau lô L8)" ở cuối `02-stories.md`: (1) số tiền tối thiểu 1đ; (2) chuyển nhiều hơn tổng đơn ngay lần đầu thì đơn vẫn đã thanh toán, phần thừa vào hàng chờ như P5/BR-TT-10. Đóng mục nợ "Tiền về nhiều hơn tổng đơn ở lần đầu" của lô L8. Làm theo TDD: 16 test BE mới và 9 ca adapter mới, tất cả chạy đỏ trước khi cài (đỏ đúng lý do: 200 thay vì 400, thiếu dòng `-THUA`, adapter 500 với `1e30` khi mới thêm kiểm 1đ). Không đụng `apps/inventory`.
+
+### Kết quả kiểm chứng
+- `cd backend && .venv/bin/python manage.py test` → **Ran 512 tests, OK**. Mốc 471, cộng 16 test của lô này, cộng 25 test của việc FEFO/seed đang làm song song ở `apps/inventory`/`accounts.demo` (không phải của lô này). Có một lần chạy giữa chừng bị đỏ 3 test `accounts.demo` do file đang được sửa song song; chạy lại riêng app đó và cả suite đều xanh.
+- `makemigrations --check --dry-run` → `No changes detected`. **Không có migration mới.** `manage.py check` → 0 issue.
+- `cd adapter && .venv/bin/python -m pytest -q` → **41 passed** (mốc 32, thêm 9).
+
+### File đã sửa / thêm
+- `backend/apps/sales/payments/services.py`:
+  - `validate_amount` (và `parse_positive_amount`): sau khi làm tròn 0,01 mà < 1đ thì raise `AMOUNT_MIN_MSG` = "Số tiền tối thiểu 1đ." (≤ 0 vẫn dùng thông điệp cũ). Thêm hằng `AMOUNT_MIN`.
+  - `_record_payment`: khi khớp đủ mà số tiền > tổng đơn, dòng MATCHED chỉ mang đúng tổng đơn, rồi gọi `split_overpaid`.
+  - Hàm mới: `overpaid_split_id`, `split_overpaid`, `overpaid_amount`.
+  - `payment_outcome`: thêm `overpaid_amount` khi có phần thừa.
+  - `_attach_to_order`: gắn một giao dịch không khớp mà một mình nó lớn hơn tổng đơn thì cũng tách như trên.
+- `backend/apps/sales/payments/internal_api.py`: gom thân phản hồi vào `_result_body` (dùng cho cả lần đầu lẫn gửi lại), thêm `overpaid_amount` khi có.
+- `backend/apps/sales/orders/api.py`: `confirm-payment` định dạng `overpaid_amount` bằng `money_str`.
+- `backend/apps/sales/refunds/services.py`: `parse_refund_amount` đổi thông điệp < 1đ thành "Số tiền hoàn tối thiểu 1đ." `create_invoice_refund` giờ dùng `parse_refund_amount` (trước đây chỉ `Decimal(str())` và kiểm > 0), nên gọi thẳng service cũng bị chặn < 1đ.
+- Test mới: `backend/apps/sales/payments/tests/test_l8_tien_bosung.py` (16).
+- Test sửa: `backend/apps/sales/payments/tests/test_qa_l7_fix.py`. Ca `p("0.005") == 0.01` bị quyết định mới thay thế, nay là `None`; thêm `p("0.995") == 1.00`.
+- `adapter/app/schemas.py`: validator `transferAmount` từ chối số < 1đ sau khi làm tròn 0,01 ROUND_HALF_UP, cùng cách Django làm. Chỉ quantize khi giá trị < 1 để số khổng lồ không nổ `InvalidOperation` thành 500. Giá trị gửi Django giữ nguyên.
+- `adapter/tests/test_webhook.py`: thêm 9 ca (5 ca dưới 1đ → 400 không forward; `1`, `"1"`, `"0.995"` → forward; `1e30` → không 500).
+- README: `backend/README.md` (số test), `backend/apps/sales/payments/README.md`, `adapter/README.md`.
+
+### Thiết kế phần thừa: tách 2 dòng, không đổi schema
+Chọn cách **tách thành 2 dòng PaymentTransaction**, không thêm trường "số thừa" vào 1 dòng. Lý do:
+1. **Không cần migration.** Schema giữ nguyên (bất biến #8).
+2. **Toàn bộ S12/S13 chạy luôn mà không phải sửa.** Dòng phần thừa có `match_status=OVERPAID` và `resolution_status=OPEN`, y hệt dòng P5 "tiền về lần hai". Vì vậy hàng chờ, `refundable_amount` (= số tiền của dòng), `available_actions=["refund"]`, `create_refund_for_payment`, `mark_payment_refunded`, `needs_attention` và báo cáo lãi kỳ (phiếu hoàn gắn giao dịch không trừ lãi) đều đúng mà không thêm nhánh nào.
+3. **Giữ quy ước hiện có.** Nếu dùng 1 dòng, một dòng MATCHED (`resolution_status=null`) sẽ phải đồng thời nằm trong hàng chờ. Điều đó phá quy ước "null = khớp, không thuộc hàng chờ" và rẽ nhánh `payment_refundable_amount`/"hoàn theo hoá đơn".
+
+Chi tiết:
+- Dòng khớp giữ mã GD gốc, `amount` = tổng đơn. Hoá đơn = tổng đơn (không đổi).
+- Dòng thừa:
+  - mã `<mã GD>-THUA`; mã gốc bị cắt bớt nếu tổng vượt 100 ký tự;
+  - nếu mã đó đã bị chiếm thì dùng `-THUA2`, `-THUA3`… (cực hiếm);
+  - cùng `sales_order`, `source`, `received_at` với dòng khớp;
+  - `raw_payload = {"split_from": "<mã GD>", "bank_amount": "600000"}`. Payload gốc của SePay vẫn nằm ở dòng khớp.
+- Tổng hai dòng = đúng số ngân hàng báo.
+- **Idempotent:** mọi lần gửi lại (webhook, có hay không có mã đơn, khác hoa thường hoặc khoảng trắng) và xác nhận tay trùng mã đều gặp dòng khớp ở bước kiểm trùng BR-TT-03 **dưới khoá dòng đơn**, nên trả lại kết quả cũ, không tách thêm. Dòng thừa được tạo trong cùng transaction với dòng khớp.
+- **AuditLog:** `split_overpaid_payment` gắn lên dòng thừa, gồm `changes = {bank_txn_id, bank_amount, order, total_amount, overpaid_amount}`. Actor = Hệ thống (webhook) hoặc Chủ (xác nhận tay, `ATTACH_TO_ORDER`).
+- `order_paid_total` chỉ tính MATCHED/UNDERPAID, nên `paid_total` của đơn = tổng đơn (540.000), không tính phần thừa.
+
+### Contract thay đổi (chỉ **thêm** key, không đổi key cũ)
+```
+POST /api/internal/payments/sepay-webhook/   {"bank_txn_id": "FT600", "order_code": "SO…", "amount": "600000", …}  (đơn 540.000đ, Giữ chỗ)
+200 {"matched": true, "order_status": "PROCESSING", "match_status": "MATCHED", "overpaid_amount": "60000"}
+    // gửi lại cùng mã → cùng body, không tạo thêm dòng. Không thừa → KHÔNG có key overpaid_amount (như cũ).
+400 {"detail": "Số tiền (amount) không hợp lệ — Số tiền tối thiểu 1đ.", "code": "WEBHOOK_INVALID_INPUT"}   // "0.5", "0.99", "0.994"
+
+POST /api/sales/orders/{id}/confirm-payment   {"bank_txn_id": "FTM600", "amount": "600000"}
+200 {"result": "PAID", "duplicate": false, "order_status": "PROCESSING", "invoice_id": 55,
+     "delivery_note_code": "GH-…", "overpaid_amount": "60000"}
+400 {"code": "BR-TT-08", "detail": "Số tiền tối thiểu 1đ."}
+
+POST /api/sales/payments/{id}/resolve   {"action": "ATTACH_TO_ORDER", "order_id": 101}   (giao dịch 700.000đ, đơn 540.000đ)
+200 {"payment_id": 89, "resolution_status": "RESOLVED", "resolution": "ATTACHED", "order_status": "PROCESSING",
+     "invoice_id": 56, "delivery_note_code": "GH-…", "resolved_payment_ids": [89], "overpaid_amount": "160000"}
+    // giao dịch 89 đổi amount 700000 → 540000; dòng "FTNOCODE-THUA" 160000 OVERPAID/OPEN
+
+GET /api/sales/payments/?resolution_status=OPEN
+  {… "bank_txn_id": "FT600-THUA", "amount": "60000", "match_status": "OVERPAID",
+   "order": {"id": 101, "code": "SO…", "status": "PROCESSING", "total_amount": "540000", "paid_total": "540000"},
+   "resolution_status": "OPEN", "refundable_amount": "60000", "available_actions": ["refund"]}
+
+POST /api/sales/refunds/create/   {"payment_transaction": <id dòng -THUA>, "amount": "60000", …} → 201 như S13
+400 {"code": "BR-HT-04", "detail": "Số tiền hoàn tối thiểu 1đ."}     // "0.5" — cả nhánh hoá đơn lẫn nhánh giao dịch
+400 {"code": "BR-HT-04", "detail": "Vượt số tiền còn được hoàn: tối đa 60.000đ."}
+```
+- Adapter: `transferAmount` > 0 nhưng < 1đ sau làm tròn (`0.5`, `"0.99"`, `0.004`, `"0.994"`, `"0.01"`) → **400** `{"detail": {"message": "Payload SePay không hợp lệ", "errors": [{…, "loc": [..., "transferAmount"], "msg": "Value error, transferAmount tối thiểu 1đ"}]}}`, không forward Django. `"0.995"` (làm tròn thành 1,00) vẫn forward.
+- Chi tiết đơn (`payments[]`) và timeline sẽ thấy **2 dòng** cho khoản chuyển thừa: dòng MATCHED (tổng đơn) và dòng OVERPAID `-THUA` (phần thừa). FE không cần sửa để chạy đúng; có thể muốn hiển thị `overpaid_amount` sau khi xác nhận tay.
+- **FE cần làm:** chặn < 1đ ở ô số tiền (xác nhận tay, phiếu hoàn) theo quyết định của Duy. BE đã trả 400 kèm thông điệp ở trên.
+
+### Rule BR đã cài
+- **BR-TT-08** (mở rộng): số tiền tối thiểu 1đ, so sau khi làm tròn 0,01 ROUND_HALF_UP. Áp cho mọi đường nhận tiền: xác nhận tay (400 BR-TT-08), webhook nội bộ (400 WEBHOOK_INVALID_INPUT, cả nhánh không khớp đơn), adapter (400), phiếu hoàn cả hai nhánh (400 BR-HT-04).
+- **BR-TT-10** (mở rộng): chuyển thừa ngay lần đầu cho đơn Giữ chỗ thì đơn vẫn PAID → PROCESSING, hoá đơn = tổng đơn, phần thừa vào hàng chờ OPEN để Chủ hoàn qua S13. **BA cần thêm vào `business-process-spec.md`** cùng BR-TT-08/09/10 (nợ N-4).
+
+### Giả định dev tự đặt (cần PO/BA xác nhận)
+1. `ATTACH_TO_ORDER` một giao dịch mà **một mình nó** lớn hơn tổng đơn cũng được tách như lần đầu, vì cùng bản chất "một khoản ngân hàng > tổng đơn". Khác với webhook, ở đây `amount` của dòng giao dịch sẵn có bị **sửa** từ số ngân hàng xuống tổng đơn. Số gốc còn trong AuditLog `split_overpaid_payment.bank_amount` và `raw_payload.bank_amount` của dòng `-THUA`.
+2. Tối thiểu 1đ vẫn giữ làm tròn 0,01 (không ép số nguyên). `1.5` hợp lệ; `0.995` làm tròn thành `1.00` nên hợp lệ.
+3. Số tiền để trống ở xác nhận tay vẫn mặc định = tổng đơn, không qua kiểm 1đ (tổng đơn luôn ≥ 1đ).
+
+### Còn nợ
+- **Tổng nhiều khoản thiếu vượt tổng đơn** (Q9, `CONFIRM_ORDER`, hoặc `ATTACH_TO_ORDER` gộp với khoản thiếu đã có; vd 300.000 + 300.000 cho đơn 540.000) vẫn **chưa tách** phần thừa 60.000đ. Đơn được xác nhận, các khoản đóng CONFIRMED, và `paid_total` hiện 600.000 > tổng đơn. Muốn tách thì phải chọn khoản nào bị giảm; cần PO chốt.
+- Phần thừa có số lẻ < 1đ (vd đơn 540.000, chuyển 540.000,50) vẫn tạo dòng OVERPAID 0,50đ, nhưng không hoàn được vì phiếu hoàn tối thiểu 1đ. Thực tế VND không có số lẻ nên chưa xử lý.
+- Dữ liệu production trước lô này: khoản chuyển thừa lần đầu đã ghi MATCHED với toàn bộ số tiền, **không** được tách lại. Tìm bằng truy vấn `PaymentTransaction.amount > SalesOrder.total_amount` với `match_status=MATCHED`, rồi Chủ xử lý tay.
+- Chưa commit, chưa deploy.
+
+## Lô L8 — S12, S13 (FE) · 2026-09-26
+
+Chỉ `erp-console/`. Dựng mock theo contract story trước, rồi **khớp lại theo contract thực tế** ở "Lô L8 — S12, S13 (BE)" và
+"Lô L8 — bổ sung tiền (BE)". Rule thực thi phía màn: BR-TT-09 (hàng chờ, ba cách đóng), BR-TT-10 (chuyển thừa, P5 + chuyển thừa
+lần đầu), BR-TT-04/05/07/08 (xác nhận đơn, đơn tự huỷ, chỉ Chủ, tối thiểu 1đ), BR-HT-01/04 (phiếu hoàn đúng một nguồn, không vượt số
+còn hoàn, tối thiểu 1đ), BR-PQ-12 (menu con + ViewGuard), BR-PQ-15 (không có field giá vốn). Không mã BR mới.
+Skill: `caveve-ui`, `impeccable` (`context` + craft-floor, `detect`; không bật hooks), `emil-design-eng`, `baseline-ui`,
+`fixing-accessibility`, `nextjs-shop-patterns`.
+
+### Kết quả kiểm chứng
+- `./node_modules/.bin/tsc --noEmit` sạch. `npm run build` **thật** sạch (route mới `/orders/payments`); `out/` không chứa
+  `__caveMock|demo1234|Chế độ mock|mockOrdersApi|mockPaymentsApi|cave_erp_mock` (0 file).
+- E2E mock (bản build `NEXT_PUBLIC_USE_MOCK=1` chép sang scratchpad, `http.server` 127.0.0.1:3101 dưới `perl alarm`, đã kill theo PID,
+  `lsof -i tcp:3101` sạch): **mới** `e2e/s12_s13_queue.py` **100/100**; hồi quy `s10_s11_orders` **90/90** · `s8_views` **47/47**
+  (45 + 2 kiểm FEFO) · `s7_shell` **25/25** (đổi kỳ vọng menu Chủ, xem dưới).
+- Grep hex/`rgba(` ngoài `tokens.css` = 0, `style={{` = 0. `impeccable detect --json features/orders features/overview features/inventory shared/ui/Shell.tsx` → `[]`.
+
+### Vị trí: module `features/orders/`, màn con `/orders/payments/` (không tách `features/payments/`)
+Story gọi là **menu con** "Hàng chờ thanh toán" của "Đơn & tiền" (S12-AC7). Màn cần tìm đơn (API đơn S10), mở chi tiết đơn liên quan
+(`OrderDetailSheet`) và dùng chung ô số tiền với S11 → tách module riêng sẽ phải import chéo vào ruột `orders` (trái quy tắc module).
+- `shared/lib/nav.ts`: mục `payments` (`parent: "orders"`, `href /orders/payments/`), hiện khi `sales.view_salesorder` **và**
+  `sales.confirm_payment_manual` (PERM mới `confirmPaymentManual`) và không chỉ thuộc `nv_giao`. Hàm mới `navMatch()` = khớp đường dẫn dài nhất.
+- `shared/ui/Shell.tsx`: mục con vẽ thụt (lớp `.nav a.sub`) ngay dưới mục cha; chỉ mục khớp dài nhất sáng; tiêu đề topbar theo `navMatch`;
+  menu đáy điện thoại **không** có mục con (mục cha "Đơn" sáng khi đang ở hàng chờ). `globals.css`: `.nav a.sub`.
+- Điện thoại vào hàng chờ qua **tab con** "Đơn hàng · Hàng chờ thanh toán" (`OrdersTabs`, chỉ < 768 px, chỉ người mở được hàng chờ) ở
+  đầu cả hai màn.
+- **Huy hiệu số lượng** chưa làm: S12/S13 không yêu cầu; thuộc S24 (`/api/dashboard/attention/` `payments_open`, lô L12).
+
+### Trang / component / hàm
+- **Danh sách** (`PaymentQueueScreen.tsx`): seg "Đang chờ / Đã xử lý" (`resolution_status=OPEN|RESOLVED`) + chọn loại lệch
+  (`match_status` = UNDERPAID / UNMATCHED / ORPHAN / OVERPAID) + Làm mới; 20 dòng + "Tải thêm khoản". Mỗi dòng là một nút ≥ 44 px:
+  loại lệch (chấm hổ phách) hoặc cách xử lý (xanh lá, tab Đã xử lý) · mã GD mono + giờ nhận · mã đơn / "Chưa gắn đơn" · số tiền căn phải
+  tabular. Trạng thái: khung chờ đúng hình, lỗi (Thử lại), 403 (icon khoá + câu BE), rỗng Đang chờ / rỗng Đã xử lý, không khớp lọc
+  ("Xem mọi loại"), làm mới lỗi giữ danh sách + dải lỗi.
+- **Tấm khoản tiền** (`PaymentSheet.tsx` + `PaymentView.tsx`, `SideSheet`): loại lệch + số tiền lớn · thuộc tính (mã GD, nhận lúc,
+  nguồn, "Còn được hoàn" khi đã có phiếu) · Đơn liên quan (mã, trạng thái, Tổng đơn / Đã nhận / Còn thiếu hoặc Thừa, nút "Xem đơn SO…"
+  mở `OrderDetailSheet` tải mới) · Đã xử lý (cách, người, lúc, ghi chú). Thanh nút dính đáy **chỉ theo `available_actions`**.
+  Sau thao tác: dòng báo kết quả (focus vào) theo response BE, tải lại khoản bằng `GET /api/sales/payments/{id}/` (lỗi → sửa tại chỗ
+  theo response, ẩn nút, nhắc làm mới), đóng tấm → danh sách tải lại + toast.
+- **Gắn vào đơn** (`AttachOrderForm.tsx`, `ATTACH_TO_ORDER`): seg "Đang giữ chỗ / Mọi đơn" + ô tìm (BE lọc `q`, trễ 300 ms, gọi
+  `listOrders`) → danh sách radio (`.check-row`): mã, tổng, khách + đuôi SĐT, trạng thái, nhãn "Bằng số tiền" khi tổng đơn = số tiền
+  (chỉ gợi ý hiển thị). Chưa chọn → báo tại chỗ, không gọi API. Câu hỏi nêu số tiền + mã đơn, hậu quả, ghi chú không bắt buộc.
+- **Xác nhận đơn** (`ConfirmOrderForm.tsx`, `CONFIRM_ORDER`): câu hỏi + tổng/đã nhận; còn thiếu theo số liệu thì nhắc trước (BE vẫn quyết,
+  BR-TT-09 nguyên văn); hậu quả "mọi khoản chuyển thiếu của đơn cùng được đóng"; kết quả nêu số khoản đã đóng (`resolved_payment_ids`).
+- **Lập phiếu hoàn** (`RefundForm.tsx`, S13): số tiền mặc định = `refundable_amount`, đọc bằng `parseAmount` (≥ 1 ₫, ≤ 12 chữ số); vượt
+  số còn hoàn thì nhắc tại ô nhưng vẫn gửi để BE trả BR-HT-04 nguyên văn (S13-AC3); lý do bắt buộc, điền sẵn theo loại lệch; `request_id`
+  UUID v4 sinh **một lần mỗi lần mở form** (`crypto.randomUUID`, dự phòng `getRandomValues`) → bấm đúp / gửi lại không tạo phiếu thứ hai;
+  200 `duplicate:true` báo "đã được lập trước đó". Hậu quả: tiền CHƯA rời túi, khoản vẫn trong hàng chờ tới khi phiếu được xác nhận (S16),
+  không trừ doanh thu/lãi.
+- Chung ba bước (`QueueFormParts.tsx`): đầu câu hỏi, ô ghi chú/lý do (textarea có `aria-invalid`, `aria-describedby`), danh sách hậu quả,
+  thanh nút (điện thoại: nút chính hàng riêng dưới cùng), **khoá gửi theo ref** (e2e bấm đúp → 1 POST), tấm không đóng khi đang gửi,
+  lỗi BE hiện **nguyên văn** ngay trên thanh nút. "Quay lại" trả focus về nút thao tác.
+- `amount.ts` (mới): `parseAmount`, `AMOUNT_MSG`, `digits`, `TXN_MAX_LENGTH` **đưa lên dùng chung trong module** từ `ConfirmPaymentForm`
+  (hành vi S11 không đổi). `usePagedList.ts` (mới): khung phân trang chung; `useOrderList` giờ là lớp mỏng trên nó.
+- Hàm API mới (`features/orders/api.ts`): `listPaymentQueue(params, page)`, `getPayment(id)`, `resolvePayment(id, input)`,
+  `createRefund(input)` — mỗi hàm có nhánh mock (`mockPaymentsApi`, `mockRefundsApi`). Kiểu ở `types.ts`; nhãn ở `labels.ts`
+  (`QUEUE_TYPE_*`, `RESOLUTION_LABEL`, OVERPAID); câu FE ở `messages.ts` (`QUEUE_MSG`); `shared/lib/beErrors.mock.ts` thêm câu BE L8 +
+  bổ sung tiền (chép nguyên văn).
+- **Bổ sung tiền (Duy 2026-09-26)**: ô số tiền S11 nhiều hơn tổng đơn → nhắc "phần thừa vào hàng chờ…"; kết quả confirm-payment PAID và
+  resolve ATTACH có `overpaid_amount` → thêm câu "Khách chuyển thừa X ₫ — đã đưa vào hàng chờ để hoàn." Dòng báo kết quả trong chi tiết đơn
+  có **liên kết "Mở hàng chờ thanh toán"** khi có phần thừa, UNDERPAID hoặc ORPHAN (chỉ người mở được hàng chờ). Chi tiết đơn hiện 2 dòng
+  (khớp + `-THUA`) không cần sửa gì. Tối thiểu 1đ: mọi ô số tiền của L8 (chỉ có ô phiếu hoàn; gắn đơn/xác nhận đơn không nhập tiền) và S11
+  đi qua `parseAmount` → `0,5`, `0.99` báo "Số tiền phải từ 1 ₫ trở lên…" tại ô, không gửi.
+- Mock (`features/orders/mock.ts`): hàng chờ dùng **chung kho đơn** (thao tác hàng chờ đổi chi tiết đơn, và ngược lại); gieo 106
+  UNDERPAID, 119 ORPHAN, 113 OVERPAID, 2 UNMATCHED (880 = 540.000 khớp đơn 101), 1 lịch sử đã hoàn. Luật như BE L8 (+ bổ sung tiền: tách
+  `-THUA`, 1đ). `needs_attention` của đơn = có giao dịch OPEN hoặc phiếu giao FAILED (như BE). Công cụ: `__caveMock.payments(mode)`,
+  `expireOrder`, `confirmRefund` (giả lập S16), `queueJson`, `resolveJson`, `refundJson`, `txnRefundsOf`.
+- Route: `app/(console)/orders/payments/page.tsx` (`<ViewGuard view="payments">`). README: `erp-console/README.md`, `features/orders/README.md`.
+
+### E2E
+- Mới `e2e/s12_s13_queue.py` (100 kiểm): menu con (vị trí, thụt, chỉ nó sáng, tiêu đề), S12-AC1 (5 khoản, không MATCHED, đủ 4 loại, cột
+  đúng), lọc `match_status`, S12-AC4 (chưa đủ → không có nút; gọi thẳng → BR-TT-09 nguyên văn), S12-AC2 (gắn 880 vào 101: tìm "chi hoa",
+  "Bằng số tiền", chưa chọn → không gọi API, bấm đúp → 1 POST, kết quả + phiếu giao, khoản RESOLVED ghi Lộc + ghi chú, mở chi tiết đơn thấy
+  Đang xử lý + giao dịch, toast, danh sách tải lại), S12-AC6, S12-AC5 (đơn tự huỷ giữa chừng → BR-TT-05 nguyên văn, không đổi gì),
+  S12-AC3 (tạo khoản thiếu thứ hai qua S11 → `confirm_order` xuất hiện → đóng **cả hai**), tab Đã xử lý, S13-AC1/AC2/AC3/AC4/AC6,
+  `request_id` UUID + trùng → `duplicate`, request_id sai → BR-HT-01, OVERPAID chỉ `refund`, chuyển thừa lần đầu (`-THUA`, câu + liên kết
+  hàng chờ), tối thiểu 1đ (BE + ô FE), lỗi/rỗng/403, S12-AC7 (ql1, kho1: không menu con, gõ URL bị chặn và không gọi API, resolve 403,
+  không tab con), 360/1280 sáng/tối: không cuộn ngang (danh sách, tấm, bước gắn, bước hoàn), vùng bấm ≥ 44 px, menu đáy không có mục con.
+- **Đổi `e2e/s7_shell.py` (không nới):** AC1 menu Chủ thêm "Hàng chờ thanh toán" ngay sau "Đơn & tiền" (S12 thêm mục con cho Chủ).
+- `e2e/s8_views.py` +2 kiểm FEFO (hồ sơ `2026-09-26-fefo`, xem dưới).
+
+### Ảnh (`shots/`, không lên git)
+`s12-list-{360,1280}-{light,dark}`, `s12-detail-{360,1280}-{light,dark}` (khoản không khớp), `s12-attach-{360,1280}-{light,dark}`,
+`s13-refund-{360,1280}-{light,dark}`, `s12-detail-under-1280-light`, `s12-detail-unmatched-1280-light`, `s12-attach-result-1280-light`,
+`s12-confirm-1280-light`, `s12-resolved-1280-light`, `s12-error-1280-light` (BR-TT-05), `s13-error-1280-light` (BR-HT-04),
+`s12-state-{fail,empty,forbidden}-1280-light`.
+
+### Lệch contract / cần BE, PO biết
+1. Dòng hàng chờ **không có** `order.customer_name`, nội dung chuyển khoản (`content`) và danh sách phiếu hoàn của khoản. FE đã sẵn chỗ
+   hiện (key optional) nhưng mock bám đúng BE nên không trả. Đề xuất BE thêm: tên khách giúp quét danh sách; **nội dung CK** giúp Chủ tìm
+   đúng đơn khi gắn khoản không khớp (quan trọng nhất); `refunds[]` để thấy phiếu Chờ hoàn của khoản (hiện chỉ suy ra qua `refundable_amount`).
+2. `resolved_by`: contract chưa rõ trả tên hay id. FE chỉ hiện khi là **chuỗi** (tên); là số thì hiện "—". Đề xuất BE trả `display_name`.
+3. `resolution` = `""` khi còn OPEN (không phải `null`) — FE chịu cả hai.
+4. Câu BR-TT-05 cho đơn huỷ tay chỉ ghi "Đơn đã huỷ, …" — mock tạm dùng "Đơn đã huỷ, chỉ còn cách hoàn tiền."; UI luôn hiện nguyên văn BE.
+5. FE gọi `…/resolve/` và `…/refunds/create/` có "/" cuối (BE nhận cả hai).
+6. Thứ tự danh sách: mock mới → cũ theo `received_at`; FE hiện nguyên thứ tự BE.
+
+### Còn nợ
+- Huy hiệu số khoản đang chờ trên menu/"Cần chú ý" → S24.
+- Xác nhận / báo thất bại phiếu hoàn (S16) chưa có màn; e2e giả lập bằng `__caveMock.confirmRefund`.
+- Bộ lọc và khoản đang mở chưa lên URL (như #19 UI5); chưa chạy E2E trên backend thật cho S12/S13; chưa thử trên điện thoại thật.
+- Chưa commit, chưa deploy.

@@ -48,7 +48,8 @@ with sync_playwright() as p:
     page.wait_for_load_state("networkidle")
     labels = nav_labels(page)
     labels = [l.split("\n")[-1].strip() for l in labels]
-    expected = ["Tổng quan", "Đơn & tiền", "Giao hàng", "Kho & lô", "Mua hàng", "Kiểm kê", "Báo cáo lãi lỗ", "Danh mục & giá", "Nhân sự · Nhật ký"]
+    # S12 (L8): Chủ có thêm mục con "Hàng chờ thanh toán" ngay dưới "Đơn & tiền" (sales.confirm_payment_manual).
+    expected = ["Tổng quan", "Đơn & tiền", "Hàng chờ thanh toán", "Giao hàng", "Kho & lô", "Mua hàng", "Kiểm kê", "Báo cáo lãi lỗ", "Danh mục & giá", "Nhân sự · Nhật ký"]
     ok("AC1 menu Chủ", labels == expected, str(labels))
     rr = page.locator("#rail-right")
     ok("AC7 1280: 3 cột (cột phải hiện)", rr.is_visible() and rr.bounding_box()["x"] > 900, str(rr.bounding_box()))

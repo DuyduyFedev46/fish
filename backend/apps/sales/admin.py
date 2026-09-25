@@ -81,11 +81,15 @@ class PaymentTransactionAdmin(LockedFieldsAdminMixin, admin.ModelAdmin):
     locked_fields = (
         "bank_txn_id", "sales_order", "amount", "match_status", "source",
         "raw_payload", "received_at",
+        # S12 / BR-TT-09: đóng hàng chờ chỉ qua console (service + AuditLog).
+        "resolution_status", "resolution", "resolved_at", "resolution_note",
     )
+    actor_fields = ("resolved_by",)
     superuser_only_add = True
 
-    list_display = ("bank_txn_id", "sales_order", "amount", "match_status", "source", "received_at")
-    list_filter = ("match_status", "source")
+    list_display = ("bank_txn_id", "sales_order", "amount", "match_status", "resolution_status",
+                    "source", "received_at")
+    list_filter = ("match_status", "resolution_status", "source")
     search_fields = ("bank_txn_id",)
     date_hierarchy = "received_at"
 
@@ -94,11 +98,12 @@ class PaymentTransactionAdmin(LockedFieldsAdminMixin, admin.ModelAdmin):
 class RefundAdmin(LockedFieldsAdminMixin, admin.ModelAdmin):
     # Phiếu hoàn chỉ sinh/chuyển trạng thái qua service (P-07, BR-HT).
     locked_fields = (
-        "status", "amount", "is_partial", "sales_invoice", "bank_txn_ref",
-        "confirmed_by", "confirmed_at",
+        "status", "amount", "is_partial", "sales_invoice", "payment_transaction", "bank_txn_ref",
+        "confirmed_by", "confirmed_at", "request_id",
     )
     actor_fields = ("created_by",)
     superuser_only_add = True
-    list_display = ("id", "sales_invoice", "amount", "is_partial", "method", "status", "created_by")
+    list_display = ("id", "sales_invoice", "payment_transaction", "amount", "is_partial", "method",
+                    "status", "created_by")
     list_filter = ("status", "method", "is_partial")
-    autocomplete_fields = ("sales_invoice", "created_by", "confirmed_by")
+    autocomplete_fields = ("sales_invoice", "payment_transaction", "created_by", "confirmed_by")

@@ -2,7 +2,7 @@
 Kho (P-04, P-09) — Batch là trái tim vận hành.
 
 - Tồn quản lý THEO LÔ, không gộp theo mặt hàng (BR-KK-01).
-- FIFO theo ngày nhập khi bán (BR-BH-05).
+- Xuất theo FEFO khi bán: hạn dùng sớm nhất trước, cùng hạn thì nhập trước (BR-BH-05).
 - Tồn khả dụng hiển thị Shop = qty_available − qty_reserved (BR-BH-01).
 - Vòng đời lô P-04; chốt lô đông cứng lãi/lỗ (BR-LO-05).
 - StockLedgerEntry: sổ chuyển động append-only — nền cho báo cáo (system-written).

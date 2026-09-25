@@ -148,4 +148,121 @@ export type ConfirmPaymentResult = {
   delivery_note_code?: string;
   paid_total?: string;
   missing?: string;
+  /** L8 bổ sung tiền: chuyển thừa ngay lần đầu → phần thừa thành dòng `<mã GD>-THUA` OVERPAID trong hàng chờ. */
+  overpaid_amount?: string;
+};
+
+// ---------------------------------------------------------------------------------------------------------------------
+// S12 — Hàng chờ thanh toán lệch (GET /api/sales/payments/?resolution_status=OPEN, POST …/{id}/resolve)
+// S13 — Hoàn tiền cho khoản không có hoá đơn (POST /api/sales/refunds/create {payment_transaction, amount, reason, request_id})
+// Khớp contract THỰC TẾ ở 03-dev-notes.md "Lô L8 — S12, S13 (BE)". Key optional = BE không luôn trả / FE đề xuất thêm.
+
+/** Loại lệch. UNDERPAID/ORPHAN/UNMATCHED (BR-TT-04/05); OVERPAID = tiền về cho đơn đã thanh toán (BR-TT-10, P5). */
+export type QueueMatchStatus = "UNDERPAID" | "ORPHAN" | "UNMATCHED" | "OVERPAID" | "MATCHED";
+
+export type ResolutionStatus = "OPEN" | "RESOLVED";
+/** Cách đã đóng khoản lệch (BR-TT-09): gắn vào đơn · xác nhận đơn khi khách đã bù · hoàn tiền (S13, qua phiếu hoàn đã xác nhận). */
+export type Resolution = "ATTACHED" | "CONFIRMED" | "REFUNDED";
+
+/** Thao tác trên một khoản lệch — BE tính cả luật lẫn quyền; FE chỉ đọc để hiện nút. */
+export type PaymentAction = "attach_to_order" | "confirm_order" | "refund" | string;
+
+/** Đơn liên quan của một khoản lệch (null khi tiền không khớp đơn nào — UNMATCHED). */
+export type QueueOrderRef = {
+  id: number;
+  code: string;
+  status: OrderStatus | string;
+  status_label?: string;
+  total_amount: string;
+  /** Tổng tiền đã nhận của đơn (MATCHED + UNDERPAID, trừ giao dịch đang có phiếu hoàn chưa Thất bại) — BE tính. */
+  paid_total: string;
+  /** FE đề xuất (BE L8 chưa trả) — có thì hiện tên khách cạnh mã đơn. */
+  customer_name?: string;
+};
+
+/** Phiếu hoàn đã lập cho khoản lệch (S13) — FE ĐỀ XUẤT, BE L8 chưa trả trong dòng hàng chờ; có thì hiện. */
+export type QueueRefund = {
+  id: number;
+  amount: string;
+  /** PENDING | REFUNDED | FAILED */
+  status: string;
+  status_label?: string;
+  bank_txn_ref?: string;
+};
+
+/** Một dòng của GET /api/sales/payments/ (phân trang DRF, 20 dòng/trang). */
+export type PaymentQueueItem = {
+  id: number;
+  bank_txn_id: string;
+  amount: string;
+  received_at: string | null;
+  match_status: QueueMatchStatus | string;
+  match_status_label?: string;
+  /** WEBHOOK | MANUAL */
+  source?: string;
+  source_label?: string;
+  /** Nội dung chuyển khoản trên sao kê (SePay `content`) — FE ĐỀ XUẤT, BE L8 chưa trả; có thì hiện. */
+  content?: string;
+  order: QueueOrderRef | null;
+  resolution_status: ResolutionStatus | string;
+  resolution?: Resolution | string | null;
+  resolution_label?: string;
+  /** Tên người xử lý (BE có thể trả id số — FE chỉ hiện khi là chuỗi). */
+  resolved_by?: string | number | null;
+  resolved_at?: string | null;
+  resolution_note?: string;
+  refunds?: QueueRefund[];
+  /** Số tiền còn được hoàn (BR-HT-04) — BE tính; thiếu thì FE mặc định = `amount`, BE vẫn chặn. */
+  refundable_amount?: string;
+  available_actions: PaymentAction[];
+};
+
+export type PaymentQueueParams = {
+  /** OPEN | RESOLVED. */
+  resolution_status: ResolutionStatus;
+  /** Lọc theo loại lệch (BE L8 nhận nhiều giá trị cách dấu phẩy). Rỗng = mọi loại. */
+  match_status: string;
+};
+
+export type ResolveInput =
+  | { action: "ATTACH_TO_ORDER"; order_id: number; note: string }
+  | { action: "CONFIRM_ORDER"; note: string };
+
+/** 200 của POST /api/sales/payments/{id}/resolve. */
+export type ResolveResult = {
+  payment_id: number;
+  resolution_status: ResolutionStatus | string;
+  /** "" khi khoản vẫn OPEN (gắn đơn mà chưa đủ tiền). */
+  resolution: Resolution | string | null;
+  order_status: OrderStatus | string;
+  /** Có khi đơn vừa đủ tiền (xuất hoá đơn + phiếu giao). */
+  invoice_id?: number;
+  delivery_note_code?: string;
+  /** Mọi giao dịch được đóng trong lần này (S12-AC3: cả hai khoản thiếu). */
+  resolved_payment_ids?: number[];
+  /** Khoản gắn vào lớn hơn tổng đơn → phần thừa tách thành dòng `-THUA` OVERPAID (L8 bổ sung tiền). */
+  overpaid_amount?: string;
+};
+
+/** Body POST /api/sales/refunds/create — S13 gửi `payment_transaction` (không kèm `sales_invoice`, BR-HT-01). */
+export type CreateRefundInput = {
+  payment_transaction: number;
+  amount: string;
+  reason: string;
+  /** Chống tạo trùng khi bấm đúp / gửi lại: cùng một lần mở form = cùng một mã. */
+  request_id: string;
+};
+
+/** 201 phiếu mới · 200 + `duplicate: true` khi cùng `request_id` (phiếu đã tạo trước đó). */
+export type CreateRefundResult = {
+  id: number;
+  status: string;
+  status_label?: string;
+  amount: string;
+  payment_transaction: number | null;
+  sales_invoice: number | null;
+  reason?: string;
+  bank_txn_ref?: string;
+  request_id?: string | null;
+  duplicate?: boolean;
 };

@@ -34,7 +34,10 @@ adapter/
   - Xác thực: header `Authorization: Apikey <SEPAY_WEBHOOK_SECRET>`
     (thiếu/sai -> `401`).
   - Payload không đúng dạng SePay (thiếu field bắt buộc, sai kiểu, số tiền
-    <= 0, ...) -> `400`.
+    <= 0 / dưới 1đ sau làm tròn 0,01 (L8, BR-TT-08) / NaN / Infinity, `transactionDate` không parse được, ...) -> `400`
+    `{"detail": {"message": "Payload SePay không hợp lệ", "errors": [{"type", "loc", "msg"}]}}`
+    (QA · B7: trước đây ra 500 vì `errors()` chứa `ValueError`/`Decimal` không JSON được;
+    nay bỏ `ctx`/`input`/`url`). Không forward Django.
   - Giao dịch `transferType != "in"` (không phải tiền vào) -> bỏ qua, trả
     `200 {"skipped": true, "reason": "not-incoming-transfer"}`, KHÔNG forward
     Django (đây là housekeeping của webhook, không phải business rule).

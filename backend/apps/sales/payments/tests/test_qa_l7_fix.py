@@ -43,7 +43,10 @@ class ParseAmountTests(SimpleTestCase):
         self.assertEqual(p("100.005"), Decimal("100.01"))
         self.assertEqual(p("100.004"), Decimal("100.00"))
         self.assertEqual(p(540000), Decimal("540000.00"))
-        self.assertEqual(p("0.005"), Decimal("0.01"))
+        # L8 (quyết định Duy 2026-09-26): tối thiểu 1đ → "0.005" (→ 0,01) nay bị từ chối,
+        # xem test_l8_tien_bosung; vẫn làm tròn 0,01 trước khi so 1đ.
+        self.assertIsNone(p("0.005"))
+        self.assertEqual(p("0.995"), Decimal("1.00"))
 
     def test_b13_tu_choi_sau_lam_tron_le_0_hoac_vuot_mien(self):
         p = payment_services.parse_positive_amount

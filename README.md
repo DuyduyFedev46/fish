@@ -41,7 +41,7 @@ pip install -r requirements.txt && uvicorn app:app --port 9000
 ## Tiến độ — tất cả các phase đã xong (V1)
 
 - ✅ Phase 1 — Data model (Django), phân quyền 3 tầng, Admin.
-- ✅ Phase 2 — Business logic (FIFO, giữ chỗ/TTL, landed cost, hoàn tiền, báo cáo).
+- ✅ Phase 2 — Business logic (FIFO → FEFO từ 2026-09-26, giữ chỗ/TTL, landed cost, hoàn tiền, báo cáo).
 - ✅ Phase 3 — DRF API (serializer tách Group chống rò rỉ giá vốn, scope dòng).
 - ✅ Phase 4 — FastAPI adapter (webhook SePay, 10 test).
 - ✅ Phase 5 — Next.js (Landing + Shop, build sạch).

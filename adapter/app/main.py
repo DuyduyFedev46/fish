@@ -131,7 +131,11 @@ async def webhook_sepay(
     except ValidationError as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail={"message": "Payload SePay không hợp lệ", "errors": exc.errors()},
+            # B7: ctx/input của pydantic có thể chứa ValueError/Decimal → không JSON được → 500.
+            detail={
+                "message": "Payload SePay không hợp lệ",
+                "errors": exc.errors(include_context=False, include_input=False, include_url=False),
+            },
         ) from exc
 
     if not is_incoming_transfer(payload):

@@ -13,6 +13,7 @@ from rest_framework.views import APIView
 
 from apps.common.exceptions import BusinessError
 from apps.sales.models import PaymentTransaction, SalesOrder
+from apps.sales.utils import money_str
 
 from . import services
 
@@ -35,13 +36,20 @@ def _token_ok(token):
 def _existing_response(payment):
     """R5 (review): giao dịch đã ghi trước đó → trả đúng kết quả thực tế (idempotent)."""
     order = payment.sales_order
-    return Response(
-        {
-            "matched": payment.match_status == PaymentTransaction.MatchStatus.MATCHED,
-            "order_status": order.status if order is not None else None,
-            "match_status": payment.match_status,
-        }
-    )
+    return Response(_result_body(payment, order.status if order is not None else None))
+
+
+def _result_body(payment, order_status):
+    """Kết quả gửi adapter; `overpaid_amount` chỉ có khi phần thừa đã tách vào hàng chờ (L8)."""
+    body = {
+        "matched": payment.match_status == PaymentTransaction.MatchStatus.MATCHED,
+        "order_status": order_status,
+        "match_status": payment.match_status,
+    }
+    extra = services.overpaid_amount(payment)
+    if extra is not None:
+        body["overpaid_amount"] = money_str(extra)
+    return body
 
 
 class SepayWebhookInternalView(APIView):
@@ -86,6 +94,9 @@ class SepayWebhookInternalView(APIView):
                     "sales_order": None,
                     "amount": amount,
                     "match_status": PaymentTransaction.MatchStatus.UNMATCHED,
+                    "resolution_status": services.initial_resolution_status(
+                        PaymentTransaction.MatchStatus.UNMATCHED
+                    ),  # BR-TT-09: vào hàng chờ
                     "source": PaymentTransaction.Source.WEBHOOK,
                     "raw_payload": d.get("raw") or {},
                     "received_at": received_at,
@@ -103,10 +114,4 @@ class SepayWebhookInternalView(APIView):
             return Response({"detail": str(exc), "code": exc.code}, status=400)
 
         order.refresh_from_db()
-        return Response(
-            {
-                "matched": payment.match_status == PaymentTransaction.MatchStatus.MATCHED,
-                "order_status": order.status,
-                "match_status": payment.match_status,
-            }
-        )
+        return Response(_result_body(payment, order.status))

@@ -36,9 +36,9 @@ class CreateOrderTests(SalesServiceBase):
         )
         self.assertEqual(order.customer.orders.count(), 2)
 
-    def test_order_spans_multiple_batches_fifo(self):
+    def test_order_spans_multiple_batches_fefo(self):
         ca = self._item("CA02", price="100000")
-        self._stocked_batch(ca, "5", received=self.yday)  # lô cũ ra trước
+        self._stocked_batch(ca, "5", received=self.yday)  # hạn = hôm qua+90: sớm hơn -> ra trước (FEFO)
         self._stocked_batch(ca, "5", received=self.today)
         order = order_services.create_order(
             customer_phone="0900000002", customer_name="B",
@@ -47,7 +47,7 @@ class CreateOrderTests(SalesServiceBase):
         )
         allocs = SalesOrderLineBatch.objects.filter(order_line__order=order).order_by("id")
         self.assertEqual(allocs.count(), 2)
-        self.assertEqual(allocs[0].qty, Decimal("5"))  # vét lô cũ trước
+        self.assertEqual(allocs[0].qty, Decimal("5"))  # vét lô hạn sớm trước
         self.assertEqual(allocs[1].qty, Decimal("2"))
 
     def test_insufficient_stock_rolls_back_whole_order(self):

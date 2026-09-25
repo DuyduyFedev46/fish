@@ -182,3 +182,102 @@ def test_b13_django_401_sai_token_noi_bo_van_502(client, valid_sepay_payload):
     resp = client.post("/webhook/sepay", json=valid_sepay_payload, headers=AUTH_HEADER)
 
     assert resp.status_code == 502
+
+
+# --- QA · B7 (Medium): transferAmount ≤ 0 / NaN → trước đây 500 (ValueError trong ctx không
+# JSON được). Phải 400, không forward Django, body lỗi JSON được. ------------------------------
+
+import pytest  # noqa: E402
+
+B7_BAD_AMOUNTS = [0, -5, "0", "-0", -0.001, "-0.001", "0.00", "-705000"]
+
+
+@pytest.mark.parametrize("amount", B7_BAD_AMOUNTS)
+@respx.mock
+def test_b7_transfer_amount_khong_duong_tra_400_khong_forward(client, valid_sepay_payload, amount):
+    route = respx.post(DJANGO_WEBHOOK_ENDPOINT).mock(return_value=httpx.Response(200, json={}))
+    payload = dict(valid_sepay_payload, transferAmount=amount)
+
+    resp = client.post("/webhook/sepay", json=payload, headers=AUTH_HEADER)
+
+    assert resp.status_code == 400, resp.text
+    body = resp.json()
+    assert body["detail"]["message"] == "Payload SePay không hợp lệ"
+    assert any(e["loc"][-1] == "transferAmount" for e in body["detail"]["errors"])
+    assert not route.called
+
+
+@pytest.mark.parametrize("raw", [b'NaN', b'Infinity', b'-Infinity', b'"NaN"', b'"abc"', b'null'])
+@respx.mock
+def test_b7_transfer_amount_nan_vo_cuc_chu_tra_400(client, valid_sepay_payload, raw):
+    route = respx.post(DJANGO_WEBHOOK_ENDPOINT).mock(return_value=httpx.Response(200, json={}))
+    body = json.dumps(dict(valid_sepay_payload, transferAmount="__X__")).encode()
+    body = body.replace(b'"__X__"', raw)
+
+    resp = client.post(
+        "/webhook/sepay", content=body,
+        headers={**AUTH_HEADER, "Content-Type": "application/json"},
+    )
+
+    assert resp.status_code == 400, resp.text
+    assert not route.called
+
+
+@pytest.mark.parametrize("value", ["khong-phai-ngay", "", "2024-13-45 99:99:99"])
+@respx.mock
+def test_b7_transaction_date_hong_tra_400_khong_500(client, valid_sepay_payload, value):
+    route = respx.post(DJANGO_WEBHOOK_ENDPOINT).mock(return_value=httpx.Response(200, json={}))
+    payload = dict(valid_sepay_payload, transactionDate=value)
+
+    resp = client.post("/webhook/sepay", json=payload, headers=AUTH_HEADER)
+
+    assert resp.status_code == 400, resp.text
+    assert not route.called
+
+
+# --- L8 (quyết định Duy 2026-09-26, BR-TT-08): số tiền tối thiểu 1đ SAU khi làm tròn 0,01
+# (ROUND_HALF_UP, cùng cách Django làm) → 400, không forward Django. ---------------------------
+
+L8_BELOW_MIN = [0.5, "0.99", 0.004, "0.994", "0.01"]
+
+
+@pytest.mark.parametrize("amount", L8_BELOW_MIN)
+@respx.mock
+def test_l8_transfer_amount_duoi_1d_tra_400_khong_forward(client, valid_sepay_payload, amount):
+    route = respx.post(DJANGO_WEBHOOK_ENDPOINT).mock(return_value=httpx.Response(200, json={}))
+    payload = dict(valid_sepay_payload, transferAmount=amount)
+
+    resp = client.post("/webhook/sepay", json=payload, headers=AUTH_HEADER)
+
+    assert resp.status_code == 400, resp.text
+    errors = resp.json()["detail"]["errors"]
+    assert any(e["loc"][-1] == "transferAmount" and "1đ" in e["msg"] for e in errors)
+    assert not route.called
+
+
+@pytest.mark.parametrize("amount", [1, "1", "0.995"])
+@respx.mock
+def test_l8_transfer_amount_tu_1d_sau_lam_tron_van_forward(client, valid_sepay_payload, amount):
+    route = respx.post(DJANGO_WEBHOOK_ENDPOINT).mock(
+        return_value=httpx.Response(200, json={"matched": False, "order_status": "BOOKED"})
+    )
+    payload = dict(valid_sepay_payload, transferAmount=amount)
+
+    resp = client.post("/webhook/sepay", json=payload, headers=AUTH_HEADER)
+
+    assert resp.status_code == 200, resp.text
+    assert route.called
+
+
+@respx.mock
+def test_l8_so_tien_khong_lo_khong_500_khi_kiem_1d(client, valid_sepay_payload):
+    """Kiểm 1đ không được quantize số khổng lồ (InvalidOperation → 500): vẫn chuyển Django xét miền."""
+    respx.post(DJANGO_WEBHOOK_ENDPOINT).mock(
+        return_value=httpx.Response(400, json={"detail": "quá lớn", "code": "WEBHOOK_INVALID_INPUT"})
+    )
+    body = json.dumps(dict(valid_sepay_payload, transferAmount="__X__")).encode()
+    body = body.replace(b'"__X__"', b'1e30')
+
+    resp = client.post("/webhook/sepay", content=body, headers={**AUTH_HEADER, "Content-Type": "application/json"})
+
+    assert resp.status_code == 400, resp.text

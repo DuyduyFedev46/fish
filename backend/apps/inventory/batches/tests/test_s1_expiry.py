@@ -68,7 +68,7 @@ class S1Base(TestCase):
 class S1ServiceTests(S1Base):
     def test_s1_ac1_lo_qua_han_bi_bo_qua_phan_bo_lo_con_han(self):
         a, b = self._ab()
-        alloc = batch_services.allocate_fifo(item=self.item, qty=Decimal("2"))
+        alloc = batch_services.allocate_fefo(item=self.item, qty=Decimal("2"))
         self.assertEqual([(x.pk, q) for x, q in alloc], [(b.pk, Decimal("2"))])
 
         order = self._order("2")
@@ -85,7 +85,7 @@ class S1ServiceTests(S1Base):
             received=self.today - datetime.timedelta(days=5),
             expiry=self.today + datetime.timedelta(days=10),
         )
-        alloc = batch_services.allocate_fifo(item=self.item, qty=Decimal("2"))
+        alloc = batch_services.allocate_fefo(item=self.item, qty=Decimal("2"))
         self.assertEqual(alloc[0][0].pk, a.pk)
         self.assertEqual(alloc[0][1], Decimal("2"))
 
@@ -107,11 +107,11 @@ class S1ServiceTests(S1Base):
         fake_now = datetime.datetime(2026, 9, 24, 17, 30, tzinfo=datetime.timezone.utc)
         with mock.patch("django.utils.timezone.now", return_value=fake_now):
             with self.assertRaises(BusinessError):
-                batch_services.allocate_fifo(item=self.item, qty=Decimal("1"))
+                batch_services.allocate_fefo(item=self.item, qty=Decimal("1"))
         # Cùng thời điểm tính theo UTC vẫn là ngày D -> trước 00:00 VN (16:59 UTC) bán được
         before_midnight = datetime.datetime(2026, 9, 24, 16, 59, tzinfo=datetime.timezone.utc)
         with mock.patch("django.utils.timezone.now", return_value=before_midnight):
-            alloc = batch_services.allocate_fifo(item=self.item, qty=Decimal("1"))
+            alloc = batch_services.allocate_fefo(item=self.item, qty=Decimal("1"))
         self.assertEqual(alloc[0][1], Decimal("1"))
 
     def test_s1_sellable_batches_la_nguon_chung(self):

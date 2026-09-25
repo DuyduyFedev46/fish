@@ -41,7 +41,7 @@ export type RecentOrder = {
   expires_at: string | null;
 };
 
-/** Tối đa 20 lô đang hoạt động (DRAFT/SELLING/NEAR_EXPIRY), FIFO theo received_date. */
+/** Tối đa 20 lô đang hoạt động (DRAFT/SELLING/NEAR_EXPIRY). Màn hiện theo thứ tự xuất FEFO (`fefoOrder`). */
 export type DashboardBatch = {
   batch_id: string;
   item: string;
@@ -96,4 +96,21 @@ export type DashboardSummary = {
 export function nearExpiryDays(data: Pick<DashboardSummary, "near_expiry_days">): number | null {
   const v = data.near_expiry_days;
   return typeof v === "number" && Number.isFinite(v) && v > 0 ? v : null;
+}
+
+/**
+ * Thứ tự xuất kho FEFO (BR-BH-05 sửa, hồ sơ 2026-09-26-fefo F2-AC1): hạn dùng sớm nhất trước, cùng hạn thì ngày nhập sớm
+ * hơn trước, cùng cả hai thì giữ thứ tự BE trả. Lô không có hạn xếp cuối. Chỉ để HIỂN THỊ — chọn lô thật do BE (F1).
+ */
+export function fefoOrder<T extends { expiry_date?: string | null; received_date?: string | null }>(rows: T[]): T[] {
+  const key = (v: string | null | undefined) => v || "9999-12-31";
+  return rows
+    .map((r, i) => ({ r, i }))
+    .sort(
+      (a, b) =>
+        key(a.r.expiry_date).localeCompare(key(b.r.expiry_date)) ||
+        key(a.r.received_date).localeCompare(key(b.r.received_date)) ||
+        a.i - b.i,
+    )
+    .map((x) => x.r);
 }

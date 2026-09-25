@@ -17,6 +17,7 @@ type Me = Viewer;
 export type ViewKey =
   | "overview"
   | "orders"
+  | "payments"
   | "deliveries"
   | "my-deliveries"
   | "inventory"
@@ -38,6 +39,11 @@ export type NavItem = {
   /** Mô tả ngắn + story sẽ làm — hiện ở khung chờ khi màn chưa có. */
   summary: string;
   plannedIn: string;
+  /**
+   * Mục con (menu con) — vẽ thụt vào ngay dưới mục cha ở menu trái, KHÔNG lên menu đáy điện thoại (trên điện thoại vào
+   * qua tab con trong màn cha). S12: "Hàng chờ thanh toán" là con của "Đơn & tiền".
+   */
+  parent?: ViewKey;
 };
 
 /**
@@ -47,6 +53,8 @@ export type NavItem = {
 export const PERM = {
   viewDashboard: "reports.view_dashboard",
   viewSalesOrder: "sales.view_salesorder",
+  /** S11/S12: chỉ Chủ — xác nhận tiền tay, xử lý hàng chờ thanh toán lệch (BR-TT-07, BR-TT-09). */
+  confirmPaymentManual: "sales.confirm_payment_manual",
   viewDeliveryNote: "delivery.view_deliverynote",
   viewBatch: "inventory.view_batch",
   viewPurchaseReceipt: "purchasing.view_purchasereceipt",
@@ -90,6 +98,20 @@ export const NAV: NavItem[] = [
     visible: (me) => has(me, PERM.viewSalesOrder) && !onlyDelivery(me),
   },
   {
+    key: "payments",
+    summary: "Khoản tiền về lệch: thiếu, thừa, về sau khi đơn tự huỷ, không khớp đơn.",
+    plannedIn: "S12, S13",
+    href: "/orders/payments/",
+    label: "Hàng chờ thanh toán",
+    short: "Hàng chờ",
+    icon: "rule",
+    section: "Điều hành",
+    parent: "orders",
+    // S12-AC7: chỉ người có sales.confirm_payment_manual (Chủ). Quản lý/NV kho có view_paymenttransaction nhưng BE trả 403
+    // cho GET ?resolution_status=OPEN → menu con không hiện.
+    visible: (me) => has(me, PERM.viewSalesOrder) && has(me, PERM.confirmPaymentManual) && !onlyDelivery(me),
+  },
+  {
     key: "deliveries",
     summary: "Bảng phiếu giao, gán và đổi người giao.",
     plannedIn: "S17",
@@ -113,7 +135,7 @@ export const NAV: NavItem[] = [
   },
   {
     key: "inventory",
-    summary: "Tồn theo lô, xuất FIFO, mở bán và chốt lô.",
+    summary: "Tồn theo lô, xuất theo hạn dùng sớm nhất (FEFO), mở bán và chốt lô.",
     plannedIn: "S8, S25",
     href: "/inventory/",
     label: "Kho & lô",
@@ -196,6 +218,17 @@ export const ACCOUNT_LABEL = "Tài khoản của tôi";
 export function visibleNav(me: Me | null): NavItem[] {
   if (!me || me.home === "no-role") return [];
   return NAV.filter((n) => n.visible(me));
+}
+
+/**
+ * Mục menu ứng với đường dẫn: khớp dài nhất thắng, để "/orders/payments/" chọn mục con "Hàng chờ thanh toán" chứ không
+ * phải mục cha "Đơn & tiền" ("/orders/").
+ */
+export function navMatch(pathname: string, items: NavItem[] = NAV): NavItem | undefined {
+  const path = pathname.endsWith("/") ? pathname : pathname + "/";
+  return items
+    .filter((n) => path.startsWith(n.href))
+    .sort((a, b) => b.href.length - a.href.length)[0];
 }
 
 export function navItem(key: ViewKey): NavItem {

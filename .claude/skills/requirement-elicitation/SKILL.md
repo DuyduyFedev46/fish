@@ -28,7 +28,7 @@ Nguồn tham khảo: BMAD `bmad-agent-analyst` + `bmad-advanced-elicitation`
    - *Ai*: tác nhân nào (Khách / Chủ / Quản lý / NV kho / NV giao / Hệ thống)? Group nào có quyền?
    - *Khi nào*: sự kiện kích hoạt, trạng thái trước/sau (state machine đơn, vòng đời lô).
    - *Tiền*: có làm đổi giá vốn, lãi lỗ, tiền rời túi không? → thuộc quyền Chủ.
-   - *Hàng*: có trừ/cộng tồn, ảnh hưởng FIFO, giữ chỗ, hạn dùng, chuỗi lạnh không?
+   - *Hàng*: có trừ/cộng tồn, ảnh hưởng FEFO (thứ tự xuất theo hạn), giữ chỗ, hạn dùng, chuỗi lạnh không?
    - *Sai thì sao*: huỷ, hoàn tiền, giao thất bại, trùng thao tác, mạng rớt, TTL hết.
 4. **Kiểm tra rủi ro Cá Về** (skill `caveve-domain`): rò giá vốn? xoá chứng từ? thiếu AuditLog?
 5. **Viết use case** cho mỗi luồng: tiền điều kiện → luồng chính (đánh số) → luồng thay thế
@@ -65,7 +65,7 @@ Nguồn tham khảo: BMAD `bmad-agent-analyst` + `bmad-advanced-elicitation`
 Model/field bị ảnh hưởng (không thiết kế chi tiết), API/màn hình liên quan, bên thứ 3.
 
 ## 8. Rủi ro Cá Về
-Giá vốn · phân quyền · chứng từ/AuditLog · FIFO/tồn · tiền
+Giá vốn · phân quyền · chứng từ/AuditLog · FEFO/tồn · tiền
 
 ## 9. Ngoài phạm vi
 

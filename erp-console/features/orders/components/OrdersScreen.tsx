@@ -23,6 +23,7 @@ import type { OrderListItem, OrderListParams } from "../types";
 import { useNow } from "../useNow";
 import { useOrderList } from "../useOrderList";
 import { OrderDetailSheet } from "./OrderDetailSheet";
+import { OrdersTabs } from "./OrdersTabs";
 import s from "../orders.module.css";
 
 /** YYYY-MM-DD theo giờ Việt Nam (BE lọc ngày theo Asia/Ho_Chi_Minh). */
@@ -137,6 +138,7 @@ export function OrdersScreen() {
 
   return (
     <div className="screen">
+      <OrdersTabs current="orders" />
       <p className="view-head">Vòng đời: giữ chỗ (có hạn) → thanh toán → xử lý → hoàn tất. Bấm một đơn để xem tiền, giao hàng và hoàn tiền.</p>
 
       <div className={s.bar}>

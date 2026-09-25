@@ -9,11 +9,14 @@ from apps.common.api import BusinessModelPermissions, DocumentViewSet, require_p
 from apps.inventory.models import Batch
 
 from . import services
+from .services import FEFO_ORDER
 from .serializers import BatchSerializer
 
 
 class BatchViewSet(DocumentViewSet):
-    queryset = Batch.objects.select_related("item", "supplier", "warehouse").all()
+    # Danh sách Kho & lô theo thứ tự xuất FEFO (BR-BH-05, UC-6); Meta.ordering giữ nguyên để
+    # không sinh migration.
+    queryset = Batch.objects.select_related("item", "supplier", "warehouse").order_by(*FEFO_ORDER)
     serializer_class = BatchSerializer
     permission_classes = [BusinessModelPermissions]
     custom_perm_actions = ("publish", "close")

@@ -14,7 +14,7 @@ R4 (code review trước deploy 1): dữ liệu demo tự nhất quán — lô n
 giữ chỗ qua `inventory.batches.reserve` + `SalesOrderLineBatch` (tồn giữ chỗ = Σ phân bổ của đơn
 BOOKED, job TTL nhả đúng); đơn đã thanh toán đi qua `payments.confirm_payment` (giao dịch MATCHED
 → hoá đơn đủ dòng + phân bổ lô + bút toán SALE, BR-BH-06/BR-TT-06); đơn tự huỷ đã nhả giữ chỗ.
-Demo chỉ giữ chỗ trên LÔ DEMO của mặt hàng (không FIFO sang lô thật) và không bao giờ đụng lô thật.
+Demo chỉ giữ chỗ trên LÔ DEMO của mặt hàng (không phân bổ FEFO sang lô thật) và không bao giờ đụng lô thật.
 """
 from datetime import timedelta
 from decimal import Decimal
@@ -55,6 +55,9 @@ BATCHES = [
     ("LO-0912", "CA-HOI-NU", "NK Đại Dương", 18, 3, 1, Batch.Status.NEAR_EXPIRY),
     ("LO-0907", "MUC-ONG", "Tàu cá Long Hải", 37, 6, 2, Batch.Status.NEAR_EXPIRY),
     ("LO-0903", "TOM-SU-1", "Vựa Ba Hòn", 28, 8, 3, Batch.Status.NEAR_EXPIRY),
+    # F1 (FEFO): LO-0915 nhập TRƯỚC LO-0918 nhưng hạn MUỘN hơn -> FEFO xuất LO-0918 trước (FIFO
+    # thì ngược lại). Đặt trước LO-0918 để đơn demo cá thu vẫn đi LO-0918 (batch_by_item = lô cuối).
+    ("LO-0915", "CA-THU", "Vựa Ba Hòn", 25, 5, 12, Batch.Status.SELLING),
     ("LO-0918", "CA-THU", "Tàu cá Long Hải", 67, 1, 8, Batch.Status.SELLING),
     ("LO-0921", "GHE-XANH", "Vựa Ba Hòn", 29, 1, 6, Batch.Status.SELLING),
     ("LO-0922", "BACH-TUOC", "NK Đại Dương", 40, 1, 10, Batch.Status.SELLING),

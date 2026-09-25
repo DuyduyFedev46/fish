@@ -73,6 +73,8 @@ export const BE_ERRORS = {
   // ---- S11 POST /api/sales/orders/{id}/confirm-payment (contract THỰC TẾ BE L7, 03-dev-notes.md "Lô L7 — S10, S11 (BE)") ----
   TT_TXN_REQUIRED: { status: 400, code: "BR-TT-08", detail: "Thiếu mã giao dịch ngân hàng." },
   TT_AMOUNT_INVALID: { status: 400, code: "BR-TT-08", detail: "Số tiền phải là số lớn hơn 0." },
+  /** L8 bổ sung tiền (Duy 2026-09-26): sau làm tròn 0,01 mà 0 < số < 1đ. */
+  TT_AMOUNT_MIN: { status: 400, code: "BR-TT-08", detail: "Số tiền tối thiểu 1đ." },
   TT_TXN_TOO_LONG: { status: 400, code: "BR-TT-08", detail: "Mã giao dịch ngân hàng dài quá 100 ký tự." },
   TT_WRONG_STATUS: { status: 400, code: "BR-TT-08", detail: "Đơn không ở trạng thái Giữ chỗ/Tự huỷ." },
   TT_TXN_OTHER: {
@@ -80,6 +82,35 @@ export const BE_ERRORS = {
     code: "BR-TT-03",
     detail: "Mã giao dịch này đã được ghi nhận cho giao dịch khác, không dùng lại (BR-TT-03).",
   },
+  // ---- S12 POST /api/sales/payments/{id}/resolve — contract THỰC TẾ BE L8 (03-dev-notes.md "Lô L8 — S12, S13 (BE)") ----
+  TT_NOT_ENOUGH: { status: 400, code: "BR-TT-09", detail: "Tổng tiền đã nhận {paid} < tổng đơn {total}." },
+  TT_ORDER_CANCELLED: { status: 400, code: "BR-TT-05", detail: "Đơn đã tự huỷ, chỉ còn cách hoàn tiền." },
+  /** BE ghi "Đơn đã huỷ, …" — phần sau dấu phẩy chưa chép được nguyên văn, mock dùng cùng đuôi với câu tự huỷ. */
+  TT_ORDER_CANCELLED_MANUAL: { status: 400, code: "BR-TT-05", detail: "Đơn đã huỷ, chỉ còn cách hoàn tiền." },
+  TT_ALREADY_RESOLVED: { status: 400, code: "BR-TT-09", detail: "Giao dịch đã được xử lý, không xử lý lại." },
+  TT_ACTION_INVALID: {
+    status: 400,
+    code: "BR-TT-09",
+    detail: "Cách xử lý không hợp lệ: ATTACH_TO_ORDER hoặc CONFIRM_ORDER (hoàn tiền thì tạo phiếu hoàn).",
+  },
+  TT_ORDER_REQUIRED: { status: 400, code: "BR-TT-09", detail: "Thiếu hoặc sai order_id." },
+  TT_ORDER_NOT_FOUND: { status: 400, code: "BR-TT-09", detail: "Không tìm thấy đơn để gắn." },
+  TT_ATTACH_ONLY_UNMATCHED: { status: 400, code: "BR-TT-09", detail: "Chỉ gắn đơn cho giao dịch không khớp đơn." },
+  TT_ORDER_NOT_BOOKED: { status: 400, code: "BR-TT-09", detail: "Đơn không ở trạng thái Giữ chỗ (đã thanh toán hoặc đang xử lý)." },
+  TT_CONFIRM_NO_ORDER: { status: 400, code: "BR-TT-09", detail: "Giao dịch chưa gắn đơn — gắn đơn trước (ATTACH_TO_ORDER)." },
+  TT_CONFIRM_ONLY_UNDERPAID: { status: 400, code: "BR-TT-09", detail: "Chỉ xác nhận đơn từ giao dịch thiếu tiền." },
+  TT_CONFIRM_HAS_REFUND: { status: 400, code: "BR-TT-09", detail: "Giao dịch đang có phiếu hoàn — không dùng để xác nhận đơn." },
+  // ---- S13 POST /api/sales/refunds/create/ (BE L8) ----
+  HT_OVER_REFUNDABLE: { status: 400, code: "BR-HT-04", detail: "Vượt số tiền còn được hoàn: tối đa {max}." },
+  HT_AMOUNT_INVALID: { status: 400, code: "BR-HT-04", detail: "Số tiền hoàn phải lớn hơn 0." },
+  HT_AMOUNT_MIN: { status: 400, code: "BR-HT-04", detail: "Số tiền hoàn tối thiểu 1đ." },
+  HT_ONE_SOURCE: { status: 400, code: "BR-HT-01", detail: "Chỉ gửi một trong hai: sales_invoice hoặc payment_transaction." },
+  HT_NO_SOURCE: { status: 400, code: "BR-HT-01", detail: "Thiếu sales_invoice hoặc payment_transaction." },
+  HT_TXN_MATCHED: { status: 400, code: "BR-HT-01", detail: "Giao dịch đã khớp hoá đơn — lập phiếu hoàn từ hoá đơn." },
+  HT_TXN_NOT_FOUND: { status: 400, code: "BR-HT-01", detail: "Giao dịch không tồn tại." },
+  HT_REQUEST_ID_INVALID: { status: 400, code: "BR-HT-01", detail: "request_id phải là UUID." },
+  HT_REQUEST_ID_USED: { status: 400, code: "BR-HT-01", detail: "request_id đã dùng cho phiếu hoàn khác." },
+  HT_TXN_RESOLVED: { status: 400, code: "BR-TT-09", detail: "Giao dịch đã được xử lý, không lập phiếu hoàn." },
   // ---- S10 GET /api/sales/orders/ — tham số lọc sai ----
   INVALID_FILTER: { status: 400, code: "INVALID_FILTER", detail: "Tham số {param} phải là ngày dạng YYYY-MM-DD." },
 } satisfies Record<string, Entry>;

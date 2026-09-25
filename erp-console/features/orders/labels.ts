@@ -24,12 +24,14 @@ export const PAYMENT_LABEL: Record<string, string> = {
   UNDERPAID: "Thiếu tiền — chờ Chủ",
   ORPHAN: "Đến sau khi đơn đã huỷ — chờ Chủ",
   UNMATCHED: "Không khớp đơn — chờ Chủ",
+  OVERPAID: "Chuyển thừa — đơn đã thanh toán, chờ Chủ",
 };
 export const PAYMENT_STATUS: Record<string, StatusLook> = {
   MATCHED: { tone: "good", icon: "check_circle" },
   UNDERPAID: { tone: "warn", icon: "error" },
   ORPHAN: { tone: "warn", icon: "error" },
   UNMATCHED: { tone: "warn", icon: "error" },
+  OVERPAID: { tone: "warn", icon: "error" },
 };
 export const PAYMENT_SOURCE_LABEL: Record<string, string> = {
   WEBHOOK: "Webhook SePay",
@@ -80,3 +82,33 @@ export const DATE_FILTERS: { value: DatePreset; label: string }[] = [
 export function labelOf(map: Record<string, string>, code: string, fromBe?: string): string {
   return fromBe || map[code] || code;
 }
+
+// ---- S12: hàng chờ thanh toán lệch ----
+// OVERPAID = BR-TT-10 (P5: tiền về cho đơn đã thanh toán). Nhãn ngắn cho cột "Loại lệch"; chi tiết ưu tiên `match_status_label` BE.
+export const QUEUE_TYPE_LABEL: Record<string, string> = {
+  UNDERPAID: "Thiếu tiền",
+  ORPHAN: "Về sau khi đơn tự huỷ",
+  UNMATCHED: "Không khớp đơn",
+  OVERPAID: "Chuyển thừa",
+  MATCHED: "Khớp",
+};
+export const QUEUE_TYPE_STATUS: Record<string, StatusLook> = {
+  UNDERPAID: { tone: "warn", icon: "error" },
+  ORPHAN: { tone: "warn", icon: "error" },
+  UNMATCHED: { tone: "warn", icon: "help" },
+  OVERPAID: { tone: "warn", icon: "add_circle" },
+  MATCHED: { tone: "good", icon: "check_circle" },
+};
+/** Lọc loại lệch — giá trị gửi thẳng lên `?match_status=`. */
+export const QUEUE_TYPE_FILTERS: { value: string; label: string }[] = [
+  { value: "", label: "Mọi loại lệch" },
+  { value: "UNDERPAID", label: "Thiếu tiền" },
+  { value: "UNMATCHED", label: "Không khớp đơn" },
+  { value: "ORPHAN", label: "Về sau khi đơn tự huỷ" },
+  { value: "OVERPAID", label: "Chuyển thừa" },
+];
+export const RESOLUTION_LABEL: Record<string, string> = {
+  ATTACHED: "Đã gắn vào đơn",
+  CONFIRMED: "Đã xác nhận đơn",
+  REFUNDED: "Đã hoàn tiền",
+};

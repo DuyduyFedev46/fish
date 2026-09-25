@@ -29,11 +29,8 @@ from . import services
 from .serializers import SalesOrderDetailSerializer, SalesOrderListSerializer
 
 INVALID_FILTER = "INVALID_FILTER"
-# Giao dịch lệch chờ Chủ (BR-TT-04/05) hoặc phiếu giao thất bại (BR-GH-04) → cần chú ý.
-ATTENTION_PAYMENT_STATUSES = (
-    PaymentTransaction.MatchStatus.UNDERPAID,
-    PaymentTransaction.MatchStatus.ORPHAN,
-)
+# Giao dịch lệch CÒN MỞ trong hàng chờ Chủ (BR-TT-04/05/10, S12 BR-TT-09: đã xử lý thì bỏ)
+# hoặc phiếu giao thất bại (BR-GH-04) → cần chú ý.
 
 
 class InvalidFilter(Exception):
@@ -74,7 +71,8 @@ class SalesOrderViewSet(viewsets.ReadOnlyModelViewSet):
                 delivery_status=Subquery(latest_note.values("status")[:1]),
                 needs_attention=Exists(
                     PaymentTransaction.objects.filter(
-                        sales_order=OuterRef("pk"), match_status__in=ATTENTION_PAYMENT_STATUSES
+                        sales_order=OuterRef("pk"),
+                        resolution_status=PaymentTransaction.ResolutionStatus.OPEN,
                     )
                 ) | Exists(latest_note.filter(status=DeliveryNote.Status.FAILED)),
             )
@@ -148,7 +146,7 @@ class SalesOrderViewSet(viewsets.ReadOnlyModelViewSet):
         )
         outcome = payment_services.payment_outcome(payment)
         body = {"result": outcome.pop("result"), "duplicate": duplicate, **outcome}
-        for key in ("paid_total", "missing"):
+        for key in ("paid_total", "missing", "overpaid_amount"):
             if key in body:
                 body[key] = money_str(body[key])
         return Response(body)
