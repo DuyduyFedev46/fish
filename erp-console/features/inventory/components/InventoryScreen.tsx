@@ -1,6 +1,6 @@
 "use client";
 
-// Màn Kho & lô (S8) — chuyển từ view "Kho & Lô" của bản HTML cũ: lô đang hoạt động (≤20), FIFO theo ngày nhập.
+// Màn Kho & lô (S8) — chuyển từ view "Kho & Lô" của bản HTML cũ: lô đang hoạt động (≤20), xếp theo thứ tự xuất FEFO (hạn dùng sớm nhất trước).
 // Cột "Giá vốn/kg" chỉ hiện khi user.can_cost (inventory.view_costprice) — bất biến #1, S8-AC2/AC3.
 // Backend mới là lớp chặn thật: thiếu quyền thì response không có key unit_cost.
 // UI3: bảng phẳng, header dính, số căn phải; hẹp thì thành danh sách gọn (mặt hàng + tồn, dòng phụ lô · kho · hạn).
@@ -32,7 +32,7 @@ function Body({ data, q, onClearSearch }: { data: InventoryData; q: string; onCl
     <section className="sect" aria-labelledby="inv-h">
       <div className="sect-h">
         <h2 id="inv-h">Tồn theo lô</h2>
-        <span className="sub num">{data.batches.length} lô đang hoạt động · FIFO theo ngày nhập</span>
+        <span className="sub num">{data.batches.length} lô đang hoạt động · Xuất theo hạn dùng sớm nhất (FEFO)</span>
       </div>
       <div className="dt-wrap">
         <table className="data">
@@ -89,7 +89,7 @@ function Body({ data, q, onClearSearch }: { data: InventoryData; q: string; onCl
                 searching={!!q.trim()}
                 onClearSearch={onClearSearch}
                 emptyText="Chưa có lô nào đang hoạt động"
-                hint="Lô nhập ở Mua hàng sẽ hiện ở đây, xếp theo ngày nhập (FIFO)."
+                hint="Lô nhập ở Mua hàng sẽ hiện ở đây, xếp theo hạn dùng sớm nhất (FEFO)."
                 action={
                   canPurchase ? (
                     <Link href="/purchasing/" className="btn">
@@ -115,7 +115,7 @@ export function InventoryScreen() {
   return (
     <div className="screen">
       <p className="view-head">
-        Tồn theo lô, xuất FIFO.{" "}
+        Tồn theo lô, xuất theo hạn dùng sớm nhất (FEFO).{" "}
         {canCost === false ? "Bạn không có quyền xem giá vốn nên cột giá vốn được ẩn." : "Cột giá vốn chỉ hiện với người có quyền xem giá vốn."}
       </p>
       <Toolbar

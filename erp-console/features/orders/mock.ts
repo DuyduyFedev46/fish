@@ -26,6 +26,32 @@
 //   window.__caveMock.orders("ok" | "fail" | "empty" | "forbidden" | "detailfail") — chế độ (localStorage, qua reload)
 //   window.__caveMock.resetOrders()                  — gieo lại dữ liệu
 //   window.__caveMock.orderJson(username, id)        — JSON chi tiết đúng như người đó nhận (e2e kiểm key unit_cost)
+//
+// ---- S12/S13 (lô L8) — theo contract THỰC TẾ BE ở 03-dev-notes.md "Lô L8 — S12, S13 (BE)" ----
+//   GET  /api/sales/payments/?resolution_status=OPEN|RESOLVED&match_status=&page=     (20 dòng/trang, mới → cũ)
+//   GET  /api/sales/payments/{id}/
+//   POST /api/sales/payments/{id}/resolve[/]   {action: ATTACH_TO_ORDER, order_id, note} | {action: CONFIRM_ORDER, note}
+//   POST /api/sales/refunds/create[/]          {payment_transaction, amount, reason, request_id}
+// Hàng chờ = mọi giao dịch có `resolution_status` (UNDERPAID/ORPHAN/UNMATCHED/OVERPAID lúc ghi). Webhook MATCHED không vào.
+// Luật mock (giả định FE, BE chốt thì chép lại):
+//  - Cần sales.confirm_payment_manual (thiếu → 403, kiểm TRƯỚC khi tra giao dịch) — Quản lý/NV kho 403 (S12-AC7).
+//  - available_actions (khoản OPEN): UNMATCHED → attach_to_order; UNDERPAID + đơn Giữ chỗ + tổng đã trả ĐỦ (giả định 1 BE)
+//    → confirm_order; mọi loại còn tiền hoàn được (BR-HT-04) + sales.create_refund → refund. Khoản RESOLVED → [].
+//    Tổng đã trả = MATCHED + UNDERPAID, TRỪ giao dịch đang có phiếu hoàn chưa Thất bại (Q9 BE).
+//  - ATTACH_TO_ORDER: chỉ UNMATCHED; đơn Tự huỷ → BR-TT-05; đơn khác Giữ chỗ → 400 (tạm); đủ tiền (cộng các khoản đã nhận
+//    của đơn) → đơn PROCESSING như S11-AC1, khoản RESOLVED/ATTACHED (khoản thiếu cũ của đơn → CONFIRMED); chưa đủ → khoản
+//    thành UNDERPAID của đơn, VẪN OPEN.
+//  - CONFIRM_ORDER: chỉ UNDERPAID; đơn Tự huỷ/Huỷ → BR-TT-05; tổng MATCHED+UNDERPAID < tổng đơn → BR-TT-09 (S12-AC4);
+//    đủ → PROCESSING, MỌI khoản UNDERPAID của đơn RESOLVED/CONFIRMED (S12-AC3). Đã RESOLVED → 400 (S12-AC6).
+//  - refunds/create: thiếu create_refund → 403; gắn payment_transaction mà thiếu confirm_payment_manual → 403 (S13-AC6);
+//    gửi cả hai nguồn / thiếu cả hai → BR-HT-01; vượt số còn hoàn (không tính phiếu FAILED) → BR-HT-04; request_id không phải
+//    UUID → BR-HT-01; cùng request_id → 200 phiếu cũ + duplicate:true.
+//    Phiếu PENDING, khoản vẫn OPEN (S13-AC1). Xác nhận phiếu (S16, chưa có màn) giả lập bằng __caveMock.confirmRefund.
+// Công cụ thử:
+//   window.__caveMock.payments("ok" | "fail" | "empty" | "forbidden")  — chế độ hàng chờ (localStorage)
+//   window.__caveMock.expireOrder(id)                 — đơn tự huỷ "trong lúc chờ" (S12-AC5)
+//   window.__caveMock.confirmRefund(refundId, ref)    — giả lập S16: phiếu REFUNDED → khoản RESOLVED/REFUNDED (S13-AC2)
+//   window.__caveMock.queueJson(username)             — JSON hàng chờ OPEN đúng như người đó nhận
 
 import type { MockRequest, MockResponse, Paginated } from "@/shared/lib/http";
 import { beError } from "@/shared/lib/beErrors.mock";
@@ -35,6 +61,7 @@ import type { Me } from "@/features/auth/types";
 import { vnd } from "@/shared/lib/format";
 import type {
   ConfirmPaymentResult,
+  CreateRefundResult,
   OrderAllocation,
   OrderDetail,
   OrderListItem,
@@ -42,10 +69,14 @@ import type {
   OrderRefund,
   OrderStatus,
   OrderTimelineEntry,
+  PaymentQueueItem,
+  QueueRefund,
+  ResolveResult,
 } from "./types";
 
 const STORE_KEY = "cave_erp_mock_orders";
 const MODE_KEY = "cave_erp_mock_orders_mode";
+const QUEUE_MODE_KEY = "cave_erp_mock_payments_mode";
 const RESEED_MS = 25 * 60_000;
 const TTL_MIN = 30;
 const PAGE_SIZE = 20;
@@ -54,6 +85,19 @@ const PERM_CONFIRM = "sales.confirm_payment_manual";
 const PERM_CANCEL = "sales.cancel_paid_order";
 const PERM_REFUND = "sales.create_refund";
 const PERM_COST = "inventory.view_costprice";
+
+/** Giao dịch trong kho mock: field nội bộ (người xác nhận tay, xử lý hàng chờ, nội dung CK) — BE chỉ trả một phần. */
+type Pay = OrderPayment & {
+  actor?: string;
+  content?: string;
+  /** Có key = giao dịch từng vào hàng chờ (S12). */
+  resolution_status?: "OPEN" | "RESOLVED";
+  resolution?: "ATTACHED" | "CONFIRMED" | "REFUNDED" | null;
+  resolved_by?: string | null;
+  resolved_at?: string | null;
+  resolution_note?: string;
+};
+type MockRefund = QueueRefund & { txnId: number; reason: string; request_id: string };
 
 type Line = { item_code: string; item_name: string; qty: number; price: number; discount: number; batches: [string, number, number][] };
 type Delivery = { id: number; code: string; status: string; assigned_to: number | null; failed_attempts: number };
@@ -67,13 +111,22 @@ type Order = {
   lines: Line[];
   invoice: { id: number; code: string; issued_at: string } | null;
   /** `actor` = tên người xác nhận tay (nội bộ mock, không trả ra) — nguồn `actor_display` của timeline. */
-  payments: (OrderPayment & { actor?: string })[];
+  payments: Pay[];
   delivery: Delivery | null;
   refunds: OrderRefund[];
   needs_attention: boolean;
 };
 type Txn = { orderId: number; result: ConfirmPaymentResult };
-type Store = { seededAt: number; orders: Order[]; txns: Record<string, Txn>; seq: number };
+type Store = {
+  seededAt: number;
+  orders: Order[];
+  txns: Record<string, Txn>;
+  seq: number;
+  /** S12: tiền về không khớp đơn nào (chưa gắn). */
+  unmatched: Pay[];
+  /** S13: phiếu hoàn gắn giao dịch (không hoá đơn). */
+  txnRefunds: MockRefund[];
+};
 
 const ORDER_LABEL: Record<OrderStatus, string> = {
   BOOKED: "Giữ chỗ",
@@ -94,7 +147,7 @@ const ITEMS: [string, string, number, string, number][] = [
   ["CA-HONG", "Cá hồng đỏ", 210000, "CA-HONG-260918-CH01", 142500],
   ["CA-NGU", "Cá ngừ đại dương loin", 290000, "CA-NGU-260919-CN01", 205000],
 ];
-// Lô cũ hơn cùng mặt hàng — để có đơn phân bổ 2 lô (FIFO).
+// Lô khác cùng mặt hàng — để có đơn phân bổ 2 lô (BR-BH-06).
 const OLD_BATCH: Record<string, [string, number]> = {
   "TOM-SU-1": ["TOM-SU-1-260912-ZX09A", 176000],
   "CA-BOP": ["CA-BOP-260910-CB00", 151000],
@@ -247,16 +300,73 @@ function seed(): Store {
     if (tag === "under") {
       // Khách đã chuyển thiếu một lần (webhook ghi UNDERPAID).
       const txn = "FT2626700002";
-      o.payments.push({ id: ++payId, bank_txn_id: txn, amount: money(total - 100000), match_status: "UNDERPAID", received_at: isoVN(createdMs + 4 * 60_000), source: "WEBHOOK" });
+      o.payments.push({
+        id: ++payId,
+        bank_txn_id: txn,
+        amount: money(total - 100000),
+        match_status: "UNDERPAID",
+        received_at: isoVN(createdMs + 4 * 60_000),
+        source: "WEBHOOK",
+        content: `${o.code} chuyen khoan`,
+        resolution_status: "OPEN",
+      });
       txns[txn] = {
         orderId: id,
         result: { result: "UNDERPAID", duplicate: false, order_status: "BOOKED", paid_total: money(total - 100000), missing: "100000" },
       };
       o.needs_attention = true;
     }
+    // S12 — thêm vài khoản lệch trên đơn CŨ (không đụng đơn 101–110 mà e2e S10/S11 bám).
+    if (id === 119 && status === "AUTO_CANCELLED") {
+      // Tiền về 12′ sau khi đơn tự huỷ (BR-TT-05) — webhook ghi ORPHAN.
+      const txn = "FT2626700019";
+      o.payments.push({
+        id: ++payId, bank_txn_id: txn, amount: money(total), match_status: "ORPHAN",
+        received_at: isoVN(createdMs + (TTL_MIN + 12) * 60_000), source: "WEBHOOK", content: `${o.code} thanh toan`, resolution_status: "OPEN",
+      });
+      txns[txn] = { orderId: id, result: { result: "ORPHAN", duplicate: false, order_status: "AUTO_CANCELLED" } };
+    }
+    if (id === 113 && status === "COMPLETED") {
+      // P5: khách chuyển lần hai cho đơn đã thanh toán → "chuyển thừa", vào hàng chờ để Chủ hoàn.
+      const txn = "FT2626700013";
+      o.payments.push({
+        id: ++payId, bank_txn_id: txn, amount: "150000", match_status: "OVERPAID",
+        received_at: isoVN(createdMs + 40 * 60_000), source: "WEBHOOK", content: `${o.code} ck lan 2`, resolution_status: "OPEN",
+      });
+      txns[txn] = { orderId: id, result: { result: "OVERPAID", duplicate: false, order_status: "COMPLETED" } };
+    }
+    if (id === 128 && status === "AUTO_CANCELLED") {
+      // Lịch sử: khoản về sau khi đơn tự huỷ, đã hoàn xong (RESOLVED/REFUNDED).
+      const txn = "FT2626700028";
+      o.payments.push({
+        id: 870, bank_txn_id: txn, amount: money(total), match_status: "ORPHAN",
+        received_at: isoVN(createdMs + (TTL_MIN + 5) * 60_000), source: "WEBHOOK", content: `${o.code}`,
+        resolution_status: "RESOLVED", resolution: "REFUNDED", resolved_by: "Lộc",
+        resolved_at: isoVN(createdMs + 26 * 3600_000), resolution_note: "Đã chuyển trả khách",
+      });
+      txns[txn] = { orderId: id, result: { result: "ORPHAN", duplicate: false, order_status: "AUTO_CANCELLED" } };
+    }
     orders.push(o);
   }
-  return { seededAt: now, orders, txns, seq: 60 };
+  // S12 — tiền về không khớp đơn nào (UNMATCHED). Khoản 1 bằng đúng tổng đơn 101 của Chị Hoa (540.000 ₫) → S12-AC2.
+  const unmatched: Pay[] = [
+    {
+      id: 880, bank_txn_id: "FT2626700091", amount: "540000", match_status: "UNMATCHED",
+      received_at: isoVN(now - 6 * 60_000), source: "WEBHOOK", content: "CHI HOA CK TIEN TOM", resolution_status: "OPEN",
+    },
+    {
+      id: 881, bank_txn_id: "FT2626700092", amount: "185000", match_status: "UNMATCHED",
+      received_at: isoVN(now - 2 * 86_400_000 - 3 * 3600_000), source: "WEBHOOK", content: "chuyen tien", resolution_status: "OPEN",
+    },
+  ];
+  txns["FT2626700091"] = { orderId: 0, result: { result: "UNMATCHED", duplicate: false, order_status: "" } };
+  txns["FT2626700092"] = { orderId: 0, result: { result: "UNMATCHED", duplicate: false, order_status: "" } };
+  const txnRefunds: MockRefund[] = [
+    { id: 30, txnId: 870, amount: "0", status: "REFUNDED", bank_txn_ref: "HT2626700028", reason: "Tiền về sau khi đơn tự huỷ", request_id: "seed-30" },
+  ];
+  const o128 = orders.find((x) => x.id === 128);
+  if (o128) txnRefunds[0].amount = money(orderTotal(o128));
+  return { seededAt: now, orders, txns, seq: 60, unmatched, txnRefunds };
 }
 
 function ss(): Storage | null {
@@ -274,7 +384,7 @@ function load(): Store {
   if (raw) {
     try {
       const s = JSON.parse(raw) as Store;
-      if (Date.now() - s.seededAt < RESEED_MS) {
+      if (Date.now() - s.seededAt < RESEED_MS && Array.isArray(s.unmatched) && Array.isArray(s.txnRefunds)) {
         memory = s;
         return s;
       }
@@ -318,6 +428,7 @@ const MATCH_LABEL: Record<string, string> = {
   UNDERPAID: "Thiếu tiền — chờ Chủ",
   ORPHAN: "Đến sau khi đơn đã huỷ — chờ Chủ",
   UNMATCHED: "Không khớp đơn — chờ Chủ",
+  OVERPAID: "Chuyển thừa — đơn đã thanh toán, chờ Chủ",
 };
 const SOURCE_LABEL: Record<string, string> = { WEBHOOK: "Webhook SePay", MANUAL: "Xác nhận tay" };
 const REFUND_LABEL: Record<string, string> = { PENDING: "Chờ hoàn", REFUNDED: "Đã hoàn", FAILED: "Thất bại" };
@@ -409,7 +520,8 @@ function listItem(o: Order): OrderListItem {
     created_at: o.created_at,
     reserved_until: o.reserved_until,
     delivery_status: o.delivery ? o.delivery.status : null,
-    needs_attention: o.needs_attention,
+    // Giả định 5 của BE L7 + S12: chỉ tính khoản lệch CÒN MỞ (khoản đã xử lý không còn cần chú ý).
+    needs_attention: o.delivery?.status === "FAILED" || o.payments.some((p) => p.resolution_status === "OPEN"),
   };
 }
 
@@ -445,9 +557,15 @@ function detail(me: Me, o: Order): OrderDetail {
     })),
     allocations: o.status === "AUTO_CANCELLED" ? [] : allocations,
     invoice: o.invoice ? { ...o.invoice } : null,
-    payments: o.payments.map(({ actor: _actor, ...p }) => ({
-      ...p,
+    // Chỉ các key của contract S10 — field nội bộ (người xác nhận tay, hàng chờ S12) không trả ra.
+    payments: o.payments.map((p) => ({
+      id: p.id,
+      bank_txn_id: p.bank_txn_id,
+      amount: p.amount,
+      match_status: p.match_status,
       match_status_label: MATCH_LABEL[p.match_status],
+      received_at: p.received_at,
+      source: p.source,
       source_label: p.source ? SOURCE_LABEL[p.source] : undefined,
     })),
     delivery: o.delivery
@@ -506,6 +624,30 @@ function listResponse(me: Me, query: URLSearchParams): MockResponse {
   return { status: 200, body };
 }
 
+/** Dòng phần thừa `<mã GD>-THUA` (BE `split_overpaid`): cùng nguồn, cùng giờ, OVERPAID, vào hàng chờ. */
+function splitOverpaid(store: Store, from: Pay, extra: number): Pay {
+  const code = `${from.bank_txn_id.slice(0, 95)}-THUA`;
+  const extraPay: Pay = {
+    id: ++store.seq + 900,
+    bank_txn_id: code,
+    amount: money(extra),
+    match_status: "OVERPAID",
+    received_at: from.received_at,
+    source: from.source,
+    actor: from.actor,
+    resolution_status: "OPEN",
+  };
+  return extraPay;
+}
+
+/** Đủ tiền → hoá đơn + phiếu giao PREPARING + đơn PROCESSING (lõi chung `_record_payment` của BE, S11-AC1). */
+function markPaid(store: Store, o: Order): void {
+  const created = isoVN(Date.now());
+  o.status = "PROCESSING";
+  o.invoice = { id: ++store.seq, code: `INV${yymmdd(created)}-${hex(store.seq * 7, 6)}`, issued_at: created };
+  o.delivery = { id: ++store.seq, code: `GH-${o.invoice.code}-${hex(store.seq * 13, 5)}`, status: "PREPARING", assigned_to: null, failed_attempts: 0 };
+}
+
 function confirm(me: Me, o: Order, body: unknown): MockResponse {
   const b = (body && typeof body === "object" ? body : {}) as Record<string, unknown>;
   const txn = typeof b.bank_txn_id === "string" ? b.bank_txn_id.trim() : "";
@@ -521,10 +663,11 @@ function confirm(me: Me, o: Order, body: unknown): MockResponse {
   // KHÔNG ghi giao dịch 0 ₫, KHÔNG 500. BE đang sửa song song, câu "quá lớn" chưa chốt → mock dùng chung câu TT_AMOUNT_INVALID.
   const amount = Math.round(Number(rawAmount) * 100) / 100;
   if (!Number.isFinite(amount) || amount <= 0 || amount >= 1e12) return beError("TT_AMOUNT_INVALID");
+  if (amount < 1) return beError("TT_AMOUNT_MIN"); // L8 bổ sung tiền: tối thiểu 1đ
   if (o.status !== "BOOKED" && o.status !== "AUTO_CANCELLED") return beError("TT_WRONG_STATUS");
 
   const now = Date.now();
-  const payment: OrderPayment & { actor?: string } = {
+  const payment: Pay = {
     id: ++store.seq + 900,
     bank_txn_id: txn,
     amount: money(amount),
@@ -536,16 +679,21 @@ function confirm(me: Me, o: Order, body: unknown): MockResponse {
   let result: ConfirmPaymentResult;
   if (o.status === "AUTO_CANCELLED") {
     payment.match_status = "ORPHAN";
+    payment.resolution_status = "OPEN"; // vào hàng chờ S12
     o.needs_attention = true;
     result = { result: "ORPHAN", duplicate: false, order_status: "AUTO_CANCELLED" };
   } else if (amount >= total) {
-    const created = isoVN(now);
-    o.status = "PROCESSING";
-    o.invoice = { id: ++store.seq, code: `INV${yymmdd(created)}-${hex(store.seq * 7, 6)}`, issued_at: created };
-    o.delivery = { id: ++store.seq, code: `GH-${o.invoice.code}-${hex(store.seq * 13, 5)}`, status: "PREPARING", assigned_to: null, failed_attempts: 0 };
-    result = { result: "PAID", duplicate: false, order_status: "PROCESSING", invoice_id: o.invoice.id, delivery_note_code: o.delivery.code };
+    markPaid(store, o);
+    result = { result: "PAID", duplicate: false, order_status: "PROCESSING", invoice_id: o.invoice!.id, delivery_note_code: o.delivery!.code };
+    if (amount > total) {
+      // L8 bổ sung tiền (BR-TT-10 mở rộng): dòng khớp mang đúng tổng đơn, phần thừa tách thành `<mã>-THUA` OVERPAID/OPEN.
+      payment.amount = money(total);
+      o.payments.push(splitOverpaid(store, payment, amount - total));
+      result.overpaid_amount = money(amount - total);
+    }
   } else {
     payment.match_status = "UNDERPAID";
+    payment.resolution_status = "OPEN"; // vào hàng chờ S12
     o.needs_attention = true;
     const paid =
       o.payments.filter((p) => p.match_status === "MATCHED" || p.match_status === "UNDERPAID").reduce((sum, p) => sum + Number(p.amount), 0) +
@@ -585,6 +733,302 @@ export function mockOrdersApi(req: MockRequest): MockResponse {
   return beError("NOT_FOUND");
 }
 
+// ---------- S12: hàng chờ thanh toán lệch · S13: phiếu hoàn cho khoản không có hoá đơn ----------
+const QUEUE_RESOLUTION_LABEL: Record<string, string> = {
+  ATTACHED: "Đã gắn vào đơn",
+  CONFIRMED: "Đã xác nhận đơn",
+  REFUNDED: "Đã hoàn tiền",
+};
+
+type QMode = "ok" | "fail" | "empty" | "forbidden";
+function queueMode(): QMode {
+  try {
+    const v = typeof window === "undefined" ? null : window.localStorage.getItem(QUEUE_MODE_KEY);
+    return v === "fail" || v === "empty" || v === "forbidden" ? v : "ok";
+  } catch {
+    return "ok";
+  }
+}
+
+/** "300000" → "300.000đ" (cách BE viết tiền trong câu lỗi, contract S12/S13). */
+function vndD(n: number): string {
+  return `${Math.round(n).toLocaleString("vi-VN")}đ`;
+}
+
+/** Mọi giao dịch từng vào hàng chờ, kèm đơn (null = chưa gắn đơn). */
+function queueEntries(store: Store): { p: Pay; o: Order | null }[] {
+  const out: { p: Pay; o: Order | null }[] = [];
+  store.orders.forEach((o) => o.payments.forEach((p) => p.resolution_status && out.push({ p, o })));
+  store.unmatched.forEach((p) => out.push({ p, o: null }));
+  return out;
+}
+function findEntry(store: Store, id: number): { p: Pay; o: Order | null } | null {
+  return queueEntries(store).find((e) => e.p.id === id) || null;
+}
+/** Tổng đã trả của đơn (BE `order_paid_total`): MATCHED + UNDERPAID, trừ giao dịch đang có phiếu hoàn chưa Thất bại. */
+function paidOf(o: Order, store: Store = load()): number {
+  return o.payments
+    .filter((p) => p.match_status === "MATCHED" || p.match_status === "UNDERPAID")
+    .filter((p) => !store.txnRefunds.some((r) => r.txnId === p.id && r.status !== "FAILED"))
+    .reduce((sum, p) => sum + Number(p.amount), 0);
+}
+function refundsOf(store: Store, txnId: number): MockRefund[] {
+  return store.txnRefunds.filter((r) => r.txnId === txnId);
+}
+function refundableOf(store: Store, p: Pay): number {
+  const used = refundsOf(store, p.id)
+    .filter((r) => r.status !== "FAILED")
+    .reduce((sum, r) => sum + Number(r.amount), 0);
+  return Math.max(0, Number(p.amount) - used);
+}
+
+function queueActions(me: Me, store: Store, p: Pay, o: Order | null): string[] {
+  if (p.resolution_status !== "OPEN" || !has(me, PERM_CONFIRM)) return [];
+  const out: string[] = [];
+  if (!o && p.match_status === "UNMATCHED") out.push("attach_to_order");
+  if (o && p.match_status === "UNDERPAID" && o.status === "BOOKED" && paidOf(o, store) >= orderTotal(o)) out.push("confirm_order");
+  if (has(me, PERM_REFUND) && refundableOf(store, p) > 0) out.push("refund");
+  return out;
+}
+
+function queueItem(me: Me, store: Store, p: Pay, o: Order | null): PaymentQueueItem {
+  // Đúng key BE L8: KHÔNG có `content`, `refunds`, `order.customer_name` (FE đề xuất thêm, xem 03-dev-notes.md).
+  return {
+    id: p.id,
+    bank_txn_id: p.bank_txn_id,
+    amount: p.amount,
+    received_at: p.received_at,
+    match_status: p.match_status,
+    match_status_label: MATCH_LABEL[p.match_status],
+    source: p.source,
+    source_label: p.source ? SOURCE_LABEL[p.source] : undefined,
+    order: o
+      ? {
+          id: o.id,
+          code: o.code,
+          status: o.status,
+          status_label: ORDER_LABEL[o.status],
+          total_amount: money(orderTotal(o)),
+          paid_total: money(paidOf(o, store)),
+        }
+      : null,
+    resolution_status: p.resolution_status || "OPEN",
+    resolution: p.resolution ?? "",
+    resolution_label: p.resolution ? QUEUE_RESOLUTION_LABEL[p.resolution] : "",
+    resolved_by: p.resolved_by ?? null,
+    resolved_at: p.resolved_at ?? null,
+    resolution_note: p.resolution_note || "",
+    refundable_amount: money(refundableOf(store, p)),
+    available_actions: queueActions(me, store, p, o),
+  };
+}
+
+function queueList(me: Me, query: URLSearchParams): MockResponse {
+  const status = query.get("resolution_status") || "";
+  const type = (query.get("match_status") || "").split(",").filter(Boolean);
+  const page = Math.max(1, Number(query.get("page") || "1") || 1);
+  const store = load();
+  const hit = (queueMode() === "empty" ? [] : queueEntries(store))
+    .filter(({ p }) => !status || p.resolution_status === status)
+    .filter(({ p }) => !type.length || type.includes(p.match_status))
+    .sort((a, b) => ((a.p.received_at || "") < (b.p.received_at || "") ? 1 : (a.p.received_at || "") > (b.p.received_at || "") ? -1 : b.p.id - a.p.id));
+  const pages = Math.max(1, Math.ceil(hit.length / PAGE_SIZE));
+  if (page > pages) return { status: 404, body: { detail: "Trang không hợp lệ." } };
+  const link = (n: number) => {
+    const qs = new URLSearchParams(query);
+    qs.set("page", String(n));
+    return `http://localhost:8000/api/sales/payments/?${qs.toString()}`;
+  };
+  const body: Paginated<PaymentQueueItem> = {
+    count: hit.length,
+    next: page < pages ? link(page + 1) : null,
+    previous: page > 1 ? link(page - 1) : null,
+    results: hit.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE).map(({ p, o }) => queueItem(me, store, p, o)),
+  };
+  return { status: 200, body };
+}
+
+function closeEntry(me: Me, p: Pay, resolution: "ATTACHED" | "CONFIRMED" | "REFUNDED", note: string): void {
+  p.resolution_status = "RESOLVED";
+  p.resolution = resolution;
+  p.resolved_by = me.display_name || me.username;
+  p.resolved_at = isoVN(Date.now());
+  p.resolution_note = note;
+}
+
+function resolve(me: Me, id: number, body: unknown): MockResponse {
+  const b = (body && typeof body === "object" ? body : {}) as Record<string, unknown>;
+  const note = typeof b.note === "string" ? b.note.trim() : "";
+  const store = load();
+  const e = findEntry(store, id);
+  if (!e) return beError("NOT_FOUND");
+  const { p } = e;
+  if (b.action !== "ATTACH_TO_ORDER" && b.action !== "CONFIRM_ORDER") return beError("TT_ACTION_INVALID");
+  if (p.resolution_status === "RESOLVED") return beError("TT_ALREADY_RESOLVED"); // S12-AC6
+  const cancelled = (o: Order) =>
+    o.status === "AUTO_CANCELLED" ? beError("TT_ORDER_CANCELLED") : o.status === "CANCELLED" ? beError("TT_ORDER_CANCELLED_MANUAL") : null;
+  const closeUnder = (o: Order): number[] => {
+    const ids: number[] = [];
+    o.payments
+      .filter((x) => x.match_status === "UNDERPAID" && x.resolution_status === "OPEN")
+      .forEach((x) => {
+        closeEntry(me, x, "CONFIRMED", note);
+        ids.push(x.id);
+      });
+    return ids;
+  };
+  if (b.action === "ATTACH_TO_ORDER") {
+    if (e.o || p.match_status !== "UNMATCHED") return beError("TT_ATTACH_ONLY_UNMATCHED");
+    const orderId = Number(b.order_id);
+    if (!Number.isInteger(orderId) || orderId <= 0) return beError("TT_ORDER_REQUIRED");
+    const o = store.orders.find((x) => x.id === orderId);
+    if (!o) return beError("TT_ORDER_NOT_FOUND");
+    const c = cancelled(o);
+    if (c) return c; // S12-AC5
+    if (o.status !== "BOOKED") return beError("TT_ORDER_NOT_BOOKED");
+    const before = paidOf(o, store);
+    store.unmatched = store.unmatched.filter((x) => x.id !== p.id);
+    o.payments.push(p);
+    // BE giả định 2: đánh giá lại match_status — một mình khoản này đủ thì MATCHED, không thì UNDERPAID.
+    p.match_status = Number(p.amount) >= orderTotal(o) ? "MATCHED" : "UNDERPAID";
+    store.txns[p.bank_txn_id] = { orderId: o.id, result: { result: p.match_status, duplicate: false, order_status: o.status } };
+    if (before + Number(p.amount) >= orderTotal(o)) {
+      const ids = closeUnder(o).filter((x) => x !== p.id);
+      closeEntry(me, p, "ATTACHED", note);
+      markPaid(store, o);
+      let overpaid: string | undefined;
+      if (Number(p.amount) > orderTotal(o)) {
+        // BE giả định 1 (bổ sung tiền): một mình khoản gắn > tổng đơn → tách phần thừa như lần đầu.
+        const extra = Number(p.amount) - orderTotal(o);
+        p.amount = money(orderTotal(o));
+        o.payments.push(splitOverpaid(store, p, extra));
+        overpaid = money(extra);
+      }
+      save(store);
+      return {
+        status: 200,
+        body: {
+          payment_id: p.id, resolution_status: "RESOLVED", resolution: "ATTACHED", order_status: o.status,
+          invoice_id: o.invoice!.id, delivery_note_code: o.delivery!.code, resolved_payment_ids: [...ids, p.id].sort((a, c2) => a - c2),
+          ...(overpaid ? { overpaid_amount: overpaid } : {}),
+        } satisfies ResolveResult,
+      };
+    }
+    save(store);
+    return { status: 200, body: { payment_id: p.id, resolution_status: "OPEN", resolution: "", order_status: o.status, resolved_payment_ids: [] } satisfies ResolveResult };
+  }
+  // CONFIRM_ORDER
+  const o = e.o;
+  if (!o) return beError("TT_CONFIRM_NO_ORDER");
+  if (p.match_status !== "UNDERPAID") return beError("TT_CONFIRM_ONLY_UNDERPAID");
+  const c = cancelled(o);
+  if (c) return c; // S12-AC5
+  if (o.status !== "BOOKED") return beError("TT_ORDER_NOT_BOOKED");
+  if (refundsOf(store, p.id).some((r) => r.status !== "FAILED")) return beError("TT_CONFIRM_HAS_REFUND");
+  const paid = paidOf(o, store);
+  const total = orderTotal(o);
+  if (paid < total) return beError("TT_NOT_ENOUGH", { paid: vndD(paid), total: vndD(total) }); // S12-AC4
+  const ids = closeUnder(o);
+  markPaid(store, o);
+  save(store);
+  return {
+    status: 200,
+    body: {
+      payment_id: p.id, resolution_status: "RESOLVED", resolution: "CONFIRMED", order_status: o.status,
+      invoice_id: o.invoice!.id, delivery_note_code: o.delivery!.code, resolved_payment_ids: ids.sort((a, c2) => a - c2),
+    } satisfies ResolveResult,
+  };
+}
+
+export function mockPaymentsApi(req: MockRequest): MockResponse {
+  const me = mockRequireUser(req);
+  if (!me) return MOCK_UNAUTHORIZED;
+  // S12-AC7: Quản lý / NV kho (không có confirm_payment_manual) → 403 cả xem lẫn xử lý; kiểm TRƯỚC khi tra giao dịch.
+  if (!has(me, PERM_CONFIRM) || queueMode() === "forbidden") return beError("DRF_FORBIDDEN");
+  const [path, q = ""] = req.path.split("?");
+  if (path === "/api/sales/payments/") {
+    if (req.method !== "GET") return beError("METHOD_NOT_ALLOWED", { method: req.method });
+    if (queueMode() === "fail") return { status: 500, body: null };
+    return queueList(me, new URLSearchParams(q));
+  }
+  const one = /^\/api\/sales\/payments\/(\d+)\/$/.exec(path);
+  if (one) {
+    if (req.method !== "GET") return beError("METHOD_NOT_ALLOWED", { method: req.method });
+    const store = load();
+    const e = findEntry(store, Number(one[1]));
+    return e ? { status: 200, body: queueItem(me, store, e.p, e.o) } : beError("NOT_FOUND");
+  }
+  const m = /^\/api\/sales\/payments\/(\d+)\/resolve\/?$/.exec(path);
+  if (!m) return beError("NOT_FOUND");
+  if (req.method !== "POST") return beError("METHOD_NOT_ALLOWED", { method: req.method });
+  return resolve(me, Number(m[1]), req.body);
+}
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function createTxnRefund(me: Me, body: unknown): MockResponse {
+  const b = (body && typeof body === "object" ? body : {}) as Record<string, unknown>;
+  const given = (v: unknown) => v !== undefined && v !== null && v !== "";
+  const hasInvoice = given(b.sales_invoice);
+  const hasTxn = given(b.payment_transaction);
+  // S13-AC6: gắn payment_transaction mà thiếu confirm_payment_manual → 403, kiểm TRƯỚC dữ liệu.
+  if (hasTxn && !has(me, PERM_CONFIRM)) return beError("DRF_FORBIDDEN");
+  if (hasInvoice && hasTxn) return beError("HT_ONE_SOURCE"); // S13-AC4
+  if (!hasInvoice && !hasTxn) return beError("HT_NO_SOURCE");
+  if (!hasTxn) return beError("NOT_FOUND"); // phiếu hoàn theo hoá đơn (S15) chưa mock ở đây
+  const store = load();
+  const requestId = typeof b.request_id === "string" ? b.request_id : "";
+  if (requestId && !UUID_RE.test(requestId)) return beError("HT_REQUEST_ID_INVALID");
+  const e = findEntry(store, Number(b.payment_transaction));
+  const inQueue = e && e.p.resolution_status;
+  const anyTxn = store.orders.some((o) => o.payments.some((x) => x.id === Number(b.payment_transaction)));
+  if (!e) return beError(anyTxn ? "HT_TXN_MATCHED" : "HT_TXN_NOT_FOUND");
+  if (!inQueue) return beError("HT_TXN_MATCHED");
+  const shape = (r: MockRefund) => ({
+    id: r.id, sales_invoice: null, payment_transaction: r.txnId, amount: r.amount, is_partial: false, method: "MANUAL_TRANSFER",
+    status: r.status, status_label: REFUND_LABEL[r.status], bank_txn_ref: r.bank_txn_ref || "", reason: r.reason,
+    created_by: me.id, confirmed_by: null, created_at: isoVN(Date.now()), confirmed_at: null, request_id: r.request_id || null,
+  });
+  const prev = requestId ? store.txnRefunds.find((x) => x.request_id === requestId) : undefined;
+  if (prev) {
+    if (prev.txnId !== e.p.id) return beError("HT_REQUEST_ID_USED");
+    return { status: 200, body: { ...shape(prev), duplicate: true } }; // cùng request_id → không tạo phiếu thứ hai
+  }
+  if (e.p.resolution_status === "RESOLVED") return beError("HT_TXN_RESOLVED");
+  const amount = Math.round(Number(b.amount) * 100) / 100;
+  if (b.amount === null || b.amount === "" || !Number.isFinite(amount) || amount <= 0) return beError("HT_AMOUNT_INVALID");
+  if (amount < 1) return beError("HT_AMOUNT_MIN"); // L8 bổ sung tiền: tối thiểu 1đ
+  const max = refundableOf(store, e.p);
+  if (amount > max) return beError("HT_OVER_REFUNDABLE", { max: vndD(max) }); // S13-AC3
+  const r: MockRefund = {
+    id: ++store.seq + 100,
+    txnId: e.p.id,
+    amount: money(amount),
+    status: "PENDING",
+    bank_txn_ref: "",
+    reason: typeof b.reason === "string" ? b.reason : "",
+    request_id: requestId,
+  };
+  store.txnRefunds.push(r);
+  save(store);
+  return { status: 201, body: shape(r) };
+}
+
+export function mockRefundsApi(req: MockRequest): MockResponse {
+  const me = mockRequireUser(req);
+  if (!me) return MOCK_UNAUTHORIZED;
+  if (!/^\/api\/sales\/refunds\/create\/?$/.test(req.path)) return beError("NOT_FOUND");
+  if (req.method !== "POST") return beError("METHOD_NOT_ALLOWED", { method: req.method });
+  if (!has(me, PERM_REFUND)) return beError("DRF_FORBIDDEN");
+  return createTxnRefund(me, req.body);
+}
+
+function meOf(username: string): Me | null {
+  const u = mockUsers().find((x) => x.username === username);
+  if (!u) return null;
+  return { id: u.id, username: u.username, display_name: u.display_name, groups: u.groups, permissions: mockPermsOf(u) } as unknown as Me;
+}
+
 if (process.env.NEXT_PUBLIC_USE_MOCK === "1" && typeof window !== "undefined") {
   const w = window as unknown as { __caveMock?: Record<string, unknown> };
   w.__caveMock = {
@@ -605,6 +1049,57 @@ if (process.env.NEXT_PUBLIC_USE_MOCK === "1" && typeof window !== "undefined") {
       const perms = mockPermsOf(u);
       const me = { id: u.id, groups: u.groups, permissions: perms } as unknown as Me;
       return detail(me, o);
+    },
+    payments: (m: QMode) => {
+      window.localStorage.setItem(QUEUE_MODE_KEY, m);
+      return `Chế độ mock hàng chờ: ${m}`;
+    },
+    /** S12-AC5: đơn tự huỷ "trong lúc Chủ đang xem" (danh sách cũ vẫn còn nút). */
+    expireOrder: (id: number) => {
+      const store = load();
+      const o = store.orders.find((x) => x.id === id);
+      if (!o) return null;
+      o.status = "AUTO_CANCELLED";
+      save(store);
+      return o.status;
+    },
+    /** Giả lập S16 (chưa có màn): Chủ xác nhận phiếu hoàn đã chuyển → khoản lệch RESOLVED/REFUNDED (S13-AC2). */
+    confirmRefund: (refundId: number, ref: string) => {
+      const store = load();
+      const r = store.txnRefunds.find((x) => x.id === refundId);
+      if (!r) return null;
+      r.status = "REFUNDED";
+      r.bank_txn_ref = ref;
+      const e = findEntry(store, r.txnId);
+      if (e && e.p.resolution_status === "OPEN") {
+        e.p.resolution_status = "RESOLVED";
+        e.p.resolution = "REFUNDED";
+        e.p.resolved_by = "Lộc";
+        e.p.resolved_at = isoVN(Date.now());
+        e.p.resolution_note = `Mã GD hoàn ${ref}`;
+      }
+      save(store);
+      return r.status;
+    },
+    /** E2E: gọi thẳng luật resolve như gọi API (kiểm lớp chặn "BE": S12-AC4/AC6). */
+    resolveJson: (username: string, id: number, body: unknown) => {
+      const me = meOf(username);
+      if (!me) return null;
+      if (!me.permissions.includes(PERM_CONFIRM)) return { status: 403 };
+      return resolve(me, id, body);
+    },
+    /** Phiếu hoàn đã lập cho một giao dịch (để e2e lấy id giả lập S16). */
+    txnRefundsOf: (txnId: number) => refundsOf(load(), txnId).map((r) => ({ ...r })),
+    queueJson: (username: string, status = "OPEN") => {
+      const me = meOf(username);
+      if (!me) return null;
+      return queueList(me, new URLSearchParams({ resolution_status: status })).body;
+    },
+    refundJson: (username: string, body: unknown) => {
+      const me = meOf(username);
+      if (!me) return null;
+      if (!me.permissions.includes(PERM_REFUND)) return { status: 403 };
+      return createTxnRefund(me, body);
     },
     /** E2E: gọi thẳng luật confirm-payment của mock như gọi API (bỏ qua ô FE) — kiểm lớp chặn phía "BE" (B13). */
     confirmJson: (username: string, id: number, body: unknown) => {

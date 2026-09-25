@@ -1,7 +1,7 @@
 # sales — Bán hàng (P-05, P-07)
 
 Khách đặt trên Shop → đơn giữ chỗ (TTL) → tiền về (webhook) → hoá đơn trừ kho → (giao hàng ở `delivery`) → huỷ/hoàn tiền.
-BR chính: BR-PQ-11 (đơn/hoá đơn chỉ Hệ thống tạo), BR-BH-02/06/07 (giữ chỗ FIFO theo lô), BR-TT-03 (idempotent), BR-HT (hoàn tiền).
+BR chính: BR-PQ-11 (đơn/hoá đơn chỉ Hệ thống tạo), BR-BH-02/06/07 (giữ chỗ theo lô, chọn lô FEFO), BR-BH-11 (lô chốt lúc tạo đơn), BR-TT-03 (idempotent), BR-HT (hoàn tiền).
 Model: `models/` (customers, orders, invoices, payments, refunds). Tiện ích tiền/mã chứng từ: `utils.py`.
 
 | Module | Làm gì |

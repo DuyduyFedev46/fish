@@ -72,6 +72,9 @@ input,textarea{caret-color:var(--accent)}
 .nav a:active{background:var(--surface-3)}
 .nav a.active{background:var(--accent-soft);color:var(--accent-text)}
 .nav a.active .mi{color:var(--accent-text);font-variation-settings:'FILL' 1,'wght' 500,'GRAD' 0,'opsz' 24}
+/* Mục con (S12 "Hàng chờ thanh toán" dưới "Đơn & tiền"): thụt vào thẳng chữ mục cha, chữ nhỏ hơn một bậc */
+.nav a.sub{padding-left:calc(var(--space-2-5) + 28px);font-size:var(--text-sm)}
+.nav a.sub .mi{font-size:16px}
 @media (hover:hover) and (pointer:fine){.nav a:not(.active):hover{background:var(--surface-3);color:var(--ink)}}
 .who{border-top:1px solid var(--border);padding:var(--space-2);display:flex;align-items:center;gap:var(--space-1);padding-bottom:max(var(--space-2),env(safe-area-inset-bottom))}
 .avatar{width:32px;height:32px;border-radius:var(--radius-full);background:var(--accent-soft);display:grid;place-items:center;font-weight:var(--weight-semibold);color:var(--accent-text);font-size:var(--text-sm);flex:none}

@@ -2,12 +2,12 @@
 Đơn hàng (P-05 giữ chỗ, TTL; P-07 huỷ đơn đã thanh toán) — TÀI CHÍNH + KHO.
 
 Chữ ký hàm bám BUILD-PLAN.md "Contract A". Biến động kho đi qua
-inventory.batches/stock services (không viết lại FIFO/giữ chỗ/sổ). Lỗi nghiệp vụ ->
+inventory.batches/stock services (không viết lại chọn lô FEFO/giữ chỗ/sổ). Lỗi nghiệp vụ ->
 BusinessError. actor=None nghĩa là Hệ thống.
 
 - create_order          : 7.1 gộp Customer theo phone (customers.services); BR-DM-02 giá
                           ItemPrice hiệu lực; BR-DM-08 áp DUY NHẤT 1 PricingRule lợi nhất;
-                          BR-BH-05/06 FIFO + phân bổ lô; BR-BH-07 BUNDLE giữ chỗ đồng thời
+                          BR-BH-05/06 FEFO + phân bổ lô; BR-BH-07 BUNDLE giữ chỗ đồng thời
                           mọi thành phần; BR-BH-08/DM-07 đóng băng giá & công thức.
 - cancel_unpaid_expired : job TTL BR-BH-03/04 — idempotent, actor=None.
 - cancel_paid_order     : hoàn kho lô gốc (CANCEL_RESTORE), audit (BR-HT-05).
@@ -211,7 +211,7 @@ def create_order(*, customer_phone, customer_name, delivery_address, phone, line
         if best is not None:
             rule, per_line_discount = best
 
-        # Bước 3: tạo dòng đơn + giữ chỗ từng thành phần (FIFO). Thiếu tồn -> rollback cả đơn.
+        # Bước 3: tạo dòng đơn + giữ chỗ từng thành phần (FEFO, BR-BH-05). Thiếu tồn -> rollback cả đơn.
         total = ZERO
         for idx, ld in enumerate(lines_data):
             item = ld["item"]
@@ -237,7 +237,7 @@ def create_order(*, customer_phone, customer_name, delivery_address, phone, line
             # BR-BH-07: giữ chỗ ĐỒNG THỜI mọi thành phần. Vì cùng transaction, thiếu 1
             # thành phần -> BusinessError -> rollback toàn bộ đơn.
             for component_item, comp_qty in components:
-                allocation = batches.allocate_fifo(item=component_item, qty=comp_qty)
+                allocation = batches.allocate_fefo(item=component_item, qty=comp_qty)
                 for batch, take in allocation:
                     batches.reserve(batch=batch, qty=take)  # khoá lô, người sau thua (BR-BH-02)
                     fresh = Batch.objects.get(pk=batch.pk)

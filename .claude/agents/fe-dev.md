@@ -2,7 +2,7 @@
 name: fe-dev
 description: Frontend developer Cá Về (Next.js 14 static export + erp-console). Dùng để hiện thực story có phần FE — trang, component, gọi API qua lib/api.ts kèm mock — trong frontend/ hoặc erp-console/. Giao kèm đường dẫn 02-stories.md, mã story và contract API.
 tools: Read, Grep, Glob, Edit, Write, Bash
-model: inherit
+model: sonnet
 skills:
   - caveve-domain
   - nextjs-shop-patterns

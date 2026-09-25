@@ -207,3 +207,87 @@
 .consequences{margin:0;padding:var(--space-3) 0 0;list-style:none;display:flex;flex-direction:column;gap:var(--space-2);border-top:1px solid var(--border)}
 .consequences li{display:flex;gap:var(--space-2);align-items:flex-start;color:var(--ink-2);font-size:var(--text-sm);line-height:var(--leading-normal)}
 .consequences li :global(.mi){font-size:16px;margin-top:2px;color:var(--ink-3)}
+
+/* ---------- S12: tab con "Đơn & tiền" (chỉ điện thoại — máy tính đã có mục con ở menu trái) ---------- */
+.tabs{display:flex;gap:var(--space-1);border-bottom:1px solid var(--border);margin:calc(-1 * var(--space-1)) 0 0}
+.tab{
+  flex:1 1 0;min-width:0;min-height:var(--tap);display:flex;align-items:center;justify-content:center;
+  padding:0 var(--space-2);border-bottom:2px solid transparent;margin-bottom:-1px;
+  color:var(--ink-3);font-weight:var(--weight-semibold);font-size:var(--text-sm);text-decoration:none;white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis;user-select:none;transition:color var(--dur-fast) ease,border-color var(--dur-fast) ease;
+}
+.tab[aria-current="page"]{color:var(--ink);border-bottom-color:var(--accent)}
+.tab:focus-visible{outline-offset:-2px;border-radius:var(--radius-sm)}
+@media (hover:hover) and (pointer:fine){.tab:not([aria-current="page"]):hover{color:var(--ink-2)}}
+@media (min-width:768px){.tabs{display:none}}
+
+/* ---------- S12: danh sách hàng chờ ---------- */
+.qFilters{flex:1 1 100%;display:flex;gap:var(--space-2);min-width:0}
+.qFilters > .select{flex:1 1 auto}
+.qFilters > :global(.toolbar){flex:none}
+@media (min-width:1100px){
+  .bar > :global(.seg){flex:none}
+  .qFilters{flex:1 1 auto;justify-content:flex-end}
+  .qFilters > .select{flex:0 1 240px}
+}
+.qOpen{grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"type amt" "txn order"}
+.qType{grid-area:type;min-width:0}
+.qType :global(.status){font-size:var(--text-sm)}
+.qTxn{grid-area:txn;display:flex;flex-direction:column;gap:var(--space-0-5);min-width:0}
+.qOrder{grid-area:order;justify-self:end;display:flex;flex-direction:column;align-items:flex-end;gap:var(--space-0-5);min-width:0;text-align:right}
+.qCode{font-family:var(--font-mono);font-size:var(--text-xs);color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.qCust{font-size:var(--text-xs);color:var(--ink-3);overflow-wrap:anywhere}
+.qOpen .cAmt{grid-area:amt}
+@container (min-width:640px){
+  .qHead,.qOpen{grid-template-columns:200px minmax(0,1fr) minmax(0,1fr) 120px;grid-template-areas:"type txn order amt"}
+  .qHead > span:nth-child(1){grid-area:type}
+  .qHead > span:nth-child(2){grid-area:txn}
+  .qHead > span:nth-child(3){grid-area:order}
+  .qHead > span:nth-child(4){grid-area:amt}
+  .qOrder{justify-self:start;align-items:flex-start;text-align:left}
+  .qOpen .cAmt{justify-self:end}
+}
+
+/* ---------- S12/S13: tấm chi tiết khoản tiền ---------- */
+.resolvedChip:global(.status){font-size:var(--text-sm)}
+.contentText{font-family:var(--font-mono);font-size:var(--text-sm);color:var(--ink-2);overflow-wrap:anywhere}
+.qOrderBox{display:flex;flex-direction:column;gap:var(--space-2)}
+.qOrderBox > .item{border-top:1px solid var(--border)}
+.sums{margin:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--space-2)}
+.sums > div{display:flex;flex-direction:column;gap:var(--space-0-5);min-width:0}
+.sums dt{font-size:var(--text-xs);color:var(--ink-3)}
+.sums dd{margin:0;font-size:var(--text-base);font-weight:var(--weight-medium);color:var(--ink);white-space:nowrap}
+.sumWarn dt,.sumWarn dd{color:var(--warn)}
+.openOrderBtn:global(.btn){align-self:flex-start}
+.openOrderBtn:global(.btn) :global(.mi){color:var(--accent-text)}
+
+/* Ô ghi chú / lý do (textarea) trong bước xử lý */
+.noteField textarea{min-height:72px;resize:vertical;line-height:var(--leading-normal)}
+.noteField textarea[aria-invalid=true]{border-color:var(--crit)}
+.noteField textarea[aria-invalid=true]:focus{box-shadow:0 0 0 1px var(--crit),0 0 0 4px var(--crit-soft)}
+.optional{font-weight:var(--weight-regular);color:var(--ink-3)}
+
+/* Gắn vào đơn: phạm vi + ô tìm + danh sách chọn một đơn */
+.pickTools{display:flex;flex-direction:column;gap:var(--space-3)}
+.pickTools > :global(.seg){align-self:flex-start}
+.searchField{display:flex;flex-direction:column;gap:var(--space-1-5)}
+.searchField label{font-size:var(--text-sm);font-weight:var(--weight-medium);color:var(--ink-2)}
+.pickList{margin:0;padding:0;border:0;min-width:0;display:flex;flex-direction:column;gap:var(--space-2);max-height:360px;overflow-y:auto;overscroll-behavior:contain}
+.pickList[aria-invalid=true] .pickRow{border-color:var(--crit)}
+.pickList .nil{display:flex;align-items:center;gap:var(--space-2)}
+.pickRow:global(.check-row){align-items:flex-start}
+.pickBody{display:flex;flex-direction:column;gap:var(--space-1);min-width:0;flex:1}
+.pickTop{display:flex;align-items:baseline;justify-content:space-between;gap:var(--space-2);min-width:0}
+.pickTop b{font-size:var(--text-base);font-weight:var(--weight-semibold);white-space:nowrap}
+.pickSub{display:flex;align-items:center;justify-content:space-between;gap:var(--space-2);flex-wrap:wrap;font-size:var(--text-sm);color:var(--ink-2)}
+.pickSub :global(.status){font-size:var(--text-xs)}
+.sameTag{display:inline-flex;align-items:center;gap:var(--space-1);align-self:flex-start;height:22px;padding:0 var(--space-2);border-radius:var(--radius-sm);background:var(--good-soft);color:var(--good);font-size:var(--text-xs);font-weight:var(--weight-medium)}
+.sameTag :global(.mi){font-size:14px}
+/* .check-row (globals) biến MỌI span con thành cột flex — trả lại bố cục cho dòng chọn đơn */
+.pickRow:global(.check-row) span{display:inline;flex-direction:initial}
+.pickRow:global(.check-row) .pickBody{display:flex;flex-direction:column}
+.pickRow:global(.check-row) .pickTop,.pickRow:global(.check-row) .pickSub{display:flex;flex-direction:row}
+.pickRow:global(.check-row) .sameTag{display:inline-flex}
+.pickRow:global(.check-row) :global(.status){display:inline-flex}
+.pickRow:global(.check-row) :global(.status .dot){display:inline-block}
+.searchField :global(.search){flex:none}

@@ -1396,3 +1396,7 @@ Không đổi nghiệp vụ hay contract API. Mọi AC chức năng của S7, S8
 | UI3 | Tổng quan, Đơn, Kho & Lô | KPI, bảng và thẻ mobile làm lại. Số dùng tabular-nums, căn phải. Đủ trạng thái tải, rỗng, lỗi, 403. |
 | UI4 | Nhân sự + Tài khoản của tôi | Danh sách, form, sheet, xác nhận nguy hiểm, ô mật khẩu làm lại. Có micro-interaction (emil-design-eng). |
 | UI5 | UI review | Chạy `impeccable audit`/`critique`, `web-design-guidelines`, `fixing-accessibility`, không còn lỗi mức cao. Có ảnh trước và sau ở `shots/ui/`. |
+
+### Quyết định của Duy về tiền (2026-09-26, sau lô L8)
+- Số tiền **tối thiểu 1đ** ở cả BE và FE, vì VND không có số lẻ. BE từ chối số dưới 1đ (BR-TT-08).
+- Khách chuyển **nhiều hơn tổng đơn ngay lần đầu**: đơn vẫn chuyển sang "Đã thanh toán", còn **phần thừa đưa vào hàng chờ** để Chủ hoàn lại. Cách xử lý giống P5 / BR-TT-10.

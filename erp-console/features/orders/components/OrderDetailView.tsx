@@ -5,7 +5,9 @@
 // ngăn bằng đường mảnh (không khung lồng khung). Giá vốn trong phân bổ lô CHỈ hiện khi JSON có key `unit_cost`
 // (BR-PQ-15) và người xem có quyền xem giá vốn. Thanh nút dính đáy tấm (tay cái) theo `available_actions`.
 
+import Link from "next/link";
 import type { RefObject } from "react";
+import { canView, navItem } from "@/shared/lib/nav";
 import { useAuth } from "@/features/auth/components/AuthProvider";
 import { dateTime, kg, timeHM, vnd } from "@/shared/lib/format";
 import { ORDER_STATUS } from "@/shared/lib/status";
@@ -127,6 +129,14 @@ export function OrderDetailView({ order: o, fallback, refreshing, refreshError, 
           <span>
             {note.duplicate && <b className={s.noteLead}>{ORDERS_MSG.duplicate} </b>}
             {note.text}
+            {note.queueLink && canView(me, "payments") && (
+              <>
+                {" "}
+                <Link href={navItem("payments").href} className="inline-link queue-link">
+                  {ORDERS_MSG.openQueue}
+                </Link>
+              </>
+            )}
           </span>
         </div>
       )}

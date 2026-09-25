@@ -114,7 +114,7 @@ Quy mô: 1 điểm bán/kho duy nhất. Timeline tự đặt 6 tháng. Duy phát
 
 ## 6.2 Kho
 - Tồn kho quản lý theo lô, không gộp theo mặt hàng
-- Xuất kho theo nguyên tắc lô nhập trước xuất trước (FIFO) khi bán
+- Xuất kho theo nguyên tắc **hết hạn trước xuất trước (FEFO)** khi bán: lô có hạn dùng sớm nhất xuất trước; cùng hạn thì lô nhập trước xuất trước. Áp dụng cho mọi mặt hàng, kể cả từng thành phần combo *(sửa 2026-09-26, xem decisions.md)*
 - **Vòng đời lô**: Nháp → Đang bán → Cận hạn (cảnh báo, không tự giảm giá) → Hết hàng/Quá hạn → Đã chốt
 - Kiểm kê định kỳ: đối chiếu tồn sổ sách với tồn thực tế, ghi nhận chênh lệch (hao hụt) — cũng là tín hiệu cảnh báo sớm nếu giả định ở mục 6.4 sai lệch trong thực tế
 - Chỉ 1 kho duy nhất
@@ -198,7 +198,8 @@ Quy mô: 1 điểm bán/kho duy nhất. Timeline tự đặt 6 tháng. Duy phát
 | Lô (Batch) | Đơn vị hàng nhập theo từng lần mua tại cảng, tính bằng kg, có hạn dùng và nhà cung cấp riêng |
 | Giữ chỗ (Booked) | Trạng thái đơn hàng đã tạo, đã giữ tạm số lượng trong lô, nhưng chưa xác nhận thanh toán |
 | TTL | Thời gian tối đa một đơn được giữ ở trạng thái "giữ chỗ" trước khi tự huỷ (30 phút) |
-| FIFO | Nguyên tắc xuất lô nhập trước, bán trước |
+| FEFO | First Expired, First Out: lô hết hạn trước thì xuất trước. Đây là nguyên tắc chọn lô khi bán *(sửa 2026-09-26, xem decisions.md)* |
+| FIFO | First In, First Out: lô nhập trước xuất trước. Chỉ dùng làm **tiêu chí phụ** khi hai lô cùng hạn dùng, không còn là nguyên tắc chọn lô chính *(sửa 2026-09-26, xem decisions.md)* |
 | Kiểm kê | Đối chiếu định kỳ giữa tồn kho ghi trên hệ thống và tồn thực tế đếm được |
 | Soạn hàng | Bước nhân viên cân/đóng gói hàng đúng số kg đã đặt, trước khi bàn giao cho người giao hàng |
 | Combo dạng gói | Mặt hàng bán có công thức thành phần; khi bán thì nổ ra và trừ kho từng thành phần |

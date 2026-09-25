@@ -26,7 +26,7 @@ from apps.purchasing.models import Supplier
 from apps.sales.models import Customer, SalesInvoice, SalesOrder, SalesOrderLine
 
 DEMO_ITEM_CODES = ["CA-THU", "TOM-SU-1", "MUC-ONG", "CA-HOI-NU", "GHE-XANH", "BACH-TUOC"]
-DEMO_BATCH_IDS = ["LO-0912", "LO-0907", "LO-0903", "LO-0918", "LO-0921", "LO-0922"]
+DEMO_BATCH_IDS = ["LO-0912", "LO-0907", "LO-0903", "LO-0915", "LO-0918", "LO-0921", "LO-0922"]
 DEMO_ORDER_CODES = [
     "DH-2609-118", "DH-2609-117", "DH-2609-116", "DH-2609-119", "DH-2609-115", "DH-2609-114",
 ]
@@ -81,7 +81,7 @@ class D1SeedTests(TestCase):
         self.assertEqual(
             set(Item.objects.values_list("code", flat=True)), set(DEMO_ITEM_CODES)
         )
-        self.assertEqual(Batch.objects.count(), 6)
+        self.assertEqual(Batch.objects.count(), 7)
         self.assertEqual(SalesOrder.objects.count(), 6)
         self.assertEqual(SalesInvoice.objects.count(), 3)
         # Phiếu giao do signal sinh cũng được đánh dấu.
@@ -555,3 +555,18 @@ class R4SeedConsistencyTests(TestCase):
             with self.subTest(model=model.__name__):
                 self.assertFalse(model.objects.exists())
         self.assertFalse(DemoRecord.objects.exists())
+
+
+class F1SeedFefoCaseTests(TestCase):
+    """F1 (FEFO, 2026-09-26) — demo có sẵn ca 'cùng mặt hàng, lô nhập sau nhưng hạn sớm hơn' để QA."""
+
+    def test_f1_seed_co_ca_lo_nhap_sau_han_som_hon_fefo_chon_lo_nay(self):
+        from apps.inventory.batches import services as batch_services
+        run()
+        old = Batch.objects.get(batch_id="LO-0915")
+        new = Batch.objects.get(batch_id="LO-0918")
+        self.assertEqual(old.item_id, new.item_id)
+        self.assertLess(old.received_date, new.received_date)   # LO-0915 nhập trước
+        self.assertGreater(old.expiry_date, new.expiry_date)     # nhưng hạn muộn hơn
+        alloc = batch_services.allocate_fefo(item=new.item, qty=Decimal("1"))
+        self.assertEqual(alloc[0][0].batch_id, "LO-0918")

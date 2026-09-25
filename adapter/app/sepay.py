@@ -5,12 +5,8 @@
 from __future__ import annotations
 
 import re
-from datetime import datetime
 
-from .schemas import InternalPaymentPayload, SePayWebhookPayload
-
-# SePay tài liệu ví dụ dùng format "YYYY-MM-DD HH:MM:SS" (giờ VN, không có timezone).
-_SEPAY_DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
+from .schemas import InternalPaymentPayload, SePayWebhookPayload, parse_sepay_datetime
 
 
 def parse_transaction_date(raw: str) -> str:
@@ -18,11 +14,7 @@ def parse_transaction_date(raw: str) -> str:
     Chuẩn hoá transactionDate của SePay về ISO 8601 để Django (DRF DateTimeField)
     parse được. Fallback: nếu SePay đổi format sang ISO sẵn thì dùng luôn.
     """
-    try:
-        dt = datetime.strptime(raw, _SEPAY_DATE_FORMAT)
-    except ValueError:
-        dt = datetime.fromisoformat(raw)
-    return dt.isoformat()
+    return parse_sepay_datetime(raw).isoformat()
 
 
 def extract_order_code(payload: SePayWebhookPayload, fallback_pattern: str) -> str:

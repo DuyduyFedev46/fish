@@ -1,7 +1,7 @@
 # features/overview — Tổng quan
 
 Màn đầu của Chủ/Quản lý/NV kho: 4 KPI (doanh thu hôm nay, đơn chờ xử lý, lô cận hạn, giá trị tồn),
-8 đơn gần nhất, cảnh báo cận hạn (≤6), tồn theo lô (≤20, FIFO). Story: **S8** (chuyển từ bản HTML cũ, số liệu y như cũ).
+8 đơn gần nhất, cảnh báo cận hạn (≤6), tồn theo lô (≤20, thứ tự xuất FEFO). Story: **S8** (chuyển từ bản HTML cũ, số liệu y như cũ).
 
 - Endpoint: `GET /api/dashboard/summary/` — BE chỉ đòi đăng nhập (`IsAuthenticated`). Contract + kiểu đầy đủ ở
   `shared/lib/dashboardSummary.ts` (dùng chung với `orders`, `inventory`), cache chung qua `shared/lib/useResource.ts`.

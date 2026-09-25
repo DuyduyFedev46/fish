@@ -104,6 +104,13 @@ with sync_playwright() as p:
     ok("AC1 Tổng quan: lô ≤ 20, có dữ liệu", 0 < len(new_ov_batches) <= 20, str(len(new_ov_batches)))
     ok("AC3 Tổng quan Chủ: có cột Giá vốn/kg", page.locator("section[aria-labelledby=ov-batches] th", has_text="Giá vốn/kg").count() == 1)
     ok("AC3 Chủ: KPI giá trị tồn có số", new_kpis["inventory"] not in ("—", ""), new_kpis["inventory"])
+    # FEFO (hồ sơ 2026-09-26-fefo, F2-AC1): phụ đề mới, không còn chữ FIFO, lô xếp theo hạn dùng sớm nhất
+    ok("F2-AC1: phụ đề bảng lô 'Xuất theo hạn dùng sớm nhất (FEFO)', trang không còn chữ 'FIFO'",
+       page.locator("section[aria-labelledby=ov-batches] .sect-h .sub").inner_text() == "Xuất theo hạn dùng sớm nhất (FEFO)"
+       and "FIFO" not in page.locator("main").inner_text())
+    exp = [t.strip() for t in page.locator("section[aria-labelledby=ov-batches] tbody td[data-m-label=Hạn]").all_inner_texts()]
+    keys = [d[3:5] + d[0:2] for d in exp if len(d) == 5]
+    ok("F2-AC1: lô xếp theo hạn dùng tăng dần (thứ tự xuất FEFO)", keys == sorted(keys) and len(keys) == len(exp), str(exp))
 
     # Refresh: đúng 1 request mới
     clear_log(page)

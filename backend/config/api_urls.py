@@ -84,6 +84,9 @@ urlpatterns = [
     # S11: contract viết không có "/" cuối — nhận cả hai dạng (router tự có dạng có "/").
     path("sales/orders/<int:pk>/confirm-payment",
          SalesOrderViewSet.as_view({"post": "confirm_payment"})),
+    # S12: như trên, contract viết không có "/" cuối.
+    path("sales/payments/<int:pk>/resolve",
+         PaymentTransactionViewSet.as_view({"post": "resolve"})),
     # Back-office (router)
     path("", include(router.urls)),
 ]

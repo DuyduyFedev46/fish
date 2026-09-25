@@ -17,7 +17,8 @@ class BatchServiceTests(InventoryServiceBase):
         self.assertEqual(b.expiry_date, self.today + datetime.timedelta(days=90))
         self.assertEqual(b.ledger_entries.count(), 1)
 
-    def test_allocate_fifo_orders_by_received_date(self):
+    def test_allocate_fefo_cung_han_thi_lo_nhap_truoc_ra_truoc(self):
+        # F1: hai lô cùng hạn (cùng ngày tạo + 90) -> tiêu chí phụ ngày nhập (BR-BH-05).
         b1 = self._batch(qty="5")
         b1.received_date = datetime.date(2026, 8, 1)
         b1.status = Batch.Status.SELLING
@@ -25,17 +26,17 @@ class BatchServiceTests(InventoryServiceBase):
         b2 = self._batch(qty="5")
         b2.status = Batch.Status.SELLING
         b2.save()
-        alloc = batch_services.allocate_fifo(item=self.item, qty=Decimal("7"))
-        self.assertEqual(alloc[0][0].pk, b1.pk)      # lô nhập trước ra trước
+        alloc = batch_services.allocate_fefo(item=self.item, qty=Decimal("7"))
+        self.assertEqual(alloc[0][0].pk, b1.pk)      # cùng hạn: lô nhập trước ra trước
         self.assertEqual(alloc[0][1], Decimal("5"))
         self.assertEqual(alloc[1][1], Decimal("2"))
 
-    def test_allocate_fifo_insufficient_raises(self):
+    def test_allocate_fefo_insufficient_raises(self):
         b = self._batch(qty="3")
         b.status = Batch.Status.SELLING
         b.save()
         with self.assertRaises(BusinessError):
-            batch_services.allocate_fifo(item=self.item, qty=Decimal("5"))
+            batch_services.allocate_fefo(item=self.item, qty=Decimal("5"))
 
     def test_reserve_reduces_sellable_and_blocks_oversell(self):
         b = self._batch(qty="4")
@@ -50,7 +51,7 @@ class BatchServiceTests(InventoryServiceBase):
     def test_draft_batch_not_sellable(self):
         self._batch(qty="10")  # DRAFT
         with self.assertRaises(BusinessError):
-            batch_services.allocate_fifo(item=self.item, qty=Decimal("1"))
+            batch_services.allocate_fefo(item=self.item, qty=Decimal("1"))
 
     def test_publish_and_close_batch(self):
         b = self._batch(qty="2")

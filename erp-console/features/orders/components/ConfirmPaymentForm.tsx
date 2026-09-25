@@ -13,6 +13,7 @@ import { ApiError } from "@/shared/lib/http";
 import { errorText } from "@/shared/lib/messages";
 import { vnd } from "@/shared/lib/format";
 import { Icon } from "@/shared/ui/Icon";
+import { AMOUNT_MSG, TXN_MAX_LENGTH, digits, parseAmount, type AmountProblem } from "../amount";
 import { confirmPayment } from "../api";
 import { ORDERS_MSG } from "../messages";
 import type { ConfirmPaymentResult, OrderDetail } from "../types";
@@ -25,45 +26,6 @@ type Props = {
   onBusy: (busy: boolean) => void;
   onCancel: () => void;
   onDone: (r: ConfirmPaymentResult) => void;
-};
-
-/** Chỉ giữ chữ số (tiền VND không số lẻ). "540.000" / "540,000 ₫" → "540000". */
-function digits(v: string): string {
-  return v.replace(/\D+/g, "").replace(/^0+(?=\d)/, "");
-}
-
-/** Tối đa 12 chữ số phần nguyên (999.999.999.999 ₫) — cột `amount` của BE là 14 chữ số, 2 lẻ (B13). */
-export const AMOUNT_MAX_DIGITS = 12;
-export const TXN_MAX_LENGTH = 100;
-
-type AmountProblem = "missing" | "negative" | "zero" | "tooBig" | "notNumber";
-type AmountCheck = { value: string; problem: null } | { value: null; problem: AmountProblem };
-
-/**
- * Đọc ô số tiền theo cách người Việt gõ: "." / "," / khoảng trắng là dấu nghìn ("540.000", "540,000 ₫").
- * Dấu cuối theo sau 1–2 chữ số ("540000,5") hoặc "0," / "0." ở đầu ("0,004") là phần lẻ → bỏ, chỉ giữ đồng.
- */
-export function parseAmount(raw: string): AmountCheck {
-  const s = raw.replace(/vnd|₫|đ/gi, "").replace(/\s+/g, "");
-  if (/[-−]/.test(s)) return { value: null, problem: "negative" };
-  if (/[^\d.,]/.test(s)) return { value: null, problem: "notNumber" };
-  if (!/\d/.test(s)) return { value: null, problem: "missing" };
-  let int = s;
-  const frac = s.match(/^(.*?)[.,](\d{1,2})$/);
-  if (frac) int = frac[1];
-  else if (/^0*[.,]\d/.test(s) || /^0+[.,]/.test(s)) int = "0";
-  const d = int.replace(/\D+/g, "").replace(/^0+/, "");
-  if (!d) return { value: null, problem: "zero" };
-  if (d.length > AMOUNT_MAX_DIGITS) return { value: null, problem: "tooBig" };
-  return { value: d, problem: null };
-}
-
-const AMOUNT_MSG: Record<AmountProblem, string> = {
-  missing: ORDERS_MSG.amountMissing,
-  negative: ORDERS_MSG.amountNegative,
-  zero: ORDERS_MSG.amountZero,
-  tooBig: ORDERS_MSG.amountTooBig,
-  notNumber: ORDERS_MSG.amountNotNumber,
 };
 
 export function ConfirmPaymentForm({ order, fallbackTotal, onBusy, onCancel, onDone }: Props) {

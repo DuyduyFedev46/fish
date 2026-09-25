@@ -1,6 +1,6 @@
 ---
 name: caveve-domain
-description: Kiến thức nghiệp vụ + bất biến kỹ thuật của dự án Cá Về (vựa cá B2C — mua lô ở cảng, bán online, quản lý kho/giá vốn). Dùng khi phân tích yêu cầu, viết story, code, test hay review BẤT KỲ phần nào của repo này — đặc biệt khi đụng tới lô (batch), FIFO, giữ chỗ/TTL, giá vốn, phân quyền 3 tầng, hoàn tiền, AuditLog, hoặc mã BR-*.
+description: Kiến thức nghiệp vụ + bất biến kỹ thuật của dự án Cá Về (vựa cá B2C — mua lô ở cảng, bán online, quản lý kho/giá vốn). Dùng khi phân tích yêu cầu, viết story, code, test hay review BẤT KỲ phần nào của repo này — đặc biệt khi đụng tới lô (batch), FEFO, giữ chỗ/TTL, giá vốn, phân quyền 3 tầng, hoàn tiền, AuditLog, hoặc mã BR-*.
 ---
 
 # Cá Về — bản đồ nghiệp vụ & bất biến
@@ -67,7 +67,7 @@ frontend/ (Next.js 14, static export → Firebase cangca-loc)   erp-console/ (Ne
 4. `SalesOrder`/`SalesInvoice` chỉ Hệ thống tạo (BR-PQ-11). `AuditLog`, `StockLedgerEntry`,
    `*LineBatch` là append-only.
 5. Thay đổi trạng thái quan trọng → ghi `AuditLog` (BR-PQ-04/05).
-6. Xuất kho theo **FIFO lô** + bảng phân bổ lô (BR-BH-06). Giữ chỗ có TTL
+6. Xuất kho theo **FEFO**: lô hạn dùng sớm nhất ra trước; cùng hạn thì lô nhập trước, rồi lô tạo trước. Nguồn duy nhất cho thứ tự là `sellable_batches`. Lô chốt một lần lúc tạo đơn, khi thanh toán không chọn lại (BR-BH-05/11, decisions 2026-09-26). Có bảng phân bổ lô (BR-BH-06). Giữ chỗ có TTL
    (`SALES_ORDER_TTL_MINUTES`), job `cancel_expired_orders` phải **idempotent**.
 7. Tiền dùng `Decimal`, không float. Tham số nghiệp vụ đọc từ `settings`/env, không hard-code.
 8. Schema là tài sản đã ổn định: thêm model/field phải có lý do trong hồ sơ tính năng

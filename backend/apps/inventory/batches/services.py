@@ -1,8 +1,8 @@
 """
-Lô hàng: sinh lô, FIFO + giữ chỗ, vòng đời, giá vốn lô, job trạng thái theo hạn (P-04).
+Lô hàng: sinh lô, chọn lô FEFO + giữ chỗ, vòng đời, giá vốn lô, job trạng thái theo hạn (P-04).
 
-Giữ chỗ tách khỏi tồn thật: `qty_reserved` (BR-BH-01/02). Chọn lô FIFO theo ngày
-nhập (BR-BH-05). Tất cả hàm chạy trong transaction, dùng `select_for_update` để an
+Giữ chỗ tách khỏi tồn thật: `qty_reserved` (BR-BH-01/02). Chọn lô FEFO — hạn dùng sớm nhất
+xuất trước, cùng hạn thì lô nhập trước, rồi lô tạo trước (BR-BH-05, decisions 2026-09-26). Tất cả hàm chạy trong transaction, dùng `select_for_update` để an
 toàn khi hai khách tranh lô cuối (BR-BH-02, E-06). Biến động tồn đi qua
 `apps.inventory.stock.services.record_movement`.
 """
@@ -22,6 +22,9 @@ from apps.inventory.stock import services as stock
 
 ZERO = Decimal("0")
 SELLABLE_STATUSES = (Batch.Status.SELLING, Batch.Status.NEAR_EXPIRY)
+# Thứ tự xuất FEFO (BR-BH-05): hạn dùng tăng dần → ngày nhập → lô tạo trước (id). Mọi chỗ chọn
+# lô để bán hoặc hiển thị "thứ tự xuất" phải dùng khoá này (hoặc `sellable_batches`).
+FEFO_ORDER = ("expiry_date", "received_date", "id")
 
 
 def sellable_batches(*, item=None, on_date=None):
@@ -29,13 +32,13 @@ def sellable_batches(*, item=None, on_date=None):
     Nguồn DUY NHẤT cho "lô bán được" (BR-LO-02, S1): trạng thái SELLING/NEAR_EXPIRY
     **và** `expiry_date >= hôm nay` theo giờ Asia/Ho_Chi_Minh. `expiry_date` là ngày
     cuối còn bán (C1). Không phụ thuộc job `update_batch_status` — job chết thì lô
-    quá hạn vẫn không bán được. Thứ tự FIFO theo ngày nhập (BR-BH-05).
+    quá hạn vẫn không bán được. Trả về theo thứ tự xuất FEFO (`FEFO_ORDER`, BR-BH-05).
     """
     on_date = on_date or timezone.localdate()
     qs = Batch.objects.filter(status__in=SELLABLE_STATUSES, expiry_date__gte=on_date)
     if item is not None:
         qs = qs.filter(item=item)
-    return qs.order_by("received_date", "id")
+    return qs.order_by(*FEFO_ORDER)
 
 
 # --- Sinh lô ----------------------------------------------------------------
@@ -78,10 +81,12 @@ def create_batch(*, item, supplier, warehouse, received_date, qty, purchase_rate
 
 # --- Giữ chỗ (reservation) --------------------------------------------------
 
-def allocate_fifo(*, item, qty):
+def allocate_fefo(*, item, qty):
     """
-    Tính phân bổ FIFO cho `qty` kg của `item` từ các lô đang bán được (còn hạn, BR-LO-02).
-    Trả list[(Batch, kg)]. KHÔNG thay đổi state (chỉ tính). Raise nếu không đủ.
+    Tính phân bổ FEFO cho `qty` kg của `item` từ các lô đang bán được (còn hạn, BR-LO-02):
+    lấy dần tồn khả dụng theo thứ tự `sellable_batches` (BR-BH-05/06). Trả list[(Batch, kg)].
+    KHÔNG thay đổi state (chỉ tính). Raise nếu không đủ (BR-BH-02).
+    Chỉ gọi lúc TẠO ĐƠN — thanh toán trừ đúng lô đã giữ, không chọn lại (BR-BH-11).
     """
     qty = Decimal(qty)
     remaining = qty
@@ -100,6 +105,10 @@ def allocate_fifo(*, item, qty):
             f"Không đủ tồn khả dụng cho {item.code}: thiếu {remaining}kg (BR-BH-02)."
         )
     return result
+
+
+# Tên cũ (trước FEFO 2026-09-26) — giữ để không vỡ chỗ gọi ngoài; hành vi là FEFO.
+allocate_fifo = allocate_fefo
 
 
 def reserve(*, batch, qty):

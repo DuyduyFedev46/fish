@@ -6,7 +6,7 @@ Model: `models/` (warehouses, batches, stock, stocktake, returns).
 
 | Module | Làm gì |
 |---|---|
-| `batches/` | sinh lô, FIFO + giữ chỗ, publish/chốt lô, giá vốn lô, job trạng thái theo hạn |
+| `batches/` | sinh lô, chọn lô FEFO + giữ chỗ, publish/chốt lô, giá vốn lô, job trạng thái theo hạn |
 | `stock/` | sổ chuyển động kho, kho, phiếu điều chỉnh kho |
 | `stocktake/` | kiểm kê & hao hụt |
 | `returns/` | duyệt hàng giao thất bại về kho |

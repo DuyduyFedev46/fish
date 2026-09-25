@@ -6,6 +6,7 @@ from django.core.validators import MinValueValidator
 from django.db import models
 
 from .invoices import SalesInvoice
+from .payments import PaymentTransaction
 
 
 class Refund(models.Model):
@@ -13,6 +14,9 @@ class Refund(models.Model):
     Phiếu hoàn tiền (P-07) — entity riêng (BR-HT-01), không phải field trên đơn.
     Tách quyền: create_refund (Chủ + Quản lý) ≠ confirm_refund (chỉ Chủ) — BR-HT-07.
     Thực thi V1 là chuyển khoản tay; hệ thống chỉ ghi sổ.
+
+    Gắn ĐÚNG MỘT trong hai (S13 / Q9): hoá đơn (tiền đã ghi doanh thu) hoặc giao dịch thanh
+    toán không có hoá đơn (tiền về sau khi huỷ / thiếu mà khách không bù / chuyển thừa).
     """
 
     class Method(models.TextChoices):
@@ -25,8 +29,15 @@ class Refund(models.Model):
         FAILED = "FAILED", "Thất bại"
 
     sales_invoice = models.ForeignKey(
-        SalesInvoice, on_delete=models.PROTECT, related_name="refunds", verbose_name="Hoá đơn"
+        SalesInvoice, on_delete=models.PROTECT, related_name="refunds", verbose_name="Hoá đơn",
+        null=True, blank=True,
     )
+    payment_transaction = models.ForeignKey(
+        PaymentTransaction, on_delete=models.PROTECT, related_name="refunds",
+        verbose_name="Giao dịch thanh toán (không hoá đơn)", null=True, blank=True,
+    )
+    # Q12 (S13/S15): khoá chống tạo trùng do FE sinh khi mở form, gửi lại y nguyên khi thử lại.
+    request_id = models.UUIDField("Mã yêu cầu (chống trùng)", null=True, blank=True, unique=True)
     amount = models.DecimalField(
         "Số tiền hoàn", max_digits=14, decimal_places=2,
         validators=[MinValueValidator(Decimal("0"))],
@@ -58,6 +69,15 @@ class Refund(models.Model):
         verbose_name = "Phiếu hoàn tiền"
         verbose_name_plural = "Phiếu hoàn tiền"
         ordering = ["-created_at", "-id"]
+        constraints = [
+            models.CheckConstraint(
+                name="refund_exactly_one_source",
+                condition=(
+                    models.Q(sales_invoice__isnull=False, payment_transaction__isnull=True)
+                    | models.Q(sales_invoice__isnull=True, payment_transaction__isnull=False)
+                ),
+            ),
+        ]
         permissions = [
             ("create_refund", "Tạo phiếu hoàn tiền"),
             ("confirm_refund", "Xác nhận đã hoàn tiền (tiền rời tài khoản)"),

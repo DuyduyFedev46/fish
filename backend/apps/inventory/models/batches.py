@@ -71,7 +71,9 @@ class Batch(models.Model):
     class Meta:
         verbose_name = "Lô hàng"
         verbose_name_plural = "Lô hàng"
-        ordering = ["received_date", "id"]  # FIFO theo ngày nhập (BR-BH-05)
+        # Thứ tự mặc định (admin, quan hệ) — KHÔNG phải thứ tự xuất. Thứ tự xuất là FEFO:
+        # `apps.inventory.batches.services.FEFO_ORDER` / `sellable_batches` (BR-BH-05).
+        ordering = ["received_date", "id"]
         permissions = [
             ("publish_batch", "Publish lô ra Shop"),
             ("close_batch", "Chốt lô (đông cứng lãi/lỗ)"),

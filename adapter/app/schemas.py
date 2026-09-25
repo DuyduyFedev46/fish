@@ -40,10 +40,26 @@ lúc build; chỉnh lại schema này nếu Lộc gửi payload thật khác):
 
 from __future__ import annotations
 
-from decimal import Decimal
+from datetime import datetime
+from decimal import ROUND_HALF_UP, Decimal
 from typing import Any, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+
+# SePay tài liệu ví dụ dùng format "YYYY-MM-DD HH:MM:SS" (giờ VN, không có timezone).
+SEPAY_DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
+
+AMOUNT_QUANT = Decimal("0.01")
+AMOUNT_MIN = Decimal("1")
+
+
+def parse_sepay_datetime(raw: str) -> datetime:
+    """transactionDate SePay → datetime. Nhận "YYYY-MM-DD HH:MM:SS" hoặc ISO 8601; sai → ValueError."""
+    try:
+        return datetime.strptime(raw, SEPAY_DATE_FORMAT)
+    except ValueError:
+        return datetime.fromisoformat(raw)
 
 
 class SePayWebhookPayload(BaseModel):
@@ -60,15 +76,31 @@ class SePayWebhookPayload(BaseModel):
     content: str = ""
     transfer_type: str = Field(alias="transferType")
     description: Optional[str] = ""
-    transfer_amount: Decimal = Field(alias="transferAmount")
+    # B7: NaN/±Infinity bị pydantic chặn ngay (allow_inf_nan=False) → 400, không tới validator.
+    transfer_amount: Decimal = Field(alias="transferAmount", allow_inf_nan=False)
     accumulated: Optional[Decimal] = None
     reference_code: Optional[str] = Field(default=None, alias="referenceCode")
 
     @field_validator("transfer_amount")
     @classmethod
     def amount_must_be_positive(cls, value: Decimal) -> Decimal:
-        if value <= 0:
+        if not value.is_finite() or value <= 0:
             raise ValueError("transferAmount phải > 0")
+        # L8 (BR-TT-08, quyết định Duy 2026-09-26): VND không có số lẻ → tối thiểu 1đ, so SAU
+        # khi làm tròn 0,01 ROUND_HALF_UP (cùng cách Django `validate_amount`). Không đổi giá
+        # trị gửi đi — Django tự làm tròn.
+        if value < AMOUNT_MIN and value.quantize(AMOUNT_QUANT, rounding=ROUND_HALF_UP) < AMOUNT_MIN:
+            raise ValueError("transferAmount tối thiểu 1đ")
+        return value
+
+    @field_validator("transaction_date")
+    @classmethod
+    def transaction_date_parsable(cls, value: str) -> str:
+        # N-7 / B7: ngày hỏng trước đây nổ ở to_internal_payload → 500, SePay gửi lại mãi.
+        try:
+            parse_sepay_datetime(value)
+        except (TypeError, ValueError):
+            raise ValueError("transactionDate phải dạng 'YYYY-MM-DD HH:MM:SS' hoặc ISO 8601") from None
         return value
 
     @field_validator("transfer_type")

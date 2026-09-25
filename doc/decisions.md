@@ -159,3 +159,18 @@ Những điểm dưới đây chưa từng được Lộc hoặc Duy phát biể
 - Nguyên tắc thiết kế xuyên suốt: hạn chế tối đa nhập liệu thủ công; ưu tiên đơn giản/dễ 1 mình maintain; ưu tiên công cụ có sẵn (Django Admin/auth) hơn tự build; bên thứ 3 luôn qua adapter; **chưa có dữ liệu vận hành thật → ưu tiên giả định đơn giản nhất, dễ mở rộng sau**.
 - **Level 2 (doctype)**: `doctype-mapping.md` — ⚠ ĐÃ LỖI THỜI, cần viết lại. **URD v4**: `URD.md`. **Level 3 (nghiệp vụ chi tiết) v2: `business-process-spec.md`.**
 - **Câu hỏi mở còn lại**: (1) mục tiêu nghiệp vụ suy luận ở URD 2.2, (2) service token FastAPI ↔ Django, (3) điều kiện/phí SePay, (4) giả định "số kg đặt = số kg thực giao", (5) combo thực tế bán dạng nào, (6) mua tại cảng có gối đầu không, (7) ngưỡng thời gian ngoài chuỗi lạnh, (8) **vựa có bao nhiêu người và có ai để Lộc uỷ quyền duyệt khi vắng mặt không**.
+
+## 2026-09-26 — Xuất kho FEFO (hết hạn trước xuất trước) thay FIFO — [DUY CHỐT]
+Hàng đông lạnh phải xuất lô **hạn dùng sớm nhất** trước. Chọn lô như sau:
+- Chỉ xét các lô còn bán được (BR-LO-02 lọc trước).
+- Sắp theo `expiry_date` tăng dần. Cùng hạn thì lô nhập sớm hơn ra trước, còn trùng nữa thì lô tạo trước.
+- Áp dụng cho **toàn bộ mặt hàng**, gồm cả từng thành phần của combo.
+- Lô được chốt **một lần lúc tạo đơn**, khi thanh toán không chọn lại (BR-BH-11).
+- Hàng hoàn và huỷ đơn trả về lô gốc.
+- V1 không cho chọn tay lô.
+
+Quyết định này **thay thế** hai ghi chú trước:
+- "theo dõi theo ngày nhập lô là đủ" (2026-09-09);
+- "FIFO từng thành phần" (combo, 2026-09-10).
+
+Hồ sơ: `doc/features/2026-09-26-fefo/`.

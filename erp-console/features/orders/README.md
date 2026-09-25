@@ -1,5 +1,12 @@
 # features/orders — Đơn & tiền
 
+**L8 (S12, S13):** hàng chờ thanh toán lệch là **màn con** `/orders/payments/` của "Đơn & tiền" (menu con, chỉ Chủ —
+`sales.confirm_payment_manual`). Đặt trong CÙNG module vì cần tìm đơn (API đơn), mở chi tiết đơn liên quan và dùng chung ô số
+tiền với S11 — tách module riêng sẽ phải import chéo vào ruột `orders`. Contract thật: 03-dev-notes.md "Lô L8 — S12, S13 (BE)".
+- `GET /api/sales/payments/?resolution_status=OPEN|RESOLVED&match_status=&page=`, `GET /api/sales/payments/{id}/`
+- `POST /api/sales/payments/{id}/resolve/` `{action: ATTACH_TO_ORDER, order_id, note}` | `{action: CONFIRM_ORDER, note}`
+- `POST /api/sales/refunds/create/` `{payment_transaction, amount, reason, request_id}`
+
 Story: **S10** (danh sách + chi tiết đơn) và **S11** (Chủ xác nhận đã nhận tiền thủ công) — lô L7. Thay list 8 đơn đọc từ
 `/api/dashboard/summary/` (S8) bằng endpoint đơn riêng. Contract thực tế: `03-dev-notes.md` mục "Lô L7 — S10, S11 (BE)".
 
@@ -26,6 +33,17 @@ Story: **S10** (danh sách + chi tiết đơn) và **S11** (Chủ xác nhận đ
 | `components/OrderDetailSheet.tsx` | tấm chi tiết (tải, lỗi, chuyển bước xác nhận, báo kết quả) |
 | `components/OrderDetailView.tsx` | nội dung chi tiết + thanh nút theo `available_actions` |
 | `components/ConfirmPaymentForm.tsx` | S11: bước xác nhận đã nhận tiền (hậu quả, chống bấm đúp, lỗi BE) |
+| `amount.ts` | `parseAmount` dùng chung cho mọi ô số tiền (S11 xác nhận tiền, S13 phiếu hoàn): tối thiểu 1 ₫, tối đa 12 chữ số |
+| `usePagedList.ts` | khung tải danh sách phân trang DRF dùng chung (đơn S10, hàng chờ S12) |
+| `components/OrdersTabs.tsx` | tab con Đơn hàng · Hàng chờ thanh toán (chỉ điện thoại, chỉ người mở được hàng chờ) |
+| `components/PaymentQueueScreen.tsx` | S12: hàng chờ thanh toán lệch — lọc Đang chờ/Đã xử lý + loại lệch, tải thêm, mở khoản / mở đơn liên quan |
+| `components/PaymentSheet.tsx` · `PaymentView.tsx` | S12: tấm chi tiết khoản tiền, nút theo `available_actions`, tải lại khoản sau thao tác |
+| `components/AttachOrderForm.tsx` | S12: gắn khoản không khớp vào đơn (tìm đơn qua API đơn) |
+| `components/ConfirmOrderForm.tsx` | S12: xác nhận đơn khi khách đã chuyển bù |
+| `components/RefundForm.tsx` | S13: lập phiếu hoàn cho khoản không có hoá đơn (request_id UUID chống tạo trùng) |
+| `components/QueueFormParts.tsx` | mảnh chung của ba bước trên + khoá gửi chống bấm đúp |
 
-E2E: `e2e/s10_s11_orders.py` (mock). Mock trong DevTools: `__caveMock.orders("fail"|"empty"|"forbidden"|"detailfail"|"ok")`,
+E2E: `e2e/s10_s11_orders.py`, `e2e/s12_s13_queue.py` (mock). Mock hàng chờ: `__caveMock.payments("fail"|"empty"|"forbidden"|"ok")`,
+`__caveMock.expireOrder(id)`, `__caveMock.confirmRefund(refundId, ref)` (giả lập S16), `__caveMock.queueJson(username, status)`,
+`__caveMock.resolveJson(username, id, body)`, `__caveMock.refundJson(username, body)`, `__caveMock.txnRefundsOf(txnId)`. Mock trong DevTools: `__caveMock.orders("fail"|"empty"|"forbidden"|"detailfail"|"ok")`,
 `__caveMock.resetOrders()`, `__caveMock.orderJson(username, id)`.

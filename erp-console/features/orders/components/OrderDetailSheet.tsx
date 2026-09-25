@@ -18,7 +18,8 @@ import { OrderDetailView } from "./OrderDetailView";
 import s from "../orders.module.css";
 
 type Mode = "view" | "confirm";
-export type ResultNote = { tone: "ok" | "warn"; text: string; duplicate: boolean };
+/** `queueLink` = kèm liên kết tới hàng chờ thanh toán (khoản thiếu / về sau khi huỷ / chuyển thừa vào hàng chờ). */
+export type ResultNote = { tone: "ok" | "warn"; text: string; duplicate: boolean; queueLink?: boolean };
 
 type Props = {
   /** Dòng đã bấm trong danh sách — để có tiêu đề/tổng tiền ngay khi chi tiết đang tải. */
@@ -33,7 +34,7 @@ function resultNote(r: ConfirmPaymentResult, code: string): ResultNote {
   let tone: ResultNote["tone"] = "warn";
   if (r.result === "PAID") {
     tone = "ok";
-    text = ORDERS_MSG.resultPaid(code, r.delivery_note_code);
+    text = ORDERS_MSG.resultPaid(code, r.delivery_note_code) + (r.overpaid_amount ? ORDERS_MSG.resultOverpaid(r.overpaid_amount) : "");
   } else if (r.result === "UNDERPAID") {
     text = ORDERS_MSG.resultUnder(r.paid_total || "0", r.missing || "0");
   } else if (r.result === "ORPHAN") {
@@ -41,7 +42,7 @@ function resultNote(r: ConfirmPaymentResult, code: string): ResultNote {
   } else {
     text = ORDERS_MSG.resultOther(ORDER_LABEL[r.order_status] || r.order_status);
   }
-  return { tone, text, duplicate: r.duplicate };
+  return { tone, text, duplicate: r.duplicate, queueLink: !!r.overpaid_amount || r.result === "UNDERPAID" || r.result === "ORPHAN" };
 }
 
 export function OrderDetailSheet({ summary, onChanged, onClose }: Props) {

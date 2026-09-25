@@ -200,7 +200,7 @@ Phân quyền mà không có log thì chỉ chặn được nhầm lẫn, không
 
 | Dạng | Cơ chế | Kho trừ ở đâu | Dùng khi |
 |---|---|---|---|
-| **Gói có công thức** (BUNDLE) | `Item.item_type=BUNDLE` + `BundleLine` (thành phần, định mức kg) | Nổ ra thành phần, FIFO từng thành phần | "Set lẩu 2kg: 1kg tôm + 0.5kg mực + 0.5kg cá" |
+| **Gói có công thức** (BUNDLE) | `Item.item_type=BUNDLE` + `BundleLine` (thành phần, định mức kg) | Nổ ra thành phần, FEFO từng thành phần *(sửa 2026-09-26, xem decisions.md)* | "Set lẩu 2kg: 1kg tôm + 0.5kg mực + 0.5kg cá" |
 | **Đóng gói sẵn** | Không cần cơ chế mới — `Item` thường có lô riêng | Chính lô của nó | Khay 500g đóng sẵn từ lúc nhập |
 | **Ưu đãi** (`PricingRule`) | Điều kiện 1 tầng → giảm tiền hoặc % | Từng mặt hàng riêng | "Mua ≥ 3kg tôm giảm 10%" |
 
@@ -331,12 +331,13 @@ stateDiagram-v2
 | BR-BH-02 | Giữ chỗ ghi ở **mức lô**, khoá dòng lô khi tạo đơn. Hai khách tranh lô cuối: người tạo đơn trước thắng, người sau thấy hết hàng ngay tại bước đặt. |
 | BR-BH-03 | TTL giữ chỗ **30 phút** (D). Job nền quét và nhả. |
 | BR-BH-04 | Job nhả giữ chỗ phải **idempotent** và có giám sát — job này chết thì hàng bị khoá vô hình, không ai biết cho tới khi Shop báo hết hàng oan. |
-| BR-BH-05 | Chọn lô theo **FIFO theo ngày nhập**. Lô cận hạn vẫn theo FIFO (tự nhiên ra trước). |
+| BR-BH-05 | **(D) 2026-09-26** — Chọn lô theo **FEFO** (hết hạn trước xuất trước): trong các lô *bán được* (BR-LO-02 lọc trước), lô có **hạn dùng sớm nhất** xuất trước. Cùng hạn thì lô **nhập sớm hơn** trước; vẫn trùng thì lô **tạo trước** trước, để thứ tự luôn cố định. Áp dụng cho mọi mặt hàng, kể cả từng thành phần combo. Khách không chọn lô (BR-PQ-12); V1 không cho ai chọn tay lô khác FEFO. *(sửa 2026-09-26, xem decisions.md; thay "FIFO theo ngày nhập")* |
 | BR-BH-06 | Một dòng đơn **được phép ăn nhiều lô**. Bắt buộc lưu bảng phân bổ: `dòng ↔ lô ↔ số kg ↔ đơn giá vốn`. **Không có bảng này thì không tồn tại báo cáo giá vốn theo lô.** |
 | BR-BH-07 | Đơn BUNDLE giữ chỗ **đồng thời tất cả thành phần**; thiếu một thành phần thì cả đơn không tạo được. |
 | BR-BH-08 | Giá và công thức BUNDLE **đóng băng** tại thời điểm tạo đơn. Đổi giá niêm yết sau đó không ảnh hưởng đơn đang giữ chỗ. |
 | BR-BH-09 | Địa chỉ giao **bắt buộc** ngay bước đặt (L — 100% giao tận nhà). |
 | BR-BH-10 | **Không có trường phí giao hàng** trên đơn (L — outscope hoàn toàn). |
+| BR-BH-11 | **(D) 2026-09-26** — Phân bổ lô được **chốt một lần lúc tạo đơn**. Khi thanh toán, hệ thống trừ kho đúng các lô đã giữ chỗ, **không chọn lại** lô (kể cả khi đã có lô mới hạn sớm hơn). Đơn đã phân bổ không bị phân bổ lại khi có lô mới hay khi đổi quy tắc chọn lô. *(sửa 2026-09-26, xem decisions.md)* |
 
 ## 7.4 Thanh toán
 | Mã | Luật |

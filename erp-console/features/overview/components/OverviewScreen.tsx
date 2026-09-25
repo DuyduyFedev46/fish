@@ -122,7 +122,7 @@ function Body({ data, q, onClearSearch }: { data: OverviewData; q: string; onCle
       <section className="sect" aria-labelledby="ov-batches">
         <div className="sect-h">
           <h2 id="ov-batches">Tồn kho theo lô</h2>
-          <span className="sub">FIFO theo ngày nhập</span>
+          <span className="sub">Xuất theo hạn dùng sớm nhất (FEFO)</span>
           <Link href="/inventory/" className="link">
             Quản lý kho <Icon name="arrow_forward" />
           </Link>
@@ -180,7 +180,7 @@ function Body({ data, q, onClearSearch }: { data: OverviewData; q: string; onCle
                   searching={searching}
                   onClearSearch={onClearSearch}
                   emptyText="Chưa có lô nào đang hoạt động"
-                  hint="Lô nhập ở Mua hàng sẽ hiện ở đây, xếp theo ngày nhập (FIFO)."
+                  hint="Lô nhập ở Mua hàng sẽ hiện ở đây, xếp theo hạn dùng sớm nhất (FEFO)."
                   action={
                     canPurchase ? (
                       <Link href="/purchasing/" className="btn">

@@ -16,7 +16,7 @@ from rest_framework.permissions import BasePermission
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.inventory.batches.services import SELLABLE_STATUSES, sellable_batches
+from apps.inventory.batches.services import FEFO_ORDER, SELLABLE_STATUSES, sellable_batches
 from apps.inventory.models import Batch, StockLedgerEntry
 from apps.sales.models import SalesInvoice, SalesOrder
 
@@ -85,10 +85,10 @@ class DashboardSummaryView(APIView):
             "expires_at": o.booked_expires_at.isoformat() if o.booked_expires_at else None,
         } for o in orders]
 
-        # ---- Tồn theo lô (FIFO theo received_date) ----
+        # ---- Tồn theo lô: theo thứ tự xuất FEFO (BR-BH-05, cùng khoá với sellable_batches) ----
         batches = (
             active_batches.select_related("item", "warehouse", "supplier")
-            .order_by("received_date", "id")[:20]
+            .order_by(*FEFO_ORDER)[:20]
         )
         batch_rows = []
         for b in batches:

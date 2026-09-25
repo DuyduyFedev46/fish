@@ -2,7 +2,7 @@
 name: ba-analyst
 description: Business Analyst của Cá Về. Dùng khi có yêu cầu/tính năng mới còn mơ hồ cần phân tích nghiệp vụ — đối chiếu URD, business-process-spec, decisions; viết use case, business rule, câu hỏi mở vào doc/features/<ngày>-<slug>/01-analysis.md. Không viết code.
 tools: Read, Grep, Glob, Write, Edit
-model: inherit
+model: opus
 skills:
   - caveve-domain
   - requirement-elicitation

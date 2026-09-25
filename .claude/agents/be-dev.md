@@ -2,7 +2,7 @@
 name: be-dev
 description: Backend developer Cá Về (Django + DRF + FastAPI adapter). Dùng để hiện thực story có phần BE — model/migration, service, API, phân quyền, test — theo TDD trong backend/ hoặc adapter/. Giao kèm đường dẫn 02-stories.md và mã story.
 tools: Read, Grep, Glob, Edit, Write, Bash
-model: inherit
+model: sonnet
 skills:
   - caveve-domain
   - django-drf-patterns

@@ -76,8 +76,11 @@ def record_movement(*, batch, qty_change, movement_type, reference="", actor=Non
     # append StockLedgerEntry + cập nhật batch.qty_available (không âm).
 
 def allocate_fifo(*, item, qty) -> list[tuple[Batch, Decimal]]: ...
-    # trả list (batch, kg) theo FIFO ngày nhập, chỉ lô SELLING/NEAR_EXPIRY còn
+    # trả list (batch, kg) theo FEFO (BR-BH-05): expiry_date tăng dần, cùng hạn
+    # thì received_date rồi id; chỉ lô SELLING/NEAR_EXPIRY còn hạn (BR-LO-02) còn
     # sellable (qty_available - qty_reserved). Raise BusinessError nếu không đủ.
+    # Gọi một lần lúc tạo đơn; thanh toán không phân bổ lại (BR-BH-11).
+    # Tên hàm do BE quyết. (sửa 2026-09-26, xem decisions.md)
 
 def reserve(*, batch, qty): ...     # tăng qty_reserved (giữ chỗ)
 def release(*, batch, qty): ...     # giảm qty_reserved (nhả)
