@@ -33,6 +33,9 @@ vercel-labs/agent-skills, anthropics/skills, phuryn/pm-skills, alirezarezvani/cl
 Skill UI/UX cài nguyên bản (giữ LICENSE): pbakaus/impeccable, emilkowalski/skills, nextlevelbuilder/ui-ux-pro-max-skill,
 ibelick/ui-skills, vercel web-design-guidelines. Hướng thiết kế + chọn skill: `caveve-ui`.
 
+## Môi trường (từ 2026-09-27)
+**Staging** (sandbox SePay, DB `cangca_staging`) và **Production** (SePay live, DB `postgres` trên Supabase). Deploy luôn lên staging trước, Duy duyệt rồi mới lên production. Chi tiết URL, secret và lệnh build nằm ở `doc/ops/moi-truong.md`. Build frontend luôn truyền `NEXT_PUBLIC_*` trực tiếp, vì `.env.local` đè lên `.env.production`.
+
 ## Luật chung
 - **Git:** mỗi khi xong một tính năng (một lô đã QA APPROVED) thì commit và `git push origin main` lên github.com/DuyduyFedev46/fish. Đây là quy ước Duy đặt ngày 2026-09-25. Repo đang công khai nên không bao giờ commit `.env` hay bí mật.
 - Không deploy khi Duy chưa yêu cầu.
