@@ -19,7 +19,7 @@ import { listRefundQueue } from "../api";
 import { REFUND_LABEL, REFUND_STATUS, labelOf } from "../labels";
 import { REFUND_Q_MSG } from "../messages";
 import type { RefundQueueItem } from "../types";
-import { usePagedList } from "../usePagedList";
+import { usePagedList } from "@/shared/lib/usePagedList";
 import { OrdersTabs } from "./OrdersTabs";
 import { RefundSheet } from "./RefundSheet";
 import s from "../orders.module.css";

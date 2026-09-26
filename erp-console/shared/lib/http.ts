@@ -115,14 +115,17 @@ async function sendMock(path: string, init: ApiInit, token: string | null): Prom
 
 async function sendReal(path: string, init: ApiInit, token: string | null): Promise<MockResponse> {
   const headers: Record<string, string> = { Accept: "application/json" };
-  if (init.body !== undefined) headers["Content-Type"] = "application/json";
+  // Tải ảnh (A2, 02-stories.md): body là FormData (multipart) — KHÔNG tự đặt Content-Type, để trình duyệt
+  // tự gắn boundary; KHÔNG JSON.stringify (mất tệp nhị phân).
+  const isForm = typeof FormData !== "undefined" && init.body instanceof FormData;
+  if (init.body !== undefined && !isForm) headers["Content-Type"] = "application/json";
   if (token) headers.Authorization = `Token ${token}`;
   let res: Response;
   try {
     res = await fetch(`${API_BASE}${path}`, {
       method: init.method || "GET",
       headers,
-      body: init.body !== undefined ? JSON.stringify(init.body) : undefined,
+      body: init.body !== undefined ? (isForm ? (init.body as FormData) : JSON.stringify(init.body)) : undefined,
       cache: "no-store",
       signal: init.signal,
     });

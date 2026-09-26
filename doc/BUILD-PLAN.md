@@ -157,9 +157,12 @@ không đăng nhập (guest). Trả JSON. Lỗi nghiệp vụ → 400 `{"detail"
 
 ### Shop API (công khai — cho Next.js, Agent FE build theo đây)
 ```
-GET  /api/shop/catalog/            -> [{item_code,name,group,item_type,unit:"Kg",price,sellable_qty}]
+GET  /api/shop/catalog/            -> [{item_code,name,group,item_type,unit:"Kg",price,sellable_qty,image}]
      # sellable_qty = tồn khả dụng (tồn sổ − giữ chỗ); BUNDLE tính min theo thành phần (BR-DM-06)
-GET  /api/shop/catalog/{item_code}/ -> {..., bundle_components?:[{item_code,name,qty_per_bundle}]}
+     # image (A4, doc/features/2026-09-26-anh-mat-hang) = {alt,is_illustration,urls:{thumb,card,detail}} | null.
+     # Chưa có ảnh vẫn KHÔNG loại mặt hàng khỏi danh sách (BR-DM-09). Không có id/uploaded_by/tệp gốc —
+     # chỉ URL công khai (bất biến 1). Combo có ảnh riêng, không tự lấy ảnh thành phần.
+GET  /api/shop/catalog/{item_code}/ -> {..., image, bundle_components?:[{item_code,name,qty_per_bundle}]}
 POST /api/shop/orders/             body {customer:{phone,name},delivery_address,phone,items:[{item_code,qty}]}
      -> 201 {order_code, total_amount, vietqr:{payload,amount,content}, booked_expires_at}
      # content chuyển khoản mang order_code (BR-TT-01)

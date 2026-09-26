@@ -1,7 +1,9 @@
 "use client";
 
-// Tải một danh sách phân trang DRF theo bộ lọc (dùng chung S10 danh sách đơn và S12 hàng chờ thanh toán):
-// trang 1 khi bộ lọc đổi, "Tải thêm" nối trang kế (20 dòng/trang, DRF `next`), bỏ kết quả về trễ của bộ lọc cũ (đếm lượt),
+// Tải một danh sách phân trang DRF theo bộ lọc — dùng chung cho MỌI module có endpoint phân trang
+// (features/orders: S10 danh sách đơn, S12 hàng chờ thanh toán, S13 phiếu hoàn; features/catalog: A2 màn
+// Danh mục). Đưa lên shared/ vì nextjs-shop-patterns cấm module đọc thẳng vào ruột module khác.
+// Trang 1 khi bộ lọc đổi, "Tải thêm" nối trang kế (DRF `next`), bỏ kết quả về trễ của bộ lọc cũ (đếm lượt),
 // không setState sau unmount. Làm mới lỗi → GIỮ danh sách cũ + báo lỗi. Sau một thao tác → `patch()` sửa đúng dòng tại chỗ.
 
 import { useCallback, useEffect, useRef, useState } from "react";

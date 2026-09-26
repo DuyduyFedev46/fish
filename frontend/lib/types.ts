@@ -2,6 +2,17 @@
 
 export type ItemType = "SIMPLE" | "BUNDLE";
 
+// Ảnh mặt hàng (A4, doc/features/2026-09-26-anh-mat-hang/02-stories.md). Chưa có ảnh -> `image: null`,
+// Shop vẽ khung mặc định bằng code (components/ItemImageFrame.tsx) — KHÔNG có field id/người tải/tệp
+// gốc (bất biến 1: Shop không lộ dữ liệu nội bộ, chỉ nhận URL công khai).
+export type ItemImageUrls = { thumb: string; card: string; detail: string };
+
+export type ItemImage = {
+  alt: string;
+  is_illustration: boolean;
+  urls: ItemImageUrls;
+};
+
 export type CatalogItem = {
   item_code: string;
   name: string;
@@ -10,6 +21,7 @@ export type CatalogItem = {
   unit: "Kg";
   price: number;
   sellable_qty: number;
+  image: ItemImage | null;
 };
 
 export type BundleComponent = {

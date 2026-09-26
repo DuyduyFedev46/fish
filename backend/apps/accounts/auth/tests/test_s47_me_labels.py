@@ -44,8 +44,11 @@ class S47MeLabelsTests(TestCase):
                 {"code": "inventory.approve_stockreconciliation", "label": "Duyệt kiểm kê"},
             ],
         )
-        # Ngoài 5 việc §1.5, Quản lý chỉ còn quyền xem Tổng quan (S6); không có việc của Chủ.
-        self.assertEqual(codes(body)[5:], ["reports.view_dashboard"])
+        # Ngoài 5 việc §1.5, Quản lý còn quyền xem Tổng quan (S6) và sửa ảnh mặt hàng
+        # (A2, Q3); không có việc của Chủ.
+        self.assertEqual(
+            codes(body)[5:], ["reports.view_dashboard", "catalog.change_item_image"]
+        )
         self.assertIs(body["can_view_cost"], False)
 
     def test_s47_ac1_chu_co_du_viec_tang_2(self):

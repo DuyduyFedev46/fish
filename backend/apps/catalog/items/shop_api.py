@@ -6,6 +6,7 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.catalog.images.serializers import serialize_item_image_public
 from apps.catalog.models import Item
 from apps.catalog.pricing.services import effective_price
 
@@ -23,6 +24,9 @@ def _item_public(item):
         "unit": "Kg",
         "price": str(price) if price is not None else None,
         "sellable_qty": str(sellable_qty(item)),
+        # A4: ảnh không phải điều kiện hiển thị (BR-DM-09) -> null khi chưa có ảnh.
+        # Serializer công khai KHÔNG trả id/người tải/đường dẫn tệp gốc (bất biến 1, BR-DM-15).
+        "image": serialize_item_image_public(getattr(item, "image", None)),
     }
 
 
@@ -32,7 +36,7 @@ class ShopCatalogView(APIView):
     def get(self, request):
         items = (
             Item.objects.filter(is_active=True)
-            .select_related("item_group")
+            .select_related("item_group", "image")
             .order_by("item_group__name", "code")
         )
         # Chỉ hiển thị mặt hàng đã có giá niêm yết hiệu lực.
@@ -45,7 +49,9 @@ class ShopItemDetailView(APIView):
 
     def get(self, request, item_code):
         try:
-            item = Item.objects.select_related("item_group").get(code=item_code, is_active=True)
+            item = Item.objects.select_related("item_group", "image").get(
+                code=item_code, is_active=True
+            )
         except Item.DoesNotExist:
             return Response({"detail": "Không tìm thấy mặt hàng."}, status=404)
         data = _item_public(item)

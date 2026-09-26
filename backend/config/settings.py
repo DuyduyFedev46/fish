@@ -138,6 +138,30 @@ STORAGES = {
 }
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
+# Chỉ dùng khi ITEM_IMAGE_STORAGE=local (dev/test) — Cloud Run KHÔNG lưu ảnh trên đĩa
+# tạm này (BR-DM-16), production/staging luôn ITEM_IMAGE_STORAGE=gcs.
+MEDIA_URL = "media/"
+MEDIA_ROOT = BASE_DIR / "media"
+
+# --- Ảnh mặt hàng (A1/A2/A3/A4, doc/features/2026-09-26-anh-mat-hang) -------
+# `local` (mặc định, dev/test — không gọi mạng ra GCS) | `gcs` (staging/production).
+ITEM_IMAGE_STORAGE = os.getenv("ITEM_IMAGE_STORAGE", "local").strip().lower()
+ITEM_IMAGE_BUCKET = os.getenv("ITEM_IMAGE_BUCKET", "").strip()
+# Mặc định suy ra từ bucket khi dùng GCS; local thì phục vụ qua MEDIA_URL của chính API.
+ITEM_IMAGE_PUBLIC_BASE_URL = os.getenv("ITEM_IMAGE_PUBLIC_BASE_URL", "").strip() or (
+    f"https://storage.googleapis.com/{ITEM_IMAGE_BUCKET}"
+    if ITEM_IMAGE_STORAGE == "gcs" and ITEM_IMAGE_BUCKET
+    else "http://localhost:8000/media/item-images"
+)
+ITEM_IMAGE_MAX_BYTES = int(os.getenv("ITEM_IMAGE_MAX_BYTES", str(10 * 1024 * 1024)))
+ITEM_IMAGE_MIN_SIDE_WARN = int(os.getenv("ITEM_IMAGE_MIN_SIDE_WARN", "600"))
+# 3 cỡ WebP xuất ra (Q7): thu nhỏ / lưới / chi tiết. Không phóng to ảnh gốc nhỏ hơn cỡ này.
+ITEM_IMAGE_SIZES = {
+    "thumb": int(os.getenv("ITEM_IMAGE_SIZE_THUMB", "160")),
+    "card": int(os.getenv("ITEM_IMAGE_SIZE_CARD", "480")),
+    "detail": int(os.getenv("ITEM_IMAGE_SIZE_DETAIL", "1200")),
+}
+
 # --- Bảo mật/triển khai production (kích hoạt khi DEBUG=0) ------------------
 # Cloud Run kết thúc TLS ở proxy và chuyển tiếp X-Forwarded-Proto.
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")

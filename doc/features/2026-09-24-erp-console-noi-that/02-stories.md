@@ -1050,6 +1050,7 @@ Bối cảnh: UC-21 bước 2–3, API có sẵn `GET /api/reports/batch/{batch_
 ## S38 — Mặt hàng và nhóm hàng · Should · BE+FE
 **Là** Chủ vựa, **tôi muốn** xem và sửa mặt hàng (tên, nhóm, hạn dùng mặc định, ảnh, ẩn/hiện) trên console, **để** không phải vào Admin cho việc thường ngày.
 Bối cảnh: UC-22, A24 (CRUD có sẵn). Why Should: Admin đang làm tốt việc này; console chỉ để tiện. Xoá mặt hàng đã có giao dịch bị chặn (BR-PQ-10). Ngừng bán = ẩn.
+> **Ghi chú 2026-09-27:** phần **ảnh** đã tách sang hồ sơ `doc/features/2026-09-26-anh-mat-hang/` (story A1–A5), làm ngay. S38 không còn gồm ảnh.
 
 | Mã | Given | When | Then | BR |
 |---|---|---|---|---|

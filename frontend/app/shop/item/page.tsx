@@ -9,6 +9,7 @@ import { getCatalogItem } from "../../../lib/api";
 import type { CatalogItemDetail } from "../../../lib/types";
 import { formatVnd, formatKg } from "../../../lib/format";
 import AddToCartControl from "../../../components/AddToCartControl";
+import ItemImageFrame from "../../../components/ItemImageFrame";
 
 function ItemDetail() {
   const code = useSearchParams().get("code") || "";
@@ -43,6 +44,7 @@ function ItemDetail() {
     <div className="item-detail">
       <Link href="/shop" className="item-detail-back">← Quay lại bảng giá</Link>
       <div className="item-detail-card">
+        <ItemImageFrame image={item.image} alt={item.name} groupLabel={item.group} size="detail" />
         <p className="item-detail-group">{item.group}</p>
         <h1 className="item-detail-name">
           {item.name}

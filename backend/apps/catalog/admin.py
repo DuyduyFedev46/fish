@@ -1,5 +1,7 @@
 from django.contrib import admin
+from django.utils.html import format_html
 
+from .images.serializers import image_urls
 from .models import BundleLine, Item, ItemGroup, ItemPrice, PriceList, PricingRule
 
 
@@ -22,6 +24,24 @@ class ItemAdmin(admin.ModelAdmin):
     list_filter = ("item_type", "item_group", "is_active")
     search_fields = ("code", "name")
     inlines = [BundleLineInline]
+    # A2-AC18: Admin chỉ XEM ảnh (không có widget tải lên) — tải/thay/gỡ ảnh bắt buộc đi
+    # qua `apps.catalog.images.services` để kiểm tệp (BR-DM-10) và ghi AuditLog (BR-DM-12).
+    readonly_fields = ("image_preview",)
+
+    def image_preview(self, obj):
+        if not obj or not obj.pk:
+            return "—"
+        image = getattr(obj, "image", None)
+        if image is None:
+            return "Chưa có ảnh (dùng console hoặc API để tải lên)."
+        urls = image_urls(obj.pk, image.image_id)
+        illustration = " · Ảnh minh hoạ" if image.is_illustration else ""
+        return format_html(
+            '<img src="{}" alt="{}" style="max-height:120px" />{}',
+            urls["thumb"], image.alt_text, illustration,
+        )
+
+    image_preview.short_description = "Ảnh (chỉ xem)"
 
     def get_inline_instances(self, request, obj=None):
         # Chỉ hiện công thức khi là BUNDLE.

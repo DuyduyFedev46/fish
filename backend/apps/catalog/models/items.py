@@ -57,6 +57,11 @@ class Item(models.Model):
         verbose_name = "Mặt hàng"
         verbose_name_plural = "Mặt hàng"
         ordering = ["code"]
+        permissions = [
+            # Q3 (2026-09-26): quyền Tầng 2 riêng cho ảnh — chu + quan_ly. KHÔNG mở
+            # `change_item` (Quản lý vẫn không sửa được tên, hạn dùng, ẩn/hiện, giá).
+            ("change_item_image", "Thêm / thay / gỡ ảnh mặt hàng"),
+        ]
 
     def __str__(self):
         return f"{self.code} — {self.name}"

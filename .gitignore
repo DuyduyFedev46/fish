@@ -17,6 +17,8 @@ __pycache__/
 db.sqlite3
 db.sqlite3-journal
 backend/staticfiles/
+# ITEM_IMAGE_STORAGE=local (dev) ghi ảnh thử vào đây — không phải kho ảnh thật (GCS).
+backend/media/
 
 # Node / Next.js
 node_modules/

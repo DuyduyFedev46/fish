@@ -5,7 +5,7 @@
 
 import { listOrders } from "./api";
 import type { OrderListItem, OrderListParams } from "./types";
-import { usePagedList, type PagedState } from "./usePagedList";
+import { usePagedList, type PagedState } from "@/shared/lib/usePagedList";
 
 export type OrderListState = PagedState<OrderListItem>;
 

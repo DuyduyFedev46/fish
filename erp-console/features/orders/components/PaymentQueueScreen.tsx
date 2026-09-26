@@ -19,7 +19,7 @@ import { listPaymentQueue } from "../api";
 import { QUEUE_TYPE_FILTERS, QUEUE_TYPE_LABEL, QUEUE_TYPE_STATUS, RESOLUTION_LABEL, labelOf } from "../labels";
 import { QUEUE_MSG } from "../messages";
 import type { OrderListItem, PaymentQueueItem, PaymentQueueParams, QueueOrderRef, ResolutionStatus } from "../types";
-import { usePagedList } from "../usePagedList";
+import { usePagedList } from "@/shared/lib/usePagedList";
 import { OrderDetailSheet } from "./OrderDetailSheet";
 import { OrdersTabs } from "./OrdersTabs";
 import { PaymentSheet } from "./PaymentSheet";

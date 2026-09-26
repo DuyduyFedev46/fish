@@ -374,6 +374,65 @@ input {
   gap: 8px;
   box-shadow: var(--shadow);
 }
+.item-card-media {
+  display: block;
+  border-radius: calc(var(--radius) - 2px);
+  overflow: hidden;
+  margin: -14px -14px 2px;
+}
+
+/* ---------- Ảnh mặt hàng (A4) — khung vuông cố định, chống nhảy bố cục lúc ảnh tải ---------- */
+.item-image {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  background: var(--color-bg);
+  overflow: hidden;
+}
+.item-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.item-image-fallback {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  color: var(--color-muted);
+  background: var(--color-bg);
+}
+.item-image-fallback svg {
+  color: var(--color-border);
+}
+.item-image-fallback-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--color-muted);
+  text-align: center;
+  padding: 0 8px;
+}
+.item-image-badge {
+  position: absolute;
+  left: 8px;
+  bottom: 8px;
+  background: rgba(22, 35, 43, 0.72);
+  color: #fff;
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  padding: 3px 8px;
+  border-radius: 999px;
+}
+.item-detail-card .item-image-detail {
+  max-width: 380px;
+  margin: 0 auto 18px;
+  border-radius: var(--radius);
+}
 .item-card-name {
   font-weight: 700;
   color: var(--color-text);

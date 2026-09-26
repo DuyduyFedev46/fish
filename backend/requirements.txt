@@ -11,3 +11,9 @@ redis>=5.0
 gunicorn>=22.0
 whitenoise>=6.6
 django-cors-headers>=4.4
+# Ảnh mặt hàng (doc/features/2026-09-26-anh-mat-hang, A1/A2): kiểm nội dung thật, gỡ
+# EXIF, xuất WebP. Pillow bắt buộc ở mọi môi trường (kể cả ITEM_IMAGE_STORAGE=local).
+Pillow>=10.4,<11
+# Chỉ thật sự cần khi ITEM_IMAGE_STORAGE=gcs (staging/production) — import trong hàm
+# (apps/catalog/images/storage.py) nên dev/test không bắt buộc cài để chạy `manage.py test`.
+google-cloud-storage>=2.18,<3

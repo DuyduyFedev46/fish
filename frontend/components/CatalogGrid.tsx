@@ -4,6 +4,7 @@ import Link from "next/link";
 import type { CatalogItem } from "../lib/types";
 import { formatVnd } from "../lib/format";
 import AddToCartControl from "./AddToCartControl";
+import ItemImageFrame from "./ItemImageFrame";
 
 export default function CatalogGrid({ items }: { items: CatalogItem[] }) {
   if (items.length === 0) {
@@ -22,6 +23,14 @@ export default function CatalogGrid({ items }: { items: CatalogItem[] }) {
               .filter((i) => i.group === group)
               .map((item) => (
                 <article key={item.item_code} className="item-card">
+                  <Link
+                    href={`/shop/item?code=${encodeURIComponent(item.item_code)}`}
+                    className="item-card-media"
+                    aria-hidden="true"
+                    tabIndex={-1}
+                  >
+                    <ItemImageFrame image={item.image} alt={item.name} groupLabel={item.group} size="card" />
+                  </Link>
                   <Link href={`/shop/item?code=${encodeURIComponent(item.item_code)}`} className="item-card-name">
                     {item.name}
                     {item.item_type === "BUNDLE" && (

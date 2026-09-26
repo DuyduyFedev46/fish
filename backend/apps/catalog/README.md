@@ -8,3 +8,4 @@ Model: `models/` (items, pricing).
 |---|---|
 | `items/` | nhóm hàng, mặt hàng, công thức combo; Shop API danh mục (giá + tồn khả dụng) |
 | `pricing/` | bảng giá, giá niêm yết, ưu đãi (PricingRule); hàm giá hiệu lực |
+| `images/` | ảnh mặt hàng (1 ảnh/mặt hàng, BR-DM-09..16): kiểm tệp, xử lý (Pillow), lưu trữ (local/GCS), quyền `catalog.change_item_image` |

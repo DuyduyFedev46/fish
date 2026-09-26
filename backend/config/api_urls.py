@@ -12,6 +12,7 @@ from rest_framework.routers import DefaultRouter
 
 from apps.accounts.auth.api import ChangePasswordView, LoginTokenView, LogoutView, MeView
 from apps.accounts.staff.api import StaffViewSet
+from apps.catalog.images.api import ItemImageDetailView
 from apps.catalog.items.api import BundleLineViewSet, ItemGroupViewSet, ItemViewSet
 from apps.catalog.items.shop_api import ShopCatalogView, ShopItemDetailView
 from apps.catalog.pricing.api import ItemPriceViewSet, PriceListViewSet, PricingRuleViewSet
@@ -93,6 +94,8 @@ urlpatterns = [
     # S12: như trên, contract viết không có "/" cuối.
     path("sales/payments/<int:pk>/resolve",
          PaymentTransactionViewSet.as_view({"post": "resolve"})),
+    # A2/A3: tải lên / thay (POST) hoặc gỡ (DELETE) ảnh mặt hàng — quyền catalog.change_item_image.
+    path("catalog/items/<int:pk>/image/", ItemImageDetailView.as_view()),
     # Back-office (router)
     path("", include(router.urls)),
 ]

@@ -18,6 +18,15 @@ class ItemViewSet(viewsets.ModelViewSet):
     serializer_class = ItemSerializer
     permission_classes = [BusinessModelPermissions]
 
+    def get_queryset(self):
+        # A2-AC16: bộ lọc "Chưa có ảnh" cho UC-A5 (nhập ảnh ban đầu cho toàn bộ danh mục).
+        qs = super().get_queryset().select_related("image")
+        has_image = self.request.query_params.get("has_image")
+        if has_image is not None:
+            wants_image = has_image.strip().lower() in {"1", "true", "yes"}
+            qs = qs.filter(image__isnull=not wants_image)
+        return qs
+
 
 class BundleLineViewSet(viewsets.ModelViewSet):
     queryset = BundleLine.objects.select_related("bundle", "component").all()

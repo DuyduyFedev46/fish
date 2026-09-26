@@ -64,6 +64,9 @@ export const PERM = {
   viewPurchaseReceipt: "purchasing.view_purchasereceipt",
   viewStockReconciliation: "inventory.view_stockreconciliation",
   viewItem: "catalog.view_item",
+  /** A2 (02-stories.md, hồ sơ 2026-09-26-anh-mat-hang): Tầng 2 riêng cho ảnh mặt hàng — Chủ, Quản lý có;
+   * nv_kho/nv_giao không. KHÔNG mở rộng sang sửa mặt hàng (change_item) — đó vẫn là S38. */
+  changeItemImage: "catalog.change_item_image",
   manageStaff: "accounts.manage_staff",
 } as const;
 

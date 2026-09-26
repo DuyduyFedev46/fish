@@ -7,10 +7,41 @@ import {
   type CatalogItem,
   type CatalogItemDetail,
   type CreateOrderPayload,
+  type ItemImage,
   type PaymentCheckoutSession,
   type WireCreateOrderResponse,
   type WireOrderStatus,
 } from "./types";
+
+// Ảnh mẫu cho mock (A4) — sinh BẰNG CODE lúc chạy (SVG data URI), KHÔNG commit tệp ảnh nào vào repo
+// (quy ước 2026-09-25, BR-DM-16). Đủ 3 trạng thái theo 02-stories.md: có ảnh, `image: null`, ảnh lỗi
+// (data URI không giải mã được — thử khung mặc định A4-AC6 mà không phụ thuộc mạng thật).
+function toBase64Utf8(text: string): string {
+  if (typeof TextEncoder !== "undefined" && typeof window !== "undefined") {
+    const bytes = new TextEncoder().encode(text);
+    let binary = "";
+    bytes.forEach((b) => (binary += String.fromCharCode(b)));
+    return window.btoa(binary);
+  }
+  return Buffer.from(text, "utf-8").toString("base64");
+}
+
+function mockImage(bg: string, label: string, isIllustration = false): ItemImage {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="480" height="480"><rect width="480" height="480" fill="${bg}"/><text x="240" y="252" font-size="44" text-anchor="middle" fill="#fff" font-family="sans-serif" font-weight="600">${label}</text></svg>`;
+  const src = `data:image/svg+xml;base64,${toBase64Utf8(svg)}`;
+  return { alt: label, is_illustration: isIllustration, urls: { thumb: src, card: src, detail: src } };
+}
+
+/** Data URI hỏng — không giải mã được, để thử khung mặc định khi ảnh lỗi (A4-AC6), không cần mạng. */
+const BROKEN_IMAGE: ItemImage = {
+  alt: "Tôm sú tươi",
+  is_illustration: false,
+  urls: {
+    thumb: "data:image/webp;base64,AAAA",
+    card: "data:image/webp;base64,AAAA",
+    detail: "data:image/webp;base64,AAAA",
+  },
+};
 
 const MOCK_CATALOG: CatalogItemDetail[] = [
   {
@@ -21,6 +52,7 @@ const MOCK_CATALOG: CatalogItemDetail[] = [
     unit: "Kg",
     price: 65000,
     sellable_qty: 120,
+    image: null,
   },
   {
     item_code: "CA-THU-KHUC",
@@ -30,6 +62,7 @@ const MOCK_CATALOG: CatalogItemDetail[] = [
     unit: "Kg",
     price: 150000,
     sellable_qty: 60,
+    image: mockImage("#0a6e8c", "Ca thu"),
   },
   {
     item_code: "TOM-SU-TUOI",
@@ -39,6 +72,7 @@ const MOCK_CATALOG: CatalogItemDetail[] = [
     unit: "Kg",
     price: 220000,
     sellable_qty: 45,
+    image: BROKEN_IMAGE,
   },
   {
     item_code: "MUC-ONG",
@@ -48,6 +82,7 @@ const MOCK_CATALOG: CatalogItemDetail[] = [
     unit: "Kg",
     price: 180000,
     sellable_qty: 30,
+    image: null,
   },
   {
     item_code: "GHEO-BIEN",
@@ -57,6 +92,8 @@ const MOCK_CATALOG: CatalogItemDetail[] = [
     unit: "Kg",
     price: 240000,
     sellable_qty: 20,
+    // Q8 (02-stories.md): ảnh minh hoạ khi chưa có ảnh Lộc tự chụp — Shop phải ghi rõ nhãn.
+    image: mockImage("#a85a07", "Ghe bien", true),
   },
   {
     item_code: "NGHEU-TRANG",
@@ -66,6 +103,7 @@ const MOCK_CATALOG: CatalogItemDetail[] = [
     unit: "Kg",
     price: 45000,
     sellable_qty: 80,
+    image: null,
   },
   {
     item_code: "COMBO-HAISAN-GD",
@@ -75,6 +113,8 @@ const MOCK_CATALOG: CatalogItemDetail[] = [
     unit: "Kg",
     price: 450000,
     sellable_qty: 15,
+    // A4-AC8: ảnh của COMBO, không tự lấy ảnh thành phần (dù CA-BASA-PHILE ở trên đang image:null).
+    image: mockImage("#157f3d", "Combo"),
     bundle_components: [
       { item_code: "CA-BASA-PHILE", name: "Cá basa phi lê", qty_per_bundle: 1 },
       { item_code: "TOM-SU-TUOI", name: "Tôm sú tươi", qty_per_bundle: 0.5 },
@@ -89,6 +129,8 @@ const MOCK_CATALOG: CatalogItemDetail[] = [
     unit: "Kg",
     price: 380000,
     sellable_qty: 10,
+    // A4-AC8: combo chưa có ảnh riêng -> khung mặc định (không mượn ảnh Tôm sú/Mực ống/Nghêu).
+    image: null,
     bundle_components: [
       { item_code: "TOM-SU-TUOI", name: "Tôm sú tươi", qty_per_bundle: 0.3 },
       { item_code: "MUC-ONG", name: "Mực ống", qty_per_bundle: 0.3 },

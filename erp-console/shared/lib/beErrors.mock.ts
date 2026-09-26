@@ -151,6 +151,36 @@ export const BE_ERRORS = {
     detail: "Chỉ báo thất bại được khi phiếu đang Chờ hoàn.",
   },
   HT_RETRY_WRONG_STATUS: { status: 400, code: "BR-HT-09", detail: "Chỉ thử lại được khi phiếu đang Thất bại." },
+
+  // ---- POST /api/catalog/items/{id}/image/ (contract A2, doc/features/2026-09-26-anh-mat-hang/02-stories.md) ----
+  CATALOG_IMAGE_FORBIDDEN: {
+    status: 403,
+    code: "BR-PQ-12",
+    detail: "Bạn không có quyền đổi ảnh mặt hàng.",
+  },
+  CATALOG_IMAGE_BAD_FORMAT: {
+    status: 400,
+    code: "BR-DM-10",
+    detail: "Chỉ nhận ảnh JPEG, PNG hoặc WebP.",
+  },
+  CATALOG_IMAGE_TOO_LARGE: { status: 400, code: "BR-DM-10", detail: "Ảnh vượt 10 MB." },
+  CATALOG_IMAGE_MISSING_FILE: { status: 400, code: "BR-DM-10", detail: "Chưa chọn tệp ảnh." },
+  CATALOG_IMAGE_ALT_TOO_LONG: {
+    status: 400,
+    code: "BR-DM-11",
+    detail: "Chú thích ảnh (alt text) không quá 125 ký tự.",
+  },
+  CATALOG_IMAGE_CONFLICT: {
+    status: 409,
+    code: "BR-DM-12",
+    detail: "Ảnh vừa được người khác đổi, tải lại để xem.",
+  },
+  CATALOG_IMAGE_STORAGE_ERROR: {
+    status: 503,
+    code: "BR-DM-16",
+    detail: "Chưa lưu được ảnh, thử lại.",
+  },
+  CATALOG_ITEM_NOT_FOUND: { status: 404, detail: "Không tìm thấy mặt hàng." },
 } satisfies Record<string, Entry>;
 
 export type BeErrorKey = keyof typeof BE_ERRORS;

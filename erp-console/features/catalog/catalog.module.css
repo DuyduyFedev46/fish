@@ -1,0 +1,89 @@
+/* Màn Danh mục tối thiểu (A2) — danh sách hàng thoáng như Nhân sự/Kho: ảnh thu nhỏ trái, tên + mã +
+   nhóm giữa, nút ảnh phải. Chỉ token trong shared/ui/tokens.css. */
+
+.bar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.bar > :global(.seg) { flex: 1 1 100%; }
+.bar > :global(.seg) button { flex: 1; }
+.bar > :global(.toolbar) { flex: 1 1 100%; min-width: 0; }
+@media (min-width: 640px) {
+  .bar > :global(.seg) { flex: none; }
+  .bar > :global(.seg) button { flex: none; padding: 0 var(--space-3); }
+  .bar > :global(.toolbar) { flex: 1 1 260px; }
+}
+
+.list { container-type: inline-size; min-width: 0; }
+.rowsWrap { margin-inline: calc(-1 * var(--space-3)); border-top: 1px solid var(--border); }
+.rows { list-style: none; margin-block: 0; padding: 0; }
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 64px;
+  padding: var(--space-2-5) var(--space-3);
+  border-bottom: 1px solid var(--border);
+  transition: background-color var(--dur-fast) ease;
+}
+@media (hover: hover) and (pointer: fine) {
+  .row:hover { background: var(--surface-2); }
+}
+
+.thumb {
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  color: var(--ink-3);
+  overflow: hidden;
+}
+.thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.thumb :global(.mi) { font-size: 22px; }
+
+.info { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: var(--space-0-5); }
+.name { color: var(--ink); font-weight: var(--weight-semibold); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sub { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-2); font-size: var(--text-xs); color: var(--ink-3); min-width: 0; }
+.sub :global(.code) { font-size: var(--text-xs); }
+.sub :global(.tag) { height: 18px; padding: 0 var(--space-1-5); }
+.sub :global(.status) { font-size: var(--text-xs); }
+
+.more { display: flex; justify-content: center; padding-top: var(--space-4); }
+.more :global(.btn) { flex: 1 1 auto; max-width: 320px; }
+
+.row > :global(.btn) { flex: none; }
+.btnLabel { white-space: nowrap; }
+@media (max-width: 420px) {
+  .btnLabel { display: none; }
+  .row > :global(.btn) { width: var(--tap); padding: 0; }
+}
+
+/* ---------- Tấm tải/thay ảnh ---------- */
+.previewRow { display: flex; gap: var(--space-3); align-items: flex-start; }
+.previewBox {
+  flex: none;
+  width: 96px;
+  height: 96px;
+  border-radius: var(--radius-lg);
+  background: var(--surface-2);
+  color: var(--ink-3);
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+.previewBox img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.previewBox :global(.mi) { font-size: 28px; }
+.previewActions { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: var(--space-1-5); }
+.fileName { margin: 0; font-size: var(--text-xs); color: var(--ink-2); overflow-wrap: anywhere; }
+.privacy {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin: 0;
+  padding: var(--space-2-5) var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  color: var(--ink-2);
+  font-size: var(--text-xs);
+  line-height: var(--leading-normal);
+}
+.privacy :global(.mi) { font-size: 16px; color: var(--ink-3); margin-top: 1px; flex: none; }
