@@ -86,18 +86,21 @@ def to_internal_payload(payload: SePayWebhookPayload, order_code_regex: str) -> 
 
 VN_TZ = timezone(timedelta(hours=7))
 
-# Q4 (01-analysis.md, vẫn ĐỎ): chưa có payload sandbox thật để đối chiếu 1:1 lúc build.
-# Ưu tiên mã tham chiếu ngân hàng (FT…, đúng mã Chủ gõ khi xác nhận tay S11, BR-TT-03) nếu
-# IPN có; danh sách tên field ứng viên xếp theo độ ưu tiên. Lùi về id giao dịch của SePay
-# khi không field nào khớp. CHỈNH LẠI danh sách này khi có payload sandbox thật (ghi vào
-# 03-dev-notes.md).
+# Payload mẫu thật (developer.sepay.vn/vi/cong-thanh-toan/IPN) không liệt kê field mã tham
+# chiếu ngân hàng riêng trong `transaction` (chỉ thấy `id`, `transaction_id`). Vẫn dò thêm
+# vài tên ứng viên (BR-TT-03: ưu tiên mã tham chiếu ngân hàng FT…, đúng mã Chủ gõ khi xác
+# nhận tay S11) phòng khi SePay trả field này ở một số phương thức thanh toán/ngân hàng.
+# Không thấy field nào khớp -> lùi về `transaction.transaction_id`, cuối cùng
+# `transaction.id` (đúng thứ tự tài liệu: mã giao dịch SePay `transaction_id` đáng tin hơn
+# `id` nội bộ).
 _IPN_REFERENCE_CODE_KEYS = (
+    "reference",
     "reference_code",
     "reference_number",
     "bank_reference_code",
     "bank_transaction_id",
 )
-_IPN_TRANSACTION_ID_KEYS = ("id", "transaction_id", "transaction_code")
+_IPN_TRANSACTION_ID_KEYS = ("transaction_id", "transaction_code", "id")
 
 # Mã đơn dạng SO<yymmdd>-<6 ký tự hex> (01-analysis.md §3.2). Thanh toán lại (UC-2, Q5) có
 # thể cần hậu tố lần thử (vd "-2") nếu SePay không nhận lại đúng order_invoice_number cũ —
@@ -108,6 +111,9 @@ _ORDER_CODE_WITH_RETRY_SUFFIX = re.compile(r"^(SO\d{6}-[0-9A-Za-z]{6})(?:-\d+)?$
 # Giao dịch cổng thanh toán (VietQR duy nhất ở V1) — luôn VND.
 IPN_CONFIRM_CURRENCY = "VND"
 IPN_CONFIRM_ORDER_STATUS = "CAPTURED"
+# transaction.transaction_status: chỉ kiểm khi field này CÓ mặt trong payload (một số
+# notification_type/kênh có thể không kèm) — có mà khác APPROVED thì không xác nhận.
+IPN_CONFIRM_TRANSACTION_STATUS = "APPROVED"
 
 NOTIFICATION_ORDER_PAID = "ORDER_PAID"
 NOTIFICATION_TRANSACTION_VOID = "TRANSACTION_VOID"
@@ -143,11 +149,13 @@ def pick_ipn_transaction_reference(transaction: dict[str, Any]) -> str:
     return ""
 
 
-# Tên field ứng viên chứa thời điểm giao dịch trong sub-object `transaction` — chưa có
-# payload sandbox thật để chốt (Q4). Không tìm được field nào parse được -> dùng thời điểm
-# adapter nhận IPN (giờ VN) làm received_at, KHÔNG coi là payload hỏng (chỉ 3 field mã đơn/
-# số tiền/mã giao dịch mới bắt buộc, theo P2-AC5).
-_IPN_TIMESTAMP_KEYS = ("paid_at", "captured_at", "transaction_time", "transaction_date", "created_at")
+# Tên field thời điểm giao dịch trong sub-object `transaction` theo payload mẫu thật là
+# `transaction_date` (định dạng "YYYY-MM-DD HH:MM:SS", giờ VN — `parse_sepay_datetime` parse
+# đúng format này). Giữ vài tên ứng viên khác làm dự phòng (GIẢ ĐỊNH ban đầu trước khi có
+# payload thật). Không tìm được field nào parse được -> dùng thời điểm adapter nhận IPN (giờ
+# VN) làm received_at, KHÔNG coi là payload hỏng (chỉ 3 field mã đơn/số tiền/mã giao dịch
+# mới bắt buộc, theo P2-AC5).
+_IPN_TIMESTAMP_KEYS = ("transaction_date", "paid_at", "captured_at", "transaction_time", "created_at")
 
 
 def _extract_ipn_received_at(transaction: dict[str, Any]) -> str:
@@ -156,9 +164,15 @@ def _extract_ipn_received_at(transaction: dict[str, Any]) -> str:
         if not raw:
             continue
         try:
-            return parse_sepay_datetime(str(raw)).isoformat()
+            parsed = parse_sepay_datetime(str(raw))
         except (TypeError, ValueError):
             continue
+        # `transaction_date` (và các tên dự phòng cùng format "YYYY-MM-DD HH:MM:SS") không
+        # kèm offset -> gán rõ giờ VN (đúng tài liệu SePay) thay vì để naive, để Django nhận
+        # ISO 8601 không phụ thuộc timezone mặc định của tiến trình chạy adapter.
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=VN_TZ)
+        return parsed.isoformat()
     return datetime.now(VN_TZ).isoformat()
 
 
@@ -171,11 +185,20 @@ def is_ipn_transaction_void(payload: SePayIpnPayload) -> bool:
 
 
 def is_ipn_status_confirmable(payload: SePayIpnPayload) -> bool:
-    """P2-AC6/Q9: chỉ xác nhận khi order.status=CAPTURED và currency=VND."""
+    """P2-AC6/Q9: chỉ xác nhận khi order.order_status=CAPTURED và order.order_currency=VND
+    (transaction.transaction_status=APPROVED nếu field này có mặt — có mà khác APPROVED thì
+    không xác nhận)."""
     order = payload.order
-    status_ok = (order.status or "").strip().upper() == IPN_CONFIRM_ORDER_STATUS
-    currency_ok = (order.currency or "").strip().upper() == IPN_CONFIRM_CURRENCY
-    return status_ok and currency_ok
+    status_ok = (order.effective_status or "").strip().upper() == IPN_CONFIRM_ORDER_STATUS
+    currency_ok = (order.effective_currency or "").strip().upper() == IPN_CONFIRM_CURRENCY
+
+    transaction_status = payload.transaction.get("transaction_status")
+    transaction_status_ok = (
+        str(transaction_status).strip().upper() == IPN_CONFIRM_TRANSACTION_STATUS
+        if transaction_status
+        else True
+    )
+    return status_ok and currency_ok and transaction_status_ok
 
 
 def to_internal_payload_from_ipn(payload: SePayIpnPayload) -> InternalPaymentPayload:
@@ -186,17 +209,17 @@ def to_internal_payload_from_ipn(payload: SePayIpnPayload) -> InternalPaymentPay
     order_invoice_number = (payload.order.order_invoice_number or "").strip()
     if not order_invoice_number:
         raise IpnMalformedError("Thiếu order.order_invoice_number.")
-    if payload.order.amount is None:
-        raise IpnMalformedError("Thiếu order.amount.")
+    if payload.order.effective_amount is None:
+        raise IpnMalformedError("Thiếu order.order_amount.")
 
     bank_txn_id = pick_ipn_transaction_reference(payload.transaction)
     if not bank_txn_id:
-        raise IpnMalformedError("Thiếu mã giao dịch (transaction.id/reference_code).")
+        raise IpnMalformedError("Thiếu mã giao dịch (transaction.transaction_id/id).")
 
     return InternalPaymentPayload(
         bank_txn_id=bank_txn_id,
         order_code=strip_order_retry_suffix(order_invoice_number),
-        amount=payload.order.amount,
+        amount=payload.order.effective_amount,
         received_at=_extract_ipn_received_at(payload.transaction),
         raw=payload.model_dump(mode="json"),
     )

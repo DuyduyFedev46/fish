@@ -548,3 +548,92 @@ ngang; nút ≥44px; light mode (Shop chưa có dark mode, ngoài phạm vi P4).
 > theo `Item.name`, quét toàn bộ JSON không lộ key giá vốn/lô/SĐT/địa chỉ đầy đủ). Không có
 > migration. `manage.py test` → **582 passed, 0 failed** (578 mốc cũ + 4 mới);
 > `makemigrations --check --dry-run` sạch; `manage.py check` sạch.
+
+---
+
+## Sửa field IPN theo payload thật (adapter)
+> BE (adapter) · 2026-09-26 · vá lệch tên field IPN P2 sau khi X-Secret-Key ĐÃ chạy được
+> trên production nhưng adapter đọc sai tên field nên log "ORDER_PAID nhưng status/currency
+> không hợp lệ… status=None currency=None" và không forward Django. Nguồn: tài liệu SePay
+> https://developer.sepay.vn/vi/cong-thanh-toan/IPN (payload mẫu thật khác GIẢ ĐỊNH ban đầu
+> lúc build P2 — Q4 trong 01-analysis.md nay đã có căn cứ để trả lời). Phạm vi: CHỈ
+> `adapter/`.
+
+### Nguyên nhân gốc
+`SePayIpnOrder` đọc `order.amount` / `order.currency` / `order.status` (tên field GIẢ ĐỊNH
+khi build P2, chưa có payload thật). Payload thật SePay gửi field tên khác:
+`order.order_amount`, `order.order_currency`, `order.order_status` (đều có tiền tố
+`order_`). Vì Pydantic không lỗi khi thiếu field optional, adapter parse "thành công" nhưng
+`order.status`/`order.currency` luôn `None` → `is_ipn_status_confirmable()` luôn `False` →
+không bao giờ forward Django, dù `X-Secret-Key` đã xác thực đúng.
+
+### Việc đã sửa
+- `app/schemas.py` (`SePayIpnOrder`): thêm field THẬT `order_amount` / `order_currency` /
+  `order_status` (đọc trực tiếp từ payload). Giữ nguyên tên field GIẢ ĐỊNH cũ (`amount`,
+  `currency`, `status`) làm DỰ PHÒNG — không xoá, vì có thể SePay gửi biến thể khác ở
+  kênh/phương thức thanh toán khác. Thêm 3 property `effective_amount` / `effective_currency`
+  / `effective_status` (ưu tiên field thật, lùi về field dự phòng khi field thật vắng mặt).
+  `order_invoice_number` giữ nguyên tên (đã đúng ngay từ đầu, trùng cả 2 nguồn).
+- `app/sepay.py`:
+  - `is_ipn_status_confirmable()` dùng `order.effective_status` / `effective_currency`.
+    Thêm điều kiện mới: nếu `transaction.transaction_status` CÓ mặt trong payload và khác
+    `APPROVED` → không xác nhận (dù order_status/currency đúng). Field vắng mặt → coi như
+    đạt (một số kênh có thể không kèm field này).
+  - `to_internal_payload_from_ipn()` dùng `order.effective_amount`; lỗi thiếu số tiền đổi
+    thông điệp thành "Thiếu order.order_amount." cho đúng tên field thật.
+  - Mã giao dịch (`pick_ipn_transaction_reference`): đổi thứ tự ưu tiên đúng theo yêu cầu —
+    mã tham chiếu ngân hàng (`reference`, `reference_code`, `reference_number`,
+    `bank_reference_code`, `bank_transaction_id` — payload mẫu thật KHÔNG có field này,
+    danh sách vẫn giữ dự phòng theo BR-TT-03) → `transaction.transaction_id` →
+    `transaction.id`. Trước đây thứ tự sai (`id` được ưu tiên trước `transaction_id`).
+  - Thời điểm giao dịch (`_extract_ipn_received_at`): ưu tiên `transaction.transaction_date`
+    (field thật, format `"YYYY-MM-DD HH:MM:SS"`, giờ VN — không kèm offset). Khi parse ra
+    datetime "naive" (không tzinfo), gán rõ `VN_TZ` (+07:00) trước khi `isoformat()`, để
+    Django nhận ISO 8601 luôn rõ múi giờ, không phụ thuộc timezone mặc định của tiến trình
+    chạy adapter. Các tên field dự phòng cũ (`paid_at`, `captured_at`, `transaction_time`,
+    `created_at`) vẫn giữ, xếp sau `transaction_date`.
+- `app/main.py`:
+  - **Xoá log chẩn đoán tạm** trong `ipn_sepay()` (log "IPN SePay chẩn đoán: header=…
+    authorization_scheme=…" cùng biến cục bộ `_auth`) — đã hết cần thiết vì X-Secret-Key
+    xác nhận chạy đúng trên production. Phần còn lại của handler giữ nguyên (xác thực
+    `X-Secret-Key` qua `_verify_sepay_ipn_secret` không đổi).
+  - Log cảnh báo "ORDER_PAID nhưng status/currency không hợp lệ" đổi sang đọc
+    `payload.order.effective_status` / `effective_currency` (trước đọc `order.status` /
+    `order.currency` — luôn `None` với field thật).
+  - `_ipn_transaction_id()` (best-effort lấy mã giao dịch để LOG khi payload hỏng): đổi thứ
+    tự ưu tiên khớp `pick_ipn_transaction_reference` (`transaction_id` trước `id`).
+
+### Test
+- `tests/conftest.py` (`valid_sepay_ipn_payload`): thay bằng payload mẫu THẬT nguyên văn
+  theo tài liệu SePay (rút gọn, giữ đủ field liên quan) — `order.order_status=CAPTURED`,
+  `order.order_currency=VND`, `order.order_amount="540000.00"`,
+  `order.order_invoice_number="SO260926-A1B2C3"`; `transaction.transaction_id=
+  "FT26092612345"`, `transaction.transaction_date="2026-09-26 10:15:00"`,
+  `transaction.transaction_status=APPROVED`, `transaction.payment_method="BANK_TRANSFER"`.
+- `tests/test_ipn.py`: sửa các test set field theo tên GIẢ ĐỊNH cũ (`amount=None`,
+  `status="PENDING"`, `currency="USD"`) sang tên THẬT (`order_amount=None`,
+  `order_status="PENDING"`, `order_currency="USD"`) cho đúng payload mới — nếu không sửa,
+  test sẽ pass "giả" (set field không tồn tại trong schema thật, không kiểm được gì).
+  Test P2-AC1 hiện assert thẳng `bank_txn_id="FT26092612345"` (từ
+  `transaction.transaction_id`), `order_code="SO260926-A1B2C3"`, `amount=540000`,
+  `received_at="2026-09-26T10:15:00+07:00"` (đã localize `+07:00`) — tức chính là test
+  "payload mẫu thật → forward Django với bank_txn_id/amount/received_at đúng" theo yêu cầu.
+  Test mới `test_p2_ac6_transaction_status_not_approved_does_not_confirm_returns_200`:
+  `transaction.transaction_status="DECLINED"` (dù order_status=CAPTURED, order_currency=VND
+  đúng) → 200, không forward Django. Test cũ đã có sẵn: order_status khác CAPTURED → 200
+  không forward; thiếu `order_invoice_number` → 400.
+- `cd adapter && .venv/bin/python -m pytest -q` → **68 passed, 0 failed** (67 mốc cũ + 1
+  test mới `test_p2_ac6_transaction_status_not_approved_does_not_confirm_returns_200`).
+
+### Còn nợ / giả định
+- Danh sách field mã tham chiếu ngân hàng (`reference`, `reference_code`,
+  `reference_number`, `bank_reference_code`, `bank_transaction_id`) trong `transaction` vẫn
+  là DỰ PHÒNG — payload mẫu thật trong yêu cầu KHÔNG có field này (chỉ có
+  `transaction.transaction_id`). Nếu SePay có gửi mã FT… ngân hàng thật ở field tên khác,
+  cần điều chỉnh lại danh sách này (đối chiếu IPN thật/sao kê khi có).
+- Chưa xác nhận `TRANSACTION_VOID` có cùng cấu trúc `order`/`transaction` field thật hay
+  không (tài liệu yêu cầu chỉ đưa mẫu `ORDER_PAID`) — code hiện xử lý `TRANSACTION_VOID`
+  không đọc field nào của `order`/`transaction` ngoài best-effort log, nên không bị ảnh
+  hưởng dù cấu trúc khác.
+- Không đổi contract `POST /api/internal/payments/sepay-ipn/` phía Django (body forward vẫn
+  đúng shape `{bank_txn_id, order_code, amount, received_at, raw}` như cũ).

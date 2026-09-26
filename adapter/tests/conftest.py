@@ -73,24 +73,37 @@ def valid_sepay_payload() -> dict:
 
 @pytest.fixture
 def valid_sepay_ipn_payload() -> dict:
-    """Payload IPN Cổng thanh toán mẫu — ORDER_PAID, CAPTURED, VND (xem docstring
-    app/schemas.py:SePayIpnPayload về nguồn/giả định)."""
+    """Payload IPN Cổng thanh toán mẫu — ĐÚNG theo tài liệu SePay thật
+    (https://developer.sepay.vn/vi/cong-thanh-toan/IPN), ORDER_PAID, CAPTURED, VND,
+    transaction_status APPROVED (xem docstring app/schemas.py:SePayIpnOrder)."""
     return {
+        "timestamp": 1757058220,
         "notification_type": "ORDER_PAID",
         "order": {
+            "id": "e2c195be-1111-2222-3333-444455556666",
+            "order_id": "NPSETVI00101000042R",
+            "order_status": "CAPTURED",
+            "order_currency": "VND",
+            "order_amount": "540000.00",
             "order_invoice_number": "SO260926-A1B2C3",
-            "amount": 540000,
-            "currency": "VND",
-            "status": "CAPTURED",
+            "custom_data": [],
+            "user_agent": "Mozilla/5.0",
+            "ip_address": "14.169.1.1",
+            "order_description": "Thanh toan don hang SO260926-A1B2C3",
         },
         "transaction": {
-            "id": 999888,
-            "reference_code": "FT26092612345",
-            "amount": 540000,
-            "paid_at": "2026-09-26T10:15:00+07:00",
+            "id": "384c66dd-7777-8888-9999-aaaabbbbcccc",
+            "payment_method": "BANK_TRANSFER",
+            "transaction_id": "FT26092612345",
+            "transaction_type": "PAYMENT",
+            "transaction_date": "2026-09-26 10:15:00",
+            "transaction_status": "APPROVED",
+            "transaction_amount": "540000",
+            "transaction_currency": "VND",
+            "authentication_status": "AUTHENTICATION_SUCCESSFUL",
         },
         "customer": {
-            "name": "Nguyen Van A",
-            "phone": "0900000000",
+            "id": "bae12d2f-0000-1111-2222-333344445555",
+            "customer_id": "CUST_001",
         },
     }

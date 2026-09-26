@@ -160,7 +160,7 @@ def test_p2_ac5_missing_order_invoice_number_returns_400_not_500(client, valid_s
 def test_p2_ac5_missing_amount_returns_400_not_500(client, valid_sepay_ipn_payload):
     route = respx.post(DJANGO_IPN_ENDPOINT).mock(return_value=httpx.Response(200, json={}))
     payload = dict(valid_sepay_ipn_payload)
-    payload["order"] = dict(payload["order"], amount=None)
+    payload["order"] = dict(payload["order"], order_amount=None)
 
     resp = client.post("/ipn/sepay", json=payload, headers=IPN_SECRET_HEADER)
 
@@ -215,14 +215,14 @@ def test_p2_ac5_log_canh_bao_khong_chua_khoa(client, valid_sepay_ipn_payload, ca
         assert SEPAY_SECRET_KEY not in record.getMessage()
 
 
-# --- P2-AC6: ORDER_PAID nhưng status != CAPTURED hoặc currency != VND -> không xác nhận,
-# ghi nhận (log), trả 200, KHÔNG gọi Django -------------------------------------------
+# --- P2-AC6: ORDER_PAID nhưng order_status != CAPTURED hoặc order_currency != VND -> không
+# xác nhận, ghi nhận (log), trả 200, KHÔNG gọi Django ----------------------------------
 
 @respx.mock
 def test_p2_ac6_status_not_captured_does_not_confirm_returns_200(client, valid_sepay_ipn_payload):
     route = respx.post(DJANGO_IPN_ENDPOINT).mock(return_value=httpx.Response(200, json={}))
     payload = dict(valid_sepay_ipn_payload)
-    payload["order"] = dict(payload["order"], status="PENDING")
+    payload["order"] = dict(payload["order"], order_status="PENDING")
 
     resp = client.post("/ipn/sepay", json=payload, headers=IPN_SECRET_HEADER)
 
@@ -234,7 +234,7 @@ def test_p2_ac6_status_not_captured_does_not_confirm_returns_200(client, valid_s
 def test_p2_ac6_currency_not_vnd_does_not_confirm_returns_200(client, valid_sepay_ipn_payload):
     route = respx.post(DJANGO_IPN_ENDPOINT).mock(return_value=httpx.Response(200, json={}))
     payload = dict(valid_sepay_ipn_payload)
-    payload["order"] = dict(payload["order"], currency="USD")
+    payload["order"] = dict(payload["order"], order_currency="USD")
 
     resp = client.post("/ipn/sepay", json=payload, headers=IPN_SECRET_HEADER)
 
@@ -247,12 +247,28 @@ def test_p2_ac6_logs_for_chu_to_review(client, valid_sepay_ipn_payload, caplog):
     caplog.set_level("WARNING")
     route = respx.post(DJANGO_IPN_ENDPOINT).mock(return_value=httpx.Response(200, json={}))
     payload = dict(valid_sepay_ipn_payload)
-    payload["order"] = dict(payload["order"], currency="USD")
+    payload["order"] = dict(payload["order"], order_currency="USD")
 
     client.post("/ipn/sepay", json=payload, headers=IPN_SECRET_HEADER)
 
     assert not route.called
     assert any("status/currency" in r.getMessage() for r in caplog.records)
+
+
+@respx.mock
+def test_p2_ac6_transaction_status_not_approved_does_not_confirm_returns_200(
+    client, valid_sepay_ipn_payload
+):
+    """transaction.transaction_status có mặt và khác APPROVED -> không xác nhận (dù
+    order_status=CAPTURED, order_currency=VND đúng)."""
+    route = respx.post(DJANGO_IPN_ENDPOINT).mock(return_value=httpx.Response(200, json={}))
+    payload = dict(valid_sepay_ipn_payload)
+    payload["transaction"] = dict(payload["transaction"], transaction_status="DECLINED")
+
+    resp = client.post("/ipn/sepay", json=payload, headers=IPN_SECRET_HEADER)
+
+    assert resp.status_code == 200
+    assert not route.called
 
 
 # --- P2-AC7: TRANSACTION_VOID -> 200, không đổi đơn/kho (không gọi Django), log cảnh báo --

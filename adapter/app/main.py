@@ -211,7 +211,7 @@ def _ipn_transaction_id(raw_body: dict) -> str:
     """Best-effort lấy id giao dịch để LOG (không raise)."""
     transaction = raw_body.get("transaction")
     if isinstance(transaction, dict):
-        for key in ("reference_code", "reference_number", "id", "transaction_id"):
+        for key in ("reference", "reference_code", "reference_number", "transaction_id", "id"):
             value = transaction.get(key)
             if value:
                 return str(value)
@@ -229,9 +229,11 @@ async def ipn_sepay(
 
     - `X-Secret-Key` sai/thiếu -> 401, KHÔNG gọi Django, KHÔNG log giá trị khoá (P2-AC2).
     - `TRANSACTION_VOID` -> 200, chỉ log cảnh báo, KHÔNG đổi đơn/kho (BR-TT-16, P2-AC7).
-    - `ORDER_PAID` + `status=CAPTURED` + `currency=VND` -> map & gọi Django, trả nguyên
-      kết quả Django (P2-AC1, P2-AC3 idempotent do Django lo).
-    - `ORDER_PAID` với status/currency khác -> 200, chỉ ghi log, KHÔNG gọi Django (Q9/P2-AC6).
+    - `ORDER_PAID` + `order.order_status=CAPTURED` + `order.order_currency=VND` (+
+      `transaction.transaction_status=APPROVED` nếu field này có mặt) -> map & gọi Django,
+      trả nguyên kết quả Django (P2-AC1, P2-AC3 idempotent do Django lo).
+    - `ORDER_PAID` với status/currency/transaction_status khác -> 200, chỉ ghi log, KHÔNG
+      gọi Django (Q9/P2-AC6).
     - Payload hỏng vĩnh viễn (thiếu mã đơn/số tiền/mã giao dịch) -> 400, KHÔNG 500, log đủ
       để đối soát, không log khoá (E9/P2-AC5).
     - Django lỗi mạng/timeout/5xx -> không trả 200 cho SePay (SePay gửi lại, P2-AC4).
@@ -284,14 +286,15 @@ async def ipn_sepay(
         return JSONResponse(status_code=200, content={"acknowledged": True, "action": "ignored_unknown_type"})
 
     if not is_ipn_status_confirmable(payload):
-        # Q9: order.status != CAPTURED hoặc currency != VND -> không tự xác nhận, ghi nhận
-        # để Chủ xem (log), trả 200.
+        # Q9: order.order_status != CAPTURED, order.order_currency != VND, hoặc
+        # transaction.transaction_status != APPROVED (khi có mặt) -> không tự xác nhận, ghi
+        # nhận để Chủ xem (log), trả 200.
         logger.warning(
             "IPN SePay ORDER_PAID nhưng status/currency không hợp lệ để xác nhận: "
             "order_code=%s status=%s currency=%s",
             _ipn_order_code(raw_body),
-            payload.order.status,
-            payload.order.currency,
+            payload.order.effective_status,
+            payload.order.effective_currency,
         )
         return JSONResponse(status_code=200, content={"acknowledged": True, "action": "ignored_status_or_currency"})
 

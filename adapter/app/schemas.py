@@ -127,44 +127,77 @@ class InternalPaymentPayload(BaseModel):
 
 # --- IPN Cổng thanh toán SePay (hồ sơ 2026-09-26-sepay-cong-thanh-toan, story P2) --------
 #
-# Tài liệu tham khảo: https://developer.sepay.vn/vi/cong-thanh-toan/IPN (tóm tắt do điều
-# phối viên cung cấp trong phiên — KHÔNG có tài khoản Cổng thanh toán thật để đối chiếu
-# payload 1:1 lúc build; Q4 trong 01-analysis.md vẫn ĐỎ). Payload mô tả:
+# Tài liệu tham khảo: https://developer.sepay.vn/vi/cong-thanh-toan/IPN — ĐÃ có payload mẫu
+# thật (xác thực X-Secret-Key chạy production 2026-09-26). Payload thật:
 #
 #   {
+#     "timestamp": 1757058220,
 #     "notification_type": "ORDER_PAID" | "TRANSACTION_VOID",
 #     "order": {
-#       "order_invoice_number": "SO260926-A1B2C3",
-#       "amount": 540000,
-#       "currency": "VND",
-#       "status": "CAPTURED",
+#       "id": "e2c195be-...",
+#       "order_id": "NPSETVI00101000042R",
+#       "order_status": "CAPTURED",
+#       "order_currency": "VND",
+#       "order_amount": "50000.00",
+#       "order_invoice_number": "SUB_202509_001",
+#       "custom_data": [],
 #       ...
 #     },
 #     "transaction": {
-#       "id": 999888,
-#       "reference_code": "FT26092612345",
+#       "id": "384c66dd-...",
+#       "payment_method": "CARD" | "BANK_TRANSFER",
+#       "transaction_id": "68ba94ac80123",
+#       "transaction_type": "PAYMENT",
+#       "transaction_date": "2025-09-01 00:00:15",
+#       "transaction_status": "APPROVED",
+#       "authentication_status": "AUTHENTICATION_SUCCESSFUL",
 #       ...
 #     },
-#     "customer": {...}
+#     "customer": {"id": "bae12d2f-...", "customer_id": "CUST_001"}
 #   }
 #
-# GIẢ ĐỊNH (ghi rõ để BE/Duy đối chiếu khi có payload sandbox thật — xem 03-dev-notes.md
-# mục "P2 (adapter)"):
-# - Tên field con trong `transaction` chưa chắc đúng 100%. Adapter dò một danh sách tên
-#   field ứng viên (ưu tiên mã tham chiếu ngân hàng FT… nếu có, theo Q4/BR-TT-03), xem
+# GHI CHÚ (xem 03-dev-notes.md mục "Sửa field IPN theo payload thật (adapter)"):
+# - Field THẬT là `order.order_status` / `order.order_currency` / `order.order_amount` /
+#   `order.order_invoice_number` (không phải `order.status/currency/amount` như GIẢ ĐỊNH ban
+#   đầu lúc chưa có payload sandbox). Giữ tên field giả định cũ làm DỰ PHÒNG (đọc được nếu
+#   SePay gửi biến thể khác) qua các property `effective_*`, nhưng field thật luôn được ưu
+#   tiên.
+# - Tên field con trong `transaction` chưa liệt kê rõ mã tham chiếu ngân hàng trong tài liệu
+#   mẫu — adapter vẫn dò danh sách ứng viên (ưu tiên mã tham chiếu ngân hàng FT… nếu có,
+#   theo BR-TT-03), lùi về `transaction.transaction_id`, cuối cùng `transaction.id`. Xem
 #   `app/sepay.py:pick_ipn_transaction_reference`.
 # - `order`/`transaction` để `extra="allow"` (không chặn field lạ) vì tài liệu có thể có
 #   thêm field SePay không liệt kê ở đây.
 class SePayIpnOrder(BaseModel):
-    """Sub-object `order` trong payload IPN. Field khác ngoài 4 field dưới bị bỏ qua
-    (không cần cho việc map sang payload nội bộ), nhưng KHÔNG bị chặn (extra="allow")."""
+    """Sub-object `order` trong payload IPN. Field khác bị bỏ qua (không cần cho việc map
+    sang payload nội bộ), nhưng KHÔNG bị chặn (extra="allow")."""
 
     model_config = ConfigDict(extra="allow")
 
     order_invoice_number: Optional[str] = None
+
+    # Field THẬT theo tài liệu SePay (developer.sepay.vn/vi/cong-thanh-toan/IPN).
+    order_amount: Optional[Decimal] = Field(default=None, allow_inf_nan=False)
+    order_currency: Optional[str] = None
+    order_status: Optional[str] = None
+
+    # Dự phòng: tên field GIẢ ĐỊNH ban đầu (trước khi có payload thật) — giữ lại phòng khi
+    # SePay gửi biến thể khác không kèm tiền tố "order_".
     amount: Optional[Decimal] = Field(default=None, allow_inf_nan=False)
     currency: Optional[str] = None
     status: Optional[str] = None
+
+    @property
+    def effective_amount(self) -> Optional[Decimal]:
+        return self.order_amount if self.order_amount is not None else self.amount
+
+    @property
+    def effective_currency(self) -> Optional[str]:
+        return self.order_currency or self.currency
+
+    @property
+    def effective_status(self) -> Optional[str]:
+        return self.order_status or self.status
 
 
 class SePayIpnPayload(BaseModel):
