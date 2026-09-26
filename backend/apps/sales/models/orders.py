@@ -35,6 +35,14 @@ class SalesOrder(models.Model):
         help_text="created_at + TTL (mặc định 30') — job nền quét & nhả (BR-BH-03/04).",
     )
     created_at = models.DateTimeField(auto_now_add=True)
+    # P1/BR-TT-17 (Q5): đếm số lần lập tham số thanh toán cổng cho đơn này. Lần 1 gửi SePay
+    # đúng `code`; từ lần 2 (thanh toán lại, UC-2) thêm hậu tố "-<n>" vào order_invoice_number
+    # — GIẢ ĐỊNH một số cổng có thể từ chối dùng lại đúng mã cũ. Adapter (P2) đã cài sẵn
+    # `strip_order_retry_suffix` bóc ĐÚNG định dạng này (`^(SO\d{6}-[0-9A-Za-z]{6})(?:-\d+)?$`)
+    # khi khớp đơn — hai bên đã đối chiếu (xem 03-dev-notes.md).
+    checkout_attempts = models.PositiveIntegerField(
+        "Số lần lập tham số thanh toán cổng", default=0,
+    )
     # KHÔNG có trường phí giao hàng (BR-BH-10 — outscope hoàn toàn).
 
     class Meta:

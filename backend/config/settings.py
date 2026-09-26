@@ -171,13 +171,29 @@ REST_FRAMEWORK = {
 
 # --- Tham số nghiệp vụ cấu hình được (không hard-code trong logic) ---------
 # Nguồn: business-process-spec.md (BR-MH-02, BR-LO-06, BR-BH-03, BR-GH-04, BR-HV-03).
-BATCH_DEFAULT_SHELF_LIFE_DAYS = int(os.getenv("BATCH_DEFAULT_SHELF_LIFE_DAYS", "90"))
+BATCH_DEFAULT_SHELF_LIFE_DAYS = int(os.getenv("BATCH_DEFAULT_SHELF_LIFE_DAYS", "365"))
 BATCH_NEAR_EXPIRY_DAYS = int(os.getenv("BATCH_NEAR_EXPIRY_DAYS", "14"))
 SALES_ORDER_TTL_MINUTES = int(os.getenv("SALES_ORDER_TTL_MINUTES", "30"))
 DELIVERY_MAX_FAILED_ATTEMPTS = int(os.getenv("DELIVERY_MAX_FAILED_ATTEMPTS", "2"))
 COLD_CHAIN_MAX_HOURS = int(os.getenv("COLD_CHAIN_MAX_HOURS", "6"))
 
 INTERNAL_SERVICE_TOKEN = os.getenv("INTERNAL_SERVICE_TOKEN", "")
+
+# --- Cổng thanh toán SePay (P1/P3, doc/features/2026-09-26-sepay-cong-thanh-toan) ----------
+# BR-TT-14: môi trường + URL cổng + khoá là cấu hình theo môi trường, KHÔNG hard-code.
+# Secret thật nằm ở GCP Secret Manager (cangca-sepay-sandbox-*) — KHÔNG có giá trị mặc định
+# ở đây, rỗng thì P1 từ chối ký (an toàn hơn ký nhầm bằng chuỗi rỗng).
+SEPAY_ENV = os.getenv("SEPAY_ENV", "SANDBOX").strip().upper()  # SANDBOX | PRODUCTION
+SEPAY_MERCHANT_ID = os.getenv("SEPAY_MERCHANT_ID", "")
+SEPAY_SECRET_KEY = os.getenv("SEPAY_SECRET_KEY", "")
+SEPAY_CHECKOUT_URL_SANDBOX = os.getenv(
+    "SEPAY_CHECKOUT_URL_SANDBOX", "https://pay-sandbox.sepay.vn/v1/checkout/init"
+)
+SEPAY_CHECKOUT_URL_PRODUCTION = os.getenv(
+    "SEPAY_CHECKOUT_URL_PRODUCTION", "https://pay.sepay.vn/v1/checkout/init"
+)
+# Trang tra đơn Shop — success/cancel/error_url của P1 đều trỏ về đây (BR-TT-12).
+SHOP_BASE_URL = os.getenv("SHOP_BASE_URL", "http://localhost:3000").rstrip("/")
 
 # --- Celery (job nền) ------------------------------------------------------
 CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL", "redis://localhost:6379/0")

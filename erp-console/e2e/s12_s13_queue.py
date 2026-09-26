@@ -456,7 +456,14 @@ with sync_playwright() as p:
         ok(f"S12-AC7: {user} resolve → 403", r["status"] == 403, str(r))
         page.goto(BASE + "/orders/")
         expect(page.locator("ul.order-list > li").first).to_be_visible()
-        ok(f"S12: {user} không thấy tab con ở màn Đơn", page.locator(".orders-tabs").count() == 0)
+        if user == "ql1":
+            # S16 (L9): ql1 có sales.view_refund → tab con VẪN hiện, nhưng chỉ "Phiếu hoàn chờ chuyển" (không có
+            # "Hàng chờ thanh toán", vì thiếu confirm_payment_manual).
+            ok("S12/S16: ql1 tab con chỉ có 'Phiếu hoàn chờ chuyển', không có 'Hàng chờ thanh toán'",
+               page.locator(".orders-tabs", has_text="Phiếu hoàn chờ chuyển").count() == 1
+               and page.locator(".orders-tabs", has_text="Hàng chờ thanh toán").count() == 0)
+        else:
+            ok(f"S12: {user} không thấy tab con ở màn Đơn", page.locator(".orders-tabs").count() == 0)
         ctx.close()
 
     # ================= Ảnh + đo: 360 và 1280, sáng và tối =================

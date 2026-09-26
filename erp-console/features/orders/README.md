@@ -1,5 +1,14 @@
 # features/orders — Đơn & tiền
 
+**L9 (S14, S15, S16):** huỷ đơn đã thanh toán, lập phiếu hoàn từ đơn có hoá đơn, và màn con thứ ba
+"Phiếu hoàn chờ chuyển" (`/orders/refunds/`, `sales.view_refund` — Chủ và Quản lý, hành động
+xác nhận/thất bại/thử lại chỉ Chủ có `sales.confirm_refund`). Contract thật: 03-dev-notes.md
+"Lô L9 — S14, S15, S16 (BE)".
+- `POST /api/sales/orders/{id}/cancel/` `{reason_code, note}` → `available_actions` có `cancel`.
+- `POST /api/sales/refunds/create/` nhánh `sales_invoice` (S15) — dùng chung `RefundForm.tsx` với nhánh
+  `payment_transaction` (S13) qua prop `target: {kind: "payment"|"invoice", ...}`.
+- `GET /api/sales/refunds/?status=PENDING,FAILED`, `POST /api/sales/refunds/{id}/confirm|mark-failed|retry/`.
+
 **L8 (S12, S13):** hàng chờ thanh toán lệch là **màn con** `/orders/payments/` của "Đơn & tiền" (menu con, chỉ Chủ —
 `sales.confirm_payment_manual`). Đặt trong CÙNG module vì cần tìm đơn (API đơn), mở chi tiết đơn liên quan và dùng chung ô số
 tiền với S11 — tách module riêng sẽ phải import chéo vào ruột `orders`. Contract thật: 03-dev-notes.md "Lô L8 — S12, S13 (BE)".
@@ -17,7 +26,7 @@ Story: **S10** (danh sách + chi tiết đơn) và **S11** (Chủ xác nhận đ
   Cần `sales.confirm_payment_manual` (chỉ Chủ). Nút chỉ hiện khi `available_actions` có `confirm_payment` (đơn Giữ chỗ và Tự huỷ).
 - Quyền xem màn (menu, `ViewGuard`): `sales.view_salesorder` và không phải người CHỈ thuộc `nv_giao`.
 - FE không tự suy luật: nút theo `available_actions`; kết quả xác nhận theo `result` BE; lỗi BE hiện nguyên văn `detail`.
-  `cancel` (S14), `create_refund` (S15) có trong `available_actions` nhưng chưa có màn → chưa vẽ nút.
+  `cancel` (S14) mở `CancelOrderForm`; `create_refund` (S15) mở `RefundForm` với `target.kind: "invoice"`.
 
 | File | Làm gì |
 |---|---|
@@ -40,10 +49,19 @@ Story: **S10** (danh sách + chi tiết đơn) và **S11** (Chủ xác nhận đ
 | `components/PaymentSheet.tsx` · `PaymentView.tsx` | S12: tấm chi tiết khoản tiền, nút theo `available_actions`, tải lại khoản sau thao tác |
 | `components/AttachOrderForm.tsx` | S12: gắn khoản không khớp vào đơn (tìm đơn qua API đơn) |
 | `components/ConfirmOrderForm.tsx` | S12: xác nhận đơn khi khách đã chuyển bù |
-| `components/RefundForm.tsx` | S13: lập phiếu hoàn cho khoản không có hoá đơn (request_id UUID chống tạo trùng) |
-| `components/QueueFormParts.tsx` | mảnh chung của ba bước trên + khoá gửi chống bấm đúp |
+| `components/RefundForm.tsx` | S13 + S15: lập phiếu hoàn — `target.kind: "payment"` (không hoá đơn) hoặc `"invoice"` (đơn có hoá đơn), `request_id` UUID chống tạo trùng |
+| `components/QueueFormParts.tsx` | mảnh chung của các bước trên + khoá gửi chống bấm đúp |
+| `refund.ts` | `refundableOfOrder()` — số còn được hoàn của một đơn, tính từ `total_amount` + `refunds[]` (BE chưa trả field riêng) |
+| `components/CancelOrderForm.tsx` | S14: huỷ đơn — chọn lý do (radio, OTHER bắt buộc ghi chú), hậu quả theo `stock_restored` |
+| `components/RefundQueueScreen.tsx` | S16: danh sách phiếu hoàn chờ chuyển (`status=PENDING,FAILED`), tải thêm |
+| `components/RefundSheet.tsx` · `RefundView.tsx` | S16: tấm chi tiết phiếu hoàn, nút theo `available_actions` |
+| `components/ConfirmRefundForm.tsx` · `MarkRefundFailedForm.tsx` · `RetryRefundForm.tsx` | S16: ba bước xác nhận/thất bại/thử lại |
 
-E2E: `e2e/s10_s11_orders.py`, `e2e/s12_s13_queue.py` (mock). Mock hàng chờ: `__caveMock.payments("fail"|"empty"|"forbidden"|"ok")`,
-`__caveMock.expireOrder(id)`, `__caveMock.confirmRefund(refundId, ref)` (giả lập S16), `__caveMock.queueJson(username, status)`,
-`__caveMock.resolveJson(username, id, body)`, `__caveMock.refundJson(username, body)`, `__caveMock.txnRefundsOf(txnId)`. Mock trong DevTools: `__caveMock.orders("fail"|"empty"|"forbidden"|"detailfail"|"ok")`,
-`__caveMock.resetOrders()`, `__caveMock.orderJson(username, id)`.
+E2E: `e2e/s10_s11_orders.py`, `e2e/s12_s13_queue.py`, `e2e/s14_s16_cancel_refund.py` (mock). Mock hàng chờ:
+`__caveMock.payments("fail"|"empty"|"forbidden"|"ok")`, `__caveMock.expireOrder(id)`,
+`__caveMock.confirmRefund(refundId, ref)` (nay chạy qua đúng luật S16 dưới danh "Lộc"), `__caveMock.queueJson(username, status)`,
+`__caveMock.resolveJson(username, id, body)`, `__caveMock.refundJson(username, body)`, `__caveMock.txnRefundsOf(txnId)`.
+Mock đơn: `__caveMock.orders("fail"|"empty"|"forbidden"|"detailfail"|"ok")`, `__caveMock.resetOrders()`,
+`__caveMock.orderJson(username, id)`, `__caveMock.cancelJson(username, id, body)`. Mock phiếu hoàn chờ chuyển:
+`__caveMock.refunds("fail"|"empty"|"forbidden"|"ok")`, `__caveMock.refundQueueJson(username)`,
+`__caveMock.confirmRefundJson/markRefundFailedJson/retryRefundJson(username, id, body)`.

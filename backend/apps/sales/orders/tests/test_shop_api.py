@@ -44,7 +44,7 @@ class ShopOrderAPITests(TestCase):
         self.assertEqual(resp.status_code, 201, resp.content)
         data = resp.json()
         self.assertEqual(data["total_amount"], "300000.00")
-        self.assertEqual(data["vietqr"]["content"], data["order_code"])
+        self.assertNotIn("vietqr", data)  # P1-AC7: không còn QR giả
         code = data["order_code"]
 
         # tra đúng 4 số cuối

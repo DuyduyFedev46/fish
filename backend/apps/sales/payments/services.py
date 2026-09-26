@@ -15,6 +15,7 @@ Thanh toán (P-05): ghi nhận tiền vào + xuất hoá đơn (chuyển giữ c
 """
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 
+from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 
@@ -55,6 +56,12 @@ AMOUNT_INVALID_MSG = "Số tiền phải là số lớn hơn 0."
 AMOUNT_MIN_MSG = "Số tiền tối thiểu 1đ."
 AMOUNT_TOO_LARGE_MSG = "Số tiền quá lớn (tối đa 999.999.999.999,99 ₫)."
 
+# BR-TT-15 (UC-5, PA, quyết định Duy 2026-09-26): nhãn cảnh báo khi một khoản OVERPAID mới
+# (mã giao dịch khác) trùng SỐ TIỀN với một khoản đã MATCHED qua xác nhận tay (MANUAL) của
+# CHÍNH đơn đó — rất có thể là cùng một lần chuyển khoản, Chủ gõ tay rồi IPN mới báo về sau,
+# KHÔNG PHẢI tiền thừa thật. Không tự hoàn khi thấy nhãn này — đối chiếu sao kê trước.
+DUPLICATE_MANUAL_WARNING = "Nghi trùng xác nhận tay, đối chiếu sao kê trước khi hoàn"
+
 
 def normalize_bank_txn_id(raw):
     """
@@ -91,6 +98,18 @@ def validate_amount(raw):
     if amount > AMOUNT_MAX:
         raise ValueError(AMOUNT_TOO_LARGE_MSG)
     return amount
+
+
+def environment_for_source(source):
+    """
+    BR-TT-14: chỉ giao dịch từ Cổng SePay (Source.GATEWAY) mới gắn môi trường — lấy từ
+    `settings.SEPAY_ENV` TẠI THỜI ĐIỂM ghi (đây cũng là môi trường Django dùng để ký tham số
+    thanh toán ở P1, nên luôn khớp). Webhook ngân hàng cũ / xác nhận tay không có khái niệm
+    môi trường cổng → "".
+    """
+    if source != PaymentTransaction.Source.GATEWAY:
+        return ""
+    return (getattr(settings, "SEPAY_ENV", "") or "").strip().upper()
 
 
 def parse_positive_amount(raw):
@@ -265,9 +284,23 @@ def _record_payment(*, order, bank_txn_id, amount, received_at, source, raw_payl
             match_status=match_status,
             resolution_status=initial_resolution_status(match_status),
             source=source,
+            environment=environment_for_source(source),
             raw_payload=raw_payload or {},
             received_at=received_at,
         )
+
+        # BR-TT-15 (UC-5): khoản OVERPAID này (mã GD khác) trùng số tiền với một khoản đã
+        # MATCHED bằng xác nhận tay của CHÍNH đơn -> rất có thể là cùng một lần chuyển khoản,
+        # không phải tiền thừa thật. Gắn nhãn để Chủ đối chiếu sao kê trước khi hoàn.
+        if match_status == PaymentTransaction.MatchStatus.OVERPAID and source != PaymentTransaction.Source.MANUAL:
+            manual_duplicate = o.payments.filter(
+                source=PaymentTransaction.Source.MANUAL,
+                match_status=PaymentTransaction.MatchStatus.MATCHED,
+                amount=amount,
+            ).exclude(pk=payment.pk).exists()
+            if manual_duplicate:
+                payment.duplicate_warning = DUPLICATE_MANUAL_WARNING
+                payment.save(update_fields=["duplicate_warning"])
 
         # Chỉ chuyển tồn thành bán thật khi khớp đủ & đơn còn ở BOOKED.
         if match_status == PaymentTransaction.MatchStatus.MATCHED and (
@@ -330,6 +363,7 @@ def split_overpaid(*, payment, order, bank_amount, actor=None):
         match_status=PaymentTransaction.MatchStatus.OVERPAID,
         resolution_status=initial_resolution_status(PaymentTransaction.MatchStatus.OVERPAID),
         source=payment.source,
+        environment=payment.environment,  # BR-TT-14: phần tách vẫn "từ cổng" như dòng gốc
         raw_payload={"split_from": payment.bank_txn_id, "bank_amount": str(bank_amount)},
         received_at=payment.received_at,
     )

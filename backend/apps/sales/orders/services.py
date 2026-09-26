@@ -31,6 +31,7 @@ from apps.sales.models import SalesOrder, SalesOrderLine, SalesOrderLineBatch
 from apps.sales.utils import ZERO
 from apps.sales.utils import gen_code as _gen_code
 from apps.sales.utils import money as _q
+from apps.sales.utils import money_vnd as _q_vnd
 from apps.sales.utils import now as _now
 
 
@@ -251,7 +252,9 @@ def create_order(*, customer_phone, customer_name, delivery_address, phone, line
                     )
             total += amount
 
-        order.total_amount = _q(total)
+        # BR-BH-15 (Q6): tổng đơn là số NGUYÊN ĐỒNG, half-up — dòng đơn vẫn giữ 2 chữ số
+        # thập phân (_q) như trước; chỉ tổng cuối cùng làm tròn để khớp số gửi cổng SePay.
+        order.total_amount = _q_vnd(total)
         order.save(update_fields=["total_amount"])
 
     return order

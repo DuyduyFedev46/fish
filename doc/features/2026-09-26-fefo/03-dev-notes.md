@@ -108,3 +108,11 @@ Kết quả cuối (2026-09-26):
 - Mock Tổng quan/Kho (`shared/lib/dashboardSummary.mock.ts`) chưa có ca "nhập trước hạn muộn" để thấy FEFO khác FIFO trên màn mock; FE vẫn
   sắp đúng nhờ `fefoOrder`. Có thể thêm khi làm S25.
 - Nếu FE cần hạn dùng trên phân bổ lô của đơn (mục 2 phía BE) thì cần BE thêm `allocations[].expiry_date`.
+
+## Hạn mặc định 365 ngày · 2026-09-26 (BE)
+> Quyết định 2026-09-26 "Hạn dùng mặc định hàng đông lạnh 12 tháng; giữ FEFO": đổi mặc định 90 → 365 ngày. FEFO không đổi (giữ nguyên `FEFO_ORDER`), chỉ ảnh hưởng công thức tính `expiry_date` khi không có hạn tường minh.
+- Sửa: `backend/config/settings.py` (`BATCH_DEFAULT_SHELF_LIFE_DAYS` 90→365), `backend/.env.example` (đồng bộ), `backend/apps/catalog/models/items.py` (`Item.shelf_life_in_days` default 90→365) + migration `apps/catalog/migrations/0002_alter_item_shelf_life_in_days.py` (chỉ `AlterField` đổi default, không đổi dữ liệu mặt hàng/lô đã có).
+- `seed_demo.py` giữ nguyên hạn từng mặt hàng/lô demo (đều khai tường minh trong `ITEMS`/`BATCHES`, không dựa vào default) — QA FEFO trên demo không đổi.
+- Test mới: `apps/catalog/items/tests/test_models.py` (mặt hàng tạo mới không khai hạn → 365, đã kiểm RED khi default=90 rồi GREEN khi 365); `apps/inventory/batches/tests/test_services.py::test_create_batch_khong_nhap_han_dung_shelf_life_mat_hang_365` (tạo lô không truyền `shelf_life_days` → lấy đúng `item.shelf_life_in_days`=365). Các test cũ dùng hạn tường minh (90, 60…) qua tham số/field riêng nên không đổi và vẫn xanh.
+- Đã chạy: `manage.py test` 547 test, 0 failure; `makemigrations --check --dry-run` sạch; `manage.py check` sạch. Không đụng `frontend/`, `erp-console/`, không deploy/commit.
+- Còn nợ: chưa có script cập nhật hạn cho mặt hàng/lô cũ (theo yêu cầu là giữ nguyên, không phải nợ kỹ thuật).

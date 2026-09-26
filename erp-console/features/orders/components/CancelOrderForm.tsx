@@ -93,6 +93,7 @@ export function CancelOrderForm({ order, onBusy, onCancel, onDone }: Props) {
               onChange={() => {
                 setReasonCode(r.value as CancelReasonCode);
                 setReasonErr(false);
+                if (r.value !== "OTHER") setNoteErr(false); // đổi khỏi "Khác" thì ghi chú hết bắt buộc — bỏ lỗi cũ nếu có
               }}
               disabled={sub.busy}
             />

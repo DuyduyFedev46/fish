@@ -47,7 +47,7 @@ class Item(models.Model):
         "Loại", max_length=10, choices=ItemType.choices, default=ItemType.SIMPLE
     )
     stock_uom = models.CharField("Đơn vị", max_length=10, default=KG)  # luôn Kg (BR-DM-01)
-    shelf_life_in_days = models.PositiveIntegerField("Hạn dùng mặc định (ngày)", default=90)
+    shelf_life_in_days = models.PositiveIntegerField("Hạn dùng mặc định (ngày)", default=365)
     has_batch_no = models.BooleanField("Quản lý theo lô", default=True)
     has_expiry_date = models.BooleanField("Có hạn dùng", default=True)
     is_active = models.BooleanField("Đang kinh doanh", default=True)

@@ -1400,3 +1400,11 @@ Không đổi nghiệp vụ hay contract API. Mọi AC chức năng của S7, S8
 ### Quyết định của Duy về tiền (2026-09-26, sau lô L8)
 - Số tiền **tối thiểu 1đ** ở cả BE và FE, vì VND không có số lẻ. BE từ chối số dưới 1đ (BR-TT-08).
 - Khách chuyển **nhiều hơn tổng đơn ngay lần đầu**: đơn vẫn chuyển sang "Đã thanh toán", còn **phần thừa đưa vào hàng chờ** để Chủ hoàn lại. Cách xử lý giống P5 / BR-TT-10.
+
+### Bổ sung S38: ảnh mặt hàng (Duy chốt 2026-09-26, hồ sơ `doc/features/2026-09-26-anh-mat-hang/`)
+Khi làm S38 phải thêm các tiêu chí sau:
+- **S38-AC-ẢNH-1:** mỗi mặt hàng có đúng **1 ảnh**. Ảnh lưu trên GCS bucket riêng ở asia-southeast1: công khai chỉ đọc, không liệt kê, không lưu trên container, không nằm trong git.
+- **S38-AC-ẢNH-2:** chỉ nhận JPEG, PNG, WebP. Từ chối SVG và file không phải ảnh. Có giới hạn dung lượng (tham số cấu hình). Ảnh được gỡ EXIF/GPS, cắt vuông 1:1, sinh 3 cỡ WebP.
+- **S38-AC-ẢNH-3:** quyền Tầng 2 mới, **chỉ cho ảnh**, gán cho Chủ và Quản lý. Quyền này không cho sửa tên, hạn dùng, giá hay trạng thái ẩn/hiện. Người không có quyền nhận 403. Thêm, thay hay gỡ ảnh đều ghi AuditLog.
+- **S38-AC-ẢNH-4:** Shop API trả URL ảnh. Lưới và trang chi tiết Shop hiển thị ảnh có alt tiếng Việt. Mặt hàng thiếu ảnh hiện ảnh mặc định trung tính và vẫn bán được (BR-DM-09…16 trong 01-analysis). Thay ảnh thì dùng URL mới.
+- **S38-AC-ẢNH-5:** màn Danh mục trên ERP cho tải ảnh bằng điện thoại, có xem trước. Nếu là ảnh minh hoạ thì phải gắn nhãn "Ảnh minh hoạ".

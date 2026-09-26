@@ -51,7 +51,7 @@ class PaymentTransactionViewSet(viewsets.ReadOnlyModelViewSet):
         if self.action != "list":
             return queryset
         params = self.request.query_params
-        for name in ("resolution_status", "match_status"):
+        for name in ("resolution_status", "match_status", "source", "environment"):
             values = [v.strip().upper() for v in params.get(name, "").split(",") if v.strip()]
             if values:
                 queryset = queryset.filter(**{f"{name}__in": values})

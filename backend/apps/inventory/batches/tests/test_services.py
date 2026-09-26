@@ -17,6 +17,16 @@ class BatchServiceTests(InventoryServiceBase):
         self.assertEqual(b.expiry_date, self.today + datetime.timedelta(days=90))
         self.assertEqual(b.ledger_entries.count(), 1)
 
+    def test_create_batch_khong_nhap_han_dung_shelf_life_mat_hang_365(self):
+        # Quyết định 2026-09-26: hạn mặc định mặt hàng tạo mới là 365 ngày; không truyền
+        # shelf_life_days lúc tạo lô -> lấy đúng Item.shelf_life_in_days (mặc định 365).
+        b = batch_services.create_batch(
+            item=self.item, supplier=self.sup, warehouse=self.wh,
+            received_date=self.today, qty=Decimal("10"), purchase_rate=Decimal("80000"),
+        )
+        self.assertEqual(self.item.shelf_life_in_days, 365)
+        self.assertEqual(b.expiry_date, self.today + datetime.timedelta(days=365))
+
     def test_allocate_fefo_cung_han_thi_lo_nhap_truoc_ra_truoc(self):
         # F1: hai lô cùng hạn (cùng ngày tạo + 90) -> tiêu chí phụ ngày nhập (BR-BH-05).
         b1 = self._batch(qty="5")

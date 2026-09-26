@@ -1,8 +1,10 @@
 """
 Shop API công khai — đặt hàng & tra cứu đơn (guest checkout, 7.1).
 
-- Đặt hàng: gọi orders.services.create_order (Hệ thống tạo, BR-PQ-11), trả mã VietQR.
+- Đặt hàng: gọi orders.services.create_order (Hệ thống tạo, BR-PQ-11).
 - Tra đơn: mã đơn + 4 số cuối SĐT (không cần đăng nhập).
+- Lập tham số thanh toán cổng SePay: `apps.sales.payments.shop_api.ShopOrderCheckoutView`
+  (P1, BR-TT-01/13/14/17) — KHÔNG còn mã VietQR giả (BR-TT-01, quyết định Duy 2026-09-26).
 KHÔNG có phí giao hàng (BR-BH-10).
 """
 from decimal import Decimal, InvalidOperation
@@ -15,18 +17,6 @@ from apps.common.exceptions import BusinessError
 from apps.sales.models import SalesOrder
 
 from . import services
-
-
-def _vietqr_stub(order):
-    """
-    Placeholder mã VietQR động (BR-TT-01): nội dung chuyển khoản mang mã đơn.
-    Tích hợp SePay/VietQR thật làm ở lớp adapter/khoá SePay sau — schema không đổi.
-    """
-    return {
-        "payload": f"VIETQR|ORDER:{order.code}|AMOUNT:{order.total_amount}",
-        "amount": str(order.total_amount),
-        "content": order.code,
-    }
 
 
 class ShopOrderCreateView(APIView):
@@ -59,7 +49,6 @@ class ShopOrderCreateView(APIView):
             {
                 "order_code": order.code,
                 "total_amount": str(order.total_amount),
-                "vietqr": _vietqr_stub(order),
                 "booked_expires_at": order.booked_expires_at,
             },
             status=201,

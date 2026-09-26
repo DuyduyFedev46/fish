@@ -92,7 +92,7 @@ export function RefundView({ item: r, refreshing, note, noteRef, actionRef, onAc
           <dt>{REFUND_Q_MSG.reason}</dt>
           <dd>{r.reason || <span className={s.muted}>—</span>}</dd>
         </div>
-        {r.created_by && (
+        {typeof r.created_by === "string" && r.created_by && (
           <div className={s.prop}>
             <dt>{REFUND_Q_MSG.createdByLabel}</dt>
             <dd>{r.created_by}</dd>

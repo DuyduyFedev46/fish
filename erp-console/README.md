@@ -26,7 +26,9 @@ erp-console/
       api.ts mock.ts types.ts messages.ts components/ README.md
     overview/             S8 Tổng quan: KPI, 8 đơn gần nhất, cận hạn, tồn theo lô
     orders/               S10 danh sách + chi tiết đơn (GET /api/sales/orders/), S11 Chủ xác nhận đã nhận tiền,
-                          S12 hàng chờ thanh toán lệch (/orders/payments/, menu con), S13 phiếu hoàn cho khoản không có hoá đơn
+                          S12 hàng chờ thanh toán lệch (/orders/payments/, menu con), S13 phiếu hoàn cho khoản không có hoá đơn,
+                          S14 huỷ đơn đã thanh toán, S15 phiếu hoàn từ đơn có hoá đơn, S16 phiếu hoàn chờ chuyển
+                          (/orders/refunds/, menu con — xác nhận/thất bại/thử lại)
     inventory/            S8 Kho & lô + tab "Hoạt động" (sổ kho) của cột phải — S25 mở rộng
                           (mỗi module: api.ts mock.ts types.ts components/ README.md)
   shared/                 dùng chung, KHÔNG phụ thuộc features/

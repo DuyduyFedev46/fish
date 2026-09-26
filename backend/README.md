@@ -51,7 +51,7 @@ Module gọi module khác **qua services** của module đó. Route tập trung 
 | | `stocktake/` | P-09 | `inventory/reconciliations/` (+ `approve`) |
 | | `returns/` | P-08 | `inventory/returns/` (+ `approve`) |
 | `sales` | `orders/` | P-05, P-07 (huỷ đơn) | Shop `shop/orders/`; `sales/orders/` (lọc/tìm/chi tiết + `cancel`, `confirm-payment`) |
-| | `payments/` | P-05 | `internal/payments/sepay-webhook/`; `sales/invoices/` (chỉ đọc), `sales/payments/`; service xác nhận tay cho `sales/orders/{id}/confirm-payment` |
+| | `payments/` | P-05 | `internal/payments/sepay-webhook/` (cũ), `internal/payments/sepay-ipn/` (P3, Cổng SePay); Shop `shop/orders/{code}/checkout/` (P1); `sales/invoices/` (chỉ đọc), `sales/payments/`; service xác nhận tay cho `sales/orders/{id}/confirm-payment` |
 | | `refunds/` | P-07 | `sales/refunds/` (+ `create`, `confirm`) |
 | | `customers/` | P-05 (7.1) | `sales/customers/` |
 | `delivery` | (phẳng) | P-06, P-08 | `delivery/notes/` (+ `status`) |

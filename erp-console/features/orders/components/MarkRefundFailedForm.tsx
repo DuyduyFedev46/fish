@@ -1,7 +1,8 @@
 "use client";
 
-// S16 — Báo chuyển khoản hoàn thất bại (sai số tài khoản, khách không nhận…). Lý do bắt buộc (lưu vào phiếu + nhật ký,
-// hiện lại khi "Thử lại"). Phiếu chuyển Chờ hoàn → Thất bại; bấm "Thử lại" sau đó để quay lại Chờ hoàn (BR-HT-09).
+// S16 — Báo chuyển khoản hoàn thất bại (sai số tài khoản, khách không nhận…). Lý do KHÔNG bắt buộc ở BE
+// (`Refund.failure_reason` cho phép rỗng) nhưng luôn nên ghi để đối chiếu — FE chỉ nhắc, không chặn gửi khi để trống.
+// Phiếu chuyển Chờ hoàn → Thất bại; bấm "Thử lại" sau đó để quay lại Chờ hoàn (BR-HT-09).
 
 import { useEffect, useId, useRef, useState } from "react";
 import { markRefundFailed } from "../api";
@@ -20,7 +21,6 @@ type Props = {
 export function MarkRefundFailedForm({ item, onBusy, onCancel, onDone }: Props) {
   const id = useId();
   const [reason, setReason] = useState("");
-  const [reasonErr, setReasonErr] = useState(false);
   const reasonRef = useRef<HTMLTextAreaElement>(null);
   const sub = useSubmit(onBusy);
 
@@ -31,13 +31,7 @@ export function MarkRefundFailedForm({ item, onBusy, onCancel, onDone }: Props) 
   const submit = () => {
     if (sub.locked()) return;
     sub.setError(null);
-    const r = reason.trim();
-    if (!r) {
-      setReasonErr(true);
-      reasonRef.current?.focus();
-      return;
-    }
-    void sub.run(() => markRefundFailed(item.id, { reason: r }), onDone);
+    void sub.run(() => markRefundFailed(item.id, { reason: reason.trim() }), onDone);
   };
 
   return (
@@ -67,13 +61,8 @@ export function MarkRefundFailedForm({ item, onBusy, onCancel, onDone }: Props) 
         id={`${id}-reason`}
         label={REFUND_Q_MSG.markFailedReasonLabel}
         value={reason}
-        onChange={(v) => {
-          setReason(v);
-          if (reasonErr) setReasonErr(false);
-        }}
+        onChange={setReason}
         help={REFUND_Q_MSG.markFailedReasonHelp}
-        required
-        error={reasonErr ? REFUND_Q_MSG.markFailedReasonMissing : null}
         disabled={sub.busy}
         inputRef={reasonRef}
       />

@@ -29,7 +29,8 @@ from apps.sales.customers.api import CustomerViewSet
 from apps.sales.orders.api import SalesOrderViewSet
 from apps.sales.orders.shop_api import ShopOrderCreateView, ShopOrderLookupView
 from apps.sales.payments.api import PaymentTransactionViewSet, SalesInvoiceViewSet
-from apps.sales.payments.internal_api import SepayWebhookInternalView
+from apps.sales.payments.internal_api import SepayGatewayIpnInternalView, SepayWebhookInternalView
+from apps.sales.payments.shop_api import ShopOrderCheckoutView
 from apps.sales.refunds.api import RefundViewSet
 
 router = DefaultRouter()
@@ -69,6 +70,8 @@ urlpatterns = [
     path("shop/catalog/<str:item_code>/", ShopItemDetailView.as_view()),
     path("shop/orders/", ShopOrderCreateView.as_view()),
     path("shop/orders/<str:order_code>/", ShopOrderLookupView.as_view()),
+    # P1: lập tham số thanh toán cổng SePay cho đơn Giữ chỗ (lần đầu hoặc thanh toán lại).
+    path("shop/orders/<str:order_code>/checkout/", ShopOrderCheckoutView.as_view()),
     # Đăng nhập token cho dashboard SPA
     path("auth/token/", LoginTokenView.as_view()),
     path("auth/me/", MeView.as_view()),
@@ -81,6 +84,9 @@ urlpatterns = [
     path("reports/period/", PeriodPnlView.as_view()),
     # Internal (adapter)
     path("internal/payments/sepay-webhook/", SepayWebhookInternalView.as_view()),
+    # P3: IPN Cổng thanh toán SePay (adapter POST /ipn/sepay -> đây), Source.GATEWAY.
+    # Path khớp CHÍNH XÁC hằng số DJANGO_IPN_ENDPOINT_PATH ở adapter/app/main.py (P2).
+    path("internal/payments/sepay-ipn/", SepayGatewayIpnInternalView.as_view()),
     # S11: contract viết không có "/" cuối — nhận cả hai dạng (router tự có dạng có "/").
     path("sales/orders/<int:pk>/confirm-payment",
          SalesOrderViewSet.as_view({"post": "confirm_payment"})),

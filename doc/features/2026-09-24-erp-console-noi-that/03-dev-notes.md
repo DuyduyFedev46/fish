@@ -2104,3 +2104,127 @@ Route dùng router mặc định (có `/` cuối), giống `confirm` đã có �
   thật).
 - `business-process-spec.md` chưa có BR-GH-07, BR-HT-09 (BA cập nhật khi duyệt, cùng nợ N-4 cũ).
 - Chưa commit, chưa deploy.
+
+## Lô L9 — S14, S15, S16 (FE) · 2026-09-26
+
+Chỉ `erp-console/`. Dựng mock theo contract story trước, rồi **khớp lại theo contract thực tế** ở "Lô L9 — S14, S15,
+S16 (BE)" ngay trên (BE làm xong giữa chừng — đã sửa lại type/mock/e2e đúng theo mục đó, kể cả câu lỗi nguyên văn, field
+`created_by` là ID số, `is_partial`, `method`, v.v.). Rule thực thi phía màn: BR-HT-05/BR-GH-07/BR-GH-05 (huỷ đơn), Q8b
+(không hoàn kho sau giao thất bại — chỉ hiển thị, quyết định là của BE), BR-HT-01/04 (một nguồn, không vượt số còn
+hoàn — tái dùng `RefundForm` của L8), BR-HT-09/BR-HT-03/BR-HT-07 (phiếu hoàn: xác nhận/thất bại/thử lại, chỉ Chủ),
+BR-PQ-12 (menu con + ViewGuard). Không mã BR mới.
+Skill: `caveve-ui`, `impeccable` (`context` + craft-floor; không bật hooks), `emil-design-eng`, `baseline-ui`,
+`fixing-accessibility`, `nextjs-shop-patterns`.
+
+### Kết quả kiểm chứng
+- `./node_modules/.bin/tsc --noEmit` sạch. `npm run build` **thật** sạch (route mới `/orders/refunds`); `out/` không
+  chứa `__caveMock|demo1234|Chế độ mock|mockOrdersApi|mockRefundQueueApi|cave_erp_mock` (0 file). Grep hex/`rgba(`
+  ngoài `tokens.css` = 0; `style={{` = 0.
+- E2E mock (bản build `NEXT_PUBLIC_USE_MOCK=1` chép sang scratchpad, `http.server` 127.0.0.1 dưới `perl alarm`, đã
+  kill theo PID, `lsof` sạch): **mới** `e2e/s14_s16_cancel_refund.py` **43/43**; hồi quy `s7_shell` **25/25** (sửa danh
+  sách menu Chủ) · `s8_views` **47/47** (sửa danh sách menu ql1) · `s10_s11_orders` **90/90** (không đổi) ·
+  `s12_s13_queue` **100/100** (sửa kỳ vọng tab con của ql1) · `s41_s47_staff` **72/72** · `s48_password` **41/41**.
+
+### Trang / component / hàm mới
+- **S14 — Huỷ đơn** (`CancelOrderForm.tsx`, mở từ nút "Huỷ đơn" trong `OrderDetailView`/`OrderDetailSheet` theo
+  `available_actions` có `"cancel"`): chọn 1 trong 4 lý do (`CANCEL_REASONS` ở `labels.ts`, kiểu `.check-row` như danh
+  sách chọn đơn của S12) + ghi chú (bắt buộc khi chọn "Khác", FE chặn trước khi gọi API); hậu quả nêu rõ hàng về kho lô
+  gốc (trừ khi phiếu giao đã Giao thất bại), cần hoàn tiền, phiếu giao đóng theo. Xong: dòng báo kết quả nêu đúng có
+  hoàn kho hay không (`stock_restored`), và **nút riêng nổi bật** "Tạo phiếu hoàn toàn phần …" điền sẵn
+  `suggest_refund_amount` (S14-AC7) — bấm mở thẳng bước lập phiếu hoàn (S15), tách biệt với nút "Lập phiếu hoàn" chung
+  ở thanh dưới (cũng hiện vì `available_actions` giờ có `create_refund`).
+- **S15 — Lập phiếu hoàn từ đơn có hoá đơn**: **tái dùng `RefundForm.tsx`** của L8 (S13) thay vì viết form mới — đổi
+  props từ gắn cứng `PaymentQueueItem` sang `target: {kind:"payment"|"invoice", id, invoiceTotal?}` +
+  `refundableMax`/`reasonDefault`/`subLabel` do nơi gọi truyền vào. `PaymentSheet.tsx` (S13) truyền `target.kind:
+  "payment"`; `OrderDetailSheet.tsx` (S15) truyền `target.kind: "invoice"` với `refundableMax` tính từ
+  `refundableOfOrder()` (`features/orders/refund.ts`, mới — vì chi tiết đơn không có field `refundable_amount` riêng,
+  FE cộng trừ từ `total_amount` và `refunds[]` đã có sẵn trong contract S10) và `reasonDefault` = câu gợi ý khi đơn vừa
+  huỷ. Hậu quả của nhánh hoá đơn khác nhánh S13: có dòng riêng "trừ vào doanh thu và lãi lỗ của kỳ đó" (`QUEUE_MSG.
+  refundConsequence3Invoice`) thay vì "không trừ doanh thu" của nhánh không hoá đơn.
+- **S16 — Phiếu hoàn chờ chuyển** (`RefundQueueScreen.tsx`, `RefundSheet.tsx`, `RefundView.tsx`, `ConfirmRefundForm.tsx`,
+  `MarkRefundFailedForm.tsx`, `RetryRefundForm.tsx`): menu con mới "Phiếu hoàn chờ chuyển" (`shared/lib/nav.ts`, key
+  `refunds`, `parent: "orders"`, hiện khi có `sales.view_refund` — Chủ **và** Quản lý, không phải người chỉ thuộc
+  `nv_giao`); điện thoại vào qua tab con thứ ba trong `OrdersTabs.tsx` (Đơn hàng · Hàng chờ thanh toán · Phiếu hoàn chờ
+  chuyển — mỗi tab chỉ hiện nếu người xem mở được màn đó). Danh sách `GET /api/sales/refunds/?status=PENDING,FAILED`
+  (20 dòng/trang qua `usePagedList`, không có bộ lọc theo story) — mỗi dòng là một nút (chấm trạng thái + số tiền, mã
+  đơn/"Không có hoá đơn" + tên khách, người lập + giờ lập). Tấm chi tiết: số tiền lớn + trạng thái, thuộc tính kiểu
+  Notion (đơn liên quan, SĐT khách dạng `tel:` — Q13, mã GD tiền vào, lý do, người lập, mã GD hoàn, lý do thất bại lần
+  trước), thanh nút **chỉ theo `available_actions`** của phiếu (`confirm`/`mark_failed`/`retry`; Quản lý xem được danh
+  sách nhưng luôn `[]` vì thiếu `sales.confirm_refund` — S16-AC7). Ba bước dùng chung `QueueFormParts` (L8) như mọi
+  form khác trong module: xác nhận (mã GD chuyển khoản hoàn bắt buộc, FE chặn trước), báo thất bại (lý do **không**
+  bắt buộc — BE cho phép rỗng, chỉ nhắc), thử lại (không cần nhập gì, vẫn qua một bước xác nhận để chống bấm nhầm/bấm
+  đúp). Vì cả ba action cùng gác sau **một** quyền `sales.confirm_refund` (không tách theo action), sau khi thao tác
+  xong FE tự suy nút tiếp theo thẳng theo state machine cố định của BR-HT-09 (không phải tự đặt luật quyền) thay vì
+  gọi lại API lấy `available_actions` mới (contract 3 action chỉ trả `{status}`).
+- Hàm API mới (`features/orders/api.ts`): `cancelOrder(id, input)`, `listRefundQueue(params, page)`, `confirmRefund(id,
+  input)`, `markRefundFailed(id, input)`, `retryRefund(id)` — mỗi hàm kèm nhánh mock. Kiểu ở `types.ts`
+  (`CancelOrderInput/Result`, `RefundQueueItem` đúng field `RefundSerializer` + phần S16 bổ sung, `ConfirmRefundInput/
+  Result`, `MarkRefundFailedInput/Result`, `RetryRefundResult`; `CreateRefundInput` đổi thành union hai nhánh
+  `payment_transaction` | `sales_invoice`). Nhãn mới ở `labels.ts` (`CANCEL_REASONS`, `DELIVERY_LABEL.CANCELLED`).
+  Câu FE mới ở `messages.ts` (`ORDERS_MSG` phần S14/S15, `REFUND_Q_MSG` cho cả màn S16).
+- Mock (`features/orders/mock.ts`): `cancel()` — kiểm lý do/ghi chú, trạng thái phiếu giao
+  (`cancellableDeliveryStatus`, cũng dùng lại trong `actions()` để `available_actions` ẩn "cancel" đúng như BE khi
+  Đang giao/Hoàn tất/Đã huỷ), `stock_restored` theo đúng trạng thái phiếu giao lúc huỷ, ghi `cancelReasonLabel/
+  cancelledAt/cancelStockRestored/cancelFromFailedDelivery` lên đơn để dòng thời gian kể đúng chuyện đã xảy ra (kể cả
+  bước "Đang giao" đã đi qua trước khi bị báo thất bại rồi mới huỷ). `createRefundMock()` tách hai nhánh
+  `createPaymentRefund`/`createInvoiceRefund` dùng chung `findRefundByRequestId` (chống trùng `request_id` **CẢ hai**
+  nguồn, vì một `Refund` duy nhất ở BE); phiếu hoàn hoá đơn sống ngay trong `Order.refunds` (không thêm mảng Store
+  mới) — `detail()` chỉ lộ field công khai, bookkeeping (`reason/request_id/created_by/…`) ở lại phía mock.
+  `mockRefundQueueApi()` gộp danh sách từ `store.txnRefunds` (S13) và `order.refunds` (S15) làm một, tính
+  `available_actions` theo `sales.confirm_refund` + trạng thái. Gieo thêm 1 phiếu Thất bại mặc định (`id 31`, khoản
+  UNMATCHED 881) để màn S16 có gì để thử ngay khi mở; phiếu Chờ hoàn mặc định lấy từ đơn `CANCELLED` đã gieo sẵn ở L7
+  (`id 4`, tag `refund-pending`). Công cụ devtool mới: `__caveMock.refunds(mode)`, `refundQueueJson(username)`,
+  `confirmRefundJson/markRefundFailedJson/retryRefundJson(username, id, body)`, `cancelJson(username, id, body)`;
+  `confirmRefund(id, ref)` (dùng bởi e2e L8 cũ) giữ chữ ký cũ nhưng nay chạy qua đúng luật S16 thật dưới danh "Lộc".
+  Route: `app/(console)/orders/refunds/page.tsx` (`<ViewGuard view="refunds">`).
+
+### Lệch contract / cần BE, PO biết
+1. **`created_by`/`confirmed_by` là ID số** (assumption #5 của BE) — FE chỉ hiện tên khi BE đổi sang trả chuỗi (tạm ẩn
+   ở danh sách/chi tiết S16, đúng quy ước "chỉ hiện khi là chuỗi" đã dùng cho `resolved_by` ở L8).
+2. **`RefundQueueItem` không có field "mã phiếu hoàn"** (chỉ có `id` số) — tiêu đề tấm chi tiết tạm ghi "Phiếu hoàn
+   #<id>". Đề xuất BE thêm mã dạng `HT…` như các chứng từ khác nếu cần đối chiếu bằng mắt với sao kê.
+3. **Câu lỗi vượt số còn hoàn khác nhau giữa hai nhánh** (BE L9 đã chốt): nhánh `payment_transaction` (S13) vẫn
+   "Vượt số tiền còn được hoàn: tối đa X." (`HT_OVER_REFUNDABLE`); nhánh `sales_invoice` (S15) đổi thành "Vượt số đã
+   thu: còn được hoàn tối đa X." (`HT_OVER_REFUNDABLE_INVOICE`). FE hiện nguyên văn theo response, mock tách đúng hai
+   khoá — không phải lệch, ghi lại để lần sau khỏi nhầm dùng chung một câu.
+4. **`retry` vượt số còn hoàn dùng lại câu của nhánh `payment_transaction`** trong ví dụ contract (140.000đ) dù phiếu
+   có thể gắn `sales_invoice` — mock tạm dùng `HT_OVER_REFUNDABLE` cho mọi `retry` bất kể nguồn; chưa rõ BE có đổi
+   sang câu "Vượt số đã thu…" khi phiếu retry là loại gắn hoá đơn hay không. Ảnh hưởng thấp (FE luôn hiện nguyên văn).
+5. **BR-LO-05 ("lô đã chốt, không hoàn kho được")** nêu trong story S14 contract nháp không xuất hiện trong contract
+   BE L9 thật (8 test không có ca này) — FE đã bỏ nhánh mock tương ứng, không còn hiện được lỗi này (nếu BE có làm ở
+   lô sau thì FE tự động hiện đúng vì chỉ đọc `detail`/`code` từ response, không cần sửa).
+6. FE gọi `…/cancel/`, `…/confirm/`, `…/mark-failed/`, `…/retry/` có "/" cuối (BE dùng router mặc định, nhận cả hai
+   dạng như các action khác).
+7. Mock dựng thời gian huỷ/hoàn từ đồng hồ máy khi thao tác thật (không phải giờ giả lập cố định như dữ liệu gieo) —
+   không phải lệch, chỉ ghi chú cho ai đọc mock sau này.
+
+### Còn nợ
+- Huy hiệu số phiếu hoàn đang chờ trên menu/"Cần chú ý" → S24 (như hàng chờ thanh toán).
+- Chưa có ảnh 1280×800 tối cho riêng màn Phiếu hoàn chờ chuyển (chỉ có 360 sáng/tối + vài tấm 1280 sáng dọc theo luồng
+  chính) — làm nốt khi có đợt soát UI tiếp theo.
+- BR-GH-05 (huỷ khi phiếu giao đã Hoàn tất) chỉ được xác minh bằng đọc code mock, chưa dựng được state thật để chạy
+  qua e2e (đơn PROCESSING + phiếu giao COMPLETED không tự nhiên sinh ra trong dữ liệu gieo, vì theo luật nghiệp vụ khi
+  phiếu giao Hoàn tất thì đơn cũng chuyển COMPLETED cùng lúc).
+- Bộ lọc và phiếu đang mở chưa lên URL (như #19 UI5, đã ghi ở các lô trước); chưa chạy E2E trên backend thật cho
+  S14/S15/S16; chưa thử trên điện thoại thật.
+
+## Sửa nhanh — delivery set_status (BE) · 2026-09-26
+
+Sửa **B-DELIVERY-MARKFAILED** (04-qa-report.md, "QA lô L9"): `apps/delivery/api.py::DeliveryNoteViewSet.set_status`
+gán thẳng tuple `(note, needs_decision)` của `services.mark_failed` vào biến `note` khi `to_status=FAILED`, làm
+serializer trả body hỏng (`assigned_to`/`completed_at` về `None` sai). Đã unpack đúng tuple; các nhánh khác
+(`advance_status` — READY/DELIVERING/COMPLETED) không bị lỗi này (đã kiểm bằng test riêng cho từng nhánh, đúng như
+ghi nhận của QA). Response nhánh FAILED nay có thêm khoá `needs_decision` (bool, chỉ thêm key, không đổi field cũ) —
+đúng tinh thần BR-GH-04, không phải contract S21 (`POST .../fail`, còn nợ, riêng biệt với `set_status`).
+
+- File sửa: `backend/apps/delivery/api.py` (không đổi service, không đổi serializer, không có migration).
+- Test mới: `backend/apps/delivery/tests/test_api.py` (9 test, HTTP thật qua APIClient) — bao mọi nhánh `to_status`
+  của `POST /api/delivery/notes/{id}/status/`: READY, DELIVERING, COMPLETED, FAILED (dưới/trên ngưỡng
+  `DELIVERY_MAX_FAILED_ATTEMPTS`), 400 sai state machine, 401 chưa đăng nhập, 404 nv_giao khác (BR-GH-06/BR-PQ-12,
+  scope dòng — không rò trạng thái phiếu của người khác qua 403).
+- Test tái hiện đúng triệu chứng QA nêu trước khi sửa (đỏ với `KeyError: 'status'`, body chỉ còn
+  `{'assigned_to': None, 'completed_at': None}`), xanh sau khi unpack tuple.
+- Suite backend: 545 test (536 cũ + 9 mới), `OK`; `makemigrations --check --dry-run` sạch; `manage.py check` sạch.
+- Còn nợ: S21 (`POST /api/delivery/notes/{id}/fail`, contract riêng với `reason_code`/`already`) chưa làm — không
+  nằm trong phạm vi sửa lỗi này.
+- Chưa commit, chưa deploy.

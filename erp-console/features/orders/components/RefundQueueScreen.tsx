@@ -50,7 +50,7 @@ function Row({ r, onOpen }: { r: RefundQueueItem; onOpen: () => void }) {
           {r.customer_name && <span className={s.qCust}>{r.customer_name}</span>}
         </span>
         <span className={s.rCreated}>
-          {r.created_by && (
+          {typeof r.created_by === "string" && r.created_by && (
             <span className={s.sub}>
               <span className="sr-only">, lập bởi </span>
               {r.created_by}
