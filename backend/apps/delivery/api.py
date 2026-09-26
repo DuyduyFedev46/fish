@@ -42,8 +42,14 @@ class DeliveryNoteViewSet(DocumentViewSet):
     def set_status(self, request, pk=None):
         note = self.get_object()  # đã bị get_queryset lọc theo phạm vi
         to_status = request.data.get("to_status")
+        needs_decision = None
         if to_status == DeliveryNote.Status.FAILED:
-            note = services.mark_failed(note=note, actor=request.user)
+            # BR-GH-04: mark_failed trả (note, needs_decision) — không gán thẳng tuple
+            # vào serializer (B-DELIVERY-MARKFAILED, 04-qa-report.md).
+            note, needs_decision = services.mark_failed(note=note, actor=request.user)
         else:
             note = services.advance_status(note=note, to_status=to_status, actor=request.user)
-        return Response(self.get_serializer(note).data)
+        data = self.get_serializer(note).data
+        if needs_decision is not None:
+            data["needs_decision"] = needs_decision
+        return Response(data)

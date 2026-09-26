@@ -174,3 +174,8 @@ Quyết định này **thay thế** hai ghi chú trước:
 - "FIFO từng thành phần" (combo, 2026-09-10).
 
 Hồ sơ: `doc/features/2026-09-26-fefo/`.
+
+## 2026-09-26 — Hạn dùng mặc định hàng đông lạnh 12 tháng; giữ FEFO — [DUY CHỐT]
+Hàng đông lạnh có hạn theo niên hạn, nên hạn dùng mặc định là **365 ngày** kể từ ngày nhập (trước đây là 90 ngày). Mức này áp cho tham số `BATCH_DEFAULT_SHELF_LIFE_DAYS` và cho giá trị mặc định `Item.shelf_life_in_days` của mặt hàng **tạo mới**. Mặt hàng và lô đã có thì giữ nguyên hạn.
+
+**Giữ FEFO.** Khi mọi lô tính hạn theo cùng một công thức thì FEFO chọn lô giống hệt FIFO. FEFO chỉ khác khi có lô bị sửa hạn cho ngắn hơn; lúc đó FEFO giúp tránh phải huỷ hàng.

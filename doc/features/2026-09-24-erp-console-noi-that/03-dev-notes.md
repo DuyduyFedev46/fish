@@ -2207,4 +2207,24 @@ Skill: `caveve-ui`, `impeccable` (`context` + craft-floor; không bật hooks), 
   phiếu giao Hoàn tất thì đơn cũng chuyển COMPLETED cùng lúc).
 - Bộ lọc và phiếu đang mở chưa lên URL (như #19 UI5, đã ghi ở các lô trước); chưa chạy E2E trên backend thật cho
   S14/S15/S16; chưa thử trên điện thoại thật.
+
+## Sửa nhanh — delivery set_status (BE) · 2026-09-26
+
+Sửa **B-DELIVERY-MARKFAILED** (04-qa-report.md, "QA lô L9"): `apps/delivery/api.py::DeliveryNoteViewSet.set_status`
+gán thẳng tuple `(note, needs_decision)` của `services.mark_failed` vào biến `note` khi `to_status=FAILED`, làm
+serializer trả body hỏng (`assigned_to`/`completed_at` về `None` sai). Đã unpack đúng tuple; các nhánh khác
+(`advance_status` — READY/DELIVERING/COMPLETED) không bị lỗi này (đã kiểm bằng test riêng cho từng nhánh, đúng như
+ghi nhận của QA). Response nhánh FAILED nay có thêm khoá `needs_decision` (bool, chỉ thêm key, không đổi field cũ) —
+đúng tinh thần BR-GH-04, không phải contract S21 (`POST .../fail`, còn nợ, riêng biệt với `set_status`).
+
+- File sửa: `backend/apps/delivery/api.py` (không đổi service, không đổi serializer, không có migration).
+- Test mới: `backend/apps/delivery/tests/test_api.py` (9 test, HTTP thật qua APIClient) — bao mọi nhánh `to_status`
+  của `POST /api/delivery/notes/{id}/status/`: READY, DELIVERING, COMPLETED, FAILED (dưới/trên ngưỡng
+  `DELIVERY_MAX_FAILED_ATTEMPTS`), 400 sai state machine, 401 chưa đăng nhập, 404 nv_giao khác (BR-GH-06/BR-PQ-12,
+  scope dòng — không rò trạng thái phiếu của người khác qua 403).
+- Test tái hiện đúng triệu chứng QA nêu trước khi sửa (đỏ với `KeyError: 'status'`, body chỉ còn
+  `{'assigned_to': None, 'completed_at': None}`), xanh sau khi unpack tuple.
+- Suite backend: 545 test (536 cũ + 9 mới), `OK`; `makemigrations --check --dry-run` sạch; `manage.py check` sạch.
+- Còn nợ: S21 (`POST /api/delivery/notes/{id}/fail`, contract riêng với `reason_code`/`already`) chưa làm — không
+  nằm trong phạm vi sửa lỗi này.
 - Chưa commit, chưa deploy.

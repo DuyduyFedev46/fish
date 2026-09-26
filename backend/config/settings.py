@@ -171,7 +171,7 @@ REST_FRAMEWORK = {
 
 # --- Tham số nghiệp vụ cấu hình được (không hard-code trong logic) ---------
 # Nguồn: business-process-spec.md (BR-MH-02, BR-LO-06, BR-BH-03, BR-GH-04, BR-HV-03).
-BATCH_DEFAULT_SHELF_LIFE_DAYS = int(os.getenv("BATCH_DEFAULT_SHELF_LIFE_DAYS", "90"))
+BATCH_DEFAULT_SHELF_LIFE_DAYS = int(os.getenv("BATCH_DEFAULT_SHELF_LIFE_DAYS", "365"))
 BATCH_NEAR_EXPIRY_DAYS = int(os.getenv("BATCH_NEAR_EXPIRY_DAYS", "14"))
 SALES_ORDER_TTL_MINUTES = int(os.getenv("SALES_ORDER_TTL_MINUTES", "30"))
 DELIVERY_MAX_FAILED_ATTEMPTS = int(os.getenv("DELIVERY_MAX_FAILED_ATTEMPTS", "2"))

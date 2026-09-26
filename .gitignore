@@ -48,3 +48,7 @@ next-env.d.ts
 *.woff2
 *.ttf
 *.otf
+
+# File bí mật dạng <tên>.env (vd sepay.env) — KHÔNG commit
+*.env
+!.env.example
