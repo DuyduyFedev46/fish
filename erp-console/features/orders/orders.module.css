@@ -261,6 +261,9 @@
 .openOrderBtn:global(.btn){align-self:flex-start}
 .openOrderBtn:global(.btn) :global(.mi){color:var(--accent-text)}
 
+/* S14-AC7: nút nổi bật ngay dưới kết quả huỷ đơn, điền sẵn số tiền hoàn toàn phần */
+.cancelRefundCta:global(.btn){align-self:flex-start;margin-top:calc(-1 * var(--space-2))}
+
 /* Ô ghi chú / lý do (textarea) trong bước xử lý */
 .noteField textarea{min-height:72px;resize:vertical;line-height:var(--leading-normal)}
 .noteField textarea[aria-invalid=true]{border-color:var(--crit)}
@@ -291,3 +294,25 @@
 .pickRow:global(.check-row) :global(.status){display:inline-flex}
 .pickRow:global(.check-row) :global(.status .dot){display:inline-block}
 .searchField :global(.search){flex:none}
+
+/* ---------- S14: chọn lý do huỷ đơn (fieldset ngắn, không cần scroll như .pickList gắn đơn) ---------- */
+.pickList:global(.cancel-reasons){max-height:none;overflow:visible}
+.pickList:global(.cancel-reasons) legend{padding:0;margin:0 0 var(--space-1-5);font-size:var(--text-sm);font-weight:var(--weight-medium);color:var(--ink-2)}
+.pickList:global(.cancel-reasons) .pickRow{align-items:flex-start}
+
+/* ---------- S16: danh sách phiếu hoàn chờ chuyển ---------- */
+.rOpen{grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"type amt" "order created"}
+.rType{grid-area:type;min-width:0}
+.rType :global(.status){font-size:var(--text-sm)}
+.rOrder{grid-area:order;display:flex;flex-direction:column;gap:var(--space-0-5);min-width:0}
+.rCreated{grid-area:created;justify-self:end;display:flex;flex-direction:column;align-items:flex-end;gap:var(--space-0-5);min-width:0;text-align:right}
+.rOpen .cAmt{grid-area:amt}
+@container (min-width:640px){
+  .rHead,.rOpen{grid-template-columns:160px minmax(0,1fr) minmax(0,1fr) 120px;grid-template-areas:"type order created amt"}
+  .rHead > span:nth-child(1){grid-area:type}
+  .rHead > span:nth-child(2){grid-area:order}
+  .rHead > span:nth-child(3){grid-area:created}
+  .rHead > span:nth-child(4){grid-area:amt}
+  .rCreated{justify-self:start;align-items:flex-start;text-align:left}
+  .rOpen .cAmt{justify-self:end}
+}

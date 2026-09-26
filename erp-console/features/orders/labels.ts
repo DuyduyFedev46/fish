@@ -10,6 +10,8 @@ export const DELIVERY_LABEL: Record<string, string> = {
   DELIVERING: "Đang giao",
   COMPLETED: "Hoàn tất",
   FAILED: "Giao thất bại",
+  // S14 (mới): đơn đã thanh toán bị huỷ thì phiếu giao đóng theo.
+  CANCELLED: "Đã huỷ theo đơn",
 };
 export const DELIVERY_STATUS: Record<string, StatusLook> = {
   PREPARING: { tone: "info", icon: "inventory" },
@@ -17,6 +19,7 @@ export const DELIVERY_STATUS: Record<string, StatusLook> = {
   DELIVERING: { tone: "info", icon: "local_shipping" },
   COMPLETED: { tone: "good", icon: "flag" },
   FAILED: { tone: "crit", icon: "report" },
+  CANCELLED: { tone: "mute", icon: "cancel" },
 };
 
 export const PAYMENT_LABEL: Record<string, string> = {
@@ -112,3 +115,11 @@ export const RESOLUTION_LABEL: Record<string, string> = {
   CONFIRMED: "Đã xác nhận đơn",
   REFUNDED: "Đã hoàn tiền",
 };
+
+// ---- S14: huỷ đơn đã thanh toán ----
+export const CANCEL_REASONS: { value: string; label: string; hint: string }[] = [
+  { value: "CUSTOMER_CHANGED_MIND", label: "Khách đổi ý", hint: "Khách không muốn nhận hàng nữa." },
+  { value: "DAMAGED_WHEN_PACKING", label: "Hư khi đóng hàng", hint: "Hàng hư/dập trong lúc soạn, không giao được." },
+  { value: "GIVE_UP_AFTER_FAILED", label: "Bỏ sau khi giao thất bại", hint: "Đã giao thất bại, không giao lại nữa." },
+  { value: "OTHER", label: "Khác", hint: "Nêu rõ lý do ở ô ghi chú bên dưới." },
+];

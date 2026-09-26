@@ -20,10 +20,11 @@ from apps.common.api import (
     has_full_delivery_scope,
     require_perm,
 )
+from apps.common.exceptions import BusinessError
 from apps.delivery.models import DeliveryNote
 from apps.sales.models import Customer, PaymentTransaction, SalesOrder
 from apps.sales.payments import services as payment_services
-from apps.sales.utils import fold_text, money_str
+from apps.sales.utils import ZERO, fold_text, money_str
 
 from . import services
 from .serializers import SalesOrderDetailSerializer, SalesOrderListSerializer
@@ -127,11 +128,39 @@ class SalesOrderViewSet(viewsets.ReadOnlyModelViewSet):
 
     @action(detail=True, methods=["post"])
     def cancel(self, request, pk=None):
+        """
+        S14: huỷ đơn đã thanh toán theo trạng thái phiếu giao (BR-GH-07/05).
+        `{"reason_code": ..., "note": ""}` — OTHER bắt buộc `note`.
+        """
         require_perm(request.user, "sales.cancel_paid_order")
-        services.cancel_paid_order(
-            order=self.get_object(), actor=request.user, reason=request.data.get("reason", "")
+        data = request.data if isinstance(request.data, dict) else {}
+        reason_code = data.get("reason_code")
+        note_text = (data.get("note") or "").strip()
+        if reason_code not in services.CANCEL_REASON_CODES:
+            raise BusinessError("Lý do huỷ không hợp lệ.", code="BR-HT-05")
+        if reason_code == "OTHER" and not note_text:
+            raise BusinessError(
+                "Bắt buộc nhập ghi chú khi chọn lý do khác (OTHER).", code="BR-HT-05",
+            )
+        label = services.CANCEL_REASON_LABELS[reason_code]
+        reason = f"{label} — {note_text}" if note_text else label
+
+        result = services.cancel_paid_order(
+            order=self.get_object(), actor=request.user, reason=reason, reason_code=reason_code,
         )
-        return Response(self.get_serializer(self.get_object()).data)  # đọc lại sau khi đổi
+        order = result["order"]
+        note = result["delivery_note"]
+        invoice = getattr(order, "invoice", None)
+        from apps.sales.refunds.services import refundable_amount
+
+        suggest = refundable_amount(invoice=invoice) if invoice is not None else ZERO
+        return Response({
+            "order_status": order.status,
+            "stock_restored": result["stock_restored"],
+            "delivery_status": note.status if note is not None else None,
+            "suggest_refund_amount": money_str(suggest),
+            "invoice_id": invoice.pk if invoice is not None else None,
+        })
 
     @action(detail=True, methods=["post"], url_path="confirm-payment")
     def confirm_payment(self, request, pk=None):

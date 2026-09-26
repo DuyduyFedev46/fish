@@ -17,6 +17,7 @@ class DeliveryNote(models.Model):
         DELIVERING = "DELIVERING", "Đang giao"
         COMPLETED = "COMPLETED", "Hoàn tất"      # điểm không quay lui (BR-GH-05)
         FAILED = "FAILED", "Giao thất bại"       # trạng thái tạm (BR-GH-04)
+        CANCELLED = "CANCELLED", "Đã huỷ theo đơn"  # S14: đơn bị huỷ (BR-GH-07), không quay lui
 
     code = models.CharField("Mã phiếu giao", max_length=32, unique=True)
     sales_invoice = models.ForeignKey(

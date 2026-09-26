@@ -5,19 +5,27 @@
 // S13 thêm sales.create_refund). Nút trên từng khoản theo `available_actions` của khoản đó.
 
 import { apiFetch, type Paginated } from "@/shared/lib/http";
-import { mockOrdersApi, mockPaymentsApi, mockRefundsApi } from "./mock";
+import { mockOrdersApi, mockPaymentsApi, mockRefundQueueApi, mockRefundsApi } from "./mock";
 import type {
+  CancelOrderInput,
+  CancelOrderResult,
   ConfirmPaymentInput,
   ConfirmPaymentResult,
+  ConfirmRefundInput,
+  ConfirmRefundResult,
   CreateRefundInput,
   CreateRefundResult,
+  MarkRefundFailedInput,
+  MarkRefundFailedResult,
   OrderDetail,
   OrderListItem,
   OrderListParams,
   PaymentQueueItem,
   PaymentQueueParams,
+  RefundQueueItem,
   ResolveInput,
   ResolveResult,
+  RetryRefundResult,
 } from "./types";
 
 const BASE = "/api/sales/orders/";
@@ -56,6 +64,15 @@ export function getOrder(id: number, signal?: AbortSignal): Promise<OrderDetail>
  */
 export function confirmPayment(id: number, input: ConfirmPaymentInput): Promise<ConfirmPaymentResult> {
   return apiFetch<ConfirmPaymentResult>(`${BASE}${id}/confirm-payment/`, {
+    method: "POST",
+    body: input,
+    mock: process.env.NEXT_PUBLIC_USE_MOCK === "1" ? mockOrdersApi : undefined,
+  });
+}
+
+/** POST /api/sales/orders/{id}/cancel/ (S14) — nút chỉ hiện khi `available_actions` có "cancel". */
+export function cancelOrder(id: number, input: CancelOrderInput): Promise<CancelOrderResult> {
+  return apiFetch<CancelOrderResult>(`${BASE}${id}/cancel/`, {
     method: "POST",
     body: input,
     mock: process.env.NEXT_PUBLIC_USE_MOCK === "1" ? mockOrdersApi : undefined,
@@ -116,5 +133,47 @@ export function createRefund(input: CreateRefundInput): Promise<CreateRefundResu
     method: "POST",
     body: input,
     mock: process.env.NEXT_PUBLIC_USE_MOCK === "1" ? mockRefundsApi : undefined,
+  });
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// S16 — phiếu hoàn chờ chuyển: danh sách + xác nhận / báo thất bại / thử lại
+
+const REFUNDS = "/api/sales/refunds/";
+
+/** GET /api/sales/refunds/?status=PENDING,FAILED&page= — cần sales.view_refund (Chủ, Quản lý). */
+export function listRefundQueue(_params: Record<string, never>, page = 1, signal?: AbortSignal): Promise<Paginated<RefundQueueItem>> {
+  const qs = new URLSearchParams({ status: "PENDING,FAILED" });
+  if (page > 1) qs.set("page", String(page));
+  return apiFetch<Paginated<RefundQueueItem>>(`${REFUNDS}?${qs.toString()}`, {
+    signal,
+    mock: process.env.NEXT_PUBLIC_USE_MOCK === "1" ? mockRefundQueueApi : undefined,
+  });
+}
+
+/** POST /api/sales/refunds/{id}/confirm/ {bank_txn_ref} → 200 REFUNDED. Cần sales.confirm_refund (chỉ Chủ). */
+export function confirmRefund(id: number, input: ConfirmRefundInput): Promise<ConfirmRefundResult> {
+  return apiFetch<ConfirmRefundResult>(`${REFUNDS}${id}/confirm/`, {
+    method: "POST",
+    body: input,
+    mock: process.env.NEXT_PUBLIC_USE_MOCK === "1" ? mockRefundQueueApi : undefined,
+  });
+}
+
+/** POST /api/sales/refunds/{id}/mark-failed/ {reason} → 200 FAILED. */
+export function markRefundFailed(id: number, input: MarkRefundFailedInput): Promise<MarkRefundFailedResult> {
+  return apiFetch<MarkRefundFailedResult>(`${REFUNDS}${id}/mark-failed/`, {
+    method: "POST",
+    body: input,
+    mock: process.env.NEXT_PUBLIC_USE_MOCK === "1" ? mockRefundQueueApi : undefined,
+  });
+}
+
+/** POST /api/sales/refunds/{id}/retry/ {} → 200 PENDING (quay lại Chờ hoàn). */
+export function retryRefund(id: number): Promise<RetryRefundResult> {
+  return apiFetch<RetryRefundResult>(`${REFUNDS}${id}/retry/`, {
+    method: "POST",
+    body: {},
+    mock: process.env.NEXT_PUBLIC_USE_MOCK === "1" ? mockRefundQueueApi : undefined,
   });
 }

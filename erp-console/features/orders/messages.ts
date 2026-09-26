@@ -75,6 +75,91 @@ export const ORDERS_MSG = {
   resultOrphan: "Đơn đã tự huỷ nên không khôi phục. Khoản tiền nằm trong hàng chờ thanh toán lệch để Chủ xử lý hoàn.",
   resultOther: (status: string) => `Đã ghi nhận. Trạng thái đơn hiện tại: ${status}.`,
   duplicate: "Mã giao dịch này đã được ghi trước đó — hệ thống không xử lý lần hai. Tình trạng hiện tại:",
+
+  // ---- S14: huỷ đơn đã thanh toán ----
+  cancelAction: "Huỷ đơn",
+  cancelTitle: (code: string) => `Huỷ đơn ${code}`,
+  cancelQuestion: (code: string) => `Huỷ đơn ${code}?`,
+  cancelReasonLabel: "Lý do huỷ",
+  cancelReasonMissing: "Chọn một lý do huỷ.",
+  cancelNoteLabel: "Ghi chú",
+  cancelNoteHelp: 'Bắt buộc khi chọn "Khác" — nêu rõ lý do để đối chiếu sau này.',
+  cancelNoteMissing: 'Chọn "Khác" thì phải nhập ghi chú nêu rõ lý do.',
+  cancelConsequence1: "Hàng về lại đúng lô gốc theo bảng phân bổ (trừ khi phiếu giao đã Giao thất bại — tồn lô giữ nguyên tới khi duyệt hàng hoàn).",
+  cancelConsequence2: "Đơn đã thanh toán nên cần hoàn tiền lại cho khách — bước tiếp theo là lập phiếu hoàn.",
+  cancelConsequence3: "Phiếu giao đóng theo, không còn trong việc của người giao.",
+  cancelSubmit: "Huỷ đơn này",
+  cancelling: "Đang huỷ đơn…",
+  cancelResult: (code: string, restored: boolean) =>
+    `Đã huỷ đơn ${code}.${restored ? " Hàng đã về lại kho theo lô gốc." : " Phiếu giao từng thất bại nên tồn kho giữ nguyên — duyệt hàng hoàn để cộng lại."}`,
+  cancelSuggestRefund: (amount: string) => `Tạo phiếu hoàn toàn phần ${vnd(amount)}`,
+
+  // ---- S15: lập phiếu hoàn từ đơn có hoá đơn ----
+  refundFromOrderTitle: (code: string) => `Lập phiếu hoàn · Đơn ${code}`,
+  refundFromOrderReasonCancelled: "Huỷ đơn — hoàn tiền cho khách",
+} as const;
+
+// ---- S16: phiếu hoàn chờ chuyển (xác nhận / báo thất bại / thử lại) ----
+export const REFUND_Q_MSG = {
+  intro: "Mọi phiếu hoàn đang chờ bạn chuyển khoản trả khách, kể cả phiếu vừa báo thất bại để thử lại.",
+  listTitle: "Phiếu hoàn",
+  refresh: "Làm mới",
+  loading: "Đang tải phiếu hoàn chờ chuyển…",
+  shown: (n: number, total: number) => (n >= total ? `${total} phiếu` : `Đang hiện ${n} / ${total} phiếu`),
+  loadMore: "Tải thêm phiếu",
+  loadingMore: "Đang tải thêm…",
+  emptyTitle: "Không còn phiếu hoàn nào chờ chuyển",
+  emptyHint: "Phiếu hoàn mới lập (S15) hoặc vừa báo thất bại sẽ hiện ở đây.",
+  noOrder: "Không có hoá đơn (tiền về không khớp đơn)",
+  createdBy: (name: string) => `Lập bởi ${name}`,
+
+  // Chi tiết
+  sheetTitle: (id: number) => `Phiếu hoàn #${id}`,
+  amount: "Số tiền hoàn",
+  reason: "Lý do",
+  order: "Đơn liên quan",
+  sourceTxn: "Mã GD tiền vào",
+  createdByLabel: "Người lập",
+  createdAt: "Lập lúc",
+  confirmedAt: "Xác nhận lúc",
+  failureReason: "Lý do thất bại lần trước",
+  noActions: "Không còn thao tác nào cho phiếu này (cần quyền Xác nhận đã hoàn tiền).",
+
+  // Nút theo available_actions
+  actConfirm: "Xác nhận đã chuyển",
+  actMarkFailed: "Báo chuyển thất bại",
+  actRetry: "Thử lại",
+  back: "Quay lại",
+
+  // Xác nhận đã chuyển (confirm)
+  confirmTitle: (amount: string) => `Xác nhận đã chuyển ${vnd(amount)}?`,
+  confirmTxnLabel: "Mã giao dịch chuyển khoản hoàn",
+  confirmTxnHelp: "Chép từ tin nhắn hoặc sao kê sau khi bạn chuyển khoản trả khách, vd HT2626712345.",
+  confirmTxnMissing: "Nhập mã giao dịch chuyển khoản hoàn để đối chiếu sao kê.",
+  confirmTxnPlaceholder: "Mã HT… bạn vừa chuyển",
+  confirmConsequence1: "Phiếu chuyển sang Đã hoàn — không đổi lại được bằng nút này.",
+  confirmConsequence2: "Nếu phiếu gắn giao dịch không hoá đơn, khoản đó cũng đóng lại (Đã xử lý · Đã hoàn tiền).",
+  confirmSubmit: "Xác nhận đã chuyển",
+  confirming: "Đang xác nhận…",
+  confirmResult: "Đã xác nhận chuyển khoản hoàn. Phiếu chuyển Đã hoàn.",
+
+  // Báo chuyển thất bại (mark_failed)
+  markFailedTitle: "Báo chuyển thất bại",
+  markFailedQuestion: "Chuyển khoản không thành công?",
+  markFailedReasonLabel: "Lý do thất bại",
+  markFailedReasonHelp: 'Không bắt buộc nhưng nên ghi, vd "Sai số tài khoản", "Khách không nhận được".',
+  markFailedConsequence1: "Phiếu chuyển sang Thất bại. Bấm \"Thử lại\" sau khi có số tài khoản đúng để chuyển lại.",
+  markFailedSubmit: "Báo thất bại",
+  markingFailed: "Đang ghi nhận…",
+  markFailedResult: "Đã ghi nhận chuyển thất bại. Phiếu chuyển Thất bại.",
+
+  // Thử lại (retry)
+  retryTitle: "Thử lại chuyển khoản",
+  retryQuestion: (amount: string) => `Thử lại chuyển ${vnd(amount)} cho khách?`,
+  retryConsequence1: "Phiếu quay lại Chờ hoàn — chuyển khoản trả khách rồi xác nhận phiếu kèm mã giao dịch.",
+  retrySubmit: "Thử lại",
+  retrying: "Đang chuyển về Chờ hoàn…",
+  retryResult: "Phiếu quay lại Chờ hoàn. Chuyển khoản trả khách rồi xác nhận phiếu.",
 } as const;
 
 // ---- S12/S13: hàng chờ thanh toán lệch + phiếu hoàn cho khoản không có hoá đơn ----
@@ -83,6 +168,7 @@ export const QUEUE_MSG = {
   tabsLabel: "Đơn & tiền",
   tabOrders: "Đơn hàng",
   tabQueue: "Hàng chờ thanh toán",
+  tabRefunds: "Phiếu hoàn chờ chuyển",
 
   // Danh sách
   intro: "Mọi khoản tiền về lệch với đơn: thiếu, thừa, về sau khi đơn tự huỷ hoặc không khớp đơn nào. Mở từng khoản để gắn vào đơn, xác nhận khi khách đã bù, hoặc lập phiếu hoàn.",
@@ -190,6 +276,8 @@ export const QUEUE_MSG = {
   refundConsequence1: "Tạo phiếu hoàn Chờ hoàn. Tiền CHƯA rời tài khoản: bạn chuyển khoản trả khách rồi xác nhận phiếu kèm mã giao dịch.",
   refundConsequence2: "Khoản này vẫn nằm trong hàng chờ tới khi phiếu hoàn được xác nhận đã chuyển.",
   refundConsequence3: "Khoản này không có hoá đơn nên không trừ vào doanh thu hay lãi lỗ.",
+  // S15: phiếu hoàn gắn hoá đơn (khác S13 ở trên — có hoá đơn nên CÓ trừ vào báo cáo lãi lỗ).
+  refundConsequence3Invoice: "Khi phiếu được xác nhận đã chuyển, khoản này trừ vào doanh thu và lãi lỗ của kỳ đó.",
   refundSubmit: (amount: string) => `Lập phiếu hoàn ${vnd(amount)}`,
   refundSubmitNoAmount: "Lập phiếu hoàn",
   refunding: "Đang lập phiếu…",

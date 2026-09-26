@@ -11,15 +11,21 @@ import { SideSheet } from "@/shared/ui/SideSheet";
 import { ErrorBox } from "@/shared/ui/StateBox";
 import { getOrder } from "../api";
 import { ORDER_LABEL } from "../labels";
-import { ORDERS_MSG } from "../messages";
-import type { ConfirmPaymentResult, OrderDetail, OrderListItem } from "../types";
+import { ORDERS_MSG, QUEUE_MSG } from "../messages";
+import { refundableOfOrder } from "../refund";
+import type { CancelOrderResult, ConfirmPaymentResult, CreateRefundResult, OrderDetail, OrderListItem } from "../types";
+import { CancelOrderForm } from "./CancelOrderForm";
 import { ConfirmPaymentForm } from "./ConfirmPaymentForm";
 import { OrderDetailView } from "./OrderDetailView";
+import { RefundForm } from "./RefundForm";
 import s from "../orders.module.css";
 
-type Mode = "view" | "confirm";
-/** `queueLink` = kèm liên kết tới hàng chờ thanh toán (khoản thiếu / về sau khi huỷ / chuyển thừa vào hàng chờ). */
-export type ResultNote = { tone: "ok" | "warn"; text: string; duplicate: boolean; queueLink?: boolean };
+type Mode = "view" | "confirm" | "cancel" | "refund";
+/**
+ * `queueLink` = kèm liên kết tới hàng chờ thanh toán (khoản thiếu / về sau khi huỷ / chuyển thừa vào hàng chờ).
+ * `cancelSuggestRefund` = vừa huỷ đơn thành công → hiện ngay nút "Tạo phiếu hoàn toàn phần" điền sẵn số tiền (S14-AC7).
+ */
+export type ResultNote = { tone: "ok" | "warn"; text: string; duplicate: boolean; queueLink?: boolean; cancelSuggestRefund?: string };
 
 type Props = {
   /** Dòng đã bấm trong danh sách — để có tiêu đề/tổng tiền ngay khi chi tiết đang tải. */
@@ -91,7 +97,19 @@ export function OrderDetailSheet({ summary, onChanged, onClose }: Props) {
   }, [note, mode]);
 
   const code = detail?.code || summary.code;
-  const title = mode === "confirm" ? ORDERS_MSG.confirmTitle(code) : `Đơn ${code}`;
+  const title =
+    mode === "confirm"
+      ? ORDERS_MSG.confirmTitle(code)
+      : mode === "cancel"
+        ? ORDERS_MSG.cancelTitle(code)
+        : mode === "refund"
+          ? ORDERS_MSG.refundFromOrderTitle(code)
+          : `Đơn ${code}`;
+
+  const backToView = () => {
+    setMode("view");
+    requestAnimationFrame(() => actionRef.current?.focus());
+  };
 
   const onConfirmed = (r: ConfirmPaymentResult) => {
     const n = resultNote(r, code);
@@ -110,6 +128,25 @@ export function OrderDetailSheet({ summary, onChanged, onClose }: Props) {
     });
   };
 
+  const onCancelled = (r: CancelOrderResult) => {
+    const text = ORDERS_MSG.cancelResult(code, r.stock_restored);
+    setNote({ tone: "warn", text, duplicate: false, cancelSuggestRefund: r.suggest_refund_amount });
+    setMode("view");
+    void load((d) => {
+      onChangedRef.current(
+        { status: d.status, status_label: d.status_label || ORDER_LABEL[d.status] || d.status, delivery_status: d.delivery ? d.delivery.status : null },
+        text,
+      );
+    });
+  };
+
+  const onRefundCreated = (r: CreateRefundResult) => {
+    const text = r.duplicate ? QUEUE_MSG.resultRefundDup(r.amount) : QUEUE_MSG.resultRefund(r.amount);
+    setNote({ tone: r.duplicate ? "warn" : "ok", text, duplicate: !!r.duplicate });
+    setMode("view");
+    void load(() => onChangedRef.current({}, text));
+  };
+
   return (
     <SideSheet title={title} onClose={onClose} busy={busy}>
       {mode === "confirm" && detail ? (
@@ -117,11 +154,20 @@ export function OrderDetailSheet({ summary, onChanged, onClose }: Props) {
           order={detail}
           fallbackTotal={summary.total_amount}
           onBusy={setBusy}
-          onCancel={() => {
-            setMode("view");
-            requestAnimationFrame(() => actionRef.current?.focus());
-          }}
+          onCancel={backToView}
           onDone={onConfirmed}
+        />
+      ) : mode === "cancel" && detail ? (
+        <CancelOrderForm order={detail} onBusy={setBusy} onCancel={backToView} onDone={onCancelled} />
+      ) : mode === "refund" && detail?.invoice ? (
+        <RefundForm
+          target={{ kind: "invoice", id: detail.invoice.id, invoiceTotal: detail.total_amount ?? summary.total_amount }}
+          refundableMax={refundableOfOrder(detail)}
+          reasonDefault={detail.status === "CANCELLED" ? ORDERS_MSG.refundFromOrderReasonCancelled : ""}
+          subLabel={<>{detail.code} · {detail.customer.name}</>}
+          onBusy={setBusy}
+          onCancel={backToView}
+          onDone={onRefundCreated}
         />
       ) : detail ? (
         <OrderDetailView
@@ -137,6 +183,12 @@ export function OrderDetailSheet({ summary, onChanged, onClose }: Props) {
             if (a === "confirm_payment") {
               setNote(null);
               setMode("confirm");
+            } else if (a === "cancel") {
+              setNote(null);
+              setMode("cancel");
+            } else if (a === "create_refund") {
+              setNote(null);
+              setMode("refund");
             }
           }}
         />

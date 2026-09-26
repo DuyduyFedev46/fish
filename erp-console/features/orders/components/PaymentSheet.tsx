@@ -7,6 +7,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ApiError } from "@/shared/lib/http";
+import { vnd } from "@/shared/lib/format";
 import { SideSheet } from "@/shared/ui/SideSheet";
 import { getPayment } from "../api";
 import { ORDER_LABEL, RESOLUTION_LABEL, labelOf } from "../labels";
@@ -137,7 +138,20 @@ export function PaymentSheet({ item, onChanged, onOpenOrder, onClose }: Props) {
       ) : mode === "confirm_order" && cur.order ? (
         <ConfirmOrderForm item={cur} order={cur.order} onBusy={setBusy} onCancel={back} onDone={(r) => onResolved(r, "CONFIRM_ORDER", cur.order!)} />
       ) : mode === "refund" ? (
-        <RefundForm item={cur} onBusy={setBusy} onCancel={back} onDone={onRefunded} />
+        <RefundForm
+          target={{ kind: "payment", id: cur.id }}
+          refundableMax={cur.refundable_amount ?? cur.amount}
+          reasonDefault={QUEUE_MSG.refundReasonDefault[cur.match_status] || ""}
+          subLabel={
+            <>
+              {cur.bank_txn_id} · {vnd(cur.amount)}
+              {cur.order ? ` · ${cur.order.code}` : ""}
+            </>
+          }
+          onBusy={setBusy}
+          onCancel={back}
+          onDone={onRefunded}
+        />
       ) : (
         <PaymentView
           item={cur}

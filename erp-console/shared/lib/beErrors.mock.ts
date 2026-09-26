@@ -100,8 +100,10 @@ export const BE_ERRORS = {
   TT_CONFIRM_NO_ORDER: { status: 400, code: "BR-TT-09", detail: "Giao dịch chưa gắn đơn — gắn đơn trước (ATTACH_TO_ORDER)." },
   TT_CONFIRM_ONLY_UNDERPAID: { status: 400, code: "BR-TT-09", detail: "Chỉ xác nhận đơn từ giao dịch thiếu tiền." },
   TT_CONFIRM_HAS_REFUND: { status: 400, code: "BR-TT-09", detail: "Giao dịch đang có phiếu hoàn — không dùng để xác nhận đơn." },
-  // ---- S13 POST /api/sales/refunds/create/ (BE L8) ----
+  // ---- S13 POST /api/sales/refunds/create/ (BE L8, nhánh payment_transaction — `create_refund_for_payment`) ----
   HT_OVER_REFUNDABLE: { status: 400, code: "BR-HT-04", detail: "Vượt số tiền còn được hoàn: tối đa {max}." },
+  /** S15 nhánh sales_invoice (`create_invoice_refund`, câu viết lại ở BE L9 để khớp đúng chữ story). */
+  HT_OVER_REFUNDABLE_INVOICE: { status: 400, code: "BR-HT-04", detail: "Vượt số đã thu: còn được hoàn tối đa {max}." },
   HT_AMOUNT_INVALID: { status: 400, code: "BR-HT-04", detail: "Số tiền hoàn phải lớn hơn 0." },
   HT_AMOUNT_MIN: { status: 400, code: "BR-HT-04", detail: "Số tiền hoàn tối thiểu 1đ." },
   HT_ONE_SOURCE: { status: 400, code: "BR-HT-01", detail: "Chỉ gửi một trong hai: sales_invoice hoặc payment_transaction." },
@@ -113,6 +115,42 @@ export const BE_ERRORS = {
   HT_TXN_RESOLVED: { status: 400, code: "BR-TT-09", detail: "Giao dịch đã được xử lý, không lập phiếu hoàn." },
   // ---- S10 GET /api/sales/orders/ — tham số lọc sai ----
   INVALID_FILTER: { status: 400, code: "INVALID_FILTER", detail: "Tham số {param} phải là ngày dạng YYYY-MM-DD." },
+
+  // ---- S14 POST /api/sales/orders/{id}/cancel/ (contract THỰC TẾ BE L9, 03-dev-notes.md "Lô L9 — S14, S15, S16 (BE)") ----
+  GH_CANCEL_DELIVERING: {
+    status: 400,
+    code: "BR-GH-07",
+    detail: "Phiếu giao đang Đang giao — báo giao thất bại trước khi huỷ.",
+  },
+  GH_CANCEL_COMPLETED: {
+    status: 400,
+    code: "BR-GH-05",
+    detail: "Đơn đã giao hoàn tất — chỉ còn cách lập phiếu hoàn.",
+  },
+  HT_CANCEL_REASON_INVALID: { status: 400, code: "BR-HT-05", detail: "Lý do huỷ không hợp lệ." },
+  HT_CANCEL_NOTE_REQUIRED: {
+    status: 400,
+    code: "BR-HT-05",
+    detail: "Bắt buộc nhập ghi chú khi chọn lý do khác (OTHER).",
+  },
+  /** Không nằm trong 8 test S14 của BE (available_actions đã ẩn nút "cancel" ở các trạng thái này) — FE chỉ
+   * dùng làm lưới an toàn khi có ai gọi thẳng API ngoài luồng nút. */
+  HT_CANCEL_INVALID_STATUS: { status: 400, code: "BR-HT-05", detail: "Chỉ huỷ được đơn đã thanh toán, chưa giao xong." },
+
+  // ---- S16 POST /api/sales/refunds/{id}/confirm/ | mark-failed/ | retry/ (contract THỰC TẾ BE L9) ----
+  HT_CONFIRM_TXN_REQUIRED: {
+    status: 400,
+    code: "BR-HT-03",
+    detail: "Bắt buộc nhập mã giao dịch chuyển khoản (BR-HT-03).",
+  },
+  /** REFUNDED chặn cả 3 action (điểm không quay lui). */
+  HT_ALREADY_DONE: { status: 400, code: "BR-HT-09", detail: "Phiếu đã hoàn, không đổi trạng thái được." },
+  HT_MARK_FAILED_WRONG_STATUS: {
+    status: 400,
+    code: "BR-HT-09",
+    detail: "Chỉ báo thất bại được khi phiếu đang Chờ hoàn.",
+  },
+  HT_RETRY_WRONG_STATUS: { status: 400, code: "BR-HT-09", detail: "Chỉ thử lại được khi phiếu đang Thất bại." },
 } satisfies Record<string, Entry>;
 
 export type BeErrorKey = keyof typeof BE_ERRORS;

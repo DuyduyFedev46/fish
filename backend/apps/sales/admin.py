@@ -99,7 +99,7 @@ class RefundAdmin(LockedFieldsAdminMixin, admin.ModelAdmin):
     # Phiếu hoàn chỉ sinh/chuyển trạng thái qua service (P-07, BR-HT).
     locked_fields = (
         "status", "amount", "is_partial", "sales_invoice", "payment_transaction", "bank_txn_ref",
-        "confirmed_by", "confirmed_at", "request_id",
+        "confirmed_by", "confirmed_at", "request_id", "failure_reason",
     )
     actor_fields = ("created_by",)
     superuser_only_add = True

@@ -19,7 +19,7 @@ python manage.py createsuperuser
 python manage.py runserver      # /admin/ và /api/
 ```
 
-Chạy test: `python manage.py test` (512 test, ~30 giây). Một module:
+Chạy test: `python manage.py test` (536 test, ~30 giây). Một module:
 `python manage.py test apps.sales.orders`. Sản phẩm dùng **PostgreSQL** (`DATABASE_URL=postgres://…`).
 
 ## Cấu trúc thư mục — chia theo MODULE TÍNH NĂNG

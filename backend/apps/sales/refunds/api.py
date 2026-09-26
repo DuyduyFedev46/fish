@@ -26,10 +26,25 @@ def _get_or_400(model, raw_pk, label):
 
 
 class RefundViewSet(viewsets.ReadOnlyModelViewSet):
-    queryset = Refund.objects.select_related("sales_invoice", "payment_transaction").all()
+    queryset = Refund.objects.select_related(
+        "sales_invoice__sales_order__customer",
+        "payment_transaction__sales_order__customer",
+        "created_by__staff_profile", "confirmed_by__staff_profile",
+    ).all()
     serializer_class = RefundSerializer
     permission_classes = [BusinessModelPermissions]
-    custom_perm_actions = ("create_refund", "confirm")
+    custom_perm_actions = ("create_refund", "confirm", "mark_failed", "retry")
+
+    def filter_queryset(self, queryset):
+        queryset = super().filter_queryset(queryset)
+        if self.action == "list":
+            statuses = [
+                s.strip().upper() for s in self.request.query_params.get("status", "").split(",")
+                if s.strip()
+            ]
+            if statuses:
+                queryset = queryset.filter(status__in=statuses)
+        return queryset
 
     @action(detail=False, methods=["post"], url_path="create")
     def create_refund(self, request):
@@ -78,4 +93,20 @@ class RefundViewSet(viewsets.ReadOnlyModelViewSet):
             bank_txn_ref=request.data.get("bank_txn_ref", ""),
             actor=request.user,
         )
+        return Response(self.get_serializer(refund).data)
+
+    @action(detail=True, methods=["post"], url_path="mark-failed")
+    def mark_failed(self, request, pk=None):
+        """S16: Chủ báo chuyển khoản thất bại (BR-HT-09) — tiền rời túi nên chỉ Chủ."""
+        require_perm(request.user, "sales.confirm_refund")
+        refund = services.mark_refund_failed(
+            refund=self.get_object(), reason=request.data.get("reason", ""), actor=request.user,
+        )
+        return Response(self.get_serializer(refund).data)
+
+    @action(detail=True, methods=["post"])
+    def retry(self, request, pk=None):
+        """S16: Chủ thử chuyển lại phiếu Thất bại (BR-HT-09)."""
+        require_perm(request.user, "sales.confirm_refund")
+        refund = services.retry_refund(refund=self.get_object(), actor=request.user)
         return Response(self.get_serializer(refund).data)

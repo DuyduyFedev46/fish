@@ -1400,3 +1400,145 @@ DB scratchpad riêng + http.server 3003 (Shop build BE thật) → shop_e2e → 
 kill mọi PID (django ×3 lượt tái sử dụng cổng, adapter ×2, http.server 3101/3102/3003) → lsof 8000/8100/3003/3101/3102 sạch → backend/db.sqlite3 mtime vẫn 13/09 (không đụng)
 ```
 Script/log/ảnh ở scratchpad `qafinal/`: `qa_money_fefo.py`, `qa_money_fefo2.py`, `ui_real_check2.py`, `check_auditlog.py`, `seed_accounts.py`, `accounts_tokens.txt`, `shots_real/`, `shots_s41_47_real/`, `shots_shop/`. Không sửa code sản phẩm, không thêm test vào repo ngoài phạm vi cho phép.
+
+---
+
+# QA lô L9 — S14 (huỷ đơn đã thanh toán theo trạng thái phiếu giao), S15 (phiếu hoàn từ đơn, chống trùng), S16 (phiếu hoàn: xác nhận/thất bại/thử lại) · lần 1 · 2026-09-26
+
+## Kết luận: **APPROVED** — mọi AC S14/S15/S16 và các ca ngoại lệ/biên/đồng thời đạt trên backend thật (SQLite scratchpad, Django `runserver`, không mock). Không rò giá vốn, không vượt quyền, không xoá chứng từ, AuditLog đầy đủ đúng người/lúc/lý do. Hồi quy backend/adapter/erp-console/frontend + e2e mock và e2e BE thật xanh 100%. Có **1 lỗi Medium đã có từ trước** (B-DELIVERY-MARKFAILED, ở `apps/delivery/api.py`, không phải code lô L9) — không chặn lô L9 (state thật vẫn đúng, chỉ hỏng phần JSON trả về của một action khác), nhưng cần sửa trước khi S17–S21 (giao hàng) dựng UI "báo giao thất bại" dựa vào response đó.
+
+## Tổng: **95 phép kiểm HTTP trên backend thật** (S14: 45 ca gồm AC1–AC8 + biên READY/reason sai/bấm đúp/DELETE + quyền 4 vai; S15: 19 ca gồm AC1–AC6 + đồng thời thật 2 luồng cùng request_id; S16: 25 ca gồm AC1–AC8 + quyền; Rò giá vốn: 6 ca) · ✅ 95 · ❌ 0 · ⏸ 0 (đồng thời 2 đơn tranh 1 lô thật cần Postgres, xem N-8 cũ, không phải của lô này) · cộng hồi quy: 536 test BE · 41 test adapter · `makemigrations --check`/`check` sạch · erp-console `tsc --noEmit` sạch · 3 bản build erp-console sạch (thật, mock, trỏ BE thật) · 1 bản build frontend Shop sạch (trỏ BE thật) · e2e mock **43/43** (`s14_s16_cancel_refund`, mới) + hồi quy `s7_shell` 25/25 · `s8_views` 47/47 · `s10_s11_orders` 90/90 · `s12_s13_queue` 100/100 · `s41_s47_staff` 72/72 · `s48_password` 41/41 · e2e BE thật `s41_s47_real` 39/39 · `shop_e2e` 3/3 · UI trỏ BE thật (Playwright, menu/quyền/rò giá vốn/mobile) 16/17 (1 flaky hạ tầng, xem "Ngoại lệ & biên").
+
+Môi trường: Django `runserver` 127.0.0.1:8090 trên **SQLite tạm trong scratchpad** (`migrate` → `bootstrap_masterdata` → `seed_demo` → seed tài khoản test bằng `manage.py shell`: `loc` chu, `ql1`/`ql9` quan_ly (`ql9` thêm `manage_staff` nhưng không thuộc `chu`), `kho1` nv_kho+nv_giao, `khoonly` nv_kho, `giao1`/`giao2` nv_giao, `moi1` không nhóm, `nghi1` đã nghỉ, `admin` superuser). Đơn/hoá đơn dựng bằng đúng đường nghiệp vụ thật (`POST /api/shop/orders/` rồi `POST /api/sales/orders/{id}/confirm-payment`), không tạo tay qua ORM. Không đụng `backend/db.sqlite3` (mtime vẫn 13/09 trước và sau lượt QA). Bộ tài khoản/DB riêng thứ hai cho `s41_s47_real` (mutate dữ liệu — tạo `giao4`, cho `giao1` nghỉ, đổi mật khẩu `kho1`) để không phá dữ liệu của bộ QA S14–S16. Mọi server có PID riêng, tắt hết khi xong; `lsof` trên 8090/8001/3003/3102/3141/3151 sạch sau lượt QA.
+
+## Theo AC
+
+| Mã AC | Kết quả | Bằng chứng |
+|---|---|---|
+| S14-AC1 (Soạn hàng → huỷ, hoàn kho lô gốc, AuditLog có lý do) | ✅ | Đơn PROCESSING/PREPARING → `cancel` với `CUSTOMER_CHANGED_MIND` → 200, `order_status=CANCELLED`, `stock_restored=true`, `delivery_status=CANCELLED`, `suggest_refund_amount` = đúng tổng đơn, `invoice_id` có; lô tăng đúng +2kg (trước/sau); phiếu giao đọc lại = CANCELLED; `AuditLog(action=cancel_paid_order)` có "Khách đổi ý" trong `note` |
+| S14 biên (Chờ lấy hàng → huỷ) | ✅ | Phiếu giao đẩy lên READY rồi huỷ → vẫn 200, `stock_restored=true` (đúng contract "PREPARING hoặc READY") |
+| S14-AC2 (phiếu gán NV giao → huỷ → biến khỏi "của tôi") | ✅ | Gán `giao1`; trước huỷ `giao1` thấy phiếu trong `?status=PREPARING,READY,DELIVERING,FAILED`; sau huỷ (Quản lý gọi) phiếu biến mất khỏi danh sách của `giao1` |
+| S14-AC3 (phiếu Giao thất bại + `GIVE_UP_AFTER_FAILED` → không hoàn kho) | ✅ | Đẩy phiếu qua READY→DELIVERING→FAILED (Đang giao thất bại, xem lỗi B-DELIVERY-MARKFAILED bên dưới), huỷ với `GIVE_UP_AFTER_FAILED` → `stock_restored=false`, tồn lô không đổi, không có bút toán `CANCEL_RESTORE` gắn mã đơn này |
+| S14-AC3 (tiếp — không cộng kho hai lần với duyệt hàng hoàn P-08) | ✅ | Dựng thật luồng P-08 ở tầng service (`return_to_warehouse` → `apply_return` RESTOCK, cộng đúng +1kg) rồi mới gọi `cancel` (`GIVE_UP_AFTER_FAILED`) qua API thật: `stock_restored=false`, tồn **không** cộng thêm lần 2 |
+| S14-AC4 (Đang giao → huỷ) | ✅ | 400 `{"code":"BR-GH-07","detail":"Phiếu giao đang Đang giao — báo giao thất bại trước khi huỷ."}`; đơn vẫn PROCESSING, phiếu vẫn DELIVERING; `available_actions` không có `cancel` |
+| S14-AC5 (Hoàn tất → huỷ) | ✅ | 400 `{"code":"BR-GH-05",...}`; `available_actions` không có `cancel` |
+| S14-AC6 (`OTHER` thiếu/có ghi chú) | ✅ | Thiếu `note` → 400, đơn không đổi; có `note` → 200 |
+| S14 biên (`reason_code` sai) | ✅ | `"KHONG_HOP_LE"` → 400, đơn không đổi (giả định dev BE ghi `BR-HT-05`, xem 03-dev-notes) |
+| S14-AC7 (nút tạo phiếu hoàn sau huỷ) | ✅ | `available_actions` sau huỷ có `create_refund`, không còn `cancel` |
+| S14-AC8 (NV kho 403) | ✅ | 403, đơn không đổi; NV giao cũng 403; ẩn danh 401 |
+| S15-AC1 (tạo toàn phần) | ✅ | 201 PENDING, `amount` đúng tổng đơn, `AuditLog(create_refund)`, phiếu vào `?status=PENDING,FAILED` |
+| S15-AC2 (vượt số còn hoàn) | ✅ | 400 `BR-HT-04` "Vượt số đã thu: còn được hoàn tối đa 0đ." (đã hoàn hết) |
+| S15-AC3 (phiếu FAILED không tính) | ✅ | Phiếu 200.000 → FAILED; tạo lại toàn phần → vẫn 201 |
+| S15-AC4 (bấm đúp cùng `request_id`) | ✅ | Lần 1 → 201; lần 2 y hệt `request_id` → 200 `duplicate:true`, cùng `id`; DB chỉ 1 phiếu |
+| S15-AC5 (amount ≤ 0) | ✅ | `"0"` và `"-1"` → 400 cả hai |
+| S15-AC6 (NV kho 403) | ✅ | 403; NV giao 403; ẩn danh 401 |
+| S16-AC1 (xác nhận có mã GD) | ✅ | 200 `REFUNDED`; `AuditLog(confirm_refund)` |
+| S16-AC2 (trừ đúng kỳ xác nhận) | ✅ | Hoá đơn `issued_at` tháng 8, `confirmed_at` tháng 9 → `GET /api/reports/period/?month=9` cộng đúng khoản hoàn; `?month=8` = 0 |
+| S16-AC3 (thất bại rồi thử lại) | ✅ | `mark-failed` (lý do) → FAILED; `retry` → PENDING; `AuditLog(mark_refund_failed)` + `AuditLog(retry_refund)` đều có |
+| S16-AC4 (confirm thiếu mã GD) | ✅ | 400 `BR-HT-03` |
+| S16-AC5 (REFUNDED bất biến) | ✅ | `confirm`/`mark-failed`/`retry` trên phiếu REFUNDED → cả 3 đều 400 `BR-HT-09` |
+| S16-AC6 (retry vượt số còn hoàn) | ✅ | Phiếu 1 FAILED 200k; phiếu 2 lấp đầy phần còn lại; `retry` phiếu 1 → 400 `BR-HT-04`, phiếu 1 vẫn FAILED |
+| S16-AC7 (Quản lý 403, vẫn xem list) | ✅ | 3 action đều 403; `GET` list vẫn 200 nhưng `available_actions=[]` cho Quản lý |
+| S16-AC8 (mobile 360, SĐT `tel:`, nút ≥44px) | ✅ | e2e mock `s14_s16_cancel_refund` (43/43) có 10 ca 360 sáng/tối riêng cho S16 (không cuộn ngang, vùng bấm ≥44px, SĐT là link `tel:`); đối chứng thêm trên console trỏ BE thật 1280/360 sáng/tối |
+
+## Ngoại lệ & biên
+- Bấm đúp huỷ đơn (đơn đã CANCELLED huỷ lần 2) → 400, tồn kho không tăng thêm lần 2 (mốc đo ngay trước/sau lần bấm đúp, không lẫn với hoạt động của các đơn test khác).
+- Bấm đúp/gửi lại `confirm-payment` y hệt (webhook giả lập gửi 2 lần, hồi quy S11/S12) → `duplicate:true`, không tạo thêm hoá đơn/giao dịch.
+- 2 luồng tạo phiếu hoàn cùng `request_id` gửi **đồng thời thật** (threading, cùng lúc tới `manage.py runserver`) → chỉ sinh đúng **1** phiếu (`id` giống nhau ở cả hai response). *Lưu ý*: `runserver` phục vụ tuần tự trên SQLite nên đây là phép đo tốt nhất có thể trên máy dev; 2 đơn tranh nhau 1 lô thật (race hai request khác nhau, không cùng `request_id`) vẫn cần Postgres/Cloud SQL thật để đo đúng (N-8 cũ, không phải của lô này).
+- Lô cuối / TTL: không phát sinh ca mới ở lô L9 (không đụng `allocate_fifo`/TTL); hồi quy qua toàn bộ 536 test BE (gồm các test TTL/FEFO cũ) vẫn xanh.
+- **Flaky hạ tầng (không phải lỗi sản phẩm)**: script Playwright tự viết `ui_real_l9.py` (17 phép kiểm UI trên console build trỏ BE thật) có 1/17 lần đăng nhập lại "Chủ" ở bước thứ 7 trong cùng một tiến trình không chuyển hướng khỏi `/login/` dù `POST /api/auth/token/` trả 200 đúng token (xác nhận bằng bắt sự kiện `response` của trình duyệt) — tái hiện ngẫu nhiên (có lần qua, có lần không) khi mở nhiều `BrowserContext` liên tiếp nhắm vào `manage.py runserver`; gọi `curl` trực tiếp cùng token vào đúng lúc đó luôn trả 200 đúng dữ liệu, và một script độc lập (không mở nhiều context trước đó) tải lại đúng màn "Phiếu hoàn chờ chuyển" với dữ liệu thật (ảnh `shots-l9-real/`, xem log `debug_menu.py`). Không nghi ngờ đây là lỗi sản phẩm (đối chứng bằng 43/43 e2e mock xác định cho đúng màn này); ghi nhận để không lặp lại nhầm là bug.
+
+## Phân quyền (bảng Group × hành động)
+
+| Hành động | Chủ | Quản lý | NV kho | NV giao | Chưa đăng nhập |
+|---|---|---|---|---|---|
+| `POST /api/sales/orders/{id}/cancel/` | 200 (đúng luật) | 200 (đúng luật) | 403 | 403 | 401 |
+| `POST /api/sales/refunds/create/` | 200 | 200 | 403 | 403 | 401 |
+| `POST .../refunds/{id}/confirm\|mark-failed\|retry/` | 200 | **403** | 403 | 403 | 401 |
+| `GET /api/sales/refunds/` (list) | 200, `available_actions` đủ | 200, `available_actions=[]` | 403 | 403 | 401 |
+| Menu "Phiếu hoàn chờ chuyển" (console trỏ BE thật) | hiện | hiện (không nút) | ẩn | ẩn | — |
+| Gõ thẳng URL `/orders/refunds/` | vào được | vào được | "Bạn không có quyền…" | "Bạn không có quyền…" | về `/login/` |
+
+Đúng bất biến BR-PQ: huỷ đơn + tạo phiếu hoàn là việc "khách phải chờ" → Chủ và Quản lý cùng làm được; xác nhận/báo thất bại/thử lại phiếu hoàn là "tiền rời túi vựa" → chỉ Chủ (`sales.confirm_refund`), Quản lý bị chặn ở API dù UI có cho xem danh sách.
+
+## Rò giá vốn
+- Quét đệ quy JSON `GET /api/sales/orders/{id}/` (đơn vừa huỷ, có `allocations`) cho `khoonly`, `ql1`: **0** field `unit_cost`/`purchase_rate`/`landed_unit_cost`. Đối chứng: cùng endpoint với `loc` **có** các field này (xác nhận phép quét không dương tính giả).
+- Quét `GET /api/sales/refunds/` và response `POST /api/sales/refunds/create/`: **0** field giá vốn (đúng theo contract S15/S16 — chứng từ hoàn tiền vốn dĩ không mang field này cho bất kỳ ai).
+- HTML console thật (build trỏ BE thật, Playwright, cả 4 vai `loc`/`ql1`/`kho1`/`giao1`) tại `/orders/refunds/`: **0** field giá vốn trong DOM, kể cả màn bị chặn của `kho1`/`giao1`.
+- Shop (frontend build thật trỏ BE thật, `shop_e2e.py`): **0** chuỗi `unit_cost`/`purchase_rate`/`landed_unit_cost`/`profit`/"giá vốn" trong HTML `/shop/`.
+
+## Chứng từ & AuditLog
+- `DELETE` trên `sales/orders/{id}`, `delivery/notes/{id}`, `sales/refunds/{id}` → **405** cả ba, dữ liệu không đổi.
+- `AuditLog` đọc trực tiếp trên DB (mẫu, actor id 1=`loc`, 2=`ql1`):
+  - `cancel_paid_order`: `changes={"status":{"from":"PROCESSING","to":"CANCELLED"},"stock_restored":bool,"reason_code":...}`, `note` chứa lý do tiếng Việt kể cả nhánh "Khác".
+  - `create_refund`: `changes={"amount":{"to":...},"invoice":...}`.
+  - `confirm_refund`: `changes={"status":{"from":"PENDING","to":"REFUNDED"},"bank_txn_ref":...}`.
+  - `mark_refund_failed` / `retry_refund`: `changes={"status":{"from":...,"to":...}}`, lý do thất bại nằm trong `note`.
+  - Không dòng nào thiếu actor hay để trắng mã BR/hành động.
+
+## Hồi quy
+
+| Ca | Kết quả |
+|---|---|
+| `backend manage.py test` | ✅ Ran 536 tests, OK |
+| `makemigrations --check --dry-run` / `manage.py check` | ✅ No changes detected / 0 issue |
+| `adapter pytest -q` | ✅ 41 passed |
+| erp-console `tsc --noEmit` | ✅ sạch |
+| erp-console `npm run build` (thật) | ✅ exit 0, có route `/orders/refunds`, `out/` 0 dấu mock |
+| erp-console `NEXT_PUBLIC_USE_MOCK=1 npm run build` | ✅ exit 0 |
+| erp-console build trỏ BE thật (`:8090`, `:8001` cho `s41_s47_real`) | ✅ exit 0 ×2 |
+| `frontend npm run build` (Shop, trỏ BE thật) | ✅ exit 0 |
+| e2e mock (`:3141`) `s14_s16_cancel_refund` (mới) | ✅ 43/43 |
+| e2e mock hồi quy `s7_shell`·`s8_views`·`s10_s11_orders`·`s12_s13_queue`·`s41_s47_staff`·`s48_password` | ✅ 25/25 · 47/47 · 90/90 · 100/100 · 72/72 · 41/41 |
+| e2e BE thật (`:3102`, DB scratchpad riêng) `s41_s47_real` | ✅ 39/39 |
+| `shop_e2e` (Shop thật `:3003` → BE thật `:8090`) | ✅ 3/3 |
+| UI trỏ BE thật (`:3151`, Playwright tự viết) menu/quyền/rò giá vốn/mobile | ✅ 16/17 (1 flaky hạ tầng, xem "Ngoại lệ & biên") |
+
+## Lỗi
+
+### B-DELIVERY-MARKFAILED — Response của "báo giao thất bại" bị hỏng (thiếu hầu hết field) · Medium · liền kề (không thuộc S14/S15/S16, không chặn lô L9)
+**Bước tái hiện**
+1. Có phiếu giao ở trạng thái Đang giao (`DELIVERING`), gán cho một NV giao.
+2. Gọi `POST /api/delivery/notes/{id}/status/` với `{"to_status": "FAILED"}` (đúng action NV giao dùng để báo giao thất bại — chính là bước cần làm trước khi huỷ đơn theo `GIVE_UP_AFTER_FAILED`, S14-AC3).
+
+**Mong đợi**: 200, JSON đầy đủ như các trạng thái khác, vd:
+`{"id":23,"code":"GH-...","sales_invoice":23,"invoice_code":"INV-...","status":"FAILED","status_label":"Giao thất bại","assigned_to":6,"failed_attempts":1,"note":"","created_at":"...","completed_at":null}`
+
+**Thực tế**: 200 nhưng body chỉ có `{"assigned_to":null,"completed_at":null}` — thiếu `id`, `code`, `status`, `status_label`, `failed_attempts`, sai luôn `assigned_to` (thật ra note vẫn đang gán, không phải `null`). Gọi lại `GET /api/delivery/notes/{id}/` ngay sau đó cho thấy **trạng thái DB đúng** (`status:"FAILED"`, `failed_attempts:1`, `assigned_to` vẫn đúng người) — dữ liệu không sai, chỉ response của riêng action này bị hỏng.
+
+**Nguyên nhân (đọc code)**: `apps/delivery/services.py::mark_failed` trả về **tuple** `(note, needs_decision)` (để báo cần Quản lý/Chủ quyết định khi vượt ngưỡng thất bại, BR-GH-04). Nhưng `apps/delivery/api.py::DeliveryNoteViewSet.set_status` gán thẳng kết quả đó vào biến `note` rồi đưa cho serializer mà **không unpack tuple**:
+```python
+if to_status == DeliveryNote.Status.FAILED:
+    note = services.mark_failed(note=note, actor=request.user)   # note giờ là (note, needs_decision)
+else:
+    note = services.advance_status(...)
+return Response(self.get_serializer(note).data)                  # serialize nhầm 1 tuple
+```
+Sửa: `note, _needs_decision = services.mark_failed(...)`.
+
+**Ảnh hưởng**: Không sai lệch dữ liệu/tiền/tồn kho (đã xác nhận qua GET riêng), không rò giá vốn, không vượt quyền → không thuộc nhóm Critical. Không phải AC của S14/S15/S16 (mã lỗi này nằm ở `apps/delivery/api.py`, không đổi ở lô L9 — S14-S16 không chạm file này). Không có test nào (kể cả `apps/delivery/tests/test_services.py`) gọi hành động này **qua HTTP** với `to_status=FAILED`; mọi test đều gọi thẳng service và unpack tuple đúng, nên lỗi này chưa từng bị bắt trước lô L9. **Không chặn lô L9** (theo đúng tiền lệ B7 ở lô L7/L8 — lỗi có từ trước, không do thay đổi của lô đang QA), nhưng **cần sửa trước khi S17–S21 (bảng điều phối/giao hàng)** dựng màn "Việc giao của tôi → Báo giao thất bại" cho NV giao, vì màn đó sẽ đọc thẳng response này để cập nhật UI.
+
+## Lệnh đã chạy (kèm output tóm tắt)
+```
+backend manage.py test                                                  → Ran 536 tests OK (chạy lại lần cuối để chốt số)
+makemigrations --check --dry-run · manage.py check                      → No changes detected · 0 issues
+adapter pytest -q                                                       → 41 passed
+erp-console tsc --noEmit                                                → sạch
+erp-console npm run build (thật)                                        → exit 0, route /orders/refunds, out/ 0 dấu mock
+erp-console NEXT_PUBLIC_USE_MOCK=1 npm run build                        → exit 0
+erp-console NEXT_PUBLIC_API_BASE=http://127.0.0.1:8090 npm run build    → exit 0 (console trỏ BE thật, QA UI)
+erp-console NEXT_PUBLIC_API_BASE=http://127.0.0.1:8001 npm run build    → exit 0 (dành riêng cho s41_s47_real)
+frontend NEXT_PUBLIC_API_BASE=http://127.0.0.1:8090 npm run build       → exit 0 (Shop trỏ BE thật)
+DB scratchpad l9.sqlite3: migrate → bootstrap_masterdata → seed_demo (7 lô, 6 đơn) → seed_accounts.py (10 tài khoản+token)
+django runserver 127.0.0.1:8090 (SQLite scratchpad, CORS mở cho 3141/3151/3003)
+qa_l9.py (95 phép kiểm HTTP S14/S15/S16 + rò giá vốn)                    → PASS=95 FAIL=0
+http.server 3141 (mock out) → e2e s14_s16_cancel_refund                 → 43/43
+http.server 3141 → e2e s7_shell/s8_views/s10_s11_orders/s12_s13_queue/s41_s47_staff/s48_password → 25/47/90/100/72/41 PASS
+erp-console build trỏ BE thật (:8090) phục vụ ở :3151 → ui_real_l9.py    → 16/17 PASS (1 flaky hạ tầng, xem "Ngoại lệ & biên")
+DB scratchpad riêng s41real.sqlite3 (loc/ql1/kho1/giao1/nghi1 + StaffProfile) + django :8001 + console build riêng :3102 → e2e s41_s47_real → 39/39
+DB scratchpad l9.sqlite3 (dùng lại) + frontend Shop build thật phục vụ ở :3003 → shop_e2e.py → 3/3
+AuditLog (Django shell, đọc trực tiếp)                                   → cancel_paid_order/create_refund/confirm_refund/mark_refund_failed/retry_refund đủ actor+changes+lý do
+DELETE sales/orders, delivery/notes, sales/refunds                      → 405 cả ba, không đổi dữ liệu
+kill mọi PID (django :8090 ×4 lượt tái khởi động vì thêm CORS, :8001 ×1, http.server 3003/3102/3141/3151) → lsof 8090/8001/3003/3102/3141/3151 sạch → backend/db.sqlite3 mtime vẫn 13/09 (không đụng)
+```
+Script/log/ảnh ở scratchpad `l9/`: `qa_l9.py`, `ui_real_l9.py`, `shop_e2e.py`, `debug_menu.py`, `seed_accounts.py`, `seed_s41real.py`, `shots-l9/`, `shots-l9-real/`, `shots-s41real/`, `erp-out-mock/`, `erp-out-real/`, `erp-out-realbe/`, `erp-out-s41real/`, `shop-out/`. Không sửa code sản phẩm, không thêm test vào repo ngoài phạm vi cho phép (test HTTP/E2E chạy từ scratchpad; `erp-console/e2e/s14_s16_cancel_refund.py` đã có sẵn từ BE/FE lô L9, không phải QA thêm mới).
