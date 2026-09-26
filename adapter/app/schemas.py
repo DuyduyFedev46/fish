@@ -123,3 +123,56 @@ class InternalPaymentPayload(BaseModel):
     amount: Decimal
     received_at: str  # ISO 8601, xem app/sepay.py:parse_transaction_date
     raw: dict[str, Any]
+
+
+# --- IPN Cổng thanh toán SePay (hồ sơ 2026-09-26-sepay-cong-thanh-toan, story P2) --------
+#
+# Tài liệu tham khảo: https://developer.sepay.vn/vi/cong-thanh-toan/IPN (tóm tắt do điều
+# phối viên cung cấp trong phiên — KHÔNG có tài khoản Cổng thanh toán thật để đối chiếu
+# payload 1:1 lúc build; Q4 trong 01-analysis.md vẫn ĐỎ). Payload mô tả:
+#
+#   {
+#     "notification_type": "ORDER_PAID" | "TRANSACTION_VOID",
+#     "order": {
+#       "order_invoice_number": "SO260926-A1B2C3",
+#       "amount": 540000,
+#       "currency": "VND",
+#       "status": "CAPTURED",
+#       ...
+#     },
+#     "transaction": {
+#       "id": 999888,
+#       "reference_code": "FT26092612345",
+#       ...
+#     },
+#     "customer": {...}
+#   }
+#
+# GIẢ ĐỊNH (ghi rõ để BE/Duy đối chiếu khi có payload sandbox thật — xem 03-dev-notes.md
+# mục "P2 (adapter)"):
+# - Tên field con trong `transaction` chưa chắc đúng 100%. Adapter dò một danh sách tên
+#   field ứng viên (ưu tiên mã tham chiếu ngân hàng FT… nếu có, theo Q4/BR-TT-03), xem
+#   `app/sepay.py:pick_ipn_transaction_reference`.
+# - `order`/`transaction` để `extra="allow"` (không chặn field lạ) vì tài liệu có thể có
+#   thêm field SePay không liệt kê ở đây.
+class SePayIpnOrder(BaseModel):
+    """Sub-object `order` trong payload IPN. Field khác ngoài 4 field dưới bị bỏ qua
+    (không cần cho việc map sang payload nội bộ), nhưng KHÔNG bị chặn (extra="allow")."""
+
+    model_config = ConfigDict(extra="allow")
+
+    order_invoice_number: Optional[str] = None
+    amount: Optional[Decimal] = Field(default=None, allow_inf_nan=False)
+    currency: Optional[str] = None
+    status: Optional[str] = None
+
+
+class SePayIpnPayload(BaseModel):
+    """Payload IPN Cổng thanh toán SePay gửi tới `POST /ipn/sepay`."""
+
+    model_config = ConfigDict(extra="allow")
+
+    notification_type: str
+    order: SePayIpnOrder
+    transaction: dict[str, Any] = Field(default_factory=dict)
+    customer: Optional[dict[str, Any]] = None

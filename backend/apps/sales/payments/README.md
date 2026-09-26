@@ -22,3 +22,21 @@ Endpoint (chỉ Chủ, `confirm_payment_manual`): `GET /api/sales/payments/?reso
 thừa ngay lần đầu cho đơn Giữ chỗ (webhook, tay, hoặc `ATTACH_TO_ORDER`) → dòng MATCHED mang đúng tổng đơn + `split_overpaid`
 tạo dòng OVERPAID `<mã GD>-THUA` (OPEN, `raw_payload.split_from`) cho phần thừa, AuditLog `split_overpaid_payment`.
 `overpaid_amount(payment)` tra phần thừa; phản hồi webhook/xác nhận tay/resolve có thêm `overpaid_amount` khi có.
+
+**Cổng thanh toán SePay (P1/P3, doc/features/2026-09-26-sepay-cong-thanh-toan, ĐÃ DUYỆT).**
+- `checkout.py` (P1, BR-TT-01/13/14/17): `build_checkout_params(order=…)` ký tham số hosted
+  checkout (HMAC-SHA256, `_sign`/`_signature_string` cô lập — GIẢ ĐỊNH chuỗi ký, xem
+  `03-dev-notes.md`). Chỉ đơn `BOOKED` còn TTL; khoá `SEPAY_SECRET_KEY` không rời server.
+  `SalesOrder.checkout_attempts` đếm số lần lập tham số — từ lần 2 thêm hậu tố `-<n>` vào
+  `order_invoice_number` (Q5), khớp `strip_order_retry_suffix` bên adapter.
+  Endpoint Shop: `POST /api/shop/orders/{order_code}/checkout/` (`shop_api.py`, AllowAny —
+  không cần 4 số cuối SĐT vì response không có PII).
+- `internal_api.py` (P3, BR-TT-02/03/14/15): `POST /api/internal/payments/sepay-ipn/` — CÙNG
+  contract body với webhook cũ, chạy chung `_handle_payment_ipn`/`confirm_payment`, chỉ khác
+  `source=PaymentTransaction.Source.GATEWAY`. `environment_for_source` gắn
+  `PaymentTransaction.environment` (SANDBOX/PRODUCTION) theo `settings.SEPAY_ENV` — CHỈ cho
+  nguồn GATEWAY. `DUPLICATE_MANUAL_WARNING`: OVERPAID mới (mã GD khác) trùng số tiền với một
+  khoản đã MATCHED qua xác nhận tay (MANUAL) của cùng đơn → gắn `duplicate_warning` (UC-5,
+  BR-TT-15) thay vì để hiện như tiền thừa bình thường.
+- Webhook biến động số dư cũ (`Source.WEBHOOK`, `/sepay-webhook/`) GIỮ NGUYÊN hành vi, không
+  tắt ở Django (route đó tắt phía **adapter**, theo cấu hình `SEPAY_BANK_WEBHOOK_ENABLED`).

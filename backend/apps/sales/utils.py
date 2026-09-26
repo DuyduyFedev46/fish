@@ -17,6 +17,17 @@ def money(amount):
     return Decimal(amount).quantize(CENT, rounding=ROUND_HALF_UP)
 
 
+def money_vnd(amount):
+    """
+    BR-BH-15 (Q6, quyết định Duy 2026-09-26): làm tròn về SỐ NGUYÊN ĐỒNG, HALF-UP.
+    Dùng cho `SalesOrder.total_amount` lúc tạo đơn, để số gửi cổng SePay, số trên hoá
+    đơn và số khách trả trùng nhau tuyệt đối (cổng chỉ nhận VND nguyên đồng).
+    Kết quả vẫn là Decimal 2 chữ số thập phân (khớp `decimal_places=2` của cột) nhưng
+    luôn tròn — vd 18812.50 -> 18813.00.
+    """
+    return Decimal(amount).quantize(Decimal("1"), rounding=ROUND_HALF_UP).quantize(CENT)
+
+
 def gen_code(prefix, model):
     """Sinh mã chứng từ duy nhất."""
     while True:

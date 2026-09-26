@@ -179,3 +179,12 @@ Hồ sơ: `doc/features/2026-09-26-fefo/`.
 Hàng đông lạnh có hạn theo niên hạn, nên hạn dùng mặc định là **365 ngày** kể từ ngày nhập (trước đây là 90 ngày). Mức này áp cho tham số `BATCH_DEFAULT_SHELF_LIFE_DAYS` và cho giá trị mặc định `Item.shelf_life_in_days` của mặt hàng **tạo mới**. Mặt hàng và lô đã có thì giữ nguyên hạn.
 
 **Giữ FEFO.** Khi mọi lô tính hạn theo cùng một công thức thì FEFO chọn lô giống hệt FIFO. FEFO chỉ khác khi có lô bị sửa hạn cho ngắn hơn; lúc đó FEFO giúp tránh phải huỷ hàng.
+
+## 2026-09-26 — Thanh toán qua Cổng thanh toán SePay, chỉ VietQR — [DUY CHỐT]
+- Cổng thanh toán SePay thay mã VietQR giả. **V1 chỉ có VietQR**: không thẻ, không NAPAS khác, không cọc, thanh toán 100%.
+- Chỉ IPN `ORDER_PAID` gửi về adapter `/ipn/sepay` mới xác nhận được thanh toán. Khách quay lại `success_url` không có nghĩa là đã trả tiền.
+- **Webhook ngân hàng SePay (`/webhook/sepay`) tắt ở V1.** Code vẫn giữ. Nếu bật lại thì phải chống ghi trùng với IPN.
+- Giai đoạn sandbox dùng luôn production, dữ liệu hiện có coi là dữ liệu thử. **Shop chưa mở công khai** cho tới khi có khoá production. Trước khi mở phải dọn DB.
+- Tổng đơn làm tròn về nguyên đồng.
+
+Hồ sơ: `doc/features/2026-09-26-sepay-cong-thanh-toan/`.

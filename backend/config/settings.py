@@ -179,6 +179,22 @@ COLD_CHAIN_MAX_HOURS = int(os.getenv("COLD_CHAIN_MAX_HOURS", "6"))
 
 INTERNAL_SERVICE_TOKEN = os.getenv("INTERNAL_SERVICE_TOKEN", "")
 
+# --- Cổng thanh toán SePay (P1/P3, doc/features/2026-09-26-sepay-cong-thanh-toan) ----------
+# BR-TT-14: môi trường + URL cổng + khoá là cấu hình theo môi trường, KHÔNG hard-code.
+# Secret thật nằm ở GCP Secret Manager (cangca-sepay-sandbox-*) — KHÔNG có giá trị mặc định
+# ở đây, rỗng thì P1 từ chối ký (an toàn hơn ký nhầm bằng chuỗi rỗng).
+SEPAY_ENV = os.getenv("SEPAY_ENV", "SANDBOX").strip().upper()  # SANDBOX | PRODUCTION
+SEPAY_MERCHANT_ID = os.getenv("SEPAY_MERCHANT_ID", "")
+SEPAY_SECRET_KEY = os.getenv("SEPAY_SECRET_KEY", "")
+SEPAY_CHECKOUT_URL_SANDBOX = os.getenv(
+    "SEPAY_CHECKOUT_URL_SANDBOX", "https://pay-sandbox.sepay.vn/v1/checkout/init"
+)
+SEPAY_CHECKOUT_URL_PRODUCTION = os.getenv(
+    "SEPAY_CHECKOUT_URL_PRODUCTION", "https://pay.sepay.vn/v1/checkout/init"
+)
+# Trang tra đơn Shop — success/cancel/error_url của P1 đều trỏ về đây (BR-TT-12).
+SHOP_BASE_URL = os.getenv("SHOP_BASE_URL", "http://localhost:3000").rstrip("/")
+
 # --- Celery (job nền) ------------------------------------------------------
 CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL", "redis://localhost:6379/0")
 CELERY_RESULT_BACKEND = os.getenv("CELERY_RESULT_BACKEND", "redis://localhost:6379/0")

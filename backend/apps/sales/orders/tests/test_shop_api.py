@@ -44,7 +44,7 @@ class ShopOrderAPITests(TestCase):
         self.assertEqual(resp.status_code, 201, resp.content)
         data = resp.json()
         self.assertEqual(data["total_amount"], "300000.00")
-        self.assertEqual(data["vietqr"]["content"], data["order_code"])
+        self.assertNotIn("vietqr", data)  # P1-AC7: không còn QR giả
         code = data["order_code"]
 
         # tra đúng 4 số cuối
@@ -66,3 +66,84 @@ class ShopOrderAPITests(TestCase):
             format="json",
         )
         self.assertEqual(resp.status_code, 400)
+
+    def _place_order(self, phone="0912345678"):
+        resp = self.client.post(
+            "/api/shop/orders/",
+            {
+                "customer": {"phone": phone, "name": "Anh A"},
+                "delivery_address": "1 Bến Cảng",
+                "phone": phone,
+                "items": [{"item_code": "CA01", "qty": "3"}],
+            },
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 201, resp.content)
+        return resp.json()["order_code"]
+
+    def test_lookup_returns_booked_expires_at_iso_vn_when_booked(self):
+        """Bổ sung tra đơn Shop: BOOKED -> booked_expires_at ISO giờ VN (khớp
+        SalesOrder.booked_expires_at, không suy đoán)."""
+        code = self._place_order(phone="0911111111")
+        order = SalesOrder.objects.get(code=code)
+
+        resp = self.client.get(f"/api/shop/orders/{code}/?phone_last4=1111")
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertIn("booked_expires_at", data)
+        expected = timezone.localtime(order.booked_expires_at).isoformat()
+        self.assertEqual(data["booked_expires_at"], expected)
+        # Giờ VN => offset +07:00 trong chuỗi ISO
+        self.assertTrue(data["booked_expires_at"].endswith("+07:00"))
+
+    def test_lookup_booked_expires_at_null_when_not_booked(self):
+        """Bổ sung tra đơn Shop: khác BOOKED -> booked_expires_at = null (không rò TTL
+        cũ của một đơn đã xong/huỷ)."""
+        code = self._place_order(phone="0922222222")
+        order = SalesOrder.objects.get(code=code)
+        order.status = SalesOrder.Status.AUTO_CANCELLED
+        order.save(update_fields=["status"])
+
+        resp = self.client.get(f"/api/shop/orders/{code}/?phone_last4=2222")
+        self.assertEqual(resp.status_code, 200)
+        self.assertIsNone(resp.json()["booked_expires_at"])
+
+    def test_lookup_returns_item_name_per_line(self):
+        """Bổ sung tra đơn Shop: mỗi dòng có tên mặt hàng (`name`), khớp
+        `WireOrderLine.name` FE đang đọc ở lib/api.ts (mapOrderStatus)."""
+        code = self._place_order(phone="0933333333")
+
+        resp = self.client.get(f"/api/shop/orders/{code}/?phone_last4=3333")
+        self.assertEqual(resp.status_code, 200)
+        lines = resp.json()["lines"]
+        self.assertEqual(len(lines), 1)
+        self.assertEqual(lines[0]["item_code"], "CA01")
+        self.assertEqual(lines[0]["name"], "Cá thu")
+
+    def test_lookup_does_not_leak_internal_or_cost_fields(self):
+        """Shop công khai: quét toàn bộ JSON (kể cả lồng trong `lines`) không chứa key
+        giá vốn/lô/nội bộ (bất biến #1) hay SĐT/địa chỉ đầy đủ."""
+        code = self._place_order(phone="0944444444")
+
+        resp = self.client.get(f"/api/shop/orders/{code}/?phone_last4=4444")
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+
+        forbidden_keys = {
+            "purchase_rate", "landed_unit_cost", "unit_cost", "rate", "batch",
+            "batch_id", "cost", "profit", "phone", "customer_phone",
+            "delivery_address", "address",
+        }
+        found_keys = set()
+
+        def _collect(node):
+            if isinstance(node, dict):
+                for k, v in node.items():
+                    found_keys.add(k)
+                    _collect(v)
+            elif isinstance(node, list):
+                for item in node:
+                    _collect(item)
+
+        _collect(data)
+        self.assertFalse(found_keys & forbidden_keys, found_keys & forbidden_keys)

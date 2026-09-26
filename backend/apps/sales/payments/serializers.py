@@ -63,9 +63,9 @@ class PaymentTransactionSerializer(serializers.ModelSerializer):
         model = PaymentTransaction
         fields = [
             "id", "bank_txn_id", "amount", "received_at", "match_status", "match_status_label",
-            "source", "source_label", "order", "resolution_status", "resolution",
-            "resolution_label", "resolved_by", "resolved_at", "resolution_note",
-            "refundable_amount", "available_actions",
+            "source", "source_label", "environment", "duplicate_warning", "order",
+            "resolution_status", "resolution", "resolution_label", "resolved_by", "resolved_at",
+            "resolution_note", "refundable_amount", "available_actions",
         ]
         read_only_fields = fields
 

@@ -33,6 +33,13 @@ class PaymentTransaction(models.Model):
     class Source(models.TextChoices):
         WEBHOOK = "WEBHOOK", "Webhook SePay"
         MANUAL = "MANUAL", "Xác nhận tay"
+        GATEWAY = "GATEWAY", "Cổng SePay"  # P3/BR-TT-02: IPN Cổng thanh toán SePay (hosted checkout)
+
+    class Environment(models.TextChoices):
+        """BR-TT-14: môi trường cổng lúc ghi giao dịch — chỉ áp dụng cho Source.GATEWAY.
+        Nguồn khác (webhook ngân hàng cũ / xác nhận tay) để trống."""
+        SANDBOX = "SANDBOX", "Sandbox (thử)"
+        PRODUCTION = "PRODUCTION", "Production (thật)"
 
     bank_txn_id = models.CharField("Mã giao dịch ngân hàng", max_length=100, unique=True)
     sales_order = models.ForeignKey(
@@ -47,6 +54,14 @@ class PaymentTransaction(models.Model):
     raw_payload = models.JSONField("Payload gốc", default=dict, blank=True)
     received_at = models.DateTimeField("Thời điểm nhận")
     created_at = models.DateTimeField(auto_now_add=True)
+
+    # BR-TT-14: môi trường cổng (chỉ Source.GATEWAY); "" = không áp dụng (webhook/manual).
+    environment = models.CharField(
+        "Môi trường cổng", max_length=10, choices=Environment.choices, blank=True, default="",
+    )
+    # BR-TT-15 (UC-5, PA): IPN trùng số tiền một khoản Chủ đã xác nhận tay nhưng KHÔNG cùng
+    # mã giao dịch — không tự coi là "tiền thừa" bình thường, phải cảnh báo trước khi hoàn.
+    duplicate_warning = models.CharField("Cảnh báo nghi trùng", max_length=255, blank=True, default="")
 
     # --- S12 / BR-TT-09: hàng chờ lệch — ai đóng, lúc nào, bằng cách nào ---------
     resolution_status = models.CharField(
