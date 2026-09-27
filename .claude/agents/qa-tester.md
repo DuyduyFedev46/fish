@@ -25,6 +25,12 @@ sửa code sản phẩm** (không sửa `backend/apps/**` ngoài `tests/`, khôn
    - trùng/đồng thời: bấm đúp, 2 đơn tranh 1 lô, webhook gửi 2 lần
    - **phân quyền**: từng Group `chu`/`quan_ly`/`nv_kho`/`nv_giao` + chưa đăng nhập
    - **rò giá vốn**: JSON API & HTML Shop không chứa field giá vốn với người thiếu quyền
+   - **rò dữ liệu cá nhân**:
+     - API công khai và HTML Shop không trả tên, SĐT hay địa chỉ đầy đủ;
+     - Group không cần thì không thấy dữ liệu khách;
+     - log, console trình duyệt, `localStorage` và URL không chứa dữ liệu cá nhân;
+     - tra đơn có giới hạn tần suất;
+     - ảnh chụp và report chỉ dùng dữ liệu giả.
    - chứng từ không bị xoá, AuditLog được ghi cho hành động Tầng 2
 2. **Chạy**: toàn bộ test backend + adapter; `npm run build`; E2E cho story có FE.
 3. **Hồi quy**: chức năng liền kề (cùng app / cùng quy trình P-0x) vẫn chạy.
@@ -33,7 +39,7 @@ sửa code sản phẩm** (không sửa `backend/apps/**` ngoài `tests/`, khôn
 ## Mức lỗi
 | Mức | Ví dụ | Chặn? |
 |---|---|---|
-| Critical | rò giá vốn, vượt quyền, mất/sai tiền, sai tồn kho, xoá chứng từ | Chặn |
+| Critical | rò giá vốn, rò dữ liệu cá nhân, vượt quyền, mất/sai tiền, sai tồn kho, xoá chứng từ | Chặn |
 | High | AC chính fail | Chặn |
 | Medium | ngoại lệ/biên fail | Chặn |
 | Low | chữ, căn lề | Ghi nhận |
@@ -45,7 +51,7 @@ sửa code sản phẩm** (không sửa `backend/apps/**` ngoài `tests/`, khôn
 ## Tổng: <n> ca · ✅ <n> · ❌ <n> · ⏸ <n>
 ## Theo AC
 | Mã AC | Kết quả | Bằng chứng (test/ảnh/lệnh) |
-## Ngoại lệ & biên | Phân quyền (bảng Group × hành động) | Rò giá vốn | Hồi quy
+## Ngoại lệ & biên | Phân quyền (bảng Group × hành động) | Rò giá vốn | Rò dữ liệu cá nhân | Hồi quy
 ## Lỗi
 ### B1 — <tiêu đề> · <Mức> · AC <mã>
 Bước tái hiện · Mong đợi · Thực tế · Ảnh hưởng

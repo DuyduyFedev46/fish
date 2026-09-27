@@ -41,3 +41,7 @@ ibelick/ui-skills, vercel web-design-guidelines. Hướng thiết kế + chọn 
 - Không deploy khi Duy chưa yêu cầu.
 - Không báo "xong"/"test xanh" khi chưa chạy lệnh kiểm chứng trong lượt đó.
 - Không rò giá vốn, không xoá chứng từ, không lật quyết định trong `doc/decisions.md`.
+- **Không rò dữ liệu cá nhân của khách** (tên, SĐT, địa chỉ). Quy tắc chi tiết ở bất biến 9 trong skill
+  `caveve-domain`. Tóm tắt: API công khai không trả dữ liệu cá nhân, không ghi dữ liệu cá nhân vào log, không
+  đưa dữ liệu thật vào test/doc/commit, không gửi cho bên thứ ba khi Duy chưa duyệt. Rò dữ liệu cá nhân là
+  lỗi **Critical**. Pháp lý go-live xem ở `doc/ops/go-live-phap-ly.md`.

@@ -23,6 +23,9 @@ hơn không kém.
    của app đó) trước khi viết.
 2. Với từng AC: RED → GREEN → REFACTOR (skill `tdd-workflow`). Tên test mang mã AC.
 3. Luôn có test phân quyền (403) và test không rò giá vốn nếu endpoint trả dữ liệu lô/giá.
+   Endpoint nào trả hoặc nhận dữ liệu khách (tên, SĐT, địa chỉ) phải có thêm test không rò dữ liệu cá nhân:
+   API công khai không chứa các field đó, và Group không cần thì không thấy. Không log payload hay dữ liệu
+   cá nhân (bất biến 9 của `caveve-domain`). Fixture chỉ dùng SĐT và địa chỉ giả.
 4. Chạy toàn bộ `cd backend && .venv/bin/python manage.py test` (và `pytest` ở adapter nếu
    có sửa) + `makemigrations --check --dry-run`.
 5. Ghi `03-dev-notes.md` (mục BE): file đã sửa, endpoint mới + JSON mẫu, migration, rule

@@ -25,7 +25,7 @@ trong story để làm song song với BE.
 ## Cách làm
 1. Đọc story + AC + contract; đọc component/trang tương tự đang có để bắt chước.
 2. Thêm kiểu vào `lib/types.ts`, hàm vào `lib/api.ts` **kèm** nhánh mock trong `lib/mock.ts`.
-3. Làm UI theo skill `caveve-ui`: hướng Linear/Notion tinh gọn, chỉ dùng token trong `DESIGN.md`, đủ các trạng thái (tải, lỗi, rỗng, 403, đang gửi), mobile-first, tiếng Việt, không lộ giá vốn ở Shop. Trước khi báo xong phải qua "Cổng chất lượng UI" của `caveve-ui`.
+3. Làm UI theo skill `caveve-ui`: hướng Linear/Notion tinh gọn, chỉ dùng token trong `DESIGN.md`, đủ các trạng thái (tải, lỗi, rỗng, 403, đang gửi), mobile-first, tiếng Việt, không lộ giá vốn ở Shop. Không lưu dữ liệu cá nhân (tên, SĐT, địa chỉ) vào `localStorage`, URL hay `console.log`. Nếu hiện SĐT hay địa chỉ ở trang công khai thì phải che bớt (bất biến 9 của `caveve-domain`). Trước khi báo xong phải qua "Cổng chất lượng UI" của `caveve-ui`.
 4. Kiểm: `cd frontend && npx tsc --noEmit && npm run build` phải sạch. Tự chạy nhanh
    `NEXT_PUBLIC_USE_MOCK=1 npm run dev` và mở trang bằng Playwright chụp 1 ảnh mobile nếu
    có thể (skill `e2e-playwright` cho cách làm) — tắt server sau khi xong.

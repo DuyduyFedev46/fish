@@ -72,6 +72,29 @@ frontend/ (Next.js 14, static export → Firebase cangca-loc)   erp-console/ (Ne
 7. Tiền dùng `Decimal`, không float. Tham số nghiệp vụ đọc từ `settings`/env, không hard-code.
 8. Schema là tài sản đã ổn định: thêm model/field phải có lý do trong hồ sơ tính năng
    và migration đi kèm.
+9. **Không rò dữ liệu cá nhân của khách** (Luật BVDLCN 2025, checklist `doc/ops/go-live-phap-ly.md`).
+   Dữ liệu cá nhân gồm tên, SĐT, địa chỉ ở `Customer.*`, `SalesOrder.phone/delivery_address`, `DeliveryNote`,
+   cùng nội dung IPN hay sao kê có tên người chuyển. Mức nghiêm trọng ngang rò giá vốn.
+   - **Thu tối thiểu.** Chỉ thu field phục vụ giao hàng hoặc thanh toán. Thêm field cá nhân mới phải ghi lý do
+     trong `01-analysis.md` và Duy duyệt.
+   - **API công khai (`AllowAny`) không bao giờ trả tên, SĐT hay địa chỉ đầy đủ.** Nếu cần hiện thì che bớt,
+     ví dụ `09xx xxx 123`. Tra đơn phải có yếu tố xác minh (mã đơn + SĐT) và **giới hạn tần suất**.
+   - **Trong ERP, chỉ lộ cho ai cần** (Tầng 3). `nv_giao` chỉ thấy khách của phiếu giao được giao cho mình.
+     Serializer liệt kê field tường minh, giống quy tắc giá vốn.
+   - **Không ghi dữ liệu cá nhân vào log**, gồm `logger`, `print`, Sentry và console FE. Không log nguyên
+     `request.data` hay payload IPN. Chỉ log mã đơn, mã giao dịch và SĐT đã che. `AuditLog` ghi *ai làm gì
+     với đơn nào*, không chép địa chỉ hay SĐT vào `detail`.
+   - **Không đưa dữ liệu thật ra ngoài môi trường production.** Không dùng trong fixture, test, ảnh chụp QA,
+     `doc/`, commit hay tin nhắn. Staging và demo dùng dữ liệu giả. Không copy DB production xuống máy.
+     Repo đang công khai.
+   - **Không gửi dữ liệu cá nhân cho bên thứ ba mới** (analytics, pixel quảng cáo, AI, SMS…) khi Duy chưa duyệt
+     và chính sách quyền riêng tư chưa nêu. Đặc biệt không gửi tới dịch vụ đặt server ở nước ngoài
+     (xem mục 6b trong checklist).
+   - **FE không lưu dữ liệu cá nhân** vào `localStorage` hay URL (query string). Giỏ hàng chỉ giữ mã hàng và
+     số lượng. Form checkout phải có ô đồng ý xử lý dữ liệu khi có chính sách (việc go-live).
+   - **Chỉ truyền qua HTTPS.** Secret và chuỗi kết nối DB lấy từ Secret Manager, không commit.
+   - Quyền của khách (xem, sửa, xoá) xử lý bằng **ẩn danh hoá** trường cá nhân. Chứng từ vẫn giữ (bất biến 3),
+     không xoá dòng.
 
 ## Lệnh chuẩn
 
