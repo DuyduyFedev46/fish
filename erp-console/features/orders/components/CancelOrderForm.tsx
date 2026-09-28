@@ -7,6 +7,7 @@
 
 import { useEffect, useId, useRef, useState } from "react";
 import { Icon } from "@/shared/ui/Icon";
+import { ApiError } from "@/shared/lib/http";
 import { CANCEL_REASONS } from "../labels";
 import { ORDERS_MSG } from "../messages";
 import { cancelOrder } from "../api";
@@ -19,9 +20,10 @@ type Props = {
   onBusy: (b: boolean) => void;
   onCancel: () => void;
   onDone: (r: CancelOrderResult) => void;
+  onError400?: () => void;
 };
 
-export function CancelOrderForm({ order, onBusy, onCancel, onDone }: Props) {
+export function CancelOrderForm({ order, onBusy, onCancel, onDone, onError400 }: Props) {
   const id = useId();
   const [reasonCode, setReasonCode] = useState<CancelReasonCode | "">("");
   const [reasonErr, setReasonErr] = useState(false);
@@ -50,7 +52,15 @@ export function CancelOrderForm({ order, onBusy, onCancel, onDone }: Props) {
       noteRef.current?.focus();
       return;
     }
-    void sub.run(() => cancelOrder(order.id, { reason_code: reasonCode, note: n }), onDone);
+    void sub.run(
+      () => cancelOrder(order.id, { reason_code: reasonCode, note: n }),
+      onDone,
+      (err) => {
+        if (err instanceof ApiError && err.status === 400) {
+          onError400?.();
+        }
+      },
+    );
   };
 
   return (

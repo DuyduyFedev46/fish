@@ -26,9 +26,10 @@ type Props = {
   onBusy: (busy: boolean) => void;
   onCancel: () => void;
   onDone: (r: ConfirmPaymentResult) => void;
+  onError400?: () => void;
 };
 
-export function ConfirmPaymentForm({ order, fallbackTotal, onBusy, onCancel, onDone }: Props) {
+export function ConfirmPaymentForm({ order, fallbackTotal, onBusy, onCancel, onDone, onError400 }: Props) {
   const id = useId();
   const total = digits(order.total_amount ?? fallbackTotal);
   const [txn, setTxn] = useState("");
@@ -81,7 +82,11 @@ export function ConfirmPaymentForm({ order, fallbackTotal, onBusy, onCancel, onD
       setBusy(false);
       onBusy(false);
       if (err instanceof ApiError && err.status === 401) return;
-      setError(errorText(err));
+      const codeStr = err instanceof ApiError && err.code ? ` (${err.code})` : "";
+      setError(`${errorText(err)}${codeStr}`);
+      if (err instanceof ApiError && err.status === 400) {
+        onError400?.();
+      }
       requestAnimationFrame(() => errRef.current?.scrollIntoView({ block: "nearest" }));
     }
   };

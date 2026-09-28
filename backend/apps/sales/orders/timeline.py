@@ -39,6 +39,10 @@ class TimelineEvent:
     kind: str
     label: str
     actor_display: str
+    doc: str = "order"
+    actor_kind: str = "system"  # "system" | "user" | "ai"
+    ai_level: str | None = None
+    ai_config_version: int | None = None
 
 
 def actor_display(user):
@@ -65,9 +69,10 @@ def _audits(order, notes, returns, refunds):
         cond |= Q(model_name=REFUND_MODEL, object_id__in=[str(r.pk) for r in refunds])
     return list(
         AuditLog.objects.filter(cond)
-        .select_related("actor__staff_profile")
+        .select_related("actor__staff_profile", "ai_actor__staff_profile")
         .order_by("created_at", "id")
     )
+
 
 
 def build_timeline(order):
@@ -87,24 +92,37 @@ def build_timeline(order):
         if a.model_name == ORDER_MODEL and a.action == "confirm_payment_manual"
     }
 
-    events = [TimelineEvent(order.created_at, "order_placed",
-                            f"Khách đặt đơn {order.code} ({vnd_display(order.total_amount)})", SYSTEM)]
+    events = [
+        TimelineEvent(
+            order.created_at, "order_placed",
+            f"Khách đặt đơn {order.code} ({vnd_display(order.total_amount)})", SYSTEM,
+            doc="order", actor_kind="system",
+        )
+    ]
 
     for p in sorted(order.payments.all(), key=lambda p: (p.received_at, p.pk)):
-        who = manual_actor.get(p.bank_txn_id) if p.source == p.Source.MANUAL else None
+        who_user = manual_actor.get(p.bank_txn_id) if p.source == p.Source.MANUAL else None
         events.append(TimelineEvent(
             p.received_at, "payment_received",
             f"Nhận {vnd_display(p.amount)} · {p.get_source_display()} · "
             f"{p.get_match_status_display()} (mã GD {p.bank_txn_id})",
-            actor_display(who),
+            actor_display(who_user),
+            doc="order",
+            actor_kind="user" if who_user else "system",
         ))
 
     if invoice is not None:
-        events.append(TimelineEvent(invoice.issued_at, "invoice_issued",
-                                    f"Xuất hoá đơn {invoice.code}", SYSTEM))
+        events.append(TimelineEvent(
+            invoice.issued_at, "invoice_issued",
+            f"Xuất hoá đơn {invoice.code}", SYSTEM,
+            doc="invoice", actor_kind="system",
+        ))
     for n in notes:
-        events.append(TimelineEvent(n.created_at, "delivery_created",
-                                    f"Tạo phiếu giao {n.code} (Soạn hàng)", SYSTEM))
+        events.append(TimelineEvent(
+            n.created_at, "delivery_created",
+            f"Tạo phiếu giao {n.code} (Soạn hàng)", SYSTEM,
+            doc="delivery", actor_kind="system",
+        ))
 
     for a in audits:
         event = _audit_event(a, notes_by_id, returns_by_id, refunds_by_id)
@@ -117,12 +135,16 @@ def build_timeline(order):
                 r.created_at, "refund_created",
                 f"Tạo phiếu hoàn {vnd_display(r.amount)}" + (f" — {r.reason}" if r.reason else ""),
                 actor_display(r.created_by),
+                doc="refund",
+                actor_kind="user" if r.created_by else "system",
             ))
             if r.confirmed_at is not None:
                 events.append(TimelineEvent(
                     r.confirmed_at, "refund_confirmed",
                     f"Đã hoàn {vnd_display(r.amount)} (mã GD {r.bank_txn_ref})",
                     actor_display(r.confirmed_by),
+                    doc="refund",
+                    actor_kind="user" if r.confirmed_by else "system",
                 ))
 
     # sort ổn định: cùng thời điểm giữ thứ tự thêm vào (đặt → tiền → hoá đơn → phiếu giao …)
@@ -130,17 +152,38 @@ def build_timeline(order):
 
 
 def _audit_event(a, notes_by_id, returns_by_id, refunds_by_id):
-    who = actor_display(a.actor)
+    if a.actor_kind == AuditLog.ActorKind.AI:
+        who = f"AI của {actor_display(a.ai_actor)}"
+        kind_actor = "ai"
+        ai_lvl = getattr(a, "ai_level", None) or "C"
+        ai_cfg = getattr(a, "ai_config_version", None)
+    elif a.actor_kind == AuditLog.ActorKind.USER:
+        who = actor_display(a.actor)
+        kind_actor = "user"
+        ai_lvl = None
+        ai_cfg = None
+    else:
+        who = SYSTEM
+        kind_actor = "system"
+        ai_lvl = None
+        ai_cfg = None
+
     changes = a.changes or {}
     if a.model_name == ORDER_MODEL:
         if a.action == "cancel_unpaid_expired":
-            return TimelineEvent(a.created_at, "auto_cancelled",
-                                 "Tự huỷ vì quá hạn giữ chỗ, đã nhả hàng giữ", who)
+            return TimelineEvent(
+                a.created_at, "auto_cancelled",
+                "Tự huỷ vì quá hạn giữ chỗ, đã nhả hàng giữ", who,
+                doc="order", actor_kind=kind_actor, ai_level=ai_lvl, ai_config_version=ai_cfg,
+            )
         if a.action == "cancel_paid_order":
             reason = f" — lý do: {a.note}" if a.note else ""
             restored = changes.get("stock_restored", True)  # S14: FAILED thì không hoàn kho (Q8b)
             label = "Huỷ đơn, hoàn hàng về lô gốc" if restored else "Huỷ đơn (hàng đang ở người giao, chưa hoàn kho)"
-            return TimelineEvent(a.created_at, "cancelled", f"{label}{reason}", who)
+            return TimelineEvent(
+                a.created_at, "cancelled", f"{label}{reason}", who,
+                doc="order", actor_kind=kind_actor, ai_level=ai_lvl, ai_config_version=ai_cfg,
+            )
         return None
     if a.model_name == NOTE_MODEL:
         note = notes_by_id.get(a.object_id)
@@ -149,34 +192,47 @@ def _audit_event(a, notes_by_id, returns_by_id, refunds_by_id):
             status = changes.get("status") or {}
             to = status.get("to")
             if to == DeliveryNote.Status.COMPLETED:
-                return TimelineEvent(a.created_at, "delivered", f"Giao hàng thành công ({code})", who)
+                return TimelineEvent(
+                    a.created_at, "delivered", f"Giao hàng thành công ({code})", who,
+                    doc="delivery", actor_kind=kind_actor, ai_level=ai_lvl, ai_config_version=ai_cfg,
+                )
             return TimelineEvent(
                 a.created_at, "delivery_status",
                 f"Phiếu giao {code}: {_note_status_label(status.get('from'))} → {_note_status_label(to)}",
                 who,
+                doc="delivery", actor_kind=kind_actor, ai_level=ai_lvl, ai_config_version=ai_cfg,
             )
         if a.action == "delivery_mark_failed":
             attempts = (changes.get("failed_attempts") or {}).get("to")
             label = f"Giao thất bại lần {attempts} ({code})"
             if changes.get("needs_decision"):
                 label += " — cần Quản lý/Chủ quyết định"
-            return TimelineEvent(a.created_at, "delivery_failed", label, who)
+            return TimelineEvent(
+                a.created_at, "delivery_failed", label, who,
+                doc="delivery", actor_kind=kind_actor, ai_level=ai_lvl, ai_config_version=ai_cfg,
+            )
         return None
     if a.model_name == RETURN_MODEL:
         rt = returns_by_id.get(a.object_id)
         if rt is None:
             return None
         if a.action == "return_to_warehouse":
-            return TimelineEvent(a.created_at, "return_to_warehouse",
-                                 f"Mang hàng về kho {kg_str(rt.qty)} kg — chờ duyệt", who)
+            return TimelineEvent(
+                a.created_at, "return_to_warehouse",
+                f"Mang hàng về kho {kg_str(rt.qty)} kg — chờ duyệt", who,
+                doc="return", actor_kind=kind_actor, ai_level=ai_lvl, ai_config_version=ai_cfg,
+            )
         if a.action == "approve_returntostock":
             decision = (changes.get("decision") or {}).get("to")
             try:
                 decision_label = ReturnToStock.Decision(decision).label
             except ValueError:
                 decision_label = decision or ""
-            return TimelineEvent(a.created_at, "return_approved",
-                                 f"Duyệt hàng về kho: {decision_label}", who)
+            return TimelineEvent(
+                a.created_at, "return_approved",
+                f"Duyệt hàng về kho: {decision_label}", who,
+                doc="return", actor_kind=kind_actor, ai_level=ai_lvl, ai_config_version=ai_cfg,
+            )
         return None
     if a.model_name == REFUND_MODEL:
         r = refunds_by_id.get(a.object_id)
@@ -186,9 +242,15 @@ def _audit_event(a, notes_by_id, returns_by_id, refunds_by_id):
             label = f"Phiếu hoàn {vnd_display(r.amount)} chuyển thất bại"
             if a.note:
                 label += f" — {a.note}"
-            return TimelineEvent(a.created_at, "refund_failed", label, who)
+            return TimelineEvent(
+                a.created_at, "refund_failed", label, who,
+                doc="refund", actor_kind=kind_actor, ai_level=ai_lvl, ai_config_version=ai_cfg,
+            )
         if a.action == "retry_refund":
-            return TimelineEvent(a.created_at, "refund_retry",
-                                 f"Thử chuyển lại phiếu hoàn {vnd_display(r.amount)}", who)
+            return TimelineEvent(
+                a.created_at, "refund_retry",
+                f"Thử chuyển lại phiếu hoàn {vnd_display(r.amount)}", who,
+                doc="refund", actor_kind=kind_actor, ai_level=ai_lvl, ai_config_version=ai_cfg,
+            )
         return None
     return None

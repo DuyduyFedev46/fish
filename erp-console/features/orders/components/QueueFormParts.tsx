@@ -143,7 +143,7 @@ export function useSubmit(onBusy: (b: boolean) => void) {
   const errRef = useRef<HTMLDivElement>(null);
 
   const run = useCallback(
-    async <T,>(send: () => Promise<T>, onOk: (r: T) => void) => {
+    async <T,>(send: () => Promise<T>, onOk: (r: T) => void, onErr?: (err: unknown) => void) => {
       if (lock.current) return;
       lock.current = true;
       setBusy(true);
@@ -160,7 +160,9 @@ export function useSubmit(onBusy: (b: boolean) => void) {
         setBusy(false);
         onBusy(false);
         if (err instanceof ApiError && err.status === 401) return;
-        setError(errorText(err));
+        const codeSuffix = err instanceof ApiError && err.code ? ` (${err.code})` : "";
+        setError(`${errorText(err)}${codeSuffix}`);
+        onErr?.(err);
         requestAnimationFrame(() => errRef.current?.scrollIntoView({ block: "nearest" }));
       }
     },

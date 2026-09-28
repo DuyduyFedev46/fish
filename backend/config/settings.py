@@ -255,3 +255,7 @@ CELERY_BEAT_SCHEDULE = {
 }
 # Ngưỡng cảnh báo job TTL "chết": còn đơn BOOKED quá hạn lâu hơn số phút này = báo động.
 TTL_JOB_HEALTH_GRACE_MINUTES = int(os.getenv("TTL_JOB_HEALTH_GRACE_MINUTES", "5"))
+
+# --- AI Digital Worker ----------------------------------------------------
+AI_ENABLED = _bool("AI_ENABLED", "0")
+

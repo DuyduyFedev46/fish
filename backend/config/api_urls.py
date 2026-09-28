@@ -14,6 +14,8 @@ from apps.accounts.audit.api import AuditLogListView
 from apps.accounts.auth.api import ChangePasswordView, LoginTokenView, LogoutView, MeView
 from apps.accounts.staff.api import StaffViewSet
 from apps.ai.commands.api import CommandCatalogView
+from apps.common.guidance.api import GuidanceView
+import apps.sales.orders.next_steps  # noqa: F401 - đăng ký guidance provider cho order
 from apps.catalog.images.api import ItemImageDetailView
 from apps.catalog.items.api import BundleLineViewSet, ItemGroupViewSet, ItemViewSet
 from apps.catalog.items.shop_api import ShopCatalogView, ShopItemDetailView
@@ -102,6 +104,8 @@ urlpatterns = [
     path("commands/catalog/", CommandCatalogView.as_view()),
     # S03: nhật ký hành động (append-only) — quyền accounts.view_auditlog (chu + quan_ly).
     path("audit-logs/", AuditLogListView.as_view()),
+    # Tiếp theo · Đã làm (02b §6.7, DW-03)
+    path("guidance/<str:doc_type>/<str:doc_id>/", GuidanceView.as_view(), name="guidance-detail"),
     # Back-office (router)
     path("", include(router.urls)),
 ]

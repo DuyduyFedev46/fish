@@ -102,6 +102,12 @@ class AuditLog(models.Model):
         verbose_name_plural = "Nhật ký hành động"
         ordering = ["-created_at"]
         default_permissions = ("view",)  # BR-PQ-06: chỉ xem, không add/change/delete
+        indexes = [
+            models.Index(
+                fields=["model_name", "object_id", "created_at"],
+                name="auditlog_timeline_idx",
+            ),
+        ]
 
     def __str__(self):
         if self.actor_kind == self.ActorKind.AI:

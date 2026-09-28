@@ -26,6 +26,7 @@ import {
   labelOf,
 } from "../labels";
 import { ORDERS_MSG, QUEUE_MSG } from "../messages";
+import { GuidancePanel } from "@/features/guidance";
 import type { OrderAction, OrderDetail, OrderListItem, OrderTimelineEntry } from "../types";
 import { mmss, useNow } from "../useNow";
 import type { ResultNote } from "./OrderDetailSheet";
@@ -48,6 +49,7 @@ type Props = {
   noteRef: RefObject<HTMLDivElement>;
   actionRef: RefObject<HTMLButtonElement>;
   onAction: (a: OrderAction) => void;
+  guidanceRefreshKey?: number;
 };
 
 function Part({ title, count, children }: { title: string; count?: number; children: React.ReactNode }) {
@@ -103,7 +105,18 @@ function timelineOf(o: OrderDetail): { entries: OrderTimelineEntry[]; derived: b
   return { entries: out, derived: true };
 }
 
-export function OrderDetailView({ order: o, fallback, refreshing, refreshError, onRetry, note, noteRef, actionRef, onAction }: Props) {
+export function OrderDetailView({
+  order: o,
+  fallback,
+  refreshing,
+  refreshError,
+  onRetry,
+  note,
+  noteRef,
+  actionRef,
+  onAction,
+  guidanceRefreshKey,
+}: Props) {
   const { me } = useAuth();
   const booked = o.status === "BOOKED";
   const reservedUntil = o.reserved_until ?? (booked ? fallback.reserved_until : null);
@@ -237,6 +250,13 @@ export function OrderDetailView({ order: o, fallback, refreshing, refreshError, 
           </dd>
         </div>
       </dl>
+
+      <GuidancePanel
+        docType="order"
+        docId={o.id}
+        onAction={(key) => onAction(key as OrderAction)}
+        refreshSignal={guidanceRefreshKey}
+      />
 
       <Part title="Hàng" count={o.lines.length}>
         <ul className={s.items}>

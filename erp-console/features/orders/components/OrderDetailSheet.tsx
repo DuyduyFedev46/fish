@@ -58,6 +58,7 @@ export function OrderDetailSheet({ summary, onChanged, onClose }: Props) {
   const [mode, setMode] = useState<Mode>("view");
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<ResultNote | null>(null);
+  const [guidanceRefreshKey, setGuidanceRefreshKey] = useState(0);
   const seq = useRef(0);
   const noteRef = useRef<HTMLDivElement>(null);
   const actionRef = useRef<HTMLButtonElement>(null);
@@ -156,9 +157,16 @@ export function OrderDetailSheet({ summary, onChanged, onClose }: Props) {
           onBusy={setBusy}
           onCancel={backToView}
           onDone={onConfirmed}
+          onError400={() => setGuidanceRefreshKey((k) => k + 1)}
         />
       ) : mode === "cancel" && detail ? (
-        <CancelOrderForm order={detail} onBusy={setBusy} onCancel={backToView} onDone={onCancelled} />
+        <CancelOrderForm
+          order={detail}
+          onBusy={setBusy}
+          onCancel={backToView}
+          onDone={onCancelled}
+          onError400={() => setGuidanceRefreshKey((k) => k + 1)}
+        />
       ) : mode === "refund" && detail?.invoice ? (
         <RefundForm
           target={{ kind: "invoice", id: detail.invoice.id, invoiceTotal: detail.total_amount ?? summary.total_amount }}
@@ -179,6 +187,7 @@ export function OrderDetailSheet({ summary, onChanged, onClose }: Props) {
           note={note}
           noteRef={noteRef}
           actionRef={actionRef}
+          guidanceRefreshKey={guidanceRefreshKey}
           onAction={(a) => {
             if (a === "confirm_payment") {
               setNote(null);
