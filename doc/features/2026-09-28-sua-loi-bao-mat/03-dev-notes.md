@@ -73,3 +73,11 @@
 4. `git diff --exit-code frontend/firebase.json erp-console/firebase.json`:
    Exit code 0 (file production hoàn toàn không bị thay đổi).
 - Nhắc việc: Kiểm tra `curl -sI https://cangca-loc-staging.web.app/shop/ | grep -i x-robots-tag` và `https://cangca-erp-staging.web.app/` sẽ được Duy thực hiện sau khi deploy staging.
+
+### Commit origin/main trước khi merge (git log --oneline wip/autosave..origin/main):
+```
+7758878 (origin/main) Không đưa ảnh/asset lên git: gỡ 340 ảnh chụp test, thêm luật .gitignore
+b327092 Workflow: commit + push sau mỗi tính năng đã qua QA
+e2b4f14 Runbook deploy 1: cập nhật trạng thái đã chạy
+e4f1f2a Cá Về: ERP console mới, tài khoản & phân quyền, giao diện Linear/Notion
+```
