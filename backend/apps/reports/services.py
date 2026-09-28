@@ -3,8 +3,9 @@ Báo cáo giá vốn & lãi lỗ (P-10, mục 12 business-process-spec.md).
 
 Hai góc nhìn (12.1):
 - `batch_pnl`  : lãi/lỗ THEO LÔ — nguồn sự thật, tính lại từ `landed_unit_cost`
-  hiện hành (BR-BC-04), không dùng số ảnh chụp trên đơn. Lô chưa `CLOSED` phải
-  gắn nhãn "tạm tính" (BR-BC-05).
+  hiện hành (BR-BC-04), không dùng số ảnh chụp trên đơn. Doanh thu chỉ tính hoá đơn
+  chưa huỷ. Chi phí chỉ gồm giá mua + phân bổ (hao hụt và hàng hỏng chỉ để hiển thị,
+  không cộng hai lần vào giá vốn). Lô chưa `CLOSED` phải gắn nhãn "tạm tính" (BR-BC-05).
 - `period_pnl` : lãi/lỗ THEO KỲ (tháng) — điều hành, doanh thu/giá vốn ghi nhận
   cùng thời điểm xác nhận thanh toán (BR-BC-01/02), hoàn tiền tính vào kỳ phát
   sinh hoàn, không sửa ngược kỳ cũ (BR-BC-03).
@@ -23,15 +24,18 @@ ZERO = Decimal("0")
 def batch_pnl(*, batch):
     """
     Lãi/lỗ theo lô (nguồn sự thật, BR-BC-04):
-        Lãi/lỗ = doanh thu bán từ lô − (giá mua + chi phí phân bổ + hao hụt + hàng hỏng)
+        Lãi/lỗ = doanh thu bán từ lô − (giá mua + chi phí phân bổ)
 
-    - doanh thu bán từ lô = Σ(SalesInvoiceLineBatch.qty × rate dòng hoá đơn tương ứng).
+    - doanh thu bán từ lô = Σ(SalesInvoiceLineBatch.qty × rate dòng hoá đơn tương ứng),
+      loại trừ hoá đơn đã huỷ (status=CANCELLED).
     - giá mua = purchase_rate × qty_received (chưa gồm chi phí phụ).
     - chi phí phân bổ = Σ PurchaseCostAllocation.allocated_amount của lô.
     - hao hụt = kg âm từ kiểm kê (StockLedgerEntry.RECONCILE < 0) định giá theo
-      landed_unit_cost HIỆN HÀNH.
+      landed_unit_cost HIỆN HÀNH (chỉ hiển thị số tiền mất, đã nằm trong giá mua,
+      không cộng vào total_cost).
     - hàng hỏng = kg đã duyệt Huỷ bỏ (ReturnToStock.WRITE_OFF, APPROVED) định giá
-      theo landed_unit_cost hiện hành.
+      theo landed_unit_cost hiện hành (chỉ hiển thị số tiền mất, đã nằm trong giá mua,
+      không cộng vào total_cost).
     - Lô chưa CLOSED -> "provisional": True (BR-BC-05, nhãn "tạm tính").
     """
     if batch is None:
@@ -39,7 +43,9 @@ def batch_pnl(*, batch):
 
     revenue = ZERO
     qty_sold = ZERO
-    for alloc in batch.sold_allocations.select_related("invoice_line").all():
+    for alloc in batch.sold_allocations.select_related("invoice_line__invoice").exclude(
+        invoice_line__invoice__status=SalesInvoice.Status.CANCELLED   # BR-BC-04 (L-11, Duy duyệt 28/09)
+    ):
         revenue += alloc.qty * alloc.invoice_line.rate
         qty_sold += alloc.qty
 
@@ -62,7 +68,9 @@ def batch_pnl(*, batch):
         damage_qty += rt.qty
     damage_cost = damage_qty * batch.landed_unit_cost
 
-    total_cost = purchase_cost + allocated_cost + shrinkage_cost + damage_cost
+    # BR-BC-04 (sửa 2026-09-28, Duy duyệt): purchase_cost đã tính trên toàn bộ qty_received, gồm cả kg hao hụt/hỏng
+    # → shrinkage_cost/damage_cost chỉ để HIỂN THỊ số tiền mất, KHÔNG cộng vào total_cost.
+    total_cost = purchase_cost + allocated_cost
     profit = revenue - total_cost
 
     return {

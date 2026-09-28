@@ -144,7 +144,7 @@ def return_to_warehouse(*, note, batch, qty, actor) -> ReturnToStock: ...  # t�
 
 ### `apps/reports/services.py` (Agent C)
 ```python
-def batch_pnl(*, batch) -> dict: ...     # doanh thu từ lô − (giá mua + chi phí + hao hụt + hàng hỏng). Nguồn sự thật. Nhãn "tạm tính" nếu chưa chốt (BR-BC-05)
+def batch_pnl(*, batch) -> dict: ...     # doanh thu từ lô − (giá mua + chi phí phân bổ); hao hụt/hàng hỏng trả riêng, không cộng (BR-BC-04 sửa 28/09). Nguồn sự thật. Nhãn "tạm tính" nếu chưa chốt (BR-BC-05)
 def period_pnl(*, year, month) -> dict: ...  # doanh thu ghi nhận − giá vốn ghi nhận − hoàn tiền trong kỳ (BR-BC-03)
 ```
 

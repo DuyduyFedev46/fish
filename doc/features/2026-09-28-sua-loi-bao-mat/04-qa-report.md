@@ -143,3 +143,69 @@
    - Output: JSON parse hợp lệ, TypeScript kiểm tra không lỗi, Build Next.js thành công 21/21 static pages.
 4. `git diff --exit-code frontend/firebase.json erp-console/firebase.json`
    - Output: Exit code 0 (file cấu hình production hoàn toàn không bị đụng tới).
+
+## Lô 3: S06 (L-10), S07 (L-11) · Lần 1 · 2026-09-28
+### Kết luận: APPROVED — Lô 3 đạt 100% tiêu chí AC của S06 và S07; công thức lãi/lỗ theo lô được sửa chính xác theo quyết định của Duy 28/09 (BR-BC-04: không tính hai lần hao hụt/hàng hỏng; L-11: bỏ hoá đơn huỷ); bảo đảm triệt để Bất biến 1 (Không rò giá vốn), Bất biến 9 (Không rò PII) và Bất biến 4 (Append-only); 723/723 test backend chạy xanh.
+### Tổng: 38 ca · ✅ 38 · ❌ 0 · ⏸ 0
+
+### Theo AC
+| Mã AC | Kết quả | Bằng chứng (test/ảnh/lệnh) |
+|---|---|---|
+| **S06-AC1** (Ví dụ Duy, hao hụt không cộng hai lần) | ✅ PASS | `apps/reports/tests/test_services.py::test_batch_pnl_duy_example_shrinkage_not_double_counted`: Lô 100 kg × 100.000đ, không phân bổ; bán 90 kg × 150.000đ; kiểm kê RECONCILE −10 kg. Kết quả: `revenue` = 13.500.000đ, `purchase_cost` = 10.000.000đ, `allocated_cost` = 0, `shrinkage_qty` = 10, `shrinkage_cost` = 1.000.000đ, `total_cost` = 10.000.000đ, `profit` = **3.500.000đ** (đúng theo Duy, không còn bị trừ thành 2.500.000đ). |
+| **S06-AC2** (Hàng hỏng + chi phí phân bổ) | ✅ PASS | `apps/reports/tests/test_services.py::test_batch_pnl_damage_shown_not_added_to_total_cost` & `test_batch_pnl_computes_profit_with_shrinkage_and_damage`: Lô nhận 100 kg × 80.000đ, phân bổ 200.000đ (`landed_unit_cost` 82.000đ). Bán 60 kg × 120.000đ, hao hụt −2 kg (164.000đ), hàng hỏng 3 kg `WRITE_OFF APPROVED` (246.000đ). `total_cost` = **8.200.000đ**, `profit` = **−1.000.000đ** (trước đây 8.610.000đ và −1.410.000đ). Phiếu `DRAFT` (2 kg) và phiếu `RESTOCK APPROVED` (1 kg) không được tính vào `damage_qty`. |
+| **S06-AC3** (Bất biến công thức trước/sau tổn thất) | ✅ PASS | `apps/reports/tests/test_services.py::test_batch_pnl_total_cost_invariant_under_losses`: Xác minh `total_cost == purchase_cost + allocated_cost` và `profit == revenue - total_cost`. Thêm bút toán hao hụt kiểm kê và phiếu hàng hoàn huỷ bỏ không làm đổi `total_cost` hay `profit` (chỉ hiển thị trong `shrinkage_*` và `damage_*`). |
+| **S06-AC4** (Nhãn "tạm tính" và đồng nhất công thức) | ✅ PASS | `apps/reports/tests/test_services.py::test_batch_pnl_not_provisional_when_closed`: Lô `CLOSED` trả `provisional: false`; lô chưa `CLOSED` trả `provisional: true`. Cả hai trạng thái đều áp dụng cùng một công thức `total_cost = purchase_cost + allocated_cost`, không rẽ nhánh logic. |
+| **S06-AC5** (Contract giữ đúng 14 khoá) | ✅ PASS | `apps/reports/tests/test_services.py::test_batch_pnl_keys_unchanged`: Response giữ đúng 14 khoá tiêu chuẩn (`batch_id`, `provisional`, `qty_received`, `qty_sold`, `landed_unit_cost`, `revenue`, `purchase_cost`, `allocated_cost`, `shrinkage_qty`, `shrinkage_cost`, `damage_qty`, `damage_cost`, `total_cost`, `profit`), không thêm/bớt/đổi tên khoá. |
+| **S06-AC6** (Phân quyền & không rò giá vốn) | ✅ PASS | `apps/reports/tests/test_api.py::BatchPnlApiTests`: `chu` (có quyền `reports.view_profitreport`) nhận 200 OK đủ 14 khoá; `quan_ly`, `nv_kho`, `nv_giao` nhận 403 Forbidden và payload JSON lỗi không chứa khoá nhạy cảm (`profit`, `landed_unit_cost`, `purchase_cost`, `total_cost`, `allocated_cost`); khách chưa đăng nhập nhận 401 Unauthorized; mã lô không tồn tại nhận 404 Not Found. |
+| **S06-AC7** (Nơi khác không đổi & tài liệu cập nhật) | ✅ PASS | `period_pnl` (`/api/reports/period/`) giữ nguyên công thức BR-BC-01..03, 3 test kỳ xanh nguyên; `dashboard_api.py` không đổi; `doc/BUILD-PLAN.md:147` và docstring `services.py` đã cập nhật chuẩn công thức mới. Không có màn FE nào bị ảnh hưởng. |
+| **S07-AC1** (Một hoá đơn huỷ, một hiệu lực) | ✅ PASS | `apps/reports/tests/test_services.py::test_batch_pnl_excludes_cancelled_invoice_revenue`: Lô 100 kg × 100.000đ; hoá đơn A `ISSUED` 30 kg × 150.000đ; hoá đơn B `CANCELLED` 20 kg × 150.000đ. `revenue` = 4.500.000đ, `qty_sold` = 30 kg, `total_cost` = 10.000.000đ, `profit` = **−5.500.000đ** (loại bỏ hoàn toàn doanh thu từ hoá đơn B). |
+| **S07-AC2** (Chỉ có hoá đơn huỷ) | ✅ PASS | `apps/reports/tests/test_services.py::test_batch_pnl_only_cancelled_invoices_zero_revenue`: Lô chỉ có hoá đơn `CANCELLED` trả `revenue` = 0, `qty_sold` = 0, `profit` = −`total_cost`. |
+| **S07-AC3** (Huỷ sau khi xem & bất biến append-only) | ✅ PASS | `apps/reports/tests/test_services.py::test_batch_pnl_invoice_cancelled_after_issue`: Hoá đơn từ `ISSUED` chuyển sang `CANCELLED` làm `revenue`/`qty_sold` giảm trừ chính xác; bảng `SalesInvoiceLineBatch` không bị xoá hay sửa dòng nào (Bất biến 4 append-only). |
+| **S07-AC4** (Các trường khác giữ nguyên) | ✅ PASS | Các chỉ số `purchase_cost`, `allocated_cost`, `shrinkage_*`, `damage_*`, `total_cost`, `provisional` giữ nguyên giá trị độc lập với trạng thái hoá đơn huỷ. |
+| **S07-AC5** (Phạm vi — nơi khác đã chuẩn) | ✅ PASS | `period_pnl` (`services.py:112-114`) và `dashboard_api.py:57-59` đã lọc sẵn `status=ISSUED` từ trước → không cần sửa. Chỉ sửa lọc `exclude(status=CANCELLED)` trong `batch_pnl`. |
+
+### Ngoại lệ & biên
+- **Kiểm tra đầu vào `batch=None`**: Raise `BusinessError("Thiếu lô để tính báo cáo lãi lỗ.")` đúng chuẩn domain exception Cá Về.
+- **Biên doanh thu = 0**: Lô chưa bán được kg nào hoặc toàn bộ hoá đơn bị huỷ đều tính toán chính xác `revenue = 0`, `profit = -total_cost`.
+- **Định giá hao hụt/hàng hỏng**: Sử dụng `batch.landed_unit_cost` hiện hành của lô (theo BR-BC-04), không lấy nhầm `unit_cost` ảnh chụp trên dòng hoá đơn.
+- **Trạng thái phiếu hàng hoàn**: Chỉ phiếu `decision=WRITE_OFF` và `status=APPROVED` mới được tổng hợp vào `damage_qty/damage_cost`; phiếu `DRAFT` hoặc `RESTOCK` bị loại bỏ chính xác.
+- **Lô đã chốt (`CLOSED`) vs chưa chốt (`SELLING`)**: Cùng một công thức duy nhất `total_cost = purchase_cost + allocated_cost`, bảo đảm tính nhất quán trước và sau khi chốt lô.
+
+### Phân quyền (bảng vai × hành động)
+| Vai | GET /api/reports/batch/<batch_id>/ | Quyền truy cập giá vốn / lãi lỗ |
+|---|---|---|
+| **Chủ** (`chu`) | 200 OK (đủ 14 khoá) | Có quyền `reports.view_profitreport` |
+| **Quản lý** (`quan_ly`) | 403 Forbidden | Bị chặn, response không có khoá nhạy cảm |
+| **Nhân viên kho** (`nv_kho`) | 403 Forbidden | Bị chặn, response không có khoá nhạy cảm |
+| **Nhân viên giao** (`nv_giao`) | 403 Forbidden | Bị chặn, response không có khoá nhạy cảm |
+| **Khách** (chưa đăng nhập) | 401 Unauthorized | Bị chặn ngay từ tầng Authentication |
+
+### Rò giá vốn (Bất biến 1 — BR-PQ-13, BR-GV-03)
+- ✅ API `GET /api/reports/batch/<batch_id>/` được bảo vệ chặt chẽ bằng `require_perm(request.user, "reports.view_profitreport")`.
+- ✅ Các nhóm người dùng không phải Chủ (`quan_ly`, `nv_kho`, `nv_giao`) khi gọi API đều nhận mã HTTP 403 Forbidden.
+- ✅ Kiểm tra tập khoá trả về của response lỗi 403: Hoàn toàn không rò rỉ bất kỳ khoá giá vốn hay lãi lỗ nào (`profit`, `landed_unit_cost`, `purchase_cost`, `total_cost`, `allocated_cost`).
+
+### Rò dữ liệu cá nhân khách (Bất biến 9)
+- ✅ Response API báo cáo lô chỉ bao gồm đúng 14 trường thống kê tài chính/kho của lô, tuyệt đối không chứa bất kỳ trường thông tin cá nhân nào của khách hàng (`customer`, `name`, `phone`, `delivery_address`).
+- ✅ Toàn bộ test fixture chỉ sử dụng số điện thoại giả (`0900000002`) và tên giả (`Khách B`).
+
+### Hồi quy & Toàn vẹn hệ thống
+- ✅ Toàn bộ 723 test backend chạy hoàn toàn xanh (tăng 11 test từ 712 lên 723 test).
+- ✅ Báo cáo theo kỳ (`period_pnl`) và demo seed script (`apps.accounts.demo`) chạy xanh 57/57 tests.
+- ✅ Không phát sinh migration nào (`makemigrations --check --dry-run` báo `No changes detected`).
+- ✅ `git diff --stat origin/main -- frontend erp-console backend/apps/reports/api.py` rỗng hoàn toàn, không có sửa đổi ngoài phạm vi.
+- ✅ Sửa test cũ có chủ đích duy nhất: `test_batch_pnl_computes_profit_with_shrinkage_and_damage` (sửa `total_cost` 8.610.000đ → 8.200.000đ và `profit` −1.410.000đ → −1.000.000đ do test cũ khoá công thức sai BR-BC-04 cũ).
+
+### Lỗi
+- Không có lỗi nào (0 lỗi).
+
+### Lệnh đã chạy (kèm output tóm tắt)
+1. `cd backend && .venv/bin/python manage.py test apps.reports apps.accounts.demo`
+   - Output: `Ran 57 tests in 17.571s. OK`
+2. `grep -n "total_cost = " backend/apps/reports/services.py`
+   - Output: `73:    total_cost = purchase_cost + allocated_cost` (đúng duy nhất 1 dòng logic).
+3. `git diff --stat origin/main -- frontend erp-console backend/apps/reports/api.py`
+   - Output: Rỗng (không có file nào bị thay đổi).
+4. `cd backend && .venv/bin/python manage.py test && .venv/bin/python manage.py makemigrations --check --dry-run`
+   - Output: `Ran 723 tests in 68.393s. OK. No changes detected.`
+

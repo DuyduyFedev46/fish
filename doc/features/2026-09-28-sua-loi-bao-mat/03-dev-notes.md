@@ -81,3 +81,58 @@ b327092 Workflow: commit + push sau mỗi tính năng đã qua QA
 e2b4f14 Runbook deploy 1: cập nhật trạng thái đã chạy
 e4f1f2a Cá Về: ERP console mới, tài khoản & phân quyền, giao diện Linear/Notion
 ```
+
+## Lô 3: S06 (L-10), S07 (L-11)
+- Trạng thái: BE hoàn thành, kiểm chứng xanh, chuyển QA
+- Nhánh thực hiện: `main`
+
+### Baseline trước Lô 3:
+- Lệnh: `cd backend && .venv/bin/python manage.py test apps.reports`
+- Kết quả: `Ran 13 tests in 1.689s. OK`
+
+### Danh sách file thực hiện:
+- `backend/apps/reports/services.py`:
+  - `batch_pnl`: Vòng lặp doanh thu thêm `.exclude(invoice_line__invoice__status=SalesInvoice.Status.CANCELLED)` (S07 / L-11).
+  - `total_cost = purchase_cost + allocated_cost` (không cộng `shrinkage_cost` và `damage_cost` vào `total_cost`, chỉ trả về để hiển thị) (S06 / L-10).
+  - `profit = revenue - total_cost`.
+  - Cập nhật docstring module và docstring hàm `batch_pnl` giải thích rõ quy tắc mới theo BR-BC-04.
+- `doc/BUILD-PLAN.md`: Sửa dòng 147 ghi rõ công thức mới `batch_pnl`.
+- `backend/apps/reports/tests/test_services.py`:
+  - Mở rộng `_make_invoice` hỗ trợ tham số `batch` và `status`.
+  - Sửa test cũ có chủ đích duy nhất: `test_batch_pnl_computes_profit_with_shrinkage_and_damage`:
+    - `total_cost`: `8610000` -> `8200000`
+    - `profit`: `-1410000` -> `-1000000`
+  - Bổ sung assert cùng công thức cho lô `CLOSED` trong `test_batch_pnl_not_provisional_when_closed`.
+  - Thêm tests cho S06:
+    - `test_batch_pnl_duy_example_shrinkage_not_double_counted` (AC1)
+    - `test_batch_pnl_damage_shown_not_added_to_total_cost` (AC2)
+    - `test_batch_pnl_total_cost_invariant_under_losses` (AC3)
+    - `test_batch_pnl_keys_unchanged` (AC5, đúng 14 khoá)
+  - Thêm tests cho S07:
+    - `test_batch_pnl_excludes_cancelled_invoice_revenue` (AC1)
+    - `test_batch_pnl_only_cancelled_invoices_zero_revenue` (AC2)
+    - `test_batch_pnl_invoice_cancelled_after_issue` (AC3)
+- `backend/apps/reports/tests/test_api.py` (mới):
+  - `BatchPnlApiTests`: 4 tests kiểm tra phân quyền và không rò giá vốn/lãi lỗ (AC6):
+    - `test_chu_can_view_batch_pnl` (200, 14 khoá)
+    - `test_non_owner_groups_forbidden_and_no_cost_keys` (403, không rò khoá)
+    - `test_anonymous_user_unauthorized` (401)
+    - `test_non_existent_batch_returns_404` (404)
+
+### Sửa test cũ có chủ đích (duy nhất):
+- `apps/reports/tests/test_services.py::ReportsServiceTests::test_batch_pnl_computes_profit_with_shrinkage_and_damage`:
+  `total_cost` 8.610.000 -> 8.200.000, `profit` -1.410.000 -> -1.000.000 vì test cũ đang khoá công thức sai BR-BC-04 cũ tính hai lần hao hụt/hàng hỏng.
+
+### Lệch thiết kế:
+- Không có. Tuân thủ 100% tài liệu thiết kế `02b-tech-design.md` §7, §7b.
+
+### Kết quả kiểm chứng thực tế:
+1. `cd backend && .venv/bin/python manage.py test apps.reports apps.accounts.demo`:
+   `Ran 57 tests in 17.571s. OK`
+2. `grep -n "total_cost = " backend/apps/reports/services.py`:
+   `73:    total_cost = purchase_cost + allocated_cost` (chính xác 1 dòng).
+3. `git diff --stat origin/main -- frontend erp-console backend/apps/reports/api.py`:
+   Rỗng hoàn toàn.
+4. `cd backend && .venv/bin/python manage.py test && .venv/bin/python manage.py makemigrations --check --dry-run`:
+   `Ran 723 tests in 68.393s. OK. No changes detected.` (tăng 11 test từ 712 lên 723).
+

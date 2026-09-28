@@ -61,7 +61,9 @@ class ReportsServiceTests(TestCase):
         self.batch.refresh_from_db()
         self.assertEqual(self.batch.landed_unit_cost, Decimal("82000"))
 
-    def _make_invoice(self, *, code, issued_at, qty_sold, sell_rate, unit_cost, amount=None):
+    def _make_invoice(self, *, code, issued_at, qty_sold, sell_rate, unit_cost, amount=None, batch=None, status=SalesInvoice.Status.ISSUED):
+        target_batch = batch or self.batch
+        target_item = target_batch.item
         order = SalesOrder.objects.create(
             code=f"SO-{code}", customer=self.customer, status=SalesOrder.Status.PROCESSING,
             delivery_address="123 đường A", phone=self.customer.phone,
@@ -69,14 +71,14 @@ class ReportsServiceTests(TestCase):
         )
         invoice = SalesInvoice.objects.create(
             code=code, sales_order=order, customer=self.customer, issued_at=issued_at,
-            amount=amount or (qty_sold * sell_rate), status=SalesInvoice.Status.ISSUED,
+            amount=amount or (qty_sold * sell_rate), status=status,
         )
         line = SalesInvoiceLine.objects.create(
-            invoice=invoice, item=self.item, qty=qty_sold, rate=sell_rate,
+            invoice=invoice, item=target_item, qty=qty_sold, rate=sell_rate,
             amount=qty_sold * sell_rate,
         )
         SalesInvoiceLineBatch.objects.create(
-            invoice_line=line, batch=self.batch, component_item=self.item,
+            invoice_line=line, batch=target_batch, component_item=target_item,
             qty=qty_sold, unit_cost=unit_cost,
         )
         return invoice
@@ -109,8 +111,9 @@ class ReportsServiceTests(TestCase):
         self.assertEqual(result["shrinkage_cost"], Decimal("164000"))    # 2 × 82.000 (hiện hành)
         self.assertEqual(result["damage_qty"], Decimal("3"))
         self.assertEqual(result["damage_cost"], Decimal("246000"))       # 3 × 82.000 (hiện hành)
-        self.assertEqual(result["total_cost"], Decimal("8610000"))
-        self.assertEqual(result["profit"], Decimal("-1410000"))          # lỗ vì lô chưa bán hết
+        # BR-BC-04 sửa 2026-09-28: total_cost không cộng shrinkage_cost + damage_cost
+        self.assertEqual(result["total_cost"], Decimal("8200000"))
+        self.assertEqual(result["profit"], Decimal("-1000000"))          # lỗ vì lô chưa bán hết
         self.assertTrue(result["provisional"])                          # chưa CLOSED (BR-BC-05)
 
     def test_batch_pnl_not_provisional_when_closed(self):
@@ -119,6 +122,9 @@ class ReportsServiceTests(TestCase):
         self.batch.save(update_fields=["status", "closed_at"])
         result = services.batch_pnl(batch=self.batch)
         self.assertFalse(result["provisional"])
+        # S06-AC4: cùng công thức cho cả lô đã chốt
+        self.assertEqual(result["total_cost"], result["purchase_cost"] + result["allocated_cost"])
+        self.assertEqual(result["profit"], result["revenue"] - result["total_cost"])
 
     def test_batch_pnl_requires_batch(self):
         with self.assertRaises(BusinessError):
@@ -133,6 +139,180 @@ class ReportsServiceTests(TestCase):
         )
         result = services.batch_pnl(batch=self.batch)
         self.assertEqual(result["shrinkage_cost"], Decimal("82000"))  # không phải 80.000
+
+    # --- S06 (L-10) Tests ---------------------------------------------------
+
+    def test_batch_pnl_duy_example_shrinkage_not_double_counted(self):
+        """
+        S06-AC1: Ví dụ Duy — Lô nhận 100 kg, purchase_rate 100.000, không phân bổ.
+        Bán 90 kg × 150.000, kiểm kê RECONCILE -10 kg.
+        profit = 13.500.000 - 10.000.000 = 3.500.000 (không phải 2.500.000).
+        """
+        batch = batch_services.create_batch(
+            item=self.item, supplier=self.sup, warehouse=self.wh,
+            received_date=datetime.date(2026, 9, 2), qty=Decimal("100"),
+            purchase_rate=Decimal("100000"),
+        )
+        self._make_invoice(
+            code="INV-S06-1", issued_at=_dt(2026, 9, 6), qty_sold=Decimal("90"),
+            sell_rate=Decimal("150000"), unit_cost=Decimal("100000"), batch=batch,
+        )
+        StockLedgerEntry.objects.create(
+            batch=batch, movement_type=StockLedgerEntry.MovementType.RECONCILE,
+            qty_change=Decimal("-10"), reference="KK-S06-1", created_by=self.user,
+        )
+
+        res = services.batch_pnl(batch=batch)
+        self.assertEqual(res["revenue"], Decimal("13500000"))
+        self.assertEqual(res["purchase_cost"], Decimal("10000000"))
+        self.assertEqual(res["allocated_cost"], Decimal("0"))
+        self.assertEqual(res["shrinkage_qty"], Decimal("10"))
+        self.assertEqual(res["shrinkage_cost"], Decimal("1000000"))
+        self.assertEqual(res["total_cost"], Decimal("10000000"))
+        self.assertEqual(res["profit"], Decimal("3500000"))
+
+    def test_batch_pnl_damage_shown_not_added_to_total_cost(self):
+        """
+        S06-AC2: Hàng hỏng WRITE_OFF APPROVED vào damage_*, DRAFT không vào;
+        total_cost không cộng damage_cost.
+        """
+        # Hàng hỏng đã duyệt huỷ bỏ 5kg
+        ReturnToStock.objects.create(
+            batch=self.batch, qty=Decimal("5"), decision=ReturnToStock.Decision.WRITE_OFF,
+            status=ReturnToStock.Status.APPROVED, created_by=self.user, approved_by=self.user,
+        )
+        # Hàng hỏng còn DRAFT 2kg (không được tính vào damage)
+        ReturnToStock.objects.create(
+            batch=self.batch, qty=Decimal("2"), decision=ReturnToStock.Decision.WRITE_OFF,
+            status=ReturnToStock.Status.DRAFT, created_by=self.user,
+        )
+        # Phiếu duyệt RESTOCK 1kg (không phải WRITE_OFF, không tính vào damage)
+        ReturnToStock.objects.create(
+            batch=self.batch, qty=Decimal("1"), decision=ReturnToStock.Decision.RESTOCK,
+            status=ReturnToStock.Status.APPROVED, created_by=self.user, approved_by=self.user,
+        )
+
+        res = services.batch_pnl(batch=self.batch)
+        self.assertEqual(res["damage_qty"], Decimal("5"))
+        self.assertEqual(res["damage_cost"], Decimal("410000"))  # 5 × 82.000
+        self.assertEqual(res["total_cost"], Decimal("8200000"))  # purchase 8.000.000 + allocated 200.000
+
+    def test_batch_pnl_total_cost_invariant_under_losses(self):
+        """
+        S06-AC3: Thêm hao hụt hay hàng hỏng không làm đổi total_cost hay profit (khi revenue cố định).
+        """
+        res_before = services.batch_pnl(batch=self.batch)
+
+        StockLedgerEntry.objects.create(
+            batch=self.batch, movement_type=StockLedgerEntry.MovementType.RECONCILE,
+            qty_change=Decimal("-3"), reference="KK-INV", created_by=self.user,
+        )
+        ReturnToStock.objects.create(
+            batch=self.batch, qty=Decimal("2"), decision=ReturnToStock.Decision.WRITE_OFF,
+            status=ReturnToStock.Status.APPROVED, created_by=self.user, approved_by=self.user,
+        )
+
+        res_after = services.batch_pnl(batch=self.batch)
+        self.assertEqual(res_after["total_cost"], res_before["total_cost"])
+        self.assertEqual(res_after["profit"], res_before["profit"])
+        self.assertEqual(res_after["shrinkage_qty"], Decimal("3"))
+        self.assertEqual(res_after["damage_qty"], Decimal("2"))
+        self.assertEqual(res_after["total_cost"], res_after["purchase_cost"] + res_after["allocated_cost"])
+        self.assertEqual(res_after["profit"], res_after["revenue"] - res_after["total_cost"])
+
+    def test_batch_pnl_keys_unchanged(self):
+        """
+        S06-AC5: Giữ đúng 14 khoá, không thêm, không bớt.
+        """
+        expected_keys = {
+            "batch_id", "provisional", "qty_received", "qty_sold", "landed_unit_cost",
+            "revenue", "purchase_cost", "allocated_cost", "shrinkage_qty", "shrinkage_cost",
+            "damage_qty", "damage_cost", "total_cost", "profit",
+        }
+        res = services.batch_pnl(batch=self.batch)
+        self.assertEqual(set(res.keys()), expected_keys)
+        self.assertEqual(len(res), 14)
+
+    # --- S07 (L-11) Tests ---------------------------------------------------
+
+    def test_batch_pnl_excludes_cancelled_invoice_revenue(self):
+        """
+        S07-AC1: Hoá đơn ISSUED 30kg + CANCELLED 20kg -> revenue chỉ tính 30kg ISSUED.
+        """
+        batch = batch_services.create_batch(
+            item=self.item, supplier=self.sup, warehouse=self.wh,
+            received_date=datetime.date(2026, 9, 3), qty=Decimal("100"),
+            purchase_rate=Decimal("100000"),
+        )
+        self._make_invoice(
+            code="INV-S07-A", issued_at=_dt(2026, 9, 7), qty_sold=Decimal("30"),
+            sell_rate=Decimal("150000"), unit_cost=Decimal("100000"), batch=batch,
+            status=SalesInvoice.Status.ISSUED,
+        )
+        self._make_invoice(
+            code="INV-S07-B", issued_at=_dt(2026, 9, 7), qty_sold=Decimal("20"),
+            sell_rate=Decimal("150000"), unit_cost=Decimal("100000"), batch=batch,
+            status=SalesInvoice.Status.CANCELLED,
+        )
+
+        res = services.batch_pnl(batch=batch)
+        self.assertEqual(res["revenue"], Decimal("4500000"))      # 30 × 150.000
+        self.assertEqual(res["qty_sold"], Decimal("30"))
+        self.assertEqual(res["total_cost"], Decimal("10000000"))
+        self.assertEqual(res["profit"], Decimal("-5500000"))
+
+    def test_batch_pnl_only_cancelled_invoices_zero_revenue(self):
+        """
+        S07-AC2: Lô chỉ có hoá đơn CANCELLED -> revenue = 0, qty_sold = 0, profit = -total_cost.
+        """
+        batch = batch_services.create_batch(
+            item=self.item, supplier=self.sup, warehouse=self.wh,
+            received_date=datetime.date(2026, 9, 3), qty=Decimal("50"),
+            purchase_rate=Decimal("100000"),
+        )
+        self._make_invoice(
+            code="INV-S07-C", issued_at=_dt(2026, 9, 7), qty_sold=Decimal("20"),
+            sell_rate=Decimal("150000"), unit_cost=Decimal("100000"), batch=batch,
+            status=SalesInvoice.Status.CANCELLED,
+        )
+
+        res = services.batch_pnl(batch=batch)
+        self.assertEqual(res["revenue"], Decimal("0"))
+        self.assertEqual(res["qty_sold"], Decimal("0"))
+        self.assertEqual(res["total_cost"], Decimal("5000000"))
+        self.assertEqual(res["profit"], Decimal("-5000000"))
+
+    def test_batch_pnl_invoice_cancelled_after_issue(self):
+        """
+        S07-AC3: Hoá đơn ISSUED sau đó đổi thành CANCELLED -> revenue giảm,
+        SalesInvoiceLineBatch không bị xoá hay sửa (bất biến append-only).
+        """
+        batch = batch_services.create_batch(
+            item=self.item, supplier=self.sup, warehouse=self.wh,
+            received_date=datetime.date(2026, 9, 3), qty=Decimal("50"),
+            purchase_rate=Decimal("100000"),
+        )
+        inv = self._make_invoice(
+            code="INV-S07-D", issued_at=_dt(2026, 9, 7), qty_sold=Decimal("25"),
+            sell_rate=Decimal("150000"), unit_cost=Decimal("100000"), batch=batch,
+            status=SalesInvoice.Status.ISSUED,
+        )
+
+        res1 = services.batch_pnl(batch=batch)
+        self.assertEqual(res1["revenue"], Decimal("3750000"))
+        self.assertEqual(res1["qty_sold"], Decimal("25"))
+
+        alloc_count_before = SalesInvoiceLineBatch.objects.filter(batch=batch).count()
+
+        inv.status = SalesInvoice.Status.CANCELLED
+        inv.save(update_fields=["status"])
+
+        res2 = services.batch_pnl(batch=batch)
+        self.assertEqual(res2["revenue"], Decimal("0"))
+        self.assertEqual(res2["qty_sold"], Decimal("0"))
+
+        alloc_count_after = SalesInvoiceLineBatch.objects.filter(batch=batch).count()
+        self.assertEqual(alloc_count_before, alloc_count_after)
 
     # --- period_pnl ---------------------------------------------------------
 
