@@ -52,4 +52,5 @@ cache chung (Redis) · SEO nâng cao cho bài viết · hoàn kho/hoàn tiền m
 | 2026-09-28 21:50 | P1 | Lô 2 | APPROVED | `9ef26e1` | 712 | S04 chốt lô BR-LO-04/BR-KK-05, S05 noindex staging |
 | 2026-09-28 22:12 | — | Merge | — | `85c0b36` | 712 | Hợp nhất lịch sử main cũ vào wip/autosave và fast-forward main |
 | 2026-09-28 22:20 | P1 | Lô 3 | APPROVED | `9f39fe9` | 723 | S06 lãi lỗ không tính 2 lần hao hụt/hỏng, S07 bỏ hoá đơn huỷ |
+| 2026-09-28 22:32 | P2 | Lô 0 | PASS | `cd74f0f` | 723 | Spike DW-01 (114 lệnh, dispatch 100%), DW-02 (recall@5 98%) |
 
