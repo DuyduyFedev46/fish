@@ -1,0 +1,308 @@
+import { DeliveryListResponse, DeliveryNoteDetail, DeliveryNoteItem } from "./types";
+
+export const MOCK_DELIVERY_NOTES: DeliveryNoteDetail[] = [
+  {
+    id: 30,
+    code: "GH-HD-0030-CONF",
+    status: "CONFIRMING",
+    status_label: "Chờ xác nhận",
+    sales_invoice: 10,
+    invoice_code: "HD-0030",
+    order: { id: 130, code: "DH-260928-0030" },
+    paid_at: "2026-09-28T09:10:00+07:00",
+    confirmed_at: null,
+    confirm_skipped: false,
+    assigned_to: null,
+    failed_attempts: 0,
+    note: "",
+    created_at: "2026-09-28T09:10:05+07:00",
+    completed_at: null,
+    lines_summary: "Cá thu Côn Đảo 1,500 kg",
+    total_kg: "1.500",
+    label: { printed: false, valid_print_no: null, needs_void: 0, to_void: [] },
+    customer_name: "Khách Thử B",
+    address: "Số 2 Đường Thử, Phường 2, TP. Vũng Tàu",
+    available_actions: [],
+    recipient_name: null,
+    recipient_phone: null,
+    lines: [
+      {
+        item_name: "Cá thu Côn Đảo",
+        qty_kg: "1.500",
+        batch_id: "CA-THU-260928-VT01",
+        expiry_date: "2027-09-28",
+      },
+    ],
+  },
+  {
+    id: 31,
+    code: "GH-HD-0031-PREP",
+    status: "PREPARING",
+    status_label: "Soạn hàng",
+    sales_invoice: 7,
+    invoice_code: "HD-0031",
+    order: { id: 101, code: "DH-260928-0001" },
+    paid_at: "2026-09-28T08:05:00+07:00",
+    confirmed_at: "2026-09-28T08:20:00+07:00",
+    confirm_skipped: false,
+    assigned_to: null,
+    failed_attempts: 0,
+    note: "Giao trước 11h trưa",
+    created_at: "2026-09-28T08:05:01+07:00",
+    completed_at: null,
+    lines_summary: "Tôm sú loại 1 2,000 kg · Mực lá Phan Thiết 1,000 kg",
+    total_kg: "3.000",
+    label: { printed: false, valid_print_no: null, needs_void: 0, to_void: [] },
+    customer_name: "Khách Thử A",
+    address: "Số 1 Đường Thử, P. Thử, Lâm Đồng",
+    available_actions: ["set_status:READY", "print_label"],
+    recipient_name: null,
+    recipient_phone: null,
+    lines: [
+      {
+        item_name: "Tôm sú loại 1",
+        qty_kg: "2.000",
+        batch_id: "TOM-SU-1-260920-AB12C",
+        expiry_date: "2027-09-20",
+      },
+      {
+        item_name: "Mực lá Phan Thiết",
+        qty_kg: "1.000",
+        batch_id: "MUC-LA-260925-CD34E",
+        expiry_date: "2027-09-25",
+      },
+    ],
+  },
+  {
+    id: 32,
+    code: "GH-HD-0032-READY",
+    status: "READY",
+    status_label: "Chờ lấy",
+    sales_invoice: 8,
+    invoice_code: "HD-0032",
+    order: { id: 102, code: "DH-260928-0002" },
+    paid_at: "2026-09-28T07:45:00+07:00",
+    confirmed_at: "2026-09-28T08:00:00+07:00",
+    confirm_skipped: false,
+    assigned_to: 14,
+    failed_attempts: 0,
+    note: "",
+    created_at: "2026-09-28T07:45:10+07:00",
+    completed_at: null,
+    lines_summary: "Cua Cà Mau Y4 2,500 kg",
+    total_kg: "2.500",
+    label: { printed: true, valid_print_no: 1, needs_void: 0, to_void: [] },
+    customer_name: "Khách Thử C",
+    address: "Số 3 Đường Thử, Q. Ninh Kiều, Cần Thơ",
+    available_actions: ["reprint_label"],
+    recipient_name: null,
+    recipient_phone: null,
+    lines: [
+      {
+        item_name: "Cua Cà Mau Y4",
+        qty_kg: "2.500",
+        batch_id: "CUA-CM-Y4-260926-EF56",
+        expiry_date: "2027-09-26",
+      },
+    ],
+  },
+  {
+    id: 33,
+    code: "GH-HD-0033-DELI",
+    status: "DELIVERING",
+    status_label: "Đang giao",
+    sales_invoice: 9,
+    invoice_code: "HD-0033",
+    order: { id: 103, code: "DH-260928-0003" },
+    paid_at: "2026-09-28T07:30:00+07:00",
+    confirmed_at: "2026-09-28T07:40:00+07:00",
+    confirm_skipped: false,
+    assigned_to: 14,
+    failed_attempts: 0,
+    note: "",
+    created_at: "2026-09-28T07:30:00+07:00",
+    completed_at: null,
+    lines_summary: "Cá chẽm phi lê 1,000 kg",
+    total_kg: "1.000",
+    label: { printed: true, valid_print_no: 1, needs_void: 0, to_void: [] },
+    customer_name: "Khách Thử D",
+    address: "Số 4 Đường Thử, TP. Hồ Chí Minh",
+    available_actions: ["set_status:COMPLETED", "set_status:FAILED"],
+    recipient_name: null,
+    recipient_phone: null,
+    lines: [
+      {
+        item_name: "Cá chẽm phi lê",
+        qty_kg: "1.000",
+        batch_id: "CA-CHEM-260927-GH78",
+        expiry_date: "2027-09-27",
+      },
+    ],
+  },
+  {
+    id: 34,
+    code: "GH-HD-0034-FAIL",
+    status: "FAILED",
+    status_label: "Giao thất bại",
+    sales_invoice: 11,
+    invoice_code: "HD-0034",
+    order: { id: 104, code: "DH-260928-0004" },
+    paid_at: "2026-09-28T07:00:00+07:00",
+    confirmed_at: "2026-09-28T07:15:00+07:00",
+    confirm_skipped: false,
+    assigned_to: 14,
+    failed_attempts: 1,
+    note: "Không gọi được người nhận",
+    created_at: "2026-09-28T07:00:00+07:00",
+    completed_at: null,
+    lines_summary: "Bạch tuộc tươi 2,000 kg",
+    total_kg: "2.000",
+    label: { printed: true, valid_print_no: 1, needs_void: 0, to_void: [] },
+    customer_name: "Khách Thử E",
+    address: "Số 5 Đường Thử, TP. Biên Hoà",
+    available_actions: ["set_status:DELIVERING"],
+    recipient_name: null,
+    recipient_phone: null,
+    lines: [
+      {
+        item_name: "Bạch tuộc tươi",
+        qty_kg: "2.000",
+        batch_id: "BACH-TUOC-260925-JK90",
+        expiry_date: "2027-09-25",
+      },
+    ],
+  },
+  {
+    id: 35,
+    code: "GH-HD-0035-DONE",
+    status: "COMPLETED",
+    status_label: "Hoàn tất",
+    sales_invoice: 12,
+    invoice_code: "HD-0035",
+    order: { id: 105, code: "DH-260928-0005" },
+    paid_at: "2026-09-28T06:30:00+07:00",
+    confirmed_at: "2026-09-28T06:45:00+07:00",
+    confirm_skipped: false,
+    assigned_to: 14,
+    failed_attempts: 0,
+    note: "",
+    created_at: "2026-09-28T06:30:00+07:00",
+    completed_at: "2026-09-28T09:30:00+07:00",
+    lines_summary: "Tôm sú loại 1 1,000 kg",
+    total_kg: "1.000",
+    label: { printed: true, valid_print_no: 1, needs_void: 0, to_void: [] },
+    customer_name: "Khách Thử F",
+    address: "Số 6 Đường Thử, TP. Vũng Tàu",
+    available_actions: [],
+    recipient_name: null,
+    recipient_phone: null,
+    lines: [
+      {
+        item_name: "Tôm sú loại 1",
+        qty_kg: "1.000",
+        batch_id: "TOM-SU-1-260920-AB12C",
+        expiry_date: "2027-09-20",
+      },
+    ],
+  },
+];
+
+export function getMockDeliveryNotes(params?: {
+  status?: string;
+  completed_from?: string;
+  page?: number;
+}): DeliveryListResponse {
+  let filtered = [...MOCK_DELIVERY_NOTES];
+  if (params?.status) {
+    const statuses = params.status.split(",").map((s) => s.trim());
+    filtered = filtered.filter((n) => statuses.includes(n.status));
+  }
+  return {
+    count: filtered.length,
+    next: null,
+    previous: null,
+    results: filtered,
+  };
+}
+
+export function getMockDeliveryNoteDetail(id: number): DeliveryNoteDetail {
+  const item = MOCK_DELIVERY_NOTES.find((n) => n.id === id);
+  if (!item) {
+    throw new Error("Không tìm thấy phiếu giao hàng");
+  }
+  return item;
+}
+
+export function mockPackDeliveryNote(
+  id: number,
+  fromStatus?: string
+): { note: DeliveryNoteDetail; already: boolean } {
+  const item = MOCK_DELIVERY_NOTES.find((n) => n.id === id);
+  if (!item) {
+    throw new Error("Không tìm thấy phiếu giao hàng");
+  }
+  if (item.status === "READY" && fromStatus === "PREPARING") {
+    return { note: item, already: true };
+  }
+  if (item.status === "CONFIRMING") {
+    throw new Error("BR-GH-11: Chưa xác nhận với khách, chưa soạn được.");
+  }
+  if (item.status === "CANCELLED") {
+    throw new Error("BR-GH-07: Đơn đã huỷ, không soạn.");
+  }
+  if (item.status !== "PREPARING" && item.status !== "READY") {
+    throw new Error(`STALE_STATE: Phiếu đang ở ${item.status_label}, tải lại để xem.`);
+  }
+
+  item.status = "READY";
+  item.status_label = "Chờ lấy";
+  item.available_actions = ["reprint_label"];
+  return { note: item, already: false };
+}
+
+export function mockListDeliveryNotes(req: any): { status: number; body: DeliveryListResponse } {
+  let status: string | undefined;
+  let completed_from: string | undefined;
+  if (req?.url) {
+    try {
+      const u = new URL(req.url, "http://localhost");
+      status = u.searchParams.get("status") || undefined;
+      completed_from = u.searchParams.get("completed_from") || undefined;
+    } catch {
+      // ignore
+    }
+  }
+  return {
+    status: 200,
+    body: getMockDeliveryNotes({ status, completed_from }),
+  };
+}
+
+export function mockGetDeliveryNoteDetail(req: any): { status: number; body: DeliveryNoteDetail | { detail: string } } {
+  const match = req?.url ? String(req.url).match(/\/api\/delivery\/notes\/(\d+)\//) : null;
+  const id = match ? parseInt(match[1], 10) : 31;
+  const item = MOCK_DELIVERY_NOTES.find((n) => n.id === id);
+  if (!item) {
+    return { status: 404, body: { detail: "Không tìm thấy phiếu giao hàng" } };
+  }
+  return { status: 200, body: item };
+}
+
+export function mockPostDeliveryNoteStatus(req: any): { status: number; body: any } {
+  const match = req?.url ? String(req.url).match(/\/api\/delivery\/notes\/(\d+)\/status\//) : null;
+  const id = match ? parseInt(match[1], 10) : 31;
+  let body = req?.body as { to_status?: string; from_status?: string } | undefined;
+  if (typeof body === "string") {
+    try {
+      body = JSON.parse(body);
+    } catch {
+      // ignore
+    }
+  }
+  try {
+    const res = mockPackDeliveryNote(id, body?.from_status);
+    return { status: 200, body: { ...res.note, already: res.already } };
+  } catch (err: any) {
+    return { status: 400, body: { detail: err.message, code: err.message.split(":")[0] } };
+  }
+}

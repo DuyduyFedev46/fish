@@ -1,11 +1,10 @@
 import { ViewGuard } from "@/features/auth/components/ViewGuard";
-import { Placeholder } from "@/shared/ui/Placeholder";
+import { DeliveriesView } from "@/features/deliveries/components/DeliveriesView";
 
-// Màn chưa làm (xem plannedIn trong shared/lib/nav.ts). Khi làm: thay <Placeholder> bằng màn của features/<module>.
-export default function Page() {
+export default function DeliveriesPage() {
   return (
     <ViewGuard view="deliveries">
-      <Placeholder view="deliveries" />
+      <DeliveriesView />
     </ViewGuard>
   );
 }

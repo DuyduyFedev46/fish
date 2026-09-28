@@ -21,10 +21,11 @@ from .authentication import must_change_password
 VIEW_PROFITREPORT_PERM = "reports.view_profitreport"
 
 # Thứ tự hiển thị cố định theo vai (không theo thứ tự gán trong DB).
-ROLE_ORDER = ("chu", "quan_ly", "nv_kho", "nv_giao")
+ROLE_ORDER = ("chu", "quan_ly", "nv_kho", "nv_giao", "cskh")
 
 HOME_DASHBOARD = "dashboard"
 HOME_MY_DELIVERIES = "my-deliveries"
+HOME_CSKH_QUEUE = "cskh-queue"
 HOME_NO_ROLE = "no-role"
 
 # S47: nhãn tiếng Việt cho màn "Quyền của tôi".
@@ -33,6 +34,7 @@ GROUP_LABELS = {
     "quan_ly": "Quản lý",
     "nv_kho": "Nhân viên kho",
     "nv_giao": "Nhân viên giao",
+    "cskh": "CSKH",
 }
 
 # S47: quyền Tầng 2 = bảng spec §1.5 + mọi `Meta.permissions` tuỳ biến. Thứ tự dict = thứ tự
@@ -58,6 +60,12 @@ CAPABILITY_LABELS = {
     "inventory.cancel_expired_batch": "Huỷ lô quá hạn",
     # DW-13 (2026-09-28-ai-digital-worker): chỉ chu.
     "ai.manage_ai_policy": "Quản lý chính sách AI",
+    # CS-01 / CS-03 / CS-11 (2026-09-28-cskh-xac-nhan-in-tem): CSKH + kho + QL + Chủ.
+    "delivery.confirm_with_customer": "Gọi xác nhận đơn",
+    "delivery.change_recipient": "Đổi thông tin nhận hàng",
+    "delivery.decide_unconfirmed": "Quyết định đơn không liên lạc được",
+    "delivery.pack_deliverynote": "Đóng gói phiếu giao",
+    "delivery.print_label": "In / huỷ tem giao",
 }
 
 AUTH_OLD_PASSWORD = "AUTH_OLD_PASSWORD"
@@ -65,17 +73,19 @@ AUTH_WEAK_PASSWORD = "AUTH_WEAK_PASSWORD"
 
 
 def sorted_groups(names):
-    """Tên Group theo thứ tự vai cố định (chu, quan_ly, nv_kho, nv_giao; nhóm lạ xếp sau)."""
+    """Tên Group theo thứ tự vai cố định (chu, quan_ly, nv_kho, nv_giao, cskh; nhóm lạ xếp sau)."""
     rank = {name: i for i, name in enumerate(ROLE_ORDER)}
     return sorted(names, key=lambda n: (rank.get(n, len(ROLE_ORDER)), n))
 
 
 def home_for(groups) -> str:
-    """Trang mặc định: không Group → no-role; chỉ nv_giao → my-deliveries; còn lại → dashboard."""
+    """Trang mặc định: không Group → no-role; chỉ nv_giao → my-deliveries; chỉ cskh → cskh-queue; còn lại → dashboard."""
     if not groups:
         return HOME_NO_ROLE
     if set(groups) == {"nv_giao"}:
         return HOME_MY_DELIVERIES
+    if set(groups) == {"cskh"}:
+        return HOME_CSKH_QUEUE
     return HOME_DASHBOARD
 
 

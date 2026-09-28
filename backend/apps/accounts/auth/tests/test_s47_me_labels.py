@@ -44,10 +44,19 @@ class S47MeLabelsTests(TestCase):
                 {"code": "inventory.approve_stockreconciliation", "label": "Duyệt kiểm kê"},
             ],
         )
-        # Ngoài 5 việc §1.5, Quản lý còn quyền xem Tổng quan (S6) và sửa ảnh mặt hàng
-        # (A2, Q3); không có việc của Chủ.
+        # Ngoài 5 việc §1.5, Quản lý còn quyền xem Tổng quan (S6), sửa ảnh mặt hàng
+        # (A2, Q3) và 5 quyền nghiệp vụ CSKH/giao hàng (CS-01, 02b §3.1); không có việc của Chủ.
         self.assertEqual(
-            codes(body)[5:], ["reports.view_dashboard", "catalog.change_item_image"]
+            codes(body)[5:],
+            [
+                "reports.view_dashboard",
+                "catalog.change_item_image",
+                "delivery.confirm_with_customer",
+                "delivery.change_recipient",
+                "delivery.decide_unconfirmed",
+                "delivery.pack_deliverynote",
+                "delivery.print_label",
+            ],
         )
         self.assertIs(body["can_view_cost"], False)
 

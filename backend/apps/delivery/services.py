@@ -28,11 +28,13 @@ Status = DeliveryNote.Status
 
 # BR-GH-05: COMPLETED không có cạnh đi ra (điểm không quay lui).
 ALLOWED_TRANSITIONS = {
+    Status.CONFIRMING: set(),
     Status.PREPARING: {Status.READY},
     Status.READY: {Status.DELIVERING},
     Status.DELIVERING: {Status.COMPLETED, Status.FAILED},
     Status.FAILED: {Status.DELIVERING},  # hẹn giao lại
     Status.COMPLETED: set(),
+    Status.CANCELLED: set(),
 }
 
 
@@ -40,10 +42,11 @@ def _now():
     return timezone.now()
 
 
-def create_delivery_note(*, invoice, assigned_to=None, note=""):
+def create_delivery_note(*, invoice, assigned_to=None, note="", status=None):
     """
     Tạo phiếu giao hàng cho một hoá đơn đã xuất (đơn đã thanh toán, PAID/PROCESSING).
-    status khởi tạo = PREPARING (soạn hàng). Mã phiếu sinh duy nhất.
+    status khởi tạo = PREPARING (soạn hàng) mặc định; Lô 2 CSKH truyền CONFIRMING.
+    Mã phiếu sinh duy nhất.
     """
     if invoice is None:
         raise BusinessError("Thiếu hoá đơn để tạo phiếu giao hàng.")
@@ -56,34 +59,57 @@ def create_delivery_note(*, invoice, assigned_to=None, note=""):
     while DeliveryNote.objects.filter(code=code).exists():
         code = f"GH-{invoice.code}-{uuid4().hex[:5].upper()}"
 
+    initial_status = status or Status.PREPARING
     with transaction.atomic():
         dn = DeliveryNote.objects.create(
             code=code,
             sales_invoice=invoice,
-            status=Status.PREPARING,
+            status=initial_status,
             assigned_to=assigned_to,
             note=note,
         )
     return dn
 
 
-def advance_status(*, note, to_status, actor):
+def advance_status(*, note, to_status, actor, from_status=None):
     """
-    Chuyển trạng thái phiếu giao đúng theo state machine P-06. Sai state machine
-    hoặc chuyển ra khỏi COMPLETED -> BusinessError (BR-GH-05). Set completed_at
-    khi chuyển sang COMPLETED.
+    Chuyển trạng thái phiếu giao đúng theo state machine P-06.
+    Hỗ trợ from_status để kiểm tra stale state hoặc idempotency (already: True).
+    Trả về (note, already: bool).
     """
     if to_status not in Status.values:
         raise BusinessError(f"Trạng thái '{to_status}' không hợp lệ.")
 
     current = note.status
+    if current == Status.CONFIRMING:
+        raise BusinessError("Chưa xác nhận với khách, chưa soạn được.", code="BR-GH-11")
+
+    if current == Status.CANCELLED:
+        raise BusinessError("Đơn đã huỷ, không soạn.", code="BR-GH-07")
+
+    if from_status is not None:
+        if current == to_status:
+            return note, True
+        if current != from_status:
+            raise BusinessError(
+                f"Phiếu đang ở {note.get_status_display()}, tải lại để xem.",
+                code="STALE_STATE",
+                extra={"current_status": current},
+            )
+
     if current == Status.COMPLETED:
-        raise BusinessError("Phiếu giao đã Hoàn tất — không quay lui được (BR-GH-05).")
+        raise BusinessError("Phiếu giao đã Hoàn tất — không quay lui được (BR-GH-05).", code="BR-GH-05")
 
     allowed = ALLOWED_TRANSITIONS.get(current, set())
     if to_status not in allowed:
+        current_label = note.get_status_display()
+        try:
+            to_label = Status(to_status).label
+        except ValueError:
+            to_label = to_status
         raise BusinessError(
-            f"Không thể chuyển phiếu giao từ '{current}' sang '{to_status}'."
+            f"Không chuyển được từ {current_label} sang {to_label}.",
+            code="BR-GH-05",
         )
 
     with transaction.atomic():
@@ -98,7 +124,7 @@ def advance_status(*, note, to_status, actor):
         "delivery_advance_status", actor=actor, obj=note,
         changes={"status": {"from": current, "to": to_status}},
     )
-    return note
+    return note, False
 
 
 def mark_failed(*, note, actor):

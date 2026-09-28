@@ -153,11 +153,12 @@ def exception_handler(exc, context):
         return response
     if isinstance(exc, BusinessError):
         payload = {"detail": str(exc), "code": exc.code}
-        if getattr(exc, "details", None):
-            if isinstance(exc.details, dict):
-                payload.update(exc.details)
+        extra = getattr(exc, "extra", None) or getattr(exc, "details", None)
+        if extra:
+            if isinstance(extra, dict):
+                payload.update(extra)
             else:
-                payload["details"] = exc.details
+                payload["details"] = extra
         return Response(payload, status=exc.http_status)
     if isinstance(exc, APIException) and getattr(exc, "render_code", False):
         # Lỗi API mang mã riêng cho console (vd 403 AUTH_MUST_CHANGE_PASSWORD, BR-PQ-19).
@@ -166,6 +167,16 @@ def exception_handler(exc, context):
     if isinstance(exc, (NotAuthenticated, AuthenticationFailed)):
         exc.detail = UNAUTHORIZED_DETAIL
     return drf_exception_handler(exc, context)
+
+
+class NoStoreMixin:
+    """Mixin gắn header Cache-Control: no-store cho response chứa PII (02b §3.3)."""
+
+    def finalize_response(self, request, response, *args, **kwargs):
+        response = super().finalize_response(request, response, *args, **kwargs)
+        response["Cache-Control"] = "no-store"
+        return response
+
 
 
 # --- BR-PQ-14 / BR-PQ-16: field do nghiệp vụ / hệ thống ghi ------------------

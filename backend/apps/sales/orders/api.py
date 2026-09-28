@@ -91,10 +91,23 @@ class SalesOrderViewSet(AiDeclarable, viewsets.ReadOnlyModelViewSet):
                 "invoice__delivery_notes__returns",
             )
         # S5 / BR-PQ-12: nv_giao chỉ thấy đơn của phiếu giao gán cho mình.
+        # CS-01 / BR-GH-18: cskh chỉ thấy đơn trong phạm vi gọi và đơn mình đã gọi gần đây.
         user = self.request.user
         if has_full_delivery_scope(user):
             return qs
-        return qs.filter(invoice__delivery_notes__assigned_to=user).distinct()
+
+        assigned_q = Q(invoice__delivery_notes__assigned_to=user)
+        from apps.delivery.cskh.scope import cskh_note_q, is_cskh
+
+        if is_cskh(user):
+            cskh_q = Exists(
+                DeliveryNote.objects.filter(
+                    sales_invoice__sales_order=OuterRef("pk")
+                ).filter(cskh_note_q(user))
+            )
+            return qs.filter(assigned_q | cskh_q).distinct()
+
+        return qs.filter(assigned_q).distinct()
 
     def list(self, request, *args, **kwargs):
         try:

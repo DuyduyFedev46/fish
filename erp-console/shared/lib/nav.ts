@@ -8,7 +8,7 @@ export type Viewer = {
   groups: string[];
   permissions: string[];
   can_view_profit: boolean;
-  home: "dashboard" | "my-deliveries" | "no-role";
+  home: "dashboard" | "my-deliveries" | "cskh-queue" | "no-role";
   /** S48: còn dùng mật khẩu tạm → chỉ được mở màn "Đặt mật khẩu mới". */
   must_change_password?: boolean;
 };
@@ -79,7 +79,7 @@ export const PERM = {
 } as const;
 
 /** Mã Group dùng trong luật menu (danh sách đầy đủ + nhãn: shared/lib/groups.ts). */
-export const GROUP = { chu: "chu", quanLy: "quan_ly", nvKho: "nv_kho", nvGiao: "nv_giao" } as const;
+export const GROUP = { chu: "chu", quanLy: "quan_ly", nvKho: "nv_kho", nvGiao: "nv_giao", cskh: "cskh" } as const;
 
 const has = (me: Me, perm: string) => me.permissions.includes(perm);
 const inGroup = (me: Me, ...groups: string[]) => me.groups.some((g) => groups.includes(g));
@@ -322,6 +322,7 @@ export function homePath(me: Me): string {
   if (me.must_change_password) return SET_PASSWORD_HREF;
   if (me.home === "no-role") return "/no-role/";
   if (me.home === "my-deliveries") return "/my-deliveries/";
+  if (me.home === "cskh-queue") return "/cskh/queue/";
   const first = visibleNav(me)[0];
   return canView(me, "overview") ? "/overview/" : first ? first.href : "/no-role/";
 }

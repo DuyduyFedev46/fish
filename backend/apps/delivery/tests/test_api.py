@@ -32,8 +32,14 @@ class SetStatusHttpTests(TestCase):
 
     def test_ac_ready_returns_full_note_json(self):
         """PREPARING -> READY (nhánh advance_status) — body đầy đủ, không lỗi."""
+        # CS-03-AC6: NV giao không soạn hàng, cần delivery.pack_deliverynote -> dùng user nv_kho
+        nv_kho = User.objects.create_user("kho1", password="x")
+        nv_kho.groups.add(Group.objects.get(name="nv_kho"))
+        client = APIClient()
+        client.force_authenticate(nv_kho)
+
         _, _, note = make_order_with_note("SO-R1", "0900000101", assigned_to=self.nv_giao)
-        resp = self._post(note, DeliveryNote.Status.READY)
+        resp = client.post(self._url(note), {"to_status": DeliveryNote.Status.READY}, format="json")
         self.assertEqual(resp.status_code, 200, resp.content)
         body = resp.json()
         self.assertEqual(body["status"], DeliveryNote.Status.READY)

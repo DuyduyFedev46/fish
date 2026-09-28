@@ -41,7 +41,7 @@
 
 ---
 
-## Lô 1 — Nền: Group `cskh`, phạm vi dữ liệu cá nhân, bảng + chi tiết phiếu giao
+## [x] Lô 1 — Nền: Group `cskh`, phạm vi dữ liệu cá nhân, bảng + chi tiết phiếu giao (QA APPROVED 2026-09-29)
 **Việc (theo `02b` §2, §3, §4.2):**
 - Migration `delivery/0004_cskh_confirmation` (toàn bộ schema §2.1–§2.4, gồm `ConfirmationTask`, `CustomerCall`, `LabelPrint`)
   + data migration Group `cskh` và 5 quyền Tầng 2 mới cho `chu`/`quan_ly`/`nv_kho`/`cskh` theo bảng §3.1.

@@ -1,9 +1,9 @@
 // Kiểu dữ liệu module auth — khớp contract S6 (+ phần mở rộng S47 và S46 theo story, BE L6 chưa chốt).
 
-export type GroupCode = "chu" | "quan_ly" | "nv_kho" | "nv_giao";
+export type GroupCode = "chu" | "quan_ly" | "nv_kho" | "nv_giao" | "cskh";
 
 /** Trang mặc định sau đăng nhập. */
-export type MeHome = "dashboard" | "my-deliveries" | "no-role";
+export type MeHome = "dashboard" | "my-deliveries" | "cskh-queue" | "no-role";
 
 export type CodeLabel = { code: string; label: string };
 
