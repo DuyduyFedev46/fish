@@ -258,4 +258,5 @@ TTL_JOB_HEALTH_GRACE_MINUTES = int(os.getenv("TTL_JOB_HEALTH_GRACE_MINUTES", "5"
 
 # --- AI Digital Worker ----------------------------------------------------
 AI_ENABLED = _bool("AI_ENABLED", "0")
+GUIDANCE_REFUND_WARNING_DAYS = int(os.getenv("GUIDANCE_REFUND_WARNING_DAYS", "25"))
 

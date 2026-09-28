@@ -21,9 +21,21 @@ import { SkeletonScreen, SkeletonTable } from "@/shared/ui/Skeleton";
 import { StatusChip } from "@/shared/ui/StatusChip";
 import { Toolbar } from "@/shared/ui/Toolbar";
 import { filterBatches, getInventory } from "../api";
-import type { InventoryData } from "../types";
+import type { BatchRow, InventoryData } from "../types";
+import { BatchDetailSheet } from "./BatchDetailSheet";
+import s from "../inventory.module.css";
 
-function Body({ data, q, onClearSearch }: { data: InventoryData; q: string; onClearSearch: () => void }) {
+function Body({
+  data,
+  q,
+  onClearSearch,
+  onSelectBatch,
+}: {
+  data: InventoryData;
+  q: string;
+  onClearSearch: () => void;
+  onSelectBatch: (b: BatchRow) => void;
+}) {
   const { me } = useAuth();
   const canCost = data.user.can_cost;
   const rows = filterBatches(data.batches, q);
@@ -59,8 +71,20 @@ function Body({ data, q, onClearSearch }: { data: InventoryData; q: string; onCl
               rows.map((b) => {
                 const expTone = b.status === "EXPIRED" ? " crit-text" : b.near_expiry ? " warn-text" : "";
                 return (
-                  <tr key={b.batch_id}>
-                    <td className="code m-first" data-label="Lô">{b.batch_id}</td>
+                  <tr key={b.batch_id} className={s.rowClickable} onClick={() => onSelectBatch(b)}>
+                    <td className="code m-first" data-label="Lô">
+                      <button
+                        type="button"
+                        className={s.batchLink}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onSelectBatch(b);
+                        }}
+                        title={`Xem chi tiết lô ${b.batch_id}`}
+                      >
+                        {b.batch_id}
+                      </button>
+                    </td>
                     <td className="m-title" data-label="Mặt hàng">{b.item}</td>
                     <td className="muted" data-m-label="NCC">
                       {b.supplier}
@@ -111,6 +135,7 @@ export function InventoryScreen() {
   const { me } = useAuth();
   const res = useResource(me ? dashboardSummaryKey(me.id) : null, getInventory);
   const [q, setQ] = useState("");
+  const [selectedBatch, setSelectedBatch] = useState<BatchRow | null>(null);
   const canCost = res.data?.user.can_cost;
   return (
     <div className="screen">
@@ -134,8 +159,20 @@ export function InventoryScreen() {
           </SkeletonScreen>
         }
       >
-        {(data) => <Body data={data} q={q} onClearSearch={() => setQ("")} />}
+        {(data) => (
+          <Body
+            data={data}
+            q={q}
+            onClearSearch={() => setQ("")}
+            onSelectBatch={setSelectedBatch}
+          />
+        )}
       </ResourceView>
+      <BatchDetailSheet
+        batch={selectedBatch}
+        onClose={() => setSelectedBatch(null)}
+        canCost={canCost}
+      />
     </div>
   );
 }

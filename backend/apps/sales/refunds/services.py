@@ -290,13 +290,8 @@ def retry_refund(*, refund, actor):
 def refund_available_actions(*, refund, user):
     """
     Thao tác trên một phiếu hoàn ở hàng chờ (`available_actions`): confirm/mark_failed khi
-    Chờ hoàn; retry khi Thất bại. Mọi thao tác đòi `confirm_refund` (chỉ Chủ — BR-HT-07,
-    ranh giới "tiền rời túi").
+    Chờ hoàn; retry khi Thất bại. Tính lại từ next_steps (02b §8.1).
     """
-    if not user.has_perm("sales.confirm_refund"):
-        return []
-    if refund.status == Refund.Status.PENDING:
-        return ["confirm", "mark_failed"]
-    if refund.status == Refund.Status.FAILED:
-        return ["retry"]
-    return []
+    from apps.sales.refunds.next_steps import get_refund_next_steps
+
+    return [s.key for s in get_refund_next_steps(refund, user) if s.allowed]

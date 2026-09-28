@@ -475,31 +475,11 @@ def _check_order_bookable(order):
 def payment_available_actions(*, payment, user):
     """
     Thao tác trên một dòng hàng chờ (quy ước `available_actions`: luật + quyền).
-    - attach_to_order: giao dịch không khớp đơn, còn mở.
-    - confirm_order  : giao dịch thiếu tiền còn mở, đơn Giữ chỗ, tổng đã trả ≥ tổng đơn (Q9).
-    - refund         : còn mở, còn tiền hoàn được (BR-HT-04) + `create_refund` (S13-AC6).
-    Mọi thao tác đòi `confirm_payment_manual` (chỉ Chủ).
+    Tính lại từ next_steps (02b §8.1).
     """
-    from apps.sales.refunds.services import payment_refundable_amount
+    from apps.sales.payments.next_steps import get_payment_next_steps
 
-    if payment.resolution_status != PaymentTransaction.ResolutionStatus.OPEN:
-        return []
-    if not user.has_perm(RESOLVE_PERM):
-        return []
-    status = PaymentTransaction.MatchStatus
-    actions = []
-    order = payment.sales_order
-    if payment.match_status == status.UNMATCHED and order is None:
-        actions.append("attach_to_order")
-    if (payment.match_status == status.UNDERPAID and order is not None
-            and order.status == SalesOrder.Status.BOOKED
-            and _confirmable_payments(order).filter(pk=payment.pk).exists()
-            and order_paid_total(order) >= order.total_amount):
-        actions.append("confirm_order")
-    if (user.has_perm("sales.create_refund")
-            and payment_refundable_amount(payment=payment) > 0):
-        actions.append("refund")
-    return actions
+    return [s.key for s in get_payment_next_steps(payment, user) if s.allowed]
 
 
 def resolve_payment(*, payment, action, actor, order_id=None, note=""):

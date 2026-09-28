@@ -23,6 +23,15 @@ def register_guidance(doc_type: str, provider: Callable[..., dict[str, Any]]) ->
 
 
 def get_guidance_provider(doc_type: str) -> Callable[..., dict[str, Any]] | None:
+    if doc_type not in _PROVIDERS:
+        if doc_type == "order":
+            import apps.sales.orders.next_steps  # noqa: F401
+        elif doc_type == "refund":
+            import apps.sales.refunds.next_steps  # noqa: F401
+        elif doc_type == "payment":
+            import apps.sales.payments.next_steps  # noqa: F401
+        elif doc_type == "batch":
+            import apps.inventory.batches.next_steps  # noqa: F401
     return _PROVIDERS.get(doc_type)
 
 

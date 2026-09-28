@@ -11,6 +11,7 @@ import { Icon } from "@/shared/ui/Icon";
 import { StatusChip } from "@/shared/ui/StatusChip";
 import { REFUND_LABEL, REFUND_STATUS, labelOf } from "../labels";
 import { REFUND_Q_MSG } from "../messages";
+import { GuidancePanel } from "@/features/guidance";
 import type { RefundQueueAction, RefundQueueItem } from "../types";
 import type { ResultNote } from "./OrderDetailSheet";
 import s from "../orders.module.css";
@@ -119,6 +120,17 @@ export function RefundView({ item: r, refreshing, note, noteRef, actionRef, onAc
           </div>
         )}
       </dl>
+
+      {/* Khối Tiếp theo · Đã làm (02b §6.7, DW-04) */}
+      <GuidancePanel
+        docType="refund"
+        docId={r.id}
+        onAction={(actionKey) => {
+          if (actionKey === "confirm" || actionKey === "mark_failed" || actionKey === "retry") {
+            onAction(actionKey as RefundQueueAction);
+          }
+        }}
+      />
 
       {actions.length > 0 ? (
         <div className={`form-actions ${s.footer} ${s.stack}`}>

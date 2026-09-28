@@ -104,4 +104,48 @@
   - First Load JS shared by all giữ nguyên **87.6 kB**.
   - Route `/orders` giữ nguyên **128 kB** (không tăng bundle).
 
+## Lô 1b: DW-04 (Phiếu hoàn + Giao dịch lệch) & DW-05 (Lô hàng)
+- Trạng thái: BE & FE HOÀN THÀNH, QA APPROVED 20/20 tiêu chí.
+- Ngày: 2026-09-28 23:45
+- Nhánh: `main`
+
+### 1. Backend (`be-dev`)
+- Settings:
+  - `backend/config/settings.py`: Thêm `GUIDANCE_REFUND_WARNING_DAYS = int(os.getenv("GUIDANCE_REFUND_WARNING_DAYS", "25"))`.
+- Phiếu hoàn (`backend/apps/sales/refunds/`):
+  - `timeline.py`: `build_refund_timeline(refund)` xây dựng sự kiện tạo phiếu, duyệt, thất bại, thử lại từ Refund + AuditLog, chuẩn hoá actor AI theo L-4.
+  - `next_steps.py`: `get_refund_next_steps` (PENDING có `confirm`, `mark_failed`; FAILED có `retry`), `check_confirm_refund`, `check_retry_refund`, `get_refund_guidance`.
+  - `services.py`: Cập nhật `refund_available_actions` tính lại từ `[s.key for s in get_refund_next_steps(refund, user) if s.allowed]`.
+  - Test: `apps/sales/refunds/tests/test_guidance.py` (6 tests).
+- Giao dịch lệch (`backend/apps/sales/payments/`):
+  - `timeline.py`: `build_payment_timeline(payment)` ghi nhận dòng thời gian thanh toán không rò PII (Bất biến 9).
+  - `next_steps.py`: `get_payment_next_steps` (OPEN có `attach_to_order`, `confirm_order`, `refund`), `get_payment_guidance` loại bỏ triệt để `raw_payload`, `content`/`description`, `counter_account_name`.
+  - `services.py`: Cập nhật `payment_available_actions` tính lại từ `[s.key for s in get_payment_next_steps(payment, user) if s.allowed]`.
+  - Test: `apps/sales/payments/tests/test_guidance.py` (4 tests).
+- Lô hàng (`backend/apps/inventory/batches/`):
+  - `services.py`: Tách `check_close_batch(batch) -> list[Missing]` nguyên văn 7 bước kiểm tra L-1 ra khỏi `close_batch`. Chạy lại `test_l1_close_batch.py` xanh nguyên vẹn 20/20 tests.
+  - `timeline.py`: `build_batch_timeline(batch, viewer)` lọc giá vốn theo `can_view_cost(viewer)` (Bất biến 1), dòng xuất bán không rò PII khách (Bất biến 9).
+  - `next_steps.py`: `get_batch_next_steps` (DRAFT có `publish`; SELLING cận hạn có `auto_near_expiry` deadline; chưa chốt có `close` dựa vào `check_close_batch`), `get_batch_guidance` hỗ trợ cả pk số và batch_id chuỗi, cảnh báo chi phí mua không chứa số tiền.
+  - Test: `apps/inventory/batches/tests/test_guidance.py` (7 tests).
+- Guidance Registry:
+  - `backend/apps/common/guidance/api.py`: Nạp tự động provider cho `refund`, `payment`, `batch`.
+- Kiểm chứng suite backend:
+  - Toàn bộ backend test suite: **749 tests xanh** (`Ran 749 tests in 36.370s. OK`).
+  - `makemigrations --check --dry-run` sạch `No changes detected`.
+
+### 2. Frontend (`fe-dev`)
+- Mock API:
+  - `erp-console/features/guidance/mock.ts`: Mở rộng kịch bản mock cho `refund`, `payment`, `batch`.
+- GuidancePanel:
+  - `erp-console/features/guidance/components/GuidancePanel.tsx`: Bổ sung hiển thị phần "Đã làm" (Timeline) từ `data.timeline` bên dưới việc tiếp theo.
+- Tích hợp màn hình:
+  - `erp-console/features/orders/components/RefundView.tsx`: Gắn `GuidancePanel docType="refund"`.
+  - `erp-console/features/orders/components/PaymentView.tsx`: Gắn `GuidancePanel docType="payment"`.
+  - `erp-console/features/inventory/components/BatchDetailSheet.tsx` (mới): Slide-over sheet xem chi tiết thuộc tính lô và khối `GuidancePanel docType="batch"`, ẩn cột giá vốn khi thiếu quyền `canCost`.
+  - `erp-console/features/inventory/components/InventoryScreen.tsx`: Cho phép bấm vào dòng hoặc mã lô để mở `BatchDetailSheet`.
+  - `erp-console/features/inventory/inventory.module.css` (mới): Style theo chuẩn Linear / Notion.
+- Kiểm chứng build:
+  - `erp-console`: `npx tsc --noEmit && npm run build` sạch 22/22 static pages, First Load JS shared by all giữ nguyên 87.6 kB.
+  - `frontend`: `npx tsc --noEmit && npm run build` sạch 8/8 static pages.
+
 

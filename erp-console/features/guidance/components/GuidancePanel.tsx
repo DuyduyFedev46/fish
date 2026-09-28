@@ -109,6 +109,17 @@ export function GuidancePanel({ docType, docId, onAction, refreshSignal = 0 }: P
           )}
         </section>
       )}
+
+      {/* 4. Đã làm (Dòng thời gian / Timeline) */}
+      {data && data.timeline && data.timeline.length > 0 && (
+        <section className={s.part} aria-label="Đã làm">
+          <h3 className={s.partH}>
+            <span>Đã làm</span>
+            <span className={`${s.partCount} num`}>{data.timeline.length}</span>
+          </h3>
+          <GuidanceTimelineView entries={data.timeline} />
+        </section>
+      )}
     </div>
   );
 }

@@ -22,6 +22,7 @@ import {
   labelOf,
 } from "../labels";
 import { QUEUE_MSG } from "../messages";
+import { GuidancePanel } from "@/features/guidance";
 import type { PaymentAction, PaymentQueueItem, QueueOrderRef } from "../types";
 import type { ResultNote } from "./OrderDetailSheet";
 import s from "../orders.module.css";
@@ -226,6 +227,17 @@ export function PaymentView({ item: p, refreshing, stale, note, noteRef, actionR
           </dl>
         </Part>
       )}
+
+      {/* Khối Tiếp theo · Đã làm (02b §6.7, DW-04) */}
+      <GuidancePanel
+        docType="payment"
+        docId={p.id}
+        onAction={(actionKey) => {
+          if (actionKey === "attach_to_order" || actionKey === "confirm_order" || actionKey === "refund") {
+            onAction(actionKey as PaymentAction);
+          }
+        }}
+      />
 
       {actions.length > 0 ? (
         <div className={`form-actions ${s.footer} ${s.stack}`}>
