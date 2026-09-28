@@ -9,18 +9,21 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.common.exceptions import BusinessError
+from apps.common.throttling import ShopCheckoutThrottle
 from apps.sales.models import SalesOrder
+from apps.sales.orders.shop_api import LOOKUP_NOT_FOUND
 
 from . import checkout
 
 
 class ShopOrderCheckoutView(APIView):
     permission_classes = [AllowAny]
+    throttle_classes = [ShopCheckoutThrottle]
 
     def post(self, request, order_code):
         order = SalesOrder.objects.filter(code=order_code).first()
         if order is None:
-            return Response({"detail": "Không tìm thấy đơn."}, status=404)
+            return Response({"detail": LOOKUP_NOT_FOUND}, status=404)
         try:
             params = checkout.build_checkout_params(order=order)
         except BusinessError as exc:

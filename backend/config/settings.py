@@ -194,7 +194,26 @@ REST_FRAMEWORK = {
     "PAGE_SIZE": 50,
     # Đổi BusinessError (service layer) -> HTTP 400 (apps/common/api.py).
     "EXCEPTION_HANDLER": "apps.common.api.exception_handler",
+    "NUM_PROXIES": int(os.getenv("DRF_NUM_PROXIES", "1")),
 }
+
+# --- Giới hạn tần suất throttle (S03 / L-5, doc/features/2026-09-28-sua-loi-bao-mat) ----
+def _rate(name: str, default: str) -> str | None:
+    val = os.getenv(name, default).strip()
+    if not val or val.lower() in {"off", "none", "0"}:
+        return None
+    return val
+
+_DEFAULT_THROTTLE_RATES = {
+    "shop_lookup_ip": _rate("THROTTLE_SHOP_LOOKUP_IP", "20/min"),
+    "shop_lookup_order": _rate("THROTTLE_SHOP_LOOKUP_ORDER", "10/hour"),
+    "shop_order_create": _rate("THROTTLE_SHOP_ORDER_CREATE", "20/hour"),
+    "shop_checkout": _rate("THROTTLE_SHOP_CHECKOUT", "30/hour"),
+    "login_ip": _rate("THROTTLE_LOGIN_IP", "10/min"),
+    "login_user": _rate("THROTTLE_LOGIN_USER", "30/hour"),
+}
+
+CAVEVE_THROTTLE_RATES = {k: None for k in _DEFAULT_THROTTLE_RATES} if TESTING else _DEFAULT_THROTTLE_RATES
 
 # --- Tham số nghiệp vụ cấu hình được (không hard-code trong logic) ---------
 # Nguồn: business-process-spec.md (BR-MH-02, BR-LO-06, BR-BH-03, BR-GH-04, BR-HV-03).

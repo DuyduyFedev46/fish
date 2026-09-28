@@ -3,6 +3,8 @@ Ghi AuditLog — dùng chung cho mọi service (BR-PQ-04/05).
 
 Append-only. Gọi ở mọi hành động Tầng 2 (duyệt/chốt/huỷ/xác nhận) và mọi thay đổi
 `Batch.landed_unit_cost` + chuyển trạng thái `Refund`.
+
+Quy ước: không đưa số giá vốn vào `note`. Xem COST_KEYS trong apps.common.cost_keys.
 """
 import datetime
 from decimal import Decimal

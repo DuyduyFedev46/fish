@@ -16,6 +16,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.common.exceptions import BusinessError
+from apps.common.throttling import LoginIpThrottle, LoginUserThrottle
 
 from . import services
 
@@ -27,6 +28,7 @@ class LoginTokenView(ObtainAuthToken):
     từ chối), thêm ghi `User.last_login` để cột "Đăng nhập gần nhất" ở /api/staff/ có dữ liệu."""
 
     allow_must_change_password = True  # BR-PQ-19: đăng nhập bằng mật khẩu tạm vẫn được
+    throttle_classes = [LoginIpThrottle, LoginUserThrottle]
 
     def post(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)

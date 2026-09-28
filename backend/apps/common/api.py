@@ -7,6 +7,8 @@ cho bất kỳ ai gọi được endpoint. `CostFieldSerializerMixin` loại fie
 serializer khi user KHÔNG có `inventory.view_costprice` — kiểm bằng test gọi API
 bằng token nhân viên (BR-PQ-13).
 """
+from math import ceil
+
 from rest_framework import mixins, status, viewsets
 from rest_framework.exceptions import (
     APIException,
@@ -14,6 +16,7 @@ from rest_framework.exceptions import (
     MethodNotAllowed,
     NotAuthenticated,
     PermissionDenied,
+    Throttled,
 )
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import DjangoModelPermissions
@@ -108,6 +111,15 @@ UNAUTHORIZED_DETAIL = "Thông tin xác thực không hợp lệ."
 
 def exception_handler(exc, context):
     """BusinessError (service layer) -> HTTP 400 (hoặc `http_status` của lớp con) `{"detail", "code"}` (S3)."""
+    if isinstance(exc, Throttled):
+        response = drf_exception_handler(exc, context)
+        if response is not None:
+            wait = ceil(exc.wait) if exc.wait is not None else 1
+            response.data = {
+                "detail": f"Bạn thao tác quá nhanh. Vui lòng thử lại sau {wait} giây.",
+                "code": "throttled",
+            }
+        return response
     if isinstance(exc, BusinessError):
         return Response({"detail": str(exc), "code": exc.code}, status=exc.http_status)
     if isinstance(exc, APIException) and getattr(exc, "render_code", False):

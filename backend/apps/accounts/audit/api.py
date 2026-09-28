@@ -4,12 +4,14 @@ Endpoint nhật ký hành động — GET /api/audit-logs/ (S03).
 Quyền `accounts.view_auditlog` (chu + quan_ly — data migration 0007); nv_kho/nv_giao
 → 403 (S03-AC5). Append-only: không POST/PUT/PATCH/DELETE (BR-PQ-06, bất biến 3/5).
 Lọc `?actor_kind=` / `?action=`; phân trang theo quy ước console (StandardPagination).
+Lọc giá vốn khỏi `changes` khi người gọi không có quyền xem giá vốn (S01, L-3).
 """
 from rest_framework.permissions import BasePermission, IsAuthenticated
 from rest_framework.views import APIView
 
 from apps.accounts.models import AuditLog
 from apps.common.api import StandardPagination
+from apps.common.cost_keys import can_view_cost
 
 from .serializers import audit_item
 
@@ -37,6 +39,7 @@ class AuditLogListView(APIView):
         if actor_kind:
             qs = qs.filter(actor_kind=actor_kind)
 
+        can_cost = can_view_cost(request.user)
         paginator = StandardPagination()
         page = paginator.paginate_queryset(qs, request, view=self)
-        return paginator.get_paginated_response([audit_item(row) for row in page])
+        return paginator.get_paginated_response([audit_item(row, can_view_cost=can_cost) for row in page])

@@ -7,6 +7,7 @@ Shop API công khai — đặt hàng & tra cứu đơn (guest checkout, 7.1).
   (P1, BR-TT-01/13/14/17) — KHÔNG còn mã VietQR giả (BR-TT-01, quyết định Duy 2026-09-26).
 KHÔNG có phí giao hàng (BR-BH-10).
 """
+import re
 from decimal import Decimal, InvalidOperation
 
 from django.utils import timezone
@@ -15,13 +16,23 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.common.exceptions import BusinessError
+from apps.common.throttling import (
+    ShopLookupIpThrottle,
+    ShopLookupOrderThrottle,
+    ShopOrderCreateThrottle,
+)
 from apps.sales.models import SalesOrder
 
 from . import services
 
+LOOKUP_NOT_FOUND = "Không tìm thấy đơn với mã và số điện thoại này."
+LOOKUP_BAD_LAST4 = "Vui lòng nhập đúng 4 số cuối số điện thoại."
+_LAST4 = re.compile(r"\d{4}")
+
 
 class ShopOrderCreateView(APIView):
     permission_classes = [AllowAny]
+    throttle_classes = [ShopOrderCreateThrottle]
 
     def post(self, request):
         d = request.data or {}
@@ -60,15 +71,17 @@ class ShopOrderLookupView(APIView):
     """Tra đơn bằng mã đơn + 4 số cuối SĐT (7.1)."""
 
     permission_classes = [AllowAny]
+    throttle_classes = [ShopLookupIpThrottle, ShopLookupOrderThrottle]
 
     def get(self, request, order_code):
         phone_last4 = request.query_params.get("phone_last4", "")
-        try:
-            order = SalesOrder.objects.select_related("customer").get(code=order_code)
-        except SalesOrder.DoesNotExist:
-            return Response({"detail": "Không tìm thấy đơn."}, status=404)
-        if not phone_last4 or not order.phone.endswith(phone_last4):
-            return Response({"detail": "Sai mã đơn hoặc số điện thoại."}, status=404)
+        if not _LAST4.fullmatch(phone_last4):
+            return Response({"detail": LOOKUP_BAD_LAST4}, status=400)
+
+        order = SalesOrder.objects.select_related("customer").filter(code=order_code).first()
+        digits = re.sub(r"\D", "", order.phone) if order and order.phone else ""
+        if order is None or len(digits) < 4 or digits[-4:] != phone_last4:
+            return Response({"detail": LOOKUP_NOT_FOUND}, status=404)
 
         delivery = None
         invoice = getattr(order, "invoice", None)
