@@ -64,7 +64,7 @@ export class WorkerManager {
     try {
       return await promise;
     } finally {
-      if (this.pending?.id === id) this.pending = null;
+      if ((this.pending as Pending | null)?.id === id) this.pending = null;
       this.bumpIdle();
     }
   }

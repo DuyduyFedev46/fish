@@ -16,7 +16,13 @@ from django.utils import timezone
 
 from apps.common.audit import record_audit
 from apps.common.exceptions import BusinessError
-from apps.inventory.models import Batch, StockLedgerEntry
+from apps.inventory.models import (
+    Batch,
+    ReturnToStock,
+    StockLedgerEntry,
+    StockReconciliation,
+    StockReconciliationLine,
+)
 from apps.inventory.stock import services as stock
 
 
@@ -145,20 +151,76 @@ def publish_batch(*, batch, actor):
     return batch
 
 
+# Trạng thái đơn bán hàng đang mở (chưa hoàn tất hoặc huỷ) tham chiếu lô (S04 / L-1, BR-LO-04)
+OPEN_ORDER_STATUSES = ("BOOKED", "PAID", "PROCESSING")
+
+
+@transaction.atomic
 def close_batch(*, batch, actor):
     """
-    Chốt lô (BR-LO-04/05). Yêu cầu: tồn=0 (hoặc đã huỷ phần còn lại) và đã có
-    Purchase Invoice. Đông cứng lãi/lỗ. Chỉ Chủ (perm close_batch kiểm ở API).
+    Chốt lô (BR-LO-04/05, BR-KK-05). Yêu cầu:
+    - Chưa chốt (BR-LO-05)
+    - Tồn = 0 hoặc EXPIRED/CANCELLED (BR-LO-04)
+    - Không còn lượng giữ chỗ qty_reserved > 0 (BR-LO-04)
+    - Không còn đơn mở BOOKED, PAID, PROCESSING (BR-LO-04)
+    - Không có phiếu hàng hoàn DRAFT (BR-LO-04, BR-LO-05)
+    - Đã có Purchase Invoice nếu nhập từ PO (BR-MH-04/BR-LO-04)
+    - Đã kiểm kê và duyệt (APPROVED), không có phiếu kiểm kê DRAFT (BR-KK-05)
+    Đông cứng lãi/lỗ. Chỉ Chủ (perm close_batch kiểm ở API).
     """
+    batch = Batch.objects.select_for_update().get(pk=batch.pk)
     if batch.is_closed:
-        raise BusinessError("Lô đã chốt.")
+        raise BusinessError("Lô đã chốt.", code="BR-LO-05")
     if batch.qty_available > ZERO and batch.status not in (
         Batch.Status.EXPIRED, Batch.Status.CANCELLED
     ):
-        raise BusinessError("Chốt lô yêu cầu tồn = 0 hoặc đã huỷ phần còn lại (BR-LO-04).")
+        raise BusinessError("Chốt lô yêu cầu tồn = 0 hoặc đã huỷ phần còn lại (BR-LO-04).", code="BR-LO-04")
+    if batch.qty_reserved > ZERO:
+        raise BusinessError("Lô còn lượng giữ chỗ chưa giải phóng (BR-LO-04).", code="BR-LO-04")
+
+    from apps.sales.models import SalesOrderLineBatch
+    open_orders_count = (
+        SalesOrderLineBatch.objects.filter(
+            batch=batch,
+            order_line__order__status__in=OPEN_ORDER_STATUSES,
+        )
+        .values("order_line__order")
+        .distinct()
+        .count()
+    )
+    if open_orders_count > 0:
+        raise BusinessError(
+            f"Còn {open_orders_count} đơn đang mở tham chiếu lô, chưa chốt được (BR-LO-04).",
+            code="BR-LO-04",
+        )
+
+    if ReturnToStock.objects.filter(batch=batch, status=ReturnToStock.Status.DRAFT).exists():
+        raise BusinessError(
+            "Còn phiếu hàng hoàn đang chờ duyệt tham chiếu lô (BR-LO-04).",
+            code="BR-LO-04",
+        )
+
     line = getattr(batch, "source_line", None)
     if line is not None and not line.receipt.invoices.exists():
-        raise BusinessError("Cần có Purchase Invoice trước khi chốt lô (BR-MH-04/BR-LO-04).")
+        raise BusinessError(
+            "Cần có Purchase Invoice trước khi chốt lô (BR-MH-04/BR-LO-04).",
+            code="BR-LO-04",
+        )
+
+    has_approved_recon = StockReconciliationLine.objects.filter(
+        batch=batch,
+        reconciliation__status=StockReconciliation.Status.APPROVED,
+    ).exists()
+    has_draft_recon = StockReconciliationLine.objects.filter(
+        batch=batch,
+        reconciliation__status=StockReconciliation.Status.DRAFT,
+    ).exists()
+    if not has_approved_recon or has_draft_recon:
+        raise BusinessError(
+            "Lô phải được kiểm kê và duyệt trước khi chốt (BR-KK-05).",
+            code="BR-KK-05",
+        )
+
     batch.status = Batch.Status.CLOSED
     batch.closed_at = timezone.now()
     batch.closed_by = actor

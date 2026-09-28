@@ -11,6 +11,15 @@
     "trailingSlash": true,
     "headers": [
       {
+        "source": "**",
+        "headers": [
+          {
+            "key": "X-Robots-Tag",
+            "value": "noindex, nofollow"
+          }
+        ]
+      },
+      {
         "source": "/_next/static/**",
         "headers": [
           {

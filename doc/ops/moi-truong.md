@@ -58,6 +58,7 @@ Trang quản trị bên ngoài:
   firebase deploy --only hosting --project keolai-63ec1
   ```
 - Sau khi build, grep thư mục `out/_next` để chắc bản build trỏ đúng URL. Thư mục `out/` đang chứa bản build nào thì deploy ra đúng bản đó.
+- Staging được gắn header `X-Robots-Tag: noindex, nofollow` qua `firebase.staging.json` để chặn máy tìm kiếm index; sau deploy kiểm bằng `curl -sI https://cangca-loc-staging.web.app/shop/ | grep -i x-robots-tag` và `https://cangca-erp-staging.web.app/`.
 
 ## Bucket ảnh mặt hàng (A1 — đã tạo 2026-09-27; kiểm: đọc object 200, liệt kê 403)
 > Còn nợ: cả `cangca-api` và `cangca-api-staging` đang chạy bằng SA mặc định `675411800433-compute@` (roles/editor cả project), nên chưa tách quyền ghi theo môi trường. Chưa đặt budget alert 5 USD.

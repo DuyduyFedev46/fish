@@ -17,7 +17,7 @@ import { Empty, ErrorBox, Loading } from "@/shared/ui/StateBox";
 import { getAuditLogs } from "@/features/ai/api";
 import type { AuditActorKind, AuditLogRow, AuditLogParams } from "@/features/ai/types";
 import { AUDIT_MSG } from "@/features/ai/messages";
-import s from "./audit.module.css";
+import s from "../audit.module.css";
 
 const KINDS: { key: "" | AuditActorKind; label: string }[] = [
   { key: "", label: AUDIT_MSG.filterAll },

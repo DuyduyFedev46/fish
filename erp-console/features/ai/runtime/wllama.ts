@@ -1,3 +1,4 @@
+/// <reference path="./wllama.d.ts" />
 // Khung gọi @wllama/wllama — Lô 1–3 CHỈ LÀ KHUNG (model thật chờ S17, BR-AI-16: production luôn model thật).
 // import động + webpackIgnore: gói wllama CHƯA CÀI, nên không được để webpack cố phân giải lúc build;
 // lúc chạy mà thiếu thư viện → ném lỗi tiếng Việt fail-closed (người dùng vẫn nhập tay được).

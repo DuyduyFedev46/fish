@@ -74,6 +74,15 @@ class BatchServiceTests(InventoryServiceBase):
             movement_type=b.ledger_entries.model.MovementType.SALE,
         )
         b.refresh_from_db()
+        # BR-KK-05: Cần phiếu kiểm kê APPROVED trước khi chốt
+        from django.contrib.auth.models import User
+        from apps.inventory.models import StockReconciliation
+        u = User.objects.create(username="checker_close")
+        rec = StockReconciliation.objects.create(
+            count_date=self.today, created_by=u, approved_by=u,
+            status=StockReconciliation.Status.APPROVED,
+        )
+        rec.lines.create(batch=b, system_qty=Decimal("0"), counted_qty=Decimal("0"))
         batch_services.close_batch(batch=b, actor=None)
         b.refresh_from_db()
         self.assertEqual(b.status, Batch.Status.CLOSED)
