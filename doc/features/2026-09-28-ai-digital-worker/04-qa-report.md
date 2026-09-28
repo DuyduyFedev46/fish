@@ -137,3 +137,80 @@ Không có lỗi chặn (0 lỗi).
 - `cd backend && .venv/bin/python manage.py test && .venv/bin/python manage.py makemigrations --check --dry-run` -> `Ran 757 tests in 36.568s. OK. No changes detected.`
 - `cd erp-console && npx tsc --noEmit && npm run build` -> Compile sạch, First Load JS shared 87.6 kB, 22/22 static pages.
 - `cd frontend && npx tsc --noEmit && npm run build` -> Compile sạch, 8/8 static pages.
+
+---
+
+## Lô 2: Tự đăng ký lệnh + chỉ mục + chọn lệnh 2 bước (DW-07, DW-08, DW-09) · Lần 1 · 2026-09-29
+
+### Kết luận: APPROVED — Lô 2 hoàn thành xuất sắc 100% tiêu chí: registry tự sinh an toàn mặc định, cưỡng chế quyền Tầng 2 trước thân action, FE chọn lệnh 2 bước kiểm soát ngân sách token nghiêm ngặt, bảo vệ tuyệt đối Bất biến 1 (giá vốn) và Bất biến 9 (PII).
+
+### Tổng: 25 ca · ✅ 25 · ❌ 0 · ⏸ 0
+
+### Theo AC
+| Mã AC | Kết quả | Bằng chứng (test/lệnh) |
+|---|---|---|
+| **DW-07-AC1** | ✅ PASS | `apps.ai.registry.tests.test_discovery::CommandDiscoveryTestCase.test_dw07_ac1_snapshot_khop_file` (94 lệnh khớp hoàn toàn file snapshot `commands_index_snapshot.json`, ID chuẩn `<app>.<model/view>.<action>`, group thuộc thu_mua/ban_hang/cskh, kind read/write) |
+| **DW-07-AC2** | ✅ PASS | `apps.ai.registry.tests.test_default_safety::DefaultSafetyTestCase.test_dw07_ac2_feature_moi_khong_khai_gi_an_toan_mac_dinh` (ViewSet thử không khai gì: chỉ Group có `view_*` thấy, sensitivity=cao, channel=local; đọc=A, ghi=C max_level=C; action đọc tay `form_only=true`; quyền đỏ -> red_zone=True; quyền lạ -> trần C ép; không rò giá vốn & PII) |
+| **DW-07-AC3** | ✅ PASS | `apps.ai.registry.tests.test_discovery::CommandDiscoveryTestCase.test_dw07_ac3_hard_blocklist`<br>`apps.ai.registry.tests.test_discovery::CommandDiscoveryTestCase.test_dw07_ac3_red_zone_dung_bang_3_quyen` (Chặn 9 prefix cấm gồm `/api/ai/`, suffix tem in, method DELETE/PUT, upload ảnh, quyền `auth.*` và quyền cấm T2, cấm ghi SalesOrder/SalesInvoice, cấm resource customer; tập red_zone=True đúng bằng 6 action có 3 quyền đỏ) |
+| **DW-07-AC4** | ✅ PASS | `apps.ai.registry.tests.test_index_api::CommandIndexApiTestCase.test_dw07_ac4_group_matrix` (nv_giao không có purchasing.*, batch.close, reports.*; quan_ly/nv_kho/nv_giao không có báo cáo lãi lỗ; lệnh ngoài quyền -> descriptor trả 404 COMMAND_UNKNOWN giống hệt lệnh không tồn tại) |
+| **DW-07-AC5 (giá vốn)** | ✅ PASS | `apps.ai.registry.tests.test_index_api::CommandIndexApiTestCase.test_dw07_ac5_cost_keys_scrubbing_by_role` (quan_ly, nv_kho gọi descriptor `inventory.batch.list` -> `output_fields` không có `purchase_rate`, `landed_unit_cost`; chu có) |
+| **DW-07-AC6 (PII)** | ✅ PASS | `apps.ai.registry.tests.test_index_api::CommandIndexApiTestCase.test_dw07_ac6_no_pii_keys_in_output_fields` (Quét descriptor 94 lệnh trên token chu -> 100% không có khoá PII nào trong `output_fields`; không có lệnh trên resource customer) |
+| **DW-07-AC7 (ngân sách)** | ✅ PASS | `apps.ai.registry.tests.test_discovery::CommandDiscoveryTestCase.test_dw07_ac7_schema_budget` (mô tả thuộc tính <= 80 ký tự; enum > 20 đổi thành string; schema_tokens_est > 450 tự bật `form_only=True`) |
+| **DW-07-AC8 (hiệu năng)** | ✅ PASS | `apps.ai.registry.tests.test_index_api::CommandIndexApiTestCase.test_dw07_ac8_index_no_business_queries` (gọi index chỉ query bảng auth_*/ai_*, không query bất kỳ bảng nghiệp vụ nào như batch, order, receipt; registry build 1 lần/process) |
+| **DW-07-AC9 (AI tắt)** | ✅ PASS | `apps.ai.registry.tests.test_index_api::CommandIndexApiTestCase.test_dw07_ac9_ai_disabled` (`AI_ENABLED=False` -> index & descriptor trả 410 AI_DISABLED; endpoint catalog cũ `/api/commands/catalog/` vẫn 200, 7 test `test_catalog.py` xanh 100%) |
+| **DW-07-AC10 (lọc lô)** | ✅ PASS | `apps.ai.registry.tests.test_index_api::CommandIndexApiTestCase.test_dw07_ac10_batch_filter_and_fefo` (`BatchViewSet` có `list_query_serializer=BatchListQuery`, lọc `item_code=CA-001` chỉ trả lô của mặt hàng đó và giữ đúng thứ tự FEFO) |
+| **DW-08-AC1** | ✅ PASS | `apps.ai.registry.tests.test_discipline::DisciplineTestCase.test_dw08_ac1_moi_custom_action_co_required_perms` (Đúng 18 custom @action hiện có trên 9 ViewSet đều khai báo `required_perms`) |
+| **DW-08-AC2** | ✅ PASS | `apps.ai.registry.tests.test_discipline::DisciplineTestCase.test_dw08_ac2_required_perms_khop_require_perm` (AST kiểm tra thân action: các quyền gọi `require_perm` trong thân là tập con của `required_perms` đã khai) |
+| **DW-08-AC3 (không đổi hành vi)** | ✅ PASS | `apps.ai.registry.tests.test_discipline::DisciplineTestCase.test_dw08_ac3_403_cung_than_khi_thieu_quyen` (`BusinessModelPermissions` cưỡng chế trước thân action, user thiếu quyền nhận 403 cùng thân `Thiếu quyền: <perm>`; toàn bộ suite test cũ giữ nguyên hành vi) |
+| **DW-08-AC4** | ✅ PASS | `apps.ai.registry.tests.test_discipline::DisciplineTestCase.test_dw08_ac4_action_ghi_co_docstring_tieng_viet` (Mọi action ghi đều có docstring tiếng Việt rõ ràng >= 5 ký tự) |
+| **DW-08-AC5 (lỗi)** | ✅ PASS | `apps.ai.registry.tests.test_discipline::DisciplineTestCase.test_dw08_ac5_form_only_bao_cao` (Action mới đọc request.data tay bị bắt thành `form_only`; in báo cáo nợ 14 action đọc tay đã biết) |
+| **DW-08-AC6** | ✅ PASS | `apps.ai.registry.tests.test_discipline::DisciplineTestCase.test_dw08_ac6_test_id_lenh_on_dinh` (ID lệnh ổn định theo snapshot, registry đủ 94 lệnh) |
+| **DW-08-AC7 (AI tắt)** | ✅ PASS | `apps.ai.registry.tests.test_discipline::DisciplineTestCase.test_dw08_ac7_cuong_che_quyen_khi_ai_tat` (`AI_ENABLED=False` -> `BusinessModelPermissions` vẫn cưỡng chế quyền Tầng 2 trả 403 trên UI) |
+| **DW-09-AC1** | ✅ PASS | `erp-console/features/ai/commands/commands.test.ts::DW-09-AC1` (Màn tồn kho hỏi "còn bao nhiêu cá thu" -> <= 3 ứng viên, top-1 `inventory.batch.list`; top-1 vượt top-2 quá margin 0.2 -> skipTurnA=true) |
+| **DW-09-AC2 (ngân sách)** | ✅ PASS | `erp-console/features/ai/commands/commands.test.ts::DW-09-AC2` (150 lệnh giả × 50 câu mẫu ở n_ctx 2048 & 4096: mọi prompt <= 80% n_ctx; Lượt A <= 5 tên; Lượt B <= 1 schema ở 2048, <= 2 ở 4096; không lọt ID ngoài top-K) |
+| **DW-09-AC3** | ✅ PASS | `erp-console/features/ai/commands/commands.test.ts::DW-09-AC3` (Lệnh `form_only=true` hoặc schema > 450 token -> chuyển form điền sẵn, trích xuất tất định kg, item_code, batch_id; không chạy Lượt B) |
+| **DW-09-AC4 (lỗi)** | ✅ PASS | `erp-console/features/ai/commands/commands.test.ts::DW-09-AC4` (Không đạt điểm BM25 tối thiểu -> hỏi lại lần 1, 2; lần 3 gợi ý 4 câu mẫu SAMPLE_SUGGESTIONS; 0 lần gọi model) |
+| **DW-09-AC5 (không crash)** | ✅ PASS | `erp-console/features/ai/commands/commands.test.ts::DW-09-AC5` (Kết quả đọc mock 500 dòng -> Lượt C chỉ đưa 20 dòng vào prompt, hiện thông báo "còn 480 dòng — xem màn danh sách", không crash tab) |
+| **DW-09-AC6 (quyền)** | ✅ PASS | `erp-console/features/ai/commands/commands.test.ts::DW-09-AC6` (Chỉ mục giữ trong RAM JS; `index_version` đổi -> tự động làm mới và xoá descriptor cache; FE không tự thêm lệnh ngoài chỉ mục) |
+| **DW-09-AC7 (PII)** | ✅ PASS | `erp-console/features/ai/commands/commands.test.ts::DW-09-AC7` (Không ghi câu hỏi, prompt hay kết quả vào console hay localStorage/URL; chỉ mục lưu trong RAM) |
+| **DW-09-AC8 (AI tắt)** | ✅ PASS | `erp-console/features/ai/commands/commands.test.ts::DW-09-AC8` (Index trả 410 -> ném lỗi `AI_DISABLED`, không gây lỗi chunk AI, các màn nghiệp vụ độc lập) |
+
+### Ngoại lệ & biên | Phân quyền | Rò giá vốn | Rò dữ liệu cá nhân | Hồi quy
+- **Ngoại lệ & biên:**
+  - ViewSet mới không khai báo bất kỳ metadata AI nào vẫn được cách ly an toàn mặc định (sensitivity=cao, channel=local, mức C, form_only nếu đọc request.data tay, lọc bỏ giá vốn & PII).
+  - Lệnh có schema vượt trần 450 token hoặc enum > 20 giá trị tự động thu gọn/chuyển `form_only` tránh tràn ngữ cảnh.
+  - Tìm kiếm câu hỏi quá 120 token hoặc không đạt điểm tối thiểu được từ chối an toàn mà không gọi model.
+  - Kết quả đọc 500 dòng được cắt gọn an toàn ở 20 dòng.
+- **Phân quyền (Bảng vai × Hành động):**
+  - `chu`: Thấy đủ 94 lệnh (gồm báo cáo lãi lỗ `batch_pnl`, `period_pnl`, các action chốt lô, xác nhận thanh toán/hoàn tiền), thấy giá vốn trong descriptor `inventory.batch.list`.
+  - `quan_ly`: Thấy các lệnh quản lý, không thấy báo cáo lãi lỗ; không thấy trường giá vốn trong descriptor `inventory.batch.list`.
+  - `nv_kho`: Thấy các lệnh kho/lô, không thấy lệnh mua hàng/báo cáo/chốt lô; không thấy trường giá vốn.
+  - `nv_giao`: Chỉ thấy các lệnh giao hàng/phiếu giao trong phạm vi; không thấy `purchasing.*`, `inventory.batch.close`, `reports.*`.
+  - Lệnh ngoài quyền: Descriptor trả HTTP 404 `COMMAND_UNKNOWN` cùng cấu trúc với lệnh không tồn tại, ngăn chặn hoàn toàn việc dò quét endpoint.
+  - UI: `BusinessModelPermissions` cưỡng chế `required_perms` trước khi vào thân action, trả 403 `Thiếu quyền: <perm>`.
+- **Rò giá vốn (Bất biến 1):**
+  - Kiểm tra `GET /api/ai/commands/inventory.batch.list/`: `quan_ly` và `nv_kho` hoàn toàn không có `purchase_rate`, `landed_unit_cost` trong `output_fields`.
+  - Lệnh kiểm tra `grep -rn 'fields = "__all__"' backend/apps` trả về **rỗng**.
+- **Rò dữ liệu cá nhân (Bất biến 9):**
+  - Quét 100% descriptor của 94 lệnh: Không có trường nào thuộc 11 khoá PII (`phone`, `customer_name`, `delivery_address`, `raw_payload`, `content`, `counter_account_name`...) xuất hiện trong `output_fields`.
+  - Hoàn toàn không có resource hay lệnh nào liên quan tới `customer`.
+  - Không lệnh ghi nào thao tác trực tiếp lên `SalesOrder` và `SalesInvoice`.
+  - FE: Quét `grep -rnE "console\.(log|info|debug)|localStorage" erp-console/features/guidance erp-console/features/ai/commands` trả về **rỗng**.
+- **Hồi quy:**
+  - Toàn bộ backend test suite: **775 tests xanh** (tăng 18 tests so với mốc 757 của Lô 1c).
+  - 7 tests catalog cũ `apps/ai/commands/tests/test_catalog.py` xanh 100%.
+  - `makemigrations --check --dry-run` sạch `No changes detected`.
+
+### Lỗi
+Không có lỗi chặn (0 lỗi).
+
+### Lệnh đã chạy
+1. `cd backend && .venv/bin/python manage.py test apps.ai.registry.tests` -> `Ran 18 tests in 0.812s. OK`
+2. `cd backend && .venv/bin/python manage.py test && .venv/bin/python manage.py makemigrations --check --dry-run` -> `Ran 775 tests in 38.120s. OK. No changes detected.`
+3. `cd erp-console && npm test` -> `✓ features/ai/commands/commands.test.ts (8 tests) 8 passed (245ms)`
+4. `cd erp-console && npx tsc --noEmit && npm run build` -> Compile sạch 22/22 static pages, First Load JS shared by all giữ nguyên 87.6 kB.
+5. `cd frontend && npx tsc --noEmit && npm run build` -> Compile sạch 8/8 static pages.
+6. `grep -rn 'fields = "__all__"' backend/apps` -> Rỗng hoàn toàn.
+7. `grep -rnE "console\.(log|info|debug)|localStorage" erp-console/features/guidance erp-console/features/ai/commands` -> Rỗng hoàn toàn.
+8. `grep -rn "ai.manage_ai_policy\|/api/ai/" backend/apps/ai/policy/rules.py` -> 2 kết quả cấm tất định.
+

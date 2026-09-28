@@ -38,8 +38,9 @@ class DeliveryNoteViewSet(DocumentViewSet):
                 queryset = queryset.filter(status__in=statuses)
         return queryset
 
-    @action(detail=True, methods=["post"], url_path="status")
+    @action(detail=True, methods=["post"], url_path="status", required_perms=("delivery.change_deliverynote",))
     def set_status(self, request, pk=None):
+        """Cập nhật trạng thái phiếu giao hàng."""
         note = self.get_object()  # đã bị get_queryset lọc theo phạm vi
         to_status = request.data.get("to_status")
         needs_decision = None

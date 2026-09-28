@@ -27,8 +27,9 @@ class PurchaseReceiptViewSet(DocumentViewSet):
     locked_fields = ("status",)  # BR-PQ-14: ghi nhận qua action submit
     actor_fields = ("created_by",)  # BR-PQ-16
 
-    @action(detail=True, methods=["post"])
+    @action(detail=True, methods=["post"], required_perms=("purchasing.change_purchasereceipt",))
     def submit(self, request, pk=None):
+        """Xác nhận phiếu nhập hàng và sinh các lô cá tương ứng."""
         # Sinh lô từ các dòng nhập (cần quyền change phiếu — Tầng 1 đã chặn).
         require_perm(request.user, "purchasing.change_purchasereceipt")
         batches = services.submit_receipt(receipt=self.get_object(), actor=request.user)

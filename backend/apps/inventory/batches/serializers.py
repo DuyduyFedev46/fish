@@ -4,6 +4,7 @@ với ai không có `inventory.view_costprice` — Tầng 3 phạm vi cột (spe
 """
 from rest_framework import serializers
 
+from apps.catalog.models import Item
 from apps.common.api import CostFieldSerializerMixin
 from apps.inventory.models import Batch
 
@@ -22,3 +23,11 @@ class BatchSerializer(CostFieldSerializerMixin, serializers.ModelSerializer):
             "purchase_rate", "landed_unit_cost",  # nhạy cảm — mixin loại nếu thiếu quyền
         ]
         read_only_fields = ["batch_id", "qty_available", "qty_reserved", "closed_at"]
+
+
+class BatchListQuery(serializers.Serializer):
+    """Tham số lọc danh sách lô (02b §2.5, DW-07-AC10)."""
+    item_code = serializers.SlugRelatedField(
+        slug_field="code", queryset=Item.objects.all(), required=False, help_text="Mã mặt hàng"
+    )
+    status = serializers.ChoiceField(choices=Batch.Status.choices, required=False)

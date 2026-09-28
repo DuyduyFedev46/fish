@@ -1,33 +1,37 @@
 """
-Sinh JSON schema từ DRF Serializer (Spike DW-01, 02b §2.4, §13 S-4).
+Sinh JSON Schema từ DRF Serializer với tối ưu ngân sách token (02b §2.4, §5.5, DW-07).
 """
 import json
 from decimal import Decimal
 from rest_framework import serializers
 
 
-def serializer_to_schema(serializer_cls_or_instance):
+def serializer_to_schema(serializer_cls_or_instance, *, exclude_fields=None):
     """
-    Chuyển đổi một serializer DRF thành JSON schema đơn giản cho LLM.
+    Chuyển đổi một serializer DRF thành JSON schema rút gọn cho LLM.
     Trả về (schema_dict, unsupported_fields).
     """
     if serializer_cls_or_instance is None:
         return None, []
 
     if isinstance(serializer_cls_or_instance, type) and issubclass(serializer_cls_or_instance, serializers.BaseSerializer):
-        instance = serializer_cls_or_instance()
+        try:
+            instance = serializer_cls_or_instance()
+        except Exception:
+            return None, []
     elif isinstance(serializer_cls_or_instance, serializers.BaseSerializer):
         instance = serializer_cls_or_instance
     else:
         return None, []
 
+    exclude_set = set(exclude_fields or ())
     unsupported = []
     properties = {}
     required_fields = []
 
     fields = getattr(instance, "fields", {})
     for name, field in fields.items():
-        if field.read_only:
+        if field.read_only or name in exclude_set:
             continue
 
         if field.required:
@@ -49,11 +53,13 @@ def serializer_to_schema(serializer_cls_or_instance):
 
 
 def _field_to_schema(field):
-    """Chuyển đổi 1 field DRF sang schema."""
-    desc = field.help_text or getattr(field, "label", "") or ""
+    """Chuyển đổi 1 field DRF sang schema có cắt giảm token (02b §5.5)."""
+    raw_desc = field.help_text or getattr(field, "label", "") or ""
+    # Mô tả cắt tối đa 80 ký tự theo DW-07-AC7
+    desc = str(raw_desc)[:80]
     schema = {}
     if desc:
-        schema["description"] = str(desc)
+        schema["description"] = desc
 
     if isinstance(field, serializers.BooleanField):
         schema["type"] = "boolean"
@@ -78,8 +84,17 @@ def _field_to_schema(field):
         return schema, True
 
     if isinstance(field, serializers.ChoiceField):
-        schema["type"] = "string"
-        schema["enum"] = list(field.choices.keys())
+        choices = list(field.choices.keys())
+        # DW-07-AC7: enum > 20 giá trị đổi thành string
+        if len(choices) > 20:
+            schema["type"] = "string"
+            if desc:
+                schema["description"] = f"{desc} (mã)"[:80]
+            else:
+                schema["description"] = "mã lựa chọn"
+        else:
+            schema["type"] = "string"
+            schema["enum"] = choices
         return schema, True
 
     if isinstance(field, (serializers.CharField, serializers.SlugRelatedField, serializers.PrimaryKeyRelatedField, serializers.EmailField, serializers.URLField, serializers.UUIDField)):
@@ -116,11 +131,31 @@ def _field_to_schema(field):
 
 def estimate_schema_tokens(schema_dict):
     """
-    Ước lượng số token của một schema dictionary.
-    Theo quy ước: 1 token ~ 4 ký tự JSON minified hoặc 0.75 từ.
+    Ước lượng số token của schema dictionary (02b §5.5: ký tự / 2.5 hoặc minified len // 3).
     """
     if not schema_dict:
         return 0
     raw_json = json.dumps(schema_dict, ensure_ascii=False, separators=(",", ":"))
-    # Ước tính số token: khoảng 3.5 ký tự mỗi token cho JSON cấu trúc
     return max(1, len(raw_json) // 3)
+
+
+def get_serializer_output_fields(serializer_cls_or_instance) -> list[str]:
+    """Lấy danh sách tên field đầu ra của serializer (bao gồm sensitive_fields để lọc theo quyền)."""
+    if serializer_cls_or_instance is None:
+        return []
+    try:
+        cls = serializer_cls_or_instance if isinstance(serializer_cls_or_instance, type) else serializer_cls_or_instance.__class__
+        if isinstance(serializer_cls_or_instance, type) and issubclass(serializer_cls_or_instance, serializers.BaseSerializer):
+            instance = serializer_cls_or_instance()
+        elif isinstance(serializer_cls_or_instance, serializers.BaseSerializer):
+            instance = serializer_cls_or_instance
+        else:
+            return []
+        field_keys = list(instance.fields.keys())
+        sensitive = getattr(cls, "sensitive_fields", ())
+        for s in sensitive:
+            if s not in field_keys:
+                field_keys.append(s)
+        return field_keys
+    except Exception:
+        return []

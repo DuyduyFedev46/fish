@@ -10,6 +10,7 @@ from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
+from apps.ai.declare import AiDeclarable
 from apps.common.api import BusinessModelPermissions, reject_protected_fields, require_perm
 from apps.common.exceptions import BusinessError
 from apps.sales.models import PaymentTransaction, Refund, SalesInvoice
@@ -25,7 +26,7 @@ def _get_or_400(model, raw_pk, label):
         raise BusinessError(f"{label} không tồn tại.", code=services.REFUND_SOURCE_CODE) from None
 
 
-class RefundViewSet(viewsets.ReadOnlyModelViewSet):
+class RefundViewSet(AiDeclarable, viewsets.ReadOnlyModelViewSet):
     queryset = Refund.objects.select_related(
         "sales_invoice__sales_order__customer",
         "payment_transaction__sales_order__customer",
@@ -46,8 +47,9 @@ class RefundViewSet(viewsets.ReadOnlyModelViewSet):
                 queryset = queryset.filter(status__in=statuses)
         return queryset
 
-    @action(detail=False, methods=["post"], url_path="create")
+    @action(detail=False, methods=["post"], url_path="create", required_perms=("sales.create_refund",))
     def create_refund(self, request):
+        """Tạo phiếu hoàn tiền mới cho đơn hàng hoặc giao dịch lệch (BR-HT-07)."""
         require_perm(request.user, "sales.create_refund")
         data = request.data if hasattr(request.data, "get") else {}
         reject_protected_fields(data, actor=("created_by", "confirmed_by"))  # BR-PQ-16
@@ -85,8 +87,9 @@ class RefundViewSet(viewsets.ReadOnlyModelViewSet):
             return Response({**body, "duplicate": True}, status=200)
         return Response(body, status=201)
 
-    @action(detail=True, methods=["post"])
+    @action(detail=True, methods=["post"], required_perms=("sales.confirm_refund",))
     def confirm(self, request, pk=None):
+        """Xác nhận đã chuyển khoản hoàn tiền cho khách (BR-HT-07)."""
         require_perm(request.user, "sales.confirm_refund")
         refund = services.confirm_refund(
             refund=self.get_object(),
@@ -95,18 +98,18 @@ class RefundViewSet(viewsets.ReadOnlyModelViewSet):
         )
         return Response(self.get_serializer(refund).data)
 
-    @action(detail=True, methods=["post"], url_path="mark-failed")
+    @action(detail=True, methods=["post"], url_path="mark-failed", required_perms=("sales.confirm_refund",))
     def mark_failed(self, request, pk=None):
-        """S16: Chủ báo chuyển khoản thất bại (BR-HT-09) — tiền rời túi nên chỉ Chủ."""
+        """Đánh dấu chuyển khoản hoàn tiền thất bại (BR-HT-09) — tiền rời túi nên chỉ Chủ."""
         require_perm(request.user, "sales.confirm_refund")
         refund = services.mark_refund_failed(
             refund=self.get_object(), reason=request.data.get("reason", ""), actor=request.user,
         )
         return Response(self.get_serializer(refund).data)
 
-    @action(detail=True, methods=["post"])
+    @action(detail=True, methods=["post"], required_perms=("sales.confirm_refund",))
     def retry(self, request, pk=None):
-        """S16: Chủ thử chuyển lại phiếu Thất bại (BR-HT-09)."""
+        """Thử lại chuyển khoản hoàn tiền thất bại (BR-HT-09)."""
         require_perm(request.user, "sales.confirm_refund")
         refund = services.retry_refund(refund=self.get_object(), actor=request.user)
         return Response(self.get_serializer(refund).data)

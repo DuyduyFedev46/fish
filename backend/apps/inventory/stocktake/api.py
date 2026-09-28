@@ -17,8 +17,9 @@ class StockReconciliationViewSet(DocumentViewSet):
     locked_fields = ("status", "approved_by", "approved_at")  # BR-PQ-14
     actor_fields = ("created_by",)  # BR-PQ-16 → BR-KK-02 có nghĩa
 
-    @action(detail=True, methods=["post"])
+    @action(detail=True, methods=["post"], required_perms=("inventory.approve_stockreconciliation",))
     def approve(self, request, pk=None):
+        """Duyệt phiếu kiểm kê kho và cân đối sổ kho."""
         require_perm(request.user, "inventory.approve_stockreconciliation")
         rec = services.apply_reconciliation(reconciliation=self.get_object(), approver=request.user)
         return Response(self.get_serializer(rec).data)

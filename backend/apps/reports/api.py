@@ -13,6 +13,7 @@ PERM = "reports.view_profitreport"
 
 class BatchPnlView(APIView):
     permission_classes = [IsAuthenticated]
+    required_perms = (PERM,)
 
     def get(self, request, batch_id):
         require_perm(request.user, PERM)
@@ -25,6 +26,7 @@ class BatchPnlView(APIView):
 
 class PeriodPnlView(APIView):
     permission_classes = [IsAuthenticated]
+    required_perms = (PERM,)
 
     def get(self, request):
         require_perm(request.user, PERM)
@@ -34,3 +36,4 @@ class PeriodPnlView(APIView):
         except (KeyError, ValueError):
             return Response({"detail": "Cần tham số year & month."}, status=400)
         return Response(services.period_pnl(year=year, month=month))
+

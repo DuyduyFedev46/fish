@@ -11,6 +11,7 @@ from rest_framework.exceptions import MethodNotAllowed
 from rest_framework.permissions import BasePermission
 from rest_framework.response import Response
 
+from apps.ai.declare import AiDeclarable
 from apps.common.exceptions import BusinessError
 
 from . import services
@@ -42,7 +43,7 @@ def _payload(request, allowed, *, required=()):
     return {k: data.get(k) for k in allowed if k in data or k in required}
 
 
-class StaffViewSet(viewsets.GenericViewSet):
+class StaffViewSet(AiDeclarable, viewsets.GenericViewSet):
     permission_classes = [CanManageStaff]
     queryset = User.objects.select_related("staff_profile").prefetch_related("groups")
     http_method_names = ["get", "post", "patch", "put", "head", "options"]
@@ -92,28 +93,32 @@ class StaffViewSet(viewsets.GenericViewSet):
         user = services.update_profile(actor=request.user, user=self.get_object(), **data)
         return Response(self._item(user))
 
-    @action(detail=True, methods=["put"], url_path="groups")
+    @action(detail=True, methods=["put"], url_path="groups", required_perms=("accounts.manage_staff",))
     def groups(self, request, pk=None):
+        """Cập nhật danh sách nhóm quyền của nhân viên."""
         data = _payload(request, {"groups"}, required=("groups",))
         groups, added, removed = services.set_groups(
             actor=request.user, user=self.get_object(), groups=data["groups"]
         )
         return Response({"groups": groups, "added": added, "removed": removed})
 
-    @action(detail=True, methods=["post"])
+    @action(detail=True, methods=["post"], required_perms=("accounts.manage_staff",))
     def deactivate(self, request, pk=None):
+        """Vô hiệu hoá tài khoản nhân viên."""
         _payload(request, set())
         user = services.deactivate(actor=request.user, user=self.get_object())
         return Response({"is_active": user.is_active})
 
-    @action(detail=True, methods=["post"])
+    @action(detail=True, methods=["post"], required_perms=("accounts.manage_staff",))
     def reactivate(self, request, pk=None):
+        """Kích hoạt lại tài khoản nhân viên."""
         _payload(request, set())
         user = services.reactivate(actor=request.user, user=self.get_object())
         return Response({"is_active": user.is_active})
 
-    @action(detail=True, methods=["post"], url_path="reset-password")
+    @action(detail=True, methods=["post"], url_path="reset-password", required_perms=("accounts.manage_staff",))
     def reset_password(self, request, pk=None):
+        """Đặt lại mật khẩu cho nhân viên."""
         data = _payload(request, {"new_password"}, required=("new_password",))
         services.reset_password(
             actor=request.user, user=self.get_object(), new_password=data["new_password"]

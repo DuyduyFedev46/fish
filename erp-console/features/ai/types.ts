@@ -122,3 +122,45 @@ export type AuditLogParams = {
   actor_kind?: "" | AuditActorKind;
   action?: string;
 };
+
+// ---- DW-07 & DW-09 Chỉ mục lệnh & Mô tả lệnh (02b §6.1, §6.2) ----
+export type AiCommandGroup = "thu_mua" | "ban_hang" | "cskh";
+export type AiCommandKind = "read" | "write";
+export type AiCommandLevel = "OFF" | "C" | "B" | "A";
+
+export type AiCommandIndexItem = {
+  id: string;
+  title: string;
+  group: AiCommandGroup;
+  kind: AiCommandKind;
+  level: AiCommandLevel;
+  screens: string[];
+  keywords: string[];
+  target?: "detail";
+  red_zone?: boolean;
+  form_only?: boolean;
+};
+
+export type AiCommandsIndexResponse = {
+  index_version: string;
+  config_version: number;
+  commands: AiCommandIndexItem[];
+};
+
+export type AiCommandDescriptor = {
+  id: string;
+  title: string;
+  description: string;
+  kind: AiCommandKind;
+  level: AiCommandLevel;
+  max_level: string;
+  sensitivity: string;
+  channel: string;
+  red_zone: boolean;
+  target: string | null;
+  form_only: boolean;
+  schema_tokens_est: number;
+  input_schema: Record<string, unknown> | null;
+  output_fields: string[];
+};
+

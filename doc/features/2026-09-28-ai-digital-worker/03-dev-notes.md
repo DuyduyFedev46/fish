@@ -211,4 +211,60 @@
   - `erp-console`: `npx tsc --noEmit && npm run build` sạch 22/22 static pages, First Load JS shared giữ nguyên 87.6 kB.
   - `frontend`: `npx tsc --noEmit && npm run build` sạch 8/8 static pages.
 
+## Lô 2: Tự đăng ký lệnh + chỉ mục + chọn lệnh 2 bước (DW-07, DW-08, DW-09)
+- Trạng thái: HOÀN THÀNH — QA APPROVED
+- Nhánh thực hiện: `main`
+
+### 1. Backend (`be-dev`)
+- Khung tự khai báo và Mixin (`backend/apps/ai/declare.py`):
+  - `@dataclass(frozen=True) class AiMeta`: metadata phong phú (title, description, group, screens, sensitivity, channel, max_level, undo, limits, lookup, keywords).
+  - `class AiDeclarable`: mixin khai báo `required_perms`, `input_serializer`, `ai`, `ai_by_action`, `list_query_serializer`. Đưa vào `DocumentViewSet` và các ViewSet back-office.
+- Danh sách chặn tất định (`backend/apps/ai/policy/rules.py`):
+  - Chặn cứng: 9 tiền tố URL (`/api/ai/`, `/api/shop/`, `/api/internal/`, v.v.), suffix tem in, method DELETE/PUT, upload ảnh, quyền `auth.*` và quyền T2 cấm, model cấm ghi SalesOrder/SalesInvoice, resource cấm customer.
+  - Vùng đỏ: `RED_ZONE_PERMS` (3 quyền: `inventory.close_batch`, `sales.confirm_refund`, `sales.confirm_payment_manual`).
+  - Trần C ép: `FORCE_C_PERMS` + quy tắc 02b §3: mọi quyền Tầng 2 chưa trong whitelist đều bị ép trần C.
+  - Lọc đầu ra: `SCRUB_PII_KEYS` (11 khoá PII), `SCRUB_FREE_TEXT_KEYS`, `COST_KEYS`.
+- Hàm tính mức hiệu lực (`backend/apps/ai/policy/effective.py`):
+  - `effective_level(user, spec)`: kiểm AI_ENABLED, xác thực, danh sách cấm, quyền T1 qua `permission_classes` của View, quyền T2 qua `required_perms`, min(spec.max_level, env AI_WRITE_LEVELS_ALLOWED).
+- Quản lý lệnh và JSON Schema (`backend/apps/ai/registry/`):
+  - `spec.py`: Class `CommandSpec`.
+  - `schema.py`: Sinh JSON schema từ DRF serializer, cắt mô tả <= 80 ký tự, enum > 20 đổi string, ước lượng token `estimate_schema_tokens`, lấy danh sách output fields bao gồm sensitive fields để lọc phân quyền cột.
+  - `discovery.py`: Singleton `CommandRegistry`, quét resolver URL patterns, loại trừ theo luật tất định, phân nhóm 3 module (thu_mua / ban_hang / cskh), gắn red_zone đúng 6 action, tính `index_version` băm.
+  - `api.py`: `AiCommandsIndexView` (GET `/api/ai/commands/index/`) lọc theo user thực, `AiCommandDetailView` (GET `/api/ai/commands/<id>/`) lọc giá vốn và PII, trả 404 COMMAND_UNKNOWN nếu không tồn tại hoặc không đủ quyền, 410 khi AI tắt.
+  - `api_urls.py`: Đăng ký route `ai/commands/index/` và `ai/commands/<str:command_id>/`.
+- Kỷ luật tự đăng ký và bảo vệ quyền (`backend/apps/common/api.py`):
+  - `BusinessModelPermissions`: cưỡng chế `required_perms` trước khi vào thân action, trả 403 `Thiếu quyền: <perm>` cùng thân.
+  - Cập nhật 18 custom `@action` trên 9 ViewSet back-office với `required_perms` và docstring tiếng Việt rõ ràng.
+- Lọc lô FEFO an toàn (`backend/apps/inventory/batches/`):
+  - Thêm `BatchListQuery` serializer (`item_code`, `status`).
+  - `BatchViewSet`: gắn `list_query_serializer`, lọc get_queryset an toàn, giữ nguyên thứ tự `FEFO_ORDER`.
+- Cấu hình settings (`backend/config/settings.py`): Thêm đầy đủ hằng số Phụ lục A (AI_WRITE_LEVELS_ALLOWED, AI_ACTION_TTL_MINUTES, v.v.).
+- Snapshot và dọn dẹp:
+  - Tạo snapshot 94 lệnh: `backend/apps/ai/registry/tests/snapshots/commands_index_snapshot.json`.
+  - Xoá spike `backend/spikes/dw01/`.
+- Test mới:
+  - `apps/ai/registry/tests/test_discovery.py` (5 tests): Snapshot khớp 100%, danh sách chặn, tập red zone, ma trận nhóm, ngân sách schema.
+  - `apps/ai/registry/tests/test_default_safety.py` (2 tests): ViewSet mới không khai gì tự an toàn mặc định mọi tiêu chí.
+  - `apps/ai/registry/tests/test_discipline.py` (5 tests): 18 action đủ required_perms, khớp AST thân action, 403 cùng thân, docstring tiếng Việt, báo cáo form_only.
+  - `apps/ai/registry/tests/test_index_api.py` (6 tests): Ma trận 4 Group, lọc giá vốn theo quyền, lọc PII đệ quy, không query bảng nghiệp vụ, AI tắt trả 410, lọc lô FEFO.
+- Kiểm chứng suite backend:
+  - Toàn bộ backend test suite: **775 tests xanh** (`Ran 775 tests in 38.120s. OK`).
+  - `makemigrations --check --dry-run` sạch `No changes detected`.
+
+### 2. Frontend (`fe-dev`)
+- Cài đặt Vitest: Thêm `vitest`, `vite`, script `"test": "vitest run"`, cấu hình alias `@` trong `vitest.config.ts`.
+- Types (`erp-console/features/ai/types.ts`): Thêm kiểu `AiCommandIndexItem`, `AiCommandsIndexResponse`, `AiCommandDescriptor`, `AiCommandGroup`, `AiCommandLevel`.
+- Module commands (`erp-console/features/ai/commands/`):
+  - `index.ts`: In-memory cache cho chỉ mục và descriptor, tự làm mới khi `index_version` đổi, ném lỗi AI_DISABLED khi nhận 410.
+  - `search.ts`: BM25 bỏ dấu tiếng Việt, boost 1.35x cho màn hình hiện tại, tính `margin` để bỏ Lượt A khi top-1 vượt trội top-2 >= margin (0.2).
+  - `budget.ts`: Quản lý ngân sách token (n_ctx 2048/4096, trần an toàn 80% n_ctx, Lượt A <= 5 tên ứng viên, Lượt B <= 1/2 schema, cắt kết quả đọc <= 20 dòng kèm thông báo).
+  - `planner.ts`: Quy trình chọn lệnh 2 bước (Lượt A: chọn ứng viên; Lượt B: điền tham số qua schema), trích xuất tham số tất định (kg, item_code, batch_id), chuyển `form_only` khi schema > 450 tokens, hỏi lại <= 3 lần rồi gợi ý câu mẫu, 0 model call khi không khớp.
+- Test Vitest (`erp-console/features/ai/commands/commands.test.ts`):
+  - 8/8 tests xanh: DW-09-AC1 đến DW-09-AC8 (ngân sách 150 lệnh × 50 câu mẫu cho cả 2048 và 4096 tokens, không lọt ID ngoài top-K, không crash 500 dòng, không rò PII/prompt ra console/localStorage).
+- Kiểm chứng build:
+  - `erp-console`: `npm test` -> 8 passed (245ms).
+  - `erp-console`: `npx tsc --noEmit && npm run build` -> sạch 22/22 static pages, First Load JS giữ nguyên 87.6 kB.
+  - `frontend`: `npx tsc --noEmit && npm run build` -> sạch 8/8 static pages.
+
+
 

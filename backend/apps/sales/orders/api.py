@@ -14,6 +14,7 @@ from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
+from apps.ai.declare import AiDeclarable
 from apps.common.api import (
     BusinessModelPermissions,
     StandardPagination,
@@ -53,7 +54,7 @@ def _customer_ids_by_name(q):
     return [pk for pk, name in Customer.objects.values_list("pk", "name") if needle in fold_text(name)]
 
 
-class SalesOrderViewSet(viewsets.ReadOnlyModelViewSet):
+class SalesOrderViewSet(AiDeclarable, viewsets.ReadOnlyModelViewSet):
     queryset = SalesOrder.objects.select_related("customer").all()
     permission_classes = [BusinessModelPermissions]
     pagination_class = StandardPagination
@@ -126,12 +127,9 @@ class SalesOrderViewSet(viewsets.ReadOnlyModelViewSet):
             )
         return cond
 
-    @action(detail=True, methods=["post"])
+    @action(detail=True, methods=["post"], required_perms=("sales.cancel_paid_order",))
     def cancel(self, request, pk=None):
-        """
-        S14: huỷ đơn đã thanh toán theo trạng thái phiếu giao (BR-GH-07/05).
-        `{"reason_code": ..., "note": ""}` — OTHER bắt buộc `note`.
-        """
+        """Huỷ đơn hàng đã thanh toán và sinh phiếu hoàn tiền (BR-GH-07/05)."""
         require_perm(request.user, "sales.cancel_paid_order")
         data = request.data if isinstance(request.data, dict) else {}
         reason_code = data.get("reason_code")
@@ -162,9 +160,9 @@ class SalesOrderViewSet(viewsets.ReadOnlyModelViewSet):
             "invoice_id": invoice.pk if invoice is not None else None,
         })
 
-    @action(detail=True, methods=["post"], url_path="confirm-payment")
+    @action(detail=True, methods=["post"], url_path="confirm-payment", required_perms=("sales.confirm_payment_manual",))
     def confirm_payment(self, request, pk=None):
-        """S11 / E-05: Chủ xác nhận đã nhận tiền cho đơn Giữ chỗ (BR-TT-07/08)."""
+        """Xác nhận thanh toán thủ công cho đơn hàng (BR-TT-07/08)."""
         require_perm(request.user, "sales.confirm_payment_manual")
         data = request.data if isinstance(request.data, dict) else {}
         payment, duplicate = payment_services.confirm_payment_manual(

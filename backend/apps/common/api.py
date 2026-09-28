@@ -24,6 +24,7 @@ from rest_framework.response import Response
 from rest_framework.views import exception_handler as drf_exception_handler
 
 from .exceptions import BusinessError
+from apps.ai.declare import AiDeclarable
 
 VIEW_COSTPRICE_PERM = "inventory.view_costprice"
 
@@ -49,7 +50,23 @@ class BusinessModelPermissions(DjangoModelPermissions):
         method = request.method.lower()
         if authenticated and method != "options" and not hasattr(view, method):
             raise MethodNotAllowed(request.method)
-        if getattr(view, "action", None) in getattr(view, "custom_perm_actions", ()):
+        action_name = getattr(view, "action", None)
+        if action_name:
+            action_func = getattr(view, action_name, None)
+            func_kwargs = getattr(action_func, "kwargs", {}) if action_func else {}
+            required_perms = (
+                getattr(action_func, "required_perms", None)
+                or func_kwargs.get("required_perms")
+                or getattr(view, "required_perms", ())
+            )
+            if required_perms:
+                if not authenticated:
+                    return False
+                for perm in required_perms:
+                    if not request.user.has_perm(perm):
+                        raise PermissionDenied(f"Thiếu quyền: {perm}")
+                return True
+        if action_name in getattr(view, "custom_perm_actions", ()):
             return authenticated
         return super().has_permission(request, view)
 
@@ -188,6 +205,7 @@ class ProtectedFieldsMixin:
 
 
 class DocumentViewSet(
+    AiDeclarable,
     ProtectedFieldsMixin,
     mixins.CreateModelMixin,
     mixins.RetrieveModelMixin,

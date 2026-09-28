@@ -17,8 +17,9 @@ class ReturnToStockViewSet(DocumentViewSet):
     locked_fields = ("status", "decision", "approved_by")  # BR-PQ-14 (tạo mới qua S22)
     actor_fields = ("created_by",)  # BR-PQ-16
 
-    @action(detail=True, methods=["post"])
+    @action(detail=True, methods=["post"], required_perms=("inventory.approve_returntostock",))
     def approve(self, request, pk=None):
+        """Duyệt phiếu hàng hoàn và nhập lại kho."""
         require_perm(request.user, "inventory.approve_returntostock")
         rt = self.get_object()
         decision = request.data.get("decision")

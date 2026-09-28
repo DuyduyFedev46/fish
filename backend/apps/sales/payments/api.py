@@ -9,6 +9,7 @@ from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
+from apps.ai.declare import AiDeclarable
 from apps.common.api import BusinessModelPermissions, StandardPagination, require_perm
 from apps.sales.models import PaymentTransaction, SalesInvoice
 
@@ -22,7 +23,7 @@ class SalesInvoiceViewSet(viewsets.ReadOnlyModelViewSet):
     permission_classes = [BusinessModelPermissions]
 
 
-class PaymentTransactionViewSet(viewsets.ReadOnlyModelViewSet):
+class PaymentTransactionViewSet(AiDeclarable, viewsets.ReadOnlyModelViewSet):
     """
     S12 — hàng chờ thanh toán lệch (UNDERPAID/ORPHAN/UNMATCHED/OVERPAID), BR-TT-09.
 
@@ -57,9 +58,9 @@ class PaymentTransactionViewSet(viewsets.ReadOnlyModelViewSet):
                 queryset = queryset.filter(**{f"{name}__in": values})
         return queryset
 
-    @action(detail=True, methods=["post"])
+    @action(detail=True, methods=["post"], required_perms=("sales.confirm_payment_manual",))
     def resolve(self, request, pk=None):
-        """S12: gắn đơn / xác nhận đơn khi khách đã bù (BR-TT-09). Hoàn tiền: tạo phiếu hoàn (S13)."""
+        """Xử lý giao dịch thanh toán chuyển khoản lệch (BR-TT-09)."""
         data = request.data if hasattr(request.data, "get") else {}
         result = services.resolve_payment(
             payment=self.get_object(),
