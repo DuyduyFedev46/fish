@@ -54,5 +54,6 @@ cache chung (Redis) · SEO nâng cao cho bài viết · hoàn kho/hoàn tiền m
 | 2026-09-28 22:20 | P1 | Lô 3 | APPROVED | `9f39fe9` | 723 | S06 lãi lỗ không tính 2 lần hao hụt/hỏng, S07 bỏ hoá đơn huỷ |
 | 2026-09-28 22:32 | P2 | Lô 0 | PASS | `cd74f0f` | 723 | Spike DW-01 (114 lệnh, dispatch 100%), DW-02 (recall@5 98%) |
 | 2026-09-28 22:58 | P2 | Lô 1a | APPROVED | `5ef773b` | 732 | DW-03 khung Tiếp theo · Đã làm trên đơn (+L-4 dòng AI) |
+| 2026-09-29 00:04 | P2 | Lô 1b | APPROVED | `ea6f2da` | 749 | DW-04 phiếu hoàn + GD lệch, DW-05 lô (tách check_close_batch) |
 
 
