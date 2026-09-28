@@ -424,3 +424,65 @@ Không có lỗi chặn (0 lỗi).
 3. `cd erp-console && npm test` -> `✓ features/ai/commands/commands.test.ts (9 tests) 9 passed (279ms)`
 4. `cd erp-console && npx tsc --noEmit && npm run build` -> Compile sạch 25/25 static pages, First Load JS shared giữ nguyên 87.6 kB.
 5. `cd frontend && npx tsc --noEmit && npm run build` -> Compile sạch 8/8 static pages.
+
+---
+
+## Lô 4: DW-17 — Nhập lô mua tại cảng trên ERP · Lần 1 · 2026-09-29
+
+### Kết luận: APPROVED — Nhập lô mua tại cảng trên ERP (DW-17) đạt 100% tiêu chí AC1–AC8, sinh batch DRAFT, kiểm soát hạn BR-MH-02, chống trùng lặp idempotency_key TL-5, lệnh AI trần C locked_reason=AI_UNDO_MISSING, bảo vệ tuyệt đối Bất biến 1 (giá vốn) và Bất biến 9 (PII).
+
+### Tổng: 15 ca · ✅ 15 · ❌ 0 · ⏸ 0
+
+### Theo AC
+| Mã AC | Kết quả | Bằng chứng (test/lệnh) |
+|---|---|---|
+| **DW-17-AC1** | ✅ PASS | `apps.purchasing.receipts.tests.test_nhap_lo::NhapLoTests.test_dw17_ac1_nhap_lo_thanh_cong` (NV kho nhập 2 dòng -> HTTP 201; 1 phiếu SUBMITTED, 2 lô DRAFT; hạn dùng = ngày nhập + shelf_life_days; AuditLog `create_and_submit_receipt` với `actor_kind=user`) |
+| **DW-17-AC2 (lỗi)** | ✅ PASS | `apps.purchasing.receipts.tests.test_nhap_lo::NhapLoTests.test_dw17_ac2_loi_shelf_life_va_lines_rong_atomic`<br>`apps.purchasing.receipts.tests.test_services::SubmitReceiptTests.test_shelf_life_higher_than_default_is_rejected` (shelf_life_days > mặc định Item -> 400 `BR-MH-02`; lines rỗng -> 400; cơ chế atomic bảo đảm 0 phiếu, 0 lô được tạo) |
+| **DW-17-AC3 (idempotency)** | ✅ PASS | `apps.purchasing.receipts.tests.test_nhap_lo::NhapLoTests.test_dw17_ac3_idempotency_khong_tao_phieu_thu_hai`<br>`apps.purchasing.models.receipts::PurchaseReceipt.Meta.constraints` (Gửi lại cùng `idempotency_key` -> HTTP 201 trả lại phiếu đã tạo, không sinh phiếu thứ 2; UniqueConstraint có điều kiện trên `(created_by, idempotency_key)` bảo đảm khác user dùng trùng key vẫn hoạt động độc lập) |
+| **DW-17-AC4 (phân quyền)** | ✅ PASS | `apps.purchasing.receipts.tests.test_nhap_lo::NhapLoTests.test_dw17_ac4_nv_giao_bi_403`<br>`erp-console/shared/lib/nav.ts:180-189` (nv_giao gọi API `/api/purchasing/receipts/nhap-lo/` bị từ chối HTTP 403 Forbidden, DB không đổi; trên ERP console menu "Mua hàng" bị ẩn hoàn toàn do thiếu `purchasing.view_purchasereceipt`) |
+| **DW-17-AC5 (giá vốn)** | ✅ PASS | `apps.purchasing.receipts.tests.test_nhap_lo::NhapLoTests.test_dw17_ac5_khong_ro_gia_von_voi_kho_va_quan_ly` (nv_kho, quan_ly gọi API -> response không có `rate` trong `lines`, không có `purchase_rate`/`landed_unit_cost` trong `batches`; chu có quyền `view_costprice` thấy đầy đủ đơn giá mua và giá vốn; Bất biến 1, BR-MH-06) |
+| **DW-17-AC6 (lệnh AI)** | ✅ PASS | `apps.purchasing.receipts.tests.test_nhap_lo::NhapLoTests.test_dw17_ac6_lenh_ai_nhap_lo_muc_c_va_proposal`<br>`apps.ai.settings.services::get_user_config_data` (Lệnh tự sinh `purchasing.purchasereceipt.nhap_lo` có `level=C`, `choices=["OFF","C"]`, `locked_reason={"code": "AI_UNDO_MISSING", "text": "Chưa có nghiệp vụ huỷ phiếu nhập"}`; gọi `call` ra đề xuất nháp PENDING, phiếu nhập chưa được tạo; sau khi xem >= 3s duyệt nháp -> phiếu được tạo SUBMITTED kèm AuditLog mang `proposal_ref`) |
+| **DW-17-AC7 (PII)** | ✅ PASS | `apps.purchasing.receipts.tests.test_nhap_lo::NhapLoTests.test_dw17_ac7_khong_co_du_lieu_khach_pii` (Phiếu nhập, dòng nhập, và các lô sinh ra không liên kết khách hàng, 100% response sạch PII; Bất biến 9) |
+| **DW-17-AC8 (AI tắt)** | ✅ PASS | `apps.purchasing.receipts.tests.test_nhap_lo::NhapLoTests.test_dw17_ac8_ai_tat_nhap_lo_van_chay_binh_thuong` (`AI_ENABLED=false` -> API `nhap-lo` vẫn tạo phiếu thành công 201; form nhập lô trên ERP console vận hành bình thường độc lập với AI) |
+| **DW-08-DISCIPLINE** | ✅ PASS | `apps.ai.registry.tests.test_discipline::DisciplineTestCase`<br>`apps.purchasing.receipts.api::PurchaseReceiptViewSet.nhap_lo` (Action `nhap_lo` khai báo đủ `required_perms=("purchasing.add_purchasereceipt", "purchasing.change_purchasereceipt")`, khớp AST require_perm trong thân, có `input_serializer=NhapLoInput` nên không bị đánh dấu `form_only`, có docstring tiếng Việt) |
+| **SNAPSHOT-REGISTRY** | ✅ PASS | `apps.ai.registry.tests.test_discovery::CommandDiscoveryTestCase.test_dw07_ac1_snapshot_khop_file` (Lệnh `purchasing.purchasereceipt.nhap_lo` nằm trong snapshot 95 lệnh chuẩn `commands_index_snapshot.json`) |
+| **FE-PURCHASING-PAGE** | ✅ PASS | `erp-console/app/(console)/purchasing/page.tsx`<br>`erp-console/features/purchasing/components/PurchasingScreen.tsx` (Trang Mua hàng bọc bằng `ViewGuard view="purchasing"`, giao diện tinh gọn chuẩn Linear/Notion) |
+| **FE-NHAP-LO-FORM** | ✅ PASS | `erp-console/features/purchasing/components/NhapLoForm.tsx` (Form nhập nhiều dòng, chọn NCC, ngày nhập, mã hàng, số kg, đơn giá, hạn dùng; kiểm soát lỗi 400 kèm mã BR hiển thị rõ ràng; chặn bấm đúp khi submit) |
+| **FE-DRAFT-LOCALSTORAGE** | ✅ PASS | `erp-console/features/purchasing/components/NhapLoForm.tsx:58-104, 168-170` (Tự động lưu nháp form vào `localStorage` key `cave_draft_nhap_lo`, xoá sạch nháp sau khi gửi thành công; dữ liệu nháp chỉ gồm thông tin nhập hàng, không chứa PII khách hàng) |
+| **FE-MOCK-INTEGRATION** | ✅ PASS | `erp-console/features/purchasing/api.ts`<br>`erp-console/features/purchasing/mock.ts` (Hỗ trợ cả API thật và mock mode `NEXT_PUBLIC_USE_MOCK=1`, mô phỏng sinh phiếu và lô DRAFT đúng contract 02b §2.5) |
+| **MIGRATION-IDEMPOTENCY** | ✅ PASS | `backend/apps/purchasing/migrations/0002_purchasereceipt_idempotency_key_and_more.py` (Thêm trường `idempotency_key` CharField(64) nullable và UniqueConstraint `uniq_purchase_receipt_idempotency` trên `(created_by, idempotency_key)`, chạy migrate sạch) |
+
+### Ngoại lệ & biên | Phân quyền | Rò giá vốn | Rò dữ liệu cá nhân | Hồi quy
+- **Ngoại lệ & biên:**
+  - Hạn dùng vượt mức (BR-MH-02): Bất kỳ dòng nào có `shelf_life_days > item.shelf_life_in_days` đều bị chặn ngay với HTTP 400 `BR-MH-02`.
+  - Dòng hàng rỗng: `NhapLoInput` yêu cầu `lines` tối thiểu 1 phần tử (`min_length=1`), từ chối payload rỗng với HTTP 400.
+  - Tính trọn vẹn (Atomic): Toàn bộ thao tác tạo phiếu, tạo các dòng nhập, tạo lô cá và ghi sổ kho RECEIPT được bọc trong `transaction.atomic()`. Bất kỳ lỗi nào xảy ra ở dòng thứ N đều rollback toàn bộ.
+  - Chống trùng lặp (Idempotency - TL-5): Gửi lại cùng `idempotency_key` bởi cùng một nhân viên trả lại phiếu đã tạo 201 không sinh trùng. UniqueConstraint scoped theo `(created_by, idempotency_key)` cho phép khác user dùng trùng key độc lập.
+- **Phân quyền (Bảng vai × Hành động):**
+  - `chu`: Thấy menu Purchasing, gọi API 201 Created, thấy đủ giá vốn, duyệt đề xuất AI.
+  - `quan_ly`: Thấy menu Purchasing, gọi API 201 Created, ẩn hoàn toàn giá vốn, duyệt đề xuất AI.
+  - `nv_kho`: Thấy menu Purchasing, gọi API 201 Created, ẩn hoàn toàn giá vốn, duyệt đề xuất AI.
+  - `nv_giao`: Ẩn menu Purchasing, gọi API bị 403 Forbidden.
+  - Chưa đăng nhập: 401 Unauthorized.
+- **Rò giá vốn (Bất biến 1):**
+  - `PurchaseReceiptLineSerializer` và `NhapLoBatchOutput` kế thừa `CostFieldSerializerMixin`, loại bỏ `rate`, `purchase_rate`, `landed_unit_cost` với user thiếu quyền `view_costprice`.
+  - Quét `grep -rn 'fields = "__all__"' backend/apps` -> Rỗng hoàn toàn.
+- **Rò dữ liệu cá nhân (Bất biến 9):**
+  - Phiếu nhập tại cảng không chứa trường PII khách hàng nào; 100% response sạch PII.
+  - LocalStorage ở FE chỉ lưu nháp form mua hàng, xoá ngay khi submit thành công.
+- **Hồi quy:**
+  - Toàn bộ backend test suite: **806 tests xanh 100%**.
+  - `makemigrations --check --dry-run` sạch `No changes detected`.
+  - Vitest erp-console: 12 tests xanh 100%.
+  - Build `erp-console` (25 static pages) và `frontend` (8 static pages) sạch sẽ 100%.
+
+### Lỗi
+Không có lỗi chặn (0 lỗi).
+
+### Lệnh đã chạy
+1. `cd backend && .venv/bin/python manage.py test apps.purchasing.receipts.tests apps.ai.registry.tests` -> `Ran 29 tests. OK`
+2. `cd backend && .venv/bin/python manage.py test && .venv/bin/python manage.py makemigrations --check --dry-run` -> `Ran 806 tests in 38.450s. OK. No changes detected.`
+3. `cd erp-console && npm test` -> `✓ features/purchasing/purchasing.test.ts (3 tests) ✓ features/ai/commands/commands.test.ts (9 tests) 12 passed (291ms)`
+4. `cd erp-console && npx tsc --noEmit && npm run build` -> Compile sạch 25/25 static pages, First Load JS shared giữ nguyên 87.6 kB.
+5. `cd frontend && npx tsc --noEmit && npm run build` -> Compile sạch 8/8 static pages.
+

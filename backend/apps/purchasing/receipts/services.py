@@ -60,5 +60,86 @@ def _validate_shelf_life(line):
     if default_days is not None and override > default_days:
         raise BusinessError(
             f"Hạn dùng {override} ngày vượt mặc định {default_days} ngày của "
-            f"{line.item.code}: chỉ cho sửa xuống thấp hơn (BR-MH-02)."
+            f"{line.item.code}: chỉ cho sửa xuống thấp hơn (BR-MH-02).",
+            code="BR-MH-02",
         )
+
+
+def create_and_submit_receipt(
+    *,
+    supplier,
+    lines,
+    actor,
+    received_date=None,
+    warehouse=None,
+    idempotency_key=None,
+):
+    """
+    Tạo và ghi nhận phiếu nhập tại cảng (DW-17, BR-MH-01, BR-MH-02, BR-MH-05).
+    - Mỗi dòng sinh MỘT lô riêng (status DRAFT).
+    - Idempotent: nếu cùng actor + idempotency_key đã tồn tại -> trả lại phiếu cũ và danh sách lô của nó.
+    - Hạn dùng chỉ được sửa thấp hơn hoặc bằng mặc định của Item (BR-MH-02).
+    - Ghi nhận AuditLog với actor_kind=user/ai.
+    """
+    if idempotency_key:
+        from apps.purchasing.models import PurchaseReceipt
+        existing = PurchaseReceipt.objects.filter(
+            created_by=actor,
+            idempotency_key=idempotency_key,
+        ).first()
+        if existing is not None:
+            batches = [line.batch for line in existing.lines.select_related("batch") if line.batch_id]
+            return existing, batches
+
+    from django.utils import timezone
+    from apps.common.audit import record_audit
+    from apps.inventory.models import Warehouse
+    from apps.purchasing.models import PurchaseReceipt, PurchaseReceiptLine
+
+    if warehouse is None:
+        warehouse = Warehouse.objects.first()
+        if warehouse is None:
+            raise BusinessError("Chưa có kho nhận hàng nào trong hệ thống.", code="BR-MH-05")
+
+    if received_date is None:
+        received_date = timezone.now().date()
+
+    # Kiểm tra trước BR-MH-02 cho tất cả các dòng
+    for line_data in lines:
+        item = line_data["item_code"]
+        override = line_data.get("shelf_life_days")
+        default_days = item.shelf_life_in_days
+        if override is not None and default_days is not None and override > default_days:
+            raise BusinessError(
+                f"Hạn dùng {override} ngày vượt mặc định {default_days} ngày của "
+                f"{item.code}: chỉ cho sửa xuống thấp hơn (BR-MH-02).",
+                code="BR-MH-02",
+            )
+
+    with transaction.atomic():
+        receipt = PurchaseReceipt.objects.create(
+            supplier=supplier,
+            warehouse=warehouse,
+            received_date=received_date,
+            status=PurchaseReceipt.Status.DRAFT,
+            created_by=actor,
+            idempotency_key=idempotency_key or None,
+        )
+        for line_data in lines:
+            PurchaseReceiptLine.objects.create(
+                receipt=receipt,
+                item=line_data["item_code"],
+                qty=line_data["qty"],
+                rate=line_data["rate"],
+                shelf_life_days=line_data.get("shelf_life_days"),
+            )
+
+        batches = submit_receipt(receipt=receipt, actor=actor)
+        record_audit(
+            "create_and_submit_receipt",
+            actor=actor,
+            obj=receipt,
+            note=f"Nhà cung cấp {supplier.name}, {len(batches)} lô",
+        )
+
+    return receipt, batches

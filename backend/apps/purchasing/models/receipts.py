@@ -30,6 +30,9 @@ class PurchaseReceipt(models.Model):
         settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="purchase_receipts",
         verbose_name="Người nhập",
     )
+    idempotency_key = models.CharField(
+        "Khoá lặp (idempotency)", max_length=64, null=True, blank=True
+    )
     note = models.TextField("Ghi chú", blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -37,6 +40,13 @@ class PurchaseReceipt(models.Model):
         verbose_name = "Phiếu nhập kho"
         verbose_name_plural = "Phiếu nhập kho"
         ordering = ["-received_date", "-id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["created_by", "idempotency_key"],
+                name="uniq_purchase_receipt_idempotency",
+                condition=models.Q(idempotency_key__isnull=False),
+            ),
+        ]
 
     def __str__(self):
         return f"PR-{self.pk} · {self.supplier} · {self.received_date}"

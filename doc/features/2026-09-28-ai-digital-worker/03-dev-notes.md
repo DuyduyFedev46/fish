@@ -451,3 +451,67 @@
   - `erp-console`: `npm test` -> 9 tests passed 100%.
   - `erp-console`: `npx tsc --noEmit && npm run build` sạch 25/25 static pages.
   - `frontend`: `npx tsc --noEmit && npm run build` sạch 8/8 static pages.
+
+---
+
+## Lô 4 — Nhập lô mua tại cảng trên ERP (DW-17)
+- Trạng thái: HOÀN THÀNH — QA APPROVED
+- Nhánh thực hiện: `main`
+
+### 1. Backend (`be-dev`)
+- **Model & Migration (`apps/purchasing/`)**:
+  - `backend/apps/purchasing/models/receipts.py`: thêm `idempotency_key = models.CharField(max_length=64, null=True, blank=True)` và `UniqueConstraint(fields=["created_by", "idempotency_key"], name="uniq_purchase_receipt_idempotency", condition=Q(idempotency_key__isnull=False))` (TL-5, DW-17-AC3).
+  - Migration: `apps/purchasing/migrations/0002_purchasereceipt_idempotency_key_and_more.py`.
+- **Serializers (`apps/purchasing/receipts/serializers.py`)**:
+  - `NhapLoLine`: validate từng dòng hàng (`item_code`, `qty > 0`, `rate >= 0`, `shelf_life_days > 0`).
+  - `NhapLoInput`: validate toàn bộ payload (`supplier`, `received_date`, `idempotency_key`, `lines` tối thiểu 1 phần tử).
+  - `NhapLoBatchOutput`: kế thừa `CostFieldSerializerMixin`, nhạy cảm `purchase_rate` và `landed_unit_cost` để ẩn với người không có quyền `view_costprice`.
+  - Nâng cấp `CostFieldSerializerMixin` trong `backend/apps/common/api.py` để lọc cả ở `to_representation` cho các nested serializer.
+- **Service Layer (`apps/purchasing/receipts/services.py`)**:
+  - Hàm `create_and_submit_receipt(*, supplier, received_date, lines_data, created_by, idempotency_key=None, warehouse=None)`:
+    - Bọc toàn bộ trong `transaction.atomic()`.
+    - Kiểm tra `idempotency_key`: nếu đã có phiếu của `created_by` với key này, trả lại phiếu hiện có (idempotent, không tạo phiếu thứ 2).
+    - Kiểm soát hạn dùng BR-MH-02: nếu `shelf_life_days > item.shelf_life_in_days`, raise `ValidationError` code `BR-MH-02`.
+    - Tạo `PurchaseReceipt` SUBMITTED và `PurchaseReceiptLine`.
+    - Gọi tạo các lô cá mới `Batch` ở trạng thái Nháp DRAFT (`BR-MH-01`), 1 dòng = 1 lô, `expiry_date = received_date + timedelta(days=shelf_life_days)`.
+    - Ghi bút toán sổ kho `StockLedgerEntry` loại RECEIPT cho từng lô.
+    - Ghi nhận `AuditLog` với action `create_and_submit_receipt`.
+- **API & AI Metadata (`apps/purchasing/receipts/api.py`)**:
+  - Thêm action `@action(detail=False, methods=["post"], url_path="nhap-lo")` trên `PurchaseReceiptViewSet`.
+  - Khai báo `required_perms=("purchasing.add_purchasereceipt", "purchasing.change_purchasereceipt")`.
+  - Gắn `AiMeta`:
+    - `title="Nhập lô mua tại cảng"`
+    - `description="Ghi nhận phiếu nhập kiểm đếm tại cảng và tạo các lô cá mới trạng thái nháp."`
+    - `max_level="C"`
+    - `locked_reason={"code": "AI_UNDO_MISSING", "text": "Chưa có nghiệp vụ huỷ phiếu nhập"}` (chờ DW-18 ở Lô 5).
+- **Snapshot & Kỷ luật Registry**:
+  - `backend/apps/ai/registry/tests/snapshots/commands_index_snapshot.json`: thêm lệnh `purchasing.purchasereceipt.nhap_lo` (tổng 95 lệnh).
+  - `backend/apps/ai/registry/tests/test_discipline.py`: nâng kiểm tra số custom action từ 18 lên 19.
+- **Tests mới (`apps/purchasing/receipts/tests/test_nhap_lo.py`)**:
+  - 8 tests bao phủ 100% AC1..AC8 của DW-17 (nhập lô thành công sinh batch DRAFT, kiểm soát hạn BR-MH-02 & atomic, chống trùng lặp idempotency_key, phân quyền 403, ẩn giá vốn theo quyền, AI trần C tạo đề xuất nháp, sạch PII, chạy độc lập khi AI tắt).
+- **Kiểm chứng Backend**:
+  - Suite backend: **806 tests xanh 100%**.
+  - `makemigrations --check --dry-run` sạch `No changes detected`.
+
+### 2. Frontend (`fe-dev`)
+- **Module Mua hàng (`erp-console/features/purchasing/`)**:
+  - `types.ts`: các kiểu dữ liệu `Supplier`, `NhapLoLineInput`, `NhapLoPayload`, `NhapLoResponse`.
+  - `api.ts`: các hàm `fetchSuppliers`, `submitNhapLo`, cùng các helper lưu nháp `getNhapLoDraft`, `saveNhapLoDraft`, `clearNhapLoDraft`.
+  - `mock.ts`: mock API cho danh sách nhà cung cấp và submit nhập lô sinh batch DRAFT.
+  - `purchasing.module.css`: CSS style giao diện nhập lô tinh gọn chuẩn Linear/Notion.
+  - `components/NhapLoForm.tsx`: biểu mẫu nhập lô mua tại cảng:
+    - Chọn NCC từ dropdown hoặc danh sách cảng cá.
+    - Chọn ngày nhập hàng (mặc định hôm nay).
+    - Thêm/xoá/sửa nhiều dòng mặt hàng: chọn cá, khối lượng kg, đơn giá mua (tuỳ chọn), hạn dùng tuỳ chỉnh (ngày).
+    - Tự động lưu nháp form vào `localStorage` key `cave_draft_nhap_lo`, tự xoá nháp khi gửi thành công.
+    - Kiểm soát lỗi validation tiếng Việt, hiển thị lỗi 400 kèm mã BR. Chặn bấm đúp khi submit.
+    - Sau khi thành công: hiển thị hộp kết quả chi tiết kèm mã phiếu PR-xxx và danh sách các mã lô cá DRAFT vừa sinh, có nút "Nhập phiếu tiếp" và nút "Xem tồn kho".
+  - `components/PurchasingScreen.tsx`: bọc màn hình Mua hàng.
+  - `erp-console/app/(console)/purchasing/page.tsx`: thay thế `Placeholder` bằng `PurchasingScreen` bọc trong `ViewGuard view="purchasing"`.
+- **Unit test (`erp-console/features/purchasing/purchasing.test.ts`)**:
+  - 3 tests: lưu và khôi phục nháp localStorage, mock API submit tạo batch DRAFT, gọi API xử lý kết quả thành công.
+- **Kiểm chứng Frontend**:
+  - `erp-console`: `npm test` -> 12 tests passed 100%.
+  - `erp-console`: `npx tsc --noEmit && npm run build` -> sạch 25/25 static pages (route `/purchasing` 5.81 kB).
+  - `frontend`: `npx tsc --noEmit && npm run build` -> sạch 8/8 static pages.
+

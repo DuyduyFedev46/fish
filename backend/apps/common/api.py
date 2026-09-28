@@ -85,11 +85,25 @@ class CostFieldSerializerMixin:
         if not self.sensitive_fields:
             return
         request = self.context.get("request")
+        if request is None and hasattr(self, "parent") and self.parent:
+            request = getattr(self.parent, "context", {}).get("request")
+        user = getattr(request, "user", None)
+        can_see = bool(user and user.has_perm(VIEW_COSTPRICE_PERM))
+        if not can_see and request is not None:
+            for field_name in self.sensitive_fields:
+                self.fields.pop(field_name, None)
+
+    def to_representation(self, instance):
+        ret = super().to_representation(instance)
+        if not self.sensitive_fields:
+            return ret
+        request = self.context.get("request")
         user = getattr(request, "user", None)
         can_see = bool(user and user.has_perm(VIEW_COSTPRICE_PERM))
         if not can_see:
             for field_name in self.sensitive_fields:
-                self.fields.pop(field_name, None)
+                ret.pop(field_name, None)
+        return ret
 
 
 # Nhóm thấy mọi đơn / khách / phiếu giao. Ai chỉ thuộc nv_giao bị giới hạn theo phiếu

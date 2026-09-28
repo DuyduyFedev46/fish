@@ -66,6 +66,7 @@
   "purchasing.purchaseinvoice.retrieve",
   "purchasing.purchasereceipt.create",
   "purchasing.purchasereceipt.list",
+  "purchasing.purchasereceipt.nhap_lo",
   "purchasing.purchasereceipt.partial_update",
   "purchasing.purchasereceipt.retrieve",
   "purchasing.purchasereceipt.submit",

@@ -1,11 +1,10 @@
 import { ViewGuard } from "@/features/auth/components/ViewGuard";
-import { Placeholder } from "@/shared/ui/Placeholder";
+import { PurchasingScreen } from "@/features/purchasing/components/PurchasingScreen";
 
-// Màn chưa làm (xem plannedIn trong shared/lib/nav.ts). Khi làm: thay <Placeholder> bằng màn của features/<module>.
 export default function Page() {
   return (
     <ViewGuard view="purchasing">
-      <Placeholder view="purchasing" />
+      <PurchasingScreen />
     </ViewGuard>
   );
 }
