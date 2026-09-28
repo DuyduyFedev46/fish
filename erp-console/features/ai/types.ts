@@ -164,3 +164,59 @@ export type AiCommandDescriptor = {
   output_fields: string[];
 };
 
+// ---- DW-10 POST /api/ai/commands/<id>/call/ (02b §6.3) ----
+export type CallRequest = {
+  args?: Record<string, unknown>;
+  target_id?: string | number;
+  idempotency_key?: string;
+  screen?: string;
+  client?: string;
+};
+
+export type CallResponse = {
+  outcome: "done" | "proposal" | "scheduled";
+  level: string;
+  action_id: string;
+  result?: {
+    rows: unknown[];
+    total: number;
+    truncated: boolean;
+  };
+  expires_at?: string;
+  downgrade_reason?: { code: string; text: string } | null;
+  preview?: {
+    target: { type: string; code: string };
+  };
+};
+
+// ---- DW-11 GET /api/ai/actions/ & POST confirm/reject (02b §6.4) ----
+export type AiActionRow = {
+  id: string;
+  command: string;
+  title: string;
+  kind: "read" | "write";
+  level: string;
+  status:
+    | "PENDING"
+    | "CONFIRMED"
+    | "REJECTED"
+    | "EXPIRED"
+    | "SCHEDULED"
+    | "DONE"
+    | "UNDONE"
+    | "CANCELLED"
+    | "ESCALATED"
+    | "FAILED";
+  owner_display: string;
+  created_at: string;
+  expires_at: string | null;
+  execute_after: string | null;
+  undo_until: string | null;
+  viewed_at: string | null;
+  target: { type: string; code: string };
+  args_preview: Record<string, unknown>;
+  downgrade_reason: { code: string; text: string } | null;
+  confirm_nonce?: string;
+};
+
+

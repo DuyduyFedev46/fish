@@ -89,6 +89,13 @@ class AuditLog(models.Model):
         verbose_name="AI thay cho ai",
     )
     proposal_ref = models.CharField("Mã đề xuất AI", max_length=64, blank=True)
+    ai_level = models.CharField("Mức tự chủ AI", max_length=1, blank=True, default="")
+    ai_config_version = models.PositiveIntegerField(
+        "Phiên bản cấu hình AI", null=True, blank=True
+    )
+    ai_policy_version = models.PositiveIntegerField(
+        "Phiên bản chính sách AI", null=True, blank=True
+    )
     action = models.CharField("Hành động", max_length=100)  # vd: confirm_refund, close_batch
     model_name = models.CharField("Loại chứng từ", max_length=100, blank=True)
     object_id = models.CharField("Mã đối tượng", max_length=64, blank=True)

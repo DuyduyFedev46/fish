@@ -317,6 +317,15 @@ class CommandRegistry:
     def get_spec(self, cmd_id: str) -> CommandSpec | None:
         return self._specs.get(cmd_id)
 
+    def get(self, cmd_id: str, default=None) -> CommandSpec | None:
+        return self._specs.get(cmd_id, default)
+
+    def __getitem__(self, cmd_id: str) -> CommandSpec:
+        return self._specs[cmd_id]
+
+    def __contains__(self, cmd_id: str) -> bool:
+        return cmd_id in self._specs
+
     @property
     def index_version(self) -> str:
         return self._index_version

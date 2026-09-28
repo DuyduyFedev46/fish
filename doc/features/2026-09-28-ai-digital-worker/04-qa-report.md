@@ -214,3 +214,75 @@ Không có lỗi chặn (0 lỗi).
 7. `grep -rnE "console\.(log|info|debug)|localStorage" erp-console/features/guidance erp-console/features/ai/commands` -> Rỗng hoàn toàn.
 8. `grep -rn "ai.manage_ai_policy\|/api/ai/" backend/apps/ai/policy/rules.py` -> 2 kết quả cấm tất định.
 
+---
+
+## Lô 3a: Mức C + AI của tôi + Việc AI (DW-10, DW-11) · Lần 1 · 2026-09-29
+
+### Kết luận: APPROVED — Lô 3a hoàn thành 100% tiêu chí nghiệm thu: lệnh đọc mức A lọc giá vốn và PII triệt để 2 lớp, lệnh ghi mức C tự động tạo nháp đề xuất 15 phút, AuditLog ghi nhận đầy đủ actor_kind=ai và proposal_ref, bảo đảm cưỡng chế đếm ngược 3 giây (V5, BR-AI-14), kiểm kê không tự duyệt (H6, BR-KK-02), không rò giá vốn và PII.
+
+### Tổng: 21 ca · ✅ 21 · ❌ 0 · ⏸ 0
+
+### Theo AC
+| Mã AC | Kết quả | Bằng chứng (test/lệnh) |
+|---|---|---|
+| **DW-10-AC1** | ✅ PASS | `apps.ai.execution.tests.test_call_api::AiCommandCallApiTestCase.test_dw10_ac1_call_read_success` (nv_kho gọi `inventory.batch.list` -> 200 outcome=done, level=A, 5 dòng <= 20 dòng, total=5, truncated=False; 1 `AiAction(kind=read, status=DONE)`, không lưu kết quả vào DB tuân thủ BR-AI-09) |
+| **DW-10-AC2 (giá vốn)** | ✅ PASS | `apps.ai.execution.tests.test_call_api::AiCommandCallApiTestCase.test_dw10_ac2_cost_keys_scrubbed_for_unauthorized` (Mọi lệnh đọc × quan_ly/nv_kho/nv_giao trên fixture -> JSON response không có bất kỳ khoá giá vốn nào: `purchase_rate`, `landed_unit_cost`, `rate`, `unit_cost`, `profit`, `margin`, `cogs`, Bất biến 1, H3) |
+| **DW-10-AC3 (PII)** | ✅ PASS | `apps.ai.execution.tests.test_call_api::AiCommandCallApiTestCase.test_dw10_ac3_pii_scrubbed_even_for_chu` (Fixture đơn hàng/khách hàng có PII giả -> gọi mọi lệnh đọc với cả 5 Group gồm `chu`, `quan_ly`, `nv_kho`, `nv_giao`, `cskh` -> 100% chuỗi PII không xuất hiện trong response, AiAction, AuditLog, Bất biến 9, H2) |
+| **DW-10-AC4 (chữ tự do)** | ✅ PASS | `apps.ai.execution.tests.test_call_api::AiCommandCallApiTestCase.test_dw10_ac4_free_text_scrubbed_for_ai_read`<br>`apps.ai.execution.tests.test_scrub::ScrubTests.test_free_text_scrubbed_for_ai_read` (Các trường chữ tự do `note`, `reason`, `comment`... bị loại bỏ hoàn toàn khi AI đọc để chống indirect prompt injection H10; vẫn giữ nguyên trên UI) |
+| **DW-10-AC5 (quyền/IDOR)** | ✅ PASS | `apps.ai.execution.tests.test_call_api::AiCommandCallApiTestCase.test_dw10_ac5_permission_and_idor` (nv_giao gọi lệnh ngoài quyền hoặc lệnh không tồn tại -> 404 `COMMAND_UNKNOWN`; target ngoài scope T3 trả 404 y hệt UI; DB không đổi, H1, BR-PQ-12) |
+| **DW-10-AC6 (lỗi)** | ✅ PASS | `apps.ai.execution.tests.test_call_api::AiCommandCallApiTestCase.test_dw10_ac6_errors_args_and_cloud_channel` (args không phải dict -> 400 `BR-AI-01`; lệnh `channel=cloud` gọi qua endpoint local -> 400 `BR-AI-02`) |
+| **DW-10-AC7 (idempotency)** | ✅ PASS | `apps.ai.execution.tests.test_call_api::AiCommandCallApiTestCase.test_dw10_ac7_idempotency` (Cùng `idempotency_key` gửi lại cùng args -> trả cùng `action_id`; gửi khác args -> 409 `AI_IDEMPOTENCY_CONFLICT`) |
+| **DW-10-AC8 (throttle)** | ✅ PASS | `apps.ai.execution.tests.test_call_api::AiCommandCallApiTestCase.test_dw10_ac8_throttling` (Quá tần suất `AI_CALL_RATE` -> 429 `THROTTLED`) |
+| **DW-10-AC9 (lỗi 5xx)** | ✅ PASS | `apps.ai.execution.tests.test_call_api::AiCommandCallApiTestCase.test_dw10_ac9_view_5xx_returns_502` (View DRF nội bộ gặp 5xx -> pipeline trả 502 `AI_DISPATCH_FAILED`, tuyệt đối không lộ stack trace) |
+| **DW-10-AC10 (contextvar)** | ✅ PASS | `apps.ai.execution.tests.test_call_api::AiCommandCallApiTestCase.test_dw10_ac10_contextvar_reset_after_call` (Sau khi kết thúc lệnh AI, ngữ cảnh audit được reset sạch sẽ qua `finally`, request UI tiếp theo cùng thread ghi `actor_kind=user`, không bị dính `ai_*`, BR-AI-08) |
+| **DW-10-AC11 (AI tắt)** | ✅ PASS | `apps.ai.execution.tests.test_call_api::AiCommandCallApiTestCase.test_dw10_ac11_ai_disabled_returns_410` (`AI_ENABLED=False` -> gọi `call` trả 410 `AI_DISABLED`, BR-AI-10) |
+| **DW-11-AC1** | ✅ PASS | `apps.ai.actions.tests.test_actions_api::AiActionApiTestCase.test_dw11_ac1_call_write_creates_proposal_and_auditlog` (nv_kho gọi lệnh ghi `purchasing.purchasereceipt.submit` -> 200 outcome=proposal, level=C, expires_at=+15m; phiếu vẫn DRAFT; AuditLog `propose_...` ghi nhận `actor_kind=ai`, `ai_actor`=nv_kho, `ai_level=C`, BR-AI-06, BR-AI-08) |
+| **DW-11-AC2** | ✅ PASS | `apps.ai.actions.tests.test_actions_api::AiActionApiTestCase.test_dw11_ac2_confirm_success_after_3_seconds` (Mở xem chi tiết >= 3 giây, confirm kèm `confirm_nonce` -> phiếu SUBMITTED; AuditLog thực thi mang `actor_kind=user`, actor=người duyệt, `proposal_ref`=id đề xuất; `AiAction` CONFIRMED, BR-AI-08 Q6) |
+| **DW-11-AC3 (lỗi duyệt)** | ✅ PASS | `apps.ai.actions.tests.test_actions_api::AiActionApiTestCase.test_dw11_ac3_confirm_errors` (Chưa mở chi tiết hoặc mở < 3 giây -> 400 `BR-AI-14`; quá 15 phút -> 410 `AI_ACTION_EXPIRED`; duyệt lần 2 -> 409 `AI_ACTION_ALREADY_DECIDED`; phiếu không đổi) |
+| **DW-11-AC4** | ✅ PASS | `apps.ai.actions.tests.test_actions_api::AiActionApiTestCase.test_dw11_ac4_reject_action` (Nháp bất kỳ bấm reject -> `AiAction` REJECTED, chứng từ không đổi, AuditLog ghi 1 dòng `reject_...`) |
+| **DW-11-AC5 (quyền duyệt)** | ✅ PASS | `apps.ai.actions.tests.test_actions_api::AiActionApiTestCase.test_dw11_ac5_permission_denied_on_confirm` (nv_giao thiếu quyền duyệt phiếu nhập -> 403 `BR-AI-04`; `scope=all` chỉ người có `ai.manage_ai_policy` (Chủ) xem được, người khác 403, H1) |
+| **DW-11-AC6 (kiểm kê H6)** | ✅ PASS | `apps.ai.actions.tests.test_actions_api::AiActionApiTestCase.test_dw11_ac6_stocktake_h6_constraint` (Đề xuất kiểm kê do AI của A nhập -> A bấm duyệt bị từ chối 400 `BR-KK-02` ngay tại `actions/services.py` và service kiểm kê, BR-KK-02, H6) |
+| **DW-11-AC7 (giá vốn nháp)** | ✅ PASS | `apps.ai.actions.tests.test_actions_api::AiActionApiTestCase.test_dw11_ac7_args_preview_scrub_cost_keys` (Đề xuất có `rate` trong args -> nv_kho xem chi tiết thì `args_preview` không có `rate`; chu có `view_costprice` xem chi tiết thì thấy `rate`, Bất biến 1, BR-MH-06) |
+| **DW-11-AC8 (PII target)** | ✅ PASS | `apps.ai.actions.tests.test_actions_api::AiActionApiTestCase.test_dw11_ac8_target_only_type_and_code_no_pii` (Đề xuất trên đơn hàng -> trường `target` chỉ có type + code, hoàn toàn không có tên/SĐT/địa chỉ khách hàng và không có `object_repr`, Bất biến 9) |
+| **DW-11-AC9 (AI tắt)** | ✅ PASS | `apps.ai.actions.tests.test_actions_api::AiActionApiTestCase.test_dw11_ac9_ai_disabled_behavior` (`AI_ENABLED=False` -> confirm trả 410 `AI_DISABLED`; reject và GET xem chi tiết vẫn hoạt động bình thường, BR-AI-10) |
+| **DW-11-AC10 (FE)** | ✅ PASS | `erp-console/features/ai/actions/components/ActionDetailModal.tsx`<br>`erp-console/app/(console)/ai/actions/page.tsx` (Màn "Việc AI" có 2 tab Chờ duyệt / Đã xử lý; modal chi tiết có đếm ngược 3 giây bắt buộc trên nút "Đồng ý thực thi"; hiển thị nhãn "AI của <tên>"; xử lý đủ trạng thái tải/lỗi/rỗng; phân quyền xem Của tôi / Tất cả) |
+| **MIGRATION-CHECK** | ✅ PASS | `backend/apps/ai/migrations/0001_initial.py`, `0002_grant_manage_ai_policy.py`, `backend/apps/accounts/migrations/0010_auditlog_ai_config_version_auditlog_ai_level_and_more.py` (Tạo 3 model AI với `default_permissions = ()`, gán `ai.manage_ai_policy` cho Group `chu`, thêm 3 field AI nullable cho `AuditLog`; `makemigrations --check --dry-run` sạch) |
+
+### Ngoại lệ & biên | Phân quyền | Rò giá vốn | Rò dữ liệu cá nhân | Hồi quy
+- **Biên & Ngoại lệ:**
+  - Idempotency key bảo đảm gọi lại cùng tham số trả đúng kết quả/proposal cũ; khác tham số trả HTTP 409 `AI_IDEMPOTENCY_CONFLICT`.
+  - Rate throttle `AI_CALL_RATE` chặn spam gọi lệnh AI vượt ngưỡng với HTTP 429 `THROTTLED`.
+  - Giới hạn kết quả đọc tối đa 20 dòng và 3.000 ký tự; không lưu kết quả vào DB.
+  - Đề xuất ghi (mức C) tự động hết hạn sau 15 phút (`expires_at`), xác nhận sau 15 phút trả HTTP 410 `AI_ACTION_EXPIRED`.
+  - Cơ chế nonce và kiểm tra `viewed_at >= 3s` loại bỏ hoàn toàn việc click nhanh hoặc xác nhận tự động.
+- **Phân quyền (Bảng vai × Hành động):**
+  - `chu`: Sở hữu quyền `ai.manage_ai_policy`, xem được `scope=all` trên toàn bộ Việc AI; thấy đầy đủ các trường giá vốn khi xem chi tiết đề xuất; duyệt được các hành động trong thẩm quyền.
+  - `quan_ly`: Xem được Việc AI của mình (`scope=mine`); không được xem `scope=all` (403); không thấy trường giá vốn.
+  - `nv_kho`: Gọi lệnh ghi sinh nháp mức C; xem Việc AI của mình; không có quyền xem giá vốn trong `args_preview`.
+  - `nv_giao`: Bị từ chối khi duyệt các lệnh ngoài quyền (HTTP 403 `BR-AI-04`); không xem được `scope=all` (403); gọi lệnh ngoài quyền bị 404 `COMMAND_UNKNOWN`.
+  - Chưa đăng nhập: 401 Unauthorized.
+- **Rò giá vốn (Bất biến 1):**
+  - Mọi lệnh đọc qua `pipeline.py` đều đi qua bộ lọc `scrub_data`: người dùng thiếu `view_costprice` bị loại bỏ toàn bộ các khoá nhạy cảm `purchase_rate`, `landed_unit_cost`, `rate`, `unit_cost`, `profit`, `margin`, `cogs`.
+  - Màn hình Việc AI: `args_preview` được lọc theo quyền của **người đang xem** (`request.user`), nhân viên kho không thấy đơn giá mua dù là chủ đề xuất.
+- **Rò dữ liệu cá nhân (Bất biến 9):**
+  - Bộ lọc `scrub_data` loại bỏ đệ quy 11 khoá PII khách hàng đối với **tất cả mọi vai trò** (kể cả `chu`).
+  - Đối tượng `target` trong đề xuất chỉ lưu và trả về `type` và `code` (ví dụ `{"type": "salesorder", "code": "SO-01"}`), không lưu tên, SĐT hay địa chỉ khách hàng.
+  - Không có chuỗi PII nào xuất hiện trong `AiAction`, `AuditLog`, response JSON hay console log.
+- **Hồi quy:**
+  - Toàn bộ backend test suite đạt **785 tests xanh 100%** (tăng 10 tests so với Lô 2).
+  - Không thay đổi chữ ký `record_audit` hiện có; `set_ai_audit_scope` tự động reset token để không ảnh hưởng đến các luồng UI thông thường.
+  - Build frontend và erp-console sạch sẽ, không lỗi TypeScript.
+
+### Lỗi
+Không có lỗi chặn (0 lỗi).
+
+### Lệnh đã chạy
+1. `cd backend && .venv/bin/python manage.py test apps.ai.execution.tests apps.ai.actions.tests` -> `Ran 25 tests in 0.985s. OK`
+2. `cd backend && .venv/bin/python manage.py test && .venv/bin/python manage.py makemigrations --check --dry-run` -> `Ran 785 tests in 37.099s. OK. No changes detected.`
+3. `cd erp-console && npm test` -> `✓ features/ai/commands/commands.test.ts (8 tests) 8 passed (245ms)`
+4. `cd erp-console && npx tsc --noEmit && npm run build` -> Compile sạch 23/23 static pages (thêm route `/ai/actions`), First Load JS 97.8 kB.
+5. `cd frontend && npx tsc --noEmit && npm run build` -> Compile sạch 8/8 static pages.
+6. `grep -rn 'fields = "__all__"' backend/apps` -> Rỗng hoàn toàn.
+7. `grep -rnE "console\.(log|info|debug)|localStorage" erp-console/features/guidance erp-console/features/ai/commands erp-console/features/ai/actions` -> Rỗng hoàn toàn.
+
+

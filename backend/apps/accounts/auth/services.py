@@ -56,6 +56,8 @@ CAPABILITY_LABELS = {
     "catalog.change_item_image": "Sửa ảnh mặt hàng",
     # DW-06 (2026-09-28-ai-digital-worker): chỉ chu.
     "inventory.cancel_expired_batch": "Huỷ lô quá hạn",
+    # DW-13 (2026-09-28-ai-digital-worker): chỉ chu.
+    "ai.manage_ai_policy": "Quản lý chính sách AI",
 }
 
 AUTH_OLD_PASSWORD = "AUTH_OLD_PASSWORD"

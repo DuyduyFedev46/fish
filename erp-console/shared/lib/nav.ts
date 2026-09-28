@@ -27,7 +27,8 @@ export type ViewKey =
   | "reports"
   | "catalog"
   | "staff"
-  | "audit-logs";
+  | "audit-logs"
+  | "ai-actions";
 
 export type NavItem = {
   key: ViewKey;
@@ -239,6 +240,17 @@ export const NAV: NavItem[] = [
     section: "Quản trị",
     // S03: chu + quan_ly (accounts.view_auditlog); NV kho/giao không đọc toàn bộ nhật ký (S03-AC5).
     visible: (me) => has(me, PERM.viewAuditLog) && !onlyDelivery(me),
+  },
+  {
+    key: "ai-actions",
+    summary: "Các việc do AI đề xuất cần duyệt hoặc kiểm tra.",
+    plannedIn: "DW-11",
+    href: "/ai/actions/",
+    label: "Việc AI",
+    short: "Việc AI",
+    icon: "smart_toy",
+    section: "Điều hành",
+    visible: (me) => !onlyDelivery(me),
   },
 ];
 

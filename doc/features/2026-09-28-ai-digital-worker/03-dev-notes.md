@@ -266,5 +266,74 @@
   - `erp-console`: `npx tsc --noEmit && npm run build` -> sạch 22/22 static pages, First Load JS giữ nguyên 87.6 kB.
   - `frontend`: `npx tsc --noEmit && npm run build` -> sạch 8/8 static pages.
 
+## Lô 3a: Mức C + AI của tôi + Việc AI (DW-10, DW-11)
+- Trạng thái: SẴN SÀNG QA
+- Nhánh thực hiện: `main`
+
+### 1. Backend (`be-dev`)
+- Model & Migrations (02b §7.1–7.4):
+  - `backend/apps/ai/models/config.py`: `AiConfigVersion` (user, version, group_levels, overrides, limits, killed, created_by, created_at, note). Default permissions rỗng, UniqueConstraint(user, version), index (user, -version).
+  - `backend/apps/ai/models/policy.py`: `AiPolicyVersion` (version, global_mode, red_zone_open, caps, created_by, created_at, note). Default permissions rỗng, permission `ai.manage_ai_policy`.
+  - `backend/apps/ai/models/actions.py`: `AiAction` (id UUID, command, kind, level, status, owner, config_version, policy_version, target_model, target_id, args, idempotency_key, channel, client, downgrade_reason, expires_at, execute_after, undo_until, viewed_at, decided_by, decided_at, executed_at, created_at, assignee_group, result_ref). Không lưu output đọc (BR-AI-09).
+  - `backend/apps/accounts/models.py`: Thêm `ai_level`, `ai_config_version`, `ai_policy_version` vào `AuditLog`.
+  - `backend/apps/ai/admin.py`: Đăng ký 3 model `AiConfigVersion`, `AiPolicyVersion`, `AiAction` chế độ chỉ đọc (has_add_permission=False, has_change_permission=False, has_delete_permission=False).
+  - Migrations:
+    - `backend/apps/ai/migrations/0001_initial.py`: Tạo 3 model AI.
+    - `backend/apps/ai/migrations/0002_grant_manage_ai_policy.py`: Gán `ai.manage_ai_policy` cho nhóm `chu`, hỗ trợ rollback gỡ quyền.
+    - `backend/apps/accounts/migrations/0010_auditlog_ai_config_version_auditlog_ai_level_and_more.py`: Bổ sung 3 field AI vào `AuditLog`.
+  - Cập nhật `CAPABILITY_LABELS` trong `apps/accounts/auth/services.py` với nhãn `ai.manage_ai_policy: "Quản lý chính sách AI"`.
+- Audit Scope ContextVar (`backend/apps/common/audit.py`):
+  - Thêm contextvar `ai_audit_scope` và context manager `set_ai_audit_scope`.
+  - Tự động gán `actor_kind="ai"`, `ai_actor`, `ai_level`, `ai_config_version`, `ai_policy_version`, `proposal_ref` khi ghi audit trong scope AI. Tự động reset token trong `finally` để không dính sang request UI cùng thread.
+- Lớp thực thi và an toàn (`backend/apps/ai/execution/`):
+  - `scrub.py`: Lọc đệ quy toàn bộ 11 khoá PII kể cả với Chủ; lọc chữ tự do (note, reason...) khi đọc cho AI; lọc khoá giá vốn lưới 2 nếu thiếu `view_costprice`; cắt tối đa `AI_RESULT_MAX_ROWS` (20) và `AI_RESULT_MAX_CHARS` (3000 ký tự).
+  - `dispatch.py`: Gọi lại view DRF trong tiến trình với token/user thật, bắt 4xx trả nguyên JSON, bắt 5xx trả 502 `AI_DISPATCH_FAILED` không lộ stack trace.
+  - `pipeline.py`: Xử lý `POST /api/ai/commands/<id>/call/`:
+    - Trả 410 khi `AI_ENABLED=false`.
+    - Giới hạn tần suất `AiCallRateThrottle` (đọc `AI_CALL_RATE`, mặc định 30/phút).
+    - Trả 404 `COMMAND_UNKNOWN` nếu không có lệnh hoặc `effective_level == OFF`.
+    - Trả 400 `BR-AI-02` nếu lệnh `channel == "cloud"`.
+    - Idempotency: cùng args trả lại kết quả cũ; khác args trả 409 `AI_IDEMPOTENCY_CONFLICT`.
+    - Validate args qua `input_serializer_cls`, lỗi trả 400 `BR-AI-01`.
+    - Kiểm tra target scope: `view.get_object()` với user thật, ngoài scope trả 404 y như UI.
+    - Mức A: dispatch view -> scrub -> cắt 20 dòng / 3000 ký tự -> lưu `AiAction(kind=read, status=DONE)` không lưu output -> trả 200 outcome=done.
+    - Mức C: tạo `AiAction(kind=write, level=C, status=PENDING, expires_at=now+15m)` -> ghi AuditLog `propose_<id>` -> trả 200 outcome=proposal kèm preview target.
+- Nghiệp vụ và API Việc AI (`backend/apps/ai/actions/`):
+  - `serializers.py`: `AiActionSerializer` trả thông tin việc AI, `owner_display` ("AI của <tên>"), `args_preview` lọc theo quyền người xem (giá vốn) và lọc PII, `target` chỉ chứa type và code.
+  - `services.py`:
+    - `confirm_ai_action`: kiểm tra AI_ENABLED (410), trạng thái PENDING (409 nếu đã quyết), chưa hết hạn 15m (410), kiểm tra xem chi tiết và tối thiểu 3 giây `AI_CONFIRM_MIN_SECONDS` (400 BR-AI-14), kiểm tra quyền người duyệt (403 BR-AI-04), kiểm tra kiểm kê H6 không được duyệt số do AI của mình nhập (400 BR-KK-02), thực thi bằng token người duyệt, ghi AuditLog actor_kind=user, actor=người duyệt.
+    - `reject_ai_action`: chuyển status REJECTED, chứng từ không đổi, ghi AuditLog.
+  - `api.py`: `AiActionViewSet` hỗ trợ list (lọc theo status, scope=mine hoặc scope=all nếu có `manage_ai_policy`), retrieve (cập nhật viewed_at), confirm, reject, undo (410).
+  - Đăng ký URL routes trong `backend/config/api_urls.py`: `POST /api/ai/commands/<command_id>/call/` và router `ai/actions/`.
+- Test mới (25 tests):
+  - `backend/apps/ai/execution/tests/test_scrub.py` (4 tests): lọc PII đệ quy, chữ tự do, giá vốn theo quyền, cắt 20 dòng và 3000 ký tự.
+  - `backend/apps/ai/execution/tests/test_call_api.py` (11 tests): DW-10-AC1 đến DW-10-AC11 (gọi đọc, lọc giá vốn, lọc PII với 5 Group, chữ tự do, ma trận quyền và IDOR, lỗi args/cloud, idempotency, throttle 429, 502 khi 5xx, contextvar reset, 410 khi AI tắt).
+  - `backend/apps/ai/actions/tests/test_actions_api.py` (10 tests): DW-11-AC1 đến DW-11-AC10 (đề xuất C và audit propose, confirm sau 3s và audit thực thi, lỗi confirm <3s/đã quyết/hết hạn, reject, quyền 403 và scope=all, kiểm kê H6 BR-KK-02, args_preview lọc giá vốn, target an toàn không PII, AI tắt confirm 410, list display owner_display).
+- Kiểm chứng suite backend:
+  - Toàn bộ backend test suite: **785 tests xanh 100%** (`Ran 785 tests in 37.099s. OK`).
+  - `makemigrations --check --dry-run`: sạch `No changes detected`.
+
+### 2. Frontend (`fe-dev`)
+- Types (`erp-console/features/ai/types.ts`): Thêm kiểu `CallRequest`, `CallResponse`, `AiActionRow`.
+- Commands API (`erp-console/features/ai/commands/call.ts`): Hàm `callCommand` gọi `POST /api/ai/commands/<id>/call/` kèm mock handler.
+- Actions API (`erp-console/features/ai/actions/api.ts`): Các hàm `fetchAiActions`, `fetchAiActionDetail`, `confirmAiAction`, `rejectAiAction` kèm mock handler.
+- Component Modal (`erp-console/features/ai/actions/components/ActionDetailModal.tsx`):
+  - Hiển thị chi tiết đề xuất AI: tiêu đề, lệnh, trạng thái, mức tự chủ, nhãn `AI của <tên>`.
+  - Hiển thị `target` và bảng tham số `args_preview`.
+  - Nút "Đồng ý thực thi" bắt buộc đếm ngược 3 giây (`AI_CONFIRM_MIN_SECONDS = 3`): trước 3s hiển thị `Chờ xem xét (Xs)` và disabled; sau 3s mới kích hoạt.
+  - Nút "Từ chối" với xác nhận.
+- Màn hình Việc AI (`erp-console/app/(console)/ai/actions/page.tsx`):
+  - Route `/ai/actions/` được bọc bởi `ViewGuard view="ai-actions"`.
+  - Hai tab: "Chờ duyệt" (`PENDING`) và "Đã xử lý" (các trạng thái khác).
+  - Chuyển đổi phạm vi "Của tôi" / "Tất cả" đối với người có quyền `ai.manage_ai_policy` (Chủ).
+  - Bảng danh sách hành động, bấm từng dòng mở modal chi tiết đề xuất.
+- Điều hướng (`erp-console/shared/lib/nav.ts`):
+  - Thêm `ai-actions` vào `ViewKey` và mục "Việc AI" (icon `smart_toy`) vào menu Điều hành.
+- Kiểm chứng build:
+  - `erp-console`: `npm test` -> 8 passed (vitest).
+  - `erp-console`: `npx tsc --noEmit && npm run build` -> sạch 23/23 static pages (thêm route `/ai/actions`), First Load JS 97.8 kB.
+  - `frontend`: `npx tsc --noEmit && npm run build` -> sạch 8/8 static pages.
+
+
 
 
