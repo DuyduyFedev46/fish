@@ -59,6 +59,6 @@ cache chung (Redis) · SEO nâng cao cho bài viết · hoàn kho/hoàn tiền m
 | 2026-09-29 02:20 | P3 | Lô 2 | APPROVED | `c427bf8` | 775 | DW-07 registry tự sinh + chỉ mục, DW-08 required_perms, DW-09 chọn lệnh 2 bước |
 | 2026-09-29 03:15 | P3 | Lô 3a | APPROVED | `f0f32e9` | 785 | DW-10 lệnh đọc mức A, DW-11 nháp C + Việc AI (lọc PII, 3s đếm ngược, H6 kiểm kê) |
 | 2026-09-29 03:50 | P3 | Lô 3b | APPROVED | `eda18d3` | 805 | DW-12 AI của tôi (bản ghi, kill=C), DW-13 chính sách + tắt khẩn cấp (Chủ) |
-| 2026-09-29 04:55 | P3 | Lô 3c | APPROVED | Sẽ cập nhật | 798 | DW-14 chat qua call + Để AI làm, DW-15 gỡ catalog cũ (404), DW-16 tóm tắt timeline |
+| 2026-09-29 04:55 | P3 | Lô 3c | APPROVED | `55f78f9` | 798 | DW-14 chat qua call + Để AI làm, DW-15 gỡ catalog cũ (404), DW-16 tóm tắt timeline |
 
 
