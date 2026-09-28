@@ -1,10 +1,11 @@
-# Sửa lỗi bảo mật có sẵn (L-1, L-3, L-5, L-6, robots staging)
+# Sửa lỗi bảo mật có sẵn (L-1, L-3, L-5, L-6, robots staging) + L-10 lãi lỗ theo lô
 > Claude (Tech Lead thay PO, luồng NHANH) · 2026-09-28 · Trạng thái: **ĐÃ DUYỆT (Duy 28/09, luồng NHANH)**
 > Nguồn: `doc/features/2026-09-28-ai-digital-worker/02b-tech-design.md` §14 (L-1…L-9, đã đối chiếu code 28/09).
 > Duy chốt 28/09: phase này làm **đầu tiên**, trước mọi hồ sơ khác. Lô 2 QA APPROVED → merge `wip/autosave` vào `main`.
 > Thiết kế: `02b-tech-design.md` · Giao việc: `02c-giao-viec.md`.
+> **S06 (L-10) thêm ngày 28/09, Duy duyệt** (trả lời "ok" cho đề xuất sửa công thức lãi lỗ theo lô). Làm ở Lô 3, trên `main` sau khi Lô 2 merge.
 
-Không có tính năng mới, không đổi schema. Mỗi lỗi một story. "Group" = 4 Group seed sẵn `chu`, `quan_ly`,
+Không có tính năng mới, không đổi schema. Mỗi lỗi một story (S06 sửa công thức nghiệp vụ, không phải lỗi bảo mật, gom vào đây vì cùng đợt sửa lỗi có sẵn). "Group" = 4 Group seed sẵn `chu`, `quan_ly`,
 `nv_kho`, `nv_giao`; "khách" = gọi không đăng nhập. Dữ liệu trong test chỉ dùng số giả (vd SĐT `0900000000`).
 
 | Story | Lỗi | Mức | Lô |
@@ -14,6 +15,7 @@ Không có tính năng mới, không đổi schema. Mỗi lỗi một story. "Gr
 | S03 | L-5 Không có giới hạn tần suất ở endpoint công khai | Cao | 1 |
 | S04 | L-1 Chốt lô thiếu kiểm BR-LO-04/BR-KK-05 và thiếu khoá | Cao | 2 |
 | S05 | Trang staging bị máy tìm kiếm index | Trung bình | 2 |
+| S06 | L-10 Lãi lỗ theo lô tính hao hụt/hàng hỏng hai lần | Cao (sai con số lời lỗ) | 3 |
 
 L-2 (huỷ lô quá hạn, BR-LO-03) **không làm trong hồ sơ này**, xem mục "Việc sau".
 
@@ -115,6 +117,39 @@ không `select_for_update`. BR-KK-05 là giả định *(PA)* trong spec; Duy ch
 - **AC4 (kiểm trước deploy).** Hai file staging parse được JSON, header `Cache-Control` của `/_next/static/**` ở Shop staging vẫn còn;
   `npm run build` hai app sạch. Kiểm bằng `curl` sau deploy là việc của Duy khi deploy staging (ghi trong `03-dev-notes.md`).
 
+## S06 — Lãi lỗ theo lô không tính hao hụt/hàng hỏng hai lần (L-10, BR-BC-04, BR-BC-05, BR-KK-03, BR-GV-01)
+**Là** Chủ, **tôi muốn** lãi lỗ của một lô bằng đúng tiền bán trừ tiền đã bỏ ra cho lô, **để** không đọc nhầm lô có lãi thành lô lỗ.
+
+Hiện trạng `backend/apps/reports/services.py:46-66` (`batch_pnl`): `total_cost = purchase_cost + allocated_cost + shrinkage_cost +
+damage_cost`. `purchase_cost = purchase_rate × qty_received` đã gồm cả số kg sau đó hao hụt hoặc hỏng, nên hai khoản này bị trừ hai lần.
+Công thức sai nằm trong spec §12.1 và `doc/BUILD-PLAN.md:147`.
+**Quyết định Duy 28/09:** Lãi/lỗ theo lô = doanh thu bán từ lô − (giá mua + chi phí phân bổ). Hao hụt và hàng hỏng vẫn trả riêng (số kg
+và giá trị = kg × `landed_unit_cost` hiện hành) để Chủ biết mất bao nhiêu, nhưng **không** cộng vào `total_cost`. BR-BC-04 sửa theo.
+
+- **AC1 (ví dụ Duy, hao hụt).** Given lô nhận 100 kg, `purchase_rate` 100.000, không chi phí phân bổ (`landed_unit_cost` 100.000), đã bán
+  90 kg giá 150.000, kiểm kê ghi `RECONCILE` −10 kg. When gọi `batch_pnl`, Then `revenue` = 13.500.000, `purchase_cost` = 10.000.000,
+  `allocated_cost` = 0, `shrinkage_qty` = 10, `shrinkage_cost` = 1.000.000, `total_cost` = 10.000.000, `profit` = **3.500.000**
+  (không phải 2.500.000).
+- **AC2 (hàng hỏng + chi phí phân bổ).** Given lô nhận 100 kg × 80.000, chi phí phân bổ 200.000 (`landed_unit_cost` 82.000), bán 60 kg
+  giá 120.000, hao hụt −2 kg, hàng hỏng 3 kg (`ReturnToStock` `WRITE_OFF` `APPROVED`). Then `revenue` = 7.200.000, `shrinkage_cost` =
+  164.000, `damage_qty` = 3, `damage_cost` = 246.000, `total_cost` = **8.200.000**, `profit` = **−1.000.000** (trước đây 8.610.000 và
+  −1.410.000). Phiếu hàng hỏng `DRAFT` hoặc quyết định khác `WRITE_OFF` không vào `damage_qty`.
+- **AC3 (bất biến công thức).** Với mọi lô: `total_cost == purchase_cost + allocated_cost` và `profit == revenue − total_cost`; thêm một
+  dòng hao hụt hay một phiếu hàng hỏng **không** làm đổi `total_cost`, chỉ đổi `shrinkage_*`/`damage_*` (test so trước/sau trên cùng lô).
+- **AC4 ("tạm tính").** Lô chưa `CLOSED` → `provisional: true`; lô `CLOSED` → `false`. Công thức AC1 áp dụng giống nhau cho cả hai
+  (không có nhánh công thức riêng cho lô chưa chốt).
+- **AC5 (contract không đổi hình dạng).** Response `GET /api/reports/batch/<batch_id>/` giữ **đúng 14 khoá** hiện có (`batch_id`,
+  `provisional`, `qty_received`, `qty_sold`, `landed_unit_cost`, `revenue`, `purchase_cost`, `allocated_cost`, `shrinkage_qty`,
+  `shrinkage_cost`, `damage_qty`, `damage_cost`, `total_cost`, `profit`), không thêm, không bỏ, không đổi tên. Chỉ đổi ý nghĩa
+  `total_cost` (= giá mua + chi phí phân bổ) và `profit`. Các khoá còn lại cùng giá trị như trước với cùng dữ liệu.
+- **AC6 (phân quyền, không rò giá vốn).** `chu` → 200 đủ 14 khoá. `quan_ly`, `nv_kho`, `nv_giao` → 403 và body không chứa
+  `landed_unit_cost`, `purchase_cost`, `profit`; chưa đăng nhập → 401. Lô không tồn tại với `chu` → 404.
+- **AC7 (nơi khác dùng công thức).** `period_pnl` (`/api/reports/period/`) **không đổi** (công thức riêng BR-BC-01..03, không cộng hao hụt/
+  hỏng — test cũ giữ nguyên xanh). `/api/dashboard/summary/` không dùng công thức lãi lỗ lô → không đổi. ERP console và Shop hiện **không có
+  màn** hiển thị `total_cost`/`profit` theo lô (đã kiểm 28/09: không có `reports/batch` trong `erp-console/`, `frontend/`) → không sửa FE;
+  mô tả lệnh AI `bao_cao_lo` ở `erp-console/features/ai/mock.ts` không nêu công thức → không sửa. Tài liệu còn ghi công thức cũ
+  (`doc/BUILD-PLAN.md:147`, docstring `batch_pnl`) sửa theo công thức mới.
+
 ---
 
 ## Việc sau (không làm trong hồ sơ này)
@@ -126,3 +161,5 @@ không `select_for_update`. BR-KK-05 là giả định *(PA)* trong spec; Duy ch
 - Throttle `/admin/login/` và `/api-auth/login/` (không đi qua DRF).
 - Checkout Shop chưa đòi 4 số cuối SĐT (đổi contract FE, P1-AC6) — cân nhắc khi go-live.
 - L-4, L-7, L-8, L-9: theo hồ sơ `2026-09-28-ai-digital-worker`.
+- (Tech Lead thấy khi làm S06, **chưa hỏi Duy**) `batch_pnl` cộng doanh thu từ mọi `SalesInvoiceLineBatch` của lô, kể cả hoá đơn
+  `CANCELLED`, và không trừ phiếu hoàn. `period_pnl` không phản ánh hao hụt/hàng hỏng (chỉ giá vốn phần bán). Đề xuất ghi L-11, hỏi Duy riêng.
