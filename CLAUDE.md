@@ -35,6 +35,14 @@ vercel-labs/agent-skills, anthropics/skills, phuryn/pm-skills, alirezarezvani/cl
 Skill UI/UX cài nguyên bản (giữ LICENSE): pbakaus/impeccable, emilkowalski/skills, nextlevelbuilder/ui-ux-pro-max-skill,
 ibelick/ui-skills, vercel web-design-guidelines. Hướng thiết kế + chọn skill: `caveve-ui`.
 
+## Chia việc với Gemini CLI / Antigravity (Duy chốt 2026-09-28) — ưu tiên hơn bảng trên
+Claude chỉ làm **phân tích cùng Duy**: BA → [Duy duyệt] → PO → [Duy duyệt] → Tech Lead (+ `legal-vn`)
+→ viết `02c-giao-viec.md` (mẫu `doc/features/_mau-02c-giao-viec.md`) → [Duy duyệt, đổi trạng thái
+`SẴN SÀNG CODE`] → dừng. **Code, QA và commit do Gemini CLI / Antigravity làm** theo `AGENTS.md` và
+workflow `/lam-tinh-nang <slug>` (`.agents/`, `.gemini/`). Claude không giao `be-dev`/`fe-dev`/`qa-tester`
+trừ khi Duy yêu cầu rõ; Claude review code/QA report khi Duy nhờ. Skill dùng chung: `.agents/skills/`
+trỏ về `.claude/skills/` — sửa skill ở `.claude/skills/`.
+
 ## Môi trường (từ 2026-09-27)
 **Staging** (sandbox SePay, DB `cangca_staging`) và **Production** (SePay live, DB `postgres` trên Supabase). Deploy luôn lên staging trước, Duy duyệt rồi mới lên production. Chi tiết URL, secret và lệnh build nằm ở `doc/ops/moi-truong.md`. Build frontend luôn truyền `NEXT_PUBLIC_*` trực tiếp, vì `.env.local` đè lên `.env.production`.
 

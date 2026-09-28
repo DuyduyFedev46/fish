@@ -1,0 +1,7 @@
+description = "Hiện thực một tính năng Cá Về đã được duyệt: đọc 02c-giao-viec.md, giao be-dev ∥ fe-dev theo lô, QA, commit. Vd: /lam-tinh-nang 2026-09-28-ai-digital-worker"
+
+prompt = """
+Đọc và làm đúng theo quy trình trong file `.agents/workflows/lam-tinh-nang.md` (cùng quy trình Antigravity dùng), tuân thủ `AGENTS.md`.
+
+Slug hồ sơ tính năng: {{args}}
+"""
