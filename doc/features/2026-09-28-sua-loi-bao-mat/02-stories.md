@@ -142,8 +142,8 @@ và giá trị = kg × `landed_unit_cost` hiện hành) để Chủ biết mất
   `provisional`, `qty_received`, `qty_sold`, `landed_unit_cost`, `revenue`, `purchase_cost`, `allocated_cost`, `shrinkage_qty`,
   `shrinkage_cost`, `damage_qty`, `damage_cost`, `total_cost`, `profit`), không thêm, không bỏ, không đổi tên. Chỉ đổi ý nghĩa
   `total_cost` (= giá mua + chi phí phân bổ) và `profit`. Các khoá còn lại cùng giá trị như trước với cùng dữ liệu.
-- **AC6 (phân quyền, không rò giá vốn).** `chu` → 200 đủ 14 khoá. `quan_ly`, `nv_kho`, `nv_giao` → 403 và body không chứa
-  `landed_unit_cost`, `purchase_cost`, `profit`; chưa đăng nhập → 401. Lô không tồn tại với `chu` → 404.
+- **AC6 (phân quyền, không rò giá vốn).** `chu` → 200 đủ 14 khoá. `quan_ly`, `nv_kho`, `nv_giao` → 403 và JSON không có khoá
+  `landed_unit_cost`, `purchase_cost`, `profit`, không có số tiền nào; chưa đăng nhập → 401. Lô không tồn tại với `chu` → 404.
 - **AC7 (nơi khác dùng công thức).** `period_pnl` (`/api/reports/period/`) **không đổi** (công thức riêng BR-BC-01..03, không cộng hao hụt/
   hỏng — test cũ giữ nguyên xanh). `/api/dashboard/summary/` không dùng công thức lãi lỗ lô → không đổi. ERP console và Shop hiện **không có
   màn** hiển thị `total_cost`/`profit` theo lô (đã kiểm 28/09: không có `reports/batch` trong `erp-console/`, `frontend/`) → không sửa FE;

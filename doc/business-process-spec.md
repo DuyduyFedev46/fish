@@ -458,7 +458,7 @@ Hàng đông lạnh mất trọng lượng theo thời gian (rút nước, bay h
 ## 12.1 Hai góc nhìn
 | Báo cáo | Đơn vị | Nội dung | Tính chất |
 |---|---|---|---|
-| **Lãi lỗ theo lô** | 1 lô | Doanh thu bán từ lô − (giá mua + chi phí phân bổ + hao hụt + hàng hỏng) | **Nguồn sự thật**. Chốt lô là chốt số. |
+| **Lãi lỗ theo lô** | 1 lô | Doanh thu bán từ lô − (giá mua + chi phí phân bổ). Hao hụt và hàng hỏng hiện riêng (kg + giá trị), không cộng thêm — xem BR-BC-04 *(sửa 2026-09-28, Duy duyệt)* | **Nguồn sự thật**. Chốt lô là chốt số. |
 | **Lãi lỗ theo kỳ** | Tháng | Tổng doanh thu ghi nhận − tổng giá vốn ghi nhận − hoàn tiền trong kỳ | Điều hành. Có thể lệch nhẹ với tổng theo lô khi lô chưa chốt. |
 
 Cả hai báo cáo nằm sau `view_profitreport` — mặc định chỉ Chủ (1.7).
@@ -469,7 +469,7 @@ Cả hai báo cáo nằm sau `view_profitreport` — mặc định chỉ Chủ (
 | BR-BC-01 | Doanh thu ghi nhận tại thời điểm **xác nhận thanh toán**. |
 | BR-BC-02 | Giá vốn ghi nhận **cùng thời điểm** với doanh thu, lấy từ bảng phân bổ lô (BR-BH-06). |
 | BR-BC-03 | Hoàn tiền ghi vào **kỳ phát sinh hoàn**, không sửa ngược kỳ đã qua. |
-| BR-BC-04 | Báo cáo theo lô **tính lại** từ `landed_unit_cost` hiện hành, không dùng số ảnh chụp trên đơn. |
+| BR-BC-04 | Lãi/lỗ theo lô = doanh thu bán từ lô − (giá mua + chi phí phân bổ), với giá mua = `purchase_rate` × số kg nhập. Hao hụt (kiểm kê âm) và hàng hỏng (hàng hoàn đã duyệt Huỷ bỏ) **hiển thị riêng** số kg và giá trị (kg × `landed_unit_cost` **hiện hành**, không dùng số ảnh chụp trên đơn) để biết mất bao nhiêu, **không cộng vào tổng chi phí** vì số kg đó đã nằm trong giá mua; phần mất làm giảm lãi qua việc không có doanh thu (BR-KK-03). Ví dụ: nhập 100 kg × 100.000đ, bán 90 kg × 150.000đ, hao 10 kg → lãi 3.500.000đ. *(D — sửa 2026-09-28, Duy duyệt, lý do: công thức cũ "giá mua + chi phí phân bổ + hao hụt + hàng hỏng" tính hai lần hao hụt/hỏng.)* |
 | BR-BC-05 | Lô chưa chốt phải hiển thị nhãn **"tạm tính"** — nếu không, Lộc sẽ đọc số chưa đủ chi phí như số cuối cùng. |
 
 ---

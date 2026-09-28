@@ -1,5 +1,5 @@
 # Thiết kế kỹ thuật — Sửa lỗi bảo mật có sẵn
-> Claude (Tech Lead) · 2026-09-28 · Trạng thái: **ĐÃ DUYỆT (Duy 28/09)**
+> Claude (Tech Lead) · 2026-09-28 · Trạng thái: **ĐÃ DUYỆT (Duy 28/09)** · §7 S06 (L-10) thêm ngày 28/09, Duy duyệt
 > Story: `02-stories.md` (S01–S05). Không model mới, **không migration**, không đổi contract FE ngoài thông điệp lỗi.
 > Dòng code tham chiếu theo nhánh `wip/autosave` tại commit `9648b07`.
 
@@ -210,6 +210,54 @@ def close_batch(*, batch, actor):
 | Vòng import inventory ↔ sales | Import trong hàm | Suite + `makemigrations --check` |
 | 404/400 tra đơn đổi thông điệp → FE hiện sai | FE coi 404 = không thấy; form chặn khác 4 số | QA thử Shop mock + staging |
 | Header noindex lọt production | Chỉ sửa `*.staging.json` | `git diff --exit-code` hai `firebase.json` |
+| S06 đổi nhầm `period_pnl` hoặc khoá response lô | Chỉ sửa 1 dòng `total_cost` + docstring trong `batch_pnl` | `period_pnl` test cũ xanh; S06-AC5 assert đúng 14 khoá |
+| S06 làm lộ lãi lỗ cho người thiếu quyền | Không đụng `reports/api.py` (`require_perm` giữ nguyên) | S06-AC6 `test_api.py` mới |
 
-## 7. Review
+## 7. S06 — Lãi lỗ theo lô không tính hai lần (L-10) · thêm 28/09, Duy duyệt
+
+**Chỗ sửa**: `backend/apps/reports/services.py` hàm `batch_pnl` (dòng 23-83). `reports/api.py`, `config/api_urls.py`, `period_pnl`,
+`dashboard_api.py` **không đổi**. Không model, không migration, không FE.
+
+**Cách sửa** (một dòng logic, còn lại là docstring)
+```python
+    # BR-BC-04 (sửa 2026-09-28, Duy duyệt): purchase_cost đã tính trên toàn bộ qty_received, gồm cả kg hao hụt/hỏng
+    # → shrinkage_cost/damage_cost chỉ để HIỂN THỊ số tiền mất, KHÔNG cộng vào total_cost.
+    total_cost = purchase_cost + allocated_cost
+    profit = revenue - total_cost
+```
+- Giữ nguyên cách tính `shrinkage_qty/cost`, `damage_qty/cost` (theo `landed_unit_cost` hiện hành), `provisional`, thứ tự và tên 14 khoá.
+- Sửa docstring module + `batch_pnl`: công thức mới, ghi rõ hao hụt/hàng hỏng "chỉ hiển thị, đã nằm trong giá mua" (tránh người sau cộng lại).
+- `doc/BUILD-PLAN.md:147`: sửa chú thích `batch_pnl` thành `doanh thu từ lô − (giá mua + chi phí phân bổ); hao hụt/hàng hỏng trả riêng,
+  không cộng (BR-BC-04 sửa 28/09)`. `backend/apps/reports/README.md` nếu có nêu công thức thì sửa cùng ý (hiện không nêu — dev kiểm).
+- Vì sao không đổi `period_pnl`: giá vốn kỳ = Σ `qty × unit_cost` ảnh chụp của phần **đã bán** (BR-BC-02), vốn không có khoản hao hụt/hỏng
+  → không tính hai lần. Việc kỳ không phản ánh tiền mất do hao hụt là câu hỏi khác (ghi "Việc sau" L-11 trong `02-stories.md`).
+- Tương thích với hồ sơ AI: DW-06 (TL-4) thêm `expired_qty`/`expired_cost` **chỉ hiển thị** — cùng nguyên tắc; sau S06 số khoá thành 16 ở hồ
+  sơ đó, không mâu thuẫn AC5 ở đây (AC5 chốt contract tại thời điểm Lô 3).
+
+**Rủi ro bắt buộc**
+| Rủi ro | Cơ chế chặn | Test bắt |
+|---|---|---|
+| Rò giá vốn/lãi lỗ | Không đổi view; `require_perm("reports.view_profitreport")` ở `BatchPnlView` | AC6: 3 Group → 403, JSON không có khoá `landed_unit_cost`/`purchase_cost`/`profit`; khách 401 |
+| Rò dữ liệu cá nhân | Response lô không có field khách; test chỉ dùng `Customer` giả (`0900000002`) như test cũ | review diff |
+| Đổi nhầm hình dạng response (FE/AI lệnh `bao_cao_lo` bám theo) | Không thêm/bớt khoá | AC5 `assertEqual(set(result), {14 khoá})` |
+| Chứng từ/xoá dữ liệu | Hàm chỉ đọc | — |
+
+**Test bắt buộc**
+- `backend/apps/reports/tests/test_services.py` (thêm test, dùng `setUp` sẵn hoặc lô riêng 100 kg × 100.000 không phân bổ cho AC1):
+  - `test_batch_pnl_duy_example_shrinkage_not_double_counted` — AC1, profit 3.500.000.
+  - `test_batch_pnl_damage_shown_not_added_to_total_cost` — phiếu hỏng `WRITE_OFF APPROVED` 5 kg + phiếu `DRAFT` 2 kg: `damage_qty`=5,
+    `total_cost` = `purchase_cost + allocated_cost`.
+  - `test_batch_pnl_total_cost_invariant_under_losses` — AC3: gọi trước và sau khi thêm hao hụt + hàng hỏng, `total_cost`/`profit` bằng nhau.
+  - `test_batch_pnl_keys_unchanged` — AC5, đúng 14 khoá.
+  - `test_batch_pnl_not_provisional_when_closed` (có sẵn) + thêm assert lô `CLOSED` cùng công thức (AC4).
+- `backend/apps/reports/tests/test_api.py` (**mới**, dùng `apps/common/tests/fixtures.py` `make_user`/`client_for`/`make_master`): AC6 `chu`
+  200 + 14 khoá; `quan_ly`/`nv_kho`/`nv_giao` 403 và `resp.json()` không có **khoá** `profit`, `landed_unit_cost`, `purchase_cost`
+  (so khoá, không so chuỗi — thông điệp 403 chứa chữ `view_profitreport`); khách 401; mã lô
+  không tồn tại 404.
+- **Sửa test cũ có chủ đích (duy nhất)**: `apps/reports/tests/test_services.py::ReportsServiceTests::test_batch_pnl_computes_profit_with_shrinkage_and_damage`
+  (dòng 112-113): `total_cost` `8610000` → `8200000`, `profit` `-1410000` → `-1000000`, sửa chú thích "lỗ vì lô chưa bán hết" giữ nguyên.
+  Lý do: test đang khoá công thức sai BR-BC-04 cũ. Các assert khác trong test đó (`shrinkage_cost` 164.000, `damage_cost` 246.000…) giữ nguyên.
+  Ghi vào `03-dev-notes.md`. Không sửa test cũ nào khác; `period_pnl` và `test_d1_seed_demo.py` (chỉ dùng `period_pnl`) phải xanh nguyên.
+
+## 8. Review
 _(Tech Lead điền sau khi lô QA APPROVED: REVIEW PASS / REVIEW FAIL kèm file:dòng.)_
