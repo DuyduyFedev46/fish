@@ -38,7 +38,7 @@ const mockAiPolicy: AiPolicy = {
       delay_minutes: 0,
     },
   ],
-  caps: {},
+  caps: [],
   users: [
     {
       user_id: 1,

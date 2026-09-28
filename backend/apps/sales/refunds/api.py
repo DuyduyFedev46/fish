@@ -10,7 +10,7 @@ from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from apps.ai.declare import AiDeclarable
+from apps.ai.declare import AiDeclarable, AiMeta
 from apps.common.api import BusinessModelPermissions, reject_protected_fields, require_perm
 from apps.common.exceptions import BusinessError
 from apps.sales.models import PaymentTransaction, Refund, SalesInvoice
@@ -47,7 +47,13 @@ class RefundViewSet(AiDeclarable, viewsets.ReadOnlyModelViewSet):
                 queryset = queryset.filter(status__in=statuses)
         return queryset
 
-    @action(detail=False, methods=["post"], url_path="create", required_perms=("sales.create_refund",))
+    @action(
+        detail=False,
+        methods=["post"],
+        url_path="create",
+        required_perms=("sales.create_refund",),
+        ai=AiMeta(keywords=("tao_phieu_hoan", "tạo phiếu hoàn")),
+    )
     def create_refund(self, request):
         """Tạo phiếu hoàn tiền mới cho đơn hàng hoặc giao dịch lệch (BR-HT-07)."""
         require_perm(request.user, "sales.create_refund")
@@ -87,7 +93,12 @@ class RefundViewSet(AiDeclarable, viewsets.ReadOnlyModelViewSet):
             return Response({**body, "duplicate": True}, status=200)
         return Response(body, status=201)
 
-    @action(detail=True, methods=["post"], required_perms=("sales.confirm_refund",))
+    @action(
+        detail=True,
+        methods=["post"],
+        required_perms=("sales.confirm_refund",),
+        ai=AiMeta(keywords=("xac_nhan_hoan", "xác nhận hoàn")),
+    )
     def confirm(self, request, pk=None):
         """Xác nhận đã chuyển khoản hoàn tiền cho khách (BR-HT-07)."""
         require_perm(request.user, "sales.confirm_refund")

@@ -16,6 +16,7 @@ from rest_framework.permissions import BasePermission
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.ai.declare import AiMeta
 from apps.inventory.batches.services import FEFO_ORDER, SELLABLE_STATUSES, sellable_batches
 from apps.inventory.models import Batch, StockLedgerEntry
 from apps.sales.models import SalesInvoice, SalesOrder
@@ -43,6 +44,7 @@ class CanViewDashboard(BasePermission):
 
 
 class DashboardSummaryView(APIView):
+    ai = AiMeta(keywords=("bao_cao_ton_kho", "báo cáo tồn kho"))
     permission_classes = [CanViewDashboard]
 
     def get(self, request):

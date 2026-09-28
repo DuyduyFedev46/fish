@@ -14,7 +14,6 @@ from apps.accounts.audit.api import AuditLogListView
 from apps.accounts.auth.api import ChangePasswordView, LoginTokenView, LogoutView, MeView
 from apps.accounts.staff.api import StaffViewSet
 from apps.ai.actions.api import AiActionViewSet
-from apps.ai.commands.api import CommandCatalogView
 from apps.ai.execution.pipeline import AiCommandCallView
 from apps.ai.policy.api import (
     AiPolicyUserConfigView,
@@ -112,8 +111,6 @@ urlpatterns = [
          PaymentTransactionViewSet.as_view({"post": "resolve"})),
     # A2/A3: tải lên / thay (POST) hoặc gỡ (DELETE) ảnh mặt hàng — quyền catalog.change_item_image.
     path("catalog/items/<int:pk>/image/", ItemImageDetailView.as_view()),
-    # S01 (AI Native ERP): catalog lệnh nghiệp vụ — lọc theo quyền (registry là code).
-    path("commands/catalog/", CommandCatalogView.as_view()),
     # S03: nhật ký hành động (append-only) — quyền accounts.view_auditlog (chu + quan_ly).
     path("audit-logs/", AuditLogListView.as_view()),
     # Tiếp theo · Đã làm (02b §6.7, DW-03)

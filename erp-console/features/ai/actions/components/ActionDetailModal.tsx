@@ -1,10 +1,10 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import type { AiActionRow } from "../../types";
+import type { AiActionDetail, AiActionRow } from "../../types";
 
 interface ActionDetailModalProps {
-  action: AiActionRow | null;
+  action: AiActionDetail | AiActionRow | null;
   isOpen: boolean;
   onClose: () => void;
   onConfirm: (actionId: string, nonce?: string) => Promise<void>;
@@ -120,7 +120,7 @@ export function ActionDetailModal({
               </button>
               <button
                 type="button"
-                onClick={() => onConfirm(action.id, action.confirm_nonce)}
+                onClick={() => onConfirm(action.id, "confirm_nonce" in action ? (action as AiActionDetail).confirm_nonce : undefined)}
                 disabled={countdown > 0 || isSubmitting}
                 className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300 dark:disabled:bg-blue-900"
               >

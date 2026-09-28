@@ -3,6 +3,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.ai.declare import AiMeta
 from apps.common.api import require_perm
 from apps.inventory.models import Batch
 
@@ -12,6 +13,7 @@ PERM = "reports.view_profitreport"
 
 
 class BatchPnlView(APIView):
+    ai = AiMeta(keywords=("bao_cao_lo", "báo cáo lô"))
     permission_classes = [IsAuthenticated]
     required_perms = (PERM,)
 
@@ -25,6 +27,7 @@ class BatchPnlView(APIView):
 
 
 class PeriodPnlView(APIView):
+    ai = AiMeta(keywords=("bao_cao_ky", "báo cáo kỳ"))
     permission_classes = [IsAuthenticated]
     required_perms = (PERM,)
 

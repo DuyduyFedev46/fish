@@ -350,4 +350,23 @@ describe("DW-09: FE chọn lệnh 2 bước + ngân sách token (chạy với LL
 
     await expect(fetchCommandIndex(true)).rejects.toThrow();
   });
+
+  it("DW-15-AC3: Tìm kiếm bằng từ khoá cũ 'tra tồn', 'tra_ton' -> top-3 có inventory.batch.list", () => {
+    const listWithKeywords: AiCommandIndexItem[] = baseCommands.map((c) => {
+      if (c.id === "inventory.batch.list") {
+        return {
+          ...c,
+          keywords: [...(c.keywords || []), "tra_ton", "tra tồn", "tồn kho"],
+        };
+      }
+      return c;
+    });
+
+    const results1 = searchCommands("tra tồn", listWithKeywords, { limit: 3 });
+    expect(results1.candidates.some((r) => r.command.id === "inventory.batch.list")).toBe(true);
+
+    const results2 = searchCommands("tra_ton", listWithKeywords, { limit: 3 });
+    expect(results2.candidates.some((r) => r.command.id === "inventory.batch.list")).toBe(true);
+  });
 });
+

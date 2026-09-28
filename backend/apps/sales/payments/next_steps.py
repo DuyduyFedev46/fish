@@ -104,7 +104,7 @@ def get_payment_next_steps(payment: PaymentTransaction, user: Any) -> list[NextS
                 missing=missing_perm,
                 deadline=None,
                 why=Why("BR-TT-10", get_reason("BR-TT-10")),
-                command="sales.refund.create",
+                command="sales.refund.create_refund",
                 ai=None,
             )
         )
@@ -142,7 +142,7 @@ def get_payment_guidance(doc_id: str, user: Any, request: Optional[Any] = None) 
     }
 
     next_steps_objs = get_payment_next_steps(payment, user)
-    next_steps_data = [step_to_dict(s) for s in next_steps_objs]
+    next_steps_data = [step_to_dict(s, user=user) for s in next_steps_objs]
 
     timeline_events = build_payment_timeline(payment)
     timeline_data = format_guidance_timeline(timeline_events, viewer=user)

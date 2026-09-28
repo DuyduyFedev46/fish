@@ -1,6 +1,7 @@
 """API nội bộ — nhóm hàng, mặt hàng, công thức combo (P-01). CRUD theo perm model (Tầng 1)."""
 from rest_framework import viewsets
 
+from apps.ai.declare import AiMeta
 from apps.catalog.models import BundleLine, Item, ItemGroup
 from apps.common.api import BusinessModelPermissions
 
@@ -14,6 +15,7 @@ class ItemGroupViewSet(viewsets.ModelViewSet):
 
 
 class ItemViewSet(viewsets.ModelViewSet):
+    ai = AiMeta(keywords=("tra_hang", "tra hàng"))
     queryset = Item.objects.select_related("item_group").all()
     serializer_class = ItemSerializer
     permission_classes = [BusinessModelPermissions]

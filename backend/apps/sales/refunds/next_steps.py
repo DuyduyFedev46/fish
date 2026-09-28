@@ -152,7 +152,7 @@ def get_refund_guidance(doc_id: str, user: Any, request: Optional[Any] = None) -
     }
 
     next_steps_objs = get_refund_next_steps(refund, user)
-    next_steps_data = [step_to_dict(s) for s in next_steps_objs]
+    next_steps_data = [step_to_dict(s, user=user) for s in next_steps_objs]
 
     timeline_events = build_refund_timeline(refund)
     timeline_data = format_guidance_timeline(timeline_events, viewer=user)

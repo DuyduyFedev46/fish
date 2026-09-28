@@ -404,3 +404,50 @@
 
 
 
+
+---
+
+## Lô 3c — Chat gọi lệnh qua `call` (DW-14), Gỡ catalog cũ (DW-15), Nút Tóm tắt AI (DW-16)
+
+### 1. Backend (`be-dev`)
+- **DW-14 (Guidance `ai` field)**:
+  - `backend/apps/common/guidance/steps.py`:
+    - Hàm `resolve_step_ai(step, user)`: kiểm tra `AI_ENABLED`, xác thực `user`, kiểm tra `step.command`. Lấy spec từ `CommandRegistry` (`discovery.get_registry()`), tính `level = effective_level(user, spec)`.
+    - Trả về `{"level": level, "label": f"AI soạn nháp {step.label.lower()}"}` (nếu mức C), nhãn thực thi (nếu mức B), hoặc tra cứu (nếu mức A). Trả `None` nếu `level in ("OFF", None)` hoặc AI tắt.
+    - Cập nhật `step_to_dict(step, user)` nạp `ai` thông qua `resolve_step_ai(step, user)`.
+  - Cập nhật 4 file `next_steps.py` (`apps/sales/orders/`, `apps/inventory/batches/`, `apps/sales/refunds/`, `apps/sales/payments/`): truyền `user=user` vào `step_to_dict(s, user=user)`, đồng bộ command ID chuẩn (`sales.salesorder.cancel`, `sales.refund.create_refund`).
+  - Test mới `backend/apps/common/guidance/tests/test_guidance_ai.py` (4 tests): kiểm tra Chủ thấy mức C, Quản lý thiếu quyền thấy null, AI tắt thấy null.
+- **DW-15 (Gỡ catalog cũ và chuyển sang registry tự sinh)**:
+  - Xoá triệt để các file S01 cũ: `backend/apps/ai/commands/{registry,api,serializers}.py`, `tests/test_catalog.py`, `tests/test_registry.py`.
+  - `backend/apps/ai/commands/README.md`: ghi chú chuyển toàn bộ sang `apps/ai/registry/`.
+  - `backend/config/api_urls.py`: gỡ import `CommandCatalogView` và route `commands/catalog/`. `GET /api/commands/catalog/` trả về 404 (DW-15-AC1).
+  - `backend/apps/ai/registry/tests/test_index_api.py`: cập nhật assert `GET /api/commands/catalog/` trả 404.
+  - Gắn `keywords` theo Phụ lục B: `BatchViewSet` (tra tồn, tra_ton, chốt lô, chot_lo), `ItemViewSet` (tra hàng, tra_hang), `SalesOrderViewSet` (tra đơn, tra_don), `RefundViewSet` (tạo phiếu hoàn, xác nhận hoàn), `ReportViewSet` (báo cáo lô, báo cáo kỳ, báo cáo tồn kho).
+  - Test mới `backend/apps/ai/registry/tests/test_registry_invariants.py` (7 tests): bảo toàn và mở rộng toàn bộ ý định test cũ trên registry tự sinh (tên lệnh duy nhất, JSON schema Draft 2020-12, không rò PII, quyền tồn tại trong DB, mô tả tiếng Việt không rỗng, đối chiếu 12 lệnh cũ, keywords Phụ lục B).
+- **Kiểm chứng Backend**:
+  - Toàn bộ backend test suite: **798 tests xanh 100%**.
+  - `makemigrations --check --dry-run` sạch `No changes detected`.
+
+### 2. Frontend (`fe-dev`)
+- **DW-15 (Gỡ catalog cũ và commands.ts cũ)**:
+  - Xoá file cũ `erp-console/features/ai/commands.ts`.
+  - `erp-console/features/ai/api.ts`: gỡ `getCommandCatalog` và `mockCatalog`.
+  - `erp-console/features/ai/mock.ts`: gỡ `mockCatalog`, mảng `CATALOG` cũ và các khai báo liên quan `CommandSpec`.
+  - `erp-console/features/ai/types.ts`: gỡ kiểu `CommandSpec` và `CommandCatalog` cũ.
+  - Test Vitest: thêm test `DW-15-AC3` tìm kiếm từ khoá cũ "tra tồn", "tra_ton" -> top-3 có `inventory.batch.list`.
+- **DW-14 (Nút "Để AI làm" và Chat qua `call`)**:
+  - `erp-console/features/guidance/components/GuidancePanel.tsx`:
+    - Hiển thị nút "Để AI làm" trên từng bước có `step.ai.level === "C"` và có `step.command`.
+    - Bấm nút kích hoạt `callCommand`, thông báo tạo đề xuất nháp thành công kèm link sang `/ai/actions`, bắt lỗi 400 hiển thị nguyên văn tiếng Việt kèm mã BR. Ẩn nút khi `AI_ENABLED=false`.
+  - `erp-console/features/ai/components/AiAssistantPanel.tsx`:
+    - Nối chat vào `fetchCommandIndex`, `planCommand`, `callCommand`.
+    - Trả lời kết quả đọc (mức A) kèm nhãn "AI", trả lời thông báo nháp đề xuất (mức C).
+    - An toàn giá vốn và PII: chặn hỏi giá vốn khi thiếu quyền, loại bỏ 100% tên/SĐT/địa chỉ khách hàng trong tin nhắn chat. Lỗi 400 hiển thị nguyên văn.
+- **DW-16 (Nút "Tóm tắt" trên khối Đã làm)**:
+  - `erp-console/features/guidance/components/GuidancePanel.tsx`:
+    - Thêm nút "Tóm tắt" trên khối Đã làm (Timeline), gọi `askAi` với engine LLMock truyền payload dòng thời gian an toàn không chứa PII và giá vốn.
+    - Hiển thị 2-3 câu tóm tắt nhãn "AI" ngay trên dòng thời gian chi tiết. Timeout 10s tự động huỷ qua `AbortController`. Ẩn nút khi máy yếu hoặc AI tắt.
+- **Kiểm chứng Frontend**:
+  - `erp-console`: `npm test` -> 9 tests passed 100%.
+  - `erp-console`: `npx tsc --noEmit && npm run build` sạch 25/25 static pages.
+  - `frontend`: `npx tsc --noEmit && npm run build` sạch 8/8 static pages.

@@ -2,7 +2,8 @@
 
 // Tấm AI NẶNG — chỉ nạp khi `ai_enabled` VÀ đã đồng ý (AiAssistantGate, next/dynamic ssr:false).
 // Gồm: kiểm tra máy (RAM/WebGPU/mạng) → tải model (sequential GGUF, % + ETA, tạm dừng/tải tiếp/huỷ,
-// cache IndexedDB) → hộp chat. Lô 1–2 chat chạy LLMock (dữ liệu giả, không đọc sổ sách thật).
+// cache IndexedDB) → hộp chat.
+// DW-14: Chat gọi lệnh qua call + chọn lệnh 2 bước (planCommand -> callCommand).
 // Vòng đời worker (C.2 dòng 3): ẩn tab 60s → shutdown("close"); unmount (đăng xuất/tắt AI) →
 // shutdown("unmount"); nhàn 10 phút → worker tự "idle". Suy luận KHÔNG gọi mạng (S08-AC5),
 // KHÔNG log prompt (S08-AC8).
@@ -16,6 +17,10 @@ import { canDownloadModel, detectAiCapability, type AiCapability, type DownloadV
 import { getCachedModel, putCachedModel, removeCachedModel } from "../runtime/model-store";
 import { GgufDownloader, type DownloadState } from "../runtime/model-downloader";
 import { askAi, selectEngineName, setRuntimeModelUrl, shutdownRuntime } from "../runtime/engine";
+import { fetchCommandIndex, fetchCommandDescriptor } from "../commands/index";
+import { planCommand } from "../commands/planner";
+import { callCommand } from "../commands/call";
+import { useAuth } from "@/features/auth/components/AuthProvider";
 import s from "./ai.module.css";
 
 const HIDE_GRACE_MS = 60 * 1000;
@@ -58,6 +63,7 @@ function verdictNotice(v: DownloadVerdict): string | null {
 }
 
 export function AiAssistantPanel({ status }: { status: AiStatus }) {
+  const { me } = useAuth();
   const engine = selectEngineName();
   const [cap, setCap] = useState<AiCapability>(() => detectAiCapability());
   const [cached, setCached] = useState<boolean | null>(null);
@@ -136,7 +142,7 @@ export function AiAssistantPanel({ status }: { status: AiStatus }) {
 
   const recheck = useCallback(() => setCap(detectAiCapability()), []);
 
-  // ---- Chat (LLMock lô 1–2; H4: gửi câu mới huỷ câu cũ) ----
+  // ---- Chat ----
   const finalizePending = useCallback(() => {
     setChat((msgs) => msgs.map((m) => (m.pending ? { ...m, pending: false } : m)));
   }, []);
@@ -149,26 +155,122 @@ export function AiAssistantPanel({ status }: { status: AiStatus }) {
     });
   }, []);
 
+  // DW-14: Chat gọi lệnh qua call + kiểm tra an toàn giá vốn & PII
   const send = useCallback(
-    (text: string) => {
+    async (text: string) => {
       const q = text.trim();
       if (!q) return;
-      finalizePending(); // câu cũ đang nghĩ → giữ phần đã có, bỏ trạng thái "đang nghĩ"
+      finalizePending();
       setChatError(null);
       setChat((msgs) => msgs.concat({ id: nextId(), role: "user", text: q }));
       setInput("");
-      void askAi(q, { onToken: appendAi })
-        .then(() => finalizePending())
-        .catch((err: unknown) => {
-          if (err instanceof DOMException && err.name === "AbortError") return; // bị thay bằng câu mới — không phải lỗi
-          setChatError(AI_MSG.chatError);
-          finalizePending();
-        });
-    },
-    [appendAi, finalizePending],
-  );
 
-  // H4: không chặn ô nhập khi đang nghĩ — gửi câu mới sẽ huỷ câu cũ.
+      // DW-14-AC4: Kiểm tra hỏi giá vốn
+      const costKeywords = ["giá vốn", "gia von", "lãi lỗ", "lai lo", "cost", "giá mua", "gia mua"];
+      const isAskingCost = costKeywords.some((k) => q.toLowerCase().includes(k));
+      const canCost = me?.permissions?.includes("inventory.view_costprice") || me?.groups?.includes("chu");
+
+      if (isAskingCost && !canCost) {
+        appendAi("Bạn không có quyền xem thông tin giá vốn.");
+        finalizePending();
+        return;
+      }
+
+      try {
+        // Tải chỉ mục lệnh
+        const indexRes = await fetchCommandIndex();
+        // Lập kế hoạch 2 bước
+        const plan = await planCommand(q, indexRes.commands, {
+          descriptorFetcher: fetchCommandDescriptor,
+        });
+
+        if (plan.type === "execute_ready") {
+          try {
+            const res = await callCommand(plan.command.id, {
+              args: plan.args,
+              screen: "chat",
+            });
+
+            if (res.outcome === "done") {
+              // DW-14-AC1: Mức A - lệnh đọc thành công
+              let reply = `Kết quả thực hiện "${plan.command.title}":\n`;
+              if (res.result) {
+                if (Array.isArray(res.result.rows)) {
+                  reply += `Tìm thấy ${res.result.rows.length} mục:\n`;
+                  res.result.rows.forEach((row, i) => {
+                    // DW-14-AC5: Không hiển thị bất kỳ tên/SĐT/địa chỉ khách hàng nào
+                    const code = row.batch_id || row.item_code || row.code || row.id || `Mục ${i + 1}`;
+                    const qty = row.qty_available !== undefined ? ` (tồn: ${row.qty_available})` : "";
+                    const status = row.status ? ` [${row.status}]` : "";
+                    reply += `• ${code}${qty}${status}\n`;
+                  });
+                } else if (res.result.total !== undefined) {
+                  reply += `Tổng số: ${res.result.total}`;
+                } else {
+                  reply += "Thao tác đọc thành công.";
+                }
+              } else {
+                reply += "Không có dữ liệu trả về.";
+              }
+              appendAi(reply.trim());
+            } else if (res.outcome === "proposal") {
+              // Mức C - đề xuất nháp
+              appendAi(
+                `AI đã tạo đề xuất nháp cho thao tác "${plan.command.title}" (mã: ${res.action_id}). Vui lòng vào màn Việc AI để kiểm tra và duyệt.`
+              );
+            } else {
+              appendAi(`Lệnh "${plan.command.title}" đã được ghi nhận.`);
+            }
+          } catch (callErr: unknown) {
+            // DW-14-AC6: Lỗi 400 hiển thị nguyên văn tiếng Việt + mã, không tự thử lại
+            const errMsg = callErr instanceof Error ? callErr.message : "Thao tác gặp lỗi khi thực thi.";
+            appendAi(`Lỗi thực hiện: ${errMsg}`);
+          }
+          finalizePending();
+          return;
+        }
+
+        if (plan.type === "form_only") {
+          appendAi(
+            `Thao tác "${plan.command.title}" cần mở biểu mẫu để điền thông tin chi tiết. Vui lòng mở màn hình liên quan.`
+          );
+          finalizePending();
+          return;
+        }
+
+        if (plan.type === "no_match") {
+          if (plan.suggestions && plan.suggestions.length > 0) {
+            appendAi(
+              `${plan.message}\n` + plan.suggestions.map((s) => `• ${s}`).join("\n")
+            );
+          } else {
+            appendAi(plan.message);
+          }
+          finalizePending();
+          return;
+        }
+
+        // Fallback: gọi LLMock trò chuyện thông thường
+        void askAi(q, { onToken: appendAi })
+          .then(() => finalizePending())
+          .catch((err: unknown) => {
+            if (err instanceof DOMException && err.name === "AbortError") return;
+            setChatError(AI_MSG.chatError);
+            finalizePending();
+          });
+      } catch (err: unknown) {
+        // Fallback gọi model khi lỗi lập kế hoạch
+        void askAi(q, { onToken: appendAi })
+          .then(() => finalizePending())
+          .catch((mErr: unknown) => {
+            if (mErr instanceof DOMException && mErr.name === "AbortError") return;
+            setChatError(AI_MSG.chatError);
+            finalizePending();
+          });
+      }
+    },
+    [appendAi, finalizePending, me],
+  );
 
   return (
     <div className={`rr-pane ${s.panel}`} ref={rootRef}>
@@ -180,13 +282,14 @@ export function AiAssistantPanel({ status }: { status: AiStatus }) {
       {/* ---- Kiểm tra máy ---- */}
       <section className={s.section} aria-label={AI_MSG.capTitle}>
         <h3 className={s.sectionTitle}>{AI_MSG.capTitle}</h3>
-        <div className={s.capRow}>
+        <div className={s.metrics}>
           <span>
             {AI_MSG.ramLabel}:{" "}
             <b className="num">{cap.deviceMemoryGb !== null ? `${cap.deviceMemoryGb} GB` : AI_MSG.unknown}</b>
           </span>
           <span>
-            {AI_MSG.webgpuLabel}: <b className="num">{cap.webgpu ? "Có" : "Không"}</b>
+            {AI_MSG.webgpuLabel}:{" "}
+            <b>{cap.webgpu ? "Có" : "Không"}</b>
           </span>
           <span>
             {AI_MSG.wifiLabel}:{" "}

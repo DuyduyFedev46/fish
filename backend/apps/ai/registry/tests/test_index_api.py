@@ -135,9 +135,9 @@ class CommandIndexApiTestCase(TestCase):
         self.assertEqual(res_det.status_code, 410)
         self.assertEqual(res_det.json().get("code"), "AI_DISABLED")
 
-        # Endpoint catalog cũ vẫn trả 200
+        # DW-15-AC1: Endpoint catalog cũ đã gỡ bỏ -> trả về 404
         res_old = self.client_chu.get("/api/commands/catalog/")
-        self.assertEqual(res_old.status_code, 200)
+        self.assertEqual(res_old.status_code, 404)
 
     def test_dw07_ac10_batch_filter_and_fefo(self):
         """DW-07-AC10: Lọc lô theo item_code và status giữ đúng thứ tự FEFO."""

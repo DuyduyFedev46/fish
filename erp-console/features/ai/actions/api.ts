@@ -1,5 +1,5 @@
 import { apiFetch, type MockRequest, type Paginated } from "@/shared/lib/http";
-import type { AiActionRow } from "../types";
+import type { AiActionDetail, AiActionRow } from "../types";
 
 export type FetchAiActionsParams = {
   status?: string;
@@ -16,7 +16,6 @@ const mockAiActions: Paginated<AiActionRow> = {
       id: "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
       command: "purchasing.purchasereceipt.submit",
       title: "Xác nhận phiếu nhập hàng",
-      kind: "write",
       level: "C",
       status: "PENDING",
       owner_display: "AI của Lộc",
@@ -24,11 +23,10 @@ const mockAiActions: Paginated<AiActionRow> = {
       expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
       execute_after: null,
       undo_until: null,
-      viewed_at: null,
       target: { type: "purchasereceipt", code: "PR-260928-01" },
       args_preview: { item_code: "CA-001", qty: "10.000" },
       downgrade_reason: null,
-      confirm_nonce: "mock-nonce-123",
+      result_ref: null,
     },
   ],
 };
@@ -53,15 +51,16 @@ export async function fetchAiActions(
 export async function fetchAiActionDetail(
   id: string,
   signal?: AbortSignal
-): Promise<AiActionRow> {
+): Promise<AiActionDetail> {
   const isMock = process.env.NEXT_PUBLIC_USE_MOCK === "1";
-  const mockDetail: AiActionRow = {
+  const mockDetail: AiActionDetail = {
     ...mockAiActions.results[0],
     id,
     viewed_at: new Date().toISOString(),
+    confirm_nonce: "mock-nonce-123",
   };
 
-  return apiFetch<AiActionRow>(`/api/ai/actions/${encodeURIComponent(id)}/`, {
+  return apiFetch<AiActionDetail>(`/api/ai/actions/${encodeURIComponent(id)}/`, {
     signal,
     mock: isMock ? (_req: MockRequest) => ({ status: 200, body: mockDetail }) : undefined,
   });

@@ -356,3 +356,71 @@ Không có lỗi chặn (0 lỗi).
 8. `grep -rnE "console\.(log|info|debug)|localStorage" erp-console/features/guidance erp-console/features/ai/commands erp-console/features/ai/actions erp-console/features/ai/settings erp-console/features/ai/policy` -> Rỗng hoàn toàn.
 
 
+
+---
+
+## Lô 3c: Chat gọi lệnh qua `call` (DW-14), Gỡ catalog cũ (DW-15), Nút Tóm tắt AI (DW-16) · Lần 1 · 2026-09-29
+
+### Kết luận: APPROVED — Lô 3c hoàn thành 100% Acceptance Criteria: chat kích hoạt chọn lệnh 2 bước và gọi `call` có nhãn AI rõ ràng, nút "Để AI làm" trên NextStep tự động tạo nháp đề xuất mức C, gỡ bỏ triệt để catalog S01 viết tay theo đúng lộ trình 02b §9.1 (404), nút "Tóm tắt" tóm tắt ngắn gọn <= 3 câu với LLMock mà không gọi API ngoài, bảo vệ tuyệt đối Bất biến 1 (giá vốn) và Bất biến 9 (PII).
+
+### Tổng: 20 ca · ✅ 20 · ❌ 0 · ⏸ 0
+
+### Theo AC
+| Mã AC | Kết quả | Bằng chứng (test/lệnh) |
+|---|---|---|
+| **DW-14-AC1** | ✅ PASS | `erp-console/features/ai/components/AiAssistantPanel.tsx:180-223`<br>`apps.ai.execution.tests.test_call_api::AiCommandCallApiTestCase.test_dw10_ac1_call_read_success` (nv_kho hỏi "còn bao nhiêu CA-001" -> chat chạy chỉ mục -> chọn lệnh `inventory.batch.list` -> gọi `call` -> kết quả hiển thị có nhãn "AI", danh sách mục và số lượng tồn khớp kết quả đọc) |
+| **DW-14-AC2** | ✅ PASS | `apps.common.guidance.tests.test_guidance_ai::GuidanceAiFieldTestCase.test_dw14_ac2_chu_mo_lo_buoc_chot_co_ai_level_c`<br>`apps.common.guidance.tests.test_guidance_ai::GuidanceAiFieldTestCase.test_dw14_ac2_quan_ly_thieu_quyen_buoc_chot_ai_null` (Chủ mở lô -> bước chốt có `ai={"level": "C", "label": "AI soạn nháp chốt lô"}`; Quản lý thiếu quyền chốt lô `inventory.close_batch` -> bước chốt có `ai=null`) |
+| **DW-14-AC3** | ✅ PASS | `erp-console/features/guidance/components/GuidancePanel.tsx:260-290`<br>`apps.ai.actions.tests.test_actions_api::AiActionApiTestCase.test_dw11_ac1_call_write_creates_proposal_and_auditlog` (Bước có `ai.level=C` hiện nút "Để AI làm" -> bấm kích hoạt `callCommand` sinh đề xuất nháp PENDING, hiển thị thông báo kèm mã việc và link tới màn Việc AI `/ai/actions`; chứng từ gốc trong DB chưa đổi) |
+| **DW-14-AC4 (giá vốn)** | ✅ PASS | `erp-console/features/ai/components/AiAssistantPanel.tsx:168-177`<br>`apps.ai.execution.tests.test_call_api::AiCommandCallApiTestCase.test_dw10_ac2_cost_keys_scrubbed_for_unauthorized` (Quản lý/kho hỏi "giá vốn lô B-01" -> chặn trước khi gửi model, trả lời ngay "Bạn không có quyền xem thông tin giá vốn."; nếu gọi qua API thì `scrub_data` lọc bỏ 100% khoá giá vốn; descriptor ẩn `purchase_rate`/`landed_unit_cost`) |
+| **DW-14-AC5 (PII)** | ✅ PASS | `erp-console/features/ai/components/AiAssistantPanel.tsx:201-206`<br>`apps.ai.execution.tests.test_call_api::AiCommandCallApiTestCase.test_dw10_ac3_pii_scrubbed_even_for_chu` (Hỏi "đơn SO... của ai" -> kết quả hiển thị chỉ gồm mã đơn, trạng thái, số lượng; hoàn toàn không có tên/SĐT/địa chỉ khách hàng; backend scrub đệ quy 11 khoá PII) |
+| **DW-14-AC6 (lỗi)** | ✅ PASS | `erp-console/features/ai/components/AiAssistantPanel.tsx:224-228` (Lệnh `call` bị backend từ chối trả lỗi 400 kèm mã BR -> chat hiển thị nguyên văn thông điệp tiếng Việt và mã lỗi, không tự ý gửi lại/thử lại vòng lặp) |
+| **DW-14-AC7 (máy không model)** | ✅ PASS | `erp-console/features/ai/components/AiAssistantPanel.tsx:45-63, 351-370`<br>`apps.ai.execution.tests.test_call_api::AiCommandCallApiTestCase.test_dw10_ac6_errors_args_and_cloud_channel` (Máy yếu/chưa tải model/4G -> hiển thị hướng dẫn nhập tay, không đẩy lệnh local lên cloud; lệnh local gọi qua kênh cloud bị từ chối 400 `BR-AI-02`) |
+| **DW-14-AC8 (AI tắt)** | ✅ PASS | `apps.common.guidance.tests.test_guidance_ai::GuidanceAiFieldTestCase.test_dw14_ac8_ai_disabled_ai_null`<br>`erp-console/features/ai/components/AiAssistantGate.tsx:60-84`<br>`erp-console/features/guidance/components/GuidancePanel.tsx:263-265` (`AI_ENABLED=false` -> `AiAssistantGate` không render chat panel; `resolve_step_ai` trả về `None`, guidance vẫn trả 200 đầy đủ nhưng mọi bước có `ai=null`, nút "Để AI làm" ẩn hoàn toàn) |
+| **DW-15-AC1** | ✅ PASS | `apps.ai.registry.tests.test_index_api::CommandIndexApiTestCase.test_dw07_ac9_ai_disabled` (`GET /api/commands/catalog/` trả HTTP 404; các file cũ `registry.py`, `commands/api.py`, `commands/serializers.py`, `test_catalog.py` đã bị xoá hoàn toàn; FE không còn dùng `getCommandCatalog` hay `CommandSpec`) |
+| **DW-15-AC2** | ✅ PASS | `apps.ai.registry.tests.test_index_api::CommandIndexApiTestCase.test_dw07_ac4_group_matrix`<br>`apps.ai.registry.tests.test_discovery::CommandDiscoveryTestCase.test_dw07_ac1_snapshot_khop_file` (12 lệnh active cũ đối chiếu Phụ lục B: mọi lệnh đều xuất hiện tương ứng trong registry tự sinh theo đúng phân quyền từng Group; các lệnh chưa có view như `nhap_lo` chờ DW-17) |
+| **DW-15-AC3** | ✅ PASS | `erp-console/features/ai/commands/commands.test.ts::DW-15-AC3` (Tìm kiếm bằng từ khoá cũ "tra tồn", "tra_ton" -> hàm `searchCommands` trả về `inventory.batch.list` trong top-3; view khai báo `AiMeta(keywords=("tra_ton", "tra tồn", ...))`) |
+| **DW-15-AC4 (kỷ luật registry)** | ✅ PASS | `apps.ai.registry.tests.test_discovery::CommandDiscoveryTestCase`<br>`apps.ai.registry.tests.test_discipline::DisciplineTestCase`<br>`apps.ai.registry.tests.test_index_api::CommandIndexApiTestCase` (Toàn bộ ý định test cũ của S01 được bảo toàn và mở rộng trên registry tự sinh: ID lệnh chuẩn hoá duy nhất, JSON Schema hợp lệ, không chứa bất kỳ khoá PII nào, quyền yêu cầu tồn tại thực và khớp AST, mô tả tiếng Việt >= 5 ký tự) |
+| **DW-15-AC5 (AI tắt không lỗi)** | ✅ PASS | `apps.ai.registry.tests.test_index_api::CommandIndexApiTestCase.test_dw07_ac9_ai_disabled`<br>`erp-console/features/ai/commands/commands.test.ts::DW-09-AC8` (`AI_ENABLED=false` -> mở console không bị lỗi do thiếu catalog cũ, các màn hình vận hành độc lập) |
+| **DW-16-AC1** | ✅ PASS | `erp-console/features/guidance/components/GuidancePanel.tsx:97-129, 220-230` (Bấm "Tóm tắt" trên khối Đã làm -> gọi LLMock tóm tắt <= 3 câu, hiển thị nhãn "AI", đặt ngay phía trên danh sách dòng thời gian chi tiết) |
+| **DW-16-AC2** | ✅ PASS | `erp-console/features/guidance/components/GuidancePanel.tsx:103-112` (Payload gửi cho LLMock chỉ trích xuất từ `data.timeline` đã có sẵn gồm `at`, `label`, `doc`, `actor`; không gọi thêm bất kỳ API nào ra backend) |
+| **DW-16-AC3 (giá vốn tóm tắt)** | ✅ PASS | `apps.inventory.batches.tests.test_guidance::GuidanceBatchTest.test_dw05_ac3_cost_hidden_in_timeline_for_non_chu`<br>`erp-console/features/guidance/components/GuidancePanel.tsx:103-112` (`quan_ly` xem dòng thời gian lô đã chốt -> backend đã lọc bỏ toàn bộ số tiền giá vốn; payload và kết quả tóm tắt không chứa số giá vốn) |
+| **DW-16-AC4 (PII tóm tắt)** | ✅ PASS | `apps.sales.orders.tests.test_guidance::GuidanceOrderTest.test_dw03_ac5_no_pii_for_chu`<br>`erp-console/features/guidance/components/GuidancePanel.tsx:103-112` (Dòng thời gian đơn không chứa tên, SĐT hay địa chỉ khách hàng; payload tóm tắt sạch PII) |
+| **DW-16-AC5 (máy không model)** | ✅ PASS | `erp-console/features/guidance/components/GuidancePanel.tsx:66-94, 206-217` (Máy không đủ năng lực/4G/iOS -> cờ `canSummarize=false`, ẩn hoàn toàn nút "Tóm tắt", không phát sinh network request ra ngoài) |
+| **DW-16-AC6 (timeout 10s)** | ✅ PASS | `erp-console/features/guidance/components/GuidancePanel.tsx:114-126` (Quá thời gian 10 giây hoặc model gặp lỗi -> `AbortController` huỷ request, ẩn nội dung tóm tắt, hiển thị thông báo "Không thể tóm tắt dòng thời gian. Vui lòng xem dòng thời gian chi tiết bên dưới", giữ nguyên dòng thời gian) |
+| **DW-16-AC7 (AI tắt tóm tắt)** | ✅ PASS | `erp-console/features/guidance/components/GuidancePanel.tsx:71-85` (`AI_ENABLED=false` -> `getAiStatus` trả `ai_enabled=false`, nút "Tóm tắt" bị ẩn, khối Đã làm hiển thị danh sách tất định bình thường) |
+
+### Ngoại lệ & biên | Phân quyền | Rò giá vốn | Rò dữ liệu cá nhân | Hồi quy
+- **Biên & Ngoại lệ:**
+  - Nút "Tóm tắt" có timeout 10 giây qua `AbortController` + `setTimeout(10000)`, chống treo giao diện.
+  - Chat bắt lỗi 400 và lỗi nghiệp vụ BR-*, hiển thị trực tiếp thông điệp cho người dùng, không tự động retry gây lặp.
+  - Phân tích câu hỏi tiếng Việt có fallback an toàn: nếu không khớp lệnh ERP thì chuyển qua LLMock thông thường hoặc gợi ý 4 câu mẫu sau 3 lần không khớp.
+- **Phân quyền (Bảng vai × Hành động):**
+  - `chu`: Thấy bước chốt lô có `ai={"level": "C", "label": "AI soạn nháp chốt lô"}`; hỏi giá vốn trong chat được xử lý; thấy toàn bộ lệnh trong chỉ mục.
+  - `quan_ly`: Bước chốt lô có `ai=null` vì không sở hữu quyền `inventory.close_batch`; hỏi giá vốn trong chat bị từ chối ngay lập tức; tóm tắt timeline không thấy số tiền giá vốn.
+  - `nv_kho`: Thấy các lệnh kho/lô; bấm "Để AI làm" trên các bước được phép sinh đề xuất nháp C chuyển về Việc AI.
+  - `nv_giao`: Bị giới hạn phạm vi T3; không thấy các lệnh/bước ngoài phạm vi giao hàng.
+  - Chưa đăng nhập: Chat và guidance yêu cầu xác thực (401).
+- **Rò giá vốn (Bất biến 1):**
+  - Chat có kiểm tra quyền xem giá vốn trước khi xử lý các câu hỏi chứa từ khoá giá vốn/lãi lỗ.
+  - Backend lọc 2 lớp: ViewSet serializer + `apps/ai/execution/scrub.py`.
+  - Descriptor của 94 lệnh không lộ các trường giá vốn nhạy cảm cho người thiếu quyền.
+  - Quét `grep -rn 'fields = "__all__"' backend/apps` -> Rỗng.
+- **Rò dữ liệu cá nhân (Bất biến 9):**
+  - Chat hiển thị kết quả đọc (DW-14-AC5) loại bỏ toàn bộ tên khách, SĐT và địa chỉ.
+  - Dòng thời gian và payload tóm tắt sạch 100% PII.
+  - Quét mã nguồn frontend: không ghi câu hỏi/kết quả vào `console.log` hay `localStorage`/URL query.
+- **Hồi quy:**
+  - Gỡ bỏ `commands/catalog/` và `registry.py` cũ không gây ảnh hưởng đến bất kỳ API back-office nào.
+  - Toàn bộ backend test suite đạt **798 tests xanh 100%**.
+  - Vitest erp-console: 9 tests xanh 100%.
+  - Build `erp-console` (25 static pages) và `frontend` (8 static pages) sạch sẽ 100%.
+
+### Lỗi
+Không có lỗi chặn (0 lỗi).
+
+### Lệnh đã chạy
+1. `cd backend && .venv/bin/python manage.py test apps.common.guidance.tests apps.ai.registry.tests` -> `Ran 22 tests. OK`
+2. `cd backend && .venv/bin/python manage.py test && .venv/bin/python manage.py makemigrations --check --dry-run` -> `Ran 798 tests in 37.874s. OK. No changes detected.`
+3. `cd erp-console && npm test` -> `✓ features/ai/commands/commands.test.ts (9 tests) 9 passed (279ms)`
+4. `cd erp-console && npx tsc --noEmit && npm run build` -> Compile sạch 25/25 static pages, First Load JS shared giữ nguyên 87.6 kB.
+5. `cd frontend && npx tsc --noEmit && npm run build` -> Compile sạch 8/8 static pages.

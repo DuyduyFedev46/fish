@@ -121,7 +121,7 @@ def get_order_next_steps(order: SalesOrder, user: Any) -> list[NextStep]:
                 missing=all_missing,
                 deadline=None,
                 why=Why("BR-GH-07", get_reason("BR-GH-07")),
-                command="sales.salesorder.cancel_order",
+                command="sales.salesorder.cancel",
                 ai=None,
             )
         )
@@ -140,7 +140,7 @@ def get_order_next_steps(order: SalesOrder, user: Any) -> list[NextStep]:
                 missing=missing,
                 deadline=None,
                 why=Why("BR-HT-04", get_reason("BR-HT-04")),
-                command="sales.refund.create",
+                command="sales.refund.create_refund",
                 ai=None,
             )
         )
@@ -188,7 +188,7 @@ def get_order_guidance(doc_id: str, user: Any, request: Optional[Any] = None) ->
     }
 
     next_steps_objs = get_order_next_steps(order, user)
-    next_steps_data = [step_to_dict(s) for s in next_steps_objs]
+    next_steps_data = [step_to_dict(s, user=user) for s in next_steps_objs]
 
     timeline_events = build_timeline(order)
     timeline_data = format_guidance_timeline(timeline_events, viewer=user)

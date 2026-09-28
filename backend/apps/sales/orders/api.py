@@ -14,7 +14,7 @@ from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from apps.ai.declare import AiDeclarable
+from apps.ai.declare import AiDeclarable, AiMeta
 from apps.common.api import (
     BusinessModelPermissions,
     StandardPagination,
@@ -55,6 +55,7 @@ def _customer_ids_by_name(q):
 
 
 class SalesOrderViewSet(AiDeclarable, viewsets.ReadOnlyModelViewSet):
+    ai = AiMeta(keywords=("tra_don", "tra đơn"))
     queryset = SalesOrder.objects.select_related("customer").all()
     permission_classes = [BusinessModelPermissions]
     pagination_class = StandardPagination
