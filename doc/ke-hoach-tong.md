@@ -56,5 +56,6 @@ cache chung (Redis) · SEO nâng cao cho bài viết · hoàn kho/hoàn tiền m
 | 2026-09-28 22:58 | P2 | Lô 1a | APPROVED | `5ef773b` | 732 | DW-03 khung Tiếp theo · Đã làm trên đơn (+L-4 dòng AI) |
 | 2026-09-29 00:04 | P2 | Lô 1b | APPROVED | `ea6f2da` | 749 | DW-04 phiếu hoàn + GD lệch, DW-05 lô (tách check_close_batch) |
 | 2026-09-29 00:38 | P2 | Lô 1c | APPROVED | `c0c4272` | 757 | DW-06 Chủ huỷ lô quá hạn (EXPIRED->CANCELLED, PnL TL-4) |
+| 2026-09-29 02:20 | P3 | Lô 2 | APPROVED | `c427bf8` | 775 | DW-07 registry tự sinh + chỉ mục, DW-08 required_perms, DW-09 chọn lệnh 2 bước |
 
 
