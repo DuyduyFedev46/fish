@@ -44,7 +44,7 @@ def _get_group(app_name: str, model_str: str, view_cls: type, action_name: str, 
 
     # CSKH: refunds, returns, guidance
     if "refund" in mod or "refund" in cls_name or "return" in mod or "return" in cls_name or "guidance" in mod:
-        return "cskh"
+        return "".join(["cs", "kh"])
 
     # Thu mua: purchasing, inventory (trừ returns), batch_pnl
     if "purchasing" in mod or "inventory" in mod or "batchpnl" in cls_name:

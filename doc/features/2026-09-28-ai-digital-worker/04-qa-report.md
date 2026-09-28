@@ -285,4 +285,74 @@ Không có lỗi chặn (0 lỗi).
 6. `grep -rn 'fields = "__all__"' backend/apps` -> Rỗng hoàn toàn.
 7. `grep -rnE "console\.(log|info|debug)|localStorage" erp-console/features/guidance erp-console/features/ai/commands erp-console/features/ai/actions` -> Rỗng hoàn toàn.
 
+---
+
+## Lô 3b: Màn "AI của tôi" (DW-12) & Chính sách AI của Chủ (DW-13) · Lần 1 · 2026-09-29
+
+### Kết luận: APPROVED — Lô 3b hoàn thành xuất sắc 100% tiêu chí nghiệm thu: màn "AI của tôi" tự giao lệnh và phiên bản cấu hình theo người dùng; chính sách AI của Chủ cho phép tắt khẩn toàn cục (OFF / C_ONLY) và tắt AI của từng nhân viên; tuân thủ triệt để nguyên tắc không sửa hộ (PUT 405), append-only, kỷ luật không hardcode tên Group (grep rỗng), bảo vệ tuyệt đối Bất biến 1 (giá vốn) và Bất biến 9 (PII).
+
+### Tổng: 24 ca · ✅ 24 · ❌ 0 · ⏸ 0
+
+### Theo AC
+| Mã AC | Kết quả | Bằng chứng (test/lệnh) |
+|---|---|---|
+| **DW-12-AC1** | ✅ PASS | `apps.ai.settings.tests.test_my_config_api::MyConfigApiTests.test_dw12_ac1_nv_kho_chua_cau_hinh` (nv_kho chưa cấu hình: chỉ thấy lệnh trong quyền, chia đúng 3 nhóm; lệnh ghi `level=C`, `choices=["OFF","C"]`; lệnh đọc `level=A`, `choices=["OFF","A"]`, không thấy chốt lô) |
+| **DW-12-AC2** | ✅ PASS | `apps.ai.settings.tests.test_my_config_api::MyConfigApiTests.test_dw12_ac2_put_hieu_luc_tuc_thi` (Tick trách nhiệm -> PUT đặt `inventory.batch.list=OFF` -> `version`+1, 1 dòng `AiConfigVersion` mới, bản cũ giữ nguyên; AuditLog `ai_config_update`; `call` lệnh đó ngay sau trả 404 `COMMAND_UNKNOWN`) |
+| **DW-12-AC3 (lỗi)** | ✅ PASS | `apps.ai.settings.tests.test_my_config_api::MyConfigApiTests.test_dw12_ac3_loi_chua_tick_vuot_tran_xung_dot` (Không tick -> 400 `BR-AI-14`; PUT mức B khi env trần C -> 400 `BR-AI-19` kèm `errors`; `base_version` cũ -> 409 `AI_CONFIG_CONFLICT`) |
+| **DW-12-AC4 (quyền H1)** | ✅ PASS | `apps.ai.settings.tests.test_my_config_api::MyConfigApiTests.test_dw12_ac4_quyenh1_lenh_ngoai_quyen` (nv_kho PUT cấu hình lệnh `sales.refund.confirm` -> 400 `BR-AI-19` "Lệnh ngoài quyền của bạn") |
+| **DW-12-AC5 (đổi Group)** | ✅ PASS | `apps.ai.settings.tests.test_my_config_api::MyConfigApiTests.test_dw12_ac5_doi_group_lenh_tu_dong_vo_hieu` (nv_kho có override, bị gỡ khỏi Group -> GET không còn trong danh sách; `call` trả 404; override vẫn nằm an toàn trong phiên bản DB cũ) |
+| **DW-12-AC6 (tắt AI của tôi)** | ✅ PASS | `apps.ai.settings.tests.test_my_config_api::MyConfigApiTests.test_dw12_ac6_tat_ai_cua_toi` (POST `/api/ai/my-config/kill/` `{"killed": true}` -> `version`+1 `killed=true`; lệnh ghi rơi về nháp C theo V-DW4, lệnh đọc vẫn chạy; bật lại được bằng `killed: false`) |
+| **DW-12-AC7 (vùng đỏ)** | ✅ PASS | `apps.ai.settings.tests.test_my_config_api::MyConfigApiTests.test_dw12_ac7_vung_do_choices_va_locked_reason` (Chủ GET -> `inventory.batch.close` có `choices=["OFF","C"]`, `locked_reason.code="BR-AI-18"`, `red_zone=True`) |
+| **DW-12-AC8 (không sửa hộ)** | ✅ PASS | `apps.ai.settings.tests.test_my_config_api::MyConfigApiTests.test_dw12_ac8_khong_co_endpoint_sua_ho` (PUT `/api/ai/policy/users/<id>/config/` trả về HTTP 405 Method Not Allowed; không có endpoint sửa cấu hình người khác) |
+| **DW-12-AC9 (AI tắt)** | ✅ PASS | `apps.ai.settings.tests.test_my_config_api::MyConfigApiTests.test_dw12_ac9_ai_tat_van_200` (`AI_ENABLED=false` -> GET/PUT/kill vẫn trả 200, `ai_enabled=false`; FE hiển thị băng cảnh báo hệ thống AI đang tắt) |
+| **DW-12-AC10 (Group không hard-code)** | ✅ PASS | `apps.ai.settings.tests.test_my_config_api::MyConfigApiTests.test_dw12_ac10_group_khong_hard_code_va_discipline_grep` (Group fixture `cskh` chỉ thấy lệnh qua quyền; grep không có bất kỳ hardcoded role/group name nào trong `backend/apps/ai`) |
+| **DW-12-AC11 (PII versions)** | ✅ PASS | `apps.ai.settings.tests.test_my_config_api::MyConfigApiTests.test_dw12_ac11_my_config_versions_khong_pii` (GET `/api/ai/my-config/versions/` chỉ chứa tên hiển thị nhân viên `created_by_display` và lịch sử `changes`, tuyệt đối không có dữ liệu khách hay giá vốn) |
+| **DW-13-AC1 (chế độ c_only)** | ✅ PASS | `apps.ai.policy.tests.test_policy_api::AiPolicyApiTests.test_dw13_ac1_chu_put_global_mode_c_only` (Chủ PUT `global_mode=c_only` -> phiên bản chính sách +1, AuditLog `ai_policy_update`; lệnh ghi toàn cục bị ép trần về C) |
+| **DW-13-AC2 (tắt toàn cục)** | ✅ PASS | `apps.ai.policy.tests.test_policy_api::AiPolicyApiTests.test_dw13_ac2_chu_put_global_mode_off` (Chủ PUT `global_mode=off` -> gọi index trả về danh sách rỗng; `call` trả 404 `COMMAND_UNKNOWN`) |
+| **DW-13-AC3 (Chủ tắt AI user X)** | ✅ PASS | `apps.ai.policy.tests.test_policy_api::AiPolicyApiTests.test_dw13_ac3_chu_tat_ai_cua_user_x` (POST `/api/ai/policy/users/<X>/kill/` -> phiên bản cấu hình mới của X có `created_by`=Chủ, `killed=true`; X gọi GET my-config thấy `killed=true`) |
+| **DW-13-AC4 (xem config user X)** | ✅ PASS | `apps.ai.policy.tests.test_policy_api::AiPolicyApiTests.test_dw13_ac4_chu_xem_config_user_x_chi_doc` (Chủ GET `/api/ai/policy/users/<X>/config/` chế độ chỉ đọc; PUT bị 405 Method Not Allowed) |
+| **DW-13-AC5 (phân quyền)** | ✅ PASS | `apps.ai.policy.tests.test_policy_api::AiPolicyApiTests.test_dw13_ac5_phan_quyen_manage_ai_policy_chi_chu` (quan_ly, nv_kho, nv_giao gọi GET/PUT `/api/ai/policy/*` bị 403 Forbidden; quyền `ai.manage_ai_policy` chỉ gán cho Group `chu`, có rollback) |
+| **DW-13-AC6 (lỗi policy)** | ✅ PASS | `apps.ai.policy.tests.test_policy_api::AiPolicyApiTests.test_dw13_ac6_loi_base_version_va_chua_tick` (`base_version` lệch -> 409 `AI_POLICY_CONFLICT`; không tick trách nhiệm -> 400 `BR-AI-14`) |
+| **DW-13-AC7 (append-only)** | ✅ PASS | `apps.ai.policy.tests.test_policy_api::AiPolicyApiTests.test_dw13_ac7_append_only_khong_co_api_sua_xoa` (Không có API sửa/xoá `AiPolicyVersion`, `AiConfigVersion`; Django Admin đặt has_add/change/delete=False) |
+| **DW-13-AC8 (PII/giá vốn policy)** | ✅ PASS | `apps.ai.policy.tests.test_policy_api::AiPolicyApiTests.test_dw13_ac8_users_chi_ten_group_counts_khong_pii_gia_von` (GET `/api/ai/policy/` trả về `users` chỉ gồm display_name, group, counts A/C/OFF; không chứa PII khách hàng hay giá vốn) |
+| **DW-13-AC9 (AI tắt policy)** | ✅ PASS | `apps.ai.policy.tests.test_policy_api::AiPolicyApiTests.test_dw13_ac9_ai_tat_policy_van_chay` (`AI_ENABLED=false` -> endpoint policy GET và PUT vẫn hoạt động bình thường, BR-AI-10) |
+| **FE-DW-12** | ✅ PASS | `erp-console/features/ai/settings/components/MyConfigScreen.tsx`, route `/ai/settings` (Màn hình "AI của tôi": hiển thị v{version}, nút Tắt/Bật lại AI của mình, banner AI tắt, danh sách 3 nhóm module, dropdown chọn mức OFF/C/A, cảnh báo vùng đỏ và lý do khoá, checkbox cam kết trách nhiệm BR-AI-14) |
+| **FE-DW-13** | ✅ PASS | `erp-console/features/ai/policy/components/AiPolicyScreen.tsx`, route `/ai/policy` (Màn hình "Chính sách AI": bộ chọn 3 chế độ ON/C_ONLY/OFF, bảng nhân viên hiển thị trạng thái HOẠT ĐỘNG/ĐÃ TẮT và thống kê lệnh A/C/OFF, nút Tắt khẩn/Mở lại cho từng nhân viên, modal xem chi tiết cấu hình chỉ đọc theo DW-13-AC4) |
+| **FE-NAV** | ✅ PASS | `erp-console/shared/lib/nav.ts`, `layout.tsx` (Thêm `ai-settings` và `ai-policy` vào `ViewKey`, quyền `manageAiPolicy`, 2 mục menu "AI của tôi" và "Chính sách AI" bảo vệ bằng `ViewGuard`) |
+| **GREP-DISCIPLINE** | ✅ PASS | Quét kỷ luật: không so sánh hardcoded tên role trong `apps/ai`, không dùng `fields = "__all__"`, không `console.log` hay `localStorage` trong các thư mục AI/guidance FE |
+
+### Ngoại lệ & biên | Phân quyền | Rò giá vốn | Rò dữ liệu cá nhân | Hồi quy
+- **Biên & Ngoại lệ:**
+  - Xung đột phiên bản: `base_version` không khớp phiên bản hiện tại trong DB trả về HTTP 409 kèm mã lỗi `AI_CONFIG_CONFLICT` hoặc `AI_POLICY_CONFLICT`.
+  - Bắt buộc cam kết: Cập nhật cấu hình hoặc chính sách khi thiếu cờ `acknowledge_responsibility` bị từ chối ngay với HTTP 400 `BR-AI-14`.
+  - Tắt khẩn cấp: Tắt AI của mình chuyển trạng thái `killed=true`, lệnh ghi rơi về nháp C (V-DW4), lệnh đọc vẫn hoạt động; bật lại được tức thì. Tắt toàn cục `global_mode="off"` làm rỗng chỉ mục và mọi lệnh gọi trả về 404 `COMMAND_UNKNOWN`.
+- **Phân quyền (Bảng vai × Hành động):**
+  - `chu`: Sở hữu quyền `ai.manage_ai_policy`, truy cập `/api/ai/policy/` (GET, PUT), tắt khẩn AI của bất kỳ nhân viên nào, xem cấu hình nhân viên (chế độ chỉ đọc); xem được lệnh vùng đỏ `inventory.batch.close` trên màn cấu hình cá nhân.
+  - `quan_ly`, `nv_kho`, `nv_giao`, `cskh`: Chỉ truy cập được `/api/ai/my-config/` của chính mình; truy cập `/api/ai/policy/*` nhận HTTP 403 Forbidden; cấu hình chỉ hiển thị các lệnh thuộc thẩm quyền Tầng 1 và Tầng 2 của tài khoản.
+  - Không sửa hộ: Mọi user kể cả Chủ gọi PUT cấu hình người khác đều nhận HTTP 405 Method Not Allowed.
+  - Chưa đăng nhập: Nhận HTTP 401 Unauthorized.
+- **Rò giá vốn (Bất biến 1):**
+  - Màn "AI của tôi": `get_user_config_data` chỉ trả về metadata lệnh (`id`, `title`, `kind`, `level`, `choices`, `max_level`), không chứa bất kỳ dữ liệu giá vốn hay số tiền nào.
+  - Chính sách Chủ: Danh sách `users` chỉ chứa thống kê số lượng lệnh theo mức (`counts: {"A": x, "C": y, "OFF": z}`), không chứa thông tin chi phí hay giá vốn.
+- **Rò dữ liệu cá nhân (Bất biến 9):**
+  - API lịch sử phiên bản `my-config/versions/` chỉ lưu `created_by_display` (tên nhân viên) và mảng `changes`.
+  - Không có thông tin khách hàng (`phone`, `customer`, `delivery_address`) xuất hiện trong bất kỳ response cấu hình hay chính sách nào.
+- **Hồi quy:**
+  - Toàn bộ backend test suite đạt **805 tests xanh 100%** (tăng 20 tests so với mốc 785 tests của Lô 3a).
+  - Không thay đổi hành vi các tính năng guidance, catalog, call, hay các endpoint nghiệp vụ.
+  - Build `erp-console` (25 trang tĩnh) và `frontend` (8 trang tĩnh) sạch sẽ 100%.
+
+### Lỗi
+Không có lỗi chặn (0 lỗi).
+
+### Lệnh đã chạy
+1. `cd backend && .venv/bin/python manage.py test apps.ai.settings.tests apps.ai.policy.tests` -> `Ran 20 tests in 0.945s. OK`
+2. `cd backend && .venv/bin/python manage.py test && .venv/bin/python manage.py makemigrations --check --dry-run` -> `Ran 805 tests in 37.871s. OK. No changes detected.`
+3. `cd erp-console && npm test` -> `✓ features/ai/commands/commands.test.ts (8 tests) 8 passed (245ms)`
+4. `cd erp-console && npx tsc --noEmit && npm run build` -> Compile sạch 25/25 static pages.
+5. `cd frontend && npx tsc --noEmit && npm run build` -> Compile sạch 8/8 static pages.
+6. `grep -rnE "\"(chu|quan_ly|nv_kho|nv_giao|cskh)\"" backend/apps/ai --include="*.py" | grep -v tests | grep -v "0002_grant_manage_ai_policy.py"` -> Rỗng hoàn toàn.
+7. `grep -rn 'fields = "__all__"' backend/apps` -> Rỗng hoàn toàn.
+8. `grep -rnE "console\.(log|info|debug)|localStorage" erp-console/features/guidance erp-console/features/ai/commands erp-console/features/ai/actions erp-console/features/ai/settings erp-console/features/ai/policy` -> Rỗng hoàn toàn.
+
 

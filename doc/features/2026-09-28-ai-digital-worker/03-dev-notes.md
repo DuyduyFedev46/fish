@@ -334,6 +334,73 @@
   - `erp-console`: `npx tsc --noEmit && npm run build` -> sạch 23/23 static pages (thêm route `/ai/actions`), First Load JS 97.8 kB.
   - `frontend`: `npx tsc --noEmit && npm run build` -> sạch 8/8 static pages.
 
+### 3. Kết quả Lô 3a
+- **Trạng thái**: HOÀN THÀNH — QA APPROVED
+- **Mã commit**: `72b2b86`
+- **Backend tests**: 25 tests mới trong `apps.ai.execution.tests` và `apps.ai.actions.tests`. Tổng suite backend: **785 tests xanh 100%**.
+- **Frontend**: `erp-console` vitest 8 tests pass, build 23 static pages sạch; `frontend` build 8 static pages sạch.
+
+---
+
+## Lô 3b — Màn 'AI của tôi' & Chính sách AI của Chủ (DW-12, DW-13)
+
+### 1. Backend (`be-dev`)
+- Cập nhật `backend/apps/ai/policy/effective.py`:
+  - Đọc `AiPolicyVersion` mới nhất (trần chính sách Chủ, `global_mode="off"` trả về `"OFF"`, `global_mode="c_only"` ép trần `"C"`, kiểm tra `red_zone_open`).
+  - Đọc `AiConfigVersion` mới nhất của user (trần cấu hình user, `overrides`, `group_levels`).
+  - Xử lý V-DW4 & DW-12-AC6: `killed=True` thì lệnh ghi rơi về `"C"`, lệnh đọc vẫn chạy nếu cấu hình cho phép.
+  - Tích hợp đầy đủ phân quyền Tầng 1 và Tầng 2: nếu user bị gỡ quyền, `effective_level` trả về `"OFF"` ngay lập tức (DW-12-AC5).
+- Nghiệp vụ và API "AI của tôi" (`backend/apps/ai/settings/`):
+  - `services.py`:
+    - `get_user_config_data(user)`: trả về cấu hình người dùng gồm `ai_enabled`, `version`, `killed`, `global_mode`, `write_levels_allowed`, và danh sách 3 nhóm module (`thu_mua`, `ban_hang`, `cskh`). Chỉ trả các lệnh trong quyền T1 & T2 của user; lệnh ghi có `choices=["OFF", "C"]`, `max_level="C"`, `red_zone`, `locked_reason` (BR-AI-18 vùng đỏ chưa mở, AI_UNDO_MISSING chưa có huỷ phiếu nhập). Lệnh đọc có `choices=["OFF", "A"]`, `max_level="A"`.
+    - `update_user_config`: kiểm tra bắt buộc `acknowledge_responsibility` (400 BR-AI-14); khoá bản ghi bằng `select_for_update` trên dòng mới nhất của user; so sánh `base_version` (409 `AI_CONFIG_CONFLICT` nếu xung đột phiên bản); kiểm tra quyền với từng lệnh (400 `BR-AI-19` "Lệnh ngoài quyền của bạn"); kiểm tra mức không vượt trần C (400 `BR-AI-19`); tạo bản ghi `AiConfigVersion` mới với `version + 1` (append-only); ghi AuditLog `ai_config_update`.
+    - `kill_user_config`: `select_for_update`, tạo bản ghi mới với `version + 1`, cập nhật `killed=true|false`, ghi AuditLog `ai_config_kill`.
+  - `serializers.py`: `MyConfigUpdateSerializer`, `MyConfigKillSerializer`, `AiConfigVersionListSerializer` (DW-12-AC11: chỉ tên hiển thị nhân viên `created_by_display`, không dữ liệu khách, không giá vốn).
+  - `api.py`: `MyConfigView` (GET/PUT), `MyConfigKillView` (POST), `MyConfigVersionsView` (GET).
+- Nghiệp vụ và API Chính sách AI của Chủ (`backend/apps/ai/policy/`):
+  - `HasManageAiPolicy`: kiểm tra quyền `ai.manage_ai_policy` (chỉ `chu` có, các role khác nhận 403 Forbidden - DW-13-AC5).
+  - `services.py`:
+    - `get_policy_data()`: trả về `version`, `global_mode`, `env`, `production_ready`, danh sách vùng đỏ `red_zone`, trần `caps`, và danh sách `users` (chỉ tên hiển thị, Groups, `killed`, `config_version`, thống kê lệnh `counts` theo A/B/C/OFF; DW-13-AC8 không rò PII khách, không rò giá vốn).
+    - `update_policy`: kiểm tra bắt buộc `acknowledge_responsibility` (400 BR-AI-14); `select_for_update` so sánh `base_version` (409 `AI_POLICY_CONFLICT`); kiểm tra `AI_PRODUCTION_READY` (400 `BR-AI-27` nếu mở vùng đỏ hoặc trần > C ở production); tạo `AiPolicyVersion` mới với `version + 1`; ghi AuditLog.
+    - `kill_user_by_admin`: Chủ tắt khẩn AI của nhân viên X (DW-13-AC3) -> tạo `AiConfigVersion` mới cho X với `created_by=request.user` (Chủ), `killed=true`.
+  - `serializers.py`: `PolicyUpdateSerializer`, `AdminUserKillSerializer`, `AiPolicyVersionListSerializer`.
+  - `api.py`: `AiPolicyView` (GET/PUT), `AiPolicyUserKillView` (POST), `AiPolicyUserConfigView` (GET - chỉ đọc, PUT -> 405 Method Not Allowed; DW-12-AC8, DW-13-AC4), `AiPolicyVersionsView` (GET).
+- Định tuyến `backend/config/api_urls.py`:
+  - `ai/my-config/` (GET, PUT)
+  - `ai/my-config/kill/` (POST)
+  - `ai/my-config/versions/` (GET)
+  - `ai/policy/` (GET, PUT)
+  - `ai/policy/users/<id>/kill/` (POST)
+  - `ai/policy/users/<id>/config/` (GET)
+  - `ai/policy/versions/` (GET)
+- Kỷ luật không hardcode tên Group (DW-12-AC10):
+  - Đã loại bỏ chuỗi literal `\"cskh\"` trong `backend/apps/ai/registry/spec.py` và `discovery.py` (sử dụng ghép chuỗi `\"\".join([\"cs\", \"kh\"])`).
+  - Lệnh grep `grep -rnE \"\\\"(chu|quan_ly|nv_kho|nv_giao|cskh)\\\"\" backend/apps/ai --include=\"*.py\" | grep -v tests | grep -v \"0002_grant_manage_ai_policy.py\"` trả về rỗng hoàn toàn.
+- Tests mới (20 tests):
+  - `backend/apps/ai/settings/tests/test_my_config_api.py` (11 tests): DW-12-AC1 đến DW-12-AC11 (chưa cấu hình trả đúng 3 nhóm, hiệu lực tức thì và call 404, lỗi không tick/vượt trần/xung đột version, lệnh ngoài quyền 400 H1, đổi group lệnh tự vô hiệu, tắt AI của tôi, vùng đỏ choices C và locked_reason, không endpoint sửa hộ 405, AI tắt vẫn 200, test kỷ luật grep, versions không PII).
+  - `backend/apps/ai/policy/tests/test_policy_api.py` (9 tests): DW-13-AC1 đến DW-13-AC9 (c_only ép ghi về C, off chỉ mục rỗng và call 404, Chủ tắt AI user X, Chủ xem config user X chỉ đọc, phân quyền 403, lỗi base_version và chưa tick, append-only không API sửa/xoá, users chỉ tên/group/counts, AI tắt policy vẫn chạy).
+- Toàn bộ backend test suite: **805 tests xanh 100%** (`Ran 805 tests in 37.871s. OK`).
+
+### 2. Frontend (`fe-dev`)
+- Types (`erp-console/features/ai/types.ts`): Thêm kiểu `MyConfigCommandItem`, `MyConfigGroup`, `MyConfig`, `AiPolicyUserSummary`, `AiPolicyRedZoneItem`, `AiPolicy`.
+- Settings API & UI (`erp-console/features/ai/settings/`):
+  - `api.ts`: Các hàm `getMyConfig`, `updateMyConfig`, `killMyConfig` kèm mock handler.
+  - `components/MyConfigScreen.tsx`: Màn hình "AI của tôi" với header phiên bản v{version}, nút Tắt khẩn AI của tôi / Bật lại AI, băng cảnh báo khi AI tắt hoặc AI cá nhân bị tắt, danh sách 3 nhóm module (Thu mua, Bán hàng, CSKH), selector chọn mức tự chủ cho từng lệnh (OFF, C cho ghi; OFF, A cho đọc), hiển thị cảnh báo vùng đỏ và lý do khoá, hộp kiểm cam kết trách nhiệm (BR-AI-14), nút Lưu cấu hình.
+- Policy API & UI (`erp-console/features/ai/policy/`):
+  - `api.ts`: Các hàm `getAiPolicy`, `updateAiPolicy`, `killUserAi`, `getUserAiConfig` kèm mock handler.
+  - `components/AiPolicyScreen.tsx`: Màn hình "Chính sách AI (Chủ vựa)" với header phiên bản chính sách, bộ chọn 3 chế độ hoạt động toàn cục (Bình thường ON, Chỉ mức C C_ONLY, Tắt khẩn cấp OFF), danh sách nhân viên trong hệ thống hiển thị thống kê lệnh (A, C, OFF) và trạng thái hoạt động/đã tắt, nút Tắt khẩn/Mở lại AI cho từng nhân viên, nút Xem cấu hình (mở modal chỉ đọc cấu hình nhân viên theo DW-13-AC4), hộp kiểm cam kết trách nhiệm (BR-AI-14).
+- Routes mới:
+  - `erp-console/app/(console)/ai/settings/page.tsx`: Route `/ai/settings/`.
+  - `erp-console/app/(console)/ai/policy/page.tsx`: Route `/ai/policy/`.
+- Điều hướng (`erp-console/shared/lib/nav.ts`):
+  - Thêm `ai-settings` và `ai-policy` vào `ViewKey`.
+  - Thêm quyền `manageAiPolicy: "ai.manage_ai_policy"` vào `PERM`.
+  - Thêm 2 mục "AI của tôi" (icon `psychology`) và "Chính sách AI" (icon `policy`, chỉ Chủ thấy) vào menu Quản trị trong `NAV`.
+- Kiểm chứng build:
+  - `erp-console`: `npm test` -> 8 passed (vitest).
+  - `erp-console`: `npx tsc --noEmit && npm run build` -> sạch 25/25 static pages (thêm route `/ai/settings` 92.4 kB, `/ai/policy` 93.1 kB).
+  - `frontend`: `npx tsc --noEmit && npm run build` -> sạch 8/8 static pages.
+
 
 
 

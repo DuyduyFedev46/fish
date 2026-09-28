@@ -28,7 +28,9 @@ export type ViewKey =
   | "catalog"
   | "staff"
   | "audit-logs"
-  | "ai-actions";
+  | "ai-actions"
+  | "ai-settings"
+  | "ai-policy";
 
 export type NavItem = {
   key: ViewKey;
@@ -72,6 +74,8 @@ export const PERM = {
   manageStaff: "accounts.manage_staff",
   /** S03 (AI Lô 1, chốt Duy 27/09): xem màn Nhật ký hoạt động — chu + quan_ly; nv_kho/nv_giao không (S03-AC5). */
   viewAuditLog: "accounts.view_auditlog",
+  /** DW-13: quản lý chính sách AI — chỉ Chủ có (ai.manage_ai_policy). */
+  manageAiPolicy: "ai.manage_ai_policy",
 } as const;
 
 /** Mã Group dùng trong luật menu (danh sách đầy đủ + nhãn: shared/lib/groups.ts). */
@@ -251,6 +255,28 @@ export const NAV: NavItem[] = [
     icon: "smart_toy",
     section: "Điều hành",
     visible: (me) => !onlyDelivery(me),
+  },
+  {
+    key: "ai-settings",
+    summary: "Cấu hình phân quyền và mức độ tự chủ của AI cá nhân.",
+    plannedIn: "DW-12",
+    href: "/ai/settings/",
+    label: "AI của tôi",
+    short: "AI của tôi",
+    icon: "psychology",
+    section: "Quản trị",
+    visible: (me) => !onlyDelivery(me),
+  },
+  {
+    key: "ai-policy",
+    summary: "Chính sách hoạt động toàn cục và quản lý AI của nhân viên.",
+    plannedIn: "DW-13",
+    href: "/ai/policy/",
+    label: "Chính sách AI",
+    short: "Chính sách AI",
+    icon: "policy",
+    section: "Quản trị",
+    visible: (me) => has(me, PERM.manageAiPolicy),
   },
 ];
 

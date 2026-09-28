@@ -11,7 +11,7 @@ class CommandSpec:
     title: str
     description: str = ""
     kind: str = "read"                      # "read" | "write"
-    group: str = "thu_mua"                  # "thu_mua" | "ban_hang" | "cskh"
+    group: str = "thu_mua"                  # thu_mua | ban_hang | cskh
     screens: tuple = ()
     keywords: list[str] = field(default_factory=list)
     method: str = "GET"

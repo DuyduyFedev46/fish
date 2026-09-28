@@ -16,7 +16,14 @@ from apps.accounts.staff.api import StaffViewSet
 from apps.ai.actions.api import AiActionViewSet
 from apps.ai.commands.api import CommandCatalogView
 from apps.ai.execution.pipeline import AiCommandCallView
+from apps.ai.policy.api import (
+    AiPolicyUserConfigView,
+    AiPolicyUserKillView,
+    AiPolicyVersionsView,
+    AiPolicyView,
+)
 from apps.ai.registry.api import AiCommandDetailView, AiCommandsIndexView
+from apps.ai.settings.api import MyConfigKillView, MyConfigVersionsView, MyConfigView
 from apps.common.guidance.api import GuidanceView
 import apps.sales.orders.next_steps  # noqa: F401 - đăng ký guidance provider cho order
 from apps.catalog.images.api import ItemImageDetailView
@@ -115,6 +122,15 @@ urlpatterns = [
     path("ai/commands/index/", AiCommandsIndexView.as_view(), name="ai-commands-index"),
     path("ai/commands/<str:command_id>/call/", AiCommandCallView.as_view(), name="ai-commands-call"),
     path("ai/commands/<str:command_id>/", AiCommandDetailView.as_view(), name="ai-commands-detail"),
+    # AI của tôi (02b §6.5, DW-12)
+    path("ai/my-config/kill/", MyConfigKillView.as_view(), name="ai-my-config-kill"),
+    path("ai/my-config/versions/", MyConfigVersionsView.as_view(), name="ai-my-config-versions"),
+    path("ai/my-config/", MyConfigView.as_view(), name="ai-my-config"),
+    # Chính sách AI của Chủ (02b §6.6, DW-13)
+    path("ai/policy/users/<int:user_id>/kill/", AiPolicyUserKillView.as_view(), name="ai-policy-user-kill"),
+    path("ai/policy/users/<int:user_id>/config/", AiPolicyUserConfigView.as_view(), name="ai-policy-user-config"),
+    path("ai/policy/versions/", AiPolicyVersionsView.as_view(), name="ai-policy-versions"),
+    path("ai/policy/", AiPolicyView.as_view(), name="ai-policy"),
     # Back-office (router)
     path("", include(router.urls)),
 ]

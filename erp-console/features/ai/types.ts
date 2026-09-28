@@ -219,4 +219,67 @@ export type AiActionRow = {
   confirm_nonce?: string;
 };
 
+// ---- DW-12 GET & PUT /api/ai/my-config/ (02b §6.5) ----
+export type MyConfigCommandItem = {
+  id: string;
+  title: string;
+  kind: "read" | "write";
+  level: string;
+  source: "default" | "group" | "override";
+  choices: string[];
+  max_level: string;
+  locked_reason: { code: string; text: string } | null;
+  red_zone: boolean;
+  limits: Record<string, unknown> | null;
+};
+
+export type MyConfigGroup = {
+  group: string;
+  label: string;
+  read_level: string;
+  write_level: string;
+  commands: MyConfigCommandItem[];
+};
+
+export type MyConfig = {
+  ai_enabled: boolean;
+  version: number;
+  killed: boolean;
+  updated_at: string | null;
+  global_mode: string;
+  write_levels_allowed: string[];
+  groups: MyConfigGroup[];
+};
+
+// ---- DW-13 GET & PUT /api/ai/policy/ (02b §6.6) ----
+export type AiPolicyUserSummary = {
+  user_id: number;
+  display_name: string;
+  groups: string[];
+  killed: boolean;
+  config_version: number;
+  counts: { A: number; B: number; C: number; OFF: number };
+};
+
+export type AiPolicyRedZoneItem = {
+  perm: string;
+  label: string;
+  open: boolean;
+  commands: string[];
+  can_do: string;
+  cannot_do: string;
+  legal_note: string;
+  delay_minutes: number;
+};
+
+export type AiPolicy = {
+  version: number;
+  global_mode: "on" | "c_only" | "off";
+  env: string;
+  production_ready: boolean;
+  red_zone: AiPolicyRedZoneItem[];
+  caps: Record<string, unknown>;
+  users: AiPolicyUserSummary[];
+};
+
 
