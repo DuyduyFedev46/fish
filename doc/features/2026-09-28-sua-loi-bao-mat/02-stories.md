@@ -1,9 +1,10 @@
-# Sửa lỗi bảo mật có sẵn (L-1, L-3, L-5, L-6, robots staging) + L-10 lãi lỗ theo lô
+# Sửa lỗi bảo mật có sẵn (L-1, L-3, L-5, L-6, robots staging) + L-10, L-11 lãi lỗ theo lô
 > Claude (Tech Lead thay PO, luồng NHANH) · 2026-09-28 · Trạng thái: **ĐÃ DUYỆT (Duy 28/09, luồng NHANH)**
 > Nguồn: `doc/features/2026-09-28-ai-digital-worker/02b-tech-design.md` §14 (L-1…L-9, đã đối chiếu code 28/09).
 > Duy chốt 28/09: phase này làm **đầu tiên**, trước mọi hồ sơ khác. Lô 2 QA APPROVED → merge `wip/autosave` vào `main`.
 > Thiết kế: `02b-tech-design.md` · Giao việc: `02c-giao-viec.md`.
 > **S06 (L-10) thêm ngày 28/09, Duy duyệt** (trả lời "ok" cho đề xuất sửa công thức lãi lỗ theo lô). Làm ở Lô 3, trên `main` sau khi Lô 2 merge.
+> **S07 (L-11) thêm 28/09, Duy duyệt** (trả lời "ok"): doanh thu lô chỉ tính hoá đơn chưa huỷ. Gộp vào Lô 3.
 
 Không có tính năng mới, không đổi schema. Mỗi lỗi một story (S06 sửa công thức nghiệp vụ, không phải lỗi bảo mật, gom vào đây vì cùng đợt sửa lỗi có sẵn). "Group" = 4 Group seed sẵn `chu`, `quan_ly`,
 `nv_kho`, `nv_giao`; "khách" = gọi không đăng nhập. Dữ liệu trong test chỉ dùng số giả (vd SĐT `0900000000`).
@@ -16,6 +17,7 @@ Không có tính năng mới, không đổi schema. Mỗi lỗi một story (S06
 | S04 | L-1 Chốt lô thiếu kiểm BR-LO-04/BR-KK-05 và thiếu khoá | Cao | 2 |
 | S05 | Trang staging bị máy tìm kiếm index | Trung bình | 2 |
 | S06 | L-10 Lãi lỗ theo lô tính hao hụt/hàng hỏng hai lần | Cao (sai con số lời lỗ) | 3 |
+| S07 | L-11 Lãi lỗ theo lô tính cả doanh thu hoá đơn đã huỷ | Cao (sai con số lời lỗ) | 3 |
 
 L-2 (huỷ lô quá hạn, BR-LO-03) **không làm trong hồ sơ này**, xem mục "Việc sau".
 
@@ -150,6 +152,26 @@ và giá trị = kg × `landed_unit_cost` hiện hành) để Chủ biết mất
   mô tả lệnh AI `bao_cao_lo` ở `erp-console/features/ai/mock.ts` không nêu công thức → không sửa. Tài liệu còn ghi công thức cũ
   (`doc/BUILD-PLAN.md:147`, docstring `batch_pnl`) sửa theo công thức mới.
 
+## S07 — Doanh thu lô không tính hoá đơn đã huỷ (L-11, BR-BC-04, BR-BC-01)
+**Là** Chủ, **tôi muốn** doanh thu của lô chỉ gồm hoá đơn còn hiệu lực, **để** lô không "lãi ảo" từ hoá đơn đã huỷ.
+
+Hiện trạng `backend/apps/reports/services.py:42-45` (`batch_pnl`): cộng `revenue`/`qty_sold` từ mọi `SalesInvoiceLineBatch` của lô
+(`batch.sold_allocations`), không lọc trạng thái hoá đơn. **Quyết định Duy 28/09:** chỉ tính dòng thuộc hoá đơn có trạng thái **khác**
+`SalesInvoice.Status.CANCELLED`.
+
+- **AC1 (một huỷ, một hiệu lực).** Given lô (100 kg × 100.000, không phân bổ) có hoá đơn A `ISSUED` bán 30 kg × 150.000 và hoá đơn B
+  `CANCELLED` bán 20 kg × 150.000, When gọi `batch_pnl`, Then `revenue` = 4.500.000, `qty_sold` = 30, `total_cost` = 10.000.000,
+  `profit` = −5.500.000 (trước khi sửa: 7.500.000 / 50 / −2.500.000).
+- **AC2 (chỉ hoá đơn huỷ).** Given lô chỉ có hoá đơn `CANCELLED`, Then `revenue` = 0, `qty_sold` = 0, `profit` = −`total_cost`.
+- **AC3 (huỷ sau khi xem).** Given hoá đơn A `ISSUED` rồi đổi thành `CANCELLED`, When gọi lại `batch_pnl`, Then `revenue`/`qty_sold` giảm đúng
+  phần của A; `SalesInvoiceLineBatch` không bị xoá hay sửa (bất biến 4, chỉ lọc khi đọc).
+- **AC4 (không đổi phần khác).** `purchase_cost`, `allocated_cost`, `shrinkage_*`, `damage_*`, `total_cost` (theo S06), `provisional` và 14
+  khoá response giữ nguyên; phân quyền như S06-AC6.
+- **AC5 (phạm vi — nơi khác đã đúng).** `period_pnl` đã lọc `status=ISSUED` (`services.py:103-105`) cho doanh thu và giá vốn;
+  `/api/dashboard/summary/` `revenue_today` đã lọc `ISSUED` (`dashboard_api.py:57-59`) → **không sửa**, test cũ giữ xanh. Chỉ sửa `batch_pnl`.
+- Ngoài phạm vi: phiếu hoàn một phần trên hoá đơn còn `ISSUED` không trừ vào doanh thu lô (Duy chưa quyết). Hiện chưa có service nào đổi
+  hoá đơn sang `CANCELLED` (chỉ Admin/dữ liệu) — S07 là chốt chặn đúng cho khi có.
+
 ---
 
 ## Việc sau (không làm trong hồ sơ này)
@@ -161,5 +183,5 @@ và giá trị = kg × `landed_unit_cost` hiện hành) để Chủ biết mất
 - Throttle `/admin/login/` và `/api-auth/login/` (không đi qua DRF).
 - Checkout Shop chưa đòi 4 số cuối SĐT (đổi contract FE, P1-AC6) — cân nhắc khi go-live.
 - L-4, L-7, L-8, L-9: theo hồ sơ `2026-09-28-ai-digital-worker`.
-- (Tech Lead thấy khi làm S06, **chưa hỏi Duy**) `batch_pnl` cộng doanh thu từ mọi `SalesInvoiceLineBatch` của lô, kể cả hoá đơn
-  `CANCELLED`, và không trừ phiếu hoàn. `period_pnl` không phản ánh hao hụt/hàng hỏng (chỉ giá vốn phần bán). Đề xuất ghi L-11, hỏi Duy riêng.
+- (Tech Lead, chưa hỏi Duy) `batch_pnl` không trừ phiếu hoàn một phần trên hoá đơn còn hiệu lực; `period_pnl` không phản ánh tiền mất do
+  hao hụt/hàng hỏng (chỉ giá vốn phần bán). Phần hoá đơn huỷ đã thành S07 (L-11, Duy duyệt 28/09).

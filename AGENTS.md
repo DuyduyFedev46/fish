@@ -17,8 +17,9 @@ Hồ sơ mỗi tính năng nằm ở `doc/features/<YYYY-MM-DD>-<slug>/`. **Bạ
 file nào, lệnh kiểm chứng và điều kiện xong. Thiếu file này, hoặc `02-stories.md`/`02b-tech-design.md`
 chưa `ĐÃ DUYỆT` → dừng và báo Duy, không tự viết yêu cầu hay tự thiết kế.
 
-Workflow chạy việc: `/lam-tinh-nang <slug>` (file `.agents/workflows/lam-tinh-nang.md` cho Antigravity,
-`.gemini/commands/lam-tinh-nang.toml` cho Gemini CLI).
+Workflow chạy việc: `/lam-tiep` (làm phase kế tiếp theo **`doc/ke-hoach-tong.md`** — thứ tự các phase, điều
+kiện bắt đầu, việc của Duy) hoặc `/lam-tinh-nang <slug>` (một hồ sơ cụ thể). File ở `.agents/workflows/` cho
+Antigravity, `.gemini/commands/` cho Gemini CLI.
 
 ## Agent
 

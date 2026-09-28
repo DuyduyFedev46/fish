@@ -1,0 +1,5 @@
+description = "Làm phase kế tiếp trong doc/ke-hoach-tong.md (phase đầu tiên chưa xong có 02c SẴN SÀNG CODE)"
+
+prompt = """
+Đọc và làm đúng theo quy trình trong file `.agents/workflows/lam-tiep.md`, tuân thủ `AGENTS.md`.
+"""

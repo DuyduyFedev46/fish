@@ -1,5 +1,5 @@
 # Thiết kế kỹ thuật — Sửa lỗi bảo mật có sẵn
-> Claude (Tech Lead) · 2026-09-28 · Trạng thái: **ĐÃ DUYỆT (Duy 28/09)** · §7 S06 (L-10) thêm ngày 28/09, Duy duyệt
+> Claude (Tech Lead) · 2026-09-28 · Trạng thái: **ĐÃ DUYỆT (Duy 28/09)** · §7 S06 (L-10) thêm ngày 28/09, Duy duyệt · §7 S07 (L-11) thêm 28/09, Duy duyệt
 > Story: `02-stories.md` (S01–S05). Không model mới, **không migration**, không đổi contract FE ngoài thông điệp lỗi.
 > Dòng code tham chiếu theo nhánh `wip/autosave` tại commit `9648b07`.
 
@@ -230,7 +230,7 @@ def close_batch(*, batch, actor):
 - `doc/BUILD-PLAN.md:147`: sửa chú thích `batch_pnl` thành `doanh thu từ lô − (giá mua + chi phí phân bổ); hao hụt/hàng hỏng trả riêng,
   không cộng (BR-BC-04 sửa 28/09)`. `backend/apps/reports/README.md` nếu có nêu công thức thì sửa cùng ý (hiện không nêu — dev kiểm).
 - Vì sao không đổi `period_pnl`: giá vốn kỳ = Σ `qty × unit_cost` ảnh chụp của phần **đã bán** (BR-BC-02), vốn không có khoản hao hụt/hỏng
-  → không tính hai lần. Việc kỳ không phản ánh tiền mất do hao hụt là câu hỏi khác (ghi "Việc sau" L-11 trong `02-stories.md`).
+  → không tính hai lần. Việc kỳ không phản ánh tiền mất do hao hụt là câu hỏi khác (ghi "Việc sau" trong `02-stories.md`).
 - Tương thích với hồ sơ AI: DW-06 (TL-4) thêm `expired_qty`/`expired_cost` **chỉ hiển thị** — cùng nguyên tắc; sau S06 số khoá thành 16 ở hồ
   sơ đó, không mâu thuẫn AC5 ở đây (AC5 chốt contract tại thời điểm Lô 3).
 
@@ -258,6 +258,29 @@ def close_batch(*, batch, actor):
   (dòng 112-113): `total_cost` `8610000` → `8200000`, `profit` `-1410000` → `-1000000`, sửa chú thích "lỗ vì lô chưa bán hết" giữ nguyên.
   Lý do: test đang khoá công thức sai BR-BC-04 cũ. Các assert khác trong test đó (`shrinkage_cost` 164.000, `damage_cost` 246.000…) giữ nguyên.
   Ghi vào `03-dev-notes.md`. Không sửa test cũ nào khác; `period_pnl` và `test_d1_seed_demo.py` (chỉ dùng `period_pnl`) phải xanh nguyên.
+
+### 7b. S07 — Doanh thu lô bỏ hoá đơn đã huỷ (L-11) · thêm 28/09, Duy duyệt
+
+**Chỗ sửa**: cùng hàm `batch_pnl`, vòng doanh thu (`services.py:42-45`). Chung Lô 3 với S06, cùng commit.
+```python
+    for alloc in batch.sold_allocations.select_related("invoice_line__invoice").exclude(
+        invoice_line__invoice__status=SalesInvoice.Status.CANCELLED   # BR-BC-04 (L-11, Duy duyệt 28/09)
+    ):
+        revenue += alloc.qty * alloc.invoice_line.rate
+        qty_sold += alloc.qty
+```
+- Dùng `exclude(CANCELLED)` đúng lời Duy ("không ở trạng thái huỷ"), không `filter(ISSUED)`: nếu sau này thêm trạng thái hiệu lực khác thì
+  vẫn tính. `SalesInvoice` đã import sẵn ở đầu file. Chỉ lọc khi đọc, không đụng `SalesInvoiceLineBatch` (append-only).
+- Phạm vi đã kiểm 28/09: `period_pnl` (`services.py:103-105`, lọc `ISSUED` cho cả doanh thu và `cogs`) và dashboard `revenue_today`
+  (`dashboard_api.py:57-59`, lọc `ISSUED`) **không có lỗi này → không sửa**. Không đổi response, quyền, migration, FE.
+
+**Rủi ro**: như §7 (không đổi view/khoá). Thêm: lọc nhầm làm mất doanh thu hoá đơn hiệu lực → AC1 assert cả phần `ISSUED` còn nguyên.
+
+**Test bắt buộc** (`backend/apps/reports/tests/test_services.py`, dựng hoá đơn qua `_make_invoice` rồi đổi `status` bằng ORM):
+- `test_batch_pnl_excludes_cancelled_invoice_revenue` — S07-AC1 (4.500.000 / 30 / −5.500.000).
+- `test_batch_pnl_only_cancelled_invoices_zero_revenue` — AC2.
+- `test_batch_pnl_invoice_cancelled_after_issue` — AC3: gọi trước/sau khi đổi `CANCELLED`, số `SalesInvoiceLineBatch` không đổi.
+- Không sửa thêm test cũ nào (test `period_pnl` đã có hoá đơn `ISSUED`, không bị ảnh hưởng).
 
 ## 8. Review
 _(Tech Lead điền sau khi lô QA APPROVED: REVIEW PASS / REVIEW FAIL kèm file:dòng.)_

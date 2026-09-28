@@ -1,0 +1,46 @@
+# Kế hoạch tổng — đợt 2026-09-28
+> Điều phối: Claude (phân tích) · Người hiện thực: Gemini CLI / Antigravity (`AGENTS.md`) · Duy duyệt từng phase.
+> Scope Duy chốt 28/09: sửa lỗi + AI + CSKH + CMS + khung go-live. **Không** làm đợt này: vai trò tự định nghĩa
+> (hồ sơ `2026-09-28-vai-tro-tu-dinh-nghia` để sau), in tem tự động, AI cho khách.
+
+## Cách chạy
+- Gemini/Antigravity làm **đúng thứ tự bảng dưới**, một phase một lúc: `/lam-tiep` (tự chọn phase kế tiếp) hoặc
+  `/lam-tinh-nang <slug>`.
+- Một phase chỉ được bắt đầu khi `02c-giao-viec.md` của nó ở trạng thái **SẴN SÀNG CODE** — Duy đổi trạng thái
+  này. Chưa đổi → dừng, báo Duy.
+- Không chạy hai phase song song: các hồ sơ cùng sửa `backend/apps/common/api.py`, `config/settings.py`,
+  `config/api_urls.py`, migration `accounts` — chạy tuần tự để tránh xung đột migration.
+- Xong mỗi lô: QA APPROVED → commit + push; đánh dấu ☑ trong 02c của hồ sơ và ☑ ở bảng dưới.
+
+## Thứ tự phase
+
+| ☐/☑ | Phase | Hồ sơ (`doc/features/…`) | Lô | Trạng thái 02c | Điều kiện bắt đầu | Ghi chú |
+|---|---|---|---|---|---|---|
+| ☐ | **P1** Sửa lỗi bảo mật + lãi lỗ | `2026-09-28-sua-loi-bao-mat` | 1 → 2 → (merge `wip/autosave` → `main`) → 3 | SẴN SÀNG CODE | — | Lô 1: Nhật ký lộ giá vốn, tra đơn dò được, throttle. Lô 2: chốt lô đủ điều kiện, noindex staging, **merge main** (xung đột → dừng hỏi Duy). Lô 3: lãi lỗ tính hai lần (S06) + doanh thu hoá đơn huỷ (S07) |
+| ☐ | **P2** Tiếp theo · Đã làm | `2026-09-28-ai-digital-worker` | 0 (spike, song song) + 1a → 1b → 1c | NHÁP | P1 xong + merge main | Lô 1c sau P1 Lô 3 (cùng sửa `batch_pnl`). Spike DW-02: phần đo trên máy Android/Windows ≥ 8GB do **Duy chạy** |
+| ☐ | **P3** Lệnh AI tự sinh + AI của tôi | `2026-09-28-ai-digital-worker` | 2 → 3a → 3b → 3c → 4 | NHÁP | P2 xong; kết quả spike Lô 0 đạt | Mọi môi trường `AI_WRITE_LEVELS_ALLOWED=C` (AI chỉ soạn nháp). Lô 2 có sẵn danh sách cấm `/api/public/`, `/api/cskh/`, `…/label/` |
+| ☐ | **P4** CSKH xác nhận + in tem | `2026-09-28-cskh-xac-nhan-in-tem` | 1 → 2 → 3 → 4 (5 là Could) | NHÁP | P3 xong | Lô 2 chỉ staging. Lô 3 (tự huỷ) lên production **sau khi legal-vn duyệt câu thông báo** và Duy bật cờ `CSKH_AUTO_CANCEL_ENABLED` |
+| ☐ | **P5** CMS viết bài | `2026-09-28-cms-viet-bai` | 1 → 2 → … → 7 | NHÁP | P4 xong | Thư viện mới duy nhất: Tiptap 2 (erp-console). CMS-16 đã làm ở P1 |
+| ☐ | **P6** Khung go-live | `2026-09-28-khung-go-live` | 1 → 2 → 3 | NHÁP | CMS Lô 5 (Lô 1–2), CMS Lô 7 (Lô 3) | Cờ `PRIVACY_CONSENT_REQUIRED` bật: chưa đăng chính sách thì Shop không nhận đơn |
+| ☐ | **P7** AI tự ghi + vùng đỏ | `2026-09-28-ai-digital-worker` | 5a → 5b → 5c → 6a → 6b | NHÁP | P6 xong | **Chỉ staging** tới khi xong S-L1…S-L4 (pháp lý) |
+
+## Việc của Duy (không phải code)
+| Khi nào | Việc |
+|---|---|
+| Trước P2 | Đổi 02c AI sang SẴN SÀNG CODE (ghi rõ "P2"); chạy spike DW-02 trên máy Android/Windows ≥ 8GB |
+| Trước P4 | Ghi 3 quyết định vào `doc/decisions.md`: trạng thái "Chờ xác nhận", Group `cskh`, luật tự huỷ đơn không liên lạc được. Gán nhân viên vào `cskh` |
+| Trước P4 Lô 3 lên production | `legal-vn` duyệt câu thông báo huỷ, câu báo trước ở checkout, quy định ghi nhãn trên tem. Tạo Cloud Run Job + lịch 5 phút cho `process_cskh_deadlines`, đặt `SHOP_HOTLINE` |
+| Trước P6 lên production | Chốt chủ thể pháp lý của Lộc, đặt biến `SELLER_*` (không đưa vào repo); soạn nội dung các trang chính sách trong CMS; checklist D1–D11 trong `2026-09-28-khung-go-live/01-analysis.md` §6 |
+| Trước P7 | Hoàn tất S-L1…S-L4: hồ sơ phân loại rủi ro AI, thông báo Bộ KH&CN, hợp đồng không-huấn-luyện với nhà cung cấp cloud, thoả thuận Duy–Lộc |
+| Mỗi phase | Đổi trạng thái 02c → SẴN SÀNG CODE; duyệt kết quả QA; quyết định deploy (Gemini không deploy) |
+
+## Mặc định đã áp (Duy lật được — ghi ở từng hồ sơ)
+- AI: lệnh đọc chạy ngay có lọc, lệnh ghi mặc định nháp; chỉ Chủ huỷ lô quá hạn; "tắt AI của tôi" = lệnh ghi về nháp.
+- CSKH: gọi 3 lần trong 30' → Quản lý → 30' không xử lý thì tự huỷ + hệ thống lập phiếu hoàn chờ Chủ xác nhận;
+  tính giờ thật; khách tự muốn huỷ/đổi thì không tự huỷ; không sửa đơn cũ; in tem tay 100×150.
+- CMS: đơn giản, trang bài tải lúc chạy (không SEO nâng cao); CMS tự thành lệnh AI (chỉ soạn nháp).
+- Go-live: thông tin người bán qua biến môi trường; câu "vựa sẽ gọi xác nhận" tắt tới khi CSKH chạy thật.
+
+## Để sau (không trong đợt này)
+Vai trò tự định nghĩa (ma trận CRUD) · in tem tự động/trạm in · huỷ lô quá hạn đã có ở P2 (DW-06) · throttle dùng
+cache chung (Redis) · SEO nâng cao cho bài viết · hoàn kho/hoàn tiền một phần theo dòng · S18/S20/S21 giao hàng.

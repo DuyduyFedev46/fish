@@ -72,3 +72,7 @@ Lệnh `manage.py check` chạy trên máy dev, **không** trỏ DB staging/prod
 - Cần đổi luồng giữ chỗ, thanh toán, tra đơn, hoặc thêm field cá nhân nào ngoài 2 field ở `02b` §2.1.
 - Có giá trị người bán thật trong tay (không đưa vào repo — hỏi Duy cách đặt lên Cloud Run).
 - Test cũ đỏ.
+
+## Ghi chú liên hồ sơ (điều phối viên thêm 28/09, từ 02b CSKH)
+- GL-04 dùng khối `cskh_notice` trong `GET /api/public/site-info/` (CSKH Lô 3 thêm khoá này vào cùng view GL-01 — không mở endpoint thứ hai). Ai làm trước thì tạo view, người sau chỉ thêm khoá.
+- GL-03-AC9 (tập khoá response tra đơn Shop) phải tính thêm khoá `cancel_notice` do CSKH Lô 3 thêm, nếu CSKH Lô 3 đã merge.

@@ -1,5 +1,5 @@
-# Giao việc — Sửa lỗi bảo mật có sẵn (L-1, L-3, L-5, L-6, robots staging) + L-10
-> Claude (Tech Lead) · 2026-09-28 · Trạng thái: **SẴN SÀNG CODE (Duy 28/09)** · **Lô 3 thêm ngày 28/09, Duy duyệt** (S06, L-10)
+# Giao việc — Sửa lỗi bảo mật có sẵn (L-1, L-3, L-5, L-6, robots staging) + L-10, L-11
+> Claude (Tech Lead) · 2026-09-28 · Trạng thái: **SẴN SÀNG CODE (Duy 28/09)** · **Lô 3 thêm ngày 28/09, Duy duyệt** (S06, L-10) · **S07 thêm 28/09, Duy duyệt** (L-11, gộp Lô 3)
 > Người hiện thực: Gemini CLI / Antigravity theo `AGENTS.md`, lệnh `/lam-tinh-nang 2026-09-28-sua-loi-bao-mat`.
 > Nhánh làm việc: `wip/autosave` (sau Lô 2 merge vào `main`, từ đó làm trên `main`). **Lô 3 làm trên `main`**, chỉ bắt đầu khi bước merge cuối Lô 2 đã push `main`.
 
@@ -14,7 +14,7 @@
 |---|---|---|---|---|---|---|
 | ☐ | 1 | S01 (L-3), S02 (L-6), S03 (L-5) | BE | `backend/apps/common/cost_keys.py` (mới), `backend/apps/common/throttling.py` (mới), `backend/apps/common/api.py` (chỉ `exception_handler`), `backend/apps/common/audit.py` (chỉ docstring), `backend/apps/accounts/audit/serializers.py`, `backend/apps/accounts/audit/api.py`, `backend/apps/sales/orders/shop_api.py`, `backend/apps/sales/payments/shop_api.py`, `backend/apps/accounts/auth/api.py` (chỉ `LoginTokenView`), `backend/config/settings.py` (khối `REST_FRAMEWORK` + `CAVEVE_THROTTLE_RATES`), test mới ở `backend/apps/common/tests/`, `backend/apps/accounts/audit/tests/`, `backend/apps/sales/orders/tests/`, `backend/apps/sales/payments/tests/`; `03-dev-notes.md` | mọi `migrations/`, `models/`, `record_audit` và dữ liệu `AuditLog`, `frontend/`, `erp-console/`, `adapter/`, `doc/decisions.md`, `02*.md`, test cũ (chỉ thêm, không sửa/xoá) | — |
 | ☐ | 2 | S04 (L-1), S05 (robots) | BE + cấu hình hosting | `backend/apps/inventory/batches/services.py` (chỉ `close_batch` + hằng số đi kèm), `backend/apps/inventory/batches/tests/test_l1_close_batch.py` (mới), `backend/apps/inventory/batches/tests/test_services.py` (**chỉ** `test_publish_and_close_batch` thêm phiếu kiểm kê APPROVED), `frontend/firebase.staging.json`, `erp-console/firebase.staging.json`, `doc/ops/moi-truong.md` (1 dòng mục Deploy); `03-dev-notes.md` | `frontend/firebase.json`, `erp-console/firebase.json`, `*/app/layout.tsx`, `batches/api.py`, mọi `migrations/`, `models/`, service huỷ lô (L-2 là việc sau), `doc/decisions.md`, `02*.md` | — |
-| ☐ | 3 | S06 (L-10) | BE | `backend/apps/reports/services.py` (**chỉ** `batch_pnl`: dòng `total_cost` + docstring hàm và docstring module), `backend/apps/reports/tests/test_services.py` (thêm test S06 + sửa đúng 2 assert đã nêu), `backend/apps/reports/tests/test_api.py` (mới), `doc/BUILD-PLAN.md` (chỉ dòng 147), `backend/apps/reports/README.md` (chỉ khi có nêu công thức); `03-dev-notes.md` | `period_pnl`, `reports/api.py`, `reports/dashboard_api.py`, `config/api_urls.py`, mọi `migrations/`, `models/`, `frontend/`, `erp-console/`, `doc/decisions.md`, `doc/business-process-spec.md` (Tech Lead đã sửa BR-BC-04), `02*.md`, test cũ khác | — |
+| ☐ | 3 | S06 (L-10), S07 (L-11) | BE | `backend/apps/reports/services.py` (**chỉ** `batch_pnl`: dòng `total_cost`, vòng doanh thu lọc hoá đơn huỷ, docstring hàm và docstring module), `backend/apps/reports/tests/test_services.py` (thêm test S06, S07 + sửa đúng 2 assert đã nêu), `backend/apps/reports/tests/test_api.py` (mới), `doc/BUILD-PLAN.md` (chỉ dòng 147), `backend/apps/reports/README.md` (chỉ khi có nêu công thức); `03-dev-notes.md` | `period_pnl`, `reports/api.py`, `reports/dashboard_api.py`, `config/api_urls.py`, mọi `migrations/`, `models/`, `frontend/`, `erp-console/`, `doc/decisions.md`, `doc/business-process-spec.md` (Tech Lead đã sửa BR-BC-04), `02*.md`, test cũ khác | — |
 
 ## Lô 1 — điều kiện xong
 - Lệnh kiểm chứng (dán output tóm tắt vào `03-dev-notes.md`):
@@ -73,12 +73,14 @@
   `WRITE_OFF APPROVED` vào `damage_*`, phiếu `DRAFT` không vào, `total_cost` không đổi; AC3 bất biến trước/sau khi thêm hao hụt + hàng hỏng;
   AC4 `provisional` lô chưa chốt / đã chốt cùng công thức; AC5 đúng 14 khoá; AC6 `test_api.py`: `chu` 200, `quan_ly`/`nv_kho`/`nv_giao`
   403 không có khoá giá vốn/lãi lỗ, khách 401, lô không có 404.
+- Test bắt buộc S07 (`02b` §7b): hoá đơn `ISSUED` 30 kg + `CANCELLED` 20 kg → `revenue` 4.500.000, `qty_sold` 30, `profit` −5.500.000; chỉ
+  hoá đơn huỷ → 0; đổi `ISSUED`→`CANCELLED` giảm đúng phần đó, không xoá/sửa `SalesInvoiceLineBatch`. `period_pnl`/dashboard không sửa.
 - **Sửa test cũ có chủ đích (duy nhất)**: `apps/reports/tests/test_services.py::ReportsServiceTests::test_batch_pnl_computes_profit_with_shrinkage_and_damage`
   — `total_cost` 8.610.000 → **8.200.000**, `profit` −1.410.000 → **−1.000.000** (test đang khoá công thức BR-BC-04 cũ tính hai lần hao
   hụt/hàng hỏng). Ghi lý do trong `03-dev-notes.md`. Test cũ khác đỏ → dừng, ghi "Lệch thiết kế".
 - QA APPROVED (`04-qa-report.md`, mục Lô 3): gọi `GET /api/reports/batch/<batch_id>/` bằng token 4 Group trên máy local với dữ liệu giả
   dựng như AC1; so số với bảng tính tay.
-- Commit: `Lô 3 sửa lỗi L-10: lãi lỗ theo lô không tính hai lần hao hụt/hàng hỏng (BR-BC-04)` → `git push origin main`.
+- Commit: `Lô 3 sửa lỗi L-10, L-11: lãi lỗ theo lô không tính hai lần hao hụt/hàng hỏng, bỏ hoá đơn huỷ (BR-BC-04)` → `git push origin main`.
 - Sau khi push: đánh dấu ☑ Lô 3 + mã commit và ghi "Lô 3 ☑ ngày …" cạnh trạng thái đầu file. Trạng thái **XONG** mà bước cuối Lô 2 ghi
   (điều kiện vào của hồ sơ AI) giữ nguyên; Lô 3 là phần bổ sung, chỉ chặn Lô 1c (DW-06) của hồ sơ AI vì cùng sửa `batch_pnl`. **Không deploy.**
 

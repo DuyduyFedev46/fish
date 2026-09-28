@@ -241,3 +241,7 @@ Mọi AC mức B đều có ca **production → bị chặn** (`AI_WRITE_LEVELS_
 - Bất kỳ việc gì làm B/A chạy được ở production, cần đổi env staging/production, cần lịch chạy job thật.
 - Đầu Lô 6b: xác nhận V-DW1 trước DW-26.
 - Contract/thiết kế không khớp code → ghi "Lệch thiết kế" trong `03-dev-notes.md`, dừng lô; Claude chốt (Việc 2 Tech Lead).
+
+## Ghi chú liên hồ sơ (điều phối viên thêm 28/09, từ 02b CSKH và CMS)
+- **Lô 2 — danh sách "cấm hẳn" của lệnh tự sinh** phải có sẵn các tiền tố sau dù endpoint chưa tồn tại: `/api/public/` (site-info, nội dung công khai — CMS/go-live), `/api/cskh/` (dữ liệu cá nhân khách — CSKH), mọi đường dẫn kết thúc `/label/` và `/label/print/` (tem có tên/SĐT/địa chỉ). Test kỷ luật tự đăng ký (DW-08) thêm ca: route mới dưới các tiền tố này không bao giờ vào chỉ mục.
+- Khi lệnh AI tạo/sửa bài CMS thì đặt `Entry.source="ai"` (02b CMS). Thêm một ca CMS vào test "feature mới không khai gì" (§11.2) khi hồ sơ CMS đã có code.
