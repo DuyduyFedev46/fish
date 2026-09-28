@@ -1,6 +1,6 @@
 ---
 name: feature
-description: Điều phối workflow đội dự án Cá Về (BA → PO → BE ∥ FE → QA → Review → Deploy) bằng các subagent ba-analyst, po-owner, be-dev, fe-dev, qa-tester. PHẢI dùng mỗi khi Duy nhờ bằng lời thường một việc làm thay đổi sản phẩm — thêm/sửa/bỏ chức năng, "Lộc muốn…", "khách phàn nàn…", sửa lỗi, đổi giao diện, đổi quy tắc nghiệp vụ, viết yêu cầu/story, test thử một luồng, deploy — kể cả khi không nhắc tới workflow hay tên agent. Không dùng cho câu hỏi thuần giải thích/tra cứu.
+description: Điều phối workflow đội dự án Cá Về (BA → PO → Tech Lead → BE ∥ FE → QA → Review → Deploy) bằng các subagent ba-analyst, po-owner, techlead, be-dev, fe-dev, qa-tester. PHẢI dùng mỗi khi Duy nhờ bằng lời thường một việc làm thay đổi sản phẩm — thêm/sửa/bỏ chức năng, "Lộc muốn…", "khách phàn nàn…", sửa lỗi, đổi giao diện, đổi quy tắc nghiệp vụ, viết yêu cầu/story, test thử một luồng, deploy — kể cả khi không nhắc tới workflow hay tên agent. Không dùng cho câu hỏi thuần giải thích/tra cứu.
 argument-hint: "<yêu cầu bằng lời thường>"
 ---
 
@@ -22,6 +22,7 @@ FE): QA sẽ kiểm lại sau khi sửa"* — rồi chạy luôn. Duy nói khác
 | "Viết story/backlog/tiêu chí nghiệm thu…" | **CHỈ PO** | Bước 2 (chạy BA trước nếu chưa có 01-analysis) |
 | "Test thử / kiểm tra / QA … xem có lỗi không" | **CHỈ QA** | Bước 4, không tự sửa — báo lỗi rồi hỏi có sửa không |
 | "Review code…", "kiểm tra bảo mật…" | **REVIEW** | Bước 5 |
+| "Luật/pháp lý…", "có vi phạm không", "go-live checklist", hỏi về nghĩa vụ nhà nước | **CHỈ PHÁP LÝ** | Giao `legal-vn` (không qua BA/PO), memo `0X-phap-ly.md` |
 | "Deploy / đưa lên / cập nhật bản thật" | **DEPLOY** | Bước 6 — xác nhận lại phạm vi trước khi chạy |
 | Làm tiếp tính năng đang dở ("làm tiếp", "ok duyệt") | **TIẾP TỤC** | Đọc trạng thái trong `doc/features/<gần nhất>/` |
 
@@ -54,13 +55,20 @@ Giao `po-owner` (chế độ viết story).
 ➜ **ĐIỂM DỪNG 2**: đưa Duy bảng story (mã · tiêu đề · ưu tiên · BE/FE) + thứ tự làm. Duy
 duyệt/cắt bớt → cập nhật `02-stories.md` thành `ĐÃ DUYỆT`.
 
+## 2b. Tech Lead — thiết kế kỹ thuật
+Giao `techlead`: viết `02b-tech-design.md` (kiến trúc, contract API BE↔FE, model/migration,
+điểm rủi ro giá vốn/PII/phân quyền + cơ chế chặn, lô giao việc). Điều phối viên đọc lướt —
+chỉ dừng hỏi Duy khi techlead nêu câu hỏi kỹ thuật 🔴 cần quyết định.
+
 ## 3. BE ∥ FE — hiện thực
+- BE/FE làm theo `02b-tech-design.md` (contract API + thứ tự lô trong đó).
 - Story `BE` → `be-dev`; story `FE` → `fe-dev`; story `BE+FE` → cả hai, **chạy song song
   trong cùng một lượt** (FE dùng mock theo contract trong story).
 - Giao theo lô nhỏ (1–3 story/lượt) theo thứ tự PO đề xuất, không dồn cả backlog.
 - Sau mỗi lượt: **tự kiểm** (skill `tdd-workflow` — cổng kiểm chứng): chạy lại
   `manage.py test` / `npm run build`, xem diff. Không tin báo cáo suông.
-- Nếu contract BE thực tế lệch story → giao `fe-dev` chỉnh lại theo contract thật.
+- Nếu contract BE thực tế lệch story → giao `techlead` chốt (sửa code hay sửa design), rồi
+  `fe-dev` chỉnh theo contract thật.
 
 ## 3b. UI review (khi lô có đổi giao diện)
 Giao `fe-dev` một lượt **chỉ để soát và đánh bóng**:
@@ -85,8 +93,10 @@ Khi lô đã QA APPROVED:
 Trước khi push, kiểm `git status` không có `.env`, DB hay bí mật nào.
 
 ## 5. Review & nghiệm thu
-- Chạy `/code-review` (hoặc `/security-review` nếu đụng phân quyền, thanh toán, webhook,
-  giá vốn) trên phần đã đổi; sửa lỗi xác thực được qua `be-dev`/`fe-dev`.
+- Nếu lô đụng pháp lý (dữ liệu cá nhân, thanh toán, AI, hợp đồng, go-live) → giao `legal-vn`
+  soát trước khi nghiệm thu, memo vào hồ sơ tính năng.
+- Giao `techlead` review diff của lô (code review + security review khi đụng phân quyền,
+  thanh toán, webhook, giá vốn, dữ liệu cá nhân); lỗi xác thực được → giao `be-dev`/`fe-dev` sửa.
 - Giao `po-owner` (chế độ nghiệm thu) đối chiếu `04-qa-report.md` với AC.
 - Rule nghiệp vụ mới/đổi → đề xuất cập nhật `doc/business-process-spec.md` (hỏi Duy trước
   khi sửa spec gốc).
@@ -103,6 +113,9 @@ Cho bug nhỏ / chỉnh sửa rõ ràng, 1 story:
 2. `be-dev` và/hoặc `fe-dev` (TDD, test tái hiện bug trước).
 3. `qa-tester` (chỉ AC + hồi quy app liên quan).
 4. Tổng kết như bước 6.
+
+Không cần `techlead` trừ khi sửa đụng kiến trúc/hợp đồng BE↔FE — lúc đó techlead viết
+`02b` ngắn trước khi dev.
 
 ## Nguyên tắc điều phối
 - Mỗi lượt giao việc: nêu rõ đường dẫn hồ sơ, mã story, phạm vi file được sửa, đầu ra cần trả.

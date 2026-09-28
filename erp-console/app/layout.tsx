@@ -1,8 +1,31 @@
 import type { Metadata, Viewport } from "next";
+import { Inter, JetBrains_Mono } from "next/font/google";
 import "@/shared/ui/tokens.css";
 import "@/shared/ui/globals.css";
 import { AuthProvider } from "@/features/auth/components/AuthProvider";
 import { THEME_INIT_SCRIPT } from "@/shared/ui/themeScript";
+
+// Tự host font (C.6/K8 — QA baseline 27/09: LCP mobile 2829ms do 2 stylesheet Google Fonts
+// render-blocking + preconnect):
+// - Inter + JetBrains Mono: next/font/google tải font LÚC BUILD → tự host, không request runtime.
+//   (tokens.css: --font-sans/--font-mono trỏ tới var(--font-inter)/var(--font-jetmono).)
+// - Material Symbols (font icon biến trục — next/font không tự host được): tập con tự cắt ở
+//   public/fonts/ms/ (scripts/subset-material-symbols.py) + css local, KHÔNG còn request Google.
+// KHÔNG được thêm lại <link> font Google vào đây; KHÔNG preload model AI/wasm vào metadata (C.2).
+
+const inter = Inter({
+  subsets: ["latin", "vietnamese"],
+  weight: ["400", "500", "600", "700"],
+  display: "swap",
+  variable: "--font-inter",
+});
+
+const mono = JetBrains_Mono({
+  subsets: ["latin"],
+  weight: ["400", "500"],
+  display: "swap",
+  variable: "--font-jetmono",
+});
 
 export const metadata: Metadata = {
   title: { default: "Vận hành Cá Về", template: "%s · Vận hành Cá Về" },
@@ -19,21 +42,10 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="vi" suppressHydrationWarning>
+    <html lang="vi" suppressHydrationWarning className={`${inter.variable} ${mono.variable}`}>
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
-        {/* eslint-disable-next-line @next/next/no-page-custom-font */}
-        <link
-          rel="stylesheet"
-          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
-        />
-        {/* eslint-disable-next-line @next/next/no-page-custom-font */}
-        <link
-          rel="stylesheet"
-          href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=block"
-        />
+        <link rel="stylesheet" href="/fonts/material-symbols.css" />
       </head>
       <body>
         <AuthProvider>{children}</AuthProvider>

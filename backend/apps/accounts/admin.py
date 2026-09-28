@@ -77,10 +77,11 @@ class StaffProfileAdmin(admin.ModelAdmin):
 
 @admin.register(AuditLog)
 class AuditLogAdmin(admin.ModelAdmin):
-    """Chỉ đọc — append-only (BR-PQ-06)."""
+    """Chỉ đọc — append-only (BR-PQ-06). Dòng AI hiển thị `ai:<tên user>` (S03)."""
 
-    list_display = ("created_at", "actor", "action", "model_name", "object_repr")
-    list_filter = ("action", "model_name")
+    list_display = ("created_at", "actor_kind", "actor", "ai_actor", "action",
+                    "model_name", "object_repr")
+    list_filter = ("actor_kind", "action", "model_name")
     search_fields = ("action", "object_repr", "object_id")
     date_hierarchy = "created_at"
 

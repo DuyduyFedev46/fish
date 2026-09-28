@@ -10,19 +10,21 @@ sửa lỗi, đổi giao diện, đổi quy tắc, viết yêu cầu/story, test
 **gọi skill `feature` trước khi làm gì khác**, để nó chọn luồng và báo Duy một dòng:
 
 ```
-ĐẦY ĐỦ  (tính năng mới / đổi nghiệp vụ)  BA → [Duy duyệt] → PO → [Duy duyệt] → BE ∥ FE → UI review → QA → Review → [Duy duyệt] → Deploy
+ĐẦY ĐỦ  (tính năng mới / đổi nghiệp vụ)  BA → [Duy duyệt] → PO → [Duy duyệt] → Tech Lead → BE ∥ FE → UI review → QA → Review → [Duy duyệt] → Deploy
 NHANH   (lỗi rõ / chỉnh nhỏ)             AC ngắn → BE/FE → QA → tổng kết
 CHỈ BA · CHỈ PO · CHỈ QA · REVIEW · DEPLOY · TIẾP TỤC (việc đang dở)
 ```
 Không chạy workflow cho câu hỏi thuần giải thích/tra cứu, hoặc việc vận hành không đổi
 code (xem log, seed dữ liệu, đổi mật khẩu) — làm trực tiếp.
 
-**Model (Duy chốt 2026-09-26):** lập kế hoạch dùng **Opus**, gồm điều phối viên (phiên chính), `ba-analyst` và `po-owner`. Code và test dùng **Sonnet**, gồm `be-dev`, `fe-dev` và `qa-tester`. Model khai ở frontmatter `model:` của từng agent; khi gọi Agent thì không ghi đè.
+**Model (Duy chốt 2026-09-26, bổ sung techlead + legal-vn 2026-09-27):** lập kế hoạch dùng **Opus**, gồm điều phối viên (phiên chính), `ba-analyst`, `po-owner`, `techlead` và `legal-vn`. Code và test dùng **Sonnet**, gồm `be-dev`, `fe-dev` và `qa-tester`. Model khai ở frontmatter `model:` của từng agent; khi gọi Agent thì không ghi đè.
 
 | Vai | Subagent | Skill nạp sẵn | Đầu ra |
 |---|---|---|---|
 | BA | `ba-analyst` | requirement-elicitation | `doc/features/<ngày>-<slug>/01-analysis.md` |
 | PO | `po-owner` | user-story-writing | `02-stories.md` (+ nghiệm thu) |
+| Tech Lead | `techlead` | caveve-domain, django-drf-patterns, nextjs-shop-patterns | `02b-tech-design.md` + review code |
+| Pháp lý | `legal-vn` | caveve-domain (+ WebSearch/WebFetch) | `0X-phap-ly.md` trong hồ sơ tính năng hoặc `doc/ops/` |
 | BE | `be-dev` | django-drf-patterns, tdd-workflow | code `backend/` `adapter/` + `03-dev-notes.md` |
 | FE | `fe-dev` | nextjs-shop-patterns, caveve-ui, impeccable, emil-design-eng, baseline-ui, fixing-accessibility | code `frontend/` `erp-console/` + `03-dev-notes.md` |
 | QA | `qa-tester` | e2e-playwright, tdd-workflow | `04-qa-report.md` |

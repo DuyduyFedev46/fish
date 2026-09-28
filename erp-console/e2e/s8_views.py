@@ -267,7 +267,8 @@ with sync_playwright() as p:
     # ================= Menu theo quyền THẬT của /api/auth/me/ (S6) =================
     for user, expected in [
         # S16 (L9): Quản lý có sales.view_refund → thấy mục con "Phiếu hoàn chờ chuyển" (không có nút, chỉ xem).
-        ("ql1", ["Tổng quan", "Đơn & tiền", "Phiếu hoàn chờ chuyển", "Giao hàng", "Kho & lô", "Mua hàng", "Kiểm kê", "Danh mục & giá"]),
+        # S03 (AI Lô 1): Quản lý có accounts.view_auditlog → thấy "Nhật ký hoạt động".
+        ("ql1", ["Tổng quan", "Đơn & tiền", "Phiếu hoàn chờ chuyển", "Giao hàng", "Kho & lô", "Mua hàng", "Kiểm kê", "Danh mục & giá", "Nhật ký hoạt động"]),
         # nv_kho có catalog.view_item thật → thấy "Danh mục & giá" (điều phối chốt; phần giá ẩn ở S38/S39)
         ("kho1", ["Tổng quan", "Đơn & tiền", "Giao hàng", "Việc giao của tôi", "Kho & lô", "Mua hàng", "Kiểm kê", "Danh mục & giá"]),
     ]:

@@ -55,16 +55,40 @@ class AuditLog(models.Model):
     Ghi mọi permission Tầng 2 (BR-PQ-04) và mọi thay đổi `Batch.landed_unit_cost`
     + mọi chuyển trạng thái `Refund` (BR-PQ-05). Actor = None nghĩa là Hệ thống
     (job huỷ TTL, webhook) — không mượn tài khoản người (BR-PQ-07).
+
+    S03 (AI Native ERP, BR-AI-08/Q6): phân biệt 3 loại tác nhân qua `actor_kind`:
+    - user   — người bấm nút / xác nhận (actor = người đó).
+    - system — job/webhook, actor = None.
+    - ai     — AI đề xuất thay cho user nào (ai_actor), actor = None; dòng thực thi
+               ghi actor=người xác nhận + `proposal_ref`/note mã đề xuất.
+    Dòng AI hiển thị `ai:<tên user>` (BR-AI-14) — phục vụ giải trình Luật AI 134/2025.
     """
+
+    class ActorKind(models.TextChoices):
+        USER = "user", "Người dùng"
+        SYSTEM = "system", "Hệ thống"
+        AI = "ai", "AI (thay người dùng)"
 
     actor = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,
         null=True,
-        blank=True,  # None = Hệ thống (system)
+        blank=True,  # None = Hệ thống (system) hoặc dòng AI (xem ai_actor)
         related_name="audit_logs",
         verbose_name="Người thực hiện",
     )
+    actor_kind = models.CharField(
+        "Loại tác nhân", max_length=10, choices=ActorKind.choices, default=ActorKind.USER
+    )
+    ai_actor = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="+",  # "AI thay cho user nào" (BR-AI-08)
+        verbose_name="AI thay cho ai",
+    )
+    proposal_ref = models.CharField("Mã đề xuất AI", max_length=64, blank=True)
     action = models.CharField("Hành động", max_length=100)  # vd: confirm_refund, close_batch
     model_name = models.CharField("Loại chứng từ", max_length=100, blank=True)
     object_id = models.CharField("Mã đối tượng", max_length=64, blank=True)
@@ -80,7 +104,10 @@ class AuditLog(models.Model):
         default_permissions = ("view",)  # BR-PQ-06: chỉ xem, không add/change/delete
 
     def __str__(self):
-        who = self.actor.get_username() if self.actor else "system"
+        if self.actor_kind == self.ActorKind.AI:
+            who = f"ai:{self.ai_actor.get_username()}" if self.ai_actor else "ai:?"
+        else:
+            who = self.actor.get_username() if self.actor else "system"
         return f"[{self.created_at:%Y-%m-%d %H:%M}] {who} · {self.action}"
 
 

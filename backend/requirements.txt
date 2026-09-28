@@ -17,3 +17,5 @@ Pillow>=10.4,<11
 # Chỉ thật sự cần khi ITEM_IMAGE_STORAGE=gcs (staging/production) — import trong hàm
 # (apps/catalog/images/storage.py) nên dev/test không bắt buộc cài để chạy `manage.py test`.
 google-cloud-storage>=2.18,<3
+# S01 (AI Native ERP): validate args theo input_schema của command registry (02b mục 4.4).
+jsonschema>=4.20

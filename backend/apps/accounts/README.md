@@ -11,3 +11,7 @@ Command: `bootstrap_masterdata` (Kho chính + bảng giá Bán lẻ), `seed_demo
 `remove_demo` (D1 — ngoại lệ có chủ đích của BR-PQ-10, chỉ cho bản ghi demo).
 Tập giữ lại tính theo bao đóng (QA lần 2 · B2): demo là "một phần" của bản ghi đang giữ (mọi FK ngoài `REFERENCE_FIELDS`) cũng giữ — chứng từ giữ cả cụm hoặc gỡ cả cụm.
 Migration `0004`: `StaffProfile.must_change_password` (S48, BR-PQ-19; dữ liệu cũ = False).
+Migration `0007`: `AuditLog` thêm 3 field nullable `actor_kind`/`ai_actor`/`proposal_ref` + backfill
+`actor_kind` (actor null → `system`) + gán quyền `accounts.view_auditlog` cho chu/quan_ly (S03, AI Native ERP).
+`audit/`: `GET /api/audit-logs/` (S03) — nhật ký có `actor_kind` (`user`/`system`/`ai`), dòng AI hiển thị
+`ai:<tên user>`, lọc `?action=`/`?actor_kind=`, append-only (chỉ GET). Xem `apps/accounts/audit/README.md`.

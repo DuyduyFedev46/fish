@@ -26,7 +26,8 @@ export type ViewKey =
   | "stocktake"
   | "reports"
   | "catalog"
-  | "staff";
+  | "staff"
+  | "audit-logs";
 
 export type NavItem = {
   key: ViewKey;
@@ -68,6 +69,8 @@ export const PERM = {
    * nv_kho/nv_giao không. KHÔNG mở rộng sang sửa mặt hàng (change_item) — đó vẫn là S38. */
   changeItemImage: "catalog.change_item_image",
   manageStaff: "accounts.manage_staff",
+  /** S03 (AI Lô 1, chốt Duy 27/09): xem màn Nhật ký hoạt động — chu + quan_ly; nv_kho/nv_giao không (S03-AC5). */
+  viewAuditLog: "accounts.view_auditlog",
 } as const;
 
 /** Mã Group dùng trong luật menu (danh sách đầy đủ + nhãn: shared/lib/groups.ts). */
@@ -216,7 +219,7 @@ export const NAV: NavItem[] = [
   },
   {
     key: "staff",
-    summary: "Tài khoản nhân viên, nhóm quyền và nhật ký hoạt động.",
+    summary: "Tài khoản nhân viên và nhóm quyền (nhật ký hoạt động đã tách riêng — S03).",
     plannedIn: "S41, S43",
     href: "/staff/",
     label: "Nhân sự · Nhật ký",
@@ -224,6 +227,18 @@ export const NAV: NavItem[] = [
     icon: "badge",
     section: "Quản trị",
     visible: (me) => has(me, PERM.manageStaff),
+  },
+  {
+    key: "audit-logs",
+    summary: "Mọi thay đổi trong hệ thống, kể cả việc do trợ lý AI đề xuất (ai:<tên>).",
+    plannedIn: "S03",
+    href: "/audit-logs/",
+    label: "Nhật ký hoạt động",
+    short: "Nhật ký",
+    icon: "history",
+    section: "Quản trị",
+    // S03: chu + quan_ly (accounts.view_auditlog); NV kho/giao không đọc toàn bộ nhật ký (S03-AC5).
+    visible: (me) => has(me, PERM.viewAuditLog) && !onlyDelivery(me),
   },
 ];
 

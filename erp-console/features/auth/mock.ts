@@ -82,7 +82,8 @@ const GROUP_PERMS: Record<string, string[]> = {
     "sales.view_salesorderline", "sales.view_salesorderlinebatch",
   ],
   quan_ly: [
-    "accounts.view_staffprofile", "auth.view_user", "catalog.change_item_image", "catalog.view_bundleline",
+    "accounts.view_auditlog", "accounts.view_staffprofile", "auth.view_user", "catalog.change_item_image",
+    "catalog.view_bundleline",
     "catalog.view_item", "catalog.view_itemgroup", "catalog.view_itemprice", "catalog.view_pricelist", "catalog.view_pricingrule",
     "delivery.add_deliverynote", "delivery.change_deliverynote", "delivery.view_deliverynote",
     "inventory.add_stockentry", "inventory.add_stockreconciliation", "inventory.add_stockreconciliationline",

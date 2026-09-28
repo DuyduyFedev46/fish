@@ -1,0 +1,12 @@
+/* Material Symbols Outlined — TỰ HOST (tập con, chỉ glyph icon đang dùng của erp-console).
+   Sinh bằng:  python3 scripts/subset-material-symbols.py
+   Lý do: bỏ 2 stylesheet render-blocking + 2 preconnect tới fonts.googleapis.com ở app/layout.tsx
+   (QA baseline 27/09: LCP mobile 2829ms do Google Fonts — C.6/K8). Full font 4 MB → tập con ~70 KB.
+   `font-display: block` giữ như bản Google (icon không nhấp nháy). */
+@font-face {
+  font-family: "Material Symbols Outlined";
+  font-style: normal;
+  font-weight: 100 700;
+  font-display: block;
+  src: url(ms/material-symbols-outlined.woff2) format("woff2");
+}

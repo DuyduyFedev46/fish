@@ -60,6 +60,9 @@ INSTALLED_APPS = [
     "apps.sales",
     "apps.delivery",
     "apps.reports",
+    # AI Native ERP (doc/features/2026-09-27-ai-native-erp): lớp lệnh dùng chung —
+    # Lô 1 chỉ registry + catalog (chưa có model); AiProposal/AiUsageLedger ở lô sau.
+    "apps.ai",
 ]
 
 MIDDLEWARE = [

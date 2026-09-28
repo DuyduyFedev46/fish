@@ -1,6 +1,11 @@
 # Hai môi trường: staging và production
 > Tách ngày 2026-09-27 theo quyết định của Duy. Code xong thì deploy **staging**, QA hoặc Duy test trên đó, **Duy duyệt** rồi mới deploy **production**.
 
+> ⏸ **Chế độ tiết kiệm (2026-09-27, Duy yêu cầu): PRODUCTION ĐANG TẮT, chỉ chạy STAGING.**
+> Đang chạy: `cangca-api-staging`, `cangca-adapter-staging` (max 1 instance). Đang tắt: `cangca-api`, `cangca-adapter` (ingress `internal` → gọi từ ngoài trả 404; Shop/ERP production vẫn mở trang nhưng không gọi được API).
+> Scheduler `cangca-ttl-trigger` + `cangca-batch-status-trigger` (production) **tạm dừng**.
+> Bật lại: `gcloud run services update <svc> --region asia-southeast1 --project keolai-63ec1 --ingress all` và `gcloud scheduler jobs resume <job> --location asia-southeast1 --project keolai-63ec1`. Phải bật adapter + TTL trước khi mở thanh toán.
+
 | | **Staging (thử)** | **Production (thật)** |
 |---|---|---|
 | Shop | https://cangca-loc-staging.web.app | https://cangca-loc.web.app |
@@ -13,6 +18,7 @@
 | Dữ liệu | Dữ liệu thử và dữ liệu mẫu, được phép tạo đơn thử | Chỉ dữ liệu thật (đã làm sạch 2026-09-27) |
 | Job nền | chưa có (khi cần thì thêm `cangca-ttl-staging`) | `cangca-ttl` (*/15), `cangca-batch-status` (00:05), `cangca-migrate` |
 | Bucket ảnh (A1, `doc/features/2026-09-26-anh-mat-hang`) | `cangca-item-images-keolai-staging` (đọc công khai qua `https://storage.googleapis.com/cangca-item-images-keolai-staging/…`) — **đã tạo 2026-09-27** | `cangca-item-images-keolai` (đọc công khai qua `https://storage.googleapis.com/cangca-item-images-keolai/…`) — **đã tạo 2026-09-27** |
+| Tài khoản thử (QA/team, tạo 2026-09-27) | `demo_chu` (nhóm chu) · `demo_nv_kho` · `demo_nv_giao` — cùng mật khẩu, **không ghi mật khẩu vào repo công khai**; hỏi Duy/điều phối khi cần | — |
 
 ## Danh sách link
 | Dùng cho | Staging (thử) | Production (thật) |
