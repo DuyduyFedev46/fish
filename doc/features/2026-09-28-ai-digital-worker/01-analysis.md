@@ -1,6 +1,8 @@
 # AI của tôi: người dùng tự giao quyền cho AI ("nhân viên số") — Phân tích nghiệp vụ
-> BA · 2026-09-28 (viết lại sau khi Duy trả lời Q1–Q3) · Trạng thái: **ĐÃ DUYỆT** (hướng đi theo
-> trả lời của Duy ngày 2026-09-28; không còn câu hỏi 🔴; các mặc định 🟡 ở §15 Duy lật được bất cứ lúc nào)
+> BA · 2026-09-28 (viết lại sau khi Duy trả lời Q1–Q3; bổ sung §4.7 cùng ngày) · Trạng thái:
+> **CHỜ DUYỆT (bổ sung 28/09)**. Phần "AI của tôi" (§4.1–4.6) đã được Duy duyệt hướng. Phần mới §4.7
+> "Hướng dẫn theo từng chứng từ" và các rule BR-AI-28…34 chờ Duy duyệt. Không có câu hỏi 🔴; các mặc
+> định 🟡 ở §15 Duy lật được.
 >
 > **Đây là lật quyết định đã chốt** (ADR AI Native 27/09 §2.6 và lý do phân loại ở §2.11; BR-AI-06;
 > BR-AI-07). Duy đã chốt hướng lật ngày 2026-09-28 (mục "Câu trả lời của Duy"). BA không sửa
@@ -14,6 +16,7 @@
 | Q1 | "AI tự làm" nghĩa là gì trong giai đoạn này? | **"cho phép người dùng tự phân quyền cho AI của mình"** | Mô hình **AI của tôi**: mỗi người dùng tự chọn lệnh nào (trong quyền của mình) AI được làm và ở mức nào (A/B/C). Mặc định C khi chưa cấu hình. §4, §5. |
 | Q2 | Ba lệnh tiền và chốt lô (BR-AI-07) | **Chọn "Mở theo công tắc của Chủ"** (Chủ tự bật tự chủ khi muốn). Duy chọn khi đã biết khuyến nghị ngược lại của BA và legal-vn. | BR-AI-07 đổi từ "cấm" thành "**đóng mặc định, chỉ Chủ mở bằng công tắc riêng**, và chỉ cho AI của người có quyền tương ứng". Sàn cứng §6 vẫn áp. Ghi trung thực phần AI vẫn không làm được ở §7. |
 | Q3 | AI là ai, ai chịu trách nhiệm | **"ai cấp quyền thì người đó chịu trách nhiệm"** | Người cấu hình AI của mình chịu trách nhiệm cho việc AI làm theo cấu hình đó. AuditLog ghi **người cấp + phiên bản cấu hình tại thời điểm thực thi**. Lệnh vùng đỏ có hai lớp cấp: Chủ mở vùng, chủ AI cấu hình lệnh. §4.3. |
+| Bổ sung | (yêu cầu mới, không phải câu hỏi) | **"chỗ Agent đó, có thể đề xuất bước tiếp hoặc những gì đã làm trong từng record để nhân viên nào cũng làm được thay vì phải học thuộc quy trình"** | Mục mới §4.7: khối "Tiếp theo" và "Đã làm" trên từng chứng từ. Phần bước hợp lệ và dòng thời gian là tất định, AI chỉ diễn đạt và đề nghị "để AI làm". |
 | Q4 | Chấp nhận hệ quả pháp lý? | Coi như đã trả lời bằng memo `01c-phap-ly.md` | Vẫn **rủi ro trung bình** (không thuộc Danh mục QĐ 33/2026). **Phải viết lại hồ sơ phân loại** (bỏ lý do "chỉ đề xuất, không tự quyết"). Vùng đỏ vướng **Luật Kế toán Đ.16** (người duyệt chứng từ), **Luật BVQLNTD 2023** (trách nhiệm với khách), **NĐ 356/2025** (quyết định tự động ảnh hưởng khách). Các nghĩa vụ này thành sàn cứng (§6) và điều kiện bật production (§6, S-L). |
 
 ## 1. Yêu cầu gốc
@@ -154,6 +157,151 @@ vượt được.
 - Đóng công tắc → mọi cấu hình của lệnh đó rơi về C ngay.
 - Chủ cũng đặt được **trần ngưỡng** (tiền, kg) cho từng lệnh; người dùng đặt thấp hơn được, không cao
   hơn (🟡 Q-M2).
+
+### 4.7 Hướng dẫn theo từng chứng từ: "Tiếp theo" và "Đã làm" (bổ sung 28/09)
+
+**Yêu cầu** (Duy, 28/09): *"chỗ Agent đó, có thể đề xuất bước tiếp hoặc những gì đã làm trong từng
+record để nhân viên nào cũng làm được thay vì phải học thuộc quy trình"*.
+
+**Tóm tắt**: **Mọi nhân viên** cần, trên màn chi tiết của **từng chứng từ**, thấy **việc tiếp theo hợp
+lệ** (ai làm, còn thiếu gì, hạn khi nào, vì sao) và **những gì đã xảy ra** với chứng từ đó, để **làm
+đúng quy trình mà không phải học thuộc P-01…P-10**.
+
+**Nguyên tắc chính (PA)**:
+1. **Phần sự thật là tất định.** Danh sách bước hợp lệ tính từ máy trạng thái, quyền và điều kiện
+   nghiệp vụ trong service. Dòng thời gian lấy từ AuditLog và các mốc trạng thái. Không phần nào phụ
+   thuộc model.
+2. **AI chỉ diễn đạt.** AI tóm tắt dòng thời gian thành vài câu, giải thích bước tiếp bằng lời thường,
+   trả lời "giờ tôi làm gì", và đề nghị "để AI làm" nếu người dùng đã giao lệnh đó cho AI của mình (§4.1).
+3. **Tắt AI thì phần tất định vẫn hiện đủ** (BR-AI-10). Tắt AI chỉ mất câu tóm tắt và nút "để AI làm".
+4. **Hướng dẫn không thay phân quyền.** Cảnh báo không chặn. Chặn chỉ nằm ở lớp quyền và service
+   (BR-PQ-12).
+
+#### 4.7.1 Máy trạng thái từng loại chứng từ (đối chiếu code 2026-09-28)
+
+| Chứng từ | Trạng thái (code) | Chuyển trạng thái → ai làm (quyền) | Điều kiện / hạn | `available_actions` hiện có? |
+|---|---|---|---|---|
+| **Phiếu nhập** `PurchaseReceipt` | DRAFT → SUBMITTED | `submit_receipt` → NV kho/Quản lý/Chủ (`add_purchasereceipt`); sinh 1 lô/dòng | Hạn dùng không được cao hơn mặc định (BR-MH-02). Sau đó cần Purchase Invoice trước khi chốt lô (BR-MH-04). **Chưa có đường huỷ phiếu nhập.** | Không |
+| **Lô** `Batch` | DRAFT → SELLING → NEAR_EXPIRY → SOLD_OUT / EXPIRED → CANCELLED → CLOSED | `publish_batch` (Chủ/Quản lý theo `publish_batch`); NEAR_EXPIRY, SOLD_OUT, EXPIRED do Hệ thống (job `update_batch_statuses`); EXPIRED → CANCELLED (Chủ huỷ, hạch toán lỗ, BR-LO-03); → CLOSED `close_batch` (Chủ) | Cận hạn 14 ngày (tham số, BR-LO-06). Chốt: tồn = 0 hoặc Quá hạn/Huỷ, có Purchase Invoice, không còn đơn mở (BR-LO-04); kiểm kê trước chốt (BR-KK-05, PA). **Code chưa có service EXPIRED → CANCELLED; `close_batch` chưa kiểm "không còn đơn mở" và BR-KK-05** (🟢 Q-L6). | Không |
+| **Đơn** `SalesOrder` | BOOKED → PAID → PROCESSING → COMPLETED; BOOKED → AUTO_CANCELLED; PAID/PROCESSING → CANCELLED | Thanh toán: Hệ thống (IPN) hoặc Chủ (`confirm_payment_manual`); tự huỷ: Hệ thống (TTL); huỷ đơn đã trả: Quản lý/Chủ (`cancel_paid_order`) khi phiếu giao chưa Đang giao/Hoàn tất; phiếu hoàn: Quản lý/Chủ (`create_refund`) khi còn tiền hoàn được | Giữ chỗ TTL 30 phút (`SALES_ORDER_TTL_MINUTES`) | **Có** (`confirm_payment`, `cancel`, `create_refund`) |
+| **Hoá đơn** `SalesInvoice` | ISSUED / CANCELLED | Chỉ Hệ thống (BR-PQ-11) | — | Không cần (không ai thao tác tay) |
+| **Phiếu giao** `DeliveryNote` | PREPARING → READY → DELIVERING → COMPLETED \| FAILED; FAILED → DELIVERING; CANCELLED (theo đơn) | `advance_status`/`mark_failed` → NV giao được gán (scope phiếu mình), Quản lý; `return_to_warehouse` (tạo phiếu hàng hoàn) khi FAILED/DELIVERING | COMPLETED không quay lui (BR-GH-05). Thất bại ≥ `DELIVERY_MAX_FAILED_ATTEMPTS` → cần Quản lý/Chủ quyết (BR-GH-04) | Không |
+| **Hàng hoàn** `ReturnToStock` | DRAFT (PENDING) → APPROVED (RESTOCK / WRITE_OFF) | `apply_return` → Quản lý/Chủ (`approve_returntostock`); NV giao không tự nhập kho (BR-HV-02) | Về đúng lô gốc (BR-HV-01); ngưỡng thời gian ngoài chuỗi lạnh (tham số) | Không |
+| **Phiếu hoàn** `Refund` | PENDING → REFUNDED \| FAILED; FAILED → PENDING (thử lại) | Tạo: Quản lý/Chủ; xác nhận/đánh thất bại/thử lại: Chủ (`confirm_refund`) | Bắt buộc mã GD (BR-HT-03). Hạn hoàn 30 ngày khi khách đơn phương chấm dứt hợp lệ (Luật BVQLNTD, memo §4) | **Có** (`confirm`, `mark_failed`, `retry`) |
+| **Giao dịch lệch** `PaymentTransaction` | OPEN → RESOLVED (ATTACHED / CONFIRMED / REFUNDED) | Chủ (`confirm_payment_manual`); lập phiếu hoàn cần thêm `create_refund` | BR-TT-04/05/09/10/15 | **Có** (`attach_to_order`, `confirm_order`, `refund`) |
+| **Kiểm kê** `StockReconciliation` | DRAFT → APPROVED | Nhập số: NV kho; duyệt `apply_reconciliation` → người có `approve_stockreconciliation`, **khác người nhập** (BR-KK-02) | Chênh dương phải có lý do (BR-KK-04) | Không |
+| **Chi phí mua** `PurchaseCost` | Không có trạng thái (ghi nhận là xong) | `record_purchase_cost` → Chủ (`add_purchasecost`); cập nhật giá vốn lô | Lô đã chốt thì không thêm được (BR-LO-05) | Không |
+
+Nhận xét: đã có **quy ước `available_actions`** (BE tính luật + quyền, FE chỉ đọc để hiện nút) cho
+đơn, phiếu hoàn, giao dịch lệch và nhân viên. Tính năng này **mở rộng quy ước đó**, không phát minh
+cơ chế mới. Hiện quy ước chỉ trả **bước được phép**; cần thêm **bước bị chặn kèm lý do**.
+
+#### 4.7.2 Khối "Tiếp theo"
+
+Với mỗi chứng từ và **người đang xem**, hệ thống trả danh sách bước. Mỗi bước gồm:
+
+| Trường | Ý nghĩa | Ví dụ (lô SOLD_OUT, người xem là Quản lý) |
+|---|---|---|
+| Việc | Tên thao tác bằng lời thường | "Chốt lô" |
+| Bạn làm được? | Có / Không | Không |
+| Ai làm được | Group/vai có quyền (không nêu tên người) | "Chủ" |
+| Còn thiếu | Điều kiện nghiệp vụ chưa đạt, lời thường | "Chưa có hoá đơn mua (Purchase Invoice)" |
+| Hạn | Nếu có mốc thời gian | Đơn giữ chỗ: "tự huỷ lúc 10:42" |
+| Vì sao | Câu lời thường gắn mã BR, soạn sẵn | "Lô chỉ chốt khi đã có hoá đơn mua, để giá vốn đủ căn cứ (BR-LO-04)" |
+| Để AI làm | Chỉ hiện khi AI của người xem được giao lệnh này (§4.1) | "AI soạn nháp chốt lô" (mức C) |
+
+Quy tắc:
+- **Một nguồn duy nhất**: cùng một hàm tính cho màn ERP, cho AI và cho mọi kênh. Không để FE hay model
+  tự suy luận bước tiếp.
+- **Không nói nhiều hơn service kiểm**: bước "được phép" phải thực sự chạy được. Nếu service chưa kiểm
+  một điều kiện trong spec (vd `close_batch` chưa kiểm "không còn đơn mở"), khối Tiếp theo không được
+  hứa, phải báo Tech Lead sửa service (🟢 Q-L6).
+- **Bước bị chặn vì quyền** vẫn hiện (để nhân viên biết phải nhờ ai), nhưng **lý do không được lộ số
+  nhạy cảm**: nói "chưa có chi phí mua", không nói "chi phí 1.250.000đ". Người thiếu quyền xem giá vốn
+  không thấy bước chỉ có ý nghĩa với giá vốn (vd "thêm chi phí mua") ngoài dòng "Chủ xử lý" (🟡 Q-M15).
+- **Bước do Hệ thống làm** (tự huỷ TTL, cận hạn, xác nhận IPN) hiện dạng "Hệ thống sẽ…, lúc…".
+- **Chứng từ liên quan**: đơn hiện luôn bước của phiếu giao, phiếu hoàn, giao dịch gắn với nó (🟡 Q-M16).
+
+#### 4.7.3 Khối "Đã làm" (dòng thời gian)
+
+- **Nguồn**: AuditLog (append-only) của chính chứng từ và chứng từ liên quan; các mốc trạng thái có
+  sẵn (`created_at`, `completed_at`, `confirmed_at`, `closed_at`…); sổ kho `StockLedgerEntry` cho lô.
+  Không tạo bảng lịch sử mới.
+- **Mỗi dòng**: lúc nào, ai (người / Hệ thống / AI), làm gì, trạng thái trước → sau. Dòng do AI ghi
+  hiện **"AI của <người cấp>"**, mức tự chủ, và (với Chủ) phiên bản cấu hình (BR-AI-08, BR-AI-20).
+- **Lọc theo quyền người xem** (Tầng 3):
+  - Chỉ thấy dòng thời gian của chứng từ mình đã được xem (NV giao: phiếu được gán cho mình).
+  - **Field giá vốn, lãi lỗ bị lọc khỏi dòng** khi người xem thiếu `view_costprice`/`view_profitreport`.
+    Ví dụ thật trong code: AuditLog `close_batch` ghi `landed_unit_cost` trong `changes`;
+    `recompute_landed_cost` và `record_purchase_cost` cũng đổi giá vốn. Người thiếu quyền chỉ thấy
+    "Chủ đã chốt lô", "Chủ ghi nhận chi phí mua", không có con số.
+  - Không hiện tên, SĐT, địa chỉ khách (bất biến 9); nội dung chuyển khoản không hiện.
+- **Hiện trạng**: endpoint nhật ký `GET /api/audit-logs/` đòi `view_auditlog` (chỉ Chủ, Quản lý). NV
+  kho, NV giao hiện **không xem được** nhật ký. Dòng thời gian theo chứng từ là quyền xem mới, **giới
+  hạn trong chứng từ họ đã xem được**, không mở toàn bộ nhật ký (🟡 Q-M17).
+
+#### 4.7.4 Vai trò của AI
+
+| Việc | Tất định (không AI) | AI thêm gì |
+|---|---|---|
+| Bước tiếp theo | Danh sách, ai, còn thiếu, hạn, câu "vì sao" soạn sẵn | Diễn đạt gọn cho người mới; trả lời câu hỏi "giờ tôi làm gì với đơn này" |
+| Đã làm | Dòng thời gian đầy đủ | Tóm tắt 2–3 câu ("Đơn đã trả tiền lúc 9:10, đang soạn hàng, chưa ai nhận giao") |
+| Để AI làm | — | Nút hiện theo cấu hình AI của tôi; bấm thì đi đường A/B/C như §4.1 |
+| Cảnh báo | Luật bất thường tất định (bảng §4.7.5) | Giải thích cảnh báo |
+
+**Ràng buộc đầu vào của AI**:
+- Đầu vào duy nhất là **bước tiếp và dòng thời gian đã lọc theo quyền người xem**. AI không đọc thêm gì.
+- **Không PII khách** (H2): dùng mã đơn, mã khách.
+- **Tên nhân viên** cũng là dữ liệu cá nhân (Luật BVDLCN áp cho mọi cá nhân, không chỉ khách). Khi lên
+  cloud thì thay bằng vai ("NV giao", "Chủ"); tên thật chỉ ghép lại trên UI (🟡 Q-M18).
+- **Nếu câu tóm tắt lệch với dòng thời gian thì dòng thời gian là sự thật.** Câu tóm tắt luôn gắn nhãn
+  AI (BR-AI-14) và nằm cạnh dòng thời gian thô.
+
+**Chạy ở đâu** (router tĩnh, BR-AI-02):
+- Hai lệnh mới đề xuất: `tom_tat_chung_tu` (tóm tắt "Đã làm") và `giai_thich_buoc_tiep` (diễn đạt
+  "Tiếp theo"). Nhãn **`local`**: đầu vào ngắn (một chứng từ), không tốn trần cloud, không gửi tên nhân
+  viên ra ngoài. Nhãn nhạy cảm theo loại chứng từ: lô, phiếu nhập, chi phí mua → `cao`; đơn, phiếu
+  giao, phiếu hoàn → `trung_binh`.
+- **Máy không có model** (chưa tải, không đủ RAM, iPhone, 4G): hiện bản không AI, tức dòng thời gian
+  và câu "vì sao" soạn sẵn. Không đẩy lên cloud thay (BR-AI-02, BR-AI-16).
+- Chi phí: 0 đồng cloud. Nếu sau này muốn chất lượng tốt hơn trên cloud thì là quyết định riêng (🟡 Q-M19).
+- Đọc nên mặc định mức A (lệnh đọc, §4.1); người dùng tắt được.
+
+#### 4.7.5 Hướng dẫn cho người mới và cảnh báo
+
+- **"Vì sao"**: mỗi luật dùng trong khối Tiếp theo có **một câu lời thường soạn sẵn** gắn mã BR (vd
+  BR-KK-02 → "Người đếm và người duyệt phải khác nhau, để số kiểm kê có người thứ hai soát"). Bảng câu
+  này là tất định; AI chỉ được diễn đạt lại, không được bịa luật.
+- **Cảnh báo bất thường** (không chặn, tất định). Ví dụ đề xuất (PA):
+  - Chốt lô khi lô chưa có chi phí mua nào (có thể thiếu đá, xe).
+  - Phiếu nhập có đơn giá lệch nhiều so với lô gần nhất cùng mặt hàng (chỉ hiện cho người có
+    `view_costprice`; người khác chỉ thấy "đơn giá cần kiểm lại", không thấy số).
+  - Kiểm kê chênh dương mà chưa có lý do (BR-KK-04).
+  - Đơn giữ chỗ sắp hết TTL; phiếu hoàn chờ quá X ngày (gần hạn 30 ngày theo Luật BVQLNTD).
+  - Phiếu giao thất bại đạt ngưỡng lần.
+- **Thao tác trái quy trình bị chặn** thì chặn ở service như hiện nay (BusinessError kèm mã BR). Khối
+  hướng dẫn chỉ giúp người dùng hiểu trước, không là lớp kiểm soát thứ hai. Ẩn nút không phải là phân
+  quyền (BR-PQ-12).
+
+#### 4.7.6 Use case
+
+**UC-DW-07 Nhân viên mở một chứng từ và làm bước tiếp**
+- **Tiền điều kiện**: đăng nhập; người dùng xem được chứng từ (Tầng 3).
+- **Luồng chính**: 1) Mở màn chi tiết. 2) Khối "Tiếp theo" hiện bước hợp lệ, ai làm, còn thiếu, hạn,
+  vì sao. 3) Khối "Đã làm" hiện dòng thời gian đã lọc; nếu có model thì kèm câu tóm tắt AI. 4) Người
+  dùng bấm bước mình làm được → chạy thao tác như nút hiện nay; hoặc bấm "để AI làm" nếu được giao.
+  5) Sau thao tác, hai khối tính lại.
+- **Luồng thay thế**: AI tắt hoặc máy không có model → chỉ phần tất định. Bước người dùng không làm được
+  → hiện "Chủ xử lý", có thể bấm "Nhờ" để tạo việc chuyển (§8) (🟡 Q-M20).
+- **Ngoại lệ**: dữ liệu đổi giữa lúc xem và lúc bấm → service từ chối với mã BR, khối tính lại. Người
+  dùng thiếu quyền gọi thẳng API → 403. Câu tóm tắt AI lỗi hoặc quá chậm → ẩn câu, giữ dòng thời gian.
+- **Hậu điều kiện**: không có dữ liệu nào đổi chỉ vì xem. Chỉ thao tác mới ghi AuditLog.
+
+**UC-DW-08 Hỏi AI "giờ tôi làm gì"**
+- **Luồng chính**: người dùng hỏi trong khung chat trên màn chứng từ → AI nhận đúng khối Tiếp theo và
+  Đã làm đã lọc → trả lời bằng lời thường, dẫn mã BR.
+- **Ngoại lệ**: hỏi về chứng từ không có quyền xem → "không có quyền xem". Hỏi giá vốn khi thiếu quyền →
+  context chưa từng chứa số đó (BR-AI-05).
 
 ## 5. Bảng 14 lệnh: trần mức được cấu hình và mặc định
 
@@ -352,6 +500,13 @@ Mã BR-AI-18/19/20 khớp với đề xuất của memo `01c-phap-ly.md` §9, đ
 | BR-AI-25 | **Chuyển việc** (§8): điều kiện tất định; chuyển chủ AI trước, rồi Group có quyền; trong ERP; quá hạn nhắc và đẩy cấp; không tự thực thi vì hết hạn. | PA | Mới |
 | BR-AI-26 | **Báo cáo cuối ngày** cho Chủ về mọi việc AI làm ở A/B, việc chuyển, hoàn tác. | PA + memo §3 | Mới |
 | BR-AI-27 | **Sàn triển khai**: không bật A/B cho lệnh ghi ở production khi S-L1…S-L4 chưa xong. | Luật (memo §10) | Mới |
+| BR-AI-28 | **Bước tiếp tất định**: với mỗi chứng từ và người xem, danh sách bước tiếp tính từ máy trạng thái + quyền + điều kiện nghiệp vụ trong service; một nguồn duy nhất cho ERP, AI và mọi kênh; hiện đủ khi AI tắt (BR-AI-10). Mở rộng quy ước `available_actions` hiện có. | D (Duy 28/09) + PA | Mới |
+| BR-AI-29 | **Bước bị chặn** hiện kèm ai làm được (theo vai) và điều kiện còn thiếu bằng lời thường; không lộ số giá vốn, lãi lỗ hay PII trong lý do. Bước "được phép" phải thực sự chạy được (không hứa nhiều hơn service kiểm). | PA | Mới |
+| BR-AI-30 | **Dòng thời gian theo chứng từ** lấy từ AuditLog + mốc trạng thái + sổ kho; append-only; lọc theo quyền người xem (chứng từ trong scope, field giá vốn/lãi lỗ bị lọc); dòng AI hiện "AI của <người cấp>" + mức. | D (Duy 28/09) + bất biến 1, 3, 9 | Mới |
+| BR-AI-31 | **Tóm tắt/diễn đạt bằng AI** chỉ nhận đầu vào là khối Tiếp theo và Đã làm đã lọc; không PII khách; tên nhân viên thay bằng vai khi lên cloud; gắn nhãn AI; dòng thời gian là sự thật khi lệch. | PA + BR-AI-05/09/14 | Mới |
+| BR-AI-32 | **"Vì sao" soạn sẵn**: mỗi luật dùng trong hướng dẫn có một câu lời thường gắn mã BR, tất định; AI không được bịa luật. | PA | Mới |
+| BR-AI-33 | **Cảnh báo không chặn**: cảnh báo bất thường là tất định và chỉ để nhắc; chặn chỉ ở lớp quyền và service (BR-PQ-12). | PA | Mới |
+| BR-AI-34 | **"Để AI làm" theo cấu hình**: nút chỉ hiện khi AI của người xem được giao lệnh tương ứng, và chạy đúng mức đã cấu hình (A/B/C, §4.1). | D (Q1) + PA | Mới |
 | BR-AI-02, 05, 09, 10, 11, 16 | Giữ nguyên. | D | Giữ |
 | BR-PQ-07, 11 | Giữ. AI không phải Hệ thống; AI không tạo SalesOrder/SalesInvoice. | D | Giữ (làm rõ) |
 | BR-KK-02 | Giữ. Thêm: AI của một user không đóng cả hai vai; AI không phải "người thứ hai". | PA | Giữ (làm rõ) |
@@ -381,6 +536,19 @@ Chỉ nêu cái gì; thiết kế là việc của Tech Lead. Lý do thêm dữ 
   sẵn có; không đọc `raw_payload` vào model.
 - **Trung tâm thông báo** (S12): kênh cho việc chuyển người, thông báo B, báo cáo cuối ngày.
 - **Bên thứ 3**: không thêm. Không kênh ngoài ERP (H14).
+- **Hướng dẫn theo chứng từ (§4.7)**:
+  - **"Tiếp theo" theo chứng từ**: mở rộng `available_actions` hiện có (đơn, phiếu hoàn, giao dịch lệch)
+    sang lô, phiếu nhập, phiếu giao, hàng hoàn, kiểm kê; trả thêm bước bị chặn, ai làm được, còn thiếu,
+    hạn, mã BR, lệnh AI tương ứng (nếu có). Tech Lead chọn một endpoint chung hay nhúng vào từng API chi tiết.
+  - **"Đã làm" theo chứng từ**: đọc AuditLog theo chứng từ (và chứng từ liên quan), lọc theo quyền người
+    xem. Quyền xem mới, giới hạn trong chứng từ người xem đã thấy được; **không** mở `view_auditlog`
+    toàn bộ cho NV kho, NV giao. Có thể cần chỉ mục tra AuditLog theo chứng từ (Tech Lead).
+  - **Bảng câu "vì sao"** theo mã BR: dữ liệu tĩnh trong code, không cần bảng DB.
+  - **Registry**: thêm 2 lệnh đọc `tom_tat_chung_tu`, `giai_thich_buoc_tiep` (nhãn `local`, nhạy cảm
+    theo loại chứng từ).
+  - **Không thêm model mới** cho phần này.
+  - **Service cần sửa trước** (phát hiện khi đối chiếu): `close_batch` chưa kiểm "không còn đơn mở" (BR-LO-04)
+    và kiểm kê trước chốt (BR-KK-05); chưa có service huỷ lô quá hạn (EXPIRED → CANCELLED, BR-LO-03).
 
 ### 11.1 Giao diện cần có (mô tả nhu cầu, không thiết kế)
 
@@ -393,6 +561,11 @@ Chỉ nêu cái gì; thiết kế là việc của Tech Lead. Lý do thêm dữ 
 | **Việc được chuyển** | Người nhận | Trong trung tâm thông báo S12; lọc theo quyền người nhận. |
 | **Báo cáo AI cuối ngày** | Chủ | Việc A/B, hoàn tác, việc chuyển, quá hạn. |
 | **Nhãn AI trên chứng từ** | Mọi người xem chứng từ | Nhận diện chứng từ do AI ghi (BR-AI-14). |
+| **Khối "Tiếp theo"** trên màn chi tiết mọi chứng từ | Mọi user | Bước làm được (nút), bước bị chặn (ai làm, còn thiếu), hạn, "vì sao", cảnh báo; nút "để AI làm" nếu được giao. Thay cho các nút rời rạc hiện nay. |
+| **Khối "Đã làm"** trên màn chi tiết | Mọi user (lọc theo quyền) | Dòng thời gian; câu tóm tắt AI (nếu có model) nằm trên, gắn nhãn AI. |
+
+Ghi chú: nhiều màn chi tiết còn là placeholder (mua hàng S07/S28, kiểm kê S34, giao hàng S17/S20). Hai
+khối đi kèm khi các màn đó được xây; màn đã có (đơn, phiếu hoàn, giao dịch lệch, tồn kho/lô) làm trước.
 
 ## 12. Rủi ro Cá Về
 
@@ -410,9 +583,23 @@ Chỉ nêu cái gì; thiết kế là việc của Tech Lead. Lý do thêm dữ 
 | Cấu hình cũ còn hiệu lực sau khi đổi Group | Trung bình | Kiểm quyền tại thời điểm thực thi (§4.2) |
 | Chi phí cloud tăng khi AI tự làm nhiều | Trung bình | H8 |
 | Hồ sơ phân loại mô tả sai mức tự chủ | Trung bình | S-L1 |
+| Dòng thời gian lộ giá vốn cho người thiếu quyền (AuditLog `close_batch` có `landed_unit_cost`) | Cao | BR-AI-30: lọc field theo quyền người xem; test bằng token từng Group (BR-PQ-13) |
+| Mở nhật ký cho NV kho, NV giao làm lộ chứng từ ngoài scope | Trung bình | Chỉ dòng thời gian của chứng từ người đó đã xem được, không mở `view_auditlog` |
+| Khối Tiếp theo hứa bước mà service không kiểm (vd `close_batch` thiếu kiểm đơn mở) | Trung bình | BR-AI-29; sửa service trước (Q-L6) |
+| AI tóm tắt sai, người mới tin theo | Trung bình | BR-AI-31: dòng thời gian thô là sự thật, nằm cạnh; AI chỉ nhận đầu vào đã lọc |
+| Tên nhân viên lên cloud nước ngoài | Trung bình | BR-AI-31: thay bằng vai; mặc định chạy local |
 
 ## 13. Phân đoạn thực hiện (đề xuất cho PO)
 
+- **Đoạn H0 — Hướng dẫn tất định, không cần AI** (làm được ngay, song song hoặc trước đoạn 0; không
+  phụ thuộc model, không phụ thuộc pháp lý AI):
+  khối "Tiếp theo" (mở rộng `available_actions`, thêm bước bị chặn + lý do + hạn + "vì sao") và khối
+  "Đã làm" (dòng thời gian lọc quyền) trên các màn đã có: đơn, phiếu hoàn, giao dịch lệch, lô. Sửa
+  `close_batch` cho khớp BR-LO-04 trước khi hiện bước chốt lô. Màn mới (mua hàng, kiểm kê, giao hàng)
+  có hai khối ngay khi được xây. Lợi ích cho người mới có ngay cả khi AI tắt.
+- **Đoạn H1 — AI diễn đạt** (sau S08 runtime on-device): `tom_tat_chung_tu`, `giai_thich_buoc_tiep`
+  chạy local; máy không model hiện bản tất định.
+- **Đoạn H2 — "Để AI làm"**: nút trên khối Tiếp theo nối với cấu hình AI của tôi (cần đoạn 0).
 - **Đoạn 0 — Nền cấu hình, chưa ai tự ghi** (cùng Lô 2):
   S02 xây theo mức C như đã duyệt, cộng: trần mức trong registry; cấu hình AI theo user + phiên bản;
   chính sách Chủ + tắt khẩn (toàn cục, theo user); AuditLog ghi người cấp + phiên bản; màn **AI của
@@ -441,7 +628,8 @@ Chỉ nêu cái gì; thiết kế là việc của Tech Lead. Lý do thêm dữ 
 
 ### 🔴 Chặn
 
-Không còn. Q1–Q3 Duy đã trả lời; Q4 đã được memo `01c-phap-ly.md` trả lời.
+Không còn. Q1–Q3 Duy đã trả lời; Q4 đã được memo `01c-phap-ly.md` trả lời. Phần bổ sung §4.7 không
+phát sinh câu hỏi chặn: mọi điểm mở đều có mặc định an toàn (Q-M15…Q-M20).
 
 ### 🟡 Có mặc định (Duy lật được)
 
@@ -461,6 +649,12 @@ Không còn. Q1–Q3 Duy đã trả lời; Q4 đã được memo `01c-phap-ly.md
 | Q-M12 | Hạn xử lý việc chuyển | Việc khách chờ: 2 giờ rồi đẩy lên Chủ. Việc tiền: nhắc mỗi 12 giờ. Không tự thực thi vì hết hạn. |
 | Q-M13 | Mức A cho lệnh ghi có được phép không? | Chỉ `cap_nhat_giao` trạng thái trung gian (theo bảng §5). Lệnh ghi khác trần B để luôn có thông báo + hoàn tác. |
 | Q-M14 | Lưu cấu hình có cần khung xác nhận không? | Có, nêu rõ trách nhiệm (BR-AI-14, BR-AI-20). |
+| Q-M15 | Người thiếu quyền giá vốn có thấy bước liên quan giá vốn (vd "thêm chi phí mua") không? | Thấy một dòng "Chủ xử lý: chi phí mua", không có số. |
+| Q-M16 | Khối trên đơn có gộp bước và dòng thời gian của chứng từ liên quan (hoá đơn, phiếu giao, phiếu hoàn, giao dịch) không? | Có, gộp theo chuỗi đơn → hoá đơn → phiếu giao → phiếu hoàn; mỗi dòng ghi rõ thuộc chứng từ nào. |
+| Q-M17 | NV kho, NV giao có được xem dòng thời gian (ai làm gì) không? | Có, chỉ trên chứng từ họ đã xem được; không mở nhật ký chung. |
+| Q-M18 | Tên nhân viên trong câu tóm tắt AI | Local: dùng tên được. Cloud: thay bằng vai. |
+| Q-M19 | Tóm tắt chạy local hay cloud? | Local (0 đồng, không gửi dữ liệu ra ngoài); máy không model hiện bản tất định. |
+| Q-M20 | Bước người xem không làm được có nút "Nhờ" (tạo việc chuyển cho người có quyền) không? | Có, đi qua cơ chế chuyển việc §8, trong ERP. |
 
 ### 🟢 Để sau
 
@@ -471,3 +665,4 @@ Không còn. Q1–Q3 Duy đã trả lời; Q4 đã được memo `01c-phap-ly.md
 | Q-L3 | SePay có báo giao dịch tiền ra, và API tra cứu giao dịch dùng được qua adapter không. Nếu có thì mới có nguồn cho `xac_nhan_hoan` và mở rộng `xac_nhan_thanh_toan_tay`. |
 | Q-L4 | Kế toán/luật sư xác nhận "người cấp làm người duyệt" theo Luật Kế toán Đ.16 (memo §11 điểm 6) — thuộc S-L1. |
 | Q-L5 | Định nghĩa "sự cố AI" cho quy trình báo cáo (S-L3). |
+| Q-L6 | Lệch spec và code phát hiện khi đối chiếu máy trạng thái: `close_batch` chưa kiểm "không còn đơn mở" (BR-LO-04) và kiểm kê trước chốt (BR-KK-05, PA); chưa có service huỷ lô quá hạn EXPIRED → CANCELLED (BR-LO-03). Tech Lead xử lý ở đoạn H0 trước khi khối Tiếp theo hiện bước chốt/huỷ lô. |
