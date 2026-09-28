@@ -61,6 +61,6 @@ cache chung (Redis) · SEO nâng cao cho bài viết · hoàn kho/hoàn tiền m
 | 2026-09-29 03:50 | P3 | Lô 3b | APPROVED | `eda18d3` | 805 | DW-12 AI của tôi (bản ghi, kill=C), DW-13 chính sách + tắt khẩn cấp (Chủ) |
 | 2026-09-29 04:55 | P3 | Lô 3c | APPROVED | `55f78f9` | 798 | DW-14 chat qua call + Để AI làm, DW-15 gỡ catalog cũ (404), DW-16 tóm tắt timeline |
 | 2026-09-29 05:34 | P3 | Lô 4 | APPROVED | `18c4a13` | 806 | DW-17 nhập lô mua tại cảng trên ERP, sinh batch DRAFT, chống trùng idempotency |
-| 2026-09-29 06:45 | P4 | Lô 1 | APPROVED | `a297c2e` | 824 | CS-01 nhóm cskh + phạm vi PII, CS-02 bảng phiếu giao, CS-03 soạn hàng |
+| 2026-09-29 06:45 | P4 | Lô 1 | APPROVED | `e874966` | 824 | CS-01 nhóm cskh + phạm vi PII, CS-02 bảng phiếu giao, CS-03 soạn hàng |
 
 
