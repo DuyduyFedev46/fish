@@ -1,7 +1,8 @@
 # AI của tôi — Lệnh AI tự sinh từ API, chọn lệnh 2 bước — Thiết kế kỹ thuật
 
-> Tech Lead · 2026-09-28 · Trạng thái: **CHỜ DUYỆT — chưa làm spike/code khi Duy chưa duyệt**
-> (Duy: "làm thiết kế đã, không duyệt là chưa làm").
+> Tech Lead · 2026-09-28 · Trạng thái: **ĐÃ DUYỆT (Duy 28/09)**. Mọi mặc định 🟡 §15 lấy theo đề
+> xuất. T1: L-1, L-3, L-5, L-6 tách sang hồ sơ `2026-09-28-sua-loi-bao-mat` (làm trước). T2: lệnh đọc
+> chưa khai gì chạy mức A có lọc; lệnh ghi mặc định C. Story: `02-stories.md` (DW-01…DW-28).
 >
 > Nguồn: `01-analysis.md` (§4.1–4.7, §5, §6 H1–H16, §7, §8, BR-AI-18…34, mục "Câu trả lời của Duy"),
 > `01c-phap-ly.md`, `research/01-mcp-per-function.md`, hồ sơ cũ `doc/features/2026-09-27-ai-native-erp/`

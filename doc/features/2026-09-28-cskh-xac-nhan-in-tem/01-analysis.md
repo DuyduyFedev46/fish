@@ -1,5 +1,19 @@
 # CSKH gọi xác nhận đơn → tự in tem → kho soạn hàng — Phân tích nghiệp vụ
-> BA · 2026-09-28 · Trạng thái: **CHỜ DUYỆT**
+> BA · 2026-09-28 · Trạng thái: **ĐÃ DUYỆT** (Duy 28/09 — chốt scope qua câu hỏi; câu trả lời ở mục ngay dưới)
+
+## Câu trả lời của Duy (2026-09-28)
+*PO ghi lại theo lời Duy do điều phối viên chuyển. Chỗ nào lật mặc định BA thì ghi rõ "LẬT". Mục nào có hiệu lực hơn
+nội dung phía dưới của bản phân tích thì mục này thắng.*
+
+| # | Nguyên văn / nội dung chốt | Hệ quả áp vào bản phân tích |
+|---|---|---|
+| Q-C1 | Gọi xác nhận **SAU** khi trả tiền, **TRƯỚC** soạn hàng → thêm trạng thái **"Chờ xác nhận"** trước "Soạn hàng" (sửa chuỗi trạng thái phiếu giao của quyết định 10/09). BR-GH-09 đổi thành **in tem sau xác nhận**. | Chọn (a). BR-GH-11 có hiệu lực. BR-GH-09 (sửa) có hiệu lực. **Việc của Duy:** ghi quyết định mới vào `decisions.md` (chuỗi phiếu giao: Chờ xác nhận → Soạn hàng → Chờ lấy → Đang giao → Hoàn tất). |
+| Q-C2 | Nguyên văn: **"cho tới quản lý, ko giải quyết trong 30' sẽ tự hủy, nhắc nhỏ cho nhân viên gọi hoàn tiền"** + **"3 lần, trong vòng 30'"**. | **LẬT** mặc định BA (60 phút / 24 giờ / "không bao giờ tự huỷ"). Luật mới thay BR-GH-13 và UC-CS-5 E2: CSKH gọi **tối đa 3 lần trong 30 phút**; không liên lạc được → chuyển **Quản lý** ("Cần quyết định"); Quản lý **không xử lý trong 30 phút** → **Hệ thống tự huỷ** đơn đã thanh toán, **hoàn kho**, ghi **AuditLog actor = Hệ thống**, lập phiếu hoàn và **tạo nhắc việc** cho nhân viên gọi khách về việc hoàn tiền. Xác nhận đã chuyển tiền vẫn **chỉ Chủ** (`confirm_refund`, BR-HT-03). Không huỷ nếu đơn đã sang Soạn hàng. Mọi mốc (3 lần, 30', 30') là **tham số**. Đây là quyết định tự động bất lợi cho khách → phải **thông báo cho khách lý do huỷ và cách nhận hoàn tiền** (NĐ 356/2025; `legal-vn` kiểm nội dung câu chữ). |
+| Q-C3 | **Không sửa đơn cũ**: thêm = đơn mới; bớt/đổi = huỷ + hoàn + đặt lại. | Chọn (a). BR-GH-14 có hiệu lực. |
+| Q-C4 | **Chưa có máy in.** V1 **in tay từ trình duyệt** (trang in khổ **100×150 mm**). In tự động **để sau**. | Đoạn C6 (lệnh in, trạm in, thiết bị kho) **không làm đợt này**. UC-CS-3 chạy theo luồng thay thế 3c. BR-GH-09 (sửa) ở V1 hiểu là: tem **chỉ in được sau khi xác nhận**, phiếu vừa xác nhận hiện "Chưa in tem" ở đầu danh sách soạn. |
+| Q-C5 | Thêm **Group thứ năm `cskh`** (cộng dồn). CSKH chỉ xem **tên/SĐT/địa chỉ** của đơn đang **Chờ xác nhận / Cần quyết định** + đơn **mình đã gọi trong 7 ngày**. | Chọn (a), phạm vi PII như BR-GH-18 với X = 7 (tham số). **Vai trò tự định nghĩa không làm đợt này** (hồ sơ `2026-09-28-vai-tro-tu-dinh-nghia` sau này gom `cskh` vào). Thêm Group là đổi quyết định 10/09 "bốn Group" → **Duy ghi `decisions.md`**. |
+| Q-C6…Q-C18 (🟡) | **Theo đề xuất BA.** | Tem theo Q-C6 (chờ `legal-vn` về ghi nhãn); không ghi âm, gọi bằng máy/SIM của vựa (Q-C7); mọi đơn đều gọi (Q-C8); báo khách trước ở Shop (Q-C9); không đổi địa chỉ mặc định (Q-C10); **field người nhận hộ trên phiếu giao được duyệt** (Q-C11, field PII mới); nút "Đã huỷ tem" (Q-C12); theo "100% NV nội bộ" (Q-C13); Chủ soạn kịch bản (Q-C14); Q-C17 chuyển Tech Lead. Các 🟢 để sau. |
+| Tiền đề | Nếu màn Giao hàng (S17–S19) chưa có thì đưa **story tối thiểu cần thiết** vào hồ sơ này, ghi rõ nguồn. | Đã kiểm 28/09: `deliveries/page.tsx` là Placeholder, BE chưa có gán người, `from_status`, dòng hàng trong chi tiết phiếu. PO đưa S17, S19 (bản thu gọn) vào `02-stories.md` là CS-02, CS-03. |
 
 Ký hiệu câu hỏi: 🔴 chặn (không trả lời thì PO không viết story được) · 🟡 có mặc định PA, Duy lật được · 🟢 để sau.
 

@@ -1,8 +1,7 @@
 # AI của tôi: người dùng tự giao quyền cho AI ("nhân viên số") — Phân tích nghiệp vụ
 > BA · 2026-09-28 (viết lại sau khi Duy trả lời Q1–Q3; bổ sung §4.7 cùng ngày) · Trạng thái:
-> **CHỜ DUYỆT (bổ sung 28/09)**. Phần "AI của tôi" (§4.1–4.6) đã được Duy duyệt hướng. Phần mới §4.7
-> "Hướng dẫn theo từng chứng từ" và các rule BR-AI-28…34 chờ Duy duyệt. Không có câu hỏi 🔴; các mặc
-> định 🟡 ở §15 Duy lật được.
+> **ĐÃ DUYỆT (Duy 28/09)**, gồm cả §4.7 và BR-AI-28…34. Mọi mặc định 🟡 ở §15 lấy theo đề xuất (xem
+> dòng "Duyệt 28/09" trong bảng "Câu trả lời của Duy"). Story ở `02-stories.md`.
 >
 > **Đây là lật quyết định đã chốt** (ADR AI Native 27/09 §2.6 và lý do phân loại ở §2.11; BR-AI-06;
 > BR-AI-07). Duy đã chốt hướng lật ngày 2026-09-28 (mục "Câu trả lời của Duy"). BA không sửa
@@ -22,6 +21,12 @@
 | M-scope (28/09) | Vai trò tự định nghĩa + luồng CSKH | **"Tách 2 hồ sơ mới"**. Ý Duy: vai trò/quyền trên tính năng do người dùng tự định nghĩa (tự tạo profile vai trò, một user kiêm nhiệm nhiều vai; vựa này tách, trường hợp khác gộp). CSKH là nhân viên nội bộ: gọi khách xác nhận địa chỉ để tư vấn → tự động in tem → vào kho lấy hàng. | Hai hồ sơ BA riêng; hồ sơ này chỉ tham chiếu. |
 | M-spike (28/09) | Spike Gemma 3n gọi tool trước khi thiết kế? | **"làm thiết kế đã, không duyệt là chưa làm"** | Viết thiết kế trước; spike và code chỉ làm sau khi Duy duyệt thiết kế. |
 | Q4 | Chấp nhận hệ quả pháp lý? | Coi như đã trả lời bằng memo `01c-phap-ly.md` | Vẫn **rủi ro trung bình** (không thuộc Danh mục QĐ 33/2026). **Phải viết lại hồ sơ phân loại** (bỏ lý do "chỉ đề xuất, không tự quyết"). Vùng đỏ vướng **Luật Kế toán Đ.16** (người duyệt chứng từ), **Luật BVQLNTD 2023** (trách nhiệm với khách), **NĐ 356/2025** (quyết định tự động ảnh hưởng khách). Các nghĩa vụ này thành sàn cứng (§6) và điều kiện bật production (§6, S-L). |
+| Duyệt 28/09 | Duyệt 01-analysis + 02b, chốt scope (qua điều phối viên, câu hỏi chọn) | **Mọi câu mặc định 🟡** ở §15 (Q-M1…Q-M20) và 02b §15 (Q-T1…Q-T7) **lấy theo đề xuất**. | Q-M/Q-T áp nguyên mặc định vào story. |
+| T1 (28/09) | 3 lỗi có sẵn (02b §14 L-3 Nhật ký lộ giá vốn, L-5 không throttle, L-6 tra đơn dò được) + L-1 chốt lô | **Tách sang hồ sơ `2026-09-28-sua-loi-bao-mat`, làm trước.** | Không có story nào trong hồ sơ này cho L-1/L-3/L-5/L-6; chỉ ghi phụ thuộc. L-2 (huỷ lô quá hạn) và L-4 (dòng AI trên dòng thời gian) vẫn ở Lô 1. |
+| T2 (28/09) | Lệnh đọc của feature chưa khai gì | **Chạy ngay mức A, kết quả có lọc** (giá vốn theo quyền, PII, chữ tự do, cắt dòng). Lệnh ghi mặc định **C**. | Theo đề xuất Tech Lead 02b §15 T2. |
+| Vai trò (28/09) | Vai trò tự tạo có trong đợt này? | **Không.** Dùng 4 Group hiện có (`chu`, `quan_ly`, `nv_kho`, `nv_giao`) + Group `cskh` mới từ hồ sơ CSKH. | Hồ sơ `2026-09-28-vai-tro-tu-dinh-nghia` làm sau; test phân quyền theo Group. |
+| Thứ tự (28/09) | Thứ tự phase | **P2**: khối Tiếp theo · Đã làm = Lô 1 (H0). **P3**: lệnh tự sinh + AI của tôi = Lô 2–4 (spike Lô 0 chạy trước Lô 2). **P7 (cuối cùng)**: mức B/A + vùng đỏ = Lô 5–6, **chỉ staging** tới khi xong S-L1…S-L4. | Thứ tự làm trong `02-stories.md`. |
+| CMS (28/09) | CMS có thành lệnh AI không? | **Có**, theo nguyên tắc chung (API ghi tự thành lệnh trần C). | Không cần story riêng trong hồ sơ này; hồ sơ `2026-09-28-cms-viet-bai` chỉ cần tuân kỷ luật tự đăng ký. |
 
 ## 1. Yêu cầu gốc
 

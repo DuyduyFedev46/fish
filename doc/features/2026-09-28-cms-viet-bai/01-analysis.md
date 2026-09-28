@@ -1,5 +1,5 @@
 # CMS viết bài (bài viết + trang nội dung trên web công khai) — Phân tích nghiệp vụ
-> BA · 2026-09-28 · Trạng thái: **CHỜ DUYỆT**
+> BA · 2026-09-28 · Trạng thái: **ĐÃ DUYỆT** (Duy 28/09, chốt scope qua câu hỏi, xem §13)
 
 ## 1. Yêu cầu gốc
 
@@ -399,3 +399,24 @@ giá chi phí đường build tự động so với C.
 | **Đ4: nối AI** | Theo Q10 (chặn đường dẫn, hoặc gắn nguồn AI cho nháp) | Test "feature mới không khai gì" có ca CMS |
 
 Đ3 có thể làm ngay sau Đ1 nếu go-live gấp hơn SEO.
+
+## 13. Câu trả lời của Duy (2026-09-28)
+
+Ghi bởi PO theo nội dung điều phối viên chuyển lại từ Duy. Các câu Duy không trả lời riêng thì lấy mặc định BA đề xuất.
+
+| # | Trả lời | Hệ quả |
+|---|---|---|
+| **Q1** | Nguyên văn: *"viết bài đăng bài như 1 cms thôi, viết bài trên web là đc"*. Chốt **(c) → PA B**: CMS đơn giản, soạn trên web (ERP console). Trang bài trên Landing **tải nội dung lúc chạy** qua API công khai. **Không** làm trang tĩnh riêng từng bài, ảnh chia sẻ riêng từng bài hay đường build/deploy tự động. Vẫn có slug, tiêu đề, mô tả. **SEO nâng cao để sau.** | Đổi so với mặc định BA (a). BR-ND-11 rút gọn: tiêu đề và mô tả đặt lúc chạy (không bắt buộc có trong HTML ban đầu); ảnh chia sẻ riêng và canonical để sau. BR-ND-12: **sitemap để sau**, chỉ giữ "staging luôn noindex". BR-ND-15: gỡ bài có hiệu lực ngay vì trang đọc lúc chạy, không cần đường gỡ khẩn riêng. UC-ND-05 E2: API tắt thì trang bài không hiện được, **chấp nhận**. UC-ND-08 phần lớn để sau. Facebook/Zalo hiện ảnh chung khi chia sẻ link bài, **chấp nhận**. |
+| Q2 | (a) Soạn ở ERP console. Django Admin chỉ để cứu hộ. | — |
+| Q3 | Tách ND-01 Soạn, ND-02 Đăng, ND-03 Chuyên mục. **Vai trò tự tạo không làm đợt này.** Ba quyền gán cho **Group có sẵn**, mặc định `chu` + `quan_ly`, qua data migration. `nv_kho`, `nv_giao` không có. | Không phụ thuộc hồ sơ `vai-tro-tu-dinh-nghia`. Khi hồ sơ đó làm, khai thêm mảng "Nội dung" vào danh mục quyền tính năng. |
+| Q4 | Có trạng thái **Chờ duyệt**. Vòng đời Nháp → Chờ duyệt → Đã đăng ⇄ Đã gỡ. | — |
+| Q5 | V1 chỉ chuyên mục, một bài một chuyên mục, chưa có thẻ. | — |
+| Q6 | Không đổi slug bài đã đăng. | — |
+| Q7 | Xoá thật nháp chưa từng đăng, có hỏi xác nhận, không AuditLog. Bài đã từng đăng **không xoá cứng**. | — |
+| Q8 | Tác giả hiển thị "Cá Về". | — |
+| Q9 | Máy quét chuỗi giống SĐT và từ khoá giá vốn thì **cảnh báo**, người đăng xác nhận lại, không chặn cứng. | — |
+| **Q10** | Chốt **(a)**: CMS tự thành lệnh AI theo nguyên tắc chung. AI chỉ soạn nháp hoặc đề xuất, người duyệt và bấm. Bài AI soạn được gắn nhãn nguồn AI. | Story phía AI thuộc hồ sơ `2026-09-28-ai-digital-worker`. Hồ sơ này chỉ có AC "API ghi của CMS kiểm đúng quyền, không có đường tắt". Việc `legal-vn` rà nghĩa vụ ghi nhãn nội dung AI (§11 mục 5) vẫn còn, chặn đăng bài AI soạn trên production. |
+| Q11 | Canonical và tên miền: để sau cùng SEO nâng cao. | — |
+| Q12–Q14 | Để sau. | — |
+
+Chống XSS hai lớp (BR-ND-06), phiên bản khi đăng (BR-ND-05), không xoá cứng bài đã đăng (BR-ND-02) giữ nguyên theo đề xuất BA.
