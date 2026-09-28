@@ -17,7 +17,7 @@
 | ☐/☑ | Phase | Hồ sơ (`doc/features/…`) | Lô | Trạng thái 02c | Điều kiện bắt đầu | Ghi chú |
 |---|---|---|---|---|---|---|
 | ☑ | **P1** Sửa lỗi bảo mật + lãi lỗ | `2026-09-28-sua-loi-bao-mat` | 1 → 2 → (merge `wip/autosave` → `main`) → 3 | XONG | — | Lô 1: Nhật ký lộ giá vốn, tra đơn dò được, throttle. Lô 2: chốt lô đủ điều kiện, noindex staging, **merge main** (xung đột → dừng hỏi Duy). Lô 3: lãi lỗ tính hai lần (S06) + doanh thu hoá đơn huỷ (S07) |
-| ☐ | **P2** Tiếp theo · Đã làm | `2026-09-28-ai-digital-worker` | 0 (spike, song song) + 1a → 1b → 1c | SẴN SÀNG CODE (Duy duyệt 28/09) | P1 xong + merge main | Lô 1c sau P1 Lô 3 (cùng sửa `batch_pnl`). Spike DW-02: phần đo trên máy Android/Windows ≥ 8GB do **Duy chạy** |
+| ☑ | **P2** Tiếp theo · Đã làm | `2026-09-28-ai-digital-worker` | 0 (spike, song song) + 1a → 1b → 1c | XONG | P1 xong + merge main | Lô 1c sau P1 Lô 3 (cùng sửa `batch_pnl`). Spike DW-02: phần đo trên máy Android/Windows ≥ 8GB do **Duy chạy** |
 | ☐ | **P3** Lệnh AI tự sinh + AI của tôi | `2026-09-28-ai-digital-worker` | 2 → 3a → 3b → 3c → 4 | SẴN SÀNG CODE (Duy duyệt 28/09) | P2 xong; kết quả spike Lô 0 đạt | Mọi môi trường `AI_WRITE_LEVELS_ALLOWED=C` (AI chỉ soạn nháp). Lô 2 có sẵn danh sách cấm `/api/public/`, `/api/cskh/`, `…/label/` |
 | ☐ | **P4** CSKH xác nhận + in tem | `2026-09-28-cskh-xac-nhan-in-tem` | 1 → 2 → 3 → 4 (5 là Could) | SẴN SÀNG CODE (Duy duyệt 28/09) | P3 xong | Lô 2 chỉ staging. Lô 3 (tự huỷ) lên production **sau khi legal-vn duyệt câu thông báo** và Duy bật cờ `CSKH_AUTO_CANCEL_ENABLED` |
 | ☐ | **P5** CMS viết bài | `2026-09-28-cms-viet-bai` | 1 → 2 → … → 7 | SẴN SÀNG CODE (Duy duyệt 28/09) | P4 xong | Thư viện mới duy nhất: Tiptap 2 (erp-console). CMS-16 đã làm ở P1 |
@@ -55,5 +55,6 @@ cache chung (Redis) · SEO nâng cao cho bài viết · hoàn kho/hoàn tiền m
 | 2026-09-28 22:32 | P2 | Lô 0 | PASS | `cd74f0f` | 723 | Spike DW-01 (114 lệnh, dispatch 100%), DW-02 (recall@5 98%) |
 | 2026-09-28 22:58 | P2 | Lô 1a | APPROVED | `5ef773b` | 732 | DW-03 khung Tiếp theo · Đã làm trên đơn (+L-4 dòng AI) |
 | 2026-09-29 00:04 | P2 | Lô 1b | APPROVED | `ea6f2da` | 749 | DW-04 phiếu hoàn + GD lệch, DW-05 lô (tách check_close_batch) |
+| 2026-09-29 00:38 | P2 | Lô 1c | APPROVED | `c0c4272` | 757 | DW-06 Chủ huỷ lô quá hạn (EXPIRED->CANCELLED, PnL TL-4) |
 
 
