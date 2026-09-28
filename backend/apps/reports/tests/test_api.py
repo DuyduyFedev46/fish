@@ -13,7 +13,7 @@ class BatchPnlApiTests(TestCase):
     EXPECTED_KEYS = {
         "batch_id", "provisional", "qty_received", "qty_sold", "landed_unit_cost",
         "revenue", "purchase_cost", "allocated_cost", "shrinkage_qty", "shrinkage_cost",
-        "damage_qty", "damage_cost", "total_cost", "profit",
+        "damage_qty", "damage_cost", "expired_qty", "expired_cost", "total_cost", "profit",
     }
     SENSITIVE_COST_KEYS = {"profit", "landed_unit_cost", "purchase_cost", "total_cost", "allocated_cost"}
 
@@ -25,13 +25,13 @@ class BatchPnlApiTests(TestCase):
         self.url = f"/api/reports/batch/{self.batch.batch_id}/"
 
     def test_chu_can_view_batch_pnl(self):
-        """Chủ sở hữu quyền view_profitreport -> 200, đủ 14 khoá."""
+        """Chủ sở hữu quyền view_profitreport -> 200, đủ 16 khoá (thêm expired_qty, expired_cost theo TL-4)."""
         user = make_user("chu1", "chu")
         resp = client_for(user).get(self.url)
         self.assertEqual(resp.status_code, 200)
         data = resp.json()
         self.assertEqual(set(data.keys()), self.EXPECTED_KEYS)
-        self.assertEqual(len(data), 14)
+        self.assertEqual(len(data), 16)
         self.assertEqual(data["batch_id"], self.batch.batch_id)
 
     def test_non_owner_groups_forbidden_and_no_cost_keys(self):

@@ -15,11 +15,12 @@ type Props = {
   docType: string;
   docId: string | number;
   onAction?: (actionKey: string) => void;
+  onDataLoaded?: (data: GuidanceData) => void;
   /** Tăng key này khi component cha muốn ép tải lại khối (vd: sau khi action bị 400 — AC8). */
   refreshSignal?: number;
 };
 
-export function GuidancePanel({ docType, docId, onAction, refreshSignal = 0 }: Props) {
+export function GuidancePanel({ docType, docId, onAction, onDataLoaded, refreshSignal = 0 }: Props) {
   const [data, setData] = useState<GuidanceData | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -30,6 +31,7 @@ export function GuidancePanel({ docType, docId, onAction, refreshSignal = 0 }: P
     try {
       const res = await getGuidance(docType, docId, signal);
       setData(res);
+      onDataLoaded?.(res);
     } catch (err: unknown) {
       if (signal?.aborted) return;
       const msg = err instanceof Error ? err.message : "Không thể tải hướng dẫn tiếp theo";
@@ -39,7 +41,7 @@ export function GuidancePanel({ docType, docId, onAction, refreshSignal = 0 }: P
         setLoading(false);
       }
     }
-  }, [docType, docId]);
+  }, [docType, docId, onDataLoaded]);
 
   useEffect(() => {
     const ac = new AbortController();

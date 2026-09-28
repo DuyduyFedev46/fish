@@ -95,3 +95,45 @@ Không có lỗi chặn (0 lỗi).
 - `cd backend && .venv/bin/python manage.py test && .venv/bin/python manage.py makemigrations --check --dry-run` -> `Ran 749 tests in 36.370s. OK. No changes detected.`
 - `cd erp-console && npx tsc --noEmit && npm run build` -> Compile sạch, First Load JS shared 87.6 kB, 22/22 static pages.
 - `cd frontend && npx tsc --noEmit && npm run build` -> Compile sạch, 8/8 static pages.
+
+---
+
+## Lô 1c: DW-06 (Chủ huỷ lô quá hạn EXPIRED -> CANCELLED, hạch toán lỗ) · Lần 1 · 2026-09-28
+
+### Kết luận: APPROVED — Nghiệm thu toàn diện Story DW-06: huỷ lô quá hạn đúng nghiệp vụ P-04 (EXPIRED -> CANCELLED), ghi sổ kho xuất huỷ append-only, hạch toán lỗ PnL chuẩn TL-4, chống race condition bằng select_for_update, bảo đảm tuyệt đối Bất biến 1 (giá vốn), Bất biến 9 (PII) và phân quyền 3 tầng.
+
+### Tổng: 14 ca · ✅ 14 · ❌ 0 · ⏸ 0
+
+### Theo AC
+| Mã AC | Kết quả | Bằng chứng (test/lệnh) |
+|---|---|---|
+| **DW-06-AC1** | ✅ PASS | `apps.inventory.batches.tests.test_cancel_expired::CancelExpiredBatchTest.test_dw06_ac1_cancel_expired_success` (lô CANCELLED, 1 dòng WRITE_OFF âm 5 kg, 1 dòng AuditLog, PnL expired_cost = 5 * landed_unit_cost, profit và total_cost không đổi theo TL-4) |
+| **DW-06-AC2 (lỗi)** | ✅ PASS | `apps.inventory.batches.tests.test_cancel_expired::CancelExpiredBatchTest.test_dw06_ac2_cancel_non_expired_rejected_br_lo_03` (lô SELLING, NEAR_EXPIRY, DRAFT nhận 400 BR-LO-03 "Chỉ huỷ được lô Quá hạn.", dữ liệu không đổi) |
+| **DW-06-AC3 (song song / khoá)** | ✅ PASS | `apps.inventory.batches.tests.test_cancel_expired::CancelExpiredBatchTest.test_dw06_ac3_repeat_cancel_rejected` (atomic + select_for_update, request 2 nhận 400 BR-LO-03, sổ kho chỉ có đúng 1 dòng WRITE_OFF) |
+| **DW-06-AC4 (quyền)** | ✅ PASS | `apps.inventory.batches.tests.test_cancel_expired::CancelExpiredBatchTest.test_dw06_ac4_permissions_matrix` (quan_ly, nv_kho, nv_giao nhận 403; khách nhận 401; FE ẩn nút Huỷ lô) |
+| **DW-06-AC5 (giá vốn)** | ✅ PASS | `apps.inventory.batches.tests.test_cancel_expired::CancelExpiredBatchTest.test_dw06_ac5_cost_hidden_in_timeline_for_quan_ly` (quan_ly xem timeline thấy "Chủ đã huỷ lô" không số tiền lỗ; Chủ thấy số tiền) |
+| **DW-06-AC6 (guidance)** | ✅ PASS | `apps.inventory.batches.tests.test_cancel_expired::CancelExpiredBatchTest.test_dw06_ac6_guidance_next_steps_expired_then_cancelled` (lô EXPIRED có bước Huỷ lô allowed=true, không hiện Chốt lô; sau khi huỷ chuyển sang CANCELLED thì bước kế là Chốt lô) |
+| **DW-06-AC7 (AI tắt)** | ✅ PASS | `apps.inventory.batches.tests.test_cancel_expired::CancelExpiredBatchTest.test_dw06_ac7_cancel_expired_when_ai_disabled` (AI_ENABLED=False -> huỷ lô chạy bình thường, BR-AI-10) |
+| **MIGRATION-TEST** | ✅ PASS | `apps.inventory.batches.tests.test_cancel_expired::CancelExpiredBatchTest.test_migration_permissions_group_chu_only` (quyền inventory.cancel_expired_batch chỉ gán cho Group chu, 3 Group còn lại không có, rollback sạch) |
+| **FE-ACTION-BTN** | ✅ PASS | `erp-console/features/inventory/components/BatchDetailSheet.tsx` (nút Huỷ lô ở header chỉ hiện khi canCancelExpired=true) |
+| **FE-CONFIRM-MODAL** | ✅ PASS | `erp-console/features/inventory/components/BatchDetailSheet.tsx` (modal xác nhận nêu rõ mã lô + số kg tồn xuất huỷ, tuyệt đối không nêu số tiền giá vốn, có cờ cancelling chặn đúp click) |
+| **FE-API-MOCK** | ✅ PASS | `erp-console/features/inventory/api.ts` (cancelExpiredBatch gọi đúng API contract, mock trả về HTTP 200 CANCELLED) |
+| **REPORT-PNL-16KEYS** | ✅ PASS | `apps.reports.tests.test_api.py::BatchPnlApiTests.test_chu_can_view_batch_pnl` (bổ sung expired_qty, expired_cost đủ 16 khoá, giữ vững công thức lãi lỗ TL-4) |
+| **L1-CLOSE-REGRESSION** | ✅ PASS | `apps.inventory.batches.tests.test_l1_close_batch` (20/20 tests xanh) |
+| **GUIDANCE-REGRESSION** | ✅ PASS | `apps.inventory.batches.tests.test_guidance` (7/7 tests xanh) |
+
+### Ngoại lệ & biên | Phân quyền | Rò giá vốn | Rò dữ liệu cá nhân | Hồi quy
+- **Biên & Ngoại lệ:** Lô EXPIRED còn 5 kg xuất huỷ đúng 5 kg; lô tồn 0 vẫn huỷ và chuyển trạng thái bình thường; `select_for_update` loại bỏ race condition khi 2 request gọi cùng lúc.
+- **Phân quyền:** Chỉ duy nhất Group `chu` sở hữu quyền `inventory.cancel_expired_batch`. Mọi Group khác (`quan_ly`, `nv_kho`, `nv_giao`) nhận 403 Forbidden và FE ẩn nút hành động.
+- **Rò giá vốn (Bất biến 1):** `BatchSerializer` lọc bỏ `purchase_rate`/`landed_unit_cost` cho ai không có `view_costprice`. Dòng thời gian hiển thị "Chủ đã huỷ lô" không có số tiền lỗ với Quản lý và Kho. Modal xác nhận FE chỉ chứa số kg, không có số tiền.
+- **Rò dữ liệu cá nhân (Bất biến 9):** Nghiệp vụ không đụng chạm đến PII khách hàng. Test sử dụng fixture giả định.
+- **Hồi quy:** `test_l1_close_batch.py` xanh 20/20 tests. Tổng số test backend đạt **757 tests xanh**. `makemigrations --check --dry-run` sạch. Build console và frontend sạch.
+
+### Lỗi
+Không có lỗi chặn (0 lỗi).
+
+### Lệnh đã chạy
+- `cd backend && .venv/bin/python manage.py test apps.inventory.batches.tests.test_cancel_expired apps.inventory.batches.tests.test_guidance apps.inventory.batches.tests.test_l1_close_batch apps.reports.tests` -> `Ran 45 tests in 2.158s. OK`
+- `cd backend && .venv/bin/python manage.py test && .venv/bin/python manage.py makemigrations --check --dry-run` -> `Ran 757 tests in 36.568s. OK. No changes detected.`
+- `cd erp-console && npx tsc --noEmit && npm run build` -> Compile sạch, First Load JS shared 87.6 kB, 22/22 static pages.
+- `cd frontend && npx tsc --noEmit && npm run build` -> Compile sạch, 8/8 static pages.

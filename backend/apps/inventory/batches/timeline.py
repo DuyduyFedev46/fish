@@ -156,5 +156,26 @@ def build_batch_timeline(batch: Batch, viewer: Optional[Any] = None) -> list[Tim
                     ai_config_version=ai_cfg,
                 )
             )
+        elif a.action == "cancel_expired_batch":
+            # DW-06-AC5: quan_ly và nv_kho thấy "Chủ đã huỷ lô" không số; chu thấy số (hoặc nhãn huỷ)
+            if user_can_see_cost:
+                loss_val = (a.changes or {}).get("loss_amount")
+                loss_text = f" (lỗ {vnd_display(loss_val)})" if loss_val else ""
+                label_cancel = f"Huỷ lô quá hạn{loss_text}"
+            else:
+                label_cancel = "Chủ đã huỷ lô"
+
+            events.append(
+                TimelineEvent(
+                    at=a.created_at,
+                    kind="batch_cancelled",
+                    label=label_cancel,
+                    actor_display=who,
+                    doc="batch",
+                    actor_kind=kind_actor,
+                    ai_level=ai_lvl,
+                    ai_config_version=ai_cfg,
+                )
+            )
 
     return sorted(events, key=lambda e: e.at)

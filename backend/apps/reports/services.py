@@ -68,8 +68,15 @@ def batch_pnl(*, batch):
         damage_qty += rt.qty
     damage_cost = damage_qty * batch.landed_unit_cost
 
-    # BR-BC-04 (sửa 2026-09-28, Duy duyệt): purchase_cost đã tính trên toàn bộ qty_received, gồm cả kg hao hụt/hỏng
-    # → shrinkage_cost/damage_cost chỉ để HIỂN THỊ số tiền mất, KHÔNG cộng vào total_cost.
+    expired_qty = ZERO
+    for entry in batch.ledger_entries.filter(
+        movement_type=StockLedgerEntry.MovementType.WRITE_OFF, qty_change__lt=ZERO
+    ):
+        expired_qty += -entry.qty_change
+    expired_cost = expired_qty * batch.landed_unit_cost
+
+    # BR-BC-04 (sửa 2026-09-28, Duy duyệt, TL-4): purchase_cost đã tính trên toàn bộ qty_received, gồm cả kg hao hụt/hỏng/hết hạn
+    # → shrinkage_cost/damage_cost/expired_cost chỉ để HIỂN THỊ số tiền mất, KHÔNG cộng vào total_cost.
     total_cost = purchase_cost + allocated_cost
     profit = revenue - total_cost
 
@@ -86,6 +93,8 @@ def batch_pnl(*, batch):
         "shrinkage_cost": shrinkage_cost,
         "damage_qty": damage_qty,
         "damage_cost": damage_cost,
+        "expired_qty": expired_qty,
+        "expired_cost": expired_cost,
         "total_cost": total_cost,
         "profit": profit,
     }

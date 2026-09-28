@@ -241,6 +241,60 @@ def close_batch(*, batch, actor):
     return batch
 
 
+def check_cancel_expired_batch(batch):
+    """
+    Kiểm tra điều kiện huỷ lô quá hạn (BR-LO-03, DW-06).
+    Chỉ huỷ được lô khi đang ở trạng thái EXPIRED (Quá hạn).
+    """
+    from apps.common.guidance.steps import Missing
+
+    if batch.status != Batch.Status.EXPIRED:
+        return [Missing("BR-LO-03", "Chỉ huỷ được lô Quá hạn.")]
+    return []
+
+
+def cancel_expired_batch(*, batch, actor):
+    """
+    Huỷ lô quá hạn (EXPIRED -> CANCELLED, BR-LO-03, DW-06).
+    - transaction.atomic + select_for_update TRƯỚC mọi phép kiểm.
+    - Ghi StockLedgerEntry WRITE_OFF âm đúng lượng tồn còn lại (append-only).
+    - Status chuyển CANCELLED.
+    - Ghi AuditLog 1 dòng với loss_amount nếu có tồn.
+    """
+    with transaction.atomic():
+        b = Batch.objects.select_for_update().get(pk=batch.pk)
+        missing = check_cancel_expired_batch(b)
+        if missing:
+            raise BusinessError(missing[0].text, code=missing[0].code)
+
+        remaining_qty = b.qty_available
+        if remaining_qty > ZERO:
+            stock.record_movement(
+                batch=b,
+                qty_change=-remaining_qty,
+                movement_type=StockLedgerEntry.MovementType.WRITE_OFF,
+                reference=f"cancel_expired_batch {b.batch_id}",
+                actor=actor,
+            )
+        b.refresh_from_db()
+        old_status = b.status
+        b.status = Batch.Status.CANCELLED
+        b.save(update_fields=["status"])
+        loss_amount = remaining_qty * b.landed_unit_cost
+        record_audit(
+            "cancel_expired_batch",
+            actor=actor,
+            obj=b,
+            changes={
+                "status": {"from": old_status, "to": Batch.Status.CANCELLED},
+                "loss_amount": loss_amount,
+                "qty": remaining_qty,
+            },
+            note=f"cancel_expired_batch {remaining_qty}kg",
+        )
+    return b
+
+
 def recompute_landed_cost(*, batch, actor=None):
     """
     landed_unit_cost = (giá mua lô + Σ chi phí phân bổ) / qty_received (BR-GV-01).

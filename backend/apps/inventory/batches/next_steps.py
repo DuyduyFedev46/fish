@@ -88,8 +88,27 @@ def get_batch_next_steps(batch: Batch, user: Any) -> list[NextStep]:
             )
         )
 
-    # 3. Bước chốt lô (close) khi lô chưa chốt
-    if not batch.is_closed:
+    # 3. Bước huỷ lô khi EXPIRED (DW-06, BR-LO-03)
+    if batch.status == Batch.Status.EXPIRED:
+        can_cancel = user.has_perm("inventory.cancel_expired_batch")
+        missing_perm = [] if can_cancel else [Missing("BR-PQ-12", get_reason("BR-PQ-12"))]
+        steps.append(
+            NextStep(
+                key="cancel_expired",
+                label="Huỷ lô",
+                actor="user",
+                allowed=can_cancel,
+                who=["Chủ"],
+                missing=missing_perm,
+                deadline=None,
+                why=Why("BR-LO-03", get_reason("BR-LO-03")),
+                command="inventory.batch.cancel_expired",
+                ai=None,
+            )
+        )
+
+    # 4. Bước chốt lô (close) khi lô chưa chốt và không ở trạng thái EXPIRED (khi EXPIRED thì bước tiếp là huỷ lô)
+    if not batch.is_closed and batch.status != Batch.Status.EXPIRED:
         missing_biz = check_close_batch(batch)
         can_close = user.has_perm("inventory.close_batch")
         missing_perm = [] if can_close else [Missing("BR-PQ-12", get_reason("BR-PQ-12"))]

@@ -78,6 +78,7 @@ class Batch(models.Model):
             ("publish_batch", "Publish lô ra Shop"),
             ("close_batch", "Chốt lô (đông cứng lãi/lỗ)"),
             ("view_costprice", "Xem giá vốn / đơn giá mua"),
+            ("cancel_expired_batch", "Huỷ lô quá hạn (hạch toán lỗ)"),
         ]
 
     def __str__(self):

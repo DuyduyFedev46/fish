@@ -222,16 +222,16 @@ class ReportsServiceTests(TestCase):
 
     def test_batch_pnl_keys_unchanged(self):
         """
-        S06-AC5: Giữ đúng 14 khoá, không thêm, không bớt.
+        S06-AC5 + DW-06 (TL-4): Giữ đúng 16 khoá (14 khoá S06 + expired_qty, expired_cost hiển thị).
         """
         expected_keys = {
             "batch_id", "provisional", "qty_received", "qty_sold", "landed_unit_cost",
             "revenue", "purchase_cost", "allocated_cost", "shrinkage_qty", "shrinkage_cost",
-            "damage_qty", "damage_cost", "total_cost", "profit",
+            "damage_qty", "damage_cost", "expired_qty", "expired_cost", "total_cost", "profit",
         }
         res = services.batch_pnl(batch=self.batch)
         self.assertEqual(set(res.keys()), expected_keys)
-        self.assertEqual(len(res), 14)
+        self.assertEqual(len(res), 16)
 
     # --- S07 (L-11) Tests ---------------------------------------------------
 

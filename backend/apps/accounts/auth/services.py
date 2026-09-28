@@ -54,6 +54,8 @@ CAPABILITY_LABELS = {
     "reports.view_dashboard": "Xem Tổng quan",
     # A2 (doc/features/2026-09-26-anh-mat-hang, Q3): chu + quan_ly. Không mở `change_item`.
     "catalog.change_item_image": "Sửa ảnh mặt hàng",
+    # DW-06 (2026-09-28-ai-digital-worker): chỉ chu.
+    "inventory.cancel_expired_batch": "Huỷ lô quá hạn",
 }
 
 AUTH_OLD_PASSWORD = "AUTH_OLD_PASSWORD"

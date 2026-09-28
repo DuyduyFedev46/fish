@@ -22,3 +22,19 @@ export function getActivity(): Promise<ActivityData> {
 export function filterBatches(rows: BatchRow[], q: string): BatchRow[] {
   return fefoOrder(rows.filter((b) => matches(q, b.batch_id, b.item, b.supplier, b.warehouse, b.status_label)));
 }
+
+/**
+ * Huỷ lô quá hạn (DW-06 / BR-LO-03) — chỉ Chủ.
+ * Hạch toán lỗ phần tồn còn lại và chuyển status = CANCELLED.
+ */
+export function cancelExpiredBatch(batchId: number | string): Promise<{ id: number; batch_id: string; status: string }> {
+  return apiFetch<{ id: number; batch_id: string; status: string }>(
+    `/api/inventory/batches/${batchId}/cancel-expired/`,
+    {
+      method: "POST",
+      mock: process.env.NEXT_PUBLIC_USE_MOCK === "1"
+        ? () => ({ status: 200, body: { id: Number(batchId) || 1, batch_id: String(batchId), status: "CANCELLED" } })
+        : undefined,
+    }
+  );
+}

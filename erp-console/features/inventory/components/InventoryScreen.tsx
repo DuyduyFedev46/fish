@@ -172,6 +172,7 @@ export function InventoryScreen() {
         batch={selectedBatch}
         onClose={() => setSelectedBatch(null)}
         canCost={canCost}
+        onUpdated={() => void res.reload()}
       />
     </div>
   );

@@ -148,4 +148,67 @@
   - `erp-console`: `npx tsc --noEmit && npm run build` sạch 22/22 static pages, First Load JS shared by all giữ nguyên 87.6 kB.
   - `frontend`: `npx tsc --noEmit && npm run build` sạch 8/8 static pages.
 
+---
+
+## Lô 1c — DW-06 (Chủ huỷ lô quá hạn, hạch toán lỗ)
+- Trạng thái: ĐÃ XONG CODE & TEST, CHỜ QA NGHIỆM THU
+- Nhánh: `main`
+
+### 1. Backend (`be-dev`)
+- Model & Migration:
+  - `backend/apps/inventory/models/batches.py`: Thêm permission `("cancel_expired_batch", "Huỷ lô quá hạn (hạch toán lỗ)")` vào `Batch.Meta.permissions`.
+  - Migration `inventory/0003_alter_batch_options.py`: AlterModelOptions thêm quyền mới.
+  - Migration `accounts/0009_grant_cancel_expired_batch.py`: Data migration gán `inventory.cancel_expired_batch` cho Group `chu` (TL-3, V-DW3), có `revoke` để rollback. Kiểm tra migrate lùi/tiến sạch 100%.
+  - `backend/apps/accounts/auth/services.py`: Khai báo nhãn `"inventory.cancel_expired_batch": "Huỷ lô quá hạn"` trong `CAPABILITY_LABELS` (vượt qua test kỷ luật `test_s47_moi_quyen_meta_permissions_deu_co_nhan`).
+- Service (`backend/apps/inventory/batches/services.py`):
+  - `check_cancel_expired_batch(batch)`: Kiểm tra trạng thái `batch.status == Batch.Status.EXPIRED`. Trả `Missing("BR-LO-03", "Chỉ huỷ được lô Quá hạn.")` nếu không thoả mãn.
+  - `cancel_expired_batch(*, batch, actor)`:
+    - Bọc trong `transaction.atomic()`
+    - `b = Batch.objects.select_for_update().get(pk=batch.pk)` TRƯỚC mọi phép kiểm (chống race condition).
+    - Ghi `StockLedgerEntry` `WRITE_OFF` âm đúng lượng tồn còn lại `remaining_qty = b.qty_available` (append-only).
+    - Chuyển `status = Batch.Status.CANCELLED`.
+    - Ghi `AuditLog` 1 dòng action `cancel_expired_batch`, lưu `loss_amount = remaining_qty * b.landed_unit_cost`.
+- API (`backend/apps/inventory/batches/api.py`):
+  - `BatchViewSet`: Thêm `cancel_expired` vào `custom_perm_actions`.
+  - Hỗ trợ `get_object()` linh hoạt cả int ID và batch_id chuỗi.
+  - Action `@action(detail=True, methods=["post"], url_path="cancel-expired")`: kiểm tra `require_perm(request.user, "inventory.cancel_expired_batch")`, gọi service và trả về `BatchSerializer(batch).data`.
+- Báo cáo Lãi/Lỗ (`backend/apps/reports/services.py`):
+  - `batch_pnl`: Bổ sung 2 trường hiển thị `expired_qty` (tổng kg `WRITE_OFF` âm) và `expired_cost` (`expired_qty * landed_unit_cost`) theo TL-4.
+  - Công thức lãi/lỗ giữ nguyên: `total_cost = purchase_cost + allocated_cost`, `profit = revenue - total_cost` không đổi (vì chi phí mua đã tính trên toàn bộ `qty_received`).
+  - Cập nhật test `apps/reports/tests/test_api.py` và `test_services.py` mong đợi 16 khoá.
+- Dòng thời gian & Việc tiếp theo (`backend/apps/inventory/batches/`):
+  - `timeline.py`: Xử lý action `cancel_expired_batch`. Người xem có quyền xem giá vốn (`chu`) thấy nhãn `Huỷ lô quá hạn (lỗ ...)` có số tiền. Người xem không có quyền (`quan_ly`, `nv_kho`) thấy `"Chủ đã huỷ lô"`, không có số tiền lỗ (Bất biến 1, DW-06-AC5).
+  - `next_steps.py`: Khi `batch.status == Batch.Status.EXPIRED`: có bước `cancel_expired` ("Huỷ lô") `allowed=True` với `chu`. Khi EXPIRED, không hiện bước `close`. Sau khi huỷ thành `CANCELLED`: bước tiếp theo là `close` ("Chốt lô") (DW-06-AC6).
+- Test mới:
+  - `backend/apps/inventory/batches/tests/test_cancel_expired.py` (8 tests):
+    - AC1: Huỷ lô EXPIRED còn 5 kg -> CANCELLED, 1 dòng WRITE_OFF âm 5 kg, PnL expired_cost, profit không đổi.
+    - AC2: Lô SELLING/NEAR_EXPIRY -> 400 BR-LO-03.
+    - AC3: Huỷ 2 lần -> lần 2 bị từ chối 400, sổ kho 1 dòng WRITE_OFF.
+    - AC4: Ma trận quyền (quan_ly, nv_kho, nv_giao nhận 403; khách nhận 401).
+    - AC5: quan_ly xem dòng thời gian thấy "Chủ đã huỷ lô", không số tiền lỗ.
+    - AC6: Guidance: EXPIRED có bước Huỷ lô; sau khi huỷ có bước Chốt lô.
+    - AC7: AI tắt (AI_ENABLED=False) -> huỷ lô chạy bình thường.
+    - Test migration: Chỉ Group `chu` có quyền `inventory.cancel_expired_batch`.
+- Kiểm chứng suite backend:
+  - Toàn bộ backend test suite: **757 tests xanh** (`Ran 757 tests in 36.568s. OK`).
+  - `makemigrations --check --dry-run` sạch `No changes detected`.
+
+### 2. Frontend (`fe-dev`)
+- API (`erp-console/features/inventory/api.ts`):
+  - Thêm `cancelExpiredBatch(batchId)` gọi `POST /api/inventory/batches/<batchId>/cancel-expired/` kèm mock handler.
+- GuidancePanel (`erp-console/features/guidance/components/GuidancePanel.tsx`):
+  - Thêm prop `onDataLoaded?: (data: GuidanceData) => void` để component cha phản ứng với các bước tiếp theo.
+- BatchDetailSheet (`erp-console/features/inventory/components/BatchDetailSheet.tsx`):
+  - Theo dõi next_steps từ Guidance.
+  - Nút "Huỷ lô" ở header chỉ hiện khi bước `cancel_expired` có `allowed === true` (DW-06-AC4: nhân viên không thấy nút).
+  - Hộp xác nhận huỷ lô (Modal dialog):
+    - Nêu rõ mã lô (`batch.batch_id`) và khối lượng xuất huỷ (`kg(batch.qty_available)`).
+    - TUYỆT ĐỐI KHÔNG nêu số tiền giá vốn hay số tiền lỗ.
+    - Chặn bấm đúp bằng cờ `cancelling`.
+    - Sau khi thành công: cập nhật trạng thái, tự động tăng `refreshSignal` để tải lại Guidance và gọi `onUpdated()` để làm mới màn hình danh sách tồn kho.
+  - CSS style trong `erp-console/features/inventory/inventory.module.css`.
+- Kiểm chứng build:
+  - `erp-console`: `npx tsc --noEmit && npm run build` sạch 22/22 static pages, First Load JS shared giữ nguyên 87.6 kB.
+  - `frontend`: `npx tsc --noEmit && npm run build` sạch 8/8 static pages.
+
 
