@@ -17,12 +17,12 @@
 | ☐/☑ | Phase | Hồ sơ (`doc/features/…`) | Lô | Trạng thái 02c | Điều kiện bắt đầu | Ghi chú |
 |---|---|---|---|---|---|---|
 | ☐ | **P1** Sửa lỗi bảo mật + lãi lỗ | `2026-09-28-sua-loi-bao-mat` | 1 → 2 → (merge `wip/autosave` → `main`) → 3 | SẴN SÀNG CODE | — | Lô 1: Nhật ký lộ giá vốn, tra đơn dò được, throttle. Lô 2: chốt lô đủ điều kiện, noindex staging, **merge main** (xung đột → dừng hỏi Duy). Lô 3: lãi lỗ tính hai lần (S06) + doanh thu hoá đơn huỷ (S07) |
-| ☐ | **P2** Tiếp theo · Đã làm | `2026-09-28-ai-digital-worker` | 0 (spike, song song) + 1a → 1b → 1c | NHÁP | P1 xong + merge main | Lô 1c sau P1 Lô 3 (cùng sửa `batch_pnl`). Spike DW-02: phần đo trên máy Android/Windows ≥ 8GB do **Duy chạy** |
-| ☐ | **P3** Lệnh AI tự sinh + AI của tôi | `2026-09-28-ai-digital-worker` | 2 → 3a → 3b → 3c → 4 | NHÁP | P2 xong; kết quả spike Lô 0 đạt | Mọi môi trường `AI_WRITE_LEVELS_ALLOWED=C` (AI chỉ soạn nháp). Lô 2 có sẵn danh sách cấm `/api/public/`, `/api/cskh/`, `…/label/` |
-| ☐ | **P4** CSKH xác nhận + in tem | `2026-09-28-cskh-xac-nhan-in-tem` | 1 → 2 → 3 → 4 (5 là Could) | NHÁP | P3 xong | Lô 2 chỉ staging. Lô 3 (tự huỷ) lên production **sau khi legal-vn duyệt câu thông báo** và Duy bật cờ `CSKH_AUTO_CANCEL_ENABLED` |
-| ☐ | **P5** CMS viết bài | `2026-09-28-cms-viet-bai` | 1 → 2 → … → 7 | NHÁP | P4 xong | Thư viện mới duy nhất: Tiptap 2 (erp-console). CMS-16 đã làm ở P1 |
-| ☐ | **P6** Khung go-live | `2026-09-28-khung-go-live` | 1 → 2 → 3 | NHÁP | CMS Lô 5 (Lô 1–2), CMS Lô 7 (Lô 3) | Cờ `PRIVACY_CONSENT_REQUIRED` bật: chưa đăng chính sách thì Shop không nhận đơn |
-| ☐ | **P7** AI tự ghi + vùng đỏ | `2026-09-28-ai-digital-worker` | 5a → 5b → 5c → 6a → 6b | NHÁP | P6 xong | **Chỉ staging** tới khi xong S-L1…S-L4 (pháp lý) |
+| ☐ | **P2** Tiếp theo · Đã làm | `2026-09-28-ai-digital-worker` | 0 (spike, song song) + 1a → 1b → 1c | SẴN SÀNG CODE (Duy duyệt 28/09) | P1 xong + merge main | Lô 1c sau P1 Lô 3 (cùng sửa `batch_pnl`). Spike DW-02: phần đo trên máy Android/Windows ≥ 8GB do **Duy chạy** |
+| ☐ | **P3** Lệnh AI tự sinh + AI của tôi | `2026-09-28-ai-digital-worker` | 2 → 3a → 3b → 3c → 4 | SẴN SÀNG CODE (Duy duyệt 28/09) | P2 xong; kết quả spike Lô 0 đạt | Mọi môi trường `AI_WRITE_LEVELS_ALLOWED=C` (AI chỉ soạn nháp). Lô 2 có sẵn danh sách cấm `/api/public/`, `/api/cskh/`, `…/label/` |
+| ☐ | **P4** CSKH xác nhận + in tem | `2026-09-28-cskh-xac-nhan-in-tem` | 1 → 2 → 3 → 4 (5 là Could) | SẴN SÀNG CODE (Duy duyệt 28/09) | P3 xong | Lô 2 chỉ staging. Lô 3 (tự huỷ) lên production **sau khi legal-vn duyệt câu thông báo** và Duy bật cờ `CSKH_AUTO_CANCEL_ENABLED` |
+| ☐ | **P5** CMS viết bài | `2026-09-28-cms-viet-bai` | 1 → 2 → … → 7 | SẴN SÀNG CODE (Duy duyệt 28/09) | P4 xong | Thư viện mới duy nhất: Tiptap 2 (erp-console). CMS-16 đã làm ở P1 |
+| ☐ | **P6** Khung go-live | `2026-09-28-khung-go-live` | 1 → 2 → 3 | SẴN SÀNG CODE (Duy duyệt 28/09) | CMS Lô 5 (Lô 1–2), CMS Lô 7 (Lô 3) | Cờ `PRIVACY_CONSENT_REQUIRED` bật: chưa đăng chính sách thì Shop không nhận đơn |
+| ☐ | **P7** AI tự ghi + vùng đỏ | `2026-09-28-ai-digital-worker` | 5a → 5b → 5c → 6a → 6b | SẴN SÀNG CODE (Duy duyệt 28/09) | P6 xong | **Chỉ staging** tới khi xong S-L1…S-L4 (pháp lý) |
 
 ## Việc của Duy (không phải code)
 | Khi nào | Việc |
@@ -44,3 +44,11 @@
 ## Để sau (không trong đợt này)
 Vai trò tự định nghĩa (ma trận CRUD) · in tem tự động/trạm in · huỷ lô quá hạn đã có ở P2 (DW-06) · throttle dùng
 cache chung (Redis) · SEO nâng cao cho bài viết · hoàn kho/hoàn tiền một phần theo dòng · S18/S20/S21 giao hàng.
+
+## Nhật ký chạy đêm
+| Thời gian | Phase | Lô | Kết quả QA | Commit | Số test BE | Ghi chú / Vấn đề |
+|---|---|---|---|---|---|---|
+| 2026-09-28 21:00 | P1 | Lô 1 | APPROVED | `91a9fc3` | 692 | S01 lọc giá vốn nhật ký, S02 tra đơn, S03 throttle |
+| 2026-09-28 21:50 | P1 | Lô 2 | APPROVED | `9ef26e1` | 712 | S04 chốt lô BR-LO-04/BR-KK-05, S05 noindex staging |
+| 2026-09-28 22:12 | — | Merge | — | `85c0b36` | 712 | Hợp nhất lịch sử main cũ vào wip/autosave và fast-forward main |
+

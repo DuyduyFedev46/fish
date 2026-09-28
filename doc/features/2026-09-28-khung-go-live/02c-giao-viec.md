@@ -1,5 +1,5 @@
 # Giao việc — Khung go-live pháp lý trên web
-> Claude (Tech Lead) · 2026-09-28 · Trạng thái: **NHÁP — chờ Duy đổi SẴN SÀNG CODE**
+> Claude (Tech Lead) · 2026-09-28 · Trạng thái: **SẴN SÀNG CODE (Duy duyệt 28/09 — chạy toàn bộ kế hoạch)**
 > Người hiện thực: Gemini CLI / Antigravity theo `AGENTS.md`, lệnh `/lam-tinh-nang 2026-09-28-khung-go-live`.
 > Nhánh làm việc: **`main`** (sau khi hồ sơ `2026-09-28-sua-loi-bao-mat` đã merge vào `main`). Nếu hồ sơ đó **chưa** merge thì làm trên `wip/autosave` và ghi rõ trong `03-dev-notes.md`.
 
