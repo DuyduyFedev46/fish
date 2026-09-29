@@ -65,6 +65,7 @@ cache chung (Redis) · SEO nâng cao cho bài viết · hoàn kho/hoàn tiền m
 | 2026-09-29 12:30 | P4 | Lô 2 | APPROVED | `8415ce0` | 843 | CS-04 chờ xác nhận, CS-05 hàng chờ gọi, CS-06 ghi kết quả, CS-11 tem 100x150 |
 | 2026-09-29 13:10 | P4 | Lô 3 | APPROVED | `fd515a5` | 880 | CS-07 chuyển Quản lý, CS-08 tự huỷ (cờ tắt), CS-09 nhắc gọi báo hoàn, CS-10 báo khách |
 | 2026-09-29 13:52 | P4 | Lô 4 | APPROVED | `02babc5` | 907 | CS-12 đổi người nhận, CS-13 khách muốn huỷ/đổi, CS-14 in lại/huỷ tem, CS-15 cần chú ý |
+| 2026-09-29 14:30 | P5 | Lô 1 | APPROVED | `69f6c3b` | 920 | CMS-01 phân quyền 8 quyền content, CMS-02 chuyên mục, BusinessError.extra |
 
 
 
