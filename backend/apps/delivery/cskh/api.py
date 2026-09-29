@@ -241,7 +241,7 @@ class CskhQueueViewSet(NoStoreMixin, viewsets.GenericViewSet):
     @action(detail=True, methods=["post"], url_path="recipient")
     def recipient(self, request, *args, **kwargs):
         """
-        Đổi thông tin người nhận hàng hộ.
+        Đổi thông tin người nhận hàng hộ và địa chỉ giao hàng (CS-12, 02b §4.5).
         """
         if not request.user.has_perm("delivery.change_recipient"):
             raise PermissionDenied("Bạn không có quyền đổi thông tin nhận hàng.")
@@ -252,16 +252,21 @@ class CskhQueueViewSet(NoStoreMixin, viewsets.GenericViewSet):
             raise Http404("Không tìm thấy mục chờ gọi trong phạm vi của bạn.")
 
         data = request.data or {}
-        recipient_name = data.get("recipient_name", "")
-        recipient_phone = data.get("recipient_phone", "")
+        delivery_address = data.get("delivery_address")
+        recipient_name = data.get("recipient_name")
+        recipient_phone = data.get("recipient_phone")
 
         res = cskh_services.change_recipient(
             task.pk,
             request.user,
+            delivery_address=delivery_address,
             recipient_name=recipient_name,
             recipient_phone=recipient_phone,
         )
-        return Response({"changed": res["changed"]}, status=status.HTTP_200_OK)
+        return Response({
+            "changed": res["changed"],
+            "label_invalidated": res.get("label_invalidated", False),
+        }, status=status.HTTP_200_OK)
 
     @action(detail=True, methods=["post"], url_path="decide")
     def decide(self, request, *args, **kwargs):

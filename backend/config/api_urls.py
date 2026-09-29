@@ -31,6 +31,7 @@ from apps.catalog.items.api import BundleLineViewSet, ItemGroupViewSet, ItemView
 from apps.catalog.items.shop_api import ShopCatalogView, ShopItemDetailView
 from apps.catalog.pricing.api import ItemPriceViewSet, PriceListViewSet, PricingRuleViewSet
 from apps.delivery.api import DeliveryNoteViewSet
+from apps.delivery.attention_api import DashboardAttentionView
 from apps.delivery.cskh.api import CskhQueueViewSet, CskhSearchView
 from apps.inventory.batches.api import BatchViewSet
 from apps.inventory.returns.api import ReturnToStockViewSet
@@ -103,6 +104,7 @@ urlpatterns = [
     path("auth/change-password/", ChangePasswordView.as_view()),
     # Bảng điều hành (dashboard vận hành)
     path("dashboard/summary/", DashboardSummaryView.as_view()),
+    path("dashboard/attention/", DashboardAttentionView.as_view(), name="dashboard-attention"),
     # Báo cáo
     path("reports/batch/<str:batch_id>/", BatchPnlView.as_view()),
     path("reports/period/", PeriodPnlView.as_view()),

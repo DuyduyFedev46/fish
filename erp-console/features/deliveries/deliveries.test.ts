@@ -8,6 +8,8 @@ import {
   getMockDeliveryNotes,
   getMockDeliveryNoteDetail,
   mockPackDeliveryNote,
+  mockPostDeliveryLabelPrint,
+  mockPostDeliveryLabelVoid,
   MOCK_DELIVERY_NOTES,
 } from "./mock";
 
@@ -112,4 +114,32 @@ describe("Deliveries feature tests (CS-02, CS-03)", () => {
     expect(res.results.length).toBe(1);
     expect(res.results[0].code).toBe("GH-HD-0030-CONF");
   });
+
+  it("CS-14-AC1 & AC2: mockPostDeliveryLabelPrint records reprint and to_void, mockPostDeliveryLabelVoid removes from to_void", () => {
+    const print1 = mockPostDeliveryLabelPrint({}, 31);
+    expect(print1.status).toBe(201);
+    expect((print1.body as any).print_no).toBe(1);
+
+    const print2 = mockPostDeliveryLabelPrint({}, 31);
+    expect(print2.status).toBe(200);
+    expect((print2.body as any).print_no).toBe(2);
+    expect((print2.body as any).is_reprint).toBe(true);
+
+    const note31 = MOCK_DELIVERY_NOTES.find((n) => n.id === 31)!;
+    expect(note31.label.to_void).toContain(1);
+
+    const voidActive = mockPostDeliveryLabelVoid({ body: { print_no: 2 } }, 31);
+    expect(voidActive.status).toBe(400);
+    expect((voidActive.body as any).code).toBe("BR-GH-16");
+
+    const void1 = mockPostDeliveryLabelVoid({ body: { print_no: 1 } }, 31);
+    expect(void1.status).toBe(200);
+    expect((void1.body as any).already).toBe(false);
+    expect((void1.body as any).print_no).toBe(1);
+
+    const voidAgain = mockPostDeliveryLabelVoid({ body: { print_no: 1 } }, 31);
+    expect(voidAgain.status).toBe(200);
+    expect((voidAgain.body as any).already).toBe(true);
+  });
 });
+

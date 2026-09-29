@@ -388,24 +388,31 @@ def change_recipient(
     task_id: int,
     user,
     *,
-    recipient_name: str = "",
-    recipient_phone: str = "",
+    delivery_address: str | None = None,
+    recipient_name: str | None = None,
+    recipient_phone: str | None = None,
 ) -> dict:
     """
-    Đổi thông tin người nhận hộ (CS-06, §1.6, CS-12).
-    Nếu tem đã in: vô hiệu tem cũ (superseded_at = now).
+    Đổi thông tin người nhận hộ và địa chỉ giao hàng (CS-06, CS-12, 02b §4.5).
+    Nếu tem đã in: vô hiệu tem cũ (superseded_at = now), label_invalidated = True.
     Nếu không đổi: trả changed=[], không AuditLog, không vô hiệu tem.
     """
-    clean_name = (recipient_name or "").strip()
-    clean_phone = normalize_phone(recipient_phone or "")
+    import re
+    from apps.sales.orders import services as order_services
 
     with transaction.atomic():
         try:
-            task = ConfirmationTask.objects.select_related("note").get(pk=task_id)
+            task = ConfirmationTask.objects.select_related("note__sales_invoice__sales_order").get(pk=task_id)
         except ConfirmationTask.DoesNotExist:
             raise BusinessError("Không tìm thấy mục chờ gọi.", code="NOT_FOUND")
 
         note = DeliveryNote.objects.select_for_update().get(pk=task.note_id)
+
+        if note.status in (DeliveryNote.Status.READY, DeliveryNote.Status.DELIVERING):
+            raise BusinessError("Hàng đã soạn xong/đang đi giao — liên hệ Quản lý.", code="BR-GH-15")
+
+        if note.status == DeliveryNote.Status.CANCELLED:
+            raise BusinessError("Đơn đã huỷ.", code="BR-GH-07")
 
         if note.status not in (DeliveryNote.Status.CONFIRMING, DeliveryNote.Status.PREPARING):
             raise ConflictError(
@@ -414,35 +421,67 @@ def change_recipient(
                 extra={"current_status": note.status},
             )
 
-        # Kiểm tra xem có gì thay đổi không
-        current_name = note.recipient_name or ""
-        current_phone = note.recipient_phone or ""
-        if clean_name == current_name and clean_phone == current_phone:
-            return {"changed": [], "note": note}
-
-        now = timezone.now()
-        # Vô hiệu tem cũ nếu đã in (§1.6, §2.4)
-        note.label_prints.filter(superseded_at__isnull=True).update(superseded_at=now)
-
-        note.recipient_name = clean_name
-        note.recipient_phone = clean_phone
-        note.save(update_fields=["recipient_name", "recipient_phone"])
-
         changed_fields = []
-        if clean_name != current_name:
-            changed_fields.append("recipient_name")
-        if clean_phone != current_phone:
-            changed_fields.append("recipient_phone")
+        now = timezone.now()
 
-        record_audit(
-            "recipient_changed",
-            actor=user,
-            obj=note,
-            changes={"fields": changed_fields},
-        )
+        # 1. Đổi địa chỉ giao hàng (ghi đè SalesOrder.delivery_address)
+        if delivery_address is not None:
+            clean_address = delivery_address.strip()
+            if not clean_address:
+                raise BusinessError("Địa chỉ giao hàng không được để trống.", code="INVALID_INPUT")
+            if len(clean_address) > 500:
+                raise BusinessError("Địa chỉ giao hàng không được vượt quá 500 ký tự.", code="INVALID_INPUT")
+
+            order = note.sales_invoice.sales_order if (note.sales_invoice and note.sales_invoice.sales_order) else None
+            if order and clean_address != (order.delivery_address or "").strip():
+                order_services.update_delivery_address(order, clean_address)
+                changed_fields.append("delivery_address")
+
+        # 2. Đổi người nhận hộ (recipient_name, recipient_phone)
+        save_note_fields = []
+
+        if recipient_name is not None:
+            clean_name = recipient_name.strip()
+            if clean_name != (note.recipient_name or ""):
+                note.recipient_name = clean_name
+                changed_fields.append("recipient_name")
+                save_note_fields.append("recipient_name")
+
+        if recipient_phone is not None:
+            raw_phone = recipient_phone.strip()
+            if raw_phone:
+                clean_phone = normalize_phone(raw_phone)
+                if not re.match(r"^0\d{9}$", clean_phone):
+                    raise BusinessError("Số điện thoại người nhận không hợp lệ.", code="BR-BH-14")
+            else:
+                clean_phone = ""
+
+            if clean_phone != (note.recipient_phone or ""):
+                note.recipient_phone = clean_phone
+                changed_fields.append("recipient_phone")
+                save_note_fields.append("recipient_phone")
+
+        if save_note_fields:
+            note.save(update_fields=save_note_fields)
+
+        # 3. Vô hiệu tem cũ nếu đã in và có thay đổi (§1.6, §2.4, CS-12-AC3)
+        label_invalidated = False
+        if changed_fields:
+            active_prints = note.label_prints.filter(superseded_at__isnull=True, voided_at__isnull=True)
+            if active_prints.exists():
+                active_prints.update(superseded_at=now)
+                label_invalidated = True
+
+            record_audit(
+                "recipient_changed",
+                actor=user,
+                obj=note,
+                changes={"fields": changed_fields},
+            )
 
         return {
             "changed": changed_fields,
+            "label_invalidated": label_invalidated,
             "note": note,
         }
 

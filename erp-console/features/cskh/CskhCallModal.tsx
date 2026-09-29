@@ -35,6 +35,7 @@ export function CskhCallModal({ noteId, initialItem, onClose, onUpdated }: Props
   const [error, setError] = useState<string | null>(null);
   const [lockWarning, setLockWarning] = useState<string | null>(null);
   const [isLockedByOther, setIsLockedByOther] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
 
   // Form states
   const [selectedResult, setSelectedResult] = useState<CallResult | null>(null);
@@ -152,12 +153,15 @@ export function CskhCallModal({ noteId, initialItem, onClose, onUpdated }: Props
     setError(null);
 
     try {
-      await changeRecipient(noteId, {
+      const res = await changeRecipient(noteId, {
         recipient_name: recipientName.trim(),
         recipient_phone: recipientPhone.trim(),
         delivery_address: deliveryAddress.trim(),
       });
       setShowChangeRecipient(false);
+      if (res.label_invalidated) {
+        setNotice("Tem cũ đã hết hiệu lực – cần in lại tem mới và huỷ tem cũ.");
+      }
       // Reload detail
       const refreshed = await fetchCskhDetail(noteId);
       setDetail(refreshed);
@@ -272,6 +276,12 @@ export function CskhCallModal({ noteId, initialItem, onClose, onUpdated }: Props
           {lockWarning && (
             <div className={`${s.alertBox} ${s.alertWarn}`}>
               ⚠️ {lockWarning}
+            </div>
+          )}
+
+          {notice && (
+            <div className={`${s.alertBox} ${s.alertWarn}`} style={{ background: "#fffbeb", borderColor: "#fde68a", color: "#92400e" }}>
+              ⚠️ {notice}
             </div>
           )}
 
@@ -476,8 +486,14 @@ export function CskhCallModal({ noteId, initialItem, onClose, onUpdated }: Props
                       </span>
                     )}
                   </div>
-                  <div style={{ fontSize: "0.8125rem", color: "#4c0519" }}>
-                    Đơn hàng đã gọi {item.attempts} lần không liên lạc được hoặc thông tin liên lạc sai.
+                  <div style={{ fontSize: "0.8125rem", color: "#4c0519", lineHeight: "1.4" }}>
+                    {item.escalation_reason === "WANT_CHANGE" ? (
+                      <span>💡 <strong>Khách muốn đổi món:</strong> Quản lý huỷ đơn và tạo phiếu hoàn tiền. Mời khách đặt đơn mới trên Shop sau khi đơn cũ được huỷ.</span>
+                    ) : item.escalation_reason === "WANT_CANCEL" ? (
+                      <span>💡 <strong>Khách muốn huỷ đơn:</strong> Quản lý huỷ đơn và lập phiếu hoàn tiền cho khách.</span>
+                    ) : (
+                      <span>Đơn hàng đã gọi {item.attempts} lần không liên lạc được hoặc thông tin liên lạc sai.</span>
+                    )}
                   </div>
 
                   {/* Decision Selector */}

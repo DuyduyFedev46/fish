@@ -22,6 +22,7 @@ import { StatusChip } from "@/shared/ui/StatusChip";
 import { Toolbar } from "@/shared/ui/Toolbar";
 import { filterBatches, filterRecentOrders, getOverview } from "../api";
 import type { ExpiryAlert, OverviewData } from "../types";
+import { AttentionBlock } from "./AttentionBlock";
 import { KpiTiles } from "./KpiTiles";
 
 function Alerts({ alerts }: { alerts: ExpiryAlert[] }) {
@@ -72,6 +73,7 @@ function Body({ data, q, onClearSearch }: { data: OverviewData; q: string; onCle
             <h2 id="ov-alerts">Cần chú ý</h2>
             <span className="sub">{data.kpis.near_expiry ? `${data.kpis.near_expiry} lô cận hạn` : "Cận hạn"}</span>
           </div>
+          <AttentionBlock />
           <Alerts alerts={data.alerts} />
         </section>
         <section className="sect sect-orders" aria-labelledby="ov-orders">

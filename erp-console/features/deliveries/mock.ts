@@ -1,4 +1,4 @@
-import { DeliveryListResponse, DeliveryNoteDetail, DeliveryNoteItem, LabelData, PrintDeliveryLabelResponse } from "./types";
+import { DeliveryListResponse, DeliveryNoteDetail, DeliveryNoteItem, LabelData, PrintDeliveryLabelResponse, VoidLabelResponse } from "./types";
 
 export const MOCK_DELIVERY_NOTES: DeliveryNoteDetail[] = [
   {
@@ -373,7 +373,12 @@ export function mockPostDeliveryLabelPrint(
   }
 
   const isReprint = item.label.printed;
+  const oldPrintNo = item.label.valid_print_no;
   const printNo = (item.label.valid_print_no || 0) + 1;
+  if (isReprint && oldPrintNo && !item.label.to_void.includes(oldPrintNo)) {
+    item.label.to_void.push(oldPrintNo);
+    item.label.needs_void = item.label.to_void.length;
+  }
   item.label.printed = true;
   item.label.valid_print_no = printNo;
   if (!item.available_actions.includes("reprint_label")) {
@@ -390,4 +395,46 @@ export function mockPostDeliveryLabelPrint(
     },
   };
 }
+
+export function mockPostDeliveryLabelVoid(
+  req: any,
+  id: number
+): { status: number; body: VoidLabelResponse | { detail: string; code?: string } } {
+  const item = MOCK_DELIVERY_NOTES.find((n) => n.id === id);
+  if (!item) {
+    return { status: 404, body: { detail: "Không tìm thấy phiếu giao hàng" } };
+  }
+  const body = req?.body || {};
+  const printNo = Number(body.print_no);
+  if (!printNo) {
+    return { status: 400, body: { detail: "Thiếu print_no" } };
+  }
+  if (item.status !== "CANCELLED" && item.label.valid_print_no === printNo && !item.label.to_void.includes(printNo)) {
+    return {
+      status: 400,
+      body: { code: "BR-GH-16", detail: `Tem lần ${printNo} đang có hiệu lực, không huỷ được.` },
+    };
+  }
+  if (!item.label.to_void.includes(printNo)) {
+    return {
+      status: 200,
+      body: {
+        print_no: printNo,
+        voided_at: new Date().toISOString(),
+        already: true,
+      },
+    };
+  }
+  item.label.to_void = item.label.to_void.filter((p) => p !== printNo);
+  item.label.needs_void = item.label.to_void.length;
+  return {
+    status: 200,
+    body: {
+      print_no: printNo,
+      voided_at: new Date().toISOString(),
+      already: false,
+    },
+  };
+}
+
 

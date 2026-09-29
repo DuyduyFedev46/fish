@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { fetchDeliveryNoteDetail, packDeliveryNote, printDeliveryLabel } from "../api";
+import { fetchDeliveryNoteDetail, packDeliveryNote, printDeliveryLabel, voidDeliveryLabel } from "../api";
 import type { DeliveryNoteDetail, DeliveryNoteItem } from "../types";
 import s from "../deliveries.module.css";
 
@@ -16,6 +16,7 @@ export function DeliveryDetailModal({ item, onClose, onUpdated }: Props) {
   const [loading, setLoading] = useState(true);
   const [packing, setPacking] = useState(false);
   const [printing, setPrinting] = useState(false);
+  const [voidingNo, setVoidingNo] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
@@ -66,6 +67,37 @@ export function DeliveryDetailModal({ item, onClose, onUpdated }: Props) {
     }
   };
 
+  const handleVoidLabel = async (printNo: number) => {
+    setVoidingNo(printNo);
+    setError(null);
+    setSuccessMsg(null);
+    try {
+      const res = await voidDeliveryLabel(current.id, printNo);
+      if (res.already) {
+        setSuccessMsg(`Tem lần ${printNo} đã được xác nhận huỷ trước đó.`);
+      } else {
+        setSuccessMsg(`Đã xác nhận huỷ tem giấy lần ${printNo}.`);
+      }
+      if (detail) {
+        const updatedToVoid = (detail.label?.to_void || []).filter((p) => p !== printNo);
+        setDetail({
+          ...detail,
+          label: {
+            ...detail.label,
+            to_void: updatedToVoid,
+            needs_void: updatedToVoid.length,
+          },
+        });
+      }
+      onUpdated();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Không thể huỷ tem.";
+      setError(msg);
+    } finally {
+      setVoidingNo(null);
+    }
+  };
+
   const current = detail || item;
   const canPack =
     current.status === "PREPARING" &&
@@ -83,12 +115,19 @@ export function DeliveryDetailModal({ item, onClose, onUpdated }: Props) {
       const res = await printDeliveryLabel(current.id);
       window.open(`/print/label/?note=${current.id}&print_no=${res.print_no}`, "_blank");
       if (detail) {
+        const oldPrintNo = detail.label.valid_print_no;
+        const toVoidList = [...(detail.label.to_void || [])];
+        if (detail.label.printed && oldPrintNo && !toVoidList.includes(oldPrintNo)) {
+          toVoidList.push(oldPrintNo);
+        }
         setDetail({
           ...detail,
           label: {
             ...detail.label,
             printed: true,
             valid_print_no: res.print_no,
+            to_void: toVoidList,
+            needs_void: toVoidList.length,
           },
           available_actions: detail.available_actions.includes("reprint_label")
             ? detail.available_actions
@@ -136,6 +175,51 @@ export function DeliveryDetailModal({ item, onClose, onUpdated }: Props) {
         <div className={s.modalBody}>
           {error && <div className={`${s.alertBox} ${s.alertError}`}>{error}</div>}
           {successMsg && <div className={`${s.alertBox} ${s.alertSuccess}`}>{successMsg}</div>}
+
+          {/* Cảnh báo tem cần huỷ theo CS-14 */}
+          {current.label?.to_void && current.label.to_void.length > 0 && (
+            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+              {current.label.to_void.map((pNo) => (
+                <div
+                  key={pNo}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    padding: "10px 14px",
+                    borderRadius: "6px",
+                    fontSize: "0.875rem",
+                    background: current.status === "CANCELLED" ? "#fef2f2" : "#fffbeb",
+                    border: `1px solid ${current.status === "CANCELLED" ? "#fecaca" : "#fde68a"}`,
+                    color: current.status === "CANCELLED" ? "#991b1b" : "#92400e",
+                  }}
+                >
+                  <div style={{ fontWeight: 500 }}>
+                    {current.status === "CANCELLED"
+                      ? `🚨 Đơn đã huỷ – xé tem lần ${pNo}`
+                      : `⚠️ Tem cũ lần ${pNo} hết hiệu lực – in tem mới, huỷ tem cũ`}
+                  </div>
+                  <button
+                    type="button"
+                    className={s.btnSecondary}
+                    onClick={() => handleVoidLabel(pNo)}
+                    disabled={voidingNo === pNo}
+                    style={{
+                      fontSize: "0.8125rem",
+                      padding: "4px 10px",
+                      background: "#ffffff",
+                      borderColor: current.status === "CANCELLED" ? "#fca5a5" : "#fcd34d",
+                      color: current.status === "CANCELLED" ? "#991b1b" : "#92400e",
+                      fontWeight: 600,
+                      cursor: voidingNo === pNo ? "not-allowed" : "pointer",
+                    }}
+                  >
+                    {voidingNo === pNo ? "Đang xử lý..." : "Đã huỷ tem"}
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
 
           <div className={s.infoSection}>
             <div>

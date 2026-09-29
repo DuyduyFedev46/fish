@@ -285,3 +285,89 @@ Quy trình: Kiểm thử độc lập theo TDD, kiểm tra ma trận phân quy�
 ### 4. Kết luận
 **APPROVED — Lô 3 hoàn thành toàn bộ yêu cầu, sẵn sàng commit và push lên staging.**
 *(Lưu ý điều kiện lên production: Chờ `legal-vn` duyệt câu chữ và Duy tự tay bật `CSKH_AUTO_CANCEL_ENABLED=1`).*
+
+---
+
+## BÁO CÁO QA — LÔ 4: HOÀN THIỆN VẬN HÀNH (CS-12, CS-13, CS-14, CS-15)
+
+- **Người thực hiện**: `qa-tester` (Subagent độc lập).
+- **Ngày kiểm thử**: 2026-09-29.
+- **Trạng thái**: **APPROVED**.
+
+### 1. Bảng kết quả theo Acceptance Criteria (38/38 PASS)
+
+| Mã AC | Tiêu chí | Kết quả | Bằng chứng (test / code audit) |
+|---|---|:---:|---|
+| **CS-12-AC1** | Phiếu `CONFIRMING`: `cs1` đổi địa chỉ + người nhận hộ -> `order.delivery_address` cập nhật; `order.phone` & `Customer.default_address` không đổi; AuditLog `recipient_changed` chỉ ghi `{"fields": [...]}` | ✅ PASS | `test_cskh_l4.py::test_cs12_ac1_change_address_and_recipient`, `order_services.update_delivery_address`. |
+| **CS-12-AC2** | Ghi kết quả `CONFIRMED_CHANGED` -> phiếu sang `PREPARING`, task `DONE` | ✅ PASS | `test_cskh_l4.py::test_cs12_ac2_confirmed_changed`, `cskh_services.record_call`. |
+| **CS-12-AC3** | Phiếu `PREPARING` đã in tem lần 1 -> Đổi địa chỉ -> `label_invalidated: true`, tem lần 1 có `superseded_at`, `to_void=[1]`, FE hiện thông báo tem cũ hết hiệu lực | ✅ PASS | `test_cskh_l4.py::test_cs12_ac3_label_invalidated_when_address_changed`, FE `CskhCallModal.tsx:162-164`. |
+| **CS-12-AC4** | Phiếu `READY` hoặc `DELIVERING` -> Đổi người nhận -> 400 `BR-GH-15` | ✅ PASS | `test_cskh_l4.py::test_cs12_ac4_blocked_when_ready_or_delivering`. |
+| **CS-12-AC5** | SĐT người nhận không hợp lệ -> 400 `BR-BH-14`; `delivery_address` rỗng hoặc > 500 ký tự -> 400 `INVALID_INPUT` | ✅ PASS | `test_cskh_l4.py::test_cs12_ac5_validation_errors`. |
+| **CS-12-AC6** | Khách tra đơn Shop bằng 4 số cuối SĐT gốc sau khi đổi người nhận hộ -> Vẫn tra được 200 | ✅ PASS | `test_cskh_l4.py::test_cs12_ac6_shop_lookup_with_original_phone`. |
+| **CS-12-AC7** | Thu tối thiểu: Chuỗi địa chỉ cũ không tồn tại trong AuditLog, bản ghi cuộc gọi hay bất kỳ bảng lịch sử nào | ✅ PASS | `test_cskh_l4.py::test_cs12_ac7_no_old_address_in_audit_or_logs`. |
+| **CS-12-AC8** | Mở tem in khi có người nhận hộ: Tem in tên người nhận hộ và SĐT người nhận hộ dạng che `09xx xxx 344` | ✅ PASS | `test_cskh_l4.py::test_cs12_ac8_label_prints_recipient_name_and_masked_phone`. |
+| **CS-12-AC9** | Phân quyền: `kho1`, `giao1` gọi `POST recipient` -> 403 | ✅ PASS | `test_cskh_l4.py::test_cs12_ac9_permissions`. |
+| **CS-13-AC1** | Phiếu `PENDING`: `cs1` ghi `WANT_CANCEL` có ghi chú -> `ESCALATED` nhãn "Khách muốn huỷ", `decide_deadline=None` (không tự huỷ) | ✅ PASS | `test_cskh_l4.py::test_cs13_ac1_want_cancel_escalates_without_deadline`, `CskhQueueItemSerializer`. |
+| **CS-13-AC2** | Quản lý `decide` `CANCEL` -> đơn `CANCELLED`, hoàn kho đúng lô gốc, FE điều hướng sang `/orders/?order={id}&open=refund` | ✅ PASS | `test_cskh_l4.py::test_cs13_ac2_manager_cancels_want_cancel_order`, FE `CskhCallModal.tsx:243-245`. |
+| **CS-13-AC3** | Phiếu `PENDING`: ghi `WANT_CHANGE` -> `ESCALATED` nhãn "Khách muốn đổi món – huỷ + hoàn + đặt lại", FE CSKH hiện câu hướng dẫn cố định D3 | ✅ PASS | `test_cskh_l4.py::test_cs13_ac3_want_change_escalates`, FE `CskhCallModal.tsx:490-492`. |
+| **CS-13-AC4** | `cs1` gọi `POST /api/sales/orders/{id}/cancel` -> 403 | ✅ PASS | `test_cskh_l4.py::test_cs13_ac4_cs1_cannot_cancel_sales_order`. |
+| **CS-13-AC5** | `cs1` gửi sửa dòng hàng/số kg của đơn -> 403/405 `BR-PQ-14`, đơn không đổi | ✅ PASS | `test_cskh_l4.py::test_cs13_ac5_cs1_cannot_modify_order_lines`. |
+| **CS-14-AC1** | Tem lần 1 đã in -> NV kho bấm "In lại" -> `print_no=2`, `is_reprint=True`, tem 1 có `superseded_at`, vào `to_void=[1]`, AuditLog `label_reprinted`, trang in có dấu "IN LẠI – LẦN 2" | ✅ PASS | `test_cskh_l4.py::test_cs14_ac1_reprint_label_invalidates_previous_and_sets_to_void`, `deliveries.test.ts`, `app/print/label/page.tsx:226-239`. |
+| **CS-14-AC2** | Bấm "Đã huỷ tem" lần 1 -> `voided_at/by` lưu, AuditLog `label_voided`, hết nhắc `to_void=[]` | ✅ PASS | `test_cskh_l4.py::test_cs14_ac2_void_label`, `deliveries.test.ts`. |
+| **CS-14-AC3** | Đơn có tem lần 1 bị huỷ -> mở phiếu hiện banner đỏ "🚨 Đơn đã huỷ – xé tem lần 1" + nút "Đã huỷ tem" | ✅ PASS | `test_cskh_l4.py::test_cs14_ac3_cancelled_order_marks_all_labels_to_void`, `DeliveryDetailModal.tsx:180-221`. |
+| **CS-14-AC4** | Tem lần 2 đang hiệu lực, đơn hoạt động -> `void` lần 2 -> 400 `BR-GH-16` | ✅ PASS | `test_cskh_l4.py::test_cs14_ac4_cannot_void_valid_active_label`, `deliveries.test.ts`. |
+| **CS-14-AC5** | Lần 1 đã huỷ -> `void` lần 1 lại -> 200 `already: True`, không thêm AuditLog | ✅ PASS | `test_cskh_l4.py::test_cs14_ac5_void_already_voided_is_idempotent`, `deliveries.test.ts`. |
+| **CS-14-AC6** | Đơn `CANCELLED` -> "In lại" -> 400 `BR-GH-07` | ✅ PASS | `test_cskh_l4.py::test_cs14_ac6_cannot_reprint_on_cancelled_order`. |
+| **CS-14-AC7** | Phân quyền: `cs1`, `giao1` gọi `label/print` hoặc `label/void` -> 403 | ✅ PASS | `test_cskh_l4.py::test_cs14_ac7_permissions`. |
+| **CS-15-AC1** | Dữ liệu đủ loại: Chủ gọi `GET /api/dashboard/attention/` -> đủ 6 key, số đếm khớp danh sách | ✅ PASS | `test_cskh_l4.py::test_cs15_ac1_owner_sees_all_6_keys`, `attention_api.py`. |
+| **CS-15-AC2** | Phiếu `PENDING` trả tiền 61 phút trước -> tính vào `cskh_queue_waiting`; 59 phút -> không tính | ✅ PASS | `test_cskh_l4.py::test_cs15_ac2_cskh_queue_waiting_threshold`. |
+| **CS-15-AC3** | Phiếu `PREPARING` xác nhận 16 phút trước, chưa in -> `labels_not_printed` tính; 14 phút -> không tính | ✅ PASS | `test_cskh_l4.py::test_cs15_ac3_labels_not_printed_threshold`. |
+| **CS-15-AC4** | Phân quyền lọc key: `cs1` chỉ 2 key CSKH; `kho1` chỉ 2 key tem; Quản lý/Chủ cả 6 key | ✅ PASS | `test_cskh_l4.py::test_cs15_ac4_permissions_filter_keys`, `overview.test.ts`. |
+| **CS-15-AC5** | Phân quyền: `giao1` gọi `GET /api/dashboard/attention/` -> 403 | ✅ PASS | `test_cskh_l4.py::test_cs15_ac5_delivery_staff_forbidden`, `overview.test.ts`. |
+| **CS-15-AC6** | Xử lý lỗi riêng khối: API lỗi -> hiện "Chưa tải được", phần còn lại của Tổng quan vẫn hoạt động; JSON không có key giá vốn hay PII | ✅ PASS | `test_cskh_l4.py::test_cs15_ac6_no_cost_or_pii_keys`, `AttentionBlock.tsx:28-31, 47-68`. |
+
+### 2. Kiểm tra Bất biến & Ngoại lệ chuẩn (X-AC)
+
+1. **Bất biến 1 — Không rò giá vốn (X-AC3):**
+   - `GET /api/dashboard/attention/`: chỉ trả số nguyên đếm công việc (integer count), không chứa bất kỳ trường giá, doanh thu hay giá vốn nào.
+   - `POST /api/cskh/queue/{id}/recipient/`: chỉ trả `{"changed": [...], "label_invalidated": bool}`.
+   - `POST /api/delivery/notes/{id}/label/void/`: chỉ trả `{"print_no": int, "voided_at": str, "already": bool}`.
+   - Kết quả: ✅ **ĐẠT**.
+
+2. **Bất biến 9 — Không rò dữ liệu cá nhân khách (X-AC1, X-AC2, X-AC4):**
+   - **AuditLog (X-AC2)**: Sự kiện `recipient_changed` chỉ lưu `{"fields": ["delivery_address", "recipient_name"]}`. Hoàn toàn không ghi giá trị địa chỉ hoặc SĐT cũ/mới vào `changes` hay `note`. Sự kiện `label_reprinted` và `label_voided` chỉ lưu `{"print_no": n}`.
+   - **Thu tối thiểu**: Khi đổi địa chỉ giao hàng, chỉ ghi đè `order.delivery_address`. Địa chỉ cũ không lưu vào bất kỳ bảng lịch sử hay log nào (`test_cs12_ac7`).
+   - **Tem in**: SĐT trên tem luôn ở dạng mask `09xx xxx 344`.
+   - **FE Storage / URL / Console (X-AC4)**: Quét grep `localStorage`, `sessionStorage`, `useDraft`, `console.*` trên `features/cskh`, `features/deliveries`, `features/overview`, `app/print` -> **Rỗng 100%**.
+   - Kết quả: ✅ **ĐẠT**.
+
+3. **Bất biến 3 — Không xoá chứng từ (X-AC6):**
+   - `LabelPrint` không có action DELETE, huỷ bằng trạng thái `voided_at` và `voided_by`.
+   - Chặn nghiêm ngặt không cho huỷ tem đang có hiệu lực duy nhất của đơn đang hoạt động (400 `BR-GH-16`).
+   - Kết quả: ✅ **ĐẠT**.
+
+4. **Ma trận phân quyền (X-AC7) cho Lô 4:**
+   - `POST /api/cskh/queue/{id}/recipient/`: `chu` (200), `quan_ly` (200), `cskh` (200 trong scope / 404 ngoài scope), `nv_kho` (403), `nv_giao` (403), không Group (403).
+   - `POST /api/delivery/notes/{id}/label/void/`: `chu` (200), `quan_ly` (200), `nv_kho` (200), `cskh` (403), `nv_giao` (403), không Group (403).
+   - `GET /api/dashboard/attention/`: `chu` (200, 6 keys), `quan_ly` (200, 6 keys), `cskh` (200, 2 keys), `nv_kho` (200, 2 keys), `nv_giao` (403), không Group (403).
+   - Kết quả: ✅ **ĐẠT**.
+
+5. **AI Policy Registry Guard:**
+   - `backend/apps/ai/policy/rules.py` đã cập nhật `FORBIDDEN_PREFIXES` chứa `/api/dashboard/attention/` và `FORBIDDEN_SUFFIXES` chứa `/label/void/`, `/label/void`.
+   - Suite `apps.ai.registry.tests` xanh 100% (25/25 tests).
+   - Kết quả: ✅ **ĐẠT**.
+
+### 3. Kết quả kiểm chứng lệnh (Dev & QA)
+
+1. `cd backend && .venv/bin/python manage.py makemigrations --check --dry-run`: `No changes detected`.
+2. `cd backend && .venv/bin/python manage.py test apps.delivery apps.ai.registry.tests`: **145/145 tests xanh 100%** (27 tests Lô 4 `test_cskh_l4.py`).
+3. `cd backend && .venv/bin/python manage.py test`: **907/907 tests xanh 100%** (toàn bộ test suite backend).
+4. `cd erp-console && npm test`: **5 test files, 42/42 tests xanh 100%**.
+5. `cd erp-console && npx tsc --noEmit && npm run build`: 27/27 static pages pass 100%.
+6. `cd erp-console && NEXT_PUBLIC_USE_MOCK=1 npm run build`: 27/27 static pages pass 100%.
+7. `cd frontend && npx tsc --noEmit && NEXT_PUBLIC_USE_MOCK=1 npm run build`: 8/8 static pages pass 100%.
+8. Quét bảo mật PII/Storage: Rỗng.
+
+### 4. Kết luận
+**APPROVED — Lô 4 hoàn thành xuất sắc toàn bộ tiêu chí nghiệm thu và bất biến.**
+

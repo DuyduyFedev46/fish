@@ -99,7 +99,13 @@ class CskhQueueItemSerializer(serializers.ModelSerializer):
 
         # Escalation
         escalation_reason = obj.escalation_reason or None
-        escalation_label = obj.get_escalation_reason_display() if obj.escalation_reason else None
+        escalation_label = None
+        if obj.escalation_reason == ConfirmationTask.EscalationReason.WANT_CHANGE:
+            escalation_label = "Khách muốn đổi món – huỷ + hoàn + đặt lại"
+        elif obj.escalation_reason == ConfirmationTask.EscalationReason.WANT_CANCEL:
+            escalation_label = "Khách muốn huỷ"
+        elif obj.escalation_reason:
+            escalation_label = obj.get_escalation_reason_display()
 
         # Next call after
         min_retry = getattr(settings, "CSKH_MIN_RETRY_MINUTES", 10)

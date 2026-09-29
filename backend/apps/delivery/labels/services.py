@@ -125,6 +125,11 @@ def record_print(
         last_print = locked_note.label_prints.select_for_update().order_by("-print_no").first()
         next_print_no = (last_print.print_no + 1) if last_print else 1
 
+        now = timezone.now()
+        if next_print_no > 1:
+            # Tem cũ trước đó bị vô hiệu (CS-14, 02b §2.4, §4.5)
+            locked_note.label_prints.filter(superseded_at__isnull=True).update(superseded_at=now)
+
         actual_reason = LabelPrint.Reason.FIRST if next_print_no == 1 else LabelPrint.Reason.REPRINT
         if reason and reason in LabelPrint.Reason.values:
             actual_reason = reason
@@ -146,3 +151,52 @@ def record_print(
         )
 
         return lp, False
+
+
+def void_label(note: DeliveryNote, user, print_no: int) -> dict:
+    """
+    Xác nhận đã huỷ tem giấy (CS-14, 02b §4.5).
+    """
+    if print_no is None:
+        raise BusinessError("Thiếu print_no.", code="INVALID_INPUT")
+
+    try:
+        print_no = int(print_no)
+    except (ValueError, TypeError):
+        raise BusinessError("print_no không hợp lệ.", code="INVALID_INPUT")
+
+    with transaction.atomic():
+        locked_note = DeliveryNote.objects.select_for_update().get(pk=note.pk)
+        lp = locked_note.label_prints.select_for_update().filter(print_no=print_no).first()
+        if not lp:
+            raise BusinessError(f"Không tìm thấy lượt in #{print_no}.", code="NOT_FOUND")
+
+        if lp.voided_at is not None:
+            return {
+                "print_no": print_no,
+                "voided_at": lp.voided_at.isoformat(),
+                "already": True,
+            }
+
+        # Nếu đơn chưa huỷ và tem này đang là tem hiệu lực duy nhất (chưa superseded) -> không được huỷ (CS-14-AC4)
+        if locked_note.status != DeliveryNote.Status.CANCELLED and lp.superseded_at is None:
+            raise BusinessError(f"Tem lần {print_no} đang có hiệu lực, không huỷ được.", code="BR-GH-16")
+
+        now = timezone.now()
+        lp.voided_at = now
+        lp.voided_by = user
+        lp.save(update_fields=["voided_at", "voided_by"])
+
+        record_audit(
+            "label_voided",
+            actor=user,
+            obj=locked_note,
+            changes={"print_no": print_no},
+        )
+
+        return {
+            "print_no": print_no,
+            "voided_at": now.isoformat(),
+            "already": False,
+        }
+

@@ -419,3 +419,19 @@ def _get_item(item_code):
         return Item.objects.get(code=item_code)
     except Item.DoesNotExist:
         raise BusinessError(f"Không tìm thấy mặt hàng: {item_code}.")
+
+
+def update_delivery_address(order: SalesOrder, address: str) -> None:
+    """
+    Cập nhật địa chỉ giao hàng của đơn (CS-12, 02b §4.5).
+    Chỉ ghi đè delivery_address trên SalesOrder, không sửa phone hay Customer.
+    """
+    clean_address = (address or "").strip()
+    if not clean_address:
+        raise BusinessError("Địa chỉ giao hàng không được để trống.", code="INVALID_INPUT")
+    if len(clean_address) > 500:
+        raise BusinessError("Địa chỉ giao hàng không được vượt quá 500 ký tự.", code="INVALID_INPUT")
+
+    order.delivery_address = clean_address
+    order.save(update_fields=["delivery_address"])
+

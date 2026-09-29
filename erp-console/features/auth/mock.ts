@@ -86,6 +86,7 @@ const GROUP_PERMS: Record<string, string[]> = {
     "catalog.view_bundleline",
     "catalog.view_item", "catalog.view_itemgroup", "catalog.view_itemprice", "catalog.view_pricelist", "catalog.view_pricingrule",
     "delivery.add_deliverynote", "delivery.change_deliverynote", "delivery.view_deliverynote",
+    "delivery.confirm_with_customer", "delivery.change_recipient", "delivery.decide_unconfirmed", "delivery.pack_deliverynote", "delivery.print_label",
     "inventory.add_stockentry", "inventory.add_stockreconciliation", "inventory.add_stockreconciliationline",
     "inventory.approve_returntostock", "inventory.approve_stockreconciliation", "inventory.change_stockentry",
     "inventory.change_stockreconciliation", "inventory.change_stockreconciliationline", "inventory.publish_batch",
@@ -103,7 +104,7 @@ const GROUP_PERMS: Record<string, string[]> = {
   nv_kho: [
     "accounts.view_staffprofile", "auth.view_user", "catalog.view_bundleline", "catalog.view_item",
     "catalog.view_itemgroup", "delivery.add_deliverynote", "delivery.change_deliverynote",
-    "delivery.view_deliverynote", "inventory.add_returntostock", "inventory.add_stockentry",
+    "delivery.view_deliverynote", "delivery.pack_deliverynote", "delivery.print_label", "inventory.add_returntostock", "inventory.add_stockentry",
     "inventory.add_stockreconciliation", "inventory.add_stockreconciliationline", "inventory.change_stockentry",
     "inventory.change_stockreconciliation", "inventory.change_stockreconciliationline", "inventory.view_batch",
     "inventory.view_returntostock", "inventory.view_stockentry", "inventory.view_stockledgerentry",
@@ -118,6 +119,10 @@ const GROUP_PERMS: Record<string, string[]> = {
     "accounts.view_staffprofile", "auth.view_user", "delivery.change_deliverynote", "delivery.view_deliverynote",
     "inventory.add_returntostock", "inventory.view_returntostock", "sales.view_customer", "sales.view_salesorder",
     "sales.view_salesorderline",
+  ],
+  cskh: [
+    "accounts.view_staffprofile", "auth.view_user", "sales.view_salesorder", "sales.view_salesorderline",
+    "delivery.view_deliverynote", "delivery.confirm_with_customer", "delivery.change_recipient",
   ],
 };
 
@@ -178,6 +183,7 @@ function seed(): MockUser[] {
     u(8, "ql9", "Chị Mai", "0909000666", ["quan_ly"], { extra_perms: ["accounts.manage_staff"] }),
     u(9, "sa1", "Kỹ thuật", "0909000777", ["quan_ly"], { is_superuser: true }),
     u(10, "kho5", "Chị Sáu", "0909000888", ["nv_kho"], { must_change_password: true }),
+    u(11, "cs1", "Chị Cúc", "0909000999", ["cskh"], { last_login: "2026-09-28T08:00:00+07:00" }),
   ];
 }
 

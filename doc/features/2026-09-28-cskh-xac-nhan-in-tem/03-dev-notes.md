@@ -266,3 +266,78 @@ gcloud scheduler jobs create http cskh-deadlines-scheduler \
 - `cd erp-console && npm test`: 4 test files, **40/40 tests xanh 100%**.
 - `cd erp-console && npx tsc --noEmit && npm run build`: **27/27 static pages pass 100%**.
 - `cd frontend && npx tsc --noEmit && NEXT_PUBLIC_USE_MOCK=1 npm run build`: **8/8 static pages pass 100%**.
+
+---
+
+## Lô 4 — Hoàn thiện vận hành (CS-12, CS-13, CS-14, CS-15)
+
+### 1. Phạm vi thực hiện:
+- **CS-12**: Đổi địa chỉ / người nhận hộ (AC1..AC10).
+- **CS-13**: Khách muốn huỷ / đổi món (AC1..AC8).
+- **CS-14**: In lại tem, tem hết hiệu lực, xác nhận đã huỷ tem giấy (AC1..AC7).
+- **CS-15**: "Cần chú ý" cho việc gọi và tem trên dashboard (AC1..AC6).
+
+### 2. Backend đã làm:
+- `backend/apps/sales/orders/services.py`:
+  - Thêm `update_delivery_address(order, address)` ghi đè `order.delivery_address` (không sửa `phone` hay `Customer.default_address`).
+- `backend/apps/delivery/cskh/services.py`:
+  - Nâng cấp `change_recipient` hỗ trợ: `delivery_address`, `recipient_name`, `recipient_phone`.
+  - Validate SĐT 10 số bắt đầu bằng 0 (`BR-BH-14`), địa chỉ không rỗng và <= 500 ký tự.
+  - Chặn khi phiếu `READY`/`DELIVERING` (400 `BR-GH-15`), `CANCELLED` (400 `BR-GH-07`).
+  - Vô hiệu tem cũ (`superseded_at = now`) khi có thay đổi trên phiếu đã in tem, trả `label_invalidated: True`.
+  - AuditLog `recipient_changed` chỉ lưu `{"fields": changed_fields}` (Bất biến 9).
+- `backend/apps/delivery/cskh/api.py`:
+  - `recipient` action nhận `delivery_address`, trả về `changed` và `label_invalidated`.
+  - Kiểm tra quyền `delivery.change_recipient` (403 cho `kho1`, `giao1`) và scope 404 cho CSKH ngoài scope.
+- `backend/apps/delivery/cskh/serializers.py`:
+  - Map `escalation_label` chuẩn spec: `"Khách muốn đổi món – huỷ + hoàn + đặt lại"` khi `WANT_CHANGE`, `"Khách muốn huỷ"` khi `WANT_CANCEL`.
+- `backend/apps/delivery/labels/services.py`:
+  - Trong `record_print`: khi in lại (`next_print_no > 1`), đánh dấu `superseded_at = now` cho các tem trước đó chưa superseded.
+  - Thêm hàm `void_label(note, user, print_no)`: huỷ tem giấy, idempotent (trả `already: True` nếu đã void), chặn huỷ tem đang có hiệu lực duy nhất 400 `BR-GH-16`, AuditLog `label_voided`.
+- `backend/apps/delivery/api.py`:
+  - Thêm action `label_void` trên `DeliveryNoteViewSet` (`POST /api/delivery/notes/{id}/label/void/`).
+  - Cập nhật `custom_perm_actions = ("set_status", "label", "label_print", "label_void")`.
+- `backend/apps/delivery/attention_api.py` & `backend/config/api_urls.py`:
+  - Thêm endpoint `GET /api/dashboard/attention/`: trả 6 khoá lọc theo quyền: `cskh_queue_waiting`, `refund_calls_open` (`confirm_with_customer`), `cskh_escalated`, `cskh_auto_cancel_blocked` (`decide_unconfirmed`), `labels_not_printed`, `labels_to_void` (`print_label`). User không có quyền nào (như `giao1`) trả 403.
+- `backend/apps/ai/policy/rules.py`:
+  - Cập nhật `FORBIDDEN_PREFIXES` thêm `/api/dashboard/attention/`.
+  - Cập nhật `FORBIDDEN_SUFFIXES` thêm `/label/void/`, `/label/void`.
+- Test BE mới: `backend/apps/delivery/tests/test_cskh_l4.py`:
+  - **27 test cases** bao phủ toàn diện CS-12, CS-13, CS-14, CS-15, ma trận quyền và các bất biến.
+
+### 3. Frontend đã làm:
+- `erp-console/features/cskh/`:
+  - `CskhCallModal.tsx`:
+    - Hiển thị thông báo `notice` ("Tem cũ đã hết hiệu lực – cần in lại tem mới và huỷ tem cũ.") khi đổi người nhận/địa chỉ trên đơn đã in tem.
+    - Hiển thị hướng dẫn khi `ESCALATED` theo đúng `escalation_reason`:
+      - `WANT_CHANGE`: 💡 **Khách muốn đổi món:** Quản lý huỷ đơn và tạo phiếu hoàn tiền. Mời khách đặt đơn mới trên Shop sau khi đơn cũ được huỷ.
+      - `WANT_CANCEL`: 💡 **Khách muốn huỷ đơn:** Quản lý huỷ đơn và lập phiếu hoàn tiền cho khách.
+- `erp-console/features/deliveries/`:
+  - `types.ts`: thêm kiểu `VoidLabelResponse`.
+  - `api.ts`: thêm hàm `voidDeliveryLabel`.
+  - `mock.ts`: thêm `mockPostDeliveryLabelVoid`, cập nhật `mockPostDeliveryLabelPrint` đưa tem cũ vào `to_void` khi reprint.
+  - `components/DeliveryDetailModal.tsx`:
+    - Danh sách tem cần huỷ theo `current.label.to_void`:
+      - Đơn `CANCELLED`: hiện banner đỏ `🚨 Đơn đã huỷ – xé tem lần {pNo}`.
+      - Đơn hoạt động: hiện banner vàng `⚠️ Tem cũ lần {pNo} hết hiệu lực – in tem mới, huỷ tem cũ`.
+    - Nút "Đã huỷ tem" gọi `voidDeliveryLabel` và cập nhật lại state.
+  - `deliveries.test.ts`: thêm unit test cho reprint và void label.
+- `erp-console/features/overview/`:
+  - `types.ts`: thêm kiểu `DashboardAttentionData`.
+  - `api.ts`: thêm hàm `getDashboardAttention()`.
+  - `mock.ts`: thêm `mockAttention` phân quyền 3 tầng theo quyền thật của BE.
+  - `components/AttentionBlock.tsx`: component tải và hiển thị 6 đầu việc cần chú ý; xử lý lỗi riêng khối ("Chưa tải được" theo CS-15-AC6); link điều hướng trực tiếp sang `/cskh/` và `/deliveries/`.
+  - `components/OverviewScreen.tsx`: nhúng `<AttentionBlock />` vào khối "Cần chú ý".
+  - `overview.test.ts`: unit test phân quyền `mockAttention` cho Quản lý, CSKH, Kho, Giao hàng (403).
+
+### 4. Kết quả kiểm chứng Lô 4:
+- `cd backend && .venv/bin/python manage.py makemigrations --check --dry-run`: **No changes detected**.
+- `cd backend && .venv/bin/python manage.py test apps.delivery apps.ai.registry.tests`: **145/145 tests xanh 100%**.
+- `cd backend && .venv/bin/python manage.py test`: **907/907 tests xanh 100%** (toàn bộ test suite backend).
+- `cd erp-console && npm test`: 5 test files, **42/42 tests xanh 100%**.
+- `cd erp-console && npx tsc --noEmit && npm run build`: **27/27 static pages pass 100%**.
+- `cd erp-console && NEXT_PUBLIC_USE_MOCK=1 npm run build`: **27/27 static pages pass 100%**.
+- `cd frontend && npx tsc --noEmit && NEXT_PUBLIC_USE_MOCK=1 npm run build`: **8/8 static pages pass 100%**.
+- `grep -rn "localStorage\|sessionStorage\|useDraft\|console\." erp-console/features/cskh erp-console/features/deliveries erp-console/app/print || true`: **Rỗng** (Bất biến 9).
+- `grep -rn 'fields = "__all__"' backend/apps/delivery backend/apps/common/pii.py erp-console/features/deliveries || true`: **Rỗng**.
+

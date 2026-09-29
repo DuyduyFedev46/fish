@@ -37,7 +37,7 @@ class DeliveryNoteViewSet(NoStoreMixin, DocumentViewSet):
     serializer_class = DeliveryNoteSerializer
     pagination_class = StandardPagination
     permission_classes = [BusinessModelPermissions]
-    custom_perm_actions = ("set_status", "label", "label_print")
+    custom_perm_actions = ("set_status", "label", "label_print", "label_void")
 
     # BR-PQ-14 / BR-GH-06: trạng thái & người giao chỉ đổi qua action nghiệp vụ.
     locked_fields = (
@@ -173,3 +173,20 @@ class DeliveryNoteViewSet(NoStoreMixin, DocumentViewSet):
             resp_data,
             status=status.HTTP_200_OK if duplicate else status.HTTP_201_CREATED,
         )
+
+    @action(
+        detail=True,
+        methods=["post"],
+        url_path="label/void",
+        required_perms=("delivery.print_label",),
+    )
+    def label_void(self, request, pk=None):
+        """Xác nhận đã huỷ tem giấy (CS-14, 02b §4.5)."""
+        if not request.user.has_perm("delivery.print_label"):
+            raise PermissionDenied("Bạn không có quyền huỷ tem giao hàng.")
+        note = self.get_object()
+        print_no = request.data.get("print_no") if request.data else None
+        from apps.delivery.labels import services as label_services
+        res = label_services.void_label(note, request.user, print_no=print_no)
+        return Response(res, status=status.HTTP_200_OK)
+

@@ -4,6 +4,7 @@ import {
   mockGetDeliveryNoteDetail,
   mockListDeliveryNotes,
   mockPostDeliveryLabelPrint,
+  mockPostDeliveryLabelVoid,
   mockPostDeliveryNoteStatus,
 } from "./mock";
 import type {
@@ -11,6 +12,7 @@ import type {
   DeliveryNoteDetail,
   LabelData,
   PrintDeliveryLabelResponse,
+  VoidLabelResponse,
 } from "./types";
 
 export async function fetchDeliveryNotes(
@@ -99,4 +101,19 @@ export async function printDeliveryLabel(
     mock: isMock ? (req) => mockPostDeliveryLabelPrint(req, id) : undefined,
   });
 }
+
+export async function voidDeliveryLabel(
+  id: number,
+  printNo: number,
+  signal?: AbortSignal
+): Promise<VoidLabelResponse> {
+  const isMock = process.env.NEXT_PUBLIC_USE_MOCK === "1";
+  return apiFetch<VoidLabelResponse>(`/api/delivery/notes/${id}/label/void/`, {
+    method: "POST",
+    body: { print_no: printNo },
+    signal,
+    mock: isMock ? (req) => mockPostDeliveryLabelVoid(req, id) : undefined,
+  });
+}
+
 

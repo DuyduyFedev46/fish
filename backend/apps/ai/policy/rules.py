@@ -15,14 +15,17 @@ FORBIDDEN_PREFIXES = (
     "/api/commands/",
     "/api/public/",
     "/api/cskh/",
+    "/api/dashboard/attention/",
 )
 
 # Hậu tố URL cấm hẳn (tem có tên/SĐT/địa chỉ khách)
 FORBIDDEN_SUFFIXES = (
     "/label/",
     "/label/print/",
+    "/label/void/",
     "/label",
     "/label/print",
+    "/label/void",
 )
 
 # Phương thức HTTP cấm hẳn (Bất biến 3, H4)

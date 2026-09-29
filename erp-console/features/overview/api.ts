@@ -2,14 +2,22 @@
 import { apiFetch } from "@/shared/lib/http";
 import { DASHBOARD_SUMMARY_PATH, fefoOrder } from "@/shared/lib/dashboardSummary";
 import { matches } from "@/shared/lib/search";
-import { mockOverview } from "./mock";
-import type { DashboardBatch, OverviewData, RecentOrder } from "./types";
+import { mockAttention, mockOverview } from "./mock";
+import type { DashboardAttentionData, DashboardBatch, OverviewData, RecentOrder } from "./types";
 
 export function getOverview(): Promise<OverviewData> {
   return apiFetch<OverviewData>(DASHBOARD_SUMMARY_PATH, {
     mock: process.env.NEXT_PUBLIC_USE_MOCK === "1" ? mockOverview : undefined,
   });
 }
+
+export function getDashboardAttention(signal?: AbortSignal): Promise<DashboardAttentionData> {
+  return apiFetch<DashboardAttentionData>("/api/dashboard/attention/", {
+    signal,
+    mock: process.env.NEXT_PUBLIC_USE_MOCK === "1" ? mockAttention : undefined,
+  });
+}
+
 
 /** Lọc như bản cũ: mã đơn, khách, trạng thái. */
 export function filterRecentOrders(rows: RecentOrder[], q: string): RecentOrder[] {

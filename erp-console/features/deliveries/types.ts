@@ -102,3 +102,9 @@ export type PrintDeliveryLabelResponse = {
   duplicate: boolean;
 };
 
+export type VoidLabelResponse = {
+  print_no: number;
+  voided_at: string;
+  already: boolean;
+};
+
