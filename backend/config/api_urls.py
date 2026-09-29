@@ -22,6 +22,7 @@ from apps.ai.policy.api import (
     AiPolicyView,
 )
 from apps.ai.registry.api import AiCommandDetailView, AiCommandsIndexView
+from apps.ai.report.api import AiDailyReportView
 from apps.ai.settings.api import MyConfigKillView, MyConfigVersionsView, MyConfigView
 from apps.common.guidance.api import GuidanceView
 from apps.content.site.api import SiteInfoView
@@ -165,6 +166,8 @@ urlpatterns = [
     path("ai/policy/users/<int:user_id>/config/", AiPolicyUserConfigView.as_view(), name="ai-policy-user-config"),
     path("ai/policy/versions/", AiPolicyVersionsView.as_view(), name="ai-policy-versions"),
     path("ai/policy/", AiPolicyView.as_view(), name="ai-policy"),
+    # Báo cáo AI cuối ngày (02b §6.6, DW-22)
+    path("ai/report/daily/", AiDailyReportView.as_view(), name="ai-report-daily"),
     # Back-office (router)
     path("", include(router.urls)),
 ]

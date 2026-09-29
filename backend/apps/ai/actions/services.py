@@ -255,3 +255,119 @@ def undo_ai_action(*, action_id: str, user, request=None) -> dict:
 
     raise BusinessError(f"Hành động ở trạng thái {action.status}, không thể hoàn tác.", code="AI_CANNOT_UNDO", status_code=400)
 
+
+def find_assignee_group_for_step(step: dict, spec=None) -> str:
+    """
+    Định tuyến Group nhận việc theo quyền (DW-23-AC2).
+    Không so sánh hardcode tên Group trong code; dùng quyền để tìm Group có thẩm quyền.
+    """
+    from django.contrib.auth.models import Group, Permission
+
+    # 1. Dò theo required_perms của spec lệnh
+    if spec and getattr(spec, "required_perms", None):
+        for perm_str in spec.required_perms:
+            if "." in perm_str:
+                app_label, codename = perm_str.split(".", 1)
+                matching_groups = set(
+                    Group.objects.filter(
+                        permissions__content_type__app_label=app_label,
+                        permissions__codename=codename,
+                    ).values_list("name", flat=True)
+                )
+                if "quan_ly" in matching_groups:
+                    return "quan_ly"
+                if "chu" in matching_groups:
+                    return "chu"
+                if matching_groups:
+                    return list(matching_groups)[0]
+
+    # 2. Dò theo trường who của step nếu có
+    who_list = [w.lower() for w in step.get("who", [])]
+    if any("quản lý" in w for w in who_list):
+        return "quan_ly"
+    if any("chủ" in w for w in who_list):
+        return "chu"
+
+    return "chu"
+
+
+def escalate_guidance_step(*, doc_type: str, doc_id: str, step_key: str, user) -> dict:
+    """
+    Chuyển việc cho người/nhóm có quyền (DW-23, contract 02-stories DW-23).
+    POST /api/ai/actions/escalate/ {"doc_type", "doc_id", "step_key"}
+    -> 201 {"action_id", "assignee_group"}
+    """
+    from apps.common.guidance.api import get_guidance_provider
+    from apps.ai.registry.discovery import get_registry
+
+    if not doc_type or not doc_id or not step_key:
+        raise BusinessError("Thiếu tham số chứng từ hoặc bước cần nhờ.", code="INVALID_PARAMS", status_code=400)
+
+    provider = get_guidance_provider(doc_type)
+    if provider is None:
+        raise BusinessError(f"Không hỗ trợ loại chứng từ: {doc_type}.", code="GUIDANCE_TYPE_UNKNOWN", status_code=400)
+
+    try:
+        data = provider(doc_id=str(doc_id), user=user)
+    except Exception as e:
+        raise BusinessError(f"Không thể nạp chứng từ {doc_type} #{doc_id}: {e}", code="DOC_NOT_FOUND", status_code=400)
+
+    next_steps = data.get("next_steps", [])
+    target_step = None
+    for s in next_steps:
+        s_key = s.key if hasattr(s, "key") else s.get("key")
+        if s_key == step_key:
+            target_step = s
+            break
+
+    if target_step is None:
+        raise BusinessError(f"Bước '{step_key}' không tồn tại trên chứng từ.", code="STEP_NOT_FOUND", status_code=400)
+
+    is_allowed = target_step.allowed if hasattr(target_step, "allowed") else target_step.get("allowed")
+    if is_allowed:
+        raise BusinessError("Bạn đã có quyền tự thực hiện bước này.", code="BR-AI-25", status_code=400)
+
+    command_id = target_step.command if hasattr(target_step, "command") else target_step.get("command")
+    registry = get_registry()
+    spec = registry.get(command_id) if command_id else None
+
+    step_dict = {
+        "key": step_key,
+        "who": target_step.who if hasattr(target_step, "who") else target_step.get("who", []),
+        "command": command_id,
+        "label": target_step.label if hasattr(target_step, "label") else target_step.get("label", ""),
+    }
+
+    target_group = find_assignee_group_for_step(step_dict, spec)
+
+    action = AiAction.objects.create(
+        command=command_id or f"{doc_type}.{step_key}",
+        kind=AiAction.Kind.WRITE,
+        level=AiAction.Level.C,
+        status=AiAction.Status.ESCALATED,
+        owner=user,
+        assignee_group=target_group,
+        target_model=doc_type,
+        target_id=str(doc_id),
+        args={
+            "doc_type": doc_type,
+            "doc_id": str(doc_id),
+            "step_key": step_key,
+            "label": step_dict["label"],
+        },
+    )
+
+    record_audit(
+        f"escalate_{action.command}",
+        actor=user,
+        actor_kind="user",
+        proposal_ref=str(action.id),
+        note=f"Chuyển việc {step_dict['label']} ({doc_type} #{doc_id}) cho nhóm {target_group}",
+    )
+
+    return {
+        "action_id": str(action.id),
+        "assignee_group": target_group,
+    }
+
+

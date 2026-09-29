@@ -13,6 +13,7 @@ import { getGuidance } from "../api";
 import type { GuidanceData, GuidanceNextStep, GuidanceTimelineEntry } from "../types";
 import { callCommand } from "@/features/ai/commands/call";
 import { getAiStatus } from "@/features/ai/api";
+import { escalateStep } from "@/features/ai/actions/api";
 import { askAi, selectEngineName } from "@/features/ai/runtime/engine";
 import { canDownloadModel, detectAiCapability } from "@/features/ai/runtime/feature-detect";
 import s from "./guidance.module.css";
@@ -260,8 +261,16 @@ function StepItem({
   const [aiSuccessMsg, setAiSuccessMsg] = useState<{ text: string; actionId: string } | null>(null);
   const [aiErrorMsg, setAiErrorMsg] = useState<string | null>(null);
 
+  // DW-23: Trạng thái nút "Nhờ" (chuyển việc cho người có quyền)
+  const [escalating, setEscalating] = useState<boolean>(false);
+  const [escalatedGroup, setEscalatedGroup] = useState<string | null>(null);
+  const [escalateError, setEscalateError] = useState<string | null>(null);
+
   // DW-14-AC3, AC8: Chỉ hiện nút "Để AI làm" khi AI bật, step.ai.level === "C" và có step.command
   const showAiButton = aiEnabled && step.ai && step.ai.level === "C" && Boolean(step.command);
+
+  // DW-23-AC1: Hiện nút "Nhờ" khi bước chưa được phép thực hiện (allowed === false) và không phải hệ thống
+  const showEscalateBtn = !step.allowed && !isSystem && Boolean(step.key);
 
   const handleAiAction = async () => {
     if (!step.command) return;
@@ -287,6 +296,25 @@ function StepItem({
       setAiErrorMsg(msg);
     } finally {
       setCallingAi(false);
+    }
+  };
+
+  const handleEscalate = async () => {
+    setEscalating(true);
+    setEscalateError(null);
+
+    try {
+      const res = await escalateStep({
+        doc_type: docType,
+        doc_id: docId,
+        step_key: step.key,
+      });
+      setEscalatedGroup(res.assignee_group);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Không thể chuyển việc lúc này.";
+      setEscalateError(msg);
+    } finally {
+      setEscalating(false);
     }
   };
 
@@ -321,6 +349,26 @@ function StepItem({
             </button>
           )}
 
+          {/* DW-23: Nút "Nhờ" */}
+          {showEscalateBtn && (
+            <button
+              type="button"
+              className={s.stepEscalateBtn}
+              onClick={handleEscalate}
+              disabled={disabled || escalating || Boolean(escalatedGroup)}
+              title="Chuyển việc cho người có thẩm quyền thực hiện (DW-23)"
+            >
+              <Icon name="handshake" />
+              <span>
+                {escalating
+                  ? "Đang chuyển..."
+                  : escalatedGroup
+                  ? `Đã nhờ (${escalatedGroup})`
+                  : "Nhờ"}
+              </span>
+            </button>
+          )}
+
           {canAct && (
             <button
               type="button"
@@ -333,6 +381,28 @@ function StepItem({
           )}
         </div>
       </div>
+
+      {/* Thông báo kết quả bấm "Nhờ" (DW-23) */}
+      {escalatedGroup && (
+        <div className={s.aiNotice}>
+          <Icon name="check_circle" />
+          <div className={s.aiNoticeContent}>
+            <span>
+              Đã chuyển việc cho nhóm <strong>{escalatedGroup}</strong>. Việc hiển thị trong tab &quot;Được chuyển&quot; của màn Việc AI.
+            </span>
+            <Link href="/ai/actions?status=ESCALATED" className={s.aiActionsLink}>
+              Đến tab Được chuyển
+            </Link>
+          </div>
+        </div>
+      )}
+
+      {escalateError && (
+        <div className={`${s.aiNotice} ${s.aiNoticeError}`}>
+          <Icon name="error" />
+          <span>{escalateError}</span>
+        </div>
+      )}
 
       {/* Thông báo kết quả bấm "Để AI làm" */}
       {aiSuccessMsg && (

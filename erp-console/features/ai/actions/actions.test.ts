@@ -1,14 +1,65 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { callCommand } from "../commands/call";
-import { fetchAiActions, undoAiAction, mockAiActions, mockUndoAiAction } from "./api";
+import { fetchAiActions, undoAiAction, mockAiActions, mockUndoAiAction, escalateStep } from "./api";
+import { fetchDailyAiReport } from "../report/api";
 
-describe("DW-19 & DW-21 Frontend Actions & Undo Tests", () => {
+describe("DW-19, DW-21, DW-22 & DW-23 Frontend AI Tests", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
     vi.stubGlobal(
       "fetch",
       vi.fn().mockImplementation((url: string, init?: RequestInit) => {
         const urlStr = String(url);
+        if (urlStr.includes("/api/ai/report/daily/")) {
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            headers: new Headers({ "content-type": "application/json" }),
+            json: () =>
+              Promise.resolve({
+                date: "2026-09-28",
+                by_user: [
+                  {
+                    user_id: 1,
+                    display_name: "Duy (Chủ)",
+                    A: 5,
+                    B: 2,
+                    C_confirmed: 3,
+                    C_expired: 0,
+                    undone: 1,
+                    escalated: 0,
+                  },
+                ],
+                items: [
+                  {
+                    id: "rpt-1",
+                    command: "purchasing.purchasereceipt.nhap_lo",
+                    title: "Nhập lô mua tại cảng",
+                    level: "B",
+                    status: "DONE",
+                    owner_display: "Tuấn (Kho)",
+                    created_at: "2026-09-28T09:15:00+07:00",
+                    target: { type: "purchasereceipt", code: "PR-260928-01" },
+                    result_ref: { model: "purchasereceipt", id: 101 },
+                  },
+                ],
+              }),
+          });
+        }
+
+        if (urlStr.includes("/api/ai/actions/escalate/")) {
+          return Promise.resolve({
+            ok: true,
+            status: 201,
+            headers: new Headers({ "content-type": "application/json" }),
+            json: () =>
+              Promise.resolve({
+                action_id: "mock-escalated-uuid-12345",
+                assignee_group: "chu",
+              }),
+          });
+        }
+
         if (urlStr.includes("/api/ai/commands/")) {
           const body = typeof init?.body === "string" ? JSON.parse(init.body) : (init?.body || {});
           if (body?.args?._defer) {
@@ -154,6 +205,31 @@ describe("DW-19 & DW-21 Frontend Actions & Undo Tests", () => {
     pendingRes.results.forEach((item) => {
       expect(item.status).toBe("PENDING");
     });
+
+    const escalatedRes = await fetchAiActions({ status: "ESCALATED" });
+    escalatedRes.results.forEach((item) => {
+      expect(item.status).toBe("ESCALATED");
+    });
+  });
+
+  it("DW-23-AC1: escalateStep gọi API POST /api/ai/actions/escalate/ chuyển việc thành công", async () => {
+    const res = await escalateStep({
+      doc_type: "batch",
+      doc_id: 123,
+      step_key: "close",
+    });
+    expect(res.action_id).toBe("mock-escalated-uuid-12345");
+    expect(res.assignee_group).toBe("chu");
+  });
+
+  it("DW-22-AC1: fetchDailyAiReport gọi API báo cáo ngày thành công", async () => {
+    const report = await fetchDailyAiReport("2026-09-28");
+    expect(report.date).toBe("2026-09-28");
+    expect(report.by_user.length).toBeGreaterThan(0);
+    expect(report.by_user[0].display_name).toBe("Duy (Chủ)");
+    expect(report.items.length).toBeGreaterThan(0);
+    expect(report.items[0].command).toBe("purchasing.purchasereceipt.nhap_lo");
   });
 });
+
 

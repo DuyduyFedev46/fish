@@ -59,6 +59,24 @@ export const mockAiActions: Paginated<AiActionRow> = {
       args_preview: { supplier: 1, lines: [{ item_code: "CA-001", qty: "50.000" }] },
       downgrade_reason: null,
       result_ref: { model: "purchasing.purchasereceipt", id: 102 },
+      assignee_group: null,
+    },
+    {
+      id: "d4e5f6a7-b8c9-0123-cdef-123456789013",
+      command: "inventory.batch.close",
+      title: "Chốt lô cá thu CA02",
+      level: "C",
+      status: "ESCALATED",
+      owner_display: "AI của Kho",
+      created_at: new Date(Date.now() - 10 * 60 * 1000).toISOString(),
+      expires_at: null,
+      execute_after: null,
+      undo_until: null,
+      target: { type: "batch", code: "CA02-260928-XY34Z" },
+      args_preview: { batch_id: "CA02-260928-XY34Z" },
+      downgrade_reason: null,
+      result_ref: null,
+      assignee_group: "chu",
     },
   ],
 };
@@ -195,4 +213,56 @@ export async function undoAiAction(
     }
   );
 }
+
+export interface EscalatePayload {
+  doc_type: string;
+  doc_id: string | number;
+  step_key: string;
+}
+
+export interface EscalateResponse {
+  action_id: string;
+  assignee_group: string;
+}
+
+export async function escalateStep(
+  payload: EscalatePayload,
+  signal?: AbortSignal
+): Promise<EscalateResponse> {
+  const isMock = process.env.NEXT_PUBLIC_USE_MOCK === "1";
+  return apiFetch<EscalateResponse>("/api/ai/actions/escalate/", {
+    method: "POST",
+    body: payload,
+    signal,
+    mock: isMock
+      ? (_req: MockRequest) => {
+          const actionId = `esc-${Date.now()}`;
+          const newAction: AiActionRow = {
+            id: actionId,
+            command: `${payload.doc_type}.${payload.step_key}`,
+            title: `Nhờ hỗ trợ bước ${payload.step_key}`,
+            level: "C",
+            status: "ESCALATED",
+            owner_display: "AI của Bạn",
+            created_at: new Date().toISOString(),
+            expires_at: null,
+            execute_after: null,
+            undo_until: null,
+            target: { type: payload.doc_type, code: String(payload.doc_id) },
+            args_preview: { step_key: payload.step_key },
+            downgrade_reason: null,
+            result_ref: null,
+            assignee_group: "chu",
+          };
+          mockAiActions.results.unshift(newAction);
+          mockAiActions.count += 1;
+          return {
+            status: 201,
+            body: { action_id: actionId, assignee_group: "chu" },
+          };
+        }
+      : undefined,
+  });
+}
+
 

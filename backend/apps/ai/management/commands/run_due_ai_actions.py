@@ -2,6 +2,7 @@
 Management command: Chạy các việc AI mức B đã lên lịch tới hạn (DW-21, 02b §4.2).
 Idempotent, select_for_update(skip_locked=True).
 """
+import datetime
 import logging
 from django.conf import settings
 from django.core.management.base import BaseCommand
@@ -124,9 +125,40 @@ class Command(BaseCommand):
                     )
 
                 if dispatch_res.is_error:
-                    locked_action.status = AiAction.Status.FAILED
-                    locked_action.save(update_fields=["status"])
-                    logger.warning("Failed action=%s cmd=%s code=%s", locked_action.id, locked_action.command, dispatch_res.status_code)
+                    # DW-23-AC2: Gặp BusinessError -> ESCALATED cho chủ AI hoặc Group có quyền
+                    target_group = "chu"
+                    if spec:
+                        owner_has_perm = True
+                        if getattr(spec, "required_perms", None):
+                            owner_has_perm = all(owner.has_perm(p) for p in spec.required_perms)
+
+                        if owner_has_perm:
+                            owner_groups = list(owner.groups.values_list("name", flat=True))
+                            target_group = owner_groups[0] if owner_groups else "chu"
+                        else:
+                            from apps.ai.actions.services import find_assignee_group_for_step
+                            target_group = find_assignee_group_for_step({}, spec=spec)
+
+                    locked_action.status = AiAction.Status.ESCALATED
+                    locked_action.assignee_group = target_group
+                    locked_action.save(update_fields=["status", "assignee_group"])
+
+                    with set_ai_audit_scope(
+                        ai_actor=owner,
+                        level="C",
+                        config_version=locked_action.config_version,
+                        policy_version=locked_action.policy_version,
+                        action_ref=str(locked_action.id),
+                    ):
+                        record_audit(
+                            f"escalate_{locked_action.command}",
+                            actor=None,
+                            actor_kind="ai",
+                            ai_actor=owner,
+                            proposal_ref=str(locked_action.id),
+                            note=f"Lệnh AI gặp lỗi {dispatch_res.status_code}, chuyển việc cho nhóm {target_group}",
+                        )
+                    logger.warning("Escalated action=%s cmd=%s to group=%s code=%s", locked_action.id, locked_action.command, target_group, dispatch_res.status_code)
                 else:
                     result_ref = None
                     if isinstance(dispatch_res.data, dict) and "id" in dispatch_res.data:
@@ -161,4 +193,36 @@ class Command(BaseCommand):
                     # DW-21-AC7: Log chỉ in id lệnh + mã action
                     logger.info("Executed action=%s cmd=%s", locked_action.id, locked_action.command)
 
-        self.stdout.write(f"Finished: executed {executed_count}, downgraded {downgraded_count}.")
+        # DW-23-AC3: Quét các việc chờ quá 2 giờ -> đẩy lên 'chu'
+        two_hours_ago = now - datetime.timedelta(hours=2)
+        overdue_actions = AiAction.objects.filter(
+            status=AiAction.Status.PENDING,
+            created_at__lte=two_hours_ago,
+        ).exclude(assignee_group="chu")
+
+        overdue_escalated_count = 0
+        for overdue_act in overdue_actions:
+            with transaction.atomic():
+                locked_overdue = (
+                    AiAction.objects.select_for_update(skip_locked=True)
+                    .filter(pk=overdue_act.pk, status=AiAction.Status.PENDING)
+                    .first()
+                )
+                if not locked_overdue:
+                    continue
+                locked_overdue.status = AiAction.Status.ESCALATED
+                locked_overdue.assignee_group = "chu"
+                locked_overdue.save(update_fields=["status", "assignee_group"])
+
+                # Ghi AuditLog không có PII/giá vốn
+                record_audit(
+                    f"escalate_overdue_{locked_overdue.command}",
+                    actor=None,
+                    actor_kind="system",
+                    proposal_ref=str(locked_overdue.id),
+                    note=f"Việc AI #{locked_overdue.id} quá hạn 2 giờ, chuyển cho Chủ vựa",
+                )
+                overdue_escalated_count += 1
+                logger.info("Overdue action=%s cmd=%s escalated to chu", locked_overdue.id, locked_overdue.command)
+
+        self.stdout.write(f"Finished: executed {executed_count}, downgraded {downgraded_count}, overdue escalated {overdue_escalated_count}.")

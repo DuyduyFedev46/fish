@@ -627,3 +627,70 @@ Không có lỗi chặn (0 lỗi).
 3. `cd erp-console && npm test` -> `77 passed (vitest)`
 4. `cd erp-console && npx tsc --noEmit && npm run build` -> Compile sạch 30/30 static pages.
 5. `cd frontend && npx tsc --noEmit && npm run build` -> Compile sạch 10/10 static pages.
+
+---
+
+## Lô 5c: Báo cáo AI cuối ngày (DW-22) & Chuyển việc + nút "Nhờ" (DW-23) · Lần 1 · 2026-09-29
+
+### Kết luận: APPROVED — Nghiệm thu toàn diện Lô 5c: Báo cáo AI cuối ngày tổng hợp chính xác theo nhân sự và nhật ký việc, bảo đảm quyền kiểm soát của Chủ (DW-22); Cơ chế chuyển việc định tuyến nhóm nhận theo thẩm quyền quyền hạn (không hardcode tên Group), nút "Nhờ" tích hợp mượt mà trên GuidancePanel và màn Việc AI, tự động leo thang việc chờ quá 2 giờ và lệnh B lỗi về Chủ (DW-23); Bảo vệ tuyệt đối Bất biến 1 (giá vốn) và Bất biến 9 (PII khách hàng).
+
+### Tổng: 16 ca · ✅ 16 · ❌ 0 · ⏸ 0
+
+### Theo AC
+| Mã AC | Kết quả | Bằng chứng (test tự động / file kiểm chứng) |
+|---|---|---|
+| **DW-22-AC1** | ✅ PASS | `apps.ai.report.tests.test_daily_report::DailyAiReportTests.test_dw22_ac1_counts_and_items`<br>Ngày có 3 việc B, 1 hoàn tác, 2 nháp C duyệt, 1 nháp C hết hạn, 1 chuyển việc -> `by_user` đếm đúng từng cột (`B=4`, `undone=1`, `C_confirmed=2`, `C_expired=1`, `escalated=1`), `items` liệt kê đủ 8 việc (BR-AI-26). |
+| **DW-22-AC2 (lỗi)** | ✅ PASS | `apps.ai.report.tests.test_daily_report::DailyAiReportTests.test_dw22_ac2_empty_and_invalid_date`<br>Ngày không có việc -> HTTP 200 `{"by_user": [], "items": []}`; Ngày sai định dạng -> HTTP 400 `INVALID_DATE`. |
+| **DW-22-AC3 (quyền)** | ✅ PASS | `apps.ai.report.tests.test_daily_report::DailyAiReportTests.test_dw22_ac3_permission_check`<br>`quan_ly`, `nv_kho`, `nv_giao` gọi `GET /api/ai/report/daily/` bị từ chối HTTP 403 Forbidden `BR-PQ-12`; Chưa đăng nhập -> 401 Unauthorized. |
+| **DW-22-AC4 (PII / giá vốn)** | ✅ PASS | `apps.ai.report.tests.test_daily_report::DailyAiReportTests.test_dw22_ac4_no_pii_no_costprice`<br>Việc đụng đơn có PII giả ("Nguyễn Văn A", "0987654321", "123 Đường Giả Lập") và giá vốn ("150000", "35000") -> `target` chỉ chứa `type` + `code` (`DN-20260928-001`), toàn bộ JSON response sạch 100% PII và giá vốn (Bất biến 1 & 9). |
+| **DW-22-AC5 (AI tắt)** | ✅ PASS | `apps.ai.report.tests.test_daily_report::DailyAiReportTests.test_dw22_ac5_ai_disabled_still_accessible`<br>`@override_settings(AI_ENABLED=False)` -> gọi xem báo cáo ngày vẫn trả HTTP 200, cho phép Chủ tra cứu lịch sử khi AI tắt (BR-AI-10). |
+| **DW-22-FE** | ✅ PASS | `erp-console/features/ai/report/components/AiDailyReportScreen.tsx`<br>`erp-console/app/(console)/ai/report/page.tsx`<br>Trang `/ai/report/` bọc bằng `ViewGuard view="ai-report"`, menu Báo cáo AI chỉ hiển thị với Chủ; có bộ chọn ngày, 6 thẻ KPI tổng hợp, bảng theo nhân sự (`by_user`), và bảng nhật ký chi tiết (`items`). |
+| **DW-23-AC1** | ✅ PASS | `apps.ai.actions.tests.test_escalate::EscalateGuidanceStepTests.test_dw23_ac1_nv_kho_escalate_close_batch_to_chu`<br>NV kho xem lô, bước "Chốt lô" `allowed=false` -> gọi `POST /api/ai/actions/escalate/` -> HTTP 201 Created `{"action_id": "...", "assignee_group": "chu"}`; `AiAction` tạo với `status=ESCALATED`; Chủ đăng nhập thấy trong danh sách `GET /api/ai/actions/?status=ESCALATED` (BR-AI-25, Q-M20). |
+| **DW-23-AC2** | ✅ PASS | `apps.ai.actions.tests.test_escalate::EscalateGuidanceStepTests.test_dw23_ac2_job_b_error_escalates_to_permitted_group`<br>Job B (`run_due_ai_actions`) gặp `BusinessError` -> tự động chuyển `status=ESCALATED` cho chủ AI hoặc Group có quyền (`target_group="chu"` với việc chốt lô); AuditLog ghi nhận `escalate_{command}` với `actor_kind="ai"`. |
+| **DW-23-AC3 (quá hạn)** | ✅ PASS | `apps.ai.actions.tests.test_escalate::EscalateGuidanceStepTests.test_dw23_ac3_overdue_2h_escalates_to_chu_no_execution`<br>Việc chờ khách quá 2 giờ (`created_at <= now - 2h` và `status=PENDING`) -> job `run_due_ai_actions` quét và chuyển `status=ESCALATED`, `assignee_group="chu"`, ghi AuditLog `escalate_overdue_{command}`, `executed_at` vẫn `None` (tuyệt đối không tự thực thi). |
+| **DW-23-AC4 (giá vốn)** | ✅ PASS | `apps.ai.actions.tests.test_escalate::EscalateGuidanceStepTests.test_dw23_ac4_quan_ly_view_no_cost_price`<br>Việc chuyển tới `quan_ly` về lô hàng -> `GET /api/ai/actions/<id>/` -> `args_preview` lọc sạch `unit_cost`, `purchase_cost` qua `scrub_data(..., user=request.user)` (Bất biến 1). |
+| **DW-23-AC5 (PII)** | ✅ PASS | `apps.ai.actions.tests.test_escalate::EscalateGuidanceStepTests.test_dw23_ac5_order_action_no_pii`<br>Việc chuyển đụng đơn hàng chứa PII -> xem chi tiết chỉ trả mã đơn `target={"type": "order", "code": "ORD-9999"}`, không có tên khách, SĐT hay địa chỉ (Bất biến 9). |
+| **DW-23-AC6 (lỗi)** | ✅ PASS | `apps.ai.actions.tests.test_escalate::EscalateGuidanceStepTests.test_dw23_ac6_errors_already_allowed_or_step_missing`<br>1) Bước không tồn tại -> HTTP 400 `STEP_NOT_FOUND`; 2) Người gửi tự làm được bước (`allowed=true`) -> HTTP 400 `BR-AI-25`. |
+| **DW-23-AC7 (AI tắt)** | ✅ PASS | `apps.ai.actions.tests.test_escalate::EscalateGuidanceStepTests.test_dw23_ac7_ai_disabled_escalate_still_works`<br>`@override_settings(AI_ENABLED=False)` -> bấm "Nhờ" gọi escalate vẫn trả HTTP 201 Created và chuyển việc bình thường không phụ thuộc AI model (BR-AI-10). |
+| **DW-23-FE-NHO** | ✅ PASS | `erp-console/features/guidance/components/GuidancePanel.tsx:264-320, 353-370`<br>Nút "Nhờ" hiển thị trên các bước `allowed === false` (và không phải hệ thống); bấm nút gọi `escalateStep`, hiển thị thông báo "Đã chuyển việc cho nhóm X" kèm link dẫn sang tab "Được chuyển". |
+| **DW-23-FE-TAB** | ✅ PASS | `erp-console/app/(console)/ai/actions/page.tsx:27-29, 218-227`<br>`ActionDetailModal.tsx:145-157`<br>Màn hình Việc AI có tab "Được chuyển", hỗ trợ query string `?status=ESCALATED` tự động kích hoạt tab; hiển thị badge "ĐƯỢC CHUYỂN (nhóm)" và modal chi tiết. |
+| **FE-UNIT-TESTS** | ✅ PASS | `erp-console/features/ai/actions/actions.test.ts:215-233`<br>Bổ sung và pass 100% tests cho `escalateStep` (DW-23-AC1) và `fetchDailyAiReport` (DW-22-AC1). |
+
+### Ngoại lệ & biên | Phân quyền (bảng vai × hành động) | Rò giá vốn | Rò dữ liệu cá nhân | Hồi quy
+- **Ngoại lệ & biên:**
+  - Định dạng ngày sai (`?date=28-09-2026`): Bị chặn ngay với HTTP 400 `INVALID_DATE`.
+  - Ngày không có dữ liệu: Trả về HTTP 200 danh sách rỗng, không gây lỗi 500 hay crash frontend.
+  - Tự làm được bước (`allowed=true`): Bị chặn escalate với HTTP 400 `BR-AI-25`.
+  - Quét việc quá hạn 2 giờ: Sử dụng `select_for_update(skip_locked=True)`, bảo đảm an toàn đa tiến trình, không gây race condition và không tự động thực thi.
+- **Phân quyền (Bảng vai × Hành động):**
+  | Vai | Xem Báo cáo AI (`GET /report/daily/`) | Bấm "Nhờ" (Escalate step) | Xem việc "Được chuyển" (`status=ESCALATED`) |
+  |---|---|---|---|
+  | `chu` | ✅ 200 OK | ✅ 201 Created (nếu step disallowed) | ✅ Thấy toàn bộ việc chuyển cho `chu` & all |
+  | `quan_ly` | ❌ 403 `BR-PQ-12` | ✅ 201 Created | ✅ Thấy việc chuyển cho nhóm `quan_ly` |
+  | `nv_kho` | ❌ 403 `BR-PQ-12` | ✅ 201 Created | ✅ Thấy việc chuyển cho nhóm `nv_kho` |
+  | `nv_giao` | ❌ 403 `BR-PQ-12` | ✅ 201 Created | ❌ Chỉ thấy việc của chính mình |
+  | Khách / Chưa login | ❌ 401 Unauthorized | ❌ 401 Unauthorized | ❌ 401 Unauthorized |
+- **Rò giá vốn (Bất biến 1):**
+  - Response Báo cáo AI không trả trường `args`, `target` chỉ chứa `type` và `code`, hoàn toàn không có trường giá vốn hay số tiền chi phí mua.
+  - Xem chi tiết việc AI chuyển (`GET /api/ai/actions/<id>/`): `args_preview` được lọc bằng `scrub_data(..., user=request.user)`. Người thiếu `view_costprice` (`quan_ly`, `nv_kho`) bị loại bỏ hoàn toàn các trường `unit_cost`, `purchase_cost`, `rate`.
+- **Rò dữ liệu cá nhân (Bất biến 9):**
+  - Mở rộng `SCRUB_PII_KEYS` với `shipping_address`, `recipient_name`, `receiver_name` để bảo đảm dữ liệu giao hàng sạch hoàn toàn.
+  - `target` trong `AiAction` và Báo cáo AI chỉ ghi `type` và `code` (ví dụ `order #ORD-9999`), không chứa tên khách, SĐT hay địa chỉ.
+  - Giao diện console không log thông tin nhạy cảm ra `console` hay `localStorage`.
+- **Hồi quy:**
+  - Suite backend `apps.ai.report` và `apps.ai.actions` đạt **22 tests xanh 100%**.
+  - Toàn bộ backend test suite đạt **1044 tests xanh 100%**.
+  - `makemigrations --check --dry-run` sạch sẽ: `No changes detected`.
+  - Vitest `erp-console`: **79 tests passed 100%**.
+  - Build tĩnh Next.js: `erp-console` sạch 31/31 static pages, `frontend` sạch 10/10 static pages.
+
+### Lỗi
+Không có lỗi chặn (0 lỗi).
+
+### Lệnh đã chạy (kèm output tóm tắt)
+1. `cd backend && .venv/bin/python manage.py test apps.ai.report apps.ai.actions` -> `Ran 22 tests in 0.683s. OK`
+2. `cd backend && .venv/bin/python manage.py test && .venv/bin/python manage.py makemigrations --check --dry-run` -> `Ran 1044 tests in 48.581s. OK. No changes detected.`
+3. `cd backend && .venv/bin/python manage.py run_due_ai_actions` -> `Finished: executed 0, downgraded 0, overdue escalated 0.`
+4. `cd erp-console && npm test` -> `79 passed (vitest)`
+5. `cd erp-console && npx tsc --noEmit && npm run build` -> Compile sạch 31/31 static pages (thêm route `/ai/report/` 6.4 kB).
+6. `cd frontend && npx tsc --noEmit && npm run build` -> Compile sạch 10/10 static pages.

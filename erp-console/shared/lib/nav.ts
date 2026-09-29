@@ -32,6 +32,7 @@ export type ViewKey =
   | "ai-actions"
   | "ai-settings"
   | "ai-policy"
+  | "ai-report"
   | "content"
   | "content-categories";
 
@@ -329,6 +330,17 @@ export const NAV: NavItem[] = [
     label: "Chính sách AI",
     short: "Chính sách AI",
     icon: "policy",
+    section: "Quản trị",
+    visible: (me) => has(me, PERM.manageAiPolicy),
+  },
+  {
+    key: "ai-report",
+    summary: "Báo cáo tổng hợp hoạt động của các trợ lý AI cuối ngày.",
+    plannedIn: "DW-22",
+    href: "/ai/report/",
+    label: "Báo cáo AI",
+    short: "Báo cáo AI",
+    icon: "analytics",
     section: "Quản trị",
     visible: (me) => has(me, PERM.manageAiPolicy),
   },

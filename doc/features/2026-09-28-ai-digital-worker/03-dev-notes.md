@@ -659,3 +659,74 @@
   - `erp-console`: `npm test` -> **77 / 77 tests pass 100%**.
   - `erp-console`: `npx tsc --noEmit && npm run build` -> **30 / 30 static pages thành công**.
   - `frontend`: `npx tsc --noEmit && npm run build` -> **10 / 10 static pages thành công**.
+
+---
+
+## Lô 5c — Báo cáo AI cuối ngày (DW-22) & Chuyển việc + Nút "Nhờ" (DW-23)
+- Trạng thái: BE & FE HOÀN THÀNH — ĐÃ CẬP NHẬT ĐẦY ĐỦ TEST SUITE
+- Nhánh thực hiện: `main`
+
+### 1. Backend (`be-dev`)
+- **Story DW-22: Báo cáo AI cuối ngày cho Chủ (DW-22-AC1..AC5, 02b §6.6, BR-AI-26)**:
+  - `backend/apps/ai/report/`: Tạo package mới quản lý báo cáo AI cuối ngày.
+  - `backend/apps/ai/report/services.py`: Cài đặt `get_daily_ai_report(report_date)`:
+    - Lọc các `AiAction` trong khoảng `report_date 00:00:00` đến `23:59:59`.
+    - Thống kê `by_user`: theo từng nhân viên với các cột A, B, C_confirmed, C_expired, undone, escalated.
+    - Danh sách `items`: lọc an toàn, chỉ chứa type + code của target, không chứa PII (Bất biến 9) và không chứa giá vốn (Bất biến 1).
+  - `backend/apps/ai/report/api.py`: `AiDailyReportView`:
+    - Chặn quyền `ai.manage_ai_policy` -> 403 `BR-PQ-12` nếu không phải Chủ (DW-22-AC3).
+    - Validate định dạng ngày -> 400 `INVALID_DATE` nếu sai định dạng, 200 danh sách rỗng nếu không có việc (DW-22-AC2).
+    - Vẫn hoạt động khi `AI_ENABLED=False` (DW-22-AC5).
+  - Định tuyến: Thêm route `ai/report/daily/` vào `backend/config/api_urls.py`.
+
+- **Story DW-23: Chuyển việc cho người có quyền + nút "Nhờ" (DW-23-AC1..AC7, BR-AI-25, Q-M20)**:
+  - `backend/apps/ai/actions/services.py`:
+    - `find_assignee_group_for_step`: Định tuyến Group nhận việc theo quyền của lệnh/bước, tuân thủ kỷ luật không so sánh hardcode tên Group trong code (`Group.objects.filter(permissions__...)`).
+    - `escalate_guidance_step`: Nạp guidance qua provider, kiểm tra bước tồn tại (400 `STEP_NOT_FOUND`), kiểm tra `allowed=True` thì chặn (400 `BR-AI-25`), tìm Group thẩm quyền, tạo `AiAction(status=ESCALATED, assignee_group=...)`, ghi AuditLog `escalate_{command}` (DW-23-AC1, AC6).
+  - `backend/apps/ai/actions/api.py`:
+    - Thêm action `@action(detail=False, methods=["post"], url_path="escalate")`.
+    - Cập nhật `get_queryset` và `retrieve`: Cho phép người nhận trong `assignee_group` (hoặc nhóm của user) xem và lấy chi tiết việc `ESCALATED`.
+  - `backend/apps/ai/actions/serializers.py`: Bổ sung `assignee_group` vào `fields`. `args_preview` lọc theo quyền của người xem qua `scrub_data(..., user=request.user)`.
+  - `backend/apps/ai/policy/rules.py`: Mở rộng `SCRUB_PII_KEYS` với `shipping_address`, `recipient_name`, `receiver_name` để lọc sạch địa chỉ giao hàng và thông tin người nhận (Bất biến 9).
+  - `backend/apps/ai/management/commands/run_due_ai_actions.py`:
+    - DW-23-AC2: Khi lệnh B tới hạn gặp `BusinessError` (`dispatch_res.is_error`), tự động chuyển `status=ESCALATED` cho chủ AI hoặc Group có quyền tương ứng.
+    - DW-23-AC3: Quét các việc chờ quá 2 giờ (`created_at <= now - 2h` và `status=PENDING`), tự động chuyển `assignee_group="chu"`, `status=ESCALATED`, ghi AuditLog hệ thống, tuyệt đối không tự thực thi.
+
+- **Kiểm chứng Backend**:
+  - `backend/apps/ai/report/tests/test_daily_report.py`: **5 tests bao phủ DW-22-AC1..AC5**.
+  - `backend/apps/ai/actions/tests/test_escalate.py`: **7 tests bao phủ DW-23-AC1..AC7**.
+  - Chạy suite Lô 5c:
+    ```bash
+    .venv/bin/python manage.py test apps.ai.report apps.ai.actions
+    # Ran 22 tests in 0.683s. OK
+    ```
+  - Chạy toàn bộ backend test suite:
+    ```bash
+    .venv/bin/python manage.py test && .venv/bin/python manage.py makemigrations --check --dry-run
+    # Ran 1044 tests in 48.581s. OK. No changes detected.
+    ```
+
+### 2. Frontend (`fe-dev`)
+- **DW-23 (FE - Nút "Nhờ" trong Guidance & Tab "Được chuyển" trong Việc AI)**:
+  - `erp-console/features/ai/actions/api.ts`: Cài đặt `escalateStep(payload)` và mock handler sinh action `ESCALATED`. Cập nhật `mockAiActions` có mục `ESCALATED`.
+  - `erp-console/features/guidance/components/GuidancePanel.tsx`:
+    - Thêm nút "Nhờ" trên các bước `allowed === false` và không phải hệ thống.
+    - Khi bấm "Nhờ", gọi `escalateStep`, hiển thị thông báo chuyển việc thành công cho nhóm và link sang tab Được chuyển.
+  - `erp-console/features/guidance/components/guidance.module.css`: Thêm class `.stepEscalateBtn`.
+  - `erp-console/app/(console)/ai/actions/page.tsx`:
+    - Thêm tab "Được chuyển" (`ESCALATED`).
+    - Hỗ trợ query string `?status=ESCALATED` tự động kích hoạt tab.
+    - Bảng hiển thị badge "ĐƯỢC CHUYỂN" kèm nhóm nhận việc.
+  - `erp-console/features/ai/actions/components/ActionDetailModal.tsx`: Hiển thị nhãn `ĐÃ CHUYỂN VIỆC (ESCALATED)` và nhóm nhận việc `assignee_group`.
+- **DW-22 (FE - Màn hình Báo cáo AI cuối ngày cho Chủ vựa)**:
+  - `erp-console/features/ai/report/api.ts`: Cài đặt `fetchDailyAiReport(dateStr)` và mock data.
+  - `erp-console/features/ai/report/components/AiDailyReportScreen.tsx`: Màn hình Báo cáo AI cuối ngày gồm bộ chọn ngày, 6 thẻ KPI tổng hợp (Tổng, A, B, C duyệt, Hoàn tác, Chuyển việc), Bảng thống kê theo nhân sự (`by_user`), Bảng chi tiết việc AI trong ngày (`items`).
+  - `erp-console/app/(console)/ai/report/page.tsx`: Trang route `/ai/report/` bọc trong `ViewGuard view="ai-report"`.
+  - `erp-console/shared/lib/nav.ts`: Đăng ký `ai-report` vào `ViewKey` và thêm mục menu "Báo cáo AI" trong section Quản trị dành riêng cho Chủ.
+- **Unit test Frontend (`erp-console/features/ai/actions/actions.test.ts`)**:
+  - Bổ sung test cho `escalateStep` (DW-23-AC1) và `fetchDailyAiReport` (DW-22-AC1).
+- **Kiểm chứng Frontend**:
+  - `erp-console`: `npm test` -> **79 / 79 tests pass 100%**.
+  - `erp-console`: `npx tsc --noEmit && npm run build` -> **31 / 31 static pages thành công**.
+  - `frontend`: `npx tsc --noEmit && npm run build` -> **10 / 10 static pages thành công**.
+

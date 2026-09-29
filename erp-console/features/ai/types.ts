@@ -167,12 +167,43 @@ export type AiActionRow = {
     text: string;
   } | null;
   result_ref: Record<string, unknown> | null;
+  assignee_group?: string | null;
 };
 
 export type AiActionDetail = AiActionRow & {
   confirm_nonce?: string;
   viewable_from?: string;
   viewed_at?: string | null;
+};
+
+// ---- DW-22 Báo cáo AI cuối ngày cho Chủ (02b §6.6) ----
+export type AiDailyReportUserStat = {
+  user_id: number;
+  display_name: string;
+  A: number;
+  B: number;
+  C_confirmed: number;
+  C_expired: number;
+  undone: number;
+  escalated: number;
+};
+
+export type AiDailyReportItem = {
+  id: string;
+  command: string;
+  title: string;
+  level: AiCommandLevel;
+  status: AiActionStatus;
+  owner_display: string;
+  created_at: string;
+  target: { type: string; code: string } | null;
+  result_ref: Record<string, unknown> | null;
+};
+
+export type AiDailyReport = {
+  date: string;
+  by_user: AiDailyReportUserStat[];
+  items: AiDailyReportItem[];
 };
 
 // ---- DW-12 & DW-13 Cấu hình người dùng & Chính sách AI của Chủ (02b §6.5, §6.6) ----

@@ -131,6 +131,8 @@ export function ActionDetailModal({
                     ? "bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300"
                     : action.status === "PENDING"
                     ? "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300"
+                    : action.status === "ESCALATED"
+                    ? "bg-orange-100 text-orange-800 dark:bg-orange-950 dark:text-orange-300"
                     : action.status === "DONE" || action.status === "CONFIRMED"
                     ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
                     : action.status === "CANCELLED" || action.status === "REJECTED"
@@ -138,10 +140,21 @@ export function ActionDetailModal({
                     : "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200"
                 }`}
               >
-                {action.status === "SCHEDULED" ? "ĐÃ LÊN LỊCH (SCHEDULED)" : action.status}
+                {action.status === "SCHEDULED"
+                  ? "ĐÃ LÊN LỊCH (SCHEDULED)"
+                  : action.status === "ESCALATED"
+                  ? "ĐÃ CHUYỂN VIỆC (ESCALATED)"
+                  : action.status}
               </span>
             </div>
           </div>
+
+          {action.assignee_group && (
+            <div>
+              <span className="font-medium text-gray-700 dark:text-gray-200">Nhóm nhận việc:</span>{" "}
+              <span className="font-semibold text-orange-700 dark:text-orange-300">{action.assignee_group}</span>
+            </div>
+          )}
 
           {action.target && action.target.code && (
             <div>

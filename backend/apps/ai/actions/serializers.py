@@ -40,6 +40,7 @@ class AiActionSerializer(serializers.ModelSerializer):
             "downgrade_reason",
             "result_ref",
             "confirm_nonce",
+            "assignee_group",
         ]
 
     def get_title(self, obj) -> str:

@@ -1,6 +1,7 @@
 """
 API endpoints cho Việc AI (02b §6.4, DW-11).
 """
+from django.db.models import Q
 from django.utils import timezone
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
@@ -24,6 +25,7 @@ class AiActionViewSet(viewsets.GenericViewSet):
     ViewSet quản lý Việc AI:
     - GET /api/ai/actions/?status=&scope=&page=
     - GET /api/ai/actions/<id>/
+    - POST /api/ai/actions/escalate/
     - POST /api/ai/actions/<id>/confirm/
     - POST /api/ai/actions/<id>/reject/
     - POST /api/ai/actions/<id>/undo/
@@ -36,12 +38,18 @@ class AiActionViewSet(viewsets.GenericViewSet):
     def get_queryset(self):
         user = self.request.user
         scope = self.request.query_params.get("scope", "mine")
+        user_groups = set(user.groups.values_list("name", flat=True))
+        if user.has_perm("ai.manage_ai_policy"):
+            user_groups.add("chu")
+
         if scope == "all":
             if not user.has_perm("ai.manage_ai_policy"):
                 return AiAction.objects.none()
             qs = AiAction.objects.all()
         else:
-            qs = AiAction.objects.filter(owner=user)
+            qs = AiAction.objects.filter(
+                Q(owner=user) | Q(status=AiAction.Status.ESCALATED, assignee_group__in=user_groups)
+            )
 
         status_param = self.request.query_params.get("status")
         if status_param:
@@ -69,10 +77,14 @@ class AiActionViewSet(viewsets.GenericViewSet):
 
     def retrieve(self, request, pk=None, *args, **kwargs):
         user = request.user
+        user_groups = set(user.groups.values_list("name", flat=True))
         if user.has_perm("ai.manage_ai_policy"):
+            user_groups.add("chu")
             action_obj = AiAction.objects.filter(id=pk).first()
         else:
-            action_obj = AiAction.objects.filter(id=pk, owner=user).first()
+            action_obj = AiAction.objects.filter(
+                Q(id=pk) & (Q(owner=user) | Q(status=AiAction.Status.ESCALATED, assignee_group__in=user_groups))
+            ).first()
 
         if not action_obj:
             return Response(
@@ -108,6 +120,26 @@ class AiActionViewSet(viewsets.GenericViewSet):
             request=request,
         )
         return Response(res, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=["post"], url_path="escalate")
+    def escalate(self, request):
+        """
+        POST /api/ai/actions/escalate/
+        Body: {"doc_type": "batch", "doc_id": "123", "step_key": "close"}
+        -> 201 {"action_id": "...", "assignee_group": "chu"}
+        DW-23-AC1, AC6, AC7
+        """
+        doc_type = request.data.get("doc_type")
+        doc_id = request.data.get("doc_id")
+        step_key = request.data.get("step_key")
+
+        res = services.escalate_guidance_step(
+            doc_type=doc_type,
+            doc_id=doc_id,
+            step_key=step_key,
+            user=request.user,
+        )
+        return Response(res, status=status.HTTP_201_CREATED)
 
     @action(detail=True, methods=["post"], url_path="undo")
     def undo(self, request, pk=None):

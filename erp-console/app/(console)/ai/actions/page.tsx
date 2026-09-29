@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { ViewGuard } from "@/features/auth/components/ViewGuard";
 import { useAuth } from "@/features/auth/components/AuthProvider";
 import { fetchAiActions, confirmAiAction, rejectAiAction, undoAiAction } from "@/features/ai/actions/api";
@@ -12,14 +13,20 @@ import { Loading } from "@/shared/ui/StateBox";
 export default function AiActionsPage() {
   return (
     <ViewGuard view="ai-actions">
-      <AiActionsContent />
+      <Suspense fallback={<div className="p-6"><Loading label="Đang tải..." /></div>}>
+        <AiActionsContent />
+      </Suspense>
     </ViewGuard>
   );
 }
 
 function AiActionsContent() {
   const { me } = useAuth();
-  const [activeTab, setActiveTab] = useState<"pending" | "scheduled" | "history">("pending");
+  const searchParams = useSearchParams();
+  const initialStatus = searchParams.get("status")?.toUpperCase();
+  const defaultTab = initialStatus === "ESCALATED" ? "escalated" : initialStatus === "SCHEDULED" ? "scheduled" : "pending";
+
+  const [activeTab, setActiveTab] = useState<"pending" | "scheduled" | "escalated" | "history">(defaultTab);
   const [scope, setScope] = useState<"mine" | "all">("mine");
   const [actions, setActions] = useState<AiActionRow[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -37,6 +44,8 @@ function AiActionsContent() {
       let statusFilter = "PENDING";
       if (activeTab === "scheduled") {
         statusFilter = "SCHEDULED";
+      } else if (activeTab === "escalated") {
+        statusFilter = "ESCALATED";
       } else if (activeTab === "history") {
         statusFilter = "CONFIRMED,REJECTED,EXPIRED,DONE,CANCELLED,UNDONE";
       }
@@ -207,6 +216,17 @@ function AiActionsContent() {
         </button>
         <button
           type="button"
+          onClick={() => setActiveTab("escalated")}
+          className={`border-b-2 px-4 py-2 text-sm font-medium ${
+            activeTab === "escalated"
+              ? "border-amber-600 text-amber-600 dark:border-amber-400 dark:text-amber-400"
+              : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400"
+          }`}
+        >
+          Được chuyển ({actions.filter((a) => a.status === "ESCALATED").length})
+        </button>
+        <button
+          type="button"
           onClick={() => setActiveTab("history")}
           className={`border-b-2 px-4 py-2 text-sm font-medium ${
             activeTab === "history"
@@ -270,6 +290,8 @@ function AiActionsContent() {
                           ? "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300"
                           : act.status === "SCHEDULED"
                           ? "bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300"
+                          : act.status === "ESCALATED"
+                          ? "bg-orange-100 text-orange-800 dark:bg-orange-950 dark:text-orange-300"
                           : act.status === "CONFIRMED" || act.status === "DONE"
                           ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
                           : act.status === "REJECTED" || act.status === "CANCELLED"
@@ -277,7 +299,11 @@ function AiActionsContent() {
                           : "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300"
                       }`}
                     >
-                      {act.status === "SCHEDULED" ? "ĐÃ LÊN LỊCH" : act.status}
+                      {act.status === "SCHEDULED"
+                        ? "ĐÃ LÊN LỊCH"
+                        : act.status === "ESCALATED"
+                        ? `ĐƯỢC CHUYỂN${act.assignee_group ? ` (${act.assignee_group})` : ""}`
+                        : act.status}
                     </span>
                   </td>
                   <td className="px-4 py-3 text-xs text-gray-500">
