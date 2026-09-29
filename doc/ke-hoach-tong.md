@@ -21,7 +21,7 @@
 | ☑ | **P3** Lệnh AI tự sinh + AI của tôi | `2026-09-28-ai-digital-worker` | 2 → 3a → 3b → 3c → 4 | XONG | P2 xong; kết quả spike Lô 0 đạt | Mọi môi trường `AI_WRITE_LEVELS_ALLOWED=C` (AI chỉ soạn nháp). Lô 2 có sẵn danh sách cấm `/api/public/`, `/api/cskh/`, `…/label/` |
 | ☑ | **P4** CSKH xác nhận + in tem | `2026-09-28-cskh-xac-nhan-in-tem` | 1 → 2 → 3 → 4 (5 là Could) | XONG | P3 xong | Lô 2 chỉ staging. Lô 3 (tự huỷ) lên production **sau khi legal-vn duyệt câu thông báo** và Duy bật cờ `CSKH_AUTO_CANCEL_ENABLED` |
 | ☑ | **P5** CMS viết bài | `2026-09-28-cms-viet-bai` | 1 → 2 → … → 7 | XONG | P4 xong | Thư viện mới duy nhất: Tiptap 2 (erp-console). CMS-16 đã làm ở P1 |
-| ☐ | **P6** Khung go-live | `2026-09-28-khung-go-live` | 1 → 2 → 3 | SẴN SÀNG CODE (Duy duyệt 28/09) | CMS Lô 5 (Lô 1–2), CMS Lô 7 (Lô 3) | Cờ `PRIVACY_CONSENT_REQUIRED` bật: chưa đăng chính sách thì Shop không nhận đơn |
+| ☑ | **P6** Khung go-live | `2026-09-28-khung-go-live` | 1 → 2 → 3 | XONG | CMS Lô 5 (Lô 1–2), CMS Lô 7 (Lô 3) | Cờ `PRIVACY_CONSENT_REQUIRED` bật: chưa đăng chính sách thì Shop không nhận đơn |
 | ☐ | **P7** AI tự ghi + vùng đỏ | `2026-09-28-ai-digital-worker` | 5a → 5b → 5c → 6a → 6b | SẴN SÀNG CODE (Duy duyệt 28/09) | P6 xong | **Chỉ staging** tới khi xong S-L1…S-L4 (pháp lý) |
 
 ## Việc của Duy (không phải code)
@@ -72,6 +72,6 @@ cache chung (Redis) · SEO nâng cao cho bài viết · hoàn kho/hoàn tiền m
 | 2026-09-29 17:50 | P5 | Lô 5 | APPROVED | `adb66b9` | 980 | CMS-15 trang go-live (privacy/terms/refund/seller_info), golive-status, footer-links |
 | 2026-09-29 18:20 | P5 | Lô 6 | APPROVED | `91318b4` | 987 | CMS-06 thẻ mặt hàng live catalog, CMS-14 danh sách bài & khối Bài mới Landing |
 | 2026-09-29 19:05 | P5 | Lô 7 | APPROVED | `38dc277` | 997 | CMS-09 gửi duyệt & trả về, CMS-11 lịch sử phiên bản & khôi phục, CMS-04 tự lưu nháp |
-
-
-
+| 2026-09-29 19:35 | P6 | Lô 1 | APPROVED | `3667428` | 1002 | GL-01 footer thông tin người bán từ env, GL-02 footer link các trang chính sách |
+| 2026-09-29 19:50 | P6 | Lô 2 | APPROVED | `9fe0954` | 1012 | GL-03 ô đồng ý xử lý dữ liệu ở checkout, consent timestamp & policy version |
+| 2026-09-29 20:35 | P6 | Lô 3 | APPROVED | `10cf61e` | 1019 | GL-05 bằng chứng đồng ý trên ERP, GL-04 thông báo gọi xác nhận kèm 4 số cuối |
