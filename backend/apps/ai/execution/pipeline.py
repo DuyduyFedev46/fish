@@ -378,23 +378,50 @@ class AiCommandCallView(APIView):
                     if not ok:
                         downgrade_reason = close_reason
 
-            # Nếu có downgrade_reason hoặc current_level == "C": tạo đề xuất nháp PENDING
+            # 4. DW-27-AC1, AC2: Xác nhận hoàn tiền luôn hạ C với mã AI_NO_EVIDENCE vì thiếu bằng chứng chuyển tiền thật
+            if not downgrade_reason:
+                if spec.id == "sales.refund.confirm" or (getattr(spec, "required_perms", ()) and "sales.confirm_refund" in spec.required_perms):
+                    downgrade_reason = {
+                        "code": "AI_NO_EVIDENCE",
+                        "text": "Cần bằng chứng chuyển tiền thật từ ngân hàng",
+                    }
+
+            # Nếu có downgrade_reason hoặc current_level == "C": tạo đề xuất nháp PENDING / ESCALATED
             if downgrade_reason or current_level == "C":
                 ttl_minutes = getattr(settings, "AI_ACTION_TTL_MINUTES", 15)
                 expires_at = timezone.now() + datetime.timedelta(minutes=ttl_minutes)
+
+                action_status = AiAction.Status.PENDING
+                assignee_group = ""
+                clean_args = dict(args) if isinstance(args, dict) else {}
+                if downgrade_reason and downgrade_reason.get("code") == "AI_NO_EVIDENCE":
+                    action_status = AiAction.Status.ESCALATED
+                    assignee_group = "chu"
+                    from apps.sales.models import Refund
+                    from apps.sales.utils import money_str
+                    rf = None
+                    if target_id and str(target_id).isdigit():
+                        rf = Refund.objects.filter(pk=int(target_id)).first()
+                    rf_code = f"RF-{target_id}" if target_id else ""
+                    amount_str = f"{money_str(rf.amount)} " if rf and rf.amount else ""
+                    task_summary = f"Chuyển {amount_str}cho phiếu {rf_code}, rồi nhập mã giao dịch".strip()
+                    clean_args["summary"] = task_summary
+                    if "bank_txn_ref" in clean_args:
+                        clean_args.pop("bank_txn_ref", None)
 
                 action = AiAction.objects.create(
                     command=spec.id,
                     kind=AiAction.Kind.WRITE,
                     level=AiAction.Level.C,
-                    status=AiAction.Status.PENDING,
+                    status=action_status,
+                    assignee_group=assignee_group,
                     owner=request.user,
                     config_version=user_cfg.version if user_cfg else None,
                     policy_version=latest_policy.version if latest_policy else None,
                     idempotency_key=idempotency_key,
                     channel="ai_local",
                     client=client,
-                    args=args,
+                    args=clean_args,
                     target_model=target_model_label,
                     target_id=str(target_id or ""),
                     downgrade_reason=downgrade_reason,

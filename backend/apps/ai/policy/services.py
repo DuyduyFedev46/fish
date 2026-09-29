@@ -169,7 +169,10 @@ def update_policy(
 
         new_version = current_version + 1
         mode = global_mode or (latest.global_mode if latest else "on")
-        rz = red_zone if red_zone is not None else (latest.red_zone_open if latest else {})
+        if red_zone is not None:
+            rz = {**(latest.red_zone_open if latest and latest.red_zone_open else {}), **red_zone}
+        else:
+            rz = latest.red_zone_open if latest else {}
         cp = caps if caps is not None else (latest.caps if latest else {})
 
         changes = []

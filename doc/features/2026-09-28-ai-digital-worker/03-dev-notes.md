@@ -792,4 +792,60 @@
   - `erp-console`: `npx tsc --noEmit && npm run build` -> **31 / 31 static pages thành công**.
   - `frontend`: `npx tsc --noEmit && npm run build` -> **10 / 10 static pages thành công**.
 
+---
+
+## Lô 6b — DW-27: Xác nhận hoàn tiền luôn chuyển Chủ & DW-26: Khớp thanh toán tuyệt đối (Job Hệ thống)
+- Trạng thái: BE HOÀN THÀNH — ĐÃ CẬP NHẬT ĐẦY ĐỦ TEST SUITE
+- Nhánh thực hiện: `main`
+
+### 1. Backend (`be-dev`)
+- **Story DW-27: Xác nhận hoàn tiền luôn hạ C với AI_NO_EVIDENCE và chuyển việc cho Chủ (DW-27-AC1..AC5, 02b §4.3, §6.6, BR-AI-07, BR-HT-04, Q-M1, Q-M7, TL-1, TL-2)**:
+  - `backend/apps/ai/execution/pipeline.py`:
+    - Khi nhận lệnh `sales.refund.confirm` hoặc lệnh có required perm `sales.confirm_refund`:
+      - Luôn luôn hạ về mức C (`level="C"`, `outcome="proposal"`), bất kể `current_level` là bao nhiêu (kể cả khi công tắc vùng đỏ mở và user cấu hình mức B).
+      - `downgrade_reason = {"code": "AI_NO_EVIDENCE", "text": "Cần bằng chứng chuyển tiền thật từ ngân hàng"}` (DW-27-AC1).
+      - Loại bỏ hoàn toàn `bank_txn_ref` (mã giao dịch ngân hàng) do model/AI sinh ra khỏi `clean_args` trước khi tạo `AiAction` (DW-27-AC2).
+      - Tạo `AiAction(status=ESCALATED, assignee_group="chu")` và `task_summary = "Cần chuyển khoản thật và nhập mã GD ngân hàng vào phiếu hoàn tiền"` (DW-27-AC3).
+      - Khi Chủ mở modal việc và bấm xác nhận, frontend/API yêu cầu bắt buộc nhập `bank_txn_ref` thật từ sao kê ngân hàng (BR-HT-04).
+      - Lệnh `confirm` hoàn tiền tuyệt đối không tự động hoàn tất ở bất kỳ mức tự chủ nào (DW-27-AC4).
+      - Tuân thủ Bất biến 1 (không rò giá vốn) và Bất biến 9 (không rò PII khách) (DW-27-AC5).
+  - Tests BE: `backend/apps/ai/execution/tests/test_dw27_confirm_refund.py` (5 tests, bao phủ DW-27-AC1..AC5).
+
+- **Story DW-26: Khớp thanh toán tuyệt đối bằng job Hệ thống (DW-26-AC1..AC6, 02b §4.1, §4.3, §6.6, BR-TT-01, BR-TT-07, BR-TT-09, Q-M1, Q-M7, TL-1, TL-2, V-DW1)**:
+  - `backend/apps/sales/payments/auto_confirm.py`:
+    - Module `process_exact_payment_matches()` xử lý khớp thanh toán hoàn toàn bằng job Hệ thống (`actor_kind="system"`), theo phương án V-DW1 Duy đã duyệt:
+      1. Môi trường: Chỉ chạy khi `DEBUG=True` hoặc `AI_PRODUCTION_READY=True` (Staging).
+      2. Công tắc của Chủ: Kiểm tra `"system.auto_confirm_exact_match"` trong `AiPolicyVersion.red_zone_open`. Nếu công tắc đóng -> không thực hiện (DW-26-AC1).
+      3. Cờ nghi trùng: Bỏ qua các giao dịch có `is_suspected_duplicate=True` (DW-26-AC2).
+      4. Trạng thái giao dịch: Chỉ xử lý giao dịch `resolution_status == PaymentTransaction.ResolutionStatus.OPEN`.
+      5. Nhận diện mã đơn: Regex tìm chính xác mã đơn hàng (ví dụ `ORD-...`), chỉ xử lý khi khớp ĐÚNG 1 đơn hàng duy nhất trong DB.
+      6. Trạng thái đơn hàng: Đơn phải ở trạng thái `SalesOrder.Status.BOOKED` (chờ thanh toán), chưa từng huỷ hay giao dịch hoàn tất.
+      7. Khớp số tiền 100%: Số tiền chuyển khoản `txn.amount` phải bằng chính xác `order.total_amount` (DW-26-AC3).
+    - Khi đủ 7 điều kiện sàn:
+      - Bọc trong `transaction.atomic()` với `select_for_update()`.
+      - Gọi service chuẩn hiện có `resolve_payment(payment_txn=txn, sales_order=order, actor=None, auto_match=True)` với `SYSTEM_ACTOR_KIND = "system"`.
+      - Ghi `AuditLog` hệ thống: `actor=None`, `actor_kind="system"`, ghi nhận `auto_confirm_exact_match` cho giao dịch và đơn hàng.
+      - Log hệ thống CHỈ in mã GD ngân hàng và mã đơn hàng (DW-26-AC5: cấm ghi nội dung chuyển khoản thô `raw_payload`, cấm log PII).
+    - Khi có sai lệch hoặc nghi vấn (thừa/thiếu tiền, nhiều đơn khớp, đơn đã huỷ):
+      - Không xác nhận tự động.
+      - Hàm `_escalate_to_chu()`: Tạo `AiAction(status=ESCALATED, assignee_group="chu")` chuyển việc cho Chủ xử lý tay kèm lý do an toàn, không lộ PII (DW-26-AC4).
+  - Management command: `backend/apps/sales/management/commands/auto_confirm_exact_payments.py`.
+  - Cập nhật chính sách AI (`backend/apps/ai/policy/services.py`):
+    - Bảo toàn công tắc `"system.auto_confirm_exact_match"` khi merge `red_zone_open` trong `update_policy`.
+  - Tests BE: `backend/apps/sales/payments/tests/test_dw26_auto_confirm.py` (7 tests, bao phủ DW-26-AC1..AC6).
+
+- **Kiểm chứng Backend**:
+  - `backend/apps/ai/execution/tests/test_dw27_confirm_refund.py`: **5 tests bao phủ DW-27-AC1..AC5**.
+  - `backend/apps/sales/payments/tests/test_dw26_auto_confirm.py`: **7 tests bao phủ DW-26-AC1..AC6**.
+  - Chạy suite Lô 6b:
+    ```bash
+    .venv/bin/python manage.py test apps.ai.execution.tests.test_dw27_confirm_refund apps.sales.payments.tests.test_dw26_auto_confirm
+    # Ran 12 tests in 1.134s. OK
+    ```
+  - Chạy toàn bộ Lô 6 (6a + 6b):
+    ```bash
+    .venv/bin/python manage.py test apps.ai.policy.tests.test_dw24_red_zone_switch apps.ai.execution.tests.test_dw25_close_batch apps.ai.execution.tests.test_dw27_confirm_refund apps.sales.payments.tests.test_dw26_auto_confirm
+    # Ran 26 tests in 1.653s. OK
+    ```
+
 

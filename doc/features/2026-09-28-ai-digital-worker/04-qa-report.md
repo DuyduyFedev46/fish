@@ -778,3 +778,88 @@ Không có lỗi chặn (0 lỗi).
 5. `cd erp-console && npx tsc --noEmit && npm run build` -> Compile sạch 31/31 static pages.
 6. `cd frontend && npx tsc --noEmit && npm run build` -> Compile sạch 10/10 static pages.
 
+---
+
+## Lô 6b: Xác nhận hoàn tiền (DW-27) & Khớp thanh toán tuyệt đối (DW-26) · Lần 1 · 2026-09-30
+
+### Kết luận: APPROVED — Lô 6b hoàn thành 100% tiêu chí nghiệm thu cho Story DW-27 và DW-26: hoàn tiền luôn hạ mức C chuyển việc cho Chủ (DW-27), khớp thanh toán tuyệt đối bằng job Hệ thống với 7 điều kiện sàn nghiêm ngặt (DW-26), bảo vệ tuyệt đối Bất biến 1 (giá vốn), Bất biến 9 (PII) và an toàn tài chính.
+
+### Tổng: 14 ca · ✅ 14 · ❌ 0 · ⏸ 0
+
+### Theo AC
+
+| Mã AC | Kết quả | Bằng chứng (test tự động / file kiểm chứng) |
+|---|---|---|
+| **DW-27-AC1** | ✅ PASS | `apps.ai.execution.tests.test_dw27_confirm_refund::ConfirmRefundAiTests.test_dw27_ac1_confirm_refund_always_downgrades_to_c_with_ai_no_evidence`<br>Phiếu hoàn PENDING, công tắc vùng đỏ `confirm_refund` mở, Chủ cấu hình override B -> AI `call` lệnh `sales.refund.confirm` luôn luôn hạ mức C (`outcome="proposal"`, `level="C"`), `downgrade_reason={"code": "AI_NO_EVIDENCE", "text": "Cần bằng chứng chuyển tiền thật từ ngân hàng"}`; tạo `AiAction` với `status=ESCALATED`, `assignee_group="chu"`, tóm tắt việc chuyển "Chuyển [X đ] cho phiếu RF-..., rồi nhập mã giao dịch"; phiếu hoàn trong DB vẫn giữ nguyên trạng thái PENDING (BR-AI-07, BR-HT-03). |
+| **DW-27-AC2** | ✅ PASS | `apps.ai.execution.tests.test_dw27_confirm_refund::ConfirmRefundAiTests.test_dw27_ac2_args_with_bank_txn_ref_never_auto_executed`<br>Dù payload args gửi lên có chứa `bank_txn_ref` (mã GD ngân hàng giả định do model sinh ra) -> pipeline vẫn hạ C `AI_NO_EVIDENCE`, tự động loại bỏ (`pop`) trường `bank_txn_ref` khỏi `clean_args` trước khi lưu vào `AiAction`; DB không bao giờ tự động cập nhật mã này hay tự hoàn tiền (H10, BR-HT-03). |
+| **DW-27-AC3 (quyền)** | ✅ PASS | `apps.ai.execution.tests.test_dw27_confirm_refund::ConfirmRefundAiTests.test_dw27_ac3_quan_ly_cannot_see_or_call_confirm_refund_404`<br>`quan_ly` (dù có quyền `create_refund`) xem `GET /api/ai/my-config/` hoàn toàn không thấy lệnh `sales.refund.confirm`; gọi `call` lệnh này bị từ chối với HTTP 404 `COMMAND_UNKNOWN`, cấu trúc y hệt lệnh không tồn tại (BR-HT-07, H1). |
+| **DW-27-AC4 (PII)** | ✅ PASS | `apps.ai.execution.tests.test_dw27_confirm_refund::ConfirmRefundAiTests.test_dw27_ac4_escalated_action_view_has_no_pii`<br>Việc chuyển `ESCALATED` khi Chủ xem chi tiết (`GET /api/ai/actions/<id>/`) chỉ hiển thị mã phiếu hoàn `RF-...`, số tiền và hạn; tuyệt đối không chứa tên khách hàng, SĐT, địa chỉ hay thông tin tài khoản ngân hàng của khách (Bất biến 9). |
+| **DW-27-AC5 (AI tắt)** | ✅ PASS | `apps.ai.execution.tests.test_dw27_confirm_refund::ConfirmRefundAiTests.test_dw27_ac5_manual_confirm_works_when_ai_disabled`<br>`@override_settings(AI_ENABLED=False)` -> Chủ thực hiện xác nhận hoàn tiền thủ công qua `POST /api/sales/refunds/<id>/confirm/` kèm `bank_txn_ref` thật vẫn chuyển trạng thái `REFUNDED` bình thường (BR-AI-10, BR-HT-04). |
+| **DW-26-AC1** | ✅ PASS | `apps.sales.payments.tests.test_dw26_auto_confirm::AutoConfirmExactMatchTests.test_dw26_ac1_exact_match_confirms_payment_and_creates_invoice`<br>Giao dịch UNMATCHED/OPEN: số tiền đúng bằng tổng đơn, mã đơn khớp đúng 1 đơn BOOKED, mã GD chưa dùng, không cờ nghi trùng, đúng môi trường -> Job Hệ thống (`actor_kind="system"`, V-DW1) gọi đúng service hiện có `resolve_payment`, đơn chuyển PAID, xuất SalesInvoice, giao dịch RESOLVED, ghi AuditLog hệ thống (BR-TT-03, BR-TT-14, BR-TT-15). Khi công tắc `system.auto_confirm_exact_match` đóng -> job bỏ qua với `reason="SWITCH_CLOSED"`. |
+| **DW-26-AC2 (lệch tiền)** | ✅ PASS | `apps.sales.payments.tests.test_dw26_auto_confirm::AutoConfirmExactMatchTests.test_dw26_ac2_underpaid_escalates_to_chu`<br>Giao dịch thiếu tiền (hoặc thừa tiền) -> không tự động xác nhận, tự động tạo `AiAction(status=ESCALATED, assignee_group="chu")` kèm lý do "Thiếu tiền: Giao dịch ...đ khác tổng đơn ...đ" để Chủ xử lý tay (BR-TT-04, BR-AI-25). |
+| **DW-26-AC2 (đơn huỷ)** | ✅ PASS | `apps.sales.payments.tests.test_dw26_auto_confirm::AutoConfirmExactMatchTests.test_dw26_ac2_cancelled_order_escalates_to_chu`<br>Đơn hàng đã tự huỷ (`AUTO_CANCELLED`) do hết hạn giữ chỗ -> job không tự xác nhận, tạo `AiAction(status=ESCALATED, assignee_group="chu")` kèm lý do "Đơn ... ở trạng thái Tự huỷ, không thể tự xác nhận (BR-TT-05)". |
+| **DW-26-AC2 (nghi trùng)** | ✅ PASS | `apps.sales.payments.tests.test_dw26_auto_confirm::AutoConfirmExactMatchTests.test_dw26_ac2_duplicate_warning_escalates_to_chu`<br>Giao dịch có cảnh báo nghi trùng xác nhận tay (`duplicate_warning`) -> job không xác nhận tự động, tạo `AiAction(status=ESCALATED, assignee_group="chu")` kèm lý do cảnh báo nghi trùng (BR-TT-15). |
+| **DW-26-AC3 (PII)** | ✅ PASS | `apps.sales.payments.tests.test_dw26_auto_confirm::AutoConfirmExactMatchTests.test_dw26_ac3_logs_only_txn_and_order_code_no_pii`<br>Khớp bằng code; không có đường nào đưa `raw_payload` hay nội dung chuyển khoản vào model; `assertLogs` chứng minh log hệ thống CHỈ ghi mã GD ngân hàng và mã đơn hàng, tuyệt đối không in nội dung chuyển khoản hay PII khách (H2, H10, Bất biến 9). |
+| **DW-26-AC4 (sai lệch)** | ✅ PASS | `apps.sales.payments.auto_confirm::_escalate_to_chu`<br>Mọi ca sai lệch (khớp 0 đơn, khớp >= 2 đơn, sai môi trường SePay `BR-TT-14`) đều không xác nhận tự động và được chuyển việc cho Chủ qua `AiAction(status=ESCALATED, assignee_group="chu")`. |
+| **DW-26-AC5 (production)** | ✅ PASS | `apps.sales.payments.tests.test_dw26_auto_confirm::AutoConfirmExactMatchTests.test_dw26_ac5_production_ready_false_does_not_run`<br>`@override_settings(AI_PRODUCTION_READY=False)` -> Job Hệ thống từ chối chạy tự động, trả về `{"confirmed": 0, "reason": "PRODUCTION_NOT_READY"}`; đơn hàng vẫn giữ nguyên trạng thái BOOKED (BR-AI-27). |
+| **DW-26-AC6 (AI tắt)** | ✅ PASS | `apps.sales.payments.tests.test_dw26_auto_confirm::AutoConfirmExactMatchTests.test_dw26_ac6_manual_confirm_works_when_ai_disabled`<br>`@override_settings(AI_ENABLED=False)` -> Chủ xác nhận thanh toán thủ công trên giao diện ERP thông qua `confirm_payment_manual` vẫn hoạt động bình thường, đơn chuyển sang PAID (BR-AI-10). |
+| **MANAGEMENT-CMD** | ✅ PASS | `backend/apps/sales/management/commands/auto_confirm_exact_payments.py`<br>Management command gọi `process_exact_payment_matches()` in output chuẩn xác, sẵn sàng cho cấu hình job Hệ thống. |
+
+### Ngoại lệ & biên | Phân quyền (bảng vai × hành động) | Rò giá vốn | Rò dữ liệu cá nhân | Hồi quy
+
+- **Ngoại lệ & biên:**
+  - Xác nhận hoàn tiền (DW-27): Bất kể công tắc vùng đỏ mở hay đóng, cấu hình override A hay B, lệnh `confirm_refund` luôn bị hạ về mức C với `AI_NO_EVIDENCE`. Tham số `bank_txn_ref` từ model bị loại bỏ triệt để. Khi Chủ xác nhận tay trên ERP, service `confirm_refund` bắt buộc nhập `bank_txn_ref` (BR-HT-03/04).
+  - Khớp thanh toán tuyệt đối (DW-26): Kiểm tra 7 điều kiện sàn chặt chẽ:
+    1. Môi trường: Chỉ chạy ở Staging/Debug (`AI_PRODUCTION_READY=True`).
+    2. Công tắc Chủ: Mở `"system.auto_confirm_exact_match"` trong `AiPolicyVersion.red_zone_open`.
+    3. Không cờ nghi trùng: Không có `duplicate_warning`.
+    4. Môi trường cổng: `txn.environment == settings.SEPAY_ENV` (BR-TT-14).
+    5. Trạng thái giao dịch: Chỉ xử lý giao dịch `resolution_status == OPEN`.
+    6. Khớp đúng 1 đơn hàng `SalesOrder.Status.BOOKED`.
+    7. Số tiền khớp 100%: `txn.amount == order.total_amount` (lệch dù 1đ cũng bị chặn).
+  - Xử lý đồng thời / Race condition: Sử dụng `transaction.atomic()` và `select_for_update(skip_locked=True)` cho từng giao dịch lệch, tránh va chạm đa tiến trình.
+  - Mọi trường hợp sai lệch đều leo thang thành `AiAction` với `status=ESCALATED`, `assignee_group="chu"`.
+
+- **Phân quyền (Bảng vai × Hành động):**
+  | Vai | Xem/Gọi `sales.refund.confirm` qua AI | Nhận việc chuyển hoàn tiền / lệch tiền (`ESCALATED`) | Xác nhận thanh toán tay (`confirm_payment_manual`) |
+  |---|---|---|---|
+  | `chu` | ✅ Mức C (soạn nháp ESCALATED) | ✅ Thấy toàn bộ trong tab "Được chuyển" | ✅ Toàn quyền xác nhận trên ERP |
+  | `quan_ly` | ❌ 404 `COMMAND_UNKNOWN` (ẩn khỏi config) | ❌ Không thấy (assignee_group="chu") | ❌ 403 `BR-PQ-12` |
+  | `nv_kho` | ❌ 404 `COMMAND_UNKNOWN` | ❌ Không thấy | ❌ 403 `BR-PQ-12` |
+  | `nv_giao` | ❌ 404 `COMMAND_UNKNOWN` | ❌ Không thấy | ❌ 403 `BR-PQ-12` |
+  | Khách / Chưa login | ❌ 401 Unauthorized | ❌ 401 Unauthorized | ❌ 401 Unauthorized |
+
+- **Rò giá vốn (Bất biến 1):**
+  - Nghiệp vụ hoàn tiền và thanh toán không thao tác với giá vốn kho.
+  - Quét toàn bộ response của lệnh qua `scrub_data`, loại bỏ triệt để các khoá giá vốn nếu người xem thiếu quyền `view_costprice`.
+  - Quét mã nguồn `grep -rn 'fields = "__all__"' backend/apps` trả về rỗng.
+
+- **Rò dữ liệu cá nhân (Bất biến 9):**
+  - Tóm tắt việc chuyển của hoàn tiền (`task_summary`) chỉ ghi mã phiếu hoàn `RF-...` và số tiền, tuyệt đối không ghi tên khách, SĐT, địa chỉ hay số tài khoản.
+  - Log của job `auto_confirm` được kiểm tra bằng `assertLogs`: chỉ in mã GD ngân hàng và mã đơn hàng, cấm log nội dung chuyển khoản thô (`raw_payload`) hay PII khách.
+  - `AiAction` leo thang cho giao dịch lệch chỉ lưu `payment_id` và lý do ngắn gọn không chứa PII.
+
+- **Chứng từ không bị xoá & AuditLog:**
+  - Khớp thanh toán gọi service hiện có `resolve_payment`, ghi nhận đầy đủ `AuditLog` hệ thống với `actor=None`, `actor_kind="system"`.
+  - Không có chứng từ nào bị xoá (bất biến 3).
+
+- **Hồi quy:**
+  - Suite Lô 6b: 12 tests xanh 100% (`Ran 12 tests in 1.134s. OK`).
+  - Suite toàn bộ Lô 6 (6a + 6b): 26 tests xanh 100% (`Ran 26 tests in 1.653s. OK`).
+  - Toàn bộ backend test suite: **1058 tests xanh 100%**.
+  - `makemigrations --check --dry-run`: Sạch sẽ (`No changes detected`).
+  - Unit test `erp-console`: 79/79 tests pass.
+  - Build tĩnh Next.js: `erp-console` sạch 31/31 static pages, `frontend` sạch 10/10 static pages.
+
+### Lỗi
+Không có lỗi chặn (0 lỗi).
+
+### Lệnh đã chạy (kèm output tóm tắt)
+1. `cd backend && .venv/bin/python manage.py test apps.ai.execution.tests.test_dw27_confirm_refund apps.sales.payments.tests.test_dw26_auto_confirm` -> `Ran 12 tests in 1.134s. OK`
+2. `cd backend && .venv/bin/python manage.py test apps.ai.policy.tests.test_dw24_red_zone_switch apps.ai.execution.tests.test_dw25_close_batch apps.ai.execution.tests.test_dw27_confirm_refund apps.sales.payments.tests.test_dw26_auto_confirm` -> `Ran 26 tests in 1.653s. OK`
+3. `cd backend && .venv/bin/python manage.py test && .venv/bin/python manage.py makemigrations --check --dry-run` -> `Ran 1058 tests in 49.867s. OK. No changes detected.`
+4. `cd backend && .venv/bin/python manage.py auto_confirm_exact_payments` -> `Finished: confirmed 0, escalated 0, skipped 0 (SWITCH_CLOSED).`
+5. `cd erp-console && npm test` -> `79 passed (vitest)`
+6. `cd erp-console && npx tsc --noEmit && npm run build` -> Compile sạch 31/31 static pages.
+7. `cd frontend && npx tsc --noEmit && npm run build` -> Compile sạch 10/10 static pages.
+
