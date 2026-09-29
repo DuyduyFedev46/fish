@@ -19,7 +19,7 @@
 | ☑ | **P1** Sửa lỗi bảo mật + lãi lỗ | `2026-09-28-sua-loi-bao-mat` | 1 → 2 → (merge `wip/autosave` → `main`) → 3 | XONG | — | Lô 1: Nhật ký lộ giá vốn, tra đơn dò được, throttle. Lô 2: chốt lô đủ điều kiện, noindex staging, **merge main** (xung đột → dừng hỏi Duy). Lô 3: lãi lỗ tính hai lần (S06) + doanh thu hoá đơn huỷ (S07) |
 | ☑ | **P2** Tiếp theo · Đã làm | `2026-09-28-ai-digital-worker` | 0 (spike, song song) + 1a → 1b → 1c | XONG | P1 xong + merge main | Lô 1c sau P1 Lô 3 (cùng sửa `batch_pnl`). Spike DW-02: phần đo trên máy Android/Windows ≥ 8GB do **Duy chạy** |
 | ☑ | **P3** Lệnh AI tự sinh + AI của tôi | `2026-09-28-ai-digital-worker` | 2 → 3a → 3b → 3c → 4 | XONG | P2 xong; kết quả spike Lô 0 đạt | Mọi môi trường `AI_WRITE_LEVELS_ALLOWED=C` (AI chỉ soạn nháp). Lô 2 có sẵn danh sách cấm `/api/public/`, `/api/cskh/`, `…/label/` |
-| ☐ | **P4** CSKH xác nhận + in tem | `2026-09-28-cskh-xac-nhan-in-tem` | 1 → 2 → 3 → 4 (5 là Could) | SẴN SÀNG CODE (Duy duyệt 28/09) | P3 xong | Lô 2 chỉ staging. Lô 3 (tự huỷ) lên production **sau khi legal-vn duyệt câu thông báo** và Duy bật cờ `CSKH_AUTO_CANCEL_ENABLED` |
+| ☑ | **P4** CSKH xác nhận + in tem | `2026-09-28-cskh-xac-nhan-in-tem` | 1 → 2 → 3 → 4 (5 là Could) | XONG | P3 xong | Lô 2 chỉ staging. Lô 3 (tự huỷ) lên production **sau khi legal-vn duyệt câu thông báo** và Duy bật cờ `CSKH_AUTO_CANCEL_ENABLED` |
 | ☐ | **P5** CMS viết bài | `2026-09-28-cms-viet-bai` | 1 → 2 → … → 7 | SẴN SÀNG CODE (Duy duyệt 28/09) | P4 xong | Thư viện mới duy nhất: Tiptap 2 (erp-console). CMS-16 đã làm ở P1 |
 | ☐ | **P6** Khung go-live | `2026-09-28-khung-go-live` | 1 → 2 → 3 | SẴN SÀNG CODE (Duy duyệt 28/09) | CMS Lô 5 (Lô 1–2), CMS Lô 7 (Lô 3) | Cờ `PRIVACY_CONSENT_REQUIRED` bật: chưa đăng chính sách thì Shop không nhận đơn |
 | ☐ | **P7** AI tự ghi + vùng đỏ | `2026-09-28-ai-digital-worker` | 5a → 5b → 5c → 6a → 6b | SẴN SÀNG CODE (Duy duyệt 28/09) | P6 xong | **Chỉ staging** tới khi xong S-L1…S-L4 (pháp lý) |
@@ -63,5 +63,8 @@ cache chung (Redis) · SEO nâng cao cho bài viết · hoàn kho/hoàn tiền m
 | 2026-09-29 05:34 | P3 | Lô 4 | APPROVED | `18c4a13` | 806 | DW-17 nhập lô mua tại cảng trên ERP, sinh batch DRAFT, chống trùng idempotency |
 | 2026-09-29 06:45 | P4 | Lô 1 | APPROVED | `e874966` | 824 | CS-01 nhóm cskh + phạm vi PII, CS-02 bảng phiếu giao, CS-03 soạn hàng |
 | 2026-09-29 12:30 | P4 | Lô 2 | APPROVED | `8415ce0` | 843 | CS-04 chờ xác nhận, CS-05 hàng chờ gọi, CS-06 ghi kết quả, CS-11 tem 100x150 |
+| 2026-09-29 13:10 | P4 | Lô 3 | APPROVED | `fd515a5` | 880 | CS-07 chuyển Quản lý, CS-08 tự huỷ (cờ tắt), CS-09 nhắc gọi báo hoàn, CS-10 báo khách |
+| 2026-09-29 13:52 | P4 | Lô 4 | APPROVED | `02babc5` | 907 | CS-12 đổi người nhận, CS-13 khách muốn huỷ/đổi, CS-14 in lại/huỷ tem, CS-15 cần chú ý |
+
 
 
