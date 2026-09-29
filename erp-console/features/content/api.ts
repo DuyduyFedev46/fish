@@ -13,6 +13,7 @@ import type {
   EntryPublishResponse,
   EntryUnpublishPayload,
   EntryUpdatePayload,
+  GoliveStatusResponse,
 } from "./types";
 import {
   mockCreateCategory,
@@ -21,6 +22,7 @@ import {
   mockDiscardChanges,
   mockGetEntry,
   mockGetEntryCounts,
+  mockGetGoliveStatus,
   mockListCategories,
   mockListEntries,
   mockPublishEntry,
@@ -199,5 +201,13 @@ export async function discardChanges(
     mock: isMock ? () => ({ status: 200, body: mockDiscardChanges(id, payload) }) : undefined,
   });
 }
+
+export async function fetchGoliveStatus(signal?: AbortSignal): Promise<GoliveStatusResponse> {
+  return apiFetch<GoliveStatusResponse>("/api/content/golive-status/", {
+    signal,
+    mock: isMock ? () => ({ status: 200, body: mockGetGoliveStatus() }) : undefined,
+  });
+}
+
 
 

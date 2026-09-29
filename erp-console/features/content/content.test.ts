@@ -7,6 +7,7 @@ import {
   mockDiscardChanges,
   mockGetEntry,
   mockGetEntryCounts,
+  mockGetGoliveStatus,
   mockListCategories,
   mockListEntries,
   mockPublishEntry,
@@ -426,7 +427,19 @@ describe("CMS-01 & CMS-02 Console Tests", () => {
       }).toThrowError(/BR-ND-01/);
     });
   });
+
+  describe("CMS-15 Console Tests", () => {
+    it("CMS-15-AC7: mockGetGoliveStatus trả đúng danh sách vai trò bắt buộc go-live chưa có bài đăng", () => {
+      const status = mockGetGoliveStatus();
+      expect(Array.isArray(status.missing_roles)).toBe(true);
+      const required = ["privacy", "terms", "refund", "seller_info"];
+      for (const r of status.missing_roles) {
+        expect(required).toContain(r);
+      }
+    });
+  });
 });
+
 
 
 

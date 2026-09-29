@@ -310,5 +310,90 @@ grep -rn "dangerouslySetInnerHTML" frontend/features/content frontend/app/bai-vi
 ### Lệch thiết kế
 *(Không có)*
 
+---
+
+## Lô 5: CMS-15 Trang nội dung và phiên bản có hiệu lực
+
+### Những gì đã làm
+1. **Backend**:
+   - `backend/apps/content/entries/services.py`:
+     - Khai báo `GOLIVE_PAGE_ROLES = ("privacy", "terms", "refund", "seller_info")`.
+     - Trong `save_draft`:
+       - Kiểm tra `page_role` hợp lệ thuộc `GOLIVE_PAGE_ROLES` (400 `BR-ND-16`).
+       - Kiểm tra không đặt trùng `page_role` với trang khác (400 `BR-ND-16`, CMS-15-AC2).
+       - TD-3: Nếu bài `status == "published"` và `page_role` có giá trị, cấm bỏ hoặc đổi `page_role` (400 `BR-ND-16`).
+       - CMS-15-AC8: Nếu request có `page_role`, `show_in_footer`, `footer_order` mà user thiếu quyền `content.publish_entry` -> từ chối 403 `BR-PQ-12` trước khi lưu, không field nào của request được cập nhật.
+     - Trong `unpublish_entry`: kiểm tra `entry.page_role is not None` trước khi kiểm tra lý do gỡ -> 400 `BR-ND-16` "Trang bắt buộc go-live chỉ sửa và đăng lại (BR-ND-16)." (CMS-15-AC3).
+     - Thêm hàm `effective_version(role: str, at: Any = None) -> EntryVersion | None` (CMS-15-AC4).
+     - Thêm hàm `current_policy_version(role: str) -> EntryVersion | None` (GL-03).
+     - Thêm hàm `golive_missing_roles() -> list[str]` (CMS-15-AC7).
+   - `backend/apps/content/entries/api.py`:
+     - Thêm `GoliveStatusView(APIView)`: `permission_classes = [ContentPermissions]`, `required_perms = ("content.view_entry",)`, `parser_classes = []` (tránh tự sinh nhầm thành lệnh AI ghi), GET gọi `golive_missing_roles()` trả `{"missing_roles": [...]}` (CMS-15-AC7, AC9).
+   - `backend/config/api_urls.py`:
+     - Đăng ký `path("content/golive-status/", GoliveStatusView.as_view(), name="content-golive-status")`.
+   - `backend/apps/content/public/api.py`:
+     - `PublicPageByRoleView`: trả đúng 5 khoá contract (`slug`, `title`, `version`, `version_id`, `effective_from`), `effective_from` dùng `timezone.localtime(version.published_at).isoformat()`, gán `Cache-Control: public, max-age=60`. Không rò rỉ bất kỳ khoá cấm nào (Bất biến 1, 9).
+     - `PublicFooterLinksView`: chỉ lọc trang `status == "published"` có `show_in_footer=True`, sắp xếp theo `footer_order`, chỉ trả `title` và `slug`, gán `Cache-Control: public, max-age=60`.
+   - `backend/apps/content/tests/test_pages_policy.py`:
+     - 10 test cases tự động bao quát toàn bộ CMS-15 (AC1..AC9) và TD-3, quét khoá cấm qua `assert_no_forbidden_keys`.
+
+2. **Frontend ERP Console**:
+   - `erp-console/features/content/types.ts`:
+     - Thêm `GoliveStatusResponse`, `FooterLink`, `PageByRoleResponse`.
+   - `erp-console/features/content/api.ts` & `mock.ts`:
+     - Thêm `fetchGoliveStatus()` và `mockGetGoliveStatus()`.
+   - `erp-console/features/content/components/ContentListScreen.tsx`:
+     - Gọi `fetchGoliveStatus()`, hiển thị Banner màu vàng cảnh báo "Thiếu trang bắt buộc go-live: ..." khi `missingRoles.length > 0` (CMS-15-AC7).
+   - `erp-console/app/(console)/content/edit/page.tsx`:
+     - Form cho `kind === "page"`: cấu hình `page_role` (dropdown), `show_in_footer` (checkbox), `footer_order` (input number).
+     - Khoá dropdown đổi vai trò khi `status === "published" && pageRole` (TD-3).
+     - Ẩn nút "Gỡ bài" khi `status === "published" && pageRole` (CMS-15-AC3).
+   - `erp-console/features/content/content.test.ts`:
+     - Bổ sung unit test cho `mockGetGoliveStatus` (CMS-15-AC7).
+
+3. **Frontend Shop Web**:
+   - `frontend/features/content/types.ts`:
+     - Thêm `FooterLink`, `PageByRoleResponse`.
+   - `frontend/features/content/api.ts` & `mock.ts`:
+     - Thêm `fetchPageByRole(role)` và `fetchFooterLinks()`.
+   - `frontend/app/trang/page.tsx` & `trang.module.css`:
+     - Trang tĩnh `/trang/?slug=...` bọc trong `<Suspense>`.
+     - Hiển thị "Có hiệu lực từ dd/mm/yyyy" (CMS-15-AC1).
+     - Render thân bài bằng `ArticleBody` an toàn, không sử dụng `dangerouslySetInnerHTML`.
+     - Xử lý đầy đủ 404, 410 ("Trang này không còn trên web"), lỗi kết nối mạng.
+
+### Kết quả kiểm chứng Lô 5
+```bash
+# 1. Content tests (bao gồm test_pages_policy.py):
+cd backend && .venv/bin/python manage.py test apps.content
+# Output: Ran 70 tests in 3.730s -> OK.
+
+# 2. Toàn bộ backend tests và makemigrations check:
+cd backend && .venv/bin/python manage.py test && .venv/bin/python manage.py makemigrations --check --dry-run
+# Output: Ran 979 tests in 75.285s -> OK. No changes detected.
+
+# 3. ERP Console tests & build:
+cd erp-console && npm test
+# Output: 7 test files passed, 61 tests passed (100%).
+cd erp-console && npx tsc --noEmit && npm run build
+# Output: Compiled successfully, Generating static pages (30/30) -> OK.
+
+# 4. Frontend Shop Web typecheck & build:
+cd frontend && npx tsc --noEmit && NEXT_PUBLIC_USE_MOCK=0 NEXT_PUBLIC_API_BASE=https://cangca-api-staging-675411800433.asia-southeast1.run.app npm run build
+# Output: Compiled successfully, Generating static pages (10/10) -> OK.
+
+# 5. Kiểm tra dangerouslySetInnerHTML:
+grep -rn "dangerouslySetInnerHTML" frontend/features/content frontend/app/bai-viet frontend/app/trang erp-console/features/content
+# Output: rỗng (0 vi phạm).
+
+# 6. Kiểm tra migration app khác:
+git status --porcelain -- backend/apps | grep "/migrations/" | grep -v "apps/content/migrations/"
+# Output: rỗng.
+```
+
+### Lệch thiết kế
+*(Không có)*
+
+
 
 

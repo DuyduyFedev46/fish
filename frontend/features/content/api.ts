@@ -1,10 +1,14 @@
 import { apiFetch, USE_MOCK } from "@/lib/api";
 import type {
+  FooterLink,
+  PageByRoleResponse,
   PublicCategory,
   PublicEntryDetail,
   PublicEntryListResponse,
 } from "./types";
 import {
+  mockGetFooterLinks,
+  mockGetPageByRole,
   mockGetPublicCategories,
   mockGetPublicEntries,
   mockGetPublicEntry,
@@ -37,3 +41,18 @@ export async function fetchPublicCategories(): Promise<PublicCategory[]> {
   }
   return apiFetch<PublicCategory[]>("/api/public/content/categories/");
 }
+
+export async function fetchPageByRole(role: string): Promise<PageByRoleResponse> {
+  if (USE_MOCK) {
+    return mockGetPageByRole(role);
+  }
+  return apiFetch<PageByRoleResponse>(`/api/public/content/pages/by-role/${encodeURIComponent(role)}/`);
+}
+
+export async function fetchFooterLinks(): Promise<FooterLink[]> {
+  if (USE_MOCK) {
+    return mockGetFooterLinks();
+  }
+  return apiFetch<FooterLink[]>("/api/public/content/footer-links/");
+}
+

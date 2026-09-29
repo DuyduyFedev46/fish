@@ -80,3 +80,17 @@ export interface PublicEntryListResponse {
   page: number;
   total_pages: number;
 }
+
+export interface FooterLink {
+  title: string;
+  slug: string;
+}
+
+export interface PageByRoleResponse {
+  slug: string;
+  title: string;
+  version: number;
+  version_id: number;
+  effective_from: string;
+}
+

@@ -86,7 +86,7 @@ router.register("staff", StaffViewSet, basename="staff")
 router.register("ai/actions", AiActionViewSet, basename="ai-actions")
 # content — CMS nội dung (2026-09-28-cms-viet-bai)
 from apps.content.categories.api import CategoryViewSet
-from apps.content.entries.api import EntryViewSet
+from apps.content.entries.api import EntryViewSet, GoliveStatusView
 from apps.content.images.api import ContentImageViewSet, EntryImageUploadView
 from apps.content.public.api import (
     PublicCategoryListView,
@@ -102,6 +102,8 @@ router.register("content/images", ContentImageViewSet, basename="content-images"
 
 
 urlpatterns = [
+    # CMS Golive Status (CMS-15)
+    path("content/golive-status/", GoliveStatusView.as_view(), name="content-golive-status"),
     # CMS Content Image Upload (CMS-05)
     path("content/entries/<int:pk>/images/", EntryImageUploadView.as_view()),
     # CMS Content Public API (CMS-13, CMS-14, CMS-15)

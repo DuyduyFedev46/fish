@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Icon } from "@/shared/ui/Icon";
 import { Empty } from "@/shared/ui/StateBox";
-import { fetchEntries, fetchEntryCounts } from "../api";
+import { fetchEntries, fetchEntryCounts, fetchGoliveStatus } from "../api";
 import type { ContentCounts, ContentEntryListItem, ContentKind, ContentStatus } from "../types";
 import s from "../content.module.css";
 
@@ -22,10 +22,18 @@ const KIND_OPTIONS: Array<{ key: ContentKind | "all"; label: string }> = [
   { key: "page", label: "Trang" },
 ];
 
+const GOLIVE_ROLE_LABELS: Record<string, string> = {
+  privacy: "Chính sách bảo mật",
+  terms: "Điều khoản dịch vụ",
+  refund: "Đổi trả & hoàn tiền",
+  seller_info: "Thông tin người bán",
+};
+
 export function ContentListScreen() {
   const [statusFilter, setStatusFilter] = useState<ContentStatus | "all">("all");
   const [kindFilter, setKindFilter] = useState<ContentKind | "all">("all");
   const [entries, setEntries] = useState<ContentEntryListItem[]>([]);
+  const [missingRoles, setMissingRoles] = useState<string[]>([]);
   const [counts, setCounts] = useState<ContentCounts>({
     draft: 0,
     pending_review: 0,
@@ -39,16 +47,18 @@ export function ContentListScreen() {
     async function loadData() {
       setLoading(true);
       try {
-        const [countsData, entriesData] = await Promise.all([
+        const [countsData, entriesData, goliveData] = await Promise.all([
           fetchEntryCounts(kindFilter !== "all" ? { kind: kindFilter } : undefined),
           fetchEntries({
             status: statusFilter !== "all" ? statusFilter : undefined,
             kind: kindFilter !== "all" ? kindFilter : undefined,
           }),
+          fetchGoliveStatus().catch(() => ({ missing_roles: [] })),
         ]);
         if (active) {
           setCounts(countsData);
           setEntries(entriesData.results || []);
+          setMissingRoles(goliveData.missing_roles || []);
         }
       } catch (err) {
         console.error("Lỗi tải nội dung:", err);
@@ -86,6 +96,25 @@ export function ContentListScreen() {
           </Link>
         </div>
       </div>
+
+      {/* Banner thiếu trang bắt buộc go-live (CMS-15-AC7) */}
+      {missingRoles.length > 0 && (
+        <div
+          role="alert"
+          style={{
+            background: "#fffbeb",
+            border: "1px solid #fef3c7",
+            padding: "12px 16px",
+            borderRadius: "8px",
+            marginBottom: "16px",
+            color: "#92400e",
+            fontSize: "14px",
+          }}
+        >
+          <strong>Thiếu trang bắt buộc go-live:</strong>{" "}
+          {missingRoles.map((r) => GOLIVE_ROLE_LABELS[r] || r).join(", ")}
+        </div>
+      )}
 
       {/* Tabs lọc trạng thái (CMS-01-AC7) */}
       <div className={s.tabs} role="tablist">

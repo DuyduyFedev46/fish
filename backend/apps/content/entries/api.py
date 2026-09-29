@@ -2,12 +2,14 @@
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework.views import APIView
 
 from apps.common.api import StandardPagination
 from apps.content.entries.serializers import EntryDetailSerializer, EntryListSerializer
 from apps.content.entries.services import (
     delete_draft,
     discard_changes,
+    golive_missing_roles,
     publish_entry,
     save_draft,
     unpublish_entry,
@@ -162,4 +164,22 @@ class EntryViewSet(viewsets.ModelViewSet):
             "unpublished": qs.filter(status="unpublished").count(),
         }
         return Response(counts)
+
+
+class GoliveStatusView(APIView):
+    """
+    GET /api/content/golive-status/
+    Kiểm tra tình trạng đủ 4 trang bắt buộc go-live (CMS-15-AC7, AC9).
+    Quyền: content.view_entry.
+    """
+
+    permission_classes = [ContentPermissions]
+    required_perms = ("content.view_entry",)
+    http_method_names = ["get", "head", "options"]
+    parser_classes = []
+
+    def get(self, request):
+        roles = golive_missing_roles()
+        return Response({"missing_roles": roles}, status=status.HTTP_200_OK)
+
 

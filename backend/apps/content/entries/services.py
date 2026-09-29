@@ -9,9 +9,10 @@ from django.utils import timezone
 from apps.common.exceptions import BusinessError
 from apps.content.body.slug import slugify_vi, suggest_unique_slug
 from apps.content.body.sanitize import normalize_body
-from apps.content.models.entries import Entry
+from apps.content.models.entries import Entry, EntryVersion
 from apps.content.models.images import ContentImage
 
+GOLIVE_PAGE_ROLES = ("privacy", "terms", "refund", "seller_info")
 
 PROTECTED_FIELDS = {
     "status",
@@ -201,12 +202,23 @@ def save_draft(*, entry: Entry | None = None, data: dict, actor) -> Entry:
         footer_order = int(data.get("footer_order", entry.footer_order if entry else 0))
 
         if page_role:
+            if page_role not in GOLIVE_PAGE_ROLES:
+                raise BusinessError("Vai trò trang chính sách không hợp lệ (BR-ND-16).", code="BR-ND-16")
             # Kiểm tra page_role trùng với trang khác
             qs_role = Entry.objects.filter(page_role=page_role)
             if entry:
                 qs_role = qs_role.exclude(pk=entry.pk)
             if qs_role.exists():
                 raise BusinessError("Vai trò trang chính sách này đã được sử dụng (BR-ND-16).", code="BR-ND-16")
+
+        # TD-3: Bỏ hoặc đổi vai trò của trang bắt buộc go-live đang Đã đăng -> 400 BR-ND-16
+        if entry and entry.status == "published" and entry.page_role is not None:
+            if "page_role" in data and data.get("page_role") != entry.page_role:
+                raise BusinessError(
+                    "Trang bắt buộc go-live đang đăng không được bỏ hoặc đổi vai trò (BR-ND-16).",
+                    code="BR-ND-16",
+                )
+
 
         try:
             if entry is None:
@@ -521,19 +533,19 @@ def unpublish_entry(*, entry: Entry, actor: Any, row_version: int, reason: str) 
                 code="BR-ND-01",
             )
 
-        # 3. Kiểm tra lý do gỡ (CMS-12-AC1)
+        # 3. Kiểm tra trang giữ vai trò go-live (CMS-15, BR-ND-16)
+        if entry.page_role is not None:
+            raise BusinessError(
+                "Trang bắt buộc go-live chỉ sửa và đăng lại (BR-ND-16).",
+                code="BR-ND-16",
+            )
+
+        # 4. Kiểm tra lý do gỡ (CMS-12-AC1)
         clean_reason = str(reason or "").strip()
         if clean_reason not in UNPUBLISH_REASONS:
             raise BusinessError(
                 "Lý do gỡ bài không hợp lệ (BR-ND-15).",
                 code="BR-ND-15",
-            )
-
-        # 4. Kiểm tra trang giữ vai trò go-live (CMS-15, BR-ND-16)
-        if entry.page_role is not None:
-            raise BusinessError(
-                "Không thể gỡ trực tiếp trang nội dung đang giữ vai trò go-live (BR-ND-16).",
-                code="BR-ND-16",
             )
 
         ver_num = entry.published_version.version if entry.published_version else 1
@@ -624,6 +636,54 @@ def discard_changes(*, entry: Entry, actor: Any, row_version: int) -> dict[str, 
         ])
 
         return entry
+
+
+def effective_version(role: str, at: Any = None) -> EntryVersion | None:
+    """
+    Trang đang giữ page_role=role -> phiên bản có published_at <= at lớn nhất; không có -> None (CMS-15-AC4).
+    """
+    if not role or role not in GOLIVE_PAGE_ROLES:
+        return None
+    entry = Entry.objects.filter(page_role=role).first()
+    if not entry:
+        return None
+    if at is None:
+        at = timezone.now()
+    return (
+        EntryVersion.objects.filter(entry=entry, published_at__lte=at)
+        .order_by("-published_at", "-version")
+        .first()
+    )
+
+
+def current_policy_version(role: str) -> EntryVersion | None:
+    """
+    Trang có page_role=role, status=published -> published_version; không -> None.
+    Dùng bởi hồ sơ go-live (GL-03).
+    """
+    if not role or role not in GOLIVE_PAGE_ROLES:
+        return None
+    entry = (
+        Entry.objects.filter(page_role=role, status="published")
+        .select_related("published_version")
+        .first()
+    )
+    if not entry or not entry.published_version:
+        return None
+    return entry.published_version
+
+
+def golive_missing_roles() -> list[str]:
+    """
+    Danh sách vai trò trong 4 vai trò bắt buộc go-live chưa có trang published (CMS-15-AC7).
+    """
+    published_roles = set(
+        Entry.objects.filter(page_role__in=GOLIVE_PAGE_ROLES, status="published")
+        .exclude(page_role__isnull=True)
+        .values_list("page_role", flat=True)
+    )
+    return [r for r in GOLIVE_PAGE_ROLES if r not in published_roles]
+
 
 
 

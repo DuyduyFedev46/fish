@@ -1,5 +1,7 @@
 import { ApiError } from "@/lib/types";
 import type {
+  FooterLink,
+  PageByRoleResponse,
   PublicCategory,
   PublicEntryDetail,
   PublicEntryListItem,
@@ -126,6 +128,52 @@ export const MOCK_ENTRY_MAP: Record<string, PublicEntryDetail> = {
     effective_from: "2026-09-29T09:00:00Z",
     author: "Cá Về",
   },
+  "chinh-sach-bao-mat": {
+    kind: "page",
+    slug: "chinh-sach-bao-mat",
+    title: "Chính sách bảo mật thông tin",
+    seo_title: "Chính sách bảo mật | Cá Về",
+    description: "Chính sách bảo vệ quyền riêng tư và dữ liệu cá nhân của khách hàng tại Cá Về.",
+    excerpt: "Cam kết bảo mật thông tin khách hàng, số điện thoại và địa chỉ giao hàng tuyệt đối an toàn.",
+    category: null,
+    cover_image: null,
+    body: {
+      type: "doc",
+      blocks: [
+        {
+          type: "heading",
+          level: 2,
+          text: "1. Mục đích thu thập thông tin",
+        },
+        {
+          type: "paragraph",
+          children: [
+            {
+              text: "Cá Về chỉ thu thập thông tin tên, số điện thoại và địa chỉ nhận hàng nhằm phục vụ cho mục đích xác nhận đơn hàng và giao hải sản tươi sống tận nơi.",
+            },
+          ],
+        },
+        {
+          type: "heading",
+          level: 2,
+          text: "2. Cam kết bảo mật",
+        },
+        {
+          type: "paragraph",
+          children: [
+            {
+              text: "Chúng tôi tuân thủ nghiêm ngặt quy định pháp luật Việt Nam về bảo vệ dữ liệu cá nhân, tuyệt đối không chia sẻ thông tin khách hàng cho bên thứ ba.",
+            },
+          ],
+        },
+      ],
+    },
+    published_at: "2026-09-28T08:00:00Z",
+    updated_at: "2026-09-28T08:00:00Z",
+    version: 1,
+    effective_from: "2026-09-28T08:00:00Z",
+    author: "Cá Về",
+  },
 };
 
 export function mockGetPublicEntry(slug: string): PublicEntryDetail {
@@ -169,3 +217,25 @@ export function mockGetPublicEntries(params?: {
 export function mockGetPublicCategories(): PublicCategory[] {
   return MOCK_CATEGORIES;
 }
+
+export function mockGetPageByRole(role: string): PageByRoleResponse {
+  if (role === "privacy") {
+    return {
+      slug: "chinh-sach-bao-mat",
+      title: "Chính sách bảo mật thông tin",
+      version: 1,
+      version_id: 101,
+      effective_from: "2026-09-28T08:00:00Z",
+    };
+  }
+  throw new ApiError("Không tìm thấy trang chính sách.", 404);
+}
+
+export function mockGetFooterLinks(): FooterLink[] {
+  return [
+    { title: "Chính sách bảo mật", slug: "chinh-sach-bao-mat" },
+    { title: "Điều khoản dịch vụ", slug: "dieu-khoan-dich-vu" },
+    { title: "Đổi trả & hoàn tiền", slug: "doi-tra-va-hoan-tien" },
+  ];
+}
+

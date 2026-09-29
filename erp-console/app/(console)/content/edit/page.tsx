@@ -23,6 +23,7 @@ import type {
   ContentCategory,
   ContentImage,
   ContentKind,
+  ContentPageRole,
   ContentStatus,
   ContentWarning,
   UnpublishReason,
@@ -74,7 +75,9 @@ function ContentEditScreen() {
   const [firstPublishedAt, setFirstPublishedAt] = useState<string | null>(null);
   const [publicUrl, setPublicUrl] = useState<string | null>(null);
   const [hasUnpublishedChanges, setHasUnpublishedChanges] = useState(false);
-  const [pageRole, setPageRole] = useState<string | null>(null);
+  const [pageRole, setPageRole] = useState<ContentPageRole>(null);
+  const [showInFooter, setShowInFooter] = useState(false);
+  const [footerOrder, setFooterOrder] = useState(0);
 
   const [categories, setCategories] = useState<ContentCategory[]>([]);
   const [loading, setLoading] = useState(true);
@@ -146,6 +149,8 @@ function ContentEditScreen() {
         setFirstPublishedAt(data.first_published_at);
         setHasUnpublishedChanges(Boolean(data.has_unpublished_changes));
         setPageRole(data.page_role || null);
+        setShowInFooter(Boolean(data.show_in_footer));
+        setFooterOrder(data.footer_order || 0);
       })
       .catch((err) => {
         if (active) {
@@ -181,6 +186,13 @@ function ContentEditScreen() {
           seo_description: seoDescription.trim(),
           cover_image: coverImageId,
           body,
+          ...(kind === "page"
+            ? {
+                page_role: pageRole || null,
+                show_in_footer: showInFooter,
+                footer_order: footerOrder,
+              }
+            : {}),
         });
         setEntryId(res.id);
         setSlug(res.slug);
@@ -190,6 +202,8 @@ function ContentEditScreen() {
         setFirstPublishedAt(res.first_published_at);
         setHasUnpublishedChanges(Boolean(res.has_unpublished_changes));
         setPageRole(res.page_role || null);
+        setShowInFooter(Boolean(res.show_in_footer));
+        setFooterOrder(res.footer_order || 0);
         setImages(res.images || []);
         setSuccessMsg("Đã tạo và lưu nháp thành công!");
         window.history.replaceState(null, "", `/content/edit/?id=${res.id}`);
@@ -206,6 +220,13 @@ function ContentEditScreen() {
           seo_description: seoDescription.trim(),
           cover_image: coverImageId,
           body,
+          ...(kind === "page"
+            ? {
+                page_role: pageRole || null,
+                show_in_footer: showInFooter,
+                footer_order: footerOrder,
+              }
+            : {}),
         });
         setSlug(res.slug);
         setRowVersion(res.row_version);
@@ -214,6 +235,8 @@ function ContentEditScreen() {
         setFirstPublishedAt(res.first_published_at);
         setHasUnpublishedChanges(Boolean(res.has_unpublished_changes));
         setPageRole(res.page_role || null);
+        setShowInFooter(Boolean(res.show_in_footer));
+        setFooterOrder(res.footer_order || 0);
         setImages(res.images || []);
         setSuccessMsg("Đã lưu nháp thành công!");
       }
@@ -538,7 +561,7 @@ function ContentEditScreen() {
           >
             {saving ? "Đang lưu..." : "Lưu nháp"}
           </button>
-          {status === "published" && (
+          {status === "published" && !pageRole && (
             <button
               type="button"
               className={s.unpublishBtn}
@@ -694,6 +717,54 @@ function ContentEditScreen() {
                   ))}
                 </select>
               </div>
+            )}
+
+            {kind === "page" && (
+              <>
+                <div className={s.formGroup}>
+                  <label className={s.label}>Vai trò trang (Bắt buộc go-live)</label>
+                  <select
+                    className={s.select}
+                    value={pageRole || ""}
+                    onChange={(e) => setPageRole((e.target.value as ContentPageRole) || null)}
+                    disabled={status === "published" && Boolean(pageRole)}
+                  >
+                    <option value="">-- Không (Trang tự do) --</option>
+                    <option value="privacy">Chính sách bảo mật (privacy)</option>
+                    <option value="terms">Điều khoản dịch vụ (terms)</option>
+                    <option value="refund">Đổi trả & hoàn tiền (refund)</option>
+                    <option value="seller_info">Thông tin người bán (seller_info)</option>
+                  </select>
+                  {status === "published" && Boolean(pageRole) && (
+                    <p className={s.hint} style={{ color: "#d97706", marginTop: "4px", fontSize: "12px" }}>
+                      Trang bắt buộc go-live đang đăng không được bỏ hoặc đổi vai trò (TD-3).
+                    </p>
+                  )}
+                </div>
+
+                <div className={s.formGroup}>
+                  <label style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", fontSize: "14px" }}>
+                    <input
+                      type="checkbox"
+                      checked={showInFooter}
+                      onChange={(e) => setShowInFooter(e.target.checked)}
+                    />
+                    <span>Hiện ở chân trang (Footer)</span>
+                  </label>
+                </div>
+
+                {showInFooter && (
+                  <div className={s.formGroup}>
+                    <label className={s.label}>Thứ tự chân trang (footer_order)</label>
+                    <input
+                      type="number"
+                      className={s.input}
+                      value={footerOrder}
+                      onChange={(e) => setFooterOrder(parseInt(e.target.value, 10) || 0)}
+                    />
+                  </div>
+                )}
+              </>
             )}
 
             <div className={s.formGroup}>

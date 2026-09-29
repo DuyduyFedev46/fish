@@ -8,6 +8,7 @@ API công khai nội dung (§8.6 02b-tech-design).
 
 from django.conf import settings
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.exceptions import NotFound
 from rest_framework.permissions import AllowAny
@@ -204,13 +205,15 @@ class PublicPageByRoleView(APIView):
                     status=status.HTTP_404_NOT_FOUND,
                 )
             version = entry.published_version
-            return Response({
+            res = Response({
                 "slug": entry.slug,
                 "title": version.title,
                 "version": version.version,
                 "version_id": version.pk,
-                "effective_from": version.published_at.isoformat(),
-            })
+                "effective_from": timezone.localtime(version.published_at).isoformat(),
+            }, status=status.HTTP_200_OK)
+            res["Cache-Control"] = f"public, max-age={_cache_control_seconds()}"
+            return res
         except Exception:
             return Response(
                 {"detail": "Không tìm thấy trang chính sách.", "code": "NOT_FOUND"},

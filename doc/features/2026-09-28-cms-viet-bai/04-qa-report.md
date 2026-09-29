@@ -358,5 +358,82 @@ git status --porcelain -- backend/apps | grep "/migrations/" | grep -v "apps/con
 - **Nghiệm thu Lô 4**: **APPROVED** (13/13 ca PASS).
 </QA — CMS viết bài · lô 4 · lần 2 · 2026-09-29>
 
+---
+
+<QA — CMS viết bài · lô 5 · lần 2 · 2026-09-29>
+## Kết luận: APPROVED — Toàn bộ Acceptance Criteria của CMS-15 và TD-3 đạt 100%, bảo đảm nghiêm ngặt các bất biến hệ thống và không có lỗi chặn.
+## Tổng: 10 ca · ✅ 10 · ❌ 0 · ⏸ 0
+
+---
+
+### 1. Bảng theo dõi Acceptance Criteria (AC)
+
+#### CMS-15 — Trang nội dung và phiên bản có hiệu lực (AC1..AC9, TD-3)
+| Mã AC | Kết quả | Bằng chứng (test / code / kiểm tra) |
+|---|---|---|
+| CMS-15-AC1 | ✅ PASS | `apps/content/tests/test_pages_policy.py::PagesPolicyTests::test_cms_15_ac1_create_and_publish_page_without_category_and_cover`<br>- Quản lý tạo `kind=page` "Chính sách bảo mật" không cần chuyên mục và ảnh bìa -> Đăng thành công 200, `public_path` trả về `/trang/?slug=chinh-sach-bao-mat`.<br>- Danh sách bài viết công khai (`/api/public/content/entries/`) tự động lọc bỏ các bản ghi `kind=page` (không xuất hiện trong CMS-14).<br>- `frontend/app/trang/page.tsx` hiển thị dòng `Có hiệu lực từ dd/mm/yyyy` định dạng tiếng Việt chuẩn. |
+| CMS-15-AC2 | ✅ PASS | `apps/content/tests/test_pages_policy.py::PagesPolicyTests::test_cms_15_ac2_duplicate_page_role_rejected_br_nd_16`<br>- Tạo trang thứ hai có cùng `page_role="privacy"` -> Trả về 400 `BR-ND-16`, bảo đảm mỗi vai trò chỉ gắn với đúng một trang duy nhất. |
+| CMS-15-AC3 | ✅ PASS | `apps/content/tests/test_pages_policy.py::PagesPolicyTests::test_cms_15_ac3_unpublish_policy_page_rejected_br_nd_16`<br>- Trang `privacy` đang Đã đăng gọi `unpublish` -> 400 `BR-ND-16` ("Trang bắt buộc go-live chỉ sửa và đăng lại (BR-ND-16).").<br>- `erp-console/app/(console)/content/edit/page.tsx` (dòng 564) tự động ẩn nút "Gỡ bài" khi `pageRole` khác null. |
+| CMS-15-AC4 | ✅ PASS | `apps/content/tests/test_pages_policy.py::PagesPolicyTests::test_cms_15_ac4_effective_version_3_timestamps_and_current_policy_version`<br>- `effective_version("privacy", at)`: trước ngày đăng v1 -> `None`; giữa v1 và v2 -> trả `v1`; sau v2 -> trả `v2`.<br>- `current_policy_version("privacy")` trả `None` khi trang chưa đăng, và trả đúng `published_version` khi trang đã đăng (chuẩn bị sẵn sàng cho hồ sơ go-live GL-03). |
+| CMS-15-AC5 | ✅ PASS | `apps/content/tests/test_pages_policy.py::PagesPolicyTests::test_cms_15_ac5_public_page_by_role_contract_and_forbidden_keys`<br>- `GET /api/public/content/pages/by-role/privacy/` trả đúng 5 khoá hợp đồng: `slug`, `title`, `version`, `version_id`, `effective_from`.<br>- Header có `Cache-Control: public, max-age=60`.<br>- `assert_no_forbidden_keys` quét đệ quy xác nhận 100% sạch các khoá cấm. |
+| CMS-15-AC6 | ✅ PASS | `apps/content/tests/test_pages_policy.py::PagesPolicyTests::test_cms_15_ac6_public_footer_links_order_and_published_only`<br>- `GET /api/public/content/footer-links/` chỉ trả các trang Đã đăng có `show_in_footer=True`, sắp xếp chuẩn theo `footer_order`.<br>- Loại bỏ hoàn toàn các trang Nháp hoặc Đã gỡ. Response chỉ gồm `title` và `slug`. |
+| CMS-15-AC7 | ✅ PASS | `apps/content/tests/test_pages_policy.py::PagesPolicyTests::test_cms_15_ac7_golive_missing_roles_service_and_api`<br>- `golive_missing_roles()` và `GET /api/content/golive-status/` trả đầy đủ danh sách vai trò chưa có trang Đã đăng trong 4 vai trò bắt buộc.<br>- ERP console (`ContentListScreen.tsx`) hiển thị Banner cảnh báo màu vàng `#fffbeb` kèm tên tiếng Việt của từng trang bị thiếu khi `missingRoles.length > 0`. |
+| CMS-15-AC8 | ✅ PASS | `apps/content/tests/test_pages_policy.py::PagesPolicyTests::test_cms_15_ac8_user_with_only_nd01_patch_policy_fields_forbidden_403`<br>- User chỉ có quyền soạn ND-01 gửi PATCH sửa `page_role`, `show_in_footer`, hoặc `footer_order` -> Bị từ chối 403 `BR-PQ-12` ngay trước khi lưu; toàn bộ các trường khác trong request không bị thay đổi. |
+| CMS-15-AC9 | ✅ PASS | `apps/content/tests/test_pages_policy.py::PagesPolicyTests::test_cms_15_ac9_nv_kho_golive_status_403_and_guest_401`<br>- Nhân viên kho gọi `GET /api/content/golive-status/` -> 403 `BR-PQ-12`. Khách chưa đăng nhập -> 401 `Unauthorized`. |
+| TD-3 | ✅ PASS | `apps/content/tests/test_pages_policy.py::PagesPolicyTests::test_td_3_cannot_change_or_remove_page_role_of_published_entry`<br>- Trang bắt buộc go-live đang Đã đăng gửi PATCH gán `page_role=None` hoặc đổi vai trò khác -> 400 `BR-ND-16`.<br>- ERP console (`edit/page.tsx` dòng 730) khoá disable ô chọn vai trò đối với trang đã đăng. |
+
+---
+
+### 2. Kiểm tra Bất biến, Phân quyền & An toàn dữ liệu
+
+1. **Bất biến 1 (Không rò giá vốn)**:
+   - Các endpoint mới công khai (`/api/public/content/pages/by-role/<role>/`, `/api/public/content/footer-links/`) và nội bộ (`/api/content/golive-status/`) không chứa bất kỳ trường giá vốn, giá mua, lãi lỗ hay chi phí.
+   - Đã quét đệ quy qua hàm `assert_no_forbidden_keys` trên toàn bộ response của Lô 5.
+2. **Bất biến 9 (Không rò dữ liệu cá nhân khách)**:
+   - Trang nội dung không lưu và không chứa bất kỳ thông tin khách hàng nào (PII).
+   - Tác giả công khai cố định `author = "Cá Về"`. Không log dữ liệu nhạy cảm.
+3. **Phân quyền 3 tầng**:
+   - `ContentPermissions` bảo vệ endpoint `golive-status` yêu cầu `content.view_entry`.
+   - `save_draft` bảo vệ tầng 2: việc cấu hình các trường vai trò chính sách (`page_role`, `show_in_footer`, `footer_order`) bắt buộc có quyền `content.publish_entry`.
+4. **Lệnh cấm `dangerouslySetInnerHTML`**:
+   - Quét kiểm tra `grep -rn "dangerouslySetInnerHTML" frontend/features/content frontend/app/bai-viet frontend/app/trang erp-console/features/content` -> Rỗng (0 vi phạm). `frontend/app/trang/page.tsx` render an toàn qua JSX với component `ArticleBody`.
+5. **Chứng từ & Append-only (Bất biến 3 & 4)**:
+   - Trang go-live không cho phép gỡ trực tiếp (chỉ sửa và đăng lại tạo phiên bản mới) nhằm bảo toàn tính liên tục của lịch sử pháp lý.
+
+---
+
+### 3. Bảng Phân quyền (vai × hành động Lô 5)
+| Vai / Group | GET /content/golive-status/ | PATCH …/ (có page_role/footer) | POST …/unpublish/ (Trang go-live) | GET /public/content/pages/by-role/<role>/ | GET /public/content/footer-links/ |
+|---|---|---|---|---|---|
+| `chu` | 200 | 200 | 400 `BR-ND-16` | 200 | 200 |
+| `quan_ly` | 200 | 200 | 400 `BR-ND-16` | 200 | 200 |
+| User chỉ ND-01 | 200 (có view_entry) | 403 `BR-PQ-12` | 403 | 200 | 200 |
+| `nv_kho` | 403 `BR-PQ-12` | 403 | 403 | 200 | 200 |
+| `nv_giao` | 403 `BR-PQ-12` | 403 | 403 | 200 | 200 |
+| Khách (chưa login) | 401 | 401 | 401 | 200 | 200 |
+
+---
+
+### 4. Lỗi chặn
+*(Không có lỗi chặn nào)*
+
+---
+
+### 5. Lệnh kiểm chứng đã chạy
+1. `cd backend && .venv/bin/python manage.py test apps.content` -> Ran 70 tests in 3.730s -> OK (0 failures).
+2. `cd backend && .venv/bin/python manage.py test && .venv/bin/python manage.py makemigrations --check --dry-run` -> Ran 979 tests in 75.285s -> OK. No changes detected.
+3. `cd erp-console && npm test` -> 7 test files passed, 61 tests passed (100%).
+4. `cd erp-console && npx tsc --noEmit && npm run build` -> Compiled successfully, Generating static pages (30/30) -> OK.
+5. `cd frontend && npx tsc --noEmit && NEXT_PUBLIC_USE_MOCK=0 NEXT_PUBLIC_API_BASE=https://cangca-api-staging-675411800433.asia-southeast1.run.app npm run build` -> Compiled successfully, Generating static pages (10/10) -> OK.
+6. `grep -rn "dangerouslySetInnerHTML" frontend/features/content frontend/app/bai-viet frontend/app/trang erp-console/features/content` -> Rỗng (0 vi phạm).
+7. `git status --porcelain -- backend/apps | grep "/migrations/" | grep -v "apps/content/migrations/"` -> Rỗng (không có migration app khác ngoài content).
+
+---
+
+### 6. Kết luận
+- **Nghiệm thu Lô 5**: **APPROVED** (10/10 ca PASS).
+</QA — CMS viết bài · lô 5 · lần 2 · 2026-09-29>
+
+
 
 

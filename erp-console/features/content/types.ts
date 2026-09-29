@@ -185,4 +185,21 @@ export interface EntryDiscardPayload {
   row_version: number;
 }
 
+export interface GoliveStatusResponse {
+  missing_roles: string[];
+}
+
+export interface FooterLink {
+  title: string;
+  slug: string;
+}
+
+export interface PageByRoleResponse {
+  slug: string;
+  title: string;
+  version: number;
+  version_id: number;
+  effective_from: string;
+}
+
 

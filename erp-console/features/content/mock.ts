@@ -13,6 +13,7 @@ import {
   EntryPublishResponse,
   EntryUnpublishPayload,
   EntryUpdatePayload,
+  GoliveStatusResponse,
 } from "./types";
 import { ApiError } from "@/shared/lib/http";
 
@@ -564,3 +565,11 @@ export function mockDiscardChanges(
   return { ...entry };
 }
 
+export function mockGetGoliveStatus(): GoliveStatusResponse {
+  const publishedRoles = new Set(
+    MOCK_ENTRIES.filter((e) => e.status === "published" && e.page_role).map((e) => e.page_role as string)
+  );
+  const requiredRoles = ["privacy", "terms", "refund", "seller_info"];
+  const missing = requiredRoles.filter((r) => !publishedRoles.has(r));
+  return { missing_roles: missing };
+}
