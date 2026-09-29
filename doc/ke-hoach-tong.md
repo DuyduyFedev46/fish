@@ -20,7 +20,7 @@
 | ☑ | **P2** Tiếp theo · Đã làm | `2026-09-28-ai-digital-worker` | 0 (spike, song song) + 1a → 1b → 1c | XONG | P1 xong + merge main | Lô 1c sau P1 Lô 3 (cùng sửa `batch_pnl`). Spike DW-02: phần đo trên máy Android/Windows ≥ 8GB do **Duy chạy** |
 | ☑ | **P3** Lệnh AI tự sinh + AI của tôi | `2026-09-28-ai-digital-worker` | 2 → 3a → 3b → 3c → 4 | XONG | P2 xong; kết quả spike Lô 0 đạt | Mọi môi trường `AI_WRITE_LEVELS_ALLOWED=C` (AI chỉ soạn nháp). Lô 2 có sẵn danh sách cấm `/api/public/`, `/api/cskh/`, `…/label/` |
 | ☑ | **P4** CSKH xác nhận + in tem | `2026-09-28-cskh-xac-nhan-in-tem` | 1 → 2 → 3 → 4 (5 là Could) | XONG | P3 xong | Lô 2 chỉ staging. Lô 3 (tự huỷ) lên production **sau khi legal-vn duyệt câu thông báo** và Duy bật cờ `CSKH_AUTO_CANCEL_ENABLED` |
-| ☐ | **P5** CMS viết bài | `2026-09-28-cms-viet-bai` | 1 → 2 → … → 7 | SẴN SÀNG CODE (Duy duyệt 28/09) | P4 xong | Thư viện mới duy nhất: Tiptap 2 (erp-console). CMS-16 đã làm ở P1 |
+| ☑ | **P5** CMS viết bài | `2026-09-28-cms-viet-bai` | 1 → 2 → … → 7 | XONG | P4 xong | Thư viện mới duy nhất: Tiptap 2 (erp-console). CMS-16 đã làm ở P1 |
 | ☐ | **P6** Khung go-live | `2026-09-28-khung-go-live` | 1 → 2 → 3 | SẴN SÀNG CODE (Duy duyệt 28/09) | CMS Lô 5 (Lô 1–2), CMS Lô 7 (Lô 3) | Cờ `PRIVACY_CONSENT_REQUIRED` bật: chưa đăng chính sách thì Shop không nhận đơn |
 | ☐ | **P7** AI tự ghi + vùng đỏ | `2026-09-28-ai-digital-worker` | 5a → 5b → 5c → 6a → 6b | SẴN SÀNG CODE (Duy duyệt 28/09) | P6 xong | **Chỉ staging** tới khi xong S-L1…S-L4 (pháp lý) |
 
@@ -66,6 +66,12 @@ cache chung (Redis) · SEO nâng cao cho bài viết · hoàn kho/hoàn tiền m
 | 2026-09-29 13:10 | P4 | Lô 3 | APPROVED | `fd515a5` | 880 | CS-07 chuyển Quản lý, CS-08 tự huỷ (cờ tắt), CS-09 nhắc gọi báo hoàn, CS-10 báo khách |
 | 2026-09-29 13:52 | P4 | Lô 4 | APPROVED | `02babc5` | 907 | CS-12 đổi người nhận, CS-13 khách muốn huỷ/đổi, CS-14 in lại/huỷ tem, CS-15 cần chú ý |
 | 2026-09-29 14:30 | P5 | Lô 1 | APPROVED | `69f6c3b` | 920 | CMS-01 phân quyền 8 quyền content, CMS-02 chuyên mục, BusinessError.extra |
+| 2026-09-29 15:40 | P5 | Lô 2 | APPROVED | `e312e5c` | 948 | CMS-03 soạn & lưu nháp, CMS-05 ảnh 3 cỡ WebP giữ 4:3, không EXIF |
+| 2026-09-29 16:30 | P5 | Lô 3 | APPROVED | `9c03606` | 967 | CMS-07 đăng bài checklist, CMS-08 quét SĐT/giá vốn, CMS-13 bài viết công khai |
+| 2026-09-29 17:15 | P5 | Lô 4 | APPROVED | `cb8befb` | 974 | CMS-12 gỡ bài (410, lý do), CMS-10 sửa nháp bài đang đăng & huỷ thay đổi |
+| 2026-09-29 17:50 | P5 | Lô 5 | APPROVED | `adb66b9` | 980 | CMS-15 trang go-live (privacy/terms/refund/seller_info), golive-status, footer-links |
+| 2026-09-29 18:20 | P5 | Lô 6 | APPROVED | `91318b4` | 987 | CMS-06 thẻ mặt hàng live catalog, CMS-14 danh sách bài & khối Bài mới Landing |
+| 2026-09-29 19:05 | P5 | Lô 7 | APPROVED | `38dc277` | 997 | CMS-09 gửi duyệt & trả về, CMS-11 lịch sử phiên bản & khôi phục, CMS-04 tự lưu nháp |
 
 
 
