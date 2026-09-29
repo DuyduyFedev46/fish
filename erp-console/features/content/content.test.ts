@@ -4,11 +4,13 @@ import {
   mockCreateCategory,
   mockCreateEntry,
   mockDeleteEntry,
+  mockDiscardChanges,
   mockGetEntry,
   mockGetEntryCounts,
   mockListCategories,
   mockListEntries,
   mockPublishEntry,
+  mockUnpublishEntry,
   mockUpdateCategory,
   mockUpdateEntry,
   mockUpdateImageAlt,
@@ -274,6 +276,157 @@ describe("CMS-01 & CMS-02 Console Tests", () => {
       }).toThrowError(/STALE_VERSION/);
     });
   });
+
+  describe("CMS-12 & CMS-10: Gỡ bài viết và Huỷ thay đổi nháp", () => {
+    it("CMS-12: Gỡ bài viết đã xuất bản, kiểm tra lý do và bất biến", () => {
+      // 1. Tạo và đăng 1 bài viết
+      const entry = mockCreateEntry({
+        kind: "post",
+        title: "Bài viết để gỡ thử",
+        category: 1,
+        excerpt: "Tóm tắt bài viết",
+      });
+      const fakeFile = new File(["dummy"], "cov.jpg", { type: "image/jpeg" });
+      const img = mockUploadEntryImage(entry.id, fakeFile, "Ảnh bìa");
+      mockUpdateEntry(entry.id, {
+        row_version: entry.row_version,
+        cover_image: img.id,
+        body: {
+          type: "doc",
+          blocks: [{ type: "paragraph", children: [{ text: "Nội dung chuẩn" }] }],
+        },
+      });
+      const published = mockPublishEntry(entry.id, {
+        row_version: 2,
+        checklist_confirmed: true,
+        acknowledge_warnings: true,
+      });
+      expect(published.status).toBe("published");
+
+      // 2. Gỡ bài với row_version cũ -> STALE_VERSION 409
+      expect(() => {
+        mockUnpublishEntry(entry.id, {
+          row_version: 1,
+          reason: "wrong_content",
+        });
+      }).toThrowError(/STALE_VERSION/);
+
+      // 3. Gỡ bài với lý do không hợp lệ -> BR-ND-15
+      expect(() => {
+        mockUnpublishEntry(entry.id, {
+          row_version: 3,
+          reason: "invalid_reason" as any,
+        });
+      }).toThrowError(/BR-ND-15/);
+
+      // 4. Gỡ bài thành công với lý do 'wrong_content'
+      const unpubRes = mockUnpublishEntry(entry.id, {
+        row_version: 3,
+        reason: "wrong_content",
+      });
+      expect(unpubRes.status).toBe("unpublished");
+      expect(unpubRes.return_reason).toBe("wrong_content");
+      expect(unpubRes.row_version).toBe(4);
+
+      // 5. Gỡ bài khi bài không ở trạng thái published -> 400 BR-ND-01
+      expect(() => {
+        mockUnpublishEntry(entry.id, {
+          row_version: 4,
+          reason: "wrong_content",
+        });
+      }).toThrowError(/BR-ND-01/);
+
+      // 6. Gỡ trang go-live có page_role -> 400 BR-ND-16
+      const goLivePage = mockCreateEntry({
+        kind: "page",
+        title: "Chính sách bảo mật",
+        excerpt: "Cam kết bảo mật thông tin khách hàng Cá Về",
+      });
+      mockUpdateEntry(goLivePage.id, {
+        row_version: goLivePage.row_version,
+        page_role: "privacy",
+        body: {
+          type: "doc",
+          blocks: [{ type: "paragraph", children: [{ text: "Nội dung điều khoản bảo mật chi tiết." }] }],
+        },
+      });
+      mockPublishEntry(goLivePage.id, {
+        row_version: 2,
+        checklist_confirmed: true,
+        acknowledge_warnings: true,
+      });
+      expect(() => {
+        mockUnpublishEntry(goLivePage.id, {
+          row_version: 3,
+          reason: "wrong_content",
+        });
+      }).toThrowError(/BR-ND-16/);
+    });
+
+    it("CMS-10: Sửa nháp bài đang đăng và huỷ thay đổi (discard_changes)", () => {
+      // 1. Tạo và đăng 1 bài viết
+      const entry = mockCreateEntry({
+        kind: "post",
+        title: "Bài viết gốc trước khi sửa",
+        category: 1,
+        excerpt: "Tóm tắt gốc",
+      });
+      const fakeFile = new File(["dummy"], "cov.jpg", { type: "image/jpeg" });
+      const img = mockUploadEntryImage(entry.id, fakeFile, "Ảnh bìa gốc");
+      mockUpdateEntry(entry.id, {
+        row_version: entry.row_version,
+        cover_image: img.id,
+        body: {
+          type: "doc",
+          blocks: [{ type: "paragraph", children: [{ text: "Nội dung gốc phiên bản 1" }] }],
+        },
+      });
+      mockPublishEntry(entry.id, {
+        row_version: 2,
+        checklist_confirmed: true,
+        acknowledge_warnings: true,
+      });
+
+      // 2. Sửa nháp tiêu đề và nội dung của bài đang đăng
+      const updated = mockUpdateEntry(entry.id, {
+        row_version: 3,
+        title: "Tiêu đề nháp mới đã bị sửa",
+        body: {
+          type: "doc",
+          blocks: [{ type: "paragraph", children: [{ text: "Nội dung nháp mới" }] }],
+        },
+      });
+      expect(updated.title).toBe("Tiêu đề nháp mới đã bị sửa");
+      expect(updated.has_unpublished_changes).toBe(true);
+
+      // 3. Huỷ thay đổi với row_version cũ -> STALE_VERSION 409
+      expect(() => {
+        mockDiscardChanges(entry.id, {
+          row_version: 2,
+        });
+      }).toThrowError(/STALE_VERSION/);
+
+      // 4. Huỷ thay đổi thành công -> nạp lại tiêu đề và nội dung gốc, has_unpublished_changes = false
+      const discarded = mockDiscardChanges(entry.id, {
+        row_version: 4,
+      });
+      expect(discarded.title).toBe("Bài viết gốc trước khi sửa");
+      expect(discarded.has_unpublished_changes).toBe(false);
+      expect(discarded.row_version).toBe(5);
+
+      // 5. Thử gọi discard_changes trên bài nháp chưa từng đăng -> 400 BR-ND-01
+      const draftOnly = mockCreateEntry({
+        kind: "post",
+        title: "Bài nháp chưa từng đăng",
+      });
+      expect(() => {
+        mockDiscardChanges(draftOnly.id, {
+          row_version: draftOnly.row_version,
+        });
+      }).toThrowError(/BR-ND-01/);
+    });
+  });
 });
+
 
 

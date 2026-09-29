@@ -155,7 +155,22 @@ export function ContentListScreen() {
                   </td>
                   <td>{entry.kind === "post" ? "Bài viết" : "Trang"}</td>
                   <td>
-                    <span className="tag">{entry.status}</span>
+                    <span className="tag">
+                      {entry.status === "draft"
+                        ? "Nháp"
+                        : entry.status === "pending_review"
+                        ? "Chờ duyệt"
+                        : entry.status === "published"
+                        ? "Đã đăng"
+                        : entry.status === "unpublished"
+                        ? "Đã gỡ"
+                        : entry.status}
+                    </span>
+                    {entry.has_unpublished_changes && (
+                      <span className={s.badgeWarning} style={{ marginLeft: 6 }}>
+                        Có thay đổi chưa đăng
+                      </span>
+                    )}
                   </td>
                   <td className="muted">{entry.updated_at}</td>
                 </tr>

@@ -29,10 +29,12 @@
   "content.category.partial_update",
   "content.entry.counts",
   "content.entry.create",
+  "content.entry.discard_changes",
   "content.entry.list",
   "content.entry.partial_update",
   "content.entry.publish",
   "content.entry.retrieve",
+  "content.entry.unpublish",
 
   "delivery.deliverynote.create",
   "delivery.deliverynote.list",

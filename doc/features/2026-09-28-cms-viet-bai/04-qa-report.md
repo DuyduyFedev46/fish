@@ -287,4 +287,76 @@ git status --porcelain -- backend/apps | grep "/migrations/" | grep -v "apps/con
 - **Nghiệm thu Lô 3**: **APPROVED** (100% tiêu chí đạt).
 </QA — CMS viết bài · lô 3 · lần 2 · 2026-09-29>
 
+---
+
+## Lô 4: CMS-12 Gỡ bài viết / trang & CMS-10 Sửa nháp bài đang đăng & huỷ thay đổi
+
+<QA — CMS viết bài · lô 4 · lần 2 · 2026-09-29>
+## Kết luận: APPROVED — Toàn bộ 4 lỗi B1, B2, B3, B4 đã được khắc phục triệt để. Lô 4 hoàn thành xuất sắc, đạt 100% Acceptance Criteria của CMS-12 và CMS-10, bảo đảm nghiêm ngặt các bất biến hệ thống và không có lỗi chặn.
+## Tổng: 13 ca · ✅ 13 · ❌ 0 · ⏸ 0
+
+---
+
+### 1. Bảng theo dõi Acceptance Criteria (AC)
+
+#### CMS-12 — Gỡ bài viết / trang (AC1..AC7)
+| Mã AC | Kết quả | Bằng chứng (test / code / kiểm tra) |
+|---|---|---|
+| CMS-12-AC1 | ✅ PASS | `apps/content/tests/test_unpublish_discard.py::UnpublishAndDiscardTests::test_cms_12_ac1_unpublish_published_entry_success` (Gỡ bài đang published với lý do `wrong_price` -> 200, status="unpublished", return_reason="wrong_price", row_version tăng). |
+| CMS-12-AC2 | ✅ PASS | `apps/content/tests/test_unpublish_discard.py::UnpublishAndDiscardTests::test_cms_12_ac1_err_missing_or_invalid_reason` (Thiếu `reason` hoặc `reason` ngoài danh mục cho phép -> 400 `BR-ND-15`, bài vẫn giữ nguyên trạng thái published). |
+| CMS-12-AC3 | ✅ PASS | **ĐÃ KHẮC PHỤC B3**: `PublicEntryDetailView` (`backend/apps/content/public/api.py` dòng 139–145) đã gán `res["Cache-Control"] = f"public, max-age={_cache_control_seconds()}"` khi trả 410 GONE. Được kiểm chứng tự động qua `test_cms_12_ac3_public_api_immediately_returns_410`. |
+| CMS-12-AC4 | ✅ PASS | `frontend/app/bai-viet/page.tsx` (dòng 93–107): Khách mở bài đã gỡ nhận 410 -> hiển thị giao diện "Bài này không còn trên web", nút "Về cửa hàng Cá Về" trỏ về `/shop`, hoàn toàn không hiện nội dung cũ của bài viết. |
+| CMS-12-AC5 | ✅ PASS | `apps/content/tests/test_unpublish_discard.py::UnpublishAndDiscardTests::test_cms_12_ac4_republish_same_slug_creates_version_n_plus_1` (Bài đã gỡ đăng lại -> tạo phiên bản n+1, giữ cùng slug cũ, ghi AuditLog `content_republish`, public API phục vụ 200 OK với phiên bản mới). |
+| CMS-12-AC6 | ✅ PASS | `apps/content/tests/test_unpublish_discard.py::UnpublishAndDiscardTests::test_cms_12_ac5_delete_unpublished_entry_rejected_br_nd_02` (Bài đã gỡ gọi DELETE -> 400 `BR-ND-02`, bài viết và toàn bộ `EntryVersion` trong DB được bảo toàn nguyên vẹn). |
+| CMS-12-AC7 | ✅ PASS | **ĐÃ KHẮC PHỤC B4**: `apps/content/tests/test_unpublish_discard.py::UnpublishAndDiscardTests::test_cms_12_ac6_permissions_unpublish_forbidden_403` kiểm tra đầy đủ cả 3 vai trò: `user chỉ có ND-01`, `nv_giao` và `nv_kho` gọi `unpublish` đều nhận 403 Forbidden; bài viết giữ nguyên trạng thái published. |
+
+#### CMS-10 — Sửa bài đã đăng & huỷ thay đổi (AC1..AC6)
+| Mã AC | Kết quả | Bằng chứng (test / code / kiểm tra) |
+|---|---|---|
+| CMS-10-AC1 | ✅ PASS | `apps/content/tests/test_unpublish_discard.py::UnpublishAndDiscardTests::test_cms_10_ac1_edit_draft_of_published_entry` (Sửa nháp bài published -> 200, `has_unpublished_changes=True`, draft_hash khác published_version.content_hash). |
+| CMS-10-AC2 | ✅ PASS | `apps/content/tests/test_unpublish_discard.py::UnpublishAndDiscardTests::test_cms_10_ac2_public_api_still_serves_published_version` (Trong khi nháp đang sửa dở, API công khai tiếp tục trả đúng tiêu đề và thân bài của `published_version`). |
+| CMS-10-AC3 | ✅ PASS | **ĐÃ KHẮC PHỤC B1 & B2**: <br>1. Action `discard_changes` trong `backend/apps/content/entries/api.py` đã thêm `url_path="discard-changes"`, khớp hoàn toàn contract `POST /api/content/entries/<id>/discard-changes/`.<br>2. Endpoint trả về `→ 200 (chi tiết)` qua `EntryDetailSerializer`, cung cấp đầy đủ `title`, `slug`, `excerpt`, `body`, `cover_image`, `category`,... giúp giao diện trình soạn thảo cập nhật lại bản published mà không bị xoá trắng form.<br>3. `erp-console/features/content/api.ts` đã cập nhật URL trỏ đúng `/discard-changes/`. Kiểm chứng tự động qua `test_cms_10_ac3_discard_changes_restores_from_published_version` và `content.test.ts`. |
+| CMS-10-AC4 | ✅ PASS | `apps/content/tests/test_unpublish_discard.py::UnpublishAndDiscardTests::test_cms_10_ac4_republish_without_changes_rejected_br_nd_05` (Đăng lại khi draft_hash == published_version.content_hash -> 400 `BR-ND-05` "Không có thay đổi để đăng", không tạo phiên bản mới). |
+| CMS-10-AC5 | ✅ PASS | `apps/content/tests/test_unpublish_discard.py::UnpublishAndDiscardTests::test_cms_10_ac5_entry_version_append_only` (EntryVersion là append-only: gọi `ver.save()`, `ver.delete()`, `EntryVersion.objects.filter(...).update()`, `delete()` đều raise `BusinessError` mã `BR-ND-05`). |
+| CMS-10-AC6 | ✅ PASS | **ĐÃ KHẮC PHỤC B4**: `apps/content/tests/test_unpublish_discard.py::UnpublishAndDiscardTests::test_cms_10_ac6_user_nd01_can_edit_draft_but_cannot_publish_403` kiểm tra: User chỉ có quyền soạn ND-01 sửa được nháp bài đã đăng (PATCH 200, `has_unpublished_changes=True`), nhưng khi gọi publish bị từ chối 403 Forbidden, và web công khai vẫn phục vụ bản cũ. |
+
+---
+
+### 2. Bất biến, Phân quyền & An toàn dữ liệu
+
+- **Bất biến 1 (Không rò giá vốn)**: ✅ ĐẠT. Cả `unpublish` và `discard-changes` không đụng trường giá vốn hay tài chính. Response trả về không chứa các khoá cấm.
+- **Bất biến 9 (Không rò PII)**: ✅ ĐẠT. `reason` gỡ bài là enum chuẩn (`UNPUBLISH_REASONS`), không cho nhập text tự do nhằm chống lọt PII vào `AuditLog`. AuditLog `content_unpublish` chỉ ghi `entry_id`, `version`, `reason`; không ghi tiêu đề/chữ bài.
+- **Append-only & Chứng từ (Bất biến 3 & 4)**: ✅ ĐẠT. `EntryVersion` chặn toàn bộ thao tác ghi đè/xoá qua ORM (`save()`, `delete()`, `update()`). Bài đã từng đăng (kể cả đã gỡ `unpublished`) không thể xoá qua DELETE -> 400 `BR-ND-02`.
+- **Cấm dangerouslySetInnerHTML**: ✅ ĐẠT. Kiểm tra toàn bộ mã nguồn không sử dụng `dangerouslySetInnerHTML`.
+
+---
+
+### 3. Bảng Phân quyền (vai × hành động Lô 4)
+| Vai / Group | POST …/unpublish/ (Gỡ bài) | POST …/discard-changes/ (Bỏ thay đổi) | POST …/publish/ (Đăng lại) | GET /public/content/entries/<slug>/ (Bài đã gỡ) |
+|---|---|---|---|---|
+| `chu` | 200 | 200 | 200 | 410 |
+| `quan_ly` | 200 | 200 | 200 | 410 |
+| User chỉ ND-01 | 403 | 200 (có change_entry) | 403 | 410 |
+| `nv_kho` | 403 | 403 | 403 | 410 |
+| `nv_giao` | 403 | 403 | 403 | 410 |
+| Khách (chưa login) | 401 | 401 | 401 | 410 |
+
+---
+
+### 4. Lệnh kiểm chứng đã chạy
+1. `cd backend && .venv/bin/python manage.py test apps.content` -> Ran 60 tests -> OK (0 failures).
+2. `cd backend && .venv/bin/python manage.py test && .venv/bin/python manage.py makemigrations --check --dry-run` -> Ran 977 tests -> OK. No changes detected.
+3. `cd erp-console && npm test` -> 7 test files passed, 60 tests passed (100%).
+4. `cd erp-console && npx tsc --noEmit && npm run build` -> Compiled successfully, Generating static pages (30/30) -> OK.
+5. `cd frontend && npx tsc --noEmit && npm run build` -> Compiled successfully, Generating static pages (9/9) -> OK.
+6. `grep -rn "dangerouslySetInnerHTML" frontend/features/content frontend/app/bai-viet erp-console/features/content` -> Rỗng (0 vi phạm).
+7. `git status --porcelain -- backend/apps | grep "/migrations/" | grep -v "apps/content/migrations/"` -> Rỗng (không có migration app khác ngoài content).
+
+---
+
+### 5. Kết luận
+- **Nghiệm thu Lô 4**: **APPROVED** (13/13 ca PASS).
+</QA — CMS viết bài · lô 4 · lần 2 · 2026-09-29>
+
+
 

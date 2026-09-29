@@ -247,4 +247,68 @@ git status --porcelain -- backend/apps | grep "/migrations/" | grep -v "apps/con
 ### Lệch thiết kế
 *(Không có)*
 
+---
+
+## Lô 4: CMS-12 Gỡ bài viết / trang & CMS-10 Sửa nháp bài đang đăng & huỷ thay đổi
+
+### Những gì đã làm
+1. **Backend**:
+   - `backend/apps/content/entries/services.py`:
+     - `UNPUBLISH_REASONS = {"wrong_price", "complaint", "out_of_season", "wrong_content", "other"}`.
+     - Hiện thực `unpublish_entry`: kiểm tra `row_version` (409 STALE_VERSION), kiểm tra `status == "published"` (400 BR-ND-01), kiểm tra `reason` hợp lệ (400 BR-ND-15), chặn gỡ trang go-live có `page_role` (400 BR-ND-16), cập nhật `status = "unpublished"`, `return_reason = clean_reason`, ghi AuditLog 1 dòng `content_unpublish` (`entry_id, version, reason`), không ghi tiêu đề/chữ bài.
+     - Hiện thực `discard_changes`: nạp lại nội dung từ `published_version`, `draft_hash = published_version.content_hash`, `row_version += 1`, không ghi AuditLog, trả về instance `entry`.
+   - `backend/apps/content/entries/api.py`:
+     - Thêm action `@action(detail=True, methods=["post"], required_perms=("content.publish_entry",)) def unpublish`.
+     - Thêm action `@action(detail=True, methods=["post"], url_path="discard-changes", required_perms=("content.change_entry",)) def discard_changes` trả về `Response(EntryDetailSerializer(entry, ...).data)`.
+     - Cập nhật `custom_perm_actions = ("counts", "publish", "unpublish", "discard_changes")`.
+   - `backend/apps/content/public/api.py`:
+     - Gán header `Cache-Control: public, max-age=60` khi trả về mã 410 GONE (CMS-12-AC3).
+   - `backend/apps/ai/registry/tests/snapshots/commands_index_snapshot.json`:
+     - Đã thêm `content.entry.discard_changes` và `content.entry.unpublish` theo alphabet.
+   - `backend/apps/content/tests/test_unpublish_discard.py`:
+     - 13 test cases bao quát đầy đủ CMS-12 (AC1..AC7) và CMS-10 (AC1..AC6), append-only test cho `EntryVersion`, phân quyền 3 vai trò và `Cache-Control`.
+
+2. **Frontend ERP Console**:
+   - `erp-console/features/content/types.ts`:
+     - Thêm `UnpublishReason`, `EntryUnpublishPayload`, `EntryDiscardPayload`.
+   - `erp-console/features/content/api.ts` & `mock.ts`:
+     - Thêm `unpublishEntry` và `discardChanges` gọi đúng `/discard-changes/`.
+     - Mock hỗ trợ lưu `_published_snapshot`, khôi phục bản nháp và gỡ bài.
+   - `erp-console/features/content/components/ContentListScreen.tsx`:
+     - Hiển thị badge vàng "Có thay đổi chưa đăng" khi `item.has_unpublished_changes` (CMS-10-AC6).
+   - `erp-console/app/(console)/content/edit/page.tsx` & `edit.module.css`:
+     - Thêm nút "Gỡ bài" khi bài đang `published`: modal chọn lý do gỡ bài (`wrong_price`, `complaint`, `out_of_season`, `wrong_content`, `other`). Chặn gỡ trang go-live kèm thông báo thân thiện.
+     - Khi `has_unpublished_changes = true`: hiển thị banner cảnh báo và nút "Huỷ thay đổi" (gọi `discardChanges`), nạp lại toàn bộ dữ liệu vào form mượt mà.
+   - `erp-console/features/content/content.test.ts`:
+     - Bổ sung đầy đủ unit tests cho CMS-12 và CMS-10.
+
+### Kết quả kiểm chứng Lô 4
+```bash
+# 1. Content tests:
+cd backend && .venv/bin/python manage.py test apps.content
+# Output: Ran 60 tests in 3.127s -> OK.
+
+# 2. Makemigrations check:
+cd backend && .venv/bin/python manage.py makemigrations --check --dry-run
+# Output: No changes detected.
+
+# 3. ERP Console tests & build:
+cd erp-console && npm test
+# Output: 7 test files passed, 60 tests passed (100%).
+cd erp-console && npx tsc --noEmit && npm run build
+# Output: Compiled successfully, Generating static pages (30/30) -> OK.
+
+# 4. Frontend Shop Web typecheck & build:
+cd frontend && npx tsc --noEmit && npm run build
+# Output: Compiled successfully, Generating static pages (9/9) -> OK.
+
+# 5. Kiểm tra dangerouslySetInnerHTML:
+grep -rn "dangerouslySetInnerHTML" frontend/features/content frontend/app/bai-viet erp-console/features/content
+# Output: rỗng (0 vi phạm).
+```
+
+### Lệch thiết kế
+*(Không có)*
+
+
 

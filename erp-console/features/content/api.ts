@@ -8,19 +8,23 @@ import type {
   ContentEntryListItem,
   ContentImage,
   EntryCreatePayload,
+  EntryDiscardPayload,
   EntryPublishPayload,
   EntryPublishResponse,
+  EntryUnpublishPayload,
   EntryUpdatePayload,
 } from "./types";
 import {
   mockCreateCategory,
   mockCreateEntry,
   mockDeleteEntry,
+  mockDiscardChanges,
   mockGetEntry,
   mockGetEntryCounts,
   mockListCategories,
   mockListEntries,
   mockPublishEntry,
+  mockUnpublishEntry,
   mockUpdateCategory,
   mockUpdateEntry,
   mockUpdateImageAlt,
@@ -173,4 +177,27 @@ export async function publishEntry(
     mock: isMock ? () => ({ status: 200, body: mockPublishEntry(id, payload) }) : undefined,
   });
 }
+
+export async function unpublishEntry(
+  id: number,
+  payload: EntryUnpublishPayload
+): Promise<ContentEntryDetail> {
+  return apiFetch<ContentEntryDetail>(`/api/content/entries/${id}/unpublish/`, {
+    method: "POST",
+    body: payload,
+    mock: isMock ? () => ({ status: 200, body: mockUnpublishEntry(id, payload) }) : undefined,
+  });
+}
+
+export async function discardChanges(
+  id: number,
+  payload: EntryDiscardPayload
+): Promise<ContentEntryDetail> {
+  return apiFetch<ContentEntryDetail>(`/api/content/entries/${id}/discard-changes/`, {
+    method: "POST",
+    body: payload,
+    mock: isMock ? () => ({ status: 200, body: mockDiscardChanges(id, payload) }) : undefined,
+  });
+}
+
 

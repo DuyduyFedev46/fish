@@ -1,6 +1,7 @@
 """Dịch vụ nghiệp vụ bài viết và trang nội dung (§4 02b-tech-design)."""
 import hashlib
 import json
+from typing import Any
 import uuid
 from django.conf import settings
 from django.db import transaction, IntegrityError
@@ -487,4 +488,142 @@ def publish_entry(
             "public_path": public_path,
             "public_url": f"{shop_base}{public_path}",
         }
+
+
+UNPUBLISH_REASONS = {"wrong_price", "complaint", "out_of_season", "wrong_content", "other"}
+
+
+def unpublish_entry(*, entry: Entry, actor: Any, row_version: int, reason: str) -> dict[str, Any]:
+    """
+    Gỡ bài viết hoặc trang khỏi website công khai (CMS-12, §4.6 02b-tech-design).
+    - Chỉ cho phép gỡ từ trạng thái 'published'.
+    - Lý do bắt buộc thuộc UNPUBLISH_REASONS.
+    - Không cho gỡ trực tiếp trang đang giữ page_role go-live (BR-ND-16).
+    - Ghi đúng 1 dòng AuditLog action 'content_unpublish'.
+    """
+    from apps.common.audit import record_audit
+
+    with transaction.atomic():
+        entry = Entry.objects.select_for_update().get(pk=entry.pk)
+
+        # 1. Kiểm tra row_version
+        if row_version != entry.row_version:
+            raise BusinessError(
+                "Bài viết đã được chỉnh sửa bởi người khác (STALE_VERSION).",
+                code="STALE_VERSION",
+                status_code=409,
+            )
+
+        # 2. Kiểm tra trạng thái hiện tại (CMS-12-AC7)
+        if entry.status != "published":
+            raise BusinessError(
+                "Chỉ có thể gỡ bài viết đang ở trạng thái đã đăng (BR-ND-01).",
+                code="BR-ND-01",
+            )
+
+        # 3. Kiểm tra lý do gỡ (CMS-12-AC1)
+        clean_reason = str(reason or "").strip()
+        if clean_reason not in UNPUBLISH_REASONS:
+            raise BusinessError(
+                "Lý do gỡ bài không hợp lệ (BR-ND-15).",
+                code="BR-ND-15",
+            )
+
+        # 4. Kiểm tra trang giữ vai trò go-live (CMS-15, BR-ND-16)
+        if entry.page_role is not None:
+            raise BusinessError(
+                "Không thể gỡ trực tiếp trang nội dung đang giữ vai trò go-live (BR-ND-16).",
+                code="BR-ND-16",
+            )
+
+        ver_num = entry.published_version.version if entry.published_version else 1
+        entry.status = "unpublished"
+        entry.return_reason = clean_reason
+        entry.row_version += 1
+        entry.updated_by = actor
+        entry.save(update_fields=[
+            "status",
+            "return_reason",
+            "row_version",
+            "updated_by",
+            "updated_at",
+        ])
+
+        # Ghi AuditLog
+        record_audit(
+            action="content_unpublish",
+            actor=actor,
+            obj=entry,
+            changes={
+                "entry_id": entry.id,
+                "version": ver_num,
+                "reason": clean_reason,
+            },
+            object_repr=f"Nội dung #{entry.id}",
+            note="",
+        )
+
+        return {
+            "status": "unpublished",
+            "row_version": entry.row_version,
+        }
+
+
+def discard_changes(*, entry: Entry, actor: Any, row_version: int) -> dict[str, Any]:
+    """
+    Huỷ các thay đổi nháp đang soạn, khôi phục lại nội dung bản đã đăng (CMS-10-AC3, §4.6).
+    - Yêu cầu bài đã từng được xuất bản (published_version is not None).
+    - Nạp lại mọi trường nội dung từ published_version.
+    - Không ghi AuditLog.
+    """
+    with transaction.atomic():
+        entry = Entry.objects.select_for_update().get(pk=entry.pk)
+
+        # 1. Kiểm tra row_version
+        if row_version != entry.row_version:
+            raise BusinessError(
+                "Bài viết đã được chỉnh sửa bởi người khác (STALE_VERSION).",
+                code="STALE_VERSION",
+                status_code=409,
+            )
+
+        # 2. Kiểm tra có bản published không
+        if entry.published_version is None:
+            raise BusinessError(
+                "Bài viết chưa từng được đăng, không thể huỷ thay đổi (BR-ND-02).",
+                code="BR-ND-02",
+            )
+
+        ver = entry.published_version
+        entry.title = ver.title
+        entry.slug = ver.slug
+        entry.excerpt = ver.excerpt
+        entry.seo_title = ver.seo_title
+        entry.seo_description = ver.seo_description
+        entry.category = ver.category
+        entry.cover_image = ver.cover_image
+        entry.body = ver.body
+        entry.restored_from = None
+        entry.draft_hash = ver.content_hash
+        entry.row_version += 1
+        entry.updated_by = actor
+        entry.save(update_fields=[
+            "title",
+            "slug",
+            "excerpt",
+            "seo_title",
+            "seo_description",
+            "category",
+            "cover_image",
+            "body",
+            "restored_from",
+            "draft_hash",
+            "row_version",
+            "updated_by",
+            "updated_at",
+        ])
+
+        return entry
+
+
 

@@ -8,8 +8,10 @@ import {
   ContentImage,
   ContentWarning,
   EntryCreatePayload,
+  EntryDiscardPayload,
   EntryPublishPayload,
   EntryPublishResponse,
+  EntryUnpublishPayload,
   EntryUpdatePayload,
 } from "./types";
 import { ApiError } from "@/shared/lib/http";
@@ -290,6 +292,13 @@ export function mockUpdateEntry(id: number, payload: EntryUpdatePayload): Conten
     listItem.updated_at = entry.updated_at;
   }
 
+  if (entry.published_version) {
+    entry.has_unpublished_changes = true;
+    if (listItem) {
+      listItem.has_unpublished_changes = true;
+    }
+  }
+
   return { ...entry };
 }
 
@@ -433,6 +442,17 @@ export function mockPublishEntry(
   const publicUrl = entry.kind === "post" ? `/bai-viet?slug=${entry.slug}` : `/trang?slug=${entry.slug}`;
   entry.public_url = publicUrl;
 
+  (entry as any)._published_snapshot = {
+    title: entry.title,
+    slug: entry.slug,
+    category: entry.category,
+    excerpt: entry.excerpt,
+    seo_title: entry.seo_title,
+    seo_description: entry.seo_description,
+    cover_image: entry.cover_image,
+    body: JSON.parse(JSON.stringify(entry.body)),
+  };
+
   return {
     id: entry.id,
     slug: entry.slug,
@@ -442,3 +462,105 @@ export function mockPublishEntry(
     row_version: entry.row_version,
   };
 }
+
+export function mockUnpublishEntry(
+  id: number,
+  payload: EntryUnpublishPayload
+): ContentEntryDetail {
+  const entry = MOCK_ENTRY_DETAILS.get(id);
+  if (!entry) throw new ApiError("Không tìm thấy bài viết.", 404, "NOT_FOUND");
+
+  if (entry.row_version !== payload.row_version) {
+    throw new ApiError(
+      "Dữ liệu đã bị thay đổi bởi người khác (STALE_VERSION).",
+      409,
+      "STALE_VERSION"
+    );
+  }
+
+  if (entry.status !== "published") {
+    throw new ApiError(
+      "Chỉ có thể gỡ bài viết đang ở trạng thái đã đăng (BR-ND-01).",
+      400,
+      "BR-ND-01"
+    );
+  }
+
+  if (entry.page_role) {
+    throw new ApiError(
+      "Trang giữ vai trò go-live không được gỡ trực tiếp (BR-ND-16).",
+      400,
+      "BR-ND-16"
+    );
+  }
+
+  const validReasons = ["wrong_price", "complaint", "out_of_season", "wrong_content", "other"];
+  if (!payload.reason || !validReasons.includes(payload.reason)) {
+    throw new ApiError("Lý do gỡ bài không hợp lệ (BR-ND-15).", 400, "BR-ND-15");
+  }
+
+  entry.status = "unpublished";
+  entry.return_reason = payload.reason;
+  entry.row_version += 1;
+  entry.updated_at = new Date().toISOString();
+
+  const listItem = MOCK_ENTRIES.find((e) => e.id === id);
+  if (listItem) {
+    listItem.status = "unpublished";
+    listItem.updated_at = entry.updated_at;
+  }
+
+  return { ...entry };
+}
+
+export function mockDiscardChanges(
+  id: number,
+  payload: EntryDiscardPayload
+): ContentEntryDetail {
+  const entry = MOCK_ENTRY_DETAILS.get(id);
+  if (!entry) throw new ApiError("Không tìm thấy bài viết.", 404, "NOT_FOUND");
+
+  if (entry.row_version !== payload.row_version) {
+    throw new ApiError(
+      "Dữ liệu đã bị thay đổi bởi người khác (STALE_VERSION).",
+      409,
+      "STALE_VERSION"
+    );
+  }
+
+  if (!entry.published_version) {
+    throw new ApiError(
+      "Bài viết chưa từng xuất bản, không có phiên bản để huỷ thay đổi (BR-ND-01).",
+      400,
+      "BR-ND-01"
+    );
+  }
+
+  if ((entry as any)._published_snapshot) {
+    const snap = (entry as any)._published_snapshot;
+    entry.title = snap.title;
+    entry.slug = snap.slug;
+    entry.category = snap.category;
+    entry.excerpt = snap.excerpt;
+    entry.seo_title = snap.seo_title;
+    entry.seo_description = snap.seo_description;
+    entry.cover_image = snap.cover_image;
+    entry.body = JSON.parse(JSON.stringify(snap.body));
+  }
+
+  entry.has_unpublished_changes = false;
+  entry.row_version += 1;
+  entry.updated_at = new Date().toISOString();
+
+  const listItem = MOCK_ENTRIES.find((e) => e.id === id);
+  if (listItem) {
+    listItem.title = entry.title;
+    listItem.slug = entry.slug;
+    listItem.category = entry.category;
+    listItem.has_unpublished_changes = false;
+    listItem.updated_at = entry.updated_at;
+  }
+
+  return { ...entry };
+}
+

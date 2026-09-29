@@ -169,3 +169,20 @@ export interface EntryPublishResponse {
   row_version: number;
 }
 
+export type UnpublishReason =
+  | "wrong_price"
+  | "complaint"
+  | "out_of_season"
+  | "wrong_content"
+  | "other";
+
+export interface EntryUnpublishPayload {
+  row_version: number;
+  reason: UnpublishReason;
+}
+
+export interface EntryDiscardPayload {
+  row_version: number;
+}
+
+

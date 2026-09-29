@@ -137,10 +137,12 @@ class PublicEntryDetailView(APIView):
 
         # Bài đã gỡ -> 410 GONE
         if entry.status == "unpublished":
-            return Response(
+            res = Response(
                 {"detail": "Bài này không còn trên web.", "code": "GONE"},
                 status=status.HTTP_410_GONE,
             )
+            res["Cache-Control"] = f"public, max-age={_cache_control_seconds()}"
+            return res
 
         # Bài ở trạng thái nháp hoặc chờ duyệt hoặc chưa từng đăng -> trả 404 giống hệt không tồn tại (CMS-13-AC4)
         if entry.status in ("draft", "pending_review") or entry.published_version is None:

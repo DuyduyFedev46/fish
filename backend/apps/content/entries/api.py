@@ -5,7 +5,13 @@ from rest_framework.response import Response
 
 from apps.common.api import StandardPagination
 from apps.content.entries.serializers import EntryDetailSerializer, EntryListSerializer
-from apps.content.entries.services import delete_draft, save_draft
+from apps.content.entries.services import (
+    delete_draft,
+    discard_changes,
+    publish_entry,
+    save_draft,
+    unpublish_entry,
+)
 from apps.content.models.entries import Entry
 from apps.content.permissions import ContentPermissions
 
@@ -22,7 +28,7 @@ class EntryViewSet(viewsets.ModelViewSet):
     serializer_class = EntryListSerializer
     queryset = Entry.objects.all()
     pagination_class = StandardPagination
-    custom_perm_actions = ("counts", "publish")
+    custom_perm_actions = ("counts", "publish", "unpublish", "discard_changes")
     required_perms: tuple = ()
 
     def get_queryset(self):
@@ -95,6 +101,51 @@ class EntryViewSet(viewsets.ModelViewSet):
             acknowledge_warnings=acknowledge_warnings,
         )
         return Response(res, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=["post"], required_perms=("content.publish_entry",))
+    def unpublish(self, request, pk=None):
+        """Gỡ bài viết/trang khỏi web công khai (CMS-12, §8.3)."""
+        instance = self.get_object()
+        req_version = request.data.get("row_version")
+        if req_version is not None:
+            try:
+                req_version = int(req_version)
+            except (ValueError, TypeError):
+                pass
+        reason = request.data.get("reason", "")
+        res = unpublish_entry(
+            entry=instance,
+            actor=request.user,
+            row_version=req_version,
+            reason=reason,
+        )
+        return Response(res, status=status.HTTP_200_OK)
+
+    @action(
+        detail=True,
+        methods=["post"],
+        url_path="discard-changes",
+        required_perms=("content.change_entry",),
+    )
+    def discard_changes(self, request, pk=None):
+        """Huỷ các thay đổi nháp, khôi phục lại bản đã đăng (CMS-10, §8.3, §8.5)."""
+        instance = self.get_object()
+        req_version = request.data.get("row_version")
+        if req_version is not None:
+            try:
+                req_version = int(req_version)
+            except (ValueError, TypeError):
+                pass
+        entry = discard_changes(
+            entry=instance,
+            actor=request.user,
+            row_version=req_version,
+        )
+        return Response(
+            EntryDetailSerializer(entry, context=self.get_serializer_context()).data,
+            status=status.HTTP_200_OK,
+        )
+
 
     @action(detail=False, methods=["get"], required_perms=("content.view_entry",))
     def counts(self, request):
