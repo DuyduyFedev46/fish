@@ -315,5 +315,22 @@ CONTENT_MAX_BLOCKS = int(os.getenv("CONTENT_MAX_BLOCKS", "300"))
 CONTENT_BODY_MAX_CHARS = int(os.getenv("CONTENT_BODY_MAX_CHARS", "60000"))
 CONTENT_MAX_IMAGE_UPLOADS_PER_ENTRY = int(os.getenv("CONTENT_MAX_IMAGE_UPLOADS_PER_ENTRY", "100"))
 
+# --- Khung go-live pháp lý (2026-09-28-khung-go-live) -----------------------
+SELLER_NAME = os.getenv("SELLER_NAME", "")
+SELLER_BUSINESS_TYPE = os.getenv("SELLER_BUSINESS_TYPE", "")
+SELLER_REG_NO = os.getenv("SELLER_REG_NO", "")
+SELLER_TAX_CODE = os.getenv("SELLER_TAX_CODE", "")
+SELLER_ADDRESS = os.getenv("SELLER_ADDRESS", "")
+SELLER_PHONE = os.getenv("SELLER_PHONE", "")
+SELLER_EMAIL = os.getenv("SELLER_EMAIL", "")
+
+# Cờ bắt buộc đồng ý chính sách bảo mật (mặc định BẬT ngoài dev/test - G1)
+PRIVACY_CONSENT_REQUIRED = _bool("PRIVACY_CONSENT_REQUIRED", "0" if (TESTING or DEBUG) else "1")
+
+# Cờ thông báo xác nhận cuộc gọi (mặc định TẮT tới khi CSKH vận hành - G2)
+SHOP_CONFIRM_CALL_NOTICE = _bool("SHOP_CONFIRM_CALL_NOTICE", "0")
+SHOP_CONFIRM_CALL_HOURS = os.getenv("SHOP_CONFIRM_CALL_HOURS", "7:00–20:00")
+
+
 
 

@@ -41,6 +41,22 @@ Trang quản trị bên ngoài:
 - **Sandbox:** IPN URL trỏ adapter **staging**, Auth Type = **Secret Key** (khoá sandbox).
 - **Live:** IPN URL trỏ adapter **production**, Auth Type = **Secret Key** (khoá live).
 
+## Biến môi trường Khung go-live pháp lý (GL-01..GL-05)
+Khai báo trên Cloud Run (`cangca-api-staging` và `cangca-api`):
+- `SELLER_NAME`: Tên hộ kinh doanh hoặc doanh nghiệp.
+- `SELLER_BUSINESS_TYPE`: Loại hình kinh doanh (ví dụ: Hộ kinh doanh, Công ty TNHH...).
+- `SELLER_REG_NO`: Số giấy chứng nhận đăng ký kinh doanh.
+- `SELLER_TAX_CODE`: Mã số thuế.
+- `SELLER_ADDRESS`: Địa chỉ trụ sở / địa chỉ kinh doanh.
+- `SELLER_PHONE`: Số điện thoại liên hệ chính thức.
+- `SELLER_EMAIL`: Email liên hệ chính thức.
+- `PRIVACY_CONSENT_REQUIRED`: Cờ yêu cầu đồng ý chính sách bảo mật khi đặt đơn (`1` hoặc `0`). Mặc định trên production/staging là bật (`1`), môi trường test/dev là tắt (`0`).
+  > ⚠️ **LƯU Ý QUAN TRỌNG (G1)**: Trước khi bật API production và cờ `PRIVACY_CONSENT_REQUIRED=1`, **phải đăng trang chính sách bảo mật** (`page_role="privacy"`) trên CMS trước. Nếu chưa có trang Đã đăng, Shop sẽ từ chối tạo đơn với lỗi 503 `BR-BH-17` để đảm bảo tuân thủ pháp lý.
+- `SHOP_CONFIRM_CALL_NOTICE`: Bật thông báo gọi xác nhận đơn (`1` hoặc `0`).
+- `SHOP_CONFIRM_CALL_HOURS`: Khung giờ gọi xác nhận (ví dụ: `8:00 - 18:00`).
+
+*Tuyệt đối không lưu giá trị thật của người bán vào mã nguồn git. Đặt biến trực tiếp qua Google Cloud Run Secrets / Environment Variables.*
+
 ## Deploy
 **Backend / adapter:**
 - Build image một lần, deploy lên `*-staging` trước. Staging đạt thì deploy **cùng image** lên production.

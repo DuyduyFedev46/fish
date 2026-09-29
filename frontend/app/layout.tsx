@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import SiteLegalFooter from "@/features/site/components/SiteLegalFooter";
 
 export const metadata: Metadata = {
   title: {
@@ -17,7 +18,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="vi">
-      <body>{children}</body>
+      <body>
+        {children}
+        <SiteLegalFooter />
+      </body>
     </html>
   );
 }

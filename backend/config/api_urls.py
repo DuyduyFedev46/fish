@@ -24,7 +24,7 @@ from apps.ai.policy.api import (
 from apps.ai.registry.api import AiCommandDetailView, AiCommandsIndexView
 from apps.ai.settings.api import MyConfigKillView, MyConfigVersionsView, MyConfigView
 from apps.common.guidance.api import GuidanceView
-from apps.common.site_info_api import PublicSiteInfoView
+from apps.content.site.api import SiteInfoView
 import apps.sales.orders.next_steps  # noqa: F401 - đăng ký guidance provider cho order
 from apps.catalog.images.api import ItemImageDetailView
 from apps.catalog.items.api import BundleLineViewSet, ItemGroupViewSet, ItemViewSet
@@ -112,8 +112,8 @@ urlpatterns = [
     path("public/content/categories/", PublicCategoryListView.as_view(), name="public-content-categories"),
     path("public/content/pages/by-role/<str:role>/", PublicPageByRoleView.as_view(), name="public-content-pages-by-role"),
     path("public/content/footer-links/", PublicFooterLinksView.as_view(), name="public-content-footer-links"),
-    # Thông tin công khai cho Shop web (CS-10)
-    path("public/site-info/", PublicSiteInfoView.as_view(), name="public-site-info"),
+    # Thông tin công khai cho Shop web (CS-10, GL-01, GL-04)
+    path("public/site-info/", SiteInfoView.as_view(), name="public-site-info"),
 
     # CSKH tìm kiếm nhanh (chỉ POST)
     path("cskh/search/", CskhSearchView.as_view(), name="cskh-search"),
