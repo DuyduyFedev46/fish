@@ -249,6 +249,32 @@ export function OrderDetailView({
             )}
           </dd>
         </div>
+        {"privacy_consent" in o && o.privacy_consent !== undefined && (
+          <div className={s.prop}>
+            <dt>Chính sách bảo mật</dt>
+            <dd>
+              {o.privacy_consent ? (
+                <span className={s.inline}>
+                  Đồng ý chính sách bảo mật: phiên bản {o.privacy_consent.policy_version}
+                  {o.privacy_consent.accepted_at && (
+                    <span className={`${s.muted} num`}>
+                      , lúc {dateTime(o.privacy_consent.accepted_at)}
+                    </span>
+                  )}
+                  {" · "}
+                  <Link
+                    href={`/content/edit/?id=${o.privacy_consent.policy_entry_id}&version=${o.privacy_consent.policy_version}`}
+                    className="inline-link"
+                  >
+                    Xem phiên bản
+                  </Link>
+                </span>
+              ) : (
+                <span className={s.muted}>Không có dữ liệu đồng ý (đơn trước ngày áp dụng)</span>
+              )}
+            </dd>
+          </div>
+        )}
       </dl>
 
       <GuidancePanel

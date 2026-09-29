@@ -57,6 +57,7 @@ class S47MeLabelsTests(TestCase):
                 "delivery.pack_deliverynote",
                 "delivery.print_label",
                 "content.publish_entry",
+                "sales.view_privacy_consent",
             ],
         )
         self.assertIs(body["can_view_cost"], False)

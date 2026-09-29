@@ -68,6 +68,8 @@ CAPABILITY_LABELS = {
     "delivery.print_label": "In / huỷ tem giao",
     # CMS (2026-09-28-cms-viet-bai): Quyền Tầng 2 đăng/gỡ/trả về nháp bài viết và trang
     "content.publish_entry": "Đăng bài viết và trang",
+    # GL-05 (2026-09-28-khung-go-live): chu + quan_ly.
+    "sales.view_privacy_consent": "Xem bằng chứng đồng ý xử lý dữ liệu của đơn",
 }
 
 AUTH_OLD_PASSWORD = "AUTH_OLD_PASSWORD"

@@ -7,6 +7,7 @@ import OrderPaymentPanel, {
   type PaymentReturn,
 } from "../../../features/checkout/components/OrderPaymentPanel";
 import { recallOrderContact } from "../../../features/checkout/storage";
+import { ConfirmCallNotice } from "../../../features/site/components/ConfirmCallNotice";
 
 const POLL_MS = 5000;
 
@@ -94,8 +95,16 @@ export default function OrderLookup({
     await performLookup(code, last4);
   }
 
+  const successNoticeLast4 =
+    paymentReturn === "success"
+      ? (phoneLast4 || (initialCode ? recallOrderContact(initialCode) : null) || (result?.order_code ? recallOrderContact(result.order_code) : null) || "")
+      : "";
+
   return (
     <>
+      {paymentReturn === "success" && successNoticeLast4 ? (
+        <ConfirmCallNotice last4={successNoticeLast4} />
+      ) : null}
       <form className="lookup-form panel" onSubmit={handleSubmit} noValidate>
         <div className="lookup-form-row">
           <div className="form-field">

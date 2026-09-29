@@ -82,13 +82,14 @@ class SalesOrderDetailSerializer(serializers.ModelSerializer):
     refunds = serializers.SerializerMethodField()
     available_actions = serializers.SerializerMethodField()
     timeline = serializers.SerializerMethodField()
+    privacy_consent = serializers.SerializerMethodField()
 
     class Meta:
         model = SalesOrder
         fields = [
             "id", "code", "status", "status_label", "total_amount", "created_at",
             "reserved_until", "customer", "lines", "allocations", "invoice", "payments",
-            "delivery", "refunds", "available_actions", "timeline",
+            "delivery", "refunds", "available_actions", "timeline", "privacy_consent",
         ]
         read_only_fields = fields
 
@@ -191,6 +192,32 @@ class SalesOrderDetailSerializer(serializers.ModelSerializer):
              "actor_display": e.actor_display}
             for e in build_timeline(order)
         ]
+
+    def get_privacy_consent(self, order):
+        """GL-05 / BR-PQ: Thông tin bằng chứng đồng ý. Chỉ tính khi user có quyền."""
+        request = self.context.get("request")
+        user = getattr(request, "user", None)
+        if not user or not user.has_perm("sales.view_privacy_consent"):
+            return None
+        version = order.privacy_policy_version
+        if version is None:
+            return None
+        dt = serializers.DateTimeField()
+        return {
+            "accepted_at": dt.to_representation(order.privacy_consent_at) if order.privacy_consent_at else None,
+            "policy_entry_id": version.entry_id,
+            "policy_version": version.version,
+            "policy_version_id": version.pk,
+        }
+
+    def to_representation(self, instance):
+        ret = super().to_representation(instance)
+        request = self.context.get("request")
+        user = getattr(request, "user", None)
+        has_perm = user is not None and user.has_perm("sales.view_privacy_consent")
+        if not has_perm:
+            ret.pop("privacy_consent", None)
+        return ret
 
 
 def _staff(user):

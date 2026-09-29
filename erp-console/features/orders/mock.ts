@@ -663,6 +663,19 @@ function detail(me: Me, o: Order): OrderDetail {
     refunds: o.refunds.map((r) => ({ id: r.id, amount: r.amount, status: r.status, status_label: REFUND_LABEL[r.status], bank_txn_ref: r.bank_txn_ref })),
     timeline: timelineOf(o),
     available_actions: actions(me, o),
+    ...(has(me, "sales.view_privacy_consent")
+      ? {
+          privacy_consent:
+            o.id % 2 === 0
+              ? {
+                  accepted_at: o.created_at,
+                  policy_entry_id: 1,
+                  policy_version: 1,
+                  policy_version_id: 1,
+                }
+              : null,
+        }
+      : {}),
   };
 }
 

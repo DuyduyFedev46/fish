@@ -11,6 +11,7 @@ import type { CreateOrderResponse, SiteInfo } from "../../../lib/types";
 import CountdownTimer from "../../../components/CountdownTimer";
 import { goToMockGateway, redirectToGateway } from "../gateway";
 import { rememberOrderContact } from "../storage";
+import { ConfirmCallNotice } from "../../site/components/ConfirmCallNotice";
 
 export default function PaymentPanel({
   order,
@@ -71,6 +72,7 @@ export default function PaymentPanel({
             <p className="pay-note">
               Thanh toán 100% trước khi giao, bằng VietQR qua cổng SePay.
             </p>
+            <ConfirmCallNotice last4={phone.slice(-4)} />
             {siteInfo?.cskh_notice?.enabled && (
               <div
                 className="cskh-notice-box"

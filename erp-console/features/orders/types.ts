@@ -134,6 +134,15 @@ export type OrderDetail = {
   /** Có ở BE L7 bổ sung. Thiếu (BE cũ) → FE ghép tạm từ các mốc giờ sẵn có. */
   timeline?: OrderTimelineEntry[];
   available_actions: OrderAction[];
+  /** GL-05: bằng chứng đồng ý chính sách bảo mật (chỉ trả khi có sales.view_privacy_consent). null khi đơn cũ. */
+  privacy_consent?: PrivacyConsentInfo | null;
+};
+
+export type PrivacyConsentInfo = {
+  accepted_at: string | null;
+  policy_entry_id: number;
+  policy_version: number;
+  policy_version_id: number;
 };
 
 /** Body POST /api/sales/orders/{id}/confirm-payment — `amount` bỏ trống thì BE lấy tổng đơn. */

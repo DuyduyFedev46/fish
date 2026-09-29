@@ -68,7 +68,10 @@ class SalesOrder(models.Model):
         ordering = ["-created_at", "-id"]
         # BR-PQ-11: không ai được tạo/xoá tay — chỉ còn view/change.
         default_permissions = ("view", "change")
-        permissions = [("cancel_paid_order", "Huỷ đơn đã thanh toán")]
+        permissions = [
+            ("cancel_paid_order", "Huỷ đơn đã thanh toán"),
+            ("view_privacy_consent", "Xem bằng chứng đồng ý xử lý dữ liệu của đơn"),
+        ]
 
     def __str__(self):
         return self.code

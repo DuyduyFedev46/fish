@@ -79,7 +79,7 @@ const GROUP_PERMS: Record<string, string[]> = {
     "sales.create_refund", "sales.delete_customer", "sales.delete_paymenttransaction", "sales.delete_refund",
     "sales.view_customer", "sales.view_paymenttransaction", "sales.view_refund", "sales.view_salesinvoice",
     "sales.view_salesinvoiceline", "sales.view_salesinvoicelinebatch", "sales.view_salesorder",
-    "sales.view_salesorderline", "sales.view_salesorderlinebatch",
+    "sales.view_salesorderline", "sales.view_salesorderlinebatch", "sales.view_privacy_consent",
   ],
   quan_ly: [
     "accounts.view_auditlog", "accounts.view_staffprofile", "auth.view_user", "catalog.change_item_image",
@@ -99,7 +99,7 @@ const GROUP_PERMS: Record<string, string[]> = {
     "reports.view_dashboard", "sales.add_customer", "sales.add_refund", "sales.cancel_paid_order",
     "sales.change_customer", "sales.change_refund", "sales.create_refund", "sales.view_customer",
     "sales.view_paymenttransaction", "sales.view_refund", "sales.view_salesinvoice", "sales.view_salesinvoiceline",
-    "sales.view_salesorder", "sales.view_salesorderline",
+    "sales.view_salesorder", "sales.view_salesorderline", "sales.view_privacy_consent",
   ],
   nv_kho: [
     "accounts.view_staffprofile", "auth.view_user", "catalog.view_bundleline", "catalog.view_item",

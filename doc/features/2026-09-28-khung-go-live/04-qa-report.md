@@ -185,3 +185,98 @@
    ```
 
 </QA — Khung go-live pháp lý trên web · lô 2 · lần 1 · 2026-09-29>
+
+---
+
+<QA — Khung go-live pháp lý trên web · lô 3 · lần 1 · 2026-09-29>
+
+## Kết luận: APPROVED — Đạt 8/8 AC của GL-05 & GL-04, bảo đảm tuyệt đối Bất biến 1 (giá vốn) và Bất biến 9 (dữ liệu cá nhân), phân quyền Tầng 2 chuẩn xác, 0 lỗi chặn.
+
+## Tổng: 18 ca · ✅ 18 · ❌ 0 · ⏸ 0
+
+## Theo AC
+
+| Mã AC | Kết quả | Bằng chứng (test / lệnh / file kiểm tra) |
+|---|:---:|---|
+| **GL-05-AC1** (Chủ và Quản lý mở chi tiết đơn có consent → 200, có đủ 4 khoá consent; FE console hiện dòng kèm link xem đúng phiên bản) | ✅ PASS | `backend/apps/sales/orders/tests/test_privacy_consent_view.py::test_gl05_ac1_chu_sees_privacy_consent` & `test_gl05_ac1_quan_ly_sees_privacy_consent` trả về HTTP 200 kèm đủ 4 khoá `accepted_at`, `policy_entry_id`, `policy_version`, `policy_version_id`. Frontend `erp-console/features/orders/components/OrderDetailView.tsx`: render "Đồng ý chính sách bảo mật: phiên bản {policy_version}, lúc {accepted_at}" kèm link `<Link href="/content/edit/?id={policy_entry_id}&version={policy_version}">Xem phiên bản</Link>` trỏ đúng phiên bản lịch sử đã lưu (CMS-11). `erp-console/features/orders/orders_consent.test.ts` (test vitest) pass 100%. |
+| **GL-05-AC2** (Đơn tạo trước ngày áp dụng / không có consent → `privacy_consent: null`; FE console hiện "Không có dữ liệu đồng ý (đơn trước ngày áp dụng)") | ✅ PASS | `test_privacy_consent_view.py::test_gl05_ac2_order_without_consent_returns_null`: `SalesOrderDetailSerializer.get_privacy_consent` trả về `None` khi đơn không có `privacy_policy_version`, JSON trả `"privacy_consent": null`. Frontend `OrderDetailView.tsx`: khi `o.privacy_consent === null` hiển thị `<span className={s.muted}>Không có dữ liệu đồng ý (đơn trước ngày áp dụng)</span>`. Vitest `orders_consent.test.ts` pass. |
+| **GL-05-AC3** (Phân quyền: NV kho, NV giao mở chi tiết đơn → response **không có** khoá consent ở mọi độ sâu; FE console không hiện dòng) | ✅ PASS | `test_privacy_consent_view.py::test_gl05_ac3_nv_kho_does_not_see_privacy_consent_key` & `test_gl05_ac3_nv_giao_does_not_see_privacy_consent_key`: Hàm quét đệ quy `find_key(data, "privacy_consent")` xác nhận khoá bị loại bỏ hoàn toàn khỏi output (`SalesOrderDetailSerializer.to_representation` thực hiện `ret.pop("privacy_consent", None)` khi user thiếu quyền `sales.view_privacy_consent`). Frontend `OrderDetailView.tsx` kiểm tra `"privacy_consent" in o && o.privacy_consent !== undefined`, không render thuộc tính này khi vắng khoá. Vitest `orders_consent.test.ts` pass cho `kho1` và `giao1`. |
+| **GL-04-AC1** (`confirm_call_notice=true` → màn thanh toán có câu "Cá Về sẽ gọi số đuôi {last4} trong khung {hours} để xác nhận trước khi giao") | ✅ PASS | `frontend/features/checkout/components/PaymentPanel.tsx` chèn `<ConfirmCallNotice last4={phone.slice(-4)} />`. `ConfirmCallNotice.tsx` tải `getSiteInfo()`, đọc `confirm_call_hours` (mặc định "7:00–20:00") và render thông báo khi cờ `confirm_call_notice === true`. |
+| **GL-04-AC2** (Sau thanh toán cổng về `/shop/orders?code=…&result=success` → có cùng câu thông báo, dùng 4 số cuối từ `sessionStorage`) | ✅ PASS | `frontend/app/shop/orders/OrderLookup.tsx`: Khi `paymentReturn === "success"`, tính `successNoticeLast4` từ `phoneLast4` hoặc `recallOrderContact(initialCode)` lưu trong `sessionStorage`, sau đó render `<ConfirmCallNotice last4={successNoticeLast4} />`. |
+| **GL-04-AC3** (Quét DOM và URL → DOM không chứa SĐT đầy đủ; URL không có tham số SĐT) | ✅ PASS | `PaymentPanel.tsx` chỉ truyền `phone.slice(-4)` vào `ConfirmCallNotice`. `ConfirmCallNotice.tsx` chuẩn hoá: `cleanLast4 = (last4 || "").trim().slice(-4)` và chỉ in 4 số cuối vào thẻ `<strong>`. DOM tuyệt đối không chứa SĐT đầy đủ. URL `/shop/orders/` chỉ có query params `code` và `result=success`, không có param SĐT. `sessionStorage` chỉ lưu 4 số cuối (`storage.ts`). |
+| **GL-04-AC4** (`confirm_call_notice=false` → không có câu thông báo) | ✅ PASS | `ConfirmCallNotice.tsx` kiểm tra `if (!siteInfo?.confirm_call_notice ...) return null;`. `backend/config/settings.py` cấu hình cờ `SHOP_CONFIRM_CALL_NOTICE = _bool("SHOP_CONFIRM_CALL_NOTICE", "0")` mặc định tắt (`False`). Cả PaymentPanel và OrderLookup đều không hiển thị thông báo. |
+| **GL-04-AC5** (`site-info` lỗi → ẩn câu thông báo; luồng thanh toán không bị chặn) | ✅ PASS | `ConfirmCallNotice.tsx`: `getSiteInfo().catch(() => {})` bắt lỗi im lặng, giữ `siteInfo = null` và return `null` an toàn, không ném exception làm vỡ cây render React. Nút thanh toán VietQR / SePay trong `PaymentPanel.tsx` hoạt động hoàn toàn độc lập, không bị chặn. |
+
+---
+
+## Ngoại lệ & biên | Phân quyền | Rò giá vốn | Rò dữ liệu cá nhân | Hồi quy
+
+- **Ngoại lệ & biên**:
+  - Dữ liệu `last4` rỗng, có khoảng trắng hoặc không đủ 4 chữ số: `ConfirmCallNotice.tsx` kiểm tra chặt chẽ `cleanLast4.length !== 4` → trả về `null` ngay lập tức, tránh hiển thị chuỗi cụt hoặc rỗng.
+  - Đơn có consent nhưng bản chính sách sau đó có phiên bản mới hơn: Link trên ERP vẫn trỏ chính xác về phiên bản đã được chấp thuận lúc đặt (`/content/edit/?id={policy_entry_id}&version={policy_version}`), bảo toàn tính toàn vẹn chứng cứ pháp lý.
+- **Phân quyền 3 tầng & Bất biến S47**:
+  - Quyền Tầng 2 mới `sales.view_privacy_consent` được khai báo trong `SalesOrder.Meta.permissions` (migration `0009`).
+  - Data migration `0010_grant_view_privacy_consent.py` gán quyền này cho Group `chu` và `quan_ly`, có hàm `revoke` phục vụ rollback.
+  - Test `test_group_permissions_after_migration` xác nhận `chu` và `quan_ly` có quyền; `nv_kho` và `nv_giao` tuyệt đối không có quyền này.
+  - `CAPABILITY_LABELS` trong `backend/apps/accounts/auth/services.py` đã bổ sung nhãn `"sales.view_privacy_consent": "Xem bằng chứng đồng ý xử lý dữ liệu của đơn"`. Test `test_s47_me_labels.py::test_s47_moi_quyen_meta_permissions_deu_co_nhan` và `test_s47_ac1_quan_ly_nhan_nhom_va_viec_theo_spec_1_5` pass 100%.
+  - `erp-console/shared/lib/nav.ts` đã thêm hằng số `PERM.viewPrivacyConsent = "sales.view_privacy_consent"`.
+- **Bất biến 1 — Không rò giá vốn**:
+  - `SalesOrderDetailSerializer`: `privacy_consent` chỉ chứa 4 trường định danh phiên bản và thời điểm (`accepted_at`, `policy_entry_id`, `policy_version`, `policy_version_id`). Các trường giá vốn trên phân bổ lô (`allocations.unit_cost`) vẫn được bảo vệ bởi `CostFieldSerializerMixin` (`inventory.view_costprice`).
+  - Danh sách đơn `SalesOrderListSerializer` (GET `/api/sales/orders/`): Test `test_order_list_does_not_have_privacy_consent_key` xác nhận danh sách đơn không chứa trường `privacy_consent` với bất kỳ user nào, không lộ giá vốn hay dữ liệu consent thừa thãi.
+- **Bất biến 9 — Không rò dữ liệu cá nhân**:
+  - API công khai Shop và URL: Không chứa SĐT đầy đủ; chỉ truyền và hiển thị 4 số cuối ở `ConfirmCallNotice`.
+  - Phân quyền nội bộ ERP: Nhân viên kho (`nv_kho`) và nhân viên giao hàng (`nv_giao`) không được phép xem bằng chứng consent (bị pop khoá ở serializer và ẩn trên UI).
+  - Quét XSS: `grep -rn "dangerouslySetInnerHTML" frontend/features/site frontend/features/checkout` trả về rỗng (0 kết quả). Toàn bộ hiển thị React escape chuẩn.
+  - Quét bí mật người bán: `git grep -n "SELLER_" -- . ':!*.md' ':!*.example'` xác nhận không có MST, SĐT hay dữ liệu người bán thật trong repo.
+- **Hồi quy & Tương thích**:
+  - Toàn bộ backend test suite: 1019/1019 test pass 100% (tăng 7 tests mới của `test_privacy_consent_view.py`).
+  - Kiểm tra migration: `manage.py makemigrations --check --dry-run` sạch, không phát hiện migration chưa sinh.
+  - Frontend Shop Web: Static export build (`npm run build`) thành công 10/10 trang tĩnh với `NEXT_PUBLIC_USE_MOCK=0`.
+  - ERP Console: Static export build (`npm run build`) thành công 30/30 trang tĩnh; toàn bộ test vitest (8 test files, 70 tests) pass 100%.
+
+---
+
+## Lỗi
+*(Không có lỗi mức Critical, High, hay Medium nào phát hiện. 0 lỗi chặn).*
+
+---
+
+## Lệnh đã chạy (kèm output tóm tắt)
+
+1. **Test chi tiết quyền xem consent Lô 3 (BE)**:
+   ```bash
+   cd backend && .venv/bin/python manage.py test apps.sales.orders.tests.test_privacy_consent_view
+   # Kết quả: Ran 7 tests in 3.892s - OK
+   ```
+2. **Test các app content và sales**:
+   ```bash
+   cd backend && .venv/bin/python manage.py test apps.content apps.sales
+   # Kết quả: Ran 354 tests in 15.532s - OK
+   ```
+3. **Toàn bộ backend test suite & kiểm tra migration**:
+   ```bash
+   cd backend && .venv/bin/python manage.py test && .venv/bin/python manage.py makemigrations --check --dry-run
+   # Kết quả: Ran 1019 tests in 55.885s - OK. No changes detected.
+   ```
+4. **Build tĩnh Frontend Shop Web**:
+   ```bash
+   cd frontend && npx tsc --noEmit && NEXT_PUBLIC_USE_MOCK=0 NEXT_PUBLIC_API_BASE=https://cangca-api-staging-675411800433.asia-southeast1.run.app npm run build
+   # Kết quả: Compiled successfully. Generating static pages (10/10). Export complete.
+   ```
+5. **Build tĩnh ERP Console & chạy vitest**:
+   ```bash
+   cd erp-console && npx tsc --noEmit && npm run build
+   # Kết quả: Compiled successfully. Generating static pages (30/30). Export complete.
+   cd erp-console && npm test
+   # Kết quả: 8 passed (8 test files), 70 passed (70 tests)
+   ```
+6. **Rà soát nguy cơ XSS và bí mật người bán**:
+   ```bash
+   grep -rn "dangerouslySetInnerHTML" frontend/features/site frontend/features/checkout
+   # Kết quả: Rỗng (0 kết quả)
+   git grep -n "SELLER_" -- . ':!*.md' ':!*.example'
+   # Kết quả: Chỉ có ở settings.py, site/services.py, site/checks.py và tests; không có giá trị người bán thật.
+   ```
+
+</QA — Khung go-live pháp lý trên web · lô 3 · lần 1 · 2026-09-29>
+

@@ -94,6 +94,8 @@ export const PERM = {
   publishContentEntry: "content.publish_entry",
   addCategory: "content.add_category",
   changeCategory: "content.change_category",
+  /** GL-05: xem bằng chứng đồng ý xử lý dữ liệu của đơn */
+  viewPrivacyConsent: "sales.view_privacy_consent",
 } as const;
 
 /** Mã Group dùng trong luật menu (danh sách đầy đủ + nhãn: shared/lib/groups.ts). */

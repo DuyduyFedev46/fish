@@ -177,3 +177,99 @@ grep -rn "dangerouslySetInnerHTML" frontend/features/site frontend/features/chec
 # Kết quả: rỗng (0 kết quả)
 ```
 
+---
+
+## Lô 3: GL-05 Bằng chứng đồng ý trên ERP & GL-04 Thông báo gọi xác nhận
+
+### Kế hoạch & Thực hiện
+
+#### 1. Backend (GL-05)
+- **Model `backend/apps/sales/models/orders.py`**:
+  - `SalesOrder.Meta.permissions` thêm: `("view_privacy_consent", "Xem bằng chứng đồng ý xử lý dữ liệu của đơn")`.
+- **Migration Schema `backend/apps/sales/migrations/0009_salesorder_view_privacy_consent.py`**:
+  - AlterModelOptions permissions trên model `SalesOrder`.
+- **Data Migration `backend/apps/sales/migrations/0010_grant_view_privacy_consent.py`**:
+  - Cấp quyền `sales.view_privacy_consent` cho Group `chu` và `quan_ly`.
+  - Có hàm `revoke` khi rollback migration.
+- **Hệ thống nhãn quyền `backend/apps/accounts/auth/services.py`**:
+  - Cập nhật `CAPABILITY_LABELS` thêm `"sales.view_privacy_consent": "Xem bằng chứng đồng ý xử lý dữ liệu của đơn"` để bảo toàn bất biến S47.
+  - Cập nhật `backend/apps/accounts/auth/tests/test_s47_me_labels.py`.
+- **Serializer `backend/apps/sales/orders/serializers.py`**:
+  - `SalesOrderDetailSerializer`: thêm trường `privacy_consent = serializers.SerializerMethodField()`.
+  - Method `get_privacy_consent`:
+    - Nếu user có `sales.view_privacy_consent`:
+      - Có version -> trả dict: `{"accepted_at": ..., "policy_entry_id": ..., "policy_version": ..., "policy_version_id": ...}` (GL-05-AC1).
+      - Không có version (đơn cũ) -> trả `None` (JSON: `"privacy_consent": null`) (GL-05-AC2).
+    - Thiếu quyền -> trả `None`.
+  - Method `to_representation`: Nếu user không có quyền `sales.view_privacy_consent` -> pop hẳn khoá `"privacy_consent"` khỏi dict representation (GL-05-AC3, không trả khoá ở mọi độ sâu).
+  - `SalesOrderListSerializer`: không thêm trường `privacy_consent` (giữ nguyên danh sách đơn gọn nhẹ, an toàn).
+- **Tests BE `backend/apps/sales/orders/tests/test_privacy_consent_view.py`**:
+  - 7 tests pass 100%:
+    - `test_group_permissions_after_migration`: quyền chỉ có ở `chu`, `quan_ly`; `nv_kho`, `nv_giao` không có.
+    - `test_gl05_ac1_chu_sees_privacy_consent`: `chu` thấy đủ 4 khoá consent.
+    - `test_gl05_ac1_quan_ly_sees_privacy_consent`: `quan_ly` thấy đủ 4 khoá consent.
+    - `test_gl05_ac2_order_without_consent_returns_null`: đơn cũ trả `"privacy_consent": null`.
+    - `test_gl05_ac3_nv_kho_does_not_see_privacy_consent_key`: `nv_kho` không thấy khoá `privacy_consent` ở mọi độ sâu.
+    - `test_gl05_ac3_nv_giao_does_not_see_privacy_consent_key`: `nv_giao` không thấy khoá `privacy_consent` ở mọi độ sâu.
+    - `test_order_list_does_not_have_privacy_consent_key`: GET `/api/sales/orders/` không chứa `privacy_consent` với bất kỳ ai.
+
+#### 2. Frontend ERP Console (GL-05)
+- **Cấu hình quyền `erp-console/shared/lib/nav.ts`**:
+  - Thêm `PERM.viewPrivacyConsent = "sales.view_privacy_consent"`.
+- **Kiểu dữ liệu `erp-console/features/orders/types.ts`**:
+  - Thêm `PrivacyConsentInfo`: `{ accepted_at: string | null; policy_entry_id: number; policy_version: number; policy_version_id: number; }`.
+  - Cập nhật `OrderDetail`: thêm `privacy_consent?: PrivacyConsentInfo | null`.
+- **Component `erp-console/features/orders/components/OrderDetailView.tsx`**:
+  - Trong `<dl className={s.props}>`:
+    - Nếu `"privacy_consent" in o && o.privacy_consent !== undefined`:
+      - Khi `o.privacy_consent !== null`: hiển thị "Đồng ý chính sách bảo mật: phiên bản {policy_version}, lúc {accepted_at}" kèm link `<Link href="/content/edit/?id={policy_entry_id}&version={policy_version}">Xem phiên bản</Link>` (GL-05-AC1).
+      - Khi `o.privacy_consent === null`: hiển thị "Không có dữ liệu đồng ý (đơn trước ngày áp dụng)" (GL-05-AC2).
+    - Khi vắng khoá `privacy_consent`: không render thuộc tính này (GL-05-AC3).
+- **Mock & Tests `erp-console`**:
+  - `erp-console/features/auth/mock.ts`: bổ sung `sales.view_privacy_consent` vào `GROUP_PERMS` cho `chu` và `quan_ly`.
+  - `erp-console/features/orders/mock.ts`: mock trả `privacy_consent` khi user có quyền, loại bỏ khi thiếu quyền.
+  - `erp-console/features/orders/orders_consent.test.ts`: 5 vitest tests pass 100%.
+
+#### 3. Frontend Shop Web (GL-04)
+- **Component `frontend/features/site/components/ConfirmCallNotice.tsx`**:
+  - Props: `{ last4: string }`.
+  - Đọc `getSiteInfo()`.
+  - Nếu `confirm_call_notice === true` và có `last4`: hiển thị "Cá Về sẽ gọi số đuôi {last4} trong khung {hours} để xác nhận trước khi giao".
+  - Nếu cờ tắt hoặc API lỗi -> ẩn, không chặn luồng đặt hàng hay thanh toán (GL-04-AC4, GL-04-AC5).
+  - Chỉ nhận và render 4 số cuối SĐT, DOM và URL không chứa SĐT đầy đủ (GL-04-AC3, bất biến 9).
+- **Checkout Payment `frontend/features/checkout/components/PaymentPanel.tsx`**:
+  - Chèn `<ConfirmCallNotice last4={phone.slice(-4)} />` (GL-04-AC1).
+- **Tra cứu đơn `frontend/app/shop/orders/OrderLookup.tsx`**:
+  - Khi `paymentReturn === "success"`, lấy 4 số cuối từ `phoneLast4` hoặc `recallOrderContact(initialCode)` trong `sessionStorage` và hiển thị `<ConfirmCallNotice last4={last4} />` (GL-04-AC2).
+
+---
+
+### Lệnh kiểm chứng Lô 3
+
+```bash
+# 1. Toàn bộ test suite backend + makemigrations check
+cd backend && .venv/bin/python manage.py test && .venv/bin/python manage.py makemigrations --check --dry-run
+# Kết quả: Ran 1019 tests in 55.885s - OK - No changes detected
+
+# 2. Test apps.content và apps.sales
+cd backend && .venv/bin/python manage.py test apps.content apps.sales
+# Kết quả: Ran 354 tests in 15.532s - OK
+
+# 3. Frontend static export build
+cd frontend && npx tsc --noEmit && NEXT_PUBLIC_USE_MOCK=0 NEXT_PUBLIC_API_BASE=https://cangca-api-staging-675411800433.asia-southeast1.run.app npm run build
+# Kết quả: ✓ Generating static pages (10/10) - Compiled successfully
+
+# 4. ERP Console build & vitest
+cd erp-console && npx tsc --noEmit && npm run build
+# Kết quả: ✓ Generating static pages (30/30) - Compiled successfully
+cd erp-console && npm test
+# Kết quả: 8 passed (8 test files), 70 passed (70 tests)
+
+# 5. Rà soát bảo mật XSS và người bán
+git grep -n "SELLER_" -- . ':!*.md' ':!*.example'
+# Kết quả: chỉ settings.py, site/services, site/checks, test; không có giá trị thật
+grep -rn "dangerouslySetInnerHTML" frontend/features/site frontend/features/checkout
+# Kết quả: rỗng (0 kết quả)
+```
+
+
