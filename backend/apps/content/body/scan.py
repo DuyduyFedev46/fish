@@ -184,15 +184,18 @@ def scan_entry_warnings(entry: Any) -> list[dict[str, Any]]:
             if item_code and isinstance(item_code, str):
                 item_codes_to_check.append(item_code.strip())
 
-    # 4. Quét item_card không khả dụng
+    # 4. Quét item_card không khả dụng (CMS-06, CMS-08, §9 02b-tech-design)
     if item_codes_to_check:
         try:
             from apps.catalog.models import Item
-            existing_active_codes = set(
-                Item.objects.filter(code__in=item_codes_to_check, is_active=True).values_list("code", flat=True)
-            )
+            from apps.catalog.pricing.services import effective_price
+
+            items_by_code = {
+                it.code: it for it in Item.objects.filter(code__in=item_codes_to_check)
+            }
             for code in item_codes_to_check:
-                if code not in existing_active_codes:
+                item_obj = items_by_code.get(code)
+                if not item_obj or not item_obj.is_active or effective_price(item_obj) is None:
                     warnings.append({
                         "type": "item_unavailable",
                         "item_code": code,

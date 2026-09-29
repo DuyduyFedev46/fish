@@ -15,12 +15,15 @@ User = get_user_model()
 
 class SanitizeBodyTests(TestCase):
     def setUp(self):
+        from apps.catalog.models import Item, ItemGroup
         self.user = User.objects.create_user(username="test_author", password="password")
         self.entry = Entry.objects.create(
             title="Bài kiểm tra",
             slug="bai-kiem-tra",
             created_by=self.user,
         )
+        grp, _ = ItemGroup.objects.get_or_create(name="Hải sản")
+        self.item = Item.objects.create(code="CA-THU-1KG", name="Cá thu 1kg", item_group=grp)
 
     def test_cms_03_ac5_invalid_doc_root(self):
         """Root không phải dict {'type':'doc', 'blocks':[...]} -> 400 BR-ND-06."""
@@ -163,3 +166,17 @@ class SanitizeBodyTests(TestCase):
         with self.assertRaises(BusinessError) as ctx:
             normalize_body({"type": "doc", "blocks": blocks}, entry=self.entry, strict=True)
         self.assertEqual(ctx.exception.code, "BR-ND-07")
+
+    def test_cms_06_ac2_invalid_item_code_raises_br_nd_10(self):
+        """Lưu body có item_card với mã không tồn tại -> 400 BR-ND-10 (CMS-06-AC2)."""
+        doc = {
+            "type": "doc",
+            "blocks": [{"type": "item_card", "item_code": "NON-EXISTENT-ITEM"}],
+        }
+        with self.assertRaises(BusinessError) as ctx:
+            normalize_body(doc, entry=self.entry, strict=True)
+        self.assertEqual(ctx.exception.code, "BR-ND-10")
+
+        # Với strict=False (lúc public_body), không raise mà giữ nguyên
+        clean = normalize_body(doc, entry=self.entry, strict=False)
+        self.assertEqual(clean["blocks"][0]["item_code"], "NON-EXISTENT-ITEM")

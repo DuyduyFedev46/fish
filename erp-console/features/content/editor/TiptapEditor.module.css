@@ -143,6 +143,32 @@
   font-style: italic;
 }
 
+.editorArea :global(.item-card-block) {
+  margin: 14px 0;
+  padding: 10px 14px;
+  border: 1px solid #bae6fd;
+  border-radius: 6px;
+  background-color: #f0f9ff;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.editorArea :global(.item-card-badge) {
+  font-size: 13px;
+  font-weight: 600;
+  color: #0369a1;
+}
+
+.editorArea :global(.item-card-code) {
+  font-size: 14px;
+  font-family: monospace;
+  color: #0f172a;
+  background-color: #e0f2fe;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
 @media (max-width: 640px) {
   .toolbar {
     padding: 4px;

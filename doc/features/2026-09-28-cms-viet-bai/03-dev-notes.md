@@ -394,6 +394,89 @@ git status --porcelain -- backend/apps | grep "/migrations/" | grep -v "apps/con
 ### Lệch thiết kế
 *(Không có)*
 
+---
+
+## Lô 6: CMS-06 Thẻ mặt hàng & CMS-14 Danh sách công khai / khối Bài mới
+
+### Kế hoạch & Thực hiện
+1. **Backend**:
+   - `backend/apps/content/body/sanitize.py`:
+     - Kiểm tra khối `item_card`: khi `strict=True`, kiểm tra `Item.objects.filter(code=item_code).exists()`. Nếu không tồn tại -> raise `BusinessError("Mặt hàng không tồn tại (BR-ND-10).", code="BR-ND-10")` (CMS-06-AC2).
+     - Khi `strict=False` (lúc `public_body`): không tra DB, chỉ kiểm dạng regex `ITEM_CODE_RE`.
+   - `backend/apps/content/body/scan.py`:
+     - Cải tiến quét `item_unavailable`: kiểm tra `is_active=True` và `effective_price(item) is not None` từ `apps.catalog.pricing.services`. Nếu không khả dụng -> cảnh báo `{"type": "item_unavailable", "item_code": code}` (CMS-06-AC6).
+   - `backend/apps/content/public/api.py`:
+     - `PublicEntryListView`: Lọc `status="published"`, `kind="post"` (loại trừ nháp và trang tĩnh). Phân trang 12 bài/trang (`CONTENT_LIST_PAGE_SIZE = 12`). Hỗ trợ lọc theo `category`. Sắp xếp mới nhất trước. Trang vượt quá giới hạn -> trả 404 (CMS-14-AC6).
+     - `PublicCategoryListView`: Chỉ trả các chuyên mục `is_active=True` có ít nhất 1 bài Đã đăng (`status="published"`, `kind="post"`).
+   - `backend/apps/content/tests/test_item_card_and_public_list.py`:
+     - Bổ sung 7 test case kiểm tra toàn diện CMS-06 và CMS-14 (AC1, AC2, AC5, AC6, AC7).
+
+2. **ERP Console**:
+   - `erp-console/features/content/editor/ItemCardExtension.ts`:
+     - Extension Tiptap node `itemCard` cho phép chèn và hiển thị thẻ mặt hàng trên trình soạn thảo.
+   - `erp-console/features/content/api.ts` & `mock.ts`:
+     - Thêm `ShopCatalogItem` và `fetchShopCatalog()`, `mockFetchShopCatalog()` gọi catalog công khai không lộ giá vốn.
+   - `erp-console/features/content/editor/TiptapEditor.tsx` & `TiptapEditor.module.css`:
+     - Thêm nút "🛒 Mặt hàng" trên toolbar.
+     - Modal tìm kiếm mặt hàng theo tên/mã (CMS-06-AC1: gõ "thu" -> ra mặt hàng khớp).
+     - Thêm phương thức `insertItemCard` trên `TiptapEditorHandle`.
+   - `erp-console/features/content/content.test.ts`:
+     - Thêm unit test kiểm tra `mockFetchShopCatalog()` không rò rỉ giá vốn hay khoá cấm.
+
+3. **Frontend Shop Web**:
+   - `frontend/features/content/types.ts`:
+     - Bổ sung `count`, `next`, `previous` cho `PublicEntryListResponse`.
+   - `frontend/features/content/components/ItemCard.tsx` & `ItemCard.module.css`:
+     - Nhận `itemCode` và `postSlug`.
+     - Tải mặt hàng qua `getCatalogItem(itemCode)`.
+     - Hiển thị giá bán hiện hành lấy lúc xem (CMS-06-AC3).
+     - Nút "Xem giá & đặt" dẫn sang `/shop/item/?code=...&utm_source=caveve_web&utm_medium=bai_viet&utm_campaign=<slug>`, không tham số thừa (CMS-06-AC4).
+     - Khi mặt hàng ẩn / hết hàng / lỗi API -> hiện "Tạm hết hàng", nút dẫn về `/shop` kèm UTM (CMS-06-AC5).
+   - `frontend/features/content/components/ArticleBody.tsx`:
+     - Render `<ItemCard>` khi gặp block `item_card`.
+   - `frontend/features/content/components/LatestPosts.tsx` & `LatestPosts.module.css`:
+     - Hiển thị khối "Cẩm nang & Mẹo hay từ vựa" gồm 3 bài mới nhất và link "Xem tất cả" (CMS-14-AC3).
+     - Khi API lỗi hoặc tắt -> ẩn hoàn toàn khối này (CMS-14-AC4).
+   - `frontend/app/page.tsx`:
+     - Chèn khối `<LatestPosts />` vào trang chủ Landing.
+   - `frontend/app/bai-viet/page.tsx` & `bai-viet.module.css`:
+     - Hỗ trợ lọc theo `chuyen-muc` query param (CMS-14-AC2).
+     - Bộ lọc tabs chuyên mục, khi không có bài hiện "Chưa có bài".
+     - Khối phân trang 12 bài/trang (CMS-14-AC1).
+     - Truyền `postSlug={entry.slug}` vào `ArticleBody`.
+
+### Kết quả kiểm chứng Lô 6
+```bash
+# 1. Content tests (bao gồm test_item_card_and_public_list.py):
+cd backend && .venv/bin/python manage.py test apps.content
+# Output: Ran 78 tests in 3.938s -> OK.
+
+# 2. Toàn bộ backend tests và makemigrations check:
+cd backend && .venv/bin/python manage.py test && .venv/bin/python manage.py makemigrations --check --dry-run
+# Output: Ran 987 tests in 81.899s -> OK. No changes detected.
+
+# 3. ERP Console tests & build:
+cd erp-console && npm test
+# Output: 7 test files passed, 62 tests passed (100%).
+cd erp-console && npx tsc --noEmit && npm run build
+# Output: Compiled successfully, Generating static pages (30/30) -> OK.
+
+# 4. Frontend Shop Web typecheck & build với staging API env:
+cd frontend && npx tsc --noEmit && NEXT_PUBLIC_USE_MOCK=0 NEXT_PUBLIC_API_BASE=https://cangca-api-staging-675411800433.asia-southeast1.run.app npm run build
+# Output: Compiled successfully, Generating static pages (10/10) -> OK.
+
+# 5. Kiểm tra dangerouslySetInnerHTML:
+grep -rn "dangerouslySetInnerHTML" frontend/features/content frontend/app/bai-viet frontend/app/trang erp-console/features/content
+# Output: rỗng (0 vi phạm).
+
+# 6. Kiểm tra migration app khác:
+git status --porcelain -- backend/apps | grep "/migrations/" | grep -v "apps/content/migrations/"
+# Output: rỗng.
+```
+
+### Lệch thiết kế
+*(Không có)*
+
 
 
 

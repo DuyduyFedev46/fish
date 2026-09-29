@@ -193,14 +193,16 @@ export function mockGetPublicEntries(params?: {
   category?: string;
   page?: number;
 }): PublicEntryListResponse {
-  let list = Object.values(MOCK_ENTRY_MAP).map((e) => ({
-    slug: e.slug,
-    title: e.title,
-    excerpt: e.excerpt,
-    category: e.category,
-    cover_image: e.cover_image,
-    published_at: e.published_at,
-  }));
+  let list = Object.values(MOCK_ENTRY_MAP)
+    .filter((e) => e.kind === "post")
+    .map((e) => ({
+      slug: e.slug,
+      title: e.title,
+      excerpt: e.excerpt,
+      category: e.category,
+      cover_image: e.cover_image,
+      published_at: e.published_at,
+    }));
 
   if (params?.category) {
     list = list.filter((e) => e.category?.slug === params.category);
@@ -208,6 +210,7 @@ export function mockGetPublicEntries(params?: {
 
   return {
     results: list,
+    count: list.length,
     total: list.length,
     page: params?.page || 1,
     total_pages: 1,

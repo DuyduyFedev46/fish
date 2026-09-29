@@ -209,5 +209,27 @@ export async function fetchGoliveStatus(signal?: AbortSignal): Promise<GoliveSta
   });
 }
 
+export interface ShopCatalogItem {
+  item_code: string;
+  name: string;
+  price?: number;
+  sellable_qty?: number;
+}
+
+export async function fetchShopCatalog(): Promise<ShopCatalogItem[]> {
+  return apiFetch<ShopCatalogItem[]>("/api/shop/catalog/", {
+    auth: false,
+    mock: () => ({
+      status: 200,
+      body: [
+        { item_code: "CA-THU-1KG", name: "Cá thu Phan Thiết 1kg", price: 250000, sellable_qty: 10 },
+        { item_code: "CA-BOP-1KG", name: "Cá bớp cắt khoanh 1kg", price: 280000, sellable_qty: 5 },
+        { item_code: "TOM-SU-1KG", name: "Tôm sú Cà Mau 1kg", price: 320000, sellable_qty: 8 },
+        { item_code: "MUC-ONG-1KG", name: "Mực ống Phan Thiết 1kg", price: 220000, sellable_qty: 12 },
+      ],
+    }),
+  });
+}
+
 
 

@@ -432,7 +432,94 @@ git status --porcelain -- backend/apps | grep "/migrations/" | grep -v "apps/con
 
 ### 6. Kết luận
 - **Nghiệm thu Lô 5**: **APPROVED** (10/10 ca PASS).
-</QA — CMS viết bài · lô 5 · lần 2 · 2026-09-29>
+
+---
+
+<QA — CMS viết bài · lô 6 · lần 1 · 2026-09-29>
+## Kết luận: APPROVED — Lô 6 hoàn thành xuất sắc, đạt 100% Acceptance Criteria của CMS-06 và CMS-14, tuân thủ nghiêm ngặt Bất biến 1 (Không rò giá vốn) và Bất biến 9 (Không rò dữ liệu cá nhân khách), không có lỗi chặn.
+## Tổng: 13 ca · ✅ 13 · ❌ 0 · ⏸ 0
+
+---
+
+### 1. Bảng theo dõi Acceptance Criteria (AC)
+
+#### Story CMS-06 — Thẻ mặt hàng trong bài viết (AC1..AC7)
+| Mã AC | Kết quả | Bằng chứng (test / code / kiểm tra) |
+|---|---|---|
+| CMS-06-AC1 | ✅ PASS | **ERP & BE**: `apps/content/tests/test_item_card_and_public_list.py::ItemCardAndPublicListTests::test_cms_06_ac1_save_draft_with_valid_item_card`<br>- Lưu nháp với khối `{"type": "item_card", "item_code": "CA-THU-1KG"}` hợp lệ -> 201 Created, thân bài lưu trữ đúng cấu trúc.<br>- ERP Console (`TiptapEditor.tsx` & `ItemCardExtension.ts`): Có nút "🛒 Mặt hàng", mở modal tìm kiếm mặt hàng Shop theo tên/mã ("thu" -> gợi ý `CA-THU-1KG`), chèn đúng khối `item_card` vào trình soạn thảo.<br>- `erp-console/features/content/content.test.ts` kiểm chứng `mockFetchShopCatalog` không rò rỉ giá vốn hay khoá cấm. |
+| CMS-06-AC2 | ✅ PASS | `apps/content/tests/test_item_card_and_public_list.py::ItemCardAndPublicListTests::test_cms_06_ac2_save_draft_with_non_existent_item_card_raises_br_nd_10`<br>- `normalize_body(..., strict=True)` trong `sanitize.py`: kiểm tra sự tồn tại của `Item` trong cơ sở dữ liệu khi lưu nháp/đăng bài.<br>- Gửi `item_code` không tồn tại (`MA-KHONG-TON-TAI-999`) -> Ném lỗi 400 `BR-ND-10`, nội dung bài viết và cơ sở dữ liệu không bị thay đổi. |
+| CMS-06-AC3 | ✅ PASS | `frontend/features/content/components/ItemCard.tsx`<br>- Thẻ mặt hàng trên web là client component ("use client") gọi `getCatalogItem(itemCode)` lấy giá live lúc khách xem từ API catalog công khai `/api/shop/catalog/<code>/`.<br>- Định dạng giá qua `formatVnd(item.price)`. Khi vựa cập nhật giá từ 250.000đ lên 260.000đ trên Shop, bài viết không cần đăng lại mà thẻ tự động cập nhật hiển thị 260.000đ. |
+| CMS-06-AC4 | ✅ PASS | `frontend/features/content/components/ItemCard.tsx` (dòng 50–52 & 96–98):<br>- Nút "Xem giá & đặt" trỏ sang URL: `/shop/item/?code=CA-THU-1KG&utm_source=caveve_web&utm_medium=bai_viet&utm_campaign=cach-ra-dong-ca-thu`<br>- Đường dẫn tuân thủ trailing slash của Next.js tĩnh, UTM URL đúng chuẩn gồm 3 tham số `utm_source`, `utm_medium`, `utm_campaign`, tuyệt đối không thừa tham số nào khác.<br>- `ArticleBody.tsx` và `bai-viet/page.tsx` truyền đúng `postSlug={entry.slug}` vào component. |
+| CMS-06-AC5 | ✅ PASS | `frontend/features/content/components/ItemCard.tsx` (dòng 28–40 & 63–75):<br>- Khi mặt hàng bị ẩn, hoặc `sellable_qty <= 0` (hết hàng), hoặc API catalog trả 404/500 -> Render fallback card hiển thị badge "Tạm hết hàng", nút dẫn về danh mục `/shop/?utm_source=caveve_web&utm_medium=bai_viet&utm_campaign=<slug>`.<br>- Xử lý lỗi khép kín trong `ItemCard`, phần còn lại của bài viết vẫn hiển thị đầy đủ và nguyên vẹn. |
+| CMS-06-AC6 | ✅ PASS | `apps/content/tests/test_item_card_and_public_list.py::ItemCardAndPublicListTests::test_cms_06_ac6_warning_item_unavailable_when_inactive_or_no_price`<br>- `apps/content/body/scan.py` quét khối `item_card`: nếu `Item` không `is_active` hoặc không có giá hiệu lực (`effective_price is None`) -> Sinh cảnh báo `{"type": "item_unavailable", "item_code": code}`.<br>- Khi Quản lý đăng lại bài, bước quét CMS-08 cảnh báo mã hàng không khả dụng, không chặn xuất bản khi đã xác nhận `acknowledge_warnings`. |
+| CMS-06-AC7 | ✅ PASS | `apps/content/public/serializers.py` & `frontend/features/content/components/ItemCard.tsx`<br>- Thẻ mặt hàng trong API công khai bài viết chỉ trả duy nhất `{"type": "item_card", "item_code": "..."}`.<br>- Toàn bộ request mạng trên trang bài viết công khai chỉ gọi `/api/public/content/**` và `/api/shop/catalog/**`; tuyệt đối không gọi tới endpoint ERP nội bộ.<br>- Không có bất kỳ trường giá vốn nào xuất hiện trong JSON response công khai. |
+
+---
+
+#### Story CMS-14 — Danh sách bài viết công khai & khối "Bài mới" trên Landing (AC1..AC6)
+| Mã AC | Kết quả | Bằng chứng (test / code / kiểm tra) |
+|---|---|---|
+| CMS-14-AC1 | ✅ PASS | `apps/content/tests/test_item_card_and_public_list.py::ItemCardAndPublicListTests::test_cms_14_ac1_public_entries_list_pagination_and_exclusion`<br>- Kiểm thử kịch bản: 25 bài Đã đăng, 3 bài Nháp, 2 Trang tĩnh Đã đăng.<br>- `PublicEntryListView` lọc chuẩn `status="published"` và `kind="post"`: loại bỏ 100% bài Nháp và Trang tĩnh.<br>- Phân trang 12 bài/trang (`CONTENT_LIST_PAGE_SIZE = 12`): Trang 1 có 12 bài mới nhất trước, có link sang trang 2; trang 2 có 12 bài; trang 3 có 1 bài.<br>- `frontend/app/bai-viet/page.tsx`: Khối phân trang hiển thị điều hướng "← Trang trước" và "Trang sau →". |
+| CMS-14-AC2 | ✅ PASS | `apps/content/tests/test_item_card_and_public_list.py::ItemCardAndPublicListTests::test_cms_14_ac2_filter_by_category_slug`<br>- Lọc `?category=cong-thuc` chỉ trả về đúng các bài thuộc chuyên mục đó.<br>- Chuyên mục không có bài trả danh sách rỗng `results: []`.<br>- Frontend `frontend/app/bai-viet/page.tsx`: Hỗ trợ URL `?chuyen-muc=cong-thuc`, tab chuyên mục tương ứng active; khi danh sách rỗng hiển thị thông báo "Chưa có bài". |
+| CMS-14-AC3 | ✅ PASS | `frontend/features/content/components/LatestPosts.tsx` & `frontend/app/page.tsx`<br>- Khối "Cẩm nang & Mẹo hay từ vựa" trên Landing page gọi API công khai và hiển thị đúng 3 bài mới nhất (`posts.slice(0, 3)`).<br>- Có link "Xem tất cả bài viết →" trỏ sang danh sách bài viết `/bai-viet`. Mỗi thẻ bài gồm ảnh bìa, chuyên mục, tiêu đề, tóm tắt và ngày đăng. |
+| CMS-14-AC4 | ✅ PASS | `frontend/features/content/components/LatestPosts.tsx` (dòng 35–49):<br>- Khi API công khai bị tắt hoặc gặp lỗi kết nối -> Bắt lỗi và đặt `hasError = true`, component trả về `null` (ẩn hoàn toàn khối "Bài mới").<br>- Landing page (`frontend/app/page.tsx`) không bị vỡ giao diện, các khối Hero, Features, Steps, CTA và Footer vẫn hiển thị đầy đủ và ổn định. |
+| CMS-14-AC5 | ✅ PASS | `apps/content/tests/test_item_card_and_public_list.py::ItemCardAndPublicListTests::test_cms_14_ac5_public_list_and_categories_no_forbidden_keys`<br>- Quét đệ quy toàn bộ JSON response của danh sách bài viết (`/api/public/content/entries/`) và chuyên mục (`/api/public/content/categories/`): không chứa `body`, không chứa bất kỳ khoá nào trong bộ khoá cấm.<br>- API chuyên mục công khai chỉ trả về các chuyên mục đang hoạt động (`is_active=True`) và có ít nhất 1 bài Đã đăng. |
+| CMS-14-AC6 | ✅ PASS | `apps/content/tests/test_item_card_and_public_list.py::ItemCardAndPublicListTests::test_cms_14_ac6_page_beyond_bounds_returns_404`<br>- Gọi API công khai với `?page=999` -> Trả về HTTP 404 Not Found (DRF EmptyPage -> NotFound), tuyệt đối không gây lỗi 500.<br>- Frontend (`frontend/app/bai-viet/page.tsx`) bắt mã 404 và hiển thị danh sách rỗng ("Chưa có bài"), không làm trắng trang. |
+
+---
+
+### 2. Kiểm tra Bất biến & Quy định bắt buộc
+
+1. **Bất biến 1 (Không rò giá vốn)**:
+   - Các endpoint công khai của Lô 6 (`PublicEntryListView`, `PublicCategoryListView`, `PublicEntryDetailView`) chỉ sử dụng các serializer dựng dict tường minh (`PublicEntryListSerializer`, `PublicCategorySerializer`), không sử dụng ModelSerializer hay `fields = '__all__'`.
+   - Khối `item_card` trong thân bài chỉ lưu và trả duy nhất `item_code`.
+   - `ItemCard` trên web gọi API catalog công khai `/api/shop/catalog/<code>/` để hiển thị giá bán lẻ, hoàn toàn không chạm tới trường giá vốn, giá mua cảng, hay tỷ suất lợi nhuận.
+   - Hàm quét đệ quy `_has_forbidden_key` xác nhận 100% sạch các trường cấm (`unit_cost`, `cost`, `purchase_rate`, `landed_cost`, `profit`,...).
+
+2. **Bất biến 9 (Không rò dữ liệu cá nhân khách - PII)**:
+   - Toàn bộ bài viết, chuyên mục, và catalog không chứa dữ liệu khách hàng (tên, SĐT, địa chỉ giao hàng).
+   - Tác giả bài viết công khai cố định `author = "Cá Về"`.
+   - Máy quét `scan_entry_warnings` phát hiện SĐT trong bài và che snippet theo chuẩn `09xx xxx 678`, không ghi log PII ra console hay hệ thống.
+
+3. **Lệnh cấm `dangerouslySetInnerHTML`**:
+   - Quét kiểm tra toàn diện:
+     `grep -rn "dangerouslySetInnerHTML" frontend/features/content frontend/app/bai-viet frontend/app/trang erp-console/features/content` -> Rỗng (0 vi phạm).
+   - Nội dung được hiển thị hoàn toàn qua React JSX an toàn với `ArticleBody` và `ItemCard`.
+
+4. **Kiểm tra migration**:
+   - `git status --porcelain -- backend/apps | grep "/migrations/" | grep -v "apps/content/migrations/"` -> Rỗng.
+   - Không có migration nào của app khác ngoài `content` bị ảnh hưởng.
+
+---
+
+### 3. Lệnh kiểm chứng đã chạy (kèm output tóm tắt)
+
+1. `cd backend && .venv/bin/python manage.py test apps.content`
+   - **Output**: `Ran 78 tests in 3.938s -> OK` (100% pass, bao gồm 7 test case mới của Lô 6).
+2. `cd backend && .venv/bin/python manage.py test && .venv/bin/python manage.py makemigrations --check --dry-run`
+   - **Output**: `Ran 987 tests in 81.899s -> OK. No changes detected.`
+3. `cd erp-console && npm test`
+   - **Output**: `7 test files passed, 62 tests passed (100%).`
+4. `cd erp-console && npx tsc --noEmit && npm run build`
+   - **Output**: `Compiled successfully. Generating static pages (30/30) -> OK.`
+5. `cd frontend && npx tsc --noEmit && NEXT_PUBLIC_USE_MOCK=0 NEXT_PUBLIC_API_BASE=https://cangca-api-staging-675411800433.asia-southeast1.run.app npm run build`
+   - **Output**: `Compiled successfully. Generating static pages (10/10) -> OK.`
+6. `grep -rn "dangerouslySetInnerHTML" frontend/features/content frontend/app/bai-viet frontend/app/trang erp-console/features/content`
+   - **Output**: `rỗng` (0 vi phạm).
+7. `git status --porcelain -- backend/apps | grep "/migrations/" | grep -v "apps/content/migrations/"`
+   - **Output**: `rỗng`.
+
+---
+
+### 4. Danh sách lỗi
+*(Không có lỗi chặn)*
+
+---
+
+### 5. Kết luận
+- **Nghiệm thu Lô 6**: **APPROVED** (13/13 ca PASS).
+</QA — CMS viết bài · lô 6 · lần 1 · 2026-09-29>
+
 
 
 

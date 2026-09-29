@@ -1,11 +1,13 @@
 import React from "react";
 import Link from "next/link";
+import ItemCard from "./ItemCard";
 import type { InlineNode, PublicBlock, PublicBodyDoc } from "../types";
 import { isExternalLink, isSafeHref } from "../safeHref";
 import s from "./ArticleBody.module.css";
 
 interface ArticleBodyProps {
   body: PublicBodyDoc;
+  postSlug?: string;
 }
 
 function renderInline(node: InlineNode, index: number): React.ReactNode {
@@ -44,7 +46,7 @@ function renderInline(node: InlineNode, index: number): React.ReactNode {
   return <React.Fragment key={index}>{content}</React.Fragment>;
 }
 
-function renderBlock(block: PublicBlock, index: number): React.ReactNode {
+function renderBlock(block: PublicBlock, index: number, postSlug?: string): React.ReactNode {
   switch (block.type) {
     case "heading": {
       if (block.level === 3) {
@@ -111,15 +113,11 @@ function renderBlock(block: PublicBlock, index: number): React.ReactNode {
 
     case "item_card": {
       return (
-        <div key={index} className={s.itemCard}>
-          <div className={s.itemCardInfo}>
-            <span className={s.itemCardLabel}>Hải sản tươi vựa</span>
-            <span className={s.itemCardCode}>Mặt hàng #{block.item_code}</span>
-          </div>
-          <Link href={`/shop#item-${block.item_code}`} className={s.itemCardBtn}>
-            Xem trên Shop
-          </Link>
-        </div>
+        <ItemCard
+          key={index}
+          itemCode={block.item_code}
+          postSlug={postSlug}
+        />
       );
     }
 
@@ -128,14 +126,14 @@ function renderBlock(block: PublicBlock, index: number): React.ReactNode {
   }
 }
 
-export default function ArticleBody({ body }: ArticleBodyProps) {
+export default function ArticleBody({ body, postSlug }: ArticleBodyProps) {
   if (!body || !Array.isArray(body.blocks)) {
     return null;
   }
 
   return (
     <article className={s.articleBody}>
-      {body.blocks.map((block, idx) => renderBlock(block, idx))}
+      {body.blocks.map((block, idx) => renderBlock(block, idx, postSlug))}
     </article>
   );
 }

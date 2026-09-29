@@ -4,13 +4,20 @@ import React, { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { ApiError } from "@/lib/types";
-import { fetchPublicEntries, fetchPublicEntry } from "@/features/content/api";
+import {
+  fetchPublicCategories,
+  fetchPublicEntries,
+  fetchPublicEntry,
+} from "@/features/content/api";
 import ArticleBody from "@/features/content/components/ArticleBody";
 import type {
+  PublicCategory,
   PublicEntryDetail,
   PublicEntryListItem,
 } from "@/features/content/types";
 import s from "./bai-viet.module.css";
+
+const PAGE_SIZE = 12;
 
 function formatDate(isoStr?: string): string {
   if (!isoStr) return "";
@@ -29,12 +36,26 @@ function formatDate(isoStr?: string): string {
 function BaiVietContent() {
   const searchParams = useSearchParams();
   const slug = searchParams.get("slug");
+  const categoryParam = searchParams.get("chuyen-muc") || searchParams.get("category");
+  const pageParam = parseInt(searchParams.get("trang") || searchParams.get("page") || "1", 10);
+  const currentPage = isNaN(pageParam) || pageParam < 1 ? 1 : pageParam;
 
   const [entry, setEntry] = useState<PublicEntryDetail | null>(null);
   const [list, setList] = useState<PublicEntryListItem[]>([]);
+  const [totalCount, setTotalCount] = useState<number>(0);
+  const [categories, setCategories] = useState<PublicCategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorStatus, setErrorStatus] = useState<number | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Tải danh mục chuyên mục cho thanh lọc
+  useEffect(() => {
+    if (!slug) {
+      fetchPublicCategories()
+        .then((cats) => setCategories(cats || []))
+        .catch(() => setCategories([]));
+    }
+  }, [slug]);
 
   const loadData = () => {
     setLoading(true);
@@ -62,14 +83,24 @@ function BaiVietContent() {
           setLoading(false);
         });
     } else {
-      fetchPublicEntries()
+      fetchPublicEntries({
+        category: categoryParam || undefined,
+        page: currentPage,
+      })
         .then((res) => {
           setList(res.results || []);
+          setTotalCount(res.count ?? res.total ?? 0);
           document.title = "Bài viết & Cẩm nang cá biển | Cá Về";
         })
         .catch((err: any) => {
-          setErrorStatus(500);
-          setErrorMessage(err?.message || "Chưa tải được danh sách bài.");
+          if (err instanceof ApiError && err.status === 404) {
+            // CMS-14-AC6: page quá giới hạn trả 404
+            setList([]);
+            setTotalCount(0);
+          } else {
+            setErrorStatus(500);
+            setErrorMessage(err?.message || "Chưa tải được danh sách bài.");
+          }
         })
         .finally(() => {
           setLoading(false);
@@ -79,7 +110,7 @@ function BaiVietContent() {
 
   useEffect(() => {
     loadData();
-  }, [slug]);
+  }, [slug, categoryParam, currentPage]);
 
   if (loading) {
     return (
@@ -145,7 +176,7 @@ function BaiVietContent() {
     );
   }
 
-  // 4. Hiển thị chi tiết bài viết (CMS-13)
+  // 4. Hiển thị chi tiết bài viết (CMS-13, CMS-06)
   if (slug && entry) {
     const cover = entry.cover_image;
     const coverSrc = cover ? (cover.urls.lg || cover.urls.md || cover.urls.sm) : null;
@@ -161,7 +192,9 @@ function BaiVietContent() {
           {entry.category && (
             <>
               <span>/</span>
-              <Link href={`/bai-viet?category=${entry.category.slug}`}>{entry.category.name}</Link>
+              <Link href={`/bai-viet?chuyen-muc=${encodeURIComponent(entry.category.slug)}`}>
+                {entry.category.name}
+              </Link>
             </>
           )}
         </nav>
@@ -169,7 +202,10 @@ function BaiVietContent() {
         {/* Header */}
         <header className={s.header}>
           {entry.category && (
-            <Link href={`/bai-viet?category=${entry.category.slug}`} className={s.categoryTag}>
+            <Link
+              href={`/bai-viet?chuyen-muc=${encodeURIComponent(entry.category.slug)}`}
+              className={s.categoryTag}
+            >
               {entry.category.name}
             </Link>
           )}
@@ -200,58 +236,135 @@ function BaiVietContent() {
           </div>
         )}
 
-        {/* Nội dung bài viết sạch, render qua ArticleBody an toàn */}
-        <ArticleBody body={entry.body} />
+        {/* Nội dung bài viết sạch, render qua ArticleBody an toàn kèm ItemCard */}
+        <ArticleBody body={entry.body} postSlug={entry.slug} />
       </main>
     );
   }
 
   // 5. Hiển thị danh sách bài viết khi không có slug (CMS-14)
+  const totalPages = Math.ceil(totalCount / PAGE_SIZE) || 1;
+  const hasNextPage = currentPage < totalPages;
+  const hasPrevPage = currentPage > 1;
+
   return (
     <main className={s.container}>
       <header className={s.header}>
-        <h1 className={s.title}>Cẩm nang & Kinh nghiệm từ cảng cá</h1>
+        <h1 className={s.title}>Cẩm nang &amp; Kinh nghiệm từ cảng cá</h1>
         <p style={{ color: "#64748b", margin: 0 }}>
           Chia sẻ kinh nghiệm chọn hải sản tươi, bí quyết bảo quản và các công thức nấu ăn đậm đà vị biển.
         </p>
       </header>
 
+      {/* Tabs lọc chuyên mục (CMS-14-AC2) */}
+      <nav className={s.categoryTabs} aria-label="Chuyên mục bài viết">
+        <Link
+          href="/bai-viet"
+          className={`${s.tabItem} ${!categoryParam ? s.tabActive : ""}`}
+        >
+          Tất cả
+        </Link>
+        {categories.map((cat) => {
+          const isActive = categoryParam === cat.slug;
+          return (
+            <Link
+              key={cat.slug}
+              href={`/bai-viet?chuyen-muc=${encodeURIComponent(cat.slug)}`}
+              className={`${s.tabItem} ${isActive ? s.tabActive : ""}`}
+            >
+              {cat.name}
+            </Link>
+          );
+        })}
+      </nav>
+
+      {/* CMS-14-AC2: Chuyên mục không có bài -> hiện "Chưa có bài" */}
       {list.length === 0 ? (
-        <div style={{ textAlign: "center", padding: "40px", color: "#64748b" }}>
-          Chưa có bài viết nào được đăng.
+        <div style={{ textAlign: "center", padding: "48px 16px", color: "#64748b" }}>
+          Chưa có bài
         </div>
       ) : (
-        <div className={s.listGrid}>
-          {list.map((item) => {
-            const coverSrc = item.cover_image
-              ? (item.cover_image.urls.md || item.cover_image.urls.sm)
-              : null;
-            return (
-              <Link key={item.slug} href={`/bai-viet?slug=${item.slug}`} className={s.card}>
-                {coverSrc && (
-                  <div className={s.cardImgWrapper}>
-                    <img
-                      src={coverSrc}
-                      alt={item.cover_image?.alt || item.title}
-                      className={s.cardImg}
-                      loading="lazy"
-                    />
-                  </div>
-                )}
-                <div className={s.cardBody}>
-                  {item.category && (
-                    <span style={{ fontSize: "12px", color: "#0284c7", fontWeight: 600, marginBottom: "4px" }}>
-                      {item.category.name}
-                    </span>
+        <>
+          <div className={s.listGrid}>
+            {list.map((item) => {
+              const coverSrc = item.cover_image
+                ? (item.cover_image.urls.md || item.cover_image.urls.sm)
+                : null;
+              return (
+                <Link
+                  key={item.slug}
+                  href={`/bai-viet?slug=${encodeURIComponent(item.slug)}`}
+                  className={s.card}
+                >
+                  {coverSrc && (
+                    <div className={s.cardImgWrapper}>
+                      <img
+                        src={coverSrc}
+                        alt={item.cover_image?.alt || item.title}
+                        className={s.cardImg}
+                        loading="lazy"
+                      />
+                    </div>
                   )}
-                  <h3 className={s.cardTitle}>{item.title}</h3>
-                  <p className={s.cardExcerpt}>{item.excerpt}</p>
-                  <span className={s.cardDate}>{formatDate(item.published_at)}</span>
-                </div>
+                  <div className={s.cardBody}>
+                    {item.category && (
+                      <span
+                        style={{
+                          fontSize: "12px",
+                          color: "#0284c7",
+                          fontWeight: 600,
+                          marginBottom: "4px",
+                        }}
+                      >
+                        {item.category.name}
+                      </span>
+                    )}
+                    <h3 className={s.cardTitle}>{item.title}</h3>
+                    <p className={s.cardExcerpt}>{item.excerpt}</p>
+                    <span className={s.cardDate}>{formatDate(item.published_at)}</span>
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+
+          {/* Phân trang (CMS-14-AC1) */}
+          {totalPages > 1 && (
+            <div className={s.pagination}>
+              <Link
+                href={{
+                  pathname: "/bai-viet",
+                  query: {
+                    ...(categoryParam ? { "chuyen-muc": categoryParam } : {}),
+                    trang: currentPage - 1,
+                  },
+                }}
+                className={`${s.pageBtn} ${!hasPrevPage ? s.pageDisabled : ""}`}
+                aria-disabled={!hasPrevPage}
+              >
+                ← Trang trước
               </Link>
-            );
-          })}
-        </div>
+
+              <span className={s.pageInfo}>
+                Trang {currentPage} / {totalPages}
+              </span>
+
+              <Link
+                href={{
+                  pathname: "/bai-viet",
+                  query: {
+                    ...(categoryParam ? { "chuyen-muc": categoryParam } : {}),
+                    trang: currentPage + 1,
+                  },
+                }}
+                className={`${s.pageBtn} ${!hasNextPage ? s.pageDisabled : ""}`}
+                aria-disabled={!hasNextPage}
+              >
+                Trang sau →
+              </Link>
+            </div>
+          )}
+        </>
       )}
     </main>
   );

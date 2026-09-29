@@ -76,9 +76,12 @@ export interface PublicEntryListItem {
 
 export interface PublicEntryListResponse {
   results: PublicEntryListItem[];
-  total: number;
-  page: number;
-  total_pages: number;
+  count?: number;
+  total?: number;
+  next?: string | null;
+  previous?: string | null;
+  page?: number;
+  total_pages?: number;
 }
 
 export interface FooterLink {

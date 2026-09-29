@@ -181,6 +181,11 @@ def normalize_body(
             if not ITEM_CODE_RE.match(item_code):
                 # Mã không hợp lệ hoặc chứa payload XSS -> bỏ khối
                 continue
+            if strict:
+                from apps.catalog.models import Item
+
+                if not Item.objects.filter(code=item_code).exists():
+                    raise BusinessError("Mặt hàng không tồn tại (BR-ND-10).", code="BR-ND-10")
             cleaned_blocks.append({"type": "item_card", "item_code": item_code})
 
     if total_chars > max_body_chars:

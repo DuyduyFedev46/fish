@@ -16,6 +16,7 @@ import {
   mockUpdateEntry,
   mockUpdateImageAlt,
   mockUploadEntryImage,
+  mockFetchShopCatalog,
 } from "./mock";
 
 describe("CMS-01 & CMS-02 Console Tests", () => {
@@ -435,6 +436,22 @@ describe("CMS-01 & CMS-02 Console Tests", () => {
       const required = ["privacy", "terms", "refund", "seller_info"];
       for (const r of status.missing_roles) {
         expect(required).toContain(r);
+      }
+    });
+  });
+
+  describe("CMS-06 Console Tests", () => {
+    it("CMS-06-AC1: mockFetchShopCatalog trả danh mục mặt hàng công khai không rò giá vốn", () => {
+      const items = mockFetchShopCatalog();
+      expect(Array.isArray(items)).toBe(true);
+      expect(items.length).toBeGreaterThan(0);
+      const forbidden = ["unit_cost", "purchase_rate", "cost", "landed_cost"];
+      for (const it of items) {
+        expect(it.item_code).toBeDefined();
+        expect(it.name).toBeDefined();
+        for (const f of forbidden) {
+          expect(f in it).toBe(false);
+        }
       }
     });
   });

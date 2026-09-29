@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import LatestPosts from "@/features/content/components/LatestPosts";
 
 export const metadata: Metadata = {
   title: "Vựa hải sản đông lạnh tươi ngon, giao tận nhà",
@@ -129,6 +130,8 @@ export default function LandingPage() {
           ))}
         </div>
       </section>
+
+      <LatestPosts />
 
       <section className="cta-banner">
         <h2>Sẵn sàng cho bữa hải sản tươi ngon?</h2>
