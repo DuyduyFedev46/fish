@@ -84,22 +84,33 @@ class ShopOrderLookupView(APIView):
             return Response({"detail": LOOKUP_NOT_FOUND}, status=404)
 
         delivery = None
+        status_label = order.get_status_display()
         invoice = getattr(order, "invoice", None)
         if invoice is not None:
             dn = invoice.delivery_notes.first()
             if dn is not None:
-                delivery = {"status": dn.status, "status_label": dn.get_status_display()}
+                deliv_label = dn.get_status_display()
+                if dn.status == "CONFIRMING":
+                    deliv_label = "Chờ vựa gọi xác nhận"
+                    if order.status == SalesOrder.Status.PROCESSING:
+                        status_label = "Đã thanh toán – chờ vựa gọi xác nhận"
+                elif dn.status == "CANCELLED" and order.status == SalesOrder.Status.CANCELLED:
+                    deliv_label = "Đã huỷ theo đơn"
+                delivery = {"status": dn.status, "status_label": deliv_label}
 
         booked_expires_at = None
         if order.status == SalesOrder.Status.BOOKED and order.booked_expires_at is not None:
             # Giờ VN (BR-BH-03): FE hiện đồng hồ đếm ngược, không tự suy đoán từ UTC.
             booked_expires_at = timezone.localtime(order.booked_expires_at).isoformat()
 
+        from .customer_notices import build_cancel_notice
+        cancel_notice = build_cancel_notice(order)
+
         return Response(
             {
                 "order_code": order.code,
                 "status": order.status,
-                "status_label": order.get_status_display(),
+                "status_label": status_label,
                 "total_amount": str(order.total_amount),
                 "lines": [
                     {
@@ -112,5 +123,6 @@ class ShopOrderLookupView(APIView):
                 ],
                 "delivery": delivery,
                 "booked_expires_at": booked_expires_at,
+                "cancel_notice": cancel_notice,
             }
         )

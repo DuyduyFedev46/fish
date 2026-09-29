@@ -114,7 +114,7 @@ production cùng Lô 3.
 
 ---
 
-## Lô 3 — Không liên lạc được, tự huỷ, báo khách (lên production **cùng nhau**)
+## [x] Lô 3 — Không liên lạc được, tự huỷ, báo khách (QA APPROVED 2026-09-29)
 > **Ràng buộc phát hành (bắt buộc):** Lô 3 **chỉ lên production sau khi `legal-vn` duyệt** câu `cancel_notice` và câu báo
 > trước ở checkout (NĐ 356/2025), và Duy tự bật `CSKH_AUTO_CANCEL_ENABLED=1`. Code để mặc định `0`. Staging được bật `1` để
 > QA. Chuỗi câu trong `customer_notices.py` và FE Shop giữ dấu `# CHỜ legal-vn` tới khi có bản duyệt; khi có, thay đúng câu,

@@ -24,6 +24,7 @@ from apps.ai.policy.api import (
 from apps.ai.registry.api import AiCommandDetailView, AiCommandsIndexView
 from apps.ai.settings.api import MyConfigKillView, MyConfigVersionsView, MyConfigView
 from apps.common.guidance.api import GuidanceView
+from apps.common.site_info_api import PublicSiteInfoView
 import apps.sales.orders.next_steps  # noqa: F401 - đăng ký guidance provider cho order
 from apps.catalog.images.api import ItemImageDetailView
 from apps.catalog.items.api import BundleLineViewSet, ItemGroupViewSet, ItemViewSet
@@ -84,6 +85,8 @@ router.register("staff", StaffViewSet, basename="staff")
 router.register("ai/actions", AiActionViewSet, basename="ai-actions")
 
 urlpatterns = [
+    # Thông tin công khai cho Shop web (CS-10)
+    path("public/site-info/", PublicSiteInfoView.as_view(), name="public-site-info"),
     # CSKH tìm kiếm nhanh (chỉ POST)
     path("cskh/search/", CskhSearchView.as_view(), name="cskh-search"),
     # Shop công khai (guest)

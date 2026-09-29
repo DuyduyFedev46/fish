@@ -10,6 +10,7 @@ import {
   type CreateOrderResponse,
   type OrderStatus,
   type PaymentCheckoutSession,
+  type SiteInfo,
   type WireCreateOrderResponse,
   type WireOrderStatus,
 } from "./types";
@@ -18,6 +19,7 @@ import {
   mockGetCatalog,
   mockGetCatalogItem,
   mockGetOrderStatus,
+  mockGetSiteInfo,
   mockStartCheckoutSession,
 } from "./mock";
 
@@ -83,6 +85,7 @@ function mapOrderStatus(wire: WireOrderStatus): OrderStatus {
     order_code: wire.order_code,
     status: wire.status,
     status_label: wire.status_label,
+    fulfilment: wire.fulfilment ?? (wire.delivery ? wire.delivery.status : undefined),
     total_amount: Number(wire.total_amount),
     lines: wire.lines.map((l) => ({
       item_code: l.item_code,
@@ -93,8 +96,16 @@ function mapOrderStatus(wire: WireOrderStatus): OrderStatus {
     is_paid: PAID_STATUSES.has(wire.status),
     is_expired: wire.status === "AUTO_CANCELLED",
     ...(wire.booked_expires_at ? { booked_expires_at: wire.booked_expires_at } : {}),
-    delivery: wire.delivery ? { status: wire.delivery.status } : undefined,
+    delivery: wire.delivery
+      ? { status: wire.delivery.status, status_label: wire.delivery.status_label }
+      : undefined,
+    cancel_notice: wire.cancel_notice ?? null,
   };
+}
+
+export async function getSiteInfo(): Promise<SiteInfo> {
+  if (USE_MOCK) return mockGetSiteInfo();
+  return apiFetch<SiteInfo>("/api/public/site-info/");
 }
 
 function mapCreateOrderResponse(wire: WireCreateOrderResponse): CreateOrderResponse {

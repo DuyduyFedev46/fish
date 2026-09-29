@@ -8,7 +8,9 @@ import {
   type CatalogItemDetail,
   type CreateOrderPayload,
   type ItemImage,
+  type OrderCancelNotice,
   type PaymentCheckoutSession,
+  type SiteInfo,
   type WireCreateOrderResponse,
   type WireOrderStatus,
 } from "./types";
@@ -158,9 +160,10 @@ type MockOrderRecord = {
   pay_confirmed_at: number | null;
   status_label: string;
   delivery_status: string;
+  cancel_notice?: OrderCancelNotice | null;
 };
 
-const ORDERS_STORAGE_KEY = "cangcaloc_mock_orders_v1";
+const ORDERS_STORAGE_KEY = "cangcaloc_mock_orders_v2";
 
 function nowIso(minutesFromNow: number): string {
   return new Date(Date.now() + minutesFromNow * 60 * 1000).toISOString();
@@ -210,6 +213,32 @@ function seedDemoOrders(): Map<string, MockOrderRecord> {
     pay_confirmed_at: null,
     status_label: "Đơn đã hết hạn giữ hàng",
     delivery_status: "Đã huỷ (hết hạn giữ chỗ)",
+  });
+  // Đơn mẫu 4: CS-10 tự huỷ do không liên lạc được kèm hoàn tiền (mã DH-DEMO004, SĐT 5678).
+  orders.set("DH-DEMO004", {
+    order_code: "DH-DEMO004",
+    phone: "0901235678",
+    total_amount: 540000,
+    lines: [{ item_code: "TOM-SU-TUOI", name: "Tôm sú tươi", qty: 2, amount: 540000 }],
+    is_paid: false,
+    is_expired: false,
+    booked_expires_at: null,
+    pay_confirmed_at: null,
+    status_label: "Đã huỷ",
+    delivery_status: "Đã huỷ theo đơn",
+    cancel_notice: {
+      reason_code: "UNREACHABLE_AUTO",
+      // # CHỜ legal-vn: câu thông báo tự huỷ do không liên lạc được
+      message:
+        "Cá Về đã gọi số điện thoại đặt hàng 3 lần trong 30 phút nhưng không liên lạc được, nên đơn được huỷ tự động để hoàn tiền cho quý khách.",
+      refund: {
+        amount: "540000",
+        status_label: "Đang chờ hoàn",
+        deadline: "2026-10-28",
+        refunded_at: null,
+      },
+      contact: "1900 6868",
+    },
   });
   return orders;
 }
@@ -281,10 +310,20 @@ function resolveMockOrder(record: MockOrderRecord): { record: MockOrderRecord; c
 // API thật. Khác BE thật ở 2 chỗ (có ghi chú rõ): mock trả thêm `name` mỗi dòng và
 // `booked_expires_at` — BE thật hôm nay chưa có 2 field này ở tra đơn (xem lib/types.ts).
 function toWireOrderStatus(record: MockOrderRecord): WireOrderStatus {
+  const fulfilment =
+    record.delivery_status === "Đã huỷ theo đơn"
+      ? "CANCELLED"
+      : record.is_paid
+      ? "CONFIRMING"
+      : record.is_expired
+      ? "CANCELLED"
+      : "BOOKED";
+
   return {
     order_code: record.order_code,
-    status: record.is_paid ? "PROCESSING" : record.is_expired ? "AUTO_CANCELLED" : "BOOKED",
+    status: record.is_paid ? "PROCESSING" : record.is_expired ? "AUTO_CANCELLED" : record.cancel_notice ? "CANCELLED" : "BOOKED",
     status_label: record.status_label,
+    fulfilment,
     total_amount: String(record.total_amount),
     lines: record.lines.map((l) => ({
       item_code: l.item_code,
@@ -293,8 +332,24 @@ function toWireOrderStatus(record: MockOrderRecord): WireOrderStatus {
       amount: String(l.amount),
     })),
     delivery: { status: record.delivery_status },
+    cancel_notice: record.cancel_notice ?? null,
     ...(record.booked_expires_at ? { booked_expires_at: record.booked_expires_at } : {}),
   };
+}
+
+export async function mockGetSiteInfo(): Promise<SiteInfo> {
+  return delay({
+    cskh_notice: {
+      enabled: true,
+      working_hours: "07:00-21:00",
+      max_attempts: 3,
+      window_minutes: 30,
+      decision_minutes: 30,
+      auto_cancel_enabled: false,
+      refund_deadline_days: 30,
+      hotline: "1900 6868",
+    },
+  });
 }
 
 function delay<T>(value: T, ms = 250): Promise<T> {

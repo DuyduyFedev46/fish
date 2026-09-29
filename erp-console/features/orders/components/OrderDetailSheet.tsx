@@ -30,6 +30,8 @@ export type ResultNote = { tone: "ok" | "warn"; text: string; duplicate: boolean
 type Props = {
   /** Dòng đã bấm trong danh sách — để có tiêu đề/tổng tiền ngay khi chi tiết đang tải. */
   summary: OrderListItem;
+  /** Mở sẵn form xác nhận, huỷ hay hoàn tiền (vd ?open=refund). */
+  initialMode?: Mode;
   /** Chi tiết đổi sau thao tác → sửa dòng trong danh sách; `toast` = câu hiện khi đóng tấm (nếu có). */
   onChanged: (change: Partial<OrderListItem>, toast?: string) => void;
   onClose: () => void;
@@ -51,11 +53,11 @@ function resultNote(r: ConfirmPaymentResult, code: string): ResultNote {
   return { tone, text, duplicate: r.duplicate, queueLink: !!r.overpaid_amount || r.result === "UNDERPAID" || r.result === "ORPHAN" };
 }
 
-export function OrderDetailSheet({ summary, onChanged, onClose }: Props) {
+export function OrderDetailSheet({ summary, initialMode = "view", onChanged, onClose }: Props) {
   const [detail, setDetail] = useState<OrderDetail | null>(null);
   const [error, setError] = useState<unknown>(null);
   const [loading, setLoading] = useState(true);
-  const [mode, setMode] = useState<Mode>("view");
+  const [mode, setMode] = useState<Mode>(initialMode);
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<ResultNote | null>(null);
   const [guidanceRefreshKey, setGuidanceRefreshKey] = useState(0);

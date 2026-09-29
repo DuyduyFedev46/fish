@@ -10,6 +10,8 @@ import type {
   UnconfirmResponse,
   ChangeRecipientPayload,
   ChangeRecipientResponse,
+  DecidePayload,
+  DecideResponse,
 } from "./types";
 import {
   mockClaimCskhTask,
@@ -19,6 +21,7 @@ import {
   mockSearchCskh,
   mockUnconfirm,
   mockChangeRecipient,
+  mockDecideCskh,
 } from "./mock";
 
 export async function fetchCskhQueue(
@@ -123,3 +126,18 @@ export async function searchCskh(
     mock: isMock ? (req) => mockSearchCskh(req, q) : undefined,
   });
 }
+
+export async function decideCskh(
+  noteId: number,
+  payload: DecidePayload,
+  signal?: AbortSignal
+): Promise<DecideResponse> {
+  const isMock = process.env.NEXT_PUBLIC_USE_MOCK === "1";
+  return apiFetch<DecideResponse>(`/api/cskh/queue/${noteId}/decide/`, {
+    method: "POST",
+    body: payload,
+    signal,
+    mock: isMock ? (req) => mockDecideCskh(req, noteId, payload) : undefined,
+  });
+}
+

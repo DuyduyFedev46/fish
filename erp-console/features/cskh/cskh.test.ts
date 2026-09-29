@@ -6,6 +6,7 @@ import {
   mockSearchCskh,
   mockUnconfirm,
   mockChangeRecipient,
+  mockDecideCskh,
   MOCK_CSKH_ITEMS,
 } from "./mock";
 import {
@@ -15,13 +16,26 @@ import {
 
 describe("CSKH Feature Tests (CS-04, CS-05, CS-06, CS-11)", () => {
   beforeEach(() => {
-    // Reset state on mock items if modified
     const item31 = MOCK_CSKH_ITEMS.find((i) => i.note_id === 31);
     if (item31) {
       item31.note_status = "CONFIRMING";
       item31.confirm_state = "PENDING";
       item31.claimed_by = null;
       item31.claimed_until = null;
+    }
+    const item28 = MOCK_CSKH_ITEMS.find((i) => i.note_id === 28);
+    if (item28) {
+      item28.note_status = "CONFIRMING";
+      item28.confirm_state = "ESCALATED";
+      item28.claimed_by = null;
+      item28.claimed_until = null;
+    }
+    const item27 = MOCK_CSKH_ITEMS.find((i) => i.note_id === 27);
+    if (item27) {
+      item27.note_status = "CANCELLED";
+      item27.confirm_state = "REFUND_CALL";
+      item27.claimed_by = null;
+      item27.claimed_until = null;
     }
   });
 
@@ -185,6 +199,70 @@ describe("CSKH Feature Tests (CS-04, CS-05, CS-06, CS-11)", () => {
       expect([200, 201]).toContain(res.status);
       if ("print_no" in res.body) {
         expect(res.body.print_no).toBeGreaterThanOrEqual(1);
+      }
+    });
+  });
+
+  describe("Lô 3: CS-07, CS-08, CS-09 (Chuyển Quản lý, Quyết định, Báo hoàn tiền)", () => {
+    it("CS-07-AC8: Quản lý chọn DELIVER_WITHOUT_CONFIRM chuyển phiếu sang PREPARING", () => {
+      const res = mockDecideCskh({}, 28, {
+        decision: "DELIVER_WITHOUT_CONFIRM",
+        reason: "Khách quen, địa chỉ đã giao 2 lần",
+      });
+      expect(res.status).toBe(200);
+      if ("note_status" in res.body) {
+        expect(res.body.note_status).toBe("PREPARING");
+        expect(res.body.confirm_state).toBeNull();
+      }
+    });
+
+    it("CS-07-AC9: Quản lý chọn EXTEND chuyển confirm_state về CALLBACK", () => {
+      const until = new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString();
+      const res = mockDecideCskh({}, 28, {
+        decision: "EXTEND",
+        until,
+        reason: "Khách nhắn đang họp",
+      });
+      expect(res.status).toBe(200);
+      if ("confirm_state" in res.body) {
+        expect(res.body.confirm_state).toBe("CALLBACK");
+      }
+    });
+
+    it("CS-07-AC11: Quản lý chọn CANCEL huỷ đơn và trả suggest_refund_amount", () => {
+      const res = mockDecideCskh({}, 28, {
+        decision: "CANCEL",
+        reason_code: "UNREACHABLE",
+        note: "Gọi 3 lần không liên lạc được",
+      });
+      expect(res.status).toBe(200);
+      if ("note_status" in res.body) {
+        expect(res.body.note_status).toBe("CANCELLED");
+        expect(res.body.order_id).toBeDefined();
+        expect(res.body.suggest_refund_amount).toBeDefined();
+      }
+    });
+
+    it("CS-09-AC1: Tab REFUND_CALL lọc các phiếu bị tự huỷ cần báo khách", () => {
+      const res = getMockCskhQueue({ state: "REFUND_CALL" });
+      expect(res.results.length).toBeGreaterThan(0);
+      for (const item of res.results) {
+        expect(item.confirm_state).toBe("REFUND_CALL");
+        expect(item.refund).toBeDefined();
+        expect(item.refund?.amount).toBeDefined();
+      }
+    });
+
+    it("CS-09-AC2: Ghi NOTIFIED trên phiếu REFUND_CALL đóng task thành công", () => {
+      const res = mockRecordCskhCall({}, 27, {
+        result: "NOTIFIED",
+        note: "Đã gọi báo khách về khoản hoàn 540k",
+        request_id: "req-notified-test-uuid",
+      });
+      expect(res.status).toBe(201);
+      if ("confirm_state" in res.body) {
+        expect(res.body.confirm_state).toBeNull();
+        expect(res.body.note_status).toBe("CANCELLED");
       }
     });
   });

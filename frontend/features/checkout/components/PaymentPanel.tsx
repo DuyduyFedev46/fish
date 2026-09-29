@@ -3,11 +3,11 @@
 // Màn "đặt hàng thành công" của trang checkout: tóm tắt đơn, đồng hồ giữ chỗ, nút
 // "Thanh toán bằng VietQR" chuyển khách sang cổng SePay (P4-AC1/AC2, BR-TT-01/13).
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { formatVnd } from "../../../lib/format";
-import { startCheckoutSession, USE_MOCK } from "../../../lib/api";
-import type { CreateOrderResponse } from "../../../lib/types";
+import { getSiteInfo, startCheckoutSession, USE_MOCK } from "../../../lib/api";
+import type { CreateOrderResponse, SiteInfo } from "../../../lib/types";
 import CountdownTimer from "../../../components/CountdownTimer";
 import { goToMockGateway, redirectToGateway } from "../gateway";
 import { rememberOrderContact } from "../storage";
@@ -22,6 +22,13 @@ export default function PaymentPanel({
   const [expired, setExpired] = useState(false);
   const [paying, setPaying] = useState(false);
   const [payError, setPayError] = useState<string | null>(null);
+  const [siteInfo, setSiteInfo] = useState<SiteInfo | null>(null);
+
+  useEffect(() => {
+    getSiteInfo()
+      .then(setSiteInfo)
+      .catch(() => {});
+  }, []);
 
   async function handlePay() {
     setPayError(null);
@@ -64,6 +71,34 @@ export default function PaymentPanel({
             <p className="pay-note">
               Thanh toán 100% trước khi giao, bằng VietQR qua cổng SePay.
             </p>
+            {siteInfo?.cskh_notice?.enabled && (
+              <div
+                className="cskh-notice-box"
+                style={{
+                  background: "#f0fdf4",
+                  border: "1px solid #bbf7d0",
+                  borderRadius: "6px",
+                  padding: "10px 14px",
+                  marginBottom: "12px",
+                  fontSize: "0.8125rem",
+                  color: "#166534",
+                  lineHeight: "1.45",
+                  textAlign: "left",
+                }}
+              >
+                <strong>Lưu ý xác nhận đơn:</strong> Sau khi thanh toán, Cá Về sẽ gọi xác nhận trong khung giờ{" "}
+                {siteInfo.cskh_notice.working_hours} (tối đa {siteInfo.cskh_notice.max_attempts} lần trong{" "}
+                {siteInfo.cskh_notice.window_minutes} phút).
+                {siteInfo.cskh_notice.auto_cancel_enabled && (
+                  <span>
+                    {" "}
+                    Sau thời gian trên nếu không liên lạc được, đơn hàng có thể bị huỷ và hoàn đủ tiền trong vòng{" "}
+                    {siteInfo.cskh_notice.refund_deadline_days} ngày. Hotline: {siteInfo.cskh_notice.hotline}.
+                  </span>
+                )}{" "}
+                {/* # CHỜ legal-vn */}
+              </div>
+            )}
             {payError && <p className="form-banner-error">{payError}</p>}
             <button
               type="button"

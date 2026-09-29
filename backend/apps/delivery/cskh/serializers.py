@@ -113,11 +113,18 @@ class CskhQueueItemSerializer(serializers.ModelSerializer):
         if obj.first_unreachable_at:
             window_ends_at = (obj.first_unreachable_at + timedelta(minutes=window_mins)).isoformat()
 
-        # Decide deadline
-        decide_hours = getattr(settings, "CSKH_DECIDE_WINDOW_HOURS", 24)
+        # Decide deadline (CS-07, CS-13)
+        decision_mins = getattr(settings, "CSKH_MANAGER_DECISION_MINUTES", 30)
         decide_deadline = None
-        if obj.state == ConfirmationTask.State.ESCALATED and obj.escalated_at:
-            decide_deadline = (obj.escalated_at + timedelta(hours=decide_hours)).isoformat()
+        if (
+            obj.state == ConfirmationTask.State.ESCALATED
+            and obj.escalated_at
+            and obj.escalation_reason in (
+                ConfirmationTask.EscalationReason.UNREACHABLE,
+                ConfirmationTask.EscalationReason.WRONG_NUMBER,
+            )
+        ):
+            decide_deadline = (obj.escalated_at + timedelta(minutes=decision_mins)).isoformat()
 
         # Claimed by / until
         claimed_by_data = None

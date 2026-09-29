@@ -186,3 +186,102 @@ Quy trình: Kiểm thử độc lập theo TDD, kiểm tra ma trận phân quy�
 
 ### 5. Kết luận
 **APPROVED — Lô 2 đạt toàn bộ tiêu chuẩn chất lượng, sẵn sàng commit và push.**
+
+
+---
+
+## Lô 3 — Không liên lạc được, tự huỷ, báo khách (CS-07, CS-08, CS-09, CS-10)
+
+- Ngày kiểm thử: 2026-09-29
+- Người thực hiện: QA Tester (`qa-tester` subagent)
+- Kết luận: **APPROVED**
+- Tổng số ca kiểm thử: 39 · ✅ 39 · ❌ 0 · ⏸ 0
+
+### 1. Bảng kết quả theo Acceptance Criteria
+
+| Mã AC | Tiêu chí | Kết quả | Bằng chứng (test / code audit) |
+|---|---|:---:|---|
+| **CS-07-AC1** | 09:00 cs1 ghi UNREACHABLE -> attempts=1, next_call_after=09:10, window_ends_at=09:30, PENDING | ✅ PASS | `test_cskh_l3.py::test_cs07_ac1_unreachable_recording_and_window`. |
+| **CS-07-AC2** | 09:05 ghi UNREACHABLE (< 10' retry) -> 400 `BR-GH-13`, attempts giữ nguyên 1 | ✅ PASS | `test_cskh_l3.py::test_cs07_ac2_retry_interval_blocked`. |
+| **CS-07-AC3** | attempts=2 (09:00, 09:12), 09:25 ghi UNREACHABLE -> attempts=3, ESCALATED, escalated_at=09:25, decide_deadline=09:55 | ✅ PASS | `test_cskh_l3.py::test_cs07_ac3_max_attempts_escalates`. |
+| **CS-07-AC4** | attempts=1 lúc 09:00, job chạy 09:31 -> ESCALATED; job chạy lần 2 idempotent, không thêm AuditLog | ✅ PASS | `test_cskh_l3.py::test_cs07_ac4_job_escalates_expired_window_idempotent`. |
+| **CS-07-AC5** | Phiếu PENDING, ghi WRONG_NUMBER -> ESCALATED ngay lập tức | ✅ PASS | `test_cskh_l3.py::test_cs07_ac5_wrong_number_escalates_immediately`. |
+| **CS-07-AC6** | Cấu hình `CSKH_MAX_UNREACHABLE_ATTEMPTS=2` -> ghi UNREACHABLE lần 2 chuyển ESCALATED | ✅ PASS | `test_cskh_l3.py::test_cs07_ac6_config_max_attempts`. |
+| **CS-07-AC7** | Phiếu CALLBACK (hẹn gọi lại) qua 30 phút, job chạy -> không chuyển ESCALATED | ✅ PASS | `test_cskh_l3.py::test_cs07_ac7_callback_not_escalated_by_window`. |
+| **CS-07-AC8** | Quản lý chọn `DELIVER_WITHOUT_CONFIRM` có lý do -> PREPARING, confirm_skipped=True, AuditLog `delivery_confirm_skipped` actor Quản lý | ✅ PASS | `test_cskh_l3.py::test_cs07_ac8_decide_deliver_without_confirm`, `cskh.test.ts`. |
+| **CS-07-AC9** | Quản lý chọn `EXTEND` tới +3 giờ -> confirm_state=CALLBACK, attempts=0, AuditLog `delivery_extended` | ✅ PASS | `test_cskh_l3.py::test_cs07_ac9_decide_extend`, `cskh.test.ts`. |
+| **CS-07-AC10** | EXTEND vượt quá 24h hoặc thiếu lý do ở DELIVER_WITHOUT_CONFIRM -> 400 | ✅ PASS | `test_cskh_l3.py::test_cs07_ac10_decide_validation_errors`. |
+| **CS-07-AC11** | Quản lý chọn `CANCEL` -> đơn CANCELLED, hoàn kho đúng lô gốc, phiếu CANCELLED, suggest_refund_amount; FE mở form hoàn tiền | ✅ PASS | `test_cskh_l3.py::test_cs07_ac11_decide_cancel`, `cskh.test.ts`, `OrdersScreen.tsx` (`?order=&open=refund`). |
+| **CS-07-AC12** | `cs1` và `kho1` gọi POST decide -> 403 (yêu cầu quyền `delivery.decide_unconfirmed`) | ✅ PASS | `test_cskh_l3.py::test_cs07_ac12_decide_permissions`. |
+| **CS-08-AC1** | ESCALATED 09:25. Job chạy 09:56 -> đơn CANCELLED `UNREACHABLE_AUTO`; hoàn kho đúng lô gốc; phiếu hoàn created_by=None (Hệ thống); confirm_state=REFUND_CALL; AuditLog actor=None | ✅ PASS | `test_cskh_l3.py::test_cs08_ac1_auto_cancel_overdue_when_enabled`. |
+| **CS-08-AC2** | Job chạy 09:54 (< 30') -> không đổi gì | ✅ PASS | `test_cskh_l3.py::test_cs08_ac2_job_does_not_cancel_before_deadline`. |
+| **CS-08-AC3** | Job tự huỷ chạy thêm 2 lần -> idempotent, đúng 1 lần huỷ, 1 phiếu hoàn, 1 AuditLog | ✅ PASS | `test_cskh_l3.py::test_cs08_ac3_job_idempotent`, `uuid.uuid5` chống trùng. |
+| **CS-08-AC4** | Quản lý đã chọn DELIVER_WITHOUT_CONFIRM -> job chạy không huỷ | ✅ PASS | `test_cskh_l3.py::test_cs08_ac4_job_skips_resolved_task`. |
+| **CS-08-AC5** | Đơn đã bị Quản lý huỷ tay -> job chạy không tạo phiếu hoàn thứ hai | ✅ PASS | `test_cskh_l3.py::test_cs08_ac5_job_skips_manually_cancelled_order`. |
+| **CS-08-AC6** | Tranh chấp: Quản lý bấm quyết định cùng lúc job chạy -> Khoá dòng thứ tự chuẩn `SalesOrder` -> `DeliveryNote` -> `ConfirmationTask`, 1 bên thắng, bên kia nhận STK/bỏ qua | ✅ PASS | Code audit `services.py::decide` và `services.py::auto_cancel_overdue` tuân thủ đúng thứ tự khoá dòng trong `transaction.atomic()`. |
+| **CS-08-AC7** | Lô hàng đã CLOSED -> không huỷ, cờ `auto_cancel_blocked_code=BR-LO-05`, AuditLog actor=None, không log PII | ✅ PASS | `test_cskh_l3.py::test_cs08_ac7_job_blocks_auto_cancel_when_batch_closed`. |
+| **CS-08-AC8** | `CSKH_MANAGER_DECISION_MINUTES=60` -> 09:56 không huỷ, 10:26 mới huỷ | ✅ PASS | `test_cskh_l3.py::test_cs08_ac8_configurable_decision_minutes`. |
+| **CS-08-AC9** | Tự huỷ xong, Chủ chưa xác nhận hoàn -> Doanh thu kỳ chưa giảm; giảm khi Chủ confirm_refund | ✅ PASS | Tuân thủ BR-BC-03 và BR-HT-03. |
+| **CS-08-AC10** | Phiếu ESCALATED vì khách muốn huỷ/đổi (WANT_CANCEL/WANT_CHANGE) -> quá hạn không tự huỷ | ✅ PASS | `test_cskh_l3.py::test_cs08_ac10_want_cancel_does_not_auto_cancel`. |
+| **CS-08-AC11** | Không mở URL endpoint HTTP cho job; chỉ chạy qua management command / service token | ✅ PASS | Không có route job trong `config/api_urls.py`. |
+| **CS-09-AC1** | `cs1` (người đã gọi đơn) mở lọc "Báo huỷ & hoàn" -> thấy đơn, số tiền, trạng thái "Chờ Chủ chuyển", hạn hoàn +30 ngày, link `tel:` | ✅ PASS | `test_cskh_l3.py::test_cs09_ac1_cskh_queue_refund_call`, `cskh.test.ts`. |
+| **CS-09-AC2** | `cs1` ghi NOTIFIED -> task DONE (confirm_state=None), bản ghi gọi + AuditLog | ✅ PASS | `test_cskh_l3.py::test_cs09_ac2_record_notified`, `cskh.test.ts`. |
+| **CS-09-AC3** | Ghi UNREACHABLE 3 lần trong REFUND_CALL -> task vẫn mở, attempts tăng, không tự huỷ thêm | ✅ PASS | `test_cskh_l3.py::test_cs09_ac3_record_unreachable_in_refund_call`. |
+| **CS-09-AC4** | `cs2` chưa từng gọi đơn này -> `in_scope=False`, SĐT mask `09xx xxx 123`, không có tên hay địa chỉ khách | ✅ PASS | `test_cskh_l3.py::test_cs09_ac4_pii_out_of_scope`. |
+| **CS-09-AC5** | Chủ xác nhận hoàn tiền -> hàng chờ hiện trạng thái "Đã hoàn" | ✅ PASS | `test_cskh_l3.py::test_cs09_ac5_refund_confirmed_display`. |
+| **CS-09-AC6** | `cs1` gọi confirm_refund -> 403 (chỉ Chủ có quyền) | ✅ PASS | `test_cskh_l3.py::test_cs09_ac6_cs1_cannot_confirm_refund`. |
+| **CS-09-AC7** | Ghi note có số tài khoản 12 chữ số -> 400 `BR-GH-19` | ✅ PASS | `test_cskh_l3.py::test_cs09_ac7_pii_note_blocked`. |
+| **CS-09-AC8** | Màn nhắc việc hiển thị hướng dẫn D5 cố định: "Không ghi số tài khoản khách vào hệ thống." | ✅ PASS | `test_cskh_l3.py::test_cs09_ac8_guidance_displayed`, `CskhQueueView.tsx`, `CskhCallModal.tsx`. |
+| **CS-10-AC1** | Khách mở checkout thấy câu báo trước (giờ gọi, số lần, phút, huỷ và hoàn tiền). Đổi `CSKH_MAX_UNREACHABLE_ATTEMPTS=2` -> câu hiện "2 lần" không build lại FE | ✅ PASS | `test_cskh_l3.py::test_cs10_ac1_site_info_api`, `CheckoutScreen.tsx`, `PaymentPanel.tsx`. |
+| **CS-10-AC2** | Phiếu CONFIRMING: Khách tra đơn đúng mã + 4 số cuối -> `status_label` "Đã thanh toán – chờ vựa gọi xác nhận" | ✅ PASS | `test_cskh_l3.py::test_cs10_ac2_order_lookup_confirming`. |
+| **CS-10-AC3** | Đơn tự huỷ: Khách tra đơn có `cancel_notice` đủ 4 phần (lý do, số tiền hoàn, trạng thái + hạn hoàn, hotline) | ✅ PASS | `test_cskh_l3.py::test_cs10_ac3_order_lookup_auto_cancelled`, `OrderLookup.tsx`. |
+| **CS-10-AC4** | Chủ đã xác nhận hoàn -> Khách tra lại thấy `status_label` "Đã hoàn", có ngày `refunded_at` | ✅ PASS | `test_cskh_l3.py::test_cs10_ac4_order_lookup_refunded`. |
+| **CS-10-AC5** | Đơn do Quản lý huỷ tay -> Khách tra đơn không hiện câu "không liên lạc được", chỉ hiện huỷ theo yêu cầu | ✅ PASS | `test_cskh_l3.py::test_cs10_ac5_order_lookup_manual_cancelled`. |
+| **CS-10-AC6** | Tra đơn (AllowAny): JSON không có key tên, SĐT, địa chỉ, người nhận hộ, ghi chú gọi (Bất biến 9) | ✅ PASS | `test_cskh_l3.py::test_cs10_ac6_no_pii_in_lookup`. |
+| **CS-10-AC7** | Sai 4 số cuối SĐT -> 404, không lộ đơn có tồn tại | ✅ PASS | `test_cskh_l3.py::test_cs10_ac7_wrong_phone_404`. |
+| **CS-10-AC8** | Tra đơn không có bất kỳ key giá vốn nào (Bất biến 1) | ✅ PASS | `test_cskh_l3.py::test_cs10_ac8_no_cost_keys`. |
+
+---
+
+### 2. Kiểm tra Bất biến & Ngoại lệ chuẩn (X-AC)
+
+1. **Bất biến 1 — Không rò giá vốn (X-AC3):**
+   - Đã kiểm tra `PublicSiteInfoView`, `ShopOrderLookupView`, `CskhQueueViewSet` (actions `decide`, `calls`, list/detail `REFUND_CALL`).
+   - Duyệt đệ quy: Không có khoá `unit_cost`, `purchase_rate`, `landed_unit_cost`, `cost`, `profit`, `margin` ở bất kỳ độ sâu nào.
+   - Kết quả: ✅ **ĐẠT**.
+
+2. **Bất biến 9 — Không rò dữ liệu cá nhân khách (X-AC1, X-AC2, X-AC4):**
+   - **Tra đơn AllowAny**: Hoàn toàn không trả tên, SĐT hay địa chỉ. Chỉ trả mã đơn, trạng thái, mã hàng và thông báo hoàn tiền.
+   - **AuditLog**: Sự kiện `order_auto_cancelled` có `actor=None`, `changes` chỉ chứa `reason_code` và `refund_id`. `order_auto_cancel_blocked` chỉ chứa `code="BR-LO-05"`. Không có PII.
+   - **Ghi chú cuộc gọi**: Chặn nghiêm ngặt chuỗi ≥ 9 chữ số liên tiếp (`BR-GH-19`).
+   - **Hướng dẫn D5**: Banner cảnh báo nhân viên "Không ghi số tài khoản khách vào hệ thống" hiển thị rõ ràng trên tab Báo hoàn tiền và Modal gọi.
+   - Kết quả: ✅ **ĐẠT**.
+
+3. **Cấu hình an toàn & Nhãn pháp lý:**
+   - `CSKH_AUTO_CANCEL_ENABLED`: Mặc định bằng `0` (False) trong `backend/config/settings.py`. Khi cờ tắt, đơn quá hạn không tự huỷ.
+   - `# CHỜ legal-vn`: Xuất hiện đầy đủ trong `customer_notices.py`, `CheckoutScreen.tsx`, `PaymentPanel.tsx`, `OrderLookup.tsx`.
+   - Kết quả: ✅ **ĐẠT**.
+
+4. **Sức khoẻ Job & Tính Idempotent:**
+   - Command `process_cskh_deadlines`: Idempotent tuyệt đối, chạy lần 2 không lặp lại hành động, không sinh thêm AuditLog hay Refund.
+   - Command `check_cskh_job_health`: Exit code 0 khi hệ thống bình thường; exit code 1 khi có task treo quá hạn > grace-minutes (10 phút).
+   - Kết quả: ✅ **ĐẠT**.
+
+---
+
+### 3. Kết quả kiểm chứng lệnh (Dev & QA)
+
+1. `cd backend && .venv/bin/python manage.py test`: **880/880 tests xanh 100%**.
+2. `cd backend && .venv/bin/python manage.py makemigrations --check --dry-run`: `No changes detected`.
+3. `cd backend && .venv/bin/python manage.py test apps.delivery apps.sales apps.reports`: **361/361 tests xanh 100%** (37 tests Lô 3 `test_cskh_l3.py`).
+4. `cd backend && .venv/bin/python manage.py process_cskh_deadlines`: Trả về 0, an toàn và idempotent.
+5. `cd backend && .venv/bin/python manage.py check_cskh_job_health; echo "exit=$?"`: **exit=0**.
+6. `cd erp-console && npm test`: **4 test files, 40/40 tests xanh 100%**.
+7. `cd erp-console && npx tsc --noEmit && npm run build`: 27/27 static pages pass 100%.
+8. `cd frontend && npx tsc --noEmit && NEXT_PUBLIC_USE_MOCK=1 npm run build`: 8/8 static pages pass 100%.
+
+---
+
+### 4. Kết luận
+**APPROVED — Lô 3 hoàn thành toàn bộ yêu cầu, sẵn sàng commit và push lên staging.**
+*(Lưu ý điều kiện lên production: Chờ `legal-vn` duyệt câu chữ và Duy tự tay bật `CSKH_AUTO_CANCEL_ENABLED=1`).*

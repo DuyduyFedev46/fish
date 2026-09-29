@@ -3,14 +3,14 @@
 // Màn checkout: giỏ hàng + form giao hàng → đặt đơn → thanh toán (P4). Tách khỏi
 // app/shop/checkout/page.tsx theo cấu trúc module tính năng (features/checkout).
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useSearchParams } from "next/navigation";
 import { useCart } from "../../../components/CartContext";
-import { createOrder, USE_MOCK } from "../../../lib/api";
+import { createOrder, getSiteInfo, USE_MOCK } from "../../../lib/api";
 import { formatVnd } from "../../../lib/format";
-import type { CreateOrderResponse } from "../../../lib/types";
+import type { CreateOrderResponse, SiteInfo } from "../../../lib/types";
 import PaymentPanel from "./PaymentPanel";
 import { rememberOrderContact } from "../storage";
 
@@ -33,6 +33,13 @@ export default function CheckoutScreen() {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [order, setOrder] = useState<CreateOrderResponse | null>(null);
   const [orderPhone, setOrderPhone] = useState("");
+  const [siteInfo, setSiteInfo] = useState<SiteInfo | null>(null);
+
+  useEffect(() => {
+    getSiteInfo()
+      .then(setSiteInfo)
+      .catch(() => {});
+  }, []);
 
   // Trang "cổng SePay" giả lập chỉ tồn tại ở chế độ mock (xem lib/mock.ts,
   // mockStartCheckoutSession) — build thật (USE_MOCK=false) loại hẳn nhánh này.
@@ -177,6 +184,35 @@ export default function CheckoutScreen() {
             />
             {errors.address && <span className="form-error">{errors.address}</span>}
           </div>
+
+          {siteInfo?.cskh_notice?.enabled && (
+            <div
+              className="cskh-notice-box"
+              style={{
+                background: "#f0fdf4",
+                border: "1px solid #bbf7d0",
+                borderRadius: "6px",
+                padding: "10px 14px",
+                marginBottom: "16px",
+                fontSize: "0.8125rem",
+                color: "#166534",
+                lineHeight: "1.45",
+              }}
+            >
+              <strong>Lưu ý xác nhận đơn:</strong> Cá Về sẽ gọi xác nhận trong khung giờ{" "}
+              {siteInfo.cskh_notice.working_hours} (tối đa {siteInfo.cskh_notice.max_attempts} lần trong{" "}
+              {siteInfo.cskh_notice.window_minutes} phút).
+              {siteInfo.cskh_notice.auto_cancel_enabled && (
+                <span>
+                  {" "}
+                  Sau thời gian trên nếu không liên lạc được, đơn hàng có thể bị huỷ và hoàn đủ tiền trong vòng{" "}
+                  {siteInfo.cskh_notice.refund_deadline_days} ngày. Hotline: {siteInfo.cskh_notice.hotline}.
+                </span>
+              )}{" "}
+              {/* # CHỜ legal-vn */}
+            </div>
+          )}
+
           <button type="submit" className="btn btn-primary btn-block" disabled={submitting}>
             {submitting ? "Đang đặt hàng..." : `Đặt hàng — ${formatVnd(totalAmount)}`}
           </button>

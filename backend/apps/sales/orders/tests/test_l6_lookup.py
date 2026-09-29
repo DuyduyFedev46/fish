@@ -83,7 +83,7 @@ class ShopOrderLookupL6Tests(TestCase):
 
         expected_keys = {
             "order_code", "status", "status_label", "total_amount",
-            "lines", "delivery", "booked_expires_at",
+            "lines", "delivery", "booked_expires_at", "cancel_notice",
         }
         self.assertEqual(set(data.keys()), expected_keys)
 

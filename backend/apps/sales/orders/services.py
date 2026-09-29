@@ -297,9 +297,15 @@ CANCEL_REASON_LABELS = {
     "CUSTOMER_CHANGED_MIND": "Khách đổi ý",
     "DAMAGED_WHEN_PACKING": "Hư hỏng khi soạn hàng",
     "GIVE_UP_AFTER_FAILED": "Bỏ giao sau khi thất bại",
+    "UNREACHABLE": "Không liên lạc được khách",
     "OTHER": "Khác",
 }
 CANCEL_REASON_CODES = set(CANCEL_REASON_LABELS)
+
+SYSTEM_CANCEL_REASON_CODES = {
+    "UNREACHABLE_AUTO": "Hệ thống tự huỷ — không liên lạc được",
+}
+ALL_CANCEL_REASON_CODES = set(CANCEL_REASON_LABELS) | set(SYSTEM_CANCEL_REASON_CODES)
 
 # Trạng thái phiếu giao còn giữ hàng TẠI KHO — huỷ ở đây thì hoàn kho được ngay.
 _STOCK_STILL_IN_WAREHOUSE = (

@@ -50,12 +50,14 @@ function Row({ r, onOpen }: { r: RefundQueueItem; onOpen: () => void }) {
           {r.customer_name && <span className={s.qCust}>{r.customer_name}</span>}
         </span>
         <span className={s.rCreated}>
-          {typeof r.created_by === "string" && r.created_by && (
-            <span className={s.sub}>
-              <span className="sr-only">, lập bởi </span>
-              {r.created_by}
-            </span>
-          )}
+          <span className={s.sub}>
+            <span className="sr-only">, lập bởi </span>
+            {r.created_by === null || r.created_by === undefined
+              ? "Hệ thống"
+              : typeof r.created_by === "string"
+              ? r.created_by
+              : `#${r.created_by}`}
+          </span>
           {r.created_at && (
             <span className={`${s.sub} num`}>
               <span className="sr-only">, lúc </span>

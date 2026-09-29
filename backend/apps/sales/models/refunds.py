@@ -58,7 +58,7 @@ class Refund(models.Model):
     failure_reason = models.TextField("Lý do thất bại", blank=True, default="")
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="refunds_created",
-        verbose_name="Người tạo phiếu",
+        verbose_name="Người tạo phiếu", null=True, blank=True,
     )
     confirmed_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, blank=True,

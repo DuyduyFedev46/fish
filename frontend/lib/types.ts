@@ -66,10 +66,38 @@ export type OrderLineStatus = {
   line_total?: number;
 };
 
+export type CskhNoticeConfig = {
+  enabled: boolean;
+  working_hours: string;
+  max_attempts: number;
+  window_minutes: number;
+  decision_minutes: number;
+  auto_cancel_enabled: boolean;
+  refund_deadline_days: number;
+  hotline: string;
+};
+
+export type SiteInfo = {
+  cskh_notice: CskhNoticeConfig;
+};
+
+export type OrderCancelNotice = {
+  reason_code: string | null;
+  message: string;
+  refund: {
+    amount: string;
+    status_label: string;
+    deadline: string;
+    refunded_at: string | null;
+  };
+  contact: string;
+};
+
 export type OrderStatus = {
   order_code: string;
   status: string;
   status_label: string;
+  fulfilment?: string;
   lines: OrderLineStatus[];
   total_amount: number;
   // Suy ra từ `status` ở lib/api.ts (BE trả status thô: BOOKED/PAID/PROCESSING/COMPLETED/
@@ -82,7 +110,9 @@ export type OrderStatus = {
   booked_expires_at?: string;
   delivery?: {
     status: string;
+    status_label?: string;
   };
+  cancel_notice?: OrderCancelNotice | null;
 };
 
 // Một field gửi cổng thanh toán, ĐÚNG THỨ TỰ máy chủ trả (chữ ký HMAC phụ thuộc thứ tự —
@@ -121,12 +151,14 @@ export type WireOrderStatus = {
   order_code: string;
   status: string; // BOOKED | PAID | PROCESSING | COMPLETED | CANCELLED | AUTO_CANCELLED
   status_label: string;
+  fulfilment?: string;
   total_amount: string;
   lines: WireOrderLine[];
-  delivery: { status: string } | null;
+  delivery: { status: string; status_label?: string } | null;
   // BE hôm nay CHƯA trả field này ở tra đơn (chỉ có lúc đặt hàng) — xem OrderStatus ở trên.
   // Mock có trả để luồng đếm ngược chạy đủ.
   booked_expires_at?: string | null;
+  cancel_notice?: OrderCancelNotice | null;
 };
 
 export class ApiError extends Error {

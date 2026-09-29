@@ -93,12 +93,16 @@ export function RefundView({ item: r, refreshing, note, noteRef, actionRef, onAc
           <dt>{REFUND_Q_MSG.reason}</dt>
           <dd>{r.reason || <span className={s.muted}>—</span>}</dd>
         </div>
-        {typeof r.created_by === "string" && r.created_by && (
-          <div className={s.prop}>
-            <dt>{REFUND_Q_MSG.createdByLabel}</dt>
-            <dd>{r.created_by}</dd>
-          </div>
-        )}
+        <div className={s.prop}>
+          <dt>{REFUND_Q_MSG.createdByLabel}</dt>
+          <dd>
+            {r.created_by === null || r.created_by === undefined
+              ? "Hệ thống"
+              : typeof r.created_by === "string"
+              ? r.created_by
+              : `#${r.created_by}`}
+          </dd>
+        </div>
         {r.bank_txn_ref && (
           <div className={s.prop}>
             <dt>Mã GD hoàn</dt>

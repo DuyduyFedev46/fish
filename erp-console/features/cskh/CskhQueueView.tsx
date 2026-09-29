@@ -194,6 +194,13 @@ export function CskhQueueView() {
         </div>
       )}
 
+      {/* CS-09: Guidance D5 banner for REFUND_CALL tab */}
+      {activeTab === "REFUND_CALL" && (
+        <div className={`${s.alertBox} ${s.alertWarn}`}>
+          💡 <strong>Hướng dẫn CSKH:</strong> Không ghi số tài khoản khách vào hệ thống. Chủ sẽ lấy số tài khoản trực tiếp từ khách khi chuyển khoản.
+        </div>
+      )}
+
       {/* Content */}
       {loading ? (
         <div className={s.emptyState}>Đang tải danh sách hàng chờ...</div>
@@ -268,6 +275,16 @@ export function CskhQueueView() {
                   <div className={s.linesSummary}>
                     {item.lines_summary} · <strong>{item.total_kg} kg</strong>
                   </div>
+
+                  {item.refund && (
+                    <div style={{ marginBottom: "10px", padding: "8px 12px", background: "#fefce8", border: "1px solid #fef08a", borderRadius: "6px", fontSize: "0.8125rem", color: "#854d0e" }}>
+                      <div>Số tiền hoàn: <strong style={{ color: "#dc2626" }}>{Number(item.refund.amount).toLocaleString("vi-VN")} đ</strong></div>
+                      <div style={{ fontSize: "0.75rem", color: "#6b7280", marginTop: "2px" }}>
+                        Trạng thái: <strong>{item.refund.status_label || (item.refund.status === "PENDING" ? "Chờ Chủ chuyển" : "Đã hoàn")}</strong>
+                        {item.refund.deadline && <span> · Hạn: {item.refund.deadline}</span>}
+                      </div>
+                    </div>
+                  )}
 
                   <div className={s.cardFooter}>
                     <span>Số lần gọi: <strong>{item.attempts}</strong>/3</span>

@@ -121,10 +121,42 @@ export function OrdersScreen() {
   const now = useNow(!!list.rows?.some((o) => o.status === "BOOKED"), 30_000);
 
   const [openRow, setOpenRow] = useState<OrderListItem | null>(null);
+  const [openMode, setOpenMode] = useState<"view" | "confirm" | "cancel" | "refund">("view");
   const [toast, setToast] = useState<string | null>(null);
   const pendingToast = useRef<string | null>(null);
   const statusId = useId();
   const dateId = useId();
+
+  // Đọc query param ?order=<id>&open=refund (CS-07)
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const sp = new URLSearchParams(window.location.search);
+    const orderIdStr = sp.get("order");
+    const openParam = sp.get("open");
+    if (orderIdStr) {
+      const orderId = parseInt(orderIdStr, 10);
+      if (!Number.isNaN(orderId)) {
+        const found = list.rows?.find((r) => r.id === orderId);
+        const item: OrderListItem = found || {
+          id: orderId,
+          code: `DH-${orderId}`,
+          customer_name: `Đơn ${orderId}`,
+          customer_phone: "",
+          created_at: new Date().toISOString(),
+          total_amount: "0",
+          status: "CANCELLED",
+          status_label: "Đã huỷ",
+          reserved_until: null,
+          delivery_status: null,
+          needs_attention: false,
+        };
+        setOpenRow(item);
+        if (openParam === "refund") {
+          setOpenMode("refund");
+        }
+      }
+    }
+  }, [list.rows]);
 
   const clearFilters = () => {
     setQ("");
@@ -310,12 +342,17 @@ export function OrdersScreen() {
         <OrderDetailSheet
           key={openRow.id}
           summary={openRow}
+          initialMode={openMode}
           onChanged={(change, message) => {
             list.patch(openRow.id, change);
             if (message) pendingToast.current = message;
           }}
           onClose={() => {
             setOpenRow(null);
+            setOpenMode("view");
+            if (typeof window !== "undefined" && window.location.search) {
+              window.history.replaceState({}, "", window.location.pathname);
+            }
             if (pendingToast.current) {
               setToast(pendingToast.current);
               pendingToast.current = null;

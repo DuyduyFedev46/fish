@@ -138,6 +138,59 @@ export default function OrderLookup({
           <p style={{ margin: "0 0 6px", fontWeight: 700 }}>{result.order_code}</p>
           <span className="status-badge">{result.status_label}</span>
 
+          {result.cancel_notice && (
+            <div
+              className="cancel-notice-box"
+              style={{
+                background: "#fef2f2",
+                border: "1px solid #fecaca",
+                borderRadius: "8px",
+                padding: "16px",
+                marginTop: "16px",
+                marginBottom: "16px",
+                color: "#991b1b",
+              }}
+            >
+              <div style={{ fontWeight: 700, fontSize: "1rem", marginBottom: "8px" }}>
+                Thông báo huỷ đơn và hoàn tiền
+              </div>
+              <p style={{ margin: "0 0 12px", lineHeight: "1.5", fontSize: "0.875rem" }}>
+                {result.cancel_notice.message} {/* # CHỜ legal-vn */}
+              </p>
+              <div
+                style={{
+                  background: "#ffffff",
+                  border: "1px solid #fee2e2",
+                  borderRadius: "6px",
+                  padding: "12px",
+                  fontSize: "0.875rem",
+                  color: "#1f2937",
+                }}
+              >
+                <div>
+                  Số tiền hoàn:{" "}
+                  <strong style={{ color: "#dc2626" }}>
+                    {formatVnd(Number(result.cancel_notice.refund.amount))}
+                  </strong>
+                </div>
+                <div style={{ marginTop: "4px" }}>
+                  Trạng thái hoàn: <strong>{result.cancel_notice.refund.status_label}</strong>
+                  {result.cancel_notice.refund.refunded_at ? (
+                    <span>
+                      {" "}
+                      (đã hoàn {new Date(result.cancel_notice.refund.refunded_at).toLocaleDateString("vi-VN")})
+                    </span>
+                  ) : result.cancel_notice.refund.deadline ? (
+                    <span> (hạn hoàn: {result.cancel_notice.refund.deadline})</span>
+                  ) : null}
+                </div>
+                <div style={{ marginTop: "8px", fontSize: "0.8125rem", color: "#6b7280" }}>
+                  Cần hỗ trợ? Vui lòng liên hệ hotline: <strong>{result.cancel_notice.contact}</strong>
+                </div>
+              </div>
+            </div>
+          )}
+
           <OrderPaymentPanel
             order={result}
             paymentReturn={paymentReturn}

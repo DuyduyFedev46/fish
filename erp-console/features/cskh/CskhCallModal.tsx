@@ -1,15 +1,18 @@
 "use client";
 
 import React, { useState, useEffect, useId } from "react";
+import { useRouter } from "next/navigation";
 import {
   claimCskhTask,
   fetchCskhDetail,
   recordCskhCall,
   unconfirmDelivery,
   changeRecipient,
+  decideCskh,
 } from "./api";
 import type {
   CallResult,
+  CskhDecision,
   CskhQueueDetail,
   CskhQueueItem,
   RecordCallPayload,
@@ -25,6 +28,7 @@ type Props = {
 };
 
 export function CskhCallModal({ noteId, initialItem, onClose, onUpdated }: Props) {
+  const router = useRouter();
   const [detail, setDetail] = useState<CskhQueueDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -36,6 +40,14 @@ export function CskhCallModal({ noteId, initialItem, onClose, onUpdated }: Props
   const [selectedResult, setSelectedResult] = useState<CallResult | null>(null);
   const [callNote, setCallNote] = useState("");
   const [callbackTime, setCallbackTime] = useState("");
+
+  // Manager Decision state (for ESCALATED)
+  const [decisionType, setDecisionType] = useState<CskhDecision>("DELIVER_WITHOUT_CONFIRM");
+  const [deliverReason, setDeliverReason] = useState("");
+  const [extendUntil, setExtendUntil] = useState("");
+  const [extendReason, setExtendReason] = useState("");
+  const [cancelReasonCode, setCancelReasonCode] = useState<"UNREACHABLE" | "CUSTOMER_CHANGED_MIND" | "OTHER">("UNREACHABLE");
+  const [cancelNote, setCancelNote] = useState("");
 
   // Subform toggles
   const [showChangeRecipient, setShowChangeRecipient] = useState(false);
@@ -176,6 +188,61 @@ export function CskhCallModal({ noteId, initialItem, onClose, onUpdated }: Props
       const msg = err instanceof Error ? err.message : "Không thể huỷ xác nhận.";
       setError(msg);
     } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleManagerDecisionSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitting(true);
+    setError(null);
+
+    try {
+      if (decisionType === "DELIVER_WITHOUT_CONFIRM") {
+        if (!deliverReason.trim()) {
+          setError("Vui lòng nhập lý do giao không xác nhận.");
+          setSubmitting(false);
+          return;
+        }
+        await decideCskh(noteId, {
+          decision: "DELIVER_WITHOUT_CONFIRM",
+          reason: deliverReason.trim(),
+        });
+        onUpdated();
+        onClose();
+      } else if (decisionType === "EXTEND") {
+        if (!extendUntil) {
+          setError("Vui lòng chọn thời gian gia hạn.");
+          setSubmitting(false);
+          return;
+        }
+        if (!extendReason.trim()) {
+          setError("Vui lòng nhập lý do gia hạn.");
+          setSubmitting(false);
+          return;
+        }
+        await decideCskh(noteId, {
+          decision: "EXTEND",
+          until: new Date(extendUntil).toISOString(),
+          reason: extendReason.trim(),
+        });
+        onUpdated();
+        onClose();
+      } else if (decisionType === "CANCEL") {
+        const res = await decideCskh(noteId, {
+          decision: "CANCEL",
+          reason_code: cancelReasonCode,
+          note: cancelNote.trim(),
+        });
+        onUpdated();
+        onClose();
+        if (res.order_id) {
+          router.push(`/orders/?order=${res.order_id}&open=refund`);
+        }
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Không thể thực hiện quyết định Quản lý.";
+      setError(msg);
       setSubmitting(false);
     }
   };
@@ -371,6 +438,174 @@ export function CskhCallModal({ noteId, initialItem, onClose, onUpdated }: Props
                 </form>
               )}
 
+              {/* CS-09: Guidance D5 & Refund Info for REFUND_CALL */}
+              {item.confirm_state === "REFUND_CALL" && (
+                <>
+                  <div className={`${s.alertBox} ${s.alertWarn}`}>
+                    💡 <strong>Hướng dẫn CSKH:</strong> {item.guidance || "Không ghi số tài khoản khách vào hệ thống. Chủ sẽ lấy số tài khoản trực tiếp từ khách khi chuyển khoản."}
+                  </div>
+
+                  {item.refund && (
+                    <div className={s.subformSection} style={{ background: "#fefce8", borderColor: "#fef08a" }}>
+                      <div style={{ fontWeight: 600, fontSize: "0.875rem", color: "#854d0e" }}>
+                        Thông tin hoàn tiền cho khách
+                      </div>
+                      <div style={{ fontSize: "0.9375rem", color: "#1f2937" }}>
+                        Số tiền cần hoàn: <strong style={{ color: "#dc2626" }}>{Number(item.refund.amount).toLocaleString("vi-VN")} đ</strong>
+                      </div>
+                      <div style={{ fontSize: "0.8125rem", color: "#4b5563" }}>
+                        Trạng thái: <strong>{item.refund.status_label || (item.refund.status === "PENDING" ? "Chờ Chủ chuyển" : "Đã hoàn")}</strong>
+                        {item.refund.deadline && <span> · Hạn hoàn: {item.refund.deadline}</span>}
+                        {item.cancelled_at && <span> · Huỷ lúc: {item.cancelled_at.slice(11, 16)}</span>}
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* CS-07: Manager Decision Block for ESCALATED */}
+              {item.confirm_state === "ESCALATED" && (
+                <div className={s.subformSection} style={{ background: "#fff1f2", borderColor: "#fecdd3" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <div style={{ fontWeight: 700, fontSize: "0.9375rem", color: "#9f1239" }}>
+                      🚨 Cần Quản lý quyết định xử lý
+                    </div>
+                    {item.decide_deadline && (
+                      <span style={{ fontSize: "0.75rem", color: "#be123c", fontWeight: 600 }}>
+                        Hạn quyết định: {item.decide_deadline.slice(11, 16)}
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ fontSize: "0.8125rem", color: "#4c0519" }}>
+                    Đơn hàng đã gọi {item.attempts} lần không liên lạc được hoặc thông tin liên lạc sai.
+                  </div>
+
+                  {/* Decision Selector */}
+                  <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginTop: "4px" }}>
+                    <button
+                      type="button"
+                      className={`${s.btnSecondary} ${decisionType === "DELIVER_WITHOUT_CONFIRM" ? s.tabActive : ""}`}
+                      onClick={() => setDecisionType("DELIVER_WITHOUT_CONFIRM")}
+                      style={{ fontSize: "0.8125rem", padding: "6px 12px", minHeight: "36px" }}
+                    >
+                      Giao không xác nhận
+                    </button>
+                    <button
+                      type="button"
+                      className={`${s.btnSecondary} ${decisionType === "EXTEND" ? s.tabActive : ""}`}
+                      onClick={() => setDecisionType("EXTEND")}
+                      style={{ fontSize: "0.8125rem", padding: "6px 12px", minHeight: "36px" }}
+                    >
+                      Gia hạn thêm
+                    </button>
+                    <button
+                      type="button"
+                      className={`${s.btnSecondary} ${decisionType === "CANCEL" ? s.tabActive : ""}`}
+                      onClick={() => setDecisionType("CANCEL")}
+                      style={{ fontSize: "0.8125rem", padding: "6px 12px", minHeight: "36px", color: "#dc2626" }}
+                    >
+                      Huỷ đơn
+                    </button>
+                  </div>
+
+                  {/* Form for chosen decision */}
+                  <form onSubmit={handleManagerDecisionSubmit} style={{ display: "flex", flexDirection: "column", gap: "8px", marginTop: "6px" }}>
+                    {decisionType === "DELIVER_WITHOUT_CONFIRM" && (
+                      <div>
+                        <label style={{ fontSize: "0.8125rem", color: "#4b5563" }}>
+                          Lý do giao không xác nhận (bắt buộc):
+                        </label>
+                        <input
+                          type="text"
+                          className={s.searchInput}
+                          value={deliverReason}
+                          onChange={(e) => setDeliverReason(e.target.value)}
+                          placeholder="VD: Khách quen, địa chỉ đã giao nhiều lần..."
+                          required
+                        />
+                      </div>
+                    )}
+
+                    {decisionType === "EXTEND" && (
+                      <>
+                        <div>
+                          <label style={{ fontSize: "0.8125rem", color: "#4b5563" }}>
+                            Gia hạn gọi lại tới (tối đa 24 giờ):
+                          </label>
+                          <input
+                            type="datetime-local"
+                            className={s.searchInput}
+                            value={extendUntil}
+                            onChange={(e) => setExtendUntil(e.target.value)}
+                            required
+                          />
+                        </div>
+                        <div>
+                          <label style={{ fontSize: "0.8125rem", color: "#4b5563" }}>
+                            Lý do gia hạn:
+                          </label>
+                          <input
+                            type="text"
+                            className={s.searchInput}
+                            value={extendReason}
+                            onChange={(e) => setExtendReason(e.target.value)}
+                            placeholder="VD: Khách nhắn đang họp, gia hạn đến chiều..."
+                            required
+                          />
+                        </div>
+                      </>
+                    )}
+
+                    {decisionType === "CANCEL" && (
+                      <>
+                        <div>
+                          <label style={{ fontSize: "0.8125rem", color: "#4b5563" }}>
+                            Lý do huỷ đơn:
+                          </label>
+                          <select
+                            className={s.searchInput}
+                            value={cancelReasonCode}
+                            onChange={(e) => setCancelReasonCode(e.target.value as any)}
+                          >
+                            <option value="UNREACHABLE">Không liên lạc được khách</option>
+                            <option value="CUSTOMER_CHANGED_MIND">Khách đổi ý muốn huỷ</option>
+                            <option value="OTHER">Lý do khác</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label style={{ fontSize: "0.8125rem", color: "#4b5563" }}>
+                            Ghi chú thêm:
+                          </label>
+                          <input
+                            type="text"
+                            className={s.searchInput}
+                            value={cancelNote}
+                            onChange={(e) => setCancelNote(e.target.value)}
+                            placeholder="Chi tiết bổ sung (không bắt buộc)..."
+                          />
+                        </div>
+                      </>
+                    )}
+
+                    <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "4px" }}>
+                      <button
+                        type="submit"
+                        className={decisionType === "CANCEL" ? s.btnDanger : s.btnPrimary}
+                        disabled={submitting}
+                      >
+                        {submitting
+                          ? "Đang lưu..."
+                          : decisionType === "CANCEL"
+                          ? "Huỷ đơn và lập phiếu hoàn"
+                          : decisionType === "EXTEND"
+                          ? "Lưu gia hạn"
+                          : "Xác nhận chuyển soạn hàng"}
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              )}
+
               {/* Call History */}
               <div>
                 <div className={s.sectionTitle}>
@@ -461,32 +696,57 @@ export function CskhCallModal({ noteId, initialItem, onClose, onUpdated }: Props
               <div>
                 <div className={s.sectionTitle}>Chọn kết quả cuộc gọi</div>
                 <div className={s.resultsGrid}>
-                  {CALL_RESULT_OPTIONS.map((opt) => {
-                    const isConfirmed = opt.value === "CONFIRMED";
-                    const isCallback = opt.value === "CALLBACK";
-                    const isUnreachable = opt.value === "UNREACHABLE";
-
-                    return (
+                  {item.confirm_state === "REFUND_CALL" ? (
+                    // CS-09: REFUND_CALL only shows NOTIFIED & UNREACHABLE
+                    <>
                       <button
-                        key={opt.value}
                         type="button"
-                        className={`${s.resultBtn} ${
-                          isConfirmed
-                            ? s.resultBtnConfirmed
-                            : isCallback
-                            ? s.resultBtnCallback
-                            : isUnreachable
-                            ? s.resultBtnUnreachable
-                            : ""
-                        } ${isLockedByOther ? s.resultBtnDisabled : ""}`}
-                        onClick={() => handleRecordCall(opt.value)}
+                        className={`${s.resultBtn} ${s.resultBtnConfirmed} ${isLockedByOther ? s.resultBtnDisabled : ""}`}
+                        onClick={() => handleRecordCall("NOTIFIED")}
                         disabled={submitting || isLockedByOther || hasForbiddenPii}
                       >
-                        <div>{opt.label}</div>
-                        <div className={s.resultBtnSub}>{opt.hint}</div>
+                        <div>Đã báo hoàn tiền</div>
+                        <div className={s.resultBtnSub}>Đã báo khách lý do huỷ và số tiền hoàn</div>
                       </button>
-                    );
-                  })}
+                      <button
+                        type="button"
+                        className={`${s.resultBtn} ${s.resultBtnUnreachable} ${isLockedByOther ? s.resultBtnDisabled : ""}`}
+                        onClick={() => handleRecordCall("UNREACHABLE")}
+                        disabled={submitting || isLockedByOther || hasForbiddenPii}
+                      >
+                        <div>Chưa liên lạc được</div>
+                        <div className={s.resultBtnSub}>Không nghe máy, bận, thuê bao...</div>
+                      </button>
+                    </>
+                  ) : (
+                    // Standard call result options (CONFIRMED, CALLBACK, UNREACHABLE, etc.)
+                    CALL_RESULT_OPTIONS.filter((opt) => opt.value !== "NOTIFIED").map((opt) => {
+                      const isConfirmed = opt.value === "CONFIRMED";
+                      const isCallback = opt.value === "CALLBACK";
+                      const isUnreachable = opt.value === "UNREACHABLE";
+
+                      return (
+                        <button
+                          key={opt.value}
+                          type="button"
+                          className={`${s.resultBtn} ${
+                            isConfirmed
+                              ? s.resultBtnConfirmed
+                              : isCallback
+                              ? s.resultBtnCallback
+                              : isUnreachable
+                              ? s.resultBtnUnreachable
+                              : ""
+                          } ${isLockedByOther ? s.resultBtnDisabled : ""}`}
+                          onClick={() => handleRecordCall(opt.value)}
+                          disabled={submitting || isLockedByOther || hasForbiddenPii}
+                        >
+                          <div>{opt.label}</div>
+                          <div className={s.resultBtnSub}>{opt.hint}</div>
+                        </button>
+                      );
+                    })
+                  )}
                 </div>
               </div>
             </>

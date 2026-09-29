@@ -45,6 +45,7 @@ class CskhQueueViewSet(NoStoreMixin, viewsets.GenericViewSet):
     lookup_field = "note_id"
     pagination_class = CskhQueuePagination
     permission_classes = [IsAuthenticated]
+    required_perms: tuple = ()
 
     def get_queryset(self):
         return ConfirmationTask.objects.select_related(
@@ -261,6 +262,49 @@ class CskhQueueViewSet(NoStoreMixin, viewsets.GenericViewSet):
             recipient_phone=recipient_phone,
         )
         return Response({"changed": res["changed"]}, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=["post"], url_path="decide")
+    def decide(self, request, *args, **kwargs):
+        """
+        Quản lý quyết định cho đơn ESCALATED (CS-07, 02b §4.4).
+        Quyền: delivery.decide_unconfirmed.
+        """
+        if not request.user.has_perm("delivery.decide_unconfirmed"):
+            raise PermissionDenied("Bạn không có quyền quyết định đơn không xác nhận.")
+
+        task = self.get_object()
+        now = timezone.now()
+        if not note_in_cskh_scope(request.user, task.note, now=now):
+            raise Http404("Không tìm thấy mục chờ gọi trong phạm vi của bạn.")
+
+        data = request.data or {}
+        decision = data.get("decision")
+        if not decision:
+            raise BusinessError("Quyết định bắt buộc.", code="INVALID_INPUT")
+
+        reason = data.get("reason", "")
+        reason_code = data.get("reason_code", "")
+        note = data.get("note", "")
+        raw_until = data.get("until")
+
+        until = None
+        if raw_until:
+            try:
+                until = datetime.fromisoformat(str(raw_until).replace("Z", "+00:00"))
+            except (ValueError, TypeError):
+                raise BusinessError("Giờ gia hạn không đúng định dạng ISO.", code="INVALID_INPUT")
+
+        res = cskh_services.decide(
+            task.pk,
+            request.user,
+            decision=decision,
+            reason=reason,
+            until=until,
+            reason_code=reason_code,
+            note=note,
+            now=now,
+        )
+        return Response(res, status=status.HTTP_200_OK)
 
 
 class CskhSearchView(NoStoreMixin, APIView):

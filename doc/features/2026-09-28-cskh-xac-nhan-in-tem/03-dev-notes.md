@@ -154,3 +154,115 @@
 - `cd frontend && npx tsc --noEmit && npm run build`: 8/8 static pages pass 100%.
 - Quét cấm storage, useDraft, console: `grep -rn "localStorage\|sessionStorage\|useDraft\|console\." erp-console/features/cskh erp-console/features/deliveries erp-console/app/print` -> **Rỗng 100%**.
 - Quét cấm AI import: `grep -rn "features/ai" erp-console/features/cskh erp-console/features/deliveries erp-console/app/print` -> **Rỗng 100%**.
+
+---
+
+## Lô 3 — Không liên lạc được, tự huỷ, báo khách (CS-07, CS-08, CS-09, CS-10)
+- Trạng thái: DEV HOÀN TẤT — CHỜ QA
+- Phạm vi story:
+  - CS-07: Không liên lạc được: 3 lần trong 30 phút rồi chuyển Quản lý quyết định (giao luôn / gia hạn / huỷ).
+  - CS-08: Hệ thống tự huỷ khi Quản lý không xử lý trong 30 phút (`CSKH_AUTO_CANCEL_ENABLED` mặc định 0, bật trên staging/test). Phiếu hoàn `created_by=None` (Hệ thống). Chặn `BR-LO-05` khi lô đã `CLOSED`.
+  - CS-09: Nhắc việc gọi khách báo huỷ và hoàn tiền (`REFUND_CALL`), hướng dẫn D5 không ghi STK vào hệ thống.
+  - CS-10: Shop báo trước luật gọi xác nhận và báo lý do, số tiền hoàn khi đơn bị tự huỷ (`cancel_notice`, `# CHỜ legal-vn`).
+
+### 1. Sửa test cũ có chủ đích (02b §4.4):
+- `backend/apps/sales/orders/tests/test_l6_lookup.py`:
+  - `test_s02_ac3_khong_ro_khoa_nhay_cam`: API tra đơn trước đây có đúng 7 khoá, nay bổ sung khoá thứ 8 là `cancel_notice` (chứa lý do huỷ và thông tin hoàn tiền khi đơn CANCELLED, null khi đơn đang xử lý). Test được cập nhật chấp nhận đúng 8 khoá theo thiết kế §4.4.
+
+### 2. Backend đã làm:
+- `backend/apps/sales/models/refunds.py`:
+  - `Refund.created_by`: đổi thành `null=True, blank=True` để cho phép Hệ thống tự lập phiếu hoàn tiền (CS-08).
+- `backend/apps/sales/migrations/0007_alter_refund_created_by.py`:
+  - Migration nới lỏng ràng buộc `created_by` của `Refund`.
+- `backend/config/settings.py`:
+  - Thêm `CSKH_NOTICE_ENABLED = _bool("CSKH_NOTICE_ENABLED", "1")`.
+  - Thêm `CSKH_AUTO_CANCEL_ENABLED = _bool("CSKH_AUTO_CANCEL_ENABLED", "0")` (mặc định tắt theo yêu cầu an toàn).
+  - Thêm `CSKH_MANAGER_DECISION_MINUTES = int(os.environ.get("CSKH_MANAGER_DECISION_MINUTES", "30"))`.
+  - Thêm `CSKH_EXTEND_MAX_HOURS = int(os.environ.get("CSKH_EXTEND_MAX_HOURS", "24"))`.
+  - Thêm `REFUND_DEADLINE_DAYS = int(os.environ.get("REFUND_DEADLINE_DAYS", "30"))`.
+  - Thêm `SHOP_WORKING_HOURS = os.environ.get("SHOP_WORKING_HOURS", "07:00-21:00")`.
+- `backend/apps/sales/orders/services.py`:
+  - Thêm `"UNREACHABLE": "Không liên lạc được khách"` vào `CANCEL_REASON_LABELS`.
+  - Thêm `SYSTEM_CANCEL_REASON_CODES = {"UNREACHABLE_AUTO": "Hệ thống tự huỷ — không liên lạc được"}`.
+  - Cập nhật `ALL_CANCEL_REASON_CODES` kết hợp cả 2 bộ mã.
+- `backend/apps/sales/orders/customer_notices.py`:
+  - Dựng template thông điệp tự huỷ động theo `CSKH_MAX_UNREACHABLE_ATTEMPTS` và `CSKH_UNREACHABLE_WINDOW_MINUTES` kèm `# CHỜ legal-vn`.
+  - Hàm `build_cancel_notice(order)` tổng hợp trạng thái hoàn tiền, hạn hoàn (`created_at + 30 ngày`) và hotline.
+- `backend/apps/sales/orders/shop_api.py`:
+  - `ShopOrderLookupView` trả `cancel_notice` khi đơn CANCELLED (hoặc null), trả `status_label = "Đã thanh toán – chờ vựa gọi xác nhận"` khi `CONFIRMING`.
+- `backend/apps/common/site_info_api.py`:
+  - Cung cấp `GET /api/public/site-info/` (AllowAny, public Cache-Control 300s, chứa khoá `cskh_notice`).
+- `backend/config/api_urls.py`:
+  - Đăng ký endpoint `path("public/site-info/", PublicSiteInfoView.as_view())`.
+- `backend/apps/delivery/cskh/services.py`:
+  - `decide`: khoá 3 tầng (`SalesOrder` -> `DeliveryNote` -> `ConfirmationTask`). Hỗ trợ `DELIVER_WITHOUT_CONFIRM` (chuyển PREPARING, AuditLog `delivery_confirm_skipped`), `EXTEND` (về CALLBACK, chặn > 24h BR-GH-13), `CANCEL` (gọi `cancel_paid_order`, trả `suggest_refund_amount`).
+  - `escalate_expired_windows`: chuyển các task PENDING hết cửa sổ 30 phút sang ESCALATED, idempotent.
+  - `auto_cancel_overdue`: kiểm tra cờ `CSKH_AUTO_CANCEL_ENABLED`. Kiểm tra lô `CLOSED` (chặn `BR-LO-05`, ghi AuditLog `order_auto_cancel_blocked`). Huỷ đơn tự động với lý do `UNREACHABLE_AUTO`, tạo `Refund(created_by=None)` idempotent qua UUID5, chuyển task sang `REFUND_CALL`, ghi AuditLog `order_auto_cancelled` với `actor=None`.
+  - Cho phép `claim_task` và `record_call` thao tác trên phiếu CANCELLED khi `task.state == "REFUND_CALL"`.
+- `backend/apps/delivery/cskh/serializers.py`:
+  - Cập nhật `decide_deadline` (trả null khi WANT_CANCEL/WANT_CHANGE).
+  - Trả thông tin `refund` và `cancelled_at` khi task ở trạng thái `REFUND_CALL`.
+- `backend/apps/delivery/cskh/api.py`:
+  - Action `decide` trên `CskhQueueViewSet` yêu cầu quyền `delivery.decide_unconfirmed`.
+- `backend/apps/delivery/management/commands/process_cskh_deadlines.py`:
+  - Command định kỳ quét và xử lý escalate + auto-cancel.
+- `backend/apps/delivery/management/commands/check_cskh_job_health.py`:
+  - Command giám sát sức khoẻ job (exit code 1 khi có task quá hạn treo, exit code 0 khi khoẻ).
+- Test BE mới: `backend/apps/delivery/tests/test_cskh_l3.py`:
+  - **37 test cases** bao phủ toàn diện CS-07 (AC1..AC12), CS-08 (AC1..AC11), CS-09 (AC1..AC8), CS-10 (AC1..AC8) và các bất biến.
+
+### 3. Frontend đã làm:
+- `erp-console/features/cskh/`:
+  - `types.ts`: thêm `CskhDecision`, `DecidePayload`, `DecideResponse`, trường `refund`, `cancelled_at`, `guidance` vào `CskhQueueItem` và `CskhQueueDetail`. Thêm `NOTIFIED` vào `CALL_RESULT_OPTIONS`.
+  - `api.ts`: thêm hàm `decideCskh`.
+  - `mock.ts`: bổ sung mock items ESCALATED (note 28) và REFUND_CALL (note 27), hàm `mockDecideCskh`, cho phép gọi khi `REFUND_CALL`.
+  - `CskhCallModal.tsx`:
+    - Khối "Cần quyết định (Quản lý)": 3 lựa chọn (Giao không xác nhận, Gia hạn, Huỷ đơn kèm form). Bấm Huỷ đơn thành công tự động điều hướng sang `/orders/?order=${res.order_id}&open=refund`.
+    - Khối REFUND_CALL: banner D5 ("Không ghi số tài khoản khách vào hệ thống..."), thông tin hoàn tiền (`refund`), 2 nút kết quả (`NOTIFIED` / `UNREACHABLE`).
+  - `CskhQueueView.tsx`:
+    - Banner D5 trên tab "Báo hoàn tiền".
+    - Hiển thị thông tin hoàn tiền (`item.refund`) trên các thẻ đơn hàng.
+  - `cskh.test.ts`: thêm 5 vitest unit tests cho Lô 3 (CS-07, CS-09).
+- `erp-console/features/orders/`:
+  - `OrderDetailSheet.tsx`: thêm prop `initialMode` để mở sẵn form hoàn tiền (`mode="refund"`).
+  - `OrdersScreen.tsx`: bắt query param `?order=<id>&open=refund` tự động mở chi tiết đơn và mở sẵn form hoàn tiền.
+  - `RefundView.tsx` & `RefundQueueScreen.tsx`: hiển thị "Hệ thống" khi `created_by` là null.
+- `frontend/lib/`:
+  - `types.ts`: thêm `CskhNoticeConfig`, `SiteInfo`, `OrderCancelNotice`. Cập nhật `OrderStatus` và `WireOrderStatus` hỗ trợ `cancel_notice` và `fulfilment`.
+  - `api.ts`: thêm hàm `getSiteInfo()`, cập nhật `mapOrderStatus`.
+  - `mock.ts`: thêm đơn mẫu `DH-DEMO004` (đơn tự huỷ kèm `cancel_notice` và `refund`), thêm `mockGetSiteInfo()`.
+- `frontend/app/shop/orders/OrderLookup.tsx`:
+  - Hiển thị khối `cancel_notice` (lý do huỷ, số tiền hoàn, trạng thái hoàn, hạn hoàn/ngày đã hoàn, hotline) khi đơn bị huỷ.
+- `frontend/features/checkout/components/CheckoutScreen.tsx` & `PaymentPanel.tsx`:
+  - Tải `getSiteInfo()` và hiển thị câu thông báo lưu ý luật gọi xác nhận đơn trước khi đặt và sau khi đặt thành công (kèm dấu `# CHỜ legal-vn`).
+
+### 4. Lệnh gcloud mẫu tạo Cloud Run Job + Cloud Scheduler (tham khảo hạ tầng, KHÔNG CHẠY):
+```bash
+# 1. Tạo Cloud Run Job quét deadline CSKH (chạy container backend django)
+gcloud run jobs create cskh-deadlines-job \
+  --image asia-southeast1-docker.pkg.dev/<PROJECT_ID>/cangca/backend:latest \
+  --region asia-southeast1 \
+  --command "python" \
+  --args "manage.py,process_cskh_deadlines" \
+  --set-env-vars "DJANGO_SETTINGS_MODULE=config.settings" \
+  --service-account "cloud-run-jobs@<PROJECT_ID>.iam.gserviceaccount.com"
+
+# 2. Tạo Cloud Scheduler định kỳ mỗi 5 phút gọi Cloud Run Job
+gcloud scheduler jobs create http cskh-deadlines-scheduler \
+  --location asia-southeast1 \
+  --schedule "*/5 * * * *" \
+  --time-zone "Asia/Ho_Chi_Minh" \
+  --uri "https://asia-southeast1-run.googleapis.com/v2/projects/<PROJECT_ID>/locations/asia-southeast1/jobs/cskh-deadlines-job:run" \
+  --http-method POST \
+  --oauth-service-account-email "cloud-scheduler@<PROJECT_ID>.iam.gserviceaccount.com"
+```
+
+### 5. Kết quả kiểm chứng Lô 3:
+- `cd backend && .venv/bin/python manage.py makemigrations --check --dry-run`: **No changes detected**.
+- `cd backend && .venv/bin/python manage.py test apps.delivery apps.sales apps.reports`: **361/361 tests xanh 100%** (trong đó có 37 tests của `test_cskh_l3.py`).
+- `cd backend && .venv/bin/python manage.py test`: **880/880 tests xanh 100%** (toàn bộ test suite backend).
+- `cd backend && .venv/bin/python manage.py process_cskh_deadlines && .venv/bin/python manage.py process_cskh_deadlines`: Cả 2 lần đều trả về 0, idempotent, không lỗi.
+- `cd backend && .venv/bin/python manage.py check_cskh_job_health; echo "exit=$?"`: **exit=0**.
+- `cd erp-console && npm test`: 4 test files, **40/40 tests xanh 100%**.
+- `cd erp-console && npx tsc --noEmit && npm run build`: **27/27 static pages pass 100%**.
+- `cd frontend && npx tsc --noEmit && NEXT_PUBLIC_USE_MOCK=1 npm run build`: **8/8 static pages pass 100%**.

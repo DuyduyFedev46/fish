@@ -33,6 +33,16 @@ export type CskhQueueItem = {
   address: string;
   recipient_name: string | null;
   recipient_phone: string | null;
+  cancelled_at?: string | null;
+  guidance?: string | null;
+  refund?: {
+    id: number;
+    amount: string;
+    status: string;
+    status_label: string;
+    deadline: string;
+    refunded_at: string | null;
+  } | null;
 };
 
 export type CustomerCall = {
@@ -47,7 +57,7 @@ export type CustomerCall = {
 export type CskhQueueDetail = CskhQueueItem & {
   calls: CustomerCall[];
   available_actions: string[];
-  guidance: unknown;
+  guidance?: string | null;
 };
 
 export type CskhQueueResponse = {
@@ -122,7 +132,30 @@ export const CALL_RESULT_OPTIONS: Array<{
     tone: "info",
     hint: "Khách đổi ý không lấy nữa. Chuyển Quản lý xử lý huỷ đơn.",
   },
+  {
+    value: "NOTIFIED",
+    label: "Đã báo hoàn tiền",
+    tone: "good",
+    hint: "Đã liên hệ với khách để thông báo đơn bị huỷ và chính sách hoàn tiền.",
+  },
 ];
+
+export type CskhDecision = "DELIVER_WITHOUT_CONFIRM" | "EXTEND" | "CANCEL";
+
+export type DecidePayload = {
+  decision: CskhDecision;
+  reason?: string;
+  until?: string | null;
+  reason_code?: string;
+  note?: string;
+};
+
+export type DecideResponse = {
+  note_status: string;
+  confirm_state: string | null;
+  order_id: number;
+  suggest_refund_amount: string | null;
+};
 
 export type RecordCallPayload = {
   result: CallResult;

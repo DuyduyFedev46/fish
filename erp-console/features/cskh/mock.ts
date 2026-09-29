@@ -11,6 +11,8 @@ import type {
   UnconfirmResponse,
   ChangeRecipientPayload,
   ChangeRecipientResponse,
+  DecidePayload,
+  DecideResponse,
 } from "./types";
 
 export const MOCK_CSKH_ITEMS: CskhQueueDetail[] = [
@@ -155,6 +157,92 @@ export const MOCK_CSKH_ITEMS: CskhQueueDetail[] = [
     ],
     guidance: null,
   },
+  {
+    note_id: 28,
+    order_id: 108,
+    order_code: "DH-260928-0028",
+    note_status: "CONFIRMING",
+    paid_at: "2026-09-28T08:00:00+07:00",
+    confirm_state: "ESCALATED",
+    escalation_reason: "UNREACHABLE",
+    escalation_label: "Không nghe máy",
+    attempts: 3,
+    max_attempts: 3,
+    next_call_after: null,
+    window_ends_at: null,
+    callback_at: null,
+    escalated_at: "2026-09-28T09:25:00+07:00",
+    decide_deadline: "2026-09-28T09:55:00+07:00",
+    auto_cancel_blocked: null,
+    claimed_by: null,
+    claimed_until: null,
+    lines_summary: "Tôm sú loại 1 2,000 kg",
+    total_kg: "2.000",
+    total_amount: "540000",
+    in_scope: true,
+    customer_name: "Khách Thử E",
+    phone: "0900000999",
+    address: "Số 5 Đường Thử, Đà Lạt",
+    recipient_name: null,
+    recipient_phone: null,
+    calls: [
+      { id: 71, at: "2026-09-28T09:00:00+07:00", by: { id: 12, display_name: "CSKH Thử" }, result: "UNREACHABLE", result_label: "Không nghe máy", note: "" },
+      { id: 72, at: "2026-09-28T09:12:00+07:00", by: { id: 12, display_name: "CSKH Thử" }, result: "UNREACHABLE", result_label: "Không nghe máy", note: "" },
+      { id: 73, at: "2026-09-28T09:25:00+07:00", by: { id: 12, display_name: "CSKH Thử" }, result: "UNREACHABLE", result_label: "Không nghe máy", note: "" },
+    ],
+    available_actions: [
+      "claim",
+      "decide:DELIVER_WITHOUT_CONFIRM",
+      "decide:EXTEND",
+      "decide:CANCEL",
+    ],
+    guidance: null,
+  },
+  {
+    note_id: 27,
+    order_id: 107,
+    order_code: "DH-260928-0027",
+    note_status: "CANCELLED",
+    paid_at: "2026-09-28T07:30:00+07:00",
+    confirm_state: "REFUND_CALL",
+    escalation_reason: "UNREACHABLE",
+    escalation_label: "Không nghe máy",
+    attempts: 0,
+    max_attempts: 3,
+    next_call_after: null,
+    window_ends_at: null,
+    callback_at: null,
+    escalated_at: "2026-09-28T08:00:00+07:00",
+    decide_deadline: null,
+    auto_cancel_blocked: null,
+    claimed_by: null,
+    claimed_until: null,
+    lines_summary: "Mực lá Phan Thiết 1,000 kg",
+    total_kg: "1.000",
+    total_amount: "280000",
+    in_scope: true,
+    customer_name: "Khách Thử F",
+    phone: "0900000888",
+    address: "Số 6 Đường Thử, Nha Trang",
+    recipient_name: null,
+    recipient_phone: null,
+    cancelled_at: "2026-09-28T08:31:00+07:00",
+    refund: {
+      id: 5,
+      amount: "280000",
+      status: "PENDING",
+      status_label: "Chờ hoàn",
+      deadline: "2026-10-28",
+      refunded_at: null,
+    },
+    calls: [],
+    available_actions: [
+      "claim",
+      "call:NOTIFIED",
+      "call:UNREACHABLE",
+    ],
+    guidance: "Không ghi số tài khoản khách vào hệ thống. Chủ sẽ lấy số tài khoản trực tiếp từ khách khi chuyển khoản.",
+  },
 ];
 
 export function getMockCskhQueue(params?: { state?: string; page?: number }): CskhQueueResponse {
@@ -268,7 +356,7 @@ export function mockRecordCskhCall(
     return { status: 404, body: { code: "NOT_FOUND", detail: "Không tìm thấy phiếu." } };
   }
 
-  if (item.note_status === "CANCELLED") {
+  if (item.note_status === "CANCELLED" && item.confirm_state !== "REFUND_CALL") {
     return { status: 400, body: { code: "BR-GH-07", detail: "Đơn đã huỷ." } };
   }
 
@@ -314,6 +402,8 @@ export function mockRecordCskhCall(
         ? "Khách muốn đổi món"
         : payload.result === "WANT_CANCEL"
         ? "Khách muốn huỷ đơn"
+        : payload.result === "NOTIFIED"
+        ? "Đã báo hoàn tiền"
         : "Đã thông báo",
     note: payload.note || "",
   };
@@ -322,6 +412,20 @@ export function mockRecordCskhCall(
   // Clear soft lock
   item.claimed_by = null;
   item.claimed_until = null;
+
+  if (payload.result === "NOTIFIED") {
+    item.confirm_state = null;
+    return {
+      status: 201,
+      body: {
+        call_id: callId,
+        note_status: item.note_status,
+        confirm_state: null,
+        attempts: item.attempts,
+        duplicate: false,
+      },
+    };
+  }
 
   if (payload.result === "CONFIRMED") {
     item.note_status = "PREPARING";
@@ -525,3 +629,72 @@ export function mockSearchCskh(
     body: { results },
   };
 }
+
+export function mockDecideCskh(
+  req: any,
+  noteId: number,
+  payload: DecidePayload
+): { status: number; body: DecideResponse | { code: string; detail: string } } {
+  const item = MOCK_CSKH_ITEMS.find((it) => it.note_id === noteId);
+  if (!item) {
+    return { status: 404, body: { code: "NOT_FOUND", detail: "Không tìm thấy mục chờ gọi." } };
+  }
+  if (item.confirm_state !== "ESCALATED") {
+    return {
+      status: 409,
+      body: {
+        code: "STALE_STATE",
+        detail: "Đơn đã được xử lý.",
+        current_status: item.note_status,
+        confirm_state: item.confirm_state,
+      } as any,
+    };
+  }
+
+  if (payload.decision === "DELIVER_WITHOUT_CONFIRM") {
+    if (!payload.reason?.trim()) {
+      return { status: 400, body: { code: "INVALID_INPUT", detail: "Lý do bỏ qua xác nhận bắt buộc." } };
+    }
+    item.note_status = "PREPARING";
+    item.confirm_state = null;
+    return {
+      status: 200,
+      body: {
+        note_status: "PREPARING",
+        confirm_state: null,
+        order_id: item.order_id,
+        suggest_refund_amount: null,
+      },
+    };
+  } else if (payload.decision === "EXTEND") {
+    if (!payload.until) {
+      return { status: 400, body: { code: "INVALID_INPUT", detail: "Giờ gia hạn bắt buộc." } };
+    }
+    item.confirm_state = "CALLBACK";
+    item.callback_at = payload.until;
+    item.attempts = 0;
+    return {
+      status: 200,
+      body: {
+        note_status: "CONFIRMING",
+        confirm_state: "CALLBACK",
+        order_id: item.order_id,
+        suggest_refund_amount: null,
+      },
+    };
+  } else if (payload.decision === "CANCEL") {
+    item.note_status = "CANCELLED";
+    item.confirm_state = null;
+    return {
+      status: 200,
+      body: {
+        note_status: "CANCELLED",
+        confirm_state: null,
+        order_id: item.order_id,
+        suggest_refund_amount: item.total_amount,
+      },
+    };
+  }
+  return { status: 400, body: { code: "INVALID_INPUT", detail: "Quyết định không hợp lệ." } };
+}
+
