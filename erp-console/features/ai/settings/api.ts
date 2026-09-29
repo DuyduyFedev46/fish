@@ -1,13 +1,13 @@
 import { apiFetch, type MockRequest } from "@/shared/lib/http";
-import { MyConfig } from "../types";
+import type { MyConfig } from "../types";
 
-const mockMyConfig: MyConfig = {
+export const mockMyConfig: MyConfig = {
   ai_enabled: true,
   version: 1,
   killed: false,
   updated_at: new Date().toISOString(),
   global_mode: "on",
-  write_levels_allowed: ["OFF", "C"],
+  write_levels_allowed: ["OFF", "C", "B"],
   groups: [
     {
       group: "thu_mua",
@@ -38,6 +38,21 @@ const mockMyConfig: MyConfig = {
           locked_reason: null,
           red_zone: false,
           limits: null,
+        },
+        {
+          id: "purchasing.purchasereceipt.nhap_lo",
+          title: "Nhập lô mua tại cảng",
+          kind: "write",
+          level: "C",
+          source: "default",
+          choices: ["OFF", "C", "B"],
+          max_level: "B",
+          locked_reason: null,
+          red_zone: false,
+          limits: {
+            kg: { mine: null, cap: "200" },
+            vnd: { mine: null, cap: "30000000" },
+          },
         },
       ],
     },

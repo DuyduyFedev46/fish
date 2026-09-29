@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { ViewGuard } from "@/features/auth/components/ViewGuard";
 import { useAuth } from "@/features/auth/components/AuthProvider";
-import { fetchAiActions, confirmAiAction, rejectAiAction } from "@/features/ai/actions/api";
+import { fetchAiActions, confirmAiAction, rejectAiAction, undoAiAction } from "@/features/ai/actions/api";
 import { ActionDetailModal } from "@/features/ai/actions/components/ActionDetailModal";
 import type { AiActionRow } from "@/features/ai/types";
 import { Icon } from "@/shared/ui/Icon";
@@ -19,7 +19,7 @@ export default function AiActionsPage() {
 
 function AiActionsContent() {
   const { me } = useAuth();
-  const [activeTab, setActiveTab] = useState<"pending" | "history">("pending");
+  const [activeTab, setActiveTab] = useState<"pending" | "scheduled" | "history">("pending");
   const [scope, setScope] = useState<"mine" | "all">("mine");
   const [actions, setActions] = useState<AiActionRow[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -34,14 +34,20 @@ function AiActionsContent() {
     setLoading(true);
     setError(null);
     try {
-      const statusFilter = activeTab === "pending" ? "PENDING" : "CONFIRMED,REJECTED,EXPIRED,DONE";
+      let statusFilter = "PENDING";
+      if (activeTab === "scheduled") {
+        statusFilter = "SCHEDULED";
+      } else if (activeTab === "history") {
+        statusFilter = "CONFIRMED,REJECTED,EXPIRED,DONE,CANCELLED,UNDONE";
+      }
+
       const res = await fetchAiActions({
         status: statusFilter,
         scope: canManageAll ? scope : "mine",
       });
       setActions(res.results || []);
-    } catch (err: any) {
-      setError(err?.message || "Không thể tải danh sách việc AI.");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Không thể tải danh sách việc AI.");
     } finally {
       setLoading(false);
     }
@@ -58,8 +64,8 @@ function AiActionsContent() {
       setFeedback({ type: "success", text: "Đã duyệt và thực thi thành công đề xuất AI!" });
       setSelectedAction(null);
       await loadActions();
-    } catch (err: any) {
-      setFeedback({ type: "error", text: err?.message || "Thực thi thất bại." });
+    } catch (err: unknown) {
+      setFeedback({ type: "error", text: err instanceof Error ? err.message : "Thực thi thất bại." });
     } finally {
       setIsSubmitting(false);
     }
@@ -72,11 +78,45 @@ function AiActionsContent() {
       setFeedback({ type: "success", text: "Đã từ chối đề xuất AI." });
       setSelectedAction(null);
       await loadActions();
-    } catch (err: any) {
-      setFeedback({ type: "error", text: err?.message || "Từ chối thất bại." });
+    } catch (err: unknown) {
+      setFeedback({ type: "error", text: err instanceof Error ? err.message : "Từ chối thất bại." });
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleUndo = async (actionId: string) => {
+    setIsSubmitting(true);
+    try {
+      await undoAiAction(actionId);
+      setFeedback({
+        type: "success",
+        text: "Đã hoàn tác thao tác thành công. Chứng từ liên quan đã chuyển trạng thái Đã huỷ.",
+      });
+      if (selectedAction?.id === actionId) {
+        setSelectedAction((prev) =>
+          prev
+            ? {
+                ...prev,
+                status: prev.status === "SCHEDULED" ? "CANCELLED" : "UNDONE",
+              }
+            : null
+        );
+      }
+      await loadActions();
+    } catch (err: unknown) {
+      setFeedback({ type: "error", text: err instanceof Error ? err.message : "Hoàn tác thất bại." });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const formatCountdown = (isoString?: string | null) => {
+    if (!isoString) return "";
+    const diff = Math.max(0, Math.floor((new Date(isoString).getTime() - Date.now()) / 1000));
+    const m = Math.floor(diff / 60).toString().padStart(2, "0");
+    const s = (diff % 60).toString().padStart(2, "0");
+    return `${m}:${s}`;
   };
 
   return (
@@ -87,7 +127,7 @@ function AiActionsContent() {
             Việc AI
           </h1>
           <p className="text-sm text-gray-500 dark:text-gray-400">
-            Duyệt và kiểm tra các hành động do AI đề xuất hoặc tự động thực hiện.
+            Duyệt, huỷ lịch và kiểm tra các hành động do AI đề xuất hoặc tự động thực hiện.
           </p>
         </div>
 
@@ -156,6 +196,17 @@ function AiActionsContent() {
         </button>
         <button
           type="button"
+          onClick={() => setActiveTab("scheduled")}
+          className={`border-b-2 px-4 py-2 text-sm font-medium ${
+            activeTab === "scheduled"
+              ? "border-purple-600 text-purple-600 dark:border-purple-400 dark:text-purple-400"
+              : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400"
+          }`}
+        >
+          Đã lên lịch ({actions.filter((a) => a.status === "SCHEDULED").length})
+        </button>
+        <button
+          type="button"
           onClick={() => setActiveTab("history")}
           className={`border-b-2 px-4 py-2 text-sm font-medium ${
             activeTab === "history"
@@ -190,7 +241,7 @@ function AiActionsContent() {
                 <th className="px-4 py-3">Tác nhân</th>
                 <th className="px-4 py-3">Chứng từ đích</th>
                 <th className="px-4 py-3">Trạng thái</th>
-                <th className="px-4 py-3">Thời gian tạo</th>
+                <th className="px-4 py-3">Thời gian tạo / Lịch</th>
                 <th className="px-4 py-3 text-right">Chi tiết</th>
               </tr>
             </thead>
@@ -217,18 +268,26 @@ function AiActionsContent() {
                       className={`inline-block rounded px-2 py-0.5 text-xs font-medium ${
                         act.status === "PENDING"
                           ? "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300"
-                          : act.status === "CONFIRMED"
+                          : act.status === "SCHEDULED"
+                          ? "bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300"
+                          : act.status === "CONFIRMED" || act.status === "DONE"
                           ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
-                          : act.status === "REJECTED"
+                          : act.status === "REJECTED" || act.status === "CANCELLED"
                           ? "bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300"
                           : "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300"
                       }`}
                     >
-                      {act.status}
+                      {act.status === "SCHEDULED" ? "ĐÃ LÊN LỊCH" : act.status}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-xs text-gray-400">
-                    {new Date(act.created_at).toLocaleString("vi-VN")}
+                  <td className="px-4 py-3 text-xs text-gray-500">
+                    {act.status === "SCHEDULED" && act.execute_after ? (
+                      <span className="font-mono text-purple-700 dark:text-purple-300">
+                        Chạy sau: {formatCountdown(act.execute_after)}
+                      </span>
+                    ) : (
+                      new Date(act.created_at).toLocaleString("vi-VN")
+                    )}
                   </td>
                   <td className="px-4 py-3 text-right">
                     <button
@@ -252,6 +311,7 @@ function AiActionsContent() {
         onClose={() => setSelectedAction(null)}
         onConfirm={handleConfirm}
         onReject={handleReject}
+        onUndo={handleUndo}
         isSubmitting={isSubmitting}
       />
     </div>

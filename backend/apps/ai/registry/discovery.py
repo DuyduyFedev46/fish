@@ -223,6 +223,9 @@ class CommandRegistry:
                         else:
                             undo_missing = True
                             max_level_val = "C"
+                    elif undo_val == "defer":
+                        undo_missing = False
+                        max_level_val = max_level_val or "B"
                     elif not max_level_val:
                         max_level_val = "A" if kind == "read" else "C"
 
@@ -247,6 +250,7 @@ class CommandRegistry:
                         sensitivity=getattr(ai_meta, "sensitivity", "") or "cao",
                         channel=getattr(ai_meta, "channel", "") or "local",
                         max_level=max_level_val,
+                        undo=undo_val,
                         undo_missing=undo_missing,
                         red_zone=red_zone,
                         force_c=force_c,
@@ -313,6 +317,7 @@ class CommandRegistry:
                             sensitivity=getattr(ai_meta, "sensitivity", "") or "cao",
                             channel=getattr(ai_meta, "channel", "") or "local",
                             max_level=getattr(ai_meta, "max_level", "") or ("A" if kind == "read" else "C"),
+                            undo=getattr(ai_meta, "undo", "") or "",
                             undo_missing=False,
                             red_zone=red_zone,
                             force_c=force_c,

@@ -583,3 +583,79 @@
   - `frontend`: `npx tsc --noEmit && npm run build` -> sạch 10/10 static pages.
 
 
+
+---
+
+## Lô 5b — Mức B: AI tự ghi, hoàn tác 10 phút (DW-19) & Trì hoãn ghi, job tới hạn (DW-21)
+- Trạng thái: BE & FE HOÀN THÀNH — ĐÃ CẬP NHẬT ĐẦY ĐỦ TEST SUITE
+- Nhánh thực hiện: `main`
+
+### 1. Backend (`be-dev`)
+- **Story DW-19: Mức B: AI tự ghi, báo ngay, hoàn tác trong 10 phút (DW-19-AC1..AC10)**:
+  - `backend/apps/ai/settings/services.py`:
+    - Chặn mức B trên production (`AI_WRITE_LEVELS_ALLOWED="C"`) trả về HTTP 400 `BR-AI-27` (DW-19-AC2).
+    - Chặn các lệnh thuộc "trần C ép" nâng lên B (`getattr(spec, "force_c", False)` hoặc `spec.max_level == "C"` hoặc `sales.refund.create_refund`) trả về HTTP 400 `BR-AI-19` (DW-19-AC7).
+  - `backend/apps/ai/execution/pipeline.py`:
+    - Kiểm tra ngưỡng tự động hạ về C (DW-19-AC5):
+      1. Khối lượng kg: `effective_cap_kg = min(cap_kg, limit_kg)`, nếu vượt -> `outcome="proposal"`, `level="C"`, `downgrade_reason={"code": "AI_LIMIT_KG"}`.
+      2. Giá trị tiền vnd: `effective_cap_vnd = min(cap_vnd, limit_vnd)`, nếu vượt -> `outcome="proposal"`, `level="C"`, `downgrade_reason={"code": "AI_LIMIT_VND"}`.
+      3. Hạn mức ngày: đếm số `AiAction` loại write của user trong ngày, nếu `>= effective_daily` -> `outcome="proposal"`, `level="C"`, `downgrade_reason={"code": "AI_DAILY_LIMIT"}`.
+    - Thực thi mức B an toàn trong `transaction.atomic()` (H5, DW-19-AC6):
+      - Gọi view qua `dispatch_command` trong `set_ai_audit_scope`.
+      - Tạo `AiAction(status=DONE, level=B, executed_at=now, undo_until=now+10m, result_ref=...)`.
+      - Ghi AuditLog `execute_{spec.id}` (`actor=None, actor_kind="ai", ai_actor=request.user, ai_level="B"`).
+      - H5 rollback: Nếu ghi AuditLog gặp lỗi -> rollback toàn bộ, chứng từ không được tạo.
+    - Lọc sạch giá vốn: Gọi `scrub_data` lọc bỏ toàn bộ khoá chi phí/giá vốn đối với người dùng không có quyền `view_costprice` (DW-19-AC8).
+  - `backend/apps/ai/actions/services.py`:
+    - Cài đặt `undo_ai_action(*, action_id, user)`:
+      - Kiểm tra `AI_ENABLED`: nếu tắt -> 410 `AI_DISABLED` (DW-19-AC10).
+      - Hoàn tác trong 10 phút: Kiểm tra `undo_until`, nếu quá hạn -> 410 `AI_UNDO_WINDOW_CLOSED` (DW-19-AC4).
+      - Gọi nghiệp vụ đảo trạng thái `cancel_receipt` (DW-18). Nếu vi phạm nghiệp vụ (lô đã publish, đã có hoá đơn) -> giữ nguyên 400 `BR-MH-07` từ service.
+      - Chuyển `action.status = UNDONE`, ghi AuditLog `undo_{command}` (DW-19-AC3).
+
+- **Story DW-21: Trì hoãn ghi & Job chạy việc tới hạn (DW-21-AC1..AC8)**:
+  - `backend/config/settings.py`: Cấu hình `AI_DEFERRED_DELAY_MINUTES = int(os.getenv("AI_DEFERRED_DELAY_MINUTES", "10"))`.
+  - `backend/apps/ai/registry/spec.py` & `discovery.py`: Bổ sung trường `undo: str = ""` trên `CommandSpec`, nhận biết `undo="defer"`.
+  - `backend/apps/ai/execution/pipeline.py`:
+    - Với lệnh khai báo `undo="defer"`, sinh `AiAction(status=SCHEDULED, level=B, execute_after=+N phút, undo_until=+N phút)`, AuditLog `schedule_{spec.id}`, không gọi view, chứng từ chưa đổi (DW-21-AC1).
+  - `backend/apps/ai/actions/services.py`:
+    - Huỷ lịch trong cửa sổ: Khi action đang `SCHEDULED` và còn trong cửa sổ `undo_until`, chuyển `status = CANCELLED`, ghi AuditLog `cancel_schedule_{command}`, chứng từ không đổi (DW-21-AC4). Quá hạn -> 410 `AI_UNDO_WINDOW_CLOSED`.
+  - Management Command `run_due_ai_actions` (`backend/apps/ai/management/commands/run_due_ai_actions.py`):
+    - Quét các việc `SCHEDULED` có `execute_after <= timezone.now()`.
+    - Idempotent chống race condition với `select_for_update(skip_locked=True)` (DW-21-AC5).
+    - Tái kiểm tra điều kiện bước 2-7 (DW-21-AC3): Nếu user bị khoá, đổi cấu hình, hoặc mất quyền -> hạ về `PENDING` (C) với `downgrade_reason={"code": "AI_LEVEL_REVOKED"}`.
+    - Khi `AI_ENABLED=False`: Tự động chuyển việc tới hạn sang `PENDING` với `downgrade_reason={"code": "AI_DISABLED"}` (DW-21-AC8).
+    - Gọi view an toàn với `_force_auth_user` trong tiến trình nội bộ (DW-21-AC6), cập nhật `status = DONE`, ghi AuditLog `level=B` (DW-21-AC2).
+    - Log an toàn: Chỉ ghi ID việc và mã lệnh, không in PII và giá vốn (DW-21-AC7).
+
+- **Kiểm chứng Backend**:
+  - `backend/apps/ai/execution/tests/test_dw19_level_b.py`: **9 tests bao phủ DW-19-AC1..AC10**.
+  - `backend/apps/ai/execution/tests/test_dw21_deferred_actions.py`: **8 tests bao phủ DW-21-AC1..AC8**.
+  - Chạy suite Lô 5b:
+    ```bash
+    .venv/bin/python manage.py test apps.ai.execution.tests.test_dw19_level_b apps.ai.execution.tests.test_dw21_deferred_actions
+    # Ran 17 tests in 0.713s. OK
+    ```
+  - Chạy toàn bộ backend test suite:
+    ```bash
+    .venv/bin/python manage.py test && .venv/bin/python manage.py makemigrations --check --dry-run
+    # Ran 1032 tests in 48.495s. OK. No changes detected.
+    ```
+
+### 2. Frontend (`fe-dev`)
+- **DW-19 (FE - Thông báo "AI đã ghi" & Hoàn tác đếm ngược)**:
+  - `erp-console/features/ai/commands/call.ts`: Nhận diện kết quả mức B (`outcome="done"`, `level="B"`) trả về có `undo_until`.
+  - `erp-console/features/ai/components/AiAssistantPanel.tsx`: Thêm component `UndoCountdownButton`, hiển thị thông báo "AI đã ghi" và đếm ngược thời gian còn lại có thể hoàn tác.
+  - `erp-console/features/ai/actions/components/ActionDetailModal.tsx`: Thêm nút "Hoàn tác" và đồng hồ đếm ngược cho việc `status="DONE"` mức B.
+- **DW-21 (FE - Việc đã xếp lịch SCHEDULED & Huỷ lịch)**:
+  - `erp-console/features/ai/actions/api.ts`: Cài đặt `undoAiAction(actionId)` và `mockUndoAiAction(actionId)`. Cập nhật `mockAiActions` bao gồm việc `SCHEDULED` và việc mức B có `undo_until`.
+  - `erp-console/app/(console)/ai/actions/page.tsx`: Thêm tab "Đã lên lịch" (`SCHEDULED`) và nút huỷ lịch trực tiếp.
+  - `erp-console/features/ai/actions/components/ActionDetailModal.tsx`: Hiển thị nhãn "ĐÃ LÊN LỊCH", đồng hồ đếm ngược dự kiến tự thực thi sau `mm:ss`, nút "Huỷ lịch".
+- **DW-19 / DW-20 (FE - Mức B ở màn AI của tôi)**:
+  - `erp-console/features/ai/settings/components/MyConfigScreen.tsx`: Hỗ trợ chọn mức B khi `write_levels_allowed` bao gồm "B" (staging).
+- **Unit test Frontend (`erp-console/features/ai/actions/actions.test.ts`)**:
+  - 5 tests kiểm tra toàn diện: `callCommand` trả về `undo_until` ở mức B; `callCommand` trả về `execute_after` và `undo_until` khi scheduled; `undoAiAction` huỷ lịch `SCHEDULED -> CANCELLED`; `undoAiAction` hoàn tác `DONE -> UNDONE`; `fetchAiActions` lọc theo trạng thái `SCHEDULED` và `PENDING`.
+- **Kiểm chứng Frontend**:
+  - `erp-console`: `npm test` -> **77 / 77 tests pass 100%**.
+  - `erp-console`: `npx tsc --noEmit && npm run build` -> **30 / 30 static pages thành công**.
+  - `frontend`: `npx tsc --noEmit && npm run build` -> **10 / 10 static pages thành công**.

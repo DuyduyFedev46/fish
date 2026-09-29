@@ -562,3 +562,68 @@ Không có lỗi chặn (0 lỗi).
 6. `cd frontend && npx tsc --noEmit && npm run build` -> Compile sạch 10/10 static pages.
 
 
+
+---
+
+## Lô 5b: Mức B: AI tự ghi, hoàn tác 10 phút (DW-19) & Trì hoãn ghi, job tới hạn (DW-21) · Lần 2 · 2026-09-29
+
+### Kết luận: APPROVED — Lô 5b hoàn thành toàn diện 100% Acceptance Criteria của DW-19 (AC1..AC10) và DW-21 (AC1..AC8); cơ chế tự ghi mức B có hoàn tác và trì hoãn ghi qua job tới hạn hoạt động chính xác; bảo vệ tuyệt đối Bất biến 1 (giá vốn), Bất biến 9 (PII), Bất biến 3 (chứng từ), Bất biến 4 & 6 (khoá / race condition) và H5 (rollback atomic).
+
+### Tổng: 18 ca · ✅ 18 · ❌ 0 · ⏸ 0
+
+### Theo AC
+| Mã AC | Kết quả | Bằng chứng (test tự động / file kiểm chứng) |
+|---|---|---|
+| **DW-19-AC1** | ✅ PASS | `apps.ai.execution.tests.test_dw19_level_b::DW19LevelBTestCase.test_dw19_ac1_call_level_b_nhap_lo_success`<br>Staging (`AI_WRITE_LEVELS_ALLOWED="B"`), NV kho cấu hình `nhap_lo=B` (ngưỡng 150 kg), gọi nhập phiếu 50 kg -> HTTP 200, `outcome="done"`, `level="B"`, `undo_until=+10m`; phiếu `PurchaseReceipt` SUBMITTED, lô `Batch` DRAFT; `AiAction` status DONE, level B; AuditLog ghi nhận `action="execute_purchasing.purchasereceipt.nhap_lo"`, `actor_kind="ai"`, `ai_actor=user_kho`, `ai_level="B"`, `ai_config_version=1`. |
+| **DW-19-AC2** | ✅ PASS | `apps.ai.execution.tests.test_dw19_level_b::DW19LevelBTestCase.test_dw19_ac2_production_blocks_level_b`<br>`@override_settings(AI_WRITE_LEVELS_ALLOWED="C")` (production) -> GET `/api/ai/my-config/` trả về `write_levels_allowed=["OFF", "C"]` (không có B); PUT override mức B bị chặn ngay với HTTP 400 `BR-AI-27` ("Môi trường hiện tại không hỗ trợ mức tự thực thi B."). |
+| **DW-19-AC3** | ✅ PASS | `apps.ai.execution.tests.test_dw19_level_b::DW19LevelBTestCase.test_dw19_ac3_undo_within_window_cancels_receipt`<br>Trong 10 phút, gọi `POST /api/ai/actions/<id>/undo/` -> HTTP 200 `outcome="undone"`; phiếu nhập và lô cá tự động chuyển trạng thái CANCELLED qua service `cancel_receipt` (DW-18); `AiAction` chuyển `status=UNDONE`; AuditLog ghi nhận `undo_purchasing.purchasereceipt.nhap_lo` với `actor=user_kho`. |
+| **DW-19-AC4** | ✅ PASS | `apps.ai.execution.tests.test_dw19_level_b::DW19LevelBTestCase.test_dw19_ac4_undo_expired_window_or_published_batch`<br>1) Quá thời hạn 10 phút (`now > undo_until`) gọi undo -> HTTP 410 `AI_UNDO_WINDOW_CLOSED`; 2) Lô cá đã mở bán (`status=SELLING`) gọi undo -> HTTP 400 `BR-MH-07` ("Chỉ huỷ được phiếu khi các lô còn trạng thái Nháp"). Dữ liệu nguyên vẹn. |
+| **DW-19-AC5** | ✅ PASS | `apps.ai.execution.tests.test_dw19_level_b::DW19LevelBTestCase.test_dw19_ac5_downgrade_to_c_on_limits`<br>1) Phiếu 180 kg (> ngưỡng 150 kg của nhân viên) -> tự động hạ C, trả `outcome="proposal"`, `level="C"`, `downgrade_reason.code="AI_LIMIT_KG"`; 2) Gọi lần thứ 21 trong ngày (> hạn mức ngày 20) -> hạ C, `downgrade_reason.code="AI_DAILY_LIMIT"`. Chứng từ chưa được tạo trong DB. |
+| **DW-19-AC6 (H5)** | ✅ PASS | `apps.ai.execution.tests.test_dw19_level_b::DW19LevelBTestCase.test_dw19_ac6_h5_atomic_rollback_on_audit_error`<br>Mock `record_audit` ném Exception trong `transaction.atomic()` của pipeline call mức B -> rollback toàn bộ giao dịch: không có `PurchaseReceipt`, không có `Batch`, không có `StockLedgerEntry`, và không có `AiAction` nào được lưu trong DB (tuân thủ tuyệt đối H5). |
+| **DW-19-AC7** | ✅ PASS | `apps.ai.execution.tests.test_dw19_level_b::DW19LevelBTestCase.test_dw19_ac7_force_c_commands_cannot_be_set_to_b`<br>Cố tình PUT cấu hình B cho lệnh thuộc "trần C ép" (đặc biệt `sales.refund.create_refund` theo TL-1 và 02b §3) -> bị từ chối ngay với HTTP 400 `BR-AI-19` ("Lệnh sales.refund.create_refund bị giới hạn trần tối đa là C."). |
+| **DW-19-AC8 (giá vốn)** | ✅ PASS | `apps.ai.execution.tests.test_dw19_level_b::DW19LevelBTestCase.test_dw19_ac8_cost_price_scrubbed_in_b_result`<br>Người dùng thiếu quyền `view_costprice` (`nv_kho`) gọi call mức B -> `scrub_data` lọc sạch 100% khoá giá vốn (`purchase_rate`, `landed_unit_cost`, `rate`) khỏi JSON response trả về. |
+| **DW-19-AC9 (FE)** | ✅ PASS | `erp-console/features/ai/actions/actions.test.ts` (test case 1 & 4)<br>`erp-console/features/ai/actions/components/ActionDetailModal.tsx:51-61, 167-173, 228-237`<br>Modal chi tiết việc AI hiển thị khung đếm ngược thời gian hoàn tác còn lại (`mm:ss`) trước `undo_until` và nút "Hoàn tác" gọi `undoAiAction`; `AiAssistantPanel.tsx` có `UndoCountdownButton` thông báo "AI đã ghi" kèm đếm ngược. |
+| **DW-19-AC10 (AI tắt)** | ✅ PASS | `apps.ai.execution.tests.test_dw19_level_b::DW19LevelBTestCase.test_dw19_ac10_undo_ai_disabled_returns_410`<br>`@override_settings(AI_ENABLED=False)` -> gọi `POST /api/ai/actions/<id>/undo/` trả về HTTP 410 `AI_DISABLED`; người dùng thao tác huỷ tay qua màn hình phiếu nhập (DW-18). |
+| **DW-21-AC1** | ✅ PASS | `apps.ai.execution.tests.test_dw21_deferred_actions::DW21DeferredActionsTestCase.test_dw21_ac1_deferred_command_call_creates_scheduled_action`<br>Lệnh khai báo `undo="defer"` gọi ở mức B -> trả về `outcome="scheduled"`, `level="B"`, `execute_after=+10m`, `undo_until=+10m`; `AiAction` tạo với `status=SCHEDULED`; AuditLog ghi nhận `schedule_{command}` với `actor_kind="ai"`, `ai_level="B"`; chứng từ nghiệp vụ gốc **chưa thay đổi**. |
+| **DW-21-AC2** | ✅ PASS | `apps.ai.execution.tests.test_dw21_deferred_actions::DW21DeferredActionsTestCase.test_dw21_ac2_job_executes_due_scheduled_actions`<br>Action `SCHEDULED` tới hạn (`execute_after <= now`) -> chạy management command `run_due_ai_actions` -> kiểm tra lại các bước 2-7 -> thực thi view qua `dispatch_command` trong `set_ai_audit_scope` -> `AiAction` chuyển `status=DONE`, `executed_at=now`; AuditLog ghi nhận `execute_{command}` với `actor_kind="ai"`, `ai_level="B"`. |
+| **DW-21-AC3 (thu hồi)** | ✅ PASS | `apps.ai.execution.tests.test_dw21_deferred_actions::DW21DeferredActionsTestCase.test_dw21_ac3_job_revokes_scheduled_action_if_conditions_changed`<br>Trong cửa sổ trì hoãn nếu người dùng bị tắt khẩn AI (`killed=true`), mất quyền, hoặc tài khoản bị khoá -> job `run_due_ai_actions` không gọi view, tự động chuyển `status=PENDING`, hạ `level=C`, ghi nhận `downgrade_reason={"code": "AI_LEVEL_REVOKED"}` (tuân thủ BR-AI-21, Q-M5, H12). |
+| **DW-21-AC4** | ✅ PASS | `apps.ai.execution.tests.test_dw21_deferred_actions::DW21DeferredActionsTestCase.test_dw21_ac4_user_cancels_scheduled_action_within_window`<br>Chủ AI bấm huỷ lịch trong cửa sổ (`POST /api/ai/actions/<id>/undo/`) -> HTTP 200 `outcome="cancelled"`; `AiAction` chuyển `status=CANCELLED`; AuditLog ghi nhận `cancel_schedule_{command}`; chứng từ nghiệp vụ hoàn toàn không bị thay đổi. |
+| **DW-21-AC5 (idempotent)** | ✅ PASS | `apps.ai.execution.tests.test_dw21_deferred_actions::DW21DeferredActionsTestCase.test_dw21_ac5_job_is_idempotent_with_select_for_update_skip_locked`<br>Job sử dụng `AiAction.objects.select_for_update(skip_locked=True)`. Hai tiến trình chạy đồng thời hoặc chạy liên tiếp -> view nghiệp vụ chỉ được gọi đúng 1 lần duy nhất, ngăn chặn race condition (Bất biến 4 & 6). |
+| **DW-21-AC6 (bảo mật)** | ✅ PASS | `apps.ai.execution.tests.test_dw21_deferred_actions::DW21DeferredActionsTestCase.test_dw21_ac6_no_http_path_to_force_auth_user`<br>Gửi payload HTTP chứa `_force_auth_user` hoặc `HTTP_X_FORCE_USER` -> hệ thống hoàn toàn phớt lờ, `AiAction` luôn được xác định chính xác theo user từ Token xác thực; `force_authenticate` chỉ chạy trong ngữ cảnh nội bộ của job (H1). |
+| **DW-21-AC7 (PII / giá vốn)** | ✅ PASS | `apps.ai.execution.tests.test_dw21_deferred_actions::DW21DeferredActionsTestCase.test_dw21_ac7_job_logs_only_command_and_action_id_no_pii_no_cost`<br>Lệnh chạy trên dữ liệu có PII giả định ("Khach Thu Nghiem PII", "0900000123") và giá vốn ("987654.32") -> `assertLogs` kiểm chứng log của command `run_due_ai_actions` chỉ in `action.id` và `command`, tuyệt đối không in tên, SĐT, hay con số giá vốn (Bất biến 1 & 9). |
+| **DW-21-AC8 (AI tắt)** | ✅ PASS | `apps.ai.execution.tests.test_dw21_deferred_actions::DW21DeferredActionsTestCase.test_dw21_ac8_job_when_ai_disabled_downgrades_to_pending_c`<br>`AI_ENABLED=False` lúc tới hạn -> job `run_due_ai_actions` quét các việc SCHEDULED, không thực thi view, chuyển `status=PENDING`, `level=C`, ghi nhận `downgrade_reason={"code": "AI_DISABLED"}` (BR-AI-10). |
+
+### Ngoại lệ & biên | Phân quyền | Rò giá vốn | Rò dữ liệu cá nhân | Hồi quy
+- **Ngoại lệ & biên**:
+  - Biên thời gian hoàn tác: Quá hạn `undo_until` (10 phút) gọi hoàn tác nhận ngay HTTP 410 `AI_UNDO_WINDOW_CLOSED`.
+  - Biên nghiệp vụ: Nếu lô cá sinh ra từ phiếu nhập đã mở bán (`SELLING`), gắn hoá đơn, hoặc phân bổ chi phí -> huỷ phiếu bị từ chối 400 `BR-MH-07`.
+  - Biên ngưỡng: Vượt ngưỡng kg hoặc số tiền của nhân viên/Chủ -> tự động hạ mức C (`outcome="proposal"`), không bao giờ lọt mức B.
+  - Hạn mức ngày: Vượt quá 20 lần/ngày tự động hạ mức C (`AI_DAILY_LIMIT`).
+  - Lỗi Audit: H5 được chứng minh bằng test mock lỗi audit, bảo đảm toàn bộ thao tác trong `transaction.atomic()` bị huỷ bỏ trọn vẹn.
+- **Phân quyền (Bảng vai × Hành động)**:
+  - `chu`: Có quyền `ai.manage_ai_policy`, hoàn tác được việc của mình và của nhân viên khác; đặt trần caps.
+  - `quan_ly`: Cấu hình AI của mình; bị chặn nâng lệnh trần C ép (`sales.refund.create_refund`) lên B (HTTP 400).
+  - `nv_kho`: Cấu hình mức B cho `nhap_lo` trong giới hạn trần của Chủ; gọi `call` tự sinh phiếu và lô DRAFT; hoàn tác việc của mình trong 10 phút.
+  - `nv_giao`: Bị từ chối khi gọi các lệnh ngoài phạm vi; không thể can thiệp vào các việc của kho.
+- **Rò giá vốn (Bất biến 1)**:
+  - Kết quả trả về của lệnh call mức B được chạy qua `scrub_data`: nhân viên kho không thấy `purchase_rate`, `landed_unit_cost`, `rate`.
+  - Log của management command `run_due_ai_actions` chỉ in ID lệnh và ID action, không in giá trị số tiền.
+- **Rò dữ liệu cá nhân (Bất biến 9)**:
+  - Log của management command `run_due_ai_actions` được kiểm chứng bằng `assertLogs`, không chứa tên, SĐT khách.
+  - `target` trong `AiAction` chỉ lưu `type` và `code`, không lưu `object_repr` chứa PII.
+  - Màn hình Việc AI ở FE không ghi câu hỏi hay PII ra console log hay localStorage.
+- **Hồi quy**:
+  - Toàn bộ backend test suite đạt **1032 tests xanh 100%**.
+  - `makemigrations --check --dry-run` sạch sẽ: `No changes detected`.
+  - Suite Vitest frontend: **77 tests passed 100%** (bao gồm 5 tests mới `actions.test.ts`).
+  - Build tĩnh Next.js: `erp-console` sạch 30/30 trang, `frontend` sạch 10/10 trang.
+
+### Lỗi
+Không có lỗi chặn (0 lỗi).
+
+### Lệnh đã chạy (kèm output tóm tắt)
+1. `cd backend && .venv/bin/python manage.py test apps.ai.execution.tests.test_dw19_level_b apps.ai.execution.tests.test_dw21_deferred_actions` -> `Ran 17 tests in 0.713s. OK`
+2. `cd backend && .venv/bin/python manage.py test && .venv/bin/python manage.py makemigrations --check --dry-run` -> `Ran 1032 tests in 48.495s. OK. No changes detected.`
+3. `cd erp-console && npm test` -> `77 passed (vitest)`
+4. `cd erp-console && npx tsc --noEmit && npm run build` -> Compile sạch 30/30 static pages.
+5. `cd frontend && npx tsc --noEmit && npm run build` -> Compile sạch 10/10 static pages.

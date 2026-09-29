@@ -229,13 +229,10 @@ class AiCommandCallView(APIView):
             })
 
         else:
-            # Lệnh ghi: Mức C (Proposal)
-            ttl_minutes = getattr(settings, "AI_ACTION_TTL_MINUTES", 15)
-            expires_at = timezone.now() + datetime.timedelta(minutes=ttl_minutes)
-
-            # DW-20-AC2: Kiểm tra ngưỡng trần lúc gọi lệnh ghi
-            downgrade_reason = None
+            # Lệnh ghi
+            import uuid
             from decimal import Decimal
+            from django.db import transaction
             from apps.ai.settings.services import get_cap_for_command
             from apps.ai.models import AiPolicyVersion, AiConfigVersion
 
@@ -263,64 +260,283 @@ class AiCommandCallView(APIView):
 
             effective_cap_kg = min([x for x in [cap_kg, limit_kg] if x is not None], default=None)
 
-            if "lines" in args and isinstance(args["lines"], list):
+            cap_vnd = None
+            if cap_cfg and cap_cfg.get("vnd") is not None:
                 try:
-                    total_qty = sum(
-                        Decimal(str(l.get("qty", 0)))
-                        for l in args["lines"]
-                        if isinstance(l, dict)
-                    )
-                    if effective_cap_kg is not None and total_qty > effective_cap_kg:
-                        is_over_owner_cap = (cap_kg is not None and total_qty > cap_kg)
-                        downgrade_reason = {
-                            "code": "AI_LIMIT_KG",
-                            "text": "Vượt trần của Chủ" if is_over_owner_cap else "Vượt ngưỡng bạn đặt",
-                        }
+                    cap_vnd = Decimal(str(cap_cfg["vnd"]))
                 except Exception:
                     pass
 
-            action = AiAction.objects.create(
-                command=spec.id,
-                kind=AiAction.Kind.WRITE,
-                level=AiAction.Level.C,
-                status=AiAction.Status.PENDING,
-                owner=request.user,
-                idempotency_key=idempotency_key,
-                channel="ai_local",
-                client=client,
-                args=args,
-                target_model=target_model_label,
-                target_id=str(target_id or ""),
-                downgrade_reason=downgrade_reason,
-                expires_at=expires_at,
-            )
+            limit_vnd = None
+            if user_lim and user_lim.get("vnd") is not None:
+                try:
+                    limit_vnd = Decimal(str(user_lim["vnd"]))
+                except Exception:
+                    pass
 
-            # Ghi AuditLog propose_<id> (DW-11-AC1)
-            with set_ai_audit_scope(
-                ai_actor=request.user,
-                level="C",
-                action_ref=str(action.id),
-                is_proposal=True,
-            ):
-                record_audit(
-                    f"propose_{spec.id}",
-                    actor=None,
-                    actor_kind="ai",
-                    ai_actor=request.user,
-                    proposal_ref=str(action.id),
-                    note=f"AI đề xuất lệnh {spec.title}",
+            effective_cap_vnd = min([x for x in [cap_vnd, limit_vnd] if x is not None], default=None)
+
+            # Hạn mức ngày
+            cap_daily = None
+            if cap_cfg and cap_cfg.get("daily") is not None:
+                try:
+                    cap_daily = int(cap_cfg["daily"])
+                except Exception:
+                    pass
+
+            limit_daily = None
+            if user_lim and user_lim.get("daily") is not None:
+                try:
+                    limit_daily = int(user_lim["daily"])
+                except Exception:
+                    pass
+
+            default_daily = getattr(settings, "AI_DAILY_LIMIT_DEFAULT", 20)
+            daily_candidates = [x for x in [cap_daily, limit_daily] if x is not None]
+            effective_daily = min(daily_candidates) if daily_candidates else default_daily
+
+            downgrade_reason = None
+
+            # 1. Kiểm tra số kg và tiền
+            total_qty = Decimal("0")
+            total_amount = Decimal("0")
+            if "lines" in args and isinstance(args["lines"], list):
+                try:
+                    for l in args["lines"]:
+                        if isinstance(l, dict):
+                            q = Decimal(str(l.get("qty", 0)))
+                            r = Decimal(str(l.get("rate", 0)))
+                            total_qty += q
+                            total_amount += q * r
+                except Exception:
+                    pass
+
+                if effective_cap_kg is not None and total_qty > effective_cap_kg:
+                    is_over_owner_cap = (cap_kg is not None and total_qty > cap_kg)
+                    downgrade_reason = {
+                        "code": "AI_LIMIT_KG",
+                        "text": "Vượt trần của Chủ" if is_over_owner_cap else "Vượt ngưỡng bạn đặt",
+                    }
+                elif effective_cap_vnd is not None and total_amount > effective_cap_vnd:
+                    is_over_owner_cap = (cap_vnd is not None and total_amount > cap_vnd)
+                    downgrade_reason = {
+                        "code": "AI_LIMIT_VND",
+                        "text": "Vượt trần của Chủ" if is_over_owner_cap else "Vượt ngưỡng bạn đặt",
+                    }
+
+            # 2. Kiểm tra hạn mức ngày (DW-19-AC5)
+            if not downgrade_reason and current_level == "B":
+                today_start = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
+                daily_count = AiAction.objects.filter(
+                    owner=request.user,
+                    kind=AiAction.Kind.WRITE,
+                    created_at__gte=today_start,
+                    status__in=[
+                        AiAction.Status.DONE,
+                        AiAction.Status.CONFIRMED,
+                        AiAction.Status.SCHEDULED,
+                    ],
+                ).count()
+                if daily_count >= effective_daily:
+                    downgrade_reason = {
+                        "code": "AI_DAILY_LIMIT",
+                        "text": "Vượt hạn mức trong ngày",
+                    }
+
+            # Nếu có downgrade_reason hoặc current_level == "C": tạo đề xuất nháp PENDING
+            if downgrade_reason or current_level == "C":
+                ttl_minutes = getattr(settings, "AI_ACTION_TTL_MINUTES", 15)
+                expires_at = timezone.now() + datetime.timedelta(minutes=ttl_minutes)
+
+                action = AiAction.objects.create(
+                    command=spec.id,
+                    kind=AiAction.Kind.WRITE,
+                    level=AiAction.Level.C,
+                    status=AiAction.Status.PENDING,
+                    owner=request.user,
+                    config_version=user_cfg.version if user_cfg else None,
+                    policy_version=latest_policy.version if latest_policy else None,
+                    idempotency_key=idempotency_key,
+                    channel="ai_local",
+                    client=client,
+                    args=args,
+                    target_model=target_model_label,
+                    target_id=str(target_id or ""),
+                    downgrade_reason=downgrade_reason,
+                    expires_at=expires_at,
                 )
 
-            return Response({
-                "outcome": "proposal",
-                "level": "C",
-                "action_id": str(action.id),
-                "expires_at": action.expires_at.isoformat(),
-                "downgrade_reason": downgrade_reason,
-                "preview": {
-                    "target": {
-                        "type": target_model_label or "document",
-                        "code": str(target_id or ""),
-                    }
-                },
-            })
+                # Ghi AuditLog propose_<id> (DW-11-AC1)
+                with set_ai_audit_scope(
+                    ai_actor=request.user,
+                    level="C",
+                    config_version=user_cfg.version if user_cfg else None,
+                    policy_version=latest_policy.version if latest_policy else None,
+                    action_ref=str(action.id),
+                    is_proposal=True,
+                ):
+                    record_audit(
+                        f"propose_{spec.id}",
+                        actor=None,
+                        actor_kind="ai",
+                        ai_actor=request.user,
+                        proposal_ref=str(action.id),
+                        note=f"AI đề xuất lệnh {spec.title}",
+                    )
+
+                return Response({
+                    "outcome": "proposal",
+                    "level": "C",
+                    "action_id": str(action.id),
+                    "expires_at": action.expires_at.isoformat(),
+                    "downgrade_reason": downgrade_reason,
+                    "preview": {
+                        "target": {
+                            "type": target_model_label or "document",
+                            "code": str(target_id or ""),
+                        }
+                    },
+                })
+
+            # Đến đây: current_level == "B" và không bị hạ mức
+            undo_attr = getattr(spec, "undo", "") or ""
+
+            # TRƯỜNG HỢP 1: Lệnh trì hoãn ghi (DW-21)
+            if undo_attr == "defer":
+                delay_minutes = getattr(spec, "delay_minutes", None) or getattr(settings, "AI_DEFERRED_DELAY_MINUTES", 10)
+                execute_after = timezone.now() + datetime.timedelta(minutes=delay_minutes)
+                undo_until = execute_after
+
+                action = AiAction.objects.create(
+                    command=spec.id,
+                    kind=AiAction.Kind.WRITE,
+                    status=AiAction.Status.SCHEDULED,
+                    level=AiAction.Level.B,
+                    owner=request.user,
+                    config_version=user_cfg.version if user_cfg else None,
+                    policy_version=latest_policy.version if latest_policy else None,
+                    target_model=target_model_label,
+                    target_id=str(target_id or ""),
+                    args=args,
+                    idempotency_key=idempotency_key,
+                    channel="ai_local",
+                    client=client,
+                    execute_after=execute_after,
+                    undo_until=undo_until,
+                )
+
+                # Ghi AuditLog schedule_<spec.id>
+                with set_ai_audit_scope(
+                    ai_actor=request.user,
+                    level="B",
+                    config_version=user_cfg.version if user_cfg else None,
+                    policy_version=latest_policy.version if latest_policy else None,
+                    action_ref=str(action.id),
+                ):
+                    record_audit(
+                        f"schedule_{spec.id}",
+                        actor=None,
+                        actor_kind="ai",
+                        ai_actor=request.user,
+                        proposal_ref=str(action.id),
+                        note=f"AI xếp lịch lệnh {spec.title} chạy sau {delay_minutes} phút",
+                    )
+
+                return Response({
+                    "outcome": "scheduled",
+                    "level": "B",
+                    "action_id": str(action.id),
+                    "execute_after": execute_after.isoformat(),
+                    "undo_until": undo_until.isoformat(),
+                })
+
+            # TRƯỜNG HỢP 2: Lệnh hoàn tác bằng trạng thái (DW-19)
+            # Toàn bộ bọc trong transaction.atomic() (H5, DW-19-AC6)
+            with transaction.atomic():
+                action_id = uuid.uuid4()
+
+                # 1. Gọi view trong ai_audit_scope
+                with set_ai_audit_scope(
+                    ai_actor=request.user,
+                    level="B",
+                    config_version=user_cfg.version if user_cfg else None,
+                    policy_version=latest_policy.version if latest_policy else None,
+                    action_ref=str(action_id),
+                ):
+                    dispatch_res = dispatch_command(
+                        spec,
+                        user=request.user,
+                        args=args,
+                        target_id=target_id,
+                        request_origin=request,
+                    )
+
+                if dispatch_res.is_error:
+                    transaction.set_rollback(True)
+                    return Response(dispatch_res.data, status=dispatch_res.status_code)
+
+                # 2. Lấy result_ref
+                result_ref = None
+                if isinstance(dispatch_res.data, dict):
+                    if "receipt" in dispatch_res.data and isinstance(dispatch_res.data["receipt"], dict):
+                        result_ref = {
+                            "model": "purchasereceipt",
+                            "id": dispatch_res.data["receipt"].get("id"),
+                        }
+                    elif "id" in dispatch_res.data:
+                        result_ref = {
+                            "model": target_model_label or "",
+                            "id": dispatch_res.data.get("id"),
+                        }
+
+                target_final_id = str(target_id or (result_ref.get("id") if result_ref else "") or "")
+
+                undo_window_minutes = getattr(settings, "AI_UNDO_WINDOW_MINUTES", 10)
+                undo_until = timezone.now() + datetime.timedelta(minutes=undo_window_minutes)
+
+                action = AiAction.objects.create(
+                    id=action_id,
+                    command=spec.id,
+                    kind=AiAction.Kind.WRITE,
+                    status=AiAction.Status.DONE,
+                    level=AiAction.Level.B,
+                    owner=request.user,
+                    config_version=user_cfg.version if user_cfg else None,
+                    policy_version=latest_policy.version if latest_policy else None,
+                    target_model=target_model_label,
+                    target_id=target_final_id,
+                    args=args,
+                    idempotency_key=idempotency_key,
+                    channel="ai_local",
+                    client=client,
+                    executed_at=timezone.now(),
+                    undo_until=undo_until,
+                    result_ref=result_ref,
+                )
+
+                # 3. Ghi AuditLog execute_<spec.id> (H5: nếu lỗi AuditLog -> rollback toàn bộ!)
+                with set_ai_audit_scope(
+                    ai_actor=request.user,
+                    level="B",
+                    config_version=user_cfg.version if user_cfg else None,
+                    policy_version=latest_policy.version if latest_policy else None,
+                    action_ref=str(action.id),
+                ):
+                    record_audit(
+                        f"execute_{spec.id}",
+                        actor=None,
+                        actor_kind="ai",
+                        ai_actor=request.user,
+                        proposal_ref=str(action.id),
+                        note=f"AI tự ghi lệnh {spec.title} mức B",
+                    )
+
+                clean_result = scrub_data(dispatch_res.data, user=request.user)
+
+                return Response({
+                    "outcome": "done",
+                    "level": "B",
+                    "action_id": str(action.id),
+                    "result": clean_result,
+                    "undo_until": action.undo_until.isoformat(),
+                })

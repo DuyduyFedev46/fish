@@ -7,8 +7,8 @@ export type FetchAiActionsParams = {
   page?: number;
 };
 
-const mockAiActions: Paginated<AiActionRow> = {
-  count: 1,
+export const mockAiActions: Paginated<AiActionRow> = {
+  count: 3,
   next: null,
   previous: null,
   results: [
@@ -19,14 +19,46 @@ const mockAiActions: Paginated<AiActionRow> = {
       level: "C",
       status: "PENDING",
       owner_display: "AI của Lộc",
-      created_at: new Date().toISOString(),
-      expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+      created_at: new Date(Date.now() - 5 * 60 * 1000).toISOString(),
+      expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
       execute_after: null,
       undo_until: null,
       target: { type: "purchasereceipt", code: "PR-260928-01" },
       args_preview: { item_code: "CA-001", qty: "10.000" },
       downgrade_reason: null,
       result_ref: null,
+    },
+    {
+      id: "b2c3d4e5-f6a7-8901-bcde-f12345678901",
+      command: "inventory.batch.close",
+      title: "Chốt lô cá thu CA01",
+      level: "B",
+      status: "SCHEDULED",
+      owner_display: "AI của Lộc",
+      created_at: new Date(Date.now() - 2 * 60 * 1000).toISOString(),
+      expires_at: null,
+      execute_after: new Date(Date.now() + 12 * 60 * 1000).toISOString(),
+      undo_until: new Date(Date.now() + 12 * 60 * 1000).toISOString(),
+      target: { type: "batch", code: "CA01-260928-AB12C" },
+      args_preview: { batch_id: "CA01-260928-AB12C" },
+      downgrade_reason: null,
+      result_ref: null,
+    },
+    {
+      id: "c3d4e5f6-a7b8-9012-cdef-123456789012",
+      command: "purchasing.purchasereceipt.nhap_lo",
+      title: "Nhập lô mua tại cảng",
+      level: "B",
+      status: "DONE",
+      owner_display: "AI của Kho",
+      created_at: new Date(Date.now() - 3 * 60 * 1000).toISOString(),
+      expires_at: null,
+      execute_after: null,
+      undo_until: new Date(Date.now() + 7 * 60 * 1000).toISOString(),
+      target: { type: "purchasereceipt", code: "PR-260928-02" },
+      args_preview: { supplier: 1, lines: [{ item_code: "CA-001", qty: "50.000" }] },
+      downgrade_reason: null,
+      result_ref: { model: "purchasing.purchasereceipt", id: 102 },
     },
   ],
 };
@@ -42,9 +74,26 @@ export async function fetchAiActions(
   if (params.page) qs.set("page", String(params.page));
   const query = qs.toString();
 
+  const mockHandler = (_req: MockRequest) => {
+    let filtered = [...mockAiActions.results];
+    if (params.status) {
+      const allowed = params.status.split(",").map((s) => s.trim());
+      filtered = filtered.filter((act) => allowed.includes(act.status));
+    }
+    return {
+      status: 200,
+      body: {
+        count: filtered.length,
+        next: null,
+        previous: null,
+        results: filtered,
+      },
+    };
+  };
+
   return apiFetch<Paginated<AiActionRow>>(`/api/ai/actions/${query ? `?${query}` : ""}`, {
     signal,
-    mock: isMock ? (_req: MockRequest) => ({ status: 200, body: mockAiActions }) : undefined,
+    mock: isMock ? mockHandler : undefined,
   });
 }
 
@@ -54,7 +103,7 @@ export async function fetchAiActionDetail(
 ): Promise<AiActionDetail> {
   const isMock = process.env.NEXT_PUBLIC_USE_MOCK === "1";
   const mockDetail: AiActionDetail = {
-    ...mockAiActions.results[0],
+    ...(mockAiActions.results.find((a) => a.id === id) || mockAiActions.results[0]),
     id,
     viewed_at: new Date().toISOString(),
     confirm_nonce: "mock-nonce-123",
@@ -76,10 +125,16 @@ export async function confirmAiAction(
     `/api/ai/actions/${encodeURIComponent(id)}/confirm/`,
     {
       method: "POST",
-      body: JSON.stringify({ confirm_nonce: confirmNonce }),
+      body: { confirm_nonce: confirmNonce },
       signal,
       mock: isMock
-        ? (_req: MockRequest) => ({ status: 200, body: { outcome: "done", result: { ok: true } } })
+        ? (_req: MockRequest) => {
+            const target = mockAiActions.results.find((a) => a.id === id);
+            if (target) {
+              target.status = "CONFIRMED";
+            }
+            return { status: 200, body: { outcome: "done", result: { ok: true } } };
+          }
         : undefined,
     }
   );
@@ -95,11 +150,49 @@ export async function rejectAiAction(
     `/api/ai/actions/${encodeURIComponent(id)}/reject/`,
     {
       method: "POST",
-      body: JSON.stringify({ reason_code: reasonCode }),
+      body: { reason_code: reasonCode },
       signal,
       mock: isMock
-        ? (_req: MockRequest) => ({ status: 200, body: { outcome: "rejected", action_id: id } })
+        ? (_req: MockRequest) => {
+            const target = mockAiActions.results.find((a) => a.id === id);
+            if (target) {
+              target.status = "REJECTED";
+            }
+            return { status: 200, body: { outcome: "rejected", action_id: id } };
+          }
         : undefined,
     }
   );
 }
+
+export function mockUndoAiAction(id: string): { status: number; body: { outcome: string; action_id: string } } {
+  const target = mockAiActions.results.find((a) => a.id === id);
+  if (target) {
+    if (target.status === "SCHEDULED") {
+      target.status = "CANCELLED";
+    } else {
+      target.status = "UNDONE";
+    }
+  }
+  return {
+    status: 200,
+    body: { outcome: "undone", action_id: id },
+  };
+}
+
+export async function undoAiAction(
+  id: string,
+  signal?: AbortSignal
+): Promise<{ outcome: string; action_id: string }> {
+  const isMock = process.env.NEXT_PUBLIC_USE_MOCK === "1";
+  return apiFetch<{ outcome: string; action_id: string }>(
+    `/api/ai/actions/${encodeURIComponent(id)}/undo/`,
+    {
+      method: "POST",
+      body: {},
+      signal,
+      mock: isMock ? (_req: MockRequest) => mockUndoAiAction(id) : undefined,
+    }
+  );
+}
+

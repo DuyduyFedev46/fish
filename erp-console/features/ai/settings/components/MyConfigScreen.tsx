@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { getMyConfig, killMyConfig, updateMyConfig } from "../api";
-import { MyConfig } from "../../types";
+import type { MyConfig, MyConfigCommandItem, AiCommandLevel } from "../../types";
 
 export default function MyConfigScreen() {
   const [config, setConfig] = useState<MyConfig | null>(null);
@@ -14,6 +14,7 @@ export default function MyConfigScreen() {
 
   // Form state
   const [overrides, setOverrides] = useState<Record<string, string>>({});
+  const [limits, setLimits] = useState<Record<string, { kg?: string; vnd?: string }>>({});
   const [ack, setAck] = useState(false);
 
   const loadData = async () => {
@@ -22,16 +23,24 @@ export default function MyConfigScreen() {
       setError(null);
       const data = await getMyConfig();
       setConfig(data);
-      // Khởi tạo overrides từ danh sách lệnh
+      // Khởi tạo overrides và limits từ danh sách lệnh
       const initialOverrides: Record<string, string> = {};
+      const initialLimits: Record<string, { kg?: string; vnd?: string }> = {};
       data.groups.forEach((grp) => {
         grp.commands.forEach((cmd) => {
           if (cmd.source === "override") {
             initialOverrides[cmd.id] = cmd.level;
           }
+          if (cmd.limits) {
+            initialLimits[cmd.id] = {
+              kg: cmd.limits.kg?.mine || "",
+              vnd: cmd.limits.vnd?.mine || "",
+            };
+          }
         });
       });
       setOverrides(initialOverrides);
+      setLimits(initialLimits);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Không thể tải cấu hình AI.");
     } finally {
@@ -50,6 +59,16 @@ export default function MyConfigScreen() {
     }));
   };
 
+  const handleLimitChange = (cmdId: string, field: "kg" | "vnd", val: string) => {
+    setLimits((prev) => ({
+      ...prev,
+      [cmdId]: {
+        ...(prev[cmdId] || {}),
+        [field]: val,
+      },
+    }));
+  };
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!config) return;
@@ -65,6 +84,7 @@ export default function MyConfigScreen() {
       const updated = await updateMyConfig({
         base_version: config.version,
         overrides,
+        limits,
         acknowledge_responsibility: true,
       });
       setConfig(updated);
@@ -101,6 +121,32 @@ export default function MyConfigScreen() {
     } finally {
       setKilling(false);
     }
+  };
+
+  // DW-19 & DW-20: Tính danh sách choices hợp lệ theo write_levels_allowed
+  const computeChoices = (cmd: MyConfigCommandItem): AiCommandLevel[] => {
+    if (cmd.kind === "read") {
+      return cmd.choices || ["OFF", "A"];
+    }
+
+    // Lệnh ghi:
+    // Chỉ cho chọn B nếu:
+    // 1. write_levels_allowed có "B" (staging)
+    // 2. cmd.max_level === "B" hoặc cmd.choices?.includes("B")
+    // 3. Không bị vùng đỏ (cmd.red_zone)
+    // 4. Không bị khoá (cmd.locked_reason === null)
+    const isWriteAllowedB = Boolean(config?.write_levels_allowed?.includes("B"));
+    const canChooseB =
+      isWriteAllowedB &&
+      (cmd.max_level === "B" || cmd.choices?.includes("B")) &&
+      !cmd.red_zone &&
+      !cmd.locked_reason;
+
+    const choices: AiCommandLevel[] = ["OFF", "C"];
+    if (canChooseB) {
+      choices.push("B");
+    }
+    return choices;
   };
 
   if (loading) {
@@ -196,57 +242,101 @@ export default function MyConfigScreen() {
               <div className="divide-y divide-gray-100">
                 {grp.commands.map((cmd) => {
                   const currentLevel = overrides[cmd.id] || cmd.level;
+                  const allowedChoices = computeChoices(cmd);
                   return (
                     <div
                       key={cmd.id}
-                      className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-gray-50 transition"
+                      className="p-4 flex flex-col gap-3 hover:bg-gray-50 transition"
                     >
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium text-sm text-gray-900">{cmd.title}</span>
-                          <span
-                            className={`px-1.5 py-0.5 text-[10px] font-mono rounded uppercase ${
-                              cmd.kind === "read"
-                                ? "bg-blue-50 text-blue-700 border border-blue-200"
-                                : "bg-purple-50 text-purple-700 border border-purple-200"
-                            }`}
-                          >
-                            {cmd.kind === "read" ? "Đọc" : "Ghi"}
-                          </span>
-                          {cmd.red_zone && (
-                            <span className="px-1.5 py-0.5 text-[10px] font-medium bg-red-100 text-red-800 rounded">
-                              Vùng đỏ
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium text-sm text-gray-900">{cmd.title}</span>
+                            <span
+                              className={`px-1.5 py-0.5 text-[10px] font-mono rounded uppercase ${
+                                cmd.kind === "read"
+                                  ? "bg-blue-50 text-blue-700 border border-blue-200"
+                                  : "bg-purple-50 text-purple-700 border border-purple-200"
+                              }`}
+                            >
+                              {cmd.kind === "read" ? "Đọc" : "Ghi"}
                             </span>
+                            {cmd.red_zone && (
+                              <span className="px-1.5 py-0.5 text-[10px] font-medium bg-red-100 text-red-800 rounded">
+                                Vùng đỏ
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs text-gray-500 font-mono">{cmd.id}</p>
+                          {cmd.locked_reason && (
+                            <p className="text-xs text-amber-700">
+                              Lưu ý: {cmd.locked_reason.text} ({cmd.locked_reason.code})
+                            </p>
                           )}
                         </div>
-                        <p className="text-xs text-gray-500 font-mono">{cmd.id}</p>
-                        {cmd.locked_reason && (
-                          <p className="text-xs text-amber-700">
-                            Lưu ý: {cmd.locked_reason.text} ({cmd.locked_reason.code})
-                          </p>
-                        )}
+
+                        <div className="flex items-center gap-2">
+                          <label className="text-xs text-gray-600 font-medium">Mức tự chủ:</label>
+                          <select
+                            value={currentLevel}
+                            onChange={(e) => handleLevelChange(cmd.id, e.target.value)}
+                            className="text-xs border rounded px-2.5 py-1.5 bg-white font-medium focus:ring-1 focus:ring-blue-500"
+                          >
+                            {allowedChoices.map((choice) => (
+                              <option key={choice} value={choice}>
+                                {choice === "OFF"
+                                  ? "Tắt (OFF)"
+                                  : choice === "A"
+                                  ? "Mức A (Tự đọc)"
+                                  : choice === "C"
+                                  ? "Mức C (Soạn nháp)"
+                                  : choice === "B"
+                                  ? "Mức B (Tự ghi + hoàn tác)"
+                                  : choice}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
                       </div>
 
-                      <div className="flex items-center gap-2">
-                        <label className="text-xs text-gray-600">Mức:</label>
-                        <select
-                          value={currentLevel}
-                          onChange={(e) => handleLevelChange(cmd.id, e.target.value)}
-                          className="text-xs border rounded px-2.5 py-1.5 bg-white font-medium focus:ring-1 focus:ring-blue-500"
-                        >
-                          {cmd.choices.map((choice) => (
-                            <option key={choice} value={choice}>
-                              {choice === "OFF"
-                                ? "Tắt (OFF)"
-                                : choice === "A"
-                                ? "Mức A (Tự đọc)"
-                                : choice === "C"
-                                ? "Mức C (Soạn nháp)"
-                                : choice}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
+                      {/* Hiển thị cấu hình ngưỡng nếu lệnh hỗ trợ limits */}
+                      {cmd.limits && currentLevel === "B" && (
+                        <div className="mt-2 rounded-md border border-gray-200 bg-gray-50 p-3 text-xs">
+                          <span className="font-semibold text-gray-700">Ngưỡng tự ghi an toàn:</span>
+                          <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            {cmd.limits.kg && (
+                              <div>
+                                <label className="block text-gray-600 mb-1">
+                                  Giới hạn kg mỗi lần (Trần của Chủ: {cmd.limits.kg.cap || "không giới hạn"} kg)
+                                </label>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  value={limits[cmd.id]?.kg || ""}
+                                  onChange={(e) => handleLimitChange(cmd.id, "kg", e.target.value)}
+                                  placeholder="Nhập số kg"
+                                  className="w-full rounded border px-2.5 py-1 bg-white"
+                                />
+                              </div>
+                            )}
+                            {cmd.limits.vnd && (
+                              <div>
+                                <label className="block text-gray-600 mb-1">
+                                  Giới hạn tiền mỗi lần (Trần của Chủ: {cmd.limits.vnd.cap ? `${cmd.limits.vnd.cap} đ` : "không giới hạn"})
+                                </label>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  value={limits[cmd.id]?.vnd || ""}
+                                  onChange={(e) => handleLimitChange(cmd.id, "vnd", e.target.value)}
+                                  placeholder="Nhập số tiền VNĐ"
+                                  className="w-full rounded border px-2.5 py-1 bg-white"
+                                />
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   );
                 })}

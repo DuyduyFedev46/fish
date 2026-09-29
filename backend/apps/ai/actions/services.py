@@ -167,3 +167,91 @@ def reject_ai_action(*, action_id: str, user, reason_code: str = "", request=Non
     )
 
     return {"outcome": "rejected", "action_id": str(action.id)}
+
+
+@transaction.atomic
+def undo_ai_action(*, action_id: str, user, request=None) -> dict:
+    """
+    Hoàn tác hành động AI mức B (DW-19, DW-21).
+    """
+    if not getattr(settings, "AI_ENABLED", False):
+        raise BusinessError("Hệ thống AI đang tắt.", code="AI_DISABLED", status_code=410)
+
+    action = (
+        AiAction.objects.select_for_update()
+        .filter(id=action_id)
+        .first()
+    )
+    if not action:
+        raise BusinessError("Không tìm thấy hành động AI.", code="NOT_FOUND", status_code=404)
+
+    # Phân quyền: chỉ owner hoặc người có quyền ai.manage_ai_policy
+    if action.owner_id != user.id and not user.has_perm("ai.manage_ai_policy"):
+        raise BusinessError("Bạn không có quyền hoàn tác hành động này.", code="PERMISSION_DENIED", status_code=403)
+
+    now = timezone.now()
+
+    # Trường hợp 1: Huỷ lịch (DW-21-AC4)
+    if action.status == AiAction.Status.SCHEDULED:
+        if action.undo_until and now > action.undo_until:
+            raise BusinessError("Đã quá thời gian huỷ lịch.", code="AI_UNDO_WINDOW_CLOSED", status_code=410)
+
+        action.status = AiAction.Status.CANCELLED
+        action.decided_by = user
+        action.decided_at = now
+        action.save(update_fields=["status", "decided_by", "decided_at"])
+
+        record_audit(
+            f"cancel_schedule_{action.command}",
+            actor=user,
+            actor_kind="user",
+            proposal_ref=str(action.id),
+            note=f"Huỷ lịch thực thi lệnh AI {action.id}",
+        )
+
+        return {"outcome": "cancelled", "action_id": str(action.id)}
+
+    # Trường hợp 2: Hoàn tác hành động mức B đã thực hiện (DW-19-AC3, AC4)
+    if action.status == AiAction.Status.DONE and action.level == AiAction.Level.B:
+        if not action.undo_until or now > action.undo_until:
+            raise BusinessError("Thời gian hoàn tác đã đóng.", code="AI_UNDO_WINDOW_CLOSED", status_code=410)
+
+        spec = get_registry().get(action.command)
+        undo_attr = getattr(spec, "undo", "") or ""
+
+        # Tìm target_id
+        target_id = None
+        if action.result_ref and isinstance(action.result_ref, dict):
+            target_id = action.result_ref.get("id")
+        if not target_id:
+            target_id = action.target_id
+
+        if undo_attr.startswith("cancel_action:") or "nhap_lo" in action.command:
+            from apps.purchasing.models import PurchaseReceipt
+            from apps.purchasing.receipts.services import cancel_receipt
+
+            try:
+                receipt = PurchaseReceipt.objects.get(pk=target_id)
+            except PurchaseReceipt.DoesNotExist:
+                raise BusinessError("Không tìm thấy chứng từ cần huỷ.", code="NOT_FOUND", status_code=404)
+
+            # Gọi cancel_receipt: nếu lô đã publish hoặc có hoá đơn, sẽ raise BusinessError (DW-19-AC4)
+            cancel_receipt(receipt=receipt, actor=user)
+
+        action.status = AiAction.Status.UNDONE
+        action.decided_by = user
+        action.decided_at = now
+        action.save(update_fields=["status", "decided_by", "decided_at"])
+
+        record_audit(
+            f"undo_{action.command}",
+            actor=user,
+            actor_kind="user",
+            proposal_ref=str(action.id),
+            note=f"Hoàn tác hành động AI {action.id}",
+        )
+
+        return {"outcome": "undone", "action_id": str(action.id)}
+
+    raise BusinessError(f"Hành động ở trạng thái {action.status}, không thể hoàn tác.", code="AI_CANNOT_UNDO", status_code=400)
+

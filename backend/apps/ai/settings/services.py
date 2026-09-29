@@ -231,6 +231,20 @@ def update_user_config(
                 if lvl not in valid_read_levels:
                     errors[cmd_id] = "Mức không hợp lệ cho lệnh đọc"
             else:
+                # DW-19-AC7: Mọi lệnh thuộc "trần C ép" không cho phép nâng lên B
+                if lvl == "B":
+                    is_forced_c = getattr(spec, "force_c", False) or getattr(spec, "max_level", "C") == "C" or cmd_id == "sales.refund.create_refund"
+                    if is_forced_c:
+                        errors[cmd_id] = f"Lệnh {cmd_id} bị giới hạn trần tối đa là C."
+                        continue
+                    # DW-19-AC2: Khi env_write_max == "C" (production), chặn user gửi mức B
+                    if env_write_max == "C":
+                        raise BusinessError(
+                            "Môi trường hiện tại không hỗ trợ mức tự thực thi B.",
+                            code="BR-AI-27",
+                            status_code=400,
+                        )
+
                 if lvl not in valid_write_levels:
                     errors[cmd_id] = f"Vượt trần: tối đa {env_write_max}"
                 elif getattr(spec, "red_zone", False) and lvl not in {"OFF", "C"}:
@@ -245,6 +259,12 @@ def update_user_config(
             if r_lvl and r_lvl not in valid_read_levels:
                 errors[f"groups.{grp_key}.read"] = "Mức đọc không hợp lệ"
             if w_lvl and w_lvl not in valid_write_levels:
+                if w_lvl == "B" and env_write_max == "C":
+                    raise BusinessError(
+                        "Môi trường hiện tại không hỗ trợ mức tự thực thi B.",
+                        code="BR-AI-27",
+                        status_code=400,
+                    )
                 errors[f"groups.{grp_key}.write"] = f"Vượt trần: tối đa {env_write_max}"
 
         # Validate limits theo caps của Chủ (DW-20-AC1)
@@ -269,8 +289,9 @@ def update_user_config(
                         errors[cmd_id] = "Giá trị giới hạn vnd không hợp lệ"
 
         if errors:
+            detail_msg = next(iter(errors.values())) if len(errors) == 1 else "Dữ liệu cấu hình không hợp lệ."
             raise BusinessError(
-                "Dữ liệu cấu hình không hợp lệ.",
+                detail_msg,
                 code="BR-AI-19",
                 status_code=400,
                 details={"errors": errors},

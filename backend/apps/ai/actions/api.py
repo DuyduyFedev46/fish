@@ -111,8 +111,9 @@ class AiActionViewSet(viewsets.GenericViewSet):
 
     @action(detail=True, methods=["post"], url_path="undo")
     def undo(self, request, pk=None):
-        # Mức B hoàn tác ở Lô 5
-        return Response(
-            {"detail": "Thời gian hoàn tác đã đóng hoặc tính năng chưa khả dụng.", "code": "AI_UNDO_WINDOW_CLOSED"},
-            status=status.HTTP_410_GONE,
+        res = services.undo_ai_action(
+            action_id=pk,
+            user=request.user,
+            request=request,
         )
+        return Response(res, status=status.HTTP_200_OK)
