@@ -202,4 +202,61 @@ export interface PageByRoleResponse {
   effective_from: string;
 }
 
+export type ReturnReason =
+  | "missing_info"
+  | "wrong_content"
+  | "legal_risk"
+  | "other";
+
+export interface EntrySubmitPayload {
+  row_version: number;
+  acknowledge_warnings?: boolean;
+}
+
+export interface EntrySubmitResponse {
+  status: string;
+  row_version: number;
+}
+
+export interface EntryReturnPayload {
+  row_version: number;
+  reason: ReturnReason;
+}
+
+export interface EntryReturnResponse {
+  status: string;
+  row_version: number;
+  return_reason?: string;
+}
+
+export interface EntryRestorePayload {
+  row_version: number;
+}
+
+export interface ContentEntryVersionListItem {
+  version: number;
+  published_at: string;
+  published_by_name: string;
+  title: string;
+  restored_from: number | null;
+}
+
+export interface ContentEntryVersionDetail {
+  version: number;
+  published_at: string;
+  published_by_name: string;
+  kind: ContentKind;
+  title: string;
+  slug: string;
+  excerpt: string;
+  seo_title: string;
+  seo_description: string;
+  description: string;
+  category: number | null;
+  cover_image: number | null;
+  body: BodyDoc;
+  restored_from: number | null;
+}
+
+
 

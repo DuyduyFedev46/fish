@@ -106,3 +106,61 @@ class EntryDetailSerializer(serializers.ModelSerializer):
 
     def get_updated_at(self, obj: Entry) -> str:
         return timezone.localtime(obj.updated_at).isoformat()
+
+
+class EntryVersionListSerializer(serializers.Serializer):
+    """
+    Serializer cho danh sách phiên bản của một bài viết (§8.5, CMS-11-AC1).
+    Tuyệt đối không trả body ở danh sách phiên bản (CMS-11-AC1).
+    published_by_name chỉ có ở ERP (CMS-11-AC5).
+    """
+
+    version = serializers.IntegerField()
+    published_at = serializers.SerializerMethodField()
+    published_by_name = serializers.SerializerMethodField()
+    title = serializers.CharField()
+    restored_from = serializers.IntegerField(allow_null=True)
+
+    def get_published_at(self, obj) -> str:
+        return timezone.localtime(obj.published_at).isoformat()
+
+    def get_published_by_name(self, obj) -> str:
+        if not obj.published_by:
+            return ""
+        staff_profile = getattr(obj.published_by, "staff_profile", None)
+        if staff_profile and getattr(staff_profile, "display_name", None):
+            return staff_profile.display_name
+        return obj.published_by.username
+
+
+class EntryVersionDetailSerializer(serializers.Serializer):
+    """
+    Serializer chi tiết một phiên bản của bài viết (§8.5, CMS-11).
+    """
+
+    version = serializers.IntegerField()
+    published_at = serializers.SerializerMethodField()
+    published_by_name = serializers.SerializerMethodField()
+    kind = serializers.CharField()
+    title = serializers.CharField()
+    slug = serializers.CharField()
+    excerpt = serializers.CharField()
+    seo_title = serializers.CharField()
+    seo_description = serializers.CharField()
+    description = serializers.CharField()
+    category = serializers.IntegerField(source="category_id", allow_null=True)
+    cover_image = serializers.IntegerField(source="cover_image_id", allow_null=True)
+    body = serializers.DictField()
+    restored_from = serializers.IntegerField(allow_null=True)
+
+    def get_published_at(self, obj) -> str:
+        return timezone.localtime(obj.published_at).isoformat()
+
+    def get_published_by_name(self, obj) -> str:
+        if not obj.published_by:
+            return ""
+        staff_profile = getattr(obj.published_by, "staff_profile", None)
+        if staff_profile and getattr(staff_profile, "display_name", None):
+            return staff_profile.display_name
+        return obj.published_by.username
+

@@ -5,16 +5,25 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.common.api import StandardPagination
-from apps.content.entries.serializers import EntryDetailSerializer, EntryListSerializer
+from apps.common.exceptions import BusinessError
+from apps.content.entries.serializers import (
+    EntryDetailSerializer,
+    EntryListSerializer,
+    EntryVersionDetailSerializer,
+    EntryVersionListSerializer,
+)
 from apps.content.entries.services import (
     delete_draft,
     discard_changes,
     golive_missing_roles,
     publish_entry,
+    restore_entry_version,
+    return_entry,
     save_draft,
+    submit_entry,
     unpublish_entry,
 )
-from apps.content.models.entries import Entry
+from apps.content.models.entries import Entry, EntryVersion
 from apps.content.permissions import ContentPermissions
 
 
@@ -30,7 +39,17 @@ class EntryViewSet(viewsets.ModelViewSet):
     serializer_class = EntryListSerializer
     queryset = Entry.objects.all()
     pagination_class = StandardPagination
-    custom_perm_actions = ("counts", "publish", "unpublish", "discard_changes")
+    custom_perm_actions = (
+        "counts",
+        "publish",
+        "unpublish",
+        "discard_changes",
+        "submit",
+        "return_action",
+        "versions",
+        "version_detail",
+        "restore_version",
+    )
     required_perms: tuple = ()
 
     def get_queryset(self):
@@ -148,6 +167,105 @@ class EntryViewSet(viewsets.ModelViewSet):
             status=status.HTTP_200_OK,
         )
 
+    @action(detail=True, methods=["post"], required_perms=("content.change_entry",))
+    def submit(self, request, pk=None):
+        """Gửi duyệt bài viết hoặc trang (§8.5, CMS-09)."""
+        instance = self.get_object()
+        req_version = request.data.get("row_version")
+        if req_version is not None:
+            try:
+                req_version = int(req_version)
+            except (ValueError, TypeError):
+                pass
+        ack_raw = request.data.get("acknowledge_warnings")
+        if isinstance(ack_raw, str):
+            acknowledge_warnings = ack_raw.strip().lower() in ("true", "1")
+        else:
+            acknowledge_warnings = bool(ack_raw)
+
+        res = submit_entry(
+            entry=instance,
+            actor=request.user,
+            row_version=req_version,
+            acknowledge_warnings=acknowledge_warnings,
+        )
+        return Response(res, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=["post"], url_path="return", required_perms=("content.publish_entry",))
+    def return_action(self, request, pk=None):
+        """Trả bài viết/trang về nháp kèm lý do (§8.5, CMS-09)."""
+        instance = self.get_object()
+        req_version = request.data.get("row_version")
+        if req_version is not None:
+            try:
+                req_version = int(req_version)
+            except (ValueError, TypeError):
+                pass
+        reason = request.data.get("reason", "")
+        res = return_entry(
+            entry=instance,
+            actor=request.user,
+            row_version=req_version,
+            reason=reason,
+        )
+        return Response(res, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=["get"], url_path="versions", required_perms=("content.view_entry",))
+    def versions(self, request, pk=None):
+        """Danh sách các phiên bản đã xuất bản của bài (§8.5, CMS-11-AC1)."""
+        instance = self.get_object()
+        qs = (
+            EntryVersion.objects.filter(entry=instance)
+            .select_related("published_by", "published_by__staff_profile")
+            .order_by("-version")
+        )
+        serializer = EntryVersionListSerializer(qs, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    @action(
+        detail=True,
+        methods=["get"],
+        url_path=r"versions/(?P<version_no>\d+)",
+        required_perms=("content.view_entry",),
+    )
+    def version_detail(self, request, pk=None, version_no=None):
+        """Chi tiết một phiên bản đã xuất bản (§8.5, CMS-11)."""
+        instance = self.get_object()
+        ver = (
+            EntryVersion.objects.filter(entry=instance, version=int(version_no))
+            .select_related("published_by", "published_by__staff_profile")
+            .first()
+        )
+        if not ver:
+            raise BusinessError("Không tìm thấy phiên bản yêu cầu.", code="NOT_FOUND", status_code=404)
+        serializer = EntryVersionDetailSerializer(ver)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    @action(
+        detail=True,
+        methods=["post"],
+        url_path=r"versions/(?P<version_no>\d+)/restore",
+        required_perms=("content.change_entry",),
+    )
+    def restore_version(self, request, pk=None, version_no=None):
+        """Khôi phục nội dung từ phiên bản cũ vào bản đang soạn (§8.5, CMS-11)."""
+        instance = self.get_object()
+        req_version = request.data.get("row_version")
+        if req_version is not None:
+            try:
+                req_version = int(req_version)
+            except (ValueError, TypeError):
+                pass
+        entry = restore_entry_version(
+            entry=instance,
+            actor=request.user,
+            version_no=int(version_no),
+            row_version=req_version,
+        )
+        return Response(
+            EntryDetailSerializer(entry, context=self.get_serializer_context()).data,
+            status=status.HTTP_200_OK,
+        )
 
     @action(detail=False, methods=["get"], required_perms=("content.view_entry",))
     def counts(self, request):

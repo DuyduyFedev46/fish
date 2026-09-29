@@ -9,6 +9,7 @@ from django.utils import timezone
 from apps.common.exceptions import BusinessError
 from apps.content.body.slug import slugify_vi, suggest_unique_slug
 from apps.content.body.sanitize import normalize_body
+from apps.content.body.scan import scan_entry_warnings
 from apps.content.models.entries import Entry, EntryVersion
 from apps.content.models.images import ContentImage
 
@@ -500,6 +501,229 @@ def publish_entry(
             "public_path": public_path,
             "public_url": f"{shop_base}{public_path}",
         }
+
+
+RETURN_REASONS = {"missing_info", "wrong_content", "legal_risk", "other"}
+
+
+def submit_entry(
+    *,
+    entry: Entry,
+    actor: Any,
+    row_version: int,
+    acknowledge_warnings: bool = False,
+) -> dict[str, Any]:
+    """
+    Gửi bài viết hoặc trang để chờ duyệt (CMS-09, §4.6 02b-tech-design).
+    - Chỉ cho phép gửi từ trạng thái 'draft'.
+    - Bài đã đăng hoặc đã gỡ gọi submit -> 400 BR-ND-02.
+    - Kiểm tra điều kiện bắt buộc BR-ND-03 (missing_fields).
+    - Quét cảnh báo CMS-08: nếu có cảnh báo và chưa xác nhận -> 409 CONTENT_WARNINGS.
+    - Ghi đúng 1 dòng AuditLog action 'content_submit'.
+    """
+    from apps.common.audit import record_audit
+
+    with transaction.atomic():
+        entry = Entry.objects.select_for_update().get(pk=entry.pk)
+
+        # 1. Kiểm tra row_version
+        if row_version != entry.row_version:
+            raise BusinessError(
+                "Bài viết đã được chỉnh sửa bởi người khác (STALE_VERSION).",
+                code="STALE_VERSION",
+                status_code=409,
+            )
+
+        # 2. Kiểm tra trạng thái hiện tại (CMS-09-AC6)
+        if entry.status in ("published", "unpublished"):
+            raise BusinessError(
+                "Bài viết đã được xuất bản hoặc đã gỡ không thể gửi duyệt (BR-ND-02).",
+                code="BR-ND-02",
+            )
+        if entry.status != "draft":
+            raise BusinessError(
+                "Chỉ có thể gửi duyệt bài viết đang ở trạng thái nháp (BR-ND-02).",
+                code="BR-ND-02",
+            )
+
+        # 3. Kiểm tra điều kiện bắt buộc BR-ND-03 (CMS-09-AC2)
+        missing = missing_fields(entry)
+        if missing:
+            raise BusinessError(
+                "Bài viết chưa đủ điều kiện gửi duyệt (BR-ND-03).",
+                code="BR-ND-03",
+                extra={"missing": missing},
+            )
+
+        # 4. Quét cảnh báo CMS-08
+        warnings = scan_entry_warnings(entry)
+        if warnings and acknowledge_warnings is not True:
+            raise BusinessError(
+                "Phát hiện cảnh báo trước khi gửi duyệt (CONTENT_WARNINGS).",
+                code="CONTENT_WARNINGS",
+                status_code=409,
+                extra={"warnings": warnings},
+            )
+
+        entry.status = "pending_review"
+        entry.row_version += 1
+        entry.updated_by = actor
+        entry.save(update_fields=[
+            "status",
+            "row_version",
+            "updated_by",
+            "updated_at",
+        ])
+
+        # Ghi AuditLog
+        record_audit(
+            action="content_submit",
+            actor=actor,
+            obj=entry,
+            changes={"entry_id": entry.id},
+            object_repr=f"Nội dung #{entry.id}",
+            note="",
+        )
+
+        return {
+            "status": "pending_review",
+            "row_version": entry.row_version,
+        }
+
+
+def return_entry(
+    *,
+    entry: Entry,
+    actor: Any,
+    row_version: int,
+    reason: str,
+) -> dict[str, Any]:
+    """
+    Trả bài viết/trang về trạng thái nháp từ 'pending_review' kèm lý do (CMS-09, §4.6).
+    - Chỉ cho phép trả về từ trạng thái 'pending_review'.
+    - Lý do bắt buộc thuộc RETURN_REASONS.
+    - Ghi đúng 1 dòng AuditLog action 'content_return'.
+    """
+    from apps.common.audit import record_audit
+
+    with transaction.atomic():
+        entry = Entry.objects.select_for_update().get(pk=entry.pk)
+
+        # 1. Kiểm tra row_version
+        if row_version != entry.row_version:
+            raise BusinessError(
+                "Bài viết đã được chỉnh sửa bởi người khác (STALE_VERSION).",
+                code="STALE_VERSION",
+                status_code=409,
+            )
+
+        # 2. Kiểm tra trạng thái hiện tại (CMS-09-AC4)
+        if entry.status != "pending_review":
+            raise BusinessError(
+                "Chỉ có thể trả về bài viết đang ở trạng thái chờ duyệt (BR-ND-02).",
+                code="BR-ND-02",
+            )
+
+        # 3. Kiểm tra lý do trả về (CMS-09-AC4)
+        clean_reason = str(reason or "").strip()
+        if clean_reason not in RETURN_REASONS:
+            raise BusinessError(
+                "Lý do trả về không hợp lệ (BR-ND-15).",
+                code="BR-ND-15",
+            )
+
+        entry.status = "draft"
+        entry.return_reason = clean_reason
+        entry.row_version += 1
+        entry.updated_by = actor
+        entry.save(update_fields=[
+            "status",
+            "return_reason",
+            "row_version",
+            "updated_by",
+            "updated_at",
+        ])
+
+        # Ghi AuditLog
+        record_audit(
+            action="content_return",
+            actor=actor,
+            obj=entry,
+            changes={
+                "entry_id": entry.id,
+                "reason": clean_reason,
+            },
+            object_repr=f"Nội dung #{entry.id}",
+            note="",
+        )
+
+        return {
+            "status": "draft",
+            "row_version": entry.row_version,
+        }
+
+
+def restore_entry_version(
+    *,
+    entry: Entry,
+    actor: Any,
+    version_no: int,
+    row_version: int,
+) -> Entry:
+    """
+    Khôi phục nội dung từ phiên bản cũ version_no vào bản nháp đang soạn (CMS-11, §4.6).
+    - Nạp mọi trường nội dung từ EntryVersion version_no.
+    - Đặt restored_from = version_no.
+    - Không ghi AuditLog lúc này (AuditLog content_restore_version sẽ ghi lúc publish lại - CMS-11-AC2).
+    """
+    with transaction.atomic():
+        entry = Entry.objects.select_for_update().get(pk=entry.pk)
+
+        # 1. Kiểm tra row_version
+        if row_version != entry.row_version:
+            raise BusinessError(
+                "Bài viết đã được chỉnh sửa bởi người khác (STALE_VERSION).",
+                code="STALE_VERSION",
+                status_code=409,
+            )
+
+        ver = EntryVersion.objects.filter(entry=entry, version=version_no).first()
+        if not ver:
+            raise BusinessError(
+                f"Không tìm thấy phiên bản số {version_no} của bài viết này.",
+                code="NOT_FOUND",
+                status_code=404,
+            )
+
+        entry.title = ver.title
+        entry.slug = ver.slug
+        entry.excerpt = ver.excerpt
+        entry.seo_title = ver.seo_title
+        entry.seo_description = ver.seo_description
+        entry.category = ver.category
+        entry.cover_image = ver.cover_image
+        entry.body = ver.body
+        entry.restored_from = version_no
+        entry.draft_hash = ver.content_hash
+        entry.row_version += 1
+        entry.updated_by = actor
+        entry.save(update_fields=[
+            "title",
+            "slug",
+            "excerpt",
+            "seo_title",
+            "seo_description",
+            "category",
+            "cover_image",
+            "body",
+            "restored_from",
+            "draft_hash",
+            "row_version",
+            "updated_by",
+            "updated_at",
+        ])
+
+        return entry
 
 
 UNPUBLISH_REASONS = {"wrong_price", "complaint", "out_of_season", "wrong_content", "other"}

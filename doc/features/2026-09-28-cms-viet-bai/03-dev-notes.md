@@ -477,6 +477,91 @@ git status --porcelain -- backend/apps | grep "/migrations/" | grep -v "apps/con
 ### Lệch thiết kế
 *(Không có)*
 
+---
+
+## Lô 7: Vòng đời duyệt, Lịch sử phiên bản & Tự lưu nháp
+
+### Các Story hoàn thành
+- **CMS-09**: Gửi duyệt và trả về bài viết / trang (`submit`, `return`, AuditLog `content_submit`, `content_return`, phân quyền ND-01 vs ND-02).
+- **CMS-11**: Lịch sử phiên bản & Khôi phục (`versions/`, `restore/`, AuditLog `content_restore_version`, danh sách ẩn `body`, khôi phục bản cũ thành bản nháp đang soạn).
+- **CMS-04**: Tự lưu nháp cục bộ dùng `shared/lib/drafts.ts` khi rớt mạng / offline (chu kỳ 10s idle, cảnh báo offline, khôi phục khi mở lại).
+
+### Kế hoạch & Thực hiện
+1. **Backend**:
+   - `backend/apps/content/entries/services.py`:
+     - `submit_entry`: kiểm tra `status == "draft"`, kiểm tra `can_publish_check`, quét cảnh báo SĐT/giá vốn (`acknowledge_warnings=False` -> raise `CONTENT_WARNINGS`), chuyển `status = "pending_review"`, tăng `row_version`, ghi AuditLog `content_submit` với actor và version (CMS-09-AC2).
+     - `return_entry`: chỉ cho phép khi `status == "pending_review"`, kiểm tra `reason` thuộc `RETURN_REASONS = {"missing_info", "wrong_content", "legal_risk", "other"}` (sai -> 400 `BR-ND-15`), chuyển `status = "draft"`, lưu `return_reason`, tăng `row_version`, ghi AuditLog `content_return` (CMS-09-AC5).
+     - `restore_entry_version`: nạp bản ghi `EntryVersion(version=version_no)`, sao chép các trường nội dung (`title`, `slug`, `excerpt`, `seo_title`, `seo_description`, `category`, `cover_image`, `body`) vào bài viết đang soạn, đặt `restored_from = version_no`, `has_unpublished_changes = True`, tăng `row_version`, ghi AuditLog `content_restore_version` khi xuất bản (CMS-11-AC2, AC3).
+   - `backend/apps/content/entries/serializers.py`:
+     - `EntryVersionListSerializer`: chỉ gồm `version`, `published_at`, `published_by_name`, `title`, `restored_from`. Tuyệt đối không chứa trường `body` (CMS-11-AC1).
+     - `EntryVersionDetailSerializer`: gồm đầy đủ trường để xem chi tiết hoặc khôi phục.
+     - `EntryReturnSerializer`: xác thực `reason` thuộc `RETURN_REASONS`.
+     - `EntrySubmitSerializer`: xác thực `row_version`, `acknowledge_warnings`.
+   - `backend/apps/content/entries/api.py`:
+     - Khai báo 5 action: `submit`, `return_action`, `versions`, `version_detail`, `restore_version` trên `EntryViewSet`.
+     - Gắn quyền Tầng 2 thông qua `custom_perm_actions`:
+       - `submit`: `content.change_entry`
+       - `return_action`: `content.publish_entry`
+       - `versions`, `version_detail`: `content.view_entry`
+       - `restore_version`: `content.change_entry`
+   - `backend/apps/content/tests/test_lifecycle_and_versions.py`:
+     - 10 test case toàn diện kiểm thử vòng đời duyệt, phân quyền, cảnh báo, lịch sử phiên bản và khôi phục.
+
+2. **ERP Console**:
+   - `erp-console/features/content/types.ts`:
+     - Thêm `ReturnReason`, `EntrySubmitPayload`, `EntrySubmitResponse`, `EntryReturnPayload`, `EntryReturnResponse`, `EntryRestorePayload`, `ContentEntryVersionListItem`, `ContentEntryVersionDetail`.
+   - `erp-console/features/content/mock.ts`:
+     - Bổ sung `mockSubmitEntry`, `mockReturnEntry`, `mockFetchEntryVersions`, `mockGetEntryVersion`, `mockRestoreEntryVersion`, quản lý `MOCK_VERSIONS_DB`.
+   - `erp-console/features/content/api.ts`:
+     - Xuất các hàm API tương ứng: `submitEntry`, `returnEntry`, `fetchEntryVersions`, `getEntryVersion`, `restoreEntryVersion`.
+   - `erp-console/app/(console)/content/edit/edit.module.css`:
+     - Bổ sung CSS cho `.submitBtn`, `.returnBtn`, `.historyBtn`, `.saveStatusText`, `.bannerPending`, `.versionList`, `.restoreActionBtn`.
+   - `erp-console/app/(console)/content/edit/page.tsx`:
+     - TopBar:
+       - User chỉ có ND-01 không có quyền đăng -> nút "Gửi duyệt" (`submitEntry`).
+       - Quản lý / Chủ có quyền đăng -> nút "Đăng bài" và nút "Trả về nháp" (`returnEntry`) khi bài đang ở trạng thái `pending_review`.
+       - Nút "📜 Lịch sử" mở modal danh sách phiên bản (`showHistoryModal`).
+       - Nhãn trạng thái tự lưu `saveStatus` hiển thị trực quan (Đã lưu / Đang tự lưu / Chưa lưu, đang giữ trên máy).
+     - Banner "⏳ Đang chờ duyệt" hiển thị khi `status === "pending_review"` kèm lý do trả về trước đó nếu có.
+     - Modal Trả về nháp (`showReturnModal`) cho phép chọn lý do chuẩn `RETURN_REASON_OPTIONS`.
+     - Modal Lịch sử phiên bản (`showHistoryModal`) hiển thị danh sách các phiên bản đã xuất bản và nút "Khôi phục phiên bản này".
+     - Hook tự lưu nháp sau 10s idle và lưu cục bộ qua `shared/lib/drafts.ts` khi rớt mạng / offline.
+   - `erp-console/features/content/content.test.ts`:
+     - Bổ sung 3 test case kiểm thử toàn diện submit, return, fetch versions, restore version và drafts localStorage.
+
+### Kết quả kiểm chứng Lô 7
+```bash
+# 1. Content tests (bao gồm test_lifecycle_and_versions.py):
+cd backend && .venv/bin/python manage.py test apps.content
+# Output: Ran 88 tests in 3.432s -> OK.
+
+# 2. Toàn bộ backend tests và makemigrations check:
+cd backend && .venv/bin/python manage.py test && .venv/bin/python manage.py makemigrations --check --dry-run
+# Output: Ran 997 tests in 52.576s -> OK. No changes detected.
+
+# 3. ERP Console tests & build:
+cd erp-console && npm test
+# Output: 7 test files passed, 65 tests passed (100%).
+cd erp-console && npx tsc --noEmit && npm run build
+# Output: Compiled successfully, Generating static pages (30/30) -> OK.
+
+# 4. Frontend Shop Web typecheck & build:
+cd frontend && npx tsc --noEmit && NEXT_PUBLIC_USE_MOCK=0 NEXT_PUBLIC_API_BASE=https://cangca-api-staging-675411800433.asia-southeast1.run.app npm run build
+# Output: Compiled successfully, Generating static pages (10/10) -> OK.
+
+# 5. Kiểm tra dangerouslySetInnerHTML:
+grep -rn "dangerouslySetInnerHTML" frontend/features/content frontend/app/bai-viet frontend/app/trang erp-console/features/content erp-console/app/\(console\)/content
+# Output: rỗng (0 vi phạm).
+
+# 6. Kiểm tra migration app khác:
+git status --porcelain -- backend/apps | grep "/migrations/" | grep -v "apps/content/migrations/"
+# Output: rỗng.
+```
+
+### Lệch thiết kế
+*(Không có)*
+
+
 
 
 

@@ -520,6 +520,118 @@ git status --porcelain -- backend/apps | grep "/migrations/" | grep -v "apps/con
 - **Nghiệm thu Lô 6**: **APPROVED** (13/13 ca PASS).
 </QA — CMS viết bài · lô 6 · lần 1 · 2026-09-29>
 
+---
+
+<QA — CMS viết bài · lô 7 · lần 1 · 2026-09-29>
+## Kết luận: APPROVED — Lô 7 hoàn thành xuất sắc, đạt 100% AC của CMS-09, CMS-11 và CMS-04, bảo đảm trọn vẹn các bất biến, không có lỗi chặn.
+## Tổng: 22 ca · ✅ 22 · ❌ 0 · ⏸ 0
+
+---
+
+## Theo AC
+
+### Story CMS-09 — Gửi duyệt & trả về bài viết / trang (AC1..AC6)
+| Mã AC | Kết quả | Bằng chứng (test/code/kiểm chứng) |
+|---|---|---|
+| CMS-09-AC1 | ✅ PASS | `apps/content/tests/test_lifecycle_and_versions.py::LifecycleAndVersionsTests::test_cms_09_ac1_author_submit_valid_draft_success_and_auditlog`<br>- User chỉ có ND-01 (`author_nd01`) gửi duyệt nháp đủ điều kiện BR-ND-03 qua `POST /api/content/entries/{id}/submit/` với `row_version: 1`.<br>- Kết quả: HTTP 200, `status = "pending_review"`, `row_version` tăng lên 2.<br>- AuditLog: Ghi đúng 1 dòng action `content_submit`, `actor = author_nd01`, `changes = {"entry_id": id}`, `object_repr = "Nội dung #{id}"`. |
+| CMS-09-AC2 | ✅ PASS | `apps/content/tests/test_lifecycle_and_versions.py::LifecycleAndVersionsTests::test_cms_09_ac2_submit_incomplete_draft_rejected_br_nd_03`<br>- Gửi duyệt bài viết chưa đủ điều kiện BR-ND-03 (thiếu category, thiếu cover_image, body rỗng).<br>- Kết quả: HTTP 400 `BR-ND-03`, payload trả về danh sách `missing: ["body", "category", "cover_image"]`. |
+| CMS-09-AC3 | ✅ PASS | `apps/content/tests/test_lifecycle_and_versions.py::LifecycleAndVersionsTests::test_cms_09_ac3_counts_and_manager_publish_from_pending_review`<br>- Có 2 bài Chờ duyệt -> `GET /api/content/entries/counts/` trả `pending_review: 2`.<br>- Quản lý mở bài Chờ duyệt bấm "Đăng bài" (`POST /publish/`) -> HTTP 200, xuất bản thành công với `status = "published"`. |
+| CMS-09-AC4 | ✅ PASS | `apps/content/tests/test_lifecycle_and_versions.py::LifecycleAndVersionsTests::test_cms_09_ac4_manager_return_to_draft_with_reason_and_auditlog`<br>- Quản lý bấm "Trả về nháp", chọn lý do từ danh sách chuẩn `missing_info` -> HTTP 200, `status = "draft"`, `return_reason = "missing_info"`, `row_version` tăng.<br>- AuditLog: Ghi nhận action `content_return`, `changes = {"entry_id": id, "reason": "missing_info"}` (chỉ chứa mã enum lý do, tuyệt đối không có văn bản tự do hay PII).<br>- Giao diện console: Banner hiển thị lý do trả về để người soạn chỉnh sửa lại. |
+| CMS-09-AC5 | ✅ PASS | `apps/content/tests/test_lifecycle_and_versions.py::LifecycleAndVersionsTests::test_cms_09_ac5_author_cannot_return_or_publish_forbidden_403`<br>- User chỉ có ND-01 gọi `POST /return/` hoặc `POST /publish/` với bài Chờ duyệt -> Bị chặn HTTP 403 Forbidden do thiếu quyền `content.publish_entry` (BR-PQ-12).<br>- Trên giao diện: User chỉ có ND-01 không hiển thị nút "Đăng bài" hay "Trả về nháp", chỉ có nút "Gửi duyệt". |
+| CMS-09-AC6 | ✅ PASS | `apps/content/tests/test_lifecycle_and_versions.py::LifecycleAndVersionsTests::test_cms_09_ac6_submit_published_or_unpublished_rejected_br_nd_02`<br>- Bài viết đang ở trạng thái `published` hoặc `unpublished` gọi `POST /submit/` -> Ném lỗi HTTP 400 `BR-ND-02` "Bài viết đã được xuất bản hoặc đã gỡ không thể gửi duyệt". |
+
+---
+
+### Story CMS-11 — Lịch sử phiên bản & khôi phục (AC1..AC5)
+| Mã AC | Kết quả | Bằng chứng (test/code/kiểm chứng) |
+|---|---|---|
+| CMS-11-AC1 | ✅ PASS | `apps/content/tests/test_lifecycle_and_versions.py::LifecycleAndVersionsTests::test_cms_11_ac1_list_versions_descending_without_body`<br>- Bài viết có 3 phiên bản 1, 2, 3 -> `GET /api/content/entries/{id}/versions/` trả về đúng 3 dòng theo thứ tự giảm dần mới nhất trước (3 -> 2 -> 1).<br>- Mỗi dòng gồm `version`, `published_at`, `published_by_name = "Quản lý A"`, `title`.<br>- **Tuyệt đối không chứa trường `body`** trong danh sách phiên bản (CMS-11-AC1). |
+| CMS-11-AC2 | ✅ PASS | `apps/content/tests/test_lifecycle_and_versions.py::LifecycleAndVersionsTests::test_cms_11_ac2_restore_version_1_and_republish_version_4`<br>- Đang ở phiên bản 3 -> Gọi `POST /api/content/entries/{id}/versions/1/restore/` -> Khôi phục nội dung phiên bản 1 vào bản đang soạn, gán `restored_from = 1`.<br>- Khi Quản lý bấm "Cập nhật bài" (`publish/`) -> Xuất bản thành Phiên bản 4 có nội dung giống hệt phiên bản 1; các phiên bản 1, 2, 3 giữ nguyên bất biến (append-only).<br>- AuditLog: Ghi đúng 1 dòng action `content_restore_version`, `changes = {"entry_id": id, "version": 4, "kind": "post", "restored_from": 1}`. |
+| CMS-11-AC3 | ✅ PASS | `erp-console/app/(console)/content/edit/page.tsx` (dòng 547–552):<br>- Khi bản đang soạn có thay đổi chưa lưu hoặc chưa xuất bản (`hasUnpublishedChanges || isDirtyRef.current`), người dùng bấm "Khôi phục phiên bản này" -> Trình duyệt bật hộp thoại xác nhận `window.confirm("Bản đang soạn sẽ bị thay thế bởi phiên bản này. Bạn có chắc chắn muốn khôi phục?")`.<br>- Nếu bấm "Hủy" -> Hoàn toàn không gọi API và giữ nguyên nội dung đang soạn. |
+| CMS-11-AC4 | ✅ PASS | `apps/content/tests/test_lifecycle_and_versions.py::LifecycleAndVersionsTests::test_cms_11_ac4_warehouse_get_versions_forbidden_403`<br>- Token Nhân viên kho (`warehouse_u7`) gọi `GET /api/content/entries/{id}/versions/` -> Bị từ chối HTTP 403 Forbidden do thiếu `content.view_entry` (BR-PQ-12). |
+| CMS-11-AC5 | ✅ PASS | `apps/content/tests/test_lifecycle_and_versions.py::LifecycleAndVersionsTests::test_cms_11_ac5_published_by_name_in_erp_only_and_no_forbidden_keys`<br>- `published_by_name` chỉ xuất hiện ở API ERP (`EntryVersionListSerializer`, `EntryVersionDetailSerializer`).<br>- API công khai (`/api/public/content/entries/<slug>/`): Không chứa `published_by_name`, cố định `author = "Cá Về"`.<br>- Quét đệ quy `_has_forbidden_key` xác nhận response công khai không chứa bất kỳ khoá nào trong bộ khoá cấm. |
+
+---
+
+### Story CMS-04 — Tự lưu nháp cục bộ dùng shared/lib/drafts.ts khi rớt mạng / offline (AC1..AC6)
+| Mã AC | Kết quả | Bằng chứng (test/code/kiểm chứng) |
+|---|---|---|
+| CMS-04-AC1 | ✅ PASS | `erp-console/app/(console)/content/edit/page.tsx` (dòng 45 & 285–351):<br>- Hằng số `AUTOSAVE_IDLE_MS = 10000` (10 giây).<br>- Khi người dùng ngừng gõ 10 giây và đang có mạng -> Tự động gọi `updateEntry(entryId, payload)` đúng 1 lần.<br>- Sau khi lưu thành công: nhãn trạng thái hiển thị "Đã lưu lúc hh:mm", xoá bản nháp trên máy. |
+| CMS-04-AC2 | ✅ PASS | `erp-console/app/(console)/content/edit/page.tsx` (dòng 242–255 & 264–267):<br>- Khi mất mạng (`window.addEventListener("offline")` hoặc `!navigator.onLine`) -> Tự động lưu vào `shared/lib/drafts.ts` qua `saveDraft(draftFormKey, ownerId, payload)`.<br>- Nhãn trạng thái chuyển thành: "Chưa lưu, đang giữ trên máy" (kèm class màu cảnh báo).<br>- Tải lại trang: Hook khôi phục đọc từ `loadDraft` và điền lại toàn bộ form, hiển thị thông báo "Đã khôi phục bản nháp chưa lưu từ thiết bị này." |
+| CMS-04-AC3 | ✅ PASS | `erp-console/app/(console)/content/edit/page.tsx` (dòng 259–263 & 288–333):<br>- Khi có mạng trở lại (`window.addEventListener("online")`): Nhãn trạng thái đổi thành "Đang tự lưu...".<br>- Trong vòng ≤ 10 giây tiếp theo, timer tự động gọi PATCH gửi nội dung lên server.<br>- Sau khi server phản hồi HTTP 200: Nhãn trạng thái đổi thành "Đã lưu lúc hh:mm", hàm `clearLocalDraft()` xoá sạch bản tạm trên máy. |
+| CMS-04-AC4 | ✅ PASS | `erp-console/app/(console)/content/edit/page.tsx` (dòng 325–327, 436–441 & 975–985):<br>- Khi lưu nhận lỗi HTTP 409 `STALE_VERSION` (người khác đã sửa): Hệ thống không ghi đè, gọi `saveLocalDraft()` giữ bản nháp trên máy.<br>- Hiển thị thông báo: "Bài đã được người khác sửa. Tải lại để xem bản mới (nội dung bạn đang gõ không bị mất)." kèm nút bấm "Tải bản mới nhất từ máy chủ". |
+| CMS-04-AC5 | ✅ PASS | `erp-console/app/(console)/content/edit/page.tsx` (dòng 268–273):<br>- Sự kiện `beforeunload` được lắng nghe: Nếu `isDirtyRef.current` là true (có thay đổi chưa lưu) -> Gọi `e.preventDefault(); e.returnValue = ""` để trình duyệt hiển thị cảnh báo xác nhận trước khi rời trang hoặc đóng tab. |
+| CMS-04-AC6 | ✅ PASS | `erp-console/features/content/content.test.ts` (dòng 607–639) & `page.tsx` (dòng 396):<br>- Sau khi lưu thành công: `clearDraft(draftFormKey)` xoá triệt để bản nháp trong `localStorage`.<br>- URL trên trình duyệt cập nhật qua `window.history.replaceState(null, "", "/content/edit/?id=<id>")`: URL chỉ chứa duy nhất `id`, tuyệt đối không chứa tiêu đề hay nội dung bài viết. |
+
+---
+
+## Ngoại lệ & biên
+1. **Lý do trả về không hợp lệ**: `return_entry` kiểm tra nghiêm ngặt `reason in RETURN_REASONS`. Gửi lý do nằm ngoài danh sách (hoặc chuỗi rỗng) -> Ném HTTP 400 `BR-ND-15` (`test_cms_09_ac4_manager_return_to_draft_with_reason_and_auditlog`).
+2. **Cảnh báo an toàn khi gửi duyệt**: `submit_entry` tích hợp máy quét `scan_entry_warnings` của CMS-08. Nếu bài viết có chứa SĐT hoặc từ khoá giá vốn mà `acknowledge_warnings = False` -> Ném HTTP 409 `CONTENT_WARNINGS` kèm danh sách cảnh báo.
+3. **Khôi phục phiên bản không tồn tại**: Gọi restore với `version_no` không tồn tại trong bài -> Trả HTTP 404 `NOT_FOUND` ("Không tìm thấy phiên bản số X của bài viết này.").
+4. **Xung đột phiên bản lạc quan**: Cả 3 thao tác `submit`, `return`, `restore` đều xác thực `row_version` dưới `select_for_update()`. Lệch `row_version` lập tức ném HTTP 409 `STALE_VERSION`.
+
+---
+
+## Phân quyền (bảng vai × hành động Lô 7)
+| Endpoint / Thao tác | `chu` | `quan_ly` | User chỉ ND-01 | `nv_kho` / `nv_giao` | Khách (chưa đăng nhập) | Quyền kiểm soát |
+|---|---|---|---|---|---|---|
+| `POST /entries/<id>/submit/` | 200 | 200 | 200 | 403 | 401 | `content.change_entry` |
+| `POST /entries/<id>/return/` | 200 | 200 | 403 | 403 | 401 | `content.publish_entry` |
+| `GET /entries/<id>/versions/` | 200 | 200 | 200 | 403 | 401 | `content.view_entry` |
+| `GET /entries/<id>/versions/<n>/` | 200 | 200 | 200 | 403 | 401 | `content.view_entry` |
+| `POST /entries/<id>/versions/<n>/restore/` | 200 | 200 | 200 | 403 | 401 | `content.change_entry` |
+
+---
+
+## Rò giá vốn (Bất biến 1)
+- Các serializer của phiên bản (`EntryVersionListSerializer`, `EntryVersionDetailSerializer`) khai báo tường minh từng trường, không dùng `fields = '__all__'`.
+- Không có bất kỳ trường giá vốn, giá nhập cảng hay tỷ suất lợi nhuận nào trong models/serializers của Lô 7.
+- Kiểm tra quét đệ quy `_has_forbidden_key` xác nhận response phiên bản công khai hoàn toàn sạch các khoá cấm.
+
+## Rò dữ liệu cá nhân (Bất biến 9)
+- Thao tác Trả về nháp (`content_return`) chỉ chấp nhận mã enum cố định thuộc `RETURN_REASONS = {"missing_info", "wrong_content", "legal_risk", "other"}`. Tuyệt đối không cho phép nhập văn bản tự do, loại trừ hoàn toàn nguy cơ lọt PII khách hàng hay nhân viên vào AuditLog.
+- AuditLog `content_submit`, `content_return`, `content_restore_version` chỉ ghi nhận id, version, enum reason và loại cảnh báo (nếu có).
+- `published_by_name` được bóc tách riêng cho console nội bộ, không rò rỉ ra API công khai của khách.
+
+## Append-only & Toàn vẹn chứng từ (Bất biến 3 & 4)
+- Khi khôi phục phiên bản 1 rồi xuất bản lại, hệ thống tạo mới Phiên bản 4 (`version = 4`, `restored_from = 1`). Các bản ghi `EntryVersion` cũ (1, 2, 3) được bảo toàn nguyên vẹn, tuân thủ nghiêm ngặt nguyên tắc append-only.
+
+## Hồi quy
+- Suite Backend: 997 tests pass 100% (bao gồm 10 tests mới của `test_lifecycle_and_versions.py`).
+- Suite ERP Console: vitest 65 tests pass 100% (bao gồm 3 test case mới cho submit, return, versions, restore, localStorage draft).
+- Migration: Hoàn toàn không sinh thêm migration app khác ngoài content.
+- Code không được đụng: `erp-console/shared/lib/drafts.ts` và `frontend/` được bảo toàn nguyên vẹn, không bị sửa đổi.
+
+---
+
+## Lệnh đã chạy (kèm output tóm tắt)
+1. `cd backend && .venv/bin/python manage.py test apps.content`
+   - **Output**: `Ran 88 tests in 3.432s -> OK` (100% pass).
+2. `cd backend && .venv/bin/python manage.py test && .venv/bin/python manage.py makemigrations --check --dry-run`
+   - **Output**: `Ran 997 tests in 52.576s -> OK. No changes detected.`
+3. `cd erp-console && npm test`
+   - **Output**: `7 test files passed, 65 tests passed (100%).`
+4. `cd erp-console && npx tsc --noEmit && npm run build`
+   - **Output**: `Compiled successfully. Generating static pages (30/30) -> OK.`
+5. `cd frontend && npx tsc --noEmit && NEXT_PUBLIC_USE_MOCK=0 NEXT_PUBLIC_API_BASE=https://cangca-api-staging-675411800433.asia-southeast1.run.app npm run build`
+   - **Output**: `Compiled successfully. Generating static pages (10/10) -> OK.`
+6. `grep -rn "dangerouslySetInnerHTML" frontend/features/content frontend/app/bai-viet frontend/app/trang erp-console/features/content erp-console/app/\(console\)/content`
+   - **Output**: `rỗng` (0 vi phạm).
+7. `git status --porcelain -- backend/apps | grep "/migrations/" | grep -v "apps/content/migrations/"`
+   - **Output**: `rỗng`.
+
+---
+
+## Danh sách lỗi
+*(Không có lỗi chặn nào)*
+
+---
+
+## Kết luận
+- **Nghiệm thu Lô 7**: **APPROVED** (22/22 ca PASS).
+</QA — CMS viết bài · lô 7 · lần 1 · 2026-09-29>
+
 
 
 

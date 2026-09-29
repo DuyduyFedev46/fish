@@ -14,18 +14,30 @@ import type {
   EntryUnpublishPayload,
   EntryUpdatePayload,
   GoliveStatusResponse,
+  ContentEntryVersionDetail,
+  ContentEntryVersionListItem,
+  EntryRestorePayload,
+  EntryReturnPayload,
+  EntryReturnResponse,
+  EntrySubmitPayload,
+  EntrySubmitResponse,
 } from "./types";
 import {
   mockCreateCategory,
   mockCreateEntry,
   mockDeleteEntry,
   mockDiscardChanges,
+  mockFetchEntryVersions,
   mockGetEntry,
   mockGetEntryCounts,
+  mockGetEntryVersion,
   mockGetGoliveStatus,
   mockListCategories,
   mockListEntries,
   mockPublishEntry,
+  mockRestoreEntryVersion,
+  mockReturnEntry,
+  mockSubmitEntry,
   mockUnpublishEntry,
   mockUpdateCategory,
   mockUpdateEntry,
@@ -230,6 +242,62 @@ export async function fetchShopCatalog(): Promise<ShopCatalogItem[]> {
     }),
   });
 }
+
+export async function submitEntry(
+  id: number,
+  payload: EntrySubmitPayload
+): Promise<EntrySubmitResponse> {
+  return apiFetch<EntrySubmitResponse>(`/api/content/entries/${id}/submit/`, {
+    method: "POST",
+    body: payload,
+    mock: isMock ? () => ({ status: 200, body: mockSubmitEntry(id, payload) }) : undefined,
+  });
+}
+
+export async function returnEntry(
+  id: number,
+  payload: EntryReturnPayload
+): Promise<EntryReturnResponse> {
+  return apiFetch<EntryReturnResponse>(`/api/content/entries/${id}/return/`, {
+    method: "POST",
+    body: payload,
+    mock: isMock ? () => ({ status: 200, body: mockReturnEntry(id, payload) }) : undefined,
+  });
+}
+
+export async function fetchEntryVersions(
+  id: number,
+  signal?: AbortSignal
+): Promise<ContentEntryVersionListItem[]> {
+  return apiFetch<ContentEntryVersionListItem[]>(`/api/content/entries/${id}/versions/`, {
+    signal,
+    mock: isMock ? () => ({ status: 200, body: mockFetchEntryVersions(id) }) : undefined,
+  });
+}
+
+export async function getEntryVersion(
+  id: number,
+  versionNo: number,
+  signal?: AbortSignal
+): Promise<ContentEntryVersionDetail> {
+  return apiFetch<ContentEntryVersionDetail>(`/api/content/entries/${id}/versions/${versionNo}/`, {
+    signal,
+    mock: isMock ? () => ({ status: 200, body: mockGetEntryVersion(id, versionNo) }) : undefined,
+  });
+}
+
+export async function restoreEntryVersion(
+  id: number,
+  versionNo: number,
+  payload: EntryRestorePayload
+): Promise<ContentEntryDetail> {
+  return apiFetch<ContentEntryDetail>(`/api/content/entries/${id}/versions/${versionNo}/restore/`, {
+    method: "POST",
+    body: payload,
+    mock: isMock ? () => ({ status: 200, body: mockRestoreEntryVersion(id, versionNo, payload) }) : undefined,
+  });
+}
+
 
 
 

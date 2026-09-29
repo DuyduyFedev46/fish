@@ -1,17 +1,23 @@
 "use client";
 
-import React, { Suspense, useEffect, useRef, useState } from "react";
+import React, { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useAuth } from "@/features/auth/components/AuthProvider";
 import { ViewGuard } from "@/features/auth/components/ViewGuard";
 import {
   createEntry,
   deleteEntry,
   discardChanges,
   fetchCategories,
+  fetchEntryVersions,
   getEntry,
+  getEntryVersion,
   publishEntry,
+  restoreEntryVersion,
+  returnEntry,
+  submitEntry,
   unpublishEntry,
   updateEntry,
   updateImageAlt,
@@ -21,21 +27,35 @@ import type { TiptapEditorHandle } from "@/features/content/editor/TiptapEditor"
 import type {
   BodyDoc,
   ContentCategory,
+  ContentEntryVersionDetail,
+  ContentEntryVersionListItem,
   ContentImage,
   ContentKind,
   ContentPageRole,
   ContentStatus,
   ContentWarning,
+  ReturnReason,
   UnpublishReason,
 } from "@/features/content/types";
+import { clearDraft, loadDraft, saveDraft } from "@/shared/lib/drafts";
 import { ApiError } from "@/shared/lib/http";
+import { PERM } from "@/shared/lib/nav";
 import s from "./edit.module.css";
+
+const AUTOSAVE_IDLE_MS = 10000;
 
 const UNPUBLISH_REASON_OPTIONS: Array<{ key: UnpublishReason; label: string }> = [
   { key: "wrong_price", label: "Giá chưa đúng" },
   { key: "complaint", label: "Khiếu nại / rủi ro pháp lý" },
   { key: "out_of_season", label: "Hết mùa vụ" },
   { key: "wrong_content", label: "Nội dung chưa chuẩn" },
+  { key: "other", label: "Khác" },
+];
+
+const RETURN_REASON_OPTIONS: Array<{ key: ReturnReason; label: string }> = [
+  { key: "missing_info", label: "Thiếu thông tin / hình ảnh" },
+  { key: "wrong_content", label: "Nội dung chưa chuẩn / cần sửa" },
+  { key: "legal_risk", label: "Rủi ro pháp lý / bản quyền" },
   { key: "other", label: "Khác" },
 ];
 
@@ -52,6 +72,13 @@ function ContentEditScreen() {
 
   const queryId = searchParams.get("id");
   const queryNew = searchParams.get("new");
+
+  const { me } = useAuth();
+  const canPublish = Boolean(
+    me?.permissions?.includes(PERM.publishContentEntry) ||
+    me?.groups?.includes("chu") ||
+    me?.groups?.includes("quan_ly")
+  );
 
   const [entryId, setEntryId] = useState<number | null>(
     queryId ? parseInt(queryId, 10) : null
@@ -89,6 +116,26 @@ function ContentEditScreen() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [slugSuggestion, setSlugSuggestion] = useState<string | null>(null);
+
+  // CMS-09: Gửi duyệt & Trả về
+  const [submitting, setSubmitting] = useState(false);
+  const [returning, setReturning] = useState(false);
+  const [returnReason, setReturnReason] = useState("");
+  const [showReturnModal, setShowReturnModal] = useState(false);
+  const [selectedReturnReason, setSelectedReturnReason] = useState<ReturnReason>("missing_info");
+
+  // CMS-11: Lịch sử phiên bản & Khôi phục
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [versionsList, setVersionsList] = useState<ContentEntryVersionListItem[]>([]);
+  const [loadingVersions, setLoadingVersions] = useState(false);
+  const [selectedVersionDetail, setSelectedVersionDetail] = useState<ContentEntryVersionDetail | null>(null);
+  const [restoring, setRestoring] = useState(false);
+
+  // CMS-04: Tự lưu nháp & Offline
+  const [saveStatus, setSaveStatus] = useState<string | null>(null);
+  const isDirtyRef = useRef(false);
+  const draftFormKey = `content_entry_${entryId ?? "new"}`;
+  const ownerId = (me as any)?.id || 1;
 
   // Modal Checklist & Cảnh báo (CMS-07, CMS-08, BR-ND-13)
   const [showChecklistModal, setShowChecklistModal] = useState(false);
@@ -148,6 +195,7 @@ function ContentEditScreen() {
         setPublishedVersion(data.published_version);
         setFirstPublishedAt(data.first_published_at);
         setHasUnpublishedChanges(Boolean(data.has_unpublished_changes));
+        setReturnReason(data.return_reason || "");
         setPageRole(data.page_role || null);
         setShowInFooter(Boolean(data.show_in_footer));
         setFooterOrder(data.footer_order || 0);
@@ -166,7 +214,143 @@ function ContentEditScreen() {
     };
   }, [entryId]);
 
-  // Lưu nháp (CMS-03)
+  const markDirty = () => {
+    isDirtyRef.current = true;
+  };
+
+  const saveLocalDraft = useCallback(() => {
+    const currentBody = body;
+    const payload = {
+      title,
+      slug,
+      excerpt,
+      seo_title: seoTitle,
+      seo_description: seoDescription,
+      category,
+      cover_image: coverImageId,
+      body: currentBody,
+    };
+    saveDraft(draftFormKey, ownerId, payload);
+  }, [draftFormKey, ownerId, title, slug, excerpt, seoTitle, seoDescription, category, coverImageId, body]);
+
+  const clearLocalDraft = useCallback(() => {
+    clearDraft(draftFormKey);
+    isDirtyRef.current = false;
+  }, [draftFormKey]);
+
+  // Khôi phục nháp lúc mở màn (CMS-04-AC2)
+  useEffect(() => {
+    const cached = loadDraft<any>(draftFormKey, ownerId);
+    if (cached) {
+      if (cached.title !== undefined) setTitle(cached.title);
+      if (cached.slug !== undefined) setSlug(cached.slug);
+      if (cached.category !== undefined) setCategory(cached.category);
+      if (cached.excerpt !== undefined) setExcerpt(cached.excerpt);
+      if (cached.seo_title !== undefined) setSeoTitle(cached.seo_title);
+      if (cached.seo_description !== undefined) setSeoDescription(cached.seo_description);
+      if (cached.cover_image !== undefined) setCoverImageId(cached.cover_image);
+      if (cached.body) setBody(cached.body);
+      setSuccessMsg("Đã khôi phục bản nháp chưa lưu từ thiết bị này.");
+    }
+  }, [entryId, ownerId, draftFormKey]);
+
+  // Bắt sự kiện mạng và beforeunload (CMS-04-AC2, CMS-04-AC3, CMS-04-AC5)
+  useEffect(() => {
+    const handleOnline = () => {
+      if (isDirtyRef.current) {
+        setSaveStatus("Đang tự lưu...");
+      }
+    };
+    const handleOffline = () => {
+      saveLocalDraft();
+      setSaveStatus("Chưa lưu, đang giữ trên máy");
+    };
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (isDirtyRef.current) {
+        e.preventDefault();
+        e.returnValue = "";
+      }
+    };
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
+  }, [saveLocalDraft]);
+
+  // Tự lưu sau 10s không gõ (CMS-04-AC1)
+  useEffect(() => {
+    if (!isDirtyRef.current) return;
+
+    const timer = setTimeout(async () => {
+      if (!navigator.onLine || !entryId) {
+        saveLocalDraft();
+        setSaveStatus("Chưa lưu, đang giữ trên máy");
+        return;
+      }
+
+      setSaveStatus("Đang tự lưu...");
+      try {
+        const currentBody = body;
+        const res = await updateEntry(entryId, {
+          row_version: rowVersion,
+          kind,
+          title: title.trim(),
+          slug: slug.trim(),
+          category: kind === "post" ? category : null,
+          excerpt: excerpt.trim(),
+          seo_title: seoTitle.trim(),
+          seo_description: seoDescription.trim(),
+          cover_image: coverImageId,
+          body: currentBody,
+          ...(kind === "page"
+            ? {
+                page_role: pageRole || null,
+                show_in_footer: showInFooter,
+                footer_order: footerOrder,
+              }
+            : {}),
+        });
+        setSlug(res.slug);
+        setRowVersion(res.row_version);
+        setHasUnpublishedChanges(Boolean(res.has_unpublished_changes));
+        clearLocalDraft();
+        const nowStr = new Date().toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" });
+        setSaveStatus(`Đã lưu lúc ${nowStr}`);
+      } catch (err: any) {
+        saveLocalDraft();
+        if (err instanceof ApiError && err.status === 409 && err.code === "STALE_VERSION") {
+          setSaveStatus("Xung đột phiên bản");
+        } else {
+          setSaveStatus("Chưa lưu, đang giữ trên máy");
+        }
+      }
+    }, AUTOSAVE_IDLE_MS);
+
+    return () => clearTimeout(timer);
+  }, [
+    title,
+    slug,
+    category,
+    excerpt,
+    seoTitle,
+    seoDescription,
+    coverImageId,
+    body,
+    entryId,
+    rowVersion,
+    kind,
+    pageRole,
+    showInFooter,
+    footerOrder,
+    saveLocalDraft,
+    clearLocalDraft,
+  ]);
+
+  // Lưu nháp thủ công (CMS-03)
   const handleSaveDraft = async () => {
     setSaving(true);
     setErrorMsg(null);
@@ -205,6 +389,9 @@ function ContentEditScreen() {
         setShowInFooter(Boolean(res.show_in_footer));
         setFooterOrder(res.footer_order || 0);
         setImages(res.images || []);
+        clearLocalDraft();
+        const nowStr = new Date().toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" });
+        setSaveStatus(`Đã lưu lúc ${nowStr}`);
         setSuccessMsg("Đã tạo và lưu nháp thành công!");
         window.history.replaceState(null, "", `/content/edit/?id=${res.id}`);
       } else {
@@ -238,12 +425,17 @@ function ContentEditScreen() {
         setShowInFooter(Boolean(res.show_in_footer));
         setFooterOrder(res.footer_order || 0);
         setImages(res.images || []);
+        clearLocalDraft();
+        const nowStr = new Date().toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" });
+        setSaveStatus(`Đã lưu lúc ${nowStr}`);
         setSuccessMsg("Đã lưu nháp thành công!");
       }
     } catch (err: any) {
       if (err instanceof ApiError) {
         // CMS-03-AC7: Xung đột sửa trùng (409 STALE_VERSION)
         if (err.status === 409 && err.code === "STALE_VERSION") {
+          saveLocalDraft();
+          setSaveStatus("Xung đột phiên bản");
           setErrorMsg(
             "Bài đã được người khác sửa. Tải lại để xem bản mới (nội dung bạn đang gõ không bị mất)."
           );
@@ -258,12 +450,133 @@ function ContentEditScreen() {
           setErrorMsg(err.message || "Lỗi lưu nháp.");
         }
       } else {
+        saveLocalDraft();
+        setSaveStatus("Chưa lưu, đang giữ trên máy");
         setErrorMsg("Lỗi kết nối khi lưu nháp. Vui lòng thử lại.");
       }
     } finally {
       setSaving(false);
     }
   };
+
+  // CMS-09: Gửi duyệt bài viết
+  const handleSubmitEntry = async (acknowledgeWarnings = false) => {
+    if (!entryId) {
+      setErrorMsg("Vui lòng bấm 'Lưu nháp' bài viết trước khi gửi duyệt.");
+      return;
+    }
+    setSubmitting(true);
+    setErrorMsg(null);
+    try {
+      const res = await submitEntry(entryId, {
+        row_version: rowVersion,
+        acknowledge_warnings: acknowledgeWarnings,
+      });
+      setStatus(res.status as ContentStatus);
+      setRowVersion(res.row_version);
+      setShowWarningModal(false);
+      clearLocalDraft();
+      setSuccessMsg("Bài viết đã được gửi cho Quản lý / Chủ duyệt.");
+    } catch (err: any) {
+      if (err instanceof ApiError) {
+        if (err.status === 409 && err.code === "CONTENT_WARNINGS") {
+          const warnings = (err as any).warnings || [];
+          setWarningsList(warnings);
+          setShowWarningModal(true);
+        } else if (err.status === 409 && err.code === "STALE_VERSION") {
+          setErrorMsg("Bài đã được người khác sửa. Vui lòng tải lại trang.");
+        } else if (err.code === "BR-ND-03") {
+          const missing = (err as any).missing || [];
+          setErrorMsg(`Bài viết chưa đủ điều kiện gửi duyệt (BR-ND-03): thiếu ${missing.join(", ")}`);
+        } else {
+          setErrorMsg(err.message || "Lỗi khi gửi duyệt bài.");
+        }
+      } else {
+        setErrorMsg("Lỗi kết nối khi gửi duyệt.");
+      }
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // CMS-09: Trả về nháp
+  const handleReturnEntry = async () => {
+    if (!entryId) return;
+    setReturning(true);
+    setErrorMsg(null);
+    try {
+      const res = await returnEntry(entryId, {
+        row_version: rowVersion,
+        reason: selectedReturnReason,
+      });
+      setStatus(res.status as ContentStatus);
+      setRowVersion(res.row_version);
+      setReturnReason(selectedReturnReason);
+      setShowReturnModal(false);
+      clearLocalDraft();
+      setSuccessMsg("Đã trả bài về trạng thái nháp.");
+    } catch (err: any) {
+      if (err instanceof ApiError) {
+        setErrorMsg(err.message || "Lỗi khi trả bài về nháp.");
+      } else {
+        setErrorMsg("Lỗi kết nối khi trả bài.");
+      }
+    } finally {
+      setReturning(false);
+    }
+  };
+
+  // CMS-11: Lịch sử phiên bản
+  const handleOpenHistoryModal = async () => {
+    if (!entryId) return;
+    setShowHistoryModal(true);
+    setLoadingVersions(true);
+    setSelectedVersionDetail(null);
+    try {
+      const versions = await fetchEntryVersions(entryId);
+      setVersionsList(versions);
+    } catch (err: any) {
+      setErrorMsg("Không thể tải lịch sử phiên bản.");
+    } finally {
+      setLoadingVersions(false);
+    }
+  };
+
+  const handleConfirmRestore = async (verNo: number) => {
+    if (!entryId) return;
+    if (hasUnpublishedChanges || isDirtyRef.current) {
+      const ok = window.confirm(
+        "Bản đang soạn sẽ bị thay thế bởi phiên bản này. Bạn có chắc chắn muốn khôi phục?"
+      );
+      if (!ok) return;
+    }
+    setRestoring(true);
+    try {
+      const res = await restoreEntryVersion(entryId, verNo, { row_version: rowVersion });
+      setTitle(res.title);
+      setSlug(res.slug);
+      setCategory(res.category);
+      setExcerpt(res.excerpt);
+      setSeoTitle(res.seo_title);
+      setSeoDescription(res.seo_description);
+      setCoverImageId(res.cover_image);
+      setBody(res.body);
+      setRowVersion(res.row_version);
+      setHasUnpublishedChanges(Boolean(res.has_unpublished_changes));
+      setShowHistoryModal(false);
+      clearLocalDraft();
+      setSuccessMsg(`Đã khôi phục nội dung từ phiên bản #${verNo}. Vui lòng bấm Cập nhật bài để xuất bản.`);
+    } catch (err: any) {
+      if (err instanceof ApiError) {
+        setErrorMsg(err.message || "Lỗi khi khôi phục phiên bản.");
+      } else {
+        setErrorMsg("Lỗi kết nối khi khôi phục phiên bản.");
+      }
+    } finally {
+      setRestoring(false);
+    }
+  };
+
 
   // Xoá nháp (CMS-03-AC8, CMS-03-AC9: chỉ nháp chưa từng đăng)
   const canDelete =
@@ -543,12 +856,31 @@ function ContentEditScreen() {
           ← Quay lại danh sách
         </Link>
         <div className={s.actionsGroup}>
+          {saveStatus && (
+            <span
+              className={`${s.saveStatusText} ${
+                saveStatus.includes("Chưa lưu") ? s.saveStatusOffline : ""
+              }`}
+            >
+              {saveStatus}
+            </span>
+          )}
+          {entryId !== null && (firstPublishedAt !== null || status === "published" || status === "unpublished") && (
+            <button
+              type="button"
+              className={s.historyBtn}
+              onClick={handleOpenHistoryModal}
+              disabled={saving || deleting || publishing || unpublishing || discarding || submitting || returning}
+            >
+              📜 Lịch sử
+            </button>
+          )}
           {canDelete && (
             <button
               type="button"
               className={s.deleteBtn}
               onClick={handleDeleteDraft}
-              disabled={saving || deleting || publishing || unpublishing || discarding}
+              disabled={saving || deleting || publishing || unpublishing || discarding || submitting || returning}
             >
               {deleting ? "Đang xoá..." : "Xoá nháp"}
             </button>
@@ -557,30 +889,66 @@ function ContentEditScreen() {
             type="button"
             className={s.saveBtn}
             onClick={handleSaveDraft}
-            disabled={saving || deleting || publishing || unpublishing || discarding}
+            disabled={saving || deleting || publishing || unpublishing || discarding || submitting || returning}
           >
             {saving ? "Đang lưu..." : "Lưu nháp"}
           </button>
+          {status === "pending_review" && canPublish && (
+            <button
+              type="button"
+              className={s.returnBtn}
+              onClick={() => setShowReturnModal(true)}
+              disabled={saving || deleting || publishing || unpublishing || discarding || submitting || returning}
+            >
+              {returning ? "Đang trả về..." : "Trả về nháp"}
+            </button>
+          )}
+          {!canPublish && status === "draft" && (
+            <button
+              type="button"
+              className={s.submitBtn}
+              onClick={() => handleSubmitEntry(false)}
+              disabled={saving || deleting || publishing || unpublishing || discarding || submitting || returning}
+            >
+              {submitting ? "Đang gửi..." : "Gửi duyệt"}
+            </button>
+          )}
           {status === "published" && !pageRole && (
             <button
               type="button"
               className={s.unpublishBtn}
               onClick={handleOpenUnpublishModal}
-              disabled={saving || deleting || publishing || unpublishing || discarding}
+              disabled={saving || deleting || publishing || unpublishing || discarding || submitting || returning}
             >
               {unpublishing ? "Đang gỡ..." : "Gỡ bài"}
             </button>
           )}
-          <button
-            type="button"
-            className={s.publishBtn}
-            onClick={handleOpenPublishModal}
-            disabled={saving || deleting || publishing || unpublishing || discarding}
-          >
-            {publishing ? "Đang đăng..." : "Đăng bài"}
-          </button>
+          {canPublish && (
+            <button
+              type="button"
+              className={s.publishBtn}
+              onClick={handleOpenPublishModal}
+              disabled={saving || deleting || publishing || unpublishing || discarding || submitting || returning}
+            >
+              {publishing ? "Đang đăng..." : "Đăng bài"}
+            </button>
+          )}
         </div>
       </div>
+
+      {/* Banner thông báo trạng thái Chờ duyệt (CMS-09) */}
+      {status === "pending_review" && (
+        <div className={s.bannerPending}>
+          <div>
+            ⏳ <strong>Đang chờ duyệt:</strong> Bài viết đã được gửi cho Quản lý / Chủ duyệt trước khi xuất bản.
+            {returnReason && (
+              <div style={{ marginTop: "4px", fontSize: "13px" }}>
+                Lý do trước đó: <em>{RETURN_REASON_OPTIONS.find((o) => o.key === returnReason)?.label || returnReason}</em>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Banner cảnh báo bản nháp có thay đổi chưa đăng (CMS-10) */}
       {status === "published" && hasUnpublishedChanges && (
@@ -636,7 +1004,10 @@ function ContentEditScreen() {
                 placeholder="Nhập tiêu đề (tối đa 200 ký tự)..."
                 value={title}
                 maxLength={200}
-                onChange={(e) => setTitle(e.target.value)}
+                onChange={(e) => {
+                  setTitle(e.target.value);
+                  markDirty();
+                }}
               />
             </div>
 
@@ -650,6 +1021,7 @@ function ContentEditScreen() {
                 onChange={(e) => {
                   setSlug(e.target.value);
                   setSlugSuggestion(null);
+                  markDirty();
                 }}
               />
               {slugSuggestion && (
@@ -661,6 +1033,7 @@ function ContentEditScreen() {
                     onClick={() => {
                       setSlug(slugSuggestion);
                       setSlugSuggestion(null);
+                      markDirty();
                     }}
                   >
                     {slugSuggestion}
@@ -674,7 +1047,10 @@ function ContentEditScreen() {
               <TiptapEditor
                 ref={editorRef}
                 value={body}
-                onChange={(newBody) => setBody(newBody)}
+                onChange={(newBody) => {
+                  setBody(newBody);
+                  markDirty();
+                }}
               />
             </div>
           </div>
@@ -690,7 +1066,10 @@ function ContentEditScreen() {
               <select
                 className={s.select}
                 value={kind}
-                onChange={(e) => setKind(e.target.value as ContentKind)}
+                onChange={(e) => {
+                  setKind(e.target.value as ContentKind);
+                  markDirty();
+                }}
                 disabled={entryId !== null}
               >
                 <option value="post">Bài viết tin tức / công thức</option>
@@ -707,6 +1086,7 @@ function ContentEditScreen() {
                   onChange={(e) => {
                     const val = e.target.value;
                     setCategory(val ? parseInt(val, 10) : null);
+                    markDirty();
                   }}
                 >
                   <option value="">-- Chọn chuyên mục --</option>
@@ -726,7 +1106,10 @@ function ContentEditScreen() {
                   <select
                     className={s.select}
                     value={pageRole || ""}
-                    onChange={(e) => setPageRole((e.target.value as ContentPageRole) || null)}
+                    onChange={(e) => {
+                      setPageRole((e.target.value as ContentPageRole) || null);
+                      markDirty();
+                    }}
                     disabled={status === "published" && Boolean(pageRole)}
                   >
                     <option value="">-- Không (Trang tự do) --</option>
@@ -747,7 +1130,10 @@ function ContentEditScreen() {
                     <input
                       type="checkbox"
                       checked={showInFooter}
-                      onChange={(e) => setShowInFooter(e.target.checked)}
+                      onChange={(e) => {
+                        setShowInFooter(e.target.checked);
+                        markDirty();
+                      }}
                     />
                     <span>Hiện ở chân trang (Footer)</span>
                   </label>
@@ -760,7 +1146,10 @@ function ContentEditScreen() {
                       type="number"
                       className={s.input}
                       value={footerOrder}
-                      onChange={(e) => setFooterOrder(parseInt(e.target.value, 10) || 0)}
+                      onChange={(e) => {
+                        setFooterOrder(parseInt(e.target.value, 10) || 0);
+                        markDirty();
+                      }}
                     />
                   </div>
                 )}
@@ -772,13 +1161,21 @@ function ContentEditScreen() {
               <div>
                 <span
                   className={`${s.badge} ${
-                    status === "published" ? s.badgePublished : s.badgeDraft
+                    status === "published"
+                      ? s.badgePublished
+                      : status === "pending_review"
+                      ? s.badgePending
+                      : s.badgeDraft
                   }`}
                 >
                   {status === "draft"
                     ? "Bản nháp"
+                    : status === "pending_review"
+                    ? "Chờ duyệt"
                     : status === "published"
                     ? "Đã đăng"
+                    : status === "unpublished"
+                    ? "Đã gỡ"
                     : status}
                 </span>
                 {rowVersion > 1 && (
@@ -796,7 +1193,10 @@ function ContentEditScreen() {
                 placeholder="Đoạn văn ngắn tóm tắt bài viết..."
                 value={excerpt}
                 maxLength={500}
-                onChange={(e) => setExcerpt(e.target.value)}
+                onChange={(e) => {
+                  setExcerpt(e.target.value);
+                  markDirty();
+                }}
               />
             </div>
 
@@ -808,7 +1208,10 @@ function ContentEditScreen() {
                 placeholder="Tiêu đề hiển thị trên Google..."
                 value={seoTitle}
                 maxLength={200}
-                onChange={(e) => setSeoTitle(e.target.value)}
+                onChange={(e) => {
+                  setSeoTitle(e.target.value);
+                  markDirty();
+                }}
               />
             </div>
 
@@ -819,7 +1222,10 @@ function ContentEditScreen() {
                 placeholder="Mô tả SEO hiển thị trên Google..."
                 value={seoDescription}
                 maxLength={300}
-                onChange={(e) => setSeoDescription(e.target.value)}
+                onChange={(e) => {
+                  setSeoDescription(e.target.value);
+                  markDirty();
+                }}
               />
             </div>
           </div>
@@ -1015,6 +1421,115 @@ function ContentEditScreen() {
                 disabled={unpublishing}
               >
                 {unpublishing ? "Đang gỡ bài..." : "Xác nhận gỡ bài"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Trả bài về nháp (CMS-09) */}
+      {showReturnModal && (
+        <div className={s.modalBackdrop}>
+          <div className={s.modalDialog}>
+            <h3 className={s.modalTitle} style={{ color: "#d97706" }}>
+              Trả bài viết về nháp
+            </h3>
+            <p className={s.modalDesc}>
+              Vui lòng chọn lý do trả về để người soạn bài biết và chỉnh sửa lại:
+            </p>
+
+            <div className={s.formGroup} style={{ marginTop: "12px", marginBottom: "16px" }}>
+              <label className={s.label}>Lý do trả về</label>
+              <select
+                className={s.select}
+                value={selectedReturnReason}
+                onChange={(e) => setSelectedReturnReason(e.target.value as ReturnReason)}
+              >
+                {RETURN_REASON_OPTIONS.map((opt) => (
+                  <option key={opt.key} value={opt.key}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className={s.modalActions}>
+              <button
+                type="button"
+                className={s.cancelBtn}
+                onClick={() => setShowReturnModal(false)}
+                disabled={returning}
+              >
+                Hủy bỏ
+              </button>
+              <button
+                type="button"
+                className={s.returnBtn}
+                style={{ backgroundColor: "#d97706", color: "#ffffff", borderColor: "#d97706" }}
+                onClick={handleReturnEntry}
+                disabled={returning}
+              >
+                {returning ? "Đang trả về..." : "Xác nhận trả về nháp"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Lịch sử phiên bản & Khôi phục (CMS-11) */}
+      {showHistoryModal && (
+        <div className={s.modalBackdrop}>
+          <div className={s.modalDialog} style={{ maxWidth: "680px" }}>
+            <h3 className={s.modalTitle}>Lịch sử phiên bản</h3>
+            <p className={s.modalDesc}>
+              Danh sách các phiên bản đã xuất bản của bài viết này. Bạn có thể khôi phục lại nội dung bản cũ vào bản đang soạn.
+            </p>
+
+            {loadingVersions ? (
+              <div style={{ padding: "20px 0", textAlign: "center", color: "#64748b" }}>
+                Đang tải lịch sử phiên bản...
+              </div>
+            ) : versionsList.length === 0 ? (
+              <div style={{ padding: "20px 0", textAlign: "center", color: "#64748b" }}>
+                Chưa có phiên bản đã đăng nào.
+              </div>
+            ) : (
+              <div className={s.versionList}>
+                {versionsList.map((ver) => (
+                  <div key={ver.version} className={s.versionItem}>
+                    <div className={s.versionMeta}>
+                      <span className={s.versionBadge}>Phiên bản #{ver.version}</span>
+                      <span className={s.versionAuthor}>
+                        Bởi {ver.published_by_name || "Hệ thống"}
+                      </span>
+                      <span className={s.versionDate}>
+                        {new Date(ver.published_at).toLocaleString("vi-VN")}
+                      </span>
+                    </div>
+                    <div className={s.versionTitle}>{ver.title}</div>
+                    <div className={s.versionActions}>
+                      <button
+                        type="button"
+                        className={s.restoreActionBtn}
+                        onClick={() => handleConfirmRestore(ver.version)}
+                        disabled={restoring}
+                      >
+                        {restoring ? "Đang khôi phục..." : "Khôi phục phiên bản này"}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className={s.modalActions}>
+              <button
+                type="button"
+                className={s.cancelBtn}
+                onClick={() => setShowHistoryModal(false)}
+                disabled={restoring}
+              >
+                Đóng
               </button>
             </div>
           </div>

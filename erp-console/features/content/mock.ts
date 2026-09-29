@@ -14,6 +14,13 @@ import {
   EntryUnpublishPayload,
   EntryUpdatePayload,
   GoliveStatusResponse,
+  ContentEntryVersionDetail,
+  ContentEntryVersionListItem,
+  EntryRestorePayload,
+  EntryReturnPayload,
+  EntryReturnResponse,
+  EntrySubmitPayload,
+  EntrySubmitResponse,
 } from "./types";
 import { ApiError } from "@/shared/lib/http";
 
@@ -105,6 +112,9 @@ let MOCK_ENTRY_DETAILS = new Map<number, ContentEntryDetail>([
     },
   ],
 ]);
+
+let MOCK_VERSIONS_DB = new Map<number, ContentEntryVersionDetail[]>();
+
 
 export function mockListCategories(): ContentCategory[] {
   return [...MOCK_CATEGORIES].sort((a, b) => a.order - b.order || a.id - b.id);
@@ -454,6 +464,26 @@ export function mockPublishEntry(
     body: JSON.parse(JSON.stringify(entry.body)),
   };
 
+  const vDetail: ContentEntryVersionDetail = {
+    version: nextVer,
+    published_at: now,
+    published_by_name: "Quản trị viên",
+    kind: entry.kind,
+    title: entry.title,
+    slug: entry.slug,
+    excerpt: entry.excerpt,
+    seo_title: entry.seo_title,
+    seo_description: entry.seo_description,
+    description: entry.seo_description || entry.excerpt,
+    category: entry.category,
+    cover_image: entry.cover_image,
+    body: JSON.parse(JSON.stringify(entry.body)),
+    restored_from: entry.restored_from,
+  };
+  const currentVersions = MOCK_VERSIONS_DB.get(id) || [];
+  MOCK_VERSIONS_DB.set(id, [vDetail, ...currentVersions.filter((v) => v.version !== nextVer)]);
+
+
   return {
     id: entry.id,
     slug: entry.slug,
@@ -582,3 +612,145 @@ export function mockFetchShopCatalog() {
     { item_code: "MUC-ONG-1KG", name: "Mực ống Phan Thiết 1kg", price: 220000, sellable_qty: 12 },
   ];
 }
+
+export function mockSubmitEntry(
+  id: number,
+  payload: EntrySubmitPayload
+): EntrySubmitResponse {
+  const entry = MOCK_ENTRY_DETAILS.get(id);
+  if (!entry) throw new ApiError("Không tìm thấy bài viết.", 404, "NOT_FOUND");
+
+  if (entry.status !== "draft") {
+    throw new ApiError(
+      "Chỉ có thể gửi duyệt bài viết đang ở trạng thái bản nháp (BR-ND-01).",
+      400,
+      "BR-ND-01"
+    );
+  }
+
+  if (entry.row_version !== payload.row_version) {
+    throw new ApiError(
+      "Dữ liệu đã bị thay đổi bởi người khác (STALE_VERSION).",
+      409,
+      "STALE_VERSION"
+    );
+  }
+
+  entry.status = "pending_review";
+  entry.row_version += 1;
+  entry.updated_at = new Date().toISOString();
+
+  const listItem = MOCK_ENTRIES.find((e) => e.id === id);
+  if (listItem) {
+    listItem.status = "pending_review";
+    listItem.updated_at = entry.updated_at;
+  }
+
+  return { status: "pending_review", row_version: entry.row_version };
+}
+
+export function mockReturnEntry(
+  id: number,
+  payload: EntryReturnPayload
+): EntryReturnResponse {
+  const entry = MOCK_ENTRY_DETAILS.get(id);
+  if (!entry) throw new ApiError("Không tìm thấy bài viết.", 404, "NOT_FOUND");
+
+  if (entry.status !== "pending_review") {
+    throw new ApiError(
+      "Chỉ có thể trả về bài viết đang chờ duyệt (BR-ND-01).",
+      400,
+      "BR-ND-01"
+    );
+  }
+
+  const validReasons = ["missing_info", "wrong_content", "legal_risk", "other"];
+  if (!payload.reason || !validReasons.includes(payload.reason)) {
+    throw new ApiError("Lý do trả về không hợp lệ (BR-ND-15).", 400, "BR-ND-15");
+  }
+
+  if (entry.row_version !== payload.row_version) {
+    throw new ApiError(
+      "Dữ liệu đã bị thay đổi bởi người khác (STALE_VERSION).",
+      409,
+      "STALE_VERSION"
+    );
+  }
+
+  entry.status = "draft";
+  entry.return_reason = payload.reason;
+  entry.row_version += 1;
+  entry.updated_at = new Date().toISOString();
+
+  const listItem = MOCK_ENTRIES.find((e) => e.id === id);
+  if (listItem) {
+    listItem.status = "draft";
+    listItem.updated_at = entry.updated_at;
+  }
+
+  return { status: "draft", row_version: entry.row_version, return_reason: entry.return_reason };
+}
+
+export function mockFetchEntryVersions(id: number): ContentEntryVersionListItem[] {
+  const list = MOCK_VERSIONS_DB.get(id) || [];
+  return list.map((v) => ({
+    version: v.version,
+    published_at: v.published_at,
+    published_by_name: v.published_by_name,
+    title: v.title,
+    restored_from: v.restored_from,
+  }));
+}
+
+export function mockGetEntryVersion(
+  id: number,
+  versionNo: number
+): ContentEntryVersionDetail {
+  const list = MOCK_VERSIONS_DB.get(id) || [];
+  const ver = list.find((v) => v.version === versionNo);
+  if (!ver) throw new ApiError("Không tìm thấy phiên bản yêu cầu.", 404, "NOT_FOUND");
+  return { ...ver };
+}
+
+export function mockRestoreEntryVersion(
+  id: number,
+  versionNo: number,
+  payload: EntryRestorePayload
+): ContentEntryDetail {
+  const entry = MOCK_ENTRY_DETAILS.get(id);
+  if (!entry) throw new ApiError("Không tìm thấy bài viết.", 404, "NOT_FOUND");
+
+  if (entry.row_version !== payload.row_version) {
+    throw new ApiError(
+      "Dữ liệu đã bị thay đổi bởi người khác (STALE_VERSION).",
+      409,
+      "STALE_VERSION"
+    );
+  }
+
+  const ver = mockGetEntryVersion(id, versionNo);
+  entry.title = ver.title;
+  entry.slug = ver.slug;
+  entry.excerpt = ver.excerpt;
+  entry.seo_title = ver.seo_title;
+  entry.seo_description = ver.seo_description;
+  entry.category = ver.category;
+  entry.cover_image = ver.cover_image;
+  entry.body = JSON.parse(JSON.stringify(ver.body));
+  entry.restored_from = versionNo;
+  entry.has_unpublished_changes = true;
+  entry.row_version += 1;
+  entry.updated_at = new Date().toISOString();
+
+  const listItem = MOCK_ENTRIES.find((e) => e.id === id);
+  if (listItem) {
+    listItem.title = entry.title;
+    listItem.slug = entry.slug;
+    listItem.category = entry.category;
+    listItem.has_unpublished_changes = true;
+    listItem.updated_at = entry.updated_at;
+  }
+
+  return { ...entry };
+}
+

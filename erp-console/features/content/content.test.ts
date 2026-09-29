@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { canView, GROUP, PERM, visibleNav, type Viewer } from "@/shared/lib/nav";
+import { clearDraft, loadDraft, saveDraft } from "@/shared/lib/drafts";
 import {
   mockCreateCategory,
   mockCreateEntry,
@@ -17,6 +18,11 @@ import {
   mockUpdateImageAlt,
   mockUploadEntryImage,
   mockFetchShopCatalog,
+  mockSubmitEntry,
+  mockReturnEntry,
+  mockFetchEntryVersions,
+  mockGetEntryVersion,
+  mockRestoreEntryVersion,
 } from "./mock";
 
 describe("CMS-01 & CMS-02 Console Tests", () => {
@@ -452,6 +458,183 @@ describe("CMS-01 & CMS-02 Console Tests", () => {
         for (const f of forbidden) {
           expect(f in it).toBe(false);
         }
+      }
+    });
+  });
+
+  describe("CMS-09, CMS-11 & CMS-04: Vòng đời duyệt, Lịch sử phiên bản & Tự lưu nháp", () => {
+    it("CMS-09: Gửi duyệt bài viết (submitEntry) -> pending_review và Trả về nháp (returnEntry) với lý do", () => {
+      // 1. Tạo bài nháp đầy đủ điều kiện
+      const entry = mockCreateEntry({
+        kind: "post",
+        title: "Bài viết để gửi duyệt",
+        category: 1,
+        excerpt: "Tóm tắt bài viết gửi duyệt",
+      });
+      const fakeFile = new File(["dummy"], "cov.jpg", { type: "image/jpeg" });
+      const img = mockUploadEntryImage(entry.id, fakeFile, "Ảnh bìa gửi duyệt");
+      mockUpdateEntry(entry.id, {
+        row_version: entry.row_version,
+        cover_image: img.id,
+        body: {
+          type: "doc",
+          blocks: [{ type: "paragraph", children: [{ text: "Nội dung đạt chuẩn kiểm duyệt" }] }],
+        },
+      });
+
+      // 2. Gửi duyệt khi chưa nạp đủ điều kiện -> ném lỗi nếu thiếu trường (BR-ND-03)
+      // Thử submit với row_version cũ -> STALE_VERSION
+      expect(() => {
+        mockSubmitEntry(entry.id, {
+          row_version: 1,
+        });
+      }).toThrowError(/STALE_VERSION/);
+
+      // 3. Gửi duyệt thành công với row_version hiện tại (2)
+      const submitRes = mockSubmitEntry(entry.id, {
+        row_version: 2,
+      });
+      expect(submitRes.status).toBe("pending_review");
+      expect(submitRes.row_version).toBe(3);
+
+      const entryAfterSubmit = mockGetEntry(entry.id);
+      expect(entryAfterSubmit.status).toBe("pending_review");
+
+      // 4. Submit lại khi đã ở pending_review -> từ chối BR-ND-01
+      expect(() => {
+        mockSubmitEntry(entry.id, {
+          row_version: 3,
+        });
+      }).toThrowError(/BR-ND-01/);
+
+      // 5. Trả về nháp với lý do không hợp lệ -> BR-ND-15
+      expect(() => {
+        mockReturnEntry(entry.id, {
+          row_version: 3,
+          reason: "invalid_reason" as any,
+        });
+      }).toThrowError(/BR-ND-15/);
+
+      // 6. Trả về nháp thành công với lý do 'missing_info'
+      const returnRes = mockReturnEntry(entry.id, {
+        row_version: 3,
+        reason: "missing_info",
+      });
+      expect(returnRes.status).toBe("draft");
+      expect(returnRes.return_reason).toBe("missing_info");
+      expect(returnRes.row_version).toBe(4);
+
+      const entryAfterReturn = mockGetEntry(entry.id);
+      expect(entryAfterReturn.status).toBe("draft");
+      expect(entryAfterReturn.return_reason).toBe("missing_info");
+    });
+
+    it("CMS-11: Lịch sử phiên bản (fetchEntryVersions) không trả body, và khôi phục (restoreEntryVersion)", () => {
+      // 1. Tạo bài viết
+      const entry = mockCreateEntry({
+        kind: "post",
+        title: "Bài viết phiên bản gốc",
+        category: 1,
+        excerpt: "Tóm tắt bản 1",
+      });
+      const fakeFile = new File(["dummy"], "cov.jpg", { type: "image/jpeg" });
+      const img = mockUploadEntryImage(entry.id, fakeFile, "Ảnh bìa");
+      mockUpdateEntry(entry.id, {
+        row_version: entry.row_version,
+        cover_image: img.id,
+        body: {
+          type: "doc",
+          blocks: [{ type: "paragraph", children: [{ text: "Nội dung phiên bản 1 ban đầu" }] }],
+        },
+      });
+
+      // Xuất bản phiên bản 1
+      mockPublishEntry(entry.id, {
+        row_version: 2,
+        checklist_confirmed: true,
+        acknowledge_warnings: true,
+      });
+
+      // Sửa và xuất bản phiên bản 2
+      mockUpdateEntry(entry.id, {
+        row_version: 3,
+        title: "Bài viết phiên bản 2 đã cập nhật",
+        body: {
+          type: "doc",
+          blocks: [{ type: "paragraph", children: [{ text: "Nội dung phiên bản 2 mới hơn" }] }],
+        },
+      });
+      mockPublishEntry(entry.id, {
+        row_version: 4,
+        checklist_confirmed: true,
+        acknowledge_warnings: true,
+      });
+
+      // 2. Lấy danh sách lịch sử phiên bản
+      const versions = mockFetchEntryVersions(entry.id);
+      expect(versions.length).toBe(2);
+      expect(versions[0].version).toBe(2); // Giảm dần theo version
+      expect(versions[1].version).toBe(1);
+
+      // CMS-11-AC1: Danh sách phiên bản tuyệt đối không chứa field 'body'
+      for (const v of versions) {
+        expect("body" in v).toBe(false);
+        expect(v.title).toBeDefined();
+        expect(v.published_at).toBeDefined();
+      }
+
+      // 3. Lấy chi tiết phiên bản 1
+      const detailV1 = mockGetEntryVersion(entry.id, 1);
+      expect(detailV1.version).toBe(1);
+      expect(detailV1.title).toBe("Bài viết phiên bản gốc");
+      expect(detailV1.body).toBeDefined();
+
+      // 4. Khôi phục phiên bản 1
+      const restoreRes = mockRestoreEntryVersion(entry.id, 1, {
+        row_version: 5,
+      });
+      expect(restoreRes.title).toBe("Bài viết phiên bản gốc");
+      expect(restoreRes.has_unpublished_changes).toBe(true);
+      expect(restoreRes.restored_from).toBe(1);
+      expect(restoreRes.row_version).toBe(6);
+
+      const restoredEntry = mockGetEntry(entry.id);
+      expect(restoredEntry.title).toBe("Bài viết phiên bản gốc");
+      expect(restoredEntry.has_unpublished_changes).toBe(true);
+      expect(restoredEntry.restored_from).toBe(1);
+    });
+
+    it("CMS-04: Lưu và xoá nháp cục bộ qua drafts helper", () => {
+      const store = new Map<string, string>();
+      const fakeStorage = {
+        getItem: (k: string) => store.get(k) ?? null,
+        setItem: (k: string, v: string) => { store.set(k, String(v)); },
+        removeItem: (k: string) => { store.delete(k); },
+        clear: () => { store.clear(); },
+        key: (i: number) => Array.from(store.keys())[i] ?? null,
+        get length() { return store.size; },
+      };
+      const origWindow = (globalThis as any).window;
+      (globalThis as any).window = { localStorage: fakeStorage };
+
+      try {
+        const formKey = "test_content_entry_999";
+        const owner = 42;
+        const payload = {
+          title: "Nháp tạm thời khi mất mạng",
+          slug: "nhap-tam-thoi",
+        };
+
+        saveDraft(formKey, owner, payload);
+        const loaded = loadDraft<typeof payload>(formKey, owner);
+        expect(loaded).toBeDefined();
+        expect(loaded?.title).toBe("Nháp tạm thời khi mất mạng");
+
+        clearDraft(formKey);
+        const loadedAfterClear = loadDraft<typeof payload>(formKey, owner);
+        expect(loadedAfterClear).toBeNull();
+      } finally {
+        (globalThis as any).window = origWindow;
       }
     });
   });
