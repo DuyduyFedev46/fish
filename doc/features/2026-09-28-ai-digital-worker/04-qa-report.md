@@ -486,3 +486,79 @@ Không có lỗi chặn (0 lỗi).
 4. `cd erp-console && npx tsc --noEmit && npm run build` -> Compile sạch 25/25 static pages, First Load JS shared giữ nguyên 87.6 kB.
 5. `cd frontend && npx tsc --noEmit && npm run build` -> Compile sạch 8/8 static pages.
 
+---
+
+## Lô 5a: Huỷ phiếu nhập (DW-18) & Trần lệnh ghi của Chủ (DW-20) · Lần 1 · 2026-09-29
+
+### Kết luận: APPROVED — Nghiệm thu toàn diện Lô 5a: Huỷ phiếu nhập bằng trạng thái theo BR-MH-07 và V-DW2, bút toán đảo sổ kho WRITE_OFF bảo toàn tính append-only, descriptor nhap_lo tự động mở max_level=B và hết cờ AI_UNDO_MISSING (DW-18); Chủ kiểm soát trần caps chặt chẽ với kiểm tra số không âm, chặn max_level > C trên production (BR-AI-27), cưỡng chế trần tại my-config và tự động hạ C tại pipeline call (DW-20); bảo vệ tuyệt đối Bất biến 1 (giá vốn) và Bất biến 9 (PII).
+
+### Tổng: 20 ca · ✅ 20 · ❌ 0 · ⏸ 0
+
+### Theo AC
+| Mã AC | Kết quả | Bằng chứng (test/ảnh/lệnh) |
+|---|---|---|
+| **DW-18-AC1** | ✅ PASS | `apps.purchasing.receipts.tests.test_cancel_receipt::CancelReceiptTests.test_dw18_ac1_nguoi_tao_phieu_huy_thanh_cong`<br>Phiếu SUBMITTED, 2 lô DRAFT -> người tạo gọi cancel -> HTTP 200; phiếu CANCELLED, 2 lô CANCELLED, tồn kho về 0; sổ kho ghi nhận 2 bút toán WRITE_OFF âm đúng lượng nhận; AuditLog ghi nhận `cancel_purchase_receipt` với actor là người tạo; không có dòng nào bị xoá (BR-MH-07, Bất biến 3). |
+| **DW-18-AC2 (lỗi)** | ✅ PASS | `apps.purchasing.receipts.tests.test_cancel_receipt::CancelReceiptTests.test_dw18_ac2_loi_khi_lo_da_publish_hoac_co_invoice_cost`<br>1) Một lô đã SELLING -> 400 `BR-MH-07`; 2) Phiếu đã có PurchaseInvoice -> 400 `BR-MH-07`; 3) Lô đã phân bổ PurchaseCost -> 400 `BR-MH-07`; phiếu vẫn SUBMITTED, dữ liệu nguyên vẹn. |
+| **DW-18-AC3 (quyền)** | ✅ PASS | `apps.purchasing.receipts.tests.test_cancel_receipt::CancelReceiptTests.test_dw18_ac3_phan_quyen_v_dw2`<br>Phân quyền V-DW2: `nv_kho` khác người tạo nhận HTTP 403 Forbidden; `nv_giao` nhận 403; `quan_ly` và `chu` huỷ thành công phiếu của người khác (HTTP 200). |
+| **DW-18-AC4 (song song)** | ✅ PASS | `apps.purchasing.receipts.tests.test_cancel_receipt::CancelReceiptTests.test_dw18_ac4_hai_lan_huy_lien_tiep`<br>Gọi huỷ 2 lần liên tiếp -> lần 2 nhận 400 `BR-MH-07` "Phiếu nhập đã bị huỷ"; `transaction.atomic` + `select_for_update` trên cả phiếu và các lô ngăn chặn hoàn toàn race condition (Bất biến 4). |
+| **DW-18-AC5 (giá vốn)** | ✅ PASS | `apps.purchasing.receipts.tests.test_cancel_receipt::CancelReceiptTests.test_dw18_ac5_quan_ly_xem_phieu_huy_khong_ro_rate`<br>`quan_ly` gọi `GET /api/purchasing/receipts/<id>/` trên phiếu đã huỷ -> response lines không chứa khoá `rate`; Bất biến 1 được bảo vệ nghiêm ngặt. |
+| **DW-18-AC6 (lệnh AI)** | ✅ PASS | `apps.purchasing.receipts.tests.test_cancel_receipt::CancelReceiptTests.test_dw18_ac6_descriptor_nhap_lo_max_level_b_va_het_ai_undo_missing`<br>Sau khi action `cancel` xuất hiện trên `PurchaseReceiptViewSet` -> Discovery registry nhận diện `undo="cancel_action:cancel"` -> gán `max_level="B"`, `undo_missing=False`; API descriptor trả `max_level="B"`; `GET /api/ai/my-config/` gỡ bỏ hoàn toàn `locked_reason=AI_UNDO_MISSING` (BR-AI-24). |
+| **DW-18-AC7 (AI tắt)** | ✅ PASS | `apps.purchasing.receipts.tests.test_cancel_receipt::CancelReceiptTests.test_dw18_ac7_ai_tat_huy_phieu_van_chay_binh_thuong`<br>`@override_settings(AI_ENABLED=False)` -> gọi API cancel phiếu nhập vẫn hoạt động bình thường, trả 200, phiếu chuyển CANCELLED độc lập với trạng thái AI (BR-AI-10). |
+| **DW-20-AC1** | ✅ PASS | `apps.ai.policy.tests.test_caps::PolicyCapsTests.test_dw20_ac1_vuot_tran_cua_chu_bi_tu_choi_400`<br>Chủ PUT caps `nhap_lo={kg: 200, vnd: 30000000, daily: 20}` -> NV kho PUT limits 250 kg vào `my-config` -> bị từ chối HTTP 400 `BR-AI-19` kèm thông báo "vượt trần của Chủ". |
+| **DW-20-AC2** | ✅ PASS | `apps.ai.policy.tests.test_caps::PolicyCapsTests.test_dw20_ac2_nguong_hieu_luc_la_min_va_ha_c_khi_call`<br>NV kho đặt limits 150 kg; Chủ hạ caps còn 100 kg -> NV kho `call` phiếu 120 kg -> tự động hạ C (ngưỡng hiệu lực min = 100 kg), trả về `outcome="proposal"`, `level="C"`, `downgrade_reason={"code": "AI_LIMIT_KG", "text": "Vượt trần của Chủ"}`. |
+| **DW-20-AC3 (production)** | ✅ PASS | `apps.ai.policy.tests.test_caps::PolicyCapsTests.test_dw20_ac3_production_chan_dat_tran_lon_hon_c`<br>`@override_settings(AI_PRODUCTION_READY=False)` -> Chủ PUT caps `max_level="B"` -> bị chặn ngay lập tức với HTTP 400 `BR-AI-27` "Production chưa hỗ trợ tự thực thi." (Q-M7). |
+| **DW-20-AC4 (quyền)** | ✅ PASS | `apps.ai.policy.tests.test_caps::PolicyCapsTests.test_dw20_ac4_quan_ly_put_caps_bi_403`<br>`quan_ly` gọi `PUT /api/ai/policy/` (chứa caps) -> nhận HTTP 403 Forbidden do thiếu `ai.manage_ai_policy`. |
+| **DW-20-AC5 (lỗi)** | ✅ PASS | `apps.ai.policy.tests.test_caps::PolicyCapsTests.test_dw20_ac5_so_am_hoac_khong_phai_so_bi_400`<br>Chủ PUT caps có số âm (`kg: -50`) hoặc không phải số (`kg: "abc"`) -> nhận HTTP 400 `BR-AI-19`, cơ chế atomic bảo vệ không sinh phiên bản chính sách mới. |
+| **DW-20-AC6 (AI tắt)** | ✅ PASS | `apps.ai.policy.tests.test_caps::PolicyCapsTests.test_dw20_ac6_ai_tat_put_caps_van_chay`<br>`@override_settings(AI_ENABLED=False)` -> Chủ PUT caps vẫn trả HTTP 200, lưu chính sách mới thành công (BR-AI-10). |
+| **FE-DW-18-BTN** | ✅ PASS | `erp-console/features/purchasing/components/NhapLoForm.tsx:278-288`<br>Form nhập lô sau khi submit thành công hiển thị nút "Huỷ phiếu nhập này" (màu đỏ thận trọng), có `window.confirm` cảnh báo hoàn kho về 0, có cờ `isCancelling` chặn bấm đúp. |
+| **FE-DW-18-STATUS** | ✅ PASS | `erp-console/features/purchasing/components/NhapLoForm.tsx:232-276`<br>Sau khi huỷ, tiêu đề đổi sang "(ĐÃ HUỶ)", badge trạng thái của các lô đổi sang `batchBadgeCancelled` ("Trạng thái: Đã huỷ"), nút huỷ bị ẩn. |
+| **FE-DW-18-MOCK** | ✅ PASS | `erp-console/features/purchasing/mock.ts:133-149`<br>`erp-console/features/purchasing/purchasing.test.ts:145-197`<br>Mock API `mockCancelPurchaseReceipt` và `cancelPurchaseReceipt` xử lý chuẩn contract `POST /api/purchasing/receipts/<id>/cancel/` -> HTTP 200 `{"id": id, "status": "CANCELLED"}`. |
+| **FE-DW-20-CAPS** | ✅ PASS | `erp-console/features/ai/policy/components/AiPolicyScreen.tsx:270-349`<br>Màn hình Chính sách AI (Chủ) hiển thị khối "Trần lệnh ghi của Chủ (Caps)" cho lệnh `purchasing.purchasereceipt.nhap_lo` với 3 ô nhập: Trần khối lượng mỗi lần (kg), Trần giá trị mỗi lần (VNĐ), Hạn mức số lần trong ngày (daily). |
+| **FE-DW-20-VALIDATION** | ✅ PASS | `erp-console/features/ai/policy/components/AiPolicyScreen.tsx:84-106`<br>Validation phía frontend kiểm tra số không âm trước khi gửi API, hiển thị thông báo lỗi thân thiện nếu nhập sai. |
+| **FE-BUILD-PROD** | ✅ PASS | `erp-console`: `npx tsc --noEmit && npm run build` -> sạch 30/30 static pages.<br>`frontend`: `npx tsc --noEmit && npm run build` -> sạch 10/10 static pages. |
+| **FE-BUILD-MOCK** | ✅ PASS | `erp-console`: `NEXT_PUBLIC_USE_MOCK=1 npm run build` -> sạch 30/30 static pages. |
+
+### Ngoại lệ & biên | Phân quyền (bảng vai × hành động) | Rò giá vốn | Rò dữ liệu cá nhân | Hồi quy
+- **Biên & Ngoại lệ:**
+  - Phiếu có lô đã publish (SELLING), đã phát sinh xuất kho, đã gắn PurchaseInvoice, hoặc đã phân bổ PurchaseCost -> bị chặn huỷ với HTTP 400 `BR-MH-07`.
+  - Hai request huỷ cùng lúc / huỷ 2 lần liên tiếp -> request sau bị chặn với 400 `BR-MH-07` do `select_for_update()` khoá chặt phiếu và các lô.
+  - Điền caps số âm hoặc chuỗi không phải số -> 400 `BR-AI-19`, không làm tăng version chính sách.
+  - Production (`AI_PRODUCTION_READY=False`) chặn triệt để việc mở trần `max_level > C` với HTTP 400 `BR-AI-27`.
+  - Gọi lệnh AI với khối lượng vượt trần hiệu lực (min giữa trần Chủ và giới hạn nhân viên) -> tự động hạ C (`downgrade_reason.code="AI_LIMIT_KG"`).
+- **Phân quyền (Bảng vai × Hành động):**
+  | Vai | Huỷ phiếu của mình | Huỷ phiếu người khác | Đặt trần Caps (PUT policy) | Đặt Limits (PUT my-config) |
+  |---|---|---|---|---|
+  | `chu` | ✅ 200 OK | ✅ 200 OK | ✅ 200 OK | ✅ 200 (nếu <= caps) |
+  | `quan_ly` | ✅ 200 OK | ✅ 200 OK | ❌ 403 Forbidden | ✅ 200 (nếu <= caps) |
+  | `nv_kho` | ✅ 200 OK | ❌ 403 Forbidden | ❌ 403 Forbidden | ✅ 200 (nếu <= caps) |
+  | `nv_giao` | ❌ 403 Forbidden | ❌ 403 Forbidden | ❌ 403 Forbidden | ❌ 404/403 |
+  | Khách / Chưa login | ❌ 401 Unauthorized | ❌ 401 Unauthorized | ❌ 401 Unauthorized | ❌ 401 Unauthorized |
+- **Rò giá vốn (Bất biến 1):**
+  - Action `cancel` chỉ trả về `{"id": id, "status": "CANCELLED"}`, tuyệt đối không có trường giá vốn.
+  - Xem chi tiết phiếu đã huỷ (`GET /api/purchasing/receipts/<id>/`): `PurchaseReceiptLineSerializer` kế thừa `CostFieldSerializerMixin`, loại bỏ hoàn toàn `rate` khi người xem thiếu `view_costprice`.
+  - Descriptor của `nhap_lo` tiếp tục ẩn các trường nhạy cảm đối với người thiếu quyền.
+- **Rò dữ liệu cá nhân (Bất biến 9):**
+  - Nghiệp vụ mua hàng và nhập lô tại cảng không chứa thông tin khách hàng (tên, SĐT, địa chỉ).
+  - Dòng AuditLog `cancel_purchase_receipt` chỉ ghi mã phiếu `PR-<id>` và số lô đã huỷ, không có PII.
+  - Không ghi thông tin nhạy cảm ra `console` hay `localStorage`.
+- **Bảo toàn chứng từ (Bất biến 3):**
+  - Phiếu nhập chuyển `status=CANCELLED`, các lô chuyển `status=CANCELLED`.
+  - Tồn kho được đảo bằng bút toán `StockLedgerEntry` loại `WRITE_OFF` âm đúng lượng đã nhận, không xoá bất kỳ dòng lịch sử nào.
+- **Hồi quy:**
+  - Suite `apps.purchasing` và `apps.ai` đạt **91 tests xanh 100%**.
+  - Toàn bộ backend test suite đạt **1032 tests xanh 100%**.
+  - `makemigrations --check --dry-run` sạch `No changes detected`.
+  - Vitest `erp-console`: **72 tests passed 100%**.
+
+### Lỗi
+Không có lỗi chặn (0 lỗi).
+
+### Lệnh đã chạy (kèm output tóm tắt)
+1. `cd backend && .venv/bin/python manage.py test apps.purchasing apps.ai` -> `Ran 91 tests. OK`
+2. `cd backend && .venv/bin/python manage.py test && .venv/bin/python manage.py makemigrations --check --dry-run` -> `Ran 1032 tests. OK. No changes detected.`
+3. `cd erp-console && npm test` -> `72 passed (vitest)`
+4. `cd erp-console && npx tsc --noEmit && npm run build` -> Compile sạch 30/30 static pages.
+5. `cd erp-console && NEXT_PUBLIC_USE_MOCK=1 npm run build` -> Compile sạch 30/30 static pages.
+6. `cd frontend && npx tsc --noEmit && npm run build` -> Compile sạch 10/10 static pages.
+
+

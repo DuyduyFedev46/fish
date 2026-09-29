@@ -53,3 +53,9 @@ export type NhapLoResponse = {
   receipt: PurchaseReceiptSummary;
   batches: NhapLoBatchItem[];
 };
+
+export type CancelPurchaseReceiptResponse = {
+  id: number;
+  status: string;
+};
+

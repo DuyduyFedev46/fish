@@ -233,6 +233,52 @@ class AiCommandCallView(APIView):
             ttl_minutes = getattr(settings, "AI_ACTION_TTL_MINUTES", 15)
             expires_at = timezone.now() + datetime.timedelta(minutes=ttl_minutes)
 
+            # DW-20-AC2: Kiểm tra ngưỡng trần lúc gọi lệnh ghi
+            downgrade_reason = None
+            from decimal import Decimal
+            from apps.ai.settings.services import get_cap_for_command
+            from apps.ai.models import AiPolicyVersion, AiConfigVersion
+
+            latest_policy = AiPolicyVersion.objects.order_by("-version").first()
+            policy_caps = latest_policy.caps if latest_policy else {}
+            cap_cfg = get_cap_for_command(policy_caps, spec.id)
+
+            user_cfg = AiConfigVersion.objects.filter(user=request.user).order_by("-version").first()
+            user_limits = user_cfg.limits if user_cfg else {}
+            user_lim = get_cap_for_command(user_limits, spec.id)
+
+            cap_kg = None
+            if cap_cfg and cap_cfg.get("kg") is not None:
+                try:
+                    cap_kg = Decimal(str(cap_cfg["kg"]))
+                except Exception:
+                    pass
+
+            limit_kg = None
+            if user_lim and user_lim.get("kg") is not None:
+                try:
+                    limit_kg = Decimal(str(user_lim["kg"]))
+                except Exception:
+                    pass
+
+            effective_cap_kg = min([x for x in [cap_kg, limit_kg] if x is not None], default=None)
+
+            if "lines" in args and isinstance(args["lines"], list):
+                try:
+                    total_qty = sum(
+                        Decimal(str(l.get("qty", 0)))
+                        for l in args["lines"]
+                        if isinstance(l, dict)
+                    )
+                    if effective_cap_kg is not None and total_qty > effective_cap_kg:
+                        is_over_owner_cap = (cap_kg is not None and total_qty > cap_kg)
+                        downgrade_reason = {
+                            "code": "AI_LIMIT_KG",
+                            "text": "Vượt trần của Chủ" if is_over_owner_cap else "Vượt ngưỡng bạn đặt",
+                        }
+                except Exception:
+                    pass
+
             action = AiAction.objects.create(
                 command=spec.id,
                 kind=AiAction.Kind.WRITE,
@@ -245,6 +291,7 @@ class AiCommandCallView(APIView):
                 args=args,
                 target_model=target_model_label,
                 target_id=str(target_id or ""),
+                downgrade_reason=downgrade_reason,
                 expires_at=expires_at,
             )
 
@@ -269,7 +316,7 @@ class AiCommandCallView(APIView):
                 "level": "C",
                 "action_id": str(action.id),
                 "expires_at": action.expires_at.isoformat(),
-                "downgrade_reason": None,
+                "downgrade_reason": downgrade_reason,
                 "preview": {
                     "target": {
                         "type": target_model_label or "document",

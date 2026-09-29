@@ -25,7 +25,7 @@ class PurchaseReceiptViewSet(DocumentViewSet):
     queryset = PurchaseReceipt.objects.prefetch_related("lines").all()
     serializer_class = PurchaseReceiptSerializer
     permission_classes = [BusinessModelPermissions]
-    custom_perm_actions = ("submit", "nhap_lo")
+    custom_perm_actions = ("submit", "nhap_lo", "cancel")
     locked_fields = ("status",)  # BR-PQ-14: ghi nhận qua action submit
     actor_fields = ("created_by",)  # BR-PQ-16
 
@@ -41,6 +41,19 @@ class PurchaseReceiptViewSet(DocumentViewSet):
         )
 
     @action(
+        detail=True,
+        methods=["post"],
+        url_path="cancel",
+        required_perms=("purchasing.change_purchasereceipt",),
+    )
+    def cancel(self, request, pk=None):
+        """Huỷ phiếu nhập kho khi mọi lô còn Nháp (BR-MH-07)."""
+        require_perm(request.user, "purchasing.change_purchasereceipt")
+        receipt = self.get_object()
+        services.cancel_receipt(receipt=receipt, actor=request.user)
+        return Response({"id": receipt.id, "status": "CANCELLED"}, status=status.HTTP_200_OK)
+
+    @action(
         detail=False,
         methods=["post"],
         url_path="nhap-lo",
@@ -49,7 +62,7 @@ class PurchaseReceiptViewSet(DocumentViewSet):
         ai=AiMeta(
             title="Nhập lô mua tại cảng",
             keywords=("nhập lô", "nhập hàng", "mua cá", "nhap_lo"),
-            max_level="C",
+            max_level="B",
             undo="cancel_action:cancel",
             limits={"lines[].qty": "kg", "lines[].amount": "vnd"},
         ),

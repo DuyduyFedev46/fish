@@ -15,6 +15,15 @@ export default function AiPolicyScreen() {
   // Form state
   const [globalMode, setGlobalMode] = useState<"on" | "c_only" | "off">("on");
   const [ack, setAck] = useState(false);
+  const [capsState, setCapsState] = useState<{
+    nhap_lo_kg: string;
+    nhap_lo_vnd: string;
+    nhap_lo_daily: string;
+  }>({
+    nhap_lo_kg: "",
+    nhap_lo_vnd: "",
+    nhap_lo_daily: "",
+  });
 
   // User config viewer modal
   const [viewingUser, setViewingUser] = useState<AiPolicyUserSummary | null>(null);
@@ -28,6 +37,13 @@ export default function AiPolicyScreen() {
       const data = await getAiPolicy();
       setPolicy(data);
       setGlobalMode(data.global_mode);
+
+      const nhapLoCap = data.caps?.["purchasing.purchasereceipt.nhap_lo"] || {};
+      setCapsState({
+        nhap_lo_kg: nhapLoCap.kg != null ? String(nhapLoCap.kg) : "",
+        nhap_lo_vnd: nhapLoCap.vnd != null ? String(nhapLoCap.vnd) : "",
+        nhap_lo_daily: nhapLoCap.daily != null ? String(nhapLoCap.daily) : "",
+      });
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Không thể tải chính sách AI.");
     } finally {
@@ -47,13 +63,38 @@ export default function AiPolicyScreen() {
       return;
     }
 
+    const kgNum = capsState.nhap_lo_kg.trim() ? Number(capsState.nhap_lo_kg) : null;
+    const vndNum = capsState.nhap_lo_vnd.trim() ? Number(capsState.nhap_lo_vnd) : null;
+    const dailyNum = capsState.nhap_lo_daily.trim() ? Number(capsState.nhap_lo_daily) : null;
+
+    if (
+      (kgNum !== null && (isNaN(kgNum) || kgNum < 0)) ||
+      (vndNum !== null && (isNaN(vndNum) || vndNum < 0)) ||
+      (dailyNum !== null && (isNaN(dailyNum) || dailyNum < 0))
+    ) {
+      setError("Các giá trị trần lệnh (kg, VNĐ, số lần/ngày) phải là số không âm (DW-20-AC5).");
+      return;
+    }
+
     try {
       setSaving(true);
       setError(null);
       setSuccess(null);
+
+      const newCaps: Record<string, any> = {
+        ...(policy.caps || {}),
+        "purchasing.purchasereceipt.nhap_lo": {
+          ...(policy.caps?.["purchasing.purchasereceipt.nhap_lo"] || {}),
+          kg: kgNum !== null ? String(kgNum) : null,
+          vnd: vndNum !== null ? String(vndNum) : null,
+          daily: dailyNum !== null ? dailyNum : null,
+        },
+      };
+
       const updated = await updateAiPolicy({
         base_version: policy.version,
         global_mode: globalMode,
+        caps: newCaps,
         acknowledge_responsibility: true,
       });
       setPolicy(updated);
@@ -224,6 +265,87 @@ export default function AiPolicyScreen() {
               Ngừng toàn bộ lệnh AI trên mọi thiết bị ngay lập tức.
             </p>
           </label>
+        </div>
+
+        {/* DW-20: Trần lệnh ghi của Chủ (Caps) */}
+        <div className="pt-4 border-t space-y-3">
+          <div>
+            <h3 className="text-sm font-semibold text-gray-900">
+              Trần lệnh ghi của Chủ (Caps)
+            </h3>
+            <p className="text-xs text-gray-500 mt-0.5">
+              Đặt giới hạn an toàn tối đa cho các lệnh ghi dữ liệu của AI. Khi nhân viên gọi lệnh vượt trần, hệ thống tự động hạ về mức C (soạn nháp để duyệt) thay vì tự động thực thi.
+            </p>
+          </div>
+
+          <div className="border rounded-lg p-4 bg-gray-50/50 space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <span className="font-semibold text-xs text-gray-800">
+                  Nhập lô mua tại cảng
+                </span>
+                <span className="ml-2 font-mono text-[10px] text-gray-500">
+                  purchasing.purchasereceipt.nhap_lo
+                </span>
+              </div>
+              <span className="text-[11px] px-2 py-0.5 bg-blue-50 text-blue-700 rounded border border-blue-200 font-medium">
+                Mức tối đa: B
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div>
+                <label className="block text-[11px] font-medium text-gray-700 mb-1">
+                  Trần khối lượng mỗi lần (kg)
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  step="any"
+                  placeholder="Không giới hạn"
+                  value={capsState.nhap_lo_kg}
+                  onChange={(e) =>
+                    setCapsState((prev) => ({ ...prev, nhap_lo_kg: e.target.value }))
+                  }
+                  className="w-full text-xs px-2.5 py-1.5 border rounded border-gray-300 focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-medium text-gray-700 mb-1">
+                  Trần giá trị mỗi lần (VNĐ)
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  step="1000"
+                  placeholder="Không giới hạn"
+                  value={capsState.nhap_lo_vnd}
+                  onChange={(e) =>
+                    setCapsState((prev) => ({ ...prev, nhap_lo_vnd: e.target.value }))
+                  }
+                  className="w-full text-xs px-2.5 py-1.5 border rounded border-gray-300 focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-medium text-gray-700 mb-1">
+                  Hạn mức số lần trong ngày
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  placeholder="Không giới hạn"
+                  value={capsState.nhap_lo_daily}
+                  onChange={(e) =>
+                    setCapsState((prev) => ({ ...prev, nhap_lo_daily: e.target.value }))
+                  }
+                  className="w-full text-xs px-2.5 py-1.5 border rounded border-gray-300 focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
+                />
+              </div>
+            </div>
+          </div>
         </div>
 
         <div className="pt-2 border-t flex flex-col sm:flex-row sm:items-center justify-between gap-3">

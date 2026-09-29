@@ -15,6 +15,7 @@ export function mockListSuppliers(_req: MockRequest): { status: number; body: { 
 }
 
 let mockBatchSeq = 100;
+export const mockReceiptsStore = new Map<number, NhapLoResponse>();
 
 export function mockSubmitNhapLo(req: MockRequest): { status: number; body: NhapLoResponse | { detail: string; code: string } } {
   let body = req.body as NhapLoPayload | undefined;
@@ -35,7 +36,7 @@ export function mockSubmitNhapLo(req: MockRequest): { status: number; body: Nhap
   const receiptId = Math.floor(Math.random() * 900) + 100;
   const receivedDate = body.received_date || new Date().toISOString().slice(0, 10);
 
-  const batches = body.lines.map((line, idx) => {
+  const batches = body.lines.map((line) => {
     mockBatchSeq += 1;
     const days = line.shelf_life_days || 60;
     const exp = new Date(Date.now() + days * 86400 * 1000).toISOString().slice(0, 10);
@@ -67,5 +68,38 @@ export function mockSubmitNhapLo(req: MockRequest): { status: number; body: Nhap
     batches,
   };
 
+  mockReceiptsStore.set(receiptId, resp);
+
   return { status: 201, body: resp };
+}
+
+export function mockCancelPurchaseReceipt(req: MockRequest): {
+  status: number;
+  body: import("./types").CancelPurchaseReceiptResponse | { detail: string; code: string };
+} {
+  const match = req.path.match(/\/receipts\/(\d+)\/cancel\/?/);
+  const receiptId = match ? Number(match[1]) : 0;
+  if (!receiptId) {
+    return {
+      status: 400,
+      body: { detail: "Mã phiếu nhập không hợp lệ.", code: "BR-MH-07" },
+    };
+  }
+
+  const existing = mockReceiptsStore.get(receiptId);
+  if (existing) {
+    existing.receipt.status = "CANCELLED";
+    existing.batches = existing.batches.map((b) => ({
+      ...b,
+      status: "CANCELLED",
+    }));
+  }
+
+  return {
+    status: 200,
+    body: {
+      id: receiptId,
+      status: "CANCELLED",
+    },
+  };
 }

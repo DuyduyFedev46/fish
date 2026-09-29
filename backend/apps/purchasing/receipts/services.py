@@ -143,3 +143,88 @@ def create_and_submit_receipt(
         )
 
     return receipt, batches
+
+
+def cancel_receipt(*, receipt, actor):
+    """
+    Huỷ phiếu nhập kho khi mọi lô còn Nháp (DW-18, BR-MH-07, V-DW2).
+    - Phân quyền V-DW2: Người tạo phiếu (phiếu của mình) HOẶC Quản lý/Chủ (mọi phiếu).
+    - Trong transaction.atomic + select_for_update:
+      - Kiểm tra phiếu chưa bị huỷ.
+      - Kiểm tra chưa có PurchaseInvoice gắn với phiếu.
+      - Khoá các dòng và các lô liên quan.
+      - Kiểm tra từng lô: chưa phân bổ chi phí, trạng thái DRAFT, chưa xuất kho.
+      - Đặt receipt.status = CANCELLED.
+      - Với mỗi lô: ghi bút toán đảo WRITE_OFF cho phần tồn kho còn lại, đặt batch.status = CANCELLED.
+      - Ghi AuditLog cancel_purchase_receipt.
+    """
+    from django.core.exceptions import PermissionDenied
+    from apps.common.audit import record_audit
+    from apps.inventory.models import Batch, StockLedgerEntry
+    from apps.inventory.stock import services as stock
+    from apps.purchasing.models import PurchaseReceipt
+
+    is_creator = (receipt.created_by_id == actor.id)
+    is_manager_or_owner = (
+        actor.has_perm("purchasing.delete_purchasereceipt")
+        or actor.groups.filter(name__in=["chu", "quan_ly"]).exists()
+        or getattr(actor, "is_superuser", False)
+    )
+    if not (is_creator or is_manager_or_owner):
+        raise PermissionDenied("Bạn không có quyền huỷ phiếu nhập này.")
+
+    with transaction.atomic():
+        receipt = PurchaseReceipt.objects.select_for_update().get(pk=receipt.pk)
+        if receipt.status == PurchaseReceipt.Status.CANCELLED:
+            raise BusinessError("Phiếu nhập đã bị huỷ.", code="BR-MH-07")
+
+        if receipt.invoices.exists():
+            raise BusinessError("Không thể huỷ phiếu nhập đã gắn hoá đơn mua.", code="BR-MH-07")
+
+        lines = list(receipt.lines.select_for_update().select_related("batch"))
+        batch_ids = [line.batch_id for line in lines if line.batch_id]
+        batches = list(Batch.objects.select_for_update().filter(id__in=batch_ids))
+
+        for batch in batches:
+            if batch.cost_allocations.exists():
+                raise BusinessError("Không thể huỷ phiếu nhập đã phân bổ chi phí mua hàng.", code="BR-MH-07")
+
+            if batch.status != Batch.Status.DRAFT:
+                raise BusinessError(
+                    f"Lô {batch.batch_id} đã chuyển trạng thái {batch.get_status_display()}, không thể huỷ phiếu.",
+                    code="BR-MH-07",
+                )
+
+            has_other_entries = batch.ledger_entries.exclude(
+                movement_type=StockLedgerEntry.MovementType.RECEIPT
+            ).exists()
+            if batch.qty_available != batch.qty_received or has_other_entries:
+                raise BusinessError(
+                    f"Lô {batch.batch_id} đã phát sinh xuất kho, không thể huỷ phiếu.",
+                    code="BR-MH-07",
+                )
+
+        receipt.status = PurchaseReceipt.Status.CANCELLED
+        receipt.save(update_fields=["status"])
+
+        for batch in batches:
+            if batch.qty_available > 0:
+                stock.record_movement(
+                    batch=batch,
+                    qty_change=-batch.qty_available,
+                    movement_type=StockLedgerEntry.MovementType.WRITE_OFF,
+                    reference=f"cancel_purchase_receipt PR-{receipt.pk}",
+                    actor=actor,
+                )
+            batch.status = Batch.Status.CANCELLED
+            batch.save(update_fields=["status"])
+
+        record_audit(
+            "cancel_purchase_receipt",
+            actor=actor,
+            obj=receipt,
+            note=f"Huỷ phiếu nhập PR-{receipt.pk}, {len(batches)} lô đã huỷ",
+        )
+
+    return receipt
+

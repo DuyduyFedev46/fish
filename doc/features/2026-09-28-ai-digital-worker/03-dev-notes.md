@@ -515,3 +515,71 @@
   - `erp-console`: `npx tsc --noEmit && npm run build` -> sạch 25/25 static pages (route `/purchasing` 5.81 kB).
   - `frontend`: `npx tsc --noEmit && npm run build` -> sạch 8/8 static pages.
 
+---
+
+## Lô 5a — Huỷ phiếu nhập (DW-18) & Trần lệnh ghi của Chủ (DW-20)
+- Trạng thái: BE & FE HOÀN THÀNH — CHỜ QA
+- Nhánh thực hiện: `main`
+
+### 1. Backend (`be-dev`)
+- **Huỷ phiếu nhập (DW-18, BR-MH-07, V-DW2)**:
+  - `backend/apps/purchasing/models/receipts.py`: Thêm trạng thái `CANCELLED = "CANCELLED", "Đã huỷ"` vào `PurchaseReceipt.Status`.
+  - Migration schema: `apps/purchasing/migrations/0003_alter_purchasereceipt_status.py`.
+  - `backend/apps/purchasing/receipts/services.py`: Cài đặt hàm `cancel_receipt(*, receipt, actor)`:
+    - Kiểm tra phân quyền V-DW2: Người tạo phiếu (`receipt.created_by_id == actor.id`) HOẶC Quản lý/Chủ (`purchasing.delete_purchasereceipt`).
+    - Bọc trong `transaction.atomic()` với `select_for_update()`.
+    - Kiểm tra bất biến BR-MH-07: Phiếu chưa bị huỷ; chưa gắn hoá đơn mua; các lô cá chưa phân bổ chi phí; mọi lô còn trạng thái `DRAFT`; chưa phát sinh xuất kho hay thay đổi số lượng tồn kho.
+    - Cập nhật trạng thái: Phiếu chuyển sang `CANCELLED`. Các lô chuyển sang `CANCELLED`.
+    - Đảo sổ kho: Ghi bút toán `WRITE_OFF` với `qty_change = -batch.qty_available` (hoàn tồn kho về 0, không xoá dòng lịch sử sổ kho).
+    - Ghi `AuditLog` với action `cancel_purchase_receipt`.
+  - `backend/apps/purchasing/receipts/api.py`: Thêm action `cancel` trên `PurchaseReceiptViewSet` (`custom_perm_actions = ("submit", "nhap_lo", "cancel")`).
+  - Nâng cấp descriptor AI: Action `nhap_lo` được khai báo `max_level="B"`, `undo="cancel_action:cancel"`.
+  - Discovery động & Settings (`apps/ai/registry/discovery.py`, `apps/ai/settings/services.py`):
+    - Nhận biết `undo="cancel_action:cancel"`. Khi ViewSet có action `cancel`, gán `undo_missing=False` và `max_level="B"`.
+    - Gỡ bỏ `locked_reason=AI_UNDO_MISSING` cho lệnh `purchasing.purchasereceipt.nhap_lo` (DW-18-AC6).
+  - Snapshot & Kỷ luật Registry:
+    - Bổ sung `"purchasing.purchasereceipt.cancel"` vào commands index snapshot.
+    - Cập nhật kiểm tra số lượng custom action trong test discipline từ 22 lên 23.
+- **Trần lệnh ghi của Chủ (DW-20, caps)**:
+  - `backend/apps/ai/policy/services.py`:
+    - Validation `caps`: kiểm tra số không âm cho `kg`, `vnd`, `daily` (DW-20-AC5).
+    - Kiểm tra `AI_PRODUCTION_READY=false`: Chủ không được đặt trần `max_level > C` (DW-20-AC3).
+  - `backend/apps/ai/settings/services.py`:
+    - Hàm `get_cap_for_command`: lấy trần của Chủ cho một lệnh ghi.
+    - Trong `save_user_config`: kiểm tra `limits` của user so với `caps` của Chủ, nếu vượt quá -> 400 `BR-AI-19` "vượt trần của Chủ" (DW-20-AC1).
+  - `backend/apps/ai/execution/pipeline.py`:
+    - Trong API `call`: kiểm tra trần hiệu lực (min giữa trần Chủ và giới hạn nhân viên). Nếu tổng khối lượng vượt trần hiệu lực -> tự động hạ về mức C (`level="C"`, `outcome="proposal"`, `downgrade_reason={"code": "AI_LIMIT_KG", "text": "Vượt trần của Chủ" | "Vượt ngưỡng bạn đặt"}`) (DW-20-AC2).
+- **Tests mới**:
+  - `backend/apps/purchasing/receipts/tests/test_cancel_receipt.py`: 7 tests bao phủ 100% DW-18-AC1..AC7.
+  - `backend/apps/ai/policy/tests/test_caps.py`: 6 tests bao phủ 100% DW-20-AC1..AC6.
+- **Kiểm chứng Backend**:
+  - Chạy `apps.purchasing` và `apps.ai`: 91 tests xanh 100%.
+  - Toàn bộ suite backend: 1032 tests xanh 100%.
+  - `makemigrations --check --dry-run`: Sạch, "No changes detected".
+
+### 2. Frontend (`fe-dev`)
+- **Huỷ phiếu nhập (DW-18)**:
+  - `erp-console/features/purchasing/types.ts`: Thêm `CancelPurchaseReceiptResponse`.
+  - `erp-console/features/purchasing/api.ts`: Thêm hàm `cancelPurchaseReceipt(receiptId)`.
+  - `erp-console/features/purchasing/mock.ts`: Cập nhật `mockReceiptsStore` và hàm `mockCancelPurchaseReceipt`.
+  - `erp-console/features/purchasing/components/NhapLoForm.tsx`:
+    - Thêm nút "Huỷ phiếu nhập này" (màu đỏ/thận trọng) khi phiếu nhập đang hiển thị.
+    - Có hộp thoại xác nhận cảnh báo hoàn kho về 0.
+    - Gọi API và cập nhật trạng thái phiếu nhập sang "ĐÃ HUỶ" (CANCELLED), các lô hiển thị badge "ĐÃ HUỶ".
+  - `erp-console/features/purchasing/purchasing.module.css`: Thêm styling `.cancelBtn`, `.cancelledBox`, `.batchBadgeCancelled`.
+  - `erp-console/features/purchasing/purchasing.test.ts`: Thêm tests cho `mockCancelPurchaseReceipt` và `cancelPurchaseReceipt`.
+- **Trần lệnh ghi của Chủ (DW-20)**:
+  - `erp-console/features/ai/types.ts`: Định nghĩa kiểu `CommandCapConfig`, `PolicyCaps`.
+  - `erp-console/features/ai/policy/api.ts`: Bổ sung `caps` vào `mockAiPolicy` và payload `UpdateAiPolicyPayload`.
+  - `erp-console/features/ai/policy/components/AiPolicyScreen.tsx`:
+    - Thêm khối cấu hình "Trần lệnh ghi của Chủ (Caps)" cho lệnh `purchasing.purchasereceipt.nhap_lo` (Nhập lô mua tại cảng).
+    - Cấu hình: Trần khối lượng mỗi lần (kg), Trần giá trị mỗi lần (VNĐ), Hạn mức số lần trong ngày (daily).
+    - Validate số không âm (DW-20-AC5) phía frontend trước khi gửi.
+    - Gửi `caps` cùng `global_mode` và `acknowledge_responsibility` khi lưu chính sách.
+- **Kiểm chứng Frontend**:
+  - `erp-console`: `npm test` -> 72 tests passed 100%.
+  - `erp-console`: `npx tsc --noEmit && npm run build` -> sạch 30/30 static pages.
+  - `erp-console`: `NEXT_PUBLIC_USE_MOCK=1 npm run build` -> sạch 30/30 static pages.
+  - `frontend`: `npx tsc --noEmit && npm run build` -> sạch 10/10 static pages.
+
+

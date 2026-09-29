@@ -235,18 +235,21 @@ export type AiPolicyRedZoneItem = {
   delay_minutes: number;
 };
 
+export interface CommandCapConfig {
+  max_level?: AiCommandLevel;
+  kg?: string | number | null;
+  vnd?: string | number | null;
+  daily?: number | null;
+}
+
+export type PolicyCaps = Record<string, CommandCapConfig>;
+
 export type AiPolicy = {
   version: number;
   global_mode: "on" | "c_only" | "off";
   env: string;
   production_ready: boolean;
   red_zone: AiPolicyRedZoneItem[];
-  caps: Array<{
-    command: string;
-    max_level: AiCommandLevel;
-    kg: string;
-    vnd: string;
-    daily: number;
-  }>;
+  caps: PolicyCaps;
   users: AiPolicyUserSummary[];
 };

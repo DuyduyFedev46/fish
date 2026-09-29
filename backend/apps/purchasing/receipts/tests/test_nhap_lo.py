@@ -181,7 +181,7 @@ class NhapLoTests(TestCase):
         thu_mua = next(g for g in groups if g["group"] == "thu_mua")
         cfg_cmd = next(c for c in thu_mua["commands"] if c["id"] == "purchasing.purchasereceipt.nhap_lo")
         self.assertEqual(cfg_cmd["choices"], ["OFF", "C"])
-        self.assertEqual(cfg_cmd["locked_reason"]["code"], "AI_UNDO_MISSING")
+        self.assertIsNone(cfg_cmd["locked_reason"])
 
         # 3. Call lệnh ghi -> outcome=proposal (mức C)
         call_payload = {

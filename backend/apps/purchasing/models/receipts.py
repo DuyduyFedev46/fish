@@ -14,6 +14,7 @@ class PurchaseReceipt(models.Model):
     class Status(models.TextChoices):
         DRAFT = "DRAFT", "Nháp"
         SUBMITTED = "SUBMITTED", "Đã ghi nhận"
+        CANCELLED = "CANCELLED", "Đã huỷ"
 
     supplier = models.ForeignKey(
         Supplier, on_delete=models.PROTECT, related_name="receipts", verbose_name="Nhà cung cấp"

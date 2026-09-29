@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Icon } from "@/shared/ui/Icon";
 import { listItems } from "@/features/catalog/api";
 import type { CatalogItem } from "@/features/catalog/types";
-import { fetchSuppliers, submitNhapLo } from "../api";
+import { cancelPurchaseReceipt, fetchSuppliers, submitNhapLo } from "../api";
 import type { NhapLoLineInput, NhapLoResponse, Supplier } from "../types";
 import s from "../purchasing.module.css";
 
@@ -45,6 +45,11 @@ export function NhapLoForm() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successResult, setSuccessResult] = useState<NhapLoResponse | null>(null);
+
+  // Huỷ phiếu nhập (DW-18)
+  const [isCancelling, setIsCancelling] = useState(false);
+  const [cancelError, setCancelError] = useState<string | null>(null);
+  const [cancelSuccessMsg, setCancelSuccessMsg] = useState<string | null>(null);
 
   // Khởi tạo key và nạp dữ liệu ban đầu
   useEffect(() => {
@@ -125,6 +130,8 @@ export function NhapLoForm() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
+    setCancelError(null);
+    setCancelSuccessMsg(null);
 
     if (!supplierId) {
       setErrorMessage("Vui lòng chọn nhà cung cấp.");
@@ -181,30 +188,104 @@ export function NhapLoForm() {
   const handleResetNew = () => {
     setSuccessResult(null);
     setErrorMessage(null);
+    setCancelError(null);
+    setCancelSuccessMsg(null);
     setLines([{ item_code: items[0]?.code || "", qty: "", rate: "", shelf_life_days: null }]);
     setIdempotencyKey(generateUUID());
   };
 
+  const handleCancelReceipt = async () => {
+    if (!successResult) return;
+    const receiptId = successResult.receipt.id;
+    const confirmed = window.confirm(
+      `Bạn có chắc chắn muốn huỷ phiếu nhập PR-${receiptId}? Các lô cá thuộc phiếu nhập này sẽ bị huỷ và hoàn kho về 0.`
+    );
+    if (!confirmed) return;
+
+    setIsCancelling(true);
+    setCancelError(null);
+    try {
+      await cancelPurchaseReceipt(receiptId);
+      setSuccessResult((prev) =>
+        prev
+          ? {
+              ...prev,
+              receipt: { ...prev.receipt, status: "CANCELLED" },
+              batches: prev.batches.map((b) => ({ ...b, status: "CANCELLED" })),
+            }
+          : null
+      );
+      setCancelSuccessMsg(
+        `Phiếu nhập PR-${receiptId} đã được huỷ. Các lô liên quan đã chuyển trạng thái Đã huỷ (CANCELLED).`
+      );
+    } catch (err: unknown) {
+      const errorObj = err as { detail?: string; code?: string; message?: string };
+      setCancelError(
+        errorObj.detail || errorObj.message || "Không thể huỷ phiếu nhập. Vui lòng thử lại."
+      );
+    } finally {
+      setIsCancelling(false);
+    }
+  };
+
   if (successResult) {
+    const isCancelled = successResult.receipt.status === "CANCELLED";
+
     return (
       <div className={s.successBox}>
         <h3 className={s.successTitle}>
-          <Icon name="check_circle" />
-          <span>Ghi nhận phiếu nhập thành công (Mã: PR-{successResult.receipt.id})</span>
+          <Icon name={isCancelled ? "cancel" : "check_circle"} />
+          <span>
+            {isCancelled
+              ? `Phiếu nhập PR-${successResult.receipt.id} (ĐÃ HUỶ)`
+              : `Ghi nhận phiếu nhập thành công (Mã: PR-${successResult.receipt.id})`}
+          </span>
         </h3>
+
+        {cancelSuccessMsg && (
+          <div className={s.cancelledBox}>
+            <Icon name="info" />
+            <span>{cancelSuccessMsg}</span>
+          </div>
+        )}
+
+        {cancelError && (
+          <div className={s.errorBox} style={{ marginTop: "12px", marginBottom: "12px" }}>
+            <strong>Lỗi huỷ phiếu: </strong>
+            <span>{cancelError}</span>
+          </div>
+        )}
+
         <p className={s.desc}>
-          Hệ thống đã tự động ghi nhận phiếu nhập và sinh {successResult.batches.length} lô cá mới ở trạng thái Nháp (DRAFT):
+          {isCancelled
+            ? `Các lô cá thuộc phiếu nhập này đã chuyển sang trạng thái Đã huỷ (CANCELLED) và hoàn kho về 0:`
+            : `Hệ thống đã tự động ghi nhận phiếu nhập và sinh ${successResult.batches.length} lô cá mới ở trạng thái Nháp (DRAFT):`}
         </p>
 
         <ul className={s.batchList}>
           {successResult.batches.map((b) => (
             <li key={b.batch_id} className={s.batchItem}>
-              <span className={s.batchBadge}>{b.batch_id}</span> — {b.qty_available} kg — Hạn dùng: {b.expiry_date}
+              <span className={b.status === "CANCELLED" ? s.batchBadgeCancelled : s.batchBadge}>
+                {b.batch_id}
+              </span>{" "}
+              — {b.qty_available} kg —{" "}
+              {b.status === "CANCELLED" ? "Trạng thái: Đã huỷ" : `Hạn dùng: ${b.expiry_date}`}
             </li>
           ))}
         </ul>
 
         <div className={s.actions} style={{ borderTop: "none", paddingTop: 0 }}>
+          {!isCancelled && (
+            <button
+              type="button"
+              onClick={handleCancelReceipt}
+              className={s.cancelBtn}
+              disabled={isCancelling}
+            >
+              <Icon name="delete_forever" />
+              <span>{isCancelling ? "Đang huỷ phiếu..." : "Huỷ phiếu nhập này"}</span>
+            </button>
+          )}
           <button type="button" onClick={handleResetNew} className={s.submitBtn}>
             Nhập phiếu tiếp
           </button>

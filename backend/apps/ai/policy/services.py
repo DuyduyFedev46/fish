@@ -1,6 +1,7 @@
 """
 Services xử lý chính sách AI của Chủ (DW-13, 02b §6.6).
 """
+from decimal import Decimal
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.db import transaction
@@ -126,6 +127,27 @@ def update_policy(
                 status_code=409,
                 details={"current_version": current_version},
             )
+
+        # DW-20-AC5: Kiểm tra caps không âm và hợp lệ
+        if caps:
+            if not isinstance(caps, dict):
+                raise BusinessError("Dữ liệu trần (caps) phải là dict.", code="BR-AI-19", status_code=400)
+            for cmd_id, cap_cfg in caps.items():
+                if not isinstance(cap_cfg, dict):
+                    raise BusinessError("Cấu hình trần cho từng lệnh phải là dict.", code="BR-AI-19", status_code=400)
+                for field_name in ("kg", "vnd", "daily"):
+                    val = cap_cfg.get(field_name)
+                    if val is not None:
+                        try:
+                            dec_val = Decimal(str(val))
+                            if dec_val < 0:
+                                raise ValueError("Số âm")
+                        except Exception:
+                            raise BusinessError(
+                                f"Giá trị {field_name} của {cmd_id} phải là số không âm.",
+                                code="BR-AI-19",
+                                status_code=400,
+                            )
 
         # Kiểm tra BR-AI-27: production chưa có S-L1...S-L4 mà mở vùng đỏ hoặc trần > C
         production_ready = getattr(settings, "AI_PRODUCTION_READY", False)

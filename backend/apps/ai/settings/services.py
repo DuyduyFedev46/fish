@@ -1,6 +1,7 @@
 """
 Service xử lý nghiệp vụ cấu hình AI của tôi (DW-12, 02b §6.5).
 """
+from decimal import Decimal
 from django.conf import settings
 from django.db import transaction
 from django.test import RequestFactory
@@ -14,6 +15,20 @@ from apps.common.exceptions import BusinessError
 
 GROUP_CSKH = "".join(["cs", "kh"])
 _rf = RequestFactory()
+
+
+def get_cap_for_command(caps: dict, cmd_id: str) -> dict | None:
+    if not caps or not isinstance(caps, dict):
+        return None
+    if cmd_id in caps and isinstance(caps[cmd_id], dict):
+        return caps[cmd_id]
+    alias = cmd_id.split(".")[-1]
+    if alias in caps and isinstance(caps[alias], dict):
+        return caps[alias]
+    for k, v in caps.items():
+        if isinstance(v, dict) and (k == cmd_id or k.endswith(f".{cmd_id}") or cmd_id.endswith(f".{k}")):
+            return v
+    return None
 
 
 def user_has_spec_permission(user, spec) -> bool:
@@ -116,13 +131,13 @@ def get_user_config_data(user) -> dict:
                     source = "default"
             else:
                 choices = list(write_choices)
-                max_level = "C"
+                max_level = getattr(spec, "max_level", "C")
                 red_zone = bool(getattr(spec, "red_zone", False))
                 locked_reason = None
                 if red_zone:
                     locked_reason = {"code": "BR-AI-18", "text": "Chủ chưa mở vùng đỏ cho lệnh này"}
-                elif getattr(spec, "undo_missing", False) or spec.id == "purchasing.purchasereceipt.nhap_lo":
-                    locked_reason = {"code": "AI_UNDO_MISSING", "text": "Chưa có nghiệp vụ huỷ phiếu nhập"}
+                elif getattr(spec, "undo_missing", False):
+                    locked_reason = {"code": "AI_UNDO_MISSING", "text": "Chưa có nghiệp vụ huỷ chứng từ"}
 
                 cmd_limits = limits.get(spec.id, None)
                 if spec.id in overrides:
@@ -231,6 +246,27 @@ def update_user_config(
                 errors[f"groups.{grp_key}.read"] = "Mức đọc không hợp lệ"
             if w_lvl and w_lvl not in valid_write_levels:
                 errors[f"groups.{grp_key}.write"] = f"Vượt trần: tối đa {env_write_max}"
+
+        # Validate limits theo caps của Chủ (DW-20-AC1)
+        latest_policy = AiPolicyVersion.objects.order_by("-version").first()
+        policy_caps = latest_policy.caps if latest_policy else {}
+        for cmd_id, lim in (limits or {}).items():
+            if not isinstance(lim, dict):
+                continue
+            cap = get_cap_for_command(policy_caps, cmd_id)
+            if cap:
+                if "kg" in lim and "kg" in cap and lim["kg"] is not None and cap["kg"] is not None:
+                    try:
+                        if Decimal(str(lim["kg"])) > Decimal(str(cap["kg"])):
+                            errors[cmd_id] = "vượt trần của Chủ"
+                    except Exception:
+                        errors[cmd_id] = "Giá trị giới hạn kg không hợp lệ"
+                if "vnd" in lim and "vnd" in cap and lim["vnd"] is not None and cap["vnd"] is not None:
+                    try:
+                        if Decimal(str(lim["vnd"])) > Decimal(str(cap["vnd"])):
+                            errors[cmd_id] = "vượt trần của Chủ"
+                    except Exception:
+                        errors[cmd_id] = "Giá trị giới hạn vnd không hợp lệ"
 
         if errors:
             raise BusinessError(

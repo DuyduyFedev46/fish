@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { submitNhapLo, getNhapLoDraft, saveNhapLoDraft, clearNhapLoDraft } from "./api";
-import { mockSubmitNhapLo } from "./mock";
+import { mockSubmitNhapLo, mockCancelPurchaseReceipt } from "./mock";
 import { NhapLoPayload } from "./types";
 
 const storageMock = (() => {
@@ -141,4 +141,58 @@ describe("Purchasing feature tests (DW-17)", () => {
     expect(res.batches.length).toBe(1);
     expect(res.batches[0].batch_id).toBe("CA-THU-260929-101");
   });
+
+  it("DW-18-AC1 & AC2: mockCancelPurchaseReceipt cancels receipt and batches", () => {
+    // Tạo 1 phiếu nhập trước trong mockReceiptsStore
+    const payload: NhapLoPayload = {
+      supplier: 1,
+      received_date: "2026-09-29",
+      lines: [
+        {
+          item_code: "CA-THU",
+          qty: "30",
+          rate: "150000",
+        },
+      ],
+    };
+
+    const submitRes = mockSubmitNhapLo({
+      method: "POST",
+      path: "/api/purchasing/receipts/nhap-lo/",
+      body: payload,
+      token: "mock-token",
+    });
+    const receiptId = (submitRes.body as any).receipt.id;
+
+    const cancelRes = mockCancelPurchaseReceipt({
+      method: "POST",
+      path: `/api/purchasing/receipts/${receiptId}/cancel/`,
+      token: "mock-token",
+    });
+
+    expect(cancelRes.status).toBe(200);
+    const body = cancelRes.body as any;
+    expect(body.id).toBe(receiptId);
+    expect(body.status).toBe("CANCELLED");
+  });
+
+  it("DW-18-AC1: cancelPurchaseReceipt calls POST API and returns cancelled status", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockImplementation(() =>
+        Promise.resolve({
+          ok: true,
+          status: 200,
+          headers: new Headers({ "content-type": "application/json" }),
+          json: () => Promise.resolve({ id: 88, status: "CANCELLED" }),
+        })
+      )
+    );
+
+    const { cancelPurchaseReceipt } = await import("./api");
+    const res = await cancelPurchaseReceipt(88);
+    expect(res.id).toBe(88);
+    expect(res.status).toBe("CANCELLED");
+  });
 });
+

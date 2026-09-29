@@ -1,6 +1,6 @@
 import { apiFetch, type Paginated } from "@/shared/lib/http";
-import { mockListSuppliers, mockSubmitNhapLo } from "./mock";
-import type { NhapLoPayload, NhapLoResponse, Supplier } from "./types";
+import { mockCancelPurchaseReceipt, mockListSuppliers, mockSubmitNhapLo } from "./mock";
+import type { CancelPurchaseReceiptResponse, NhapLoPayload, NhapLoResponse, Supplier } from "./types";
 
 export async function fetchSuppliers(signal?: AbortSignal): Promise<Supplier[]> {
   const isMock = process.env.NEXT_PUBLIC_USE_MOCK === "1";
@@ -22,6 +22,22 @@ export async function submitNhapLo(
     signal,
     mock: isMock ? mockSubmitNhapLo : undefined,
   });
+}
+
+export async function cancelPurchaseReceipt(
+  receiptId: number,
+  signal?: AbortSignal
+): Promise<CancelPurchaseReceiptResponse> {
+  const isMock = process.env.NEXT_PUBLIC_USE_MOCK === "1";
+  return apiFetch<CancelPurchaseReceiptResponse>(
+    `/api/purchasing/receipts/${receiptId}/cancel/`,
+    {
+      method: "POST",
+      body: {},
+      signal,
+      mock: isMock ? mockCancelPurchaseReceipt : undefined,
+    }
+  );
 }
 
 export const DRAFT_STORAGE_KEY = "cave_draft_nhap_lo";

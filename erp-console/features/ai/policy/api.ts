@@ -1,5 +1,13 @@
 import { apiFetch, type MockRequest } from "@/shared/lib/http";
-import { AiPolicy, MyConfig } from "../types";
+import { AiPolicy, MyConfig, PolicyCaps } from "../types";
+
+export interface UpdateAiPolicyPayload {
+  base_version: number;
+  global_mode?: "on" | "c_only" | "off";
+  red_zone?: Record<string, boolean>;
+  caps?: PolicyCaps;
+  acknowledge_responsibility: boolean;
+}
 
 const mockAiPolicy: AiPolicy = {
   version: 1,
@@ -38,7 +46,13 @@ const mockAiPolicy: AiPolicy = {
       delay_minutes: 0,
     },
   ],
-  caps: [],
+  caps: {
+    "purchasing.purchasereceipt.nhap_lo": {
+      kg: "200",
+      vnd: "30000000",
+      daily: 20,
+    },
+  },
   users: [
     {
       user_id: 1,
@@ -68,13 +82,7 @@ export async function getAiPolicy(signal?: AbortSignal): Promise<AiPolicy> {
 }
 
 export async function updateAiPolicy(
-  payload: {
-    base_version: number;
-    global_mode?: "on" | "c_only" | "off";
-    red_zone?: Record<string, boolean>;
-    caps?: Record<string, unknown>;
-    acknowledge_responsibility: boolean;
-  },
+  payload: UpdateAiPolicyPayload,
   signal?: AbortSignal
 ): Promise<AiPolicy> {
   const isMock = process.env.NEXT_PUBLIC_USE_MOCK === "1";
@@ -83,14 +91,17 @@ export async function updateAiPolicy(
     body: JSON.stringify(payload),
     signal,
     mock: isMock
-      ? (_req: MockRequest) => ({
-          status: 200,
-          body: {
-            ...mockAiPolicy,
-            version: payload.base_version + 1,
-            global_mode: payload.global_mode || mockAiPolicy.global_mode,
-          },
-        })
+      ? (_req: MockRequest) => {
+          mockAiPolicy.version = payload.base_version + 1;
+          if (payload.global_mode) mockAiPolicy.global_mode = payload.global_mode;
+          if (payload.caps) mockAiPolicy.caps = payload.caps;
+          return {
+            status: 200,
+            body: {
+              ...mockAiPolicy,
+            },
+          };
+        }
       : undefined,
   });
 }

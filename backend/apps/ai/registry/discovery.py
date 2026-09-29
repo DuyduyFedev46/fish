@@ -211,6 +211,24 @@ class CommandRegistry:
 
                     is_detail = getattr(action_func, "detail", False) if action_func else ("<pk>" in pattern_str or "<id>" in pattern_str or "<str:" in pattern_str or "<int:" in pattern_str)
 
+                    # Xử lý undo và max_level
+                    undo_val = getattr(ai_meta, "undo", "") or ""
+                    undo_missing = False
+                    max_level_val = getattr(ai_meta, "max_level", "")
+                    if undo_val.startswith("cancel_action:"):
+                        cancel_act_name = undo_val.split(":", 1)[1]
+                        if hasattr(cls, cancel_act_name):
+                            undo_missing = False
+                            max_level_val = max_level_val or "B"
+                        else:
+                            undo_missing = True
+                            max_level_val = "C"
+                    elif not max_level_val:
+                        max_level_val = "A" if kind == "read" else "C"
+
+                    if force_c:
+                        max_level_val = "C"
+
                     spec = CommandSpec(
                         id=cmd_id,
                         title=title,
@@ -228,7 +246,8 @@ class CommandRegistry:
                         required_perms=required_perms,
                         sensitivity=getattr(ai_meta, "sensitivity", "") or "cao",
                         channel=getattr(ai_meta, "channel", "") or "local",
-                        max_level=getattr(ai_meta, "max_level", "") or ("A" if kind == "read" else "C"),
+                        max_level=max_level_val,
+                        undo_missing=undo_missing,
                         red_zone=red_zone,
                         force_c=force_c,
                         form_only=is_form_only,
@@ -294,6 +313,7 @@ class CommandRegistry:
                             sensitivity=getattr(ai_meta, "sensitivity", "") or "cao",
                             channel=getattr(ai_meta, "channel", "") or "local",
                             max_level=getattr(ai_meta, "max_level", "") or ("A" if kind == "read" else "C"),
+                            undo_missing=False,
                             red_zone=red_zone,
                             force_c=force_c,
                             form_only=is_form_only,

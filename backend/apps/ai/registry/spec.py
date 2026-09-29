@@ -24,6 +24,7 @@ class CommandSpec:
     sensitivity: str = "cao"                # "cao" | "trung_binh" | "thap"
     channel: str = "local"                  # "local" | "cloud"
     max_level: str = "C"                    # "A" | "B" | "C"
+    undo_missing: bool = False              # True nếu undo trỏ tới action chưa có
     red_zone: bool = False
     force_c: bool = False
     form_only: bool = False

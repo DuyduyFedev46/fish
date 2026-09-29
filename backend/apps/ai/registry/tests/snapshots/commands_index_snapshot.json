@@ -80,6 +80,7 @@
   "purchasing.purchaseinvoice.list",
   "purchasing.purchaseinvoice.partial_update",
   "purchasing.purchaseinvoice.retrieve",
+  "purchasing.purchasereceipt.cancel",
   "purchasing.purchasereceipt.create",
   "purchasing.purchasereceipt.list",
   "purchasing.purchasereceipt.nhap_lo",
