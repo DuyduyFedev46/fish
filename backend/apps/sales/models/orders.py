@@ -45,6 +45,23 @@ class SalesOrder(models.Model):
     )
     # KHÔNG có trường phí giao hàng (BR-BH-10 — outscope hoàn toàn).
 
+    # Khung go-live pháp lý (GL-03, BR-BH-17, bất biến 9)
+    privacy_consent_at = models.DateTimeField(
+        "Đồng ý xử lý dữ liệu lúc",
+        null=True,
+        blank=True,
+        editable=False,
+    )
+    privacy_policy_version = models.ForeignKey(
+        "content.EntryVersion",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        editable=False,
+        related_name="+",
+        verbose_name="Phiên bản chính sách bảo mật đã đồng ý",
+    )
+
     class Meta:
         verbose_name = "Đơn hàng"
         verbose_name_plural = "Đơn hàng"

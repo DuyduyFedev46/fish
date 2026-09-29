@@ -46,16 +46,14 @@ class ShopOrderCreateView(APIView):
         except (KeyError, TypeError, InvalidOperation):
             return Response({"detail": "Dữ liệu giỏ hàng không hợp lệ."}, status=400)
 
-        try:
-            order = services.create_order(
-                customer_phone=(customer.get("phone") or "").strip(),
-                customer_name=(customer.get("name") or "").strip(),
-                delivery_address=(d.get("delivery_address") or "").strip(),
-                phone=(d.get("phone") or customer.get("phone") or "").strip(),
-                lines=lines,
-            )
-        except BusinessError as exc:
-            return Response({"detail": str(exc), "code": exc.code}, status=400)
+        order = services.create_order(
+            customer_phone=(customer.get("phone") or "").strip(),
+            customer_name=(customer.get("name") or "").strip(),
+            delivery_address=(d.get("delivery_address") or "").strip(),
+            phone=(d.get("phone") or customer.get("phone") or "").strip(),
+            lines=lines,
+            privacy_consent=d.get("privacy_consent"),
+        )
 
         return Response(
             {

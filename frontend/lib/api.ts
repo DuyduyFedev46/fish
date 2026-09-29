@@ -38,24 +38,32 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
 
   if (res.status === 404 || res.status === 410) {
     let detail = res.status === 410 ? "Bài này không còn trên web." : "Không tìm thấy";
+    let code: string | undefined;
+    let data: any;
     try {
       const body = await res.json();
+      data = body;
       if (body?.detail) detail = body.detail;
+      if (body?.code) code = body.code;
     } catch {
       // ignore
     }
-    throw new ApiError(detail, res.status);
+    throw new ApiError(detail, res.status, code, data);
   }
 
   if (!res.ok) {
     let detail = `Lỗi máy chủ (${res.status})`;
+    let code: string | undefined;
+    let data: any;
     try {
       const body = await res.json();
+      data = body;
       if (body?.detail) detail = body.detail;
+      if (body?.code) code = body.code;
     } catch {
       // ignore parse error, keep default message
     }
-    throw new ApiError(detail, res.status);
+    throw new ApiError(detail, res.status, code, data);
   }
 
   if (res.status === 204) {

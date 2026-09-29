@@ -8,9 +8,11 @@ import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useSearchParams } from "next/navigation";
 import { useCart } from "../../../components/CartContext";
-import { createOrder, getSiteInfo, USE_MOCK } from "../../../lib/api";
+import { createOrder, getSiteInfo, USE_MOCK, ApiError } from "../../../lib/api";
 import { formatVnd } from "../../../lib/format";
-import type { CreateOrderResponse, SiteInfo } from "../../../lib/types";
+import type { CreateOrderPayload, CreateOrderResponse, SiteInfo } from "../../../lib/types";
+import { getPrivacyPolicy } from "@/features/site/api";
+import type { PrivacyPolicyResponse } from "@/features/site/types";
 import PaymentPanel from "./PaymentPanel";
 import { rememberOrderContact } from "../storage";
 
@@ -35,10 +37,40 @@ export default function CheckoutScreen() {
   const [orderPhone, setOrderPhone] = useState("");
   const [siteInfo, setSiteInfo] = useState<SiteInfo | null>(null);
 
+  // Khung go-live pháp lý (GL-03)
+  const [policyInfo, setPolicyInfo] = useState<PrivacyPolicyResponse | null>(null);
+  const [consentAccepted, setConsentAccepted] = useState(false);
+  const [consentRequired, setConsentRequired] = useState<boolean | null>(null);
+  const [shopClosed, setShopClosed] = useState(false);
+
   useEffect(() => {
-    getSiteInfo()
-      .then(setSiteInfo)
-      .catch(() => {});
+    let active = true;
+
+    Promise.allSettled([getSiteInfo(), getPrivacyPolicy()]).then(([siteRes, policyRes]) => {
+      if (!active) return;
+
+      let isRequired = true;
+      if (siteRes.status === "fulfilled" && siteRes.value) {
+        setSiteInfo(siteRes.value);
+        if (siteRes.value.privacy_consent_required === false) {
+          isRequired = false;
+        }
+      }
+      setConsentRequired(isRequired);
+
+      if (policyRes.status === "fulfilled" && policyRes.value) {
+        setPolicyInfo(policyRes.value);
+      } else {
+        // Chưa có chính sách bảo mật Đã đăng (GL-03-AC5)
+        if (isRequired) {
+          setShopClosed(true);
+        }
+      }
+    });
+
+    return () => {
+      active = false;
+    };
   }, []);
 
   // Trang "cổng SePay" giả lập chỉ tồn tại ở chế độ mock (xem lib/mock.ts,
@@ -47,12 +79,31 @@ export default function CheckoutScreen() {
     return <MockGatewayPanel />;
   }
 
+  if (shopClosed) {
+    return (
+      <div className="checkout-grid">
+        <div className="panel" style={{ textAlign: "center", padding: "3rem 1.5rem" }}>
+          <h2>Shop tạm chưa nhận đơn</h2>
+          <p style={{ color: "#6b7280", marginTop: "0.5rem", marginBottom: "1.5rem" }}>
+            Hệ thống đang hoàn thiện chuẩn bị điều kiện phục vụ tốt nhất. Quý khách vui lòng quay lại sau.
+          </p>
+          <Link href="/shop" className="btn btn-secondary">
+            Quay lại cửa hàng
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   function validate(): boolean {
     const next: Record<string, string> = {};
     if (!name.trim()) next.name = "Vui lòng nhập tên người nhận";
     if (!PHONE_RE.test(phone.trim())) next.phone = "Số điện thoại không hợp lệ";
     if (!address.trim()) next.address = "Vui lòng nhập địa chỉ giao hàng";
     if (lines.length === 0) next.cart = "Giỏ hàng đang trống";
+    if (consentRequired && policyInfo && !consentAccepted) {
+      next.consent = "Vui lòng đồng ý chính sách xử lý dữ liệu cá nhân";
+    }
     setErrors(next);
     return Object.keys(next).length === 0;
   }
@@ -64,18 +115,50 @@ export default function CheckoutScreen() {
 
     setSubmitting(true);
     try {
-      const result = await createOrder({
+      const payload: CreateOrderPayload = {
         customer: { phone: phone.trim(), name: name.trim() },
         delivery_address: address.trim(),
         phone: phone.trim(),
         items: lines.map((l) => ({ item_code: l.item_code, qty: l.qty })),
-      });
+      };
+
+      if (consentRequired && policyInfo) {
+        payload.privacy_consent = {
+          accepted: consentAccepted,
+          policy_version_id: policyInfo.version_id,
+        };
+      }
+
+      const result = await createOrder(payload);
       rememberOrderContact(result.order_code, phone.trim().slice(-4));
       setOrderPhone(phone.trim());
       setOrder(result);
       clear();
     } catch (err) {
-      setSubmitError(err instanceof Error ? err.message : "Có lỗi xảy ra, vui lòng thử lại.");
+      if (err instanceof ApiError) {
+        if (err.status === 409 || err.code === "POLICY_CHANGED") {
+          setConsentAccepted(false);
+          if (err.data?.current) {
+            setPolicyInfo({
+              slug: err.data.current.slug,
+              title: policyInfo?.title || "Chính sách bảo mật",
+              version: err.data.current.version,
+              version_id: err.data.current.version_id,
+              effective_from: null,
+            });
+          }
+          setSubmitError("Chính sách vừa cập nhật, vui lòng xem và đồng ý lại.");
+          return;
+        }
+        if (err.status === 503) {
+          setShopClosed(true);
+          setSubmitError("Shop tạm chưa nhận đơn.");
+          return;
+        }
+        setSubmitError(err.message);
+      } else {
+        setSubmitError(err instanceof Error ? err.message : "Có lỗi xảy ra, vui lòng thử lại.");
+      }
     } finally {
       setSubmitting(false);
     }
@@ -84,6 +167,8 @@ export default function CheckoutScreen() {
   if (order) {
     return <PaymentPanel order={order} phone={orderPhone} />;
   }
+
+  const isConsentLocked = consentRequired === true && policyInfo !== null && !consentAccepted;
 
   return (
     <div className="checkout-grid">
@@ -98,7 +183,8 @@ export default function CheckoutScreen() {
             <thead>
               <tr>
                 <th>Mặt hàng</th>
-                <th>Số kg</th>
+                <th>Số lượng</th>
+                <th>Đơn giá</th>
                 <th>Thành tiền</th>
                 <th></th>
               </tr>
@@ -107,42 +193,55 @@ export default function CheckoutScreen() {
               {lines.map((l) => (
                 <tr key={l.item_code}>
                   <td>
-                    {l.name}
-                    <div style={{ fontSize: "0.78rem", color: "var(--color-muted)" }}>
-                      {formatVnd(l.price)} / kg
-                    </div>
+                    <strong>{l.name}</strong>
+                    <div className="item-unit">({l.unit})</div>
                   </td>
                   <td>
-                    <input
-                      className="cart-qty-input"
-                      type="number"
-                      min={0.1}
-                      step={0.1}
-                      value={l.qty}
-                      onChange={(e) => {
-                        const v = parseFloat(e.target.value);
-                        updateQty(l.item_code, Number.isFinite(v) ? v : 0);
-                      }}
-                      aria-label={`Số kg cho ${l.name}`}
-                    />
+                    <div className="qty-control">
+                      <button
+                        type="button"
+                        onClick={() => updateQty(l.item_code, l.qty - 1)}
+                        className="btn-qty"
+                      >
+                        -
+                      </button>
+                      <span className="qty-value">{l.qty}</span>
+                      <button
+                        type="button"
+                        onClick={() => updateQty(l.item_code, l.qty + 1)}
+                        className="btn-qty"
+                      >
+                        +
+                      </button>
+                    </div>
                   </td>
-                  <td>{formatVnd(l.qty * l.price)}</td>
+                  <td>{formatVnd(l.price)}</td>
+                  <td>
+                    <strong>{formatVnd(l.price * l.qty)}</strong>
+                  </td>
                   <td>
                     <button
                       type="button"
-                      className="cart-remove"
                       onClick={() => removeItem(l.item_code)}
+                      className="btn-remove"
+                      aria-label="Xoá khỏi giỏ"
                     >
-                      Xoá
+                      ×
                     </button>
                   </td>
                 </tr>
               ))}
-              <tr className="cart-total-row">
-                <td colSpan={2}>Tổng cộng</td>
-                <td colSpan={2}>{formatVnd(totalAmount)}</td>
-              </tr>
             </tbody>
+            <tfoot>
+              <tr>
+                <td colSpan={3}>
+                  <strong>Tổng cộng</strong>
+                </td>
+                <td colSpan={2}>
+                  <strong className="cart-total">{formatVnd(totalAmount)}</strong>
+                </td>
+              </tr>
+            </tfoot>
           </table>
         )}
       </div>
@@ -213,7 +312,47 @@ export default function CheckoutScreen() {
             </div>
           )}
 
-          <button type="submit" className="btn btn-primary btn-block" disabled={submitting}>
+          {consentRequired && policyInfo && (
+            <div className="form-field form-field-checkbox" style={{ marginBottom: "16px" }}>
+              <label
+                style={{
+                  display: "flex",
+                  alignItems: "flex-start",
+                  gap: "8px",
+                  fontSize: "0.875rem",
+                  lineHeight: "1.45",
+                  cursor: "pointer",
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={consentAccepted}
+                  onChange={(e) => setConsentAccepted(e.target.checked)}
+                  style={{ marginTop: "3px" }}
+                />
+                <span>
+                  Tôi đồng ý để Cá Về dùng họ tên, số điện thoại và địa chỉ của tôi để giao hàng và liên hệ
+                  xác nhận đơn, theo{" "}
+                  <Link
+                    href={{ pathname: "/trang/", query: { slug: policyInfo.slug } }}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ color: "#2563eb", textDecoration: "underline" }}
+                  >
+                    Chính sách bảo mật
+                  </Link>
+                  .
+                </span>
+              </label>
+              {errors.consent && <span className="form-error">{errors.consent}</span>}
+            </div>
+          )}
+
+          <button
+            type="submit"
+            className="btn btn-primary btn-block"
+            disabled={submitting || isConsentLocked}
+          >
             {submitting ? "Đang đặt hàng..." : `Đặt hàng — ${formatVnd(totalAmount)}`}
           </button>
         </form>

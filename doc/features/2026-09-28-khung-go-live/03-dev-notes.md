@@ -3,6 +3,7 @@
 - **Nhánh làm việc**: `main`
 - **Số test gốc BE**: 997 test(s) (chạy lúc bắt đầu Lô 1: `manage.py test` passed 100%, 0 issues).
 - **Số test sau Lô 1**: 1002 test(s) (tăng 5 test `apps.content.site.tests.test_site_info`).
+- **Số test sau Lô 2**: 1012 test(s) (tăng 10 test `apps.sales.orders.tests.test_privacy_consent`).
 
 ---
 
@@ -86,3 +87,93 @@ git grep -n "SELLER_" -- . ':!*.md' ':!*.example'
 grep -rn "dangerouslySetInnerHTML" frontend/features/site frontend/features/checkout
 # Kết quả: rỗng (0 kết quả)
 ```
+
+---
+
+## Lô 2: GL-03 Ô đồng ý xử lý dữ liệu cá nhân ở checkout
+
+### Kế hoạch & Thực hiện
+
+#### 1. Backend (GL-03)
+- **Model `backend/apps/sales/models/orders.py`**:
+  - `SalesOrder` thêm 2 field:
+    - `privacy_consent_at`: DateTimeField(null=True, blank=True, editable=False)
+    - `privacy_policy_version`: ForeignKey("content.EntryVersion", on_delete=PROTECT, null=True, blank=True, editable=False, related_name="+")
+  - Không thêm trường IP, user agent hay bản chép dữ liệu cá nhân nào (GL-03-AC7).
+- **Migration `backend/apps/sales/migrations/0008_salesorder_privacy_consent.py`**:
+  - Đánh số `0008` (vì `0007_alter_refund_created_by.py` đã dùng trước đó bởi hồ sơ khác).
+  - Dependencies gồm `("content", "0002_grant_content_perms")` và `("sales", "0007_alter_refund_created_by")`.
+- **Dịch vụ `backend/apps/sales/orders/consent.py`**:
+  - Lớp lỗi `PolicyChanged(BusinessError)`: `http_status = 409`.
+  - Lớp lỗi `ShopClosed(BusinessError)`: `http_status = 503`.
+  - Hàm `resolve_privacy_consent(payload)`:
+    - Đọc chính sách hiện hành qua `current_policy_version("privacy")`.
+    - Nếu không có chính sách và `PRIVACY_CONSENT_REQUIRED=True` -> raise `ShopClosed("Shop tạm chưa nhận đơn.", code="BR-BH-17")`.
+    - Nếu `PRIVACY_CONSENT_REQUIRED=False` và `payload=None` -> trả về `None` (cho phép test cũ chạy).
+    - Kiểm tra `payload` là dict có `accepted=True` -> nếu không raise `BusinessError("Vui lòng đồng ý chính sách xử lý dữ liệu cá nhân.", code="BR-BH-17")`.
+    - So sánh `policy_version_id` tuyệt đối với `current.pk` (chặn cả dạng chuỗi) -> nếu lệch raise `PolicyChanged` kèm `extra={"current": {"version": current.version, "version_id": current.pk, "slug": current.entry.slug}}`.
+- **Dịch vụ `backend/apps/sales/orders/services.py`**:
+  - `create_order` thêm keyword `privacy_consent=None`.
+  - Gọi `resolve_privacy_consent(privacy_consent)` trước khi mở `transaction.atomic()`.
+  - Gán `privacy_consent_at = timezone.now() if policy_version else None` và `privacy_policy_version = policy_version`.
+- **API `backend/apps/sales/orders/shop_api.py`**:
+  - `ShopOrderCreateView.post`: truyền `privacy_consent=d.get("privacy_consent")`.
+  - Bỏ khối `try/except BusinessError` cục bộ để `apps.common.api.exception_handler` tự map và trả đúng `http_status` kèm `extra` (409 trả `current`, 503 trả detail, 400 trả BR-BH-17).
+- **Admin `backend/apps/sales/admin.py`**:
+  - `SalesOrderAdmin` thêm 2 field vào `locked_fields` và `readonly_fields`.
+- **Tests BE `backend/apps/sales/orders/tests/test_privacy_consent.py`**:
+  - 10 tests pass 100% bao phủ AC1..AC10 của GL-03:
+    - `test_gl03_ac1_consent_recorded_with_server_time_and_version`
+    - `test_gl03_ac3_missing_or_invalid_consent_rejected_400_no_reservation`
+    - `test_gl03_ac4_policy_changed_returns_409_with_current`
+    - `test_gl03_ac5_flag_enabled_no_published_policy_returns_503`
+    - `test_gl03_ac6_flag_disabled_allows_order_without_consent`
+    - `test_gl03_ac7_sales_order_fields_and_no_new_tables_in_sales`
+    - `test_gl03_ac8_no_pii_in_logs`
+    - `test_gl03_ac9_order_lookup_does_not_leak_consent_keys`
+    - `test_gl03_ac10_consent_fields_immutable_and_protected`
+    - `test_settings_privacy_consent_required_outside_testing_and_debug`
+
+#### 2. Frontend (GL-03)
+- **Kiểu dữ liệu `frontend/lib/types.ts`**:
+  - `CreateOrderPayload`: thêm trường `privacy_consent?: { accepted: boolean; policy_version_id: number; };`.
+  - `ApiError`: mở rộng thêm `code?: string` và `data?: any`.
+  - `SiteInfo`: thêm `privacy_consent_required?: boolean; confirm_call_notice?: boolean; confirm_call_hours?: string;`.
+- **API Client `frontend/lib/api.ts`**:
+  - `apiFetch`: gắn thêm `code` và `data` vào đối tượng `ApiError` khi ném lỗi HTTP khác 2xx.
+- **Mock `frontend/lib/mock.ts`**:
+  - `mockCreateOrder`: hỗ trợ giả lập 409 `POLICY_CHANGED`, 503 `BR-BH-17` và kiểm tra consent cho QA.
+- **Màn Checkout `frontend/features/checkout/components/CheckoutScreen.tsx`**:
+  - Tải song song `getSiteInfo()` và `getPrivacyPolicy()`.
+  - Mặc định checkbox chưa tick, nhãn nêu rõ mục đích xử lý dữ liệu và link tab mới tới `/trang/?slug=...`.
+  - Nút "Đặt hàng" bị khoá khi chưa tick đồng ý (GL-03-AC2).
+  - Chưa có chính sách đã đăng và cờ bật -> hiển thị màn hình "Shop tạm chưa nhận đơn" (GL-03-AC5).
+  - Khi API trả 409 `POLICY_CHANGED` -> bỏ tick, cập nhật phiên bản chính sách mới, báo lỗi "Chính sách vừa cập nhật, vui lòng xem và đồng ý lại", toàn bộ thông tin form được giữ nguyên vẹn (GL-03-AC4).
+  - Tuyệt đối không lưu dữ liệu đồng ý vào storage/URL (GL-03-AC8).
+
+---
+
+### Lệnh kiểm chứng Lô 2
+
+```bash
+# 1. Toàn bộ test suite backend + makemigrations check
+cd backend && .venv/bin/python manage.py test && .venv/bin/python manage.py makemigrations --check --dry-run
+# Kết quả: Ran 1012 tests in 54.583s - OK - No changes detected
+
+# 2. Test apps.sales và apps.content
+cd backend && .venv/bin/python manage.py test apps.content apps.sales
+# Kết quả: Ran 334 tests - OK
+
+# 3. Frontend static export build
+cd frontend && npx tsc --noEmit && NEXT_PUBLIC_USE_MOCK=0 NEXT_PUBLIC_API_BASE=https://cangca-api-staging-675411800433.asia-southeast1.run.app npm run build
+# Kết quả: ✓ Generating static pages (10/10) - Compiled successfully
+
+# 4. ERP Console build
+cd erp-console && npx tsc --noEmit && npm run build
+# Kết quả: ✓ Generating static pages (30/30) - Compiled successfully
+
+# 5. Rà soát bảo mật XSS
+grep -rn "dangerouslySetInnerHTML" frontend/features/site frontend/features/checkout
+# Kết quả: rỗng (0 kết quả)
+```
+

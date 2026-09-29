@@ -40,7 +40,11 @@ class SalesOrderLineInline(admin.TabularInline):
 
 @admin.register(SalesOrder)
 class SalesOrderAdmin(NoManualAddMixin, LockedFieldsAdminMixin, admin.ModelAdmin):
-    locked_fields = ("status", "total_amount", "customer", "booked_expires_at")
+    locked_fields = (
+        "status", "total_amount", "customer", "booked_expires_at",
+        "privacy_consent_at", "privacy_policy_version",
+    )
+    readonly_fields = ("privacy_consent_at", "privacy_policy_version")
     list_display = ("code", "customer", "status", "total_amount", "booked_expires_at", "created_at")
     list_filter = ("status",)
     search_fields = ("code", "customer__phone")

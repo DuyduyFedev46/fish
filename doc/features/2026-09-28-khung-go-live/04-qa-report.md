@@ -96,3 +96,92 @@
    ```
 
 </QA — Khung go-live pháp lý trên web · lô 1 · lần 1 · 2026-09-29>
+
+---
+
+<QA — Khung go-live pháp lý trên web · lô 2 · lần 1 · 2026-09-29>
+
+## Kết luận: APPROVED — Đạt 10/10 AC của GL-03, bảo đảm tuyệt đối Bất biến 1 (giá vốn) và Bất biến 9 (dữ liệu cá nhân), 0 lỗi chặn.
+
+## Tổng: 20 ca · ✅ 20 · ❌ 0 · ⏸ 0
+
+## Theo AC
+
+| Mã AC | Kết quả | Bằng chứng (test / lệnh / file kiểm tra) |
+|---|:---:|---|
+| **GL-03-AC1** (Chính sách bảo mật đã đăng phiên bản X → tick đặt hàng → 201; `privacy_consent_at` = giờ server, `privacy_policy_version` = X) | ✅ PASS | `backend/apps/sales/orders/tests/test_privacy_consent.py::test_gl03_ac1_consent_recorded_with_server_time_and_version`. Backend `create_order` gán `privacy_consent_at=timezone.now() if policy_version else None`, `privacy_policy_version=policy_version`. Giờ server lấy từ `timezone.now()`, độc lập với giờ máy khách. Frontend `CheckoutScreen.tsx` truyền đúng `privacy_consent: { accepted: consentAccepted, policy_version_id: policyInfo.version_id }`. |
+| **GL-03-AC2** (Mở checkout: checkbox chưa tick; nhãn nêu mục đích giao hàng & xác nhận, link mở tab mới; nút Đặt hàng khoá tới khi tick) | ✅ PASS | `frontend/features/checkout/components/CheckoutScreen.tsx`: Khởi tạo state `consentAccepted = false` (chưa tick sẵn). Nhãn hiển thị: "Tôi đồng ý để Cá Về dùng họ tên, số điện thoại và địa chỉ của tôi để giao hàng và liên hệ xác nhận đơn, theo [Chính sách bảo mật](/trang/?slug=chinh-sach-bao-mat)." Thẻ `<Link>` có `target="_blank" rel="noopener noreferrer"`. Biến `isConsentLocked = consentRequired === true && policyInfo !== null && !consentAccepted` khoá nút Submit: `disabled={submitting || isConsentLocked}`. |
+| **GL-03-AC3** (Không có `privacy_consent` hoặc `accepted=false` / `accepted="true"` chuỗi → 400 `BR-BH-17`; không tạo đơn, không giữ chỗ lô) | ✅ PASS | `apps/sales/orders/tests/test_privacy_consent.py::test_gl03_ac3_missing_or_invalid_consent_rejected_400_no_reservation`: Kiểm tra 5 trường hợp (thiếu hẳn khoá, `None`, `accepted=False`, `accepted="true"` dạng chuỗi, kiểu dữ liệu không phải dict). Tất cả đều trả về HTTP 400 `code: BR-BH-17`. `SalesOrder`, `SalesOrderLine`, `SalesOrderLineBatch` và `Batch.qty_reserved` giữ nguyên 100%. `resolve_privacy_consent` chặn trước khi vào `transaction.atomic()`. |
+| **GL-03-AC4** (Chính sách vừa cập nhật phiên bản mới → gửi bản cũ nhận 409 `POLICY_CHANGED`, FE bỏ tick, cập nhật link, giữ nguyên form) | ✅ PASS | `test_privacy_consent.py::test_gl03_ac4_policy_changed_returns_409_with_current`: Đăng lại chính sách lên v2, gửi payload v1 cũ → HTTP 409 `code: POLICY_CHANGED`, kèm `extra.current: {version: 2, version_id, slug}`. Số đơn không tăng. Gửi `policy_version_id` kiểu chuỗi cũng trả 409. Frontend `CheckoutScreen.tsx`: bắt mã 409 / `POLICY_CHANGED`, thực hiện `setConsentAccepted(false)`, cập nhật `policyInfo` mới từ `err.data.current`, báo thông điệp "Chính sách vừa cập nhật, vui lòng xem và đồng ý lại.", các trường form `name`, `phone`, `address` giữ nguyên vẹn. `frontend/lib/mock.ts` hỗ trợ mock QA với `name: "MOCK_409"`. |
+| **GL-03-AC5** (Chưa có chính sách bảo mật đã đăng & cờ bật → FE hiện "Shop tạm chưa nhận đơn", API trả 503 `BR-BH-17`) | ✅ PASS | `test_privacy_consent.py::test_gl03_ac5_flag_enabled_no_published_policy_returns_503`: Khi không có entry `page_role="privacy"` đã đăng và cờ `PRIVACY_CONSENT_REQUIRED=True` → API trả HTTP 503 `BR-BH-17`, `detail: "Shop tạm chưa nhận đơn."`. Frontend `CheckoutScreen.tsx`: khi `policyRes` lỗi/404 và cờ bật → `setShopClosed(true)`, hiển thị màn hình riêng "Shop tạm chưa nhận đơn" thay thế toàn bộ form checkout. `mock.ts` hỗ trợ mock QA với `name: "MOCK_503"`. |
+| **GL-03-AC6** (`PRIVACY_CONSENT_REQUIRED=false` trong test/dev → tạo đơn không cần consent → 201, 2 field để trống) | ✅ PASS | `test_privacy_consent.py::test_gl03_ac6_flag_disabled_allows_order_without_consent`: Override cờ `False`, gửi đơn không kèm `privacy_consent` → HTTP 201, `privacy_consent_at=None`, `privacy_policy_version=None`. `config/settings.py` cấu hình mặc định bật cờ ngoài `TESTING` và `DEBUG` (`test_settings_privacy_consent_required_outside_testing_and_debug` pass). |
+| **GL-03-AC7** (Thu tối thiểu: bằng chứng chỉ gồm thời điểm + phiên bản; không lưu IP, user agent hay bản chép field cá nhân) | ✅ PASS | `test_privacy_consent.py::test_gl03_ac7_sales_order_fields_and_no_new_tables_in_sales`: Kiểm tra toàn bộ model app `sales` không thêm bảng mới; `SalesOrder` chỉ thêm đúng 2 field (`privacy_consent_at`, `privacy_policy_version`), không có `ip_address`, `user_agent` hay các bản chép PII nào khác. |
+| **GL-03-AC8** (Log backend và console FE không chứa PII đầy đủ; FE không lưu trạng thái đồng ý hay PII mới vào storage / URL) | ✅ PASS | `test_privacy_consent.py::test_gl03_ac8_no_pii_in_logs`: Bắt toàn bộ logger handler trong lúc gọi API tạo đơn → không chứa tên ("Anh A"), SĐT ("0912345678"), hay địa chỉ ("123 Bến Cảng"). Frontend `CheckoutScreen.tsx` chỉ gọi `rememberOrderContact(result.order_code, phone.trim().slice(-4))` lưu `order_code` và 4 số cuối vào `sessionStorage` (`frontend/features/checkout/storage.ts`); không lưu trạng thái đồng ý, không ghi `localStorage`, URL không chứa query consent hay PII. |
+| **GL-03-AC9** (Tra đơn công khai `GET /api/shop/orders/<code>/?phone_last4=…` giữ nguyên bộ khoá, không rò rỉ field consent) | ✅ PASS | `test_privacy_consent.py::test_gl03_ac9_order_lookup_does_not_leak_consent_keys`: Sau khi tạo đơn có consent, tra cứu đơn công khai qua `ShopOrderLookupView` → response không chứa `privacy_consent`, `privacy_consent_at`, `privacy_policy_version`. Bộ khoá trả về giữ nguyên contract công khai. |
+| **GL-03-AC10** (Bằng chứng không đổi được: PATCH 405, Admin readonly/locked, EntryVersion bị tham chiếu cấm xoá `PROTECT`) | ✅ PASS | `test_privacy_consent.py::test_gl03_ac10_consent_fields_immutable_and_protected`: Gọi `PATCH /api/sales/orders/<id>/` → HTTP 405 Method Not Allowed; `SalesOrderAdmin` khai báo cả 2 field trong `locked_fields` và `readonly_fields`; gọi `v1.delete()` trên `EntryVersion` đang được tham chiếu ném `ProtectedError` / `BusinessError` (BR-ND-05). |
+
+---
+
+## Ngoại lệ & biên | Phân quyền | Rò giá vốn | Rò dữ liệu cá nhân | Hồi quy
+
+- **Ngoại lệ & biên**:
+  - Gửi `policy_version_id` kiểu chuỗi (ví dụ `"918"` thay vì số nguyên `918`): Chặn dứt khoát với HTTP 409 `POLICY_CHANGED`, bảo đảm so sánh kiểu dữ liệu int tuyệt đối.
+  - Gửi payload `accepted: "true"` (chuỗi) hoặc không phải dict: Bị chặn với HTTP 400 `BR-BH-17`.
+  - Giữ chỗ kho (FEFO) an toàn: Khi consent không hợp lệ, transaction không mở, không gọi hàm phân bổ lô, không tăng `qty_reserved`, không sinh mã đơn.
+- **Phân quyền**:
+  - Khách vãng lai: Được phép POST `/api/shop/orders/` với consent hợp lệ. Không được phép chỉnh sửa đơn (mọi method ghi vào viewset đơn nội bộ trả về 405).
+  - Admin Django: `locked_fields` và `readonly_fields` vô hiệu hoá việc sửa tay `privacy_consent_at` và `privacy_policy_version`.
+- **Bất biến 1 — Không rò giá vốn**:
+  - `POST /api/shop/orders/` chỉ trả `order_code`, `total_amount`, `booked_expires_at`.
+  - `GET /api/shop/orders/<code>/` chỉ trả dòng mặt hàng với `qty` và `amount` (doanh thu bán lẻ), không có `unit_cost`, `purchase_rate`, `landed_cost` hay chi phí mua lô.
+- **Bất biến 9 — Không rò dữ liệu cá nhân**:
+  - Backend logger không ghi log tên, SĐT đầy đủ, địa chỉ giao hàng.
+  - `sessionStorage` phía client chỉ lưu tạm mã đơn và 4 số cuối SĐT (`phone_last4`).
+  - Quét XSS: `grep -rn "dangerouslySetInnerHTML" frontend/features/site frontend/features/checkout` trả về rỗng (0 kết quả).
+- **Hồi quy & Tương thích**:
+  - Suite Backend: 1012/1012 test pass 100% (tăng 10 test mới bao phủ AC1..AC10 của GL-03).
+  - Migration check: `makemigrations --check --dry-run` không phát hiện thay đổi schema ngoài migration `0008_salesorder_privacy_consent.py` đã tạo.
+  - Frontend Shop Web: Static export build (`npm run build`) thành công 10/10 trang tĩnh với `NEXT_PUBLIC_USE_MOCK=0`.
+  - ERP Console: Static export build (`npm run build`) thành công 30/30 trang tĩnh.
+
+---
+
+## Lỗi
+*(Không có lỗi mức Critical, High, hay Medium nào phát hiện. 0 lỗi chặn).*
+
+---
+
+## Lệnh đã chạy (kèm output tóm tắt)
+
+1. **Chạy riêng test suite consent Lô 2**:
+   ```bash
+   cd backend && .venv/bin/python manage.py test apps.sales.orders.tests.test_privacy_consent
+   # Kết quả: Ran 10 tests in 4.312s - OK
+   ```
+2. **Chạy toàn bộ backend test suite & makemigrations check**:
+   ```bash
+   cd backend && .venv/bin/python manage.py test && .venv/bin/python manage.py makemigrations --check --dry-run
+   # Kết quả: Ran 1012 tests in 54.583s - OK. No changes detected.
+   ```
+3. **Chạy test app content và sales**:
+   ```bash
+   cd backend && .venv/bin/python manage.py test apps.content apps.sales
+   # Kết quả: Ran 334 tests - OK
+   ```
+4. **Kiểm tra build xuất tĩnh Frontend Shop Web**:
+   ```bash
+   cd frontend && npx tsc --noEmit && NEXT_PUBLIC_USE_MOCK=0 NEXT_PUBLIC_API_BASE=https://cangca-api-staging-675411800433.asia-southeast1.run.app npm run build
+   # Kết quả: Compiled successfully. Generating static pages (10/10). Export complete.
+   ```
+5. **Kiểm tra build xuất tĩnh ERP Console**:
+   ```bash
+   cd erp-console && npx tsc --noEmit && npm run build
+   # Kết quả: Compiled successfully. Generating static pages (30/30). Export complete.
+   ```
+6. **Rà soát nguy cơ XSS**:
+   ```bash
+   grep -rn "dangerouslySetInnerHTML" frontend/features/site frontend/features/checkout
+   # Kết quả: Rỗng (0 vi phạm).
+   ```
+
+</QA — Khung go-live pháp lý trên web · lô 2 · lần 1 · 2026-09-29>

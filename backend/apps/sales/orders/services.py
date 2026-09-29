@@ -28,6 +28,7 @@ from apps.inventory.models import Batch, StockLedgerEntry
 from apps.inventory.stock import services as stock
 from apps.sales.customers import services as customers
 from apps.sales.models import SalesOrder, SalesOrderLine, SalesOrderLineBatch
+from apps.sales.orders.consent import resolve_privacy_consent
 from apps.sales.utils import ZERO
 from apps.sales.utils import gen_code as _gen_code
 from apps.sales.utils import money as _q
@@ -163,7 +164,15 @@ def _bundle_components(item, line_qty):
 
 # --- P-05: tạo đơn (giữ chỗ) ------------------------------------------------
 
-def create_order(*, customer_phone, customer_name, delivery_address, phone, lines):
+def create_order(
+    *,
+    customer_phone,
+    customer_name,
+    delivery_address,
+    phone,
+    lines,
+    privacy_consent=None,
+):
     """
     Tạo đơn ở trạng thái BOOKED — do Hệ thống tạo (BR-PQ-11). TẤT CẢ trong 1 transaction:
     thiếu tồn 1 thành phần bất kỳ -> cả đơn fail (BR-BH-02/07).
@@ -174,6 +183,9 @@ def create_order(*, customer_phone, customer_name, delivery_address, phone, line
         raise BusinessError("Địa chỉ giao bắt buộc (BR-BH-09).")
     if not lines:
         raise BusinessError("Đơn hàng phải có ít nhất một dòng.")
+
+    # Kiểm tra đồng ý chính sách bảo mật trước khi giữ chỗ hoặc ghi DB (GL-03, BR-BH-17)
+    policy_version = resolve_privacy_consent(privacy_consent)
 
     today = timezone.localdate()
     now = _now()
@@ -193,6 +205,8 @@ def create_order(*, customer_phone, customer_name, delivery_address, phone, line
             total_amount=ZERO,
             booked_expires_at=now
             + timezone.timedelta(minutes=settings.SALES_ORDER_TTL_MINUTES),
+            privacy_consent_at=timezone.now() if policy_version else None,
+            privacy_policy_version=policy_version,
         )
 
         # Bước 1: dựng dữ liệu dòng + giá (đóng băng), chưa áp ưu đãi.

@@ -379,6 +379,19 @@ function genOrderCode(): string {
 export async function mockCreateOrder(
   payload: CreateOrderPayload
 ): Promise<WireCreateOrderResponse> {
+  // Giả lập cho QA kiểm thử các case đặc biệt (GL-03)
+  if (payload.customer?.name === "MOCK_409") {
+    throw new ApiError("Chính sách vừa cập nhật, vui lòng xem và đồng ý lại.", 409, "POLICY_CHANGED", {
+      current: { version: 4, version_id: 930, slug: "chinh-sach-bao-mat" },
+    });
+  }
+  if (payload.customer?.name === "MOCK_503") {
+    throw new ApiError("Shop tạm chưa nhận đơn.", 503, "BR-BH-17");
+  }
+  if (payload.privacy_consent && payload.privacy_consent.accepted !== true) {
+    throw new ApiError("Vui lòng đồng ý chính sách xử lý dữ liệu cá nhân.", 400, "BR-BH-17");
+  }
+
   let total = 0;
   const lines: MockOrderLine[] = [];
   for (const line of payload.items) {

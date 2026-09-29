@@ -47,6 +47,10 @@ export type CreateOrderPayload = {
   delivery_address: string;
   phone: string;
   items: CreateOrderItemInput[];
+  privacy_consent?: {
+    accepted: boolean;
+    policy_version_id: number;
+  };
 };
 
 // Cổng thanh toán SePay (VietQR) — xem doc/features/2026-09-26-sepay-cong-thanh-toan.
@@ -78,7 +82,10 @@ export type CskhNoticeConfig = {
 };
 
 export type SiteInfo = {
-  cskh_notice: CskhNoticeConfig;
+  cskh_notice?: CskhNoticeConfig;
+  privacy_consent_required?: boolean;
+  confirm_call_notice?: boolean;
+  confirm_call_hours?: string;
 };
 
 export type OrderCancelNotice = {
@@ -163,9 +170,13 @@ export type WireOrderStatus = {
 
 export class ApiError extends Error {
   status: number;
-  constructor(message: string, status: number) {
+  code?: string;
+  data?: any;
+  constructor(message: string, status: number, code?: string, data?: any) {
     super(message);
     this.name = "ApiError";
     this.status = status;
+    this.code = code;
+    this.data = data;
   }
 }
