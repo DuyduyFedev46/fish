@@ -26,7 +26,7 @@ import {
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8000";
 export const USE_MOCK = process.env.NEXT_PUBLIC_USE_MOCK === "1";
 
-async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
+export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     ...init,
     headers: {
@@ -36,8 +36,15 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
     cache: "no-store",
   });
 
-  if (res.status === 404) {
-    throw new ApiError("Không tìm thấy", 404);
+  if (res.status === 404 || res.status === 410) {
+    let detail = res.status === 410 ? "Bài này không còn trên web." : "Không tìm thấy";
+    try {
+      const body = await res.json();
+      if (body?.detail) detail = body.detail;
+    } catch {
+      // ignore
+    }
+    throw new ApiError(detail, res.status);
   }
 
   if (!res.ok) {

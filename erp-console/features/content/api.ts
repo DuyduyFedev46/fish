@@ -8,6 +8,8 @@ import type {
   ContentEntryListItem,
   ContentImage,
   EntryCreatePayload,
+  EntryPublishPayload,
+  EntryPublishResponse,
   EntryUpdatePayload,
 } from "./types";
 import {
@@ -18,6 +20,7 @@ import {
   mockGetEntryCounts,
   mockListCategories,
   mockListEntries,
+  mockPublishEntry,
   mockUpdateCategory,
   mockUpdateEntry,
   mockUpdateImageAlt,
@@ -159,3 +162,15 @@ export async function updateImageAlt(imageId: number, alt: string): Promise<Cont
     mock: isMock ? () => ({ status: 200, body: mockUpdateImageAlt(imageId, alt) }) : undefined,
   });
 }
+
+export async function publishEntry(
+  id: number,
+  payload: EntryPublishPayload
+): Promise<EntryPublishResponse> {
+  return apiFetch<EntryPublishResponse>(`/api/content/entries/${id}/publish/`, {
+    method: "POST",
+    body: payload,
+    mock: isMock ? () => ({ status: 200, body: mockPublishEntry(id, payload) }) : undefined,
+  });
+}
+

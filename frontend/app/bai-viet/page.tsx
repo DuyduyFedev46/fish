@@ -1,0 +1,272 @@
+"use client";
+
+import React, { Suspense, useEffect, useState } from "react";
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
+import { ApiError } from "@/lib/types";
+import { fetchPublicEntries, fetchPublicEntry } from "@/features/content/api";
+import ArticleBody from "@/features/content/components/ArticleBody";
+import type {
+  PublicEntryDetail,
+  PublicEntryListItem,
+} from "@/features/content/types";
+import s from "./bai-viet.module.css";
+
+function formatDate(isoStr?: string): string {
+  if (!isoStr) return "";
+  try {
+    const d = new Date(isoStr);
+    return d.toLocaleDateString("vi-VN", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    });
+  } catch {
+    return isoStr;
+  }
+}
+
+function BaiVietContent() {
+  const searchParams = useSearchParams();
+  const slug = searchParams.get("slug");
+
+  const [entry, setEntry] = useState<PublicEntryDetail | null>(null);
+  const [list, setList] = useState<PublicEntryListItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [errorStatus, setErrorStatus] = useState<number | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const loadData = () => {
+    setLoading(true);
+    setErrorStatus(null);
+    setErrorMessage(null);
+
+    if (slug) {
+      fetchPublicEntry(slug)
+        .then((data) => {
+          setEntry(data);
+          if (data.seo_title || data.title) {
+            document.title = `${data.seo_title || data.title} | Cá Về`;
+          }
+        })
+        .catch((err: any) => {
+          if (err instanceof ApiError) {
+            setErrorStatus(err.status);
+            setErrorMessage(err.message);
+          } else {
+            setErrorStatus(500);
+            setErrorMessage("Chưa tải được bài.");
+          }
+        })
+        .finally(() => {
+          setLoading(false);
+        });
+    } else {
+      fetchPublicEntries()
+        .then((res) => {
+          setList(res.results || []);
+          document.title = "Bài viết & Cẩm nang cá biển | Cá Về";
+        })
+        .catch((err: any) => {
+          setErrorStatus(500);
+          setErrorMessage(err?.message || "Chưa tải được danh sách bài.");
+        })
+        .finally(() => {
+          setLoading(false);
+        });
+    }
+  };
+
+  useEffect(() => {
+    loadData();
+  }, [slug]);
+
+  if (loading) {
+    return (
+      <div className={s.container}>
+        <div className={s.loadingBox}>Đang tải nội dung...</div>
+      </div>
+    );
+  }
+
+  // 1. Trường hợp 410 GONE (CMS-13-AC4)
+  if (errorStatus === 410) {
+    return (
+      <div className={s.container}>
+        <div className={s.errorBox}>
+          <h2 className={s.errorTitle}>Bài này không còn trên web</h2>
+          <p className={s.errorDesc}>
+            {errorMessage || "Nội dung bài viết đã được gỡ hoặc chuyển sang chuyên mục khác."}
+          </p>
+          <Link href="/shop" className={s.actionBtn}>
+            Về cửa hàng Cá Về
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  // 2. Trường hợp 404 NOT_FOUND (CMS-13-AC4)
+  if (errorStatus === 404) {
+    return (
+      <div className={s.container}>
+        <div className={s.errorBox}>
+          <h2 className={s.errorTitle}>Không tìm thấy bài viết</h2>
+          <p className={s.errorDesc}>
+            Đường dẫn bài viết không tồn tại hoặc đã bị thay đổi.
+          </p>
+          <div style={{ display: "flex", gap: "12px", justifyContent: "center" }}>
+            <Link href="/bai-viet" className={s.actionBtn} style={{ backgroundColor: "#64748b" }}>
+              Xem bài viết khác
+            </Link>
+            <Link href="/shop" className={s.actionBtn}>
+              Về cửa hàng
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // 3. Trường hợp lỗi khác (500 hoặc mất mạng) (CMS-13-AC4)
+  if (errorStatus && errorStatus >= 400) {
+    return (
+      <div className={s.container}>
+        <div className={s.errorBox}>
+          <h2 className={s.errorTitle}>Chưa tải được bài</h2>
+          <p className={s.errorDesc}>
+            Đã có lỗi xảy ra trong quá trình nạp dữ liệu. Vui lòng kiểm tra lại kết nối mạng.
+          </p>
+          <button type="button" onClick={loadData} className={s.actionBtn}>
+            Thử lại
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // 4. Hiển thị chi tiết bài viết (CMS-13)
+  if (slug && entry) {
+    const cover = entry.cover_image;
+    const coverSrc = cover ? (cover.urls.lg || cover.urls.md || cover.urls.sm) : null;
+    const isUpdated = entry.updated_at && entry.published_at && entry.updated_at !== entry.published_at;
+
+    return (
+      <main className={s.container}>
+        {/* Breadcrumb */}
+        <nav className={s.breadcrumb} aria-label="Đường dẫn">
+          <Link href="/">Trang chủ</Link>
+          <span>/</span>
+          <Link href="/bai-viet">Bài viết</Link>
+          {entry.category && (
+            <>
+              <span>/</span>
+              <Link href={`/bai-viet?category=${entry.category.slug}`}>{entry.category.name}</Link>
+            </>
+          )}
+        </nav>
+
+        {/* Header */}
+        <header className={s.header}>
+          {entry.category && (
+            <Link href={`/bai-viet?category=${entry.category.slug}`} className={s.categoryTag}>
+              {entry.category.name}
+            </Link>
+          )}
+          <h1 className={s.title}>{entry.title}</h1>
+          <div className={s.metaBar}>
+            <span className={s.author}>Tác giả: {entry.author || "Cá Về"}</span>
+            <span>•</span>
+            <span>Đăng ngày: {formatDate(entry.published_at)}</span>
+            {isUpdated && (
+              <>
+                <span>•</span>
+                <span>Cập nhật: {formatDate(entry.updated_at)}</span>
+              </>
+            )}
+          </div>
+        </header>
+
+        {/* Ảnh bìa */}
+        {cover && coverSrc && (
+          <div className={s.coverWrapper}>
+            <img
+              src={coverSrc}
+              alt={cover.alt || entry.title}
+              width={cover.width}
+              height={cover.height}
+              className={s.coverImg}
+            />
+          </div>
+        )}
+
+        {/* Nội dung bài viết sạch, render qua ArticleBody an toàn */}
+        <ArticleBody body={entry.body} />
+      </main>
+    );
+  }
+
+  // 5. Hiển thị danh sách bài viết khi không có slug (CMS-14)
+  return (
+    <main className={s.container}>
+      <header className={s.header}>
+        <h1 className={s.title}>Cẩm nang & Kinh nghiệm từ cảng cá</h1>
+        <p style={{ color: "#64748b", margin: 0 }}>
+          Chia sẻ kinh nghiệm chọn hải sản tươi, bí quyết bảo quản và các công thức nấu ăn đậm đà vị biển.
+        </p>
+      </header>
+
+      {list.length === 0 ? (
+        <div style={{ textAlign: "center", padding: "40px", color: "#64748b" }}>
+          Chưa có bài viết nào được đăng.
+        </div>
+      ) : (
+        <div className={s.listGrid}>
+          {list.map((item) => {
+            const coverSrc = item.cover_image
+              ? (item.cover_image.urls.md || item.cover_image.urls.sm)
+              : null;
+            return (
+              <Link key={item.slug} href={`/bai-viet?slug=${item.slug}`} className={s.card}>
+                {coverSrc && (
+                  <div className={s.cardImgWrapper}>
+                    <img
+                      src={coverSrc}
+                      alt={item.cover_image?.alt || item.title}
+                      className={s.cardImg}
+                      loading="lazy"
+                    />
+                  </div>
+                )}
+                <div className={s.cardBody}>
+                  {item.category && (
+                    <span style={{ fontSize: "12px", color: "#0284c7", fontWeight: 600, marginBottom: "4px" }}>
+                      {item.category.name}
+                    </span>
+                  )}
+                  <h3 className={s.cardTitle}>{item.title}</h3>
+                  <p className={s.cardExcerpt}>{item.excerpt}</p>
+                  <span className={s.cardDate}>{formatDate(item.published_at)}</span>
+                </div>
+              </Link>
+            );
+          })}
+        </div>
+      )}
+    </main>
+  );
+}
+
+export default function BaiVietPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className={s.container}>
+          <div className={s.loadingBox}>Đang tải nội dung...</div>
+        </div>
+      }
+    >
+      <BaiVietContent />
+    </Suspense>
+  );
+}

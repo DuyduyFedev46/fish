@@ -6,7 +6,10 @@ import {
   ContentEntryDetail,
   ContentEntryListItem,
   ContentImage,
+  ContentWarning,
   EntryCreatePayload,
+  EntryPublishPayload,
+  EntryPublishResponse,
   EntryUpdatePayload,
 } from "./types";
 import { ApiError } from "@/shared/lib/http";
@@ -338,5 +341,104 @@ export function mockUpdateImageAlt(imageId: number, alt: string): ContentImage {
     width: 1600,
     height: 1200,
     urls: { sm: "", md: "", lg: "" },
+  };
+}
+
+export function mockPublishEntry(
+  id: number,
+  payload: EntryPublishPayload
+): EntryPublishResponse {
+  const entry = MOCK_ENTRY_DETAILS.get(id);
+  if (!entry) throw new ApiError("Không tìm thấy bài viết.", 404, "NOT_FOUND");
+
+  if (entry.row_version !== payload.row_version) {
+    throw new ApiError(
+      "Dữ liệu đã bị thay đổi bởi người khác (STALE_VERSION).",
+      409,
+      "STALE_VERSION"
+    );
+  }
+
+  // BR-ND-03: Kiểm tra các trường bắt buộc
+  const missing: string[] = [];
+  if (!entry.title?.trim()) missing.push("title");
+  if (!entry.body?.blocks?.length) missing.push("body");
+  if (entry.kind === "post") {
+    if (!entry.category) missing.push("category");
+    if (!entry.excerpt?.trim()) missing.push("excerpt");
+    if (!entry.cover_image) missing.push("cover_image");
+  }
+  if (missing.length > 0) {
+    const err = new ApiError("Bài viết chưa đủ điều kiện xuất bản (BR-ND-03).", 400, "BR-ND-03");
+    (err as any).missing = missing;
+    throw err;
+  }
+
+  if (payload.checklist_confirmed !== true) {
+    throw new ApiError(
+      "Chưa xác nhận danh sách tự kiểm trước khi đăng (BR-ND-13).",
+      400,
+      "BR-ND-13"
+    );
+  }
+
+  // Quét cảnh báo đơn giản cho mock: nếu bài chứa SĐT hoặc từ giá vốn
+  const bodyText = JSON.stringify(entry.body);
+  const warnings: ContentWarning[] = [];
+  if (bodyText.includes("0912") || bodyText.includes("giá mua") || bodyText.includes("giá vốn")) {
+    if (bodyText.includes("0912")) {
+      warnings.push({
+        type: "phone_like",
+        field: "body",
+        snippet: "…vui lòng gọi 09xx xxx 678 để…",
+      });
+    }
+    if (bodyText.includes("giá mua") || bodyText.includes("giá vốn")) {
+      warnings.push({
+        type: "cost_keyword",
+        field: "body",
+        snippet: "…giá mua tại cảng…",
+      });
+    }
+  }
+
+  if (warnings.length > 0 && payload.acknowledge_warnings !== true) {
+    const err = new ApiError(
+      "Phát hiện cảnh báo trước khi xuất bản (CONTENT_WARNINGS).",
+      409,
+      "CONTENT_WARNINGS"
+    );
+    (err as any).warnings = warnings;
+    throw err;
+  }
+
+  const now = new Date().toISOString();
+  const nextVer = (entry.published_version || 0) + 1;
+  entry.status = "published";
+  entry.published_version = nextVer;
+  if (!entry.first_published_at) entry.first_published_at = now;
+  entry.last_published_at = now;
+  entry.slug_locked = true;
+  entry.has_unpublished_changes = false;
+  entry.row_version += 1;
+  entry.updated_at = now;
+
+  const listItem = MOCK_ENTRIES.find((e) => e.id === id);
+  if (listItem) {
+    listItem.status = "published";
+    listItem.has_unpublished_changes = false;
+    listItem.updated_at = now;
+  }
+
+  const publicUrl = entry.kind === "post" ? `/bai-viet?slug=${entry.slug}` : `/trang?slug=${entry.slug}`;
+  entry.public_url = publicUrl;
+
+  return {
+    id: entry.id,
+    slug: entry.slug,
+    status: entry.status,
+    version: nextVer,
+    public_url: publicUrl,
+    row_version: entry.row_version,
   };
 }

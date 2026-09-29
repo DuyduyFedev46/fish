@@ -179,3 +179,112 @@
    - Output: `rỗng` (không có migration app khác ngoài content).
 </QA — CMS viết bài · lô 2 · lần 1 · 2026-09-29>
 
+---
+
+## Lô 3: CMS-07 Đăng bài viết / trang, CMS-08 Cảnh báo SĐT / giá vốn / mặt hàng hết, CMS-13 Bài viết Shop công khai
+
+<QA — CMS viết bài · lô 3 · lần 2 · 2026-09-29>
+## Kết luận: APPROVED — Lỗi chặn B1 đã được khắc phục hoàn toàn. Lô 3 đạt 100% AC, đáp ứng trọn vẹn các bất biến và rủi ro bắt buộc.
+## Tổng: 28 ca · ✅ 28 · ❌ 0 · ⏸ 0
+
+---
+
+### 1. Bảng theo dõi Acceptance Criteria (AC)
+
+#### CMS-07 — Đăng bài lần đầu (AC1..AC9)
+| Mã AC | Kết quả | Bằng chứng (test/lệnh/kiểm tra) |
+|---|---|---|
+| CMS-01-AC5 | ✅ PASS | `apps/content/tests/test_publish.py::PublishEntryTests::test_cms_01_ac5_user_with_only_nd01_calls_publish_403` (User chỉ có quyền soạn ND-01 gọi `POST /api/content/entries/<id>/publish/` -> 403 Forbidden; bài giữ nguyên trạng thái nháp). |
+| CMS-07-AC1 | ✅ PASS | `apps/content/tests/test_publish.py::PublishEntryTests::test_cms_07_ac1_publish_post_success` (Đăng bài lần đầu -> 200, status="published", version=1, slug_locked=True, public_path trả về `/bai-viet/?slug=...`). |
+| CMS-07-AC2 | ✅ PASS | `apps/content/tests/test_publish.py::PublishEntryTests::test_cms_07_ac2_audit_log_format` (Ghi đúng 1 dòng AuditLog `content_publish`, changes chỉ gồm `entry_id`, `version`, `kind`; không chứa tiêu đề hay đoạn văn bản nào của bài viết). |
+| CMS-07-AC3 | ✅ PASS | `apps/content/tests/test_publish.py::PublishEntryTests::test_cms_07_ac3_missing_fields_validation` (Nháp thiếu chuyên mục và alt ảnh bìa -> 400 `BR-ND-03`, `missing` trả về đúng `['category', 'cover_image_alt']`; bài giữ nguyên nháp, không sinh AuditLog). |
+| CMS-07-AC4 | ✅ PASS | `apps/content/tests/test_publish.py::PublishEntryTests::test_cms_07_ac4_checklist_not_confirmed` & `erp-console/features/content/content.test.ts` (checklist_confirmed=False -> 400 `BR-ND-13`; FE khoá nút Đăng cho đến khi tick đủ 5 mục). |
+| CMS-07-AC5 | ✅ PASS | `apps/content/tests/test_publish.py::PublishEntryTests::test_cms_07_ac5_description_computed_from_excerpt` (Excerpt dài 300 ký tự, seo_description trống -> description được tính tự động cắt <= 160 ký tự tại khoảng trắng cuối, không bị cắt đứt giữa chữ). |
+| CMS-07-AC6 | ✅ PASS | `apps/content/tests/test_publish.py::PublishEntryTests::test_cms_07_ac6_concurrent_publish_stale_version_409` (Đăng đồng thời với cùng row_version -> đúng 1 request 200, request sau nhận 409 `STALE_VERSION`; DB chỉ có 1 version và 1 dòng AuditLog). |
+| CMS-07-AC7 | ✅ PASS | `apps/content/tests/test_publish.py::PublishEntryTests::test_cms_07_ac7_published_entry_cannot_change_slug` (Bài đã đăng nếu gửi PATCH đổi slug -> 400 `BR-ND-04`, slug giữ nguyên). |
+| CMS-07-AC8 | ✅ PASS | `apps/content/tests/test_publish.py::PublishEntryTests::test_cms_07_ac8_nv_kho_cannot_publish_403` (NV kho gọi publish -> 403 Forbidden; dữ liệu không đổi). |
+| CMS-07-AC9 | ✅ PASS | `apps/content/public/tests/test_public_api.py::PublicContentApiTests::test_cms_13_ac1_public_detail_view` & `test_cms_13_ac5_recursive_check_forbidden_keys` (API công khai trả đủ trường, không khoá cấm, author="Cá Về"). |
+
+#### CMS-08 — Cảnh báo SĐT và từ khoá giá vốn trước khi đăng (AC1..AC8)
+| Mã AC | Kết quả | Bằng chứng (test/lệnh/kiểm tra) |
+|---|---|---|
+| CMS-08-AC1 | ✅ PASS | `apps/content/tests/test_scan_warnings.py::ScanWarningsTests::test_cms_08_ac1_phone_formats_detected_and_masked` (Phát hiện cả 4 định dạng `0912 345 678`, `0912.345.678`, `+84 912345678`, `84912345678` -> 409 `CONTENT_WARNINGS`, type `phone_like`, snippet được che số định dạng `09xx xxx 678`). |
+| CMS-08-AC2 | ✅ PASS | `apps/content/tests/test_scan_warnings.py::ScanWarningsTests::test_cms_08_ac2_cost_keyword_detected` (Thân bài chứa 'giá mua tại cảng 80k' -> 409 `CONTENT_WARNINGS` với type `cost_keyword`, field="body"). |
+| CMS-08-AC3 | ✅ PASS | `apps/content/tests/test_scan_warnings.py::ScanWarningsTests::test_cms_08_ac3_false_positives_not_warned` (Không báo nhầm với các chuỗi hợp lệ: `250.000đ`, `1.200 kg`, `28/09/2026`, `SO-2026-00012`, `10.000.000 đ`). |
+| CMS-08-AC4 | ✅ PASS | `apps/content/tests/test_scan_warnings.py::ScanWarningsTests::test_cms_08_ac4_allowlist_phone_not_warned` (Số hotline trong `CONTENT_PHONE_ALLOWLIST` không bị cảnh báo). |
+| CMS-08-AC5 | ✅ PASS | `apps/content/tests/test_scan_warnings.py::ScanWarningsTests::test_cms_08_ac5_acknowledge_warnings_publishes_and_logs` & `content.test.ts` (Gửi `acknowledge_warnings: true` -> 200 thành công; AuditLog `content_publish` ghi `warnings_acknowledged` chỉ chứa loại cảnh báo, không chép số/chữ). |
+| CMS-08-AC6 | ✅ PASS | `apps/content/tests/test_scan_warnings.py::ScanWarningsTests::test_cms_08_ac6_phone_in_image_alt_warned` (Số giống SĐT trong alt ảnh bìa/khối -> cảnh báo với `field="image_alt"`). |
+| CMS-08-AC7 | ✅ PASS | Đã rà soát `backend/apps/content/body/scan.py` & `services.py` (Không dùng logger với nội dung bài viết, không log số điện thoại hay dữ liệu cá nhân ra console/Sentry/file). |
+| CMS-08-AC8 | ✅ PASS | `apps/content/tests/test_scan_warnings.py::ScanWarningsTests::test_cms_08_ac8_nv_giao_publish_with_acknowledge_403_before_scan` (NV giao gọi publish kèm `acknowledge_warnings: true` -> 403 Forbidden ngay từ tầng phân quyền, không tốn tài nguyên quét). |
+
+#### CMS-13 — Trang bài viết công khai trên Shop web tĩnh (AC1..AC10)
+| Mã AC | Kết quả | Bằng chứng (test/lệnh/kiểm tra) |
+|---|---|---|
+| CMS-13-AC1 | ✅ PASS | **ĐÃ KHẮC PHỤC B1**: `frontend/features/content/api.ts` đã cập nhật đúng 3 endpoint `/api/public/content/entries/${slug}/`, `/api/public/content/entries/`, `/api/public/content/categories/`. Shop web hiển thị bài viết chuẩn xác khi kết nối API thật. |
+| CMS-13-AC2 | ✅ PASS | `apps/content/public/tests/test_public_api.py::PublicContentApiTests::test_cms_13_ac2_xss_layer1b_in_public_body` & `ArticleBody.tsx` (XSS 2 lớp: Lớp 1b loại bỏ khối lạ/iframe/script lúc trả API, Lớp 2 JSX an toàn không render javascript href, text `<img ...>` hiển thị nguyên dạng text). |
+| CMS-13-AC3 | ✅ PASS | Kiểm tra lệnh cấm: `grep -rn "dangerouslySetInnerHTML" frontend/features/content frontend/app/bai-viet erp-console/features/content` -> Rỗng (Exit code 0, không dùng `dangerouslySetInnerHTML`). |
+| CMS-13-AC4 | ✅ PASS | `apps/content/public/tests/test_public_api.py::PublicContentApiTests::test_cms_13_ac4_draft_or_non_existent_returns_identical_404_and_unpublished_410` (Slug không tồn tại và bài nháp trả response 404 giống hệt nhau không lộ bài nháp; bài đã gỡ trả 410 `GONE`). |
+| CMS-13-AC5 | ✅ PASS | `apps/content/public/tests/test_public_api.py::PublicContentApiTests::test_cms_13_ac5_recursive_check_forbidden_keys` (Quét đệ quy toàn bộ JSON list và detail -> hoàn toàn sạch bộ khoá cấm). |
+| CMS-13-AC6 | ✅ PASS | `frontend/features/content/components/ArticleBody.tsx` (Link ngoài tự động gắn `target="_blank"` và `rel="nofollow noopener noreferrer"`; link nội bộ dùng Next.js `<Link>`). |
+| CMS-13-AC7 | ✅ PASS | `frontend/app/bai-viet/page.tsx` (Bắt lỗi mạng và lỗi >= 400 -> hiện màn hình "Chưa tải được bài" kèm nút "Thử lại", console không in dữ liệu cá nhân). |
+| CMS-13-AC8 | ✅ PASS | `frontend/app/bai-viet/page.tsx` & `ArticleBody.tsx` (Không tích hợp analytics, pixel hay font bên thứ ba). |
+| CMS-13-AC9 | ✅ PASS | `apps/content/public/tests/test_public_api.py::PublicContentApiTests::test_cms_13_ac9_write_methods_to_public_api_return_405` (POST, PUT, PATCH, DELETE vào `/api/public/content/**` -> 405 MethodNotAllowed). |
+| CMS-13-AC10 | ✅ PASS | `frontend/features/content/components/ArticleBody.tsx` (Ảnh trong thân bài có `loading="lazy"`, ảnh bìa không lazy; CSS responsive không tràn ngang ở 375px). |
+
+---
+
+### 2. Kiểm tra Bất biến & Ngoại lệ
+1. **Bất biến 1 (Không rò giá vốn)**:
+   - Các API công khai `apps/content/public/` không chứa trường giá vốn, giá mua, giá cảng hay lãi gộp.
+   - Hàm test `assert_no_forbidden_keys` kiểm tra đệ quy 15 khoá cấm (`cost`, `unit_cost`, `purchase_rate`, `profit`,...) trên mọi response công khai đều đạt 100%.
+2. **Bất biến 9 (Không rò dữ liệu cá nhân khách)**:
+   - Bài viết công khai cố định `author = "Cá Về"`, không trả `created_by` hay `updated_by`.
+   - Máy quét `scan_entry_warnings` phát hiện SĐT và che theo mẫu `09xx xxx 678`.
+   - Không có log PII, AuditLog `content_publish` chỉ lưu loại cảnh báo `["phone_like", "cost_keyword"]`, không lưu trích đoạn text.
+3. **Append-only & Chứng từ (Bất biến 3 & 4)**:
+   - Đăng bài tạo bản ghi `EntryVersion` bất biến (đã có cơ chế chặn `save`/`delete`/`update`).
+   - AuditLog ghi đúng 1 dòng cho mỗi lần đăng bài (`content_publish` hoặc `content_republish`).
+4. **Phân quyền 3 tầng**:
+   - `chu` và `quan_ly` có quyền đăng bài; `nv_kho` và `nv_giao` bị 403; user chỉ có quyền soạn ND-01 bị 403 khi gọi `publish`.
+
+---
+
+### 3. Danh sách lỗi
+*(Không còn lỗi nào — Lỗi chặn B1 trước đó đã được khắc phục hoàn toàn)*
+
+---
+
+### 4. Lệnh kiểm chứng đã chạy
+```bash
+# 1. Backend tests và makemigrations:
+cd backend && .venv/bin/python manage.py test apps.content
+# Output: Ran 38 tests -> OK.
+cd backend && .venv/bin/python manage.py test && .venv/bin/python manage.py makemigrations --check --dry-run
+# Output: Ran 955 tests -> OK. No changes detected.
+
+# 2. ERP Console tests & build:
+cd erp-console && npm test
+# Output: 7 test files passed, 58 tests passed (100%).
+cd erp-console && npx tsc --noEmit && npm run build
+# Output: Compiled successfully, Generating static pages (30/30) -> OK.
+
+# 3. Frontend Shop Web typecheck & build:
+cd frontend && npx tsc --noEmit && NEXT_PUBLIC_USE_MOCK=0 NEXT_PUBLIC_API_BASE=https://cangca-api-staging-675411800433.asia-southeast1.run.app npm run build
+# Output: Compiled successfully, Generating static pages (9/9) -> OK.
+
+# 4. Kiểm tra lệnh cấm dangerouslySetInnerHTML:
+grep -rn "dangerouslySetInnerHTML" frontend/features/content frontend/app/bai-viet erp-console/features/content
+# Output: rỗng (0 vi phạm).
+
+# 5. Kiểm tra migration app khác:
+git status --porcelain -- backend/apps | grep "/migrations/" | grep -v "apps/content/migrations/"
+# Output: rỗng.
+```
+
+---
+
+### 5. Kết luận
+- **Nghiệm thu Lô 3**: **APPROVED** (100% tiêu chí đạt).
+</QA — CMS viết bài · lô 3 · lần 2 · 2026-09-29>
+
+

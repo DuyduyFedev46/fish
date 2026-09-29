@@ -22,7 +22,7 @@ class EntryViewSet(viewsets.ModelViewSet):
     serializer_class = EntryListSerializer
     queryset = Entry.objects.all()
     pagination_class = StandardPagination
-    custom_perm_actions = ("counts",)
+    custom_perm_actions = ("counts", "publish")
     required_perms: tuple = ()
 
     def get_queryset(self):
@@ -63,6 +63,39 @@ class EntryViewSet(viewsets.ModelViewSet):
         delete_draft(entry=instance, actor=request.user)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
+    @action(detail=True, methods=["post"], required_perms=("content.publish_entry",))
+    def publish(self, request, pk=None):
+        """Xuất bản bài viết hoặc trang (§8.5, CMS-07)."""
+        from apps.content.entries.services import publish_entry
+
+        instance = self.get_object()
+        req_version = request.data.get("row_version")
+        if req_version is not None:
+            try:
+                req_version = int(req_version)
+            except (ValueError, TypeError):
+                pass
+        checklist_raw = request.data.get("checklist_confirmed")
+        if isinstance(checklist_raw, str):
+            checklist_confirmed = checklist_raw.strip().lower() in ("true", "1")
+        else:
+            checklist_confirmed = bool(checklist_raw)
+
+        ack_raw = request.data.get("acknowledge_warnings")
+        if isinstance(ack_raw, str):
+            acknowledge_warnings = ack_raw.strip().lower() in ("true", "1")
+        else:
+            acknowledge_warnings = bool(ack_raw)
+
+        res = publish_entry(
+            entry=instance,
+            actor=request.user,
+            row_version=req_version,
+            checklist_confirmed=checklist_confirmed,
+            acknowledge_warnings=acknowledge_warnings,
+        )
+        return Response(res, status=status.HTTP_200_OK)
+
     @action(detail=False, methods=["get"], required_perms=("content.view_entry",))
     def counts(self, request):
         """Đếm số bài viết/trang theo từng trạng thái (§8.3)."""
@@ -78,3 +111,4 @@ class EntryViewSet(viewsets.ModelViewSet):
             "unpublished": qs.filter(status="unpublished").count(),
         }
         return Response(counts)
+

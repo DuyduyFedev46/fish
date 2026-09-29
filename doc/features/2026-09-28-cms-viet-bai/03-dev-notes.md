@@ -177,3 +177,74 @@ git status --porcelain -- backend/apps | grep "/migrations/" | grep -v "apps/con
 ### Lệch thiết kế
 *(Không có)*
 
+---
+
+## Lô 3: CMS-07 Đăng bài viết / trang, CMS-08 Cảnh báo SĐT / giá vốn / mặt hàng hết, CMS-13 Bài viết Shop công khai
+
+### Kế hoạch & Thực hiện
+1. **Backend**:
+   - `backend/apps/common/throttling.py`: Thêm `PublicContentThrottle` với scope `public_content` (60 req/phút).
+   - `backend/config/settings.py`: Thêm `"public_content": "60/minute"` vào `_DEFAULT_THROTTLE_RATES`.
+   - `backend/apps/content/models/entries.py`: Thêm `@property def slug_locked(self) -> bool` dựa trên `first_published_at is not None`.
+   - `backend/apps/content/body/scan.py`: Máy quét an toàn nội dung `scan_entry_warnings` phát hiện SĐT (10-11 chữ số, che dạng `09xx xxx 678` trong snippet, bỏ qua `CONTENT_PHONE_ALLOWLIST` và các ca không báo nhầm CMS-08-AC3), phát hiện từ khoá giá vốn không phân biệt hoa thường/dấu, phát hiện thẻ mặt hàng không khả dụng.
+   - `backend/apps/content/entries/services.py`:
+     - `missing_fields`: kiểm tra thiếu tiêu đề, body, cover_image (bài viết bắt buộc có alt), category, excerpt.
+     - `compute_description`: tự tính SEO description từ excerpt <= 160 ký tự tại từ cuối, bỏ dấu câu treo.
+     - `publish_entry`: kiểm tra `row_version` (409 STALE_VERSION), kiểm tra không thay đổi (BR-ND-05), kiểm tra missing fields (400 BR-ND-03), kiểm tra checklist_confirmed (400 BR-ND-13), cảnh báo CONTENT_WARNINGS (409), tạo `EntryVersion` append-only, cập nhật status=published, first_published_at, last_published_at, row_version + 1, ghi AuditLog 1 dòng `content_publish` hoặc `content_republish` chỉ chứa `entry_id, version, kind` + `warnings_acknowledged`.
+   - `backend/apps/content/entries/api.py`: Thêm action `publish` trên `EntryViewSet` với `@action(detail=True, methods=["post"], required_perms=("content.publish_entry",))`.
+   - `backend/apps/content/public/`:
+     - `serializers.py`: `public_body` (Lớp 1b chuẩn hoá bỏ image_id, tính URLs sm/md/lg qua storage), `PublicEntryDetailSerializer`, `PublicEntryListSerializer`, `PublicCategorySerializer`. Không dùng ModelSerializer, dict dựng tường minh, không chứa khoá cấm.
+     - `api.py`: `PublicEntryListView` (12 bài/trang, Cache-Control public max-age <= 60), `PublicEntryDetailView` (404 NOT_FOUND giống hệt cho nháp và không tồn tại, 410 GONE cho unpublished), `PublicCategoryListView`, `PublicPageByRoleView`, `PublicFooterLinksView`. Tất cả AllowAny, chỉ GET/HEAD/OPTIONS.
+   - `backend/config/api_urls.py`: Đăng ký router `public/content/entries`, `public/content/categories`, `public/content/pages/by-role/<role>/`, `public/content/footer-links/`.
+   - `backend/apps/ai/registry/tests/snapshots/commands_index_snapshot.json`: Thêm `content.entry.publish` theo thứ tự alphabet.
+
+2. **ERP Console**:
+   - `erp-console/features/content/types.ts`: Thêm `ContentWarning`, `EntryPublishPayload`, `EntryPublishResponse`.
+   - `erp-console/features/content/api.ts` & `mock.ts`: Thêm `publishEntry` và mock tương ứng (kiểm tra checklist, cảnh báo CONTENT_WARNINGS, STALE_VERSION, BR-ND-03).
+   - `erp-console/app/(console)/content/edit/page.tsx` & `edit.module.css`:
+     - Thêm nút "Đăng bài" bên cạnh "Lưu nháp".
+     - Modal Checklist 5 mục tự kiểm (BR-ND-13): Đã đọc lại bài, Không chứa giá vốn nội bộ, Không lộ SĐT cá nhân, Ảnh rõ nét có alt, Thẻ món sẵn hàng.
+     - Modal Cảnh báo (409 CONTENT_WARNINGS): Liệt kê các cảnh báo và nút "Tôi đã kiểm tra, vẫn đăng" (`acknowledge_warnings: true`).
+
+3. **Frontend Shop Web**:
+   - `frontend/lib/api.ts`: Thêm `export` cho `apiFetch`, an toàn parse lỗi 404 và 410.
+   - `frontend/features/content/types.ts`: Khai báo types công khai không chứa ID nội bộ.
+   - `frontend/features/content/safeHref.ts`: Hàm kiểm tra link an toàn chống XSS.
+   - `frontend/features/content/mock.ts`: Mock dữ liệu cho Shop web.
+   - `frontend/features/content/api.ts`: Gọi `/api/public/content/entries/`, `/api/public/content/categories/`.
+   - `frontend/features/content/components/ArticleBody.tsx`: Render an toàn toàn bộ BodyDoc thuần JSX (heading, paragraph, quote, list, image lazy, item_card), không dùng `dangerouslySetInnerHTML`.
+   - `frontend/app/bai-viet/page.tsx` & `bai-viet.module.css`: Trang bài viết tĩnh bọc trong `<Suspense>`, xử lý chi tiết bài viết, danh sách bài viết, 404, 410 ("Bài này không còn trên web"), lỗi kết nối mạng.
+
+### Kết quả kiểm chứng Lô 3
+```bash
+# 1. Backend tests và makemigrations check:
+cd backend && .venv/bin/python manage.py test && .venv/bin/python manage.py makemigrations --check --dry-run
+# Output: Ran 955 tests in 90.4s -> OK. No changes detected.
+
+# 2. Content tests:
+cd backend && .venv/bin/python manage.py test apps.content
+# Output: Ran 38 tests in 2.1s -> OK.
+
+# 3. ERP Console tests & build:
+cd erp-console && npm test
+# Output: 7 test files passed, 58 tests passed (100%).
+cd erp-console && npx tsc --noEmit && npm run build
+# Output: Compiled successfully, Generating static pages (30/30) -> OK.
+
+# 4. Frontend Shop Web typecheck & build:
+cd frontend && npx tsc --noEmit && NEXT_PUBLIC_USE_MOCK=0 NEXT_PUBLIC_API_BASE=https://cangca-api-staging-675411800433.asia-southeast1.run.app npm run build
+# Output: Compiled successfully, Generating static pages (9/9) -> OK.
+
+# 5. Kiểm tra dangerouslySetInnerHTML:
+grep -rn "dangerouslySetInnerHTML" frontend/features/content frontend/app/bai-viet erp-console/features/content
+# Output: rỗng (0 vi phạm).
+
+# 6. Kiểm tra migration app khác:
+git status --porcelain -- backend/apps | grep "/migrations/" | grep -v "apps/content/migrations/"
+# Output: rỗng.
+```
+
+### Lệch thiết kế
+*(Không có)*
+
+

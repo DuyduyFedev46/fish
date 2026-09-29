@@ -147,3 +147,25 @@ export interface EntryUpdatePayload {
   footer_order?: number;
 }
 
+export interface ContentWarning {
+  type: "phone_like" | "cost_keyword" | "item_unavailable";
+  field?: string;
+  snippet?: string;
+  item_code?: string;
+}
+
+export interface EntryPublishPayload {
+  row_version: number;
+  checklist_confirmed: boolean;
+  acknowledge_warnings?: boolean;
+}
+
+export interface EntryPublishResponse {
+  id: number;
+  slug: string;
+  status: ContentStatus;
+  version: number;
+  public_url: string;
+  row_version: number;
+}
+

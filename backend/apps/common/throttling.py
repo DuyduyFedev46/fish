@@ -93,3 +93,8 @@ class CskhSearchThrottle(SettingsRateThrottle):
             return None
         return self.cache_format % {"scope": self.scope, "ident": str(request.user.pk)}
 
+
+class PublicContentThrottle(SettingsRateThrottle):
+    scope = "public_content"
+
+

@@ -8,6 +8,7 @@ import {
   mockGetEntryCounts,
   mockListCategories,
   mockListEntries,
+  mockPublishEntry,
   mockUpdateCategory,
   mockUpdateEntry,
   mockUpdateImageAlt,
@@ -197,6 +198,82 @@ describe("CMS-01 & CMS-02 Console Tests", () => {
         mockUploadEntryImage(entry.id, fakeFile, "Ảnh thứ 21");
       }).toThrowError(/BR-ND-07/);
     });
+
+    it("CMS-07 & CMS-08: Đăng bài, xác nhận checklist 5 mục, cảnh báo an toàn và acknowledge_warnings", () => {
+      const entry = mockCreateEntry({
+        kind: "post",
+        title: "Kinh nghiệm chọn cá thu ngon",
+        category: 1,
+        excerpt: "Bí quyết chọn cá tươi ngon mắt trong mang đỏ.",
+      });
+
+      // Tạo ảnh và gán cover
+      const fakeFile = new File(["dummy"], "cov.jpg", { type: "image/jpeg" });
+      const img = mockUploadEntryImage(entry.id, fakeFile, "Đĩa cá thu");
+      mockUpdateEntry(entry.id, {
+        row_version: entry.row_version,
+        cover_image: img.id,
+        body: {
+          type: "doc",
+          blocks: [
+            {
+              type: "paragraph",
+              children: [{ text: "Liên hệ tư vấn mua cá qua 0912 345 678 giá mua cảng tốt nhất." }],
+            },
+          ],
+        },
+      });
+
+      const updated = mockGetEntry(entry.id);
+
+      // 1. Publish khi chưa xác nhận checklist -> 400 BR-ND-13
+      expect(() => {
+        mockPublishEntry(entry.id, {
+          row_version: updated.row_version,
+          checklist_confirmed: false,
+        });
+      }).toThrowError(/BR-ND-13/);
+
+      // 2. Publish khi có cảnh báo SĐT / giá vốn và acknowledge_warnings=false -> 409 CONTENT_WARNINGS
+      try {
+        mockPublishEntry(entry.id, {
+          row_version: updated.row_version,
+          checklist_confirmed: true,
+          acknowledge_warnings: false,
+        });
+        expect.unreachable("Phải ném lỗi CONTENT_WARNINGS");
+      } catch (err: any) {
+        expect(err.code).toBe("CONTENT_WARNINGS");
+        expect(err.warnings.length).toBeGreaterThan(0);
+        expect(err.warnings.some((w: any) => w.type === "phone_like")).toBe(true);
+        expect(err.warnings.some((w: any) => w.type === "cost_keyword")).toBe(true);
+      }
+
+      // 3. Publish với acknowledge_warnings=true -> Thành công 200, status=published, slug_locked=true
+      const pubRes = mockPublishEntry(entry.id, {
+        row_version: updated.row_version,
+        checklist_confirmed: true,
+        acknowledge_warnings: true,
+      });
+
+      expect(pubRes.status).toBe("published");
+      expect(pubRes.version).toBe(1);
+      expect(pubRes.public_url).toContain("/bai-viet?slug=");
+
+      const finalEntry = mockGetEntry(entry.id);
+      expect(finalEntry.status).toBe("published");
+      expect(finalEntry.slug_locked).toBe(true);
+      expect(finalEntry.row_version).toBe(updated.row_version + 1);
+
+      // 4. Publish lại với row_version cũ -> 409 STALE_VERSION
+      expect(() => {
+        mockPublishEntry(entry.id, {
+          row_version: updated.row_version,
+          checklist_confirmed: true,
+        });
+      }).toThrowError(/STALE_VERSION/);
+    });
   });
 });
+
 

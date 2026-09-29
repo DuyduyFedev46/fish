@@ -88,16 +88,28 @@ router.register("ai/actions", AiActionViewSet, basename="ai-actions")
 from apps.content.categories.api import CategoryViewSet
 from apps.content.entries.api import EntryViewSet
 from apps.content.images.api import ContentImageViewSet, EntryImageUploadView
+from apps.content.public.api import (
+    PublicCategoryListView,
+    PublicEntryDetailView,
+    PublicEntryListView,
+    PublicFooterLinksView,
+    PublicPageByRoleView,
+)
 
 router.register("content/categories", CategoryViewSet, basename="content-categories")
 router.register("content/entries", EntryViewSet, basename="content-entries")
 router.register("content/images", ContentImageViewSet, basename="content-images")
 
 
-
 urlpatterns = [
     # CMS Content Image Upload (CMS-05)
     path("content/entries/<int:pk>/images/", EntryImageUploadView.as_view()),
+    # CMS Content Public API (CMS-13, CMS-14, CMS-15)
+    path("public/content/entries/", PublicEntryListView.as_view(), name="public-content-entries-list"),
+    path("public/content/entries/<str:slug>/", PublicEntryDetailView.as_view(), name="public-content-entries-detail"),
+    path("public/content/categories/", PublicCategoryListView.as_view(), name="public-content-categories"),
+    path("public/content/pages/by-role/<str:role>/", PublicPageByRoleView.as_view(), name="public-content-pages-by-role"),
+    path("public/content/footer-links/", PublicFooterLinksView.as_view(), name="public-content-footer-links"),
     # Thông tin công khai cho Shop web (CS-10)
     path("public/site-info/", PublicSiteInfoView.as_view(), name="public-site-info"),
 

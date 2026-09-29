@@ -10,6 +10,7 @@ import {
   deleteEntry,
   fetchCategories,
   getEntry,
+  publishEntry,
   updateEntry,
   updateImageAlt,
 } from "@/features/content/api";
@@ -21,6 +22,7 @@ import type {
   ContentImage,
   ContentKind,
   ContentStatus,
+  ContentWarning,
 } from "@/features/content/types";
 import { ApiError } from "@/shared/lib/http";
 import s from "./edit.module.css";
@@ -59,14 +61,28 @@ function ContentEditScreen() {
   const [status, setStatus] = useState<ContentStatus>("draft");
   const [publishedVersion, setPublishedVersion] = useState<number | null>(null);
   const [firstPublishedAt, setFirstPublishedAt] = useState<string | null>(null);
+  const [publicUrl, setPublicUrl] = useState<string | null>(null);
 
   const [categories, setCategories] = useState<ContentCategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [publishing, setPublishing] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [slugSuggestion, setSlugSuggestion] = useState<string | null>(null);
+
+  // Modal Checklist & Cảnh báo (CMS-07, CMS-08, BR-ND-13)
+  const [showChecklistModal, setShowChecklistModal] = useState(false);
+  const [checklist, setChecklist] = useState<[boolean, boolean, boolean, boolean, boolean]>([
+    false,
+    false,
+    false,
+    false,
+    false,
+  ]);
+  const [showWarningModal, setShowWarningModal] = useState(false);
+  const [warningsList, setWarningsList] = useState<ContentWarning[]>([]);
 
   // Tải danh mục
   useEffect(() => {
@@ -229,6 +245,74 @@ function ContentEditScreen() {
     }
   };
 
+  // Mở modal tự kiểm trước khi đăng (CMS-07, BR-ND-13)
+  const handleOpenPublishModal = () => {
+    if (!entryId) {
+      setErrorMsg("Vui lòng bấm 'Lưu nháp' bài viết trước khi thực hiện đăng.");
+      return;
+    }
+    setChecklist([false, false, false, false, false]);
+    setShowChecklistModal(true);
+  };
+
+  const handleChecklistChange = (index: number) => {
+    setChecklist((prev) => {
+      const next = [...prev] as [boolean, boolean, boolean, boolean, boolean];
+      next[index] = !next[index];
+      return next;
+    });
+  };
+
+  // Xác nhận đăng bài (CMS-07, CMS-08)
+  const handleConfirmPublish = async (acknowledgeWarnings = false) => {
+    if (!entryId) return;
+
+    setPublishing(true);
+    setErrorMsg(null);
+    try {
+      const res = await publishEntry(entryId, {
+        row_version: rowVersion,
+        checklist_confirmed: true,
+        acknowledge_warnings: acknowledgeWarnings,
+      });
+
+      setStatus(res.status);
+      setRowVersion(res.row_version);
+      setPublishedVersion(res.version);
+      setPublicUrl(res.public_url);
+      setShowChecklistModal(false);
+      setShowWarningModal(false);
+      setSuccessMsg(`Đã đăng bài viết thành công (phiên bản ${res.version}).`);
+    } catch (err: any) {
+      if (err instanceof ApiError) {
+        if (err.status === 409 && err.code === "CONTENT_WARNINGS") {
+          // CMS-08: Phát hiện cảnh báo SĐT/giá vốn
+          setShowChecklistModal(false);
+          const warnings = (err as any).warnings || [];
+          setWarningsList(warnings);
+          setShowWarningModal(true);
+        } else if (err.status === 409 && err.code === "STALE_VERSION") {
+          setShowChecklistModal(false);
+          setShowWarningModal(false);
+          setErrorMsg("Bài đã được người khác sửa. Vui lòng tải lại trang.");
+        } else if (err.code === "BR-ND-03") {
+          setShowChecklistModal(false);
+          setShowWarningModal(false);
+          const missing = (err as any).missing || [];
+          setErrorMsg(`Bài viết chưa đủ điều kiện xuất bản (BR-ND-03): thiếu ${missing.join(", ")}`);
+        } else {
+          setShowChecklistModal(false);
+          setErrorMsg(err.message || "Lỗi khi đăng bài.");
+        }
+      } else {
+        setShowChecklistModal(false);
+        setErrorMsg("Lỗi kết nối khi đăng bài. Vui lòng thử lại.");
+      }
+    } finally {
+      setPublishing(false);
+    }
+  };
+
   // Tải lại bài khi bị conflict 409
   const handleReloadLatest = async () => {
     if (!entryId) return;
@@ -330,9 +414,17 @@ function ContentEditScreen() {
             type="button"
             className={s.saveBtn}
             onClick={handleSaveDraft}
-            disabled={saving || deleting}
+            disabled={saving || deleting || publishing}
           >
             {saving ? "Đang lưu..." : "Lưu nháp"}
+          </button>
+          <button
+            type="button"
+            className={s.publishBtn}
+            onClick={handleOpenPublishModal}
+            disabled={saving || deleting || publishing}
+          >
+            {publishing ? "Đang đăng..." : "Đăng bài"}
           </button>
         </div>
       </div>
@@ -524,10 +616,143 @@ function ContentEditScreen() {
             onInsertToContent={handleInsertToContent}
             onUpdateAlt={handleUpdateAlt}
             defaultAlt={title}
-            disabled={saving || deleting}
+            disabled={saving || deleting || publishing}
           />
         </div>
       </div>
+
+      {/* Modal 5 mục tự kiểm trước khi đăng (CMS-07, BR-ND-13) */}
+      {showChecklistModal && (
+        <div className={s.modalBackdrop}>
+          <div className={s.modalDialog}>
+            <h3 className={s.modalTitle}>Danh sách tự kiểm trước khi đăng bài</h3>
+            <p className={s.modalDesc}>
+              Vui lòng xác nhận 5 tiêu chí bắt buộc dưới đây để đảm bảo chất lượng và an toàn thông tin:
+            </p>
+
+            <div className={s.checklistGroup}>
+              <label className={s.checklistItem}>
+                <input
+                  type="checkbox"
+                  checked={checklist[0]}
+                  onChange={() => handleChecklistChange(0)}
+                />
+                <span>1. Đã kiểm tra tính chính xác và không có lỗi chính tả trong nội dung bài viết.</span>
+              </label>
+
+              <label className={s.checklistItem}>
+                <input
+                  type="checkbox"
+                  checked={checklist[1]}
+                  onChange={() => handleChecklistChange(1)}
+                />
+                <span>2. Không chứa thông tin giá vốn, giá mua cảng, hay lãi gộp nội bộ (Bất biến 1).</span>
+              </label>
+
+              <label className={s.checklistItem}>
+                <input
+                  type="checkbox"
+                  checked={checklist[2]}
+                  onChange={() => handleChecklistChange(2)}
+                />
+                <span>3. Không để lộ số điện thoại cá nhân (chỉ dùng hotline chung của vựa).</span>
+              </label>
+
+              <label className={s.checklistItem}>
+                <input
+                  type="checkbox"
+                  checked={checklist[3]}
+                  onChange={() => handleChecklistChange(3)}
+                />
+                <span>4. Ảnh bìa và ảnh trong bài rõ nét, đúng tỉ lệ và có mô tả alt phù hợp.</span>
+              </label>
+
+              <label className={s.checklistItem}>
+                <input
+                  type="checkbox"
+                  checked={checklist[4]}
+                  onChange={() => handleChecklistChange(4)}
+                />
+                <span>5. Thẻ mặt hàng đính kèm (nếu có) đang sẵn hàng và đúng quy cách.</span>
+              </label>
+            </div>
+
+            <div className={s.modalActions}>
+              <button
+                type="button"
+                className={s.cancelBtn}
+                onClick={() => setShowChecklistModal(false)}
+                disabled={publishing}
+              >
+                Hủy bỏ
+              </button>
+              <button
+                type="button"
+                className={s.confirmPublishBtn}
+                onClick={() => handleConfirmPublish(false)}
+                disabled={!checklist.every(Boolean) || publishing}
+              >
+                {publishing ? "Đang xuất bản..." : "Xác nhận đăng bài"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Cảnh báo an toàn nội dung (CMS-08, CONTENT_WARNINGS 409) */}
+      {showWarningModal && (
+        <div className={s.modalBackdrop}>
+          <div className={s.modalDialog}>
+            <h3 className={s.modalTitle} style={{ color: "#b45309" }}>
+              Cảnh báo an toàn nội dung
+            </h3>
+            <p className={s.modalDesc}>
+              Hệ thống phát hiện một số thông tin cần lưu ý trước khi đưa bài lên website công khai:
+            </p>
+
+            <div className={s.warningBox}>
+              {warningsList.map((w, idx) => (
+                <div key={idx} className={s.warningItem}>
+                  {w.type === "phone_like" && (
+                    <span>
+                      ⚠️ <strong>Số giống SĐT:</strong> {w.snippet || "Phát hiện số điện thoại"} ({w.field})
+                    </span>
+                  )}
+                  {w.type === "cost_keyword" && (
+                    <span>
+                      ⚠️ <strong>Từ khóa giá vốn/nhạy cảm:</strong> {w.snippet || "Phát hiện từ khóa giá vốn"} ({w.field})
+                    </span>
+                  )}
+                  {w.type === "item_unavailable" && (
+                    <span>
+                      ⚠️ <strong>Mặt hàng hết/ngừng bán:</strong> Mã <code>{w.item_code}</code> không khả dụng.
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            <div className={s.modalActions}>
+              <button
+                type="button"
+                className={s.cancelBtn}
+                onClick={() => setShowWarningModal(false)}
+                disabled={publishing}
+              >
+                Quay lại sửa
+              </button>
+              <button
+                type="button"
+                className={s.forcePublishBtn}
+                onClick={() => handleConfirmPublish(true)}
+                disabled={publishing}
+              >
+                {publishing ? "Đang xuất bản..." : "Tôi đã kiểm tra, vẫn đăng"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

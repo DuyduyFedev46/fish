@@ -70,6 +70,11 @@ class Entry(models.Model):
             models.Index(fields=["kind", "status", "first_published_at"], name="idx_content_entry_pub")
         ]
 
+    @property
+    def slug_locked(self) -> bool:
+        """Slug khoá khi đăng bài lần đầu (BR-ND-02)."""
+        return self.first_published_at is not None
+
     def __str__(self):
         # __str__ trả f"Nội dung #{self.pk}", KHÔNG trả tiêu đề — record_audit chép str(obj) vào AuditLog.object_repr; CMS-07-AC2 cấm tiêu đề trong AuditLog.
         return f"Nội dung #{self.pk}"
