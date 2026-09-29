@@ -66,6 +66,8 @@ CAPABILITY_LABELS = {
     "delivery.decide_unconfirmed": "Quyết định đơn không liên lạc được",
     "delivery.pack_deliverynote": "Đóng gói phiếu giao",
     "delivery.print_label": "In / huỷ tem giao",
+    # CMS (2026-09-28-cms-viet-bai): Quyền Tầng 2 đăng/gỡ/trả về nháp bài viết và trang
+    "content.publish_entry": "Đăng bài viết và trang",
 }
 
 AUTH_OLD_PASSWORD = "AUTH_OLD_PASSWORD"

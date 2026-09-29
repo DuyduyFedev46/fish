@@ -57,6 +57,7 @@ Module gọi module khác **qua services** của module đó. Route tập trung 
 | `delivery` | (phẳng) | P-06, P-08 | `delivery/notes/` (+ `status`) |
 | `reports` | (phẳng) | P-10 | `reports/batch/{batch_id}/`, `reports/period/`, `dashboard/summary/` |
 | `accounts` | `auth/`, `staff/` | §1 Phân quyền | `auth/token/`, `auth/me/`, `auth/logout/`, `auth/change-password/`; `staff/` (+ `groups`, `deactivate`, `reactivate`, `reset-password`) |
+| `content` | `categories/`, `entries/`, `images/`, `body/`, `public/` | P-11 | `content/categories/`, `content/entries/`; công khai `public/content/` |
 | `common` | (phẳng) | dùng chung | — (phân quyền, ẩn giá vốn, `BusinessError`, AuditLog) |
 
 ### File cấu hình — mỗi file làm gì

@@ -84,6 +84,13 @@ router.register("cskh/queue", CskhQueueViewSet, basename="cskh-queue")
 router.register("staff", StaffViewSet, basename="staff")
 # AI Actions — Việc AI (DW-11)
 router.register("ai/actions", AiActionViewSet, basename="ai-actions")
+# content — CMS nội dung (2026-09-28-cms-viet-bai)
+from apps.content.categories.api import CategoryViewSet
+from apps.content.entries.api import EntryViewSet
+
+router.register("content/categories", CategoryViewSet, basename="content-categories")
+router.register("content/entries", EntryViewSet, basename="content-entries")
+
 
 urlpatterns = [
     # Thông tin công khai cho Shop web (CS-10)

@@ -63,6 +63,8 @@ INSTALLED_APPS = [
     # AI Native ERP (doc/features/2026-09-27-ai-native-erp): lớp lệnh dùng chung —
     # Lô 1 chỉ registry + catalog (chưa có model); AiProposal/AiUsageLedger ở lô sau.
     "apps.ai",
+    # CMS viết bài (doc/features/2026-09-28-cms-viet-bai)
+    "apps.content",
 ]
 
 MIDDLEWARE = [
@@ -289,5 +291,28 @@ SHOP_HOTLINE = os.getenv("SHOP_HOTLINE", "1900 xxxx")
 CSKH_AUTO_CANCEL_ENABLED = _bool("CSKH_AUTO_CANCEL_ENABLED", "0")
 CSKH_NOTICE_ENABLED = _bool("CSKH_NOTICE_ENABLED", "1")
 THROTTLE_CSKH_SEARCH = os.getenv("THROTTLE_CSKH_SEARCH", "30/min")
+
+# --- Content / CMS (2026-09-28-cms-viet-bai) -------------------------------
+CONTENT_TITLE_MAX = int(os.getenv("CONTENT_TITLE_MAX", "200"))
+CONTENT_DESCRIPTION_MAX = int(os.getenv("CONTENT_DESCRIPTION_MAX", "160"))
+CONTENT_MAX_IMAGES_PER_ENTRY = int(os.getenv("CONTENT_MAX_IMAGES_PER_ENTRY", "20"))
+CONTENT_LIST_PAGE_SIZE = int(os.getenv("CONTENT_LIST_PAGE_SIZE", "12"))
+CONTENT_PUBLIC_CACHE_SECONDS = int(os.getenv("CONTENT_PUBLIC_CACHE_SECONDS", "60"))
+CONTENT_COST_KEYWORDS = (
+    "giá mua",
+    "giá vốn",
+    "giá nhập",
+    "giá cảng",
+    "nhà cung cấp",
+    "tiền lãi",
+)
+CONTENT_PHONE_ALLOWLIST = tuple(
+    x.strip() for x in os.getenv("CONTENT_PHONE_ALLOWLIST", "").split(",") if x.strip()
+)
+CONTENT_IMAGE_WIDTHS = {"sm": 480, "md": 960, "lg": 1600}
+CONTENT_MAX_BLOCKS = int(os.getenv("CONTENT_MAX_BLOCKS", "300"))
+CONTENT_BODY_MAX_CHARS = int(os.getenv("CONTENT_BODY_MAX_CHARS", "60000"))
+CONTENT_MAX_IMAGE_UPLOADS_PER_ENTRY = int(os.getenv("CONTENT_MAX_IMAGE_UPLOADS_PER_ENTRY", "100"))
+
 
 

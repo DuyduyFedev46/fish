@@ -23,7 +23,7 @@ class BusinessError(Exception):
             code = found.group(0) if found else DEFAULT_CODE
         self.code = code
         self.details = details
-        self.extra = extra or {}
+        self.extra = dict(extra or {})
         if status_code is not None:
             self.http_status = status_code
 

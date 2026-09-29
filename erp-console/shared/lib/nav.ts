@@ -31,7 +31,9 @@ export type ViewKey =
   | "cskh"
   | "ai-actions"
   | "ai-settings"
-  | "ai-policy";
+  | "ai-policy"
+  | "content"
+  | "content-categories";
 
 export type NavItem = {
   key: ViewKey;
@@ -87,6 +89,11 @@ export const PERM = {
   decideUnconfirmed: "delivery.decide_unconfirmed",
   /** CS-03: đóng gói chuyển READY. */
   packDeliveryNote: "delivery.pack_deliverynote",
+  /** CMS-01: Quyền xem, soạn, đăng nội dung và quản lý chuyên mục */
+  viewContentEntry: "content.view_entry",
+  publishContentEntry: "content.publish_entry",
+  addCategory: "content.add_category",
+  changeCategory: "content.change_category",
 } as const;
 
 /** Mã Group dùng trong luật menu (danh sách đầy đủ + nhãn: shared/lib/groups.ts). */
@@ -243,6 +250,29 @@ export const NAV: NavItem[] = [
     // Điều phối chốt 2026-09-24: menu hiện khi có catalog.view_item (nv_kho cũng có); phần GIÁ bên trong màn
     // chỉ hiện khi có catalog.view_itemprice (S38/S39 làm).
     visible: (me) => has(me, PERM.viewItem),
+  },
+  {
+    key: "content",
+    summary: "Bài viết, trang chính sách, chuyên mục và nội dung web.",
+    plannedIn: "CMS-01",
+    href: "/content/",
+    label: "Nội dung",
+    short: "Nội dung",
+    icon: "article",
+    section: "Sổ sách",
+    visible: (me) => has(me, PERM.viewContentEntry),
+  },
+  {
+    key: "content-categories",
+    summary: "Quản lý chuyên mục bài viết.",
+    plannedIn: "CMS-02",
+    href: "/content/categories/",
+    label: "Chuyên mục",
+    short: "Chuyên mục",
+    icon: "category",
+    section: "Sổ sách",
+    parent: "content",
+    visible: (me) => has(me, PERM.viewContentEntry),
   },
   {
     key: "staff",

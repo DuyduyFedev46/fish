@@ -152,13 +152,15 @@ def exception_handler(exc, context):
             }
         return response
     if isinstance(exc, BusinessError):
-        payload = {"detail": str(exc), "code": exc.code}
+        payload = {}
         extra = getattr(exc, "extra", None) or getattr(exc, "details", None)
         if extra:
             if isinstance(extra, dict):
                 payload.update(extra)
             else:
                 payload["details"] = extra
+        payload["detail"] = str(exc)
+        payload["code"] = exc.code
         return Response(payload, status=exc.http_status)
     if isinstance(exc, APIException) and getattr(exc, "render_code", False):
         # Lỗi API mang mã riêng cho console (vd 403 AUTH_MUST_CHANGE_PASSWORD, BR-PQ-19).
