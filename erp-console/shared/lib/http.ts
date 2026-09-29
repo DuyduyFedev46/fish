@@ -186,3 +186,90 @@ export function loadErrorText(err: unknown): string {
   if (err instanceof ApiError && (err.status === 0 || err.status === 403 || err.status === 404)) return err.message;
   return MSG.loadFailed;
 }
+
+export type ApiUploadInit = {
+  auth?: boolean;
+  onProgress?: (percent: number) => void;
+  mock?: MockHandler;
+};
+
+/**
+ * Tải tệp lên server qua multipart/form-data kèm theo dõi tiến trình upload (CMS-05).
+ * Dùng XMLHttpRequest.upload.onprogress để báo % tiến trình cho UI.
+ */
+export async function apiUpload<T>(path: string, formData: FormData, init: ApiUploadInit = {}): Promise<T> {
+  const token = init.auth === false ? null : getToken();
+
+  if (USE_MOCK) {
+    if (init.onProgress) {
+      init.onProgress(50);
+      await new Promise((r) => setTimeout(r, 100));
+      init.onProgress(100);
+    }
+    const mockRes = await sendMock(path, { method: "POST", body: formData, mock: init.mock }, token);
+    const { status, body } = mockRes;
+    if (status >= 200 && status < 300) return (status === 204 ? undefined : body) as T;
+    const { detail, code } = detailOf(body);
+    if (status === 401) {
+      if (token && onUnauthorized) onUnauthorized();
+      throw new ApiError(detail || MSG.unauthorized, 401, code);
+    }
+    if (status === 403) {
+      if (onForbidden) onForbidden(code, `POST ${path}`);
+      throw new ApiError(detail || MSG.forbidden, 403, code);
+    }
+    if (status === 404) throw new ApiError(detail || MSG.notFound, 404, code);
+    if (status === 400) throw new ApiError(detail || MSG.badRequest, 400, code);
+    throw new ApiError(detail || MSG.server(status), status, code);
+  }
+
+  return new Promise<T>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", `${API_BASE}${path}`);
+    xhr.setRequestHeader("Accept", "application/json");
+    if (token) xhr.setRequestHeader("Authorization", `Token ${token}`);
+
+    if (xhr.upload && init.onProgress) {
+      xhr.upload.onprogress = (evt) => {
+        if (evt.lengthComputable) {
+          const percent = Math.round((evt.loaded / evt.total) * 100);
+          init.onProgress!(percent);
+        }
+      };
+    }
+
+    xhr.onload = () => {
+      let body: unknown = null;
+      if (xhr.status !== 204) {
+        try {
+          body = JSON.parse(xhr.responseText);
+        } catch {
+          body = null;
+        }
+      }
+      const { status } = xhr;
+      if (status >= 200 && status < 300) {
+        return resolve((status === 204 ? undefined : body) as T);
+      }
+      const { detail, code } = detailOf(body);
+      if (status === 401) {
+        if (token && onUnauthorized) onUnauthorized();
+        return reject(new ApiError(detail || MSG.unauthorized, 401, code));
+      }
+      if (status === 403) {
+        if (onForbidden) onForbidden(code, `POST ${path}`);
+        return reject(new ApiError(detail || MSG.forbidden, 403, code));
+      }
+      if (status === 404) return reject(new ApiError(detail || MSG.notFound, 404, code));
+      if (status === 400) return reject(new ApiError(detail || MSG.badRequest, 400, code));
+      return reject(new ApiError(detail || MSG.server(status), status, code));
+    };
+
+    xhr.onerror = () => {
+      reject(new ApiError(MSG.network, 0));
+    };
+
+    xhr.send(formData);
+  });
+}
+

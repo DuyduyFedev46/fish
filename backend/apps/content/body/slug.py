@@ -33,3 +33,18 @@ def slugify_vi(text: str, max_len: int = 100) -> str:
             slug = trimmed
         slug = slug.strip("-")
     return slug
+
+
+def suggest_unique_slug(base_slug: str, exclude_id: int | None = None) -> str:
+    """Tìm suggestion = '<base>-<n nhỏ nhất >= 2 còn trống>' (§4.1 02b-tech-design)."""
+    from apps.content.models.entries import Entry
+
+    qs = Entry.objects.all()
+    if exclude_id is not None:
+        qs = qs.exclude(pk=exclude_id)
+
+    n = 2
+    while qs.filter(slug=f"{base_slug}-{n}").exists():
+        n += 1
+    return f"{base_slug}-{n}"
+

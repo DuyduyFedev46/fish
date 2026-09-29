@@ -87,14 +87,20 @@ router.register("ai/actions", AiActionViewSet, basename="ai-actions")
 # content — CMS nội dung (2026-09-28-cms-viet-bai)
 from apps.content.categories.api import CategoryViewSet
 from apps.content.entries.api import EntryViewSet
+from apps.content.images.api import ContentImageViewSet, EntryImageUploadView
 
 router.register("content/categories", CategoryViewSet, basename="content-categories")
 router.register("content/entries", EntryViewSet, basename="content-entries")
+router.register("content/images", ContentImageViewSet, basename="content-images")
+
 
 
 urlpatterns = [
+    # CMS Content Image Upload (CMS-05)
+    path("content/entries/<int:pk>/images/", EntryImageUploadView.as_view()),
     # Thông tin công khai cho Shop web (CS-10)
     path("public/site-info/", PublicSiteInfoView.as_view(), name="public-site-info"),
+
     # CSKH tìm kiếm nhanh (chỉ POST)
     path("cskh/search/", CskhSearchView.as_view(), name="cskh-search"),
     # Shop công khai (guest)

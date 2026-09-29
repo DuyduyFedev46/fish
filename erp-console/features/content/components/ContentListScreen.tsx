@@ -78,6 +78,12 @@ export function ContentListScreen() {
             <Icon name="category" />
             <span>Quản lý chuyên mục</span>
           </Link>
+          <Link href="/content/edit/?new=post" className="btn btnPrimary">
+            <span>+ Viết bài mới</span>
+          </Link>
+          <Link href="/content/edit/?new=page" className="btn">
+            <span>+ Tạo trang</span>
+          </Link>
         </div>
       </div>
 
@@ -142,8 +148,10 @@ export function ContentListScreen() {
               {entries.map((entry) => (
                 <tr key={entry.id}>
                   <td>
-                    <b>{entry.title || "(Chưa có tiêu đề)"}</b>
-                    <div className="muted">{entry.slug}</div>
+                    <Link href={`/content/edit/?id=${entry.id}`} style={{ textDecoration: "none", color: "inherit" }}>
+                      <b>{entry.title || "(Chưa có tiêu đề)"}</b>
+                      <div className="muted">{entry.slug}</div>
+                    </Link>
                   </td>
                   <td>{entry.kind === "post" ? "Bài viết" : "Trang"}</td>
                   <td>

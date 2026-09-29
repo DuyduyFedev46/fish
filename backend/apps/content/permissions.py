@@ -32,10 +32,18 @@ class ContentPermissions(BusinessModelPermissions):
     """
 
     def has_permission(self, request, view):
+        action_name = getattr(view, "action", None)
+        if not action_name and getattr(view, "required_perms", ()):
+            if not request.user or not request.user.is_authenticated:
+                return False
+            for perm in view.required_perms:
+                if not request.user.has_perm(perm):
+                    raise PermissionDenied(f"Thiếu quyền: {perm}")
+            return True
+
         if not super().has_permission(request, view):
             return False
 
-        action_name = getattr(view, "action", None)
         custom_perm_actions = getattr(view, "custom_perm_actions", ())
         if action_name and action_name in custom_perm_actions:
             action_func = getattr(view, action_name, None)
@@ -56,3 +64,4 @@ class ContentPermissions(BusinessModelPermissions):
             return True
 
         return True
+

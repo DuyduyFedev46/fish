@@ -1,17 +1,27 @@
-import { apiFetch } from "@/shared/lib/http";
+import { apiFetch, apiUpload } from "@/shared/lib/http";
 import type {
   CategoryCreatePayload,
   CategoryUpdatePayload,
   ContentCategory,
   ContentCounts,
+  ContentEntryDetail,
   ContentEntryListItem,
+  ContentImage,
+  EntryCreatePayload,
+  EntryUpdatePayload,
 } from "./types";
 import {
   mockCreateCategory,
+  mockCreateEntry,
+  mockDeleteEntry,
+  mockGetEntry,
   mockGetEntryCounts,
   mockListCategories,
   mockListEntries,
   mockUpdateCategory,
+  mockUpdateEntry,
+  mockUpdateImageAlt,
+  mockUploadEntryImage,
 } from "./mock";
 
 const isMock = process.env.NEXT_PUBLIC_USE_MOCK === "1";
@@ -80,5 +90,72 @@ export async function fetchEntryCounts(
   return apiFetch<ContentCounts>(url, {
     signal,
     mock: isMock ? () => ({ status: 200, body: mockGetEntryCounts() }) : undefined,
+  });
+}
+
+export async function getEntry(id: number, signal?: AbortSignal): Promise<ContentEntryDetail> {
+  return apiFetch<ContentEntryDetail>(`/api/content/entries/${id}/`, {
+    signal,
+    mock: isMock ? () => ({ status: 200, body: mockGetEntry(id) }) : undefined,
+  });
+}
+
+export async function createEntry(payload: EntryCreatePayload): Promise<ContentEntryDetail> {
+  return apiFetch<ContentEntryDetail>("/api/content/entries/", {
+    method: "POST",
+    body: payload,
+    mock: isMock ? () => ({ status: 201, body: mockCreateEntry(payload) }) : undefined,
+  });
+}
+
+export async function updateEntry(
+  id: number,
+  payload: EntryUpdatePayload
+): Promise<ContentEntryDetail> {
+  return apiFetch<ContentEntryDetail>(`/api/content/entries/${id}/`, {
+    method: "PATCH",
+    body: payload,
+    mock: isMock ? () => ({ status: 200, body: mockUpdateEntry(id, payload) }) : undefined,
+  });
+}
+
+export async function deleteEntry(id: number): Promise<void> {
+  return apiFetch<void>(`/api/content/entries/${id}/`, {
+    method: "DELETE",
+    mock: isMock
+      ? () => {
+          mockDeleteEntry(id);
+          return { status: 204, body: null };
+        }
+      : undefined,
+  });
+}
+
+export async function uploadEntryImage(
+  entryId: number,
+  file: File,
+  alt?: string,
+  onProgress?: (percent: number) => void
+): Promise<ContentImage> {
+  const formData = new FormData();
+  formData.append("file", file);
+  if (alt) formData.append("alt", alt);
+
+  return apiUpload<ContentImage>(`/api/content/entries/${entryId}/images/`, formData, {
+    onProgress,
+    mock: isMock
+      ? () => ({
+          status: 201,
+          body: mockUploadEntryImage(entryId, file, alt),
+        })
+      : undefined,
+  });
+}
+
+export async function updateImageAlt(imageId: number, alt: string): Promise<ContentImage> {
+  return apiFetch<ContentImage>(`/api/content/images/${imageId}/`, {
+    method: "PATCH",
+    body: { alt },
+    mock: isMock ? () => ({ status: 200, body: mockUpdateImageAlt(imageId, alt) }) : undefined,
   });
 }

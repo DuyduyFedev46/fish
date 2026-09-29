@@ -98,3 +98,35 @@ def process_item_image(raw: bytes, *, sizes: dict) -> ProcessedImage:
         )
         outputs[name] = _encode_webp(resized, max_bytes=SIZE_BUDGET_BYTES.get(name))
     return ProcessedImage(sizes=outputs, source_side=side)
+
+
+@dataclass
+class ProcessedRatioImage:
+    sizes: dict  # {"sm": bytes, "md": bytes, "lg": bytes} (WebP)
+    width: int  # chiều rộng của cỡ lớn nhất
+    height: int  # chiều cao của cỡ lớn nhất
+
+
+def process_image_keep_ratio(raw: bytes, *, widths: dict) -> ProcessedRatioImage:
+    """Như process_item_image nhưng KHÔNG cắt vuông: giữ tỉ lệ, thu nhỏ theo chiều rộng,
+    không phóng to. Trả sizes {name: webp bytes} + (width, height) của cỡ lớn nhất."""
+    image = _open_verified(raw)
+    clean = _strip_exif_and_orient(image)
+    orig_w, orig_h = clean.size
+
+    outputs = {}
+    max_w = 0
+    max_h = 0
+    for name, target in widths.items():
+        out_w = min(int(target), orig_w)
+        out_h = max(1, round(orig_h * out_w / orig_w))
+        if out_w > max_w:
+            max_w = out_w
+            max_h = out_h
+        resized = clean if (out_w, out_h) == (orig_w, orig_h) else clean.resize(
+            (out_w, out_h), Image.LANCZOS
+        )
+        outputs[name] = _encode_webp(resized)
+
+    return ProcessedRatioImage(sizes=outputs, width=max_w, height=max_h)
+

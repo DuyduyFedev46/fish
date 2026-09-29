@@ -28,7 +28,11 @@
   "content.category.list",
   "content.category.partial_update",
   "content.entry.counts",
+  "content.entry.create",
   "content.entry.list",
+  "content.entry.partial_update",
+  "content.entry.retrieve",
+
   "delivery.deliverynote.create",
   "delivery.deliverynote.list",
   "delivery.deliverynote.partial_update",

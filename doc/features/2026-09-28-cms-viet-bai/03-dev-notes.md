@@ -91,3 +91,89 @@ git status --porcelain -- backend/apps | grep "/migrations/" | grep -v "apps/con
 
 ### Lệch thiết kế
 *(Không có)*
+
+---
+
+## Lô 2: CMS-03 Soạn và lưu nháp bài/trang & CMS-05 Ảnh trong bài và ảnh bìa giữ tỉ lệ
+
+### Kế hoạch & Thực hiện
+1. **Backend**:
+   - `backend/apps/catalog/images/processing.py`:
+     - Thêm dataclass `ProcessedRatioImage` và hàm `process_image_keep_ratio` (giữ tỉ lệ 4:3, sai số $\le 1$px, loại bỏ EXIF/GPS, xuất 3 cỡ WebP sm/md/lg).
+     - Không sửa đổi bất kỳ hàm cũ nào trong `catalog/images/`.
+   - `backend/apps/content/body/slug.py`:
+     - `slugify_vi`: chuẩn hoá chữ thường, bỏ dấu, gạch nối, chống gạch nối đôi hoặc ở đầu/cuối.
+     - `suggest_unique_slug`: gợi ý `<base>-<n nhỏ nhất >= 2 còn trống>`.
+   - `backend/apps/content/body/sanitize.py`:
+     - `normalize_body`: chuẩn hoá danh sách trắng 15 payload XSS (§6.3 `02b-tech-design`), idempotent (`normalize(normalize(x)) == normalize(x)`), giữ chữ `<` dạng text, giới hạn ký tự và khối.
+   - `backend/apps/content/images/`:
+     - `services.py`: `upload_content_image` (kiểm tra định dạng JPEG/PNG/WebP, dung lượng $\le 10$MB `BR-DM-10`, trần 20 ảnh `BR-ND-07`, trần 100 uploads trong đời bài, loại bỏ EXIF), `update_image_alt` (tối đa 200 ký tự).
+     - `serializers.py`: `ContentImageSerializer` xuất các URL sm/md/lg.
+     - `api.py`: `EntryImageUploadView` (POST tải ảnh lên bài viết), `ContentImageViewSet` (PATCH sửa alt ảnh).
+   - `backend/apps/content/entries/`:
+     - `services.py`: `save_draft` (chặn 409 `STALE_VERSION` khi `row_version` lệch, tính `draft_hash`, kiểm tra slug trùng `BR-ND-04`), `delete_draft` (chỉ cho phép xoá nháp chưa từng đăng `published_version is None and first_published_at is None`, nếu đã đăng chặn 400 `BR-ND-02`).
+     - `serializers.py`: `EntryDetailSerializer` (đầy đủ các trường chi tiết theo §8.3).
+     - `api.py`: `EntryViewSet` hỗ trợ CRUD nháp bài viết / trang.
+   - `backend/apps/content/permissions.py`:
+     - Bổ sung hỗ trợ APIView có thuộc tính `required_perms`.
+   - `backend/config/api_urls.py`:
+     - Đăng ký router `content/images` và route `content/entries/<int:pk>/images/`.
+   - `backend/apps/ai/registry/tests/snapshots/commands_index_snapshot.json`:
+     - Cập nhật thêm 3 lệnh mới tự sinh từ router DRF: `content.entry.create`, `content.entry.partial_update`, `content.entry.retrieve`.
+   - Tests backend:
+     - `apps.content.body.tests` (8 tests), `apps.content.images.tests` (5 tests), `apps.content.entries.tests.test_draft` (11 tests), `apps.catalog.images` (47 tests).
+     - Toàn bộ backend test suite: 933 tests passed 100%.
+
+2. **Frontend ERP Console**:
+   - Cài đặt thư viện Tiptap 2.x: `@tiptap/react`, `@tiptap/pm`, `@tiptap/starter-kit`, `@tiptap/extension-link`.
+   - `erp-console/shared/lib/http.ts`:
+     - Thêm hàm `apiUpload` hỗ trợ upload multipart/form-data với XMLHttpRequest `onprogress` để theo dõi tiến trình upload (CMS-05-AC8), hỗ trợ token và mock mode.
+   - `erp-console/features/content/types.ts`:
+     - Bổ sung đầy đủ types: `ContentImage`, `BodyDoc`, `Block`, `InlineNode`, `ContentEntryDetail`, `EntryCreatePayload`, `EntryUpdatePayload`.
+   - `erp-console/features/content/mock.ts`:
+     - Bổ sung mock cho `getEntry`, `createEntry`, `updateEntry` (STALE_VERSION 409), `deleteEntry` (BR-ND-02), `uploadEntryImage` (BR-ND-07 trần 20 ảnh), `updateImageAlt`.
+   - `erp-console/features/content/api.ts`:
+     - Bổ sung API client methods cho entry và image upload.
+   - `erp-console/features/content/editor/`:
+     - `convert.ts`: `tiptapToBody`, `bodyToTiptap`, `safeHref` loại bỏ toàn bộ HTML lạ/XSS.
+     - `CaveImageExtension.ts`: custom Tiptap node extension cho khối ảnh Cá Về.
+     - `TiptapEditor.tsx` & `TiptapEditor.module.css`: editor tải lười, thanh công cụ touch target $\ge 44\times 44$px, drop script/iframe khi paste HTML.
+     - `ImageUploader.tsx` & `ImageUploader.module.css`: tải ảnh từ camera/thư viện (CMS-05-AC8), thanh tiến trình, hiển thị danh sách ảnh, chèn vào bài, đặt làm ảnh bìa, sửa alt, xử lý lỗi mất mạng (CMS-05-AC6).
+   - `erp-console/app/(console)/content/edit/page.tsx` & `edit.module.css`:
+     - Màn hình soạn thảo bài/trang bọc bởi `ViewGuard` và `Suspense`.
+     - Xử lý xung đột 409 `STALE_VERSION`: hiện cảnh báo và nút tải bản mới, **không xoá** nội dung đang gõ (CMS-03-AC7).
+     - Xoá nháp: chỉ hiện nút xoá khi bài chưa từng đăng (CMS-03-AC8, CMS-03-AC9).
+     - Responsive mobile: 375x667 không cuộn ngang, touch target $\ge 44\times 44$px (CMS-03-AC13).
+   - `erp-console/features/content/components/ContentListScreen.tsx`:
+     - Thêm nút "Viết bài mới", "Tạo trang", link dòng bảng sang `/content/edit/?id=...`.
+   - Tests:
+     - `convert.test.ts` (5 tests), `content.test.ts` (10 tests) -> 57 vitest tests passed 100%.
+
+### Kết quả kiểm chứng Lô 2
+```bash
+# 1. Backend tests và makemigrations check:
+cd backend && .venv/bin/python manage.py test && .venv/bin/python manage.py makemigrations --check --dry-run
+# Output: Ran 933 tests in 78.8s -> OK. No changes detected.
+
+# 2. Content tests:
+cd backend && .venv/bin/python manage.py test apps.content
+# Output: Ran 24 tests in 1.48s -> OK.
+
+# 3. ERP Console tests & build:
+cd erp-console && npm test
+# Output: 7 test files passed, 57 tests passed (100%).
+cd erp-console && npx tsc --noEmit && npm run build
+# Output: Compiled successfully, Generating static pages (30/30) -> OK.
+
+# 4. Kiểm tra dangerouslySetInnerHTML:
+grep -rn "dangerouslySetInnerHTML" frontend/features/content frontend/app/bai-viet frontend/app/trang erp-console/features/content erp-console/app/\(console\)/content
+# Output: rỗng (không sử dụng dangerouslySetInnerHTML).
+
+# 5. Kiểm tra migration app khác:
+git status --porcelain -- backend/apps | grep "/migrations/" | grep -v "apps/content/migrations/"
+# Output: rỗng.
+```
+
+### Lệch thiết kế
+*(Không có)*
+

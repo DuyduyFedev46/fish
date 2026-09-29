@@ -1,0 +1,158 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 8px;
+  background-color: #fff;
+  overflow: hidden;
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  padding: 8px;
+  background-color: #f8fafc;
+  border-bottom: 1px solid var(--border-color, #e2e8f0);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.toolBtn {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background-color: transparent;
+  color: #334155;
+  font-size: 14px;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  touch-action: manipulation;
+  user-select: none;
+  transition: background-color 0.15s, color 0.15s;
+}
+
+.toolBtn:hover {
+  background-color: #e2e8f0;
+}
+
+.toolBtn:active {
+  background-color: #cbd5e1;
+}
+
+.active {
+  background-color: #0284c7;
+  color: #ffffff;
+}
+
+.active:hover {
+  background-color: #0369a1;
+}
+
+.editorArea {
+  padding: 16px;
+  min-height: 250px;
+  cursor: text;
+  font-size: 16px;
+  line-height: 1.6;
+  color: #1e293b;
+}
+
+.editorArea :global(.ProseMirror) {
+  outline: none;
+  min-height: 220px;
+}
+
+.editorArea :global(.ProseMirror p) {
+  margin: 0 0 12px 0;
+}
+
+.editorArea :global(.ProseMirror h2) {
+  font-size: 1.4rem;
+  font-weight: 700;
+  margin: 20px 0 10px 0;
+  color: #0f172a;
+}
+
+.editorArea :global(.ProseMirror h3) {
+  font-size: 1.2rem;
+  font-weight: 600;
+  margin: 16px 0 8px 0;
+  color: #1e293b;
+}
+
+.editorArea :global(.ProseMirror blockquote) {
+  border-left: 4px solid #0284c7;
+  padding-left: 14px;
+  color: #475569;
+  font-style: italic;
+  margin: 14px 0;
+}
+
+.editorArea :global(.ProseMirror ul),
+.editorArea :global(.ProseMirror ol) {
+  padding-left: 24px;
+  margin: 0 0 12px 0;
+}
+
+.editorArea :global(.ProseMirror li) {
+  margin-bottom: 4px;
+}
+
+.editorArea :global(.ProseMirror a) {
+  color: #0284c7;
+  text-decoration: underline;
+}
+
+.editorArea :global(.cave-image-block) {
+  margin: 16px 0;
+  padding: 8px;
+  border: 1px dashed #cbd5e1;
+  border-radius: 6px;
+  background-color: #f8fafc;
+}
+
+.editorArea :global(.cave-image-preview) {
+  max-width: 100%;
+  height: auto;
+  border-radius: 4px;
+  display: block;
+}
+
+.editorArea :global(.cave-image-tag) {
+  display: inline-block;
+  font-weight: 500;
+  font-size: 14px;
+  color: #0369a1;
+  background-color: #e0f2fe;
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+.editorArea :global(.cave-image-caption) {
+  font-size: 13px;
+  color: #64748b;
+  margin-top: 4px;
+  font-style: italic;
+}
+
+@media (max-width: 640px) {
+  .toolbar {
+    padding: 4px;
+    gap: 2px;
+  }
+  .toolBtn {
+    min-width: 44px;
+    min-height: 44px;
+    padding: 8px;
+    font-size: 13px;
+  }
+}
+
