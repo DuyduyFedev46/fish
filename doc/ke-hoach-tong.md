@@ -22,7 +22,7 @@
 | ☑ | **P4** CSKH xác nhận + in tem | `2026-09-28-cskh-xac-nhan-in-tem` | 1 → 2 → 3 → 4 (5 là Could) | XONG | P3 xong | Lô 2 chỉ staging. Lô 3 (tự huỷ) lên production **sau khi legal-vn duyệt câu thông báo** và Duy bật cờ `CSKH_AUTO_CANCEL_ENABLED` |
 | ☑ | **P5** CMS viết bài | `2026-09-28-cms-viet-bai` | 1 → 2 → … → 7 | XONG | P4 xong | Thư viện mới duy nhất: Tiptap 2 (erp-console). CMS-16 đã làm ở P1 |
 | ☑ | **P6** Khung go-live | `2026-09-28-khung-go-live` | 1 → 2 → 3 | XONG | CMS Lô 5 (Lô 1–2), CMS Lô 7 (Lô 3) | Cờ `PRIVACY_CONSENT_REQUIRED` bật: chưa đăng chính sách thì Shop không nhận đơn |
-| ☐ | **P7** AI tự ghi + vùng đỏ | `2026-09-28-ai-digital-worker` | 5a → 5b → 5c → 6a → 6b | SẴN SÀNG CODE (Duy duyệt 28/09) | P6 xong | **Chỉ staging** tới khi xong S-L1…S-L4 (pháp lý) |
+| ☑ | **P7** AI tự ghi + vùng đỏ | `2026-09-28-ai-digital-worker` | 5a → 5b → 5c → 6a → 6b | XONG | P6 xong | **Chỉ staging** tới khi xong S-L1…S-L4 (pháp lý) |
 
 ## Việc của Duy (không phải code)
 | Khi nào | Việc |
@@ -75,3 +75,9 @@ cache chung (Redis) · SEO nâng cao cho bài viết · hoàn kho/hoàn tiền m
 | 2026-09-29 19:35 | P6 | Lô 1 | APPROVED | `3667428` | 1002 | GL-01 footer thông tin người bán từ env, GL-02 footer link các trang chính sách |
 | 2026-09-29 19:50 | P6 | Lô 2 | APPROVED | `9fe0954` | 1012 | GL-03 ô đồng ý xử lý dữ liệu ở checkout, consent timestamp & policy version |
 | 2026-09-29 20:35 | P6 | Lô 3 | APPROVED | `10cf61e` | 1019 | GL-05 bằng chứng đồng ý trên ERP, GL-04 thông báo gọi xác nhận kèm 4 số cuối |
+| 2026-09-29 22:15 | P7 | Lô 5a | APPROVED | `1ff0b3f` | 1032 | DW-18 huỷ phiếu nhập (BR-MH-07, V-DW2), DW-20 trần của Chủ (caps) |
+| 2026-09-29 23:00 | P7 | Lô 5b | APPROVED | `9da8661` | 1032 | DW-19 mức B hoàn tác 10m, DW-21 trì hoãn ghi + management command |
+| 2026-09-29 23:45 | P7 | Lô 5c | APPROVED | `2a9f4de` | 1044 | DW-22 báo cáo AI cuối ngày cho Chủ, DW-23 chuyển việc + nút Nhờ |
+| 2026-09-30 00:30 | P7 | Lô 6a | APPROVED | `3676bf4` | 1051 | DW-24 công tắc vùng đỏ của Chủ, DW-25 AI chốt lô trì hoãn 30 phút |
+| 2026-09-30 01:10 | P7 | Lô 6b | APPROVED | `f8df5f7` | 1058 | DW-27 xác nhận hoàn luôn chuyển Chủ, DW-26 khớp tuyệt đối job Hệ thống |
+
