@@ -28,6 +28,7 @@ export type ViewKey =
   | "catalog"
   | "staff"
   | "audit-logs"
+  | "cskh"
   | "ai-actions"
   | "ai-settings"
   | "ai-policy";
@@ -76,6 +77,16 @@ export const PERM = {
   viewAuditLog: "accounts.view_auditlog",
   /** DW-13: quản lý chính sách AI — chỉ Chủ có (ai.manage_ai_policy). */
   manageAiPolicy: "ai.manage_ai_policy",
+  /** CS-01 / CS-05 / CS-06: gọi xác nhận đơn khách hàng. */
+  confirmWithCustomer: "delivery.confirm_with_customer",
+  /** CS-12: đổi người nhận / địa chỉ giao. */
+  changeRecipient: "delivery.change_recipient",
+  /** CS-11 / CS-14: in tem nhãn giao hàng. */
+  printLabel: "delivery.print_label",
+  /** CS-07: Quản lý quyết định đơn không liên lạc được. */
+  decideUnconfirmed: "delivery.decide_unconfirmed",
+  /** CS-03: đóng gói chuyển READY. */
+  packDeliveryNote: "delivery.pack_deliverynote",
 } as const;
 
 /** Mã Group dùng trong luật menu (danh sách đầy đủ + nhãn: shared/lib/groups.ts). */
@@ -139,6 +150,17 @@ export const NAV: NavItem[] = [
     // S16-AC7: Quản lý có sales.view_refund nên VẪN thấy danh sách, chỉ không có nút (available_actions của từng
     // phiếu không có confirm/mark_failed/retry vì thiếu sales.confirm_refund) — khớp cách BE tính available_actions.
     visible: (me) => has(me, PERM.viewRefund) && !onlyDelivery(me),
+  },
+  {
+    key: "cskh",
+    summary: "Hàng chờ gọi xác nhận đơn, hẹn gọi lại và xử lý đơn.",
+    plannedIn: "CS-05",
+    href: "/cskh/",
+    label: "Gọi xác nhận",
+    short: "Xác nhận",
+    icon: "phone_in_talk",
+    section: "Điều hành",
+    visible: (me) => has(me, PERM.confirmWithCustomer),
   },
   {
     key: "deliveries",
@@ -322,7 +344,7 @@ export function homePath(me: Me): string {
   if (me.must_change_password) return SET_PASSWORD_HREF;
   if (me.home === "no-role") return "/no-role/";
   if (me.home === "my-deliveries") return "/my-deliveries/";
-  if (me.home === "cskh-queue") return "/cskh/queue/";
+  if (me.home === "cskh-queue") return "/cskh/";
   const first = visibleNav(me)[0];
   return canView(me, "overview") ? "/overview/" : first ? first.href : "/no-role/";
 }

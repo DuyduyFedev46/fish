@@ -201,7 +201,7 @@ class S12ResolveTests(S12Base):
         })
         self.order.refresh_from_db()
         self.assertEqual(self.order.status, SalesOrder.Status.PROCESSING)
-        self.assertEqual(note.status, DeliveryNote.Status.PREPARING)
+        self.assertEqual(note.status, DeliveryNote.Status.CONFIRMING)
         b = Batch.objects.get(pk=self.batch.pk)
         self.assertEqual((b.qty_available, b.qty_reserved), (Decimal("98"), Decimal("0")))
         pay.refresh_from_db()

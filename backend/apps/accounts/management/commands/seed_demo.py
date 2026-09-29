@@ -294,11 +294,18 @@ def adopt_legacy():
                     batch__batch_id__in=DEMO_BATCH_IDS,
                 ):
                     mark(entry)  # R4: bút toán SALE của hoá đơn demo
-                # B5 (QA lần 2): chỉ nhận phiếu giao CHƯA BẮT ĐẦU (Soạn hàng, chưa gán người
+                # B5 (QA lần 2): chỉ nhận phiếu giao CHƯA BẮT ĐẦU (Chờ xác nhận / Soạn hàng, chưa gán người
                 # giao) như lúc seed sinh ra. Phiếu đã gán/đang giao/đã giao coi là dữ liệu thật →
                 # hoá đơn của nó (và cả cụm đơn/HĐ/phiếu giao) được giữ nguyên.
                 for dn in DeliveryNote.objects.filter(
-                    sales_invoice=inv, status=DeliveryNote.Status.PREPARING,
+                    sales_invoice=inv,
+                    status__in=[DeliveryNote.Status.CONFIRMING, DeliveryNote.Status.PREPARING],
                     assigned_to__isnull=True,
                 ):
                     mark(dn)
+                    if hasattr(dn, "confirmation"):
+                        mark(dn.confirmation)
+                    for call in dn.calls.all():
+                        mark(call)
+                    for lp in dn.label_prints.all():
+                        mark(lp)

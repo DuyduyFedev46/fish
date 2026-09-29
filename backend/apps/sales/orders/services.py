@@ -302,7 +302,11 @@ CANCEL_REASON_LABELS = {
 CANCEL_REASON_CODES = set(CANCEL_REASON_LABELS)
 
 # Trạng thái phiếu giao còn giữ hàng TẠI KHO — huỷ ở đây thì hoàn kho được ngay.
-_STOCK_STILL_IN_WAREHOUSE = (DeliveryNote.Status.PREPARING, DeliveryNote.Status.READY)
+_STOCK_STILL_IN_WAREHOUSE = (
+    DeliveryNote.Status.CONFIRMING,
+    DeliveryNote.Status.PREPARING,
+    DeliveryNote.Status.READY,
+)
 
 
 def cancel_paid_order(*, order, actor, reason="", reason_code=""):
@@ -363,6 +367,8 @@ def cancel_paid_order(*, order, actor, reason="", reason_code=""):
         if note is not None:
             note.status = DeliveryNote.Status.CANCELLED
             note.save(update_fields=["status"])
+            from apps.delivery.cskh import services as cskh_services
+            cskh_services.close_task_on_cancel(note)
 
         record_audit(
             "cancel_paid_order", actor=actor, obj=o,

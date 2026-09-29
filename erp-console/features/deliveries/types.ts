@@ -77,3 +77,28 @@ export const STATUS_GROUP_TABS: Array<{ key: DeliveryStatusGroup; label: string 
   { key: "FAILED", label: "Giao thất bại" },
   { key: "COMPLETED", label: "Hoàn tất (hôm nay)" },
 ];
+
+export type LabelData = {
+  note_code: string;
+  order_code: string;
+  print_no: number;
+  next_print_no: number;
+  is_reprint: boolean;
+  reprint_reason: string | null;
+  barcode_value: string;
+  recipient_name: string;
+  recipient_phone_masked: string;
+  address: string;
+  packages: string;
+  total_kg: string;
+  earliest_expiry: string;
+  paid_text: string;
+};
+
+export type PrintDeliveryLabelResponse = {
+  print_no: number;
+  printed_at: string;
+  is_reprint: boolean;
+  duplicate: boolean;
+};
+

@@ -159,7 +159,7 @@ class S10ListTests(OrderApiBase):
         self.assertIsNotNone(row["reserved_until"])
         self.assertIsNone(row["delivery_status"])
         self.assertFalse(row["needs_attention"])
-        self.assertEqual(rows[paid.pk]["delivery_status"], "PREPARING")
+        self.assertEqual(rows[paid.pk]["delivery_status"], "CONFIRMING")
 
     def test_s10_list_needs_attention_khi_co_giao_dich_lech(self):
         order = self._order()
@@ -250,7 +250,7 @@ class S10DetailTests(OrderApiBase):
         self.assertIn("received_at", pay)
         self.assertEqual(body["delivery"]["id"], note.pk)
         self.assertEqual(body["delivery"]["code"], note.code)
-        self.assertEqual(body["delivery"]["status"], "PREPARING")
+        self.assertEqual(body["delivery"]["status"], "CONFIRMING")
         self.assertEqual(body["delivery"]["failed_attempts"], 0)
         self.assertEqual(body["delivery"]["assigned_to"], {
             "id": self.giao.pk, "display_name": "Anh Tư", "phone": "0908111222",

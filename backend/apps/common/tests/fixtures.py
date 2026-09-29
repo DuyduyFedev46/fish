@@ -7,6 +7,7 @@ from django.utils import timezone
 from rest_framework.test import APIClient
 
 from apps.catalog.models import Item, ItemGroup
+from apps.delivery.models import ConfirmationTask, DeliveryNote
 from apps.inventory.batches import services as batch_services
 from apps.inventory.models import Warehouse
 from apps.purchasing.models import Supplier
@@ -47,7 +48,20 @@ def make_batch(item, sup, wh, qty="50"):
     )
 
 
-def make_order_with_note(code, phone, *, assigned_to=None):
+def confirm_note_for_test(note, user=None, confirmed_at=None):
+    """Chuyển phiếu giao sang PREPARING và task sang DONE để phục vụ test."""
+    note.status = DeliveryNote.Status.PREPARING
+    note.confirmed_at = confirmed_at
+    note.confirmed_by = user
+    note.save(update_fields=["status", "confirmed_at", "confirmed_by"])
+    task = getattr(note, "confirmation", None)
+    if task:
+        task.state = ConfirmationTask.State.DONE
+        task.save(update_fields=["state", "updated_at"])
+    return note
+
+
+def make_order_with_note(code, phone, *, assigned_to=None, confirmed=True):
     """Đơn PROCESSING + hoá đơn (signal tự tạo phiếu giao) → trả (order, customer, note)."""
     customer = Customer.objects.create(phone=phone, name=f"Khách {code}", default_address="1 Cảng")
     order = SalesOrder.objects.create(
@@ -60,7 +74,14 @@ def make_order_with_note(code, phone, *, assigned_to=None):
         amount=Decimal("100000"), status=SalesInvoice.Status.ISSUED,
     )
     note = invoice.delivery_notes.get()
+    if confirmed:
+        confirm_note_for_test(note)
     if assigned_to is not None:
         note.assigned_to = assigned_to
         note.save(update_fields=["assigned_to"])
     return order, customer, note
+
+
+def make_confirming_note(code, phone):
+    """Tạo đơn và phiếu giao ở trạng thái CONFIRMING."""
+    return make_order_with_note(code, phone, confirmed=False)

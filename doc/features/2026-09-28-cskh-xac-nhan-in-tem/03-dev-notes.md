@@ -64,3 +64,93 @@
   - `cd erp-console && npx tsc --noEmit && npm run build`: 25/25 static pages pass 100%.
   - `cd erp-console && NEXT_PUBLIC_USE_MOCK=1 npm run build`: 25/25 static pages pass 100%.
   - `cd frontend && npx tsc --noEmit && npm run build`: 8/8 static pages pass 100%.
+
+---
+
+## Lô 2 — Luồng xác nhận chạy được sớm nhất (gọi → xác nhận → in tem tay → soạn)
+- Trạng thái: DEV HOÀN TẤT — CHỜ QA
+- Phạm vi story:
+  - CS-04: Đơn đã trả tiền vào "Chờ xác nhận", kho chưa soạn được.
+  - CS-05: Hàng chờ gọi của CSKH, phân trang, lọc state, tìm kiếm bằng POST body, khoá mềm 5 phút chống tranh chấp.
+  - CS-06: Ghi kết quả cuộc gọi (append-only), xác nhận chuyển PREPARING, huỷ xác nhận (unconfirm).
+  - CS-11: Tem giao hàng khổ 100×150 mm in tay từ trình duyệt, QR code SVG trên client, tuyệt đối không tiền, không giá vốn, SĐT che.
+
+### 1. Sửa test cũ có chủ đích (BR-GH-11):
+- `backend/apps/common/tests/fixtures.py`:
+  - `make_order_with_note` thêm tham số `confirmed=True` (mặc định) để mô phỏng đơn đã xác nhận (chuyển PREPARING và task DONE), giữ cho các test cũ đi qua fixture không bị ảnh hưởng.
+  - Thêm helper `confirm_note_for_test(note, user=None, confirmed_at=None)` và `make_confirming_note(order=None, ...)`.
+- Test đi qua luồng thanh toán thật chuyển kỳ vọng sang `CONFIRMING` hoặc dùng `confirm_note_for_test`:
+  - `backend/apps/sales/orders/tests/test_s10_api.py`
+  - `backend/apps/sales/orders/tests/test_l7_bosung.py`
+  - `backend/apps/sales/orders/tests/test_f1_fefo.py`
+  - `backend/apps/sales/orders/tests/test_s14_cancel_paid_order.py`
+  - `backend/apps/sales/payments/tests/test_p3_sepay_gateway_ipn.py`
+  - `backend/apps/sales/payments/tests/test_s11_confirm_manual.py`
+  - `backend/apps/sales/payments/tests/test_s12_payment_queue.py`
+  - `backend/apps/sales/orders/tests/test_s9_admin_locked_fields.py`
+  - `backend/apps/delivery/tests/test_cskh_l1.py`
+  - `backend/apps/ai/registry/tests/test_discipline.py`: cập nhật tổng số custom actions từ 19 lên 21 (thêm `label` và `label_print` trên `DeliveryNoteViewSet`).
+
+### 2. Backend đã làm:
+- `backend/config/settings.py` & `backend/apps/common/throttling.py`:
+  - Thêm `CskhSearchThrottle` (khoá theo user id, rate `THROTTLE_CSKH_SEARCH` = `30/min`).
+  - Cấu hình tham số CSKH: `CSKH_CLAIM_MINUTES = 5`, `CSKH_MAX_UNREACHABLE_ATTEMPTS = 3`, `CSKH_UNREACHABLE_WINDOW_MINUTES = 30`, `CSKH_MIN_RETRY_MINUTES = 10`.
+- `backend/apps/delivery/signals.py`:
+  - Nối `start_confirmation(invoice)` vào tín hiệu `SalesInvoice.Status.ISSUED` tạo `CONFIRMING` note + `ConfirmationTask` trong cùng 1 transaction, idempotent chống lặp IPN.
+- `backend/apps/sales/orders/services.py`:
+  - `_STOCK_STILL_IN_WAREHOUSE` thêm `DeliveryNote.Status.CONFIRMING`.
+  - `cancel_paid_order` gọi `close_task_on_cancel(note)` đưa task về `DONE`.
+- `backend/apps/delivery/cskh/services.py`:
+  - `claim_task`: khoá mềm trong 5 phút (`CSKH_CLAIM_MINUTES`), trả 409 `CLAIMED` nếu có người khác đang giữ.
+  - `record_call`: máy trạng thái CONFIRMED, CALLBACK, UNREACHABLE, WRONG_NUMBER, WANT_CANCEL, WANT_CHANGE, NOTIFIED. Kiểm tra BR-GH-19 (chặn SĐT/STK trong ghi chú), BR-GH-13 (giãn cách 10' nếu chưa đủ N/W), thứ tự khoá `DeliveryNote` -> `ConfirmationTask`. Ghi AuditLog an toàn không lưu ghi chú tự do.
+  - `unconfirm`: đưa phiếu PREPARING về CONFIRMING khi chưa in tem (chặn 400 `BR-GH-16` nếu đã in tem).
+  - `change_recipient`: đổi người nhận hộ, cập nhật `superseded_at = now` vô hiệu hoá tem cũ.
+- `backend/apps/delivery/labels/services.py`:
+  - `get_label_data`: sinh dữ liệu tem (tuyệt đối không giá vốn, không tiền, SĐT che dạng `09xx xxx 123`, barcode_value `f"{note.code}.{print_no}"`, chặn khi CONFIRMING BR-GH-09 hoặc CANCELLED BR-GH-07 hoặc tem cũ superseded BR-GH-16).
+  - `record_print`: idempotent theo `request_id`, tăng `print_no`, AuditLog `label_printed` / `label_reprinted`.
+- `backend/apps/delivery/cskh/serializers.py` & `api.py`:
+  - `CskhQueueViewSet`: list (mặc định PENDING + CALLBACK hợp lệ, lọc `?state=`), detail (404 nếu ngoài scope), custom actions `claim`, `calls`, `unconfirm`, `recipient`. Header `Cache-Control: no-store`.
+  - `CskhSearchView`: chỉ nhận POST (GET trả 405), throttle `cskh_search`, tìm đúng SĐT ≥ 9 chữ số hoặc mã đơn, chặn SĐT một phần (400 `INVALID_QUERY`).
+- `backend/apps/delivery/api.py`:
+  - Thêm custom actions `label` (GET) và `label_print` (POST `.../label/print/`), kế thừa `NoStoreMixin`.
+- `backend/config/api_urls.py`: Đăng ký router `/api/cskh/queue/` và view `/api/cskh/search/`.
+- `backend/apps/accounts/management/commands/seed_demo.py`: Cập nhật `adopt_legacy()` nhận `CONFIRMING` và dọn `confirmation`, `calls`, `label_prints` khi `--remove`.
+- Test BE mới: `backend/apps/delivery/tests/test_cskh_l2.py` với 19 tests bao phủ CS-04 (AC1..AC8), CS-05 (AC1..AC9), CS-06 (AC1..AC10), CS-11 (AC1..AC5, AC7..AC9), X-AC1, X-AC2, X-AC3.
+
+### 3. Frontend đã làm:
+- `erp-console/package.json`: thêm `qrcode` (`^1.5.4`) và `@types/qrcode` (`^1.5.5`).
+- `erp-console/shared/lib/nav.ts`:
+  - Thêm `cskh` vào `ViewKey`.
+  - Thêm quyền CSKH vào `PERM` (`confirmWithCustomer`, `changeRecipient`, `printLabel`, `decideUnconfirmed`, `packDeliveryNote`).
+  - Thêm mục menu "Gọi xác nhận" (`/cskh/`, icon `phone_in_talk`, hiển thị khi có `confirmWithCustomer`).
+  - Cập nhật `homePath` trả về `/cskh/` khi `me.home === "cskh-queue"`.
+- `erp-console/features/orders/labels.ts`: thêm `CONFIRMING: "Chờ xác nhận"` vào `DELIVERY_LABEL` và `DELIVERY_STATUS`.
+- `erp-console/features/deliveries/`:
+  - `types.ts`: thêm `LabelData`, `PrintDeliveryLabelResponse`.
+  - `api.ts`: thêm `fetchDeliveryLabel`, `printDeliveryLabel`.
+  - `mock.ts`: thêm `mockGetDeliveryLabel`, `mockPostDeliveryLabelPrint`.
+  - `components/DeliveryDetailModal.tsx`: thêm nút "In tem" / "In lại tem", gọi API in và mở popup `/print/label/?note={id}&print_no={n}`.
+- `erp-console/app/print/label/page.tsx`:
+  - Màn hình in tem nhãn giao hàng độc lập (ngoài console layout).
+  - Khổ giấy CSS `@page { size: 100mm 150mm; margin: 0; }`.
+  - Sinh mã QR client-side qua SVG bằng thư viện `qrcode`.
+  - Đảm bảo bất biến: Tuyệt đối không giá tiền, không giá vốn, SĐT che `09xx xxx 123`, tự động gọi `window.print()` sau khi render.
+- `erp-console/features/cskh/`:
+  - `types.ts`: các kiểu dữ liệu `CskhQueueItem`, `CustomerCall`, `CskhQueueDetail`, `CskhSearchResultItem`, options kết quả gọi.
+  - `mock.ts`: dữ liệu mẫu hàng chờ, cuộc gọi, tìm kiếm, khoá mềm, đổi người nhận, huỷ xác nhận.
+  - `api.ts`: các hàm `fetchCskhQueue`, `fetchCskhDetail`, `claimCskhTask`, `recordCskhCall`, `unconfirmDelivery`, `changeRecipient`, `searchCskh`.
+  - `cskh.module.css`: phong cách Linear/Notion tối giản, responsive mobile (nút kết quả to ≥ 44px ở nửa dưới màn hình).
+  - `CskhCallModal.tsx`: modal gọi xác nhận, tự động claim task khi mở, hiển thị SĐT link `tel:`, ghi chú kiểm tra BR-GH-19, lưới nút kết quả, lịch sử gọi.
+  - `CskhQueueView.tsx`: màn hình hàng chờ CSKH với các tab lọc trạng thái, tìm kiếm POST body, bảng desktop & thẻ mobile.
+  - `cskh.test.ts`: 14 vitest unit tests bao phủ các AC của CS-05, CS-06, CS-11, X-AC3.
+- `erp-console/app/(console)/cskh/page.tsx`: trang route `/cskh/` bọc `ViewGuard view="cskh"`.
+
+### 4. Kết quả kiểm chứng Lô 2:
+- `cd backend && .venv/bin/python manage.py test`: **843/843 tests xanh 100%** (38/38 tests delivery, 19/19 test_cskh_l2).
+- `cd backend && .venv/bin/python manage.py makemigrations --check --dry-run`: No changes detected.
+- `cd erp-console && npm test`: 4 test files, **35/35 tests xanh 100%**.
+- `cd erp-console && npx tsc --noEmit && npm run build`: 27/27 static pages pass 100%.
+- `cd erp-console && NEXT_PUBLIC_USE_MOCK=1 npm run build`: 27/27 static pages pass 100%.
+- `cd frontend && npx tsc --noEmit && npm run build`: 8/8 static pages pass 100%.
+- Quét cấm storage, useDraft, console: `grep -rn "localStorage\|sessionStorage\|useDraft\|console\." erp-console/features/cskh erp-console/features/deliveries erp-console/app/print` -> **Rỗng 100%**.
+- Quét cấm AI import: `grep -rn "features/ai" erp-console/features/cskh erp-console/features/deliveries erp-console/app/print` -> **Rỗng 100%**.

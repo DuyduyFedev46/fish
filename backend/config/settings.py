@@ -211,6 +211,7 @@ _DEFAULT_THROTTLE_RATES = {
     "shop_checkout": _rate("THROTTLE_SHOP_CHECKOUT", "30/hour"),
     "login_ip": _rate("THROTTLE_LOGIN_IP", "10/min"),
     "login_user": _rate("THROTTLE_LOGIN_USER", "30/hour"),
+    "cskh_search": _rate("THROTTLE_CSKH_SEARCH", "30/min"),
 }
 
 CAVEVE_THROTTLE_RATES = {k: None for k in _DEFAULT_THROTTLE_RATES} if TESTING else _DEFAULT_THROTTLE_RATES

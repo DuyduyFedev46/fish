@@ -75,8 +75,8 @@ class P3AC1MatchedTests(SepayGatewayIpnBase):
 
         invoice = SalesInvoice.objects.get(sales_order=self.order)
         self.assertEqual(invoice.payment_method, "VIETQR")
-        self.assertEqual(invoice.delivery_notes.count(), 1)  # signal tạo phiếu giao PREPARING
-        self.assertEqual(invoice.delivery_notes.first().status, "PREPARING")
+        self.assertEqual(invoice.delivery_notes.count(), 1)  # signal tạo phiếu giao CONFIRMING
+        self.assertEqual(invoice.delivery_notes.first().status, "CONFIRMING")
 
     def test_p3_ac2_wrong_token_401(self):
         resp = self._post("wrong", {"bank_txn_id": "X", "order_code": self.order.code,

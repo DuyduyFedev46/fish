@@ -44,7 +44,7 @@ class S11ConfirmManualTests(OrderApiBase):
             "invoice_id": invoice.pk, "delivery_note_code": note.code,
         })
         self.assertEqual(self.order.status, SalesOrder.Status.PROCESSING)
-        self.assertEqual(note.status, DeliveryNote.Status.PREPARING)
+        self.assertEqual(note.status, DeliveryNote.Status.CONFIRMING)
         b = Batch.objects.get(pk=self.batch.pk)
         self.assertEqual(b.qty_available, Decimal("98"))
         self.assertEqual(b.qty_reserved, Decimal("0"))

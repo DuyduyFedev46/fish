@@ -8,10 +8,10 @@ from django.dispatch import receiver
 
 from apps.sales.models import SalesInvoice
 
-from . import services
+from .cskh import services as cskh_services
 
 
 @receiver(post_save, sender=SalesInvoice, dispatch_uid="create_delivery_note_on_invoice")
 def create_delivery_note_on_invoice(sender, instance, created, **kwargs):
     if created and instance.status == SalesInvoice.Status.ISSUED:
-        services.create_delivery_note(invoice=instance)
+        cskh_services.start_confirmation(invoice=instance)

@@ -1,4 +1,4 @@
-import { DeliveryListResponse, DeliveryNoteDetail, DeliveryNoteItem } from "./types";
+import { DeliveryListResponse, DeliveryNoteDetail, DeliveryNoteItem, LabelData, PrintDeliveryLabelResponse } from "./types";
 
 export const MOCK_DELIVERY_NOTES: DeliveryNoteDetail[] = [
   {
@@ -306,3 +306,88 @@ export function mockPostDeliveryNoteStatus(req: any): { status: number; body: an
     return { status: 400, body: { detail: err.message, code: err.message.split(":")[0] } };
   }
 }
+
+export function mockGetDeliveryLabel(
+  req: any,
+  id: number,
+  printNo?: number
+): { status: number; body: LabelData | { detail: string; code?: string } } {
+  const item = MOCK_DELIVERY_NOTES.find((n) => n.id === id);
+  if (!item) {
+    return { status: 404, body: { detail: "Không tìm thấy phiếu giao hàng" } };
+  }
+  if (item.status === "CONFIRMING") {
+    return {
+      status: 400,
+      body: { code: "BR-GH-09", detail: "Chưa xác nhận với khách, chưa in tem." },
+    };
+  }
+  if (item.status === "CANCELLED") {
+    return {
+      status: 400,
+      body: { code: "BR-GH-07", detail: "Đơn đã huỷ, không in tem." },
+    };
+  }
+
+  const pNo = printNo || item.label.valid_print_no || 1;
+  const isReprint = pNo > 1 || (item.label.printed && pNo === item.label.valid_print_no);
+
+  const data: LabelData = {
+    note_code: item.code,
+    order_code: item.order?.code || "DH-260928-0001",
+    print_no: pNo,
+    next_print_no: (item.label.valid_print_no || 1) + 1,
+    is_reprint: isReprint,
+    reprint_reason: isReprint ? "REPRINT" : null,
+    barcode_value: `${item.code}.${pNo}`,
+    recipient_name: item.recipient_name || item.customer_name,
+    recipient_phone_masked: "09xx xxx 123",
+    address: item.address,
+    packages: "1/1",
+    total_kg: item.total_kg,
+    earliest_expiry: item.lines[0]?.expiry_date || "2027-09-20",
+    paid_text: "ĐÃ THANH TOÁN – không thu thêm",
+  };
+  return { status: 200, body: data };
+}
+
+export function mockPostDeliveryLabelPrint(
+  req: any,
+  id: number
+): { status: number; body: PrintDeliveryLabelResponse | { detail: string; code?: string } } {
+  const item = MOCK_DELIVERY_NOTES.find((n) => n.id === id);
+  if (!item) {
+    return { status: 404, body: { detail: "Không tìm thấy phiếu giao hàng" } };
+  }
+  if (item.status === "CONFIRMING") {
+    return {
+      status: 400,
+      body: { code: "BR-GH-09", detail: "Chưa xác nhận với khách, chưa in tem." },
+    };
+  }
+  if (item.status === "CANCELLED") {
+    return {
+      status: 400,
+      body: { code: "BR-GH-07", detail: "Đơn đã huỷ, không in tem." },
+    };
+  }
+
+  const isReprint = item.label.printed;
+  const printNo = (item.label.valid_print_no || 0) + 1;
+  item.label.printed = true;
+  item.label.valid_print_no = printNo;
+  if (!item.available_actions.includes("reprint_label")) {
+    item.available_actions.push("reprint_label");
+  }
+
+  return {
+    status: isReprint ? 200 : 201,
+    body: {
+      print_no: printNo,
+      printed_at: new Date().toISOString(),
+      is_reprint: isReprint,
+      duplicate: false,
+    },
+  };
+}
+

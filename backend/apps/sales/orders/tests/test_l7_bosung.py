@@ -72,8 +72,8 @@ class L7LabelTests(OrderApiBase):
         self.assertEqual(pay["match_status_label"], "Khớp — đã xác nhận")
         self.assertEqual(pay["source"], "WEBHOOK")
         self.assertEqual(pay["source_label"], "Webhook SePay")
-        self.assertEqual(body["delivery"]["status"], "PREPARING")
-        self.assertEqual(body["delivery"]["status_label"], "Soạn hàng")
+        self.assertEqual(body["delivery"]["status"], "CONFIRMING")
+        self.assertEqual(body["delivery"]["status_label"], "Chờ xác nhận")
         self.assertEqual(body["refunds"][0]["status"], "PENDING")
         self.assertEqual(body["refunds"][0]["status_label"], "Chờ hoàn")
 
@@ -110,6 +110,8 @@ class L7TimelineTests(OrderApiBase):
         StaffProfile.objects.create(user=self.chu, phone="0908000222", display_name="Anh Lộc")
         order = self._paid_order()
         note = DeliveryNote.objects.get(sales_invoice=order.invoice)
+        from apps.common.tests.fixtures import confirm_note_for_test
+        confirm_note_for_test(note)
         note.assigned_to = self.giao
         note.save(update_fields=["assigned_to"])
         for st in (DeliveryNote.Status.READY, DeliveryNote.Status.DELIVERING):
@@ -194,6 +196,8 @@ class L7TimelineTests(OrderApiBase):
 
         order = self._paid_order()
         note = DeliveryNote.objects.get(sales_invoice=order.invoice)
+        from apps.common.tests.fixtures import confirm_note_for_test
+        confirm_note_for_test(note)
         for st in (DeliveryNote.Status.READY, DeliveryNote.Status.DELIVERING):
             delivery_services.advance_status(note=note, to_status=st, actor=self.giao)
         delivery_services.mark_failed(note=note, actor=self.giao)

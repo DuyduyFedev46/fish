@@ -5,6 +5,7 @@ cho mình (get_queryset lọc, không phải ẩn ở giao diện — BR-PQ-12).
 import datetime
 
 from django.db.models import F
+from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
@@ -12,6 +13,7 @@ from rest_framework.response import Response
 from apps.common.api import (
     BusinessModelPermissions,
     DocumentViewSet,
+    NoStoreMixin,
     StandardPagination,
     has_full_delivery_scope,
     require_perm,
@@ -22,7 +24,7 @@ from .models import DeliveryNote
 from .serializers import DeliveryNoteDetailSerializer, DeliveryNoteSerializer
 
 
-class DeliveryNoteViewSet(DocumentViewSet):
+class DeliveryNoteViewSet(NoStoreMixin, DocumentViewSet):
     queryset = DeliveryNote.objects.select_related(
         "sales_invoice__sales_order__customer",
         "assigned_to",
@@ -35,7 +37,7 @@ class DeliveryNoteViewSet(DocumentViewSet):
     serializer_class = DeliveryNoteSerializer
     pagination_class = StandardPagination
     permission_classes = [BusinessModelPermissions]
-    custom_perm_actions = ("set_status",)
+    custom_perm_actions = ("set_status", "label", "label_print")
 
     # BR-PQ-14 / BR-GH-06: trạng thái & người giao chỉ đổi qua action nghiệp vụ.
     locked_fields = (
@@ -127,3 +129,47 @@ class DeliveryNoteViewSet(DocumentViewSet):
         if needs_decision is not None:
             data["needs_decision"] = needs_decision
         return Response(data)
+
+    @action(
+        detail=True,
+        methods=["get"],
+        url_path="label",
+        required_perms=("delivery.print_label",),
+    )
+    def label(self, request, pk=None):
+        """Xem trước hoặc lấy dữ liệu in tem."""
+        if not request.user.has_perm("delivery.print_label"):
+            raise PermissionDenied("Bạn không có quyền in tem giao hàng.")
+        note = self.get_object()
+        print_no = request.query_params.get("print_no")
+        from apps.delivery.labels import services as label_services
+        data = label_services.get_label_data(note, print_no=print_no)
+        return Response(data)
+
+    @action(
+        detail=True,
+        methods=["post"],
+        url_path="label/print",
+        required_perms=("delivery.print_label",),
+    )
+    def label_print(self, request, pk=None):
+        """Ghi nhận lượt in tem (idempotent)."""
+        if not request.user.has_perm("delivery.print_label"):
+            raise PermissionDenied("Bạn không có quyền in tem giao hàng.")
+        note = self.get_object()
+        request_id = request.data.get("request_id") if request.data else None
+        reason = request.data.get("reason", "FIRST") if request.data else "FIRST"
+        from apps.delivery.labels import services as label_services
+        lp, duplicate = label_services.record_print(
+            note, request.user, request_id=request_id, reason=reason
+        )
+        resp_data = {
+            "print_no": lp.print_no,
+            "printed_at": lp.printed_at.isoformat(),
+            "is_reprint": lp.print_no > 1,
+            "duplicate": duplicate,
+        }
+        return Response(
+            resp_data,
+            status=status.HTTP_200_OK if duplicate else status.HTTP_201_CREATED,
+        )

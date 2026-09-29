@@ -5,6 +5,7 @@
 import type { StatusLook } from "@/shared/lib/status";
 
 export const DELIVERY_LABEL: Record<string, string> = {
+  CONFIRMING: "Chờ xác nhận",
   PREPARING: "Soạn hàng",
   READY: "Chờ lấy hàng",
   DELIVERING: "Đang giao",
@@ -14,6 +15,7 @@ export const DELIVERY_LABEL: Record<string, string> = {
   CANCELLED: "Đã huỷ theo đơn",
 };
 export const DELIVERY_STATUS: Record<string, StatusLook> = {
+  CONFIRMING: { tone: "warn", icon: "phone_in_talk" },
   PREPARING: { tone: "info", icon: "inventory" },
   READY: { tone: "info", icon: "package_2" },
   DELIVERING: { tone: "info", icon: "local_shipping" },

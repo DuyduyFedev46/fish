@@ -1,12 +1,16 @@
 import { apiFetch } from "@/shared/lib/http";
 import {
+  mockGetDeliveryLabel,
   mockGetDeliveryNoteDetail,
   mockListDeliveryNotes,
+  mockPostDeliveryLabelPrint,
   mockPostDeliveryNoteStatus,
 } from "./mock";
 import type {
   DeliveryListResponse,
   DeliveryNoteDetail,
+  LabelData,
+  PrintDeliveryLabelResponse,
 } from "./types";
 
 export async function fetchDeliveryNotes(
@@ -63,3 +67,36 @@ export async function packDeliveryNote(
     mock: isMock ? mockPostDeliveryNoteStatus : undefined,
   });
 }
+
+export async function fetchDeliveryLabel(
+  id: number,
+  printNo?: number,
+  signal?: AbortSignal
+): Promise<LabelData> {
+  const isMock = process.env.NEXT_PUBLIC_USE_MOCK === "1";
+  const qs = printNo ? `?print_no=${printNo}` : "";
+  return apiFetch<LabelData>(`/api/delivery/notes/${id}/label/${qs}`, {
+    signal,
+    mock: isMock ? (req) => mockGetDeliveryLabel(req, id, printNo) : undefined,
+  });
+}
+
+export async function printDeliveryLabel(
+  id: number,
+  requestId?: string,
+  signal?: AbortSignal
+): Promise<PrintDeliveryLabelResponse> {
+  const isMock = process.env.NEXT_PUBLIC_USE_MOCK === "1";
+  const reqId =
+    requestId ||
+    (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+      ? crypto.randomUUID()
+      : undefined);
+  return apiFetch<PrintDeliveryLabelResponse>(`/api/delivery/notes/${id}/label/print/`, {
+    method: "POST",
+    body: { request_id: reqId },
+    signal,
+    mock: isMock ? (req) => mockPostDeliveryLabelPrint(req, id) : undefined,
+  });
+}
+

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { fetchDeliveryNoteDetail, packDeliveryNote } from "../api";
+import { fetchDeliveryNoteDetail, packDeliveryNote, printDeliveryLabel } from "../api";
 import type { DeliveryNoteDetail, DeliveryNoteItem } from "../types";
 import s from "../deliveries.module.css";
 
@@ -15,6 +15,7 @@ export function DeliveryDetailModal({ item, onClose, onUpdated }: Props) {
   const [detail, setDetail] = useState<DeliveryNoteDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [packing, setPacking] = useState(false);
+  const [printing, setPrinting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
@@ -69,6 +70,39 @@ export function DeliveryDetailModal({ item, onClose, onUpdated }: Props) {
   const canPack =
     current.status === "PREPARING" &&
     current.available_actions.includes("set_status:READY");
+  const canPrint =
+    (current.status === "PREPARING" || current.status === "READY") &&
+    (current.available_actions.includes("print_label") ||
+      current.available_actions.includes("reprint_label"));
+
+  const handlePrint = async () => {
+    if (!current) return;
+    setPrinting(true);
+    setError(null);
+    try {
+      const res = await printDeliveryLabel(current.id);
+      window.open(`/print/label/?note=${current.id}&print_no=${res.print_no}`, "_blank");
+      if (detail) {
+        setDetail({
+          ...detail,
+          label: {
+            ...detail.label,
+            printed: true,
+            valid_print_no: res.print_no,
+          },
+          available_actions: detail.available_actions.includes("reprint_label")
+            ? detail.available_actions
+            : [...detail.available_actions.filter((a) => a !== "print_label"), "reprint_label"],
+        });
+      }
+      onUpdated();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Không thể in tem.";
+      setError(msg);
+    } finally {
+      setPrinting(false);
+    }
+  };
 
   return (
     <div className={s.modalBackdrop} onClick={onClose} role="dialog" aria-modal="true">
@@ -172,6 +206,20 @@ export function DeliveryDetailModal({ item, onClose, onUpdated }: Props) {
           <button type="button" className={s.btnSecondary} onClick={onClose}>
             Đóng
           </button>
+          {canPrint && (
+            <button
+              type="button"
+              className={s.btnSecondary}
+              onClick={handlePrint}
+              disabled={printing}
+            >
+              {printing
+                ? "Đang xử lý..."
+                : current.label.printed
+                ? "In lại tem"
+                : "In tem"}
+            </button>
+          )}
           {canPack && (
             <button
               type="button"

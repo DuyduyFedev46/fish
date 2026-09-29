@@ -137,10 +137,10 @@ class CskhL1Tests(TestCase):
     def test_cs01_ac3_cskh_order_scope_filtering(self):
         """CS-01-AC3: D1 (CONFIRMING/PENDING), D2 (CONFIRMING/ESCALATED), D3 (READY), D4 (PREPARING, đã gọi 2 ngày trước)."""
         o1, _, n1 = self._create_order_invoice_note("D1", status=DeliveryNote.Status.CONFIRMING)
-        ConfirmationTask.objects.create(note=n1, state=ConfirmationTask.State.PENDING)
+        ConfirmationTask.objects.update_or_create(note=n1, defaults={"state": ConfirmationTask.State.PENDING})
 
         o2, _, n2 = self._create_order_invoice_note("D2", status=DeliveryNote.Status.CONFIRMING)
-        ConfirmationTask.objects.create(note=n2, state=ConfirmationTask.State.ESCALATED)
+        ConfirmationTask.objects.update_or_create(note=n2, defaults={"state": ConfirmationTask.State.ESCALATED})
 
         o3, _, n3 = self._create_order_invoice_note("D3", status=DeliveryNote.Status.READY)
 

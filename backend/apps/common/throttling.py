@@ -83,3 +83,13 @@ class LoginUserThrottle(SettingsRateThrottle):
             return None
         ident = hashlib.sha256(username.encode("utf-8")).hexdigest()
         return self.cache_format % {"scope": self.scope, "ident": ident}
+
+
+class CskhSearchThrottle(SettingsRateThrottle):
+    scope = "cskh_search"
+
+    def get_cache_key(self, request, view):
+        if not (request.user and request.user.is_authenticated):
+            return None
+        return self.cache_format % {"scope": self.scope, "ident": str(request.user.pk)}
+

@@ -30,7 +30,7 @@ class S14CancelPaidOrderTests(OrderApiBase):
     def test_s14_ac1_huy_khi_soan_hang_hoan_kho_lo_goc(self):
         order = self._paid_order()
         note = DeliveryNote.objects.get(sales_invoice=order.invoice)
-        self.assertEqual(note.status, DeliveryNote.Status.PREPARING)
+        self.assertEqual(note.status, DeliveryNote.Status.CONFIRMING)
         self.batch.refresh_from_db()
         before = self.batch.qty_available
 
@@ -76,8 +76,10 @@ class S14CancelPaidOrderTests(OrderApiBase):
         self.assertNotIn(note.pk, [r["id"] for r in rows])
 
     def test_s14_ac3_phieu_that_bai_khong_hoan_kho(self):
+        from apps.common.tests.fixtures import confirm_note_for_test
         order = self._paid_order()
         note = DeliveryNote.objects.get(sales_invoice=order.invoice)
+        confirm_note_for_test(note)
         delivery_services.advance_status(note=note, to_status=DeliveryNote.Status.READY, actor=self.giao)
         delivery_services.advance_status(
             note=note, to_status=DeliveryNote.Status.DELIVERING, actor=self.giao
@@ -105,8 +107,10 @@ class S14CancelPaidOrderTests(OrderApiBase):
         )
 
     def test_s14_ac4_dang_giao_bi_chan(self):
+        from apps.common.tests.fixtures import confirm_note_for_test
         order = self._paid_order()
         note = DeliveryNote.objects.get(sales_invoice=order.invoice)
+        confirm_note_for_test(note)
         delivery_services.advance_status(note=note, to_status=DeliveryNote.Status.READY, actor=self.giao)
         delivery_services.advance_status(
             note=note, to_status=DeliveryNote.Status.DELIVERING, actor=self.giao
@@ -125,8 +129,10 @@ class S14CancelPaidOrderTests(OrderApiBase):
         self.assertNotIn("cancel", body["available_actions"])
 
     def test_s14_ac5_da_hoan_tat_bi_chan(self):
+        from apps.common.tests.fixtures import confirm_note_for_test
         order = self._paid_order()
         note = DeliveryNote.objects.get(sales_invoice=order.invoice)
+        confirm_note_for_test(note)
         for st in (DeliveryNote.Status.READY, DeliveryNote.Status.DELIVERING, DeliveryNote.Status.COMPLETED):
             delivery_services.advance_status(note=note, to_status=st, actor=self.giao)
 

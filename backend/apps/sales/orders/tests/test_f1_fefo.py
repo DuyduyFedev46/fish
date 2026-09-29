@@ -158,6 +158,8 @@ class F1ReturnToOriginalBatchTests(F1FefoSalesBase):
         giao = make_user("giao1", "nv_giao")
         ql = make_user("ql1", "quan_ly")
         note = DeliveryNote.objects.get(sales_invoice=self.order.invoice)
+        from apps.common.tests.fixtures import confirm_note_for_test
+        confirm_note_for_test(note)
         for st in (DeliveryNote.Status.READY, DeliveryNote.Status.DELIVERING):
             delivery_services.advance_status(note=note, to_status=st, actor=giao)
         delivery_services.mark_failed(note=note, actor=giao)

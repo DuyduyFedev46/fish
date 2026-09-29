@@ -30,6 +30,7 @@ from apps.catalog.items.api import BundleLineViewSet, ItemGroupViewSet, ItemView
 from apps.catalog.items.shop_api import ShopCatalogView, ShopItemDetailView
 from apps.catalog.pricing.api import ItemPriceViewSet, PriceListViewSet, PricingRuleViewSet
 from apps.delivery.api import DeliveryNoteViewSet
+from apps.delivery.cskh.api import CskhQueueViewSet, CskhSearchView
 from apps.inventory.batches.api import BatchViewSet
 from apps.inventory.returns.api import ReturnToStockViewSet
 from apps.inventory.stock.api import StockEntryViewSet, StockLedgerEntryViewSet, WarehouseViewSet
@@ -75,12 +76,16 @@ router.register("sales/refunds", RefundViewSet)
 router.register("sales/payments", PaymentTransactionViewSet)
 # delivery
 router.register("delivery/notes", DeliveryNoteViewSet)
+# cskh
+router.register("cskh/queue", CskhQueueViewSet, basename="cskh-queue")
 # accounts — quản lý nhân viên (S41, S42)
 router.register("staff", StaffViewSet, basename="staff")
 # AI Actions — Việc AI (DW-11)
 router.register("ai/actions", AiActionViewSet, basename="ai-actions")
 
 urlpatterns = [
+    # CSKH tìm kiếm nhanh (chỉ POST)
+    path("cskh/search/", CskhSearchView.as_view(), name="cskh-search"),
     # Shop công khai (guest)
     path("shop/catalog/", ShopCatalogView.as_view()),
     path("shop/catalog/<str:item_code>/", ShopItemDetailView.as_view()),
