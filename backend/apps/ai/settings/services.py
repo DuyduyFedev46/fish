@@ -79,6 +79,7 @@ def get_user_config_data(user) -> dict:
 
     policy = AiPolicyVersion.objects.order_by("-version").first()
     global_mode = policy.global_mode if policy else "on"
+    red_zone_open = policy.red_zone_open if policy else {}
 
     latest_config = AiConfigVersion.objects.filter(user=user).order_by("-version").first()
     version = latest_config.version if latest_config else 0
@@ -135,7 +136,18 @@ def get_user_config_data(user) -> dict:
                 red_zone = bool(getattr(spec, "red_zone", False))
                 locked_reason = None
                 if red_zone:
-                    locked_reason = {"code": "BR-AI-18", "text": "Chủ chưa mở vùng đỏ cho lệnh này"}
+                    is_rz_open = any(
+                        red_zone_open.get(p, False)
+                        for p in getattr(spec, "required_perms", ())
+                    )
+                    if is_rz_open:
+                        locked_reason = None
+                        choices = list(write_choices)
+                        max_level = getattr(spec, "max_level", "B") or "B"
+                    else:
+                        locked_reason = {"code": "BR-AI-18", "text": "Chủ chưa mở vùng đỏ cho lệnh này"}
+                        choices = ["OFF", "C"]
+                        max_level = "C"
                 elif getattr(spec, "undo_missing", False):
                     locked_reason = {"code": "AI_UNDO_MISSING", "text": "Chưa có nghiệp vụ huỷ chứng từ"}
 
@@ -220,6 +232,10 @@ def update_user_config(
 
         errors = {}
 
+        latest_policy = AiPolicyVersion.objects.order_by("-version").first()
+        policy_caps = latest_policy.caps if latest_policy else {}
+        policy_rz = latest_policy.red_zone_open if latest_policy else {}
+
         # Validate overrides
         for cmd_id, lvl in (overrides or {}).items():
             spec = registry.get_spec(cmd_id)
@@ -231,12 +247,22 @@ def update_user_config(
                 if lvl not in valid_read_levels:
                     errors[cmd_id] = "Mức không hợp lệ cho lệnh đọc"
             else:
-                # DW-19-AC7: Mọi lệnh thuộc "trần C ép" không cho phép nâng lên B
                 if lvl == "B":
-                    is_forced_c = getattr(spec, "force_c", False) or getattr(spec, "max_level", "C") == "C" or cmd_id == "sales.refund.create_refund"
-                    if is_forced_c:
-                        errors[cmd_id] = f"Lệnh {cmd_id} bị giới hạn trần tối đa là C."
-                        continue
+                    # DW-24: Nếu là lệnh vùng đỏ, kiểm tra công tắc Chủ
+                    if getattr(spec, "red_zone", False):
+                        is_rz_open = any(
+                            policy_rz.get(p, False)
+                            for p in getattr(spec, "required_perms", ())
+                        )
+                        if not is_rz_open:
+                            errors[cmd_id] = "Chủ chưa mở vùng đỏ cho lệnh này"
+                            continue
+                    else:
+                        is_forced_c = getattr(spec, "force_c", False) or getattr(spec, "max_level", "C") == "C" or cmd_id == "sales.refund.create_refund"
+                        if is_forced_c:
+                            errors[cmd_id] = f"Lệnh {cmd_id} bị giới hạn trần tối đa là C."
+                            continue
+
                     # DW-19-AC2: Khi env_write_max == "C" (production), chặn user gửi mức B
                     if env_write_max == "C":
                         raise BusinessError(
@@ -248,7 +274,12 @@ def update_user_config(
                 if lvl not in valid_write_levels:
                     errors[cmd_id] = f"Vượt trần: tối đa {env_write_max}"
                 elif getattr(spec, "red_zone", False) and lvl not in {"OFF", "C"}:
-                    errors[cmd_id] = "Chủ chưa mở vùng đỏ cho lệnh này"
+                    is_rz_open = any(
+                        policy_rz.get(p, False)
+                        for p in getattr(spec, "required_perms", ())
+                    )
+                    if not is_rz_open:
+                        errors[cmd_id] = "Chủ chưa mở vùng đỏ cho lệnh này"
 
         # Validate group levels
         for grp_key, grp_cfg in (groups or {}).items():

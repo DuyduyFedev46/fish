@@ -109,6 +109,36 @@ class Command(BaseCommand):
                     logger.info("Downgraded action=%s cmd=%s reason=AI_LEVEL_REVOKED", locked_action.id, locked_action.command)
                     continue
 
+                # DW-25-AC4: Nếu là lệnh chốt lô, kiểm tra lại điều kiện sàn trước khi gọi view
+                if locked_action.command == "inventory.batch.close" or (spec and getattr(spec, "required_perms", None) and "inventory.close_batch" in spec.required_perms):
+                    from apps.inventory.models import Batch
+                    from apps.ai.execution.safety import check_ai_close_batch_conditions
+                    b_target = None
+                    t_id = locked_action.target_id
+                    if t_id:
+                        if str(t_id).isdigit():
+                            b_target = Batch.objects.filter(pk=int(t_id)).first()
+                        if not b_target:
+                            b_target = Batch.objects.filter(batch_id=str(t_id)).first()
+                    ok, close_reason = check_ai_close_batch_conditions(b_target, current_action_id=locked_action.id)
+                    if not ok:
+                        # DW-25-AC4: Không chốt, về PENDING/ESCALATED + chuyển việc Chủ
+                        locked_action.status = AiAction.Status.ESCALATED
+                        locked_action.assignee_group = "chu"
+                        locked_action.downgrade_reason = close_reason
+                        locked_action.save(update_fields=["status", "assignee_group", "downgrade_reason"])
+                        record_audit(
+                            f"escalate_{locked_action.command}",
+                            actor=None,
+                            actor_kind="ai",
+                            ai_actor=owner,
+                            ai_level="B",
+                            proposal_ref=str(locked_action.id),
+                            note="Lô không còn đủ điều kiện chốt, chuyển việc cho Chủ",
+                        )
+                        logger.info("Escalated action=%s cmd=%s reason=CONDITIONS_NOT_MET", locked_action.id, locked_action.command)
+                        continue
+
                 # Mọi điều kiện đạt: gọi view qua dispatch_command
                 with set_ai_audit_scope(
                     ai_actor=owner,

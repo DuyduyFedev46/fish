@@ -176,6 +176,74 @@ def update_policy(
         if latest and latest.global_mode != mode:
             changes.append({"key": "global_mode", "from": latest.global_mode, "to": mode})
 
+        # DW-24-AC4: Xác định các quyền vùng đỏ bị đóng
+        closed_perms = set()
+        for p, is_op in rz.items():
+            if not is_op:
+                closed_perms.add(p)
+        if latest and latest.red_zone_open:
+            for p, prev_op in latest.red_zone_open.items():
+                if prev_op and not rz.get(p, False):
+                    closed_perms.add(p)
+                if prev_op != rz.get(p, False):
+                    changes.append({"key": f"red_zone.{p}", "from": prev_op, "to": rz.get(p, False)})
+        elif rz:
+            for p, is_op in rz.items():
+                changes.append({"key": f"red_zone.{p}", "from": False, "to": is_op})
+
+        if closed_perms:
+            from apps.ai.registry import get_registry
+            from apps.ai.models import AiAction
+            registry = get_registry()
+            affected_cmd_ids = set()
+            for s in registry.get_specs():
+                if any(p in closed_perms for p in getattr(s, "required_perms", ())):
+                    affected_cmd_ids.add(s.id)
+
+            if affected_cmd_ids:
+                # 1. Cấu hình người dùng: hạ override B về C ngay
+                for u in User.objects.filter(is_active=True):
+                    cfg = AiConfigVersion.objects.filter(user=u).order_by("-version").first()
+                    if cfg and cfg.overrides:
+                        has_change = False
+                        new_overrides = dict(cfg.overrides)
+                        for cmd_id in affected_cmd_ids:
+                            if new_overrides.get(cmd_id) in ("B", "A"):
+                                new_overrides[cmd_id] = "C"
+                                has_change = True
+                        if has_change:
+                            AiConfigVersion.objects.create(
+                                user=u,
+                                version=cfg.version + 1,
+                                group_levels=cfg.group_levels,
+                                overrides=new_overrides,
+                                limits=cfg.limits,
+                                killed=cfg.killed,
+                                created_by=created_by,
+                                note="Hạ mức C do Chủ đóng công tắc vùng đỏ",
+                            )
+
+                # 2. Việc SCHEDULED: chuyển sang PENDING mức C ngay lập tức
+                scheduled_acts = AiAction.objects.filter(
+                    status=AiAction.Status.SCHEDULED,
+                    command__in=affected_cmd_ids,
+                )
+                for act in scheduled_acts:
+                    act.status = AiAction.Status.PENDING
+                    act.level = AiAction.Level.C
+                    act.downgrade_reason = {
+                        "code": "AI_RED_ZONE_CLOSED",
+                        "text": "Chủ đã đóng công tắc vùng đỏ",
+                    }
+                    act.save(update_fields=["status", "level", "downgrade_reason"])
+                    record_audit(
+                        f"downgrade_{act.command}",
+                        actor=created_by,
+                        actor_kind="user",
+                        proposal_ref=str(act.id),
+                        note="Chủ đóng công tắc vùng đỏ, việc xếp lịch chuyển về đề xuất C",
+                    )
+
         new_policy = AiPolicyVersion.objects.create(
             version=new_version,
             global_mode=mode,

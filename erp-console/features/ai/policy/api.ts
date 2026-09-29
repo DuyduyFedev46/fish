@@ -95,6 +95,12 @@ export async function updateAiPolicy(
           mockAiPolicy.version = payload.base_version + 1;
           if (payload.global_mode) mockAiPolicy.global_mode = payload.global_mode;
           if (payload.caps) mockAiPolicy.caps = payload.caps;
+          if (payload.red_zone) {
+            mockAiPolicy.red_zone = mockAiPolicy.red_zone.map((rz) => ({
+              ...rz,
+              open: payload.red_zone?.[rz.perm] !== undefined ? payload.red_zone[rz.perm] : rz.open,
+            }));
+          }
           return {
             status: 200,
             body: {

@@ -148,7 +148,8 @@ def is_force_c_action(required_perms: tuple | list | set) -> bool:
     if not perms_set:
         return False
     if is_red_zone_action(perms_set):
-        return True
+        # Vùng đỏ có cơ chế riêng: trần C khi công tắc đóng, tối đa B khi công tắc mở
+        return False
     if perms_set & FORCE_C_PERMS:
         return True
     if not perms_set.issubset(WHITELISTED_ABOVE_C_PERMS):

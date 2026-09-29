@@ -694,3 +694,87 @@ Không có lỗi chặn (0 lỗi).
 4. `cd erp-console && npm test` -> `79 passed (vitest)`
 5. `cd erp-console && npx tsc --noEmit && npm run build` -> Compile sạch 31/31 static pages (thêm route `/ai/report/` 6.4 kB).
 6. `cd frontend && npx tsc --noEmit && npm run build` -> Compile sạch 10/10 static pages.
+
+---
+
+## Lô 6a: Công tắc vùng đỏ của Chủ (DW-24) & AI chốt lô trì hoãn 30 phút (DW-25) · Lần 1 · 2026-09-30
+
+### Kết luận: APPROVED — Nghiệm thu toàn diện Lô 6a: Công tắc vùng đỏ phân quyền nghiêm ngặt theo quyền Tầng 2, chặn cứng ở Production (BR-AI-27), tự động thu hồi và hạ mức khi đóng công tắc (DW-24); Quy trình AI chốt lô trì hoãn 30 phút kiểm soát chặt chẽ 5 điều kiện sàn nghiệp vụ, tự động leo thang ESCALATED cho Chủ khi phát sinh rủi ro trong cửa sổ chờ (DW-25); Bảo vệ tuyệt đối Bất biến 1 (giá vốn) và Bất biến 9 (PII).
+
+### Tổng: 14 ca · ✅ 14 · ❌ 0 · ⏸ 0
+
+### Theo AC
+| Mã AC | Kết quả | Bằng chứng (test tự động / file kiểm chứng) |
+|---|---|---|
+| **DW-24-AC1** | ✅ PASS | `apps.ai.policy.tests.test_dw24_red_zone_switch::RedZoneSwitchTests.test_dw24_ac1_staging_policy_contains_3_red_zone_entries_default_closed`<br>Staging, Chủ gọi `GET /api/ai/policy/` trả về đúng 3 mục vùng đỏ (`inventory.close_batch`, `sales.confirm_refund`, `sales.confirm_payment_manual`), có đầy đủ `label`, `commands`, `can_do`, `cannot_do`, `legal_note`, `delay_minutes=30` (đối với chốt lô), mặc định `open=False` (BR-AI-18). |
+| **DW-24-AC2** | ✅ PASS | `apps.ai.policy.tests.test_dw24_red_zone_switch::RedZoneSwitchTests.test_dw24_ac2_chu_put_open_close_batch_allows_b_in_my_config`<br>Chủ PUT mở `inventory.close_batch` (tick cam kết trách nhiệm BR-AI-14) -> phiên bản policy tăng +1, AuditLog `ai_policy_update`; sau đó `GET /api/ai/my-config/` có `choices` mở thêm "B", `max_level="B"`, `locked_reason=None`; Chủ PUT override mức B thành công (BR-AI-07). Khi công tắc đóng: `choices=["OFF", "C"]`, `locked_reason.code="BR-AI-18"`, cố PUT B bị chặn với HTTP 400 `BR-AI-19`. |
+| **DW-24-AC3 (production)** | ✅ PASS | `apps.ai.policy.tests.test_dw24_red_zone_switch::RedZoneSwitchTests.test_dw24_ac3_production_ready_false_blocks_opening_red_zone_400`<br>`AI_PRODUCTION_READY=False` (production) -> Chủ cố tình PUT mở bất kỳ công tắc vùng đỏ nào bị từ chối ngay lập tức với HTTP 400 `BR-AI-27` "Production chưa hỗ trợ tự thực thi" (Q-M7). |
+| **DW-24-AC4 (thu hồi)** | ✅ PASS | `apps.ai.policy.tests.test_dw24_red_zone_switch::RedZoneSwitchTests.test_dw24_ac4_closing_red_zone_downgrades_user_config_and_scheduled_actions`<br>Chủ đang đặt override B, có việc `SCHEDULED` của lệnh chốt lô -> Chủ PUT đóng công tắc -> cấu hình cá nhân của người dùng tự động sinh `AiConfigVersion` mới hạ override B về C ngay lập tức; việc `SCHEDULED` tự động chuyển về `PENDING` (mức C) kèm `downgrade_reason={"code": "AI_RED_ZONE_CLOSED"}` và ghi AuditLog thu hồi (BR-AI-07, BR-AI-21). |
+| **DW-24-AC5 (quyền)** | ✅ PASS | `apps.ai.policy.tests.test_dw24_red_zone_switch::RedZoneSwitchTests.test_dw24_ac5_quan_ly_cannot_put_policy_or_see_red_zone_commands`<br>`quan_ly`, `nv_kho`, `nv_giao` gọi `PUT /api/ai/policy/` bị từ chối HTTP 403 Forbidden `BR-PQ-12`; `quan_ly` gọi `GET /api/ai/my-config/` hoàn toàn không thấy 3 lệnh vùng đỏ (`inventory.batch.close`, `sales.refund.confirm`, `sales.salesorder.confirm_payment`) vì ngoài thẩm quyền (H1). |
+| **DW-24-AC6 (kỷ luật)** | ✅ PASS | `apps.ai.policy.tests.test_dw24_red_zone_switch::RedZoneSwitchTests.test_dw24_ac6_action_with_red_zone_perm_follows_switch`<br>Registry tự động gán `red_zone=True` cho mọi lệnh có `required_perms` chứa quyền thuộc `RED_ZONE_PERMS`, bảo đảm feature mới khai thác quyền vùng đỏ tự động chịu sự chi phối của công tắc mà không cần sửa code trung tâm. |
+| **DW-24-AC7 (AI tắt)** | ✅ PASS | `apps.ai.policy.tests.test_dw24_red_zone_switch::RedZoneSwitchTests.test_dw24_ac7_ai_disabled_can_still_get_and_put_policy`<br>`@override_settings(AI_ENABLED=False)` -> Chủ vẫn GET và PUT policy bình thường để chuẩn bị cấu hình trước khi kích hoạt (BR-AI-10). |
+| **DW-24-FE** | ✅ PASS | `erp-console/features/ai/policy/components/AiPolicyScreen.tsx:359-450`<br>Màn hình Chính sách AI (`/ai/policy/`) hiển thị khối "Công tắc vùng đỏ (Red Zone) của Chủ" với 3 mục nghiệp vụ, switch checkbox bật/tắt, nhãn trạng thái ĐANG MỞ (B) / ĐANG ĐÓNG (C), badge trì hoãn 30 phút, tag lệnh phụ trách, và 3 thẻ giải trình an toàn: `can_do` ("✓ AI được phép"), `cannot_do` ("✕ AI KHÔNG được"), `legal_note` ("⚖ Pháp lý & Trách nhiệm"). |
+| **DW-25-AC1** | ✅ PASS | `apps.ai.execution.tests.test_dw25_close_batch::CloseBatchAiTests.test_dw25_ac1_eligible_batch_scheduled_30m_then_executed_to_closed`<br>Lô đã bán hết (`SOLD_OUT`), có hoá đơn mua, không còn đơn mở, 7 ngày không chi phí mới, có biên bản kiểm kê duyệt sau lần xuất cuối -> công tắc mở, Chủ đặt B -> `call` chốt lô trả về `outcome="scheduled"`, `level="B"`, `execute_after` +30m; lô chưa chốt; tới hạn job `run_due_ai_actions` chốt lô `CLOSED`, `closed_by=Chủ`, AuditLog ghi nhận `execute_inventory.batch.close` với `ai_level="B"`, `proposal_ref` (BR-LO-04, BR-KK-05, BR-AI-20). |
+| **DW-25-AC2 (hạ mức)** | ✅ PASS | `apps.ai.execution.tests.test_dw25_close_batch::CloseBatchAiTests.test_dw25_ac2_missing_condition_downgrades_to_c_proposal`<br>Thiếu 1 điều kiện sàn (phát sinh chi phí mua đá 3 ngày trước < 7 ngày) -> gọi `call` tự động hạ mức C: trả `outcome="proposal"`, `level="C"`, `downgrade_reason={"code": "AI_CLOSE_BATCH_CONDITIONS_NOT_MET"}`, action `PENDING`, không xếp lịch (BR-AI-19, Q-M6). |
+| **DW-25-AC3 (huỷ lịch)** | ✅ PASS | `apps.ai.execution.tests.test_dw25_close_batch::CloseBatchAiTests.test_dw25_ac3_undo_within_30m_cancels_action_batch_not_closed`<br>Chủ gọi `POST /api/ai/actions/<id>/undo/` trong 30 phút -> action chuyển `CANCELLED`, ghi AuditLog `cancel_schedule_inventory.batch.close`; khi job tới hạn chạy qua, lô vẫn giữ nguyên `SOLD_OUT`, không chốt (BR-AI-24). |
+| **DW-25-AC4 (đơn mới / lỗi)** | ✅ PASS | `apps.ai.execution.tests.test_dw25_close_batch::CloseBatchAiTests.test_dw25_ac4_reserved_qty_added_in_window_escalates_to_chu`<br>Trong cửa sổ 30 phút phát sinh đơn mới giữ lô (`qty_reserved > 0`) -> job `run_due_ai_actions` tái kiểm tra điều kiện sàn, phát hiện vi phạm: không chốt lô, chuyển action sang `status=ESCALATED`, `assignee_group="chu"`, `downgrade_reason={"code": "AI_CLOSE_BATCH_CONDITIONS_NOT_MET"}` và ghi AuditLog cảnh báo (BR-LO-04, H16). |
+| **DW-25-AC5 (giá vốn)** | ✅ PASS | `apps.ai.execution.tests.test_dw25_close_batch::CloseBatchAiTests.test_dw25_ac5_view_action_no_cost_keys_for_unauthorized`<br>Việc chuyển về lô cá -> người xem thiếu quyền `view_costprice` (`quan_ly`, `nv_kho`) gọi `GET /api/ai/actions/<id>/` thì `args_preview` được lọc sạch 100% các khoá giá vốn (`unit_cost`, `purchase_cost`) qua `scrub_data` (Bất biến 1, H3). |
+| **DW-25-AC6 (quyền)** | ✅ PASS | `apps.ai.execution.tests.test_dw25_close_batch::CloseBatchAiTests.test_dw25_ac6_quan_ly_cannot_call_close_batch_404`<br>Người dùng thiếu quyền `inventory.close_batch` (`quan_ly`, `nv_kho`) gọi `call` chốt lô -> trả về HTTP 404 `COMMAND_UNKNOWN`, cấu trúc y hệt lệnh không tồn tại, ngăn chặn dò quét endpoint (H1). |
+| **DW-25-AC7 (AI tắt)** | ✅ PASS | `apps.ai.execution.tests.test_dw25_close_batch::CloseBatchAiTests.test_dw25_ac7_ai_disabled_manual_close_still_works`<br>`@override_settings(AI_ENABLED=False)` -> Chủ thực hiện chốt lô thủ công trên giao diện ERP thông qua `POST /api/inventory/batches/<id>/close/` vẫn hoàn tất chuyển trạng thái `CLOSED` bình thường (BR-AI-10). |
+
+### Ngoại lệ & biên | Phân quyền (bảng vai × hành động) | Rò giá vốn | Rò dữ liệu cá nhân | Hồi quy
+
+- **Ngoại lệ & biên**:
+  - Hạn mức ngày lệnh vùng đỏ (`AI_DAILY_LIMIT_RED_ZONE = 10`, Q-M10): Pipeline đếm số lượng `AiAction` loại write của các lệnh có cờ `red_zone=True` trong ngày của người dùng; khi đạt từ 10 lần trở lên, lệnh vùng đỏ gọi tiếp theo tự động bị hạ về mức C với `downgrade_reason={"code": "AI_DAILY_LIMIT"}`.
+  - Cửa sổ trì hoãn 30 phút (`AI_RED_ZONE_DELAY_MINUTES = 30`, Q-M4): Kiểm tra tính toán `execute_after` và `undo_until` đúng +30 phút; Chủ huỷ lịch trong cửa sổ thành công.
+  - Kiểm tra 5 điều kiện sàn nghiệp vụ (`safety.py::check_ai_close_batch_conditions`):
+    1. Đủ điều kiện `check_close_batch` gốc (tồn kho = 0 hoặc EXPIRED/CANCELLED, đã có hoá đơn mua, không còn đơn mở...).
+    2. Ít nhất 7 ngày không có chi phí mua hàng mới phát sinh (Q-M6).
+    3. Biên bản kiểm kê kho đã duyệt phải diễn ra sau lần xuất kho cuối cùng của lô (Q-M6, BR-KK-05).
+    4. Không có phiếu hoàn tiền PENDING, hàng hoàn DRAFT, hoặc giao dịch thanh toán OPEN tham chiếu lô.
+    5. Không có `AiAction` PENDING hoặc SCHEDULED khác trên cùng lô cá.
+  - Khi một trong 5 điều kiện không thoả mãn -> tự động hạ mức C (soạn nháp PENDING để Chủ tự duyệt).
+  - Tái kiểm tra điều kiện lúc tới hạn trong `run_due_ai_actions`: Nếu điều kiện thay đổi trong 30 phút chờ (như đơn mới giữ lô) -> chuyển ngay `status=ESCALATED` cho Chủ, không chốt bừa.
+
+- **Phân quyền (Bảng vai × Hành động)**:
+  | Vai | Xem/Sửa chính sách vùng đỏ (`/api/ai/policy/`) | Cấu hình mức B lệnh chốt lô (`my-config`) | Gọi `call` chốt lô | Nhận việc chuyển chốt lô (`ESCALATED`) |
+  |---|---|---|---|---|
+  | `chu` | ✅ Toàn quyền (GET/PUT) | ✅ Được phép (khi công tắc mở) | ✅ Xếp lịch 30m / Chốt lô | ✅ Nhận việc chuyển |
+  | `quan_ly` | ❌ 403 `BR-PQ-12` | ❌ Không thấy lệnh | ❌ 404 `COMMAND_UNKNOWN` | ❌ Không thuộc thẩm quyền |
+  | `nv_kho` | ❌ 403 `BR-PQ-12` | ❌ Không thấy lệnh | ❌ 404 `COMMAND_UNKNOWN` | ❌ Không thuộc thẩm quyền |
+  | `nv_giao` | ❌ 403 `BR-PQ-12` | ❌ Không thấy lệnh | ❌ 404 `COMMAND_UNKNOWN` | ❌ Không thuộc thẩm quyền |
+  | Khách / Chưa login | ❌ 401 Unauthorized | ❌ 401 Unauthorized | ❌ 401 Unauthorized | ❌ 401 Unauthorized |
+
+- **Rò giá vốn (Bất biến 1)**:
+  - Xem chi tiết hành động AI (`GET /api/ai/actions/<id>/`): `args_preview` được làm sạch qua `scrub_data(..., user=request.user)`. Người thiếu `view_costprice` (`quan_ly`, `nv_kho`) hoàn toàn không thấy `unit_cost`, `purchase_cost`, hay số tiền giá vốn.
+  - Quét kiểm tra toàn bộ backend: `grep -rn 'fields = "__all__"' backend/apps` trả về rỗng hoàn toàn.
+  - Management command `run_due_ai_actions` chỉ log ID lệnh và ID action, không log số tiền giá vốn.
+
+- **Rò dữ liệu cá nhân (Bất biến 9)**:
+  - `AiAction` trên lô hàng chỉ lưu `target_model="batch"` và `target_id`, không ghi nhận dữ liệu PII khách hàng.
+  - Log của job và AuditLog không chứa tên, SĐT, hay địa chỉ của khách.
+  - Giao diện `erp-console` không log dữ liệu nhạy cảm ra `console` hay `localStorage`.
+
+- **Chứng từ không bị xoá & AuditLog Tầng 2**:
+  - Nghiệp vụ chốt lô chỉ cập nhật trạng thái (`status=CLOSED`, `closed_at`, `closed_by`), không xoá bản ghi.
+  - Thao tác huỷ lịch và thu hồi chỉ chuyển trạng thái `CANCELLED` hoặc `PENDING`.
+  - Mọi hành động quan trọng đều được ghi nhận AuditLog: `ai_policy_update`, `execute_inventory.batch.close` (`actor_kind="ai"`, `ai_level="B"`), `downgrade_<cmd>`, `cancel_schedule_<cmd>`, `escalate_<cmd>`.
+
+- **Hồi quy**:
+  - `apps.inventory.batches.tests.test_l1_close_batch`: 20/20 tests xanh 100% (logic `close_batch` và `check_close_batch` gốc không bị sửa đổi hay ảnh hưởng).
+  - Toàn bộ backend test suite: **1051 tests xanh 100%**.
+  - `makemigrations --check --dry-run`: Sạch sẽ (`No changes detected`).
+  - Frontend `erp-console`: Vitest 79/79 tests pass 100%, build tĩnh Next.js sạch 31/31 static pages.
+  - Frontend shop: Build tĩnh Next.js sạch 10/10 static pages.
+
+### Lỗi
+Không có lỗi chặn (0 lỗi).
+
+### Lệnh đã chạy (kèm output tóm tắt)
+1. `cd backend && .venv/bin/python manage.py test apps.ai.policy.tests.test_dw24_red_zone_switch apps.ai.execution.tests.test_dw25_close_batch` -> `Ran 14 tests in 1.434s. OK`
+2. `cd backend && .venv/bin/python manage.py test && .venv/bin/python manage.py makemigrations --check --dry-run` -> `Ran 1051 tests in 50.400s. OK. No changes detected.`
+3. `cd backend && .venv/bin/python manage.py run_due_ai_actions` -> `Finished: executed 0, downgraded 0, overdue escalated 0.`
+4. `cd erp-console && npm test` -> `79 passed (vitest)`
+5. `cd erp-console && npx tsc --noEmit && npm run build` -> Compile sạch 31/31 static pages.
+6. `cd frontend && npx tsc --noEmit && npm run build` -> Compile sạch 10/10 static pages.
+

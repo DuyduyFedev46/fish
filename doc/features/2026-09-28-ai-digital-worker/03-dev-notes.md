@@ -730,3 +730,66 @@
   - `erp-console`: `npx tsc --noEmit && npm run build` -> **31 / 31 static pages thành công**.
   - `frontend`: `npx tsc --noEmit && npm run build` -> **10 / 10 static pages thành công**.
 
+---
+
+## Lô 6a — Công tắc vùng đỏ (DW-24) & AI chốt lô trì hoãn 30 phút (DW-25)
+- Trạng thái: BE & FE HOÀN THÀNH — ĐÃ CẬP NHẬT ĐẦY ĐỦ TEST SUITE
+- Nhánh thực hiện: `main`
+
+### 1. Backend (`be-dev`)
+- **Story DW-24: Công tắc vùng đỏ của Chủ (DW-24-AC1..AC7, 02b §2.3, §3, §4.1, §4.2, §4.3, §6.6, BR-AI-07, BR-AI-27, Q-M4, Q-M10, TL-5, TL-7)**:
+  - `backend/apps/ai/policy/rules.py`: Tách bạch `is_red_zone_action` và `is_force_c_action`. Vùng đỏ không phải trần C ép, mở được lên B khi công tắc Chủ bật và chạy ở Staging (`AI_PRODUCTION_READY=True`).
+  - `backend/apps/inventory/batches/api.py`: Thêm `undo="defer"` vào `AiMeta` của action `close`.
+  - `backend/apps/ai/policy/services.py`: Cập nhật `update_policy`:
+    - Chỉ cho phép bật công tắc vùng đỏ khi `AI_PRODUCTION_READY=True` (staging), nếu tắt mà cố bật thì chặn với 400 `BR-AI-27` (DW-24-AC3).
+    - Khi đóng công tắc vùng đỏ: tự động quét hạ các override mức B của lệnh vùng đỏ về C trong `AiConfigVersion`, đồng thời chuyển các `AiAction` đang `SCHEDULED` của lệnh vùng đỏ về `PENDING` (mức C) kèm lý do `AI_RED_ZONE_CLOSED` và ghi AuditLog (DW-24-AC4).
+  - `backend/apps/ai/settings/services.py`:
+    - `get_user_config_data`: khi vùng đỏ mở, `locked_reason=None` và `choices` mở thêm mức B; khi vùng đỏ đóng, `locked_reason={"code": "AI_RED_ZONE_LOCKED"}` và chỉ có `["OFF", "C"]`.
+    - `update_user_config`: validate chặn user override mức B nếu công tắc vùng đỏ đang đóng (400 `BR-AI-19`).
+  - `backend/apps/ai/execution/pipeline.py`:
+    - Áp dụng hạn mức ngày riêng cho lệnh vùng đỏ: tối đa 10 lần/ngày (`AI_DAILY_LIMIT_RED_ZONE=10`, Q-M10). Nếu quá giới hạn thì tự động hạ về C.
+    - Lệnh vùng đỏ tự động trì hoãn 30 phút (`AI_RED_ZONE_DELAY_MINUTES=30`, Q-M4).
+  - Tests BE: `backend/apps/ai/policy/tests/test_dw24_red_zone_switch.py` (7 tests, bao phủ DW-24-AC1..AC7).
+
+- **Story DW-25: AI của Chủ chốt lô trì hoãn 30 phút (DW-25-AC1..AC7, 02b §4.2, §4.4, §6.4, BR-LO-04, BR-KK-05, Q-M4, Q-M6, Q-M10)**:
+  - `backend/apps/ai/execution/safety.py`: Cài đặt `check_ai_close_batch_conditions(batch, current_action_id=None)` kiểm tra nghiêm ngặt 5 điều kiện sàn:
+    1. Đủ điều kiện `check_close_batch` (tồn = 0 hoặc EXPIRED/CANCELLED, đã có hoá đơn mua, không còn đơn mở...).
+    2. Ít nhất 7 ngày không có chi phí mua hàng mới phát sinh (Q-M6).
+    3. Biên bản kiểm kê kho đã duyệt phải diễn ra sau lần xuất kho cuối cùng của lô (Q-M6, BR-KK-05).
+    4. Không có phiếu hoàn tiền (`Refund.Status.PENDING`), hàng hoàn (`ReturnToStock.Status.DRAFT`), hoặc giao dịch chưa khớp/đang mở (`PaymentTransaction.ResolutionStatus.OPEN`) tham chiếu lô.
+    5. Không có `AiAction` PENDING hoặc SCHEDULED khác trên lô này.
+    - Thiếu bất kỳ điều kiện nào -> hạ mức C (soạn đề xuất nháp PENDING để Chủ tự duyệt).
+  - `backend/apps/ai/execution/pipeline.py`: Tích hợp kiểm tra `check_ai_close_batch_conditions` khi gọi lệnh `inventory.batch.close`.
+  - `backend/apps/ai/management/commands/run_due_ai_actions.py`:
+    - Khi tới hạn 30 phút, kiểm tra lại điều kiện sàn chốt lô.
+    - DW-25-AC4: Nếu trong 30 phút phát sinh đơn mới giữ lô hoặc thay đổi điều kiện sàn -> không chốt, tự động chuyển `status=ESCALATED` cho Chủ kèm lý do rõ ràng.
+  - Tests BE: `backend/apps/ai/execution/tests/test_dw25_close_batch.py` (7 tests, bao phủ DW-25-AC1..AC7).
+
+- **Kiểm chứng Backend**:
+  - `backend/apps/ai/policy/tests/test_dw24_red_zone_switch.py`: **7 tests bao phủ DW-24-AC1..AC7**.
+  - `backend/apps/ai/execution/tests/test_dw25_close_batch.py`: **7 tests bao phủ DW-25-AC1..AC7**.
+  - Chạy suite Lô 6a:
+    ```bash
+    .venv/bin/python manage.py test apps.ai.policy.tests.test_dw24_red_zone_switch apps.ai.execution.tests.test_dw25_close_batch
+    # Ran 14 tests in 1.434s. OK
+    ```
+  - Chạy toàn bộ backend test suite:
+    ```bash
+    .venv/bin/python manage.py test && .venv/bin/python manage.py makemigrations --check --dry-run
+    # Ran 1051 tests in 50.400s. OK. No changes detected.
+    ```
+
+### 2. Frontend (`fe-dev`)
+- **DW-24 (FE - Khối công tắc vùng đỏ của Chủ trên màn hình Chính sách AI)**:
+  - `erp-console/features/ai/policy/components/AiPolicyScreen.tsx`:
+    - Bổ sung khối giao diện "Công tắc vùng đỏ (Red Zone) của Chủ" với 3 mục nghiệp vụ: Chốt lô cá tại kho (`inventory.close_batch`), Huỷ đơn hàng có thanh toán (`sales.cancel_paid_order`), Hoàn tiền cho khách (`sales.confirm_refund`).
+    - Mỗi mục hiển thị rõ ràng: Nhãn, mã quyền, trạng thái mở/đóng (B/C), thời gian trì hoãn (30 phút), danh sách lệnh phụ trách.
+    - Hiển thị khối giải trình an toàn và pháp lý: Những gì AI làm được (`can_do`), Những gì AI không được làm (`cannot_do`), và Căn cứ pháp lý (`legal_note`).
+    - Công tắc switch bật/tắt gửi lên qua payload `red_zone` trong `updateAiPolicy`.
+  - `erp-console/features/ai/policy/api.ts`: Mock và interface cập nhật đồng bộ `red_zone`.
+- **Kiểm chứng Frontend**:
+  - `erp-console`: `npm test` -> **79 / 79 tests pass 100%**.
+  - `erp-console`: `npx tsc --noEmit && npm run build` -> **31 / 31 static pages thành công**.
+  - `frontend`: `npx tsc --noEmit && npm run build` -> **10 / 10 static pages thành công**.
+
+

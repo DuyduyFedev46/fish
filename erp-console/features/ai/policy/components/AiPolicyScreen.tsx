@@ -15,6 +15,7 @@ export default function AiPolicyScreen() {
   // Form state
   const [globalMode, setGlobalMode] = useState<"on" | "c_only" | "off">("on");
   const [ack, setAck] = useState(false);
+  const [redZoneState, setRedZoneState] = useState<Record<string, boolean>>({});
   const [capsState, setCapsState] = useState<{
     nhap_lo_kg: string;
     nhap_lo_vnd: string;
@@ -37,6 +38,12 @@ export default function AiPolicyScreen() {
       const data = await getAiPolicy();
       setPolicy(data);
       setGlobalMode(data.global_mode);
+
+      const rzInit: Record<string, boolean> = {};
+      (data.red_zone || []).forEach((rz) => {
+        rzInit[rz.perm] = rz.open;
+      });
+      setRedZoneState(rzInit);
 
       const nhapLoCap = data.caps?.["purchasing.purchasereceipt.nhap_lo"] || {};
       setCapsState({
@@ -94,6 +101,7 @@ export default function AiPolicyScreen() {
       const updated = await updateAiPolicy({
         base_version: policy.version,
         global_mode: globalMode,
+        red_zone: redZoneState,
         caps: newCaps,
         acknowledge_responsibility: true,
       });
@@ -345,6 +353,105 @@ export default function AiPolicyScreen() {
                 />
               </div>
             </div>
+          </div>
+        </div>
+
+        {/* DW-24: Công tắc vùng đỏ (Red Zone) của Chủ */}
+        <div className="pt-4 border-t space-y-3">
+          <div>
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-gray-900">
+                Công tắc vùng đỏ (Red Zone) của Chủ
+              </h3>
+              <span className="text-[11px] font-mono text-gray-500">
+                Chỉ mở được ở Staging
+              </span>
+            </div>
+            <p className="text-xs text-gray-500 mt-0.5">
+              Các nghiệp vụ quan trọng liên quan đến chốt sổ và giao dịch tiền. Mặc định luôn ở mức C (soạn nháp). Khi Chủ mở công tắc, lệnh được phép cấu hình mức B theo cơ chế trì hoãn ghi.
+            </p>
+          </div>
+
+          <div className="space-y-3">
+            {policy.red_zone.map((rz) => {
+              const isOpen = redZoneState[rz.perm] ?? rz.open;
+              return (
+                <div
+                  key={rz.perm}
+                  className={`border rounded-lg p-4 transition ${
+                    isOpen ? "bg-amber-50/40 border-amber-300" : "bg-gray-50/50 border-gray-200"
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-semibold text-xs text-gray-900">{rz.label}</span>
+                        <span className="font-mono text-[10px] text-gray-500">{rz.perm}</span>
+                        {isOpen ? (
+                          <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-green-100 text-green-800">
+                            ĐANG MỞ (B)
+                          </span>
+                        ) : (
+                          <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-gray-200 text-gray-700">
+                            ĐANG ĐÓNG (C)
+                          </span>
+                        )}
+                        {rz.delay_minutes > 0 && (
+                          <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-50 text-blue-700 border border-blue-200">
+                            Trì hoãn {rz.delay_minutes} phút
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-[11px] text-gray-600">
+                        <span className="font-medium text-gray-700">Lệnh phụ trách:</span>{" "}
+                        <code className="bg-gray-100 px-1 py-0.5 rounded text-gray-800 font-mono text-[10px]">
+                          {rz.commands.join(", ")}
+                        </code>
+                      </div>
+                    </div>
+
+                    <label className="flex items-center gap-2 cursor-pointer select-none shrink-0">
+                      <input
+                        type="checkbox"
+                        checked={isOpen}
+                        onChange={(e) =>
+                          setRedZoneState((prev) => ({
+                            ...prev,
+                            [rz.perm]: e.target.checked,
+                          }))
+                        }
+                        className="h-4 w-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500"
+                      />
+                      <span className="text-xs font-medium text-gray-800">
+                        {isOpen ? "Mở công tắc" : "Đóng công tắc"}
+                      </span>
+                    </label>
+                  </div>
+
+                  {/* Chi tiết can_do, cannot_do, legal_note */}
+                  <div className="mt-3 pt-3 border-t border-gray-200/80 grid grid-cols-1 md:grid-cols-3 gap-2.5 text-[11px]">
+                    <div className="bg-white/80 p-2.5 rounded border border-gray-100">
+                      <span className="font-semibold text-emerald-700 block mb-0.5">
+                        ✓ AI được phép:
+                      </span>
+                      <span className="text-gray-600 leading-relaxed">{rz.can_do}</span>
+                    </div>
+                    <div className="bg-white/80 p-2.5 rounded border border-gray-100">
+                      <span className="font-semibold text-rose-700 block mb-0.5">
+                        ✕ AI KHÔNG được:
+                      </span>
+                      <span className="text-gray-600 leading-relaxed">{rz.cannot_do}</span>
+                    </div>
+                    <div className="bg-white/80 p-2.5 rounded border border-gray-100">
+                      <span className="font-semibold text-amber-800 block mb-0.5">
+                        ⚖ Pháp lý & Trách nhiệm:
+                      </span>
+                      <span className="text-gray-600 leading-relaxed">{rz.legal_note}</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
 

@@ -324,7 +324,7 @@ class AiCommandCallView(APIView):
                         "text": "Vượt trần của Chủ" if is_over_owner_cap else "Vượt ngưỡng bạn đặt",
                     }
 
-            # 2. Kiểm tra hạn mức ngày (DW-19-AC5)
+            # 2. Kiểm tra hạn mức ngày (DW-19-AC5, DW-25 Q-M10)
             if not downgrade_reason and current_level == "B":
                 today_start = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
                 daily_count = AiAction.objects.filter(
@@ -342,6 +342,41 @@ class AiCommandCallView(APIView):
                         "code": "AI_DAILY_LIMIT",
                         "text": "Vượt hạn mức trong ngày",
                     }
+                elif getattr(spec, "red_zone", False):
+                    # Hạn mức ngày riêng cho lệnh vùng đỏ (Q-M10: 10 lần/ngày)
+                    red_zone_cmd_ids = [s.id for s in get_registry().get_specs() if getattr(s, "red_zone", False)]
+                    rz_daily_count = AiAction.objects.filter(
+                        owner=request.user,
+                        kind=AiAction.Kind.WRITE,
+                        command__in=red_zone_cmd_ids,
+                        created_at__gte=today_start,
+                        status__in=[
+                            AiAction.Status.DONE,
+                            AiAction.Status.CONFIRMED,
+                            AiAction.Status.SCHEDULED,
+                        ],
+                    ).count()
+                    rz_daily_limit = getattr(settings, "AI_DAILY_LIMIT_RED_ZONE", 10)
+                    if rz_daily_count >= rz_daily_limit:
+                        downgrade_reason = {
+                            "code": "AI_DAILY_LIMIT",
+                            "text": "Vượt hạn mức lệnh vùng đỏ trong ngày",
+                        }
+
+            # 3. DW-25-AC1, AC2: Kiểm tra điều kiện sàn cho lệnh chốt lô
+            if not downgrade_reason and current_level == "B":
+                if spec.id == "inventory.batch.close" or (getattr(spec, "required_perms", ()) and "inventory.close_batch" in spec.required_perms):
+                    from apps.inventory.models import Batch
+                    from apps.ai.execution.safety import check_ai_close_batch_conditions
+                    b_target = None
+                    if target_id is not None:
+                        if str(target_id).isdigit():
+                            b_target = Batch.objects.filter(pk=int(target_id)).first()
+                        if not b_target:
+                            b_target = Batch.objects.filter(batch_id=str(target_id)).first()
+                    ok, close_reason = check_ai_close_batch_conditions(b_target)
+                    if not ok:
+                        downgrade_reason = close_reason
 
             # Nếu có downgrade_reason hoặc current_level == "C": tạo đề xuất nháp PENDING
             if downgrade_reason or current_level == "C":
@@ -401,9 +436,12 @@ class AiCommandCallView(APIView):
             # Đến đây: current_level == "B" và không bị hạ mức
             undo_attr = getattr(spec, "undo", "") or ""
 
-            # TRƯỜNG HỢP 1: Lệnh trì hoãn ghi (DW-21)
+            # TRƯỜNG HỢP 1: Lệnh trì hoãn ghi (DW-21, DW-25)
             if undo_attr == "defer":
-                delay_minutes = getattr(spec, "delay_minutes", None) or getattr(settings, "AI_DEFERRED_DELAY_MINUTES", 10)
+                if getattr(spec, "red_zone", False):
+                    delay_minutes = getattr(settings, "AI_RED_ZONE_DELAY_MINUTES", 30)
+                else:
+                    delay_minutes = getattr(spec, "delay_minutes", None) or getattr(settings, "AI_DEFERRED_DELAY_MINUTES", 10)
                 execute_after = timezone.now() + datetime.timedelta(minutes=delay_minutes)
                 undo_until = execute_after
 

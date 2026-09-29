@@ -59,7 +59,7 @@ class BatchViewSet(DocumentViewSet):
         batch = services.publish_batch(batch=self.get_object(), actor=request.user)
         return Response(self.get_serializer(batch).data)
 
-    @action(detail=True, methods=["post"], required_perms=("inventory.close_batch",), ai=AiMeta(keywords=("chot_lo", "chốt lô")))
+    @action(detail=True, methods=["post"], required_perms=("inventory.close_batch",), ai=AiMeta(keywords=("chot_lo", "chốt lô"), undo="defer"))
     def close(self, request, pk=None):
         """Chốt sổ lô cá sau khi bán hết hoặc quá hạn đã kiểm kê."""
         require_perm(request.user, "inventory.close_batch")
