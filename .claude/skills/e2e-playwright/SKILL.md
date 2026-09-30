@@ -57,3 +57,35 @@ with sync_playwright() as p:
 - Bấm đúp nút đặt hàng → chỉ tạo 1 đơn.
 - Không có giá vốn, lãi lỗ, hay dữ liệu nội bộ nào trong HTML Shop (`page.content()`).
 - Console không có lỗi đỏ.
+
+## Đặt tên (P8b, Duy chốt 01/10)
+
+Định danh trong code (hàm, biến, class, module, thư mục, file, test, script, route API, khoá JSON, biến env, Group,
+`data-testid`, id lệnh AI, khoá lưu trình duyệt) là **tiếng Anh chuẩn, không viết tắt tiếng Việt**. Chữ hiển thị cho người
+dùng, comment, docstring và tài liệu vẫn tiếng Việt. Viết tắt chỉ dùng khi là chuẩn quốc tế: `VN`, `VND`, `pnl`, `id`, `url`.
+Không đưa mã lô giao việc (`lo7`, `l8`, `p8_lo5`) vào tên; mã lô/story ghi trong docstring.
+
+| Khái niệm | Dùng | Không dùng |
+|---|---|---|
+| Vai (Group) | `owner` `manager` `warehouse_staff` `delivery_staff` `customer_service` | `chu` `quan_ly` `nv_kho` `nv_giao` `cskh` |
+| Người giao trên một phiếu | `courier` | `nv_giao` |
+| Việc gọi xác nhận đơn | `confirmation` | `cskh` (module, route, khoá JSON, env) |
+| Nhập lô | `receive_batches`, `ReceiveBatches*` | `nhap_lo`, `NhapLo*` |
+| Lệnh AI: nhóm / mức nhạy cảm | `purchasing` `sales` `customer_service` / `high` `medium` `low` | `thu_mua` `ban_hang` / `cao` `trung_binh` `thap` |
+| Giờ Việt Nam | `VN_TIME_ZONE`, `todayInVietnam()`, `today_in_vietnam()` | `VN_TZ`, `todayVn`, `vn_today` |
+| Bản rà soát QA / bổ sung | `review_*` / `extra`, `followup` | `ra_soat_*` / `bosung` |
+
+Giữ nguyên (không đổi): migration đã chạy, `AuditLog.action` đã ghi, dòng phiên bản cấu hình AI cũ, URL công khai Shop
+`/bai-viet/` `/trang/` `?chuyen-muc=`, dữ liệu demo (username `kho1`, `chu_vua`..., slug, mã hàng), keyword AI có dấu, chuỗi `cangca`.
+Bảng đầy đủ: `doc/features/2026-09-30-dat-ten-tieng-anh/02c-giao-viec.md` mục 1.
+
+**Kiểm bằng máy** (Python 3 stdlib, chạy từ gốc repo, dưới 10 giây, không cần venv):
+`python3 scripts/check_naming.py`. Exit 1 khi file MỚI có định danh tiếng Việt, hoặc số vi phạm của một file TĂNG so với
+`scripts/naming_baseline.json`; in file, dòng, token. Script không xét chuỗi hiển thị, comment, docstring. Danh sách từ chặn và
+allowlist ở `scripts/naming_blocklist.txt`. Chạy lệnh này trước khi báo xong mọi việc có sửa code.
+
+**Kịch bản e2e**: tên file và hàm đặt tiếng Anh theo hành vi (`test_customer_places_order.py`, `check_cash_on_delivery_flow`),
+không đặt mã lô (`lo7`, `l8`, `p8_lo5`) vào tên. Bản rà soát QA do kịch bản sinh ra dùng tiền tố `review_*` (không dùng `ra_soat_*`).
+Dữ liệu demo (username `kho1`, `chu_vua`...) là dữ liệu, không phải định danh, nên giữ. `data-testid` mà kịch bản bám là tiếng Anh
+(vd `confirmation-policy-notice`); đổi `data-testid` thì đổi cùng lúc ở FE và kịch bản. Chạy `python3 scripts/check_naming.py`
+sau khi thêm hoặc đổi tên kịch bản; script quét cả thư mục e2e (định danh và tên file).

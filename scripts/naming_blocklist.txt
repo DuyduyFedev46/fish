@@ -1,0 +1,176 @@
+# Danh sách từ tiếng Việt (không dấu) bị chặn trong ĐỊNH DANH (scripts/check_naming.py, P8b Lô 0).
+# Đọc kèm: doc/features/2026-09-30-dat-ten-tieng-anh/02c-giao-viec.md §1 (glossary), §3 Lô 0.
+# Nguồn: từ điển của bản rà soát 30/09 (01-ra-soat-dat-ten.md) + dò tần suất toàn repo ngày 01/10.
+#
+# Cú pháp (mỗi dòng một mục, "#" bắt đầu ghi chú):
+#   từ               chặn từ đơn (so khớp sau khi tách snake/camel/kebab và bỏ chữ số cuối: kho1 -> kho)
+#   a+b              chặn CẶP từ liền nhau trong cùng một tên (cho từ trùng nghĩa tiếng Anh)
+#   re:mẫu           regex, khớp TOÀN BỘ một từ đã tách (đã hạ chữ thường, còn chữ số cuối)
+#   testname:mẫu     như re: nhưng chỉ áp cho tên file/thư mục của file test/e2e
+#
+# ALLOWLIST (từ tiếng Việt cố ý KHÔNG chặn từ đơn, chỉ bị chặn khi đi thành cặp ở cuối file):
+#   ton don hang ban chi mat tra ra so ke ve con cho co la ho ten the no ma di an thu bai muc trang nha tom
+#   lo loc cu hoa nhan vien lam moi lai tu da doi dau du sau le cap be ca
+#   Lý do (đúng từng nhóm):
+#   - Trùng từ tiếng Anh hợp lệ: ban, no, be, the, cap, con, co, la, di, an, so, ra, tra, chi, mat, ten, nha, tom, da, le, du, cu,
+#     lo (lot), hoa, loc, tu, ca, ma, ho, doi, dau, lam, moi, lai, ve, cho, ke, thu.
+#   - Nằm trong URL công khai, slug, dữ liệu demo hoặc mã business rule (BR-LO-04, BR-HT-04, TOM-SU-1, /bai-viet/, /trang/): bai, muc, trang.
+#   - Từ quá phổ biến trong tên tiếng Anh dạng viết tắt hoặc nhãn: nhan, vien, sau.
+#   Chúng chỉ bị chặn khi đi thành cặp tiếng Việt bên dưới (trang+thai, nhan+vien, don+hang...).
+# Muốn miễn thêm một từ mà code sản phẩm dùng làm định danh chính thức: DỪNG và hỏi Duy (02c Lô 0).
+
+# ---- Bắt buộc theo 02c Lô 0 ----
+cskh
+nhap
+kho
+giao
+chu
+nv
+soat
+bosung
+tien
+quan+ly
+thu+mua
+ban+hang
+bo+sung
+qua+han
+qa+lo
+re:lo[0-9]+
+testname:l[0-9]+
+
+# ---- Viết tắt tiếng Việt ----
+ql
+ncc
+sdt
+mk
+matkhau
+quanly
+
+# ---- Từ tiếng Việt không có nghĩa tiếng Anh ----
+khong
+duoc
+khac
+chua
+phieu
+cua
+khoa
+khi
+von
+giu
+thi
+chung
+phan
+viec
+thay
+nguoi
+truoc
+cung
+thieu
+khach
+nhom
+sua
+vao
+pham
+dinh
+xac
+voi
+nhat
+xoa
+minh
+tinh
+nho
+khop
+ngoai
+lenh
+dem
+thuong
+ngay
+khoi
+choi
+phai
+hom
+danh
+nua
+tac
+nhieu
+khoan
+lanh
+buoc
+tiet
+vuot
+hinh
+xuat
+tiep
+som
+kiem
+luu
+xem
+tren
+cac
+deu
+thang
+luong
+rac
+rieng
+chuyen
+tuoi
+nguoc
+nhung
+canh
+duong
+duoi
+chon
+diep
+giua
+phien
+goc
+nghiep
+nhau
+gioi
+nao
+thua
+thuc
+nghi
+trong
+anh
+hai
+gia
+ghi
+hoan
+huy
+toan
+loi
+cong
+khau
+chinh
+gio
+sach
+
+# ---- Cặp từ (mỗi từ riêng lẻ là từ tiếng Anh hợp lệ) ----
+don+hang
+hang+hoa
+mat+hang
+lo+hang
+chot+lo
+tra+ton
+tra+don
+tra+hang
+mat+khau
+ton+kho
+trang+thai
+ly+do
+hien+tai
+ket+qua
+nhan+vien
+bao+cao
+tao+moi
+dang+ban
+
+# ---- Tên glossary 02c cột "Không dùng" (mức nhạy cảm lệnh AI, giờ Việt Nam) ----
+cao
+thap
+trung+binh
+vn+tz
+today+vn
+vn+today
+year+vn
