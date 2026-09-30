@@ -305,3 +305,70 @@ Ký hiệu: T = `cn.issued_at`, H = Σ phiếu hoàn REFUNDED có `confirmed_at 
 ### Ghi chú
 - 02b §4.4 (công thức) chưa phản ánh D1-B, E1 và E2. Techlead sẽ cập nhật 02b theo code hiện tại. 02-stories.md đã có ghi chú đổi AC dưới SR-14 (câu "chỉ trừ chứng từ lập trước `closed_at`" khớp với code `<=`, vì trùng timestamp chỉ xảy ra trong test).
 - L1 và L2 của lần 1 vẫn còn hiệu lực. L2 đã được làm một phần: dry-run đã liệt kê riêng lô CLOSED, nhưng chưa in tháng huỷ hay tháng hoàn. Với E1 thì L2 không còn cần thiết, vì lập bù luôn ghi vào kỳ hiện tại.
+
+## Lô 5
+> Techlead · 2026-09-30 · Diff chưa commit (`git diff` + file chưa track). Story SR-15, SR-16, SR-17 (+F11).
+
+### Kết luận: **CẦN SỬA — 2 lỗi Low, chỉ ở test (T5-1, T5-2). Code BE/FE đạt.**
+Sửa xong 2 test thì Lô 5 PASS, không cần review lại code. Riêng M5-1 (mock lọt bản build thật) là lỗi **có từ trước** (commit `18406ce`, 27/09),
+không thuộc diff Lô 5 và không chặn Lô 5, nhưng chặn lần deploy ERP kế tiếp (runbook yêu cầu `grep demo1234 out` = 0).
+
+### Lệnh kiểm chứng đã chạy trong lượt review
+- `cd backend && DJANGO_DEBUG=1 env -u DATABASE_URL .venv/bin/python manage.py test apps.inventory apps.reports apps.delivery apps.ai` → `Ran 547 tests ... OK`.
+- `manage.py makemigrations --check --dry-run` → `No changes detected`.
+- `cd erp-console && npm test` → `Test Files 10 passed`, `Tests 103 passed`.
+- Quét `erp-console/out/` (bản build thật hiện có): chuỗi mock riêng của `features/inventory/mock.ts`, `overview/mock.ts`, `dashboardSummary.mock.ts` = 0.
+  Chuỗi mock của `features/auth/mock.ts` (123/139 chuỗi, gồm `password:"demo1234"`, SĐT giả `0909000222`) và `features/catalog/mock.ts` (29/38) **có** trong
+  `out/_next/static/chunks/2800-*.js` (nạp ở `/catalog/`, `/purchasing/`). Xem M5-1.
+
+### Đối chiếu từng điểm
+| Điểm | Kết quả |
+|---|---|
+| Migration `inventory/0004` | Đúng 2 operation: `AlterField(movement_type)` thêm `SUPPLIER_RETURN` (15 ký tự, `max_length=16` giữ nguyên) + `CreateModel(BatchSupplierReturn)` (`default_permissions=("view",)`, FK `PROTECT`, `request_id` unique). Không có thay đổi ngoài 2 model. Khớp 02b §5.2. |
+| `supplier_refund_amount` không lọt | Response 200/400/403 không có tiền (test sentinel `1234567`). AuditLog: khoá nằm trong `changes`, thuộc `COST_KEYS` (`common/cost_keys.py:19`), `note` audit chỉ ghi kg. Không đăng ký Admin. `BatchSerializer` không thêm field. AI: lệnh `return_to_supplier` trần C + `force_c`; `AiAction.args` qua `scrub_data` lọc `SCRUB_COST_KEYS`; registry chỉ lộ tên field trong schema, không lộ giá trị. `batch_pnl` chỉ Chủ (`view_profitreport`). Đạt. |
+| `total_cost`, landed cost, `period_pnl` | `total_cost = purchase_cost + allocated_cost − Σ tiền NCC hoàn` (`reports/services.py`). `landed_unit_cost`, `recompute_landed_cost`, `period_pnl` không đổi (diff không đụng). Đạt. |
+| Quy tắc Duy 30/09 (lô đã chốt không đổi số) | Trả NCC từ chối lô chốt (`check_process_expired_stock` → BR-LO-05), nên `total_cost`/`profit` của lô CLOSED không đổi. Logic Lô 4 (`closed_at`) giữ nguyên. Riêng F11 đổi con số **hiển thị** `expired_qty`/`expired_cost` của lô cũ có `WRITE_OFF` do huỷ phiếu nhập. Hai khoá này không cộng vào `total_cost` (TL-4), nên `profit` không đổi. Xem D5-1. |
+| F11 `expired_qty` | Lọc `reference__startswith="cancel_expired_batch "`. Chuỗi reference này có từ commit `c0c4272` và chưa đổi lần nào, nên dữ liệu cũ vẫn đếm đúng. `ReturnToStock` WRITE_OFF ghi `qty_change=0` nên trước đây cũng không bị đếm. Đạt. |
+| Kho: `SUPPLIER_RETURN` âm, khoá lô | `select_for_update` lô trước mọi phép kiểm; `record_movement(-qty)` khoá lại và chặn âm. Đạt. |
+| `request_id` idempotent | Kiểm sau khi khoá lô, nên hai request cùng lô được xếp hàng và request sau thấy bản ghi của request trước (READ COMMITTED đọc lại ở câu lệnh mới). Mã dùng cho lô khác → 400 BR-MH-08 (`services.py:399`), nhưng **chưa có test** (T5-2). Ca lý thuyết: hai request cùng UUID trên hai lô khác nhau chạy đồng thời thì request sau gặp `IntegrityError` → 500. UUID do FE sinh theo từng form nên ca này không xảy ra thực tế. Ghi nhận, không sửa. |
+| Tranh chấp với giữ chỗ / huỷ | Còn giữ chỗ → cả hai xác nhận bị chặn (BR-LO-07, `_check_expired_reserved`). Trả NCC ↔ huỷ lô: cùng khoá dòng lô. Huỷ trước thì trả gặp `CANCELLED` → 400. Trả trước thì huỷ có `confirm_qty` cũ → 400 "Tồn đã đổi". Lô EXPIRED không nằm trong `sellable_batches` nên không phát sinh giữ chỗ mới. Đạt. |
+| BR-LO-04 gỡ ngoại lệ | `check_close_batch`: `if batch.qty_available > ZERO` → BR-LO-04 với mọi trạng thái. `check_ai_close_batch_conditions` (`ai/execution/safety.py:38`) gọi lại `check_close_batch` nên tự chặn, nhưng **chưa có test** cho vế "luật sàn AI" của SR-15-AC1 (T5-1). Lô CANCELLED tồn 0 vẫn chốt được. Đạt. |
+| Attention 403 / khoá mới | `attention_api.py:36-38`: 403 chỉ khi thiếu cả 4 quyền. `expired_batches_open` chỉ trả cho người có `inventory.cancel_expired_batch`, và chỉ là số đếm. Có test cho các ca: chỉ có quyền này thì 200, `quan_ly` không có khoá, `nv_giao` 403, khách 401. Đạt. |
+| Dashboard `recent_orders` | Còn đúng 5 khoá `{code, amount, status, status_label, expires_at}`, bỏ `select_related("customer")`, không rẽ nhánh theo nhóm. Test so tập khoá cho chu/quan_ly/nv_kho và quét tên, SĐT, `0456`. Đạt. Các khối khác (`batches`, `alerts`, `activity`) không có dữ liệu khách. `reference` của `SUPPLIER_RETURN` là `supplier_return SR-<id>`, không có tiền. |
+| Phân quyền | Action có `required_perms` + `require_perm` + `custom_perm_actions` (Tầng 1+2). Ma trận 5 nhóm + 401 + 404 có test. Không có quyền mới, không có migration Group. Đạt. |
+| FE: không lộ tiền hoàn | `ReturnToSupplierResult` không có tiền. Thông báo sau khi lưu chỉ nêu kg. Ô tiền chỉ nhận chữ số, tối đa 12 ký tự (< 10^12, khớp giới hạn BE). Đạt. |
+| FE: `confirm_qty` | Hộp "Đã huỷ phần tồn" ghi lại `confirmQty` lúc mở, nêu số kg đó, rồi gửi `decimalKg(confirmQty)`. Lỗi 400 BR-LO-07 hiện `detail` kèm nút "Tải lại". Đạt. |
+| FE: chặn bấm đúp | Form trả NCC chặn bằng `submitting` ref cộng nút bị khoá, và `request_id` giữ nguyên suốt phiên form. Hộp huỷ/chốt chỉ chặn bằng state `busy` (`BatchDetailSheet.tsx:105`). Nếu bấm lần hai trước khi React vẽ lại thì request thứ hai nhận 400 (lô đã `CANCELLED`/`CLOSED`), không ghi thêm gì. Low, xem L5-2. |
+| FE: Tổng quan không PII | Đã bỏ cột "Khách", bỏ `customer` khỏi `matches`, đổi `RecentOrder` type, mock seed hết tên và SĐT. Vitest quét tên. Đạt. |
+| FE: mock lọt build | Các hàm mới của Lô 5 dùng `process.env.NEXT_PUBLIC_USE_MOCK === "1"` viết thẳng tại chỗ, và bản build thật không còn chuỗi mock inventory/overview. Rà các feature khác: `features/content/api.ts:48` (`const isMock` cấp module) và `auth/components/LoginScreen.tsx:16` (`const MOCK`) **không** lọt (terser gập được hằng trong cùng module). `features/catalog/api.ts:5,28,47` dùng `USE_MOCK` **import** từ `shared/lib/http.ts:16` thì terser không gập được, nên cả `catalog/mock.ts` lẫn `auth/mock.ts` (catalog mock import auth mock) lọt vào bản thật. Xem M5-1. |
+
+### Chốt các lệch be-dev và fe-dev nêu
+| # | Lệch | Quyết định |
+|---|---|---|
+| a | `test_cancel_expired.py::test_dw06_ac6_guidance_next_steps_expired_then_cancelled` đổi nhãn và `close` luôn hiện | **Đã chạm điểm dừng theo câu chữ**: test cũ ngoài S04 đỏ vì bỏ ngoại lệ EXPIRED ở tầng Tiếp theo. Tuy vậy assert mới đúng từng chữ với 02b §5.3 ("bỏ điều kiện `status != EXPIRED` ở bước 4") và SR-15-AC3 (nhãn, `close` `allowed=false` + BR-LO-04), không nới kiểm tra nào, và dev đã báo thay vì lặng lẽ sửa. **Chấp nhận**, không cần Duy quyết. Điểm dừng nhằm bắt hành vi *ngoài thiết kế* bị đổi, còn ca này là hành vi thiết kế yêu cầu đổi. |
+| b | 3 test ngoài danh sách 02c (`test_discipline.py` 23→24, snapshot registry, `test_cskh_l4 cs15_ac1` +khoá) | **Chấp nhận.** Đây là hệ quả cơ học, trực tiếp của action và khoá mới trong 02b §5.4. Không nới điều kiện nào: `required_perms` vẫn bắt buộc, snapshot chỉ thêm 1 lệnh, tập khoá vẫn so bằng `assertEqual(set)`. Lỗi nằm ở danh sách file của 02c (techlead bỏ sót), không phải lỗi dev. |
+| c | Serializer đầu vào dùng chuỗi lỏng | **Chấp nhận.** Service là lớp kiểm thật (`_parse_decimal` loại NaN/Infinity/bool, kiểm số lẻ), nên mọi lỗi đều về một dạng 400 `{code: BR-MH-08}`. Schema AI mô tả field là chuỗi, và vì lệnh ở trần C nên chỉ soạn nháp, không gây rủi ro. |
+| d | Chặn số lẻ (>3 kg, >2 tiền) và tiền ≥ 10^12 | **Chấp nhận.** Tránh 500 do vượt `max_digits`, và nhất quán với cột. |
+| e | `cancel_expired` không gắn `input_serializer` | **Chấp nhận.** Giữ nguyên registry/snapshot (lệnh `form_only`). `confirm_qty` là tuỳ chọn, nên lệnh AI không gửi thì hành vi vẫn như cũ (đúng SR-15-AC5 "giữ tương thích lệnh AI"). |
+| FE-1 | Sửa `shared/lib/dashboardSummary.ts` + `.mock.ts` | **Chấp nhận, bắt buộc phải sửa.** `RecentOrder` là type dùng chung, nếu không sửa thì FE vẫn khai `customer`. 02b §5.7 ghi thiếu file này. |
+| FE-2 | `features/guidance/mock.ts` và `features/overview/mock.ts:7` import `features/inventory/mock` | **Chấp nhận tạm** (chỉ là mock, và đã kiểm là không lọt bản thật). Cách này trái quy tắc "module không import ruột module khác". Nên chuyển state lô quá hạn giả sang `shared/lib/expiredBatches.mock.ts` khi có đợt sửa FE sau (L5-3). |
+| FE-3 | Danh sách EXPIRED chỉ lấy trang 1 (50 dòng), lọc tồn > 0 ở FE, không có tên mặt hàng/NCC | **Chấp nhận cho Lô 5, ghi nợ L5-1.** Lô EXPIRED tồn 0 chưa chốt vẫn giữ trạng thái EXPIRED. Khi số lô loại này nhiều lên, trang 1 có thể toàn lô tồn 0, và danh sách sẽ ít dòng hơn con số trên thẻ. |
+
+### Việc sửa
+| # | Mức | File:dòng | Việc |
+|---|---|---|---|
+| T5-1 | **Low, trước commit** (AC chưa có bằng chứng) | `backend/apps/inventory/batches/tests/test_p8_lo5_expired_return.py` (lớp `SR15CloseExpiredTests`) | SR-15-AC1 yêu cầu "luật sàn AI chốt lô (DW-25) cũng chặn". Thêm test: lô EXPIRED còn 3 kg, gọi `apps.ai.execution.safety.check_ai_close_batch_conditions(batch)` → `ok is False` và `reason["text"]` chứa "tồn = 0". Kế thừa fixture của `test_p8_close_batch_sold.py:78`. |
+| T5-2 | **Low, trước commit** | cùng file (lớp `SR16ReturnToSupplierTests`) | Test cho nhánh `services.py:398-399`: Chủ trả NCC ở lô A với `request_id=X` (200), rồi gửi `request_id=X` cho lô B (EXPIRED, còn tồn) → 400 `BR-MH-08`. Tồn lô B và số `BatchSupplierReturn` của lô B không đổi. |
+| M5-1 | **Medium, có từ trước** (không thuộc Lô 5), phải sửa trước lần deploy ERP kế tiếp | `erp-console/features/catalog/api.ts:5`, `:28`, `:47` | Thay `USE_MOCK ? mockX : undefined` bằng `process.env.NEXT_PUBLIC_USE_MOCK === "1" ? mockX : undefined` viết thẳng tại chỗ (mẫu của Lô 5). Cách kiểm: `npm run build` (bản thật), sau đó `grep -rl "demo1234\|mock-token-\|cave_erp_mock_users" out` phải = 0 (runbook `2026-09-24-erp-console-noi-that/05-deploy-1-runbook.md:50`). Tuỳ chọn: bỏ `export` của `USE_MOCK` ở `shared/lib/http.ts:16` để không ai import lại. Hiện `out/_next/static/chunks/2800-*.js` chứa danh sách tài khoản mock, mật khẩu `demo1234` và SĐT giả. Đây không phải dữ liệu thật và backend không dùng mật khẩu này, nhưng trái quy ước build sạch và làm lộ cấu trúc quyền. |
+| L5-1 | Low (backlog Lô 7) | `erp-console/features/inventory/api.ts:67-75`; `backend/apps/inventory/batches/serializers.py:28` (`BatchListQuery`) | BE thêm tham số `has_stock=1` (lọc `qty_available__gt=0`) và các khoá tên (`item_name`, `supplier_name`, `warehouse_name`, `status_label`) cho danh sách lô. FE bỏ lọc phía máy. |
+| L5-2 | Low (backlog) | `erp-console/features/inventory/components/BatchDetailSheet.tsx:104-105` | `runSimple` nên chặn bấm đúp bằng `useRef` như `ReturnToSupplierDialog`. Hiện tại lần bấm thứ hai chỉ nhận 400 vô hại. |
+| L5-3 | Low (backlog) | `erp-console/features/overview/mock.ts:7`, `erp-console/features/guidance/mock.ts:5` | Chuyển state mock lô quá hạn lên `shared/lib/`. |
+| L5-4 | Low (backlog, ngoài phạm vi) | `backend/apps/inventory/batches/timeline.py:50-66`; `backend/apps/ai/execution/safety.py:23` | Thêm nhãn "Trả NCC" cho `SUPPLIER_RETURN` trong Sổ chi tiết. Sửa docstring "tồn = 0 hoặc EXPIRED/CANCELLED" (dev đã ghi nợ). |
+
+### Cần Duy quyết / biết
+- **D5-1 (biết, không chặn):** F11 (SR-15-AC6, Duy đã duyệt) làm đổi **số hiển thị** "kg hết hạn / tiền hết hạn" của lô **đã chốt** nếu lô đó có phần tồn bị xoá do huỷ phiếu nhập (trước đây bị đếm nhầm là hết hạn, nay về 0). **Lãi lỗ và tổng chi phí của lô đó không đổi**, vì hai số này chỉ để hiển thị và không cộng vào chi phí. Techlead đề nghị giữ nguyên, vì đây là sửa nhãn sai, không phải đổi con số lời lỗ. Nếu Duy muốn giữ đúng từng chữ quy tắc "lô đã chốt không đổi số" thì dev có thể áp F11 chỉ cho lô chưa chốt (`closed_at` rỗng).
+- **M5-1:** sửa theo luồng NHANH riêng, hoặc gộp vào commit Lô 5. Techlead đề nghị gộp vào Lô 6 (lô FE), nhưng phải sửa trước mọi lần deploy ERP.
+
+### Ghi chú
+- 02b §5.7 và 02c dòng Lô 5 thiếu các file `shared/lib/dashboardSummary*.ts`, `ai/registry/tests/*`, `delivery/tests/test_cskh_l4.py`. Đây là thiếu sót của techlead, không phải lệch do dev.
+- Ô ghi chú ở FE chặn `\d{8,}`, còn BE dùng `has_long_digit_run` (≥ 9 chữ số, tính cả khi có dấu cách). Hai bên lệch nhau nhưng vô hại, vì BE mới là lớp chặn thật.

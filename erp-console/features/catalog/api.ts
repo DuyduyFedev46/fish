@@ -2,7 +2,7 @@
 // Danh sách mặt hàng + tải/thay ảnh. Endpoint ảnh gửi multipart/form-data — KHÔNG tự đặt
 // Content-Type (shared/lib/http.ts lo phần đó khi body là FormData).
 
-import { apiFetch, USE_MOCK, type Paginated } from "@/shared/lib/http";
+import { apiFetch, type Paginated } from "@/shared/lib/http";
 import { matches } from "@/shared/lib/search";
 import { mockListItems, mockUploadImage } from "./mock";
 import type { CatalogItem, ImageFilter, UploadImageInput, UploadImageResponse } from "./types";
@@ -25,7 +25,7 @@ function queryOf(filter: ImageFilter, page: number): string {
  */
 export function listItems(filter: ImageFilter, page = 1): Promise<Paginated<CatalogItem>> {
   return apiFetch<Paginated<CatalogItem>>(`/api/catalog/items/${queryOf(filter, page)}`, {
-    mock: USE_MOCK ? mockListItems : undefined,
+    mock: process.env.NEXT_PUBLIC_USE_MOCK === "1" ? mockListItems : undefined,
   });
 }
 
@@ -44,6 +44,6 @@ export function uploadItemImage(itemId: number, input: UploadImageInput): Promis
   return apiFetch<UploadImageResponse>(`/api/catalog/items/${itemId}/image/`, {
     method: "POST",
     body: fd,
-    mock: USE_MOCK ? mockUploadImage : undefined,
+    mock: process.env.NEXT_PUBLIC_USE_MOCK === "1" ? mockUploadImage : undefined,
   });
 }

@@ -88,7 +88,6 @@ function Body({ data, q, onClearSearch }: { data: OverviewData; q: string; onCle
               <thead>
                 <tr>
                   <th scope="col">Mã đơn</th>
-                  <th scope="col">Khách</th>
                   <th scope="col" className="r">Giá trị</th>
                   <th scope="col">Trạng thái</th>
                 </tr>
@@ -98,7 +97,6 @@ function Body({ data, q, onClearSearch }: { data: OverviewData; q: string; onCle
                   orders.map((o) => (
                     <tr key={o.code}>
                       <td className="code m-first" data-label="Mã đơn">{o.code}</td>
-                      <td className="m-title" data-label="Khách">{o.customer}</td>
                       <td className="r num m-fig" data-label="Giá trị">
                         <Figure text={vnd(o.amount)} />
                       </td>
@@ -109,7 +107,7 @@ function Body({ data, q, onClearSearch }: { data: OverviewData; q: string; onCle
                   ))
                 ) : (
                   <EmptyRow
-                    cols={4}
+                    cols={3}
                     searching={searching}
                     onClearSearch={onClearSearch}
                     emptyText="Chưa có đơn nào"
@@ -210,7 +208,7 @@ export function OverviewScreen() {
       <Toolbar
         query={q}
         onQuery={setQ}
-        placeholder="Tìm đơn, lô, khách, mặt hàng…"
+        placeholder="Tìm đơn, lô, mặt hàng…"
         onRefresh={() => void res.reload()}
         refreshing={res.loading}
         asOf={res.data?.as_of}
@@ -220,7 +218,7 @@ export function OverviewScreen() {
         skeleton={
           <SkeletonScreen>
             <SkeletonKpis />
-            <SkeletonTable rows={5} cols={4} />
+            <SkeletonTable rows={5} cols={3} />
             <SkeletonTable rows={6} cols={6} />
           </SkeletonScreen>
         }

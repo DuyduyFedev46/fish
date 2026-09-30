@@ -76,14 +76,10 @@ class DashboardSummaryView(APIView):
         near_expiry_count = near_expiry.count()
 
         # ---- Đơn gần đây ----
-        orders = (
-            SalesOrder.objects.select_related("customer")
-            .order_by("-created_at", "-id")[:8]
-        )
+        # SR-17 (bất biến 9): KHÔNG trả tên/SĐT khách — dashboard xem bởi nhiều nhóm, mở đơn ở màn Đơn hàng.
+        orders = SalesOrder.objects.order_by("-created_at", "-id")[:8]
         recent_orders = [{
             "code": o.code,
-            "customer": o.customer.name or "Khách lẻ",
-            "phone_last4": (o.phone or "")[-4:],
             "amount": _money(o.total_amount),
             "status": o.status,
             "status_label": o.get_status_display(),

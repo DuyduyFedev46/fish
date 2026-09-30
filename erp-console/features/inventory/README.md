@@ -9,10 +9,22 @@ Story: **S8** (chuyển view "Kho & Lô" của bản HTML cũ + tab "Hoạt đ�
   `inventory.view_stockledgerentry` (L2: GET danh sách back-office đòi quyền view_*).
 - Quyền xem màn (FE): `inventory.view_batch`. Tab "Hoạt động" cũng chỉ tải khi có quyền này, và chỉ khi được mở.
 
+## Lô Quá hạn còn tồn (P8 Lô 5 — SR-15, SR-16, BR-LO-07, BR-MH-08)
+
+- `/inventory/?status=EXPIRED` (thẻ "Lô quá hạn còn tồn" ở Tổng quan → Cần chú ý) đọc `GET /api/inventory/batches/?status=EXPIRED`
+  (trang đầu, chỉ giữ lô còn tồn). Danh sách này chỉ có mã mặt hàng, không có tên NCC/kho nên bỏ hai cột đó.
+- Chi tiết lô Quá hạn vẽ nút theo `next_steps` (chỉ Chủ thấy; lô đang giữ chỗ thì khoá kèm lý do):
+  **Xác nhận Đã huỷ phần tồn** (gửi `confirm_qty` = tồn đang hiển thị), **Xác nhận Đã trả NCC** (form kg + tiền NCC hoàn + ghi chú,
+  `request_id` sinh khi mở form), **Chốt lô** (khoá kèm lý do khi còn tồn, BR-LO-04). Tiền NCC hoàn không hiện lại sau khi lưu.
+- Công cụ thử ở mock: `window.__caveMock.expiredSetQty("L0908-CT00", 2)` (đổi tồn "phía máy chủ"), `expiredState()`, `expiredReset()`.
+
 | File | Làm gì |
 |---|---|
-| `api.ts` | `getInventory()`, `getActivity()`, `filterBatches()` |
-| `mock.ts` | mock endpoint (seed chung; `unit_cost` theo quyền người đăng nhập) |
-| `types.ts` | `InventoryData`, `ActivityData`, `BatchRow`, `LedgerActivity` |
-| `components/InventoryScreen.tsx` | màn Kho & lô |
+| `api.ts` | `getInventory()`, `getActivity()`, `filterBatches()`, `getBatchesByStatus()`, `cancelExpiredBatch()`, `returnToSupplier()`, `closeBatch()` |
+| `mock.ts` | mock endpoint (seed chung; `unit_cost` theo quyền) + 3 lô quá hạn bịa và trạng thái trong bộ nhớ |
+| `types.ts` | `InventoryData`, `ActivityData`, `BatchRow`, `LedgerActivity`, `ReturnToSupplierInput/Result`, `BatchApiRow` |
+| `components/InventoryScreen.tsx` | màn Kho & lô (+ chế độ lọc theo `?status=`) |
+| `components/BatchDetailSheet.tsx` | chi tiết lô + nút thao tác lô Quá hạn |
+| `components/ReturnToSupplierDialog.tsx` | form Đã trả NCC |
+| `components/ModalDialog.tsx` | hộp thoại nhỏ mở trên tấm chi tiết (bẫy Tab/Esc riêng) |
 | `components/ActivityFeed.tsx` | tab "Hoạt động" (8 dòng sổ kho), ghép vào cột phải ở `app/(console)/layout.tsx` |

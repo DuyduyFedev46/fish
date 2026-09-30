@@ -13,6 +13,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.delivery.models import ConfirmationTask, DeliveryNote, LabelPrint
+from apps.inventory.models import Batch
 
 
 class DashboardAttentionView(APIView):
@@ -22,7 +23,8 @@ class DashboardAttentionView(APIView):
     - confirm_with_customer: cskh_queue_waiting, refund_calls_open
     - decide_unconfirmed: cskh_escalated, cskh_auto_cancel_blocked
     - print_label: labels_not_printed, labels_to_void
-    Không có quyền nào trong 3 quyền trên -> 403.
+    - inventory.cancel_expired_batch (Chủ): expired_batches_open — số lô Quá hạn còn tồn (BR-LO-07, SR-15)
+    Không có quyền nào trong 4 quyền trên -> 403.
     """
     permission_classes = [permissions.IsAuthenticated]
 
@@ -31,8 +33,9 @@ class DashboardAttentionView(APIView):
         has_confirm = user.has_perm("delivery.confirm_with_customer")
         has_decide = user.has_perm("delivery.decide_unconfirmed")
         has_print = user.has_perm("delivery.print_label")
+        has_expired = user.has_perm("inventory.cancel_expired_batch")
 
-        if not (has_confirm or has_decide or has_print):
+        if not (has_confirm or has_decide or has_print or has_expired):
             raise PermissionDenied("Bạn không có quyền xem thông tin chú ý.")
 
         now = timezone.now()
@@ -89,5 +92,11 @@ class DashboardAttentionView(APIView):
 
             res["labels_not_printed"] = labels_not_printed
             res["labels_to_void"] = labels_to_void
+
+        # 4. Lô quá hạn còn tồn (Chủ, BR-LO-07): chỉ đếm, không trả tiền/giá vốn.
+        if has_expired:
+            res["expired_batches_open"] = Batch.objects.filter(
+                status=Batch.Status.EXPIRED, qty_available__gt=0,
+            ).count()
 
         return Response(res, status=status.HTTP_200_OK)

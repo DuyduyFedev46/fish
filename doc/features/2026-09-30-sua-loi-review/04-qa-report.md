@@ -510,3 +510,188 @@ adapter  .venv/bin/python -m pytest -q                                          
 Việc còn lại (⏸): 2 luồng huỷ cùng 1 đơn song song trên Postgres staging (`cancel_paid_order` ↔ `auto_cancel_overdue`), xác nhận không deadlock và không nhân đôi chứng từ.
 Trước khi chạy `--apply` trên staging/production: chạy dry-run, đọc danh sách lô CLOSED và ước lượng KPI hôm nay (N1).
 ```
+
+
+---
+
+## Lô 5 — SR-15, SR-16, SR-17 + M5-1 (lô quá hạn còn tồn, trả NCC, dashboard bỏ tên khách, cắt mock khỏi bản thật; có migration `inventory/0004`) · lần 1 · 2026-09-30
+
+### Kết luận: REJECTED — 1 lỗi chặn B1 (rò `supplier_refund_amount` ra Django Admin, trang chi tiết Nhật ký, cho tài khoản `is_staff` không phải Chủ). Mọi AC nghiệp vụ SR-15/16/17 và M5-1 đều xanh khi chạy thật; B1 là lỗ hổng CŨ của `AuditLogAdmin` (không lọc `changes` cho mọi khoá giá vốn), Lô 5 thêm một khoá mới đi qua đó. Sửa nhỏ (mục B1), chạy lại 1 test.
+### Tổng: 86 ca · ✅ 84 · ❌ 1 · ⏸ 1
+
+Cách đếm: 19 ca theo AC (SR-15 x7, SR-16 x8, SR-17 x4) + 5 ca M5-1 + 3 ca migration + 45 test QA bổ sung (44 + 1 ở `reports`, mỗi `test_` = 1 ca; 1 trong đó là ❌ B1) + 3 ca FE chạy thật (script mock 1366px, script mock 375px, luồng Django thật) + 10 ca hồi quy/build (backend đầy đủ, `makemigrations --check`, adapter, `npm ci` x2, `tsc` x2, `npm test` erp, build x2) + 1 ca ⏸.
+
+Phạm vi: code chưa commit trong working tree (`inventory/batches/{services,api,serializers,next_steps}.py`, `inventory/models/{stock,supplier_returns,__init__}.py`, migration `0004_batchsupplierreturn`, `delivery/attention_api.py`, `reports/{services,dashboard_api}.py`, `erp-console/features/{inventory,overview,cskh,catalog,guidance}`, `frontend/{lib/api.ts,features/*}` + 55 + 13 test của dev). Không sửa code sản phẩm. QA thêm:
+- `backend/apps/inventory/batches/tests/test_p8_lo5_qa_edges.py` (44 test: luồng đủ, lô đã bán, tranh chấp 2 thứ tự, `confirm_qty`, `request_id`, fuzz biên, ma trận Group, rò tiền NCC hoàn, AI, bất biến)
+- `backend/apps/reports/tests/test_p8_lo5_qa_edges.py` (1 test: số kỳ không đổi)
+- `erp-console/e2e/p8_lo5_qa_real_backend.py` (Playwright với Django thật)
+- Ảnh QA chạy thật: `qa-lo5/qa-real-1366-*.png` (Django thật), `qa-lo5/qa-m51-*.png` (bản mock M5-1). Toàn bộ dữ liệu là giả (Khách Giả Năm/Sáu, `0900000456`, `0900000789`, Số 5 Đường Giả, tiền NCC hoàn mồi `1234567` và `999888`). `backend/db.sqlite3` không bị đụng (md5 `25ea4d9b…7dc` trước = sau).
+
+## Theo AC
+| Mã AC | Kết quả | Bằng chứng |
+|---|---|---|
+| SR-15-AC1 (EXPIRED còn tồn không chốt; API + luật sàn AI) | ✅ | dev 4 test luật sàn + QA `test_qa_expired_con_ton_khong_chot_duoc_moi_duong` (đủ kiểm kê vẫn 400 `BR-LO-04`); AI: QA job `run_due_ai_actions` chạy 2 lần → ESCALATED, audit/action không nhân đôi, lô vẫn EXPIRED 40 kg; Chủ bấm confirm đề xuất AI (mở chi tiết + đủ 3 giây) → 400 `BR-LO-04`, action vẫn PENDING |
+| SR-15-AC2 (tồn 0 → chốt; CANCELLED chốt như cũ) | ✅ | QA `test_qa_flow_tra_nhieu_lan_ton_0_roi_chot` (3 lần trả 30/30/40 → tồn 0 → chốt cần kiểm kê BR-KK-05 → có kiểm kê thì CLOSED); `..._tra_mot_phan_roi_huy_phan_con_lai_roi_chot`; CANCELLED tồn 0 chốt được |
+| SR-15-AC3 (Tiếp theo 3 bước) | ✅ | dev test guidance; FE thật: Playwright thấy 2 nút bật + Chốt khoá kèm "tồn = 0" (mock 77/77, Django thật 12/12) |
+| SR-15-AC4 (thẻ Cần chú ý, ma trận quyền) | ✅ | QA `test_qa_attention_ma_tran` (chu 200 có khoá = 1; các nhóm khác 200 không có khoá hoặc 403; khách 401), `..._dem_theo_trang_thai` (đang bán 0 → EXPIRED 1 → +lô 2 = 2 → trả hết lô 2 = 1 → huỷ = 0), `test_qa_nguoi_chi_co_quyen_cancel_expired_van_lam_duoc` (200 `{"expired_batches_open": 1}`) |
+| SR-15-AC5 (`confirm_qty` khớp màn hình) | ✅ | QA 4 ca: dạng số khớp (`100`, `100.000`, ` 100 `, `1E+2`, số nguyên/thực) → huỷ; lệch/rác (`99.999`, `0`, `-100`, `abc`, `NaN`, `Infinity`, `1e999`, `1,5`, `True`…) → 400, dữ liệu không đổi, không 5xx; không gửi/null/rỗng → chạy như cũ; trả 30 kg giữa chừng rồi bấm huỷ với 100 → 400 "Tồn đã đổi (70,000 kg)", tải lại rồi huỷ 70 → 200 |
+| SR-15-AC6 (F11 `expired_qty` chỉ đếm huỷ lô quá hạn) | ✅ | QA lô có phiếu nhập bị huỷ (DW-18) rồi CLOSED: `expired_qty=0`, `total_cost = purchase+allocated`, `profit = revenue − total_cost` không đổi; lô trả 60 + huỷ 40 → `expired_qty=40` (chỉ phần huỷ) |
+| SR-15-AC7 (FE chạy thật) | ✅ | Playwright mock `p8_lo5_fe_lo_qua_han.py` 1366px + 375px = **77/77 PASS**; Playwright Django thật `p8_lo5_qa_real_backend.py` = **12/12 PASS**: `loc` (Chủ) thấy tồn 6,5 kg, Chốt khoá; `kho1` (nv_kho) không có nút Huỷ/Trả/Chốt và không thấy thẻ. Ảnh `qa-real-1366-1..4` |
+| SR-16-AC1 (trả 3/5 kg: tồn, sổ kho, bản ghi, audit) | ✅ | dev + QA: mỗi lần trả 1 dòng `SUPPLIER_RETURN`, 1 `BatchSupplierReturn`, 1 AuditLog; tổng biến động sổ kho = tồn; lô vẫn EXPIRED. Django thật: DB sau khi chạy có 2 bản ghi (2,000 kg/999888 và 4,500 kg/0), sổ kho lô 1 tổng 0, AuditLog đúng `return_batch_to_supplier` x2 + `close_batch` |
+| SR-16-AC2 (trả hết → chốt) | ✅ | QA luồng đủ (xem SR-15-AC2) + Django thật: Trả hết (bấm đúp) → tồn 0 → Chốt lô mở → CLOSED (200) |
+| SR-16-AC3 (lãi lỗ) | ✅ | dev + QA: lô đã bán 98 kg rồi trả 98 kg tiền 2.000.000 → `revenue`, `qty_sold`, `purchase_cost`, `allocated_cost`, `landed_unit_cost` không đổi; `total_cost −= 2.000.000`, `profit += 2.000.000`; `supplier_return_qty=100`, `supplier_refund_amount=3 x 1234567` ở lô đã chốt |
+| SR-16-AC4 (biên) | ✅ | QA fuzz `qty` 27 giá trị rác/biên (0, âm, `100.001`, `1e12`, `NaN`, `Infinity`, `sNaN`, chữ số Ả Rập/full-width, list/dict/bool/null, thiếu) → 400 không đổi dữ liệu; hợp lệ biên `0.001` và `99.999`; tiền âm/`0.001`/`1e13`/`NaN`/`bool` → 400, `0`/rỗng/null/`0.01`/`999999999999.99` → 200; ghi chú >500 ký tự, giống SĐT/số tài khoản → 400; lô CLOSED/CANCELLED → 400 `BR-LO-05`; còn giữ chỗ → 400 `BR-LO-07` |
+| SR-16-AC5 (bấm đúp `request_id`) | ✅ | QA 10 lần cùng `request_id` → 10 x 200 cùng `return_id`, đúng 1 dòng sổ kho, 1 bản ghi, 1 AuditLog; cùng `request_id` body khác → trả bản cũ (5 kg/111), không ghi đè; `request_id` của lô khác → 400 `BR-MH-08` không ghi; gửi lại sau khi lô đã bị huỷ → 200 bản cũ, sổ kho không đổi; Django thật bấm đúp → đúng 1 POST |
+| SR-16-AC6 (không rò giá vốn) | ✅ (kèm B1, xem mục Lỗi) | response trả về chỉ có `{batch_id, status, qty_available, returned_qty, return_id}`; quét GET x 5 Group x 19 URL, đếm 200 > 30 (chu/quan_ly/nv_kho mỗi nhóm > 5): quan_ly/nv_kho/nv_giao/cskh không thấy `1234567`, `supplier_refund_amount`, `supplier_return_qty`; Nhật ký quan_ly không có khoá; Chủ thấy. **Riêng Admin HTML: ❌ B1** |
+| SR-16-AC7 (AI trần C) | ✅ | `spec.max_level=="C"`, `force_c`; QA gọi lệnh qua API thật → 200 `outcome=proposal`, `level=C`, kho không đổi vì AI |
+| SR-16-AC8 (FE chạy thật) | ✅ | mock 77/77 (1366 + 375, hộp form, `inputMode=decimal`, focus, chặn vượt tồn ngay ở form, 400 tiếng Việt + "Tải lại tồn", bấm đúp = 1 request, sau lưu không hiện lại tiền); Django thật 12/12 (POST `return-to-supplier` thật → 200, tồn lấy lại từ máy chủ 4,5 kg, không lộ `999888` ở DOM/URL/storage/console) |
+| SR-17-AC1 (tái hiện: không `customer`/`phone_last4`) | ✅ | QA `test_qa_dashboard_5_khoa_moi_group_khong_pii_dem_200`: 2 đơn có tên/SĐT/địa chỉ giả (+ tên người chuyển `NGUYEN VAN GIA` trong `raw_payload`) → JSON của chu/quan_ly/nv_kho không chứa `Khách Giả Năm`, `Khách Giả Sáu`, `0900000456/789`, `0456`, `0789`, địa chỉ, `NGUYEN VAN GIA`, `phone_last4`, `customer`, `recipient`; có mã đơn (dữ liệu không rỗng) |
+| SR-17-AC2 (5 khoá mọi nhóm) | ✅ | `set(row)=={code, amount, status, status_label, expires_at}` ở chu/quan_ly/nv_kho (đếm 3 x 200); nv_giao/cskh/không nhóm 403, khách 401 |
+| SR-17-AC3 (FE chạy thật) | ✅ | Playwright mock 1366 + 375: cột chỉ còn 3 (Mã đơn, Giá trị, Trạng thái), DOM/HTML không có 9 tên khách mock cũ, placeholder không nhắc "khách", không cuộn ngang; nv_kho cũng vậy; console không có SĐT. Django thật: nv_kho không có cột Khách |
+| SR-17-AC4 (AI `reports.dashboard_summary`) | ✅ | dev (SR-04-AC1 + `test_p8_pii_sweep`), chạy lại trong bộ đầy đủ 1492 OK |
+| M5-1 build thật không lọt mock | ✅ | `NEXT_PUBLIC_USE_MOCK=0` + API Cloud Run truyền trực tiếp: erp-console và frontend `npm run build` OK; `grep -rlE "demo1234|0900000|Khách Giả|mockGet|mockSiteInfo" out/` = **0 file** ở cả hai; erp thêm `expiredSetQty|L0908-CT00|__caveMock` = 0; frontend không có `127.0.0.1`/`localhost:8000`. **Đối chứng dương:** cùng lệnh grep trên bản mock ra 3 file ở mỗi FE (grep không "xanh giả") |
+| M5-1 build mock vẫn chạy mock | ✅ | frontend `NEXT_PUBLIC_USE_MOCK=1` (mặc dù `.env.local` cũng đặt 1): `/shop/` liệt kê Cá basa/Cá thu/Tôm sú…; thêm giỏ → `/shop/checkout/` thấy hàng, đặt hàng với dữ liệu giả → "Đặt hàng thành công" mã `DH-260930-xxxx` 65.000đ → "Thanh toán bằng VietQR" → sang trang cổng SePay GIẢ LẬP (`mock_gateway=1`); `/shop/orders/` tra `DH-DEMO001` + `6789` → "Đã thanh toán, đang soạn hàng"; erp-console: `/catalog/` "Danh mục & giá" 6 mặt hàng mock, `/inventory/` 11 lô; không lỗi trang (`pageerror` rỗng). Ảnh `qa-m51-*` |
+| M5-1 rebuild bản thật cuối phiên | ✅ | build lại cả hai: frontend `out/` không còn chuỗi mock, chỉ trỏ `cangca-api-675411800433…` (Cloud Run); erp `out/` không mock, không trỏ `127.0.0.1:8115` |
+
+## Ngoại lệ & biên (ngoài đường thuận)
+| # | Tình huống | Kết quả | Bằng chứng |
+|---|---|---|---|
+| E1 | Lô đã từng bán (98 kg đã PAID) rồi trả NCC | ✅ | doanh thu/kg bán không đổi; đơn cũ vẫn PROCESSING; đơn PAID còn tham chiếu lô vẫn chặn chốt (BR-LO-04) dù tồn 0 |
+| E2 | Tồn 0 rồi khách huỷ đơn đã thanh toán → hoàn 2 kg về lô EXPIRED | ✅ | tồn 2 kg, thẻ Cần chú ý sáng lại (0 → 1), trả tiếp 2 kg được, sổ kho khớp 0 |
+| E3 | Lô đã CLOSED: trả NCC, huỷ phần tồn, chốt lại | ✅ | 3 lần đều 400 (`BR-LO-05`), snapshot (tồn, sổ kho, bản ghi, AuditLog) không đổi, `batch_pnl` lô đã chốt bằng nhau từng khoá; trả NCC ở lô KHÁC không đổi số lô đã chốt |
+| E4 | Tranh chấp thứ tự A: đơn giữ chỗ 4 kg trước, lô hết hạn | ✅ | trả và huỷ đều 400 `BR-LO-07`, snapshot không đổi; job TTL chạy 2 lần (1 rồi 0); nhả giữ chỗ xong thì trả 100 kg được |
+| E5 | Tranh chấp thứ tự B: trả NCC/huỷ trước, rồi mới đặt/giữ chỗ | ✅ | trả 50 kg rồi đặt đơn trên lô quá hạn → `BusinessError`, không giữ chỗ; đơn giữ chỗ đã thanh toán trước khi trả → tồn 96 kg, trả 97 → 400, trả 96 → 200, đơn PROCESSING nguyên vẹn |
+| E6 | Màn hình cũ: huỷ xong rồi bấm trả; trả xong rồi bấm huỷ với `confirm_qty` cũ | ✅ | cả hai 400 `BR-LO-07`, không ghi gì; FE thật: 400 hiện đúng `detail`, "Tải lại tồn" cập nhật, thao tác lại thành công (mock, cả 2 kích thước) |
+| E7 | Kỳ (`period_pnl`) khi trả NCC và huỷ lô quá hạn | ✅ | `revenue`, `cogs` kỳ không đổi (đúng thiết kế: kỳ tính giá vốn hàng đã bán); API kỳ của quan_ly không có khoá `supplier_refund` |
+| E8 | Cờ bật/tắt | ✅ | không có cờ mới ở Lô 5; AI bật/tắt: AI tắt → 410 `AI_DISABLED` (bằng chứng test QA đầu tiên phải bật cờ mới có 200, không xanh giả) |
+| E9 | Method/Content-Type lạ | ✅ | GET/PUT/DELETE → 405; JSON hỏng → 4xx; multipart/form-urlencoded → 200 (DRF phân giải) |
+| E10 | Tranh chấp song song thật (2 giao dịch DB cùng lúc: trả NCC ↔ huỷ lô ↔ đơn giữ chỗ; cùng `request_id` cho 2 lô cùng lúc) | ⏸ | máy này không có Postgres; SQLite bỏ qua `select_for_update`. Cần chạy trên staging (xem Ghi nhận L5) |
+
+## Phân quyền (Group x hành động)
+Chạy thật (`QaPermissionMatrixTests`, đếm 200 > 0; nhóm không có quyền: tồn kho không đổi và response không chứa số tiền):
+| | chu | quan_ly | nv_kho | nv_giao | cskh | không nhóm | khách |
+|---|---|---|---|---|---|---|---|
+| `POST …/return-to-supplier/` | 200 | 403 | 403 | 403 | 403 | 403 | 401 |
+| `POST …/cancel-expired/` | 200 | 403 | 403 | 403 | 403 | 403 | 401 |
+| `POST …/close/` (lô EXPIRED còn tồn) | 400 `BR-LO-04` | 403 | 403 | 403 | 403 | 403 | 401 |
+| thẻ `expired_batches_open` | có | không | không | không | không | 403 | 401 |
+| `GET /api/dashboard/summary/` | 200 | 200 | 200 | 403 | 403 | 403 | 401 |
+| tạo `BatchSupplierReturn` bởi người khác Chủ | — | 0 | 0 | 0 | 0 | 0 | — |
+403 luôn đứng trước validation (body rác vẫn 403). Người chỉ có quyền `inventory.cancel_expired_batch` (+ xem lô) làm được trả NCC và thấy thẻ (200 thay vì 403) như AC4. FE: nv_kho không thấy nút/thẻ (Playwright thật + mock).
+
+## Rò giá vốn
+- ✅ Response của trả NCC không có tiền hay khoá giá vốn (`find_keys(COST_KEYS)` rỗng).
+- ✅ 5 Group x 19 URL GET (lô, chi tiết theo `id` và `batch_id`, `guidance/batch`, sổ kho, audit-logs, báo cáo lô, báo cáo kỳ, dashboard, attention, `ai/actions`, `ai/commands/index`, `ai/report/daily`…): > 30 response 200, nhóm khác Chủ không thấy `1234567`, dạng `1,234,567`, `supplier_refund_amount`, `supplier_return_qty`. Nhật ký `quan_ly` có đúng 1 dòng `return_batch_to_supplier`, không khoá giá vốn.
+- ✅ Tính ngược tiền ÷ kg: người thiếu `view_costprice` chỉ thấy `qty` (kg) trong Nhật ký, không thấy tiền → không suy ra được giá vốn/kg; `note` chỉ là chữ cố định.
+- ✅ Ghi chú người dùng nhập (`note` của bản ghi trả NCC) không lọt vào AuditLog, timeline, guidance, sổ kho, danh sách lô.
+- ✅ Django thật: `999888` không có ở DOM, URL, `localStorage`/`sessionStorage`, console; payload có gửi nhưng không hiện lại sau khi lưu.
+- ✅ AI: lệnh trả NCC chỉ soạn nháp (C); quan_ly/nv_kho/nv_giao/cskh gọi `ai/actions`, `commands/index`, `report/daily` (đếm 200 > 0) không thấy tiền.
+- ❌ **Admin HTML: B1** — trang chi tiết Nhật ký (`/admin/accounts/auditlog/<id>/change/`) hiện nguyên `changes` cho `is_staff` quan_ly/nv_kho. Đối chứng cùng trang với khoá CŨ `purchase_rate` cũng lộ, tức lỗ hổng có sẵn.
+- ✅ Admin còn lại: `BatchSupplierReturn` không đăng ký Admin (superuser vào `/admin/inventory/batchsupplierreturn/` = 404), trang Lô/Sổ kho của staff không có tiền; quyền của model chỉ có `view_batchsupplierreturn`.
+
+## Rò dữ liệu cá nhân
+- ✅ Dashboard JSON (chu/quan_ly/nv_kho): không tên, SĐT (cả 4 số cuối), địa chỉ, tên người chuyển khoản; tập khoá đúng 5.
+- ✅ FE: DOM/HTML không có tên khách mock; console không có SĐT (Playwright mock + Django thật); URL không chứa dữ liệu cá nhân.
+- ✅ AuditLog trả NCC: `changes = {qty, supplier_refund_amount}`, `note` không có tên/SĐT/địa chỉ.
+- ✅ Ảnh và report chỉ dùng dữ liệu giả. Không có tra đơn công khai mới ở Lô 5 nên không có ca giới hạn tần suất mới.
+
+## Chứng từ bất biến & AuditLog
+- ✅ Không có endpoint xoá/sửa bản ghi trả NCC (DELETE 404); xoá lô có bản ghi trả NCC → `ProtectedError`; xoá người tạo → `ProtectedError`; Group không có quyền add/change/delete.
+- ✅ AuditLog: mỗi hành động Tầng 2 đúng 1 dòng (`return_batch_to_supplier`, `cancel_expired_batch`, `close_batch`); 400 không ghi dòng nào.
+
+## Hồi quy
+- ✅ Bộ backend đầy đủ (không `--parallel`): **1492 test OK** (1447 gốc + 44 + 1 test QA; 1 expected failure là B1), 106 s; `makemigrations --check` = No changes.
+- ✅ adapter: 68 passed.
+- ✅ Lô 1–4 không đỏ (chạy trong bộ đầy đủ); Lô 3 (`STALE_STATE`, huỷ lô quá hạn) và Lô 4 (chứng từ đảo, `batch_pnl` lô chốt) vẫn đúng: `test_qa_lo4_*` OK.
+- ✅ erp-console: `npm ci` (không `--legacy-peer-deps`) exit 0, `tsc --noEmit` exit 0, `npm test` 10 file / **103 test** OK, build OK. frontend: `npm ci` exit 0, `tsc` exit 0, build OK (không có script `npm test`).
+- Ghi nhận: `npm audit` báo lỗ hổng phụ thuộc có sẵn (erp 27: 25 moderate, 1 high, 1 critical; frontend 2: 1 high, 1 critical); không thuộc Lô 5.
+
+## Lỗi
+### B1 — `supplier_refund_amount` lộ ra Django Admin (trang chi tiết Nhật ký) cho tài khoản `is_staff` không phải Chủ · Critical theo bảng mức (rò giá vốn) nhưng phạm vi hẹp · AC SR-16-AC6 / tiêu chí "không lọt Admin HTML"
+- **Bước tái hiện** (test đỏ được giữ dưới `expectedFailure`): `cd backend && DJANGO_DEBUG=1 env -u DATABASE_URL .venv/bin/python manage.py test apps.inventory.batches.tests.test_p8_lo5_qa_edges.QaLeakTests.test_qa_admin_html_khong_lo_tien_ncc_voi_nhan_vien_khong_phai_chu` (bỏ dòng `@unittest.expectedFailure` để thấy đỏ). Thủ công: tạo `quan_ly` với `is_staff=True`; Chủ trả NCC 10 kg kèm tiền `1234567`; đăng nhập `/admin/` bằng tài khoản đó, mở `/admin/accounts/auditlog/<id>/change/`. Ca đối chứng `QaAdminAuditBaselineTests` cho thấy khoá cũ `purchase_rate` trong `changes` cũng lộ y hệt.
+- **Mong đợi**: người không có `inventory.view_costprice` không thấy các khoá thuộc `COST_KEYS` (kể cả `supplier_refund_amount`) ở bất kỳ đầu ra nào, gồm Admin (bất biến 1). API `/api/audit-logs/` đã lọc đúng (`redact_cost`), Admin thì không.
+- **Thực tế**: `apps/accounts/admin.py::AuditLogAdmin` hiển thị nguyên `changes` (JSON) trong trang chi tiết; `is_staff` + `view_auditlog` là đủ.
+- **Ảnh hưởng**: rò giá vốn/tiền NCC hoàn cho nhân viên vào được Admin. Phạm vi hẹp: ứng dụng không bao giờ tự đặt `is_staff` và `UserAdmin` chỉ dành cho superuser, nên cần Duy/superuser chủ động cấp quyền Admin cho người không phải Chủ. Lỗ hổng có từ trước Lô 5 (ảnh hưởng mọi khoá giá vốn trong `changes`); Lô 5 thêm một khoá mới đi qua đó nên nằm trong tiêu chí lô này.
+- **Đề xuất sửa (BE, nhỏ)**: trong `AuditLogAdmin` thêm `get_exclude`/`get_readonly_fields` bỏ hẳn cột `changes` khi `not request.user.has_perm("inventory.view_costprice")`, hoặc hiển thị `redact_cost(obj.changes)`; kèm test giữ nguyên ca `QaLeakTests…admin_html…` (bỏ `expectedFailure`) và đổi `assertIn` ở `QaAdminAuditBaselineTests` thành `assertNotIn`. Nếu Duy chấp nhận rủi ro (chưa cấp `is_staff` cho ai ngoài Chủ), điều phối viên có thể hạ B1 thành ghi nhận và chuyển sang Lô sau; QA giữ REJECTED theo bảng mức đến khi có quyết định đó.
+
+### Ghi nhận (Low/không chặn)
+- **L5-1** `qty` chấp nhận `"1_0"` (= 10, Python `Decimal` cho phép gạch dưới) và `request_id` chấp nhận số nguyên `12345` (DRF `UUIDField` ép thành UUID). Vô hại (Chủ-only, giá trị hợp lệ) nhưng khoá chống bấm đúp yếu hơn UUID ngẫu nhiên.
+- **L5-2** Response trả `qty_available` bằng số thực JSON (ví dụ tồn 99,999 → `99.998999999999995…` khi đọc lại bằng `Decimal(float)`); chỉ ảnh hưởng hiển thị, FE làm tròn; sổ kho lưu `Decimal` đúng.
+- **L5-3** Không có trần cho `supplier_refund_amount` (chấp nhận tới 999.999.999.999,99): `total_cost` của lô có thể âm. Chỉ Chủ nhập; cân nhắc cảnh báo khi tiền hoàn > giá mua lô.
+- **L5-4** Timeline nhãn `SUPPLIER_RETURN` còn chung chung (nợ L5-4 của dev, đã ghi ở dev notes).
+- **L5-5 (⏸ E10)** Tranh chấp song song thật và trường hợp cùng `request_id` gửi đồng thời cho 2 lô khác nhau (có thể `IntegrityError` → 500 thay vì 400 trên Postgres, không chứng minh được trên SQLite) cần chạy trên staging trước khi lên production.
+- **L5-6** Ảnh chụp headless hiện tên biểu tượng Material Symbols dạng chữ cái vì font tải từ CDN, không phải lỗi sản phẩm.
+- `period_pnl` không cộng tiền NCC hoàn (đúng thiết kế: kỳ tính giá vốn hàng bán, không tính hàng trả NCC) — chỉ để Duy biết khi đối chiếu số lô và số kỳ.
+
+## Lệnh đã chạy (tóm tắt output)
+```
+backend  DJANGO_DEBUG=1 env -u DATABASE_URL .venv/bin/python manage.py test                           -> Ran 1492 tests OK (expected failures=1), 106 s (baseline dev: 1447)
+backend  manage.py makemigrations --check --dry-run                                                   -> No changes detected
+backend  manage.py test apps.inventory.batches.tests.test_p8_lo5_qa_edges                             -> Ran 44 OK (expected failures=1 = B1); lần đầu 5 đỏ do kỳ vọng SAI trong test QA (số float, "1_0", request_id int, 0,001 vs 0,000), đã sửa test, không phải lỗi sản phẩm; riêng B1 là lỗi thật
+backend  manage.py test apps.reports.tests.test_p8_lo5_qa_edges                                       -> Ran 1 OK
+backend  DATABASE_URL=sqlite:///<scratchpad>/qa-lo5/clean.sqlite3 manage.py sqlmigrate inventory 0004 -> 1 CREATE TABLE, index, BEGIN/COMMIT
+backend  ... clean.sqlite3 manage.py migrate / migrate inventory 0003 / migrate                        -> Applying inventory.0004 OK / Unapplying OK (bảng biến mất) / Applying OK
+adapter  ../backend/.venv/bin/python -m pytest -q                                                     -> 68 passed
+erp      npm ci --cache <scratchpad>/npm-cache ; npx tsc --noEmit ; npm test                          -> exit 0 ; exit 0 ; 10 file / 103 test OK
+frontend npm ci --cache <scratchpad>/npm-cache ; npx tsc --noEmit                                     -> exit 0 ; exit 0
+erp      NEXT_PUBLIC_USE_MOCK=1 npm run build -> out copy sang scratchpad; python3 -m http.server 3215 ; BASE=http://127.0.0.1:3215 python3 e2e/p8_lo5_fe_lo_qua_han.py   -> 77/77 PASS (1366px + 375px); nhiễu console chỉ là "Failed to fetch RSC payload" do http.server tĩnh
+Django thật  SQLite tạm <scratchpad>/qa-lo5/real.sqlite3, migrate + seed 2 lô EXPIRED + 2 user (loc/chu, kho1/nv_kho), runserver 127.0.0.1:8115 (CORS 127.0.0.1:3216)
+erp      NEXT_PUBLIC_USE_MOCK=0 NEXT_PUBLIC_API_BASE=http://127.0.0.1:8115 npm run build ; http.server 3216 ; python3 e2e/p8_lo5_qa_real_backend.py                          -> 12/12 PASS; DB sau: lô 1 CLOSED tồn 0, 2 bản ghi trả NCC (2,000/999888 và 4,500/0), sổ kho lô 1 tổng 0, AuditLog return x2 + close
+M5-1     NEXT_PUBLIC_USE_MOCK=0 NEXT_PUBLIC_API_BASE=<Cloud Run> npm run build (erp, frontend) ; grep -rlE "demo1234|0900000|Khách Giả|mockGet|mockSiteInfo" out/   -> 0 file / 0 file
+M5-1     đối chứng dương: cùng grep trên bản mock                                                     -> 3 file / 3 file
+M5-1     frontend NEXT_PUBLIC_USE_MOCK=1 npm run build ; http.server 3217 ; Playwright /shop/, /shop/checkout/, /shop/orders/ (DH-DEMO001/6789)  -> catalog mock, đặt hàng mock, cổng SePay giả lập, tra đơn mock đều chạy; erp mock /catalog/, /inventory/ có dữ liệu mock
+M5-1     rebuild bản thật cuối phiên (erp, frontend) + grep                                           -> 0 file mock; frontend chỉ trỏ Cloud Run
+md5 backend/db.sqlite3                                                                                -> 25ea4d9bb8dc1de7533a236dc6ab07e4 (không đổi)
+(Đã tắt mọi server 3215/3216/3217/8115. Không commit, không deploy.)
+Việc còn lại (⏸): chạy E10 trên staging (Postgres) trước khi lên production; sau khi sửa B1 chạy lại `test_p8_lo5_qa_edges` (bỏ expectedFailure) + bộ backend đầy đủ.
+```
+
+---
+
+## Lô 5 — lần 2 (kiểm lại B1) · 2026-09-30
+
+### Kết luận: APPROVED — B1 (Critical) đã sửa, kiểm bằng HTML Admin thật ở 20 đường x 2 nhóm staff + Chủ + superuser; không lỗi mới
+### Tổng lần 2: 8 ca mới/đổi · ✅ 8 · ❌ 0 · ⏸ 0 (E10 Postgres vẫn ⏸ từ lần 1, chuyển sang staging)
+
+### Theo ca
+| Ca | Kết quả | Bằng chứng |
+|---|---|---|
+| B1-1 quan_ly + nv_kho (is_staff, có `view_auditlog`, KHÔNG có `view_costprice`) quét 20 đường Admin của AuditLog: danh sách, `?q=` (theo hành động / theo chuỗi tiền / theo giá trị khoá cũ), lọc `action`/`model_name`/`actor_kind`, `date_hierarchy` (`created_at__year`), sắp xếp `?o=`, change view (dòng trả NCC, khoá cũ `purchase_rate`, khoá lồng `lines[].unit_cost` + `meta.purchase_cost`, `changes={}`, `changes=None`), `?_popup=1`, `/<id>/` (302 về change), `/history/`, `/delete/`, `/add/`, `/export/` | ✅ | `QaAdminB1MatrixTests.test_qa_b1_quan_ly_va_nv_kho_khong_thay_gia_von_o_moi_duong_admin`: mỗi nhóm >= 12 phản hồi 200 (`assertGreaterEqual(n200, 12)`), 0 trang chứa `1234567`, `7654321`, `5550001`, `5550002`, `supplier_refund_amount`, `purchase_rate`, `unit_cost`, `purchase_cost` |
+| B1-2 khoá không nhạy cảm vẫn hiện (không ẩn quá tay), dòng rỗng/None không 5xx | ✅ | `..._khoa_khong_nhay_cam_van_hien_...`: `status`, `qty`, `meta.ok` hiện với quan_ly; change view `changes={}`/`None` trả 200 |
+| B1-3 Chủ (is_staff) + superuser thấy đủ | ✅ | `..._chu_va_superuser_thay_du_o_change_view`: mỗi người > 8 phản hồi 200; thấy `7654321`, `supplier_refund_amount`, `1234567`, `5550001` |
+| B1-4 append-only: POST sửa / POST xoá / action `delete_selected` bị từ chối (không 5xx); số dòng, `changes`, `note` trong DB không đổi sau khi staff/superuser xem hoặc thử sửa (bản ẩn không ghi đè dữ liệu gốc) | ✅ | `..._khong_sua_khong_xoa_nhat_ky_...` |
+| B1-5 4 ca dev đã đổi (bỏ `expectedFailure`, đối chứng Chủ/superuser) chạy lại | ✅ | `QaLeakTests.test_qa_admin_html_...` + `QaAdminAuditBaselineTests` (2 ca) đều xanh; đỏ -> xanh so với lần 1 |
+| B1-6 đối chứng đột biến (không sửa code sản phẩm): `mock.patch("apps.accounts.admin.can_view_cost", return_value=True)` rồi chạy đúng ca B1-1 | ✅ | Ca đỏ (change view, `?_popup=1`, `/<id>/` lộ) -> test QA thật sự bắt được lỗi; bản thật thì xanh |
+| Hồi quy: full backend | ✅ | `Ran 1497 tests ... OK` (1493 của điều phối + 4 ca QA mới), 0 expected failure |
+| Hồi quy: migration / adapter / db.sqlite3 | ✅ | `makemigrations --check --dry-run` = No changes detected; adapter `68 passed`; md5 `db.sqlite3` = `25ea4d9b...e4` không đổi |
+
+### Phân quyền Admin AuditLog (HTML thật)
+| Người xem | Thấy dòng Nhật ký | Thấy khoá COST_KEYS / tiền NCC hoàn | Sửa / xoá |
+|---|---|---|---|
+| quan_ly (is_staff + view_auditlog) | có (200) | không (đã lọc bởi `redact_cost`) | không |
+| nv_kho (is_staff + view_auditlog) | có (200) | không | không |
+| Chủ (is_staff, có `view_costprice`) | có | có (đủ) | không |
+| superuser | có | có (đủ) | không (`has_delete/change/add_permission` = False) |
+| Chưa đăng nhập / nv_giao / cskh không is_staff | về trang đăng nhập Admin (lần 1: đã kiểm) | không | không |
+
+### Rò giá vốn / dữ liệu cá nhân
+- Giá vốn: đã đóng ở mọi đường Admin của AuditLog (B1). Khoá suy ra được giá vốn (tiền ÷ kg) `supplier_refund_amount` và khoá cũ `purchase_rate` không còn trong HTML cho người thiếu quyền, kể cả khi lồng trong list/dict.
+- Ghi chú kiểm thử: trang tìm kiếm dội lại đúng chuỗi người xem gõ (ô `q` và link lọc) — đã loại phần dội lại khỏi phép dò để khỏi báo lỗi giả; `search_fields` chỉ gồm `action`, `object_repr`, `object_id` nên không dò ngược được nội dung `changes` qua ô tìm kiếm (ca `?q=1234567` cho 200 và không có dòng nào khớp qua `changes`).
+- Dữ liệu cá nhân: không đổi so với lần 1 (không có tên/SĐT/địa chỉ trong trang Nhật ký; dữ liệu toàn giả).
+- Còn lại (Low, chấp nhận): trường `note` của AuditLog không được lọc — theo quy ước chỉ chứa mô tả (vd. `return_batch_to_supplier 5kg`, không có tiền). Ca quét không tìm thấy số tiền trong `note`.
+
+### Lỗi
+Không có lỗi chặn nào còn lại. B1 đóng. Ghi nhận Low L5-1..L5-6 từ lần 1 không đổi, không chặn.
+
+### Lệnh đã chạy lần 2
+```
+backend  manage.py test apps.inventory.batches.tests.test_p8_lo5_qa_edges.QaAdminB1MatrixTests      -> lần đầu 2 đỏ do kỳ vọng SAI của test QA (khoá `cost_price` không thuộc COST_KEYS; `note` dòng trả NCC không rỗng; ô tìm kiếm dội lại chuỗi gõ) -> sửa test, xanh
+backend  manage.py test apps.inventory.batches.tests.test_p8_lo5_qa_edges                           -> Ran 49 OK
+backend  đột biến patch can_view_cost=True (file tạm, đã xoá)                                       -> ca B1-1 đỏ như kỳ vọng
+backend  DJANGO_DEBUG=1 env -u DATABASE_URL .venv/bin/python manage.py test                        -> Ran 1497 tests in 107.7s OK
+backend  manage.py makemigrations --check --dry-run                                                 -> No changes detected
+adapter  ../backend/.venv/bin/python -m pytest -q                                                   -> 68 passed
+md5 backend/db.sqlite3                                                                              -> 25ea4d9bb8dc1de7533a236dc6ab07e4 (không đổi)
+Playwright/FE: không chạy lại (FE không đổi kể từ lần 1; kết quả lần 1 giữ nguyên: erp 77/77 + 12/12, M5-1 sạch)
+```
+Việc còn lại (⏸): E10 tranh chấp song song thật trên staging (Postgres) trước khi lên production. Không commit, không deploy.

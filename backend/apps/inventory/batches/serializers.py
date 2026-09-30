@@ -31,3 +31,27 @@ class BatchListQuery(serializers.Serializer):
         slug_field="code", queryset=Item.objects.all(), required=False, help_text="Mã mặt hàng"
     )
     status = serializers.ChoiceField(choices=Batch.Status.choices, required=False)
+
+
+class CancelExpiredInput(serializers.Serializer):
+    """Body tuỳ chọn của POST .../cancel-expired/ (SR-15): số kg người dùng đang thấy trên màn hình."""
+    confirm_qty = serializers.CharField(
+        required=False, allow_blank=True, allow_null=True,
+        help_text="Tồn (kg) đang hiển thị; lệch tồn hiện tại -> 400 BR-LO-07",
+    )
+
+
+class ReturnToSupplierInput(serializers.Serializer):
+    """
+    Body POST .../return-to-supplier/ (SR-16, BR-MH-08). Các trường số để dạng chuỗi lỏng cho service
+    kiểm và trả 400 BR-MH-08 thống nhất (không để DRF trả lỗi field lệch contract).
+    """
+    qty = serializers.CharField(allow_blank=True, allow_null=True, help_text="Số kg trả NCC (> 0, không vượt tồn)")
+    supplier_refund_amount = serializers.CharField(
+        required=False, allow_blank=True, allow_null=True, default="0",
+        help_text="Tiền NCC hoàn (đ, tuỳ chọn, >= 0). Không trả lại trong response",
+    )
+    note = serializers.CharField(
+        required=False, allow_blank=True, allow_null=True, default="", help_text="Ghi chú (không chứa số điện thoại)"
+    )
+    request_id = serializers.UUIDField(help_text="Mã chống gửi lặp, FE sinh khi mở form")

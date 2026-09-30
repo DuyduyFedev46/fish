@@ -11,5 +11,7 @@ export type DashboardAttentionData = {
   refund_calls_open?: number;
   labels_not_printed?: number;
   labels_to_void?: number;
+  /** P8 Lô 5 (BR-LO-07): số lô Quá hạn còn tồn. Chỉ có khi người xem có inventory.cancel_expired_batch (Chủ). */
+  expired_batches_open?: number;
 };
 

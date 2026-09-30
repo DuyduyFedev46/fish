@@ -1,10 +1,14 @@
+import json
+
 from django.contrib import admin
 from django.contrib.auth.admin import GroupAdmin as BaseGroupAdmin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.contrib.auth.models import Group, User
+from django.utils.html import format_html
 
 from apps.accounts.auth.services import sorted_groups
 from apps.common.audit import record_audit
+from apps.common.cost_keys import can_view_cost, redact_cost
 
 from .models import AuditLog, StaffProfile
 
@@ -77,7 +81,27 @@ class StaffProfileAdmin(admin.ModelAdmin):
 
 @admin.register(AuditLog)
 class AuditLogAdmin(admin.ModelAdmin):
-    """Chỉ đọc — append-only (BR-PQ-06). Dòng AI hiển thị `ai:<tên user>` (S03)."""
+    """
+    Chỉ đọc — append-only (BR-PQ-06). Dòng AI hiển thị `ai:<tên user>` (S03).
+
+    Bất biến 1 (P8 Lô 5, B1): `changes` chứa khoá giá vốn/tiền NCC hoàn (COST_KEYS). Cột này không
+    hiện thẳng mà đi qua `changes_visible`, dùng ĐÚNG `can_view_cost` + `redact_cost` như endpoint
+    `/api/audit-logs/` (một nguồn duy nhất). `note` theo quy ước không chứa số tiền (audit.py) và
+    API cũng trả nguyên văn, nên giữ nguyên.
+    """
+
+    exclude = ("changes",)
+
+    def get_readonly_fields(self, request, obj=None):
+        # Callable gắn theo request (không lưu trạng thái trên instance admin dùng chung giữa các luồng).
+        show_cost = can_view_cost(request.user)
+
+        def changes_visible(row):
+            data = row.changes if show_cost else redact_cost(row.changes)
+            return format_html("<pre>{}</pre>", json.dumps(data, ensure_ascii=False, indent=2, default=str))
+
+        changes_visible.short_description = "Thay đổi"
+        return [*super().get_readonly_fields(request, obj), changes_visible]
 
     list_display = ("created_at", "actor_kind", "actor", "ai_actor", "action",
                     "model_name", "object_repr")

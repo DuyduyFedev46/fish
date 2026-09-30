@@ -8,7 +8,7 @@ import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useSearchParams } from "next/navigation";
 import { useCart } from "../../../components/CartContext";
-import { createOrder, getSiteInfo, USE_MOCK, ApiError } from "../../../lib/api";
+import { createOrder, getSiteInfo, ApiError } from "../../../lib/api";
 import { formatVnd } from "../../../lib/format";
 import type { CreateOrderPayload, CreateOrderResponse, SiteInfo } from "../../../lib/types";
 import { getPrivacyPolicy } from "@/features/site/api";
@@ -75,7 +75,7 @@ export default function CheckoutScreen() {
 
   // Trang "cổng SePay" giả lập chỉ tồn tại ở chế độ mock (xem lib/mock.ts,
   // mockStartCheckoutSession) — build thật (USE_MOCK=false) loại hẳn nhánh này.
-  if (USE_MOCK && searchParams.get("mock_gateway") === "1") {
+  if (process.env.NEXT_PUBLIC_USE_MOCK === "1" && searchParams.get("mock_gateway") === "1") {
     return <MockGatewayPanel />;
   }
 

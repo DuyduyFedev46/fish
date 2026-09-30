@@ -52,6 +52,7 @@
   "inventory.batch.partial_update",
   "inventory.batch.publish",
   "inventory.batch.retrieve",
+  "inventory.batch.return_to_supplier",
   "inventory.returntostock.approve",
   "inventory.returntostock.create",
   "inventory.returntostock.list",

@@ -29,11 +29,9 @@ export type DashboardKpis = {
   inventory_value?: number;
 };
 
-/** 8 đơn mới nhất (created_at giảm dần). */
+/** 8 đơn mới nhất (created_at giảm dần). KHÔNG có tên khách / SĐT (SR-17, bất biến 9: dashboard không lộ dữ liệu cá nhân). */
 export type RecentOrder = {
   code: string;
-  customer: string;
-  phone_last4: string;
   amount: number;
   status: OrderStatus;
   status_label: string;

@@ -407,7 +407,7 @@ export function CskhCallModal({ noteId, initialItem, onClose, onUpdated }: Props
                       className={s.searchInput}
                       value={recipientPhone}
                       onChange={(e) => setRecipientPhone(e.target.value)}
-                      placeholder="VD: 0900000456"
+                      placeholder="VD: 09xx xxx xxx"
                     />
                   </div>
                   <div>

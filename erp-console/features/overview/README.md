@@ -7,7 +7,8 @@ Màn đầu của Chủ/Quản lý/NV kho: 4 KPI (doanh thu hôm nay, đơn ch�
   `shared/lib/dashboardSummary.ts` (dùng chung với `orders`, `inventory`), cache chung qua `shared/lib/useResource.ts`.
 - Quyền xem màn (FE): `reports.view_dashboard` hoặc thuộc `chu`/`quan_ly`/`nv_kho` (`shared/lib/nav.ts`).
 - Giá vốn: cột "Giá vốn/kg" và ô "Giá trị tồn kho" chỉ hiện khi `user.can_cost` (bất biến #1).
-- Tìm kiếm phía máy (mã, khách, mặt hàng, kho, trạng thái; không phân biệt dấu). Nút Làm mới tải lại cả 3 màn.
+- Bảng đơn gần đây không có tên khách/SĐT (SR-17, bất biến 9). Tìm kiếm phía máy (mã đơn, mặt hàng, kho, trạng thái; không phân biệt dấu).
+- Khối Cần chú ý (`GET /api/dashboard/attention/`) có thẻ `expired_batches_open` (Chủ) → `/inventory/?status=EXPIRED` (P8 Lô 5). Nút Làm mới tải lại cả 3 màn.
 - Mock: `mock.ts` → seed chung `shared/lib/dashboardSummary.mock.ts`. Thử lỗi 500 / rỗng: đặt
   `localStorage.cave_erp_mock_dashboard = "fail" | "empty"` (hoặc `window.__caveMock.dashboard("fail")`).
 

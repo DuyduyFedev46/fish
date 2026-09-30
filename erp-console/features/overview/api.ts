@@ -19,9 +19,9 @@ export function getDashboardAttention(signal?: AbortSignal): Promise<DashboardAt
 }
 
 
-/** Lọc như bản cũ: mã đơn, khách, trạng thái. */
+/** Lọc: mã đơn, trạng thái (SR-17: bảng đơn không còn tên khách, bất biến 9). */
 export function filterRecentOrders(rows: RecentOrder[], q: string): RecentOrder[] {
-  return rows.filter((o) => matches(q, o.code, o.customer, o.status_label));
+  return rows.filter((o) => matches(q, o.code, o.status_label));
 }
 
 /** Lọc như bản cũ: mã lô, mặt hàng, kho, trạng thái. */

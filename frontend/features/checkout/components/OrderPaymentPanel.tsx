@@ -7,7 +7,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import type { OrderStatus } from "../../../lib/types";
-import { startCheckoutSession, USE_MOCK } from "../../../lib/api";
+import { startCheckoutSession } from "../../../lib/api";
 import CountdownTimer from "../../../components/CountdownTimer";
 import { goToMockGateway, redirectToGateway } from "../gateway";
 import { rememberOrderContact } from "../storage";
@@ -34,7 +34,7 @@ export default function OrderPaymentPanel({
     try {
       const session = await startCheckoutSession(order.order_code);
       rememberOrderContact(order.order_code, phoneLast4);
-      if (USE_MOCK) {
+      if (process.env.NEXT_PUBLIC_USE_MOCK === "1") {
         goToMockGateway(order.order_code, order.total_amount);
       } else {
         redirectToGateway(session);

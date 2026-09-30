@@ -188,10 +188,13 @@ class CancelExpiredBatchTest(OrderApiBase):
         self.assertIn("cancel_expired", steps_before)
         cancel_step = steps_before["cancel_expired"]
         self.assertTrue(cancel_step["allowed"])
-        self.assertEqual(cancel_step["label"], "Huỷ lô")
+        # P8 Lô 5 (SR-15): đổi nhãn thành "Xác nhận Đã huỷ phần tồn" (song song có "Xác nhận Đã trả NCC").
+        self.assertEqual(cancel_step["label"], "Xác nhận Đã huỷ phần tồn")
         self.assertEqual(cancel_step["why"]["br"], "BR-LO-03")
-        # Khi EXPIRED không hiện bước close
-        self.assertNotIn("close", steps_before)
+        # P8 Lô 5 (SR-15, BR-LO-04): EXPIRED còn tồn vẫn hiện bước close nhưng chưa allowed (phải xử lý hết tồn).
+        self.assertIn("close", steps_before)
+        self.assertFalse(steps_before["close"]["allowed"])
+        self.assertIn("BR-LO-04", [m["code"] for m in steps_before["close"]["missing"]])
 
         # Với NV kho: bước cancel_expired allowed=false
         resp_kho = self.c_kho.get(f"/api/guidance/batch/{self.batch.pk}/")

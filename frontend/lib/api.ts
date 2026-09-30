@@ -74,12 +74,12 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
 }
 
 export async function getCatalog(): Promise<CatalogItem[]> {
-  if (USE_MOCK) return mockGetCatalog();
+  if (process.env.NEXT_PUBLIC_USE_MOCK === "1") return mockGetCatalog();
   return apiFetch<CatalogItem[]>("/api/shop/catalog/");
 }
 
 export async function getCatalogItem(itemCode: string): Promise<CatalogItemDetail | null> {
-  if (USE_MOCK) return mockGetCatalogItem(itemCode);
+  if (process.env.NEXT_PUBLIC_USE_MOCK === "1") return mockGetCatalogItem(itemCode);
   try {
     return await apiFetch<CatalogItemDetail>(
       `/api/shop/catalog/${encodeURIComponent(itemCode)}/`
@@ -119,7 +119,7 @@ function mapOrderStatus(wire: WireOrderStatus): OrderStatus {
 }
 
 export async function getSiteInfo(): Promise<SiteInfo> {
-  if (USE_MOCK) return mockGetSiteInfo();
+  if (process.env.NEXT_PUBLIC_USE_MOCK === "1") return mockGetSiteInfo();
   return apiFetch<SiteInfo>("/api/public/site-info/");
 }
 
@@ -134,7 +134,7 @@ function mapCreateOrderResponse(wire: WireCreateOrderResponse): CreateOrderRespo
 export async function createOrder(
   payload: CreateOrderPayload
 ): Promise<CreateOrderResponse> {
-  if (USE_MOCK) return mapCreateOrderResponse(await mockCreateOrder(payload));
+  if (process.env.NEXT_PUBLIC_USE_MOCK === "1") return mapCreateOrderResponse(await mockCreateOrder(payload));
   const wire = await apiFetch<WireCreateOrderResponse>("/api/shop/orders/", {
     method: "POST",
     body: JSON.stringify(payload),
@@ -146,7 +146,7 @@ export async function getOrderStatus(
   orderCode: string,
   phoneLast4: string
 ): Promise<OrderStatus | null> {
-  if (USE_MOCK) {
+  if (process.env.NEXT_PUBLIC_USE_MOCK === "1") {
     const wire = await mockGetOrderStatus(orderCode, phoneLast4);
     return wire ? mapOrderStatus(wire) : null;
   }
@@ -171,7 +171,7 @@ export async function getOrderStatus(
 export async function startCheckoutSession(
   orderCode: string
 ): Promise<PaymentCheckoutSession> {
-  if (USE_MOCK) return mockStartCheckoutSession(orderCode);
+  if (process.env.NEXT_PUBLIC_USE_MOCK === "1") return mockStartCheckoutSession(orderCode);
   return apiFetch<PaymentCheckoutSession>(
     `/api/shop/orders/${encodeURIComponent(orderCode)}/checkout/`,
     { method: "POST" }

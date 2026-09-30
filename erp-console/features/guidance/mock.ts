@@ -2,6 +2,7 @@
 // Phục vụ test mock mode và E2E không phụ thuộc backend.
 
 import type { MockRequest, MockResponse } from "@/shared/lib/http";
+import { mockExpiredBatchGuidance } from "@/features/inventory/mock";
 import type { GuidanceData } from "./types";
 
 export function mockGuidanceApi(req: MockRequest): MockResponse {
@@ -253,6 +254,9 @@ export function mockGuidanceApi(req: MockRequest): MockResponse {
   }
 
   if (docType === "batch") {
+    // P8 Lô 5: lô Quá hạn còn tồn do mock của inventory quản (tồn đổi theo thao tác Đã huỷ / Đã trả NCC).
+    const expired = mockExpiredBatchGuidance(docId, req);
+    if (expired) return expired;
     const data: GuidanceData = {
       doc: {
         type: "batch",

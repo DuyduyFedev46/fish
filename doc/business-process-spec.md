@@ -236,6 +236,7 @@ Mua trực tiếp tại cảng, **không có đơn đặt hàng trước** (L). 
 | BR-MH-04 | Purchase Invoice tách riêng khỏi Purchase Receipt (D — kiểm đếm vật lý ≠ ghi chi phí), nhưng phải tồn tại trước khi chốt lô. |
 | BR-MH-05 | Lô ở trạng thái **Nháp** không hiện trên Shop. Phải publish thủ công (`publish_batch`). |
 | BR-MH-06 | Đơn giá mua là **field nhạy cảm** — NV kho nhập được nhưng không xem lại được phiếu của người khác (xem 1.6). |
+| BR-MH-08 | 🟡 **Trả NCC** phần tồn lô Quá hạn: ghi số kg (xuất kho `SUPPLIER_RETURN`) và số tiền NCC hoàn nếu có; tiền NCC hoàn giảm tổng chi phí lô (BR-BC-04). Giả định: mua tại cảng trả tiền ngay (decisions 10/09), việc NCC hoàn tiền là thoả thuận ngoài hệ thống, hệ thống chỉ ghi sổ. Tiền NCC hoàn là số nhạy cảm (chỉ Chủ xem) *(mới 2026-09-30, PA, Duy duyệt 30/09)*. |
 
 ---
 
@@ -296,9 +297,10 @@ stateDiagram-v2
 | BR-LO-01 | Lô **Cận hạn**: hệ thống chỉ **cảnh báo**, không tự giảm giá. Muốn xả giá thì Chủ tạo Item Price mới có `valid_upto` *(PA — tự động giảm giá là quyết định kinh doanh, không để máy làm)*. |
 | BR-LO-02 | Lô **Quá hạn** bị loại khỏi tồn khả dụng **ngay**, kể cả còn kg. Không bán được nữa. |
 | BR-LO-03 | Huỷ lô quá hạn → toàn bộ giá trị tồn còn lại hạch toán **lỗ hàng hết hạn** vào chính lô đó. |
-| BR-LO-04 | **Chốt lô** yêu cầu: tồn = 0 (hoặc đã huỷ phần còn lại), Purchase Invoice đã có, không còn đơn đang mở tham chiếu lô. |
+| BR-LO-04 | **Chốt lô** yêu cầu: **tồn = 0**, Purchase Invoice đã có, không còn đơn đang mở tham chiếu lô. Lô Quá hạn còn tồn phải xử lý hết phần tồn (BR-LO-07) trước khi chốt — bỏ ngoại lệ tạm thời "chốt thẳng lô Quá hạn" của S04 *(sửa 2026-09-30, Duy duyệt 30/09)*. |
 | BR-LO-05 | Lô **đã chốt** khoá vĩnh viễn: không sửa chi phí, không kiểm kê, không hoàn hàng về. Lãi/lỗ đông cứng. |
 | BR-LO-06 | Ngưỡng cận hạn 14 ngày là **tham số cấu hình**, không hard-code. |
+| BR-LO-07 | Lô Quá hạn còn tồn → hệ thống **cảnh báo** (Cần chú ý, Tiếp theo). Chủ xác nhận phần tồn là **Đã huỷ** (BR-LO-03, ghi lỗ) hoặc **Đã trả NCC** (BR-MH-08), được chia nhiều lần. Không xác nhận khi lô còn giữ chỗ. Số kg xác nhận phải khớp tồn đang hiển thị *(mới 2026-09-30, Duy duyệt 30/09)*. |
 
 ---
 
@@ -470,7 +472,7 @@ Cả hai báo cáo nằm sau `view_profitreport` — mặc định chỉ Chủ (
 | BR-BC-01 | Doanh thu ghi nhận tại thời điểm **xác nhận thanh toán**. |
 | BR-BC-02 | Giá vốn ghi nhận **cùng thời điểm** với doanh thu, lấy từ bảng phân bổ lô (BR-BH-06). |
 | BR-BC-03 | Hoàn tiền ghi vào **kỳ phát sinh hoàn**, không sửa ngược kỳ đã qua. Chứng từ đảo doanh thu ghi vào kỳ lập chứng từ (BR-HT-06). |
-| BR-BC-04 | Lãi/lỗ theo lô = doanh thu bán từ lô − (giá mua + chi phí phân bổ). Doanh thu (và số kg đã bán) = phân bổ lô của hoá đơn **chưa huỷ** **trừ** dòng chứng từ đảo doanh thu của lô *(sửa 2026-09-30, Duy duyệt 30/09)*; lô đã chốt: chỉ trừ chứng từ lập trước thời điểm chốt *(Duy quyết 30/09)*; kg hoàn về kho rồi bán lại chỉ tính một lần *(hoá đơn đã huỷ vẫn không tính — sửa 2026-09-28, Duy duyệt)*. Giá mua = `purchase_rate` × số kg nhập. Hao hụt (kiểm kê âm) và hàng hỏng (hàng hoàn đã duyệt Huỷ bỏ) **hiển thị riêng** số kg và giá trị (kg × `landed_unit_cost` **hiện hành**, không dùng số ảnh chụp trên đơn) để biết mất bao nhiêu, **không cộng vào tổng chi phí** vì số kg đó đã nằm trong giá mua; phần mất làm giảm lãi qua việc không có doanh thu (BR-KK-03). Ví dụ: nhập 100 kg × 100.000đ, bán 90 kg × 150.000đ, hao 10 kg → lãi 3.500.000đ. *(D — sửa 2026-09-28, Duy duyệt, lý do: công thức cũ "giá mua + chi phí phân bổ + hao hụt + hàng hỏng" tính hai lần hao hụt/hỏng.)* |
+| BR-BC-04 | Lãi/lỗ theo lô = doanh thu bán từ lô − (giá mua + chi phí phân bổ − tiền NCC hoàn). Tổng chi phí lô = giá mua + chi phí phân bổ − tiền NCC hoàn (BR-MH-08); kg trả NCC hiện riêng, không lẫn hao hụt/huỷ *(bổ sung 2026-09-30, Duy duyệt 30/09)*. Doanh thu (và số kg đã bán) = phân bổ lô của hoá đơn **chưa huỷ** **trừ** dòng chứng từ đảo doanh thu của lô *(sửa 2026-09-30, Duy duyệt 30/09)*; lô đã chốt: chỉ trừ chứng từ lập trước thời điểm chốt *(Duy quyết 30/09)*; kg hoàn về kho rồi bán lại chỉ tính một lần *(hoá đơn đã huỷ vẫn không tính — sửa 2026-09-28, Duy duyệt)*. Giá mua = `purchase_rate` × số kg nhập. Hao hụt (kiểm kê âm) và hàng hỏng (hàng hoàn đã duyệt Huỷ bỏ) **hiển thị riêng** số kg và giá trị (kg × `landed_unit_cost` **hiện hành**, không dùng số ảnh chụp trên đơn) để biết mất bao nhiêu, **không cộng vào tổng chi phí** vì số kg đó đã nằm trong giá mua; phần mất làm giảm lãi qua việc không có doanh thu (BR-KK-03). Ví dụ: nhập 100 kg × 100.000đ, bán 90 kg × 150.000đ, hao 10 kg → lãi 3.500.000đ. *(D — sửa 2026-09-28, Duy duyệt, lý do: công thức cũ "giá mua + chi phí phân bổ + hao hụt + hàng hỏng" tính hai lần hao hụt/hỏng.)* |
 | BR-BC-05 | Lô chưa chốt phải hiển thị nhãn **"tạm tính"** — nếu không, Lộc sẽ đọc số chưa đủ chi phí như số cuối cùng. |
 
 ---
@@ -488,7 +490,7 @@ Cả hai báo cáo nằm sau `view_profitreport` — mặc định chỉ Chủ (
 | E-07 | Soạn hàng phát hiện hàng hỏng | Huỷ toàn/một phần + phiếu hoàn | P-07 |
 | E-08 | Giao 2 lần không gặp khách | Hệ thống nhắc Quản lý/Chủ quyết định | BR-GH-04 |
 | E-09 | Hàng giao thất bại về kho | Quản lý/Chủ duyệt tái nhập hoặc huỷ bỏ | P-08 |
-| E-10 | Lô quá hạn còn tồn | Loại khỏi bán ngay, Chủ huỷ, hạch toán lỗ | BR-LO-02/03 |
+| E-10 | Lô quá hạn còn tồn | Loại khỏi bán ngay, cảnh báo, Chủ xác nhận Đã huỷ (ghi lỗ) hoặc Đã trả NCC | BR-LO-02/03/07, BR-MH-08 |
 | E-11 | Hao hụt kiểm kê bất thường | Duyệt, hạch toán vào lô, xem lại giả định cân | BR-KK-03/06 |
 | E-12 | Job nhả giữ chỗ chết | Cần cảnh báo giám sát — hàng bị khoá vô hình | BR-BH-04 |
 | E-13 | Thành phần BUNDLE hết hàng | Combo tự động hết hàng trên Shop | BR-DM-06 |

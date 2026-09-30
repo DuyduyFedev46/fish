@@ -78,20 +78,20 @@ const BATCHES: SeedBatch[] = [
   ["L0901-CB00", "Cá bớp cắt khúc", KHO_LANH, "Ghe Tư Hải", 0, 0, 23, -2, "CLOSED", 151000],
 ];
 
-// [code, customer ("" = Khách lẻ), phone, total, status, phút trước, hạn giữ chỗ còn (phút) | null]
-type SeedOrder = [string, string, string, number, OrderStatus, number, number | null];
+// [code, total, status, phút trước, hạn giữ chỗ còn (phút) | null] — không có tên khách / SĐT (SR-17)
+type SeedOrder = [string, number, OrderStatus, number, number | null];
 const ORDERS: SeedOrder[] = [
-  ["DH-240924-011", "Chị Mai (Q.1)", "0903118822", 1_092_000, "BOOKED", 22, 6],
-  ["DH-240924-010", "", "0937004561", 546_000, "BOOKED", 9, 21],
-  ["DH-240924-009", "Nhà hàng Biển Xanh", "0282204455", 4_860_000, "PAID", 48, null],
-  ["DH-240924-008", "Anh Khoa", "0918772310", 780_000, "PROCESSING", 95, null],
-  ["DH-240924-007", "Cô Thuý", "0909556677", 1_415_000, "COMPLETED", 180, null],
-  ["DH-240924-006", "", "0977123450", 312_000, "AUTO_CANCELLED", 240, null],
-  ["DH-240924-005", "Quán Ốc Tám", "0985661234", 2_236_000, "PROCESSING", 300, null],
-  ["DH-240924-004", "Chị Ngân", "0903998877", 928_000, "CANCELLED", 420, null],
-  ["DH-240923-018", "Anh Bình", "0912345098", 1_640_000, "COMPLETED", 1_200, null],
-  ["DH-240923-017", "Nhà hàng Hải Âu", "0283221100", 6_210_000, "PAID", 1_300, null],
-  ["DH-240923-016", "", "0966440022", 459_000, "COMPLETED", 1_420, null],
+  ["DH-240924-011", 1_092_000, "BOOKED", 22, 6],
+  ["DH-240924-010", 546_000, "BOOKED", 9, 21],
+  ["DH-240924-009", 4_860_000, "PAID", 48, null],
+  ["DH-240924-008", 780_000, "PROCESSING", 95, null],
+  ["DH-240924-007", 1_415_000, "COMPLETED", 180, null],
+  ["DH-240924-006", 312_000, "AUTO_CANCELLED", 240, null],
+  ["DH-240924-005", 2_236_000, "PROCESSING", 300, null],
+  ["DH-240924-004", 928_000, "CANCELLED", 420, null],
+  ["DH-240923-018", 1_640_000, "COMPLETED", 1_200, null],
+  ["DH-240923-017", 6_210_000, "PAID", 1_300, null],
+  ["DH-240923-016", 459_000, "COMPLETED", 1_420, null],
 ];
 
 // [batch_id, type, qty_change, reference, phút trước]
@@ -190,20 +190,16 @@ export function buildDashboardSummaryMock(
   const orders = (empty ? [] : ORDERS).map((o, i) => ({
     id: i + 1,
     code: o[0],
-    customer: o[1],
-    phone: o[2],
-    total: o[3],
-    status: o[4],
-    created: new Date(now.getTime() - o[5] * 60000),
-    expires: o[6] === null ? null : new Date(now.getTime() + o[6] * 60000),
+    total: o[1],
+    status: o[2],
+    created: new Date(now.getTime() - o[3] * 60000),
+    expires: o[4] === null ? null : new Date(now.getTime() + o[4] * 60000),
   }));
   const recent_orders: RecentOrder[] = [...orders]
     .sort((a, b) => b.created.getTime() - a.created.getTime() || b.id - a.id)
     .slice(0, 8)
     .map((o) => ({
       code: o.code,
-      customer: o.customer || "Khách lẻ",
-      phone_last4: o.phone.slice(-4),
       amount: o.total,
       status: o.status,
       status_label: ORDER_LABEL[o.status],

@@ -453,3 +453,153 @@ Nguyên tắc Duy: "báo cáo đã qua thì không được sửa số".
 - XANH: `apps.reports apps.sales` → `Ran 395 tests ... OK`; toàn bộ `manage.py test` → `Ran 1341 tests in 56.459s ... OK` (chạy sau khi sửa xong docstring/README/spec); `makemigrations --check --dry-run` → `No changes detected`.
 
 **T1 (techlead vòng 2):** `apps/reports/tests/test_p8_pnl_credit_note.py` đổi 4 chỗ lấy year/month từ `timezone.now()` (UTC) sang `timezone.localdate()` (giờ VN, khớp bộ lọc của `period_pnl`), tránh đỏ 00:00-07:00 VN ngày 1 hằng tháng. Kiểm bằng script tạm (scratchpad, ngoài repo) patch `timezone.now` = 2026-10-31 20:00 UTC (= 01/11 03:00 VN): 48 test P8 (reports + credit_notes) OK; với mẫu cũ thì 3 test đỏ. Các file test P8 khác chỉ dùng `now()` cho so sánh thời điểm, không lấy year/month.
+
+## Lô 5 — BE
+
+Story: SR-15 (chốt lô Quá hạn phải xử lý hết tồn, BR-LO-04/07), SR-16 (trả NCC, BR-MH-08), SR-17 (dashboard bỏ dữ liệu khách), F11 (`expired_qty`). Quy tắc Duy 30/09: lô đã chốt / kỳ đã qua không đổi số; logic Lô 4 trong `batch_pnl` (lô CLOSED chỉ trừ chứng từ trước `closed_at`) giữ nguyên.
+
+### File đã sửa
+- `backend/apps/inventory/models/supplier_returns.py` (mới), `models/__init__.py` (re-export), `models/stock.py` (`MovementType.SUPPLIER_RETURN`).
+- `backend/apps/inventory/migrations/0004_batchsupplierreturn.py` (mới, xem dưới).
+- `backend/apps/inventory/batches/services.py`: `check_close_batch` (bỏ ngoại lệ EXPIRED/CANCELLED; đếm đơn mở qua `_open_orders_count` — techlead L3), `_check_expired_reserved` (tách từ SR-08), `check_cancel_expired_batch`, `check_process_expired_stock` (mới), `cancel_expired_batch(confirm_qty=None)`, `return_batch_to_supplier` (mới).
+- `backend/apps/inventory/batches/api.py`, `serializers.py` (`CancelExpiredInput`, `ReturnToSupplierInput`), `next_steps.py`.
+- `backend/apps/delivery/attention_api.py`, `backend/apps/reports/services.py` (`batch_pnl`), `backend/apps/reports/dashboard_api.py`.
+- Test mới: `backend/apps/inventory/batches/tests/test_p8_lo5_expired_return.py` (50 test), `backend/apps/reports/tests/test_p8_lo5_pnl_dashboard.py` (13 test).
+- Doc: `doc/business-process-spec.md` chỉ BR-LO-04 (sửa), BR-LO-07 (mới), BR-MH-08 (mới), BR-BC-04 (thêm vế NCC), E-10, theo 02b §5.6.
+- Không sửa: `cost_keys.py` (Lô 1 đã có `supplier_refund_amount`, `supplier_return_cost`), `admin.py` (không đăng ký `BatchSupplierReturn` vào Admin: không có màn hình nào lộ tiền hoàn), `landed_unit_cost`/`recompute_landed_cost`, `period_pnl`, `cancel_receipt`, không quyền/migration Group mới.
+
+### Migration `inventory/0004_batchsupplierreturn.py`
+Đúng 2 operation: `AlterField(stockledgerentry.movement_type)` (thêm choice `SUPPLIER_RETURN`, `max_length` 16 giữ nguyên) + `CreateModel(BatchSupplierReturn)` (`default_permissions=("view",)`). Đã đọc lại file. `sqlmigrate inventory 0004`: AlterField là `(no-op)`, CreateModel = 1 `CREATE TABLE` + 2 `CREATE INDEX` (batch_id, created_by_id) + `request_id ... UNIQUE`. `migrate` sạch trên SQLite ở scratchpad (`DATABASE_URL=sqlite:///.../scratchpad/lo5/clean.sqlite3`) → rollback `migrate inventory 0003` (`Unapplying inventory.0004... OK`) → `migrate inventory` lại OK. Không đụng `backend/db.sqlite3`. `makemigrations --check --dry-run` → `No changes detected`.
+
+### Contract thực tế (cho FE)
+```
+POST /api/inventory/batches/<pk|batch_id>/return-to-supplier/     Chủ (inventory.cancel_expired_batch)
+Request  {"qty": "3.000", "supplier_refund_amount": "150000", "note": "", "request_id": "<uuid>"}
+         qty, supplier_refund_amount, note nhận chuỗi/số; supplier_refund_amount và note tuỳ chọn (mặc định 0 / ""); qty và request_id bắt buộc có khoá.
+200      {"batch_id": "LO-…", "status": "EXPIRED", "qty_available": "2.000", "returned_qty": "3.000", "return_id": 12}
+         KHÔNG có tiền NCC hoàn. request_id trùng -> 200 cùng dạng, không trừ kho lần 2.
+400      {"code": "BR-MH-08", "detail": "Số kg trả phải lớn hơn 0 và không vượt tồn 5,000 kg."}   (qty <=0/rác/NaN/vượt tồn/quá 3 số lẻ)
+400      {"code": "BR-MH-08", "detail": "Tiền NCC hoàn phải là số không âm, tối đa 2 chữ số thập phân."}
+400      {"code": "BR-MH-08", "detail": "Ghi chú không được chứa dãy số dài (số điện thoại, số tài khoản)."}   / "Ghi chú tối đa 500 ký tự."
+400      {"code": "BR-LO-07", "detail": "Chỉ xác nhận trả NCC cho lô Quá hạn còn tồn."}   (không EXPIRED hoặc tồn 0)
+400      {"code": "BR-LO-07", "detail": "Còn 2,000 kg đang giữ chỗ của 1 đơn — chờ đơn thanh toán hoặc hết hạn giữ chỗ rồi huỷ."}
+400      {"code": "BR-LO-05", "detail": "Lô đã chốt."}
+400 (DRF) thiếu khoá `qty` hoặc `request_id` hợp lệ (UUID) -> lỗi field chuẩn DRF (không có `code`).
+403 quan_ly/nv_kho/nv_giao/cskh · 401 chưa đăng nhập · 404 lô không có.
+
+POST /api/inventory/batches/<pk>/cancel-expired/   body TUỲ CHỌN {"confirm_qty": "100.000"}; response không đổi (BatchSerializer)
+400  {"code": "BR-LO-07", "detail": "Tồn đã đổi (70,000 kg) — tải lại."}     (confirm_qty != tồn hiện tại)
+400  {"code": "BR-LO-07", "detail": "Số kg xác nhận không hợp lệ."}          (confirm_qty rác)
+     Không gửi body -> hành vi cũ (DW-06). Huỷ lô tồn 0 (đã trả hết NCC) vẫn hợp lệ.
+
+GET /api/dashboard/attention/   thêm "expired_batches_open": <số lô EXPIRED còn tồn> cho user có inventory.cancel_expired_batch (Chủ).
+    403 chỉ khi thiếu cả 4 quyền (confirm_with_customer, decide_unconfirmed, print_label, cancel_expired_batch).
+    quan_ly không có khoá này. User chỉ có cancel_expired_batch nhận {"expired_batches_open": n}.
+
+GET /api/guidance/batch/<id>/  (lô EXPIRED): next_steps
+    cancel_expired  label "Xác nhận Đã huỷ phần tồn"  command inventory.batch.cancel_expired
+    return_to_supplier label "Xác nhận Đã trả NCC"    command inventory.batch.return_to_supplier  (chỉ khi qty_available > 0)
+    close  label "Chốt lô": HIỆN cả khi EXPIRED; allowed=false + missing BR-LO-04 khi còn tồn; allowed khi tồn 0 và đủ điều kiện khác.
+    Còn giữ chỗ: cả 2 bước xử lý tồn allowed=false, missing BR-LO-07 "Còn X kg đang giữ chỗ của N đơn — …".
+
+GET /api/reports/batch/<batch_id>/  (view_profitreport): thêm "supplier_return_qty", "supplier_refund_amount" (20 khoá); total_cost = purchase_cost + allocated_cost − supplier_refund_amount.
+GET /api/dashboard/summary/: recent_orders[] còn đúng {code, amount, status, status_label, expires_at}.
+```
+AI: lệnh `inventory.batch.return_to_supplier` có `max_level="C"` và `force_c=True` (quyền `cancel_expired_batch` thuộc `FORCE_C_PERMS`); `cancel_expired` vẫn form_only như cũ (không gắn input_serializer vào decorator để không đổi registry).
+
+### Rule BR đã cài
+- BR-LO-04: `check_close_batch` — mọi lô còn `qty_available > 0` bị chặn, kể cả EXPIRED (gỡ ngoại lệ S04). Chuỗi đếm đơn mở dùng `_open_orders_count(batch, OPEN_ORDER_STATUSES)`; câu chữ giữ nguyên "Còn N đơn đang mở …".
+- BR-LO-07: `check_process_expired_stock` (EXPIRED? / đã chốt BR-LO-05 / tồn > 0 / còn giữ chỗ), `confirm_qty` khớp tồn.
+- BR-MH-08: `return_batch_to_supplier` — khoá dòng lô, `request_id` idempotent (kiểm sau khi khoá; `request_id` đã dùng cho lô khác -> 400 BR-MH-08), 0 < qty ≤ tồn và ≤ 3 số lẻ, tiền ≥ 0 và ≤ 2 số lẻ, ghi chú ≤ 500 ký tự và chặn `has_long_digit_run`, ghi `BatchSupplierReturn` + `SUPPLIER_RETURN` (âm) + AuditLog. Lô vẫn EXPIRED.
+- BR-BC-04: `batch_pnl` + `supplier_return_qty`, `supplier_refund_amount`; `total_cost` trừ tiền hoàn; không tính lại `landed_unit_cost`; `period_pnl` không đổi.
+- F11: `expired_qty` chỉ đếm `WRITE_OFF` có `reference` bắt đầu `"cancel_expired_batch "` (huỷ phiếu nhập DW-18 và hàng hoàn huỷ không còn bị tính là quá hạn).
+
+### Chống rò
+- Response trả NCC, 400, 403 không chứa tiền hoàn (test dò chuỗi sentinel `1234567`).
+- AuditLog: `changes = {qty, supplier_refund_amount}`; `supplier_refund_amount` thuộc `COST_KEYS` nên quan_ly không thấy; `note` audit chỉ là `return_batch_to_supplier <n>kg`, không có ghi chú tự do lẫn tiền. Test quét hết các trang `/api/audit-logs/` với quan_ly: `ok_responses > 0`, thấy action `return_batch_to_supplier`, không còn khoá COST_KEYS, không có chuỗi `1234567`; Chủ thấy đủ.
+- `BatchSerializer` không thêm field nào (test: không có khoá chứa `refund`/`supplier_return`, nv_kho không thấy `purchase_rate`/`landed_unit_cost`).
+- SR-17: dashboard `recent_orders` bỏ `customer`, `phone_last4` và `select_related("customer")`, không phân nhánh theo nhóm. Test: đúng 5 khoá cho chu/quan_ly/nv_kho; JSON không chứa tên giả, `0456`, SĐT, địa chỉ, `phone_last4`, `customer`; nv_giao/cskh 403, khách 401. Fixture chỉ dùng tên, SĐT (`0900000456`), địa chỉ giả.
+
+### TDD đỏ → xanh
+- ĐỎ (trước code, `scratchpad/lo5/red.txt`): `apps.inventory.batches.tests.test_p8_lo5_expired_return` không nạp được (`ImportError: cannot import name 'BatchSupplierReturn'`); `apps.reports.tests.test_p8_lo5_pnl_dashboard` → `Ran 14 tests ... FAILED (failures=8, errors=7)`. Lý do đúng: `recent_orders` còn `"customer":"Khách Giả Bảy","phone_last4":"0456"`; `batch_pnl` thiếu `supplier_return_qty`/`return_batch_to_supplier` chưa có.
+- XANH: `manage.py test apps.inventory.batches.tests.test_p8_lo5_expired_return apps.reports.tests.test_p8_lo5_pnl_dashboard` → `Ran 63 tests ... OK`.
+- Toàn bộ: `DJANGO_DEBUG=1 env -u DATABASE_URL manage.py test` → trước 1379 OK; sau `Ran 1442 tests in 65.513s ... OK` (+63 test mới, 0 failure, 0 xoá); `makemigrations --check --dry-run` → `No changes detected`.
+- Bổ sung sau review techlead (T5-1, T5-2): thêm 5 test vào `test_p8_lo5_expired_return.py` (lớp `SR15AiFloorTests` 4 test: luật sàn AI, đối chứng tồn 0, lệnh AI qua API hạ C, job `run_due_ai_actions` ESCALATED; và `test_sr16_ac3_request_id_da_dung_cho_lo_khac_400_br_mh_08`). File này 55 test; toàn bộ `Ran 1447 tests ... OK`; `makemigrations --check --dry-run` → `No changes detected`.
+- Lượt chạy đầu sau khi code có 6 đỏ (test cũ, xem "Lệch thiết kế"), đã cập nhật kỳ vọng rồi chạy lại xanh.
+
+### Lệch thiết kế / cần Duy-techlead xác nhận
+1. **Test S04 cũ**: không tồn tại test S04 nào cho phép chốt lô EXPIRED còn tồn (`test_l1_close_batch.py` không có ca EXPIRED). Việc bỏ ngoại lệ ở `check_close_batch` không làm đỏ test cũ nào ở tầng service/AI (`test_dw25_close_batch`, `test_p8_close_batch_sold` xanh). Điểm dừng "test cũ đỏ vì bỏ ngoại lệ" KHÔNG bị chạm theo nghĩa chặt.
+2. **Test cũ cập nhật kỳ vọng vì thêm hợp đồng mới theo 02b** (không đổi hành vi khác), 6 test, trong đó 3 nằm NGOÀI danh sách file 02c Lô 5 — cần người duyệt xác nhận:
+   - Trong `inventory/batches/tests/` (thư mục được phép): `test_cancel_expired.py::test_dw06_ac6_guidance_next_steps_expired_then_cancelled` — nhãn "Huỷ lô" → "Xác nhận Đã huỷ phần tồn" và dòng `assertNotIn("close", steps_before)` → `close` hiện, `allowed=false`, có BR-LO-04 (do bỏ điều kiện `status != EXPIRED` ở bước 4, đúng 02b §5.3). Đây là test gần nhất với việc bỏ ngoại lệ ở tầng Tiếp theo; báo rõ để techlead xem có coi là "chạm điểm dừng" không.
+   - Trong `reports/tests/` (được phép): `test_api.py::test_chu_can_view_batch_pnl`, `test_services.py::test_batch_pnl_keys_unchanged` — bộ khoá 18 → 20.
+   - NGOÀI danh sách: `ai/registry/tests/test_discipline.py` (số `@action` 23 → 24), `ai/registry/tests/snapshots/commands_index_snapshot.json` (thêm `inventory.batch.return_to_supplier`), `delivery/tests/test_cskh_l4.py::test_cs15_ac1_owner_sees_all_6_keys` (thêm `expired_batches_open`). Đều là hệ quả trực tiếp của action/khoá mới theo thiết kế, sửa mang tính cơ học.
+3. Serializer đầu vào để `qty`/`supplier_refund_amount`/`note` dạng chuỗi lỏng (không `DecimalField`) để mọi giá trị sai trả 400 `BR-MH-08` thống nhất thay vì lỗi field DRF. Hệ quả: schema AI của lệnh này mô tả các trường là chuỗi.
+4. `return_batch_to_supplier` tuân thủ 02b nhưng chặn thêm số lẻ vượt 3 (kg) / 2 (tiền) bằng BR-MH-08, và tiền ≥ 10^12 (giới hạn cột `max_digits=14`) để không 500.
+5. Trả NCC luôn từ chối lô CLOSED (BR-LO-05) nên `batch_pnl` không cần lọc `closed_at` cho phần NCC; số lô đã chốt không đổi.
+
+### Nợ / lưu ý
+- `apps/inventory/batches/timeline.py` (ngoài danh sách): `SUPPLIER_RETURN` rơi vào nhãn chung "Biến động kho X kg"; nên thêm nhãn "Trả NCC" ở lô sau. Sổ chi tiết không lộ tiền.
+- `apps/ai/execution/safety.py` docstring còn nhắc "tồn = 0 hoặc EXPIRED/CANCELLED" (ngoài danh sách); logic dùng lại `check_close_batch` nên tự đúng, chỉ cần sửa câu chữ.
+- `period_pnl` chưa phản ánh tiền NCC hoàn (đúng 02b §5.5: "để sau").
+- FE: `BatchDetailSheet` phải gửi `confirm_qty` = tồn đang hiển thị và sinh `request_id = crypto.randomUUID()` khi mở form trả NCC; xử lý 400 BR-LO-07 "Tồn đã đổi" bằng nút Tải lại.
+
+### B1 — Admin Nhật ký lộ `changes` (QA Critical, đã sửa)
+- **Lệch thiết kế (điều phối cho phép):** sửa `backend/apps/accounts/admin.py` (ngoài danh sách 02c) vì lỗi chặn SR-16-AC6. Lỗi có từ trước Lô 5 (khoá `purchase_rate`...), Lô 5 thêm khoá `supplier_refund_amount` vào.
+- `AuditLogAdmin`: `exclude = ("changes",)` + readonly callable `changes_visible` (tạo theo request trong `get_readonly_fields`, không lưu trạng thái trên instance admin). Dùng đúng `can_view_cost` và `redact_cost` từ `apps.common.cost_keys` như `/api/audit-logs/` (một nguồn duy nhất). Người xem thiếu `inventory.view_costprice` thấy `changes` đã bỏ mọi khoá COST_KEYS; Chủ/superuser thấy đủ. `list_display`, `search_fields` không chứa `changes`, không có action export. `note` giữ nguyên (quy ước audit.py: không ghi tiền; API cũng trả nguyên văn).
+- Bài học M1 Lô 4: field readonly tường minh không qua `CostHidingMixin` nên kiểm bằng HTML thật (status 200), không tin cấu hình.
+- Test (`inventory/batches/tests/test_p8_lo5_qa_edges.py`): bỏ `@expectedFailure` ở `QaLeakTests.test_qa_admin_html_khong_lo_tien_ncc_...`; `QaAdminAuditBaselineTests` đổi thành 2 test: staff `quan_ly` không thấy `purchase_rate`/`7654321`/`supplier_refund_amount`/tiền NCC (khoá không nhạy cảm `status` vẫn hiện), và đối chứng Chủ (is_staff) + superuser vẫn thấy đủ. Đã thử tạm đặt `show_cost = True`: 2 test đỏ, khôi phục thì xanh.
+- Toàn bộ `manage.py test`: `Ran 1493 tests in 106.089s ... OK` (0 expected failure); `makemigrations --check --dry-run` -> `No changes detected`.
+
+## Lô 5 — FE
+
+Phạm vi: SR-15 (AC3, AC4, AC7), SR-16 (AC8), SR-17 (AC3). Chỉ sửa `erp-console/`. Không commit, không deploy.
+
+### Đã làm (đường dẫn dưới `erp-console/`)
+- **Lô quá hạn còn tồn** (`features/inventory/`):
+  - `components/BatchDetailSheet.tsx`: vẽ nút từ `next_steps`. Lô EXPIRED còn tồn có 2 nút "Xác nhận Đã huỷ phần tồn" và "Xác nhận Đã trả NCC". Nút "Chốt lô" luôn hiện và bị khoá kèm lý do (BR-LO-04) khi còn tồn. Lô còn giữ chỗ thì 2 nút xử lý tồn cũng bị khoá kèm lý do BR-LO-07. Không có quyền (BR-PQ-12) thì không hiện nút.
+  - Huỷ phần tồn: hộp thoại nêu đúng số kg đang hiển thị, gửi `confirm_qty` bằng đúng số đó. 400 BR-LO-07 hiện `detail` tiếng Việt kèm nút "Tải lại".
+  - `components/ReturnToSupplierDialog.tsx` (mới): ô kg `inputMode="decimal"` (nhận "," hoặc ".", tối đa 3 số lẻ, có nút "Trả hết"), tiền NCC hoàn tuỳ chọn (chỉ số), ghi chú. `request_id` sinh 1 lần khi mở form. Chặn bấm đúp (ref + nút khoá). Hiện `detail` của 400. Sau khi lưu KHÔNG hiện tiền hoàn ở đâu cả.
+  - `components/ModalDialog.tsx` (mới): hộp thoại bẫy Tab, Esc chỉ đóng hộp thoại con (không đóng SideSheet), khoá đóng khi đang gửi.
+  - `components/InventoryScreen.tsx`: đọc `?status=` (danh sách trắng), bọc `Suspense`. Chế độ lọc: tiêu đề "Lô quá hạn còn tồn", chip "Bỏ lọc, xem tất cả lô", ẩn cột NCC/Kho, có trạng thái rỗng.
+  - `api.ts`: `getBatchesByStatus`, `cancelExpiredBatch(batchId, confirmQty?)`, `returnToSupplier(batchId, input)`, `closeBatch(batchId)`, `batchStatusLabel`, `decimalKg`. `types.ts`: `ReturnToSupplierInput`, `ReturnToSupplierResult`, `BatchApiRow`, `BatchActionResult`.
+  - `mock.ts`: 3 lô quá hạn bịa (L0908-CT00, L0909-MU00 có giữ chỗ 1,5 kg, L0910-TS00), trạng thái trong bộ nhớ. Công cụ DevTools: `__caveMock.expiredSetQty(id, qty)`, `expiredState()`, `expiredReset()`.
+  - `inventory.module.css`: bỏ hex/rgba, dùng token.
+- **Tổng quan** (`features/overview/`): bỏ cột "Khách" và `o.customer` khỏi `matches`; thêm thẻ Cần chú ý "Lô quá hạn còn tồn: N" (`expired_batches_open`) trỏ `/inventory/?status=EXPIRED`; `types.ts` thêm `expired_batches_open?: number`; `mock.ts` chỉ trả cho Chủ; `overview.test.ts` cập nhật (quan_ly / cskh / nv_kho không có khoá, Chủ = 3, 403 cho nv_giao, `recent_orders` không có tên/SĐT). Hex inline trong `AttentionBlock.tsx` đổi sang token.
+- `e2e/p8_lo5_fe_lo_qua_han.py` (mới): Playwright Python.
+- README của `features/inventory` và `features/overview` đã cập nhật.
+
+### Ngoại lệ phạm vi (ngoài thư mục được phép, cần Duy/techlead biết)
+1. `shared/lib/dashboardSummary.ts`: bỏ `customer`, `phone_last4` khỏi `RecentOrder` (khớp BE: `recent_orders[]` = `{code, amount, status, status_label, expires_at}`).
+2. `shared/lib/dashboardSummary.mock.ts`: bỏ hết tên khách và SĐT giả trong seed.
+3. `features/guidance/mock.ts`: nhánh `batch` gọi `mockExpiredBatchGuidance` (guidance của lô quá hạn nằm ở mock inventory).
+
+### Kiểm chứng (đã chạy trong lượt này)
+- `npx tsc --noEmit` → sạch.
+- `npm run build` (bản thật, không mock) → thành công. `grep -rl "expiredSetQty\|L0908-CT00\|Ghe Tư Hải" out` → không có file nào (mock không lọt vào bản thật). Lần build đầu có lọt do hằng `MOCK` trong `api.ts` làm bundler không cắt được nhánh mock; đã đổi sang `process.env.NEXT_PUBLIC_USE_MOCK === "1"` trực tiếp.
+- `npm test` → 10 file, 103 test qua.
+- Playwright (bản build mock, cổng 3215, 1366px và 375px, Chủ và kho1): **77/77 PASS** ở lần chạy trước khi đổi mã lỗi ghi chú (xem "Đối chiếu contract"). Cách chạy: build mock (`NEXT_PUBLIC_USE_MOCK=1 npm run build`), `python3 -m http.server 3215 --bind 127.0.0.1` trong `out/`, rồi `BASE=http://127.0.0.1:3215 SHOTS=<thư mục> python3 e2e/p8_lo5_fe_lo_qua_han.py`. Sau khi xong phải build lại bản thật (không để mock trong `out/`).
+- Ảnh (22 file) ở `doc/features/2026-09-30-sua-loi-review/qa-lo5/` (`lo5-1366-1..11`, `lo5-375-1..11`).
+- Luồng đã chạy thật: thẻ "Lô quá hạn còn tồn: 3" → danh sách lọc 3 lô; mở lô thấy 2 nút bật + Chốt khoá lý do; form trả NCC chặn kg vượt tồn phía máy khách; 400 tồn đổi hiện detail + "Tải lại tồn"; "Trả hết" + bấm đúp chỉ gửi đúng 1 request; tiền hoàn 150.000 không hiện sau khi lưu; Chốt mở sau khi tồn về 0; huỷ phần tồn gửi `confirm_qty`, lệch → 400 "Tồn đã đổi (5,000 kg) — tải lại."; lô giữ chỗ khoá cả 3 nút; kho1 không thấy thẻ/nút; Tổng quan không còn cột Khách, không tên khách trong DOM, không cuộn ngang ở 375px.
+
+### Đối chiếu contract BE thực tế (điều phối gửi giữa chừng)
+- Khớp: URL, body/response của `return-to-supplier` và `cancel-expired`, 400 `{code,detail}`, `expired_batches_open` ở `/api/dashboard/attention/`, nhãn bước, `close` luôn hiện + BR-LO-04, giữ chỗ → BR-LO-07, `recent_orders` 5 khoá.
+- Đã sửa: mock trả ghi chú có dãy số dài bằng code `BR-MH-08` (trước đó tôi đoán `NOTE_LONG_DIGITS`). FE không rẽ nhánh theo code này. Thay đổi chỉ là chuỗi trong mock; chưa chạy lại Playwright sau thay đổi này, `tsc` và `npm test` chạy lại xanh.
+- Còn đoán: 400 DRF thiếu khoá (không có `code`) — FE vẫn hiện thông điệp của `ApiError`, chưa thử với dạng `{"qty":["..."]}` thật. Nút "Tải lại tồn" hiện cho mọi BR-MH-08, kể cả lỗi ghi chú/tiền (vô hại nhưng thừa).
+
+### Nợ / lưu ý
+- Danh sách lọc EXPIRED dùng `GET /api/inventory/batches/?status=EXPIRED` chỉ trang 1 (50 dòng), lọc `qty_available>0` phía FE. `BatchSerializer` chỉ trả id nên cột mặt hàng hiện `item_code`, bỏ cột NCC/Kho. Đề nghị BE thêm `item_name`, `supplier_name`, `warehouse_name`, `status_label`, hoặc đưa lô EXPIRED còn tồn vào summary.
+- Lỗi có sẵn ngoài phạm vi: `shared/ui/globals.css` (mobile) luật `table.data tbody tr:last-child td` mạnh hơn `td.m-title`/`m-fig`/`m-status` nên dòng cuối mọi bảng ở 375px lệch bố cục (thấy ở `lo5-375-2`, dòng L0910-TS00).
+- Chưa chạy lại các script e2e cũ (`e2e/s8_views.py` v.v.); grep tên khách trong e2e không thấy phụ thuộc cột "Khách".
+- Console có nhiễu "Failed to fetch RSC payload" do `python3 -m http.server` không phục vụ prefetch RSC của Next; không liên quan thay đổi này, không có SĐT trong log.
+- Nhãn `close` "Chốt lô" và mã bước (`cancel_expired`, `return_to_supplier`, `close`) là theo mock/giả định; nếu BE dùng khoá khác thì `BatchDetailSheet` cần đổi map.
+
+### M5-1 — mock lọt vào bản build thật (techlead, Duy duyệt gộp Lô 5)
+- **Nguyên nhân:** hằng `USE_MOCK` được `export` từ file khác rồi `import` sang; bundler không cắt được nhánh mock khi hằng đi qua ranh giới module. Chỉ khi viết thẳng `process.env.NEXT_PUBLIC_USE_MOCK === "1"` tại chỗ dùng thì Next thay bằng literal và cắt nhánh chết.
+- **erp-console:** `features/catalog/api.ts` (dòng 5, 28, 47) bỏ import `USE_MOCK`, viết thẳng biểu thức. `shared/lib/http.ts` giữ nguyên (dùng nội bộ cùng file, không ảnh hưởng bundle). Rà toàn bộ `erp-console/`: mọi file khác đã viết thẳng hoặc dùng hằng cục bộ trong cùng file; không còn chỗ import `USE_MOCK`.
+- **frontend/ (cùng mẫu, có lọt thật):** bản thật chứa `mockSiteInfo` (SĐT giả `0900000000`) trong `app/layout`, `shop/checkout`, `shop/orders`. Đã viết thẳng biểu thức ở `features/site/api.ts`, `features/content/api.ts`, `features/checkout/components/{CheckoutScreen,PaymentPanel,OrderPaymentPanel}.tsx`, `lib/api.ts`; bỏ import `USE_MOCK` ở các file đó. `lib/api.ts` vẫn `export USE_MOCK` (không còn nơi nào import).
+- **Trùng khớp giả (không phải mock):** `erp-console/features/cskh/CskhCallModal.tsx:410` có placeholder `VD: 0900000456` làm grep `0900000` dính ở `/cskh/`. Đổi thành `VD: 09xx xxx xxx` (số giả trông như thật cũng không nên nằm trong bundle).
+- **Kiểm (chạy trong lượt này, build với `NEXT_PUBLIC_USE_MOCK=0` truyền trực tiếp):**
+  - erp-console: `npx tsc --noEmit` sạch; `npm test` 10 file / 103 test qua; `npm run build` OK; `grep -rlE "demo1234|0900000|Khách Giả|mockGet" out/` → 0 file; `grep -rlE "expiredSetQty|L0908-CT00|__caveMock" out/` → 0 file.
+  - frontend: `npx tsc --noEmit` sạch; `npm run build` OK; `grep -rlE "demo1234|0900000|Khách Giả|mockGet" out/` → 0 file (trước sửa: 3 file). `frontend/` không có script `npm test`.
+  - Trước sửa, cùng grep ở erp-console ra `out/_next/static/chunks/2800-*.js` (theo techlead) — sau khi build lại và sửa thì không còn.
+- `out/` của cả hai đang là bản thật. Chưa chạy lại Playwright mock cho `frontend/` sau đổi này (đổi chỉ là cách viết điều kiện, ngữ nghĩa giữ nguyên; tsc sạch).

@@ -12,7 +12,7 @@ from apps.inventory.models import Batch
 
 from . import services
 from .services import FEFO_ORDER
-from .serializers import BatchListQuery, BatchSerializer
+from .serializers import BatchListQuery, BatchSerializer, CancelExpiredInput, ReturnToSupplierInput
 
 
 class BatchViewSet(DocumentViewSet):
@@ -23,7 +23,7 @@ class BatchViewSet(DocumentViewSet):
     list_query_serializer = BatchListQuery
     ai_by_action = {"list": AiMeta(keywords=("tra_ton", "tra tồn", "tồn kho", "còn bao nhiêu kg"), sensitivity="trung_binh")}
     permission_classes = [BusinessModelPermissions]
-    custom_perm_actions = ("publish", "close", "cancel_expired")
+    custom_perm_actions = ("publish", "close", "cancel_expired", "return_to_supplier")
     # BR-PQ-14 / BR-GV-03: trạng thái, tồn, giá vốn, hạn chỉ đổi qua service.
     locked_fields = (
         "status", "qty_received", "qty_available", "qty_reserved", "purchase_rate",
@@ -68,7 +68,44 @@ class BatchViewSet(DocumentViewSet):
 
     @action(detail=True, methods=["post"], url_path="cancel-expired", required_perms=("inventory.cancel_expired_batch",))
     def cancel_expired(self, request, pk=None):
-        """Huỷ lô cá quá hạn và hạch toán xuất huỷ vào sổ kho."""
+        """
+        Xác nhận Đã huỷ phần tồn lô cá quá hạn và hạch toán xuất huỷ vào sổ kho.
+        Body tuỳ chọn `{"confirm_qty": "3.000"}` (SR-15): số kg đang hiển thị, lệch tồn -> 400 BR-LO-07.
+        """
         require_perm(request.user, "inventory.cancel_expired_batch")
-        batch = services.cancel_expired_batch(batch=self.get_object(), actor=request.user)
+        payload = CancelExpiredInput(data=request.data if isinstance(request.data, dict) else {})
+        payload.is_valid(raise_exception=True)
+        batch = services.cancel_expired_batch(
+            batch=self.get_object(), actor=request.user,
+            confirm_qty=payload.validated_data.get("confirm_qty"),
+        )
         return Response(self.get_serializer(batch).data)
+
+    @action(
+        detail=True, methods=["post"], url_path="return-to-supplier",
+        required_perms=("inventory.cancel_expired_batch",),
+        input_serializer=ReturnToSupplierInput,
+        ai=AiMeta(keywords=("tra_ncc", "trả nhà cung cấp"), max_level="C"),
+    )
+    def return_to_supplier(self, request, pk=None):
+        """
+        Xác nhận Đã trả NCC một phần/toàn bộ tồn lô Quá hạn (BR-LO-07, BR-MH-08, SR-16).
+        Response không có tiền NCC hoàn (nhạy cảm).
+        """
+        require_perm(request.user, "inventory.cancel_expired_batch")
+        payload = ReturnToSupplierInput(data=request.data)
+        payload.is_valid(raise_exception=True)
+        data = payload.validated_data
+        batch = self.get_object()
+        rec = services.return_batch_to_supplier(
+            batch=batch, qty=data["qty"], supplier_refund_amount=data.get("supplier_refund_amount"),
+            note=data.get("note"), request_id=data["request_id"], actor=request.user,
+        )
+        batch.refresh_from_db()
+        return Response({
+            "batch_id": batch.batch_id,
+            "status": batch.status,
+            "qty_available": batch.qty_available,
+            "returned_qty": rec.qty,
+            "return_id": rec.pk,
+        })

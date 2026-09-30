@@ -481,7 +481,7 @@ class TestCS14LabelReprintAndVoid(CskhL4BaseTestCase):
 
 class TestCS15DashboardAttention(CskhL4BaseTestCase):
     def test_cs15_ac1_owner_sees_all_6_keys(self):
-        """Chủ gọi GET /api/dashboard/attention/ -> có đủ 6 khoá."""
+        """Chủ gọi GET /api/dashboard/attention/ -> có đủ 6 khoá + expired_batches_open (P8 Lô 5, BR-LO-07)."""
         client_chu = client_for(self.chu)
         resp = client_chu.get("/api/dashboard/attention/")
         self.assertEqual(resp.status_code, 200)
@@ -489,6 +489,7 @@ class TestCS15DashboardAttention(CskhL4BaseTestCase):
         expected_keys = {
             "cskh_queue_waiting", "cskh_escalated", "cskh_auto_cancel_blocked",
             "refund_calls_open", "labels_not_printed", "labels_to_void",
+            "expired_batches_open",
         }
         self.assertEqual(set(data.keys()), expected_keys)
 

@@ -7,7 +7,7 @@ toàn khi hai khách tranh lô cuối (BR-BH-02, E-06). Biến động tồn đi
 `apps.inventory.stock.services.record_movement`.
 """
 import datetime
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from uuid import uuid4
 
 from django.conf import settings
@@ -16,8 +16,10 @@ from django.utils import timezone
 
 from apps.common.audit import record_audit
 from apps.common.exceptions import BusinessError
+from apps.common.pii import has_long_digit_run
 from apps.inventory.models import (
     Batch,
+    BatchSupplierReturn,
     ReturnToStock,
     StockLedgerEntry,
     StockReconciliation,
@@ -195,24 +197,15 @@ def check_close_batch(batch):
         missing.append(Missing("BR-LO-05", "Lô đã chốt."))
         return missing
 
-    if batch.qty_available > ZERO and batch.status not in (
-        Batch.Status.EXPIRED, Batch.Status.CANCELLED
-    ):
+    # SR-15 (P8 Lô 5, Duy duyệt 30/09): bỏ ngoại lệ tạm thời "chốt thẳng lô Quá hạn". Lô Quá hạn còn tồn
+    # phải xử lý hết (Đã huỷ / Đã trả NCC, BR-LO-07) rồi mới chốt.
+    if batch.qty_available > ZERO:
         missing.append(Missing("BR-LO-04", "Chốt lô yêu cầu tồn = 0 hoặc đã huỷ phần còn lại (BR-LO-04)."))
 
     if batch.qty_reserved > ZERO:
         missing.append(Missing("BR-LO-04", "Lô còn lượng giữ chỗ chưa giải phóng (BR-LO-04)."))
 
-    from apps.sales.models import SalesOrderLineBatch
-    open_orders_count = (
-        SalesOrderLineBatch.objects.filter(
-            batch=batch,
-            order_line__order__status__in=OPEN_ORDER_STATUSES,
-        )
-        .values("order_line__order")
-        .distinct()
-        .count()
-    )
+    open_orders_count = _open_orders_count(batch, OPEN_ORDER_STATUSES)  # L3: dùng chung với BR-LO-07
     if open_orders_count > 0:
         missing.append(Missing(
             "BR-LO-04",
@@ -245,7 +238,7 @@ def close_batch(*, batch, actor):
     """
     Chốt lô (BR-LO-04/05, BR-KK-05). Yêu cầu:
     - Chưa chốt (BR-LO-05)
-    - Tồn = 0 hoặc EXPIRED/CANCELLED (BR-LO-04)
+    - Tồn = 0, kể cả lô Quá hạn (BR-LO-04, SR-15: bỏ ngoại lệ S04)
     - Không còn lượng giữ chỗ qty_reserved > 0 (BR-LO-04)
     - Không còn đơn mở BOOKED, PAID, PROCESSING (BR-LO-04)
     - Không có phiếu hàng hoàn DRAFT (BR-LO-04, BR-LO-05)
@@ -269,16 +262,11 @@ def close_batch(*, batch, actor):
     return batch
 
 
-def check_cancel_expired_batch(batch):
-    """
-    Kiểm tra điều kiện huỷ lô quá hạn (BR-LO-03, DW-06).
-    Chỉ huỷ được lô khi đang ở trạng thái EXPIRED (Quá hạn).
-    """
+def _check_expired_reserved(batch):
+    """Lô EXPIRED còn giữ chỗ của đơn BOOKED -> [Missing BR-LO-07] (SR-08), else []."""
     from apps.common.guidance.steps import Missing
 
-    if batch.status != Batch.Status.EXPIRED:
-        return [Missing("BR-LO-03", "Chỉ huỷ được lô Quá hạn.")]
-    # SR-08 / BR-LO-07: còn giữ chỗ của đơn BOOKED thì chưa huỷ — huỷ sẽ xoá tồn mà đơn
+    # SR-08 / BR-LO-07: còn giữ chỗ của đơn BOOKED thì chưa xử lý phần tồn — huỷ/trả sẽ xoá tồn mà đơn
     # khách vẫn đang giữ, thanh toán sau đó văng "Xuất vượt tồn" và mất giao dịch tiền.
     # Không tự nhả giữ chỗ / huỷ đơn khách; giữ chỗ tự hết theo TTL.
     if batch.qty_reserved > ZERO:
@@ -291,10 +279,39 @@ def check_cancel_expired_batch(batch):
     return []
 
 
-def cancel_expired_batch(*, batch, actor):
+def check_cancel_expired_batch(batch):
     """
-    Huỷ lô quá hạn (EXPIRED -> CANCELLED, BR-LO-03, DW-06).
+    Kiểm tra điều kiện huỷ lô quá hạn (BR-LO-03, BR-LO-07, DW-06).
+    Chỉ huỷ được lô khi đang ở trạng thái EXPIRED (Quá hạn) và không còn giữ chỗ.
+    Cho phép tồn 0 (huỷ lô đã trả hết NCC vẫn hợp lệ để kết thúc lô).
+    """
+    from apps.common.guidance.steps import Missing
+
+    if batch.status != Batch.Status.EXPIRED:
+        return [Missing("BR-LO-03", "Chỉ huỷ được lô Quá hạn.")]
+    return _check_expired_reserved(batch)
+
+
+def check_process_expired_stock(batch):
+    """
+    Điều kiện xác nhận "Đã trả NCC" phần tồn lô Quá hạn (BR-LO-07, BR-MH-08, SR-16).
+    Như huỷ lô quá hạn nhưng còn phải CÒN TỒN (qty_available > 0) và lô chưa chốt (BR-LO-05).
+    """
+    from apps.common.guidance.steps import Missing
+
+    if batch.is_closed:
+        return [Missing("BR-LO-05", "Lô đã chốt.")]
+    if batch.status != Batch.Status.EXPIRED or batch.qty_available <= ZERO:
+        return [Missing("BR-LO-07", "Chỉ xác nhận trả NCC cho lô Quá hạn còn tồn.")]
+    return _check_expired_reserved(batch)
+
+
+def cancel_expired_batch(*, batch, actor, confirm_qty=None):
+    """
+    Huỷ lô quá hạn (EXPIRED -> CANCELLED, BR-LO-03, BR-LO-07, DW-06).
     - transaction.atomic + select_for_update TRƯỚC mọi phép kiểm.
+    - `confirm_qty` (tuỳ chọn, SR-15): số kg người dùng đang thấy trên màn hình; lệch tồn hiện tại
+      (vd vừa trả NCC một phần ở tab khác) -> 400 BR-LO-07, không huỷ.
     - Ghi StockLedgerEntry WRITE_OFF âm đúng lượng tồn còn lại (append-only).
     - Status chuyển CANCELLED.
     - Ghi AuditLog 1 dòng với loss_amount nếu có tồn.
@@ -305,13 +322,25 @@ def cancel_expired_batch(*, batch, actor):
         if missing:
             raise BusinessError(missing[0].text, code=missing[0].code)
 
+        if confirm_qty not in (None, ""):
+            try:
+                confirmed = Decimal(str(confirm_qty))
+                if not confirmed.is_finite():
+                    raise InvalidOperation
+            except (InvalidOperation, ValueError):
+                raise BusinessError("Số kg xác nhận không hợp lệ.", code="BR-LO-07")
+            if confirmed != b.qty_available:
+                raise BusinessError(
+                    f"Tồn đã đổi ({_fmt_kg(b.qty_available)} kg) — tải lại.", code="BR-LO-07"
+                )
+
         remaining_qty = b.qty_available
         if remaining_qty > ZERO:
             stock.record_movement(
                 batch=b,
                 qty_change=-remaining_qty,
                 movement_type=StockLedgerEntry.MovementType.WRITE_OFF,
-                reference=f"cancel_expired_batch {b.batch_id}",
+                reference=f"cancel_expired_batch {b.batch_id}",  # F11: batch_pnl đếm expired_qty theo tiền tố này
                 actor=actor,
             )
         b.refresh_from_db()
@@ -331,6 +360,81 @@ def cancel_expired_batch(*, batch, actor):
             note=f"cancel_expired_batch {remaining_qty}kg",
         )
     return b
+
+
+SUPPLIER_RETURN_NOTE_MAX = 500
+_MONEY_MAX = Decimal("1000000000000")  # 14 chữ số nguyên khớp max_digits=14, decimal_places=2
+
+
+def _parse_decimal(value):
+    """Decimal hữu hạn hoặc None (chuỗi rác, NaN, Infinity, bool, None)."""
+    if value is None or isinstance(value, bool):
+        return None
+    try:
+        d = Decimal(str(value).strip())
+    except (InvalidOperation, ValueError):
+        return None
+    return d if d.is_finite() else None
+
+
+@transaction.atomic
+def return_batch_to_supplier(*, batch, qty, supplier_refund_amount, note, request_id, actor):
+    """
+    Xác nhận "Đã trả NCC" một phần/toàn bộ tồn lô Quá hạn (BR-LO-07, BR-MH-08, SR-16).
+    - `request_id` trùng bản ghi cũ -> trả bản ghi cũ, KHÔNG trừ kho lần 2 (chống bấm đúp/gửi lại).
+    - Khoá dòng lô rồi kiểm điều kiện (`check_process_expired_stock`), 0 < qty <= tồn, tiền >= 0.
+    - Ghi BatchSupplierReturn + StockLedgerEntry SUPPLIER_RETURN âm; lô vẫn EXPIRED (có thể còn tồn
+      để huỷ tiếp hoặc về 0 để chốt).
+    - Tiền NCC hoàn nhạy cảm: chỉ vào `changes` của AuditLog (khoá thuộc COST_KEYS -> quan_ly không thấy);
+      `note` audit không chứa ghi chú tự do/tiền để không lọt qua Nhật ký.
+    - KHÔNG tính lại landed_unit_cost (tránh lệch giá vốn ảnh chụp của hoá đơn đã bán); tiền hoàn chỉ
+      giảm total_cost lô ở `batch_pnl`.
+    """
+    b = Batch.objects.select_for_update().get(pk=batch.pk)
+    if request_id is not None:
+        # Sau khi khoá lô: hai request cùng request_id tuần tự hoá ở đây, request sau thấy bản ghi của request trước.
+        existing = BatchSupplierReturn.objects.filter(request_id=request_id).first()
+        if existing is not None:
+            if existing.batch_id != b.pk:
+                raise BusinessError("Mã yêu cầu đã được dùng cho lô khác.", code="BR-MH-08")
+            return existing
+    missing = check_process_expired_stock(b)
+    if missing:
+        raise BusinessError(missing[0].text, code=missing[0].code)
+
+    qty_d = _parse_decimal(qty)
+    if qty_d is None or qty_d <= ZERO or qty_d > b.qty_available or qty_d != qty_d.quantize(Decimal("0.001")):
+        raise BusinessError(
+            f"Số kg trả phải lớn hơn 0 và không vượt tồn {_fmt_kg(b.qty_available)} kg.", code="BR-MH-08"
+        )
+    refund = _parse_decimal(supplier_refund_amount if supplier_refund_amount not in (None, "") else "0")
+    if refund is None or refund < ZERO or refund >= _MONEY_MAX or refund != refund.quantize(Decimal("0.01")):
+        raise BusinessError("Tiền NCC hoàn phải là số không âm, tối đa 2 chữ số thập phân.", code="BR-MH-08")
+    note = (note or "").strip()
+    if len(note) > SUPPLIER_RETURN_NOTE_MAX:
+        raise BusinessError(f"Ghi chú tối đa {SUPPLIER_RETURN_NOTE_MAX} ký tự.", code="BR-MH-08")
+    if has_long_digit_run(note):
+        raise BusinessError("Ghi chú không được chứa dãy số dài (số điện thoại, số tài khoản).", code="BR-MH-08")
+
+    rec = BatchSupplierReturn.objects.create(
+        batch=b, qty=qty_d, supplier_refund_amount=refund, note=note,
+        request_id=request_id, created_by=actor,
+    )
+    stock.record_movement(
+        batch=b,
+        qty_change=-qty_d,
+        movement_type=StockLedgerEntry.MovementType.SUPPLIER_RETURN,
+        reference=f"supplier_return SR-{rec.pk}",
+        actor=actor,
+    )
+    record_audit(
+        "return_batch_to_supplier",
+        actor=actor,
+        obj=b,
+        changes={"qty": qty_d, "supplier_refund_amount": refund},
+        note=f"return_batch_to_supplier {qty_d}kg",
+    )
+    return rec
 
 
 def recompute_landed_cost(*, batch, actor=None):

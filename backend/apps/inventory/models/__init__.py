@@ -17,6 +17,7 @@ from .batches import Batch  # noqa: F401
 from .stock import StockLedgerEntry, StockEntry  # noqa: F401
 from .stocktake import StockReconciliation, StockReconciliationLine  # noqa: F401
 from .returns import ReturnToStock  # noqa: F401
+from .supplier_returns import BatchSupplierReturn  # noqa: F401
 
 __all__ = [
     "Warehouse",
@@ -26,4 +27,5 @@ __all__ = [
     "StockReconciliation",
     "StockReconciliationLine",
     "ReturnToStock",
+    "BatchSupplierReturn",
 ]

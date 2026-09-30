@@ -38,7 +38,7 @@ export function AttentionBlock() {
 
   if (loading) {
     return (
-      <div style={{ padding: "8px 12px", fontSize: "0.8125rem", color: "var(--ink-3, #6b7280)" }}>
+      <div style={{ padding: "8px 12px", fontSize: "0.8125rem", color: "var(--ink-3)" }}>
         Đang kiểm tra đầu việc…
       </div>
     );
@@ -53,9 +53,9 @@ export function AttentionBlock() {
           gap: "8px",
           padding: "10px 14px",
           borderRadius: "6px",
-          background: "#fef2f2",
-          border: "1px solid #fecaca",
-          color: "#991b1b",
+          background: "var(--crit-soft)",
+          border: "1px solid var(--crit)",
+          color: "var(--crit)",
           fontSize: "0.8125rem",
           margin: "8px 0",
         }}
@@ -75,7 +75,21 @@ export function AttentionBlock() {
     label: string;
     href: string;
     crit: boolean;
+    /** Ghi đè cả dòng chữ (mặc định "{count} {label}"). */
+    text?: string;
   }> = [];
+
+  // P8 Lô 5 (BR-LO-07): lô Quá hạn còn tồn — chỉ Chủ có khoá này. Bấm → danh sách lô lọc theo Quá hạn.
+  if (typeof data.expired_batches_open === "number" && data.expired_batches_open > 0) {
+    items.push({
+      key: "expired_batches_open",
+      count: data.expired_batches_open,
+      label: "lô quá hạn còn tồn",
+      text: `Lô quá hạn còn tồn: ${data.expired_batches_open}`,
+      href: "/inventory/?status=EXPIRED",
+      crit: true,
+    });
+  }
 
   if (typeof data.cskh_queue_waiting === "number" && data.cskh_queue_waiting > 0) {
     items.push({
@@ -145,11 +159,11 @@ export function AttentionBlock() {
           alignItems: "center",
           gap: "8px",
           padding: "8px 12px",
-          color: "var(--ink-2, #4b5563)",
+          color: "var(--ink-2)",
           fontSize: "0.8125rem",
         }}
       >
-        <span style={{ color: "var(--good, #16a34a)", display: "inline-flex" }}>
+        <span style={{ color: "var(--good)", display: "inline-flex" }}>
           <Icon name="check_circle" />
         </span>
         <span>Không có việc gọi hoặc tem bị quá hạn.</span>
@@ -160,12 +174,12 @@ export function AttentionBlock() {
   return (
     <ul className="alerts" style={{ borderTop: "none" }}>
       {items.map((it) => (
-        <li key={it.key} className={`alert${it.crit ? " crit" : ""}`}>
+        <li key={it.key} className={`alert${it.crit ? " crit" : ""}`} data-attention={it.key}>
           <Icon name={it.crit ? "error" : "schedule"} />
           <div className="tx" style={{ flex: 1, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <div>
-              <b style={{ color: it.crit ? "#b91c1c" : "inherit" }}>
-                {it.count} {it.label}
+              <b style={{ color: it.crit ? "var(--crit)" : "inherit" }}>
+                {it.text ?? `${it.count} ${it.label}`}
               </b>
             </div>
             <Link

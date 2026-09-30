@@ -20,7 +20,11 @@ from apps.common.guidance.api import register_guidance
 from apps.common.guidance.reasons import get_reason
 from apps.common.guidance.steps import Missing, NextStep, Why, step_to_dict
 from apps.common.guidance.timeline import format_guidance_timeline
-from apps.inventory.batches.services import check_cancel_expired_batch, check_close_batch
+from apps.inventory.batches.services import (
+    check_cancel_expired_batch,
+    check_close_batch,
+    check_process_expired_stock,
+)
 from apps.inventory.batches.timeline import build_batch_timeline
 from apps.inventory.models import Batch
 
@@ -88,7 +92,8 @@ def get_batch_next_steps(batch: Batch, user: Any) -> list[NextStep]:
             )
         )
 
-    # 3. Bước huỷ lô khi EXPIRED (DW-06, BR-LO-03)
+    # 3. Lô EXPIRED (BR-LO-07, SR-15/16): Chủ xác nhận phần tồn là Đã huỷ (BR-LO-03) hoặc Đã trả NCC (BR-MH-08),
+    #    được chia nhiều lần. Bước "trả NCC" chỉ hiện khi còn tồn.
     if batch.status == Batch.Status.EXPIRED:
         can_cancel = user.has_perm("inventory.cancel_expired_batch")
         missing_perm = [] if can_cancel else [Missing("BR-PQ-12", get_reason("BR-PQ-12"))]
@@ -96,7 +101,7 @@ def get_batch_next_steps(batch: Batch, user: Any) -> list[NextStep]:
         steps.append(
             NextStep(
                 key="cancel_expired",
-                label="Huỷ lô",
+                label="Xác nhận Đã huỷ phần tồn",
                 actor="user",
                 allowed=can_cancel and not missing_biz,
                 who=["Chủ"],
@@ -107,9 +112,26 @@ def get_batch_next_steps(batch: Batch, user: Any) -> list[NextStep]:
                 ai=None,
             )
         )
+        if batch.qty_available > 0:
+            missing_ret = check_process_expired_stock(batch)
+            steps.append(
+                NextStep(
+                    key="return_to_supplier",
+                    label="Xác nhận Đã trả NCC",
+                    actor="user",
+                    allowed=can_cancel and not missing_ret,
+                    who=["Chủ"],
+                    missing=missing_ret + missing_perm,
+                    deadline=None,
+                    why=Why("BR-LO-07", "Lô Quá hạn còn tồn: Chủ xác nhận phần tồn là Đã huỷ hoặc Đã trả NCC"),
+                    command="inventory.batch.return_to_supplier",
+                    ai=None,
+                )
+            )
 
-    # 4. Bước chốt lô (close) khi lô chưa chốt và không ở trạng thái EXPIRED (khi EXPIRED thì bước tiếp là huỷ lô)
-    if not batch.is_closed and batch.status != Batch.Status.EXPIRED:
+    # 4. Bước chốt lô (close) khi lô chưa chốt. Lô EXPIRED còn tồn vẫn hiện bước này nhưng allowed=false
+    #    (BR-LO-04: phải xử lý hết tồn trước — SR-15 bỏ ngoại lệ S04).
+    if not batch.is_closed:
         missing_biz = check_close_batch(batch)
         can_close = user.has_perm("inventory.close_batch")
         missing_perm = [] if can_close else [Missing("BR-PQ-12", get_reason("BR-PQ-12"))]

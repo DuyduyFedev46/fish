@@ -18,6 +18,7 @@ class StockLedgerEntry(models.Model):
         RECONCILE = "RECONCILE", "Điều chỉnh kiểm kê"
         WRITE_OFF = "WRITE_OFF", "Hạch toán lỗ / huỷ"
         CANCEL_RESTORE = "CANCEL_RESTORE", "Hoàn kho do huỷ đơn"
+        SUPPLIER_RETURN = "SUPPLIER_RETURN", "Trả nhà cung cấp"  # P8 Lô 5, BR-MH-08
 
     batch = models.ForeignKey(
         Batch, on_delete=models.PROTECT, related_name="ledger_entries", verbose_name="Lô"

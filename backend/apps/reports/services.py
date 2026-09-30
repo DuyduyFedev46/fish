@@ -27,7 +27,7 @@ ZERO = Decimal("0")
 def batch_pnl(*, batch):
     """
     Lãi/lỗ theo lô (nguồn sự thật, BR-BC-04):
-        Lãi/lỗ = doanh thu bán từ lô − (giá mua + chi phí phân bổ)
+        Lãi/lỗ = doanh thu bán từ lô − (giá mua + chi phí phân bổ − tiền NCC hoàn)
 
     - doanh thu bán từ lô = Σ(SalesInvoiceLineBatch.qty × rate dòng hoá đơn tương ứng),
       loại trừ hoá đơn đã huỷ (status=CANCELLED), TRỪ Σ dòng chứng từ đảo của lô
@@ -90,16 +90,28 @@ def batch_pnl(*, batch):
         damage_qty += rt.qty
     damage_cost = damage_qty * batch.landed_unit_cost
 
+    # F11 (P8 Lô 5): chỉ đếm WRITE_OFF do huỷ lô quá hạn (reference `cancel_expired_batch …`). WRITE_OFF của
+    # huỷ phiếu nhập (`cancel_purchase_receipt …`, DW-18) hoặc hàng hoàn bị huỷ không phải "quá hạn".
     expired_qty = ZERO
     for entry in batch.ledger_entries.filter(
-        movement_type=StockLedgerEntry.MovementType.WRITE_OFF, qty_change__lt=ZERO
+        movement_type=StockLedgerEntry.MovementType.WRITE_OFF, qty_change__lt=ZERO,
+        reference__startswith="cancel_expired_batch ",
     ):
         expired_qty += -entry.qty_change
     expired_cost = expired_qty * batch.landed_unit_cost
 
+    # BR-MH-08: kg trả NCC (riêng, không lẫn hao hụt/huỷ) và tiền NCC hoàn (giảm tổng chi phí lô).
+    # Trả NCC chỉ xảy ra khi lô chưa chốt (service từ chối lô CLOSED) nên không cần lọc closed_at.
+    supplier_return_qty = ZERO
+    supplier_refund_amount = ZERO
+    for sr in batch.supplier_returns.all():
+        supplier_return_qty += sr.qty
+        supplier_refund_amount += sr.supplier_refund_amount
+
     # BR-BC-04 (sửa 2026-09-28, Duy duyệt, TL-4): purchase_cost đã tính trên toàn bộ qty_received, gồm cả kg hao hụt/hỏng/hết hạn
     # → shrinkage_cost/damage_cost/expired_cost chỉ để HIỂN THỊ số tiền mất, KHÔNG cộng vào total_cost.
-    total_cost = purchase_cost + allocated_cost
+    # BR-BC-04 + BR-MH-08: trừ tiền NCC hoàn. KHÔNG tính lại landed_unit_cost (giá vốn ảnh chụp các hoá đơn đã bán giữ nguyên).
+    total_cost = purchase_cost + allocated_cost - supplier_refund_amount
     profit = revenue - total_cost
 
     return {
@@ -119,6 +131,8 @@ def batch_pnl(*, batch):
         "damage_cost": damage_cost,
         "expired_qty": expired_qty,
         "expired_cost": expired_cost,
+        "supplier_return_qty": supplier_return_qty,
+        "supplier_refund_amount": supplier_refund_amount,
         "total_cost": total_cost,
         "profit": profit,
     }
