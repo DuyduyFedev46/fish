@@ -312,3 +312,5 @@ Việc Duy trên staging (không phải QA): `backfill_credit_notes` dry-run tr�
 - **RA-04:** chốt luật "Chủ tắt AI của nhân viên thì chỉ Chủ bật lại được" → làm ở P10 lô 3 (liên quan P9).
 - **RA-15:** chữ tự do nhân viên gõ (lý do hoàn/huỷ) **không coi là dữ liệu cá nhân** → đóng, không sửa.
 - **P-10 (bucket ảnh):** đã kiểm 30/09 — cả `cangca-item-images-keolai-staging` và `cangca-item-images-keolai` trả 403 khi liệt kê công khai → đạt.
+- **RA-05 — luật Duy 01/10:** "cái gì AI không làm được thì bảo là không làm được và nhờ người dùng làm thôi". → AI **không** tự đẩy việc sang người khác (Chủ) khi không làm được; trả lời rõ "không làm được + lý do" và để **chính người dùng** làm. Cần BA đối chiếu với DW-23 (nút "Nhờ" do người bấm — vẫn giữ), DW-26/DW-27 (AI tự chuyển Chủ), job đẩy việc quá 2 giờ lên Chủ — xử lý ở P9/P10.
+- **Giờ Shop (Duy hỏi 01/10):** hiện Shop **không** có mở/đóng theo giờ (nhận đơn 24/7). `CSKH_WORKING_HOURS` / `SHOP_CONFIRM_CALL_HOURS` chỉ là giờ gọi xác nhận (đang lệch 21:00/20:00 — D7-1, chờ Duy cho giờ thật). "Shop tạm chưa nhận đơn" trên staging = chưa đăng trang chính sách (BR-BH-17).

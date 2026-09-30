@@ -34,3 +34,4 @@
 - **Cấu hình tham chiếu (Duy 30/09):** tối thiểu **8 GB RAM**, Chrome/Edge, Windows **hoặc Mac** (máy thử: MacBook M1 8 GB của Duy).
   Gợi ý kỹ thuật (Tech Lead chốt): Gemma 3n **E2B** Q4 (~1,5–2 GB, chia mảnh < 2 GB cho wllama), n_ctx 2048; cần COOP/COEP trên
   Firebase Hosting để chạy đa luồng; Safari kiểm riêng. Dưới 8 GB / iPhone / 4G → bản không AI (tất định).
+- **Luật Duy 01/10:** "cái gì AI không làm được thì bảo là không làm được và nhờ người dùng làm thôi" — AI không tự chuyển việc sang người khác; báo không làm được + lý do, người dùng tự làm (liên quan RA-05, DW-26/27).
