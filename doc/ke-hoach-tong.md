@@ -1,10 +1,11 @@
 # Kế hoạch tổng — đợt 2026-09-28
-> Điều phối: Claude (phân tích) · Người hiện thực: Gemini CLI / Antigravity (`AGENTS.md`) · Duy duyệt từng phase.
+> Điều phối: Claude · Người hiện thực: P1–P7 Gemini CLI / Antigravity; **từ P8 là đội Claude** (Duy chốt 30/09, quy trình ở
+> `CLAUDE.md` mục "Người hiện thực"; AGY tạm dừng) · Duy duyệt từng phase.
 > Scope Duy chốt 28/09: sửa lỗi + AI + CSKH + CMS + khung go-live. **Không** làm đợt này: vai trò tự định nghĩa
 > (hồ sơ `2026-09-28-vai-tro-tu-dinh-nghia` để sau), in tem tự động, AI cho khách.
 
 ## Cách chạy
-- Gemini/Antigravity làm **đúng thứ tự bảng dưới**, một phase một lúc: `/lam-tiep` (tự chọn phase kế tiếp) hoặc
+- Người hiện thực (từ P8 là đội Claude) làm **đúng thứ tự bảng dưới**, một phase một lúc: `/lam-tiep` (tự chọn phase kế tiếp) hoặc
   `/lam-tinh-nang <slug>`.
 - Một phase chỉ được bắt đầu khi `02c-giao-viec.md` của nó ở trạng thái **SẴN SÀNG CODE** — Duy đổi trạng thái
   này. Chưa đổi → dừng, báo Duy.
@@ -34,7 +35,7 @@
 | Trước P4 Lô 3 lên production | `legal-vn` duyệt câu thông báo huỷ, câu báo trước ở checkout, quy định ghi nhãn trên tem. Tạo Cloud Run Job + lịch 5 phút cho `process_cskh_deadlines`, đặt `SHOP_HOTLINE` |
 | Trước P6 lên production | Chốt chủ thể pháp lý của Lộc, đặt biến `SELLER_*` (không đưa vào repo); soạn nội dung các trang chính sách trong CMS; checklist D1–D11 trong `2026-09-28-khung-go-live/01-analysis.md` §6 |
 | Trước P7 | Hoàn tất S-L1…S-L4: hồ sơ phân loại rủi ro AI, thông báo Bộ KH&CN, hợp đồng không-huấn-luyện với nhà cung cấp cloud, thoả thuận Duy–Lộc |
-| Mỗi phase | Đổi trạng thái 02c → SẴN SÀNG CODE; duyệt kết quả QA; quyết định deploy (Gemini không deploy) |
+| Mỗi phase | Đổi trạng thái 02c → SẴN SÀNG CODE; duyệt kết quả QA; quyết định deploy (đội hiện thực không tự deploy) |
 
 ## Mặc định đã áp (Duy lật được — ghi ở từng hồ sơ)
 - AI: lệnh đọc chạy ngay có lọc, lệnh ghi mặc định nháp; chỉ Chủ huỷ lô quá hạn; "tắt AI của tôi" = lệnh ghi về nháp.

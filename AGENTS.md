@@ -4,7 +4,11 @@ Vựa cá B2C: mua lô tại cảng → bán online → quản lý kho và giá 
 trao đổi bằng tiếng Việt. Nghiệp vụ và bất biến nằm ở skill `caveve-domain`: **đọc skill này trước khi
 đụng vào bất kỳ code nào.**
 
-## Chia việc (Duy chốt 2026-09-28)
+> **TẠM DỪNG (Duy chốt 2026-09-30):** từ P8, đội Claude Code tự hiện thực, QA và commit. Gemini CLI /
+> Antigravity **không** chạy `/lam-tiep` hay `/lam-tinh-nang`. Nếu được gọi, báo Duy một dòng "AGY đang tạm
+> dừng theo AGENTS.md" rồi dừng, trừ khi Duy nói rõ trong lượt đó rằng bật lại AGY.
+
+## Chia việc (Duy chốt 2026-09-28, tạm dừng từ 30/09)
 
 | Ai | Làm gì | Đầu ra |
 |---|---|---|

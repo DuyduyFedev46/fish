@@ -35,13 +35,21 @@ vercel-labs/agent-skills, anthropics/skills, phuryn/pm-skills, alirezarezvani/cl
 Skill UI/UX cài nguyên bản (giữ LICENSE): pbakaus/impeccable, emilkowalski/skills, nextlevelbuilder/ui-ux-pro-max-skill,
 ibelick/ui-skills, vercel web-design-guidelines. Hướng thiết kế + chọn skill: `caveve-ui`.
 
-## Chia việc với Gemini CLI / Antigravity (Duy chốt 2026-09-28) — ưu tiên hơn bảng trên
-Claude chỉ làm **phân tích cùng Duy**: BA → [Duy duyệt] → PO → [Duy duyệt] → Tech Lead (+ `legal-vn`)
-→ viết `02c-giao-viec.md` (mẫu `doc/features/_mau-02c-giao-viec.md`) → [Duy duyệt, đổi trạng thái
-`SẴN SÀNG CODE`] → dừng. **Code, QA và commit do Gemini CLI / Antigravity làm** theo `AGENTS.md` và
-workflow `/lam-tinh-nang <slug>` (`.agents/`, `.gemini/`). Claude không giao `be-dev`/`fe-dev`/`qa-tester`
-trừ khi Duy yêu cầu rõ; Claude review code/QA report khi Duy nhờ. Skill dùng chung: `.agents/skills/`
-trỏ về `.claude/skills/` — sửa skill ở `.claude/skills/`.
+## Người hiện thực: đội Claude (Duy chốt 2026-09-30, thay phân công 28/09)
+Từ P8 trở đi **Claude và đội subagent tự code, QA và commit**. Gemini CLI / Antigravity **tạm dừng**
+(review 30/09 thấy QA của AGY chấm PASS bằng đọc code, sót 1 Critical + nhiều High). Hồ sơ vẫn giữ
+`02c-giao-viec.md` làm phiếu giao việc cho từng lô. Quy trình một lô:
+1. Điều phối viên (phiên chính) `git pull`, đọc dòng lô trong 02c, rồi chạy lệnh kiểm chứng để ghi số gốc.
+2. Giao `be-dev` ∥ `fe-dev` (chạy song song khi lô ghi BE ∥ FE). Kèm theo mã story, danh sách file được sửa
+   và không được đụng, contract từ 02b, test tái hiện của review nếu có.
+3. Điều phối viên **tự chạy lại** lệnh kiểm chứng. Không tin báo cáo của subagent khi chưa chạy.
+4. `techlead` review diff (giá vốn, dữ liệu cá nhân, phân quyền, migration, lệch 02b).
+5. `qa-tester` kiểm theo luật đã siết: không PASS bằng đọc code, có ca ngoài đường thuận, `npm ci` sạch.
+6. REJECTED → giao lại dev, quay về bước 3. APPROVED → commit tiếng Việt có mã lô/story, `git push origin main`,
+   đánh ☑ ở 02c. Gặp điểm dừng trong 02c → hỏi Duy.
+
+`AGENTS.md`/`.agents/`/`.gemini/` giữ nguyên để có thể bật lại AGY. Không cho hai bên cùng làm một phase.
+Skill dùng chung: `.agents/skills/` trỏ về `.claude/skills/`, nên sửa skill ở `.claude/skills/`.
 
 ## Môi trường (từ 2026-09-27)
 **Staging** (sandbox SePay, DB `cangca_staging`) và **Production** (SePay live, DB `postgres` trên Supabase). Deploy luôn lên staging trước, Duy duyệt rồi mới lên production. Chi tiết URL, secret và lệnh build nằm ở `doc/ops/moi-truong.md`. Build frontend luôn truyền `NEXT_PUBLIC_*` trực tiếp, vì `.env.local` đè lên `.env.production`.
