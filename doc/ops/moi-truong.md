@@ -152,3 +152,6 @@ không có lệnh `gcloud` chuẩn cho budget theo project + label).
 - Bucket `gs://cangca-db-backups-keolai/export/` chứa các bản xuất lúc chuyển DB, gồm cả bản production trước khi làm sạch.
 - Supabase Free không tự sao lưu. Job `pg_dump` hằng đêm: **còn nợ**.
 - Cloud SQL `cangca-loc-db` **đã xoá** ngày 2026-09-27 (Duy duyệt). Dữ liệu cũ vẫn giữ ở các file `.sql` trong bucket nói trên.
+
+## Nhật ký deploy staging
+- **2026-09-30 — P1–P8 lên staging** (commit `6da8dd7`): image `api:v6`, revision `cangca-api-staging-00003-7sv` (rollback: `00002-4nl`, image `api:v5`). Chạy 21 migration trên `cangca_staging` bằng job **`cangca-migrate-staging`** (mới, đọc secret staging; đổi lệnh bằng `--args`, mặc định `manage.py,migrate,--noinput`). Thêm env `ITEM_IMAGE_STORAGE=gcs`, `ITEM_IMAGE_BUCKET=cangca-item-images-keolai-staging`. AI vẫn tắt (`AI_ENABLED` chưa đặt). `backfill_credit_notes` dry-run: 0 đơn cần lập bù. Shop/ERP staging build trỏ API staging, `check-no-mock` xanh, header noindex có. Adapter không đổi. Bucket ảnh cả hai môi trường: liệt kê công khai trả 403 (đã kiểm).
