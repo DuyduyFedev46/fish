@@ -107,8 +107,12 @@ QA (mỗi hồ sơ 30–240 AC). P8 mỗi lô thường 3–4 lượt subagent; 
 
 ## Prompt cho Duy dán (phiên Claude Code mới, repo `fish`, nhánh `main`)
 
+Chạy trên máy (Mac) thì trước khi mở Claude Code, kéo code mới về: `cd <thư mục fish> && git checkout main && git pull origin main`.
+Phiên Claude Code trên web tự clone mới, không cần bước này.
+
 **Prompt 1 — chạy hết (bước A rồi P8 Lô 1→7):**
 ```
+git checkout main && git pull origin main trước (git status phải sạch, có thay đổi dở thì dừng hỏi Duy).
 Làm theo doc/features/2026-09-30-sua-loi-review/02d-ke-hoach-doi-claude.md, đọc CLAUDE.md trước.
 Chạy Bước A (rà lại toàn bộ phần AGY làm, A1–A5 song song, A6 gộp + commit), rồi Bước B: P8 Lô 1 → 7 theo đúng
 vòng một lô, mỗi lô QA APPROVED thì commit + push main. Tự chạy lệnh kiểm chứng, dán kết quả, không tin báo cáo
@@ -118,12 +122,13 @@ Không deploy. Xong thì báo: lỗi mới từ bước A (mức, 1 dòng), lô 
 
 **Prompt 2 — chỉ rà soát (bước A):**
 ```
+git checkout main && git pull origin main trước (git status phải sạch, có thay đổi dở thì dừng hỏi Duy).
 Làm Bước A trong doc/features/2026-09-30-sua-loi-review/02d-ke-hoach-doi-claude.md (đọc CLAUDE.md trước):
 rà lại toàn bộ phần AGY làm, A1–A5 song song, A6 gộp bao-cao-tong.md, commit + push main. Không sửa code sản phẩm.
 ```
 
 **Prompt 3 — làm tiếp (khi phiên trước dừng giữa chừng):**
 ```
-Tiếp tục kế hoạch doc/features/2026-09-30-sua-loi-review/02d-ke-hoach-doi-claude.md: git pull, xem bước A đã có
+Tiếp tục kế hoạch doc/features/2026-09-30-sua-loi-review/02d-ke-hoach-doi-claude.md: git checkout main && git pull origin main, xem bước A đã có
 bao-cao-tong.md chưa và lô P8 nào đã ☑ trong 02c-giao-viec.md, làm tiếp phần còn lại theo đúng quy trình.
 ```
