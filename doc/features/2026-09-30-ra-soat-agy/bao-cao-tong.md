@@ -307,3 +307,8 @@ Việc Duy trên staging (không phải QA): `backfill_credit_notes` dry-run tr�
 | I8-2 | Medium (tiềm ẩn, cùng loại M1/B1) | `PurchaseInvoiceAdmin` hiện `amount` (giá mua) không ẩn theo `view_costprice`; lộ nếu bật `is_staff` cho Quản lý | `backend/apps/purchasing/admin.py` |
 | L8-Q4 | Medium–High (tiền, chờ PO) | Shop tra đơn: đơn đã huỷ/đã hoàn vẫn hiện "Chưa thanh toán" + nút **"Thanh toán lại"** + chữ thô `CANCELLED` → khách có thể trả tiền cho đơn đã huỷ. Có từ trước P8 | `frontend/app/shop/orders/OrderLookup.tsx` (+ BE checkout có chặn đơn CANCELLED không — cần kiểm) |
 | L8-Q5 | Low | Hàng chờ CSKH hiện `1.000 kg` cho 1 kg (đọc kiểu VN là một nghìn kg) | BE serializer CSKH (định dạng kg) |
+
+### Quyết định Duy 30/09 (sau P8)
+- **RA-04:** chốt luật "Chủ tắt AI của nhân viên thì chỉ Chủ bật lại được" → làm ở P10 lô 3 (liên quan P9).
+- **RA-15:** chữ tự do nhân viên gõ (lý do hoàn/huỷ) **không coi là dữ liệu cá nhân** → đóng, không sửa.
+- **P-10 (bucket ảnh):** đã kiểm 30/09 — cả `cangca-item-images-keolai-staging` và `cangca-item-images-keolai` trả 403 khi liệt kê công khai → đạt.
