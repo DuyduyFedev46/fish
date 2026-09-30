@@ -7,7 +7,7 @@
 - `02-stories.md`: ĐÃ DUYỆT (Duy 30/09) · `02b-tech-design.md`: ĐÃ DUYỆT (Duy 30/09)
 - P7 đã xong (xem `doc/ke-hoach-tong.md`). **Chặn deploy staging tới khi Lô 1–5 xong.**
 - Trước Lô 1: `git pull`; chạy lệnh kiểm chứng BE một lần, ghi số test gốc vào `03-dev-notes.md`.
-- Điều phối viên đính kèm mã R1–R6 (test tái hiện của review, nằm ở scratchpad Claude, không trong repo) khi giao Lô 1, 3, 4 — nếu không có
+- Điều phối viên đính kèm mã R1–R6 (test tái hiện của review, ở `repro/` cùng hồ sơ — cách chạy trong `repro/README.md`) khi giao Lô 1, 3, 4 — nếu không có
   file đó thì viết lại theo mô tả "Tái hiện" trong `review-tien-kho-ai.md` và 02b §7.
 - Mỗi lô tuần tự, một lô một lượt. Lô 4 và Lô 5 có migration — không chạy song song với hồ sơ khác.
 
