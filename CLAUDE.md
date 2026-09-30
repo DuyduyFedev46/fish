@@ -17,7 +17,7 @@ CHỈ BA · CHỈ PO · CHỈ QA · REVIEW · DEPLOY · TIẾP TỤC (việc đa
 Không chạy workflow cho câu hỏi thuần giải thích/tra cứu, hoặc việc vận hành không đổi
 code (xem log, seed dữ liệu, đổi mật khẩu) — làm trực tiếp.
 
-**Model (Duy chốt 2026-09-26, bổ sung techlead + legal-vn 2026-09-27):** lập kế hoạch dùng **Opus**, gồm điều phối viên (phiên chính), `ba-analyst`, `po-owner`, `techlead` và `legal-vn`. Code và test dùng **Sonnet**, gồm `be-dev`, `fe-dev` và `qa-tester`. Model khai ở frontmatter `model:` của từng agent; khi gọi Agent thì không ghi đè.
+**Model (Duy chốt 2026-09-26, bổ sung techlead + legal-vn 2026-09-27):** lập kế hoạch dùng **Opus**, gồm điều phối viên (phiên chính), `ba-analyst`, `po-owner`, `techlead` và `legal-vn`. Code và test dùng **Sonnet 5.5** (`claude-sonnet-5-5`, Duy nâng 2026-09-30), gồm `be-dev`, `fe-dev` và `qa-tester`. Model khai ở frontmatter `model:` của từng agent; khi gọi Agent thì không ghi đè.
 
 | Vai | Subagent | Skill nạp sẵn | Đầu ra |
 |---|---|---|---|
