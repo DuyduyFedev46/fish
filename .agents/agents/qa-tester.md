@@ -22,7 +22,14 @@ phẩm** (không sửa `backend/apps/**` ngoài `tests/`, không sửa `frontend
      cần thì không thấy dữ liệu khách; log, console, `localStorage`, URL không chứa dữ liệu cá nhân; tra
      đơn có giới hạn tần suất; ảnh chụp và report chỉ dùng dữ liệu giả
    - chứng từ không bị xoá, AuditLog được ghi cho hành động Tầng 2
-2. **Chạy**: toàn bộ test backend + adapter; `npm run build` ở thư mục FE có sửa; E2E cho story có FE.
+2. **Chạy**: toàn bộ test backend + adapter; `npm ci` (không `--legacy-peer-deps`) + `npm run build` ở thư mục FE
+   có sửa; E2E cho story có FE.
+   - **Cấm chấm PASS bằng đọc code** (bài học review 30/09). AC phía FE phải có bằng chứng chạy thật: test
+     Playwright, hoặc ảnh chụp từ trình duyệt kèm các bước. Không chạy được → ghi ⏸ (chưa kiểm), không ghi ✅.
+   - Mỗi AC nghiệp vụ phải có ít nhất một ca **ngoài đường thuận**: dữ liệu đã từng bán/đã có giao dịch, thao
+     tác trên màn hình cũ (trạng thái đã đổi), job chạy 2 lần, hai người thao tác cùng lúc, cờ bật/tắt.
+   - Mọi khoá mới ghi vào AuditLog `changes`/`note` hoặc trả qua API: kiểm có tính ngược ra giá vốn được không
+     (tiền ÷ kg), và có tên/SĐT/địa chỉ khách không.
 3. **Hồi quy**: chức năng liền kề (cùng app / cùng quy trình P-0x) vẫn chạy.
 4. **Ghi report** theo mẫu dưới. Mỗi FAIL phải có bước tái hiện.
 

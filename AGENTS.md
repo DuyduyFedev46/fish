@@ -50,14 +50,17 @@ chưa có thì chạy `sh scripts/lien-ket-skill.sh` một lần để tạo li�
   nói rõ, theo `doc/ops/moi-truong.md`.
 - **Không commit `.env`, khoá, mật khẩu** — repo đang công khai.
 - **Không báo "xong" / "test xanh"** khi chưa chạy lệnh kiểm chứng trong lượt đó và dán kết quả.
+- **QA không chấm PASS bằng đọc code** (review 30/09 phát hiện nhiều AC FE PASS mà thực tế sai): AC FE cần
+  Playwright hoặc ảnh chụp trình duyệt; mỗi AC nghiệp vụ có ca ngoài đường thuận (xem `.agents/agents/qa-tester.md`).
 
 ## Lệnh kiểm chứng
 
 ```bash
 cd backend && .venv/bin/python manage.py test && .venv/bin/python manage.py makemigrations --check --dry-run
 cd adapter && pytest                                    # khi có sửa adapter
-cd frontend && npx tsc --noEmit && npm run build
-cd erp-console && npx tsc --noEmit && npm run build
+cd frontend && npm ci && npx tsc --noEmit && npm run build
+cd erp-console && npm ci && npx tsc --noEmit && npm run build && npm test   # npm ci phải sạch, không --legacy-peer-deps
+# Test admin cần static: DJANGO_DEBUG=1 .venv/bin/python manage.py collectstatic --noinput (một lần)
 ```
 
 ## Git
