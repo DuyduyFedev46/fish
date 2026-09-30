@@ -2,23 +2,11 @@
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
+import { formatDate } from "@/lib/format";
 import { fetchPublicEntries } from "../api";
 import type { PublicEntryListItem } from "../types";
 import s from "./LatestPosts.module.css";
 
-function formatDate(isoStr?: string): string {
-  if (!isoStr) return "";
-  try {
-    const d = new Date(isoStr);
-    return d.toLocaleDateString("vi-VN", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-    });
-  } catch {
-    return isoStr;
-  }
-}
 
 export default function LatestPosts() {
   const [posts, setPosts] = useState<PublicEntryListItem[]>([]);

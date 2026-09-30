@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
+import { todayInVietnam } from "@/shared/lib/format";
 import { fetchDeliveryNotes } from "../api";
 import { DeliveryDetailModal } from "./DeliveryDetailModal";
 import {
@@ -21,9 +22,7 @@ export function DeliveriesView() {
     setLoading(true);
     setError(null);
 
-    const todayVN = new Date().toLocaleDateString("en-CA", {
-      timeZone: "Asia/Ho_Chi_Minh",
-    });
+    const todayVN = todayInVietnam();
 
     const params =
       activeTab === "COMPLETED"

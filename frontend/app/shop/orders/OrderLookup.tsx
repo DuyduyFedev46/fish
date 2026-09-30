@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getOrderStatus, type OrderStatus } from "../../../lib/api";
-import { formatVnd, formatKg } from "../../../lib/format";
+import { formatVnd, formatKg, formatDate, formatDateOnly } from "../../../lib/format";
 import OrderPaymentPanel, {
   type PaymentReturn,
 } from "../../../features/checkout/components/OrderPaymentPanel";
@@ -179,7 +179,7 @@ export default function OrderLookup({
                 <div>
                   Số tiền hoàn:{" "}
                   <strong style={{ color: "#dc2626" }}>
-                    {formatVnd(Number(result.cancel_notice.refund.amount))}
+                    {formatVnd(result.cancel_notice.refund.amount)}
                   </strong>
                 </div>
                 <div style={{ marginTop: "4px" }}>
@@ -187,10 +187,10 @@ export default function OrderLookup({
                   {result.cancel_notice.refund.refunded_at ? (
                     <span>
                       {" "}
-                      (đã hoàn {new Date(result.cancel_notice.refund.refunded_at).toLocaleDateString("vi-VN")})
+                      (đã hoàn {formatDate(result.cancel_notice.refund.refunded_at)})
                     </span>
                   ) : result.cancel_notice.refund.deadline ? (
-                    <span> (hạn hoàn: {result.cancel_notice.refund.deadline})</span>
+                    <span> (hạn hoàn: {formatDateOnly(result.cancel_notice.refund.deadline)})</span>
                   ) : null}
                 </div>
                 <div style={{ marginTop: "8px", fontSize: "0.8125rem", color: "#6b7280" }}>

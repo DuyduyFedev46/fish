@@ -7,6 +7,7 @@
 
 import React, { useCallback, useEffect, useState } from "react";
 import { ApiError } from "@/shared/lib/http";
+import { dateTimeFull } from "@/shared/lib/format";
 import { ErrorBox, Loading } from "@/shared/ui/StateBox";
 import { Icon } from "@/shared/ui/Icon";
 import { SideSheet } from "@/shared/ui/SideSheet";
@@ -22,19 +23,6 @@ type Props = {
   onClose: () => void;
 };
 
-/** ISO → "30/09/2026 14:05" theo giờ Việt Nam, bất kể múi giờ của máy. */
-function vnDateTime(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "—";
-  return d.toLocaleString("vi-VN", {
-    timeZone: "Asia/Ho_Chi_Minh",
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
 
 function Inline({ nodes }: { nodes: InlineNode[] }) {
   return (
@@ -160,7 +148,7 @@ export default function PolicyVersionSheet({ entryId, versionNo, onClose }: Prop
               <dl className={s.meta}>
                 <div>
                   <dt>Đăng lúc</dt>
-                  <dd className="num">{vnDateTime(detail.published_at)} (giờ Việt Nam)</dd>
+                  <dd className="num">{dateTimeFull(detail.published_at)} (giờ Việt Nam)</dd>
                 </div>
                 {detail.published_by_name && (
                   <div>

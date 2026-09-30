@@ -4,6 +4,8 @@ from uuid import uuid4
 
 from django.utils import timezone
 
+from apps.common.formatting import format_vnd
+
 ZERO = Decimal("0")
 CENT = Decimal("0.01")
 
@@ -31,7 +33,7 @@ def money_vnd(amount):
 def gen_code(prefix, model):
     """Sinh mã chứng từ duy nhất."""
     while True:
-        code = f"{prefix}{now():%y%m%d}-{uuid4().hex[:6].upper()}"
+        code = f"{prefix}{timezone.localtime(now()):%y%m%d}-{uuid4().hex[:6].upper()}"
         if not model.objects.filter(code=code).exists():
             return code
 
@@ -66,11 +68,5 @@ def fold_text(value):
 
 
 def vnd_display(amount):
-    """Tiền hiển thị trong câu chữ: 540000 → "540.000 ₫" (không float, bất biến #7)."""
-    d = Decimal(amount).quantize(Decimal("1"), rounding=ROUND_HALF_UP)
-    return f"{int(d):,}".replace(",", ".") + " ₫"
-
-
-def vnd_short(amount):
-    """Tiền trong thông điệp lỗi theo contract: 300000 → "300.000đ" (S12/S13)."""
-    return vnd_display(amount).replace(" ₫", "đ")
+    """Tiền hiển thị trong câu chữ: 540000 → "540.000 ₫" (một kiểu duy nhất, SR-25; xem `apps.common.formatting`)."""
+    return format_vnd(amount)

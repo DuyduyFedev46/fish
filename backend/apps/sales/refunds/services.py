@@ -15,7 +15,7 @@ from django.db.models import Sum
 from apps.common.audit import record_audit
 from apps.common.exceptions import BusinessError
 from apps.sales.models import PaymentTransaction, Refund
-from apps.sales.utils import ZERO, vnd_short
+from apps.sales.utils import ZERO, vnd_display
 from apps.sales.utils import now as _now
 
 
@@ -36,7 +36,7 @@ REFUND_AMOUNT_CODE = "BR-HT-04"
 REFUND_SOURCE_CODE = "BR-HT-01"
 REFUND_STATUS_CODE = "BR-HT-09"  # S16: phiếu hoàn sai trạng thái để đổi (confirm/mark-failed/retry)
 REFUND_AMOUNT_INVALID_MSG = "Số tiền hoàn phải lớn hơn 0."
-REFUND_AMOUNT_MIN_MSG = "Số tiền hoàn tối thiểu 1đ."
+REFUND_AMOUNT_MIN_MSG = "Số tiền hoàn tối thiểu 1 ₫."
 REFUND_ALREADY_REFUNDED_MSG = "Phiếu đã hoàn, không đổi trạng thái được."
 
 
@@ -113,7 +113,7 @@ def create_refund_for_payment(*, payment, amount, reason, actor, is_partial=None
         remaining = payment_refundable_amount(payment=p)
         if amount > remaining:
             raise BusinessError(
-                f"Vượt số tiền còn được hoàn: tối đa {vnd_short(remaining)}.",
+                f"Vượt số tiền còn được hoàn: tối đa {vnd_display(remaining)}.",
                 code=REFUND_AMOUNT_CODE,
             )
         refund = Refund.objects.create(
@@ -163,7 +163,7 @@ def create_invoice_refund(*, invoice, amount, is_partial, reason, actor, request
         remaining = refundable_amount(invoice=invoice)
         if amount > remaining:
             raise BusinessError(
-                f"Vượt số đã thu: còn được hoàn tối đa {vnd_short(remaining)}.",
+                f"Vượt số đã thu: còn được hoàn tối đa {vnd_display(remaining)}.",
                 code=REFUND_AMOUNT_CODE,
             )
 
@@ -275,7 +275,7 @@ def retry_refund(*, refund, actor):
             remaining = payment_refundable_amount(payment=r.payment_transaction)
         if r.amount > remaining:
             raise BusinessError(
-                f"Vượt số tiền còn được hoàn: tối đa {vnd_short(remaining)}.",
+                f"Vượt số tiền còn được hoàn: tối đa {vnd_display(remaining)}.",
                 code=REFUND_AMOUNT_CODE,
             )
         old_status = r.status

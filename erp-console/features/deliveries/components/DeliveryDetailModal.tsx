@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { dateOnly } from "@/shared/lib/format";
 import { fetchDeliveryNoteDetail, packDeliveryNote, printDeliveryLabel, voidDeliveryLabel } from "../api";
 import type { DeliveryNoteDetail, DeliveryNoteItem } from "../types";
 import s from "../deliveries.module.css";
@@ -273,7 +274,7 @@ export function DeliveryDetailModal({ item, onClose, onUpdated }: Props) {
                     <div>
                       <div className={s.lineItemName}>{line.item_name}</div>
                       <div className={s.lineItemSub}>
-                        Lô: {line.batch_id} · HSD: {line.expiry_date}
+                        Lô: {line.batch_id} · HSD: {dateOnly(line.expiry_date)}
                       </div>
                     </div>
                     <div className={s.lineItemQty}>{line.qty_kg} kg</div>

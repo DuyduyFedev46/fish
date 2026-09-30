@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/features/auth/components/AuthProvider";
 import { ViewGuard } from "@/features/auth/components/ViewGuard";
+import { dateTimeFull, timeHM } from "@/shared/lib/format";
 import {
   createEntry,
   deleteEntry,
@@ -327,7 +328,7 @@ function ContentEditScreen() {
         setRowVersion(res.row_version);
         setHasUnpublishedChanges(Boolean(res.has_unpublished_changes));
         clearLocalDraft();
-        const nowStr = new Date().toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" });
+        const nowStr = timeHM(new Date());
         setSaveStatus(`Đã lưu lúc ${nowStr}`);
       } catch (err: any) {
         saveLocalDraft();
@@ -399,7 +400,7 @@ function ContentEditScreen() {
         setFooterOrder(res.footer_order || 0);
         setImages(res.images || []);
         clearLocalDraft();
-        const nowStr = new Date().toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" });
+        const nowStr = timeHM(new Date());
         setSaveStatus(`Đã lưu lúc ${nowStr}`);
         setSuccessMsg("Đã tạo và lưu nháp thành công!");
         window.history.replaceState(null, "", `/content/edit/?id=${res.id}`);
@@ -435,7 +436,7 @@ function ContentEditScreen() {
         setFooterOrder(res.footer_order || 0);
         setImages(res.images || []);
         clearLocalDraft();
-        const nowStr = new Date().toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" });
+        const nowStr = timeHM(new Date());
         setSaveStatus(`Đã lưu lúc ${nowStr}`);
         setSuccessMsg("Đã lưu nháp thành công!");
       }
@@ -1524,7 +1525,7 @@ function ContentEditScreen() {
                         Bởi {ver.published_by_name || "Hệ thống"}
                       </span>
                       <span className={s.versionDate}>
-                        {new Date(ver.published_at).toLocaleString("vi-VN")}
+                        {dateTimeFull(ver.published_at)}
                       </span>
                     </div>
                     <div className={s.versionTitle}>{ver.title}</div>

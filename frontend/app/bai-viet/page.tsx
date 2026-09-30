@@ -4,6 +4,7 @@ import React, { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { ApiError } from "@/lib/types";
+import { formatDate } from "@/lib/format";
 import {
   fetchPublicCategories,
   fetchPublicEntries,
@@ -19,19 +20,6 @@ import s from "./bai-viet.module.css";
 
 const PAGE_SIZE = 12;
 
-function formatDate(isoStr?: string): string {
-  if (!isoStr) return "";
-  try {
-    const d = new Date(isoStr);
-    return d.toLocaleDateString("vi-VN", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-    });
-  } catch {
-    return isoStr;
-  }
-}
 
 function BaiVietContent() {
   const searchParams = useSearchParams();

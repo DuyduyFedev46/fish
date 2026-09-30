@@ -8,7 +8,7 @@
 
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { ApiError, loadErrorText } from "@/shared/lib/http";
-import { dateTime, remaining, vnd } from "@/shared/lib/format";
+import { dateTime, remaining, todayInVietnam, vnd } from "@/shared/lib/format";
 import { ORDER_STATUS } from "@/shared/lib/status";
 import { Figure } from "@/shared/ui/Figure";
 import { Icon } from "@/shared/ui/Icon";
@@ -28,7 +28,7 @@ import s from "../orders.module.css";
 
 /** YYYY-MM-DD theo giờ Việt Nam (BE lọc ngày theo Asia/Ho_Chi_Minh). */
 function vnDate(ms: number): string {
-  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Ho_Chi_Minh" }).format(new Date(ms));
+  return todayInVietnam(new Date(ms));
 }
 
 function presetRange(p: DatePreset, from: string, to: string): { date_from: string; date_to: string } {

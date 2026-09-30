@@ -73,8 +73,8 @@ export const BE_ERRORS = {
   // ---- S11 POST /api/sales/orders/{id}/confirm-payment (contract THỰC TẾ BE L7, 03-dev-notes.md "Lô L7 — S10, S11 (BE)") ----
   TT_TXN_REQUIRED: { status: 400, code: "BR-TT-08", detail: "Thiếu mã giao dịch ngân hàng." },
   TT_AMOUNT_INVALID: { status: 400, code: "BR-TT-08", detail: "Số tiền phải là số lớn hơn 0." },
-  /** L8 bổ sung tiền (Duy 2026-09-26): sau làm tròn 0,01 mà 0 < số < 1đ. */
-  TT_AMOUNT_MIN: { status: 400, code: "BR-TT-08", detail: "Số tiền tối thiểu 1đ." },
+  /** L8 bổ sung tiền (Duy 2026-09-26): sau làm tròn 0,01 mà 0 < số < 1 ₫. */
+  TT_AMOUNT_MIN: { status: 400, code: "BR-TT-08", detail: "Số tiền tối thiểu 1 ₫." },
   TT_TXN_TOO_LONG: { status: 400, code: "BR-TT-08", detail: "Mã giao dịch ngân hàng dài quá 100 ký tự." },
   TT_WRONG_STATUS: { status: 400, code: "BR-TT-08", detail: "Đơn không ở trạng thái Giữ chỗ/Tự huỷ." },
   TT_TXN_OTHER: {
@@ -105,7 +105,7 @@ export const BE_ERRORS = {
   /** S15 nhánh sales_invoice (`create_invoice_refund`, câu viết lại ở BE L9 để khớp đúng chữ story). */
   HT_OVER_REFUNDABLE_INVOICE: { status: 400, code: "BR-HT-04", detail: "Vượt số đã thu: còn được hoàn tối đa {max}." },
   HT_AMOUNT_INVALID: { status: 400, code: "BR-HT-04", detail: "Số tiền hoàn phải lớn hơn 0." },
-  HT_AMOUNT_MIN: { status: 400, code: "BR-HT-04", detail: "Số tiền hoàn tối thiểu 1đ." },
+  HT_AMOUNT_MIN: { status: 400, code: "BR-HT-04", detail: "Số tiền hoàn tối thiểu 1 ₫." },
   HT_ONE_SOURCE: { status: 400, code: "BR-HT-01", detail: "Chỉ gửi một trong hai: sales_invoice hoặc payment_transaction." },
   HT_NO_SOURCE: { status: 400, code: "BR-HT-01", detail: "Thiếu sales_invoice hoặc payment_transaction." },
   HT_TXN_MATCHED: { status: 400, code: "BR-HT-01", detail: "Giao dịch đã khớp hoá đơn — lập phiếu hoàn từ hoá đơn." },

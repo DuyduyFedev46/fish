@@ -10,6 +10,7 @@ import type {
 import { QUEUE_TABS } from "./types";
 import { CskhCallModal } from "./CskhCallModal";
 import s from "./cskh.module.css";
+import { dateOnly, dateTime, timeHM, vnd } from "@/shared/lib/format";
 
 export function CskhQueueView() {
   const [activeTab, setActiveTab] = useState<QueueTabKey>("DEFAULT");
@@ -228,7 +229,7 @@ export function CskhQueueView() {
                     <div>
                       <div className={s.orderCode}>{item.order_code}</div>
                       <div className={s.paidTime}>
-                        Trả tiền: {item.paid_at ? `${item.paid_at.slice(11, 16)} ngày ${item.paid_at.slice(8, 10)}/${item.paid_at.slice(5, 7)}` : "—"}
+                        Trả tiền: {dateTime(item.paid_at)}
                       </div>
                     </div>
                     <div>
@@ -237,7 +238,7 @@ export function CskhQueueView() {
                       )}
                       {item.confirm_state === "CALLBACK" && (
                         <span className={`${s.badge} ${s.badgeCallback}`}>
-                          Hẹn gọi lại {item.callback_at ? item.callback_at.slice(11, 16) : ""}
+                          Hẹn gọi lại {item.callback_at ? timeHM(item.callback_at) : ""}
                         </span>
                       )}
                       {item.confirm_state === "ESCALATED" && (
@@ -254,7 +255,7 @@ export function CskhQueueView() {
                   {isClaimedByOther && (
                     <div style={{ marginBottom: "8px" }}>
                       <span className={`${s.badge} ${s.badgeClaimed}`}>
-                        🔒 Đang xử lý: {item.claimed_by?.display_name} (tới {item.claimed_until?.slice(11, 16)})
+                        🔒 Đang xử lý: {item.claimed_by?.display_name} (tới {timeHM(item.claimed_until)})
                       </span>
                     </div>
                   )}
@@ -278,10 +279,10 @@ export function CskhQueueView() {
 
                   {item.refund && (
                     <div style={{ marginBottom: "10px", padding: "8px 12px", background: "#fefce8", border: "1px solid #fef08a", borderRadius: "6px", fontSize: "0.8125rem", color: "#854d0e" }}>
-                      <div>Số tiền hoàn: <strong style={{ color: "#dc2626" }}>{Number(item.refund.amount).toLocaleString("vi-VN")} đ</strong></div>
+                      <div>Số tiền hoàn: <strong style={{ color: "#dc2626" }}>{vnd(item.refund.amount)}</strong></div>
                       <div style={{ fontSize: "0.75rem", color: "#6b7280", marginTop: "2px" }}>
                         Trạng thái: <strong>{item.refund.status_label || (item.refund.status === "PENDING" ? "Chờ Chủ chuyển" : "Đã hoàn")}</strong>
-                        {item.refund.deadline && <span> · Hạn: {item.refund.deadline}</span>}
+                        {item.refund.deadline && <span> · Hạn: {dateOnly(item.refund.deadline)}</span>}
                       </div>
                     </div>
                   )}

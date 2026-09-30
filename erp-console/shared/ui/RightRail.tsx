@@ -9,6 +9,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Icon } from "./Icon";
 import { MSG } from "@/shared/lib/messages";
+import { timeHM } from "@/shared/lib/format";
 
 type Pane = "notes" | "ai" | "feed";
 
@@ -42,7 +43,7 @@ function Notes() {
     timer.current = setTimeout(() => {
       try {
         localStorage.setItem(NOTES_KEY, v);
-        setState("Đã lưu · " + new Date().toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" }));
+        setState("Đã lưu · " + timeHM(new Date()));
       } catch {
         setState(MSG.noteSaveFailed);
       }

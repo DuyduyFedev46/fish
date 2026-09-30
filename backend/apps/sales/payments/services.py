@@ -33,7 +33,7 @@ from apps.sales.models import (
     SalesOrder,
 )
 from apps.sales.utils import gen_code as _gen_code
-from apps.sales.utils import money_str, vnd_short
+from apps.sales.utils import money_str, vnd_display
 
 
 # --- P-05: xác nhận thanh toán ----------------------------------------------
@@ -53,7 +53,7 @@ AMOUNT_MAX = Decimal(10) ** (_AMOUNT_FIELD.max_digits - _AMOUNT_FIELD.decimal_pl
 AMOUNT_MIN = Decimal("1")
 
 AMOUNT_INVALID_MSG = "Số tiền phải là số lớn hơn 0."
-AMOUNT_MIN_MSG = "Số tiền tối thiểu 1đ."
+AMOUNT_MIN_MSG = "Số tiền tối thiểu 1 ₫."
 AMOUNT_TOO_LARGE_MSG = "Số tiền quá lớn (tối đa 999.999.999.999,99 ₫)."
 
 # BR-TT-15 (UC-5, PA, quyết định Duy 2026-09-26): nhãn cảnh báo khi một khoản OVERPAID mới
@@ -590,7 +590,7 @@ def _confirm_order(p, *, order, actor, note):
     received = order_paid_total(order)
     if received < order.total_amount:
         raise BusinessError(
-            f"Tổng tiền đã nhận {vnd_short(received)} < tổng đơn {vnd_short(order.total_amount)}.",
+            f"Tổng tiền đã nhận {vnd_display(received)} < tổng đơn {vnd_display(order.total_amount)}.",
             code=RESOLVE_CODE,
         )
     return _issue_and_close(

@@ -419,12 +419,12 @@ class AiCommandCallView(APIView):
                     action_status = AiAction.Status.ESCALATED
                     assignee_group = "chu"
                     from apps.sales.models import Refund
-                    from apps.sales.utils import money_str
+                    from apps.common.formatting import format_vnd
                     rf = None
                     if target_id and str(target_id).isdigit():
                         rf = Refund.objects.filter(pk=int(target_id)).first()
                     rf_code = f"RF-{target_id}" if target_id else ""
-                    amount_str = f"{money_str(rf.amount)} " if rf and rf.amount else ""
+                    amount_str = f"{format_vnd(rf.amount)} " if rf and rf.amount else ""
                     task_summary = f"Chuyển {amount_str}cho phiếu {rf_code}, rồi nhập mã giao dịch".strip()
                     clean_args["summary"] = task_summary
                     if "bank_txn_ref" in clean_args:

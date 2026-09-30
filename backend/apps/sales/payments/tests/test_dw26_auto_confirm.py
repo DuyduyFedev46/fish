@@ -163,6 +163,27 @@ class AutoConfirmExactMatchTests(TestCase):
         self.assertEqual(action.assignee_group, "chu")
         self.assertIn("Thiếu tiền", action.downgrade_reason.get("text", ""))
 
+    def test_p8_lo8_sr25_ac1_underpaid_reason_tien_vnd_dau_cham(self):
+        """P8 Lô 8 SR-25: lý do chuyển Chủ hiện tiền `x.xxx ₫`, không phải `400000.00đ`."""
+        from apps.common.formatting import format_vnd
+
+        txn = PaymentTransaction.objects.create(
+            bank_txn_id="TXN-LO8-UNDERPAID",
+            amount=Decimal("400000"),
+            match_status=PaymentTransaction.MatchStatus.UNMATCHED,
+            resolution_status=PaymentTransaction.ResolutionStatus.OPEN,
+            source=PaymentTransaction.Source.GATEWAY,
+            environment="SANDBOX",
+            raw_payload={"order_code": self.order.code},
+            received_at=timezone.now(),
+        )
+        process_exact_payment_matches()
+        action = AiAction.objects.get(target_model="paymenttransaction", target_id=str(txn.id))
+        self.assertIn(
+            f"Giao dịch 400.000 ₫ khác tổng đơn {format_vnd(self.order.total_amount)} (BR-TT-04/10)",
+            action.downgrade_reason["text"],
+        )
+
     def test_dw26_ac2_cancelled_order_escalates_to_chu(self):
         """DW-26-AC2 (đơn huỷ): Đơn đã tự huỷ -> không xác nhận, chuyển việc cho chu."""
         self.order.status = SalesOrder.Status.AUTO_CANCELLED

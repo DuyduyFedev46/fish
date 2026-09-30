@@ -83,7 +83,7 @@ class S13CreateTests(S13Base):
         resp = self._create(self.chu, payment_transaction=self.orphan.pk, amount="150000")
         self.assertEqual(resp.status_code, 400)
         self.assertEqual(resp.json(), {
-            "code": "BR-HT-04", "detail": "Vượt số tiền còn được hoàn: tối đa 100.000đ.",
+            "code": "BR-HT-04", "detail": "Vượt số tiền còn được hoàn: tối đa 100.000 ₫.",
         })
         self.assertEqual(Refund.objects.count(), 1)
 

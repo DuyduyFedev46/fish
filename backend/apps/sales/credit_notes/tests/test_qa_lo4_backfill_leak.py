@@ -101,6 +101,13 @@ class QABackfillTests(QAItem2Base):
         self._manual_cancel(o5)
         return o1, o2, o3
 
+    def test_p8_lo8_sr25_ac1_dry_run_so_tien_ban_dang_vnd_dau_cham(self):
+        """P8 Lô 8 SR-25: dòng `số tiền bán` hiện `x.xxx ₫`, không còn số trần."""
+        self._build_legacy_world()
+        out = self._cmd()
+        self.assertRegex(out, r"số tiền bán \d{1,3}(\.\d{3})* ₫ · lô")
+        self.assertNotRegex(out, r"số tiền bán \d{4,}")
+
     def test_dry_run_khong_ghi_gi_khong_pii_khong_gia_von(self):
         o1, o2, o3 = self._build_legacy_world()
         cn_before = SalesCreditNote.objects.count()

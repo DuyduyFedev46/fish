@@ -5,6 +5,8 @@ from django.conf import settings
 from django.core.validators import MinValueValidator
 from django.db import models
 
+from apps.common.formatting import format_vnd
+
 from .receipts import PurchaseReceipt
 from .suppliers import Supplier
 
@@ -37,4 +39,4 @@ class PurchaseInvoice(models.Model):
         ordering = ["-invoice_date", "-id"]
 
     def __str__(self):
-        return f"PI-{self.pk} · {self.supplier} · {self.amount}đ"
+        return f"PI-{self.pk} · {self.supplier} · {format_vnd(self.amount)}"

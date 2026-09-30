@@ -2,6 +2,8 @@
 from django.conf import settings
 from django.db import models
 
+from apps.common.formatting import format_vnd
+
 from .orders import SalesOrder
 
 
@@ -84,4 +86,4 @@ class PaymentTransaction(models.Model):
         ordering = ["-received_at", "-id"]
 
     def __str__(self):
-        return f"{self.bank_txn_id} · {self.amount}đ ({self.get_match_status_display()})"
+        return f"{self.bank_txn_id} · {format_vnd(self.amount)} ({self.get_match_status_display()})"

@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { getMyConfig, killMyConfig, updateMyConfig } from "../api";
 import type { MyConfig, MyConfigCommandItem, AiCommandLevel } from "../../types";
+import { dateTimeFull, vnd } from "@/shared/lib/format";
 
 export default function MyConfigScreen() {
   const [config, setConfig] = useState<MyConfig | null>(null);
@@ -173,7 +174,7 @@ export default function MyConfigScreen() {
             Phiên bản: <span className="font-semibold text-gray-700">v{config.version}</span>
             {config.updated_at && (
               <span className="ml-2 text-xs">
-                (cập nhật: {new Date(config.updated_at).toLocaleString("vi-VN")})
+                (cập nhật: {dateTimeFull(config.updated_at)})
               </span>
             )}
           </p>
@@ -322,7 +323,7 @@ export default function MyConfigScreen() {
                             {cmd.limits.vnd && (
                               <div>
                                 <label className="block text-gray-600 mb-1">
-                                  Giới hạn tiền mỗi lần (Trần của Chủ: {cmd.limits.vnd.cap ? `${cmd.limits.vnd.cap} đ` : "không giới hạn"})
+                                  Giới hạn tiền mỗi lần (Trần của Chủ: {cmd.limits.vnd.cap ? vnd(cmd.limits.vnd.cap) : "không giới hạn"})
                                 </label>
                                 <input
                                   type="number"

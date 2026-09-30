@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import type { CatalogItem } from "../lib/types";
-import { formatVnd } from "../lib/format";
+import { formatVnd, formatKg } from "../lib/format";
 import AddToCartControl from "./AddToCartControl";
 import ItemImageFrame from "./ItemImageFrame";
 
@@ -43,11 +43,11 @@ export default function CatalogGrid({ items }: { items: CatalogItem[] }) {
                   <div
                     className={
                       "item-card-stock " +
-                      (item.sellable_qty > 0 ? "in-stock" : "out-stock")
+                      (Number(item.sellable_qty) > 0 ? "in-stock" : "out-stock")
                     }
                   >
-                    {item.sellable_qty > 0
-                      ? `Còn ${item.sellable_qty.toLocaleString("vi-VN")} kg`
+                    {Number(item.sellable_qty) > 0
+                      ? `Còn ${formatKg(item.sellable_qty)}`
                       : "Hết hàng"}
                   </div>
                   <AddToCartControl item={item} />

@@ -269,7 +269,7 @@ class S12ResolveTests(S12Base):
         resp = self._resolve(self.chu, pay, {"action": "CONFIRM_ORDER"})
         self.assertEqual(resp.status_code, 400)
         self.assertEqual(resp.json(), {
-            "code": "BR-TT-09", "detail": "Tổng tiền đã nhận 300.000đ < tổng đơn 540.000đ.",
+            "code": "BR-TT-09", "detail": "Tổng tiền đã nhận 300.000 ₫ < tổng đơn 540.000 ₫.",
         })
         pay.refresh_from_db()
         self.assertEqual(pay.resolution_status, "OPEN")

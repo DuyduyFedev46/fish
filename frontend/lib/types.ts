@@ -19,8 +19,10 @@ export type CatalogItem = {
   group: string;
   item_type: ItemType;
   unit: "Kg";
-  price: number;
-  sellable_qty: number;
+  // API thật trả Decimal dạng chuỗi ("260000.00", "50.000"); mock trả số. Hiển thị qua lib/format.ts,
+  // tính toán (giỏ hàng) ép bằng Number ở AddToCartControl.
+  price: string | number;
+  sellable_qty: string | number;
   image: ItemImage | null;
 };
 

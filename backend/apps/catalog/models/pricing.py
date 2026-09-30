@@ -5,6 +5,8 @@ from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator
 from django.db import models
 
+from apps.common.formatting import format_vnd
+
 from .items import Item
 
 
@@ -49,7 +51,7 @@ class ItemPrice(models.Model):
         ordering = ["item", "-valid_from"]
 
     def __str__(self):
-        return f"{self.item.code}: {self.rate}đ ({self.valid_from} → {self.valid_upto or '∞'})"
+        return f"{self.item.code}: {format_vnd(self.rate)} ({self.valid_from} → {self.valid_upto or '∞'})"
 
     def clean(self):
         # BR-DM-03: chặn chồng lấn khoảng hiệu lực trên cùng item + bảng giá.

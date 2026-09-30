@@ -14,6 +14,7 @@ import type {
   DecidePayload,
   DecideResponse,
 } from "./types";
+import { timeHM } from "@/shared/lib/format";
 
 export const MOCK_CSKH_ITEMS: CskhQueueDetail[] = [
   {
@@ -392,7 +393,7 @@ export function mockClaimCskhTask(
         status: 409,
         body: {
           code: "CLAIMED",
-          detail: `Đơn đang được ${item.claimed_by.display_name} xử lý tới ${item.claimed_until.slice(11, 16)}.`,
+          detail: `Đơn đang được ${item.claimed_by.display_name} xử lý tới ${timeHM(item.claimed_until)}.`,
           claimed_until: item.claimed_until,
         },
       };

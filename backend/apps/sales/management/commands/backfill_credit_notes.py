@@ -17,6 +17,7 @@ from django.core.management.base import BaseCommand
 from django.db import transaction
 
 from apps.accounts.models import AuditLog
+from apps.common.formatting import format_vnd
 from apps.inventory.models import Batch
 from apps.sales.credit_notes import services
 from apps.sales.models import SalesInvoice, SalesInvoiceLineBatch, SalesOrder
@@ -73,7 +74,7 @@ class Command(BaseCommand):
             closed |= order_closed
             if order_closed:
                 closed_orders.append((o.code, sorted(order_closed)))
-            self.stdout.write(f"- đơn {o.code} · hoá đơn {inv.code} · số tiền bán {inv.amount:.0f} · lô {', '.join(sorted(batch_ids))}")
+            self.stdout.write(f"- đơn {o.code} · hoá đơn {inv.code} · số tiền bán {format_vnd(inv.amount)} · lô {', '.join(sorted(batch_ids))}")
 
         if closed:
             self.stdout.write(

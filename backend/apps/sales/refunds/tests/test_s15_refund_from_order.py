@@ -43,7 +43,7 @@ class S15RefundFromOrderTests(OrderApiBase):
         resp = self._create(self.ql, sales_invoice=order.invoice.pk, amount="300000")
         self.assertEqual(resp.status_code, 400, resp.content)
         self.assertEqual(resp.json(), {
-            "code": "BR-HT-04", "detail": "Vượt số đã thu: còn được hoàn tối đa 240.000đ.",
+            "code": "BR-HT-04", "detail": "Vượt số đã thu: còn được hoàn tối đa 240.000 ₫.",
         })
 
     def test_s15_ac3_phieu_that_bai_khong_tinh(self):

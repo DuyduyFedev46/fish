@@ -9,6 +9,7 @@ import { ActionDetailModal } from "@/features/ai/actions/components/ActionDetail
 import type { AiActionRow } from "@/features/ai/types";
 import { Icon } from "@/shared/ui/Icon";
 import { Loading } from "@/shared/ui/StateBox";
+import { dateTimeFull } from "@/shared/lib/format";
 
 export default function AiActionsPage() {
   return (
@@ -312,7 +313,7 @@ function AiActionsContent() {
                         Chạy sau: {formatCountdown(act.execute_after)}
                       </span>
                     ) : (
-                      new Date(act.created_at).toLocaleString("vi-VN")
+                      dateTimeFull(act.created_at)
                     )}
                   </td>
                   <td className="px-4 py-3 text-right">

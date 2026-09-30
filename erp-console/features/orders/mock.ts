@@ -765,7 +765,7 @@ function confirm(me: Me, o: Order, body: unknown): MockResponse {
   // KHÔNG ghi giao dịch 0 ₫, KHÔNG 500. BE đang sửa song song, câu "quá lớn" chưa chốt → mock dùng chung câu TT_AMOUNT_INVALID.
   const amount = Math.round(Number(rawAmount) * 100) / 100;
   if (!Number.isFinite(amount) || amount <= 0 || amount >= 1e12) return beError("TT_AMOUNT_INVALID");
-  if (amount < 1) return beError("TT_AMOUNT_MIN"); // L8 bổ sung tiền: tối thiểu 1đ
+  if (amount < 1) return beError("TT_AMOUNT_MIN"); // L8 bổ sung tiền: tối thiểu 1 ₫
   if (o.status !== "BOOKED" && o.status !== "AUTO_CANCELLED") return beError("TT_WRONG_STATUS");
 
   const now = Date.now();
@@ -902,9 +902,9 @@ function queueMode(): QMode {
   }
 }
 
-/** "300000" → "300.000đ" (cách BE viết tiền trong câu lỗi, contract S12/S13). */
+/** 300000 → "300.000 ₫" (BE viết tiền trong câu lỗi cùng một kiểu `vnd_display`, SR-25 L8-1). */
 function vndD(n: number): string {
-  return `${Math.round(n).toLocaleString("vi-VN")}đ`;
+  return vnd(n);
 }
 
 /** Mọi giao dịch từng vào hàng chờ, kèm đơn (null = chưa gắn đơn). */
@@ -1164,7 +1164,7 @@ function createPaymentRefund(me: Me, store: Store, b: Record<string, unknown>, r
   if (e.p.resolution_status === "RESOLVED") return beError("HT_TXN_RESOLVED");
   const amount = Math.round(Number(b.amount) * 100) / 100;
   if (b.amount === null || b.amount === "" || !Number.isFinite(amount) || amount <= 0) return beError("HT_AMOUNT_INVALID");
-  if (amount < 1) return beError("HT_AMOUNT_MIN"); // L8 bổ sung tiền: tối thiểu 1đ
+  if (amount < 1) return beError("HT_AMOUNT_MIN"); // L8 bổ sung tiền: tối thiểu 1 ₫
   const max = refundableOf(store, e.p);
   if (amount > max) return beError("HT_OVER_REFUNDABLE", { max: vndD(max) }); // S13-AC3
   const r: MockRefund = {

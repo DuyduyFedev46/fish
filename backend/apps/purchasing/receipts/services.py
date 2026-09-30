@@ -102,7 +102,7 @@ def create_and_submit_receipt(
             raise BusinessError("Chưa có kho nhận hàng nào trong hệ thống.", code="BR-MH-05")
 
     if received_date is None:
-        received_date = timezone.now().date()
+        received_date = timezone.localdate()  # L8-2: ngày nhập theo giờ VN, không phải ngày UTC
 
     # Kiểm tra trước BR-MH-02 cho tất cả các dòng
     for line_data in lines:

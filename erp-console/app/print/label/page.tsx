@@ -3,6 +3,7 @@
 import React, { Suspense, useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import QRCode from "qrcode";
+import { dateOnly } from "@/shared/lib/format";
 import { useAuth } from "@/features/auth/components/AuthProvider";
 import { fetchDeliveryLabel } from "@/features/deliveries/api";
 import type { LabelData } from "@/features/deliveries/types";
@@ -329,7 +330,7 @@ function LabelPrintContent() {
           </div>
           <div>
             <div style={{ color: "#555555" }}>HSD sớm nhất</div>
-            <div style={{ fontSize: "9pt", fontWeight: 600 }}>{labelData.earliest_expiry}</div>
+            <div style={{ fontSize: "9pt", fontWeight: 600 }}>{dateOnly(labelData.earliest_expiry)}</div>
           </div>
         </div>
 

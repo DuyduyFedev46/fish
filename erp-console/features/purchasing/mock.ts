@@ -1,4 +1,5 @@
 import type { MockRequest } from "@/shared/lib/http";
+import { todayInVietnam } from "@/shared/lib/format";
 import type { NhapLoPayload, NhapLoResponse, Supplier } from "./types";
 
 export const MOCK_SUPPLIERS: Supplier[] = [
@@ -34,12 +35,12 @@ export function mockSubmitNhapLo(req: MockRequest): { status: number; body: Nhap
   }
 
   const receiptId = Math.floor(Math.random() * 900) + 100;
-  const receivedDate = body.received_date || new Date().toISOString().slice(0, 10);
+  const receivedDate = body.received_date || todayInVietnam();
 
   const batches = body.lines.map((line) => {
     mockBatchSeq += 1;
     const days = line.shelf_life_days || 60;
-    const exp = new Date(Date.now() + days * 86400 * 1000).toISOString().slice(0, 10);
+    const exp = todayInVietnam(new Date(Date.now() + days * 86400 * 1000));
     return {
       batch_id: `${line.item_code}-${receivedDate.replace(/-/g, "").slice(2)}-${mockBatchSeq}`,
       status: "DRAFT",

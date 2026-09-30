@@ -111,7 +111,7 @@ class SR11AutoConfirmIdempotentTests(CskhL3BaseTestCase):
         act = self._actions().get()
         first_text = act.downgrade_reason["text"]
         self.assertEqual(self._audits(), 1)
-        self.assertIn("1000", first_text)
+        self.assertIn("1.000 ₫", first_text)
 
         process_exact_payment_matches()  # lý do không đổi -> không thêm
         self.assertEqual(self._audits(), 1)
@@ -122,7 +122,7 @@ class SR11AutoConfirmIdempotentTests(CskhL3BaseTestCase):
         act.refresh_from_db()
         self.assertEqual(self._audits(), 2)
         self.assertNotEqual(act.downgrade_reason["text"], first_text)
-        self.assertIn("2000", act.downgrade_reason["text"])
+        self.assertIn("2.000 ₫", act.downgrade_reason["text"])
         self.assertEqual(act.status, AiAction.Status.ESCALATED)
         self.assertEqual(self._actions().count(), 1)
 

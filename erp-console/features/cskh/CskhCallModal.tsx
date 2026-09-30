@@ -20,6 +20,7 @@ import type {
 } from "./types";
 import { CALL_RESULT_OPTIONS } from "./types";
 import s from "./cskh.module.css";
+import { dateOnly, dateTime, timeHM, vnInputToIso, vnd } from "@/shared/lib/format";
 
 type Props = {
   noteId: number;
@@ -151,7 +152,7 @@ export function CskhCallModal({ noteId, initialItem, onClose, onUpdated }: Props
       const payload: RecordCallPayload = {
         result,
         note: callNote.trim(),
-        callback_at: result === "CALLBACK" ? new Date(callbackTime).toISOString() : null,
+        callback_at: result === "CALLBACK" ? vnInputToIso(callbackTime) : null,
         request_id: requestId,
       };
 
@@ -251,7 +252,7 @@ export function CskhCallModal({ noteId, initialItem, onClose, onUpdated }: Props
         }
         await decideCskh(noteId, {
           decision: "EXTEND",
-          until: new Date(extendUntil).toISOString(),
+          until: vnInputToIso(extendUntil),
           reason: extendReason.trim(),
         });
         onUpdated();
@@ -493,12 +494,12 @@ export function CskhCallModal({ noteId, initialItem, onClose, onUpdated }: Props
                         Thông tin hoàn tiền cho khách
                       </div>
                       <div style={{ fontSize: "0.9375rem", color: "#1f2937" }}>
-                        Số tiền cần hoàn: <strong style={{ color: "#dc2626" }}>{Number(item.refund.amount).toLocaleString("vi-VN")} đ</strong>
+                        Số tiền cần hoàn: <strong style={{ color: "#dc2626" }}>{vnd(item.refund.amount)}</strong>
                       </div>
                       <div style={{ fontSize: "0.8125rem", color: "#4b5563" }}>
                         Trạng thái: <strong>{item.refund.status_label || (item.refund.status === "PENDING" ? "Chờ Chủ chuyển" : "Đã hoàn")}</strong>
-                        {item.refund.deadline && <span> · Hạn hoàn: {item.refund.deadline}</span>}
-                        {item.cancelled_at && <span> · Huỷ lúc: {item.cancelled_at.slice(11, 16)}</span>}
+                        {item.refund.deadline && <span> · Hạn hoàn: {dateOnly(item.refund.deadline)}</span>}
+                        {item.cancelled_at && <span> · Huỷ lúc: {timeHM(item.cancelled_at)}</span>}
                       </div>
                     </div>
                   )}
@@ -514,7 +515,7 @@ export function CskhCallModal({ noteId, initialItem, onClose, onUpdated }: Props
                     </div>
                     {item.decide_deadline && (
                       <span style={{ fontSize: "0.75rem", color: "#be123c", fontWeight: 600 }}>
-                        Hạn quyết định: {item.decide_deadline.slice(11, 16)}
+                        Hạn quyết định: {timeHM(item.decide_deadline)}
                       </span>
                     )}
                   </div>
@@ -578,7 +579,7 @@ export function CskhCallModal({ noteId, initialItem, onClose, onUpdated }: Props
                       <>
                         <div>
                           <label style={{ fontSize: "0.8125rem", color: "#4b5563" }}>
-                            Gia hạn gọi lại tới (tối đa 24 giờ):
+                            Gia hạn gọi lại tới (giờ Việt Nam, tối đa 24 giờ):
                           </label>
                           <input
                             type="datetime-local"
@@ -672,7 +673,7 @@ export function CskhCallModal({ noteId, initialItem, onClose, onUpdated }: Props
                           )}
                         </div>
                         <div className={s.callMeta}>
-                          {call.by.display_name} · {call.at.slice(11, 16)} {call.at.slice(8, 10)}/{call.at.slice(5, 7)}
+                          {call.by.display_name} · {dateTime(call.at)}
                         </div>
                       </div>
                     ))}
@@ -711,7 +712,7 @@ export function CskhCallModal({ noteId, initialItem, onClose, onUpdated }: Props
               {selectedResult === "CALLBACK" && (
                 <div className={s.subformSection}>
                   <div style={{ fontWeight: 600, fontSize: "0.875rem" }}>
-                    Chọn thời gian hẹn gọi lại
+                    Chọn thời gian hẹn gọi lại (giờ Việt Nam)
                   </div>
                   <input
                     type="datetime-local"

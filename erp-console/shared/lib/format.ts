@@ -17,20 +17,90 @@ export function kg(value: string | number | null | undefined): string {
   return `${n.toLocaleString("vi-VN", { maximumFractionDigits: 3 })} kg`;
 }
 
-/** ISO → "24/09 14:05". */
-export function dateTime(iso: string | null | undefined): string {
-  if (!iso) return "—";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "—";
-  return d.toLocaleString("vi-VN", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+/** Múi giờ hiển thị duy nhất của Cá Về (GMT+7, không đổi giờ mùa hè). DB lưu UTC; hiển thị luôn qua đây (SR-25). */
+export const VN_TZ = "Asia/Ho_Chi_Minh";
+
+// Một formatter/lần gọi rẻ hơn tạo mới mỗi dòng bảng; dựng lười để không chạy Intl khi import ở test node.
+let partsFmt: Intl.DateTimeFormat | null = null;
+
+/** Tách ngày giờ theo giờ VN → { year, month, day, hour, minute, second } (chuỗi 2 chữ số). null nếu không hợp lệ. */
+function vnParts(input: string | number | Date | null | undefined) {
+  if (input === null || input === undefined || input === "") return null;
+  const d = input instanceof Date ? input : new Date(input);
+  if (Number.isNaN(d.getTime())) return null;
+  partsFmt ??= new Intl.DateTimeFormat("en-GB", {
+    timeZone: VN_TZ,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hourCycle: "h23", // tránh "24:05" lúc nửa đêm
+  });
+  const o: Record<string, string> = {};
+  for (const p of partsFmt.formatToParts(d)) o[p.type] = p.value;
+  return { year: o.year, month: o.month, day: o.day, hour: o.hour, minute: o.minute, second: o.second };
 }
 
-/** ISO → "14:05" (giờ máy người dùng). */
-export function timeHM(iso: string | null | undefined): string {
-  if (!iso) return "—";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "—";
-  return d.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" });
+/** ISO → "24/09 14:05" (giờ VN, bất kể múi giờ máy). */
+export function dateTime(iso: string | Date | null | undefined): string {
+  const p = vnParts(iso);
+  return p ? `${p.day}/${p.month} ${p.hour}:${p.minute}` : "—";
+}
+
+/** ISO → "24/09/2026 14:05" (giờ VN) — dùng khi cần thấy cả năm (lịch sử phiên bản, nhật ký). */
+export function dateTimeFull(iso: string | Date | null | undefined): string {
+  const p = vnParts(iso);
+  return p ? `${p.day}/${p.month}/${p.year} ${p.hour}:${p.minute}` : "—";
+}
+
+/** ISO → "24/09/2026" (ngày theo giờ VN). */
+export function date(iso: string | Date | null | undefined): string {
+  const p = vnParts(iso);
+  return p ? `${p.day}/${p.month}/${p.year}` : "—";
+}
+
+/** ISO → "14:05" (giờ VN). */
+export function timeHM(iso: string | Date | null | undefined): string {
+  const p = vnParts(iso);
+  return p ? `${p.hour}:${p.minute}` : "—";
+}
+
+/** ISO → "14:05:09" (giờ VN) — chỉ cho mốc hẹn giờ cần độ chính xác tới giây. */
+export function timeHMS(iso: string | Date | null | undefined): string {
+  const p = vnParts(iso);
+  return p ? `${p.hour}:${p.minute}:${p.second}` : "—";
+}
+
+/** Ngày "hôm nay" theo giờ VN dạng "2026-09-30" (dùng cho lọc/so sánh ngày; KHÔNG dùng `toISOString().slice(0,10)` vì đó là UTC). */
+export function todayInVietnam(now: Date = new Date()): string {
+  const p = vnParts(now);
+  return p ? `${p.year}-${p.month}-${p.day}` : "";
+}
+
+/**
+ * Giá trị ô `datetime-local` ("2026-09-30T15:00") do người dùng nhập là GIỜ VIỆT NAM, không phải giờ máy →
+ * ISO UTC để gửi BE ("2026-09-30T08:00:00.000Z"). "" hoặc sai định dạng → "".
+ */
+export function vnInputToIso(local: string | null | undefined): string {
+  const m = /^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})(?::(\d{2}))?$/.exec(local ?? "");
+  if (!m) return "";
+  const d = new Date(`${m[1]}T${m[2]}:${m[3] ?? "00"}+07:00`);
+  return Number.isNaN(d.getTime()) ? "" : d.toISOString();
+}
+
+/** ISO → "2026-09-30" theo giờ VN (khoá gom nhóm theo ngày). "" nếu không hợp lệ. */
+export function dateKeyInVietnam(iso: string | Date | null | undefined): string {
+  const p = vnParts(iso);
+  return p ? `${p.year}-${p.month}-${p.day}` : "";
+}
+
+/** "2026-10-28" → "28/10/2026" (ngày thuần từ BE như hạn hoàn tiền; không đổi múi giờ). */
+export function dateOnly(isoDate: string | null | undefined): string {
+  if (!isoDate) return "—";
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(isoDate);
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : "—";
 }
 
 /** "2026-09-30" → "30/09" (ngày thuần, không đổi múi giờ). */

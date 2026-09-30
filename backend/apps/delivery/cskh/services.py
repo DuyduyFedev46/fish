@@ -14,6 +14,7 @@ from django.utils import timezone
 
 from apps.common.audit import record_audit
 from apps.common.exceptions import BusinessError, ConflictError
+from apps.common.formatting import format_local_time
 from apps.common.pii import has_long_digit_run, normalize_phone
 from apps.delivery import services as delivery_services
 from apps.delivery.models import ConfirmationTask, CustomerCall, DeliveryNote, LabelPrint
@@ -78,7 +79,7 @@ def claim_task(task_id: int, user, *, now=None) -> ConfirmationTask:
         if task.claimed_by_id and task.claimed_by_id != user.pk:
             if task.claimed_until and task.claimed_until > now:
                 claimer_name = task.claimed_by.get_full_name() or task.claimed_by.username
-                time_str = timezone.localtime(task.claimed_until).strftime("%H:%M")
+                time_str = format_local_time(task.claimed_until)
                 raise ConflictError(
                     f"Đơn đang được {claimer_name} xử lý tới {time_str}.",
                     code="CLAIMED",
@@ -164,7 +165,7 @@ def record_call(
         if task.claimed_by_id and task.claimed_by_id != user.pk:
             if task.claimed_until and task.claimed_until > now:
                 claimer_name = task.claimed_by.get_full_name() or task.claimed_by.username
-                time_str = timezone.localtime(task.claimed_until).strftime("%H:%M")
+                time_str = format_local_time(task.claimed_until)
                 raise ConflictError(
                     f"Đơn đang được {claimer_name} xử lý tới {time_str}.",
                     code="CLAIMED",

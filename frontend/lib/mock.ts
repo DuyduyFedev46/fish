@@ -13,6 +13,7 @@ import {
   type WireCreateOrderResponse,
   type WireOrderStatus,
 } from "./types";
+import { todayVn } from "./format";
 
 // Ảnh mẫu cho mock (A4) — sinh BẰNG CODE lúc chạy (SVG data URI), KHÔNG commit tệp ảnh nào vào repo
 // (quy ước 2026-09-25, BR-DM-16). Đủ 3 trạng thái theo 02-stories.md: có ảnh, `image: null`, ảnh lỗi
@@ -44,7 +45,21 @@ const BROKEN_IMAGE: ItemImage = {
   },
 };
 
-const MOCK_CATALOG: CatalogItemDetail[] = [
+// Seed dùng số để tính toán; ra ngoài qua `toWireItem` với giá/tồn dạng CHUỖI Decimal giống API thật
+// ("65000.00", "120.000") — để mock bắt được lỗi hiển thị kiểu "260000.00đ" (RA-01).
+type MockCatalogItem = Omit<CatalogItemDetail, "price" | "sellable_qty"> & {
+  price: number;
+  sellable_qty: number;
+};
+
+function toWireItem<T extends MockCatalogItem>(item: T): Omit<T, "price" | "sellable_qty"> & {
+  price: string;
+  sellable_qty: string;
+} {
+  return { ...item, price: item.price.toFixed(2), sellable_qty: item.sellable_qty.toFixed(3) };
+}
+
+const MOCK_CATALOG: MockCatalogItem[] = [
   {
     item_code: "CA-BASA-PHILE",
     name: "Cá basa phi lê",
@@ -342,22 +357,20 @@ function delay<T>(value: T, ms = 250): Promise<T> {
 
 export async function mockGetCatalog(): Promise<CatalogItem[]> {
   return delay(
-    MOCK_CATALOG.map(({ bundle_components: _bc, ...rest }) => rest)
+    MOCK_CATALOG.map(({ bundle_components: _bc, ...rest }) => toWireItem(rest))
   );
 }
 
 export async function mockGetCatalogItem(itemCode: string): Promise<CatalogItemDetail | null> {
   const found = MOCK_CATALOG.find((i) => i.item_code === itemCode);
-  return delay(found ?? null);
+  return delay(found ? toWireItem(found) : null);
 }
 
 function genOrderCode(): string {
-  const now = new Date();
-  const y = now.getFullYear().toString().slice(2);
-  const m = (now.getMonth() + 1).toString().padStart(2, "0");
-  const d = now.getDate().toString().padStart(2, "0");
+  // Ngày theo giờ VN (SR-25 AC4), không theo múi giờ máy.
+  const [y, m, d] = todayVn().split("-");
   const rand = Math.floor(1000 + Math.random() * 9000);
-  return `DH-${y}${m}${d}-${rand}`;
+  return `DH-${y.slice(2)}${m}${d}-${rand}`;
 }
 
 export async function mockCreateOrder(

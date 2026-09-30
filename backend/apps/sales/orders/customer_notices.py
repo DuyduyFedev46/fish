@@ -8,8 +8,8 @@ Tuân thủ:
 """
 from datetime import timedelta
 from django.conf import settings
-from django.utils import timezone
 
+from apps.common.formatting import format_local_date, format_vnd
 from apps.sales.models import Refund, SalesOrder
 
 
@@ -17,7 +17,7 @@ from apps.sales.models import Refund, SalesOrder
 AUTO_CANCEL_MESSAGE_TEMPLATE = (
     "Cá Về đã gọi số điện thoại đặt hàng {max_attempts} lần trong {window_minutes} phút "
     "nhưng không liên lạc được, nên đơn được huỷ tự động để hoàn tiền lại cho quý khách. "
-    "Số tiền {amount}đ sẽ được hoàn trong vòng {refund_deadline_days} ngày. "
+    "Số tiền {amount} sẽ được hoàn trong vòng {refund_deadline_days} ngày. "
     "Vui lòng liên hệ hotline {hotline} nếu cần hỗ trợ."
 )
 
@@ -54,7 +54,7 @@ def build_cancel_notice(order: SalesOrder) -> dict | None:
             status_label = "Đã hoàn"
             latest_confirmed = max((r.confirmed_at for r in refunds if r.confirmed_at), default=None)
             refunded_at = (
-                timezone.localtime(latest_confirmed).strftime("%Y-%m-%d")
+                format_local_date(latest_confirmed)
                 if latest_confirmed
                 else None
             )
@@ -63,8 +63,8 @@ def build_cancel_notice(order: SalesOrder) -> dict | None:
             refunded_at = None
 
         earliest_created = min((r.created_at for r in refunds if r.created_at), default=order.created_at)
-        deadline_date = timezone.localtime(earliest_created) + timedelta(days=refund_days)
-        deadline_str = deadline_date.strftime("%Y-%m-%d")
+        deadline_date = earliest_created + timedelta(days=refund_days)
+        deadline_str = format_local_date(deadline_date)
 
         refund_data = {
             "amount": str(int(total_amount)),
@@ -76,7 +76,7 @@ def build_cancel_notice(order: SalesOrder) -> dict | None:
         refund_data = {
             "amount": str(int(order.total_amount)),
             "status_label": "Đang chờ hoàn",
-            "deadline": (timezone.localtime(order.created_at) + timedelta(days=refund_days)).strftime("%Y-%m-%d"),
+            "deadline": format_local_date(order.created_at + timedelta(days=refund_days)),
             "refunded_at": None,
         }
 
@@ -88,7 +88,7 @@ def build_cancel_notice(order: SalesOrder) -> dict | None:
         msg = AUTO_CANCEL_MESSAGE_TEMPLATE.format(
             max_attempts=max_attempts,
             window_minutes=window_minutes,
-            amount=refund_data["amount"],
+            amount=format_vnd(refund_data["amount"]),
             refund_deadline_days=refund_days,
             hotline=hotline,
         )

@@ -4,24 +4,12 @@ import React, { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { ApiError } from "@/lib/types";
+import { formatDate } from "@/lib/format";
 import { fetchPublicEntry } from "@/features/content/api";
 import ArticleBody from "@/features/content/components/ArticleBody";
 import type { PublicEntryDetail } from "@/features/content/types";
 import s from "./trang.module.css";
 
-function formatDate(isoStr?: string): string {
-  if (!isoStr) return "";
-  try {
-    const d = new Date(isoStr);
-    return d.toLocaleDateString("vi-VN", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-    });
-  } catch {
-    return isoStr;
-  }
-}
 
 function TrangContent() {
   const searchParams = useSearchParams();
@@ -149,7 +137,8 @@ function TrangContent() {
     );
   }
 
-  const effectiveDateStr = formatDate(entry.effective_from || entry.published_at || entry.updated_at);
+  const effectiveRaw = entry.effective_from || entry.published_at || entry.updated_at;
+  const effectiveDateStr = effectiveRaw ? formatDate(effectiveRaw) : "";
 
   return (
     <article className={s.container}>

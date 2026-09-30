@@ -982,3 +982,105 @@ Build cuối (production-base, NEXT_PUBLIC_USE_MOCK=0) cả 2 FE -> OK; không c
 ```
 Test QA mới: `backend/apps/{ai/actions,ai/execution,delivery,sales/payments,sales/orders,content/entries,inventory/batches}/tests/test_p8_lo7_qa_edges.py`; `frontend/e2e/qa-lo7-shop-links.py`; `erp-console/e2e/qa_lo7_login_next.py`, `qa_lo7_real_expired.py`.
 Ảnh (dữ liệu giả): `doc/features/2026-09-30-sua-loi-review/qa-lo7/` (`f14-*`, `l1-*`, `l4-*`, `l5-1-*`, `lo7-f*`, `real-l51-*`).
+
+---
+
+## Lô 8 — SR-25 (tiền VNĐ `x.xxx ₫`, giờ hiển thị GMT+7) · lần 1 · 2026-09-30
+
+### Kết luận: APPROVED — 5/5 AC đạt bằng chứng chạy thật; không lỗi chặn (Critical/High/Medium = 0); 1 ca chưa kiểm (⏸: Postgres), có ghi nhận Low bên dưới
+
+### Tổng: 880 ca QA chạy thật · ✅ 879 · ❌ 0 · ⏸ 1
+Không tính 1672 test có sẵn của dev. Cách đếm: E2E trình duyệt thật 656 (Shop mock+API giả 54, Shop Django thật 77, ERP mock 71, ERP Django thật 96, hồi quy ERP Lô 7 79, hồi quy Shop SR-21 279) + vitest ERP 185 + `test-format` Shop 26 + 2 test BE mới của QA + 10 kiểm lệnh (tsc ×2, npm ci ×2, build ×2, check-no-mock ×2, check-ai-chunks, makemigrations). Toàn bộ backend chạy lại: **1674 OK** (1667 → 1674: dev thêm test Lô 8 + 2 của QA), không dùng `--parallel`.
+
+Cách dựng bằng chứng "múi giờ + ngày sát nửa đêm":
+- Trình duyệt Playwright đổi `timezone_id` sang `America/New_York` (-4), `UTC`, `Pacific/Kiritimati` (+14), `Asia/Ho_Chi_Minh` (đối chứng); ERP còn cố định đồng hồ trình duyệt ở `2026-09-30T17:30:00Z` (= 01/10 00:30 giờ VN).
+- Django thật (SQLite tạm trong scratchpad, `qa8_settings`, cổng 8119): QA đóng băng `django.utils.timezone.now` ở `2026-09-30T17:30:00Z` để tạo đơn, hoá đơn, phiếu giao (hoàn tất), phiếu hoàn, hàng chờ CSKH; thêm 1 đơn ở 14:50Z (= 21:50 VN ngày 30/09) làm đối chứng "ngày hôm trước".
+- Build Shop/ERP là bản thật (`NEXT_PUBLIC_USE_MOCK=0`) trỏ tới Django cục bộ; dữ liệu 100% giả (tên "Khách Giả …", SĐT 0900000xxx, địa chỉ "Đường Giả").
+
+### Theo AC
+| Mã AC | Kết quả | Bằng chứng (test/ảnh/lệnh) |
+|---|---|---|
+| AC1 Tiền luôn `x.xxx ₫`, kể cả API trả chuỗi Decimal (RA-01) | ✅ | Django thật trả `price: "280000.00"` → Shop hiện `280.000 ₫` ở catalog (mọi món khớp API), giỏ, checkout, màn thanh toán, tra đơn (`qa-lo8-shop-django.py` 77/77 × 4 múi giờ). Tổng FE = `total_amount` BE, không lệch đồng nào. ERP: Tổng quan, Đơn (`165.000 ₫`), chi tiết đơn, CSKH, không có token tiền sai (`qa_lo8_real.py` 96/96). Mock: `qa-lo8-shop-format.py` 54/54, `p8_lo8_fe_erp_tz.py` 71/71. Ảnh: `qa-lo8/qa8-shop-django-*.png`, `qa8-erp-django-*.png` |
+| AC2 Giờ luôn `Asia/Ho_Chi_Minh` bất kể múi giờ máy | ✅ | Đơn tạo 17:30Z hiện `01/10 00:30` ở cả 4 múi giờ (Đơn hàng, chi tiết + timeline, hoá đơn, Giao hàng "Hoàn tất", CSKH "Trả tiền: 01/10 00:30", Tổng quan). CSKH hẹn gọi lại: nhập `09:00` trên máy New York/UTC/Kiritimati/HCM → API lưu `callback_at = 2026-10-02T02:00:00Z` cả 4 lần, UI đọc lại `Hẹn gọi lại 09:00`. Tra đơn hoàn: `đã hoàn 01/10/2026`, không `30/09`. Ảnh `qa8-erp-django-ny-don-chi-tiet.png`, `qa8-erp-django-utc-cskh-hen-goi.png` |
+| AC3 Một hàm định dạng chung mỗi FE, không `toLocale*String` cho ngày/giờ thiếu `timeZone` | ✅ | Quét `frontend/{app,components,lib}` + `erp-console/{app,features,shared,components}`: `toLocale…`/`Intl.DateTimeFormat` chỉ còn trong 2 file `format.ts`; không còn `getHours/getDate/getMonth/getFullYear/getTimezoneOffset/slice(11,16)/toISOString().slice`. `noLocalTime.test.ts` + vitest ERP 185/185 (`TZ=UTC` và `TZ=America/New_York`), `TZ=UTC node scripts/test-format.mjs` 26/26 (cả New_York) |
+| AC4 "Hôm nay"/lọc ngày tính theo giờ VN | ✅ | ERP + Django thật: bộ lọc Đơn hàng "Hôm nay" gửi `date_from=date_to=2026-10-01` (không phải 09-30 UTC) và hiện đúng đơn 00:30 VN, loại đơn 21:50 VN hôm trước, ở cả 4 múi giờ; "7 ngày" = 2026-09-25..2026-10-01; Giao hàng/Hoàn tất gửi `completed_from=2026-10-01` và hiện phiếu hoàn tất 17:30Z; Nhập lô mặc định ngày nhập `2026-10-01`; mã chứng từ mới theo ngày VN (`SO261001-…`, `GH-INV261001-…` sinh lúc 17:30Z); `cancel_notice` hạn hoàn `31/10/2026` |
+| AC5 Đặt tên tiếng Anh | ✅ | Hàm/tệp mới: `formatVnd/formatDateTime/todayVn` (Shop), `vnd/dateTime/todayInVietnam/dateKeyInVietnam/vnInputToIso` (ERP), `apps/common/formatting.py::format_vnd/format_local_*` (BE). `vnd_short` đã bỏ, không còn tham chiếu (`grep`) |
+
+### Ngoại lệ & biên (đã chạy)
+| Ca | Kết quả |
+|---|---|
+| Nửa đêm 00:00–07:00 VN: 17:30Z (00:30 VN) ở New York/UTC/Kiritimati/HCM | ✅ ngày VN 01/10 ở cả 4 |
+| Kiritimati (+14) — máy đã sang 01/10 14:30 trong khi VN mới 00:30 | ✅ "Hôm nay" vẫn theo VN (`date_from=2026-10-01`), không theo máy |
+| Giỏ cũ giá chuỗi `"280000.00"` ×2 → `560.000 ₫`; giá số `280000` ×2 → `560.000 ₫` | ✅ 4 múi giờ |
+| Giỏ hỏng (giá `'abc'`, `null`) | ✅ không NaN/undefined/pageerror; ⚠ dòng hiện `0 ₫` (xem L8-Q3) |
+| Tổng checkout FE = `total_amount` BE (POST 201 thật) | ✅ |
+| Tra đơn: đã trả, đã hủy + đã hoàn, đã hủy + chờ hoàn (hạn 31/10) | ✅ ngày VN, tiền đúng |
+| ISO của API giữ offset (`booked_expires_at`, `callback_at`) — hợp đồng JSON không đổi | ✅ `…+00:00`/`Z`; `refund.deadline` vẫn `YYYY-MM-DD`, FE `dateOnly` đọc đúng |
+| Làm tròn tiền: BE `Decimal` half-up (`0.5→1`, `-0.4→"0 ₫"`, `999999999999.99`), FE `Math.round` | ✅ trừ 2 ghi nhận Low (L8-Q1, L8-Q2) |
+| Nhập lô: ngày nhập mặc định = hôm nay VN (BE `timezone.localdate()`, FE `2026-10-01` trên build thật) | ✅ (nợ đã ghi ở lượt QA trước — nay đã sửa) |
+| Đồng hồ trình duyệt ≠ đồng hồ BE (Tổng quan "Cập nhật HH:MM" lấy giờ BE, hiện theo VN) | ✅ lệch ≤ 5 phút so với giờ VN thật, không theo máy |
+| Bấm đúp / webhook 2 lần / 2 đơn tranh 1 lô | ➖ không thuộc SR-25 (không đổi logic); hồi quy 1674 test BE xanh phủ |
+| Lọc ngày trên **Postgres** thật (`completed_at__date`, `created_at__date` với `USE_TZ`) | ⏸ máy này chỉ có SQLite; Django dịch `__date` theo `TIME_ZONE` cả hai DB nhưng chưa chạy Postgres — nên nhìn lại khi lên staging |
+
+### Phân quyền (không đổi, kiểm lại trên Django thật)
+| Group | Đơn hàng / Giao hàng | Nhập lô | CSKH | Ghi chú |
+|---|---|---|---|---|
+| chu (`loc`) | ✅ thấy | ✅ | – | mở được chi tiết đơn, phiếu giao |
+| cskh (`cs1`) | – | – | ✅ hẹn gọi lại lưu đúng giờ | menu chỉ có Đơn & tiền, Gọi xác nhận (ảnh `qa8-erp-django-utc-cskh-hen-goi.png`) |
+| quan_ly / nv_kho / nv_giao / cskh — Django Admin | xem bảng "Rò giá vốn" | | | `test_qa_lo8_admin_str_leak.py` |
+| chưa đăng nhập | ➖ đường Shop công khai không đổi quyền; `/login/` ERP vẫn bắt đăng nhập | | | |
+
+### Rò giá vốn
+`__str__` mới (`format_vnd`) của `PurchaseCost`, `PurchaseCostAllocation`, `PurchaseInvoice`, `ItemPrice`, `PaymentTransaction`, `Refund` chỉ đổi định dạng (`123đ` → `123 ₫`), không thêm trường mới. QA quét **HTML Admin thật** (changelist + trang sửa) với số bí mật `7654321` cho từng Group (`apps/common/tests/test_qa_lo8_admin_str_leak.py`, 2 ca xanh):
+| Trang Admin | chu | quan_ly | nv_kho | nv_giao | cskh |
+|---|---|---|---|---|---|
+| `PurchaseCost` (chi phí phụ, phân bổ vào lô) | 200 | **403** | 403 | 403 | 403 |
+| `PurchaseInvoice` | 200 | 200 (có từ trước) | 403 | 403 | 403 |
+| `ItemPrice` (giá **bán**) | 200 | 200 | 403 | 403 | 403 |
+| `PaymentTransaction` (tiền về) | 200 | 200 | 403 | 403 | 403 |
+Không Group thiếu `view_costprice` thấy số của `PurchaseCost` hay `PurchaseCostAllocation`. JSON `/api/shop/catalog/` (Django thật) chỉ có `group, image, item_code, item_type, name, price, sellable_qty, unit` — không có chuỗi cost/purchase/landed/margin/supplier; bản build Shop không chứa `purchase_rate`/`landed`. Không khoá mới nào được ghi vào AuditLog `changes`/`note` hoặc trả qua API trong Lô 8; `AuditLog.__str__` chỉ đổi cách in giờ (VN), không thêm dữ liệu.
+
+### Rò dữ liệu cá nhân
+- API công khai `/api/shop/catalog/` và tra đơn: không trả tên, SĐT đầy đủ, địa chỉ (quét thân trang tra đơn 3 trạng thái × 4 múi giờ: không có `Khách Giả`, `0900000777`, `Đường Giả`).
+- `localStorage`/`sessionStorage`/URL sau đặt hàng và sau khi CSKH thao tác (4 múi giờ): không chứa tên/SĐT/địa chỉ; giỏ chỉ có `item_code, name, price, unit, qty`.
+- Console trình duyệt: không lỗi, không chứa dữ liệu cá nhân (bỏ qua nhiễu `Failed to fetch RSC payload` do prefetch, có từ trước). Log Django (`server.log`, 1073 dòng): 0 dòng chứa SĐT/tên/địa chỉ giả.
+- Ảnh trong `qa-lo8/` chỉ dùng dữ liệu giả. Màn CSKH có SĐT/tên khách giả vì chính quyền của Group `cskh` (đúng thiết kế); Group khác không thấy.
+- Tra đơn có giới hạn tần suất: Lô 8 không đụng tới; hồi quy xanh.
+
+### Hồi quy
+- Backend: `manage.py test` (không `--parallel`) **1674 OK**; `makemigrations --check --dry-run`: *No changes detected*.
+- ERP: `tsc` 0; vitest 185/185 (`TZ=UTC` và `TZ=America/New_York`); `p8_lo7_fe_erp.py` **79/79**; `check-no-mock` XANH; `check-ai-chunks` XANH.
+- Shop: `tsc` 0; `test-format` 26/26; `qa-lo6-sr21-shop.py` **279/279**; `check-no-mock` XANH.
+- `npm ci` (không `--legacy-peer-deps`, cache scratchpad) sạch ERESOLVE ở cả hai FE; cảnh báo `npm audit` 2 lỗ hổng (next/postcss) có từ trước, không thuộc Lô 8.
+- Build cuối `NEXT_PUBLIC_USE_MOCK=0` + `NEXT_PUBLIC_API_BASE` production cho cả 2 FE: OK; `out/` không còn URL `localhost` của API (chỉ còn chuỗi trong thư viện `polyfills`/`psl`), 3 và 5 file chứa base production.
+
+### Lỗi
+**Không có lỗi chặn.** Ghi nhận không chặn (Low, đều không do Lô 8 gây ra hoặc ảnh hưởng hiển thị nhỏ):
+- **L8-Q1 (Low, AC1):** FE `formatVnd("-0.4")` (và ERP `vnd(-0.4)`) in `-0 ₫` do `Math.round(-0.4)` = `-0`; BE in `0 ₫`. Tái hiện: `node -e 'console.log(Math.round(-0.4).toLocaleString("vi-VN"))'` → `-0`. Chỉ xảy ra khi tiền âm dưới 0,5 đồng.
+- **L8-Q2 (Low, AC1):** số âm đúng nửa đồng: BE `format_vnd(Decimal("-1234567.5"))` = `-1.234.568 ₫` (half-up, ra xa 0), FE `Math.round(-1234567.5)` = `-1.234.567 ₫`. Số dương khớp nhau. Tiền thực tế ít có phần lẻ.
+- **L8-Q3 (Low, AC1):** giỏ trong `localStorage` bị sửa tay thành giá `'abc'`/`null` → dòng giỏ hiện `0 ₫` và tổng tạm sai. BE vẫn là nguồn tính tiền nên đơn không sai; không crash.
+- **L8-Q4 (cần Duy biết, có từ trước, ngoài Lô 8):** tra đơn `CANCELLED` + đã hoàn hiện thêm "Chưa thanh toán." + nút "Thanh toán lại" và dòng "Trạng thái giao hàng: CANCELLED" (chữ thô, chưa dịch). Khách có thể bấm trả lại một đơn đã huỷ. Ảnh `qa8-shop-django-ny-tra-don-hoan.png`. Nên mở việc riêng.
+- **L8-Q5 (Low, có từ trước):** BE `lines_summary`/`total_kg` của hàng chờ CSKH trả `1.000 kg` cho 1 kg (3 số lẻ) → khi đọc theo kiểu VN là "một nghìn kg". Chỉ chuỗi từ BE, không phải phần Lô 8.
+- **L8-Q6 (ghi nhận, có từ trước):** `quan_ly` xem được `amount` của `PurchaseInvoice` trong Django Admin (quyền model chuẩn của Django, API cũng theo `BusinessModelPermissions`); `__str__` mới không thêm thông tin so với cột `amount` đã có. Techlead cân nhắc nếu coi tổng hoá đơn mua là giá vốn.
+- **Sự cố môi trường của QA, không phải lỗi sản phẩm:** vài lệnh `migrate`/tạo dữ liệu đầu phiên chạy nhầm lên `backend/db.sqlite3` (DB dev đã nằm trong `.gitignore`) — thêm các migration mới đã có sẵn trong mã và 2 đơn giả `SO261001-9D6BB0`, `SO261001-732D19`. Không có dữ liệu thật, không thể hoàn nguyên; xoá file dev DB và `migrate` lại là sạch. Sau đó mọi lệnh chạy qua `dj.sh` với DB riêng ở scratchpad.
+- **Đã sửa trong test của QA (không phải lỗi sản phẩm):** cổng 3220/3231 trùng với server của phiên khác (chạy lại 71/71), quên tách người dùng CSKH ra context mới (đã sửa), URL hàng chờ CSKH cần `?state=CALLBACK` để kiểm `callback_at`, dùng giờ BE thật thay vì giờ đóng băng ở ô "Cập nhật" Tổng quan.
+
+### Lệnh đã chạy (tóm tắt output)
+```
+cd backend && DJANGO_DEBUG=1 env -u DATABASE_URL .venv/bin/python manage.py test         -> Ran 1674 tests OK (127s)
+manage.py makemigrations --check --dry-run                                               -> No changes detected
+manage.py test apps.common.tests.test_qa_lo8_admin_str_leak                               -> 2 OK (Admin HTML × 5 Group, PurchaseCost 403 cho quan_ly/nv_kho/nv_giao/cskh)
+cd frontend && npm ci --cache <scratchpad>/npm-cache && npx tsc --noEmit (0) && TZ=UTC node scripts/test-format.mjs -> 26/26 (cả TZ=America/New_York)
+cd erp-console && npm ci --cache ... && npx tsc --noEmit (0) && TZ=UTC npm test          -> 185/185 (cả TZ=America/New_York)
+python3 frontend/e2e/qa-lo8-shop-format.py (mock 3111 + real/API giả 3112)               -> 54/54
+python3 frontend/e2e/qa-lo8-shop-django.py (build thật 3113 + Django thật 8119, 4 múi giờ) -> 77/77
+BASE=… python3 erp-console/e2e/p8_lo8_fe_erp_tz.py (mock 3220)                           -> 71/71
+python3 erp-console/e2e/qa_lo8_real.py (build thật 3231 + Django thật 8119, 4 múi giờ)     -> 96/96
+BASE=… python3 erp-console/e2e/p8_lo7_fe_erp.py                                          -> 79/79
+QA_BASE=… python3 frontend/e2e/qa-lo6-sr21-shop.py                                       -> 279/279
+NEXT_PUBLIC_USE_MOCK=0 NEXT_PUBLIC_API_BASE=<production> npm run build (ERP rồi Shop)     -> OK cả hai
+node scripts/check-no-mock.mjs (ERP, Shop) -> XANH ; node scripts/check-ai-chunks.mjs (ERP) -> XANH
+Đã tắt server 3111, 3112, 3113, 3220, 3231, Django 8119 (không đụng 3110/3221 của phiên khác). Không commit, không deploy, không chạy trên production.
+```
+Test QA mới (đã thêm vào repo, chưa commit): `backend/apps/common/tests/test_qa_lo8_admin_str_leak.py`; `frontend/e2e/qa-lo8-shop-django.py`; `erp-console/e2e/qa_lo8_real.py`.
+Ảnh (dữ liệu giả): `doc/features/2026-09-30-sua-loi-review/qa-lo8/qa8-*.png` (ERP Django thật New York/UTC/Kiritimati, Shop Django thật New York/Kiritimati).

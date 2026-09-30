@@ -5,6 +5,8 @@ from django.conf import settings
 from django.core.validators import MinValueValidator
 from django.db import models
 
+from apps.common.formatting import format_vnd
+
 
 class PurchaseCost(models.Model):
     """
@@ -48,7 +50,7 @@ class PurchaseCost(models.Model):
         # gán builtin add_purchasecost cho Group `chu` trong fixture phân quyền.
 
     def __str__(self):
-        return f"{self.get_cost_type_display()} · {self.amount}đ"
+        return f"{self.get_cost_type_display()} · {format_vnd(self.amount)}"
 
 
 class PurchaseCostAllocation(models.Model):
@@ -77,4 +79,4 @@ class PurchaseCostAllocation(models.Model):
         ]
 
     def __str__(self):
-        return f"{self.purchase_cost} → {self.batch} = {self.allocated_amount}đ"
+        return f"{self.purchase_cost} → {self.batch} = {format_vnd(self.allocated_amount)}"

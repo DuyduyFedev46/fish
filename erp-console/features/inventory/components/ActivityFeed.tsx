@@ -11,7 +11,7 @@
 import { useAuth } from "@/features/auth/components/AuthProvider";
 import { dashboardSummaryKey } from "@/shared/lib/dashboardSummary";
 import type { LedgerActivity, MovementType } from "@/shared/lib/dashboardSummary";
-import { kg, timeHM } from "@/shared/lib/format";
+import { dateKeyInVietnam, kg, timeHM, todayInVietnam } from "@/shared/lib/format";
 import { canView } from "@/shared/lib/nav";
 import { useResource } from "@/shared/lib/useResource";
 import { Icon } from "@/shared/ui/Icon";
@@ -28,19 +28,15 @@ const TYPE_ICON: Record<MovementType, string> = {
   WRITE_OFF: "delete_sweep",
 };
 
-/** Khoá ngày theo giờ máy người dùng: "2026-09-24". */
-function dayKey(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "";
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
+/** Khoá ngày theo giờ Việt Nam (không theo múi giờ máy): "2026-09-24". */
+const dayKey = dateKeyInVietnam;
 
 function dayLabel(key: string): string {
   if (!key) return "Không rõ ngày";
-  const today = new Date();
-  const yesterday = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1);
-  if (key === dayKey(today.toISOString())) return "Hôm nay";
-  if (key === dayKey(yesterday.toISOString())) return "Hôm qua";
+  const now = new Date();
+  if (key === todayInVietnam(now)) return "Hôm nay";
+  // Việt Nam không đổi giờ mùa hè nên lùi đúng 24 giờ là ngày hôm qua.
+  if (key === todayInVietnam(new Date(now.getTime() - 86_400_000))) return "Hôm qua";
   const [, m, d] = key.split("-");
   return `${d}/${m}`;
 }

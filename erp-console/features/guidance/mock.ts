@@ -112,7 +112,7 @@ export function mockGuidanceApi(req: MockRequest): MockResponse {
         {
           at: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
           kind: "order_placed",
-          label: `Khách đặt đơn SO-DEMO-${docId} (540.000 đ)`,
+          label: `Khách đặt đơn SO-DEMO-${docId} (540.000 ₫)`,
           doc: "order",
           actor: { kind: "system" as const, display: "Hệ thống" },
         },
@@ -122,7 +122,7 @@ export function mockGuidanceApi(req: MockRequest): MockResponse {
               {
                 at: new Date(Date.now() - 20 * 60 * 1000).toISOString(),
                 kind: "payment_received",
-                label: "Nhận 540.000 đ · Cổng SePay · Khớp (mã GD SP-123456)",
+                label: "Nhận 540.000 ₫ · Cổng SePay · Khớp (mã GD SP-123456)",
                 doc: "order",
                 actor: { kind: "system" as const, display: "Hệ thống" },
               },
@@ -204,7 +204,7 @@ export function mockGuidanceApi(req: MockRequest): MockResponse {
         {
           at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
           kind: "refund_created",
-          label: "Tạo phiếu hoàn 50.000 đ",
+          label: "Tạo phiếu hoàn 50.000 ₫",
           doc: "refund",
           actor: { kind: "user" as const, display: "Quản lý A" },
         },
@@ -264,7 +264,7 @@ export function mockGuidanceApi(req: MockRequest): MockResponse {
         {
           at: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
           kind: "payment_received",
-          label: "Nhận giao dịch thanh toán 200.000 đ (mã GD SP-987654)",
+          label: "Nhận giao dịch thanh toán 200.000 ₫ (mã GD SP-987654)",
           doc: "payment",
           actor: { kind: "system" as const, display: "Hệ thống" },
         },

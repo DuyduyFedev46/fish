@@ -13,6 +13,7 @@
 //   window.__caveMock.expiredState()             — xem tồn/trạng thái các lô quá hạn
 //   window.__caveMock.expiredReset()             — về lại seed
 import type { MockRequest, MockResponse } from "@/shared/lib/http";
+import { todayInVietnam } from "@/shared/lib/format";
 import { dashboardSummaryMockResponse } from "@/shared/lib/dashboardSummary.mock";
 import { MOCK_UNAUTHORIZED, mockRequireUser } from "@/features/auth/mock";
 import type { Me } from "@/features/auth/types";
@@ -73,9 +74,8 @@ const err = (status: number, code: string, detail: string): MockResponse => ({ s
 const FORBIDDEN: MockResponse = { status: 403, body: { detail: "Bạn không có quyền để thực hiện thao tác này." } };
 
 function isoDay(daysAgo: number): string {
-  const d = new Date();
-  d.setDate(d.getDate() - daysAgo);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  // Ngày theo giờ VN (SR-25), không theo múi giờ máy. VN không đổi giờ mùa hè nên lùi N×24h = lùi N ngày.
+  return todayInVietnam(new Date(Date.now() - daysAgo * 86_400_000));
 }
 
 function findLot(ref: string | number): MockLot | undefined {

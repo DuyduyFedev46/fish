@@ -5,9 +5,10 @@ import { fetchDailyAiReport } from "../api";
 import type { AiDailyReport } from "../../types";
 import { Icon } from "@/shared/ui/Icon";
 import { Loading } from "@/shared/ui/StateBox";
+import { timeHMS, todayInVietnam } from "@/shared/lib/format";
 
 export function AiDailyReportScreen() {
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayStr = todayInVietnam();
   const [selectedDate, setSelectedDate] = useState<string>(todayStr);
   const [report, setReport] = useState<AiDailyReport | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -188,7 +189,7 @@ export function AiDailyReportScreen() {
                     {report?.items.map((it) => (
                       <tr key={it.id} className="hover:bg-gray-50/50 dark:hover:bg-gray-800/30">
                         <td className="px-4 py-3 text-xs text-gray-500 font-mono">
-                          {new Date(it.created_at).toLocaleTimeString("vi-VN")}
+                          {timeHMS(it.created_at)}
                         </td>
                         <td className="px-4 py-3 font-medium text-gray-800 dark:text-gray-200">
                           {it.owner_display}

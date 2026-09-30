@@ -998,3 +998,133 @@ Phạm vi: `erp-console/` (fe-dev). Không đụng `frontend/`, `backend/`, `pac
 - **Playwright (mock, cổng 3217)** `erp-console/e2e/l7_1_open_redirect.py` 16/16: đã đăng nhập rồi mở `/login/?next=` với `/%5Cevil.example`, `/%09/evil.example`, `//evil.example`, `https://evil.example`, `javascript:alert(1)` -> luôn ở lại `127.0.0.1:3217` (`/overview/`), không có điều hướng tới host khác; `next=/print/label/?note=32&print_no=1` hợp lệ vẫn được theo. Hồi quy: `p8_lo7_fe_erp.py` 79/79, `sr09_ac4_stale_state.py` 22/22, `sr07_nhap_lo_draft.py` 18/18.
 - **L7-5 (comment):** `frontend/features/content/safeHref.ts` đầu file: bỏ câu "chặt hơn ERP" (không còn đúng vì ERP đã chép nguyên luật). Đây là thay đổi duy nhất trong `frontend/` (chỉ comment; `node scripts/test-safe-href.mjs` vẫn 40/40, `tsc` sạch).
 - **Kiểm chứng:** `erp-console`: `tsc --noEmit` exit 0; `npm test` 12 file, 158 test đạt; build thật `NEXT_PUBLIC_USE_MOCK=0` + `check-no-mock` XANH (13 tệp mock, 32 chuỗi seed, 130 tệp build) + `check-ai-chunks` XANH (layout gốc 308,3 kB; console 372,3 kB; /orders 432,1 kB; /orders/payments 445,2 kB; /orders/refunds 407,8 kB; /inventory 386,9 kB); `out/ai-spike` không tồn tại; `out/` hiện là bản thật.
+
+## Lô 8 — FE Shop
+SR-25 phần Shop (`frontend/`): tiền VNĐ và ngày giờ giờ Việt Nam. Lời Duy 30/09: "đơn vị tiền tệ là VNĐ, GMT +7 … hiển thị phải là +7". Gồm RA-01 (API trả `price` dạng chuỗi Decimal `"260000.00"`, `formatVnd` cũ hiện `260000.00đ`).
+
+**File đã sửa (chỉ `frontend/`):**
+- `lib/format.ts` viết lại. `formatVnd(string|number|null|undefined)` ép `Number`, làm tròn, `vi-VN` -> `"260.000 ₫"` (cùng kiểu `erp-console/shared/lib/format.ts::vnd`), rác/rỗng/null -> `"—"`. `formatKg` nhận cả chuỗi. Hàm ngày giờ mới, mọi hàm ép `timeZone: "Asia/Ho_Chi_Minh"` (một `Intl.DateTimeFormat` duy nhất + `formatToParts`, `hourCycle: h23` nên không ra "24:30"): `formatDateTime` ("01/10 00:30"), `formatDate` ("01/10/2026"), `formatTime` ("00:30"), `formatDateOnly` (ngày thuần "2026-10-28" -> "28/10/2026", không đổi múi giờ), `todayVn()` ("YYYY-MM-DD" giờ VN, AC4), `currentYearVn()`.
+- Thay chỗ tự định dạng: `app/bai-viet/page.tsx`, `app/trang/page.tsx`, `features/content/components/LatestPosts.tsx` (3 bản `formatDate` chép tay dùng `toLocaleDateString` không `timeZone` -> dùng hàm chung); `app/shop/orders/OrderLookup.tsx` (ngày hoàn `toLocaleDateString` -> `formatDate`; hạn hoàn in thô "2026-10-28" -> `formatDateOnly`; bỏ `Number()` thừa quanh `refund.amount`); `components/CatalogGrid.tsx` (tồn kho `toLocaleString` -> `formatKg`); `features/content/components/ItemCard.tsx` (bỏ `Number()` thừa); `app/page.tsx` (năm bản quyền `getFullYear()` -> `currentYearVn()`); `lib/mock.ts::genOrderCode` (ngày mã đơn theo `todayVn()`).
+- Kiểu (`lib/types.ts`): `CatalogItem.price` và `sellable_qty` từ `number` -> `string | number` (API thật trả chuỗi Decimal, trước đây khai `number` là khai sai). Nơi tính toán ép rõ: `components/AddToCartControl.tsx` (`Number(item.price)` khi bỏ vào giỏ; `Number(sellable_qty) > 0`), `CatalogGrid.tsx`/`app/shop/item/page.tsx` (`Number(item.sellable_qty) > 0`). `CartLine.price` giữ `number`.
+- `components/CartContext.tsx`: nạp giỏ từ `localStorage` ép `price` về số (giỏ cũ của khách đã lưu `"260000.00"` dạng chuỗi từ bản trước; không ép thì `qty * price` vẫn ra số nhưng lưu chuỗi và dễ sai về sau). Giỏ vẫn chỉ giữ mã hàng, tên, giá, số lượng (không dữ liệu cá nhân).
+- `lib/mock.ts`: catalog mock nay trả `price`/`sellable_qty` dạng CHUỖI giống API thật (`"65000.00"`, `"120.000"`) qua `toWireItem`, seed nội bộ vẫn là số để tính tiền. Mục đích: mock bắt được lỗi RA-01 (trước đây mock trả số nên FE không bao giờ thấy lỗi `260000.00đ`).
+- Grep cuối: trong `frontend/` (trừ `e2e/`, `scripts/`) không còn `toLocale*String`/`Intl.*`/`getFullYear`/`getDate` ngoài `lib/format.ts`; không còn `+ "đ"` hay `{…}đ`.
+
+**Không đổi:** `CountdownTimer` (đếm ngược theo mốc backend, không định dạng ngày), `features/site/api.ts` (`Date.now()` chỉ để cache), `lib/mock.ts` các `Date.now()` (mốc TTL, không hiển thị). Không thêm thư viện, không đụng `package.json`/lock, `erp-console/`, backend.
+
+**Quyết định nhỏ:** dấu cách trước `₫` là dấu cách thường (giống ERP), chưa dùng NBSP; nếu Duy muốn tránh xuống dòng giữa số và `₫` thì đổi một ký tự trong `formatVnd` ở cả hai FE.
+
+**TDD đỏ -> xanh.** Test không thêm thư viện: `frontend/scripts/test-format.mjs` (26 ca: tiền, ngày giờ sát ranh giới ngày VN, ngày thuần, `todayVn`, năm), nạp `lib/format.ts` bằng `typescript.transpileModule` như `test-safe-href.mjs`.
+- ĐỎ trên `format.ts` cũ (`git show HEAD:frontend/lib/format.ts`, `TZ=America/New_York`): `test-format: 1/26 đạt, 25 sai`. Ví dụ: `formatVnd "chuỗi nguyên": muốn "65.000 ₫", được "65000đ"`; `formatVnd "triệu": muốn "1.250.000 ₫", được "1250000.00đ"`; `formatVnd null: THROW Cannot read properties of null (reading 'toLocaleString')`; `formatDateTime …: THROW mod.formatDateTime is not a function`.
+- XANH trên bản mới: `TZ=America/New_York`, `TZ=UTC`, `TZ=Asia/Ho_Chi_Minh`, `TZ=Pacific/Kiritimati` đều `test-format: 26/26 đạt, 0 sai`. Ca chính: `"260000.00"` -> `260.000 ₫`; `"2026-09-30T17:30:00Z"` -> `01/10 00:30`; `2026-12-31T20:00:00Z` -> ngày `01/01/2027`, năm 2027.
+- `test-safe-href.mjs` (Lô 7) vẫn `40/40`.
+
+**Playwright** (`frontend/e2e/qa-lo8-shop-format.py`, 54 ca; múi giờ trình duyệt `America/New_York` và `UTC`, đã kiểm `getTimezoneOffset() != -420`):
+- Build mock (cổng 3109): `/shop/`, `/shop/item`, giỏ -> checkout (đơn giá, thành tiền, tổng `285.000 ₫`, nút đặt hàng), màn thanh toán, tra đơn `DH-DEMO004` (tiền hoàn `540.000 ₫`, hạn hoàn `28/10/2026`), `/bai-viet`, `/trang`, trang chủ. Tồn kho chuỗi `"120.000"` -> `Còn 120 kg`.
+- Build thật + API giả `localhost:8199` chặn bằng `page.route` (cổng 3110), dữ liệu sát ranh giới `published_at = refunded_at = 2026-09-30T17:30:00Z`: giá `"260000.00"` -> `260.000 ₫`, `"1250000.00"` -> `1.250.000 ₫`, tồn `"2.500"` -> `Còn 2,5 kg`; giỏ lưu giá dạng số; giỏ cũ giá chuỗi `x2` -> `520.000 ₫`; màn thanh toán `260.000 ₫`; bài viết/danh sách/trang chủ/trang chính sách hiện `01/10/2026` (giờ VN, không `30/09`); tra đơn "đã hoàn 01/10/2026".
+- Bộ quét tiền: mọi token `số + đ/₫` phải khớp `\d{1,3}(\.\d{3})* ₫`, không còn `\d+.\d{2}đ`.
+- XANH: `54/54 PASS, 0 FAIL` cả hai múi giờ. ĐỎ trên bản cũ (build từ `git worktree` HEAD, dựng tạm ở scratchpad rồi xoá): `12/54 PASS, 42 FAIL` (ví dụ `[real] /shop/ ... <['260000.00đ', '1250000.00đ', …]>`, `[real] bài viết: 'Đăng ngày: 01/10/2026'` sai vì bản cũ ra `30/09/2026`).
+- Hồi quy, build thật, không sửa assert nào: `e2e/qa-lo7-shop-real.py` 21 ca 0 FAIL; `e2e/qa-lo6-sr21-shop.py` 279 ca, 0 FAIL, 0 LOW (assert cũ không khớp chuỗi `đ`; `qa-lo7-shop-real.py` chỉ khớp `"100.000"`, vẫn đúng với `100.000 ₫`).
+- Ảnh (390 px, dữ liệu giả): `doc/features/2026-09-30-sua-loi-review/qa-lo8/lo8-{shop,item,checkout,thanh-toan,tra-don}-{New_York,UTC}-390.png` (mock), `lo8-real-{shop,baiviet,tra-don}-{New_York,UTC}-390.png` (build thật). Ảnh `lo8-erp-*` là của FE ERP.
+
+**Kiểm chứng (chạy trong lượt này):** `npx tsc --noEmit` sạch; `npm run build` mock và build thật sạch; `node scripts/check-no-mock.mjs` XANH (4 file mock, 27 chuỗi seed, 46 file build). Bản `out/` cuối cùng là build thật với API base production trong `.env.production` (truyền `NEXT_PUBLIC_*` trực tiếp vì `.env.local` đè), không còn `localhost:8199`.
+
+**Lệch contract / còn nợ:** không lệch contract. Còn nợ: `frontend/` chưa có lệnh `npm test`; `scripts/test-format.mjs` chạy tay (`TZ=… node scripts/test-format.mjs`), chưa nối vào `package.json` vì Duy cấm đụng `package.json` ở lô này.
+
+## Lô 8 — FE ERP
+SR-25 phần ERP (`erp-console/`): tiền VNĐ `x.xxx ₫` và mọi ngày giờ theo `Asia/Ho_Chi_Minh` bất kể múi giờ máy. Lời Duy 30/09: "đơn vị tiền tệ là VNĐ, GMT +7 … hiển thị phải là +7". Không đụng `frontend/`, backend, `package.json`/lock, `02*.md`.
+
+**Hàm chung (`erp-console/shared/lib/format.ts`).** `vnd` giữ kiểu `"540.000 ₫"` (chuẩn chung với Shop). Mọi hàm ngày giờ đi qua một `Intl.DateTimeFormat` cố định `timeZone: "Asia/Ho_Chi_Minh"`, `hourCycle: "h23"`, tách bằng `formatToParts` (bản cũ `toLocaleString("vi-VN")` ra chuỗi ngược kiểu `13:30 30-09` và theo giờ máy):
+- `dateTime` `"01/10 00:30"`, `dateTimeFull` `"01/10/2026 00:30"`, `date` `"01/10/2026"`, `timeHM` `"00:30"`, `timeHMS` `"00:30:15"` (nhận `string | Date`).
+- `todayInVietnam(now?)` `"2026-10-01"` (thay `toISOString().slice(0,10)` là ngày UTC), `dateKeyInVietnam(iso)` (khoá gom ngày), `dateOnly("2026-10-28")` `"28/10/2026"` (ngày thuần của BE như hạn hoàn, HSD, không đổi múi giờ), `vnInputToIso("2026-10-02T09:00")` -> `"…T02:00:00.000Z"` (ô `datetime-local` là GIỜ VN, không phải giờ máy). `VN_TZ` xuất ra để dùng chung.
+
+**Chỗ đã thay bằng hàm chung (AC3, AC4).**
+- Ngày giờ: `shared/ui/RightRail.tsx` ("Đã lưu · HH:mm"), `app/(console)/content/edit/page.tsx` (3 chỗ "Đã lưu lúc", lịch sử phiên bản), `features/content/components/PolicyVersionSheet.tsx` (bỏ hàm `vnDateTime` tự chế), `ContentListScreen.tsx` (cột "cập nhật" trước đây in nguyên chuỗi ISO), `app/(console)/ai/actions/page.tsx`, `features/ai/actions/components/ActionDetailModal.tsx` (3 mốc, `timeHMS`), `features/ai/settings/components/MyConfigScreen.tsx`, `features/ai/report/components/AiDailyReportScreen.tsx` + `features/ai/report/api.ts` (ngày báo cáo mặc định = ngày VN), `features/cskh/CskhQueueView.tsx` và `CskhCallModal.tsx` (bỏ 8 chỗ cắt chuỗi `slice(11, 16)` — chỉ đúng khi BE trả `+07:00`; nay đúng cho mọi offset), `features/inventory/components/ActivityFeed.tsx` (gom "Hôm nay/Hôm qua" theo ngày VN, trước theo giờ máy), `features/orders/components/OrdersScreen.tsx` (`vnDate` bộ lọc "Hôm nay/7 ngày/30 ngày"), `features/deliveries/components/DeliveriesView.tsx` (`completed_from` = hôm nay VN), `features/purchasing/components/NhapLoForm.tsx` (ngày nhập lô mặc định = hôm nay VN).
+- Nhập giờ: `CskhCallModal.tsx` hẹn gọi lại / gia hạn dùng `vnInputToIso` (trước: `new Date(callbackTime)` hiểu theo giờ máy nên khách hẹn 09:00 ở máy New York thành 13:00 UTC = 20:00 VN). Nhãn ô thêm "(giờ Việt Nam)".
+- Tiền: `CskhQueueView.tsx`, `CskhCallModal.tsx` (`Number(x).toLocaleString + " đ"` -> `vnd`), `MyConfigScreen.tsx` (trần lệnh `${cap} đ` -> `vnd`), `CancelOrderForm.tsx` (`Tổng đơn {order.total_amount}` in chuỗi Decimal thô -> `vnd`).
+- Ngày thuần in thô `2027-09-20` -> `dd/mm/yyyy` bằng `dateOnly`: `DeliveryDetailModal.tsx` (HSD), `NhapLoForm.tsx` ("Hạn dùng"), `app/print/label/page.tsx` (HSD sớm nhất trên tem), hạn hoàn tiền ở CSKH.
+- Mock (để e2e đúng múi giờ, không đổi hợp đồng): `shared/lib/dashboardSummary.mock.ts` và `features/inventory/mock.ts` tính "ngày" theo giờ VN; `features/purchasing/mock.ts`, `features/cskh/mock.ts`; `features/guidance/mock.ts` nhãn tiền `540.000 đ` -> `540.000 ₫` (khớp `backend/apps/sales/utils.py::vnd_display`, nhãn timeline thật của BE).
+- Không đổi có chủ đích: `features/orders/mock.ts::vndD` (`300.000đ`) — mô phỏng đúng câu lỗi của BE theo contract S12/S13; các `Date.now()` dùng cho đếm ngược/TTL/cache.
+
+**TDD đỏ -> xanh.** `shared/lib/format.test.ts` (Vitest, 13 ca: tiền `"260000.00"` -> `260.000 ₫`, rác/rỗng/`NaN` -> `—`; ngày giờ qua nửa đêm VN; `todayInVietnam`; `vnInputToIso`) và `shared/lib/noLocalTime.test.ts` (quét mã nguồn: cấm `toLocaleDateString`/`toLocaleTimeString`/`Intl.DateTimeFormat`/`Date#toLocaleString`/`slice(11, 16)`/`toISOString().slice(0, 10)` ngoài `format.ts`, AC3).
+- ĐỎ (`TZ=America/New_York npx vitest run shared/lib/format.test.ts`, trước khi sửa `format.ts`): `Tests 8 failed | 3 passed (11)`. Ví dụ: `dateTime qua nửa đêm VN: expected '13:30 30-09' to be '01/10 00:30'`; `timeHM / timeHMS: expected '13:30' to be '00:30'`; `giờ ban ngày: expected '03:05 30-09' to be '30/09 14:05'`; các hàm mới `TypeError: dateTimeFull is not a function`. Quét mã nguồn ĐỎ trước khi thay nốt 2 chỗ mock: `expected [ 'features/cskh/mock.ts:395' ] to deeply equal []`.
+- XANH: `TZ=America/New_York`, `TZ=UTC`, `TZ=Asia/Ho_Chi_Minh`: `format.test.ts` 13/13 và `noLocalTime.test.ts` 7/7; `npm test` toàn bộ `Test Files 14 passed, Tests 178 passed` (cả ba múi giờ).
+
+**Playwright** (`erp-console/e2e/p8_lo8_fe_erp_tz.py`, build mock, cổng 3219, `out/` copy sang scratchpad `lo8-erp/`, dữ liệu giả). Đồng hồ trình duyệt cố định `2026-09-30T17:30:00Z` (= `00:30 ngày 01/10` giờ VN, qua nửa đêm) bằng `context.clock.set_fixed_time`; 4 context `America/New_York`, `UTC`, `Pacific/Pago_Pago` và `Asia/Ho_Chi_Minh` (mốc đối chiếu). Đi qua Tổng quan, Đơn hàng (danh sách + chi tiết + timeline), Giao hàng (danh sách + chi tiết), Lô (tồn + tab Hoạt động), Nhập lô (ngày mặc định), CSKH (danh sách + vòng đi-về hẹn gọi lại 09:00).
+- Giá trị tuyệt đối theo mốc VN: `Cập nhật 00:30`, `01/10 00:20`, `Đặt 01/10 00:20 · Tới 00:50`, timeline `01/10 00:10`, ngày nhập lô mặc định `2026-10-01`, `Trả tiền: 28/09 06:00`, hẹn `09:00` nhập ra lại `Hẹn gọi lại 09:00`; ở 3 múi giờ máy khác, chuỗi mốc giờ trên từng màn bằng đúng mốc VN, "Hôm nay/Hôm qua" của Hoạt động khớp ngày VN. Bộ quét tiền: 0 token sai kiểu (`\d{4,} ₫` hoặc hậu tố `đ`) ở 8 màn x 4 múi giờ, 60 số tiền `x.xxx ₫` trên Tổng quan/Đơn/Lô; mobile 390 px không cuộn ngang.
+- XANH: `71/71 PASS`. ĐỎ trên bản cũ (`git stash -u -- erp-console`, build mock, chạy cùng script, rồi `stash pop`): `42/71 PASS, 29 FAIL` — ví dụ `overview: ['Cập nhật 13:30'] vs ['Cập nhật 00:30']` (New York), `['Cập nhật 17:30']` (UTC), ngày nhập lô `2026-09-30` thay vì `2026-10-01`, hẹn 09:00 ở New York hiện `13:00`, hậu tố `0 đ` trong nhãn timeline.
+- Hồi quy trên build mock mới, KHÔNG sửa assert nào (không có assert chuỗi giờ/tiền bị lệch): `e2e/p8_lo7_fe_erp.py` 79/79, `e2e/p8_lo5_fe_lo_qua_han.py` 77/77, `e2e/p8_lo6_fe_sr19_sr20.py` 74/74. Đã tắt server.
+- Ảnh (dữ liệu giả, giờ máy New York): `doc/features/2026-09-30-sua-loi-review/qa-lo8/lo8-erp-{1-tong-quan-ny,2-don-chi-tiet-ny,3-lo-ny,4-cskh-ny,5-don-chi-tiet-mobile-ny}.png`.
+
+**Kiểm chứng (chạy trong lượt này):** `erp-console`: `./node_modules/.bin/tsc --noEmit` exit 0; `npm test` 14 file, 178 test đạt; build thật `rm -rf .next out && NEXT_PUBLIC_USE_MOCK=0 npm run build` xong; `node scripts/check-no-mock.mjs` XANH (13 tệp mock, 32 chuỗi seed, 131 tệp build); `node scripts/check-ai-chunks.mjs` XANH (layout gốc 308,3 kB; console 373,4 kB; /orders 433,4 kB; /orders/payments 446,5 kB; /orders/refunds 409,1 kB; /inventory 388,2 kB); `grep -rlE "demo1234|0900000|Khách Giả|mockGet|__caveMock" out/` = 0 tệp. `erp-console/out/` hiện là bản thật.
+
+**Lệch contract / còn nợ (báo Duy/BE, không tự sửa):**
+- Câu lỗi BE theo contract S12/S13 viết tiền là `300.000đ` (`backend/apps/sales/utils.py::vnd_display_msg`, `beErrors.mock.ts` "tối thiểu 1đ"), còn nhãn timeline và FE dùng `540.000 ₫`. AC1 "thống nhất một kiểu" cần BE đổi câu lỗi sang `₫` (thuộc backend, ngoài phạm vi lô này); FE hiện in nguyên văn thông điệp BE nên sẽ tự khớp khi BE đổi.
+- Thứ tự thu gọn "dd/mm hh:mm" (không năm) ở danh sách vẫn như cũ; chỗ cần năm (lịch sử phiên bản, cột cập nhật bài viết, ngày báo cáo) dùng `dateTimeFull`/`date`.
+- Các màn đọc `created_at`/`at` từ BE giả định BE trả ISO có offset hoặc `Z` (Django DRF với `USE_TZ`); nếu BE trả chuỗi không offset thì `new Date()` hiểu theo giờ máy — chưa kiểm với backend thật trong lô này.
+- Mock `cskh` vẫn dùng vài màu hex cứng trong `CskhQueueView.tsx`/`CskhCallModal.tsx` (nợ từ trước, không đổi trong lô này).
+
+## Lô 8 — BE
+
+**SR-25 phần BE (AC1 tiền `x.xxx ₫`, AC2 giờ GMT+7, AC5 tên tiếng Anh).** Không đổi model/migration/contract JSON: `refund.amount` trong `cancel_notice` và CSKH vẫn là chuỗi số thô (`"300000"`), ISO trong API giữ nguyên (có offset). Chỉ đổi CHUỖI người đọc do BE dựng.
+
+**Phát hiện lệch giả định đầu vào:** `vnd_display` đã trả `300.000 ₫` (dấu cách thường) từ trước; chuỗi `300.000đ` đến từ `vnd_short` (thông điệp lỗi S12/S13) cùng nhiều literal `{amount}đ`. Không có `vnd_display_msg` như ghi chú FE ERP (tên thật là `vnd_short`).
+
+**File đã sửa**
+- Mới `backend/apps/common/formatting.py`: `format_vnd`, `format_local_time`, `format_local_date`, `format_local_datetime` (mọi chuỗi giờ/ngày qua `timezone.localtime`).
+- `apps/sales/utils.py`: `vnd_display` gọi `format_vnd`; **xoá `vnd_short`**; `gen_code` lấy ngày mã chứng từ theo giờ VN (`SO-261001-…` khi tạo lúc 00:30 VN, trước đây theo ngày UTC).
+- Thông điệp lỗi: `sales/payments/services.py` (`AMOUNT_MIN_MSG` "Số tiền tối thiểu 1 ₫.", BR-TT-09 "Tổng tiền đã nhận 300.000 ₫ < tổng đơn 540.000 ₫."), `sales/refunds/services.py` (`REFUND_AMOUNT_MIN_MSG`, 3 câu "Vượt số … tối đa x ₫").
+- `sales/orders/customer_notices.py`: câu báo khách tự huỷ dùng `format_vnd` ("Số tiền 300.000 ₫ sẽ được hoàn…", trước đây `300000đ` không có dấu chấm); ngày hạn/ngày hoàn qua `format_local_date`.
+- `sales/payments/auto_confirm.py`: lý do chuyển Chủ "Giao dịch 400.000 ₫ khác tổng đơn 500.000 ₫" (trước đây `400000.00đ`).
+- `ai/execution/pipeline.py`: việc chuyển tiền "Chuyển 300.000 ₫ cho phiếu RF-…" (trước đây `300000`).
+- `sales/management/commands/backfill_credit_notes.py`: "số tiền bán 300.000 ₫" (trước `:.0f`).
+- `__str__` (hiện ở Django admin): `PaymentTransaction`, `Refund`, `PurchaseCost`, `PurchaseCostAllocation`, `PurchaseInvoice`, `ItemPrice` dùng `format_vnd`; `AuditLog.__str__` theo giờ VN (trước đây in giờ UTC).
+- Giờ VN: `delivery/cskh/serializers.py` (`refund.deadline` trước đây `strftime` trên UTC → lệch 1 ngày khi phiếu tạo 00:00–07:00 VN), `delivery/cskh/services.py` (câu "đang được … xử lý tới HH:MM" dùng `format_local_time`).
+
+**Đã rà, KHÔNG cần đổi:** timeline (`orders/payments/refunds/batches`) chỉ dùng `vnd_display`, không có giờ trong nhãn; guidance `reasons.py` không có tiền (đã có test quét); `shop_api`/serializers content/catalog/staff đã `localtime(...).isoformat()`; ISO thô (`dashboard_api`, `delivery`, `ai`) giữ nguyên theo giao ước; không có CSV/báo cáo AI dựng chuỗi giờ/tiền (báo cáo AI chỉ trả ISO).
+
+**TDD.** ĐỎ trước khi sửa (chạy 7 file liên quan): `test_p8_lo8_gmt7` `cancel_notice_message_tien_vnd_dau_cham` ("Số tiền 300000đ sẽ được hoàn" thay vì "300.000 ₫"), `cskh_queue_refund_deadline_theo_ngay_vn` (`'2026-10-30' != '2026-10-31'`); `test_dw27_confirm_refund.test_p8_lo8_sr25_ac1_task_summary…` ("Chuyển 300000 cho phiếu" ≠ "Chuyển 300.000 ₫ cho phiếu"); `test_qa_lo4_backfill_leak.test_p8_lo8_sr25_ac1_dry_run…` ("số tiền bán 300000"); `test_dw26_auto_confirm.test_p8_lo8_sr25_ac1_underpaid_reason…` ("Giao dịch 400000.00đ …", đỏ khi tạm stash `auto_confirm.py`); `test_p8_lo8_vnd_gmt7` ImportError `apps.common.formatting` (module chưa có); assert cũ đổi sang `₫` đỏ (7 dòng trong 4 file) ("…1đ." vs "…1 ₫.", "60.000đ." …). Sau sửa: xanh hết.
+
+**Test mới (19):** `apps/common/tests/test_p8_lo8_vnd_gmt7.py` (12: `format_vnd` dấu chấm/không nbsp/half-up, `vnd_display` cùng kết quả, `vnd_short` đã bỏ, `format_local_*` với datetime 17:30Z ra `00:30`/`2026-10-01`, cả khi truyền datetime múi giờ New York, `AuditLog.__str__`, 4 nhóm `__str__` tiền, `gen_code` với 17:30Z → `SO-261001-`); `apps/delivery/tests/test_p8_lo8_gmt7.py` (4: message khách, hạn hoàn ở CSKH và Shop theo ngày VN, câu "tới 00:30" + ISO `2026-09-30T17:30:00+00:00` giữ nguyên); 1 test trong `test_dw27_confirm_refund.py`, 1 trong `test_qa_lo4_backfill_leak.py`, 1 trong `test_dw26_auto_confirm.py`.
+
+**Assert cũ đã đổi (chỉ các assert chuỗi `đ`, 9 dòng, không đổi gì khác):**
+- `sales/payments/tests/test_l8_tien_bosung.py`: `MIN_MSG` = "Số tiền tối thiểu 1 ₫."; 2 assert "Số tiền hoàn tối thiểu 1 ₫."; 1 assert "tối đa 60.000 ₫."
+- `sales/payments/tests/test_s12_payment_queue.py`: "Tổng tiền đã nhận 300.000 ₫ < tổng đơn 540.000 ₫."
+- `sales/refunds/tests/test_s13_refund_payment.py`: "tối đa 100.000 ₫."
+- `sales/refunds/tests/test_s15_refund_from_order.py`: "còn được hoàn tối đa 240.000 ₫."
+- `sales/payments/tests/test_p8_auto_confirm_idempotent.py`: `assertIn("1000", …)` → `"1.000 ₫"` và `"2000"` → `"2.000 ₫"` (số tiền lý do chuyển Chủ).
+
+**Kiểm chứng (chạy trong lượt này):** `cd backend && DJANGO_DEBUG=1 env -u DATABASE_URL .venv/bin/python manage.py test` → `Ran 1667 tests … OK` (1648 cũ + 19 mới, 0 failure); `makemigrations --check --dry-run` → `No changes detected`.
+
+**Còn nợ / báo Duy:**
+- Contract chuỗi lỗi S12/S13 đổi `300.000đ` → `300.000 ₫` (và "1đ" → "1 ₫"): FE in nguyên văn nên tự khớp; `erp-console/features/**/beErrors.mock.ts` còn viết `1đ` (thuộc FE, ngoài phạm vi BE).
+- `apps/purchasing/receipts/services.py:105` mặc định `received_date = timezone.now().date()` (ngày UTC): tạo lô lúc 00:00–07:00 VN cho ra ngày hôm trước. Là giá trị lưu chứ không phải chuỗi định dạng nên KHÔNG sửa trong lô này; đề xuất đổi thành `timezone.localdate()` (một dòng) khi Duy/Tech Lead duyệt, vì `batch_id` dùng ngày này.
+- Chuỗi trong `AuditLog.changes`/`extra` (ISO `isoformat()` UTC) giữ nguyên là dữ liệu máy đọc, không phải câu chữ hiển thị.
+
+### L8-2 (Medium, techlead) và N8-3 — Lô 8 BE
+
+- **L8-2:** `backend/apps/purchasing/receipts/services.py:105` `received_date = timezone.now().date()` → `timezone.localdate()` (ngày nhập mặc định theo giờ VN, BR-MH-01). Không migration, không đụng dữ liệu cũ. `batch_id` (`{item.code}-{received_date:%y%m%d}-…`) và `expiry_date` đều tính từ `received_date` nên tự đúng theo.
+- **TDD** `apps/purchasing/receipts/tests/test_p8_lo8_received_date_vn.py` (4 test, cố định `django.utils.timezone.now`). ĐỎ trước khi sửa: `test_l8_2_api_khong_truyen_ngay_sau_nua_dem_vn_lay_ngay_vn` và `test_l8_2_service_khong_truyen_ngay_sau_nua_dem_vn` → `AssertionError: datetime.date(2026, 9, 30) != datetime.date(2026, 10, 1)`. XANH sau sửa: 17:30Z → `received_date == 2026-10-01`, `batch_id` chứa `-261001-`, `expiry_date` = 01/10 + hạn dùng (30 ngày → 2026-10-31; service mặc định 90 ngày); ca 10:00Z vẫn `2026-09-30` / `-260930-`; `received_date` truyền tường minh vẫn được giữ.
+- **Lệnh AI `nhap_lo`:** là chính endpoint `POST /api/purchasing/receipts/nhap-lo/` (khai qua decorator `ai_command` ở `receipts/api.py`) gọi cùng `create_and_submit_receipt`, nên được test API bao phủ; không có đường AI riêng khác để test.
+- **N8-3:** `format_vnd(None)` → `"—"` (test `test_n8_3_format_vnd_none_ra_gach_ngang`, đỏ trước: `TypeError: conversion from NoneType to Decimal`); `vnd_display(None)` cùng kết quả.
+- **Rà `now().date()` trong `backend/apps/**` (không test):** chỉ còn đúng 1 chỗ (đã sửa ở trên). Không có `date.today()`, `utcnow()`, `.date()` trên datetime UTC nào khác. Các chỗ ngày nghiệp vụ còn lại đã dùng `timezone.localdate()` sẵn (`sales/orders/services.py:191`, `catalog/pricing/services.py:12`, `inventory/batches/services.py:45,511`, `inventory/batches/next_steps.py:59`, `reports/dashboard_api.py:52`, `ai/report/api.py:45`); `ai/report/services.py:16-23` dựng mốc đầu/cuối ngày bằng `make_aware(..., get_current_timezone())` = Asia/Ho_Chi_Minh nên đúng.
+- **Chỉ liệt kê, KHÔNG sửa (nằm trong test, dùng ngày UTC làm dữ liệu vào tường minh):** `ai/execution/tests/test_dw19_level_b.py` (7 chỗ `timezone.now().date().isoformat()`), `ai/execution/tests/test_call_api.py:58-59`, `ai/actions/tests/test_actions_api.py:42`, `ai/actions/tests/test_p8_lo7_qa_edges.py:145`, `ai/execution/tests/test_p8_lo7_qa_edges.py:78-79`. Có thể lệch 1 ngày nếu test chạy 00:00–07:00 VN, nhưng đây là dữ liệu dựng của test, không phải hành vi sản phẩm; không đổi trong lô này.
+- **Kiểm chứng (chạy trong lượt này):** `DJANGO_DEBUG=1 env -u DATABASE_URL .venv/bin/python manage.py test` → `Ran 1672 tests … OK` (1667 + 4 test L8-2 + 1 test N8-3); `makemigrations --check --dry-run` → `No changes detected`.
+
+### Lô 8 — FE ERP: L8-1 / L8-3 (sau review Tech Lead)
+Chỉ sửa trong `erp-console/`; không đụng `frontend/` (phần Shop của L8-3 để P8b).
+
+**L8-1 — tiền trong câu lỗi mock cùng kiểu `₫` như BE.** BE nay trả `300.000 ₫`/`1 ₫` (`vnd_display`).
+- `features/orders/mock.ts::vndD` gọi `vnd()` của `shared/lib/format.ts` (bỏ `toLocaleString(...)+"đ"` tự chế); chú thích "tối thiểu 1 ₫" hai chỗ.
+- `shared/lib/beErrors.mock.ts`: `TT_AMOUNT_MIN` "Số tiền tối thiểu 1 ₫." và `HT_AMOUNT_MIN` "Số tiền hoàn tối thiểu 1 ₫.".
+- `e2e/s12_s13_queue.py` dựng kỳ vọng bằng `" ₫"` (S12-AC4 `paid/total`, S13-AC3 `max`).
+- ĐỎ (mock cũ `300.000đ`, script mới, build mock `out_red`): `95/100`, `FAIL S12-AC4 … 'Tổng tiền đã nhận 1.535.000đ < tổng đơn 1.635.000đ.'` (kỳ vọng `… ₫`) và S13-AC3.
+- XANH: S12-AC4 đạt; `s14_s16_cancel_refund.py` 43/43.
+- Trong lúc chạy lại `s12_s13_queue.py` thấy thêm 2 lỗi CŨ của chính script (không do L8): (a) selector `.queue-error > span` trúng icon `error` (icon là `<span>` đầu) và UI nay nối thêm ` (BR-xx)` sau thông điệp BE → đổi sang `.queue-error > span:last-child` + `startswith(be(...))` (S12-AC5, S13-AC3); (b) 2 ca "vùng bấm chi tiết ≥ 44px" ở 360 px (`Làm mới 88x28`, `Thực hiện 79x25`) vẫn ĐỎ, cả trước lẫn sau khi sửa — nợ UI cũ của màn Hàng chờ thanh toán, không thuộc SR-25. Kết quả cuối `98/100`.
+
+**L8-3 — `shared/lib/noLocalTime.test.ts` chặn thêm đường vòng** (mọi file `app/ features/ shared/` trừ `format.ts` và test; bỏ qua dòng chú thích thuần):
+`getHours/getMinutes/getSeconds/getMilliseconds/getDay`, `getDate/getMonth/getFullYear`, `setHours/…/setFullYear`, `toISOString().split|slice|substring|substr`, `toDateString/toTimeString`, mọi `.toLocaleString(`, và tiền hậu tố `đ` (`1đ`, `"đ"`, `${x} đ`). Tổng 14 ca.
+- Kiểm thử chính mẫu quy tắc: thả tạm một file có đủ các kiểu trên → 7 ca mới đỏ đúng dòng; xoá file → xanh.
+- Chỗ bị bắt trong mã thật: 0 chỗ dùng Date/`toLocaleString`; chỉ bắt 2 chú thích cuối dòng `tối thiểu 1đ` ở `features/orders/mock.ts:768,1167` (đã đổi thành `1 ₫`). `Math.round(n).toLocaleString` chỉ còn trong `format.ts` (`vnd`, `kg`), là chỗ được phép. Không cần ngoại lệ nào.
+
+**Kiểm chứng (chạy trong lượt này):** `tsc --noEmit` exit 0; `TZ=America/New_York npm test` và `TZ=UTC npm test`: 14 file, 185 test đạt; Playwright trên build mock: `s12_s13_queue` 98/100 (2 ca nợ cũ nêu trên), `s14_s16_cancel_refund` 43/43, `p8_lo8_fe_erp_tz` 71/71, `p8_lo7_fe_erp` 79/79, `p8_lo5_fe_lo_qua_han` 77/77, `p8_lo6_fe_sr19_sr20` 74/74. Build thật `NEXT_PUBLIC_USE_MOCK=0`: xong; `check-no-mock` XANH (13 file mock, 32 chuỗi seed, 131 file build); `check-ai-chunks` XANH; `grep` chuỗi mock trong `out/` = 0. `erp-console/out/` là bản thật; server đã tắt.

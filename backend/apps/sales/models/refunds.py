@@ -5,6 +5,8 @@ from django.conf import settings
 from django.core.validators import MinValueValidator
 from django.db import models
 
+from apps.common.formatting import format_vnd
+
 from .invoices import SalesInvoice
 from .payments import PaymentTransaction
 
@@ -86,4 +88,4 @@ class Refund(models.Model):
         ]
 
     def __str__(self):
-        return f"HT-{self.pk} · {self.amount}đ ({self.get_status_display()})"
+        return f"HT-{self.pk} · {format_vnd(self.amount)} ({self.get_status_display()})"

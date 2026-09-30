@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Icon } from "@/shared/ui/Icon";
 import { listItems } from "@/features/catalog/api";
 import { useAuth } from "@/features/auth/components/AuthProvider";
+import { dateOnly, todayInVietnam } from "@/shared/lib/format";
 import type { CatalogItem } from "@/features/catalog/types";
 import { cancelPurchaseReceipt, fetchSuppliers, submitNhapLo } from "../api";
 import type { NhapLoLineInput, NhapLoResponse, Supplier } from "../types";
@@ -23,11 +24,7 @@ function generateUUID(): string {
 }
 
 function getTodayString(): string {
-  const d = new Date();
-  const year = d.getFullYear();
-  const month = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
+  return todayInVietnam();
 }
 
 export function NhapLoForm() {
@@ -259,7 +256,7 @@ export function NhapLoForm() {
                 {b.batch_id}
               </span>{" "}
               — {b.qty_available} kg —{" "}
-              {b.status === "CANCELLED" ? "Trạng thái: Đã huỷ" : `Hạn dùng: ${b.expiry_date}`}
+              {b.status === "CANCELLED" ? "Trạng thái: Đã huỷ" : `Hạn dùng: ${dateOnly(b.expiry_date)}`}
             </li>
           ))}
         </ul>

@@ -179,6 +179,17 @@ class ConfirmRefundAiTests(APITestCase):
         self.refund.refresh_from_db()
         self.assertEqual(self.refund.status, Refund.Status.PENDING)
 
+    def test_p8_lo8_sr25_ac1_task_summary_tien_vnd_dau_cham(self):
+        """P8 Lô 8 SR-25: câu việc chuyển tiền hiện `300.000 ₫`, không phải `300000`."""
+        res = self.client_chu.post(
+            "/api/ai/commands/sales.refund.confirm/call/",
+            {"target_id": self.refund.id, "args": {}},
+            format="json",
+        )
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        summary = AiAction.objects.get(id=res.data["action_id"]).args["summary"]
+        self.assertEqual(summary, f"Chuyển 300.000 ₫ cho phiếu RF-{self.refund.id}, rồi nhập mã giao dịch")
+
     def test_dw27_ac2_args_with_bank_txn_ref_never_auto_executed(self):
         """
         DW-27-AC2 (lỗi): Dù args do model điền có bank_txn_ref

@@ -22,7 +22,7 @@ from apps.sales.payments import services as payment_services
 WEBHOOK_URL = "/api/internal/payments/sepay-webhook/"
 QUEUE_URL = "/api/sales/payments/"
 REFUND_URL = "/api/sales/refunds/create/"
-MIN_MSG = "Số tiền tối thiểu 1đ."
+MIN_MSG = "Số tiền tối thiểu 1 ₫."
 
 
 class L8MinAmountParseTests(SimpleTestCase):
@@ -99,7 +99,7 @@ class L8MinAmountApiTests(L8Base):
                 REFUND_URL, {**source, "amount": "0.5", "reason": "x"}, format="json",
             )
             self.assertEqual(resp.status_code, 400, (source, resp.content))
-            self.assertEqual(resp.json(), {"code": "BR-HT-04", "detail": "Số tiền hoàn tối thiểu 1đ."})
+            self.assertEqual(resp.json(), {"code": "BR-HT-04", "detail": "Số tiền hoàn tối thiểu 1 ₫."})
         self.assertFalse(Refund.objects.exists())
 
     def test_l8_br_ht_04_service_hoa_don_duoi_1d_bi_tu_choi(self):
@@ -108,7 +108,7 @@ class L8MinAmountApiTests(L8Base):
 
         paid = self._paid_order(phone="0903333333", txn="FTPAID")
         invoice = SalesInvoice.objects.get(sales_order=paid)
-        with self.assertRaisesMessage(BusinessError, "Số tiền hoàn tối thiểu 1đ."):
+        with self.assertRaisesMessage(BusinessError, "Số tiền hoàn tối thiểu 1 ₫."):
             refund_services.create_refund(invoice=invoice, amount=Decimal("0.5"), is_partial=True,
                                           reason="x", actor=self.chu)
         self.assertFalse(Refund.objects.exists())
@@ -212,7 +212,7 @@ class L8OverpaidFirstTimeTests(L8Base):
             format="json",
         )
         self.assertEqual(resp.status_code, 400, resp.content)
-        self.assertEqual(resp.json()["detail"], "Vượt số tiền còn được hoàn: tối đa 60.000đ.")
+        self.assertEqual(resp.json()["detail"], "Vượt số tiền còn được hoàn: tối đa 60.000 ₫.")
 
         resp = client_for(self.chu).post(
             REFUND_URL, {"payment_transaction": extra.pk, "amount": "60000", "reason": "thừa"},

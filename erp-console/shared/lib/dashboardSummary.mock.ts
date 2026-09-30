@@ -15,6 +15,7 @@
 //   window.__caveMock.dashboardJson("loc")                — JSON mock đúng như người đó nhận (e2e so với bản cũ)
 
 import type { MockResponse } from "./http";
+import { dateKeyInVietnam, todayInVietnam } from "./format";
 import type {
   BatchStatus,
   DashboardBatch,
@@ -110,16 +111,14 @@ const LEDGER: SeedLedger[] = [
 
 const REVENUE_TODAY = 9_291_000; // tổng hoá đơn ISSUED hôm nay (không suy ra từ seed đơn)
 
+// Ngày của mock tính theo giờ VN (SR-25): "ngày" là một Date đặt ở 00:00 UTC của ngày lịch VN, nên mọi so sánh/định dạng
+// bên dưới không phụ thuộc múi giờ máy.
 function localIsoDate(d: Date): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
+  return dateKeyInVietnam(d); // 00:00 UTC = 07:00 VN cùng ngày
 }
 function addDays(base: Date, days: number): Date {
-  const d = new Date(base.getFullYear(), base.getMonth(), base.getDate());
-  d.setDate(d.getDate() + days);
-  return d;
+  const [y, m, day] = todayInVietnam(base).split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, day + days));
 }
 
 /**

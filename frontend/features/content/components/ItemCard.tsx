@@ -61,7 +61,7 @@ export default function ItemCard({ itemCode, postSlug, item, loading }: ItemCard
         <span className={s.tag}>Mặt hàng đang bán</span>
         <h4 className={s.name}>{item.name}</h4>
         <div className={s.priceBox}>
-          <span className={s.price}>{formatVnd(Number(item.price))}</span>
+          <span className={s.price}>{formatVnd(item.price)}</span>
           <span className={s.unit}> / kg</span>
         </div>
       </div>

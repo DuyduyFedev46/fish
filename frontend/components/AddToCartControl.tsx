@@ -9,12 +9,12 @@ export default function AddToCartControl({ item }: { item: CatalogItem }) {
   const [qty, setQty] = useState(1);
   const [added, setAdded] = useState(false);
 
-  const outOfStock = item.sellable_qty <= 0;
+  const outOfStock = !(Number(item.sellable_qty) > 0);
 
   function handleAdd() {
     if (qty <= 0 || outOfStock) return;
     addItem(
-      { item_code: item.item_code, name: item.name, price: item.price, unit: "Kg" },
+      { item_code: item.item_code, name: item.name, price: Number(item.price), unit: "Kg" },
       qty
     );
     setAdded(true);

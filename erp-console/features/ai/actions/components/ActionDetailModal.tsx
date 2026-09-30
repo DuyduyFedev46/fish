@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import type { AiActionDetail, AiActionRow } from "../../types";
+import { timeHMS } from "@/shared/lib/format";
 
 interface ActionDetailModalProps {
   action: AiActionDetail | AiActionRow | null;
@@ -165,7 +166,7 @@ export function ActionDetailModal({
 
           {action.expires_at && isPending && (
             <div className="text-xs text-amber-600 dark:text-amber-400">
-              Hết hạn duyệt lúc: {new Date(action.expires_at).toLocaleTimeString("vi-VN")}
+              Hết hạn duyệt lúc: {timeHMS(action.expires_at)}
             </div>
           )}
 
@@ -173,7 +174,7 @@ export function ActionDetailModal({
             <div className="rounded-md border border-purple-200 bg-purple-50 p-2.5 text-xs text-purple-900 dark:border-purple-800 dark:bg-purple-950 dark:text-purple-200">
               <span className="font-semibold">Dự kiến tự thực thi sau:</span>{" "}
               <span className="font-mono font-bold">{formatMmSs(scheduledSeconds)}</span> (lúc{" "}
-              {new Date(action.execute_after).toLocaleTimeString("vi-VN")})
+              {timeHMS(action.execute_after)})
             </div>
           )}
 
@@ -181,7 +182,7 @@ export function ActionDetailModal({
             <div className="rounded-md border border-amber-200 bg-amber-50 p-2.5 text-xs text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200">
               <span className="font-semibold">Thời hạn hoàn tác còn lại:</span>{" "}
               <span className="font-mono font-bold">{formatMmSs(undoSeconds)}</span> (trước{" "}
-              {new Date(action.undo_until!).toLocaleTimeString("vi-VN")})
+              {timeHMS(action.undo_until)})
             </div>
           )}
 

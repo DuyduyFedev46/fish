@@ -1,0 +1,187 @@
+# P8 Lô 8 — SR-25 (ERP): tiền VNĐ "x.xxx ₫", ngày giờ luôn theo giờ Việt Nam (GMT+7) bất kể múi giờ trình duyệt.
+# Mock (NEXT_PUBLIC_USE_MOCK=1), dữ liệu giả. Đồng hồ trình duyệt CỐ ĐỊNH ở 2026-09-30T17:30:00Z = 00:30 ngày 01/10 giờ VN
+# (qua nửa đêm VN, còn ở New York/Pago Pago vẫn là 30/09) nên giờ hiển thị đúng/sai phân biệt được rõ.
+# Chạy:
+#   cd erp-console && NEXT_PUBLIC_USE_MOCK=1 npm run build && cp -R out <thư-mục-out-riêng> && (cd <thư-mục-out-riêng> && python3 -m http.server 3219 --bind 127.0.0.1 &)
+#   BASE=http://127.0.0.1:3219 SHOTS=<thư mục ảnh> python3 e2e/p8_lo8_fe_erp_tz.py      # tắt server rồi build lại bản thật
+import os
+import re
+
+from playwright.sync_api import sync_playwright
+
+BASE = os.environ.get("BASE", "http://127.0.0.1:3219")
+SHOTS = os.environ.get("SHOTS", "/tmp")
+FIXED = "2026-09-30T17:30:00Z"
+TZS = ["America/New_York", "UTC", "Pacific/Pago_Pago", "Asia/Ho_Chi_Minh"]  # cuối = mốc đối chiếu (giờ máy = giờ VN)
+results = []
+
+
+def ok(name, cond, extra=""):
+    results.append((name, bool(cond), extra))
+    print(("PASS" if cond else "FAIL"), name, extra)
+
+
+def login(page, user, pw="demo1234"):
+    page.goto(BASE + "/login/")
+    page.wait_for_load_state("networkidle")
+    page.fill("#u", user)
+    page.fill("#p", pw)
+    page.get_by_role("button", name="Đăng nhập").click()
+    page.wait_for_function("() => !window.location.href.includes('/login/')", timeout=10_000)
+    page.wait_for_load_state("networkidle")
+
+
+def new_ctx(browser, tz, w=1280, h=900):
+    ctx = browser.new_context(viewport={"width": w, "height": h}, timezone_id=tz, locale="vi-VN", reduced_motion="reduce")
+    ctx.clock.set_fixed_time(FIXED)
+    return ctx
+
+
+def goto(page, path):
+    page.goto(BASE + path)
+    page.wait_for_load_state("networkidle")
+    page.wait_for_timeout(500)
+
+
+TIME_TOKENS = re.compile(r"\d{2}/\d{2} \d{2}:\d{2}|(?:Cập nhật|Tới|Trả tiền:|Hẹn gọi lại) \d{2}:\d{2}|Hôm nay|Hôm qua")
+
+
+def time_tokens(text):
+    return TIME_TOKENS.findall(text)
+
+
+def money_bad(text):
+    """Số tiền sai kiểu: dính liền 4+ chữ số trước ₫ (thiếu dấu chấm), hoặc hậu tố 'đ' thay vì '₫'."""
+    return re.findall(r"\d{4,}\s?₫", text) + re.findall(r"\d\s?đ(?!\w)", text)
+
+
+def money_good(text):
+    return re.findall(r"\d{1,3}(?:\.\d{3})+ ₫", text)
+
+
+def collect(browser, tz):
+    """Trả về dict văn bản các màn (Tổng quan, Đơn + chi tiết, Giao hàng, Lô, hoạt động kho, CSKH) dưới múi giờ `tz`."""
+    out = {}
+    ctx = new_ctx(browser, tz)
+    page = ctx.new_page()
+    errs = []
+    page.on("pageerror", lambda e: errs.append(str(e)))
+    login(page, "loc")
+    goto(page, "/overview/")
+    out["overview"] = page.inner_text("body")
+    if tz == "America/New_York":
+        page.screenshot(path=f"{SHOTS}/lo8-erp-1-tong-quan-ny.png")
+    goto(page, "/orders/")
+    out["orders"] = page.inner_text("body")
+    page.locator("button.order-open").first.click()
+    dlg = page.get_by_role("dialog")
+    dlg.wait_for(timeout=10_000)
+    page.wait_for_timeout(900)
+    out["order_detail"] = dlg.inner_text()
+    if tz == "America/New_York":
+        page.screenshot(path=f"{SHOTS}/lo8-erp-2-don-chi-tiet-ny.png")
+    goto(page, "/deliveries/")
+    out["deliveries"] = page.inner_text("body")
+    page.locator("[class*='card'], tr").nth(1).click()
+    d2 = page.get_by_role("dialog")
+    d2.wait_for(timeout=10_000)
+    page.wait_for_timeout(500)
+    out["delivery_detail"] = d2.inner_text()
+    goto(page, "/inventory/")
+    out["inventory"] = page.inner_text("body")
+    if tz == "America/New_York":
+        page.screenshot(path=f"{SHOTS}/lo8-erp-3-lo-ny.png")
+    page.get_by_role("tab", name="Hoạt động").click()
+    page.wait_for_timeout(700)
+    out["activity"] = page.inner_text("body")
+    goto(page, "/purchasing/")
+    page.wait_for_selector("#received-date", timeout=10_000)
+    out["received_date_default"] = page.input_value("#received-date")
+    ctx.close()
+
+    ctx = new_ctx(browser, tz)
+    page = ctx.new_page()
+    page.on("pageerror", lambda e: errs.append(str(e)))
+    login(page, "cs1")
+    goto(page, "/cskh/")
+    out["cskh"] = page.inner_text("body")
+    if tz == "America/New_York":
+        page.screenshot(path=f"{SHOTS}/lo8-erp-4-cskh-ny.png")
+    # Vòng đi-về giờ nhập: ô datetime-local là GIỜ VN -> hẹn 09:00 phải hiện lại 09:00 (không lệch theo múi giờ máy)
+    card = page.locator("[class*='queueCard']", has_text="DH-260928-0030")
+    card.first.click()
+    modal = page.get_by_role("dialog")
+    modal.wait_for(timeout=10_000)
+    page.wait_for_timeout(500)
+    modal.get_by_role("button", name="Hẹn gọi lại").first.click()
+    modal.locator("input[type=datetime-local]").fill("2026-10-02T09:00")
+    modal.get_by_role("button", name="Lưu hẹn gọi lại").click()
+    page.wait_for_timeout(1000)
+    page.wait_for_load_state("networkidle")
+    if page.get_by_role("dialog").count():
+        page.keyboard.press("Escape")
+        page.wait_for_timeout(300)
+    page.get_by_role("button", name="Hẹn gọi lại", exact=True).first.click()
+    page.wait_for_timeout(700)
+    out["cskh_after_callback"] = page.inner_text("body")
+    ctx.close()
+    out["errs"] = errs
+    return out
+
+
+def main():
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        data = {tz: collect(browser, tz) for tz in TZS}
+
+        base = data["Asia/Ho_Chi_Minh"]
+        # ---- giá trị tuyệt đối (mốc VN) -> chứng minh đúng, không chỉ nhất quán
+        ok("AC2 Tổng quan: 'Cập nhật 00:30' (17:30Z = 00:30 VN)", "Cập nhật 00:30" in base["overview"])
+        ok("AC2 Lô: 'Cập nhật 00:30'", "Cập nhật 00:30" in base["inventory"])
+        ok("AC2 Đơn hàng: dòng đầu '01/10 00:20'", "01/10 00:20" in base["orders"], str(time_tokens(base["orders"])[:4]))
+        ok("AC2 Chi tiết đơn: 'Đặt 01/10 00:20', 'Tới 00:50', timeline '01/10 00:10'",
+           all(x in base["order_detail"] for x in ("Đặt 01/10 00:20", "Tới 00:50", "01/10 00:10", "01/10 00:20 · Hệ thống")))
+        ok("AC4 Ngày nhập lô mặc định = 2026-10-01 (hôm nay VN)", base["received_date_default"] == "2026-10-01", base["received_date_default"])
+        ok("AC2 CSKH: 'Trả tiền: 28/09 06:00'", "Trả tiền: 28/09 06:00" in base["cskh"])
+        ok("AC4 CSKH: hẹn gọi lại nhập 09:00 hiện 'Hẹn gọi lại 09:00'", "Hẹn gọi lại 09:00" in base["cskh_after_callback"])
+
+        # ---- mọi múi giờ máy khác phải cho đúng kết quả như giờ VN
+        for tz in TZS[:-1]:
+            d = data[tz]
+            for key in ("overview", "orders", "order_detail", "inventory", "activity", "cskh", "cskh_after_callback"):
+                ok(f"AC2 [{tz}] {key}: giờ/ngày hiển thị = giờ VN ({len(time_tokens(base[key]))} mốc)",
+                   time_tokens(d[key]) == time_tokens(base[key]) and len(time_tokens(base[key])) > 0,
+                   f"{time_tokens(d[key])[:6]} vs {time_tokens(base[key])[:6]}")
+            ok(f"AC4 [{tz}] Ngày nhập lô mặc định = ngày VN", d["received_date_default"] == "2026-10-01", d["received_date_default"])
+            ok(f"AC2 [{tz}] HSD phiếu giao dạng dd/mm/yyyy", "HSD: 20/09/2027" in d["delivery_detail"], "")
+            ok(f"[{tz}] không có pageerror", not d["errs"], str(d["errs"][:2]))
+
+        # ---- tiền
+        for tz in TZS:
+            d = data[tz]
+            for key in ("overview", "orders", "order_detail", "inventory", "deliveries", "delivery_detail", "activity", "cskh"):
+                bad = money_bad(d[key])
+                ok(f"AC1 [{tz}] {key}: không có tiền sai kiểu", not bad, str(bad[:3]))
+        allmoney = sum(len(money_good(base[k])) for k in ("overview", "orders", "order_detail", "inventory"))
+        ok("AC1 có >= 30 số tiền dạng x.xxx ₫ trên Tổng quan/Đơn/Lô", allmoney >= 30, str(allmoney))
+
+        # ---- mobile 390 + ảnh (giờ máy New York)
+        ctx = new_ctx(browser, "America/New_York", 390, 800)
+        page = ctx.new_page()
+        login(page, "loc")
+        goto(page, "/orders/")
+        page.locator("button.order-open").first.click()
+        page.get_by_role("dialog").wait_for(timeout=10_000)
+        page.wait_for_timeout(900)
+        ok("mobile 390: không cuộn ngang ở chi tiết đơn",
+           page.evaluate("() => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1"))
+        page.screenshot(path=f"{SHOTS}/lo8-erp-5-don-chi-tiet-mobile-ny.png")
+        ctx.close()
+        browser.close()
+
+    bad = [r for r in results if not r[1]]
+    print(f"\n{len(results) - len(bad)}/{len(results)} PASS")
+    raise SystemExit(1 if bad else 0)
+
+
+main()

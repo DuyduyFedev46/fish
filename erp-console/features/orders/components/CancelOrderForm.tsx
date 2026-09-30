@@ -8,6 +8,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { Icon } from "@/shared/ui/Icon";
 import { ApiError } from "@/shared/lib/http";
+import { vnd } from "@/shared/lib/format";
 import { CANCEL_REASONS } from "../labels";
 import { ORDERS_MSG } from "../messages";
 import { cancelOrder } from "../api";
@@ -78,7 +79,7 @@ export function CancelOrderForm({ order, onBusy, onCancel, onDone, onError400 }:
         icon="cancel"
         tone="warn"
         question={ORDERS_MSG.cancelQuestion(order.code)}
-        sub={<>{order.customer.name} · Tổng đơn {order.total_amount}</>}
+        sub={<>{order.customer.name} · Tổng đơn {vnd(order.total_amount)}</>}
       />
 
       <fieldset

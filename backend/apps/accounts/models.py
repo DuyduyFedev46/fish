@@ -12,6 +12,8 @@ API — nên cần model riêng, append-only (BR-PQ-06).
 from django.conf import settings
 from django.db import models
 
+from apps.common.formatting import format_local_datetime
+
 
 class StaffProfile(models.Model):
     """Hồ sơ nhân viên — mỏng có chủ đích (không lương/chấm công/KPI/hợp đồng)."""
@@ -121,7 +123,7 @@ class AuditLog(models.Model):
             who = f"ai:{self.ai_actor.get_username()}" if self.ai_actor else "ai:?"
         else:
             who = self.actor.get_username() if self.actor else "system"
-        return f"[{self.created_at:%Y-%m-%d %H:%M}] {who} · {self.action}"
+        return f"[{format_local_datetime(self.created_at)}] {who} · {self.action}"
 
 
 class DemoRecord(models.Model):

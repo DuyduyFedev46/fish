@@ -42,7 +42,10 @@ export function CartProvider({ children }: { children: ReactNode }) {
       const raw = window.localStorage.getItem(STORAGE_KEY);
       if (raw) {
         const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) setLines(parsed);
+        if (Array.isArray(parsed)) {
+          // Giỏ cũ có thể lưu giá dạng chuỗi Decimal ("260000.00") -> ép về số.
+          setLines(parsed.map((l: CartLine) => ({ ...l, price: Number(l.price) || 0 })));
+        }
       }
     } catch {
       // localStorage không khả dụng hoặc dữ liệu hỏng — bỏ qua, giỏ hàng rỗng.

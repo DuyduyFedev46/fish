@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { dateTimeFull } from "@/shared/lib/format";
 import { Icon } from "@/shared/ui/Icon";
 import { Empty } from "@/shared/ui/StateBox";
 import { fetchEntries, fetchEntryCounts, fetchGoliveStatus } from "../api";
@@ -201,7 +202,7 @@ export function ContentListScreen() {
                       </span>
                     )}
                   </td>
-                  <td className="muted">{entry.updated_at}</td>
+                  <td className="muted">{dateTimeFull(entry.updated_at)}</td>
                 </tr>
               ))}
             </tbody>

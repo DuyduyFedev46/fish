@@ -12,6 +12,7 @@ from django.db import transaction
 from apps.ai.models import AiAction, AiPolicyVersion
 from apps.common.audit import record_audit
 from apps.common.exceptions import BusinessError
+from apps.common.formatting import format_vnd
 from apps.sales.models import PaymentTransaction, SalesOrder
 from apps.sales.payments import services as payment_services
 
@@ -134,7 +135,7 @@ def process_exact_payment_matches() -> dict:
                 status_text = "Thiếu tiền" if diff < Decimal("0") else "Thừa tiền"
                 if _escalate_to_chu(
                     p,
-                    reason=f"{status_text}: Giao dịch {p.amount}đ khác tổng đơn {order.total_amount}đ (BR-TT-04/10)",
+                    reason=f"{status_text}: Giao dịch {format_vnd(p.amount)} khác tổng đơn {format_vnd(order.total_amount)} (BR-TT-04/10)",
                 ):
                     escalated_count += 1
                 else:

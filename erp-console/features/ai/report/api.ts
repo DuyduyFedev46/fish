@@ -1,4 +1,5 @@
 import { apiFetch, type MockRequest } from "@/shared/lib/http";
+import { todayInVietnam } from "@/shared/lib/format";
 import type { AiDailyReport } from "../types";
 
 export const mockDailyAiReport: AiDailyReport = {
@@ -87,7 +88,7 @@ export async function fetchDailyAiReport(
             status: 200,
             body: {
               ...mockDailyAiReport,
-              date: dateStr || new Date().toISOString().slice(0, 10),
+              date: dateStr || todayInVietnam(),
             },
           };
         }

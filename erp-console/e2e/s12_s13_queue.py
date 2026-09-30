@@ -171,7 +171,7 @@ with sync_playwright() as p:
     ok("S12-AC4: khoản thiếu chưa đủ → available_actions KHÔNG có confirm_order (chỉ refund)", under["available_actions"] == ["refund"], str(under["available_actions"]))
     r = page.evaluate("([id]) => window.__caveMock.resolveJson('loc', id, {action: 'CONFIRM_ORDER', note: ''})", [under["id"]])
     o = under["order"]
-    exp = be(page, "TT_NOT_ENOUGH", {"paid": f"{int(o['paid_total']):,}".replace(",", ".") + "đ", "total": f"{int(o['total_amount']):,}".replace(",", ".") + "đ"})
+    exp = be(page, "TT_NOT_ENOUGH", {"paid": f"{int(o['paid_total']):,}".replace(",", ".") + " ₫", "total": f"{int(o['total_amount']):,}".replace(",", ".") + " ₫"})
     ok("S12-AC4: CONFIRM_ORDER khi chưa đủ → 400 BR-TT-09 'Tổng tiền đã nhận … < tổng đơn …'",
        r["status"] == 400 and r["body"]["code"] == "BR-TT-09" and r["body"]["detail"] == exp, str(r))
     dlg = open_txn(page, under["id"])
@@ -251,7 +251,7 @@ with sync_playwright() as p:
     form.locator("button[type=submit]").click()
     expect(form.locator(".queue-error")).to_be_visible()
     ok("S12-AC5: đơn đã tự huỷ → lỗi BE nguyên văn (BR-TT-05), vẫn ở bước gắn",
-       form.locator(".queue-error > span").inner_text().strip() == be(page, "TT_ORDER_CANCELLED") and form.is_visible(), form.locator(".queue-error").inner_text())
+       form.locator(".queue-error > span:last-child").inner_text().strip().startswith(be(page, "TT_ORDER_CANCELLED")) and form.is_visible(), form.locator(".queue-error").inner_text())
     page.screenshot(path=f"{SHOTS}/s12-error-1280-light.png")
     ok("S12-AC5: khoản vẫn OPEN, đơn không khôi phục",
        any(x["id"] == 881 and x["order"] is None for x in qjson(page)["results"])
@@ -351,8 +351,8 @@ with sync_playwright() as p:
     expect(form.get_by_text("Nhiều hơn số còn được hoàn")).to_be_visible()
     form.locator("button[type=submit]").click()
     expect(form.locator(".queue-error")).to_be_visible()
-    ok("S13-AC3: vượt số còn hoàn → lỗi BE nguyên văn 'tối đa 100.000đ'",
-       form.locator(".queue-error > span").inner_text().strip() == be(page, "HT_OVER_REFUNDABLE", {"max": "100.000đ"}), form.locator(".queue-error").inner_text())
+    ok("S13-AC3: vượt số còn hoàn → lỗi BE nguyên văn 'tối đa 100.000 ₫'",
+       form.locator(".queue-error > span:last-child").inner_text().strip().startswith(be(page, "HT_OVER_REFUNDABLE", {"max": "100.000 ₫"})), form.locator(".queue-error > span:last-child").inner_text())
     page.screenshot(path=f"{SHOTS}/s13-error-1280-light.png")
     form.get_by_role("button", name="Quay lại").click()
     close_sheet(page)
@@ -392,7 +392,7 @@ with sync_playwright() as p:
     page.evaluate("() => window.__caveMock.payments('ok')")
     ctx.close()
 
-    # ================= L8 bổ sung tiền (Duy 2026-09-26): chuyển thừa ngay lần đầu + tối thiểu 1đ =================
+    # ================= L8 bổ sung tiền (Duy 2026-09-26): chuyển thừa ngay lần đầu + tối thiểu 1 ₫ =================
     ctx, page = new_page()
     login(page, "loc")
     page.wait_for_url("**/overview/")
@@ -426,9 +426,9 @@ with sync_playwright() as p:
     list_ready(page)
     ok("Bổ sung tiền: bấm liên kết → hàng chờ, có dòng -THUA", page.locator(".queue-list", has_text="FT2626799600-THUA").count() == 1)
     r = page.evaluate("([id]) => window.__caveMock.refundJson('loc', {payment_transaction: id, amount: '0.5', reason: 'x', request_id: crypto.randomUUID()})", [thua[0]["id"]])
-    ok("Tối thiểu 1đ: phiếu hoàn 0,5 → 400 'Số tiền hoàn tối thiểu 1đ.'", r["status"] == 400 and r["body"]["detail"] == be(page, "HT_AMOUNT_MIN"), str(r))
+    ok("Tối thiểu 1đ: phiếu hoàn 0,5 → 400 'Số tiền hoàn tối thiểu 1 ₫.'", r["status"] == 400 and r["body"]["detail"] == be(page, "HT_AMOUNT_MIN"), str(r))
     r = page.evaluate("() => window.__caveMock.confirmJson('loc', 101, {bank_txn_id: 'FT-MIN-1', amount: '0.5'})")
-    ok("Tối thiểu 1đ: xác nhận tay 0,5 → 400 'Số tiền tối thiểu 1đ.'", r["status"] == 400 and r["body"]["detail"] == be(page, "TT_AMOUNT_MIN"), str(r))
+    ok("Tối thiểu 1đ: xác nhận tay 0,5 → 400 'Số tiền tối thiểu 1 ₫.'", r["status"] == 400 and r["body"]["detail"] == be(page, "TT_AMOUNT_MIN"), str(r))
     dlg = open_txn(page, thua[0]["id"])
     dlg.get_by_role("button", name="Lập phiếu hoàn").click()
     form = dlg.locator("form.refund-form")

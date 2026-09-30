@@ -10,6 +10,7 @@ from django.conf import settings
 from django.utils import timezone
 from rest_framework import serializers
 
+from apps.common.formatting import format_local_date
 from apps.common.pii import mask_phone
 from apps.delivery.cskh.scope import note_in_cskh_scope
 from apps.delivery.models import ConfirmationTask, CustomerCall, DeliveryNote
@@ -199,7 +200,7 @@ class CskhQueueItemSerializer(serializers.ModelSerializer):
             refund = obj.refund
             if refund:
                 refund_days = getattr(settings, "REFUND_DEADLINE_DAYS", 30)
-                deadline_date = (refund.created_at + timedelta(days=refund_days)).strftime("%Y-%m-%d")
+                deadline_date = format_local_date(refund.created_at + timedelta(days=refund_days))
                 data["refund"] = {
                     "id": refund.pk,
                     "amount": str(int(refund.amount)),
