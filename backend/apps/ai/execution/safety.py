@@ -99,7 +99,7 @@ def check_ai_close_batch_conditions(batch: Batch, *, current_action_id=None) -> 
         # Phiếu hoàn tiền chờ duyệt
         pending_refunds = Refund.objects.filter(
             models.Q(sales_invoice__sales_order_id__in=order_ids)
-            | models.Q(payment_transaction__order_id__in=order_ids),
+            | models.Q(payment_transaction__sales_order_id__in=order_ids),
             status=Refund.Status.PENDING,
         )
         if pending_refunds.exists():
@@ -110,7 +110,7 @@ def check_ai_close_batch_conditions(batch: Batch, *, current_action_id=None) -> 
 
         # Giao dịch thanh toán chưa khớp
         open_txns = PaymentTransaction.objects.filter(
-            order_id__in=order_ids,
+            sales_order_id__in=order_ids,
             resolution_status=PaymentTransaction.ResolutionStatus.OPEN,
         )
         if open_txns.exists():

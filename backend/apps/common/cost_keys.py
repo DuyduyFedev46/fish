@@ -13,6 +13,9 @@ COST_KEYS = frozenset({
     "purchase_rate", "landed_unit_cost", "unit_cost", "rate",          # Batch, PurchaseReceiptLine, *LineBatch
     "allocated_amount", "purchase_cost", "allocated_cost", "total_cost",  # PurchaseCost / batch_pnl
     "shrinkage_cost", "damage_cost", "cogs", "profit",
+    # P8 SR-01 (BM-01): khoá tiền suy ra được giá vốn (số kg đã biết -> chia ra đơn giá vốn).
+    "loss_amount", "loss", "inventory_value", "margin", "gross_profit", "expired_cost",
+    "supplier_refund_amount", "supplier_return_cost",
 })
 
 
