@@ -297,8 +297,16 @@ def escalate_guidance_step(*, doc_type: str, doc_id: str, step_key: str, user) -
     POST /api/ai/actions/escalate/ {"doc_type", "doc_id", "step_key"}
     -> 201 {"action_id", "assignee_group"}
     """
+    import logging
+
+    from django.core.exceptions import PermissionDenied
+    from django.http import Http404
+    from rest_framework.exceptions import PermissionDenied as DRFPermissionDenied
+
     from apps.common.guidance.api import get_guidance_provider
     from apps.ai.registry.discovery import get_registry
+
+    logger = logging.getLogger(__name__)
 
     if not doc_type or not doc_id or not step_key:
         raise BusinessError("Thiếu tham số chứng từ hoặc bước cần nhờ.", code="INVALID_PARAMS", status_code=400)
@@ -309,8 +317,14 @@ def escalate_guidance_step(*, doc_type: str, doc_id: str, step_key: str, user) -
 
     try:
         data = provider(doc_id=str(doc_id), user=user)
-    except Exception as e:
-        raise BusinessError(f"Không thể nạp chứng từ {doc_type} #{doc_id}: {e}", code="DOC_NOT_FOUND", status_code=400)
+    except (Http404, PermissionDenied, DRFPermissionDenied):
+        # SR-06-AC2: 404 (ngoài phạm vi/không có) và 403 (thiếu quyền xem) đi thẳng ra API,
+        # không bị đổi thành 400 (DRF exception handler dựng body chung).
+        raise
+    except Exception as exc:  # noqa: BLE001
+        # Không in nguyên văn exception ra response (có thể chứa dữ liệu từ DB — bất biến 9).
+        logger.warning("escalate: không nạp được chứng từ type=%s err=%s", doc_type, type(exc).__name__)
+        raise BusinessError("Không thể nạp chứng từ.", code="DOC_NOT_FOUND", status_code=400)
 
     next_steps = data.get("next_steps", [])
     target_step = None

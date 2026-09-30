@@ -19,6 +19,7 @@ from apps.common.guidance.steps import Missing, NextStep, Why, step_to_dict
 from apps.common.guidance.timeline import format_guidance_timeline
 from apps.delivery.models import DeliveryNote
 from apps.sales.models import SalesOrder
+from apps.sales.orders.scope import scope_orders_for
 from apps.sales.orders.timeline import build_timeline
 from apps.sales.payments.services import MANUAL_CONFIRMABLE_STATUSES
 from apps.sales.refunds.services import refundable_amount
@@ -166,9 +167,9 @@ def get_order_guidance(doc_id: str, user: Any, request: Optional[Any] = None) ->
         )
     )
 
-    # Phạm vi T3 (scope) như SalesOrderViewSet: NV giao chỉ thấy đơn của phiếu giao gán cho mình
-    if user.groups.filter(name="nv_giao").exists() and not user.is_superuser:
-        qs = qs.filter(invoice__delivery_notes__assigned_to=user).distinct()
+    # Phạm vi T3 dùng chung với SalesOrderViewSet (SR-06, BR-GH-18, BR-PQ-12):
+    # nv_giao / cskh / user gán quyền trực tiếp chỉ thấy đơn trong phạm vi của mình.
+    qs = scope_orders_for(user, qs)
 
     try:
         if str(doc_id).isdigit():
@@ -176,7 +177,9 @@ def get_order_guidance(doc_id: str, user: Any, request: Optional[Any] = None) ->
         else:
             order = qs.get(code=doc_id)
     except SalesOrder.DoesNotExist:
-        raise Http404(f"Không tìm thấy đơn hàng: {doc_id}")
+        # Thông điệp cố định: không lặp lại mã người gọi gửi lên, không phân biệt
+        # "không tồn tại" với "ngoài phạm vi".
+        raise Http404("Không tìm thấy đơn hàng")
 
     # doc: không bao gồm PII (tên, SĐT, địa chỉ khách)
     doc_summary = {

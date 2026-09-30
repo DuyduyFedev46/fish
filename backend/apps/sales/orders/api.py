@@ -18,7 +18,6 @@ from apps.ai.declare import AiDeclarable, AiMeta
 from apps.common.api import (
     BusinessModelPermissions,
     StandardPagination,
-    has_full_delivery_scope,
     require_perm,
 )
 from apps.common.exceptions import BusinessError
@@ -28,6 +27,7 @@ from apps.sales.payments import services as payment_services
 from apps.sales.utils import ZERO, fold_text, money_str
 
 from . import services
+from .scope import scope_orders_for
 from .serializers import SalesOrderDetailSerializer, SalesOrderListSerializer
 
 INVALID_FILTER = "INVALID_FILTER"
@@ -90,24 +90,8 @@ class SalesOrderViewSet(AiDeclarable, viewsets.ReadOnlyModelViewSet):
                 "invoice__delivery_notes__assigned_to__staff_profile",
                 "invoice__delivery_notes__returns",
             )
-        # S5 / BR-PQ-12: nv_giao chỉ thấy đơn của phiếu giao gán cho mình.
-        # CS-01 / BR-GH-18: cskh chỉ thấy đơn trong phạm vi gọi và đơn mình đã gọi gần đây.
-        user = self.request.user
-        if has_full_delivery_scope(user):
-            return qs
-
-        assigned_q = Q(invoice__delivery_notes__assigned_to=user)
-        from apps.delivery.cskh.scope import cskh_note_q, is_cskh
-
-        if is_cskh(user):
-            cskh_q = Exists(
-                DeliveryNote.objects.filter(
-                    sales_invoice__sales_order=OuterRef("pk")
-                ).filter(cskh_note_q(user))
-            )
-            return qs.filter(assigned_q | cskh_q).distinct()
-
-        return qs.filter(assigned_q).distinct()
+        # S5 / BR-PQ-12 (nv_giao) và CS-01 / BR-GH-18 (cskh): phạm vi dòng dùng chung, xem scope.py.
+        return scope_orders_for(self.request.user, qs)
 
     def list(self, request, *args, **kwargs):
         try:

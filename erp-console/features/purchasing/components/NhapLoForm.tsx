@@ -4,12 +4,12 @@ import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { Icon } from "@/shared/ui/Icon";
 import { listItems } from "@/features/catalog/api";
+import { useAuth } from "@/features/auth/components/AuthProvider";
 import type { CatalogItem } from "@/features/catalog/types";
 import { cancelPurchaseReceipt, fetchSuppliers, submitNhapLo } from "../api";
 import type { NhapLoLineInput, NhapLoResponse, Supplier } from "../types";
 import s from "../purchasing.module.css";
-
-const DRAFT_STORAGE_KEY = "cave_draft_nhap_lo";
+import { clearDraft, loadDraft, purgeLegacyDraft, resolveIdempotencyKey, saveDraft } from "./draftStorage";
 
 function generateUUID(): string {
   if (typeof crypto !== "undefined" && crypto.randomUUID) {
@@ -31,6 +31,8 @@ function getTodayString(): string {
 }
 
 export function NhapLoForm() {
+  const { me } = useAuth();
+  const userId = me?.id ?? null;
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [items, setItems] = useState<CatalogItem[]>([]);
   const [loadingInitial, setLoadingInitial] = useState(true);
@@ -51,28 +53,22 @@ export function NhapLoForm() {
   const [cancelError, setCancelError] = useState<string | null>(null);
   const [cancelSuccessMsg, setCancelSuccessMsg] = useState<string | null>(null);
 
-  // Khởi tạo key và nạp dữ liệu ban đầu
+  // Khởi tạo key và nạp dữ liệu ban đầu. SR-07: nháp chỉ của người đang đăng nhập (sessionStorage) và KHÔNG có giá mua;
+  // idempotency key: có trong nháp của CHÍNH người này thì dùng lại (F5 giữ key), không có thì sinh mới.
   useEffect(() => {
-    let key = generateUUID();
+    const key = resolveIdempotencyKey(userId, generateUUID);
     let initialSupplier: number | "" = "";
     let initialDate = getTodayString();
     let initialLines: NhapLoLineInput[] = [
       { item_code: "", qty: "", rate: "", shelf_life_days: null },
     ];
 
-    if (typeof window !== "undefined" && window.localStorage) {
-      const saved = localStorage.getItem(DRAFT_STORAGE_KEY);
-      if (saved) {
-        try {
-          const draft = JSON.parse(saved);
-          if (draft.supplierId) initialSupplier = draft.supplierId;
-          if (draft.receivedDate) initialDate = draft.receivedDate;
-          if (Array.isArray(draft.lines) && draft.lines.length > 0) initialLines = draft.lines;
-          if (draft.idempotencyKey) key = draft.idempotencyKey;
-        } catch {
-          // ignore corrupted draft
-        }
-      }
+    purgeLegacyDraft(); // khoá cũ ở localStorage có giá mua, dùng chung mọi người
+    const draft = userId !== null ? loadDraft(userId) : null;
+    if (draft) {
+      if (draft.supplierId) initialSupplier = draft.supplierId;
+      if (draft.receivedDate) initialDate = draft.receivedDate;
+      if (draft.lines.length > 0) initialLines = draft.lines.map((l) => ({ ...l, rate: "" }));
     }
 
     setSupplierId(initialSupplier);
@@ -91,22 +87,17 @@ export function NhapLoForm() {
       }
       setLoadingInitial(false);
     });
-  }, []);
+  }, [userId]);
 
-  // Tự động lưu nháp
+  // Tự động lưu nháp (không gồm giá mua — xem draftStorage.ts)
   useEffect(() => {
-    if (loadingInitial) return;
-    if (typeof window !== "undefined" && window.localStorage) {
-      if (successResult) {
-        localStorage.removeItem(DRAFT_STORAGE_KEY);
-      } else {
-        localStorage.setItem(
-          DRAFT_STORAGE_KEY,
-          JSON.stringify({ supplierId, receivedDate, lines, idempotencyKey })
-        );
-      }
+    if (loadingInitial || userId === null) return;
+    if (successResult) {
+      clearDraft(userId);
+    } else {
+      saveDraft(userId, { supplierId, receivedDate, lines, idempotencyKey });
     }
-  }, [supplierId, receivedDate, lines, idempotencyKey, loadingInitial, successResult]);
+  }, [supplierId, receivedDate, lines, idempotencyKey, loadingInitial, successResult, userId]);
 
   const handleAddLine = () => {
     setLines((prev) => [
@@ -172,9 +163,8 @@ export function NhapLoForm() {
 
       const res = await submitNhapLo(payload);
       setSuccessResult(res);
-      if (typeof window !== "undefined" && window.localStorage) {
-        localStorage.removeItem(DRAFT_STORAGE_KEY);
-      }
+      if (userId !== null) clearDraft(userId);
+      setIdempotencyKey(generateUUID()); // gửi thành công → key cũ đã dùng, lần nhập sau phải key mới
     } catch (err: unknown) {
       const errorObj = err as { detail?: string; code?: string; message?: string };
       setErrorMessage(

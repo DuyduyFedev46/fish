@@ -4,7 +4,7 @@
 
 ## Kết luận
 - **Không có lỗi Critical mới.** Critical/High đã biết đều đã có story P8 (SR-01…SR-24) và được xác nhận lại bằng chạy thật.
-- **14 lỗi mới**: 1 High, 5 Medium, 8 Low. Không tự sửa: cần Duy duyệt story (đề xuất gom thành **P9**, xem cuối file).
+- **15 lỗi mới** (RA-15 thêm trong P8 Lô 2): 1 High, 6 Medium, 8 Low. Không tự sửa: cần Duy duyệt story (đề xuất gom thành **P9**, xem cuối file).
 - **586 AC kiểm lại**: A2 72, A3 220, A4 175, A5 119. Kết quả: ✅ 553 · ❌ 3 · ⏸ 19 · ⚠️ ~10 (test đúng phạm vi hẹp nhưng AC bị vi phạm ở cửa khác; tất cả trùng SR-xx).
   - ❌: GL-05-AC1 (trùng SR-19); CMS-06-AC3 (RA-01); CMS-04-AC2 (RA-06).
   - ⏸: 18 AC của CS-16…CS-18 (story Could, chưa được xây, đúng phạm vi đã duyệt); CMS-04-AC4 (dựa vào test cũ).
@@ -43,6 +43,7 @@ Ghi chú máy: `~/.npm` có file thuộc root nên `npm ci` báo EACCES. Đã ch
 | RA-12 | Low | A1-10 | Code chết (`site_info_api.py`, `THROTTLE_CSKH_SEARCH`, `backend/spikes/`); kg tính bằng float, chép 3 nơi; kiểm quyền AI chép 2 nơi. | xem A1-10 | grep |
 | RA-13 | Low | A1-11 | Test yếu: `test_dw08_ac5` không assert; ca 403 trên thao tác ghi không kiểm dữ liệu đứng yên; test storage FE không chạy trong node. | xem A1-11 | quét AST |
 | RA-14 | Low | A1-12 | Thiếu `Cache-Control: no-store` ở `/api/guidance/order/` và lệnh AI đọc đơn. Có thể gộp SR-22. | `common/guidance/api.py:38-54` | đọc code |
+| RA-15 | Medium (chờ PO chốt) | QA P8 Lô 2 G1 | Chữ tự do do nhân viên gõ (lý do phiếu hoàn/huỷ) được nối vào `timeline[].label` nên có thể chứa tên khách; bộ lọc PII AI lọc theo **tên khoá** nên không chặn. Lộ qua `sales.salesorder.retrieve` (AI) và API đơn thường. Có từ trước P8. Nếu PO coi chữ tự do là PII → Medium. Đề xuất bỏ `reason` khỏi timeline khi đi qua AI (P9 cùng allowlist PII). | `backend/apps/sales/orders/timeline.py:136` | `04-qa-report.md` Lô 2 G1 (sửa lời lý do hoàn thành chuỗi có tên giả) |
 
 Repro đỏ ở `repro/` (không nằm trong suite chính). Cách chạy giống `../2026-09-30-sua-loi-review/repro/README.md`: chép vào gói tạm trong scratchpad rồi chạy `manage.py test <gói>.tests_*`.
 
@@ -64,7 +65,7 @@ Repro đỏ ở `repro/` (không nằm trong suite chính). Cách chạy giống
 |---|---|---|
 | 1 | RA-01 | High, sửa 1 dòng FE, nên làm sớm |
 | 2 | RA-02, RA-03, RA-08 | Cùng khu CSKH/giao hàng, cùng mẫu khoá dòng như SR-10 |
-| 3 | RA-04, RA-05, RA-07 | Vòng đời AI, **cần Duy chốt luật** (ai bật lại AI; cách đóng việc ESCALATED) |
+| 3 | RA-04, RA-05, RA-07, RA-15 | Vòng đời AI, **cần Duy chốt luật** (ai bật lại AI; cách đóng việc ESCALATED) |
 | 4 | RA-06 | FE CMS/ConsoleGate |
 | 5 | RA-09…RA-14 | Dọn nợ Low (có thể gộp RA-14 vào SR-22 Lô 7 nếu Duy đồng ý) |
 

@@ -2,6 +2,7 @@
 Pipeline xử lý POST /api/ai/commands/<id>/call/ (02b §4.2, DW-10, DW-11).
 """
 import datetime
+import re
 from django.conf import settings
 from django.core.cache import cache
 from django.core.exceptions import PermissionDenied
@@ -158,7 +159,26 @@ class AiCommandCallView(APIView):
                     {"detail": "Lệnh yêu cầu target_id.", "code": "BR-AI-01"},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
-            if spec.view_cls:
+            # SR-05: chỉ ViewSet/GenericAPIView có get_object mới kiểm phạm vi ở đây.
+            # APIView thuần (vd BatchPnlView) không có get_object -> để view tự kiểm quyền/phạm vi
+            # khi dispatch (không bao giờ AttributeError -> 500).
+            if spec.view_cls and not hasattr(spec.view_cls, "get_object"):
+                # dispatch_command chỉ truyền 1 tham số URL tên `lookup_field` (mặc định pk). Route
+                # APIView dùng tên khác (batch_id) hoặc nhiều tham số (doc_type/doc_id) thì view sẽ
+                # TypeError -> 502. Chặn sớm bằng 400 có thông điệp thay vì lỗi hệ thống (SR-05-AC4).
+                url_params = set(re.findall(r"<(?:\w+:)?(\w+)>", spec.path or ""))
+                lookup_name = getattr(spec.view_cls, "lookup_url_kwarg", None) or getattr(
+                    spec.view_cls, "lookup_field", "pk"
+                )
+                if url_params != {lookup_name}:
+                    return Response(
+                        {
+                            "detail": "Lệnh này chưa hỗ trợ gọi theo mã đối tượng qua AI.",
+                            "code": "BR-AI-01",
+                        },
+                        status=status.HTTP_400_BAD_REQUEST,
+                    )
+            if spec.view_cls and hasattr(spec.view_cls, "get_object"):
                 view_instance = spec.view_cls()
                 view_instance.action = spec.action
                 view_instance.request = request

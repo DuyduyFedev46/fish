@@ -27,6 +27,15 @@ from .schema import estimate_schema_tokens, get_serializer_output_fields, serial
 from .spec import CommandSpec
 
 
+# Action chuẩn của ModelViewSet thao tác trên 1 đối tượng (SR-05): luôn cần target_id.
+STANDARD_DETAIL_ACTIONS = frozenset({"retrieve", "partial_update", "update", "destroy"})
+
+
+def _path_has_lookup(pattern_str: str) -> bool:
+    """APIView (không ViewSet): route có tham số đối tượng dạng <pk>, <id>, <str:..>, <int:..>."""
+    return any(tok in pattern_str for tok in ("<pk>", "<id>", "<str:", "<int:"))
+
+
 def _camel_to_snake(name: str) -> str:
     s1 = re.sub("(.)([A-Z][a-z]+)", r"\1_\2", name)
     return re.sub("([a-z0-9])([A-Z])", r"\1_\2", s1).lower()
@@ -209,7 +218,14 @@ class CommandRegistry:
                     # Title, Description & Keywords
                     title, description, keywords = _make_doc_metadata(cls, action_name, model_str, action_func, ai_meta)
 
-                    is_detail = getattr(action_func, "detail", False) if action_func else ("<pk>" in pattern_str or "<id>" in pattern_str or "<str:" in pattern_str or "<int:" in pattern_str)
+                    # SR-05 (BM-06): action chuẩn của ModelViewSet không mang thuộc tính `detail`
+                    # (chỉ @action mới có) -> suy luận theo tên action, nếu không thì dùng thuộc tính.
+                    if action_name in STANDARD_DETAIL_ACTIONS:
+                        is_detail = True
+                    elif action_func:
+                        is_detail = bool(getattr(action_func, "detail", False))
+                    else:
+                        is_detail = _path_has_lookup(pattern_str)
 
                     # Xử lý undo và max_level
                     undo_val = getattr(ai_meta, "undo", "") or ""
@@ -297,7 +313,7 @@ class CommandRegistry:
                         clean_output = [f for f in raw_output if f not in SCRUB_PII_KEYS]
 
                         title, description, keywords = _make_doc_metadata(cls, action_name, view_name, None, ai_meta)
-                        is_detail = ("<pk>" in pattern_str or "<id>" in pattern_str or "<str:" in pattern_str or "<int:" in pattern_str)
+                        is_detail = _path_has_lookup(pattern_str)
 
                         spec = CommandSpec(
                             id=cmd_id,

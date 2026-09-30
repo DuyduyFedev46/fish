@@ -91,6 +91,14 @@ SCRUB_PII_KEYS = frozenset({
     "content",
     "bank_account_name",
     "counter_account_name",
+    # P8 SR-04 (BM-02): nhánh `customer` (chuỗi hoặc {name, phone, address}) và SĐT che một phần
+    # cũng là dữ liệu cá nhân -> bỏ cả nhánh (scrub_data `continue` khi khoá thuộc tập này).
+    "customer",
+    "recipient_phone",
+    "recipient_phone_masked",
+    "phone_last4",
+    "phone_masked",
+    "customer_address",
 })
 
 # Lọc đầu ra: Chữ tự do (H10 — tránh Prompt Injection)

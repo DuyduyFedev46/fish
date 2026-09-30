@@ -132,3 +132,107 @@ manage.py makemigrations --check --dry-run                             -> No cha
 - Sau khi thêm: `manage.py test` → `Ran 1140 tests … OK` (trước: 1072). `makemigrations --check --dry-run` → No changes detected.
 - Repro R1 gốc (`repro/review_repro_tests.py`) chạy lại: `test_r1_safety_crashes_for_sold_batch` → `AssertionError: Exception not raised`
   (lỗi đã hết), `test_r1_job_poison_pill` → `R1 job: no crash`, trạng thái `DONE`.
+
+## Lô 2 — FE
+
+**SR-07 — Nháp "Nhập lô" không giữ giá mua giữa các người dùng (BM-04, bất biến 1 phía FE).** Xong, chưa commit.
+
+### File
+- Thêm `erp-console/features/purchasing/components/draftStorage.ts`: `saveDraft(userId, draft)` (bỏ `lines[].rate` và mọi trường lạ qua `sanitize`; giữ `idempotencyKey` của chính người đó), `loadDraft(userId)` (cũng bỏ `rate` nếu dữ liệu cũ còn), `resolveIdempotencyKey(userId, generate)`, `clearDraft(userId)`, `purgeLegacyDraft()`, `clearAllDrafts()` (xoá mọi khoá `cave_draft_nhap_lo*` ở `sessionStorage` và `localStorage`). Khoá `cave_draft_nhap_lo:<userId>`, lưu `sessionStorage`.
+- Thêm `erp-console/features/purchasing/components/draftStorage.test.ts` (8 test vitest, SR-07-AC1/AC2/AC4 + nháp hỏng + không có `window`).
+- Sửa `erp-console/features/purchasing/components/NhapLoForm.tsx`: bỏ đọc/ghi `localStorage`; lấy `userId` từ `useAuth().me.id`; nạp nháp qua `loadDraft` (ô giá mua luôn rỗng); idempotency key: xem mục "Sửa L1" bên dưới; mở form gọi `purgeLegacyDraft()` dọn khoá cũ có giá mua; gửi thành công gọi `clearDraft`.
+- Sửa `erp-console/features/auth/components/AuthProvider.tsx` (hàm `logout`): thêm `clearNhapLoDrafts()` (= `clearAllDrafts` của `draftStorage`) cạnh `clearAllDrafts()` chung của `shared/lib/drafts`.
+- Thêm `erp-console/e2e/sr07_nhap_lo_draft.py` (Playwright Python, mock).
+
+### TDD
+Đỏ trước: `vitest run features/purchasing/components/draftStorage.test.ts` → `Error: Cannot find module './draftStorage'` (Test Files 1 failed, no tests). Sau khi viết `draftStorage.ts` → 8/8 xanh. Cả bộ `npm test`: 10 file, 87 test xanh. `tsc --noEmit` sạch, `npm run build` sạch.
+
+### Bằng chứng AC3 (Playwright, mock, dữ liệu giả, 12/12 PASS)
+Ảnh: `qa-lo2/sr07-1-chu-go-gia-81234.png` (Chủ gõ giá 81234), `qa-lo2/sr07-2-nv-kho-o-gia-rong.png` (nv_kho `kho1` sau khi Chủ đăng xuất: ô giá rỗng), `qa-lo2/sr07-3-f5-cung-nguoi.png` (F5 cùng người: giữ số lượng, giá rỗng).
+Các bước kiểm: khoá cũ `cave_draft_nhap_lo` (đặt sẵn, có giá) bị dọn khi mở Nhập lô; Chủ đang gõ 81234 mà local/sessionStorage không chứa 81234, nháp nằm ở `sessionStorage` khoá `cave_draft_nhap_lo:1`; sau đăng xuất không còn khoá `cave_draft_nhap_lo*` nào; `kho1` mở Nhập lô: ô giá mua và ô số lượng rỗng, storage không chứa 81234; F5 cùng người: số lượng còn, giá rỗng, storage không chứa giá.
+Cách chạy: `cd erp-console && NEXT_PUBLIC_USE_MOCK=1 npm run build`, copy `out/` sang thư mục riêng, `(cd <thư mục>/out && python3 -m http.server 3212 &)`, `python3 e2e/sr07_nhap_lo_draft.py` (đặt `BASE` nếu đổi cổng), rồi tắt server. Script tự đặt khoá cũ giả để kiểm việc dọn. QA giữ nguyên ảnh + bước này khi ghi `04-qa-report.md`.
+
+### Lệch / nợ (cần điều phối biết)
+1. `erp-console/features/purchasing/api.ts` còn `DRAFT_STORAGE_KEY`, `getNhapLoDraft`, `saveNhapLoDraft`, `clearNhapLoDraft` (localStorage, khoá cũ, có thể chứa `rate`) và được `purchasing.test.ts` (DW-17-AC3) dùng. Không còn nơi nào trong UI gọi chúng, nhưng chúng ngoài danh sách file được sửa nên giữ nguyên. Đề nghị Lô 7 (SR-23/24) xoá 3 hàm này cùng test DW-17-AC3 cũ hoặc chuyển test sang `draftStorage`.
+2. `AuthProvider` (module `auth`) import `draftStorage` của module `purchasing` — ngược quy ước "module không import vào ruột module khác", nhưng đúng chỉ dẫn story ("logout gọi `clearAllDrafts()`"). Nếu muốn sạch hơn: đưa hàm dọn nháp Nhập lô vào `shared/lib/drafts.ts`.
+3. Hành vi đổi có chủ ý: idempotency key không còn được giữ qua F5/mở lại form (SR-07-AC4), nên nếu gửi phiếu bị lỗi mạng rồi tải lại trang mà bấm gửi lại thì dùng key mới (BE dựa vào key để chống trùng nên có khả năng tạo phiếu thứ hai nếu lần trước thực ra đã thành công). Đã theo đúng story; QA lưu ý nếu cần bàn thêm với Duy.
+4. Không đổi cách xử lý 401 hết phiên (giữ nháp theo S7-AC6): nháp Nhập lô còn lại chỉ có mặt hàng/số lượng/hạn dùng, ở `sessionStorage`.
+
+## Lô 2 — BE
+> be-dev (Claude) · 2026-09-30 · Story: SR-04, SR-05 (cùng commit), SR-06 · Chưa commit (chờ QA + điều phối).
+
+### Số test
+- Gốc (đầu Lô 2, `manage.py test` không --parallel): **1155 OK**. Sau: **1186 OK** (+31: `test_p8_pii_sweep` 10, `test_p8_scrub_pii` 6, `test_p8_scope` 15).
+- `makemigrations --check --dry-run` → No changes detected (không migration, không model, không endpoint mới, contract không đổi).
+
+### File đã sửa / thêm
+- Sửa `backend/apps/ai/policy/rules.py` — `SCRUB_PII_KEYS` thêm `customer`, `recipient_phone`, `recipient_phone_masked`, `phone_last4`, `phone_masked`, `customer_address`.
+  `scrub.py` **không phải sửa**: `scrub_data` đã `continue` (bỏ cả nhánh dict/list/chuỗi) với khoá thuộc tập PII; test AC2 chứng minh.
+- Sửa `backend/apps/ai/registry/discovery.py` — hằng `STANDARD_DETAIL_ACTIONS = {retrieve, partial_update, update, destroy}` → `detail=True` (kèm `target="detail"`);
+  action khác giữ `getattr(action_func, "detail", False)`; APIView theo mẫu `<pk>|<id>|<str:|<int:` (tách hàm `_path_has_lookup`).
+- Sửa `backend/apps/ai/execution/pipeline.py` (chỉ bước 6 + `import re`) — view không có `get_object` (APIView) không còn `AttributeError`; xem "Lệch thiết kế" 1.
+- Thêm `backend/apps/sales/orders/scope.py::scope_orders_for(user, qs)` (chuyển nguyên logic từ `SalesOrderViewSet.get_queryset`: full scope → tất cả; cskh → phiếu trong phạm vi gọi hoặc đã gọi; còn lại → phiếu gán cho mình, `distinct()`).
+- Sửa `backend/apps/sales/orders/api.py` (chỉ `get_queryset` + bỏ import `has_full_delivery_scope` không còn dùng) — gọi `scope_orders_for`.
+- Sửa `backend/apps/sales/orders/next_steps.py` (chỉ khối lọc của `get_order_guidance`) — thay khối `nv_giao` riêng bằng `scope_orders_for`; `Http404("Không tìm thấy đơn hàng")` cố định (không lặp mã do người gọi gửi).
+- Sửa `backend/apps/ai/actions/services.py` (chỉ `escalate_guidance_step`, import cục bộ) — `Http404`/`PermissionDenied` (Django + DRF) từ provider được re-raise → 404/403; lỗi khác → `BusinessError("Không thể nạp chứng từ.", DOC_NOT_FOUND, 400)`, **không** in nguyên văn exception; log chỉ `type(exc).__name__`. Escalate lọc phạm vi qua provider `order` (đã dùng `scope_orders_for`) nên không có khối lọc riêng để thay.
+- Thêm test: `backend/apps/ai/registry/tests/test_p8_pii_sweep.py`, `backend/apps/ai/execution/tests/test_p8_scrub_pii.py`, `backend/apps/sales/orders/tests/test_p8_scope.py`. Không sửa/xoá test cũ.
+
+### BR / bất biến
+Bất biến 9 (SR-04: 6 khoá PII, bỏ cả nhánh, kể cả với Chủ), BR-PQ-12 + BR-GH-18 + Tầng 3 (SR-06, một hàm phạm vi), H7 (SR-05: `sales.salesorder.partial_update` vẫn bị cấm hẳn), BR-AI-09 (AiAction.args không chứa PII).
+
+### TDD — ĐỎ (trước khi sửa code)
+SR-05 (`manage.py test apps.ai.registry.tests.test_p8_pii_sweep`, code chưa sửa) — 6 failures + 1 error / 8 (lúc đó chưa có test AC3):
+```
+FAIL test_sr05_ac1_chu_retrieve_lo_tra_du_lieu      AssertionError: 502 != 200 : {"code":"AI_DISPATCH_FAILED"}   (DRF: Expected view BatchViewSet to be called with a URL keyword argument named "pk")
+FAIL test_sr05_ac2_moi_lenh_retrieve_va_partial_update_co_detail   catalog.bundleline.partial_update phải có detail=True
+FAIL test_sr05_ac3_nv_giao_de_xuat_partial_update_ngoai_pham_vi_404_khong_tao_ai_action   200 != 404 : {"outcome":"proposal",...} (chỉ discovery.py hoàn nguyên: tạo đề xuất cho phiếu ngoài phạm vi)
+ERROR test_sr05_ac4_batch_pnl_kem_target_id_khong_500  AttributeError: 'BatchPnlView' object has no attribute 'get_object'
+FAIL test_sr04_ac3_retrieve_don_hang_chu_thanh_cong_khong_pii / test_sr04_ac3_quet_moi_lenh_doc_...   502 not less than 500 : catalog.bundleline.retrieve chu -> 502
+FAIL test_sr04_ac1_nv_kho_dashboard_khong_lo_ten_khach / ..._chu_...   'Khách Giả Bí Mật' unexpectedly found in {"recent_orders":[{"customer":"Khách Giả B"...
+```
+Sau khi CHỈ sửa SR-05 (discovery + pipeline) — xác nhận thứ tự commit 02b §2.2: `retrieve` mở ra thì **lộ PII**:
+```
+FAIL test_sr04_ac3_retrieve_don_hang_chu_thanh_cong_khong_pii   'Khách Giả Bí Mật' unexpectedly found in {"id":1,"code":"SO...","customer":{"name":"Khách Giả Bí Mật"...
+FAIL test_sr04_ac3_quet_moi_lenh_doc_...   Lệnh AI rò PII: [('reports.dashboard_summary', chu|quan_ly|nv_kho, 'Khách Giả Bí Mật' / key:customer / key:phone_last4),
+     ('sales.salesinvoice.list|retrieve', chu|quan_ly|nv_kho, 'key:customer'), ('sales.salesorder.retrieve', chu|quan_ly|nv_kho|cskh, 'Khách Giả Bí Mật' / key:customer)]
+```
+SR-04-AC2 (`manage.py test apps.ai.execution.tests.test_p8_scrub_pii`, trước khi sửa `rules.py`) — 6 failures / 6: `{'code': 'SO-1', 'customer': 'Khách Giả Bí Mật'} != {'code': 'SO-1'}`; `'customer' not found in frozenset({...})`.
+SR-06 (`manage.py test apps.sales.orders.tests.test_p8_scope`, có `scope.py` nhưng chưa nối guidance/escalate) — 8 failures / 15:
+```
+test_sr06_ac1_cskh_don_ngoai_pham_vi_404              200 != 404 : {"doc":{"type":"order","code":"DH-OUT-1",...
+test_sr06_ac1_body_404_khong_lo_thong_tin             200 != 404
+test_sr06_ac3_cskh_het_pham_vi_khi_task_xong_va_chua_goi   200 != 404
+test_sr06_ac3_user_gan_quyen_truc_tiep_theo_pham_vi_viewset  200 != 404
+test_sr06_ac2_cskh_escalate_don_ngoai_pham_vi_404     400 != 404 : {"code":"STEP_NOT_FOUND"}
+test_sr06_ac2_nv_giao_escalate_don_khac_404           400 != 404 : "Không thể nạp chứng từ order #DH-OUT-1: Không tìm thấy đơn hàng: DH-OUT-1" (DOC_NOT_FOUND, in nguyên văn exception)
+test_sr06_ac2_thieu_quyen_xem_don_403                 400 != 403 : DOC_NOT_FOUND
+test_sr06_ac3_guidance_khong_lo_pii_khach             lỗi fixture của tôi (mã giao dịch giả chứa SĐT giả) -> đã sửa fixture, không phải rò
+```
+
+### TDD — XANH
+```
+manage.py test apps.ai.registry.tests.test_p8_pii_sweep      -> Ran 10 tests OK
+manage.py test apps.ai.execution.tests.test_p8_scrub_pii     -> Ran 6 tests OK
+manage.py test apps.sales.orders.tests.test_p8_scope         -> Ran 15 tests OK
+DJANGO_DEBUG=1 env -u DATABASE_URL manage.py test            -> Ran 1186 tests OK   (gốc 1155)
+manage.py makemigrations --check --dry-run                   -> No changes detected
+```
+
+### Bằng chứng chống "xanh giả"
+- Test quét (SR-04-AC3) duyệt **52 lệnh đọc** x 5 Group (chu, quan_ly, nv_kho, nv_giao, cskh), lệnh `detail` thử mọi khoá tra cứu của fixture (pk + mã đơn/lô/hàng/hoá đơn) → **101 response 200, trong đó 39 là `retrieve` thành công** (test assert `ok_total > 0` và `retrieve_ok > 0`; mọi response phải < 500). Sentinel: "Khách Giả Bí Mật", `0900000123`, "Số 1 Đường Giả", "NGUYEN VAN GIA" (`raw_payload` của giao dịch) — chuỗi và cả khoá (`customer`, `phone_last4`, tập `SCRUB_PII_KEYS`) đều không được xuất hiện.
+- Dashboard: assert mã đơn vẫn hiện (có dữ liệu thật, không rỗng).
+- SR-05-AC3 có ca đối chứng dương (gán phiếu cho nv_giao → đề xuất tạo được) và ca xác nhận `sales.salesorder.partial_update` vẫn 404 với mọi Group (H7).
+- SR-06 ma trận: chu/quan_ly/nv_kho 200 mọi đơn; nv_giao 200 đơn phiếu mình, 404 đơn khác; cskh 200 trong phạm vi / 404 ngoài / 404 khi phiếu rời hàng chờ; user gán quyền trực tiếp: 404 → 200 sau khi gán phiếu (guidance và chi tiết đơn cho cùng kết quả); khách 401; thiếu quyền 403; `scope_orders_for` khớp `GET /api/sales/orders/` cho 7 user; guidance không chứa tên/SĐT/địa chỉ.
+
+### Điểm dừng
+**Không chạm.** Test quét chỉ thấy PII ở: `reports.dashboard_summary` (customer, phone_last4) và `sales.salesorder.retrieve` (nhánh `customer`); `sales.salesinvoice.list/retrieve` chỉ có KHOÁ `customer` (là id khách, không có sentinel). Đều nằm trong nhánh `customer`/dashboard → không cần allowlist.
+
+### Lệch thiết kế / giả định / nợ
+1. **SR-05-AC4 và `dispatch.py`**: `dispatch_command` (ngoài danh sách file Lô 2) chỉ truyền 1 tham số URL tên `lookup_field` (mặc định `pk`). Hai APIView đọc có `detail=True` — `reports.batch_pnl` (`<str:batch_id>`) và `common.guidance` (`<doc_type>/<doc_id>`) — sẽ `TypeError` → 502. Trong bước 6 tôi chặn sớm: nếu view không có `get_object` và tập tham số URL ≠ {lookup_field} → **400 `BR-AI-01` "Lệnh này chưa hỗ trợ gọi theo mã đối tượng qua AI."** (AC4 cho phép 200 hoặc 400 có thông điệp). Hai lệnh này trước đây cũng không chạy được (500 AttributeError) nên không hồi quy. Muốn chạy được thật cần sửa `dispatch.py` (ánh xạ tên tham số từ `spec.path`) — đề nghị điều phối quyết định, có thể để P9.
+2. **SR-05-AC3 dùng `delivery.deliverynote.partial_update`** thay vì `sales.salesorder.partial_update` như story: lệnh của đơn bị registry cấm hẳn (H7, không lật) nên không tồn tại; cơ chế phạm vi cần kiểm là như nhau (Tầng 3 qua `get_object`). Story nên sửa chữ này.
+3. Escalate: story/02b nói "thay khối lọc riêng trong `ai/actions/services.py:299-302`" nhưng lọc phạm vi thực chất nằm ở provider `order` (đã đổi ở `next_steps.py`); phần sửa trong `services.py` là chỗ nuốt exception (A1). Hệ quả cho các provider khác (`batch`, `refund`, `payment`): 404/403 cũng đi thẳng ra thay vì 400 — nhất quán nhưng là đổi hành vi (test cũ vẫn xanh).
+4. `sales.salesinvoice.*` hết khoá `customer` trong kết quả AI (id khách) do bỏ cả nhánh — chấp nhận theo 02b §2.1.
+5. Test `test_sr06_ac1_body_404_khong_lo_thong_tin` kỳ vọng `detail` chứa "Không tìm thấy đơn hàng" (body chung của 02b §2.3).
+
+### Sửa L1 (techlead review Lô 2, cùng lô)
+Idempotency key nằm trong nháp `sessionStorage` khoá `cave_draft_nhap_lo:<userId>` (vẫn không lưu `rate`). Khi mở form: `resolveIdempotencyKey(userId, generateUUID)` — có key trong nháp của CHÍNH người này thì dùng lại (F5 rồi gửi lại sau lỗi mạng vẫn cùng key, BE chống trùng được), không có thì sinh mới. Gửi thành công: xoá nháp + sinh key mới (`NhapLoForm.tsx`). Nháp người khác không đọc được (khoá theo userId); đăng xuất `clearAllDrafts()` xoá hết nên không bao giờ dùng lại key. Thay đổi: `draftStorage.ts` (thêm `idempotencyKey?` + `resolveIdempotencyKey`), `NhapLoForm.tsx`, `draftStorage.test.ts` (thay test "không lưu key" bằng (a) F5 cùng user giữ key, (b) user khác/sau đăng xuất key mới, (c) sau gửi thành công key mới, + nháp có key vẫn không chứa `rate`; 11 test), `e2e/sr07_nhap_lo_draft.py` (thêm assert key + luồng gửi thành công → nhập phiếu tiếp; 18/18 PASS, thêm ảnh `qa-lo2/sr07-4-sau-gui-thanh-cong-key-moi.png`). `tsc --noEmit`, `npm run build` sạch; `npm test` 10 file, 90 test xanh. Ghi chú: nếu gửi lỗi mạng rồi F5 và key được giữ đúng thiết kế; mục nợ 3 cũ (nguy cơ phiếu trùng) không còn.
