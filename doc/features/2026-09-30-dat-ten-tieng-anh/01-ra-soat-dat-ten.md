@@ -93,7 +93,7 @@ Quy ước cột "Số chỗ": `prod a/b` nghĩa là a lần xuất hiện trong
 | Id lệnh AI `purchasing.purchasereceipt.nhap_lo` (sinh tự động từ tên method) | `purchasing.purchasereceipt.receive_batches` | prod 10 / 6f, test 41 / 9f | `ai/*`, `erp-console/features/ai/**` | Kéo theo dữ liệu M3 (mục M3-b) |
 | Khoá `sessionStorage`/`localStorage` `cave_draft_nhap_lo[:<userId>]` | `cave_draft_receive_batches:<userId>` | prod 6 / 3f, test 23 / 3f | `shared/lib/drafts.ts`, `purchasing/components/draftStorage.ts`, `AuthProvider.tsx` | `clearAllDrafts()` **phải xoá mãi mãi cả prefix cũ**, vì nháp cũ có giá mua (SR-07, bất biến 1). Có thể chuyển nháp cũ sang khoá mới một lần khi mở form |
 | Khoá JSON `GET /api/dashboard/attention/`: `cskh_queue_waiting`, `cskh_escalated`, `cskh_auto_cancel_blocked` | `confirmation_queue_waiting`, `confirmation_escalated`, `confirmation_auto_cancel_blocked` | prod 30 / 4f, test 16 / 2f | `delivery/attention_api.py`, `overview/components/AttentionBlock.tsx` | BE trả **cả khoá cũ và mới** trong 1 bản, FE đọc khoá mới trước rồi mới tới khoá cũ |
-| Khoá JSON công khai `GET /api/public/site-info/` → `cskh_notice` | `confirm_call_notice` | prod 19 / 7f, test 18 / 5f | `content/site/api.py:22`, `frontend/features/site/types.ts` | Trả cả 2 khoá. Shop là static export, trình duyệt có thể còn bản cũ trong cache nên giữ khoá cũ lâu hơn (2 bản) |
+| Khoá JSON công khai `GET /api/public/site-info/` → `cskh_notice` | `confirmation_policy` (sửa 01/10: `confirm_call_notice` đã là khoá boolean GL-04, không dùng được) | prod 19 / 7f, test 18 / 5f | `content/site/api.py:22`, `frontend/features/site/types.ts` | Trả cả 2 khoá. Shop là static export, trình duyệt có thể còn bản cũ trong cache nên giữ khoá cũ lâu hơn (2 bản) |
 | Giá trị `home` trong `/api/auth/me/`: `"cskh-queue"` | `"confirmation-queue"` | prod 6 / 4f, test 2 / 1f | `accounts/auth/services.py:28`, `erp-console/shared/lib/nav.ts:391` | FE nhận cả 2 giá trị trước, BE đổi sau |
 | Route ERP `/cskh/` (thư mục `app/(console)/cskh/`) | `/confirmation/` | prod 7 / 3f, test 7 / 5f | `nav.ts`, `AttentionBlock.tsx` | Giữ trang `/cskh/` chỉ để chuyển hướng (client redirect) cho ai đã bookmark |
 | 11 biến env `CSKH_*` (`CSKH_MAX_UNREACHABLE_ATTEMPTS`, `CSKH_UNREACHABLE_WINDOW_MINUTES`, `CSKH_MIN_RETRY_MINUTES`, `CSKH_MANAGER_DECISION_MINUTES`, `CSKH_PII_RECENT_DAYS`, `CSKH_CLAIM_MINUTES`, `CSKH_EXTEND_MAX_HOURS`, `CSKH_WORKING_HOURS`, `CSKH_QUEUE_ALERT_MINUTES`, `CSKH_AUTO_CANCEL_ENABLED`, `CSKH_NOTICE_ENABLED`) + `THROTTLE_CSKH_SEARCH` | `CONFIRMATION_*` (vd `CONFIRMATION_MAX_UNREACHABLE_ATTEMPTS`), `THROTTLE_CUSTOMER_SEARCH` | prod 56 / 11f, test 30 / 10f | `config/settings.py:280-295` | Settings đọc tên mới trước, không có thì đọc tên cũ (`_env("NEW", "OLD", default)`). Phải kiểm Cloud Run staging và production xem có đặt env `CSKH_*` nào không; hiện `doc/ops/` không ghi |
@@ -150,7 +150,7 @@ lô giao việc.
 | Quản lý | `manager` | `CSKH_MANAGER_DECISION_MINUTES` | |
 | NV kho | `warehouse_staff` | `Warehouse` | |
 | NV giao | `delivery_staff` (vai), `courier` (người giao trên một phiếu) | `my-deliveries`, `DeliveryNote.assigned_to`, `courierName` (mock) | Vai `delivery_staff` đi đôi với `warehouse_staff` |
-| CSKH (vai) | `customer_care` | — | Phương án khác: `customer_service`. **Cần Duy chốt** (câu Q1) |
+| CSKH (vai) | `customer_service` | — | **Duy chốt 30/09 (Q1)**, thay `customer_care`. Áp cho Group, nhóm lệnh AI, hàm theo vai (`is_customer_service`). Bảng chốt cuối cùng ở `02c-giao-viec.md` §1 |
 | Gọi xác nhận đơn (tính năng hay module của CSKH) | `confirmation` | `ConfirmationTask`, `CustomerCall`, `confirm_with_customer`, `ConfirmCallNotice` | Module đặt theo việc (`confirmation`), còn Group đặt theo vai (`customer_care`) |
 | Nhóm lệnh AI "Thu mua / Bán hàng / CSKH" | `purchasing` / `sales` / `customer_care` | trùng tên app `purchasing`, `sales` | |
 | Lô hàng | `batch` | `Batch`, `publish_batch`, `close_batch` | |
@@ -172,7 +172,7 @@ lô giao việc.
 | Khách | `customer` | `Customer` | |
 | Đơn | `order` | `SalesOrder` | |
 | Tiền | `amount` | `amount` | |
-| Rà soát (bản review QA) | `review` | — | **Không** dùng `audit`, vì dễ nhầm với `AuditLog` hay "nhật ký". Coordinator gợi ý `audit`, Tech Lead đề xuất `review` (câu Q2) |
+| Rà soát (bản review QA) | `review` | — | **Duy chốt 30/09 (Q2).** Không dùng `audit` vì dễ nhầm với `AuditLog` |
 | Bổ sung | `extra` / `followup` | | |
 | Mức nhạy cảm cao/TB/thấp | `high` / `medium` / `low` | | |
 | Bài viết / Trang (CMS) | `post` / `page` | `kind="post"`, `"page"` | URL công khai giữ nguyên `/bai-viet/`, `/trang/` (mục 3.3) |
@@ -340,3 +340,4 @@ lô giao việc.
 - Q3: 959 hàm test tiếng Việt → **đổi dần khi sửa file**; test mới đặt tiếng Anh ngay.
 - Q4: **đổi tên 5 Group** ở lô cuối (giữ id, FE nhận cả tên cũ/mới trước), được phép sửa `doc/decisions.md` dòng liên quan.
 - Thứ tự: **sau P8, trước P9** (code AI local mới viết trên tên chuẩn).
+- Glossary chốt, bảng lô và rủi ro: xem `02c-giao-viec.md` (Tech Lead 01/10). Chỉnh so với bản này: khoá `site-info` mới là `confirmation_policy`; thêm nhóm tên múi giờ (`VN_TIME_ZONE`, `todayInVietnam`); bỏ Lô 2; thêm Lô 5 gỡ alias (chờ Duy).
