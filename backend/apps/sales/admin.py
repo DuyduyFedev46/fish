@@ -1,11 +1,14 @@
 from django.contrib import admin
 
 from apps.common.admin import LockedFieldsAdminMixin
+from apps.inventory.admin import CostHidingMixin
 
 from .models import (
     Customer,
     PaymentTransaction,
     Refund,
+    SalesCreditNote,
+    SalesCreditNoteLine,
     SalesInvoice,
     SalesInvoiceLine,
     SalesInvoiceLineBatch,
@@ -111,3 +114,49 @@ class RefundAdmin(LockedFieldsAdminMixin, admin.ModelAdmin):
                     "status", "created_by")
     list_filter = ("status", "method", "is_partial")
     autocomplete_fields = ("sales_invoice", "payment_transaction", "created_by", "confirmed_by")
+
+
+class ReadOnlyAdminMixin:
+    """Chứng từ append-only (BR-HT-10): chỉ xem, kể cả superuser — không thêm/sửa/xoá."""
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+class SalesCreditNoteLineInline(CostHidingMixin, ReadOnlyAdminMixin, admin.TabularInline):
+    model = SalesCreditNoteLine
+    extra = 0
+    cost_fields = ("unit_cost",)
+    fields = ("batch", "qty", "rate", "amount", "unit_cost")
+    readonly_fields = ("batch", "qty", "rate", "amount", "unit_cost")
+
+    def get_fields(self, request, obj=None):
+        # Inline khai `fields` tường minh + không có quyền sửa -> Django đưa MỌI field thành chỉ đọc,
+        # nên `CostHidingMixin` (chỉ gỡ ở readonly_fields/exclude) không ẩn được cột giá vốn.
+        # Gỡ thẳng khỏi danh sách hiển thị khi thiếu `inventory.view_costprice` (bất biến 1, SR-12-AC8).
+        fields = list(super().get_fields(request, obj))
+        if not self._can_see_cost(request):
+            fields = [f for f in fields if f not in self.cost_fields]
+        return fields
+
+
+@admin.register(SalesCreditNote)
+class SalesCreditNoteAdmin(ReadOnlyAdminMixin, admin.ModelAdmin):
+    list_display = ("code", "sales_invoice", "kind", "issued_at", "amount", "stock_restored", "backfilled")
+    list_filter = ("kind", "stock_restored", "backfilled")
+    search_fields = ("code", "sales_invoice__code")
+    date_hierarchy = "issued_at"
+    inlines = [SalesCreditNoteLineInline]
+
+
+@admin.register(SalesCreditNoteLine)
+class SalesCreditNoteLineAdmin(CostHidingMixin, ReadOnlyAdminMixin, admin.ModelAdmin):
+    cost_fields = ("unit_cost",)
+    list_display = ("credit_note", "batch", "qty", "rate", "amount", "unit_cost")
+    readonly_fields = ("credit_note", "invoice_line_batch", "batch", "qty", "rate", "amount", "unit_cost")

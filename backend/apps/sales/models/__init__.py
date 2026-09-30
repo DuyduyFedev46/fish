@@ -12,6 +12,8 @@ Nguyên tắc nền:
 - BR-BH-08 / BR-DM-07: giá & công thức BUNDLE đóng băng (ảnh chụp) lúc tạo đơn.
 - unit_cost trên *LineBatch là field NHẠY CẢM (view_costprice).
 
+Chứng từ đảo doanh thu (credit_notes.py, BR-HT-10) — append-only, Hệ thống lập.
+
 Package models/ chia theo tính năng; file này re-export để `from apps.sales.models import X`
 và Django (app_label=sales) vẫn thấy đủ model — không sinh migration mới.
 """
@@ -20,6 +22,7 @@ from .orders import SalesOrder, SalesOrderLine, SalesOrderLineBatch  # noqa: F40
 from .invoices import SalesInvoice, SalesInvoiceLine, SalesInvoiceLineBatch  # noqa: F401
 from .payments import PaymentTransaction  # noqa: F401
 from .refunds import Refund  # noqa: F401
+from .credit_notes import SalesCreditNote, SalesCreditNoteLine  # noqa: F401
 
 __all__ = [
     "Customer",
@@ -31,4 +34,6 @@ __all__ = [
     "SalesInvoiceLineBatch",
     "PaymentTransaction",
     "Refund",
+    "SalesCreditNote",
+    "SalesCreditNoteLine",
 ]

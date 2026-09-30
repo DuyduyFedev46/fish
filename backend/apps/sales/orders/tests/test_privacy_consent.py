@@ -211,6 +211,9 @@ class PrivacyConsentTests(TestCase):
             "SalesInvoiceLineBatch",
             "PaymentTransaction",
             "Refund",
+            # P8 Lô 4 (BR-HT-10): chứng từ đảo doanh thu — không chứa dữ liệu cá nhân của khách.
+            "SalesCreditNote",
+            "SalesCreditNoteLine",
         }
         self.assertEqual(model_names, expected_models)
 

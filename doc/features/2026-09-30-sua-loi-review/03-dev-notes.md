@@ -359,3 +359,97 @@ R4 audit rows after 2 runs: 1 | action after reject + run: REJECTED
 - RA-05: việc AI `ESCALATED` vẫn chưa có đường để Chủ đóng (ngoài phạm vi); SR-11-AC2 kiểm bằng cách đặt trực tiếp trạng thái kết thúc trong test.
 - RA-03 (`advance_status` không khoá) không sửa (ngoài lô).
 - Tranh chấp thật `cancel_receipt` ∥ `publish_batch` (hai transaction song song, PostgreSQL) chưa chạy được ở đây (test dùng SQLite); logic khoá dựa vào cả hai phía cùng `select_for_update` trên dòng lô.
+
+## Lô 4 — BE
+
+Story: SR-12 (chứng từ đảo), SR-13 (báo cáo lô/kỳ/dashboard trừ chứng từ), SR-14 (lệnh lập bù). Chưa commit, chưa deploy, không chạm DB nào ngoài DB test.
+
+### Số test gốc / sau
+Toàn bộ `cd backend && DJANGO_DEBUG=1 env -u DATABASE_URL .venv/bin/python manage.py test` (không `--parallel`): **1293 → 1341 test, OK, 0 failure** (1327 khi giao lô, +1 test M1, +5 test D1-B, +8 test E1/E2).
+Mới: 48 (SR-12 17, SR-13 14, SR-14 17 gồm E1/E2). `makemigrations --check --dry-run`: "No changes detected".
+
+### File đã sửa / thêm
+- Mới: `backend/apps/sales/models/credit_notes.py`, `backend/apps/sales/migrations/0011_salescreditnote.py`, `backend/apps/sales/credit_notes/{__init__,services,README}` + `tests/{__init__,base,test_p8_credit_note,test_p8_backfill}.py`, `backend/apps/sales/management/commands/backfill_credit_notes.py`, `backend/apps/reports/tests/test_p8_pnl_credit_note.py`.
+- Sửa: `sales/models/__init__.py` (re-export), `sales/orders/services.py` (`cancel_paid_order` gọi service + docstring), `sales/orders/timeline.py` (sự kiện `credit_note_issued`), `sales/refunds/services.py` (chỉ docstring `confirm_refund`), `sales/admin.py` (Admin chỉ đọc), `reports/services.py` (`batch_pnl`, `period_pnl`, docstring), `reports/dashboard_api.py` (chỉ `revenue_today`), `sales/README.md`, `reports/README.md`, `doc/business-process-spec.md` (BR-HT-06, BR-HT-10 mới, BR-BC-03, BR-BC-04, bảng "Lãi lỗ theo lô", chép đúng 02b §4.6, ghi "Duy duyệt 30/09").
+- Sửa test cũ (2 chỗ, xem "Lệch"): `reports/tests/test_api.py`, `reports/tests/test_services.py`, `sales/orders/tests/test_privacy_consent.py`.
+
+### Migration
+`sales/migrations/0011_salescreditnote.py` (1 file, sinh bằng `makemigrations sales -n salescreditnote`, đã đọc lại): chỉ `CreateModel SalesCreditNote`, `CreateModel SalesCreditNoteLine`, `AddIndex sales_sales_issued__d6f3a9_idx` (`issued_at`). Phụ thuộc `inventory.0003_alter_batch_options`, `sales.0010_grant_view_privacy_consent`. Không đổi bảng cũ, không AlterField nào. `default_permissions=("view",)` cho cả hai model. Chạy trên DB test sạch (bộ test tự `migrate` từ đầu) đạt.
+
+### Endpoint / contract thực tế
+Không thêm endpoint. Đổi hành vi + khoá JSON (chỉ THÊM khoá):
+- `POST /api/sales/orders/<id>/cancel/` (và job tự huỷ CSKH): response giữ nguyên khoá; sau khi huỷ có 1 `SalesCreditNote` (`DC-<mã hoá đơn>`, `amount = invoice.amount`, dòng theo `SalesInvoiceLineBatch`), hoá đơn vẫn `ISSUED`.
+- `GET /api/reports/batch/<batch_id>/` (chỉ chủ): thêm `reversed_qty`, `reversed_revenue`; `revenue`/`qty_sold` đã trừ phần đảo. Mẫu sau huỷ 2 kg × 150.000: `"revenue": 0, "qty_sold": 0, "reversed_qty": 2, "reversed_revenue": 300000`.
+- `GET /api/reports/period/?year&month` (chỉ chủ): thêm `credit_notes`, `cogs_reversed`; `revenue = Σ hoá đơn trong kỳ − credit_notes`, `cogs = Σ giá vốn − cogs_reversed`.
+- `GET /api/dashboard/summary/`: `kpis.revenue_today` = hoá đơn hôm nay − chứng từ đảo lập hôm nay (không thêm khoá).
+- Timeline đơn (`order detail.timeline` và khối guidance): thêm sự kiện `kind="credit_note_issued"`, `label="Lập chứng từ đảo doanh thu DC-… (300.000 ₫)"`, `actor_display` = người huỷ hoặc "Hệ thống"; không có giá vốn/PII.
+
+### Rule BR đã cài
+BR-HT-06 (sửa), BR-HT-10 (mới: append-only, cùng transaction với huỷ, idempotent theo `source_key`, tối đa một chứng từ huỷ/hoá đơn, hoá đơn ISSUED nguyên vẹn; nếu hoá đơn không ISSUED → `BusinessError(code="BR-HT-10")`), BR-BC-03, BR-BC-04.
+
+### TDD — ĐỎ (trước khi cài code)
+- SR-12 (`red1.txt`): `Ran 16 tests ... FAILED (failures=6, errors=7)` — `AssertionError: 0 != 1` (không có chứng từ nào) 5 lần, `RuntimeError not raised` (service chưa được gọi trong `cancel_paid_order`), còn lại là chưa có sự kiện timeline / chưa đăng ký Admin. (Lần chạy đầu ImportError không tính là đỏ đúng nghĩa nên đã thêm stub rồi mới chạy lại.)
+- SR-13 (`red2.txt`): `Ran 9 tests ... FAILED (failures=2, errors=6)` — `KeyError: 'reversed_qty'`; `AssertionError: Decimal('4.000') != Decimal('2')` (bán lại kg đã hoàn cộng hai lần); `450000.0 != 150000.0` (dashboard chưa trừ).
+- SR-14 (`red3.txt`): `Ran 9 tests ... FAILED (errors=9)` — `CommandError: Unknown command: 'backfill_credit_notes'`.
+- R6 (repro `review_repro_tests.py`): xác nhận trước khi sửa doanh thu lô 300.000 / `qty_sold 2` cho đơn đã huỷ; nay thành test chính thức `SR13PnlCreditNoteTests.test_sr13_ac1_r6_batch_pnl_sau_tu_huy_doanh_thu_ve_0`.
+
+### TDD — XANH
+```
+manage.py test apps.sales.credit_notes            -> Ran 26 tests ... OK (17 SR-12 + 9 SR-14)
+manage.py test apps.reports.tests.test_p8_pnl_credit_note -> Ran 9 tests ... OK
+manage.py test (toàn bộ)                          -> Ran 1328 tests in 55.465s ... OK (sau M1)
+makemigrations --check --dry-run                  -> No changes detected
+```
+
+### Bằng chứng chống "xanh giả" / ma trận
+- Đối chứng số: trước huỷ `revenue=300000, reversed_qty=0`; sau huỷ `revenue=0, qty_sold=0`; bán lại 2 kg → `qty_sold=2`, `revenue=300000` (không 4 kg/600.000).
+- Rollback: patch `issue_cancel_credit_note` ném `RuntimeError` → đơn vẫn PAID/PROCESSING, kho không hoàn (AC5).
+- Ma trận: `…/cancel/` chu/quan_ly 200, nv_kho/nv_giao/cskh 403, khách 401 và không có chứng từ; `/api/reports/batch|period`: chu 200, quan_ly/nv_kho/nv_giao/cskh 403, khách 401; dashboard chu/quan_ly/nv_kho 200, nv_giao/cskh 403, khách 401 (đếm đủ 3 lần 200).
+- Không rò: quét order detail + `/api/guidance/order/<code>/` cho 5 Group (đếm 200 > 0) — không có `unit_cost`, không có khoá thuộc `COST_KEYS` (trừ `rate` là giá bán) ở quan_ly/nv_kho/nv_giao/cskh; AuditLog `issue_credit_note` không có khoá `COST_KEYS`, không có tên/SĐT/địa chỉ giả; `/api/audit-logs/` với quan_ly không có khoá giá vốn; dashboard cho quan_ly/nv_kho không có `unit_cost`/`cogs`.
+- Append-only: chỉ có quyền `view_*`; Admin đăng ký nhưng `has_add/change/delete=False` kể cả superuser; `unit_cost` ẩn với người không có `inventory.view_costprice` ở `SalesCreditNoteLineAdmin` (`CostHidingMixin`) và ở inline trên trang chứng từ (chỉ đúng SAU sửa M1: inline phải override `get_fields`, xem mục "Sửa M1" cuối phần này; bản đầu của lô bị rò); test quét mã nguồn không tìm thấy `.update/.delete/.bulk_update` trên chứng từ.
+- SR-14: dry-run không đổi số chứng từ/audit; `--apply` hai lần → lần 2 tạo 0; `issued_at` = audit mới nhất (kiểm khi có 2 dòng audit); không có audit → `order.created_at`, `stock_restored=True`; `stock_restored=False` lấy từ audit; output ở cả 3 lần chạy (dry-run, apply, apply lại) không chứa tên/SĐT/địa chỉ giả, `unit_cost`, giá vốn (110000/220000). Không chạy `--apply` ở DB nào ngoài DB test.
+- Kỳ (SR-13 AC3): hoá đơn tháng 9 (đẩy về tháng 9 bằng `.update` trong test) huỷ tháng 10 → `period_pnl(9)` không đổi (revenue 300000, cogs 220000), `period_pnl(10)` có `credit_notes=300000`, `cogs_reversed=220000`, revenue = 150.000 − 300.000 (âm, đúng thiết kế). Phiếu hoàn REFUNDED của hoá đơn đã đảo → `refunds=0`; hoàn một phần của hoá đơn chưa đảo vẫn trừ 50.000.
+
+### Điểm dừng
+Không chạm điểm dừng nào: (a) `makemigrations` chỉ sinh 2 model + 1 index; (b) fixture `invoice.amount` = Σ dòng (300.000) nên test lô không lệch làm tròn; (c) không đổi tiền/giá vốn/quyền ngoài phạm vi story.
+
+### Lệch thiết kế / giả định
+1. **Sửa 3 test cũ ngoài danh sách file 02c** (không đổi hành vi, chỉ cập nhật kỳ vọng vì thêm khoá/model theo thiết kế): `reports/tests/test_api.py` + `test_services.py` (bộ khoá `batch_pnl` 16 → 18: thêm `reversed_qty`, `reversed_revenue`) — đường dẫn nằm trong `apps/reports/tests/` nên được phép; `sales/orders/tests/test_privacy_consent.py::test_gl03_ac7…` (danh sách model app `sales` cố định) thêm `SalesCreditNote`, `SalesCreditNoteLine` — **file này nằm ngoài danh sách 02c**, chỉ thêm 2 tên + chú thích; techlead xin xem lại.
+2. Audit `issue_credit_note` được ghi cả khi lập bù (`backfilled: true` trong `changes`, actor = None) để có dấu vết; `issued_at` của chứng từ mới là thời điểm nghiệp vụ, còn `AuditLog.created_at` là lúc chạy lệnh.
+3. `SalesCreditNote.amount = invoice.amount` (đã làm tròn BR-BH-15) và `period_pnl` dùng `amount`, còn `batch_pnl` dùng tổng `SalesCreditNoteLine.amount` (kg × giá). Khi hoá đơn có làm tròn hoặc combo hai số này có thể lệch nhau vài đồng; không đổi công thức.
+4. `cogs_reversed` tính cho MỌI dòng chứng từ, kể cả `stock_restored=False` (hàng chưa về kho, đang ở người giao) — lô 🟡 trong ghi chú thiết kế; giá vốn của kg chưa hoàn kho vẫn được đảo. Cần Duy/techlead xác nhận ở Lô sau nếu muốn khác.
+5. Dashboard chỉ trừ theo `issued_at__date=today` của chứng từ; không lọc theo trạng thái hoá đơn (chứng từ chỉ tồn tại cho hoá đơn ISSUED).
+6. Batch/period lọc chứng từ theo `credit_note__sales_invoice__status=ISSUED` cho nhất quán với doanh thu gộp (hoá đơn đã CANCELLED không được tính hai chiều).
+
+### Nợ / lưu ý cho QA
+- Combo (BUNDLE): `SalesInvoiceLineBatch.qty` là kg thành phần còn `SalesInvoiceLine.rate` là giá cả combo, nên doanh thu lô theo công thức cũ `qty × rate` đã lệch cho combo; dòng chứng từ sao đúng công thức đó nên sau huỷ luôn về 0, nhưng bản thân số lệch của combo là nợ có sẵn, chưa sửa.
+- Chưa chạy `backfill_credit_notes` trên staging/production — Duy chạy sau deploy: trước hết dry-run, đọc danh sách lô CLOSED bị ảnh hưởng rồi mới `--apply`.
+- FE chưa hiển thị `reversed_qty/reversed_revenue`/`credit_notes` (không thuộc lô này).
+
+### Sửa M1 (techlead review Lô 4) — Admin inline lộ `unit_cost`
+Lỗi thật: `SalesCreditNoteLineInline` khai `fields` có `unit_cost` và `has_change_permission=False` nên Django đưa mọi field thành chỉ đọc; `CostHidingMixin` chỉ gỡ ở `readonly_fields`/`exclude` nên không ẩn được. Câu "Admin ẩn `unit_cost`" trong bản giao đầu của lô là sai (đã đính chính ở mục Bằng chứng). Sửa chỉ trong `backend/apps/sales/admin.py`: inline override `get_fields`, bỏ `cost_fields` khi user thiếu `inventory.view_costprice`. Không đụng `inventory/admin.py` (ngoài danh sách Lô 4; techlead gợi ý đưa `get_fields` vào `CostHidingMixin` sau, việc riêng).
+- Test mới: `SR12CreditNoteTests.test_sr12_ac7_admin_an_unit_cost_voi_staff_thieu_view_costprice`. Staff chỉ có `view_salescreditnote` + `view_salescreditnoteline` (assert không có `view_costprice`) GET `/admin/sales/salescreditnote/<id>/change/` → assert **200**, có mã chứng từ (đúng trang), không có nhãn "Giá vốn ảnh chụp (đ/kg)" lẫn giá trị giả `123457,7777` (đặt bằng `.update` trong test); trang đổi và danh sách `salescreditnoteline` cũng 200 và không có; đối chứng user có `view_costprice` và superuser → 200, thấy nhãn và giá trị.
+- ĐỎ (trước sửa): `AssertionError: 'Giá vốn ảnh chụp (đ/kg)' unexpectedly found in '<!DOCTYPE html>...` — trang 200, cột `column-unit_cost` và `<td class="field-unit_cost"><p>123457,7777</p>` hiện ra (đúng lý do, không phải 302/403).
+- XANH (sau sửa): `manage.py test apps.sales.credit_notes.tests.test_p8_credit_note` → `Ran 17 tests ... OK`; toàn bộ `manage.py test` → `Ran 1328 tests in 55.465s ... OK`; `makemigrations --check --dry-run` → `No changes detected`.
+
+### D1 phương án B — không sửa kỳ cũ (Duy quyết 30/09)
+Vấn đề (techlead D1): hoàn một phần 50.000 xác nhận tháng 9 rồi huỷ đơn tháng 10 thì công thức đầu loại mọi phiếu hoàn của hoá đơn đã có chứng từ, làm lãi tháng 9 đổi từ 30.000 lên 80.000. Sửa `backend/apps/reports/services.py::period_pnl` (chỉ sửa hàm này + docstring, `batch_pnl`/dashboard không đổi, không phải sửa để nhất quán vì hai nơi đó không trừ phiếu hoàn):
+- `refunds` kỳ: phiếu REFUNDED của hoá đơn có chứng từ chỉ bị loại khi `confirmed_at >= credit_note.issued_at`; xác nhận trước lúc huỷ vẫn trừ ở kỳ xác nhận của nó.
+- Kỳ lập chứng từ: số đảo doanh thu (`credit_notes`) = `max(0, cn.amount − Σ phiếu REFUNDED của hoá đơn có confirmed_at < cn.issued_at)`. `cogs_reversed` giữ nguyên (mọi dòng chứng từ).
+- Spec BR-HT-06 thêm câu quy tắc "(Duy quyết 30/09, phương án B)"; docstring `period_pnl`, module `reports/services.py`, `confirm_refund`, `reports/README.md` cập nhật.
+- Test mới (`SR13D1PhuongAnBTests`, `apps/reports/tests/test_p8_pnl_credit_note.py`): (1) `ky_cu_khong_doi_ky_huy_dao_phan_con_lai`: `period_pnl(9)` trước huỷ == sau huỷ (so cả dict: refunds 50000, profit 30000); tháng 10 `credit_notes=250000`, `cogs_reversed=220000`, `refunds=0`, revenue −250000, profit −30000; tổng lãi 2 kỳ = 0 và (doanh thu − hoàn) 2 kỳ = 0; (2) không hoàn trước → như cũ (300000); (3) hoàn nốt 250.000 sau huỷ → không trừ hai lần (tháng 9 refunds 50000, tháng 10 refunds 0, credit_notes 250000); (4) đã hoàn đủ 300.000 trước huỷ → số đảo 0 (không âm), tháng 9 refunds 300000; (5) `backfill_credit_notes --apply` cho đơn có hoàn trước, `issued_at` lấy từ audit (tháng 10) → tháng 9 không đổi, tháng 10 `credit_notes=250000`.
+- ĐỎ (trước sửa, `red_d1.txt`): `Ran 5 tests ... FAILED (failures=4)` — `period_pnl(9)` sau huỷ `refunds 0, profit 80000` khác trước huỷ `refunds 50000, profit 30000`; `Decimal('300000.00') != Decimal('0')`; `Decimal('0') != Decimal('50000')`; ca "không hoàn trước" xanh ngay (đúng: hành vi cũ giữ nguyên).
+- XANH: `manage.py test apps.reports` → `Ran 38 tests ... OK`; toàn bộ `manage.py test` → `Ran 1333 tests in 57.608s ... OK`; `makemigrations --check --dry-run` → `No changes detected`.
+- Lưu ý: nếu phiếu hoàn và chứng từ có cùng thời điểm (`confirmed_at == issued_at`) thì tính là "sau/cùng lúc" (bị loại khỏi refunds, không giảm số đảo). Cùng thời điểm chỉ xảy ra khi test ép giờ; thực tế phiếu hoàn xác nhận và huỷ là hai thao tác khác nhau.
+
+### E1/E2 — báo cáo đã qua không được sửa số (Duy quyết 30/09) — **SR-14-AC2 đổi theo Duy 30/09**
+Nguyên tắc Duy: "báo cáo đã qua thì không được sửa số".
+- **E1** (`backfill_credit_notes --apply`): chứng từ lập bù có `issued_at = thời điểm chạy lệnh` (`timezone.now()` trong service, lệnh truyền `at=None`), KHÔNG lấy ngày AuditLog huỷ gốc; `backfilled=True`, `created_by=None`. `stock_restored` vẫn lấy từ AuditLog `cancel_paid_order` mới nhất (mặc định True). Kỳ cũ giữ nguyên; kỳ hiện tại nhận điều chỉnh, `period_pnl` (D1-B) tự trừ phần hoàn đã xác nhận trước đó. Đây là **thay đổi AC do Duy quyết**: SR-14-AC2 gốc ("`issued_at` = thời điểm AuditLog huỷ") không còn đúng; 02-stories.md không được sửa (ngoài quyền be-dev) — cần PO/điều phối cập nhật. Test AC2 cũ được viết lại (`test_sr14_ac2_apply_lap_chung_tu_issued_at_la_luc_chay_lenh_created_by_none`, `…khong_co_audit_van_issued_at_la_luc_chay_lenh`, `…stock_restored_lay_tu_audit_moi_nhat_khi_co_nhieu_dong`), ca (5) của D1 (`test_sr13_d1_backfill_ca_co_hoan_truoc`) đổi sang hoá đơn + hoàn ở tháng 8 để không phụ thuộc ngày chạy test.
+- **E2** (`reports/services.py::batch_pnl`): lô `CLOSED` (có `closed_at`) chỉ trừ dòng chứng từ có `credit_note.issued_at <= batch.closed_at`. Chứng từ lập sau lúc chốt (kể cả lập bù) không đổi lãi lỗ lô, nhưng vẫn vào `period_pnl` kỳ hiện tại. Lô chưa chốt: như cũ. Giả định: lô `CLOSED` mà `closed_at` rỗng (chỉ xảy ra khi test ép trạng thái; `close_batch` luôn đặt `closed_at`) thì không lọc theo mốc chốt (trừ như cũ) — vì không xác định được mốc.
+- Dry-run: thêm mục riêng "Lô đã CLOSED liên quan (lãi lỗ lô giữ nguyên, điều chỉnh vào kỳ hiện tại)" và từng dòng "đơn <mã> · lô <mã> — lãi lỗ lô giữ nguyên, điều chỉnh vào kỳ hiện tại"; chỉ mã đơn/mã lô, không PII/giá vốn (test kiểm sentinel).
+- Spec: BR-HT-10 thêm câu về chứng từ lập bù; BR-BC-04 thêm vế "lô đã chốt: chỉ trừ chứng từ lập trước thời điểm chốt (Duy quyết 30/09)". Docstring lệnh, `batch_pnl`, README cập nhật. `period_pnl` và dashboard không đổi lần này.
+- Test (`SR14E1E2BackfillReportTests` trong `apps/reports/tests/test_p8_pnl_credit_note.py` + `SR14E2DryRunTests`): (a) đơn huỷ tháng 8 (audit huỷ ép về tháng 8): `period_pnl(8)` trước/sau `--apply` bằng nhau mọi khoá, kỳ hiện tại `credit_notes=300000`, `cogs_reversed=220000`; (b) lô CLOSED: `batch_pnl` trước/sau `--apply` bằng nhau mọi khoá (revenue vẫn 300000 — đối chứng lỗi F04 cũ nằm nguyên trong số đã chốt), kỳ hiện tại vẫn có `credit_notes=300000`; (c) lô chưa chốt: `revenue 0, reversed_qty 2` như cũ; (d) luồng huỷ thường lô chưa chốt không đổi, huỷ thường trước khi chốt vẫn trừ sau khi chốt, huỷ SAU khi chốt qua luồng thường thì `batch_pnl` giữ nguyên nhưng kỳ hiện tại có chứng từ; (e) `--apply` hai lần → chứng từ không tăng, `issued_at` giữ nguyên; dry-run liệt kê riêng đơn thuộc lô CLOSED.
+- ĐỎ (`red_e.txt`): `Ran 48 tests ... FAILED (failures=6)`: `issued_at` bằng ngày audit gốc `2026-09-01 not >= lúc chạy`; `batch_pnl` lô CLOSED sau `--apply` `qty_sold 0.000 != 2.000` (bị trừ); dry-run thiếu dòng "lãi lỗ lô giữ nguyên, điều chỉnh vào kỳ hiện tại". Lưu ý: ca (a) và D1-5 (đổi sang tháng 8) đã xanh sẵn ở lần chạy đầu vì hệ thống thời điểm chạy test trùng tháng của audit; ca (a) sau đó được ép audit về tháng 8 để phân biệt được hai hành vi.
+- XANH: `apps.reports apps.sales` → `Ran 395 tests ... OK`; toàn bộ `manage.py test` → `Ran 1341 tests in 56.459s ... OK` (chạy sau khi sửa xong docstring/README/spec); `makemigrations --check --dry-run` → `No changes detected`.
+
+**T1 (techlead vòng 2):** `apps/reports/tests/test_p8_pnl_credit_note.py` đổi 4 chỗ lấy year/month từ `timezone.now()` (UTC) sang `timezone.localdate()` (giờ VN, khớp bộ lọc của `period_pnl`), tránh đỏ 00:00-07:00 VN ngày 1 hằng tháng. Kiểm bằng script tạm (scratchpad, ngoài repo) patch `timezone.now` = 2026-10-31 20:00 UTC (= 01/11 03:00 VN): 48 test P8 (reports + credit_notes) OK; với mẫu cũ thì 3 test đỏ. Các file test P8 khác chỉ dùng `now()` cho so sánh thời điểm, không lấy year/month.

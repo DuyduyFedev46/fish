@@ -390,3 +390,123 @@ Playwright  Django thật (SQLite tạm, cổng 8113) + build USE_MOCK=0 phục 
 erp-console  npm run build (bản thật, không mock) sau khi QA                                          -> exit 0; out/ không còn mock
 Việc còn lại (⏸ E25): chạy ba cặp tranh chấp với 2 kết nối song song trên Postgres staging (ví dụ 2 luồng: cancel_expired_batch ↔ confirm_payment, publish_batch ↔ cancel_receipt, auto_cancel_overdue ↔ record_call) và xác nhận không deadlock, không dữ liệu lệch.
 ```
+
+## Lô 4 — SR-12, SR-13, SR-14 (chứng từ đảo doanh thu, có migration 0011) · lần 1 · 2026-09-30
+
+### Kết luận: APPROVED — 0 lỗi Critical/High/Medium; mọi AC chạy thật xanh, kể cả AC mới Duy đổi 30/09 (lập bù `issued_at` = lúc chạy, lô chốt không đổi, D1-B); mọi kịch bản so số kỳ cũ TRƯỚC/SAU đều bằng nhau ở mọi khoá; 1 ca ⏸ (tranh chấp song song thật cần Postgres); 4 ghi nhận Low không chặn
+### Tổng: 64 ca · ✅ 63 · ❌ 0 · ⏸ 1 (2 giao dịch huỷ đồng thời trên Postgres staging: máy này không có Postgres, SQLite bỏ qua khoá dòng)
+
+Cách đếm: 19 ca theo AC (SR-12 x8, SR-13 x7, SR-14 x4) + 38 test QA bổ sung độc lập với test của dev (mỗi `test_` = 1 ca) + 3 ca migration (sqlmigrate / migrate sạch + rollback + migrate lại /
+`makemigrations --check`) + 1 ca tái hiện R6 + 2 ca hồi quy (backend đầy đủ, adapter) + 1 ca ⏸.
+
+Phạm vi: code chưa commit trong working tree (`sales/credit_notes/services.py`, `sales/models/credit_notes.py`, migration `0011_salescreditnote`, `sales/orders/services.py`,
+`sales/orders/timeline.py`, `sales/refunds/services.py`, `sales/admin.py`, `reports/services.py`, `reports/dashboard_api.py`, `management/commands/backfill_credit_notes.py` + 48 test của dev).
+Không sửa code sản phẩm. QA thêm 2 file test (38 test):
+- `backend/apps/sales/credit_notes/tests/test_qa_lo4_tien.py` (23 test: mọi đường huỷ, tiền nhiều kịch bản, lô/combo/ranh giới `closed_at`)
+- `backend/apps/sales/credit_notes/tests/test_qa_lo4_backfill_leak.py` (15 test: lệnh lập bù, rò giá vốn/PII, Admin HTML thật, append-only, ma trận Group)
+Không có FE thay đổi nên không chạy npm/Playwright (lô này chỉ BE). Dữ liệu chỉ là giả (Khách Giả Bí Mật, 0900000xxx, Số 1 Đường Thử; giá vốn mồi 123457 để dò rò theo chuỗi).
+Không chạy `backfill_credit_notes --apply` với DB thật; mọi lần `--apply` nằm trong test trên DB test tạm. `backend/db.sqlite3` không bị đụng (mtime 13:51, trước phiên QA).
+
+## Theo AC
+| Mã AC | Kết quả | Bằng chứng |
+|---|---|---|
+| SR-12-AC1 (job tự huỷ → 1 chứng từ, hoá đơn giữ ISSUED) | ✅ | test dev `sr12_ac1` + QA `QAPathsTests` job 2 đơn (1 đơn lỗi); so `values()` hoá đơn trước/sau bằng nhau |
+| SR-12-AC2 (huỷ tay, `created_by`) | ✅ | dev `sr12_ac2` chu/quan_ly; QA CSKH decide CANCEL → `created_by=ql1` |
+| SR-12-AC3 (2 lô → 2 dòng) | ✅ | dev `sr12_ac3`; QA combo BUNDLE 2 lô thành phần về 0 |
+| SR-12-AC4 (idempotent) | ✅ | QA: huỷ tay 2 lần → 4xx; decide lần 2 → 4xx; job chạy lại; thứ tự A→B và B→A; ràng buộc DB unique `source_key`/`code` (IntegrityError) — luôn 1 chứng từ |
+| SR-12-AC5 (atomic, rollback) | ✅ | dev `sr12_ac5`; QA decide CANCEL lỗi lập chứng từ → đơn giữ trạng thái cũ, không CANCEL_RESTORE; job: đơn lỗi không kéo đơn khác |
+| SR-12-AC6 (giao thất bại → `stock_restored=false`) | ✅ | dev `sr12_ac6`; QA lập bù đọc đúng `stock_restored=False` từ AuditLog |
+| SR-12-AC7 (append-only) | ✅ | QA: superuser GET add/delete → 403, POST change/delete/action delete_selected không đổi bản ghi; mọi route API `credit-notes` (5 dạng x 5 phương thức x 5 user) → 404/405; PATCH/PUT/DELETE hoá đơn → 403/404/405 và hoá đơn vẫn ISSUED; không Group nào có add/change/delete; chỉ có 2 quyền `view_*`; ProtectedError khi xoá hoá đơn/lô có chứng từ |
+| SR-12-AC8 (timeline + không rò giá vốn) | ✅ | QA quét response 5 Group x 12+ URL (đếm 200 > 0 mỗi nhóm); timeline có đúng 1 `credit_note_issued`, không giá vốn/PII; AuditLog `issue_credit_note` khoá = `{credit_note, amount, backfilled}` |
+| SR-13-AC1 (lô, R6) | ✅ | repro R6 → `revenue 0.00000 qty_sold 0.000`; dev + QA `batch_pnl` `reversed_qty`/`reversed_revenue` |
+| SR-13-AC2 (bán lại không cộng đôi) | ✅ | QA: huỷ → bán lại 2 kg → huỷ lại: đảo luỹ kế 4 kg / 600.000, `qty_sold`/`revenue` về 0, không âm |
+| SR-13-AC3 (kỳ cũ không đổi) | ✅ | QA 10 kịch bản: hoá đơn 2 tháng trước / hoàn một phần / hoàn đủ / cùng tháng / hoàn sau huỷ / 2 phiếu hoàn khác kỳ / hoàn tạo trước xác nhận sau / job + hoàn; kỳ n≥1 giữ nguyên MỌI khoá; Σ profit và Σ cogs các kỳ = 0 |
+| SR-13-AC4 (phiếu hoàn không trừ đôi; hoàn không có chứng từ vẫn trừ) | ✅ | QA hoàn sau huỷ / hoàn cùng kỳ (không trừ đôi); D1-B: hoàn 50.000 xác nhận trước huỷ → kỳ đó trừ, kỳ huỷ đảo 250.000; dev test hoá đơn không chứng từ vẫn trừ |
+| SR-13-AC5 (dashboard `revenue_today`) | ✅ | QA: hôm nay 300.000 → 0 → −300.000 khi huỷ hoá đơn hôm qua (số âm đúng E1, xem L3) |
+| SR-13-AC6 (ma trận báo cáo) | ✅ | QA `QAPermMatrixTests`: period/batch/dashboard chu 200/200/200; ql, kho 403/403/200; giao, cskh 403 x3; khách 401 x3 |
+| SR-13-AC7 (docstring/spec) | ✅ | đọc diff: `confirm_refund`, spec BR-HT-06/BR-HT-10/BR-BC-04 ghi "Duy duyệt 30/09" (đây là kiểm chữ, không phải hành vi) |
+| SR-14-AC1 (dry-run không ghi + liệt kê lô CLOSED) | ✅ | QA `CaptureQueriesContext`: 0 câu INSERT/UPDATE/DELETE; đếm CN và AuditLog trước/sau bằng nhau; in mã đơn/hoá đơn/số tiền/lô; dòng riêng "đơn … · lô … — lãi lỗ lô giữ nguyên" chỉ ở lô chốt |
+| SR-14-AC2 (AC mới: `issued_at` = lúc chạy, `backfilled`, `created_by=None`) | ✅ | QA: 3 chứng từ, `issued_at` cách bây giờ < 5 phút, không phải ngày huỷ gốc, kỳ n≥1 bằng nhau mọi khoá, kỳ hiện tại `credit_notes` = 1.150.000 (300k + 300k + 250k sau trừ hoàn 50k + 300k huỷ mới), `cogs_reversed` đúng; lô CLOSED `batch_pnl` không đổi, lô còn mở được đảo |
+| SR-14-AC3 (chạy 2 lần) | ✅ | QA: lần 2 in "0 đơn"/"Đã lập 0", `issued_at` từng chứng từ, AuditLog, số kỳ không đổi; lỗi giữa chừng (đơn 2 raise) → đơn 2 rollback, chạy lại lập đúng 1, không nhân đôi |
+| SR-14-AC4 (output không PII/giá vốn) | ✅ | QA quét output dry-run + apply + apply lần 2: không tên/SĐT/địa chỉ, không `unit_cost`/`landed`/"giá vốn"/123457/220000 |
+
+## Ngoại lệ & biên (ngoài đường thuận)
+| Ca | Kết quả | Bằng chứng |
+|---|---|---|
+| Đơn còn PAID / đã huỷ mới (đã có chứng từ) không bị lập bù chọn | ✅ | QA backfill: DRY-RUN đúng 3 đơn, đơn PAID không có chứng từ |
+| Đơn huỷ khi chưa thanh toán → không chứng từ | ✅ | QA `QAPathsTests` |
+| Lô chốt trước huỷ: không đổi; chốt sau huỷ: giữ số đã đảo | ✅ | QA `QABatchTests` |
+| Ranh giới `issued_at == closed_at` trừ; `+1µs` không trừ | ✅ | QA |
+| Đơn 2 lô, 1 lô đã chốt: lô chốt đứng yên, lô còn lại đảo | ✅ | QA |
+| Hoàn đủ trước huỷ → `credit_notes` = 0 (không âm) | ✅ | QA kịch bản hoàn đủ |
+| Màn hình cũ: quản lý bấm CANCEL lần 2 sau CSKH đã huỷ | ✅ | QA 4xx, 1 chứng từ |
+| `stock_restored=False` vẫn đảo cả doanh thu và `cogs_reversed` | ✅ | QA (ghi nhận: hàng chưa về kho nhưng vẫn đảo giá vốn theo thiết kế 02b) |
+| Migration `sqlmigrate sales 0011` chỉ CREATE (2 bảng + 6 chỉ mục), không ALTER/DROP/UPDATE dữ liệu | ✅ | 19 dòng SQL |
+| `migrate` trên SQLite sạch, `migrate sales 0010` (rollback), `migrate` lại | ✅ | lần lượt "Applying sales.0011 OK" / "Unapplying sales.0011 OK" / "Applying sales.0011 OK"; sau đó 2 bảng có, 0 dòng |
+| `makemigrations --check --dry-run` | ✅ | No changes detected |
+| Tranh chấp thật: 2 giao dịch cùng huỷ 1 đơn trên Postgres | ⏸ | không có Postgres; hai thứ tự tuần tự A→B và B→A xanh; ràng buộc unique DB chặn nhân đôi |
+
+## Phân quyền (Group x hành động)
+Khảo sát bằng chạy thật, mỗi ô là mã HTTP thực (đã đếm 200 > 0 cho từng nhóm để tránh xanh giả).
+| Hành động | chu | quan_ly | nv_kho | nv_giao | cskh | khách |
+|---|---|---|---|---|---|---|
+| `GET /api/reports/period/`, `/api/reports/batch/<id>/` | 200 | 403 | 403 | 403 | 403 | 401 |
+| `GET /api/dashboard/summary/` | 200 | 200 | 200 | 403 | 403 | 401 |
+| Ghi (POST/PATCH/PUT/DELETE) mọi URL chứng từ | 404/405 | 404/405 | 404/405 | 404/405 | 404/405 | 401 |
+| Admin thêm/sửa/xoá chứng từ (superuser cũng vậy) | 403 | 403 | 403 | 403 | 403 | n/a |
+Ghi chú: huỷ đơn `sales.cancel_paid_order` (403 với nv_kho/nv_giao/cskh) đã có dev test `sr12_ac2_ma_tran_group`; CSKH decide CANCEL cần `delivery.decide_unconfirmed` (ql 200).
+
+## Rò giá vốn
+| Điểm kiểm | Kết quả | Bằng chứng |
+|---|---|---|
+| JSON 12+ endpoint x 5 Group (đơn, hoá đơn, guidance, dashboard, audit-logs, cskh queue, delivery notes, lô, ledger, report period/batch) | ✅ | QA `test_khong_ro_gia_von_va_pii_...`: nhóm thiếu `view_costprice` không có khoá giá vốn/`unit_cost`/`cogs_reversed`/`reversed_revenue`/"landed" và không có chuỗi 123457; đếm 200 mỗi nhóm > 0 |
+| Admin HTML thật, staff thiếu `view_costprice` (7 trang: changelist, change, history, changelist dòng, change dòng, 2 kết quả tìm kiếm) | ✅ | không có "Giá vốn"/`unit_cost`/`field-unit_cost`/123457 |
+| Đối chứng: staff có `view_costprice` thấy "Giá vốn ảnh chụp" và 123457 | ✅ | chứng minh ca kiểm nhạy, không xanh giả |
+| AuditLog `issue_credit_note` | ✅ | `changes` chỉ `{credit_note, amount, backfilled}`; không có `qty`/khoá giá vốn |
+| Tiền ÷ kg | ✅ | `reversed_revenue / reversed_qty` = 150.000 (giá BÁN), khác giá vốn 123457/110.000; chỉ Chủ đọc được (report 403 với nhóm khác); `amount` audit không kèm kg |
+| Timeline đơn (2 đơn x 5 Group) | ✅ | 1 sự kiện `credit_note_issued`, không giá vốn/PII |
+| Output lệnh backfill (dry-run, apply, apply lần 2) | ✅ | không giá vốn |
+
+## Rò dữ liệu cá nhân
+| Điểm kiểm | Kết quả | Bằng chứng |
+|---|---|---|
+| Shop công khai tra đơn đã huỷ có chứng từ | ✅ | không chứa `credit_note`/`DC-`/giá vốn/tên/địa chỉ; SĐT đầy đủ không trả |
+| Chưa đăng nhập vào mọi URL nội bộ | ✅ | 401 |
+| Log `cangca.delivery.cskh` khi 1 đơn lỗi khi job tự huỷ | ✅ | `assertLogs`: không chứa tên/SĐT/địa chỉ giả |
+| AuditLog + timeline + output lệnh | ✅ | không PII |
+| Chứng từ Admin | ✅ | chứng từ không lưu tên/SĐT/địa chỉ (chỉ FK hoá đơn); trang Admin HTML không chứa PII giả |
+| Chứa PII ở `localStorage`/console/URL | n/a | lô BE, không đổi FE |
+
+## Hồi quy
+| Điểm kiểm | Kết quả | Bằng chứng |
+|---|---|---|
+| Toàn bộ backend | ✅ | `Ran 1379 tests OK` (baseline 1341 + 38 QA), 61 s, không `--parallel` |
+| Adapter | ✅ | `68 passed` |
+| Repro R6 | ✅ | `review_repro.tests.R6PnlAfterAutoCancel` OK, in "order CANCELLED invoice ISSUED, pnl revenue 0.00000 qty_sold 0.000" (trước Lô 4 là doanh thu 300000) |
+| Repro R1–R5 (lô trước) | ✅ | vẫn chặn đúng: R2 `ConflictError` "Đơn đã bị huỷ", R3 `BusinessError BR-MH-05`, R5 `BusinessError` "Còn 2,000 kg đang giữ chỗ", R4 ok, R1 không còn crash. Các test repro bị "đỏ" vì bug đã hết (đúng kỳ vọng), không phải hồi quy |
+| `reports`, `sales`, `delivery`, `inventory` liền kề | ✅ | nằm trong 1379 test |
+
+## Lỗi
+Không có lỗi chặn. Ghi nhận (Low, không chặn):
+- **N1 (Low) — SR-13-AC5/E1: KPI "doanh thu hôm nay" bị trừ vào NGÀY chạy `--apply`, có thể âm** (thấy ở QA: hôm nay 300.000 → 0 → −300.000 khi huỷ hoá đơn hôm qua). Đúng theo quyết định Duy E1 ("kỳ hiện tại nhận điều chỉnh"), nhưng Duy nên biết khi chạy lập bù trên production: KPI ngày đó sẽ giảm đúng bằng tổng đơn huỷ cũ. Đề xuất chạy ngoài giờ xem số, hoặc ghi chú trên dashboard.
+- **N2 (Low) — Combo BUNDLE: `SalesInvoiceLineBatch.qty` là kg thành phần, còn `rate` là giá combo**, nên `qty × rate` của dòng chứng từ khác `amount` chứng từ khi đơn là combo (nợ có sẵn từ trước, `amount` vẫn đúng và về 0 ở `batch_pnl`). Không đổi tiền; ghi nhận để Tech Lead xem khi nào có báo cáo theo dòng.
+- **N3 (Low) — `period_pnl` tính `credit_notes` cho từng chứng từ nên có N+1 truy vấn phiếu hoàn** (đã là L4 ở `03b`). Đề xuất gom 1 truy vấn khi số chứng từ tăng.
+- **N4 (Low, FE, đã có ở `03b` L1) — union kiểu timeline FE chưa có `credit_note_issued`**: sự kiện hiển thị được ở API nhưng FE cần thêm nhãn/icon. Không đổi tiền/dữ liệu.
+- Lưu ý (không phải lỗi): 02b §4.4/§4.5 viết trước quyết định Duy 30/09 nên còn chữ "lập bù `issued_at` = ngày huỷ gốc"; code và stories mới là chuẩn. Đề xuất Tech Lead cập nhật chữ trong 02b.
+
+## Lệnh đã chạy (tóm tắt output)
+```
+backend  manage.py test apps.sales.credit_notes.tests.test_qa_lo4_tien                              -> Ran 23 OK
+backend  manage.py test apps.sales.credit_notes.tests.test_qa_lo4_backfill_leak                     -> Ran 15 OK (lần đầu 2 đỏ do số kỳ vọng SAI trong test QA: quên đơn o5 huỷ mới và đếm audit; đã sửa test, không phải lỗi sản phẩm)
+backend  DJANGO_DEBUG=1 env -u DATABASE_URL .venv/bin/python manage.py test                        -> Ran 1379 tests OK, 61 s
+backend  manage.py makemigrations --check --dry-run                                                 -> No changes detected
+backend  manage.py sqlmigrate sales 0011                                                            -> 2 CREATE TABLE, 6 CREATE INDEX, BEGIN/COMMIT
+DATABASE_URL=sqlite:///<scratchpad>/qa-lo4/clean.sqlite3  manage.py migrate                        -> ... sales.0011 OK
+DATABASE_URL=...clean.sqlite3  manage.py migrate sales 0010                                        -> Unapplying sales.0011 OK (2 bảng biến mất)
+DATABASE_URL=...clean.sqlite3  manage.py migrate                                                    -> Applying sales.0011 OK (2 bảng có, 0 dòng)
+repro R6 (gói tạm review_repro trong scratchpad, PYTHONPATH)                                        -> OK, revenue 0.00000 qty_sold 0.000; R2..R5 chặn, R1 hết crash
+adapter  .venv/bin/python -m pytest -q                                                              -> 68 passed
+(Không chạy `backfill_credit_notes --apply` trên DB thật; không đụng backend/db.sqlite3.)
+Việc còn lại (⏸): 2 luồng huỷ cùng 1 đơn song song trên Postgres staging (`cancel_paid_order` ↔ `auto_cancel_overdue`), xác nhận không deadlock và không nhân đôi chứng từ.
+Trước khi chạy `--apply` trên staging/production: chạy dry-run, đọc danh sách lô CLOSED và ước lượng KPI hôm nay (N1).
+```

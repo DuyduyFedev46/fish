@@ -410,7 +410,8 @@ stateDiagram-v2
 | BR-HT-03 | Chuyển sang **Đã hoàn** bắt buộc nhập **mã giao dịch chuyển khoản**. Không cho xác nhận suông. |
 | BR-HT-04 | Số tiền hoàn **không được vượt** số đã thu của đơn (trừ đi các lần hoàn trước). |
 | BR-HT-05 | Hoàn kho xảy ra ở **thời điểm huỷ**, độc lập với việc tiền đã chuyển hay chưa — kho và tiền là hai sổ tách nhau. |
-| BR-HT-06 | Doanh thu đã ghi bị **đảo** tại thời điểm tạo phiếu hoàn, ghi vào đúng kỳ phát sinh hoàn (không sửa kỳ cũ). |
+| BR-HT-06 | *(sửa 2026-09-30, Duy duyệt 30/09)* Huỷ đơn đã thanh toán → Hệ thống lập **chứng từ đảo doanh thu** (BR-HT-10) ngay lúc huỷ; doanh thu và giá vốn của đơn được đảo vào **kỳ phát sinh huỷ**, không sửa kỳ cũ. Phiếu hoàn chỉ ghi tiền rời tài khoản: phiếu hoàn của hoá đơn đã có chứng từ đảo **không** trừ doanh thu lần nữa; phiếu hoàn của hoá đơn chưa có chứng từ đảo (hoàn một phần, hoàn sau giao) vẫn trừ vào kỳ xác nhận hoàn. Phiếu hoàn đã xác nhận **trước** lúc huỷ vẫn trừ ở kỳ xác nhận của nó, và số đảo doanh thu ở kỳ huỷ = số tiền hoá đơn − tổng phiếu hoàn đã xác nhận trước lúc huỷ (không âm), nên kỳ cũ không bao giờ đổi số (Duy quyết 30/09, phương án B). *(Lý do: hoá đơn gốc giữ nguyên để giữ lịch sử; trước đây đơn huỷ vẫn tính doanh thu lô.)* |
+| BR-HT-10 | *(mới, Duy duyệt 30/09)* Chứng từ đảo doanh thu là chứng từ riêng, append-only, do Hệ thống lập trong cùng giao dịch với huỷ đơn (kể cả job tự huỷ CSKH), gắn hoá đơn gốc; hoá đơn gốc giữ nguyên `ISSUED`. Mỗi dòng = lô + kg + đơn giá bán lấy từ phân bổ lô của hoá đơn (BR-BH-06). Mỗi hoá đơn tối đa một chứng từ huỷ. Chứng từ lập bù cho đơn huỷ trước P8 ghi vào kỳ chạy lập bù; lãi lỗ lô đã chốt không đổi (Duy quyết 30/09). |
 | BR-HT-07 | **Tách quyền**: `create_refund` mở cho Quản lý (khách chờ không được), `confirm_refund` chỉ Chủ (tiền thật rời tài khoản). |
 | BR-HT-08 | Mọi chuyển trạng thái Refund ghi AuditLog (BR-PQ-05). |
 
@@ -458,7 +459,7 @@ Hàng đông lạnh mất trọng lượng theo thời gian (rút nước, bay h
 ## 12.1 Hai góc nhìn
 | Báo cáo | Đơn vị | Nội dung | Tính chất |
 |---|---|---|---|
-| **Lãi lỗ theo lô** | 1 lô | Doanh thu bán từ lô (hoá đơn chưa huỷ) − (giá mua + chi phí phân bổ). Hao hụt và hàng hỏng hiện riêng (kg + giá trị), không cộng thêm — xem BR-BC-04 *(sửa 2026-09-28, Duy duyệt)* | **Nguồn sự thật**. Chốt lô là chốt số. |
+| **Lãi lỗ theo lô** | 1 lô | Doanh thu bán từ lô (phân bổ lô của hoá đơn chưa huỷ, **trừ** dòng chứng từ đảo doanh thu của lô — BR-HT-10) − (giá mua + chi phí phân bổ). Hao hụt và hàng hỏng hiện riêng (kg + giá trị), không cộng thêm — xem BR-BC-04 *(sửa 2026-09-28, Duy duyệt)* | **Nguồn sự thật**. Chốt lô là chốt số. |
 | **Lãi lỗ theo kỳ** | Tháng | Tổng doanh thu ghi nhận − tổng giá vốn ghi nhận − hoàn tiền trong kỳ | Điều hành. Có thể lệch nhẹ với tổng theo lô khi lô chưa chốt. |
 
 Cả hai báo cáo nằm sau `view_profitreport` — mặc định chỉ Chủ (1.7).
@@ -468,8 +469,8 @@ Cả hai báo cáo nằm sau `view_profitreport` — mặc định chỉ Chủ (
 |---|---|
 | BR-BC-01 | Doanh thu ghi nhận tại thời điểm **xác nhận thanh toán**. |
 | BR-BC-02 | Giá vốn ghi nhận **cùng thời điểm** với doanh thu, lấy từ bảng phân bổ lô (BR-BH-06). |
-| BR-BC-03 | Hoàn tiền ghi vào **kỳ phát sinh hoàn**, không sửa ngược kỳ đã qua. |
-| BR-BC-04 | Lãi/lỗ theo lô = doanh thu bán từ lô − (giá mua + chi phí phân bổ). Doanh thu (và số kg đã bán) chỉ lấy từ hoá đơn **chưa huỷ** *(sửa 2026-09-28, Duy duyệt, lý do: hoá đơn đã huỷ bị tính vào doanh thu lô)*. Giá mua = `purchase_rate` × số kg nhập. Hao hụt (kiểm kê âm) và hàng hỏng (hàng hoàn đã duyệt Huỷ bỏ) **hiển thị riêng** số kg và giá trị (kg × `landed_unit_cost` **hiện hành**, không dùng số ảnh chụp trên đơn) để biết mất bao nhiêu, **không cộng vào tổng chi phí** vì số kg đó đã nằm trong giá mua; phần mất làm giảm lãi qua việc không có doanh thu (BR-KK-03). Ví dụ: nhập 100 kg × 100.000đ, bán 90 kg × 150.000đ, hao 10 kg → lãi 3.500.000đ. *(D — sửa 2026-09-28, Duy duyệt, lý do: công thức cũ "giá mua + chi phí phân bổ + hao hụt + hàng hỏng" tính hai lần hao hụt/hỏng.)* |
+| BR-BC-03 | Hoàn tiền ghi vào **kỳ phát sinh hoàn**, không sửa ngược kỳ đã qua. Chứng từ đảo doanh thu ghi vào kỳ lập chứng từ (BR-HT-06). |
+| BR-BC-04 | Lãi/lỗ theo lô = doanh thu bán từ lô − (giá mua + chi phí phân bổ). Doanh thu (và số kg đã bán) = phân bổ lô của hoá đơn **chưa huỷ** **trừ** dòng chứng từ đảo doanh thu của lô *(sửa 2026-09-30, Duy duyệt 30/09)*; lô đã chốt: chỉ trừ chứng từ lập trước thời điểm chốt *(Duy quyết 30/09)*; kg hoàn về kho rồi bán lại chỉ tính một lần *(hoá đơn đã huỷ vẫn không tính — sửa 2026-09-28, Duy duyệt)*. Giá mua = `purchase_rate` × số kg nhập. Hao hụt (kiểm kê âm) và hàng hỏng (hàng hoàn đã duyệt Huỷ bỏ) **hiển thị riêng** số kg và giá trị (kg × `landed_unit_cost` **hiện hành**, không dùng số ảnh chụp trên đơn) để biết mất bao nhiêu, **không cộng vào tổng chi phí** vì số kg đó đã nằm trong giá mua; phần mất làm giảm lãi qua việc không có doanh thu (BR-KK-03). Ví dụ: nhập 100 kg × 100.000đ, bán 90 kg × 150.000đ, hao 10 kg → lãi 3.500.000đ. *(D — sửa 2026-09-28, Duy duyệt, lý do: công thức cũ "giá mua + chi phí phân bổ + hao hụt + hàng hỏng" tính hai lần hao hụt/hỏng.)* |
 | BR-BC-05 | Lô chưa chốt phải hiển thị nhãn **"tạm tính"** — nếu không, Lộc sẽ đọc số chưa đủ chi phí như số cuối cùng. |
 
 ---

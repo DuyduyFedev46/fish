@@ -193,8 +193,10 @@ def _block_if_already_refunded(r):
 def confirm_refund(*, refund, bank_txn_ref, actor):
     """
     Xác nhận đã hoàn (PENDING -> REFUNDED). BẮT BUỘC bank_txn_ref (BR-HT-03) — không cho
-    xác nhận suông. Phiếu REFUNDED (ở kỳ confirmed_at) chính là bút toán ĐẢO doanh thu,
-    ghi vào kỳ phát sinh hoàn, không sửa kỳ cũ (BR-HT-06). Ghi AuditLog (BR-HT-08).
+    xác nhận suông. Phiếu hoàn chỉ ghi DÒNG TIỀN rời tài khoản (BR-HT-06 sửa 30/09): doanh thu
+    của đơn huỷ đã đảo bằng chứng từ đảo (BR-HT-10) lập lúc huỷ, nên phiếu xác nhận sau/cùng lúc
+    huỷ của hoá đơn đã có chứng từ đảo không trừ lãi kỳ lần hai (phiếu xác nhận trước huỷ vẫn trừ ở kỳ của nó, D1-B); phiếu của hoá đơn chưa có chứng từ (hoàn một phần,
+    hoàn sau giao) vẫn trừ vào kỳ `confirmed_at`. Ghi AuditLog (BR-HT-08).
     """
     if not bank_txn_ref:
         raise BusinessError("Xác nhận hoàn bắt buộc nhập mã giao dịch chuyển khoản (BR-HT-03).")

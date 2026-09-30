@@ -1,6 +1,6 @@
 # reports — Báo cáo lãi lỗ & bảng điều hành (P-10)
 
-`services.py`: lãi lỗ theo lô (nguồn sự thật, BR-BC-04/05) và theo tháng (BR-BC-01..03) — tính lại từ sales/inventory/purchasing, không có bảng riêng.
+`services.py`: lãi lỗ theo lô (nguồn sự thật, BR-BC-04/05) và theo tháng (BR-BC-01..03) — tính lại từ sales/inventory/purchasing, không có bảng riêng. Doanh thu/giá vốn đã trừ chứng từ đảo huỷ đơn (BR-HT-10): lô trừ dòng chứng từ (`reversed_qty`, `reversed_revenue`; lô đã CLOSED chỉ trừ chứng từ lập trước lúc chốt), kỳ trừ chứng từ lập trong kỳ (`credit_notes`, `cogs_reversed`), phiếu hoàn xác nhận sau/cùng lúc huỷ không trừ lần hai, phiếu xác nhận trước huỷ vẫn ở kỳ của nó và số đảo = tiền hoá đơn − hoàn trước đó, không sửa kỳ cũ (D1-B, Duy quyết 30/09).
 `api.py`: `/api/reports/batch/{batch_id}/`, `/api/reports/period/?year&month` — chỉ `view_profitreport`.
-`dashboard_api.py`: `/api/dashboard/summary/` — chỉ `reports.view_dashboard` (chu/quan_ly/nv_kho, S6) (KPI, đơn gần đây, tồn theo lô; giá vốn — `kpis.inventory_value`, `batches[].unit_cost` — chỉ có key khi có `view_costprice`; test `tests/test_dashboard_cost_leak.py`).
+`dashboard_api.py`: `/api/dashboard/summary/` — chỉ `reports.view_dashboard` (chu/quan_ly/nv_kho, S6) (KPI — `revenue_today` đã trừ chứng từ đảo lập hôm nay —, đơn gần đây, tồn theo lô; giá vốn — `kpis.inventory_value`, `batches[].unit_cost` — chỉ có key khi có `view_costprice`; test `tests/test_dashboard_cost_leak.py`).
 `models.py`: `ProfitReport` chỉ để giữ quyền `view_profitreport` và `view_dashboard` (S6; gán Group ở `accounts/migrations/0003`). App nhỏ → giữ phẳng.

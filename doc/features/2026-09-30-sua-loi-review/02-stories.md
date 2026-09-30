@@ -270,6 +270,11 @@ Ma trận Group: job Hệ thống, không có endpoint mới.
 
 Ma trận Group: lệnh quản trị, không endpoint. Duy chạy trên staging rồi production **sau** deploy (xem 02c).
 
+> **Đổi AC theo Duy 30/09 (P8 Lô 4, trả lời trực tiếp điều phối — "báo cáo đã qua thì không được sửa số"):**
+> - SR-14-AC2: chứng từ lập bù có `issued_at` = **thời điểm chạy `--apply`** (không lấy ngày huỷ gốc) → báo cáo các kỳ cũ giữ nguyên, kỳ hiện tại nhận điều chỉnh.
+> - Lô **đã chốt**: `batch_pnl` chỉ trừ chứng từ lập trước `closed_at`; chứng từ lập sau khi chốt không đổi lãi lỗ lô. Dry-run liệt kê riêng các đơn thuộc lô đã chốt.
+> - SR-13 (D1, phương án B): phiếu hoàn xác nhận **trước** lúc huỷ vẫn trừ ở kỳ của nó; kỳ huỷ chỉ đảo phần còn lại (`cn.amount − Σ hoàn trước đó`).
+
 ---
 
 # Lô 5 — quy trình lô quá hạn + dashboard (F09, quyết định Duy)

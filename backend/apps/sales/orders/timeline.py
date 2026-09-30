@@ -2,7 +2,7 @@
 Dòng thời gian của một đơn (Lô L7) — READ-ONLY, ghép từ dữ liệu thật + AuditLog.
 
 Nguồn:
-- Chứng từ: đặt đơn (`SalesOrder.created_at`), giao dịch tiền (`PaymentTransaction.received_at`),
+- Chứng từ: chứng từ đảo doanh thu (`SalesCreditNote.issued_at`, BR-HT-10), đặt đơn (`SalesOrder.created_at`), giao dịch tiền (`PaymentTransaction.received_at`),
   hoá đơn (`SalesInvoice.issued_at`), tạo phiếu giao (`DeliveryNote.created_at`), phiếu hoàn
   (`Refund.created_at` / `confirmed_at`, người tạo / người xác nhận).
 - AuditLog (BR-PQ-04/05): `cancel_unpaid_expired`, `cancel_paid_order` (đơn);
@@ -146,6 +146,16 @@ def build_timeline(order):
                     doc="refund",
                     actor_kind="user" if r.confirmed_by else "system",
                 ))
+
+    if invoice is not None:
+        for cn in invoice.credit_notes.all():
+            events.append(TimelineEvent(
+                cn.issued_at, "credit_note_issued",
+                f"Lập chứng từ đảo doanh thu {cn.code} ({vnd_display(cn.amount)})",
+                actor_display(cn.created_by),
+                doc="invoice",
+                actor_kind="user" if cn.created_by else "system",
+            ))
 
     # sort ổn định: cùng thời điểm giữ thứ tự thêm vào (đặt → tiền → hoá đơn → phiếu giao …)
     return sorted(events, key=lambda e: e.at)

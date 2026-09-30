@@ -200,3 +200,108 @@ cd erp-console && npm test                                                      
 - N1 (có từ trước, không do lô này): `_escalate_to_chu` dùng `get_or_create` theo `(target_model, target_id, command)`. Nếu Chủ đã tạo một đề xuất AI `sales.paymenttransaction.resolve` cho chính giao dịch đó (trạng thái PENDING, CONFIRMED hoặc SCHEDULED), job sẽ chuyển đề xuất ấy sang ESCALATED. Nếu có từ hai dòng trùng khoá trở lên, lệnh sẽ ném `MultipleObjectsReturned`. Nên khoá thêm `actor_kind`/nguồn "job" hoặc chỉ xét việc do job tạo. Để P9.
 - N2: tranh chấp thật `cancel_receipt` ∥ `publish_batch` và `cancel_expired_batch` ∥ `reserve` mới chỉ được chứng minh bằng việc đọc code và spy. Khi QA có môi trường PostgreSQL (staging) thì chạy thử hai request song song một lần.
 - Chữ trong 02b/02 cần điều phối viên nhờ sửa: 02b §3.4 (`code` thành `text`), SR-09 ma trận ("200" thành "201"), SR-08-AC2 ("PAID" thành "PROCESSING").
+
+## Lô 4
+
+Phạm vi: SR-12 (chứng từ đảo doanh thu), SR-13 (báo cáo lô/kỳ/dashboard trừ chứng từ đảo), SR-14 (lệnh lập bù). Diff chưa commit gồm 14 file sửa và các file mới `sales/models/credit_notes.py`, `sales/credit_notes/`, `sales/migrations/0011_salescreditnote.py`, `sales/management/commands/backfill_credit_notes.py`, `reports/tests/test_p8_pnl_credit_note.py`.
+
+### Kết luận: **REVIEW FAIL — CẦN SỬA 1 lỗi (Medium, rò giá vốn ở Admin)**
+Phần nghiệp vụ và công thức tiền đúng 02b §4. Lỗi duy nhất phải sửa là inline Admin để lộ `unit_cost` cho người không có `view_costprice`, trái với 02b §4.2, SR-12-AC8 và bất biến 1. Hiện chưa có nhóm nào được cấp quyền xem model này nên chưa khai thác được, nhưng lời "Admin ẩn `unit_cost`" trong dev-notes là sai và không có test nào bảo vệ. Sửa xong M1 (kèm test) thì PASS, không cần review lại toàn lô. Ngoài ra có 1 điểm tiền (D1) cần Duy quyết. D1 không chặn lô.
+
+### Lệnh kiểm chứng đã chạy trong lượt review
+- `DJANGO_DEBUG=1 env -u DATABASE_URL .venv/bin/python manage.py test apps.sales apps.reports` → `Ran 381 tests … OK`.
+- `makemigrations --check --dry-run` → `No changes detected`.
+- Probe Admin (script ở scratchpad, DB test): user `is_staff` chỉ có `sales.view_salescreditnote` + `view_salescreditnoteline`, **không** có `inventory.view_costprice`:
+  - `/admin/sales/salescreditnote/<id>/change/` → 200, có cột `Giá vốn ảnh chụp (đ/kg)` và ô `<td class="field-unit_cost"><p>110000,0000</p>` → **rò**.
+  - `/admin/sales/salescreditnoteline/<id>/change/` và danh sách → không có `unit_cost` (đúng).
+- Probe kỳ (DB test): hoá đơn 300.000 ở tháng trước, phiếu hoàn một phần 50.000 xác nhận ở tháng trước, rồi huỷ đơn ở tháng này. `period_pnl(tháng trước)` trước khi huỷ: `refunds=50000, profit=30000`; sau khi huỷ: `refunds=0, profit=80000`. Kỳ tháng này: `revenue=-300000, profit=-80000`. Xem D1.
+
+### Đối chiếu từng điểm
+**Công thức (02b §4.4)**
+- `batch_pnl` (`reports/services.py:56-63`): doanh thu gộp vẫn lấy phân bổ của hoá đơn chưa huỷ như cũ, rồi trừ Σ dòng chứng từ của lô (`credit_note__sales_invoice__status=ISSUED`). `qty_sold` trừ `reversed_qty`. Bán lại kg đã hoàn tạo phân bổ mới nên chỉ được cộng một lần (SR-13-AC2 có test). Không trừ hai lần: hoá đơn CANCELLED đã bị loại ở vế gộp và cũng bị loại ở vế đảo. Phần chi phí không đổi, đúng vì chi phí lô tính theo kg nhập.
+- `period_pnl` (`:141-182`): `revenue = Σ hoá đơn trong kỳ − Σ cn.amount (issued_at ∈ kỳ)`; `cogs −= Σ qty × unit_cost` của dòng chứng từ. Số này khớp đúng giá vốn đã cộng lúc bán, vì dòng chứng từ chép nguyên `silb.qty`/`silb.unit_cost`. Hoá đơn gốc không bị sửa nên doanh thu/giá vốn của kỳ hoá đơn giữ nguyên (SR-13-AC3 có test). Phiếu hoàn của hoá đơn đã có chứng từ bị loại (`:168`), đúng văn bản 02b. Xem D1 cho ca biên.
+- `revenue_today` (`dashboard_api.py:63`): trừ `SalesCreditNote.amount` có `issued_at__date=today`. Không lọc trạng thái hoá đơn vẫn đúng, vì chứng từ chỉ được lập cho hoá đơn ISSUED và hoá đơn không bao giờ bị chuyển CANCELLED (grep không có chỗ nào gán `SalesInvoice.Status.CANCELLED`).
+
+**Service & mọi đường huỷ**
+- `issue_cancel_credit_note` được gọi ở `orders/services.py:404`, bên trong `with transaction.atomic()` và sau khi đã `select_for_update` đơn. Lỗi trong service làm rollback cả lần huỷ (AC5 có test patch ném lỗi).
+- Chỉ có ba nơi gọi `cancel_paid_order`: `orders/api.py:144` (huỷ tay), `delivery/cskh/services.py:624` (quyết định CANCEL), `:786` (`auto_cancel_overdue`). Dòng `:705` chỉ là docstring. AI chỉ khai `sales.cancel_paid_order` trong policy, không có đường thực thi riêng. Không có code nào khác đổi đơn sang CANCELLED.
+- Idempotent: dùng `source_key="cancel:<order.pk>"` (unique) và đọc trước khi tạo. `code` unique, `DC-` + tối đa 32 ký tự thì vừa `max_length=40`. Hai lần huỷ đồng thời được khoá đơn xếp hàng. Nếu lệnh lập bù chạy tranh với một lần huỷ tay thì ràng buộc unique sẽ chặn.
+- Append-only: `default_permissions=("view",)` cho cả hai model. Không có `.update/.delete` (có test quét mã nguồn). Admin trả `has_add/change/delete=False`. Migration 0011 chỉ có 2 `CreateModel` + 1 `AddIndex`, FK đều `PROTECT` (trừ dòng → chứng từ là `CASCADE`, chấp nhận vì chứng từ không xoá được).
+
+**Không rò giá vốn / PII**
+- Không có serializer hay API mới. Timeline (`timeline.py:151`) chỉ có mã chứng từ và `cn.amount` (giá bán). AuditLog `issue_credit_note` (`credit_notes/services.py:56`) ghi `credit_note`, `amount` (giá bán) và `backfilled`, không có khoá giá vốn và không có PII (có test sentinel). Output lệnh lập bù (`backfill_credit_notes.py:70`) chỉ có mã đơn, mã hoá đơn, số tiền bán và mã lô (có test sentinel + chuỗi giá vốn ở cả 3 lần chạy).
+- **Admin inline rò `unit_cost`, xem M1.**
+
+**Spec (02b §4.6)**: BR-HT-06, BR-HT-10, BR-BC-03, BR-BC-04 và bảng 12.1 trong `doc/business-process-spec.md` chép đúng văn bản, có ghi "Duy duyệt 30/09". Docstring của `cancel_paid_order`, `confirm_refund` và module `reports/services.py` đã cập nhật (SR-13-AC7).
+
+### Chốt 6 lệch be-dev nêu
+1. **Sửa `test_privacy_consent.py::test_gl03_ac7…`: chấp nhận.** Test này là "danh bạ" model của app `sales`, dùng để chặn việc thêm bảng thu dữ liệu cá nhân mà không ai hay. Hai model mới không có field cá nhân nào (đã đọc model), nên thêm 2 tên kèm chú thích đúng là mục đích của test. 02c thiếu file này là do thiếu sót của techlead.
+2. **Bộ khoá `batch_pnl` 16 → 18: chấp nhận.** Chỉ thêm khoá theo 02b §4.4. Test mẫu vẫn chứng minh nhóm khác Chủ nhận 403.
+3. **Ghi audit khi lập bù: chấp nhận, nên giữ.** Có dấu vết `actor=None`, `backfilled=true`. `AuditLog.created_at` là lúc chạy lệnh, còn `issued_at` của chứng từ mới là mốc nghiệp vụ, đúng thiết kế.
+4. **Kỳ dùng `cn.amount`, lô dùng Σ dòng: chấp nhận.** Mỗi báo cáo đảo đúng thứ nó đã cộng (kỳ cộng `invoice.amount`, lô cộng Σ `qty × rate`), nên sau huỷ cả hai về đúng 0, không lệch. Hai báo cáo vốn đã có thể lệch nhau vì làm tròn BR-BH-15 (12.1 đã ghi "có thể lệch nhẹ"). Có thêm lệch dưới 1 đồng do `SalesCreditNoteLine.amount` bị làm tròn 2 số lẻ khi lưu (`credit_notes/services.py:53`, `qty` 3 số lẻ × `rate`), không đáng kể.
+5. **`cogs_reversed` cho mọi dòng kể cả `stock_restored=False`: chấp nhận, đúng giả định 🟡(5) ở 02b §10.** Hàng giao thất bại quay về theo P-08: nhập lại rồi bán lại thì phát sinh giá vốn mới ở kỳ bán; nếu huỷ bỏ thì lỗ nằm ở `batch_pnl`, còn `period_pnl` chưa tính lỗ hỏng (để sau). Duy vẫn có thể lật giả định này.
+6. **Combo `qty × rate` lệch sẵn: chấp nhận, là nợ có sẵn và ngoài phạm vi.** Dòng chứng từ sao đúng công thức cũ nên sau huỷ lô vẫn về đúng mức trước bán. Đưa vào backlog, không sửa ở Lô 4.
+
+### Việc sửa
+| # | Mức | File:dòng | Việc |
+|---|---|---|---|
+| M1 | **Medium (bắt buộc trước commit)** | `backend/apps/sales/admin.py:132-137` | Inline khai `fields` tường minh có `unit_cost`, lại thêm `has_change_permission=False`, nên Django đưa mọi field trong fieldset thành chỉ đọc và hiện `unit_cost`. `CostHidingMixin` chỉ gỡ được ở `readonly_fields`/`exclude`. Cách sửa: bỏ dòng `fields = …` của inline, hoặc override `get_fields` để lọc `cost_fields` khi `not self._can_see_cost(request)`. Nên thêm `get_fields` vào chính `CostHidingMixin` (`inventory/admin.py:16`) để mọi Admin khai `fields` đều an toàn. Thêm test: staff có `view_salescreditnote(+line)` nhưng không có `view_costprice`, GET `/admin/sales/salescreditnote/<id>/change/` → 200, không có `unit_cost` và không có chuỗi giá vốn; superuser thì thấy. Suite cũ phải xanh. |
+| L1 | Low | `erp-console/features/orders/types.ts:90-102` | Thêm `"credit_note_issued"` vào union kind và một dòng `TIMELINE_LOOK` (`OrderDetailView.tsx:86`). Hiện FE rơi về `TIMELINE_DEFAULT` nên không vỡ. Gộp vào Lô 6/7. |
+| L2 | Low (tuỳ chọn, trước khi Duy chạy `--apply`) | `backend/apps/sales/management/commands/backfill_credit_notes.py:70` | Dry-run in thêm **tháng huỷ** (tháng của `issued_at` sẽ dùng) và **tháng xác nhận phiếu hoàn** của từng đơn, để Duy thấy kỳ cũ nào sẽ đổi số (xem D1). Chỉ in tháng, không in tiền giá vốn. |
+
+### Cần Duy quyết (tiền) — D1, không chặn Lô 4
+**Kỳ cũ có thể đổi số trong một ca hiếm.** Chủ hoàn **một phần** cho hoá đơn (ví dụ giảm giá 50.000) và xác nhận trong tháng 9, rồi tháng 10 huỷ luôn đơn đó. Công thức hiện tại (theo đúng 02b §4.4 do techlead viết) loại **mọi** phiếu hoàn của hoá đơn đã có chứng từ, nên phiếu 50.000 bị gỡ khỏi tháng 9 (lãi tháng 9 tăng từ 30.000 lên 80.000). Tháng 10 bị đảo đủ 300.000. **Tổng hai tháng vẫn đúng** (0 đồng, không trừ hai lần), nhưng số tháng 9 đã báo thì đổi, trái với tinh thần BR-BC-03 "không sửa kỳ cũ". Lệnh lập bù SR-14 cũng gây hiệu ứng này cho các đơn huỷ trước P8 đã có phiếu hoàn ở tháng khác tháng huỷ.
+- **Phương án A (giữ nguyên):** chấp nhận, vì ca này hiếm và tổng luôn đúng. Ghi thêm một câu vào BR-HT-06.
+- **Phương án B (techlead khuyên):** chỉ loại phiếu hoàn có `confirmed_at ≥ issued_at` của chứng từ. Ở kỳ huỷ, số đảo doanh thu = `cn.amount − Σ phiếu hoàn REFUNDED xác nhận trước lúc huỷ`. Kỳ cũ giữ nguyên, tổng vẫn đúng. Chỉ sửa `period_pnl` và thêm 1 test, `batch_pnl` không đổi. Làm thành story nhỏ ở Lô 7, hoặc sửa cùng M1 nếu Duy chọn trước khi commit.
+
+### Ghi chú
+- Chưa có nhóm nào được cấp `view_salescreditnote`, nên hiện chỉ superuser mở được Admin chứng từ. Chủ muốn xem trong ERP thì cần màn hình riêng (theo nguyên tắc "làm xong ở ERP"). Việc này ngoài phạm vi Lô 4 (02b §4.1 đã chốt không có API), đưa vào backlog.
+- `period_pnl` có thể âm ở kỳ huỷ (đúng thiết kế). FE báo cáo kỳ và dashboard nên hiển thị được số âm, QA cần kiểm ở lô FE sau.
+
+## Lô 4 — lần 2
+
+Phạm vi: 3 thay đổi sau review lần 1, gồm M1 (Admin inline ẩn `unit_cost`), D1 phương án B (`period_pnl`) và E1/E2 (lập bù ghi vào kỳ chạy lệnh, `batch_pnl` lô đã chốt chỉ trừ chứng từ lập trước `closed_at`). Diff vẫn chưa commit.
+
+### Kết luận: **CẦN SỬA — 1 lỗi nhỏ, chỉ ở test (T1)**
+Công thức tiền đạt ở mọi đường đã soát. Kỳ đã qua và lô đã chốt không đổi số, không trừ hai lần, tổng nhiều kỳ về đúng 0. M1 đã sửa đúng và có test bảo vệ. Chỉ còn lỗi T1: 4 test phụ thuộc giờ chạy nên đỏ trong khoảng 00:00–07:00 (giờ VN) ngày 1 mỗi tháng. Sửa T1 xong thì PASS, không cần review lại. Điều phối tự kiểm bằng probe dịch đồng hồ mô tả bên dưới.
+
+### Lệnh kiểm chứng đã chạy trong lượt này
+- `DJANGO_DEBUG=1 env -u DATABASE_URL .venv/bin/python manage.py test apps.sales apps.reports` (không --parallel): `Ran 395 tests … OK`.
+- `makemigrations --check --dry-run`: `No changes detected`.
+- Probe dịch đồng hồ, script ở scratchpad. Script vá `django.utils.timezone.now` thành giờ thật cộng một độ lệch cố định, rồi chạy test runner.
+  - Đặt đồng hồ **2026-10-31 20:00 UTC**, tức 01/11 03:00 giờ VN. `apps.reports.tests.test_p8_pnl_credit_note` cho kết quả `FAILED (failures=4)`, cả 4 lỗi đều là `Decimal('0') != Decimal('250000'/'300000')` (xem T1). Chạy `apps.sales.credit_notes` ở cùng mốc thì `OK`.
+  - Đối chứng ở mốc **2026-10-15 10:00 UTC**: chạy cả hai module cho kết quả `Ran 48 tests … OK`. Như vậy test dùng mốc cố định 2026-09/10 vẫn đúng khi chạy trong tháng 10.
+- Probe tiền là file test tạm, đặt trong `apps/reports/tests/`, đã xoá sau khi chạy, `git status` sạch. Kết quả `Ran 4 tests … OK`, gồm 4 ca:
+  - Đơn huỷ theo luồng cũ ở tháng 7, hoàn đủ ở tháng 8, lập bù bây giờ. Kỳ 7 và kỳ 8 không đổi ở mọi khoá. Kỳ hiện tại có `credit_notes=0`, `cogs_reversed=220000`, `profit=+220000`. Tổng 3 kỳ cho (doanh thu − hoàn) = 0, giá vốn = 0, lãi = 0.
+  - Phiếu hoàn tạo trước lúc huỷ nhưng xác nhận sau lúc huỷ. Kỳ huỷ có `credit_notes=300000`, `refunds=0`. Tổng các kỳ bằng 0.
+  - Phiếu hoàn và chứng từ có cùng timestamp. Phiếu bị loại, số đảo là 300000 đủ, tổng bằng 0, không trừ hai lần.
+  - Hoàn trước lúc huỷ, cùng tháng với tháng huỷ. Kỳ đó có `credit_notes=250000` và `refunds=50000`, tổng bằng 0.
+
+### Soát tiền theo từng đường
+Ký hiệu: T = `cn.issued_at`, H = Σ phiếu hoàn REFUNDED có `confirmed_at < T` (`reports/services.py:170-178`).
+
+| Đường | Kỳ đã qua | Kỳ chứa T | Lô | Kết quả |
+|---|---|---|---|---|
+| Huỷ thường, lô chưa chốt | Kỳ hoá đơn giữ doanh thu gộp. Phiếu hoàn trước T nằm ở kỳ xác nhận của nó | Đảo doanh thu `max(0, amount − H)`, đảo giá vốn toàn bộ dòng. Phiếu hoàn sau T bị loại | Trừ | Đạt |
+| Huỷ trước khi chốt, rồi mới chốt | như trên | như trên | `issued_at ≤ closed_at` nên vẫn trừ, lô không đổi khi chốt | Đạt |
+| Huỷ sau khi chốt | như trên | như trên | Không trừ, lô giữ nguyên (`services.py:64-67`) | Đạt (thực tế gần như không xảy ra, vì `close_batch` đòi lô không còn đơn mở) |
+| Lập bù (E1) | Không đổi, vì T = lúc chạy lệnh nên mọi phiếu hoàn cũ có `confirmed_at < T` và vẫn nằm ở kỳ cũ | Nhận toàn bộ điều chỉnh | Lô chưa chốt thì trừ (số tạm tính). Lô đã chốt thì giữ nguyên | Đạt |
+| Hoàn đủ trước lúc huỷ | Giữ nguyên | `credit_notes=0` (không âm), `cogs_reversed` đủ | — | Đạt |
+| Cùng timestamp | — | Hai điều kiện `<` và `>=` bù trừ khít nhau: phiếu bị loại, số đảo đủ | — | Đạt |
+
+- **Tổng nhiều kỳ:** gộp − H − (amount − H) = 0 khi H ≤ amount. Nếu H > amount thì `max(0)` chặn không cho số đảo âm, và khi đó phần hoàn vượt được ghi đúng là tiền đã rời túi.
+- **Giá vốn và doanh thu ở kỳ hiện tại:** `period_pnl` luôn đảo cả hai vế trong cùng kỳ T. Với D1-B, doanh thu chỉ đảo phần còn lại, còn giá vốn đảo đủ. Cách này đúng, vì phiếu hoàn trước lúc huỷ chỉ là giảm giá hoặc trả tiền và không thu hàng về, còn huỷ mới là lúc thu hàng về. `batch_pnl` không có vế giá vốn bán (chi phí lô = giá mua + phân bổ), nên với lô đã chốt thì cả doanh thu lẫn `qty_sold` đều giữ nguyên và nhất quán với nhau. Kỳ và lô sẽ lệch nhau vĩnh viễn đối với lô đã chốt. Đây là hệ quả Duy đã chấp nhận (E2), và bảng 12.1 đã ghi "có thể lệch".
+- **Lô CLOSED mà `closed_at` rỗng:** chỉ `close_batch` (`inventory/batches/services.py:261-264`) đặt CLOSED, và hàm này luôn đặt `closed_at`. `status` và `closed_at` bị khoá ở cả API (`batches/api.py` `locked_fields`) lẫn Admin (`LockedFieldsAdminMixin`). Không có đường mở lại lô. Vì vậy giả định "rỗng thì trừ như cũ" chỉ áp dụng cho dữ liệu tạo bằng tay, chấp nhận được. Nếu production có lô CLOSED từ trước khi có field này thì `closed_at` đã có từ `0001_initial` và `close_batch` luôn điền.
+- **Rò giá vốn:** `get_fields` ở `sales/admin.py:139` lọc đúng. Test đỏ trước khi sửa và xanh sau khi sửa, có đối chứng superuser và user có `view_costprice`. `cogs_reversed` chỉ có trong `/api/reports/period/` (chỉ Chủ), và test AC6 đã quét khoá này với các nhóm khác. Không phát sinh đường rò mới.
+- **Dashboard (`dashboard_api.py:63`):** trừ đủ `cn.amount`, không tính D1-B. Cách này nhất quán, vì dashboard không trừ phiếu hoàn.
+
+### Việc sửa
+| # | Mức | File:dòng | Việc |
+|---|---|---|---|
+| T1 | **Low, bắt buộc trước commit** vì làm suite đỏ theo giờ | `backend/apps/reports/tests/test_p8_pnl_credit_note.py:308`, `:362`, `:379`, `:418` | Các dòng này dùng `now = timezone.now(); period_pnl(year=now.year, month=now.month)`. `timezone.now()` trả giờ UTC, còn `period_pnl` lọc `issued_at__month` theo `TIME_ZONE=Asia/Ho_Chi_Minh`, nên từ 00:00 đến 07:00 giờ VN ngày 1 mỗi tháng thì tháng bị lệch và test đỏ (đã tái hiện bằng probe). Cách sửa là thay bằng `d = timezone.localdate()` rồi `period_pnl(year=d.year, month=d.month)`, giống test AC6 ở dòng 164. Cách kiểm: suite xanh, và probe dịch đồng hồ tới 2026-10-31 20:00 UTC cho `OK`. |
+| L3 | Low, cần Duy biết trước khi chạy `--apply` | `backend/apps/reports/dashboard_api.py:63` | Vào ngày chạy `backfill_credit_notes --apply`, KPI "doanh thu hôm nay" bị trừ toàn bộ số tiền lập bù và có thể âm. Việc này đúng nguyên tắc E1, vì kỳ hiện tại nhận điều chỉnh. Nếu Duy muốn KPI vận hành không bị nhiễu thì lọc `backfilled=False` ở dashboard (`period_pnl` vẫn giữ). Tối thiểu cần ghi câu này vào hướng dẫn chạy lệnh trong 02c. |
+| L4 | Low (backlog) | `backend/apps/reports/services.py:170-178`, `:194-199` | `period_pnl` bị N+1: mỗi chứng từ tốn 1 truy vấn phiếu hoàn, mỗi phiếu hoàn tốn 1 truy vấn chứng từ. Số lượng bản ghi nhỏ nên chưa ảnh hưởng. Khi cần thì gom bằng `Subquery`/`prefetch`. |
+
+### Ghi chú
+- 02b §4.4 (công thức) chưa phản ánh D1-B, E1 và E2. Techlead sẽ cập nhật 02b theo code hiện tại. 02-stories.md đã có ghi chú đổi AC dưới SR-14 (câu "chỉ trừ chứng từ lập trước `closed_at`" khớp với code `<=`, vì trùng timestamp chỉ xảy ra trong test).
+- L1 và L2 của lần 1 vẫn còn hiệu lực. L2 đã được làm một phần: dry-run đã liệt kê riêng lô CLOSED, nhưng chưa in tháng huỷ hay tháng hoàn. Với E1 thì L2 không còn cần thiết, vì lập bù luôn ghi vào kỳ hiện tại.

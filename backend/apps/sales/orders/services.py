@@ -26,6 +26,7 @@ from apps.delivery.models import DeliveryNote
 from apps.inventory.batches import services as batches
 from apps.inventory.models import Batch, StockLedgerEntry
 from apps.inventory.stock import services as stock
+from apps.sales.credit_notes import services as credit_note_services
 from apps.sales.customers import services as customers
 from apps.sales.models import SalesOrder, SalesOrderLine, SalesOrderLineBatch
 from apps.sales.orders.consent import resolve_privacy_consent
@@ -340,8 +341,9 @@ def cancel_paid_order(*, order, actor, reason="", reason_code=""):
     cộng kho hai lần khi hàng hoàn đó sau này được duyệt nhập lại (Q8b).
 
     Kho và tiền là hai sổ tách nhau — hoàn tiền đi riêng qua create_refund/confirm_refund.
-    Doanh thu KHÔNG đảo ở đây (BR-HT-06: đảo tại thời điểm tạo phiếu hoàn, vào kỳ phát
-    sinh hoàn). Trả dict {"order", "stock_restored", "delivery_note"}.
+    Doanh thu đảo bằng chứng từ đảo (BR-HT-10) lập NGAY tại thời điểm huỷ, trong cùng
+    transaction (lỗi thì cả lần huỷ rollback); hoá đơn gốc giữ nguyên ISSUED (BR-HT-06).
+    Phiếu hoàn chỉ là dòng tiền, không đảo doanh thu. Trả dict {"order", "stock_restored", "delivery_note"}.
     """
     with transaction.atomic():
         o = SalesOrder.objects.select_for_update().get(pk=order.pk)
@@ -398,6 +400,10 @@ def cancel_paid_order(*, order, actor, reason="", reason_code=""):
                 "reason_code": reason_code,
             },
             note=reason,
+        )
+        credit_note_services.issue_cancel_credit_note(
+            invoice=invoice, actor=actor, reason_code=reason_code,
+            stock_restored=stock_restored,
         )
     return {"order": o, "stock_restored": stock_restored, "delivery_note": note}
 

@@ -56,6 +56,6 @@
 - Lô 5: test cũ ngoài test S04 bị đỏ vì bỏ ngoại lệ EXPIRED → dừng, liệt kê.
 
 ## Việc của Duy sau khi deploy (không phải code)
-- Sau deploy Lô 4 lên staging: `manage.py backfill_credit_notes` (dry-run) → xem danh sách, đặc biệt lô **đã chốt** bị đổi số → quyết định
-  `--apply`. Lặp lại trên production khi duyệt.
+- Sau deploy Lô 4 lên staging: `manage.py backfill_credit_notes` (dry-run) → xem danh sách → quyết định `--apply`. Lặp lại trên production khi duyệt.
+  *(Cập nhật 30/09 theo Duy: chứng từ lập bù ghi vào **kỳ chạy lệnh**, kỳ cũ và lô đã chốt **không đổi số**. Lưu ý: KPI "doanh thu hôm nay" trên dashboard ngày chạy `--apply` sẽ bị trừ toàn bộ số lập bù, có thể âm — nên chạy vào cuối ngày hoặc báo trước người xem dashboard.)*
 - Sau Lô 7: đặt biến môi trường theo `doc/ops/moi-truong.md` (staging `AI_PRODUCTION_READY=1`, production giữ `0`/`C`).

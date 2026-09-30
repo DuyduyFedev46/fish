@@ -19,7 +19,7 @@ from rest_framework.views import APIView
 from apps.ai.declare import AiMeta
 from apps.inventory.batches.services import FEFO_ORDER, SELLABLE_STATUSES, sellable_batches
 from apps.inventory.models import Batch, StockLedgerEntry
-from apps.sales.models import SalesInvoice, SalesOrder
+from apps.sales.models import SalesCreditNote, SalesInvoice, SalesOrder
 
 PENDING = [SalesOrder.Status.BOOKED, SalesOrder.Status.PAID, SalesOrder.Status.PROCESSING]
 ACTIVE_BATCH = [Batch.Status.SELLING, Batch.Status.NEAR_EXPIRY, Batch.Status.DRAFT]
@@ -59,6 +59,9 @@ class DashboardSummaryView(APIView):
         revenue_today = SalesInvoice.objects.filter(
             status=SalesInvoice.Status.ISSUED, issued_at__date=today
         ).aggregate(s=Coalesce(Sum("amount"), 0, output_field=DecimalField()))["s"]
+        # BR-HT-10: trừ chứng từ đảo doanh thu lập hôm nay (đơn đã thanh toán bị huỷ).
+        revenue_today -= SalesCreditNote.objects.filter(issued_at__date=today).aggregate(
+            s=Coalesce(Sum("amount"), 0, output_field=DecimalField()))["s"]
 
         pending_count = SalesOrder.objects.filter(status__in=PENDING).count()
         booked_soon = SalesOrder.objects.filter(
