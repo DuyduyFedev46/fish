@@ -19,6 +19,14 @@ def _image_urls(ci: ContentImage) -> Dict[str, str]:
     }
 
 
+def _own_cover(version: Any) -> Optional[ContentImage]:
+    """Lớp 1b (SR-18, BR-ND-07): ảnh bìa chỉ hiện nếu thuộc chính bài; dữ liệu cũ trỏ ảnh bài khác -> None."""
+    cover = version.cover_image
+    if cover is not None and cover.entry_id == version.entry_id:
+        return cover
+    return None
+
+
 def public_body(version: Any) -> Dict[str, Any]:
     """
     Lớp 1b (server, lúc trả công khai §6.1 02b-tech-design):
@@ -40,7 +48,7 @@ def public_body(version: Any) -> Dict[str, Any]:
 
     image_map: Dict[int, ContentImage] = {}
     if image_ids:
-        for img in ContentImage.objects.filter(pk__in=image_ids):
+        for img in ContentImage.objects.filter(pk__in=image_ids, entry_id=version.entry_id):
             image_map[img.pk] = img
 
     public_blocks = []
@@ -57,7 +65,7 @@ def public_body(version: Any) -> Dict[str, Any]:
                     "height": img.height,
                     "urls": _image_urls(img),
                 })
-            # Nếu không tìm thấy ảnh thì bỏ qua để không lộ khối ảnh hỏng
+            # Ảnh không tồn tại hoặc không thuộc bài (SR-18) -> bỏ khối, không lộ ảnh của bài khác
         else:
             public_blocks.append(b)
 
@@ -78,8 +86,8 @@ class PublicEntryDetailSerializer:
             }
 
         cover_data = None
-        if version.cover_image:
-            ci = version.cover_image
+        ci = _own_cover(version)
+        if ci:
             cover_data = {
                 "alt": ci.alt,
                 "width": ci.width,
@@ -119,8 +127,8 @@ class PublicEntryListSerializer:
             }
 
         cover_data = None
-        if version.cover_image:
-            ci = version.cover_image
+        ci = _own_cover(version)
+        if ci:
             cover_data = {
                 "alt": ci.alt,
                 "width": ci.width,

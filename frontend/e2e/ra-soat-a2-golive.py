@@ -11,13 +11,15 @@ Cách chạy:
     cd frontend && NEXT_PUBLIC_USE_MOCK=0 NEXT_PUBLIC_API_BASE=http://localhost:8199 \
         npx next dev -p 3101 &
     python3 e2e/ra-soat-a2-golive.py
+
+Có thể phục vụ bản `out/` tĩnh (P8 Lô 6 làm vậy): QA_BASE=http://127.0.0.1:3106 QA_SHOT_DIR=<thư mục ảnh>.
 """
 import json
 import os
 import sys
 from playwright.sync_api import sync_playwright, expect
 
-BASE = "http://localhost:3101"
+BASE = os.environ.get("QA_BASE", "http://localhost:3101")
 SHOT_DIR = os.environ.get("QA_SHOT_DIR", "/tmp")
 
 SITE_INFO_OK = {
@@ -338,7 +340,7 @@ def main():
         page.route(
             "**/api/shop/orders/",
             lambda r: route_json(
-                r, {"order_code": "DH-QA-0001", "total_amount": "100000", "booked_expires_at": "2026-09-30T12:30:00Z"}, status=201
+                r, {"order_code": "DH-QA-0001", "total_amount": "100000", "booked_expires_at": "2099-01-01T00:00:00Z"}, status=201
             )
             if r.request.method == "POST"
             else r.continue_(),
@@ -387,7 +389,7 @@ def main():
             page.route(
                 "**/api/shop/orders/",
                 lambda r: route_json(
-                    r, {"order_code": "DH-QA-0002", "total_amount": "100000", "booked_expires_at": "2026-09-30T12:30:00Z"}, status=201
+                    r, {"order_code": "DH-QA-0002", "total_amount": "100000", "booked_expires_at": "2099-01-01T00:00:00Z"}, status=201
                 )
                 if r.request.method == "POST"
                 else r.continue_(),
@@ -462,7 +464,7 @@ def main():
         page.route(
             "**/api/shop/orders/",
             lambda r: route_json(
-                r, {"order_code": "DH-QA-0004", "total_amount": "100000", "booked_expires_at": "2026-09-30T12:30:00Z"}, status=201
+                r, {"order_code": "DH-QA-0004", "total_amount": "100000", "booked_expires_at": "2099-01-01T00:00:00Z"}, status=201
             )
             if r.request.method == "POST"
             else r.continue_(),

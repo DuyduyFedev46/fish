@@ -6,6 +6,7 @@ import {
   ContentEntryDetail,
   ContentEntryListItem,
   ContentImage,
+  BodyDoc,
   ContentWarning,
   EntryCreatePayload,
   EntryDiscardPayload,
@@ -23,6 +24,28 @@ import {
   EntrySubmitResponse,
 } from "./types";
 import { ApiError } from "@/shared/lib/http";
+
+// SR-19: bài chính sách bảo mật (id 1) có 2 phiên bản đã đăng. Đơn mock (features/orders/mock.ts) ghi khách đồng ý
+// phiên bản 1; chính sách đã lên phiên bản 2. Nội dung 2 bản KHÁC NHAU để e2e nhận ra mở đúng/sai phiên bản.
+// Toàn văn là dữ liệu giả, không phải chính sách thật.
+const POLICY_V1_AT = "2026-08-01T03:00:00.000Z";
+const POLICY_V2_AT = "2026-09-20T03:00:00.000Z";
+
+const POLICY_V1_BODY: BodyDoc = {
+  type: "doc",
+  blocks: [
+    { type: "heading", level: 2, text: "Thông tin chúng tôi thu thập (bản 1)" },
+    { type: "paragraph", children: [{ text: "MẪU-V1: Cá Về chỉ thu họ tên, số điện thoại và địa chỉ để giao hàng." }] },
+  ],
+};
+
+const POLICY_V2_BODY: BodyDoc = {
+  type: "doc",
+  blocks: [
+    { type: "heading", level: 2, text: "Thông tin chúng tôi thu thập (bản 2)" },
+    { type: "paragraph", children: [{ text: "MẪU-V2: Bản mới bổ sung thời hạn lưu trữ và quyền yêu cầu ẩn danh hoá dữ liệu." }] },
+  ],
+};
 
 let MOCK_CATEGORIES: ContentCategory[] = [
   {
@@ -56,6 +79,18 @@ let MOCK_CATEGORIES: ContentCategory[] = [
 
 let MOCK_ENTRIES: ContentEntryListItem[] = [
   {
+    id: 1,
+    kind: "page",
+    status: "published",
+    title: "Chính sách bảo mật",
+    slug: "chinh-sach-quyen-rieng-tu",
+    category: null,
+    has_unpublished_changes: false,
+    updated_at: POLICY_V2_AT,
+    source: "human",
+    page_role: "privacy",
+  },
+  {
     id: 42,
     kind: "post",
     status: "draft",
@@ -70,6 +105,38 @@ let MOCK_ENTRIES: ContentEntryListItem[] = [
 ];
 
 let MOCK_ENTRY_DETAILS = new Map<number, ContentEntryDetail>([
+  [
+    1,
+    {
+      id: 1,
+      kind: "page",
+      status: "published",
+      title: "Chính sách bảo mật",
+      slug: "chinh-sach-quyen-rieng-tu",
+      slug_locked: true,
+      category: null,
+      excerpt: "",
+      seo_title: "",
+      seo_description: "",
+      cover_image: null,
+      body: JSON.parse(JSON.stringify(POLICY_V2_BODY)),
+      images: [],
+      has_unpublished_changes: false,
+      published_version: 2,
+      first_published_at: POLICY_V1_AT,
+      last_published_at: POLICY_V2_AT,
+      restored_from: null,
+      return_reason: "",
+      page_role: "privacy",
+      required_for_golive: true,
+      show_in_footer: true,
+      footer_order: 1,
+      public_url: "/trang?slug=chinh-sach-quyen-rieng-tu",
+      source: "human",
+      row_version: 3,
+      updated_at: POLICY_V2_AT,
+    },
+  ],
   [
     42,
     {
@@ -113,7 +180,29 @@ let MOCK_ENTRY_DETAILS = new Map<number, ContentEntryDetail>([
   ],
 ]);
 
-let MOCK_VERSIONS_DB = new Map<number, ContentEntryVersionDetail[]>();
+function policyVersion(version: number, at: string, body: BodyDoc): ContentEntryVersionDetail {
+  return {
+    version,
+    published_at: at,
+    published_by_name: "Chủ vựa (mẫu)",
+    kind: "page",
+    title: "Chính sách bảo mật",
+    slug: "chinh-sach-quyen-rieng-tu",
+    excerpt: "",
+    seo_title: "",
+    seo_description: "",
+    description: "",
+    category: null,
+    cover_image: null,
+    body: JSON.parse(JSON.stringify(body)),
+    restored_from: null,
+  };
+}
+
+// Mới nhất trước, giống API thật.
+let MOCK_VERSIONS_DB = new Map<number, ContentEntryVersionDetail[]>([
+  [1, [policyVersion(2, POLICY_V2_AT, POLICY_V2_BODY), policyVersion(1, POLICY_V1_AT, POLICY_V1_BODY)]],
+]);
 
 
 export function mockListCategories(): ContentCategory[] {

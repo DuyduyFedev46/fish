@@ -80,6 +80,9 @@ const GROUP_PERMS: Record<string, string[]> = {
     "sales.view_customer", "sales.view_paymenttransaction", "sales.view_refund", "sales.view_salesinvoice",
     "sales.view_salesinvoiceline", "sales.view_salesinvoicelinebatch", "sales.view_salesorder",
     "sales.view_salesorderline", "sales.view_salesorderlinebatch", "sales.view_privacy_consent",
+    // CMS: BE migration content/0002 gán 8 quyền này cho chu và quan_ly (nv_kho/nv_giao không có).
+    "content.add_category", "content.change_category", "content.view_category", "content.add_entry",
+    "content.change_entry", "content.delete_entry", "content.view_entry", "content.publish_entry",
   ],
   quan_ly: [
     "accounts.view_auditlog", "accounts.view_staffprofile", "auth.view_user", "catalog.change_item_image",
@@ -100,6 +103,9 @@ const GROUP_PERMS: Record<string, string[]> = {
     "sales.change_customer", "sales.change_refund", "sales.create_refund", "sales.view_customer",
     "sales.view_paymenttransaction", "sales.view_refund", "sales.view_salesinvoice", "sales.view_salesinvoiceline",
     "sales.view_salesorder", "sales.view_salesorderline", "sales.view_privacy_consent",
+    // CMS: BE migration content/0002 gán 8 quyền này cho chu và quan_ly (nv_kho/nv_giao không có).
+    "content.add_category", "content.change_category", "content.view_category", "content.add_entry",
+    "content.change_entry", "content.delete_entry", "content.view_entry", "content.publish_entry",
   ],
   nv_kho: [
     "accounts.view_staffprofile", "auth.view_user", "catalog.view_bundleline", "catalog.view_item",

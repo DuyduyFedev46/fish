@@ -603,3 +603,233 @@ Phạm vi: SR-15 (AC3, AC4, AC7), SR-16 (AC8), SR-17 (AC3). Chỉ sửa `erp-con
   - frontend: `npx tsc --noEmit` sạch; `npm run build` OK; `grep -rlE "demo1234|0900000|Khách Giả|mockGet" out/` → 0 file (trước sửa: 3 file). `frontend/` không có script `npm test`.
   - Trước sửa, cùng grep ở erp-console ra `out/_next/static/chunks/2800-*.js` (theo techlead) — sau khi build lại và sửa thì không còn.
 - `out/` của cả hai đang là bản thật. Chưa chạy lại Playwright mock cho `frontend/` sau đổi này (đổi chỉ là cách viết điều kiện, ngữ nghĩa giữ nguyên; tsc sạch).
+
+## Lô 6 — BE
+
+Phạm vi: SR-18 (F1 IDOR ảnh khi tạo/sửa bài CMS, BR-ND-07). Không migration, không đổi model, không đổi contract API (chỉ thêm ca 400 BR-ND-07). Không commit.
+
+### File đã sửa (dưới `backend/apps/content/`)
+- `entries/services.py`: `save_draft` — khối "Cover image" viết lại; thêm hàm `_as_pk`. Import `MSG_IMAGE_AFTER_FIRST_SAVE`.
+- `body/sanitize.py`: hằng `MSG_IMAGE_AFTER_FIRST_SAVE = "Tải ảnh sau khi lưu nháp lần đầu."`; nhánh khối `image` ở chế độ `strict` chặn khi `entry is None`.
+- `public/serializers.py`: `_own_cover(version)` (bìa chỉ hiện nếu `cover.entry_id == version.entry_id`); `public_body` lọc ảnh `entry_id=version.entry_id`; hai serializer chi tiết/danh sách dùng `_own_cover`.
+- Test mới: `entries/tests/test_p8_sr18_image_idor.py` (19 test), `public/tests/test_p8_sr18_public.py` (4 test); thêm lớp `Sr18SanitizeCreateTests` (3 test) vào `body/tests/test_sanitize.py`. Không sửa/xoá test cũ.
+
+### Nguyên nhân gốc
+`save_draft` kiểm sở hữu bằng `if entry and not ContentImage...exists()`: khi tạo (`entry=None`) điều kiện đoản mạch nên bỏ qua kiểm tra; sau đó `ContentImage.objects.get(pk=cov_id)` lấy ảnh của bất kỳ bài nào. `normalize_body` cũng chỉ kiểm khi `entry is not None`. Lớp 1b `public_body` lấy ảnh theo `pk` không kiểm bài, và lấy `alt` của ảnh đó, nên bài đã đăng có dữ liệu cũ trỏ ảnh bài khác (kể cả bài nháp) sẽ lộ ảnh + alt.
+
+### Đỏ → xanh
+Đỏ (trước khi sửa, `manage.py test apps.content`, 132 test, 8 fail; các fail còn lại là ca đã đúng sẵn):
+- `Sr18CreateTests.test_sr18_ac1_tao_bai_voi_cover_cua_bai_khac_400` — `AssertionError: 201 != 400` (đúng repro A5-f1, bài mới tạo với `cover_image` của bài A).
+- `Sr18CreateTests.test_sr18_ac1_tao_bai_voi_khoi_image_cua_bai_khac_400` — `201 != 400`.
+- `Sr18CreateTests.test_sr18_ac1_khi_tao_moi_moi_anh_deu_bi_chan_...` — `'Ảnh bìa không tồn tại (BR-ND-07).' != 'Tải ảnh sau khi lưu nháp lần đầu.'`.
+- `Sr18GroupMatrixTests.test_sr18_chu_cung_bi_chan_anh_bai_khac` — `201 != 400`.
+- `Sr18SanitizeCreateTests.test_sr18_ac1_entry_none_khoi_image_strict_raise` — `BusinessError not raised`.
+- `Sr18PublicLayer1bTests` 3 test — `cover_image` là dict (ảnh nháp bài A, `alt` "Ảnh nháp bài A") `is not None`; body công khai chứa `content/<id A>/...` (rò ảnh nháp của bài khác).
+Xanh sau khi sửa: `manage.py test apps.content` 132 OK; thêm 1 test `cover_image` kiểu lạ ("abc", True, -1, list, dict) -> 400 chứ không 500: `apps.content.entries` 30 test OK.
+
+Toàn bộ: `DJANGO_DEBUG=1 env -u DATABASE_URL .venv/bin/python manage.py test` → `Ran 1523 tests in 111.150s ... OK` (1497 cũ + 26 mới: 19 + 4 + 3). `makemigrations --check --dry-run` → `No changes detected`.
+
+### Hành vi thực tế (contract lỗi cho FE)
+Mọi ca là `400 {"detail": <thông điệp>, "code": "BR-ND-07"}`:
+| Tình huống | detail |
+|---|---|
+| `POST /api/content/entries/` có `cover_image` (mọi giá trị truthy) hoặc khối `image` hợp lệ về kiểu | `Tải ảnh sau khi lưu nháp lần đầu.` (không tạo bài) |
+| `PATCH` `cover_image` không thuộc bài (ảnh bài khác, không tồn tại, kiểu lạ) | `Ảnh bìa không thuộc bài viết này (BR-ND-07).` |
+| `PATCH` khối `image` không thuộc bài | `Ảnh không thuộc bài viết này (BR-ND-07).` |
+| Vượt 20 ảnh/bài (cover + khối, đếm ảnh khác nhau) | `Vượt quá số lượng ảnh tối đa cho phép (BR-ND-07).` (như cũ) |
+Ảnh không tồn tại và ảnh bài khác dùng chung một thông điệp, không lộ ảnh có tồn tại hay không, không có alt/URL của ảnh bài khác. Khối `image` thiếu `image_id` số nguyên vẫn bị bỏ im lặng như cũ (không lỗi). FE: màn soạn chỉ cho tải/chèn ảnh sau khi bài có `id`; nếu vẫn nhận 400 này khi tạo thì hiện `detail`.
+
+Ma trận Group (POST/PATCH): `chu` 201/200, `quan_ly` 201/200, `nv_kho`/`nv_giao`/`cskh` 403, khách 401 (dữ liệu không đổi). Ảnh bài khác của người không có quyền vẫn là 403, không lộ BR-ND-07.
+
+### Ca ngoài đường thuận đã có test
+Ảnh mồ côi đã gỡ khỏi cover/body của bài B dùng lại được (200); ảnh thuộc bài A ở các trạng thái draft/pending_review/published/unpublished đều 400; id ảnh của bài đã xoá (cascade) 400; PATCH với `row_version` lệch + ảnh bài khác → 409 `STALE_VERSION`, không ghi (kiểm `row_version` chạy trước kiểm ảnh); B đủ 20 ảnh riêng + cover ảnh bài A → 400; 21 ảnh của chính B → 400 (giới hạn cũ còn); lớp 1b: chi tiết + danh sách + footer không chứa `image_id`/đường dẫn/alt của ảnh nháp bài A, ảnh của chính bài vẫn hiện.
+
+### Lệch thiết kế / lưu ý
+- Không có "xoá mềm" bài trong model (`delete_draft` xoá cứng, cascade ảnh); ca đó được test bằng id ảnh không còn tồn tại.
+- Chưa xử lý (ngoài phạm vi, ghi để techlead cân nhắc): `restore_entry_version`/`discard_changes` nạp `cover_image`/`body` từ phiên bản cũ; nếu dữ liệu trước SR-18 trỏ ảnh bài khác thì nháp mang theo. Lớp 1b công khai đã che, và lần lưu body kế tiếp bị 400 BR-ND-07 (cover không đổi thì không kiểm lại). Không sửa vì không có trong AC.
+- `publish_entry` không kiểm lại ảnh (bản nháp hợp lệ nhờ lúc lưu); dữ liệu cũ được lớp 1b che.
+
+## Lô 6 — FE
+
+Phạm vi: SR-19 (liên kết bằng chứng đồng ý mở đúng phiên bản chính sách) và SR-20 (màn nghiệp vụ không tải code AI khi AI tắt, BR-AI-17). Chỉ sửa `erp-console/`. Chưa commit.
+
+### Tệp
+Mới:
+- `erp-console/scripts/check-ai-chunks.mjs`: đọc `.next/app-build-manifest.json`, quét chunk của 2 layout và 4 route nghiệp vụ tìm `new Worker`, `wllama`, `/call/`; mã thoát 1 (đỏ) / 0 (xanh) / 2 (chưa build); in bảng First Load JS.
+- `erp-console/features/ai/runtime/messages.ts`: `AI_RUNTIME_MSG.wllamaMissing` (chuyển khỏi `ai/messages.ts` để chunk nghiệp vụ không kéo tên `wllama`).
+- `erp-console/features/ai/gate-state.ts`: kho trạng thái nhỏ (`useSyncExternalStore`) `publishAiEnabled`, `useAiEnabledAndConsented`; mặc định tắt (fail-closed).
+- `erp-console/features/guidance/components/GuidanceAiActions.tsx`: nút "Để AI làm" và "Nhờ" (tách khỏi `GuidancePanel`).
+- `erp-console/features/guidance/components/GuidanceAiSummary.tsx`: nút "Tóm tắt" (tách khỏi `GuidancePanel`).
+- `erp-console/features/content/components/PolicyVersionSheet.tsx` + `policy-version.module.css`: panel chỉ đọc "Phiên bản N (khách đã đồng ý)" (dựa trên `SideSheet`: khoá cuộn, bẫy focus, Esc; chỉ dùng token).
+- `erp-console/e2e/p8_lo6_fe_sr19_sr20.py`: Playwright (mock), 28 kiểm tra.
+
+Sửa:
+- `app/(console)/content/edit/page.tsx`: đọc `version` (chỉ chấp nhận `^\d{1,9}$`, > 0), mở `PolicyVersionSheet` sau khi bài đã tải; "Về bài" và Esc đóng panel.
+- `features/guidance/components/GuidancePanel.tsx`: không import tĩnh code AI, không gọi `ai/status`; đọc `useAiEnabledAndConsented()`; nạp `GuidanceAiActions` và `GuidanceAiSummary` bằng `next/dynamic({ ssr: false })`, chỉ render khi AI bật và đã đồng ý. Thông báo kết quả đi qua portal vào thẻ `.aiHost` (`display: contents`) nên bố cục cũ không đổi.
+- `features/guidance/components/guidance.module.css`: thêm `.aiHost`.
+- `features/ai/api.ts`: `getAiStatus` công bố `ai_enabled` vào `gate-state` (lỗi thì công bố tắt).
+- `features/ai/consent.ts`: thêm `subscribeAiConsent` để giao diện phản ứng khi Chủ đổi đồng ý.
+- `features/ai/messages.ts`, `features/ai/runtime/wllama.ts`: chuyển `wllamaMissing` sang `runtime/messages.ts`.
+- `features/content/mock.ts`: chính sách bảo mật 2 phiên bản (v1 "MẪU-V1..." đăng 01/08/2026, v2 "MẪU-V2..." đăng 20/09/2026), phiên bản không có thì 404. Slug `chinh-sach-quyen-rieng-tu` (tránh trùng ca test CMS-12).
+- `features/auth/mock.ts`: bổ sung 8 quyền `content.*` cho `chu` và `quan_ly`, khớp migration BE `content/0002_grant_content_perms` (mock cũ thiếu nên mock không vào được màn Nội dung). `nv_kho` không có, đúng thực tế.
+- `features/guidance/mock.ts`: bước `create_refund` của đơn không phải giữ chỗ có `ai: { level: "C" }` để e2e SR-20-AC5 có nút "Để AI làm" (chỉ mock).
+
+### TDD SR-20 (đỏ, rồi xanh)
+Đỏ, chạy `node scripts/check-ai-chunks.mjs` sau `npm run build` khi chưa tách (mã thoát 1):
+```
+ĐỎ: code AI còn nằm trong chunk màn nghiệp vụ (BR-AI-17):
+  - layout console: chunk static/chunks/app/(console)/layout-616e52e18c01dee9.js chứa "wllama"
+  - /orders, /orders/payments, /orders/refunds, /inventory: chunk static/chunks/6877-5834223bd119dfea.js chứa "new Worker", "wllama", "/call/"
+  - (4 route trên): chunk static/chunks/1013-db843afd0baddeaa.js chứa "wllama"
+```
+Xanh sau khi tách (mã thoát 0): `XANH: 4 màn nghiệp vụ và 2 layout không chứa new Worker, wllama, /call/.`
+
+### First Load JS trước và sau
+Số liệu của script (tổng chunk JS chưa nén):
+| Route | Trước | Sau |
+|---|---|---|
+| layout gốc | 309,7 kB | 309,7 kB |
+| layout console | 373,0 kB | 373,5 kB |
+| /orders | 443,5 kB | 430,6 kB |
+| /orders/payments | 456,5 kB | 443,7 kB |
+| /orders/refunds | 419,2 kB | 406,3 kB |
+| /inventory | 398,2 kB | 385,3 kB |
+
+Số liệu của `next build` (đã nén):
+| Route | Trước | Sau |
+|---|---|---|
+| /orders | 138 kB | 133 kB |
+| /orders/payments | 141 kB | 136 kB |
+| /orders/refunds | 130 kB | 125 kB |
+| /inventory | 124 kB | 119 kB |
+| Shared | 88,2 kB | 88,2 kB |
+
+### Kết quả kiểm
+- `npx tsc --noEmit`: sạch. `npm run build` (mock=0 và mock=1): sạch. `npm test`: 103/103. `node scripts/check-ai-chunks.mjs`: mã thoát 0.
+- Build thật `NEXT_PUBLIC_USE_MOCK=0`: `grep -rlE "demo1234|0900000|Khách Giả|mockGet" out/` = 0 tệp.
+- Không màu hex trong tệp mới (chỉ token). Không lưu dữ liệu cá nhân vào localStorage/URL/console (URL chỉ có `id` và `version`).
+
+### Playwright (mock, cổng 3216, 28/28 PASS)
+Chạy: `BASE=http://127.0.0.1:3216 SHOTS=doc/features/2026-09-30-sua-loi-review/qa-lo6 python3 erp-console/e2e/p8_lo6_fe_sr19_sr20.py`.
+- SR-19-AC1: Chủ mở đơn có đồng ý, bấm "Xem phiên bản" → panel "Phiên bản 1 (khách đã đồng ý)", nội dung MẪU-V1, không lẫn MẪU-V2, "Đăng lúc 10:00 01/08/2026 (giờ Việt Nam)", không có ô nhập, href chỉ `id` + `version`.
+- SR-19-AC2: `version=99` → "Không tìm thấy phiên bản 99" + nút "Về bài" (360 px không cuộn ngang); `version=2` hiện bản 2.
+- SR-19-AC3: `ql1` thấy liên kết; `kho1` không có mục Đơn hàng và không thấy liên kết.
+- SR-20-AC3: AI tắt, mở `/orders` + chi tiết đơn, `/orders/payments`, `/orders/refunds`, `/inventory` → 0 request `/api/ai/*`, không có nút "Để AI làm".
+- SR-20-AC5: AI bật + đã đồng ý, mở tab Trợ lý (có `GET /api/ai/status/`), bấm "Để AI làm" → `POST /api/ai/commands/sales.refund.create/call/` và thông báo "AI đã soạn nháp đề xuất". AI bật nhưng chưa đồng ý → không có nút.
+- Không có `console.error`.
+Ảnh trong `doc/features/2026-09-30-sua-loi-review/qa-lo6/`: `sr19-ac1-desktop.png`, `sr19-ac2-mobile360.png`, `sr19-v2-mobile360.png`, `sr20-ac3-orders-detail-desktop.png`, `sr20-ac3-payments-desktop.png`, `sr20-ac3-refunds-desktop.png`, `sr20-ac3-inventory-desktop.png`, `sr20-ac5-before-desktop.png`, `sr20-ac5-after-desktop.png`, `sr20-orders-detail-mobile360.png`. Ảnh dùng dữ liệu mock bịa; font icon offline nên biểu tượng hiện thành chữ cái (không ảnh hưởng nội dung).
+
+### Lệch thiết kế / lưu ý
+1. Trước đây không có context "AI bật" nào để màn nghiệp vụ đọc. Tạo `gate-state.ts` và sửa `ai/api.ts`, `ai/consent.ts` (ngoài danh sách tệp của 02c). `AiAssistantGate` không đụng, vẫn gọi `getAiStatus` như cũ.
+2. Hệ quả: nút "Để AI làm" và "Tóm tắt" chỉ hiện sau khi tab Trợ lý đã mở ít nhất một lần trong phiên (lúc đó status mới được công bố). Chưa mở thì coi như AI tắt (an toàn, không gọi `ai/status` từ màn nghiệp vụ).
+3. Nút "Nhờ" (DW-23) nay cũng nằm trong khối nạp động, nên bị ẩn khi AI tắt (trước đây hiện luôn). Nếu PO muốn "Nhờ" hiện cả khi AI tắt thì cần tách riêng (đường gọi `escalateStep` phải ra khỏi `ai/actions/api`).
+4. Sửa `features/auth/mock.ts` và `features/guidance/mock.ts` (ngoài danh sách 02c) chỉ để mock chạy được e2e; không ảnh hưởng bản build thật.
+5. Tiêu đề panel khi không tìm thấy là "Phiên bản N" (không kèm "khách đã đồng ý" vì không có bằng chứng).
+6. Hàm `dateTime` dùng chung không đặt `timeZone`; panel phiên bản tự dùng `Asia/Ho_Chi_Minh` và ghi "(giờ Việt Nam)". Các màn khác chưa đổi.
+
+### Nợ còn lại
+- `/ai-spike` vẫn chứa code AI (SR-23 F12, ngoài Lô 6).
+- Cần rà tay kích thước thật trên thiết bị yếu (TTI < 2 s) khi QA đo; mới đo dung lượng chunk, chưa đo thời gian.
+
+## Lô 6 — FE Shop (M5-1b, B2)
+Phạm vi: chỉ `frontend/`. Không đụng `erp-console/`, package.json/lock, backend, `02*.md`. Không commit.
+
+### B1 (Medium) — bản build thật không còn seed mock
+Nguyên nhân: `lib/api.ts`, `features/content/api.ts`, `features/site/api.ts` import tĩnh `./mock` (dù nhánh gọi đã có điều kiện literal), và `CheckoutScreen.tsx` gọi `dynamic(() => import("./MockGatewayPanel"))` ở cấp module (chunk kéo theo `lib/mock`). Bundler giữ module vì import tĩnh có thể có hiệu ứng phụ.
+Đã sửa:
+- `frontend/lib/api.ts`, `frontend/features/content/api.ts`, `frontend/features/site/api.ts`: bỏ import tĩnh `./mock`; mỗi nhánh mock là `if (process.env.NEXT_PUBLIC_USE_MOCK === "1") { const m = await import("./mock"); return m.mockXxx(...) }`. Hành vi bản mock không đổi (các hàm vốn async).
+- `frontend/features/checkout/components/CheckoutScreen.tsx`: `MockGatewayPanel = process.env.NEXT_PUBLIC_USE_MOCK === "1" ? dynamic(...) : null`; render khi `MockGatewayPanel && ?mock_gateway=1`.
+- Script mới `frontend/scripts/check-no-mock.mjs [thư-mục-build=out]`: đọc `mock*.ts` và `Mock*.tsx` để lấy seed (khoá `cangcaloc_*`, `DH-DEMO*`, `item_code` mẫu, SĐT `0900000*`, mật khẩu demo nếu có, tên mẫu có khoảng trắng, nhãn cổng giả lập), quét mọi js/html/txt/json/css/map trong `out/`; exit 1 nếu thấy. 27 chuỗi seed hiện tại.
+
+Đỏ trước khi sửa (build thật `NEXT_PUBLIC_USE_MOCK=0 NEXT_PUBLIC_API_BASE=https://example.invalid`):
+```
+check-no-mock: 4 file mock, 27 chuỗi seed, 46 file build (out/)
+  LỌT MOCK  out/_next/static/chunks/116-af53a0319b0dba58.js  "cangcaloc_mock_orders_v2", "DH-DEMO001..004", "CA-BASA-PHILE", "TOM-SU-TUOI", "MUC-ONG", "NGHEU-TRANG", "Mực ống"
+  LỌT MOCK  out/_next/static/chunks/351.63e1c941295ab008.js  "Giả lập — chỉ hiện ở chế độ mock"
+check-no-mock: ĐỎ — 11 chỗ lọt seed mock vào bản build.     exit=1
+grep -rlE "DH-DEMO00|CA-BASA-PHILE|cangcaloc_mock_orders" out/  ->  out/_next/static/chunks/116-af53a0319b0dba58.js
+```
+Xanh sau khi sửa (43 file build, ít hơn 3 chunk):
+```
+check-no-mock: XANH — không thấy seed mock nào trong bản build.   exit=0
+grep -rlE "DH-DEMO00|CA-BASA-PHILE|cangcaloc_mock_orders" out/  ->  (rỗng, grep exit 1)
+```
+Lưu ý: script tự bắt được `MockGatewayPanel` lọt chunk riêng (351) mà lệnh grep của QA không thấy; đó là lý do sửa cả `dynamic(...)`.
+Bản mock (`NEXT_PUBLIC_USE_MOCK=1`) đương nhiên đỏ với script này (bản mock có seed) — script chỉ dùng cho bản thật.
+
+### B2 (Low)
+`frontend/features/checkout/storage.ts` `recallOrderContact`: chỉ trả về khi `phone_last4` là chuỗi khớp `/^\d{4}$/`, ngược lại `null` (không vào ô nhập, không vào URL).
+
+### Kiểm chứng
+- `npx tsc --noEmit`: exit 0.
+- Build thật xanh + `check-no-mock.mjs` exit 0 + grep rỗng (trên).
+- `e2e/qa-lo6-sr21-shop.py` chạy trên build thật (cổng 3106, out copy sang scratchpad): 279 ca, 0 FAIL, 0 LOW (M5-1 nay PASS, ca B2 nay không còn cảnh báo).
+- Build mock `NEXT_PUBLIC_USE_MOCK=1`, Playwright nhanh (390px): `/shop/` hiện "Cá basa phi lê"; `/shop/orders/` tra `DH-DEMO001` + `6789` ra đơn; `/shop/checkout/?mock_gateway=1&...` hiện màn cổng giả lập; không pageerror.
+- Cuối cùng `frontend/out/` được build lại là BẢN THẬT với `NEXT_PUBLIC_API_BASE=https://cangca-api-675411800433.asia-southeast1.run.app` (production, theo `doc/ops/moi-truong.md`), check-no-mock xanh.
+
+### Đề xuất / nợ
+- `erp-console/scripts/check-no-mock.mjs` chưa làm (fe-dev khác đang sửa `erp-console/`); script frontend viết theo cấu trúc chung nên copy sang được (đổi nguồn seed nếu ERP có mật khẩu demo ở `features/auth/mock.ts`). Đề xuất gắn vào quy trình build/deploy: chạy `node scripts/check-no-mock.mjs` sau `npm run build` bản thật, trước `firebase deploy`.
+
+### Lô 6 — FE: sửa thêm (điều phối kiểm `check-no-mock`)
+Điều phối chép `frontend/scripts/check-no-mock.mjs` sang `erp-console/scripts/check-no-mock.mjs`. Build thật rồi chạy thì ĐỎ (9 chỗ):
+- Nguồn lọt thật, chỉ một: `erp-console/features/content/api.ts`. Có 2 lỗi.
+  - `const isMock = ...` gán ra biến rồi dùng `mock: isMock ? ... : undefined`. Bundler không cắt được nhánh mock nên `features/content/mock.ts` cùng seed đi vào chunk `108-*.js`. Các api.ts khác đã viết `process.env.NEXT_PUBLIC_USE_MOCK === "1"` nguyên văn tại chỗ dùng nên không lọt.
+  - `fetchShopCatalog` có `mock: () => ({ ... "CA-THU-1KG", "MUC-ONG-1KG", "Mực ống Phan Thiết 1kg" ... })` không có điều kiện, nên 4 mã hàng mẫu nằm luôn trong bản thật.
+- Cách sửa: bỏ biến `isMock`, viết điều kiện literal nguyên văn tại từng chỗ dùng (kèm chú thích); bọc mock của `fetchShopCatalog` trong `process.env.NEXT_PUBLIC_USE_MOCK === "1" ? ... : undefined`. Không cần `await import("./mock")` vì literal nguyên văn đã đủ để bundler cắt (các api.ts khác đang xanh nhờ đúng cách này); không đổi hành vi bản mock (mock 1 build lại, e2e Lô 6 vẫn 28/28).
+- 2 chỗ còn lại trong 9 là báo nhầm: `staff/page` và `ai-spike/page` chứa chuỗi "deactivate", bị regex mật khẩu bắt do đứng sau dấu phẩy trong `["edit", "set_groups", "reset_password", "deactivate"]`. `/ai-spike` không phải nguồn lọt (Lô 7 xoá nó).
+- Sửa heuristic mật khẩu ở CẢ `erp-console/scripts/check-no-mock.mjs` và `frontend/scripts/check-no-mock.mjs` (2 tệp giống hệt nhau):
+  - Chỉ lấy chuỗi gán cho khoá tên đúng `password`/`PASSWORD`/`mat_khau`/`mật khẩu` với `:` hoặc `=`, có lookbehind để "reset_password" không tính; bỏ dấu phẩy khỏi mẫu.
+  - Thêm luật: mọi chuỗi dạng `"demo\d{3,}..."` trong tệp mock đều là seed, không phụ thuộc tên khoá. Kiểm lại: chạy trên bản build mock thì `demo1234` (từ `features/auth/mock.ts`) được báo, tức script không bỏ sót; chạy trên bản thật thì không có.
+- `frontend/scripts/check-no-mock.mjs` chạy trên `frontend/out/` đang có (không build lại vì QA đang dùng thư mục đó): XANH, exit 0. Nếu điều phối cần bằng chứng trên bản build mới của frontend thì cần build lại ở phiên khác.
+
+Kiểm cuối (build thật `NEXT_PUBLIC_USE_MOCK=0`, `erp-console/out/` hiện là bản thật):
+- `node scripts/check-no-mock.mjs` (erp-console): XANH, exit 0 (12 tệp mock, 31 chuỗi seed, 134 tệp build).
+- `node scripts/check-ai-chunks.mjs`: XANH, exit 0.
+- `npx tsc --noEmit`: sạch. `npm test`: 103/103.
+- `grep -rlE "demo1234|0900000|Khách Giả|mockGet" out/`: 0 tệp.
+- Bản mock: build lại + `e2e/p8_lo6_fe_sr19_sr20.py` 28/28 PASS.
+
+### F6-1 — nút "Nhờ" không phụ thuộc AI (techlead review Lô 6, mức High)
+**Lỗi:** sau SR-20, nút "Nhờ" (DW-23) nằm trong `GuidanceAiActions`, mà khối đó chỉ nạp khi AI bật và đã đồng ý. Kết quả: AI tắt thì mất luôn "Nhờ". Sai với DW-23-AC7 ("AI tắt → Nhờ vẫn chạy"); BE cũng không chặn escalate khi AI tắt.
+
+**Sửa (chỉ `erp-console/`):**
+- `features/guidance/components/GuidanceEscalate.tsx` (mới): nút "Nhờ" + thông báo kết quả (portal vào `noticeHost`). Điều kiện hiện giữ nguyên như cũ: `!step.allowed && step.actor !== "system" && step.key`. Không đọc cờ AI bật/đồng ý.
+- `features/guidance/components/GuidancePanel.tsx`: `StepItem` render `GuidanceEscalate` tĩnh (import thường, không `next/dynamic`), đứng trước `{aiOn && <GuidanceAiActions/>}`. Điều kiện hiện nút "Để AI làm" KHÔNG đổi (F6-2 / D6-1 chờ Duy quyết).
+- `features/guidance/components/GuidanceAiActions.tsx`: bỏ toàn bộ code "Nhờ"/escalate, chỉ còn "Để AI làm".
+- `features/ai/actions/api.ts` (viết lại, thuần http): `escalateStep` nằm ở đây và được import tĩnh. Để bản build thật không lọt seed, phần mock đã tách sang `features/ai/actions/mock.ts` (mới: `mockAiActions` 4 dòng, `mockUndoAiAction`, `mockFetchAiActions`, `mockFetchAiActionDetail`, `mockConfirmAiAction`, `mockRejectAiAction`, `mockEscalateStep`). Mỗi lời gọi viết `mock: process.env.NEXT_PUBLIC_USE_MOCK === "1" ? () => mockX(...) : undefined` nguyên văn, nên bundler cắt được. Trước đây `mockAiActions` là seed cấp module ngay trong `api.ts`; import tĩnh `api.ts` vào màn nghiệp vụ sẽ kéo seed vào bản thật (chứa uuid `a1b2c3d4-...`).
+- `features/ai/actions/actions.test.ts`: chỉ đổi dòng import (`mockAiActions`, `mockUndoAiAction` lấy từ `./mock`); 103/103 vẫn xanh.
+
+**Lệch cần biết:**
+1. **SR-20 AC3 "0 request /api/ai/*"** mâu thuẫn nhẹ với DW-23: "Nhờ" gọi `POST /api/ai/actions/escalate/` (đường dẫn nằm dưới `/api/ai/` nhưng không phải tính năng AI). Cách hiểu tôi áp dụng: AC3 nghĩa là khi MỞ màn (không ai bấm gì) có 0 request `/api/ai/*`, và không bao giờ có `/api/ai/commands` hoặc `/api/ai/status` khi AI tắt. Request escalate do NGƯỜI BẤM "Nhờ" là ngoại lệ hợp lệ. E2E kiểm đúng như vậy (xem dưới). Nếu PO muốn AC3 chặt hơn, cần sửa câu chữ AC3 hoặc đổi đường dẫn escalate (việc BE, ngoài phạm vi FE).
+2. **`features/guidance/mock.ts` (ngoài danh sách file 02c):** mock cũ chỉ có bước `allowed:false` ở nhánh lô kho (`close`). Đơn, thanh toán, hoàn tiền đều `allowed:true` nên không có màn nào hiện "Nhờ" để test. Thêm hàm `chuOnlyStep` và 3 bước người dùng `allowed:false` (chỉ Chủ): `cancel_paid` (nhánh đơn đã thanh toán), `confirm_manual` (thanh toán), `cancel_refund` (hoàn tiền). Chỉ ảnh hưởng mock; không test đơn vị nào phụ thuộc số bước (đã grep).
+3. **Sửa e2e cũ:** kiểm lại phát hiện ca SR20-AC3 cho payments/refunds/inventory dùng bộ chọn liên kết quá lỏng (`Thanh toán`, `Hoàn tiền`, `Kho|Tồn kho`), ảnh chụp cũ cho thấy có thể đứng ở danh sách đơn thay vì đúng màn. Đã đổi sang tên liên kết chính xác ("Hàng chờ thanh toán", "Phiếu hoàn chờ chuyển", "Kho & lô") và thêm `expect` hàng danh sách của đúng màn; kết quả vẫn 0 request `/api/ai/*` khi mở màn. Ảnh `sr20-ac3-payments/refunds/inventory-desktop.png` đã chụp lại.
+
+**Kiểm chứng (chạy trong lượt này):**
+- `npx tsc --noEmit`: sạch. `npm test`: 103/103.
+- Build mock rồi `e2e/p8_lo6_fe_sr19_sr20.py` (cổng 3216, out copy sang scratchpad, đã tắt server): **61/61 PASS** (28 ca cũ + ca F6-1: AI tắt ở 4 màn có "Nhờ", bấm ra thông báo "Đã chuyển việc cho nhóm chu", nút thành "Đã nhờ (chu)" và khoá, 0 request `/api/ai/commands|status`, đúng 1 `POST /api/ai/actions/escalate/`; AI bật đồng ý: có cả "Để AI làm" và "Nhờ", "Để AI làm" chạy như trước; mobile 360 không cuộn ngang).
+- Ảnh (`doc/features/2026-09-30-sua-loi-review/qa-lo6/`): `f61-nho-orders-detail-desktop.png`, `f61-nho-payments-desktop.png`, `f61-nho-refunds-desktop.png`, `f61-nho-inventory-desktop.png`, `f61-nho-orders-detail-ai-on-desktop.png`, `f61-nho-orders-detail-mobile360-desktop.png` (tên có hậu tố `-desktop` do hàm chụp gắn cố định; ảnh này là viewport 360).
+- Build thật `NEXT_PUBLIC_USE_MOCK=0` (`erp-console/out/` hiện là bản thật): `check-no-mock.mjs` XANH (13 tệp mock, 32 chuỗi seed, 134 tệp build); `check-ai-chunks.mjs` XANH; `grep -rlE "demo1234|0900000|Khách Giả|mockGet" out/` = 0 tệp; `grep -rl "a1b2c3d4-e5f6-7890-abcd-ef1234567890" out/` = 0 tệp; `frontend/scripts/check-no-mock.mjs` trên `frontend/out/` XANH.
+- First Load JS (script, chưa nén): /orders 433.3, /orders/payments 446.4, /orders/refunds 409.0, /inventory 388.0, layout console 373.5, layout gốc 309.7 kB. Tăng ~2,7 kB mỗi màn so với trước F6-1 (do `GuidanceEscalate` + `ai/actions/api.ts` đi vào chunk chung), vẫn thấp hơn mốc trước SR-20 (443,5/456,5/419,2/398,2). Next build: /orders 134, /orders/payments 137, /orders/refunds 126, /inventory 120 kB.
+
+### F6-2 (Duy chốt 30/09) — "Để AI làm" theo `step.ai` của server
+**Quyết định của Duy:** nút "Để AI làm" hiện khi `step.ai` khác null. Server đã trả `step.ai = null` khi Chủ tắt AI toàn cục, nhân viên tắt AI của mình, lệnh chưa giao/OFF hoặc không có quyền (`backend/apps/common/guidance/steps.py::resolve_step_ai`, `ai/policy/effective.py`). Nút KHÔNG còn phụ thuộc "đã đồng ý tải model" hay việc đã mở tab Trợ lý. Bấm là gọi server như cũ (`POST /api/ai/commands/<lệnh>/call/`). Luồng lớn hơn (Chủ bật → nhân viên opt-in → tab Trợ lý + tải model, router kiểm model) là P9, chưa làm.
+
+**SR-20-AC2 đổi:** trước đây "Để AI làm" hiện khi AI bật VÀ đã đồng ý. Nay "Để AI làm" hiện theo `step.ai` (mức C, có `step.command`). Điều kiện "AI bật + đã đồng ý" (gate-state) chỉ còn áp cho "Tóm tắt" (DW-16, chạy model local). AC3 (AI tắt → 0 code AI, 0 request `/api/ai/commands|status`) vẫn đúng: không bước nào có `step.ai` thì `GuidanceAiActions` không bao giờ được nạp.
+
+**Sửa (chỉ `erp-console/`):**
+- `features/guidance/components/GuidancePanel.tsx`: `StepItem` tự tính `showAiButton = step.ai && step.ai.level === "C" && step.command` (giữ đúng DW-14-AC3/AC8 như cũ, chỉ đổi nguồn điều kiện) và chỉ render `GuidanceAiActions` (vẫn `next/dynamic`) khi đúng. Bỏ prop `aiOn` của `StepItem`; `aiOn` (gate-state) chỉ còn dùng cho `GuidanceAiSummary`.
+- `features/guidance/components/GuidanceAiActions.tsx`: chỉ đổi chú thích đầu file. `features/ai/commands/call.ts` chỉ import `@/shared/lib/http` và `../types`, không kéo `wllama`/`Worker` (kiểm trên bản build thật: chunk nạp động của `GuidanceAiActions`, 2 kB, có 0 `wllama`, 0 `new Worker`; chunk có `wllama` là chunk cổng Trợ lý, tách riêng và không do màn nghiệp vụ nạp).
+- `features/ai/consent.ts`: chỉ sửa chú thích (đồng ý chỉ còn cho Tóm tắt). `gate-state.ts` không đổi.
+- Mock (mô phỏng server): `features/ai/mock.ts` export `aiEnabled()`; `features/guidance/mock.ts` bước `create_refund` trả `ai: aiEnabled() ? { level: "C", label: "Để AI làm" } : null` (cờ AI mock tắt → `ai: null`, giống `resolve_step_ai`). Đổi so với trước: mock mặc định tắt AI nên huy hiệu "AI (C)" và nút không còn hiện nếu chưa `__caveMock.ai("on")`. Không test đơn vị nào phụ thuộc.
+- Hành vi cần biết: nút nay hiện khi khối nạp động về xong (chunk tải riêng), nên chậm hơn vài chục ms so với các nút khác. Test phải chờ nút (`expect(...).to_be_visible()`), không đếm ngay.
+
+**Kiểm chứng (chạy trong lượt này):**
+- `npx tsc --noEmit`: sạch. `npm test`: 103/103.
+- Build mock + `e2e/p8_lo6_fe_sr19_sr20.py`: **74/74 PASS**. Ca F6-2:
+  - `ai("on")` không cấp đồng ý, tải lại hẳn trang, KHÔNG mở tab Trợ lý: mở chi tiết đơn 102 thấy "Để AI làm" và huy hiệu "AI (C)"; lúc mở 0 request `/api/ai/status|commands`; bấm ra đúng 1 `POST /api/ai/commands/sales.refund.create/call/` + thông báo "AI đã soạn nháp đề xuất", không gọi status; "Nhờ" vẫn cạnh đó.
+  - `ai("off")` (`step.ai = null`, kể cả đã đồng ý model, mobile 360): không có nút, không có huy hiệu, 0 request `/api/ai/*`, "Nhờ" vẫn còn, không cuộn ngang.
+  - Ca cũ "AI bật nhưng chưa đồng ý: không có nút" đổi thành "vẫn có nút" theo SR-20-AC2 mới.
+  - Kịch bản f62 bỏ qua lỗi console "Failed to fetch RSC payload" (do `page.goto` huỷ prefetch đang bay), không phải lỗi app.
+- Ảnh (`qa-lo6/`): `f62-de-ai-lam-not-opened-assistant-desktop.png`, `f62-de-ai-lam-after-desktop.png`, `f62-step-ai-null-mobile360.png`.
+- Build thật `NEXT_PUBLIC_USE_MOCK=0` (`erp-console/out/` hiện là bản thật): `check-no-mock.mjs` XANH (13 tệp mock, 32 chuỗi seed, 134 tệp build); `check-ai-chunks.mjs` XANH; `grep -rlE "demo1234|0900000|Khách Giả|mockGet" out/` = 0; `grep -rl "a1b2c3d4-e5f6-7890-abcd-ef1234567890" out/` = 0; `frontend/scripts/check-no-mock.mjs` XANH.
+- First Load JS (script, chưa nén): /orders 433.3, /orders/payments 446.4, /orders/refunds 409.0, /inventory 388.0 kB (không đổi so với F6-1). Layout console 373.5, layout gốc 309.7.

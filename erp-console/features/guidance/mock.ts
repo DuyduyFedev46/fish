@@ -3,7 +3,24 @@
 
 import type { MockRequest, MockResponse } from "@/shared/lib/http";
 import { mockExpiredBatchGuidance } from "@/features/inventory/mock";
+import { aiEnabled as mockAiEnabled } from "@/features/ai/mock";
 import type { GuidanceData } from "./types";
+
+// F6-1: bước người dùng chưa được phép (viewer thiếu quyền) để màn hiện nút "Nhờ" (DW-23). Chỉ dùng cho mock/e2e.
+function chuOnlyStep(key: string, label: string, br: string, text: string) {
+  return {
+    key,
+    label,
+    actor: "user" as const,
+    allowed: false,
+    who: ["Chủ"],
+    missing: [{ code: br, text }],
+    deadline: null,
+    why: { br, text },
+    command: null,
+    ai: null,
+  };
+}
 
 export function mockGuidanceApi(req: MockRequest): MockResponse {
   const match = req.path.match(/^\/api\/guidance\/([a-z_]+)\/([^/]+)\/$/);
@@ -85,8 +102,10 @@ export function mockGuidanceApi(req: MockRequest): MockResponse {
                 text: "Chỉ tạo phiếu hoàn khi hoá đơn còn khoản có thể hoàn",
               },
               command: "sales.refund.create",
-              ai: null,
+              // F6-2: giống server (resolve_step_ai) — cờ AI toàn cục tắt thì `ai: null`; bật thì mức C, KHÔNG xét đồng ý model.
+              ai: mockAiEnabled() ? { level: "C", label: "Để AI làm" } : null,
             },
+            chuOnlyStep("cancel_paid", "Huỷ đơn đã thanh toán", "BR-PQ-03", "Huỷ đơn đã thanh toán chỉ Chủ được làm."),
           ],
       warnings: [],
       timeline: [
@@ -173,6 +192,7 @@ export function mockGuidanceApi(req: MockRequest): MockResponse {
           command: "sales.refund.mark_failed",
           ai: null,
         },
+        chuOnlyStep("cancel_refund", "Huỷ phiếu hoàn", "BR-HT-05", "Phiếu hoàn đã có yêu cầu chuyển tiền, chỉ Chủ được huỷ."),
       ],
       warnings: [
         {
@@ -237,6 +257,7 @@ export function mockGuidanceApi(req: MockRequest): MockResponse {
           command: "sales.refund.create",
           ai: null,
         },
+        chuOnlyStep("confirm_manual", "Xác nhận thủ công đã nhận tiền", "BR-TT-07", "Xác nhận thanh toán tay cần Chủ."),
       ],
       warnings: [],
       timeline: [

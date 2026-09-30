@@ -435,3 +435,8 @@
   margin: 0 0 var(--space-2) 0;
 }
 
+
+/* Chỗ đặt (portal) kết quả của phần AI nạp động — không tạo hộp riêng nên không thêm khoảng cách (SR-20). */
+.aiHost {
+  display: contents;
+}

@@ -14,14 +14,10 @@ import {
   type WireCreateOrderResponse,
   type WireOrderStatus,
 } from "./types";
-import {
-  mockCreateOrder,
-  mockGetCatalog,
-  mockGetCatalogItem,
-  mockGetOrderStatus,
-  mockGetSiteInfo,
-  mockStartCheckoutSession,
-} from "./mock";
+// KHÔNG import tĩnh "./mock": bản build thật (USE_MOCK != "1") phải không mang seed mock.
+// Mỗi nhánh mock dưới đây dùng điều kiện literal `process.env.NEXT_PUBLIC_USE_MOCK === "1"`
+// tại chỗ + `await import("./mock")` động, để bundler cắt cả nhánh lẫn module (M5-1b;
+// kiểm bằng `node scripts/check-no-mock.mjs`).
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8000";
 export const USE_MOCK = process.env.NEXT_PUBLIC_USE_MOCK === "1";
@@ -74,12 +70,18 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
 }
 
 export async function getCatalog(): Promise<CatalogItem[]> {
-  if (process.env.NEXT_PUBLIC_USE_MOCK === "1") return mockGetCatalog();
+  if (process.env.NEXT_PUBLIC_USE_MOCK === "1") {
+    const m = await import("./mock");
+    return m.mockGetCatalog();
+  }
   return apiFetch<CatalogItem[]>("/api/shop/catalog/");
 }
 
 export async function getCatalogItem(itemCode: string): Promise<CatalogItemDetail | null> {
-  if (process.env.NEXT_PUBLIC_USE_MOCK === "1") return mockGetCatalogItem(itemCode);
+  if (process.env.NEXT_PUBLIC_USE_MOCK === "1") {
+    const m = await import("./mock");
+    return m.mockGetCatalogItem(itemCode);
+  }
   try {
     return await apiFetch<CatalogItemDetail>(
       `/api/shop/catalog/${encodeURIComponent(itemCode)}/`
@@ -119,7 +121,10 @@ function mapOrderStatus(wire: WireOrderStatus): OrderStatus {
 }
 
 export async function getSiteInfo(): Promise<SiteInfo> {
-  if (process.env.NEXT_PUBLIC_USE_MOCK === "1") return mockGetSiteInfo();
+  if (process.env.NEXT_PUBLIC_USE_MOCK === "1") {
+    const m = await import("./mock");
+    return m.mockGetSiteInfo();
+  }
   return apiFetch<SiteInfo>("/api/public/site-info/");
 }
 
@@ -134,7 +139,10 @@ function mapCreateOrderResponse(wire: WireCreateOrderResponse): CreateOrderRespo
 export async function createOrder(
   payload: CreateOrderPayload
 ): Promise<CreateOrderResponse> {
-  if (process.env.NEXT_PUBLIC_USE_MOCK === "1") return mapCreateOrderResponse(await mockCreateOrder(payload));
+  if (process.env.NEXT_PUBLIC_USE_MOCK === "1") {
+    const m = await import("./mock");
+    return mapCreateOrderResponse(await m.mockCreateOrder(payload));
+  }
   const wire = await apiFetch<WireCreateOrderResponse>("/api/shop/orders/", {
     method: "POST",
     body: JSON.stringify(payload),
@@ -147,7 +155,8 @@ export async function getOrderStatus(
   phoneLast4: string
 ): Promise<OrderStatus | null> {
   if (process.env.NEXT_PUBLIC_USE_MOCK === "1") {
-    const wire = await mockGetOrderStatus(orderCode, phoneLast4);
+    const m = await import("./mock");
+    const wire = await m.mockGetOrderStatus(orderCode, phoneLast4);
     return wire ? mapOrderStatus(wire) : null;
   }
   try {
@@ -171,7 +180,10 @@ export async function getOrderStatus(
 export async function startCheckoutSession(
   orderCode: string
 ): Promise<PaymentCheckoutSession> {
-  if (process.env.NEXT_PUBLIC_USE_MOCK === "1") return mockStartCheckoutSession(orderCode);
+  if (process.env.NEXT_PUBLIC_USE_MOCK === "1") {
+    const m = await import("./mock");
+    return m.mockStartCheckoutSession(orderCode);
+  }
   return apiFetch<PaymentCheckoutSession>(
     `/api/shop/orders/${encodeURIComponent(orderCode)}/checkout/`,
     { method: "POST" }

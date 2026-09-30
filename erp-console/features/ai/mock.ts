@@ -16,7 +16,8 @@ import type { AuditLogRow } from "./types";
 
 const AI_ON_KEY = "cave_erp_mock_ai";
 
-function aiEnabled(): boolean {
+/** Cờ AI toàn cục của mock (server thật: Chủ tắt AI → mọi `step.ai` = null). Dùng cả ở features/guidance/mock. */
+export function aiEnabled(): boolean {
   if (typeof window === "undefined") return false;
   try {
     return window.localStorage.getItem(AI_ON_KEY) === "on";

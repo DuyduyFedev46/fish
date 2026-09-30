@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { callCommand } from "../commands/call";
-import { fetchAiActions, undoAiAction, mockAiActions, mockUndoAiAction, escalateStep } from "./api";
+import { fetchAiActions, undoAiAction, escalateStep } from "./api";
+import { mockAiActions, mockUndoAiAction } from "./mock";
 import { fetchDailyAiReport } from "../report/api";
 
 describe("DW-19, DW-21, DW-22 & DW-23 Frontend AI Tests", () => {

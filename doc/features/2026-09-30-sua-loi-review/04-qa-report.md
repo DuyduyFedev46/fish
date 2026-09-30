@@ -695,3 +695,197 @@ md5 backend/db.sqlite3                                                          
 Playwright/FE: không chạy lại (FE không đổi kể từ lần 1; kết quả lần 1 giữ nguyên: erp 77/77 + 12/12, M5-1 sạch)
 ```
 Việc còn lại (⏸): E10 tranh chấp song song thật trên staging (Postgres) trước khi lên production. Không commit, không deploy.
+
+---
+
+## Lô 6 — SR-21 (phần Shop) · 2026-09-30
+
+### Kết luận: REJECTED (phần Shop) — mọi AC GL-01..GL-04 có bằng chứng chạy thật và đạt, nhưng phát hiện B1 (Medium): bản build thật `NEXT_PUBLIC_USE_MOCK=0` vẫn chứa mã và dữ liệu mock
+Phạm vi lượt này: chỉ `frontend/`. Không build, không chạy, không sửa `erp-console/` (fe-dev đang sửa song song). Không sửa code sản phẩm. Không commit, không deploy.
+
+### Tổng: 322 ca · ✅ 319 · ❌ 1 · ⏸ 2 (+ 1 ghi nhận Low)
+- `frontend/e2e/ra-soat-a2-golive.py` chạy lại trên code hiện tại: 43/43 ✅.
+- `frontend/e2e/qa-lo6-sr21-shop.py` (script bù mới): 279 ca, 277 ✅, 1 ❌ (M5-1 → B1), 1 Low (B2, không làm đỏ exit code).
+- ⏸ 2 mục thuộc `erp-console/` (CS-11-AC6, X-AC4), xem cuối mục này.
+
+### Theo AC
+Bằng chứng A2 = `frontend/e2e/ra-soat-a2-golive.py`. Bằng chứng bù = `frontend/e2e/qa-lo6-sr21-shop.py`. Ảnh nằm ở `doc/features/2026-09-30-sua-loi-review/qa-lo6/`.
+
+| Mã AC | Kết quả | Bằng chứng (script / ảnh) và ca ngoài đường thuận |
+|---|---|---|
+| GL-01-AC2 (footer Shop hiện người bán) | ✅ | A2 + script bù. Ảnh `gl01-ac2-shop-footer.png`, `sr21-gl01-footer-shop-1280.png`. Ngoài đường thuận: footer có ở mọi route (`/shop/`, checkout, tra đơn, trang nội dung), không trùng với `footer.site-footer` của layout Shop |
+| GL-01-AC5 (site-info lỗi) | ✅ | A2 + script bù. Ảnh `gl01-ac5-site-info-error.png`. Ngoài đường thuận: `/api/public/site-info/` trả 500 và timeout → trang vẫn dùng được, không vỡ, không lộ stack |
+| GL-01-AC6 | ✅ | Script bù: dữ liệu người bán chỉ là dữ liệu doanh nghiệp, không có tên/SĐT/địa chỉ khách |
+| GL-02-AC1..AC4 (link chính sách trong footer) | ✅ | A2 + script bù. Ngoài đường thuận: `footer-links` rỗng, một link thiếu, link lỗi API |
+| GL-02-AC5 (mobile) | ✅ | A2 (`gl02-ac5-mobile-375.png`) + script bù (`sr21-gl02-footer-375-chu-dai.png`, chuỗi dài, không tràn ngang, không cuộn ngang ở 375px) |
+| GL-03-AC2 (ô đồng ý ở checkout) | ✅ | A2 (`gl03-ac2-checkout-consent.png`) + bù (`sr21-gl03-ac2-checkout-375.png`). Ngoài đường thuận: chưa tích thì không gửi được đơn, payload không có `privacy_consent` thì Shop không tự gửi |
+| GL-03-AC4 (409 POLICY_CHANGED) | ✅ | A2 (`gl03-ac4-policy-changed.png`) + bù (`sr21-gl03-ac4-409-375.png`). Ngoài đường thuận: sau 409 giỏ hàng còn nguyên, ô đồng ý bị bỏ tích, gửi lại bằng `policy_version_id` mới thì được |
+| GL-03-AC5 (503 Shop tạm chưa nhận đơn) | ✅ | A2 (`gl03-ac5-shop-closed.png`) + bù (`sr21-gl03-ac5-503-375.png`). Ngoài đường thuận: nút đặt bị khoá, giỏ hàng giữ nguyên |
+| GL-03-AC8 (sau đặt đơn) | ✅ | Script bù, ảnh `sr21-gl03-ac8-sau-dat-don-1280.png`. Bấm đúp nút đặt chỉ gửi 1 POST; storage sau đặt đơn không có PII |
+| GL-04-AC1 (ConfirmCallNotice bật) | ✅ | A2 (`gl04-ac1-notice-on.png`) + bù (`sr21-gl04-ac1-notice-375.png`). Ngoài đường thuận: cờ `confirm_call_notice` tắt thì không hiện |
+| GL-04-AC2 (màn quay về) | ✅ | A2 (`gl04-ac2-return-success.png`) + bù (`sr21-gl04-ac2-return-375.png`). Ngoài đường thuận: quay về bằng URL `?code=..&result=success` khi sessionStorage trống, không hiện số cuối, không vỡ |
+| GL-04-AC3 (chỉ 4 số cuối) | ✅ (kèm Low B2) | Bù: khối thông báo chỉ hiện 4 số cuối. Ca đối kháng (sessionStorage bị sửa thành SĐT đầy đủ) làm lộ B2 |
+| GL-04-AC4, AC5 | ✅ | A2 + script bù |
+| Phát hiện thêm: M5-1 (bản build thật không lọt mock) | ❌ B1 | Script bù quét `frontend/out/`, xem B1 |
+| CS-11-AC6 (PDF tem 1 trang 100x150mm, QR) | ⏸ | Thuộc `erp-console/`, không chạy lượt này (xem cuối mục) |
+| X-AC4 (storage/URL/console CSKH) | ⏸ | Thuộc `erp-console/`, không chạy lượt này (xem cuối mục) |
+
+### Ngoại lệ và biên (đã phủ trong script bù)
+- Bấm đúp nút đặt hàng: 1 POST.
+- Trạng thái đã đổi: chính sách đổi phiên bản giữa lúc mở checkout và lúc gửi (409), Shop đóng cửa (503) giữa chừng.
+- API lỗi/timeout: site-info, footer-links, privacy, entries.
+- Cờ bật/tắt: `confirm_call_notice`.
+- Chuỗi rất dài ở footer 375px.
+- Đối kháng: sessionStorage bị sửa thủ công.
+
+### Phân quyền
+Phần Shop công khai, không có Group. Không có endpoint quản trị nào được gọi từ `frontend/`. Ca chưa đăng nhập: toàn bộ luồng chạy không cần token.
+
+### Rò giá vốn
+Payload gửi cổng thanh toán và mọi request từ Shop được quét: không có khoá giá vốn (`cost`, `cost_price`, `avg_cost`, `landed_cost`). Đạt.
+
+### Rò dữ liệu cá nhân
+Hàm `sweep_pii` chạy sau mỗi luồng chính, kiểm tra: `localStorage`, `sessionStorage`, cookie, `history.state`, URL hiện tại, console, pageerror, URL của mọi request, và host đích chỉ thuộc `{origin, localhost:8199, pay-sandbox.qa.example}` (không bên thứ ba ngoài cổng thanh toán). Giỏ hàng chỉ giữ `item_code,name,price,unit,qty`. Đạt.
+- Đối chứng dương (chống xanh giả): cấy PII giả vào storage, console, request URL và URL, cả 4 detector đều bắt được (`scratchpad/qa-lo6-sr21/ctrl.py`).
+- Chỉ dùng dữ liệu giả (`Khách Thử`, `0900000xxx`, địa chỉ mẫu). Ảnh chụp không chứa dữ liệu thật.
+
+### Hồi quy
+`ra-soat-a2-golive.py` 43/43 xanh. `npx tsc --noEmit` exit 0. `npm run build` thành công. `npm ci` không cần `--legacy-peer-deps`, không ERESOLVE.
+
+### Lỗi
+#### B1 — Bản build thật vẫn chứa mã và seed mock · Medium · M5-1 (kèm GL-03/GL-04 vì cùng bundle)
+Bước tái hiện:
+1. `cd frontend && NEXT_PUBLIC_USE_MOCK=0 NEXT_PUBLIC_API_BASE=https://cangca-api-675411800433.asia-southeast1.run.app npm run build`
+2. `grep -rlE "DH-DEMO00|CA-BASA-PHILE|cangcaloc_mock_orders" frontend/out`
+Mong đợi: không có file nào (bản build thật không mang mock).
+Thực tế: khớp chunk `frontend/out/_next/static/chunks/116-14e277bb1ef9e7d2.js`, tải trên mọi trang. Seed mock (mã đơn `DH-DEMO00x`, mặt hàng mẫu, key `cangcaloc_mock_orders`) nằm trong bundle production.
+Ảnh hưởng: Shop production tải thêm mã mock và dữ liệu giả; vi phạm M5-1 (bản thật không lọt mock). Dữ liệu là giả nên không phải rò PII thật. Lưu ý: kết luận "M5-1 sạch" ở Lô 5 dùng mẫu grep không khớp seed thật của `lib/mock.ts` nên bỏ sót. Gợi ý cho FE: `lib/api.ts` / `lib/mock.ts` cần điều kiện tĩnh `process.env.NEXT_PUBLIC_USE_MOCK === "1"` ở chỗ import để bundler cắt nhánh (import động hoặc điều kiện tĩnh).
+Kiểm lại sau sửa: cùng lệnh grep trên phải rỗng; chạy lại `frontend/e2e/qa-lo6-sr21-shop.py` (ca M5-1 chuyển xanh).
+
+#### B2 — `recallOrderContact` không kiểm 4 chữ số · Low · GL-04-AC3
+Bước tái hiện: đặt `sessionStorage["cangcaloc_last_order_contact_v1"] = {"order_code":"DH-DEMO001","phone_last4":"0900000123"}` rồi mở `/shop/orders/?code=DH-DEMO001&result=success`.
+Mong đợi: bỏ qua giá trị không đúng 4 chữ số.
+Thực tế: SĐT đầy đủ được đưa vào ô `#phoneLast4` và vào query `?phone_last4=`. Khối thông báo vẫn chỉ hiện 4 số cuối. Không xảy ra ở luồng thường (chỉ khi storage bị sửa tay), nên ghi nhận Low, không chặn.
+Gợi ý: validate `/^\d{4}$/` trong `frontend/features/checkout/storage.ts`.
+
+#### INFO — F10
+Thuộc Lô 7, không xử lý ở đây.
+
+### CS-11-AC6 và X-AC4: ⏸ (chạy lại ở QA Lô 6 cuối, sau khi fe-dev xong `erp-console/`)
+Lý do: yêu cầu giao việc cấm build/đụng `erp-console/` lượt này. Lệnh cần chạy (theo `doc/features/2026-09-30-ra-soat-agy/A4-cskh-in-tem.md`):
+```
+cd erp-console && NEXT_PUBLIC_USE_MOCK=1 npm run build
+cd erp-console/out && python3 -m http.server 3203 &
+cd erp-console/e2e && SHOTS=<thư mục ảnh> python3 ra_soat_cs11_ac6_label_pdf.py   # kỳ vọng 5/5 (cần pypdf)
+cd erp-console/e2e && python3 ra_soat_x_ac4_storage.py                             # kỳ vọng 32/32
+# sau đó build lại bản thật: cd erp-console && npm run build (không để bản mock trong out/)
+```
+
+### Lệnh đã chạy (Lô 6, phần Shop)
+```
+frontend  npm ci --cache <scratchpad>/npm-cache   -> OK, không ERESOLVE (lần đầu EACCES ở ~/.npm/_cacache: lỗi môi trường, không phải lockfile)
+frontend  npx tsc --noEmit                        -> exit 0
+frontend  NEXT_PUBLIC_USE_MOCK=0 NEXT_PUBLIC_API_BASE=http://localhost:8199 npm run build -> OK; copy out/ sang scratchpad/qa-lo6-sr21/
+serve     python3 -m http.server 3106 (thư mục scratchpad/qa-lo6-sr21)
+QA_BASE=http://localhost:3106 python3 frontend/e2e/ra-soat-a2-golive.py -> 43/43 PASS
+QA_BASE=http://localhost:3106 QA_OUT_DIR=<scratchpad>/qa-lo6-sr21 QA_SHOT_DIR=<qa-lo6> python3 frontend/e2e/qa-lo6-sr21-shop.py -> 277 PASS, 1 FAIL (M5-1), 1 LOW (B2)
+frontend  NEXT_PUBLIC_USE_MOCK=0 NEXT_PUBLIC_API_BASE=https://cangca-api-675411800433.asia-southeast1.run.app npm run build -> OK; frontend/out/ là bản thật (không còn localhost:8199), nhưng vẫn còn seed mock (B1)
+```
+Lần chạy đầu của script bù có 2 lỗi do chính script QA (strict-mode locator `footer` khớp 2 phần tử; thời điểm chuyển trang ở ca "Quay lại cửa hàng"), đã sửa trong script, không phải lỗi sản phẩm.
+Không đụng `erp-console/`, không sửa code sản phẩm (chỉ thêm biến `QA_BASE` vào script E2E `ra-soat-a2-golive.py`), không commit, không deploy.
+
+---
+
+## Lô 6 — SR-18, SR-19, SR-20, SR-21 (ERP + Shop) + M5-1b, B2, F6-1, F6-2 · lần 2 (QA cuối) · 2026-09-30
+
+### Kết luận: APPROVED — mọi AC Lô 6 có bằng chứng chạy thật (kể cả backend thật + mạng thật), B1 (M5-1b) đã đóng, không còn lỗi chặn
+Phạm vi: code chưa commit trong working tree. Không sửa code sản phẩm. Chỉ sửa 1 fixture test (xem L6-4). Không commit, không deploy. Đã dừng mọi server tạm (3106, 3203, 3216, 3218, 8116).
+
+### Tổng: 0 ❌ trên mọi bộ dưới đây (E2E/tập lệnh: 74 + 52 + 5 + 32 + 279 + 46 = 488 ca ✅; vitest 103; BE 1523 + 34) · ⏸ 1 ô ma trận (cskh trên backend thật) · 4 ghi nhận Low/INFO
+| Bộ | Kết quả |
+|---|---|
+| Backend toàn bộ (`manage.py test`, không `--parallel`) | 1523 OK (baseline 1523), `makemigrations --check` sạch |
+| SR-18 riêng (repro A5 + ca QA thêm + test dev + sanitize) | 34 OK |
+| erp-console `npm test` (vitest) | 103/103 |
+| E2E ERP bản mock `p8_lo6_fe_sr19_sr20.py` (cổng 3216) | 74/74 |
+| E2E ERP backend thật (Django 8116 + build thật 3218, mạng thật) `qa_lo6_real.py` + `qa_lo6_real_f61.py` | 52 ✅ (+1 báo đỏ giả, xem L6-5) |
+| SR-21 ERP: `ra_soat_cs11_ac6_label_pdf.py` / `ra_soat_x_ac4_storage.py` | 5/5 / 32/32 (đóng ⏸ lượt trước) |
+| SR-21 Shop: `qa-lo6-sr21-shop.py` trên build thật | 279 ca, 0 FAIL, 0 LOW |
+| Shop `ra-soat-a2-golive.py` | 46/46 (sau khi sửa fixture, L6-4) |
+| `check-ai-chunks.mjs` (bản thật) | XANH exit 0; đỏ trên build HEAD (đối chứng dương) |
+| `check-no-mock.mjs` erp + frontend | XANH trên build thật; ĐỎ (36 chỗ) trên build mock (đối chứng dương) |
+
+### Theo AC
+| Mã AC | Kết quả | Bằng chứng và ca ngoài đường thuận |
+|---|---|---|
+| SR-18-AC1 (tạo bài với ảnh bài khác) | ✅ | Repro `A5-f1-idor-cover-image-on-create.py` chuyển đỏ sang xanh (HEAD: 201, cây làm việc: 400 `BR-ND-07`). Ngoài đường thuận: các kiểu cover lạ (bool, số âm, 0, chuỗi chữ) xử lý qua `_as_pk`, không 500 (bộ 34 OK) |
+| SR-18-AC2 (sửa bài với ảnh bài khác) | ✅ | Test dev + `qa_lo6_sr18.py`: 400; ảnh cùng bài vẫn gán được (không chặn nhầm); ảnh trong `body` bài khác cũng bị chặn (strict) |
+| SR-18-AC3 (tầng 1b, API công khai không lộ ảnh nháp bài khác) | ✅ | `test_p8_sr18_public.py` + ca QA: bài đã đăng có cover/body trỏ ảnh bài khác thì API công khai không trả URL/alt của ảnh đó (không trả ALT-A-SECRET) |
+| SR-18-AC4 (Group) | ✅ | chu/quan_ly/cskh được tạo-sửa nội dung; nv_kho/nv_giao 403 trước cả khi kiểm ảnh; chưa đăng nhập 401 |
+| SR-19-AC1 (đơn có bằng chứng, link Xem phiên bản đúng V đã đồng ý) | ✅ | Mạng thật: đơn #1 (đồng ý v1, chính sách đã lên v2) có link `?id=1&version=1`, panel hiện "MAU-QA-V1" và không có "MAU-QA-V2"; GET `/versions/1/` 200. Ảnh `real-sr19-1-order.png`, `real-sr19-2-panel-v1.png`. Ngoài đường thuận: đơn #2 không có bằng chứng thì không có link; `version=2` hiện V2 |
+| SR-19-AC2 (không tìm thấy) | ✅ | `version=99` mạng thật 404 -> "Không tìm thấy phiên bản 99" + nút "Về bài" đóng panel (`real-sr19-3-notfound.png`). Ca URL lạ ở bản mock (bộ 74 ca): tham số `version` không hợp lệ (`^\d{1,9}$`, >0) bị bỏ qua, không vỡ |
+| SR-19-AC3 (Group) | ✅ | Mạng thật: chu và quan_ly 200 (thấy link); nv_kho và nv_giao 403 khi gọi API, vào thẳng URL không thấy nội dung, `/orders` không có link; chưa đăng nhập 401. Panel chỉ đọc (không input/textarea/nút khôi phục) |
+| SR-20-AC1/AC2 (Nhờ luôn hiện, "Để AI làm" theo `step.ai`) | ✅ | Mock 74/74 + mạng thật: AI tắt thì "Nhờ" có, "Để AI làm" không có. AI bật (`step.ai=C`): có cả hai. `step.ai=null` kể cả đã đồng ý model: không có huy hiệu và không có nút. Không cần đồng ý tải model để thấy "Để AI làm" |
+| SR-20-AC3 (mở màn khi AI tắt: 0 request `/api/ai/commands|status`) | ✅ | Mạng thật: `/orders` + chi tiết, `/orders/payments`, `/orders/refunds`, `/inventory` đều 0 request `/api/ai/*` (guidance thật 200). Bấm đúp "Nhờ": đúng 1 POST `/api/ai/actions/escalate/` (201) — ngoại lệ hợp lệ theo quyết định Duy |
+| SR-20-AC4 (F5 không tự mở tab Trợ lý) | ✅ | Mock: tải lại trang không mở tab Trợ lý và không gọi `/api/ai/status` |
+| SR-20-AC5 ("Tóm tắt" cần đồng ý) | ✅ | Mock: chưa đồng ý thì không có "Tóm tắt"; đồng ý rồi thì có. Ghi nhận L6-2 |
+| M5-1b (mock không lọt build thật) | ✅ | `check-no-mock.mjs`: XANH build thật (erp 13 file mock/32 chuỗi/134 file; shop 4/27/43); ĐỎ build mock. grep canary (`DH-DEMO00x`, "Vựa Thử Nghiệm", SĐT giả) trong `out/` rỗng. Đóng B1 lượt trước |
+| B2 (`recallOrderContact` chỉ nhận 4 chữ số) | ✅ | Script Shop ca đối kháng: storage bị sửa thành SĐT đầy đủ hoặc không đủ 4 số -> không hiện, không đưa vào URL/ô nhập |
+| F6-1 ("Nhờ" ở mọi màn) | ✅ | Mock + mạng thật (nv_kho, lô Nháp, desktop và 360px): thấy "Nhờ", không cuộn ngang, 1 POST escalate, AuditLog `escalate_inventory.batch.publish` được ghi (`changes` rỗng, `note` chỉ có nhãn bước + mã lô + nhóm, không có tiền/kg/PII) |
+| F6-2 ("Để AI làm" theo `step.ai`) | ✅ | Mock: bấm thì đúng 1 POST `/api/ai/commands/sales.refund.create/call/`, thông báo "AI đã soạn nháp", không gọi `/status` |
+| SR-21 ERP (CS-11-AC6 tem PDF, X-AC4 storage) | ✅ | 5/5 và 32/32 (đóng ⏸). QR tem không chứa SĐT; console/storage không có tên/địa chỉ |
+| SR-21 Shop (GL-01..GL-04) | ✅ | 279/279 trên build thật sau M5-1b; A2 46/46 |
+
+### Ngoại lệ và biên
+- Bấm đúp "Nhờ": đúng 1 POST (cả desktop và 360px, mạng thật). Nhờ ở 2 phiên riêng tạo 2 bản ghi `ESCALATED` (L6-3).
+- Thao tác trên màn cũ: đơn #1 đã lên chính sách v2 vẫn mở đúng v1. Version không tồn tại trả 404 rõ ràng.
+- Đăng nhập hạn chế tần suất: lần login thứ 2 liên tiếp trong vài giây bị 429 (đúng thiết kế, không phải lỗi).
+- Cờ AI bật/tắt, `step.ai` null/C, đồng ý model có/chưa: đủ 4 tổ hợp ở mock.
+- Bản mock có `beforeunload` khi đang soạn dở: chỉ INFO.
+
+### Phân quyền (Group x hành động)
+| Hành động | chu | quan_ly | cskh | nv_kho | nv_giao | chưa đăng nhập |
+|---|---|---|---|---|---|---|
+| Xem phiên bản chính sách (`/versions/N/`) | 200 | 200 | ⏸ (chưa seed cskh ở backend thật) | 403 | 403 | 401 |
+| Tạo/sửa bài kèm ảnh (SR-18) | 201/200 | 201/200 | 201/200 | 403 | 403 | 401 |
+| Nút "Nhờ" ở màn nghiệp vụ (nhóm có màn) | thấy | thấy | n/a | thấy (bước chưa được phép) | thấy | n/a |
+Ghi chú: ô ⏸ do DB thật của QA không seed người dùng cskh; phía SR-18 cskh đã chạy ở test BE (bộ 34). Không chấm ✅ cho ô này.
+
+### Rò giá vốn
+- AuditLog `escalate_*`: `changes` = `{}`, `note` = "Chuyển việc <nhãn> (batch #2) cho nhóm quan_ly". Không có tiền, không có kg, không tính ngược được giá vốn.
+- `ai_aiaction.args` = `{doc_type, doc_id, step_key, label}`, không có số tiền.
+- Panel phiên bản và JSON `/versions/N/`: chỉ nội dung chính sách + người đăng + giờ, không có field giá.
+
+### Rò dữ liệu cá nhân
+- Mạng thật: storage (`cave_erp_token`, `cave_erp_last_user`), URL, mọi request URL, console: không có tên/SĐT/địa chỉ khách (chỉ dữ liệu giả).
+- Shop 279 ca: quét localStorage/sessionStorage/cookie/URL/console/mọi request ở cả đường lỗi: sạch. Chỉ gọi origin + API + cổng thanh toán.
+- Không có URL/mã đơn nào mang SĐT; `phone_last4` chỉ 4 số cuối và được B2 kiểm tra.
+- Ảnh và log dùng dữ liệu giả 100%.
+
+### Chứng từ bất biến và AuditLog
+Không thao tác xoá chứng từ nào trong Lô 6. Hành động escalate (Tầng 2) đều ghi AuditLog (2 bản ghi tương ứng 2 lần bấm ở 2 viewport).
+
+### Hồi quy
+Backend 1523 OK; `makemigrations --check` sạch; vitest 103/103; erp và shop `tsc --noEmit` exit 0; `npm ci` không `--legacy-peer-deps`, không ERESOLVE; `npm run build` OK cả hai; Shop A2 46/46; ERP CS-11 5/5, X-AC4 32/32.
+
+### Lỗi
+Không có lỗi chặn. Ghi nhận không chặn:
+- **L6-2 (Low, theo thiết kế):** "Tóm tắt" chỉ hiện sau khi người dùng đã mở tab Trợ lý (gate-state fail-closed) — đúng quyết định Duy 30/09 nhưng nên ghi vào hướng dẫn.
+- **L6-3 (Low, backlog):** hai phiên riêng (desktop rồi mobile) cùng nhờ một lô/bước tạo 2 bản ghi `ESCALATED` (chưa khử trùng lặp ở server). Bấm đúp trong 1 phiên thì chỉ 1 POST.
+- **L6-4 (Low, đã sửa trong test):** fixture `ra-soat-a2-golive.py` mã cứng `booked_expires_at=2026-09-30T12:30:00Z`; quá 12:30Z ngày 30/09 thì đơn "hết hạn giữ chỗ" nên ca GL-04-AC1 đỏ giả. Không phải lỗi sản phẩm (đã chứng minh: đổi fixture sang `2099-01-01` thì 46/46). Đã sửa trong `frontend/e2e/ra-soat-a2-golive.py`.
+- **L6-5 (INFO):** ở E2E mạng thật, ca "console không lỗi (Chủ)" đỏ giả vì Chrome ghi "Failed to load resource: 404" cho chính lệnh `version=99` mà ca đó cố ý gọi (404 kỳ vọng).
+
+### Lệnh đã chạy (tóm tắt output)
+```
+cd backend && DJANGO_DEBUG=1 env -u DATABASE_URL .venv/bin/python manage.py test   -> Ran 1523 tests OK
+manage.py makemigrations --check --dry-run                                          -> No changes detected
+manage.py test repro_mod.qa_repro_a5 repro_mod.qa_lo6_sr18 apps.content...sr18* ... -> Ran 34 tests OK
+cd erp-console && npm ci && npx tsc --noEmit (0) && npm test (103 passed) && npm run build (OK)
+node scripts/check-ai-chunks.mjs   -> XANH (đỏ trên build HEAD)   | node scripts/check-no-mock.mjs -> XANH (đỏ trên build mock)
+python3 erp-console/e2e/p8_lo6_fe_sr19_sr20.py -> 74/74 ; ra_soat_cs11_ac6_label_pdf.py 5/5 ; ra_soat_x_ac4_storage.py 32/32
+Django thật 8116 (sqlite giả) + build thật 3218 -> qa_lo6_real.py + qa_lo6_real_f61.py : 52 PASS (+1 đỏ giả L6-5)
+cd frontend && npm ci && npx tsc --noEmit (0) && npm run build (OK, base local) ; check-no-mock XANH ; build mock -> ĐỎ (36)
+python3 frontend/e2e/qa-lo6-sr21-shop.py -> 279 ca, 0 FAIL ; ra-soat-a2-golive.py -> 46/46 (sau sửa fixture)
+Build cuối (NEXT_PUBLIC_USE_MOCK=0, API_BASE=https://cangca-api-...run.app) cả 2 FE -> OK; check-no-mock XANH; check-ai-chunks XANH; không còn chuỗi localhost trong out/
+```
+Ảnh: `doc/features/2026-09-30-sua-loi-review/qa-lo6/` (`real-sr19-*.png`, `real-sr20-*.png`, `real-f61-*.png`, ...), toàn bộ dữ liệu giả.

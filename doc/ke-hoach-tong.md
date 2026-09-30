@@ -26,6 +26,7 @@
 | ☑ | **P7** AI tự ghi + vùng đỏ | `2026-09-28-ai-digital-worker` | 5a → 5b → 5c → 6a → 6b | XONG | P6 xong | **Chỉ staging** tới khi xong S-L1…S-L4 (pháp lý) |
 | ☑ | **P8a** Rà lại toàn bộ phần AGY làm | `2026-09-30-ra-soat-agy` (`6c5868e`) | A1 ∥ A2–A5 → A6 | theo `02d` | — | Kiểm mọi AC P1–P7 bằng chạy thật + rà code; lỗi mới **không tự sửa**, đề xuất P9 chờ Duy. Kế hoạch + prompt: `2026-09-30-sua-loi-review/02d-ke-hoach-doi-claude.md` |
 | ☐ | **P8** Sửa lỗi review | `2026-09-30-sua-loi-review` | 1 → 2 → 3 → 4 → 5 → 6 → 7 | SẴN SÀNG CODE | P7 xong | Sửa lỗi 3 báo cáo review 30/09 (`2026-09-30-review-p1-p7`). **Chặn deploy staging tới khi P8 Lô 1–5 xong.** Lô 4 (chứng từ đảo doanh thu) và Lô 5 (trả NCC) có migration. Nhánh `main` |
+| ☐ | **P9** AI local thật (model trên máy) + bật AI hai tầng | `2026-09-30-ai-bat-tat-hai-tang` | chưa chia | CHỜ LẬP KẾ HOẠCH cùng Duy | P8 xong | Duy 30/09: tách plan riêng; không chờ máy — tham chiếu **Windows 8 GB**, UAT Duy tự tải. Gồm S17 + phần còn lại S08 (`2026-09-27-ai-native-erp`), bật AI Chủ → nhân viên opt-in → tải model, router kiểm model, RA-04 |
 
 ## Việc của Duy (không phải code)
 | Khi nào | Việc |

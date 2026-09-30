@@ -23,6 +23,8 @@ export function recallOrderContact(orderCode: string): string | null {
     if (!raw) return null;
     const value = JSON.parse(raw) as StoredContact;
     if (value.order_code !== orderCode) return null;
+    // Chỉ nhận đúng 4 chữ số; giá trị khác (bị sửa tay / dữ liệu lạ) bỏ qua — không đưa vào ô nhập/URL.
+    if (typeof value.phone_last4 !== "string" || !/^\d{4}$/.test(value.phone_last4)) return null;
     return value.phone_last4;
   } catch {
     return null;

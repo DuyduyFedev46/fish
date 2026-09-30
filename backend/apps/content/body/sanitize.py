@@ -12,6 +12,8 @@ ITEM_CODE_RE = re.compile(r"^[A-Za-z0-9_.-]{1,40}$")
 ALLOWED_MARKS = {"bold", "italic"}
 ALLOWED_BLOCK_TYPES = {"heading", "paragraph", "list", "quote", "image", "item_card"}
 ALLOWED_SCHEMES = {"https", "http", "mailto", "tel"}
+# SR-18 (BR-ND-07): khi tạo bài chưa có ảnh nào thuộc bài, nên mọi ảnh đều bị chặn.
+MSG_IMAGE_AFTER_FIRST_SAVE = "Tải ảnh sau khi lưu nháp lần đầu."
 
 
 def _strip_control_chars(text: str) -> str:
@@ -167,10 +169,12 @@ def normalize_body(
             alt = _strip_control_chars(str(block.get("alt", "")))[:200]
             caption = _strip_control_chars(str(block.get("caption", "")))[:300]
 
-            if strict and entry is not None and getattr(entry, "pk", None):
+            if strict:
+                if entry is None or not getattr(entry, "pk", None):
+                    raise BusinessError(MSG_IMAGE_AFTER_FIRST_SAVE, code="BR-ND-07")
                 from apps.content.models.images import ContentImage
 
-                if not ContentImage.objects.filter(pk=image_id, entry=entry).exists():
+                if not ContentImage.objects.filter(pk=image_id, entry_id=entry.pk).exists():
                     raise BusinessError("Ảnh không thuộc bài viết này (BR-ND-07).", code="BR-ND-07")
 
             image_ids.add(image_id)

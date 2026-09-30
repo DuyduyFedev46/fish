@@ -372,3 +372,61 @@ không thuộc diff Lô 5 và không chặn Lô 5, nhưng chặn lần deploy ER
 ### Ghi chú
 - 02b §5.7 và 02c dòng Lô 5 thiếu các file `shared/lib/dashboardSummary*.ts`, `ai/registry/tests/*`, `delivery/tests/test_cskh_l4.py`. Đây là thiếu sót của techlead, không phải lệch do dev.
 - Ô ghi chú ở FE chặn `\d{8,}`, còn BE dùng `has_long_digit_run` (≥ 9 chữ số, tính cả khi có dấu cách). Hai bên lệch nhau nhưng vô hại, vì BE mới là lớp chặn thật.
+
+## Lô 6
+Review diff chưa commit (`git diff` + file chưa track): SR-18 BE, SR-19/SR-20 FE ERP, M5-1b/B2 FE Shop, 2 script kiểm. Ngày 2026-09-30.
+
+### Kết luận: **CẦN SỬA — 1 High (F6-1), 1 Medium (F6-2) ở FE ERP. BE SR-18, SR-19, M5-1b Shop đạt.**
+QA Lô 6 chưa APPROVED toàn lô (Shop lần 1 REJECTED vì B1 nay đã sửa; CS-11-AC6, X-AC4 còn ⏸). Sau khi sửa F6-1/F6-2 cần QA chạy lại phần ERP.
+
+### Lệnh kiểm chứng đã chạy trong lượt review
+```
+backend  DJANGO_DEBUG=1 env -u DATABASE_URL .venv/bin/python manage.py test apps.content   -> Ran 133 tests OK
+erp      npm test                                                                          -> 103 passed (103)
+erp      grep seed mock nội tuyến (uuid mockAiActions, "MOCK-01", "mock-action-read", "Cá thu Phan Thiết 1kg") trong out/ (bản thật, API_BASE run.app) -> 0 tệp
+erp      grep "demo1234|mock-token-|cave_erp_mock_users" out/                               -> 0 tệp (M5-1 của Lô 5 đã hết)
+django   lookups.py: IntegerField ngoài miền -> EmptyResultSet (Django 5.1.15), nên cover_image/image_id cực lớn -> 400, không 500
+```
+Không chạy `npm run build` (điều phối đang build).
+
+### Đối chiếu từng điểm
+| Điểm | Kết quả |
+|---|---|
+| SR-18 tạo bài | `services.py:167-168` và `sanitize.py:172-174`: `entry is None` + có ảnh (bìa hoặc khối) -> 400 BR-ND-07 "Tải ảnh sau khi lưu nháp lần đầu." trước khi tạo gì. Không lộ ảnh có tồn tại hay không (mọi id đều cùng thông điệp). Đạt AC1. |
+| SR-18 sửa bài | Bìa lọc `pk=…, entry_id=entry.pk`; ảnh bài khác và ảnh không tồn tại cùng một thông điệp (chống dò id). Khối ảnh lọc `entry_id=entry.pk`. Kiểm `row_version` (409) chạy trước kiểm ảnh. Đạt AC2, AC4 (giới hạn đếm trên ảnh đã được xác nhận thuộc bài). |
+| SR-18 `_as_pk` | bool, số âm, 0, danh sách, dict, chuỗi không phải số -> None -> 400. Chuỗi số -> int. Số cực lớn -> Django trả rỗng -> 400. Khối ảnh với `image_id` không phải int vẫn bị bỏ như cũ (`sanitize.py:165`). Đạt. |
+| SR-18 lớp 1b công khai | `public_body` lọc `entry_id=version.entry_id`; `_own_cover` dùng cho cả chi tiết lẫn danh sách; `pages/by-role` đi qua `PublicEntryDetailSerializer` nên cũng được che. Test quét chi tiết + danh sách + footer không có `content/<A>/`, `image_id` (path), `alt` của ảnh nháp bài A. Không còn chỗ công khai nào khác đọc `cover_image`/`ContentImage` (đã grep `apps/content`). Đạt AC3. |
+| SR-18 ma trận quyền | chu/quan_ly 201/200, nv_kho/nv_giao/cskh 403, khách 401; nhóm không quyền gửi ảnh bài khác nhận 403, không lộ "BR-ND-07". Đạt. |
+| SR-19 | `version` chỉ nhận `^\d{1,9}$` > 0; panel chỉ đọc (không nút sửa/khôi phục), nội dung render bằng React, link đi qua `safeHref`, không `dangerouslySetInnerHTML`. 404 -> "Không tìm thấy phiên bản N" + "Về bài"; 403 có thông điệp riêng. URL chỉ `id` + `version`. `nv_kho` không thấy link (giữ nguyên `OrderDetailView`). Đạt AC1–AC3. Mock chính sách 2 phiên bản là chữ bịa. |
+| SR-20 chunk | `GuidancePanel` không còn import tĩnh runtime/`commands/call`/`ai/api`; `wllamaMissing` chuyển sang `runtime/messages.ts`; `check-ai-chunks.mjs` XANH (điều phối chạy). Đạt AC1, AC4. |
+| SR-20 hành vi | **Không đạt** ở 2 chỗ, xem F6-1, F6-2. |
+| M5-1b Shop | `lib/api.ts`, `features/content/api.ts`, `features/site/api.ts` bỏ import tĩnh `./mock`, dùng `await import("./mock")` trong nhánh literal; `MockGatewayPanel` chỉ tạo khi literal mock. Còn đúng 1 import tĩnh `lib/mock` ở `MockGatewayPanel.tsx:11`, file này chỉ được nạp qua nhánh đã bị cắt. Đã grep toàn `frontend/app features lib components`: không còn đường import mock nào khác. Đạt. |
+| M5-1b ERP | `features/content/api.ts`: bỏ `const isMock`, literal tại chỗ; `fetchShopCatalog` bọc điều kiện. Các `features/*/api.ts` khác import tĩnh `./mock` nhưng mọi chỗ dùng đều nằm sau literal, và bản thật hiện tại không chứa seed (script + grep canary nội tuyến ở trên). Đạt. |
+| B2 | `recallOrderContact` chỉ trả `phone_last4` khớp `^\d{4}$`. Đạt. |
+| PII / giá vốn / phân quyền | Không field mới, không serializer mới ở BE; API công khai chỉ bớt dữ liệu. FE không ghi gì mới vào storage/URL (cờ đồng ý AI là boolean có sẵn). Không đụng giá vốn, chứng từ. Không migration (diff BE không có `models/`/`migrations/`). Đạt. |
+
+### Chốt câu hỏi điều phối nêu
+1. **SR-18: `restore_entry_version`/`discard_changes`/`publish_entry` không kiểm lại ảnh — không siết trong lô này.** Ba đường này chỉ nạp lại dữ liệu *đã lưu* của chính bài (phiên bản lọc `entry=entry`), không nhận id ảnh từ người dùng, nên không mở lối IDOR mới. Dữ liệu cũ trước SR-18 trỏ ảnh bài khác thì phía công khai đã che (lớp 1b), còn phía ERP người xem vốn có quyền content trên mọi bài nên không vượt quyền. Ghi nợ L6-1 (Low) để phòng thủ nhiều lớp.
+2. **`gate-state.ts` + sửa `ai/api.ts`, `ai/consent.ts` (ngoài 02c): chấp nhận về mặt module** (file mỏng, không kéo runtime, không gọi mạng). Nhưng dùng nó làm *nguồn duy nhất* cho cả ba nút là sai, xem F6-1, F6-2.
+3. **Nút chỉ hiện sau khi mở tab Trợ lý: là hồi quy.** Trước Lô 6, bật AI thì "Để AI làm" hiện ngay khi mở đơn (DW-14-AC3). Nay mỗi lần tải lại trang (`enabled` là biến module, về `false`) người dùng phải mở tab Trợ lý mới thấy nút. E2E SR-20-AC5 xanh chỉ vì script mở tab Trợ lý trước.
+4. **Gọi `/api/ai/status/` bằng fetch thường trong `GuidancePanel`: về hiệu năng thì chấp nhận được** (một GET JSON nhỏ, không kéo byte JS nào; BR-AI-17 nói về code AI và TTI). **Nhưng không được làm**, vì SR-20-AC3 (và C.4 #10 hồ sơ DW) yêu cầu AI tắt thì mở 4 màn phải có **0** request `/api/ai/*`. Mà cũng không cần: backend đã có sẵn tín hiệu. `resolve_step_ai` (`backend/apps/common/guidance/steps.py:47`) trả `ai=null` khi `AI_ENABLED=false`, khi lệnh ở mức OFF, và khi người xem không có mức nào (DW-14-AC8, AC2). Như vậy `step.ai != null` nghĩa là "AI bật và người này được giao AI làm bước này". Tín hiệu đó đi kèm response guidance, không tốn thêm request nào.
+5. **"Nhờ" không phải tính năng AI.** DW-23-AC7: "`AI_ENABLED=false` → bấm Nhờ → vẫn chạy (không cần model)". Backend `POST /api/ai/actions/escalate/` không chặn khi AI tắt. Người dùng chính của nút này là NV kho (DW-23-AC1), nhóm hầu như không bao giờ đồng ý tải model. Nay nút bị ẩn khi AI tắt hoặc chưa đồng ý, tức hồi quy một AC đã duyệt, xem F6-1. `features/ai/actions/api.ts` chỉ import `shared/lib/http`, không có chuỗi `/call/`, `wllama`, `new Worker`, nên import tĩnh vào `GuidancePanel` không làm đỏ `check-ai-chunks`.
+6. **`check-no-mock.mjs`: đủ tin cậy để làm cổng deploy.** Có đối chứng âm: bản mock ERP ĐỎ 32 chỗ, `demo1234` bị bắt; bản thật XANH. Lỗi nghiêng về phía an toàn (bắt nhầm thì đỏ, không lọt). Có 2 điểm mù cần biết, xem L6-3: (a) script chỉ lấy seed từ tệp tên `mock*.ts`/`Mock*.tsx`, nên mock **nội tuyến** trong `api.ts` không được quét (`ai/actions/api.ts` `mockAiActions`, `ai/commands/call.ts`, `ai/policy|settings|report/api.ts`, trước đây là `content/api.ts fetchShopCatalog`). Lượt này tôi grep tay canary nội tuyến trên `out/`: 0 tệp, nên hiện tại sạch. (b) Không kiểm số seed tối thiểu: nếu sau này đổi tên file mock, script "xanh" với 0 seed.
+
+### Việc sửa
+| # | Mức | File:dòng | Việc |
+|---|---|---|---|
+| F6-1 | **High, trước commit** (hồi quy DW-23-AC1/AC7 đã duyệt) | `erp-console/features/guidance/components/GuidancePanel.tsx:190-192`; `GuidanceAiActions.tsx:44, 83-100, 155-172` | Đưa "Nhờ" ra khỏi khối nạp động, render **tĩnh** trong `StepItem` với điều kiện `!step.allowed && !isSystem && step.key`, **không** phụ thuộc AI hay cờ đồng ý. Có thể tách một component tĩnh nhỏ `features/guidance/components/GuidanceEscalate.tsx` (nút + thông báo), import `escalateStep` từ `@/features/ai/actions/api` như trước Lô 6. Xoá phần "Nhờ" khỏi `GuidanceAiActions`. Kiểm: (1) E2E AI tắt, `kho1` mở chi tiết lô có bước "Chốt lô" `allowed=false`: thấy "Nhờ", lúc mở trang có 0 request `/api/ai/*`, bấm "Nhờ" thì có `POST /api/ai/actions/escalate/` và thông báo "Đã chuyển việc…". (2) Build thật: `check-ai-chunks` XANH, `check-no-mock` XANH, và `grep -rl "a1b2c3d4-e5f6-7890-abcd-ef1234567890" out/` = 0 (mock nội tuyến của `actions/api.ts` không lọt). |
+| F6-2 | **Medium, trước commit** (hồi quy DW-14-AC3) | `GuidancePanel.tsx:38, 190`; `GuidanceAiActions.tsx:41` | Điều kiện nạp "Để AI làm" đổi thành `step.ai?.level === "C" && step.command` (tín hiệu server, xem mục 4), **và** cờ đồng ý nếu PO giữ nguyên SR-20-AC2 (xem D6-1). Đọc cờ đồng ý qua một hook nhỏ dùng `subscribeAiConsent`, không dùng `enabled` của gate-state. AI tắt thì `step.ai` luôn null, nên chunk `commands/call` không bao giờ được tải, AC1/AC3 vẫn giữ. Kiểm: E2E AI bật (+ đã đồng ý), **tải lại** `/orders` chi tiết đơn, **không** mở tab Trợ lý: thấy "Để AI làm", bấm thì `POST …/call/`. AI tắt: 0 request `/api/ai/*`, không có nút. Sửa `e2e/p8_lo6_fe_sr19_sr20.py` bỏ bước mở tab Trợ lý ở ca AC5. |
+| L6-2 | Low (có thể gộp vào F6-2) | `GuidancePanel.tsx:38, 141` | "Tóm tắt" cần model trên máy (DW-16-AC1), nên giữ điều kiện đồng ý là đúng. Tín hiệu "AI bật" nên lấy `gateEnabled || data.next_steps.some(s => s.ai)` để bớt phụ thuộc việc mở tab. Nếu muốn chính xác hơn, BE có thể thêm `ai_enabled: bool` vào response guidance (endpoint `/api/guidance/…` không nằm dưới `/api/ai/`). Việc này đổi contract, để Lô 7. |
+| L6-1 | Low (backlog Lô 7, SR-22) | `backend/apps/content/entries/services.py:679-730` (`restore_entry_version`), `:821-870` (`discard_changes`), `:363` (`publish_entry`) | Phòng thủ nhiều lớp cho dữ liệu cũ: khi nạp lại, `cover_image` không thuộc bài thì đặt `None`; `publish_entry` kiểm lại khối ảnh và bìa phải thuộc bài (400 BR-ND-07). Test: phiên bản cũ trỏ ảnh bài khác, khôi phục thì bìa = None. |
+| L6-3 | Low (trước khi gắn vào runbook deploy) | `erp-console/scripts/check-no-mock.mjs`, `frontend/scripts/check-no-mock.mjs` (2 bản giống hệt) | (a) Thêm nguồn seed: các tệp `features/**/api.ts`, `features/ai/commands/call.ts` có chuỗi `NEXT_PUBLIC_USE_MOCK`. Lấy chuỗi `id: "<uuid>"`, `"mock-[a-z0-9-]{4,}"`, `title:`/`name:` có khoảng trắng. (b) `seeds.size < 10` thì exit 2. (c) Ghi bước chạy vào `doc/ops/moi-truong.md` (build thật → `check-no-mock` + `check-ai-chunks` → deploy). Điều phối sửa doc. |
+
+### Cần PO/Duy quyết
+- **D6-1 (PO, không chặn nếu làm F6-2 theo AC hiện tại):** SR-20-AC2 ghi "Để AI làm" chỉ hiện khi "`ai_enabled` **và đã đồng ý**". Nhưng "đồng ý" là đồng ý *tải model 1–3 GB về máy* (`AI_MSG.consentBody`), còn "Để AI làm" mức C chỉ gọi server soạn nháp, không cần model. DW-14-AC3 cũng không đòi đồng ý. Giữ AC2 thì người chưa tải model (đa số NV) mất nút "Để AI làm". Techlead đề nghị PO sửa AC2 thành "chỉ khi `step.ai` khác null" (server đã gộp AI_ENABLED + mức + quyền), và chỉ "Tóm tắt" mới cần đồng ý. Nếu PO đổi, dev bỏ điều kiện đồng ý khỏi F6-2.
+- **Biết:** "Nhờ" hiện lại khi AI tắt (F6-1) là quay về đúng DW-23-AC7, không phải thay đổi mới.
+
+### Ghi chú
+- `frontend/out/` hiện là bản thật trỏ API production (QA/dev build để kiểm); chỉ là thư mục build cục bộ, không deploy.
+- 02b §6.3 ghi "đọc trạng thái từ context gate" mà không kiểm tra rằng gate chỉ gọi status khi mở tab. Đây là thiếu sót thiết kế của techlead, fe-dev làm đúng chữ và đã tự nêu hệ quả (lệch 2, 3 trong `03-dev-notes.md`). Nguồn đúng là `step.ai` như F6-2.
+- `gate-state.enabled` không đặt lại khi đăng xuất. Sau F6-2 nó chỉ còn dùng cho "Tóm tắt" và cờ đồng ý vẫn chặn nên vô hại. Nếu muốn gọn thì đặt lại trong luồng logout.

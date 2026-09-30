@@ -60,8 +60,8 @@ export const AI_MSG = {
   emptyChatTitle: "Hỏi trợ lý điều gì đó",
   emptyChatBody: "Ví dụ: tồn kho, lô sắp hết hạn, đơn đang chờ…",
 
-  /** Lô 1–3: @wllama/wllama chưa cài (chờ S17 chốt model) — fail-closed, vẫn nhập tay được. */
-  wllamaMissing: "Thư viện chạy AI chưa được cài (đang chờ chốt model). Bạn vẫn nhập tay như bình thường.",
+  // Chuỗi riêng của runtime (thiếu thư viện chạy AI…) nằm ở runtime/messages.ts, KHÔNG để ở đây:
+  // file này được layout nạp tĩnh, chứa chuỗi runtime sẽ kéo tên thư viện AI vào chunk ban đầu (SR-20, F13).
 } as const;
 
 // ---- Cụm cho màn Nhật ký (S03) — features/audit đọc từ đây để e2e đọc qua __caveMock.msg ----

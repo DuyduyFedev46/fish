@@ -16,10 +16,13 @@ import type { PrivacyPolicyResponse } from "@/features/site/types";
 import PaymentPanel from "./PaymentPanel";
 import { rememberOrderContact } from "../storage";
 
-// Nạp động: ở bản build thật (USE_MOCK=false), nhánh render MockGatewayPanel không bao
-// giờ chạy, nên trình duyệt khách thật không bao giờ tải chunk này (dù byte vẫn nằm
-// trong out/ như mọi chunk tách nhỏ khác — đặc điểm của static export).
-const MockGatewayPanel = dynamic(() => import("./MockGatewayPanel"), { ssr: false });
+// Chỉ tồn tại ở chế độ mock: điều kiện literal `process.env.NEXT_PUBLIC_USE_MOCK === "1"` được
+// bundler thay bằng hằng số, nên ở bản build thật cả lệnh dynamic import này bị cắt — chunk
+// MockGatewayPanel (kéo theo lib/mock) không được sinh ra (M5-1b, kiểm bằng scripts/check-no-mock.mjs).
+const MockGatewayPanel =
+  process.env.NEXT_PUBLIC_USE_MOCK === "1"
+    ? dynamic(() => import("./MockGatewayPanel"), { ssr: false })
+    : null;
 
 const PHONE_RE = /^(0|\+84)\d{9,10}$/;
 
@@ -75,7 +78,7 @@ export default function CheckoutScreen() {
 
   // Trang "cổng SePay" giả lập chỉ tồn tại ở chế độ mock (xem lib/mock.ts,
   // mockStartCheckoutSession) — build thật (USE_MOCK=false) loại hẳn nhánh này.
-  if (process.env.NEXT_PUBLIC_USE_MOCK === "1" && searchParams.get("mock_gateway") === "1") {
+  if (MockGatewayPanel && searchParams.get("mock_gateway") === "1") {
     return <MockGatewayPanel />;
   }
 

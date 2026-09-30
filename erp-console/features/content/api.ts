@@ -45,12 +45,11 @@ import {
   mockUploadEntryImage,
 } from "./mock";
 
-const isMock = process.env.NEXT_PUBLIC_USE_MOCK === "1";
-
+// Điều kiện mock viết nguyên văn tại từng chỗ dùng (không gán ra biến): bundler mới cắt nhánh mock khỏi bản build thật.
 export async function fetchCategories(signal?: AbortSignal): Promise<ContentCategory[]> {
   return apiFetch<ContentCategory[]>("/api/content/categories/", {
     signal,
-    mock: isMock ? () => ({ status: 200, body: mockListCategories() }) : undefined,
+    mock: process.env.NEXT_PUBLIC_USE_MOCK === "1" ? () => ({ status: 200, body: mockListCategories() }) : undefined,
   });
 }
 
@@ -60,7 +59,7 @@ export async function createCategory(
   return apiFetch<ContentCategory>("/api/content/categories/", {
     method: "POST",
     body: JSON.stringify(payload),
-    mock: isMock ? () => ({ status: 201, body: mockCreateCategory(payload) }) : undefined,
+    mock: process.env.NEXT_PUBLIC_USE_MOCK === "1" ? () => ({ status: 201, body: mockCreateCategory(payload) }) : undefined,
   });
 }
 
@@ -71,7 +70,7 @@ export async function updateCategory(
   return apiFetch<ContentCategory>(`/api/content/categories/${id}/`, {
     method: "PATCH",
     body: JSON.stringify(payload),
-    mock: isMock ? () => ({ status: 200, body: mockUpdateCategory(id, payload) }) : undefined,
+    mock: process.env.NEXT_PUBLIC_USE_MOCK === "1" ? () => ({ status: 200, body: mockUpdateCategory(id, payload) }) : undefined,
   });
 }
 
@@ -95,7 +94,7 @@ export async function fetchEntries(
 
   return apiFetch<{ count: number; results: ContentEntryListItem[] }>(url, {
     signal,
-    mock: isMock ? () => ({ status: 200, body: mockListEntries(params) }) : undefined,
+    mock: process.env.NEXT_PUBLIC_USE_MOCK === "1" ? () => ({ status: 200, body: mockListEntries(params) }) : undefined,
   });
 }
 
@@ -110,14 +109,14 @@ export async function fetchEntryCounts(
 
   return apiFetch<ContentCounts>(url, {
     signal,
-    mock: isMock ? () => ({ status: 200, body: mockGetEntryCounts() }) : undefined,
+    mock: process.env.NEXT_PUBLIC_USE_MOCK === "1" ? () => ({ status: 200, body: mockGetEntryCounts() }) : undefined,
   });
 }
 
 export async function getEntry(id: number, signal?: AbortSignal): Promise<ContentEntryDetail> {
   return apiFetch<ContentEntryDetail>(`/api/content/entries/${id}/`, {
     signal,
-    mock: isMock ? () => ({ status: 200, body: mockGetEntry(id) }) : undefined,
+    mock: process.env.NEXT_PUBLIC_USE_MOCK === "1" ? () => ({ status: 200, body: mockGetEntry(id) }) : undefined,
   });
 }
 
@@ -125,7 +124,7 @@ export async function createEntry(payload: EntryCreatePayload): Promise<ContentE
   return apiFetch<ContentEntryDetail>("/api/content/entries/", {
     method: "POST",
     body: payload,
-    mock: isMock ? () => ({ status: 201, body: mockCreateEntry(payload) }) : undefined,
+    mock: process.env.NEXT_PUBLIC_USE_MOCK === "1" ? () => ({ status: 201, body: mockCreateEntry(payload) }) : undefined,
   });
 }
 
@@ -136,14 +135,14 @@ export async function updateEntry(
   return apiFetch<ContentEntryDetail>(`/api/content/entries/${id}/`, {
     method: "PATCH",
     body: payload,
-    mock: isMock ? () => ({ status: 200, body: mockUpdateEntry(id, payload) }) : undefined,
+    mock: process.env.NEXT_PUBLIC_USE_MOCK === "1" ? () => ({ status: 200, body: mockUpdateEntry(id, payload) }) : undefined,
   });
 }
 
 export async function deleteEntry(id: number): Promise<void> {
   return apiFetch<void>(`/api/content/entries/${id}/`, {
     method: "DELETE",
-    mock: isMock
+    mock: process.env.NEXT_PUBLIC_USE_MOCK === "1"
       ? () => {
           mockDeleteEntry(id);
           return { status: 204, body: null };
@@ -164,7 +163,7 @@ export async function uploadEntryImage(
 
   return apiUpload<ContentImage>(`/api/content/entries/${entryId}/images/`, formData, {
     onProgress,
-    mock: isMock
+    mock: process.env.NEXT_PUBLIC_USE_MOCK === "1"
       ? () => ({
           status: 201,
           body: mockUploadEntryImage(entryId, file, alt),
@@ -177,7 +176,7 @@ export async function updateImageAlt(imageId: number, alt: string): Promise<Cont
   return apiFetch<ContentImage>(`/api/content/images/${imageId}/`, {
     method: "PATCH",
     body: { alt },
-    mock: isMock ? () => ({ status: 200, body: mockUpdateImageAlt(imageId, alt) }) : undefined,
+    mock: process.env.NEXT_PUBLIC_USE_MOCK === "1" ? () => ({ status: 200, body: mockUpdateImageAlt(imageId, alt) }) : undefined,
   });
 }
 
@@ -188,7 +187,7 @@ export async function publishEntry(
   return apiFetch<EntryPublishResponse>(`/api/content/entries/${id}/publish/`, {
     method: "POST",
     body: payload,
-    mock: isMock ? () => ({ status: 200, body: mockPublishEntry(id, payload) }) : undefined,
+    mock: process.env.NEXT_PUBLIC_USE_MOCK === "1" ? () => ({ status: 200, body: mockPublishEntry(id, payload) }) : undefined,
   });
 }
 
@@ -199,7 +198,7 @@ export async function unpublishEntry(
   return apiFetch<ContentEntryDetail>(`/api/content/entries/${id}/unpublish/`, {
     method: "POST",
     body: payload,
-    mock: isMock ? () => ({ status: 200, body: mockUnpublishEntry(id, payload) }) : undefined,
+    mock: process.env.NEXT_PUBLIC_USE_MOCK === "1" ? () => ({ status: 200, body: mockUnpublishEntry(id, payload) }) : undefined,
   });
 }
 
@@ -210,14 +209,14 @@ export async function discardChanges(
   return apiFetch<ContentEntryDetail>(`/api/content/entries/${id}/discard-changes/`, {
     method: "POST",
     body: payload,
-    mock: isMock ? () => ({ status: 200, body: mockDiscardChanges(id, payload) }) : undefined,
+    mock: process.env.NEXT_PUBLIC_USE_MOCK === "1" ? () => ({ status: 200, body: mockDiscardChanges(id, payload) }) : undefined,
   });
 }
 
 export async function fetchGoliveStatus(signal?: AbortSignal): Promise<GoliveStatusResponse> {
   return apiFetch<GoliveStatusResponse>("/api/content/golive-status/", {
     signal,
-    mock: isMock ? () => ({ status: 200, body: mockGetGoliveStatus() }) : undefined,
+    mock: process.env.NEXT_PUBLIC_USE_MOCK === "1" ? () => ({ status: 200, body: mockGetGoliveStatus() }) : undefined,
   });
 }
 
@@ -231,7 +230,7 @@ export interface ShopCatalogItem {
 export async function fetchShopCatalog(): Promise<ShopCatalogItem[]> {
   return apiFetch<ShopCatalogItem[]>("/api/shop/catalog/", {
     auth: false,
-    mock: () => ({
+    mock: process.env.NEXT_PUBLIC_USE_MOCK === "1" ? () => ({
       status: 200,
       body: [
         { item_code: "CA-THU-1KG", name: "Cá thu Phan Thiết 1kg", price: 250000, sellable_qty: 10 },
@@ -239,7 +238,7 @@ export async function fetchShopCatalog(): Promise<ShopCatalogItem[]> {
         { item_code: "TOM-SU-1KG", name: "Tôm sú Cà Mau 1kg", price: 320000, sellable_qty: 8 },
         { item_code: "MUC-ONG-1KG", name: "Mực ống Phan Thiết 1kg", price: 220000, sellable_qty: 12 },
       ],
-    }),
+    }) : undefined,
   });
 }
 
@@ -250,7 +249,7 @@ export async function submitEntry(
   return apiFetch<EntrySubmitResponse>(`/api/content/entries/${id}/submit/`, {
     method: "POST",
     body: payload,
-    mock: isMock ? () => ({ status: 200, body: mockSubmitEntry(id, payload) }) : undefined,
+    mock: process.env.NEXT_PUBLIC_USE_MOCK === "1" ? () => ({ status: 200, body: mockSubmitEntry(id, payload) }) : undefined,
   });
 }
 
@@ -261,7 +260,7 @@ export async function returnEntry(
   return apiFetch<EntryReturnResponse>(`/api/content/entries/${id}/return/`, {
     method: "POST",
     body: payload,
-    mock: isMock ? () => ({ status: 200, body: mockReturnEntry(id, payload) }) : undefined,
+    mock: process.env.NEXT_PUBLIC_USE_MOCK === "1" ? () => ({ status: 200, body: mockReturnEntry(id, payload) }) : undefined,
   });
 }
 
@@ -271,7 +270,7 @@ export async function fetchEntryVersions(
 ): Promise<ContentEntryVersionListItem[]> {
   return apiFetch<ContentEntryVersionListItem[]>(`/api/content/entries/${id}/versions/`, {
     signal,
-    mock: isMock ? () => ({ status: 200, body: mockFetchEntryVersions(id) }) : undefined,
+    mock: process.env.NEXT_PUBLIC_USE_MOCK === "1" ? () => ({ status: 200, body: mockFetchEntryVersions(id) }) : undefined,
   });
 }
 
@@ -282,7 +281,7 @@ export async function getEntryVersion(
 ): Promise<ContentEntryVersionDetail> {
   return apiFetch<ContentEntryVersionDetail>(`/api/content/entries/${id}/versions/${versionNo}/`, {
     signal,
-    mock: isMock ? () => ({ status: 200, body: mockGetEntryVersion(id, versionNo) }) : undefined,
+    mock: process.env.NEXT_PUBLIC_USE_MOCK === "1" ? () => ({ status: 200, body: mockGetEntryVersion(id, versionNo) }) : undefined,
   });
 }
 
@@ -294,7 +293,7 @@ export async function restoreEntryVersion(
   return apiFetch<ContentEntryDetail>(`/api/content/entries/${id}/versions/${versionNo}/restore/`, {
     method: "POST",
     body: payload,
-    mock: isMock ? () => ({ status: 200, body: mockRestoreEntryVersion(id, versionNo, payload) }) : undefined,
+    mock: process.env.NEXT_PUBLIC_USE_MOCK === "1" ? () => ({ status: 200, body: mockRestoreEntryVersion(id, versionNo, payload) }) : undefined,
   });
 }
 

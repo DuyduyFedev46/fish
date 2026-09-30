@@ -8,7 +8,7 @@ from django.db import transaction, IntegrityError
 from django.utils import timezone
 from apps.common.exceptions import BusinessError
 from apps.content.body.slug import slugify_vi, suggest_unique_slug
-from apps.content.body.sanitize import normalize_body
+from apps.content.body.sanitize import MSG_IMAGE_AFTER_FIRST_SAVE, normalize_body
 from apps.content.body.scan import scan_entry_warnings
 from apps.content.models.entries import Entry, EntryVersion
 from apps.content.models.images import ContentImage
@@ -52,6 +52,17 @@ def calculate_content_hash(
     }
     raw = json.dumps(payload, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
+def _as_pk(value: Any) -> int | None:
+    """Đổi giá trị JSON thành khoá chính số nguyên dương; không hợp lệ -> None (không ném 500)."""
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value if value > 0 else None
+    if isinstance(value, str) and value.isdigit():
+        return int(value) or None
+    return None
 
 
 def save_draft(*, entry: Entry | None = None, data: dict, actor) -> Entry:
@@ -148,18 +159,20 @@ def save_draft(*, entry: Entry | None = None, data: dict, actor) -> Entry:
             else:
                 slug = entry.slug
 
-        # Cover image
+        # Cover image (SR-18, BR-ND-07): ảnh phải thuộc chính bài này; khi tạo mới chưa có ảnh nào thuộc bài.
         cover_image = entry.cover_image if entry else None
         if "cover_image" in data:
             cov_id = data.get("cover_image")
             if cov_id:
-                # Kiểm tra ảnh thuộc cùng bài
-                if entry and not ContentImage.objects.filter(pk=cov_id, entry=entry).exists():
+                if entry is None:
+                    raise BusinessError(MSG_IMAGE_AFTER_FIRST_SAVE, code="BR-ND-07")
+                cover_pk = _as_pk(cov_id)
+                cover_image = (
+                    ContentImage.objects.filter(pk=cover_pk, entry_id=entry.pk).first() if cover_pk else None
+                )
+                if cover_image is None:
+                    # Cùng một thông điệp cho ảnh của bài khác và ảnh không tồn tại (không lộ sự tồn tại của ảnh).
                     raise BusinessError("Ảnh bìa không thuộc bài viết này (BR-ND-07).", code="BR-ND-07")
-                try:
-                    cover_image = ContentImage.objects.get(pk=cov_id)
-                except ContentImage.DoesNotExist:
-                    raise BusinessError("Ảnh bìa không tồn tại (BR-ND-07).", code="BR-ND-07")
             else:
                 cover_image = None
 

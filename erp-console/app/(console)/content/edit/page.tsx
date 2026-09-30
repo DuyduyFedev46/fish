@@ -22,6 +22,7 @@ import {
   updateEntry,
   updateImageAlt,
 } from "@/features/content/api";
+import PolicyVersionSheet from "@/features/content/components/PolicyVersionSheet";
 import ImageUploader from "@/features/content/editor/ImageUploader";
 import type { TiptapEditorHandle } from "@/features/content/editor/TiptapEditor";
 import type {
@@ -72,6 +73,14 @@ function ContentEditScreen() {
 
   const queryId = searchParams.get("id");
   const queryNew = searchParams.get("new");
+  // SR-19: `version=N` (link bằng chứng đồng ý ở chi tiết đơn) → mở thẳng phiên bản N ở chế độ chỉ đọc.
+  // Chỉ nhận số nguyên dương thuần; giá trị lạ thì bỏ qua, mở màn soạn như thường.
+  const queryVersionRaw = searchParams.get("version");
+  const queryVersion =
+    queryVersionRaw && /^\d{1,9}$/.test(queryVersionRaw) && Number(queryVersionRaw) > 0
+      ? Number(queryVersionRaw)
+      : null;
+  const [viewVersion, setViewVersion] = useState<number | null>(queryVersion);
 
   const { me } = useAuth();
   const canPublish = Boolean(
@@ -1474,6 +1483,18 @@ function ContentEditScreen() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* SR-19: xem đúng phiên bản chính sách khách đã đồng ý — chỉ đọc, không khôi phục */}
+      {viewVersion !== null && entryId !== null && (
+        <PolicyVersionSheet
+          entryId={entryId}
+          versionNo={viewVersion}
+          onClose={() => {
+            setViewVersion(null);
+            window.history.replaceState(null, "", `/content/edit/?id=${entryId}`);
+          }}
+        />
       )}
 
       {/* Modal Lịch sử phiên bản & Khôi phục (CMS-11) */}

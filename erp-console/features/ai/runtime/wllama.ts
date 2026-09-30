@@ -12,6 +12,7 @@
 // n_ctx: LUÔN theo NEXT_PUBLIC_AI_MAX_CONTEXT_TOKENS (mặc định 2048) — KHÔNG BAO GIỜ để mặc định 32k (H3).
 
 import { AI_MSG } from "../messages";
+import { AI_RUNTIME_MSG } from "./messages";
 
 export type WllamaFacade = {
   loadModelFromUrl(url: string, opts: { n_ctx: number }): Promise<unknown>;
@@ -24,7 +25,7 @@ let loaded = false;
 
 async function loadLib(): Promise<WllamaFacade> {
   if (loaded) {
-    if (!lib) throw new Error(AI_MSG.wllamaMissing);
+    if (!lib) throw new Error(AI_RUNTIME_MSG.wllamaMissing);
     return lib;
   }
   try {
@@ -32,13 +33,13 @@ async function loadLib(): Promise<WllamaFacade> {
       /* webpackIgnore: true */
       "@wllama/wllama"
     )) as { Wllama?: new (...a: unknown[]) => WllamaFacade };
-    if (!mod.Wllama) throw new Error(AI_MSG.wllamaMissing);
+    if (!mod.Wllama) throw new Error(AI_RUNTIME_MSG.wllamaMissing);
     lib = new mod.Wllama() as WllamaFacade;
     loaded = true;
     return lib;
   } catch {
     loaded = true;
-    throw new Error(AI_MSG.wllamaMissing);
+    throw new Error(AI_RUNTIME_MSG.wllamaMissing);
   }
 }
 

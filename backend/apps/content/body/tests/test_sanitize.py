@@ -180,3 +180,28 @@ class SanitizeBodyTests(TestCase):
         # Với strict=False (lúc public_body), không raise mà giữ nguyên
         clean = normalize_body(doc, entry=self.entry, strict=False)
         self.assertEqual(clean["blocks"][0]["item_code"], "NON-EXISTENT-ITEM")
+
+
+class Sr18SanitizeCreateTests(TestCase):
+    """SR-18 (BR-ND-07): khi TẠO bài (entry=None) mọi khối image đều bị chặn ở chế độ strict."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(username="sr18_san", password="password")
+        self.other = Entry.objects.create(title="Bài khác", slug="sr18-bai-khac", created_by=self.user)
+        self.img = ContentImage.objects.create(entry=self.other, alt="x", uploaded_by=self.user)
+
+    def test_sr18_ac1_entry_none_khoi_image_strict_raise(self):
+        doc = {"type": "doc", "blocks": [{"type": "image", "image_id": self.img.pk}]}
+        with self.assertRaises(BusinessError) as ctx:
+            normalize_body(doc, entry=None, strict=True)
+        self.assertEqual(ctx.exception.code, "BR-ND-07")
+        self.assertEqual(str(ctx.exception), "Tải ảnh sau khi lưu nháp lần đầu.")
+
+    def test_sr18_entry_none_khong_anh_van_chay(self):
+        doc = {"type": "doc", "blocks": [{"type": "paragraph", "children": [{"text": "ok"}]}]}
+        self.assertEqual(normalize_body(doc, entry=None, strict=True)["blocks"][0]["type"], "paragraph")
+
+    def test_sr18_ac3_strict_false_van_giu_khoi_de_lop_1b_loc_theo_sau(self):
+        """strict=False (đường công khai) không raise — việc lọc theo bài do public_body làm."""
+        doc = {"type": "doc", "blocks": [{"type": "image", "image_id": self.img.pk}]}
+        self.assertEqual(len(normalize_body(doc, entry=None, strict=False)["blocks"]), 1)
