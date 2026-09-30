@@ -1,4 +1,4 @@
-import { apiFetch } from "@/shared/lib/http";
+import { ApiError, apiFetch } from "@/shared/lib/http";
 import type {
   CskhQueueDetail,
   CskhQueueResponse,
@@ -141,3 +141,8 @@ export async function decideCskh(
   });
 }
 
+
+/** 409 `STALE_STATE` (SR-09): màn hình đã cũ — đơn/phiếu đổi trạng thái sau khi mở (vd job tự huỷ đã chạy). */
+export function isStaleStateError(err: unknown): err is ApiError {
+  return err instanceof ApiError && err.status === 409 && err.code === "STALE_STATE";
+}

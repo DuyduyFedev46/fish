@@ -129,3 +129,74 @@ manage.py shell: liệt kê registry                                            
 - N1: tập lọc PII vẫn là **denylist theo tên khoá**, đúng quyết định của P8. `CustomerSerializer` (`sales/customers/serializers.py:10`) có `name` và `default_address`, hai khoá này không bị lọc. Hiện lệnh đó không có trong registry. Nếu sau này thêm ViewSet khách, hoặc thêm field PII mang tên khác (`payer_name`, `default_address`…), bắt buộc phải cập nhật `SCRUB_PII_KEYS` và mở rộng fixture test quét. Nên đưa việc chuyển sang allowlist vào P9.
 - N2: `pipeline.py:181` chỉ kiểm phạm vi `target_id` khi view có `get_object`. Nếu sau này có **APIView ghi** mang một tham số `<pk>`, đề xuất mức C sẽ được tạo mà không kiểm phạm vi trước. View vẫn tự kiểm khi thực thi, nhưng khi đó `AiAction` đã có. Hiện 4 APIView trong registry đều là lệnh đọc, nên chưa có lỗ.
 - Commit: SR-04 và SR-05 phải nằm **cùng commit** (SR-05-AC5).
+
+## Lô 3
+
+> Claude (Tech Lead) · 2026-09-30 · Diff chưa commit trên `main` (sau `6d98ac9`) · Story SR-08, SR-09 (BE + FE), SR-10, SR-11.
+
+### Kết luận: **REVIEW PASS**
+
+Không có lỗi Critical, High hay Medium. Có 4 việc mức Low, không chặn commit, dồn sang Lô 7. Không có migration, không có endpoint mới, không có quyền mới.
+
+### Lệnh kiểm chứng đã chạy trong lượt review
+```
+cd backend && DJANGO_DEBUG=1 env -u DATABASE_URL .venv/bin/python manage.py test apps.inventory apps.delivery apps.sales  -> Ran 542 tests  OK
+cd backend && ... manage.py test apps.ai apps.accounts apps.common apps.catalog apps.purchasing apps.reports            -> Ran 592 tests  OK
+cd backend && ... manage.py test                                                                                        -> Ran 1241 tests OK (khớp dev notes)
+cd backend && ... manage.py makemigrations --check --dry-run                                                            -> No changes detected
+cd erp-console && ./node_modules/.bin/tsc --noEmit                                                                      -> sạch
+cd erp-console && npm test                                                                                              -> 10 file, 99 test passed
+```
+
+### Đối chiếu từng điểm
+
+**Tiền và kho: SR-08 (BR-LO-07)**
+- `check_cancel_expired_batch` (`inventory/batches/services.py:271-291`) kiểm EXPIRED trước (nên huỷ lần 2 vẫn trả `BR-LO-03`, AC5), sau đó chặn khi `qty_reserved > 0`. `cancel_expired_batch` gọi hàm kiểm **sau** `select_for_update` trên lô. `reserve` và `release` cũng khoá cùng dòng lô, nên không có khe nào để một đơn giữ chỗ thêm giữa bước kiểm và bước `WRITE_OFF`.
+- Đếm đơn qua `_open_orders_count(batch, ("BOOKED",))` với `distinct` trên `order_line__order`. Chỉ đếm BOOKED là đúng: `_record_payment` chuyển đơn sang PROCESSING và trừ kho, nên chỉ BOOKED còn `qty_reserved`. Test `dem_dung_so_don_giu_cho` có ca 2 đơn.
+- Không có đường nào nhả giữ chỗ hay huỷ đơn khách. AC2 (thanh toán sau khi bị chặn vẫn ra `PaymentTransaction` MATCHED và hoá đơn) và AC3 (TTL về 0 rồi huỷ được, đúng 1 `WRITE_OFF`) đều có test.
+- Guidance (`next_steps.py:95-103`) dùng chung `check_cancel_expired_batch`: không lặp logic, đúng AC4.
+- Body lỗi chỉ có kg và số đơn, không có giá vốn hay dữ liệu khách. Có test sentinel (`test_sr08_ac1_400_khong_ro_gia_von_va_du_lieu_khach`). Đây là 400 sớm, nên nhánh audit `loss_amount` không chạy. Nhánh đó đã được SR-01 lọc bằng `COST_KEYS`.
+
+**SR-10 (`publish_batch` có khoá)**
+- `@transaction.atomic` + `select_for_update().get(pk=…)`, kiểm DRAFT trên bản đã đọc lại, rồi ghi và trả object mới (`services.py:144-159`). Caller duy nhất là `api.py:59`, và serializer dùng giá trị trả về nên không trả trạng thái cũ.
+- `cancel_receipt` (`purchasing/receipts/services.py:176-194`) khoá phiếu → dòng → lô rồi kiểm `status == DRAFT`. `publish_batch` chỉ giữ một khoá (dòng lô), nên không có vòng khoá ngược, không deadlock. Bên nào vào trước thì thắng, bên sau thấy trạng thái mới rồi trả 400. Tranh chấp thật trên PostgreSQL chưa chạy vì test dùng SQLite. Việc chứng minh bằng spy `select_for_update` ở cả hai phía là chấp nhận được.
+- Ma trận publish đạt: chu/quan_ly 200, nv_kho/nv_giao/cskh 403, khách 401. JSON của quan_ly không có `purchase_rate`/`landed_unit_cost`.
+
+**SR-09 (`record_call` 409 STALE_STATE)**
+- Thứ tự khoá không đổi: phiếu → task, rồi đọc lại cả hai dưới khoá. Kiểm stale nằm ở `delivery/cskh/services.py:142-148`, **trước** máy trạng thái, nên phiếu đã huỷ không bao giờ quay về PREPARING. Ngoài ra không có `CustomerCall` hay audit nào được ghi. Test `_assert_unchanged` kiểm cả hai điều này.
+- Nhánh idempotent `request_id` (bước 1) chạy trước kiểm stale và chỉ trả lại cuộc gọi đã có. Hành vi này đúng.
+- Body 409 là `{"detail","code"}` với thông điệp cố định: không `extra`, không tên hay SĐT. Có test so khớp nguyên body và quét sentinel. Phân quyền không đổi: 403 cho nv_kho/nv_giao, 401 cho khách, có test ma trận.
+
+**SR-11 (DW-26 idempotent)**
+- `_escalate_to_chu` (`sales/payments/auto_confirm.py:180-222`): việc ở trạng thái kết thúc thì `return` trước khi ghi gì. Việc đang ESCALATED mà lý do không đổi cũng `return`. Audit chỉ được ghi khi tạo mới hoặc lý do đổi. Test AC2 phủ 6 trạng thái × 2 lần chạy.
+- Audit và log chỉ có `bank_txn_id`, mã đơn, số tiền giao dịch và lý do, không có `raw_payload` hay tên người chuyển. Có test sentinel `test_sr11_khong_ghi_pii_vao_audit_va_action`.
+
+**FE (SR-09-AC4)**
+- `isStaleStateError` (`features/cskh/api.ts:145-148`) nhận ra lỗi bằng `ApiError.status === 409 && code === "STALE_STATE"`. `apiFetch` đã truyền `code` từ body. Modal hiện `detail` của BE trong `role="alert"` và khoá mọi nút kết quả cùng ô ghi chú (`actionsBlocked`). Nút "Tải lại" nạp lại hàng chờ rồi đóng modal. Lỗi 409 khác (`CLAIMED`) vẫn đi qua hộp lỗi chung. Nhánh 409 `STALE_STATE` "Đơn vừa được xác nhận bởi người khác" cũng được hưởng nút Tải lại, và như vậy là đúng.
+- Sửa mock `req?.url ?? req?.path` (`mock.ts:330`) là đúng: `MockRequest` chỉ có `path` (`shared/lib/http.ts:40`), và `path` có kèm query. Trước bản sửa, tab lọc `?state=` không chạy trong chế độ mock. Mock 409 khớp contract BE. Phiếu mock 36 dùng dữ liệu giả.
+
+### Chốt các lệch be-dev và fe-dev nêu
+1. **SR-11-AC3 so `downgrade_reason["text"]` thay vì `code`: đồng ý, 02b §3.4 viết sai.** Mọi lần chuyển Chủ đều mang `code="AI_MISMATCH"`, nên nếu so `code` thì không bao giờ phát hiện được lý do đổi và AC3 không đạt. `text` mới là lý do thật. Điều phối viên sửa câu ở 02b §3.4 thành "`downgrade_reason["text"]` đổi". Lưu ý: nếu lý do có chứa `{exc}` (nhánh lỗi ở `:162`) mà thông điệp exception thay đổi giữa các lần chạy thì mỗi lần sẽ thêm 1 audit. Hiện các thông điệp `BusinessError` của `resolve_payment` là cố định, nên chưa phải lỗi.
+2. **Lọc `UNMATCHED` cho toàn job: không có hồi quy DW-26.** Đã kiểm mọi nơi tạo giao dịch:
+   - `UNMATCHED` chỉ sinh ở `payments/internal_api.py:103-117`, luôn với `sales_order=None`. `resolve_payment(ATTACH_TO_ORDER)` bỏ trạng thái UNMATCHED ngay khi gắn đơn (`services.py:534-549`). Vậy không tồn tại giao dịch UNMATCHED nào có đơn.
+   - Giao dịch OPEN có đơn chỉ gồm ORPHAN, OVERPAID và UNDERPAID (`services.py:263-270`). Ở code cũ, cả ba **chưa bao giờ** được job tự khớp. ORPHAN (đơn đã huỷ) và OVERPAID (đơn không còn BOOKED) đều dừng ở bước e và bị chuyển Chủ. UNDERPAID có `amount < total_amount` ngay lúc tạo. `total_amount` chỉ được gán một lần lúc tạo đơn (`orders/services.py:271`), và ATTACH không đổi `amount` của khoản thiếu, nên ca này luôn dừng ở bước f và bị chuyển Chủ.
+   - Kết luận: nhánh `CONFIRM_ORDER` ở code cũ vốn không bao giờ tới được. Bộ lọc mới chỉ bỏ những lần chuyển Chủ trùng với hàng chờ lệch, đúng như AC4 muốn. Không có ca tự khớp thật nào bị mất. Nhánh chết để dọn ở L1.
+3. **SR-09: kết quả rác vẫn trả 400 `INVALID_INPUT`, còn phiếu CANCELLED với task không phải REFUND_CALL đổi từ 400 sang 409: đồng ý cả hai.** Kết quả rác là lỗi đầu vào, không phải màn hình cũ. Chữ "mọi kết quả khác" trong AC2 được hiểu là mọi kết quả hợp lệ. Đổi 400 `BR-GH-07` thành 409 là đúng 02b §3.2. Không có test cũ nào phụ thuộc mã cũ, và FE giờ xử lý cả hai ca bằng nút Tải lại. Riêng ca phiếu CANCELLED mà gửi kết quả rác thì trả 409 (vì kiểm stale chạy trước), vẫn chấp nhận được.
+4. **201 thay vì 200: giữ 201.** 201 là hành vi hiện có của endpoint (`cskh/api.py:208`: 201 khi tạo, 200 khi trùng `request_id`), và test CS-09 cũ cũng kiểm 201. Chữ "200" trong bảng ma trận SR-09 chỉ có nghĩa là thành công. Điều phối viên nhờ PO sửa thành "201" (hoặc "2xx").
+5. **SR-08-AC2 ghi "PAID" nhưng thực tế là "PROCESSING": đúng theo code.** `_record_payment` chuyển thẳng PAID sang PROCESSING khi xuất hoá đơn (`payments/services.py:306-311`). Test kiểm `{PAID, PROCESSING}` cùng với giao dịch MATCHED và hoá đơn là đủ. Nhờ PO sửa chữ AC2.
+6. (Không có lệch số 6 riêng. Ý 8 của be-dev về `_open_orders_count` xem ở L3.)
+7. **Counter `escalated` đếm cả no-op: chấp nhận, xếp Low (L2).** Chỉ số thống kê của job bị thổi lên, còn Nhật ký và trạng thái việc (thứ AC bảo vệ) thì đúng.
+8. **fe-dev: STALE_STATE mới chỉ xử lý ở ghi cuộc gọi: chấp nhận.** BE lô này chỉ đổi `record_call`. Các thao tác khác trong modal vẫn hiện `detail` qua hộp lỗi chung, nên người dùng không bị kẹt, chỉ thiếu nút Tải lại. Gộp vào L4.
+
+### Việc sửa
+| # | Mức | File:dòng | Việc |
+|---|---|---|---|
+| L1 | Low (dọn, Lô 7 / SR-22) | `backend/apps/sales/payments/auto_confirm.py:85-86, 133-147` | Sau bộ lọc UNMATCHED, `p.sales_order` luôn là `None`. Việc cần làm: bỏ nhánh `candidate_orders = [p.sales_order]` và nhánh `CONFIRM_ORDER`, chỉ giữ `ATTACH_TO_ORDER`. Thêm chú thích dẫn tới chốt số 2 ở trên. Test DW-26 hiện có phải xanh y nguyên. |
+| L2 | Low (Lô 7) | `backend/apps/sales/payments/auto_confirm.py:69, 80, 102, 106, 117, 128, 163` + `:203-213` | Đổi `_escalate_to_chu` để trả `True` khi thật sự tạo mới hoặc cập nhật, `False` khi no-op. Job chỉ `escalated_count += 1` khi `True`, còn lại cộng vào `skipped` (hoặc thêm khoá `unchanged`). Cùng chỗ đó, khi lý do đổi thì cập nhật luôn `args["reason"]` (hiện chỉ `downgrade_reason` được đổi, `args.reason` giữ lý do cũ). |
+| L3 | Low (Lô 5, khi sửa `check_close_batch`) | `backend/apps/inventory/batches/services.py:207-215` | Truy vấn đơn mở trong `check_close_batch` đang lặp lại `_open_orders_count`. Thay bằng `_open_orders_count(batch, OPEN_ORDER_STATUSES)` (02b §3.1 yêu cầu tách hàm dùng chung). |
+| L4 | Low (nợ FE, Lô 7 / SR-23) | `erp-console/features/cskh/CskhCallModal.tsx:162` | Dùng cùng `isStaleStateError` + `staleMessage` cho các thao tác đổi người nhận, huỷ xác nhận và quyết định Quản lý, để đơn đã huỷ cũng có nút Tải lại. Không cần đổi BE. |
+
+### Ghi chú
+- N1 (có từ trước, không do lô này): `_escalate_to_chu` dùng `get_or_create` theo `(target_model, target_id, command)`. Nếu Chủ đã tạo một đề xuất AI `sales.paymenttransaction.resolve` cho chính giao dịch đó (trạng thái PENDING, CONFIRMED hoặc SCHEDULED), job sẽ chuyển đề xuất ấy sang ESCALATED. Nếu có từ hai dòng trùng khoá trở lên, lệnh sẽ ném `MultipleObjectsReturned`. Nên khoá thêm `actor_kind`/nguồn "job" hoặc chỉ xét việc do job tạo. Để P9.
+- N2: tranh chấp thật `cancel_receipt` ∥ `publish_batch` và `cancel_expired_batch` ∥ `reserve` mới chỉ được chứng minh bằng việc đọc code và spy. Khi QA có môi trường PostgreSQL (staging) thì chạy thử hai request song song một lần.
+- Chữ trong 02b/02 cần điều phối viên nhờ sửa: 02b §3.4 (`code` thành `text`), SR-09 ma trận ("200" thành "201"), SR-08-AC2 ("PAID" thành "PROCESSING").

@@ -241,3 +241,152 @@ Playwright  python e2e/sr07_nhap_lo_draft.py (mock, port 3212)                  
 Playwright  MODE=mock python e2e/sr07_qa_edges.py                                                  -> 23/23 PASS
 Playwright  MODE=real (Django thật sqlite, port 3213 + 8123) python e2e/sr07_qa_edges.py           -> 32/32 PASS
 ```
+
+---
+
+## Lô 3 — SR-08, SR-09, SR-10, SR-11 · lần 1 · 2026-09-30
+
+### Kết luận: APPROVED — 0 lỗi Critical/High/Medium; mọi AC chạy thật xanh (test đỏ trên HEAD, xanh trên working tree); tranh chấp hai thứ tự xanh; 1 ca ⏸ (đồng thời thật trên Postgres) chuyển cho bước staging; 6 ghi nhận Low không chặn
+### Tổng: 78 ca · ✅ 77 · ❌ 0 · ⏸ 1 (khoá dòng thật `select_for_update` khi 2 giao dịch chạy song song: SQLite bỏ qua khoá, máy này không có Postgres/Docker)
+
+Cách đếm: 16 ca theo AC (SR-08 x5, SR-09 x4, SR-10 x3, SR-11 x4) + 52 test QA bổ sung (22 SR-08/10, 13 SR-09, 17 SR-11) + 4 ca tái hiện R2–R5 chạy 2 lần
++ 2 kịch bản Playwright (mock 22 điểm kiểm, Django thật 11 điểm kiểm) + 3 ca hồi quy/build (backend đầy đủ + `makemigrations`, adapter, erp-console) + 1 ca ⏸.
+
+Phạm vi: code chưa commit trong working tree (`inventory/batches/services.py`, `next_steps.py`, `delivery/cskh/services.py`, `sales/payments/auto_confirm.py`,
+`erp-console/features/cskh/*` + 39 test của dev). Không sửa code sản phẩm. QA thêm 3 file test BE và 1 script Playwright:
+- `backend/apps/inventory/batches/tests/test_p8_lo3_qa_edges.py` (22 test: SR-08 `QaSR08Edges` 15, SR-10 `QaSR10Edges` 7)
+- `backend/apps/delivery/tests/test_p8_lo3_qa_edges.py` (13 test SR-09)
+- `backend/apps/sales/payments/tests/test_p8_lo3_qa_edges.py` (17 test SR-11)
+- `erp-console/e2e/sr09_ac4_real_backend.py` (Playwright, Django thật, 11 điểm kiểm); ảnh `qa-lo3/qa-sr09-real-desktop-1280-*.png`.
+Dữ liệu chỉ là giả (Khách Thử A/E, 0900000xxx, Số 1/5 Đường Thử, mật khẩu demo).
+
+## Theo AC
+| Mã AC | Kết quả | Bằng chứng |
+|---|---|---|
+| SR-08-AC1 (R5) lô EXPIRED còn giữ chỗ -> 400 `BR-LO-07` "Còn 2,000 kg đang giữ chỗ của 1 đơn…", lô vẫn EXPIRED, không `WRITE_OFF` | ✅ | `test_sr08_ac1_r5_...`, `..._dem_dung_so_don_giu_cho`, `..._400_khong_ro_gia_von_va_du_lieu_khach` xanh. Repro R5 chạy 2 lần: cả 2 lần bị chặn, output y hệt. Đỏ trên HEAD |
+| SR-08-AC2 tiền không mất: thanh toán sau khi bị chặn huỷ vẫn thành công | ✅ | `test_sr08_ac2_...` + QA `test_qa_race_huy_lo_truoc_bi_chan_roi_thanh_toan_sau_khong_mat_tien` (có `PaymentTransaction`, hoá đơn 1, đơn sang **PROCESSING** chứ không phải PAID, khớp quyết định Tech Lead; stories ghi "PAID" là chữ cũ) |
+| SR-08-AC3 giữ chỗ về 0 (TTL) -> huỷ lô 200, `WRITE_OFF` đúng `qty_available` | ✅ | `test_sr08_ac3_...` x2 + QA `test_qa_ttl_job_chay_2_lan_va_nhieu_don` |
+| SR-08-AC4 guidance: `cancel_expired` `allowed=false`, `missing` có `BR-LO-07` | ✅ | `test_sr08_ac4_...` x2 + QA `test_qa_guidance_tung_group_...` (5 Group) |
+| SR-08-AC5 huỷ lần 2 -> 400 `BR-LO-03`, không ghi thêm ledger | ✅ | `test_sr08_ac5_...`; QA `test_qa_lo_da_chot_hoac_da_huy_khong_huy_lai` (CANCELLED/CLOSED/SOLD_OUT, ledger không đổi) |
+| SR-09-AC1 (R2) `record_call(CONFIRMED)` sau tự huỷ -> 409 `STALE_STATE` "Đơn đã bị huỷ — tải lại màn hình."; phiếu CANCELLED, task `REFUND_CALL` | ✅ | `test_sr09_ac1_r2_...` xanh; repro R2 chạy 2 lần bị chặn. Đỏ trên HEAD |
+| SR-09-AC2 `REFUND_CALL` chỉ nhận `UNREACHABLE`/`NOTIFIED`; mọi kết quả khác 409 | ✅ | `test_sr09_ac2_...` x3 (tham số hoá từng kết quả). QA `test_qa_chu_huy_tay_roi_cskh_bam_moi_ket_qua_deu_409` chạy cả 7 kết quả trên đơn **huỷ tay**. Kết quả rác `KHONG_CO` vẫn 400 `INVALID_INPUT` (đúng quyết định Tech Lead) |
+| SR-09-AC3 tranh chấp hai chiều: (a) CSKH trước, job sau -> job bỏ qua; (b) job trước, CSKH sau -> như AC1 | ✅ | Dev `test_sr09_ac3a/ac3b`; QA bù cả hai thứ tự ở mức đầy đủ: `test_qa_race_cskh_xac_nhan_truoc_job_bo_qua_va_khong_hoan_tien`, `test_qa_race_job_truoc_roi_luong_bao_hoan_tien_van_chay` |
+| SR-09-AC4 API 409 body `{"detail","code":"STALE_STATE"}`; FE hiện thông điệp + "Tải lại" | ✅ | Backend: `test_sr09_ac4_api_...` x2 + QA `test_qa_huy_tay_api_409_body_dung_hop_dong` (body **chính xác** 2 khoá). FE: xem "FE SR-09-AC4" ngay dưới: mock 22/22 và **Django thật** 11/11 |
+| SR-10-AC1 (R3) `publish_batch(object cũ)` sau `cancel_receipt` -> 400 `BR-MH-05`, lô vẫn CANCELLED | ✅ | `test_sr10_ac1_r3_...`, `..._api_publish_lo_da_huy_400_br_mh_05`; repro R3 chạy 2 lần bị chặn. Đỏ trên HEAD |
+| SR-10-AC2 `atomic` + `select_for_update().get(pk)` rồi mới kiểm DRAFT; publish lần 2 -> 400 | ✅ | `test_sr10_ac2_...` x3 + QA `test_qa_object_cu_la_draft_nhung_db_da_o_trang_thai_khac` (6 trạng thái DB, không ghi đè); trình tự khoá kiểm bằng spy (xem E2) |
+| SR-10-AC3 luồng thuận DRAFT -> SELLING, AuditLog `publish_batch` như cũ | ✅ | `test_sr10_ac3_...`, `test_sr10_ma_tran_group_chu_200`; QA `test_qa_publish_tra_ve_object_moi_trang_thai_selling` |
+| SR-11-AC1 (R4) 1 giao dịch UNMATCHED OPEN, chạy 2 lần -> đúng 1 dòng `escalate_unmatched_payment` | ✅ | `test_sr11_ac1_r4_...`; repro R4 chạy 2 lần bị chặn. QA bù **mọi đường lý do** x2 lần chạy (E-SR11, 8 ca) đều đúng 1 dòng |
+| SR-11-AC2 Chủ đặt REJECTED/DONE/CANCELLED/EXPIRED/UNDONE/FAILED -> chạy lại giữ nguyên, không thêm audit | ✅ | `test_sr11_ac2_...` x2 (6 trạng thái) |
+| SR-11-AC3 lý do đổi -> +1 dòng audit, cập nhật `downgrade_reason` (so sánh `["text"]`) | ✅ | `test_sr11_ac3_...` x2; QA `test_qa_don_doi_trang_thai_giua_2_lan_chay_them_dung_1_dong` (đơn đổi BOOKED -> CANCELLED giữa 2 lần: +1 dòng, sau đó ổn định) |
+| SR-11-AC4 chỉ quét `UNMATCHED`; ORPHAN/OVERPAID/UNDERPAID không tạo việc | ✅ | `test_sr11_ac4_...` x2 |
+
+### FE SR-09-AC4 (bằng chứng chạy thật, không đọc code)
+| # | Lệnh / bước | Kết quả |
+|---|---|---|
+| F1 | Build mock `NEXT_PUBLIC_USE_MOCK=1 npm run build`, chép `out` sang thư mục riêng ở scratchpad, `python3 -m http.server 3213`, `SHOTS=<dir> python3 e2e/sr09_ac4_stale_state.py` | **22/22 PASS** (desktop 1280x800 và mobile 375x667: thông điệp đúng `detail`, nằm trong khung nhìn, nút Tải lại cao >= 44 px, nút kết quả bị khoá, không cuộn ngang, Tải lại đóng modal, phiếu sang tab báo hoàn tiền, console không có SĐT/tên). Đã xem ảnh: chữ đỏ "Đơn đã bị huỷ — tải lại màn hình." + nút "Tải lại" xanh, không bị cắt ở 375 px |
+| F2 | **Django thật** (SQLite tạm, cổng 8113, `CSKH_AUTO_CANCEL_ENABLED=1`, `CORS_ALLOWED_ORIGINS=http://127.0.0.1:3214`), seed phiếu ESCALATED (UNREACHABLE) bằng dữ liệu giả; build `NEXT_PUBLIC_API_BASE=http://127.0.0.1:8113 NEXT_PUBLIC_USE_MOCK=0`, phục vụ ở 3214; `TRIGGER_CMD=... python3 e2e/sr09_ac4_real_backend.py` | **11/11 PASS**. Cs1 đăng nhập, mở tab "Cần quyết định", mở màn gọi; **job `auto_cancel_overdue` chạy ở backend** (`{'cancelled': 1}`) trong lúc màn còn mở; bấm "Đã xác nhận" -> `POST /api/cskh/queue/1/calls/` **409** đúng 1 lần (không gửi lại); màn hiện "Đơn đã bị huỷ — tải lại màn hình." + "Tải lại"; bấm -> modal đóng, phiếu qua tab "Báo hoàn tiền". Ảnh: `qa-lo3/qa-sr09-real-desktop-1280-1-409.png`, `...-2-refund-tab.png` |
+| F3 | Kiểm DB sau F2 | phiếu CANCELLED, đơn CANCELLED, 1 Refund, 1 `order_auto_cancelled`, **0** `delivery_confirmed`, cuộc gọi duy nhất là UNREACHABLE cũ (không có CONFIRMED) |
+| F4 | Kiểm đường khác trên phiếu đã huỷ (curl với Django thật) | Chủ: `calls` CONFIRMED 409 `STALE_STATE`; `decide` DELIVER_WITHOUT_CONFIRM / EXTEND / CANCEL cùng 409 `STALE_STATE` "Đơn đã được xử lý." (không đổi gì); cs1 (không có `decide_unconfirmed`) `decide` 403 |
+| F5 | Rà PII: console, URL, `localStorage`/`sessionStorage`, log Django | không chứa SĐT/tên/địa chỉ khách (F1 và F2 đều có điểm kiểm; `grep` log Django 0 khớp) |
+
+Bước tái hiện SR-09-AC4 (Django thật): (1) seed 1 đơn đã thanh toán, gọi cs1 `UNREACHABLE`, đặt task ESCALATED; (2) cs1 vào `/cskh/`, tab "Cần quyết định", mở phiếu;
+(3) trong backend chạy `auto_cancel_overdue(now=now+31 phút)`; (4) bấm "Đã xác nhận" trên màn cũ; (5) thấy cảnh báo + "Tải lại", bấm "Tải lại".
+
+## Ngoại lệ & biên (ngoài đường thuận)
+Mọi ca dưới đây là test QA tự viết, đều xanh trên working tree; **trên HEAD (git archive)**: SR-08/10 đỏ 14 F + 1 E, SR-09 đỏ 6 F + 10 E (subTest), SR-11 đỏ 10 F, nên không phải test rỗng.
+
+| # | Ca | Kết quả | Bằng chứng (test) |
+|---|---|---|---|
+| E1 | Lô đã từng bán: đơn A đã PAID + đơn B BOOKED 3 kg: bị chặn -> B thanh toán -> huỷ lô ghi `WRITE_OFF` -95, tổng ledger = 0, hoá đơn A không đổi | ✅ | `test_qa_lo_da_tung_ban_don_da_tra_khong_bi_dem_va_khong_bi_dong_vao` |
+| E2 | Trình tự khoá: spy thấy lock lô trước `check_cancel_expired_batch`; `reserve`/`release` cũng khoá đúng dòng lô; publish khoá trước khi kiểm DRAFT | ✅ | `test_qa_khoa_lo_truoc_khi_kiem_dieu_kien_huy`, `test_qa_khoa_lo_o_reserve_va_release_cung_dong_lo`, `test_sr10_ac2_doc_lai_co_khoa_...` |
+| E3 | **Tranh chấp A**: thanh toán đơn giữ chỗ TRƯỚC, huỷ lô SAU -> huỷ lô 200, `WRITE_OFF` -96, không mất tiền | ✅ | `test_qa_race_thanh_toan_truoc_huy_lo_sau` |
+| E4 | **Tranh chấp B**: huỷ lô TRƯỚC (bị chặn 400) rồi thanh toán -> thành công, không giao dịch mồ côi | ✅ | `test_qa_race_huy_lo_truoc_bi_chan_roi_thanh_toan_sau_khong_mat_tien` |
+| E5 | Job TTL huỷ giữ chỗ chạy 2 lần (1 rồi 0), reserved = 0, sau đó huỷ lô được | ✅ | `test_qa_ttl_job_chay_2_lan_va_nhieu_don` |
+| E6 | Đơn nhiều dòng cùng lô = 1 đơn; giữ chỗ ở lô khác không chặn lô này; biên 0,001 kg vẫn chặn; lô SELLING còn giữ chỗ -> `BR-LO-03` (không phải `BR-LO-07`) | ✅ | `test_qa_don_nhieu_dong_cung_lo_dem_la_1_don`, `..._giu_cho_o_lo_khac_...`, `..._gia_tri_bien_...`, `..._lo_dang_ban_...` |
+| E7 | Lô CANCELLED/CLOSED/SOLD_OUT huỷ lại -> `BR-LO-03`, ledger không đổi | ✅ | `test_qa_lo_da_chot_hoac_da_huy_khong_huy_lai` |
+| E8 | AuditLog: bị chặn không ghi; thành công đúng 1 dòng, bấm lần 2 không thêm; audit-logs của quan_ly không có `loss_amount` | ✅ | `test_qa_audit_khong_ghi_khi_bi_chan_va_ghi_1_dong_khi_thanh_cong` |
+| E9 | SR-10 màn hình cũ: object DRAFT cũ nhưng DB đã SELLING/NEAR_EXPIRY/SOLD_OUT/EXPIRED/CANCELLED/CLOSED -> `BR-MH-05`, DB không bị ghi đè | ✅ | `test_qa_object_cu_la_draft_nhung_db_da_o_trang_thai_khac` |
+| E10 | **Tranh chấp C1** publish trước, `cancel_receipt` sau -> `BR-MH-07`, lô vẫn SELLING | ✅ | `test_qa_race_publish_truoc_huy_phieu_sau` |
+| E11 | **Tranh chấp C2** `cancel_receipt` trước, publish sau qua API -> 400 `BR-MH-05`, tồn 0 | ✅ | `test_qa_race_huy_phieu_truoc_publish_sau_qua_api` |
+| E12 | Bấm đúp publish qua API: 200 / 400 / 400, 1 dòng audit; id không tồn tại 404; chưa đăng nhập 401 | ✅ | `test_qa_bam_dup_api_chi_1_lan_thanh_cong`, `test_qa_id_khong_ton_tai_va_chua_dang_nhap` |
+| E13 | SR-09: Chủ **huỷ tay** (không phải job), CSKH bấm cả 7 kết quả -> 409 `STALE_STATE`, không thêm cuộc gọi, không `delivery_confirmed` | ✅ | `test_qa_chu_huy_tay_roi_cskh_bam_moi_ket_qua_deu_409` |
+| E14 | SR-09: job `auto_cancel_overdue` chạy 2 lần (1 rồi 0): 1 Refund, 1 `order_auto_cancelled`, hoá đơn gốc còn nguyên | ✅ | `test_qa_job_tu_huy_chay_2_lan_chi_huy_1_lan` |
+| E15 | SR-09 **tranh chấp D1**: CSKH xác nhận trước, job sau -> job bỏ qua, không hoàn tiền; người thứ hai bấm lại -> 409 "vừa được xác nhận", phiếu vẫn PREPARING, 1 `delivery_confirmed` | ✅ | `test_qa_race_cskh_xac_nhan_truoc_job_bo_qua_va_khong_hoan_tien` |
+| E16 | SR-09 **tranh chấp D2**: job trước, CSKH sau; luồng báo hoàn tiền vẫn chạy (UNREACHABLE attempts=1, NOTIFIED -> DONE), rồi CONFIRMED/UNREACHABLE/NOTIFIED lần nữa -> 409 | ✅ | `test_qa_race_job_truoc_roi_luong_bao_hoan_tien_van_chay` |
+| E17 | SR-09 người đang giữ (claim) bị job huỷ ngang: cs1 và cs2 bấm -> đều 409 `STALE_STATE` (không phải CLAIMED) | ✅ | `test_qa_cskh_dang_giu_phieu_bi_job_huy_ngang_roi_bam_xac_nhan` |
+| E18 | SR-09 `request_id`: UNREACHABLE trên REFUND_CALL bấm đúp cùng id -> cuộc gọi cũ, attempts giữ 1; CONFIRMED bị chặn cùng id thử lại vẫn 409 và không ghi gì | ✅ | `test_qa_request_id_bam_dup_tren_refund_call`, `test_qa_request_id_cua_lan_bi_chan_409_...` |
+| E19 | SR-09 hồi quy đường thuận: CONFIRMED trên phiếu bình thường vẫn 201 (PREPARING); kết quả rác vẫn 400; xác nhận rồi bấm lần 2 -> 409 "vừa được xác nhận" | ✅ | `test_qa_luong_thuan_confirmed_van_201`, `test_qa_ket_qua_rac_...`, `test_qa_da_xac_nhan_roi_bam_lan_2_...` |
+| E20 | SR-11 mọi đường chuyển Chủ chạy 2 lần: nghi trùng, sai môi trường, không có đơn, mã đơn không tồn tại, **đơn đã bán (PROCESSING)**, đơn đã huỷ, thiếu tiền, thừa tiền -> mỗi đường đúng 1 dòng audit, 1 `AiAction` ESCALATED, không tự đổi đơn | ✅ | 8 test `test_qa_ly_do_*` |
+| E21 | SR-11 đơn đổi trạng thái giữa 2 lần chạy -> lý do đổi -> +1 dòng, rồi ổn định | ✅ | `test_qa_don_doi_trang_thai_giua_2_lan_chay_them_dung_1_dong` |
+| E22 | SR-11 đường thuận khớp tuyệt đối chạy 2 lần (confirmed 1 rồi 0): 1 audit `auto_confirm_exact_match`, đúng 1 hoá đơn, đơn PROCESSING, không `AiAction` | ✅ | `test_qa_khop_tuyet_doi_chay_2_lan_chi_ghi_tien_1_lan` |
+| E23 | SR-11 hai giao dịch cùng đơn: giao dịch đầu khớp, giao dịch sau chuyển Chủ đúng 1 lần (3 lần chạy), 1 hoá đơn | ✅ | `test_qa_hai_giao_dich_cung_don_cai_thu_hai_chuyen_chu_dung_1_lan` |
+| E24 | SR-11 giao dịch RESOLVED không bị quét; cờ tắt (công tắc Chủ đóng / `AI_ENABLED=False` / chưa sẵn sàng production) không ghi gì; lệnh `auto_confirm_exact_payments` chạy 2 lần -> 1 audit; audit cũ không bị sửa | ✅ | `test_qa_giao_dich_da_resolved_...`, 3 test cờ, `test_qa_management_command_chay_2_lan`, `test_qa_audit_khong_xoa_va_khong_sua_khi_chay_lai` |
+| E25 | Đồng thời thật (2 giao dịch song song, `select_for_update` có tác dụng) cho 3 cặp tranh chấp | ⏸ | SQLite bỏ qua khoá; đã kiểm gián tiếp bằng spy trình tự khoá (E2) và giao thoa xác định theo cả 2 thứ tự (E3/E4/E10/E11/E15/E16). Cần chạy lại trên Postgres staging (xem "Lệnh đã chạy" cuối) |
+
+## Phân quyền (Group x hành động)
+| Hành động | chu | quan_ly | nv_kho | nv_giao | cskh | khách | Bằng chứng |
+|---|---|---|---|---|---|---|---|
+| `POST /api/inventory/batches/<id>/cancel-expired/` | 200 / 400 nghiệp vụ | 403 | 403 | 403 | 403 | 401 | `test_sr08_ma_tran_group_cancel_expired`, `test_qa_chua_dang_nhap_va_id_khong_ton_tai`, `test_qa_400_thieu_quyen_khong_lo_chi_tiet` (body 403 không rò) |
+| `POST …/publish/` | 200 / 400 | 200 / 400 | 403 | 403 | 403 | 401 | `test_sr10_ma_tran_group_publish`, `test_sr10_ma_tran_group_chu_200` |
+| `POST /api/cskh/queue/<id>/calls/` CONFIRMED trên REFUND_CALL | 409 | 409 | 403 | 403 | 409 (nếu đã gọi phiếu) / **404** nếu chưa từng gọi (ngoài phạm vi BR-GH-18) | 401 | `test_sr09_ma_tran_group_refund_call_confirmed`, `test_qa_phan_quyen_stale_khach_401_va_nhom_khong_quyen_403`. Ghi chú: cs2 chưa từng gọi phiếu nhận 404 (đúng BR-GH-18, không lộ trạng thái/PII); stories không nêu trường hợp này |
+| `…/calls/` NOTIFIED/UNREACHABLE trên REFUND_CALL | 201 | 201 | 403 | 403 | 201 | 401 | `test_sr09_ma_tran_group_refund_call_notified_unreachable`. Mã thành công là **201** (không phải 200 như ma trận stories; Tech Lead đã chốt) |
+| `…/decide/` trên phiếu đã huỷ (curl, Django thật) | 409 `STALE_STATE` | 409 (cùng logic) | 403 | 403 | 403 (thiếu `decide_unconfirmed`) | 401 | F4 |
+| SR-11 job Hệ thống | không áp dụng: không có endpoint mới | | | | | | |
+
+## Rò giá vốn
+| Kênh | Kết quả | Bằng chứng |
+|---|---|---|
+| Body lỗi `BR-LO-07` chỉ có kg + số đơn, không có giá | ✅ | `test_sr08_ac1_400_khong_ro_gia_von_va_du_lieu_khach`; QA `test_qa_guidance_tung_group_...` và `test_qa_400_thieu_quyen_...` quét `COST_KEYS` cho user thiếu `view_costprice` |
+| AuditLog `changes`/`note` của publish, huỷ lô, `order_auto_cancelled`, `escalate_unmatched_payment`, `auto_confirm_exact_match` | ✅ | `test_qa_audit_publish_khong_co_gia_von_hay_pii`, `test_qa_audit_khong_ghi_khi_bi_chan_...` (audit-logs quan_ly không có `loss_amount`), `test_qa_khong_ro_pii_hay_gia_von_trong_nhat_ky_action_va_log` (quét `unit_cost`, `landed_unit_cost`, `purchase_rate`, `loss_amount`, `gross_profit`) |
+| Khoá mới ghi audit/`AiAction.args` có tính ngược ra giá vốn (tiền ÷ kg)? | ✅ không | `args` của `AiAction` chỉ có `payment_id` và `reason` (chữ lý do, số tiền giao dịch/đơn là giá bán, không phải giá vốn). `WRITE_OFF` -95/-96 kg ghi ở ledger nội bộ, không trả qua API cho Group thiếu quyền |
+| Body 409 `STALE_STATE` (calls/decide) | ✅ | chỉ có `detail`, `code` (và `current_status`, `confirm_state` ở decide), không có tiền/kg/giá vốn |
+
+## Rò dữ liệu cá nhân
+| Kênh | Kết quả | Bằng chứng |
+|---|---|---|
+| Body lỗi BR-LO-07 không tên/SĐT/địa chỉ khách | ✅ | `test_sr08_ac1_400_...`, `test_qa_guidance_tung_group_khong_ro_gia_von_va_pii` (5 Group) |
+| Body 409 STALE_STATE và log Django khi CSKH bấm màn cũ | ✅ | `test_qa_khong_ro_pii_trong_log_body_va_audit_khi_409` (bắt log root DEBUG, sentinel tên/SĐT/địa chỉ, 0 khớp); grep log Django thật (F2) 0 khớp |
+| Nhóm cskh chưa từng gọi phiếu không thấy gì (404, body không có sentinel) | ✅ | `test_qa_phan_quyen_stale_khach_401_va_nhom_khong_quyen_403` |
+| SR-11: `raw_payload` có tên/SĐT/địa chỉ người chuyển không lọt vào `AuditLog` (`note`, `changes`), `AiAction.args`/`downgrade_reason`, log job | ✅ | `test_qa_khong_ro_pii_hay_gia_von_trong_nhat_ky_action_va_log`; log job có mã GD/mã đơn (không rỗng nên kiểm không vô nghĩa) |
+| FE: console, URL, `localStorage`/`sessionStorage` | ✅ | F1 và F2 (điểm kiểm riêng) |
+| Ảnh chụp và report chỉ dữ liệu giả | ✅ | Khách Thử E, 0900000555, Số 5 Đường Thử |
+
+## Hồi quy
+| Chức năng liền kề | Kết quả | Bằng chứng |
+|---|---|---|
+| Toàn backend | ✅ | **1293 test OK** = 1241 trước đó + 52 test QA, không `--parallel`, 86 s |
+| `makemigrations --check --dry-run` | ✅ | No changes detected |
+| adapter | ✅ | 68 passed |
+| Lô 1, Lô 2 (lọc `loss_amount`, khoá tiền, PII AI, guidance) | ✅ | nằm trong 1293 test |
+| SR-11 đường thuận DW-26 (`test_dw26_auto_confirm.py`) | ✅ | nằm trong 1293 test; QA E22 chạy lại đường thuận 2 lần |
+| erp-console `npm ci` (không `--legacy-peer-deps`, `--cache` ở scratchpad) / `tsc --noEmit` / `npm run build` / `npm test` | ✅ | `npm ci` exit 0, 189 packages, 0 dòng ERESOLVE; `package.json` và `package-lock.json` **không đổi** (md5 trước/sau khớp); tsc exit 0; build exit 0; vitest 10 file / 99 test |
+| `out/` của erp-console sau khi QA | ✅ | đã build lại bản thật (`.env.production`, `USE_MOCK=0`): không còn chuỗi mock (`mockGetCskhQueue`, `DH-260928-0036`), không trỏ 127.0.0.1:8113, trỏ đúng API Cloud Run. Đã tắt server 3213/3214/8113 |
+
+## Lỗi
+Không có lỗi chặn. Ghi nhận (Low, không chặn):
+- **N1 (Low) — SR-11: `get_or_create` có thể đẩy sang ESCALATED một `AiAction` đang PENDING/CONFIRMED/SCHEDULED của cùng giao dịch, và `MultipleObjectsReturned` nếu có 2 việc cùng khoá.** Chỉ xảy ra khi Chủ đã có việc chưa đóng cho đúng giao dịch đó; job hiện không kiểm. Đề xuất Tech Lead quyết định chỉ nâng khi trạng thái là ESCALATED/PROPOSED, hoặc dùng `filter().first()`.
+- **N2 (Low) — SR-11: bộ đếm `escalated` trong kết quả job đếm cả lần không làm gì (idempotent no-op); `args["reason"]` giữ lý do cũ sau khi lý do đổi (chỉ `downgrade_reason` cập nhật).** Không ảnh hưởng tiền/kho/Nhật ký; chỉ gây hiểu sai thống kê job và dữ liệu `args`. Đề xuất cập nhật `args` cùng `downgrade_reason` và chỉ đếm khi thực sự ghi.
+- **N3 (Low) — SR-08: chữ "0 đơn" khi `qty_reserved > 0` mà không có đơn BOOKED nào giữ chỗ** (chỉ tạo được bằng sửa DB trực tiếp, không qua nghiệp vụ). Thông điệp vẫn chặn đúng; đề xuất thêm "(dữ liệu lệch, báo Quản lý)" khi n = 0.
+- **N4 (Low) — SR-09 FE: khi màn ở trạng thái STALE, chỉ nút kết quả bị khoá; khối "Cần Quản lý quyết định" (Giao không xác nhận / Gia hạn / Huỷ đơn / Xác nhận chuyển soạn hàng) vẫn bấm được và nút "Tải lại" chỉ có ở `record_call`.** BE chặn an toàn (409 `STALE_STATE`, không đổi gì, xem F4), nhưng người dùng bấm nhầm sẽ nhận thông báo lỗi khác ("Đơn đã được xử lý.") mà không có nút Tải lại. Nằm ngoài AC4; đề xuất tái sử dụng `isStaleStateError` cho cả `decide`. Cũng: cs1 thấy nút quyết định dù không có quyền `decide_unconfirmed` (403) — hành vi có từ trước.
+- **N5 (Low) — lệch chữ giữa tài liệu và code (không lỗi code).** (a) stories SR-09 ma trận ghi NOTIFIED/UNREACHABLE "200", thực tế 201; (b) SR-08-AC2 ghi "đơn PAID", thực tế PROCESSING; (c) 02b §3.4 ghi so sánh `code`, code so sánh `downgrade_reason["text"]`; (d) `repro/README` ghi R2 = SR-09 và R3 = SR-10 theo thứ tự ngược với tên; Tech Lead đã chốt (a)-(c) ở `03b`, cần sửa chữ ở stories/02b/README khi PO rảnh.
+- **N6 (Low, hiển thị mock) — dòng "Cá thu 2,000 kg · 2.000 kg" lặp hai lần định dạng số** trong khung thông tin đơn (thấy ở ảnh mock lẫn Django thật). Có từ trước lô này, không thuộc SR-09; báo FE.
+- Cảnh báo bảo mật hạ tầng ngoài phạm vi: `npm ci` báo 27 lỗ hổng gói (25 moderate, 1 high, 1 critical) trong `erp-console`; không do lô này thay đổi (lockfile không đổi). Đề xuất lên lịch `npm audit` riêng.
+
+## Lệnh đã chạy (tóm tắt output)
+```
+backend  DJANGO_DEBUG=1 env -u DATABASE_URL .venv/bin/python manage.py test                        -> Ran 1293 tests OK, 86 s (baseline 1241 + 52 QA)
+backend  manage.py makemigrations --check --dry-run                                                 -> No changes detected
+backend  manage.py test apps.inventory.batches.tests.test_p8_lo3_qa_edges                          -> Ran 22 OK
+backend  manage.py test apps.delivery.tests.test_p8_lo3_qa_edges                                   -> Ran 13 OK
+backend  manage.py test apps.sales.payments.tests.test_p8_lo3_qa_edges                             -> Ran 17 OK
+HEAD-copy (git archive HEAD backend) + test dev Lô 3 (39)                                           -> 31 F + 3 E (đỏ đúng)
+HEAD-copy + 3 file test QA                                                                          -> SR-08/10: F14 E1 · SR-09: F6 E10 · SR-11: F10 (đỏ đúng)
+repro R2-R5 (doc/.../repro, tests.py) chạy 2 lần liên tiếp trên working tree                        -> R2, R3, R4, R5 bị chặn cả 2 lần, output giống hệt (R6 = Lô 4, vẫn lỗi cũ là đúng)
+adapter  .venv/bin/python -m pytest -q                                                              -> 68 passed
+erp-console  npm ci --cache <scratchpad> (không --legacy-peer-deps)                                 -> exit 0; lockfile md5 không đổi
+erp-console  npx tsc --noEmit -> 0 ; npm run build -> 0 ; npm test                                  -> 99 passed (10 file)
+Playwright  NEXT_PUBLIC_USE_MOCK=1 build -> http.server 3213 -> python3 e2e/sr09_ac4_stale_state.py -> 22/22 PASS (2 viewport)
+Playwright  Django thật (SQLite tạm, cổng 8113) + build USE_MOCK=0 phục vụ 3214 -> e2e/sr09_ac4_real_backend.py (TRIGGER_CMD chạy auto_cancel_overdue) -> 11/11 PASS; DB: 0 delivery_confirmed, 1 Refund
+erp-console  npm run build (bản thật, không mock) sau khi QA                                          -> exit 0; out/ không còn mock
+Việc còn lại (⏸ E25): chạy ba cặp tranh chấp với 2 kết nối song song trên Postgres staging (ví dụ 2 luồng: cancel_expired_batch ↔ confirm_payment, publish_batch ↔ cancel_receipt, auto_cancel_overdue ↔ record_call) và xác nhận không deadlock, không dữ liệu lệch.
+```

@@ -136,8 +136,16 @@ def record_call(
         task = ConfirmationTask.objects.select_for_update().get(pk=task_id)
 
         # 4. Kiểm tra trạng thái note / task
-        if note.status == DeliveryNote.Status.CANCELLED and task.state != ConfirmationTask.State.REFUND_CALL:
-            raise BusinessError("Đơn đã huỷ.", code="BR-GH-07")
+        # SR-09 (BR-GH-18, CS-08/CS-09): đơn đã bị huỷ (hệ thống tự huỷ hoặc huỷ tay) thì màn hình
+        # của CSKH đang cũ -> 409 STALE_STATE, KHÔNG được đưa phiếu về PREPARING. Task REFUND_CALL
+        # (báo huỷ & hoàn tiền) chỉ nhận UNREACHABLE / NOTIFIED; giá trị rác vẫn rơi xuống INVALID_INPUT.
+        stale_error = ConflictError("Đơn đã bị huỷ — tải lại màn hình.", code="STALE_STATE")
+        if task.state == ConfirmationTask.State.REFUND_CALL:
+            refund_call_results = (CustomerCall.Result.UNREACHABLE, CustomerCall.Result.NOTIFIED)
+            if result in CustomerCall.Result.values and result not in refund_call_results:
+                raise stale_error
+        elif note.status == DeliveryNote.Status.CANCELLED:
+            raise stale_error
 
         open_states = (
             ConfirmationTask.State.PENDING,

@@ -141,18 +141,46 @@ def release(*, batch, qty):
 
 # --- Vòng đời lô ------------------------------------------------------------
 
+@transaction.atomic
 def publish_batch(*, batch, actor):
-    """DRAFT -> SELLING (BR-MH-05). Kiểm perm publish_batch ở tầng API."""
-    if batch.status != Batch.Status.DRAFT:
+    """
+    DRAFT -> SELLING (BR-MH-05). Kiểm perm publish_batch ở tầng API.
+    Khoá dòng lô rồi ĐỌC LẠI trạng thái trước khi kiểm DRAFT (SR-10): object `batch` do
+    caller đưa có thể đã cũ (phiếu nhập vừa huỷ ở request khác, `cancel_receipt` cũng khoá
+    dòng lô) — không được mở bán lại lô đã huỷ.
+    """
+    b = Batch.objects.select_for_update().get(pk=batch.pk)
+    if b.status != Batch.Status.DRAFT:
         raise BusinessError("Chỉ publish được lô đang ở trạng thái Nháp.", code="BR-MH-05")
-    batch.status = Batch.Status.SELLING
-    batch.save(update_fields=["status"])
-    record_audit("publish_batch", actor=actor, obj=batch)
-    return batch
+    b.status = Batch.Status.SELLING
+    b.save(update_fields=["status"])
+    record_audit("publish_batch", actor=actor, obj=b)
+    return b
 
 
 # Trạng thái đơn bán hàng đang mở (chưa hoàn tất hoặc huỷ) tham chiếu lô (S04 / L-1, BR-LO-04)
 OPEN_ORDER_STATUSES = ("BOOKED", "PAID", "PROCESSING")
+# Đơn còn giữ chỗ (qty_reserved) trên lô: chỉ BOOKED — thanh toán xong là đã trừ kho (SR-08, BR-LO-07)
+RESERVING_ORDER_STATUSES = ("BOOKED",)
+
+
+def _open_orders_count(batch, statuses):
+    """Số đơn (distinct) ở trạng thái `statuses` có dòng phân bổ tham chiếu `batch`."""
+    from apps.sales.models import SalesOrderLineBatch
+    return (
+        SalesOrderLineBatch.objects.filter(
+            batch=batch,
+            order_line__order__status__in=statuses,
+        )
+        .values("order_line__order")
+        .distinct()
+        .count()
+    )
+
+
+def _fmt_kg(qty):
+    """Định dạng số kg kiểu Việt: 2,000 (3 chữ số thập phân, dấu phẩy)."""
+    return f"{Decimal(qty):.3f}".replace(".", ",")
 
 
 def check_close_batch(batch):
@@ -250,6 +278,16 @@ def check_cancel_expired_batch(batch):
 
     if batch.status != Batch.Status.EXPIRED:
         return [Missing("BR-LO-03", "Chỉ huỷ được lô Quá hạn.")]
+    # SR-08 / BR-LO-07: còn giữ chỗ của đơn BOOKED thì chưa huỷ — huỷ sẽ xoá tồn mà đơn
+    # khách vẫn đang giữ, thanh toán sau đó văng "Xuất vượt tồn" và mất giao dịch tiền.
+    # Không tự nhả giữ chỗ / huỷ đơn khách; giữ chỗ tự hết theo TTL.
+    if batch.qty_reserved > ZERO:
+        n = _open_orders_count(batch, RESERVING_ORDER_STATUSES)
+        return [Missing(
+            "BR-LO-07",
+            f"Còn {_fmt_kg(batch.qty_reserved)} kg đang giữ chỗ của {n} đơn — "
+            "chờ đơn thanh toán hoặc hết hạn giữ chỗ rồi huỷ.",
+        )]
     return []
 
 

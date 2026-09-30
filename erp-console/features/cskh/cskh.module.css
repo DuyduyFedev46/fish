@@ -364,6 +364,19 @@
   color: #991b1b;
 }
 
+/* SR-09-AC4: thông điệp "màn hình đã cũ" + nút Tải lại; xuống dòng trên mobile, nút >= 44px. */
+.staleBox {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.staleBox button {
+  min-height: 44px;
+}
+
 .alertWarn {
   background: #fffbeb;
   border: 1px solid #fcd34d;

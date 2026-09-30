@@ -42,7 +42,9 @@ def process_exact_payment_matches() -> dict:
     # 4. Quét các giao dịch lệch đang mở (OPEN)
     open_txns = list(
         PaymentTransaction.objects.filter(
-            resolution_status=PaymentTransaction.ResolutionStatus.OPEN
+            resolution_status=PaymentTransaction.ResolutionStatus.OPEN,
+            # SR-11-AC4: chỉ quét ca "không khớp đơn"; ORPHAN/OVERPAID/UNDERPAID đã nằm ở hàng chờ lệch
+            match_status=PaymentTransaction.MatchStatus.UNMATCHED,
         ).order_by("received_at", "id")
     )
 
@@ -163,8 +165,24 @@ def process_exact_payment_matches() -> dict:
     return {"confirmed": confirmed_count, "escalated": escalated_count, "skipped": skipped_count}
 
 
+# Việc đã kết thúc (Chủ hoặc hệ thống đã đóng): job KHÔNG mở lại, KHÔNG ghi thêm Nhật ký (SR-11).
+_CLOSED_ACTION_STATUSES = (
+    AiAction.Status.REJECTED,
+    AiAction.Status.DONE,
+    AiAction.Status.CANCELLED,
+    AiAction.Status.EXPIRED,
+    AiAction.Status.UNDONE,
+    AiAction.Status.FAILED,
+)
+
+
 def _escalate_to_chu(payment: PaymentTransaction, *, reason: str):
-    """Tạo hoặc cập nhật AiAction ESCALATED chuyển việc cho Chủ (DW-26-AC2)."""
+    """
+    Tạo hoặc cập nhật AiAction ESCALATED chuyển việc cho Chủ (DW-26-AC2). IDEMPOTENT (SR-11):
+    - việc đã ở trạng thái kết thúc -> giữ nguyên, không ghi Nhật ký;
+    - việc đang ESCALATED cùng lý do -> không làm gì (không ghi Nhật ký lặp);
+    - chỉ ghi `escalate_unmatched_payment` khi tạo mới hoặc lý do đổi (cập nhật downgrade_reason).
+    """
     from django.contrib.auth import get_user_model
     User = get_user_model()
     chu_user = User.objects.filter(groups__name="chu", is_active=True).first() or User.objects.filter(is_active=True).first()
@@ -183,7 +201,12 @@ def _escalate_to_chu(payment: PaymentTransaction, *, reason: str):
             "args": {"payment_id": payment.id, "reason": reason},
         },
     )
-    if not created and action.status != AiAction.Status.ESCALATED:
+    if not created:
+        if action.status in _CLOSED_ACTION_STATUSES:
+            return
+        reason_changed = (action.downgrade_reason or {}).get("text") != reason
+        if action.status == AiAction.Status.ESCALATED and not reason_changed:
+            return
         action.status = AiAction.Status.ESCALATED
         action.assignee_group = "chu"
         action.downgrade_reason = {"code": "AI_MISMATCH", "text": reason}

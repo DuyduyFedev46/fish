@@ -236,3 +236,126 @@ manage.py makemigrations --check --dry-run                   -> No changes detec
 
 ### Sửa L1 (techlead review Lô 2, cùng lô)
 Idempotency key nằm trong nháp `sessionStorage` khoá `cave_draft_nhap_lo:<userId>` (vẫn không lưu `rate`). Khi mở form: `resolveIdempotencyKey(userId, generateUUID)` — có key trong nháp của CHÍNH người này thì dùng lại (F5 rồi gửi lại sau lỗi mạng vẫn cùng key, BE chống trùng được), không có thì sinh mới. Gửi thành công: xoá nháp + sinh key mới (`NhapLoForm.tsx`). Nháp người khác không đọc được (khoá theo userId); đăng xuất `clearAllDrafts()` xoá hết nên không bao giờ dùng lại key. Thay đổi: `draftStorage.ts` (thêm `idempotencyKey?` + `resolveIdempotencyKey`), `NhapLoForm.tsx`, `draftStorage.test.ts` (thay test "không lưu key" bằng (a) F5 cùng user giữ key, (b) user khác/sau đăng xuất key mới, (c) sau gửi thành công key mới, + nháp có key vẫn không chứa `rate`; 11 test), `e2e/sr07_nhap_lo_draft.py` (thêm assert key + luồng gửi thành công → nhập phiếu tiếp; 18/18 PASS, thêm ảnh `qa-lo2/sr07-4-sau-gui-thanh-cong-key-moi.png`). `tsc --noEmit`, `npm run build` sạch; `npm test` 10 file, 90 test xanh. Ghi chú: nếu gửi lỗi mạng rồi F5 và key được giữ đúng thiết kế; mục nợ 3 cũ (nguy cơ phiếu trùng) không còn.
+
+## Lô 3 — FE
+
+**Story:** SR-09-AC4 (BR-GH-18, CS-08/CS-09) — màn gọi CSKH nhận 409 `STALE_STATE` từ `POST /api/cskh/queue/<id>/calls/`.
+
+### Đã sửa (`erp-console/features/cskh/`)
+- `api.ts`: thêm `isStaleStateError(err)` (ApiError status 409 + `code === "STALE_STATE"`). Không đổi contract/hàm gọi API.
+- `CskhCallModal.tsx`: state `staleMessage`. Khi `recordCskhCall` ném 409 STALE_STATE thì hiện hộp `role="alert"` (`data-testid="cskh-stale-alert"`) với đúng `detail` của BE + nút **Tải lại**; nút này gọi `onUpdated()` (nạp lại hàng chờ) rồi `onClose()` (đóng modal). Khi đang stale, mọi nút kết quả cuộc gọi bị khoá (`actionsBlocked`) nên không gửi lại trên màn cũ. Hộp tự cuộn vào khung nhìn (mobile: nút kết quả nằm dưới, hộp nằm đầu thân modal). Lỗi khác vẫn hiện ở hộp lỗi chung như cũ. Chỉ xử lý cuộc gọi; đổi người nhận / huỷ xác nhận / quyết định Quản lý chưa gắn xử lý STALE_STATE (BE story chỉ đổi `record_call`).
+- `cskh.module.css`: `.staleBox` (flex, xuống dòng, nút cao 44px). Dùng lại `alertError`/`btnPrimary` sẵn có, không thêm màu mới.
+- `mock.ts`: (1) phiếu mock mới `note_id 36` / `DH-260928-0036` (dữ liệu giả) trong `MOCK_STALE_ON_CALL_IDS`: lần ghi cuộc gọi đầu tiên, mock mô phỏng job `auto_cancel_overdue` đã chạy trước (phiếu CANCELLED, task REFUND_CALL) rồi trả 409. (2) `mockRecordCskhCall` theo BE: phiếu CANCELLED mà không phải REFUND_CALL, hoặc REFUND_CALL với kết quả ∉ {UNREACHABLE, NOTIFIED} → 409 `{"detail": "Đơn đã bị huỷ — tải lại màn hình.", "code": "STALE_STATE"}` (trước đây nhánh CANCELLED trả 400 BR-GH-07). (3) Sửa lỗi có sẵn của mock: `mockGetCskhQueue` đọc `req.url` (không tồn tại, MockRequest chỉ có `path`) nên lọc `?state=` (tab Báo hoàn tiền, Hẹn gọi lại…) không bao giờ chạy trong mock; nay đọc `req.url ?? req.path`.
+- `cskh.test.ts`: +9 test vitest (SR-09 AC1/AC3b, AC2 tham số hoá 5 kết quả bị chặn, NOTIFIED/UNREACHABLE vẫn 201, luồng thuận 201, `isStaleStateError`); `beforeEach` khôi phục phiếu 36.
+- `erp-console/e2e/sr09_ac4_stale_state.py` (mới): Playwright, 2 ca (1280x800 và 375x667), 11 assert mỗi ca.
+
+### Bằng chứng
+- Playwright `sr09_ac4_stale_state.py` (bản build mock, cổng 3213): **22/22 PASS**. Luồng: đăng nhập `cs1` → `/cskh/` → mở phiếu DH-260928-0036 → bấm "Đã xác nhận" → thấy đúng câu "Đơn đã bị huỷ — tải lại màn hình." + nút Tải lại (cao ≥ 44px, nằm trong khung nhìn, không cuộn ngang, nút kết quả bị khoá) → bấm Tải lại → modal đóng, phiếu rời hàng chờ mặc định và xuất hiện ở tab "Báo hoàn tiền"; console không chứa SĐT/tên.
+- Ảnh (dữ liệu giả): `qa-lo3/sr09-ac4-{desktop-1280,mobile-375x667}-{1-thong-diep-409,2-sau-tai-lai,3-tab-bao-hoan-tien}.png`.
+- `tsc --noEmit` sạch; `npm run build` sạch; `npm test` 10 file, 99 test xanh (gốc 90).
+
+### Lệch / nợ
+- Không lệch contract: dùng đúng body `{detail, code}` như story. Cần BE Lô 3 (`record_call`) trả 409 đúng mã để chạy thật; FE chưa thử với BE thật.
+- Chỉ xử lý STALE_STATE ở ghi cuộc gọi; các thao tác khác trong modal (đổi người nhận, huỷ xác nhận, quyết định Quản lý) khi đơn đã huỷ vẫn hiện lỗi chung bằng `detail`, chưa có nút Tải lại.
+
+## Lô 3 — BE
+> be-dev (Claude) · 2026-09-30 · Story: SR-08, SR-09 (BE), SR-10, SR-11 · Chưa commit (chờ QA + điều phối).
+
+### Số test gốc / sau
+- Gốc (trước Lô 3, `manage.py test` không --parallel): **1202 test, OK**.
+- Sau: **1241 test, OK** (+39 = 11 SR-08, 8 SR-10, 11 SR-09, 9 SR-11). `makemigrations --check --dry-run` → "No changes detected".
+- Không có migration, không có endpoint mới, contract API không đổi (chỉ thêm mã lỗi 409 mới ở endpoint có sẵn, xem SR-09).
+
+### File đã sửa / thêm
+- Sửa `backend/apps/inventory/batches/services.py`: `publish_batch` (`@transaction.atomic` + `select_for_update().get(pk)` rồi mới kiểm DRAFT, thao tác trên object đã khoá); `check_cancel_expired_batch` (thêm BR-LO-07); thêm hằng `RESERVING_ORDER_STATUSES = ("BOOKED",)`, hàm `_open_orders_count(batch, statuses)` và `_fmt_kg(qty)` (định dạng `2,000`).
+- Sửa `backend/apps/inventory/batches/next_steps.py`: bước `cancel_expired` gọi `check_cancel_expired_batch` → `missing` có BR-LO-07, `allowed = can_cancel and not missing_biz`; đổi dòng import (thêm `check_cancel_expired_batch`).
+- Sửa `backend/apps/delivery/cskh/services.py` (chỉ `record_call`): thay kiểm `BR-GH-07 "Đơn đã huỷ."` bằng `ConflictError("Đơn đã bị huỷ — tải lại màn hình.", code="STALE_STATE")` (HTTP 409).
+- Sửa `backend/apps/sales/payments/auto_confirm.py`: bộ lọc quét thêm `match_status=UNMATCHED`; `_escalate_to_chu` idempotent (xem dưới).
+- Thêm test: `backend/apps/inventory/batches/tests/test_p8_cancel_expired_reserved.py` (R5), `test_p8_publish_lock.py` (R3), `backend/apps/delivery/tests/test_p8_record_call_stale.py` (R2), `backend/apps/sales/payments/tests/test_p8_auto_confirm_idempotent.py` (R4).
+- Không đụng: `check_close_batch`/`close_batch`, `cancel_receipt`, `auto_cancel_overdue`, `migrations/`, `models/`, FE, `doc/decisions.md`, `02*.md`.
+
+### Endpoint / contract thực tế
+- `POST /api/inventory/batches/<id>/cancel-expired/` (chỉ `chu`): lô EXPIRED còn giữ chỗ → 400
+  `{"detail": "Còn 2,000 kg đang giữ chỗ của 1 đơn — chờ đơn thanh toán hoặc hết hạn giữ chỗ rồi huỷ.", "code": "BR-LO-07"}`.
+  Body chỉ có `detail`, `code` (không tên/SĐT khách, không giá vốn).
+- `GET /api/guidance/batch/<id>/`: bước `cancel_expired` khi còn giữ chỗ: `allowed=false`, `missing=[{"code": "BR-LO-07", "text": "Còn 2,000 kg đang giữ chỗ của 1 đơn — …"}]` (+ BR-PQ-12 nếu thiếu quyền).
+- `POST /api/inventory/batches/<id>/publish/` (chu, quan_ly): lô đã huỷ/không DRAFT → 400 `{"detail": "Chỉ publish được lô đang ở trạng thái Nháp.", "code": "BR-MH-05"}`.
+- `POST /api/cskh/queue/<note_id>/calls/` trên đơn đã huỷ → **409** `{"detail": "Đơn đã bị huỷ — tải lại màn hình.", "code": "STALE_STATE"}` (kiểm bằng API thật: `resp.json() == {"detail": ..., "code": "STALE_STATE"}`, `exception_handler` render `ConflictError.extra` rỗng). Ghi UNREACHABLE/NOTIFIED trên REFUND_CALL vẫn 201 như cũ.
+- Job DW-26 `process_exact_payment_matches`: không có endpoint.
+
+### Rule BR đã cài
+- BR-LO-07 (mới, SR-08): không huỷ lô quá hạn khi còn giữ chỗ (chỉ đếm đơn BOOKED, đúng nơi `qty_reserved` phát sinh; đơn PAID/PROCESSING đã trừ kho nên không chặn). Không tự nhả giữ chỗ/huỷ đơn khách; giữ chỗ hết theo TTL. (Văn bản BR vào spec là việc Lô 5.)
+- BR-LO-03 (huỷ 2 lần vẫn 400, không ghi ledger), BR-MH-05 (publish có khoá), BR-GH-18/CS-08/CS-09 (SR-09), DW-26/V-DW1 (SR-11), BR-PQ-04/05 (audit không nhân bản). Bất biến 9: response 409/400 và audit không chứa SĐT/tên/địa chỉ (test sentinel giả).
+
+### TDD — output ĐỎ (trước khi sửa code)
+Repro R2–R5 chạy trên code cũ (`review_repro.tests`, 4 test "OK" vì chỉ `print`, in ra hành vi sai):
+```
+R2 after auto-cancel: CANCELLED CANCELLED REFUND_CALL
+R2 after CONFIRMED: CANCELLED PREPARING DONE          <- phiếu đã huỷ bị kéo về PREPARING
+R3 receipt: CANCELLED batch: SELLING qty: 0.000       <- mở bán lô của phiếu đã huỷ
+R4 audit rows after 2 runs: 2 | action after reject + run: ESCALATED   <- nhắc lặp + mở lại việc Chủ đã từ chối
+R5 before cancel: avail 100.000 reserved 2.000
+R5 after cancel: status CANCELLED avail 0.000 reserved 2.000
+R5 confirm_payment raised: BusinessError Xuất vượt tồn lô CA-THU-…: còn 0.000kg, cần 2.000kg.
+R5 order: BOOKED | txn: None                          <- mất giao dịch tiền
+```
+Test chính thức trên code cũ:
+```
+test_p8_cancel_expired_reserved + test_p8_publish_lock  -> Ran 19, FAILED (failures=11)
+  FAIL test_sr08_ac1_r5_khong_huy_lo_khi_con_giu_cho            AssertionError: 200 != 400
+  FAIL test_sr08_ac1_service_raise_business_error_...           AssertionError: BusinessError not raised
+  FAIL test_sr08_ac2_thanh_toan_van_thanh_cong_sau_khi_bi_chan_huy  200 != 400
+  FAIL test_sr08_ac4_guidance_cancel_expired_khong_allowed_...  True is not false
+  FAIL test_sr10_ac1_r3_publish_object_cu_sau_khi_huy_phieu_bi_chan  BusinessError not raised
+  FAIL test_sr10_ac2_doc_lai_co_khoa_dong_roi_moi_kiem_draft    Expected 'select_for_update' to be called once. Called 0 times.
+  FAIL test_sr10_ac2_object_cu_khong_bi_ghi_de_...              BusinessError not raised
+  (+ ma trận Group, đếm 2 đơn, không-rò: cùng lỗi 200 != 400)
+test_p8_record_call_stale                                -> Ran 11, FAILED (failures=6, errors=3)
+  FAIL test_sr09_ac1_r2_confirmed_sau_tu_huy_409_stale_state    AssertionError: ConflictError not raised
+  ERROR test_sr09_phieu_cancelled_task_khong_phai_refund_call_cung_409  BusinessError: Đơn đã huỷ.  (mã cũ BR-GH-07, 400)
+  FAIL test_sr09_ac4_api_409_body_detail_code / ma_tran (không 409)
+test_p8_auto_confirm_idempotent                          -> Ran 9, FAILED (failures=8)
+  FAIL test_sr11_ac1_r4_chay_2_lan_chi_1_dong_audit             AssertionError: 2 != 1
+  FAIL test_sr11_ac2_viec_da_dong_khong_bi_mo_lai_...           AssertionError: 18 != 6
+  FAIL test_sr11_ac2_r4_rejected_roi_chay_lai                   'ESCALATED' != REJECTED
+  FAIL test_sr11_ac4_chi_quet_unmatched                         AssertionError: 3 != 0
+```
+### TDD — output XANH (sau khi sửa)
+```
+manage.py test apps.inventory.batches.tests.test_p8_cancel_expired_reserved apps.inventory.batches.tests.test_p8_publish_lock  -> 19 OK
+manage.py test apps.delivery.tests.test_p8_record_call_stale                                                                   -> 11 OK
+manage.py test apps.sales.payments.tests.test_p8_auto_confirm_idempotent                                                       -> 9 OK
+manage.py test apps.inventory.batches (98) · apps.delivery (133) · apps.sales.payments (133)                                    -> OK
+DJANGO_DEBUG=1 env -u DATABASE_URL .venv/bin/python manage.py test    -> Ran 1241 tests OK   (gốc 1202)
+manage.py makemigrations --check --dry-run                             -> No changes detected
+```
+Repro R2–R5 chạy lại **2 lần** sau khi sửa (job chạy lặp), hai lần cho kết quả giống hệt: R2, R3, R5 nay ném đúng lỗi nghiệp vụ ở bước sai (script tái hiện không bắt exception nên hiện "ERROR" — nghĩa là lỗi đã bị chặn), R4 ổn định:
+```
+R2: ConflictError: Đơn đã bị huỷ — tải lại màn hình.                (services.py record_call)
+R3: BusinessError: Chỉ publish được lô đang ở trạng thái Nháp.       (services.py publish_batch)
+R5: BusinessError: Còn 2,000 kg đang giữ chỗ của 1 đơn — chờ đơn thanh toán hoặc hết hạn giữ chỗ rồi huỷ.
+R4 audit rows after 2 runs: 1 | action after reject + run: REJECTED
+```
+(cả hai lần đều giống nhau; R5 trước lỗi in `avail 100.000 reserved 2.000`, lô không bị huỷ nên `confirm_payment` không còn chạm vào lô đã xoá tồn.)
+
+### Bằng chứng chống "xanh giả" / ma trận
+- SR-08: ma trận `POST …/cancel-expired/`: chu → 400 nghiệp vụ (đối chứng có 400 thật), quan_ly/nv_kho/nv_giao/cskh → 403, khách → 401, dữ liệu không đổi; AC2 thanh toán sau khi bị chặn → có `PaymentTransaction` MATCHED + `SalesInvoice`; AC3 job TTL (`cancel_unpaid_expired`) → giữ chỗ 0 → huỷ 200 với đúng 1 `WRITE_OFF = -qty_available`; đơn đã trả tiền không chặn; đếm đúng "5,000 kg … 2 đơn".
+- SR-10: ma trận `POST …/publish/`: chu 200, quan_ly 200 (không có `purchase_rate`/`landed_unit_cost` trong JSON — quét bằng `COST_KEYS`), nv_kho/nv_giao/cskh 403, khách 401, publish lại 400 `BR-MH-05`; đối chứng: lô vẫn DRAFT sau các lần 403. Chứng minh khoá: `Batch.objects.select_for_update` được gọi đúng 1 lần (spy, vì test chạy SQLite nên FOR UPDATE thật không quan sát được); object cũ không ghi đè `status/qty` lên lô đã huỷ.
+- SR-09: ma trận: cs1/chu/quan_ly (có `confirm_with_customer`) CONFIRMED → 409 `STALE_STATE`, NOTIFIED/UNREACHABLE → 2xx; nv_kho/nv_giao → 403; khách → 401. Tham số hoá `CONFIRMED, CONFIRMED_CHANGED, CALLBACK, WRONG_NUMBER, WANT_CANCEL, WANT_CHANGE` (mỗi ca kiểm phiếu vẫn CANCELLED, task vẫn REFUND_CALL, không thêm `CustomerCall`/audit). Response 409 không chứa SĐT/tên/địa chỉ giả.
+- SR-11: 6 trạng thái kết thúc `REJECTED/DONE/CANCELLED/EXPIRED/UNDONE/FAILED` × 2 lần chạy: giữ nguyên, audit không tăng; AC3 lý do đổi → +1 audit + cập nhật `downgrade_reason`, chạy tiếp thì ổn định; audit/`downgrade_reason`/`args` không chứa SĐT/tên giả.
+
+### Lệch thiết kế / giả định
+1. **SR-11-AC3: so sánh `downgrade_reason["text"]`, không phải `["code"]`** như 02b §3.4 ("chỉ ghi audit khi … `downgrade_reason["code"]` đổi"). Lý do: mọi lần chuyển Chủ đều dùng `code="AI_MISMATCH"` (chỉ `text` khác nhau), nên so `code` không bao giờ phát hiện lý do đổi và AC3 (số tiền giao dịch cập nhật → +1 audit) không thể đạt. `text` chính là "lý do".
+2. **SR-11-AC4 áp dụng cho cả nhánh tự khớp**: bộ lọc quét chuyển sang `match_status=UNMATCHED` cho toàn bộ job (theo 02b). Toàn bộ test DW-26 cũ dùng UNMATCHED nên vẫn xanh; nhánh `p.sales_order is not None → CONFIRM_ORDER` giờ hầu như không tới được (giao dịch UNMATCHED chưa gắn đơn) — không đổi vì nằm ngoài phạm vi.
+3. Số `escalated` trong dict kết quả job vẫn đếm cả ca no-op (việc đã đóng / cùng lý do); chỉ Nhật ký và trạng thái việc được bảo vệ. Không đụng tới vì không nằm trong AC.
+4. **SR-09: giá trị kết quả không nằm trong danh sách hợp lệ** (`"KHONG_CO"`) trên REFUND_CALL vẫn rơi xuống `400 INVALID_INPUT` (không phải 409) — chỉ 6 kết quả hợp lệ của `CustomerCall.Result` mới là "stale". Story nói "mọi kết quả khác" — hiểu là mọi kết quả hợp lệ khác.
+5. **SR-09 phiếu CANCELLED mà task không phải REFUND_CALL**: thông điệp/mã cũ `BR-GH-07 "Đơn đã huỷ." (400)` đổi thành 409 `STALE_STATE` theo 02b §3.2. Không có test cũ nào kiểm nhánh này (grep) nên không phải sửa assert.
+6. Story SR-09-AC4 ghi NOTIFIED/UNREACHABLE "200"; API thực tế (và test CS-09 cũ) trả **201** — giữ nguyên 201.
+7. SR-08-AC2: story ghi "đơn PAID"; sau `confirm_payment` đơn chuyển thẳng `PROCESSING` (có hoá đơn + phiếu giao). Test kiểm `status ∈ {PAID, PROCESSING}` + có giao dịch MATCHED + hoá đơn.
+8. `check_close_batch` (Lô 5, không được đụng) vẫn giữ nguyên câu truy vấn đơn mở inline; hàm `_open_orders_count(batch, statuses)` mới đã tách sẵn để Lô 5 gọi lại thay vì nhân đôi truy vấn.
+9. Chưa chạy thử với FE thật ở SR-09-AC4 (fe-dev làm song song); contract BE khớp mô tả FE (`{detail, code: "STALE_STATE"}`, 409).
+
+### Nợ / lưu ý cho QA
+- RA-05: việc AI `ESCALATED` vẫn chưa có đường để Chủ đóng (ngoài phạm vi); SR-11-AC2 kiểm bằng cách đặt trực tiếp trạng thái kết thúc trong test.
+- RA-03 (`advance_status` không khoá) không sửa (ngoài lô).
+- Tranh chấp thật `cancel_receipt` ∥ `publish_batch` (hai transaction song song, PostgreSQL) chưa chạy được ở đây (test dùng SQLite); logic khoá dựa vào cả hai phía cùng `select_for_update` trên dòng lô.

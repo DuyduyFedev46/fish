@@ -8,7 +8,10 @@ import {
   mockChangeRecipient,
   mockDecideCskh,
   MOCK_CSKH_ITEMS,
+  MOCK_STALE_ON_CALL_IDS,
 } from "./mock";
+import { isStaleStateError } from "./api";
+import { ApiError } from "@/shared/lib/http";
 import {
   mockGetDeliveryLabel,
   mockPostDeliveryLabelPrint,
@@ -23,6 +26,15 @@ describe("CSKH Feature Tests (CS-04, CS-05, CS-06, CS-11)", () => {
       item31.claimed_by = null;
       item31.claimed_until = null;
     }
+    const item36 = MOCK_CSKH_ITEMS.find((i) => i.note_id === 36);
+    if (item36) {
+      item36.note_status = "CONFIRMING";
+      item36.confirm_state = "PENDING";
+      item36.claimed_by = null;
+      item36.claimed_until = null;
+      item36.calls = [];
+    }
+    MOCK_STALE_ON_CALL_IDS.add(36);
     const item28 = MOCK_CSKH_ITEMS.find((i) => i.note_id === 28);
     if (item28) {
       item28.note_status = "CONFIRMING";
@@ -264,6 +276,57 @@ describe("CSKH Feature Tests (CS-04, CS-05, CS-06, CS-11)", () => {
         expect(res.body.confirm_state).toBeNull();
         expect(res.body.note_status).toBe("CANCELLED");
       }
+    });
+  });
+
+  describe("SR-09 (BR-GH-18): 409 STALE_STATE khi ghi cuộc gọi trên màn hình cũ", () => {
+    const stale = {
+      status: 409,
+      body: { code: "STALE_STATE", detail: "Đơn đã bị huỷ — tải lại màn hình." },
+    };
+
+    it("AC1/AC3b: job tự huỷ chạy trước, CSKH bấm 'Đã xác nhận' sau → 409 STALE_STATE, phiếu vẫn CANCELLED/REFUND_CALL", () => {
+      const res = mockRecordCskhCall({}, 36, { result: "CONFIRMED", note: "", request_id: "req-stale-1" });
+      expect(res).toEqual(stale);
+      const item = MOCK_CSKH_ITEMS.find((i) => i.note_id === 36)!;
+      expect(item.note_status).toBe("CANCELLED");
+      expect(item.confirm_state).toBe("REFUND_CALL");
+      expect(item.calls).toHaveLength(0);
+      // Sau khi tải lại: phiếu không còn ở hàng chờ mặc định, mà sang tab báo hoàn tiền.
+      expect(getMockCskhQueue().results.some((i) => i.note_id === 36)).toBe(false);
+      expect(getMockCskhQueue({ state: "REFUND_CALL" }).results.some((i) => i.note_id === 36)).toBe(true);
+    });
+
+    it.each(["CONFIRMED", "CALLBACK", "WRONG_NUMBER", "WANT_CHANGE", "WANT_CANCEL"] as const)(
+      "AC2: task REFUND_CALL không nhận kết quả %s → 409 STALE_STATE",
+      (result) => {
+        const res = mockRecordCskhCall({}, 27, {
+          result,
+          note: "",
+          callback_at: new Date(Date.now() + 3600_000).toISOString(),
+          request_id: `req-stale-${result}`,
+        });
+        expect(res).toEqual(stale);
+      }
+    );
+
+    it("AC2: task REFUND_CALL vẫn nhận UNREACHABLE và NOTIFIED", () => {
+      const r1 = mockRecordCskhCall({}, 27, { result: "UNREACHABLE", note: "", request_id: "req-ok-1" });
+      expect(r1.status).toBe(201);
+      const r2 = mockRecordCskhCall({}, 27, { result: "NOTIFIED", note: "", request_id: "req-ok-2" });
+      expect(r2.status).toBe(201);
+    });
+
+    it("luồng thuận: phiếu CONFIRMING khác (không bị job huỷ) vẫn xác nhận 201", () => {
+      const res = mockRecordCskhCall({}, 31, { result: "CONFIRMED", note: "", request_id: "req-ok-3" });
+      expect(res.status).toBe(201);
+    });
+
+    it("isStaleStateError chỉ nhận ApiError 409 mã STALE_STATE", () => {
+      expect(isStaleStateError(new ApiError("x", 409, "STALE_STATE"))).toBe(true);
+      expect(isStaleStateError(new ApiError("x", 409, "CLAIMED"))).toBe(false);
+      expect(isStaleStateError(new ApiError("x", 400, "STALE_STATE"))).toBe(false);
+      expect(isStaleStateError(new Error("x"))).toBe(false);
     });
   });
 

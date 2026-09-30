@@ -1,11 +1,12 @@
 "use client";
 
-import React, { useState, useEffect, useId } from "react";
+import React, { useState, useEffect, useId, useRef } from "react";
 import { useRouter } from "next/navigation";
 import {
   claimCskhTask,
   fetchCskhDetail,
   recordCskhCall,
+  isStaleStateError,
   unconfirmDelivery,
   changeRecipient,
   decideCskh,
@@ -36,6 +37,8 @@ export function CskhCallModal({ noteId, initialItem, onClose, onUpdated }: Props
   const [lockWarning, setLockWarning] = useState<string | null>(null);
   const [isLockedByOther, setIsLockedByOther] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  // SR-09-AC4: 409 STALE_STATE — màn hình đã cũ (đơn/phiếu đổi trạng thái sau khi mở). Hiện `detail` + nút Tải lại.
+  const [staleMessage, setStaleMessage] = useState<string | null>(null);
 
   // Form states
   const [selectedResult, setSelectedResult] = useState<CallResult | null>(null);
@@ -110,12 +113,27 @@ export function CskhCallModal({ noteId, initialItem, onClose, onUpdated }: Props
     };
   }, [noteId]);
 
+  // Trên mobile nút kết quả nằm dưới màn, cảnh báo nằm đầu thân modal: cuộn cho người dùng thấy ngay (a11y: role="alert").
+  const staleRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (staleMessage) staleRef.current?.scrollIntoView({ block: "nearest" });
+  }, [staleMessage]);
+
+  const actionsBlocked = isLockedByOther || staleMessage !== null;
+
+  // Tải lại: nạp lại hàng chờ (onUpdated) rồi đóng modal — phiếu đã rời hàng chờ hoặc sang việc "báo hoàn tiền".
+  const handleReloadAfterStale = () => {
+    setStaleMessage(null);
+    onUpdated();
+    onClose();
+  };
+
   // BR-GH-19 Validation: no >= 9 digits in note
   const cleanDigits = callNote.replace(/[\s.\-]/g, "");
   const hasForbiddenPii = /\d{9,}/.test(cleanDigits);
 
   const handleRecordCall = async (result: CallResult) => {
-    if (isLockedByOther) return;
+    if (actionsBlocked) return;
     if (hasForbiddenPii) {
       setError("BR-GH-19: Không được ghi SĐT hoặc số tài khoản vào ghi chú.");
       return;
@@ -141,6 +159,11 @@ export function CskhCallModal({ noteId, initialItem, onClose, onUpdated }: Props
       onUpdated();
       onClose();
     } catch (err: unknown) {
+      if (isStaleStateError(err)) {
+        setStaleMessage(err.message || "Đơn đã bị huỷ — tải lại màn hình.");
+        setSubmitting(false);
+        return;
+      }
       const msg = err instanceof Error ? err.message : "Đã có lỗi xảy ra.";
       setError(msg);
       setSubmitting(false);
@@ -282,6 +305,15 @@ export function CskhCallModal({ noteId, initialItem, onClose, onUpdated }: Props
           {notice && (
             <div className={`${s.alertBox} ${s.alertWarn}`} style={{ background: "#fffbeb", borderColor: "#fde68a", color: "#92400e" }}>
               ⚠️ {notice}
+            </div>
+          )}
+
+          {staleMessage && (
+            <div className={`${s.alertBox} ${s.alertError} ${s.staleBox}`} role="alert" data-testid="cskh-stale-alert" ref={staleRef}>
+              <span>{staleMessage}</span>
+              <button type="button" className={s.btnPrimary} onClick={handleReloadAfterStale}>
+                Tải lại
+              </button>
             </div>
           )}
 
@@ -661,7 +693,7 @@ export function CskhCallModal({ noteId, initialItem, onClose, onUpdated }: Props
                   onChange={(e) => setCallNote(e.target.value)}
                   placeholder="Ghi chú ngắn (VD: Giao sau 17h, giao cửa sau... Không ghi SĐT/STK)"
                   maxLength={200}
-                  disabled={isLockedByOther}
+                  disabled={actionsBlocked}
                 />
                 <div className={s.noteCharCount}>
                   <span>
@@ -700,7 +732,7 @@ export function CskhCallModal({ noteId, initialItem, onClose, onUpdated }: Props
                       type="button"
                       className={s.btnPrimary}
                       onClick={() => handleRecordCall("CALLBACK")}
-                      disabled={!callbackTime || submitting || hasForbiddenPii}
+                      disabled={!callbackTime || submitting || actionsBlocked || hasForbiddenPii}
                     >
                       Lưu hẹn gọi lại
                     </button>
@@ -717,18 +749,18 @@ export function CskhCallModal({ noteId, initialItem, onClose, onUpdated }: Props
                     <>
                       <button
                         type="button"
-                        className={`${s.resultBtn} ${s.resultBtnConfirmed} ${isLockedByOther ? s.resultBtnDisabled : ""}`}
+                        className={`${s.resultBtn} ${s.resultBtnConfirmed} ${actionsBlocked ? s.resultBtnDisabled : ""}`}
                         onClick={() => handleRecordCall("NOTIFIED")}
-                        disabled={submitting || isLockedByOther || hasForbiddenPii}
+                        disabled={submitting || actionsBlocked || hasForbiddenPii}
                       >
                         <div>Đã báo hoàn tiền</div>
                         <div className={s.resultBtnSub}>Đã báo khách lý do huỷ và số tiền hoàn</div>
                       </button>
                       <button
                         type="button"
-                        className={`${s.resultBtn} ${s.resultBtnUnreachable} ${isLockedByOther ? s.resultBtnDisabled : ""}`}
+                        className={`${s.resultBtn} ${s.resultBtnUnreachable} ${actionsBlocked ? s.resultBtnDisabled : ""}`}
                         onClick={() => handleRecordCall("UNREACHABLE")}
-                        disabled={submitting || isLockedByOther || hasForbiddenPii}
+                        disabled={submitting || actionsBlocked || hasForbiddenPii}
                       >
                         <div>Chưa liên lạc được</div>
                         <div className={s.resultBtnSub}>Không nghe máy, bận, thuê bao...</div>
@@ -753,9 +785,9 @@ export function CskhCallModal({ noteId, initialItem, onClose, onUpdated }: Props
                               : isUnreachable
                               ? s.resultBtnUnreachable
                               : ""
-                          } ${isLockedByOther ? s.resultBtnDisabled : ""}`}
+                          } ${actionsBlocked ? s.resultBtnDisabled : ""}`}
                           onClick={() => handleRecordCall(opt.value)}
-                          disabled={submitting || isLockedByOther || hasForbiddenPii}
+                          disabled={submitting || actionsBlocked || hasForbiddenPii}
                         >
                           <div>{opt.label}</div>
                           <div className={s.resultBtnSub}>{opt.hint}</div>

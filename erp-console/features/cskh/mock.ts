@@ -243,7 +243,54 @@ export const MOCK_CSKH_ITEMS: CskhQueueDetail[] = [
     ],
     guidance: "Không ghi số tài khoản khách vào hệ thống. Chủ sẽ lấy số tài khoản trực tiếp từ khách khi chuyển khoản.",
   },
+  {
+    // SR-09-AC4: phiếu "tự huỷ giữa chừng". Mở màn gọi lúc còn CONFIRMING; ngay khi bấm ghi cuộc gọi, mock mô phỏng job
+    // `auto_cancel_overdue` đã chạy trước (đơn + phiếu CANCELLED, task REFUND_CALL) nên trả 409 STALE_STATE như BE thật.
+    note_id: 36,
+    order_id: 136,
+    order_code: "DH-260928-0036",
+    note_status: "CONFIRMING",
+    paid_at: "2026-09-28T06:00:00+07:00",
+    confirm_state: "PENDING",
+    escalation_reason: null,
+    escalation_label: null,
+    attempts: 0,
+    max_attempts: 3,
+    next_call_after: null,
+    window_ends_at: null,
+    callback_at: null,
+    escalated_at: null,
+    decide_deadline: null,
+    auto_cancel_blocked: null,
+    claimed_by: null,
+    claimed_until: null,
+    lines_summary: "Cá thu 2,000 kg",
+    total_kg: "2.000",
+    total_amount: "360000",
+    in_scope: true,
+    customer_name: "Khách Thử G",
+    phone: "0900000777",
+    address: "Số 7 Đường Thử, Quy Nhơn",
+    recipient_name: null,
+    recipient_phone: null,
+    calls: [],
+    available_actions: [
+      "claim",
+      "call:CONFIRMED",
+      "call:UNREACHABLE",
+      "call:WRONG_NUMBER",
+      "call:CALLBACK",
+      "call:WANT_CHANGE",
+      "call:WANT_CANCEL",
+      "change_recipient",
+    ],
+    guidance: null,
+  },
 ];
+
+/** Phiếu mock sẽ bị "job tự huỷ" chạy trước ở lần ghi cuộc gọi đầu tiên (SR-09-AC4). */
+export const MOCK_STALE_ON_CALL_IDS = new Set<number>([36]);
+export const STALE_STATE_DETAIL = "Đơn đã bị huỷ — tải lại màn hình.";
 
 export function getMockCskhQueue(params?: { state?: string; page?: number }): CskhQueueResponse {
   let list = [...MOCK_CSKH_ITEMS];
@@ -279,9 +326,11 @@ export function getMockCskhQueue(params?: { state?: string; page?: number }): Cs
 export function mockGetCskhQueue(req: any): { status: number; body: CskhQueueResponse } {
   let state: string | undefined;
   let page: number | undefined;
-  if (req?.url) {
+  // MockRequest của apiFetch có `path` (kèm query), không có `url` — trước đây `state` không bao giờ được đọc.
+  const rawUrl: string | undefined = req?.url ?? req?.path;
+  if (rawUrl) {
     try {
-      const u = new URL(req.url, "http://localhost");
+      const u = new URL(rawUrl, "http://localhost");
       state = u.searchParams.get("state") || undefined;
       const p = u.searchParams.get("page");
       if (p) page = parseInt(p, 10);
@@ -356,8 +405,23 @@ export function mockRecordCskhCall(
     return { status: 404, body: { code: "NOT_FOUND", detail: "Không tìm thấy phiếu." } };
   }
 
-  if (item.note_status === "CANCELLED" && item.confirm_state !== "REFUND_CALL") {
-    return { status: 400, body: { code: "BR-GH-07", detail: "Đơn đã huỷ." } };
+  // Mô phỏng job tự huỷ chạy giữa lúc CSKH mở màn và lúc bấm (SR-09 AC3b).
+  if (MOCK_STALE_ON_CALL_IDS.has(noteId) && item.note_status === "CONFIRMING") {
+    MOCK_STALE_ON_CALL_IDS.delete(noteId);
+    item.note_status = "CANCELLED";
+    item.confirm_state = "REFUND_CALL";
+    item.escalation_reason = "UNREACHABLE";
+    item.escalation_label = "Không nghe máy";
+    item.available_actions = ["claim", "call:NOTIFIED", "call:UNREACHABLE"];
+  }
+
+  // SR-09 AC1/AC2/02b §3.2: như BE — phiếu đã huỷ mà không phải việc báo hoàn tiền, hoặc việc báo hoàn tiền mà kết quả
+  // không phải UNREACHABLE/NOTIFIED → 409 STALE_STATE (màn hình cũ).
+  if (item.note_status === "CANCELLED") {
+    const refundOnly = item.confirm_state === "REFUND_CALL";
+    if (!refundOnly || (payload.result !== "UNREACHABLE" && payload.result !== "NOTIFIED")) {
+      return { status: 409, body: { code: "STALE_STATE", detail: STALE_STATE_DETAIL } };
+    }
   }
 
   // Validate note for BR-GH-19: no >= 9 digits

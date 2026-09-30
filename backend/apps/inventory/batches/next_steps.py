@@ -20,7 +20,7 @@ from apps.common.guidance.api import register_guidance
 from apps.common.guidance.reasons import get_reason
 from apps.common.guidance.steps import Missing, NextStep, Why, step_to_dict
 from apps.common.guidance.timeline import format_guidance_timeline
-from apps.inventory.batches.services import check_close_batch
+from apps.inventory.batches.services import check_cancel_expired_batch, check_close_batch
 from apps.inventory.batches.timeline import build_batch_timeline
 from apps.inventory.models import Batch
 
@@ -92,14 +92,15 @@ def get_batch_next_steps(batch: Batch, user: Any) -> list[NextStep]:
     if batch.status == Batch.Status.EXPIRED:
         can_cancel = user.has_perm("inventory.cancel_expired_batch")
         missing_perm = [] if can_cancel else [Missing("BR-PQ-12", get_reason("BR-PQ-12"))]
+        missing_biz = check_cancel_expired_batch(batch)  # SR-08: BR-LO-07 còn giữ chỗ
         steps.append(
             NextStep(
                 key="cancel_expired",
                 label="Huỷ lô",
                 actor="user",
-                allowed=can_cancel,
+                allowed=can_cancel and not missing_biz,
                 who=["Chủ"],
-                missing=missing_perm,
+                missing=missing_biz + missing_perm,
                 deadline=None,
                 why=Why("BR-LO-03", get_reason("BR-LO-03")),
                 command="inventory.batch.cancel_expired",
