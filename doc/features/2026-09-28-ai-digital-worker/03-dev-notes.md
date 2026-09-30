@@ -849,3 +849,8 @@
     ```
 
 
+
+## Đính chính sau P8 Lô 7 (30/09, điều phối)
+- DW-11-AC5: `nv_giao` confirm/reject việc của người khác nay trả **404** (không phải 403) theo P8 SR-22 BM-05 — không lộ việc có tồn tại. Test cũ đổi setup, giữ ý kiểm 403 về quyền lệnh.
+- DW-19-AC10: hoàn tác/huỷ lịch khi `AI_ENABLED=false` nay **được phép** (P8 SR-22 F10), test đổi tên `..._still_allowed`.
+- V-DW1 (02c dòng 27) đã đính chính: công tắc DW-26 mở ở staging `AI_PRODUCTION_READY=1`, production `0`.

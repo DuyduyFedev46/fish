@@ -87,14 +87,20 @@ export function mockExpiredOpenCount(): number {
   return state().filter((l) => l.status === "EXPIRED" && l.qty_available > 0).length;
 }
 
+const STATUS_LABEL: Record<MockLot["status"], string> = { EXPIRED: "Quá hạn", CANCELLED: "Đã huỷ", CLOSED: "Đã chốt" };
+
 function toApiRow(l: MockLot, canCost: boolean): BatchApiRow {
   const row: BatchApiRow = {
     id: l.id,
     batch_id: l.batch_id,
     item: l.id,
     item_code: l.item_code,
+    item_name: l.item,
     supplier: l.id,
+    supplier_name: l.supplier,
     warehouse: 1,
+    warehouse_name: l.warehouse,
+    status_label: STATUS_LABEL[l.status],
     received_date: isoDay(l.received_days_ago),
     expiry_date: isoDay(l.expired_days_ago),
     qty_available: dec3(l.qty_available),
@@ -110,8 +116,12 @@ export function mockBatchList(req: MockRequest): MockResponse {
   const me = mockRequireUser(req);
   if (!me) return MOCK_UNAUTHORIZED;
   if (!me.permissions.includes("inventory.view_batch") && !me.permissions.includes("reports.view_dashboard")) return FORBIDDEN;
-  const status = new URLSearchParams(req.path.split("?")[1] || "").get("status");
-  const rows = state().filter((l) => !status || l.status === status).map((l) => toApiRow(l, me.can_view_cost));
+  const q = new URLSearchParams(req.path.split("?")[1] || "");
+  const status = q.get("status");
+  const hasStock = q.get("has_stock") === "1"; // như BE: chỉ lô còn tồn (qty_available > 0)
+  const rows = state()
+    .filter((l) => (!status || l.status === status) && (!hasStock || l.qty_available > 0))
+    .map((l) => toApiRow(l, me.can_view_cost));
   return { status: 200, body: { count: rows.length, next: null, previous: null, results: rows } };
 }
 

@@ -40,7 +40,7 @@ export function filterBatches(rows: BatchRow[], q: string): BatchRow[] {
 
 // ---- Danh sách lô lọc theo trạng thái (link từ thẻ "Lô quá hạn còn tồn" ở Tổng quan) ----
 
-/** Nhãn trạng thái lô (BE `get_status_display`); danh sách GET /api/inventory/batches/ không kèm `status_label`. */
+/** Nhãn trạng thái lô dự phòng (BE `get_status_display`) khi response không kèm `status_label`; cũng dùng cho tiêu đề chế độ lọc. */
 const BATCH_STATUS_LABEL: Record<string, string> = {
   DRAFT: "Nháp",
   SELLING: "Đang bán",
@@ -60,31 +60,31 @@ export function batchesByStatusKey(userId: number, status: string): string {
 }
 
 /**
- * GET /api/inventory/batches/?status=… — DANH SÁCH PHÂN TRANG DRF ({count,next,previous,results}), chỉ lấy trang đầu (50 dòng).
- * BatchSerializer trả `item`/`supplier`/`warehouse` là id (không có tên) nên mặt hàng hiện bằng `item_code`, cột NCC/Kho bỏ.
- * Lô EXPIRED chỉ giữ lô còn tồn (khớp con số ở thẻ Cần chú ý `expired_batches_open`).
+ * GET /api/inventory/batches/?status=…[&has_stock=1] — DANH SÁCH PHÂN TRANG DRF ({count,next,previous,results}), chỉ lấy trang đầu (50 dòng).
+ * BE trả sẵn `item_name`, `supplier_name`, `warehouse_name`, `status_label` (P8 Lô 7 / L5-1) nên bảng hiện đủ cột NCC/Kho.
+ * Lô EXPIRED lọc còn tồn ngay ở BE bằng `has_stock=1` (khớp con số ở thẻ Cần chú ý `expired_batches_open`), FE không lọc lại.
  */
 export async function getBatchesByStatus(
   status: string,
   viewer: { username: string; can_cost: boolean }
 ): Promise<InventoryData> {
-  const res = await apiFetch<Paginated<BatchApiRow>>(`/api/inventory/batches/?status=${encodeURIComponent(status)}`, {
+  const qs = `status=${encodeURIComponent(status)}${status === "EXPIRED" ? "&has_stock=1" : ""}`;
+  const res = await apiFetch<Paginated<BatchApiRow>>(`/api/inventory/batches/?${qs}`, {
     mock: process.env.NEXT_PUBLIC_USE_MOCK === "1" ? mockBatchList : undefined,
   });
   const batches: BatchRow[] = res.results
-    .filter((b) => status !== "EXPIRED" || Number(b.qty_available) > 0)
     .map((b) => {
       const row: BatchRow = {
         batch_id: b.batch_id,
-        item: b.item_code,
-        warehouse: "",
-        supplier: "",
+        item: b.item_name || b.item_code,
+        warehouse: b.warehouse_name ?? "",
+        supplier: b.supplier_name ?? "",
         qty_available: Number(b.qty_available),
         qty_reserved: Number(b.qty_reserved),
         received_date: b.received_date,
         expiry_date: b.expiry_date,
         status: b.status as BatchStatus,
-        status_label: batchStatusLabel(b.status),
+        status_label: b.status_label || batchStatusLabel(b.status),
         near_expiry: false,
       };
       if (viewer.can_cost && b.landed_unit_cost != null) row.unit_cost = Number(b.landed_unit_cost);

@@ -1,9 +1,11 @@
 """
 Nghiệp vụ duyệt, từ chối hành động AI (02b §4.4, §4.5, DW-11).
 """
+import dataclasses
 import datetime
 from django.conf import settings
 from django.db import transaction
+from django.db.models import Q
 from django.utils import timezone
 
 from apps.common.audit import record_audit, set_ai_audit_scope
@@ -11,6 +13,20 @@ from apps.common.exceptions import BusinessError
 from apps.ai.execution.dispatch import dispatch_command
 from apps.ai.models import AiAction
 from apps.ai.registry.discovery import get_registry
+
+
+def visible_actions_for(user):
+    """
+    Phạm vi việc AI mà `user` được thấy/quyết định (P8 SR-22 / BM-05). Cùng luật với `retrieve`:
+    chủ việc, hoặc việc ESCALATED cho đúng nhóm của mình, hoặc có `ai.manage_ai_policy` (thấy hết).
+    Ngoài phạm vi -> caller trả 404 (không lộ việc có tồn tại).
+    """
+    if user.has_perm("ai.manage_ai_policy"):
+        return AiAction.objects.all()
+    user_groups = set(user.groups.values_list("name", flat=True))
+    return AiAction.objects.filter(
+        Q(owner=user) | Q(status=AiAction.Status.ESCALATED, assignee_group__in=user_groups)
+    )
 
 
 @transaction.atomic
@@ -30,8 +46,9 @@ def confirm_ai_action(*, action_id: str, user, confirm_nonce: str | None = None,
         raise BusinessError("Hệ thống AI đang tắt.", code="AI_DISABLED", status_code=410)
 
     # 2. Lấy AiAction có khoá select_for_update
+    # BM-05: cùng bộ lọc với retrieve; ngoài phạm vi -> 404, trạng thái không đổi.
     action = (
-        AiAction.objects.select_for_update()
+        visible_actions_for(user).select_for_update()
         .filter(id=action_id)
         .first()
     )
@@ -142,8 +159,9 @@ def reject_ai_action(*, action_id: str, user, reason_code: str = "", request=Non
     Từ chối một đề xuất AI (DW-11-AC4).
     Chứng từ không đổi, AiAction -> REJECTED, ghi AuditLog.
     """
+    # BM-05: cùng bộ lọc với retrieve; ngoài phạm vi -> 404, trạng thái không đổi.
     action = (
-        AiAction.objects.select_for_update()
+        visible_actions_for(user).select_for_update()
         .filter(id=action_id)
         .first()
     )
@@ -173,10 +191,11 @@ def reject_ai_action(*, action_id: str, user, reason_code: str = "", request=Non
 def undo_ai_action(*, action_id: str, user, request=None) -> dict:
     """
     Hoàn tác hành động AI mức B (DW-19, DW-21).
-    """
-    if not getattr(settings, "AI_ENABLED", False):
-        raise BusinessError("Hệ thống AI đang tắt.", code="AI_DISABLED", status_code=410)
 
+    P8 SR-22 / F10: hoàn tác là rút lại việc AI đã làm nên vẫn cho phép khi AI_ENABLED=false
+    (không còn 410 AI_DISABLED). Hành động huỷ lấy từ `undo="cancel_action:<act>"` của lệnh; không có
+    đường hoàn tác thì 400 AI_CANNOT_UNDO, không được đánh dấu UNDONE khi chưa làm gì.
+    """
     action = (
         AiAction.objects.select_for_update()
         .filter(id=action_id)
@@ -218,6 +237,12 @@ def undo_ai_action(*, action_id: str, user, request=None) -> dict:
 
         spec = get_registry().get(action.command)
         undo_attr = getattr(spec, "undo", "") or ""
+        cancel_act = undo_attr.split(":", 1)[1].strip() if undo_attr.startswith("cancel_action:") else ""
+        view_cls = getattr(spec, "view_cls", None)
+        if not cancel_act or view_cls is None or not hasattr(view_cls, cancel_act):
+            raise BusinessError(
+                "Hành động này không có cách hoàn tác tự động.", code="AI_CANNOT_UNDO", status_code=400
+            )
 
         # Tìm target_id
         target_id = None
@@ -226,17 +251,22 @@ def undo_ai_action(*, action_id: str, user, request=None) -> dict:
         if not target_id:
             target_id = action.target_id
 
-        if undo_attr.startswith("cancel_action:") or "nhap_lo" in action.command:
-            from apps.purchasing.models import PurchaseReceipt
-            from apps.purchasing.receipts.services import cancel_receipt
-
-            try:
-                receipt = PurchaseReceipt.objects.get(pk=target_id)
-            except PurchaseReceipt.DoesNotExist:
-                raise BusinessError("Không tìm thấy chứng từ cần huỷ.", code="NOT_FOUND", status_code=404)
-
-            # Gọi cancel_receipt: nếu lô đã publish hoặc có hoá đơn, sẽ raise BusinessError (DW-19-AC4)
-            cancel_receipt(receipt=receipt, actor=user)
+        # Gọi đúng action huỷ khai báo trên lệnh (không mặc định huỷ phiếu nhập). Quyền 3 tầng do chính
+        # view của action huỷ kiểm tra theo người hoàn tác; lỗi nghiệp vụ (vd BR-MH-07) giữ nguyên mã.
+        undo_spec = dataclasses.replace(
+            spec, action=cancel_act, method="POST", detail=True, required_perms=()
+        )
+        result = dispatch_command(
+            undo_spec, user=user, args={}, target_id=str(target_id) if target_id is not None else None,
+            request_origin=request,
+        )
+        if result.is_error:
+            data = result.data if isinstance(result.data, dict) else {}
+            raise BusinessError(
+                str(data.get("detail") or "Không hoàn tác được hành động này."),
+                code=str(data.get("code") or "AI_CANNOT_UNDO"),
+                status_code=result.status_code or 400,
+            )
 
         action.status = AiAction.Status.UNDONE
         action.decided_by = user

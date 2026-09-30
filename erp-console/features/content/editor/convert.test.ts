@@ -1,30 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { bodyToTiptap, safeHref, tiptapToBody } from "./convert";
+import { bodyToTiptap, tiptapToBody } from "./convert";
 import type { BodyDoc } from "../types";
-
-describe("safeHref", () => {
-  it("chấp nhận link hợp lệ https, http, mailto, tel", () => {
-    expect(safeHref("https://caveve.vn/shop")).toBe(true);
-    expect(safeHref("http://example.com/item")).toBe(true);
-    expect(safeHref("mailto:support@caveve.vn")).toBe(true);
-    expect(safeHref("tel:0901234567")).toBe(true);
-  });
-
-  it("chấp nhận đường dẫn nội bộ hợp lệ", () => {
-    expect(safeHref("/shop")).toBe(true);
-    expect(safeHref("/bai-viet?slug=ca-thu")).toBe(true);
-  });
-
-  it("từ chối href nguy hiểm javascript, vbscript, data, relative protocol", () => {
-    expect(safeHref("javascript:alert(1)")).toBe(false);
-    expect(safeHref("JAVASCRIPT:alert(1)")).toBe(false);
-    expect(safeHref(" vbscript:msgbox(1)")).toBe(false);
-    expect(safeHref("data:text/html;base64,PHNjcmlwdD5...==")).toBe(false);
-    expect(safeHref("//evil.example/phish")).toBe(false);
-    expect(safeHref("/\\evil.example")).toBe(false);
-    expect(safeHref("java\tscript:alert(1)")).toBe(false);
-  });
-});
 
 describe("convert between tiptap and BodyDoc", () => {
   it("CMS-03-AC5: Chuyển đổi tiptap có các block không hợp lệ -> tự động loại bỏ", () => {

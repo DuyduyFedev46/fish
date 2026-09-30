@@ -346,7 +346,8 @@ class AiCommandCallView(APIView):
 
             # 2. Kiểm tra hạn mức ngày (DW-19-AC5, DW-25 Q-M10)
             if not downgrade_reason and current_level == "B":
-                today_start = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
+                # P8 F07: đầu ngày theo giờ VN (Asia/Ho_Chi_Minh), không phải 00:00 UTC.
+                today_start = timezone.localtime().replace(hour=0, minute=0, second=0, microsecond=0)
                 daily_count = AiAction.objects.filter(
                     owner=request.user,
                     kind=AiAction.Kind.WRITE,

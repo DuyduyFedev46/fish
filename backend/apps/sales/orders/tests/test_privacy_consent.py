@@ -18,7 +18,7 @@ from apps.inventory.batches import services as batch_services
 from apps.inventory.models import Batch, Warehouse
 from apps.purchasing.models import Supplier
 from apps.sales.models import SalesOrder, SalesOrderLine, SalesOrderLineBatch
-from config.settings import _bool
+from config.settings import privacy_consent_required
 
 User = get_user_model()
 
@@ -286,5 +286,5 @@ class PrivacyConsentTests(TestCase):
         self.assertEqual(order.privacy_policy_version, orig_version)
 
     def test_settings_privacy_consent_required_outside_testing_and_debug(self):
-        val = _bool("PRIVACY_CONSENT_REQUIRED", "0" if (False or False) else "1")
-        self.assertTrue(val)
+        # P8 Lô 7 F5(a): gọi hàm thật của settings (không sao chép công thức vào test).
+        self.assertTrue(privacy_consent_required(False, False, {}))

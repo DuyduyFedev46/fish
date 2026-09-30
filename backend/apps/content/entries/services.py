@@ -360,6 +360,44 @@ def compute_description(entry: Entry) -> str:
     return truncated
 
 
+def _own_cover(entry: Entry, ver: EntryVersion):
+    """Ảnh bìa của phiên bản chỉ được nạp lại nếu thuộc chính bài này; dữ liệu cũ trỏ ảnh bài khác -> None (BR-ND-07)."""
+    cover = ver.cover_image
+    if cover is not None and cover.entry_id != entry.pk:
+        return None
+    return cover
+
+
+def _draft_hash_after_load(entry: Entry, ver: EntryVersion, cover) -> str:
+    """Giữ nguyên hash của phiên bản nếu bìa không đổi; bìa bị bỏ thì tính lại để hash khớp nội dung nháp."""
+    if cover is ver.cover_image:
+        return ver.content_hash
+    return calculate_content_hash(
+        kind=ver.kind,
+        title=ver.title,
+        slug=ver.slug,
+        excerpt=ver.excerpt,
+        seo_title=ver.seo_title,
+        seo_description=ver.seo_description,
+        category_id=ver.category_id,
+        cover_image_id=cover.pk if cover else None,
+        body=ver.body,
+    )
+
+
+def _assert_images_belong_to_entry(entry: Entry) -> None:
+    """Kiểm lại trước khi đăng: ảnh bìa và mọi khối ảnh phải thuộc chính bài này (BR-ND-07)."""
+    if entry.cover_image_id and entry.cover_image.entry_id != entry.pk:
+        raise BusinessError("Ảnh bìa không thuộc bài viết này (BR-ND-07).", code="BR-ND-07")
+    blocks = entry.body.get("blocks", []) if isinstance(entry.body, dict) else []
+    ids = {b.get("image_id") for b in blocks if isinstance(b, dict) and b.get("type") == "image"}
+    ids = {i for i in ids if isinstance(i, int) and not isinstance(i, bool)}
+    if ids:
+        own = set(ContentImage.objects.filter(pk__in=ids, entry_id=entry.pk).values_list("pk", flat=True))
+        if ids - own:
+            raise BusinessError("Ảnh trong bài không thuộc bài viết này (BR-ND-07).", code="BR-ND-07")
+
+
 def publish_entry(
     *,
     entry: Entry,
@@ -402,6 +440,9 @@ def publish_entry(
             and entry.draft_hash == entry.published_version.content_hash
         ):
             raise BusinessError("Không có thay đổi để đăng (BR-ND-05).", code="BR-ND-05")
+
+        # 2b. P8 L6-1: ảnh bìa và khối ảnh phải thuộc chính bài (BR-ND-07), kể cả dữ liệu cũ.
+        _assert_images_belong_to_entry(entry)
 
         # 3. Thiếu điều kiện đăng (CMS-07-AC3, BR-ND-03)
         missing = missing_fields(entry)
@@ -714,10 +755,11 @@ def restore_entry_version(
         entry.seo_title = ver.seo_title
         entry.seo_description = ver.seo_description
         entry.category = ver.category
-        entry.cover_image = ver.cover_image
+        cover = _own_cover(entry, ver)  # P8 L6-1
+        entry.cover_image = cover
         entry.body = ver.body
         entry.restored_from = version_no
-        entry.draft_hash = ver.content_hash
+        entry.draft_hash = _draft_hash_after_load(entry, ver, cover)
         entry.row_version += 1
         entry.updated_by = actor
         entry.save(update_fields=[
@@ -850,10 +892,11 @@ def discard_changes(*, entry: Entry, actor: Any, row_version: int) -> dict[str, 
         entry.seo_title = ver.seo_title
         entry.seo_description = ver.seo_description
         entry.category = ver.category
-        entry.cover_image = ver.cover_image
+        cover = _own_cover(entry, ver)  # P8 L6-1
+        entry.cover_image = cover
         entry.body = ver.body
         entry.restored_from = None
-        entry.draft_hash = ver.content_hash
+        entry.draft_hash = _draft_hash_after_load(entry, ver, cover)
         entry.row_version += 1
         entry.updated_by = actor
         entry.save(update_fields=[

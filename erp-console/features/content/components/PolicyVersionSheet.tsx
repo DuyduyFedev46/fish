@@ -11,7 +11,7 @@ import { ErrorBox, Loading } from "@/shared/ui/StateBox";
 import { Icon } from "@/shared/ui/Icon";
 import { SideSheet } from "@/shared/ui/SideSheet";
 import { getEntryVersion } from "../api";
-import { safeHref } from "../editor/convert";
+import { isSafeHref } from "../editor/safeHref";
 import type { Block, ContentEntryVersionDetail, InlineNode } from "../types";
 import s from "./policy-version.module.css";
 
@@ -43,7 +43,7 @@ function Inline({ nodes }: { nodes: InlineNode[] }) {
         let el: React.ReactNode = n.text;
         if (n.marks?.includes("bold")) el = <strong>{el}</strong>;
         if (n.marks?.includes("italic")) el = <em>{el}</em>;
-        if (n.href && safeHref(n.href)) {
+        if (n.href && isSafeHref(n.href)) {
           el = (
             <a href={n.href} target="_blank" rel="noopener noreferrer">
               {el}

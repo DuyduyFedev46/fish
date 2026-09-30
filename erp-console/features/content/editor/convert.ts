@@ -1,36 +1,5 @@
 import type { Block, BodyDoc, InlineNode } from "../types";
-
-/**
- * Kiểm tra href an toàn theo §6.1 / §6.2 02b-tech-design.
- * Chặn javascript:, data:, vbscript:, //evil.example, /\\evil.example.
- */
-export function safeHref(href: string): boolean {
-  if (!href || typeof href !== "string") return false;
-  const clean = href.trim();
-  if (!clean || clean.length > 2000) return false;
-
-  // Chặn khoảng trắng hoặc ký tự điều khiển
-  for (let i = 0; i < clean.length; i++) {
-    const code = clean.charCodeAt(i);
-    if (code <= 32 || code === 127) return false;
-  }
-
-  // Đường dẫn tương đối nội bộ
-  if (clean.startsWith("/")) {
-    if (clean.startsWith("//") || clean.startsWith("/\\")) return false;
-    if (clean.length > 1 && (clean[1] === "/" || clean[1] === "\\")) return false;
-    return true;
-  }
-
-  // URL có giao thức
-  try {
-    const parsed = new URL(clean, "https://caveve-validator.invalid");
-    const proto = parsed.protocol.toLowerCase();
-    return ["https:", "http:", "mailto:", "tel:"].includes(proto);
-  } catch {
-    return false;
-  }
-}
+import { isSafeHref } from "./safeHref";
 
 function inlinesFromTiptap(contentNodes: any[] = []): InlineNode[] {
   const result: InlineNode[] = [];
@@ -50,7 +19,7 @@ function inlinesFromTiptap(contentNodes: any[] = []): InlineNode[] {
           validMarks.push("italic");
         } else if (m.type === "link" && m.attrs?.href) {
           const candidate = String(m.attrs.href).trim();
-          if (safeHref(candidate)) {
+          if (isSafeHref(candidate)) {
             href = candidate;
           }
         }
@@ -72,7 +41,7 @@ function inlinesToTiptap(children: InlineNode[] = []): any[] {
     const marks: any[] = [];
     if (child.marks?.includes("bold")) marks.push({ type: "bold" });
     if (child.marks?.includes("italic")) marks.push({ type: "italic" });
-    if (child.href && safeHref(child.href)) {
+    if (child.href && isSafeHref(child.href)) {
       marks.push({ type: "link", attrs: { href: child.href } });
     }
 

@@ -2,9 +2,16 @@
 // - Nháp lưu localStorage kèm id chủ nháp.
 // - Token hết hạn (401) → nháp GIỮ nguyên; đăng nhập lại cùng người → form mở lại đủ nội dung.
 // - Người khác đăng nhập trên cùng máy → purgeForeignDrafts() xoá sạch nháp của người trước.
-// - Đăng xuất chủ động → clearAllDrafts() (S46-AC1).
+// - Đăng xuất chủ động → clearAllDrafts() (S46-AC1) — gồm cả nháp Nhập lô (SR-07).
 
 const PREFIX = "cave_erp_draft:";
+
+/**
+ * Tiền tố khoá nháp form "Nhập lô" (SR-07): khoá mới `cave_draft_nhap_lo:<userId>` ở sessionStorage,
+ * khoá cũ `cave_draft_nhap_lo` (dùng chung, có giá mua) ở localStorage. Đăng xuất phải xoá tất cả.
+ * Khai ở đây (shared) để `auth` dọn được mà không import vào ruột `purchasing`.
+ */
+export const NHAP_LO_DRAFT_PREFIX = "cave_draft_nhap_lo";
 
 type Stored<T> = { owner: number; savedAt: string; data: T };
 
@@ -67,8 +74,31 @@ export function purgeForeignDrafts(owner: number): void {
   }
 }
 
-export function clearAllDrafts(): void {
-  const s = ls();
+function removeByPrefix(s: Storage | null, prefix: string): void {
   if (!s) return;
-  for (const k of draftKeys()) s.removeItem(k);
+  try {
+    const keys: string[] = [];
+    for (let i = 0; i < s.length; i++) {
+      const k = s.key(i);
+      if (k && k.startsWith(prefix)) keys.push(k);
+    }
+    for (const k of keys) s.removeItem(k);
+  } catch {
+    /* bỏ qua */
+  }
+}
+
+function ss(): Storage | null {
+  try {
+    return typeof window === "undefined" ? null : window.sessionStorage;
+  } catch {
+    return null;
+  }
+}
+
+/** Đăng xuất: xoá mọi nháp ERP (localStorage) và mọi nháp Nhập lô của mọi người (session + khoá cũ ở local). */
+export function clearAllDrafts(): void {
+  removeByPrefix(ls(), PREFIX);
+  removeByPrefix(ls(), NHAP_LO_DRAFT_PREFIX);
+  removeByPrefix(ss(), NHAP_LO_DRAFT_PREFIX);
 }

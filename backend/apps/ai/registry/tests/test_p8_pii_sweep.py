@@ -29,7 +29,14 @@ PII_NAME = "Khách Giả Bí Mật"
 PII_PHONE = "0900000123"
 PII_ADDR = "Số 1 Đường Giả"
 PII_PAYER = "NGUYEN VAN GIA"
-PII_STRINGS = (PII_NAME, PII_PHONE, PII_ADDR, PII_PAYER)
+PII_NAME_B = "Khách Giả B"          # khách của đơn thứ hai (P8 Lô 7 / SR-24, nợ Lô 2 L2)
+PII_PHONE_B = "0900000456"
+PII_RECIPIENT_NAME = "Người Nhận Giả C"  # tên người nhận trên phiếu giao (khác tên khách đặt)
+PII_RECIPIENT_PHONE = "0900000789"
+PII_STRINGS = (
+    PII_NAME, PII_PHONE, PII_ADDR, PII_PAYER,
+    PII_NAME_B, PII_PHONE_B, PII_RECIPIENT_NAME, PII_RECIPIENT_PHONE,
+)
 
 # Khoá bị coi là PII ở mọi đầu ra AI (02b §2.1): tập lọc hiện hành + nhánh khách/SĐT che.
 PII_KEYS = set(SCRUB_PII_KEYS) | {
@@ -89,8 +96,25 @@ class PiiSweepBase(TestCase):
         self.order.refresh_from_db()
         # Đơn thứ hai chưa thanh toán (giữ chỗ) để có dữ liệu ở nhiều trạng thái.
         self.order2 = order_services.create_order(
-            customer_phone="0900000456", customer_name="Khách Giả B", delivery_address=PII_ADDR,
-            phone="0900000456", lines=[{"item_code": self.item.code, "qty": Decimal("1")}],
+            customer_phone=PII_PHONE_B, customer_name=PII_NAME_B, delivery_address=PII_ADDR,
+            phone=PII_PHONE_B, lines=[{"item_code": self.item.code, "qty": Decimal("1")}],
+        )
+
+        # P8 Lô 7 / SR-24 (nợ Lô 2 L2): để cột nv_giao, cskh và lệnh sales.refund.* không quét trên dữ liệu rỗng.
+        # (1) phiếu giao gán cho nv_giao + người nhận bằng sentinel; (2) task CSKH của phiếu này trong phạm vi
+        # cskh (đơn đã thanh toán -> phiếu CONFIRMING + task); (3) 1 phiếu hoàn PENDING.
+        from apps.delivery.models import ConfirmationTask, DeliveryNote
+        from apps.sales.refunds import services as refund_services
+
+        self.note = DeliveryNote.objects.get(sales_invoice__sales_order=self.order)
+        self.note.assigned_to = self.users["nv_giao"]
+        self.note.recipient_name = PII_RECIPIENT_NAME
+        self.note.recipient_phone = PII_RECIPIENT_PHONE
+        self.note.save(update_fields=["assigned_to", "recipient_name", "recipient_phone"])
+        self.task = ConfirmationTask.objects.get(note=self.note)
+        self.refund, _dup = refund_services.create_invoice_refund(
+            invoice=self.order.invoice, amount=Decimal("1000"), is_partial=True,
+            reason="Hoàn giả để kiểm thử", actor=self.users["chu"],
         )
 
     def _call(self, group, command_id, body=None):
@@ -106,6 +130,25 @@ class PiiSweepBase(TestCase):
         if inv is not None:
             cands |= {str(inv.pk), inv.code}
         return sorted(cands)
+
+
+class SR24Fixture(PiiSweepBase):
+    def test_sr24_fixture_co_du_lieu_o_cot_nv_giao_cskh_va_refund(self):
+        """Chống xanh giả (Lô 2 L2): dữ liệu PII thật sự có trong phạm vi của nv_giao/cskh và trong phiếu hoàn."""
+        self.assertEqual(self.note.assigned_to, self.users["nv_giao"])
+        self.assertEqual(self.task.state, "PENDING")
+        self.assertEqual(self.refund.status, "PENDING")
+        res = self._call("nv_giao", "delivery.deliverynote.list")
+        self.assertEqual(res.status_code, 200, res.content[:300])
+        self.assertTrue(res.json()["result"]["rows"], "nv_giao phải thấy phiếu giao của mình (dữ liệu không rỗng)")
+        res2 = self._call("chu", "sales.refund.list")
+        self.assertEqual(res2.status_code, 200, res2.content[:300])
+        self.assertTrue(res2.json()["result"]["rows"], "sales.refund.list phải có dữ liệu")
+        for group in ("nv_giao", "cskh", "chu"):
+            for cmd in ("delivery.deliverynote.list", "sales.refund.list"):
+                raw = self._call(group, cmd).content.decode()
+                for s in PII_STRINGS:
+                    self.assertNotIn(s, raw, f"{cmd} x {group} rò {s}")
 
 
 class SR04Dashboard(PiiSweepBase):
@@ -216,7 +259,9 @@ class SR05Detail(PiiSweepBase):
         from apps.delivery.models import DeliveryNote
 
         note = DeliveryNote.objects.get(sales_invoice__sales_order=self.order)
-        self.assertIsNone(note.assigned_to)  # không gán cho nv_giao -> ngoài phạm vi
+        # Fixture chung (SR-24) đã gán phiếu cho nv_giao; ca này cần phiếu NGOÀI phạm vi nên bỏ gán.
+        note.assigned_to = None
+        note.save(update_fields=["assigned_to"])
         spec = get_registry().get("delivery.deliverynote.partial_update")
         self.assertIsNotNone(spec)
         before = AiAction.objects.count()

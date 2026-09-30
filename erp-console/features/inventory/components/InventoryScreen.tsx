@@ -40,7 +40,7 @@ function Body({
   q: string;
   onClearSearch: () => void;
   onSelectBatch: (b: BatchRow) => void;
-  /** Có → chế độ danh sách lọc theo trạng thái (không có tên NCC/kho). */
+  /** Có → chế độ danh sách lọc theo trạng thái (vẫn đủ cột NCC/Kho từ Lô 7). */
   status: string | null;
 }) {
   const { me } = useAuth();
@@ -49,7 +49,7 @@ function Body({
   const canPurchase = canView(me, "purchasing");
   const filtered = status !== null;
   const expiredMode = status === "EXPIRED";
-  const cols = (canCost ? 8 : 7) - (filtered ? 2 : 0);
+  const cols = canCost ? 8 : 7;
   return (
     <section className="sect" aria-labelledby="inv-h">
       <div className="sect-h">
@@ -72,8 +72,8 @@ function Body({
             <tr>
               <th scope="col">Lô</th>
               <th scope="col">Mặt hàng</th>
-              {!filtered && <th scope="col">NCC</th>}
-              {!filtered && <th scope="col">Kho</th>}
+              <th scope="col">NCC</th>
+              <th scope="col">Kho</th>
               <th scope="col" className="r">
                 Tồn
               </th>
@@ -106,12 +106,10 @@ function Body({
                       </button>
                     </td>
                     <td className="m-title" data-label="Mặt hàng">{b.item}</td>
-                    {!filtered && (
-                      <td className="muted" data-m-label="NCC">
-                        {b.supplier}
-                      </td>
-                    )}
-                    {!filtered && <td data-label="Kho">{b.warehouse}</td>}
+                    <td className="muted" data-m-label="NCC">
+                      {b.supplier}
+                    </td>
+                    <td data-label="Kho">{b.warehouse}</td>
                     <td className="r num m-fig" data-label="Tồn">
                       <Figure text={kg(b.qty_available)} />
                     </td>

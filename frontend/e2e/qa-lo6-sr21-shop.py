@@ -658,7 +658,7 @@ def main():
         ctx, page, rec = new_page(browser, {"site": dict(site_on, cskh_notice={"enabled": True, "working_hours": "07:00-21:00", "max_attempts": 3, "window_minutes": 180, "decision_minutes": 30, "auto_cancel_enabled": False, "refund_deadline_days": 3, "hotline": "0900000000"})})
         add_to_cart_and_open_checkout(page); fill_form(page); submit_btn(page).click(); page.wait_for_timeout(600)
         body = page.inner_text("body")
-        info(f"F10 (Lô 7, SR-23) khi bật cả hai cờ: thông báo GL-04 = {notice(page).count()}, khối CSKH = {page.locator('.cskh-notice-box').count()}; khung giờ '7:00–20:00' {('7:00–20:00' in body)} và '07:00-21:00' {('07:00-21:00' in body)} cùng hiện")
+        info(f"F10 (Lô 7, SR-23) khi bật cả hai cờ: thông báo GL-04 = {notice(page).count()}, khối CSKH = {page.locator('[data-testid=cskh-notice]').count()}; khung giờ '7:00–20:00' {('7:00–20:00' in body)} và '07:00-21:00' {('07:00-21:00' in body)} cùng hiện")
         ctx.close()
 
         # =====================================================================

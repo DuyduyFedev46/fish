@@ -70,24 +70,6 @@ export type OrderLineStatus = {
   line_total?: number;
 };
 
-export type CskhNoticeConfig = {
-  enabled: boolean;
-  working_hours: string;
-  max_attempts: number;
-  window_minutes: number;
-  decision_minutes: number;
-  auto_cancel_enabled: boolean;
-  refund_deadline_days: number;
-  hotline: string;
-};
-
-export type SiteInfo = {
-  cskh_notice?: CskhNoticeConfig;
-  privacy_consent_required?: boolean;
-  confirm_call_notice?: boolean;
-  confirm_call_hours?: string;
-};
-
 export type OrderCancelNotice = {
   reason_code: string | null;
   message: string;

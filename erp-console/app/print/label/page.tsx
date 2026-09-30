@@ -22,7 +22,9 @@ function LabelPrintContent() {
 
   useEffect(() => {
     if (status === "anon") {
-      router.replace("/login/?next=/print/label/");
+      // F14: giữ nguyên query (?note=…&print_no=…) để đăng nhập xong quay lại đúng tem đang in.
+      const qs = searchParams.toString();
+      router.replace(`/login/?next=${encodeURIComponent("/print/label/" + (qs ? "?" + qs : ""))}`);
       return;
     }
 
@@ -52,7 +54,7 @@ function LabelPrintContent() {
               width: 140,
               errorCorrectionLevel: "M",
             });
-            setQrSvg(svg);
+            setQrSvg(`data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`);
           } catch {
             setError("Không thể tạo mã QR cho tem.");
           }
@@ -64,7 +66,7 @@ function LabelPrintContent() {
           setLoading(false);
         });
     }
-  }, [status, me, noteParam, printNoParam, router]);
+  }, [status, me, noteParam, printNoParam, router, searchParams]);
 
   useEffect(() => {
     if (labelData && qrSvg && !error) {
@@ -258,9 +260,12 @@ function LabelPrintContent() {
             borderBottom: "1px solid #000000",
           }}
         >
-          <div
-            dangerouslySetInnerHTML={{ __html: qrSvg }}
-            style={{ width: "35mm", height: "35mm", display: "flex", justifyContent: "center" }}
+          {/* F14: QR là ảnh data-URI (không chèn HTML thô vào DOM). */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={qrSvg}
+            alt={`Mã QR ${labelData.barcode_value}`}
+            style={{ width: "35mm", height: "35mm", display: "block" }}
           />
           <div
             style={{

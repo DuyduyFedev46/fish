@@ -29,7 +29,11 @@ import {
 } from "./planner";
 
 // Đọc 114 lệnh thật và mở rộng thành 150 lệnh giả cho test ngân sách
-const indexPath = path.resolve(__dirname, "../../../spikes/dw02/index.json");
+// Chỉ mục 114 lệnh (spike DW-01, không PII/giá vốn) nằm trong hồ sơ tính năng, không còn trong erp-console/spikes (SR-23 F12).
+const indexPath = path.resolve(
+  __dirname,
+  "../../../../doc/features/2026-09-28-ai-digital-worker/research/dw01-index.json"
+);
 const queriesPath = path.resolve(
   __dirname,
   "../../../../doc/features/2026-09-28-ai-digital-worker/research/cau-mau-50.json"

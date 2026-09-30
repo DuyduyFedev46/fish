@@ -316,8 +316,9 @@ class DW19LevelBTestCase(TestCase):
         self.assertNotIn("rate", res_str)
 
     @override_settings(AI_ENABLED=False)
-    def test_dw19_ac10_undo_ai_disabled_returns_410(self):
-        """DW-19-AC10: AI tắt -> POST undo trả 410 AI_DISABLED."""
+    def test_dw19_ac10_undo_ai_disabled_still_allowed(self):
+        """DW-19-AC10 (đổi theo P8 SR-22 / F10): AI tắt vẫn được hoàn tác, không còn 410 AI_DISABLED.
+        Việc không tồn tại -> 404 NOT_FOUND. Ca hoàn tác thật khi AI tắt: test_p8_lo7_undo."""
         res = self.client_kho.post("/api/ai/actions/00000000-0000-0000-0000-000000000000/undo/", format="json")
-        self.assertEqual(res.status_code, status.HTTP_410_GONE)
-        self.assertEqual(res.data["code"], "AI_DISABLED")
+        self.assertEqual(res.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(res.data["code"], "NOT_FOUND")

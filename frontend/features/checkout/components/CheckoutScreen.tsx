@@ -8,11 +8,12 @@ import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useSearchParams } from "next/navigation";
 import { useCart } from "../../../components/CartContext";
-import { createOrder, getSiteInfo, ApiError } from "../../../lib/api";
+import { createOrder, ApiError } from "../../../lib/api";
 import { formatVnd } from "../../../lib/format";
-import type { CreateOrderPayload, CreateOrderResponse, SiteInfo } from "../../../lib/types";
-import { getPrivacyPolicy } from "@/features/site/api";
-import type { PrivacyPolicyResponse } from "@/features/site/types";
+import type { CreateOrderPayload, CreateOrderResponse } from "../../../lib/types";
+import { getPrivacyPolicy, getSiteInfo } from "@/features/site/api";
+import type { PrivacyPolicyResponse, SiteInfoResponse } from "@/features/site/types";
+import { CskhNotice } from "@/features/site/components/CskhNotice";
 import PaymentPanel from "./PaymentPanel";
 import { rememberOrderContact } from "../storage";
 
@@ -38,7 +39,7 @@ export default function CheckoutScreen() {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [order, setOrder] = useState<CreateOrderResponse | null>(null);
   const [orderPhone, setOrderPhone] = useState("");
-  const [siteInfo, setSiteInfo] = useState<SiteInfo | null>(null);
+  const [siteInfo, setSiteInfo] = useState<SiteInfoResponse | null>(null);
 
   // Khung go-live pháp lý (GL-03)
   const [policyInfo, setPolicyInfo] = useState<PrivacyPolicyResponse | null>(null);
@@ -168,7 +169,7 @@ export default function CheckoutScreen() {
   }
 
   if (order) {
-    return <PaymentPanel order={order} phone={orderPhone} />;
+    return <PaymentPanel order={order} phone={orderPhone} siteInfo={siteInfo} />;
   }
 
   const isConsentLocked = consentRequired === true && policyInfo !== null && !consentAccepted;
@@ -287,33 +288,7 @@ export default function CheckoutScreen() {
             {errors.address && <span className="form-error">{errors.address}</span>}
           </div>
 
-          {siteInfo?.cskh_notice?.enabled && (
-            <div
-              className="cskh-notice-box"
-              style={{
-                background: "#f0fdf4",
-                border: "1px solid #bbf7d0",
-                borderRadius: "6px",
-                padding: "10px 14px",
-                marginBottom: "16px",
-                fontSize: "0.8125rem",
-                color: "#166534",
-                lineHeight: "1.45",
-              }}
-            >
-              <strong>Lưu ý xác nhận đơn:</strong> Cá Về sẽ gọi xác nhận trong khung giờ{" "}
-              {siteInfo.cskh_notice.working_hours} (tối đa {siteInfo.cskh_notice.max_attempts} lần trong{" "}
-              {siteInfo.cskh_notice.window_minutes} phút).
-              {siteInfo.cskh_notice.auto_cancel_enabled && (
-                <span>
-                  {" "}
-                  Sau thời gian trên nếu không liên lạc được, đơn hàng có thể bị huỷ và hoàn đủ tiền trong vòng{" "}
-                  {siteInfo.cskh_notice.refund_deadline_days} ngày. Hotline: {siteInfo.cskh_notice.hotline}.
-                </span>
-              )}{" "}
-              {/* # CHỜ legal-vn */}
-            </div>
-          )}
+          <CskhNotice info={siteInfo} variant="form" />
 
           {consentRequired && policyInfo && (
             <div className="form-field form-field-checkbox" style={{ marginBottom: "16px" }}>

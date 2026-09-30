@@ -22,7 +22,6 @@ import { usePathname, useRouter } from "next/navigation";
 import { ApiError, setForbiddenHandler, setUnauthorizedHandler } from "@/shared/lib/http";
 import { getToken, setToken } from "@/shared/lib/token";
 import { clearAllDrafts, purgeForeignDrafts } from "@/shared/lib/drafts";
-import { clearAllDrafts as clearNhapLoDrafts } from "@/features/purchasing/components/draftStorage";
 import { changePassword as apiChangePassword, getMe, login as apiLogin, logoutRemote } from "../api";
 import { getLastUserId, setLastUserId } from "../session";
 import { MUST_CHANGE_PASSWORD_CODE, type Me } from "../types";
@@ -198,8 +197,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     loggingOut.current = true;
     await logoutRemote(); // S46: BE xoá token (mọi máy của người này); lỗi mạng thì bỏ qua
     setToken(null);
-    clearAllDrafts(); // S46-AC1: đăng xuất chủ động thì xoá nháp trên máy
-    clearNhapLoDrafts(); // SR-07: nháp Nhập lô (sessionStorage) + khoá cũ cave_draft_nhap_lo ở localStorage
+    clearAllDrafts(); // S46-AC1 + SR-07: xoá nháp trên máy, gồm nháp Nhập lô (sessionStorage) và khoá cũ cave_draft_nhap_lo
     setLastUserId(null);
     setMe(null);
     setNotice(null);

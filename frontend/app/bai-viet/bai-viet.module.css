@@ -44,6 +44,7 @@
   line-height: 1.25;
   color: #0f172a;
   margin: 0 0 16px;
+  overflow-wrap: anywhere; /* tiêu đề có chuỗi dài không dấu cách không được đẩy trang cuộn ngang */
 }
 
 .metaBar {

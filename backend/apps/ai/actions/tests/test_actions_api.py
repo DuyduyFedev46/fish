@@ -201,13 +201,15 @@ class AiActionApiTestCase(TestCase):
 
     def test_dw11_ac5_permission_denied_on_confirm(self):
         """DW-11-AC5: Người duyệt thiếu quyền -> 403 BR-AI-04. scope=all chỉ người có manage_ai_policy xem được."""
-        # 1. nv_giao cố confirm lệnh của kho -> 403 BR-AI-04
+        # 1. nv_giao cố confirm lệnh không đủ quyền -> 403 BR-AI-04.
+        # P8 Lô 7 (BM-05): việc của người khác (ngoài phạm vi) nay là 404 (xem test_p8_lo7_bm05); để vẫn
+        # kiểm BR-AI-04 thì việc phải nằm trong phạm vi của nv_giao (chính nv_giao là chủ việc).
         action = AiAction.objects.create(
             command="purchasing.purchasereceipt.submit",
             kind="write",
             level="C",
             status="PENDING",
-            owner=self.user_kho,
+            owner=self.user_giao,
             target_model="purchasereceipt",
             target_id=str(self.receipt.pk),
             viewed_at=timezone.now() - datetime.timedelta(seconds=5),

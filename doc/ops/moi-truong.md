@@ -57,6 +57,32 @@ Khai báo trên Cloud Run (`cangca-api-staging` và `cangca-api`):
 
 *Tuyệt đối không lưu giá trị thật của người bán vào mã nguồn git. Đặt biến trực tiếp qua Google Cloud Run Secrets / Environment Variables.*
 
+## Biến môi trường và job nền của AI (P8 Lô 7, SR-24 F13)
+> Tên biến `AI_PRODUCTION_READY` dễ gây nhầm: giá trị `1` nghĩa là "môi trường này được phép mở vùng đỏ, mức B và DW-26", **chỉ đặt ở staging**. Production giữ `0`.
+
+| Biến (Cloud Run) | Staging (`cangca-api-staging`) | Production (`cangca-api`) | Tác dụng |
+|---|---|---|---|
+| `AI_ENABLED` | `1` khi thử AI | theo quyết định của Duy | Công tắc gốc của AI Native. `0` thì mọi lệnh AI trả 410 (trừ rút lại/hoàn tác việc đã có) |
+| `AI_PRODUCTION_READY` | **`1`** | **`0`** | `0` khoá vùng đỏ, khoá mức B, khoá DW-26 (`auto_confirm_exact_payments` trả `PRODUCTION_NOT_READY`) |
+| `AI_WRITE_LEVELS_ALLOWED` | **`B`** | **`C`** | Trần mức ghi của AI: `C` = AI chỉ đề xuất, người bấm xác nhận; `B` = AI ghi rồi cho hoàn tác hoặc trì hoãn |
+| `AI_UNDO_WINDOW_MINUTES` | mặc định `10` | mặc định `10` | Cửa sổ hoàn tác việc mức B đã ghi |
+
+Ba bước cùng mở mới có hiệu lực: biến môi trường (bảng trên), công tắc theo nhóm/lệnh trong màn Cài đặt AI của Chủ, và công tắc vùng đỏ trong chính sách AI
+(`system.auto_confirm_exact_match` cho DW-26). Đặt nhầm `AI_PRODUCTION_READY=1` trên production là lỗi cấu hình nghiêm trọng: kiểm lại sau mỗi lần `gcloud run services update`.
+
+### Lịch chạy các job (management command)
+Cơ chế giống `cancel_expired_orders`/`update_batch_status`: Cloud Run Job + Cloud Scheduler (production không có Celery/Redis). Không có endpoint HTTP kích job.
+Bảng dưới là **khuyến nghị**; tạo job và lịch thật là việc deploy do Duy duyệt, chưa tạo trong lô này.
+
+| Job | Lệnh | Tần suất khuyến nghị | Staging | Production |
+|---|---|---|---|---|
+| Chạy việc AI mức B tới hạn (trì hoãn 30 phút, hạ mức, đưa việc quá hạn lên Chủ) | `python manage.py run_due_ai_actions` | mỗi 5 phút (`*/5 * * * *`) | Có, khi `AI_ENABLED=1` | Chỉ khi Duy mở mức B. Tắt AI vẫn chạy được để hạ mức việc đang chờ |
+| Tự khớp giao dịch chuyển khoản khớp tuyệt đối (DW-26) | `python manage.py auto_confirm_exact_payments` | mỗi 5 phút | Có, khi `AI_PRODUCTION_READY=1` và Chủ mở công tắc `system.auto_confirm_exact_match` | **Không tạo job** (job chạy cũng chỉ trả `PRODUCTION_NOT_READY`) |
+| Thời hạn CSKH (nhắc, chuyển Quản lý, tự huỷ nếu bật) | `python manage.py process_cskh_deadlines` | mỗi 5 phút (`*/5 * * * *`) | Có | Có, sau khi `legal-vn` duyệt câu thông báo huỷ (xem `doc/ops/go-live-phap-ly.md`) |
+| Giám sát job CSKH | `python manage.py check_cskh_job_health` | mỗi 15 phút, exit code 1 thì cảnh báo | Có | Có |
+
+Các job đều idempotent (khoá dòng, chạy lại không làm hai lần). Log job chỉ ghi mã việc/mã giao dịch/tên lỗi, không ghi tên, SĐT, địa chỉ hay nội dung chuyển khoản.
+
 ## Deploy
 **Backend / adapter:**
 - Build image một lần, deploy lên `*-staging` trước. Staging đạt thì deploy **cùng image** lên production.

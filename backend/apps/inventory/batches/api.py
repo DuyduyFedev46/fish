@@ -41,6 +41,9 @@ class BatchViewSet(DocumentViewSet):
         status_param = params.get("status")
         if status_param:
             qs = qs.filter(status=status_param)
+        # has_stock=1|true -> chỉ lô còn tồn. Giá trị khác không lọc (không lỗi).
+        if str(params.get("has_stock", "")).lower() in ("1", "true"):
+            qs = qs.filter(qty_available__gt=0)
         return qs
 
     def get_object(self):

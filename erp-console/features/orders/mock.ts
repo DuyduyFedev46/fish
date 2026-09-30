@@ -544,6 +544,13 @@ function timelineOf(o: Order): OrderTimelineEntry[] {
     const restored = o.cancelStockRestored ?? true;
     const restoreText = restored ? "hoàn hàng về lô gốc" : "KHÔNG hoàn kho (đã giao thất bại — chờ duyệt hàng hoàn)";
     out.push({ at: when, kind: "cancelled", label: `Huỷ đơn, ${restoreText} — lý do: ${reasonLabel}`, actor_display: "Lộc" });
+    // Lô 4 SR-13/14 (BE `orders/timeline.py`): huỷ đơn đã xuất hoá đơn → chứng từ đảo doanh thu `DC-<mã hoá đơn>`, số tiền = tổng đơn.
+    out.push({
+      at: when,
+      kind: "credit_note_issued",
+      label: `Lập chứng từ đảo doanh thu DC-${o.invoice.code} (${vnd(orderTotal(o))})`,
+      actor_display: "Lộc",
+    });
   }
   o.refunds.forEach((r) => {
     const who = courierName(r.created_by);

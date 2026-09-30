@@ -3,6 +3,7 @@
   line-height: 1.75;
   color: #1e293b;
   max-width: 100%;
+  overflow-wrap: anywhere; /* URL/chuỗi dài trong thân bài không làm trang cuộn ngang */
 }
 
 .heading2 {

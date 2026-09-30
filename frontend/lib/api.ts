@@ -10,7 +10,6 @@ import {
   type CreateOrderResponse,
   type OrderStatus,
   type PaymentCheckoutSession,
-  type SiteInfo,
   type WireCreateOrderResponse,
   type WireOrderStatus,
 } from "./types";
@@ -39,7 +38,8 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
     try {
       const body = await res.json();
       data = body;
-      if (body?.detail) detail = body.detail;
+      // DRF trả "Not found." (tiếng Anh) khi không có thông điệp riêng -> giữ câu tiếng Việt mặc định.
+      if (body?.detail && body.detail !== "Not found.") detail = body.detail;
       if (body?.code) code = body.code;
     } catch {
       // ignore
@@ -120,13 +120,7 @@ function mapOrderStatus(wire: WireOrderStatus): OrderStatus {
   };
 }
 
-export async function getSiteInfo(): Promise<SiteInfo> {
-  if (process.env.NEXT_PUBLIC_USE_MOCK === "1") {
-    const m = await import("./mock");
-    return m.mockGetSiteInfo();
-  }
-  return apiFetch<SiteInfo>("/api/public/site-info/");
-}
+// `getSiteInfo` nằm ở features/site/api.ts (một nguồn duy nhất, SR-23 F10).
 
 function mapCreateOrderResponse(wire: WireCreateOrderResponse): CreateOrderResponse {
   return {

@@ -11,8 +11,9 @@ Story: **S8** (chuyển view "Kho & Lô" của bản HTML cũ + tab "Hoạt đ�
 
 ## Lô Quá hạn còn tồn (P8 Lô 5 — SR-15, SR-16, BR-LO-07, BR-MH-08)
 
-- `/inventory/?status=EXPIRED` (thẻ "Lô quá hạn còn tồn" ở Tổng quan → Cần chú ý) đọc `GET /api/inventory/batches/?status=EXPIRED`
-  (trang đầu, chỉ giữ lô còn tồn). Danh sách này chỉ có mã mặt hàng, không có tên NCC/kho nên bỏ hai cột đó.
+- `/inventory/?status=EXPIRED` (thẻ "Lô quá hạn còn tồn" ở Tổng quan → Cần chú ý) đọc `GET /api/inventory/batches/?status=EXPIRED&has_stock=1`
+  (trang đầu; BE lọc lô còn tồn, FE không lọc lại). Mỗi dòng có `item_name`, `supplier_name`, `warehouse_name`, `status_label` (P8 Lô 7 / L5-1)
+  nên bảng đủ cột NCC và Kho như màn thường.
 - Chi tiết lô Quá hạn vẽ nút theo `next_steps` (chỉ Chủ thấy; lô đang giữ chỗ thì khoá kèm lý do):
   **Xác nhận Đã huỷ phần tồn** (gửi `confirm_qty` = tồn đang hiển thị), **Xác nhận Đã trả NCC** (form kg + tiền NCC hoàn + ghi chú,
   `request_id` sinh khi mở form), **Chốt lô** (khoá kèm lý do khi còn tồn, BR-LO-04). Tiền NCC hoàn không hiện lại sau khi lưu.

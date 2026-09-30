@@ -84,6 +84,8 @@ const TIMELINE_LOOK: Record<string, { icon: string; tone?: "warn" | "good" }> = 
   cancelled: { icon: "cancel", tone: "warn" },
   refund_created: { icon: "currency_exchange" },
   refund_confirmed: { icon: "price_check", tone: "good" },
+  // Lô 4 SR-13/14: chứng từ đảo doanh thu khi huỷ đơn đã xuất hoá đơn. `label` do BE dựng: "Lập chứng từ đảo doanh thu DC-… (x ₫)".
+  credit_note_issued: { icon: "description" },
 };
 const TIMELINE_DEFAULT = { icon: "radio_button_checked" } as const;
 

@@ -889,3 +889,96 @@ python3 frontend/e2e/qa-lo6-sr21-shop.py -> 279 ca, 0 FAIL ; ra-soat-a2-golive.p
 Build cuối (NEXT_PUBLIC_USE_MOCK=0, API_BASE=https://cangca-api-...run.app) cả 2 FE -> OK; check-no-mock XANH; check-ai-chunks XANH; không còn chuỗi localhost trong out/
 ```
 Ảnh: `doc/features/2026-09-30-sua-loi-review/qa-lo6/` (`real-sr19-*.png`, `real-sr20-*.png`, `real-f61-*.png`, ...), toàn bộ dữ liệu giả.
+
+---
+
+## Lô 7 — SR-22 (BE), SR-23 (FE Shop + ERP), SR-24 (test/doc) + nợ techlead + L7-1 · lần 1 · 2026-09-30
+
+### Kết luận: APPROVED — không còn lỗi chặn; 3 ca chưa kiểm (⏸) vì máy này không có Postgres, đều ghi rõ bên dưới
+
+### Tổng: khoảng 943 ca QA chạy thật · ✅ 943 · ❌ 0 · ⏸ 3
+Cách đếm (không tính 1594 test có sẵn của dev): 54 test BE mới do QA viết + 691 ca E2E trình duyệt thật (Shop 21 + 52 + 279 + 16 = 368; ERP mock 79 + 16 + 77 + 74 + 34 = 280; ERP với Django thật 43) + 158 vitest ERP + 40 payload `safeHref`. Toàn bộ backend chạy lại: **1648 OK** (1594 của dev + 54 của QA), không dùng `--parallel`.
+
+### Theo AC
+| Mã AC | Kết quả | Bằng chứng |
+|---|---|---|
+| SR-22 BM-05 (xác nhận/từ chối chung bộ lọc với retrieve, ngoài tầm nhìn thì 404) | ✅ | `apps/ai/actions/tests/test_p8_lo7_qa_edges.py` (17 ca: từng Group, hành động của người khác, hết hạn, đã xử lý, bấm 2 lần) |
+| SR-22 BM-07 | ✅ | cùng file trên + `apps/ai/execution/tests/test_p8_lo7_qa_edges.py` (9 ca) |
+| SR-22 F07 (hạn mức ngày theo giờ VN, `timezone.localtime()`) | ✅ | ca sát 00:00 giờ VN và 23:59 UTC ngày trước, hạn mức đúng theo ngày VN |
+| SR-22 F08 (khoá DeliveryNote rồi ConfirmationTask, chạy job 2 lần) | ✅ (logic) / ⏸ (tranh khoá Postgres) | `apps/delivery/tests/test_p8_lo7_qa_edges.py` (6 ca: job chạy 2 lần không nhân đôi, thứ tự khoá, logger `cangca.delivery.cskh`); tranh khoá thật cần Postgres |
+| SR-22 F10 (hoàn tác đi theo `CommandSpec.undo`, chạy được khi tắt AI) | ✅ | test QA cả cờ AI bật và tắt; hết cửa sổ hoàn tác thì từ chối |
+| SR-22 F12 (không có `chu` đang hoạt động thì bỏ qua + cảnh báo, `downgrade_reason` chỉ ghi mã lỗi) | ✅ | `apps/sales/payments/tests/test_p8_lo7_qa_edges.py` (8 ca) |
+| SR-22 NoStore (`Cache-Control: no-store` trên đơn, khách, phiếu giao, hàng đợi CSKH) | ✅ | `apps/sales/orders/tests/test_p8_lo7_qa_edges.py` (4 ca, từng Group + chưa đăng nhập, GET/POST/lỗi 4xx đều có header) |
+| SR-22 L6-1 (ảnh bìa/ảnh trong bài phải thuộc bài, BR-ND-07) | ✅ | `apps/content/entries/tests/test_p8_lo7_qa_edges.py` (5 ca: ảnh bài khác, ảnh mồ côi, sửa lần hai) |
+| SR-22 L5-1 BE (`has_stock=1\|true` + 4 khoá tên) | ✅ | `apps/inventory/batches/tests/test_p8_lo7_qa_edges.py` (5 ca: tồn 0, tồn âm, lô quá hạn còn tồn, giá trị lạ) |
+| SR-22 F5 + quét PII | ✅ | `test_p8_pii_sweep` xanh trong bản chạy đầy đủ; thêm ca của QA cho khoá mới |
+| SR-23 Shop `safeHref` (40 payload) | ✅ | `safeHref` 40/40; `frontend/e2e/qa-lo7-shop-links.py` 16 ca trình duyệt thật (javascript:, data:, `//host`, `\\host`, tab/newline giữa scheme, viết hoa, HTML entity) |
+| SR-23 ERP `safeHref` giống Shop | ✅ | vitest ERP 158/158; cùng bộ 40 payload cho kết quả giống nhau |
+| SR-23 L5-1 FE (Kho lọc lô còn tồn / quá hạn còn tồn) | ✅ (Kho, Lộc) / ⏸ (giao diện `cskh`) | `erp-console/e2e/qa_lo7_real_expired.py` 43 ca với Django thật; ảnh `qa-lo7/real-l51-*.png` (1280 và 375) |
+| L7-1 open redirect (`safeNext`, `erp-console/shared/lib/nav.ts`) | ✅ | `erp-console/e2e/qa_lo7_login_next.py` 34 ca trình duyệt thật: `//evil`, `/\evil`, `https://evil`, `javascript:`, `%2f%2f`, `next` lặp, không có `next`, đã đăng nhập sẵn |
+| SR-24 test/doc (F13: env AI + lịch job; hiệu chỉnh V-DW1) | ✅ | `doc/ops/moi-truong.md` có mục biến môi trường AI + lịch chạy; hiệu chỉnh V-DW1 ở `02b-tech-design.md:388` và `02c-giao-viec.md:27` (ai-digital-worker); lệnh `run_due_ai_actions`, `auto_confirm_exact_payments`, `process_cskh_deadlines` có thật; mặc định `AI_ENABLED=0`, `AI_PRODUCTION_READY=0`, `AI_WRITE_LEVELS_ALLOWED=C` |
+| Nợ techlead + D7-1 | ✅ / ghi nhận | xem mục Lỗi; D7-1 (lệch giờ) cần Duy quyết |
+
+### Ngoại lệ và biên
+- Job chạy 2 lần (F08 leo thang, `auto_confirm_exact_payments`, `run_due_ai_actions`): lần 2 không tạo thêm bản ghi, không lặp thông báo. ✅
+- Hai hành động cùng tranh một lô / cùng xác nhận: chỉ một thắng, bên kia nhận lỗi rõ ràng, tồn không sai. ✅ (mức logic trên SQLite; tranh khoá thật trên Postgres là ⏸)
+- Màn hình cũ (trạng thái đã đổi): xác nhận một hành động đã bị người khác từ chối / đã hết hạn thì 404 hoặc 409 đúng quy ước, không đổi dữ liệu. ✅
+- Cờ AI bật/tắt: hoàn tác (F10) vẫn chạy khi tắt AI; hành động ghi Tầng 2 vẫn bị chặn khi cờ tắt. ✅
+- Biên hạn mức ngày: 23:59 và 00:01 giờ VN; UTC lệch ngày. ✅
+- Lô cuối / tồn 0 / tồn âm / lô quá hạn còn tồn với bộ lọc `has_stock`. ✅
+- Không có `chu` đang hoạt động (F12): bỏ qua, ghi cảnh báo, không lỗi 500, không mất việc. ✅
+- Thử nghiệm đột biến (mutation): QA hoàn nguyên từng file sản phẩm về HEAD rồi chạy lại test của QA; **9/9 file sản phẩm bị test phát hiện** (test đỏ khi bỏ sửa lỗi, xanh khi có), nên các test không rỗng. Kết quả ở scratchpad `mut/out.txt`; working tree đã khôi phục nguyên trạng.
+- ⏸ (1) F08: tranh khoá đồng thời thật giữa 2 tiến trình cần Postgres (`select_for_update`; SQLite bỏ qua khoá dòng). ⏸ (2) N1: `get_or_create` đồng thời trên Postgres. ⏸ (3) giao diện `cskh` cho L5-1 trên backend thật (không có tài khoản/màn hình tương ứng trong seed E2E; phần BE của nhóm này đã ✅).
+
+### Phân quyền (Group × hành động), phần Lô 7
+| Hành động | chu | quan_ly | nv_kho | nv_giao | cskh | chưa đăng nhập |
+|---|---|---|---|---|---|---|
+| Xác nhận/từ chối hành động AI (BM-05) | thấy hết, làm được | chỉ hành động trong tầm nhìn | 404 nếu ngoài tầm | 404 | 404 | 401 |
+| `ai.manage_ai_policy` | có | không | không | không | không | 401 |
+| Hoàn tác (F10) hành động của mình | có | có | có | có | có | 401 |
+| Đơn / khách / phiếu giao / hàng đợi CSKH (no-store) | header có với mọi người dùng | có | có | có | có | 401 (không lộ dữ liệu) |
+| Lọc lô `has_stock` | có | có | có | 403 hoặc ẩn theo quyền hiện hành | ẩn | 401 |
+Ghi chú: bảng phản ánh kết quả các ca thực chạy; không Group nào vượt quyền so với trước Lô 7.
+
+### Rò giá vốn
+- JSON của lô, đơn, hành động AI: với Group thiếu `can_view_cost`, không có khoá trong `COST_KEYS`. ✅
+- Khoá mới ghi vào AuditLog `changes`/`note` hoặc trả qua API (đã kiểm ngược ra giá vốn = tiền ÷ kg): không tính ngược được. ✅
+- **L7-Q1 (Low, không chặn):** `cogs_reversed` chưa nằm trong `COST_KEYS` (`apps/common/cost_keys.py`). Hiện chỉ ghi ở nơi người có quyền xem giá vốn thấy, nên chưa rò; nên thêm vào danh sách để hàng rào lọc tự động phủ về sau.
+- HTML Shop, `out/` của Shop: không có chuỗi giá vốn. ✅
+
+### Rò dữ liệu cá nhân
+- API công khai và HTML Shop không trả tên/SĐT/địa chỉ; `test_p8_pii_sweep` xanh; log F08/F12 chỉ ghi mã và id. ✅
+- `downgrade_reason` (F12) chỉ ghi mã lỗi, không ghi nội dung khách. ✅
+- console trình duyệt, `localStorage`, URL trong các E2E: không có dữ liệu cá nhân; `next` của trang đăng nhập không mang dữ liệu cá nhân. ✅
+- Ảnh chụp và seed 100% dữ liệu giả.
+- **L7-Q2 (Low, không chặn):** API hoàn tiền trả kèm dữ liệu khách và API thanh toán / hoá đơn chưa gắn `Cache-Control: no-store` (NoStore chỉ phủ đơn, khách, phiếu giao, hàng đợi CSKH đúng như story). Nên mở rộng ở lô sau.
+
+### Chứng từ bất biến và AuditLog
+Không thao tác xoá chứng từ. Các hành động Tầng 2 chạy trong test đều để lại AuditLog.
+- **L7-Q3 (Low, có từ trước, không chặn):** `DELETE` khách đã có đơn trả 500 (`ProtectedError`) thay vì 409/400. Dữ liệu vẫn được bảo vệ (không xoá), chỉ sai mã trạng thái.
+
+### Hồi quy
+Backend **1648 OK**; `makemigrations --check` sạch; erp `tsc` 0, vitest 158/158; frontend `tsc` 0, `safeHref` 40/40; `npm ci` không `--legacy-peer-deps`, không ERESOLVE, cả hai FE; `npm run build` OK cả hai. E2E Shop 21 + 52 + 279 + 16 xanh; ERP mock 79 + 16 + 77 + 74 + 34 xanh; ERP Django thật 43 xanh. `check-no-mock.mjs` và `check-ai-chunks.mjs` xanh cả hai FE.
+
+### Lỗi
+Không có lỗi chặn. Ghi nhận không chặn:
+- **L7-Q1, L7-Q2, L7-Q3** (Low): như trên.
+- **L7-2..L7-5 (Low, techlead đã chốt):** giữ nguyên, không đổi trong Lô 7.
+- **D7-1 (cần Duy quyết):** lệch giờ giữa tài liệu và code; không phải lỗi chặn.
+- Đã sửa trong test của QA (không phải lỗi sản phẩm): sai tên logger F08, sai URL `confirm-payment`, `ProtectedError` khi xoá khách trong ca NoStore (tách thành ca riêng), ca "GIÁ VỐN" đỏ giả do khớp câu hướng dẫn (đổi sang kiểm `thead th`), 429 giới hạn đăng nhập khi chạy E2E dồn (khởi động lại Django).
+
+### Lệnh đã chạy (tóm tắt output)
+```
+cd backend && DJANGO_DEBUG=1 env -u DATABASE_URL .venv/bin/python manage.py test   -> Ran 1648 tests OK
+manage.py makemigrations --check --dry-run                                          -> No changes detected
+9 file sản phẩm hoàn nguyên về HEAD lần lượt + chạy test QA (scratchpad mut/mut.py)  -> 9/9 phát hiện (đỏ), khôi phục xong
+cd erp-console && npm ci && npx tsc --noEmit (0) && npm test (158 passed) && npm run build (OK)
+node scripts/check-no-mock.mjs -> XANH (đỏ trên build mock) | node scripts/check-ai-chunks.mjs -> XANH
+python3 erp-console/e2e/qa_lo7_login_next.py -> 34/34 ; qa_lo7_real_expired.py (Django thật, sqlite giả) -> 43/43
+cd frontend && npm ci && npx tsc --noEmit (0) && npm run build (OK) ; safeHref -> 40/40 ; check-no-mock XANH
+python3 frontend/e2e/qa-lo7-shop-links.py -> 16/16 ; các bộ E2E Shop có sẵn 21 + 52 + 279 xanh
+Build cuối (production-base, NEXT_PUBLIC_USE_MOCK=0) cả 2 FE -> OK; không còn chuỗi localhost trong out/
+Đã tắt mọi server (Django, static server) sau khi chạy; không commit, không deploy, không chạy E2E trên production.
+```
+Test QA mới: `backend/apps/{ai/actions,ai/execution,delivery,sales/payments,sales/orders,content/entries,inventory/batches}/tests/test_p8_lo7_qa_edges.py`; `frontend/e2e/qa-lo7-shop-links.py`; `erp-console/e2e/qa_lo7_login_next.py`, `qa_lo7_real_expired.py`.
+Ảnh (dữ liệu giả): `doc/features/2026-09-30-sua-loi-review/qa-lo7/` (`f14-*`, `l1-*`, `l4-*`, `l5-1-*`, `lo7-f*`, `real-l51-*`).

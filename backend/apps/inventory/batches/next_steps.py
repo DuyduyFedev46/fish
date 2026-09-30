@@ -177,7 +177,7 @@ def get_batch_guidance(doc_id: str, user: Any, request: Optional[Any] = None) ->
         else:
             batch = qs.get(batch_id=doc_id)
     except Batch.DoesNotExist:
-        raise Http404(f"Không tìm thấy lô hàng: {doc_id}")
+        raise Http404("Không tìm thấy lô hàng.")
 
     doc_summary = {
         "type": "batch",

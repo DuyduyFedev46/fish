@@ -176,12 +176,112 @@ export const MOCK_ENTRY_MAP: Record<string, PublicEntryDetail> = {
   },
 };
 
+/**
+ * Bài mẫu chứa payload XSS/link độc (SR-24 F9). CHỈ để Playwright kiểm bộ hiển thị thân bài
+ * (`ArticleBody` + `safeHref`): không `dialog`, không `<script>`, không `javascript:`, link ngoài
+ * có `rel`. Mọi payload đặt cờ `window.__xss` thay vì `alert` để bắt được cả khi dialog bị chặn.
+ * Không xuất hiện trong danh sách bài (không nằm trong `MOCK_ENTRY_MAP`). Đường vào: /bai-viet/?slug=xss-mau
+ */
+export const XSS_SAMPLE_SLUG = "xss-mau";
+
+const XSS_SAMPLE_ENTRY: PublicEntryDetail = {
+  kind: "post",
+  slug: XSS_SAMPLE_SLUG,
+  title: "Bài thử XSS <script>window.__xss=1</script>",
+  seo_title: "Bài thử XSS | Cá Về",
+  description: "Bài mẫu kiểm thử an toàn nội dung (chỉ có ở bản mock).",
+  excerpt: "Bài mẫu kiểm thử an toàn nội dung.",
+  category: null,
+  cover_image: null,
+  body: {
+    type: "doc",
+    blocks: [
+      { type: "heading", level: 2, text: "Tiêu đề <img src=x onerror=\"window.__xss=1\">" },
+      {
+        type: "paragraph",
+        children: [
+          { text: "<script>window.__xss=1</script> " },
+          { text: "<img src=x onerror=\"window.__xss=1\"> ", marks: ["bold"] },
+          { text: "</article><svg onload=window.__xss=1> " },
+          { text: "&lt;b&gt;không phải thẻ&lt;/b&gt;" },
+        ],
+      },
+      {
+        type: "paragraph",
+        children: [
+          { text: "LINK-JS", href: "javascript:window.__xss=1" },
+          { text: " " },
+          { text: "LINK-JS-HOA", href: "JaVaScRiPt:window.__xss=1" },
+          { text: " " },
+          { text: "LINK-JS-TAB", href: "java\tscript:window.__xss=1" },
+          { text: " " },
+          { text: "LINK-DATA", href: "data:text/html;base64,PHNjcmlwdD53aW5kb3cuX194c3M9MTwvc2NyaXB0Pg==" },
+          { text: " " },
+          { text: "LINK-VB", href: " vbscript:msgbox(1)" },
+          { text: " " },
+          { text: "LINK-GIAO-THUC-TUONG-DOI", href: "//evil.example/phish" },
+          { text: " " },
+          { text: "LINK-GACH-NGUOC", href: "/\\evil.example" },
+          { text: " " },
+          { text: "LINK-GACH-NGUOC-DAU", href: "\\evil.example" },
+          { text: " " },
+          { text: "LINK-FILE", href: "file:///etc/passwd" },
+        ],
+      },
+      {
+        type: "paragraph",
+        children: [
+          { text: "LINK-NGOAI-OK", href: "https://example.com/bai-ngoai" },
+          { text: " " },
+          { text: "LINK-NGOAI-HTTP-OK", marks: ["bold"], href: "http://example.com/x" },
+          { text: " " },
+          { text: "LINK-NOI-BO-OK", href: "/shop/" },
+          { text: " " },
+          { text: "LINK-MAIL-OK", href: "mailto:hotro@example.com" },
+          { text: " " },
+          { text: "LINK-TEL-OK", href: "tel:0900000000" },
+        ],
+      },
+      {
+        type: "quote",
+        children: [{ text: "<iframe src=\"javascript:window.__xss=1\"></iframe>", marks: ["italic"] }],
+      },
+      {
+        type: "list",
+        ordered: false,
+        items: [
+          [{ text: "<a href=\"javascript:window.__xss=1\">chữ thô</a>" }],
+          [{ text: "MUC-LINK-JS", href: "javascript:window.__xss=1" }],
+        ],
+      },
+      {
+        type: "image",
+        alt: "\"><script>window.__xss=1</script>",
+        caption: "<img src=x onerror=\"window.__xss=1\"> chú thích",
+        width: 1600,
+        height: 1200,
+        urls: {
+          sm: "/favicon.ico?w=480",
+          md: "/favicon.ico?w=960",
+          lg: "/favicon.ico?w=1600",
+        },
+      },
+      { type: "item_card", item_code: "X\"><img src=x onerror=window.__xss=1>" },
+    ],
+  },
+  published_at: "2026-09-28T08:00:00Z",
+  updated_at: "2026-09-28T08:00:00Z",
+  version: 1,
+  effective_from: "2026-09-28T08:00:00Z",
+  author: "Cá Về",
+};
+
 export function mockGetPublicEntry(slug: string): PublicEntryDetail {
   if (slug === "bai-da-go") {
     throw new ApiError("Bài này không còn trên web.", 410);
   }
 
-  const entry = MOCK_ENTRY_MAP[slug];
+  const entry = slug === XSS_SAMPLE_SLUG ? XSS_SAMPLE_ENTRY : MOCK_ENTRY_MAP[slug];
   if (!entry) {
     throw new ApiError("Không tìm thấy bài.", 404);
   }

@@ -651,21 +651,23 @@ def escalate_expired_windows(*, now=None) -> int:
     window_mins = getattr(settings, "CSKH_UNREACHABLE_WINDOW_MINUTES", 30)
     cutoff = now - timedelta(minutes=window_mins)
 
-    task_ids = list(
+    task_rows = list(
         ConfirmationTask.objects.filter(
             state=ConfirmationTask.State.PENDING,
             attempts__gte=1,
             first_unreachable_at__isnull=False,
             first_unreachable_at__lte=cutoff,
             note__status=DeliveryNote.Status.CONFIRMING,
-        ).values_list("pk", flat=True)
+        ).values_list("pk", "note_id")
     )
 
     escalated_count = 0
-    for task_id in task_ids:
+    for task_id, note_id in task_rows:
         try:
             with transaction.atomic():
-                task = ConfirmationTask.objects.select_for_update().select_related("note").get(pk=task_id)
+                # P8 F08: thứ tự khoá đơn -> phiếu -> task (02b CSKH §1.5): khoá phiếu trước, rồi task.
+                note_obj = DeliveryNote.objects.select_for_update().get(pk=note_id)
+                task = ConfirmationTask.objects.select_for_update(of=("self",)).select_related("note").get(pk=task_id)
                 if (
                     task.state != ConfirmationTask.State.PENDING
                     or task.note.status != DeliveryNote.Status.CONFIRMING
@@ -674,7 +676,6 @@ def escalate_expired_windows(*, now=None) -> int:
                 ):
                     continue
 
-                note_obj = DeliveryNote.objects.select_for_update().get(pk=task.note_id)
                 task.state = ConfirmationTask.State.ESCALATED
                 task.escalation_reason = ConfirmationTask.EscalationReason.UNREACHABLE
                 task.escalated_at = now

@@ -17,6 +17,7 @@ from rest_framework.response import Response
 from apps.ai.declare import AiDeclarable, AiMeta
 from apps.common.api import (
     BusinessModelPermissions,
+    NoStoreMixin,
     StandardPagination,
     require_perm,
 )
@@ -54,7 +55,7 @@ def _customer_ids_by_name(q):
     return [pk for pk, name in Customer.objects.values_list("pk", "name") if needle in fold_text(name)]
 
 
-class SalesOrderViewSet(AiDeclarable, viewsets.ReadOnlyModelViewSet):
+class SalesOrderViewSet(NoStoreMixin, AiDeclarable, viewsets.ReadOnlyModelViewSet):
     ai = AiMeta(keywords=("tra_don", "tra đơn"))
     queryset = SalesOrder.objects.select_related("customer").all()
     permission_classes = [BusinessModelPermissions]

@@ -292,6 +292,23 @@ export const MOCK_CSKH_ITEMS: CskhQueueDetail[] = [
 export const MOCK_STALE_ON_CALL_IDS = new Set<number>([36]);
 export const STALE_STATE_DETAIL = "Đơn đã bị huỷ — tải lại màn hình.";
 
+/**
+ * Lô 7 (nợ Lô 3 L4): phiếu được "gài" để thao tác kế tiếp (đổi người nhận / huỷ xác nhận / quyết định Quản lý) gặp
+ * 409 STALE_STATE như BE thật khi job tự huỷ đã chạy giữa chừng. Dùng cho e2e qua `window.__caveMock.cskhArmStale(noteId)`.
+ */
+const ARMED_STALE = new Set<number>();
+
+function consumeArmedStale(noteId: number): { status: number; body: { code: string; detail: string } } | null {
+  if (!ARMED_STALE.has(noteId)) return null;
+  ARMED_STALE.delete(noteId);
+  const item = MOCK_CSKH_ITEMS.find((i) => i.note_id === noteId);
+  if (item) {
+    item.note_status = "CANCELLED";
+    item.confirm_state = "REFUND_CALL";
+  }
+  return { status: 409, body: { code: "STALE_STATE", detail: STALE_STATE_DETAIL } };
+}
+
 export function getMockCskhQueue(params?: { state?: string; page?: number }): CskhQueueResponse {
   let list = [...MOCK_CSKH_ITEMS];
   const now = new Date().toISOString();
@@ -593,6 +610,8 @@ export function mockUnconfirm(
   if (!item) {
     return { status: 404, body: { code: "NOT_FOUND", detail: "Không tìm thấy phiếu." } };
   }
+  const stale = consumeArmedStale(noteId);
+  if (stale) return stale;
   item.note_status = "CONFIRMING";
   item.confirm_state = "PENDING";
   return {
@@ -613,6 +632,8 @@ export function mockChangeRecipient(
   if (!item) {
     return { status: 404, body: { code: "NOT_FOUND", detail: "Không tìm thấy phiếu." } };
   }
+  const stale = consumeArmedStale(noteId);
+  if (stale) return stale;
   const changed: string[] = [];
   if (payload.delivery_address !== undefined) {
     item.address = payload.delivery_address;
@@ -703,6 +724,8 @@ export function mockDecideCskh(
   if (!item) {
     return { status: 404, body: { code: "NOT_FOUND", detail: "Không tìm thấy mục chờ gọi." } };
   }
+  const armed = consumeArmedStale(noteId);
+  if (armed) return armed;
   if (item.confirm_state !== "ESCALATED") {
     return {
       status: 409,
@@ -762,3 +785,21 @@ export function mockDecideCskh(
   return { status: 400, body: { code: "INVALID_INPUT", detail: "Quyết định không hợp lệ." } };
 }
 
+// Công cụ thử trong DevTools/e2e (chỉ có ở mock):
+//   window.__caveMock.cskhArmStale(noteId)         — thao tác kế tiếp trên phiếu này gặp 409 STALE_STATE (job tự huỷ đã chạy)
+//   window.__caveMock.cskhSetStatus(noteId, "PREPARING") — đổi trạng thái phiếu để mở nút "Huỷ xác nhận đơn"
+if (process.env.NEXT_PUBLIC_USE_MOCK === "1" && typeof window !== "undefined") {
+  const w = window as unknown as { __caveMock?: Record<string, unknown> };
+  w.__caveMock = {
+    ...(w.__caveMock || {}),
+    cskhArmStale: (noteId: number) => {
+      ARMED_STALE.add(noteId);
+      return `Phiếu ${noteId}: thao tác kế tiếp sẽ gặp STALE_STATE`;
+    },
+    cskhSetStatus: (noteId: number, status: string) => {
+      const it = MOCK_CSKH_ITEMS.find((i) => i.note_id === noteId);
+      if (it) (it as { note_status: string }).note_status = status;
+      return it ? `Phiếu ${noteId}: ${status}` : "Không có phiếu";
+    },
+  };
+}

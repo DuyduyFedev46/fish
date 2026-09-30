@@ -325,8 +325,15 @@ SELLER_ADDRESS = os.getenv("SELLER_ADDRESS", "")
 SELLER_PHONE = os.getenv("SELLER_PHONE", "")
 SELLER_EMAIL = os.getenv("SELLER_EMAIL", "")
 
+
+def privacy_consent_required(testing: bool, debug: bool, env) -> bool:
+    """Đọc cờ bắt buộc đồng ý chính sách bảo mật: mặc định TẮT khi test/debug, BẬT ngoài dev/test (G1)."""
+    raw = env.get("PRIVACY_CONSENT_REQUIRED", "0" if (testing or debug) else "1")
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
+
+
 # Cờ bắt buộc đồng ý chính sách bảo mật (mặc định BẬT ngoài dev/test - G1)
-PRIVACY_CONSENT_REQUIRED = _bool("PRIVACY_CONSENT_REQUIRED", "0" if (TESTING or DEBUG) else "1")
+PRIVACY_CONSENT_REQUIRED = privacy_consent_required(TESTING, DEBUG, os.environ)
 
 # Cờ thông báo xác nhận cuộc gọi (mặc định TẮT tới khi CSKH vận hành - G2)
 SHOP_CONFIRM_CALL_NOTICE = _bool("SHOP_CONFIRM_CALL_NOTICE", "0")

@@ -9,18 +9,15 @@ Lọc dữ liệu đầu ra và cắt kích thước kết quả lệnh AI (02b 
 import json
 from decimal import Decimal
 from django.conf import settings
+from apps.common.cost_keys import can_view_cost
 from apps.ai.policy.rules import SCRUB_COST_KEYS, SCRUB_FREE_TEXT_KEYS, SCRUB_PII_KEYS
 
 
 def _is_cost_authorized(user) -> bool:
-    """Kiểm tra người dùng có quyền xem giá vốn không."""
+    """Quyền xem giá vốn: một nguồn duy nhất `can_view_cost` (P8 BM-07). `view_profitreport` không đủ."""
     if not user or not user.is_authenticated:
         return False
-    return (
-        user.has_perm("accounts.view_costprice")
-        or user.has_perm("inventory.view_costprice")
-        or user.has_perm("reports.view_profitreport")
-    )
+    return can_view_cost(user)
 
 
 def scrub_data(data, *, user, is_ai_read: bool = True):

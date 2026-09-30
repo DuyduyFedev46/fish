@@ -833,3 +833,168 @@ Kiểm cuối (build thật `NEXT_PUBLIC_USE_MOCK=0`, `erp-console/out/` hiện 
 - Ảnh (`qa-lo6/`): `f62-de-ai-lam-not-opened-assistant-desktop.png`, `f62-de-ai-lam-after-desktop.png`, `f62-step-ai-null-mobile360.png`.
 - Build thật `NEXT_PUBLIC_USE_MOCK=0` (`erp-console/out/` hiện là bản thật): `check-no-mock.mjs` XANH (13 tệp mock, 32 chuỗi seed, 134 tệp build); `check-ai-chunks.mjs` XANH; `grep -rlE "demo1234|0900000|Khách Giả|mockGet" out/` = 0; `grep -rl "a1b2c3d4-e5f6-7890-abcd-ef1234567890" out/` = 0; `frontend/scripts/check-no-mock.mjs` XANH.
 - First Load JS (script, chưa nén): /orders 433.3, /orders/payments 446.4, /orders/refunds 409.0, /inventory 388.0 kB (không đổi so với F6-1). Layout console 373.5, layout gốc 309.7.
+
+## Lô 7 — BE
+
+Phạm vi: `backend/` (be-dev). Không đụng `migrations/`, `models/`, `frontend/`, `erp-console/`, `doc/decisions.md`, `02-stories.md`, `02c`. Không commit/deploy. Dữ liệu 100% giả (0900000xxx, "Khách Giả A/B"). Không migration mới (`makemigrations --check --dry-run`: No changes detected).
+
+### Kiểm chứng cuối (chạy trong lượt này)
+- `cd backend && DJANGO_DEBUG=1 env -u DATABASE_URL .venv/bin/python manage.py test` (không `--parallel`): **Ran 1594 tests ... OK** (nền trước lô: 1523; thêm 71 test mới, 0 failure, 0 error).
+- `manage.py makemigrations --check --dry-run`: `No changes detected` (chỉ có cảnh báo cũ `content.W001` về SELLER_*).
+- `adapter/` không sửa nên không chạy pytest.
+
+### SR-22
+| Mã | Sửa | Test (mới) | Đỏ -> xanh |
+|---|---|---|---|
+| BM-05 | `apps/ai/actions/services.py`: `confirm_ai_action`/`reject_ai_action` dùng `visible_actions_for(user)` (cùng bộ lọc với `retrieve`). Ngoài phạm vi: 404 `NOT_FOUND`, cùng thông điệp với id không tồn tại, trạng thái không đổi | `apps/ai/actions/tests/test_p8_lo7_bm05.py` (11) | Đỏ khi viết test (việc ngoài phạm vi không trả 404), xanh sau khi cài; số đỏ chi tiết không lưu lại |
+| BM-07 | `apps/ai/execution/scrub.py`: `_is_cost_authorized` = `can_view_cost(user)` (quyền `inventory.view_costprice`), không còn tự dò nhóm | `apps/ai/execution/tests/test_p8_lo7_scrub_cost.py` (4). Khoá dò: `purchase_rate`, `landed_unit_cost` (đều thuộc `COST_KEYS`) | Đỏ rồi xanh (số đỏ chi tiết không lưu lại) |
+| F07 | `apps/ai/execution/pipeline.py`: mốc đầu ngày của hạn mức ngày dùng `timezone.localtime().replace(hour=0,...)` (giờ VN), không dùng đầu ngày UTC | `apps/ai/execution/tests/test_p8_lo7_daily_limit.py` (2): 08:00 VN có việc lúc 06:30 VN -> được đếm (trước đó bị bỏ sót); 06:30 VN có việc từ 20:00 VN hôm trước -> không đếm (trước đó bị đếm thừa) | Đỏ rồi xanh (số đỏ chi tiết không lưu lại) |
+| F08 | `apps/delivery/cskh/services.py::escalate_expired_windows`: khoá `DeliveryNote` (`select_for_update`) **trước** `ConfirmationTask`; thứ tự chung: SalesOrder -> DeliveryNote -> ConfirmationTask | `apps/delivery/tests/test_p8_lo7_lock_order.py` (spy `QuerySet.select_for_update`, kiểm thứ tự model) | Đỏ (thứ tự khoá sai) rồi xanh; số đỏ chi tiết không lưu lại |
+| F10 | `apps/ai/actions/services.py::undo_ai_action`: đọc `spec.undo == "cancel_action:<act>"`, dispatch đúng action đó của `spec.view_cls` (không còn mặc định `cancel_receipt`); không có đường hoàn tác (`""`, `defer`, action không có trên view, lệnh mất khỏi registry) -> 400 `AI_CANNOT_UNDO`, trạng thái giữ DONE. Lỗi từ action huỷ giữ mã gốc (ví dụ `BR-MH-07`). Bỏ chặn `AI_ENABLED` 410 ở đường hoàn tác/huỷ lịch (rút lại việc đã có, không phải AI làm thêm) | `apps/ai/actions/tests/test_p8_lo7_undo.py` (8) | 8 đỏ khi viết test, chỉ còn test DW-19-AC10 cũ đỏ sau khi cài (xem "Lệch"); xanh sau khi sửa test cũ |
+| F12 | `apps/sales/payments/auto_confirm.py`: (a) xoá nhánh chết `p.sales_order`/CONFIRM_ORDER (02b chốt số 2, chỉ còn ATTACH_TO_ORDER); (b) không có Chủ đang hoạt động -> `logger.warning` và **không** đếm là escalated; (c) `downgrade_reason` và log chỉ ghi **mã lỗi** (`BusinessError.code` hoặc tên lớp lỗi), không ghi `str(exc)` | `apps/sales/payments/tests/test_p8_lo7_auto_confirm.py` (7) | Chứng minh đỏ bằng cách tạm khôi phục bản HEAD của `auto_confirm.py`: 5 đỏ; khôi phục bản mới: xanh |
+| NoStore | `SalesOrderViewSet(NoStoreMixin, ...)` (`apps/sales/orders/api.py`) và `CustomerViewSet(NoStoreMixin, ...)` (`apps/sales/customers/api.py`): header `Cache-Control: no-store` | `apps/sales/orders/tests/test_p8_lo7_no_store.py` (4): ma trận chu/quan_ly/nv_kho/nv_giao/cskh + khách 401, danh sách và chi tiết | Đỏ rồi xanh |
+
+### Nợ Tech Lead xử lý (03b)
+- **Lô 1 L4** `apps/ai/management/commands/run_due_ai_actions.py`: nhánh AI tắt bọc từng việc bằng try/except (`_downgrade_when_ai_off`); một việc lỗi không làm hỏng các việc sau; log chỉ mã việc, lệnh, tên lớp lỗi. Test `apps/ai/execution/tests/test_p8_lo7_due_ai_off.py`.
+- **Lô 2 L5** `apps/sales/refunds/next_steps.py`, `apps/inventory/batches/next_steps.py`, `apps/sales/payments/next_steps.py`: thông điệp 404 cố định, không nhúng `doc_id` ("Không tìm thấy phiếu hoàn tiền." / "Không tìm thấy lô hàng." / "Không tìm thấy giao dịch thanh toán."). Test `apps/common/tests/test_p8_lo7_guidance_404.py`.
+- **Lô 2 L2** `apps/ai/registry/tests/test_p8_pii_sweep.py`: fixture có thêm khách B, người nhận (`Người Nhận Giả C`, 0900000789), phiếu giao gán nv_giao, `ConfirmationTask`, phiếu hoàn tiền; lớp `SR24Fixture` khẳng định dữ liệu **không rỗng** và các sentinel không lọt ra API/AI (quét vẫn xanh: rỗng không còn là "xanh giả").
+- **Lô 3 L1** `auto_confirm.py`: xoá nhánh chết (trùng mục F12a).
+- **Lô 3 L2** `_escalate_to_chu` trả `bool` (True = đã chuyển/cập nhật, False = không có Chủ hoặc no-op); các nơi gọi đếm `escalated`/`skipped` đúng theo giá trị trả về; khi lý do đổi thì cập nhật cả `downgrade_reason` lẫn `args["reason"]`.
+- **Lô 6 L6-1** `apps/content/entries/services.py`: ảnh bìa và khối ảnh trong thân bài phải thuộc **chính bài đó**. `restore_entry_version` và `discard_changes` bỏ ảnh bìa lạ (dùng `_own_cover`) và tính lại `content_hash` cho khớp; `publish_entry` chặn 400 `BR-ND-07` với ảnh bìa hoặc khối ảnh thuộc bài khác (`_assert_images_belong_to_entry`). Test `apps/content/entries/tests/test_p8_lo7_cover_scope.py` (9).
+- **Lô 5 L5-1 (BE)**: xem contract dưới.
+
+### Contract L5-1: `GET /api/inventory/batches/`
+Quyền không đổi: `BusinessModelPermissions` (chu, quan_ly, nv_kho 200; nv_giao, cskh 403; khách 401). Không thêm trường tiền/giá vốn. Tên khoá đúng như fe-dev ERP đang dùng.
+- Tham số mới `has_stock`: `1` hoặc `true` -> chỉ lô có `qty_available > 0`. Bỏ trống, `0` hoặc giá trị khác -> không lọc (không lỗi). Kết hợp được với `status` và `item_code`. Đã khai trong `BatchListQuery` (`has_stock` BooleanField) nên registry AI thấy tham số này.
+- Khoá mới (đọc, cả danh sách lẫn chi tiết): `item_name` (`item.name`), `supplier_name` (`supplier.name`), `warehouse_name` (`warehouse.name`), `status_label` (`get_status_display`).
+- Khoá cũ giữ nguyên.
+```
+GET /api/inventory/batches/?status=EXPIRED&has_stock=1   (nv_kho)
+{"count": 1, "next": null, "previous": null, "results": [
+  {"id": 7, "batch_id": "LO-...", "item": 3, "item_code": "TOM-SU-1", "item_name": "Tôm sú loại 1",
+   "supplier": 2, "supplier_name": "Đầu mối A", "warehouse": 1, "warehouse_name": "Kho chính",
+   "received_date": "2026-09-20", "expiry_date": "2026-09-27",
+   "qty_received": "100.000", "qty_available": "3.000", "qty_reserved": "0.000", "qty_sellable": "3.000",
+   "status": "EXPIRED", "status_label": "Quá hạn", "closed_at": null}]}
+```
+Nv_kho không có `purchase_rate`/`landed_unit_cost` (mixin `CostFieldSerializerMixin`); chu/quan_ly có quyền `inventory.view_costprice` thì vẫn thấy như cũ.
+- Test: `apps/inventory/batches/tests/test_p8_lo7_list_contract.py` (10): lọc `has_stock`, kết hợp `status`, đúng giá trị 4 khoá, chi tiết cũng có khoá mới, nv_kho không có khoá `COST_KEYS` và không chứa số giá mua giả `180000`, ma trận Group. Đỏ trước khi cài: 3 (1 error thiếu `item_name`, 2 fail: `has_stock` không lọc, chi tiết thiếu khoá); xanh sau: 10/10.
+- `apps.inventory apps.ai` sau khi sửa: 434 test OK (registry AI không vỡ).
+
+### SR-24
+- **F5(a)** `backend/config/settings.py`: tách `privacy_consent_required(testing, debug, env)`; hằng `PRIVACY_CONSENT_REQUIRED = privacy_consent_required(TESTING, DEBUG, os.environ)`. Chỉ đổi đúng chỗ này trong `settings.py`. Hàm tên chữ thường để không trùng tên hằng cấu hình. Test `apps/sales/orders/tests/test_p8_lo7_privacy_gl03.py::PrivacyConsentFlagFunctionTests` (4): mặc định bật ngoài dev/test, tắt khi test hoặc debug, biến môi trường ghi đè hai chiều (`1/true/yes/on` và `0/false/no/off/rỗng`), hằng đang chạy bằng đúng kết quả của hàm. Test cũ `test_settings_privacy_consent_required_outside_testing_and_debug` (sao chép công thức vào test, không kiểm gì) đổi sang gọi hàm thật. Đỏ: `ImportError: cannot import name 'privacy_consent_required'`; xanh sau khi tách hàm.
+- **F5(b)** GL-03-AC10: `test_f5b_gl03_ac10_admin_post_khong_doi_2_field_consent`: `force_login(superuser)`, GET trang sửa `admin:sales_salesorder_change`, dựng dữ liệu form từ chính form Admin (kèm inline), gửi giá trị **khác** cho `privacy_consent_at` và `privacy_policy_version`, POST, `refresh_from_db` -> không đổi. Kèm `test_f5b_admin_khong_hien_2_field_consent_o_dang_sua_duoc` (cả hai nằm trong `readonly_fields`). Ghi chú thật: khi thử bỏ `readonly_fields` khỏi Admin, test POST vẫn xanh vì hai field còn được chặn bởi `editable=False` ở model (lớp bảo vệ thứ hai); test `readonly_fields` thì đỏ. Hai test cùng nhau khoá cả hai lớp.
+- **F5(c)** GL-03-AC9: `test_f5c_gl03_ac9_tra_don_co_dong_y_dung_tap_khoa_cong_khai`: đơn CÓ đồng ý (kiểm `privacy_consent_at` khác None), `set(resp.json().keys()) ==` `{order_code, status, status_label, total_amount, lines, delivery, booked_expires_at, cancel_notice}` (đã tính `cancel_notice` do CSKH Lô 3 thêm). Thêm test không chứa tên/SĐT/địa chỉ giả và chữ `privacy`/`consent`/`policy_version` trong thân response.
+- **F13** `doc/ops/moi-truong.md`: thêm mục "Biến môi trường và job nền của AI": staging `AI_PRODUCTION_READY=1` và `AI_WRITE_LEVELS_ALLOWED=B`; production giữ `0` và `C`; bảng lịch chạy `run_due_ai_actions`, `auto_confirm_exact_payments`, `process_cskh_deadlines` (kèm `check_cskh_job_health`), khuyến nghị `*/5`, chưa tạo job thật (việc deploy của Duy). Câu V-DW1 ở `02b-tech-design.md` §8 (dòng "Đính chính V-DW1") **đã đúng sẵn** (staging `AI_PRODUCTION_READY=1`, production `0`/`C`, trỏ về `moi-truong.md`) nên không sửa; câu sai vẫn còn ở `doc/features/2026-09-28-ai-digital-worker/02c-giao-viec.md` (dòng V-DW1, ngoài phạm vi được sửa của lô này).
+
+### Lệch so với test/hành vi cũ (cần người review biết)
+1. `apps/ai/actions/tests/test_actions_api.py::test_dw11_ac5_permission_denied_on_confirm`: nv_giao confirm việc của người khác trước đây nhận 403; sau BM-05 nhận 404 (không lộ sự tồn tại). Test đổi cho nv_giao là chủ việc để giữ nguyên ý kiểm 403 về quyền lệnh.
+2. `apps/ai/execution/tests/test_dw19_level_b.py`: `test_dw19_ac10_undo_ai_disabled_returns_410` đổi tên `test_dw19_ac10_undo_ai_disabled_still_allowed`: hoàn tác/huỷ lịch khi AI tắt không còn 410 `AI_DISABLED` (F10). Id không tồn tại khi AI tắt: 404 `NOT_FOUND`.
+3. `test_p8_pii_sweep.py::test_sr05_ac3_nv_giao_de_xuat_partial_update_ngoai_pham_vi...`: fixture mới gán phiếu cho nv_giao nên test bỏ gán trước khi kiểm "ngoài phạm vi".
+4. Việc lỗi ở nhánh AI tắt của `run_due_ai_actions` và lỗi ở F12 giữ nguyên trạng thái cũ của việc (không tự đổi thành FAILED); chỉ log mã lỗi. Chưa có quyết định nghiệp vụ cho "việc SCHEDULED lỗi mãi".
+5. Undo: mã lỗi của action huỷ được giữ nguyên (`BR-MH-07`...), không gói thành lỗi chung.
+6. L6-1: khi khôi phục hoặc bỏ thay đổi, **khối ảnh lạ trong thân bài không bị gỡ** (chỉ ảnh bìa lạ bị bỏ); publish sẽ từ chối bằng 400 `BR-ND-07`. Lý do: không tự sửa nội dung bài của người soạn.
+
+### Nợ còn lại
+- N1 (Tech Lead, hẹn P9): `_escalate_to_chu` dùng `get_or_create` theo `(target_model, target_id, command)`; hai Chủ hoặc chạy song song trên Postgres chưa có bằng chứng, SQLite bỏ qua `skip_locked`.
+- Chưa có test song song trên Postgres cho khoá `DeliveryNote -> ConfirmationTask` (F08 chỉ kiểm thứ tự khoá bằng spy).
+- L5-1 chưa chạy với FE ERP thật (FE đang kiểm bằng mock); URL đã trùng contract trên.
+- Câu V-DW1 sai ở `2026-09-28-ai-digital-worker/02c-giao-viec.md` còn nguyên (ngoài phạm vi).
+
+## Lô 7 — FE Shop
+
+Phạm vi: `frontend/` (SR-23 F2, F6, F7, F8, F10; SR-24 F9). Không đụng `erp-console/`, `backend/`, `package.json`.
+
+### File đã sửa / thêm
+- `frontend/features/content/safeHref.ts` (viết lại): `isSafeHref`, `isExternalLink`, `isInternalLink`.
+- `frontend/scripts/test-safe-href.mjs` (mới): unit test 40 ca (34 `isSafeHref` + 6 `isExternalLink`), không thêm thư viện (dùng `typescript` có sẵn).
+- `frontend/lib/api.ts`: nhánh 404/410 của `apiFetch`; bỏ `getSiteInfo` (gộp về `features/site/api.ts`).
+- `frontend/lib/types.ts`, `frontend/lib/mock.ts`: bỏ `SiteInfo`, `CskhNoticeConfig`, `mockGetSiteInfo` (trùng với bản trong `features/site`).
+- `frontend/features/content/components/ArticleBody.tsx` (thành client component), `ItemCard.tsx` (chỉ hiển thị), `ArticleBody.module.css`, `app/bai-viet/bai-viet.module.css` (thêm `overflow-wrap: anywhere`).
+- `frontend/features/site/api.ts` (một `getSiteInfo`, cache Promise 5 phút), `types.ts`, `components/CskhNotice.tsx` + `CskhNotice.module.css` (mới), `components/ConfirmCallNotice.tsx`.
+- `frontend/features/checkout/components/CheckoutScreen.tsx`, `PaymentPanel.tsx`.
+- `frontend/features/content/mock.ts`: bài mẫu `xss-mau` (không nằm trong danh sách bài; chỉ có ở bản mock).
+- Kịch bản e2e mới: `frontend/e2e/qa-lo7-shop-real.py` (build thật, F7/F10/F6), `frontend/e2e/qa-lo7-shop-xss.py` (build mock, F9). `frontend/e2e/qa-lo6-sr21-shop.py`: chỉ đổi bộ chọn của 1 dòng INFO (`.cskh-notice-box` -> `[data-testid=cskh-notice]`).
+
+### F2 — `safeHref` cùng luật bản ERP (+ chặt hơn)
+Luật: bỏ khoảng trắng đầu/cuối; rỗng hoặc > 2000 ký tự -> từ chối; khoảng trắng/ký tự điều khiển bên trong -> từ chối; `/...` hợp lệ trừ `//` và `/\`; còn lại chỉ `https:`, `http:`, `mailto:`, `tel:`.
+Chạy `node scripts/test-safe-href.mjs`:
+- Bản CŨ (`git show HEAD:frontend/features/content/safeHref.ts`): `31/40 đạt, 9 sai` (đỏ) — lọt `//evil.example`, `/\evil.example`, `\\evil.example`, `\evil.example`, khoảng trắng trong URL, ký tự C1, `abc`, chuỗi > 2000, và ném lỗi khi vào là số.
+- Bản MỚI: `40/40 đạt, 0 sai`.
+- Lệch so với bản ERP (báo fe-dev ERP): `safeHref` ERP (`erp-console/features/content/editor/convert.ts`) đưa href qua `new URL()` nên nhận `abc` và `\\evil.example` (trình duyệt hiểu `\\host` như `//host`). Bản Shop từ chối cả hai và cả ký tự C1. Đề nghị ERP bổ sung cho khớp.
+
+### F6 — chuỗi "Không tìm thấy" và `apiFetch` 404/410
+- `grep` toàn `frontend/` (app, features, lib): KHÔNG có trang nào so sánh chuỗi "Không tìm thấy". Các trang dùng `err.status === 404`/`410` và chữ Việt cố định; `getCatalogItem`, `getOrderStatus` bắt 404 -> `null`.
+- Lệch thiết kế: `apiFetch` nhánh 404/410 (thêm ở Lô 3, CMS-13) lấy thông điệp từ `body.detail`. DRF trả mặc định `"Not found."` (tiếng Anh) nên có nguy cơ lộ chữ Anh ra người dùng. Đã sửa: `detail === "Not found."` thì dùng lại câu tiếng Việt mặc định. Vì vậy thông điệp lỗi không còn là hằng để so khớp; code gọi phải dựa vào `err.status`, không so chuỗi.
+- Chứng cứ Playwright (build thật): 404 `{"detail":"Not found."}`, 410 và 404 tiếng Việt -> trang bài không hiện "Not found", không pageerror.
+
+### F7 — catalog nạp 1 lần cho cả bài
+`ArticleBody` gọi `getCatalog()` một lần khi thân bài có `item_card` (bài không có thẻ thì không gọi), dựng `Map<item_code, CatalogItem>` truyền xuống `ItemCard`. Playwright (build thật, chặn API):
+- Bài 3 thẻ: đúng 1 request `/api/shop/catalog/`, 0 request `/api/shop/catalog/<mã>/`. Thẻ 1, 2 hiện tên và giá `100.000`; thẻ 3 (`sellable_qty` "0") báo "Tạm hết hàng".
+- Bài không có thẻ: 0 request catalog. Catalog 500: vẫn 1 request, bài vẫn đọc được, không pageerror.
+- Nợ nhỏ: `ItemCard` đổi `sellable_qty`/`price` (chuỗi từ API) bằng `Number()` (trước so sánh chuỗi). `CatalogGrid` và `app/shop/item` vẫn truyền chuỗi giá vào `formatVnd`; đã kiểm thực tế chỉ hiển thị đúng khi backend trả số, chưa sửa vì ngoài phạm vi Lô 7.
+
+### F8 — `srcset`
+API công khai trả 3 cỡ `urls {sm, md, lg}` (webp 480/960/1600, không phóng to; `width` là bề rộng cỡ lớn nhất). `<img>` có `srcSet` (480w, 960w, 1600w; cỡ hẹp hơn ảnh gốc thì hạ bề rộng khai báo và bỏ cỡ trùng) và `sizes="(max-width: 840px) 100vw, 840px"`. Playwright F9 kiểm `srcset` chứa 480w/960w/1600w và `sizes` không rỗng.
+
+### F10 — một khối "Lưu ý xác nhận đơn", một nguồn giờ, một request
+- `CskhNotice` dùng chung (form và màn thanh toán). `ConfirmCallNotice` ("sẽ gọi số đuôi ...") dùng `CallNoticeBox`, cùng nguồn giờ.
+- Nguồn giờ duy nhất: `callHours(info)` = `cskh_notice.working_hours` khi khối CSKH bật (`CSKH_WORKING_HOURS`); ngược lại `confirm_call_hours` (`SHOP_CONFIRM_CALL_HOURS`); ngược lại mặc định `DEFAULT_CALL_HOURS`.
+- `getSiteInfo` chỉ còn một hàm (`features/site/api.ts`), cache Promise 5 phút (xoá cache khi lỗi). Footer, form checkout, màn thanh toán, trang tra đơn dùng chung.
+- Playwright (build thật): mở checkout -> `site-info` đúng 1 request; sau khi đặt hàng thành công vẫn <= 1; trang tra đơn 1 request. Cả hai khối cùng hiện `07:00-21:00` (không còn `7:00–20:00`). Khi `cskh_notice=null` thì hộp gọi xác nhận dùng `7:00–20:00` và không có khối CSKH. `site-info` lỗi: form vẫn hiện (theo GL-03-AC5, mặc định bắt buộc đồng ý), không pageerror. SĐT đầy đủ không lộ, chỉ 4 số cuối.
+- Cần báo BE/ops (không sửa được ở FE): hai cài đặt `SHOP_CONFIRM_CALL_HOURS` (mặc định "7:00–20:00") và `CSKH_WORKING_HOURS` (mặc định "07:00-21:00") còn lệch nhau; nên gộp một nguồn ở backend.
+- Dấu `{/* # CHỜ legal-vn */}` giữ nguyên trong `CskhNotice`.
+
+### F9 — bài mẫu `xss-mau`
+`/bai-viet/?slug=xss-mau` (bản mock). Chứa script/img onerror/svg onload dạng chữ, link `javascript:`, `JaVaScRiPt:`, `java\tscript:`, `data:`, `vbscript:`, `//evil.example`, `/\evil.example`, `\evil.example`, `file:`, link hợp lệ (https, http, `/shop/`, mailto, tel), quote, list, ảnh alt/chú thích độc, `item_card` với mã độc. Playwright (mock, 390px và 1280px, mỗi cỡ 26 ca): không dialog, `window.__xss` không đặt, `article script` = 0, không phần tử nào có thuộc tính `on*`, không iframe/svg/img chèn, payload hiện thành chữ, không link `javascript:/data:/vbscript:/file:/`//`/`\``; 10 nhãn link độc chỉ là chữ; link ngoài có `target=_blank` + `rel="nofollow noopener noreferrer"`; nội bộ/mailto/tel không mở tab mới; bấm vào chữ link độc không đổi URL.
+- Lỗi thật phát hiện khi làm: tiêu đề bài có chuỗi dài không dấu cách làm trang cuộn ngang ở 390px (`scrollWidth` 407 > 390). Đã thêm `overflow-wrap: anywhere` cho `.title` và `.articleBody`; chạy lại đạt.
+
+### Kiểm chứng (đã chạy trong lượt này)
+- `cd frontend && npx tsc --noEmit`: exit 0.
+- `node scripts/test-safe-href.mjs`: 40/40.
+- Build thật `NEXT_PUBLIC_USE_MOCK=0` + `node scripts/check-no-mock.mjs`: XANH (4 tệp mock, 27 chuỗi seed, 44 tệp build).
+- `e2e/qa-lo7-shop-real.py`: 21 ca, 0 FAIL. `e2e/qa-lo7-shop-xss.py`: 52 ca, 0 FAIL. Hồi quy `e2e/qa-lo6-sr21-shop.py`: 279 ca, 0 FAIL, 0 LOW.
+- Cổng chất lượng UI: thành phần mới chỉ dùng token (`--color-*`, `--radius`), không hex rời; 390px không cuộn ngang; `ArticleBody.module.css` còn hex cũ có từ trước Lô 7 (nợ, chưa đổi).
+- Ảnh (`doc/features/2026-09-30-sua-loi-review/qa-lo7/`): `lo7-f7-bai-3-the-390.png`, `lo7-f9-xss-390.png`, `lo7-f9-xss-1280.png`, `lo7-f10-checkout-form-390.png`, `lo7-f10-thanh-toan-390.png`. Dữ liệu 100% giả. (Ảnh full-page hiện thanh đầu trang dính giữa màn: do chụp cả trang, không phải lỗi giao diện.)
+- Nợ: e2e cũ `frontend/e2e/ra_soat_cms06_item_card.py` chạy với backend thật và lọc request `/api/shop/catalog/`; chưa chạy lại vì cần backend.
+
+## Lô 7 — FE ERP
+
+Phạm vi: `erp-console/` (fe-dev). Không đụng `frontend/`, `backend/`, `package.json`/lock, `02*.md`. Không commit/deploy.
+
+### Việc đã làm
+- **F12** xoá `erp-console/app/ai-spike/` và `erp-console/spikes/dw02/`. Bản build thật không còn `out/ai-spike`; `check-ai-chunks.mjs` không tham chiếu spike nên không phải sửa. `features/ai/commands/commands.test.ts` đọc `spikes/dw02/index.json` (đã xoá) nên trỏ sang bản y hệt `doc/features/2026-09-28-ai-digital-worker/research/dw01-index.json` (kèm chú thích).
+- **F14** `app/print/label/page.tsx`: QR vẽ bằng `<img src="data:image/svg+xml;charset=utf-8,...">` có `alt="Mã QR <barcode>"`, không chèn SVG thô vào DOM. Chuyển về đăng nhập giờ giữ query: `next=/print/label/?note=..&print_no=..` (mã số, không phải dữ liệu cá nhân, đúng bất biến 9). `LoginScreen` chỉ đưa quay lại trang in khi đăng nhập lại đúng người (`cave_erp_last_user`), `safeNext` chỉ nhận đường dẫn nội bộ.
+- **Lô 2 L3** `features/purchasing/api.ts`: xoá `DRAFT_STORAGE_KEY`, `getNhapLoDraft`, `saveNhapLoDraft`, `clearNhapLoDraft`. Test DW-17-AC3 ở `purchasing.test.ts` chuyển sang dùng `saveDraft/loadDraft/clearDraft` của `draftStorage` (vẫn kiểm không lưu `rate`, và nháp của người khác không đọc được).
+- **Lô 2 L4** `AuthProvider` không import `purchasing/draftStorage` nữa. `shared/lib/drafts.ts` có `NHAP_LO_DRAFT_PREFIX = "cave_draft_nhap_lo"`; `clearAllDrafts()` xoá tiền tố này ở cả localStorage (khoá cũ) lẫn sessionStorage (nháp SR-07). `draftStorage.ts` import hằng từ shared.
+- **Lô 3 L4** `features/cskh/CskhCallModal.tsx`: đổi người nhận, huỷ xác nhận, quyết định Quản lý dùng chung `reportActionError` (`isStaleStateError` -> khối `cskh-stale-alert` + nút "Tải lại", như thao tác gọi); nút gửi của 3 biểu mẫu khoá khi đang stale.
+- **Lô 4 L1** timeline đơn: thêm `credit_note_issued` vào `TimelineKind` (`features/orders/types.ts`) và icon `description` trong `OrderDetailView`. Nhãn "Lập chứng từ đảo doanh thu DC-<mã hoá đơn> (x đ)" do BE trả (`orders/timeline.py`); FE chỉ hiện. Mock `orders/mock.ts` sinh mốc này cho đơn CANCELLED có hoá đơn.
+- **Lô 5 L5-1 (FE)** danh sách lô: `getBatchesByStatus("EXPIRED")` gọi `GET /api/inventory/batches/?status=EXPIRED&has_stock=1`, bỏ lọc phía client; dùng `item_name`, `supplier_name`, `warehouse_name`, `status_label` (đủ cột NCC và Kho luôn hiện ở chế độ lọc). Cập nhật `types.ts`, `mock.ts` (mock lọc `has_stock=1`), README.
+- **SR-23 F2 (ERP)** `features/content/editor/safeHref.ts` (mới) chép nguyên luật của Shop (`isSafeHref`, `isExternalLink`), không import chéo sang `frontend/`. `convert.ts`, `TiptapEditor.tsx`, `PolicyVersionSheet.tsx` dùng `isSafeHref`; hàm `safeHref` cũ (phân giải bằng `new URL`) đã bỏ. Vitest `safeHref.test.ts` chạy cùng 40 payload với `frontend/scripts/test-safe-href.mjs` (34 ca `isSafeHref` + 6 ca `isExternalLink`). Đỏ trước: với bản cũ chép vào `safeHref.ts` cho 4 ca sai (`\\evil.example`, `\evil.example`, C1 0x85, `abc`) = 36/40; xanh sau: 40/40. Test cũ về `safeHref` trong `convert.test.ts` chuyển sang file mới.
+- Sửa kèm: `shared/ui/globals.css` khối thẻ hoá bảng trên mobile: luật `tr:last-child td` (độ ưu tiên cao hơn `td.m-*`) làm dòng cuối bị sai bố cục (tên mặt hàng lọt xuống dòng đầu, lệch với các dòng trên). Chỉ còn `border:0` cho dòng cuối. Áp cho mọi bảng `table.data` ở ERP; xem ảnh `l5-1-mobile-375-lo-qua-han.png`.
+
+### Mock mới (chỉ có khi `NEXT_PUBLIC_USE_MOCK=1`, không lọt build thật)
+- `window.__caveMock.cskhArmStale(noteId)`: lần thao tác kế tiếp (đổi người nhận / huỷ xác nhận / quyết định) trả 409 `STALE_STATE` và đưa phiếu sang huỷ + báo hoàn tiền.
+- `window.__caveMock.cskhSetStatus(noteId, status)`: đổi trạng thái phiếu (ví dụ `PREPARING` để hiện nút "Huỷ xác nhận đơn").
+
+### Kiểm chứng (đã chạy trong lượt này)
+- `cd erp-console && npx tsc --noEmit`: exit 0. `npm test`: 11 file, 140 test đạt.
+- Build thật `rm -rf .next out && NEXT_PUBLIC_USE_MOCK=0 npm run build`: xong. `node scripts/check-no-mock.mjs`: XANH (13 tệp mock, 32 chuỗi seed, 131 tệp build). `node scripts/check-ai-chunks.mjs`: XANH (layout gốc 308,3 kB; layout console 372,2 kB; /orders 432,0 kB; /orders/payments 445,1 kB; /orders/refunds 407,7 kB; /inventory 386,7 kB). `ls out/ai-spike`: không tồn tại. Bản build thật chứa `has_stock=1`, không chứa `demo1234`, `0900000`, `Khách Giả`, `__caveMock`.
+- Playwright (mock, cổng 3217, `out` sao chép sang thư mục riêng): `erp-console/e2e/p8_lo7_fe_erp.py` 79/79 (desktop 1280 và mobile 375): F14 (chuyển đăng nhập giữ query, quay lại đúng tem, `<img data:image/svg+xml>` vẽ được, không `<svg>` thô, vẫn gọi in), CSKH stale cho 3 thao tác (đúng `detail` của BE, nút Tải lại >= 44px, nút gửi khoá, cảnh báo nằm trong khung nhìn, Tải lại đóng hộp thoại), timeline credit note (đúng định dạng VNĐ, đúng thứ tự sau "Huỷ đơn"), danh sách EXPIRED (3 lô, cột NCC/Kho, nhãn "Quá hạn"), `/ai-spike/` 404, console không có SĐT/tên khách.
+- Hồi quy sau khi sửa CSS (chạy lại trên bản mock mới): `p8_lo5_fe_lo_qua_han.py` 77/77 (0 FAIL; có 15 dòng console "Failed to fetch RSC payload" do `http.server` tĩnh không phục vụ RSC, thoát bằng điều hướng cứng, không ảnh hưởng), `sr07_nhap_lo_draft.py` 18/18, `sr09_ac4_stale_state.py` 22/22, `p8_lo6_fe_sr19_sr20.py` 74/74.
+- Ảnh (`doc/features/2026-09-30-sua-loi-review/qa-lo7/`): `f14-*`, `l1-*-timeline-credit-note.png`, `l4-*-{doi-nguoi-nhan,huy-xac-nhan,quyet-dinh}-stale.png`, `l5-1-*-lo-qua-han.png` (mỗi loại có bản `desktop-1280` và `mobile-375`). Dữ liệu 100% giả. Icon Material Symbols hiện thành chữ trong ảnh vì máy chụp không tải được phông (môi trường, không phải lỗi).
+
+### Lệch / nợ
+- Tem in là khổ vật lý cố định 100x150mm (~378px) nên ở màn 375px rộng hơn ~3px: chủ đích cũ, không đổi (e2e cho phép ở mobile).
+- Mock không đi qua mạng nên URL `status=EXPIRED&has_stock=1` chỉ kiểm bằng kết quả hiển thị và bằng `grep has_stock=1 out/` ở bản build thật; chưa chạy với backend thật.
+- Quyết định Quản lý ở màn CSKH: mock không phân quyền theo vai (e2e đăng nhập `cs1`); BE thật kiểm quyền riêng.
+- Còn nợ cũ, ngoài phạm vi: nhiều style hex nội tuyến trong `CskhCallModal.tsx` và `CskhQueueView.tsx`.
+- Chưa có hồi quy bằng trình duyệt cho trình soạn bài Tiptap (`isSafeHref` chỉ được unit test và tsc/build); href không có giao thức (ví dụ `abc`) giờ bị từ chối ở ô nhập link.
+
+### L7-1 — open redirect ở đăng nhập ERP (techlead review Lô 7, Medium)
+- **Lỗi:** `safeNext` (`erp-console/shared/lib/nav.ts`) chỉ chặn `//`, nên `/login/?next=/%5Cevil.example` (giải mã thành `/\evil.example`, trình duyệt hiểu là `//evil.example`) và `/%09/evil.example` lọt qua; `LoginScreen.destination` đẩy người đã đăng nhập sang trang ngoài.
+- **Sửa:** `safeNext` chỉ nhận chuỗi bắt đầu đúng bằng `/` (không trim), ký tự thứ hai không phải `/` hay `\`, không có ký tự mã <= 32 hoặc 127-159, không quá 2000 ký tự; ngược lại trả `null` (về trang mặc định theo `homePath`). Đây là luật nhánh "đường dẫn nội bộ" của `features/content/editor/safeHref.ts`, chép vào `nav.ts` (không import từ `features/content` vào `shared/lib`, theo luật module). Các nơi tạo `next` (`ConsoleGate`, `AuthProvider`, `app/print/label/page.tsx`) vẫn `encodeURIComponent`, không đổi.
+- **Vitest** `shared/lib/safeNext.test.ts` (18 ca). Đỏ trước khi sửa: 7 ca sai (`/\evil.example`, `/%5C…` sau giải mã, tab, xuống dòng, C1, quá 2000 ký tự); xanh sau: 18/18. Từ chối: `//evil.example`, `/\evil.example`, `/\t/evil.example`, `\t//evil.example`, `https://evil.example`, `javascript:alert(1)`, `\evil.example`, rỗng, `null`. Giữ nguyên: `/orders/?id=1`, `/print/label/?note=1&print_no=1`, `/`, `/inventory/?status=EXPIRED`.
+- **Playwright (mock, cổng 3217)** `erp-console/e2e/l7_1_open_redirect.py` 16/16: đã đăng nhập rồi mở `/login/?next=` với `/%5Cevil.example`, `/%09/evil.example`, `//evil.example`, `https://evil.example`, `javascript:alert(1)` -> luôn ở lại `127.0.0.1:3217` (`/overview/`), không có điều hướng tới host khác; `next=/print/label/?note=32&print_no=1` hợp lệ vẫn được theo. Hồi quy: `p8_lo7_fe_erp.py` 79/79, `sr09_ac4_stale_state.py` 22/22, `sr07_nhap_lo_draft.py` 18/18.
+- **L7-5 (comment):** `frontend/features/content/safeHref.ts` đầu file: bỏ câu "chặt hơn ERP" (không còn đúng vì ERP đã chép nguyên luật). Đây là thay đổi duy nhất trong `frontend/` (chỉ comment; `node scripts/test-safe-href.mjs` vẫn 40/40, `tsc` sạch).
+- **Kiểm chứng:** `erp-console`: `tsc --noEmit` exit 0; `npm test` 12 file, 158 test đạt; build thật `NEXT_PUBLIC_USE_MOCK=0` + `check-no-mock` XANH (13 tệp mock, 32 chuỗi seed, 130 tệp build) + `check-ai-chunks` XANH (layout gốc 308,3 kB; console 372,3 kB; /orders 432,1 kB; /orders/payments 445,2 kB; /orders/refunds 407,8 kB; /inventory 386,9 kB); `out/ai-spike` không tồn tại; `out/` hiện là bản thật.

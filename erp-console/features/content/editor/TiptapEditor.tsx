@@ -6,7 +6,8 @@ import StarterKit from "@tiptap/starter-kit";
 import Link from "@tiptap/extension-link";
 import { CaveImageExtension } from "./CaveImageExtension";
 import { ItemCardExtension } from "./ItemCardExtension";
-import { bodyToTiptap, tiptapToBody, safeHref } from "./convert";
+import { bodyToTiptap, tiptapToBody } from "./convert";
+import { isSafeHref } from "./safeHref";
 import { fetchShopCatalog, type ShopCatalogItem } from "../api";
 import type { BodyDoc } from "../types";
 import s from "./TiptapEditor.module.css";
@@ -48,7 +49,7 @@ const TiptapEditor = forwardRef<TiptapEditorHandle, TiptapEditorProps>(
           protocols: ["https", "http", "mailto", "tel"],
           autolink: false,
           openOnClick: false,
-          validate: (href) => safeHref(href),
+          validate: (href) => isSafeHref(href),
         }),
         CaveImageExtension,
         ItemCardExtension,
@@ -130,7 +131,7 @@ const TiptapEditor = forwardRef<TiptapEditorHandle, TiptapEditorProps>(
         editor.chain().focus().extendMarkRange("link").unsetLink().run();
         return;
       }
-      if (safeHref(url)) {
+      if (isSafeHref(url)) {
         editor.chain().focus().extendMarkRange("link").setLink({ href: url }).run();
       } else {
         alert("Đường dẫn không hợp lệ. Chỉ chấp nhận link https, http, mailto, tel hoặc đường dẫn nội bộ.");

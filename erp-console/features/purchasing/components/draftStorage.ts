@@ -3,12 +3,13 @@
 // - Khoá gắn id người dùng (`cave_draft_nhap_lo:<userId>`), lưu ở sessionStorage (mất khi đóng tab), không dùng localStorage.
 // - Idempotency key nằm trong nháp của CHÍNH người đó (F5 giữ key để gửi lại sau lỗi mạng không tạo phiếu thứ hai);
 //   nháp của người khác / đã đăng xuất / đã gửi thành công thì không bao giờ dùng lại key (form sinh key mới).
-// - Đăng xuất gọi clearAllDrafts(): xoá mọi khoá `cave_draft_nhap_lo*` ở cả sessionStorage và localStorage (khoá cũ dùng chung).
+// - Đăng xuất gọi clearAllDrafts() của `shared/lib/drafts.ts` (không import vào đây): xoá mọi khoá `cave_draft_nhap_lo*` ở cả sessionStorage và localStorage (khoá cũ dùng chung).
 
+import { NHAP_LO_DRAFT_PREFIX } from "@/shared/lib/drafts";
 import type { NhapLoLineInput } from "../types";
 
 /** Khoá cũ (dùng chung mọi người, ở localStorage, có cả giá mua) — chỉ còn để dọn. */
-export const LEGACY_DRAFT_KEY = "cave_draft_nhap_lo";
+export const LEGACY_DRAFT_KEY = NHAP_LO_DRAFT_PREFIX;
 
 export type NhapLoDraftLine = Omit<NhapLoLineInput, "rate">;
 
@@ -98,24 +99,4 @@ export function purgeLegacyDraft(): void {
   } catch {
     /* bỏ qua */
   }
-}
-
-function removeByPrefix(s: Storage | null): void {
-  if (!s) return;
-  try {
-    const keys: string[] = [];
-    for (let i = 0; i < s.length; i++) {
-      const k = s.key(i);
-      if (k && k.startsWith(LEGACY_DRAFT_KEY)) keys.push(k);
-    }
-    for (const k of keys) s.removeItem(k);
-  } catch {
-    /* bỏ qua */
-  }
-}
-
-/** Đăng xuất: xoá mọi nháp Nhập lô của mọi người, cả khoá cũ ở localStorage. */
-export function clearAllDrafts(): void {
-  removeByPrefix(storage("sessionStorage"));
-  removeByPrefix(storage("localStorage"));
 }

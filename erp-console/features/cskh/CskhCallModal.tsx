@@ -159,15 +159,18 @@ export function CskhCallModal({ noteId, initialItem, onClose, onUpdated }: Props
       onUpdated();
       onClose();
     } catch (err: unknown) {
-      if (isStaleStateError(err)) {
-        setStaleMessage(err.message || "Đơn đã bị huỷ — tải lại màn hình.");
-        setSubmitting(false);
-        return;
-      }
-      const msg = err instanceof Error ? err.message : "Đã có lỗi xảy ra.";
-      setError(msg);
+      reportActionError(err, "Đã có lỗi xảy ra.");
       setSubmitting(false);
     }
+  };
+
+  // Lỗi của thao tác ghi: 409 STALE_STATE → khoá thao tác + hiện `detail` kèm nút "Tải lại"; lỗi khác → hiện thông điệp.
+  const reportActionError = (err: unknown, fallback: string) => {
+    if (isStaleStateError(err)) {
+      setStaleMessage(err.message || "Đơn đã bị huỷ — tải lại màn hình.");
+      return;
+    }
+    setError(err instanceof Error ? err.message : fallback);
   };
 
   const handleChangeRecipientSubmit = async (e: React.FormEvent) => {
@@ -190,8 +193,7 @@ export function CskhCallModal({ noteId, initialItem, onClose, onUpdated }: Props
       setDetail(refreshed);
       onUpdated();
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Không thể đổi người nhận.";
-      setError(msg);
+      reportActionError(err, "Không thể đổi người nhận.");
     } finally {
       setSubmitting(false);
     }
@@ -212,8 +214,7 @@ export function CskhCallModal({ noteId, initialItem, onClose, onUpdated }: Props
       onUpdated();
       onClose();
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Không thể huỷ xác nhận.";
-      setError(msg);
+      reportActionError(err, "Không thể huỷ xác nhận.");
     } finally {
       setSubmitting(false);
     }
@@ -268,8 +269,7 @@ export function CskhCallModal({ noteId, initialItem, onClose, onUpdated }: Props
         }
       }
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Không thể thực hiện quyết định Quản lý.";
-      setError(msg);
+      reportActionError(err, "Không thể thực hiện quyết định Quản lý.");
       setSubmitting(false);
     }
   };
@@ -434,7 +434,7 @@ export function CskhCallModal({ noteId, initialItem, onClose, onUpdated }: Props
                     <button
                       type="submit"
                       className={s.btnPrimary}
-                      disabled={submitting}
+                      disabled={submitting || staleMessage !== null}
                     >
                       {submitting ? "Đang lưu..." : "Lưu thay đổi"}
                     </button>
@@ -472,7 +472,7 @@ export function CskhCallModal({ noteId, initialItem, onClose, onUpdated }: Props
                     <button
                       type="submit"
                       className={s.btnDanger}
-                      disabled={submitting}
+                      disabled={submitting || staleMessage !== null}
                     >
                       {submitting ? "Đang huỷ..." : "Xác nhận huỷ"}
                     </button>
@@ -639,7 +639,7 @@ export function CskhCallModal({ noteId, initialItem, onClose, onUpdated }: Props
                       <button
                         type="submit"
                         className={decisionType === "CANCEL" ? s.btnDanger : s.btnPrimary}
-                        disabled={submitting}
+                        disabled={submitting || staleMessage !== null}
                       >
                         {submitting
                           ? "Đang lưu..."

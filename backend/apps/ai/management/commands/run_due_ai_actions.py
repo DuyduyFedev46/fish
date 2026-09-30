@@ -32,22 +32,14 @@ class Command(BaseCommand):
             )
             count = 0
             for act in due_actions:
-                with transaction.atomic():
-                    locked = (
-                        AiAction.objects.select_for_update(skip_locked=True)
-                        .filter(pk=act.pk, status=AiAction.Status.SCHEDULED)
-                        .first()
+                # P8 L4: cô lập lỗi từng việc như nhánh AI bật; việc lỗi giữ SCHEDULED (rollback), thử lại lần sau.
+                try:
+                    if _downgrade_when_ai_off(act):
+                        count += 1
+                except Exception as exc:  # noqa: BLE001 — không log str(exc) (bất biến 9)
+                    logger.warning(
+                        "AI-off downgrade failed action=%s cmd=%s err=%s", act.pk, act.command, type(exc).__name__,
                     )
-                    if not locked:
-                        continue
-                    locked.status = AiAction.Status.PENDING
-                    locked.level = AiAction.Level.C
-                    locked.downgrade_reason = {
-                        "code": "AI_DISABLED",
-                        "text": "Hệ thống AI đang tắt",
-                    }
-                    locked.save(update_fields=["status", "level", "downgrade_reason"])
-                    count += 1
             self.stdout.write(f"AI_ENABLED is False: downgraded {count} scheduled actions to PENDING.")
             return
 
@@ -92,6 +84,26 @@ class Command(BaseCommand):
                 )
 
         self.stdout.write(f"Finished: executed {executed_count}, downgraded {downgraded_count}, overdue escalated {overdue_escalated_count}.")
+
+
+def _downgrade_when_ai_off(act):
+    """DW-21-AC8: hạ MỘT việc SCHEDULED về C/PENDING khi AI tắt toàn cục (transaction riêng). True nếu đã hạ."""
+    with transaction.atomic():
+        locked = (
+            AiAction.objects.select_for_update(skip_locked=True)
+            .filter(pk=act.pk, status=AiAction.Status.SCHEDULED)
+            .first()
+        )
+        if not locked:
+            return False
+        locked.status = AiAction.Status.PENDING
+        locked.level = AiAction.Level.C
+        locked.downgrade_reason = {
+            "code": "AI_DISABLED",
+            "text": "Hệ thống AI đang tắt",
+        }
+        locked.save(update_fields=["status", "level", "downgrade_reason"])
+    return True
 
 
 def _process_one(act, registry):

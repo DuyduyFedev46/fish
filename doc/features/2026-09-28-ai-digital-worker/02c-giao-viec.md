@@ -24,7 +24,7 @@ Câu hỏi PO (🟡, lấy theo đề xuất; Duy lật được bằng cách s�
 
 | # | Mặc định dùng để code | Lô |
 |---|---|---|
-| 🟡 V-DW1 | DW-26 chạy bằng **job Hệ thống** (`actor_kind=system`) **có công tắc riêng của Chủ**, mặc định đóng, chỉ mở được ở staging khi `AI_PRODUCTION_READY=false`. Công tắc là một khoá trong `AiPolicyVersion.red_zone_open` (`"system.auto_confirm_exact_match"`), không cần migration. Hỏi lại Duy một dòng ở đầu Lô 6b trước khi code DW-26. | 6b |
+| 🟡 V-DW1 | DW-26 chạy bằng **job Hệ thống** (`actor_kind=system`) **có công tắc riêng của Chủ**, mặc định đóng, chỉ mở được ở **staging** (`AI_PRODUCTION_READY=1`); production giữ `AI_PRODUCTION_READY=0` nên không chạy *(đính chính 30/09, P8 SR-24 F13 — câu cũ ghi "khi `AI_PRODUCTION_READY=false`" là sai)*. Công tắc là một khoá trong `AiPolicyVersion.red_zone_open` (`"system.auto_confirm_exact_match"`), không cần migration. Hỏi lại Duy một dòng ở đầu Lô 6b trước khi code DW-26. | 6b |
 | 🟡 V-DW2 | Huỷ phiếu nhập: người tạo phiếu (phiếu của mình) + `quan_ly`, `chu` (mọi phiếu); chỉ khi mọi lô của phiếu còn DRAFT. | 5a |
 | 🟡 V-DW3 | Quyền Tầng 2 mới `inventory.cancel_expired_batch`, chỉ `chu`. | 1c |
 | 🟡 V-DW4 | "Tắt AI của tôi" = lệnh ghi rơi về C, lệnh đọc vẫn chạy. | 3b |

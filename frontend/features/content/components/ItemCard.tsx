@@ -1,52 +1,23 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React from "react";
 import Link from "next/link";
-import { getCatalogItem } from "@/lib/api";
 import { formatVnd } from "@/lib/format";
-import type { CatalogItemDetail } from "@/lib/types";
+import type { CatalogItem } from "@/lib/types";
 import s from "./ItemCard.module.css";
 
 interface ItemCardProps {
   itemCode: string;
   postSlug?: string;
+  /** Mặt hàng lấy từ catalog mà `ArticleBody` nạp 1 lần (SR-23 F7). `null` = không có trong catalog. */
+  item: CatalogItem | null;
+  /** `true` khi catalog còn đang tải. */
+  loading: boolean;
 }
 
-export default function ItemCard({ itemCode, postSlug }: ItemCardProps) {
-  const [item, setItem] = useState<CatalogItemDetail | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [isUnavailable, setIsUnavailable] = useState(false);
-
-  useEffect(() => {
-    let active = true;
-    setLoading(true);
-    setIsUnavailable(false);
-
-    getCatalogItem(itemCode)
-      .then((data) => {
-        if (!active) return;
-        if (!data || data.sellable_qty <= 0) {
-          setIsUnavailable(true);
-          setItem(null);
-        } else {
-          setItem(data);
-          setIsUnavailable(false);
-        }
-      })
-      .catch(() => {
-        if (!active) return;
-        setIsUnavailable(true);
-        setItem(null);
-      })
-      .finally(() => {
-        if (active) setLoading(false);
-      });
-
-    return () => {
-      active = false;
-    };
-  }, [itemCode]);
-
+// Thẻ chỉ hiển thị, không tự gọi API: `ArticleBody` nạp catalog một lần cho cả bài rồi truyền
+// mặt hàng xuống (trước đây mỗi thẻ gọi `getCatalogItem` riêng -> bài 3 thẻ = 3 request).
+export default function ItemCard({ itemCode, postSlug, item, loading }: ItemCardProps) {
   const campaign = postSlug ? encodeURIComponent(postSlug) : "";
   const shopItemUrl = `/shop/item/?code=${encodeURIComponent(itemCode)}&utm_source=caveve_web&utm_medium=bai_viet&utm_campaign=${campaign}`;
   const shopCatalogUrl = `/shop/?utm_source=caveve_web&utm_medium=bai_viet&utm_campaign=${campaign}`;
@@ -60,7 +31,8 @@ export default function ItemCard({ itemCode, postSlug }: ItemCardProps) {
   }
 
   // Trường hợp mặt hàng ẩn, hết hàng hoặc API lỗi (CMS-06-AC5)
-  if (isUnavailable || !item) {
+  // (API lỗi cũng rơi vào đây: không có `item` -> "Tạm hết hàng").
+  if (!item || Number(item.sellable_qty) <= 0) {
     return (
       <div className={`${s.cardWrapper} ${s.unavailable}`}>
         <div className={s.itemInfo}>
@@ -89,7 +61,7 @@ export default function ItemCard({ itemCode, postSlug }: ItemCardProps) {
         <span className={s.tag}>Mặt hàng đang bán</span>
         <h4 className={s.name}>{item.name}</h4>
         <div className={s.priceBox}>
-          <span className={s.price}>{formatVnd(item.price)}</span>
+          <span className={s.price}>{formatVnd(Number(item.price))}</span>
           <span className={s.unit}> / kg</span>
         </div>
       </div>

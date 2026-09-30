@@ -99,7 +99,8 @@ export type TimelineKind =
   | "auto_cancelled"
   | "cancelled"
   | "refund_created"
-  | "refund_confirmed";
+  | "refund_confirmed"
+  | "credit_note_issued";
 
 /** Một mốc trên dòng thời gian (BE L7 bổ sung: ghép chứng từ + AuditLog, `at` tăng dần). `actor_display` "Hệ thống" khi actor=None. */
 export type OrderTimelineEntry = {

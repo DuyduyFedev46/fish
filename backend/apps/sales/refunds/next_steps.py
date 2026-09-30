@@ -141,7 +141,7 @@ def get_refund_guidance(doc_id: str, user: Any, request: Optional[Any] = None) -
     try:
         refund = qs.get(pk=int(doc_id))
     except (TypeError, ValueError, Refund.DoesNotExist):
-        raise Http404(f"Không tìm thấy phiếu hoàn tiền: {doc_id}")
+        raise Http404("Không tìm thấy phiếu hoàn tiền.")
 
     doc_summary = {
         "type": "refund",

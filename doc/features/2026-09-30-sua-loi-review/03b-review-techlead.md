@@ -430,3 +430,70 @@ Không chạy `npm run build` (điều phối đang build).
 - `frontend/out/` hiện là bản thật trỏ API production (QA/dev build để kiểm); chỉ là thư mục build cục bộ, không deploy.
 - 02b §6.3 ghi "đọc trạng thái từ context gate" mà không kiểm tra rằng gate chỉ gọi status khi mở tab. Đây là thiếu sót thiết kế của techlead, fe-dev làm đúng chữ và đã tự nêu hệ quả (lệch 2, 3 trong `03-dev-notes.md`). Nguồn đúng là `step.ai` như F6-2.
 - `gate-state.enabled` không đặt lại khi đăng xuất. Sau F6-2 nó chỉ còn dùng cho "Tóm tắt" và cờ đồng ý vẫn chặn nên vô hại. Nếu muốn gọn thì đặt lại trong luồng logout.
+
+## Lô 7
+
+**Kết luận: CẦN SỬA, 1 việc Medium.** Lỗi này có từ trước Lô 7 nhưng nằm đúng trên đường F14 vừa dùng thêm, và sửa chỉ mất 3 dòng. Nên sửa trước commit. Không có lỗi Critical hay High. Các việc Low còn lại không chặn commit.
+
+Kiểm chứng techlead chạy trong lượt này:
+- `cd backend && DJANGO_DEBUG=1 env -u DATABASE_URL .venv/bin/python manage.py test apps.ai apps.sales apps.delivery apps.content apps.inventory apps.common` (không `--parallel`): **Ran 1233 tests, OK**.
+- `cd erp-console && npm test`: **11 file, 140 test đạt**.
+- `cd frontend && node scripts/test-safe-href.mjs`: **40/40**.
+- Không build. Điều phối đã chạy build, `check-no-mock`, `check-ai-chunks` và `makemigrations --check`.
+
+### Soát theo điểm điều phối nêu
+| Điểm | Kết quả |
+|---|---|
+| BM-05 | `confirm_ai_action` và `reject_ai_action` lọc bằng `visible_actions_for(user)` (`actions/services.py:18-30`). Luật này tương đương `retrieve` (`actions/api.py:78-87`): có `manage_ai_policy` thì thấy tất cả, ngoài ra là chủ việc hoặc việc ESCALATED cùng `assignee_group`. Việc ngoài phạm vi và id không tồn tại trả cùng 404 `NOT_FOUND` với cùng thông điệp. Khoá `select_for_update` chỉ áp trên tập đã lọc, nên trạng thái không đổi. Có 11 test, trong đó có ca "không lộ tồn tại giống id không có". **Đạt.** Còn 2 điểm Low (L7-2, L7-3). |
+| BM-07 | `_is_cost_authorized` = `can_view_cost` (`inventory.view_costprice`). Quyền `view_profitreport` đứng riêng không còn mở khoá giá vốn. Đã bỏ nhánh `accounts.view_costprice`; codename đó không có trong nhóm nào nên không phát sinh hồi quy. **Đạt.** |
+| F07 | `timezone.localtime()` theo `TIME_ZONE="Asia/Ho_Chi_Minh"`, `USE_TZ=True`. Việt Nam không đổi giờ mùa hè. Test có cả biên 06:30 VN và 20:00 VN hôm trước. **Đạt.** |
+| F08 | `escalate_expired_windows` khoá `DeliveryNote` trước, sau đó khoá task bằng `select_for_update(of=("self",))`, nên không khoá lại phiếu qua `select_related`. Thứ tự này khớp 02b CSKH §1.5. Test spy mới kiểm thứ tự, chưa có test song song trên Postgres (dev đã ghi là nợ). **Đạt.** |
+| F10 | Undo đọc `cancel_action:<act>` và gọi đúng action đó qua `dispatch_command`. Tầng 1–3 do view của action huỷ kiểm theo người hoàn tác, nên **chặt hơn trước**: trước đây `cancel_receipt` bị gọi thẳng, không kiểm quyền. Lệnh không có đường hoàn tác trả 400 `AI_CANNOT_UNDO`, trạng thái vẫn DONE. `required_perms=()` không có tác dụng thật vì `dispatch_command` không đọc trường này. **Hoàn tác khi AI tắt không mở lỗ nào**: chỉ chủ việc hoặc `manage_ai_policy` được gọi. Thao tác chỉ đưa về trạng thái cũ (huỷ lịch, hoặc huỷ chứng từ bằng trạng thái), không sinh việc AI mới, không gọi model, và vẫn bị khoá bởi `undo_until`. **Đạt.** Còn 1 điểm Low về hardening (L7-4). |
+| F12 | Không có `chu` active thì hàm trả `False`, ghi log cảnh báo và không giao cho người bất kỳ. `downgrade_reason` và log chỉ còn mã lỗi (`BusinessError.code` hoặc tên lớp lỗi). Đã xoá nhánh chết CONFIRM_ORDER. `_escalate_to_chu` trả `bool` để đếm đúng. `args.reason` được cập nhật cùng lúc. Nợ Lô 3 L1/L2 đã xong. **Đạt.** |
+| NoStore | `NoStoreMixin` đứng đầu MRO của `SalesOrderViewSet` và `CustomerViewSet`. Mixin dùng `finalize_response`, nên response 401/403 cũng có header. Có test ma trận. **Đạt.** |
+| L6-1 | `_own_cover` bỏ ảnh bìa lạ khi restore/discard, và tính lại `draft_hash` khi bìa bị bỏ. `publish_entry` chặn 400 `BR-ND-07` với ảnh bìa hoặc khối ảnh thuộc bài khác. Id ảnh bị lọc `int`/không phải `bool`. Chọn không tự gỡ khối ảnh lạ trong thân bài mà chặn ở bước đăng là hợp lý, vì tránh tự sửa nội dung của người soạn. **Đạt.** |
+| L5-1 contract | `has_stock` chỉ nhận `1`/`true`; giá trị khác bỏ qua, không lỗi. `BatchListQuery.has_stock` chỉ để registry AI đọc; lời gọi AI gửi `True` thì vẫn khớp nhờ `lower()`. Bốn khoá tên đều là tên hoặc nhãn: `supplier`, `warehouse`, `item` là FK NOT NULL và đã `select_related`, nên không có N+1 hay `None`. `nv_kho` vốn có quyền đọc `supplier` (seed 0002). Không thêm field tiền nào. Giá vốn vẫn do `CostFieldSerializerMixin` chặn; test `nv_kho` kiểm cả khoá `COST_KEYS` lẫn số `180000`. **Không lộ giá vốn. Đạt.** |
+| F5 | `privacy_consent_required(testing, debug, env)` giữ đúng ngữ nghĩa của `_bool` cũ. Test đổi từ "chép công thức" sang gọi hàm thật. AC10 POST Admin thật khoá được cả hai lớp (`readonly_fields` và `editable=False`). AC9 so đúng tập khoá. **Đạt.** |
+| Nợ Lô 1 L4, Lô 2 L2/L3/L4/L5, Lô 3 L4, Lô 4 L1 | Đã xong hết. Fixture quét PII (`SR24Fixture`) nay khẳng định dữ liệu không rỗng. |
+| FE safeHref hai bên | Luật hai bên **giống hệt nhau** (so từng dòng); vitest ERP và script Shop chạy cùng 40 payload. Backend `sanitize._is_valid_href` vẫn là lớp chặn cuối, cũng từ chối href không có giao thức. Lệch nhỏ còn lại ghi ở L7-5. |
+| Tiptap từ chối href không giao thức | **Không làm hại người viết bài.** Backend vốn đã bỏ các href này khi lưu (`urlsplit("abc").scheme == ""`), nên bài đã lưu không có link nào như vậy, và bản sửa không làm mất dữ liệu cũ. Khác biệt duy nhất: trước đây ERP nhận `abc` rồi backend lặng lẽ xoá link; nay người viết được báo ngay bằng hộp thoại, tức là tốt hơn. Gợi ý UX (tuỳ chọn, không chặn): nếu người viết gõ `www.…` thì tự thêm `https://`. |
+| F6 "Not found." | Chỉ thay câu khi `detail === "Not found."` ở nhánh 404/410, còn lại giữ `detail` tiếng Việt của BE. Trong Shop không còn chỗ nào so chuỗi thông điệp. **Đạt.** |
+| F7/F8/F9 | Catalog chỉ nạp 1 lần, bài không có thẻ thì không gọi. `ArticleBody` thành client component, nhưng cả hai trang dùng nó (`bai-viet`, `trang`) vốn đã là `"use client"`, nên không mất SEO. `srcSet` và `sizes` đúng cỡ công khai. Mock `xss-mau` chỉ có ở bản mock. mailto/tel dùng thẻ `<a>` thường, không mở tab mới. **Đạt.** |
+| F10 FE | Chỉ còn một `getSiteInfo` (cache Promise 5 phút, lỗi thì bỏ cache), và `CheckoutScreen` truyền `siteInfo` xuống `PaymentPanel`. `callHours()` là nguồn giờ duy nhất trên FE. Chỉ render 4 số cuối SĐT. **Đạt.** Việc gộp nguồn giờ ở BE xem đề xuất D7-1. |
+| `shared/ui/globals.css` (ngoài phạm vi) | **Chấp nhận.** Đây là sửa lỗi thật, không phải đổi thiết kế: selector `tr:last-child td` có độ ưu tiên (0,2,4) cao hơn `td.m-*` (0,2,3), làm dòng cuối mất `order` khi bảng thành thẻ trên mobile. Nay selector chỉ giữ `border:0`. Dev đã chạy lại 4 bộ e2e của các màn có bảng (Lô 5, SR-07, SR-09, Lô 6) và đều xanh. Ghi thêm vào checklist QA hồi quy mobile 375 cho mọi `table.data`. |
+| Timeline `credit_note_issued` | FE chỉ thêm kind và icon; nhãn do BE dựng. Nhãn chỉ có mã chứng từ và số tiền doanh thu, không có giá vốn hay PII. **Đạt.** |
+| CSKH stale 3 thao tác | `reportActionError` dùng chung. Nút gửi của cả 3 form bị khoá khi đã stale. **Đạt.** |
+| F14 tem | QR vẽ bằng `<img data:image/svg+xml>`, bỏ `dangerouslySetInnerHTML`. `next` chỉ chứa `note` và `print_no` (mã số, không phải PII). **Đạt**, nhưng xem **L7-1**: `safeNext` mà F14 dựa vào có lỗ open redirect. |
+| F12 FE spike | `app/ai-spike/` và `spikes/dw02/` đã xoá. `commands.test.ts` trỏ sang bản sao index trong `doc/.../research/`, chấp nhận được. |
+
+### Lệch dev nêu: chốt
+1. **DW-11-AC5 403 → 404 (việc của người khác):** **Chấp nhận.** Đây là hệ quả trực tiếp của BM-05. Test cũ được chỉnh để vẫn kiểm BR-AI-04 (403 khi là chủ việc nhưng thiếu quyền lệnh). Việc cần làm: điều phối ghi 1 dòng vào `03-dev-notes.md` của hồ sơ `2026-09-28-ai-digital-worker` rằng DW-11-AC5 nay trả 404 cho việc ngoài phạm vi (P8 BM-05).
+2. **DW-19-AC10 đổi tên và đổi kỳ vọng (AI tắt vẫn hoàn tác được):** **Chấp nhận**, đúng SR-22 F10 đã duyệt. Việc cần làm: ghi cùng chỗ như mục 1.
+3. **Việc SCHEDULED lỗi ở nhánh AI tắt (và lỗi F12) giữ nguyên trạng thái, không tự chuyển FAILED:** **Chấp nhận cho P8.** Job idempotent: lần chạy sau thử lại, log không chứa PII. Rủi ro là một việc lỗi mãi thì bị thử lại mãi mà không ai biết. Đưa vào backlog P9 (Duy quyết nghiệp vụ): đếm số lần thử, quá N lần thì ESCALATED cho Chủ.
+4. **Fixture PII sweep đổi (bỏ gán phiếu trước khi kiểm ngoài phạm vi):** chấp nhận.
+5. **Undo giữ mã lỗi gốc (`BR-MH-07`):** chấp nhận, như vậy FE hiện đúng lý do.
+6. **L6-1 không gỡ khối ảnh lạ, chỉ chặn khi đăng:** chấp nhận.
+7. **V-DW1:** 02b §8 của hồ sơ này đã đúng. Câu sai vẫn còn ở `doc/features/2026-09-28-ai-digital-worker/02c-giao-viec.md:27` ("chỉ mở được ở staging khi `AI_PRODUCTION_READY=false`"). Việc cần làm: **điều phối** sửa thành `AI_PRODUCTION_READY=1` ở staging, production giữ `0`, rồi trỏ về `doc/ops/moi-truong.md` (file ngoài phạm vi dev, là việc sửa doc).
+
+### Việc sửa
+| # | Mức | File:dòng | Việc |
+|---|---|---|---|
+| L7-1 | **Medium, nên sửa trước commit** (có từ `13e7d51`, không phải hồi quy Lô 7) | `erp-console/shared/lib/nav.ts:397-400` (`safeNext`); dùng ở `features/auth/components/LoginScreen.tsx:18-24` | **Open redirect.** `safeNext` chỉ chặn `//`, không chặn `/\` hay ký tự điều khiển. Đã kiểm: `new URL("/\\evil.example/x", origin)` → `https://evil.example/x`. Next app-router gặp URL khác origin thì chuyển trang cứng (`isExternalURL` → `location`). Người **đang đăng nhập** mở `/login/?next=/%5Cevil.example` là bị đẩy ngay sang trang ngoài (`destination(me, next, me.id)` luôn qua điều kiện cùng người). `/%09/evil.example` cũng lọt, vì trình duyệt bỏ tab khi phân giải. Đây là kênh lừa lấy mật khẩu nhân viên ERP. Cách sửa: `safeNext` từ chối khi `next[1] === "/" \|\| next[1] === "\\"` hoặc có ký tự mã ≤ 32 hay trong khoảng 127–159 (cùng luật nhánh nội bộ của `isSafeHref`, có thể tái dùng). Test vitest: `/\evil.example`, `/%5Cevil` (sau decode), `/\t/evil.example`, `//evil`, `/orders/?id=1` (nhận), `/print/label/?note=1&print_no=2` (nhận). |
+| L7-2 | Low (dọn) | `backend/apps/ai/actions/api.py:78-87` | `retrieve` còn chép tay bộ lọc. Nên đổi sang `services.visible_actions_for(request.user).filter(id=pk).first()` để BM-05 và `retrieve` không lệch nhau về sau. `get_queryset` scope `mine` cũng dùng được hàm này. |
+| L7-3 | Low | `backend/apps/ai/actions/services.py:208-209` | `undo_ai_action` vẫn trả 403 cho việc của người khác, lộ việc có tồn tại (không đồng bộ với BM-05). Rủi ro thấp vì id là UUID. Nên lọc theo chủ việc hoặc `manage_ai_policy`, ngoài phạm vi thì 404. Cần chỉnh test `test_f10_nguoi_ngoai_khong_hoan_tac_duoc_403`. |
+| L7-4 | Low (hardening) | `backend/apps/ai/actions/services.py:242`; `backend/apps/ai/registry/discovery.py:234-236` | `hasattr(view_cls, cancel_act)` nhận cả thuộc tính không phải `@action`, ví dụ `destroy`, rồi dispatch bằng POST. Hiện chỉ có `cancel_action:cancel` và registry do code khai, nên chưa khai thác được. Nên kiểm thêm `"post" in getattr(getattr(view_cls, cancel_act), "mapping", {})` ở cả hai chỗ. Nên có thêm 1 test hoàn tác **DONE thật khi AI tắt**; hiện chỉ có ca huỷ lịch và ca id không tồn tại. |
+| L7-5 | Low (tài liệu/đồng bộ) | `frontend/features/content/safeHref.ts:5-16`; `backend/apps/content/body/sanitize.py:37-45` | (a) Chú thích Shop đã lỗi thời: vẫn ghi "Luật khớp bản ERP (`convert.ts` → `safeHref`)" và "Chặt hơn ERP ở 2 điểm". Nay hai bản giống hệt, nên sửa chú thích trỏ về `erp-console/features/content/editor/safeHref.ts` như chú thích phía ERP. (b) BE lệch FE: BE bỏ `#neo`, nên FE nhận `#` nhưng lưu xong thì mất link; BE cũng không chặn DEL và C1 không phải khoảng trắng. Dòng 41 có `r"/\ "` thừa dấu cách, là code chết vì dòng 43 đã chặn. Nên để P8b hoặc lô sau. |
+
+### Đề xuất (không chặn)
+- **D7-1 (BE, cần Duy vì là câu hiện cho khách):** gộp giờ gọi ở backend. Cách ít rủi ro nhất: `SHOP_CONFIRM_CALL_HOURS = os.getenv("SHOP_CONFIRM_CALL_HOURS", CSKH_WORKING_HOURS)` (`backend/config/settings.py:340`, đọc sau dòng 288), khi đó mặc định chỉ còn một giá trị `07:00-21:00`. Sau đó ở P9 bỏ hẳn `confirm_call_hours` khỏi `site-info` và FE chỉ đọc `cskh_notice.working_hours`. Hiện FE đã chọn một nguồn nên trên cùng một màn không còn hiện hai giờ khác nhau. Lệch chỉ còn giữa hai cấu hình (khi khối CSKH tắt, khách thấy `7:00–20:00`). Câu thông báo đang chờ legal-vn nên đổi giờ cần Duy chốt.
+- **D7-2:** nợ N1 (`get_or_create` song song trên Postgres) và test khoá song song F08: giữ ở P9 như dev ghi.
+
+### Định danh mới trong Lô 7 cần đưa vào P8b (không sửa ở Lô 7)
+Đối chiếu `doc/features/2026-09-30-dat-ten-tieng-anh/01-ra-soat-dat-ten.md`:
+- Đã có trong rà soát: `CskhNotice.tsx` và `CskhNotice.module.css` (dòng 51), `CskhNoticeConfig`, `cskhArmStale` (dòng 67), `NHAP_LO_DRAFT_PREFIX` (dòng 68), `_escalate_to_chu` và `chu_user` (dòng 63).
+- **Chưa có, cần bổ sung:** hook mock `window.__caveMock.cskhSetStatus` (`erp-console/features/cskh/mock.ts:799`); `CallNoticeBox` và `callHours` (tên tiếng Anh, nhưng nằm trong file `CskhNotice.tsx` nên đi cùng việc gộp dòng 51); 12 file test mới `test_p8_lo7_*.py` cùng e2e `p8_lo7_fe_erp.py`, `qa-lo7-*.py`, với tên hàm test tiếng Việt không dấu (ví dụ `test_bm05_nv_giao_reject_viec_cua_chu_404_trang_thai_khong_doi`, `test_f10_khong_co_duong_hoan_tac_400`). Nhóm này thuộc mục "Test" (dòng 28–29), chỉ cần cộng số đếm.
+- Slug mock `xss-mau` là dữ liệu, không phải định danh code, nên bỏ qua.
+
+### Ghi chú
+- Không có migration, không có quyền mới, không có endpoint mới. Chỉ thêm tham số `has_stock` và 4 khoá chỉ đọc vào danh sách lô. Contract khớp với FE ERP (`inventory/api.ts:71-89`).
+- Hoàn tác giờ đi qua view, nên người tự tay nhập lô rồi bị rút quyền `change_purchasereceipt` sẽ nhận 403 khi hoàn tác. Trước đây trường hợp này vẫn huỷ được. Hành vi mới đúng với BR-PQ.

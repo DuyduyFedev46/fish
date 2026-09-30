@@ -130,7 +130,7 @@ def get_payment_guidance(doc_id: str, user: Any, request: Optional[Any] = None) 
     try:
         payment = qs.get(pk=int(doc_id))
     except (TypeError, ValueError, PaymentTransaction.DoesNotExist):
-        raise Http404(f"Không tìm thấy giao dịch thanh toán: {doc_id}")
+        raise Http404("Không tìm thấy giao dịch thanh toán.")
 
     # doc: TUYỆT ĐỐI không đưa raw_payload, description, counter_account_name (DW-04-AC4)
     doc_summary = {

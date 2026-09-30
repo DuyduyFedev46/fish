@@ -10,7 +10,6 @@ import {
   type ItemImage,
   type OrderCancelNotice,
   type PaymentCheckoutSession,
-  type SiteInfo,
   type WireCreateOrderResponse,
   type WireOrderStatus,
 } from "./types";
@@ -335,21 +334,6 @@ function toWireOrderStatus(record: MockOrderRecord): WireOrderStatus {
     cancel_notice: record.cancel_notice ?? null,
     ...(record.booked_expires_at ? { booked_expires_at: record.booked_expires_at } : {}),
   };
-}
-
-export async function mockGetSiteInfo(): Promise<SiteInfo> {
-  return delay({
-    cskh_notice: {
-      enabled: true,
-      working_hours: "07:00-21:00",
-      max_attempts: 3,
-      window_minutes: 30,
-      decision_minutes: 30,
-      auto_cancel_enabled: false,
-      refund_deadline_days: 30,
-      hotline: "1900 6868",
-    },
-  });
 }
 
 function delay<T>(value: T, ms = 250): Promise<T> {

@@ -32,8 +32,13 @@ export type BatchApiRow = {
   batch_id: string;
   item: number;
   item_code: string;
+  /** Khoá tên (P8 Lô 7 / L5-1) của danh sách GET /api/inventory/batches/. Thiếu ở BE cũ → FE lùi về `item_code` / bỏ trống. */
+  item_name?: string;
   supplier: number;
+  supplier_name?: string;
   warehouse: number;
+  warehouse_name?: string;
+  status_label?: string;
   received_date: string;
   expiry_date: string;
   qty_available: string;

@@ -393,8 +393,21 @@ export function homePath(me: Me): string {
   return canView(me, "overview") ? "/overview/" : first ? first.href : "/no-role/";
 }
 
-/** `next` sau đăng nhập chỉ nhận đường dẫn nội bộ (chống open redirect). */
+const MAX_NEXT_LENGTH = 2000;
+
+/**
+ * `next` sau đăng nhập chỉ nhận đường dẫn nội bộ (chống open redirect, L7-1).
+ * Cùng luật nhánh "đường dẫn nội bộ" của `features/content/editor/safeHref.ts` (chép, không import chéo module):
+ * bắt đầu bằng "/", ký tự thứ hai không phải "/" hay "\" (trình duyệt coi "/\host" là "//host"), không có ký tự
+ * điều khiển hay khoảng trắng (mã <= 32, 127-159) và không quá 2000 ký tự. Không trim: chuỗi phải bắt đầu đúng bằng "/".
+ * Giá trị vào là chuỗi đã giải mã (`URLSearchParams.get`), nên "/%5Cevil.example" tới đây là "/\evil.example".
+ */
 export function safeNext(next: string | null): string | null {
-  if (!next || !next.startsWith("/") || next.startsWith("//")) return null;
+  if (!next || next.length > MAX_NEXT_LENGTH || !next.startsWith("/")) return null;
+  if (next[1] === "/" || next[1] === "\\") return null;
+  for (let i = 0; i < next.length; i++) {
+    const code = next.charCodeAt(i);
+    if (code <= 32 || (code >= 127 && code <= 159)) return null;
+  }
   return next;
 }

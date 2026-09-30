@@ -1,7 +1,8 @@
 // SR-07 (BM-04): nháp "Nhập lô" không giữ giá mua; gắn theo người dùng; nằm ở sessionStorage; đăng xuất xoá sạch.
 // Dữ liệu giả. Môi trường vitest là node nên dựng window + storage giả có length/key để quét khoá.
 import { beforeEach, describe, expect, it } from "vitest";
-import { clearAllDrafts, clearDraft, draftKey, loadDraft, resolveIdempotencyKey, saveDraft, LEGACY_DRAFT_KEY } from "./draftStorage";
+import { clearDraft, draftKey, loadDraft, resolveIdempotencyKey, saveDraft, LEGACY_DRAFT_KEY } from "./draftStorage";
+import { clearAllDrafts } from "@/shared/lib/drafts";
 
 function makeStorage() {
   let store: Record<string, string> = {};

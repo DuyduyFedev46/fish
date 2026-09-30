@@ -13,13 +13,19 @@ class BatchSerializer(CostFieldSerializerMixin, serializers.ModelSerializer):
     sensitive_fields = ("purchase_rate", "landed_unit_cost")
     item_code = serializers.CharField(source="item.code", read_only=True)
     qty_sellable = serializers.DecimalField(max_digits=12, decimal_places=3, read_only=True)
+    # Khoá hiển thị cho màn Kho & lô (P8 Lô 7, nợ L5-1). Chỉ là tên/nhãn, không phải tiền hay giá vốn.
+    item_name = serializers.CharField(source="item.name", read_only=True)
+    supplier_name = serializers.CharField(source="supplier.name", read_only=True)
+    warehouse_name = serializers.CharField(source="warehouse.name", read_only=True)
+    status_label = serializers.CharField(source="get_status_display", read_only=True)
 
     class Meta:
         model = Batch
         fields = [
-            "id", "batch_id", "item", "item_code", "supplier", "warehouse",
+            "id", "batch_id", "item", "item_code", "item_name", "supplier", "supplier_name",
+            "warehouse", "warehouse_name",
             "received_date", "expiry_date", "qty_received", "qty_available",
-            "qty_reserved", "qty_sellable", "status", "closed_at",
+            "qty_reserved", "qty_sellable", "status", "status_label", "closed_at",
             "purchase_rate", "landed_unit_cost",  # nhạy cảm — mixin loại nếu thiếu quyền
         ]
         read_only_fields = ["batch_id", "qty_available", "qty_reserved", "closed_at"]
@@ -31,6 +37,9 @@ class BatchListQuery(serializers.Serializer):
         slug_field="code", queryset=Item.objects.all(), required=False, help_text="Mã mặt hàng"
     )
     status = serializers.ChoiceField(choices=Batch.Status.choices, required=False)
+    has_stock = serializers.BooleanField(
+        required=False, help_text="1/true: chỉ lô còn tồn (qty_available > 0); 0 hoặc bỏ trống: không lọc"
+    )
 
 
 class CancelExpiredInput(serializers.Serializer):

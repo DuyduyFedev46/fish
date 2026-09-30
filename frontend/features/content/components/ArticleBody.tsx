@@ -1,13 +1,50 @@
-import React from "react";
+"use client";
+
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
+import { getCatalog } from "@/lib/api";
+import type { CatalogItem } from "@/lib/types";
 import ItemCard from "./ItemCard";
-import type { InlineNode, PublicBlock, PublicBodyDoc } from "../types";
-import { isExternalLink, isSafeHref } from "../safeHref";
+import type { InlineNode, PublicBlock, PublicBodyDoc, PublicImageUrls } from "../types";
+import { isExternalLink, isInternalLink, isSafeHref } from "../safeHref";
 import s from "./ArticleBody.module.css";
 
 interface ArticleBodyProps {
   body: PublicBodyDoc;
   postSlug?: string;
+}
+
+/** Trạng thái catalog dùng chung cho mọi thẻ mặt hàng trong bài (SR-23 F7): nạp đúng 1 lần. */
+type CatalogState =
+  | { status: "loading" }
+  | { status: "error" }
+  | { status: "ready"; byCode: Map<string, CatalogItem> };
+
+// Bề rộng thật của 3 cỡ ảnh công khai (backend `CONTENT_IMAGE_WIDTHS`, không phóng to:
+// ảnh gốc nhỏ hơn thì cỡ lớn = ảnh gốc, `block.width` là bề rộng cỡ lớn nhất).
+const NOMINAL_WIDTHS: Array<[keyof PublicImageUrls, number]> = [
+  ["sm", 480],
+  ["md", 960],
+  ["lg", 1600],
+];
+// Cột nội dung bài rộng tối đa 840px (bai-viet.module.css) -> ảnh không cần rộng hơn.
+const IMAGE_SIZES = "(max-width: 840px) 100vw, 840px";
+
+/** `srcset` 480w/960w/1600w (F8). Ảnh gốc hẹp hơn thì hạ bề rộng khai báo và bỏ cỡ trùng. */
+function buildSrcSet(urls: PublicImageUrls, maxWidth: number): string | undefined {
+  const cap = Number.isFinite(maxWidth) && maxWidth > 0 ? maxWidth : Infinity;
+  const byWidth = new Map<number, string>();
+  for (const [key, nominal] of NOMINAL_WIDTHS) {
+    const url = urls[key];
+    if (!url) continue;
+    const w = Math.min(nominal, cap);
+    if (!byWidth.has(w)) byWidth.set(w, url);
+  }
+  if (byWidth.size < 2) return undefined;
+  return Array.from(byWidth.entries())
+    .sort((a, b) => a[0] - b[0])
+    .map(([w, url]) => `${url} ${w}w`)
+    .join(", ");
 }
 
 function renderInline(node: InlineNode, index: number): React.ReactNode {
@@ -23,11 +60,12 @@ function renderInline(node: InlineNode, index: number): React.ReactNode {
   }
 
   if (node.href && isSafeHref(node.href)) {
-    if (isExternalLink(node.href)) {
+    const href = node.href.trim();
+    if (isExternalLink(href)) {
       return (
         <a
           key={index}
-          href={node.href}
+          href={href}
           target="_blank"
           rel="nofollow noopener noreferrer"
           className={s.link}
@@ -36,17 +74,30 @@ function renderInline(node: InlineNode, index: number): React.ReactNode {
         </a>
       );
     }
+    if (isInternalLink(href)) {
+      return (
+        <Link key={index} href={href} className={s.link}>
+          {content}
+        </Link>
+      );
+    }
+    // mailto:, tel: -> thẻ <a> thường, không mở tab mới.
     return (
-      <Link key={index} href={node.href} className={s.link}>
+      <a key={index} href={href} className={s.link}>
         {content}
-      </Link>
+      </a>
     );
   }
 
   return <React.Fragment key={index}>{content}</React.Fragment>;
 }
 
-function renderBlock(block: PublicBlock, index: number, postSlug?: string): React.ReactNode {
+function renderBlock(
+  block: PublicBlock,
+  index: number,
+  postSlug: string | undefined,
+  catalog: CatalogState
+): React.ReactNode {
   switch (block.type) {
     case "heading": {
       if (block.level === 3) {
@@ -99,6 +150,8 @@ function renderBlock(block: PublicBlock, index: number, postSlug?: string): Reac
           <div className={s.imageWrapper}>
             <img
               src={src}
+              srcSet={buildSrcSet(block.urls, block.width)}
+              sizes={IMAGE_SIZES}
               alt={block.alt}
               width={block.width}
               height={block.height}
@@ -117,6 +170,8 @@ function renderBlock(block: PublicBlock, index: number, postSlug?: string): Reac
           key={index}
           itemCode={block.item_code}
           postSlug={postSlug}
+          loading={catalog.status === "loading"}
+          item={catalog.status === "ready" ? catalog.byCode.get(block.item_code) ?? null : null}
         />
       );
     }
@@ -127,13 +182,39 @@ function renderBlock(block: PublicBlock, index: number, postSlug?: string): Reac
 }
 
 export default function ArticleBody({ body, postSlug }: ArticleBodyProps) {
-  if (!body || !Array.isArray(body.blocks)) {
+  const blocks = body && Array.isArray(body.blocks) ? body.blocks : null;
+  const hasItemCards = !!blocks && blocks.some((b) => b.type === "item_card");
+  const [catalog, setCatalog] = useState<CatalogState>({ status: "loading" });
+
+  // SR-23 F7: bài có N thẻ mặt hàng vẫn chỉ nạp catalog 1 lần (trước đây mỗi thẻ 1 request).
+  // Bài không có thẻ nào thì không gọi API.
+  useEffect(() => {
+    if (!hasItemCards) return;
+    let active = true;
+    setCatalog({ status: "loading" });
+    getCatalog()
+      .then((items) => {
+        if (!active) return;
+        setCatalog({
+          status: "ready",
+          byCode: new Map((items || []).map((it) => [it.item_code, it])),
+        });
+      })
+      .catch(() => {
+        if (active) setCatalog({ status: "error" });
+      });
+    return () => {
+      active = false;
+    };
+  }, [hasItemCards]);
+
+  if (!blocks) {
     return null;
   }
 
   return (
     <article className={s.articleBody}>
-      {body.blocks.map((block, idx) => renderBlock(block, idx, postSlug))}
+      {blocks.map((block, idx) => renderBlock(block, idx, postSlug, catalog))}
     </article>
   );
 }

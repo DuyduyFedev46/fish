@@ -1,11 +1,17 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { submitNhapLo, getNhapLoDraft, saveNhapLoDraft, clearNhapLoDraft } from "./api";
+import { submitNhapLo } from "./api";
+import { clearDraft, loadDraft, saveDraft } from "./components/draftStorage";
 import { mockSubmitNhapLo, mockCancelPurchaseReceipt } from "./mock";
 import { NhapLoPayload } from "./types";
 
+// Nháp Nhập lô nằm ở sessionStorage theo userId (SR-07), không phải localStorage dùng chung nữa.
 const storageMock = (() => {
   let store: Record<string, string> = {};
   return {
+    get length() {
+      return Object.keys(store).length;
+    },
+    key: (i: number) => Object.keys(store)[i] ?? null,
     getItem: (key: string) => store[key] ?? null,
     setItem: (key: string, val: string) => {
       store[key] = val;
@@ -21,12 +27,12 @@ const storageMock = (() => {
 
 describe("Purchasing feature tests (DW-17)", () => {
   beforeEach(() => {
-    (globalThis as any).localStorage = storageMock;
+    (globalThis as any).window = { sessionStorage: storageMock, localStorage: storageMock };
     storageMock.clear();
     vi.restoreAllMocks();
   });
 
-  it("DW-17-AC3: saves and restores draft in localStorage", () => {
+  it("DW-17-AC3: lưu và nạp lại nháp theo người dùng (sessionStorage), giá mua không được lưu", () => {
     const draft = {
       supplierId: 1,
       receivedDate: "2026-09-29",
@@ -40,15 +46,17 @@ describe("Purchasing feature tests (DW-17)", () => {
       ],
     };
 
-    saveNhapLoDraft(draft);
-    const restored = getNhapLoDraft();
+    saveDraft(7, draft);
+    const restored = loadDraft(7);
     expect(restored).not.toBeNull();
-    expect((restored as any)?.supplierId).toBe(1);
-    expect((restored as any)?.lines.length).toBe(1);
-    expect((restored as any)?.lines[0].qty).toBe("50");
+    expect(restored?.supplierId).toBe(1);
+    expect(restored?.lines.length).toBe(1);
+    expect(restored?.lines[0].qty).toBe("50");
+    expect("rate" in (restored?.lines[0] ?? {})).toBe(false);
+    expect(loadDraft(8)).toBeNull();
 
-    clearNhapLoDraft();
-    expect(getNhapLoDraft()).toBeNull();
+    clearDraft(7);
+    expect(loadDraft(7)).toBeNull();
   });
 
   it("DW-17-AC1: mockSubmitNhapLo generates batch DRAFT and receipt SUBMITTED", () => {
