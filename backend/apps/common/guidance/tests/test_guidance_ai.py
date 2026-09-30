@@ -18,14 +18,15 @@ from apps.common.tests.fixtures import client_for, make_user
 from apps.inventory.batches import services as batch_services
 from apps.inventory.models import Warehouse
 from apps.purchasing.models import Supplier
+from apps.accounts import roles
 
 
 @override_settings(AI_ENABLED=True)
 class GuidanceAiFieldTestCase(TestCase):
     def setUp(self):
-        self.chu = make_user("chu_dw14", "chu")
-        self.ql = make_user("ql_dw14", "quan_ly")
-        self.kho = make_user("kho_dw14", "nv_kho")
+        self.chu = make_user("chu_dw14", roles.OWNER)
+        self.ql = make_user("ql_dw14", roles.MANAGER)
+        self.kho = make_user("kho_dw14", roles.WAREHOUSE_STAFF)
 
         self.c_chu = client_for(self.chu)
         self.c_ql = client_for(self.ql)

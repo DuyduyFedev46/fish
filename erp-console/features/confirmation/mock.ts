@@ -1,9 +1,9 @@
 import type {
-  CskhQueueDetail,
-  CskhQueueItem,
-  CskhQueueResponse,
-  CskhSearchResponse,
-  CskhSearchResultItem,
+  ConfirmationQueueDetail,
+  ConfirmationQueueItem,
+  ConfirmationQueueResponse,
+  CustomerSearchResponse,
+  CustomerSearchResultItem,
   ClaimTaskResponse,
   RecordCallPayload,
   RecordCallResponse,
@@ -16,7 +16,7 @@ import type {
 } from "./types";
 import { timeHM } from "@/shared/lib/format";
 
-export const MOCK_CSKH_ITEMS: CskhQueueDetail[] = [
+export const MOCK_CONFIRMATION_ITEMS: ConfirmationQueueDetail[] = [
   {
     note_id: 31,
     order_id: 101,
@@ -295,14 +295,14 @@ export const STALE_STATE_DETAIL = "Đơn đã bị huỷ — tải lại màn h�
 
 /**
  * Lô 7 (nợ Lô 3 L4): phiếu được "gài" để thao tác kế tiếp (đổi người nhận / huỷ xác nhận / quyết định Quản lý) gặp
- * 409 STALE_STATE như BE thật khi job tự huỷ đã chạy giữa chừng. Dùng cho e2e qua `window.__caveMock.cskhArmStale(noteId)`.
+ * 409 STALE_STATE như BE thật khi job tự huỷ đã chạy giữa chừng. Dùng cho e2e qua `window.__caveMock.confirmationArmStale(noteId)`.
  */
 const ARMED_STALE = new Set<number>();
 
 function consumeArmedStale(noteId: number): { status: number; body: { code: string; detail: string } } | null {
   if (!ARMED_STALE.has(noteId)) return null;
   ARMED_STALE.delete(noteId);
-  const item = MOCK_CSKH_ITEMS.find((i) => i.note_id === noteId);
+  const item = MOCK_CONFIRMATION_ITEMS.find((i) => i.note_id === noteId);
   if (item) {
     item.note_status = "CANCELLED";
     item.confirm_state = "REFUND_CALL";
@@ -310,8 +310,8 @@ function consumeArmedStale(noteId: number): { status: number; body: { code: stri
   return { status: 409, body: { code: "STALE_STATE", detail: STALE_STATE_DETAIL } };
 }
 
-export function getMockCskhQueue(params?: { state?: string; page?: number }): CskhQueueResponse {
-  let list = [...MOCK_CSKH_ITEMS];
+export function getMockConfirmationQueue(params?: { state?: string; page?: number }): ConfirmationQueueResponse {
+  let list = [...MOCK_CONFIRMATION_ITEMS];
   const now = new Date().toISOString();
 
   if (params?.state) {
@@ -341,7 +341,7 @@ export function getMockCskhQueue(params?: { state?: string; page?: number }): Cs
   };
 }
 
-export function mockGetCskhQueue(req: any): { status: number; body: CskhQueueResponse } {
+export function mockGetConfirmationQueue(req: any): { status: number; body: ConfirmationQueueResponse } {
   let state: string | undefined;
   let page: number | undefined;
   // MockRequest của apiFetch có `path` (kèm query), không có `url` — trước đây `state` không bao giờ được đọc.
@@ -358,15 +358,15 @@ export function mockGetCskhQueue(req: any): { status: number; body: CskhQueueRes
   }
   return {
     status: 200,
-    body: getMockCskhQueue({ state, page }),
+    body: getMockConfirmationQueue({ state, page }),
   };
 }
 
-export function mockGetCskhDetail(
+export function mockGetConfirmationDetail(
   req: any,
   noteId: number
-): { status: number; body: CskhQueueDetail | { detail: string; code?: string } } {
-  const item = MOCK_CSKH_ITEMS.find((i) => i.note_id === noteId);
+): { status: number; body: ConfirmationQueueDetail | { detail: string; code?: string } } {
+  const item = MOCK_CONFIRMATION_ITEMS.find((i) => i.note_id === noteId);
   if (!item || !item.in_scope) {
     return {
       status: 404,
@@ -376,11 +376,11 @@ export function mockGetCskhDetail(
   return { status: 200, body: { ...item } };
 }
 
-export function mockClaimCskhTask(
+export function mockClaimConfirmationTask(
   req: any,
   noteId: number
 ): { status: number; body: ClaimTaskResponse | { code: string; detail: string; claimed_until?: string } } {
-  const item = MOCK_CSKH_ITEMS.find((i) => i.note_id === noteId);
+  const item = MOCK_CONFIRMATION_ITEMS.find((i) => i.note_id === noteId);
   if (!item) {
     return { status: 404, body: { code: "NOT_FOUND", detail: "Không tìm thấy phiếu." } };
   }
@@ -413,12 +413,12 @@ export function mockClaimCskhTask(
   };
 }
 
-export function mockRecordCskhCall(
+export function mockRecordConfirmationCall(
   req: any,
   noteId: number,
   payload: RecordCallPayload
 ): { status: number; body: RecordCallResponse | { code: string; detail: string } } {
-  const item = MOCK_CSKH_ITEMS.find((i) => i.note_id === noteId);
+  const item = MOCK_CONFIRMATION_ITEMS.find((i) => i.note_id === noteId);
   if (!item) {
     return { status: 404, body: { code: "NOT_FOUND", detail: "Không tìm thấy phiếu." } };
   }
@@ -607,7 +607,7 @@ export function mockUnconfirm(
   noteId: number,
   payload: UnconfirmPayload
 ): { status: number; body: UnconfirmResponse | { code: string; detail: string } } {
-  const item = MOCK_CSKH_ITEMS.find((i) => i.note_id === noteId);
+  const item = MOCK_CONFIRMATION_ITEMS.find((i) => i.note_id === noteId);
   if (!item) {
     return { status: 404, body: { code: "NOT_FOUND", detail: "Không tìm thấy phiếu." } };
   }
@@ -629,7 +629,7 @@ export function mockChangeRecipient(
   noteId: number,
   payload: ChangeRecipientPayload
 ): { status: number; body: ChangeRecipientResponse | { code: string; detail: string } } {
-  const item = MOCK_CSKH_ITEMS.find((i) => i.note_id === noteId);
+  const item = MOCK_CONFIRMATION_ITEMS.find((i) => i.note_id === noteId);
   if (!item) {
     return { status: 404, body: { code: "NOT_FOUND", detail: "Không tìm thấy phiếu." } };
   }
@@ -657,10 +657,10 @@ export function mockChangeRecipient(
   };
 }
 
-export function mockSearchCskh(
+export function mockSearchCustomers(
   req: any,
   q: string
-): { status: number; body: CskhSearchResponse | { code: string; detail: string } } {
+): { status: number; body: CustomerSearchResponse | { code: string; detail: string } } {
   const normalized = q.replace(/[\s.\-]/g, "").replace(/^\+84/, "0");
   const isDigits = /^\d+$/.test(normalized);
 
@@ -671,9 +671,9 @@ export function mockSearchCskh(
     };
   }
 
-  const results: CskhSearchResultItem[] = [];
+  const results: CustomerSearchResultItem[] = [];
 
-  for (const item of MOCK_CSKH_ITEMS) {
+  for (const item of MOCK_CONFIRMATION_ITEMS) {
     let matched = false;
     if (isDigits) {
       if (item.phone === normalized || item.recipient_phone === normalized) {
@@ -716,12 +716,12 @@ export function mockSearchCskh(
   };
 }
 
-export function mockDecideCskh(
+export function mockDecideConfirmation(
   req: any,
   noteId: number,
   payload: DecidePayload
 ): { status: number; body: DecideResponse | { code: string; detail: string } } {
-  const item = MOCK_CSKH_ITEMS.find((it) => it.note_id === noteId);
+  const item = MOCK_CONFIRMATION_ITEMS.find((it) => it.note_id === noteId);
   if (!item) {
     return { status: 404, body: { code: "NOT_FOUND", detail: "Không tìm thấy mục chờ gọi." } };
   }
@@ -787,18 +787,18 @@ export function mockDecideCskh(
 }
 
 // Công cụ thử trong DevTools/e2e (chỉ có ở mock):
-//   window.__caveMock.cskhArmStale(noteId)         — thao tác kế tiếp trên phiếu này gặp 409 STALE_STATE (job tự huỷ đã chạy)
-//   window.__caveMock.cskhSetStatus(noteId, "PREPARING") — đổi trạng thái phiếu để mở nút "Huỷ xác nhận đơn"
+//   window.__caveMock.confirmationArmStale(noteId)         — thao tác kế tiếp trên phiếu này gặp 409 STALE_STATE (job tự huỷ đã chạy)
+//   window.__caveMock.confirmationSetStatus(noteId, "PREPARING") — đổi trạng thái phiếu để mở nút "Huỷ xác nhận đơn"
 if (process.env.NEXT_PUBLIC_USE_MOCK === "1" && typeof window !== "undefined") {
   const w = window as unknown as { __caveMock?: Record<string, unknown> };
   w.__caveMock = {
     ...(w.__caveMock || {}),
-    cskhArmStale: (noteId: number) => {
+    confirmationArmStale: (noteId: number) => {
       ARMED_STALE.add(noteId);
       return `Phiếu ${noteId}: thao tác kế tiếp sẽ gặp STALE_STATE`;
     },
-    cskhSetStatus: (noteId: number, status: string) => {
-      const it = MOCK_CSKH_ITEMS.find((i) => i.note_id === noteId);
+    confirmationSetStatus: (noteId: number, status: string) => {
+      const it = MOCK_CONFIRMATION_ITEMS.find((i) => i.note_id === noteId);
       if (it) (it as { note_status: string }).note_status = status;
       return it ? `Phiếu ${noteId}: ${status}` : "Không có phiếu";
     },

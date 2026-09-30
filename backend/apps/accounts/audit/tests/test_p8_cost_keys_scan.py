@@ -18,6 +18,7 @@ from apps.common.tests.fixtures import client_for, make_user
 from apps.inventory.batches import services as batch_services
 from apps.inventory.models import Batch, StockReconciliation, Warehouse
 from apps.purchasing.models import PurchaseCost, PurchaseCostAllocation, Supplier
+from apps.accounts import roles
 
 AUDIT_URL = "/api/audit-logs/"
 
@@ -50,11 +51,11 @@ class P8Sr01CostKeysScanTests(TestCase):
         self.sup = Supplier.objects.create(name="Cảng Giả", is_active=True)
         self.wh = Warehouse.objects.create(name="Kho giả")
 
-        self.chu = make_user("chu_sr01", "chu")
-        self.ql = make_user("ql_sr01", "quan_ly")
-        self.kho = make_user("kho_sr01", "nv_kho")
-        self.giao = make_user("giao_sr01", "nv_giao")
-        self.cskh = make_user("cskh_sr01", "cskh")
+        self.chu = make_user("chu_sr01", roles.OWNER)
+        self.ql = make_user("ql_sr01", roles.MANAGER)
+        self.kho = make_user("kho_sr01", roles.WAREHOUSE_STAFF)
+        self.giao = make_user("giao_sr01", roles.DELIVERY_STAFF)
+        self.cskh = make_user("cskh_sr01", roles.CUSTOMER_SERVICE)
 
         # Lô 10 kg, giá mua 81234, EXPIRED.
         self.batch = batch_services.create_batch(

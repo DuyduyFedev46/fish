@@ -36,6 +36,7 @@ from apps.common.tests.fixtures import client_for, make_user
 from apps.inventory.batches import services as batch_services
 from apps.inventory.models import Batch, BatchSupplierReturn, StockLedgerEntry
 from apps.sales.orders.tests.test_s10_api import OrderApiBase, find_keys
+from apps.accounts import roles
 
 REFUND_SENTINEL = "1234567"  # tiền NCC hoàn giả, dùng để dò rò trong JSON
 
@@ -43,7 +44,7 @@ REFUND_SENTINEL = "1234567"  # tiền NCC hoàn giả, dùng để dò rò trong
 class Lo5Base(OrderApiBase):
     def setUp(self):
         super().setUp()
-        self.cs = make_user("cs_lo5", "cskh")
+        self.cs = make_user("cs_lo5", roles.CUSTOMER_SERVICE)
         self.c_chu = client_for(self.chu)
         self.url = f"/api/inventory/batches/{self.batch.pk}/return-to-supplier/"
         self.cancel_url = f"/api/inventory/batches/{self.batch.pk}/cancel-expired/"
@@ -135,7 +136,7 @@ class SR15CloseExpiredTests(Lo5Base):
 
     def test_sr15_ac2_guidance_quan_ly_thay_buoc_khong_duoc_phep(self):
         self._expire()
-        ql = make_user("ql_lo5g", "quan_ly")
+        ql = make_user("ql_lo5g", roles.MANAGER)
         resp = client_for(ql).get(f"/api/guidance/batch/{self.batch.pk}/")
         self.assertEqual(resp.status_code, 200)
         steps = {s["key"]: s for s in resp.json()["next_steps"]}
@@ -604,7 +605,7 @@ class SR15AiFloorTests(TestCase):
         act.refresh_from_db()
         batch.refresh_from_db()
         self.assertEqual(act.status, AiAction.Status.ESCALATED)
-        self.assertEqual(act.assignee_group, "chu")
+        self.assertEqual(act.assignee_group, roles.OWNER)
         self.assertEqual(act.downgrade_reason["code"], "AI_CLOSE_BATCH_CONDITIONS_NOT_MET")
         self.assertEqual(batch.status, Batch.Status.EXPIRED)
         self.assertEqual(batch.qty_available, Decimal("40.000"))

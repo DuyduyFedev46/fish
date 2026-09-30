@@ -1,13 +1,13 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import {
-  getMockCskhQueue,
-  mockClaimCskhTask,
-  mockRecordCskhCall,
-  mockSearchCskh,
+  getMockConfirmationQueue,
+  mockClaimConfirmationTask,
+  mockRecordConfirmationCall,
+  mockSearchCustomers,
   mockUnconfirm,
   mockChangeRecipient,
-  mockDecideCskh,
-  MOCK_CSKH_ITEMS,
+  mockDecideConfirmation,
+  MOCK_CONFIRMATION_ITEMS,
   MOCK_STALE_ON_CALL_IDS,
 } from "./mock";
 import { isStaleStateError } from "./api";
@@ -19,14 +19,14 @@ import {
 
 describe("CSKH Feature Tests (CS-04, CS-05, CS-06, CS-11)", () => {
   beforeEach(() => {
-    const item31 = MOCK_CSKH_ITEMS.find((i) => i.note_id === 31);
+    const item31 = MOCK_CONFIRMATION_ITEMS.find((i) => i.note_id === 31);
     if (item31) {
       item31.note_status = "CONFIRMING";
       item31.confirm_state = "PENDING";
       item31.claimed_by = null;
       item31.claimed_until = null;
     }
-    const item36 = MOCK_CSKH_ITEMS.find((i) => i.note_id === 36);
+    const item36 = MOCK_CONFIRMATION_ITEMS.find((i) => i.note_id === 36);
     if (item36) {
       item36.note_status = "CONFIRMING";
       item36.confirm_state = "PENDING";
@@ -35,14 +35,14 @@ describe("CSKH Feature Tests (CS-04, CS-05, CS-06, CS-11)", () => {
       item36.calls = [];
     }
     MOCK_STALE_ON_CALL_IDS.add(36);
-    const item28 = MOCK_CSKH_ITEMS.find((i) => i.note_id === 28);
+    const item28 = MOCK_CONFIRMATION_ITEMS.find((i) => i.note_id === 28);
     if (item28) {
       item28.note_status = "CONFIRMING";
       item28.confirm_state = "ESCALATED";
       item28.claimed_by = null;
       item28.claimed_until = null;
     }
-    const item27 = MOCK_CSKH_ITEMS.find((i) => i.note_id === 27);
+    const item27 = MOCK_CONFIRMATION_ITEMS.find((i) => i.note_id === 27);
     if (item27) {
       item27.note_status = "CANCELLED";
       item27.confirm_state = "REFUND_CALL";
@@ -53,7 +53,7 @@ describe("CSKH Feature Tests (CS-04, CS-05, CS-06, CS-11)", () => {
 
   describe("CS-05: Hàng chờ CSKH & Tìm kiếm", () => {
     it("CS-05-AC1: Hàng chờ mặc định lọc CONFIRMING, sắp xếp theo paid_at tăng dần", () => {
-      const res = getMockCskhQueue();
+      const res = getMockConfirmationQueue();
       expect(res.results.length).toBeGreaterThan(0);
       for (let i = 0; i < res.results.length - 1; i++) {
         const tA = new Date(res.results[i].paid_at!).getTime();
@@ -63,7 +63,7 @@ describe("CSKH Feature Tests (CS-04, CS-05, CS-06, CS-11)", () => {
     });
 
     it("CS-05-AC2: Tab CALLBACK chỉ trả các phiếu có confirm_state=CALLBACK", () => {
-      const res = getMockCskhQueue({ state: "CALLBACK" });
+      const res = getMockConfirmationQueue({ state: "CALLBACK" });
       expect(res.results.length).toBeGreaterThan(0);
       for (const item of res.results) {
         expect(item.confirm_state).toBe("CALLBACK");
@@ -71,18 +71,18 @@ describe("CSKH Feature Tests (CS-04, CS-05, CS-06, CS-11)", () => {
     });
 
     it("CS-05-AC3: Khoá mềm claim đơn trong 5 phút và chặn tranh chấp 409 CLAIMED", () => {
-      const firstClaim = mockClaimCskhTask({}, 31);
+      const firstClaim = mockClaimConfirmationTask({}, 31);
       expect(firstClaim.status).toBe(200);
       if ("claimed_by" in firstClaim.body) {
         expect(firstClaim.body.claimed_by.display_name).toBe("CSKH Thử");
       }
 
       // Giả lập người khác (id khác) claim trong thời gian khoá
-      const item31 = MOCK_CSKH_ITEMS.find((i) => i.note_id === 31)!;
+      const item31 = MOCK_CONFIRMATION_ITEMS.find((i) => i.note_id === 31)!;
       item31.claimed_by = { id: 99, display_name: "CSKH Khác" };
       item31.claimed_until = new Date(Date.now() + 4 * 60 * 1000).toISOString();
 
-      const secondClaim = mockClaimCskhTask({}, 31);
+      const secondClaim = mockClaimConfirmationTask({}, 31);
       expect(secondClaim.status).toBe(409);
       if ("code" in secondClaim.body) {
         expect(secondClaim.body.code).toBe("CLAIMED");
@@ -91,7 +91,7 @@ describe("CSKH Feature Tests (CS-04, CS-05, CS-06, CS-11)", () => {
     });
 
     it("CS-05-AC5: Tìm kiếm SĐT trả đủ thông tin cho đơn trong scope, che SĐT cho đơn ngoài scope", () => {
-      const res = mockSearchCskh({}, "0900000123");
+      const res = mockSearchCustomers({}, "0900000123");
       expect(res.status).toBe(200);
       if ("results" in res.body) {
         expect(res.body.results.length).toBeGreaterThan(0);
@@ -103,7 +103,7 @@ describe("CSKH Feature Tests (CS-04, CS-05, CS-06, CS-11)", () => {
     });
 
     it("CS-05-AC6: Tìm kiếm SĐT một phần (< 9 số) trả 400 INVALID_QUERY", () => {
-      const res = mockSearchCskh({}, "090012");
+      const res = mockSearchCustomers({}, "090012");
       expect(res.status).toBe(400);
       if ("code" in res.body) {
         expect(res.body.code).toBe("INVALID_QUERY");
@@ -113,7 +113,7 @@ describe("CSKH Feature Tests (CS-04, CS-05, CS-06, CS-11)", () => {
 
   describe("CS-06: Ghi kết quả cuộc gọi & Huỷ xác nhận", () => {
     it("CS-06-AC1: Ghi CONFIRMED chuyển phiếu sang PREPARING", () => {
-      const res = mockRecordCskhCall({}, 31, {
+      const res = mockRecordConfirmationCall({}, 31, {
         result: "CONFIRMED",
         note: "Giao sau 17h",
         request_id: "req-test-uuid-1",
@@ -127,7 +127,7 @@ describe("CSKH Feature Tests (CS-04, CS-05, CS-06, CS-11)", () => {
 
     it("CS-06-AC4: Ghi CALLBACK chuyển confirm_state sang CALLBACK kèm callback_at", () => {
       const futureTime = new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString();
-      const res = mockRecordCskhCall({}, 30, {
+      const res = mockRecordConfirmationCall({}, 30, {
         result: "CALLBACK",
         callback_at: futureTime,
         note: "Khách bận, gọi lại sau 2h",
@@ -140,7 +140,7 @@ describe("CSKH Feature Tests (CS-04, CS-05, CS-06, CS-11)", () => {
     });
 
     it("CS-06-AC6: BR-GH-19 chặn ghi SĐT hoặc STK (≥ 9 chữ số) vào ghi chú", () => {
-      const res1 = mockRecordCskhCall({}, 31, {
+      const res1 = mockRecordConfirmationCall({}, 31, {
         result: "CONFIRMED",
         note: "Giao cho số 0901234567 nhé",
         request_id: "req-test-uuid-3",
@@ -150,7 +150,7 @@ describe("CSKH Feature Tests (CS-04, CS-05, CS-06, CS-11)", () => {
         expect(res1.body.code).toBe("BR-GH-19");
       }
 
-      const res2 = mockRecordCskhCall({}, 31, {
+      const res2 = mockRecordConfirmationCall({}, 31, {
         result: "CONFIRMED",
         note: "SĐT liên hệ: 0900.111.222",
         request_id: "req-test-uuid-4",
@@ -162,7 +162,7 @@ describe("CSKH Feature Tests (CS-04, CS-05, CS-06, CS-11)", () => {
     });
 
     it("CS-06-AC8: Huỷ xác nhận đưa phiếu từ PREPARING về CONFIRMING/PENDING", () => {
-      const item31 = MOCK_CSKH_ITEMS.find((i) => i.note_id === 31)!;
+      const item31 = MOCK_CONFIRMATION_ITEMS.find((i) => i.note_id === 31)!;
       item31.note_status = "PREPARING";
 
       const res = mockUnconfirm({}, 31, { reason: "Bấm nhầm đơn" });
@@ -217,7 +217,7 @@ describe("CSKH Feature Tests (CS-04, CS-05, CS-06, CS-11)", () => {
 
   describe("Lô 3: CS-07, CS-08, CS-09 (Chuyển Quản lý, Quyết định, Báo hoàn tiền)", () => {
     it("CS-07-AC8: Quản lý chọn DELIVER_WITHOUT_CONFIRM chuyển phiếu sang PREPARING", () => {
-      const res = mockDecideCskh({}, 28, {
+      const res = mockDecideConfirmation({}, 28, {
         decision: "DELIVER_WITHOUT_CONFIRM",
         reason: "Khách quen, địa chỉ đã giao 2 lần",
       });
@@ -230,7 +230,7 @@ describe("CSKH Feature Tests (CS-04, CS-05, CS-06, CS-11)", () => {
 
     it("CS-07-AC9: Quản lý chọn EXTEND chuyển confirm_state về CALLBACK", () => {
       const until = new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString();
-      const res = mockDecideCskh({}, 28, {
+      const res = mockDecideConfirmation({}, 28, {
         decision: "EXTEND",
         until,
         reason: "Khách nhắn đang họp",
@@ -242,7 +242,7 @@ describe("CSKH Feature Tests (CS-04, CS-05, CS-06, CS-11)", () => {
     });
 
     it("CS-07-AC11: Quản lý chọn CANCEL huỷ đơn và trả suggest_refund_amount", () => {
-      const res = mockDecideCskh({}, 28, {
+      const res = mockDecideConfirmation({}, 28, {
         decision: "CANCEL",
         reason_code: "UNREACHABLE",
         note: "Gọi 3 lần không liên lạc được",
@@ -256,7 +256,7 @@ describe("CSKH Feature Tests (CS-04, CS-05, CS-06, CS-11)", () => {
     });
 
     it("CS-09-AC1: Tab REFUND_CALL lọc các phiếu bị tự huỷ cần báo khách", () => {
-      const res = getMockCskhQueue({ state: "REFUND_CALL" });
+      const res = getMockConfirmationQueue({ state: "REFUND_CALL" });
       expect(res.results.length).toBeGreaterThan(0);
       for (const item of res.results) {
         expect(item.confirm_state).toBe("REFUND_CALL");
@@ -266,7 +266,7 @@ describe("CSKH Feature Tests (CS-04, CS-05, CS-06, CS-11)", () => {
     });
 
     it("CS-09-AC2: Ghi NOTIFIED trên phiếu REFUND_CALL đóng task thành công", () => {
-      const res = mockRecordCskhCall({}, 27, {
+      const res = mockRecordConfirmationCall({}, 27, {
         result: "NOTIFIED",
         note: "Đã gọi báo khách về khoản hoàn 540k",
         request_id: "req-notified-test-uuid",
@@ -286,21 +286,21 @@ describe("CSKH Feature Tests (CS-04, CS-05, CS-06, CS-11)", () => {
     };
 
     it("AC1/AC3b: job tự huỷ chạy trước, CSKH bấm 'Đã xác nhận' sau → 409 STALE_STATE, phiếu vẫn CANCELLED/REFUND_CALL", () => {
-      const res = mockRecordCskhCall({}, 36, { result: "CONFIRMED", note: "", request_id: "req-stale-1" });
+      const res = mockRecordConfirmationCall({}, 36, { result: "CONFIRMED", note: "", request_id: "req-stale-1" });
       expect(res).toEqual(stale);
-      const item = MOCK_CSKH_ITEMS.find((i) => i.note_id === 36)!;
+      const item = MOCK_CONFIRMATION_ITEMS.find((i) => i.note_id === 36)!;
       expect(item.note_status).toBe("CANCELLED");
       expect(item.confirm_state).toBe("REFUND_CALL");
       expect(item.calls).toHaveLength(0);
       // Sau khi tải lại: phiếu không còn ở hàng chờ mặc định, mà sang tab báo hoàn tiền.
-      expect(getMockCskhQueue().results.some((i) => i.note_id === 36)).toBe(false);
-      expect(getMockCskhQueue({ state: "REFUND_CALL" }).results.some((i) => i.note_id === 36)).toBe(true);
+      expect(getMockConfirmationQueue().results.some((i) => i.note_id === 36)).toBe(false);
+      expect(getMockConfirmationQueue({ state: "REFUND_CALL" }).results.some((i) => i.note_id === 36)).toBe(true);
     });
 
     it.each(["CONFIRMED", "CALLBACK", "WRONG_NUMBER", "WANT_CHANGE", "WANT_CANCEL"] as const)(
       "AC2: task REFUND_CALL không nhận kết quả %s → 409 STALE_STATE",
       (result) => {
-        const res = mockRecordCskhCall({}, 27, {
+        const res = mockRecordConfirmationCall({}, 27, {
           result,
           note: "",
           callback_at: new Date(Date.now() + 3600_000).toISOString(),
@@ -311,14 +311,14 @@ describe("CSKH Feature Tests (CS-04, CS-05, CS-06, CS-11)", () => {
     );
 
     it("AC2: task REFUND_CALL vẫn nhận UNREACHABLE và NOTIFIED", () => {
-      const r1 = mockRecordCskhCall({}, 27, { result: "UNREACHABLE", note: "", request_id: "req-ok-1" });
+      const r1 = mockRecordConfirmationCall({}, 27, { result: "UNREACHABLE", note: "", request_id: "req-ok-1" });
       expect(r1.status).toBe(201);
-      const r2 = mockRecordCskhCall({}, 27, { result: "NOTIFIED", note: "", request_id: "req-ok-2" });
+      const r2 = mockRecordConfirmationCall({}, 27, { result: "NOTIFIED", note: "", request_id: "req-ok-2" });
       expect(r2.status).toBe(201);
     });
 
     it("luồng thuận: phiếu CONFIRMING khác (không bị job huỷ) vẫn xác nhận 201", () => {
-      const res = mockRecordCskhCall({}, 31, { result: "CONFIRMED", note: "", request_id: "req-ok-3" });
+      const res = mockRecordConfirmationCall({}, 31, { result: "CONFIRMED", note: "", request_id: "req-ok-3" });
       expect(res.status).toBe(201);
     });
 
@@ -341,7 +341,7 @@ describe("CSKH Feature Tests (CS-04, CS-05, CS-06, CS-11)", () => {
         "cogs",
         "profit",
       ];
-      for (const item of MOCK_CSKH_ITEMS) {
+      for (const item of MOCK_CONFIRMATION_ITEMS) {
         for (const key of costForbidden) {
           expect(item).not.toHaveProperty(key);
         }

@@ -16,18 +16,19 @@ from apps.content.entries.services import (
 )
 from apps.content.models.entries import Entry, EntryVersion
 from apps.content.public.tests.test_public_api import assert_no_forbidden_keys
+from apps.accounts import roles
 
 User = get_user_model()
 
 
 class PagesPolicyTests(APITestCase):
     def setUp(self):
-        self.quan_ly = User.objects.create_user(username="quan_ly", password="password")
-        self.nv_kho = User.objects.create_user(username="nv_kho", password="password")
+        self.quan_ly = User.objects.create_user(username=roles.MANAGER, password="password")
+        self.nv_kho = User.objects.create_user(username=roles.WAREHOUSE_STAFF, password="password")
         self.user_nd01 = User.objects.create_user(username="user_nd01", password="password")
 
-        g_ql, _ = Group.objects.get_or_create(name="quan_ly")
-        g_kho, _ = Group.objects.get_or_create(name="nv_kho")
+        g_ql, _ = Group.objects.get_or_create(name=roles.MANAGER)
+        g_kho, _ = Group.objects.get_or_create(name=roles.WAREHOUSE_STAFF)
         self.quan_ly.groups.add(g_ql)
         self.nv_kho.groups.add(g_kho)
 

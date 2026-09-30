@@ -9,26 +9,27 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from apps.ai.models import AiAction
+from apps.accounts import roles
 
 
 class DailyAiReportTests(APITestCase):
     def setUp(self):
         # 1. Tạo nhóm và quyền
-        self.chu_group, _ = Group.objects.get_or_create(name="chu")
-        self.quan_ly_group, _ = Group.objects.get_or_create(name="quan_ly")
-        self.nv_kho_group, _ = Group.objects.get_or_create(name="nv_kho")
+        self.chu_group, _ = Group.objects.get_or_create(name=roles.OWNER)
+        self.quan_ly_group, _ = Group.objects.get_or_create(name=roles.MANAGER)
+        self.nv_kho_group, _ = Group.objects.get_or_create(name=roles.WAREHOUSE_STAFF)
 
         perm_policy = Permission.objects.filter(codename="manage_ai_policy").first()
         if perm_policy:
             self.chu_group.permissions.add(perm_policy)
 
         # 2. Tạo users
-        self.chu_user = User.objects.create_user(
+        self.owner_user = User.objects.create_user(
             username="chu_vua", password="password", first_name="Duy", last_name="Chủ"
         )
-        self.chu_user.groups.add(self.chu_group)
+        self.owner_user.groups.add(self.chu_group)
         if perm_policy:
-            self.chu_user.user_permissions.add(perm_policy)
+            self.owner_user.user_permissions.add(perm_policy)
 
         self.quan_ly = User.objects.create_user(
             username="quan_ly_1", password="password", first_name="Linh", last_name="QL"
@@ -97,7 +98,7 @@ class DailyAiReportTests(APITestCase):
 
         AiAction.objects.all().update(created_at=created_dt)
 
-        self.client.force_authenticate(user=self.chu_user)
+        self.client.force_authenticate(user=self.owner_user)
         res = self.client.get("/api/ai/report/daily/?date=2026-09-28")
         self.assertEqual(res.status_code, status.HTTP_200_OK)
 
@@ -121,7 +122,7 @@ class DailyAiReportTests(APITestCase):
         """
         DW-22-AC2: Ngày không có việc -> 200 danh sách rỗng; ngày sai định dạng -> 400.
         """
-        self.client.force_authenticate(user=self.chu_user)
+        self.client.force_authenticate(user=self.owner_user)
 
         # Ngày không có việc
         res = self.client.get("/api/ai/report/daily/?date=2020-01-01")
@@ -170,7 +171,7 @@ class DailyAiReportTests(APITestCase):
         )
         AiAction.objects.all().update(created_at=created_dt)
 
-        self.client.force_authenticate(user=self.chu_user)
+        self.client.force_authenticate(user=self.owner_user)
         res = self.client.get("/api/ai/report/daily/?date=2026-09-28")
         self.assertEqual(res.status_code, status.HTTP_200_OK)
 
@@ -192,6 +193,6 @@ class DailyAiReportTests(APITestCase):
         """
         DW-22-AC5: AI_ENABLED=false -> vẫn xem được lịch sử báo cáo (BR-AI-10).
         """
-        self.client.force_authenticate(user=self.chu_user)
+        self.client.force_authenticate(user=self.owner_user)
         res = self.client.get("/api/ai/report/daily/")
         self.assertEqual(res.status_code, status.HTTP_200_OK)

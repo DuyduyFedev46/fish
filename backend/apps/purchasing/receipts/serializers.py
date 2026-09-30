@@ -35,7 +35,7 @@ class PurchaseReceiptSerializer(serializers.ModelSerializer):
         read_only_fields = ["status", "created_by", "created_at"]  # BR-PQ-14/16
 
 
-class NhapLoLine(serializers.Serializer):
+class ReceiveBatchesLine(serializers.Serializer):
     item_code = serializers.SlugRelatedField(
         slug_field="code", queryset=Item.objects.all(), help_text="Mã mặt hàng"
     )
@@ -50,7 +50,7 @@ class NhapLoLine(serializers.Serializer):
     )
 
 
-class NhapLoInput(serializers.Serializer):
+class ReceiveBatchesInput(serializers.Serializer):
     supplier = serializers.PrimaryKeyRelatedField(
         queryset=Supplier.objects.filter(is_active=True), help_text="Nhà cung cấp"
     )
@@ -61,10 +61,10 @@ class NhapLoInput(serializers.Serializer):
     idempotency_key = serializers.CharField(
         max_length=64, required=False, allow_blank=True, allow_null=True, help_text="Khoá lặp"
     )
-    lines = NhapLoLine(many=True, min_length=1)
+    lines = ReceiveBatchesLine(many=True, min_length=1)
 
 
-class NhapLoBatchOutput(CostFieldSerializerMixin, serializers.ModelSerializer):
+class ReceivedBatchOutput(CostFieldSerializerMixin, serializers.ModelSerializer):
     sensitive_fields = ("purchase_rate", "landed_unit_cost")
 
     class Meta:

@@ -14,12 +14,13 @@ from apps.purchasing.models import PurchaseCost, PurchaseInvoice, PurchaseReceip
 from apps.sales.models import Refund
 
 from .fixtures import client_for, make_batch, make_master, make_order_with_note, make_user
+from apps.accounts import roles
 
 
 class S4ReconciliationTests(TestCase):
     def setUp(self):
-        self.kho1 = make_user("kho1", "nv_kho")
-        self.ql1 = make_user("ql1", "quan_ly")
+        self.kho1 = make_user("kho1", roles.WAREHOUSE_STAFF)
+        self.ql1 = make_user("ql1", roles.MANAGER)
         self.url = "/api/inventory/reconciliations/"
         self.payload = {"count_date": str(timezone.localdate()), "note": "kiểm cuối ngày"}
 
@@ -72,7 +73,7 @@ class S4ReconciliationTests(TestCase):
         self.assertEqual(resp.json()["approved_by"], self.ql1.pk)
 
     def test_s4_ac4_nv_giao_tao_kiem_ke_403(self):
-        giao = make_user("giao1", "nv_giao")
+        giao = make_user("giao1", roles.DELIVERY_STAFF)
         resp = client_for(giao).post(self.url, self.payload, format="json")
         self.assertEqual(resp.status_code, 403)
         self.assertFalse(StockReconciliation.objects.exists())
@@ -87,10 +88,10 @@ class S4OtherDocumentsTests(TestCase):
     def setUp(self):
         self.item, self.sup, self.wh = make_master()
         self.batch = make_batch(self.item, self.sup, self.wh)
-        self.chu = make_user("chu1", "chu")
-        self.ql1 = make_user("ql1", "quan_ly")
-        self.kho1 = make_user("kho1", "nv_kho")
-        self.giao1 = make_user("giao1", "nv_giao")
+        self.chu = make_user("chu1", roles.OWNER)
+        self.ql1 = make_user("ql1", roles.MANAGER)
+        self.kho1 = make_user("kho1", roles.WAREHOUSE_STAFF)
+        self.giao1 = make_user("giao1", roles.DELIVERY_STAFF)
 
     def _assert_actor(self, user, url, payload, model):
         resp = client_for(user).post(url, {**payload, "created_by": self.ql1.pk}, format="json")

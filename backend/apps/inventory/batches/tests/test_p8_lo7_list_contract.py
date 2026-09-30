@@ -16,6 +16,7 @@ from apps.common.cost_keys import COST_KEYS
 from apps.common.tests.fixtures import client_for, make_user
 from apps.inventory.models import Batch
 from apps.sales.orders.tests.test_s10_api import OrderApiBase, find_keys
+from apps.accounts import roles
 
 URL = "/api/inventory/batches/"
 NEW_KEYS = {"item_name", "supplier_name", "warehouse_name", "status_label"}
@@ -24,7 +25,7 @@ NEW_KEYS = {"item_name", "supplier_name", "warehouse_name", "status_label"}
 class ListContractTests(OrderApiBase):
     def setUp(self):
         super().setUp()
-        self.cs = make_user("cs_l51", "cskh")
+        self.cs = make_user("cs_l51", roles.CUSTOMER_SERVICE)
 
     def _empty_batch(self):
         """Thêm lô thứ hai đã hết tồn (qty_available = 0)."""

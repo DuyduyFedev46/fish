@@ -16,18 +16,19 @@ from apps.accounts.models import AuditLog
 from apps.common.cost_keys import COST_KEYS
 from apps.common.exceptions import BusinessError
 from apps.common.tests.fixtures import client_for, make_user
-from apps.delivery.tests.test_cskh_l3 import CskhL3BaseTestCase
+from apps.delivery.tests.test_cskh_l3 import ConfirmationL3BaseTestCase
 from apps.inventory.batches import services as batch_services
 from apps.inventory.models import Batch
 from apps.purchasing.models import PurchaseReceipt
 from apps.purchasing.receipts import services as receipt_services
 from apps.sales.orders.tests.test_s10_api import find_keys
+from apps.accounts import roles
 
 
-class SR10PublishLockTests(CskhL3BaseTestCase):
+class SR10PublishLockTests(ConfirmationL3BaseTestCase):
     def setUp(self):
         super().setUp()
-        self.giao = make_user("giao_sr10", "nv_giao")
+        self.giao = make_user("giao_sr10", roles.DELIVERY_STAFF)
         self.receipt, batches = receipt_services.create_and_submit_receipt(
             supplier=self.sup, warehouse=self.wh, received_date=timezone.localdate(),
             lines=[{"item_code": self.item, "qty": Decimal("5"), "rate": Decimal("1000")}],

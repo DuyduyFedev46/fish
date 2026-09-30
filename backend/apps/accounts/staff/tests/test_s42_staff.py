@@ -26,17 +26,18 @@ from .helpers import (
     staff_user,
     token_client,
 )
+from apps.accounts import roles
 
 NEW_PASSWORD = "Moi-Kho-2026?"
 
 
 class S42Base(TestCase):
     def setUp(self):
-        self.loc = staff_user("loc", "chu", display_name="Lộc")
-        self.giao1 = staff_user("giao1", "nv_giao", display_name="Anh Tư")
+        self.loc = staff_user("loc", roles.OWNER, display_name="Lộc")
+        self.giao1 = staff_user("giao1", roles.DELIVERY_STAFF, display_name="Anh Tư")
         self.giao1.set_password(STRONG_PASSWORD)
         self.giao1.save()
-        self.kho1 = staff_user("kho1", "nv_kho")
+        self.kho1 = staff_user("kho1", roles.WAREHOUSE_STAFF)
         self.kho1.set_password(STRONG_PASSWORD)
         self.kho1.save()
         self.chu = client_for(self.loc)
@@ -130,12 +131,12 @@ class S42DeactivateTests(S42Base):
         self.assertTrue(self.loc.is_active)
 
     def test_s42_ac5_con_chu_khac_thi_cho_nghi_duoc(self):
-        chu_b = staff_user("chu_b", "chu")
+        chu_b = staff_user("chu_b", roles.OWNER)
         resp = self.post(self.chu, chu_b, "deactivate")
         self.assertEqual(resp.status_code, 200, resp.content)
 
     def test_s42_ac6_chu_tu_cho_nghi_minh_400(self):
-        staff_user("chu_b", "chu")  # còn Chủ khác → lỗi phải là BR-PQ-17
+        staff_user("chu_b", roles.OWNER)  # còn Chủ khác → lỗi phải là BR-PQ-17
         resp = self.post(self.chu, self.loc, "deactivate")
         self.assertEqual(resp.status_code, 400, resp.content)
         self.assertEqual(
@@ -145,8 +146,8 @@ class S42DeactivateTests(S42Base):
         self.assertTrue(self.loc.is_active)
 
     def test_s42_ac7_ql9_cho_nghi_hoac_lam_lai_tai_khoan_chu_403(self):
-        chu_b = staff_user("chu_b", "chu")
-        ql9 = make_user("ql9", "quan_ly", perms=("accounts.manage_staff",))
+        chu_b = staff_user("chu_b", roles.OWNER)
+        ql9 = make_user("ql9", roles.MANAGER, perms=("accounts.manage_staff",))
         resp = self.post(client_for(ql9), self.loc, "deactivate")
         self.assertEqual(resp.status_code, 403, resp.content)
         self.assertEqual(
@@ -160,7 +161,7 @@ class S42DeactivateTests(S42Base):
         self.assertEqual(self.post(client_for(ql9), chu_b, "reactivate").status_code, 403)
 
     def test_s42_ql9_cho_nghi_nhan_vien_thuong_duoc(self):
-        ql9 = make_user("ql9", "quan_ly", perms=("accounts.manage_staff",))
+        ql9 = make_user("ql9", roles.MANAGER, perms=("accounts.manage_staff",))
         self.assertEqual(self.post(client_for(ql9), self.giao1, "deactivate").status_code, 200)
 
 
@@ -210,7 +211,7 @@ class S42ResetPasswordTests(S42Base):
         self.assertEqual(resp.json()["code"], "BR-PQ-17")
 
     def test_s42_ac7_ql9_dat_lai_mat_khau_chu_403(self):
-        ql9 = make_user("ql9", "quan_ly", perms=("accounts.manage_staff",))
+        ql9 = make_user("ql9", roles.MANAGER, perms=("accounts.manage_staff",))
         resp = self.post(client_for(ql9), self.loc, "reset-password", {"new_password": NEW_PASSWORD})
         self.assertEqual(resp.status_code, 403, resp.content)
         self.assertEqual(
@@ -236,7 +237,7 @@ class S42PermissionTests(S42Base):
 
     def test_s42_ac9_quan_ly_nv_kho_nv_giao_403(self):
         token_client(self.giao1)
-        for username, group in (("ql1", "quan_ly"), ("kho2", "nv_kho"), ("giao2", "nv_giao")):
+        for username, group in (("ql1", roles.MANAGER), ("kho2", roles.WAREHOUSE_STAFF), ("giao2", roles.DELIVERY_STAFF)):
             client = client_for(make_user(username, group))
             for action, body in (("deactivate", {}), ("reactivate", {}),
                                  ("reset-password", {"new_password": NEW_PASSWORD})):

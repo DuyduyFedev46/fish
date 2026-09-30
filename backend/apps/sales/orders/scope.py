@@ -22,14 +22,14 @@ def scope_orders_for(user, qs):
         return qs
 
     assigned_q = Q(invoice__delivery_notes__assigned_to=user)
-    from apps.delivery.cskh.scope import cskh_note_q, is_cskh
+    from apps.delivery.confirmation.scope import customer_service_note_q, is_customer_service
 
-    if is_cskh(user):
-        cskh_q = Exists(
+    if is_customer_service(user):
+        customer_service_q = Exists(
             DeliveryNote.objects.filter(
                 sales_invoice__sales_order=OuterRef("pk")
-            ).filter(cskh_note_q(user))
+            ).filter(customer_service_note_q(user))
         )
-        return qs.filter(assigned_q | cskh_q).distinct()
+        return qs.filter(assigned_q | customer_service_q).distinct()
 
     return qs.filter(assigned_q).distinct()

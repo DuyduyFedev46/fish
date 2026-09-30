@@ -7,6 +7,7 @@ from decimal import Decimal
 from django.test import TestCase
 
 from apps.common.tests.fixtures import client_for, make_batch, make_master, make_user
+from apps.accounts import roles
 
 
 class BatchPnlApiTests(TestCase):
@@ -28,7 +29,7 @@ class BatchPnlApiTests(TestCase):
 
     def test_chu_can_view_batch_pnl(self):
         """Chủ sở hữu quyền view_profitreport -> 200, đủ 20 khoá (thêm expired_qty, expired_cost theo TL-4; reversed_qty/revenue theo P8 Lô 4; supplier_return_qty/refund theo Lô 5)."""
-        user = make_user("chu1", "chu")
+        user = make_user("chu1", roles.OWNER)
         resp = client_for(user).get(self.url)
         self.assertEqual(resp.status_code, 200)
         data = resp.json()
@@ -38,7 +39,7 @@ class BatchPnlApiTests(TestCase):
 
     def test_non_owner_groups_forbidden_and_no_cost_keys(self):
         """quan_ly, nv_kho, nv_giao -> 403, body lỗi không có khoá giá vốn/lãi lỗ."""
-        for username, group in [("ql1", "quan_ly"), ("kho1", "nv_kho"), ("giao1", "nv_giao")]:
+        for username, group in [("ql1", roles.MANAGER), ("kho1", roles.WAREHOUSE_STAFF), ("giao1", roles.DELIVERY_STAFF)]:
             user = make_user(username, group)
             resp = client_for(user).get(self.url)
             self.assertEqual(resp.status_code, 403, f"Group {group} phải nhận 403")
@@ -58,7 +59,7 @@ class BatchPnlApiTests(TestCase):
 
     def test_non_existent_batch_returns_404(self):
         """Mã lô không tồn tại -> 404 Not Found."""
-        user = make_user("chu2", "chu")
+        user = make_user("chu2", roles.OWNER)
         resp = client_for(user).get("/api/reports/batch/BATCH-NONEXISTENT/")
         self.assertEqual(resp.status_code, 404)
         self.assertIn("detail", resp.json())

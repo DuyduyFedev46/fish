@@ -29,10 +29,12 @@ erp-console/
                           S12 hàng chờ thanh toán lệch (/orders/payments/, menu con), S13 phiếu hoàn cho khoản không có hoá đơn,
                           S14 huỷ đơn đã thanh toán, S15 phiếu hoàn từ đơn có hoá đơn, S16 phiếu hoàn chờ chuyển
                           (/orders/refunds/, menu con — xác nhận/thất bại/thử lại)
+    confirmation/         CS-05 gọi xác nhận đơn: hàng chờ, gọi, hẹn gọi lại, xử lý (route /cskh/ giữ tới Lô 3; API /api/cskh/)
     inventory/            S8 Kho & lô + tab "Hoạt động" (sổ kho) của cột phải — S25 mở rộng
                           (mỗi module: api.ts mock.ts types.ts components/ README.md)
   shared/                 dùng chung, KHÔNG phụ thuộc features/
-    lib/                  http.ts (apiFetch + Token + mock), token.ts, nav.ts (menu ↔ quyền, hằng PERM/GROUP),
+    lib/                  http.ts (apiFetch + Token + mock), token.ts, nav.ts (menu ↔ quyền, hằng PERM),
+                          roles.ts (NƠI DUY NHẤT chứa chuỗi tên Group: hằng ROLE),
                           messages.ts (MỌI thông điệp lỗi/thông báo FE tự sinh), groups.ts (mã + nhãn nhóm),
                           beErrors.mock.ts (mã lỗi + detail của BE chép từ contract — chỉ mock import),
                           drafts.ts + useDraft.ts (giữ nháp), format.ts (tiền, kg, giờ),
@@ -64,7 +66,7 @@ erp-console/
   Menu ↔ quyền khai một chỗ ở `shared/lib/nav.ts`. Backend vẫn là lớp chặn thật.
 - **Không viết cứng thông điệp lỗi / mã lỗi / tên quyền trong component.** Lỗi nghiệp vụ: hiện nguyên văn `detail` BE,
   logic chỉ dựa vào `code`. Câu FE tự sinh (mất mạng, 5xx, kiểm tại máy, thông báo) → `shared/lib/messages.ts`
-  (hoặc `features/<x>/messages.ts`). Tên quyền → `PERM` (`shared/lib/nav.ts`); mã nhóm → `GROUP` / `groups.ts`.
+  (hoặc `features/<x>/messages.ts`). Tên quyền → `PERM` (`shared/lib/nav.ts`); mã nhóm → `ROLE` (`shared/lib/roles.ts`) / `groups.ts`.
 - **Giao diện theo `DESIGN.md` (gốc repo)**, sản phẩm/người dùng ở `PRODUCT.md`. Chỉ dùng token trong `shared/ui/tokens.css`:
   không mã hex/rgba, không `style={{…}}` trong component (`grep -rnE '#[0-9a-fA-F]{3,8}\b|rgba?\(' app features shared` ngoài tokens.css phải ra 0).
 - Mỗi màn dữ liệu có đủ 3 trạng thái (`shared/ui/StateBox.tsx`). Mobile-first: 360px không cuộn ngang, nút ≥ 44px.

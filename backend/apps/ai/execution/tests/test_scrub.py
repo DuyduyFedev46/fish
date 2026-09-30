@@ -6,13 +6,14 @@ from django.test import TestCase
 
 from apps.ai.execution.scrub import scrub_data, truncate_read_result
 from apps.ai.policy.rules import SCRUB_COST_KEYS, SCRUB_FREE_TEXT_KEYS, SCRUB_PII_KEYS
+from apps.accounts import roles
 
 
 class ScrubTests(TestCase):
     def setUp(self):
         self.user_regular = User.objects.create_user(username="regular", password="pwd")
-        self.user_chu = User.objects.create_user(username="chu", password="pwd")
-        g_chu, _ = Group.objects.get_or_create(name="chu")
+        self.user_chu = User.objects.create_user(username=roles.OWNER, password="pwd")
+        g_chu, _ = Group.objects.get_or_create(name=roles.OWNER)
         self.user_chu.groups.add(g_chu)
 
         perm_cost = Permission.objects.filter(codename="view_costprice").first()

@@ -17,14 +17,15 @@ from apps.common.audit import record_audit
 from apps.common.tests.fixtures import client_for, make_user
 from apps.sales.orders.tests.test_s10_api import OrderApiBase
 from apps.sales.refunds import services as refund_services
+from apps.accounts import roles
 
 AUDIT_URL = "/api/audit-logs/"
 
 
 class AuditLogModelTests(TestCase):
     def setUp(self):
-        self.kho = make_user("kho1", "nv_kho")
-        self.chu = make_user("chu1", "chu")
+        self.kho = make_user("kho1", roles.WAREHOUSE_STAFF)
+        self.chu = make_user("chu1", roles.OWNER)
 
     def test_s03_ac1_schema_3_field_moi_va_mac_dinh(self):
         log = AuditLog.objects.create(action="x")
@@ -66,18 +67,18 @@ class AuditLogModelTests(TestCase):
 class AuditLogPermTests(TestCase):
     def test_s03_perm_view_auditlog_gan_cho_chu_va_quan_ly(self):
         perm = Permission.objects.get(content_type__app_label="accounts", codename="view_auditlog")
-        for name in ("chu", "quan_ly"):
+        for name in (roles.OWNER, roles.MANAGER):
             self.assertIn(perm, Group.objects.get(name=name).permissions.all(), name)
-        for name in ("nv_kho", "nv_giao"):
+        for name in (roles.WAREHOUSE_STAFF, roles.DELIVERY_STAFF):
             self.assertNotIn(perm, Group.objects.get(name=name).permissions.all(), name)
 
 
 class AuditLogListApiTests(TestCase):
     def setUp(self):
-        self.chu = make_user("chu1", "chu")
-        self.ql = make_user("ql1", "quan_ly")
-        self.kho = make_user("kho1", "nv_kho")
-        self.giao = make_user("giao1", "nv_giao")
+        self.chu = make_user("chu1", roles.OWNER)
+        self.ql = make_user("ql1", roles.MANAGER)
+        self.kho = make_user("kho1", roles.WAREHOUSE_STAFF)
+        self.giao = make_user("giao1", roles.DELIVERY_STAFF)
 
         self.row_user = record_audit(
             "close_batch", actor=self.ql,

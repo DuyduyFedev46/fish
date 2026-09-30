@@ -58,25 +58,25 @@ const MOVE_LABEL: Record<MovementType, string> = {
   CANCEL_RESTORE: "Hoàn kho do huỷ đơn",
 };
 
-const KHO_LANH = "Kho lạnh Bến Đá";
+const COLD_STORAGE_NAME = "Kho lạnh Bến Đá";
 const KHO_MAT = "Kho mát chợ Vũng Tàu";
 
 // [batch_id, item, warehouse, supplier, qty_available, qty_reserved, nhận (ngày trước), hạn (ngày tới), status, landed_unit_cost]
 type SeedBatch = [string, string, string, string, number, number, number, number, BatchStatus, number];
 const BATCHES: SeedBatch[] = [
-  ["L0914-CT01", "Cá thu phi lê", KHO_LANH, "Ghe Tư Hải", 18.5, 2, 10, 4, "NEAR_EXPIRY", 182000],
-  ["L0915-MU02", "Mực lá câu", KHO_LANH, "Vựa Bà Năm", 12, 1.5, 9, 1, "NEAR_EXPIRY", 236500],
-  ["L0916-TS01", "Tôm sú size 20", KHO_LANH, "Tàu Phước Lộc 07", 25.25, 0, 8, 9, "SELLING", 312000],
-  ["L0917-CB01", "Cá bớp cắt khúc", KHO_LANH, "Ghe Tư Hải", 30, 4, 7, 21, "SELLING", 158000],
+  ["L0914-CT01", "Cá thu phi lê", COLD_STORAGE_NAME, "Ghe Tư Hải", 18.5, 2, 10, 4, "NEAR_EXPIRY", 182000],
+  ["L0915-MU02", "Mực lá câu", COLD_STORAGE_NAME, "Vựa Bà Năm", 12, 1.5, 9, 1, "NEAR_EXPIRY", 236500],
+  ["L0916-TS01", "Tôm sú size 20", COLD_STORAGE_NAME, "Tàu Phước Lộc 07", 25.25, 0, 8, 9, "SELLING", 312000],
+  ["L0917-CB01", "Cá bớp cắt khúc", COLD_STORAGE_NAME, "Ghe Tư Hải", 30, 4, 7, 21, "SELLING", 158000],
   ["L0918-GX01", "Ghẹ xanh", KHO_MAT, "Vựa Bà Năm", 9.8, 0.8, 6, 2, "SELLING", 265000],
-  ["L0918-CH01", "Cá hồng đỏ", KHO_LANH, "Tàu Phước Lộc 07", 22.4, 0, 6, 25, "SELLING", 142500],
-  ["L0919-CN01", "Cá ngừ đại dương loin", KHO_LANH, "Tàu Phước Lộc 07", 41.75, 6.5, 5, 30, "SELLING", 205000],
-  ["L0920-CC01", "Cá chim trắng", KHO_LANH, "Ghe Tư Hải", 16, 0, 4, 12, "SELLING", 176000],
-  ["L0921-MU03", "Mực ống", KHO_LANH, "Vựa Bà Năm", 0, 0, 3, 18, "SOLD_OUT", 198000],
-  ["L0921-CT02", "Cá thu nguyên con", KHO_LANH, "Ghe Tư Hải", 35, 3, 3, 28, "SELLING", 149000],
-  ["L0922-TS02", "Tôm sú size 30", KHO_LANH, "Tàu Phước Lộc 07", 20, 0, 2, 26, "DRAFT", 268000],
+  ["L0918-CH01", "Cá hồng đỏ", COLD_STORAGE_NAME, "Tàu Phước Lộc 07", 22.4, 0, 6, 25, "SELLING", 142500],
+  ["L0919-CN01", "Cá ngừ đại dương loin", COLD_STORAGE_NAME, "Tàu Phước Lộc 07", 41.75, 6.5, 5, 30, "SELLING", 205000],
+  ["L0920-CC01", "Cá chim trắng", COLD_STORAGE_NAME, "Ghe Tư Hải", 16, 0, 4, 12, "SELLING", 176000],
+  ["L0921-MU03", "Mực ống", COLD_STORAGE_NAME, "Vựa Bà Năm", 0, 0, 3, 18, "SOLD_OUT", 198000],
+  ["L0921-CT02", "Cá thu nguyên con", COLD_STORAGE_NAME, "Ghe Tư Hải", 35, 3, 3, 28, "SELLING", 149000],
+  ["L0922-TS02", "Tôm sú size 30", COLD_STORAGE_NAME, "Tàu Phước Lộc 07", 20, 0, 2, 26, "DRAFT", 268000],
   ["L0923-SO01", "Sò điệp", KHO_MAT, "Vựa Bà Năm", 14.2, 0, 1, 5, "DRAFT", 88000],
-  ["L0901-CB00", "Cá bớp cắt khúc", KHO_LANH, "Ghe Tư Hải", 0, 0, 23, -2, "CLOSED", 151000],
+  ["L0901-CB00", "Cá bớp cắt khúc", COLD_STORAGE_NAME, "Ghe Tư Hải", 0, 0, 23, -2, "CLOSED", 151000],
 ];
 
 // [code, total, status, phút trước, hạn giữ chỗ còn (phút) | null] — không có tên khách / SĐT (SR-17)

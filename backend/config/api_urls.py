@@ -33,7 +33,7 @@ from apps.catalog.items.shop_api import ShopCatalogView, ShopItemDetailView
 from apps.catalog.pricing.api import ItemPriceViewSet, PriceListViewSet, PricingRuleViewSet
 from apps.delivery.api import DeliveryNoteViewSet
 from apps.delivery.attention_api import DashboardAttentionView
-from apps.delivery.cskh.api import CskhQueueViewSet, CskhSearchView
+from apps.delivery.confirmation.api import ConfirmationQueueViewSet, CustomerSearchView
 from apps.inventory.batches.api import BatchViewSet
 from apps.inventory.returns.api import ReturnToStockViewSet
 from apps.inventory.stock.api import StockEntryViewSet, StockLedgerEntryViewSet, WarehouseViewSet
@@ -80,7 +80,7 @@ router.register("sales/payments", PaymentTransactionViewSet)
 # delivery
 router.register("delivery/notes", DeliveryNoteViewSet)
 # cskh
-router.register("cskh/queue", CskhQueueViewSet, basename="cskh-queue")
+router.register("cskh/queue", ConfirmationQueueViewSet, basename="cskh-queue")
 # accounts — quản lý nhân viên (S41, S42)
 router.register("staff", StaffViewSet, basename="staff")
 # AI Actions — Việc AI (DW-11)
@@ -117,7 +117,7 @@ urlpatterns = [
     path("public/site-info/", SiteInfoView.as_view(), name="public-site-info"),
 
     # CSKH tìm kiếm nhanh (chỉ POST)
-    path("cskh/search/", CskhSearchView.as_view(), name="cskh-search"),
+    path("cskh/search/", CustomerSearchView.as_view(), name="cskh-search"),
     # Shop công khai (guest)
     path("shop/catalog/", ShopCatalogView.as_view()),
     path("shop/catalog/<str:item_code>/", ShopItemDetailView.as_view()),

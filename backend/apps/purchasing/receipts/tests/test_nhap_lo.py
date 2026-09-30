@@ -13,6 +13,8 @@ from apps.catalog.models import Item, ItemGroup
 from apps.common.tests.fixtures import client_for, make_user
 from apps.inventory.models import Batch, Warehouse
 from apps.purchasing.models import PurchaseReceipt, PurchaseReceiptLine, Supplier
+from apps.ai import command_groups
+from apps.accounts import roles
 
 
 class NhapLoTests(TestCase):
@@ -27,10 +29,10 @@ class NhapLoTests(TestCase):
         self.sup = Supplier.objects.create(name="Đầu mối Phan Thiết")
         self.wh = Warehouse.objects.create(name="Kho chính")
 
-        self.user_chu = make_user("chu_test", "chu")
-        self.user_quanly = make_user("quanly_test", "quan_ly")
-        self.user_kho = make_user("kho_test", "nv_kho")
-        self.user_giao = make_user("giao_test", "nv_giao")
+        self.user_chu = make_user("chu_test", roles.OWNER)
+        self.user_quanly = make_user("quanly_test", roles.MANAGER)
+        self.user_kho = make_user("kho_test", roles.WAREHOUSE_STAFF)
+        self.user_giao = make_user("giao_test", roles.DELIVERY_STAFF)
 
         self.client_chu = client_for(self.user_chu)
         self.client_quanly = client_for(self.user_quanly)
@@ -178,7 +180,7 @@ class NhapLoTests(TestCase):
         res_cfg = self.client_kho.get("/api/ai/my-config/")
         self.assertEqual(res_cfg.status_code, 200)
         groups = res_cfg.json()["groups"]
-        thu_mua = next(g for g in groups if g["group"] == "thu_mua")
+        thu_mua = next(g for g in groups if g["group"] == command_groups.PURCHASING)
         cfg_cmd = next(c for c in thu_mua["commands"] if c["id"] == "purchasing.purchasereceipt.nhap_lo")
         self.assertEqual(cfg_cmd["choices"], ["OFF", "C"])
         self.assertIsNone(cfg_cmd["locked_reason"])

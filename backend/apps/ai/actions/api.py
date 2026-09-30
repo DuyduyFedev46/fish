@@ -9,6 +9,7 @@ from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
+from apps.accounts import roles
 from apps.ai.actions.serializers import AiActionSerializer
 from apps.ai.actions import services
 from apps.ai.models import AiAction
@@ -40,7 +41,7 @@ class AiActionViewSet(viewsets.GenericViewSet):
         scope = self.request.query_params.get("scope", "mine")
         user_groups = set(user.groups.values_list("name", flat=True))
         if user.has_perm("ai.manage_ai_policy"):
-            user_groups.add("chu")
+            user_groups.add(roles.OWNER)
 
         if scope == "all":
             if not user.has_perm("ai.manage_ai_policy"):
@@ -79,7 +80,7 @@ class AiActionViewSet(viewsets.GenericViewSet):
         user = request.user
         user_groups = set(user.groups.values_list("name", flat=True))
         if user.has_perm("ai.manage_ai_policy"):
-            user_groups.add("chu")
+            user_groups.add(roles.OWNER)
             action_obj = AiAction.objects.filter(id=pk).first()
         else:
             action_obj = AiAction.objects.filter(

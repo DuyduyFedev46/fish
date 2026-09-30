@@ -21,7 +21,7 @@ from apps.catalog.models import Item, ItemGroup, ItemPrice, PriceList
 from apps.common.cost_keys import COST_KEYS
 from apps.common.exceptions import BusinessError
 from apps.common.tests.fixtures import client_for, make_user
-from apps.delivery.cskh import services as cskh_services
+from apps.delivery.confirmation import services as confirmation_services
 from apps.delivery.models import ConfirmationTask, CustomerCall, DeliveryNote
 from apps.inventory.batches import services as batch_services
 from apps.inventory.models import Batch, StockLedgerEntry, Warehouse
@@ -31,9 +31,10 @@ from apps.sales.models.invoices import SalesInvoiceLineBatch
 from apps.sales.orders import services as order_services
 from apps.sales.payments import services as payment_services
 from apps.sales.refunds import services as refund_services
+from apps.accounts import roles
 
 
-class CskhL3BaseTestCase(TestCase):
+class ConfirmationL3BaseTestCase(TestCase):
     def setUp(self):
         self.wh = Warehouse.objects.create(name="Kho chính")
         self.sup = Supplier.objects.create(name="Tàu cá Long Hải")
@@ -52,13 +53,13 @@ class CskhL3BaseTestCase(TestCase):
         )
         batch_services.publish_batch(batch=self.batch, actor=None)
 
-        self.chu = make_user("chu1", "chu")
-        self.ql = make_user("ql1", "quan_ly")
-        self.cs1 = make_user("cs1", "cskh")
-        self.cs2 = make_user("cs2", "cskh")
-        self.kho = make_user("kho1", "nv_kho")
+        self.chu = make_user("chu1", roles.OWNER)
+        self.ql = make_user("ql1", roles.MANAGER)
+        self.cs1 = make_user("cs1", roles.CUSTOMER_SERVICE)
+        self.cs2 = make_user("cs2", roles.CUSTOMER_SERVICE)
+        self.kho = make_user("kho1", roles.WAREHOUSE_STAFF)
 
-    def _create_order_with_cskh(self, *, phone="0900000123", name="Khách Thử A", qty=Decimal("2")):
+    def _create_order_with_confirmation(self, *, phone="0900000123", name="Khách Thử A", qty=Decimal("2")):
         order = order_services.create_order(
             customer_phone=phone,
             customer_name=name,
@@ -78,13 +79,13 @@ class CskhL3BaseTestCase(TestCase):
         return order, note, task
 
 
-class TestCS07EscalationAndDecide(CskhL3BaseTestCase):
+class TestCS07EscalationAndDecide(ConfirmationL3BaseTestCase):
     def test_cs07_ac1_unreachable_recording_and_window(self):
         """09:00 cs1 ghi UNREACHABLE -> attempts=1, next_call_after=09:10, window_ends_at=09:30, PENDING."""
         t0 = timezone.now().replace(hour=9, minute=0, second=0, microsecond=0)
-        order, note, task = self._create_order_with_cskh()
+        order, note, task = self._create_order_with_confirmation()
 
-        call, dup = cskh_services.record_call(task.pk, self.cs1, result="UNREACHABLE", now=t0)
+        call, dup = confirmation_services.record_call(task.pk, self.cs1, result="UNREACHABLE", now=t0)
         self.assertFalse(dup)
         task.refresh_from_db()
         self.assertEqual(task.attempts, 1)
@@ -95,12 +96,12 @@ class TestCS07EscalationAndDecide(CskhL3BaseTestCase):
     def test_cs07_ac2_retry_interval_blocked(self):
         """09:05 ghi UNREACHABLE -> 400 BR-GH-13, attempts giữ 1."""
         t0 = timezone.now().replace(hour=9, minute=0, second=0, microsecond=0)
-        order, note, task = self._create_order_with_cskh()
-        cskh_services.record_call(task.pk, self.cs1, result="UNREACHABLE", now=t0)
+        order, note, task = self._create_order_with_confirmation()
+        confirmation_services.record_call(task.pk, self.cs1, result="UNREACHABLE", now=t0)
 
         t1 = t0 + timedelta(minutes=5)
         with self.assertRaises(BusinessError) as ctx:
-            cskh_services.record_call(task.pk, self.cs1, result="UNREACHABLE", now=t1)
+            confirmation_services.record_call(task.pk, self.cs1, result="UNREACHABLE", now=t1)
         self.assertEqual(ctx.exception.code, "BR-GH-13")
 
         task.refresh_from_db()
@@ -109,11 +110,11 @@ class TestCS07EscalationAndDecide(CskhL3BaseTestCase):
     def test_cs07_ac3_max_attempts_escalates(self):
         """attempts=2 (09:00, 09:12), 09:25 ghi UNREACHABLE -> attempts=3, ESCALATED, escalated_at=09:25."""
         t0 = timezone.now().replace(hour=9, minute=0, second=0, microsecond=0)
-        order, note, task = self._create_order_with_cskh()
+        order, note, task = self._create_order_with_confirmation()
 
-        cskh_services.record_call(task.pk, self.cs1, result="UNREACHABLE", now=t0)
-        cskh_services.record_call(task.pk, self.cs1, result="UNREACHABLE", now=t0 + timedelta(minutes=12))
-        cskh_services.record_call(task.pk, self.cs1, result="UNREACHABLE", now=t0 + timedelta(minutes=25))
+        confirmation_services.record_call(task.pk, self.cs1, result="UNREACHABLE", now=t0)
+        confirmation_services.record_call(task.pk, self.cs1, result="UNREACHABLE", now=t0 + timedelta(minutes=12))
+        confirmation_services.record_call(task.pk, self.cs1, result="UNREACHABLE", now=t0 + timedelta(minutes=25))
 
         task.refresh_from_db()
         self.assertEqual(task.attempts, 3)
@@ -124,12 +125,12 @@ class TestCS07EscalationAndDecide(CskhL3BaseTestCase):
     def test_cs07_ac4_job_escalates_expired_window_idempotent(self):
         """attempts=1 lúc 09:00, không gọi thêm, job chạy lúc 09:31 -> ESCALATED, escalated_at=09:31. Lần 2 không đổi."""
         t0 = timezone.now().replace(hour=9, minute=0, second=0, microsecond=0)
-        order, note, task = self._create_order_with_cskh()
-        cskh_services.record_call(task.pk, self.cs1, result="UNREACHABLE", now=t0)
+        order, note, task = self._create_order_with_confirmation()
+        confirmation_services.record_call(task.pk, self.cs1, result="UNREACHABLE", now=t0)
 
         audit_count_before = AuditLog.objects.count()
         t_job = t0 + timedelta(minutes=31)
-        n = cskh_services.escalate_expired_windows(now=t_job)
+        n = confirmation_services.escalate_expired_windows(now=t_job)
         self.assertEqual(n, 1)
 
         task.refresh_from_db()
@@ -137,14 +138,14 @@ class TestCS07EscalationAndDecide(CskhL3BaseTestCase):
         self.assertEqual(task.escalated_at, t_job)
 
         # Chạy lần 2
-        n2 = cskh_services.escalate_expired_windows(now=t_job)
+        n2 = confirmation_services.escalate_expired_windows(now=t_job)
         self.assertEqual(n2, 0)
         self.assertEqual(AuditLog.objects.count(), audit_count_before + 1)
 
     def test_cs07_ac5_wrong_number_escalates_immediately(self):
         """Phiếu PENDING, ghi WRONG_NUMBER -> ESCALATED ngay."""
-        order, note, task = self._create_order_with_cskh()
-        cskh_services.record_call(task.pk, self.cs1, result="WRONG_NUMBER")
+        order, note, task = self._create_order_with_confirmation()
+        confirmation_services.record_call(task.pk, self.cs1, result="WRONG_NUMBER")
 
         task.refresh_from_db()
         self.assertEqual(task.state, ConfirmationTask.State.ESCALATED)
@@ -154,10 +155,10 @@ class TestCS07EscalationAndDecide(CskhL3BaseTestCase):
     def test_cs07_ac6_config_max_attempts(self):
         """CSKH_MAX_UNREACHABLE_ATTEMPTS=2 -> ghi UNREACHABLE lần 2 chuyển ESCALATED."""
         t0 = timezone.now().replace(hour=9, minute=0, second=0, microsecond=0)
-        order, note, task = self._create_order_with_cskh()
+        order, note, task = self._create_order_with_confirmation()
 
-        cskh_services.record_call(task.pk, self.cs1, result="UNREACHABLE", now=t0)
-        cskh_services.record_call(task.pk, self.cs1, result="UNREACHABLE", now=t0 + timedelta(minutes=15))
+        confirmation_services.record_call(task.pk, self.cs1, result="UNREACHABLE", now=t0)
+        confirmation_services.record_call(task.pk, self.cs1, result="UNREACHABLE", now=t0 + timedelta(minutes=15))
 
         task.refresh_from_db()
         self.assertEqual(task.attempts, 2)
@@ -166,18 +167,18 @@ class TestCS07EscalationAndDecide(CskhL3BaseTestCase):
     def test_cs07_ac7_callback_not_escalated_by_window(self):
         """Phiếu CALLBACK qua 30 phút, job chạy -> không đổi."""
         t0 = timezone.now()
-        order, note, task = self._create_order_with_cskh()
-        cskh_services.record_call(task.pk, self.cs1, result="CALLBACK", callback_at=t0 + timedelta(hours=2), now=t0)
+        order, note, task = self._create_order_with_confirmation()
+        confirmation_services.record_call(task.pk, self.cs1, result="CALLBACK", callback_at=t0 + timedelta(hours=2), now=t0)
 
-        n = cskh_services.escalate_expired_windows(now=t0 + timedelta(minutes=40))
+        n = confirmation_services.escalate_expired_windows(now=t0 + timedelta(minutes=40))
         self.assertEqual(n, 0)
         task.refresh_from_db()
         self.assertEqual(task.state, ConfirmationTask.State.CALLBACK)
 
     def test_cs07_ac8_decide_deliver_without_confirm(self):
         """Quản lý chọn DELIVER_WITHOUT_CONFIRM có lý do -> PREPARING, confirm_skipped=True, AuditLog."""
-        order, note, task = self._create_order_with_cskh()
-        cskh_services.record_call(task.pk, self.cs1, result="WRONG_NUMBER")
+        order, note, task = self._create_order_with_confirmation()
+        confirmation_services.record_call(task.pk, self.cs1, result="WRONG_NUMBER")
 
         client_ql = client_for(self.ql)
         resp = client_ql.post(
@@ -203,8 +204,8 @@ class TestCS07EscalationAndDecide(CskhL3BaseTestCase):
 
     def test_cs07_ac9_decide_extend(self):
         """Quản lý chọn EXTEND tới +3 giờ -> confirm_state=CALLBACK, attempts=0."""
-        order, note, task = self._create_order_with_cskh()
-        cskh_services.record_call(task.pk, self.cs1, result="WRONG_NUMBER")
+        order, note, task = self._create_order_with_confirmation()
+        confirmation_services.record_call(task.pk, self.cs1, result="WRONG_NUMBER")
 
         client_ql = client_for(self.ql)
         future_time = timezone.now() + timedelta(hours=3)
@@ -224,8 +225,8 @@ class TestCS07EscalationAndDecide(CskhL3BaseTestCase):
 
     def test_cs07_ac10_decide_validation_errors(self):
         """EXTEND vượt quá max hours (>24h) hoặc thiếu reason ở DELIVER_WITHOUT_CONFIRM -> 400."""
-        order, note, task = self._create_order_with_cskh()
-        cskh_services.record_call(task.pk, self.cs1, result="WRONG_NUMBER")
+        order, note, task = self._create_order_with_confirmation()
+        confirmation_services.record_call(task.pk, self.cs1, result="WRONG_NUMBER")
 
         client_ql = client_for(self.ql)
         # Thiếu reason
@@ -246,8 +247,8 @@ class TestCS07EscalationAndDecide(CskhL3BaseTestCase):
 
     def test_cs07_ac11_decide_cancel(self):
         """Quản lý chọn CANCEL -> đơn CANCELLED, hoàn kho đúng lô gốc, phiếu CANCELLED, suggest_refund_amount."""
-        order, note, task = self._create_order_with_cskh()
-        cskh_services.record_call(task.pk, self.cs1, result="WRONG_NUMBER")
+        order, note, task = self._create_order_with_confirmation()
+        confirmation_services.record_call(task.pk, self.cs1, result="WRONG_NUMBER")
 
         batch_initial_qty = Batch.objects.get(pk=self.batch.pk).qty_available
 
@@ -273,8 +274,8 @@ class TestCS07EscalationAndDecide(CskhL3BaseTestCase):
 
     def test_cs07_ac12_decide_permissions(self):
         """cs1 và kho1 gọi POST decide -> 403."""
-        order, note, task = self._create_order_with_cskh()
-        cskh_services.record_call(task.pk, self.cs1, result="WRONG_NUMBER")
+        order, note, task = self._create_order_with_confirmation()
+        confirmation_services.record_call(task.pk, self.cs1, result="WRONG_NUMBER")
 
         client_cs1 = client_for(self.cs1)
         resp1 = client_cs1.post(
@@ -293,12 +294,12 @@ class TestCS07EscalationAndDecide(CskhL3BaseTestCase):
         self.assertEqual(resp2.status_code, 403)
 
 
-class TestCS08AutoCancel(CskhL3BaseTestCase):
+class TestCS08AutoCancel(ConfirmationL3BaseTestCase):
     @override_settings(CSKH_AUTO_CANCEL_ENABLED=True)
     def test_cs08_ac1_auto_cancel_overdue_when_enabled(self):
         """ESCALATED 09:25. Job chạy 09:56 -> đơn CANCELLED UNREACHABLE_AUTO; phiếu hoàn created_by=None; REFUND_CALL."""
         t0 = timezone.now().replace(hour=9, minute=25, second=0, microsecond=0)
-        order, note, task = self._create_order_with_cskh()
+        order, note, task = self._create_order_with_confirmation()
         task.state = ConfirmationTask.State.ESCALATED
         task.escalation_reason = ConfirmationTask.EscalationReason.UNREACHABLE
         task.escalated_at = t0
@@ -307,7 +308,7 @@ class TestCS08AutoCancel(CskhL3BaseTestCase):
         batch_initial_qty = Batch.objects.get(pk=self.batch.pk).qty_available
 
         t_job = t0 + timedelta(minutes=31)
-        res = cskh_services.auto_cancel_overdue(now=t_job)
+        res = confirmation_services.auto_cancel_overdue(now=t_job)
         self.assertEqual(res["cancelled"], 1)
         self.assertEqual(res["blocked"], 0)
 
@@ -338,14 +339,14 @@ class TestCS08AutoCancel(CskhL3BaseTestCase):
     def test_cs08_ac2_job_does_not_cancel_before_deadline(self):
         """Job chạy 09:54 (< 30') -> không đổi gì."""
         t0 = timezone.now().replace(hour=9, minute=25, second=0, microsecond=0)
-        order, note, task = self._create_order_with_cskh()
+        order, note, task = self._create_order_with_confirmation()
         task.state = ConfirmationTask.State.ESCALATED
         task.escalation_reason = ConfirmationTask.EscalationReason.UNREACHABLE
         task.escalated_at = t0
         task.save()
 
         t_job = t0 + timedelta(minutes=29)
-        res = cskh_services.auto_cancel_overdue(now=t_job)
+        res = confirmation_services.auto_cancel_overdue(now=t_job)
         self.assertEqual(res["cancelled"], 0)
 
         order.refresh_from_db()
@@ -355,21 +356,21 @@ class TestCS08AutoCancel(CskhL3BaseTestCase):
     def test_cs08_ac3_job_idempotent(self):
         """AC1 đã chạy, job chạy thêm 2 lần -> vẫn 1 lần huỷ, 1 phiếu hoàn, 1 AuditLog."""
         t0 = timezone.now().replace(hour=9, minute=25, second=0, microsecond=0)
-        order, note, task = self._create_order_with_cskh()
+        order, note, task = self._create_order_with_confirmation()
         task.state = ConfirmationTask.State.ESCALATED
         task.escalation_reason = ConfirmationTask.EscalationReason.UNREACHABLE
         task.escalated_at = t0
         task.save()
 
         t_job = t0 + timedelta(minutes=31)
-        res1 = cskh_services.auto_cancel_overdue(now=t_job)
+        res1 = confirmation_services.auto_cancel_overdue(now=t_job)
         self.assertEqual(res1["cancelled"], 1)
 
         refund_count = Refund.objects.count()
         audit_count = AuditLog.objects.filter(action="order_auto_cancelled").count()
 
-        res2 = cskh_services.auto_cancel_overdue(now=t_job)
-        res3 = cskh_services.auto_cancel_overdue(now=t_job)
+        res2 = confirmation_services.auto_cancel_overdue(now=t_job)
+        res3 = confirmation_services.auto_cancel_overdue(now=t_job)
         self.assertEqual(res2["cancelled"], 0)
         self.assertEqual(res3["cancelled"], 0)
         self.assertEqual(Refund.objects.count(), refund_count)
@@ -379,16 +380,16 @@ class TestCS08AutoCancel(CskhL3BaseTestCase):
     def test_cs08_ac4_job_skips_resolved_task(self):
         """Quản lý đã chọn DELIVER_WITHOUT_CONFIRM -> job chạy không huỷ."""
         t0 = timezone.now().replace(hour=9, minute=25, second=0, microsecond=0)
-        order, note, task = self._create_order_with_cskh()
+        order, note, task = self._create_order_with_confirmation()
         task.state = ConfirmationTask.State.ESCALATED
         task.escalation_reason = ConfirmationTask.EscalationReason.UNREACHABLE
         task.escalated_at = t0
         task.save()
 
-        cskh_services.decide(task.pk, self.ql, decision="DELIVER_WITHOUT_CONFIRM", reason="Khách quen")
+        confirmation_services.decide(task.pk, self.ql, decision="DELIVER_WITHOUT_CONFIRM", reason="Khách quen")
 
         t_job = t0 + timedelta(minutes=31)
-        res = cskh_services.auto_cancel_overdue(now=t_job)
+        res = confirmation_services.auto_cancel_overdue(now=t_job)
         self.assertEqual(res["cancelled"], 0)
         order.refresh_from_db()
         self.assertNotEqual(order.status, SalesOrder.Status.CANCELLED)
@@ -397,7 +398,7 @@ class TestCS08AutoCancel(CskhL3BaseTestCase):
     def test_cs08_ac5_job_skips_manually_cancelled_order(self):
         """Đơn đã bị Quản lý huỷ tay -> job chạy không tạo phiếu hoàn thứ hai."""
         t0 = timezone.now().replace(hour=9, minute=25, second=0, microsecond=0)
-        order, note, task = self._create_order_with_cskh()
+        order, note, task = self._create_order_with_confirmation()
         task.state = ConfirmationTask.State.ESCALATED
         task.escalation_reason = ConfirmationTask.EscalationReason.UNREACHABLE
         task.escalated_at = t0
@@ -406,14 +407,14 @@ class TestCS08AutoCancel(CskhL3BaseTestCase):
         order_services.cancel_paid_order(order=order, actor=self.ql, reason="Huỷ tay")
 
         t_job = t0 + timedelta(minutes=31)
-        res = cskh_services.auto_cancel_overdue(now=t_job)
+        res = confirmation_services.auto_cancel_overdue(now=t_job)
         self.assertEqual(res["cancelled"], 0)
 
     @override_settings(CSKH_AUTO_CANCEL_ENABLED=True)
     def test_cs08_ac7_job_blocks_auto_cancel_when_batch_closed(self):
         """Lô L đã CLOSED -> không huỷ, auto_cancel_blocked_code=BR-LO-05, AuditLog."""
         t0 = timezone.now().replace(hour=9, minute=25, second=0, microsecond=0)
-        order, note, task = self._create_order_with_cskh()
+        order, note, task = self._create_order_with_confirmation()
         task.state = ConfirmationTask.State.ESCALATED
         task.escalation_reason = ConfirmationTask.EscalationReason.UNREACHABLE
         task.escalated_at = t0
@@ -424,7 +425,7 @@ class TestCS08AutoCancel(CskhL3BaseTestCase):
         self.batch.save()
 
         t_job = t0 + timedelta(minutes=31)
-        res = cskh_services.auto_cancel_overdue(now=t_job)
+        res = confirmation_services.auto_cancel_overdue(now=t_job)
         self.assertEqual(res["cancelled"], 0)
         self.assertEqual(res["blocked"], 1)
 
@@ -441,32 +442,32 @@ class TestCS08AutoCancel(CskhL3BaseTestCase):
     def test_cs08_ac8_configurable_decision_minutes(self):
         """CSKH_MANAGER_DECISION_MINUTES=60 -> 09:56 không huỷ, 10:26 thì huỷ."""
         t0 = timezone.now().replace(hour=9, minute=25, second=0, microsecond=0)
-        order, note, task = self._create_order_with_cskh()
+        order, note, task = self._create_order_with_confirmation()
         task.state = ConfirmationTask.State.ESCALATED
         task.escalation_reason = ConfirmationTask.EscalationReason.UNREACHABLE
         task.escalated_at = t0
         task.save()
 
         # 09:56 (31 phút sau)
-        res1 = cskh_services.auto_cancel_overdue(now=t0 + timedelta(minutes=31))
+        res1 = confirmation_services.auto_cancel_overdue(now=t0 + timedelta(minutes=31))
         self.assertEqual(res1["cancelled"], 0)
 
         # 10:26 (61 phút sau)
-        res2 = cskh_services.auto_cancel_overdue(now=t0 + timedelta(minutes=61))
+        res2 = confirmation_services.auto_cancel_overdue(now=t0 + timedelta(minutes=61))
         self.assertEqual(res2["cancelled"], 1)
 
     @override_settings(CSKH_AUTO_CANCEL_ENABLED=True)
     def test_cs08_ac10_want_cancel_does_not_auto_cancel(self):
         """Phiếu ESCALATED vì WANT_CANCEL -> quá hạn không tự huỷ."""
         t0 = timezone.now().replace(hour=9, minute=25, second=0, microsecond=0)
-        order, note, task = self._create_order_with_cskh()
+        order, note, task = self._create_order_with_confirmation()
         task.state = ConfirmationTask.State.ESCALATED
         task.escalation_reason = ConfirmationTask.EscalationReason.WANT_CANCEL
         task.escalated_at = t0
         task.save()
 
         t_job = t0 + timedelta(minutes=35)
-        res = cskh_services.auto_cancel_overdue(now=t_job)
+        res = confirmation_services.auto_cancel_overdue(now=t_job)
         self.assertEqual(res["cancelled"], 0)
 
         order.refresh_from_db()
@@ -476,30 +477,30 @@ class TestCS08AutoCancel(CskhL3BaseTestCase):
     def test_cs08_flag_disabled_does_not_cancel(self):
         """Khi cờ tự huỷ tắt -> quá hạn không huỷ."""
         t0 = timezone.now().replace(hour=9, minute=25, second=0, microsecond=0)
-        order, note, task = self._create_order_with_cskh()
+        order, note, task = self._create_order_with_confirmation()
         task.state = ConfirmationTask.State.ESCALATED
         task.escalation_reason = ConfirmationTask.EscalationReason.UNREACHABLE
         task.escalated_at = t0
         task.save()
 
         t_job = t0 + timedelta(minutes=35)
-        res = cskh_services.auto_cancel_overdue(now=t_job)
+        res = confirmation_services.auto_cancel_overdue(now=t_job)
         self.assertEqual(res["cancelled"], 0)
 
 
-class TestCS09RefundCalls(CskhL3BaseTestCase):
+class TestCS09RefundCalls(ConfirmationL3BaseTestCase):
     @override_settings(CSKH_AUTO_CANCEL_ENABLED=True)
     def _create_auto_cancelled_order(self):
         t0 = timezone.now().replace(hour=9, minute=25, second=0, microsecond=0)
-        order, note, task = self._create_order_with_cskh()
+        order, note, task = self._create_order_with_confirmation()
         # cs1 gọi ghi nhận
-        cskh_services.record_call(task.pk, self.cs1, result="UNREACHABLE", now=t0)
+        confirmation_services.record_call(task.pk, self.cs1, result="UNREACHABLE", now=t0)
         task.state = ConfirmationTask.State.ESCALATED
         task.escalation_reason = ConfirmationTask.EscalationReason.UNREACHABLE
         task.escalated_at = t0
         task.save()
 
-        cskh_services.auto_cancel_overdue(now=t0 + timedelta(minutes=31))
+        confirmation_services.auto_cancel_overdue(now=t0 + timedelta(minutes=31))
         task.refresh_from_db()
         note.refresh_from_db()
         order.refresh_from_db()
@@ -618,7 +619,7 @@ class TestCS09RefundCalls(CskhL3BaseTestCase):
         self.assertIn("Không ghi số tài khoản khách vào hệ thống", resp.json()["guidance"])
 
 
-class TestCS10ShopNotices(CskhL3BaseTestCase):
+class TestCS10ShopNotices(ConfirmationL3BaseTestCase):
     def test_cs10_ac1_site_info_api(self):
         """GET /api/public/site-info/ trả cskh_notice; đổi max_attempts trả đúng số."""
         client = client_for(None)
@@ -636,7 +637,7 @@ class TestCS10ShopNotices(CskhL3BaseTestCase):
 
     def test_cs10_ac2_order_lookup_confirming(self):
         """Đơn CONFIRMING -> Shop tra đơn thấy status_label Chờ vựa gọi xác nhận."""
-        order, note, task = self._create_order_with_cskh(phone="0900000123")
+        order, note, task = self._create_order_with_confirmation(phone="0900000123")
         client = client_for(None)
         resp = client.get(f"/api/shop/orders/{order.code}/?phone_last4=0123")
         self.assertEqual(resp.status_code, 200)
@@ -650,13 +651,13 @@ class TestCS10ShopNotices(CskhL3BaseTestCase):
     def test_cs10_ac3_order_lookup_auto_cancelled(self):
         """Đơn tự huỷ -> Shop tra đơn có cancel_notice đủ 4 phần."""
         t0 = timezone.now().replace(hour=9, minute=25, second=0, microsecond=0)
-        order, note, task = self._create_order_with_cskh(phone="0900000123")
+        order, note, task = self._create_order_with_confirmation(phone="0900000123")
         task.state = ConfirmationTask.State.ESCALATED
         task.escalation_reason = ConfirmationTask.EscalationReason.UNREACHABLE
         task.escalated_at = t0
         task.save()
 
-        cskh_services.auto_cancel_overdue(now=t0 + timedelta(minutes=31))
+        confirmation_services.auto_cancel_overdue(now=t0 + timedelta(minutes=31))
 
         client = client_for(None)
         resp = client.get(f"/api/shop/orders/{order.code}/?phone_last4=0123")
@@ -675,13 +676,13 @@ class TestCS10ShopNotices(CskhL3BaseTestCase):
     def test_cs10_ac4_order_lookup_refunded(self):
         """Chủ xác nhận hoàn -> status_label Đã hoàn."""
         t0 = timezone.now().replace(hour=9, minute=25, second=0, microsecond=0)
-        order, note, task = self._create_order_with_cskh(phone="0900000123")
+        order, note, task = self._create_order_with_confirmation(phone="0900000123")
         task.state = ConfirmationTask.State.ESCALATED
         task.escalation_reason = ConfirmationTask.EscalationReason.UNREACHABLE
         task.escalated_at = t0
         task.save()
 
-        cskh_services.auto_cancel_overdue(now=t0 + timedelta(minutes=31))
+        confirmation_services.auto_cancel_overdue(now=t0 + timedelta(minutes=31))
         task.refresh_from_db()
         refund_services.confirm_refund(refund=task.refund, bank_txn_ref="TX123", actor=self.chu)
 
@@ -693,7 +694,7 @@ class TestCS10ShopNotices(CskhL3BaseTestCase):
 
     def test_cs10_ac5_order_lookup_manual_cancelled(self):
         """Đơn do Quản lý huỷ tay -> không hiện câu không liên lạc được."""
-        order, note, task = self._create_order_with_cskh(phone="0900000123")
+        order, note, task = self._create_order_with_confirmation(phone="0900000123")
         order_services.cancel_paid_order(order=order, actor=self.ql, reason="Khách đổi ý")
 
         client = client_for(None)
@@ -705,7 +706,7 @@ class TestCS10ShopNotices(CskhL3BaseTestCase):
 
     def test_cs10_ac6_no_pii_in_lookup(self):
         """Tra đơn AllowAny không có key tên, SĐT, địa chỉ, người nhận hộ, ghi chú gọi (Bất biến 9)."""
-        order, note, task = self._create_order_with_cskh(phone="0900000123", name="Khách Bí Mật")
+        order, note, task = self._create_order_with_confirmation(phone="0900000123", name="Khách Bí Mật")
         client = client_for(None)
         resp = client.get(f"/api/shop/orders/{order.code}/?phone_last4=0123")
         data = resp.json()
@@ -726,14 +727,14 @@ class TestCS10ShopNotices(CskhL3BaseTestCase):
 
     def test_cs10_ac7_wrong_phone_404(self):
         """Sai 4 số cuối SĐT -> 404."""
-        order, note, task = self._create_order_with_cskh(phone="0900000123")
+        order, note, task = self._create_order_with_confirmation(phone="0900000123")
         client = client_for(None)
         resp = client.get(f"/api/shop/orders/{order.code}/?phone_last4=9999")
         self.assertEqual(resp.status_code, 404)
 
     def test_cs10_ac8_no_cost_keys(self):
         """Tra đơn không chứa bất kỳ khoá giá vốn nào (Bất biến 1)."""
-        order, note, task = self._create_order_with_cskh(phone="0900000123")
+        order, note, task = self._create_order_with_confirmation(phone="0900000123")
         client = client_for(None)
         resp = client.get(f"/api/shop/orders/{order.code}/?phone_last4=0123")
         data = resp.json()

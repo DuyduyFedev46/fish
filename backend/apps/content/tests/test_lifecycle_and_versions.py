@@ -17,6 +17,7 @@ from apps.accounts.models import AuditLog, StaffProfile
 from apps.content.models.categories import Category
 from apps.content.models.entries import Entry, EntryVersion
 from apps.content.models.images import ContentImage
+from apps.accounts import roles
 
 User = get_user_model()
 
@@ -62,8 +63,8 @@ def _make_sample_image(name="test.jpg", color="blue"):
 class LifecycleAndVersionsTests(APITestCase):
     def setUp(self):
         # 1. Setup groups and users
-        self.grp_quan_ly = Group.objects.get(name="quan_ly")
-        self.grp_nv_kho = Group.objects.get(name="nv_kho")
+        self.grp_quan_ly = Group.objects.get(name=roles.MANAGER)
+        self.grp_nv_kho = Group.objects.get(name=roles.WAREHOUSE_STAFF)
 
         self.manager = User.objects.create_user(username="manager_u7", password="password")
         self.manager.groups.add(self.grp_quan_ly)

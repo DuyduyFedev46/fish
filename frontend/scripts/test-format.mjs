@@ -64,9 +64,9 @@ eq("formatDate qua ngày mới VN", () => mod.formatDate("2026-12-31T20:00:00Z")
 eq("formatTime", () => mod.formatTime("2026-09-30T17:30:00Z"), "00:30");
 eq("formatDateOnly", () => mod.formatDateOnly("2026-10-28"), "28/10/2026");
 eq("formatDateOnly rác", () => mod.formatDateOnly("28/10"), "—");
-eq("todayVn 17:30Z = ngày hôm sau ở VN", () => mod.todayVn(new Date("2026-09-30T17:30:00Z")), "2026-10-01");
-eq("todayVn 16:59Z còn trong ngày", () => mod.todayVn(new Date("2026-09-30T16:59:00Z")), "2026-09-30");
-eq("currentYearVn 31/12 20:00Z = năm sau ở VN", () => mod.currentYearVn(new Date("2026-12-31T20:00:00Z")), 2027);
+eq("todayInVietnam 17:30Z = ngày hôm sau ở VN", () => mod.todayInVietnam(new Date("2026-09-30T17:30:00Z")), "2026-10-01");
+eq("todayInVietnam 16:59Z còn trong ngày", () => mod.todayInVietnam(new Date("2026-09-30T16:59:00Z")), "2026-09-30");
+eq("currentYearInVietnam 31/12 20:00Z = năm sau ở VN", () => mod.currentYearInVietnam(new Date("2026-12-31T20:00:00Z")), 2027);
 
 console.log(`\ntest-format: ${n - fail}/${n} đạt, ${fail} sai (TZ=${process.env.TZ || "mặc định"}, ${target.replace(root + "/", "")})`);
 process.exit(fail ? 1 : 0);

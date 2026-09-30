@@ -389,8 +389,8 @@ def cancel_paid_order(*, order, actor, reason="", reason_code=""):
         if note is not None:
             note.status = DeliveryNote.Status.CANCELLED
             note.save(update_fields=["status"])
-            from apps.delivery.cskh import services as cskh_services
-            cskh_services.close_task_on_cancel(note)
+            from apps.delivery.confirmation import services as confirmation_services
+            confirmation_services.close_task_on_cancel(note)
 
         record_audit(
             "cancel_paid_order", actor=actor, obj=o,

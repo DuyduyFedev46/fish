@@ -5,6 +5,7 @@ import type { MockRequest, MockResponse } from "@/shared/lib/http";
 import { dashboardSummaryMockResponse } from "@/shared/lib/dashboardSummary.mock";
 import { MOCK_UNAUTHORIZED, mockRequireUser } from "@/features/auth/mock";
 import { mockExpiredOpenCount } from "@/features/inventory/mock";
+import { ROLE } from "@/shared/lib/roles";
 
 export function mockOverview(req: MockRequest): MockResponse {
   const me = mockRequireUser(req);
@@ -19,13 +20,13 @@ export function mockOverview(req: MockRequest): MockResponse {
 export function mockAttention(req: MockRequest): MockResponse {
   const me = mockRequireUser(req);
   if (!me) return MOCK_UNAUTHORIZED;
-  const isChu = me.groups.includes("chu") || me.username === "loc";
-  const canConfirm = isChu || me.permissions.includes("delivery.confirm_with_customer") || me.groups.includes("cskh") || me.groups.includes("quan_ly");
-  const canDecide = isChu || me.permissions.includes("delivery.decide_unconfirmed") || me.groups.includes("quan_ly");
-  const canPrint = isChu || me.permissions.includes("delivery.print_label") || me.groups.includes("nv_kho") || me.groups.includes("quan_ly");
+  const isOwner = me.groups.includes(ROLE.owner) || me.username === "loc";
+  const canConfirm = isOwner || me.permissions.includes("delivery.confirm_with_customer") || me.groups.includes(ROLE.customerService) || me.groups.includes(ROLE.manager);
+  const canDecide = isOwner || me.permissions.includes("delivery.decide_unconfirmed") || me.groups.includes(ROLE.manager);
+  const canPrint = isOwner || me.permissions.includes("delivery.print_label") || me.groups.includes(ROLE.warehouseStaff) || me.groups.includes(ROLE.manager);
 
   // P8 Lô 5: quyền inventory.cancel_expired_batch (Chủ) — 02b §5.4: thêm khoá expired_batches_open, tính vào điều kiện 403.
-  const canProcessExpired = isChu;
+  const canProcessExpired = isOwner;
 
   if (!canConfirm && !canDecide && !canPrint && !canProcessExpired) {
     return { status: 403, body: { detail: "Không có quyền xem mục cần chú ý." } };

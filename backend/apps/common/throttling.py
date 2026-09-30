@@ -85,7 +85,7 @@ class LoginUserThrottle(SettingsRateThrottle):
         return self.cache_format % {"scope": self.scope, "ident": ident}
 
 
-class CskhSearchThrottle(SettingsRateThrottle):
+class CustomerSearchThrottle(SettingsRateThrottle):
     scope = "cskh_search"
 
     def get_cache_key(self, request, view):

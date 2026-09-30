@@ -1,8 +1,8 @@
 import { ApiError, apiFetch } from "@/shared/lib/http";
 import type {
-  CskhQueueDetail,
-  CskhQueueResponse,
-  CskhSearchResponse,
+  ConfirmationQueueDetail,
+  ConfirmationQueueResponse,
+  CustomerSearchResponse,
   ClaimTaskResponse,
   RecordCallPayload,
   RecordCallResponse,
@@ -14,23 +14,23 @@ import type {
   DecideResponse,
 } from "./types";
 import {
-  mockClaimCskhTask,
-  mockGetCskhDetail,
-  mockGetCskhQueue,
-  mockRecordCskhCall,
-  mockSearchCskh,
+  mockClaimConfirmationTask,
+  mockGetConfirmationDetail,
+  mockGetConfirmationQueue,
+  mockRecordConfirmationCall,
+  mockSearchCustomers,
   mockUnconfirm,
   mockChangeRecipient,
-  mockDecideCskh,
+  mockDecideConfirmation,
 } from "./mock";
 
-export async function fetchCskhQueue(
+export async function fetchConfirmationQueue(
   params?: {
     state?: string;
     page?: number;
   },
   signal?: AbortSignal
-): Promise<CskhQueueResponse> {
+): Promise<ConfirmationQueueResponse> {
   const isMock = process.env.NEXT_PUBLIC_USE_MOCK === "1";
   const query = new URLSearchParams();
   if (params?.state) query.set("state", params.state);
@@ -39,24 +39,24 @@ export async function fetchCskhQueue(
   const qs = query.toString();
   const url = `/api/cskh/queue/${qs ? `?${qs}` : ""}`;
 
-  return apiFetch<CskhQueueResponse>(url, {
+  return apiFetch<ConfirmationQueueResponse>(url, {
     signal,
-    mock: isMock ? mockGetCskhQueue : undefined,
+    mock: isMock ? mockGetConfirmationQueue : undefined,
   });
 }
 
-export async function fetchCskhDetail(
+export async function fetchConfirmationDetail(
   noteId: number,
   signal?: AbortSignal
-): Promise<CskhQueueDetail> {
+): Promise<ConfirmationQueueDetail> {
   const isMock = process.env.NEXT_PUBLIC_USE_MOCK === "1";
-  return apiFetch<CskhQueueDetail>(`/api/cskh/queue/${noteId}/`, {
+  return apiFetch<ConfirmationQueueDetail>(`/api/cskh/queue/${noteId}/`, {
     signal,
-    mock: isMock ? (req) => mockGetCskhDetail(req, noteId) : undefined,
+    mock: isMock ? (req) => mockGetConfirmationDetail(req, noteId) : undefined,
   });
 }
 
-export async function claimCskhTask(
+export async function claimConfirmationTask(
   noteId: number,
   signal?: AbortSignal
 ): Promise<ClaimTaskResponse> {
@@ -65,11 +65,11 @@ export async function claimCskhTask(
     method: "POST",
     body: {},
     signal,
-    mock: isMock ? (req) => mockClaimCskhTask(req, noteId) : undefined,
+    mock: isMock ? (req) => mockClaimConfirmationTask(req, noteId) : undefined,
   });
 }
 
-export async function recordCskhCall(
+export async function recordConfirmationCall(
   noteId: number,
   payload: RecordCallPayload,
   signal?: AbortSignal
@@ -79,7 +79,7 @@ export async function recordCskhCall(
     method: "POST",
     body: payload,
     signal,
-    mock: isMock ? (req) => mockRecordCskhCall(req, noteId, payload) : undefined,
+    mock: isMock ? (req) => mockRecordConfirmationCall(req, noteId, payload) : undefined,
   });
 }
 
@@ -114,20 +114,20 @@ export async function changeRecipient(
 /**
  * Tìm kiếm đơn/phiếu trong CSKH. Bắt buộc dùng POST body (Bất biến 9: không để SĐT lên URL).
  */
-export async function searchCskh(
+export async function searchCustomers(
   q: string,
   signal?: AbortSignal
-): Promise<CskhSearchResponse> {
+): Promise<CustomerSearchResponse> {
   const isMock = process.env.NEXT_PUBLIC_USE_MOCK === "1";
-  return apiFetch<CskhSearchResponse>("/api/cskh/search/", {
+  return apiFetch<CustomerSearchResponse>("/api/cskh/search/", {
     method: "POST",
     body: { q },
     signal,
-    mock: isMock ? (req) => mockSearchCskh(req, q) : undefined,
+    mock: isMock ? (req) => mockSearchCustomers(req, q) : undefined,
   });
 }
 
-export async function decideCskh(
+export async function decideConfirmation(
   noteId: number,
   payload: DecidePayload,
   signal?: AbortSignal
@@ -137,7 +137,7 @@ export async function decideCskh(
     method: "POST",
     body: payload,
     signal,
-    mock: isMock ? (req) => mockDecideCskh(req, noteId, payload) : undefined,
+    mock: isMock ? (req) => mockDecideConfirmation(req, noteId, payload) : undefined,
   });
 }
 

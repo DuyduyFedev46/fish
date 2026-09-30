@@ -13,6 +13,7 @@ from apps.content.body.scan import scan_entry_warnings
 from apps.content.models.categories import Category
 from apps.content.models.entries import Entry, EntryVersion
 from apps.content.models.images import ContentImage
+from apps.accounts import roles
 
 User = get_user_model()
 
@@ -22,16 +23,16 @@ class ScanWarningsTests(TestCase):
         self.client = APIClient()
 
         # User quản lý
-        self.quan_ly = User.objects.create_user(username="quan_ly", password="password123")
-        group_ql, _ = Group.objects.get_or_create(name="quan_ly")
+        self.quan_ly = User.objects.create_user(username=roles.MANAGER, password="password123")
+        group_ql, _ = Group.objects.get_or_create(name=roles.MANAGER)
         for perm_code in ("view_entry", "add_entry", "change_entry", "delete_entry", "publish_entry"):
             perm = Permission.objects.get(codename=perm_code, content_type__app_label="content")
             group_ql.permissions.add(perm)
         self.quan_ly.groups.add(group_ql)
 
         # User NV giao
-        self.nv_giao = User.objects.create_user(username="nv_giao", password="password123")
-        group_giao, _ = Group.objects.get_or_create(name="nv_giao")
+        self.nv_giao = User.objects.create_user(username=roles.DELIVERY_STAFF, password="password123")
+        group_giao, _ = Group.objects.get_or_create(name=roles.DELIVERY_STAFF)
         self.nv_giao.groups.add(group_giao)
 
         self.category = Category.objects.create(

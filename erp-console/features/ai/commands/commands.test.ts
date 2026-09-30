@@ -5,6 +5,7 @@ import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import fs from "fs";
 import path from "path";
 
+import { COMMAND_GROUP, SENSITIVITY } from "../commandGroups";
 import type { AiCommandDescriptor, AiCommandIndexItem } from "../types";
 import {
   clearIndexCache,
@@ -63,7 +64,7 @@ while (mock150Commands.length < 150) {
   mock150Commands.push({
     id: `custom.mockcommand${i}.action`,
     title: `Thao tác giả lập số ${i}`,
-    group: i % 2 === 0 ? "thu_mua" : "ban_hang",
+    group: i % 2 === 0 ? COMMAND_GROUP.purchasing : COMMAND_GROUP.sales,
     kind: i % 3 === 0 ? "write" : "read",
     level: "A",
     screens: ["main"],
@@ -144,7 +145,7 @@ describe("DW-09: FE chọn lệnh 2 bước + ngân sách token (chạy với LL
           kind: searchRes.top1!.kind,
           level: "A",
           max_level: "A",
-          sensitivity: "trung_binh",
+          sensitivity: SENSITIVITY.medium,
           channel: "local",
           red_zone: false,
           target: null,
@@ -180,7 +181,7 @@ describe("DW-09: FE chọn lệnh 2 bước + ngân sách token (chạy với LL
     const formOnlyCommand: AiCommandIndexItem = {
       id: "inventory.batch.cancel_expired",
       title: "Huỷ lô quá hạn",
-      group: "thu_mua",
+      group: COMMAND_GROUP.purchasing,
       kind: "write",
       level: "C",
       screens: ["inventory"],
@@ -195,7 +196,7 @@ describe("DW-09: FE chọn lệnh 2 bước + ngân sách token (chạy với LL
       kind: "write",
       level: "C",
       max_level: "C",
-      sensitivity: "cao",
+      sensitivity: SENSITIVITY.high,
       channel: "local",
       red_zone: false,
       target: "detail",

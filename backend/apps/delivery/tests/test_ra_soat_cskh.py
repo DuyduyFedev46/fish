@@ -24,7 +24,7 @@ from apps.accounts.models import AuditLog
 from apps.catalog.models import Item, ItemGroup, ItemPrice, PriceList
 from apps.common.exceptions import ConflictError
 from apps.common.tests.fixtures import make_user
-from apps.delivery.cskh import services as cskh_services
+from apps.delivery.confirmation import services as confirmation_services
 from apps.delivery.models import ConfirmationTask, DeliveryNote
 from apps.inventory.batches import services as batch_services
 from apps.inventory.models import Warehouse
@@ -32,6 +32,7 @@ from apps.purchasing.models import Supplier
 from apps.sales.models import Refund, SalesOrder
 from apps.sales.orders import services as order_services
 from apps.sales.payments import services as payment_services
+from apps.accounts import roles
 
 
 class CS08AC6RaceConditionTests(TestCase):
@@ -53,7 +54,7 @@ class CS08AC6RaceConditionTests(TestCase):
             received_date=today, qty=Decimal("100"), purchase_rate=Decimal("110000"),
         )
         batch_services.publish_batch(batch=self.batch, actor=None)
-        self.ql = make_user("ql1", "quan_ly")
+        self.ql = make_user("ql1", roles.MANAGER)
 
     def _create_escalated_order(self, escalated_at):
         order = order_services.create_order(
@@ -86,7 +87,7 @@ class CS08AC6RaceConditionTests(TestCase):
         order, note, task = self._create_escalated_order(t0)
 
         t_job = t0 + timedelta(minutes=31)
-        res = cskh_services.auto_cancel_overdue(now=t_job)
+        res = confirmation_services.auto_cancel_overdue(now=t_job)
         self.assertEqual(res["cancelled"], 1, "Job phải thắng và huỷ đơn trước")
 
         order.refresh_from_db()
@@ -99,7 +100,7 @@ class CS08AC6RaceConditionTests(TestCase):
 
         # Quản lý đến sau, không biết job đã chạy, cố quyết định trên cùng task -> phải thua (409 STALE_STATE)
         with self.assertRaises(ConflictError) as ctx:
-            cskh_services.decide(
+            confirmation_services.decide(
                 task.pk, self.ql, "CANCEL",
                 reason_code="MANAGER_TOO_LATE", now=t_job + timedelta(minutes=1),
             )
@@ -124,7 +125,7 @@ class CS08AC6RaceConditionTests(TestCase):
         order, note, task = self._create_escalated_order(t0)
 
         # Quản lý thắng, quyết định trước khi job kịp chạy
-        result = cskh_services.decide(
+        result = confirmation_services.decide(
             task.pk, self.ql, "DELIVER_WITHOUT_CONFIRM",
             reason="Khách quen, địa chỉ đã giao nhiều lần", now=t0 + timedelta(minutes=5),
         )
@@ -137,7 +138,7 @@ class CS08AC6RaceConditionTests(TestCase):
 
         # Job chạy sau (thua) -> phải bỏ qua hoàn toàn, đơn vẫn PROCESSING/không bị huỷ
         t_job = t0 + timedelta(minutes=31)
-        res = cskh_services.auto_cancel_overdue(now=t_job)
+        res = confirmation_services.auto_cancel_overdue(now=t_job)
         self.assertEqual(res["cancelled"], 0)
         self.assertEqual(res["blocked"], 0)
 

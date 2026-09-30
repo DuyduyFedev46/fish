@@ -8,12 +8,12 @@ from django.test import RequestFactory
 
 from apps.ai.models.config import AiConfigVersion
 from apps.ai.models.policy import AiPolicyVersion
+from apps.ai import command_groups
 from apps.ai.registry import get_registry
 from apps.common.audit import record_audit
 from apps.common.exceptions import BusinessError
 
 
-GROUP_CSKH = "".join(["cs", "kh"])
 _rf = RequestFactory()
 
 
@@ -93,9 +93,9 @@ def get_user_config_data(user) -> dict:
     write_choices = ["OFF", "C"] if env_write_max == "C" else ["OFF", "C", "B"]
 
     group_definitions = [
-        ("thu_mua", "Thu mua"),
-        ("ban_hang", "Bán hàng"),
-        (GROUP_CSKH, "CSKH"),
+        (command_groups.PURCHASING, "Thu mua"),
+        (command_groups.SALES, "Bán hàng"),
+        (command_groups.CUSTOMER_SERVICE, "CSKH"),
     ]
 
     registry = get_registry()

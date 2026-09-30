@@ -15,6 +15,7 @@ from apps.catalog.models import Item, ItemGroup, ItemPrice, PriceList
 from apps.content.body.scan import scan_entry_warnings
 from apps.content.models.categories import Category
 from apps.content.models.entries import Entry, EntryVersion
+from apps.accounts import roles
 
 User = get_user_model()
 
@@ -52,7 +53,7 @@ def _has_forbidden_key(data: any) -> set[str]:
 class ItemCardAndPublicListTests(APITestCase):
     def setUp(self):
         # 1. Tạo nhóm và user
-        self.grp_quan_ly = Group.objects.get(name="quan_ly")
+        self.grp_quan_ly = Group.objects.get(name=roles.MANAGER)
         self.manager = User.objects.create_user(username="manager_u6", password="password")
         self.manager.groups.add(self.grp_quan_ly)
 

@@ -14,6 +14,7 @@ from django.utils import timezone
 
 from apps.common.tests.fixtures import make_master, make_user
 from apps.purchasing.models import PurchaseReceipt, PurchaseReceiptLine
+from apps.accounts import roles
 
 SECRET_RATE = "81234.56"
 
@@ -28,7 +29,7 @@ def admin_staff(username, *groups):
 class ReceiptAdminRateHiddenTests(TestCase):
     def setUp(self):
         self.item, self.sup, self.wh = make_master()
-        self.chu = admin_staff("loc", "chu")
+        self.chu = admin_staff("loc", roles.OWNER)
         self.receipt = PurchaseReceipt.objects.create(
             supplier=self.sup, warehouse=self.wh, received_date=timezone.localdate(),
             created_by=self.chu,
@@ -45,7 +46,7 @@ class ReceiptAdminRateHiddenTests(TestCase):
         return resp.content.decode()
 
     def test_quan_ly_nv_kho_khong_thay_rate_trong_inline_phieu_nhap(self):
-        for username, group in (("ql1", "quan_ly"), ("kho1", "nv_kho")):
+        for username, group in (("ql1", roles.MANAGER), ("kho1", roles.WAREHOUSE_STAFF)):
             html = self.page(admin_staff(username, group))
             self.assertNotIn(SECRET_RATE, html, username)
             self.assertNotIn("81234", html, username)
@@ -62,7 +63,7 @@ class ReceiptAdminRateHiddenTests(TestCase):
         self.assertNotIn("81234", str(self.line))
 
     def test_quan_ly_luu_phieu_nhap_khong_doi_rate_khong_them_dong(self):
-        ql1 = admin_staff("ql1", "quan_ly")
+        ql1 = admin_staff("ql1", roles.MANAGER)
         self.client.force_login(ql1)
         data = {
             "supplier": str(self.sup.pk), "warehouse": str(self.wh.pk),

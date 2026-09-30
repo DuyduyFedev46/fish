@@ -19,7 +19,8 @@ import {
 } from "@/features/auth/mock";
 import { beError } from "@/shared/lib/beErrors.mock";
 import { GROUP_CODES } from "@/shared/lib/groups";
-import { GROUP, PERM } from "@/shared/lib/nav";
+import { PERM } from "@/shared/lib/nav";
+import { ROLE } from "@/shared/lib/roles";
 import type { MockRequest, MockResponse } from "@/shared/lib/http";
 import { STAFF_MSG } from "./messages";
 import type { StaffAction, StaffMember } from "./types";
@@ -37,13 +38,13 @@ const DELIVERING: Record<string, string[]> = {
   giao2: ["GH-INV-DH01-A1B2C", "GH-INV-DH02-K7M3Q"],
 };
 
-const isChu = (u: MockUser) => u.groups.includes(GROUP.chu);
-const activeChus = (list: MockUser[]) => list.filter((u) => u.is_active && isChu(u));
+const isOwner = (u: MockUser) => u.groups.includes(ROLE.owner);
+const activeOwners = (list: MockUser[]) => list.filter((u) => u.is_active && isOwner(u));
 
 /** BR-PQ-17 thẩm quyền trên tài khoản đích (không tính thêm/bỏ nhóm chu — kiểm riêng). */
 function authorityError(viewer: MockUser, target: MockUser): MockResponse | null {
   if (target.is_superuser && !viewer.is_superuser) return beError("SUPERUSER_ONLY");
-  if (isChu(target) && !isChu(viewer) && !viewer.is_superuser) return beError("CHU_ACCOUNT_ONLY");
+  if (isOwner(target) && !isOwner(viewer) && !viewer.is_superuser) return beError("CHU_ACCOUNT_ONLY");
   return null;
 }
 
@@ -51,10 +52,10 @@ function authorityError(viewer: MockUser, target: MockUser): MockResponse | null
 function actionsFor(viewer: MockUser, target: MockUser, list: MockUser[]): StaffAction[] {
   if (viewer.id === target.id) return ["edit"];
   if (target.is_superuser && !viewer.is_superuser) return [];
-  if (isChu(target) && !isChu(viewer) && !viewer.is_superuser) return [];
+  if (isOwner(target) && !isOwner(viewer) && !viewer.is_superuser) return [];
   if (!target.is_active) return ["edit", "reactivate"];
-  const lastChu = isChu(target) && activeChus(list).length <= 1;
-  return lastChu ? ["edit", "set_groups", "reset_password"] : ["edit", "set_groups", "reset_password", "deactivate"];
+  const lastOwner = isOwner(target) && activeOwners(list).length <= 1;
+  return lastOwner ? ["edit", "set_groups", "reset_password"] : ["edit", "set_groups", "reset_password", "deactivate"];
 }
 
 function row(viewer: MockUser, u: MockUser, list: MockUser[]): StaffMember {
@@ -98,7 +99,7 @@ function create(viewer: MockUser, list: MockUser[], body: Record<string, unknown
   if (weak) return beError("PASSWORD_WEAK", { problems: weak });
   const gErr = groupsError(groups);
   if (gErr) return gErr;
-  if ((groups as string[]).includes(GROUP.chu) && !isChu(viewer) && !viewer.is_superuser) return beError("CHU_GROUP_ONLY");
+  if ((groups as string[]).includes(ROLE.owner) && !isOwner(viewer) && !viewer.is_superuser) return beError("CHU_GROUP_ONLY");
   const u: MockUser = {
     id: Math.max(...list.map((x) => x.id)) + 1,
     username,
@@ -145,11 +146,11 @@ function setGroups(viewer: MockUser, list: MockUser[], target: MockUser, body: R
   const before = sortGroups(target.groups);
   const added = next.filter((g) => !before.includes(g));
   const removed = before.filter((g) => !next.includes(g));
-  const viewerStrong = isChu(viewer) || viewer.is_superuser;
+  const viewerStrong = isOwner(viewer) || viewer.is_superuser;
   if (target.is_superuser && !viewer.is_superuser) return beError("SUPERUSER_ONLY");
-  if ((added.includes(GROUP.chu) || removed.includes(GROUP.chu)) && !viewerStrong) return beError("CHU_GROUP_ONLY");
-  if (isChu(target) && !viewerStrong) return beError("CHU_ACCOUNT_ONLY");
-  if (removed.includes(GROUP.chu) && target.is_active && activeChus(list).length <= 1) return beError("LAST_CHU_GROUP");
+  if ((added.includes(ROLE.owner) || removed.includes(ROLE.owner)) && !viewerStrong) return beError("CHU_GROUP_ONLY");
+  if (isOwner(target) && !viewerStrong) return beError("CHU_ACCOUNT_ONLY");
+  if (removed.includes(ROLE.owner) && target.is_active && activeOwners(list).length <= 1) return beError("LAST_CHU_GROUP");
   target.groups = next;
   saveMockUsers(list);
   return { status: 200, body: { groups: next, added, removed } };
@@ -160,7 +161,7 @@ function deactivate(viewer: MockUser, list: MockUser[], target: MockUser): MockR
   const auth = authorityError(viewer, target);
   if (auth) return auth;
   if (!target.is_active) return beError("ALREADY_INACTIVE");
-  if (isChu(target) && activeChus(list).length <= 1) return beError("LAST_CHU_DEACTIVATE");
+  if (isOwner(target) && activeOwners(list).length <= 1) return beError("LAST_CHU_DEACTIVATE");
   const notes = DELIVERING[target.username];
   if (notes?.length) return beError("DELIVERING_LEFT", { count: notes.length, notes: notes.join(", ") });
   target.is_active = false;

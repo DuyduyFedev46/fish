@@ -14,15 +14,16 @@ from apps.common.tests.fixtures import client_for, make_user
 from apps.inventory.models import Warehouse
 from apps.purchasing.models import PurchaseReceipt, PurchaseReceiptLine, Supplier
 from apps.sales.models import Customer, SalesOrder
+from apps.accounts import roles
 
 
 @override_settings(AI_ENABLED=True)
 class AiActionApiTestCase(TestCase):
     def setUp(self):
-        self.user_chu = make_user("chu_test", "chu")
-        self.user_ql = make_user("ql_test", "quan_ly")
-        self.user_kho = make_user("kho_test", "nv_kho")
-        self.user_giao = make_user("giao_test", "nv_giao")
+        self.user_chu = make_user("chu_test", roles.OWNER)
+        self.user_ql = make_user("ql_test", roles.MANAGER)
+        self.user_kho = make_user("kho_test", roles.WAREHOUSE_STAFF)
+        self.user_giao = make_user("giao_test", roles.DELIVERY_STAFF)
 
         self.client_chu = client_for(self.user_chu)
         self.client_ql = client_for(self.user_ql)

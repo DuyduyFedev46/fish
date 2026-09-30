@@ -15,6 +15,7 @@ from apps.common.tests.fixtures import client_for, make_user
 from apps.inventory.batches import services as batch_services
 from apps.inventory.models import Batch, Warehouse
 from apps.purchasing.models import Supplier
+from apps.accounts import roles
 
 AUDIT_URL = "/api/audit-logs/"
 
@@ -26,9 +27,9 @@ class P8Lo1QaSr01Edges(TestCase):
                                         shelf_life_in_days=60, is_active=True)
         self.sup = Supplier.objects.create(name="Cảng Giả", is_active=True)
         self.wh = Warehouse.objects.create(name="Kho giả")
-        self.chu = make_user("chu_qa1", "chu")
-        self.ql = make_user("ql_qa1", "quan_ly")
-        self.kho = make_user("kho_qa1", "nv_kho")
+        self.chu = make_user("chu_qa1", roles.OWNER)
+        self.ql = make_user("ql_qa1", roles.MANAGER)
+        self.kho = make_user("kho_qa1", roles.WAREHOUSE_STAFF)
         self.batch = batch_services.create_batch(
             item=self.item, supplier=self.sup, warehouse=self.wh,
             received_date=timezone.localdate() - datetime.timedelta(days=70),
@@ -62,13 +63,13 @@ class P8Lo1QaSr01Edges(TestCase):
     def test_qa_guidance_lo_nhan_khong_so_voi_ql_va_kho_co_so_voi_chu(self):
         """Đường đọc thứ hai của cùng dòng audit (timeline lô): quan_ly/nv_kho không thấy số lỗ."""
         blobs = {}
-        for name, u in (("chu", self.chu), ("ql", self.ql), ("kho", self.kho)):
+        for name, u in ((roles.OWNER, self.chu), ("ql", self.ql), ("kho", self.kho)):
             r = client_for(u).get(f"/api/guidance/batch/{self.batch.pk}/")
             blobs[name] = (r.status_code, json.dumps(r.json(), ensure_ascii=False) if r.status_code == 200 else "")
-        self.assertEqual(blobs["chu"][0], 200)
+        self.assertEqual(blobs[roles.OWNER][0], 200)
         self.assertEqual(blobs["ql"][0], 200)  # chống xanh giả: quan_ly phải gọi được
         self.assertIn("Chủ đã huỷ lô", blobs["ql"][1])
-        self.assertIn("Huỷ lô quá hạn (lỗ", blobs["chu"][1])
+        self.assertIn("Huỷ lô quá hạn (lỗ", blobs[roles.OWNER][1])
         for name in ("ql", "kho"):
             if blobs[name][0] == 200:
                 self.assertNotIn("812340", blobs[name][1].replace(".", "").replace(",", ""), name)

@@ -14,6 +14,7 @@ from apps.catalog.models.items import Item, ItemGroup
 from apps.inventory.models import Batch, Warehouse
 from apps.purchasing.models.suppliers import Supplier
 from apps.sales.models import Customer, Refund, SalesInvoice, SalesOrder, SalesOrderLine, SalesOrderLineBatch
+from apps.accounts import roles
 
 
 @override_settings(
@@ -25,9 +26,9 @@ from apps.sales.models import Customer, Refund, SalesInvoice, SalesOrder, SalesO
 class ConfirmRefundAiTests(APITestCase):
     def setUp(self):
         # 1. Tạo Group
-        self.chu_group, _ = Group.objects.get_or_create(name="chu")
-        self.quan_ly_group, _ = Group.objects.get_or_create(name="quan_ly")
-        self.nv_kho_group, _ = Group.objects.get_or_create(name="nv_kho")
+        self.chu_group, _ = Group.objects.get_or_create(name=roles.OWNER)
+        self.quan_ly_group, _ = Group.objects.get_or_create(name=roles.MANAGER)
+        self.nv_kho_group, _ = Group.objects.get_or_create(name=roles.WAREHOUSE_STAFF)
 
         # Gán quyền
         for perm in Permission.objects.filter(
@@ -50,10 +51,10 @@ class ConfirmRefundAiTests(APITestCase):
             self.quan_ly_group.permissions.add(perm)
 
         # 2. Tạo users
-        self.chu_user = User.objects.create_user(
+        self.owner_user = User.objects.create_user(
             username="chu_vua_dw27", password="password", first_name="Duy", last_name="Chủ"
         )
-        self.chu_user.groups.add(self.chu_group)
+        self.owner_user.groups.add(self.chu_group)
 
         self.quan_ly = User.objects.create_user(
             username="quan_ly_dw27", password="password", first_name="Linh", last_name="QL"
@@ -65,16 +66,16 @@ class ConfirmRefundAiTests(APITestCase):
             version=1,
             global_mode="on",
             red_zone_open={"sales.confirm_refund": True},
-            created_by=self.chu_user,
+            created_by=self.owner_user,
         )
 
         # Cấu hình Chủ chọn override mức B cho lệnh sales.refund.confirm
         self.chu_config = AiConfigVersion.objects.create(
-            user=self.chu_user,
+            user=self.owner_user,
             version=1,
             group_levels={"read": "A", "write": "B"},
             overrides={"sales.refund.confirm": "B"},
-            created_by=self.chu_user,
+            created_by=self.owner_user,
         )
 
         # 4. Tạo dữ liệu bán hàng & phiếu hoàn PENDING
@@ -137,11 +138,11 @@ class ConfirmRefundAiTests(APITestCase):
             amount=Decimal("300000"),
             reason="Khách đổi ý trả hàng",
             status=Refund.Status.PENDING,
-            created_by=self.chu_user,
+            created_by=self.owner_user,
         )
 
         self.client_chu = self.client_class()
-        self.client_chu.force_authenticate(user=self.chu_user)
+        self.client_chu.force_authenticate(user=self.owner_user)
 
         self.client_ql = self.client_class()
         self.client_ql.force_authenticate(user=self.quan_ly)
@@ -172,7 +173,7 @@ class ConfirmRefundAiTests(APITestCase):
         action = AiAction.objects.get(id=action_id)
         self.assertEqual(action.command, "sales.refund.confirm")
         self.assertEqual(action.status, AiAction.Status.ESCALATED)
-        self.assertEqual(action.assignee_group, "chu")
+        self.assertEqual(action.assignee_group, roles.OWNER)
         self.assertIn("RF-", action.args.get("summary", ""))
 
         # Phiếu hoàn vẫn giữ trạng thái PENDING

@@ -88,7 +88,7 @@ def open_card(page, code):
 
 
 def check_stale(page, modal, tag, what, submit_btn):
-    alert = page.get_by_test_id("cskh-stale-alert")
+    alert = page.get_by_test_id("confirmation-stale-alert")
     alert.wait_for(timeout=10_000)
     ok(f"L4[{tag}] {what}: hiện đúng `detail` của BE", "Đơn đã bị huỷ — tải lại màn hình." in alert.inner_text(), alert.inner_text().replace("\n", " | "))
     reload_btn = alert.get_by_role("button", name="Tải lại")
@@ -101,14 +101,14 @@ def check_stale(page, modal, tag, what, submit_btn):
     return alert, reload_btn
 
 
-def cskh_case(browser, tag, w, h):
+def confirmation_case(browser, tag, w, h):
     # --- đổi người nhận
     ctx, page, logs = new_page(browser, w, h)
     login(page, "cs1")
     page.goto(BASE + "/cskh/")
     page.wait_for_load_state("networkidle")
     modal = open_card(page, "DH-260928-0030")
-    page.evaluate("() => window.__caveMock.cskhArmStale(30)")
+    page.evaluate("() => window.__caveMock.confirmationArmStale(30)")
     modal.get_by_role("button", name="Đổi người nhận / địa chỉ").click()
     modal.get_by_placeholder("VD: Anh Minh (nhận hộ)").fill("Người Nhận Thử")
     submit = modal.get_by_role("button", name="Lưu thay đổi")
@@ -126,11 +126,11 @@ def cskh_case(browser, tag, w, h):
     login(page, "cs1")
     page.goto(BASE + "/cskh/")
     page.wait_for_load_state("networkidle")
-    page.evaluate("() => window.__caveMock.cskhSetStatus(36, 'PREPARING')")
+    page.evaluate("() => window.__caveMock.confirmationSetStatus(36, 'PREPARING')")
     page.get_by_role("button", name="Chờ gọi").first.click()
     page.wait_for_timeout(600)
     modal = open_card(page, "DH-260928-0036")
-    page.evaluate("() => window.__caveMock.cskhArmStale(36)")
+    page.evaluate("() => window.__caveMock.confirmationArmStale(36)")
     modal.get_by_role("button", name="Huỷ xác nhận đơn").click()
     modal.get_by_placeholder("VD: Bấm nhầm đơn, khách đổi giờ hẹn...").fill("Khách đổi ý về giờ giao")
     submit = modal.get_by_role("button", name="Xác nhận huỷ")
@@ -150,7 +150,7 @@ def cskh_case(browser, tag, w, h):
     page.get_by_role("button", name="Cần quyết định").first.click()
     page.wait_for_timeout(600)
     modal = open_card(page, "DH-260928-0028")
-    page.evaluate("() => window.__caveMock.cskhArmStale(28)")
+    page.evaluate("() => window.__caveMock.confirmationArmStale(28)")
     modal.get_by_placeholder("VD: Khách quen, địa chỉ đã giao nhiều lần...").fill("Khách quen giao nhiều lần")
     submit = modal.get_by_role("button", name="Xác nhận chuyển soạn hàng")
     submit.click()
@@ -225,7 +225,7 @@ with sync_playwright() as p:
     browser = p.chromium.launch(headless=True)
     for tag, w, h in (("desktop-1280", 1280, 800), ("mobile-375", 375, 667)):
         f14(browser, tag, w, h)
-        cskh_case(browser, tag, w, h)
+        confirmation_case(browser, tag, w, h)
         timeline_case(browser, tag, w, h)
         expired_case(browser, tag, w, h)
     f12(browser)

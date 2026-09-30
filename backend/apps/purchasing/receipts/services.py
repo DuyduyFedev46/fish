@@ -6,6 +6,7 @@ Ghi nhận phiếu nhập tại cảng -> sinh lô (P-02).
 """
 from django.db import transaction
 
+from apps.accounts import roles
 from apps.common.exceptions import BusinessError
 from apps.inventory.batches import services as batch_services
 
@@ -167,7 +168,7 @@ def cancel_receipt(*, receipt, actor):
     is_creator = (receipt.created_by_id == actor.id)
     is_manager_or_owner = (
         actor.has_perm("purchasing.delete_purchasereceipt")
-        or actor.groups.filter(name__in=["chu", "quan_ly"]).exists()
+        or actor.groups.filter(name__in=[roles.OWNER, roles.MANAGER]).exists()
         or getattr(actor, "is_superuser", False)
     )
     if not (is_creator or is_manager_or_owner):

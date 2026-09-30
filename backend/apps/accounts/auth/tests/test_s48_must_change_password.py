@@ -16,6 +16,7 @@ from rest_framework.test import APIClient
 
 from apps.accounts.models import StaffProfile
 from apps.accounts.staff.tests.helpers import STRONG_PASSWORD, client_for, staff_user
+from apps.accounts import roles
 
 ME = "/api/auth/me/"
 CHANGE = "/api/auth/change-password/"
@@ -48,14 +49,14 @@ def token_client(key):
 
 class S48Base(TestCase):
     def setUp(self):
-        self.loc = staff_user("loc", "chu", display_name="Lộc")
+        self.loc = staff_user("loc", roles.OWNER, display_name="Lộc")
         self.chu = client_for(self.loc)
 
     def create_giao4(self):
         resp = self.chu.post(
             STAFF,
             {"username": "giao4", "display_name": "Anh Năm", "phone": "0909333444",
-             "groups": ["nv_giao", "nv_kho"], "password": TEMP},
+             "groups": [roles.DELIVERY_STAFF, roles.WAREHOUSE_STAFF], "password": TEMP},
             format="json",
         )
         self.assertEqual(resp.status_code, 201, resp.content)
@@ -113,7 +114,7 @@ class S48FlagTests(S48Base):
 
     def test_s48_ac1_chu_bi_dat_lai_mat_khau_cung_bi_chan_staff_api(self):
         # Chủ thứ hai bị superuser đặt lại mật khẩu → cũng phải tự đổi trước khi quản lý người.
-        chu2 = staff_user("chu2", "chu")
+        chu2 = staff_user("chu2", roles.OWNER)
         root = User.objects.create_superuser("root", password="x")
         resp = client_for(root).post(
             f"{STAFF}{chu2.pk}/reset-password/", {"new_password": TEMP}, format="json"
@@ -144,7 +145,7 @@ class S48ChangeTests(S48Base):
         self.assertTrue(StaffProfile.objects.get(user=giao4).must_change_password)
 
     def test_s48_ac6_tu_doi_khi_co_tat_khong_bat_lai(self):
-        kho1 = staff_user("kho1", "nv_kho")
+        kho1 = staff_user("kho1", roles.WAREHOUSE_STAFF)
         kho1.set_password(STRONG_PASSWORD)
         kho1.save()
         client = self.login_client("kho1", STRONG_PASSWORD)
@@ -155,7 +156,7 @@ class S48ChangeTests(S48Base):
         self.assertFalse(StaffProfile.objects.get(user=kho1).must_change_password)
 
     def test_s48_ac6_chu_dat_lai_mat_khau_bat_lai_co(self):
-        kho1 = staff_user("kho1", "nv_kho")
+        kho1 = staff_user("kho1", roles.WAREHOUSE_STAFF)
         self.assertFalse(StaffProfile.objects.get(user=kho1).must_change_password)
         resp = self.chu.post(
             f"{STAFF}{kho1.pk}/reset-password/", {"new_password": TEMP}, format="json"
@@ -173,5 +174,5 @@ class S48ChangeTests(S48Base):
         self.assertEqual(client.get("/api/sales/orders/").status_code, 200)
 
     def test_s48_ac7_ho_so_moi_mac_dinh_false(self):
-        kho1 = staff_user("kho1", "nv_kho")
+        kho1 = staff_user("kho1", roles.WAREHOUSE_STAFF)
         self.assertFalse(StaffProfile.objects.get(user=kho1).must_change_password)

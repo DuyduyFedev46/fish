@@ -22,6 +22,7 @@ from apps.purchasing.models import PurchaseReceipt, Supplier
 from apps.sales.models import PaymentTransaction, Refund, SalesInvoice, SalesOrder
 
 from .fixtures import make_batch, make_master, make_order_with_note, make_user
+from apps.accounts import roles
 
 # Field khoá kỳ vọng theo S9-AC1/AC2 (khớp danh sách khoá API của S3 + người ghi của S4).
 EXPECTED_LOCKED = {
@@ -79,8 +80,8 @@ class S9Base(TestCase):
     def setUp(self):
         self.item, self.sup, self.wh = make_master()
         self.batch = make_batch(self.item, self.sup, self.wh)
-        self.chu = staff("loc", "chu")  # Chủ nhưng KHÔNG superuser
-        self.ql = staff("ql1", "quan_ly", perms=["inventory.change_batch"])
+        self.chu = staff("loc", roles.OWNER)  # Chủ nhưng KHÔNG superuser
+        self.ql = staff("ql1", roles.MANAGER, perms=["inventory.change_batch"])
         self.root = User.objects.create_superuser("admin", password="x")
 
     def post_as(self, user, obj, **overrides):
@@ -169,7 +170,7 @@ class S9DocumentsTests(S9Base):
         super().setUp()
         self.order, self.customer, self.note = make_order_with_note("DH01", "0901000001")
         self.invoice = SalesInvoice.objects.get(sales_order=self.order)
-        self.giao = staff("giao1", "nv_giao")
+        self.giao = staff("giao1", roles.DELIVERY_STAFF)
         self.objs = {
             Batch: self.batch,
             DeliveryNote: self.note,
@@ -280,7 +281,7 @@ class S9MasterDataTests(S9Base):
         self.assertFalse(AuditLog.objects.filter(action="admin_edit").exists())
 
     def test_s9_quyen_nguoi_khong_phai_staff_khong_vao_admin(self):
-        kho = make_user("kho1", "nv_kho")  # không is_staff
+        kho = make_user("kho1", roles.WAREHOUSE_STAFF)  # không is_staff
         self.client.force_login(kho)
         resp = self.client.get(change_url(self.batch))
         self.assertEqual(resp.status_code, 302)

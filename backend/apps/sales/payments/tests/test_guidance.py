@@ -19,15 +19,16 @@ from apps.sales.models import PaymentTransaction, SalesOrder
 from apps.sales.orders import services as order_services
 from apps.sales.orders.tests.test_s10_api import OrderApiBase
 from apps.sales.payments import services as payment_services
+from apps.accounts import roles
 
 
 class GuidancePaymentTest(OrderApiBase):
     def setUp(self):
         super().setUp()
-        self.chu = make_user("chu_pm_guidance", "chu")
-        self.ql = make_user("ql_pm_guidance", "quan_ly")
-        self.kho = make_user("kho_pm_guidance", "nv_kho")
-        self.giao = make_user("giao_pm_guidance", "nv_giao")
+        self.chu = make_user("chu_pm_guidance", roles.OWNER)
+        self.ql = make_user("ql_pm_guidance", roles.MANAGER)
+        self.kho = make_user("kho_pm_guidance", roles.WAREHOUSE_STAFF)
+        self.giao = make_user("giao_pm_guidance", roles.DELIVERY_STAFF)
 
         self.c_chu = client_for(self.chu)
         self.c_ql = client_for(self.ql)

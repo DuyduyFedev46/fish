@@ -10,16 +10,17 @@ from apps.accounts.models import AuditLog
 from apps.common.audit import record_audit
 from apps.common.cost_keys import COST_KEYS
 from apps.common.tests.fixtures import client_for, make_user
+from apps.accounts import roles
 
 AUDIT_URL = "/api/audit-logs/"
 
 
 class AuditLogCostRedactionTests(TestCase):
     def setUp(self):
-        self.chu = make_user("chu_l3", "chu")
-        self.ql = make_user("ql_l3", "quan_ly")
-        self.kho = make_user("kho_l3", "nv_kho")
-        self.giao = make_user("giao_l3", "nv_giao")
+        self.chu = make_user("chu_l3", roles.OWNER)
+        self.ql = make_user("ql_l3", roles.MANAGER)
+        self.kho = make_user("kho_l3", roles.WAREHOUSE_STAFF)
+        self.giao = make_user("giao_l3", roles.DELIVERY_STAFF)
 
         # Dòng mẫu 1: recompute_landed_cost
         self.row_recompute = record_audit(
@@ -101,7 +102,7 @@ class AuditLogCostRedactionTests(TestCase):
         self.assertIn("status", by_action["close_batch"])
 
     def test_s01_ac3_quan_ly_co_quyen_view_costprice_thay_gia_von(self):
-        ql_with_perm = make_user("ql_perm", "quan_ly", perms=["inventory.view_costprice"])
+        ql_with_perm = make_user("ql_perm", roles.MANAGER, perms=["inventory.view_costprice"])
         client = client_for(ql_with_perm)
         resp = client.get(AUDIT_URL, {"action": "recompute_landed_cost"})
         self.assertEqual(resp.status_code, 200)

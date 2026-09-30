@@ -152,7 +152,7 @@ có hàm `def kiem_tra_nhap_lo()` → exit 1 và in đúng file/token (dán outp
   Bỏ kiểu ghép chuỗi `"".join(["cs", "kh"])` (`ai/settings/services.py`, `ai/registry/discovery.py:61`).
 - Thay chuỗi tên Group trong **test** (≈690 chỗ: `Group.objects.get(name="chu")`, `make_user(..., "nv_kho")`, assert `groups == [...]`)
   bằng hằng `roles.*`. Thay thế cơ học, không đổi tên biến/hàm test (đổi dần, §5). Mục đích: Lô 4 chỉ đổi giá trị 1 file.
-- Hằng nhóm lệnh AI: tạo `backend/apps/ai/registry/command_groups.py` với `PURCHASING = "thu_mua"`, `SALES = "ban_hang"`,
+- Hằng nhóm lệnh AI: tạo `backend/apps/ai/command_groups.py` (Lệch thiết kế: dời ra `apps/ai/` thay vì `apps/ai/registry/`, theo 03b S1, để tránh import vòng với gói registry) với `PURCHASING = "thu_mua"`, `SALES = "ban_hang"`,
   `CUSTOMER_SERVICE = "cskh"`; `SENSITIVITY_HIGH = "cao"`, `SENSITIVITY_MEDIUM = "trung_binh"`, `SENSITIVITY_LOW = "thap"`.
   Thay literal ở `discovery.py`, `spec.py`, `settings/services.py`, `policy/effective.py`, các `api.py` có `AiMeta(sensitivity=…)`.
 - `git mv backend/apps/delivery/cskh backend/apps/delivery/confirmation`; sửa mọi import; đổi class/hàm §1b (cột Lô 1).

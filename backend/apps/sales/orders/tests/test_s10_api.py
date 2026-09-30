@@ -19,6 +19,7 @@ from apps.purchasing.models import Supplier
 from apps.sales.models import Customer, PaymentTransaction, Refund, SalesOrder
 from apps.sales.orders import services as order_services
 from apps.sales.payments import services as payment_services
+from apps.accounts import roles
 
 SENSITIVE_KEYS = {"unit_cost", "purchase_rate", "landed_unit_cost"}
 LIST_KEYS = {
@@ -60,10 +61,10 @@ class OrderApiBase(TestCase):
         batch_services.publish_batch(batch=self.batch, actor=None)
         self.batch.refresh_from_db()
 
-        self.chu = make_user("chu1", "chu")
-        self.ql = make_user("ql1", "quan_ly")
-        self.kho = make_user("kho1", "nv_kho")
-        self.giao = make_user("giao1", "nv_giao")
+        self.chu = make_user("chu1", roles.OWNER)
+        self.ql = make_user("ql1", roles.MANAGER)
+        self.kho = make_user("kho1", roles.WAREHOUSE_STAFF)
+        self.giao = make_user("giao1", roles.DELIVERY_STAFF)
         self.nobody = make_user("nobody")
 
     def _order(self, phone="0901234567", qty="2", name="Chị Hoa"):

@@ -11,6 +11,7 @@ from apps.catalog.models import Item, ItemGroup
 from apps.common.tests.fixtures import client_for, make_user
 from apps.inventory.models import Warehouse
 from apps.purchasing.models import Supplier
+from apps.accounts import roles
 
 User = get_user_model()
 
@@ -22,9 +23,9 @@ class PolicyCapsTests(TestCase):
         self.sup = Supplier.objects.create(name="Cảng cá Phan Thiết", is_active=True)
         self.wh = Warehouse.objects.create(name="Kho chính")
 
-        self.u_chu = make_user("chu_caps", "chu")
-        self.u_quanly = make_user("ql_caps", "quan_ly")
-        self.u_kho = make_user("kho_caps", "nv_kho")
+        self.u_chu = make_user("chu_caps", roles.OWNER)
+        self.u_quanly = make_user("ql_caps", roles.MANAGER)
+        self.u_kho = make_user("kho_caps", roles.WAREHOUSE_STAFF)
 
         self.client_chu = client_for(self.u_chu)
         self.client_quanly = client_for(self.u_quanly)

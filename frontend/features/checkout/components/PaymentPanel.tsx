@@ -13,7 +13,7 @@ import CountdownTimer from "../../../components/CountdownTimer";
 import { goToMockGateway, redirectToGateway } from "../gateway";
 import { rememberOrderContact } from "../storage";
 import { ConfirmCallNotice } from "../../site/components/ConfirmCallNotice";
-import { CskhNotice } from "../../site/components/CskhNotice";
+import { ConfirmationPolicyNotice } from "../../site/components/ConfirmationPolicyNotice";
 
 export default function PaymentPanel({
   order,
@@ -71,7 +71,7 @@ export default function PaymentPanel({
               Thanh toán 100% trước khi giao, bằng VietQR qua cổng SePay.
             </p>
             <ConfirmCallNotice last4={phone.slice(-4)} info={siteInfo} />
-            <CskhNotice info={siteInfo} variant="paid" />
+            <ConfirmationPolicyNotice info={siteInfo} variant="paid" />
             {payError && <p className="form-banner-error">{payError}</p>}
             <button
               type="button"

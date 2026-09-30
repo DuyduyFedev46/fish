@@ -16,20 +16,22 @@ from apps.ai.models import AiAction, AiConfigVersion
 from apps.ai.registry.discovery import get_registry
 from apps.ai.registry.spec import CommandSpec
 from apps.common.tests.fixtures import client_for, make_user
+from apps.ai import command_groups
+from apps.accounts import roles
 
 
 @override_settings(AI_ENABLED=True, AI_WRITE_LEVELS_ALLOWED="B")
 class DW21DeferredActionsTestCase(TestCase):
     def setUp(self):
-        self.user_chu = make_user("chu_dw21", "chu")
-        self.user_kho = make_user("kho_dw21", "nv_kho")
+        self.user_chu = make_user("chu_dw21", roles.OWNER)
+        self.user_kho = make_user("kho_dw21", roles.WAREHOUSE_STAFF)
         self.client_kho = client_for(self.user_kho)
 
         # Cấu hình AI mức B cho user_kho
         self.config_kho = AiConfigVersion.objects.create(
             user=self.user_kho,
             version=1,
-            group_levels={"thu_mua": {"read": "A", "write": "B"}},
+            group_levels={command_groups.PURCHASING: {"read": "A", "write": "B"}},
             overrides={"test.deferred.command": "B"},
             created_by=self.user_kho,
         )
@@ -39,7 +41,7 @@ class DW21DeferredActionsTestCase(TestCase):
             id="test.deferred.command",
             title="Lệnh thử nghiệm trì hoãn ghi",
             kind="write",
-            group="thu_mua",
+            group=command_groups.PURCHASING,
             method="POST",
             path="/api/purchasing/receipts/nhap-lo/",
             action="nhap_lo",

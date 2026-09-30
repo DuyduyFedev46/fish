@@ -1,6 +1,9 @@
 // Kiểu dùng chung của module AI (02b §6).
 // Chép contract ở doc/features/2026-09-28-ai-digital-worker/02b-tech-design.md. BE đổi thì sửa ở đây.
 
+import type { AiCommandGroup, AiSensitivity } from "./commandGroups";
+export type { AiCommandGroup, AiSensitivity };
+
 // ---- S05 GET /api/ai/status/ ----
 export type AiModelInfo = {
   /** Tên model (vd "qwen2.5-1.5b-instruct-q4_k_m"). */
@@ -58,7 +61,6 @@ export type AuditLogParams = {
 };
 
 // ---- DW-07 & DW-09 Chỉ mục lệnh & Mô tả lệnh (02b §6.1, §6.2) ----
-export type AiCommandGroup = "thu_mua" | "ban_hang" | "cskh";
 export type AiCommandKind = "read" | "write";
 export type AiCommandLevel = "OFF" | "C" | "B" | "A";
 
@@ -88,7 +90,7 @@ export type AiCommandDescriptor = {
   kind: AiCommandKind;
   level: AiCommandLevel;
   max_level: AiCommandLevel;
-  sensitivity: "cao" | "trung_binh" | "thap";
+  sensitivity: AiSensitivity;
   channel: "local" | "cloud";
   red_zone: boolean;
   target: "detail" | null;

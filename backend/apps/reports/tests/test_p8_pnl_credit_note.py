@@ -18,6 +18,7 @@ from apps.sales.credit_notes.tests.base import CreditNoteBase, find_keys
 from apps.inventory.models import Batch
 from apps.sales.models import Refund, SalesCreditNote, SalesInvoice
 from apps.sales.refunds import services as refund_services
+from apps.accounts import roles
 
 SEP = datetime.datetime(2026, 9, 15, 8, 0, tzinfo=datetime.timezone.utc)
 OCT = datetime.datetime(2026, 10, 10, 8, 0, tzinfo=datetime.timezone.utc)
@@ -179,15 +180,15 @@ class SR13PnlCreditNoteTests(CreditNoteBase):
     def test_sr13_ac6_dashboard_ma_tran_va_khong_lo_gia_von(self):
         order, _n, task = self._paid()
         self._auto_cancel(task)
-        expected = {"chu": 200, "ql": 200, "kho": 200, "giao": 403, "cs1": 403}
-        users = {"chu": self.chu, "ql": self.ql, "kho": self.kho, "giao": self.giao, "cs1": self.cs1}
+        expected = {roles.OWNER: 200, "ql": 200, "kho": 200, "giao": 403, "cs1": 403}
+        users = {roles.OWNER: self.chu, "ql": self.ql, "kho": self.kho, "giao": self.giao, "cs1": self.cs1}
         ok = 0
         for key, status in expected.items():
             resp = client_for(users[key]).get("/api/dashboard/summary/")
             self.assertEqual(resp.status_code, status, key)
             if status == 200:
                 ok += 1
-                if key != "chu":
+                if key != roles.OWNER:
                     self.assertNotIn("unit_cost", json.dumps(resp.json()))
                     self.assertEqual(find_keys(resp.json(), {"unit_cost", "cogs", "cogs_reversed"}), set())
         self.assertEqual(client_for(None).get("/api/dashboard/summary/").status_code, 401)

@@ -19,6 +19,7 @@ from apps.inventory.batches import services as batch_services
 from apps.inventory.models import Batch, ReturnToStock, StockReconciliation, Warehouse
 from apps.purchasing.models import Supplier
 from apps.sales.models import Customer, SalesOrder, SalesOrderLine, SalesOrderLineBatch
+from apps.accounts import roles
 
 
 class CloseBatchS04Tests(TestCase):
@@ -29,10 +30,10 @@ class CloseBatchS04Tests(TestCase):
         self.wh = Warehouse.objects.create(name="Kho chính")
         self.today = timezone.localdate()
 
-        self.chu = make_user("chu_s04", "chu")
-        self.quan_ly = make_user("ql_s04", "quan_ly")
-        self.nv_kho = make_user("kho_s04", "nv_kho")
-        self.nv_giao = make_user("giao_s04", "nv_giao")
+        self.chu = make_user("chu_s04", roles.OWNER)
+        self.quan_ly = make_user("ql_s04", roles.MANAGER)
+        self.nv_kho = make_user("kho_s04", roles.WAREHOUSE_STAFF)
+        self.nv_giao = make_user("giao_s04", roles.DELIVERY_STAFF)
 
     def _create_ready_batch(self, qty="0", purchase_rate="80000"):
         """Tạo lô đã đủ điều kiện chốt: tồn 0, đã publish, đã kiểm kê APPROVED."""

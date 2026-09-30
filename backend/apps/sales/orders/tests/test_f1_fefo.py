@@ -18,6 +18,7 @@ from apps.sales.models import SalesInvoiceLineBatch, SalesOrder, SalesOrderLineB
 from apps.sales.orders import services as order_services
 from apps.sales.orders.tests.base import SalesServiceBase
 from apps.sales.payments import services as payment_services
+from apps.accounts import roles
 
 COST_KEYS = {"inventory_value", "unit_cost", "landed_unit_cost", "purchase_rate", "rate", "cost"}
 
@@ -115,7 +116,7 @@ class F1PaymentKeepsReservedBatchTests(F1FefoSalesBase):
         self.assertEqual(self._alloc(order), [(held.pk, Decimal("3"))])
         # Sau khi giữ chỗ, nhập thêm một lô hạn SỚM HƠN -> FEFO sẽ chọn lô này cho đơn MỚI.
         newer = self._lot(ca, "10", received=self.today, expiry=self._d(5))
-        chu = make_user("loc", "chu")
+        chu = make_user("loc", roles.OWNER)
         payment_services.confirm_payment_manual(order=order, bank_txn_id="F1-AC6", actor=chu)
         order.refresh_from_db()
         self.assertEqual(order.status, SalesOrder.Status.PROCESSING)
@@ -155,8 +156,8 @@ class F1ReturnToOriginalBatchTests(F1FefoSalesBase):
         self.assertEqual(Batch.objects.filter(item=self.ca).count(), 2)  # không sinh lô mới
 
     def test_f1_ac7_hang_giao_that_bai_tai_nhap_ve_lo_goc_giu_han(self):
-        giao = make_user("giao1", "nv_giao")
-        ql = make_user("ql1", "quan_ly")
+        giao = make_user("giao1", roles.DELIVERY_STAFF)
+        ql = make_user("ql1", roles.MANAGER)
         note = DeliveryNote.objects.get(sales_invoice=self.order.invoice)
         from apps.common.tests.fixtures import confirm_note_for_test
         confirm_note_for_test(note)
@@ -194,17 +195,17 @@ class F1ShopAndDashboardTests(F1FefoSalesBase):
         self.assertEqual(set(row) & COST_KEYS, set())
 
     def test_f1_ac8_tong_quan_ton_theo_lo_sap_theo_thu_tu_xuat(self):
-        body = client_for(make_user("loc", "chu")).get("/api/dashboard/summary/").json()
+        body = client_for(make_user("loc", roles.OWNER)).get("/api/dashboard/summary/").json()
         wanted = {self.a.batch_id, self.b.batch_id}
         ids = [r["batch_id"] for r in body["batches"] if r["batch_id"] in wanted]
         self.assertEqual(ids, [self.b.batch_id, self.a.batch_id])  # b nhập sau nhưng hạn sớm hơn
 
     def test_f1_ac8_tong_quan_nv_kho_khong_thay_gia_von(self):
-        resp = client_for(make_user("kho1", "nv_kho")).get("/api/dashboard/summary/")
+        resp = client_for(make_user("kho1", roles.WAREHOUSE_STAFF)).get("/api/dashboard/summary/")
         self.assertEqual(resp.status_code, 200)
         for row in resp.json()["batches"]:
             self.assertEqual(set(row) & COST_KEYS, set())
 
     def test_f1_ac8_tong_quan_nv_giao_403(self):
-        resp = client_for(make_user("giao1", "nv_giao")).get("/api/dashboard/summary/")
+        resp = client_for(make_user("giao1", roles.DELIVERY_STAFF)).get("/api/dashboard/summary/")
         self.assertEqual(resp.status_code, 403)

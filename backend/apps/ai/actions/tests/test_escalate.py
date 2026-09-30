@@ -14,14 +14,15 @@ from apps.ai.models import AiAction
 from apps.catalog.models.items import Item, ItemGroup
 from apps.purchasing.models.suppliers import Supplier
 from apps.inventory.models import Batch, Warehouse
+from apps.accounts import roles
 
 
 class EscalateGuidanceStepTests(APITestCase):
     def setUp(self):
         # 1. Tạo nhóm
-        self.chu_group, _ = Group.objects.get_or_create(name="chu")
-        self.quan_ly_group, _ = Group.objects.get_or_create(name="quan_ly")
-        self.nv_kho_group, _ = Group.objects.get_or_create(name="nv_kho")
+        self.chu_group, _ = Group.objects.get_or_create(name=roles.OWNER)
+        self.quan_ly_group, _ = Group.objects.get_or_create(name=roles.MANAGER)
+        self.nv_kho_group, _ = Group.objects.get_or_create(name=roles.WAREHOUSE_STAFF)
 
         # Gán quyền
         for perm in Permission.objects.filter(
@@ -34,10 +35,10 @@ class EscalateGuidanceStepTests(APITestCase):
             self.nv_kho_group.permissions.add(perm)
 
         # 2. Tạo users
-        self.chu_user = User.objects.create_user(
+        self.owner_user = User.objects.create_user(
             username="chu_vua", password="password", first_name="Duy", last_name="Chủ"
         )
-        self.chu_user.groups.add(self.chu_group)
+        self.owner_user.groups.add(self.chu_group)
 
         self.quan_ly = User.objects.create_user(
             username="quan_ly_1", password="password", first_name="Linh", last_name="QL"
@@ -102,16 +103,16 @@ class EscalateGuidanceStepTests(APITestCase):
         )
         self.assertEqual(res.status_code, status.HTTP_201_CREATED)
         action_id = res.data["action_id"]
-        self.assertEqual(res.data["assignee_group"], "chu")
+        self.assertEqual(res.data["assignee_group"], roles.OWNER)
 
         # Kiểm tra action trong DB
         action = AiAction.objects.get(id=action_id)
         self.assertEqual(action.status, AiAction.Status.ESCALATED)
-        self.assertEqual(action.assignee_group, "chu")
+        self.assertEqual(action.assignee_group, roles.OWNER)
         self.assertEqual(action.owner, self.nv_kho)
 
         # Chủ đăng nhập -> vào tab "Được chuyển" (status=ESCALATED)
-        self.client.force_authenticate(user=self.chu_user)
+        self.client.force_authenticate(user=self.owner_user)
         list_res = self.client.get("/api/ai/actions/?status=ESCALATED")
         self.assertEqual(list_res.status_code, status.HTTP_200_OK)
         # Danh sách trả về chứa action vừa chuyển
@@ -132,7 +133,7 @@ class EscalateGuidanceStepTests(APITestCase):
             kind=AiAction.Kind.WRITE,
             level=AiAction.Level.B,
             status=AiAction.Status.SCHEDULED,
-            owner=self.chu_user,
+            owner=self.owner_user,
             execute_after=timezone.now() - datetime.timedelta(minutes=1),
             target_model="batch",
             target_id="999999",  # ID không tồn tại -> dispatch lỗi
@@ -143,7 +144,7 @@ class EscalateGuidanceStepTests(APITestCase):
 
         action_err.refresh_from_db()
         self.assertEqual(action_err.status, AiAction.Status.ESCALATED)
-        self.assertEqual(action_err.assignee_group, "chu")
+        self.assertEqual(action_err.assignee_group, roles.OWNER)
 
     @override_settings(AI_ENABLED=True)
     def test_dw23_ac3_overdue_2h_escalates_to_chu_no_execution(self):
@@ -165,7 +166,7 @@ class EscalateGuidanceStepTests(APITestCase):
 
         pending_act.refresh_from_db()
         self.assertEqual(pending_act.status, AiAction.Status.ESCALATED)
-        self.assertEqual(pending_act.assignee_group, "chu")
+        self.assertEqual(pending_act.assignee_group, roles.OWNER)
         self.assertIsNone(pending_act.executed_at)  # Không tự thực thi
 
     def test_dw23_ac4_quan_ly_view_no_cost_price(self):
@@ -178,7 +179,7 @@ class EscalateGuidanceStepTests(APITestCase):
             level=AiAction.Level.C,
             status=AiAction.Status.ESCALATED,
             owner=self.nv_kho,
-            assignee_group="quan_ly",
+            assignee_group=roles.MANAGER,
             target_model="batch",
             target_id=self.batch.batch_id,
             args={
@@ -210,7 +211,7 @@ class EscalateGuidanceStepTests(APITestCase):
             level=AiAction.Level.C,
             status=AiAction.Status.ESCALATED,
             owner=self.nv_kho,
-            assignee_group="chu",
+            assignee_group=roles.OWNER,
             target_model="order",
             target_id="ORD-9999",
             args={
@@ -221,7 +222,7 @@ class EscalateGuidanceStepTests(APITestCase):
             },
         )
 
-        self.client.force_authenticate(user=self.chu_user)
+        self.client.force_authenticate(user=self.owner_user)
         res = self.client.get(f"/api/ai/actions/{escalated_act.id}/")
         self.assertEqual(res.status_code, status.HTTP_200_OK)
 
@@ -250,7 +251,7 @@ class EscalateGuidanceStepTests(APITestCase):
         self.assertEqual(res_missing.data["code"], "STEP_NOT_FOUND")
 
         # 2. Người gửi tự làm được bước (Chủ vựa tự làm được bước publish trên lô DRAFT)
-        self.client.force_authenticate(user=self.chu_user)
+        self.client.force_authenticate(user=self.owner_user)
         res_allowed = self.client.post(
             "/api/ai/actions/escalate/",
             {
@@ -279,4 +280,4 @@ class EscalateGuidanceStepTests(APITestCase):
             format="json",
         )
         self.assertEqual(res.status_code, status.HTTP_201_CREATED)
-        self.assertEqual(res.data["assignee_group"], "chu")
+        self.assertEqual(res.data["assignee_group"], roles.OWNER)

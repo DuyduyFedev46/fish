@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { callCommand } from "../commands/call";
 import { fetchAiActions, undoAiAction, escalateStep } from "./api";
+import { ROLE } from "@/shared/lib/roles";
 import { mockAiActions, mockUndoAiAction } from "./mock";
 import { fetchDailyAiReport } from "../report/api";
 
@@ -56,7 +57,7 @@ describe("DW-19, DW-21, DW-22 & DW-23 Frontend AI Tests", () => {
             json: () =>
               Promise.resolve({
                 action_id: "mock-escalated-uuid-12345",
-                assignee_group: "chu",
+                assignee_group: ROLE.owner,
               }),
           });
         }
@@ -220,7 +221,7 @@ describe("DW-19, DW-21, DW-22 & DW-23 Frontend AI Tests", () => {
       step_key: "close",
     });
     expect(res.action_id).toBe("mock-escalated-uuid-12345");
-    expect(res.assignee_group).toBe("chu");
+    expect(res.assignee_group).toBe(ROLE.owner);
   });
 
   it("DW-22-AC1: fetchDailyAiReport gọi API báo cáo ngày thành công", async () => {

@@ -17,7 +17,7 @@ from apps.accounts.models import AuditLog
 from apps.common.cost_keys import COST_KEYS
 from apps.common.exceptions import BusinessError
 from apps.common.tests.fixtures import client_for, make_user
-from apps.delivery.tests.test_cskh_l3 import CskhL3BaseTestCase
+from apps.delivery.tests.test_cskh_l3 import ConfirmationL3BaseTestCase
 from apps.inventory.batches import services as batch_services
 from apps.inventory.models import Batch, StockLedgerEntry
 from apps.purchasing.models import PurchaseReceipt
@@ -26,6 +26,7 @@ from apps.sales.models import PaymentTransaction, SalesInvoice, SalesOrder
 from apps.sales.orders import services as order_services
 from apps.sales.orders.tests.test_s10_api import OrderApiBase, find_keys
 from apps.sales.payments import services as payment_services
+from apps.accounts import roles
 
 PII = ("0900000111", "0900000222", "Khách Giả A", "Khách Giả B", "1 Đường Giả")
 
@@ -33,7 +34,7 @@ PII = ("0900000111", "0900000222", "Khách Giả A", "Khách Giả B", "1 Đư�
 class QaSR08Edges(OrderApiBase):
     def setUp(self):
         super().setUp()
-        self.cs = make_user("cs_qa08", "cskh")
+        self.cs = make_user("cs_qa08", roles.CUSTOMER_SERVICE)
         self.c_chu = client_for(self.chu)
         self.url = f"/api/inventory/batches/{self.batch.pk}/cancel-expired/"
 
@@ -299,7 +300,7 @@ class QaSR08Edges(OrderApiBase):
         self.assertNotIn("loss_amount", resp.content.decode())
 
 
-class QaSR10Edges(CskhL3BaseTestCase):
+class QaSR10Edges(ConfirmationL3BaseTestCase):
     def setUp(self):
         super().setUp()
         self.receipt, batches = receipt_services.create_and_submit_receipt(

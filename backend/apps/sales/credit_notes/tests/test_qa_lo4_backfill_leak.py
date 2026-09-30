@@ -31,6 +31,7 @@ from apps.sales.credit_notes.tests.test_qa_lo4_tien import QABase, cancel_url, m
 from apps.sales.models import SalesCreditNote, SalesInvoice, SalesOrder
 from apps.sales.orders import services as order_services
 from apps.sales.payments import services as payment_services
+from apps.accounts import roles
 
 COST_SENTINEL = "123457"
 
@@ -233,10 +234,10 @@ class QABackfillTests(QAItem2Base):
 # Rò giá vốn / dữ liệu cá nhân
 # ----------------------------------------------------------------------------------------------
 class QALeakTests(QAItem2Base):
-    GROUPS = ("chu", "quan_ly", "nv_kho", "nv_giao", "cskh")
+    GROUPS = (roles.OWNER, roles.MANAGER, roles.WAREHOUSE_STAFF, roles.DELIVERY_STAFF, roles.CUSTOMER_SERVICE)
 
     def _users(self):
-        return {"chu": self.chu, "quan_ly": self.ql, "nv_kho": self.kho, "nv_giao": self.giao, "cskh": self.cs1}
+        return {roles.OWNER: self.chu, roles.MANAGER: self.ql, roles.WAREHOUSE_STAFF: self.kho, roles.DELIVERY_STAFF: self.giao, roles.CUSTOMER_SERVICE: self.cs1}
 
     def _world(self):
         o1, n1, t1 = self._paid2()                       # huỷ tay (chu)
@@ -244,7 +245,7 @@ class QALeakTests(QAItem2Base):
         o2, n2, t2 = self._paid2(phone="0900000222")     # job tự huỷ
         # đường job dùng item 1; tạo thêm một đơn item2 rồi để job huỷ
         from datetime import timedelta as td
-        from apps.delivery.cskh import services as cskh_services
+        from apps.delivery.confirmation import services as confirmation_services
         from apps.delivery.models import ConfirmationTask
         from django.test import override_settings
         t0 = timezone.now().replace(hour=9, minute=25, second=0, microsecond=0)
@@ -253,7 +254,7 @@ class QALeakTests(QAItem2Base):
         t2.escalated_at = t0
         t2.save()
         with override_settings(CSKH_AUTO_CANCEL_ENABLED=True):
-            self.assertEqual(cskh_services.auto_cancel_overdue(now=t0 + td(minutes=31))["cancelled"], 1)
+            self.assertEqual(confirmation_services.auto_cancel_overdue(now=t0 + td(minutes=31))["cancelled"], 1)
         o3, n3, t3 = self._paid2(phone="0900000333")     # còn PAID
         return o1, o2, o3
 
@@ -284,7 +285,7 @@ class QALeakTests(QAItem2Base):
                 ok[g] += 1
                 body = resp.json()
                 text = json.dumps(body, ensure_ascii=False)
-                if g == "chu":
+                if g == roles.OWNER:
                     continue
                 # nhóm KHÔNG có view_costprice: không có khoá giá vốn, không có chuỗi giá vốn sentinel
                 if not user.has_perm("inventory.view_costprice"):
@@ -296,14 +297,14 @@ class QALeakTests(QAItem2Base):
         for g in self.GROUPS:
             self.assertGreater(ok[g], 0, f"{g}: không có response 200 nào — test xanh giả\n{matrix}")
         # nhóm thiếu view_profitreport: báo cáo lãi lỗ 403
-        for g in ("quan_ly", "nv_kho", "nv_giao", "cskh"):
+        for g in (roles.MANAGER, roles.WAREHOUSE_STAFF, roles.DELIVERY_STAFF, roles.CUSTOMER_SERVICE):
             self.assertEqual(matrix[(g, "/api/reports/period/")], 403, g)
             self.assertEqual(matrix[(g, f"/api/reports/batch/{self.batch2.batch_id}/")], 403, g)
-        self.assertEqual(matrix[("chu", "/api/reports/period/")], 200)
+        self.assertEqual(matrix[(roles.OWNER, "/api/reports/period/")], 200)
         # số 200 tối thiểu của quan_ly (đã có quyền xem đơn/dashboard) để chắc endpoint thực sự gọi được
-        self.assertGreaterEqual(ok["quan_ly"], 8, matrix)
-        self.assertGreaterEqual(ok["nv_kho"], 2, matrix)
-        self.assertGreaterEqual(ok["cskh"], 1, matrix)
+        self.assertGreaterEqual(ok[roles.MANAGER], 8, matrix)
+        self.assertGreaterEqual(ok[roles.WAREHOUSE_STAFF], 2, matrix)
+        self.assertGreaterEqual(ok[roles.CUSTOMER_SERVICE], 1, matrix)
 
     def test_khach_chua_dang_nhap_401_va_shop_khong_lo(self):
         o1, o2, o3 = self._world()
@@ -469,10 +470,10 @@ class QAPermMatrixTests(QAItem2Base):
         self._manual_cancel(order)
         period = "/api/reports/period/?year=%d&month=%d" % ym_back(0)
         batch = f"/api/reports/batch/{self.batch2.batch_id}/"
-        users = {"chu": self.chu, "quan_ly": self.ql, "nv_kho": self.kho, "nv_giao": self.giao, "cskh": self.cs1}
+        users = {roles.OWNER: self.chu, roles.MANAGER: self.ql, roles.WAREHOUSE_STAFF: self.kho, roles.DELIVERY_STAFF: self.giao, roles.CUSTOMER_SERVICE: self.cs1}
         expect = {
-            "chu": (200, 200, 200), "quan_ly": (403, 403, 200), "nv_kho": (403, 403, 200),
-            "nv_giao": (403, 403, 403), "cskh": (403, 403, 403),
+            roles.OWNER: (200, 200, 200), roles.MANAGER: (403, 403, 200), roles.WAREHOUSE_STAFF: (403, 403, 200),
+            roles.DELIVERY_STAFF: (403, 403, 403), roles.CUSTOMER_SERVICE: (403, 403, 403),
         }
         for g, u in users.items():
             got = tuple(client_for(u).get(p).status_code for p in (period, batch, "/api/dashboard/summary/"))

@@ -135,3 +135,123 @@ máy", nhưng hai dòng sau không bị chặn:
 6. Không phải hỏi Duy: không từ nào bị miễn mà code sản phẩm đang dùng làm định danh chính thức.
 
 Sau khi sửa, Tech Lead review lại chỉ phần diff của `scripts/` và cập nhật mục này thành REVIEW PASS.
+
+---
+
+## Lô 1
+
+> Tech Lead · 2026-10-01 · Diff chưa commit (215 dòng `git status`, 207 file, `git mv` cụm `delivery/cskh`, `features/cskh`,
+> `NhapLoForm`, `CskhNotice`). Đối chiếu `02c-giao-viec.md` §1, §3 Lô 1, §6 và `03-dev-notes.md` mục "Lô 1 — BE", "Lô 1 — FE".
+
+### Kết luận: **REVIEW PASS** (vòng 2, 01/10). Vòng 1: CẦN SỬA (S1), xem bên dưới.
+
+#### Vòng 2 — review lại diff S1, N1, N2, N3 (01/10)
+| Mục | Kết quả kiểm trong lượt này |
+|---|---|
+| S1 | `backend/apps/ai/command_groups.py` đã staged (`A`). File cũ `registry/command_groups.py` không còn. File mới chỉ có hằng, không import gì. Tìm `registry.command_groups`, `from . import command_groups` và `registry import command_groups` trong backend: không còn. 15 file đều dùng `from apps.ai import command_groups`. `effective.py:8` đã import ở đầu module, bỏ import trong hàm. `inventory/batches/api.py:9` import lá, đứng cạnh `apps.ai.declare`. `check_naming.py` chỉ đổi một dòng đường dẫn trong `EXEMPT_STRING_FILES` |
+| N1 | `accounts/auth/services.py`: `from apps.accounts import roles` đã về nhóm import `apps.*`, trước import tương đối |
+| N2 | Tham số đổi thành `owner_ids` ở `staff/services.py:324`, `staff/serializers.py:12` và 2 nơi gọi trong `staff/api.py:64,69`. Không còn chỗ nào gọi bằng tên cũ. Hàm `active_owner_ids()` không bị che nữa |
+| N3 | Comment đầu `erp-console/shared/lib/roles.ts` đã nêu cả tên Group và `HOME_CONFIRMATION_QUEUE` |
+| Lệnh | Backend `apps.delivery apps.accounts apps.ai apps.inventory apps.purchasing`: **875 test OK**. `makemigrations --check --dry-run`: No changes detected. Import riêng lẻ `apps.ai.command_groups`, `apps.ai.policy.effective`, `apps.inventory.batches.api`, `apps.ai.registry.spec`, `apps.accounts.auth.services`, `apps.accounts.staff.api`: OK. Snapshot chỉ mục AI: không đổi so với HEAD. `check_naming.py`: OK 6724. ERP `npm test`: 185/185 |
+
+Bộ đầy đủ 1674 test do be-dev báo, tôi không chạy lại toàn bộ trong lượt này. Phần tôi chạy lại gồm mọi app bị S1 và N1–N3 đụng tới.
+Lô 1 được commit sau khi QA chạy xong smoke E2E 5 vai. Lưu ý khi commit ở mục 4 vẫn áp dụng; file hằng AI lấy theo đường dẫn mới
+`backend/apps/ai/command_groups.py`.
+
+#### Vòng 1 (lịch sử) — CẦN SỬA: 1 việc sửa nhỏ về vị trí file hằng. Hành vi, contract, phân quyền, giá vốn và PII đều đạt.
+
+### Lệnh đã chạy trong lượt review
+| Lệnh | Kết quả |
+|---|---|
+| `cd backend && DJANGO_DEBUG=1 env -u DATABASE_URL .venv/bin/python manage.py test apps.delivery apps.accounts apps.ai` | `Ran 597 tests … OK` |
+| `cd erp-console && npm test` | 14 file, **185/185 pass** |
+| `python3 scripts/check_naming.py` | `OK - 6724 vi phạm cũ trong 224 file`, exit 0 |
+| So chuỗi literal từng file HEAD↔worktree (tính theo rename, tokenize Python, regex TS) | Chỉ đổi: tên Group/nhóm/mức (thay bằng hằng), `data-testid` (đã giao), đường import, tên hàm mock `__caveMock.confirmation*` (e2e sửa cùng), username test `chu_user`→`owner_user`, chuỗi `mock.patch` `_lock_target_and_owners` |
+| Kiểm **theo thứ tự**: thay ngược `roles.*`/`command_groups.*`/`ROLE.*`/`COMMAND_GROUP.*`/`SENSITIVITY.*` (và `GROUP.*` cũ) về giá trị, so dãy tên Group từng file | Khớp ở mọi file. 9 file lệch đều do tái cấu trúc hợp lệ (đã đọc tay): `ROLE_ORDER = roles.ALL_ROLES` (đúng thứ tự `chu, quan_ly, nv_kho, nv_giao, cskh`), hằng `CHU` cục bộ bị bỏ, `"".join(["cs","kh"])` bị bỏ, kiểu union TS chuyển sang `RoleCode`/`AiCommandGroup`/`AiSensitivity` |
+| Import độc lập từng module đã sửa (`django.setup()` rồi import riêng lẻ 10 module, gồm `apps.inventory.batches.api`, `apps.ai.policy.effective`, `apps.ai.registry.spec`, `apps.common.api`) | Đều OK, không có import vòng |
+| `git diff HEAD --stat -- backend/apps/ai/registry/tests/snapshots/ backend/apps/ai/policy/rules.py` | Rỗng |
+| So `naming_baseline.json` HEAD↔worktree | 7584→6724. Không file nào tăng. 5 key mới là path sau rename và đều thấp hơn path cũ (`scope.py` 8→2, `serializers.py` 11→4, `services.py` 10→9, `api.ts` 36→8, `CskhNotice.tsx` 19→2). Phần còn lại là contract Lô 3 (`CSKH_*`, `/api/cskh/`, `cskh_notice`, logger) |
+
+### 1. Việc phải sửa trước khi commit
+
+**S1 — Dời `backend/apps/ai/registry/command_groups.py` sang `backend/apps/ai/command_groups.py`.** Trả lời câu (4) của điều phối: **dời
+file, không giữ cách import trong hàm.**
+- Lý do 1: file hằng nằm trong gói `apps.ai.registry`. Import `apps.ai.registry.command_groups` sẽ chạy `registry/__init__.py`, tức kéo theo
+  `discovery`, `api` (view), `apps.ai.policy.effective` và `rules`. Vì vậy `effective.py` phải import trong hàm
+  (`backend/apps/ai/policy/effective.py:112-113`).
+- Lý do 2: `backend/apps/inventory/batches/api.py:16` (module view của domain) giờ import cả gói registry AI ở đầu module. HEAD giữ quy
+  ước khác: module domain chỉ import lá `apps.ai.declare` (catalog, purchasing, sales đều vậy), còn `common/guidance/steps.py:55-56`
+  import registry trong hàm. Hiện chưa vỡ (đã thử import từng module), nhưng đây đúng là kiểu nối vòng mà be-dev vừa gặp. Chỉ cần
+  thêm một import ở đầu `registry/discovery.py` là vòng sẽ hiện ra.
+- Lý do 3: Lô 1 có mục đích chốt **chỗ đặt cuối cùng** cho file hằng, để Lô 4 chỉ đổi giá trị. Nếu để Lô 4 mới dời thì phải đổi tên
+  file lần hai, sửa danh sách miễn và baseline thêm một lần. `apps/ai/command_groups.py` là lá, không import gì, đứng cạnh `declare.py`
+  (nơi có `AiMeta(sensitivity=…)`). Cách đặt này giống `apps/accounts/roles.py`.
+
+Cách làm (`be-dev`):
+1. `git mv backend/apps/ai/registry/command_groups.py backend/apps/ai/command_groups.py`. Sửa import ở 15 file backend (code và test đang
+   import `apps.ai.registry.command_groups` hoặc `from . import command_groups`) thành `from apps.ai import command_groups`.
+2. Ở `effective.py`, đưa import lên đầu module và xoá comment "Import trong hàm…". Ở `inventory/batches/api.py`, xếp import theo thứ tự
+   như các import `apps.ai.declare` sẵn có.
+3. `scripts/check_naming.py` `EXEMPT_STRING_FILES` (khoảng dòng 88): đổi path `backend/apps/ai/registry/command_groups.py` thành
+   `backend/apps/ai/command_groups.py`, sửa luôn comment "Việc dọn" cho khớp. Đây là sửa đường dẫn cơ học ngoài danh sách "Được sửa"
+   của Lô 1, Tech Lead cho phép. Không đụng blocklist hay logic.
+4. Sửa đường dẫn trong `03-dev-notes.md` mục Lô 1 — BE (file mới, mục "Import vòng" ghi "đã dời theo review") và trong
+   `02c-giao-viec.md` §3 Lô 1 dòng "Hằng nhóm lệnh AI" (điều phối sửa, hoặc ghi "Lệch thiết kế: đã dời theo 03b").
+5. Kiểm lại: bộ test backend đầy đủ (phải ra 1674 OK), `makemigrations --check`, `git diff --exit-code HEAD -- backend/apps/ai/registry/tests/snapshots/`,
+   `check_naming.py` (vẫn 6724, không `--update` thêm), và `git grep -n "registry.command_groups\|from . import command_groups" -- backend`
+   phải rỗng.
+
+### 2. Đạt yêu cầu (đã soát)
+- **(1) Contract giữ nguyên.** Route `cskh/queue` + basename `cskh-queue`, `cskh/search/` + name `cskh-search`
+  (`backend/config/api_urls.py:83,120`, chỉ đổi class view). `url_path="nhap-lo"`, method `nhap_lo`, `custom_perm_actions` và keyword
+  `nhap_lo` của AI đều giữ. Khoá JSON không đổi: serializer không đổi field, type FE `confirmation/types.ts` và `purchasing/types.ts`
+  chỉ đổi tên type, không đổi property; `cskh_notice` và `cskh_*` ở attention vẫn là tên cũ. Env/settings `CSKH_*`, scope throttle
+  `cskh_search` (`common/throttling.py`), hai lệnh quản trị `process_cskh_deadlines`/`check_cskh_job_health` (không đổi tên file) và
+  logger `cangca.delivery.cskh` đều giữ. `config/settings` không có trong diff. Id lệnh AI giữ, snapshot không đổi. Khoá storage
+  `RECEIVE_BATCHES_DRAFT_PREFIX = "cave_draft_nhap_lo"` giữ giá trị, `clearAllDrafts()` vẫn dọn cả local và session. Map caps AI
+  `"purchasing.purchasereceipt.nhap_lo"` giữ, chỉ state nội bộ đổi thành `receive_*`. `me.home`: BE `HOME_CONFIRMATION_QUEUE = "cskh-queue"`,
+  FE `roles.ts` cùng giá trị, `homePath` vẫn trả `/cskh/`. Route ERP `app/(console)/cskh/` giữ. Adapter chỉ đổi tên hằng `VN_TIME_ZONE`.
+- **(2) Phân quyền không đổi hành vi.** Kiểm bằng máy theo thứ tự (bảng trên), nên không có chỗ nào bị tráo vai. Đã đọc tay các chỗ
+  nhạy cảm: `FULL_SCOPE_GROUPS` (`common/api.py:112`), `home_for`/`GROUP_LABELS`/`ROLE_ORDER` (`accounts/auth/services.py`), toàn bộ
+  `accounts/staff/services.py` (BR-PQ-17/18), `cancel_receipt` (`purchasing/receipts/services.py:171`), `find_assignee_group_for_step`,
+  `AiActionViewSet` (`user_groups.add(roles.OWNER)`), `run_due_ai_actions`, `pipeline.py`, `_escalate_to_owner`, `is_customer_service`,
+  `scope_orders_for`, và phía FE `nav.ts` (`onlyDelivery`, `inGroup`), `StaffDetail`/`StaffCreateForm` (xác nhận khi đụng nhóm Chủ),
+  `auth/mock.ts` `GROUP_PERMS`. **`is_owner` và `actor_is_owner`:** be-dev giữ cả hai là đúng. `is_owner(user)` chỉ xét Group,
+  `actor_is_owner(actor)` = superuser **hoặc** `is_owner`. `_check_can_touch` gọi `is_owner(target)` (đích là Chủ) và `actor_is_owner(actor)`,
+  đúng nghĩa như HEAD. Nếu gộp lại thì tài khoản superuser không thuộc nhóm `chu` sẽ bị coi là "Chủ cuối cùng" ở BR-PQ-18.
+- **(3) `FORBIDDEN_PREFIXES`** (`backend/apps/ai/policy/rules.py:8-19`) không đổi, vẫn có `"/api/cskh/"`, và route thật vẫn là `/api/cskh/…`.
+  `test_discovery` xanh với snapshot không regenerate. `_get_screens` không sinh màn `cskh`. `_get_group` vẫn xếp `apps.delivery.confirmation.*`
+  vào `ban_hang` vì chuỗi con `delivery` (R8).
+- **(5) Không rò giá vốn/PII mới.** `ReceivedBatchOutput` giữ `CostFieldSerializerMixin` + `sensitive_fields`. Serializer
+  `Confirmation*` chỉ đổi tên class, vẫn gọi `note_in_customer_service_scope`. Không thêm log mới. Comment log "nhóm chu" giữ nguyên
+  chữ. Không có dữ liệu thật trong diff (mock chỉ đổi literal thành `ROLE.*`, SĐT mock `0909…` có sẵn từ trước).
+- **(6) File hằng khớp allowlist.** `EXEMPT_STRING_FILES` có đúng 4 path `accounts/roles.py`, `ai/registry/command_groups.py` (đổi path
+  theo S1), `shared/lib/roles.ts`, `features/ai/commandGroups.ts`. Chỉ miễn chuỗi, định danh vẫn bị xét. Cả 4 file chỉ chứa hằng, không
+  import gì. Hai file Python có docstring nêu lý do và thời điểm đổi giá trị (Lô 4).
+- **(7) `ViewKey` "cskh"→"confirmation"** chỉ là khoá kiểu TS trong FE. Tìm trong repo: `ViewKey` chỉ dùng ở `canView`, `navItem`,
+  `ViewGuard`, `Placeholder`, `LoginScreen` (lấy `item.key` từ `NAV`). Không lưu vào storage, không gửi BE, không so với `screens` của AI
+  (BE không sinh màn `cskh`). Luật `visible` và `href: "/cskh/"` của mục menu không đổi. `me.home` không phụ thuộc view key. `tsc` sạch
+  thì không còn chỗ nào dùng `"cskh"` làm ViewKey.
+- Không còn tên cũ ngoài phạm vi Lô 3: tìm `cskhArmStale|cskh-stale-alert|cskh-notice|CskhNotice|NhapLoForm|NHAP_LO_DRAFT_PREFIX|VN_TZ|todayVn|currentYearVn|vn_today|KHO_LANH|delivery\.cskh|features/cskh|GROUP\.`
+  chỉ ra 4 dòng logger `cangca.delivery.cskh` (giữ tới Lô 3) và dòng glossary trong `AGENTS.md`.
+- Test không đổi assert: số test giữ nguyên. Thay đổi trong test chỉ là literal thành hằng, đường import, tên helper
+  (`Confirmation*BaseTestCase`, đúng 02c) và username test.
+
+### 3. Nên sửa (không chặn, làm cùng lượt S1 nếu tiện)
+- N1 — `backend/apps/accounts/auth/services.py:20`: `from apps.accounts import roles` đang nằm sau import tương đối `.authentication`.
+  Nên đưa lên nhóm import tuyệt đối `apps.*`, cho giống các file khác.
+- N2 — `backend/apps/accounts/staff/services.py:324` và `staff/serializers.py:12`: tham số `active_owner_ids` trùng tên hàm module
+  `active_owner_ids()` và che hàm này trong thân `available_actions`. Hiện chưa gây lỗi, nhưng về sau ai gọi `active_owner_ids()` trong
+  hàm đó sẽ gặp `TypeError`. Nên đặt lại tên tham số, ví dụ `owner_ids` (cả hai nơi gọi trong `staff/api.py`).
+- N3 — `HOME_CONFIRMATION_QUEUE` nằm trong `erp-console/shared/lib/roles.ts`, là file 02c dành riêng cho tên Group. Chấp nhận được vì
+  Lô 4 đổi cả hai giá trị cùng lúc và file đã được miễn chuỗi. Nếu để vậy thì sửa comment đầu file cho khớp ("tên Group và mã trang chủ
+  theo vai").
+
+### 4. Lưu ý khi commit (điều phối)
+- 4 file mới đang untracked (`??`), phải `git add` rõ ràng: `backend/apps/accounts/roles.py`, file hằng nhóm lệnh AI (path mới sau S1),
+  `erp-console/shared/lib/roles.ts`, `erp-console/features/ai/commandGroups.ts`. Nhiều file rename đang ở trạng thái `RM`, nên `git add`
+  cả phần sửa trước khi commit.
+- Sau S1 không cần chạy `--update` baseline: path mới được miễn chuỗi, định danh không đổi.
+- Smoke E2E 5 vai của QA (điều kiện xong ở §3 Lô 1) vẫn phải chạy. Review này không thay cho bước đó.
+
+Đã review lại S1 và N1–N3 ở vòng 2: REVIEW PASS.

@@ -9,7 +9,7 @@ from django.utils import timezone
 
 from apps.common.exceptions import ConflictError
 from apps.common.tests.fixtures import client_for
-from apps.delivery.cskh import services as cskh_services
+from apps.delivery.confirmation import services as confirmation_services
 from apps.delivery.models import ConfirmationTask
 from apps.delivery.tests import test_cskh_l3 as l3
 from apps.sales.models import Refund
@@ -18,16 +18,16 @@ from apps.sales.models import Refund
 LATE_UTC = datetime(2026, 9, 30, 17, 30, tzinfo=dt_timezone.utc)
 
 
-class Lo8CskhFormatTests(l3.CskhL3BaseTestCase):
+class Lo8CskhFormatTests(l3.ConfirmationL3BaseTestCase):
     def _auto_cancelled(self):
         t0 = timezone.now().replace(hour=9, minute=25, second=0, microsecond=0)
-        order, note, task = self._create_order_with_cskh()
-        cskh_services.record_call(task.pk, self.cs1, result="UNREACHABLE", now=t0)
+        order, note, task = self._create_order_with_confirmation()
+        confirmation_services.record_call(task.pk, self.cs1, result="UNREACHABLE", now=t0)
         task.state = ConfirmationTask.State.ESCALATED
         task.escalation_reason = ConfirmationTask.EscalationReason.UNREACHABLE
         task.escalated_at = t0
         task.save()
-        cskh_services.auto_cancel_overdue(now=t0 + timedelta(minutes=31))
+        confirmation_services.auto_cancel_overdue(now=t0 + timedelta(minutes=31))
         task.refresh_from_db()
         order.refresh_from_db()
         return order, note, task
@@ -62,12 +62,12 @@ class Lo8CskhFormatTests(l3.CskhL3BaseTestCase):
 
     def test_sr25_ac2_claim_conflict_gio_vn_con_iso_giu_nguyen(self):
         """Thông điệp `tới 00:30` theo giờ VN; `extra.claimed_until` ISO còn nguyên offset UTC."""
-        _order, note, task = self._create_order_with_cskh()
+        _order, note, task = self._create_order_with_confirmation()
         now = LATE_UTC - timedelta(minutes=1)
         task.claimed_by = self.cs2
         task.claimed_until = LATE_UTC
         task.save()
         with self.assertRaises(ConflictError) as ctx:
-            cskh_services.claim_task(task.pk, self.cs1, now=now)
+            confirmation_services.claim_task(task.pk, self.cs1, now=now)
         self.assertIn("tới 00:30", str(ctx.exception))
         self.assertEqual(ctx.exception.extra["claimed_until"], "2026-09-30T17:30:00+00:00")

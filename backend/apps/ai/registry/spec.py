@@ -4,6 +4,8 @@
 from dataclasses import dataclass, field
 from typing import Any
 
+from apps.ai import command_groups
+
 
 @dataclass
 class CommandSpec:
@@ -11,7 +13,7 @@ class CommandSpec:
     title: str
     description: str = ""
     kind: str = "read"                      # "read" | "write"
-    group: str = "thu_mua"                  # thu_mua | ban_hang | cskh
+    group: str = command_groups.PURCHASING  # command_groups: PURCHASING | SALES | CUSTOMER_SERVICE
     screens: tuple = ()
     keywords: list[str] = field(default_factory=list)
     method: str = "GET"
@@ -21,7 +23,7 @@ class CommandSpec:
     target: str | None = None               # "detail" | None
     view_cls: Any = None
     required_perms: tuple = ()              # Quyền Tầng 2
-    sensitivity: str = "cao"                # "cao" | "trung_binh" | "thap"
+    sensitivity: str = command_groups.SENSITIVITY_HIGH  # command_groups.SENSITIVITY_*: HIGH | MEDIUM | LOW
     channel: str = "local"                  # "local" | "cloud"
     max_level: str = "C"                    # "A" | "B" | "C"
     undo: str = ""                          # "cancel_action:<act>" | "defer" | ""

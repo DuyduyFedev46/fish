@@ -1,10 +1,10 @@
 import { ViewGuard } from "@/features/auth/components/ViewGuard";
-import { CskhQueueView } from "@/features/cskh/CskhQueueView";
+import { ConfirmationQueueView } from "@/features/confirmation/ConfirmationQueueView";
 
-export default function CskhPage() {
+export default function ConfirmationPage() {
   return (
-    <ViewGuard view="cskh">
-      <CskhQueueView />
+    <ViewGuard view="confirmation">
+      <ConfirmationQueueView />
     </ViewGuard>
   );
 }

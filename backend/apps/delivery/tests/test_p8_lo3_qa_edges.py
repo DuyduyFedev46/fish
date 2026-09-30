@@ -15,9 +15,9 @@ from django.utils import timezone
 from apps.accounts.models import AuditLog
 from apps.common.exceptions import BusinessError, ConflictError
 from apps.common.tests.fixtures import client_for
-from apps.delivery.cskh import services as cskh_services
+from apps.delivery.confirmation import services as confirmation_services
 from apps.delivery.models import ConfirmationTask, CustomerCall, DeliveryNote
-from apps.delivery.tests.test_cskh_l3 import CskhL3BaseTestCase
+from apps.delivery.tests.test_cskh_l3 import ConfirmationL3BaseTestCase
 from apps.sales.models import Refund, SalesInvoice, SalesOrder
 from apps.sales.orders import services as order_services
 
@@ -39,14 +39,14 @@ class _ListHandler(logging.Handler):
 
 
 @override_settings(CSKH_AUTO_CANCEL_ENABLED=True)
-class QaSR09Edges(CskhL3BaseTestCase):
+class QaSR09Edges(ConfirmationL3BaseTestCase):
     def setUp(self):
         super().setUp()
         self.t0 = timezone.now().replace(hour=9, minute=25, second=0, microsecond=0)
 
     def _escalated(self):
-        order, note, task = self._create_order_with_cskh()
-        cskh_services.record_call(task.pk, self.cs1, result="UNREACHABLE", now=self.t0)
+        order, note, task = self._create_order_with_confirmation()
+        confirmation_services.record_call(task.pk, self.cs1, result="UNREACHABLE", now=self.t0)
         task.refresh_from_db()
         task.state = ConfirmationTask.State.ESCALATED
         task.escalation_reason = ConfirmationTask.EscalationReason.UNREACHABLE
@@ -55,7 +55,7 @@ class QaSR09Edges(CskhL3BaseTestCase):
         return order, note, task
 
     def _auto_cancel(self, minutes=31):
-        return cskh_services.auto_cancel_overdue(now=self.t0 + timedelta(minutes=minutes))
+        return confirmation_services.auto_cancel_overdue(now=self.t0 + timedelta(minutes=minutes))
 
     def _no_side_effects(self, note, task, calls, audits, expect_task_state):
         note.refresh_from_db(); task.refresh_from_db()
@@ -91,7 +91,7 @@ class QaSR09Edges(CskhL3BaseTestCase):
         for result in ALL_RESULTS:
             with self.subTest(result=result):
                 with self.assertRaises(ConflictError) as ctx:
-                    cskh_services.record_call(
+                    confirmation_services.record_call(
                         task.pk, self.cs1, result=result, now=now,
                         callback_at=now + timedelta(hours=1) if result == "CALLBACK" else None,
                     )
@@ -110,7 +110,7 @@ class QaSR09Edges(CskhL3BaseTestCase):
     def test_qa_cskh_dang_giu_phieu_bi_job_huy_ngang_roi_bam_xac_nhan(self):
         order, note, task = self._escalated()
         # cs1 mở màn gọi và giữ phiếu (claim)
-        cskh_services.claim_task(task.pk, self.cs1, now=self.t0 + timedelta(minutes=29))
+        confirmation_services.claim_task(task.pk, self.cs1, now=self.t0 + timedelta(minutes=29))
         task.refresh_from_db()
         self.assertEqual(task.claimed_by_id, self.cs1.pk)
         res = self._auto_cancel(minutes=31)
@@ -121,14 +121,14 @@ class QaSR09Edges(CskhL3BaseTestCase):
         for user in (self.cs1, self.cs2):
             with self.subTest(user=user.username):
                 with self.assertRaises(ConflictError) as ctx:
-                    cskh_services.record_call(task.pk, user, result="CONFIRMED", now=self.t0 + timedelta(minutes=32))
+                    confirmation_services.record_call(task.pk, user, result="CONFIRMED", now=self.t0 + timedelta(minutes=32))
                 self.assertEqual(ctx.exception.code, "STALE_STATE")
         self._no_side_effects(note, task, calls, audits, ConfirmationTask.State.REFUND_CALL)
 
     # --- tranh chấp thứ tự A: CSKH trước, job sau --------------------------------
     def test_qa_race_cskh_xac_nhan_truoc_job_bo_qua_va_khong_hoan_tien(self):
         order, note, task = self._escalated()
-        cskh_services.record_call(task.pk, self.cs1, result="CONFIRMED", now=self.t0 + timedelta(minutes=20))
+        confirmation_services.record_call(task.pk, self.cs1, result="CONFIRMED", now=self.t0 + timedelta(minutes=20))
         res = self._auto_cancel(minutes=45)
         self.assertEqual(res["cancelled"], 0)
         order.refresh_from_db(); note.refresh_from_db(); task.refresh_from_db()
@@ -138,7 +138,7 @@ class QaSR09Edges(CskhL3BaseTestCase):
         self.assertEqual(Refund.objects.filter(sales_invoice__sales_order=order).count(), 0)
         # màn hình cũ của người thứ 2 bấm lần nữa -> STALE_STATE "đã xác nhận bởi người khác", KHÔNG đổi gì
         with self.assertRaises(ConflictError) as ctx:
-            cskh_services.record_call(task.pk, self.cs2, result="CONFIRMED", now=self.t0 + timedelta(minutes=46))
+            confirmation_services.record_call(task.pk, self.cs2, result="CONFIRMED", now=self.t0 + timedelta(minutes=46))
         self.assertEqual(ctx.exception.code, "STALE_STATE")
         note.refresh_from_db()
         self.assertEqual(note.status, DeliveryNote.Status.PREPARING)
@@ -148,11 +148,11 @@ class QaSR09Edges(CskhL3BaseTestCase):
         order, note, task = self._escalated()
         self._auto_cancel()
         # CSKH đúng luồng: UNREACHABLE rồi NOTIFIED trên REFUND_CALL vẫn nhận
-        cskh_services.record_call(task.pk, self.cs1, result="UNREACHABLE", now=self.t0 + timedelta(minutes=40))
+        confirmation_services.record_call(task.pk, self.cs1, result="UNREACHABLE", now=self.t0 + timedelta(minutes=40))
         task.refresh_from_db()
         self.assertEqual(task.state, ConfirmationTask.State.REFUND_CALL)
         self.assertEqual(task.attempts, 1)
-        cskh_services.record_call(task.pk, self.cs1, result="NOTIFIED", now=self.t0 + timedelta(minutes=41))
+        confirmation_services.record_call(task.pk, self.cs1, result="NOTIFIED", now=self.t0 + timedelta(minutes=41))
         task.refresh_from_db()
         self.assertEqual(task.state, ConfirmationTask.State.DONE)
         # sau khi đã DONE (đơn vẫn CANCELLED), bấm CONFIRMED / UNREACHABLE / NOTIFIED lần nữa -> 409, không thêm cuộc gọi
@@ -160,7 +160,7 @@ class QaSR09Edges(CskhL3BaseTestCase):
         for result in ("CONFIRMED", "UNREACHABLE", "NOTIFIED"):
             with self.subTest(result=result):
                 with self.assertRaises(ConflictError) as ctx:
-                    cskh_services.record_call(task.pk, self.cs1, result=result, now=self.t0 + timedelta(minutes=42))
+                    confirmation_services.record_call(task.pk, self.cs1, result=result, now=self.t0 + timedelta(minutes=42))
                 self.assertEqual(ctx.exception.code, "STALE_STATE")
         self.assertEqual(CustomerCall.objects.filter(note=note).count(), calls)
         note.refresh_from_db()
@@ -172,9 +172,9 @@ class QaSR09Edges(CskhL3BaseTestCase):
         order, note, task = self._escalated()
         self._auto_cancel()
         rid = uuid.uuid4()
-        c1, dup1 = cskh_services.record_call(task.pk, self.cs1, result="UNREACHABLE", request_id=rid,
+        c1, dup1 = confirmation_services.record_call(task.pk, self.cs1, result="UNREACHABLE", request_id=rid,
                                               now=self.t0 + timedelta(minutes=40))
-        c2, dup2 = cskh_services.record_call(task.pk, self.cs1, result="UNREACHABLE", request_id=rid,
+        c2, dup2 = confirmation_services.record_call(task.pk, self.cs1, result="UNREACHABLE", request_id=rid,
                                               now=self.t0 + timedelta(minutes=40))
         self.assertEqual((dup1, dup2), (False, True))
         self.assertEqual(c1.pk, c2.pk)
@@ -189,7 +189,7 @@ class QaSR09Edges(CskhL3BaseTestCase):
         calls = CustomerCall.objects.filter(note=note).count()
         for _ in range(2):
             with self.assertRaises(ConflictError) as ctx:
-                cskh_services.record_call(task.pk, self.cs1, result="CONFIRMED", request_id=rid,
+                confirmation_services.record_call(task.pk, self.cs1, result="CONFIRMED", request_id=rid,
                                           now=self.t0 + timedelta(minutes=40))
             self.assertEqual(ctx.exception.code, "STALE_STATE")
         self.assertEqual(CustomerCall.objects.filter(request_id=rid).count(), 0)
@@ -197,10 +197,10 @@ class QaSR09Edges(CskhL3BaseTestCase):
 
     # --- đường khác không phải "đã huỷ" (hồi quy) ---------------------------------
     def test_qa_da_xac_nhan_roi_bam_lan_2_van_409_da_xac_nhan_khong_doi_phieu(self):
-        order, note, task = self._create_order_with_cskh()
-        cskh_services.record_call(task.pk, self.cs1, result="CONFIRMED", now=self.t0)
+        order, note, task = self._create_order_with_confirmation()
+        confirmation_services.record_call(task.pk, self.cs1, result="CONFIRMED", now=self.t0)
         with self.assertRaises(ConflictError) as ctx:
-            cskh_services.record_call(task.pk, self.cs2, result="CONFIRMED", now=self.t0 + timedelta(minutes=1))
+            confirmation_services.record_call(task.pk, self.cs2, result="CONFIRMED", now=self.t0 + timedelta(minutes=1))
         self.assertEqual(ctx.exception.code, "STALE_STATE")
         self.assertIn("vừa được xác nhận", str(ctx.exception))
         note.refresh_from_db()
@@ -208,15 +208,15 @@ class QaSR09Edges(CskhL3BaseTestCase):
         self.assertEqual(AuditLog.objects.filter(action="delivery_confirmed").count(), 1)
 
     def test_qa_ket_qua_rac_tren_phieu_binh_thuong_van_400_invalid_input(self):
-        order, note, task = self._create_order_with_cskh()
+        order, note, task = self._create_order_with_confirmation()
         with self.assertRaises(BusinessError) as ctx:
-            cskh_services.record_call(task.pk, self.cs1, result="KHONG_CO", now=self.t0)
+            confirmation_services.record_call(task.pk, self.cs1, result="KHONG_CO", now=self.t0)
         self.assertEqual(ctx.exception.code, "INVALID_INPUT")
         resp = client_for(self.cs1).post(f"/api/cskh/queue/{note.pk}/calls/", {"result": "KHONG_CO"}, format="json")
         self.assertEqual(resp.status_code, 400)
 
     def test_qa_luong_thuan_confirmed_van_201(self):
-        order, note, task = self._create_order_with_cskh()
+        order, note, task = self._create_order_with_confirmation()
         resp = client_for(self.cs1).post(f"/api/cskh/queue/{note.pk}/calls/", {"result": "CONFIRMED"}, format="json")
         self.assertEqual(resp.status_code, 201, resp.content)
         note.refresh_from_db()

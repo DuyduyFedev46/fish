@@ -12,6 +12,8 @@ from apps.accounts.models import AuditLog
 from apps.ai.models.config import AiConfigVersion
 from apps.ai.models.policy import AiPolicyVersion
 from apps.ai.registry import get_registry
+from apps.ai import command_groups
+from apps.accounts import roles
 
 
 User = get_user_model()
@@ -23,10 +25,10 @@ class MyConfigApiTests(APITestCase):
         get_registry().build(force=True)
 
         # 4 nhóm người dùng theo phân quyền
-        cls.g_chu, _ = Group.objects.get_or_create(name="chu")
-        cls.g_quan_ly, _ = Group.objects.get_or_create(name="quan_ly")
-        cls.g_nv_kho, _ = Group.objects.get_or_create(name="nv_kho")
-        cls.g_nv_giao, _ = Group.objects.get_or_create(name="nv_giao")
+        cls.g_chu, _ = Group.objects.get_or_create(name=roles.OWNER)
+        cls.g_quan_ly, _ = Group.objects.get_or_create(name=roles.MANAGER)
+        cls.g_nv_kho, _ = Group.objects.get_or_create(name=roles.WAREHOUSE_STAFF)
+        cls.g_nv_giao, _ = Group.objects.get_or_create(name=roles.DELIVERY_STAFF)
 
         # Gán quyền mẫu
         p_close = Permission.objects.filter(codename="close_batch").first()
@@ -46,7 +48,7 @@ class MyConfigApiTests(APITestCase):
             if p:
                 cls.g_nv_kho.permissions.add(p)
 
-        cls.user_chu = User.objects.create_user(username="chu_user", password="x", first_name="Duy", last_name="Chủ")
+        cls.user_chu = User.objects.create_user(username="owner_user", password="x", first_name="Duy", last_name="Chủ")
         cls.user_chu.groups.add(cls.g_chu)
 
         cls.user_kho = User.objects.create_user(username="kho_user", password="x", first_name="Kho", last_name="1")
@@ -71,10 +73,10 @@ class MyConfigApiTests(APITestCase):
         self.assertEqual(data["write_levels_allowed"], ["OFF", "C"])
 
         groups = {g["group"]: g for g in data["groups"]}
-        self.assertIn("thu_mua", groups)
+        self.assertIn(command_groups.PURCHASING, groups)
 
         # Lệnh trong nhóm thu mua của nv_kho: có batch.list (đọc), submit_purchasereceipt nếu có
-        commands = {c["id"]: c for c in groups["thu_mua"]["commands"]}
+        commands = {c["id"]: c for c in groups[command_groups.PURCHASING]["commands"]}
         if "inventory.batch.list" in commands:
             cmd = commands["inventory.batch.list"]
             self.assertEqual(cmd["kind"], "read")
@@ -92,7 +94,7 @@ class MyConfigApiTests(APITestCase):
         # PUT đặt inventory.batch.list = OFF
         payload = {
             "base_version": 0,
-            "groups": {"thu_mua": {"read": "A", "write": "C"}},
+            "groups": {command_groups.PURCHASING: {"read": "A", "write": "C"}},
             "overrides": {"inventory.batch.list": "OFF"},
             "acknowledge_responsibility": True,
         }
@@ -234,7 +236,7 @@ class MyConfigApiTests(APITestCase):
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
 
         groups = {g["group"]: g for g in resp.json()["groups"]}
-        thu_mua_cmds = {c["id"]: c for c in groups["thu_mua"]["commands"]}
+        thu_mua_cmds = {c["id"]: c for c in groups[command_groups.PURCHASING]["commands"]}
         self.assertIn("inventory.batch.close", thu_mua_cmds)
 
         cmd = thu_mua_cmds["inventory.batch.close"]
@@ -274,7 +276,7 @@ class MyConfigApiTests(APITestCase):
     @override_settings(AI_ENABLED=True)
     def test_dw12_ac10_group_khong_hard_code_va_discipline_grep(self):
         """DW-12-AC10: Group cskh chỉ lệnh qua quyền; grep không có hardcoded group name."""
-        g_cskh, _ = Group.objects.get_or_create(name="cskh")
+        g_cskh, _ = Group.objects.get_or_create(name=roles.CUSTOMER_SERVICE)
         p_view_refund = Permission.objects.filter(codename="view_refund").first()
         if p_view_refund:
             g_cskh.permissions.add(p_view_refund)

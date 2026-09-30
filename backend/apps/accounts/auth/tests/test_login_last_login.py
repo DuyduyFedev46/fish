@@ -7,6 +7,7 @@ from rest_framework.authtoken.models import Token
 from rest_framework.test import APIClient
 
 from apps.common.tests.fixtures import make_user
+from apps.accounts import roles
 
 LOGIN = "/api/auth/token/"
 PW = "Ca-ve-2026"
@@ -18,7 +19,7 @@ def login(username, password):
 
 class LoginLastLoginTests(TestCase):
     def setUp(self):
-        self.kho = make_user("kho1", "nv_kho")
+        self.kho = make_user("kho1", roles.WAREHOUSE_STAFF)
         self.kho.set_password(PW)
         self.kho.save()
 

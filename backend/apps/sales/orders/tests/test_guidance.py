@@ -30,16 +30,17 @@ from apps.delivery.models import DeliveryNote
 from apps.sales.models import Customer, PaymentTransaction, Refund, SalesInvoice, SalesOrder
 from apps.sales.orders import services as order_services
 from apps.sales.orders.tests.test_s10_api import OrderApiBase, find_keys, SENSITIVE_KEYS
+from apps.accounts import roles
 
 
 class GuidanceOrderTest(OrderApiBase):
     def setUp(self):
         super().setUp()
-        self.chu = make_user("chu_guidance", "chu")
-        self.ql = make_user("ql_guidance", "quan_ly")
-        self.kho = make_user("kho_guidance", "nv_kho")
-        self.giao = make_user("giao_guidance", "nv_giao")
-        self.giao_khac = make_user("giao_khac_guidance", "nv_giao")
+        self.chu = make_user("chu_guidance", roles.OWNER)
+        self.ql = make_user("ql_guidance", roles.MANAGER)
+        self.kho = make_user("kho_guidance", roles.WAREHOUSE_STAFF)
+        self.giao = make_user("giao_guidance", roles.DELIVERY_STAFF)
+        self.giao_khac = make_user("giao_khac_guidance", roles.DELIVERY_STAFF)
 
         self.c_chu = client_for(self.chu)
         self.c_ql = client_for(self.ql)

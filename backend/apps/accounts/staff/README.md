@@ -19,4 +19,4 @@ Cho nghỉ / đặt lại mật khẩu xoá token (C8: mọi máy của người
 **BR-PQ-19** (S48): tạo tài khoản / đặt lại mật khẩu bật `must_change_password` (mật khẩu Chủ đặt là tạm).
 Đồng thời (QA Q1): trùng username lúc insert (`IntegrityError`) → 400 `BR-PQ-08`; `set_groups` và
 `deactivate` khoá MỘT lần theo pk tăng dần gồm người đích + mọi Chủ đang làm
-(`_lock_target_and_chus`) → hai Chủ cho nghỉ nhau cùng lúc không khoá chéo.
+(`_lock_target_and_owners`) → hai Chủ cho nghỉ nhau cùng lúc không khoá chéo.

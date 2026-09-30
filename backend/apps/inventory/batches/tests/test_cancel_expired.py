@@ -33,15 +33,16 @@ from apps.inventory.batches import services as batch_services
 from apps.inventory.models import Batch, StockLedgerEntry
 from apps.reports import services as report_services
 from apps.sales.orders.tests.test_s10_api import OrderApiBase
+from apps.accounts import roles
 
 
 class CancelExpiredBatchTest(OrderApiBase):
     def setUp(self):
         super().setUp()
-        self.chu = make_user("chu_cancel_exp", "chu")
-        self.ql = make_user("ql_cancel_exp", "quan_ly")
-        self.kho = make_user("kho_cancel_exp", "nv_kho")
-        self.giao = make_user("giao_cancel_exp", "nv_giao")
+        self.chu = make_user("chu_cancel_exp", roles.OWNER)
+        self.ql = make_user("ql_cancel_exp", roles.MANAGER)
+        self.kho = make_user("kho_cancel_exp", roles.WAREHOUSE_STAFF)
+        self.giao = make_user("giao_cancel_exp", roles.DELIVERY_STAFF)
 
         self.c_chu = client_for(self.chu)
         self.c_ql = client_for(self.ql)
@@ -224,10 +225,10 @@ class CancelExpiredBatchTest(OrderApiBase):
     # --- Test migration gán quyền --------------------------------------------
     def test_migration_permissions_group_chu_only(self):
         """Data migration gán cancel_expired_batch cho đúng Group chu; quan_ly, nv_kho, nv_giao không có."""
-        g_chu = Group.objects.get(name="chu")
-        g_ql = Group.objects.get(name="quan_ly")
-        g_kho = Group.objects.get(name="nv_kho")
-        g_giao = Group.objects.get(name="nv_giao")
+        g_chu = Group.objects.get(name=roles.OWNER)
+        g_ql = Group.objects.get(name=roles.MANAGER)
+        g_kho = Group.objects.get(name=roles.WAREHOUSE_STAFF)
+        g_giao = Group.objects.get(name=roles.DELIVERY_STAFF)
 
         perm_codename = "cancel_expired_batch"
         self.assertTrue(g_chu.permissions.filter(codename=perm_codename).exists())

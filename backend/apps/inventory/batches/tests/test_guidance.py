@@ -24,15 +24,16 @@ from apps.inventory.models import Batch, StockLedgerEntry
 from apps.inventory.batches import services as batch_services
 from apps.sales.orders import services as order_services
 from apps.sales.orders.tests.test_s10_api import OrderApiBase
+from apps.accounts import roles
 
 
 class GuidanceBatchTest(OrderApiBase):
     def setUp(self):
         super().setUp()
-        self.chu = make_user("chu_b_guidance", "chu")
-        self.ql = make_user("ql_b_guidance", "quan_ly")
-        self.kho = make_user("kho_b_guidance", "nv_kho")
-        self.giao = make_user("giao_b_guidance", "nv_giao")
+        self.chu = make_user("chu_b_guidance", roles.OWNER)
+        self.ql = make_user("ql_b_guidance", roles.MANAGER)
+        self.kho = make_user("kho_b_guidance", roles.WAREHOUSE_STAFF)
+        self.giao = make_user("giao_b_guidance", roles.DELIVERY_STAFF)
 
         self.c_chu = client_for(self.chu)
         self.c_ql = client_for(self.ql)

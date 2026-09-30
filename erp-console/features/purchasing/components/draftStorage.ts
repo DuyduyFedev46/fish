@@ -5,18 +5,18 @@
 //   nháp của người khác / đã đăng xuất / đã gửi thành công thì không bao giờ dùng lại key (form sinh key mới).
 // - Đăng xuất gọi clearAllDrafts() của `shared/lib/drafts.ts` (không import vào đây): xoá mọi khoá `cave_draft_nhap_lo*` ở cả sessionStorage và localStorage (khoá cũ dùng chung).
 
-import { NHAP_LO_DRAFT_PREFIX } from "@/shared/lib/drafts";
-import type { NhapLoLineInput } from "../types";
+import { RECEIVE_BATCHES_DRAFT_PREFIX } from "@/shared/lib/drafts";
+import type { ReceiveBatchesLineInput } from "../types";
 
 /** Khoá cũ (dùng chung mọi người, ở localStorage, có cả giá mua) — chỉ còn để dọn. */
-export const LEGACY_DRAFT_KEY = NHAP_LO_DRAFT_PREFIX;
+export const LEGACY_DRAFT_KEY = RECEIVE_BATCHES_DRAFT_PREFIX;
 
-export type NhapLoDraftLine = Omit<NhapLoLineInput, "rate">;
+export type ReceiveBatchesDraftLine = Omit<ReceiveBatchesLineInput, "rate">;
 
-export type NhapLoDraft = {
+export type ReceiveBatchesDraft = {
   supplierId: number | "";
   receivedDate: string;
-  lines: NhapLoDraftLine[];
+  lines: ReceiveBatchesDraftLine[];
   /** Key chống gửi trùng của lần nhập đang dở — chỉ của người sở hữu nháp. */
   idempotencyKey?: string;
 };
@@ -34,11 +34,11 @@ function storage(kind: "sessionStorage" | "localStorage"): Storage | null {
 }
 
 /** Chỉ giữ các trường an toàn; cố ý bỏ `rate` (kể cả khi dữ liệu cũ còn) và mọi trường lạ. */
-function sanitize(draft: unknown): NhapLoDraft | null {
+function sanitize(draft: unknown): ReceiveBatchesDraft | null {
   if (!draft || typeof draft !== "object") return null;
   const d = draft as Record<string, unknown>;
   if (!Array.isArray(d.lines)) return null;
-  const lines: NhapLoDraftLine[] = d.lines
+  const lines: ReceiveBatchesDraftLine[] = d.lines
     .filter((l): l is Record<string, unknown> => !!l && typeof l === "object")
     .map((l) => ({
       item_code: typeof l.item_code === "string" ? l.item_code : "",
@@ -53,7 +53,7 @@ function sanitize(draft: unknown): NhapLoDraft | null {
   };
 }
 
-export function saveDraft(userId: number, draft: NhapLoDraft): void {
+export function saveDraft(userId: number, draft: ReceiveBatchesDraft): void {
   const s = storage("sessionStorage");
   const safe = sanitize(draft);
   if (!s || !safe) return;
@@ -64,7 +64,7 @@ export function saveDraft(userId: number, draft: NhapLoDraft): void {
   }
 }
 
-export function loadDraft(userId: number): NhapLoDraft | null {
+export function loadDraft(userId: number): ReceiveBatchesDraft | null {
   const raw = storage("sessionStorage")?.getItem(draftKey(userId));
   if (!raw) return null;
   try {

@@ -61,12 +61,12 @@ class StaffViewSet(AiDeclarable, viewsets.GenericViewSet):
         user = User.objects.select_related("staff_profile").prefetch_related("groups").get(
             pk=user.pk
         )  # đọc lại sau khi service đổi nhóm/hồ sơ
-        return staff_item(user, actor=self.request.user, active_chus=services.active_chu_ids())
+        return staff_item(user, actor=self.request.user, owner_ids=services.active_owner_ids())
 
     def list(self, request):
-        active_chus = services.active_chu_ids()
+        owner_ids = services.active_owner_ids()
         return Response(
-            [staff_item(u, actor=request.user, active_chus=active_chus)
+            [staff_item(u, actor=request.user, owner_ids=owner_ids)
              for u in self.get_queryset()]
         )
 

@@ -14,6 +14,7 @@ from apps.inventory.models import Batch, Warehouse
 from apps.purchasing.models.suppliers import Supplier
 from apps.sales.models import Customer, PaymentTransaction, SalesInvoice, SalesOrder, SalesOrderLine, SalesOrderLineBatch
 from apps.sales.payments.auto_confirm import process_exact_payment_matches
+from apps.accounts import roles
 
 
 @override_settings(
@@ -25,8 +26,8 @@ from apps.sales.payments.auto_confirm import process_exact_payment_matches
 class AutoConfirmExactMatchTests(TestCase):
     def setUp(self):
         # 1. Tạo Group
-        self.chu_group, _ = Group.objects.get_or_create(name="chu")
-        self.quan_ly_group, _ = Group.objects.get_or_create(name="quan_ly")
+        self.chu_group, _ = Group.objects.get_or_create(name=roles.OWNER)
+        self.quan_ly_group, _ = Group.objects.get_or_create(name=roles.MANAGER)
 
         for perm in Permission.objects.filter(
             codename__in=["confirm_payment_manual", "manage_ai_policy", "view_salesorder"]
@@ -37,10 +38,10 @@ class AutoConfirmExactMatchTests(TestCase):
             self.quan_ly_group.permissions.add(perm)
 
         # 2. Users
-        self.chu_user = User.objects.create_user(
+        self.owner_user = User.objects.create_user(
             username="chu_vua_dw26", password="password", first_name="Duy", last_name="Chủ"
         )
-        self.chu_user.groups.add(self.chu_group)
+        self.owner_user.groups.add(self.chu_group)
 
         self.quan_ly = User.objects.create_user(
             username="quan_ly_dw26", password="password", first_name="Linh", last_name="QL"
@@ -52,7 +53,7 @@ class AutoConfirmExactMatchTests(TestCase):
             version=1,
             global_mode="on",
             red_zone_open={"system.auto_confirm_exact_match": True},
-            created_by=self.chu_user,
+            created_by=self.owner_user,
         )
 
         # 4. Master data & Batch
@@ -160,7 +161,7 @@ class AutoConfirmExactMatchTests(TestCase):
         ).first()
         self.assertIsNotNone(action)
         self.assertEqual(action.status, AiAction.Status.ESCALATED)
-        self.assertEqual(action.assignee_group, "chu")
+        self.assertEqual(action.assignee_group, roles.OWNER)
         self.assertIn("Thiếu tiền", action.downgrade_reason.get("text", ""))
 
     def test_p8_lo8_sr25_ac1_underpaid_reason_tien_vnd_dau_cham(self):
@@ -308,7 +309,7 @@ class AutoConfirmExactMatchTests(TestCase):
             order=self.order,
             bank_txn_id="TXN-DW26-MANUAL-01",
             amount=Decimal("500000"),
-            actor=self.chu_user,
+            actor=self.owner_user,
         )
         self.assertFalse(dup)
         self.assertEqual(payment.match_status, PaymentTransaction.MatchStatus.MATCHED)

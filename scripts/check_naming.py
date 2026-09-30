@@ -85,7 +85,7 @@ EXEMPT_STRING_FILES = (
     "backend/apps/ai/registry/legacy_ids.py",
     "erp-console/features/ai/legacyIds.ts",
     "backend/apps/accounts/roles.py",
-    "backend/apps/ai/registry/command_groups.py",
+    "backend/apps/ai/command_groups.py",
     "erp-console/shared/lib/roles.ts",
     "erp-console/features/ai/commandGroups.ts",
 )

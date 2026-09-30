@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { canView, GROUP, PERM, visibleNav, type Viewer } from "@/shared/lib/nav";
+import { canView, PERM, visibleNav, type Viewer } from "@/shared/lib/nav";
+import { ROLE } from "@/shared/lib/roles";
 import { clearDraft, loadDraft, saveDraft } from "@/shared/lib/drafts";
 import {
   mockCreateCategory,
@@ -28,7 +29,7 @@ import {
 describe("CMS-01 & CMS-02 Console Tests", () => {
   it("CMS-01-AC6: NV kho không thấy mục Nội dung trong menu và không có quyền xem", () => {
     const nvKhoUser: Viewer = {
-      groups: [GROUP.nvKho],
+      groups: [ROLE.warehouseStaff],
       permissions: [PERM.viewDashboard, PERM.viewBatch, PERM.viewItem],
       can_view_profit: false,
       home: "dashboard",
@@ -43,7 +44,7 @@ describe("CMS-01 & CMS-02 Console Tests", () => {
 
   it("CMS-01-AC7: Quản lý thấy mục Nội dung trong menu và có quyền xem", () => {
     const quanLyUser: Viewer = {
-      groups: [GROUP.quanLy],
+      groups: [ROLE.manager],
       permissions: [
         PERM.viewDashboard,
         PERM.viewSalesOrder,

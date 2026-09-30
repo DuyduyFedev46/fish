@@ -2,26 +2,26 @@
 // màn "Quyền của tôi" (S47). Nhãn của CHÍNH người đăng nhập lấy `me.group_labels` do BE trả (L6); bảng này
 // chép đúng nhãn BE (`GROUP_LABELS`) để dịch mã nhóm trong danh sách nhân viên (BE /api/staff/ chỉ trả mã).
 
-import { GROUP } from "./nav";
+import { ROLE } from "./roles";
 
 /** Thứ tự cố định như BE `sorted_groups`: chu, quan_ly, nv_kho, nv_giao. */
-export const GROUP_CODES = [GROUP.chu, GROUP.quanLy, GROUP.nvKho, GROUP.nvGiao, GROUP.cskh] as const;
+export const GROUP_CODES = [ROLE.owner, ROLE.manager, ROLE.warehouseStaff, ROLE.deliveryStaff, ROLE.customerService] as const;
 
 export const GROUP_LABEL: Record<string, string> = {
-  [GROUP.chu]: "Chủ",
-  [GROUP.quanLy]: "Quản lý",
-  [GROUP.nvKho]: "Nhân viên kho",
-  [GROUP.nvGiao]: "Nhân viên giao",
-  [GROUP.cskh]: "CSKH",
+  [ROLE.owner]: "Chủ",
+  [ROLE.manager]: "Quản lý",
+  [ROLE.warehouseStaff]: "Nhân viên kho",
+  [ROLE.deliveryStaff]: "Nhân viên giao",
+  [ROLE.customerService]: "CSKH",
 };
 
 /** Một dòng mô tả việc chính của nhóm — chỉ để Chủ chọn nhóm cho đúng, không phải luật (luật ở BE). */
 export const GROUP_HINT: Record<string, string> = {
-  [GROUP.chu]: "Toàn quyền: tiền, giá vốn, lãi lỗ, nhân viên",
-  [GROUP.quanLy]: "Duyệt vận hành: mở bán lô, huỷ đơn, tạo phiếu hoàn, kiểm kê",
-  [GROUP.nvKho]: "Nhập lô, soạn hàng, kiểm kê",
-  [GROUP.nvGiao]: "Nhận và giao phiếu được gán",
-  [GROUP.cskh]: "Gọi xác nhận đơn, đổi thông tin nhận",
+  [ROLE.owner]: "Toàn quyền: tiền, giá vốn, lãi lỗ, nhân viên",
+  [ROLE.manager]: "Duyệt vận hành: mở bán lô, huỷ đơn, tạo phiếu hoàn, kiểm kê",
+  [ROLE.warehouseStaff]: "Nhập lô, soạn hàng, kiểm kê",
+  [ROLE.deliveryStaff]: "Nhận và giao phiếu được gán",
+  [ROLE.customerService]: "Gọi xác nhận đơn, đổi thông tin nhận",
 };
 
 export function groupLabel(code: string): string {

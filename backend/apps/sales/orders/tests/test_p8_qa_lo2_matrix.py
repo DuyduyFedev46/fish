@@ -11,6 +11,7 @@ from apps.common.tests.fixtures import client_for, make_user
 from apps.delivery.models import DeliveryNote
 
 from .test_p8_scope import OrderScopeBase
+from apps.accounts import roles
 
 PII = ("Khách Giả A", "0900000201", "0900000202", "Số 1 Đường Giả")
 
@@ -22,8 +23,8 @@ class GuidanceMatrix(OrderScopeBase):
         note.save(update_fields=["assigned_to"])
         expect = {
             # (user, in_order, out_order)
-            "chu": (200, 200), "ql": (200, 200), "kho": (200, 200),
-            "giao": (200, 404), "giao2": (404, 404), "cskh": (200, 404), "direct": (404, 404),
+            roles.OWNER: (200, 200), "ql": (200, 200), "kho": (200, 200),
+            "giao": (200, 404), "giao2": (404, 404), roles.CUSTOMER_SERVICE: (200, 404), "direct": (404, 404),
         }
         for name, (want_in, want_out) in expect.items():
             user = getattr(self, name)
@@ -139,17 +140,17 @@ class Sr05Matrix(OrderScopeBase):
         from apps.inventory.models import Batch
         b = Batch.objects.first()
         results, leaks = {}, {}
-        for name in ("chu", "ql", "kho", "giao", "cskh", "direct"):
+        for name in (roles.OWNER, "ql", "kho", "giao", roles.CUSTOMER_SERVICE, "direct"):
             r = self._call(getattr(self, name), "inventory.batch.retrieve", {"args": {}, "target_id": str(b.pk)})
             results[name] = r.status_code
             self.assertLess(r.status_code, 500, f"{name}")
             if r.status_code == 200:
                 raw = r.content.decode()
                 leaks[name] = [k for k in ("purchase_rate", "landed_unit_cost", "110000") if k in raw]
-        self.assertEqual(results["chu"], 200)
+        self.assertEqual(results[roles.OWNER], 200)
         print("QA-LO2 batch.retrieve theo Group:", results, "rò-giá-vốn:", leaks)
         for name, found in leaks.items():
-            if name != "chu":
+            if name != roles.OWNER:
                 self.assertEqual(found, [], f"{name} thấy giá vốn qua AI batch.retrieve: {found}")
         r = client_for(None).post("/api/ai/commands/inventory.batch.retrieve/call/",
                                   {"args": {}, "target_id": str(b.pk)}, format="json")
@@ -169,7 +170,7 @@ class Sr05Matrix(OrderScopeBase):
     def test_batch_pnl_va_guidance_qua_ai_khong_500(self):
         from apps.inventory.models import Batch
         b = Batch.objects.first()
-        for name in ("chu", "ql", "kho", "giao", "cskh"):
+        for name in (roles.OWNER, "ql", "kho", "giao", roles.CUSTOMER_SERVICE):
             for cmd, tid in (("reports.batch_pnl", str(b.pk)), ("reports.batch_pnl", b.batch_id),
                              ("common.guidance", self.in_order.code)):
                 r = self._call(getattr(self, name), cmd, {"args": {}, "target_id": tid})

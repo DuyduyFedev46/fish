@@ -13,6 +13,7 @@ from apps.accounts.models import StaffProfile
 from apps.accounts.staff.tests.helpers import staff_user
 
 from .test_s48_must_change_password import CHANGE, TEMP, S48Base
+from apps.accounts import roles
 
 SAME_MSG = "Mật khẩu mới phải khác mật khẩu hiện tại."
 
@@ -34,7 +35,7 @@ class B4SamePasswordTests(S48Base):
 
 class B3AdminTests(TestCase):
     def setUp(self):
-        self.kho1 = staff_user("kho1", "nv_kho")
+        self.kho1 = staff_user("kho1", roles.WAREHOUSE_STAFF)
         self.kho1.is_staff = True
         self.kho1.save()
 

@@ -16,31 +16,32 @@ from django.utils import timezone
 from apps.accounts.models import AuditLog
 from apps.common.exceptions import ConflictError
 from apps.common.tests.fixtures import client_for, make_user
-from apps.delivery.cskh import services as cskh_services
+from apps.delivery.confirmation import services as confirmation_services
 from apps.delivery.models import ConfirmationTask, CustomerCall, DeliveryNote
-from apps.delivery.tests.test_cskh_l3 import CskhL3BaseTestCase
+from apps.delivery.tests.test_cskh_l3 import ConfirmationL3BaseTestCase
 from apps.sales.models import SalesOrder
+from apps.accounts import roles
 
 STALE_TEXT = "Đơn đã bị huỷ — tải lại màn hình."
 PII_SENTINELS = ("0900000123", "Khách Thử A", "Số 1 Đường Thử")
 
 
 @override_settings(CSKH_AUTO_CANCEL_ENABLED=True)
-class SR09RecordCallStaleTests(CskhL3BaseTestCase):
+class SR09RecordCallStaleTests(ConfirmationL3BaseTestCase):
     def setUp(self):
         super().setUp()
         self.t0 = timezone.now().replace(hour=9, minute=25, second=0, microsecond=0)
-        self.giao = make_user("giao_sr09", "nv_giao")
+        self.giao = make_user("giao_sr09", roles.DELIVERY_STAFF)
 
     def _auto_cancelled(self):
         """Đơn bị `auto_cancel_overdue`: đơn/phiếu CANCELLED, task REFUND_CALL."""
-        order, note, task = self._create_order_with_cskh()
-        cskh_services.record_call(task.pk, self.cs1, result="UNREACHABLE", now=self.t0)
+        order, note, task = self._create_order_with_confirmation()
+        confirmation_services.record_call(task.pk, self.cs1, result="UNREACHABLE", now=self.t0)
         task.state = ConfirmationTask.State.ESCALATED
         task.escalation_reason = ConfirmationTask.EscalationReason.UNREACHABLE
         task.escalated_at = self.t0
         task.save()
-        res = cskh_services.auto_cancel_overdue(now=self.t0 + timedelta(minutes=31))
+        res = confirmation_services.auto_cancel_overdue(now=self.t0 + timedelta(minutes=31))
         self.assertEqual(res["cancelled"], 1)
         order.refresh_from_db(); note.refresh_from_db(); task.refresh_from_db()
         self.assertEqual(order.status, SalesOrder.Status.CANCELLED)
@@ -64,7 +65,7 @@ class SR09RecordCallStaleTests(CskhL3BaseTestCase):
         audits = AuditLog.objects.filter(action="delivery_confirmed").count()
 
         with self.assertRaises(ConflictError) as ctx:
-            cskh_services.record_call(
+            confirmation_services.record_call(
                 task.pk, self.cs1, result="CONFIRMED", now=self.t0 + timedelta(minutes=32),
             )
         self.assertEqual(ctx.exception.code, "STALE_STATE")
@@ -82,7 +83,7 @@ class SR09RecordCallStaleTests(CskhL3BaseTestCase):
         for result in ("CONFIRMED", "CONFIRMED_CHANGED", "CALLBACK", "WRONG_NUMBER", "WANT_CANCEL", "WANT_CHANGE"):
             with self.subTest(result=result):
                 with self.assertRaises(ConflictError) as ctx:
-                    cskh_services.record_call(
+                    confirmation_services.record_call(
                         task.pk, self.cs1, result=result, now=now,
                         callback_at=now + td(hours=1) if result == "CALLBACK" else None,
                     )
@@ -92,10 +93,10 @@ class SR09RecordCallStaleTests(CskhL3BaseTestCase):
 
     def test_sr09_ac2_unreachable_va_notified_van_nhan(self):
         order, note, task = self._auto_cancelled()
-        cskh_services.record_call(task.pk, self.cs1, result="UNREACHABLE", now=self.t0 + timedelta(minutes=32))
+        confirmation_services.record_call(task.pk, self.cs1, result="UNREACHABLE", now=self.t0 + timedelta(minutes=32))
         task.refresh_from_db()
         self.assertEqual(task.state, ConfirmationTask.State.REFUND_CALL)
-        cskh_services.record_call(task.pk, self.cs1, result="NOTIFIED", now=self.t0 + timedelta(minutes=33))
+        confirmation_services.record_call(task.pk, self.cs1, result="NOTIFIED", now=self.t0 + timedelta(minutes=33))
         task.refresh_from_db()
         self.assertEqual(task.state, ConfirmationTask.State.DONE)
 
@@ -103,17 +104,17 @@ class SR09RecordCallStaleTests(CskhL3BaseTestCase):
         from apps.common.exceptions import BusinessError
         order, note, task = self._auto_cancelled()
         with self.assertRaises(BusinessError) as ctx:
-            cskh_services.record_call(task.pk, self.cs1, result="KHONG_CO", now=self.t0 + timedelta(minutes=32))
+            confirmation_services.record_call(task.pk, self.cs1, result="KHONG_CO", now=self.t0 + timedelta(minutes=32))
         self.assertEqual(ctx.exception.code, "INVALID_INPUT")
 
     def test_sr09_phieu_cancelled_task_khong_phai_refund_call_cung_409(self):
         """Phiếu đã huỷ (vd Chủ huỷ tay) mà task còn mở, không phải REFUND_CALL -> 409 STALE_STATE."""
-        order, note, task = self._create_order_with_cskh()
+        order, note, task = self._create_order_with_confirmation()
         DeliveryNote.objects.filter(pk=note.pk).update(status=DeliveryNote.Status.CANCELLED)
         for result in ("CONFIRMED", "UNREACHABLE", "NOTIFIED"):
             with self.subTest(result=result):
                 with self.assertRaises(ConflictError) as ctx:
-                    cskh_services.record_call(task.pk, self.cs1, result=result, now=self.t0)
+                    confirmation_services.record_call(task.pk, self.cs1, result=result, now=self.t0)
                 self.assertEqual(ctx.exception.code, "STALE_STATE")
                 self.assertEqual(str(ctx.exception), STALE_TEXT)
         note.refresh_from_db(); task.refresh_from_db()
@@ -122,15 +123,15 @@ class SR09RecordCallStaleTests(CskhL3BaseTestCase):
 
     # --- AC3 -----------------------------------------------------------------
     def test_sr09_ac3a_cskh_xac_nhan_truoc_job_chay_sau_thi_job_bo_qua(self):
-        order, note, task = self._create_order_with_cskh()
-        cskh_services.record_call(task.pk, self.cs1, result="UNREACHABLE", now=self.t0)
+        order, note, task = self._create_order_with_confirmation()
+        confirmation_services.record_call(task.pk, self.cs1, result="UNREACHABLE", now=self.t0)
         task.state = ConfirmationTask.State.ESCALATED
         task.escalation_reason = ConfirmationTask.EscalationReason.UNREACHABLE
         task.escalated_at = self.t0
         task.save()
-        cskh_services.record_call(task.pk, self.cs1, result="CONFIRMED", now=self.t0 + timedelta(minutes=10))
+        confirmation_services.record_call(task.pk, self.cs1, result="CONFIRMED", now=self.t0 + timedelta(minutes=10))
 
-        res = cskh_services.auto_cancel_overdue(now=self.t0 + timedelta(minutes=31))
+        res = confirmation_services.auto_cancel_overdue(now=self.t0 + timedelta(minutes=31))
         self.assertEqual(res["cancelled"], 0)
         order.refresh_from_db(); note.refresh_from_db(); task.refresh_from_db()
         self.assertNotEqual(order.status, SalesOrder.Status.CANCELLED)
@@ -142,7 +143,7 @@ class SR09RecordCallStaleTests(CskhL3BaseTestCase):
         calls = CustomerCall.objects.filter(note=note).count()
         audits = AuditLog.objects.filter(action="delivery_confirmed").count()
         with self.assertRaises(ConflictError):
-            cskh_services.record_call(
+            confirmation_services.record_call(
                 task.pk, self.cs1, result="CONFIRMED_CHANGED", now=self.t0 + timedelta(minutes=40),
             )
         self._assert_unchanged(order, note, task, calls, audits)

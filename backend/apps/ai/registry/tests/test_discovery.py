@@ -15,6 +15,7 @@ from apps.ai.policy.rules import (
     RED_ZONE_PERMS,
 )
 from apps.ai.registry.discovery import get_registry
+from apps.ai import command_groups
 
 
 class CommandDiscoveryTestCase(TestCase):
@@ -38,7 +39,7 @@ class CommandDiscoveryTestCase(TestCase):
         for s in self.specs:
             parts = s.id.split(".")
             self.assertIn(len(parts), (2, 3), f"ID lệnh không đúng format: {s.id}")
-            self.assertIn(s.group, ("thu_mua", "ban_hang", "cskh"), f"Group không hợp lệ: {s.group} của {s.id}")
+            self.assertIn(s.group, (command_groups.PURCHASING, command_groups.SALES, command_groups.CUSTOMER_SERVICE), f"Group không hợp lệ: {s.group} của {s.id}")
             self.assertIn(s.kind, ("read", "write"))
 
     def test_dw07_ac3_hard_blocklist(self):

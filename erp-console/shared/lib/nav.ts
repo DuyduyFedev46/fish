@@ -3,12 +3,14 @@
 // <ViewGuard view="..."> (features/auth) để chặn hiển thị + chặn gọi API khi thiếu quyền (S7-AC3).
 // Module mới chỉ thay nội dung trang, không sửa bảng này trừ khi đổi luật.
 
+import { HOME_CONFIRMATION_QUEUE, ROLE } from "./roles";
+
 /** Phần của `me` mà menu cần. Khai ở đây để shared/ không phụ thuộc features/auth; `Me` khớp kiểu này. */
 export type Viewer = {
   groups: string[];
   permissions: string[];
   can_view_profit: boolean;
-  home: "dashboard" | "my-deliveries" | "cskh-queue" | "no-role";
+  home: "dashboard" | "my-deliveries" | typeof HOME_CONFIRMATION_QUEUE | "no-role";
   /** S48: còn dùng mật khẩu tạm → chỉ được mở màn "Đặt mật khẩu mới". */
   must_change_password?: boolean;
 };
@@ -28,7 +30,7 @@ export type ViewKey =
   | "catalog"
   | "staff"
   | "audit-logs"
-  | "cskh"
+  | "confirmation"
   | "ai-actions"
   | "ai-settings"
   | "ai-policy"
@@ -99,13 +101,10 @@ export const PERM = {
   viewPrivacyConsent: "sales.view_privacy_consent",
 } as const;
 
-/** Mã Group dùng trong luật menu (danh sách đầy đủ + nhãn: shared/lib/groups.ts). */
-export const GROUP = { chu: "chu", quanLy: "quan_ly", nvKho: "nv_kho", nvGiao: "nv_giao", cskh: "cskh" } as const;
-
 const has = (me: Me, perm: string) => me.permissions.includes(perm);
 const inGroup = (me: Me, ...groups: string[]) => me.groups.some((g) => groups.includes(g));
 /** Chỉ thuộc nv_giao (không kèm Group nào khác). */
-export const onlyDelivery = (me: Me) => me.groups.length > 0 && me.groups.every((g) => g === GROUP.nvGiao);
+export const onlyDelivery = (me: Me) => me.groups.length > 0 && me.groups.every((g) => g === ROLE.deliveryStaff);
 
 export const NAV: NavItem[] = [
   {
@@ -162,7 +161,7 @@ export const NAV: NavItem[] = [
     visible: (me) => has(me, PERM.viewRefund) && !onlyDelivery(me),
   },
   {
-    key: "cskh",
+    key: "confirmation",
     summary: "Hàng chờ gọi xác nhận đơn, hẹn gọi lại và xử lý đơn.",
     plannedIn: "CS-05",
     href: "/cskh/",
@@ -192,7 +191,7 @@ export const NAV: NavItem[] = [
     short: "Việc giao",
     icon: "two_wheeler",
     section: "Điều hành",
-    visible: (me) => inGroup(me, GROUP.nvGiao),
+    visible: (me) => inGroup(me, ROLE.deliveryStaff),
   },
   {
     key: "inventory",
@@ -388,7 +387,7 @@ export function homePath(me: Me): string {
   if (me.must_change_password) return SET_PASSWORD_HREF;
   if (me.home === "no-role") return "/no-role/";
   if (me.home === "my-deliveries") return "/my-deliveries/";
-  if (me.home === "cskh-queue") return "/cskh/";
+  if (me.home === HOME_CONFIRMATION_QUEUE) return "/cskh/";
   const first = visibleNav(me)[0];
   return canView(me, "overview") ? "/overview/" : first ? first.href : "/no-role/";
 }

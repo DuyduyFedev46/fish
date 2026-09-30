@@ -11,6 +11,7 @@ from apps.inventory.models import Batch, Warehouse
 from apps.inventory.stock import services as stock_services
 from apps.purchasing.costs import services as cost_services
 from apps.purchasing.models import PurchaseCost, PurchaseCostAllocation, Supplier
+from apps.accounts import roles
 
 
 class RecordPurchaseCostTests(TestCase):
@@ -19,7 +20,7 @@ class RecordPurchaseCostTests(TestCase):
         self.item = Item.objects.create(code="CA01", name="Cá thu", item_group=self.g)
         self.sup = Supplier.objects.create(name="Đầu mối A")
         self.wh = Warehouse.objects.create(name="Kho chính")
-        self.user = User.objects.create(username="chu")
+        self.user = User.objects.create(username=roles.OWNER)
         self.today = datetime.date(2026, 9, 1)
 
     def _batch(self, qty, rate):

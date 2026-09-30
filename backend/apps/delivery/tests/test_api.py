@@ -11,6 +11,7 @@ from rest_framework.test import APIClient
 
 from apps.common.tests.fixtures import make_order_with_note
 from apps.delivery.models import DeliveryNote
+from apps.accounts import roles
 
 
 class SetStatusHttpTests(TestCase):
@@ -18,9 +19,9 @@ class SetStatusHttpTests(TestCase):
 
     def setUp(self):
         self.nv_giao = User.objects.create_user("giao1", password="x")
-        self.nv_giao.groups.add(Group.objects.get(name="nv_giao"))
+        self.nv_giao.groups.add(Group.objects.get(name=roles.DELIVERY_STAFF))
         self.nv_giao2 = User.objects.create_user("giao2", password="x")
-        self.nv_giao2.groups.add(Group.objects.get(name="nv_giao"))
+        self.nv_giao2.groups.add(Group.objects.get(name=roles.DELIVERY_STAFF))
         self.client = APIClient()
         self.client.force_authenticate(self.nv_giao)
 
@@ -34,7 +35,7 @@ class SetStatusHttpTests(TestCase):
         """PREPARING -> READY (nhánh advance_status) — body đầy đủ, không lỗi."""
         # CS-03-AC6: NV giao không soạn hàng, cần delivery.pack_deliverynote -> dùng user nv_kho
         nv_kho = User.objects.create_user("kho1", password="x")
-        nv_kho.groups.add(Group.objects.get(name="nv_kho"))
+        nv_kho.groups.add(Group.objects.get(name=roles.WAREHOUSE_STAFF))
         client = APIClient()
         client.force_authenticate(nv_kho)
 

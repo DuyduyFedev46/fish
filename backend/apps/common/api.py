@@ -24,6 +24,7 @@ from rest_framework.response import Response
 from rest_framework.views import exception_handler as drf_exception_handler
 
 from .exceptions import BusinessError
+from apps.accounts import roles
 from apps.ai.declare import AiDeclarable
 
 VIEW_COSTPRICE_PERM = "inventory.view_costprice"
@@ -108,7 +109,7 @@ class CostFieldSerializerMixin:
 
 # Nhóm thấy mọi đơn / khách / phiếu giao. Ai chỉ thuộc nv_giao bị giới hạn theo phiếu
 # giao gán cho mình (Tầng 3 dòng, spec §1.6). Kiêm nhiệm = hợp quyền (BR-PQ-09).
-FULL_SCOPE_GROUPS = frozenset({"chu", "quan_ly", "nv_kho"})
+FULL_SCOPE_GROUPS = frozenset({roles.OWNER, roles.MANAGER, roles.WAREHOUSE_STAFF})
 
 
 def has_full_delivery_scope(user) -> bool:

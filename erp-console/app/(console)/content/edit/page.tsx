@@ -7,6 +7,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/features/auth/components/AuthProvider";
 import { ViewGuard } from "@/features/auth/components/ViewGuard";
 import { dateTimeFull, timeHM } from "@/shared/lib/format";
+import { ROLE } from "@/shared/lib/roles";
 import {
   createEntry,
   deleteEntry,
@@ -86,8 +87,8 @@ function ContentEditScreen() {
   const { me } = useAuth();
   const canPublish = Boolean(
     me?.permissions?.includes(PERM.publishContentEntry) ||
-    me?.groups?.includes("chu") ||
-    me?.groups?.includes("quan_ly")
+    me?.groups?.includes(ROLE.owner) ||
+    me?.groups?.includes(ROLE.manager)
   );
 
   const [entryId, setEntryId] = useState<number | null>(

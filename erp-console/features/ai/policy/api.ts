@@ -1,4 +1,5 @@
 import { apiFetch, type MockRequest } from "@/shared/lib/http";
+import { ROLE } from "@/shared/lib/roles";
 import { AiPolicy, MyConfig, PolicyCaps } from "../types";
 
 export interface UpdateAiPolicyPayload {
@@ -57,7 +58,7 @@ const mockAiPolicy: AiPolicy = {
     {
       user_id: 1,
       display_name: "Lộc (Chủ vựa)",
-      groups: ["chu"],
+      groups: [ROLE.owner],
       killed: false,
       config_version: 3,
       counts: { A: 12, B: 0, C: 20, OFF: 2 },
@@ -65,7 +66,7 @@ const mockAiPolicy: AiPolicy = {
     {
       user_id: 2,
       display_name: "Kho 1",
-      groups: ["nv_kho"],
+      groups: [ROLE.warehouseStaff],
       killed: false,
       config_version: 1,
       counts: { A: 8, B: 0, C: 5, OFF: 0 },

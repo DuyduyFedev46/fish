@@ -9,6 +9,7 @@ from django.urls import get_resolver
 from django.urls.resolvers import URLPattern, URLResolver
 from rest_framework.parsers import JSONParser
 
+from apps.ai import command_groups
 from apps.ai.policy.rules import (
     COST_KEYS,
     FORBIDDEN_METHODS,
@@ -53,17 +54,17 @@ def _get_group(app_name: str, model_str: str, view_cls: type, action_name: str, 
 
     # CSKH: refunds, returns, guidance
     if "refund" in mod or "refund" in cls_name or "return" in mod or "return" in cls_name or "guidance" in mod:
-        return "".join(["cs", "kh"])
+        return command_groups.CUSTOMER_SERVICE
 
     # Thu mua: purchasing, inventory (trừ returns), batch_pnl
     if "purchasing" in mod or "inventory" in mod or "batchpnl" in cls_name:
-        return "thu_mua"
+        return command_groups.PURCHASING
 
     # Bán hàng: catalog, sales (orders, payments, invoices), delivery, dashboard, period_pnl
     if "catalog" in mod or "sales" in mod or "delivery" in mod or "dashboard" in cls_name or "periodpnl" in cls_name:
-        return "ban_hang"
+        return command_groups.SALES
 
-    return "ban_hang"
+    return command_groups.SALES
 
 
 def _get_screens(full_path: str, ai_meta) -> tuple:
@@ -263,7 +264,7 @@ class CommandRegistry:
                         target="detail" if is_detail else None,
                         view_cls=cls,
                         required_perms=required_perms,
-                        sensitivity=getattr(ai_meta, "sensitivity", "") or "cao",
+                        sensitivity=getattr(ai_meta, "sensitivity", "") or command_groups.SENSITIVITY_HIGH,
                         channel=getattr(ai_meta, "channel", "") or "local",
                         max_level=max_level_val,
                         undo=undo_val,
@@ -330,7 +331,7 @@ class CommandRegistry:
                             target="detail" if is_detail else None,
                             view_cls=cls,
                             required_perms=required_perms,
-                            sensitivity=getattr(ai_meta, "sensitivity", "") or "cao",
+                            sensitivity=getattr(ai_meta, "sensitivity", "") or command_groups.SENSITIVITY_HIGH,
                             channel=getattr(ai_meta, "channel", "") or "local",
                             max_level=getattr(ai_meta, "max_level", "") or ("A" if kind == "read" else "C"),
                             undo=getattr(ai_meta, "undo", "") or "",

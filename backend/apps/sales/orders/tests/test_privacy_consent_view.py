@@ -24,6 +24,7 @@ from apps.inventory.models import Warehouse
 from apps.purchasing.models import Supplier
 from apps.sales.models import Customer, SalesInvoice, SalesInvoiceLine, SalesOrder, SalesOrderLine
 from apps.sales.orders import services as order_services
+from apps.accounts import roles
 
 
 def find_key(data, target_key):
@@ -59,7 +60,7 @@ class PrivacyConsentViewTests(TestCase):
         self.customer = Customer.objects.create(name="Khách Thử Nghiệm", phone="0912345678")
 
         # Tạo trang chính sách và đăng bằng publish_entry
-        author = make_user("editor_consent", "quan_ly")
+        author = make_user("editor_consent", roles.MANAGER)
         self.entry = Entry.objects.create(
             kind="page",
             title="Chính sách bảo mật",
@@ -100,10 +101,10 @@ class PrivacyConsentViewTests(TestCase):
         )
 
         # Tạo các users theo nhóm
-        self.u_chu = make_user("chu_view_consent", "chu")
-        self.u_quanly = make_user("quanly_view_consent", "quan_ly")
-        self.u_nvkho = make_user("nvkho_view_consent", "nv_kho")
-        self.u_nvgiao = make_user("nvgiao_view_consent", "nv_giao")
+        self.u_chu = make_user("chu_view_consent", roles.OWNER)
+        self.u_quanly = make_user("quanly_view_consent", roles.MANAGER)
+        self.u_nvkho = make_user("nvkho_view_consent", roles.WAREHOUSE_STAFF)
+        self.u_nvgiao = make_user("nvgiao_view_consent", roles.DELIVERY_STAFF)
 
         # Thanh toán đơn có consent để tự sinh invoice + delivery note, sau đó gán cho u_nvgiao
         from apps.sales.payments import services as payment_services
@@ -121,10 +122,10 @@ class PrivacyConsentViewTests(TestCase):
     def test_group_permissions_after_migration(self):
         """Kiểm tra quyền sales.view_privacy_consent được gán đúng cho chu, quan_ly; nv_kho, nv_giao không có."""
         perm = Permission.objects.get(content_type__app_label="sales", codename="view_privacy_consent")
-        g_chu = Group.objects.get(name="chu")
-        g_ql = Group.objects.get(name="quan_ly")
-        g_kho = Group.objects.get(name="nv_kho")
-        g_giao = Group.objects.get(name="nv_giao")
+        g_chu = Group.objects.get(name=roles.OWNER)
+        g_ql = Group.objects.get(name=roles.MANAGER)
+        g_kho = Group.objects.get(name=roles.WAREHOUSE_STAFF)
+        g_giao = Group.objects.get(name=roles.DELIVERY_STAFF)
 
         self.assertIn(perm, g_chu.permissions.all())
         self.assertIn(perm, g_ql.permissions.all())

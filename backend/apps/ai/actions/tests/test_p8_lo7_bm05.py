@@ -10,15 +10,16 @@ from django.utils import timezone
 
 from apps.ai.models import AiAction
 from apps.common.tests.fixtures import client_for, make_user
+from apps.accounts import roles
 
 
 @override_settings(AI_ENABLED=True)
 class Bm05ScopeTests(TestCase):
     def setUp(self):
-        self.chu = make_user("bm05_chu", "chu")
-        self.ql = make_user("bm05_ql", "quan_ly")
-        self.kho = make_user("bm05_kho", "nv_kho")
-        self.giao = make_user("bm05_giao", "nv_giao")
+        self.chu = make_user("bm05_chu", roles.OWNER)
+        self.ql = make_user("bm05_ql", roles.MANAGER)
+        self.kho = make_user("bm05_kho", roles.WAREHOUSE_STAFF)
+        self.giao = make_user("bm05_giao", roles.DELIVERY_STAFF)
         self.clients = {u.username: client_for(u) for u in (self.chu, self.ql, self.kho, self.giao)}
 
     def _action(self, *, owner, status=AiAction.Status.PENDING, assignee_group="", viewed=False):
@@ -67,14 +68,14 @@ class Bm05ScopeTests(TestCase):
     def test_bm05_escalated_cung_assignee_group_vao_duoc_bo_loc_khong_404(self):
         """Việc ESCALATED cho nhóm quan_ly: quan_ly qua được bộ lọc (không 404). Nghiệp vụ hiện tại chỉ cho
         quyết định việc PENDING nên trả 409 AI_ACTION_ALREADY_DECIDED, trạng thái không đổi (không thuộc BM-05)."""
-        act = self._action(owner=self.kho, status=AiAction.Status.ESCALATED, assignee_group="quan_ly")
+        act = self._action(owner=self.kho, status=AiAction.Status.ESCALATED, assignee_group=roles.MANAGER)
         res = self._post(self.ql, act, "reject")
         self.assertNotEqual(res.status_code, 404, res.content)
         act.refresh_from_db()
         self.assertEqual(act.status, AiAction.Status.ESCALATED)
 
     def test_bm05_escalated_khac_group_reject_404(self):
-        act = self._action(owner=self.kho, status=AiAction.Status.ESCALATED, assignee_group="quan_ly")
+        act = self._action(owner=self.kho, status=AiAction.Status.ESCALATED, assignee_group=roles.MANAGER)
         res = self._post(self.giao, act, "reject")
         self.assertEqual(res.status_code, 404, res.content)
         act.refresh_from_db()
@@ -82,7 +83,7 @@ class Bm05ScopeTests(TestCase):
 
     def test_bm05_assignee_group_chi_co_hieu_luc_khi_escalated(self):
         """PENDING có assignee_group trùng nhưng không phải ESCALATED, không phải chủ việc -> 404 (đúng như retrieve)."""
-        act = self._action(owner=self.kho, status=AiAction.Status.PENDING, assignee_group="nv_giao")
+        act = self._action(owner=self.kho, status=AiAction.Status.PENDING, assignee_group=roles.DELIVERY_STAFF)
         res = self._post(self.giao, act, "reject")
         self.assertEqual(res.status_code, 404, res.content)
 

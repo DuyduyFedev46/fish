@@ -13,6 +13,7 @@ from apps.content.entries.services import publish_entry
 from apps.content.models.categories import Category
 from apps.content.models.entries import Entry, EntryVersion
 from apps.content.models.images import ContentImage
+from apps.accounts import roles
 
 User = get_user_model()
 
@@ -24,9 +25,9 @@ class UnpublishAndDiscardTests(APITestCase):
         self.nv_giao = User.objects.create_user(username="nv_giao_user", password="password")
         self.user_nd01 = User.objects.create_user(username="user_nd01", password="password")
 
-        g_ql, _ = Group.objects.get_or_create(name="quan_ly")
-        g_kho, _ = Group.objects.get_or_create(name="nv_kho")
-        g_giao, _ = Group.objects.get_or_create(name="nv_giao")
+        g_ql, _ = Group.objects.get_or_create(name=roles.MANAGER)
+        g_kho, _ = Group.objects.get_or_create(name=roles.WAREHOUSE_STAFF)
+        g_giao, _ = Group.objects.get_or_create(name=roles.DELIVERY_STAFF)
         self.quan_ly.groups.add(g_ql)
         self.nv_kho.groups.add(g_kho)
         self.nv_giao.groups.add(g_giao)

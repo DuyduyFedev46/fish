@@ -11,6 +11,7 @@ from apps.common.tests.fixtures import client_for, make_user
 from apps.content.models.categories import Category
 from apps.content.models.entries import Entry
 from apps.content.models.images import ContentImage
+from apps.accounts import roles
 
 User = get_user_model()
 
@@ -24,8 +25,8 @@ def _doc(*image_ids):
 
 class Sr18Base(APITestCase):
     def setUp(self):
-        self.chu = make_user("sr18_chu", "chu")
-        self.ql = make_user("sr18_ql", "quan_ly")
+        self.chu = make_user("sr18_chu", roles.OWNER)
+        self.ql = make_user("sr18_ql", roles.MANAGER)
         self.category = Category.objects.create(
             name="Sr18 danh mục", name_key="sr18 danh muc", slug="sr18-danh-muc", is_active=True
         )
@@ -220,17 +221,17 @@ class Sr18GroupMatrixTests(Sr18Base):
     def setUp(self):
         super().setUp()
         self.users = {
-            "chu": self.chu,
-            "quan_ly": self.ql,
-            "nv_kho": make_user("sr18_kho", "nv_kho"),
-            "nv_giao": make_user("sr18_giao", "nv_giao"),
-            "cskh": make_user("sr18_cskh", "cskh"),
+            roles.OWNER: self.chu,
+            roles.MANAGER: self.ql,
+            roles.WAREHOUSE_STAFF: make_user("sr18_kho", roles.WAREHOUSE_STAFF),
+            roles.DELIVERY_STAFF: make_user("sr18_giao", roles.DELIVERY_STAFF),
+            roles.CUSTOMER_SERVICE: make_user("sr18_cskh", roles.CUSTOMER_SERVICE),
             "khach": None,
         }
 
     def test_sr18_matran_post_va_patch(self):
-        expect_ok = {"chu": (201, 200), "quan_ly": (201, 200)}
-        expect_deny = {"nv_kho": 403, "nv_giao": 403, "cskh": 403, "khach": 401}
+        expect_ok = {roles.OWNER: (201, 200), roles.MANAGER: (201, 200)}
+        expect_deny = {roles.WAREHOUSE_STAFF: 403, roles.DELIVERY_STAFF: 403, roles.CUSTOMER_SERVICE: 403, "khach": 401}
         for name, user in self.users.items():
             with self.subTest(group=name):
                 client = client_for(user)
@@ -256,6 +257,6 @@ class Sr18GroupMatrixTests(Sr18Base):
 
     def test_sr18_nhom_khong_quyen_gui_anh_bai_khac_van_403_khong_lo_ly_do(self):
         """nv_kho gửi ảnh bài A: 403 (không phải 400 BR-ND-07), không lộ tồn tại ảnh."""
-        r = self.post(self.new_payload(cover_image=self.img_a.pk), user=self.users["nv_kho"])
+        r = self.post(self.new_payload(cover_image=self.img_a.pk), user=self.users[roles.WAREHOUSE_STAFF])
         self.assertEqual(r.status_code, 403)
         self.assertNotIn("BR-ND-07", r.content.decode())

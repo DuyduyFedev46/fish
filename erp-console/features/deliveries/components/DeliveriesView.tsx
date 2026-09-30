@@ -22,11 +22,9 @@ export function DeliveriesView() {
     setLoading(true);
     setError(null);
 
-    const todayVN = todayInVietnam();
-
     const params =
       activeTab === "COMPLETED"
-        ? { status: "COMPLETED", completed_from: todayVN }
+        ? { status: "COMPLETED", completed_from: todayInVietnam() }
         : { status: activeTab };
 
     fetchDeliveryNotes(params)

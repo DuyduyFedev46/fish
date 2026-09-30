@@ -6,17 +6,18 @@ from django.conf import settings
 from django.db.models import Q
 from django.utils import timezone
 
+from apps.accounts import roles
 from apps.common.api import has_full_delivery_scope
 
 OPEN_CALL_STATES = ("PENDING", "CALLBACK", "ESCALATED")
 
 
-def is_cskh(user) -> bool:
+def is_customer_service(user) -> bool:
     """Kiểm tra user có thuộc Group cskh hay không."""
-    return bool(user and user.is_authenticated and user.groups.filter(name="cskh").exists())
+    return bool(user and user.is_authenticated and user.groups.filter(name=roles.CUSTOMER_SERVICE).exists())
 
 
-def cskh_note_q(user, *, now=None, prefix=""):
+def customer_service_note_q(user, *, now=None, prefix=""):
     """
     Q trên DeliveryNote: phiếu CSKH được thấy đủ tên/SĐT/địa chỉ (BR-GH-18).
     Bao gồm:
@@ -40,13 +41,13 @@ def cskh_note_q(user, *, now=None, prefix=""):
     )
 
 
-def note_in_cskh_scope(user, note, *, now=None) -> bool:
+def note_in_customer_service_scope(user, note, *, now=None) -> bool:
     """Kiểm tra một DeliveryNote cụ thể có nằm trong phạm vi CSKH của user hay không."""
     if not user or not user.is_authenticated:
         return False
     if has_full_delivery_scope(user):
         return True
-    if not is_cskh(user):
+    if not is_customer_service(user):
         return False
 
     if note.status == "CONFIRMING":

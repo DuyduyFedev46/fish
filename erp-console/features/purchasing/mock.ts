@@ -1,6 +1,6 @@
 import type { MockRequest } from "@/shared/lib/http";
 import { todayInVietnam } from "@/shared/lib/format";
-import type { NhapLoPayload, NhapLoResponse, Supplier } from "./types";
+import type { ReceiveBatchesPayload, ReceiveBatchesResponse, Supplier } from "./types";
 
 export const MOCK_SUPPLIERS: Supplier[] = [
   { id: 1, name: "Đầu mối Cảng cá Phan Thiết", phone: "0901234567", is_active: true },
@@ -16,10 +16,10 @@ export function mockListSuppliers(_req: MockRequest): { status: number; body: { 
 }
 
 let mockBatchSeq = 100;
-export const mockReceiptsStore = new Map<number, NhapLoResponse>();
+export const mockReceiptsStore = new Map<number, ReceiveBatchesResponse>();
 
-export function mockSubmitNhapLo(req: MockRequest): { status: number; body: NhapLoResponse | { detail: string; code: string } } {
-  let body = req.body as NhapLoPayload | undefined;
+export function mockSubmitReceiveBatches(req: MockRequest): { status: number; body: ReceiveBatchesResponse | { detail: string; code: string } } {
+  let body = req.body as ReceiveBatchesPayload | undefined;
   if (typeof body === "string") {
     try {
       body = JSON.parse(body);
@@ -49,7 +49,7 @@ export function mockSubmitNhapLo(req: MockRequest): { status: number; body: Nhap
     };
   });
 
-  const resp: NhapLoResponse = {
+  const resp: ReceiveBatchesResponse = {
     receipt: {
       id: receiptId,
       supplier: body.supplier,

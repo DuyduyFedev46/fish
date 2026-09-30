@@ -6,19 +6,19 @@ export type Supplier = {
   is_active: boolean;
 };
 
-export type NhapLoLineInput = {
+export type ReceiveBatchesLineInput = {
   item_code: string;
   qty: string;
   rate: string;
   shelf_life_days?: number | null;
 };
 
-export type NhapLoPayload = {
+export type ReceiveBatchesPayload = {
   supplier: number;
   received_date?: string;
   warehouse?: number;
   idempotency_key?: string;
-  lines: NhapLoLineInput[];
+  lines: ReceiveBatchesLineInput[];
 };
 
 export type PurchaseReceiptSummary = {
@@ -40,7 +40,7 @@ export type PurchaseReceiptSummary = {
   }>;
 };
 
-export type NhapLoBatchItem = {
+export type ReceivedBatchItem = {
   batch_id: string;
   status: string;
   expiry_date: string;
@@ -49,9 +49,9 @@ export type NhapLoBatchItem = {
   landed_unit_cost?: string;
 };
 
-export type NhapLoResponse = {
+export type ReceiveBatchesResponse = {
   receipt: PurchaseReceiptSummary;
-  batches: NhapLoBatchItem[];
+  batches: ReceivedBatchItem[];
 };
 
 export type CancelPurchaseReceiptResponse = {

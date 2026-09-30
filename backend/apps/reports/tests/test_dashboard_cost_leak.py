@@ -10,6 +10,7 @@ from django.test import TestCase
 from rest_framework.test import APIClient
 
 from apps.common.tests.fixtures import client_for, make_batch, make_master, make_user
+from apps.accounts import roles
 
 URL = "/api/dashboard/summary/"
 COST_KEYS = {"inventory_value", "unit_cost", "landed_unit_cost", "purchase_rate", "rate",
@@ -35,8 +36,8 @@ class DashboardCostLeakTests(TestCase):
         batch.save(update_fields=["landed_unit_cost"])
 
     def test_l6_quan_ly_va_nv_kho_khong_co_key_gia_von(self):
-        for user in (make_user("ql1", "quan_ly"), make_user("kho1", "nv_kho"),
-                     make_user("kho2", "nv_kho", "nv_giao")):
+        for user in (make_user("ql1", roles.MANAGER), make_user("kho1", roles.WAREHOUSE_STAFF),
+                     make_user("kho2", roles.WAREHOUSE_STAFF, roles.DELIVERY_STAFF)):
             resp = client_for(user).get(URL)
             self.assertEqual(resp.status_code, 200, user.username)
             body = resp.json()
@@ -47,17 +48,17 @@ class DashboardCostLeakTests(TestCase):
             self.assertNotIn("81234.56", resp.content.decode())
 
     def test_l6_chu_van_thay_gia_von(self):
-        body = client_for(make_user("loc", "chu")).get(URL).json()
+        body = client_for(make_user("loc", roles.OWNER)).get(URL).json()
         self.assertEqual(body["kpis"]["inventory_value"], 812345.6)
         self.assertEqual(body["batches"][0]["unit_cost"], 81234.56)
 
     def test_l6_kpi_khac_van_du_cho_quan_ly(self):
-        body = client_for(make_user("ql1", "quan_ly")).get(URL).json()
+        body = client_for(make_user("ql1", roles.MANAGER)).get(URL).json()
         self.assertEqual(set(body["kpis"]),
                          {"revenue_today", "pending_orders", "booked_soon", "near_expiry"})
 
     def test_l6_nv_giao_403_chua_dang_nhap_401(self):
-        self.assertEqual(client_for(make_user("giao1", "nv_giao")).get(URL).status_code, 403)
+        self.assertEqual(client_for(make_user("giao1", roles.DELIVERY_STAFF)).get(URL).status_code, 403)
         self.assertEqual(APIClient().get(URL).status_code, 401)
 
 
@@ -88,7 +89,7 @@ class R6DashboardNearExpiryTests(TestCase):
         self.qua_han2 = lot(Batch.Status.SELLING, -3)
         self.nhap = lot(Batch.Status.DRAFT, 1)              # chưa publish
         self.xa = lot(Batch.Status.SELLING, 60)             # còn xa hạn
-        self.user = make_user("ql1", "quan_ly")
+        self.user = make_user("ql1", roles.MANAGER)
 
     def test_r6_dem_va_canh_bao_chi_lo_ban_duoc(self):
         from django.test import override_settings

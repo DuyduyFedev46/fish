@@ -17,6 +17,7 @@ from apps.common.exceptions import BusinessError
 from apps.inventory.batches import services as batch_services
 from apps.inventory.models import Batch, Warehouse
 from apps.purchasing.models import Supplier
+from apps.accounts import roles
 
 
 class FefoBase(TestCase):
@@ -127,9 +128,9 @@ class F1BatchListApiTests(FefoBase):
         self.a = self._lot(received=self._d(-10), expiry=self._d(60))
         self.b = self._lot(received=self._d(-5), expiry=self._d(20))
         self.kho = User.objects.create_user("kho", password="x")
-        self.kho.groups.add(Group.objects.get(name="nv_kho"))
+        self.kho.groups.add(Group.objects.get(name=roles.WAREHOUSE_STAFF))
         self.giao = User.objects.create_user("giao", password="x")
-        self.giao.groups.add(Group.objects.get(name="nv_giao"))
+        self.giao.groups.add(Group.objects.get(name=roles.DELIVERY_STAFF))
 
     def _get(self, user):
         client = APIClient()

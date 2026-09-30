@@ -21,29 +21,29 @@ from rest_framework.views import APIView
 from apps.common.api import NoStoreMixin
 from apps.common.exceptions import BusinessError
 from apps.common.pii import mask_phone, normalize_phone
-from apps.common.throttling import CskhSearchThrottle
-from apps.delivery.cskh import services as cskh_services
-from apps.delivery.cskh.scope import note_in_cskh_scope
-from apps.delivery.cskh.serializers import (
-    CskhQueueDetailSerializer,
-    CskhQueueItemSerializer,
+from apps.common.throttling import CustomerSearchThrottle
+from apps.delivery.confirmation import services as confirmation_services
+from apps.delivery.confirmation.scope import note_in_customer_service_scope
+from apps.delivery.confirmation.serializers import (
+    ConfirmationQueueDetailSerializer,
+    ConfirmationQueueItemSerializer,
 )
 from apps.delivery.models import ConfirmationTask, DeliveryNote
 
 
-class CskhQueuePagination(PageNumberPagination):
+class ConfirmationQueuePagination(PageNumberPagination):
     page_size = 20
     page_size_query_param = "page_size"
     max_page_size = 100
 
 
-class CskhQueueViewSet(NoStoreMixin, viewsets.GenericViewSet):
+class ConfirmationQueueViewSet(NoStoreMixin, viewsets.GenericViewSet):
     """
     ViewSet quản lý hàng chờ CSKH (02b §4.3).
     Hỗ trợ lookup qua note_id hoặc id.
     """
     lookup_field = "note_id"
-    pagination_class = CskhQueuePagination
+    pagination_class = ConfirmationQueuePagination
     permission_classes = [IsAuthenticated]
     required_perms: tuple = ()
 
@@ -103,7 +103,7 @@ class CskhQueueViewSet(NoStoreMixin, viewsets.GenericViewSet):
             ).order_by("note__sales_invoice__issued_at", "id")
 
         page = self.paginate_queryset(qs)
-        serializer = CskhQueueItemSerializer(
+        serializer = ConfirmationQueueItemSerializer(
             page if page is not None else qs,
             many=True,
             context={"request": request, "now": now},
@@ -123,10 +123,10 @@ class CskhQueueViewSet(NoStoreMixin, viewsets.GenericViewSet):
         now = timezone.now()
 
         # Kiểm tra Tầng 3 phạm vi dữ liệu cá nhân
-        if not note_in_cskh_scope(request.user, task.note, now=now):
+        if not note_in_customer_service_scope(request.user, task.note, now=now):
             raise Http404("Không tìm thấy mục chờ gọi trong phạm vi của bạn.")
 
-        serializer = CskhQueueDetailSerializer(
+        serializer = ConfirmationQueueDetailSerializer(
             task, context={"request": request, "now": now}
         )
         return Response(serializer.data)
@@ -141,10 +141,10 @@ class CskhQueueViewSet(NoStoreMixin, viewsets.GenericViewSet):
 
         task = self.get_object()
         now = timezone.now()
-        if not note_in_cskh_scope(request.user, task.note, now=now):
+        if not note_in_customer_service_scope(request.user, task.note, now=now):
             raise Http404("Không tìm thấy mục chờ gọi trong phạm vi của bạn.")
 
-        updated_task = cskh_services.claim_task(task.pk, request.user, now=now)
+        updated_task = confirmation_services.claim_task(task.pk, request.user, now=now)
         display_name = updated_task.claimed_by.get_full_name() or updated_task.claimed_by.username
         return Response(
             {
@@ -164,7 +164,7 @@ class CskhQueueViewSet(NoStoreMixin, viewsets.GenericViewSet):
 
         task = self.get_object()
         now = timezone.now()
-        if not note_in_cskh_scope(request.user, task.note, now=now):
+        if not note_in_customer_service_scope(request.user, task.note, now=now):
             raise Http404("Không tìm thấy mục chờ gọi trong phạm vi của bạn.")
 
         data = request.data or {}
@@ -183,7 +183,7 @@ class CskhQueueViewSet(NoStoreMixin, viewsets.GenericViewSet):
             except (ValueError, TypeError):
                 raise BusinessError("Giờ hẹn gọi lại không đúng định dạng ISO.", code="INVALID_INPUT")
 
-        call, duplicate = cskh_services.record_call(
+        call, duplicate = confirmation_services.record_call(
             task.pk,
             request.user,
             result=result,
@@ -218,7 +218,7 @@ class CskhQueueViewSet(NoStoreMixin, viewsets.GenericViewSet):
 
         task = self.get_object()
         now = timezone.now()
-        if not note_in_cskh_scope(request.user, task.note, now=now):
+        if not note_in_customer_service_scope(request.user, task.note, now=now):
             raise Http404("Không tìm thấy mục chờ gọi trong phạm vi của bạn.")
 
         # Chỉ người đã xác nhận hoặc có decide_unconfirmed mới được huỷ
@@ -228,7 +228,7 @@ class CskhQueueViewSet(NoStoreMixin, viewsets.GenericViewSet):
             raise PermissionDenied("Chỉ người đã xác nhận hoặc Quản lý mới được huỷ xác nhận.")
 
         reason = request.data.get("reason", "") if request.data else ""
-        note, updated_task = cskh_services.unconfirm(task.pk, request.user, reason=reason)
+        note, updated_task = confirmation_services.unconfirm(task.pk, request.user, reason=reason)
 
         return Response(
             {
@@ -248,7 +248,7 @@ class CskhQueueViewSet(NoStoreMixin, viewsets.GenericViewSet):
 
         task = self.get_object()
         now = timezone.now()
-        if not note_in_cskh_scope(request.user, task.note, now=now):
+        if not note_in_customer_service_scope(request.user, task.note, now=now):
             raise Http404("Không tìm thấy mục chờ gọi trong phạm vi của bạn.")
 
         data = request.data or {}
@@ -256,7 +256,7 @@ class CskhQueueViewSet(NoStoreMixin, viewsets.GenericViewSet):
         recipient_name = data.get("recipient_name")
         recipient_phone = data.get("recipient_phone")
 
-        res = cskh_services.change_recipient(
+        res = confirmation_services.change_recipient(
             task.pk,
             request.user,
             delivery_address=delivery_address,
@@ -279,7 +279,7 @@ class CskhQueueViewSet(NoStoreMixin, viewsets.GenericViewSet):
 
         task = self.get_object()
         now = timezone.now()
-        if not note_in_cskh_scope(request.user, task.note, now=now):
+        if not note_in_customer_service_scope(request.user, task.note, now=now):
             raise Http404("Không tìm thấy mục chờ gọi trong phạm vi của bạn.")
 
         data = request.data or {}
@@ -299,7 +299,7 @@ class CskhQueueViewSet(NoStoreMixin, viewsets.GenericViewSet):
             except (ValueError, TypeError):
                 raise BusinessError("Giờ gia hạn không đúng định dạng ISO.", code="INVALID_INPUT")
 
-        res = cskh_services.decide(
+        res = confirmation_services.decide(
             task.pk,
             request.user,
             decision=decision,
@@ -312,14 +312,14 @@ class CskhQueueViewSet(NoStoreMixin, viewsets.GenericViewSet):
         return Response(res, status=status.HTTP_200_OK)
 
 
-class CskhSearchView(NoStoreMixin, APIView):
+class CustomerSearchView(NoStoreMixin, APIView):
     """
     Tìm kiếm nhanh đơn hàng cho CSKH (02b §4.3).
     - Chỉ nhận POST (GET trả 405)
     - Throttle cskh_search
     - Chống rò PII ngoài phạm vi
     """
-    throttle_classes = [CskhSearchThrottle]
+    throttle_classes = [CustomerSearchThrottle]
     permission_classes = [IsAuthenticated]
 
     def get(self, request, *args, **kwargs):
@@ -367,7 +367,7 @@ class CskhSearchView(NoStoreMixin, APIView):
             order = getattr(note.sales_invoice, "sales_order", None)
             if not order:
                 continue
-            in_scope = note_in_cskh_scope(request.user, note, now=now)
+            in_scope = note_in_customer_service_scope(request.user, note, now=now)
             customer = getattr(order, "customer", None)
             order_phone = order.phone or (customer.phone if customer else "")
             actual_phone = note.recipient_phone or order_phone

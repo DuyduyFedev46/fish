@@ -17,6 +17,7 @@ import { todayInVietnam } from "@/shared/lib/format";
 import { dashboardSummaryMockResponse } from "@/shared/lib/dashboardSummary.mock";
 import { MOCK_UNAUTHORIZED, mockRequireUser } from "@/features/auth/mock";
 import type { Me } from "@/features/auth/types";
+import { ROLE } from "@/shared/lib/roles";
 import type { GuidanceData, GuidanceNextStep } from "@/features/guidance/types";
 import type { BatchApiRow } from "./types";
 
@@ -48,7 +49,7 @@ type MockLot = {
 };
 
 // Chủ = nhóm chu (tài khoản mock `loc` — GROUP_PERMS của chu trong auth/mock chưa liệt kê quyền tuỳ biến nên xét theo nhóm).
-const isChu = (me: Me) => me.groups.includes("chu") || me.username === "loc";
+const isOwner = (me: Me) => me.groups.includes(ROLE.owner) || me.username === "loc";
 
 const seed = (): MockLot[] => [
   { id: 901, batch_id: "L0908-CT00", item_code: "CA-THU-PL", item: "Cá thu phi lê", supplier: "Ghe Tư Hải", warehouse: "Kho lạnh Bến Đá",
@@ -130,7 +131,7 @@ type ProcessMissing = { code: string; text: string };
 /** Mô phỏng `check_process_expired_stock` (02b §5.3) + quyền Chủ. */
 function processMissing(me: Me, lot: MockLot): ProcessMissing[] {
   const out: ProcessMissing[] = [];
-  if (!isChu(me)) out.push({ code: "BR-PQ-12", text: "Chỉ Chủ được xác nhận xử lý phần tồn lô quá hạn." });
+  if (!isOwner(me)) out.push({ code: "BR-PQ-12", text: "Chỉ Chủ được xác nhận xử lý phần tồn lô quá hạn." });
   if (lot.qty_reserved > 0)
     out.push({ code: "BR-LO-07", text: `Còn ${fmtKg(lot.qty_reserved)} kg đang giữ chỗ của 1 đơn — chờ đơn xử lý xong.` });
   return out;
@@ -168,13 +169,13 @@ export function mockExpiredBatchGuidance(docId: string, req: MockRequest): MockR
         step("return_to_supplier", "Xác nhận Đã trả NCC", miss, "inventory.batch.return_to_supplier", "BR-MH-08",
           "Ghi số kg đã trả nhà cung cấp; có thể chia nhiều lần."),
         step("close", "Chốt lô", [
-          ...(isChu(me) ? [] : [{ code: "BR-PQ-12", text: "Chỉ Chủ được chốt lô." }]),
+          ...(isOwner(me) ? [] : [{ code: "BR-PQ-12", text: "Chỉ Chủ được chốt lô." }]),
           { code: "BR-LO-04", text: "Chốt lô yêu cầu tồn = 0 — xử lý hết phần tồn (Đã huỷ hoặc Đã trả NCC) trước." },
         ], "inventory.batch.close", "BR-LO-04", "Lô chỉ chốt khi không còn tồn.")
       );
     } else {
       steps.push(
-        step("close", "Chốt lô", isChu(me) ? [] : [{ code: "BR-PQ-12", text: "Chỉ Chủ được chốt lô." }],
+        step("close", "Chốt lô", isOwner(me) ? [] : [{ code: "BR-PQ-12", text: "Chỉ Chủ được chốt lô." }],
           "inventory.batch.close", "BR-LO-04", "Lô hết tồn, có thể chốt.")
       );
     }
@@ -206,7 +207,7 @@ export function mockBatchAction(kind: "cancel-expired" | "close", batchId: strin
   if (!me) return MOCK_UNAUTHORIZED;
   const lot = findLot(batchId);
   if (!lot) return { status: 404, body: { detail: "Không tìm thấy." } };
-  if (!isChu(me)) return FORBIDDEN;
+  if (!isOwner(me)) return FORBIDDEN;
   if (lot.status === "CLOSED") return err(400, "BR-LO-05", "Lô đã chốt.");
   if (kind === "close") {
     if (lot.qty_available > 0) return err(400, "BR-LO-04", `Chốt lô yêu cầu tồn = 0 (còn ${fmtKg(lot.qty_available)} kg).`);
@@ -230,7 +231,7 @@ export function mockReturnToSupplier(batchId: string | number, req: MockRequest)
   if (!me) return MOCK_UNAUTHORIZED;
   const lot = findLot(batchId);
   if (!lot) return { status: 404, body: { detail: "Không tìm thấy." } };
-  if (!isChu(me)) return FORBIDDEN;
+  if (!isOwner(me)) return FORBIDDEN;
   const body = (req.body || {}) as { qty?: string; supplier_refund_amount?: string; note?: string; request_id?: string };
 
   if (body.request_id && returns.has(body.request_id)) return { status: 200, body: returns.get(body.request_id) };

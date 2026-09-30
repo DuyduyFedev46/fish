@@ -16,6 +16,8 @@ from apps.common.cost_keys import COST_KEYS
 from apps.common.tests.fixtures import client_for, make_batch, make_master, make_user
 from apps.inventory.models import Warehouse
 from apps.purchasing.models import Supplier
+from apps.ai import command_groups
+from apps.accounts import roles
 
 VN = ZoneInfo("Asia/Ho_Chi_Minh")
 URL = "/api/ai/commands/purchasing.purchasereceipt.nhap_lo/call/"
@@ -43,7 +45,7 @@ class QaBm07Tests(TestCase):
     }
 
     def test_qa_bm07_ma_tran_group_chi_chu_thay_gia_von_pii_luon_bi_bo(self):
-        expect_cost = {"chu": True, "quan_ly": False, "nv_kho": False, "nv_giao": False, "cskh": False}
+        expect_cost = {roles.OWNER: True, roles.MANAGER: False, roles.WAREHOUSE_STAFF: False, roles.DELIVERY_STAFF: False, roles.CUSTOMER_SERVICE: False}
         for g, sees in expect_cost.items():
             with self.subTest(group=g):
                 u = make_user(f"qa7bm07_{g}", g)
@@ -62,7 +64,7 @@ class QaBm07Tests(TestCase):
         self.assertFalse(_keys(scrub_data(self.PAYLOAD, user=None, is_ai_read=False)) & COST_KEYS)
 
     def test_qa_bm07_khoa_viet_hoa_va_khong_sua_input(self):
-        u = make_user("qa7_kho_case", "nv_kho")
+        u = make_user("qa7_kho_case", roles.WAREHOUSE_STAFF)
         import copy
         data = {"Purchase_Rate": "1", "UNIT_COST": "2", "ok": "3"}
         snap = copy.deepcopy(data)
@@ -74,7 +76,7 @@ class QaBm07Tests(TestCase):
         item, sup, wh = make_master()
         batch = make_batch(item, sup, wh)
         pnl = make_user("qa7_pnl2", perms=("reports.view_profitreport",))
-        chu = make_user("qa7_chu_pnl", "chu")
+        chu = make_user("qa7_chu_pnl", roles.OWNER)
         today = datetime.date.today().isoformat()
         body = {"args": {"year": datetime.date.today().year, "month": datetime.date.today().month}}
         with override_settings(AI_ENABLED=True):
@@ -92,14 +94,14 @@ class QaBm07Tests(TestCase):
 @override_settings(AI_ENABLED=True, AI_WRITE_LEVELS_ALLOWED="B")
 class QaF07BoundaryTests(TestCase):
     def setUp(self):
-        self.kho = make_user("qa7f07_kho", "nv_kho")
+        self.kho = make_user("qa7f07_kho", roles.WAREHOUSE_STAFF)
         self.client = client_for(self.kho)
         group = ItemGroup.objects.create(name="Cá biển")
         self.item = Item.objects.create(code="CA-QF07", name="Cá ngừ", item_group=group, shelf_life_in_days=60, is_active=True)
         self.sup = Supplier.objects.create(name="Đầu mối giả", is_active=True)
         self.wh = Warehouse.objects.create(name="Kho giả")
         AiConfigVersion.objects.create(
-            user=self.kho, version=1, group_levels={"thu_mua": {"read": "A", "write": "B"}},
+            user=self.kho, version=1, group_levels={command_groups.PURCHASING: {"read": "A", "write": "B"}},
             overrides={"purchasing.purchasereceipt.nhap_lo": "B"},
             limits={"purchasing.purchasereceipt.nhap_lo": {"kg": "150", "vnd": "30000000"}}, created_by=self.kho,
         )
@@ -142,7 +144,7 @@ class QaF07BoundaryTests(TestCase):
         self.assertEqual(res.data["downgrade_reason"]["code"], "AI_DAILY_LIMIT")
 
     def test_qa_f07_du_lieu_nguoi_khac_khong_tinh_vao_han_muc_cua_toi(self):
-        other = make_user("qa7f07_other", "nv_kho")
+        other = make_user("qa7f07_other", roles.WAREHOUSE_STAFF)
         ids = [AiAction.objects.create(
             command="purchasing.purchasereceipt.nhap_lo", kind=AiAction.Kind.WRITE,
             status=AiAction.Status.DONE, level=AiAction.Level.B, owner=other).pk for _ in range(20)]

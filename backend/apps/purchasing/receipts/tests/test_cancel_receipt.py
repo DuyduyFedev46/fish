@@ -20,6 +20,8 @@ from apps.purchasing.models import (
     Supplier,
 )
 from apps.purchasing.receipts import services
+from apps.ai import command_groups
+from apps.accounts import roles
 
 User = get_user_model()
 
@@ -33,11 +35,11 @@ class CancelReceiptTests(APITestCase):
         self.sup = Supplier.objects.create(name="Cảng cá Phan Thiết", is_active=True)
         self.wh = Warehouse.objects.create(name="Kho chính")
 
-        self.u_chu = make_user("chu1", "chu")
-        self.u_quan_ly = make_user("quanly1", "quan_ly")
-        self.u_kho1 = make_user("kho1", "nv_kho")
-        self.u_kho2 = make_user("kho2", "nv_kho")
-        self.u_giao = make_user("giao1", "nv_giao")
+        self.u_chu = make_user("chu1", roles.OWNER)
+        self.u_quan_ly = make_user("quanly1", roles.MANAGER)
+        self.u_kho1 = make_user("kho1", roles.WAREHOUSE_STAFF)
+        self.u_kho2 = make_user("kho2", roles.WAREHOUSE_STAFF)
+        self.u_giao = make_user("giao1", roles.DELIVERY_STAFF)
 
         self.client_chu = client_for(self.u_chu)
         self.client_quan_ly = client_for(self.u_quan_ly)
@@ -201,7 +203,7 @@ class CancelReceiptTests(APITestCase):
         res_cfg = self.client_kho1.get("/api/ai/my-config/")
         self.assertEqual(res_cfg.status_code, status.HTTP_200_OK)
         groups = res_cfg.json()["groups"]
-        thu_mua = next(g for g in groups if g["group"] == "thu_mua")
+        thu_mua = next(g for g in groups if g["group"] == command_groups.PURCHASING)
         cfg_cmd = next(c for c in thu_mua["commands"] if c["id"] == "purchasing.purchasereceipt.nhap_lo")
         self.assertIsNone(cfg_cmd.get("locked_reason"))
 

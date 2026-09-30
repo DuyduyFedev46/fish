@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import LatestPosts from "@/features/content/components/LatestPosts";
-import { currentYearVn } from "@/lib/format";
+import { currentYearInVietnam } from "@/lib/format";
 
 export const metadata: Metadata = {
   title: "Vựa hải sản đông lạnh tươi ngon, giao tận nhà",
@@ -143,7 +143,7 @@ export default function LandingPage() {
       </section>
 
       <footer className="site-footer">
-        <p>© {currentYearVn()} Cá Về. Hải sản đông lạnh — giao tận nhà.</p>
+        <p>© {currentYearInVietnam()} Cá Về. Hải sản đông lạnh — giao tận nhà.</p>
         <p>
           <Link href="/shop">Shop</Link> · <Link href="/shop/orders">Tra cứu đơn</Link>
         </p>

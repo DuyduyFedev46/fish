@@ -14,15 +14,16 @@ from apps.common.tests.fixtures import client_for, make_user
 from apps.inventory.batches import services as batch_services
 from apps.inventory.models import Batch, Warehouse
 from apps.purchasing.models import Supplier
+from apps.accounts import roles
 
 
 @override_settings(AI_ENABLED=True)
 class CommandIndexApiTestCase(TestCase):
     def setUp(self):
-        self.user_chu = make_user("chu_test", "chu")
-        self.user_ql = make_user("ql_test", "quan_ly")
-        self.user_kho = make_user("kho_test", "nv_kho")
-        self.user_giao = make_user("giao_test", "nv_giao")
+        self.user_chu = make_user("chu_test", roles.OWNER)
+        self.user_ql = make_user("ql_test", roles.MANAGER)
+        self.user_kho = make_user("kho_test", roles.WAREHOUSE_STAFF)
+        self.user_giao = make_user("giao_test", roles.DELIVERY_STAFF)
 
         self.client_chu = client_for(self.user_chu)
         self.client_ql = client_for(self.user_ql)
@@ -48,7 +49,7 @@ class CommandIndexApiTestCase(TestCase):
             self.assertNotEqual(cid, "inventory.batch.close", "nv_giao có lệnh chốt lô")
 
         # 2. quan_ly, nv_kho, nv_giao không có reports.batch_pnl, reports.period_pnl (view_profitreport)
-        for cl, name in ((self.client_ql, "quan_ly"), (self.client_kho, "nv_kho"), (self.client_giao, "nv_giao")):
+        for cl, name in ((self.client_ql, roles.MANAGER), (self.client_kho, roles.WAREHOUSE_STAFF), (self.client_giao, roles.DELIVERY_STAFF)):
             res = cl.get("/api/ai/commands/index/")
             ids = [c["id"] for c in res.json()["commands"]]
             self.assertNotIn("reports.batch_pnl", ids, f"{name} thấy reports.batch_pnl")

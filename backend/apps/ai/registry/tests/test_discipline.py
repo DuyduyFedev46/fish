@@ -19,6 +19,7 @@ from apps.purchasing.receipts.api import PurchaseReceiptViewSet
 from apps.sales.orders.api import SalesOrderViewSet
 from apps.sales.payments.api import PaymentTransactionViewSet
 from apps.sales.refunds.api import RefundViewSet
+from apps.accounts import roles
 
 
 ALL_TARGET_VIEWSETS = [
@@ -52,7 +53,7 @@ KNOWN_FORM_ONLY_ACTIONS = {
 
 class DisciplineTestCase(TestCase):
     def setUp(self):
-        self.user_kho = make_user("kho_user", "nv_kho")
+        self.user_kho = make_user("kho_user", roles.WAREHOUSE_STAFF)
         self.client_kho = client_for(self.user_kho)
 
     def test_dw08_ac1_moi_custom_action_co_required_perms(self):

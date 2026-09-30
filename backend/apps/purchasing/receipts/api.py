@@ -8,8 +8,8 @@ from apps.purchasing.models import PurchaseReceipt, Supplier
 
 from . import services
 from .serializers import (
-    NhapLoBatchOutput,
-    NhapLoInput,
+    ReceivedBatchOutput,
+    ReceiveBatchesInput,
     PurchaseReceiptSerializer,
     SupplierSerializer,
 )
@@ -58,7 +58,7 @@ class PurchaseReceiptViewSet(DocumentViewSet):
         methods=["post"],
         url_path="nhap-lo",
         required_perms=("purchasing.add_purchasereceipt", "purchasing.change_purchasereceipt"),
-        input_serializer=NhapLoInput,
+        input_serializer=ReceiveBatchesInput,
         ai=AiMeta(
             title="Nhập lô mua tại cảng",
             keywords=("nhập lô", "nhập hàng", "mua cá", "nhap_lo"),
@@ -71,14 +71,14 @@ class PurchaseReceiptViewSet(DocumentViewSet):
         """Nhập lô mua tại cảng — mỗi dòng sinh một lô (BR-MH-01)."""
         require_perm(request.user, "purchasing.add_purchasereceipt")
         require_perm(request.user, "purchasing.change_purchasereceipt")
-        serializer = NhapLoInput(data=request.data, context=self.get_serializer_context())
+        serializer = ReceiveBatchesInput(data=request.data, context=self.get_serializer_context())
         serializer.is_valid(raise_exception=True)
         receipt, batches = services.create_and_submit_receipt(
             **serializer.validated_data,
             actor=request.user,
         )
         receipt_data = PurchaseReceiptSerializer(receipt, context=self.get_serializer_context()).data
-        batches_data = NhapLoBatchOutput(batches, many=True, context=self.get_serializer_context()).data
+        batches_data = ReceivedBatchOutput(batches, many=True, context=self.get_serializer_context()).data
         return Response(
             {"receipt": receipt_data, "batches": batches_data},
             status=status.HTTP_201_CREATED,

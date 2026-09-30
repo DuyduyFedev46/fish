@@ -24,6 +24,7 @@ from apps.inventory.models import Batch
 from apps.sales.models import (
     Customer, PaymentTransaction, Refund, SalesInvoice, SalesOrder, SalesOrderLine, SalesOrderLineBatch,
 )
+from apps.accounts import roles
 
 CMD = "inventory.batch.close"
 PII_SENTINEL = "SECRET-KHACH-GIA-0900000123"
@@ -37,8 +38,8 @@ class _SoldBatchBase(TestCase):
 
     def setUp(self):
         dw25.CloseBatchAiTests.setUp(self)
-        self.u_cskh = make_user("cskh_p8l1", "cskh")
-        self.u_giao = make_user("giao_p8l1", "nv_giao")
+        self.u_cskh = make_user("cskh_p8l1", roles.CUSTOMER_SERVICE)
+        self.u_giao = make_user("giao_p8l1", roles.DELIVERY_STAFF)
 
     def _add_sale(self, batch, *, status=SalesOrder.Status.COMPLETED, code="SO-P8L1"):
         cust, _ = Customer.objects.get_or_create(
@@ -138,7 +139,7 @@ class P8Sr03JobTests(_SoldBatchBase):
     def _overdue_pending(self):
         act = AiAction.objects.create(
             command="sales.salesorder.partial_update", kind="write", level="C", status="PENDING",
-            owner=self.u_chu, assignee_group="cskh",
+            owner=self.u_chu, assignee_group=roles.CUSTOMER_SERVICE,
         )
         AiAction.objects.filter(pk=act.pk).update(created_at=timezone.now() - timedelta(hours=3))
         return act
@@ -161,7 +162,7 @@ class P8Sr03JobTests(_SoldBatchBase):
         self.assertEqual(sold.status, Batch.Status.CLOSED)
         self.assertEqual(b.status, AiAction.Status.DONE)  # việc xếp sau vẫn được xử lý
         self.assertEqual(overdue.status, AiAction.Status.ESCALATED)  # bước đẩy quá hạn 2 giờ vẫn chạy
-        self.assertEqual(overdue.assignee_group, "chu")
+        self.assertEqual(overdue.assignee_group, roles.OWNER)
 
     def test_sr03_ac3_lo_da_ban_con_phieu_hoan_pending_thi_escalated(self):
         sold = self._create_fully_eligible_batch()
@@ -181,7 +182,7 @@ class P8Sr03JobTests(_SoldBatchBase):
         b.refresh_from_db()
         sold.refresh_from_db()
         self.assertEqual(a.status, AiAction.Status.ESCALATED)
-        self.assertEqual(a.assignee_group, "chu")
+        self.assertEqual(a.assignee_group, roles.OWNER)
         self.assertEqual(a.downgrade_reason["code"], "AI_CLOSE_BATCH_CONDITIONS_NOT_MET")
         self.assertNotEqual(sold.status, Batch.Status.CLOSED)
         self.assertEqual(b.status, AiAction.Status.DONE)

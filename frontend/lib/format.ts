@@ -81,12 +81,12 @@ export function formatDateOnly(value: string | null | undefined): string {
 }
 
 /** Ngày "hôm nay" theo giờ VN, dạng "YYYY-MM-DD" (dùng cho lọc/đặt mã theo ngày). */
-export function todayVn(now: Date = new Date()): string {
+export function todayInVietnam(now: Date = new Date()): string {
   const p = vnPartsOf(now)!;
   return `${p.year}-${p.month}-${p.day}`;
 }
 
 /** Năm hiện tại theo giờ VN (dùng cho dòng bản quyền). */
-export function currentYearVn(now: Date = new Date()): number {
+export function currentYearInVietnam(now: Date = new Date()): number {
   return Number(vnPartsOf(now)!.year);
 }

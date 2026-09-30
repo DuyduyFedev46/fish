@@ -20,7 +20,7 @@ from apps.accounts.models import AuditLog
 from apps.catalog.models import Item, ItemGroup, ItemPrice, PriceList
 from apps.common.exceptions import BusinessError
 from apps.common.tests.fixtures import client_for, confirm_note_for_test, make_user
-from apps.delivery.cskh import services as cskh_services
+from apps.delivery.confirmation import services as confirmation_services
 from apps.delivery.labels import services as label_services
 from apps.delivery.models import ConfirmationTask, CustomerCall, DeliveryNote, LabelPrint
 from apps.inventory.batches import services as batch_services
@@ -30,9 +30,10 @@ from apps.sales.models import Customer, SalesInvoice, SalesInvoiceLine, SalesOrd
 from apps.sales.models.invoices import SalesInvoiceLineBatch
 from apps.sales.orders import services as order_services
 from apps.sales.payments import services as payment_services
+from apps.accounts import roles
 
 
-class CskhL2BaseTestCase(TestCase):
+class ConfirmationL2BaseTestCase(TestCase):
     def setUp(self):
         # Master data
         self.wh = Warehouse.objects.create(name="Kho chính")
@@ -53,12 +54,12 @@ class CskhL2BaseTestCase(TestCase):
         batch_services.publish_batch(batch=self.batch, actor=None)
 
         # Users
-        self.chu = make_user("chu1", "chu")
-        self.ql = make_user("ql1", "quan_ly")
-        self.cs1 = make_user("cs1", "cskh")
-        self.cs2 = make_user("cs2", "cskh")
-        self.kho = make_user("kho1", "nv_kho")
-        self.giao = make_user("giao1", "nv_giao")
+        self.chu = make_user("chu1", roles.OWNER)
+        self.ql = make_user("ql1", roles.MANAGER)
+        self.cs1 = make_user("cs1", roles.CUSTOMER_SERVICE)
+        self.cs2 = make_user("cs2", roles.CUSTOMER_SERVICE)
+        self.kho = make_user("kho1", roles.WAREHOUSE_STAFF)
+        self.giao = make_user("giao1", roles.DELIVERY_STAFF)
 
     def _create_paid_order(self, code="DH-TEST-01", phone="0901112233", qty="2"):
         """Tạo đơn và thanh toán, trả về (order, invoice, note, task)."""
@@ -85,7 +86,7 @@ class CskhL2BaseTestCase(TestCase):
         return order, invoice, note, task
 
 
-class CS04StartConfirmationTests(CskhL2BaseTestCase):
+class CS04StartConfirmationTests(ConfirmationL2BaseTestCase):
     def test_cs04_ac1_signal_creates_note_confirming_and_task_pending(self):
         """CS-04-AC1: Hoá đơn ISSUED -> tự động tạo DeliveryNote CONFIRMING + ConfirmationTask PENDING."""
         order, invoice, note, task = self._create_paid_order("DH-CS04-1", "0901234567")
@@ -97,7 +98,7 @@ class CS04StartConfirmationTests(CskhL2BaseTestCase):
     def test_cs04_ac3_idempotent_ipn_does_not_duplicate(self):
         """CS-04-AC3: Gọi start_confirmation lần 2 trên cùng hoá đơn -> không sinh thêm."""
         order, invoice, note, task = self._create_paid_order("DH-CS04-2", "0901234568")
-        note2, task2 = cskh_services.start_confirmation(invoice)
+        note2, task2 = confirmation_services.start_confirmation(invoice)
         self.assertEqual(note.pk, note2.pk)
         self.assertEqual(task.pk, task2.pk)
         self.assertEqual(DeliveryNote.objects.filter(sales_invoice=invoice).count(), 1)
@@ -127,7 +128,7 @@ class CS04StartConfirmationTests(CskhL2BaseTestCase):
         )
 
 
-class CS05QueueAndSearchTests(CskhL2BaseTestCase):
+class CS05QueueAndSearchTests(ConfirmationL2BaseTestCase):
     def test_cs05_ac1_queue_list_default_and_ordering(self):
         """CS-05-AC1: Mặc định trả PENDING + CALLBACK hợp lệ, sắp theo paid_at tăng."""
         o1, _, n1, _ = self._create_paid_order("DH-Q1", "0901111111")
@@ -235,7 +236,7 @@ class CS05QueueAndSearchTests(CskhL2BaseTestCase):
         self.assertEqual(kho_client.post("/api/cskh/search/", {"q": "0908889999"}, format="json").status_code, 403)
 
 
-class CS06RecordCallAndUnconfirmTests(CskhL2BaseTestCase):
+class CS06RecordCallAndUnconfirmTests(ConfirmationL2BaseTestCase):
     def test_cs06_ac1_ac2_confirmed_advances_to_preparing_and_idempotent(self):
         """CS-06-AC1, AC2: Ghi CONFIRMED -> note sang PREPARING, task DONE, idempotent request_id."""
         _, _, note, task = self._create_paid_order("DH-CALL-01", "0901234567")
@@ -401,7 +402,7 @@ class CS06RecordCallAndUnconfirmTests(CskhL2BaseTestCase):
 
 
 
-class CS11LabelPrintTests(CskhL2BaseTestCase):
+class CS11LabelPrintTests(ConfirmationL2BaseTestCase):
     def test_cs11_ac1_preview_label_data_no_cost_no_amount(self):
         """CS-11-AC1, AC4: Xem trước tem giao hàng, SĐT che, tuyệt đối không có giá tiền hay giá vốn."""
         _, _, note, _ = self._create_paid_order("DH-LBL-01", "0905556666", qty="2")

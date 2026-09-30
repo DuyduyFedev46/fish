@@ -13,6 +13,7 @@ from apps.catalog.images.storage import ItemImageStorageError
 from apps.catalog.models import Item, ItemGroup
 
 from .factories import make_uploaded_bytes, make_uploaded_image
+from apps.accounts import roles
 
 URL = "/api/catalog/items/{}/image/"
 
@@ -35,7 +36,7 @@ class ItemImageApiTestCase(TestCase):
 
 class UploadItemImageApiTests(ItemImageApiTestCase):
     def test_a2_ac1_chu_tai_anh_lan_dau_tra_201_dung_hinh_dang_contract(self):
-        client, _ = client_for("chu1", "chu")
+        client, _ = client_for("chu1", roles.OWNER)
         resp = client.post(
             self.url,
             {"file": make_uploaded_image(size=(3000, 2000), fmt="JPEG"), "alt_text": ""},
@@ -56,12 +57,12 @@ class UploadItemImageApiTests(ItemImageApiTestCase):
         self.assertEqual(body["warnings"], [])
 
     def test_a2_ac4_quan_ly_thay_anh_tra_200_url_moi(self):
-        chu_client, _ = client_for("chu1", "chu")
+        chu_client, _ = client_for("chu1", roles.OWNER)
         first = chu_client.post(
             self.url, {"file": make_uploaded_image()}, format="multipart",
         ).json()
 
-        ql_client, _ = client_for("ql1", "quan_ly")
+        ql_client, _ = client_for("ql1", roles.MANAGER)
         resp = ql_client.post(
             self.url,
             {"file": make_uploaded_image(), "expected_image_id": first["image"]["id"]},
@@ -74,13 +75,13 @@ class UploadItemImageApiTests(ItemImageApiTestCase):
         self.assertNotEqual(second["image"]["urls"]["detail"], first["image"]["urls"]["detail"])
 
     def test_b2_thay_anh_cap_nhat_uploaded_at_va_uploaded_by_theo_lan_gan_nhat(self):
-        chu_client, _ = client_for("chu1", "chu")
+        chu_client, _ = client_for("chu1", roles.OWNER)
         first = chu_client.post(self.url, {"file": make_uploaded_image()}, format="multipart").json()
         first_uploaded_at = first["image"]["uploaded_at"]
         first_uploaded_by = first["image"]["uploaded_by"]
         self.assertEqual(first_uploaded_by, "chu1")
 
-        ql_client, _ = client_for("ql1", "quan_ly")
+        ql_client, _ = client_for("ql1", roles.MANAGER)
         second = ql_client.post(
             self.url,
             {"file": make_uploaded_image(), "expected_image_id": first["image"]["id"]},
@@ -99,20 +100,20 @@ class UploadItemImageApiTests(ItemImageApiTestCase):
         self.assertEqual(detail["image"]["uploaded_at"], second["image"]["uploaded_at"])
 
     def test_b3_uploaded_at_theo_gio_vn_offset_0700(self):
-        client, _ = client_for("chu1", "chu")
+        client, _ = client_for("chu1", roles.OWNER)
         resp = client.post(self.url, {"file": make_uploaded_image()}, format="multipart")
         uploaded_at = resp.json()["image"]["uploaded_at"]
         self.assertTrue(uploaded_at.endswith("+07:00"), uploaded_at)
 
     def test_a2_ac5_audit_log_ghi_nguoi_lam_va_mat_hang(self):
-        client, actor = client_for("chu1", "chu")
+        client, actor = client_for("chu1", roles.OWNER)
         client.post(self.url, {"file": make_uploaded_image()}, format="multipart")
         log = AuditLog.objects.get(action="item_image_add")
         self.assertEqual(log.actor, actor)
         self.assertEqual(log.object_id, str(self.item.pk))
 
     def test_a2_ac6_canh_bao_low_resolution_tra_ve_trong_response(self):
-        client, _ = client_for("chu1", "chu")
+        client, _ = client_for("chu1", roles.OWNER)
         resp = client.post(
             self.url,
             {"file": make_uploaded_image(size=(400, 400), fmt="PNG")},
@@ -125,7 +126,7 @@ class UploadItemImageApiTests(ItemImageApiTestCase):
         }])
 
     def test_a2_ac8_tick_anh_minh_hoa(self):
-        client, _ = client_for("chu1", "chu")
+        client, _ = client_for("chu1", roles.OWNER)
         resp = client.post(
             self.url,
             {"file": make_uploaded_image(), "is_illustration": "true"},
@@ -134,7 +135,7 @@ class UploadItemImageApiTests(ItemImageApiTestCase):
         self.assertTrue(resp.json()["image"]["is_illustration"])
 
     def test_a2_ac9_sai_dinh_dang_tra_400_br_dm_10(self):
-        client, _ = client_for("chu1", "chu")
+        client, _ = client_for("chu1", roles.OWNER)
         svg = make_uploaded_bytes("x.svg", b"<svg><script>1</script></svg>", "image/svg+xml")
         resp = client.post(self.url, {"file": svg}, format="multipart")
         self.assertEqual(resp.status_code, 400)
@@ -144,7 +145,7 @@ class UploadItemImageApiTests(ItemImageApiTestCase):
         self.assertEqual(AuditLog.objects.count(), 0)
 
     def test_a2_ac10_vuot_dung_luong_tra_400(self):
-        client, _ = client_for("chu1", "chu")
+        client, _ = client_for("chu1", roles.OWNER)
         with self.settings(ITEM_IMAGE_MAX_BYTES=10):
             resp = client.post(
                 self.url, {"file": make_uploaded_image(size=(50, 50), fmt="PNG")}, format="multipart",
@@ -153,7 +154,7 @@ class UploadItemImageApiTests(ItemImageApiTestCase):
         self.assertEqual(resp.json()["code"], "BR-DM-10")
 
     def test_a2_ac11_kho_anh_loi_tra_503(self):
-        client, _ = client_for("chu1", "chu")
+        client, _ = client_for("chu1", roles.OWNER)
         with patch(
             "apps.catalog.images.storage.LocalItemImageStorage.save",
             side_effect=ItemImageStorageError(),
@@ -164,10 +165,10 @@ class UploadItemImageApiTests(ItemImageApiTestCase):
         self.assertEqual(AuditLog.objects.count(), 0)
 
     def test_a2_ac13_expected_image_id_khong_khop_tra_409(self):
-        chu_client, _ = client_for("chu1", "chu")
+        chu_client, _ = client_for("chu1", roles.OWNER)
         first = chu_client.post(self.url, {"file": make_uploaded_image()}, format="multipart").json()
 
-        ql_client, _ = client_for("ql1", "quan_ly")
+        ql_client, _ = client_for("ql1", roles.MANAGER)
         ql_client.post(
             self.url,
             {"file": make_uploaded_image(), "expected_image_id": first["image"]["id"]},
@@ -183,12 +184,12 @@ class UploadItemImageApiTests(ItemImageApiTestCase):
         self.assertEqual(resp.json()["code"], "BR-DM-12")
 
     def test_a2_ac14_nv_kho_403_nv_giao_403_chua_dang_nhap_401(self):
-        kho_client, _ = client_for("kho1", "nv_kho")
+        kho_client, _ = client_for("kho1", roles.WAREHOUSE_STAFF)
         resp = kho_client.post(self.url, {"file": make_uploaded_image()}, format="multipart")
         self.assertEqual(resp.status_code, 403)
         self.assertEqual(resp.json()["code"], "BR-PQ-12")
 
-        giao_client, _ = client_for("giao1", "nv_giao")
+        giao_client, _ = client_for("giao1", roles.DELIVERY_STAFF)
         resp = giao_client.post(self.url, {"file": make_uploaded_image()}, format="multipart")
         self.assertEqual(resp.status_code, 403)
 
@@ -201,14 +202,14 @@ class UploadItemImageApiTests(ItemImageApiTestCase):
         self.assertEqual(AuditLog.objects.count(), 0)
 
     def test_a2_ac15_quan_ly_khong_sua_duoc_ten_hay_an_hien(self):
-        client, _ = client_for("ql1", "quan_ly")
+        client, _ = client_for("ql1", roles.MANAGER)
         resp = client.patch(f"/api/catalog/items/{self.item.pk}/", {"name": "Tên mới"}, format="json")
         self.assertEqual(resp.status_code, 403)
         self.item.refresh_from_db()
         self.assertEqual(self.item.name, "Cá thu cắt khúc")
 
     def test_a2_ac16_bo_loc_has_image(self):
-        client, _ = client_for("chu1", "chu")
+        client, _ = client_for("chu1", roles.OWNER)
         other = Item.objects.create(code="CA-KHAC", name="Cá khác", item_group=self.item.item_group)
         client.post(self.url, {"file": make_uploaded_image()}, format="multipart")
 
@@ -221,7 +222,7 @@ class UploadItemImageApiTests(ItemImageApiTestCase):
         self.assertEqual(codes_without, {"CA-KHAC"})
 
     def test_khong_ro_gia_von_qua_response_anh(self):
-        client, _ = client_for("chu1", "chu")
+        client, _ = client_for("chu1", roles.OWNER)
         resp = client.post(self.url, {"file": make_uploaded_image()}, format="multipart")
         payload_keys = set(resp.json().keys()) | set(resp.json()["image"].keys())
         self.assertFalse(payload_keys & {"purchase_rate", "landed_unit_cost", "rate", "unit_cost"})
@@ -232,7 +233,7 @@ class RemoveItemImageApiTests(ItemImageApiTestCase):
         return client.post(self.url, {"file": make_uploaded_image()}, format="multipart").json()
 
     def test_a3_ac1_go_anh_tra_204_va_null_o_get(self):
-        client, _ = client_for("chu1", "chu")
+        client, _ = client_for("chu1", roles.OWNER)
         self._upload(client)
         resp = client.delete(self.url)
         self.assertEqual(resp.status_code, 204)
@@ -240,7 +241,7 @@ class RemoveItemImageApiTests(ItemImageApiTestCase):
         self.assertIsNone(detail["image"])
 
     def test_a3_ac2_audit_log_item_image_remove(self):
-        client, actor = client_for("chu1", "chu")
+        client, actor = client_for("chu1", roles.OWNER)
         self._upload(client)
         AuditLog.objects.all().delete()
         client.delete(self.url)
@@ -249,13 +250,13 @@ class RemoveItemImageApiTests(ItemImageApiTestCase):
         self.assertEqual(log.actor, actor)
 
     def test_a3_ac4_chua_co_anh_tra_404(self):
-        client, _ = client_for("chu1", "chu")
+        client, _ = client_for("chu1", roles.OWNER)
         resp = client.delete(self.url)
         self.assertEqual(resp.status_code, 404)
         self.assertEqual(resp.json()["code"], "BR-DM-09")
 
     def test_a3_ac5_expected_image_id_sai_tra_409(self):
-        client, _ = client_for("chu1", "chu")
+        client, _ = client_for("chu1", roles.OWNER)
         first = self._upload(client)
         resp = client.delete(f"{self.url}?expected_image_id=id-sai")
         self.assertEqual(resp.status_code, 409)
@@ -265,14 +266,14 @@ class RemoveItemImageApiTests(ItemImageApiTestCase):
 
     def test_a3_ac6_nv_kho_va_nv_giao_403(self):
         self.item2 = self.item
-        chu_client, _ = client_for("chu1", "chu")
+        chu_client, _ = client_for("chu1", roles.OWNER)
         self._upload(chu_client)
 
-        kho_client, _ = client_for("kho1", "nv_kho")
+        kho_client, _ = client_for("kho1", roles.WAREHOUSE_STAFF)
         resp = kho_client.delete(self.url)
         self.assertEqual(resp.status_code, 403)
 
-        giao_client, _ = client_for("giao1", "nv_giao")
+        giao_client, _ = client_for("giao1", roles.DELIVERY_STAFF)
         resp = giao_client.delete(self.url)
         self.assertEqual(resp.status_code, 403)
 

@@ -19,6 +19,7 @@ from apps.content.entries.services import publish_entry
 from apps.content.models.categories import Category
 from apps.content.models.entries import Entry
 from apps.content.models.images import ContentImage
+from apps.accounts import roles
 
 User = get_user_model()
 
@@ -36,7 +37,7 @@ class DoubleClickUnpublishTests(APITestCase):
 
     def setUp(self):
         self.quan_ly = User.objects.create_user(username="ra_ql_dbl", password="x")
-        g_ql, _ = Group.objects.get_or_create(name="quan_ly")
+        g_ql, _ = Group.objects.get_or_create(name=roles.MANAGER)
         self.quan_ly.groups.add(g_ql)
         self.quan_ly = User.objects.get(pk=self.quan_ly.pk)
 
@@ -107,7 +108,7 @@ class DraftNotExposedByPublicApiTests(APITestCase):
 
     def setUp(self):
         self.quan_ly = User.objects.create_user(username="ra_ql_draft", password="x")
-        g_ql, _ = Group.objects.get_or_create(name="quan_ly")
+        g_ql, _ = Group.objects.get_or_create(name=roles.MANAGER)
         self.quan_ly.groups.add(g_ql)
         self.category = Category.objects.create(
             name="Ra soat draft", name_key="ra soat draft", slug="ra-soat-draft", is_active=True
@@ -146,7 +147,7 @@ class CoverImageNeverDeletedTests(APITestCase):
 
     def setUp(self):
         self.quan_ly = User.objects.create_user(username="ra_ql_img5", password="x")
-        g_ql, _ = Group.objects.get_or_create(name="quan_ly")
+        g_ql, _ = Group.objects.get_or_create(name=roles.MANAGER)
         self.quan_ly.groups.add(g_ql)
         self.quan_ly = User.objects.get(pk=self.quan_ly.pk)
         self.client.force_authenticate(self.quan_ly)

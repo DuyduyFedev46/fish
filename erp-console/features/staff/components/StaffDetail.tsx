@@ -11,7 +11,8 @@ import { SideSheet } from "@/shared/ui/SideSheet";
 import { ApiError } from "@/shared/lib/http";
 import { dateTime } from "@/shared/lib/format";
 import { groupLabel } from "@/shared/lib/groups";
-import { ACCOUNT_HREF, GROUP } from "@/shared/lib/nav";
+import { ACCOUNT_HREF } from "@/shared/lib/nav";
+import { ROLE } from "@/shared/lib/roles";
 import { Icon } from "@/shared/ui/Icon";
 import { deactivateStaff, reactivateStaff, resetStaffPassword, setStaffGroups, updateStaff } from "../api";
 import type { StaffAction, StaffMember } from "../types";
@@ -85,8 +86,8 @@ export function StaffDetail({ member: m, isSelf, onChanged, onClose }: Props) {
 
   const added = groups.filter((g) => !m.groups.includes(g));
   const removed = m.groups.filter((g) => !groups.includes(g));
-  const addsChu = added.includes(GROUP.chu);
-  const touchesChu = addsChu || removed.includes(GROUP.chu);
+  const addsOwner = added.includes(ROLE.owner);
+  const touchesOwner = addsOwner || removed.includes(ROLE.owner);
 
   const title: Record<Mode, string> = {
     view: displayName,
@@ -171,7 +172,7 @@ export function StaffDetail({ member: m, isSelf, onChanged, onClose }: Props) {
           aria-label="Đổi nhóm"
           onSubmit={(e) => {
             e.preventDefault();
-            if (touchesChu) go("groups-confirm");
+            if (touchesOwner) go("groups-confirm");
             else void saveGroups();
           }}
         >
@@ -225,17 +226,17 @@ export function StaffDetail({ member: m, isSelf, onChanged, onClose }: Props) {
       return (
         <div className={s.pane}>
           <DangerConfirm
-            tone={addsChu ? "warn" : "crit"}
-            icon={addsChu ? "shield_person" : "remove_moderator"}
-            title={addsChu ? "Cấp quyền Chủ?" : "Gỡ quyền Chủ?"}
+            tone={addsOwner ? "warn" : "crit"}
+            icon={addsOwner ? "shield_person" : "remove_moderator"}
+            title={addsOwner ? "Cấp quyền Chủ?" : "Gỡ quyền Chủ?"}
             error={error}
             busy={busy}
             cancelLabel="Quay lại"
             onCancel={() => go("groups")}
-            confirmLabel={addsChu ? "Thêm nhóm Chủ" : "Bỏ nhóm Chủ"}
+            confirmLabel={addsOwner ? "Thêm nhóm Chủ" : "Bỏ nhóm Chủ"}
             onConfirm={() => void saveGroups()}
           >
-            {addsChu ? (
+            {addsOwner ? (
               <p>
                 Bạn sắp <b>thêm nhóm Chủ</b> cho {who}. Nhóm Chủ có toàn quyền: tiền, giá vốn, lãi lỗ và quản lý nhân
                 viên.

@@ -23,6 +23,7 @@ import { planCommand } from "../commands/planner";
 import { callCommand } from "../commands/call";
 import { undoAiAction } from "../actions/api";
 import { useAuth } from "@/features/auth/components/AuthProvider";
+import { ROLE } from "@/shared/lib/roles";
 import s from "./ai.module.css";
 
 const HIDE_GRACE_MS = 60 * 1000;
@@ -257,7 +258,7 @@ export function AiAssistantPanel({ status }: { status: AiStatus }) {
       // DW-14-AC4: Kiểm tra hỏi giá vốn
       const costKeywords = ["giá vốn", "gia von", "lãi lỗ", "lai lo", "cost", "giá mua", "gia mua"];
       const isAskingCost = costKeywords.some((k) => q.toLowerCase().includes(k));
-      const canCost = me?.permissions?.includes("inventory.view_costprice") || me?.groups?.includes("chu");
+      const canCost = me?.permissions?.includes("inventory.view_costprice") || me?.groups?.includes(ROLE.owner);
 
       if (isAskingCost && !canCost) {
         appendAi("Bạn không có quyền xem thông tin giá vốn.");

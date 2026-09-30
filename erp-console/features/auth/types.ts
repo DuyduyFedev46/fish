@@ -1,9 +1,11 @@
+import type { HOME_CONFIRMATION_QUEUE, RoleCode } from "@/shared/lib/roles";
+
 // Kiểu dữ liệu module auth — khớp contract S6 (+ phần mở rộng S47 và S46 theo story, BE L6 chưa chốt).
 
-export type GroupCode = "chu" | "quan_ly" | "nv_kho" | "nv_giao" | "cskh";
+export type GroupCode = RoleCode;
 
 /** Trang mặc định sau đăng nhập. */
-export type MeHome = "dashboard" | "my-deliveries" | "cskh-queue" | "no-role";
+export type MeHome = "dashboard" | "my-deliveries" | typeof HOME_CONFIRMATION_QUEUE | "no-role";
 
 export type CodeLabel = { code: string; label: string };
 

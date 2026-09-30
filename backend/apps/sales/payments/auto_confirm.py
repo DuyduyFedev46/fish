@@ -9,6 +9,7 @@ from decimal import Decimal
 from django.conf import settings
 from django.db import transaction
 
+from apps.accounts import roles
 from apps.ai.models import AiAction, AiPolicyVersion
 from apps.common.audit import record_audit
 from apps.common.exceptions import BusinessError
@@ -67,7 +68,7 @@ def process_exact_payment_matches() -> dict:
 
             # a. Kiểm tra cờ nghi trùng (BR-TT-15)
             if p.duplicate_warning:
-                if _escalate_to_chu(p, reason="Giao dịch có cảnh báo nghi trùng xác nhận tay (BR-TT-15)"):
+                if _escalate_to_owner(p, reason="Giao dịch có cảnh báo nghi trùng xác nhận tay (BR-TT-15)"):
                     escalated_count += 1
                 else:
                     skipped_count += 1
@@ -77,7 +78,7 @@ def process_exact_payment_matches() -> dict:
             if p.environment:
                 current_env = (getattr(settings, "SEPAY_ENV", "") or "").strip().upper()
                 if p.environment != current_env:
-                    if _escalate_to_chu(
+                    if _escalate_to_owner(
                         p,
                         reason=f"Sai môi trường cổng: giao dịch {p.environment} khác hệ thống {current_env} (BR-TT-14)",
                     ):
@@ -104,13 +105,13 @@ def process_exact_payment_matches() -> dict:
 
             # d. Kiểm tra số lượng đơn khớp
             if len(candidate_orders) == 0:
-                if _escalate_to_chu(p, reason="Không tìm thấy đơn hàng khớp với giao dịch"):
+                if _escalate_to_owner(p, reason="Không tìm thấy đơn hàng khớp với giao dịch"):
                     escalated_count += 1
                 else:
                     skipped_count += 1
                 continue
             elif len(candidate_orders) > 1:
-                if _escalate_to_chu(p, reason="Giao dịch khớp với nhiều hơn 1 đơn hàng"):
+                if _escalate_to_owner(p, reason="Giao dịch khớp với nhiều hơn 1 đơn hàng"):
                     escalated_count += 1
                 else:
                     skipped_count += 1
@@ -120,7 +121,7 @@ def process_exact_payment_matches() -> dict:
 
             # e. Kiểm tra trạng thái đơn hàng (chỉ nhận BOOKED)
             if order.status != SalesOrder.Status.BOOKED:
-                if _escalate_to_chu(
+                if _escalate_to_owner(
                     p,
                     reason=f"Đơn {order.code} ở trạng thái {order.get_status_display()}, không thể tự xác nhận (BR-TT-05)",
                 ):
@@ -133,7 +134,7 @@ def process_exact_payment_matches() -> dict:
             if p.amount != order.total_amount:
                 diff = p.amount - order.total_amount
                 status_text = "Thiếu tiền" if diff < Decimal("0") else "Thừa tiền"
-                if _escalate_to_chu(
+                if _escalate_to_owner(
                     p,
                     reason=f"{status_text}: Giao dịch {format_vnd(p.amount)} khác tổng đơn {format_vnd(order.total_amount)} (BR-TT-04/10)",
                 ):
@@ -170,7 +171,7 @@ def process_exact_payment_matches() -> dict:
                 logger.warning(
                     "Error auto-confirming txn %s -> order %s: %s", p.bank_txn_id, order.code, err_code
                 )
-                if _escalate_to_chu(p, reason=f"Lỗi khi xử lý xác nhận thanh toán (mã {err_code})"):
+                if _escalate_to_owner(p, reason=f"Lỗi khi xử lý xác nhận thanh toán (mã {err_code})"):
                     escalated_count += 1
                 else:
                     skipped_count += 1
@@ -189,7 +190,7 @@ _CLOSED_ACTION_STATUSES = (
 )
 
 
-def _escalate_to_chu(payment: PaymentTransaction, *, reason: str) -> bool:
+def _escalate_to_owner(payment: PaymentTransaction, *, reason: str) -> bool:
     """
     Tạo hoặc cập nhật AiAction ESCALATED chuyển việc cho Chủ (DW-26-AC2). IDEMPOTENT (SR-11):
     - việc đã ở trạng thái kết thúc -> giữ nguyên, không ghi Nhật ký;
@@ -200,8 +201,8 @@ def _escalate_to_chu(payment: PaymentTransaction, *, reason: str) -> bool:
     """
     from django.contrib.auth import get_user_model
     User = get_user_model()
-    chu_user = User.objects.filter(groups__name="chu", is_active=True).order_by("id").first()
-    if chu_user is None:
+    owner_user = User.objects.filter(groups__name=roles.OWNER, is_active=True).order_by("id").first()
+    if owner_user is None:
         logger.warning("DW-26: không có người dùng nhóm chu đang hoạt động, bỏ qua chuyển Chủ txn %s", payment.bank_txn_id)
         return False
 
@@ -213,8 +214,8 @@ def _escalate_to_chu(payment: PaymentTransaction, *, reason: str) -> bool:
             "kind": AiAction.Kind.WRITE,
             "level": AiAction.Level.C,
             "status": AiAction.Status.ESCALATED,
-            "assignee_group": "chu",
-            "owner": chu_user,
+            "assignee_group": roles.OWNER,
+            "owner": owner_user,
             "downgrade_reason": {"code": "AI_MISMATCH", "text": reason},
             "args": {"payment_id": payment.id, "reason": reason},
         },
@@ -226,7 +227,7 @@ def _escalate_to_chu(payment: PaymentTransaction, *, reason: str) -> bool:
         if action.status == AiAction.Status.ESCALATED and not reason_changed:
             return False
         action.status = AiAction.Status.ESCALATED
-        action.assignee_group = "chu"
+        action.assignee_group = roles.OWNER
         action.downgrade_reason = {"code": "AI_MISMATCH", "text": reason}
         action.args = {**(action.args or {}), "payment_id": payment.id, "reason": reason}
         action.save(update_fields=["status", "assignee_group", "downgrade_reason", "args"])

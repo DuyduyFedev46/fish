@@ -7,9 +7,10 @@ from django.test import override_settings
 from django.utils import timezone
 
 from apps.common.tests.fixtures import make_user
-from apps.delivery.cskh import services as cskh_services
+from apps.delivery.confirmation import services as confirmation_services
 from apps.delivery.models import ConfirmationTask
-from apps.delivery.tests.test_cskh_l3 import CskhL3BaseTestCase
+from apps.delivery.tests.test_cskh_l3 import ConfirmationL3BaseTestCase
+from apps.accounts import roles
 
 # Sentinel dữ liệu cá nhân giả — không được xuất hiện ở chứng từ/timeline/audit/output lệnh.
 SENTINEL_NAME = "Khách Giả Bí Mật"
@@ -31,15 +32,15 @@ def find_keys(node, keys):
     return found
 
 
-class CreditNoteBase(CskhL3BaseTestCase):
-    """Lô X 100 kg giá mua 110.000, giá bán 150.000 (fixture CskhL3BaseTestCase)."""
+class CreditNoteBase(ConfirmationL3BaseTestCase):
+    """Lô X 100 kg giá mua 110.000, giá bán 150.000 (fixture ConfirmationL3BaseTestCase)."""
 
     def setUp(self):
         super().setUp()
-        self.giao = make_user("giao1", "nv_giao")
+        self.giao = make_user("giao1", roles.DELIVERY_STAFF)
 
     def _paid(self, *, phone=SENTINEL_PHONE, name=SENTINEL_NAME, qty=Decimal("2")):
-        order, note, task = self._create_order_with_cskh(phone=phone, name=name, qty=qty)
+        order, note, task = self._create_order_with_confirmation(phone=phone, name=name, qty=qty)
         return order, note, task
 
     @override_settings(CSKH_AUTO_CANCEL_ENABLED=True)
@@ -50,4 +51,4 @@ class CreditNoteBase(CskhL3BaseTestCase):
         task.escalation_reason = ConfirmationTask.EscalationReason.UNREACHABLE
         task.escalated_at = t0
         task.save()
-        return cskh_services.auto_cancel_overdue(now=t0 + timedelta(minutes=31))
+        return confirmation_services.auto_cancel_overdue(now=t0 + timedelta(minutes=31))

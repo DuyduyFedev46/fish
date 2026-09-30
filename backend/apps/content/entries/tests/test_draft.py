@@ -8,6 +8,7 @@ from rest_framework.test import APITestCase
 from apps.accounts.models import AuditLog
 from apps.content.models.entries import Entry, EntryVersion
 from apps.content.models.categories import Category
+from apps.accounts import roles
 
 User = get_user_model()
 
@@ -18,8 +19,8 @@ class DraftEntryTests(APITestCase):
         self.nv_giao = User.objects.create_user(username="nv_giao_user", password="password")
         self.viewer_only = User.objects.create_user(username="viewer_user", password="password")
 
-        g_ql, _ = Group.objects.get_or_create(name="quan_ly")
-        g_giao, _ = Group.objects.get_or_create(name="nv_giao")
+        g_ql, _ = Group.objects.get_or_create(name=roles.MANAGER)
+        g_giao, _ = Group.objects.get_or_create(name=roles.DELIVERY_STAFF)
         self.quan_ly.groups.add(g_ql)
         self.nv_giao.groups.add(g_giao)
 

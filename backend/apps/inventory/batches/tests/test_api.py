@@ -13,6 +13,7 @@ from apps.catalog.models import Item, ItemGroup
 from apps.inventory.batches import services as batch_services
 from apps.inventory.models import Batch, Warehouse
 from apps.purchasing.models import Supplier
+from apps.accounts import roles
 
 
 class CostLeakAPITests(TestCase):
@@ -25,10 +26,10 @@ class CostLeakAPITests(TestCase):
             item=item, supplier=sup, warehouse=wh,
             received_date=datetime.date(2026, 9, 1), qty=Decimal("50"), purchase_rate=Decimal("80000"),
         )
-        self.chu = User.objects.create_user("chu", password="x")
-        self.chu.groups.add(Group.objects.get(name="chu"))
+        self.chu = User.objects.create_user(roles.OWNER, password="x")
+        self.chu.groups.add(Group.objects.get(name=roles.OWNER))
         self.kho = User.objects.create_user("kho", password="x")
-        self.kho.groups.add(Group.objects.get(name="nv_kho"))
+        self.kho.groups.add(Group.objects.get(name=roles.WAREHOUSE_STAFF))
 
     def _first_batch(self, user):
         client = APIClient()

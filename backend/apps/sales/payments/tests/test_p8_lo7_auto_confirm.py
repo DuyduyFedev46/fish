@@ -12,18 +12,19 @@ from django.utils import timezone
 from apps.accounts.models import AuditLog
 from apps.ai.models import AiAction, AiPolicyVersion
 from apps.common.exceptions import BusinessError
-from apps.delivery.tests.test_cskh_l3 import CskhL3BaseTestCase
+from apps.delivery.tests.test_cskh_l3 import ConfirmationL3BaseTestCase
 from apps.sales.models import PaymentTransaction
 from apps.sales.orders import services as order_services
 from apps.sales.payments import auto_confirm
 from apps.sales.payments.auto_confirm import process_exact_payment_matches
+from apps.accounts import roles
 
 CMD = "sales.paymenttransaction.resolve"
 SENTINEL = "Khách Giả B 0900000999"
 
 
 @override_settings(AI_ENABLED=True, AI_PRODUCTION_READY=True, SEPAY_ENV="SANDBOX")
-class P8Lo7AutoConfirmTests(CskhL3BaseTestCase):
+class P8Lo7AutoConfirmTests(ConfirmationL3BaseTestCase):
     def setUp(self):
         super().setUp()
         AiPolicyVersion.objects.create(
@@ -50,7 +51,7 @@ class P8Lo7AutoConfirmTests(CskhL3BaseTestCase):
         self._txn()
         with self.assertLogs("apps.sales.payments.auto_confirm", level=logging.WARNING) as cm:
             res = process_exact_payment_matches()
-        self.assertTrue(any("chu" in line for line in cm.output))
+        self.assertTrue(any(roles.OWNER in line for line in cm.output))
         self.assertEqual(AiAction.objects.filter(command=CMD).count(), 0)
         self.assertEqual(AuditLog.objects.filter(action="escalate_unmatched_payment").count(), 0)
         self.assertEqual(res["escalated"], 0)
@@ -61,7 +62,7 @@ class P8Lo7AutoConfirmTests(CskhL3BaseTestCase):
         process_exact_payment_matches()
         act = AiAction.objects.get(command=CMD)
         self.assertEqual(act.owner, self.chu)
-        self.assertEqual(act.assignee_group, "chu")
+        self.assertEqual(act.assignee_group, roles.OWNER)
 
     # --- F12b: downgrade_reason chỉ ghi mã lỗi -----------------------------------
     def _exact_match_order_txn(self):

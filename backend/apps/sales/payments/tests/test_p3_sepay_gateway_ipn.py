@@ -22,6 +22,7 @@ from apps.purchasing.models import Supplier
 from apps.sales.models import PaymentTransaction, SalesInvoice, SalesOrder
 from apps.sales.orders import services as order_services
 from apps.sales.payments import services as payment_services
+from apps.accounts import roles
 
 IPN_URL = "/api/internal/payments/sepay-ipn/"  # phải khớp DJANGO_IPN_ENDPOINT_PATH ở adapter (P2)
 
@@ -174,7 +175,7 @@ class P3AC7ManualThenDifferentTxnDuplicateWarningTests(SepayGatewayIpnBase):
         # Đối chứng: hiện được qua API hàng chờ (Chủ xem) — không chỉ nằm trong DB.
         from apps.common.tests.fixtures import client_for, make_user
 
-        chu = make_user("chu-p3ac7", "chu")
+        chu = make_user("chu-p3ac7", roles.OWNER)
         resp2 = client_for(chu).get(f"/api/sales/payments/{overpaid.pk}/")
         self.assertEqual(resp2.status_code, 200)
         self.assertEqual(

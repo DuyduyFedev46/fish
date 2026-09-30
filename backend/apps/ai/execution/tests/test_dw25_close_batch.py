@@ -30,6 +30,7 @@ from apps.purchasing.models import (
     Supplier,
 )
 from apps.sales.models import Customer, SalesOrder, SalesOrderLine, SalesOrderLineBatch
+from apps.accounts import roles
 
 User = get_user_model()
 
@@ -44,9 +45,9 @@ class CloseBatchAiTests(TestCase):
         self.wh = Warehouse.objects.create(name="Kho chính")
         self.today = timezone.localdate()
 
-        self.u_chu = make_user("chu_dw25", "chu")
-        self.u_quanly = make_user("ql_dw25", "quan_ly")
-        self.u_kho = make_user("kho_dw25", "nv_kho")
+        self.u_chu = make_user("chu_dw25", roles.OWNER)
+        self.u_quanly = make_user("ql_dw25", roles.MANAGER)
+        self.u_kho = make_user("kho_dw25", roles.WAREHOUSE_STAFF)
 
         self.client_chu = client_for(self.u_chu)
         self.client_quanly = client_for(self.u_quanly)
@@ -371,7 +372,7 @@ class CloseBatchAiTests(TestCase):
 
         action = AiAction.objects.get(pk=action_id)
         self.assertEqual(action.status, AiAction.Status.ESCALATED)
-        self.assertEqual(action.assignee_group, "chu")
+        self.assertEqual(action.assignee_group, roles.OWNER)
         self.assertIsNotNone(action.downgrade_reason)
         self.assertEqual(action.downgrade_reason["code"], "AI_CLOSE_BATCH_CONDITIONS_NOT_MET")
 
@@ -384,7 +385,7 @@ class CloseBatchAiTests(TestCase):
             kind=AiAction.Kind.WRITE,
             level=AiAction.Level.B,
             status=AiAction.Status.ESCALATED,
-            assignee_group="quan_ly",
+            assignee_group=roles.MANAGER,
             owner=self.u_chu,
             target_model="batch",
             target_id=str(batch.id),

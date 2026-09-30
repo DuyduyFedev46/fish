@@ -9,6 +9,7 @@ from django.core.management.base import BaseCommand
 from django.db import transaction
 from django.utils import timezone
 
+from apps.accounts import roles
 from apps.common.audit import record_audit, set_ai_audit_scope
 from apps.ai.execution.dispatch import dispatch_command
 from apps.ai.models import AiAction, AiConfigVersion
@@ -70,7 +71,7 @@ class Command(BaseCommand):
         overdue_actions = AiAction.objects.filter(
             status=AiAction.Status.PENDING,
             created_at__lte=two_hours_ago,
-        ).exclude(assignee_group="chu")
+        ).exclude(assignee_group=roles.OWNER)
 
         overdue_escalated_count = 0
         for overdue_act in overdue_actions:
@@ -173,7 +174,7 @@ def _process_one(act, registry):
             if not ok:
                 # DW-25-AC4: Không chốt, về PENDING/ESCALATED + chuyển việc Chủ
                 locked_action.status = AiAction.Status.ESCALATED
-                locked_action.assignee_group = "chu"
+                locked_action.assignee_group = roles.OWNER
                 locked_action.downgrade_reason = close_reason
                 locked_action.save(update_fields=["status", "assignee_group", "downgrade_reason"])
                 record_audit(
@@ -205,7 +206,7 @@ def _process_one(act, registry):
 
         if dispatch_res.is_error:
             # DW-23-AC2: Gặp BusinessError -> ESCALATED cho chủ AI hoặc Group có quyền
-            target_group = "chu"
+            target_group = roles.OWNER
             if spec:
                 owner_has_perm = True
                 if getattr(spec, "required_perms", None):
@@ -213,7 +214,7 @@ def _process_one(act, registry):
 
                 if owner_has_perm:
                     owner_groups = list(owner.groups.values_list("name", flat=True))
-                    target_group = owner_groups[0] if owner_groups else "chu"
+                    target_group = owner_groups[0] if owner_groups else roles.OWNER
                 else:
                     from apps.ai.actions.services import find_assignee_group_for_step
                     target_group = find_assignee_group_for_step({}, spec=spec)
@@ -326,7 +327,7 @@ def _escalate_overdue(overdue_act):
         if not locked_overdue:
             return False
         locked_overdue.status = AiAction.Status.ESCALATED
-        locked_overdue.assignee_group = "chu"
+        locked_overdue.assignee_group = roles.OWNER
         locked_overdue.save(update_fields=["status", "assignee_group"])
 
         # Ghi AuditLog không có PII/giá vốn

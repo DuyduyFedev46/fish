@@ -1,27 +1,27 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
-import { fetchCskhQueue, searchCskh } from "./api";
+import { fetchConfirmationQueue, searchCustomers } from "./api";
 import type {
-  CskhQueueItem,
-  CskhSearchResultItem,
+  ConfirmationQueueItem,
+  CustomerSearchResultItem,
   QueueTabKey,
 } from "./types";
 import { QUEUE_TABS } from "./types";
-import { CskhCallModal } from "./CskhCallModal";
-import s from "./cskh.module.css";
+import { ConfirmationCallModal } from "./ConfirmationCallModal";
+import s from "./confirmation.module.css";
 import { dateOnly, dateTime, timeHM, vnd } from "@/shared/lib/format";
 
-export function CskhQueueView() {
+export function ConfirmationQueueView() {
   const [activeTab, setActiveTab] = useState<QueueTabKey>("DEFAULT");
-  const [items, setItems] = useState<CskhQueueItem[]>([]);
+  const [items, setItems] = useState<ConfirmationQueueItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   // Search state
   const [searchQuery, setSearchQuery] = useState("");
   const [searching, setSearching] = useState(false);
-  const [searchResults, setSearchResults] = useState<CskhSearchResultItem[] | null>(null);
+  const [searchResults, setSearchResults] = useState<CustomerSearchResultItem[] | null>(null);
   const [searchError, setSearchError] = useState<string | null>(null);
 
   // Modal state
@@ -32,7 +32,7 @@ export function CskhQueueView() {
     setError(null);
     try {
       const tab = QUEUE_TABS.find((t) => t.key === tabKey);
-      const res = await fetchCskhQueue({ state: tab?.stateParam });
+      const res = await fetchConfirmationQueue({ state: tab?.stateParam });
       setItems(res.results);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Không thể tải hàng chờ CSKH.";
@@ -58,7 +58,7 @@ export function CskhQueueView() {
     setSearching(true);
     setSearchError(null);
     try {
-      const res = await searchCskh(q);
+      const res = await searchCustomers(q);
       setSearchResults(res.results);
       if (res.results.length === 0) {
         setSearchError("Không tìm thấy đơn hàng nào phù hợp.");
@@ -300,7 +300,7 @@ export function CskhQueueView() {
 
       {/* Call Modal */}
       {selectedNoteId !== null && (
-        <CskhCallModal
+        <ConfirmationCallModal
           noteId={selectedNoteId}
           initialItem={items.find((i) => i.note_id === selectedNoteId)}
           onClose={() => setSelectedNoteId(null)}

@@ -13,6 +13,7 @@ from apps.content.models.entries import Entry
 from apps.content.models.images import ContentImage
 
 from apps.catalog.images.tests.factories import make_image_bytes, make_jpeg_with_exif_orientation
+from apps.accounts import roles
 
 User = get_user_model()
 
@@ -28,8 +29,8 @@ class ContentImageTests(APITestCase):
     def setUp(self):
         self.quan_ly = User.objects.create_user(username="quan_ly_user", password="password")
         self.nv_kho = User.objects.create_user(username="nv_kho_user", password="password")
-        g_ql, _ = Group.objects.get_or_create(name="quan_ly")
-        g_kho, _ = Group.objects.get_or_create(name="nv_kho")
+        g_ql, _ = Group.objects.get_or_create(name=roles.MANAGER)
+        g_kho, _ = Group.objects.get_or_create(name=roles.WAREHOUSE_STAFF)
         self.quan_ly.groups.add(g_ql)
         self.nv_kho.groups.add(g_kho)
 

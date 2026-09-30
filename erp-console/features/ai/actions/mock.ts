@@ -3,6 +3,7 @@
 // api.ts chỉ tham chiếu file này bên trong nhánh `process.env.NEXT_PUBLIC_USE_MOCK === "1"` nên bundler cắt được.
 
 import type { Paginated } from "@/shared/lib/http";
+import { ROLE } from "@/shared/lib/roles";
 import type { AiActionDetail, AiActionRow } from "../types";
 import type { EscalatePayload } from "./api";
 
@@ -75,7 +76,7 @@ export const mockAiActions: Paginated<AiActionRow> = {
       args_preview: { batch_id: "CA02-260928-XY34Z" },
       downgrade_reason: null,
       result_ref: null,
-      assignee_group: "chu",
+      assignee_group: ROLE.owner,
     },
   ],
 };
@@ -146,9 +147,9 @@ export function mockEscalateStep(payload: EscalatePayload) {
     args_preview: { step_key: payload.step_key },
     downgrade_reason: null,
     result_ref: null,
-    assignee_group: "chu",
+    assignee_group: ROLE.owner,
   };
   mockAiActions.results.unshift(newAction);
   mockAiActions.count += 1;
-  return { status: 201, body: { action_id: actionId, assignee_group: "chu" } };
+  return { status: 201, body: { action_id: actionId, assignee_group: ROLE.owner } };
 }

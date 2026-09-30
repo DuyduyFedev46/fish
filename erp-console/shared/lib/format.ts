@@ -18,7 +18,7 @@ export function kg(value: string | number | null | undefined): string {
 }
 
 /** Múi giờ hiển thị duy nhất của Cá Về (GMT+7, không đổi giờ mùa hè). DB lưu UTC; hiển thị luôn qua đây (SR-25). */
-export const VN_TZ = "Asia/Ho_Chi_Minh";
+export const VN_TIME_ZONE = "Asia/Ho_Chi_Minh";
 
 // Một formatter/lần gọi rẻ hơn tạo mới mỗi dòng bảng; dựng lười để không chạy Intl khi import ở test node.
 let partsFmt: Intl.DateTimeFormat | null = null;
@@ -29,7 +29,7 @@ function vnParts(input: string | number | Date | null | undefined) {
   const d = input instanceof Date ? input : new Date(input);
   if (Number.isNaN(d.getTime())) return null;
   partsFmt ??= new Intl.DateTimeFormat("en-GB", {
-    timeZone: VN_TZ,
+    timeZone: VN_TIME_ZONE,
     year: "numeric",
     month: "2-digit",
     day: "2-digit",

@@ -3,35 +3,35 @@
 import React, { useState, useEffect, useId, useRef } from "react";
 import { useRouter } from "next/navigation";
 import {
-  claimCskhTask,
-  fetchCskhDetail,
-  recordCskhCall,
+  claimConfirmationTask,
+  fetchConfirmationDetail,
+  recordConfirmationCall,
   isStaleStateError,
   unconfirmDelivery,
   changeRecipient,
-  decideCskh,
+  decideConfirmation,
 } from "./api";
 import type {
   CallResult,
-  CskhDecision,
-  CskhQueueDetail,
-  CskhQueueItem,
+  ConfirmationDecision,
+  ConfirmationQueueDetail,
+  ConfirmationQueueItem,
   RecordCallPayload,
 } from "./types";
 import { CALL_RESULT_OPTIONS } from "./types";
-import s from "./cskh.module.css";
+import s from "./confirmation.module.css";
 import { dateOnly, dateTime, timeHM, vnInputToIso, vnd } from "@/shared/lib/format";
 
 type Props = {
   noteId: number;
-  initialItem?: CskhQueueItem;
+  initialItem?: ConfirmationQueueItem;
   onClose: () => void;
   onUpdated: () => void;
 };
 
-export function CskhCallModal({ noteId, initialItem, onClose, onUpdated }: Props) {
+export function ConfirmationCallModal({ noteId, initialItem, onClose, onUpdated }: Props) {
   const router = useRouter();
-  const [detail, setDetail] = useState<CskhQueueDetail | null>(null);
+  const [detail, setDetail] = useState<ConfirmationQueueDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -47,7 +47,7 @@ export function CskhCallModal({ noteId, initialItem, onClose, onUpdated }: Props
   const [callbackTime, setCallbackTime] = useState("");
 
   // Manager Decision state (for ESCALATED)
-  const [decisionType, setDecisionType] = useState<CskhDecision>("DELIVER_WITHOUT_CONFIRM");
+  const [decisionType, setDecisionType] = useState<ConfirmationDecision>("DELIVER_WITHOUT_CONFIRM");
   const [deliverReason, setDeliverReason] = useState("");
   const [extendUntil, setExtendUntil] = useState("");
   const [extendReason, setExtendReason] = useState("");
@@ -77,7 +77,7 @@ export function CskhCallModal({ noteId, initialItem, onClose, onUpdated }: Props
     setError(null);
 
     // First, attempt to claim soft lock
-    claimCskhTask(noteId)
+    claimConfirmationTask(noteId)
       .then((res) => {
         if (!active) return;
         setLockWarning(null);
@@ -92,7 +92,7 @@ export function CskhCallModal({ noteId, initialItem, onClose, onUpdated }: Props
       });
 
     // Then load detail
-    fetchCskhDetail(noteId)
+    fetchConfirmationDetail(noteId)
       .then((data) => {
         if (active) {
           setDetail(data);
@@ -156,7 +156,7 @@ export function CskhCallModal({ noteId, initialItem, onClose, onUpdated }: Props
         request_id: requestId,
       };
 
-      await recordCskhCall(noteId, payload);
+      await recordConfirmationCall(noteId, payload);
       onUpdated();
       onClose();
     } catch (err: unknown) {
@@ -190,7 +190,7 @@ export function CskhCallModal({ noteId, initialItem, onClose, onUpdated }: Props
         setNotice("Tem cũ đã hết hiệu lực – cần in lại tem mới và huỷ tem cũ.");
       }
       // Reload detail
-      const refreshed = await fetchCskhDetail(noteId);
+      const refreshed = await fetchConfirmationDetail(noteId);
       setDetail(refreshed);
       onUpdated();
     } catch (err: unknown) {
@@ -233,7 +233,7 @@ export function CskhCallModal({ noteId, initialItem, onClose, onUpdated }: Props
           setSubmitting(false);
           return;
         }
-        await decideCskh(noteId, {
+        await decideConfirmation(noteId, {
           decision: "DELIVER_WITHOUT_CONFIRM",
           reason: deliverReason.trim(),
         });
@@ -250,7 +250,7 @@ export function CskhCallModal({ noteId, initialItem, onClose, onUpdated }: Props
           setSubmitting(false);
           return;
         }
-        await decideCskh(noteId, {
+        await decideConfirmation(noteId, {
           decision: "EXTEND",
           until: vnInputToIso(extendUntil),
           reason: extendReason.trim(),
@@ -258,7 +258,7 @@ export function CskhCallModal({ noteId, initialItem, onClose, onUpdated }: Props
         onUpdated();
         onClose();
       } else if (decisionType === "CANCEL") {
-        const res = await decideCskh(noteId, {
+        const res = await decideConfirmation(noteId, {
           decision: "CANCEL",
           reason_code: cancelReasonCode,
           note: cancelNote.trim(),
@@ -310,7 +310,7 @@ export function CskhCallModal({ noteId, initialItem, onClose, onUpdated }: Props
           )}
 
           {staleMessage && (
-            <div className={`${s.alertBox} ${s.alertError} ${s.staleBox}`} role="alert" data-testid="cskh-stale-alert" ref={staleRef}>
+            <div className={`${s.alertBox} ${s.alertError} ${s.staleBox}`} role="alert" data-testid="confirmation-stale-alert" ref={staleRef}>
               <span>{staleMessage}</span>
               <button type="button" className={s.btnPrimary} onClick={handleReloadAfterStale}>
                 Tải lại

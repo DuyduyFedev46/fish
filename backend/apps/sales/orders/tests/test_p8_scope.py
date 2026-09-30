@@ -24,6 +24,7 @@ from apps.sales.models import SalesOrder
 from apps.sales.orders import services as order_services
 from apps.sales.orders.scope import scope_orders_for
 from apps.sales.payments import services as payment_services
+from apps.accounts import roles
 
 
 @override_settings(AI_ENABLED=True)
@@ -45,12 +46,12 @@ class OrderScopeBase(TestCase):
         )
         batch_services.publish_batch(batch=batch, actor=None)
 
-        self.chu = make_user("sc_chu", "chu")
-        self.ql = make_user("sc_ql", "quan_ly")
-        self.kho = make_user("sc_kho", "nv_kho")
-        self.giao = make_user("sc_giao", "nv_giao")
-        self.giao2 = make_user("sc_giao2", "nv_giao")
-        self.cskh = make_user("sc_cskh", "cskh")
+        self.chu = make_user("sc_chu", roles.OWNER)
+        self.ql = make_user("sc_ql", roles.MANAGER)
+        self.kho = make_user("sc_kho", roles.WAREHOUSE_STAFF)
+        self.giao = make_user("sc_giao", roles.DELIVERY_STAFF)
+        self.giao2 = make_user("sc_giao2", roles.DELIVERY_STAFF)
+        self.cskh = make_user("sc_cskh", roles.CUSTOMER_SERVICE)
         # Gán quyền trực tiếp, không thuộc Group nào (AC3)
         self.direct = make_user("sc_direct", perms=("sales.view_salesorder",))
 

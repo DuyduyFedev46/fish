@@ -160,7 +160,7 @@ class QAPathsTests(QABase):
             t.escalation_reason = ConfirmationTask.EscalationReason.UNREACHABLE
             t.escalated_at = t0
             t.save()
-        from apps.delivery.cskh import services as cskh_services
+        from apps.delivery.confirmation import services as confirmation_services
         from apps.sales.credit_notes import services as cn_services
         real = cn_services.issue_cancel_credit_note
 
@@ -172,7 +172,7 @@ class QAPathsTests(QABase):
         with override_settings(CSKH_AUTO_CANCEL_ENABLED=True):
             with mock.patch("apps.sales.credit_notes.services.issue_cancel_credit_note", side_effect=flaky):
                 with self.assertLogs("cangca.delivery.cskh", level="ERROR") as logs:
-                    res = cskh_services.auto_cancel_overdue(now=t0 + timedelta(minutes=31))
+                    res = confirmation_services.auto_cancel_overdue(now=t0 + timedelta(minutes=31))
             # log lỗi không chứa dữ liệu cá nhân giả
             blob = "\n".join(logs.output)
             for s in ("0900000111", "0900000222", "Khách Giả", "Số 1 Đường Thử"):
@@ -184,9 +184,9 @@ class QAPathsTests(QABase):
             self.assertIn(o2.status, (SalesOrder.Status.PAID, SalesOrder.Status.PROCESSING))
             self.assertEqual(SalesCreditNote.objects.count(), 1)
             # chạy lại (không lỗi nữa) -> đơn 2 được huỷ + có chứng từ, đơn 1 không bị nhân đôi
-            res2 = cskh_services.auto_cancel_overdue(now=t0 + timedelta(minutes=32))
+            res2 = confirmation_services.auto_cancel_overdue(now=t0 + timedelta(minutes=32))
             self.assertEqual(res2["cancelled"], 1)
-            res3 = cskh_services.auto_cancel_overdue(now=t0 + timedelta(minutes=33))
+            res3 = confirmation_services.auto_cancel_overdue(now=t0 + timedelta(minutes=33))
             self.assertEqual(res3["cancelled"], 0)
         self.assertEqual(SalesCreditNote.objects.count(), 2)
         self.assertEqual(SalesCreditNote.objects.filter(sales_invoice=o1.invoice).count(), 1)

@@ -18,6 +18,7 @@ from apps.common.formatting import format_vnd
 from apps.common.tests.fixtures import make_batch, make_master, make_user
 from apps.purchasing.models import PurchaseCost, PurchaseCostAllocation, PurchaseInvoice
 from apps.sales.models import PaymentTransaction
+from apps.accounts import roles
 
 SECRET = Decimal("7654321")
 NEEDLES = ("7654321", "7.654.321", "7,654,321", "7654321.00")
@@ -34,7 +35,7 @@ class AdminStrNoCostLeak(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.item, cls.sup, cls.wh = make_master()
-        cls.chu = staff("chu1", "chu")
+        cls.chu = staff("chu1", roles.OWNER)
         cls.batch = make_batch(cls.item, cls.sup, cls.wh) if callable(make_batch) else None
         cls.cost = PurchaseCost.objects.create(
             cost_type="ICE", amount=SECRET, incurred_date=datetime.date(2026, 10, 1), created_by=cls.chu)
@@ -68,7 +69,7 @@ class AdminStrNoCostLeak(TestCase):
 
     def test_str_dung_vnd_va_khong_ro_khi_khong_co_quyen_xem_gia_von(self):
         self.assertEqual(format_vnd(SECRET), "7.654.321 ₫")
-        for name, grp in (("ql", "quan_ly"), ("kho", "nv_kho"), ("giao", "nv_giao"), ("cs", "cskh")):
+        for name, grp in (("ql", roles.MANAGER), ("kho", roles.WAREHOUSE_STAFF), ("giao", roles.DELIVERY_STAFF), ("cs", roles.CUSTOMER_SERVICE)):
             user = staff(name, grp)
             has_cost = user.has_perm("inventory.view_costprice")
             leaks, seen = self.scan(user)

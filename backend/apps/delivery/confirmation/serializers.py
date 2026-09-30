@@ -12,7 +12,7 @@ from rest_framework import serializers
 
 from apps.common.formatting import format_local_date
 from apps.common.pii import mask_phone
-from apps.delivery.cskh.scope import note_in_cskh_scope
+from apps.delivery.confirmation.scope import note_in_customer_service_scope
 from apps.delivery.models import ConfirmationTask, CustomerCall, DeliveryNote
 from apps.sales.models.invoices import SalesInvoiceLineBatch
 
@@ -43,7 +43,7 @@ class CustomerCallSerializer(serializers.ModelSerializer):
         return obj.note_text if in_scope else ""
 
 
-class CskhQueueItemSerializer(serializers.ModelSerializer):
+class ConfirmationQueueItemSerializer(serializers.ModelSerializer):
     """
     Serializer cho từng dòng trong hàng chờ CSKH (02b §4.3).
     """
@@ -93,7 +93,7 @@ class CskhQueueItemSerializer(serializers.ModelSerializer):
         order = getattr(invoice, "sales_order", None) if invoice else None
         customer = getattr(order, "customer", None) if order else None
 
-        in_scope = note_in_cskh_scope(user, note, now=now)
+        in_scope = note_in_customer_service_scope(user, note, now=now)
 
         # Trạng thái hiển thị
         confirm_state = None if obj.state == ConfirmationTask.State.DONE else obj.state
@@ -215,7 +215,7 @@ class CskhQueueItemSerializer(serializers.ModelSerializer):
         return data
 
 
-class CskhQueueDetailSerializer(CskhQueueItemSerializer):
+class ConfirmationQueueDetailSerializer(ConfirmationQueueItemSerializer):
     """
     Serializer chi tiết cho một task trong hàng chờ CSKH, gồm lịch sử cuộc gọi và available_actions.
     """

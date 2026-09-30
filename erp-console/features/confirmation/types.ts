@@ -1,17 +1,17 @@
-export type CskhConfirmState =
+export type ConfirmationState =
   | "PENDING"
   | "CALLBACK"
   | "ESCALATED"
   | "REFUND_CALL"
   | "DONE";
 
-export type CskhQueueItem = {
+export type ConfirmationQueueItem = {
   note_id: number;
   order_id: number;
   order_code: string;
   note_status: string;
   paid_at: string | null;
-  confirm_state: CskhConfirmState | null;
+  confirm_state: ConfirmationState | null;
   escalation_reason: string | null;
   escalation_label: string | null;
   attempts: number;
@@ -54,20 +54,20 @@ export type CustomerCall = {
   note: string;
 };
 
-export type CskhQueueDetail = CskhQueueItem & {
+export type ConfirmationQueueDetail = ConfirmationQueueItem & {
   calls: CustomerCall[];
   available_actions: string[];
   guidance?: string | null;
 };
 
-export type CskhQueueResponse = {
+export type ConfirmationQueueResponse = {
   count: number;
   next: string | null;
   previous: string | null;
-  results: CskhQueueItem[];
+  results: ConfirmationQueueItem[];
 };
 
-export type CskhSearchResultItem = {
+export type CustomerSearchResultItem = {
   note_id: number;
   order_code: string;
   status_label: string;
@@ -77,8 +77,8 @@ export type CskhSearchResultItem = {
   phone_masked?: string;
 };
 
-export type CskhSearchResponse = {
-  results: CskhSearchResultItem[];
+export type CustomerSearchResponse = {
+  results: CustomerSearchResultItem[];
 };
 
 export type CallResult =
@@ -140,10 +140,10 @@ export const CALL_RESULT_OPTIONS: Array<{
   },
 ];
 
-export type CskhDecision = "DELIVER_WITHOUT_CONFIRM" | "EXTEND" | "CANCEL";
+export type ConfirmationDecision = "DELIVER_WITHOUT_CONFIRM" | "EXTEND" | "CANCEL";
 
 export type DecidePayload = {
-  decision: CskhDecision;
+  decision: ConfirmationDecision;
   reason?: string;
   until?: string | null;
   reason_code?: string;

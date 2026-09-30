@@ -7,11 +7,12 @@ from apps.ai.execution.scrub import scrub_data
 from apps.ai.policy.rules import SCRUB_PII_KEYS
 from apps.common.tests.fixtures import make_user
 from django.test import TestCase
+from apps.accounts import roles
 
 
 class ScrubCustomerBranchTests(TestCase):
     def setUp(self):
-        self.chu = make_user("chu_scrub_p8", "chu")
+        self.chu = make_user("chu_scrub_p8", roles.OWNER)
 
     def test_sr04_ac2_customer_dang_chuoi_bi_bo(self):
         res = scrub_data({"code": "SO-1", "customer": "Khách Giả Bí Mật"}, user=self.chu)

@@ -16,6 +16,7 @@ from apps.purchasing.models import Supplier
 from apps.sales.models import Customer, SalesOrder
 from apps.sales.orders import services as order_services
 from apps.sales.orders.shop_api import LOOKUP_BAD_LAST4, LOOKUP_NOT_FOUND
+from apps.accounts import roles
 
 
 class ShopOrderLookupL6Tests(TestCase):
@@ -112,7 +113,7 @@ class ShopOrderLookupL6Tests(TestCase):
         self.assertEqual(resp.json(), {"detail": LOOKUP_NOT_FOUND})
 
     def test_s02_ac6_phan_quyen_endpoint_van_cong_khai_va_user_login_tuan_thu_ac1_ac3(self):
-        for role in ("chu", "quan_ly", "nv_kho", "nv_giao"):
+        for role in (roles.OWNER, roles.MANAGER, roles.WAREHOUSE_STAFF, roles.DELIVERY_STAFF):
             user = make_user(f"user_{role}", role)
             client = client_for(user)
             # AC1: sai định dạng -> 400

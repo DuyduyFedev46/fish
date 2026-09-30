@@ -12,6 +12,7 @@ from apps.accounts.models import AuditLog
 from apps.content.models.categories import Category
 from apps.content.models.entries import Entry, EntryVersion
 from apps.content.models.images import ContentImage
+from apps.accounts import roles
 
 User = get_user_model()
 
@@ -21,8 +22,8 @@ class PublishEntryTests(TestCase):
         self.client = APIClient()
 
         # Tạo user quản lý (có đủ quyền content)
-        self.quan_ly = User.objects.create_user(username="quan_ly", password="password123")
-        group_ql, _ = Group.objects.get_or_create(name="quan_ly")
+        self.quan_ly = User.objects.create_user(username=roles.MANAGER, password="password123")
+        group_ql, _ = Group.objects.get_or_create(name=roles.MANAGER)
         for perm_code in ("view_entry", "add_entry", "change_entry", "delete_entry", "publish_entry"):
             perm = Permission.objects.get(codename=perm_code, content_type__app_label="content")
             group_ql.permissions.add(perm)
@@ -35,8 +36,8 @@ class PublishEntryTests(TestCase):
             self.user_soan.user_permissions.add(perm)
 
         # Tạo user NV kho (không có quyền content nào)
-        self.nv_kho = User.objects.create_user(username="nv_kho", password="password123")
-        group_kho, _ = Group.objects.get_or_create(name="nv_kho")
+        self.nv_kho = User.objects.create_user(username=roles.WAREHOUSE_STAFF, password="password123")
+        group_kho, _ = Group.objects.get_or_create(name=roles.WAREHOUSE_STAFF)
         self.nv_kho.groups.add(group_kho)
 
         # Chuyên mục hợp lệ

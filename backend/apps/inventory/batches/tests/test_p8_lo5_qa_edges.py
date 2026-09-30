@@ -37,6 +37,7 @@ from apps.sales.models import SalesOrder
 from apps.sales.orders import services as order_services
 from apps.sales.orders.tests.test_s10_api import OrderApiBase, find_keys
 from apps.sales.payments import services as payment_services
+from apps.accounts import roles
 
 REFUND = "1234567"           # tiền NCC hoàn giả — dò rò
 PII_NAME = "Khách Giả Năm"
@@ -48,7 +49,7 @@ RECENT_KEYS = {"code", "amount", "status", "status_label", "expires_at"}
 class Base(OrderApiBase):
     def setUp(self):
         super().setUp()
-        self.cs = make_user("cs_qa5", "cskh")
+        self.cs = make_user("cs_qa5", roles.CUSTOMER_SERVICE)
         self.c_chu = client_for(self.chu)
         self._urls(self.batch)
 
@@ -507,13 +508,13 @@ class QaFuzzReturnTests(Base):
 class QaPermissionMatrixTests(Base):
     def _principals(self):
         return {
-            "chu": self.c_chu, "quan_ly": client_for(self.ql), "nv_kho": client_for(self.kho),
-            "nv_giao": client_for(self.giao), "cskh": client_for(self.cs), "khach": client_for(None),
+            roles.OWNER: self.c_chu, roles.MANAGER: client_for(self.ql), roles.WAREHOUSE_STAFF: client_for(self.kho),
+            roles.DELIVERY_STAFF: client_for(self.giao), roles.CUSTOMER_SERVICE: client_for(self.cs), "khach": client_for(None),
             "khong_nhom": client_for(self.nobody),
         }
 
     def test_qa_ma_tran_3_endpoint_x_7_nguoi_dung(self):
-        expect = {"chu": 200, "quan_ly": 403, "nv_kho": 403, "nv_giao": 403, "cskh": 403, "khach": 401,
+        expect = {roles.OWNER: 200, roles.MANAGER: 403, roles.WAREHOUSE_STAFF: 403, roles.DELIVERY_STAFF: 403, roles.CUSTOMER_SERVICE: 403, "khach": 401,
                   "khong_nhom": 403}
         ok200 = 0
         for name, client in self._principals().items():
@@ -528,11 +529,11 @@ class QaPermissionMatrixTests(Base):
                     exp = expect[name]
                 else:
                     r = client.post(self.close_url)
-                    exp = 400 if name == "chu" else expect[name]   # chu: 400 BR-LO-04 (còn tồn) là hợp lệ
+                    exp = 400 if name == roles.OWNER else expect[name]   # chu: 400 BR-LO-04 (còn tồn) là hợp lệ
                 self.assertEqual(r.status_code, exp, (name, ep, r.status_code, r.content[:200]))
                 if r.status_code == 200:
                     ok200 += 1
-                if name != "chu":
+                if name != roles.OWNER:
                     self.assertEqual(self._b().qty_available, Decimal("100.000"), (name, ep))
                     self.assertNotIn(REFUND, r.content.decode())
                 # trả về trạng thái để vòng sau
@@ -560,16 +561,16 @@ class QaAttentionMatrixTests(Base):
     def test_qa_attention_ma_tran(self):
         self._expire()
         rows = {}
-        for name, user in (("chu", self.chu), ("quan_ly", self.ql), ("nv_kho", self.kho),
-                           ("nv_giao", self.giao), ("cskh", self.cs), ("khong_nhom", self.nobody)):
+        for name, user in ((roles.OWNER, self.chu), (roles.MANAGER, self.ql), (roles.WAREHOUSE_STAFF, self.kho),
+                           (roles.DELIVERY_STAFF, self.giao), (roles.CUSTOMER_SERVICE, self.cs), ("khong_nhom", self.nobody)):
             r = self._attention(client_for(user))
             rows[name] = r
         r_anon = self._attention(client_for(None))
         self.assertEqual(r_anon.status_code, 401)
-        self.assertEqual(rows["chu"].status_code, 200)
-        self.assertEqual(rows["chu"].json()["expired_batches_open"], 1)
+        self.assertEqual(rows[roles.OWNER].status_code, 200)
+        self.assertEqual(rows[roles.OWNER].json()["expired_batches_open"], 1)
         n200 = 1
-        for name in ("quan_ly", "nv_kho", "nv_giao", "cskh"):
+        for name in (roles.MANAGER, roles.WAREHOUSE_STAFF, roles.DELIVERY_STAFF, roles.CUSTOMER_SERVICE):
             if rows[name].status_code == 200:
                 n200 += 1
                 self.assertNotIn("expired_batches_open", rows[name].json(), name)
@@ -615,7 +616,7 @@ class QaDashboardPiiTests(Base):
 
     def test_qa_dashboard_5_khoa_moi_group_khong_pii_dem_200(self):
         n200 = 0
-        for name, user in (("chu", self.chu), ("quan_ly", self.ql), ("nv_kho", self.kho)):
+        for name, user in ((roles.OWNER, self.chu), (roles.MANAGER, self.ql), (roles.WAREHOUSE_STAFF, self.kho)):
             r = client_for(user).get("/api/dashboard/summary/")
             self.assertEqual(r.status_code, 200, (name, r.content[:200]))
             n200 += 1
@@ -629,7 +630,7 @@ class QaDashboardPiiTests(Base):
                 self.assertNotIn(s, raw, (name, s))
             # có dữ liệu thật (mã đơn) — không xanh giả vì rỗng
             self.assertIn(self._paid_order_pii.code, raw)
-        for name, user, exp in (("nv_giao", self.giao, 403), ("cskh", self.cs, 403), ("khong_nhom", self.nobody, 403),
+        for name, user, exp in ((roles.DELIVERY_STAFF, self.giao, 403), (roles.CUSTOMER_SERVICE, self.cs, 403), ("khong_nhom", self.nobody, 403),
                                 ("khach", None, 401)):
             self.assertEqual(client_for(user).get("/api/dashboard/summary/").status_code, exp, name)
         self.assertEqual(n200, 3)
@@ -672,8 +673,8 @@ class QaLeakTests(Base):
     def test_qa_quet_get_moi_group_khong_lo_tien_ncc(self):
         n200 = 0
         per_group_200 = {}
-        for name, user in (("chu", self.chu), ("quan_ly", self.ql), ("nv_kho", self.kho),
-                           ("nv_giao", self.giao), ("cskh", self.cs)):
+        for name, user in ((roles.OWNER, self.chu), (roles.MANAGER, self.ql), (roles.WAREHOUSE_STAFF, self.kho),
+                           (roles.DELIVERY_STAFF, self.giao), (roles.CUSTOMER_SERVICE, self.cs)):
             c = client_for(user)
             per_group_200[name] = 0
             for url in self._urls_get():
@@ -683,13 +684,13 @@ class QaLeakTests(Base):
                     n200 += 1
                     per_group_200[name] += 1
                     raw = r.content.decode()
-                    if name != "chu":
+                    if name != roles.OWNER:
                         self.assertNotIn(REFUND, raw, (name, url))
                         self.assertNotIn("1,234,567", raw, (name, url))
                         self.assertNotIn("supplier_refund_amount", raw, (name, url))
                         self.assertNotIn("supplier_return_qty", raw, (name, url))
         self.assertGreater(n200, 30)
-        for name in ("chu", "quan_ly", "nv_kho"):
+        for name in (roles.OWNER, roles.MANAGER, roles.WAREHOUSE_STAFF):
             self.assertGreater(per_group_200[name], 5, name)   # không xanh giả vì toàn 403/404
 
     def test_qa_nhat_ky_quan_ly_khong_thay_tien_chu_thay(self):
@@ -724,7 +725,7 @@ class QaLeakTests(Base):
     def test_qa_admin_html_khong_lo_tien_ncc_voi_nhan_vien_khong_phai_chu(self):
         """Admin: BatchSupplierReturn không được đăng ký; trang Lô/Sổ kho/Nhật ký của user is_staff (nếu có) không lộ tiền."""
         staff = {}
-        for name, grp in (("quan_ly", "quan_ly"), ("nv_kho", "nv_kho")):
+        for name, grp in ((roles.MANAGER, roles.MANAGER), (roles.WAREHOUSE_STAFF, roles.WAREHOUSE_STAFF)):
             u = make_user(f"staff_{name}_qa5", grp)
             User.objects.filter(pk=u.pk).update(is_staff=True)
             staff[name] = User.objects.get(pk=u.pk)
@@ -772,7 +773,7 @@ class QaLeakTests(Base):
         self.assertEqual(self._b().qty_available, Decimal("90.000"))
         self.assertEqual(BatchSupplierReturn.objects.filter(batch=self.batch).count(), 1)
         n200 = 0
-        for name, user in (("quan_ly", self.ql), ("nv_kho", self.kho), ("nv_giao", self.giao), ("cskh", self.cs)):
+        for name, user in ((roles.MANAGER, self.ql), (roles.WAREHOUSE_STAFF, self.kho), (roles.DELIVERY_STAFF, self.giao), (roles.CUSTOMER_SERVICE, self.cs)):
             c = client_for(user)
             for url in ("/api/ai/actions/", "/api/ai/commands/index/", "/api/ai/report/daily/"):
                 rr = c.get(url)
@@ -863,7 +864,7 @@ class QaAdminAuditBaselineTests(Base):
         return r.content.decode()
 
     def test_qa_admin_nhat_ky_khoa_cu_va_khoa_lo5_an_voi_staff_quan_ly(self):
-        u = make_user("staff_ql_base_qa5", "quan_ly")
+        u = make_user("staff_ql_base_qa5", roles.MANAGER)
         User.objects.filter(pk=u.pk).update(is_staff=True)
         u = User.objects.get(pk=u.pk)
         self.assertFalse(u.has_perm("inventory.view_costprice"))
@@ -969,7 +970,7 @@ class QaAdminB1MatrixTests(Base):
 
     def test_qa_b1_quan_ly_va_nv_kho_khong_thay_gia_von_o_moi_duong_admin(self):
         self._seed()
-        for name, grp in (("b1_quan_ly", "quan_ly"), ("b1_nv_kho", "nv_kho")):
+        for name, grp in (("b1_quan_ly", roles.MANAGER), ("b1_nv_kho", roles.WAREHOUSE_STAFF)):
             u = self._staff(name, grp)
             self.assertFalse(u.has_perm("inventory.view_costprice"), grp)
             n200, leaked = self._sweep(u, expect_full=False)
@@ -979,7 +980,7 @@ class QaAdminB1MatrixTests(Base):
     def test_qa_b1_khoa_khong_nhay_cam_van_hien_va_dong_rong_none_khong_5xx(self):
         from django.test import Client
         self._seed()
-        u = self._staff("b1_ql_vis", "quan_ly")
+        u = self._staff("b1_ql_vis", roles.MANAGER)
         c = Client()
         c.force_login(u)
         html = c.get(f"/admin/accounts/auditlog/{self.nested.pk}/change/").content.decode()
@@ -991,7 +992,7 @@ class QaAdminB1MatrixTests(Base):
     def test_qa_b1_chu_va_superuser_thay_du_o_change_view(self):
         from django.test import Client
         self._seed()
-        chu = self._staff("b1_chu_full", "chu")
+        chu = self._staff("b1_chu_full", roles.OWNER)
         su = User.objects.create_superuser("b1_su_full", password="x")
         for who in (chu, su):
             self.assertTrue(who.has_perm("inventory.view_costprice"), who.username)
@@ -1016,7 +1017,7 @@ class QaAdminB1MatrixTests(Base):
         note_before = AuditLog.objects.get(pk=self.ret.pk).note
         self.assertIn("supplier_refund_amount", before)
         n = AuditLog.objects.count()
-        for who in (self._staff("b1_ql_ro", "quan_ly"), User.objects.create_superuser("b1_su_ro", password="x")):
+        for who in (self._staff("b1_ql_ro", roles.MANAGER), User.objects.create_superuser("b1_su_ro", password="x")):
             c = Client()
             c.force_login(who)
             c.get(f"/admin/accounts/auditlog/{self.ret.pk}/change/")

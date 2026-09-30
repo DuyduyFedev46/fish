@@ -19,6 +19,7 @@ from apps.sales.models import (
     SalesInvoiceLineBatch,
     SalesOrder,
 )
+from apps.accounts import roles
 
 
 def _dt(y, m, d, h=8):
@@ -32,7 +33,7 @@ class ReportsServiceTests(TestCase):
     """
 
     def setUp(self):
-        self.user = User.objects.create_user("chu", password="x")
+        self.user = User.objects.create_user(roles.OWNER, password="x")
         self.g = ItemGroup.objects.create(name="Cá")
         self.item = Item.objects.create(code="CA01", name="Cá thu", item_group=self.g)
         self.sup = Supplier.objects.create(name="Đầu mối A")

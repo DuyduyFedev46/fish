@@ -15,3 +15,6 @@ Migration `0007`: `AuditLog` thêm 3 field nullable `actor_kind`/`ai_actor`/`pro
 `actor_kind` (actor null → `system`) + gán quyền `accounts.view_auditlog` cho chu/quan_ly (S03, AI Native ERP).
 `audit/`: `GET /api/audit-logs/` (S03) — nhật ký có `actor_kind` (`user`/`system`/`ai`), dòng AI hiển thị
 `ai:<tên user>`, lọc `?action=`/`?actor_kind=`, append-only (chỉ GET). Xem `apps/accounts/audit/README.md`.
+
+`roles.py`: hằng tên Group (`OWNER`, `MANAGER`, `WAREHOUSE_STAFF`, `DELIVERY_STAFF`, `CUSTOMER_SERVICE`, `ALL_ROLES`) — nơi duy nhất
+chứa chuỗi tên Group trong code (P8b Lô 1); chỉ hằng, không import gì. Giá trị vẫn là tên đang lưu trong DB.

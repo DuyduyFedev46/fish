@@ -22,18 +22,19 @@ from apps.inventory.batches import services as batch_services
 from apps.inventory.models import Batch, Warehouse
 from apps.purchasing.models import Supplier
 from apps.sales.models import Customer, SalesInvoice, SalesInvoiceLine, SalesInvoiceLineBatch, SalesOrder
+from apps.accounts import roles
 
 
 class CskhL1Tests(TestCase):
     def setUp(self):
         # Các Group cơ bản đã có từ 0002
-        self.chu = make_user("chu_test", "chu")
-        self.ql = make_user("ql_test", "quan_ly")
-        self.kho = make_user("kho_test", "nv_kho")
-        self.giao = make_user("giao_test", "nv_giao")
-        self.giao2 = make_user("giao2_test", "nv_giao")
-        self.cs1 = make_user("cs1_test", "cskh")
-        self.cs2 = make_user("cs2_test", "cskh")
+        self.chu = make_user("chu_test", roles.OWNER)
+        self.ql = make_user("ql_test", roles.MANAGER)
+        self.kho = make_user("kho_test", roles.WAREHOUSE_STAFF)
+        self.giao = make_user("giao_test", roles.DELIVERY_STAFF)
+        self.giao2 = make_user("giao2_test", roles.DELIVERY_STAFF)
+        self.cs1 = make_user("cs1_test", roles.CUSTOMER_SERVICE)
+        self.cs2 = make_user("cs2_test", roles.CUSTOMER_SERVICE)
 
         # Master data
         self.group = ItemGroup.objects.create(name="Cá biển")
@@ -100,7 +101,7 @@ class CskhL1Tests(TestCase):
 
     def test_cs01_ac1_group_cskh_permissions_and_idempotent_migration(self):
         """CS-01-AC1: Group cskh có đủ 4 quyền; các group khác có quyền tương ứng."""
-        cskh_group = Group.objects.get(name="cskh")
+        cskh_group = Group.objects.get(name=roles.CUSTOMER_SERVICE)
         perm_codes = set(cskh_group.permissions.values_list("codename", flat=True))
         expected_cskh = {
             "view_salesorder",
@@ -116,7 +117,7 @@ class CskhL1Tests(TestCase):
         from django.apps import apps
         migration_mod.grant(apps, None)
 
-        cskh_group = Group.objects.get(name="cskh")
+        cskh_group = Group.objects.get(name=roles.CUSTOMER_SERVICE)
         perm_codes = set(cskh_group.permissions.values_list("codename", flat=True))
         self.assertEqual(perm_codes, expected_cskh)
 
@@ -129,7 +130,7 @@ class CskhL1Tests(TestCase):
         self.assertEqual(data["home"], "cskh-queue")
         self.assertFalse(data["can_view_cost"])
         self.assertFalse(data["can_view_profit"])
-        self.assertEqual(data["group_labels"], [{"code": "cskh", "label": "CSKH"}])
+        self.assertEqual(data["group_labels"], [{"code": roles.CUSTOMER_SERVICE, "label": "CSKH"}])
         cap_codes = [c["code"] for c in data["capabilities"]]
         self.assertIn("delivery.confirm_with_customer", cap_codes)
         self.assertIn("delivery.change_recipient", cap_codes)

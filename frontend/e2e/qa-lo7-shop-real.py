@@ -154,7 +154,7 @@ def main():
         calls.clear()
         goto(page, "/shop/checkout/")
         check("F10 mở checkout (form) -> site-info đúng 1 request (footer + form dùng chung)", n(calls, "/api/public/site-info/") == 1, str(n(calls, "/api/public/site-info/")))
-        txt = page.locator('[data-testid="cskh-notice"]').inner_text()
+        txt = page.locator('[data-testid="confirmation-policy-notice"]').inner_text()
         check("F10 khối CSKH ở form hiện giờ 07:00-21:00 (nguồn cskh_notice.working_hours)", "07:00-21:00" in txt and "7:00–20:00" not in txt, txt)
         page.screenshot(path=f"{SHOT_DIR}/lo7-f10-checkout-form-390.png", full_page=True)
         page.fill("#name", "Khách QA Ẩn Danh")
@@ -166,7 +166,7 @@ def main():
         body = page.inner_text("body")
         check("F10 màn thanh toán hiện 'Đặt hàng thành công'", "Đặt hàng thành công" in body)
         call_box = page.locator('[data-testid="confirm-call-notice"]')
-        cskh_box = page.locator('[data-testid="cskh-notice"]')
+        cskh_box = page.locator('[data-testid="confirmation-policy-notice"]')
         check("F10 hộp 'sẽ gọi số đuôi ...' hiện đúng 1 lần và giờ = 07:00-21:00 (cùng nguồn với khối CSKH)",
               call_box.count() == 1 and "07:00-21:00" in call_box.inner_text() and "5678" in call_box.inner_text(), call_box.inner_text() if call_box.count() else "none")
         check("F10 khối CSKH ở màn thanh toán hiện đúng 1 lần, cùng giờ", cskh_box.count() == 1 and "07:00-21:00" in cskh_box.inner_text() and "Sau khi thanh toán" in cskh_box.inner_text())
@@ -187,7 +187,7 @@ def main():
         page.wait_for_timeout(700)
         cb = page.locator('[data-testid="confirm-call-notice"]')
         check("F10 cskh_notice=null -> hộp gọi xác nhận dùng confirm_call_hours (7:00–20:00), không có khối CSKH",
-              cb.count() == 1 and "7:00–20:00" in cb.inner_text() and page.locator('[data-testid="cskh-notice"]').count() == 0, cb.inner_text() if cb.count() else "none")
+              cb.count() == 1 and "7:00–20:00" in cb.inner_text() and page.locator('[data-testid="confirmation-policy-notice"]').count() == 0, cb.inner_text() if cb.count() else "none")
         ctx.close()
 
         # site-info lỗi -> checkout không vỡ, không khối nào hiện
@@ -199,7 +199,7 @@ def main():
         page.get_by_role("button", name="Thêm vào giỏ").first.click()
         goto(page, "/shop/checkout/")
         check("F10 site-info lỗi (có chính sách, mặc định bắt buộc đồng ý) -> form vẫn hiện, không khối CSKH, không pageerror",
-              page.locator("#phone").count() == 1 and page.locator('[data-testid="cskh-notice"]').count() == 0 and not errs, str(errs))
+              page.locator("#phone").count() == 1 and page.locator('[data-testid="confirmation-policy-notice"]').count() == 0 and not errs, str(errs))
         ctx.close()
 
         # trang tra đơn: ConfirmCallNotice tự tải -> 1 request

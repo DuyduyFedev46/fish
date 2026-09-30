@@ -10,7 +10,7 @@
 import { useId, useState } from "react";
 import { ApiError } from "@/shared/lib/http";
 import { Icon } from "@/shared/ui/Icon";
-import { GROUP } from "@/shared/lib/nav";
+import { ROLE } from "@/shared/lib/roles";
 import { createStaff } from "../api";
 import type { StaffMember } from "../types";
 import { GroupPicker } from "./GroupPicker";
@@ -58,8 +58,8 @@ export function StaffCreateForm({ draft, setDraft, restored, onCreated, onDiscar
   const [mismatch, setMismatch] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [confirmChu, setConfirmChu] = useState(false);
-  const swapRef = useFocusOnSwap(confirmChu ? "confirm" : "form");
+  const [confirmOwner, setConfirmOwner] = useState(false);
+  const swapRef = useFocusOnSwap(confirmOwner ? "confirm" : "form");
   const uid = useId();
 
   const set = (patch: Partial<CreateDraft>) => setDraft({ ...draft, ...patch });
@@ -82,7 +82,7 @@ export function StaffCreateForm({ draft, setDraft, restored, onCreated, onDiscar
       if (!(err instanceof ApiError && err.status === 401)) {
         setError(errorText(err));
       }
-      setConfirmChu(false);
+      setConfirmOwner(false);
     } finally {
       setBusy(false);
       onBusy(false);
@@ -97,14 +97,14 @@ export function StaffCreateForm({ draft, setDraft, restored, onCreated, onDiscar
       setMismatch(true); // S48-AC3: không gọi API
       return;
     }
-    if (draft.groups.includes(GROUP.chu) && !confirmChu) {
-      setConfirmChu(true);
+    if (draft.groups.includes(ROLE.owner) && !confirmOwner) {
+      setConfirmOwner(true);
       return;
     }
     void send();
   };
 
-  if (confirmChu) {
+  if (confirmOwner) {
     return (
       <div className={s.pane} ref={swapRef} tabIndex={-1}>
         <DangerConfirm
@@ -114,7 +114,7 @@ export function StaffCreateForm({ draft, setDraft, restored, onCreated, onDiscar
           error={error}
           busy={busy}
           cancelLabel="Quay lại"
-          onCancel={() => setConfirmChu(false)}
+          onCancel={() => setConfirmOwner(false)}
           confirmLabel="Tạo tài khoản Chủ"
           onConfirm={() => void send()}
         >

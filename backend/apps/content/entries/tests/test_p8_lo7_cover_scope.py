@@ -11,6 +11,7 @@ from apps.content.entries.services import calculate_content_hash
 from apps.content.models.categories import Category
 from apps.content.models.entries import Entry, EntryVersion
 from apps.content.models.images import ContentImage
+from apps.accounts import roles
 
 ALT_A = "Ảnh riêng của bài A KHÔNG được lộ"
 
@@ -21,8 +22,8 @@ def _para():
 
 class L61Base(APITestCase):
     def setUp(self):
-        self.chu = make_user("l61_chu", "chu")
-        self.ql = make_user("l61_ql", "quan_ly")
+        self.chu = make_user("l61_chu", roles.OWNER)
+        self.ql = make_user("l61_ql", roles.MANAGER)
         self.category = Category.objects.create(
             name="L61 danh mục", name_key="l61 danh muc", slug="l61-danh-muc", is_active=True
         )
@@ -110,7 +111,7 @@ class L61RestoreDiscardTests(L61Base):
 
     def test_l61_restore_va_discard_phan_quyen(self):
         self._legacy_published_version(self.img_b)
-        for user in (make_user("l61_kho", "nv_kho"), make_user("l61_giao", "nv_giao"), make_user("l61_cs", "cskh")):
+        for user in (make_user("l61_kho", roles.WAREHOUSE_STAFF), make_user("l61_giao", roles.DELIVERY_STAFF), make_user("l61_cs", roles.CUSTOMER_SERVICE)):
             with self.subTest(user=user.username):
                 self.assertEqual(
                     self._post(user, "versions/1/restore", {"row_version": self.entry.row_version}).status_code, 403)
@@ -158,7 +159,7 @@ class L61PublishTests(L61Base):
 
     def test_l61_publish_phan_quyen(self):
         self._prepare_valid()
-        for user in (make_user("l61p_kho", "nv_kho"), make_user("l61p_giao", "nv_giao"), make_user("l61p_cs", "cskh")):
+        for user in (make_user("l61p_kho", roles.WAREHOUSE_STAFF), make_user("l61p_giao", roles.DELIVERY_STAFF), make_user("l61p_cs", roles.CUSTOMER_SERVICE)):
             with self.subTest(user=user.username):
                 self.assertEqual(self._post(user, "publish", self._publish_payload()).status_code, 403)
         self.assertEqual(client_for(None).post(

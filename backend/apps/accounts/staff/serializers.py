@@ -9,7 +9,7 @@ from apps.accounts.auth.services import sorted_groups
 from . import services
 
 
-def staff_item(user, *, actor, active_chus) -> dict:
+def staff_item(user, *, actor, owner_ids) -> dict:
     profile = getattr(user, "staff_profile", None)
     return {
         "id": user.pk,
@@ -22,6 +22,6 @@ def staff_item(user, *, actor, active_chus) -> dict:
         "is_active": user.is_active,
         "last_login": timezone.localtime(user.last_login).isoformat() if user.last_login else None,
         "available_actions": services.available_actions(
-            actor=actor, user=user, active_chus=active_chus
+            actor=actor, user=user, owner_ids=owner_ids
         ),
     }

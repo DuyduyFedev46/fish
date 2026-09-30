@@ -16,15 +16,15 @@ from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 from rest_framework.authtoken.models import Token
 
+from apps.accounts import roles
 from apps.accounts.auth.services import ROLE_ORDER, sorted_groups
 from apps.accounts.models import StaffProfile
 from apps.common.audit import record_audit
 from apps.common.exceptions import BusinessError
 
-CHU = "chu"
 INPUT_CODE = "BR-PQ-08"
 SELF_CODE = "BR-PQ-17"
-LAST_CHU_CODE = "BR-PQ-18"
+LAST_OWNER_CODE = "BR-PQ-18"
 DELIVERING_CODE = "BR-GH-08"
 USERNAME_TAKEN = "Tên đăng nhập đã tồn tại."
 
@@ -45,17 +45,17 @@ def group_names(user):
     return sorted_groups(user.groups.values_list("name", flat=True))
 
 
-def is_chu(user) -> bool:
-    return user.groups.filter(name=CHU).exists()
+def is_owner(user) -> bool:
+    return user.groups.filter(name=roles.OWNER).exists()
 
 
 def actor_is_owner(actor) -> bool:
     """Chủ hoặc superuser — người được đụng nhóm `chu` / tài khoản Chủ (BR-PQ-17)."""
-    return bool(actor.is_superuser or is_chu(actor))
+    return bool(actor.is_superuser or is_owner(actor))
 
 
-def active_chu_ids():
-    return set(User.objects.filter(is_active=True, groups__name=CHU).values_list("pk", flat=True))
+def active_owner_ids():
+    return set(User.objects.filter(is_active=True, groups__name=roles.OWNER).values_list("pk", flat=True))
 
 
 def _profile(user):
@@ -66,7 +66,7 @@ def _check_can_touch(actor, target):
     """BR-PQ-17: tài khoản Chủ chỉ Chủ/superuser thao tác; tài khoản superuser chỉ superuser."""
     if target.is_superuser and not actor.is_superuser:
         raise StaffPermissionError("Chỉ superuser mới thao tác trên tài khoản superuser.")
-    if is_chu(target) and not actor_is_owner(actor):
+    if is_owner(target) and not actor_is_owner(actor):
         raise StaffPermissionError("Chỉ Chủ mới thao tác trên tài khoản Chủ.")
 
 
@@ -111,7 +111,7 @@ def _check_password(password, user):
         raise BusinessError(" ".join(exc.messages), code=INPUT_CODE) from None
 
 
-def _lock_target_and_chus(user):
+def _lock_target_and_owners(user):
     """
     Khoá MỘT lần, theo thứ tự cố định (pk tăng dần): người bị thao tác + mọi Chủ đang làm.
 
@@ -120,7 +120,7 @@ def _lock_target_and_chus(user):
     request sau chờ request trước xong (BR-PQ-18 kiểm trên dữ liệu đã khoá).
     Trả (danh sách pk đã khoá, bản User đích mới đọc).
     """
-    ids = sorted(active_chu_ids() | {user.pk})
+    ids = sorted(active_owner_ids() | {user.pk})
     locked = list(User.objects.select_for_update().filter(pk__in=ids).order_by("pk"))
     target = next(u for u in locked if u.pk == user.pk)
     return [u.pk for u in locked], target
@@ -154,7 +154,7 @@ def create_staff(*, actor, username, password, phone, display_name="", groups=()
     phone = _clean_phone(phone)
     display_name = _clean_text(display_name, field="display_name", max_length=150)
     group_objs = _resolve_groups(groups)
-    if any(g.name == CHU for g in group_objs) and not actor_is_owner(actor):
+    if any(g.name == roles.OWNER for g in group_objs) and not actor_is_owner(actor):
         raise StaffPermissionError("Chỉ Chủ mới gán hoặc bỏ nhóm Chủ.")
     _check_password(password, User(username=username))
 
@@ -213,7 +213,7 @@ def update_profile(*, actor, user, **fields):
 @transaction.atomic
 def set_groups(*, actor, user, groups):
     """Thay toàn bộ tập nhóm (PUT). Trả (groups, added, removed) theo thứ tự vai."""
-    _locked, user = _lock_target_and_chus(user)
+    _locked, user = _lock_target_and_owners(user)
     if user.pk == actor.pk:
         raise BusinessError("Không thể tự đổi nhóm của chính mình.", code=SELF_CODE)
     group_objs = _resolve_groups(groups)
@@ -221,12 +221,12 @@ def set_groups(*, actor, user, groups):
     after = sorted_groups(g.name for g in group_objs)
     added = [g for g in after if g not in before]
     removed = [g for g in before if g not in after]
-    if not actor_is_owner(actor) and CHU in added + removed:
+    if not actor_is_owner(actor) and roles.OWNER in added + removed:
         raise StaffPermissionError("Chỉ Chủ mới gán hoặc bỏ nhóm Chủ.")
     _check_can_touch(actor, user)
-    if CHU in removed and user.is_active:
-        if not (active_chu_ids() - {user.pk}):
-            raise BusinessError("Phải còn ít nhất một Chủ đang làm.", code=LAST_CHU_CODE)
+    if roles.OWNER in removed and user.is_active:
+        if not (active_owner_ids() - {user.pk}):
+            raise BusinessError("Phải còn ít nhất một Chủ đang làm.", code=LAST_OWNER_CODE)
     if added or removed:
         user.groups.set(group_objs)
         record_audit(
@@ -248,15 +248,15 @@ def deactivate(*, actor, user):
     """Cho nghỉ: is_active=False + xoá token (mọi máy 401 ngay). Không xoá tài khoản."""
     from apps.delivery.models import DeliveryNote
 
-    _locked, user = _lock_target_and_chus(user)
+    _locked, user = _lock_target_and_owners(user)
     if user.pk == actor.pk:
         raise BusinessError("Không thể tự cho nghỉ chính mình.", code=SELF_CODE)
     _check_can_touch(actor, user)
     if not user.is_active:
         raise BusinessError("Tài khoản này đã nghỉ.", code="BR-PQ-01")
-    if is_chu(user):
-        if not (active_chu_ids() - {user.pk}):
-            raise BusinessError("Không thể cho nghỉ Chủ cuối cùng.", code=LAST_CHU_CODE)
+    if is_owner(user):
+        if not (active_owner_ids() - {user.pk}):
+            raise BusinessError("Không thể cho nghỉ Chủ cuối cùng.", code=LAST_OWNER_CODE)
     delivering = list(
         DeliveryNote.objects.filter(assigned_to=user, status=DeliveryNote.Status.DELIVERING)
         .order_by("code").values_list("code", flat=True)
@@ -321,18 +321,18 @@ def reset_password(*, actor, user, new_password):
 # --- hiển thị ------------------------------------------------------------------------
 
 
-def available_actions(*, actor, user, active_chus) -> list:
+def available_actions(*, actor, user, owner_ids) -> list:
     """Nút console được hiện cho `actor` trên dòng `user` (backend vẫn chặn lại khi gọi)."""
     user_groups = {g.name for g in user.groups.all()}
     if user.is_superuser and not actor.is_superuser:
         return []
-    if CHU in user_groups and not actor_is_owner(actor):
+    if roles.OWNER in user_groups and not actor_is_owner(actor):
         return []
     if user.pk == actor.pk:
         return ["edit"]
     if not user.is_active:
         return ["edit", "reactivate"]
     actions = ["edit", "set_groups", "reset_password"]
-    if not (CHU in user_groups and not (active_chus - {user.pk})):
+    if not (roles.OWNER in user_groups and not (owner_ids - {user.pk})):
         actions.append("deactivate")
     return actions

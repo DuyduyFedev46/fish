@@ -8,16 +8,16 @@ from unittest import mock
 from django.db.models.query import QuerySet
 from django.utils import timezone
 
-from apps.delivery.cskh import services as cskh_services
+from apps.delivery.confirmation import services as confirmation_services
 from apps.delivery.models import ConfirmationTask, DeliveryNote
 from apps.delivery.tests import test_cskh_l3
 
 
-class F08LockOrderTests(test_cskh_l3.CskhL3BaseTestCase):
+class F08LockOrderTests(test_cskh_l3.ConfirmationL3BaseTestCase):
     def test_f08_escalate_expired_windows_khoa_phieu_truoc_task(self):
         t0 = timezone.now().replace(hour=9, minute=0, second=0, microsecond=0)
-        order, note, task = self._create_order_with_cskh()
-        cskh_services.record_call(task.pk, self.cs1, result="UNREACHABLE", now=t0)
+        order, note, task = self._create_order_with_confirmation()
+        confirmation_services.record_call(task.pk, self.cs1, result="UNREACHABLE", now=t0)
 
         locked = []
         real = QuerySet.select_for_update
@@ -27,7 +27,7 @@ class F08LockOrderTests(test_cskh_l3.CskhL3BaseTestCase):
             return real(qs, *args, **kwargs)
 
         with mock.patch.object(QuerySet, "select_for_update", spy):
-            n = cskh_services.escalate_expired_windows(now=t0 + timedelta(minutes=31))
+            n = confirmation_services.escalate_expired_windows(now=t0 + timedelta(minutes=31))
 
         self.assertEqual(n, 1)
         self.assertIn(DeliveryNote, locked)

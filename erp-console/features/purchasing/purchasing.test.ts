@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { submitNhapLo } from "./api";
+import { submitReceiveBatches } from "./api";
 import { clearDraft, loadDraft, saveDraft } from "./components/draftStorage";
-import { mockSubmitNhapLo, mockCancelPurchaseReceipt } from "./mock";
-import { NhapLoPayload } from "./types";
+import { mockSubmitReceiveBatches, mockCancelPurchaseReceipt } from "./mock";
+import { ReceiveBatchesPayload } from "./types";
 
 // Nháp Nhập lô nằm ở sessionStorage theo userId (SR-07), không phải localStorage dùng chung nữa.
 const storageMock = (() => {
@@ -59,8 +59,8 @@ describe("Purchasing feature tests (DW-17)", () => {
     expect(loadDraft(7)).toBeNull();
   });
 
-  it("DW-17-AC1: mockSubmitNhapLo generates batch DRAFT and receipt SUBMITTED", () => {
-    const payload: NhapLoPayload = {
+  it("DW-17-AC1: mockSubmitReceiveBatches generates batch DRAFT and receipt SUBMITTED", () => {
+    const payload: ReceiveBatchesPayload = {
       supplier: 1,
       received_date: "2026-09-29",
       idempotency_key: "test-idem-key-123",
@@ -80,7 +80,7 @@ describe("Purchasing feature tests (DW-17)", () => {
       ],
     };
 
-    const res = mockSubmitNhapLo({
+    const res = mockSubmitReceiveBatches({
       method: "POST",
       path: "/api/purchasing/receipts/nhap-lo/",
       body: payload,
@@ -98,7 +98,7 @@ describe("Purchasing feature tests (DW-17)", () => {
     expect(body.batches[1].qty_available).toBe("40");
   });
 
-  it("DW-17-AC1 & AC8: submitNhapLo calls API and handles success response", async () => {
+  it("DW-17-AC1 & AC8: submitReceiveBatches calls API and handles success response", async () => {
     const mockResponse = {
       receipt: {
         id: 99,
@@ -131,7 +131,7 @@ describe("Purchasing feature tests (DW-17)", () => {
       )
     );
 
-    const payload: NhapLoPayload = {
+    const payload: ReceiveBatchesPayload = {
       supplier: 1,
       received_date: "2026-09-29",
       lines: [
@@ -143,7 +143,7 @@ describe("Purchasing feature tests (DW-17)", () => {
       ],
     };
 
-    const res = await submitNhapLo(payload);
+    const res = await submitReceiveBatches(payload);
     expect(res.receipt.id).toBe(99);
     expect(res.receipt.status).toBe("SUBMITTED");
     expect(res.batches.length).toBe(1);
@@ -152,7 +152,7 @@ describe("Purchasing feature tests (DW-17)", () => {
 
   it("DW-18-AC1 & AC2: mockCancelPurchaseReceipt cancels receipt and batches", () => {
     // Tạo 1 phiếu nhập trước trong mockReceiptsStore
-    const payload: NhapLoPayload = {
+    const payload: ReceiveBatchesPayload = {
       supplier: 1,
       received_date: "2026-09-29",
       lines: [
@@ -164,7 +164,7 @@ describe("Purchasing feature tests (DW-17)", () => {
       ],
     };
 
-    const submitRes = mockSubmitNhapLo({
+    const submitRes = mockSubmitReceiveBatches({
       method: "POST",
       path: "/api/purchasing/receipts/nhap-lo/",
       body: payload,

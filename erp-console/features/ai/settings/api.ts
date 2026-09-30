@@ -1,4 +1,5 @@
 import { apiFetch, type MockRequest } from "@/shared/lib/http";
+import { COMMAND_GROUP } from "../commandGroups";
 import type { MyConfig } from "../types";
 
 export const mockMyConfig: MyConfig = {
@@ -10,7 +11,7 @@ export const mockMyConfig: MyConfig = {
   write_levels_allowed: ["OFF", "C", "B"],
   groups: [
     {
-      group: "thu_mua",
+      group: COMMAND_GROUP.purchasing,
       label: "Thu mua",
       read_level: "A",
       write_level: "C",
@@ -57,14 +58,14 @@ export const mockMyConfig: MyConfig = {
       ],
     },
     {
-      group: "ban_hang",
+      group: COMMAND_GROUP.sales,
       label: "Bán hàng",
       read_level: "A",
       write_level: "C",
       commands: [],
     },
     {
-      group: "cskh",
+      group: COMMAND_GROUP.customerService,
       label: "CSKH",
       read_level: "A",
       write_level: "C",

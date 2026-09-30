@@ -9,6 +9,7 @@ from apps.accounts.models import AuditLog
 from apps.ai.models import AiAction, AiConfigVersion, AiPolicyVersion
 from apps.ai.registry import get_registry
 from apps.common.tests.fixtures import client_for, make_user
+from apps.accounts import roles
 
 User = get_user_model()
 
@@ -17,9 +18,9 @@ class RedZoneSwitchTests(TestCase):
     def setUp(self):
         get_registry().build(force=True)
 
-        self.u_chu = make_user("chu_rz", "chu")
-        self.u_quanly = make_user("ql_rz", "quan_ly")
-        self.u_kho = make_user("kho_rz", "nv_kho")
+        self.u_chu = make_user("chu_rz", roles.OWNER)
+        self.u_quanly = make_user("ql_rz", roles.MANAGER)
+        self.u_kho = make_user("kho_rz", roles.WAREHOUSE_STAFF)
 
         self.client_chu = client_for(self.u_chu)
         self.client_quanly = client_for(self.u_quanly)

@@ -15,7 +15,7 @@ from django.utils import timezone
 
 from apps.accounts.models import AuditLog
 from apps.ai.models import AiAction, AiPolicyVersion
-from apps.delivery.tests.test_cskh_l3 import CskhL3BaseTestCase
+from apps.delivery.tests.test_cskh_l3 import ConfirmationL3BaseTestCase
 from apps.sales.models import PaymentTransaction
 from apps.sales.orders import services as order_services
 from apps.sales.payments.auto_confirm import process_exact_payment_matches
@@ -25,7 +25,7 @@ ESCALATE_ACTION = "escalate_unmatched_payment"
 
 
 @override_settings(AI_ENABLED=True, AI_PRODUCTION_READY=True, SEPAY_ENV="SANDBOX")
-class SR11AutoConfirmIdempotentTests(CskhL3BaseTestCase):
+class SR11AutoConfirmIdempotentTests(ConfirmationL3BaseTestCase):
     def setUp(self):
         super().setUp()
         AiPolicyVersion.objects.create(

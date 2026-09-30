@@ -13,11 +13,12 @@ from apps.content.permissions import (
     PERM_VIEW_CATEGORY,
     PERM_VIEW_ENTRY,
 )
+from apps.accounts import roles
 
 
 class CategoryApiTests(TestCase):
     def setUp(self):
-        self.user_ql = make_user("test_ql_cat", "quan_ly")
+        self.user_ql = make_user("test_ql_cat", roles.MANAGER)
         self.user_nd01_only = make_user(
             "test_nd01_only",
             perms=[

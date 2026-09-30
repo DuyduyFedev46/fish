@@ -24,6 +24,7 @@ from apps.sales.models import PaymentTransaction, SalesInvoice, SalesOrder
 from apps.sales.orders import services as order_services
 from apps.sales.payments import services as payment_services
 from apps.sales.orders.tests.test_s10_api import OrderApiBase, find_keys
+from apps.accounts import roles
 
 PII_SENTINELS = ("0900000111", "0900000222", "Khách Giả A", "Khách Giả B", "1 Đường Giả")
 
@@ -31,7 +32,7 @@ PII_SENTINELS = ("0900000111", "0900000222", "Khách Giả A", "Khách Giả B",
 class SR08CancelExpiredReservedTests(OrderApiBase):
     def setUp(self):
         super().setUp()
-        self.cs = make_user("cs_sr08", "cskh")
+        self.cs = make_user("cs_sr08", roles.CUSTOMER_SERVICE)
         self.c_chu = client_for(self.chu)
         self.url = f"/api/inventory/batches/{self.batch.pk}/cancel-expired/"
 

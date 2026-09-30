@@ -21,6 +21,7 @@ from apps.inventory.stock import services as stock
 from apps.reports import services as report_services
 from apps.sales.orders import services as order_services
 from apps.sales.orders.tests.test_s10_api import OrderApiBase, find_keys
+from apps.accounts import roles
 
 DASH_URL = "/api/dashboard/summary/"
 RECENT_KEYS = {"code", "amount", "status", "status_label", "expires_at"}
@@ -127,7 +128,7 @@ class Lo5PnlTests(OrderApiBase):
 class SR17DashboardRecentOrdersTests(OrderApiBase):
     def setUp(self):
         super().setUp()
-        self.cs = make_user("cs_sr17", "cskh")
+        self.cs = make_user("cs_sr17", roles.CUSTOMER_SERVICE)
         order_services.create_order(
             customer_phone="0900000456", customer_name="Khách Giả Bảy",
             delivery_address="7 Đường Giả, Phường Giả", phone="0900000456",

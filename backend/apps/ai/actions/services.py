@@ -8,6 +8,7 @@ from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
 
+from apps.accounts import roles
 from apps.common.audit import record_audit, set_ai_audit_scope
 from apps.common.exceptions import BusinessError
 from apps.ai.execution.dispatch import dispatch_command
@@ -304,21 +305,21 @@ def find_assignee_group_for_step(step: dict, spec=None) -> str:
                         permissions__codename=codename,
                     ).values_list("name", flat=True)
                 )
-                if "quan_ly" in matching_groups:
-                    return "quan_ly"
-                if "chu" in matching_groups:
-                    return "chu"
+                if roles.MANAGER in matching_groups:
+                    return roles.MANAGER
+                if roles.OWNER in matching_groups:
+                    return roles.OWNER
                 if matching_groups:
                     return list(matching_groups)[0]
 
     # 2. Dò theo trường who của step nếu có
     who_list = [w.lower() for w in step.get("who", [])]
     if any("quản lý" in w for w in who_list):
-        return "quan_ly"
+        return roles.MANAGER
     if any("chủ" in w for w in who_list):
-        return "chu"
+        return roles.OWNER
 
-    return "chu"
+    return roles.OWNER
 
 
 def escalate_guidance_step(*, doc_type: str, doc_id: str, step_key: str, user) -> dict:

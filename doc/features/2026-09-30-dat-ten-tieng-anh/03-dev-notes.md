@@ -44,7 +44,7 @@ Thời gian chạy khoảng 1,6 giây (yêu cầu < 10 giây).
 - Kế thừa khi đổi tên file: đọc `git diff -M` so với **commit gần nhất có sửa `naming_baseline.json`** (HEAD nếu baseline chưa commit),
   nên `git mv` đã stage, chưa stage, hoặc đã commit mà chưa `--update` đều kế thừa baseline của đường dẫn cũ và chỉ in dòng thực sự mới.
 - Miễn vĩnh viễn (khai trong script, có comment lý do): thư mục migration; `frontend/app/bai-viet/`, `frontend/app/trang/`;
-  chuỗi `chuyen-muc` và `Asia/Ho_Chi_Minh`; **chuỗi** (không phải định danh) trong `apps/accounts/roles.py`, `apps/ai/registry/command_groups.py`,
+  chuỗi `chuyen-muc` và `Asia/Ho_Chi_Minh`; **chuỗi** (không phải định danh) trong `apps/accounts/roles.py`, `apps/ai/command_groups.py`,
   `apps/ai/registry/legacy_ids.py`, `erp-console/shared/lib/roles.ts`, `features/ai/commandGroups.ts`, `features/ai/legacyIds.ts` (các file này chưa
   tồn tại ở HEAD, script đã chờ sẵn); **dòng khai báo** `LEGACY_RECEIVE_BATCHES_DRAFT_PREFIX = ...` (dòng chỉ nhắc tên hằng không được miễn);
   dòng có `naming: allow - <lý do>` (thiếu lý do thì không được miễn; `--report` liệt kê các dòng dùng marker, hiện là 0).
@@ -132,3 +132,93 @@ Backend: `cd backend && DJANGO_DEBUG=1 env -u DATABASE_URL .venv/bin/python mana
 - Hạn chế đã biết: generic arrow `= <T,>(x) =>` trong TSX làm bộ quét nhầm thẻ (HEAD không có; nếu gặp, script in cảnh báo mất cân bằng).
   Script không quét tài liệu `.md` và không xét nội dung CSS (chỉ tên file).
 - `02c-giao-viec.md` §4 đã có dòng `python3 scripts/check_naming.py` (từ commit 8cec800), không cần sửa phiếu.
+
+## Lô 1 — BE (01/10)
+
+Trạng thái: xong phần BE + adapter, chưa commit, chưa chạy `check_naming --update` (fe-dev làm song song; điều phối chạy `--update` sau cùng).
+Không đổi hành vi, không migration, không đổi contract (route, khoá JSON, env, lệnh quản trị, id lệnh AI, giá trị Group đều giữ).
+
+### File
+Mới:
+- `backend/apps/accounts/roles.py` — `OWNER="chu"`, `MANAGER="quan_ly"`, `WAREHOUSE_STAFF="nv_kho"`, `DELIVERY_STAFF="nv_giao"`, `CUSTOMER_SERVICE="cskh"`, `ALL_ROLES`. Chỉ hằng, không import gì.
+- `backend/apps/ai/command_groups.py` — `PURCHASING="thu_mua"`, `SALES="ban_hang"`, `CUSTOMER_SERVICE="cskh"`, `SENSITIVITY_HIGH/MEDIUM/LOW = "cao"/"trung_binh"/"thap"`.
+
+Dời (`git mv`): `backend/apps/delivery/cskh/` -> `backend/apps/delivery/confirmation/` (`__init__.py`, `api.py`, `scope.py`, `serializers.py`, `services.py`).
+
+Đổi tên (toàn bộ `backend/apps`, `backend/config`, gồm test import chúng):
+| Cũ | Mới |
+|---|---|
+| `CskhQueueViewSet`, `CskhQueuePagination`, `CskhQueueItemSerializer`, `CskhQueueDetailSerializer` | `ConfirmationQueueViewSet`, `ConfirmationQueuePagination`, `ConfirmationQueueItemSerializer`, `ConfirmationQueueDetailSerializer` |
+| `CskhSearchView`, `CskhSearchThrottle` | `CustomerSearchView`, `CustomerSearchThrottle` |
+| `is_cskh`, `cskh_q`, `cskh_note_q`, `note_in_cskh_scope` | `is_customer_service`, `customer_service_q`, `customer_service_note_q`, `note_in_customer_service_scope` |
+| alias `cskh_services` | `confirmation_services` |
+| `HOME_CSKH_QUEUE` (giá trị `"cskh-queue"` giữ) | `HOME_CONFIRMATION_QUEUE` |
+| `NhapLoLine`, `NhapLoInput`, `NhapLoBatchOutput` | `ReceiveBatchesLine`, `ReceiveBatchesInput`, `ReceivedBatchOutput` |
+| `is_chu`, `active_chu_ids`, `active_chus` (tham số), `_lock_target_and_chus`, `LAST_CHU_CODE`, `_escalate_to_chu`, `chu_user`, `CHU` | `is_owner`, `active_owner_ids`, `active_owner_ids`, `_lock_target_and_owners`, `LAST_OWNER_CODE`, `_escalate_to_owner`, `owner_user`, `roles.OWNER` |
+| test helper `CskhL2/L3/L4BaseTestCase`, `_create_order_with_cskh` | `ConfirmationL2/L3/L4BaseTestCase`, `_create_order_with_confirmation` |
+| adapter `VN_TZ` (`adapter/app/sepay.py`) | `VN_TIME_ZONE` |
+
+Chuỗi tên Group/nhóm lệnh AI/mức nhạy cảm: thay bằng hằng ở code chạy thật (`common/api.py` `FULL_SCOPE_GROUPS`, `accounts/auth/services.py`
+`ROLE_ORDER = roles.ALL_ROLES`/`GROUP_LABELS`/`home_for`, `accounts/staff/services.py`, `sales/payments/auto_confirm.py`, `ai/actions/{api,services}.py`,
+`ai/execution/pipeline.py`, `ai/management/commands/run_due_ai_actions.py`, `purchasing/receipts/services.py`, `delivery/confirmation/scope.py`,
+`ai/registry/{discovery,spec}.py`, `ai/settings/services.py`, `ai/policy/effective.py`, `inventory/batches/api.py`) và ở **125 file test, 824 chuỗi** (thay cơ học
+bằng `roles.*`/`command_groups.*` qua AST, không đổi tên hàm/biến test). Hai kiểu ghép chuỗi `"".join(["cs","kh"])` đã bỏ.
+Doc: `backend/README.md` (bản đồ module), `backend/apps/delivery/README.md`, `backend/apps/accounts/README.md`, `backend/apps/accounts/staff/README.md` (tên hàm khoá).
+
+### Giữ nguyên (đúng 02c, để Lô 3/4)
+Route `cskh/queue`, `cskh/search/` và basename `cskh-queue`, `cskh-search`; khoá JSON `cskh_*`; env/settings `CSKH_*`, `THROTTLE_CSKH_SEARCH`, scope `cskh_search`;
+lệnh `process_cskh_deadlines`, `check_cskh_job_health`; logger `cangca.delivery.cskh`; method `nhap_lo` + `url_path="nhap-lo"` + `custom_perm_actions`; giá trị các hằng; migration.
+
+### Lệch thiết kế / lưu ý
+- **`is_chu` không gộp vào `actor_is_owner`:** hai hàm khác nghĩa (`actor_is_owner` = Chủ **hoặc superuser**, `is_owner` chỉ xét Group). Giữ cả hai, đổi tên `is_chu` -> `is_owner` (theo điều kiện "giữ cả hai" của 02c).
+- **Import vòng (đã xử lý theo review S1):** `command_groups.py` dời ra `backend/apps/ai/command_groups.py` (lá, không import gì), mọi nơi import `from apps.ai import command_groups`; `apps/ai/policy/effective.py` import ở đầu module, không còn import trong hàm; `inventory/batches/api.py` không kéo gói `apps.ai.registry`.
+- **Review Lô 1 (N1, N2):** `from apps.accounts import roles` ở `accounts/auth/services.py` đưa về đúng nhóm import; tham số `active_owner_ids` của `staff/services.available_actions` và `staff/serializers.staff_item` đổi thành `owner_ids`.
+- Lệnh `git grep -nE "delivery\.cskh"` của 02c còn 4 dòng: đều là **tên logger** `cangca.delivery.cskh` (giữ tới Lô 3), không phải đường dẫn module.
+- Còn 2 dòng comment/docstring nhắc `'chu'` (`ai/actions/api.py:130`, `run_due_ai_actions.py:69`): chữ trong chú thích, không phải định danh.
+- Tên test, tên file test, biến theo vai (`self.chu`, `client_kho`) **không đổi** (đổi dần, §5).
+
+### Kiểm chứng (chạy trong lượt này)
+- `cd backend && DJANGO_DEBUG=1 env -u DATABASE_URL .venv/bin/python manage.py test`: **Ran 1674 tests, OK** (trước: 1674, không thêm/bớt/skip).
+- `makemigrations --check --dry-run`: No changes detected. `git diff HEAD --stat -- '*/migrations/*'`: rỗng.
+- Snapshot chỉ mục AI `backend/apps/ai/registry/tests/snapshots/commands_index_snapshot.json`: `git diff HEAD --stat` rỗng (không regenerate); `test_discovery` xanh. `_get_group` không đổi nhóm vì `apps.delivery.confirmation.*` vẫn chứa "delivery".
+- `cd adapter && .venv/bin/python -m pytest -q`: 68 passed.
+- Grep: `"(chu|quan_ly|nv_kho|nv_giao|cskh)"` ngoài `roles.py` và migration: chỉ còn 2 chú thích nói trên; `"(thu_mua|ban_hang|cao|trung_binh|thap)"` ngoài `command_groups.py`: rỗng; `delivery.cskh|features/cskh`: chỉ 4 tên logger.
+- `python3 scripts/check_naming.py`: `OK - 6724 vi phạm cũ trong 224 file, không phát sinh mới.` (gồm cả phần FE đang làm song song; baseline ở HEAD là 7584/277).
+  Riêng `backend/ + adapter/`: 6936 (190 file) -> 6515 (170 file), giảm 421. Chưa `--update`: chờ điều phối (fe-dev làm song song).
+
+## Lô 1 — FE (01/10)
+
+Đổi tên nội bộ `erp-console/` và `frontend/` sang tiếng Anh, không đổi hành vi và không đổi contract.
+
+### Đã dời / đổi tên (git mv)
+- `erp-console/features/cskh/` -> `features/confirmation/`: `ConfirmationCallModal.tsx`, `ConfirmationQueueView.tsx`, `confirmation.module.css`, `confirmation.test.ts`, `api.ts`, `mock.ts`, `types.ts`. Toàn bộ định danh `Cskh*` đổi sang `Confirmation*` (hàm API, kiểu, hook, testid `confirmation-stale-alert`).
+- `features/purchasing/components/NhapLoForm.tsx` -> `ReceiveBatchesForm.tsx`; kiểu/hàm `NhapLo*` -> `ReceiveBatches*`; `shared/lib/drafts.ts` dùng `RECEIVE_BATCHES_DRAFT_PREFIX` (giá trị vẫn `cave_draft_nhap_lo`).
+- Shop: `CskhNotice.tsx/.module.css` -> `ConfirmationPolicyNotice.tsx/.module.css`; kiểu `ConfirmationPolicyConfig`; testid `confirmation-policy-notice`.
+- `app/(console)/cskh/page.tsx`: `ConfirmationPage`, `ViewGuard view="confirmation"` (route `/cskh/` giữ nguyên); `ViewKey` trong `nav.ts` = `"confirmation"`.
+
+### File hằng mới (chỗ duy nhất giữ chuỗi tên cũ, Lô 4 chỉ sửa ở đây)
+- `erp-console/shared/lib/roles.ts`: `ROLE` (owner/manager/warehouseStaff/deliveryStaff/customerService), `RoleCode`, `HOME_CONFIRMATION_QUEUE` (giá trị `"cskh-queue"`).
+- `erp-console/features/ai/commandGroups.ts`: `COMMAND_GROUP`, `SENSITIVITY`, kiểu `AiCommandGroup`, `AiSensitivity`; `features/ai/types.ts` import và re-export.
+- Đã thay chuỗi Group bằng `ROLE.*` ở: `nav.ts`, `groups.ts`, `features/auth/{types,mock}.ts`, `features/ai/*` (panel, mock, policy, actions), `features/inventory|overview|staff|content|guidance` (mock, component, test), `content/edit/page.tsx`. Biến `isChu/isQuanLy/...` -> `isOwner/isManager/...`; `chuOnlyStep` -> `ownerOnlyStep`.
+
+### Múi giờ thống nhất
+- erp: `VN_TIME_ZONE` (`shared/lib/format.ts`), `COLD_STORAGE_NAME`, `todayInVietnam()` inline ở `DeliveriesView.tsx`.
+- Shop: `todayInVietnam`, `currentYearInVietnam` (`lib/format.ts`, `app/page.tsx`, `lib/mock.ts`, `scripts/test-format.mjs`).
+
+### Giữ nguyên (đúng 02c, để Lô 3/4)
+Route `/cskh/`, `/nhap-lo`; đường dẫn `/api/cskh/*`; khoá JSON `cskh_*` và `cskh_notice`; id lệnh AI `...nhap_lo`; mã lỗi BE `CHU_*`; khoá nháp `cave_draft_nhap_lo`; giá trị Group gửi/nhận (nằm trong `roles.ts`, `commandGroups.ts`); giá trị `me.home = "cskh-queue"`.
+
+### Lệch / lưu ý
+- Không đổi tên file e2e (`sr07_nhap_lo_draft.py`...): 02c không giao cho Lô 1. Trong e2e chỉ cập nhật testid, tên hàm mock helper và biến (`p8_lo7_fe_erp.py`, `sr09_ac4_real_backend.py`, `sr09_ac4_stale_state.py`, `s10_s11_orders.py`, `qa-lo7-shop-real.py`, `qa-lo6-sr21-shop.py`). Literal Group trong `e2e/*.py` còn nguyên (Lô 4).
+- `README.md` các module còn nhắc tên Group cũ trong phần mô tả (chữ thường, không phải định danh); `erp-console/README.md` đã cập nhật dòng `roles.ts` và `confirmation/`.
+- Logger `cangca.delivery.cskh` và `VN_TZ` của adapter thuộc phần BE.
+- Shop: `frontend/.env.local` đặt `NEXT_PUBLIC_USE_MOCK=1` nên `npm run build` trần cho `check-no-mock` ĐỎ (có từ trước); build thật phải truyền `NEXT_PUBLIC_USE_MOCK=0 NEXT_PUBLIC_API_BASE=...` (như `doc/ops/moi-truong.md`). Bản `out/` cuối của Shop được build với `NEXT_PUBLIC_API_BASE=http://localhost:8199`, cần build lại với URL môi trường đích trước khi deploy.
+
+### Kiểm chứng (chạy trong lượt này)
+- erp: `npx tsc --noEmit` sạch; `npm test`: 14 file, **185/185 pass** (không đổi số test).
+- frontend: `npx tsc --noEmit` sạch; `test-format.mjs` 26/26; `test-safe-href.mjs` 40/40.
+- Build thật erp (`NEXT_PUBLIC_USE_MOCK=0`): `check-no-mock.mjs` XANH (131 file build); `check-ai-chunks.mjs` XANH.
+- Build thật Shop (`USE_MOCK=0`, API `http://localhost:8199`): `check-no-mock.mjs` XANH (46 file build).
+- e2e trên build mock erp (cổng 3230): `p8_lo7_fe_erp.py` **79/79 PASS**; `p8_lo8_fe_erp_tz.py` **71/71 PASS**.
+- e2e Shop (cổng 3232, build USE_MOCK=0 chặn /api bằng page.route): `qa-lo6-sr21-shop.py` **279 ca, 0 FAIL**. Bản out copy ở `scratchpad/p8b-l1-fe/{erp-mock,shop}`. Server đã tắt.
+- `python3 scripts/check_naming.py`: `OK - 6724 vi phạm cũ trong 224 file, không phát sinh mới` (46 file đã giảm; chưa `--update`, chờ điều phối).

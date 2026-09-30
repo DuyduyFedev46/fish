@@ -11,6 +11,7 @@ from django.core.exceptions import ValidationError
 from django.db import transaction
 from rest_framework.authtoken.models import Token
 
+from apps.accounts import roles
 from apps.accounts.models import StaffProfile
 from apps.common.api import VIEW_COSTPRICE_PERM
 from apps.common.audit import record_audit
@@ -21,20 +22,20 @@ from .authentication import must_change_password
 VIEW_PROFITREPORT_PERM = "reports.view_profitreport"
 
 # Thứ tự hiển thị cố định theo vai (không theo thứ tự gán trong DB).
-ROLE_ORDER = ("chu", "quan_ly", "nv_kho", "nv_giao", "cskh")
+ROLE_ORDER = roles.ALL_ROLES
 
 HOME_DASHBOARD = "dashboard"
 HOME_MY_DELIVERIES = "my-deliveries"
-HOME_CSKH_QUEUE = "cskh-queue"
+HOME_CONFIRMATION_QUEUE = "cskh-queue"
 HOME_NO_ROLE = "no-role"
 
 # S47: nhãn tiếng Việt cho màn "Quyền của tôi".
 GROUP_LABELS = {
-    "chu": "Chủ",
-    "quan_ly": "Quản lý",
-    "nv_kho": "Nhân viên kho",
-    "nv_giao": "Nhân viên giao",
-    "cskh": "CSKH",
+    roles.OWNER: "Chủ",
+    roles.MANAGER: "Quản lý",
+    roles.WAREHOUSE_STAFF: "Nhân viên kho",
+    roles.DELIVERY_STAFF: "Nhân viên giao",
+    roles.CUSTOMER_SERVICE: "CSKH",
 }
 
 # S47: quyền Tầng 2 = bảng spec §1.5 + mọi `Meta.permissions` tuỳ biến. Thứ tự dict = thứ tự
@@ -86,10 +87,10 @@ def home_for(groups) -> str:
     """Trang mặc định: không Group → no-role; chỉ nv_giao → my-deliveries; chỉ cskh → cskh-queue; còn lại → dashboard."""
     if not groups:
         return HOME_NO_ROLE
-    if set(groups) == {"nv_giao"}:
+    if set(groups) == {roles.DELIVERY_STAFF}:
         return HOME_MY_DELIVERIES
-    if set(groups) == {"cskh"}:
-        return HOME_CSKH_QUEUE
+    if set(groups) == {roles.CUSTOMER_SERVICE}:
+        return HOME_CONFIRMATION_QUEUE
     return HOME_DASHBOARD
 
 

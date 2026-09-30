@@ -48,7 +48,7 @@ def run_case(browser, tag, viewport, trigger):
     modal = page.get_by_role("dialog")
     modal.get_by_text("Đã xác nhận", exact=False).first.wait_for(timeout=10_000)
     page.wait_for_timeout(500)
-    ok(f"[{tag}] chưa có cảnh báo stale trước khi bấm", page.get_by_test_id("cskh-stale-alert").count() == 0)
+    ok(f"[{tag}] chưa có cảnh báo stale trước khi bấm", page.get_by_test_id("confirmation-stale-alert").count() == 0)
 
     if trigger:
         out = subprocess.run(TRIGGER_CMD, shell=True, capture_output=True, text=True).stdout
@@ -57,7 +57,7 @@ def run_case(browser, tag, viewport, trigger):
 
     responses.clear()
     modal.get_by_role("button", name="Đã xác nhận").first.click()
-    alert = page.get_by_test_id("cskh-stale-alert")
+    alert = page.get_by_test_id("confirmation-stale-alert")
     alert.wait_for(timeout=10_000)
     post = [r for r in responses if r[0] == "POST" and "/calls/" in r[1]]
     ok(f"[{tag}] BE thật trả 409 cho POST /calls/", post and post[-1][2] == 409, str(post))

@@ -14,6 +14,7 @@ from apps.ai.execution.dispatch import DispatchResult
 from apps.ai.models import AiAction
 from apps.ai.registry.spec import CommandSpec
 from apps.common.tests.fixtures import client_for, make_user
+from apps.accounts import roles
 
 
 class _FakeView(viewsets.ViewSet):
@@ -40,7 +41,7 @@ def _spec(undo, view_cls=_FakeView):
 @override_settings(AI_ENABLED=True)
 class F10UndoDispatchTests(TestCase):
     def setUp(self):
-        self.kho = make_user("f10_kho", "nv_kho")
+        self.kho = make_user("f10_kho", roles.WAREHOUSE_STAFF)
         self.client = client_for(self.kho)
 
     def _done_b(self, target_id="77"):
@@ -125,7 +126,7 @@ class F10UndoDispatchTests(TestCase):
 
     def test_f10_nguoi_ngoai_khong_hoan_tac_duoc_403(self):
         act = self._done_b()
-        other = client_for(make_user("f10_giao", "nv_giao"))
+        other = client_for(make_user("f10_giao", roles.DELIVERY_STAFF))
         with mock.patch("apps.ai.actions.services.get_registry", return_value=_FakeRegistry(_spec("cancel_action:foo"))), \
              mock.patch("apps.ai.actions.services.dispatch_command") as disp:
             res = other.post(f"/api/ai/actions/{act.pk}/undo/", {}, format="json")
@@ -137,7 +138,7 @@ class F10UndoWhenAiDisabledTests(TestCase):
     """Hoàn tác khi AI_ENABLED=false (Chủ tắt AI sau khi AI đã ghi): vẫn rút lại được, không 410."""
 
     def setUp(self):
-        self.kho = make_user("f10b_kho", "nv_kho")
+        self.kho = make_user("f10b_kho", roles.WAREHOUSE_STAFF)
         self.client = client_for(self.kho)
 
     def test_f10_ai_tat_huy_lich_van_duoc(self):

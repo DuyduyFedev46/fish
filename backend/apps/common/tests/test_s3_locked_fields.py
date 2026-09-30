@@ -19,6 +19,7 @@ from apps.purchasing.models import PurchaseCost, PurchaseInvoice, PurchaseReceip
 from apps.sales.models import Refund
 
 from .fixtures import client_for, make_batch, make_master, make_order_with_note, make_user
+from apps.accounts import roles
 
 
 class S3BatchLockTests(TestCase):
@@ -26,8 +27,8 @@ class S3BatchLockTests(TestCase):
         self.item, self.sup, self.wh = make_master()
         self.batch = make_batch(self.item, self.sup, self.wh)
         # Given S3-AC1: "Quản lý có change_batch" (seed hiện chỉ cấp r cho quan_ly).
-        self.ql = make_user("ql1", "quan_ly", perms=["inventory.change_batch"])
-        self.chu = make_user("chu1", "chu")
+        self.ql = make_user("ql1", roles.MANAGER, perms=["inventory.change_batch"])
+        self.chu = make_user("chu1", roles.OWNER)
 
     def _snapshot(self):
         return Batch.objects.values().get(pk=self.batch.pk)
@@ -106,7 +107,7 @@ class S3BatchLockTests(TestCase):
     def test_s2_ac7_nv_kho_patch_status_lo_khong_doi_duoc(self):
         """S2-AC7: nv_kho không có change_batch → 403 (S3-AC6: quyền trước field);
         người có change_batch → 400 BR-PQ-14. Cả hai: lô không đổi, không AuditLog."""
-        kho = make_user("kho1", "nv_kho")
+        kho = make_user("kho1", roles.WAREHOUSE_STAFF)
         url = f"/api/inventory/batches/{self.batch.pk}/"
         self.assertEqual(client_for(kho).patch(url, {"status": "EXPIRED"}, format="json").status_code, 403)
         resp = client_for(self.ql).patch(url, {"status": "EXPIRED"}, format="json")
@@ -135,7 +136,7 @@ class S3BatchLockTests(TestCase):
         self.assertNotIn("purchase_rate", resp.json())
 
     def test_s3_ac6_nv_giao_patch_lo_403_truoc_ca_kiem_field(self):
-        giao = make_user("giao1", "nv_giao")
+        giao = make_user("giao1", roles.DELIVERY_STAFF)
         before = self._snapshot()
         resp = client_for(giao).patch(
             f"/api/inventory/batches/{self.batch.pk}/", {"landed_unit_cost": "1"}, format="json"
@@ -152,8 +153,8 @@ class S3BatchLockTests(TestCase):
 
 class S3DeliveryNoteLockTests(TestCase):
     def setUp(self):
-        self.giao1 = make_user("giao1", "nv_giao")
-        self.giao2 = make_user("giao2", "nv_giao")
+        self.giao1 = make_user("giao1", roles.DELIVERY_STAFF)
+        self.giao2 = make_user("giao2", roles.DELIVERY_STAFF)
         _, _, self.note = make_order_with_note("SO-1", "0900000001", assigned_to=self.giao1)
         DeliveryNote.objects.filter(pk=self.note.pk).update(status=DeliveryNote.Status.READY)
         self.url = f"/api/delivery/notes/{self.note.pk}/"
@@ -207,9 +208,9 @@ class S3OtherDocumentLockTests(TestCase):
     def setUp(self):
         self.item, self.sup, self.wh = make_master()
         self.batch = make_batch(self.item, self.sup, self.wh)
-        self.ql = make_user("ql1", "quan_ly")
-        self.kho = make_user("kho1", "nv_kho")
-        self.chu = make_user("chu1", "chu")
+        self.ql = make_user("ql1", roles.MANAGER)
+        self.kho = make_user("kho1", roles.WAREHOUSE_STAFF)
+        self.chu = make_user("chu1", roles.OWNER)
 
     def test_s3_returns_khoa_status_decision_approved_by(self):
         rt = ReturnToStock.objects.create(batch=self.batch, qty=Decimal("1"), created_by=self.kho)
@@ -287,10 +288,10 @@ class S3NoDeleteTests(TestCase):
     def setUp(self):
         self.item, self.sup, self.wh = make_master()
         self.batch = make_batch(self.item, self.sup, self.wh)
-        self.chu = make_user("chu1", "chu")
-        self.ql = make_user("ql1", "quan_ly")
-        self.kho = make_user("kho1", "nv_kho")
-        self.giao = make_user("giao1", "nv_giao")
+        self.chu = make_user("chu1", roles.OWNER)
+        self.ql = make_user("ql1", roles.MANAGER)
+        self.kho = make_user("kho1", roles.WAREHOUSE_STAFF)
+        self.giao = make_user("giao1", roles.DELIVERY_STAFF)
         order, _, self.note = make_order_with_note("SO-1", "0900000001", assigned_to=self.giao)
         self.refund = Refund.objects.create(
             sales_invoice=order.invoice, amount=Decimal("1000"), created_by=self.chu,
@@ -345,7 +346,7 @@ class S3ErrorCodeTests(TestCase):
         item, sup, wh = make_master()
         batch = make_batch(item, sup, wh)
         Batch.objects.filter(pk=batch.pk).update(status=Batch.Status.SELLING)
-        chu = make_user("chu1", "chu")
+        chu = make_user("chu1", roles.OWNER)
         resp = client_for(chu).post(f"/api/inventory/batches/{batch.pk}/publish/")
         self.assertEqual(resp.status_code, 400, resp.content)
         body = resp.json()
@@ -357,7 +358,7 @@ class S3ErrorCodeTests(TestCase):
         item, sup, wh = make_master()
         batch = make_batch(item, sup, wh)
         Batch.objects.filter(pk=batch.pk).update(status=Batch.Status.SELLING)
-        chu = make_user("chu1", "chu")
+        chu = make_user("chu1", roles.OWNER)
         resp = client_for(chu).post(f"/api/inventory/batches/{batch.pk}/close/")
         self.assertEqual(resp.status_code, 400, resp.content)
         self.assertEqual(resp.json()["code"], "BR-LO-04")

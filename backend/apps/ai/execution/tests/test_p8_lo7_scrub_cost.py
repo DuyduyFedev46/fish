@@ -8,6 +8,7 @@ from django.test import TestCase
 from apps.ai.execution.scrub import scrub_data
 from apps.common.cost_keys import COST_KEYS
 from apps.common.tests.fixtures import make_user
+from apps.accounts import roles
 
 
 class Bm07ScrubCostTests(TestCase):
@@ -35,7 +36,7 @@ class Bm07ScrubCostTests(TestCase):
         self.assertEqual(res["lines"][0]["purchase_rate"], "13000")
 
     def test_bm07_nhom_khong_co_view_costprice_khong_thay(self):
-        for group in ("nv_kho", "nv_giao", "cskh", "quan_ly"):
+        for group in (roles.WAREHOUSE_STAFF, roles.DELIVERY_STAFF, roles.CUSTOMER_SERVICE, roles.MANAGER):
             with self.subTest(group=group):
                 user = make_user(f"bm07_{group}", group)
                 res = scrub_data(self.RAW, user=user, is_ai_read=False)

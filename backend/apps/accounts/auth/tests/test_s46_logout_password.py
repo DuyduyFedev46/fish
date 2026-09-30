@@ -12,6 +12,7 @@ from rest_framework.test import APIClient
 
 from apps.accounts.models import AuditLog
 from apps.common.tests.fixtures import make_user
+from apps.accounts import roles
 
 LOGOUT = "/api/auth/logout/"
 CHANGE = "/api/auth/change-password/"
@@ -35,7 +36,7 @@ def login(username, password):
 
 class S46LogoutTests(TestCase):
     def setUp(self):
-        self.giao1 = make_user("giao1", "nv_giao")
+        self.giao1 = make_user("giao1", roles.DELIVERY_STAFF)
         self.token = Token.objects.create(user=self.giao1)
 
     def test_s46_ac1_dang_xuat_204_xoa_token(self):
@@ -68,7 +69,7 @@ class S46LogoutTests(TestCase):
         self.assertEqual(token_client(resp.json()["token"]).get(ME).status_code, 200)
 
     def test_s46_ac1_khong_dung_token_cua_nguoi_khac(self):
-        kho1 = make_user("kho1", "nv_kho")
+        kho1 = make_user("kho1", roles.WAREHOUSE_STAFF)
         other = Token.objects.create(user=kho1)
         token_client(self.token.key).post(LOGOUT, {}, format="json")
         self.assertTrue(Token.objects.filter(pk=other.pk).exists())
@@ -105,10 +106,10 @@ class S46LogoutTests(TestCase):
 
 class S46ChangePasswordTests(TestCase):
     def setUp(self):
-        self.kho1 = make_user("kho1", "nv_kho")
+        self.kho1 = make_user("kho1", roles.WAREHOUSE_STAFF)
         self.kho1.set_password(OLD)
         self.kho1.save()
-        self.loc = make_user("loc", "chu")
+        self.loc = make_user("loc", roles.OWNER)
         self.loc.set_password("Loc-mat-khau-2026")
         self.loc.save()
         self.token = Token.objects.create(user=self.kho1)
@@ -187,7 +188,7 @@ class S46ChangePasswordTests(TestCase):
         self.assertTrue(User.objects.get(pk=self.kho1.pk).check_password(OLD))
 
     def test_s46_ac3_mat_khau_moi_giong_ten_dang_nhap_400(self):
-        tam = make_user("nguyenvantam", "nv_kho")
+        tam = make_user("nguyenvantam", roles.WAREHOUSE_STAFF)
         tam.set_password(OLD)
         tam.save()
         client = token_client(Token.objects.create(user=tam).key)
@@ -259,7 +260,7 @@ class S46SessionTests(TestCase):
     """Người đăng nhập bằng session (Django Admin) — đổi mật khẩu vẫn giữ phiên hiện tại."""
 
     def test_s46_ac2_session_giu_phien_sau_khi_tu_doi(self):
-        kho1 = make_user("kho1", "nv_kho")
+        kho1 = make_user("kho1", roles.WAREHOUSE_STAFF)
         kho1.set_password(OLD)
         kho1.save()
         client = APIClient()
@@ -269,7 +270,7 @@ class S46SessionTests(TestCase):
         self.assertEqual(client.get(ME).status_code, 200)
 
     def test_s46_ac1_dang_xuat_session_thi_phien_chet(self):
-        make_user("kho1", "nv_kho")
+        make_user("kho1", roles.WAREHOUSE_STAFF)
         client = APIClient()
         self.assertTrue(client.login(username="kho1", password="x"))
         self.assertEqual(client.post(LOGOUT, {}, format="json").status_code, 204)

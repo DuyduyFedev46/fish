@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { getSiteInfo } from "../api";
 import type { SiteInfoResponse } from "../types";
-import { CallNoticeBox, callHours } from "./CskhNotice";
+import { CallNoticeBox, callHours } from "./ConfirmationPolicyNotice";
 
 export interface ConfirmCallNoticeProps {
   last4: string;

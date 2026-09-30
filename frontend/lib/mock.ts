@@ -13,7 +13,7 @@ import {
   type WireCreateOrderResponse,
   type WireOrderStatus,
 } from "./types";
-import { todayVn } from "./format";
+import { todayInVietnam } from "./format";
 
 // Ảnh mẫu cho mock (A4) — sinh BẰNG CODE lúc chạy (SVG data URI), KHÔNG commit tệp ảnh nào vào repo
 // (quy ước 2026-09-25, BR-DM-16). Đủ 3 trạng thái theo 02-stories.md: có ảnh, `image: null`, ảnh lỗi
@@ -368,7 +368,7 @@ export async function mockGetCatalogItem(itemCode: string): Promise<CatalogItemD
 
 function genOrderCode(): string {
   // Ngày theo giờ VN (SR-25 AC4), không theo múi giờ máy.
-  const [y, m, d] = todayVn().split("-");
+  const [y, m, d] = todayInVietnam().split("-");
   const rand = Math.floor(1000 + Math.random() * 9000);
   return `DH-${y.slice(2)}${m}${d}-${rand}`;
 }

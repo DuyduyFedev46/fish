@@ -7,12 +7,13 @@ from django.test import TestCase
 from apps.delivery.models import DeliveryNote
 
 from .fixtures import client_for, make_order_with_note, make_user
+from apps.accounts import roles
 
 
 class S5ScopeTests(TestCase):
     def setUp(self):
-        self.giao1 = make_user("giao1", "nv_giao")
-        self.giao2 = make_user("giao2", "nv_giao")
+        self.giao1 = make_user("giao1", roles.DELIVERY_STAFF)
+        self.giao2 = make_user("giao2", roles.DELIVERY_STAFF)
         self.d1, self.c1, self.n1 = make_order_with_note("SO-D1", "0900000001", assigned_to=self.giao1)
         self.d2, self.c2, self.n2 = make_order_with_note("SO-D2", "0900000002", assigned_to=self.giao2)
         # đơn chưa gán ai + khách chưa có đơn
@@ -54,7 +55,7 @@ class S5ScopeTests(TestCase):
         self.assertEqual(self._ids(resp), [self.c1.pk])
 
     def test_s5_ac4_kiem_nhiem_nv_kho_va_nv_giao_thay_moi_don(self):
-        kho1 = make_user("kho1", "nv_kho", "nv_giao")
+        kho1 = make_user("kho1", roles.WAREHOUSE_STAFF, roles.DELIVERY_STAFF)
         self.assertEqual(
             self._ids(client_for(kho1).get("/api/sales/orders/")),
             sorted([self.d1.pk, self.d2.pk, self.d3.pk]),
@@ -65,7 +66,7 @@ class S5ScopeTests(TestCase):
         )
 
     def test_s5_ac4_quan_ly_va_chu_thay_moi_don(self):
-        for group in ("quan_ly", "chu"):
+        for group in (roles.MANAGER, roles.OWNER):
             user = make_user(f"u_{group}", group)
             self.assertEqual(len(self._ids(client_for(user).get("/api/sales/orders/"))), 3, group)
 

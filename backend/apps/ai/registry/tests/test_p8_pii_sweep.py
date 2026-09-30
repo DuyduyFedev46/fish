@@ -24,6 +24,7 @@ from apps.purchasing.models import Supplier
 from apps.sales.models import PaymentTransaction
 from apps.sales.orders import services as order_services
 from apps.sales.payments import services as payment_services
+from apps.accounts import roles
 
 PII_NAME = "Khách Giả Bí Mật"
 PII_PHONE = "0900000123"
@@ -44,7 +45,7 @@ PII_KEYS = set(SCRUB_PII_KEYS) | {
     "phone_masked", "customer_address",
 }
 
-GROUPS = ("chu", "quan_ly", "nv_kho", "nv_giao", "cskh")
+GROUPS = (roles.OWNER, roles.MANAGER, roles.WAREHOUSE_STAFF, roles.DELIVERY_STAFF, roles.CUSTOMER_SERVICE)
 
 
 def _find_keys(data, keys):
@@ -107,14 +108,14 @@ class PiiSweepBase(TestCase):
         from apps.sales.refunds import services as refund_services
 
         self.note = DeliveryNote.objects.get(sales_invoice__sales_order=self.order)
-        self.note.assigned_to = self.users["nv_giao"]
+        self.note.assigned_to = self.users[roles.DELIVERY_STAFF]
         self.note.recipient_name = PII_RECIPIENT_NAME
         self.note.recipient_phone = PII_RECIPIENT_PHONE
         self.note.save(update_fields=["assigned_to", "recipient_name", "recipient_phone"])
         self.task = ConfirmationTask.objects.get(note=self.note)
         self.refund, _dup = refund_services.create_invoice_refund(
             invoice=self.order.invoice, amount=Decimal("1000"), is_partial=True,
-            reason="Hoàn giả để kiểm thử", actor=self.users["chu"],
+            reason="Hoàn giả để kiểm thử", actor=self.users[roles.OWNER],
         )
 
     def _call(self, group, command_id, body=None):
@@ -135,16 +136,16 @@ class PiiSweepBase(TestCase):
 class SR24Fixture(PiiSweepBase):
     def test_sr24_fixture_co_du_lieu_o_cot_nv_giao_cskh_va_refund(self):
         """Chống xanh giả (Lô 2 L2): dữ liệu PII thật sự có trong phạm vi của nv_giao/cskh và trong phiếu hoàn."""
-        self.assertEqual(self.note.assigned_to, self.users["nv_giao"])
+        self.assertEqual(self.note.assigned_to, self.users[roles.DELIVERY_STAFF])
         self.assertEqual(self.task.state, "PENDING")
         self.assertEqual(self.refund.status, "PENDING")
-        res = self._call("nv_giao", "delivery.deliverynote.list")
+        res = self._call(roles.DELIVERY_STAFF, "delivery.deliverynote.list")
         self.assertEqual(res.status_code, 200, res.content[:300])
         self.assertTrue(res.json()["result"]["rows"], "nv_giao phải thấy phiếu giao của mình (dữ liệu không rỗng)")
-        res2 = self._call("chu", "sales.refund.list")
+        res2 = self._call(roles.OWNER, "sales.refund.list")
         self.assertEqual(res2.status_code, 200, res2.content[:300])
         self.assertTrue(res2.json()["result"]["rows"], "sales.refund.list phải có dữ liệu")
-        for group in ("nv_giao", "cskh", "chu"):
+        for group in (roles.DELIVERY_STAFF, roles.CUSTOMER_SERVICE, roles.OWNER):
             for cmd in ("delivery.deliverynote.list", "sales.refund.list"):
                 raw = self._call(group, cmd).content.decode()
                 for s in PII_STRINGS:
@@ -154,7 +155,7 @@ class SR24Fixture(PiiSweepBase):
 class SR04Dashboard(PiiSweepBase):
     def test_sr04_ac1_nv_kho_dashboard_khong_lo_ten_khach(self):
         """SR-04-AC1: nv_kho gọi reports.dashboard_summary -> không có tên/SĐT/địa chỉ khách."""
-        res = self._call("nv_kho", "reports.dashboard_summary")
+        res = self._call(roles.WAREHOUSE_STAFF, "reports.dashboard_summary")
         self.assertEqual(res.status_code, 200, res.content[:300])
         raw = res.content.decode()
         for s in PII_STRINGS:
@@ -164,7 +165,7 @@ class SR04Dashboard(PiiSweepBase):
         self.assertIn(self.order.code, raw)
 
     def test_sr04_ac1_chu_dashboard_khong_lo_ten_khach(self):
-        res = self._call("chu", "reports.dashboard_summary")
+        res = self._call(roles.OWNER, "reports.dashboard_summary")
         self.assertEqual(res.status_code, 200, res.content[:300])
         self.assertNotIn(PII_NAME, res.content.decode())
         self.assertEqual(_find_keys(res.json(), PII_KEYS), set())
@@ -205,7 +206,7 @@ class SR04SweepRegistry(PiiSweepBase):
 
     def test_sr04_ac3_retrieve_don_hang_chu_thanh_cong_khong_pii(self):
         """SR-04-AC3 + SR-05-AC1: chu retrieve đơn -> 200 có mã đơn, không PII."""
-        res = self._call("chu", "sales.salesorder.retrieve", {"args": {}, "target_id": str(self.order.pk)})
+        res = self._call(roles.OWNER, "sales.salesorder.retrieve", {"args": {}, "target_id": str(self.order.pk)})
         self.assertEqual(res.status_code, 200, res.content[:300])
         raw = res.content.decode()
         self.assertIn(self.order.code, raw)
@@ -215,7 +216,7 @@ class SR04SweepRegistry(PiiSweepBase):
 
     def test_sr04_ac3_audit_ai_action_khong_chua_pii(self):
         """Sau khi quét: AiAction.args không chứa PII (BR-AI-09)."""
-        self._call("chu", "sales.salesorder.retrieve", {"args": {}, "target_id": str(self.order.pk)})
+        self._call(roles.OWNER, "sales.salesorder.retrieve", {"args": {}, "target_id": str(self.order.pk)})
         from apps.ai.models import AiAction
         blob = json.dumps(list(AiAction.objects.values_list("args", flat=True)), ensure_ascii=False)
         for s in PII_STRINGS:
@@ -225,7 +226,7 @@ class SR04SweepRegistry(PiiSweepBase):
 class SR05Detail(PiiSweepBase):
     def test_sr05_ac1_chu_retrieve_lo_tra_du_lieu(self):
         """SR-05-AC1: chu gọi inventory.batch.retrieve {target_id: pk} -> 200 có dữ liệu lô."""
-        res = self._call("chu", "inventory.batch.retrieve", {"args": {}, "target_id": str(self.batch.pk)})
+        res = self._call(roles.OWNER, "inventory.batch.retrieve", {"args": {}, "target_id": str(self.batch.pk)})
         self.assertEqual(res.status_code, 200, res.content[:300])
         rows = res.json()["result"]["rows"]
         self.assertTrue(rows)
@@ -245,7 +246,7 @@ class SR05Detail(PiiSweepBase):
         """SR-05-AC4: reports.batch_pnl (APIView) kèm target_id (Chủ) -> 200 hoặc 4xx có thông điệp, không 500."""
         spec = get_registry().get("reports.batch_pnl")
         self.assertIsNotNone(spec)
-        res = self._call("chu", "reports.batch_pnl", {"args": {}, "target_id": str(self.batch.pk)})
+        res = self._call(roles.OWNER, "reports.batch_pnl", {"args": {}, "target_id": str(self.batch.pk)})
         self.assertLess(res.status_code, 500, res.content[:300])
         self.assertIn(res.status_code, (200, 400, 404))
         if res.status_code != 200:
@@ -265,15 +266,15 @@ class SR05Detail(PiiSweepBase):
         spec = get_registry().get("delivery.deliverynote.partial_update")
         self.assertIsNotNone(spec)
         before = AiAction.objects.count()
-        res = self._call("nv_giao", "delivery.deliverynote.partial_update",
+        res = self._call(roles.DELIVERY_STAFF, "delivery.deliverynote.partial_update",
                          {"args": {}, "target_id": str(note.pk)})
         self.assertEqual(res.status_code, 404, res.content[:300])
         self.assertEqual(res.json()["code"], "NOT_FOUND")
         self.assertEqual(AiAction.objects.count(), before)
         # Đối chứng: phiếu gán cho chính nv_giao -> đề xuất được tạo (không phải luôn 404).
-        note.assigned_to = self.users["nv_giao"]
+        note.assigned_to = self.users[roles.DELIVERY_STAFF]
         note.save(update_fields=["assigned_to"])
-        res2 = self._call("nv_giao", "delivery.deliverynote.partial_update",
+        res2 = self._call(roles.DELIVERY_STAFF, "delivery.deliverynote.partial_update",
                           {"args": {}, "target_id": str(note.pk)})
         self.assertEqual(res2.status_code, 200, res2.content[:300])
         self.assertEqual(res2.json()["outcome"], "proposal")

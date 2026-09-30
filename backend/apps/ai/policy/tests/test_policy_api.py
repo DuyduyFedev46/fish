@@ -11,6 +11,7 @@ from apps.accounts.models import AuditLog
 from apps.ai.models.config import AiConfigVersion
 from apps.ai.models.policy import AiPolicyVersion
 from apps.ai.registry import get_registry
+from apps.accounts import roles
 
 
 User = get_user_model()
@@ -21,9 +22,9 @@ class AiPolicyApiTests(APITestCase):
     def setUpTestData(cls):
         get_registry().build(force=True)
 
-        cls.g_chu, _ = Group.objects.get_or_create(name="chu")
-        cls.g_quan_ly, _ = Group.objects.get_or_create(name="quan_ly")
-        cls.g_nv_kho, _ = Group.objects.get_or_create(name="nv_kho")
+        cls.g_chu, _ = Group.objects.get_or_create(name=roles.OWNER)
+        cls.g_quan_ly, _ = Group.objects.get_or_create(name=roles.MANAGER)
+        cls.g_nv_kho, _ = Group.objects.get_or_create(name=roles.WAREHOUSE_STAFF)
 
         p_manage_ai = Permission.objects.filter(codename="manage_ai_policy").first()
         p_view_batch = Permission.objects.filter(codename="view_batch").first()
@@ -37,7 +38,7 @@ class AiPolicyApiTests(APITestCase):
         if p_close_batch:
             cls.g_chu.permissions.add(p_close_batch)
 
-        cls.user_chu = User.objects.create_user(username="chu_user", password="x", first_name="Duy", last_name="Chủ")
+        cls.user_chu = User.objects.create_user(username="owner_user", password="x", first_name="Duy", last_name="Chủ")
         cls.user_chu.groups.add(cls.g_chu)
 
         cls.user_quanly = User.objects.create_user(username="ql_user", password="x", first_name="Quản", last_name="Lý")

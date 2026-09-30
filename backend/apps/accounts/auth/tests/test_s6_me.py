@@ -11,6 +11,7 @@ from rest_framework.test import APIClient
 
 from apps.accounts.models import StaffProfile
 from apps.common.tests.fixtures import client_for, make_user
+from apps.accounts import roles
 
 URL = "/api/auth/me/"
 DASHBOARD = "/api/dashboard/summary/"
@@ -24,7 +25,7 @@ def group_perms(*names):
 
 class S6MeTests(TestCase):
     def test_s6_ac1_chu_xem_gia_von_lai_lo_home_dashboard(self):
-        loc = make_user("loc", "chu")
+        loc = make_user("loc", roles.OWNER)
         StaffProfile.objects.create(user=loc, phone="0909123456", display_name="Lộc")
         resp = client_for(loc).get(URL)
         self.assertEqual(resp.status_code, 200, resp.content)
@@ -33,17 +34,17 @@ class S6MeTests(TestCase):
         self.assertEqual(body["username"], "loc")
         self.assertEqual(body["display_name"], "Lộc")
         self.assertEqual(body["phone"], "0909123456")
-        self.assertEqual(body["groups"], ["chu"])
+        self.assertEqual(body["groups"], [roles.OWNER])
         self.assertIs(body["can_view_cost"], True)
         self.assertIs(body["can_view_profit"], True)
         self.assertEqual(body["home"], "dashboard")
-        self.assertEqual(body["permissions"], group_perms("chu"))
+        self.assertEqual(body["permissions"], group_perms(roles.OWNER))
         for perm in ("inventory.publish_batch", "inventory.close_batch",
                      "sales.confirm_payment_manual", "reports.view_dashboard"):
             self.assertIn(perm, body["permissions"])
 
     def test_s6_ac1_dung_dung_cac_key_contract(self):
-        body = client_for(make_user("loc", "chu")).get(URL).json()
+        body = client_for(make_user("loc", roles.OWNER)).get(URL).json()
         self.assertEqual(
             set(body),
             {"id", "username", "display_name", "phone", "groups", "permissions",
@@ -53,29 +54,29 @@ class S6MeTests(TestCase):
         )
 
     def test_s6_ac1_khong_co_ho_so_thi_display_name_la_username_phone_rong(self):
-        body = client_for(make_user("loc", "chu")).get(URL).json()
+        body = client_for(make_user("loc", roles.OWNER)).get(URL).json()
         self.assertEqual(body["display_name"], "loc")
         self.assertEqual(body["phone"], "")
 
     def test_s6_ac2_kiem_nhiem_kho_giao_permissions_la_hop(self):
-        kho1 = make_user("kho1", "nv_giao", "nv_kho")
+        kho1 = make_user("kho1", roles.DELIVERY_STAFF, roles.WAREHOUSE_STAFF)
         body = client_for(kho1).get(URL).json()
-        self.assertEqual(body["groups"], ["nv_kho", "nv_giao"])  # thứ tự cố định theo vai
-        self.assertEqual(body["permissions"], group_perms("nv_kho", "nv_giao"))
+        self.assertEqual(body["groups"], [roles.WAREHOUSE_STAFF, roles.DELIVERY_STAFF])  # thứ tự cố định theo vai
+        self.assertEqual(body["permissions"], group_perms(roles.WAREHOUSE_STAFF, roles.DELIVERY_STAFF))
         self.assertEqual(body["home"], "dashboard")
         self.assertIs(body["can_view_cost"], False)
         self.assertIs(body["can_view_profit"], False)
 
     def test_s6_ac3_chi_nv_giao_home_my_deliveries_khong_xem_gia_von(self):
-        body = client_for(make_user("giao1", "nv_giao")).get(URL).json()
-        self.assertEqual(body["groups"], ["nv_giao"])
+        body = client_for(make_user("giao1", roles.DELIVERY_STAFF)).get(URL).json()
+        self.assertEqual(body["groups"], [roles.DELIVERY_STAFF])
         self.assertEqual(body["home"], "my-deliveries")
         self.assertIs(body["can_view_cost"], False)
         self.assertNotIn("inventory.view_costprice", body["permissions"])
         self.assertNotIn("reports.view_dashboard", body["permissions"])
 
     def test_s6_ac3_quan_ly_khong_xem_gia_von(self):
-        body = client_for(make_user("ql1", "quan_ly")).get(URL).json()
+        body = client_for(make_user("ql1", roles.MANAGER)).get(URL).json()
         self.assertEqual(body["home"], "dashboard")
         self.assertIs(body["can_view_cost"], False)
         self.assertIs(body["can_view_profit"], False)
@@ -96,7 +97,7 @@ class S6MeTests(TestCase):
         self.assertEqual(body["home"], "no-role")
 
     def test_s6_ac5_token_cua_nguoi_da_nghi_bi_401_moi_api(self):
-        giao1 = make_user("giao1", "nv_giao")
+        giao1 = make_user("giao1", roles.DELIVERY_STAFF)
         token = Token.objects.create(user=giao1)
         client = APIClient()
         client.credentials(HTTP_AUTHORIZATION=f"Token {token.key}")
@@ -110,7 +111,7 @@ class S6MeTests(TestCase):
         self.assertEqual(client.get(DASHBOARD).status_code, 401)
 
     def test_s6_ac5_token_da_thu_hoi_401(self):
-        giao1 = make_user("giao1", "nv_giao")
+        giao1 = make_user("giao1", roles.DELIVERY_STAFF)
         token = Token.objects.create(user=giao1)
         key = token.key
         token.delete()
@@ -126,7 +127,7 @@ class S6MeTests(TestCase):
         self.assertEqual(resp.json(), UNAUTHORIZED)
 
     def test_s6_chi_cho_get(self):
-        resp = client_for(make_user("loc", "chu")).post(URL, {}, format="json")
+        resp = client_for(make_user("loc", roles.OWNER)).post(URL, {}, format="json")
         self.assertEqual(resp.status_code, 405)
 
 
@@ -140,16 +141,16 @@ class S6DashboardPermissionTests(TestCase):
                 permissions__codename="view_dashboard",
             ).values_list("name", flat=True)
         )
-        self.assertEqual(holders, {"chu", "quan_ly", "nv_kho"})
+        self.assertEqual(holders, {roles.OWNER, roles.MANAGER, roles.WAREHOUSE_STAFF})
 
     def test_s6_dashboard_200_voi_nguoi_co_quyen(self):
-        for name, group in (("loc", "chu"), ("ql1", "quan_ly"), ("kho1", "nv_kho")):
+        for name, group in (("loc", roles.OWNER), ("ql1", roles.MANAGER), ("kho1", roles.WAREHOUSE_STAFF)):
             with self.subTest(group=group):
                 resp = client_for(make_user(name, group)).get(DASHBOARD)
                 self.assertEqual(resp.status_code, 200, resp.content)
 
     def test_s6_dashboard_403_voi_nv_giao_va_nguoi_khong_group(self):
-        for name, groups in (("giao1", ("nv_giao",)), ("moi1", ())):
+        for name, groups in (("giao1", (roles.DELIVERY_STAFF,)), ("moi1", ())):
             with self.subTest(user=name):
                 resp = client_for(make_user(name, *groups)).get(DASHBOARD)
                 self.assertEqual(resp.status_code, 403, resp.content)

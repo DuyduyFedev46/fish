@@ -5,6 +5,8 @@ Dùng chung cho chỉ mục, call, guidance và màn cấu hình.
 from django.conf import settings
 from django.test import RequestFactory
 
+from apps.ai import command_groups
+
 
 LEVEL_ORDER = {"OFF": 0, "C": 1, "B": 2, "A": 3}
 _rf = RequestFactory()
@@ -109,7 +111,7 @@ def effective_level(user, spec, *, config_version=None, policy_version=None) -> 
         pass
 
     spec_id = getattr(spec, "id", "")
-    spec_group = getattr(spec, "group", "thu_mua")
+    spec_group = getattr(spec, "group", command_groups.PURCHASING)
     is_read = (getattr(spec, "kind", "read") == "read")
 
     # Xác định mức cấu hình của user

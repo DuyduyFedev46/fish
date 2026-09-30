@@ -18,6 +18,7 @@ from apps.catalog.models import Item, ItemGroup
 from apps.inventory.batches import services as batch_services
 from apps.inventory.models import Batch, Warehouse
 from apps.purchasing.models import Supplier
+from apps.accounts import roles
 
 S = Batch.Status
 
@@ -166,7 +167,7 @@ class S2PermissionTests(TestCase):
             status=S.SELLING, expiry_date=timezone.localdate() - datetime.timedelta(days=1),
         )
         kho = User.objects.create_user("kho1", password="x")
-        kho.groups.add(Group.objects.get(name="nv_kho"))
+        kho.groups.add(Group.objects.get(name=roles.WAREHOUSE_STAFF))
         client = APIClient()
         client.force_authenticate(kho)
         for url in (

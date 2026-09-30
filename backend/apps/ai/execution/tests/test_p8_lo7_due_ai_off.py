@@ -13,12 +13,13 @@ from django.utils import timezone
 
 from apps.ai.models import AiAction
 from apps.common.tests.fixtures import make_user
+from apps.accounts import roles
 
 
 @override_settings(AI_ENABLED=False)
 class L4AiOffIsolationTests(TestCase):
     def setUp(self):
-        self.kho = make_user("l4_kho", "nv_kho")
+        self.kho = make_user("l4_kho", roles.WAREHOUSE_STAFF)
         past = timezone.now() - datetime.timedelta(minutes=1)
         self.acts = [
             AiAction.objects.create(

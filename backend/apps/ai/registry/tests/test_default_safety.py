@@ -18,6 +18,8 @@ from apps.common.api import BusinessModelPermissions, CostFieldSerializerMixin
 from apps.common.tests.fixtures import make_user
 from apps.inventory.models import Batch
 from apps.sales.models import SalesOrder
+from apps.ai import command_groups
+from apps.accounts import roles
 
 
 class DummyBatchSerializer(CostFieldSerializerMixin, serializers.ModelSerializer):
@@ -55,9 +57,9 @@ urlpatterns = [
 @override_settings(AI_ENABLED=True)
 class DefaultSafetyTestCase(TestCase):
     def setUp(self):
-        self.user_chu = make_user("chu_safety", "chu")
-        self.user_kho = make_user("kho_safety", "nv_kho")
-        self.user_giao = make_user("giao_safety", "nv_giao")
+        self.user_chu = make_user("chu_safety", roles.OWNER)
+        self.user_kho = make_user("kho_safety", roles.WAREHOUSE_STAFF)
+        self.user_giao = make_user("giao_safety", roles.DELIVERY_STAFF)
 
     def test_dw07_ac2_feature_moi_khong_khai_gi_an_toan_mac_dinh(self):
         """DW-07-AC2: ViewSet mới không khai gì tự động an toàn ở mọi tiêu chí."""
@@ -76,9 +78,9 @@ class DefaultSafetyTestCase(TestCase):
             spec_action = specs["ai.batch.do_something_manual"]
 
             # (1) Mặc định: sensitivity=cao, channel=local
-            self.assertEqual(spec_list.sensitivity, "cao")
+            self.assertEqual(spec_list.sensitivity, command_groups.SENSITIVITY_HIGH)
             self.assertEqual(spec_list.channel, "local")
-            self.assertEqual(spec_action.sensitivity, "cao")
+            self.assertEqual(spec_action.sensitivity, command_groups.SENSITIVITY_HIGH)
             self.assertEqual(spec_action.channel, "local")
 
             # (1b) Quyền xem: chỉ hiện với Group có view_batch

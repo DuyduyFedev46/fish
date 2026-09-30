@@ -1,5 +1,5 @@
 import type { SiteInfoResponse } from "../types";
-import s from "./CskhNotice.module.css";
+import s from "./ConfirmationPolicyNotice.module.css";
 
 /** Khung giờ gọi mặc định khi backend chưa trả gì (giữ đúng mặc định `SHOP_CONFIRM_CALL_HOURS` cũ). */
 export const DEFAULT_CALL_HOURS = "7:00–20:00";
@@ -11,8 +11,8 @@ export const DEFAULT_CALL_HOURS = "7:00–20:00";
  * Trước đây hai câu trên cùng một màn dùng hai nguồn nên có thể hiện hai khung giờ khác nhau.
  */
 export function callHours(info: SiteInfoResponse | null | undefined): string {
-  const cskh = info?.cskh_notice;
-  if (cskh?.enabled && cskh.working_hours) return cskh.working_hours;
+  const policy = info?.cskh_notice;
+  if (policy?.enabled && policy.working_hours) return policy.working_hours;
   return info?.confirm_call_hours || DEFAULT_CALL_HOURS;
 }
 
@@ -21,27 +21,27 @@ export function callHours(info: SiteInfoResponse | null | undefined): string {
  * (`variant="paid"`). Chỉ nhận dữ liệu đã tải (`info`), KHÔNG tự gọi API: người dùng component
  * truyền `site-info` đã có để cả màn chỉ tốn 1 request. Không có SĐT/địa chỉ ở đây (bất biến 9).
  */
-export function CskhNotice({
+export function ConfirmationPolicyNotice({
   info,
   variant,
 }: {
   info: SiteInfoResponse | null | undefined;
   variant: "form" | "paid";
 }) {
-  const cskh = info?.cskh_notice;
-  if (!cskh?.enabled) return null;
+  const policy = info?.cskh_notice;
+  if (!policy?.enabled) return null;
 
   return (
-    <div className={s.box} data-testid="cskh-notice">
+    <div className={s.box} data-testid="confirmation-policy-notice">
       <strong>Lưu ý xác nhận đơn:</strong>{" "}
       {variant === "paid" ? "Sau khi thanh toán, Cá Về" : "Cá Về"} sẽ gọi xác nhận trong khung giờ{" "}
-      {callHours(info)} (tối đa {cskh.max_attempts} lần trong {cskh.window_minutes} phút).
-      {cskh.auto_cancel_enabled && (
+      {callHours(info)} (tối đa {policy.max_attempts} lần trong {policy.window_minutes} phút).
+      {policy.auto_cancel_enabled && (
         <span>
           {" "}
           Sau thời gian trên nếu không liên lạc được, đơn hàng có thể bị huỷ và hoàn đủ tiền trong vòng{" "}
-          {cskh.refund_deadline_days} ngày.
-          {cskh.hotline ? ` Hotline: ${cskh.hotline}.` : ""}
+          {policy.refund_deadline_days} ngày.
+          {policy.hotline ? ` Hotline: ${policy.hotline}.` : ""}
         </span>
       )}
       {/* # CHỜ legal-vn */}
@@ -64,4 +64,4 @@ export function CallNoticeBox({
   );
 }
 
-export default CskhNotice;
+export default ConfirmationPolicyNotice;

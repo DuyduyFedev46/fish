@@ -12,6 +12,7 @@
 import type { MockRequest, MockResponse } from "@/shared/lib/http";
 import { MOCK_UNAUTHORIZED, mockRequireUser, mockUsers } from "@/features/auth/mock";
 import { setAiConsent } from "./consent";
+import { ROLE } from "@/shared/lib/roles";
 import type { AuditLogRow } from "./types";
 
 const AI_ON_KEY = "cave_erp_mock_ai";
@@ -44,7 +45,7 @@ export function mockStatus(req: MockRequest): MockResponse {
       ai_enabled: aiEnabled(),
       cloud_enabled: false,
       model: name && url ? { name, version: "dev", gguf_url: url } : null,
-      budget: me.groups.includes("chu") ? { spent_vnd: 0, limit_vnd: 200000, status: "ok" } : null,
+      budget: me.groups.includes(ROLE.owner) ? { spent_vnd: 0, limit_vnd: 200000, status: "ok" } : null,
     },
   };
 }

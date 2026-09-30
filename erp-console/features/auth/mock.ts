@@ -32,6 +32,7 @@
 import { LOGIN_BAD, PW_PROBLEMS, beError } from "@/shared/lib/beErrors.mock";
 import { GROUP_CODES, GROUP_LABEL } from "@/shared/lib/groups";
 import { setMockGate, type MockRequest, type MockResponse } from "@/shared/lib/http";
+import { ROLE } from "@/shared/lib/roles";
 import type { Me } from "./types";
 
 const PASSWORD = "demo1234";
@@ -42,7 +43,7 @@ const TOKEN_PREFIX = "mock-token-";
 // ---- Quyền theo Group: COPY NGUYÊN `permissions` thật của GET /api/auth/me/ (BE L3–L4, 03-dev-notes.md,
 // dữ liệu seed migration). Mọi quyền của nv_giao nằm trong nv_kho. Đổi ở BE thì chép lại ở đây. ----
 const GROUP_PERMS: Record<string, string[]> = {
-  chu: [
+  [ROLE.owner]: [
     "accounts.add_staffprofile", "accounts.change_staffprofile", "accounts.delete_staffprofile",
     "accounts.manage_staff", "accounts.view_auditlog", "accounts.view_staffprofile", "auth.add_group",
     "auth.add_user", "auth.change_group", "auth.change_user", "auth.delete_group", "auth.delete_user",
@@ -84,7 +85,7 @@ const GROUP_PERMS: Record<string, string[]> = {
     "content.add_category", "content.change_category", "content.view_category", "content.add_entry",
     "content.change_entry", "content.delete_entry", "content.view_entry", "content.publish_entry",
   ],
-  quan_ly: [
+  [ROLE.manager]: [
     "accounts.view_auditlog", "accounts.view_staffprofile", "auth.view_user", "catalog.change_item_image",
     "catalog.view_bundleline",
     "catalog.view_item", "catalog.view_itemgroup", "catalog.view_itemprice", "catalog.view_pricelist", "catalog.view_pricingrule",
@@ -107,7 +108,7 @@ const GROUP_PERMS: Record<string, string[]> = {
     "content.add_category", "content.change_category", "content.view_category", "content.add_entry",
     "content.change_entry", "content.delete_entry", "content.view_entry", "content.publish_entry",
   ],
-  nv_kho: [
+  [ROLE.warehouseStaff]: [
     "accounts.view_staffprofile", "auth.view_user", "catalog.view_bundleline", "catalog.view_item",
     "catalog.view_itemgroup", "delivery.add_deliverynote", "delivery.change_deliverynote",
     "delivery.view_deliverynote", "delivery.pack_deliverynote", "delivery.print_label", "inventory.add_returntostock", "inventory.add_stockentry",
@@ -121,12 +122,12 @@ const GROUP_PERMS: Record<string, string[]> = {
     "sales.view_customer", "sales.view_salesinvoice", "sales.view_salesinvoiceline", "sales.view_salesorder",
     "sales.view_salesorderline",
   ],
-  nv_giao: [
+  [ROLE.deliveryStaff]: [
     "accounts.view_staffprofile", "auth.view_user", "delivery.change_deliverynote", "delivery.view_deliverynote",
     "inventory.add_returntostock", "inventory.view_returntostock", "sales.view_customer", "sales.view_salesorder",
     "sales.view_salesorderline",
   ],
-  cskh: [
+  [ROLE.customerService]: [
     "accounts.view_staffprofile", "auth.view_user", "sales.view_salesorder", "sales.view_salesorderline",
     "delivery.view_deliverynote", "delivery.confirm_with_customer", "delivery.change_recipient",
   ],
@@ -179,17 +180,17 @@ function seed(): MockUser[] {
     ...more,
   });
   return [
-    u(1, "loc", "Lộc", "0909123456", ["chu"], { last_login: "2026-09-24T06:40:00+07:00" }),
-    u(2, "ql1", "Chị Hạnh", "0909000111", ["quan_ly"], { last_login: "2026-09-24T07:15:00+07:00" }),
-    u(3, "kho1", "Anh Tâm", "0909000222", ["nv_kho", "nv_giao"], { last_login: "2026-09-24T05:02:00+07:00" }),
-    u(4, "giao1", "Anh Phúc", "0909000333", ["nv_giao"], { last_login: "2026-09-24T05:10:00+07:00" }),
+    u(1, "loc", "Lộc", "0909123456", [ROLE.owner], { last_login: "2026-09-24T06:40:00+07:00" }),
+    u(2, "ql1", "Chị Hạnh", "0909000111", [ROLE.manager], { last_login: "2026-09-24T07:15:00+07:00" }),
+    u(3, "kho1", "Anh Tâm", "0909000222", [ROLE.warehouseStaff, ROLE.deliveryStaff], { last_login: "2026-09-24T05:02:00+07:00" }),
+    u(4, "giao1", "Anh Phúc", "0909000333", [ROLE.deliveryStaff], { last_login: "2026-09-24T05:10:00+07:00" }),
     u(5, "admin", "Quản trị", "", [], { is_superuser: true }),
-    u(6, "nghi1", "Anh Nghĩa", "0909000444", ["nv_kho"], { is_active: false, last_login: "2026-08-30T17:20:00+07:00" }),
-    u(7, "giao2", "Anh Lâm", "0909000555", ["nv_giao"], { last_login: "2026-09-24T06:05:00+07:00" }),
-    u(8, "ql9", "Chị Mai", "0909000666", ["quan_ly"], { extra_perms: ["accounts.manage_staff"] }),
-    u(9, "sa1", "Kỹ thuật", "0909000777", ["quan_ly"], { is_superuser: true }),
-    u(10, "kho5", "Chị Sáu", "0909000888", ["nv_kho"], { must_change_password: true }),
-    u(11, "cs1", "Chị Cúc", "0909000999", ["cskh"], { last_login: "2026-09-28T08:00:00+07:00" }),
+    u(6, "nghi1", "Anh Nghĩa", "0909000444", [ROLE.warehouseStaff], { is_active: false, last_login: "2026-08-30T17:20:00+07:00" }),
+    u(7, "giao2", "Anh Lâm", "0909000555", [ROLE.deliveryStaff], { last_login: "2026-09-24T06:05:00+07:00" }),
+    u(8, "ql9", "Chị Mai", "0909000666", [ROLE.manager], { extra_perms: ["accounts.manage_staff"] }),
+    u(9, "sa1", "Kỹ thuật", "0909000777", [ROLE.manager], { is_superuser: true }),
+    u(10, "kho5", "Chị Sáu", "0909000888", [ROLE.warehouseStaff], { must_change_password: true }),
+    u(11, "cs1", "Chị Cúc", "0909000999", [ROLE.customerService], { last_login: "2026-09-28T08:00:00+07:00" }),
   ];
 }
 
@@ -260,7 +261,7 @@ function buildMe(u: MockUser): Me {
   const perms = mockPermsOf(u);
   const groups = sortGroups(u.groups);
   const home: Me["home"] =
-    groups.length === 0 ? "no-role" : groups.length === 1 && groups[0] === "nv_giao" ? "my-deliveries" : "dashboard";
+    groups.length === 0 ? "no-role" : groups.length === 1 && groups[0] === ROLE.deliveryStaff ? "my-deliveries" : "dashboard";
   return {
     id: u.id,
     username: u.username,

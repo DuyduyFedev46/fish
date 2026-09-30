@@ -18,6 +18,8 @@ from apps.catalog.models import Item, ItemGroup
 from apps.common.tests.fixtures import client_for, make_user
 from apps.inventory.models import Batch, Warehouse
 from apps.purchasing.models import PurchaseReceipt, Supplier
+from apps.ai import command_groups
+from apps.accounts import roles
 
 User = get_user_model()
 
@@ -25,11 +27,11 @@ User = get_user_model()
 @override_settings(AI_ENABLED=True, AI_WRITE_LEVELS_ALLOWED="B")
 class DW19LevelBTestCase(TestCase):
     def setUp(self):
-        self.user_chu = make_user("chu1", "chu")
-        self.user_ql = make_user("ql1", "quan_ly")
-        self.user_kho = make_user("kho1", "nv_kho")
-        self.user_kho2 = make_user("kho2", "nv_kho")
-        self.user_giao = make_user("giao1", "nv_giao")
+        self.user_chu = make_user("chu1", roles.OWNER)
+        self.user_ql = make_user("ql1", roles.MANAGER)
+        self.user_kho = make_user("kho1", roles.WAREHOUSE_STAFF)
+        self.user_kho2 = make_user("kho2", roles.WAREHOUSE_STAFF)
+        self.user_giao = make_user("giao1", roles.DELIVERY_STAFF)
 
         self.client_chu = client_for(self.user_chu)
         self.client_ql = client_for(self.user_ql)
@@ -52,7 +54,7 @@ class DW19LevelBTestCase(TestCase):
         self.config_kho1 = AiConfigVersion.objects.create(
             user=self.user_kho,
             version=1,
-            group_levels={"thu_mua": {"read": "A", "write": "B"}},
+            group_levels={command_groups.PURCHASING: {"read": "A", "write": "B"}},
             overrides={"purchasing.purchasereceipt.nhap_lo": "B"},
             limits={"purchasing.purchasereceipt.nhap_lo": {"kg": "150", "vnd": "30000000"}},
             created_by=self.user_kho,
@@ -60,7 +62,7 @@ class DW19LevelBTestCase(TestCase):
         self.config_ql = AiConfigVersion.objects.create(
             user=self.user_ql,
             version=1,
-            group_levels={"thu_mua": {"read": "A", "write": "C"}, "ban_hang": {"read": "A", "write": "C"}},
+            group_levels={command_groups.PURCHASING: {"read": "A", "write": "C"}, command_groups.SALES: {"read": "A", "write": "C"}},
             created_by=self.user_ql,
         )
 
@@ -120,7 +122,7 @@ class DW19LevelBTestCase(TestCase):
         # PUT override B -> 400 BR-AI-27
         put_payload = {
             "base_version": self.config_kho1.version,
-            "groups": {"thu_mua": {"read": "A", "write": "C"}},
+            "groups": {command_groups.PURCHASING: {"read": "A", "write": "C"}},
             "overrides": {"purchasing.purchasereceipt.nhap_lo": "B"},
             "acknowledge_responsibility": True,
         }
@@ -286,7 +288,7 @@ class DW19LevelBTestCase(TestCase):
         """DW-19-AC7: Lệnh trần C ép (như sales.refund.create_refund) PUT B -> 400 BR-AI-19."""
         put_payload = {
             "base_version": self.config_ql.version,
-            "groups": {"thu_mua": {"read": "A", "write": "C"}, "ban_hang": {"read": "A", "write": "C"}},
+            "groups": {command_groups.PURCHASING: {"read": "A", "write": "C"}, command_groups.SALES: {"read": "A", "write": "C"}},
             "overrides": {"sales.refund.create_refund": "B"},
             "acknowledge_responsibility": True,
         }

@@ -9,34 +9,34 @@ from django.db.models.query import QuerySet
 from django.utils import timezone
 
 from apps.accounts.models import AuditLog
-from apps.delivery.cskh import services as cskh_services
+from apps.delivery.confirmation import services as confirmation_services
 from apps.delivery.models import ConfirmationTask, DeliveryNote
 from apps.delivery.tests import test_cskh_l3
 
 
-class QaF08Tests(test_cskh_l3.CskhL3BaseTestCase):
+class QaF08Tests(test_cskh_l3.ConfirmationL3BaseTestCase):
     def setUp(self):
         super().setUp()
         self.t0 = timezone.now().replace(hour=9, minute=0, second=0, microsecond=0)
-        self.order, self.note, self.task = self._create_order_with_cskh()
-        cskh_services.record_call(self.task.pk, self.cs1, result="UNREACHABLE", now=self.t0)
+        self.order, self.note, self.task = self._create_order_with_confirmation()
+        confirmation_services.record_call(self.task.pk, self.cs1, result="UNREACHABLE", now=self.t0)
 
     def _audits(self):
         return AuditLog.objects.filter(action="delivery_escalated").count()
 
     def test_qa_f08_chay_job_2_lan_lan_hai_khong_lam_gi_khong_ghi_audit_them(self):
-        self.assertEqual(cskh_services.escalate_expired_windows(now=self.t0 + timedelta(minutes=31)), 1)
-        self.assertEqual(cskh_services.escalate_expired_windows(now=self.t0 + timedelta(minutes=32)), 0)
+        self.assertEqual(confirmation_services.escalate_expired_windows(now=self.t0 + timedelta(minutes=31)), 1)
+        self.assertEqual(confirmation_services.escalate_expired_windows(now=self.t0 + timedelta(minutes=32)), 0)
         self.assertEqual(self._audits(), 1)
         self.task.refresh_from_db()
         self.assertEqual(self.task.state, ConfirmationTask.State.ESCALATED)
         self.assertEqual(self.task.escalated_at, self.t0 + timedelta(minutes=31))
 
     def test_qa_f08_bien_cua_so_29p59_khong_30p00_co(self):
-        self.assertEqual(cskh_services.escalate_expired_windows(now=self.t0 + timedelta(minutes=29, seconds=59)), 0)
+        self.assertEqual(confirmation_services.escalate_expired_windows(now=self.t0 + timedelta(minutes=29, seconds=59)), 0)
         self.task.refresh_from_db()
         self.assertEqual(self.task.state, ConfirmationTask.State.PENDING)
-        self.assertEqual(cskh_services.escalate_expired_windows(now=self.t0 + timedelta(minutes=30)), 1)
+        self.assertEqual(confirmation_services.escalate_expired_windows(now=self.t0 + timedelta(minutes=30)), 1)
 
     def _race(self, mutate):
         """Chạy job, nhưng ngay khi nó xin khoá phiếu giao thì một người khác đã đổi dữ liệu (đọc cũ -> khoá mới)."""
@@ -50,7 +50,7 @@ class QaF08Tests(test_cskh_l3.CskhL3BaseTestCase):
             return real(qs, *a, **k)
 
         with mock.patch.object(QuerySet, "select_for_update", spy):
-            n = cskh_services.escalate_expired_windows(now=self.t0 + timedelta(minutes=31))
+            n = confirmation_services.escalate_expired_windows(now=self.t0 + timedelta(minutes=31))
         self.assertTrue(fired, "job không xin khoá phiếu giao")
         return n
 
@@ -71,8 +71,8 @@ class QaF08Tests(test_cskh_l3.CskhL3BaseTestCase):
         self.assertEqual(self._audits(), 0)
 
     def test_qa_f08_nhieu_task_mot_task_loi_khong_chan_task_khac(self):
-        order2, note2, task2 = self._create_order_with_cskh(phone="0900000124", name="Khách Thử B")
-        cskh_services.record_call(task2.pk, self.cs1, result="UNREACHABLE", now=self.t0)
+        order2, note2, task2 = self._create_order_with_confirmation(phone="0900000124", name="Khách Thử B")
+        confirmation_services.record_call(task2.pk, self.cs1, result="UNREACHABLE", now=self.t0)
         real = QuerySet.select_for_update
         calls = []
 
@@ -85,15 +85,15 @@ class QaF08Tests(test_cskh_l3.CskhL3BaseTestCase):
 
         with mock.patch.object(QuerySet, "select_for_update", spy):
             with self.assertLogs("cangca.delivery.cskh", level="ERROR") as cm:
-                n = cskh_services.escalate_expired_windows(now=self.t0 + timedelta(minutes=31))
+                n = confirmation_services.escalate_expired_windows(now=self.t0 + timedelta(minutes=31))
         self.assertEqual(n, 1)
         self.assertEqual(ConfirmationTask.objects.filter(state=ConfirmationTask.State.ESCALATED).count(), 1)
         self.assertNotIn("0900000", "\n".join(cm.output))
         # chạy lại: task bị lỗi lần trước được xử lý tiếp (idempotent)
-        self.assertEqual(cskh_services.escalate_expired_windows(now=self.t0 + timedelta(minutes=32)), 1)
+        self.assertEqual(confirmation_services.escalate_expired_windows(now=self.t0 + timedelta(minutes=32)), 1)
 
     def test_qa_f08_audit_khong_chua_pii_hay_gia_von(self):
-        cskh_services.escalate_expired_windows(now=self.t0 + timedelta(minutes=31))
+        confirmation_services.escalate_expired_windows(now=self.t0 + timedelta(minutes=31))
         blob = " ".join(f"{a.note}|{a.changes}" for a in AuditLog.objects.filter(action="delivery_escalated"))
         for bad in ("Khách Thử A", "0900000123", "Đường Thử", "110000", "150000", "unit_cost", "purchase_rate"):
             self.assertNotIn(bad, blob)

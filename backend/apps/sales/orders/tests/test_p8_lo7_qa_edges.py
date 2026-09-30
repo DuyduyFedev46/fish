@@ -8,6 +8,7 @@ from django.test import TestCase
 
 from apps.common.tests.fixtures import client_for, make_user
 from apps.sales.models import Customer, SalesOrder
+from apps.accounts import roles
 
 
 class QaNoStoreVerbs(TestCase):
@@ -17,7 +18,7 @@ class QaNoStoreVerbs(TestCase):
             code="SO-260930-QA01", customer=self.customer, total_amount=Decimal("100000"),
             status=SalesOrder.Status.BOOKED,
         )
-        self.users = {g: make_user(f"qns_{g}", g) for g in ("chu", "quan_ly", "nv_kho", "nv_giao", "cskh")}
+        self.users = {g: make_user(f"qns_{g}", g) for g in (roles.OWNER, roles.MANAGER, roles.WAREHOUSE_STAFF, roles.DELIVERY_STAFF, roles.CUSTOMER_SERVICE)}
 
     def test_moi_dong_tu_moi_nhom_deu_no_store(self):
         cases = [
@@ -46,7 +47,7 @@ class QaNoStoreVerbs(TestCase):
 
     def test_xoa_khach_da_co_don_khong_mat_du_lieu_chung_tu(self):
         """Bất biến: không xoá chứng từ. Khách đã có đơn: DB chặn (ProtectedError). Ghi nhận mã trả về."""
-        c = client_for(self.users["chu"])
+        c = client_for(self.users[roles.OWNER])
         c.raise_request_exception = False
         res = c.delete(f"/api/sales/customers/{self.customer.pk}/")
         print("QA-INFO DELETE khach co don ->", res.status_code)
@@ -66,7 +67,7 @@ class QaNoStoreVerbs(TestCase):
 
     def test_ghi_nhan_api_noi_bo_khac_co_du_lieu_khach_da_co_no_store_chua(self):
         """Không fail: chỉ liệt kê để báo cáo. In ra các URL 200 thiếu no-store."""
-        chu = client_for(self.users["chu"])
+        chu = client_for(self.users[roles.OWNER])
         urls = ["/api/delivery/notes/", "/api/delivery/cskh/queue/", "/api/payments/", "/api/sales/payments/",
                 "/api/refunds/", "/api/sales/refunds/", "/api/invoices/", "/api/sales/invoices/"]
         missing = []

@@ -6,7 +6,7 @@ Cloud Run Job / Cron: Quét các mốc thời gian CSKH (02b §5.1, CS-07, CS-08
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 
-from apps.delivery.cskh import services as cskh_services
+from apps.delivery.confirmation import services as confirmation_services
 
 
 class Command(BaseCommand):
@@ -14,8 +14,8 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         now = timezone.now()
-        escalated_n = cskh_services.escalate_expired_windows(now=now)
-        auto_res = cskh_services.auto_cancel_overdue(now=now)
+        escalated_n = confirmation_services.escalate_expired_windows(now=now)
+        auto_res = confirmation_services.auto_cancel_overdue(now=now)
         m = auto_res.get("cancelled", 0)
         k = auto_res.get("blocked", 0)
         self.stdout.write(f"Đã chuyển Quản lý {escalated_n} phiếu; tự huỷ {m} đơn; chặn {k} đơn.")

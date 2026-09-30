@@ -9,14 +9,15 @@ from rest_framework.test import APIClient
 from apps.common.tests.fixtures import client_for, make_user
 from apps.content.models import Category, ContentImage, Entry, EntryVersion
 from apps.content.permissions import CONTENT_ALL_PERMS
+from apps.accounts import roles
 
 
 class ContentPermissionsMatrixTests(TestCase):
     def setUp(self):
-        self.user_chu = make_user("test_chu", "chu")
-        self.user_quan_ly = make_user("test_ql", "quan_ly")
-        self.user_nv_kho = make_user("test_kho", "nv_kho")
-        self.user_nv_giao = make_user("test_giao", "nv_giao")
+        self.user_chu = make_user("test_chu", roles.OWNER)
+        self.user_quan_ly = make_user("test_ql", roles.MANAGER)
+        self.user_nv_kho = make_user("test_kho", roles.WAREHOUSE_STAFF)
+        self.user_nv_giao = make_user("test_giao", roles.DELIVERY_STAFF)
 
         # Tạo sẵn 1 category để test endpoint detail
         self.cat = Category.objects.create(
@@ -29,10 +30,10 @@ class ContentPermissionsMatrixTests(TestCase):
 
     def test_cms_01_ac1_group_permissions(self):
         """CMS-01-AC1: chu và quan_ly có đủ 8 quyền; nv_kho và nv_giao không có quyền nào."""
-        group_chu = Group.objects.get(name="chu")
-        group_ql = Group.objects.get(name="quan_ly")
-        group_kho = Group.objects.get(name="nv_kho")
-        group_giao = Group.objects.get(name="nv_giao")
+        group_chu = Group.objects.get(name=roles.OWNER)
+        group_ql = Group.objects.get(name=roles.MANAGER)
+        group_kho = Group.objects.get(name=roles.WAREHOUSE_STAFF)
+        group_giao = Group.objects.get(name=roles.DELIVERY_STAFF)
 
         for perm_code in CONTENT_ALL_PERMS:
             app_label, codename = perm_code.split(".")

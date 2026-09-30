@@ -13,7 +13,7 @@ import { formatVnd } from "../../../lib/format";
 import type { CreateOrderPayload, CreateOrderResponse } from "../../../lib/types";
 import { getPrivacyPolicy, getSiteInfo } from "@/features/site/api";
 import type { PrivacyPolicyResponse, SiteInfoResponse } from "@/features/site/types";
-import { CskhNotice } from "@/features/site/components/CskhNotice";
+import { ConfirmationPolicyNotice } from "@/features/site/components/ConfirmationPolicyNotice";
 import PaymentPanel from "./PaymentPanel";
 import { rememberOrderContact } from "../storage";
 
@@ -288,7 +288,7 @@ export default function CheckoutScreen() {
             {errors.address && <span className="form-error">{errors.address}</span>}
           </div>
 
-          <CskhNotice info={siteInfo} variant="form" />
+          <ConfirmationPolicyNotice info={siteInfo} variant="form" />
 
           {consentRequired && policyInfo && (
             <div className="form-field form-field-checkbox" style={{ marginBottom: "16px" }}>

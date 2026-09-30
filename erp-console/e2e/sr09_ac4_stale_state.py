@@ -50,10 +50,10 @@ def run_case(browser, tag, viewport):
     modal = page.get_by_role("dialog")
     modal.get_by_text("Đã xác nhận", exact=False).first.wait_for(timeout=10_000)
     page.wait_for_timeout(400)
-    ok(f"[{tag}] chưa có cảnh báo stale trước khi bấm", page.get_by_test_id("cskh-stale-alert").count() == 0)
+    ok(f"[{tag}] chưa có cảnh báo stale trước khi bấm", page.get_by_test_id("confirmation-stale-alert").count() == 0)
 
     modal.get_by_role("button", name="Đã xác nhận").first.click()
-    alert = page.get_by_test_id("cskh-stale-alert")
+    alert = page.get_by_test_id("confirmation-stale-alert")
     alert.wait_for(timeout=10_000)
     ok(f"[{tag}] hiện đúng thông điệp `detail` của BE", DETAIL in alert.inner_text(), alert.inner_text().replace("\n", " | "))
     page.wait_for_timeout(300)

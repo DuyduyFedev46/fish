@@ -6,6 +6,7 @@ from django.shortcuts import get_object_or_404
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
+from apps.ai import command_groups
 from apps.ai.declare import AiMeta
 from apps.common.api import BusinessModelPermissions, DocumentViewSet, require_perm
 from apps.inventory.models import Batch
@@ -21,7 +22,7 @@ class BatchViewSet(DocumentViewSet):
     queryset = Batch.objects.select_related("item", "supplier", "warehouse").order_by(*FEFO_ORDER)
     serializer_class = BatchSerializer
     list_query_serializer = BatchListQuery
-    ai_by_action = {"list": AiMeta(keywords=("tra_ton", "tra tồn", "tồn kho", "còn bao nhiêu kg"), sensitivity="trung_binh")}
+    ai_by_action = {"list": AiMeta(keywords=("tra_ton", "tra tồn", "tồn kho", "còn bao nhiêu kg"), sensitivity=command_groups.SENSITIVITY_MEDIUM)}
     permission_classes = [BusinessModelPermissions]
     custom_perm_actions = ("publish", "close", "cancel_expired", "return_to_supplier")
     # BR-PQ-14 / BR-GV-03: trạng thái, tồn, giá vốn, hạn chỉ đổi qua service.

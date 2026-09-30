@@ -14,6 +14,8 @@ from apps.catalog.models import Item, ItemGroup
 from apps.common.tests.fixtures import client_for, make_user
 from apps.inventory.models import Warehouse
 from apps.purchasing.models import Supplier
+from apps.ai import command_groups
+from apps.accounts import roles
 
 VN = ZoneInfo("Asia/Ho_Chi_Minh")
 URL = "/api/ai/commands/purchasing.purchasereceipt.nhap_lo/call/"
@@ -22,7 +24,7 @@ URL = "/api/ai/commands/purchasing.purchasereceipt.nhap_lo/call/"
 @override_settings(AI_ENABLED=True, AI_WRITE_LEVELS_ALLOWED="B")
 class F07DailyLimitBoundaryTests(TestCase):
     def setUp(self):
-        self.kho = make_user("f07_kho", "nv_kho")
+        self.kho = make_user("f07_kho", roles.WAREHOUSE_STAFF)
         self.client = client_for(self.kho)
         group = ItemGroup.objects.create(name="Cá biển")
         self.item = Item.objects.create(code="CA-F07", name="Cá ngừ", item_group=group,
@@ -31,7 +33,7 @@ class F07DailyLimitBoundaryTests(TestCase):
         self.wh = Warehouse.objects.create(name="Kho giả")
         AiConfigVersion.objects.create(
             user=self.kho, version=1,
-            group_levels={"thu_mua": {"read": "A", "write": "B"}},
+            group_levels={command_groups.PURCHASING: {"read": "A", "write": "B"}},
             overrides={"purchasing.purchasereceipt.nhap_lo": "B"},
             limits={"purchasing.purchasereceipt.nhap_lo": {"kg": "150", "vnd": "30000000"}},
             created_by=self.kho,

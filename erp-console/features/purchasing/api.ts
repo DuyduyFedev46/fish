@@ -1,6 +1,6 @@
 import { apiFetch, type Paginated } from "@/shared/lib/http";
-import { mockCancelPurchaseReceipt, mockListSuppliers, mockSubmitNhapLo } from "./mock";
-import type { CancelPurchaseReceiptResponse, NhapLoPayload, NhapLoResponse, Supplier } from "./types";
+import { mockCancelPurchaseReceipt, mockListSuppliers, mockSubmitReceiveBatches } from "./mock";
+import type { CancelPurchaseReceiptResponse, ReceiveBatchesPayload, ReceiveBatchesResponse, Supplier } from "./types";
 
 export async function fetchSuppliers(signal?: AbortSignal): Promise<Supplier[]> {
   const isMock = process.env.NEXT_PUBLIC_USE_MOCK === "1";
@@ -11,16 +11,16 @@ export async function fetchSuppliers(signal?: AbortSignal): Promise<Supplier[]> 
   return res.results || [];
 }
 
-export async function submitNhapLo(
-  payload: NhapLoPayload,
+export async function submitReceiveBatches(
+  payload: ReceiveBatchesPayload,
   signal?: AbortSignal
-): Promise<NhapLoResponse> {
+): Promise<ReceiveBatchesResponse> {
   const isMock = process.env.NEXT_PUBLIC_USE_MOCK === "1";
-  return apiFetch<NhapLoResponse>("/api/purchasing/receipts/nhap-lo/", {
+  return apiFetch<ReceiveBatchesResponse>("/api/purchasing/receipts/nhap-lo/", {
     method: "POST",
     body: payload,
     signal,
-    mock: isMock ? mockSubmitNhapLo : undefined,
+    mock: isMock ? mockSubmitReceiveBatches : undefined,
   });
 }
 

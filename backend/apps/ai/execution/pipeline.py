@@ -13,6 +13,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.throttling import SimpleRateThrottle
 
+from apps.accounts import roles
 from apps.common.audit import record_audit, set_ai_audit_scope
 from apps.ai.models import AiAction
 from apps.ai.policy.effective import effective_level
@@ -417,7 +418,7 @@ class AiCommandCallView(APIView):
                 clean_args = dict(args) if isinstance(args, dict) else {}
                 if downgrade_reason and downgrade_reason.get("code") == "AI_NO_EVIDENCE":
                     action_status = AiAction.Status.ESCALATED
-                    assignee_group = "chu"
+                    assignee_group = roles.OWNER
                     from apps.sales.models import Refund
                     from apps.common.formatting import format_vnd
                     rf = None

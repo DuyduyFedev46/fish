@@ -18,6 +18,7 @@ from apps.ai.policy.effective import effective_level
 from apps.ai.policy.rules import SCRUB_PII_KEYS
 from apps.ai.registry.discovery import get_registry
 from apps.common.tests.fixtures import make_user
+from apps.accounts import roles
 
 
 @override_settings(AI_ENABLED=True)
@@ -71,9 +72,9 @@ class RegistryInvariantsTestCase(TestCase):
 
     def test_dw15_ac2_doi_chieu_12_lenh_cu_voi_4_group(self):
         """DW-15-AC2: Đối chiếu 12 lệnh cũ tương ứng theo Phụ lục B với 4 Group."""
-        chu = make_user("chu_inv", "chu")
-        ql = make_user("ql_inv", "quan_ly")
-        kho = make_user("kho_inv", "nv_kho")
+        chu = make_user("chu_inv", roles.OWNER)
+        ql = make_user("ql_inv", roles.MANAGER)
+        kho = make_user("kho_inv", roles.WAREHOUSE_STAFF)
 
         # 1. tra_ton -> inventory.batch.list
         batch_list = self.registry.get("inventory.batch.list")

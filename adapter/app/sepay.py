@@ -84,7 +84,7 @@ def to_internal_payload(payload: SePayWebhookPayload, order_code_regex: str) -> 
 
 # --- IPN Cổng thanh toán SePay (story P2, hồ sơ 2026-09-26-sepay-cong-thanh-toan) --------
 
-VN_TZ = timezone(timedelta(hours=7))
+VN_TIME_ZONE = timezone(timedelta(hours=7))
 
 # Payload mẫu thật (developer.sepay.vn/vi/cong-thanh-toan/IPN) không liệt kê field mã tham
 # chiếu ngân hàng riêng trong `transaction` (chỉ thấy `id`, `transaction_id`). Vẫn dò thêm
@@ -171,9 +171,9 @@ def _extract_ipn_received_at(transaction: dict[str, Any]) -> str:
         # kèm offset -> gán rõ giờ VN (đúng tài liệu SePay) thay vì để naive, để Django nhận
         # ISO 8601 không phụ thuộc timezone mặc định của tiến trình chạy adapter.
         if parsed.tzinfo is None:
-            parsed = parsed.replace(tzinfo=VN_TZ)
+            parsed = parsed.replace(tzinfo=VN_TIME_ZONE)
         return parsed.isoformat()
-    return datetime.now(VN_TZ).isoformat()
+    return datetime.now(VN_TIME_ZONE).isoformat()
 
 
 def is_ipn_order_paid(payload: SePayIpnPayload) -> bool:

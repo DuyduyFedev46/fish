@@ -19,6 +19,7 @@ from apps.sales.payments import services as payment_services
 from apps.sales.refunds import services as refund_services
 
 from .test_p8_pii_sweep import GROUPS, PII_KEYS, PII_NAME, PII_PAYER, PII_PHONE, PII_ADDR, PiiSweepBase, _find_keys
+from apps.accounts import roles
 
 RECIP_NAME = "Người Nhận Giả Zeta"
 RECIP_PHONE = "0900000777"
@@ -35,7 +36,7 @@ class RichScopeSweep(PiiSweepBase):
     def setUp(self):
         super().setUp()
         self.note = DeliveryNote.objects.get(sales_invoice__sales_order=self.order)
-        self.note.assigned_to = self.users["nv_giao"]
+        self.note.assigned_to = self.users[roles.DELIVERY_STAFF]
         self.note.recipient_name = RECIP_NAME
         self.note.recipient_phone = RECIP_PHONE
         self.note.note = NOTE_PII
@@ -46,13 +47,13 @@ class RichScopeSweep(PiiSweepBase):
         self.assertIsNotNone(task, "fixture: phiếu phải có ConfirmationTask")
         CustomerCall.objects.create(
             note=self.note, result=CustomerCall.Result.CALLBACK, note_text=NOTE_PII,
-            created_by=self.users["cskh"], callback_at=timezone.now(),
+            created_by=self.users[roles.CUSTOMER_SERVICE], callback_at=timezone.now(),
         )
         # Phiếu hoàn (lý do trung tính; chữ tự do do nhân viên gõ là ghi chú riêng của báo cáo QA, mục G1)
         self.invoice = self.order.invoice
         self.refund = refund_services.create_refund(
             invoice=self.invoice, amount=self.invoice.amount / 2, is_partial=True,
-            reason="Khách đổi ý, hoàn một phần", actor=self.users["chu"],
+            reason="Khách đổi ý, hoàn một phần", actor=self.users[roles.OWNER],
         )
         # Đơn thứ 2 đã thanh toán để có thêm phiếu/giao dịch
         payment_services.confirm_payment(
@@ -73,9 +74,9 @@ class RichScopeSweep(PiiSweepBase):
     def test_fixture_that_su_nam_trong_pham_vi(self):
         """Điều kiện tiên quyết: dữ liệu có mặt trong phạm vi của nv_giao và cskh (không phải cột rỗng)."""
         qs = SalesOrder.objects.all()
-        self.assertIn(self.order.pk, set(scope_orders_for(self.users["nv_giao"], qs).values_list("pk", flat=True)))
-        self.assertIn(self.order.pk, set(scope_orders_for(self.users["cskh"], qs).values_list("pk", flat=True)))
-        self.assertNotIn(self.order2.pk, set(scope_orders_for(self.users["nv_giao"], qs).values_list("pk", flat=True)))
+        self.assertIn(self.order.pk, set(scope_orders_for(self.users[roles.DELIVERY_STAFF], qs).values_list("pk", flat=True)))
+        self.assertIn(self.order.pk, set(scope_orders_for(self.users[roles.CUSTOMER_SERVICE], qs).values_list("pk", flat=True)))
+        self.assertNotIn(self.order2.pk, set(scope_orders_for(self.users[roles.DELIVERY_STAFF], qs).values_list("pk", flat=True)))
         self.assertEqual(self.note.confirmation.state, ConfirmationTask.State.PENDING)
 
     def test_quet_5_group_tren_du_lieu_trong_pham_vi(self):
@@ -111,20 +112,20 @@ class RichScopeSweep(PiiSweepBase):
         for g in GROUPS:
             self.assertGreater(ok_by_group[g], 0, f"nhóm {g} không có response 200 nào (xanh giả)")
         # nv_giao/cskh phải chạm được dữ liệu chi tiết có PII trong phạm vi
-        for g in ("chu", "quan_ly", "nv_kho", "nv_giao", "cskh"):
+        for g in (roles.OWNER, roles.MANAGER, roles.WAREHOUSE_STAFF, roles.DELIVERY_STAFF, roles.CUSTOMER_SERVICE):
             self.assertIn("sales.salesorder.retrieve", ok_cmds_by_group[g], f"{g} không retrieve được đơn trong phạm vi")
-        for g in ("chu", "quan_ly", "nv_kho", "nv_giao"):
+        for g in (roles.OWNER, roles.MANAGER, roles.WAREHOUSE_STAFF, roles.DELIVERY_STAFF):
             self.assertIn("delivery.deliverynote.retrieve", ok_cmds_by_group[g], f"{g} không retrieve được phiếu giao")
-        for g in ("chu", "quan_ly"):
+        for g in (roles.OWNER, roles.MANAGER):
             self.assertIn("sales.refund.retrieve", ok_cmds_by_group[g], f"{g} không retrieve được phiếu hoàn")
         print("QA-LO2 200 theo nhóm:", ok_by_group, "chi tiết:", ok_detail_by_group)
         print("QA-LO2 khoá giống-PII ngoài tập lọc (rà tay):", {k: sorted(v) for k, v in heuristic_keys.items()})
 
     def test_orders_retrieve_nv_giao_chi_thay_don_cua_minh(self):
         """SR-05-AC3 + SR-06: nv_giao retrieve đơn của phiếu mình = 200; đơn khác = 404 (qua AI), body không có PII."""
-        ok = self._call("nv_giao", "sales.salesorder.retrieve", {"args": {}, "target_id": str(self.order.pk)})
+        ok = self._call(roles.DELIVERY_STAFF, "sales.salesorder.retrieve", {"args": {}, "target_id": str(self.order.pk)})
         self.assertEqual(ok.status_code, 200, ok.content[:300])
-        other = self._call("nv_giao", "sales.salesorder.retrieve", {"args": {}, "target_id": str(self.order2.pk)})
+        other = self._call(roles.DELIVERY_STAFF, "sales.salesorder.retrieve", {"args": {}, "target_id": str(self.order2.pk)})
         self.assertEqual(other.status_code, 404, other.content[:300])
         for res in (ok, other):
             raw = res.content.decode()
@@ -136,7 +137,7 @@ class RichScopeSweep(PiiSweepBase):
         from apps.ai.models import AiAction
         for spec in get_registry().get_specs():
             if spec.kind == "read" and spec.detail:
-                for g in ("chu", "nv_giao"):
+                for g in (roles.OWNER, roles.DELIVERY_STAFF):
                     self._call(g, spec.id, {"args": {}, "target_id": str(self.order.pk)})
         blob = json.dumps(list(AiAction.objects.values("args", "result_ref", "downgrade_reason")), ensure_ascii=False, default=str)
         blob += json.dumps(list(AuditLog.objects.values("note", "changes")), ensure_ascii=False, default=str)

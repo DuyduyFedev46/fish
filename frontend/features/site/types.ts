@@ -9,7 +9,7 @@ export interface SellerInfo {
 }
 
 /** Cấu hình thông báo CSKH (`settings.CSKH_*`). `working_hours` = `CSKH_WORKING_HOURS`: nguồn duy nhất của khung giờ gọi. */
-export interface CskhNoticeConfig {
+export interface ConfirmationPolicyConfig {
   enabled: boolean;
   working_hours: string;
   max_attempts: number;
@@ -27,7 +27,7 @@ export interface SiteInfoResponse {
   confirm_call_notice: boolean;
   confirm_call_hours: string;
   // `null`/vắng = backend cũ hoặc chưa cấu hình -> không hiện khối CSKH.
-  cskh_notice?: CskhNoticeConfig | null;
+  cskh_notice?: ConfirmationPolicyConfig | null;
 }
 
 export interface FooterLinkItem {

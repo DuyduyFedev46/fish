@@ -54,7 +54,7 @@ Module gọi module khác **qua services** của module đó. Route tập trung 
 | | `payments/` | P-05 | `internal/payments/sepay-webhook/` (cũ), `internal/payments/sepay-ipn/` (P3, Cổng SePay); Shop `shop/orders/{code}/checkout/` (P1); `sales/invoices/` (chỉ đọc), `sales/payments/`; service xác nhận tay cho `sales/orders/{id}/confirm-payment` |
 | | `refunds/` | P-07 | `sales/refunds/` (+ `create`, `confirm`) |
 | | `customers/` | P-05 (7.1) | `sales/customers/` |
-| `delivery` | (phẳng) | P-06, P-08 | `delivery/notes/` (+ `status`) |
+| `delivery` | (phẳng) + `confirmation/` (gọi xác nhận đơn, CSKH) | P-06, P-08 | `delivery/notes/` (+ `status`), `cskh/queue/`, `cskh/search/` |
 | `reports` | (phẳng) | P-10 | `reports/batch/{batch_id}/`, `reports/period/`, `dashboard/summary/` |
 | `accounts` | `auth/`, `staff/` | §1 Phân quyền | `auth/token/`, `auth/me/`, `auth/logout/`, `auth/change-password/`; `staff/` (+ `groups`, `deactivate`, `reactivate`, `reset-password`) |
 | `content` | `categories/`, `entries/`, `images/`, `body/`, `public/` | P-11 | `content/categories/`, `content/entries/`; công khai `public/content/` |

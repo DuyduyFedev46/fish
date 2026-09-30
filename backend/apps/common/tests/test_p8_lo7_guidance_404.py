@@ -5,13 +5,14 @@ người gọi gửi lên (không phản chiếu chuỗi tuỳ ý). Dữ liệu 
 from django.test import TestCase
 
 from apps.common.tests.fixtures import client_for, make_user
+from apps.accounts import roles
 
 SENTINEL = "KhachGiaB0900000999"
 
 
 class GuidanceNotFoundFixedMessageTests(TestCase):
     def setUp(self):
-        self.chu = client_for(make_user("g404_chu", "chu"))
+        self.chu = client_for(make_user("g404_chu", roles.OWNER))
 
     def _assert_fixed(self, doc_type):
         for doc_id in (SENTINEL, "999999"):
@@ -31,7 +32,7 @@ class GuidanceNotFoundFixedMessageTests(TestCase):
         self._assert_fixed("payment")
 
     def test_l5_khong_co_quyen_van_403_khong_phai_404(self):
-        giao = client_for(make_user("g404_giao", "nv_giao"))
+        giao = client_for(make_user("g404_giao", roles.DELIVERY_STAFF))
         for doc_type in ("refund", "batch", "payment"):
             with self.subTest(doc_type=doc_type):
                 self.assertEqual(giao.get(f"/api/guidance/{doc_type}/{SENTINEL}/").status_code, 403)

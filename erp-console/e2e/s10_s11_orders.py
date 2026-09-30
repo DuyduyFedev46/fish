@@ -91,7 +91,7 @@ SMALL_TAPS_JS = """(w) => [...document.querySelectorAll('button, a, input, selec
   }).map(e => (e.getAttribute('aria-label') || e.innerText || e.tagName).trim().slice(0,30) + ' ' + Math.round(e.getBoundingClientRect().width) + 'x' + Math.round(e.getBoundingClientRect().height))"""
 
 
-def vn_today():
+def today_in_vietnam():
     return (datetime.datetime.utcnow() + datetime.timedelta(hours=7)).strftime("%Y-%m-%d")
 
 
@@ -151,7 +151,7 @@ with sync_playwright() as p:
     clear_log(page)
     page.get_by_label("Ngày đặt").select_option(label="Hôm nay")
     idle(page)
-    today = vn_today()
+    today = today_in_vietnam()
     ok("S10-AC1: lọc 'Hôm nay' gửi date_from/date_to = ngày VN hôm nay",
        log(page)[-1] == f"{LIST}?status=BOOKED&date_from={today}&date_to={today}", str(log(page)))
     # Khoảng ngày sai → báo tại ô, không gọi API

@@ -17,13 +17,13 @@ export default function AiPolicyScreen() {
   const [ack, setAck] = useState(false);
   const [redZoneState, setRedZoneState] = useState<Record<string, boolean>>({});
   const [capsState, setCapsState] = useState<{
-    nhap_lo_kg: string;
-    nhap_lo_vnd: string;
-    nhap_lo_daily: string;
+    receive_kg: string;
+    receive_vnd: string;
+    receive_daily: string;
   }>({
-    nhap_lo_kg: "",
-    nhap_lo_vnd: "",
-    nhap_lo_daily: "",
+    receive_kg: "",
+    receive_vnd: "",
+    receive_daily: "",
   });
 
   // User config viewer modal
@@ -45,11 +45,11 @@ export default function AiPolicyScreen() {
       });
       setRedZoneState(rzInit);
 
-      const nhapLoCap = data.caps?.["purchasing.purchasereceipt.nhap_lo"] || {};
+      const receiveBatchesCap = data.caps?.["purchasing.purchasereceipt.nhap_lo"] || {};
       setCapsState({
-        nhap_lo_kg: nhapLoCap.kg != null ? String(nhapLoCap.kg) : "",
-        nhap_lo_vnd: nhapLoCap.vnd != null ? String(nhapLoCap.vnd) : "",
-        nhap_lo_daily: nhapLoCap.daily != null ? String(nhapLoCap.daily) : "",
+        receive_kg: receiveBatchesCap.kg != null ? String(receiveBatchesCap.kg) : "",
+        receive_vnd: receiveBatchesCap.vnd != null ? String(receiveBatchesCap.vnd) : "",
+        receive_daily: receiveBatchesCap.daily != null ? String(receiveBatchesCap.daily) : "",
       });
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Không thể tải chính sách AI.");
@@ -70,9 +70,9 @@ export default function AiPolicyScreen() {
       return;
     }
 
-    const kgNum = capsState.nhap_lo_kg.trim() ? Number(capsState.nhap_lo_kg) : null;
-    const vndNum = capsState.nhap_lo_vnd.trim() ? Number(capsState.nhap_lo_vnd) : null;
-    const dailyNum = capsState.nhap_lo_daily.trim() ? Number(capsState.nhap_lo_daily) : null;
+    const kgNum = capsState.receive_kg.trim() ? Number(capsState.receive_kg) : null;
+    const vndNum = capsState.receive_vnd.trim() ? Number(capsState.receive_vnd) : null;
+    const dailyNum = capsState.receive_daily.trim() ? Number(capsState.receive_daily) : null;
 
     if (
       (kgNum !== null && (isNaN(kgNum) || kgNum < 0)) ||
@@ -311,9 +311,9 @@ export default function AiPolicyScreen() {
                   min="0"
                   step="any"
                   placeholder="Không giới hạn"
-                  value={capsState.nhap_lo_kg}
+                  value={capsState.receive_kg}
                   onChange={(e) =>
-                    setCapsState((prev) => ({ ...prev, nhap_lo_kg: e.target.value }))
+                    setCapsState((prev) => ({ ...prev, receive_kg: e.target.value }))
                   }
                   className="w-full text-xs px-2.5 py-1.5 border rounded border-gray-300 focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
                 />
@@ -328,9 +328,9 @@ export default function AiPolicyScreen() {
                   min="0"
                   step="1000"
                   placeholder="Không giới hạn"
-                  value={capsState.nhap_lo_vnd}
+                  value={capsState.receive_vnd}
                   onChange={(e) =>
-                    setCapsState((prev) => ({ ...prev, nhap_lo_vnd: e.target.value }))
+                    setCapsState((prev) => ({ ...prev, receive_vnd: e.target.value }))
                   }
                   className="w-full text-xs px-2.5 py-1.5 border rounded border-gray-300 focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
                 />
@@ -345,9 +345,9 @@ export default function AiPolicyScreen() {
                   min="0"
                   step="1"
                   placeholder="Không giới hạn"
-                  value={capsState.nhap_lo_daily}
+                  value={capsState.receive_daily}
                   onChange={(e) =>
-                    setCapsState((prev) => ({ ...prev, nhap_lo_daily: e.target.value }))
+                    setCapsState((prev) => ({ ...prev, receive_daily: e.target.value }))
                   }
                   className="w-full text-xs px-2.5 py-1.5 border rounded border-gray-300 focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
                 />

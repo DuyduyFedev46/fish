@@ -18,6 +18,7 @@ from apps.inventory.models import Warehouse
 from apps.purchasing.models import Supplier
 from apps.sales.models import SalesOrder
 from apps.sales.orders import services as order_services
+from apps.accounts import roles
 
 
 class ThrottleL5Tests(TestCase):
@@ -136,7 +137,7 @@ class ThrottleL5Tests(TestCase):
             self.assertEqual(resp.status_code, 200)
 
     def test_s03_ac5_backoffice_khong_bi_throttle(self):
-        chu = make_user("chu_backoffice", "chu")
+        chu = make_user("chu_backoffice", roles.OWNER)
         client = client_for(chu)
         # Gọi 50 lần liên tiếp vào endpoint backoffice
         for i in range(50):

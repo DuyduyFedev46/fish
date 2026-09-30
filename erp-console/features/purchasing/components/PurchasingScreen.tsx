@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { NhapLoForm } from "./NhapLoForm";
+import { ReceiveBatchesForm } from "./ReceiveBatchesForm";
 import s from "../purchasing.module.css";
 
 export function PurchasingScreen() {
@@ -14,7 +14,7 @@ export function PurchasingScreen() {
         </p>
       </header>
 
-      <NhapLoForm />
+      <ReceiveBatchesForm />
     </div>
   );
 }

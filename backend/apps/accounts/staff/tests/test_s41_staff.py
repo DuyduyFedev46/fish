@@ -29,6 +29,7 @@ from .helpers import (
     staff_user,
     token_client,
 )
+from apps.accounts import roles
 
 ITEM_KEYS = {
     "id", "username", "display_name", "phone", "groups", "is_active", "last_login",
@@ -39,7 +40,7 @@ ITEM_KEYS = {
 def new_staff(**overrides):
     body = {
         "username": "giao4", "display_name": "Anh Năm", "phone": "0909333444",
-        "groups": ["nv_giao"], "password": STRONG_PASSWORD,
+        "groups": [roles.DELIVERY_STAFF], "password": STRONG_PASSWORD,
     }
     body.update(overrides)
     return body
@@ -47,8 +48,8 @@ def new_staff(**overrides):
 
 class S41Base:
     def setUp(self):
-        self.loc = staff_user("loc", "chu", phone="0909123456", display_name="Lộc")
-        self.kho1 = staff_user("kho1", "nv_kho", phone="0909000222", display_name="Anh Tâm")
+        self.loc = staff_user("loc", roles.OWNER, phone="0909123456", display_name="Lộc")
+        self.kho1 = staff_user("kho1", roles.WAREHOUSE_STAFF, phone="0909000222", display_name="Anh Tâm")
         self.chu = client_for(self.loc)
 
 
@@ -60,7 +61,7 @@ class S41CreateTests(S41Base, TestCase):
         giao4 = User.objects.get(username="giao4")
         self.assertEqual(body["id"], giao4.pk)
         self.assertEqual(body["username"], "giao4")
-        self.assertEqual(body["groups"], ["nv_giao"])
+        self.assertEqual(body["groups"], [roles.DELIVERY_STAFF])
         self.assertIs(body["is_active"], True)
         profile = StaffProfile.objects.get(user=giao4)
         self.assertEqual(profile.phone, "0909333444")
@@ -81,17 +82,17 @@ class S41CreateTests(S41Base, TestCase):
         log = logs.get()
         self.assertEqual(log.actor, self.loc)
         self.assertEqual(log.object_id, str(User.objects.get(username="giao4").pk))
-        self.assertEqual(log.changes["groups"], {"from": [], "to": ["nv_giao"]})
+        self.assertEqual(log.changes["groups"], {"from": [], "to": [roles.DELIVERY_STAFF]})
         dumped = json.dumps(log.changes, ensure_ascii=False) + log.note + log.object_repr
         self.assertNotIn(STRONG_PASSWORD, dumped)
         self.assertNotIn("password", dumped)
 
     def test_s41_ac1_tao_nhieu_nhom_va_khong_nhom(self):
         resp = self.chu.post(
-            LIST_URL, new_staff(username="kg1", groups=["nv_giao", "nv_kho"]), format="json"
+            LIST_URL, new_staff(username="kg1", groups=[roles.DELIVERY_STAFF, roles.WAREHOUSE_STAFF]), format="json"
         )
         self.assertEqual(resp.status_code, 201, resp.content)
-        self.assertEqual(resp.json()["groups"], ["nv_kho", "nv_giao"])
+        self.assertEqual(resp.json()["groups"], [roles.WAREHOUSE_STAFF, roles.DELIVERY_STAFF])
         resp = self.chu.post(LIST_URL, new_staff(username="moi1", groups=[]), format="json")
         self.assertEqual(resp.status_code, 201, resp.content)
         self.assertEqual(resp.json()["groups"], [])
@@ -126,7 +127,7 @@ class S41CreateTests(S41Base, TestCase):
         self._assert_rejected(new_staff(password="1234567890123"))
 
     def test_s41_ac4_nhom_khong_ton_tai(self):
-        body = self._assert_rejected(new_staff(groups=["nv_giao", "admin"]))
+        body = self._assert_rejected(new_staff(groups=[roles.DELIVERY_STAFF, "admin"]))
         self.assertIn("admin", body["detail"])
 
     def test_s41_ac4_thieu_username_hoac_mat_khau_hoac_field_la(self):
@@ -134,11 +135,11 @@ class S41CreateTests(S41Base, TestCase):
         self._assert_rejected(new_staff(password=""))
         self._assert_rejected(new_staff(username="co dau cach"))
         self._assert_rejected(new_staff(is_superuser=True))
-        self._assert_rejected(new_staff(groups="nv_giao"))
+        self._assert_rejected(new_staff(groups=roles.DELIVERY_STAFF))
 
     def test_s41_ac6_ql9_manage_staff_khong_tao_duoc_tai_khoan_chu(self):
-        ql9 = make_user("ql9", "quan_ly", perms=("accounts.manage_staff",))
-        resp = client_for(ql9).post(LIST_URL, new_staff(groups=["chu"]), format="json")
+        ql9 = make_user("ql9", roles.MANAGER, perms=("accounts.manage_staff",))
+        resp = client_for(ql9).post(LIST_URL, new_staff(groups=[roles.OWNER]), format="json")
         self.assertEqual(resp.status_code, 403, resp.content)
         self.assertEqual(
             resp.json(), {"code": "BR-PQ-17", "detail": "Chỉ Chủ mới gán hoặc bỏ nhóm Chủ."}
@@ -155,121 +156,121 @@ class S41GroupsTests(S41Base, TestCase):
         receipt = PurchaseReceipt.objects.create(
             supplier=sup, warehouse=wh, received_date=timezone.localdate(), created_by=self.kho1,
         )
-        resp = self.put_groups(self.chu, self.kho1, ["nv_kho", "nv_giao"])
+        resp = self.put_groups(self.chu, self.kho1, [roles.WAREHOUSE_STAFF, roles.DELIVERY_STAFF])
         self.assertEqual(resp.status_code, 200, resp.content)
         self.assertEqual(
-            resp.json(), {"groups": ["nv_kho", "nv_giao"], "added": ["nv_giao"], "removed": []}
+            resp.json(), {"groups": [roles.WAREHOUSE_STAFF, roles.DELIVERY_STAFF], "added": [roles.DELIVERY_STAFF], "removed": []}
         )
         me = token_client(self.kho1).get(ME_URL).json()
-        self.assertEqual(me["groups"], ["nv_kho", "nv_giao"])
+        self.assertEqual(me["groups"], [roles.WAREHOUSE_STAFF, roles.DELIVERY_STAFF])
         log = audits("staff_groups_change").get()
         self.assertEqual(log.actor, self.loc)
         self.assertEqual(log.object_id, str(self.kho1.pk))
-        self.assertEqual(log.changes, {"groups": {"from": ["nv_kho"], "to": ["nv_kho", "nv_giao"]}})
+        self.assertEqual(log.changes, {"groups": {"from": [roles.WAREHOUSE_STAFF], "to": [roles.WAREHOUSE_STAFF, roles.DELIVERY_STAFF]}})
         receipt.refresh_from_db()
         self.assertEqual(receipt.created_by, self.kho1)  # BR-PQ-03: không hồi tố
 
     def test_s41_ac3_chu_bo_nv_giao_me_chi_con_nv_kho(self):
-        self.put_groups(self.chu, self.kho1, ["nv_kho", "nv_giao"])
-        resp = self.put_groups(self.chu, self.kho1, ["nv_kho"])
+        self.put_groups(self.chu, self.kho1, [roles.WAREHOUSE_STAFF, roles.DELIVERY_STAFF])
+        resp = self.put_groups(self.chu, self.kho1, [roles.WAREHOUSE_STAFF])
         self.assertEqual(resp.status_code, 200, resp.content)
-        self.assertEqual(resp.json(), {"groups": ["nv_kho"], "added": [], "removed": ["nv_giao"]})
+        self.assertEqual(resp.json(), {"groups": [roles.WAREHOUSE_STAFF], "added": [], "removed": [roles.DELIVERY_STAFF]})
         me = token_client(self.kho1).get(ME_URL).json()
-        self.assertEqual(me["groups"], ["nv_kho"])
+        self.assertEqual(me["groups"], [roles.WAREHOUSE_STAFF])
         self.assertEqual(me["home"], "dashboard")
 
     def test_s41_dat_nhom_giong_cu_khong_ghi_audit(self):
-        resp = self.put_groups(self.chu, self.kho1, ["nv_kho"])
+        resp = self.put_groups(self.chu, self.kho1, [roles.WAREHOUSE_STAFF])
         self.assertEqual(resp.status_code, 200)
-        self.assertEqual(resp.json(), {"groups": ["nv_kho"], "added": [], "removed": []})
+        self.assertEqual(resp.json(), {"groups": [roles.WAREHOUSE_STAFF], "added": [], "removed": []})
         self.assertFalse(audits("staff_groups_change").exists())
 
     def test_s41_ac4_nhom_la_hoac_sai_kieu_400_khong_doi(self):
-        for bad in (["nv_kho", "sieu_quyen"], "nv_kho", None):
+        for bad in ([roles.WAREHOUSE_STAFF, "sieu_quyen"], roles.WAREHOUSE_STAFF, None):
             resp = self.put_groups(self.chu, self.kho1, bad)
             self.assertEqual(resp.status_code, 400, (bad, resp.content))
-        self.assertEqual(group_names(self.kho1), ["nv_kho"])
+        self.assertEqual(group_names(self.kho1), [roles.WAREHOUSE_STAFF])
 
     def test_s41_ac5_chu_tu_doi_nhom_cua_minh_400(self):
-        for groups in (["chu", "quan_ly"], ["chu"], []):
+        for groups in ([roles.OWNER, roles.MANAGER], [roles.OWNER], []):
             resp = self.put_groups(self.chu, self.loc, groups)
             self.assertEqual(resp.status_code, 400, resp.content)
             self.assertEqual(
                 resp.json(),
                 {"code": "BR-PQ-17", "detail": "Không thể tự đổi nhóm của chính mình."},
             )
-        self.assertEqual(group_names(self.loc), ["chu"])
+        self.assertEqual(group_names(self.loc), [roles.OWNER])
         self.assertFalse(audits("staff_groups_change").exists())
 
     def test_s41_ac5_superuser_cung_khong_tu_doi_nhom(self):
         root = User.objects.create_superuser("root", password="x")
-        resp = self.put_groups(client_for(root), root, ["chu"])
+        resp = self.put_groups(client_for(root), root, [roles.OWNER])
         self.assertEqual(resp.status_code, 400)
         self.assertEqual(resp.json()["code"], "BR-PQ-17")
         self.assertEqual(group_names(root), [])
 
     def test_s41_ac6_ql9_gan_chu_cho_kho1_403(self):
-        ql9 = make_user("ql9", "quan_ly", perms=("accounts.manage_staff",))
-        resp = self.put_groups(client_for(ql9), self.kho1, ["nv_kho", "chu"])
+        ql9 = make_user("ql9", roles.MANAGER, perms=("accounts.manage_staff",))
+        resp = self.put_groups(client_for(ql9), self.kho1, [roles.WAREHOUSE_STAFF, roles.OWNER])
         self.assertEqual(resp.status_code, 403, resp.content)
         self.assertEqual(
             resp.json(), {"code": "BR-PQ-17", "detail": "Chỉ Chủ mới gán hoặc bỏ nhóm Chủ."}
         )
-        self.assertEqual(group_names(self.kho1), ["nv_kho"])
+        self.assertEqual(group_names(self.kho1), [roles.WAREHOUSE_STAFF])
 
     def test_s41_ac6_ql9_bo_chu_cua_loc_403(self):
-        staff_user("chu_b", "chu")  # còn Chủ khác → lỗi phải là 403, không phải BR-PQ-18
-        ql9 = make_user("ql9", "quan_ly", perms=("accounts.manage_staff",))
-        resp = self.put_groups(client_for(ql9), self.loc, ["quan_ly"])
+        staff_user("chu_b", roles.OWNER)  # còn Chủ khác → lỗi phải là 403, không phải BR-PQ-18
+        ql9 = make_user("ql9", roles.MANAGER, perms=("accounts.manage_staff",))
+        resp = self.put_groups(client_for(ql9), self.loc, [roles.MANAGER])
         self.assertEqual(resp.status_code, 403, resp.content)
         self.assertEqual(resp.json()["code"], "BR-PQ-17")
-        self.assertEqual(group_names(self.loc), ["chu"])
+        self.assertEqual(group_names(self.loc), [roles.OWNER])
 
     def test_s41_ac6_ql9_doi_nhom_khac_cua_tai_khoan_chu_403(self):
-        ql9 = make_user("ql9", "quan_ly", perms=("accounts.manage_staff",))
-        resp = self.put_groups(client_for(ql9), self.loc, ["chu", "nv_kho"])
+        ql9 = make_user("ql9", roles.MANAGER, perms=("accounts.manage_staff",))
+        resp = self.put_groups(client_for(ql9), self.loc, [roles.OWNER, roles.WAREHOUSE_STAFF])
         self.assertEqual(resp.status_code, 403, resp.content)
         self.assertEqual(
             resp.json(),
             {"code": "BR-PQ-17", "detail": "Chỉ Chủ mới thao tác trên tài khoản Chủ."},
         )
-        self.assertEqual(group_names(self.loc), ["chu"])
+        self.assertEqual(group_names(self.loc), [roles.OWNER])
 
     def test_s41_ac6_ql9_van_doi_nhom_thuong_duoc(self):
-        ql9 = make_user("ql9", "quan_ly", perms=("accounts.manage_staff",))
-        resp = self.put_groups(client_for(ql9), self.kho1, ["nv_kho", "nv_giao"])
+        ql9 = make_user("ql9", roles.MANAGER, perms=("accounts.manage_staff",))
+        resp = self.put_groups(client_for(ql9), self.kho1, [roles.WAREHOUSE_STAFF, roles.DELIVERY_STAFF])
         self.assertEqual(resp.status_code, 200, resp.content)
-        self.assertEqual(group_names(self.kho1), ["nv_giao", "nv_kho"])
+        self.assertEqual(group_names(self.kho1), [roles.DELIVERY_STAFF, roles.WAREHOUSE_STAFF])
 
     def test_s41_chu_khong_phai_superuser_khong_thao_tac_tai_khoan_superuser(self):
         root = User.objects.create_superuser("root", password="x")
-        resp = self.put_groups(self.chu, root, ["nv_kho"])
+        resp = self.put_groups(self.chu, root, [roles.WAREHOUSE_STAFF])
         self.assertEqual(resp.status_code, 403, resp.content)
         self.assertEqual(resp.json()["code"], "BR-PQ-17")
         self.assertEqual(group_names(root), [])
 
     def test_s41_chu_gan_chu_cho_kho1_duoc(self):
-        resp = self.put_groups(self.chu, self.kho1, ["chu", "nv_kho"])
+        resp = self.put_groups(self.chu, self.kho1, [roles.OWNER, roles.WAREHOUSE_STAFF])
         self.assertEqual(resp.status_code, 200, resp.content)
-        self.assertEqual(resp.json()["groups"], ["chu", "nv_kho"])
+        self.assertEqual(resp.json()["groups"], [roles.OWNER, roles.WAREHOUSE_STAFF])
 
     def test_s41_ac7_superuser_bo_chu_cua_chu_duy_nhat_400(self):
         chu2 = User.objects.create_superuser("chu2", password="x")
-        resp = self.put_groups(client_for(chu2), self.loc, ["quan_ly"])
+        resp = self.put_groups(client_for(chu2), self.loc, [roles.MANAGER])
         self.assertEqual(resp.status_code, 400, resp.content)
         self.assertEqual(
             resp.json(), {"code": "BR-PQ-18", "detail": "Phải còn ít nhất một Chủ đang làm."}
         )
-        self.assertEqual(group_names(self.loc), ["chu"])
+        self.assertEqual(group_names(self.loc), [roles.OWNER])
 
     def test_s41_ac7_con_chu_khac_dang_lam_thi_bo_duoc(self):
-        chu_b = staff_user("chu_b", "chu")
-        resp = self.put_groups(self.chu, chu_b, ["quan_ly"])
+        chu_b = staff_user("chu_b", roles.OWNER)
+        resp = self.put_groups(self.chu, chu_b, [roles.MANAGER])
         self.assertEqual(resp.status_code, 200, resp.content)
-        self.assertEqual(group_names(chu_b), ["quan_ly"])
+        self.assertEqual(group_names(chu_b), [roles.MANAGER])
 
     def test_s41_ac7_chu_khac_da_nghi_khong_tinh(self):
-        chu_b = staff_user("chu_b", "chu")
+        chu_b = staff_user("chu_b", roles.OWNER)
         chu_b.is_active = False
         chu_b.save()
         chu2 = User.objects.create_superuser("chu2", password="x")
@@ -289,7 +290,7 @@ class S41ListEditTests(S41Base, TestCase):
         self.assertEqual(kho1["id"], self.kho1.pk)
         self.assertEqual(kho1["display_name"], "Anh Tâm")
         self.assertEqual(kho1["phone"], "0909000222")
-        self.assertEqual(kho1["groups"], ["nv_kho"])
+        self.assertEqual(kho1["groups"], [roles.WAREHOUSE_STAFF])
         self.assertIs(kho1["is_active"], True)
         self.assertIsNone(kho1["last_login"])
         self.assertEqual(
@@ -310,7 +311,7 @@ class S41ListEditTests(S41Base, TestCase):
         self.assertEqual(inactive[0]["available_actions"], ["edit", "reactivate"])
 
     def test_s41_list_ql9_thay_tai_khoan_chu_khong_co_hanh_dong(self):
-        ql9 = make_user("ql9", "quan_ly", perms=("accounts.manage_staff",))
+        ql9 = make_user("ql9", roles.MANAGER, perms=("accounts.manage_staff",))
         rows = {r["username"]: r for r in client_for(ql9).get(LIST_URL).json()}
         self.assertEqual(rows["loc"]["available_actions"], [])
         self.assertIn("set_groups", rows["kho1"]["available_actions"])
@@ -346,13 +347,13 @@ class S41ListEditTests(S41Base, TestCase):
         self.assertEqual(StaffProfile.objects.get(user=moi).phone, "0911222333")
 
     def test_s41_patch_field_la_hoac_sdt_rong_400(self):
-        for body in ({"groups": ["chu"]}, {"is_active": False}, {"password": "x" * 12},
+        for body in ({"groups": [roles.OWNER]}, {"is_active": False}, {"password": "x" * 12},
                      {"username": "khac"}, {"phone": ""}, {"is_superuser": True}):
             resp = self.chu.patch(detail_url(self.kho1), body, format="json")
             self.assertEqual(resp.status_code, 400, (body, resp.content))
         self.kho1.refresh_from_db()
         self.assertEqual(self.kho1.username, "kho1")
-        self.assertEqual(group_names(self.kho1), ["nv_kho"])
+        self.assertEqual(group_names(self.kho1), [roles.WAREHOUSE_STAFF])
         self.assertFalse(audits("staff_update").exists())
 
     def test_s41_put_chi_tiet_405(self):
@@ -360,7 +361,7 @@ class S41ListEditTests(S41Base, TestCase):
         self.assertEqual(resp.status_code, 405)
 
     def test_s41_ql9_khong_sua_ho_so_chu(self):
-        ql9 = make_user("ql9", "quan_ly", perms=("accounts.manage_staff",))
+        ql9 = make_user("ql9", roles.MANAGER, perms=("accounts.manage_staff",))
         resp = client_for(ql9).patch(detail_url(self.loc), {"phone": "0900"}, format="json")
         self.assertEqual(resp.status_code, 403)
         self.assertEqual(resp.json()["code"], "BR-PQ-17")
@@ -368,7 +369,7 @@ class S41ListEditTests(S41Base, TestCase):
 
 class S41PermissionTests(S41Base, TestCase):
     def test_s41_ac9_quan_ly_nv_kho_nv_giao_403(self):
-        for username, group in (("ql1", "quan_ly"), ("kho2", "nv_kho"), ("giao1", "nv_giao")):
+        for username, group in (("ql1", roles.MANAGER), ("kho2", roles.WAREHOUSE_STAFF), ("giao1", roles.DELIVERY_STAFF)):
             client = client_for(make_user(username, group))
             self.assertEqual(client.get(LIST_URL).status_code, 403, username)
             self.assertEqual(client.get(detail_url(self.kho1)).status_code, 403, username)
@@ -376,7 +377,7 @@ class S41PermissionTests(S41Base, TestCase):
                 client.post(LIST_URL, new_staff(), format="json").status_code, 403, username
             )
             self.assertEqual(
-                client.put(detail_url(self.kho1, "groups/"), {"groups": ["chu"]},
+                client.put(detail_url(self.kho1, "groups/"), {"groups": [roles.OWNER]},
                            format="json").status_code, 403, username,
             )
             self.assertEqual(
@@ -384,7 +385,7 @@ class S41PermissionTests(S41Base, TestCase):
                 403, username,
             )
         self.assertFalse(User.objects.filter(username="giao4").exists())
-        self.assertEqual(group_names(self.kho1), ["nv_kho"])
+        self.assertEqual(group_names(self.kho1), [roles.WAREHOUSE_STAFF])
         self.assertFalse(AuditLog.objects.exists())
 
     def test_s41_ac9_chua_dang_nhap_401(self):

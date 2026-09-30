@@ -7,8 +7,8 @@ import { listItems } from "@/features/catalog/api";
 import { useAuth } from "@/features/auth/components/AuthProvider";
 import { dateOnly, todayInVietnam } from "@/shared/lib/format";
 import type { CatalogItem } from "@/features/catalog/types";
-import { cancelPurchaseReceipt, fetchSuppliers, submitNhapLo } from "../api";
-import type { NhapLoLineInput, NhapLoResponse, Supplier } from "../types";
+import { cancelPurchaseReceipt, fetchSuppliers, submitReceiveBatches } from "../api";
+import type { ReceiveBatchesLineInput, ReceiveBatchesResponse, Supplier } from "../types";
 import s from "../purchasing.module.css";
 import { clearDraft, loadDraft, purgeLegacyDraft, resolveIdempotencyKey, saveDraft } from "./draftStorage";
 
@@ -27,7 +27,7 @@ function getTodayString(): string {
   return todayInVietnam();
 }
 
-export function NhapLoForm() {
+export function ReceiveBatchesForm() {
   const { me } = useAuth();
   const userId = me?.id ?? null;
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -37,13 +37,13 @@ export function NhapLoForm() {
   const [supplierId, setSupplierId] = useState<number | "">("");
   const [receivedDate, setReceivedDate] = useState<string>(getTodayString());
   const [idempotencyKey, setIdempotencyKey] = useState<string>("");
-  const [lines, setLines] = useState<NhapLoLineInput[]>([
+  const [lines, setLines] = useState<ReceiveBatchesLineInput[]>([
     { item_code: "", qty: "", rate: "", shelf_life_days: null },
   ]);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [successResult, setSuccessResult] = useState<NhapLoResponse | null>(null);
+  const [successResult, setSuccessResult] = useState<ReceiveBatchesResponse | null>(null);
 
   // Huỷ phiếu nhập (DW-18)
   const [isCancelling, setIsCancelling] = useState(false);
@@ -56,7 +56,7 @@ export function NhapLoForm() {
     const key = resolveIdempotencyKey(userId, generateUUID);
     let initialSupplier: number | "" = "";
     let initialDate = getTodayString();
-    let initialLines: NhapLoLineInput[] = [
+    let initialLines: ReceiveBatchesLineInput[] = [
       { item_code: "", qty: "", rate: "", shelf_life_days: null },
     ];
 
@@ -107,7 +107,7 @@ export function NhapLoForm() {
     setLines((prev) => prev.filter((_, i) => i !== idx));
   };
 
-  const handleLineChange = (idx: number, field: keyof NhapLoLineInput, val: unknown) => {
+  const handleLineChange = (idx: number, field: keyof ReceiveBatchesLineInput, val: unknown) => {
     setLines((prev) => {
       const copy = [...prev];
       copy[idx] = { ...copy[idx], [field]: val };
@@ -158,7 +158,7 @@ export function NhapLoForm() {
         })),
       };
 
-      const res = await submitNhapLo(payload);
+      const res = await submitReceiveBatches(payload);
       setSuccessResult(res);
       if (userId !== null) clearDraft(userId);
       setIdempotencyKey(generateUUID()); // gửi thành công → key cũ đã dùng, lần nhập sau phải key mới

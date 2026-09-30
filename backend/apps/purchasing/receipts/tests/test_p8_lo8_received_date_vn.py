@@ -13,6 +13,7 @@ from apps.common.tests.fixtures import client_for, make_user
 from apps.inventory.models import Batch, Warehouse
 from apps.purchasing.models import PurchaseReceipt, Supplier
 from apps.purchasing.receipts import services
+from apps.accounts import roles
 
 AFTER_MIDNIGHT_VN = datetime.datetime(2026, 9, 30, 17, 30, tzinfo=dt_timezone.utc)  # 01/10 00:30 VN
 SAME_DAY_VN = datetime.datetime(2026, 9, 30, 10, 0, tzinfo=dt_timezone.utc)  # 30/09 17:00 VN
@@ -24,7 +25,7 @@ class ReceivedDateVnTests(TestCase):
         self.item = Item.objects.create(code="TOM01", name="Tôm sú", item_group=grp, shelf_life_in_days=90, stock_uom="KG")
         self.sup = Supplier.objects.create(name="Đầu mối giả")
         self.wh = Warehouse.objects.create(name="Kho chính")
-        self.kho = make_user("kho_lo8", "nv_kho")
+        self.kho = make_user("kho_lo8", roles.WAREHOUSE_STAFF)
 
     def _payload(self):
         return {

@@ -11,7 +11,7 @@ const PREFIX = "cave_erp_draft:";
  * khoá cũ `cave_draft_nhap_lo` (dùng chung, có giá mua) ở localStorage. Đăng xuất phải xoá tất cả.
  * Khai ở đây (shared) để `auth` dọn được mà không import vào ruột `purchasing`.
  */
-export const NHAP_LO_DRAFT_PREFIX = "cave_draft_nhap_lo";
+export const RECEIVE_BATCHES_DRAFT_PREFIX = "cave_draft_nhap_lo";
 
 type Stored<T> = { owner: number; savedAt: string; data: T };
 
@@ -99,6 +99,6 @@ function ss(): Storage | null {
 /** Đăng xuất: xoá mọi nháp ERP (localStorage) và mọi nháp Nhập lô của mọi người (session + khoá cũ ở local). */
 export function clearAllDrafts(): void {
   removeByPrefix(ls(), PREFIX);
-  removeByPrefix(ls(), NHAP_LO_DRAFT_PREFIX);
-  removeByPrefix(ss(), NHAP_LO_DRAFT_PREFIX);
+  removeByPrefix(ls(), RECEIVE_BATCHES_DRAFT_PREFIX);
+  removeByPrefix(ss(), RECEIVE_BATCHES_DRAFT_PREFIX);
 }

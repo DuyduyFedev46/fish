@@ -19,8 +19,10 @@ from apps.catalog.models import Item, ItemGroup
 from apps.common.tests.fixtures import client_for, make_user
 from apps.inventory.models import Batch, Warehouse
 from apps.purchasing.models import PurchaseReceipt, Supplier
+from apps.ai import command_groups
+from apps.accounts import roles
 
-GROUPS = ("chu", "quan_ly", "nv_kho", "nv_giao")
+GROUPS = (roles.OWNER, roles.MANAGER, roles.WAREHOUSE_STAFF, roles.DELIVERY_STAFF)
 COST_MARKERS = ("80000", "purchase_rate", "landed_unit_cost", "unit_cost", "rate")
 
 
@@ -28,7 +30,7 @@ COST_MARKERS = ("80000", "purchase_rate", "landed_unit_cost", "unit_cost", "rate
 class QaBm05ScopeParityTests(TestCase):
     def setUp(self):
         self.users = {g: make_user(f"qa7_{g}", g) for g in GROUPS}
-        self.users["kho2"] = make_user("qa7_kho2", "nv_kho")
+        self.users["kho2"] = make_user("qa7_kho2", roles.WAREHOUSE_STAFF)
         self.clients = {k: client_for(u) for k, u in self.users.items()}
 
     def _act(self, owner, status=AiAction.Status.PENDING, assignee_group=""):
@@ -43,12 +45,12 @@ class QaBm05ScopeParityTests(TestCase):
         """Với MỌI cặp (user, việc): retrieve 200 <=> reject/confirm không bị 404 phạm vi. Đếm 200 và 404 > 0."""
         n200 = n404 = 0
         kinds = {
-            "own_kho": lambda: self._act(self.users["nv_kho"]),
-            "own_giao": lambda: self._act(self.users["nv_giao"]),
-            "own_chu": lambda: self._act(self.users["chu"]),
-            "esc_ql": lambda: self._act(self.users["nv_kho"], AiAction.Status.ESCALATED, "quan_ly"),
-            "esc_giao": lambda: self._act(self.users["nv_kho"], AiAction.Status.ESCALATED, "nv_giao"),
-            "esc_chu": lambda: self._act(self.users["nv_kho"], AiAction.Status.ESCALATED, "chu"),
+            "own_kho": lambda: self._act(self.users[roles.WAREHOUSE_STAFF]),
+            "own_giao": lambda: self._act(self.users[roles.DELIVERY_STAFF]),
+            "own_chu": lambda: self._act(self.users[roles.OWNER]),
+            "esc_ql": lambda: self._act(self.users[roles.WAREHOUSE_STAFF], AiAction.Status.ESCALATED, roles.MANAGER),
+            "esc_giao": lambda: self._act(self.users[roles.WAREHOUSE_STAFF], AiAction.Status.ESCALATED, roles.DELIVERY_STAFF),
+            "esc_chu": lambda: self._act(self.users[roles.WAREHOUSE_STAFF], AiAction.Status.ESCALATED, roles.OWNER),
         }
         for uname, cli in self.clients.items():
             for kname, mk in kinds.items():
@@ -72,50 +74,50 @@ class QaBm05ScopeParityTests(TestCase):
         self.assertGreater(n404, 20)
 
     def test_qa_bm05_quan_ly_khong_co_manage_ai_policy_nen_khong_quyet_viec_cua_nv_kho(self):
-        act = self._act(self.users["nv_kho"])
-        self.assertEqual(self.clients["quan_ly"].post(f"/api/ai/actions/{act.pk}/reject/", {}, format="json").status_code, 404)
+        act = self._act(self.users[roles.WAREHOUSE_STAFF])
+        self.assertEqual(self.clients[roles.MANAGER].post(f"/api/ai/actions/{act.pk}/reject/", {}, format="json").status_code, 404)
         # chu (manage_ai_policy) thì quyết được việc của người khác
-        self.assertEqual(self.clients["chu"].post(f"/api/ai/actions/{act.pk}/reject/", {}, format="json").status_code, 200)
+        self.assertEqual(self.clients[roles.OWNER].post(f"/api/ai/actions/{act.pk}/reject/", {}, format="json").status_code, 200)
 
     def test_qa_bm05_man_hinh_cu_viec_da_bi_tu_choi_roi_bam_confirm_van_o_trong_pham_vi_409(self):
-        act = self._act(self.users["nv_kho"])
-        self.assertEqual(self.clients["nv_kho"].post(f"/api/ai/actions/{act.pk}/reject/", {}, format="json").status_code, 200)
-        res = self.clients["nv_kho"].post(f"/api/ai/actions/{act.pk}/confirm/", {}, format="json")
+        act = self._act(self.users[roles.WAREHOUSE_STAFF])
+        self.assertEqual(self.clients[roles.WAREHOUSE_STAFF].post(f"/api/ai/actions/{act.pk}/reject/", {}, format="json").status_code, 200)
+        res = self.clients[roles.WAREHOUSE_STAFF].post(f"/api/ai/actions/{act.pk}/confirm/", {}, format="json")
         self.assertIn(res.status_code, (409, 400, 410), res.content)
         act.refresh_from_db()
         self.assertEqual(act.status, AiAction.Status.REJECTED)
         # reject 2 lần (job/bấm đúp): không ghi AuditLog thứ hai
-        res2 = self.clients["nv_kho"].post(f"/api/ai/actions/{act.pk}/reject/", {}, format="json")
+        res2 = self.clients[roles.WAREHOUSE_STAFF].post(f"/api/ai/actions/{act.pk}/reject/", {}, format="json")
         self.assertIn(res2.status_code, (409, 400, 410), res2.content)
         self.assertEqual(AuditLog.objects.filter(proposal_ref=str(act.pk), action__startswith="reject").count(), 1)
 
     def test_qa_bm05_tranh_chap_hai_nguoi_a_roi_b_va_b_roi_a_chi_mot_nguoi_thang(self):
         # A -> B : chu quyết trước, chủ việc (kho) đến sau
-        a = self._act(self.users["nv_kho"])
-        self.assertEqual(self.clients["chu"].post(f"/api/ai/actions/{a.pk}/reject/", {}, format="json").status_code, 200)
-        r = self.clients["nv_kho"].post(f"/api/ai/actions/{a.pk}/reject/", {}, format="json")
+        a = self._act(self.users[roles.WAREHOUSE_STAFF])
+        self.assertEqual(self.clients[roles.OWNER].post(f"/api/ai/actions/{a.pk}/reject/", {}, format="json").status_code, 200)
+        r = self.clients[roles.WAREHOUSE_STAFF].post(f"/api/ai/actions/{a.pk}/reject/", {}, format="json")
         self.assertNotEqual(r.status_code, 200, r.content)
         a.refresh_from_db()
-        self.assertEqual((a.status, a.decided_by), (AiAction.Status.REJECTED, self.users["chu"]))
+        self.assertEqual((a.status, a.decided_by), (AiAction.Status.REJECTED, self.users[roles.OWNER]))
         # B -> A : chủ việc trước, chu đến sau
-        b = self._act(self.users["nv_kho"])
-        self.assertEqual(self.clients["nv_kho"].post(f"/api/ai/actions/{b.pk}/reject/", {}, format="json").status_code, 200)
-        r = self.clients["chu"].post(f"/api/ai/actions/{b.pk}/reject/", {}, format="json")
+        b = self._act(self.users[roles.WAREHOUSE_STAFF])
+        self.assertEqual(self.clients[roles.WAREHOUSE_STAFF].post(f"/api/ai/actions/{b.pk}/reject/", {}, format="json").status_code, 200)
+        r = self.clients[roles.OWNER].post(f"/api/ai/actions/{b.pk}/reject/", {}, format="json")
         self.assertNotEqual(r.status_code, 200, r.content)
         b.refresh_from_db()
-        self.assertEqual((b.status, b.decided_by), (AiAction.Status.REJECTED, self.users["nv_kho"]))
+        self.assertEqual((b.status, b.decided_by), (AiAction.Status.REJECTED, self.users[roles.WAREHOUSE_STAFF]))
 
     def test_qa_bm05_404_giong_het_id_khong_ton_tai_ca_reject_va_confirm(self):
-        act = self._act(self.users["chu"])
+        act = self._act(self.users[roles.OWNER])
         missing = "00000000-0000-0000-0000-000000000001"
         for verb in ("reject", "confirm"):
-            a = self.clients["nv_giao"].post(f"/api/ai/actions/{act.pk}/{verb}/", {}, format="json")
-            b = self.clients["nv_giao"].post(f"/api/ai/actions/{missing}/{verb}/", {}, format="json")
+            a = self.clients[roles.DELIVERY_STAFF].post(f"/api/ai/actions/{act.pk}/{verb}/", {}, format="json")
+            b = self.clients[roles.DELIVERY_STAFF].post(f"/api/ai/actions/{missing}/{verb}/", {}, format="json")
             self.assertEqual((a.status_code, a.json()), (b.status_code, b.json()))
             self.assertNotIn(str(act.pk), a.content.decode())
 
     def test_qa_bm05_chua_dang_nhap_401(self):
-        act = self._act(self.users["nv_kho"])
+        act = self._act(self.users[roles.WAREHOUSE_STAFF])
         for verb in ("reject", "confirm", "undo"):
             self.assertEqual(client_for(None).post(f"/api/ai/actions/{act.pk}/{verb}/", {}, format="json").status_code, 401)
 
@@ -124,17 +126,17 @@ class _NhapLoBase(TestCase):
     """Dựng lệnh nhap_lo mức B thật để có việc DONE thật (không mock registry)."""
 
     def setUp(self):
-        self.kho = make_user("qa7f10_kho", "nv_kho")
-        self.kho2 = make_user("qa7f10_kho2", "nv_kho")
-        self.giao = make_user("qa7f10_giao", "nv_giao")
-        self.chu = make_user("qa7f10_chu", "chu")
-        self.c = {n: client_for(getattr(self, n)) for n in ("kho", "kho2", "giao", "chu")}
+        self.kho = make_user("qa7f10_kho", roles.WAREHOUSE_STAFF)
+        self.kho2 = make_user("qa7f10_kho2", roles.WAREHOUSE_STAFF)
+        self.giao = make_user("qa7f10_giao", roles.DELIVERY_STAFF)
+        self.chu = make_user("qa7f10_chu", roles.OWNER)
+        self.c = {n: client_for(getattr(self, n)) for n in ("kho", "kho2", "giao", roles.OWNER)}
         g = ItemGroup.objects.create(name="Cá biển")
         self.item = Item.objects.create(code="CA-QA7", name="Cá ngừ", item_group=g, shelf_life_in_days=60, is_active=True)
         self.sup = Supplier.objects.create(name="Đầu mối giả", is_active=True)
         self.wh = Warehouse.objects.create(name="Kho giả")
         AiConfigVersion.objects.create(
-            user=self.kho, version=1, group_levels={"thu_mua": {"read": "A", "write": "B"}},
+            user=self.kho, version=1, group_levels={command_groups.PURCHASING: {"read": "A", "write": "B"}},
             overrides={"purchasing.purchasereceipt.nhap_lo": "B"},
             limits={"purchasing.purchasereceipt.nhap_lo": {"kg": "150", "vnd": "30000000"}}, created_by=self.kho,
         )
@@ -205,7 +207,7 @@ class QaF10UndoRealWhenAiOffTests(_NhapLoBase):
 
     def test_qa_f10_ai_tat_chu_co_manage_ai_policy_hoan_tac_duoc(self):
         act = self._make_done()
-        res = self._undo("chu", act, AI_ENABLED=False)
+        res = self._undo(roles.OWNER, act, AI_ENABLED=False)
         self.assertEqual(res.status_code, 200, res.content)
 
     def test_qa_f10_lo_da_mo_ban_thi_400_br_mh_07_viec_van_done_ai_tat(self):
