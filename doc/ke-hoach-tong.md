@@ -23,10 +23,12 @@
 | ☑ | **P5** CMS viết bài | `2026-09-28-cms-viet-bai` | 1 → 2 → … → 7 | XONG | P4 xong | Thư viện mới duy nhất: Tiptap 2 (erp-console). CMS-16 đã làm ở P1 |
 | ☑ | **P6** Khung go-live | `2026-09-28-khung-go-live` | 1 → 2 → 3 | XONG | CMS Lô 5 (Lô 1–2), CMS Lô 7 (Lô 3) | Cờ `PRIVACY_CONSENT_REQUIRED` bật: chưa đăng chính sách thì Shop không nhận đơn |
 | ☑ | **P7** AI tự ghi + vùng đỏ | `2026-09-28-ai-digital-worker` | 5a → 5b → 5c → 6a → 6b | XONG | P6 xong | **Chỉ staging** tới khi xong S-L1…S-L4 (pháp lý) |
+| ☐ | **P8** Sửa lỗi review | `2026-09-30-sua-loi-review` | 1 → 2 → 3 → 4 → 5 → 6 → 7 | SẴN SÀNG CODE | P7 xong | Sửa lỗi 3 báo cáo review 30/09 (`2026-09-30-review-p1-p7`). **Chặn deploy staging tới khi P8 Lô 1–5 xong.** Lô 4 (chứng từ đảo doanh thu) và Lô 5 (trả NCC) có migration. Nhánh `main` |
 
 ## Việc của Duy (không phải code)
 | Khi nào | Việc |
 |---|---|
+| Sau P8 Lô 4 lên staging/production | Chạy `manage.py backfill_credit_notes` (dry-run), xem lô đã chốt bị đổi số, rồi mới `--apply` |
 | Trước P2 | Đổi 02c AI sang SẴN SÀNG CODE (ghi rõ "P2"); chạy spike DW-02 trên máy Android/Windows ≥ 8GB |
 | Trước P4 | Ghi 3 quyết định vào `doc/decisions.md`: trạng thái "Chờ xác nhận", Group `cskh`, luật tự huỷ đơn không liên lạc được. Gán nhân viên vào `cskh` |
 | Trước P4 Lô 3 lên production | `legal-vn` duyệt câu thông báo huỷ, câu báo trước ở checkout, quy định ghi nhãn trên tem. Tạo Cloud Run Job + lịch 5 phút cho `process_cskh_deadlines`, đặt `SHOP_HOTLINE` |
