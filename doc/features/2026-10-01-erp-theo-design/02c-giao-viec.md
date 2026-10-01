@@ -13,7 +13,7 @@ Thứ tự chạy từ trên xuống. Cột "Song song" = lô được giao cùn
 
 | ☐/☑ | Lô | Story | Kiểu | Board chính | Phụ thuộc | Song song | Commit |
 |---|---|---|---|---|---|---|---|
-| ☐ | 1 | ED-01, ED-02, ED-03 (phần khung), ED-04 (mẫu danh sách) | FE | sidebar/topbar mọi board, W6g, W6h, W4h | — | BE của Lô 4, 6, 8 | — |
+| ☑ | 1 | ED-01, ED-02, ED-03 (phần khung), ED-04 (mẫu danh sách) | FE | sidebar/topbar mọi board, W6g, W6h, W4h | — | BE của Lô 4, 6, 8 | a25edbc |
 | ☐ | 2 | ED-03, ED-04 (trang chi tiết), ED-05 ∥ R1, R2 | BE ∥ FE | D2b (mẫu), W6a–W6f, W6i, modal F* | FE: 1 | BE Lô 4, 6, 8 | — |
 | ☐ | 3 | ED-09, ED-10, ED-11, ED-12 ∥ R3 + số điện thoại đủ | BE ∥ FE | D2, D2b, D2c, W1a, W1a2, W1b, W1b2, F2a–F2g | FE: 1, 2 | Lô 7 (BE) | — |
 | ☐ | 4 | ED-16, ED-17, ED-18, ED-19 ∥ B5, B6, R4 | BE ∥ FE | W1d, W1d2, W1e, W2e, F2l, F2o | FE: 1, 2 | Lô 5 | — |
