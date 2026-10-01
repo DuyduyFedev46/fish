@@ -44,7 +44,7 @@ class CanViewDashboard(BasePermission):
 
 
 class DashboardSummaryView(APIView):
-    ai = AiMeta(keywords=("bao_cao_ton_kho", "báo cáo tồn kho"))
+    ai = AiMeta(keywords=("báo cáo tồn kho",))
     permission_classes = [CanViewDashboard]
 
     def get(self, request):

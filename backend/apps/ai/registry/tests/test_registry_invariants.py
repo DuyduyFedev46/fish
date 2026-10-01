@@ -103,37 +103,52 @@ class RegistryInvariantsTestCase(TestCase):
         self.assertEqual(effective_level(ql, refund_confirm), "OFF")
 
     def test_dw15_ac3_keywords_theo_phu_luc_b(self):
-        """DW-15-AC3: Các lệnh có keywords tên cũ theo Phụ lục B."""
-        # 1. Batch list: tra_ton, tra tồn
+        """DW-15-AC3: Các lệnh có keywords tiếng Việt có dấu theo Phụ lục B. P8b Lô 4: bản không dấu dạng snake (tra_ton, chot_lo...) đã bỏ."""
+        # 1. Batch list: tra tồn
         batch_list = self.registry.get("inventory.batch.list")
-        self.assertTrue(any("tra_ton" in kw or "tra tồn" in kw for kw in batch_list.keywords))
+        self.assertTrue("tra tồn" in batch_list.keywords)
 
-        # 2. Batch close: chot_lo, chốt lô
+        # 2. Batch close: chốt lô
         batch_close = self.registry.get("inventory.batch.close")
-        self.assertTrue(any("chot_lo" in kw or "chốt lô" in kw for kw in batch_close.keywords))
+        self.assertTrue("chốt lô" in batch_close.keywords)
 
-        # 3. Item list/retrieve: tra_hang, tra hàng
+        # 3. Item list/retrieve: tra hàng
         item_list = self.registry.get("catalog.item.list")
-        self.assertTrue(any("tra_hang" in kw or "tra hàng" in kw for kw in item_list.keywords))
+        self.assertTrue("tra hàng" in item_list.keywords)
 
-        # 4. Order list/retrieve: tra_don, tra đơn
+        # 4. Order list/retrieve: tra đơn
         order_list = self.registry.get("sales.salesorder.list")
-        self.assertTrue(any("tra_don" in kw or "tra đơn" in kw for kw in order_list.keywords))
+        self.assertTrue("tra đơn" in order_list.keywords)
 
-        # 5. Refund create: tao_phieu_hoan, tạo phiếu hoàn
+        # 5. Refund create: tạo phiếu hoàn
         refund_create = self.registry.get("sales.refund.create_refund")
-        self.assertTrue(any("tao_phieu_hoan" in kw or "tạo phiếu hoàn" in kw for kw in refund_create.keywords))
+        self.assertTrue("tạo phiếu hoàn" in refund_create.keywords)
 
-        # 6. Refund confirm: xac_nhan_hoan, xác nhận hoàn
+        # 6. Refund confirm: xác nhận hoàn
         refund_confirm = self.registry.get("sales.refund.confirm")
-        self.assertTrue(any("xac_nhan_hoan" in kw or "xác nhận hoàn" in kw for kw in refund_confirm.keywords))
+        self.assertTrue("xác nhận hoàn" in refund_confirm.keywords)
 
         # 7. Reports
         pnl = self.registry.get("reports.batch_pnl")
-        self.assertTrue(any("bao_cao_lo" in kw or "báo cáo lô" in kw for kw in pnl.keywords))
+        self.assertTrue("báo cáo lô" in pnl.keywords)
 
         period = self.registry.get("reports.period_pnl")
-        self.assertTrue(any("bao_cao_ky" in kw or "báo cáo kỳ" in kw for kw in period.keywords))
+        self.assertTrue("báo cáo kỳ" in period.keywords)
 
         dashboard = self.registry.get("reports.dashboard_summary")
-        self.assertTrue(any("bao_cao_ton_kho" in kw or "báo cáo tồn kho" in kw for kw in dashboard.keywords))
+        self.assertTrue("báo cáo tồn kho" in dashboard.keywords)
+
+    def test_p8b_l4_snake_case_keywords_without_diacritics_are_removed(self):
+        """P8b Lô 4: các từ khoá không dấu dạng snake đã bỏ khỏi chỉ mục; bản tiếng Việt có dấu vẫn còn."""
+        removed = {
+            "nhap_lo", "tra_ton", "chot_lo", "tra_don", "tra_hang", "bao_cao_lo", "bao_cao_ky", "bao_cao_ton_kho",
+            "tra_ncc", "tao_phieu_hoan", "xac_nhan_hoan",
+        }
+        offenders = {
+            spec.id: sorted(removed & set(spec.keywords)) for spec in self.registry.get_specs() if removed & set(spec.keywords)
+        }
+        self.assertEqual(offenders, {})
+        receive = self.registry.get("purchasing.purchasereceipt.receive_batches")
+        self.assertIn("nhập lô", receive.keywords)
+        supplier_return = [s for s in self.registry.get_specs() if "trả nhà cung cấp" in s.keywords]
+        self.assertEqual(len(supplier_return), 1)

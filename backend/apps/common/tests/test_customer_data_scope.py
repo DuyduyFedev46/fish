@@ -201,6 +201,9 @@ class MigrationTests(TestCase):
     def setUp(self):
         self.module = importlib.import_module("apps.accounts.migrations.0012_revoke_customer_view_warehouse_staff")
         self.group = Group.objects.get(name=roles.WAREHOUSE_STAFF)
+        # P8b Lô 4: migration 0012 đóng băng tên Group cũ (chạy trước 0013 đổi tên). Dựng lại đúng trạng thái lúc đó
+        # trong transaction của test (tự rollback) để kiểm hành vi của 0012.
+        Group.objects.filter(pk=self.group.pk).update(name="nv_kho")  # naming: allow - tên Group lúc chạy migration 0012
 
     def _has(self):
         return self.group.permissions.filter(content_type__app_label="sales", codename="view_customer").exists()
@@ -219,12 +222,12 @@ class MigrationTests(TestCase):
     def test_sr_pii_01_ac1_other_groups_untouched_by_forwards(self):
         before = {
             g.name: set(g.permissions.values_list("pk", flat=True))
-            for g in Group.objects.exclude(name=roles.WAREHOUSE_STAFF)
+            for g in Group.objects.exclude(pk=self.group.pk)
         }
         self.module.revoke_view_customer(django_apps, None)
         after = {
             g.name: set(g.permissions.values_list("pk", flat=True))
-            for g in Group.objects.exclude(name=roles.WAREHOUSE_STAFF)
+            for g in Group.objects.exclude(pk=self.group.pk)
         }
         self.assertEqual(before, after)
 

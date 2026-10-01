@@ -120,7 +120,7 @@ Format: bối cảnh – lựa chọn – lý do – hệ quả (5 dòng/quyết
 - **Bối cảnh**: Bản Level 3 v1 mô tả quyền bằng **động từ nghiệp vụ** ("được soạn hàng", "được duyệt kiểm kê") với 3 vai trò, và quyết định 09/09 đã chốt "không cần entity Driver/Employee riêng". Duy chất vấn: phải là CRUD, phải có profile, phải có leader.
 - **Lựa chọn**:
   1. **Ba tầng quyền**, không phải một: (T1) CRUD theo model qua `auth.Permission` + `Group`; (T2) custom permission trong `Meta.permissions` cho các chuyển trạng thái (duyệt/chốt/huỷ/xác nhận); (T3) phạm vi dòng (`get_queryset`) và phạm vi cột (serializer/Admin tách theo Group).
-  2. **Bốn Group cộng dồn** (`chu`, `quan_ly`, `nv_kho`, `nv_giao`) — không xếp bậc thang; người kiêm nhiệm gán nhiều Group.
+  2. **Bốn Group cộng dồn** (`owner`, `manager`, `warehouse_staff`, `delivery_staff`) — không xếp bậc thang; người kiêm nhiệm gán nhiều Group. (mã đổi sang tiếng Anh ngày 2026-10-01, P8b; nội dung quyết định giữ nguyên)
   3. **`StaffProfile`** OneToOne với `User`: SĐT (bắt buộc), ngày vào làm, trạng thái, ghi chú. **Lật một phần quyết định 09/09.**
   4. **`AuditLog`** riêng cho mọi hành động T2.
 - **Lý do**: CRUD là xương sống và Django cho sẵn — nhưng CRUD **không diễn đạt được** ba thứ: chuyển trạng thái ("nhập số kiểm kê nhưng chỉ Chủ duyệt"), phạm vi dòng ("chỉ đơn được gán cho mình"), phạm vi cột ("không thấy giá vốn"). Profile cần vì `User` **không có số điện thoại**, mà khách và Lộc phải gọi được người đang cầm hàng đi giao. Leader cần **không phải vì sơ đồ tổ chức mà vì Lộc đi cảng lúc rạng sáng** — bản v1 bắt "chỉ Chủ duyệt" cho kiểm kê/hàng hoàn/huỷ đơn, tức là hàng nằm chờ tới khi Lộc rảnh. Đó là nút cổ chai thật.
@@ -146,7 +146,7 @@ Những điểm dưới đây chưa từng được Lộc hoặc Duy phát biể
 - Hàng hoá: đông lạnh, nguồn theo mùa, hạn dùng nội bộ 3 tháng/lô, quản lý kho theo lô.
 - **Combo: 3 dạng (gói có công thức / đóng gói sẵn / ưu đãi 1 tầng), cấu hình trong Admin, không có rule engine tổng quát.**
 - **Giá vốn lô = giá mua + chi phí phụ phân bổ (landed cost). Báo cáo lãi lỗ theo lô là nguồn sự thật.**
-- **Phân quyền: 3 tầng (CRUD model / custom action perm / phạm vi dòng-cột), 4 Group cộng dồn (`chu`, `quan_ly`, `nv_kho`, `nv_giao`), `StaffProfile` OneToOne với `User`, `AuditLog` cho mọi hành động duyệt-chốt-huỷ-xác nhận.**
+- **Phân quyền: 3 tầng (CRUD model / custom action perm / phạm vi dòng-cột), 4 Group cộng dồn (`owner`, `manager`, `warehouse_staff`, `delivery_staff`), `StaffProfile` OneToOne với `User`, `AuditLog` cho mọi hành động duyệt-chốt-huỷ-xác nhận.** (mã đổi sang tiếng Anh ngày 2026-10-01, P8b; nội dung quyết định giữ nguyên)
 - Landing (SEO) và Shop (giỏ hàng + thanh toán) tách nhau. **Social chỉ đăng tay, không tích hợp API** — chỉ dẫn link vào Shop.
 - **Khách hàng: chỉ cá nhân, B2C thuần** (đã chốt cuối). Guest checkout, gộp theo SĐT, không có tài khoản hệ thống.
 - **100% đơn giao tận nhà, nhân viên nội bộ giao** (đã chốt cuối). Không quản lý chi phí xe cộ/điều phối phức tạp.

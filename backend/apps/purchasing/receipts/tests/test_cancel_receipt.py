@@ -189,13 +189,13 @@ class CancelReceiptTests(APITestCase):
     def test_dw18_ac6_descriptor_nhap_lo_max_level_b_va_het_ai_undo_missing(self):
         """DW-18-AC6: Sau khi action cancel có -> descriptor nhap_lo max_level=B, locked_reason không còn AI_UNDO_MISSING."""
         from apps.ai.registry.discovery import get_registry
-        spec = get_registry().get("purchasing.purchasereceipt.nhap_lo")
+        spec = get_registry().get("purchasing.purchasereceipt.receive_batches")
         self.assertIsNotNone(spec)
         self.assertEqual(spec.max_level, "B")
         self.assertFalse(spec.undo_missing)
 
         # Kiểm tra chi tiết descriptor qua API
-        res = self.client_kho1.get("/api/ai/commands/purchasing.purchasereceipt.nhap_lo/")
+        res = self.client_kho1.get("/api/ai/commands/purchasing.purchasereceipt.receive_batches/")
         self.assertEqual(res.status_code, status.HTTP_200_OK)
         self.assertEqual(res.json().get("max_level"), "B")
 
@@ -204,7 +204,7 @@ class CancelReceiptTests(APITestCase):
         self.assertEqual(res_cfg.status_code, status.HTTP_200_OK)
         groups = res_cfg.json()["groups"]
         thu_mua = next(g for g in groups if g["group"] == command_groups.PURCHASING)
-        cfg_cmd = next(c for c in thu_mua["commands"] if c["id"] == "purchasing.purchasereceipt.nhap_lo")
+        cfg_cmd = next(c for c in thu_mua["commands"] if c["id"] == "purchasing.purchasereceipt.receive_batches")
         self.assertIsNone(cfg_cmd.get("locked_reason"))
 
     @override_settings(AI_ENABLED=False)

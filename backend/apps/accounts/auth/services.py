@@ -26,7 +26,7 @@ ROLE_ORDER = roles.ALL_ROLES
 
 HOME_DASHBOARD = "dashboard"
 HOME_MY_DELIVERIES = "my-deliveries"
-HOME_CONFIRMATION_QUEUE = "cskh-queue"
+HOME_CONFIRMATION_QUEUE = "confirmation-queue"
 HOME_NO_ROLE = "no-role"
 
 # S47: nhãn tiếng Việt cho màn "Quyền của tôi".
@@ -78,13 +78,13 @@ AUTH_WEAK_PASSWORD = "AUTH_WEAK_PASSWORD"
 
 
 def sorted_groups(names):
-    """Tên Group theo thứ tự vai cố định (chu, quan_ly, nv_kho, nv_giao, cskh; nhóm lạ xếp sau)."""
+    """Tên Group theo thứ tự vai cố định (owner, manager, warehouse_staff, delivery_staff, customer_service; nhóm lạ xếp sau)."""
     rank = {name: i for i, name in enumerate(ROLE_ORDER)}
     return sorted(names, key=lambda n: (rank.get(n, len(ROLE_ORDER)), n))
 
 
 def home_for(groups) -> str:
-    """Trang mặc định: không Group → no-role; chỉ nv_giao → my-deliveries; chỉ cskh → cskh-queue; còn lại → dashboard."""
+    """Trang mặc định: không Group → no-role; chỉ delivery_staff → my-deliveries; chỉ customer_service → confirmation-queue; còn lại → dashboard."""
     if not groups:
         return HOME_NO_ROLE
     if set(groups) == {roles.DELIVERY_STAFF}:

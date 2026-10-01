@@ -127,7 +127,7 @@ class AiActionViewSet(viewsets.GenericViewSet):
         """
         POST /api/ai/actions/escalate/
         Body: {"doc_type": "batch", "doc_id": "123", "step_key": "close"}
-        -> 201 {"action_id": "...", "assignee_group": "chu"}
+        -> 201 {"action_id": "...", "assignee_group": "owner"}
         DW-23-AC1, AC6, AC7
         """
         doc_type = request.data.get("doc_type")

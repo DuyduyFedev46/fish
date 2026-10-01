@@ -171,11 +171,12 @@ urlpatterns = [
     path("ai/policy/", AiPolicyView.as_view(), name="ai-policy"),
     # Báo cáo AI cuối ngày (02b §6.6, DW-22)
     path("ai/report/daily/", AiDailyReportView.as_view(), name="ai-report-daily"),
-    # P8b Lô 3: nhập lô mua tại cảng. `receive-batches/` là tên mới, `nhap-lo/` là tên cũ (alias tới Lô 5);
-    # cả hai cùng trỏ hàm `nhap_lo` nên chỉ mục lệnh AI không thêm id (R8). Đặt trước router vì route chi tiết
-    # `<pk>/` của router sẽ nuốt `receive-batches/`. Route cũ đứng trước để đường dẫn của lệnh AI giữ nguyên.
-    path("purchasing/receipts/nhap-lo/", PurchaseReceiptViewSet.as_view({"post": "nhap_lo"})),  # naming: allow - route cũ, gỡ ở Lô 5
-    path("purchasing/receipts/receive-batches/", PurchaseReceiptViewSet.as_view({"post": "nhap_lo"})),  # naming: allow - tên hàm giữ để id lệnh AI không đổi (Lô 4)
+    # P8b Lô 3-4: nhập lô mua tại cảng. `receive-batches/` là tên chính (id lệnh AI `...receive_batches`), `nhap-lo/` là
+    # tên cũ chạy song song tới Lô 5, cùng trỏ hàm `receive_batches` nên chỉ mục lệnh AI không thêm id (R8). Đặt trước
+    # router vì route chi tiết `<pk>/` của router sẽ nuốt `receive-batches/`. Route mới đứng TRƯỚC để `spec.path` của lệnh
+    # AI là `/receive-batches/` (khám phá lệnh lấy route gặp đầu tiên).
+    path("purchasing/receipts/receive-batches/", PurchaseReceiptViewSet.as_view({"post": "receive_batches"})),
+    path("purchasing/receipts/nhap-lo/", PurchaseReceiptViewSet.as_view({"post": "receive_batches"})),  # naming: allow - route cũ, gỡ ở Lô 5
     # Back-office (router)
     path("", include(router.urls)),
 ]

@@ -3,7 +3,7 @@
 - Đăng nhập token: view có sẵn của DRF `POST /api/auth/token/` (khai ở `config/api_urls.py`).
 - `GET /api/auth/me/` (S6, BR-PQ-09): `api.MeView` → `services.describe_user(user)` trả
   `id, username, display_name, phone, groups, permissions, can_view_cost, can_view_profit, home`.
-  `home`: không Group → `no-role`; chỉ `nv_giao` → `my-deliveries`; còn lại → `dashboard`.
+  `home`: không Group → `no-role`; chỉ `delivery_staff` → `my-deliveries`; còn lại → `dashboard`.
   `display_name`/`phone` lấy từ `StaffProfile` (không có hồ sơ → username / "").
 - 401 (chưa đăng nhập, token hỏng/đã thu, `is_active=False`): `{"detail": "Thông tin xác thực không hợp lệ."}`
   — đặt ở `apps/common/api.exception_handler`.

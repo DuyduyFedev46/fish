@@ -56,8 +56,8 @@ frontend/ (Next.js 14, static export → Firebase cangca-loc)   erp-console/ (Ne
    `PurchaseReceiptLine.rate`, `*LineBatch.unit_cost`, lãi lỗ) chỉ lộ khi user có
    `view_costprice` / `view_profitreport`. Serializer tách theo quyền, **cấm `fields="__all__"`**.
    Có test mẫu: `backend/apps/inventory/batches/tests/test_api.py`.
-2. **Phân quyền 3 tầng** (BR-PQ): Tầng 1 = model perm qua 4 Group cộng dồn `chu`,
-   `quan_ly`, `nv_kho`, `nv_giao` (`BusinessModelPermissions` ở `apps/common/api.py`);
+2. **Phân quyền 3 tầng** (BR-PQ): Tầng 1 = model perm qua 4 Group cộng dồn `owner`,
+   `manager`, `warehouse_staff`, `delivery_staff` (`BusinessModelPermissions` ở `apps/common/api.py`);
    Tầng 2 = `Meta.permissions` tuỳ biến (`publish_batch`, `close_batch`,
    `cancel_paid_order`, `create_refund`, `confirm_refund`, `confirm_payment_manual`,
    `view_costprice`, `view_profitreport`, `manage_staff`…); Tầng 3 = scope dòng trong
@@ -79,7 +79,7 @@ frontend/ (Next.js 14, static export → Firebase cangca-loc)   erp-console/ (Ne
      trong `01-analysis.md` và Duy duyệt.
    - **API công khai (`AllowAny`) không bao giờ trả tên, SĐT hay địa chỉ đầy đủ.** Nếu cần hiện thì che bớt,
      ví dụ `09xx xxx 123`. Tra đơn phải có yếu tố xác minh (mã đơn + SĐT) và **giới hạn tần suất**.
-   - **Trong ERP, chỉ lộ cho ai cần** (Tầng 3). `nv_giao` chỉ thấy khách của phiếu giao được giao cho mình.
+   - **Trong ERP, chỉ lộ cho ai cần** (Tầng 3). `delivery_staff` chỉ thấy khách của phiếu giao được giao cho mình.
      Serializer liệt kê field tường minh, giống quy tắc giá vốn.
    - **Không ghi dữ liệu cá nhân vào log**, gồm `logger`, `print`, Sentry và console FE. Không log nguyên
      `request.data` hay payload IPN. Chỉ log mã đơn, mã giao dịch và SĐT đã che. `AuditLog` ghi *ai làm gì

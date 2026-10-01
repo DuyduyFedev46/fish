@@ -122,12 +122,12 @@ class CskhL1Tests(TestCase):
         self.assertEqual(perm_codes, expected_cskh)
 
     def test_cs01_ac2_me_endpoint_for_cskh(self):
-        """CS-01-AC2: cs1 gọi /api/auth/me/ -> home=cskh-queue, can_view_cost=False."""
+        """CS-01-AC2: cs1 gọi /api/auth/me/ -> home=confirmation-queue, can_view_cost=False."""
         client = client_for(self.cs1)
         resp = client.get("/api/auth/me/")
         self.assertEqual(resp.status_code, 200)
         data = resp.json()
-        self.assertEqual(data["home"], "cskh-queue")
+        self.assertEqual(data["home"], "confirmation-queue")
         self.assertFalse(data["can_view_cost"])
         self.assertFalse(data["can_view_profit"])
         self.assertEqual(data["group_labels"], [{"code": roles.CUSTOMER_SERVICE, "label": "CSKH"}])

@@ -15,7 +15,7 @@ class ItemGroupViewSet(viewsets.ModelViewSet):
 
 
 class ItemViewSet(viewsets.ModelViewSet):
-    ai = AiMeta(keywords=("tra_hang", "tra hàng"))
+    ai = AiMeta(keywords=("tra hàng",))
     queryset = Item.objects.select_related("item_group").all()
     serializer_class = ItemSerializer
     permission_classes = [BusinessModelPermissions]

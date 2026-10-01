@@ -18,7 +18,7 @@ from apps.ai import command_groups
 from apps.accounts import roles
 
 VN = ZoneInfo("Asia/Ho_Chi_Minh")
-URL = "/api/ai/commands/purchasing.purchasereceipt.nhap_lo/call/"
+URL = "/api/ai/commands/purchasing.purchasereceipt.receive_batches/call/"
 
 
 @override_settings(AI_ENABLED=True, AI_WRITE_LEVELS_ALLOWED="B")
@@ -34,8 +34,8 @@ class F07DailyLimitBoundaryTests(TestCase):
         AiConfigVersion.objects.create(
             user=self.kho, version=1,
             group_levels={command_groups.PURCHASING: {"read": "A", "write": "B"}},
-            overrides={"purchasing.purchasereceipt.nhap_lo": "B"},
-            limits={"purchasing.purchasereceipt.nhap_lo": {"kg": "150", "vnd": "30000000"}},
+            overrides={"purchasing.purchasereceipt.receive_batches": "B"},
+            limits={"purchasing.purchasereceipt.receive_batches": {"kg": "150", "vnd": "30000000"}},
             created_by=self.kho,
         )
         get_registry().build(force=True)
@@ -44,7 +44,7 @@ class F07DailyLimitBoundaryTests(TestCase):
         ids = []
         for _ in range(n):
             a = AiAction.objects.create(
-                command="purchasing.purchasereceipt.nhap_lo", kind=AiAction.Kind.WRITE,
+                command="purchasing.purchasereceipt.receive_batches", kind=AiAction.Kind.WRITE,
                 status=AiAction.Status.DONE, level=AiAction.Level.B, owner=self.kho,
             )
             ids.append(a.pk)

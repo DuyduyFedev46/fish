@@ -1,7 +1,7 @@
 """
 P8b Lô 3: `POST /api/purchasing/receipts/receive-batches/` (tên mới) và `/nhap-lo/` (tên cũ, alias tới Lô 5)
-cùng trỏ một hàm `nhap_lo`: cùng ma trận vai, cùng kết quả, không rò giá vốn ra vai không được xem.
-Hàm `nhap_lo` giữ nguyên để chỉ mục lệnh AI không đổi id (R8).
+cùng trỏ hàm `receive_batches` (Lô 4 đổi tên hàm và id lệnh AI): cùng ma trận vai, cùng kết quả,
+không rò giá vốn ra vai không được xem. `nhap-lo/` chỉ là route alias, gỡ ở Lô 5.
 """
 from decimal import Decimal
 
@@ -109,11 +109,21 @@ class ReceiveBatchesAliasTests(TestCase):
                     self.assertIn("rate", line)
                 self.assertEqual(Decimal(str(data["receipt"]["lines"][0]["rate"])), Decimal("80000.00"))
 
-    def test_receive_batches_is_not_a_second_ai_command(self):
-        """Alias chỉ là route: chỉ mục lệnh AI không được có id receive_batches (snapshot giữ nguyên)."""
+    def test_receive_batches_is_the_only_ai_command_and_its_path_is_the_new_route(self):
+        """P8b Lô 4: id lệnh AI là `receive_batches`, path `/receive-batches/`; `nhap-lo/` chỉ là route alias, không thêm lệnh."""
         from apps.ai.registry.discovery import get_registry
 
         specs = {spec.id: spec for spec in get_registry().get_specs()}
-        self.assertIn("purchasing.purchasereceipt.nhap_lo", specs)
-        self.assertFalse([i for i in specs if "receive_batches" in i])
-        self.assertTrue(specs["purchasing.purchasereceipt.nhap_lo"].path.rstrip("/").endswith("nhap-lo"))
+        receive_id = "purchasing.purchasereceipt.receive_batches"
+        self.assertIn(receive_id, specs)
+        self.assertFalse([i for i in specs if i.endswith(".nhap_lo")])  # naming: allow - id cũ phải biến mất
+        self.assertEqual(specs[receive_id].path, "/api/purchasing/receipts/receive-batches/")
+        self.assertEqual([i for i in specs if "purchasereceipt" in i and "receive" in i], [receive_id])
+
+    def test_receive_batches_old_and_new_paths_resolve_to_the_same_view_method(self):
+        from django.urls import resolve
+
+        new_match = resolve(NEW)
+        old_match = resolve(OLD)
+        self.assertEqual(new_match.func.actions, {"post": "receive_batches"})
+        self.assertEqual(old_match.func.actions, {"post": "receive_batches"})

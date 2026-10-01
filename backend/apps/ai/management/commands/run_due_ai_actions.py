@@ -66,7 +66,7 @@ class Command(BaseCommand):
             elif outcome == "downgraded":
                 downgraded_count += 1
 
-        # DW-23-AC3: Quét các việc chờ quá 2 giờ -> đẩy lên 'chu'
+        # DW-23-AC3: Quét các việc chờ quá 2 giờ -> đẩy lên vai owner (Chủ)
         two_hours_ago = now - datetime.timedelta(hours=2)
         overdue_actions = AiAction.objects.filter(
             status=AiAction.Status.PENDING,
@@ -338,5 +338,5 @@ def _escalate_overdue(overdue_act):
             proposal_ref=str(locked_overdue.id),
             note=f"Việc AI #{locked_overdue.id} quá hạn 2 giờ, chuyển cho Chủ vựa",
         )
-        logger.info("Overdue action=%s cmd=%s escalated to chu", locked_overdue.id, locked_overdue.command)
+        logger.info("Overdue action=%s cmd=%s escalated to owner", locked_overdue.id, locked_overdue.command)
     return True

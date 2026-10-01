@@ -17,10 +17,11 @@ class AuditLogMigrationTests(TransactionTestCase):
     def setUp(self):
         super().setUp()
         executor = MigrationExecutor(connection)
-        # Các app khác giữ bản mới nhất (không app nào phụ thuộc 0007); riêng accounts lùi
-        # về trạng thái TRƯỚC khi có 3 field mới để tạo dữ liệu "kiểu cũ".
+        # Các app khác giữ bản mới nhất; riêng accounts lùi về trạng thái TRƯỚC khi có 3 field mới
+        # để tạo dữ liệu "kiểu cũ". Loại cả `ai` (P8b Lô 4: `ai/0003` phụ thuộc `accounts/0013`, nếu để
+        # nó ở đích thì accounts bị kéo tới 0013 chứ không lùi về 0006).
         targets = [
-            t for t in executor.loader.graph.leaf_nodes() if t[0] != "accounts"
+            t for t in executor.loader.graph.leaf_nodes() if t[0] not in ("accounts", "ai")
         ] + self.migrate_from
         executor.migrate(targets)
         self.old_apps = executor.loader.project_state(targets).apps

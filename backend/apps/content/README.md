@@ -13,4 +13,4 @@ App quản lý nội dung: bài viết hướng dẫn nấu ăn, tin mùa vụ, 
 - ND-01: `content.view_entry`, `content.add_entry`, `content.change_entry`, `content.delete_entry`, `content.view_category`
 - ND-02: `content.publish_entry`
 - ND-03: `content.add_category`, `content.change_category`
-Gán cho `chu` và `quan_ly`; `nv_kho` và `nv_giao` không có quyền.
+Gán cho `owner` và `manager`; `warehouse_staff` và `delivery_staff` không có quyền.

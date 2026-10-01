@@ -9,7 +9,7 @@ from django.db import transaction
 from apps.ai.models.config import AiConfigVersion
 from apps.ai.models.policy import AiPolicyVersion
 from apps.ai.policy.effective import effective_level
-from apps.ai.registry import get_registry
+from apps.ai.registry import get_registry, legacy_ids
 from apps.ai.settings.services import kill_user_config, user_has_spec_permission
 from apps.common.audit import record_audit
 from apps.common.exceptions import BusinessError
@@ -24,7 +24,7 @@ def get_policy_data() -> dict:
     version = latest.version if latest else 0
     global_mode = latest.global_mode if latest else "on"
     red_zone_open = latest.red_zone_open if latest else {}
-    caps = latest.caps if latest else {}
+    caps = legacy_ids.normalize_command_keys(latest.caps) if latest else {}
 
     env = "production" if not getattr(settings, "DEBUG", True) else "staging"
     production_ready = getattr(settings, "AI_PRODUCTION_READY", False)
@@ -115,6 +115,11 @@ def update_policy(
             code="BR-AI-14",
             status_code=400,
         )
+
+    # R5: client cũ còn gửi khoá cũ; chuẩn hoá sang khoá mới TRƯỚC khi kiểm và lưu phiên bản.
+    # `caps=None` nghĩa là "không đổi trần", khác `{}`.
+    if isinstance(caps, dict):
+        caps = legacy_ids.normalize_command_keys(caps)
 
     with transaction.atomic():
         latest = AiPolicyVersion.objects.select_for_update().order_by("-version").first()

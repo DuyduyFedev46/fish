@@ -172,7 +172,7 @@ class NhapLoTests(TestCase):
         # 1. Kiểm tra index
         res_index = self.client_kho.get("/api/ai/commands/index/")
         self.assertEqual(res_index.status_code, 200)
-        cmd_item = next((c for c in res_index.json()["commands"] if c["id"] == "purchasing.purchasereceipt.nhap_lo"), None)
+        cmd_item = next((c for c in res_index.json()["commands"] if c["id"] == "purchasing.purchasereceipt.receive_batches"), None)
         self.assertIsNotNone(cmd_item)
         self.assertEqual(cmd_item["level"], "C")
 
@@ -181,7 +181,7 @@ class NhapLoTests(TestCase):
         self.assertEqual(res_cfg.status_code, 200)
         groups = res_cfg.json()["groups"]
         thu_mua = next(g for g in groups if g["group"] == command_groups.PURCHASING)
-        cfg_cmd = next(c for c in thu_mua["commands"] if c["id"] == "purchasing.purchasereceipt.nhap_lo")
+        cfg_cmd = next(c for c in thu_mua["commands"] if c["id"] == "purchasing.purchasereceipt.receive_batches")
         self.assertEqual(cfg_cmd["choices"], ["OFF", "C"])
         self.assertIsNone(cfg_cmd["locked_reason"])
 
@@ -193,7 +193,7 @@ class NhapLoTests(TestCase):
                 "lines": [{"item_code": "TOM01", "qty": "10.000", "rate": "70000.00"}],
             }
         }
-        res_call = self.client_kho.post("/api/ai/commands/purchasing.purchasereceipt.nhap_lo/call/", call_payload, format="json")
+        res_call = self.client_kho.post("/api/ai/commands/purchasing.purchasereceipt.receive_batches/call/", call_payload, format="json")
         self.assertEqual(res_call.status_code, 200)
         call_data = res_call.json()
         self.assertEqual(call_data["outcome"], "proposal")

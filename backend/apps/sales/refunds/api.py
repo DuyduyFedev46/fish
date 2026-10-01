@@ -52,7 +52,7 @@ class RefundViewSet(AiDeclarable, viewsets.ReadOnlyModelViewSet):
         methods=["post"],
         url_path="create",
         required_perms=("sales.create_refund",),
-        ai=AiMeta(keywords=("tao_phieu_hoan", "tạo phiếu hoàn")),
+        ai=AiMeta(keywords=("tạo phiếu hoàn",)),
     )
     def create_refund(self, request):
         """Tạo phiếu hoàn tiền mới cho đơn hàng hoặc giao dịch lệch (BR-HT-07)."""
@@ -97,7 +97,7 @@ class RefundViewSet(AiDeclarable, viewsets.ReadOnlyModelViewSet):
         detail=True,
         methods=["post"],
         required_perms=("sales.confirm_refund",),
-        ai=AiMeta(keywords=("xac_nhan_hoan", "xác nhận hoàn")),
+        ai=AiMeta(keywords=("xác nhận hoàn",)),
     )
     def confirm(self, request, pk=None):
         """Xác nhận đã chuyển khoản hoàn tiền cho khách (BR-HT-07)."""

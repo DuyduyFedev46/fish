@@ -102,13 +102,13 @@ Quyền Tầng 2 mới → thêm vào `Meta.permissions` + data migration gán G
 Mỗi endpoint mới cần tối thiểu:
 1. Happy path với Group đúng quyền.
 2. **403** với Group thiếu quyền (và 401 khi chưa đăng nhập) — dữ liệu không đổi.
-3. **Không rò giá vốn**: gọi bằng `nv_kho`/`nv_giao`, assert field nhạy cảm *không có* trong JSON.
+3. **Không rò giá vốn**: gọi bằng `warehouse_staff`/`delivery_staff`, assert field nhạy cảm *không có* trong JSON.
 4. Lỗi nghiệp vụ → 400 với thông điệp `BusinessError`.
 5. Nếu đụng tồn/tiền: trường hợp biên (0, âm, vượt tồn, lô cuối, hai đơn tranh nhau).
 
 ```python
 self.kho = User.objects.create_user("kho", password="x")
-self.kho.groups.add(Group.objects.get(name="nv_kho"))   # Group seed sẵn bởi migration
+self.kho.groups.add(Group.objects.get(name="warehouse_staff"))   # Group seed sẵn bởi migration
 client = APIClient(); client.force_authenticate(self.kho)
 ```
 Mẫu thật: `apps/inventory/batches/tests/test_api.py` (chống rò giá vốn), `apps/sales/orders/tests/test_services.py`, fixture user theo Group: `apps/common/tests/fixtures.py`.

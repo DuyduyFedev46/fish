@@ -2,6 +2,8 @@
 Serializers cho màn AI của tôi (DW-12).
 """
 from rest_framework import serializers
+
+from apps.ai.registry import legacy_ids
 from apps.ai.models.config import AiConfigVersion
 
 
@@ -44,8 +46,9 @@ class AiConfigVersionListSerializer(serializers.ModelSerializer):
         ).order_by("-version").first()
 
         changes = []
-        old_overrides = prev.overrides if prev else {}
-        for k, v in (obj.overrides or {}).items():
+        # P8b: so sau khi chuẩn hoá khoá cũ -> mới ở cả hai phía, để phiên bản chỉ đổi tên khoá không hiện như đổi mức.
+        old_overrides = legacy_ids.normalize_command_keys(prev.overrides) if prev else {}
+        for k, v in legacy_ids.normalize_command_keys(obj.overrides).items():
             old_v = old_overrides.get(k, "default")
             if old_v != v:
                 changes.append({"scope": "override", "key": k, "from": old_v, "to": v})

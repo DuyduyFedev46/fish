@@ -25,7 +25,7 @@ class PurchaseReceiptViewSet(DocumentViewSet):
     queryset = PurchaseReceipt.objects.prefetch_related("lines").all()
     serializer_class = PurchaseReceiptSerializer
     permission_classes = [BusinessModelPermissions]
-    custom_perm_actions = ("submit", "nhap_lo", "cancel")
+    custom_perm_actions = ("submit", "receive_batches", "cancel")
     locked_fields = ("status",)  # BR-PQ-14: ghi nhận qua action submit
     actor_fields = ("created_by",)  # BR-PQ-16
 
@@ -56,18 +56,18 @@ class PurchaseReceiptViewSet(DocumentViewSet):
     @action(
         detail=False,
         methods=["post"],
-        url_path="nhap-lo",
+        url_path="receive-batches",
         required_perms=("purchasing.add_purchasereceipt", "purchasing.change_purchasereceipt"),
         input_serializer=ReceiveBatchesInput,
         ai=AiMeta(
             title="Nhập lô mua tại cảng",
-            keywords=("nhập lô", "nhập hàng", "mua cá", "nhap_lo"),
+            keywords=("nhập lô", "nhập hàng", "mua cá"),
             max_level="B",
             undo="cancel_action:cancel",
             limits={"lines[].qty": "kg", "lines[].amount": "vnd"},
         ),
     )
-    def nhap_lo(self, request):
+    def receive_batches(self, request):
         """Nhập lô mua tại cảng — mỗi dòng sinh một lô (BR-MH-01)."""
         require_perm(request.user, "purchasing.add_purchasereceipt")
         require_perm(request.user, "purchasing.change_purchasereceipt")

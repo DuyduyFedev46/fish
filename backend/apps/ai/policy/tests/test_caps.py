@@ -39,7 +39,7 @@ class PolicyCapsTests(TestCase):
             {
                 "base_version": 0,
                 "caps": {
-                    "purchasing.purchasereceipt.nhap_lo": {
+                    "purchasing.purchasereceipt.receive_batches": {
                         "kg": 200,
                         "vnd": 30000000,
                         "daily": 20,
@@ -57,7 +57,7 @@ class PolicyCapsTests(TestCase):
             {
                 "base_version": 0,
                 "limits": {
-                    "purchasing.purchasereceipt.nhap_lo": {
+                    "purchasing.purchasereceipt.receive_batches": {
                         "kg": "250",
                         "vnd": "20000000",
                     }
@@ -69,7 +69,7 @@ class PolicyCapsTests(TestCase):
         self.assertEqual(res_kho.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(res_kho.json().get("code"), "BR-AI-19")
         errors = res_kho.json().get("errors", {})
-        self.assertIn("vượt trần của Chủ", errors.get("purchasing.purchasereceipt.nhap_lo", ""))
+        self.assertIn("vượt trần của Chủ", errors.get("purchasing.purchasereceipt.receive_batches", ""))
 
     @override_settings(AI_ENABLED=True)
     def test_dw20_ac2_nguong_hieu_luc_la_min_va_ha_c_khi_call(self):
@@ -79,7 +79,7 @@ class PolicyCapsTests(TestCase):
             "/api/ai/policy/",
             {
                 "base_version": 0,
-                "caps": {"purchasing.purchasereceipt.nhap_lo": {"kg": 200, "vnd": 30000000, "daily": 20}},
+                "caps": {"purchasing.purchasereceipt.receive_batches": {"kg": 200, "vnd": 30000000, "daily": 20}},
                 "acknowledge_responsibility": True,
             },
             format="json",
@@ -90,7 +90,7 @@ class PolicyCapsTests(TestCase):
             "/api/ai/my-config/",
             {
                 "base_version": 0,
-                "limits": {"purchasing.purchasereceipt.nhap_lo": {"kg": "150", "vnd": "20000000"}},
+                "limits": {"purchasing.purchasereceipt.receive_batches": {"kg": "150", "vnd": "20000000"}},
                 "acknowledge_responsibility": True,
             },
             format="json",
@@ -103,7 +103,7 @@ class PolicyCapsTests(TestCase):
             "/api/ai/policy/",
             {
                 "base_version": p_latest.version,
-                "caps": {"purchasing.purchasereceipt.nhap_lo": {"kg": 100, "vnd": 30000000, "daily": 20}},
+                "caps": {"purchasing.purchasereceipt.receive_batches": {"kg": 100, "vnd": 30000000, "daily": 20}},
                 "acknowledge_responsibility": True,
             },
             format="json",
@@ -119,7 +119,7 @@ class PolicyCapsTests(TestCase):
             }
         }
         res_call = self.client_kho.post(
-            "/api/ai/commands/purchasing.purchasereceipt.nhap_lo/call/",
+            "/api/ai/commands/purchasing.purchasereceipt.receive_batches/call/",
             call_payload,
             format="json",
         )
@@ -138,7 +138,7 @@ class PolicyCapsTests(TestCase):
             "/api/ai/policy/",
             {
                 "base_version": 0,
-                "caps": {"purchasing.purchasereceipt.nhap_lo": {"max_level": "B", "kg": 200}},
+                "caps": {"purchasing.purchasereceipt.receive_batches": {"max_level": "B", "kg": 200}},
                 "acknowledge_responsibility": True,
             },
             format="json",
@@ -152,7 +152,7 @@ class PolicyCapsTests(TestCase):
             "/api/ai/policy/",
             {
                 "base_version": 0,
-                "caps": {"purchasing.purchasereceipt.nhap_lo": {"kg": 100}},
+                "caps": {"purchasing.purchasereceipt.receive_batches": {"kg": 100}},
                 "acknowledge_responsibility": True,
             },
             format="json",
@@ -167,7 +167,7 @@ class PolicyCapsTests(TestCase):
             "/api/ai/policy/",
             {
                 "base_version": 0,
-                "caps": {"purchasing.purchasereceipt.nhap_lo": {"kg": -50}},
+                "caps": {"purchasing.purchasereceipt.receive_batches": {"kg": -50}},
                 "acknowledge_responsibility": True,
             },
             format="json",
@@ -180,7 +180,7 @@ class PolicyCapsTests(TestCase):
             "/api/ai/policy/",
             {
                 "base_version": 0,
-                "caps": {"purchasing.purchasereceipt.nhap_lo": {"kg": "abc"}},
+                "caps": {"purchasing.purchasereceipt.receive_batches": {"kg": "abc"}},
                 "acknowledge_responsibility": True,
             },
             format="json",
@@ -195,7 +195,7 @@ class PolicyCapsTests(TestCase):
             "/api/ai/policy/",
             {
                 "base_version": 0,
-                "caps": {"purchasing.purchasereceipt.nhap_lo": {"kg": 150, "vnd": 20000000, "daily": 10}},
+                "caps": {"purchasing.purchasereceipt.receive_batches": {"kg": 150, "vnd": 20000000, "daily": 10}},
                 "acknowledge_responsibility": True,
             },
             format="json",
@@ -203,4 +203,4 @@ class PolicyCapsTests(TestCase):
         self.assertEqual(res.status_code, status.HTTP_200_OK)
         p = AiPolicyVersion.objects.order_by("-version").first()
         self.assertIsNotNone(p)
-        self.assertEqual(p.caps["purchasing.purchasereceipt.nhap_lo"]["kg"], 150)
+        self.assertEqual(p.caps["purchasing.purchasereceipt.receive_batches"]["kg"], 150)

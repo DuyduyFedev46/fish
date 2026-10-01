@@ -52,7 +52,7 @@ class DailyAiReportTests(APITestCase):
         # 3 việc B
         for i in range(3):
             AiAction.objects.create(
-                command="purchasing.purchasereceipt.nhap_lo",
+                command="purchasing.purchasereceipt.receive_batches",
                 kind=AiAction.Kind.WRITE,
                 level=AiAction.Level.B,
                 status=AiAction.Status.DONE,
@@ -61,7 +61,7 @@ class DailyAiReportTests(APITestCase):
 
         # 1 việc hoàn tác (status=UNDONE)
         AiAction.objects.create(
-            command="purchasing.purchasereceipt.nhap_lo",
+            command="purchasing.purchasereceipt.receive_batches",
             kind=AiAction.Kind.WRITE,
             level=AiAction.Level.B,
             status=AiAction.Status.UNDONE,

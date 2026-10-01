@@ -13,10 +13,10 @@ cũ ở kho ảnh (BR-DM-14).
 | `api.py` | `ItemImageDetailView`: `POST`/`DELETE /api/catalog/items/{id}/image/`, quyền `catalog.change_item_image` |
 
 ## Quyền (Q3, Tầng 2)
-`catalog.change_item_image` khai ở `Item.Meta.permissions`, gán cho `chu` + `quan_ly`
+`catalog.change_item_image` khai ở `Item.Meta.permissions`, gán cho `owner` + `manager`
 bằng data migration `apps/accounts/migrations/0006_grant_change_item_image.py` (theo mẫu
 `0003_grant_view_dashboard.py`). KHÔNG mở `change_item` — Quản lý vẫn 403 khi sửa tên,
-hạn dùng, ẩn/hiện, giá qua endpoint khác (spec §1.4). `nv_kho`/`nv_giao` chỉ xem
+hạn dùng, ẩn/hiện, giá qua endpoint khác (spec §1.4). `warehouse_staff`/`delivery_staff` chỉ xem
 (`catalog.view_item`, đã có).
 
 ## Cấu hình (env, không hard-code)

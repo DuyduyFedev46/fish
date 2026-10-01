@@ -130,15 +130,15 @@ class _NhapLoBase(TestCase):
         self.kho2 = make_user("qa7f10_kho2", roles.WAREHOUSE_STAFF)
         self.giao = make_user("qa7f10_giao", roles.DELIVERY_STAFF)
         self.chu = make_user("qa7f10_chu", roles.OWNER)
-        self.c = {n: client_for(getattr(self, n)) for n in ("kho", "kho2", "giao", roles.OWNER)}
+        self.c = {n: client_for(getattr(self, a)) for n, a in (("kho", "kho"), ("kho2", "kho2"), ("giao", "giao"), (roles.OWNER, "chu"))}
         g = ItemGroup.objects.create(name="Cá biển")
         self.item = Item.objects.create(code="CA-QA7", name="Cá ngừ", item_group=g, shelf_life_in_days=60, is_active=True)
         self.sup = Supplier.objects.create(name="Đầu mối giả", is_active=True)
         self.wh = Warehouse.objects.create(name="Kho giả")
         AiConfigVersion.objects.create(
             user=self.kho, version=1, group_levels={command_groups.PURCHASING: {"read": "A", "write": "B"}},
-            overrides={"purchasing.purchasereceipt.nhap_lo": "B"},
-            limits={"purchasing.purchasereceipt.nhap_lo": {"kg": "150", "vnd": "30000000"}}, created_by=self.kho,
+            overrides={"purchasing.purchasereceipt.receive_batches": "B"},
+            limits={"purchasing.purchasereceipt.receive_batches": {"kg": "150", "vnd": "30000000"}}, created_by=self.kho,
         )
         get_registry().build(force=True)
 
@@ -148,7 +148,7 @@ class _NhapLoBase(TestCase):
             "lines": [{"item_code": self.item.code, "qty": "50.000", "rate": "80000.00", "shelf_life_days": 30}],
         }}
         with override_settings(AI_ENABLED=True, AI_WRITE_LEVELS_ALLOWED="B"):
-            res = self.c["kho"].post("/api/ai/commands/purchasing.purchasereceipt.nhap_lo/call/", payload, format="json")
+            res = self.c["kho"].post("/api/ai/commands/purchasing.purchasereceipt.receive_batches/call/", payload, format="json")
         self.assertEqual(res.status_code, 200, res.content)
         self.assertEqual(res.data["outcome"], "done", res.data)
         return AiAction.objects.get(pk=res.data["action_id"])

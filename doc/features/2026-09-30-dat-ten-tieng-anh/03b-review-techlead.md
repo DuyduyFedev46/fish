@@ -359,3 +359,131 @@ vòng 2 không đụng code sản phẩm BE. Mục 4 (điểm chốt Lô 4) và 
 - **Không** commit `doc/features/2026-09-30-ra-soat-agy/q1-pii-xac-minh.md` trong commit Lô 3. File này thuộc hồ sơ khác; điều phối tự quyết.
 - Trước khi deploy BE lên staging: kiểm env `CSKH_*` và args của Cloud Run Job, và bộ lọc log theo `cangca.delivery.cskh` (02c §3 Lô 3).
 - E2E QA (5 vai, FE cũ + BE mới) vẫn là điều kiện xong. Review này không thay cho bước đó.
+
+## Lô 4a
+
+Review BE đổi DỮ LIỆU sang tiếng Anh (chưa commit, 01/10). Phạm vi: `git diff` 51 file và 11 file mới (`accounts/0013`, `ai/0003`,
+`legacy_ids.py`, `preview_group_rename`, 7 test). Đối chiếu với 02c §3 Lô 4, §6 (R2, R3, R5, R6, R8, R9, R10, R12) và §7c.
+
+### Kết luận: **REVIEW PASS** (vòng 1, 01/10)
+Không có lỗi chặn. Chấp nhận cả 4 lệch thiết kế mà be-dev ghi trong 03-dev-notes. Mục 3 là việc nên sửa, không chặn commit.
+N1 nên làm trước khi chạy `preview_group_rename` trên staging. Deploy staging làm theo mục 4.
+
+### Lệnh đã chạy trong lượt review
+- `DJANGO_DEBUG=1 env -u DATABASE_URL manage.py test apps.accounts apps.ai apps.purchasing apps.delivery` (không `--parallel`): **724 tests OK**.
+- `manage.py makemigrations --check --dry-run`: No changes detected. `python3 scripts/check_naming.py`: OK, không phát sinh mới.
+- `git status backend/apps/*/migrations`: chỉ có 2 file mới (`accounts/0013`, `ai/0003`). Migration cũ không bị sửa (R12).
+- **Chạy migrate thật trên SQLite** (scratchpad `p8b-l4-review/`, dữ liệu giả, username `fake_*`):
+  1. Dựng DB giống staging: migrate tới `accounts 0012`, `ai 0002`, các app khác tới bản mới nhất. 5 Group mang tên cũ, id 1–5,
+     lần lượt 147/67/36/9/4 quyền. Tạo 5 user, mỗi user một Group, thêm 1 user kiêm `quan_ly`+`nv_kho`. Tạo 2 `AiConfigVersion` có khoá cũ:
+     `thu_mua`, id `…nhap_lo` và alias ngắn `nhap_lo` ở `limits`. Tạo 1 `AiPolicyVersion` có `caps[…nhap_lo]`. Tạo 2 `AiAction`:
+     một việc ESCALATED giao `chu` và một việc PENDING giao `quan_ly`, cả hai mang id lệnh cũ.
+  2. `preview_group_rename` trước migrate: in đúng số Group, quyền và thành viên. In 2 việc AI và 1 user, 1 chính sách còn khoá cũ, 0 xung đột.
+     Không in username.
+  3. `migrate`: chạy `accounts.0013` rồi `ai.0003`. So ảnh chụp trước và sau:
+     - id Group giữ nguyên, tập quyền của từng Group giống hệt, thành viên giống hệt.
+     - `get_all_permissions()` của **mọi user** giống hệt trước migrate (R2).
+     - `warehouse_staff` không có `sales.view_customer`.
+     - Dòng `AiConfigVersion`/`AiPolicyVersion` cũ không đổi. Mỗi bảng có thêm đúng 1 phiên bản mang khoá tiếng Anh, giá trị giữ nguyên (R9).
+     - `AiAction` đổi sang `receive_batches` và giao `owner`/`manager` (R6). Chủ vẫn thấy việc ESCALATED qua `visible_actions_for`.
+     - `effective_level`, mức khi ghim phiên bản cũ, cap và limit của `receive_batches` cho NV kho, Quản lý, Chủ đều như trước (R5).
+  4. Rollback `migrate accounts 0012`: `ai.0003` gỡ trước, `0013` gỡ sau. Group trở về y hệt ảnh chụp ban đầu, `AiAction` trở về id và Group cũ.
+     Phiên bản AI chỉ được **thêm** (ghi chú "P8b rollback"), không dòng nào bị sửa hay xoá. Code 4a chạy trên DB đã rollback vẫn tính
+     đúng mức và trần. Sau đó migrate lại: kết quả giống lần 1.
+  5. Ca xung đột: từ DB sạch giống staging, tạo thêm Group `owner`. `preview` báo "XUNG ĐỘT: 1". `migrate` dừng với `RuntimeError`,
+     `0013` không được ghi vào `django_migrations` và Group không đổi.
+  6. DB mới từ đầu: 5 Group tên tiếng Anh. Tập quyền theo tên **trùng khớp** với DB đi đường staging. Như vậy dependency chéo
+     (`ai/0002`, `content/0002`, `sales/0010` chạy trước `0013`) là đủ và đúng.
+
+### 1. Lỗi chặn
+Không có.
+
+### 2. Đạt yêu cầu (đã soát)
+- **R2, `accounts/0013`:** dùng `filter(name=old).update(name=new)` nên id giữ nguyên, không xoá rồi tạo lại Group. Hàm kiểm toàn bộ xung đột
+  **trước** khi đổi bất kỳ Group nào. Có reverse, chạy lại không đổi gì, chỉ in số lượng. Tên Group đóng băng trong file, không import `roles`.
+- **Dependency chéo (lệch 1, chấp nhận):** grep mọi migration có tên Group cũ thì chỉ có `accounts/0002…0012`, `ai/0002`, `content/0002`,
+  `sales/0010`. Tất cả đều là tiền đề của `0013`. Trên staging các migration này đã chạy rồi, nên dependency chỉ có tác dụng với DB mới.
+- **R5, R9, `ai/0003`:** chỉ append phiên bản, lấy từ phiên bản mới nhất của mỗi user và của chính sách. `killed`, `global_mode`,
+  `red_zone_open` và `created_by` được giữ. Khi khoá mới đã có sẵn thì khoá mới thắng. Không có khoá cũ thì không tạo gì. Không đụng
+  `AuditLog`. Bảng ánh xạ đóng băng trong file migration.
+- **`legacy_ids.py`:** gồm các hàm thuần, chịu được `None` hoặc giá trị không phải dict. Được gọi ở mọi chỗ **đọc** `caps`, `overrides`,
+  `group_levels`, `limits`: `effective_level` (cả khi ghim phiên bản), `get_cap_for_command` (pipeline dùng hàm này cho cả cap lẫn limit),
+  `get_user_config_data`, `get_policy_data`. Đọc `red_zone_open` không cần chuẩn hoá vì khoá là codename quyền, không đổi.
+- **§7c, mọi đường GHI nhận tên cũ và lưu tên mới:** `_resolve_groups` (tạo nhân viên, PUT groups) chuẩn hoá rồi mới tra DB. Gửi tên cũ của
+  Chủ vẫn phải là Chủ mới được (có test). `update_policy.caps` chuẩn hoá trước khi kiểm và lưu; `caps=None` vẫn nghĩa là "không đổi".
+  `update_user_config` chuẩn hoá `groups`, `overrides`, `limits` trước khi kiểm vượt trần. Không có đường nào nới trần.
+- **Ma trận 21 endpoint × 7 actor** (`test_role_permission_matrix.py`): có cả 2 path nhập lô, `delivery_staff`/`customer_service` nhận 403 (R10).
+  Test kiểm DB chỉ còn đúng 5 Group tên mới. `me.home` của CSKH là `confirmation-queue`.
+- **Route nhập lô:** `receive-batches/` khai trước nên `spec.path` là `/receive-batches/`. `nhap-lo/` là alias route trỏ cùng method, nên
+  không thêm id lệnh. `custom_perm_actions` đã có `receive_batches`. Cả hai path đều đặt `self.action="receive_batches"`, nên Tầng 1 và
+  Tầng 2 giống nhau.
+- **Snapshot (R8):** diff đúng 1 dòng, đổi `…nhap_lo` thành `…receive_batches`. Giá trị `group`/`sensitivity` không nằm trong snapshot;
+  `registry.get_specs()` thật trả `purchasing/sales/customer_service` và `high/medium`.
+- **Bỏ keyword snake-case không làm giảm recall:** `tokenize()` của ERP (`features/ai/commands/search.ts`) bỏ dấu rồi tách theo ký tự không
+  phải chữ/số. Vì vậy `chot_lo` và `chốt lô` cho cùng token `chot`, `lo`. Bỏ bản snake chỉ bỏ token trùng lặp.
+- **`FORBIDDEN_PREFIXES`:** không đổi, vẫn có cả `/api/cskh/` lẫn `/api/confirmation/`.
+- **ERP Lô 3 (đang chạy trên staging) với BE 4a:** `normalizeRole`, `normalizeHome`, `normalizeAiGroup`, `normalizeSensitivity`,
+  `findByCommand` nhận cả hai tên. FE ghi `caps`/`overrides` bằng khoá BE trả, còn `groups`/Group bằng tên cũ, và BE 4a chuẩn hoá các khoá
+  này. Hai bên tương thích về contract. Cần E2E staging để xác nhận.
+- **Lệch 2–4, chấp nhận:**
+  - Lệch 2: test gọi hàm migration trực tiếp. Lượt review đã chạy migrate/rollback thật để bù.
+  - Lệch 3: `test_s03_migration` bỏ `ai` khỏi leaf. Đúng, vì `ai/0003` kéo `accounts` tới `0013`.
+  - Lệch 4: `test_customer_data_scope` đặt Group về `nv_kho` trong transaction của test. Đúng, vì `0012` đóng băng tên cũ, và test so
+    "nhóm khác" theo `pk`.
+  - `test_p8_qa_lo2_matrix` trả `roles.OWNER` về `"chu"`. Đây là tên **thuộc tính fixture** (`self.chu`), không phải tên Group. Assert
+    chống rò không bị nới.
+- **PII và giá vốn:** không thêm field hay serializer nào. Migration và `preview` chỉ in số lượng; có test kiểm output không chứa username.
+  Log `auto_confirm` chỉ đổi từ chữ cố định sang `roles.OWNER`.
+- `doc/decisions.md`: chỉ đổi mã Group ở 2 dòng và thêm ghi chú, đúng phạm vi Duy cho phép ở §7b.
+
+### 3. Nên sửa (không chặn)
+- **N1 (nên làm trước khi chạy preview trên staging), `apps/accounts/management/commands/preview_group_rename.py:37-50`:** lệnh chưa báo Group
+  **lạ**, tức Group ngoài 10 tên cũ và mới, trong khi đó là một điểm dừng ở 02c §3 Lô 4. Thêm một dòng
+  `Group khác ngoài 5 vai: N`, đếm bằng `Group.objects.exclude(name__in=[*LEGACY_ROLE_NAMES, *ALL_ROLES]).count()`, chỉ in số lượng.
+  Thêm 1 assert vào `test_preview_group_rename.py`. Nếu chưa sửa thì người chạy staging phải đếm tay bằng `manage.py shell`.
+- **N2, `apps/ai/migrations/0003_rename_ai_keys_to_english.py:63-69`:** `_rename_actions` cộng số lượt UPDATE. Một việc vừa đổi lệnh vừa
+  đổi Group bị đếm 2 lần: thử nghiệm in "4 việc AI" trong khi chỉ có 2 dòng. Số liệu này dùng để đối chiếu với `preview`, vì vậy cần sửa
+  chữ thành "lượt cập nhật việc AI" hoặc đếm số dòng riêng. Sửa được vì migration chưa chạy ở đâu.
+- **N3, `apps/ai/settings/serializers.py:47` và `apps/ai/settings/services.py:341`:** lịch sử cấu hình AI so `overrides` thô giữa hai
+  phiên bản. Vì vậy phiên bản "P8b: đổi khoá" sẽ hiện `receive_batches: default → C` như thể người dùng vừa đổi mức. Cần chuẩn hoá cả hai
+  phía bằng `legacy_ids.normalize_command_keys` trước khi so.
+- **N4, `apps/accounts/staff/tests/test_group_rename_migration.py:139-147`:** test thứ tự đang liệt kê cứng 3 migration. Nên quét mọi file
+  `apps/*/migrations/*.py` có chứa tên Group cũ và assert từng file nằm trong `forwards_plan(0013)`, để migration gán quyền theo tên cũ
+  thêm sau này không lọt.
+- **N5, R6:** chưa có test `run_due_ai_actions` chạy việc tạo bằng id cũ sau khi đổi tên, như 02c yêu cầu. Lượt review đã kiểm bằng
+  sandbox: registry tra được id mới và việc vẫn giao đúng Group. Nên bổ sung một test trong `test_ai_key_migration.py`.
+- **N6:** còn comment và docstring nhắc `'chu'` ở `apps/ai/management/commands/run_due_ai_actions.py:69` và
+  `apps/ai/actions/api.py:130`. Cần đổi thành `owner`.
+- **Ghi cho 4b (FE):** khi `COMMAND_GROUP` nội bộ đổi sang tiếng Anh, `BM25Index` đưa `doc.group` vào text nên mất token tiếng Việt
+  `thu mua`/`ban hang`. Cần thêm nhãn nhóm tiếng Việt vào text chỉ mục (hoặc keyword), rồi thử vài câu hỏi "thu mua…", "bán hàng…"
+  trước và sau khi đổi.
+
+### 4. Hướng dẫn deploy staging an toàn (mỗi bước cần Duy cho phép)
+Trong khoảng *code 4a chạy trên DB chưa migrate*, các kiểm tra theo tên Group sẽ **đóng chặt chứ không lộ dữ liệu**:
+`FULL_SCOPE_GROUPS`, `sees_customer_directory`, `is_customer_service`, `actor_is_owner`, `home_for`. Ví dụ Chủ tạm thời không quản lý
+được nhân viên, NV kho thấy ít đơn hơn. Không có rò rỉ, nhưng vẫn nên giữ khoảng này gần bằng 0:
+1. Build image mới `api:v8` từ commit 4a. **Chưa** chuyển traffic: `gcloud run deploy cangca-api-staging --image …:v8 --no-traffic --tag p8b4a`.
+2. Cập nhật job `cangca-migrate-staging` sang image `v8`. Job cũ chạy image cũ thì không có `0013`/`0003` và không có lệnh `preview`.
+3. Chạy job với `--args manage.py,preview_group_rename` rồi dán số liệu vào 03-dev-notes. **Dừng** nếu có xung đột, thiếu Group cũ, Group lạ
+   (N1) hoặc số khác dự kiến.
+4. Chạy job với lệnh mặc định `manage.py,migrate,--noinput`. Log phải có "đã đổi tên 5 Group (giữ id)" và dòng `ai:`.
+5. Chạy lại `preview_group_rename`: id, số quyền, số thành viên của từng vai phải **giống hệt** bước 3, và mọi số "còn khoá cũ" phải bằng 0.
+6. `gcloud run services update-traffic cangca-api-staging --to-latest`.
+7. E2E 5 vai với **ERP Lô 3** (FE chưa đổi): menu, trang chủ (CSKH vào `/confirmation/`), sửa nhóm nhân viên (FE gửi tên cũ), hàng đợi
+   gọi xác nhận, Nhập lô qua cả hai path, màn Cài đặt AI và Chính sách AI hiện đúng trần cũ. Phạm vi `delivery_staff` phải vẫn chỉ thấy
+   khách của phiếu mình.
+8. Sau đó mới deploy FE 4b và chạy lại E2E 5 vai. Thứ tự bắt buộc: **BE 4a và migrate trước, FE 4b sau.** FE 4b gửi tên mới, BE cũ không
+   hiểu tên này.
+- **Rollback:** dùng chính image `v8` (image có hàm reverse) để chạy job với `--args manage.py,migrate,accounts,0012`. Lệnh này gỡ
+  `ai.0003` rồi `0013`, và chỉ thêm phiên bản AI "P8b rollback", không xoá dòng nào. Sau đó chuyển traffic về revision Lô 3
+  (`cangca-api-staging-00005-7fp`, `api:v7`). Không được chuyển traffic về `v7` khi DB vẫn mang tên mới: tình trạng đó cũng đóng chặt
+  chứ không lộ, nhưng mất quyền theo vai.
+- Trên Postgres, mỗi migration chạy trong một transaction riêng. Nếu `0013` xong mà `ai.0003` lỗi, Group đã mang tên mới nhưng
+  `AiAction.assignee_group` còn tên cũ, và việc ESCALATED cũ sẽ không hiện cho Chủ. Khi đó sửa nguyên nhân rồi chạy lại `migrate`.
+  `0003` chạy lại an toàn.
+- Production đang tắt, nên đi một lượt theo 02c §3 Lô 4 bước 5. Không đụng production trong lô này.
+
+### 5. Lưu ý khi commit (điều phối)
+- `git add` rõ 11 file mới: 2 migration, `legacy_ids.py`, `preview_group_rename.py`, 7 file test trong `accounts/staff/tests/`,
+  `ai/policy/tests/`, `ai/registry/tests/`, `ai/settings/tests/`.
+- Nếu sửa N1, N2 thì chạy lại bộ test của 4 app, `makemigrations --check` và `check_naming` trong cùng lượt báo xong.

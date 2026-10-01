@@ -38,7 +38,7 @@ Ngoại lệ (phải nói rõ với Duy): file cấu hình, migration sinh tự 
 |---|---|
 | Test xanh | Output `manage.py test` / `pytest` của lượt này: 0 failure |
 | FE ổn | `npm run build` exit 0 (+ `npx tsc --noEmit`) |
-| Không rò giá vốn | Test API với nv_kho/nv_giao chạy xanh |
+| Không rò giá vốn | Test API với warehouse_staff/delivery_staff chạy xanh |
 | Migration ổn | `makemigrations --check --dry-run` không sinh gì mới |
 | Bug đã sửa | Test tái hiện bug giờ xanh, trước đó đỏ |
 | Subagent làm xong | Tự xem diff/chạy test — không tin báo cáo suông |

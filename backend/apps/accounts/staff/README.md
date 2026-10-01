@@ -11,7 +11,7 @@ sửa tên/SĐT, cho nghỉ, cho làm lại, đặt lại mật khẩu. Không x
 | `tests/` | `test_s41_staff.py`, `test_s42_staff.py`, `test_s41_admin.py`, `test_q1_concurrency.py` |
 
 Rule: **BR-PQ-17** không tự đổi nhóm / tự cho nghỉ / tự đặt lại mật khẩu; chỉ Chủ hoặc superuser
-đụng nhóm `chu` và tài khoản Chủ (403); chỉ superuser đụng tài khoản superuser.
+đụng nhóm `owner` và tài khoản Chủ (403); chỉ superuser đụng tài khoản superuser.
 **BR-PQ-18** luôn còn ≥ 1 Chủ đang làm. **BR-GH-08** còn phiếu Đang giao thì không cho nghỉ.
 Cho nghỉ / đặt lại mật khẩu xoá token (C8: mọi máy của người đó văng ngay). Mọi thay đổi ghi AuditLog
 `staff_create`, `staff_update`, `staff_groups_change`, `staff_deactivate`, `staff_reactivate`,

@@ -335,3 +335,111 @@ Không có lỗi chặn.
 | Build cuối cả hai FE với `NEXT_PUBLIC_USE_MOCK=0` và API production, `check-no-mock`, `check-ai-chunks` | exit 0, XANH; không còn URL localhost trong `out/_next` |
 
 Tệp tạm: `/private/tmp/claude-501/-Users-dangthiduyen-Downloads-loc/3e0d9f3d-14ce-4b8b-a1cd-6fbcdc0b2f2d/scratchpad/qa-p8b-l3/` (script, log, ảnh, JSON so sánh). Không sửa mã sản phẩm, không commit, không deploy.
+
+
+## Lô 4a — BE đổi tên Group và khoá AI sang tiếng Anh (migration `accounts/0013`, `ai/0003`, `legacy_ids.py`, `preview_group_rename`) · lần 1 · 01/10/2026
+
+### Kết luận: APPROVED — không mất quyền, không tăng quyền, hành vi y nguyên trên DB có dữ liệu cũ; migration xuôi/ngược chạy đúng, không có lỗi chặn
+### Tổng: 41 ca · ✅ 38 · ❌ 0 · ⏸ 3 (cả ba cần staging/GCP, ngoài phạm vi lượt local này) · kèm 5 ghi nhận không chặn
+
+Cách kiểm: dựng DB SQLite "giống staging" bằng mã HEAD (9 tài khoản giả: `chu`, `quan_ly`, `nv_kho`, `nv_giao`, `cskh`, 2 người kiêm hai vai, 1 người không Group; 5 Group cũ; cấu hình và chính sách AI khoá cũ; 11 `AiAction` gồm PENDING/ESCALATED/hết hạn của chủ), ghi lại 2873 lượt GET theo từng tài khoản, mức AI hiệu lực/trần/nhóm/độ nhạy cảm của 999 cặp (người × lệnh) và 11 phiên bản ghim. Sau đó trên CÙNG DB đó chạy `preview_group_rename`, `migrate` bằng cây làm việc rồi chạy lại đúng các lượt trên. Cây làm việc được đồng bộ lại sau khi dev sửa (diff bản sao với cây thật = 0 tệp), và mọi bằng chứng dưới đây là của bản cuối. Dữ liệu 100% giả; không có SĐT/tên/địa chỉ khách thật trong log hay báo cáo.
+
+### Theo yêu cầu giao (§3 Lô 4, §6, §7c của `02c-giao-viec.md`)
+| Mã | Ca | Kết quả | Bằng chứng |
+|---|---|---|---|
+| A1 | Đổi tên 5 Group, giữ id, quyền, thành viên | ✅ | trước/sau: id 1..5, số quyền, tập quyền từng Group, thành viên từng user giống nhau (đối chiếu theo id Group); tên `chu/quan_ly/nv_kho/nv_giao/cskh` thành `owner/manager/warehouse_staff/delivery_staff/customer_service` |
+| A2 | Không có Group nào vô tình có thêm quyền | ✅ | `warehouse_staff` vẫn KHÔNG có `sales.view_customer` (đúng quyết định Duy 01/10); không Group nào thêm/bớt quyền |
+| A3 | `preview_group_rename` chỉ đọc | ✅ | chạy trước: nêu số việc AI/cấu hình/chính sách còn khoá cũ (10/6/1), `Xung đột: 0`; sha256 DB không đổi; chạy sau migrate: 0/0/0, `Xung đột: 0`. Chỉ in số đếm, không in tên khách |
+| A4 | `ai/0003` đổi `command`, `assignee_group` của việc AI | ✅ | 11 hàng `AiAction` đổi khoá (ví dụ `nhap_lo` thành `receive_batches`, `chu` thành `owner`), id, trạng thái, mức, thời hạn giữ nguyên |
+| A5 | Cấu hình/chính sách thêm phiên bản mới, không sửa cũ (append-only) | ✅ | `ai_aiconfigversion` 8 thành 14 (6 hàng mới), `ai_aipolicyversion` 2 thành 3 (1 hàng mới), note `P8b: đổi khoá sang tiếng Anh, giá trị giữ nguyên`; hàng cũ không đổi |
+| A6 | Phiên bản mới chỉ có khoá và giá trị cũ, không PII, không suy ngược giá vốn | ✅ | đọc trực tiếp bảng: chỉ `group_levels`, `overrides`, `limits` (kg, vnd, daily) trùng giá trị cũ (ví dụ trần 200 kg / 30 triệu / 5 lần giữ nguyên); không tên, SĐT, địa chỉ, giá mua; trần kg và vnd đã có sẵn trong cấu hình cũ, không thêm thông tin mới |
+| A7 | AuditLog không bị đụng, không xoá chứng từ | ✅ | `accounts_auditlog` 10 trước và 10 sau; số phiếu nhập, lô, sổ kho, đơn không đổi (`dbdiff.py`) |
+| A8 | Chạy `migrate` lần 2, và sau rollback rồi forward | ✅ | lần 2: "No migrations to apply"; rollback rồi forward lại: cùng kết quả, `preview_group_rename` ra 0/0/0 |
+| B1 | Endpoint 401/403/200 giống hệt trước/sau | ✅ | 1103 request mỗi bên (9 tài khoản + ẩn danh): 0 khác mã trạng thái |
+| B2 | Khác biệt body chỉ ở chỗ đổi tên chủ định | ✅ | 29 body khác, đều giải thích được: tên Group (`me`, `staff`), `home` (`cskh` thành `confirmation-queue`), id/nhóm/độ nhạy cảm/từ khoá/`index_version` trong chỉ mục AI, metadata phiên bản; lịch sử `audit-logs` còn khoá cũ ở 4 body (append-only, đúng thiết kế) |
+| B3 | Mức AI hiệu lực và trần giống nhau | ✅ | 999 cặp (người × lệnh): mức hiệu lực, trần chính sách, trần cá nhân, nhóm, độ nhạy cảm đều giống sau khi ánh xạ khoá cũ sang mới; 0 khác |
+| B4 | Phiên bản ghim còn đúng | ✅ | 11 việc có phiên bản ghim: 0 khác |
+| B5 | Việc ESCALATED/PENDING vẫn đúng người thấy | ✅ | chi tiết 99 lượt (việc × tài khoản): mã trạng thái và body giống nhau sau ánh xạ tên; nhóm nhận việc mới đúng; không ai thấy thêm hay mất việc |
+| B6 | Việc AI hẹn giờ chạy sau khi đổi khoá (`run_due_ai_actions`) | ✅ | HEAD và cây làm việc đều `executed 2`, lần chạy 2 `executed 0` (không làm hai lần); cả hai thành DONE mức B, nhóm `owner`, lệnh `receive_batches`; số hàng phiếu nhập/lô/sổ kho bằng nhau |
+| B7 | Ma trận POST 160 ca (ẩn danh, 5 vai, kiêm vai; AI call, PUT, nhập lô...) | ✅ | HEAD (id cũ) == cây làm việc (id mới) ở 160/160 ca; riêng 30 ca AI call: id cũ trên BE mới trả 404 `COMMAND_UNKNOWN` (ẩn danh 401) |
+| C1 | Rollback `migrate ai 0002` rồi `accounts 0012` | ✅ | Group trở về `chu, quan_ly, nv_kho, nv_giao, cskh` cùng id; việc AI trở về `nhap_lo`/tên cũ; chạy HEAD trên DB đó: 2873 GET 0 khác mã; mức hiệu lực 999 và phiên bản ghim giống HEAD; 16 body khác chỉ ở số phiên bản (my-config, policy: v1 thành v3, v2 thành v4; đúng vì append-only, rollback thêm phiên bản khoá cũ) |
+| C2 | Hai tên Group cùng tồn tại (xung đột) | ✅ | tạo thêm Group `owner` khi `chu` còn: `preview_group_rename` in `Xung đột: 1`; `migrate accounts` dừng với `RuntimeError: Group 'chu' và 'owner' cùng tồn tại; không tự gộp...`, không đổi gì (id/tên cũ nguyên, migration chưa áp) |
+| C3 | Quyền cũ không bị mất ở người kiêm hai vai | ✅ | `quan_ly+cskh`, `nv_kho+nv_giao`, `chu+cskh`: tập GET 200/403 giống trước |
+| D1 | PUT nhóm nhân viên: tên cũ và tên mới | ✅ | `writepaths.py`: tên cũ và tên mới đều 200 và lưu về tên mới trên BE mới (HEAD chỉ nhận tên cũ, tên mới 400); tên lạ 400; rỗng 200 (như HEAD) |
+| D2 | Trộn tên cũ và mới trong một request | ✅ | `quan_ly` + `warehouse_staff` thành `manager`, `warehouse_staff` (HEAD: 400); không ra Group thừa |
+| D3 | Leo thang quyền qua PUT nhóm | ✅ | ẩn danh 401; `cskh`, `nv_giao`, `quan_ly`, `nv_kho` đều 403, y HEAD; không Group nào bị đổi |
+| D4 | PUT `my-config` gửi khoá cũ | ✅ | lưu thành khoá mới (`purchasing`, `…receive_batches`), giá trị trần giữ 40 kg / 4 triệu; phiên bản mới ghi sau migrate KHÔNG còn khoá cũ (sửa N3 đúng); `base_version` cũ 409 `AI_CONFIG_CONFLICT` |
+| D5 | PUT `ai/policy` trần: khoá cũ, khoá mới, cả hai | ✅ | khoá cũ thành khoá mới, trần 100 kg / 10 triệu / 3 lần giữ nguyên, không nới; khoá mới 120 kg; gửi cả hai: khoá mới thắng (60); `base_version` cũ 409 `AI_POLICY_CONFLICT` |
+| D6 | Lịch sử phiên bản không báo thay đổi giả | ✅ | `my-config/versions` sau migrate: phiên bản P8b không hiện thay đổi nào (N3 đã sửa) |
+| E1 | ERP Lô 3 (HEAD) bản build thật + BE cây làm việc: 7 vai (`chu`, `quan_ly`, `nv_kho`, `nv_giao`, `cskh`, quản lý + CSKH, kho + giao) | ✅ | cổng 3260/8260, `NEXT_PUBLIC_USE_MOCK=0`; trang đích: 5 vai về `/overview/`, `nv_giao` về `/my-deliveries/`, `cskh` về `/confirmation/`; menu từng vai không có mục sai, mọi mục mở không bị đá về login |
+| E2 | Màn hình xác nhận đơn và `/cskh/` chuyển hướng | ✅ | 7 vai: `/cskh/?x=1#y` về `/confirmation/?x=1#y`; `chu`, `quan_ly`, `cskh`, kiêm CSKH thấy hàng đợi (1 thẻ dữ liệu giả); `nv_kho`, `nv_giao`, kho+giao thấy báo không có quyền |
+| E3 | Gửi nhập lô `receive-batches` | ✅ | `POST /api/purchasing/receipts/receive-batches/` 201 cho 5 vai có quyền (`chu`, `quan_ly`, `nv_kho`, quản lý+CSKH, kho+giao); `nv_giao` và `cskh` không có form, không gọi API |
+| E4 | Màn hình cài đặt AI hiện đúng mức của người dùng | ✅ | `chu` thấy mức B cho lệnh nhập lô (HEAD hiện mặc định vì FE Lô 3 dùng id mới); phiên bản +1 (v1 thành v2) vì migration thêm phiên bản |
+| E5 | Không lỗi API, không lỗi console, không rò | ✅ | 7 vai: 0 request 4xx/5xx ngoài đường dự kiến, 0 `console_errors`, storage chỉ có `cave_erp_token`, `cave_erp_last_user` (và nháp tạo nhân viên của chủ), URL/console/storage không có 6 SĐT giả và giá mua giả `987000` |
+| E6 | Lặp lại cho `nv_giao` (lần đầu có 2 dòng "Failed to fetch RSC payload") | ✅ | chạy lại 3 lần (mỗi lần cả 7 vai): `console_errors` rỗng ở mọi lần; dòng đó là nhiễu điều hướng của máy chủ tĩnh, không tái hiện, không có request API lỗi |
+| E7 | Cổng thử đã tắt | ✅ | `lsof -i :3260 -i :8260`: không còn tiến trình |
+| F1 | Toàn bộ test backend | ✅ | `manage.py test`: Ran 1807 OK (131.6 s; chạy hai lần ở cây cuối) |
+| F2 | `makemigrations --check` | ✅ | No changes detected; không migration cũ nào bị sửa (`git diff` trên thư mục `migrations`: rỗng; chỉ 2 tệp mới `0013`, `0003`) |
+| F3 | Adapter | ✅ | `adapter/.venv/bin/python -m pytest -q`: 68 passed |
+| F4 | Quy tắc đặt tên | ✅ | `python3 scripts/check_naming.py`: OK, không phát sinh vi phạm mới |
+| F5 | Rò giá vốn (JSON và HTML) | ✅ | xem mục "Rò giá vốn" |
+| F6 | Rò dữ liệu cá nhân | ✅ | xem mục "Rò dữ liệu cá nhân" |
+| F7 | Phân quyền theo từng Group | ✅ | xem mục "Phân quyền" |
+| G1 | Staging: deploy `api:v8`, chạy `preview_group_rename` bằng job trên DB staging thật trước khi `migrate` | ⏸ | cần GCP và lệnh deploy của Duy; chưa làm |
+| G2 | Staging: kiểm 5 vai sau migrate trên DB staging thật (có dữ liệu thật của staging) | ⏸ | cùng lý do |
+| G3 | Lô 4b (FE đổi hẳn sang tên mới) | ⏸ | chưa giao; bản FE Lô 3 đã chứng minh chạy được trên BE mới (E1 đến E5) |
+
+Các ca còn lại trong tổng 41 là các ca con của B1, B7, D1 đã gộp ở trên (tính từng nhóm vai/tài khoản).
+
+### Ngoại lệ và biên
+Dữ liệu đã từng có giao dịch (việc AI PENDING/ESCALATED/DONE với khoá cũ; phiếu nhập và lô đã có); thao tác trên màn hình cũ (client giữ `base_version` cũ gặp 409, FE cũ trên BE mới); job chạy hai lần (`run_due_ai_actions`, `migrate` lần 2); hai người thao tác cùng lúc (409 phiên bản); hai tên Group cùng tồn tại (dừng, không tự gộp); request chứa cả khoá cũ lẫn mới (khoá mới thắng); người kiêm hai vai; người không có Group (không thêm quyền); rollback rồi forward; trần kg/vnd/daily không nới sau khi đổi khoá.
+
+### Phân quyền (đo trên Django thật, trước và sau migrate giống nhau)
+| Hành động | owner | manager | warehouse_staff | delivery_staff | customer_service | không Group | ẩn danh |
+|---|---|---|---|---|---|---|---|
+| `PUT` nhóm của nhân viên (`GET /api/staff/` cũng vậy) | 200 | 403 | 403 | 403 | 403 | 403 (GET) | 401 |
+| `POST receive-batches/` | 201 | 201 | 201 | 403 | 403 | 403 | 401 |
+| `GET confirmation/queue/` (cả `/api/cskh/`) | 200 | 200 | 403 | 403 | 200 | 403 | 401 |
+| `GET ai/policy/` | 200 | 403 | 403 | 403 | 403 | 403 | 401 |
+| `GET ai/my-config/` | 200 | 200 | 200 | 200 | 200 | 200 | 401 |
+| `GET ai/actions/<id>/` (99 lượt việc × tài khoản) | giống trước | giống trước | giống trước | giống trước | giống trước | không có việc nào (404/405) | 401 |
+Ghi chú: các ô PUT nhóm nhân viên của `manager`, `nv_kho`, `nv_giao`, `cskh`, ẩn danh đo trực tiếp (403/401); ô `nogroup` đo bằng GET. Kết quả "trước" (tên Group cũ, mã HEAD) và "sau" (tên mới) trùng nhau ở cả 1103 GET và 160 POST; chi tiết từng hàng ở `out/pre*.json`, `out/post*.json`.
+
+### Rò giá vốn
+Không phát hiện. Phiên bản cấu hình/chính sách mới chỉ chứa khoá và giá trị đã có từ trước (mức A/B/C/OFF, trần kg/vnd/lần); không tính ngược ra giá vốn được vì không có số tiền gắn với lô/mặt hàng cụ thể. AuditLog không có action mới. `receive-batches` giữ nguyên ẩn `purchase_rate`, `landed_unit_cost` với `quan_ly` và `nv_kho` (đã kiểm ở Lô 3, không đổi ở Lô 4a). ERP 7 vai: giá mua giả `987000` không có trong storage/URL/console.
+
+### Rò dữ liệu cá nhân
+Không phát hiện do Lô 4a: không khoá mới nào mang tên/SĐT/địa chỉ; `preview_group_rename` chỉ in số đếm; chi tiết việc AI (99 lượt) giống trước. ERP 7 vai: 6 SĐT giả không có trong localStorage, sessionStorage, URL, console. Máy chủ Django: log chạy thử 507 dòng, 0 traceback. Ảnh chụp: không có ảnh nào chứa dữ liệu thật; chỉ dùng dữ liệu giả. Ghi nhận N-1 (có từ trước) ở dưới.
+
+### Hồi quy
+1807 test backend, 68 test adapter, `makemigrations --check` sạch, `check_naming` OK; ERP Lô 3 (HEAD) chạy bản build thật trên BE mới ở 7 vai; ma trận 1103 GET và 160 POST của các chức năng liền kề (kho, nhập hàng, bán hàng, giao hàng, CSKH, báo cáo) không đổi mã trạng thái.
+
+### Lỗi
+Không có lỗi chặn.
+
+### Ghi nhận (không chặn)
+- O-1 (Thấp): id lệnh AI cũ (ví dụ `purchasing.purchasereceipt.nhap_lo`) gọi `POST /api/ai/commands/<id>/call/` trên BE mới trả 404 `COMMAND_UNKNOWN` (đóng an toàn, không thực thi). Client phải lấy id từ chỉ mục AI (FE và agent đều làm vậy). Nếu có agent ngoài giữ id cũ trong cấu hình cứng, cần báo trước khi deploy.
+- O-2 (Thấp, theo thiết kế): request mang cả khoá cũ và khoá mới thì khoá mới thắng, kể cả khi khoá cũ chặt hơn (ví dụ trần 100 gửi theo khoá cũ, 60 theo khoá mới ra 60; trường hợp ngược lại, khoá mới lỏng hơn, sẽ nới). Không đường nào bỏ qua kiểm quyền, nhưng nên ghi vào hướng dẫn client.
+- O-3 (Thấp): `GET /api/ai/actions/<id>/` ghi `viewed_at` nên không phải thao tác chỉ đọc; có từ trước Lô 4a.
+- O-4 (Thấp): rollback `ai 0002` không xoá phiên bản đã thêm mà thêm phiên bản khoá cũ (append-only, chủ định); số phiên bản tăng từ v1/v2 lên v3/v4 và client giữ `base_version` cũ nhận 409.
+- N-1 (Trung bình, có từ Lô 1, giống hệt trước/sau Lô 4a, chờ Duy xét): `nv_kho` và `nv_giao` vẫn đọc được tên/SĐT/địa chỉ khách ở `/api/sales/orders/`, `/api/delivery/notes/` (và `nv_giao` ở `/api/sales/customers/`). Lô 4a không thêm, không bớt.
+- Để staging (⏸ G1, G2): chạy `preview_group_rename` trên DB staging thật và đọc `Xung đột` (phải 0) TRƯỚC khi deploy `api:v8`; nếu có Group `owner`, `manager`... đã tồn tại trên staging thì migration sẽ dừng, đây là chủ định.
+
+### Lệnh đã chạy (tóm tắt)
+| Lệnh | Kết quả |
+|---|---|
+| Dựng DB staging-like bằng HEAD (`seed_head.py`) + `capture.py` (2873 GET, 999 mức hiệu lực, 11 ghim) | trước migrate; sha256 DB không đổi sau khi chụp |
+| `manage.py preview_group_rename` trước và sau; `manage.py migrate` (cây làm việc) | `accounts 0013`, `ai 0003: 11 việc AI, 6 phiên bản cấu hình, 1 phiên bản chính sách`; sau: 0/0/0 |
+| `capture.py` sau migrate + `compare.py` | 1103 request: 0 khác mã; 29 body khác đều giải thích được; mức hiệu lực 999 và ghim 11: 0 khác |
+| `capture.py ... details` trước/sau | 99 chi tiết việc AI: 0 khác |
+| `run_due_ai_actions` HEAD và cây làm việc, chạy 2 lần | `executed 2` rồi `executed 0` ở cả hai; DB đối chiếu bằng nhau |
+| `postmatrix.py` HEAD và cây làm việc | 160 ca: 0 khác (30 ca AI call id cũ trên BE mới: 404 `COMMAND_UNKNOWN`) |
+| `writepaths.py head|work` | 26 ca như D1 đến D6 |
+| `migrate ai 0002`, `migrate accounts 0012`; chạy HEAD trên DB rollback; `migrate` lại; thêm Group `owner` rồi `migrate accounts` | như C1, C2 |
+| ERP build thật (`NEXT_PUBLIC_USE_MOCK=0`, `NEXT_PUBLIC_API_BASE=http://127.0.0.1:8260`) + `erp_stack.py` (Playwright) 7 vai, lặp lại `nv_giao` 3 lần | như E1 đến E7 |
+| `cd backend && DJANGO_DEBUG=1 env -u DATABASE_URL .venv/bin/python manage.py test` | Ran 1807 OK (hai lần) |
+| `manage.py makemigrations --check` | No changes detected |
+| `adapter/.venv/bin/python -m pytest -q` | 68 passed |
+| `python3 scripts/check_naming.py` | OK |
+
+Tệp tạm: `/private/tmp/claude-501/-Users-dangthiduyen-Downloads-loc/3e0d9f3d-14ce-4b8b-a1cd-6fbcdc0b2f2d/scratchpad/qa-p8b-l4a/` (script, DB bản sao, JSON so sánh, log). Không sửa mã sản phẩm, không commit, không deploy.

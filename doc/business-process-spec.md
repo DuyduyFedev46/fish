@@ -52,18 +52,18 @@ Ba tầng phải cùng tồn tại. Chỉ làm tầng 1 thì nhân viên giao h�
 
 | Group | Ai | Ghi chú |
 |---|---|---|
-| `chu` | Lộc | Toàn quyền. Thực tế là superuser, nhưng vẫn định nghĩa Group để phân quyền tường minh |
-| `quan_ly` | Người Lộc uỷ quyền khi vắng mặt | Duyệt vận hành, **không** đụng tiền và giá vốn |
-| `nv_kho` | Nhập lô, soạn hàng, kiểm kê | |
-| `nv_giao` | Giao hàng | Chỉ thấy đơn được gán cho mình |
+| `owner` | Lộc | Toàn quyền. Thực tế là superuser, nhưng vẫn định nghĩa Group để phân quyền tường minh |
+| `manager` | Người Lộc uỷ quyền khi vắng mặt | Duyệt vận hành, **không** đụng tiền và giá vốn |
+| `warehouse_staff` | Nhập lô, soạn hàng, kiểm kê | |
+| `delivery_staff` | Giao hàng | Chỉ thấy đơn được gán cho mình |
 
-**Cộng dồn, không xếp bậc (PA)**: một người ở vựa nhỏ vừa nhập kho vừa đi giao — gán cả `nv_kho` lẫn `nv_giao`, không cần role thứ năm. Quản lý thường là `quan_ly` + `nv_kho`. Thiết kế theo Group cộng dồn nên **thêm người kiêm nhiệm không phải sửa code**; thiết kế theo bậc thang thì phải.
+**Cộng dồn, không xếp bậc (PA)**: một người ở vựa nhỏ vừa nhập kho vừa đi giao — gán cả `warehouse_staff` lẫn `delivery_staff`, không cần role thứ năm. Quản lý thường là `manager` + `warehouse_staff`. Thiết kế theo Group cộng dồn nên **thêm người kiêm nhiệm không phải sửa code**; thiết kế theo bậc thang thì phải.
 
 ## 1.4 Tầng 1 — Ma trận CRUD theo model
 
 Ký hiệu: **C** tạo · **R** xem · **U** sửa · **D** xoá · **–** không có · **\*** giới hạn phạm vi (xem 1.6)
 
-| Model | `chu` | `quan_ly` | `nv_kho` | `nv_giao` |
+| Model | `owner` | `manager` | `warehouse_staff` | `delivery_staff` |
 |---|---|---|---|---|
 | ItemGroup, Item, BundleLine | CRUD | R | R | – |
 | PriceList, ItemPrice | CRU– | R | – | – |
@@ -93,7 +93,7 @@ Ký hiệu: **C** tạo · **R** xem · **U** sửa · **D** xoá · **–** kh�
 
 ## 1.5 Tầng 2 — Quyền hành động tuỳ biến
 
-| Permission | `chu` | `quan_ly` | Vì sao ranh giới nằm ở đây |
+| Permission | `owner` | `manager` | Vì sao ranh giới nằm ở đây |
 |---|:--:|:--:|---|
 | `publish_batch` | ✅ | ✅ | Vận hành thuần |
 | `approve_stockreconciliation` | ✅ | ✅ | Vận hành, đã có audit log |
@@ -116,9 +116,9 @@ Ký hiệu: **C** tạo · **R** xem · **U** sửa · **D** xoá · **–** kh�
 
 | Chỗ | Luật |
 |---|---|
-| `nv_giao` trên DeliveryNote | Chỉ đơn có `assigned_to = user`; chỉ sửa được field trạng thái, không sửa dòng hàng |
-| `nv_giao` trên SalesOrder / Customer | Chỉ đơn/khách thuộc phiếu giao được gán |
-| `nv_kho` trên PurchaseReceipt | Chỉ sửa phiếu do chính mình tạo, **trong ngày**; qua ngày phải nhờ Quản lý |
+| `delivery_staff` trên DeliveryNote | Chỉ đơn có `assigned_to = user`; chỉ sửa được field trạng thái, không sửa dòng hàng |
+| `delivery_staff` trên SalesOrder / Customer | Chỉ đơn/khách thuộc phiếu giao được gán |
+| `warehouse_staff` trên PurchaseReceipt | Chỉ sửa phiếu do chính mình tạo, **trong ngày**; qua ngày phải nhờ Quản lý |
 | Nhân viên trên StaffProfile | Chỉ hồ sơ của chính mình |
 
 **Phạm vi cột** — danh sách field nhạy cảm, chỉ `view_costprice` mới thấy:
@@ -131,7 +131,7 @@ Ký hiệu: **C** tạo · **R** xem · **U** sửa · **D** xoá · **–** kh�
 
 Mặc định **KHÔNG** (PA). Lý do: giá mua tại cảng là lợi thế đàm phán của Lộc với đầu mối; ở vựa cá nhân viên thường là người quen, thông tin đi nhanh.
 
-Đây là **mặc định rẻ để lật** — chỉ là gán thêm 2 permission vào Group `quan_ly`, không sửa dòng code nào. Nên tôi chốt luôn thay vì hỏi. Lộc muốn khác thì đổi trong Admin.
+Đây là **mặc định rẻ để lật** — chỉ là gán thêm 2 permission vào Group `manager`, không sửa dòng code nào. Nên tôi chốt luôn thay vì hỏi. Lộc muốn khác thì đổi trong Admin.
 
 ## 1.8 StaffProfile — có, nhưng mỏng
 
@@ -376,7 +376,7 @@ stateDiagram-v2
 | BR-GH-03 | Số kg cân khi soạn = số kg khách đặt. **Giả định V1 (PA), chưa kiểm chứng** — không có field "số kg thực xuất". |
 | BR-GH-04 | "Giao thất bại" là **trạng thái tạm**, đếm số lần thử. Sau 2 lần thất bại hệ thống nhắc Quản lý/Chủ quyết định *(PA — ngưỡng cấu hình được)*. |
 | BR-GH-05 | Chuyển sang **Hoàn tất** là điểm không quay lui. Muốn xử lý sau đó phải qua phiếu hoàn tiền. |
-| BR-GH-06 | `nv_giao` chỉ thấy và chỉ sửa được **trạng thái** của phiếu được gán cho mình — không sửa dòng hàng, không xem giá vốn (1.6). |
+| BR-GH-06 | `delivery_staff` chỉ thấy và chỉ sửa được **trạng thái** của phiếu được gán cho mình — không sửa dòng hàng, không xem giá vốn (1.6). |
 
 ---
 
@@ -520,7 +520,7 @@ Trường **mới** đáng chú ý: `Item.item_type`, `Batch.status`, `Batch.lan
 
 **Custom permissions cần khai trong `Meta.permissions`**: `publish_batch`, `close_batch`, `approve_stockreconciliation`, `approve_returntostock`, `cancel_paid_order`, `create_refund`, `confirm_refund`, `confirm_payment_manual`, `view_costprice`, `view_profitreport`, `manage_staff`.
 
-**Fixture khởi tạo**: 4 Group (`chu`, `quan_ly`, `nv_kho`, `nv_giao`) với permission gán sẵn theo mục 1.4 và 1.5 — phải là data migration, không phải bấm tay trong Admin, nếu không thì môi trường dev/staging/prod lệch nhau.
+**Fixture khởi tạo**: 4 Group (`owner`, `manager`, `warehouse_staff`, `delivery_staff`) với permission gán sẵn theo mục 1.4 và 1.5 — phải là data migration, không phải bấm tay trong Admin, nếu không thì môi trường dev/staging/prod lệch nhau.
 
 ---
 
@@ -530,7 +530,7 @@ Trường **mới** đáng chú ý: `Item.item_type`, `Batch.status`, `Batch.lan
 1. Combo thực tế Lộc định bán ở dạng nào trong 3 dạng mục 3.1? Có thể nhiều dạng cùng lúc.
 2. Mua tại cảng có gối đầu với đầu mối quen không, hay trả ngay 100%? *(Gối đầu ⇒ phải mở lại công nợ nhà cung cấp, hiện đang outscope.)*
 3. Hàng ra khỏi chuỗi lạnh bao lâu thì không bán lại được? Con số này quyết định BR-HV-03.
-4. Vựa sẽ có bao nhiêu người, và có ai được Lộc tin để uỷ quyền duyệt khi vắng mặt không? *(Nếu chỉ 2 người thì Group `quan_ly` để đó không dùng — vẫn nên định nghĩa sẵn, không tốn gì.)*
+4. Vựa sẽ có bao nhiêu người, và có ai được Lộc tin để uỷ quyền duyệt khi vắng mặt không? *(Nếu chỉ 2 người thì Group `manager` để đó không dùng — vẫn nên định nghĩa sẵn, không tốn gì.)*
 5. Xác nhận lại mục tiêu nghiệp vụ ở `URD.md` mục 2.2 — phần PA suy luận, chưa ai phát biểu.
 
 **Duy tự xử lý:**

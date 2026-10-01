@@ -13,7 +13,7 @@ PERM = "reports.view_profitreport"
 
 
 class BatchPnlView(APIView):
-    ai = AiMeta(keywords=("bao_cao_lo", "báo cáo lô"))
+    ai = AiMeta(keywords=("báo cáo lô",))
     permission_classes = [IsAuthenticated]
     required_perms = (PERM,)
 
@@ -27,7 +27,7 @@ class BatchPnlView(APIView):
 
 
 class PeriodPnlView(APIView):
-    ai = AiMeta(keywords=("bao_cao_ky", "báo cáo kỳ"))
+    ai = AiMeta(keywords=("báo cáo kỳ",))
     permission_classes = [IsAuthenticated]
     required_perms = (PERM,)
 

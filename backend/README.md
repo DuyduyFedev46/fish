@@ -77,15 +77,15 @@ Module gọi module khác **qua services** của module đó. Route tập trung 
 
 ## Phân quyền 3 tầng (§1)
 
-- **Tầng 1 — CRUD/model**: `auth.Permission` + 4 Group `chu` / `quan_ly` / `nv_kho`
-  / `nv_giao` (cộng dồn). Gán trong data migration `accounts/migrations/0002`.
+- **Tầng 1 — CRUD/model**: `auth.Permission` + 4 Group `owner` / `manager` / `warehouse_staff`
+  / `delivery_staff` (cộng dồn). Gán trong data migration `accounts/migrations/0002`.
 - **Tầng 2 — hành động tuỳ biến** (`Meta.permissions`): `publish_batch`,
   `close_batch`, `approve_stockreconciliation`, `approve_returntostock`,
   `cancel_paid_order`, `create_refund`, `confirm_refund`,
   `confirm_payment_manual`, `view_costprice`, `view_profitreport`,
   `manage_staff`, `view_dashboard` (+ builtin `add_purchasecost`).
 - **Tầng 3 — phạm vi dòng & cột**: serializer ẩn giá vốn (`CostFieldSerializerMixin`,
-  `apps/common/api.py`) + `get_queryset` lọc dòng (nv_giao chỉ thấy phiếu/đơn/khách của mình).
+  `apps/common/api.py`) + `get_queryset` lọc dòng (delivery_staff chỉ thấy phiếu/đơn/khách của mình).
   Test rò giá vốn: `apps/inventory/batches/tests/test_api.py`.
 
 Ranh giới Chủ ↔ Quản lý: Quản lý được uỷ *mọi thứ làm khách phải chờ*; Chủ giữ

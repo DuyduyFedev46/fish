@@ -197,13 +197,13 @@ def _escalate_to_owner(payment: PaymentTransaction, *, reason: str) -> bool:
     - việc đang ESCALATED cùng lý do -> không làm gì (không ghi Nhật ký lặp);
     - chỉ ghi `escalate_unmatched_payment` khi tạo mới hoặc lý do đổi (cập nhật downgrade_reason, args.reason).
     Trả True khi thật sự tạo mới/cập nhật, False khi bỏ qua (no-op, việc đã đóng, hoặc không có Chủ hoạt động).
-    Không có user nhóm `chu` đang hoạt động -> bỏ qua + log cảnh báo; KHÔNG giao cho user bất kỳ (P8 F12).
+    Không có user nhóm `owner` đang hoạt động -> bỏ qua + log cảnh báo; KHÔNG giao cho user bất kỳ (P8 F12).
     """
     from django.contrib.auth import get_user_model
     User = get_user_model()
     owner_user = User.objects.filter(groups__name=roles.OWNER, is_active=True).order_by("id").first()
     if owner_user is None:
-        logger.warning("DW-26: không có người dùng nhóm chu đang hoạt động, bỏ qua chuyển Chủ txn %s", payment.bank_txn_id)
+        logger.warning("DW-26: không có người dùng nhóm %s đang hoạt động, bỏ qua chuyển Chủ txn %s", roles.OWNER, payment.bank_txn_id)
         return False
 
     action, created = AiAction.objects.get_or_create(
@@ -240,5 +240,5 @@ def _escalate_to_owner(payment: PaymentTransaction, *, reason: str) -> bool:
         note=f"Chuyển Chủ xử lý giao dịch lệch {payment.bank_txn_id}: {reason}",
     )
     # DW-26-AC3: Log chỉ in mã GD và lý do, không in PII hay nội dung CK
-    logger.info(f"Escalated unmatched txn {payment.bank_txn_id} to chu: {reason}")
+    logger.info(f"Escalated unmatched txn {payment.bank_txn_id} to {roles.OWNER}: {reason}")
     return True

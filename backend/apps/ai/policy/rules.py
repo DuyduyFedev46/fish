@@ -144,7 +144,7 @@ def is_red_zone_action(required_perms: tuple | list | set) -> bool:
     return bool(set(required_perms) & RED_ZONE_PERMS)
 
 
-# Quyền Tầng 2 được phép nâng lên B/A (chỉ nhap_lo ở Lô 4, còn lại trần C ép theo 02b §3)
+# Quyền Tầng 2 được phép nâng lên B/A (chỉ receive_batches ở Lô 4, còn lại trần C ép theo 02b §3)
 WHITELISTED_ABOVE_C_PERMS = frozenset({
     "purchasing.add_purchasereceipt",
     "purchasing.change_purchasereceipt",

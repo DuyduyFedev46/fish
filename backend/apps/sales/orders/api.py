@@ -58,7 +58,7 @@ def _customer_ids_by_name(q):
 
 
 class SalesOrderViewSet(NoStoreMixin, AiDeclarable, viewsets.ReadOnlyModelViewSet):
-    ai = AiMeta(keywords=("tra_don", "tra đơn"))
+    ai = AiMeta(keywords=("tra đơn",))
     queryset = SalesOrder.objects.select_related("customer").all()
     permission_classes = [BusinessModelPermissions]
     pagination_class = StandardPagination

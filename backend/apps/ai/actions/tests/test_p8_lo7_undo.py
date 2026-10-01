@@ -101,9 +101,9 @@ class F10UndoDispatchTests(TestCase):
                 self.assertEqual(act.status, AiAction.Status.DONE)
 
     def test_f10_lenh_khong_con_trong_registry_400_khong_mac_dinh_huy_phieu(self):
-        """Trước đây `"nhap_lo" in command` là đường dự phòng; nay lệnh mất khỏi registry -> 400."""
+        """Trước đây `"nhap_lo" in command` (tên cũ) là đường dự phòng; nay lệnh mất khỏi registry -> 400."""
         act = self._done_b()
-        act.command = "purchasing.purchasereceipt.nhap_lo"
+        act.command = "purchasing.purchasereceipt.receive_batches"
         act.save(update_fields=["command"])
         with mock.patch("apps.ai.actions.services.get_registry", return_value=_FakeRegistry(None)), \
              mock.patch("apps.purchasing.receipts.services.cancel_receipt") as cancel_receipt:

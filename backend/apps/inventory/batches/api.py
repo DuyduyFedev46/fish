@@ -22,7 +22,7 @@ class BatchViewSet(DocumentViewSet):
     queryset = Batch.objects.select_related("item", "supplier", "warehouse").order_by(*FEFO_ORDER)
     serializer_class = BatchSerializer
     list_query_serializer = BatchListQuery
-    ai_by_action = {"list": AiMeta(keywords=("tra_ton", "tra tồn", "tồn kho", "còn bao nhiêu kg"), sensitivity=command_groups.SENSITIVITY_MEDIUM)}
+    ai_by_action = {"list": AiMeta(keywords=("tra tồn", "tồn kho", "còn bao nhiêu kg"), sensitivity=command_groups.SENSITIVITY_MEDIUM)}
     permission_classes = [BusinessModelPermissions]
     custom_perm_actions = ("publish", "close", "cancel_expired", "return_to_supplier")
     # BR-PQ-14 / BR-GV-03: trạng thái, tồn, giá vốn, hạn chỉ đổi qua service.
@@ -63,7 +63,7 @@ class BatchViewSet(DocumentViewSet):
         batch = services.publish_batch(batch=self.get_object(), actor=request.user)
         return Response(self.get_serializer(batch).data)
 
-    @action(detail=True, methods=["post"], required_perms=("inventory.close_batch",), ai=AiMeta(keywords=("chot_lo", "chốt lô"), undo="defer"))
+    @action(detail=True, methods=["post"], required_perms=("inventory.close_batch",), ai=AiMeta(keywords=("chốt lô",), undo="defer"))
     def close(self, request, pk=None):
         """Chốt sổ lô cá sau khi bán hết hoặc quá hạn đã kiểm kê."""
         require_perm(request.user, "inventory.close_batch")
@@ -89,7 +89,7 @@ class BatchViewSet(DocumentViewSet):
         detail=True, methods=["post"], url_path="return-to-supplier",
         required_perms=("inventory.cancel_expired_batch",),
         input_serializer=ReturnToSupplierInput,
-        ai=AiMeta(keywords=("tra_ncc", "trả nhà cung cấp"), max_level="C"),
+        ai=AiMeta(keywords=("trả nhà cung cấp",), max_level="C"),
     )
     def return_to_supplier(self, request, pk=None):
         """

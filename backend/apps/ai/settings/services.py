@@ -9,7 +9,7 @@ from django.test import RequestFactory
 from apps.ai.models.config import AiConfigVersion
 from apps.ai.models.policy import AiPolicyVersion
 from apps.ai import command_groups
-from apps.ai.registry import get_registry
+from apps.ai.registry import get_registry, legacy_ids
 from apps.common.audit import record_audit
 from apps.common.exceptions import BusinessError
 
@@ -20,6 +20,9 @@ _rf = RequestFactory()
 def get_cap_for_command(caps: dict, cmd_id: str) -> dict | None:
     if not caps or not isinstance(caps, dict):
         return None
+    # R5: trần lưu theo khoá cũ (phiên bản đã ghim) vẫn là trần của lệnh đã đổi id.
+    caps = legacy_ids.normalize_command_keys(caps)
+    cmd_id = legacy_ids.normalize_command_id(cmd_id)
     if cmd_id in caps and isinstance(caps[cmd_id], dict):
         return caps[cmd_id]
     alias = cmd_id.split(".")[-1]
@@ -85,9 +88,9 @@ def get_user_config_data(user) -> dict:
     version = latest_config.version if latest_config else 0
     killed = latest_config.killed if latest_config else False
     updated_at = latest_config.created_at.isoformat() if latest_config else None
-    group_levels = latest_config.group_levels if latest_config else {}
-    overrides = latest_config.overrides if latest_config else {}
-    limits = latest_config.limits if latest_config else {}
+    group_levels = legacy_ids.normalize_group_levels(latest_config.group_levels) if latest_config else {}
+    overrides = legacy_ids.normalize_command_keys(latest_config.overrides) if latest_config else {}
+    limits = legacy_ids.normalize_command_keys(latest_config.limits) if latest_config else {}
 
     env_write_max = getattr(settings, "AI_WRITE_LEVELS_ALLOWED", "C")
     write_choices = ["OFF", "C"] if env_write_max == "C" else ["OFF", "C", "B"]
@@ -213,6 +216,11 @@ def update_user_config(
             status_code=400,
         )
 
+    # R5: client cũ còn gửi khoá cũ; chuẩn hoá sang khoá mới TRƯỚC khi kiểm và lưu phiên bản.
+    groups = legacy_ids.normalize_group_levels(groups)
+    overrides = legacy_ids.normalize_command_keys(overrides)
+    limits = legacy_ids.normalize_command_keys(limits)
+
     registry = get_registry()
     env_write_max = getattr(settings, "AI_WRITE_LEVELS_ALLOWED", "C")
     valid_write_levels = {"OFF", "C"} if env_write_max == "C" else {"OFF", "C", "B"}
@@ -330,7 +338,7 @@ def update_user_config(
 
         new_version = current_version + 1
         changes = []
-        old_overrides = latest.overrides if latest else {}
+        old_overrides = legacy_ids.normalize_command_keys(latest.overrides) if latest else {}
         for k, new_val in (overrides or {}).items():
             old_val = old_overrides.get(k, "default")
             if old_val != new_val:

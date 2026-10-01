@@ -20,7 +20,7 @@ from apps.ai import command_groups
 from apps.accounts import roles
 
 VN = ZoneInfo("Asia/Ho_Chi_Minh")
-URL = "/api/ai/commands/purchasing.purchasereceipt.nhap_lo/call/"
+URL = "/api/ai/commands/purchasing.purchasereceipt.receive_batches/call/"
 
 
 def _keys(obj, acc=None):
@@ -102,14 +102,14 @@ class QaF07BoundaryTests(TestCase):
         self.wh = Warehouse.objects.create(name="Kho giả")
         AiConfigVersion.objects.create(
             user=self.kho, version=1, group_levels={command_groups.PURCHASING: {"read": "A", "write": "B"}},
-            overrides={"purchasing.purchasereceipt.nhap_lo": "B"},
-            limits={"purchasing.purchasereceipt.nhap_lo": {"kg": "150", "vnd": "30000000"}}, created_by=self.kho,
+            overrides={"purchasing.purchasereceipt.receive_batches": "B"},
+            limits={"purchasing.purchasereceipt.receive_batches": {"kg": "150", "vnd": "30000000"}}, created_by=self.kho,
         )
         get_registry().build(force=True)
 
     def _seed(self, n, when):
         ids = [AiAction.objects.create(
-            command="purchasing.purchasereceipt.nhap_lo", kind=AiAction.Kind.WRITE,
+            command="purchasing.purchasereceipt.receive_batches", kind=AiAction.Kind.WRITE,
             status=AiAction.Status.DONE, level=AiAction.Level.B, owner=self.kho).pk for _ in range(n)]
         AiAction.objects.filter(pk__in=ids).update(created_at=when)
 
@@ -146,7 +146,7 @@ class QaF07BoundaryTests(TestCase):
     def test_qa_f07_du_lieu_nguoi_khac_khong_tinh_vao_han_muc_cua_toi(self):
         other = make_user("qa7f07_other", roles.WAREHOUSE_STAFF)
         ids = [AiAction.objects.create(
-            command="purchasing.purchasereceipt.nhap_lo", kind=AiAction.Kind.WRITE,
+            command="purchasing.purchasereceipt.receive_batches", kind=AiAction.Kind.WRITE,
             status=AiAction.Status.DONE, level=AiAction.Level.B, owner=other).pk for _ in range(20)]
         AiAction.objects.filter(pk__in=ids).update(created_at=datetime.datetime(2026, 9, 30, 6, 30, tzinfo=VN))
         res = self._call(datetime.datetime(2026, 9, 30, 8, 0, tzinfo=VN))

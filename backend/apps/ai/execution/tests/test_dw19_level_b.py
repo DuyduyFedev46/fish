@@ -55,8 +55,8 @@ class DW19LevelBTestCase(TestCase):
             user=self.user_kho,
             version=1,
             group_levels={command_groups.PURCHASING: {"read": "A", "write": "B"}},
-            overrides={"purchasing.purchasereceipt.nhap_lo": "B"},
-            limits={"purchasing.purchasereceipt.nhap_lo": {"kg": "150", "vnd": "30000000"}},
+            overrides={"purchasing.purchasereceipt.receive_batches": "B"},
+            limits={"purchasing.purchasereceipt.receive_batches": {"kg": "150", "vnd": "30000000"}},
             created_by=self.user_kho,
         )
         self.config_ql = AiConfigVersion.objects.create(
@@ -70,7 +70,7 @@ class DW19LevelBTestCase(TestCase):
 
     def test_dw19_ac1_call_level_b_nhap_lo_success(self):
         """DW-19-AC1: Staging, NV kho đặt B, phiếu 50 kg -> outcome=done, level=B, undo_until=+10m."""
-        url = "/api/ai/commands/purchasing.purchasereceipt.nhap_lo/call/"
+        url = "/api/ai/commands/purchasing.purchasereceipt.receive_batches/call/"
         payload = {
             "args": {
                 "supplier": self.sup.id,
@@ -104,7 +104,7 @@ class DW19LevelBTestCase(TestCase):
         self.assertIsNotNone(action.undo_until)
 
         # Kiểm tra AuditLog
-        audit = AuditLog.objects.filter(action="execute_purchasing.purchasereceipt.nhap_lo").first()
+        audit = AuditLog.objects.filter(action="execute_purchasing.purchasereceipt.receive_batches").first()
         self.assertIsNotNone(audit)
         self.assertEqual(audit.actor_kind, "ai")
         self.assertEqual(audit.ai_actor, self.user_kho)
@@ -123,7 +123,7 @@ class DW19LevelBTestCase(TestCase):
         put_payload = {
             "base_version": self.config_kho1.version,
             "groups": {command_groups.PURCHASING: {"read": "A", "write": "C"}},
-            "overrides": {"purchasing.purchasereceipt.nhap_lo": "B"},
+            "overrides": {"purchasing.purchasereceipt.receive_batches": "B"},
             "acknowledge_responsibility": True,
         }
         res_put = self.client_kho.put("/api/ai/my-config/", put_payload, format="json")
@@ -133,7 +133,7 @@ class DW19LevelBTestCase(TestCase):
     def test_dw19_ac3_undo_within_window_cancels_receipt(self):
         """DW-19-AC3: Trong 10 phút, POST undo -> phiếu và lô CANCELLED, AiAction UNDONE."""
         # 1. Tạo phiếu bằng call mức B
-        url_call = "/api/ai/commands/purchasing.purchasereceipt.nhap_lo/call/"
+        url_call = "/api/ai/commands/purchasing.purchasereceipt.receive_batches/call/"
         payload = {
             "args": {
                 "supplier": self.sup.id,
@@ -174,7 +174,7 @@ class DW19LevelBTestCase(TestCase):
 
     def test_dw19_ac4_undo_expired_window_or_published_batch(self):
         """DW-19-AC4: Quá 10 phút -> 410; hoặc lô đã publish -> 400 BR-MH-07."""
-        url_call = "/api/ai/commands/purchasing.purchasereceipt.nhap_lo/call/"
+        url_call = "/api/ai/commands/purchasing.purchasereceipt.receive_batches/call/"
         payload = {
             "args": {
                 "supplier": self.sup.id,
@@ -212,7 +212,7 @@ class DW19LevelBTestCase(TestCase):
 
     def test_dw19_ac5_downgrade_to_c_on_limits(self):
         """DW-19-AC5: Vượt ngưỡng kg (180kg > 150kg) hoặc lần thứ 21 -> hạ mức C (proposal)."""
-        url_call = "/api/ai/commands/purchasing.purchasereceipt.nhap_lo/call/"
+        url_call = "/api/ai/commands/purchasing.purchasereceipt.receive_batches/call/"
 
         # 1. Vượt ngưỡng kg (180 kg > 150 kg của user_kho)
         payload_over_kg = {
@@ -236,7 +236,7 @@ class DW19LevelBTestCase(TestCase):
         # 2. Vượt hạn mức 20 lần trong ngày
         for i in range(20):
             AiAction.objects.create(
-                command="purchasing.purchasereceipt.nhap_lo",
+                command="purchasing.purchasereceipt.receive_batches",
                 kind=AiAction.Kind.WRITE,
                 status=AiAction.Status.DONE,
                 level=AiAction.Level.B,
@@ -261,7 +261,7 @@ class DW19LevelBTestCase(TestCase):
 
     def test_dw19_ac6_h5_atomic_rollback_on_audit_error(self):
         """DW-19-AC6 (H5): Ép ghi AuditLog lỗi -> rollback toàn bộ, không tạo phiếu/lô."""
-        url_call = "/api/ai/commands/purchasing.purchasereceipt.nhap_lo/call/"
+        url_call = "/api/ai/commands/purchasing.purchasereceipt.receive_batches/call/"
         payload = {
             "args": {
                 "supplier": self.sup.id,
@@ -299,7 +299,7 @@ class DW19LevelBTestCase(TestCase):
 
     def test_dw19_ac8_cost_price_scrubbed_in_b_result(self):
         """DW-19-AC8: Người thiếu view_costprice (nv_kho) gọi mức B -> result không chứa giá vốn."""
-        url_call = "/api/ai/commands/purchasing.purchasereceipt.nhap_lo/call/"
+        url_call = "/api/ai/commands/purchasing.purchasereceipt.receive_batches/call/"
         payload = {
             "args": {
                 "supplier": self.sup.id,

@@ -23,7 +23,7 @@ sửa code sản phẩm** (không sửa `backend/apps/**` ngoài `tests/`, khôn
    trong `01-analysis.md` → 1 ca; cộng các ca chuẩn:
    - biên: 0, âm, vượt tồn, lô cuối, TTL vừa hết
    - trùng/đồng thời: bấm đúp, 2 đơn tranh 1 lô, webhook gửi 2 lần
-   - **phân quyền**: từng Group `chu`/`quan_ly`/`nv_kho`/`nv_giao` + chưa đăng nhập
+   - **phân quyền**: từng Group `owner`/`manager`/`warehouse_staff`/`delivery_staff` + chưa đăng nhập
    - **rò giá vốn**: JSON API & HTML Shop không chứa field giá vốn với người thiếu quyền
    - **rò dữ liệu cá nhân**:
      - API công khai và HTML Shop không trả tên, SĐT hay địa chỉ đầy đủ;

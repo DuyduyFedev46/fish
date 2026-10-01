@@ -24,6 +24,9 @@ def effective_level(user, spec, *, config_version=None, policy_version=None) -> 
     Tính mức tự chủ hiệu lực của user đối với command spec.
     Trả về: "OFF" | "C" | "B" | "A"
     """
+    # Import trễ: `apps.ai.registry` (package) import ngược `effective_level` ở `registry/api.py`.
+    from apps.ai.registry import legacy_ids
+
     # 1. AI tắt toàn cục
     if not getattr(settings, "AI_ENABLED", False):
         return "OFF"
@@ -85,7 +88,8 @@ def effective_level(user, spec, *, config_version=None, policy_version=None) -> 
         if policy:
             global_mode = policy.global_mode
             red_zone_open = policy.red_zone_open or {}
-            caps = policy.caps or {}
+            # R5: phiên bản đã ghim có thể còn khoá cũ; đổi sang khoá mới khi đọc (không sửa dòng).
+            caps = legacy_ids.normalize_command_keys(policy.caps)
     except Exception:
         pass
 
@@ -105,8 +109,8 @@ def effective_level(user, spec, *, config_version=None, policy_version=None) -> 
             config = AiConfigVersion.objects.filter(user=user).order_by("-version").first()
         if config:
             killed = config.killed
-            overrides = config.overrides or {}
-            group_levels = config.group_levels or {}
+            overrides = legacy_ids.normalize_command_keys(config.overrides)
+            group_levels = legacy_ids.normalize_group_levels(config.group_levels)
     except Exception:
         pass
 

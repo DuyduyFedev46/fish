@@ -336,3 +336,53 @@ Không đổi: Group (`cskh`, `chu`...), id lệnh AI, mã quyền, tên model/b
 - N1: test env đọc giá trị thật `CAVEVE_THROTTLE_RATES["customer_search"]` (mặc định `30/min`, env mới `5/min`, env cũ `5/min`, mới thắng cũ).
 - N3: marker import `test_cskh_l2` ghi rõ tên tệp `test_cskh_l*.py` đổi ở Lô 5 (02c, điều phối cập nhật).
 - Kiểm chứng: `manage.py test` 1714 OK, `makemigrations --check` không đổi, `check_naming.py` OK (exit 0), snapshot AI không diff.
+
+## Lô 4a — BE (01/10): đổi DỮ LIỆU sang tiếng Anh
+
+### Migration
+- `accounts/0013_rename_groups_to_english`: `Group.update(name)` theo id (id, quyền, thành viên giữ nguyên). `chu`->`owner`, `quan_ly`->`manager`, `nv_kho`->`warehouse_staff`, `nv_giao`->`delivery_staff`, `cskh`->`customer_service`. Có cả tên cũ lẫn mới của một vai thì `RuntimeError` (không đoán). Chỉ có tên mới hoặc không có gì thì bỏ qua. Có reverse. Chỉ in số lượng. Không sửa `0012`.
+- `ai/0003_rename_ai_keys_to_english`: đổi `AiAction.assignee_group` và `AiAction.command` (id `...nhap_lo` -> `...receive_batches`); **append** `AiConfigVersion` mới (mỗi user, từ phiên bản mới nhất) và `AiPolicyVersion` mới với khoá đổi tên, ghi chú "P8b: đổi khoá sang tiếng Anh, giá trị giữ nguyên". Không UPDATE dòng phiên bản cũ. Reverse cũng append phiên bản khoá cũ (ghi chú "P8b rollback: ...").
+- Điều kiện thứ tự (D1): hai migration có dependency chéo `accounts.0013` <- `ai.0002`, `content.0002`, `sales.0010` và `ai.0003` <- `accounts.0013`, để seed cấp quyền theo tên cũ trên DB mới chạy xong trước khi đổi tên.
+- Chạy migrate + rollback trên SQLite sạch: `0012 -> 0013 -> 0012 -> 0013` và `ai 0002 <-> 0003`, đều OK.
+
+### Hằng, lớp tương thích
+- `apps/accounts/roles.py`: giá trị mới + `LEGACY_ROLE_NAMES` + `normalize_role_name`.
+- `apps/ai/command_groups.py`: `purchasing`/`sales`/`customer_service`, mức `high`/`medium`/`low`.
+- `apps/ai/registry/legacy_ids.py` (mới): ánh xạ cũ -> mới cho id lệnh, nhóm, mức nhạy cảm, assignee; hàm chuẩn hoá thuần (khoá mới thắng khi trùng).
+- Mọi đường GHI nhận tên cũ và chuẩn hoá trước khi lưu: `staff` tạo/PUT groups, `policy` caps, `my-config` overrides/limits/groups. `effective_level` và `get_cap_for_command` chuẩn hoá khi ĐỌC, nên việc AI ghim phiên bản cũ vẫn tính đúng.
+- `me.home` = `confirmation-queue`.
+- Lệnh AI `receive_batches` (id `purchasing.purchasereceipt.receive_batches`, path `receive-batches`, `custom_perm_actions` đổi theo). Route `nhap-lo/` là alias (không `ai=`), `receive-batches/` khai trước. Đã bỏ các keyword snake-case không dấu khỏi 6 lệnh.
+- Lệnh `preview_group_rename` (chỉ đọc, chỉ in số).
+
+### Contract thực tế
+- Giá trị Group trong `me.groups`, `/api/staff/*`, `/api/roles` là tên mới; PUT/POST nhận cả tên cũ lẫn mới và lưu tên mới.
+- `ai/commands` index: id `purchasing.purchasereceipt.receive_batches` thay `...nhap_lo`; `group`: `purchasing|sales|customer_service`; `sensitivity`: `high|medium|low`.
+- `me.home`: `confirmation-queue` (hằng `HOME_CONFIRMATION_QUEUE`).
+
+### Test (mới)
+`accounts/staff/tests/{test_role_permission_matrix, test_group_rename_migration, test_legacy_role_names, test_preview_group_rename}.py`, `ai/registry/tests/test_legacy_ids.py`, `ai/policy/tests/test_ai_key_migration.py`, `ai/settings/tests/test_legacy_keys_write_paths.py`; sửa nhiều test cũ sang hằng mới (xem danh sách trong báo cáo). Ma trận 21 endpoint x 7 người dùng ghi lại từ HEAD trước khi đổi, giữ nguyên sau đổi (`warehouse_staff` không có `sales.view_customer`). Quét PII/giá vốn cũ (`test_p8_pii_sweep`, `test_p8_qa_lo2_sweep`) vẫn đếm response 200 > 0 và xanh.
+
+### Kiểm chứng (chạy trong lượt này)
+- `manage.py test`: 1799 tests OK (nền 1746). `makemigrations --check --dry-run`: No changes detected. `check_naming.py`: OK. Adapter `pytest`: 68 passed (không sửa adapter).
+- Snapshot `commands_index_snapshot.json`: duy nhất `purchasing.purchasereceipt.nhap_lo` đổi chỗ thành `purchasing.purchasereceipt.receive_batches` (sắp theo bảng chữ cái).
+
+### Lệch thiết kế / lưu ý
+1. Thêm dependency chéo vào `accounts/0013` (xem trên) ngoài danh sách trong 02c: cần để seed theo tên cũ chạy trước.
+2. Test migration dùng gọi trực tiếp hàm `rename_*_forward/backward` trong `TestCase` thay vì `MigrationExecutor` (TransactionTestCase + serialized_rollback đụng khoá content type); thứ tự migration kiểm bằng `MigrationLoader`.
+3. `test_s03_migration` loại app `accounts`/`ai` khỏi danh sách leaf do `ai.0003` phụ thuộc `accounts.0013`.
+4. `test_customer_data_scope.MigrationTests.setUp` đặt tên Group về `nv_kho` (có marker naming) để bài test 0012 còn nghĩa.
+5. Doc đã sửa: `doc/decisions.md` dòng 123 và 149 (chỉ mã Group + ghi chú), `doc/business-process-spec.md` (mã Group trong dấu huyền), `doc/ops/moi-truong.md`, 4 file skill/agent, README backend. Bảng "cũ -> mới" trong AGENTS.md và skill giữ nguyên (là bảng ánh xạ).
+
+### Còn nợ
+- Lô 4b (FE) đổi `ROLE`, `commandGroups.ts`, mức nhạy cảm, e2e Python.
+- Lô 5 gỡ `LEGACY_*`, alias `nhap-lo/`, tên cũ ở mọi nơi.
+- Chưa commit, chưa deploy. Trên staging cần chạy `preview_group_rename` trước khi migrate.
+
+### Lô 4a — BE: sửa sau review techlead (2026-10-01)
+- N1: `preview_group_rename` in thêm "Group lạ (ngoài 10 tên cũ và mới): N" (chỉ số, không in tên); 2 test mới.
+- N2: `ai/0003` đếm SỐ DÒNG `AiAction` bị đổi (Q lệnh hoặc nhóm), không cộng trùng; test mới.
+- N3: lịch sử cấu hình (`AiConfigVersionListSerializer.get_changes`) và `update_user_config` chuẩn hoá khoá cũ -> mới ở cả hai phía trước khi so; 3 test mới (phiên bản P8b hiện không có thay đổi, đổi mức thật vẫn hiện `from` đúng, audit PUT không báo thay đổi giả).
+- N4: test thứ tự quét mọi `apps/*/migrations/0*.py` nhắc tên Group cũ (trừ 2 migration đổi tên), yêu cầu đều là tiền đề của `accounts/0013`; kèm kiểm tối thiểu 6 migration tìm thấy.
+- N5: `ai/execution/tests/test_scheduled_action_after_key_rename.py`: việc SCHEDULED tạo bằng id cũ + cấu hình ghim khoá cũ; sau migrate job chạy lệnh mới (DONE), và cấu hình cũ đặt OFF vẫn hạ mức (không nới).
+- N6: comment/log `run_due_ai_actions.py`, `actions/api.py` nhắc `owner` thay `chu`.
+- Kiểm chứng: `manage.py test` 1807 OK, `makemigrations --check` không đổi, `check_naming.py` OK, migrate/rollback SQLite sạch OK.
