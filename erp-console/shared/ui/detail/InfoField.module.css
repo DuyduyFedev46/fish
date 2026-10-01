@@ -1,0 +1,33 @@
+.cell { display: flex; flex-direction: column; gap: var(--space-0-5); min-width: 0; padding: var(--space-2) 0; border-top: 1px solid var(--surface-3); }
+.label { display: flex; align-items: center; gap: var(--space-1); font-size: var(--text-xs); color: var(--ink-3); }
+.value { margin: 0; display: flex; align-items: center; gap: var(--space-2); min-height: 28px; font-size: var(--text-base); color: var(--ink); min-width: 0; overflow-wrap: anywhere; }
+.valueText { min-width: 0; }
+.mono { font-family: var(--font-mono); font-size: var(--text-sm); }
+.lock { display: inline-flex; color: var(--ink-3); }
+.lock :global(.mi) { font-size: 14px; }
+.link {
+  font: inherit; color: var(--accent-text); background: none; border: 0; padding: 0; min-height: 28px;
+  text-align: left; cursor: pointer; text-decoration: underline; text-decoration-color: transparent; text-underline-offset: 3px;
+  transition: text-decoration-color var(--dur-fast) ease;
+}
+.link:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: var(--radius-xs); }
+@media (hover: hover) and (pointer: fine) { .link:hover { text-decoration-color: currentColor; } }
+
+/* Bút chì: cảm ứng luôn hiện; chuột chỉ hiện khi rê / focus. Vùng bấm vẫn đủ lớn nhờ ::after. */
+.pencil {
+  position: relative; flex: none; display: grid; place-items: center; width: 28px; height: 28px; padding: 0;
+  border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--ink-3); cursor: pointer;
+  transition: opacity var(--dur-fast) ease, background-color var(--dur-fast) ease;
+}
+.pencil::after { content: ""; position: absolute; inset: -8px; }
+.pencil :global(.mi) { font-size: 16px; }
+.pencil:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; opacity: 1; }
+@media (hover: hover) and (pointer: fine) {
+  .pencil { opacity: 0; }
+  .editable:hover .pencil, .editable:focus-within .pencil { opacity: 1; }
+  .pencil:hover { background: var(--surface-3); color: var(--ink); }
+}
+
+.editing .value { align-items: stretch; }
+.editForm { display: flex; flex-direction: column; gap: var(--space-2); width: 100%; }
+.editActions { display: flex; justify-content: flex-end; gap: var(--space-2); }

@@ -53,8 +53,9 @@ export type GuidanceDoc = {
   type: string;
   id: number | string;
   code: string;
-  status: string;
-  status_label: string;
+  /** Provider chỉ-dòng-thời-gian (R2: phiếu nhập, kiểm kê, khách...) có thể không có trạng thái → null. */
+  status: string | null;
+  status_label: string | null;
 };
 
 export type GuidanceData = {
@@ -62,5 +63,7 @@ export type GuidanceData = {
   next_steps: GuidanceNextStep[];
   warnings: GuidanceWarning[];
   timeline: GuidanceTimelineEntry[];
+  /** R2: dòng thời gian bị cắt bớt (chỉ N việc gần nhất). Không có = không cắt. */
+  timeline_truncated?: boolean;
   related: GuidanceRelatedDoc[];
 };

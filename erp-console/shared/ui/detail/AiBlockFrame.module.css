@@ -1,0 +1,31 @@
+.block { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-3) var(--space-4); border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--surface); min-width: 0; }
+.title { display: flex; align-items: center; gap: var(--space-1-5); margin: 0; font-size: var(--text-xs); font-weight: var(--weight-semibold); letter-spacing: var(--tracking-caps); text-transform: uppercase; color: var(--ink-3); }
+.title :global(.mi) { font-size: 16px; color: var(--accent-text); }
+.note { display: flex; align-items: center; gap: var(--space-1-5); margin: 0; font-size: var(--text-sm); color: var(--ink-3); }
+.err { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-2); padding: var(--space-2-5) var(--space-3); border-radius: var(--radius-md); background: var(--crit-soft); color: var(--crit); font-size: var(--text-sm); }
+.card { display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-3); border-radius: var(--radius-md); background: var(--surface-2); min-width: 0; }
+.by { display: flex; align-items: center; gap: var(--space-1-5); margin: 0; font-size: var(--text-xs); color: var(--ink-2); }
+.ai { padding: 0 var(--space-1-5); border-radius: var(--radius-xs); background: var(--accent-soft); color: var(--accent-text); font-size: var(--text-2xs); font-weight: var(--weight-semibold); }
+.what { margin: 0; font-size: var(--text-base); font-weight: var(--weight-semibold); color: var(--ink); }
+.changes { margin: 0; display: flex; flex-direction: column; }
+.change { display: flex; justify-content: space-between; align-items: baseline; gap: var(--space-3); padding: var(--space-1) 0; border-top: 1px solid var(--border); font-size: var(--text-sm); }
+.change:first-child { border-top: 0; }
+.change dt { color: var(--ink-2); flex: none; }
+.change dd { margin: 0; display: inline-flex; align-items: center; gap: var(--space-1); color: var(--ink); text-align: right; min-width: 0; overflow-wrap: anywhere; }
+.change dd :global(.mi) { font-size: 14px; color: var(--ink-3); }
+.before { color: var(--ink-3); text-decoration: line-through; }
+.actions { display: flex; justify-content: flex-end; gap: var(--space-2); }
+.escalated { display: flex; align-items: center; gap: var(--space-1-5); margin: 0; font-size: var(--text-sm); color: var(--ink-2); }
+.escalated :global(.mi) { font-size: 16px; color: var(--accent-text); }
+/* Khung chat TĨNH (chip + ô hỏi + nút gửi): luôn hiện sẵn, chạy nhẹ; runtime AI chỉ nạp khi người dùng chạm vào (BR-AI-17). */
+.starter { display: flex; flex-direction: column; gap: var(--space-2); padding-top: var(--space-2); border-top: 1px solid var(--border); min-width: 0; }
+.chips { display: flex; flex-wrap: wrap; gap: var(--space-1-5); }
+.chip { font: inherit; font-size: var(--text-xs); color: var(--accent-text); background: var(--accent-soft); border: 1px solid transparent; border-radius: var(--radius-full); padding: var(--space-1) var(--space-2-5); cursor: pointer; transition: background-color var(--dur-fast) ease; }
+@media (hover: hover) and (pointer: fine) { .chip:hover { background: var(--accent); color: var(--on-accent); } }
+@media (pointer: coarse) { .chip { min-height: var(--tap); } }
+.chip:active { transform: var(--press-scale); }
+.chip:focus-visible, .ask:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.askRow { display: flex; gap: var(--space-2); }
+.ask { flex: 1 1 auto; min-width: 0; min-height: var(--tap); font: inherit; font-size: var(--text-sm); color: var(--ink); background: var(--surface); border: 1px solid var(--border-input); border-radius: var(--radius-md); padding: var(--space-2) var(--space-2-5); }
+.ask:focus { outline: 2px solid var(--focus); outline-offset: 0; }
+.askRow :global(.btn) { flex: none; width: var(--tap); padding: 0; display: grid; place-items: center; }

@@ -1340,3 +1340,41 @@ khác vừa sửa") và M2 (nút Đồng ý kẹt khi tải chi tiết đề xu�
 1. Sửa M1 và M2, mỗi lỗi kèm vitest.
 2. Sửa câu font trong dev-notes (L1).
 3. Điều phối viên commit lô **kèm file font**. Tech Lead re-review chỉ phần diff của M1 và M2.
+
+### Re-review Lô 2 — FE (02/10, sau sửa M1, M2 của Techlead và B1–B5 của QA)
+> Phạm vi: mục "Lô 2 — FE: sửa sau Techlead CHANGES REQUESTED (nhẹ) và QA REJECTED lần 1" trong dev-notes, gồm
+> `useSubmit.ts`, `AiDocBlock.tsx`, `docBlockModel.ts`, `AiBlockFrame.tsx`, `AiAssistantPanel.tsx`, `InfoField.tsx`,
+> `features/ai/actions/mock.ts`, `features/ai/messages.ts`, `e2e/qa_ed_batch2_patterns.py`, `e2e/qa_ed_batch2_harness.py`.
+
+**Kiểm chứng (Tech Lead tự chạy trong lượt này):**
+- `tsc --noEmit` sạch. `vitest`: 42 file, 380 test đều đạt.
+- Build `MOCK=0` OK. `check-no-mock` XANH, `check-ai-chunks` XANH.
+- Grep `out/` và `.next/static` không thấy `aiDetailFail`, `cave_erp_mock_ai_detail_fail` hay `dev-patterns/qty`.
+- Build `MOCK=1`: chunk có khung hỏi nhanh (`data-ai-starter`, `1085.*.js`, 49,7 kB) không chứa `new Worker`, `wllama`, `/call/`,
+  `GgufDownloader` hay `gguf`. `wllama` chỉ nằm ở 3 chunk lười `7483`, `7513`, `4905`, giống lần review đầu.
+
+| Mục | Kết quả | Căn cứ |
+|---|---|---|
+| M1 | Đạt | `useSubmit.ts`: `isConflictError` chỉ trả true khi `code` thuộc `STALE_STATE`/`STALE_VERSION`, hoặc 409 có `details.updated_at` dạng chuỗi. Hàm thuần `stateAfterError` có vitest cho `CLAIMED` (giữ câu của BE, `conflict` null) và `STALE_STATE`. Khớp câu đã sửa ở 02b §2.3 |
+| M2 | Đạt | `AiDocBlock.tsx`: khi tải chi tiết lỗi (không phải abort, không phải lượt cũ), đề xuất bị xoá mốc và `loadError = AI_MSG.detailLoadFailed`, nên khối hiện "Thử lại". `anyWaiting` bỏ qua đề xuất thiếu mốc nên interval tự dừng. Đề xuất đó có `blocked`: nút Đồng ý khoá, nhãn trơn "Đồng ý", Từ chối vẫn dùng được. Bấm Thử lại thì `load()` tải lại chi tiết (id đã bị xoá khỏi `ready`) |
+| B1: `ARG_FIELDS` là allow-list | Đạt | `changesOf` lặp trên **khoá của bảng** (`Object.entries(ARG_FIELDS)`), không lặp trên `args`, nên khoá lạ không bao giờ hiện. Bảng chỉ có khoá có cấu trúc: `item_code, qty, quantity, batch_id, supplier, warehouse, refund_amount`. Đã bỏ `note` và mọi chữ tự do. Không khoá nào là giá vốn (`refund_amount` là tiền hoàn cho khách). Giá trị `text` chỉ nhận chuỗi hoặc số, object hay mảng bị bỏ. Có vitest với `note` chứa SĐT giả |
+| B2 | Đạt | `qty`/`quantity` qua `kg()`, tiền qua `vnd()`. Giá trị không phải số bị bỏ. `seen` theo nhãn nên khi có cả `qty` và `quantity` thì chỉ hiện một dòng |
+| B3: khung hỏi nhanh tĩnh, không lọt mã AI nặng | Đạt | `AiBlockFrame` (`Starter`) chỉ import `Icon`, `format` và CSS. `AiAssistantPanel` vẫn là `next/dynamic` `ssr:false`, chỉ render khi `chatOpen`, mà `chatOpen` chỉ bật khi focus ô, bấm chip hoặc gửi. Panel mount **không** tự tải model: `startDownload` chỉ chạy khi bấm nút (`AiAssistantPanel.tsx:480`). Chưa đồng ý thì hiện thẻ đồng ý thay cho panel. `handedOff` ref giữ cho câu chip chỉ gửi một lần, kể cả khi StrictMode chạy effect hai lần. Đã xác nhận bằng chunk (xem trên) |
+| B4 | Đạt | `act` dùng `inFlight` ref, đặt trước `await` và thả trong `finally`. e2e bấm 3 lần cùng tác vụ thì có đúng 1 POST |
+| B5 | Đạt | `InfoField`: `validateDraft` chạy **trước** `sub.submit()`, nên lỗi nhập không làm `failed`, nút giữ "Lưu" |
+| 2 file e2e của QA | **Không làm yếu, còn chặt hơn** | `qa_ed_batch2_harness.py:121-143`: ca cũ "409 trơn thì vẫn banner" đổi thành "409 `STALE_STATE` thiếu tên/giờ thì banner không in `undefined`/`null`/`Invalid`" (vẫn kiểm điều cũ, đúng nghĩa mới). Thêm 2 ca M1: `CLAIMED` và 409 không mã đều ra alert thường, giữ câu của BE, không có banner. `qa_ed_batch2_patterns.py:375-376`: kiểm 44 px chuyển từ nút "Hỏi trợ lý" (đã bỏ) sang nút "Gửi câu hỏi", cùng ngưỡng. `e2e/qa_harness_*/dist/` đã nằm trong `.gitignore:64` |
+| Font | Đạt | Dev-notes đã sửa câu ghi sai. File font vẫn ở trạng thái `M`, **phải có trong commit** |
+
+**Phát hiện mới (đều Low, không chặn):**
+- **L8 — Low — Chip hỏi về "chứng từ này" nhưng trợ lý không biết chứng từ nào.** Vị trí: `docBlockModel.ts` (`DOC_CHAT_CHIPS`), `AiDocBlock.tsx` (`openChat`).
+  - Chip "Tóm tắt lịch sử chứng từ này" và "Chứng từ này còn thiếu gì?" được gửi nguyên văn. `AiAssistantPanel` không nhận `targetModel`/`targetId`, nên câu trả lời không gắn với chứng từ đang xem. Không rò gì (đúng ED-04-AC10).
+  - Hướng sửa ở Lô 3, khi có trang chi tiết thật: hoặc ghép **mã** chứng từ vào câu (chỉ mã, không dữ liệu khách), hoặc đổi chip thành câu không cần ngữ cảnh. PO nên biết.
+- **L9 — Low — Focus rơi về `body` khi chưa đồng ý.** Vị trí: `AiBlockFrame.tsx` (`chat ?? <Starter/>`).
+  - Khi ô hỏi nhận focus, `Starter` bị gỡ và thay bằng thẻ đồng ý (hoặc dòng "Đang mở trợ lý…"). Với người chưa đồng ý, focus không được đặt vào thẻ đồng ý mà rơi về `body`. Người dùng bàn phím phải Tab lại từ đầu.
+  - Ngoài ra, chỉ cần Tab đi ngang ô này là panel được nạp (chỉ nạp JS, không tải model). Chấp nhận được theo quyết định B3.
+  - Sửa: focus vào ô tick đồng ý khi thẻ hiện.
+- Các mục L2–L7 của lần review đầu giữ nguyên, để sang Lô 3 như đã ghi.
+
+### Kết luận re-review Lô 2 — FE: **APPROVED**
+M1, M2, B1–B5 đều đạt. Không còn lỗi Critical, High hay Medium. Lô sẵn sàng cho QA chạy lại. Khi commit phải kèm
+`erp-console/public/fonts/ms/material-symbols-outlined.woff2`. L8 và L9 cùng L2–L7 để Lô 3 xử lý.

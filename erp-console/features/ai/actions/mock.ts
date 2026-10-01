@@ -97,19 +97,73 @@ export function mockUndoAiAction(id: string): { status: number; body: { outcome:
   };
 }
 
-export function mockFetchAiActions(params: { status?: string }) {
+/** Lọc theo R1: `target_model` khớp phần cuối ("purchasing.purchasereceipt" → "purchasereceipt"); `target_id` khớp mã đích (nhiều mã cách phẩy). */
+export function filterByTarget(rows: AiActionRow[], params: { target_model?: string; target_id?: string }): AiActionRow[] {
+  let out = rows;
+  if (params.target_model) {
+    const want = params.target_model.trim().toLowerCase().split(".").pop();
+    out = out.filter((a) => a.target?.type.toLowerCase() === want);
+  }
+  if (params.target_id) {
+    const ids = params.target_id.split(",").map((x) => x.trim()).filter(Boolean);
+    out = out.filter((a) => a.target != null && ids.includes(a.target.code));
+  }
+  return out;
+}
+
+export function mockFetchAiActions(params: { status?: string; target_model?: string; target_id?: string }) {
   let filtered = [...mockAiActions.results];
   if (params.status) {
     const allowed = params.status.split(",").map((s) => s.trim());
     filtered = filtered.filter((act) => allowed.includes(act.status));
   }
+  filtered = filterByTarget(filtered, params);
   return {
     status: 200,
     body: { count: filtered.length, next: null, previous: null, results: filtered },
   };
 }
 
+export function mockFetchAiActionCounts(params: { status?: string }) {
+  const allowed = params.status ? params.status.split(",").map((s) => s.trim()) : null;
+  const by_target_model: Record<string, number> = {};
+  for (const a of mockAiActions.results) {
+    if (allowed && !allowed.includes(a.status)) continue;
+    if (!a.target) continue;
+    const app = a.target.type === "purchasereceipt" ? "purchasing" : "inventory";
+    const key = `${app}.${a.target.type}`;
+    by_target_model[key] = (by_target_model[key] ?? 0) + 1;
+  }
+  return { status: 200, body: { by_target_model } };
+}
+
+// Cờ thử lỗi tải chi tiết đề xuất (e2e kiểm Techlead M2): window.__caveMock.aiDetailFail(true). Lưu localStorage để còn sau khi tải lại trang.
+const DETAIL_FAIL_KEY = "cave_erp_mock_ai_detail_fail";
+function detailFails(): boolean {
+  try {
+    return typeof window !== "undefined" && window.localStorage.getItem(DETAIL_FAIL_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+if (typeof window !== "undefined") {
+  const w = window as unknown as { __caveMock?: Record<string, unknown> };
+  w.__caveMock = {
+    ...(w.__caveMock || {}),
+    aiDetailFail: (v: boolean) => {
+      try {
+        if (v) window.localStorage.setItem(DETAIL_FAIL_KEY, "1");
+        else window.localStorage.removeItem(DETAIL_FAIL_KEY);
+      } catch {
+        /* storage chặn → giữ nguyên */
+      }
+      return detailFails();
+    },
+  };
+}
+
 export function mockFetchAiActionDetail(id: string) {
+  if (detailFails()) return { status: 500, body: { detail: "Máy chủ đang bận, thử lại sau." } };
   const detail: AiActionDetail = {
     ...(mockAiActions.results.find((a) => a.id === id) || mockAiActions.results[0]),
     id,

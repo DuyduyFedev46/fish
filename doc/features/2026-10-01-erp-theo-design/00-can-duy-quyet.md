@@ -51,3 +51,6 @@
 - Lô 3: thêm route chi tiết vào `TARGETS` của `erp-console/scripts/check-ai-chunks.mjs` (review Lô 2 FE L3); InfoField sửa tại chỗ gặp 409 phải báo (L5); cờ AI bật không "dính" theo trang đã ghé (L2).
 - QA BE Low gom thêm: id chữ số Ả Rập trả 200 ở chi tiết nhà cung cấp (`lookup_value_regex=[0-9]+`); `reports/batches` ~34 truy vấn/trang; ưu đãi giảm 100% cho đơn 0 đồng; `rate="1e3"` được hiểu là 1000.
 - Staging Postgres (⏸ QA): tranh chấp tên nhà cung cấp nhiều tiến trình; hai người đặt giá cùng lúc; hai PUT ma trận quyền song song; timeline nhóm quyền; thời gian phản hồi `reports/batches`.
+- Khối Trợ lý AI (ED-04-AC8): chip câu hỏi nhanh + ô chat hiện **sẵn** dạng khung tĩnh; mô hình AI chỉ nạp khi người dùng bấm vào — giữ đúng thiết kế mà không làm chậm trang (BR-AI-17, "hiệu năng không đánh đổi"). Khối AI không hiện ghi chú chữ tự do (chống lộ dữ liệu khách).
+- Lô 3: chip "chứng từ này" của khối AI phải gửi kèm ngữ cảnh chứng từ (loại + mã, không dữ liệu khách) để trợ lý trả lời đúng chứng từ (review Lô 2 L8); người chưa đồng ý AI focus ô hỏi thì focus không rơi về body (L9).
+- Lô 3+: khung hỏi nhanh AI giữ ô tĩnh tới khi panel nạp xong để không mất ký tự gõ sớm (QA Lô 2 B6); panel AI cũ còn chữ "đang chờ chốt ở S17" và dòng "RAM…WebGPU…Mạng" dính nhau (có sẵn) → Lô 15.

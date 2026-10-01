@@ -1,0 +1,35 @@
+/* Hộp thoại nổi (Modal) — chỉ dùng token trong shared/ui/tokens.css. Mobile-first: tấm trượt từ đáy, từ 640px hộp giữa màn. */
+.wrap { position: fixed; inset: 0; z-index: var(--z-sheet); display: flex; align-items: flex-end; justify-content: center; }
+.scrim { position: absolute; inset: 0; border: 0; padding: 0; background: var(--scrim); cursor: default; animation: fade var(--dur-base) var(--ease-out); }
+.box {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-height: 92dvh;
+  background: var(--surface);
+  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+  box-shadow: var(--shadow-lg);
+  padding-bottom: env(safe-area-inset-bottom);
+  outline: none;
+  animation: up var(--dur-slow) var(--ease-drawer);
+}
+.head { flex: none; display: flex; align-items: center; gap: var(--space-2); min-height: 52px; padding: var(--space-1) var(--space-2) var(--space-1) var(--space-4); border-bottom: 1px solid var(--border); }
+.title { flex: 1; min-width: 0; margin: 0; font-size: var(--text-md); font-weight: var(--weight-semibold); color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: var(--space-4); display: flex; flex-direction: column; gap: var(--space-3); }
+.foot { flex: none; display: flex; justify-content: flex-end; gap: var(--space-2); padding: var(--space-3) var(--space-4); border-top: 1px solid var(--border); }
+.foot > :global(.btn) { flex: 0 1 auto; }
+@media (max-width: 639px) { .foot > :global(.btn) { flex: 1 1 0; } }
+
+@media (min-width: 640px) {
+  .wrap { align-items: center; padding: var(--space-6); }
+  .box { width: min(520px, 100%); max-height: min(88dvh, 720px); border-radius: var(--radius-xl); padding-bottom: 0; animation: pop var(--dur-slow) var(--ease-out); }
+  .sm { width: min(400px, 100%); }
+}
+
+@keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes up { from { transform: translateY(100%); } to { transform: none; } }
+@keyframes pop { from { opacity: 0; transform: translateY(8px) scale(.98); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .scrim, .box { animation: none; }
+}

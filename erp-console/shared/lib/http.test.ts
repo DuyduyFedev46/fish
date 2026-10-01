@@ -67,3 +67,45 @@ describe("apiFetch chế độ mock", () => {
     expect((error as { details?: unknown }).details).toBeUndefined();
   });
 });
+
+describe("apiFetch lỗi 409 (xung đột phiên bản, W6f)", () => {
+  it("ApiError mang status, code và details có updated_at, updated_by_name", async () => {
+    vi.stubEnv("NEXT_PUBLIC_USE_MOCK", "1");
+    const { apiFetch, ApiError } = await import("./http");
+    const error = await apiFetch("/api/x/", {
+      method: "PUT",
+      body: {},
+      mock: () => ({
+        status: 409,
+        body: { detail: "Phiếu vừa được người khác cập nhật, tải lại để xem.", code: "STALE_STATE", updated_at: "2026-09-28T03:30:00+00:00", updated_by_name: "Lộc" },
+      }),
+    }).catch((e) => e);
+    expect(error).toBeInstanceOf(ApiError);
+    const e = error as InstanceType<typeof ApiError>;
+    expect(e.status).toBe(409);
+    expect(e.code).toBe("STALE_STATE");
+    expect(e.message).toBe("Phiếu vừa được người khác cập nhật, tải lại để xem.");
+    expect(e.details).toEqual({ updated_at: "2026-09-28T03:30:00+00:00", updated_by_name: "Lộc" });
+  });
+
+  it("409 không có detail: dùng câu chung tiếng Việt, details undefined", async () => {
+    vi.stubEnv("NEXT_PUBLIC_USE_MOCK", "1");
+    const { apiFetch } = await import("./http");
+    const error = await apiFetch("/api/x/", { method: "PUT", body: {}, mock: () => ({ status: 409, body: {} }) }).catch((e) => e);
+    expect((error as Error).message).toMatch(/người khác/);
+    expect((error as { details?: unknown }).details).toBeUndefined();
+  });
+
+  it("conflictOf đọc được updated_by_name và updated_at từ lỗi 409 thật qua apiFetch", async () => {
+    vi.stubEnv("NEXT_PUBLIC_USE_MOCK", "1");
+    const { apiFetch } = await import("./http");
+    const { conflictOf, isConflictError } = await import("../ui/form/useSubmit");
+    const error = await apiFetch("/api/x/", {
+      method: "PUT",
+      body: {},
+      mock: () => ({ status: 409, body: { detail: "x", code: "STALE_STATE", updated_at: "2026-09-28T03:30:00+00:00", updated_by_name: "Lộc" } }),
+    }).catch((e) => e);
+    expect(isConflictError(error)).toBe(true);
+    expect(conflictOf(error)).toEqual({ updatedAt: "2026-09-28T03:30:00+00:00", updatedByName: "Lộc" });
+  });
+});

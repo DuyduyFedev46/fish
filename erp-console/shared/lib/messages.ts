@@ -12,6 +12,7 @@ export const MSG = {
   forbidden: "Bạn không có quyền thực hiện thao tác này.",
   notFound: "Không tìm thấy.",
   badRequest: "Dữ liệu gửi lên chưa hợp lệ.",
+  conflict: "Bản ghi vừa được người khác cập nhật. Tải lại để xem bản mới.",
   server: (status: number) => `Lỗi máy chủ (${status}). Thử lại sau.`,
   /** S8-AC4: tải dữ liệu màn bị lỗi máy chủ. */
   loadFailed: "Không tải được dữ liệu, thử lại.",

@@ -1,0 +1,29 @@
+/* Trang form dài. Thanh nút dính đáy vùng cuộn của khung app (.content), cao --action-bar-h; bù lề để phủ hết bề ngang. */
+.page { display: flex; flex-direction: column; gap: var(--space-4); max-width: 720px; }
+.head { display: flex; flex-direction: column; gap: var(--space-1); }
+.back { display: inline-flex; align-items: center; gap: var(--space-1); align-self: flex-start; min-height: var(--tap); color: var(--ink-2); font-size: var(--text-sm); text-decoration: none; }
+.back :global(.mi) { font-size: 18px; }
+.back:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: var(--radius-xs); }
+.title { margin: 0; font-size: var(--text-xl); font-weight: var(--weight-semibold); letter-spacing: var(--tracking-tight); color: var(--ink); }
+.body { display: flex; flex-direction: column; gap: var(--space-4); }
+.bar {
+  position: sticky;
+  bottom: calc(-1 * var(--space-6));
+  z-index: var(--z-sticky);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--action-bar-h);
+  margin: var(--space-2) calc(-1 * var(--space-4)) calc(-1 * var(--space-6));
+  padding: var(--space-2) var(--space-4);
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+}
+.spacer { flex: 1; }
+@media (min-width: 768px) {
+  .bar { margin-inline: calc(-1 * var(--space-6)); padding-inline: var(--space-6); }
+}
+@media (max-width: 479px) {
+  .bar :global(.btn) { flex: 1 1 0; }
+  .spacer { display: none; }
+}

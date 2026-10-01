@@ -198,6 +198,9 @@ export async function apiFetch<T>(path: string, init: ApiInit = {}): Promise<T> 
     throw new ApiError(detail || MSG.notFound, 404, code);
   }
   if (status === 400) throw new ApiError(detail || MSG.badRequest, 400, code, details);
+  // 409 (xung đột phiên bản, vd STALE_STATE): giữ phần thân ngoài detail/code (`updated_at`, `updated_by_name`)
+  // để ConflictBanner nói "… vừa được <tên> sửa lúc …" (W6f).
+  if (status === 409) throw new ApiError(detail || MSG.conflict, 409, code, details);
   throw new ApiError(detail || MSG.server(status), status, code);
 }
 

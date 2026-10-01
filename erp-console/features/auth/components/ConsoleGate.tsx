@@ -23,6 +23,11 @@ type Props = {
   children: React.ReactNode;
 };
 
+// Chỉ bản mock: nạp công cụ thử của module AI (window.__caveMock.ai / aiConsent) cho e2e và DevTools. Trước đây AiAssistantGate nạp
+// giùm; Lô 1 bỏ gate nên nạp ở đây, ngay khi layout console được tải (sớm hơn mọi màn). Điều kiện viết nguyên văn để bản build thật
+// cắt cả import này (check-no-mock).
+if (process.env.NEXT_PUBLIC_USE_MOCK === "1" && typeof window !== "undefined") void import("@/features/ai/mock");
+
 export function ConsoleGate({ children }: Props) {
   const { status, me, error, loggedOut, refreshMe, logout, permNotice, dismissPermNotice, passwordNotice, dismissPasswordNotice } =
     useAuth();

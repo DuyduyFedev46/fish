@@ -195,20 +195,13 @@ def sr20_on(browser):
     page.on("console", lambda m: m.type == "error" and errors.append(m.text))
     login(page, "loc")
     page.evaluate("() => { window.__caveMock.ai('on'); window.__caveMock.aiConsent(true); window.__caveMock.clearLog(); }")
-    # Mở ngăn phải > tab Trợ lý để cổng AI hỏi trạng thái (status) và công bố "AI bật"
+    # ED Lô 1: không còn ngăn phải / tab Trợ lý. "Để AI làm" theo step.ai của server (F6-2), không cần ai/status.
     page.get_by_role("link", name="Đơn hàng").first.click()
     page.wait_for_url(re.compile(r"/orders/?$"))
     expect(page.locator("ul.order-list > li").first).to_be_visible()
     settle(page)
-    opener = page.get_by_role("button", name="Mở ghi chú, trợ lý, hoạt động")
-    if opener.count() and opener.first.is_visible():
-        opener.first.click()
-    page.locator("#rr-tab-ai").click()
-    expect(page.locator("#rr-pane-ai")).to_be_visible()
-    settle(page)
-    calls = ai_calls(page)
-    ok("SR20-AC5 mở tab Trợ lý -> có gọi ai/status", any("status" in str(c) for c in calls), str(calls)[:200])
-    page.locator("#rr-tab-notes").click()
+    ok("SR20-AC5 màn Đơn hàng không có tab Trợ lý (đã bỏ ngăn phải)", page.locator("#rr-tab-ai").count() == 0)
+    ok("SR20-AC5 mở danh sách đơn chưa gọi ai/status", not any("status" in str(c) for c in ai_calls(page)), str(ai_calls(page))[:200])
     dlg = open_order(page, 102)
     btn = dlg.get_by_role("button", name=re.compile("Để AI làm")).first
     expect(btn).to_be_visible()
@@ -331,13 +324,6 @@ def f61_on(browser):
     page.wait_for_url(re.compile(r"/orders/?$"))
     expect(page.locator("ul.order-list > li").first).to_be_visible()
     settle(page)
-    opener = page.get_by_role("button", name="Mở ghi chú, trợ lý, hoạt động")
-    if opener.count() and opener.first.is_visible():
-        opener.first.click()
-    page.locator("#rr-tab-ai").click()
-    expect(page.locator("#rr-pane-ai")).to_be_visible()
-    settle(page)
-    page.locator("#rr-tab-notes").click()
     dlg = open_order(page, 102)
     expect(dlg.get_by_role("button", name=re.compile("Để AI làm")).first).to_be_visible()
     ok("F6-1 AI bật: vẫn có cả 'Để AI làm' và 'Nhờ'", dlg.get_by_role("button", name=NHO).count() >= 1)

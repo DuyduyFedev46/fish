@@ -1,0 +1,7 @@
+.page { display: flex; flex-direction: column; gap: var(--space-3); max-width: var(--content-max); min-width: 0; }
+.cols { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-4); align-items: start; }
+.left, .right { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }
+@media (min-width: 1024px) {
+  .two { grid-template-columns: minmax(0, 1fr) minmax(300px, var(--rail-right-w)); gap: var(--space-6); }
+  .right { position: sticky; top: 0; }
+}

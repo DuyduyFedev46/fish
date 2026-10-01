@@ -1,0 +1,29 @@
+/* Trường form — chỉ dùng token. Ô cao tối thiểu --tap (44px mobile), chữ 16px để iOS không phóng to khi focus. */
+.field { display: flex; flex-direction: column; gap: var(--space-1-5); min-width: 0; }
+.label { font-size: var(--text-sm); font-weight: var(--weight-medium); color: var(--ink-2); }
+.req { color: var(--crit); }
+.box { position: relative; display: flex; align-items: center; }
+.control {
+  width: 100%;
+  min-height: var(--tap);
+  padding: var(--space-2-5) var(--space-3);
+  font: inherit;
+  font-size: var(--text-input);
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--border-input);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-xs);
+  outline: none;
+  transition: border-color var(--dur-fast) ease, box-shadow var(--dur-fast) ease;
+}
+textarea.control { resize: vertical; line-height: var(--leading-normal); }
+.select { appearance: none; -webkit-appearance: none; padding-right: var(--space-8); }
+.control:focus { border-color: var(--focus); box-shadow: 0 0 0 1px var(--focus), 0 0 0 4px var(--accent-soft); }
+.control:disabled { opacity: .7; cursor: not-allowed; }
+.withUnit { padding-right: calc(var(--space-3) + 3.5ch); text-align: right; }
+.unit { position: absolute; right: var(--space-3); font-size: var(--text-sm); color: var(--ink-3); pointer-events: none; }
+.control[aria-invalid="true"] { border-color: var(--crit); }
+.control[aria-invalid="true"]:focus { box-shadow: 0 0 0 1px var(--crit), 0 0 0 4px var(--crit-soft); }
+.err { display: flex; align-items: center; gap: var(--space-1-5); margin: 0; font-size: var(--text-sm); font-weight: var(--weight-medium); color: var(--crit); }
+.err :global(.mi) { font-size: 16px; flex: none; }

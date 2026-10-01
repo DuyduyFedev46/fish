@@ -137,7 +137,14 @@ function UndoCountdownButton({
   );
 }
 
-export function AiAssistantPanel({ status }: { status: AiStatus }) {
+type PanelProps = {
+  status: AiStatus;
+  /** Câu mở đầu chuyển từ khung hỏi nhanh của trang chứng từ. `autoSend` = gửi ngay (chip / bấm gửi); không thì đặt vào ô và focus. */
+  initialText?: string;
+  autoSend?: boolean;
+};
+
+export function AiAssistantPanel({ status, initialText, autoSend = false }: PanelProps) {
   const { me } = useAuth();
   const engine = selectEngineName();
   const [cap, setCap] = useState<AiCapability>(() => detectAiCapability());
@@ -145,7 +152,8 @@ export function AiAssistantPanel({ status }: { status: AiStatus }) {
   const [dl, setDl] = useState<DownloadState | null>(null);
   const [chat, setChat] = useState<ChatMsg[]>([]);
   const [chatError, setChatError] = useState<string | null>(null);
-  const [input, setInput] = useState("");
+  const [input, setInput] = useState(autoSend ? "" : initialText ?? "");
+  const inputRef = useRef<HTMLInputElement | null>(null);
   const rootRef = useRef<HTMLDivElement | null>(null);
   const downloaderRef = useRef<GgufDownloader | null>(null);
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -378,6 +386,15 @@ export function AiAssistantPanel({ status }: { status: AiStatus }) {
     [appendAi, finalizePending, me]
   );
 
+  // Câu từ khung hỏi nhanh: chip / gửi → gửi đúng một lần khi panel vừa nạp; chỉ focus ô → giữ chữ đã gõ và đưa con trỏ vào ô.
+  const handedOff = useRef(false);
+  useEffect(() => {
+    if (handedOff.current) return;
+    handedOff.current = true;
+    if (autoSend && initialText && initialText.trim()) void send(initialText);
+    else if (initialText !== undefined) inputRef.current?.focus({ preventScroll: true });
+  }, [autoSend, initialText, send]);
+
   return (
     <div className={`rr-pane ${s.panel}`} ref={rootRef}>
       <div className={s.head}>
@@ -539,6 +556,7 @@ export function AiAssistantPanel({ status }: { status: AiStatus }) {
           }}
         >
           <input
+            ref={inputRef}
             className={s.input}
             value={input}
             onChange={(e) => setInput(e.target.value)}

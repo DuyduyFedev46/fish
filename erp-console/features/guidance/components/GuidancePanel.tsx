@@ -103,15 +103,6 @@ export function GuidancePanel({ docType, docId, onAction, onDataLoaded, refreshS
         <section className={s.part} aria-label="Việc tiếp theo">
           <h3 className={s.partH}>
             <span>Việc tiếp theo</span>
-            <button
-              type="button"
-              className={s.refreshBtn}
-              onClick={() => loadData()}
-              title="Cập nhật hướng dẫn"
-            >
-              <Icon name="sync" />
-              <span>Làm mới</span>
-            </button>
           </h3>
 
           {data.next_steps.length === 0 ? (
@@ -147,6 +138,7 @@ export function GuidancePanel({ docType, docId, onAction, onDataLoaded, refreshS
           <div ref={setSummaryHost} className={s.aiHost} />
 
           <GuidanceTimelineView entries={data.timeline} />
+          {data.timeline_truncated && <p className={s.nil}>Chỉ hiện {data.timeline.length} việc gần nhất.</p>}
         </section>
       )}
     </div>
@@ -231,8 +223,8 @@ function StepItem({
 
       {step.why && (
         <div className={s.stepReason}>
+          {/* Không hiện mã BR (UI-RULES: người dùng không cần mã quy tắc); mã vẫn nằm trong dữ liệu để tra cứu. */}
           <span>Lý do: {step.why.text}</span>
-          {step.why.br && <span className="num"> ({step.why.br})</span>}
         </div>
       )}
     </li>

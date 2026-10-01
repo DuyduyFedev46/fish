@@ -57,6 +57,7 @@ export const AI_MSG = {
   thinking: "Đang nghĩ…",
   aiLabel: "AI",
   chatError: "Trợ lý chưa trả lời được lúc này — thử lại.",
+  detailLoadFailed: "Chưa mở được chi tiết đề xuất nên chưa thể Đồng ý. Bấm Thử lại.",
   emptyChatTitle: "Hỏi trợ lý điều gì đó",
   emptyChatBody: "Ví dụ: tồn kho, lô sắp hết hạn, đơn đang chờ…",
 

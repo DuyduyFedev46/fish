@@ -864,3 +864,193 @@ python3 scripts/check_naming.py -> OK
 pkill runserver 8766 và 8767
 ```
 Script nằm trong scratchpad của phiên (không đưa vào repo).
+
+---
+
+## Lô 2 — FE (mẫu trang chi tiết, popup, form, khối Trợ lý AI) · lần 1 · 2026-10-02
+
+### Kết luận: REJECTED — 2 lỗi Medium chặn (B1 khối AI hiện nguyên văn ô chữ tự do `note`, có thể mang tên/SĐT khách; B2 "Số lượng 10.000" trong đề xuất AI không đơn vị, dấu chấm, đọc thành 10 nghìn) + B3 cần PO quyết (khối AI chưa có sẵn chip câu hỏi, ô chat, nút gửi như ED-04-AC8). Phần còn lại đạt, gồm toàn bộ ca ngoài đường thuận (Esc/bấm đúp/mất mạng khi gửi, 400/409/410/500, mục "…" bị chặn, AI tắt/bật/chưa đồng ý).
+
+### Tổng: 150 ca QA mới (+ 58 ca của dev chạy lại, 75 ca hồi quy `p8_lo6`, 56 ca `ed_batch1_shell`, 66 ca khung Lô 1, 48 ca vai) · ✅ 145 · ❌ 5 ca (4 lỗi: B1, B2, B4, B5; B3 là lệch AC chờ PO) · ⏸ 7 mục
+
+| Bộ | Ca | Đạt | Hỏng |
+|---|---|---|---|
+| `e2e/qa_ed_batch2_patterns.py` (bản mock, trang thử `/dev-patterns/` và `/dev-patterns/form/`) | 79 | 78 | 1 (B5) |
+| `e2e/qa_ed_batch2_harness.py` (khung riêng, `apiFetch` thật, Playwright chặn mạng) | 71 | 67 | 4 (B1, B2, B4 x2) |
+| `ed_batch2_patterns.py` của dev, chạy lại | 58 | 58 | 0 |
+| Hồi quy: `ed_batch1_shell` 56/56, `p8_lo6_fe_sr19_sr20` 75/75, `qa_ed_batch1_template` 66/66, `qa_ed_batch1_roles` 47/48 (lỗi P1 có sẵn từ gốc) | | | |
+
+Ảnh đặt cạnh board: `shots/lot2/` (7 ảnh `board-ERP-*.png` + 30 ảnh `qa-*.png`). Chỉ dữ liệu giả của mock/khung thử.
+
+### Theo AC
+| Mã AC | Kết quả | Bằng chứng |
+|---|---|---|
+| ED-03-AC5 (khung chung cho trang chi tiết/form) | ✅ | `qa-detail-desktop.png` so với `board-ERP-D2b`, `qa-form-desktop.png` so với `board-ERP-F1a`; 360 px không cuộn ngang |
+| ED-04-AC1 (header: ← danh sách, mã mono, chip, nút chính, "…", không dòng xám) | ✅ | patterns: header chỉ có `Tổng quan / PR-260928-01 / Đã nhập kho / Sửa phiếu`; font mono đo được |
+| ED-04-AC2 (StatusPath: Tiếp theo / Đã làm; kết thúc xấu) | ✅ | patterns + harness `qa-statuspath-badend-desktop.png`: 1 bước hiện tại, bước đã qua có ✓, `badEnd` đỏ và không tô bước sau |
+| ED-04-AC3 (InfoGrid 2 cột, mỗi ô một giá trị; ô khoá có icon khoá + lý do) | ✅ | desktop 2 cột, mobile 1 cột; icon `lock` + "Giá vốn chỉ Chủ được xem" |
+| ED-04-AC4 (sửa tại chỗ: lỗi dưới ô, Esc huỷ, gửi 1 lần) | ✅ (kèm B5 Low) | để trống: viền đỏ + 1 dòng lỗi, 0 PATCH; Esc giữ "12 kg"; bấm đúp Lưu = 1 PATCH; mất mạng giữ giá trị rồi Thử lại -> "9 kg", focus về bút chì |
+| ED-04-AC5 (LookupCard) | ✅ | không giá vốn/tên/SĐT/địa chỉ, có "Đóng" + "Mở trang lô", Esc đóng |
+| ED-04-AC6 (không quyền thì ẩn hẳn, bị chặn vì trạng thái thì mờ + lý do) | ⏸ một phần | phần "mờ + lý do, không gọi API, Enter/Space không kích hoạt" đạt; phần "ẩn hẳn theo quyền" thuộc từng màn nghiệp vụ (Lô 3+), mẫu không có vai thiếu quyền |
+| ED-04-AC7 (Dòng thời gian `dd/mm/yyyy hh:mm`, không mã BR) | ✅ | "28/09/2026 10:20" (03:20 UTC +7), nhãn AI ở dòng AI làm; timeline rỗng không vỡ |
+| ED-04-AC8 (khối AI: người/giờ, việc, trước → sau, Từ chối/Đồng ý, chip, ô chat, nút gửi, Đồng ý gọi API, kết quả ở Dòng thời gian) | ❌ một phần | đạt: người/giờ, việc, bảng thay đổi, Từ chối/Đồng ý có đếm ngược 3 giây (BR-AI-14), Đồng ý gọi đúng `POST .../confirm/`. Chưa đạt: B2 (đơn vị), B3 (chip/ô chat/nút gửi chỉ hiện sau khi bấm "Hỏi trợ lý"). ⏸ "kết quả ở Dòng thời gian" cần màn nghiệp vụ |
+| ED-04-AC9 (đề xuất AI không lộ giá vốn) | ✅ | harness: `unit_cost`, `landed_unit_cost` có trong `args_preview` giả vẫn không hiện (FE là lớp phụ; lớp chính là BE `scrub_data`, đã QA ở lô BE) |
+| ED-04-AC10 (không dữ liệu cá nhân) | ❌ | B1; `customer_phone`, `recipient_name`, `address`, `customer{}` không hiện (đạt) nhưng `note` hiện nguyên văn. `AiAssistantPanel` chỉ nhận `status`, không nhận chứng từ nên không gửi dữ liệu khách |
+| ED-04-AC12 (Dòng thời gian mỗi dòng gồm giờ + việc) | ✅ | như AC7 |
+| ED-05-AC1 (popup: focus trong hộp, Esc đóng, trả focus, nền mờ) | ✅ | scrim/X/Huỷ/Esc đều đóng khi rảnh; Tab/Shift+Tab giữ trong hộp; trả focus về nút mở; nền khoá cuộn; URL không đổi. ⏸ "giữ nguyên vị trí cuộn và bộ lọc màn cha" cần màn cha thật |
+| ED-05-AC2 (form dài = trang riêng, thanh nút dính đáy, ← về màn cha) | ✅ | viewport thấp 420 px: thanh nút dính đáy (y 356 + 64 = 420) |
+| ED-05-AC3 (viền đỏ + 1 dòng đỏ dưới ô, `*` đỏ, đơn vị trong ô, không chữ gợi ý xám) | ✅ | `*` đo màu `rgb(192,49,43)`; "kg" nằm trong ô bên phải; nhãn trên ô; lỗi BE 400 theo ô hiện đúng ô, giữ giá trị `0`; `qa-field-states-desktop.png` |
+| ED-05-AC4 (thứ tự nút phụ ... chính, nhãn rõ, phá huỷ nút đỏ) | ✅ một phần / ⏸ | thứ tự và nhãn đạt; nút đỏ `.btn.danger` có trong CSS nhưng mẫu chưa có thao tác phá huỷ để chạy thật -> kiểm ở lô dùng |
+| ED-05-AC5 (lỗi gửi: giữ giá trị, alert đỏ, "Thử lại") | ✅ | harness API thật: mất mạng, 500 thân HTML, 502 không thân, 400 theo ô: giá trị giữ, câu tiếng Việt ("Không kết nối được máy chủ...", "Lỗi máy chủ (500). Thử lại sau."), không lộ stack/URL; Thử lại thành công thì alert mất |
+| ED-05-AC6 (bấm 2 lần = 1 request) | ✅ (FormPage, Modal, InfoField); B4 Low (khối AI) | `dblclick` và 3 lần `click()` cùng tác vụ JS: FormPage/Modal/InfoField đều đúng 1 request. Khối AI: bấm đúp kiểu người thật (40 ms, BE trả sau 300 ms) = 1 POST; chỉ 3 lần cùng tác vụ JS ra 3 POST (B4) |
+| ED-05-AC7 (việc không hoàn tác: bước xác nhận bằng khối tóm tắt) | ⏸ | `SummaryBlock` đã dựng và hiện đúng ở form mẫu; chưa có màn nghiệp vụ dùng (Lô 3+) |
+| DW-16 (nút "Tóm tắt") | ✅ | AI bật + đã đồng ý: hiện, bấm có phản hồi; AI tắt hoặc chưa đồng ý: không có nút |
+| G1–G4, G6–G10 | ✅ | giờ GMT+7, mã mono, không mã BR, lỗi tiếng Việt, không console.error/pageerror |
+| G5 (kg dạng `18,5 kg`) | ❌ | B2 |
+
+### Ngoại lệ và biên (đều chạy thật)
+- Esc khi đang gửi: Modal không đóng (cả scrim, X, Huỷ bị khoá); sau lỗi mở khoá lại. Request treo rồi đứt mạng giữa chừng: giữ `21`, hiện "Thử lại", thành công thì trả focus về nút mở (`qa-modal-network-lost-desktop.png`).
+- 409 từ BE: ConflictBanner "Phiếu vừa được Hạnh sửa lúc 02/10/2026 10:30. Tải lại để xem bản mới." + nút Tải lại, không alert đỏ chung, giá trị đang gõ không mất; thân 409 thiếu tên/giờ không in `undefined`/`null`.
+- Mục "…" bị chặn: bấm (kể cả `force`) không gọi API, Enter/Space không kích hoạt, lý do hiện cạnh nhãn, vẫn focus được; mục huỷ dùng được: chữ đỏ, chọn xong menu đóng; mũi tên và bấm ra ngoài hoạt động.
+- AI: tắt (mock và API thật) = không khối, 0 request `/api/ai/actions` và `chat`/`summary`, chỉ 1 `GET /api/ai/status/` (02b cho phép, đã ghi ở 03b); `status` 500 hoặc đứt mạng = không khối (fail-closed); danh sách 403 = ẩn khối; danh sách 500 = báo lỗi + "Thử lại" (không nói "Chưa có đề xuất"); bật nhưng chưa đồng ý = vẫn thấy đề xuất, chat đòi tick đồng ý, chưa nạp trợ lý, không "Tóm tắt".
+- Đồng ý lỗi: 409, 410 ("Đề xuất này đã được xử lý hoặc hết hạn. Đã tải lại danh sách."), 403 (câu BE), 500 thân HTML, mất mạng: mỗi ca có thông báo tiếng Việt, đề xuất còn, nút dùng lại được, `onApplied` không chạy, đúng 1 POST.
+- Trang không vòng đời: không StatusPath, không nút "…", không nút chính.
+- 360 px: trang chi tiết, popup (tấm dán đáy, nút cao 44 px), form (nút cao 44 px), khối AI (nút "Hỏi trợ lý" cao 44 px) đều không cuộn ngang.
+
+### Phân quyền
+Mẫu Lô 2 là thành phần dùng chung, không tự quyết quyền; `qa_ed_batch1_roles.py` (menu 5 vai) 47/48, ca lỗi duy nhất là P1 có sẵn từ gốc (`/ai/policy/` mở cho vai không phải Chủ). Khối AI trong mẫu ẩn khi API trả 403. Quyền thật của đề xuất AI nằm ở BE (đã QA lô BE).
+
+### Rò giá vốn
+Không phát hiện. Ô khoá hiện "Chỉ Chủ xem" + icon khoá; `unit_cost`/`landed_unit_cost` trong `args_preview` giả không hiện; LookupCard không có giá vốn; ARG_LABEL không có khoá giá.
+
+### Rò dữ liệu cá nhân
+- B1 Medium: `note` hiện nguyên văn (xem Lỗi).
+- Đạt: LookupCard, trang chi tiết, Timeline, DOM mock không có tên/SĐT/địa chỉ; `localStorage` chỉ có token, id người dùng, cờ AI (khoá `cave_erp_mock_users` là danh sách nhân viên GIẢ của mock, bản thật không có); URL sạch; `AiAssistantPanel` không nhận mã/nội dung chứng từ; không có `console.error` chứa dữ liệu.
+
+### Hồi quy
+`ed_batch1_shell` 56/56, `p8_lo6_fe_sr19_sr20` 75/75, khung Lô 1 `qa_ed_batch1_template` 66/66, `qa_ed_batch1_roles` 47/48 (P1 có sẵn), `s7_shell` chạy hết (chỉ có nhiễu `Failed to fetch RSC payload` của máy chủ tĩnh, có sẵn từ gốc). `/dev-patterns/` không có trong bản build thật (grep mã demo = 0; mở trong trình duyệt hiện màn Đăng nhập, không có nội dung demo).
+
+### Chấm theo UI-RULES (mục áp dụng cho Lô 2)
+| Mục | Kết quả |
+|---|---|
+| §5.1 header (← danh sách, mã mono, chip, nút chính, "…", không dòng xám) | ✅ |
+| §5.2 StatusPath (Tiếp theo/Đã làm, kết thúc xấu đỏ) | ✅ |
+| §5.3 "…" (mục chặn mờ + lý do cạnh nhãn, huỷ đỏ, bàn phím) | ✅ |
+| §5.4 InfoGrid (một giá trị/ô, khoá có icon, sửa tại chỗ) | ✅ (B5 Low) |
+| §5.5 khối AI | ❌ B1, B2; B3 chờ PO |
+| §6.2 trường form (nhãn trên, `*` đỏ, đơn vị trong ô, lỗi viền đỏ + 1 dòng) | ✅ |
+| §6.6 gửi lỗi (giữ giá trị, alert, Thử lại, chống gửi đôi) | ✅ (B4 Low ở khối AI) |
+| §7 trạng thái (đang gửi, mất mạng, 409) | ✅ |
+| §1.6 / G5 số liệu | ❌ B2 |
+| §3.2 chữ cấm (mã BR, khoá kỹ thuật) | ✅ |
+
+### Lỗi
+#### B1 — Khối AI hiện nguyên văn ô chữ tự do `note` · Medium · ED-04-AC10 / bất biến 9
+- Tái hiện: khung `e2e/qa_harness_ed_batch2` chế độ `?m=ai`, API giả trả `args_preview: {item_code, qty, note: "Giao cho Nguyễn Văn A, SĐT 0912345678"}` (dữ liệu bịa).
+- Mong đợi: không hiện tên/SĐT; BE đã xếp `note` vào `SCRUB_FREE_TEXT_KEYS` vì là chữ tự do.
+- Thực tế: khối hiện dòng "Ghi chú | Giao cho Nguyễn Văn A, SĐT 0912345678" (`qa-ai-note-pii-desktop.png`). `docBlockModel.ts` đưa `note` vào bảng nhãn `ARG_LABEL` dù chú thích đầu file nói dữ liệu cá nhân không bao giờ nằm trong bảng. BE `AiActionSerializer.get_args_preview` gọi `scrub_data(..., is_ai_read=False)` nên KHÔNG lọc `note`. Hai lớp cùng bỏ qua.
+- Ảnh hưởng: nếu lệnh AI ghi tên/SĐT khách vào `note`, mọi vai thấy khối AI trên chứng từ đều đọc được.
+- Gợi ý: FE bỏ `note` khỏi `ARG_LABEL` (hoặc cho BE lọc `note` ở cả đường xem).
+
+#### B2 — "Số lượng" trong đề xuất AI không đơn vị, dấu chấm · Medium · ED-04-AC8 / G5
+- Tái hiện: bản mock, `window.__caveMock.ai('on')`, mở `/dev-patterns/`: khối AI hiện "Số lượng | 10.000" (BE trả Decimal `"10.000"` = 10 kg).
+- Mong đợi: `10 kg` hoặc `10,0 kg` (G5, §1.6).
+- Thực tế: chuỗi thô `10.000`; người Việt đọc thành 10 nghìn. Thiếu "kg" (`qa-ai-block-desktop.png`).
+- Ảnh hưởng: duyệt sai số lượng.
+- Gợi ý: `changesOf` định dạng các khoá số lượng qua `kg()` của `shared/lib/format`.
+
+#### B3 — Khối AI chưa có sẵn chip câu hỏi, ô chat, nút gửi · Medium (PO quyết) · ED-04-AC8
+- Tái hiện: AI bật + đã đồng ý, mở trang chi tiết.
+- Mong đợi (AC8 và board ERP-D2b): chip "Tóm tắt lịch sử đơn" / "Lô nào đang xuất cho đơn?", ô "Hỏi AI về đơn này...", nút gửi hiện sẵn; "khi không có đề xuất vẫn còn ô chat".
+- Thực tế: chỉ có nút "Hỏi trợ lý"; ô chat nạp sau khi bấm (dev-notes mục 8 ghi là cố ý, vì giữ chunk nhẹ BR-AI-17).
+- Ảnh hưởng: lệch chữ AC; không mất dữ liệu. Cần PO xác nhận chấp nhận bản lazy-load hay sửa AC8.
+
+#### B4 — Khối AI cho 3 lần bấm trong cùng một tác vụ ra 3 POST · Low · ED-05-AC6
+- Tái hiện: khung `?m=ai`, đợi nút Đồng ý mở, chạy `b.click(); b.click(); b.click()` trong một `evaluate`.
+- Thực tế: 3 `POST /confirm/` (cũng với Từ chối). `AiDocBlock.act` chặn bằng state `busyId`, không dùng ref như `useSubmit`. Bấm đúp kiểu người thật (40 ms, BE trả sau 300 ms) vẫn đúng 1 POST, nên không chặn.
+- Gợi ý: thêm ref `inFlight` giống `useSubmit`.
+
+#### B5 — Lỗi nhập trống ở ô sửa tại chỗ làm nút chính thành "Thử lại" · Low · ED-04-AC4 / §6.6
+- Tái hiện: `/dev-patterns/`, bấm bút chì "Số lượng", xoá hết, Enter.
+- Thực tế: hiện đúng lỗi "Nhập giá trị cho ô này." nhưng nút chính đổi thành "Thử lại" (validate cục bộ ném lỗi trong `sub.submit` nên `failed=true`). Chưa có gì được gửi nên "Thử lại" sai nghĩa; nên giữ "Lưu".
+
+### Có sẵn từ gốc, không tính vào lô này
+- P1: `/ai/policy/` mở cho vai không phải Chủ (`qa_ed_batch1_roles` 47/48, ca G9).
+- P3: vùng bấm thẻ "Việc tiếp theo" của GuidancePanel (hiện trên `/dev-patterns/` ở `qa-detail-desktop.png`) không thuộc mẫu Lô 2.
+- `console.error` của React ở bản production: không thấy trong các lần chạy này (patterns 79 ca và harness không có console.error/pageerror).
+- `Failed to fetch RSC payload` ở `s7_shell` khi phục vụ bản tĩnh bằng `http.server`.
+
+### ⏸ Chưa kiểm được (và vì sao)
+1. ED-04-AC8 "Kết quả hiện ở Dòng thời gian" sau Đồng ý: cần màn nghiệp vụ thật (Lô 3+); chỉ kiểm được `onApplied` được gọi.
+2. ED-04-AC6 phần "ẩn hẳn theo quyền" trong header/"…": thuộc từng màn nghiệp vụ.
+3. ED-05-AC1 "giữ vị trí cuộn và bộ lọc màn cha": cần màn cha thật.
+4. ED-05-AC4 nút đỏ `.btn.danger` cho thao tác phá huỷ: mẫu chưa có thao tác như vậy.
+5. ED-05-AC7 bước xác nhận việc không hoàn tác: chưa có màn dùng.
+6. ED-04-AC9 phía response API: thuộc BE (đã QA lô BE).
+7. Lên bản thật có `NEXT_PUBLIC_API_BASE`: chưa chạy với BE thật ở lượt này.
+
+### Lệnh đã chạy (output tóm tắt)
+- `cd erp-console && rm -rf node_modules && npm ci` sạch; `npx tsc --noEmit` exit 0; `npx vitest run` 42 file, 366 test đạt.
+- `NEXT_PUBLIC_USE_MOCK=0 npm run build && node scripts/check-no-mock.mjs && node scripts/check-ai-chunks.mjs` đạt; bản thật không chứa mã demo.
+- `NEXT_PUBLIC_USE_MOCK=1 npm run build`, phục vụ tĩnh cổng 3101: `ed_batch2_patterns.py` 58/58; `ed_batch1_shell.py` 56/56; `p8_lo6_fe_sr19_sr20.py` 75/75; `qa_ed_batch1_roles.py` 47/48; `s7_shell.py` chạy hết.
+- `vite build --config e2e/qa_harness_ed_batch2/vite.config.mjs` + `http.server 3103`: `qa_ed_batch2_harness.py` 67/71.
+- `SHOTS=../doc/features/2026-10-01-erp-theo-design/shots/lot2 python3 e2e/qa_ed_batch2_patterns.py` 78/79.
+- `vite build --config e2e/qa_harness_ed_batch1/...` + cổng 3102: `qa_ed_batch1_template.py` 66/66.
+- `python3 scripts/check_naming.py`: OK, không phát sinh vi phạm mới.
+- Đã tắt các máy chủ 3101–3104. Chưa sửa mã sản phẩm. Mã QA mới: `erp-console/e2e/qa_ed_batch2_patterns.py`, `qa_ed_batch2_harness.py`, `qa_harness_ed_batch2/` (`dist/` đã nằm trong `.gitignore`).
+
+---
+
+### Lô 2 — FE lần 2 · 2026-10-02
+
+#### Kết luận: APPROVED — B1–B5, M1, M2 đã sửa và kiểm lại bằng ca chạy thật (cả ca ngoài đường thuận); B3 theo quyết định PO (khung tĩnh hiện sẵn, model chỉ nạp khi chạm) đạt AC8. Còn 1 lỗi Low mới (B6, ghi nhận, không chặn).
+
+#### Tổng lần 2: 95 ca mới (`qa_ed_batch2_followup.py`) · ✅ 94 · ❌ 1 (B6 Low) · ⏸ 3
+Chạy lại các bộ cũ, đều xanh: `qa_ed_batch2_patterns` 79/79, `qa_ed_batch2_harness` 73/73, `ed_batch2_patterns` (dev) 75/75, `ed_batch1_shell` 56/56, `p8_lo6_fe_sr19_sr20` 75/75 (`BASE=http://127.0.0.1:3101`), `s7_shell` 24 ca đạt, 0 FAIL, không lỗi console. Cộng dồn lô này: 79 + 73 + 95 = 247 ca QA của tôi (246 đạt, 1 Low).
+
+#### Sửa lại chính script QA (lần 1 tôi chấm quá tay)
+Khi rà lại 2 file QA mà dev đã chỉnh, tôi thấy 4 ca của CHÍNH TÔI ở lần 1 là "luôn đúng" (`... or True` / `True`) nên đã được tính ✅ mà không kiểm gì: khoá cuộn nền khi mở Modal, nền inert với trình đọc, bấm đúp "Thử lại" của Modal, StatusPath `next=null` không có "Tiếp theo", cộng ca G5 và mục "huỷ bị chặn". Đã đổi thành kiểm thật: body `overflow:hidden` (đạt); Tab 14 lần liên tiếp focus không ra ngoài hộp (đạt; nền KHÔNG có `inert`, chỉ dựa `aria-modal` + bẫy focus, ghi nhận); `Tiếp theo:` = 0 (đạt); G5 "10 kg" và không "10.000" (đạt); mục huỷ bị chặn `aria-disabled=true` (đạt). Số lần gửi của Modal đếm ở harness `h_modal` (Modal mẫu không đi qua apiFetch). Không ca nào đổi kết quả từ ✅ sang ❌.
+
+#### Sửa của dev vào 2 script QA: có hợp lý không
+- Ca "Hỏi trợ lý" -> "Gửi câu hỏi" (patterns, dòng 375, cao >= 44 px ở 360 px): hợp lý, chạy thật, vẫn kiểm đúng điều cần (nút gửi chạm được), và AC8 nay có khung hiện sẵn.
+- Ca 409 trong harness (409 trơn không còn là banner): hợp lý, khớp 02b (§2.3 dòng 188: xung đột = `code` `STALE_STATE`/`STALE_VERSION` hoặc 409 có `updated_at`). Tôi kiểm lại đủ 8 tổ hợp (xem M1). Dev đổi ca "thiếu tên/giờ" sang `STALE_STATE` là đúng; không có ca nào bị xoá.
+
+#### Lệnh đã chạy
+- `rm -rf node_modules && npm ci` sạch (không `--legacy-peer-deps`); `npx tsc --noEmit` exit 0; `npx vitest run` 42 file, 380 test đạt.
+- `NEXT_PUBLIC_USE_MOCK=0 npm run build` + `check-no-mock` XANH + `check-ai-chunks` XANH ("4 màn nghiệp vụ và 2 layout không chứa `new Worker`, `wllama`, `/call/`"). Bản thật: grep `PR-260928-01`, `aiDetailFail`, `Giao cho` = 0 (chỉ có vỏ route `/dev-patterns/` rỗng, không nội dung demo).
+- `NEXT_PUBLIC_USE_MOCK=1 npm run build`, `http.server 3101`; harness `vite build` + `http.server 3103`.
+- `python3 scripts/check_naming.py`: OK, không vi phạm mới.
+- Lần chạy đầu của `qa_ed_batch2_patterns` ngay sau khi dựng server: 61/62, treo ở `wait_for_selector(".nav a")` sau đăng nhập mock (timeout 30 s); 3 lần chạy sau đều 79/79. Ghi nhận là nhiễu lúc khởi động server tĩnh, không tái hiện.
+
+#### Theo lỗi của lần 1
+| Mã | Kết quả | Bằng chứng (đều chạy thật) |
+|---|---|---|
+| B1 chữ tự do `note` lộ dữ liệu khách | ✅ | args giả có `note`, `reason`, `description`, `message`, `comment`, `customer_name`, `phone`, `delivery_address` kèm SĐT giả `0900000123`/`0900000456` và tên giả, `unit_cost`, `landed_unit_cost`, `purchase_rate`: KHÔNG giá trị nào hiện trên thẻ, kể cả trong `outerHTML`; còn hiện Mã hàng, Số lượng. SĐT giả không vào localStorage/sessionStorage/URL/console. Ảnh `qa2-ai-note-pii-desktop.png` |
+| B2 đơn vị số lượng | ✅ | `"10.000"` -> "10 kg"; `"0.500"` -> "0,5 kg"; `"12.345"` -> "12,345 kg"; `quantity "2.500"` -> "2,5 kg"; số `7` -> "7 kg"; `"1250.000"` -> "1.250 kg"; `refund_amount "150000.00"` -> "150.000 đ"; `"abc"`, `""`, `null`, `{}`, `true` -> bỏ dòng, không in `NaN/undefined/[object`; `qty -3.000` vẫn có "kg"; args `{}` rỗng thẻ vẫn có Từ chối/Đồng ý |
+| B3 khung hỏi nhanh (PO chốt) | ✅ | AI bật + đã đồng ý: 2 chip + ô "Hỏi AI về chứng từ này" + nút "Gửi câu hỏi" hiện sẵn (khớp board ERP-D2b, `qa2-ai-starter-desktop.png`), nút gửi khoá khi ô trống; chưa chạm: panel chưa nạp, 0 request `commands`/`chat`. Chạm ô: panel nạp, khung tĩnh nhường chỗ (chỉ còn 1 ô nhập), focus sang ô panel, gõ tiếp không mất ký tự (khi chunk về nhanh). Bấm chip, kể cả bấm đúp: panel nạp, câu hỏi gửi đúng 1 lần, có trả lời giả. Gõ câu rồi Enter, hoặc nút gửi của panel: đúng 1 lần. Enter khi chỉ khoảng trắng: không gửi. Bàn phím: Enter trên chip gửi. 360 px + chạm: không cuộn ngang, chip/nút gửi/ô nhập cao >= 44 px, chạm chip gửi được. Tải lại trang: ô rỗng (không lưu nháp). **AI tắt: không khối, không khung, không ô, 0 request `/api/ai/*` (chỉ tối đa 1 `status`), không tải chunk model/worker.** AI bật nhưng chưa đồng ý: bấm chip chỉ ra thẻ "Bật trợ lý trên máy", 0 request chat, nút khoá tới khi tick, bật xong thì panel nạp và câu được gửi. Cờ đồng ý chưa ghi trước khi tick. Ảnh `qa2-ai-consent-card-desktop.png`, `qa2-ai-chip-sent-desktop.png`, `qa2-ai-chip-sent-mobile360.png`, `qa2-ai-focus-panel-desktop.png`, `qa2-ai-off-desktop.png` |
+| B4 bấm 3 lần cùng nhịp | ✅ | 5 lần `click()` trong một tác vụ JS: "Đồng ý" = 1 POST confirm, "Từ chối" = 1 POST reject. Sau lỗi 500 ref được thả: bấm lại ra lần 2 (tổng 2). Từ chối bị 409: báo "đã được xử lý hoặc hết hạn" + tải lại danh sách |
+| B5 ô sửa tại chỗ để trống | ✅ | để trống rồi Lưu: nút vẫn "Lưu" (không "Thử lại"), 1 dòng lỗi, 0 PATCH; chỉ khoảng trắng: không gửi; gõ tiếp: lỗi biến mất, `aria-invalid` hết; nhập hợp lệ + Lưu: đúng 1 PATCH. Ảnh `qa2-inplace-after-empty-desktop.png` |
+| M1 409 chỉ là xung đột khi đúng nghĩa | ✅ | banner: 409+`STALE_STATE`, 400+`STALE_STATE`, 409+`STALE_VERSION`, 409 trơn có `updated_at`. Alert thường giữ lý do BE, không banner: 409+`CLAIMED`, 409+`CONTENT_WARNINGS`, 409 trơn không mã, 500. Mọi ca: giá trị đang gõ còn, không in `undefined/null/NaN/Invalid`; sau `CLAIMED` nút chính "Thử lại". Ô sửa tại chỗ (mock): gõ 409 -> banner, gõ 410 -> lỗi thường. Ảnh `qa2-conflict-banner-desktop.png`, `qa2-claimed-plain-error-desktop.png` |
+| M2 chi tiết đề xuất tải lỗi | ✅ | chi tiết 500 và 404: báo "Chưa mở được chi tiết đề xuất nên chưa thể Đồng ý. Bấm Thử lại." + nút Thử lại, "Đồng ý" khoá nhãn trơn (không "Đồng ý (3)"), sau 4 giây vẫn khoá và không đếm, bấm Đồng ý (khoá) 0 request `/confirm/`, Từ chối vẫn dùng. Thử lại: lần 1 lỗi, lần 2 thành công thì lỗi mất, Đồng ý mở, tải chi tiết đúng 2 lần. Ảnh `qa2-ai-detail-error-500-desktop.png`, `-404-` |
+
+#### Lỗi mới (không chặn)
+##### B6 — Chữ gõ trong lúc trợ lý đang nạp bị mất · Low · ED-04-AC8 (B3 mới)
+- Tái hiện: bản mock, AI bật + đã đồng ý; giữ các request `_next/static/chunks/*.js` (mạng chậm); chạm ô "Hỏi AI về chứng từ này", gõ ngay `abcdef`; thả chunk.
+- Mong đợi: ô panel có `abcdef` (hoặc ô tĩnh còn giữ cho tới khi panel sẵn sàng).
+- Thực tế: ô panel rỗng. Ngay khi chạm, khung tĩnh bị gỡ (`chat` có giá trị) và chỉ còn dòng "Đang mở trợ lý…"; phím gõ lúc đó không có ô nào nhận. Ảnh: `qa2-ai-slow-chunk-desktop.png` (panel đã nạp, ô rỗng). Script: `qa_ed_batch2_followup.py`, ca "B3 mạng chậm".
+- Ảnh hưởng: chỉ khi mạng/máy chậm, mất vài ký tự đầu; không mất dữ liệu nghiệp vụ. Gợi ý: giữ khung tĩnh (ô nhập) cho tới khi panel sẵn sàng, rồi chuyển `draft` sang `initialText`.
+- Ghi chú liên quan: nút gửi của khung tĩnh trên thực tế luôn khoá (chạm ô là panel thay luôn, nên không bao giờ có chữ trong ô tĩnh); chỉ là trang trí theo board. Có lợi hay không là việc của PO. Trên iOS, focus chuyển bằng mã sau khi panel nạp có thể không mở lại bàn phím: ⏸, chưa thử được trên thiết bị thật.
+
+#### Có sẵn từ gốc, không tính vào lô
+- Chữ hiển thị của panel AI lộ mã nội bộ: "đang chờ chốt ở S17" (có từ HEAD, `features/ai/messages.ts`); dòng "RAM: 8 GBWebGPU: CóMạng: Không rõ" dính nhau ở thẻ kiểm tra máy (bản chế độ thử). Cả hai thuộc `AiAssistantPanel` cũ, không phải mẫu Lô 2.
+- P1 `/ai/policy/`, P3 vùng bấm GuidancePanel, `Failed to fetch RSC payload` (server tĩnh): như lần 1.
+
+#### Rò giá vốn / dữ liệu cá nhân (kiểm lại)
+Không rò. B1 đã đóng: không `note`/`reason`/`description`... nào lên giao diện; allow-list chỉ gồm `item_code, qty, quantity, batch_id, supplier, warehouse, refund_amount`. Lưu ý nhỏ (không lỗi): các khoá `text` (`item_code`, `supplier`, `batch_id`, `warehouse`) hiện nguyên chuỗi BE trả, nên an toàn dựa vào BE chỉ gửi giá trị có cấu trúc cho các khoá này (`scrub_data` ở BE). Không có khoá nào cho phép tính ngược giá vốn (không đơn giá). Ảnh và log chỉ dùng dữ liệu giả (SĐT `0900000123`, `0900000456`).
+
+#### ⏸ Chưa kiểm
+1. Chuyển focus sang ô panel trên iOS/Android thật (cần thiết bị).
+2. Các mục ⏸ lần 1 phụ thuộc màn nghiệp vụ Lô 3+ (Dòng thời gian sau Đồng ý, ẩn theo quyền, giữ cuộn màn cha, nút phá huỷ đỏ, bước xác nhận không hoàn tác).
+3. Chạy FE với BE thật.
+
+Server 3101–3104 đã tắt. File: `erp-console/e2e/qa_ed_batch2_followup.py` (mới), `qa_ed_batch2_patterns.py` và `qa_ed_batch2_harness.py` (siết các ca "luôn đúng"), ảnh `qa2-*.png` (13 ảnh) ở `shots/lot2/`.
