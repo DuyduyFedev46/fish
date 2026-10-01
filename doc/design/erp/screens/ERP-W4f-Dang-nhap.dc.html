@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<title>ERP · Đăng nhập (máy tính)</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@500&amp;family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..24,400,0,0&amp;display=swap">
+<style>
+body{margin:0;font-family:Inter,system-ui,sans-serif;background:#FBFBFC;color:#17171C}
+a{color:#1A5BC0}a:hover{color:#1A57B5}
+.ms{font-family:'Material Symbols Outlined';font-weight:normal;font-style:normal;font-size:18px;line-height:1;letter-spacing:normal;text-transform:none;display:inline-block;white-space:nowrap;-webkit-font-feature-settings:'liga';font-feature-settings:'liga';-webkit-font-smoothing:antialiased}
+</style>
+</helmet>
+<div style="width: 1440px; height: 900px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px; background: #FBFBFC; font-family: Inter, system-ui, sans-serif; color: #17171C; overflow: hidden">
+<main style="width: 400px; background: #FFFFFF; border: 1px solid #E4E4E9; border-radius: 12px; padding: 28px; box-sizing: border-box; display: flex; flex-direction: column; gap: 20px">
+<div style="display: flex; align-items: center; gap: 10px"><span style="width: 32px; height: 32px; border-radius: 8px; background: #1F66D1; color: #FFFFFF; display: flex; align-items: center; justify-content: center"><span class="ms">set_meal</span></span>
+<div style="display: flex; flex-direction: column; line-height: 1.25"><span style="font-size: 15px; font-weight: 600">Cá Về</span><span style="font-size: 12px; color: #686874">Vận hành</span></div></div>
+<div style="display: flex; flex-direction: column; gap: 4px"><h1 style="margin: 0; font-size: 20px; font-weight: 600; letter-spacing: -0.015em">Đăng nhập vận hành</h1></div>
+<form style="display: flex; flex-direction: column; gap: 16px">
+<div style="display: flex; flex-direction: column; gap: 6px"><label style="font-size: 13px; font-weight: 500">Tài khoản</label><input type="text" value="" placeholder="vd: tam.kho" aria-label="Tài khoản" autocomplete="username" style="height: 40px; border-radius: 8px; border: 1px solid #D4D4DB; padding: 0 12px; font: inherit; font-size: 14px; color: #17171C; outline: none; box-sizing: border-box"></div>
+<div style="display: flex; flex-direction: column; gap: 6px"><label style="font-size: 13px; font-weight: 500">Mật khẩu</label><span style="height: 40px; border-radius: 8px; border: 1px solid #D4D4DB; background: #FFFFFF; display: flex; align-items: center; padding: 0 4px 0 12px"><input type="password" value="" aria-label="Mật khẩu" style="flex-grow: 1; min-width: 0; border: 0; outline: none; font: inherit; font-size: 14px; background: transparent; letter-spacing: 0.1em"><button type="button" style="width: 32px; height: 32px; border: 0; background: transparent; color: #686874; cursor: pointer"><span class="ms">visibility</span><span style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">Hiện mật khẩu</span></button></span></div>
+<button type="submit" style="height: 36px; padding: 0 14px; border-radius: 8px; font: inherit; font-size: 13px; font-weight: 500; white-space: nowrap; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; border: 0; background: #1F66D1; color: #FFFFFF; height: 40px; justify-content: center; font-size: 14px">Đăng nhập</button>
+</form>
+<div style="padding-top: 16px; border-top: 1px solid #EBEBEF; font-size: 13px; color: #686874; text-align: center">Quên mật khẩu? Nhờ Chủ vựa đặt lại.</div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+renderVals() {
+const collapsed = !!(this.state && this.state.collapsed);
+const st = this.state || {};
+return { collapsed: collapsed, expanded: !collapsed, toggle: () => this.setState({ collapsed: !collapsed }), userOpen: !!st.userOpen, toggleUser: () => this.setState({ userOpen: !st.userOpen }) };
+}
+}
+</script>
+</body>
+</html>

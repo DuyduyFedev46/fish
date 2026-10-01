@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<title>ERP · Không có quyền (máy tính)</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@500&amp;family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..24,400,0,0&amp;display=swap">
+<style>
+body{margin:0;font-family:Inter,system-ui,sans-serif;background:#FBFBFC;color:#17171C}
+a{color:#1A5BC0}a:hover{color:#1A57B5}
+.ms{font-family:'Material Symbols Outlined';font-weight:normal;font-style:normal;font-size:18px;line-height:1;letter-spacing:normal;text-transform:none;display:inline-block;white-space:nowrap;-webkit-font-feature-settings:'liga';font-feature-settings:'liga';-webkit-font-smoothing:antialiased}
+</style>
+</helmet>
+<div style="width: 1440px; height: 900px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px; background: #FBFBFC; font-family: Inter, system-ui, sans-serif; color: #17171C; overflow: hidden">
+<main style="width: 400px; background: #FFFFFF; border: 1px solid #E4E4E9; border-radius: 12px; padding: 28px; box-sizing: border-box; display: flex; flex-direction: column; gap: 20px">
+<div style="display: flex; align-items: center; gap: 10px"><span style="width: 32px; height: 32px; border-radius: 8px; background: #1F66D1; color: #FFFFFF; display: flex; align-items: center; justify-content: center"><span class="ms">set_meal</span></span>
+<div style="display: flex; flex-direction: column; line-height: 1.25"><span style="font-size: 15px; font-weight: 600">Cá Về</span><span style="font-size: 12px; color: #686874">Vận hành</span></div></div>
+<span style="width: 44px; height: 44px; border-radius: 10px; background: #F4F4F6; color: #4E4E58; display: flex; align-items: center; justify-content: center"><span class="ms" style="font-size: 24px">person_off</span></span>
+<div style="display: flex; flex-direction: column; gap: 6px"><h1 style="margin: 0; font-size: 20px; font-weight: 600; letter-spacing: -0.015em">Tài khoản chưa được phân quyền</h1>
+<p style="margin: 0; font-size: 13px; line-height: 1.55; color: #4E4E58">Tài khoản <b style="font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 12px; color: #17171C">admin</b> chưa thuộc nhóm nào. Nhờ Chủ vựa cấp quyền.</p></div>
+<div style="display: flex; justify-content: flex-end"><button type="button" style="height: 36px; padding: 0 14px; border-radius: 8px; font: inherit; font-size: 13px; font-weight: 500; white-space: nowrap; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; border: 1px solid #E4E4E9; background: #FFFFFF; color: #17171C"><span class="ms" style="font-size: 16px">logout</span>Đăng xuất</button></div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+renderVals() {
+const collapsed = !!(this.state && this.state.collapsed);
+const st = this.state || {};
+return { collapsed: collapsed, expanded: !collapsed, toggle: () => this.setState({ collapsed: !collapsed }), userOpen: !!st.userOpen, toggleUser: () => this.setState({ userOpen: !st.userOpen }) };
+}
+}
+</script>
+</body>
+</html>

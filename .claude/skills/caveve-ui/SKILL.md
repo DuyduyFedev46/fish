@@ -20,6 +20,12 @@ Phong cách **tinh gọn kiểu Linear/Notion**, dùng cho cả ba bề mặt:
 
 Design system (token màu, chữ, khoảng cách, bo góc, bóng) lưu ở **`DESIGN.md` gốc repo**, dùng chung cho ERP, Shop và app. Chưa có file này thì việc đầu tiên là tạo nó (xem bước 1 bên dưới). Mọi màn hình phải dùng token, không hard-code màu hay khoảng cách.
 
+## ERP: luật UI/UX bắt buộc (Duy chốt 30/09–01/10/2026)
+
+Mọi việc dựng, sửa hay review màn **ERP** phải đọc **`doc/design/erp/UI-RULES.md`** trước và đối chiếu với thiết kế mẫu
+`doc/design/erp/*.dc.html` (enum: `doc/design/erp/enum-map.md`). Luật này đi trước các gợi ý chung ở trên khi hai bên khác nhau.
+QA chấm màn ERP theo từng mục của `UI-RULES.md`.
+
 ## Chọn skill theo việc
 
 | Việc | Skill | Ghi chú |
