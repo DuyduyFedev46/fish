@@ -185,7 +185,7 @@ Code nặng của AI không được vào chunk route nghiệp vụ (`scripts/ch
 | `shared/ui/detail/Timeline.tsx` | Mỗi dòng: thời gian (`dd/mm/yyyy hh:mm`) \| việc (+ người làm). Dữ liệu = `timeline` của guidance. Bỏ `why.br`. |
 | `shared/ui/detail/AiBlockFrame.tsx` | Khung tĩnh của khối "Trợ lý AI": người/giờ đề xuất, việc, bảng trước → sau, Từ chối / Đồng ý, chip câu hỏi nhanh, ô chat + nút gửi. Chỉ vẽ, nhận props. |
 | `features/ai/components/AiDocBlock.tsx` (+ cổng mỏng `AiDocBlockGate.tsx`) | Nạp `GET /api/ai/actions/?target_model=&target_id=&status=PENDING,ESCALATED` (R1), `POST …/confirm/`, `…/reject/`; ô chat nạp động `AiAssistantPanel` (`ssr:false`) **chỉ khi** `ai_enabled` và đã đồng ý, như `AiAssistantGate`. Page (`app/…/page.tsx`) ghép vào `aiSlot`; feature screen không import `features/ai`. |
-| `shared/ui/states/ConflictBanner.tsx` | Banner vàng dưới header "Phiếu vừa được <tên> sửa lúc …. Tải lại để xem bản mới." + Tải lại. Bật khi API trả `409` hoặc `code=STALE_STATE` (kèm `updated_by_name`, `updated_at` nếu có). |
+| `shared/ui/states/ConflictBanner.tsx` | Banner vàng dưới header "Phiếu vừa được <tên> sửa lúc …. Tải lại để xem bản mới." + Tải lại. Bật khi lỗi là **xung đột phiên bản**: `code` ∈ {`STALE_STATE`, `STALE_VERSION`} hoặc 409 có `updated_at` (kèm `updated_by_name`, `updated_at` nếu có). 409 khác (`CLAIMED`, `CONTENT_WARNINGS`, `AI_ACTION_ALREADY_DECIDED`…) là lỗi thường: alert đỏ hiện `detail` của BE (sửa 02/10 theo review Lô 2 FE M1). |
 
 ### 2.4 Popup và form (Lô 2)
 | File | Việc | Thay |

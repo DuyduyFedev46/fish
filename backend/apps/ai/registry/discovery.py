@@ -163,6 +163,9 @@ class CommandRegistry:
                     # 4. Cấm phương thức DELETE và PUT
                     if method_upper in FORBIDDEN_METHODS:
                         continue
+                    # View tự tắt phương thức (http_method_names) thì không có lệnh AI tương ứng.
+                    if method.lower() not in getattr(cls, "http_method_names", ()):
+                        continue
 
                     # 5. Cấm CRUD ghi trên SalesOrder và SalesInvoice (H7)
                     if model_str in ("salesorder", "salesinvoice") and action_name in ("create", "update", "partial_update"):

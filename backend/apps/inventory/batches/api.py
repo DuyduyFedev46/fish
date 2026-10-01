@@ -10,6 +10,7 @@ from apps.ai import command_groups
 from apps.ai.declare import AiMeta
 from apps.common.api import BusinessModelPermissions, DocumentViewSet, require_perm
 from apps.inventory.models import Batch
+from apps.inventory.stock.filters import parse_id_param
 
 from . import services
 from .services import FEFO_ORDER
@@ -19,7 +20,8 @@ from .serializers import BatchListQuery, BatchSerializer, CancelExpiredInput, Re
 class BatchViewSet(DocumentViewSet):
     # Danh sách Kho & lô theo thứ tự xuất FEFO (BR-BH-05, UC-6); Meta.ordering giữ nguyên để
     # không sinh migration.
-    queryset = Batch.objects.select_related("item", "supplier", "warehouse").order_by(*FEFO_ORDER)
+    # `source_line`: một JOIN để field `receipt` (R5) lấy id phiếu mà không thêm truy vấn mỗi dòng.
+    queryset = Batch.objects.select_related("item", "supplier", "warehouse", "source_line").order_by(*FEFO_ORDER)
     serializer_class = BatchSerializer
     list_query_serializer = BatchListQuery
     ai_by_action = {"list": AiMeta(keywords=("tra tồn", "tồn kho", "còn bao nhiêu kg"), sensitivity=command_groups.SENSITIVITY_MEDIUM)}
@@ -46,6 +48,20 @@ class BatchViewSet(DocumentViewSet):
         if str(params.get("has_stock", "")).lower() in ("1", "true"):
             qs = qs.filter(qty_available__gt=0)
         return qs
+
+    def filter_queryset(self, queryset):
+        """R5 (ED-23-AC1): lọc danh sách theo nhà cung cấp và kho. Id sai dạng → 400 `INVALID_FILTER`."""
+        queryset = super().filter_queryset(queryset)
+        if self.action != "list":
+            return queryset
+        params = self.request.query_params
+        supplier_id = parse_id_param(params, "supplier")
+        if supplier_id is not None:
+            queryset = queryset.filter(supplier_id=supplier_id)
+        warehouse_id = parse_id_param(params, "warehouse")
+        if warehouse_id is not None:
+            queryset = queryset.filter(warehouse_id=warehouse_id)
+        return queryset
 
     def get_object(self):
         lookup_url_kwarg = self.lookup_url_kwarg or self.lookup_field

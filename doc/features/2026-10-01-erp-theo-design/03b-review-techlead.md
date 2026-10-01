@@ -1042,3 +1042,301 @@ Contract thật nằm ở 03-dev-notes "Lô 9 — BE / Contract". FE Lô 9 bám 
 
 ### Kết luận re-review Lô 13 — BE: **APPROVED**
 Không còn lỗi Critical, High hay Medium. Lô sẵn sàng cho QA.
+
+## Lô 14 — BE
+> techlead · 02/10/2026 · Diff chưa commit: `apps/accounts/capabilities/` (mới), `audit/api.py` + `test_actor_filter.py`, `auth/services.py` (2 nhãn) + `test_s47_me_labels.py`, `config/api_urls.py` (3 path B4), `common/guidance/api.py` (`_LAZY_MODULES` có `group`).
+> Kiểm chứng: `manage.py test apps.accounts apps.common` → **504 test OK**. `python3 scripts/check_naming.py` → OK, không phát sinh mới. Thêm một test tạm (đã xoá sau khi chạy) để in ma trận seed và tái hiện M1.
+
+### Điểm đã đạt (đã soi kỹ)
+- **Leo quyền.**
+  - Ghi bị chặn hai lớp: `CanManageStaff` rồi `actor_is_owner` (`services.py`, đầu `set_group_capabilities`). `manager` nhận 403. Người có `manage_staff` gán riêng nhưng không thuộc `owner` nhận 403 `StaffPermissionError`. Test `test_ed39_non_owner_holding_manage_staff_still_cannot_write` phủ ca này.
+  - Nhóm `owner` bị khoá với mọi nội dung (`GROUP_LOCKED`).
+  - Việc `owner_only` bị từ chối trước khi đụng DB, và cả yêu cầu bị huỷ (tất cả hoặc không gì).
+  - Khoá ngoài registry (gồm codename đầy đủ, `is_superuser`, chuỗi rỗng) nhận `INPUT_NOT_ALLOWED`. Trường ngoài `capabilities` bị chặn ở view.
+  - Service chỉ `add`/`remove` đúng `perms` của việc. Có test so permission ngoài registry của từng nhóm trước và sau.
+- **Giá vốn (bất biến 1).** `inventory.view_costprice` và `reports.view_profitreport` chỉ có trong `view_cost`/`view_profit`, cả hai `owner_only=True`. Không còn đường nào khác để cấp, vì permission ngoài registry không nhận được. `add_cost` (`purchasing.add_purchasecost`) và `set_price` cũng là `owner_only`. `can_view_cost` (`common/cost_keys.py:28`) chỉ xét `view_costprice`. Ma trận seed: không nhóm nào ngoài `owner` có ô `owner_only` ở trạng thái `on` hoặc `partial`. Kết luận: không có lỗi Critical.
+- **Registry.** 25 việc, codename tồn tại, các tập rời nhau, nhãn khớp 02b §3 B4 và T9. `view_customers` = `sales.view_customer_list`, khớp `customers/permissions.py:16`.
+- **Cache quyền.** Không có cache quyền nào ngoài `_perm_cache` theo từng instance user của Django. `lru_cache` duy nhất ở `ai/actions/targets.py:33` chỉ cache nhãn model. Test cùng token chứng minh quyền có hiệu lực ngay ở cả hai chiều: directory 200 → 403 và `/api/auth/me/`.
+- **Audit.** `changes` chỉ có `{"<key>": {"from","to"}}` và `note` rỗng. `object_repr` là mã nhóm. Lệnh không làm đổi gì thì không ghi audit.
+- **R16.** Chỉ lọc thêm `actor_id` trên endpoint cũ, quyền giữ `view_auditlog`. Không mở thêm field hay dòng nào ngoài những gì `manager` vốn đã thấy. `parse_positive_id` chặn input xấu, thông điệp không lặp lại giá trị.
+- **Dữ liệu nhân viên.** `members` chỉ có `id`, `display_name`, `username`, `other_groups`, `is_active`, `added_at`, không có SĐT. Riêng audit `staff_create` có lưu `phone`, nhưng `_added_at` chỉ đọc khoá `groups`. Timeline chỉ dùng nhãn do code dựng.
+- **N+1.** Không có. `_added_at` chạy 1 truy vấn. `list_groups` chạy số truy vấn cố định, khoảng 5 nhóm × 1 truy vấn thành viên. Các dòng audit dùng `select_related("actor__staff_profile")`.
+- **AI.** `/api/staff/` có trong `FORBIDDEN_PREFIXES` (`ai/policy/rules.py:13`), nên AI không gọi được ma trận.
+
+### Phát hiện
+
+**M1 — Medium · Tắt "Giao hàng, báo kết quả giao" (`deliver`) làm gãy việc "Soạn hàng, in tem" (`pack_print`).**
+- `apps/delivery/api.py:160-178`: action `set_status` khai `required_perms=("delivery.change_deliverynote",)`, và `BusinessModelPermissions` (`common/api.py:58-69`) kiểm tra quyền này trước, kể cả khi chuyển sang `READY`. Bước này chỉ cần `pack_deliverynote`.
+- Hai tập perms "rời nhau" ở registry, nhưng thực tế hai việc **không độc lập**. Màn hình sẽ hiện `pack_print: on` trong khi người dùng không đóng gói được.
+- Tái hiện (đã chạy):
+  1. Chủ gọi `PUT /api/staff/groups/warehouse_staff/capabilities/ {"capabilities":{"deliver":false}}`.
+  2. NV kho gọi `POST /api/delivery/notes/<id>/status/ {"to_status":"READY"}`.
+  3. Trước khi tắt nhận 404 (đi qua tầng quyền). Sau khi tắt nhận **403 "Thiếu quyền: delivery.change_deliverynote"**.
+- Hướng sửa: chọn một trong hai cách.
+  - (a) Thêm `requires` vào registry: `pack_print` cần `deliver`. Service trả 400 khi tắt `deliver` lúc `pack_print` đang bật, hoặc khi bật `pack_print` mà thiếu `deliver`. Thêm test.
+  - (b) Sửa `set_status` để READY chỉ cần `pack_deliverynote`. Cách này đụng `delivery/api.py`, ngoài phạm vi lô, cần điều phối viên mở phạm vi.
+- Tôi đề xuất (a). Cũng nên rà các cặp phụ thuộc tương tự trong test registry. Ví dụ: mọi việc đều cần `view_orders`, và tắt `view_orders` là gãy cả màn hình. Dev note 5 đã ghi ca này cho `delivery_staff`, nhưng FE mới chỉ cảnh báo cho `delivery_staff`.
+
+**M2 — Medium · `scopes` cố định có thể sai sau khi Chủ bật "Xem khách hàng" cho nhóm khác (bất biến 9, hiển thị sai phạm vi dữ liệu cá nhân).**
+- `registry.py`, `GROUP_SCOPES`: `warehouse_staff`/`customer_service` có `customers: "Không xem"`, `delivery_staff` có `"Được gán"`.
+- `view_customers` không phải `owner_only`, và `customer-directory` không có phạm vi dòng (`directory_api.py` docstring: "quyền này = xem mọi khách"). Vì vậy, sau `PUT …/delivery_staff/capabilities/ {"view_customers": true}`, NV giao xem được **toàn bộ** tên, SĐT và địa chỉ khách. Trong khi đó W3i vẫn hiện "Khách: Được gán".
+- Màn hình chỉ đọc đang nói sai đúng chỗ Chủ dựa vào để quyết lộ dữ liệu cá nhân.
+- Hướng sửa: `describe_group` tính `customers = "Tất cả"` khi nhóm có `sales.view_customer_list`, còn lại lấy bảng cố định. Thêm test: bật `view_customers` cho `delivery_staff` thì detail trả `customers: "Tất cả"`.
+- **Câu hỏi cho Duy (không chặn lô).** Có muốn chặn hẳn `view_customers` cho `delivery_staff`/`customer_service` không, tức là coi nó là "chỉ Chủ + Quản lý"? 02b hiện cho Chủ toàn quyền bật.
+
+**L1 — Low · Cửa sổ quét thành viên.** `services.py` `_membership_events` lấy 1000 dòng `staff_groups_change` mới nhất của **mọi** nhóm rồi mới lọc theo nhóm. Khi hệ thống có nhiều đổi nhóm, sự kiện cũ của nhóm ít biến động sẽ mất khỏi timeline. Chấp nhận được ở quy mô hiện tại. Nếu muốn sửa thì lọc trong DB bằng `changes__groups__from__contains`/`to__contains`.
+
+**L2 — Low · Docstring lỗi thời.** `capabilities/next_steps.py` ghi "vì `_LAZY_MODULES` của guidance chưa có khoá `group`", nhưng điều phối viên đã thêm khoá này. Nên sửa docstring. Có thể bỏ `from . import next_steps` ở `api.py`, hoặc giữ cả hai vì vô hại.
+
+**L3 — Low · Bản đồ module.** `backend/README.md` và `apps/accounts/README.md` chưa liệt kê `capabilities` (dev note 6).
+
+### Kết luận Lô 14 — BE: **CHANGES REQUESTED**
+- Không có lỗi Critical hay High. Chặn leo quyền và chặn giá vốn đều đúng và có test tốt.
+- Cần sửa **M1** (phụ thuộc `pack_print` → `deliver`) và **M2** (`scopes.customers` theo quyền thực tế), mỗi cái kèm test.
+- L1–L3 có thể làm cùng hoặc ghi nợ.
+
+## Lô 12 — BE (R11 hoá đơn mua, R12 chi phí phụ, R13 hoá đơn bán, R15 báo cáo lãi lỗ theo lô + số đếm kỳ)
+
+> Tech Lead · 2026-10-02 · Code chưa commit trên `main`. Căn cứ: 02b §0, §3.0, §3.8 R11/R12/R13/R15, §4, §5.2 Lô 12; D-3; `03-dev-notes.md` "Lô 12 — BE".
+
+### Lệnh đã chạy
+- `manage.py test apps.sales.payments apps.purchasing apps.reports apps.ai`: **738 test, OK** (29.8 s).
+- `manage.py makemigrations --check --dry-run`: No changes detected. Lô này không có migration.
+- `python3 scripts/check_naming.py`: OK, không có vi phạm mới.
+- Không có FE nào đang gọi 4 endpoint này (`grep` trong `erp-console/`, `frontend/`). Vì vậy đổi kích thước trang từ 50 (mặc định DRF) xuống 20 (`StandardPagination`) ở R11 và R12 không làm gãy màn nào.
+
+### Đã soát, đạt
+**Bất biến 1 (giá vốn)**
+- **R13 dòng.** `SalesInvoiceListSerializer` có `sensitive_fields=("cogs","gross_profit")` và dùng `CostFieldSerializerMixin`. Hai khoá này đã có trong `COST_KEYS`.
+- **R13 `totals`.** `build_totals(..., with_profit=has_perm(VIEW_COSTPRICE_PERM))` chỉ thêm `gross_profit` khi người gọi có quyền giá vốn. `totals` tính trên queryset đã lọc **và** đã áp phạm vi dòng.
+- **Sắp xếp.** Settings không bật `OrderingFilter`, nên `?ordering=cogs` không có tác dụng và không lộ thứ tự theo giá vốn.
+- **`q`.** Chỉ tìm theo `code` và `sales_order__code`.
+- **Lọc sai.** Ném `BusinessError` trước khi tính `totals`. Body lỗi không lặp lại giá trị người gọi gửi.
+- **R13 chi tiết.** Vẫn dùng `SalesInvoiceSerializer` cũ. `unit_cost` lồng trong `batch_allocations` bị ẩn qua mixin (ngữ cảnh lấy từ serializer cha). `retrieve` cũng đi qua `scope_invoices_for`, nên không có IDOR với người có quyền trực tiếp mà ngoài phạm vi.
+- **R12.**
+  - `check_permissions` chặn GET/HEAD khi thiếu `view_costprice`. Lớp chặn này thêm vào Tầng 1 `view_purchasecost`, và vì không có field nào để ẩn từng phần nên cả request bị chặn.
+  - Người chưa đăng nhập nhận 401 trước, vì `super()` chạy trước.
+  - Lệnh AI `purchasing.purchasecost.list/retrieve` chạy qua `dispatch.py` (`APIRequestFactory` → `view_cls.as_view`), nên cũng bị chặn y như vậy.
+- **R11.** `amount` hiện cho Quản lý đúng theo D-3. Vai khác bị 403 ở Tầng 1. `code` `#n` và `receipt_code` `PR-n` khớp với cách R10 đặt mã (`receipts/serializers.py:129,166`).
+- **R15.**
+  - `require_perm(view_profitreport)` và `required_perms` khai ở class.
+  - Lệnh AI `reports.batch_pnl_list` mang `required_perms` đó. Lệnh chạy qua view nên Quản lý và NV kho bị 403. Kết quả còn đi qua `scrub_data`, nên ai thiếu `view_costprice` bị lọc khoá `COST_KEYS`.
+  - Kênh mặc định là `local`, mức nhạy cảm mặc định `high`, giống hệt lệnh `reports.batch_pnl` đã có. AI chỉ đọc được lãi lỗ khi người gọi là Chủ, nên lệnh này không mở đường mới.
+- **R15b.** Gộp `period_counts` vào bằng `{**period_pnl, **counts}`. Hai bên không trùng khoá, nên các số cũ giữ nguyên.
+
+**Bất biến 9 (dữ liệu khách)**
+- **R13.**
+  - Chỉ trả `customer_name`, không có SĐT hay địa chỉ.
+  - `NoStoreMixin` áp cho cả list và detail.
+  - Người không thuộc full scope chỉ thấy hoá đơn của đơn trong `scope_orders_for`, và tên bị null khi `pii_visible=False`. Phạm vi này dùng lại helper của danh sách đơn, nên hai màn không lệch nhau.
+  - `customer_name` nằm trong `SCRUB_PII_KEYS`, nên không tới được AI.
+- Không có log hay `AuditLog` mới.
+
+**Số liệu và giờ VN**
+- **`period_counts` so với `period_pnl`.**
+  - `invoice_count` dùng cùng bộ lọc với doanh thu gộp (`ISSUED` + `issued_at__year/month` theo TIME_ZONE VN).
+  - `refund_count` loại phiếu khi `EXISTS(CN.issued_at <= confirmed_at)`. `period_pnl` thì loại khi `confirmed_at >= first(CN).issued_at`.
+  - Hai cách này tương đương vì một hoá đơn tối đa có một chứng từ đảo: `SalesCreditNote.source_key` là unique `cancel:<order.pk>`, và một đơn có một hoá đơn.
+  - Có test `test_r15_ac6_*` giữ hai bên khớp nhau.
+- **"Lô phát sinh trong kỳ".**
+  - `month_bounds` tạo mốc aware theo giờ VN, áp cho `issued_at` và `closed_at`.
+  - `received_date` là DateField nên so trực tiếp theo ngày.
+  - Có test biên `test_r15_ac3_month_boundary_uses_vietnam_time`.
+  - `Exists` nên một lô không bị nhân dòng.
+- **R13 ngày.** `date_range_q` dùng `__date` theo TIME_ZONE. `date_from > date_to` trả 400.
+- **Phân trang ổn định.** Cả 4 queryset đều có thứ tự xác định: `PurchaseInvoice` và `PurchaseCost` theo `Meta.ordering`, `SalesInvoice` theo `-issued_at,-id`, lô theo `-received_date,-id`.
+
+**Khác**
+- Snapshot AI: lô này chỉ thêm đúng 1 dòng `reports.batch_pnl_list`. Các dòng khác trong `git diff` của snapshot thuộc các lô 4/6/8 chưa commit, không phải của lô này.
+- Không đụng `services.batch_pnl`/`period_pnl` và `payments/services.py`, đúng §5.2.
+
+### Phát hiện
+
+**M1 — Medium (chờ Duy, đã đưa Duy quyết; không chặn BE) · NV kho thấy tên khách trên mọi hoá đơn bán.**
+- `apps/sales/payments/invoice_list.py:39`: `has_full_delivery_scope` gồm `warehouse_staff`, nên NV kho nhận `customer_name` của toàn bộ hoá đơn.
+- BE đang làm đúng 02b R13 (`view_salesinvoice`: chu, quan_ly, nv_kho), nhưng lệch với ED-33-AC4 (NV kho thấy "Không có quyền").
+- Tái hiện: token `warehouse_staff` gọi `GET /api/sales/invoices/` → 200, `results[].customer_name` có tên.
+- Nếu Duy chọn khoá thì có hai cách, cả hai đều ngoài phạm vi lô này:
+  - (a) Thu hồi `view_salesinvoice` của Group `warehouse_staff` bằng data migration trong `accounts`. Cách này ảnh hưởng `retrieve` và lệnh AI `sales.salesinvoice.*` của NV kho.
+  - (b) Giữ quyền xem nhưng null `customer_name` cho người không thuộc `sees_customer_directory`.
+- Tôi nghiêng về (b) nếu NV kho vẫn cần tra hoá đơn khi soạn hàng. Nếu không cần thì chọn (a).
+
+**L1 — Low · Số truy vấn của R15 tăng theo số lô trên trang.**
+- `apps/reports/api.py:49` gọi `services.batch_pnl` cho từng lô: khoảng 7 truy vấn mỗi lô, tối đa khoảng 140 truy vấn cho một trang 20 lô.
+- Đã có test khoá mức này: `test_r15_query_count_is_bounded_by_batch_pnl_cost_per_row` bảo đảm không phát sinh N+1 ngoài phần của `batch_pnl`.
+- Endpoint chỉ Chủ dùng, nên chấp nhận được lúc này. Ghi nợ: nếu đo trên staging thấy trang chậm quá 1 s thì viết `batch_pnl_many` trong `services.py`, với cùng công thức và test so khớp từng lô.
+
+**L2 — Low · Tập "lô phát sinh trong kỳ" hẹp hơn tập sự kiện mà `batch_pnl` tính.**
+- `apps/reports/batch_list.py:31-37` chỉ xét ba tiêu chí: nhập, bán hoặc chốt trong tháng.
+- Một lô cũ, chưa chốt, mà trong tháng chỉ có hao hụt, hàng hoàn, trả NCC hoặc chứng từ đảo sẽ không có mặt trong danh sách của tháng đó. Số của lô vẫn đúng khi xem ở tháng khác hoặc khi bỏ `month`.
+- Đây là giả định số 4 của dev, hợp lý cho bản đầu. FE cần ghi rõ tiêu chí dưới bộ lọc tháng. Nếu Lộc muốn tính đủ thì thêm `Exists` cho `ledger_entries` và `credit_lines` của tháng.
+
+**L3 — Low · `period_counts` chép lại quy tắc của `period_pnl`.**
+- Liên quan `apps/reports/period_counts.py:19-29` (dev note 5).
+- Rủi ro lệch số khi một bên đổi quy tắc, đã có test `test_r15_ac6_refund_*` canh chừng.
+- Khi nào được sửa `services.py`, nên để `period_pnl` trả luôn hai số đếm từ cùng queryset, rồi xoá file này.
+
+**L4 — Low · `list()` của R13 dựng queryset lọc hai lần.**
+- `apps/sales/payments/api.py:54-56`: `super().list` và `build_totals` mỗi bên gọi `filter_queryset(get_queryset())` một lần. Hệ quả là parse tham số hai lần và chạy một truy vấn đếm/tổng riêng, nhưng kết quả đúng.
+- Có thể giữ nguyên, hoặc gắn queryset đã lọc lên `self` trong `filter_queryset` để dùng lại.
+
+**Ghi chú (không phải lỗi)**
+- Người có `view_profitreport` mà không có `view_costprice` vẫn nhận `landed_unit_cost`, `purchase_cost`... ở R15. Hành vi này giống hệt `GET /api/reports/batch/{id}/` đã nghiệm thu, và đã có test `test_r15_ac1_user_with_only_view_profitreport_200`.
+- Ở ma trận B4 (`capabilities/registry.py:74-75`), cả `view_cost` và `view_profit` đều là `owner_only`. Vì vậy trường hợp trên không thể xảy ra qua giao diện.
+
+### Kết luận Lô 12 — BE: **APPROVED**
+- Không có lỗi Critical hay High.
+- Mọi đường lộ giá vốn đều đã chặn ở BE và có test: dòng, `totals`, sắp xếp, `q`, chi tiết cũ, R12 cả chứng từ, R15 và lệnh AI.
+- Dữ liệu khách ở R13 có `no-store`, có phạm vi dòng và không tới được AI.
+- **M1** chờ Duy quyết theo ED-33-AC4. Nếu Duy chọn khoá NV kho thì mở lô sửa nhỏ: (a) migration `accounts` hoặc (b) null `customer_name`, kèm test.
+- L1–L4 ghi nợ.
+- Báo FE: R11 và R12 đã phân trang 20 dòng.
+
+### Re-review Lô 14 — BE (sau khi sửa M1, M2, L1–L3)
+> techlead · 02/10/2026 · Kiểm chứng: `manage.py test apps.accounts apps.common` chạy **531 test, OK**. Tôi tự quét lại bằng AST trên toàn bộ `apps/` (không gồm tests và migrations): mọi hàm hoặc class nhắc tới permission của từ hai việc trở lên, đếm cả `required_perms`, `require_perm`, `has_perm` và hằng chuỗi.
+
+- **M1 · đã sửa.**
+  - `_check_requires` (`capabilities/services.py:281`) xét trạng thái sau khi áp yêu cầu. Việc gốc hoặc việc phụ thuộc phải nằm trong yêu cầu thì mới xét. Thông điệp nêu rõ cả hai việc.
+  - Lệnh được kiểm trước mọi lần ghi, nên không ghi gì và không có audit khi bị chặn.
+  - Test phủ đủ: bật hoặc tắt lệch nhau trả 400, đổi cả hai cùng lúc trả 200, ô `partial` vẫn tính là đang bật, dữ liệu lệch có sẵn không chặn việc khác, người không phải Chủ nhận 403 trước khi tới bước kiểm phụ thuộc.
+- **Phép quét action có bao hết cặp phụ thuộc không: chưa.** Test `test_actions_spanning_several_capabilities_are_covered_by_requires` chỉ đọc `kwargs["required_perms"]` của `@action` trên các viewset có đăng ký router. Nó **không bắt được đúng dạng lỗi M1**: `set_status` chỉ khai một perm trong `required_perms`, còn `pack_deliverynote` được kiểm bằng `has_perm` ngay trong thân hàm. Test cũng bỏ qua `require_perm`/`has_perm` viết trong thân hàm, `required_perms` khai ở cấp class, và các `APIView` không đăng ký router.
+  - Tôi đã tự quét lại theo cách rộng hơn. Có 9 chỗ chạm từ hai việc trở lên. Chỉ **`delivery/api.py:167 set_status`** đòi cả hai quyền cùng lúc (`deliver` và `pack_print`), và cặp này đã được khai trong `requires`.
+  - 8 chỗ còn lại không cần khai:
+    - `refunds/api.py:64 create_refund` đòi thêm `confirm_payment` chỉ ở nhánh giao dịch lệch. Đây là nhánh con của Chủ, `confirm_payment` là `owner_only`, nên không thể khai `requires`.
+    - `delivery/attention_api.py:32` cần một trong các quyền (OR).
+    - Các hàm `get_available_actions` và `next_steps` chỉ dùng quyền để hiện nút.
+    - `ai/*` liệt kê quyền.
+  - Kết luận: **hiện không còn cặp nào bị sót**. Test quét chỉ là lưới an toàn hẹp, ghi nợ ở L4.
+- **M2 · đã sửa.** `group_scopes` (`services.py:230`) trả `customers = "Tất cả khách"` khi nhóm có `sales.view_customer_list`; khi không có thì lấy bảng cố định. Có test khớp với kết quả 200/403 của `customer-directory` cho cả 5 nhóm. Lưu ý cho FE: chuỗi `customers` đổi từ `"Tất cả"` thành `"Tất cả khách"`, và owner/manager có thể nhận `"Không xem"`. FE đang hiện chuỗi do BE trả nên không cần đổi logic.
+- **L1 · đã sửa.** Lọc trong DB bằng `changes__groups__from/to__icontains` rồi kiểm lại chính xác bằng Python. Dùng `iterator()` và dừng khi đủ 200 dòng. Postgres hỗ trợ lookup này qua `KeyTransformIContains`; dev mới chạy trên SQLite, nên QA cần thử trên staging.
+- **L2, L3 · đã sửa.**
+
+**L4 — Low (mới, ghi nợ) · `capabilities/tests/test_requires.py`, `test_actions_spanning_several_capabilities_are_covered_by_requires`:** test này không thấy được kiểm quyền viết trong thân hàm, nên nếu sau này có cặp phụ thuộc mới theo dạng giống M1 thì test vẫn xanh.
+- Cách sửa: thêm vào docstring của test và của `registry.py` rằng ai thêm `require_perm`/`has_perm` của việc khác vào một action thì phải tự khai `requires`.
+- Hoặc mở rộng test sang quét AST mã nguồn của action, như cách tôi đã quét.
+- Không chặn lô.
+
+### Kết luận re-review Lô 14 — BE: **APPROVED**
+Không còn lỗi Critical, High hay Medium. Lô sẵn sàng cho QA.
+
+---
+
+## Lô 2 — FE (mẫu trang chi tiết, popup, form, khối Trợ lý AI; ED-03 phần còn lại, ED-04 trang chi tiết, ED-05)
+> Review 02/10/2026 trên diff chưa commit: `git diff -- erp-console` cùng các file mới chưa track. Không xét `backend/`.
+> Căn cứ: 02b §0 (1, 2, 7), §0b T2/T10, §0c, §2.3, §2.4, §4, §5.2 Lô 2; contract R1/R2 ở mục "Lô 2 — BE" của dev-notes; UI-RULES.
+
+**Kết luận: CHANGES REQUESTED (nhẹ).** Không có lỗi Critical hay High. Lô không rò giá vốn, không rò dữ liệu khách và
+không vượt quyền. Có 2 lỗi Medium cần sửa trong lượt này, mỗi lỗi vài dòng: M1 (`isConflictError` coi mọi 409 là "người
+khác vừa sửa") và M2 (nút Đồng ý kẹt khi tải chi tiết đề xuất lỗi). Các lỗi Low được để lại theo lô ghi bên dưới.
+**Nhắc commit font:** `public/fonts/ms/material-symbols-outlined.woff2` (112 icon) **không** bị `.gitignore`. Dev ghi sai
+ở dev-notes. Xem L1.
+
+### Kiểm chứng (Tech Lead tự chạy trong lượt này)
+- `npx tsc --noEmit`: sạch. `npx vitest run`: 42 file, 366 test đều đạt.
+- `NEXT_PUBLIC_USE_MOCK=0 npm run build`: OK. `check-no-mock`: XANH (15 file mock, 34 seed). `check-ai-chunks`: XANH.
+- Bản build thật: trong `out/` và `.next/static` không có chuỗi demo (`PR-260928-01`, `dev-patterns/qty`, `Nhập thử một phiếu`,
+  `CA01-260928`). Route `/(console)/dev-patterns/page` chỉ có các chunk khung cùng một page chunk 1,4 kB (chỉ chứa `NotFoundScreen`).
+- `NEXT_PUBLIC_USE_MOCK=1 npm run build`: `PatternDemo` nằm ở chunk lười `1085.*.js`, có `data-ai-block`. Chunk này chỉ
+  *tham chiếu* chunk `4905.*.js`, là một trong 3 chunk có `wllama` (`7483`, `7513`, `4905`). Bản thân nó không chứa
+  `new Worker`, `wllama` hay `/call/`. Như vậy `AiAssistantPanel` đúng là tách chunk và chỉ nạp khi render.
+- `git check-ignore -v …/material-symbols-outlined.woff2` trả rc=1, tức là không bị chặn (`.gitignore:54 !erp-console/public/fonts/ms/*.woff2`).
+  `git ls-files` có file này, `git status` báo `M`.
+- So các tên icon trong `<Icon name="…">` và `icon: "…"` của `app/ features/ shared/` với danh sách `ICONS` (112 tên): không thiếu tên nào.
+- `python3 scripts/check_naming.py`: OK. Grep màu cứng trên các file mới chưa track: 0.
+
+### Đối chiếu trọng tâm
+| Mục | Kết quả | Căn cứ |
+|---|---|---|
+| SR-20: AI tắt thì không có request `/api/ai/*` | Đạt ở 4 màn SR-20 | Các màn nghiệp vụ hiện chưa gắn `AiDocBlockGate`, nên 0 request. Trang chi tiết có khối AI thì AI tắt vẫn gọi **1** `GET /api/ai/status/` và 0 `/api/ai/actions`. Đây là hành vi 02b §2.3 cho phép ("như `AiAssistantGate`"); SR-20-AC3 chỉ áp cho 4 màn danh sách. Lô 3 trở đi không được gắn khối AI vào 4 màn đó |
+| Code AI nặng chỉ nạp động sau khi bật AI và đồng ý | Đạt | `AiDocBlock.tsx:24` dùng `dynamic(() => import("./AiAssistantPanel"), { ssr:false })`. Chỉ render khi `chatOpen && consented` (`AiDocBlock.tsx:145-147`). Đã xác nhận bằng chunk của bản mock (xem trên) |
+| Không lọt vào chunk route nghiệp vụ | Đạt (xem L3) | `AiDocBlockGate.tsx:12` import **tĩnh** `AiDocBlock` (actions api, consent, `AiBlockFrame`, `ai.module.css`). Đây là phần nhẹ, không có runtime. Dev-notes viết "AiDocBlockGate (nạp động…)" là chưa đúng: chỉ panel chat là nạp động |
+| `AiDocBlockGate` tự công bố cờ AI | Không race, nhưng cờ "dính" (L2) | `getAiStatus` gọi `publishAiEnabled` (`features/ai/api.ts:16`). Unmount thì abort và không publish `false` (đúng). Mỗi lần mở trang chi tiết có 1 status + 1 list + N chi tiết đề xuất PENDING (BR-AI-14 cần chi tiết để ghi `viewed_at`). Không có lệnh gọi thừa |
+| Route `dev-patterns` | Đạt (L4) | Có thật trong bản build, nhưng chỉ vẽ `NotFoundScreen`, nằm sau `ConsoleGate` (phải đăng nhập), và không có mã hay dữ liệu demo. Cờ mock viết đúng dạng `process.env.NEXT_PUBLIC_USE_MOCK === "1" ? dynamic(...) : null` ở mức route. Như vậy đã đủ, không cần chặn thêm |
+| Timeline: không render `why.br` | Đạt | `GuidancePanel.tsx` bỏ `step.why.br`. `Timeline.tsx` và `detailAdapters.ts` không có trường `br`. e2e kiểm không có `BR-\d` |
+| `timeline_truncated` | Đạt | `types.ts` có `timeline_truncated?`. `GuidancePanel.tsx` ghi "Chỉ hiện n việc gần nhất". `Timeline` có prop `truncated`; màn thật phải truyền `data.timeline_truncated` vì `toTimelineEntries` không mang cờ này |
+| `doc.status` nullable (R2) | Đạt | `types.ts`: `status`/`status_label` cho phép `null` |
+| Dữ liệu cá nhân: LookupCard, `lookups.ts` | Đạt | `LookupKind = batch\|item\|delivery\|order`, không có thẻ khách hàng và không gọi API khách. `toLookupCard` chỉ lấy theo danh sách trường cho phép. `recipient_*`, `customer.*`, `landed_unit_cost` trong mock đều bị bỏ, có vitest và e2e (`123456` không hiện). Đã đối chiếu tên trường với `BatchSerializer`, `ItemSerializer`, `DeliveryNoteSerializer`: khớp |
+| Giá vốn trong khối AI (ED-04-AC9) | Đạt | `docBlockModel.ts` chỉ hiện khoá có trong `ARG_LABEL` (không có khoá tiền). BE đã lọc `args_preview` bằng `scrub_data` theo người xem |
+| Modal | Đạt | Giữ focus ở `focus.ts:trapTarget`. Esc đóng hộp trên cùng, đang `busy` thì không đóng; nền và nút X cũng bị khoá. Lấy nút mở lúc render và trả focus khi cleanup. `aria-modal`, `aria-labelledby`. e2e có Tab ×8, Shift+Tab, Esc khi đang gửi, trả focus |
+| MoreMenu | Đạt | Mục bị chặn có `aria-disabled`, có lý do nằm cạnh và trong tên truy cập, vẫn focus được, bấm vào không gọi `onSelect`. Bàn phím: ↑ ↓ Home End Esc (trả focus về nút "…"), Tab đóng |
+| `useSubmit` | Đạt (xem M1) | Bấm đúp bị chặn bằng `inFlight` ref, kể cả hai lần bấm trong cùng một khung hình. Khi lỗi, hook không đụng state giá trị; `failed` chuyển nút thành "Thử lại"; `fieldErrorsOf` chỉ đọc lỗi 400 |
+| 409 trong `http.ts` | Đạt, không hồi quy | `http.ts:203` truyền `details` cho 409. Đã rà mọi nơi đang đọc 409: `content/edit` và `ImageUploadSheet` chỉ đọc `status` và `code`; `confirmation/api.ts:147` đọc `code`; `ai/settings/levels.ts:74` chỉ đọc `details` khi `code==="BR-AI-19"` (400). Thay đổi duy nhất người dùng thấy được: 409 không kèm `detail` giờ hiện `MSG.conflict` thay cho "Lỗi máy chủ (409)". Mọi 409 của BE hiện đều có `detail`, nên ca này không xảy ra |
+| Font icon | Đạt, **phải commit** | `chat` và `forward_to_inbox` đã có trong `ICONS`. Font 94.576 byte đang ở trạng thái `M` |
+| Màn cũ | Đạt | `GuidancePanel` bỏ nút "Làm mới" (UI-RULES §2.2). Nút "Thử lại" khi lỗi và `refreshSignal` vẫn còn. Không e2e nào bấm "Cập nhật hướng dẫn". `p8_lo6_fe_sr19_sr20.py` sửa đúng theo việc đã gỡ cột phải ở Lô 1 |
+
+### Phát hiện
+
+**M1 — Medium — `useSubmit` coi mọi 409 là "người khác vừa sửa".** Vị trí: `shared/ui/form/useSubmit.ts:29-30`.
+- Lỗi: hàm trả true với **mọi** `status === 409`. Khi đó `useSubmit` (`:76-77`) bỏ `err.message` và chỉ bật `ConflictBanner`.
+- Phạm vi ảnh hưởng: BE đang trả 409 cho nhiều việc không phải xung đột phiên bản, ví dụ `CLAIMED` (`common/exceptions.py:32`),
+  `AI_ACTION_ALREADY_DECIDED`/`AI_ACTION_NOT_PENDING` (`ai/actions/services.py:62-63`), `POLICY_CHANGED`,
+  `CONTENT_WARNINGS` (bước xác nhận cảnh báo CMS-08), `AI_CONFIG_CONFLICT`, `AI_POLICY_CONFLICT`.
+- Hậu quả: 30 story dùng lại mẫu này sẽ hiện "Phiếu vừa được người khác sửa…" cho cả các ca trên, và người dùng mất câu
+  lý do thật của BE.
+- Nguyên nhân gốc: câu "409 hoặc STALE_STATE" ở 02b §2.3 viết lỏng. Tech Lead nhận phần này. Ý định của câu là xung đột phiên bản.
+- Cách tái hiện:
+  - `apiFetch` mock trả `{status:409, body:{detail:"Việc đã có người nhận.", code:"CLAIMED"}}` trong `useSubmit`.
+  - Kết quả hiện tại: `error === null`, `conflict = {}`, banner nói "người khác vừa sửa".
+- Sửa: chỉ coi là xung đột khi `code ∈ {"STALE_STATE","STALE_VERSION"}`, hoặc 409 mà thân có `updated_at`. Các 409 còn lại
+  đi nhánh lỗi thường (alert đỏ, hiện `err.message`). Thêm vitest cho 409 `CLAIMED`: `error` là câu của BE, `conflict === null`.
+  Tech Lead đã sửa câu ở 02b §2.3 cho khớp.
+
+**M2 — Medium — Nút "Đồng ý" kẹt ở "Đồng ý (3)" khi tải chi tiết đề xuất lỗi.** Vị trí: `features/ai/components/AiDocBlock.tsx:77`, `:98`.
+- Diễn biến lỗi:
+  1. `fetchAiActionDetail` lỗi (mất mạng, 404).
+  2. `.catch(() => ready.current.delete(r.id))` xoá mốc chờ và không báo gì.
+  3. `waitLeft(undefined)` trả về 3, nên nút bị khoá mãi.
+  4. `anyWaiting` vẫn true, nên `setInterval` 500 ms chạy mãi.
+  5. Không có lỗi nào hiện ra, và "Thử lại" không xuất hiện vì `loadError` vẫn null.
+- Hậu quả: người dùng chỉ còn cách tải lại trang.
+- Cách tái hiện (mock): cho `mockFetchAiActionDetail` trả 500 với một id PENDING, mở `/dev-patterns/` khi AI bật. Nút giữ "Đồng ý (3)" sau 10 giây.
+- Sửa: khi `.catch` (và không phải abort), đặt một lỗi cho đề xuất đó, ví dụ `setLoadError("Chưa mở được chi tiết đề xuất.")`,
+  để khối hiện "Thử lại" (gọi `load()` sẽ tải lại chi tiết vì id đã bị xoá khỏi `ready`). Đồng thời không tính đề xuất
+  thiếu mốc vào `anyWaiting`.
+
+**L1 — Low — Ghi chú font sai, có nguy cơ quên commit.** Vị trí: `03-dev-notes.md`, mục "Lô 2 — FE: sửa theo yêu cầu…" (7).
+- Dev viết font "bị `.gitignore`, mỗi máy tự sinh lại". Thực tế file đã được track từ Lô 1 (`.gitignore:54`), nay đang `M`.
+- Commit của lô **phải gồm** `erp-console/public/fonts/ms/material-symbols-outlined.woff2`. Nếu thiếu, `chat` và
+  `forward_to_inbox` sẽ hiện thành chữ trên bản build ở máy khác hoặc trên CI.
+- Sửa câu trong dev-notes.
+
+**L2 — Low — Cờ "AI bật" bị dính theo lịch sử điều hướng.** Vị trí: `features/ai/api.ts:16`, `features/ai/gate-state.ts`.
+- Biểu hiện: sau khi mở một trang chi tiết có `AiDocBlockGate`, cờ `enabled=true` ở mức module còn nguyên khi quay về `/orders`.
+  Vì vậy nút "Tóm tắt" (DW-16) của `GuidancePanel` hiện hay không tuỳ người dùng đã ghé trang chi tiết nào chưa.
+- Nếu Chủ tắt AI giữa chừng, cờ vẫn là true cho tới lần gọi status kế tiếp.
+- Không vi phạm BR-AI-17, vì vẫn cần sự đồng ý. Đây là chuyện nhất quán giao diện.
+- Ghi lại để Lô 3 quyết: "Tóm tắt" chỉ hiện trên trang chi tiết, hoặc chấp nhận hành vi này.
+
+**L3 — Low — `check-ai-chunks` chưa phủ trang chi tiết.** Vị trí: `scripts/check-ai-chunks.mjs:20`.
+- `TARGETS` chỉ gồm 4 màn danh sách và 2 layout. Hiện chưa route thật nào gắn `AiDocBlockGate`, nên kết quả XANH chưa chứng minh gì cho khối AI.
+- Lô 3 phải thêm `/(console)/orders/detail/page`, và các trang chi tiết sau đó, vào `TARGETS`.
+- Tuỳ chọn: chuyển `AiDocBlock` thành `next/dynamic` trong gate để AI tắt thì trang chi tiết không tải cả phần nhẹ.
+
+**L4 — Low — Route `dev-patterns` vẫn có trong bản build thật.** Vị trí: `app/(console)/dev-patterns/page.tsx:8`.
+- Route sinh `out/dev-patterns/index.html`, trả 200 kèm màn "Không tìm thấy" sau khi đăng nhập.
+- Không lộ gì: đã grep chuỗi demo. Chấp nhận được.
+- Nếu muốn có 404 thật, có thể đổi đuôi file (`page.mock.tsx`) và đặt `pageExtensions` theo cờ mock trong `next.config.mjs`. Không bắt buộc.
+
+**L5 — Low — `InfoField` sửa tại chỗ gặp 409 thì im lặng.** Vị trí: `shared/ui/detail/InfoField.tsx:131`.
+- `useSubmit` đưa 409 vào `conflict` chứ không vào `error`, nên ô vẫn mở, nút thành "Thử lại" mà không có dòng lỗi.
+- Hiện chỉ đúng khi màn tự bắt lỗi trong `onSave`, như trang demo đang làm.
+- Sửa: thêm prop `onConflict`, hoặc hiện câu ngắn dưới ô khi `sub.conflict`. Làm cùng M1 hoặc ở Lô 3.
+
+**L6 — Low — Thứ tự dòng cùng thời điểm bị ngược.** Vị trí: `features/guidance/detailAdapters.ts:9`.
+- `sort` ổn định, nên hai dòng cùng `at` (ví dụ "tạo" và việc đầu tiên trong cùng giây) giữ thứ tự cũ → mới, trong khi danh sách xếp mới → cũ.
+- Sửa: dùng `[...entries].reverse()` (BE đã xếp cũ → mới), hoặc thêm tiêu chí phụ là chỉ số ban đầu, đảo ngược.
+
+**L7 — Low — Dọn dẹp.**
+- `features/guidance/components/guidance.module.css:27-43`: `.refreshBtn` là CSS chết.
+- `shared/ui/form/SummaryBlock.tsx:2`: chú thích "SĐT… do màn truyền vào đã che sẵn" trái với quyết định 6 (ERP hiện đủ SĐT). Sửa thành "ERP hiện đủ, tem in và AI thì che".
+- `GuidancePanel.tsx:250` vẫn in `[e.doc]` thô (`receipt`, `delivery`…) cạnh nhãn dòng thời gian. Lỗi có từ trước, nhưng R2 làm nó lộ ra ở 8 loại mới. Bỏ hoặc dịch ở Lô 3.
+
+**Ghi nhận (không phải lỗi):**
+- Chỗ lệch 2 (R1 không có giá trị "trước", nên chỉ hiện "sẽ đổi thành") và chỗ lệch 8 (chat chỉ mở khi bấm) đều hợp lý. PO cần biết ED-04-AC8 đang làm một phần "trước → sau".
+- Chỗ lệch 3 (việc ESCALATED khi AI tắt) đã chuyển sang Lô 15 (T10). Đồng ý.
+- `lookups.ts` có thêm loại `order` (`/api/sales/orders/{id}/`) ngoài 3 loại 02b liệt kê. Đồng ý, vì thẻ chỉ đọc mã, trạng thái, tổng tiền và ngày.
+
+### Việc cần làm để APPROVED
+1. Sửa M1 và M2, mỗi lỗi kèm vitest.
+2. Sửa câu font trong dev-notes (L1).
+3. Điều phối viên commit lô **kèm file font**. Tech Lead re-review chỉ phần diff của M1 và M2.

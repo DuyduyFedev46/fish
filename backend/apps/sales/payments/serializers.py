@@ -5,6 +5,7 @@ nhạy cảm (giá vốn) — ẩn với ai không có view_costprice (spec 1.6)
 from rest_framework import serializers
 
 from apps.common.api import CostFieldSerializerMixin
+from apps.sales.customers.permissions import can_view_customer_directory
 from apps.sales.utils import money_str
 from apps.sales.models import (
     PaymentTransaction,
@@ -41,6 +42,50 @@ class SalesInvoiceSerializer(serializers.ModelSerializer):
             "payment_txn_ref", "payment_method", "status", "lines",
         ]
         read_only_fields = fields
+
+
+class SalesInvoiceListSerializer(CostFieldSerializerMixin, serializers.ModelSerializer):
+    """
+    R13 — một dòng danh sách hoá đơn bán (W5j). Cần queryset có annotate `cogs` (xem `invoice_list.with_cogs`).
+
+    `cogs` và `gross_profit` (= amount − cogs, không làm tròn — cùng cách tính với báo cáo) là giá vốn/lãi: chỉ người có `view_costprice` thấy, người khác KHÔNG có key
+    (BR-PQ-15). `customer_name` là dữ liệu khách: null khi thiếu `sales.view_customer_list` (M1) hoặc `pii_visible=False` (SR-PII-02). Không có SĐT/địa chỉ.
+    """
+
+    sensitive_fields = ("cogs", "gross_profit")
+
+    order_code = serializers.CharField(source="sales_order.code", read_only=True)
+    customer_name = serializers.CharField(source="customer.name", read_only=True)
+    status_label = serializers.CharField(source="get_status_display", read_only=True)
+    amount = serializers.SerializerMethodField()
+    cogs = serializers.SerializerMethodField()
+    gross_profit = serializers.SerializerMethodField()
+
+    class Meta:
+        model = SalesInvoice
+        fields = [
+            "id", "code", "sales_order", "order_code", "customer_name", "issued_at", "amount", "status",
+            "status_label", "cogs", "gross_profit",
+        ]
+        read_only_fields = fields
+
+    def get_amount(self, invoice):
+        return money_str(invoice.amount)
+
+    def get_cogs(self, invoice):
+        return money_str(invoice.cogs)
+
+    def get_gross_profit(self, invoice):
+        return money_str(invoice.amount - invoice.cogs)
+
+    def to_representation(self, instance):
+        ret = super().to_representation(instance)
+        request = self.context.get("request")
+        user = getattr(request, "user", None)
+        # M1: tên khách chỉ cho người có "Xem khách hàng" (cùng hàm với danh bạ khách), rồi mới tới phạm vi dòng.
+        if not can_view_customer_directory(user) or getattr(instance, "pii_visible", True) is False:
+            ret["customer_name"] = None
+        return ret
 
 
 class PaymentTransactionSerializer(serializers.ModelSerializer):

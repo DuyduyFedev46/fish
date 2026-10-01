@@ -226,6 +226,8 @@ BATCH_NEAR_EXPIRY_DAYS = int(os.getenv("BATCH_NEAR_EXPIRY_DAYS", "14"))
 SALES_ORDER_TTL_MINUTES = int(os.getenv("SALES_ORDER_TTL_MINUTES", "30"))
 DELIVERY_MAX_FAILED_ATTEMPTS = int(os.getenv("DELIVERY_MAX_FAILED_ATTEMPTS", "2"))
 COLD_CHAIN_MAX_HOURS = int(os.getenv("COLD_CHAIN_MAX_HOURS", "6"))
+# Số dòng nhật ký tối đa trong một timeline "Đã làm" (R2); thừa thì trả timeline_truncated=true.
+GUIDANCE_TIMELINE_MAX_ROWS = int(os.getenv("GUIDANCE_TIMELINE_MAX_ROWS", "200"))
 
 INTERNAL_SERVICE_TOKEN = os.getenv("INTERNAL_SERVICE_TOKEN", "")
 

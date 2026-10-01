@@ -60,7 +60,7 @@
  "backend/apps/common/tests/test_p8_lo8_vnd_gmt7.py": 21,
  "backend/apps/common/tests/test_qa_lo8_admin_str_leak.py": 13,
  "backend/apps/common/tests/test_s3_locked_fields.py": 135,
- "backend/apps/common/tests/test_s4_actor_fields.py": 74,
+ "backend/apps/common/tests/test_s4_actor_fields.py": 71,
  "backend/apps/common/tests/test_s5_scope_nv_giao.py": 70,
  "backend/apps/common/tests/test_s9_admin_locked_fields.py": 96,
  "backend/apps/common/tests/test_settings_security.py": 8,

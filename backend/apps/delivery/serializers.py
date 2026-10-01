@@ -5,6 +5,7 @@ Tuân thủ Bất biến 1 (không rò giá vốn) và Bất biến 9 (phạm vi
 from rest_framework import serializers
 
 from .models import DeliveryNote, LabelPrint
+from . import services
 from .pii_scope import is_note_pii_expired
 
 
@@ -26,6 +27,8 @@ class DeliveryNoteSerializer(serializers.ModelSerializer):
     customer_name = serializers.SerializerMethodField()
     address = serializers.SerializerMethodField()
     available_actions = serializers.SerializerMethodField()
+    assigned_to_name = serializers.SerializerMethodField()
+    failure_reason_label = serializers.SerializerMethodField()
 
     class Meta:
         model = DeliveryNote
@@ -33,14 +36,15 @@ class DeliveryNoteSerializer(serializers.ModelSerializer):
             "id", "code", "status", "status_label",
             "sales_invoice", "invoice_code", "order",
             "paid_at", "confirmed_at", "confirm_skipped",
-            "assigned_to", "failed_attempts", "note",
+            "assigned_to", "assigned_to_name", "failed_attempts", "note",
+            "failure_reason", "failure_reason_label",
             "created_at", "completed_at",
             "lines_summary", "total_kg", "label",
             "customer_name", "address",
             "available_actions",
         ]
         read_only_fields = [
-            "code", "sales_invoice", "status", "assigned_to", "failed_attempts",
+            "code", "sales_invoice", "status", "assigned_to", "failed_attempts", "failure_reason",
             "created_at", "completed_at", "confirmed_at", "confirmed_by", "confirm_skipped",
         ]
 
@@ -54,6 +58,14 @@ class DeliveryNoteSerializer(serializers.ModelSerializer):
         if self._customer_data_hidden(instance):
             ret["note"] = None
         return ret
+
+    def get_assigned_to_name(self, obj):
+        if not obj.assigned_to_id:
+            return None
+        return services.staff_display_name(obj.assigned_to)
+
+    def get_failure_reason_label(self, obj):
+        return obj.get_failure_reason_display() if obj.failure_reason else ""
 
     def get_order(self, obj):
         invoice = obj.sales_invoice
@@ -73,12 +85,9 @@ class DeliveryNoteSerializer(serializers.ModelSerializer):
             if not invoice:
                 obj._cached_allocations = []
             else:
-                from apps.sales.models.invoices import SalesInvoiceLineBatch
-                allocs = list(
-                    SalesInvoiceLineBatch.objects.filter(invoice_line__invoice=invoice)
-                    .select_related("component_item", "batch")
-                    .order_by("id")
-                )
+                # Đọc qua prefetch của viewset (`lines__batch_allocations__...`), không truy vấn thêm theo từng phiếu.
+                allocs = [alloc for line in invoice.lines.all() for alloc in line.batch_allocations.all()]
+                allocs.sort(key=lambda alloc: alloc.pk)
                 obj._cached_allocations = allocs
         return obj._cached_allocations
 
@@ -144,10 +153,13 @@ class DeliveryNoteSerializer(serializers.ModelSerializer):
             return []
 
         status = obj.status
-        if status == DeliveryNote.Status.CONFIRMING:
-            return []
-
         actions = []
+        # BR-GH-23: giao / đổi người giao khi chưa lên xe (T6). Chủ và Quản lý.
+        if status in services.ASSIGNABLE_STATUSES and user.has_perm("delivery.assign_deliverynote"):
+            actions.append("assign")
+        if status == DeliveryNote.Status.CONFIRMING:
+            return actions
+
         has_pack = user.has_perm("delivery.pack_deliverynote")
         has_print = user.has_perm("delivery.print_label")
         has_change = user.has_perm("delivery.change_deliverynote")
@@ -181,9 +193,29 @@ class DeliveryNoteSerializer(serializers.ModelSerializer):
 class DeliveryNoteDetailSerializer(DeliveryNoteSerializer):
     lines = serializers.SerializerMethodField()
     recipient_name = serializers.SerializerMethodField()
+    phone = serializers.SerializerMethodField()
+    failure_note = serializers.SerializerMethodField()
 
     class Meta(DeliveryNoteSerializer.Meta):
-        fields = DeliveryNoteSerializer.Meta.fields + ["lines", "recipient_name"]
+        fields = DeliveryNoteSerializer.Meta.fields + ["lines", "recipient_name", "phone", "failure_note"]
+
+    def get_phone(self, obj):
+        """R4: SĐT đủ của người nhận, chỉ ở chi tiết và chỉ cho người trong phạm vi (SR-PII-02). Tem vẫn che."""
+        if self._customer_data_hidden(obj):
+            return None
+        if obj.recipient_phone:
+            return obj.recipient_phone
+        invoice = obj.sales_invoice
+        order = invoice.sales_order if invoice and invoice.sales_order_id else None
+        if order is not None:
+            return order.phone or (order.customer.phone if order.customer_id else "") or ""
+        return ""
+
+    def get_failure_note(self, obj):
+        """BR-GH-22: chữ tự do, có thể chứa dữ liệu cá nhân; chỉ ở chi tiết, theo cửa sổ SR-PII-02."""
+        if self._customer_data_hidden(obj):
+            return None
+        return obj.failure_note or ""
 
     def get_recipient_name(self, obj):
         if self._customer_data_hidden(obj):

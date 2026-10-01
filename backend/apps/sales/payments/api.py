@@ -10,17 +10,55 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from apps.ai.declare import AiDeclarable
-from apps.common.api import BusinessModelPermissions, StandardPagination, require_perm
+from apps.common.api import (
+    VIEW_COSTPRICE_PERM, BusinessModelPermissions, NoStoreMixin, StandardPagination, require_perm,
+)
 from apps.sales.models import PaymentTransaction, SalesInvoice
+from apps.sales.utils import money_str
 
 from . import services
-from .serializers import PaymentTransactionSerializer, SalesInvoiceSerializer
+from .invoice_list import build_totals, filter_invoices, scope_invoices_for, with_cogs
+from .serializers import PaymentTransactionSerializer, SalesInvoiceListSerializer, SalesInvoiceSerializer
 
 
-class SalesInvoiceViewSet(viewsets.ReadOnlyModelViewSet):
+class SalesInvoiceViewSet(NoStoreMixin, viewsets.ReadOnlyModelViewSet):
+    """
+    Hoá đơn bán (read-only, BR-PQ-11).
+
+    R13: `GET /api/sales/invoices/?status=ISSUED[,CANCELLED]&date_from=&date_to=&q=&page=` (20 dòng/trang) trả
+    `{"count","next","previous","results":[…],"totals":{"amount","gross_profit"}}`. `cogs`, `gross_profit` (dòng và
+    tổng) chỉ khi có `view_costprice`. Có tên khách nên mọi response `no-store`; hoá đơn lọc theo phạm vi dòng.
+    `customer_name` chỉ có giá trị khi người gọi có `sales.view_customer_list` (M1); người khác nhận null.
+    `GET …/{id}/` giữ serializer cũ.
+    """
+
     queryset = SalesInvoice.objects.select_related("customer", "sales_order").all()
     serializer_class = SalesInvoiceSerializer
     permission_classes = [BusinessModelPermissions]
+    pagination_class = StandardPagination
+
+    def get_serializer_class(self):
+        return SalesInvoiceListSerializer if self.action == "list" else SalesInvoiceSerializer
+
+    def get_queryset(self):
+        queryset = scope_invoices_for(self.request.user, super().get_queryset())
+        if self.action == "list":
+            queryset = with_cogs(queryset)
+        return queryset
+
+    def filter_queryset(self, queryset):
+        queryset = super().filter_queryset(queryset)
+        if self.action == "list":
+            queryset = filter_invoices(queryset, self.request.query_params)
+        return queryset
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())  # dựng đúng một lần, dùng cho cả trang và tổng
+        page = self.paginate_queryset(queryset)
+        response = self.get_paginated_response(self.get_serializer(page, many=True).data)
+        totals = build_totals(queryset, with_profit=request.user.has_perm(VIEW_COSTPRICE_PERM))
+        response.data["totals"] = {key: money_str(value) for key, value in totals.items()}
+        return response
 
 
 class PaymentTransactionViewSet(AiDeclarable, viewsets.ReadOnlyModelViewSet):

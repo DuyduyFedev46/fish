@@ -15,6 +15,7 @@ from apps.sales.models import SalesOrder
 from apps.sales.utils import kg_str, money_str
 
 from . import services
+from .reasons import order_reason
 from .timeline import build_timeline
 
 
@@ -44,14 +45,20 @@ class SalesOrderListSerializer(serializers.ModelSerializer):
     reserved_until = serializers.DateTimeField(source="booked_expires_at", read_only=True)
     delivery_status = serializers.CharField(read_only=True, allow_null=True)
     needs_attention = serializers.BooleanField(read_only=True)
+    reason = serializers.SerializerMethodField()
 
     class Meta:
         model = SalesOrder
         fields = [
             "id", "code", "status", "status_label", "customer_name", "customer_phone",
             "total_amount", "created_at", "reserved_until", "delivery_status", "needs_attention",
+            "reason",
         ]
         read_only_fields = fields
+
+    def get_reason(self, order):
+        """R3: `{"code","label"}` hoặc null. Chỉ nhãn cố định, không chữ tự do (xem reasons.py)."""
+        return order_reason(order)
 
     def to_representation(self, instance):
         ret = super().to_representation(instance)

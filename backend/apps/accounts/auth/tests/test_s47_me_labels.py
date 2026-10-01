@@ -40,7 +40,7 @@ class S47MeLabelsTests(TestCase):
             [
                 {"code": "inventory.publish_batch", "label": "Mở bán lô"},
                 {"code": "sales.cancel_paid_order", "label": "Huỷ đơn đã thanh toán"},
-                {"code": "sales.create_refund", "label": "Tạo phiếu hoàn"},
+                {"code": "sales.create_refund", "label": "Lập phiếu hoàn"},
                 {"code": "inventory.approve_returntostock", "label": "Duyệt hàng hoàn"},
                 {"code": "inventory.approve_stockreconciliation", "label": "Duyệt kiểm kê"},
             ],
@@ -59,6 +59,8 @@ class S47MeLabelsTests(TestCase):
                 "delivery.print_label",
                 "content.publish_entry",
                 "sales.view_privacy_consent",
+                "delivery.assign_deliverynote",
+                "sales.view_customer_list",
             ],
         )
         self.assertIs(body["can_view_cost"], False)

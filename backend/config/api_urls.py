@@ -12,6 +12,7 @@ from rest_framework.routers import DefaultRouter
 
 from apps.accounts.audit.api import AuditLogListView
 from apps.accounts.auth.api import ChangePasswordView, LoginTokenView, LogoutView, MeView
+from apps.accounts.capabilities.api import GroupCapabilitiesView, GroupDetailView, GroupListView
 from apps.accounts.staff.api import StaffViewSet
 from apps.ai.actions.api import AiActionViewSet
 from apps.ai.execution.pipeline import AiCommandCallView
@@ -31,7 +32,7 @@ from apps.catalog.images.api import ItemImageDetailView
 from apps.catalog.items.api import BundleLineViewSet, ItemGroupViewSet, ItemViewSet
 from apps.catalog.items.shop_api import ShopCatalogView, ShopItemDetailView
 from apps.catalog.pricing.api import ItemPriceViewSet, PriceListViewSet, PricingRuleViewSet
-from apps.delivery.api import DeliveryNoteViewSet
+from apps.delivery.api import DeliverersView, DeliveryNoteViewSet
 from apps.delivery.attention_api import DashboardAttentionView
 from apps.delivery.confirmation.api import ConfirmationQueueViewSet, CustomerSearchView
 from apps.inventory.batches.api import BatchViewSet
@@ -41,9 +42,10 @@ from apps.inventory.stocktake.api import StockReconciliationViewSet
 from apps.purchasing.costs.api import PurchaseCostViewSet
 from apps.purchasing.invoices.api import PurchaseInvoiceViewSet
 from apps.purchasing.receipts.api import PurchaseReceiptViewSet, SupplierViewSet
-from apps.reports.api import BatchPnlView, PeriodPnlView
+from apps.reports.api import BatchPnlListView, BatchPnlView, PeriodPnlView
 from apps.reports.dashboard_api import DashboardSummaryView
 from apps.sales.customers.api import CustomerViewSet
+from apps.sales.customers.directory_api import CustomerDirectoryViewSet
 from apps.sales.orders.api import SalesOrderViewSet
 from apps.sales.orders.shop_api import ShopOrderCreateView, ShopOrderLookupView
 from apps.sales.payments.api import PaymentTransactionViewSet, SalesInvoiceViewSet
@@ -73,6 +75,7 @@ router.register("purchasing/invoices", PurchaseInvoiceViewSet)
 router.register("purchasing/costs", PurchaseCostViewSet)
 # sales
 router.register("sales/customers", CustomerViewSet)
+router.register("sales/customer-directory", CustomerDirectoryViewSet, basename="customer-directory")
 router.register("sales/orders", SalesOrderViewSet)
 router.register("sales/invoices", SalesInvoiceViewSet)
 router.register("sales/refunds", RefundViewSet)
@@ -117,6 +120,12 @@ urlpatterns = [
     # Thông tin công khai cho Shop web (CS-10, GL-01, GL-04)
     path("public/site-info/", SiteInfoView.as_view(), name="public-site-info"),
 
+    # Ma trận phân quyền (B4): khai trước include(router.urls) để StaffViewSet không bắt pk="groups".
+    path("staff/groups/", GroupListView.as_view(), name="staff-groups"),
+    path("staff/groups/<str:code>/capabilities/", GroupCapabilitiesView.as_view(), name="staff-group-capabilities"),
+    path("staff/groups/<str:code>/", GroupDetailView.as_view(), name="staff-group-detail"),
+    # Danh sách người giao kèm số phiếu đang giữ (BR-GH-23).
+    path("delivery/deliverers/", DeliverersView.as_view(), name="delivery-deliverers"),
     # Tìm kiếm nhanh đơn cho việc gọi xác nhận (chỉ POST).
     path("confirmation/search/", CustomerSearchView.as_view(), name="confirmation-search"),
     # Shop công khai (guest)
@@ -135,6 +144,7 @@ urlpatterns = [
     path("dashboard/summary/", DashboardSummaryView.as_view()),
     path("dashboard/attention/", DashboardAttentionView.as_view(), name="dashboard-attention"),
     # Báo cáo
+    path("reports/batches/", BatchPnlListView.as_view()),
     path("reports/batch/<str:batch_id>/", BatchPnlView.as_view()),
     path("reports/period/", PeriodPnlView.as_view()),
     # Internal (adapter)

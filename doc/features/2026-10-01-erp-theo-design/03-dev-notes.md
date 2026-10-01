@@ -847,7 +847,7 @@ Giữ nguyên theo điều phối viên: đặt giá lùi ngày (`valid_from` tr
 Test: `pricing/tests/test_set_item_price.py` (24 test: đóng đúng ngày, một giá mở, Shop đọc giá mới theo ngày, 400 chồng lấn, giá tương lai nguyên vẹn, giá khác mặt hàng/bảng giá nguyên vẹn, hai lần đặt nối tiếp cùng ngày, khoá dòng, chỉ owner, audit, PATCH). SQLite bỏ qua khoá dòng nên test tuần tự và kiểm có yêu cầu `select_for_update`; PostgreSQL mới khoá thật.
 
 ### Quy tắc đã cài
-- T9 / BR-PQ: sửa giá bán và ưu đãi chỉ Chủ (test 403 cho manager và warehouse_staff khi POST, PATCH, DELETE).
+- T9 / BR-PQ: sửa giá bán và ưu đãi chỉ Chủ (test 403 cho manager và warehouse_staff khi POST, PATCH; DELETE bị chặn hẳn, xem mục QA bên dưới).
 - BR-DM-02: `current_price` cùng nguồn với Shop (`pricing/services.py`: `current_item_price`, `effective_price` dùng chung một thứ tự chọn; có test khớp giá Shop).
 - BR-DM-08 (ED-31-AC2/AC3): `PricingRuleSerializer.validate` (trước đây API không gọi `Model.clean`, nên nhận cả dữ liệu sai). Nay 400 theo từng field, thông điệp nói cách sửa:
   - `discount_value` > 100 khi `discount_type = PERCENT` (giảm tiền `AMOUNT` không giới hạn 100);
@@ -856,6 +856,15 @@ Test: `pricing/tests/test_set_item_price.py` (24 test: đóng đúng ngày, mộ
   - PATCH một phần (vd chỉ `{"is_active": false}`) kiểm cùng giá trị đang lưu.
 - Bất biến 1: không có giá vốn trong mọi phản hồi mới (test quét khoá và mốc `purchase_rate` cho owner, manager, warehouse_staff).
 - Bất biến 9: các phản hồi này không có dữ liệu khách.
+
+### Sửa sau QA REJECTED (B13-1, B13-2, N13-3)
+- **Không xoá cứng (B13-1, N13-3):** `DELETE` trên `price-lists/{id}/`, `item-prices/{id}/`, `pricing-rules/{id}/` trả **405** (`NoHardDeleteMixin` trong `pricing/api.py`, `http_method_names` không có `delete`). Trước đây xoá ưu đãi đã dùng ở dòng đơn (FK `PROTECT`) ném `ProtectedError` → 500. Tắt ưu đãi bằng `PATCH {"is_active": false}`, đóng giá bằng `valid_upto`.
+- **405 hay 403 (lựa chọn đã chốt):** theo mẫu `SupplierViewSet`, `check_permissions` ném `MethodNotAllowed` trước khi kiểm quyền, nên **mọi người đã đăng nhập** (owner, manager, warehouse_staff...) đều nhận 405; chưa đăng nhập vẫn 401. Lý do: thống nhất một quy ước toàn hệ thống (S3-AC4), không để lộ khác biệt quyền ở method không tồn tại. PUT vẫn mở (chỉ DELETE bị chặn theo yêu cầu).
+- **`item-prices.rate` > 0 (B13-2):** 0 hoặc âm → 400 `{"rate": ["Giá bán phải lớn hơn 0. Hãy nhập lại giá bán."]}` ở POST và PATCH. Số âm trước đó bị `MinValueValidator(0)` của model chặn bằng câu tiếng Anh; nay đổi lời báo qua `extra_kwargs`.
+- **`pricing-rules` (N13-3):** `min_qty` > 0 và `discount_value` > 0, 400 theo field, tiếng Việt. Ngoại lệ có chủ đích giữ từ review L2: `PATCH {"is_active": false}` vẫn qua để tắt được ưu đãi cũ sai dữ liệu.
+- **Chống vòng nhóm hàng (N13-3):** `ItemGroupSerializer.validate_parent` đi ngược từ nhóm cha mới lên gốc; nếu gặp chính nhóm đang sửa (chọn chính nó, nhóm con hoặc cháu) → 400 `{"parent": ["Không thể chọn nhóm này hoặc nhóm con của nó làm nhóm cha. ..."]}`, lời báo không chứa tên nhóm. Vòng lặp có tập `seen` nên dữ liệu cũ đã vòng không làm treo. Tạo mới (chưa có `instance`) không thể tạo vòng.
+- Registry AI: các command `destroy` của ba view này đã tự rơi khỏi registry; `commands_index_snapshot.json` và `test_discipline` không phải sửa cho phần này (không có dòng `destroy` nào của pricing trong snapshot).
+- Test thêm trong `pricing/tests/test_r14_pricing.py` (lớp `NoHardDeleteTests`, `PositiveValueTests`, `ItemGroupCycleTests`); test cũ của manager đổi từ `(403, 405)` thành đúng 405.
 
 ### Lệch so với 02b / việc cần người khác quyết
 1. **Đặt giá mới đóng giá cũ + chặn chồng lấn (BR-DM-03)**: điều phối viên chọn phương án (b) cho ED-31-AC1, đã làm ở mục "Đặt giá mới" bên dưới. Không còn là việc mở.
@@ -884,7 +893,7 @@ Test: `pricing/tests/test_set_item_price.py` (24 test: đóng đúng ngày, mộ
 
 ### File đã sửa / thêm
 - Sửa: `backend/apps/purchasing/receipts/serializers.py` (chỉ `SupplierSerializer`), `api.py` (chỉ `SupplierViewSet`), `README.md`, `next_steps.py` (thêm 1 nhãn `supplier_create` cho dòng thời gian), `backend/apps/common/cost_keys.py` (thêm `purchase_total`).
-- Thêm: `receipts/supplier_queries.py` (annotate số liệu, tổng tiền mua, lọc), `receipts/supplier_services.py` (tạo/sửa + AuditLog), `receipts/tests/test_supplier_aggregates.py`, `receipts/tests/test_supplier_crud.py` (40 test).
+- Thêm: `receipts/supplier_queries.py` (annotate số liệu, tổng tiền mua, lọc), `receipts/supplier_services.py` (tạo/sửa + AuditLog), `receipts/tests/test_supplier_aggregates.py`, `receipts/tests/test_supplier_crud.py` (45 test).
 - Không đụng: phần phiếu nhập của Lô 10, `receipts/services.py`, `filters.py` (chỉ import `parse_bool_param`), migration, `config/api_urls.py` (route `purchasing/suppliers` đã có), `frontend/`, `erp-console/`, `adapter/`.
 
 ### Contract
@@ -908,7 +917,9 @@ Dòng dưới là của **owner** (có `view_costprice`):
 - BR-MH-06 / bất biến 1: `SupplierSerializer` dùng `CostFieldSerializerMixin`, `sensitive_fields = ("purchase_total",)`, thêm vào `COST_KEYS`. Người không có `view_costprice` còn không bị truy vấn dòng nhập (view bỏ qua bước tính tổng).
 - Không N+1: `receipt_count`, `last_received_at` annotate trong truy vấn chính; `purchase_total` tính một truy vấn cho cả trang. Test đếm câu truy vấn khi thêm 20 nhà cung cấp (số truy vấn không đổi); đã thử bỏ bước gom thì test đỏ.
 - BR-PQ-04/05: `POST` ghi AuditLog `supplier_create`, `PATCH` ghi `supplier_update`, `changes={"fields": [tên trường]}` (chỉ khi có đổi thật). **Không chép giá trị** nên SĐT và ghi chú không vào log; test quét `changes`, `note`, `object_repr`.
-- Tên nhà cung cấp không trùng: kiểm trong serializer, so bằng `casefold` trong Python (không dựa `iexact` vì SQLite không phân biệt chữ hoa có dấu).
+- Tên nhà cung cấp không trùng: kiểm trong serializer (báo lỗi theo field `name`) và **kiểm lại trong service dưới khoá tuần tự** (B11-1, QA). So bằng `casefold` trong Python (không dựa `iexact` vì SQLite không phân biệt chữ hoa có dấu).
+- **B11-1 (hai yêu cầu cùng lúc cùng tên):** `supplier_services.create_supplier/update_supplier` chạy trong `serialized_names()`: một `transaction.atomic` có khoá, kiểm trùng rồi mới ghi. Postgres: `pg_advisory_xact_lock(7110001)` (không dùng `select_for_update` vì bảng rỗng thì không có dòng nào để khoá). SQLite: `threading.RLock` trong tiến trình (giao dịch SQLite đọc trước rồi mới xin quyền ghi nên tự nó không tuần tự). Bên thua nhận 400 `{"detail": "Đã có nhà cung cấp trùng tên này.", "code": "SUPPLIER_NAME_TAKEN"}` (khác dạng `{"name": [...]}` của lần kiểm ở serializer; FE nên hiện `detail` khi không có `name`). `update_supplier` đọc lại nhà cung cấp trong khoá. Không thêm migration.
+- **Khuyến nghị cho sau:** thêm unique index `Lower(name)` (hoặc cột `name_key` đã casefold) sau khi Duy kiểm dữ liệu production không có tên trùng; migration sẽ hỏng nếu đã có trùng. Có index thì bỏ được khoá tư vấn.
 
 ### Lựa chọn và chỗ lệch so với 02b (cần Duy/điều phối xem)
 1. **`purchase_total` chỉ người có `view_costprice` (owner) thấy**, Quản lý không thấy. 02b B3 ghi đúng như vậy (`sensitive_fields`, thêm vào `COST_KEYS`) nên làm theo. D-3 (Duy: Quản lý thấy tiền hoá đơn mua) chỉ nói về `PurchaseInvoice.amount`, là một con số khác; `purchase_total` là Σ qty x rate của dòng nhập, cùng loại với `purchase_amount` của phiếu (R10), mà phiếu 1 dòng chia ra được giá mua/kg nên coi là giá vốn. Muốn Quản lý thấy thì đổi `sensitive_fields` sang kiểm `view_purchaseinvoice` như `invoices[].amount`, nhưng khi đó phải bỏ khỏi `COST_KEYS` (ngoại lệ D-3).
@@ -920,11 +931,226 @@ Dòng dưới là của **owner** (có `view_costprice`):
 7. AI: không thêm `/api/purchasing/suppliers/` vào `FORBIDDEN_PREFIXES` vì 02b không yêu cầu; khoá `phone` đã nằm trong `SCRUB_PII_KEYS` và `purchase_total` nằm trong `COST_KEYS` nên đầu ra cho AI vẫn bị lọc.
 
 ### Còn nợ
-- Không còn. (Mục DELETE nhà cung cấp đã xử lý: 405.)
+- ⏸ Khoá tư vấn Postgres (`pg_advisory_xact_lock`) chưa chạy được ở đây (chỉ có SQLite): cần chạy lại `SupplierNameConcurrencyTests` trên Postgres staging. `SupplierNameConcurrencyTests` là TransactionTestCase, tự `migrate` lại ở `setUp` vì test migration `accounts/audit` để schema ở bản cũ. Nhánh SQLite có test 6 luồng cùng tên (đúng 1 thành công, 5 bị 400).
+- Mục DELETE nhà cung cấp đã xử lý: 405.
 
 ### Kiểm chứng (lượt này)
 - `makemigrations --check --dry-run`: No changes detected.
 - `manage.py test apps.purchasing apps.inventory apps.common apps.ai apps.accounts`: Ran 1302 tests, OK (trước khi thêm 405).
 - `manage.py test apps.purchasing apps.ai` (sau khi thêm 405): Ran 418 tests, OK.
-- `manage.py test` (toàn bộ): Ran 2421 tests, OK (không đỏ ở `catalog.pricing`).
+- Sau khi sửa B11-1: `manage.py test apps.purchasing`: Ran 159 tests, OK; `manage.py test apps.accounts.audit apps.purchasing` (ép chạy test migration trước): Ran 201 tests, OK.
+- `manage.py test` (toàn bộ, sau B11-1): Ran 2642 tests, OK (Lô 13 đã xanh); trước đó Ran 2421 tests, OK (không đỏ ở `catalog.pricing`).
 - `python3 scripts/check_naming.py`: OK, không phát sinh vi phạm mới.
+
+## Lô 14 — BE (B4, R16, nhãn `CAPABILITY_LABELS`)
+> be-dev · 02/10/2026 · Không migration (dùng `auth.Group`/`Permission`). Dữ liệu trong JSON mẫu là giả. Đề xuất mã rule **BR-PQ-32** (việc "Chỉ Chủ" không cấp cho nhóm khác).
+
+### B4 — Ma trận phân quyền
+Registry một nguồn ở `apps/accounts/capabilities/registry.py` (25 việc, 5 khu, đúng bảng 02b §3 B4). Mọi codename đã kiểm tồn tại bằng test (không có codename sai, **không gặp điểm dừng**). Các tập `perms` rời nhau (test). Danh sách "Chỉ Chủ" (T9): `confirm_payment`, `confirm_refund`, `add_cost`, `close_batch`, `set_price`, `view_cost`, `view_profit`, `manage_staff`, `ai_policy`. Việc có trạng thái `on` (đủ perms) · `off` (không có cái nào) · `partial` (thiếu một phần; bật lại = cấp đủ, tắt = gỡ phần còn lại). Dữ liệu seed hiện tại không có ô `partial` nào.
+
+Mọi endpoint dưới `/api/staff/groups/` (đã thuộc `FORBIDDEN_PREFIXES` của AI qua `/api/staff/`). **Đọc**: `accounts.manage_staff` (chỉ Chủ). **Ghi**: chỉ nhóm Chủ hoặc superuser, kể cả người được gán trực tiếp `manage_staff` cũng nhận 403. Không POST/PATCH/DELETE (405). Route khai trước `include(router.urls)`.
+
+**`GET /api/staff/groups/`** → 200, mảng 5 nhóm theo thứ tự vai (owner, manager, warehouse_staff, delivery_staff, customer_service):
+```json
+[{"id": 2, "code": "manager", "label": "Quản lý", "member_count": 1,
+  "members": [{"id": 5, "display_name": "Quản Lý Thử"}],
+  "can_view_cost": false, "last_changed_at": "2026-10-02T09:00:00+07:00", "last_changed_by": "Chủ Thử",
+  "capabilities": {"view_orders": "on", "view_customers": "on", "confirm_payment": "off", "set_price": "off", "...": "..."}}]
+```
+`member_count` và `members` của list **chỉ tính người đang làm** (`is_active`). `can_view_cost` = nhóm có `inventory.view_costprice`. `last_changed_*` = dòng `change_group_capabilities` mới nhất của nhóm, `null` khi chưa từng đổi (`last_changed_by` là tên hiển thị nhân viên, "Hệ thống" nếu không có người). `capabilities` có đủ 25 khoá của registry.
+
+**`GET /api/staff/groups/{code}/`** → 200, như một phần tử trên và thêm:
+```json
+{"members": [{"id": 5, "display_name": "Quản Lý Thử", "username": "manager1", "other_groups": ["delivery_staff"],
+              "is_active": true, "added_at": "2026-10-01T10:00:00+07:00"}],
+ "registry": [{"key": "pack_print", "label": "Soạn hàng, in tem", "section": "Bán hàng", "owner_only": false, "requires": ["deliver"]}],
+ "scopes": {"orders": "Tất cả", "deliveries": "Tất cả", "customers": "Tất cả khách"},
+ "timeline": [{"at": "2026-10-02T09:00:00+07:00", "kind": "change_group_capabilities", "label": "Tắt việc Mở bán lô",
+               "doc": "group", "actor": {"kind": "user", "display": "Chủ Thử"}}]}
+```
+- `members` ở detail gồm **cả người đã nghỉ** (`is_active:false`); `member_count` vẫn chỉ đếm người đang làm. `added_at` suy từ `AuditLog` (`staff_create`, `staff_groups_change`) vì Django không lưu thời điểm gán nhóm; người gán bằng migration/seed lấy `date_joined`.
+- `scopes` (W3i, chỉ đọc, khoá `orders`, `deliveries`, `customers`): `orders`/`deliveries` là chuỗi cố định theo nhóm (owner, manager, warehouse_staff "Tất cả"; delivery_staff "Được gán"; customer_service "Trong phạm vi gọi"), bảng `registry.GROUP_SCOPES`, **đổi code Tầng 3 thì sửa bảng này**. `customers` **tính động** (sửa sau review M2): nhóm có `sales.view_customer_list` -> "Tất cả khách"; không có -> "Được gán" (delivery_staff) hoặc "Không xem". FE tự đặt tên hàng cho 3 khoá.
+- `timeline` cũ → mới, tối đa 200 dòng: mỗi việc bị đổi = một dòng ("Bật/Tắt việc <nhãn>"), cộng dòng thêm/bớt thành viên ("Thêm <tên> vào nhóm" / "Bớt <tên> khỏi nhóm", từ `staff_groups_change`). Nhãn do code dựng; không có `changes` thô.
+- Mã nhóm không phải 5 nhóm có sẵn (kể cả tên cũ `chu`, `quan_ly`) → **404** `GROUP_NOT_FOUND`.
+
+**`PUT /api/staff/groups/{code}/capabilities/`** body `{"capabilities": {"approve_return": true, "view_customers": false}}` (chỉ gửi việc muốn đổi) → 200, body = chi tiết nhóm (như GET detail). Giá trị mỗi việc phải đúng kiểu bool.
+
+| Tình huống | Kết quả |
+|---|---|
+| Người gọi không phải Chủ (kể cả `manager`, hay người có `manage_staff` gán riêng) | **403** (`manager` 403 từ tầng quyền; người có `manage_staff` mà không thuộc `owner` 403 `BR-PQ-17`); dữ liệu không đổi, không có AuditLog |
+| Chưa đăng nhập | 401 |
+| Nhóm `owner` (bất kỳ nội dung nào) | **400** `GROUP_LOCKED` ("Nhóm Chủ luôn đủ quyền, không sửa được.") |
+| Bật việc `owner_only` cho nhóm khác | **400** `BR-PQ-32` ("Việc này chỉ nhóm Chủ được làm."); cả yêu cầu bị từ chối, việc hợp lệ đi kèm cũng không áp (tất cả hoặc không gì) |
+| Khoá lạ (`nope`, codename đầy đủ, rỗng) | **400** `INPUT_NOT_ALLOWED` |
+| Body hỏng (thiếu/rỗng/không phải object, giá trị không phải bool, có trường ngoài `capabilities`) | **400** `INVALID_INPUT` hoặc `INPUT_NOT_ALLOWED` |
+| Việc có `requires` bị bật/tắt lệch (tắt `deliver` khi `pack_print` còn bật; bật `pack_print` khi `deliver` tắt) | **400** `CAPABILITY_REQUIRES` ("Không tắt được \"Giao hàng, báo kết quả giao\" khi \"Soạn hàng, in tem\" còn bật. Hãy tắt cả hai việc cùng lúc."); đổi cả hai trong một yêu cầu thì qua |
+| Nhóm lạ | **404** `GROUP_NOT_FOUND` |
+
+Luật cài trong `services.set_group_capabilities` (atomic, `select_for_update` Group): chỉ thêm/bớt đúng `perms` của việc, **không đụng permission ngoài registry** (test so từng nhóm trước/sau); chỉ nhóm đích đổi. Tắt một việc `owner_only` ở nhóm khác thì cho phép (chỉ rút quyền). Yêu cầu không làm đổi gì (đã đúng trạng thái) trả 200 và **không** ghi audit. Audit `change_group_capabilities` (`obj` = Group, `model_name="auth.Group"`, `object_id`=pk) với `changes={"<key>": {"from": "off", "to": "on"}}` (chỉ khoá thật sự đổi; không tên, không SĐT; `note` rỗng).
+
+**Hiệu lực ngay:** quyền đọc từ DB mỗi request (Django chỉ cache theo instance user trong request), test chứng minh cùng token: tắt `view_customers` của `manager` → `/api/sales/customer-directory/` 200 → 403 ở lần gọi kế tiếp, `/api/auth/me/` bỏ quyền ngay (ED-39-AC2).
+
+**Guidance `group` (R2):** `GET /api/guidance/group/<pk Group>/` (pk lấy từ field `id` của list/detail) → provider chỉ có dòng thời gian (`next_steps: []`, `warnings: []`), quyền `accounts.manage_staff`. Provider đặt ở `apps/accounts/capabilities/next_steps.py` và được `capabilities/api.py` nạp lúc khởi động URL (vì `_LAZY_MODULES` trong `apps/common/guidance/api.py`, ngoài phạm vi, chưa có khoá `group`). Chỉ gồm đổi việc của nhóm (dòng thành viên nằm ở `timeline` của detail).
+
+### R16 — lọc nhật ký theo người làm
+`GET /api/audit-logs/?actor=<user id>` (`apps/accounts/audit/api.py`). Dùng `apps/common/params.py::parse_positive_id`. Sai dạng (chữ, 0, âm, số thập phân, có dấu/khoảng trắng, chữ số Unicode, quá int64, 5000 chữ số) → **400** `{"detail": "Tham số actor phải là mã người dùng (số nguyên dương).", "code": "INVALID_FILTER"}`, không lặp lại giá trị. Để trống = không lọc. Id không tồn tại → 200 trang rỗng. Chỉ lọc dòng `actor` = người đó (không gồm dòng AI thay mặt `ai_actor`, không gồm Hệ thống); ghép được với `action`, `actor_kind`. Quyền giữ nguyên `accounts.view_auditlog` (owner, manager; warehouse_staff, delivery_staff, customer_service 403; chưa đăng nhập 401), theo mặc định Q1.
+
+### Nhãn `CAPABILITY_LABELS`
+`sales.create_refund` "Tạo phiếu hoàn" → **"Lập phiếu hoàn"**; `sales.confirm_payment_manual` "Xác nhận thanh toán thủ công" → **"Xác nhận đã nhận tiền"**. Sửa test `test_s47_me_labels.py` khớp nhãn cũ (1 chỗ). Test registry khẳng định nhãn việc `create_refund`, `confirm_payment` trùng nhãn quyền. Nhãn trong `Meta.permissions` của model (`"Tạo phiếu hoàn tiền"`, `"Xác nhận thanh toán thủ công"`) là tên Django admin, không đổi (ngoài phạm vi, kèm migration).
+
+### File đổi
+- **Mới** `backend/apps/accounts/capabilities/` (`registry.py`, `services.py`, `api.py`, `next_steps.py`, `README.md`, `tests/` gồm `base.py`, `test_registry.py`, `test_api_read.py`, `test_api_write.py`, `test_timeline.py`, `test_delivery_staff_permissions.py`).
+- `backend/apps/accounts/audit/api.py`, **mới** test `apps/accounts/audit/tests/test_actor_filter.py`.
+- `backend/apps/accounts/auth/services.py` (2 nhãn), `apps/accounts/auth/tests/test_s47_me_labels.py` (1 dòng).
+- `backend/config/api_urls.py`: thêm 1 import + 3 `path` (`staff/groups/`, `…/<code>/capabilities/`, `…/<code>/`).
+
+### Lệch 02b / điều còn nợ
+1. **Tên khoá đổi theo luật đặt tên tiếng Anh:** 02b viết `chu_only`, `chu`, `quan_ly` → code dùng `owner_only`, `owner`, `manager`... (khớp bảng đổi tên đầu file). FE dùng `owner_only`, mã nhóm tiếng Anh. Mã audit trong 02b `change_staff_groups` thực tế là **`staff_groups_change`** (code đã có, giữ nguyên).
+2. **Contract ED-39 trong `02-stories.md`** (`GET /api/permissions/matrix/`, `PATCH`) là bản "dự kiến" cũ; làm theo 02b (đã duyệt): `GET /api/staff/groups/…`, `PUT …/capabilities/`.
+3. **Test `apps/common/guidance/tests/test_audit_timeline.py::UnknownDocTypeTests::test_r2_group_type_not_registered_yet` đỏ** (nó khẳng định `group` còn 404 "để Lô 14"). Đổi sang khẳng định `group` đã đăng ký (vd 403 với `manager`, 200 với `owner` + pk Group thật) hoặc xoá test này. Tôi không sửa vì `apps/common/*` ngoài phạm vi Lô 14.
+4. Tuỳ chọn cho điều phối viên: thêm `"group": "apps.accounts.capabilities.next_steps"` vào `_LAZY_MODULES` (`apps/common/guidance/api.py`) cho đồng bộ; hiện không cần vì provider đã nạp lúc khởi động.
+5. Tắt `view_orders`/`deliver` của `delivery_staff` làm hỏng màn giao của họ: BE không cấm (quyết định của Chủ), FE hỏi xác nhận (02b §3 B4).
+6. `backend/README.md` và `apps/accounts/README.md` (bản đồ module) chưa liệt kê module `capabilities`; hai file ngoài phạm vi Lô 14.
+
+---
+
+## Lô 12 — BE (R11, R12, R13, R15)
+
+Không có migration (`makemigrations --check --dry-run`: No changes detected). Mọi ví dụ JSON dưới đây dùng dữ liệu giả.
+
+### File đã sửa / thêm (trong `backend/apps/`)
+- R11: `purchasing/invoices/{api,serializers}.py` (viết lại), `purchasing/invoices/filters.py` (mới), `purchasing/invoices/tests/test_invoice_list.py` (mới, 18 test), `README.md`.
+- R12: `purchasing/costs/{api,serializers}.py`, `purchasing/costs/filters.py` (mới), `purchasing/costs/tests/test_cost_list.py` (mới, 18 test), `README.md`.
+- R13: `sales/payments/{api,serializers}.py`, `sales/payments/invoice_list.py` (mới: lọc, phạm vi dòng, `cogs`, `totals`), `sales/payments/tests/test_invoice_list.py` (mới, 31 test), `README.md`.
+- R15: `reports/api.py` (`BatchPnlListView`, đếm kỳ), `reports/batch_list.py` và `reports/period_counts.py` (mới), `reports/tests/test_batches_list.py` (mới, 31 test), `README.md`; `config/api_urls.py` (thêm 1 route + 1 import).
+- **Ngoài danh sách được sửa**: `ai/registry/tests/snapshots/commands_index_snapshot.json` thêm đúng 1 dòng `"reports.batch_pnl_list"` (view mới tự vào registry lệnh AI, test `test_dw07_ac1_snapshot_khop_file` đòi snapshot khớp). Không sửa code `apps/ai/`.
+- Không đụng `services.py::batch_pnl/period_pnl`, `cost_keys.py` (không cần khoá mới: `cogs`, `gross_profit` đã có).
+
+### Endpoint thực tế
+
+**R11 `GET /api/purchasing/invoices/?is_paid=true|false&supplier=<id>&month=YYYY-MM&page=`** — quyền `view_purchaseinvoice` (owner, manager); khác 403; chưa đăng nhập 401. D-3: manager thấy `amount`. Phân trang 20 dòng (02b không nêu; xem "Lệch").
+```json
+{"count": 1, "next": null, "previous": null, "results": [
+  {"id": 7, "code": "#7", "supplier": 2, "supplier_name": "Đầu mối A", "receipt": 5, "receipt_code": "PR-5",
+   "amount": "1000000.00", "is_paid": true, "is_paid_label": "Đã trả tiền",
+   "invoice_date": "2026-09-28", "paid_at": "2026-09-29T10:00:00+07:00", "created_by": 1}]}
+```
+
+**R12 `GET /api/purchasing/costs/?cost_type=ICE,TRANSPORT&month=YYYY-MM&page=`** (+ `/{id}/`) — chỉ owner (`view_purchasecost` VÀ `view_costprice`); manager, warehouse_staff, delivery_staff, customer_service 403 (thân không có số tiền).
+```json
+{"count": 1, "next": null, "previous": null, "results": [
+  {"id": 3, "cost_type": "ICE", "cost_type_label": "Đá", "amount": "250000.00",
+   "allocation_method": "BY_QTY", "allocation_method_label": "Theo số kg", "incurred_date": "2026-09-28",
+   "note": "", "created_by": 1, "created_at": "2026-09-28T09:00:00+07:00",
+   "allocations": [{"id": 1, "purchase_cost": 3, "batch": 4, "allocated_amount": "250000.0000"}], "batch_count": 1}]}
+```
+Nhãn: ICE Đá, TRANSPORT Vận chuyển, LOADING Bốc vác, OTHER Khác; BY_QTY Theo số kg, BY_VALUE Theo giá trị. `POST` giữ nguyên.
+
+**R13 `GET /api/sales/invoices/?status=ISSUED[,CANCELLED]&date_from=YYYY-MM-DD&date_to=YYYY-MM-DD&q=<mã>&page=`** — `view_salesinvoice` (owner, manager, warehouse_staff); response `Cache-Control: no-store`. Chi tiết `GET …/{id}/` giữ serializer cũ. Sắp mới nhất trước, 20 dòng/trang.
+```json
+{"count": 1, "next": null, "previous": null,
+ "totals": {"amount": "100000", "gross_profit": "95758"},
+ "results": [{"id": 9, "code": "HD-T001", "sales_order": 12, "order_code": "SO-T001", "customer_name": "Khách Giả Một",
+   "issued_at": "2026-09-10T10:00:00+07:00", "amount": "100000", "status": "ISSUED", "status_label": "Đã xuất",
+   "cogs": "4242", "gross_profit": "95758"}]}
+```
+**M1 (điều phối viên yêu cầu sau review):** `customer_name` chỉ có giá trị khi người gọi có `sales.view_customer_list` (owner, manager mặc định; dùng `can_view_customer_directory`). Người khác, ví dụ `warehouse_staff`, vẫn thấy dòng hoá đơn nhưng `"customer_name": null` (key vẫn có). Phạm vi dòng (`scope_orders_for`) và `pii_visible` giữ nguyên, cộng thêm với điều kiện này. Chi tiết `…/{id}/` không có tên khách (chỉ id `customer`). Mẫu cho NV kho: `{"id": 9, "code": "HD-T001", ..., "customer_name": null, ...}`.
+
+Người không có `view_costprice` (manager, warehouse_staff): dòng không có `cogs`, `gross_profit`; `totals` chỉ `{"amount"}`. Tiền là chuỗi thập phân kiểu `money_str` ("100000", không "100000.00"), `cogs` không làm tròn (cùng cách tính với `period_pnl`).
+
+**R15a `GET /api/reports/batches/?month=YYYY-MM&state=closed|provisional&page=`** — chỉ `view_profitreport` (owner). Mỗi dòng = kết quả `batch_pnl` (20 khoá) + `item_name`, `status`, `status_label`; số tiền là chuỗi thập phân như `GET /api/reports/batch/{id}/`.
+```json
+{"count": 1, "next": null, "previous": null, "results": [
+  {"batch_id": "LOT-FAKE-1", "provisional": true, "qty_received": "100.000", "qty_sold": "2.000", "revenue": "300000.00",
+   "total_cost": "7654300.0000", "profit": "-7354300.0000", "item_name": "Cá thu", "status": "DRAFT", "status_label": "Nháp"}]}
+```
+(rút gọn: đủ 20 khoá `batch_pnl` trong thực tế).
+
+**R15b `GET /api/reports/period/?year=&month=`** thêm `invoice_count`, `refund_count`; các khoá cũ giữ nguyên số.
+
+### Quy tắc đã cài
+- D-3 (hoá đơn mua `amount` cho manager), bất biến 1 (R12 cả chứng từ là giá vốn, R13 `cogs`/`gross_profit`, R15 toàn bộ lãi lỗ), bất biến 9 (R13: chỉ `customer_name` và chỉ cho người có `view_customer_list`, không SĐT/địa chỉ; `q` không tìm theo tên khách; `no-store`; phạm vi dòng + `pii_visible`), BR-BC-01/03/04/05 (R15 không tính lại công thức).
+- Tham số lọc sai → 400 `INVALID_FILTER`, thông điệp nêu tên tham số, không lặp lại giá trị.
+
+### Chỗ lệch / giả định cần Duy hoặc điều phối viên biết
+1. **ED-33-AC4 vs 02b**: story nói nhân viên kho thấy "Không có quyền" ở màn Hoá đơn bán, nhưng 02b R13 và quyền Tầng 1 hiện cho `warehouse_staff` xem (200). BE làm theo 02b. Nếu muốn khoá thì cần đổi quyền Group (migration trong `accounts`, ngoài phạm vi lô này) hoặc FE ẩn.
+2. R11 và R12 dùng `StandardPagination` (20 dòng/trang, `count/next/previous/results`) dù 02b không nêu, để giống các danh sách khác. Cần FE biết hai endpoint này đã phân trang (trước đây mặc định DRF).
+3. R13 `totals` KHÔNG trừ chứng từ đảo (đúng 02b: tổng `amount` − `cogs` các hoá đơn chưa huỷ). Hoá đơn đã đảo vì huỷ đơn vẫn ISSUED nên vẫn được cộng; số doanh thu thật nằm ở Báo cáo kỳ (`period_pnl`). Nên ghi chú trên màn.
+4. R15 "lô có phát sinh trong kỳ" do BE chọn: nhập trong tháng, hoặc có hoá đơn chưa huỷ xuất trong tháng, hoặc chốt trong tháng (giờ VN). Không truyền `month` thì liệt kê mọi lô; không truyền `state` thì cả hai. Lô nháp (DRAFT) nhập trong tháng vẫn xuất hiện (là "tạm tính").
+5. `refund_count` sao lại quy tắc loại phiếu của `period_pnl` (phiếu xác nhận sau/cùng lúc chứng từ đảo) trong `period_counts.py` vì không được sửa `period_pnl`. Test khớp số đếm với `refunds`; nếu quy tắc ở `period_pnl` đổi thì phải sửa cả hai.
+6. R15a gọi `batch_pnl` cho từng lô của trang (khoảng 7 truy vấn/lô, tối đa 20 lô/trang). Không N+1 theo tên mặt hàng/nhãn (test khoá `select_related`), nhưng số truy vấn tăng theo số lô của trang. Muốn nhanh hơn cần tách `batch_pnl` ra thành bản hàng loạt (đổi `services.py`, ngoài phạm vi).
+7. Mới thêm một lệnh vào registry AI (`reports.batch_pnl_list`, từ khoá "danh sách lô lãi lỗ") do view mới được tự phát hiện.
+
+### Cập nhật sau review Lô 12 (M1, L4)
+- M1: `customer_name` của R13 chỉ cho người có `sales.view_customer_list` (xem contract R13 ở trên). Thêm test: owner và manager thấy tên, warehouse_staff thấy dòng nhưng tên null và thân không chứa tên; quyền gán trực tiếp quyết định (không theo Group).
+- L4: `SalesInvoiceViewSet.list()` dựng và lọc queryset đúng một lần, dùng cho cả trang lẫn `totals` (test `test_r13_l4_list_builds_filtered_queryset_once`).
+- Lệch 1 ở trên vẫn cần Duy quyết (nhân viên kho có xem được màn Hoá đơn bán không); M1 chỉ đảm bảo trong lúc chờ thì họ không thấy tên khách.
+
+### Lô 14 — BE: sửa sau review techlead (CHANGES REQUESTED, 02/10)
+- **M1 · `requires`.** `registry.Capability.requires` (tuple khoá việc gốc); hiện chỉ `pack_print -> ("deliver",)` vì `DeliveryNoteViewSet.set_status` khai `required_perms=("delivery.change_deliverynote",)` cho mọi chuyển trạng thái kể cả READY (chỉ sau đó mới kiểm `pack_deliverynote`). `set_group_capabilities` kiểm trạng thái SAU khi áp yêu cầu, chỉ với cặp có việc nằm trong yêu cầu: việc phụ thuộc đang bật (on/partial) mà việc gốc không `on` -> **400 `CAPABILITY_REQUIRES`**, thông điệp nói rõ việc nào cần tắt/bật cùng; không ghi gì, không audit (tất cả hoặc không gì). Dữ liệu lệch có sẵn ở chỗ yêu cầu không đụng tới không bị chặn. JSON `registry[]` của detail **thêm** `requires: [key]` (additive, FE dùng để hiện ràng buộc/tự gửi cặp).
+  - **Rà các cặp khác:** test `test_actions_spanning_several_capabilities_are_covered_by_requires` quét mọi `@action(required_perms=...)` của router (30 action chạm registry): không action nào đòi permission của hai việc khác nhau, nên không còn cặp nào. `view_orders` **không** khai làm việc gốc: không action nào đòi `sales.view_salesorder`; chỉ màn hình đọc đơn của Nhân viên giao cần (đã có test Lô 4). Chủ vẫn tắt được, FE cảnh báo (02b §3 B4). Muốn BE cấm hẳn thì thêm `requires=("view_orders",)` cho `deliver`/`confirm_calls`: cần Duy/Tech Lead chốt.
+  - Seed hiện tại thoả mọi `requires` (test).
+- **M2 · `scopes.customers` động.** `services.group_scopes`: nhóm có `sales.view_customer_list` thì "Tất cả khách" (kể cả Chủ, Quản lý); không thì lấy bảng cố định (cột `customers` của owner/manager đổi thành "Không xem" vì giờ chỉ hiện khi còn quyền; delivery_staff "Được gán"; còn lại "Không xem"). Test: bật `view_customers` cho `delivery_staff`/`warehouse_staff`/`customer_service` -> detail "Tất cả khách"; tắt thì về giá trị cũ; Quản lý tắt -> "Không xem"; chuỗi hiển thị khớp 200/403 của `customer-directory` cho cả 5 nhóm. Câu hỏi cho Duy (chặn hẳn `view_customers` cho nhóm giao/CSKH?) giữ nguyên, chưa đổi hành vi.
+- **L1.** `_membership_events` lọc ở DB (`changes__groups__from/to__icontains=<mã nhóm>`, so chuỗi con, chạy SQLite và Postgres) rồi kiểm lại chính xác ở Python, `iterator()` dừng ở 200 sự kiện. Test: 1100 dòng đổi nhóm của nhóm khác không làm mất sự kiện cũ của nhóm ít đổi; số truy vấn không tăng theo số sự kiện. **Chưa chạy trên Postgres** (chỉ SQLite); lookup `icontains` trên key JSON là chuẩn Django cho cả hai.
+- **L2.** Docstring `next_steps.py` nói đúng: nạp theo cả `_LAZY_MODULES` lẫn import ở `api.py`.
+- **L3.** `backend/README.md` và `apps/accounts/README.md` đã liệt kê `capabilities/` (và `audit/?actor=`); `capabilities/README.md` thêm `requires`.
+- File sửa: `capabilities/{registry,services,next_steps}.py`, `capabilities/README.md`, `capabilities/tests/{test_api_read,test_timeline}.py`, mới `capabilities/tests/test_requires.py`, `backend/README.md`, `backend/apps/accounts/README.md`. Không migration.
+- Kiểm chứng: `makemigrations --check --dry-run` No changes detected; `manage.py test apps.accounts apps.common`: Ran 531, OK; `manage.py test apps.accounts.capabilities`: Ran 81, OK; `check_naming` OK. Toàn bộ `manage.py test`: Ran 2642, 1 failure ngoài phạm vi (xem báo cáo).
+
+## Lô 2 — FE
+Mẫu trang chi tiết, popup, form và khối Trợ lý AI (ED-03 phần còn lại, ED-04 trang chi tiết, ED-05 form). Chỉ sửa trong `erp-console/`. Chưa commit.
+
+### File mới
+- `shared/ui/detail/`: `DetailPage`, `DetailHeader`, `MoreMenu`, `StatusPath`, `InfoGrid` + `InfoField`, `LookupCard`, `Timeline`, `AiBlockFrame` (kèm `.module.css`, `detail.test.ts`).
+- `shared/ui/overlay/`: `Modal` (tấm trượt đáy ở 360px, bẫy tiêu điểm, trả tiêu điểm về nút mở), `focus.ts`.
+- `shared/ui/form/`: `FormPage`, `Field`, `SummaryBlock`, `FormAlert`, `useSubmit` (chống gửi đôi, đọc `err.details`).
+- `shared/ui/states/ConflictBanner.tsx` (409: "vừa được <tên> sửa lúc <giờ GMT+7>", nút Tải lại).
+- `shared/lib/lookups.ts` (+ test): thẻ tra cứu chéo chỉ lấy danh sách trường cho phép, không hiện giá vốn, SĐT, địa chỉ. `shared/lib/mockLookups.ts` chứa dữ liệu giả (có cả trường nhạy cảm giả để chứng minh thẻ lọc bỏ). Tên file bắt đầu bằng `mock` để `check-no-mock` quét.
+- `features/ai/components/`: `AiDocBlock` (khối đề xuất cho một chứng từ: Đồng ý đếm ngược 3 giây theo BR-AI-14, Từ chối, đã nhờ nhóm xử lý, hỏi trợ lý), `AiDocBlockGate` (nạp động, tự công bố cờ AI), `docBlockModel.ts` (+ test).
+- `features/guidance/detailAdapters.ts` (+ test).
+- Trang thử nội bộ, chỉ có ở bản mock: `app/(console)/dev-patterns/` và `dev-patterns/form/`. Bản build thật trả "Không tìm thấy trang này", mã demo không vào bundle.
+- Test: `focus.test.ts`, `useSubmit.test.ts`, `ConflictBanner.test.ts`, `lookups.test.ts`, `docBlockModel.test.ts`, `filter.test.ts`, `detail.test.ts`, `detailAdapters.test.ts`.
+- E2E: `e2e/ed_batch2_patterns.py`.
+
+### File sửa
+- `features/ai/actions/api.ts`, `mock.ts`: hàm API mới (xem dưới), nhánh mock lọc theo đích.
+- `features/guidance/types.ts` (`doc.status` cho phép null, `timeline_truncated?`), `components/GuidancePanel.tsx` (bỏ "Làm mới", bỏ `why.br`, ghi chú dòng thời gian bị cắt).
+- `features/auth/components/ConsoleGate.tsx`: import `features/ai/mock` ở mức module (chỉ mock) để `window.__caveMock.ai` có sẵn.
+- `e2e/p8_lo6_fe_sr19_sr20.py`: bỏ các bước về cột phải cũ (đã gỡ ở Lô 1).
+
+### Hàm API mới (theo R1 của 02b)
+- `fetchAiActions({ target_model, target_id, status })`: `GET /api/ai/actions/?target_model=&target_id=&status=` (nhiều id cách nhau dấu phẩy; `target_id` luôn đi kèm `target_model`).
+- `fetchAiActionCounts()`: `GET /api/ai/actions/counts/` -> `{ by_target_model }`.
+- Cả hai có nhánh mock (`mockFetchAiActions` lọc theo đích, `mockFetchAiActionCounts`).
+
+### Ảnh chụp (thư mục scratchpad của phiên, không đưa vào repo)
+`.../scratchpad/shots/ed2-ai-block-desktop.png`, `ed2-detail-mobile360.png`, `ed2-form-error-mobile360.png`, `ed2-modal-error-desktop.png`, `ed2-modal-mobile360.png`, `ed2-moremenu-desktop.png`, `ed2-conflict-desktop.png`.
+
+### Kiểm chứng (chạy lại sau lần sửa cuối)
+- `npx tsc --noEmit`: sạch.
+- `npx vitest run`: 42 file, 363 test đều đạt.
+- Build `NEXT_PUBLIC_USE_MOCK=0`: OK; `check-no-mock.mjs` XANH; `check-ai-chunks.mjs` XANH (6 màn/layout nghiệp vụ không chứa `new Worker`, `wllama`, `/call/`). Bản build thật không chứa mã demo.
+- Build `NEXT_PUBLIC_USE_MOCK=1` + serve cổng 3101: `ed_batch2_patterns` 55/55, `ed_batch1_shell` 56/56, `p8_lo6_fe_sr19_sr20` 75/75, `s7_shell` 24 PASS / 0 FAIL (đã tắt server).
+- `python3 scripts/check_naming.py`: OK, không vi phạm mới.
+- Màu: file mới và file sửa của lô có 0 màu cứng (chỉ token).
+
+### Chỗ lệch / giả định
+1. **409 mất thông tin người sửa**: `shared/lib/http.ts` chỉ nạp `details` cho 400, nên 409 chưa có `updated_by_name/updated_at`. `ConflictBanner` và `useSubmit` đã đọc `err.details`; cần sửa `http.ts` (ngoài phạm vi Lô 2) để truyền `details` cho 409. Trong lúc chờ, banner dùng câu chung.
+2. **R1 không có "trước -> sau"**: chỉ có giá trị sau (từ `args_preview` qua danh sách nhãn cho phép), nên khối AI hiện "sẽ đổi thành". 
+3. **Việc đã nhờ nhóm xử lý (ESCALATED)** chỉ nhìn thấy trong `AiDocBlock`, mà khối này ẩn khi AI tắt. Khi AI tắt thì chưa có chỗ nào khác để thấy. Cần điều phối viên/PO quyết.
+4. **SR-20**: không gọi dò trạng thái AI ở `ConsoleGate`; `AiDocBlockGate` tự công bố cờ khi mở trang chi tiết (nhờ vậy "Tóm tắt" DW-16 hiện lại ở trang chi tiết). Màn nghiệp vụ không có khối AI thì AI tắt = 0 request `/api/ai/*`.
+5. Thanh hành động của form dùng `position: sticky` (không `fixed`) vì `.content` của Shell là vùng cuộn.
+6. `LookupCard` tắt prefetch của Link (các route chi tiết ED chưa tồn tại, sẽ có ở Lô 3+; prefetch sinh 404 trong console).
+7. Bộ icon Material Symbols tự lưu thiếu `chat` và `forward_to_inbox`; đã dùng `auto_awesome` và `send`. Không tái tạo font (cần mạng, ngoài phạm vi).
+8. Chip gợi ý hỏi trợ lý lấy từ Panel; khung chat chỉ mở khi người dùng bấm.
+
+### Việc còn nợ
+- Các màn chi tiết thật (Lô 3 trở đi) phải gắn `DetailPage` + `AiDocBlockGate`; chưa có trang nghiệp vụ nào dùng mẫu.
+- Trong ảnh conflict của trang demo, nhãn "Số lượng" của InfoField hiện cùng nhãn của Field khi sửa tại chỗ; trang thật nên ẩn nhãn InfoField khi đang sửa (chưa làm vì chưa có ca dùng thật).
+
+### Lô 2 — FE: sửa theo yêu cầu của điều phối viên (02/10, sau báo cáo đầu)
+- **(1) 409 mang `details`.** `shared/lib/http.ts`: nhánh `status === 409` ném `ApiError(detail || MSG.conflict, 409, code, details)`; `details` là phần thân ngoài `detail`/`code` (`updated_at`, `updated_by_name`), `code` nằm ở `err.code` (vd `STALE_STATE`). `shared/lib/messages.ts` thêm `MSG.conflict` (trước đây 409 không kèm `detail` rơi vào "Lỗi máy chủ (409)"). Vitest mới trong `shared/lib/http.test.ts` (3 ca: details đủ, 409 trống dùng câu chung, `conflictOf`/`isConflictError` đọc đúng từ lỗi thật). Trang demo giờ gọi `apiFetch` mock trả thân 409 giống BE và ConflictBanner lấy tên + giờ từ `conflictOf(err)`; e2e kiểm banner có "Lộc" và "10:30" (giờ VN). Ảnh: `ed2-conflict-desktop.png` ("Phiếu vừa được Lộc sửa lúc 28/09/2026 10:30. Tải lại để xem bản mới."). Các nơi khác đang bắt 409 (`content/edit`, `ImageUploadSheet`) chỉ đọc `status`/`code` nên không đổi hành vi. `apiUpload` chưa nạp `details` cho 409 (không có ca dùng).
+- **(7) Icon theo thiết kế.** `scripts/subset-material-symbols.py` thêm `chat`, `forward_to_inbox`; chạy lại với `SSL_CERT_FILE=/etc/ssl/cert.pem` -> `icons ok: 112/112`, font `public/fonts/ms/material-symbols-outlined.woff2` 94.576 byte (file này bị `.gitignore`, mỗi máy tự sinh lại bằng script). `AiDocBlock` "Hỏi trợ lý" dùng `chat`; `AiBlockFrame` dòng "Đã nhờ nhóm … xử lý" dùng `forward_to_inbox`.
+- **(8) InfoField đang sửa tại chỗ.** `shared/ui/detail/InfoField.tsx`: khi ở chế độ sửa, `<dt>` chuyển sang `sr-only` (giữ cho trình đọc màn hình và cấu trúc `dl`), nhãn nhìn thấy chỉ còn nhãn của `Field`. E2E thêm 2 ca: `dt` rộng <= 2px và đúng 1 `label` nhìn thấy trong ô đang sửa.
+- **(3) Việc ESCALATED khi AI tắt**: không làm trong lô này. Sẽ hiện ở dòng "đề xuất AI chờ duyệt" của màn Tổng quan, làm ở Lô 15 (T10). Hiện việc đó chỉ thấy trong `AiDocBlock` khi AI bật.
+- Kiểm chứng lại: `tsc --noEmit` sạch; vitest 42 file, 366 test đạt; build `MOCK=0` OK, `check-no-mock` XANH, `check-ai-chunks` XANH (bản thật không chứa mã demo); e2e `ed_batch2_patterns` 58/58, `ed_batch1_shell` 56/56, `p8_lo6_fe_sr19_sr20` 75/75, `s7_shell` 24 PASS/0 FAIL; `check_naming` OK; màu cứng ở file lô này 0. Mục "Chỗ lệch" 1, 3, 7, 8 ở trên coi như đã xử lý (3 chuyển sang Lô 15).

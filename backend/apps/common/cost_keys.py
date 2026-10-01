@@ -16,6 +16,10 @@ COST_KEYS = frozenset({
     # P8 SR-01 (BM-01): khoá tiền suy ra được giá vốn (số kg đã biết -> chia ra đơn giá vốn).
     "loss_amount", "loss", "inventory_value", "margin", "gross_profit", "expired_cost",
     "supplier_refund_amount", "supplier_return_cost",
+    # R10 (Lô 10): tiền mua của phiếu nhập (Σ số kg x đơn giá mua) và thành tiền từng dòng nhập.
+    "purchase_amount",
+    # B3 (Lô 11): tổng tiền mua của một nhà cung cấp (Σ số kg x đơn giá mua các phiếu đã ghi nhận).
+    "purchase_total",
 })
 
 

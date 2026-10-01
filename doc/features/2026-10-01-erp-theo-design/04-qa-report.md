@@ -597,3 +597,270 @@ manage.py makemigrations --check --dry-run                            -> No chan
 python3 scripts/check_naming.py                                       -> OK, không vi phạm mới
 pkill -f "runserver 127.0.0.1:8765"
 ```
+
+
+## BE Lô 11, 13 · lần 1 · 2026-10-02
+
+**Cách kiểm:** dựng backend thật (`runserver 127.0.0.1:8766`, SQLite tạm `qa1113.sqlite3` do `qa1113_seed.py` dựng dữ liệu giả: 9 tài khoản đủ 5 nhóm + hai quản lý + hai thủ kho + một tài khoản không nhóm; 6 mặt hàng QA01–QA06 (QA04 chưa giá, QA05 ngừng bán, QA06 combo, QA03 có ảnh); 3 ưu đãi, trong đó một ưu đãi cũ sai dữ liệu 150%; 5 nhà cung cấp, S1 có 3 phiếu Đã ghi nhận + 1 Nháp + 1 Đã huỷ). Không đụng DB staging/production. Gọi HTTP thật bằng token từng nhóm và không token. Số tiền mồi `77777`, `12345.67`, `0.01`, `66666`, `55555`, `424242`, `123457`, SĐT giả `0900000555`/`0900000999`. Script ở scratchpad: `qa_lot11.py` (307 ca), `qa_lot13.py` (465 ca), cùng `qa1113_inproc.py` / `qa1113_inproc13.py` (đếm truy vấn, du hành thời gian múi giờ VN, DELETE ưu đãi đã dùng), `qa1113_race.py` (6 POST song song cùng tên), `qa1113_ai.py`, `qa1113_aihttp.py` (lệnh AI thật).
+
+### Kết luận theo lô
+
+| Lô | Phạm vi | Kết luận | Lý do một dòng |
+|---|---|---|---|
+| 11 | B3 (ED-21) Nhà cung cấp | **REJECTED** | 306/307 ca HTTP (ca fail là Low). **B11-1 (Medium, chặn):** hai yêu cầu cùng lúc tạo cùng một tên nhà cung cấp đều thành công (trùng tên), dù AC "tên trùng 400" và "bấm đúp" yêu cầu chặn. Tái hiện được trên SQLite, không cần Postgres. |
+| 13 | R14 (ED-30/ED-31 phía BE) Danh mục và giá | **REJECTED** | 465/465 ca HTTP pass, nhưng 2 lỗi Medium ngoài đường thuận: **B13-1** `DELETE` ưu đãi đã dùng ở đơn trả 500 (ProtectedError chưa được bắt); **B13-2** giá bán `0` được chấp nhận (Shop sẽ hiện giá 0). Thêm B13-3 (Medium/Low) cần PO/techlead quyết. |
+
+### Số liệu
+
+- HTTP thật: Lô 11 **306/307**, Lô 13 **465/465**; cộng ca trong tiến trình (du hành thời gian, đếm truy vấn, AI, đua tranh) và các ca thủ công ghi ở mục lỗi.
+- `manage.py test` toàn bộ: **2591 test OK** (124 s) ở lần chạy cuối. Lần chạy đầu trong phiên này có 1 test đỏ `test_r2_group_type_not_registered_yet` (Lô 14 vừa đăng ký loại hướng dẫn `group` ở `apps/accounts/capabilities/next_steps.py`); đến lần chạy cuối cùng test này đã xanh (Lô 14 sửa test trong lúc tôi kiểm). Không có đỏ nào thuộc Lô 11, 13.
+- Adapter: `adapter/.venv/bin/python -m pytest` -> **68 passed**. (Dùng python hệ thống thì thiếu `respx`; đây là lỗi môi trường, không phải lỗi mã.)
+- `makemigrations --check --dry-run` -> No changes detected. `check_naming.py` -> không vi phạm mới.
+- Không sửa mã sản phẩm.
+
+### Lô 11 — B3 Nhà cung cấp
+
+| Mã AC / ca | Kết quả | Bằng chứng (`qa_lot11.py`, HTTP thật) |
+|---|---|---|
+| ED-21-AC1 `receipt_count`, `last_received_at`, `purchase_total` chỉ tính phiếu Đã ghi nhận | PASS | S1: 3 SUBMITTED + Nháp + Đã huỷ -> đếm 3, tổng bằng Σ làm tròn(kg × giá) từng dòng (mẫu `93939.00` = 2 × 46969.50 khớp kỳ vọng); phiếu Nháp/Đã huỷ không vào số liệu; đổi trạng thái phiếu rồi gọi lại thì số đổi đúng |
+| ED-21-AC2 giá vốn | PASS | 72 ca quét `COST_KEYS` + số mồi: `purchase_total` chỉ có ở owner. manager và kho: 200 nhưng 0 khoá giá vốn, 0 số mồi trong list, chi tiết, dòng thời gian. Lưu ý contract dùng tên `purchase_total` (story ghi `total_purchase_amount`), `purchase_total` đã nằm trong `COST_KEYS` |
+| ED-21-AC3 NCC chưa có phiếu | PASS | `receipt_count=0`, `last_received_at=null`, tổng `0.00` |
+| ED-21-AC4 quyền đọc | PASS | owner, manager, kho 200; giao, CSKH, không nhóm 403; không token 401 (28 ca) |
+| ED-21-AC5 số truy vấn không tăng theo số dòng | PASS | 5 NCC: 8/7/7 truy vấn (owner/manager/kho); 50 NCC: 8/7/7. Trang 1 có đúng 50 dòng, `count` 50 |
+| Ghi: POST/PATCH owner, manager 201/200; kho, giao, CSKH 403; không token 401 | PASS | 30 ca |
+| Tên trùng -> 400 (tuần tự) | PASS | 10 ca: trùng hoa/thường, khoảng trắng đầu/cuối, dấu tiếng Việt khác nhau thì coi là khác; đổi tên trùng NCC khác -> 400; đổi tên về chính nó, đổi hoa thường của chính nó -> 200 |
+| Dữ liệu vào xấu | PASS | 12 ca POST 400 (tên rỗng, toàn khoảng trắng, quá dài, SĐT sai định dạng...), không 500 |
+| DELETE/PUT -> 405 kể cả owner và manager (chứng từ không bị xoá) | PASS | 31 ca (mọi nhóm + không token) |
+| Ngừng hợp tác (`is_active=false`) | PASS | 3 ca: tắt/bật được, NCC đã tắt vẫn thấy số liệu cũ |
+| Lọc, phân trang | PASS | 25 ca lọc đúng; 17 ca giá trị xấu -> 400 `INVALID_FILTER` không phản hồi lại giá trị; `page` biên |
+| AuditLog | PASS | `supplier_create`/`supplier_update`, `changes={"fields":[...]}` chỉ chứa tên trường; 10 ca không chứa SĐT, 2 ca không chứa giá vốn |
+| Dữ liệu cá nhân | PASS | SĐT NCC giả không có trong AuditLog, log máy chủ (ngoại trừ URL tìm `?q=` do chính tôi gửi, xem N11-2), kết quả lệnh AI qua `scrub_data` |
+| Lệnh AI `purchasing.supplier.*` | PASS | `list/retrieve/create/partial_update` chạy qua HTTP AI thật; `purchase_total` bị scrub với người không có `view_costprice` |
+| Bấm đúp tuần tự | PASS | `[201, 400]` |
+| **Hai yêu cầu đồng thời cùng tên** | **FAIL** | **B11-1** |
+| `id` Ả Rập `%D9%A1` ở URL chi tiết | Low | N11-1 |
+
+### Lô 13 — R14 Danh mục và giá
+
+| Mã AC / ca | Kết quả | Bằng chứng (`qa_lot13.py`, HTTP thật + `qa1113_inproc13.py`) |
+|---|---|---|
+| ED-30 danh sách/chi tiết mặt hàng có `current_price` đúng | PASS | 108 ca đọc theo nhóm: owner, manager, kho, giao... `current_price` đúng theo bảng giá mặc định (BR-DM-02); bảng giá "Sỉ" mới hơn không ảnh hưởng |
+| ED-30-AC5 giá vốn | PASS | 42 ca quét `COST_KEYS`: không khoá giá vốn, không số mồi ở item, item-group, price-list, pricing-rules cho mọi vai |
+| `current_price` vắng với kho | PASS | kho không có `catalog.view_itemprice` -> không có khoá `current_price` trong list và chi tiết (còn manager/owner có) |
+| ED-31-AC5 ghi giá/ưu đãi chỉ owner | PASS | 121 ca: POST/PATCH/DELETE item-prices, price-lists, pricing-rules theo từng nhóm; manager, kho, giao, CSKH 403, không token 401 |
+| ED-31-AC1 đặt giá mới tự đóng giá cũ | PASS | giá cũ `valid_upto = D+4`, chỉ một giá mở; sổ giá không bị xoá |
+| BR-DM-03 chồng lấn -> 400 | PASS | 12 ca: cùng ngày bắt đầu với giá tương lai/hiện hành, chen vào giữa, PATCH vào khoảng cũ, đổi mặt hàng sang chỗ chồng đều 400 `BR-DM-03`; thông điệp nói cách sửa |
+| Cắt đuôi (mất giá sau ngày kết thúc) -> 400 | PASS | giá chen `D+2..D+3` khi giá cũ kéo đến `D+4` -> 400; chen khớp đuôi `D+2..D+4` trước giá tương lai `D+5` -> 201 và liền mạch |
+| `valid_upto < valid_from` -> 400 theo field | PASS | cả POST và PATCH |
+| Bấm đúp tuần tự | PASS | `[201, 400]`, một giá mở |
+| Giá Shop trước/sau ngày hiệu lực (giờ VN) | PASS | du hành thời gian quanh 00:00 VN / 17:00 UTC: Shop chi tiết, Shop danh sách, ERP chi tiết, ERP danh sách và `_effective_price` của đơn đều khớp nhau ở mọi mốc |
+| Shop không lộ giá vốn, dữ liệu cá nhân | PASS | 2 ca |
+| Shop: mặt hàng chưa giá / ngừng bán | PASS | danh sách không có QA04, QA05; chi tiết hàng chưa giá vẫn 200 với `price=null` (hành vi có từ trước, ghi N13-4) |
+| ED-31-AC2/AC3 tạo ưu đãi và dữ liệu xấu | PASS | `PERCENT > 100`, âm, `FIXED` quá lớn, ngày kết thúc trước ngày bắt đầu, thiếu mặt hàng khi `apply_on=ITEM`... đều 400 tiếng Việt, 43 ca |
+| Tắt ưu đãi cũ sai dữ liệu (150%) | PASS | `{is_active:false}` -> 200; bật lại khi vẫn sai -> 400; `{is_active:false, name}` hoặc kèm `discount_value:150` -> 400 (không miễn kiểm); sửa lại 20% hợp lệ rồi bật được |
+| ED-31-AC4 thêm nhóm hàng | PASS | có trong danh sách chọn |
+| `has_image` giá trị xấu -> 400 | PASS | 31 ca lọc xấu, `has_image=abc`, `maybe`, `2`... -> 400 `INVALID_FILTER` |
+| Số truy vấn | PASS | 7 mặt hàng: 10/10/9 (owner/manager/kho); 52 mặt hàng: 9/9/8; item-groups, pricing-rules, item-prices 7 truy vấn mỗi cái |
+| AuditLog | PASS | `create_itemprice`, `close_itemprice`, `update_itemprice` dùng khoá `sell_rate`, không có `rate`; không có giá vốn, không có SĐT |
+| ⏸ Hai người đặt giá cùng lúc cho cùng mặt hàng | ⏸ | `select_for_update` là no-op trên SQLite, cần Postgres |
+| **Ưu đãi đã dùng ở đơn: DELETE** | **FAIL** | **B13-1** |
+| **Giá bán `0`** | **FAIL** | **B13-2** |
+
+### Phân quyền (HTTP thật)
+
+| Hành động | owner | manager | warehouse_staff | delivery_staff | customer_service | không nhóm | không token |
+|---|---|---|---|---|---|---|---|
+| GET suppliers (list, detail) | 200 | 200 | 200 | 403 | 403 | 403 | 401 |
+| `purchase_total` trong body | có | không | không | n/a | n/a | n/a | n/a |
+| POST/PATCH suppliers | 201/200 | 201/200 | 403 | 403 | 403 | 403 | 401 |
+| DELETE/PUT suppliers | 405 | 405 | 403 | 403 | 403 | 403 | 401 |
+| GET items, item-groups | 200 | 200 | 200 | theo Tầng 1 hiện có | theo Tầng 1 hiện có | 403 | 401 |
+| `current_price` trong item | có | có | không | n/a | n/a | n/a | n/a |
+| POST/PATCH/DELETE item-prices, pricing-rules | 2xx | 403 | 403 | 403 | 403 | 403 | 401 |
+
+### Rò giá vốn
+
+Không rò. Quét đệ quy mọi khoá JSON theo `COST_KEYS` cộng số mồi trên mọi trang list/chi tiết/dòng thời gian của suppliers, items, item-groups, price-lists, item-prices, pricing-rules và Shop với owner, manager, kho: manager và kho 0 khoá, 0 số mồi (`purchase_total` và `purchase_amount` đã vào `COST_KEYS`). `purchase_total` ÷ kg tính ngược ra giá nhập, nên đúng là giới hạn owner. AuditLog `changes` chỉ có tên trường (`fields`), `sell_rate` là giá bán chứ không phải giá vốn. Qua AI: lệnh `purchasing.supplier.*` bị `scrub_data` bỏ khoá giá vốn khi thiếu `view_costprice`.
+
+### Rò dữ liệu cá nhân
+
+Không rò. SĐT NCC giả và SĐT/địa chỉ khách giả (tạo đơn thật dùng ưu đãi): không có trong body API công khai và Shop, AuditLog, kết quả AI, log máy chủ (dòng log duy nhất chứa SĐT là URL `?q=<SĐT>` do chính script tìm kiếm gửi, xem N11-2). `Cache-Control` không thay đổi so với trước.
+
+### Hồi quy
+
+Full `manage.py test` 2591 OK, adapter 68 OK, migration sạch, naming sạch. Quét tay các lô liền kề (Lô 8, 9, 10 vẫn chạy trên cùng cấu hình): không 5xx. Giá của đơn hiện hữu không đổi: `_effective_price` của đơn và giá ERP/Shop khớp ở mọi mốc thời gian.
+
+### Lỗi
+
+#### B11-1 — Hai yêu cầu đồng thời tạo trùng tên nhà cung cấp · Medium (chặn) · ED-21 "tên trùng 400" + bấm đúp
+- **Bước tái hiện:** `python3 qa1113_race.py` (hoặc tay): gửi 6 `POST /api/purchasing/suppliers/` song song với cùng `{"name": "NCC Đua Tranh <n>"}` bằng token owner, 15 vòng với tên khác nhau mỗi vòng.
+- **Mong đợi:** đúng 1 yêu cầu 201, các yêu cầu còn lại 400 (tên trùng).
+- **Thực tế:** 9/15 vòng có từ 2 tới 5 dòng trùng tên trong DB (nhiều yêu cầu cùng 201). Tương tự với `PATCH` đổi tên. Kiểm trùng làm bằng `casefold` trong Python và model không có ràng buộc duy nhất, nên không có gì chặn khi hai yêu cầu cùng qua bước kiểm. Không phải lỗi riêng của SQLite.
+- **Ảnh hưởng:** danh sách NCC có hai dòng cùng tên; số liệu tổng hợp (số phiếu, tổng tiền) bị chia đôi theo hai bản ghi. Người dùng bấm đúp nút Lưu là đủ để dính.
+- **Đề xuất cho BE:** khoá tuần tự khi kiểm trùng (ví dụ `pg_advisory_xact_lock` theo hash tên đã chuẩn hoá, hoặc cột `name_key` đã casefold có `UniqueConstraint`), và test song song trên Postgres.
+
+#### B13-1 — `DELETE` ưu đãi đã được đơn dùng trả 500 · Medium (chặn) · ED-31 (ngoại lệ: dữ liệu đã từng bán)
+- **Bước tái hiện:** tạo đơn 6 kg QA01 để ưu đãi "Mua 5kg giảm 10% QA" áp vào dòng đơn (`SalesOrderLine.pricing_rule`, `on_delete=PROTECT`), rồi `DELETE /api/catalog/pricing-rules/<id>/` bằng token owner.
+- **Mong đợi:** 4xx có thông điệp tiếng Việt ("Ưu đãi đã dùng ở đơn hàng, hãy tắt thay vì xoá") hoặc 405.
+- **Thực tế:** HTTP **500**, `ProtectedError ... referenced through protected foreign keys: 'SalesOrderLine.pricing_rule'` (qua HTTP thật trên `runserver`, DEBUG nên trả trang lỗi; production sẽ là 500 chung). Dữ liệu không bị mất nhờ PROTECT.
+- **Ảnh hưởng:** owner bấm Xoá thấy lỗi hệ thống thay vì lời hướng dẫn; 500 sinh log và cảnh báo. Gắn với N13-3: ưu đãi chưa dùng lại xoá cứng được (204).
+- **Đề xuất:** bắt `ProtectedError` -> 409/400 hướng dẫn tắt; cân nhắc 405 cho `DELETE` pricing-rules như các chứng từ khác, vì đã có `is_active`.
+
+#### B13-2 — Giá bán `0` được chấp nhận · Medium (chặn) · ED-31-AC3 / BR-DM
+- **Bước tái hiện:** owner `POST /api/catalog/item-prices/` với `{"item": <QA03>, "price_list": <mặc định>, "rate": "0", "valid_from": <D+61>}`.
+- **Mong đợi:** 400 "Giá bán phải lớn hơn 0" (cùng tinh thần "đặt giá âm -> 400").
+- **Thực tế:** 201. Đến ngày hiệu lực, Shop chi tiết trả `price="0.00"`, Shop danh sách cũng hiện 0.00: khách đặt hàng với giá 0 (bán lỗ toàn phần). Nguyên nhân: `ItemPrice.rate` chỉ có `MinValueValidator(0)`.
+- **Ảnh hưởng:** một lỗi gõ nhầm của owner biến thành đơn giá 0 đồng. Chưa tới mức mất tiền tự động vì cần owner đặt, nhưng không có chặn nào.
+- **Đề xuất:** `rate > 0` ở serializer và service `set_item_price`/`update_item_price`; nếu muốn tặng quà thì dùng ưu đãi.
+
+#### N13-3 — Điểm cần PO/techlead quyết · Medium hoặc Low · ED-31
+- `min_qty` của ưu đãi nhận số âm hoặc 0 (model không có validator): ưu đãi "mua >= -3 kg" áp cho mọi dòng.
+- `DELETE` item-price và pricing-rule chưa dùng -> 204 (xoá cứng lịch sử giá/ưu đãi). Nếu coi lịch sử giá là chứng từ thì nên 405 và dùng `valid_upto`/`is_active`.
+- Nhóm hàng có thể chọn chính nó làm nhóm cha (200).
+- Chưa tính thành lỗi chặn vì AC chưa viết các trường hợp này, nhưng đề nghị techlead chốt cùng lúc sửa B13-1, B13-2.
+
+#### Ghi nhận Low / thông tin
+- **N11-1 (Low):** `GET /api/purchasing/suppliers/%D9%A1/` (chữ số Ả Rập "١") trả 200 trên chi tiết (Python `int()` chấp nhận). Ca duy nhất không pass của Lô 11; không rò dữ liệu, chỉ nên chuẩn hoá `lookup_value_regex=[0-9]+` nếu muốn chặt.
+- **N11-2 (Low):** tìm NCC bằng SĐT dùng `?q=<SĐT>` nên SĐT nằm trong URL/access log. SĐT NCC (doanh nghiệp) không phải dữ liệu khách nên không phải Critical; khuyến nghị gom về POST hoặc che trong access log.
+- **N11-3 (info):** `last_received_at` lấy theo `created_at` của phiếu (đúng 02b), không phải `received_date`; phiếu nhập hồi tố sẽ hiện ngày tạo.
+- **N13-4 (info, có từ trước):** Shop chi tiết hàng chưa có giá vẫn 200, `price=null`.
+- **N13-5 (info):** `rate="1e3"` được chấp nhận và hiểu là 1000; cho phép giá hiệu lực lùi ngày quá khứ (không đóng giá nào, vẫn một giá mở).
+
+### ⏸ Chưa kiểm được
+- Hai người đặt giá/duyệt cùng lúc trên Postgres (`select_for_update`): no-op trên SQLite. B11-1 cũng nên có test song song trên Postgres sau khi sửa.
+- Không có ca FE trong lần kiểm này (chỉ BE).
+
+### Lệnh đã chạy (output tóm tắt)
+```
+bash qa1113_reset.sh                                       -> migrate + bootstrap_masterdata + seed dữ liệu giả
+bash qa1113_serve.sh (runserver 127.0.0.1:8766 --noreload)
+python3 qa_lot11.py                                        -> 307 ca, 306 pass, 1 Low (N11-1)
+python3 qa_lot13.py                                        -> 465/465 pass (sau khi chuyển các ca đổi trạng thái sang QA03 và dựng lại DB)
+python qa1113_inproc.py                                    -> truy vấn NCC 5 dòng: 8/7/7, 50 dòng: 8/7/7; trang 1 có 50 dòng
+python qa1113_inproc13.py                                  -> du hành thời gian: 5 đường tính giá khớp; truy vấn items 10/10/9 -> 9/9/8; DELETE ưu đãi đã dùng -> ProtectedError
+curl -X DELETE .../api/catalog/pricing-rules/<đã dùng>/    -> HTTP 500 (ProtectedError)
+python3 qa1113_race.py                                     -> 9/15 vòng sinh tên trùng (B11-1)
+manage.py test (backend, toàn bộ)                          -> Ran 2591 tests OK (124 s)
+adapter/.venv/bin/python -m pytest                         -> 68 passed
+manage.py makemigrations --check --dry-run                 -> No changes detected
+python3 scripts/check_naming.py                            -> OK, không vi phạm mới
+pkill -f "runserver 127.0.0.1:8766"
+```
+
+---
+
+## BE Lô 11, 12, 13, 14 (đợt 2) · 2026-10-02
+
+Chạy thật trên server `runserver` + SQLite tạm, dữ liệu giả, token từng vai (owner, manager, manager2 = manager + `manage_staff` gán riêng, extra = chỉ `manage_staff`+`view_auditlog` gán riêng, kho, kho2, viewer = kho + `view_customer_list` gán riêng, giao A/B, CSKH, không nhóm) và ca chưa đăng nhập. Không PASS bằng đọc code. Không sửa code sản phẩm.
+
+### Kết luận theo lô
+| Lô | Kết luận | Lý do một dòng |
+|---|---|---|
+| **11** | **APPROVED** | B11-1 đã sửa: 6 POST song song cùng tên cho đúng 1 thành công, PATCH đổi trùng tên cũng bị chặn; 35 vòng đua không còn bản trùng. Còn N11-1 (Low). |
+| **12** | **APPROVED** | 392/392 ca; không rò giá vốn, không rò dữ liệu cá nhân; D-3 đúng; `customer_name` chỉ theo `view_customer_list`. Còn 1 điểm cần Duy chốt (ED-33-AC4). |
+| **13** | **APPROVED** | B13-1, B13-2, N13-3 đều đã sửa và có bằng chứng chạy thật (DELETE 405 kể cả ưu đãi đã dùng trong đơn). |
+| **14** | **APPROVED** | 585/585 ca; không vượt quyền, không cấp được việc "Chỉ Chủ", hiệu lực ngay, audit chỉ có mã. Ca đồng thời cần Postgres ⏸. |
+
+### Tổng: ca có kịch bản (HTTP thật) · 1908 · ✅ 1907 · ❌ 1 (Low) · ⏸ 6 mục
+(Lô 11: 307 · Lô 12: 392 · Lô 13: 465 + 151 + 8 du hành thời gian · Lô 14: 585. Chưa tính các ca thủ công: tranh chấp tên 35 vòng, phân trang 25 hoá đơn, lệnh AI theo vai, đếm truy vấn.)
+
+### Theo AC / yêu cầu
+| Mã | Kết quả | Bằng chứng |
+|---|---|---|
+| Lô 11 · B11-1 tên NCC trùng khi đồng thời | ✅ đã sửa | `qa1214_race11.py`: 6 POST song song cùng tên (và biến thể hoa/thường, khoảng trắng) → đúng 1 thành công, còn lại 400 (`SUPPLIER_NAME_TAKEN` hoặc lỗi trường `name`); 15+10+10 vòng, 0 bản trùng. PATCH đổi sang tên trùng song song: cùng kết quả. |
+| Lô 11 · chạy lại cả script cũ | ✅ 306/307 | `qa_lot11.py`; ca lệch duy nhất là N11-1 (Low, có từ lần 1). |
+| Lô 13 · B13-1 DELETE ưu đãi đã dùng | ✅ đã sửa | DELETE `/pricing-rules/<id đã dùng trong đơn>/` → 405 (trước: 500). Mọi vai đăng nhập → 405, chưa đăng nhập → 401. |
+| Lô 13 · DELETE bảng giá / giá mặt hàng | ✅ | 405 mọi vai; dòng còn nguyên trong DB. |
+| Lô 13 · B13-2 `rate` ≤ 0 | ✅ đã sửa | `rate` 0, -1, "0.00", "-0.0001" → 400; `PERCENT=0` → 400. |
+| Lô 13 · N13-3 `min_qty`/`discount_value` ≤ 0 | ✅ đã sửa | 0, âm → 400; số dương nhỏ nhất vẫn nhận. |
+| Lô 13 · N13-3 nhóm hàng chọn chính nó/con/cháu làm cha | ✅ đã sửa | cả 3 trường hợp 400; chọn nhánh khác hợp lệ → 200. |
+| Lô 13 · chạy lại cả script cũ | ✅ | `qa_lot13.py` 465/465 (đã đổi kỳ vọng DELETE 403→405, PERCENT 0→400), `qa_lot13b.py` 151/151, du hành thời gian 8/8. |
+| R11 hoá đơn mua · D-3 | ✅ | manager thấy `amount`; kho/giao/CSKH 403; chưa đăng nhập 401. Lọc `is_paid`, `supplier`, `month` đúng số SQL; lọc sai → 400. |
+| R12 chi phí lô | ✅ | chỉ owner xem; manager và 3 vai còn lại 403, thân 403 không có số tiền. |
+| R13 hoá đơn bán · giá vốn | ✅ | owner thấy `cogs`/`gross_profit`/`totals.gross_profit`; manager, kho: không có các khoá này, `totals` chỉ `amount`. |
+| R13 · `customer_name` | ✅ | chỉ người có `sales.view_customer_list` (owner, manager, viewer). Kho: `null` (khoá vẫn có). Tắt `view_customers` của manager qua ma trận → `null` ngay. `q` không tìm theo tên khách. `Cache-Control: no-store`. |
+| R13 · lọc, trang | ✅ | `status`, `date_from/to`, `q`, phân trang 20 dòng/25 hoá đơn; sai dạng → 400 `INVALID_FILTER`. |
+| R15 `reports/batches` | ✅ | chỉ owner; mọi vai khác 403; lọc `month`, `state` đúng SQL; sai → 400. |
+| R15 `period` | ✅ | `invoice_count`, `refund_count` khớp SQL; khoá cũ giữ nguyên số. |
+| R15 · lệnh AI `reports.batch_pnl_list` | ✅ | chỉ owner thấy/gọi; vai khác bị từ chối. |
+| ED-39-AC1 đọc ma trận | ✅ | owner 200 (5 nhóm đúng thứ tự, 25 việc mỗi nhóm, 9 việc "Chỉ Chủ" khớp danh sách); manager/kho/giao/CSKH/không nhóm 403; chưa đăng nhập 401. |
+| ED-39-AC2 hiệu lực ngay | ✅ | cùng token manager: `customer-directory` 200 → 403 ngay sau khi Chủ tắt `view_customers`; `/auth/me/` bỏ quyền; `orders` 200 → 403 khi tắt `view_orders`; bật lại → trở về, DB về nguyên trạng. |
+| ED-39-AC3 người không phải Chủ không ghi được | ✅ | 9 vai × 6 nhóm × 3 thân (~160 ca): manager, manager2, extra, kho, giao, CSKH, không nhóm → 403, chưa đăng nhập 401; quyền nhóm trong DB và AuditLog không đổi. |
+| ED-39-AC4 nhóm Chủ khoá | ✅ | 6 kiểu thân vào `owner` → 400 `GROUP_LOCKED`. |
+| BR-PQ-32 việc "Chỉ Chủ" | ✅ | 9 việc × 4 nhóm bật → 400 `BR-PQ-32`; lẫn việc hợp lệ cũng không áp (tất cả hoặc không gì); không audit. Khoá lạ (`view_costprice`, `inventory.view_costprice`, `reports.view_profitreport`, `accounts.manage_staff`, rỗng, khoảng trắng, hoa/thường…) → 400 `INPUT_NOT_ALLOWED`. Bật hết việc thường cho CSKH → không có quyền owner-only nào xuất hiện. |
+| `requires` (M1) | ✅ | tắt `deliver` khi `pack_print` bật → 400 `CAPABILITY_REQUIRES`; bật `pack_print` khi `deliver` tắt → 400; đổi cả hai cùng yêu cầu thì qua; trạng thái `partial` xử lý đúng (tắt `deliver` khi `pack_print` partial → 400; bật lại partial → đủ quyền). |
+| `scopes.customers` (M2) | ✅ | động: kho bật `view_customers` → "Tất cả khách" và `customer-directory` 200; tắt → "Không xem" và 403; manager tắt → "Không xem"; khớp 200/403 cả 5 nhóm. |
+| ED-39-AC5 audit + timeline | ✅ | `change_group_capabilities` (22 dòng): `changes` chỉ `{khoá việc: {from,to}}`, `note` rỗng; PUT không đổi gì không ghi; đổi 3 việc ghi đúng 1 dòng; timeline "Bật/Tắt việc …" và "Thêm/Bớt … nhóm" (chạy qua `PUT /api/staff/<id>/groups/`); `last_changed_*` điền; người nghỉ: list không đếm, detail có `is_active:false`. |
+| R2 guidance `group` | ✅ | `/api/guidance/group/<pk>/` owner 200, `next_steps` rỗng; vai khác 403; chưa đăng nhập 401; pk lạ/chữ/âm/quá lớn → 404, không 500. |
+| R16 `audit-logs?actor=` | ✅ | owner/manager 200; kho, giao, CSKH 403; chưa đăng nhập 401. Tập id trả về = tập id SQL (đủ, chỉ của người đó); id không tồn tại → 200 rỗng; trống → không lọc; ghép `action`, `actor_kind` khớp SQL; 24 giá trị sai (chữ, 0, âm, thập phân, khoảng trắng, `+1`, Unicode, quá int64, 5000 chữ số, SQL, HTML…) → 400 `INVALID_FILTER`, không lặp lại giá trị. POST/PUT/PATCH/DELETE → 405. |
+
+### Ngoại lệ và biên (đã chạy)
+- Đồng thời: tên NCC (xem trên). Trên SQLite 4 PUT song song trên cùng nhóm: 1 thành công, 3 trả 500 "database is locked" (SQLite chỉ cho một người ghi; `select_for_update` là no-op) → **không tính lỗi, ⏸ chạy lại trên Postgres**. Trạng thái cuối vẫn on/off sạch, không dở dang (khối `atomic`).
+- Bấm đúp / PUT lặp: PUT cùng nội dung hai lần → 200 cả hai, chỉ 1 dòng audit.
+- Thân hỏng (23 kiểu + 7 thân thô: JSON cụt, byte lạ, 100 KB, form-encoded, 5000 khoá) → 400/415, không 500, DB không đổi.
+- Nhóm lạ (`chu`, `quan_ly`, `OWNER`, `Manager`, khoảng trắng, `..`, `%00`, số lớn) → 404 `GROUP_NOT_FOUND`, không 500; PUT cũng 404.
+- Dữ liệu đã có sẵn lệch (đã cấp `confirm_payment_manual` cho kho ngoài băng): Chủ tắt → gỡ được, audit ghi on→off.
+- Chứng từ không bị xoá: DELETE bảng giá/ưu đãi/giá hàng → 405; AuditLog không có đường ghi/xoá (405), số dòng không giảm.
+
+### Phân quyền (Lô 14, ghi ma trận)
+| Hành động | owner | manager | manager2 (+manage_staff riêng) | extra (chỉ manage_staff riêng) | kho | giao | CSKH | không nhóm | chưa ĐN |
+|---|---|---|---|---|---|---|---|---|---|
+| GET `/api/staff/groups/…`, guidance `group` | 200 | 403 | 200* | 200* | 403 | 403 | 403 | 403 | 401 |
+| PUT `…/capabilities/` | 200/400 theo luật | 403 | 403 | 403 | 403 | 403 | 403 | 403 | 401 |
+| GET `/api/audit-logs/?actor=` | 200 | 200 | 200 | 200 | 403 | 403 | 403 | 403 | 401 |
+| GET `reports/batches`, `purchasing/costs` | 200 | 403 | | | 403 | 403 | 403 | | 401 |
+| GET `purchasing/invoices` | 200 | 200 | | | 403 | 403 | 403 | | 401 |
+| GET `sales/invoices` (có `customer_name`) | 200 có | 200 có | | | 200 `null` | 403 | 403 | | 401 |
+
+\* theo thiết kế: quyền đọc là `accounts.manage_staff`; người được gán trực tiếp đọc được, nhưng ghi vẫn 403 (đã chạy). Không phải lỗi.
+
+### Rò giá vốn
+Quét `COST_KEYS` + số mồi (91919…) cho mọi vai không phải owner trên toàn bộ phản hồi 200/403/401 của Lô 12 và 14: **không có**. Khoá việc của registry (`view_cost`, `set_price`, `view_profit`…) **không** nằm trong `COST_KEYS` và chỉ là tên việc, không có số tiền/kg → không tính ngược ra giá vốn. Audit `changes` chỉ `{from,to}` dạng on/off (kiểm: không có số ≥ 4 chữ số). Hoá đơn bán: `cogs`, `gross_profit` chỉ cho `view_costprice`. CSKH được bật hết việc thường vẫn không đọc được `reports/batches` / `purchasing/costs` (403).
+
+### Rò dữ liệu cá nhân
+- Gài SĐT/email/ghi chú nhân viên giả vào DB và 6 khách giả: không xuất hiện trong `members`, timeline, guidance, audit, 403 body. `members` chỉ gồm `id`, `display_name`, `username`, `other_groups`, `is_active`, `added_at`.
+- `sales/invoices`: chỉ có tên khách (không SĐT, không địa chỉ) và chỉ cho người có `view_customer_list`; chi tiết hoá đơn không có tên.
+- Log server (1358 dòng): không có tên/SĐT khách ngoài URL `?q=` do chính script thăm dò.
+- Không có lệnh AI nào chạm `/api/staff/groups/` hay `/api/audit-logs/` (danh sách lệnh AI đã quét).
+
+### Hồi quy
+`manage.py test` toàn bộ (song song 4): **Ran 2642 tests, OK** (con số của điều phối viên, tôi tự chạy lại). `adapter` pytest 68 passed. `makemigrations --check --dry-run`: No changes detected. `check_naming`: OK, không vi phạm mới. Script Lô 11 (307) và Lô 13 (465 + 151) cũ chạy lại: không hồi quy.
+
+### Lỗi
+Không có lỗi Critical, High hoặc Medium trong Lô 11, 12, 13, 14.
+
+#### Ghi nhận Low / thông tin (không chặn)
+- **N11-1 (Low, còn từ lần 1):** `GET /api/purchasing/suppliers/%D9%A1/` (chữ số Ả Rập) trả 200. Đề nghị `lookup_value_regex=[0-9]+`.
+- **N12-1 (cần Duy chốt, ED-33-AC4):** story nói kho thấy "Không có quyền" ở màn Hoá đơn bán, BE theo 02b cho kho 200 (không có `customer_name`, không có giá vốn). Không rò gì; chỉ là lệch story. BE đã ghi trong dev-notes.
+- **N12-2 (info, hiệu năng):** `reports/batches` owner ≈ 34 truy vấn/trang (≈ 7 mỗi lô); dev-notes đã nêu.
+- **N12-3 (info):** `supplier=1%20`, `date_from=%0A…` được cắt khoảng trắng và trả 200; `period?month=13` trả 200 với số 0 (có từ trước, ngoài diff).
+- **N13-5 (info):** giảm 100% cho đơn tổng 0 đồng; `rate="1e3"` hiểu là 1000.
+- **N14-1 (info):** tắt `view_orders` hoặc `deliver` của NV giao làm hỏng màn hình của họ; BE không cấm (quyết định của Chủ, FE hỏi xác nhận) và `scopes.orders` cố định theo bảng.
+- **N14-2 (info):** `scopes.customers` của `delivery_staff` là "Được gán" trong khi `customer-directory` 403: đúng (họ chỉ thấy khách qua phiếu giao được gán).
+- **N-pre (có từ trước, ngoài diff, không chặn):** `PATCH /api/purchasing/costs/{id}/ {"amount":"1"}` bởi owner trả 200, không tính lại phân bổ và không ghi AuditLog. Đề nghị lô sau.
+
+### ⏸ Chưa kiểm được
+1. Tranh chấp tên NCC khi nhiều tiến trình (Postgres, `pg_advisory_xact_lock(7110001)`): SQLite chỉ dùng `RLock` trong một tiến trình.
+2. Hai người đặt giá cùng lúc (`select_for_update` no-op trên SQLite).
+3. Hai PUT ma trận cùng lúc trên cùng nhóm: SQLite trả 500 "database is locked", cần chạy trên Postgres để xác nhận `select_for_update` tuần tự hoá.
+4. `_membership_events` (lookup `changes__groups__…__icontains`) trên Postgres: chỉ chạy SQLite.
+5. FE của 4 lô này (chưa có trong đợt này).
+6. Thời gian phản hồi thật trên Postgres cho `reports/batches`.
+
+### Lệnh đã chạy (output tóm tắt)
+```
+qa1113_reset.sh + qa1113_serve.sh (8766) / qa1214_reset.sh + qa1214_serve.sh (8767), runserver --noreload, SQLite tạm
+python3 qa_lot11.py          -> 306/307 (N11-1)
+python3 qa1214_race11.py     -> tranh chấp tên NCC: 0 bản trùng sau 35 vòng; PATCH song song OK
+python3 qa_lot13.py          -> 465/465
+python3 qa_lot13b.py         -> 151/151
+python  qa1113_inproc13.py   -> du hành thời gian 8/8; DELETE ưu đãi đã dùng -> 405
+python3 qa_lot12.py          -> 392/392 (+ qa12_page.py phân trang, qa1214_ai.py lệnh AI theo vai, qa1214_q.py số truy vấn)
+python3 qa_lot14.py          -> 585/585
+manage.py test --parallel 4  -> Ran 2642 tests OK (40 s)
+adapter/.venv/bin/python -m pytest -> 68 passed
+manage.py makemigrations --check --dry-run -> No changes detected
+python3 scripts/check_naming.py -> OK
+pkill runserver 8766 và 8767
+```
+Script nằm trong scratchpad của phiên (không đưa vào repo).

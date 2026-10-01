@@ -14,6 +14,7 @@ from django.db.models import Exists, OuterRef, Q
 
 from apps.common.api import has_full_delivery_scope
 from apps.delivery.models import DeliveryNote
+from apps.sales.customers.permissions import can_view_customer_directory
 
 
 def scope_orders_for(user, qs):
@@ -33,3 +34,11 @@ def scope_orders_for(user, qs):
         return qs.filter(assigned_q | customer_service_q).distinct()
 
     return qs.filter(assigned_q).distinct()
+
+
+def can_filter_orders_by_customer(user) -> bool:
+    """Lọc đơn theo khách (`?customer=`) là xem dữ liệu khách: đòi quyền "Xem khách hàng" (02b §3.8 R3).
+
+    Dùng hàm chung `can_view_customer_directory` (`sales.view_customer_list`, B2/Lô 6) để không lệch với
+    danh bạ khách và dòng thời gian khách."""
+    return can_view_customer_directory(user)

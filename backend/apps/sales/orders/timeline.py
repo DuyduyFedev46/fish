@@ -11,7 +11,9 @@ Nguồn:
   `confirm_payment_manual` chỉ dùng để lấy NGƯỜI xác nhận tay, không thành dòng riêng.
 
 Bất biến: KHÔNG đưa `changes` thô ra ngoài — nhãn tự dựng, chỉ chứa mã chứng từ, số tiền khách
-trả/được hoàn, số kg, lý do huỷ. Không giá vốn (BR-PQ-15), không mật khẩu. actor=None → "Hệ thống".
+trả/được hoàn, số kg, lý do huỷ. KHÔNG ghép `Refund.reason` (chữ tự do, có thể chứa SĐT/tên — bất biến 9):
+lý do phiếu hoàn xem ở chính phiếu hoàn. (Còn ghép chữ tự do: ghi chú huỷ đơn, lý do báo hoàn thất bại; xem
+03-dev-notes mục Lô 3.) Không giá vốn (BR-PQ-15), không mật khẩu. actor=None → "Hệ thống".
 Hoá đơn và phiếu giao do Hệ thống tạo (BR-PQ-11) nên luôn là "Hệ thống".
 """
 from dataclasses import dataclass
@@ -133,7 +135,8 @@ def build_timeline(order):
         for r in refunds:
             events.append(TimelineEvent(
                 r.created_at, "refund_created",
-                f"Tạo phiếu hoàn {vnd_display(r.amount)}" + (f" — {r.reason}" if r.reason else ""),
+                # Bất biến 9: KHÔNG ghép `Refund.reason` (chữ tự do, có thể chứa SĐT/tên). Lý do xem ở phiếu hoàn.
+                f"Tạo phiếu hoàn {vnd_display(r.amount)}",
                 actor_display(r.created_by),
                 doc="refund",
                 actor_kind="user" if r.created_by else "system",

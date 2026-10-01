@@ -56,7 +56,7 @@ Module gọi module khác **qua services** của module đó. Route tập trung 
 | | `customers/` | P-05 (7.1) | `sales/customers/` |
 | `delivery` | (phẳng) + `confirmation/` (gọi xác nhận đơn, CSKH) | P-06, P-08 | `delivery/notes/` (+ `status`), `confirmation/queue/`, `confirmation/search/` (alias cũ `cskh/queue/`, `cskh/search/` đã gỡ ở Lô 5, trả 404) |
 | `reports` | (phẳng) | P-10 | `reports/batch/{batch_id}/`, `reports/period/`, `dashboard/summary/` |
-| `accounts` | `auth/`, `staff/` | §1 Phân quyền | `auth/token/`, `auth/me/`, `auth/logout/`, `auth/change-password/`; `staff/` (+ `groups`, `deactivate`, `reactivate`, `reset-password`) |
+| `accounts` | `auth/`, `staff/`, `capabilities/`, `audit/` | §1 Phân quyền | `auth/token/`, `auth/me/`, `auth/logout/`, `auth/change-password/`; `staff/` (+ `groups`, `deactivate`, `reactivate`, `reset-password`); `staff/groups/` + `staff/groups/{code}/` + `staff/groups/{code}/capabilities/` (ma trận phân quyền, chỉ Chủ ghi); `audit-logs/?actor=` |
 | `content` | `categories/`, `entries/`, `images/`, `body/`, `public/` | P-11 | `content/categories/`, `content/entries/`; công khai `public/content/` |
 | `common` | (phẳng) | dùng chung | — (phân quyền, ẩn giá vốn, `BusinessError`, AuditLog) |
 

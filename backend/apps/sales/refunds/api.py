@@ -5,14 +5,17 @@ confirm_refund (chỉ Chủ, tiền rời túi) — BR-HT-07.
 `POST /api/sales/refunds/create` nhận ĐÚNG MỘT trong `sales_invoice` / `payment_transaction`
 (S13). Gắn giao dịch (hàng chờ lệch) đòi thêm `confirm_payment_manual` — việc của Chủ
 (S13-AC6, BR-TT-09). `request_id` (UUID) gửi lại → 200 `duplicate: true`, vẫn 1 phiếu (Q12).
+ERP theo design Lô 3 (R3): `GET /api/sales/refunds/?month=YYYY-MM` lọc theo ngày tạo (giờ VN), sai định dạng →
+400 `INVALID_FILTER`. Response có tên/SĐT khách nên gắn `Cache-Control: no-store` (bất biến 9).
 """
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from apps.ai.declare import AiDeclarable, AiMeta
-from apps.common.api import BusinessModelPermissions, reject_protected_fields, require_perm
+from apps.common.api import BusinessModelPermissions, NoStoreMixin, reject_protected_fields, require_perm
 from apps.common.exceptions import BusinessError
+from apps.common.params import month_bounds
 from apps.sales.models import PaymentTransaction, Refund, SalesInvoice
 
 from . import services
@@ -26,7 +29,7 @@ def _get_or_400(model, raw_pk, label):
         raise BusinessError(f"{label} không tồn tại.", code=services.REFUND_SOURCE_CODE) from None
 
 
-class RefundViewSet(AiDeclarable, viewsets.ReadOnlyModelViewSet):
+class RefundViewSet(NoStoreMixin, AiDeclarable, viewsets.ReadOnlyModelViewSet):
     queryset = Refund.objects.select_related(
         "sales_invoice__sales_order__customer",
         "payment_transaction__sales_order__customer",
@@ -45,6 +48,10 @@ class RefundViewSet(AiDeclarable, viewsets.ReadOnlyModelViewSet):
             ]
             if statuses:
                 queryset = queryset.filter(status__in=statuses)
+            month = self.request.query_params.get("month", "").strip()
+            if month:  # R3 (02b §3.8): theo ngày tạo phiếu, giờ VN
+                start, end = month_bounds(month)
+                queryset = queryset.filter(created_at__gte=start, created_at__lt=end)
         return queryset
 
     @action(

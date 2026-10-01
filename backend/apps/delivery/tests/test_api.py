@@ -29,7 +29,10 @@ class SetStatusHttpTests(TestCase):
         return f"/api/delivery/notes/{note.pk}/status/"
 
     def _post(self, note, to_status):
-        return self.client.post(self._url(note), {"to_status": to_status}, format="json")
+        body = {"to_status": to_status}
+        if to_status == DeliveryNote.Status.FAILED:
+            body["failure_reason"] = DeliveryNote.FailureReason.NOT_MET  # BR-GH-22: bắt buộc từ B5
+        return self.client.post(self._url(note), body, format="json")
 
     def test_ac_ready_returns_full_note_json(self):
         """PREPARING -> READY (nhánh advance_status) — body đầy đủ, không lỗi."""

@@ -18,6 +18,7 @@ class BatchSerializer(CostFieldSerializerMixin, serializers.ModelSerializer):
     supplier_name = serializers.CharField(source="supplier.name", read_only=True)
     warehouse_name = serializers.CharField(source="warehouse.name", read_only=True)
     status_label = serializers.CharField(source="get_status_display", read_only=True)
+    receipt = serializers.SerializerMethodField(help_text='Phiếu nhập sinh ra lô: {"id","code":"PR-n"} hoặc null')
 
     class Meta:
         model = Batch
@@ -25,10 +26,17 @@ class BatchSerializer(CostFieldSerializerMixin, serializers.ModelSerializer):
             "id", "batch_id", "item", "item_code", "item_name", "supplier", "supplier_name",
             "warehouse", "warehouse_name",
             "received_date", "expiry_date", "qty_received", "qty_available",
-            "qty_reserved", "qty_sellable", "status", "status_label", "closed_at",
+            "qty_reserved", "qty_sellable", "status", "status_label", "closed_at", "receipt",
             "purchase_rate", "landed_unit_cost",  # nhạy cảm — mixin loại nếu thiếu quyền
         ]
         read_only_fields = ["batch_id", "qty_available", "qty_reserved", "closed_at"]
+
+    def get_receipt(self, batch):
+        """Lô tạo tay không có dòng phiếu nhập → null. Chỉ id và mã, không có đầu mối hay tiền."""
+        line = getattr(batch, "source_line", None)  # quan hệ ngược OneToOne: thiếu thì không có thuộc tính
+        if line is None:
+            return None
+        return {"id": line.receipt_id, "code": f"PR-{line.receipt_id}"}
 
 
 class BatchListQuery(serializers.Serializer):

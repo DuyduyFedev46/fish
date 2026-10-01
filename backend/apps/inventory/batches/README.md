@@ -4,3 +4,6 @@ Sinh lô (`create_batch`), lô bán được = đang bán/cận hạn **và** c�
 publish (BR-MH-05) / chốt lô (BR-LO-04/05), tính lại giá vốn lô (BR-GV-01/03), job trạng thái theo hạn idempotent (BR-LO-01/02/06).
 Endpoint: `/api/inventory/batches/` + `POST …/{id}/publish/`, `POST …/{id}/close/`; giá vốn ẩn nếu thiếu `view_costprice`.
 Test rò giá vốn: `tests/test_api.py`. `tests/base.py` là dữ liệu nền cho test stock/stocktake/returns.
+
+Danh sách lô (R5): lọc `supplier`, `warehouse` (id; sai dạng thì 400 `INVALID_FILTER`) cộng `item_code`, `status`, `has_stock`; mỗi dòng có `receipt: {"id","code":"PR-n"} | null` (lô tạo tay thì null). Test: `tests/test_list_filters_receipt.py`.
+

@@ -11,7 +11,8 @@ from django.utils import timezone
 
 from apps.inventory.models import ReturnToStock, StockEntry, StockReconciliation
 from apps.purchasing.models import PurchaseCost, PurchaseInvoice, PurchaseReceipt
-from apps.sales.models import Refund
+from apps.delivery.models import DeliveryNote
+from apps.sales.models import Refund, SalesInvoiceLine, SalesInvoiceLineBatch
 
 from .fixtures import client_for, make_batch, make_master, make_order_with_note, make_user
 from apps.accounts import roles
@@ -27,7 +28,7 @@ class S4ReconciliationTests(TestCase):
     def test_s4_ac1_created_by_la_nguoi_dang_nhap(self):
         resp = client_for(self.kho1).post(self.url, self.payload, format="json")
         self.assertEqual(resp.status_code, 201, resp.content)
-        self.assertEqual(resp.json()["created_by"], self.kho1.pk)
+        self.assertEqual(resp.json()["created_by"]["id"], self.kho1.pk)  # 02b R8: {"id", "display_name"}
         self.assertEqual(StockReconciliation.objects.get().created_by, self.kho1)
 
     def test_s4_ac2_gui_created_by_bi_chan_400_br_pq_16(self):
@@ -66,14 +67,17 @@ class S4ReconciliationTests(TestCase):
         self.assertEqual(StockReconciliation.objects.get(pk=rec_id).status, "DRAFT")
 
     def test_s4_ac3_nguoi_khac_duyet_duoc(self):
-        resp = client_for(self.kho1).post(self.url, self.payload, format="json")
+        # L3 (Lô 8): phiếu rỗng không duyệt được, nên phiếu này có một dòng số đếm.
+        batch = make_batch(*make_master())
+        payload = {**self.payload, "lines": [{"batch": batch.pk, "counted_qty": "49", "reason": ""}]}
+        resp = client_for(self.kho1).post(self.url, payload, format="json")
         rec_id = resp.json()["id"]
         resp = client_for(self.ql1).post(f"{self.url}{rec_id}/approve/")
         self.assertEqual(resp.status_code, 200, resp.content)
-        self.assertEqual(resp.json()["approved_by"], self.ql1.pk)
+        self.assertEqual(resp.json()["approved_by"]["id"], self.ql1.pk)  # 02b R8: {"id", "display_name"}
 
     def test_s4_ac4_nv_giao_tao_kiem_ke_403(self):
-        giao = make_user("giao1", roles.DELIVERY_STAFF)
+        giao = make_user("courier1", roles.DELIVERY_STAFF)
         resp = client_for(giao).post(self.url, self.payload, format="json")
         self.assertEqual(resp.status_code, 403)
         self.assertFalse(StockReconciliation.objects.exists())
@@ -91,7 +95,7 @@ class S4OtherDocumentsTests(TestCase):
         self.chu = make_user("chu1", roles.OWNER)
         self.ql1 = make_user("ql1", roles.MANAGER)
         self.kho1 = make_user("kho1", roles.WAREHOUSE_STAFF)
-        self.giao1 = make_user("giao1", roles.DELIVERY_STAFF)
+        self.courier1 = make_user("courier1", roles.DELIVERY_STAFF)
 
     def _assert_actor(self, user, url, payload, model):
         resp = client_for(user).post(url, {**payload, "created_by": self.ql1.pk}, format="json")
@@ -104,10 +108,21 @@ class S4OtherDocumentsTests(TestCase):
         return resp
 
     def test_s4_hang_hoan_created_by_la_nv_giao(self):
-        resp = self._assert_actor(
-            self.giao1, "/api/inventory/returns/", {"batch": self.batch.pk, "qty": "1.5"}, ReturnToStock,
+        # R9: phải tạo từ phiếu giao gán cho mình, lô có trong phiếu, số kg không vượt quá số đã giao.
+        _order, _customer, note = make_order_with_note("SO-S4-RT", "0900000444", assigned_to=self.courier1)
+        line = SalesInvoiceLine.objects.create(
+            invoice=note.sales_invoice, item=self.item, qty=Decimal("5"), rate=Decimal("100000"), amount=Decimal("500000"),
         )
-        self.assertEqual(resp.json()["created_by"], self.giao1.pk)
+        SalesInvoiceLineBatch.objects.create(
+            invoice_line=line, batch=self.batch, component_item=self.item, qty=Decimal("5"), unit_cost=Decimal("1000"),
+        )
+        note.status = DeliveryNote.Status.DELIVERING
+        note.save(update_fields=["status"])
+        resp = self._assert_actor(
+            self.courier1, "/api/inventory/returns/",
+            {"delivery_note": note.pk, "batch": self.batch.pk, "qty": "1.5"}, ReturnToStock,
+        )
+        self.assertEqual(resp.json()["created_by"], self.courier1.pk)
         rt = ReturnToStock.objects.get()
         self.assertEqual((rt.status, rt.decision), ("DRAFT", "PENDING"))
 

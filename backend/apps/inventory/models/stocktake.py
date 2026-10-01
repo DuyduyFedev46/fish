@@ -32,6 +32,10 @@ class StockReconciliation(models.Model):
     approved_at = models.DateTimeField("Thời điểm duyệt", null=True, blank=True)
     note = models.TextField("Ghi chú", blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(
+        "Cập nhật lúc", auto_now=True, null=True,
+        help_text="Phiên bản phiếu: client gửi lại khi sửa dòng, lệch thì 409 STALE_STATE (B1, W6f).",
+    )
 
     class Meta:
         verbose_name = "Phiếu kiểm kê"

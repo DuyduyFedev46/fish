@@ -9,6 +9,8 @@ from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.views import APIView
 
 from apps.common.api import (
     BusinessModelPermissions,
@@ -19,15 +21,31 @@ from apps.common.api import (
     require_perm,
 )
 
+from apps.common.exceptions import BusinessError
+from apps.common.params import parse_positive_id
+
 from . import services
 from .models import DeliveryNote
 from .serializers import DeliveryNoteDetailSerializer, DeliveryNoteSerializer
+
+INVALID_FILTER = "INVALID_FILTER"
+
+
+def _positive_int_param(raw, name):
+    """Giá trị lọc là số nguyên dương; rỗng nghĩa là không lọc (trả None); sai thì 400 INVALID_FILTER."""
+    raw = (raw or "").strip()
+    if not raw:
+        return None
+    try:
+        return parse_positive_id(raw)  # chỉ chữ số ASCII, tối đa int64 (apps/common/params.py)
+    except ValueError:
+        raise BusinessError(f"Giá trị lọc `{name}` không hợp lệ.", code=INVALID_FILTER)
 
 
 class DeliveryNoteViewSet(NoStoreMixin, DocumentViewSet):
     queryset = DeliveryNote.objects.select_related(
         "sales_invoice__sales_order__customer",
-        "assigned_to",
+        "assigned_to__staff_profile",
         "confirmed_by",
     ).prefetch_related(
         "label_prints",
@@ -43,6 +61,7 @@ class DeliveryNoteViewSet(NoStoreMixin, DocumentViewSet):
     locked_fields = (
         "status", "assigned_to", "failed_attempts", "completed_at", "sales_invoice",
         "confirmed_at", "confirmed_by", "confirm_skipped", "recipient_name", "recipient_phone",
+        "failure_reason", "failure_note",  # BR-GH-22: chỉ ghi qua `status` (mark_failed)
     )
 
     def get_serializer_class(self):
@@ -72,6 +91,12 @@ class DeliveryNoteViewSet(NoStoreMixin, DocumentViewSet):
             if statuses:
                 queryset = queryset.filter(status__in=statuses)
 
+            # R4: assigned_to=me|<id>, order=<id>. Phạm vi dòng (Tầng 3) đã áp ở get_queryset.
+            queryset = self._filter_assigned_to(queryset)
+            order_id = _positive_int_param(self.request.query_params.get("order"), "order")
+            if order_id is not None:
+                queryset = queryset.filter(sales_invoice__sales_order_id=order_id)
+
             # CS-02: completed_from YYYY-MM-DD
             completed_from = self.request.query_params.get("completed_from")
             if completed_from:
@@ -97,6 +122,41 @@ class DeliveryNoteViewSet(NoStoreMixin, DocumentViewSet):
                 queryset = queryset.order_by("-created_at", "-id")
 
         return queryset
+
+    def _filter_assigned_to(self, queryset):
+        raw = (self.request.query_params.get("assigned_to") or "").strip()
+        if not raw:
+            return queryset
+        user = self.request.user
+        if raw == "me":
+            return queryset.filter(assigned_to=user)
+        target = _positive_int_param(raw, "assigned_to")
+        # NV giao chỉ được lọc theo chính mình; hỏi người khác là 403 (không tiết lộ phiếu của họ).
+        if not has_full_delivery_scope(user) and target != user.pk:
+            raise PermissionDenied("Bạn chỉ xem được phiếu giao của mình.")
+        return queryset.filter(assigned_to_id=target)
+
+    @action(
+        detail=True,
+        methods=["post"],
+        url_path="assign",
+        required_perms=("delivery.assign_deliverynote",),
+    )
+    def assign(self, request, pk=None):
+        """BR-GH-23 (B6): giao hoặc đổi người giao. Body: `assigned_to` (id), tuỳ chọn `expected_assigned_to`."""
+        note = self.get_object()
+        data = request.data if hasattr(request.data, "get") else {}
+        assignee = services.resolve_assignee(data.get("assigned_to"))
+        kwargs = {}
+        if "expected_assigned_to" in data:
+            kwargs["expected_assignee_id"] = services.validate_expected_assignee(data.get("expected_assigned_to"))
+        note, already = services.assign_deliverer(
+            note=note, assignee=assignee, actor=request.user, **kwargs
+        )
+        note = self.get_queryset().get(pk=note.pk)
+        body = self.get_serializer(note).data
+        body["already"] = already
+        return Response(body)
 
     @action(
         detail=True,
@@ -124,7 +184,13 @@ class DeliveryNoteViewSet(NoStoreMixin, DocumentViewSet):
 
         if to_status == DeliveryNote.Status.FAILED:
             # BR-GH-04: mark_failed trả (note, needs_decision)
-            note, needs_decision = services.mark_failed(note=note, actor=request.user)
+            data_in = request.data if hasattr(request.data, "get") else {}
+            # API luôn kiểm lý do (BR-GH-22): thiếu hoặc null đều là "chưa chọn", không đi đường nội bộ cũ.
+            note, needs_decision = services.mark_failed(
+                note=note, actor=request.user,
+                reason=data_in.get("failure_reason") or "",
+                reason_note=data_in.get("failure_note"),
+            )
         else:
             note, already = services.advance_status(
                 note=note, to_status=to_status, actor=request.user, from_status=from_status
@@ -196,3 +262,29 @@ class DeliveryNoteViewSet(NoStoreMixin, DocumentViewSet):
         res = label_services.void_label(note, request.user, print_no=print_no)
         return Response(res, status=status.HTTP_200_OK)
 
+
+
+class DeliverersView(APIView):
+    """
+    GET /api/delivery/deliverers/ (BR-GH-23, T7): người giao đang làm kèm số phiếu DELIVERING và READY.
+    Chỉ người có quyền giao phiếu mới xem. Không trả SĐT hay tên đăng nhập (bất biến 9).
+    """
+
+    permission_classes = [IsAuthenticated]
+    # Khai ở mức lớp để registry AI chỉ đưa lệnh `delivery.deliverers` cho người có quyền (mẫu apps/reports/api.py).
+    required_perms = ("delivery.assign_deliverynote",)
+
+    def get(self, request):
+        require_perm(request.user, "delivery.assign_deliverynote")
+        rows = [
+            {
+                "id": u.pk,
+                "display_name": services.staff_display_name(u),
+                "delivering_count": u.delivering_count,
+                "ready_count": u.ready_count,
+            }
+            for u in services.list_deliverers()
+        ]
+        response = Response(rows)
+        response["Cache-Control"] = "no-store"
+        return response

@@ -5,7 +5,9 @@ Giao hàng (P-06) và CSKH gọi xác nhận (2026-09-28-cskh-xac-nhan-in-tem).
 - BR-GH-01: người giao là nhân viên nội bộ, FK trỏ `User` (StaffProfile cấp SĐT).
 - BR-GH-03: số kg cân khi soạn = số kg khách đặt (giả định V1).
 - BR-GH-11: đơn đã thanh toán vào CONFIRMING trước khi soạn hàng.
-- BR-GH-18: phạm vi xem dữ liệu cá nhân khách cho nhóm cskh.
+- BR-GH-18: phạm vi xem dữ liệu cá nhân khách cho nhóm customer_service.
+- BR-GH-22: báo giao thất bại phải có lý do (`failure_reason`); "Khác" đòi ghi chú (ERP theo design, Lô 4, B5).
+- BR-GH-23: giao / đổi người giao bằng quyền riêng `assign_deliverynote` (ERP theo design, Lô 4, B6).
 """
 from django.conf import settings
 from django.db import models
@@ -34,6 +36,22 @@ class DeliveryNote(models.Model):
         related_name="deliveries", verbose_name="Nhân viên giao",  # BR-GH-01
     )
     failed_attempts = models.PositiveSmallIntegerField("Số lần giao thất bại", default=0)
+
+    class FailureReason(models.TextChoices):
+        """BR-GH-22. Mã là hợp đồng với FE và với `apps/sales/orders/reasons.py` (nhãn lý do của đơn)."""
+        NOT_MET = "NOT_MET", "Không gặp khách"
+        REFUSED = "REFUSED", "Khách từ chối nhận"
+        WRONG_ADDRESS = "WRONG_ADDRESS", "Sai địa chỉ"
+        DAMAGED = "DAMAGED", "Hàng hư khi giao"
+        OTHER = "OTHER", "Khác"
+
+    # Lý do của lần thất bại gần nhất. Giao lại (FAILED -> DELIVERING) giữ nguyên tới khi có lần mới;
+    # lịch sử từng lần nằm ở AuditLog (chỉ mã lý do, không chép ghi chú).
+    failure_reason = models.CharField(
+        "Lý do giao thất bại", max_length=16, choices=FailureReason.choices, blank=True, default=""
+    )
+    # Chữ tự do của người giao, có thể chứa dữ liệu cá nhân: không vào AuditLog, log, AI (bất biến 9).
+    failure_note = models.CharField("Ghi chú giao thất bại", max_length=200, blank=True, default="")
     note = models.TextField("Ghi chú", blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     completed_at = models.DateTimeField("Thời điểm hoàn tất", null=True, blank=True)
@@ -58,6 +76,7 @@ class DeliveryNote(models.Model):
             ("decide_unconfirmed", "Quyết định đơn không liên lạc được"),
             ("pack_deliverynote", "Đóng gói phiếu giao"),
             ("print_label", "In / huỷ tem giao"),
+            ("assign_deliverynote", "Giao phiếu cho người giao"),
         ]
 
     def __str__(self):

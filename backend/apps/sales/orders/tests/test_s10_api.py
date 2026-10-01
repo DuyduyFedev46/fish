@@ -25,6 +25,7 @@ SENSITIVE_KEYS = {"unit_cost", "purchase_rate", "landed_unit_cost"}
 LIST_KEYS = {
     "id", "code", "status", "status_label", "customer_name", "customer_phone",
     "total_amount", "created_at", "reserved_until", "delivery_status", "needs_attention",
+    "reason",  # R3 (ERP theo design Lô 3)
 }
 
 

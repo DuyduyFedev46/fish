@@ -44,13 +44,13 @@ GROUP_LABELS = {
 CAPABILITY_LABELS = {
     "inventory.publish_batch": "Mở bán lô",
     "sales.cancel_paid_order": "Huỷ đơn đã thanh toán",
-    "sales.create_refund": "Tạo phiếu hoàn",
+    "sales.create_refund": "Lập phiếu hoàn",
     "inventory.approve_returntostock": "Duyệt hàng hoàn",
     "inventory.approve_stockreconciliation": "Duyệt kiểm kê",
     "inventory.close_batch": "Chốt lô",
     "purchasing.add_purchasecost": "Nhập chi phí mua",
     "sales.confirm_refund": "Xác nhận đã hoàn tiền",
-    "sales.confirm_payment_manual": "Xác nhận thanh toán thủ công",
+    "sales.confirm_payment_manual": "Xác nhận đã nhận tiền",
     "accounts.manage_staff": "Quản lý nhân viên",
     "inventory.view_costprice": "Xem giá vốn",
     "reports.view_profitreport": "Xem báo cáo lãi lỗ",
@@ -71,6 +71,9 @@ CAPABILITY_LABELS = {
     "content.publish_entry": "Đăng bài viết và trang",
     # GL-05 (2026-09-28-khung-go-live): chu + quan_ly.
     "sales.view_privacy_consent": "Xem bằng chứng đồng ý xử lý dữ liệu của đơn",
+    "delivery.assign_deliverynote": "Giao hoặc đổi người giao của phiếu giao",
+    # B2 (ERP theo design, Lô 6): chu + quan_ly. Khác `sales.view_customer` (Tầng 1, phạm vi dòng của NV giao).
+    "sales.view_customer_list": "Xem khách hàng",
 }
 
 AUTH_OLD_PASSWORD = "AUTH_OLD_PASSWORD"

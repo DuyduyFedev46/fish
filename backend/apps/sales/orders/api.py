@@ -6,11 +6,14 @@ Tầng 3: nv_giao chỉ thấy đơn của phiếu giao gán cho mình (BR-PQ-12
 S10: `GET /api/sales/orders/?status=BOOKED,PAID&date_from=&date_to=&q=&page=` (20 dòng/trang)
 và `GET /api/sales/orders/{id}/` (chi tiết + `available_actions`).
 S11: `POST /api/sales/orders/{id}/confirm-payment` (chạy chung service với webhook SePay).
+ERP theo design Lô 3 (R3, 02b §3.8): mỗi dòng danh sách có `reason`; thêm lọc `customer=<id>` (đòi quyền xem
+khách hàng, 403 nếu thiếu) và `batch=<pk>` (đơn có phân bổ từ lô). Sai định dạng → 400 `INVALID_FILTER`.
 """
 import datetime
 
 from django.db.models import Exists, OuterRef, Q, Subquery
 from rest_framework import viewsets
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
@@ -23,14 +26,15 @@ from apps.common.api import (
     require_perm,
 )
 from apps.common.exceptions import BusinessError
+from apps.common.params import parse_positive_id
 from apps.delivery.models import DeliveryNote
 from apps.delivery.pii_scope import annotate_order_pii_visible
-from apps.sales.models import Customer, PaymentTransaction, SalesOrder
+from apps.sales.models import Customer, PaymentTransaction, SalesOrder, SalesOrderLineBatch
 from apps.sales.payments import services as payment_services
 from apps.sales.utils import ZERO, fold_text, money_str
 
 from . import services
-from .scope import scope_orders_for
+from .scope import can_filter_orders_by_customer, scope_orders_for
 from .serializers import SalesOrderDetailSerializer, SalesOrderListSerializer
 
 INVALID_FILTER = "INVALID_FILTER"
@@ -47,6 +51,14 @@ def _parse_date(raw, name):
         return datetime.date.fromisoformat(raw)
     except ValueError:
         raise InvalidFilter(f"Tham số {name} phải là ngày dạng YYYY-MM-DD.")
+
+
+def _parse_positive_int(raw, name):
+    """Tham số id: số nguyên dương (chuỗi rỗng đã được bỏ qua trước khi gọi). Quy tắc ở `apps/common/params.py`."""
+    try:
+        return parse_positive_id(raw)
+    except ValueError:
+        raise InvalidFilter(f"Tham số {name} phải là số nguyên dương.")
 
 
 def _customer_ids_by_name(q):
@@ -73,7 +85,10 @@ class SalesOrderViewSet(NoStoreMixin, AiDeclarable, viewsets.ReadOnlyModelViewSe
             latest_note = DeliveryNote.objects.filter(
                 sales_invoice__sales_order=OuterRef("pk")
             ).order_by("-id")
-            qs = qs.annotate(
+            # `reason` (R3) đọc payments / phiếu giao / chứng từ đảo qua prefetch: không N+1.
+            qs = qs.select_related("invoice").prefetch_related(
+                "payments", "invoice__credit_notes", "invoice__delivery_notes",
+            ).annotate(
                 delivery_status=Subquery(latest_note.values("status")[:1]),
                 needs_attention=Exists(
                     PaymentTransaction.objects.filter(
@@ -102,6 +117,9 @@ class SalesOrderViewSet(NoStoreMixin, AiDeclarable, viewsets.ReadOnlyModelViewSe
         return qs
 
     def list(self, request, *args, **kwargs):
+        if request.query_params.get("customer", "").strip() and not can_filter_orders_by_customer(request.user):
+            # R3: lọc theo khách là xem dữ liệu khách, kiểm quyền TRƯỚC khi đọc tham số khác.
+            raise PermissionDenied("Thiếu quyền xem khách hàng.")
         try:
             self.queryset_filters = self._filters(
                 request.query_params, restrict_customer_search=not has_full_delivery_scope(request.user)
@@ -130,6 +148,15 @@ class SalesOrderViewSet(NoStoreMixin, AiDeclarable, viewsets.ReadOnlyModelViewSe
             cond &= Q(created_at__date__gte=_parse_date(params["date_from"], "date_from"))
         if params.get("date_to"):
             cond &= Q(created_at__date__lte=_parse_date(params["date_to"], "date_to"))
+        customer = params.get("customer", "").strip()
+        if customer:
+            cond &= Q(customer_id=_parse_positive_int(customer, "customer"))
+        batch = params.get("batch", "").strip()
+        if batch:
+            # Exists (không join) để đơn nhiều dòng cùng lô chỉ hiện một lần.
+            cond &= Exists(SalesOrderLineBatch.objects.filter(
+                order_line__order=OuterRef("pk"), batch_id=_parse_positive_int(batch, "batch"),
+            ))
         q = params.get("q", "").strip()
         if q:
             by_customer = (

@@ -17,6 +17,8 @@ FORBIDDEN_PREFIXES = (
     "/api/cskh/",  # giữ vĩnh viễn: tên cũ của hàng đợi gọi xác nhận (phòng thủ nhiều lớp)
     "/api/confirmation/",  # hàng đợi gọi xác nhận đơn: tên, SĐT, địa chỉ khách (P8b Lô 3, R1)
     "/api/dashboard/attention/",
+    "/api/sales/customer-directory/",  # danh bạ khách: tên, SĐT, địa chỉ, ghi chú (B2, bất biến 9)
+    "/api/sales/customers/",  # endpoint khách cũ (S5/CS-01): cùng dữ liệu cá nhân
 )
 
 # Hậu tố URL cấm hẳn (tem có tên/SĐT/địa chỉ khách)
@@ -100,6 +102,7 @@ SCRUB_PII_KEYS = frozenset({
     "phone_last4",
     "phone_masked",
     "customer_address",
+    "default_address",  # địa chỉ giao mặc định của khách (B2)
 })
 
 # Lọc đầu ra: Chữ tự do (H10 — tránh Prompt Injection)
@@ -108,6 +111,7 @@ SCRUB_FREE_TEXT_KEYS = frozenset({
     "reason",
     "resolution_note",
     "failure_reason",
+    "failure_note",
     "comment",
 })
 
