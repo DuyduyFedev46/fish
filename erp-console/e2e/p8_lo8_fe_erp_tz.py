@@ -1,4 +1,4 @@
-# P8 Lô 8 — SR-25 (ERP): tiền VNĐ "x.xxx ₫", ngày giờ luôn theo giờ Việt Nam (GMT+7) bất kể múi giờ trình duyệt.
+# P8 Lô 8 — SR-25 (ERP): tiền VNĐ "x.xxx đ" (UI-RULES §1.6, đổi từ ₫ ở ERP theo design Lô 1), ngày giờ luôn theo giờ Việt Nam (GMT+7) bất kể múi giờ trình duyệt.
 # Mock (NEXT_PUBLIC_USE_MOCK=1), dữ liệu giả. Đồng hồ trình duyệt CỐ ĐỊNH ở 2026-09-30T17:30:00Z = 00:30 ngày 01/10 giờ VN
 # (qua nửa đêm VN, còn ở New York/Pago Pago vẫn là 30/09) nên giờ hiển thị đúng/sai phân biệt được rõ.
 # Chạy:
@@ -43,7 +43,7 @@ def goto(page, path):
     page.wait_for_timeout(500)
 
 
-TIME_TOKENS = re.compile(r"\d{2}/\d{2} \d{2}:\d{2}|(?:Cập nhật|Tới|Trả tiền:|Hẹn gọi lại) \d{2}:\d{2}|Hôm nay|Hôm qua")
+TIME_TOKENS = re.compile(r"\d{2}/\d{2}/\d{4} \d{2}:\d{2}|\d{2}/\d{2} \d{2}:\d{2}|(?:Cập nhật|Tới|Trả tiền:|Hẹn gọi lại) \d{2}:\d{2}|Hôm nay|Hôm qua")
 
 
 def time_tokens(text):
@@ -51,12 +51,12 @@ def time_tokens(text):
 
 
 def money_bad(text):
-    """Số tiền sai kiểu: dính liền 4+ chữ số trước ₫ (thiếu dấu chấm), hoặc hậu tố 'đ' thay vì '₫'."""
-    return re.findall(r"\d{4,}\s?₫", text) + re.findall(r"\d\s?đ(?!\w)", text)
+    """Số tiền sai kiểu: dính liền 4+ chữ số trước đ (thiếu dấu chấm), (chữ BE dựng sẵn như nhãn nhật ký vẫn có thể mang ký hiệu ₫: không tính là lỗi)."""
+    return re.findall(r"\d{4,}\s?[đ₫](?!\w)", text)
 
 
 def money_good(text):
-    return re.findall(r"\d{1,3}(?:\.\d{3})+ ₫", text)
+    return re.findall(r"\d{1,3}(?:\.\d{3})+ đ(?!\w)", text)
 
 
 def collect(browser, tz):
@@ -91,9 +91,7 @@ def collect(browser, tz):
     out["inventory"] = page.inner_text("body")
     if tz == "America/New_York":
         page.screenshot(path=f"{SHOTS}/lo8-erp-3-lo-ny.png")
-    page.get_by_role("tab", name="Hoạt động").click()
-    page.wait_for_timeout(700)
-    out["activity"] = page.inner_text("body")
+    out["activity"] = ""  # tab Hoạt động ở cột phải đã bỏ (ERP theo design Lô 1); sổ kho có màn riêng ở Lô 7
     goto(page, "/purchasing/")
     page.wait_for_selector("#received-date", timeout=10_000)
     out["received_date_default"] = page.input_value("#received-date")
@@ -138,17 +136,17 @@ def main():
         # ---- giá trị tuyệt đối (mốc VN) -> chứng minh đúng, không chỉ nhất quán
         ok("AC2 Tổng quan: 'Cập nhật 00:30' (17:30Z = 00:30 VN)", "Cập nhật 00:30" in base["overview"])
         ok("AC2 Lô: 'Cập nhật 00:30'", "Cập nhật 00:30" in base["inventory"])
-        ok("AC2 Đơn hàng: dòng đầu '01/10 00:20'", "01/10 00:20" in base["orders"], str(time_tokens(base["orders"])[:4]))
-        ok("AC2 Chi tiết đơn: 'Đặt 01/10 00:20', 'Tới 00:50', timeline '01/10 00:10'",
-           all(x in base["order_detail"] for x in ("Đặt 01/10 00:20", "Tới 00:50", "01/10 00:10", "01/10 00:20 · Hệ thống")))
+        ok("AC2 Đơn hàng: dòng đầu '01/10/2026 00:20'", "01/10/2026 00:20" in base["orders"], str(time_tokens(base["orders"])[:4]))
+        ok("AC2 Chi tiết đơn: 'Đặt 01/10/2026 00:20', 'Tới 00:50', timeline '01/10/2026 00:10'",
+           all(x in base["order_detail"] for x in ("Đặt 01/10/2026 00:20", "Tới 00:50", "01/10/2026 00:10", "01/10/2026 00:20 · Hệ thống")))
         ok("AC4 Ngày nhập lô mặc định = 2026-10-01 (hôm nay VN)", base["received_date_default"] == "2026-10-01", base["received_date_default"])
-        ok("AC2 CSKH: 'Trả tiền: 28/09 06:00'", "Trả tiền: 28/09 06:00" in base["cskh"])
+        ok("AC2 CSKH: 'Trả tiền: 28/09/2026 06:00'", "Trả tiền: 28/09/2026 06:00" in base["cskh"])
         ok("AC4 CSKH: hẹn gọi lại nhập 09:00 hiện 'Hẹn gọi lại 09:00'", "Hẹn gọi lại 09:00" in base["cskh_after_callback"])
 
         # ---- mọi múi giờ máy khác phải cho đúng kết quả như giờ VN
         for tz in TZS[:-1]:
             d = data[tz]
-            for key in ("overview", "orders", "order_detail", "inventory", "activity", "cskh", "cskh_after_callback"):
+            for key in ("overview", "orders", "order_detail", "inventory", "cskh", "cskh_after_callback"):
                 ok(f"AC2 [{tz}] {key}: giờ/ngày hiển thị = giờ VN ({len(time_tokens(base[key]))} mốc)",
                    time_tokens(d[key]) == time_tokens(base[key]) and len(time_tokens(base[key])) > 0,
                    f"{time_tokens(d[key])[:6]} vs {time_tokens(base[key])[:6]}")
@@ -159,11 +157,11 @@ def main():
         # ---- tiền
         for tz in TZS:
             d = data[tz]
-            for key in ("overview", "orders", "order_detail", "inventory", "deliveries", "delivery_detail", "activity", "cskh"):
+            for key in ("overview", "orders", "order_detail", "inventory", "deliveries", "delivery_detail", "cskh"):
                 bad = money_bad(d[key])
                 ok(f"AC1 [{tz}] {key}: không có tiền sai kiểu", not bad, str(bad[:3]))
         allmoney = sum(len(money_good(base[k])) for k in ("overview", "orders", "order_detail", "inventory"))
-        ok("AC1 có >= 30 số tiền dạng x.xxx ₫ trên Tổng quan/Đơn/Lô", allmoney >= 30, str(allmoney))
+        ok("AC1 có >= 30 số tiền dạng x.xxx đ trên Tổng quan/Đơn/Lô", allmoney >= 30, str(allmoney))
 
         # ---- mobile 390 + ảnh (giờ máy New York)
         ctx = new_ctx(browser, "America/New_York", 390, 800)

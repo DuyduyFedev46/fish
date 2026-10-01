@@ -40,7 +40,7 @@ Mã `DH-…` chỉ có trong mock, placeholder và test của FE (`deliveries/mo
 | ConfirmTask.escalation_reason | UNREACHABLE Không nghe máy · WRONG_NUMBER Sai số · WANT_CANCEL Khách muốn huỷ · WANT_CHANGE Khách muốn đổi | escalation_label từ BE | nhãn model |
 | ConfirmCall.result | CONFIRMED Đã xác nhận · CONFIRMED_CHANGED … · UNREACHABLE Không nghe máy · WRONG_NUMBER Sai số · CALLBACK Hẹn gọi lại · WANT_CHANGE Khách muốn đổi món/số lượng · WANT_CANCEL Khách muốn huỷ · NOTIFIED Đã báo hoàn tiền | CALL_RESULT_OPTIONS: Đã xác nhận · Hẹn gọi lại · Không nghe máy · Sai số điện thoại · Khách muốn đổi món · Khách muốn huỷ đơn · Đã báo hoàn tiền | nhãn FE |
 | Quyết định đơn chưa xác nhận (FE) | DELIVER_WITHOUT_CONFIRM · EXTEND · CANCEL | Giao không xác nhận · Gia hạn thêm · Huỷ đơn | nhãn FE |
-| mark_failed | không có trường lý do (chỉ DeliveryNote.note "Ghi chú") | — | bỏ trường "Lý do" |
+| mark_failed | `DeliveryNote.failure_reason` (B5, Lô 4): NOT_MET Không gặp khách · REFUSED Khách từ chối nhận · WRONG_ADDRESS Sai địa chỉ · DAMAGED Hàng hư khi giao · OTHER Khác; `failure_note` bắt buộc khi OTHER | — | giữ trường "Lý do" (bắt buộc) + "Ghi chú" (bắt buộc khi Khác) |
 
 ## inventory
 | Model.field | Giá trị → nhãn model | Nhãn FE | Artboard |

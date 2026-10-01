@@ -41,7 +41,7 @@
 
   /* ---- Kích thước khung ---- */
   --tap:44px;
-  --rail-left-w:240px; --rail-right-w:320px;
+  --rail-left-w:240px; --rail-left-w-collapsed:60px; --rail-right-w:320px; --action-bar-h:64px;
   --topbar-h:56px; --bottom-nav-h:60px;
   --content-max:1280px;
 

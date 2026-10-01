@@ -29,7 +29,8 @@ def login(page, user, pw="demo1234"):
 
 
 def logout(page):
-    page.locator(".who .iconbtn").click()
+    page.locator(".avatar-btn").click()
+    page.get_by_role("menuitem", name="Đăng xuất").click()
     page.wait_for_url("**/login/")
 
 
@@ -182,7 +183,7 @@ with sync_playwright() as p:
     # ---- S48-AC1 (403 AUTH_MUST_CHANGE_PASSWORD giữa phiên): cờ bật lúc đang mở console → bị đưa về màn đặt MK ----
     expect(page.locator(".tile[data-kpi=revenue]")).to_be_visible()
     page.evaluate("() => window.__caveMock.patchUser('kho5', {must_change_password: true})")
-    page.get_by_role("button", name="Làm mới").click()
+    page.locator(".nav a", has_text="Đơn & tiền").click()  # đi sang màn khác -> API trả 403 (nút "Làm mới" đã bỏ ở ERP theo design)
     page.wait_for_url("**/set-password/")
     ok("S48-AC1 API trả 403 AUTH_MUST_CHANGE_PASSWORD → console chuyển sang màn đặt mật khẩu", True)
     ok("403 AUTH_MUST_CHANGE_PASSWORD không báo 'Quyền của bạn vừa thay đổi'", page.locator(".perm-notice").count() == 0)

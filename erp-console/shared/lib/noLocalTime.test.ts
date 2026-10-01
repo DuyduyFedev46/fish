@@ -34,7 +34,7 @@ const FORBIDDEN: [string, RegExp][] = [
   ["toISOString().split/slice/substring/substr làm ngày", /toISOString\(\)\s*\.(split|slice|substring|substr)\(/],
   ["toDateString/toTimeString", /\.to(Date|Time)String\(/],
   ["toLocaleString (mọi loại; số → dùng số/vnd/kg trong format.ts)", /\.toLocaleString\(/],
-  ["tiền hậu tố 'đ' (dùng vnd → ' ₫')", /\d\s?đ(?![a-zà-ỹ])|["'`]\s?đ["'`]|\}\s?đ(?![a-zà-ỹ])/i],
+  ["tiền hậu tố 'đ' tự viết tay (dùng vnd() / money() trong format.ts)", /\d\s?đ(?![a-zà-ỹ])|["'`]\s?đ["'`]|\}\s?đ(?![a-zà-ỹ])/i],
 ];
 
 describe("SR-25: không định dạng ngày giờ theo giờ máy", () => {

@@ -1,0 +1,43 @@
+# Việc cần Duy quyết — gom từ đêm 02/10/2026
+> Duy dặn 02/10 00:40: "cho auto chạy qua đêm, cái gì cần anh quyết gom lại trưa mai tính sau".
+> Điều phối viên không đứng chờ: lô nào gặp điểm dừng thì ghi vào đây, bỏ qua, làm lô khác.
+
+| # | Lô | Việc cần quyết | Em đề xuất | Đang làm tạm thế nào |
+|---|---|---|---|---|
+| 1 | ngoài lô | **ERP gọi `GET /api/ai/status/` nhưng backend không có route** (em đã grep `config/api_urls.py`: không có; chỉ mock có). Trên backend thật request trả 404 → cổng AI coi như tắt → Trợ lý AI không bao giờ hiện trên staging/production. | Làm lô NHANH: thêm route `ai/status/` ở backend theo contract S05 (luôn 200, `ai_enabled`…), có test. | Chưa sửa (ngoài phạm vi ERP theo design). Không chặn các lô. |
+| 2 | Lô 3 | Dòng thời gian đơn có sẵn (`apps/sales/orders/timeline.py`) ghép `Refund.reason` (chữ tự do) vào nhãn "Tạo phiếu hoàn … — <lý do>" → có thể lộ dữ liệu cá nhân nếu nhân viên gõ vào lý do. | Bỏ phần lý do khỏi nhãn timeline (lý do vẫn xem ở trang phiếu hoàn). | Em giao Lô 3 sửa luôn vì cùng thư mục `sales/orders` và là bất biến 9 (Critical) — anh lật được. |
+| 3 | Lô 3 | Còn 4 chỗ dòng thời gian ghép **chữ tự do** do nhân viên gõ: `orders/timeline.py` (huỷ đơn đã trả tiền: "<nhãn> — <ghi chú>"; báo chuyển hoàn thất bại: ghi chú), `refunds/timeline.py:32` (lý do hoàn), `:64` (lý do thất bại). Timeline đơn xem được bởi cả NV kho. Sửa = đổi hành vi đã nghiệm thu S14/S16 (2 test cũ). | Nhãn theo mã lý do (`reason_code`) thay chữ tự do; chữ tự do chỉ xem ở trang phiếu hoàn/đơn cho Chủ/Quản lý. | Giữ nguyên chờ anh quyết. Riêng lý do phiếu hoàn trong timeline **đơn** đã bỏ (mục 2). |
+| 4 | Lô 4 | Bộ chặn dữ liệu cá nhân trong ghi chú giao thất bại dùng luật "từ 9 chữ số liền": **chặn nhầm** "Khách hẹn lại 10/10/2026 9h", "Thu 1.250.000.000 đ"; **bỏ sót** "Gọi 0912,345,678". Ghi chú không đi vào nhật ký/AI/log nên bỏ sót không rò ra ngoài. | Giữ luật hiện tại đợt này; làm lô riêng nhận diện SĐT VN chuẩn hơn nếu anh muốn. | Giữ nguyên. |
+| 5 | Lô 6 | Sửa **SĐT khách** trên trang Khách hàng: 02b (Tech Lead) khoá SĐT; story ED-13 AC5/AC6 cho đổi SĐT + báo trùng. | Giữ khoá đợt này (SĐT là khoá nhận diện khách khi đặt đơn guest; đổi dễ gộp/nhầm khách). Muốn đổi thì làm lô riêng. | Code theo 02b: PATCH chỉ `name`, `default_address`, `note`; FE không có ô sửa SĐT. |
+| 6 | Lô 8 | Luật mới **BR-KK-08**: người đã nhập/sửa số đếm của phiếu kiểm kê **không được tự duyệt** phiếu đó (mở rộng BR-KK-02 "người tạo không tự duyệt"). Mặc định 🟡 T8 trong 02b. Hệ quả: vựa ít người thì cần người thứ hai duyệt. | Giữ (chống tự khai khống kho). Anh đồng ý thì PO ghi chính thức vào `business-process-spec.md`. | Đã code theo T8; phiếu bị chặn hiện lý do ngắn ở nút Duyệt. |
+| 7 | Lô 8 | ⚠️ **Tồn kho — cần anh chốt trước khi commit Lô 8.** Duyệt phiếu kiểm kê đang **tính lại** chênh lệch = số đếm − tồn *lúc duyệt*. Nếu giữa lúc đếm và lúc duyệt có bán hàng thì sổ sai. Ví dụ: tồn 50, đếm 48 (hụt 2), bán 5, duyệt → tồn sổ thành 48 (thật còn 43), sổ ghi "thừa +3". Lỗi có sẵn nhưng trước giờ API chưa gửi được số đếm nên chưa ai gặp. | **Phương án B (em + Tech Lead đề xuất, mã BR-KK-09):** lúc duyệt áp đúng chênh lệch đã chụp lúc nhập số (hụt 2 → trừ 2 → còn 43). Phương án A: tồn đổi thì trả lỗi bắt nhập lại (an toàn hơn nhưng Shop bán liên tục thì khó duyệt). | Em cho dev **làm sẵn phương án B kèm test nhưng chưa commit** Lô 8; anh gật là commit ngay, chọn A thì em đổi. |
+| 8 | Lô 9 | Phiếu **hàng hoàn** đang "Chờ duyệt" mà nhập sai số kg thì **không sửa, không huỷ được**, và số sai vẫn chiếm hạn mức "đã giao" → lối ra duy nhất là duyệt với số sai. | Thêm thao tác "Từ chối / huỷ phiếu hoàn" (Chủ/Quản lý, khi còn Chờ duyệt) — story mới, đề xuất BR-HV-05. | Chưa làm (ngoài phạm vi R9). |
+| 9 | Lô 10 | Spec ghi **NV kho chỉ xem phiếu nhập "của mình, trong ngày"** (Tầng 3), nhưng code hiện cho ai có quyền xem phiếu nhập thấy **mọi** phiếu (lỗi có sẵn). Giá mua vẫn ẩn với NV kho nên không rò giá vốn. | Làm lô NHANH: thêm phạm vi dòng phiếu nhập cho NV kho đúng spec (kèm test) — hoặc anh bỏ dòng đó khỏi spec nếu muốn NV kho xem hết. | Giữ hành vi hiện tại. |
+| 10 | Lô 13 | **Đặt giá lùi ngày**: hiện Chủ đặt được giá mới có "từ ngày" trong quá khứ → lịch sử giá trên ERP bị viết lại (đơn cũ không đổi tiền vì giá đã chốt vào đơn). | Chặn "từ ngày" trước hôm nay (giờ VN); muốn sửa giá quá khứ thì không cho. | Đang cho phép (giữ hành vi cũ). |
+| 11 | Lô 6 | Tìm khách theo SĐT gửi số trong **URL** (`?q=0900…`) → số nằm trong log máy chủ/proxy (QA L6-N2). | Đổi tìm khách sang POST (như màn Gọi xác nhận đang làm) — đổi API, cần lô nhỏ. | Giữ GET như thiết kế. |
+
+## Đã tự chốt theo nguyên tắc (Duy xem lại nếu muốn lật)
+- 02b viết trước đợt đổi tên P8b Lô 4–5 → dùng tên mới trong code (bảng ở `03-dev-notes.md`).
+- Tên e2e 02b đặt `ed_lo<N>_…` bị `scripts/check_naming.py` chặn (viết tắt tiếng Việt) → dùng `ed_lot<N>_…`.
+- Lệnh grep màu cứng 02b §5.0 ghi "phải rỗng" nhưng gốc đã có 553 dòng → áp "không tăng tổng + file lô đụng phải sạch".
+
+## Nợ chuyển lô sau (điều phối ghi, không cần Duy quyết)
+- Lô 6: test timeline `customer` với quyền mới `sales.view_customer_list` (provider tự chuyển khi quyền tồn tại).
+- Lô 9: siết phạm vi dòng hàng hoàn cho `delivery_staff` ở API **và** provider timeline `return` (dùng chung hàm), test 404 NV giao khác (review Lô 2 L1).
+- Lô 6: gom hàm quyền "Xem khách hàng" trùng nhau ở `apps/sales/orders/scope.py` và `apps/sales/customers/next_steps.py` về một chỗ, chuyển sang `has_perm("sales.view_customer_list")` (review Lô 3 L3).
+- Lô sau được sửa test `apps/sales`: bỏ mặc định `mark_failed(reason=None)` để không còn đường bỏ qua lý do bắt buộc (review Lô 4 L4).
+- FE Lô 4: form "Giao cho người giao" xử lý **409** `STALE_STATE` (02b ghi 400; BE trả 409 — techlead chấp nhận).
+- **Không deploy giữa chừng:** sau Lô 1, khung mới bỏ cột phải nên nút "Tóm tắt" AI (DW-16) tạm mất cho tới khi Lô 2 FE gắn khối Trợ lý AI vào trang. Đằng nào cũng chỉ deploy khi anh bảo — nhưng đừng deploy bản có Lô 1 mà chưa có Lô 2.
+- Font icon ERP (`erp-console/public/fonts/ms/*.woff2`, 93 KB, Apache-2.0) trước bị `.gitignore` chặn → clone sạch build ra icon vỡ. Em bỏ chặn và commit font cùng Lô 1.
+- Ký hiệu tiền: ERP thống nhất **"đ"** theo thiết kế. FE tự định dạng từ số (`format.vnd`), không hiển thị chuỗi `vnd_display` "₫" của BE; BE và Shop giữ nguyên (không đổi API).
+- Lô sau (có migration `inventory`): index sổ nhập xuất `(batch, created_at, id)`, `(-created_at, -id)`, lọc ngày theo khoảng giờ VN thay `__date`; PATCH đổi tên kho ghi AuditLog + chặn trùng hoa thường; gom hàm đọc tham số lọc về `apps/common/params.py` (review Lô 7 L1–L4).
+- Trước deploy Lô 8: đếm (chỉ đọc) dòng kiểm kê thuộc phiếu DRAFT cũ trên staging/production — số "tồn sổ" của phiếu tạo qua Django Admin do người gõ tay, BR-KK-09 sẽ áp đúng số đó (review Lô 8 L5).
+- Lô 15: `/ai/policy/` thiếu ViewGuard (lỗi có sẵn, QA Lô 1 P1) — mọi vai vào được màn (BE vẫn chặn API).
+- Staging Postgres: thử 2 POST hàng hoàn 6 kg cùng lúc vào phiếu 10 kg → phải ra một 201 + một 400 `RETURN_QTY_EXCEEDS` (review Lô 9 L3; SQLite không thử được khoá đồng thời).
+- Quy ước FE: mỗi trang chỉ một `useTabParam` (ghi tham số `tab`); trang cần 2 thanh tab thì thêm tham số `param` (review Lô 1 L7).
+- Lô 11: "Tổng tiền mua" của nhà cung cấp chỉ **Chủ** thấy (02b B3; khác tiền hoá đơn mua D-3 — vì tổng = kg × giá mua, chia ra được giá vốn). Số phiếu / lần nhập gần nhất / tổng tiền chỉ tính phiếu **đã ghi nhận** (không tính Nháp) theo mặc định Q4 trong 02-stories.
+- Lô 11: nhà cung cấp **không xoá** được qua API (DELETE → 405), ngừng hợp tác = tắt "Đang hợp tác".
+- Lô sau được sửa `apps/sales`: tạo đơn dùng chung hàm chọn giá `current_item_price` của catalog (review Lô 13 L4).
+- QA BE Low gom (lô dọn dẹp): khoảng trắng trong tham số lọc được chấp nhận; chữ số Ả Rập ở chi tiết khách; `reference` tự do cũ ở sổ kho echo nguyên; `reference_link` kiểm kê không tồn tại không null; tên kho dạng NFD không coi là trùng; giờ trả lẫn `+07:00` và `Z`.
+- Tech Lead xem (QA Lô 8 N8-2, có sẵn): chặn H6 trong `apps/ai/actions/services.py` khoá **mọi** lệnh AI kiểm kê khi người xác nhận là chủ AI (kể cả `create`, `replace_lines`) → chủ AI không bao giờ xác nhận được đề xuất kiểm kê. Đề xuất chỉ chặn `approve`.
+- QA Low Lô 8/9/10 (lô dọn dẹp): duyệt kiểm kê lần 2 trả mã chung `BUSINESS_ERROR` thay `RECON_NOT_DRAFT`; NV giao PATCH/duyệt hàng hoàn người khác ra 403 (dev-notes ghi 404, không rò); số kg trong lỗi vượt kg không chuẩn 3 chữ số; `status=DRAFT,,` được chấp nhận; id chữ số Ả Rập không ra 404.

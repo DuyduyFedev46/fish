@@ -59,4 +59,4 @@ Ghi chú:
 - Lô 14: codename trong registry B4 không tồn tại, hoặc `nv_giao` mất quyền cần cho Lô 4 khi chạy test.
 - QA REJECTED quá 2 vòng.
 - Test hỏng ngoài phạm vi lô mà không sửa được trong lô.
-- Deploy: không tự làm; chỉ khi Duy bảo.
+- Deploy: không tự làm; chỉ khi Duy bảo. **Không deploy bản có Lô 1 mà chưa có Lô 2 FE** (khung mới bỏ cột phải → nút "Tóm tắt" AI tạm mất, review Lô 1 M3).

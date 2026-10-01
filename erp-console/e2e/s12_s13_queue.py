@@ -124,19 +124,21 @@ with sync_playwright() as p:
     login(page, "loc")
     page.wait_for_url("**/overview/")
     labels = nav_labels(page)
-    ok("S12: menu Chủ có mục con 'Hàng chờ thanh toán' ngay dưới 'Đơn & tiền'",
-       "Hàng chờ thanh toán" in labels and labels.index("Hàng chờ thanh toán") == labels.index("Đơn & tiền") + 1, str(labels))
-    ok("S12: mục con thụt vào (lớp .sub)", page.locator(".nav a.sub", has_text="Hàng chờ thanh toán").count() == 1)
+    # ERP theo design Lô 1: "Hàng chờ thanh toán" không còn dòng riêng ở menu trái (UI-RULES §2.1) — là tab của Đơn & tiền
+    # (Lô 3 làm tab trên máy tính; tới lúc đó vào bằng đường dẫn). Kịch bản mở thẳng /orders/payments/.
+    ok("S12: menu Chủ không còn mục con 'Hàng chờ thanh toán' (là tab của Đơn & tiền)",
+       "Hàng chờ thanh toán" not in labels and "Đơn & tiền" in labels, str(labels))
+    page.goto(BASE + "/orders/payments/")
+    list_ready(page)
     clear_log(page)
-    page.locator(".nav a", has_text="Hàng chờ thanh toán").click()
-    page.wait_for_url("**/orders/payments/")
+    page.reload()
     list_ready(page)
     ok("S12: mở màn gọi GET /api/sales/payments/?resolution_status=OPEN", QLIST in log(page), str(log(page)))
-    ok("S12: tiêu đề = 'Hàng chờ thanh toán', chỉ mục con sáng (không sáng cả 'Đơn & tiền')",
+    ok("S12: tiêu đề = 'Hàng chờ thanh toán', menu sáng mục cha 'Đơn & tiền' (đúng 1 mục sáng)",
        page.locator(".topbar h1").inner_text() == "Hàng chờ thanh toán"
-       and page.locator(".nav a.active").all_inner_texts()[-1].split("\n")[-1].strip() == "Hàng chờ thanh toán"
+       and page.locator(".nav a.active").all_inner_texts()[-1].split("\n")[-1].strip() == "Đơn & tiền"
        and page.locator(".nav a.active").count() == 1)
-    ok("S12: máy tính không hiện tab con (đã có menu con)", not page.locator(".orders-tabs").is_visible())
+    ok("S12: máy tính hiện tab con Đơn & tiền (ED-01: hàng chờ là tab, không còn menu con)", page.locator(".orders-tabs").is_visible())
 
     # S12-AC1: không có MATCHED; mỗi dòng có loại lệch, số tiền, đơn liên quan
     j = qjson(page)
@@ -147,7 +149,7 @@ with sync_playwright() as p:
     expect(page.locator("#queue-h + .sub")).to_have_text("5 khoản")
     txt = rows(page).all_inner_texts()
     ok("S12-AC1: mỗi dòng có loại lệch + số tiền (₫) + mã GD",
-       all("₫" in t and "FT" in t for t in txt) and any("Thiếu tiền" in t for t in txt) and any("Không khớp đơn" in t for t in txt)
+       all(("đ" in t or "₫" in t) and "FT" in t for t in txt) and any("Thiếu tiền" in t for t in txt) and any("Không khớp đơn" in t for t in txt)
        and any("Chuyển thừa" in t for t in txt) and any("Về sau khi đơn tự huỷ" in t for t in txt), str(txt[:2]))
     ok("S12-AC1: khoản không khớp ghi 'Chưa gắn đơn'; khoản có đơn ghi mã SO…",
        "Chưa gắn đơn" in page.locator('.queue-open[data-id="880"]').inner_text()
@@ -207,7 +209,7 @@ with sync_playwright() as p:
     expect(form.locator(".attach-pick label")).to_have_count(1)
     row101.click()
     q = form.locator("h3").inner_text()
-    ok("S12: câu hỏi nêu số tiền + mã đơn", "540.000 ₫" in q and "SO" in q, q)
+    ok("S12: câu hỏi nêu số tiền + mã đơn", "540.000 đ" in q and "SO" in q, q)
     ok("S12: nêu hậu quả (Đang xử lý, không hoàn tác, nhật ký)",
        "Đang xử lý" in form.inner_text() and "Không hoàn tác" in form.inner_text() and "Nhật ký" in form.inner_text())
     form.get_by_label("Ghi chú").fill("Khách ghi sai nội dung CK")
@@ -412,8 +414,8 @@ with sync_playwright() as p:
     expect(od.locator(".confirm-result")).to_be_visible()
     idle(page)
     res = od.locator(".confirm-result").inner_text()
-    ok("Bổ sung tiền: xác nhận PAID + báo 'Khách chuyển thừa 60.000 ₫ — đã đưa vào hàng chờ để hoàn'",
-       "Đã xác nhận nhận tiền" in res and "Khách chuyển thừa 60.000 ₫ — đã đưa vào hàng chờ để hoàn" in res, res)
+    ok("Bổ sung tiền: xác nhận PAID + báo 'Khách chuyển thừa 60.000 đ — đã đưa vào hàng chờ để hoàn'",
+       "Đã xác nhận nhận tiền" in res and "Khách chuyển thừa 60.000 đ — đã đưa vào hàng chờ để hoàn" in res, res)
     ok("Bổ sung tiền: chi tiết đơn có dòng -THUA 'Chuyển thừa' cạnh dòng khớp",
        od.locator("code", has_text="FT2626799600-THUA").count() >= 1 and "Chuyển thừa" in od.inner_text())
     ok("Bổ sung tiền: thông báo có liên kết 'Mở hàng chờ thanh toán'", od.locator(".confirm-result a.queue-link").is_visible())

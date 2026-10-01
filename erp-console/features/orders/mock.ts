@@ -58,7 +58,7 @@ import { beError } from "@/shared/lib/beErrors.mock";
 import { hasLimitedCourierScope } from "@/shared/lib/personalData";
 import { MOCK_UNAUTHORIZED, mockRequireUser, mockUsers, mockPermsOf } from "@/features/auth/mock";
 import type { Me } from "@/features/auth/types";
-import { vnd } from "@/shared/lib/format";
+import { money as formatMoney } from "@/shared/lib/format";
 import type {
   ConfirmPaymentResult,
   OrderAllocation,
@@ -524,13 +524,13 @@ function courierName(id: number | null): string {
 function timelineOf(o: Order): OrderTimelineEntry[] {
   const out: OrderTimelineEntry[] = [];
   const at = (iso: string, plusMin: number) => isoVN(new Date(iso).getTime() + plusMin * 60_000);
-  out.push({ at: o.created_at, kind: "order_placed", label: `Khách đặt đơn ${o.code} (${vnd(orderTotal(o))})`, actor_display: SYSTEM });
+  out.push({ at: o.created_at, kind: "order_placed", label: `Khách đặt đơn ${o.code} (${beVnd(orderTotal(o))})`, actor_display: SYSTEM });
   o.payments.forEach((p) => {
     if (!p.received_at) return;
     out.push({
       at: p.received_at,
       kind: "payment_received",
-      label: `Nhận ${vnd(p.amount)} · ${SOURCE_LABEL[p.source || "WEBHOOK"]} · ${MATCH_LABEL[p.match_status]} (mã GD ${p.bank_txn_id})`,
+      label: `Nhận ${beVnd(p.amount)} · ${SOURCE_LABEL[p.source || "WEBHOOK"]} · ${MATCH_LABEL[p.match_status]} (mã GD ${p.bank_txn_id})`,
       actor_display: p.source === "MANUAL" ? p.actor || SYSTEM : SYSTEM,
     });
   });
@@ -568,7 +568,7 @@ function timelineOf(o: Order): OrderTimelineEntry[] {
     out.push({
       at: when,
       kind: "credit_note_issued",
-      label: `Lập chứng từ đảo doanh thu DC-${o.invoice.code} (${vnd(orderTotal(o))})`,
+      label: `Lập chứng từ đảo doanh thu DC-${o.invoice.code} (${beVnd(orderTotal(o))})`,
       actor_display: "Lộc",
     });
   }
@@ -577,11 +577,11 @@ function timelineOf(o: Order): OrderTimelineEntry[] {
     out.push({
       at: r.created_at || o.created_at,
       kind: "refund_created",
-      label: `Tạo phiếu hoàn ${vnd(r.amount)}${r.reason ? ` — ${r.reason}` : ""}`,
+      label: `Tạo phiếu hoàn ${beVnd(r.amount)}${r.reason ? ` — ${r.reason}` : ""}`,
       actor_display: who,
     });
     if (r.status === "REFUNDED") {
-      out.push({ at: r.confirmed_at || r.created_at || o.created_at, kind: "refund_confirmed", label: `Đã hoàn ${vnd(r.amount)} (mã GD ${r.bank_txn_ref})`, actor_display: "Lộc" });
+      out.push({ at: r.confirmed_at || r.created_at || o.created_at, kind: "refund_confirmed", label: `Đã hoàn ${beVnd(r.amount)} (mã GD ${r.bank_txn_ref})`, actor_display: "Lộc" });
     }
   });
   // Sắp tăng dần theo giờ, giữ thứ tự chèn (= thứ tự nghiệp vụ) khi cùng giờ.
@@ -942,9 +942,14 @@ function queueMode(): QMode {
   }
 }
 
+/** Tiền trong chữ do BACKEND dựng (`vnd_display` → "540.000 ₫", SR-25). Mock bắt chước BE nên giữ ký hiệu ₫; chữ do FE dựng dùng `vnd()` ("540.000 đ"). */
+function beVnd(n: number | string): string {
+  return `${formatMoney(n)} ₫`;
+}
+
 /** 300000 → "300.000 ₫" (BE viết tiền trong câu lỗi cùng một kiểu `vnd_display`, SR-25 L8-1). */
 function vndD(n: number): string {
-  return vnd(n);
+  return beVnd(n);
 }
 
 /** Mọi giao dịch từng vào hàng chờ, kèm đơn (null = chưa gắn đơn). */

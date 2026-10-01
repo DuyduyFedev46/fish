@@ -181,7 +181,7 @@ def timeline_case(browser, tag, w, h):
     ev = dlg.locator('li[data-kind="credit_note_issued"]')
     ok(f"L1[{tag}] timeline có đúng 1 mốc credit_note_issued", ev.count() == 1)
     txt = re.sub(r"\s+", " ", ev.first.inner_text()) if ev.count() else ""
-    ok(f"L1[{tag}] nhãn 'Lập chứng từ đảo doanh thu DC-… (x ₫)' đúng định dạng VNĐ", re.search(r"Lập chứng từ đảo doanh thu DC-INV\d+-[0-9A-Fa-f]+ \(\d{1,3}(\.\d{3})* ₫\)", txt) is not None, txt)
+    ok(f"L1[{tag}] nhãn 'Lập chứng từ đảo doanh thu DC-… (x ₫)' đúng định dạng VNĐ", re.search(r"Lập chứng từ đảo doanh thu DC-INV\d+-[0-9A-Fa-f]+ \(\d{1,3}(\.\d{3})* [đ₫]\)", txt) is not None, txt)
     ok(f"L1[{tag}] mốc có icon riêng (không dùng icon mặc định)", ev.count() == 1 and ev.first.locator("i.mi").inner_text() == "description")
     kinds = dlg.locator("ol.order-timeline > li[data-kind]").evaluate_all("els => els.map(e => e.dataset.kind)")
     ok(f"L1[{tag}] thứ tự: huỷ đơn trước, chứng từ đảo sau", kinds.index("cancelled") < kinds.index("credit_note_issued"), str(kinds))

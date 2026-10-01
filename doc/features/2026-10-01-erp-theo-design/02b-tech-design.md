@@ -249,7 +249,7 @@ Giá vốn: không có field nào. Dữ liệu cá nhân: không.
  {"id": 41, "name": "Khách Thử A", "phone": "0900000123", "order_count": 6, "total_spent": "2140000",
   "cancelled_count": 1, "last_order_at": "2026-10-01T09:32:00+07:00", "note": "Giao trước 11 giờ"}]}
 ```
-`total_spent` = Σ `SalesInvoice.amount` của hoá đơn `ISSUED` (doanh thu, không phải giá vốn). `cancelled_count` = đơn `CANCELLED` + `AUTO_CANCELLED`. Tính bằng `annotate` (Subquery/Count), không N+1.
+`total_spent` = Σ `SalesInvoice.amount` của hoá đơn `ISSUED` thuộc đơn **không** huỷ (`CANCELLED`/`AUTO_CANCELLED`), trừ Σ `Refund.amount` `REFUNDED` của chính các hoá đơn đó (theo ED-13-AC2; chốt lại ở review Lô 6 vì hoá đơn của đơn huỷ vẫn `ISSUED`). Doanh thu, không phải giá vốn. `cancelled_count` = đơn `CANCELLED` + `AUTO_CANCELLED`. Tính bằng `annotate` (Subquery/Count), không N+1.
 
 `GET /api/sales/customer-directory/{id}/` — thêm `default_address`, `created_at`, `first_order_at`,
 `orders: [{id, code, status, status_label, total_amount, created_at}]` (50 đơn mới nhất),
@@ -261,7 +261,7 @@ Giá vốn: không có field nào. Dữ liệu cá nhân: không.
 Nhãn `CAPABILITY_LABELS["sales.view_customer_list"] = "Xem khách hàng"`. FE: `PERM.viewCustomerList`, mục menu "Khách hàng".
 
 ### B3 — Số liệu nhà cung cấp
-Không migration. `SupplierSerializer` thêm (đọc): `receipt_count` (phiếu khác `CANCELLED`), `last_received_at` (max `PurchaseReceipt.created_at` của phiếu khác `CANCELLED`), `supplier_type_label`, `purchase_total` (**nhạy cảm**: Σ `qty × rate` của dòng thuộc phiếu `SUBMITTED`). `sensitive_fields = ("purchase_total",)`; thêm `"purchase_total"` vào `COST_KEYS`.
+Không migration. `SupplierSerializer` thêm (đọc): `receipt_count` (chỉ phiếu `SUBMITTED`, theo Q4 mặc định Duy chốt 01/10, cập nhật theo Lô 11), `last_received_at` (max `PurchaseReceipt.created_at` của phiếu `SUBMITTED`), `supplier_type_label`, `purchase_total` (**nhạy cảm**: Σ `qty × rate` của dòng thuộc phiếu `SUBMITTED`). `sensitive_fields = ("purchase_total",)`; thêm `"purchase_total"` vào `COST_KEYS`.
 `GET /api/purchasing/suppliers/?q=&supplier_type=&is_active=` (annotate, phân trang chuẩn) · Tầng 1 `purchasing.view_supplier` (chu, quan_ly, nv_kho). `POST`/`PATCH` như cũ (`add/change_supplier`: chu, quan_ly). "Ngừng hợp tác" = `PATCH {"is_active": false}`. FE **không** gọi `DELETE`.
 ```json
 {"id": 3, "name": "Ghe Tư Hải", "supplier_type": "INDIVIDUAL", "supplier_type_label": "Cá nhân", "phone": "0900000907",
@@ -388,7 +388,7 @@ Không có serializer ERP nào đang che số với người có quyền, nên B
 | R3 | `GET /api/sales/orders/` | field `reason: {"code","label"}\|null` (AUTO_CANCELLED → "Hết giờ giữ chỗ"; CANCELLED → nhãn `SalesCreditNote.reason_code`; giao dịch mở `UNDERPAID` → "Chuyển thiếu tiền"; phiếu `FAILED` → nhãn `failure_reason`); lọc `customer=<id>` (đòi thêm `view_customer_list`), `batch=<pk>` (qua `lines__batch_allocations__batch`). `GET /api/sales/refunds/` thêm lọc `month=YYYY-MM` (lọc `status` đã có). | `sales.view_salesorder` + `scope_orders_for` | không thêm |
 | R4 | `GET /api/delivery/notes/` | lọc `assigned_to=me\|<id>` (`<id>` chỉ người full scope), `order=<id>`; field `assigned_to_name`, `failure_reason(_label)`; detail thêm `phone` (§3.7), `failure_note`. (`GET /api/cskh/queue/{id}/` đã trả `calls`, không đổi) | như hiện tại | `phone` chỉ trong detail, đã qua phạm vi |
 | R5 | `GET /api/inventory/batches/` | lọc `supplier`, `warehouse`; field `receipt: {"id","code"}\|null` | `inventory.view_batch` | giữ `sensitive_fields` |
-| R6 | `GET /api/inventory/ledger/` | lọc `batch`, `movement_type` (nhiều), `warehouse`, `item`, `date_from/date_to`; field `batch_code`, `item_name`, `warehouse_name`, `type_label` (WRITE_OFF → "Ghi lỗ, huỷ hàng"), `balance_after` (`Window(Sum("qty_change"), partition_by=batch, order_by=[created_at, id])`), `reference_display` + `reference_link {kind, id}` (phân tích `reference`: `reconciliation N`→KK-N, `return N`→RT-N, `INV…`, `cancel SO…`, `create_batch`→PR của lô, `supplier_return SR-N`), `created_by_name` ("Hệ thống" khi null); `StandardPagination` | `inventory.view_stockledgerentry` | không có tiền |
+| R6 | `GET /api/inventory/ledger/` | lọc `batch`, `movement_type` (nhiều), `warehouse`, `item`, `date_from/date_to`; field `batch_code`, `item_name`, `warehouse_name`, `type_label` (WRITE_OFF → "Ghi lỗ, huỷ hàng"), `balance_after` (truy vấn con tương quan theo lô, thứ tự `created_at, id` — không dùng `Window` vì chạy sau WHERE nên sai khi lọc; sửa theo Lô 7), `reference_display` + `reference_link {kind, id}` (phân tích `reference`: `reconciliation N`→KK-N, `return N`→RT-N, `INV…`, `cancel SO…`, `create_batch`→PR của lô, `supplier_return SR-N`), `created_by_name` ("Hệ thống" khi null); `StandardPagination` | `inventory.view_stockledgerentry` | không có tiền |
 | R7 | `GET /api/inventory/warehouses/` | `active_batch_count`, `total_qty` (lô còn tồn); `is_group_label` | `inventory.view_warehouse` | không |
 | R7b | `GET /api/inventory/stock-entries/` | `code` "SE-n", `purpose_label`, `batch_code`, `item_name`, `created_by_name`; lọc `purpose`, `date_from/date_to` | `inventory.view_stockentry` | không |
 | R8 | kiểm kê | xem B1 | | |
@@ -433,7 +433,7 @@ Mỗi lô BE chạy `makemigrations --check --dry-run` sạch, đọc file sinh 
 | `nv_giao` tạo hàng hoàn cho phiếu người khác / vượt số kg (R9) | `validate` + kiểm phạm vi | `apps/inventory/returns/tests/test_create_validation.py` |
 | Người nhập số tự duyệt kiểm kê sau khi lines sửa được (B1) | BR-KK-08 | `apps/inventory/stocktake/tests/test_lines.py`: người sửa dòng duyệt → 400; người khác duyệt → 200 và tồn đổi đúng |
 | Hai người sửa cùng phiếu kiểm kê | `expected_updated_at` → 409 | test 409 + body có `updated_by_name` |
-| **Xoá chứng từ** | Không thêm DELETE; `DocumentViewSet` giữ; FE không có nút xoá cho chứng từ. Master data (`Warehouse`, `Supplier`, `ItemPrice`, `PricingRule`) còn DELETE ở BE với `chu` → FE **không** gọi DELETE ngoài ảnh mặt hàng và bài nháp (đã có) | test 405 DELETE cho `reconciliations`, `returns`, `delivery/notes`, `sales/invoices`; `grep -rn '"DELETE"' erp-console/features` chỉ ra `catalog` ảnh + `content` |
+| **Xoá chứng từ** | Không thêm DELETE; `DocumentViewSet` giữ; FE không có nút xoá cho chứng từ. Master data (`Warehouse`, `ItemPrice`, `PricingRule`) còn DELETE ở BE với `chu`; `Supplier` DELETE/PUT → 405 từ Lô 11 → FE **không** gọi DELETE ngoài ảnh mặt hàng và bài nháp (đã có) | test 405 DELETE cho `reconciliations`, `returns`, `delivery/notes`, `sales/invoices`; `grep -rn '"DELETE"' erp-console/features` chỉ ra `catalog` ảnh + `content` |
 | Migration phá dữ liệu | Chỉ `AddField` có default/null + `AlterModelOptions` + data migration có `revoke` | `makemigrations --check --dry-run`; đọc file; test chạy migrate từ đầu (Django test runner) |
 | AI tải vào route nghiệp vụ | Khối AI qua cổng mỏng + `next/dynamic` `ssr:false` | `node scripts/check-ai-chunks.mjs` phải exit 0 sau build |
 | Mock lọt vào bản build thật | Biểu thức `process.env.NEXT_PUBLIC_USE_MOCK === "1" ? mockX : undefined` tại chỗ | `NEXT_PUBLIC_USE_MOCK=0 npm run build && node scripts/check-no-mock.mjs` |

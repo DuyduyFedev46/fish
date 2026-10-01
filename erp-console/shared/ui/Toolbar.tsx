@@ -1,7 +1,8 @@
 "use client";
 
-// Thanh công cụ đầu màn dữ liệu: ô tìm (lọc phía máy) + nút Làm mới + mốc "cập nhật lúc".
-// Bản HTML cũ để ô tìm và nút làm mới trên topbar; console mới đặt ngay đầu màn để dùng được trên điện thoại.
+// Thanh công cụ đầu màn dữ liệu CŨ: ô tìm (lọc phía máy) + mốc "cập nhật lúc". UI-RULES §2.2: KHÔNG có nút Làm mới.
+// Màn mới dùng shared/ui/list/FilterBar; màn cũ còn gọi Toolbar tới khi được làm lại (Lô 17 xoá).
+// `onRefresh` / `refreshing` còn nhận để các màn cũ build được nhưng không vẽ gì; dữ liệu tự nạp lại khi vào màn / sau thao tác.
 
 import { useId } from "react";
 import { Icon } from "./Icon";
@@ -11,13 +12,15 @@ type Props = {
   query: string;
   onQuery: (q: string) => void;
   placeholder: string;
-  onRefresh: () => void;
-  refreshing: boolean;
+  /** @deprecated Không còn nút Làm mới (UI-RULES §2.2). Giữ để màn cũ build được. */
+  onRefresh?: () => void;
+  /** Dùng để hiện "Đang tải…" cạnh mốc cập nhật. */
+  refreshing?: boolean;
   /** Mốc dữ liệu (as_of của BE). */
   asOf?: string;
 };
 
-export function Toolbar({ query, onQuery, placeholder, onRefresh, refreshing, asOf }: Props) {
+export function Toolbar({ query, onQuery, placeholder, refreshing, asOf }: Props) {
   const id = useId();
   return (
     <div className="toolbar">
@@ -42,16 +45,6 @@ export function Toolbar({ query, onQuery, placeholder, onRefresh, refreshing, as
           </button>
         )}
       </div>
-      <button
-        type="button"
-        className="iconbtn"
-        onClick={onRefresh}
-        disabled={refreshing}
-        aria-label="Làm mới"
-        title="Làm mới"
-      >
-        <Icon name="refresh" className={refreshing ? "spin" : undefined} />
-      </button>
       {asOf && (
         <span className="asof muted" aria-live="polite">
           {refreshing ? "Đang tải…" : `Cập nhật ${timeHM(asOf)}`}

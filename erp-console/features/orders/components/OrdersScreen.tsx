@@ -119,7 +119,8 @@ export function OrdersScreen() {
   );
   const list = useOrderList(params, !badRange);
   const filtered = !!(status || params.q || params.date_from || params.date_to);
-  const now = useNow(!!list.rows?.some((o) => o.status === "BOOKED"), 30_000);
+  // Đếm lùi hiện mm:ss nên phải tick MỖI GIÂY (30 giây một lần thì số giây nhảy cóc).
+  const now = useNow(!!list.rows?.some((o) => o.status === "BOOKED"), 1000);
 
   const [openRow, setOpenRow] = useState<OrderListItem | null>(null);
   const [openMode, setOpenMode] = useState<"view" | "confirm" | "cancel" | "refund">("view");

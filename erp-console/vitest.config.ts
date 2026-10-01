@@ -7,6 +7,8 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./"),
     },
   },
+  // tsconfig đặt jsx=preserve cho Next; test dựng component (react-dom/server) cần biến đổi JSX tự động.
+  oxc: { jsx: { runtime: "automatic" } },
   test: {
     environment: "node",
   },

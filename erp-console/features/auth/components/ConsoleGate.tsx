@@ -1,9 +1,10 @@
 "use client";
 
 // Cổng vào mọi màn nghiệp vụ: phải đăng nhập, đã đặt mật khẩu riêng (S48) và có Group; rồi mới vẽ Shell (menu theo quyền).
+// Đăng xuất nối vào menu avatar của Shell (không còn nút đăng xuất rời).
 import { useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { Shell } from "@/shared/ui/Shell";
+import { Shell } from "@/shared/ui/shell/Shell";
 import { Icon } from "@/shared/ui/Icon";
 import { ErrorBox, Loading } from "@/shared/ui/StateBox";
 import { groupLabel } from "@/shared/lib/groups";
@@ -20,12 +21,9 @@ export function roleText(me: Me): string {
 
 type Props = {
   children: React.ReactNode;
-  /** Nội dung tab "Hoạt động" / "Trợ lý" của cột phải — tầng app ghép từ module (vd S8 ActivityFeed). */
-  activity?: React.ReactNode;
-  assistant?: React.ReactNode;
 };
 
-export function ConsoleGate({ children, activity, assistant }: Props) {
+export function ConsoleGate({ children }: Props) {
   const { status, me, error, loggedOut, refreshMe, logout, permNotice, dismissPermNotice, passwordNotice, dismissPasswordNotice } =
     useAuth();
   const router = useRouter();
@@ -66,8 +64,6 @@ export function ConsoleGate({ children, activity, assistant }: Props) {
       roleText={roleText(me)}
       onLogout={logout}
       accountHref={ACCOUNT_HREF}
-      activity={activity}
-      assistant={assistant}
     >
       {permNotice && (
         <div className="alert-box info perm-notice" role="status">

@@ -46,7 +46,7 @@ def clear_log(page):
 
 def norm(s):
     """Chuẩn hoá ô để so bản cũ/mới: bỏ ₫, kg, khoảng trắng; ',' → '.'; 'MM-DD' → 'DD/MM'."""
-    s = (s or "").replace(" ", " ").replace("₫", "").replace("kg", "").strip()
+    s = (s or "").replace(" ", " ").replace("₫", "").replace("đ", "").replace("kg", "").strip()
     m = re.fullmatch(r"(\d{2})-(\d{2})", s)
     if m:
         s = f"{m.group(2)}/{m.group(1)}"
@@ -112,26 +112,16 @@ with sync_playwright() as p:
     keys = [d[3:5] + d[0:2] for d in exp if len(d) == 5]
     ok("F2-AC1: lô xếp theo hạn dùng tăng dần (thứ tự xuất FEFO)", keys == sorted(keys) and len(keys) == len(exp), str(exp))
 
-    # Refresh: đúng 1 request mới
-    clear_log(page)
-    page.get_by_role("button", name="Làm mới").click()
-    page.wait_for_function("s => window.__caveMock.log.includes(s)", arg=SUMMARY)
-    expect(page.get_by_role("button", name="Làm mới")).to_be_enabled()
-    ok("Làm mới → gọi lại summary 1 lần", mock_log(page) == [SUMMARY], str(mock_log(page)))
+    # (Nút "Làm mới" đã bỏ ở ERP theo design Lô 1 — UI-RULES §2.2; kiểm "gọi lại summary 1 lần" không còn đối tượng.)
 
-    # Cache chung: sang Kho & lô bằng menu + mở tab Hoạt động → không request thêm
+    # Cache chung: sang Kho & lô bằng menu → không request thêm (cột phải/tab Hoạt động đã bỏ ở ERP theo design Lô 1)
     clear_log(page)
     page.locator(".nav a", has_text="Kho & lô").click()
     page.wait_for_url("**/inventory/")
     expect(page.locator("th", has_text="Giá vốn/kg")).to_have_count(1)
-    page.get_by_role("tab", name="Hoạt động").click()
-    expect(page.locator(".feed .fev")).to_have_count(8)
-    ok("3 màn + Hoạt động dùng chung 1 response (không gọi thêm)", mock_log(page) == [], str(mock_log(page)))
+    ok("Tổng quan + Đơn + Kho & lô dùng chung 1 response (không gọi thêm)", mock_log(page) == [], str(mock_log(page)))
     new_inv = table_rows(page, ".screen tbody")
-    new_feed = page.eval_on_selector_all(".feed .fev", "els => els.map(e => e.querySelector('p').textContent + '|' + e.querySelector('time').textContent)")
-    ok("AC3 Kho & lô Chủ: ô giá vốn có tiền", all("₫" in c for c in page.eval_on_selector_all(".screen tbody tr td:nth-child(6)", "t => t.map(x => x.textContent)")))
-    page.get_by_role("tab", name="Trợ lý").click()
-    ok("Trợ lý: 'đang được nối, sắp có' (bỏ regex)", page.get_by_text("Trợ lý đang được nối, sắp có").is_visible())
+    ok("AC3 Kho & lô Chủ: ô giá vốn có tiền", all("đ" in c for c in page.eval_on_selector_all(".screen tbody tr td:nth-child(6)", "t => t.map(x => x.textContent)")))
     page.screenshot(path=f"{SHOTS}/s8-desktop-1280-inventory-chu.png")
 
     # Tìm kiếm phía máy (bỏ dấu)
@@ -151,7 +141,7 @@ with sync_playwright() as p:
     page.wait_for_url("**/orders/")
     expect(page.locator("ul.order-list > li")).to_have_count(20)
     countdown = page.locator("ul.order-list > li").all_inner_texts()
-    ok("Đơn: đơn BOOKED có đếm lùi giữ chỗ còn", any("còn" in c and "′" in c for c in countdown), str(countdown[:3]))
+    ok("Đơn: đơn BOOKED có đếm lùi giữ chỗ còn", any("còn" in c and re.search(r"\d+:\d{2}", c) for c in countdown), str(countdown[:3]))
     page.get_by_placeholder("Tìm mã đơn, tên khách hoặc SĐT…").fill("0901234")
     expect(page.locator("ul.order-list > li")).to_have_count(1)
     ok("Đơn: tìm theo SĐT (BE lọc)", page.locator("ul.order-list > li").count() == 1)
@@ -237,9 +227,7 @@ with sync_playwright() as p:
         expect(page.get_by_text("Bạn không có quyền xem mục này")).to_be_visible()
         lg = mock_log(page)
         ok(f"Review #1 kho1 gõ {path}: ViewGuard chặn, không gọi summary, /me đúng 1 lần", lg == ["GET /api/auth/me/"], str(lg))
-    page.get_by_role("tab", name="Hoạt động").click()
-    expect(page.get_by_text("Bạn không có quyền xem sổ kho.")).to_be_visible()
-    ok("Review #1 kho1 tab Hoạt động: báo không có quyền, không gọi summary", SUMMARY not in mock_log(page), str(mock_log(page)))
+    ok("Review #1 kho1: không gọi summary", SUMMARY not in mock_log(page), str(mock_log(page)))
     page.screenshot(path=f"{SHOTS}/review-desktop-1280-kho1-no-dashboard.png")
     ctx.close()
 
@@ -254,7 +242,7 @@ with sync_playwright() as p:
     ok("AC2 Quản lý: Tổng quan không có cột giá vốn", page.locator("th", has_text="Giá vốn").count() == 0)
     page.goto(BASE + "/inventory/")
     expect(page.locator(".screen tbody tr").first).to_be_visible()
-    ok("AC2 Quản lý: Kho & lô không có cột giá vốn", page.locator("th", has_text="Giá vốn").count() == 0 and "₫" not in page.locator(".screen tbody").inner_text())
+    ok("AC2 Quản lý: Kho & lô không có cột giá vốn", page.locator("th", has_text="Giá vốn").count() == 0 and not re.search(r"\d\s?[đ₫]", page.locator(".screen tbody").inner_text()))
     ql_json = page.evaluate("() => window.__caveMock.dashboardJson('ql1')")
     ok("AC2 JSON (mock theo BE) không có key unit_cost", all("unit_cost" not in b for b in ql_json["batches"]) and len(ql_json["batches"]) > 0)
     ok("AC2 JSON (mock theo BE L6) không có key kpis.inventory_value", "inventory_value" not in ql_json["kpis"], str(ql_json["kpis"]))
@@ -268,9 +256,9 @@ with sync_playwright() as p:
     for user, expected in [
         # S16 (L9): Quản lý có sales.view_refund → thấy mục con "Phiếu hoàn chờ chuyển" (không có nút, chỉ xem).
         # S03 (AI Lô 1): Quản lý có accounts.view_auditlog → thấy "Nhật ký hoạt động".
-        ("ql1", ["Tổng quan", "Đơn & tiền", "Phiếu hoàn chờ chuyển", "Giao hàng", "Kho & lô", "Mua hàng", "Kiểm kê", "Danh mục & giá", "Nhật ký hoạt động"]),
+        ("ql1", ["Tổng quan", "Đơn & tiền", "Gọi xác nhận", "Giao hàng", "Mua hàng", "Kho & lô", "Kiểm kê", "Danh mục & giá", "Nội dung", "Nhật ký hoạt động"]),
         # warehouse_staff có catalog.view_item thật → thấy "Danh mục & giá" (điều phối chốt; phần giá ẩn ở S38/S39)
-        ("kho1", ["Tổng quan", "Đơn & tiền", "Giao hàng", "Việc giao của tôi", "Kho & lô", "Mua hàng", "Kiểm kê", "Danh mục & giá"]),
+        ("kho1", ["Tổng quan", "Đơn & tiền", "Giao hàng", "Việc giao của tôi", "Mua hàng", "Kho & lô", "Kiểm kê", "Danh mục & giá"]),
     ]:
         ctx = browser.new_context(viewport={"width": 1280, "height": 800}, reduced_motion="reduce")
         page = ctx.new_page()
@@ -294,11 +282,7 @@ with sync_playwright() as p:
         expect(page.get_by_text("Bạn không có quyền xem mục này")).to_be_visible()
         log = mock_log(page)
         ok(f"AC5 giao1 {path}: chặn, không gọi summary", log == ["GET /api/auth/me/"], str(log))
-    page.get_by_role("button", name="Mở ghi chú, trợ lý, hoạt động").click() if page.get_by_role("button", name="Mở ghi chú, trợ lý, hoạt động").is_visible() else None
-    page.get_by_role("tab", name="Hoạt động").click()
-    expect(page.get_by_text("Bạn không có quyền xem sổ kho.")).to_be_visible()
-    ok("giao1 tab Hoạt động: báo không có quyền, không gọi API",
-       page.get_by_text("Bạn không có quyền xem sổ kho.").is_visible() and mock_log(page) == ["GET /api/auth/me/"], str(mock_log(page)))
+    ok("giao1: không gọi API nghiệp vụ", mock_log(page) == ["GET /api/auth/me/"], str(mock_log(page)))
     ctx.close()
 
     # ================= Mobile 360 =================
@@ -318,12 +302,6 @@ with sync_playwright() as p:
         small = page.evaluate(SMALL_TAPS_JS)
         ok(f"360 {path} vùng bấm ≥44px", not small, str(small))
         page.screenshot(path=f"{SHOTS}/s8-mobile-360-{shot}.png")
-    page.get_by_role("button", name="Mở ghi chú, trợ lý, hoạt động").click()
-    page.get_by_role("tab", name="Hoạt động").click()
-    expect(page.locator(".feed .fev")).to_have_count(8)
-    ok("360 ngăn kéo Hoạt động không cuộn ngang", no_hscroll(page) <= 360)
-    page.screenshot(path=f"{SHOTS}/s8-mobile-360-activity.png")
-    page.keyboard.press("Escape")
     set_mode(page, "fail")
     page.goto(BASE + "/overview/")
     expect(page.get_by_text("Không tải được dữ liệu, thử lại")).to_be_visible()
@@ -362,7 +340,6 @@ with sync_playwright() as p:
         old_ov_batches = table_rows(page, "#ovBatches")
         old_inv = table_rows(page, "#tbInv")
         old_alerts = page.eval_on_selector_all("#ovAlerts .alert", "els => els.map(e => { const c = e.cloneNode(true); c.querySelectorAll('.mi').forEach(i => i.remove()); return c.textContent; })")
-        old_feed = page.eval_on_selector_all("#feed .fev", "els => els.map(e => e.querySelector('p').textContent + '|' + e.querySelector('time').textContent)")
         ctx.close()
 
         def feed_norm(rows):
@@ -376,7 +353,6 @@ with sync_playwright() as p:
         ok("AC1 Tổng quan: 8 đơn trùng", new_ov_orders == old_ov_orders, f"\nmới={new_ov_orders}\ncũ={old_ov_orders}")
         ok("AC1 Tổng quan: bảng lô trùng", new_ov_batches == old_ov_batches, f"\nmới={new_ov_batches[:2]}\ncũ={old_ov_batches[:2]}")
         ok("AC1 cận hạn trùng", alert_norm(new_alerts) == alert_norm(old_alerts), f"\nmới={new_alerts}\ncũ={old_alerts}")
-        ok("AC1 8 dòng sổ kho trùng", feed_norm(new_feed) == feed_norm(old_feed), f"\nmới={new_feed}\ncũ={old_feed}")
         # L7/S10: màn Đơn không còn là bản chép 8 đơn của bản cũ (đọc /api/sales/orders/) → bỏ so sánh màn Đơn.
         ok("AC1 màn Kho & lô trùng", new_inv == old_inv, f"\nmới={new_inv[:2]}\ncũ={old_inv[:2]}")
     else:

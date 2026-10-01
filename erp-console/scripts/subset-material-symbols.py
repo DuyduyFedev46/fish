@@ -26,6 +26,7 @@ pending person_add person_check person_off photo_camera price_check progress_act
 receipt_long refresh replay report rule schedule search search_off sell send set_meal shield_person shopping_bag
 shopping_cart sync sync_alt sync_problem task_alt timer timer_off two_wheeler undo visibility visibility_off
 warning wifi_off
+add admin_panel_settings arrow_back article assignment_return category content_copy delete_forever done handshake insights left_panel_close left_panel_open north_east person phone_in_talk play_arrow policy receipt remove_moderator request_quote smart_toy south_west storefront swap_vert
 """.split()))
 
 from fontTools.ttLib import TTFont
@@ -84,7 +85,8 @@ unicodes = ",".join(f"U+{cp:04X}" for cp in sorted(codepoints))
 args = [
     sys.executable, "-m", "fontTools.subset", "/tmp/ms-full.woff2",
     "--unicodes=" + unicodes,
-    "--layout-features=liga",
+    "--layout-features=liga,rlig,rclt",
+    "--no-layout-closure",
     "--flavor=woff2",
     "--name-IDs=1,2,3,4,6",
     "--notdef-outline",

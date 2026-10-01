@@ -1,12 +1,18 @@
 // Định dạng hiển thị dùng chung. Tiền/kg từ API là chuỗi thập phân ("540000", "2.500") — không
 // cộng trừ bằng float ở FE; chỉ đổi sang số để HIỂN THỊ.
 
-/** "540000" → "540.000 ₫" (không số lẻ). */
-export function vnd(value: string | number | null | undefined): string {
+/** "540000" → "540.000" (không đơn vị, không số lẻ) — cho ô bảng đã có đơn vị ở tiêu đề cột. */
+export function money(value: string | number | null | undefined): string {
   if (value === null || value === undefined || value === "") return "—";
   const n = typeof value === "number" ? value : Number(value);
   if (!Number.isFinite(n)) return "—";
-  return `${Math.round(n).toLocaleString("vi-VN")} ₫`;
+  return Math.round(n).toLocaleString("vi-VN");
+}
+
+/** "540000" → "540.000 đ" (UI-RULES §1.6: tiền có "đ", không số lẻ). */
+export function vnd(value: string | number | null | undefined): string {
+  const m = money(value);
+  return m === "—" ? m : `${m} đ`;
 }
 
 /** "2.500" → "2,5 kg". */
@@ -43,13 +49,13 @@ function vnParts(input: string | number | Date | null | undefined) {
   return { year: o.year, month: o.month, day: o.day, hour: o.hour, minute: o.minute, second: o.second };
 }
 
-/** ISO → "24/09 14:05" (giờ VN, bất kể múi giờ máy). */
+/** ISO → "24/09/2026 14:05" (giờ VN, bất kể múi giờ máy; UI-RULES §1.5: luôn đủ ngày giờ, có năm). */
 export function dateTime(iso: string | Date | null | undefined): string {
   const p = vnParts(iso);
-  return p ? `${p.day}/${p.month} ${p.hour}:${p.minute}` : "—";
+  return p ? `${p.day}/${p.month}/${p.year} ${p.hour}:${p.minute}` : "—";
 }
 
-/** ISO → "24/09/2026 14:05" (giờ VN) — dùng khi cần thấy cả năm (lịch sử phiên bản, nhật ký). */
+/** Giữ tên cũ cho chỗ đang gọi: giống `dateTime`. */
 export function dateTimeFull(iso: string | Date | null | undefined): string {
   const p = vnParts(iso);
   return p ? `${p.day}/${p.month}/${p.year} ${p.hour}:${p.minute}` : "—";
@@ -110,12 +116,14 @@ export function dayMonth(isoDate: string | null | undefined): string {
   return m ? `${m[3]}/${m[2]}` : "—";
 }
 
-/** Thời gian còn lại tới mốc `iso` (mốc do backend trả): "1h05′", "12′", "hết giờ". null nếu không có mốc. */
+/** Đếm ngược tới mốc `iso` (mốc do backend trả) dạng "mm:ss" (phút có thể quá 59: "65:12"); "hết giờ" khi đã qua. null nếu không có mốc. */
 export function remaining(iso: string | null | undefined, now: number): string | null {
   if (!iso) return null;
   const ms = new Date(iso).getTime() - now;
   if (Number.isNaN(ms)) return null;
   if (ms <= 0) return "hết giờ";
-  const m = Math.floor(ms / 60000);
-  return (m >= 60 ? `${Math.floor(m / 60)}h${String(m % 60).padStart(2, "0")}′` : `${m}′`);
+  const total = Math.floor(ms / 1000);
+  const m = Math.floor(total / 60);
+  const sec = total % 60;
+  return `${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}`;
 }

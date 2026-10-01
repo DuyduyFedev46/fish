@@ -76,6 +76,17 @@ def nav_labels(page):
     return [t.split("\n")[-1].strip() for t in page.locator(".nav a").all_inner_texts()]
 
 
+def open_account(page):
+    """Trang 'Tài khoản của tôi' mở từ menu avatar (ERP theo design Lô 1; trước đây là liên kết `.who-link`)."""
+    page.locator(".avatar-btn").click()
+    page.get_by_role("menuitem", name="Tài khoản của tôi").click()
+
+
+def avatar_logout(page):
+    page.locator(".avatar-btn").click()
+    page.get_by_role("menuitem", name="Đăng xuất").click()
+
+
 def staff_row(page, username):
     return page.locator("ul.staff-list > li").filter(
         has=page.locator("small", has_text=re.compile(rf"^{re.escape(username)}$"))
@@ -150,8 +161,8 @@ with sync_playwright() as p:
     login(page, "loc")
     page.wait_for_url("**/overview/")
     page.wait_for_load_state("networkidle")
-    ok("Menu Chủ có 'Nhân sự · Nhật ký'", "Nhân sự · Nhật ký" in nav_labels(page), str(nav_labels(page)))
-    page.get_by_role("link", name="Nhân sự · Nhật ký").click()
+    ok("Menu Chủ có 'Nhân sự'", "Nhân sự" in nav_labels(page), str(nav_labels(page)))
+    page.locator(".nav a", has_text="Nhân sự").click()
     page.wait_for_url("**/staff/")
     expect(page.locator("ul.staff-list > li").first).to_be_visible()
     users = page.locator("ul.staff-list > li small").all_inner_texts()
@@ -323,7 +334,7 @@ with sync_playwright() as p:
 
     # ---- S46-AC1: Chủ đăng xuất ở màn Tài khoản của tôi ----
     t_loc = token(page)
-    page.locator(".who-link").click()
+    open_account(page)
     page.wait_for_url("**/account/")
     ok("Bấm tên ở chân menu → Tài khoản của tôi", page.locator(".topbar h1").inner_text() == "Tài khoản của tôi")
     page.screenshot(path=f"{SHOTS}/s47-desktop-1280-account-chu.png")
@@ -358,7 +369,7 @@ with sync_playwright() as p:
     drop_token(page)
     login(page, "kho1", "Songbien2026")  # "máy A"
     page.wait_for_url("**/overview/")
-    page.locator(".who-link").click()
+    open_account(page)
     page.wait_for_url("**/account/")
     page.get_by_role("button", name="Đổi mật khẩu").click()
     dlg = page.get_by_role("dialog")
@@ -398,24 +409,24 @@ with sync_playwright() as p:
 
     # ---- S47-AC2: Chủ thêm lại delivery_staff cho kho1 → kho1 bấm 'Tải lại quyền' (hoặc mở lại app) → menu có Việc giao ----
     page.evaluate("() => window.__caveMock.patchUser('kho1', {groups: ['warehouse_staff', 'delivery_staff']})")
-    page.locator(".who-link").click()
+    open_account(page)
     page.wait_for_url("**/account/")
     page.get_by_role("button", name="Tải lại quyền").click()
     expect(page.locator(".nav").get_by_role("link", name="Việc giao của tôi")).to_be_visible()
     ok("S47-AC2 menu 'Việc giao của tôi' xuất hiện, không cần đăng nhập lại", True)
-    page.locator(".who .iconbtn").click()
+    avatar_logout(page)
     page.wait_for_url("**/login/")
 
     # ---- S47-AC1 / AC4 + S41-AC9: Quản lý ----
     login(page, "ql1")
     page.wait_for_url("**/overview/")
     page.wait_for_load_state("networkidle")
-    ok("S41-AC9 Quản lý không có menu Nhân sự", "Nhân sự · Nhật ký" not in nav_labels(page), str(nav_labels(page)))
+    ok("S41-AC9 Quản lý không có menu Nhân sự", "Nhân sự" not in nav_labels(page), str(nav_labels(page)))
     clear_log(page)
     page.goto(BASE + "/staff/")
     expect(page.get_by_text(msg(page, "noViewPermission"))).to_be_visible()
     ok("S41-AC9 gõ /staff/ → chặn, không gọi /api/staff/", all("/api/staff" not in x for x in log(page)), str(log(page)))
-    page.locator(".who-link").click()
+    open_account(page)
     page.wait_for_url("**/account/")
     caps = [c.split("\n")[-1].strip() for c in page.locator(".cap-list li").all_inner_texts()]
     ok("S47-AC1 Quản lý: 5 việc §1.5 + Xem Tổng quan (BE L6)",
@@ -458,9 +469,9 @@ with sync_playwright() as p:
     expect(page.locator(".perm-notice")).to_be_visible()
     ok("S47-AC3 403 → tải lại me, báo 'Quyền của bạn vừa thay đổi'", msg(page, "permChanged") in page.locator(".perm-notice").inner_text())
     expect(page.get_by_text(msg(page, "noViewPermission"))).to_be_visible()
-    ok("S47-AC3 màn Nhân viên ẩn, menu không còn Nhân sự", "Nhân sự · Nhật ký" not in nav_labels(page), str(nav_labels(page)))
+    ok("S47-AC3 màn Nhân viên ẩn, menu không còn Nhân sự", "Nhân sự" not in nav_labels(page), str(nav_labels(page)))
     page.screenshot(path=f"{SHOTS}/s47-desktop-1280-perm-changed.png")
-    page.locator(".who .iconbtn").click()
+    avatar_logout(page)
     page.wait_for_url("**/login/")
 
     # ---- S41-AC7: BR-PQ-18 (sa1 = superuser, bỏ Chủ của loc — Chủ cuối cùng) ----
@@ -478,7 +489,7 @@ with sync_playwright() as p:
     expect(dlg.locator(".alert-box.err")).to_be_visible()
     ok("S41-AC7 BR-PQ-18 nguyên văn", alert_text(dlg) == be(page, "LAST_CHU_GROUP"), alert_text(dlg))
     page.keyboard.press("Escape")
-    page.locator(".who .iconbtn").click()
+    avatar_logout(page)
     page.wait_for_url("**/login/")
 
     # ---- S41-AC1: giao4 đăng nhập → (S48: đặt mật khẩu mới trước) → Việc giao của tôi;
@@ -490,7 +501,7 @@ with sync_playwright() as p:
     page.get_by_role("button", name="Lưu mật khẩu mới").click()
     page.wait_for_url("**/my-deliveries/")
     ok("S41-AC1 giao4 đăng nhập (qua màn đặt mật khẩu mới S48) → Việc giao của tôi", True)
-    page.locator(".who .iconbtn").click()
+    avatar_logout(page)
     page.wait_for_url("**/login/")
     login(page, "loc")
     page.wait_for_url("**/overview/")
@@ -502,7 +513,7 @@ with sync_playwright() as p:
     dlg.get_by_role("button", name="Cho làm lại").click()
     expect(page.get_by_role("dialog")).to_have_count(0)
     expect(page.locator(".alert-box.ok")).to_contain_text(smsg(page, "reactivated", "Anh Phúc (giao1)"))
-    page.locator(".who .iconbtn").click()
+    avatar_logout(page)
     page.wait_for_url("**/login/")
     login(page, "giao1")
     page.wait_for_url("**/my-deliveries/")

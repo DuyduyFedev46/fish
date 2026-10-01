@@ -1,6 +1,9 @@
 // Màu + icon cho trạng thái đơn / lô (kế thừa bản HTML cũ). Nhãn chữ luôn lấy từ `status_label` BE trả.
 
-export type Tone = "good" | "warn" | "crit" | "info" | "mute";
+import type { Tone } from "./enums";
+
+// `Tone` nay khai ở enums.ts (một nguồn); giữ re-export cho chỗ import cũ.
+export type { Tone };
 export type StatusLook = { tone: Tone; icon: string };
 
 export const ORDER_STATUS: Record<string, StatusLook> = {

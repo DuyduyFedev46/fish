@@ -8,6 +8,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ApiError, type Paginated } from "@/shared/lib/http";
+import { useOfflineRegistration } from "@/shared/ui/states/offlineSource";
 
 export type PagedState<T> = {
   /** undefined = chưa có dữ liệu của bộ lọc hiện tại (đang tải lần đầu hoặc lỗi). */
@@ -18,10 +19,12 @@ export type PagedState<T> = {
   error: unknown;
   moreLoading: boolean;
   moreError: unknown;
+  /** Giờ (ISO) lần tải trang 1 thành công gần nhất: dải mất mạng ghi "Dữ liệu lúc …". */
+  asOf: string | null;
 };
 
 function initial<T>(): PagedState<T> {
-  return { rows: undefined, count: 0, hasMore: false, loading: true, error: null, moreLoading: false, moreError: null };
+  return { rows: undefined, count: 0, hasMore: false, loading: true, error: null, moreLoading: false, moreError: null, asOf: null };
 }
 
 export function usePagedList<T extends { id: number }, P>(
@@ -51,7 +54,7 @@ export function usePagedList<T extends { id: number }, P>(
       const r = await loaderRef.current(paramsRef.current, 1);
       if (id !== seq.current) return;
       page.current = 1;
-      setState({ rows: r.results, count: r.count, hasMore: !!r.next, loading: false, error: null, moreLoading: false, moreError: null });
+      setState({ rows: r.results, count: r.count, hasMore: !!r.next, loading: false, error: null, moreLoading: false, moreError: null, asOf: new Date().toISOString() });
     } catch (err) {
       if (id !== seq.current) return;
       if (err instanceof ApiError && err.status === 401) return; // đã về màn đăng nhập
@@ -95,5 +98,9 @@ export function usePagedList<T extends { id: number }, P>(
     setState((s) => (s.rows ? { ...s, rows: s.rows.map((o) => (o.id === id ? { ...o, ...change } : o)) } : s));
   }, []);
 
-  return { ...state, reload: () => loadFirst(true), loadMore, patch };
+  const reload = () => loadFirst(true);
+  // Đăng ký với dải mất mạng chung (mốc dữ liệu + nút Thử lại). Chỉ khi đã có dữ liệu để "mờ".
+  useOfflineRegistration(enabled && state.rows ? { asOf: state.asOf, onRetry: () => void reload() } : null);
+
+  return { ...state, reload, loadMore, patch };
 }

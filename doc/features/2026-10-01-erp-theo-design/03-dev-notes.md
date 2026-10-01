@@ -1,0 +1,930 @@
+# Ghi chú dev — ERP theo design
+> Điều phối viên ghi số kiểm chứng thật; dev ghi lệch thiết kế và việc đã làm theo từng lô.
+
+## Bảng đổi tên (02b viết trên `main` trước P8b Lô 4–5)
+02b/02-stories dùng tên cũ. **Code hiện tại thắng** — dev dùng tên mới:
+
+| Tên trong 02b | Tên thật trong code (sau P8b Lô 4–5) |
+|---|---|
+| Group `chu` / `quan_ly` / `nv_kho` / `nv_giao` / `cskh` | `owner` / `manager` / `warehouse_staff` / `delivery_staff` / `customer_service` (hằng `ROLE.*` ở `shared/lib/roles.ts`) |
+| Route `/cskh/`, `features/cskh/`, `CskhQueueView`, `CskhCallModal` | `/confirmation/`, `features/confirmation/`, `ConfirmationQueueView`, `ConfirmationCallModal` |
+| API `/api/cskh/*`, `apps/delivery/cskh/` | xem `backend/config/api_urls.py` (tên mới), không dùng alias cũ (đã gỡ) |
+| `POST /api/purchasing/receipts/nhap-lo/`, `NhapLoForm` | tên mới `receive_batches` (xem code) |
+| Tài khoản mock `chu`, `ql1`, `kho1`, `giao1` | giữ nguyên username (chỉ đổi mã nhóm) |
+
+## Số gốc trước Lô 1 (điều phối viên chạy 02/10/2026 00:37)
+**FE** (`erp-console`):
+- `npm ci`: sạch · `tsc --noEmit`: 0 lỗi · `vitest run`: **27 file / 272 test xanh**
+- `NEXT_PUBLIC_USE_MOCK=0 npm run build`: xanh · `check-no-mock`: XANH · `check-ai-chunks`: XANH
+- grep màu cứng (hex/rgba ngoài `tokens.css`): **553 dòng** (gốc; không phải 0 như 02b §5.0 giả định).
+  Quy ước điều phối: **mỗi lô không làm tăng tổng**, và **file lô đó tạo/sửa giao diện phải về 0**.
+  Nhiều nhất: `confirmation.module.css` 121, `content/edit/edit.module.css` 88, `deliveries.module.css` 84 → dọn dần ở Lô 4, 5, 16.
+
+**BE** (`backend`): `makemigrations --check`: No changes · `manage.py test`: **1827 test OK** (107 s).
+
+## Lô 2 — BE (R1, R2)
+> be-dev · 02/10/2026 · Không migration. Dữ liệu trong JSON mẫu là giả.
+
+### R1 — Lọc việc AI theo chứng từ + đếm theo màn
+**`GET /api/ai/actions/`** thêm 2 query (kèm `status`, `scope`, `page` có sẵn):
+
+| Query | Ý nghĩa |
+|---|---|
+| `target_model` | Chấp nhận mọi dạng: `purchasing.purchasereceipt` (nhãn 02b), `purchasereceipt`, `receipt` (doc_type của guidance), `PurchaseReceipt`. Backend tự gom các dạng về cùng một model. |
+| `target_id` | **Phải đi kèm `target_model`** (thiếu → 400 `TARGET_MODEL_REQUIRED`, vì phiếu nhập 12 khác lô 12). Một hoặc nhiều mã cách nhau dấu phẩy (tối đa 100). So khớp đúng chuỗi lưu ở `AiAction.target_id` (với đơn bán là **mã đơn** `SO…`, với phiếu nhập/lô là **pk** dạng số). |
+| `status` | Như cũ: `PENDING,ESCALATED`. |
+
+- Bộ lọc chỉ **thu hẹp** tập "mine" hiện có (việc mình làm chủ, hoặc việc `ESCALATED` giao cho nhóm của mình). `scope=all` vẫn chỉ người có `ai.manage_ai_policy` (403 nếu không). Không có bộ lọc: hành vi cũ không đổi. JSON mỗi dòng giữ nguyên (`target` chỉ `{"type","code"}`).
+- `target_model` không nhận ra → **400** `{"detail":"Loại chứng từ không hợp lệ.","code":"INVALID_TARGET_MODEL"}` (không lặp lại giá trị gửi lên). Hơn 100 mã → **400** `INVALID_TARGET_ID`. Có `target_id` mà thiếu `target_model` → **400** `TARGET_MODEL_REQUIRED` (cả list lẫn counts; thông điệp không lặp lại giá trị gửi lên). Chưa đăng nhập → 401.
+
+**`GET /api/ai/actions/counts/?status=PENDING,ESCALATED[&scope=mine|all][&target_model=][&target_id=]`**
+```json
+{"by_target_model": {"purchasing.purchasereceipt": 2, "inventory.batch": 1}}
+```
+- Khoá là nhãn `app.model` (đúng 02b). `AiAction.target_model` đang lưu lẫn `purchasereceipt`, `batch`, `Batch`, `order`… nên đếm **gộp** về một khoá (vd `order` + `salesorder` → `sales.salesorder`). Giá trị không đổi được về model thì giữ nguyên chữ thường. Việc không gắn chứng từ bị bỏ qua.
+- Dùng đúng `get_queryset` của danh sách nên cùng phạm vi: không đếm được việc ngoài phạm vi người xem. `scope=all` không có quyền → 403. POST → 405.
+
+### R2 — Dòng thời gian cho đối tượng chưa có "Tiếp theo"
+**`GET /api/guidance/<loại>/<id>/`** với `<loại>` mới: `receipt`, `supplier`, `stocktake`, `return`, `delivery`, `item`, `customer`, `staff`. (`group` **chưa đăng ký**, để Lô 14 → hiện 404 `GUIDANCE_TYPE_UNKNOWN`.) `<id>` là **pk dạng số**.
+
+```json
+{
+  "doc": {"type": "receipt", "id": 12, "code": "PR-12", "status": "SUBMITTED", "status_label": "Đã ghi nhận"},
+  "next_steps": [],
+  "warnings": [],
+  "timeline": [
+    {"at": "2026-10-01T02:10:00+00:00", "kind": "receipt_created", "label": "Tạo phiếu nhập",
+     "doc": "receipt", "actor": {"kind": "user", "display": "Kho Thử"}},
+    {"at": "2026-10-01T02:11:00+00:00", "kind": "cancel_purchase_receipt", "label": "Huỷ phiếu nhập",
+     "doc": "receipt", "actor": {"kind": "user", "display": "Quản Lý Thử"}}
+  ],
+  "timeline_truncated": false,
+  "related": []
+}
+```
+- **Giới hạn dòng (review M1):** timeline chỉ lấy tối đa N dòng nhật ký **mới nhất** (setting `GUIDANCE_TIMELINE_MAX_ROWS`, env cùng tên, mặc định **200**; dòng "tạo" của đối tượng không tính vào N), vẫn xếp cũ → mới. Thừa thì `"timeline_truncated": true` (FE nên hiện "Chỉ hiện N việc gần nhất"). Khoá `timeline_truncated` là **thêm mới** cho 8 loại ở mục này; FE bỏ qua được, không phá contract cũ. Các loại cũ (`order`, `batch`…) không có khoá này.
+- **`staff`:** bỏ các dòng `logout` và `login` khỏi timeline (nhiễu, không phải "việc đã làm"); chúng cũng không chiếm chỗ trong N dòng.
+- `doc.code`: `PR-<pk>` (receipt), `SUP-<pk>` (supplier), `KK-<pk>` (stocktake), `RT-<pk>` (return), mã phiếu giao (delivery), mã hàng (item), `KH-<pk>` (customer), tên đăng nhập (staff). `status`/`status_label` là `null` khi đối tượng không có trạng thái (item, supplier, customer, staff). `actor.kind` là `user|system|ai` (dòng AI: `"display": "AI của <tên>"`, kèm `level`).
+- Dòng "tạo" có cho receipt, stocktake, return, delivery, customer. Item, supplier, staff chỉ có dòng từ nhật ký hành động. Nhãn "Tiếp theo" của các loại này là bảng tĩnh ở FE (`next_steps` luôn `[]`).
+- `delivery` và `customer`: response có header `Cache-Control: no-store`.
+
+**Quyền** (giống quyền xem chính đối tượng; thiếu quyền → 403 trước, không có/ngoài phạm vi → 404 thông điệp cố định, chưa đăng nhập → 401):
+
+| Loại | Quyền | Phạm vi dòng |
+|---|---|---|
+| receipt | `purchasing.view_purchasereceipt` | — |
+| supplier | `purchasing.view_supplier` | — |
+| stocktake | `inventory.view_stockreconciliation` | — |
+| return | `inventory.view_returntostock` | — (API hàng hoàn hiện chưa scope; Lô 9 siết thì sửa `scope_fn` ở `apps/inventory/returns/next_steps.py`) |
+| delivery | `delivery.view_deliverynote` | NV giao chỉ phiếu gán cho mình (giống `DeliveryNoteViewSet`) |
+| item | `catalog.view_item` | — |
+| customer | `sales.view_customer_list` (xem lệch bên dưới) | — |
+| staff | `accounts.manage_staff` | — |
+
+**Bất biến 9 và 1:** nhãn dòng do code dựng từ bảng `action_labels`; **không** đưa `AuditLog.changes`, `note`, `object_repr` ra ngoài (nơi có thể chứa tên, SĐT, địa chỉ, ghi chú khách). Không có số tiền, giá, giá vốn. Hành động chưa có trong bảng nhãn hiện nhãn chung "Có thay đổi" (nhãn không lộ gì thêm). Lưu ý `timeline[].kind` vẫn là mã hành động `AuditLog.action` nguyên văn (giống timeline `order`); mã này không phải dữ liệu nhạy cảm.
+- Loại chứng từ lạ ở URL → 404 `GUIDANCE_TYPE_UNKNOWN` với thông điệp cố định, không lặp lại loại người gọi gửi lên.
+
+### File đổi
+- `backend/apps/ai/actions/api.py` (lọc + `counts`), **mới** `apps/ai/actions/targets.py` (chuẩn hoá `target_model`), test `apps/ai/actions/tests/test_target_filter.py`.
+- `backend/apps/common/guidance/api.py` (nạp lười theo bảng `_LAZY_MODULES`, cờ `no_store`), **mới** `apps/common/guidance/audit_timeline.py`, test `apps/common/guidance/tests/test_audit_timeline.py`.
+- **Mới** `next_steps.py` đăng ký provider ở `apps/purchasing/receipts/` (receipt + supplier), `apps/inventory/stocktake/`, `apps/inventory/returns/`, `apps/delivery/`, `apps/catalog/items/`, `apps/sales/customers/`, `apps/accounts/staff/`.
+- `config/api_urls.py`: **không cần sửa** (route `guidance/<doc_type>/<doc_id>/` đã chung cho mọi loại).
+
+### Lệch 02b / điều còn nợ
+1. **`customer` đòi `sales.view_customer_list` nhưng quyền này chưa tồn tại** (thuộc Lô 6/B2, cần migration, mà Lô 2 không có migration). Tạm thời provider dùng `sees_customer_directory` (Chủ + Quản lý, đúng nhóm B2 sẽ cấp, cùng quy tắc `CustomerViewSet`). Provider tự phát hiện: khi Lô 6 khai `view_customer_list` trong `Customer.Meta.permissions` thì chuyển sang `has_perm` mà không cần sửa. **Lô 6 nên thêm test timeline `customer` với quyền mới** (đã có 7 test hiện tại làm khung).
+2. Khoá `by_target_model` đúng 02b (`app.model`), nhưng dữ liệu cũ lưu lẫn nhiều dạng → backend gom (xem trên). Không sửa dữ liệu đã ghi.
+3. `target_id` của việc AI không đồng nhất giữa loại chứng từ (mã đơn `SO…` cho đơn bán, pk cho phiếu nhập/lô). FE khi lọc theo đơn phải truyền đúng giá trị mà pipeline ghi; nếu FE có cả mã lẫn pk thì truyền cả hai, cách nhau dấu phẩy.
+4. `supplier` có trong 02b nhưng không có trong danh sách giao việc Lô 2; đã làm luôn (cùng file với receipt) vì cùng cơ chế.
+5. Dòng thời gian của `order` có sẵn dòng "tạo phiếu hoàn … — <lý do>" lấy từ `Refund.reason` (văn bản tự do). Không thuộc Lô 2, chưa sửa; techlead cân nhắc ở Lô 3.
+
+## Lô 3 — BE (R3, SĐT đủ)
+> be-dev · 02/10/2026 · Không migration. Dữ liệu trong JSON mẫu là giả. BR: BR-BH-03, BR-HT-05/07, BR-TT-04, BR-GH-04, BR-PQ-12/15, bất biến 9.
+
+### R3 — `GET /api/sales/orders/` (danh sách đơn)
+Mỗi dòng thêm `reason` (null hoặc `{"code","label"}`), thêm 2 lọc. Các lọc có sẵn (`status`, `date_from`, `date_to`, `q`, `page`) giữ nguyên.
+
+```json
+{"id": 41, "code": "SO261001-4B7E20", "status": "AUTO_CANCELLED", "status_label": "Tự huỷ (quá TTL)",
+ "customer_name": "Khách Thử A", "customer_phone": "0900000123", "total_amount": "390000",
+ "created_at": "2026-10-01T09:32:00+07:00", "reserved_until": "2026-10-01T10:02:00+07:00",
+ "delivery_status": null, "needs_attention": false,
+ "reason": {"code": "AUTO_CANCELLED", "label": "Hết giờ giữ chỗ"}}
+```
+
+`reason` (code dựng ở `apps/sales/orders/reasons.py`, ưu tiên từ trên xuống):
+
+| Điều kiện | `code` | `label` |
+|---|---|---|
+| `AUTO_CANCELLED` | `AUTO_CANCELLED` | Hết giờ giữ chỗ |
+| `CANCELLED` và chứng từ đảo có `reason_code` | chính mã đó (`CUSTOMER_CHANGED_MIND`, `DAMAGED_WHEN_PACKING`, `GIVE_UP_AFTER_FAILED`, `UNREACHABLE`, `OTHER`, `UNREACHABLE_AUTO`) | Khách đổi ý · Hư hỏng khi soạn hàng · Bỏ giao sau khi thất bại · Không liên lạc được khách · Khác · Hệ thống tự huỷ — không liên lạc được |
+| Có giao dịch `UNDERPAID` còn `OPEN` | `UNDERPAID` | Chuyển thiếu tiền |
+| Phiếu giao mới nhất `FAILED` | `failure_reason` của phiếu nếu có (B5, Lô 4), ngược lại `DELIVERY_FAILED` | nhãn `failure_reason`, ngược lại "Giao thất bại" |
+| Còn lại | `reason: null` | |
+
+- `reason` chỉ là **nhãn cố định theo mã**: không bao giờ ghi chú huỷ, `Refund.reason`, `failure_note` (chữ tự do, có thể chứa SĐT, bất biến 9). Test `test_ed09_ac1_cancelled_does_not_leak_free_text_note`.
+- Không N+1: list thêm `select_related("invoice")` + `prefetch_related("payments", "invoice__credit_notes", "invoice__delivery_notes")`; test `test_r3_query_count_does_not_grow_with_order_count`.
+
+| Query mới | Ý nghĩa | Lỗi |
+|---|---|---|
+| `customer=<id>` | Đơn của khách. **Đòi quyền "Xem khách hàng"**: hiện là Chủ + Quản lý (`sees_customer_directory`), vì `sales.view_customer_list` chưa tồn tại (Lô 6/B2). Hàm `can_filter_orders_by_customer` ở `apps/sales/orders/scope.py` tự chuyển sang `has_perm("sales.view_customer_list")` khi Lô 6 khai quyền trong `Customer.Meta.permissions`. | Thiếu quyền → **403** (kiểm trước mọi tham số khác). Không phải số nguyên dương → **400** `INVALID_FILTER`. Id không tồn tại → 200, rỗng. |
+| `batch=<pk>` | Đơn có dòng giữ chỗ/phân bổ từ lô đó (`lines__batch_allocations__batch`, dùng `Exists` nên đơn nhiều dòng cùng lô chỉ hiện một lần). Quyền và phạm vi như danh sách (`view_salesorder` + `scope_orders_for`): `delivery_staff` chỉ thấy đơn của phiếu mình. | Không phải số nguyên dương → 400 `INVALID_FILTER`. Id không tồn tại → 200, rỗng. |
+
+Tham số rỗng (`?customer=`) = không lọc (giống `status`, `q`).
+
+### R3 — `GET /api/sales/refunds/?month=YYYY-MM`
+- Lọc theo **ngày tạo phiếu (`created_at`) tính theo giờ VN** (00:30 ngày 01/10 GMT+7 thuộc tháng 10). Kết hợp được với `status` có sẵn. Sai định dạng (`2026-13`, `2026-9`, `09-2026`, `2026-09-01`…) → **400** `{"detail","code":"INVALID_FILTER"}`. Không có `month` → hành vi cũ.
+- 02b không nói rõ cột ngày; chọn `created_at` vì danh sách phiếu hoàn hiện cột "Thời gian" theo ngày tạo. (Kỳ báo cáo lãi lỗ vẫn tính hoàn tiền theo `confirmed_at`, không đổi.)
+- `RefundViewSet` thêm `NoStoreMixin` (response có `customer_name`, `customer_phone`).
+
+### §3.7 — SĐT đủ trong `apps/sales`
+Rà theo bảng 02b §3.7: **BE `apps/sales` đã trả số đủ cho người trong phạm vi, không phải sửa serializer**. Việc của lô này là khoá hành vi bằng test và bổ sung `NoStore` cho phiếu hoàn:
+- Danh sách đơn `customer_phone`, chi tiết đơn `customer.phone`, phiếu hoàn `customer_phone`: **đủ** với `owner`, `manager`, `warehouse_staff` (full scope); `delivery_staff` chỉ đơn của phiếu mình, quá cửa sổ SR-PII-02 thì `customer_name`/`customer_phone` = null; `customer_service` ngoài phạm vi không thấy đơn. Phiếu hoàn: chỉ `owner`/`manager` (403 các nhóm khác, body không có SĐT).
+- Giữ che: tem in, dòng CSKH ngoài phạm vi (`phone_masked`), AI. Không đụng.
+- Phần còn lại của §3.7 (phiếu giao chi tiết thêm `phone`, R4) nằm ở `apps/delivery`, **không làm ở lô này, để Lô 4**.
+
+### Bất biến 9 — dòng thời gian của đơn
+`apps/sales/orders/timeline.py` không còn ghép `Refund.reason` vào nhãn: giờ là "Tạo phiếu hoàn 100.000 ₫" (lý do vẫn xem ở phiếu hoàn). Ảnh hưởng cả `GET /api/sales/orders/<id>/` (`timeline`) lẫn `GET /api/guidance/order/<id>/`. Test: `apps/sales/orders/tests/test_timeline_privacy.py` (lý do chứa SĐT giả `0900000999` không xuất hiện ở cả hai endpoint, và vẫn đọc được ở `GET /api/sales/refunds/<id>/`).
+
+### File đổi
+- `backend/apps/sales/orders/api.py` (lọc `customer`, `batch`, prefetch), `serializers.py` (`reason`), **mới** `reasons.py`, `scope.py` (`can_filter_orders_by_customer`), `timeline.py` (bỏ `Refund.reason`).
+- `backend/apps/sales/refunds/api.py` (`month`, `NoStoreMixin`).
+- Test mới: `apps/sales/orders/tests/test_order_list_r3.py` (30), `test_timeline_privacy.py` (3), `apps/sales/refunds/tests/test_refund_list_month.py` (8). Sửa 1 test cũ: `LIST_KEYS` ở `test_s10_api.py` thêm `reason`.
+- Không đụng: `payments/services.py`, `refunds/services.py`, migration, `ai/policy/rules.py`, `cost_keys.py` (không có khoá tiền mới), `config/api_urls.py`.
+
+### Điều còn nợ / cần quyết định (cùng loại rò, ngoài phạm vi Lô 3)
+Còn 4 chỗ ghép chữ tự do vào nhãn dòng thời gian. Tôi KHÔNG sửa vì (a) hai chỗ nằm ngoài file được phép, (b) hai chỗ còn lại đang được test cũ ghi nhận là hành vi mong muốn (`test_s16_timeline_hien_that_bai_va_thu_lai`, `test_l7_timeline_huy_don_co_ly_do_...`), đổi là đổi nghiệm thu:
+1. `apps/sales/refunds/timeline.py:32` ghép `refund.reason` ("Tạo phiếu hoàn … — <lý do>"): ra ở `GET /api/guidance/refund/<id>/`. Cùng lỗi đã sửa ở timeline đơn.
+2. `apps/sales/refunds/timeline.py:64` ghép `AuditLog.note` ("Báo thất bại — lý do: …", lý do báo chuyển hoàn thất bại do Chủ gõ).
+3. `apps/sales/orders/timeline.py` (`mark_refund_failed`) cũng ghép `a.note` như trên, ra ở timeline đơn.
+4. `apps/sales/orders/timeline.py` (`cancel_paid_order`) ghép `a.note` = "<nhãn> — <ghi chú tự do>" (lý do `OTHER` đòi ghi chú).
+Đề xuất: dùng nhãn theo `changes.reason_code` cho (4), bỏ lý do khỏi nhãn cho (1)–(3), sửa 2 test cũ tương ứng; việc này cần Duy/techlead duyệt vì đổi nghiệm thu S14/S16.
+
+### Lô 3 — BE: sửa theo review techlead (M1, L1, L2)
+- **M1:** `refunds/api.py::_month_bounds` giới hạn năm 2000..2100 và đưa phép tính tháng sau vào trong `try`
+  (bắt thêm `OverflowError`). `?month=9999-12`, `?month=0001-01` trả 400 `INVALID_FILTER` thay vì 500.
+- **L1:** `month` chỉ nhận `fullmatch([0-9]{4}-[0-9]{2})` (ASCII, không nhận `+`, khoảng trắng, chữ số toàn độ rộng).
+  `?customer=`/`?batch=` chặn ở int64 (`MAX_ID = 2**63 - 1`); lớn hơn trả 400, đúng bằng int64 max thì 200 rỗng.
+- **L2:** `orders/reasons.py` chỉ trả `reason.code` thuộc tập cố định; mã lạ trong `SalesCreditNote.reason_code`
+  trả `{"code": "CANCELLED", "label": "Đã huỷ"}`.
+- Test: mở rộng `test_ed12_ac1_invalid_month_400`, `test_ed13_customer_filter_invalid_value_400`,
+  `test_ed06_batch_filter_invalid_value_400`; thêm `test_ed12_month_accepts_boundary_years`,
+  `test_ed13_customer_filter_int64_max_is_accepted`, `test_ed09_ac1_unknown_reason_code_is_not_echoed`.
+- L3 (gom hàm quyền xem khách) để Lô 6.
+
+## Lô 4 — BE (B5, B6, R4)
+
+Giao hàng: lý do giao thất bại (BR-GH-22), giao / đổi người giao (BR-GH-23), phiếu giao chi tiết có SĐT đủ và lọc danh sách. Chỉ đổi `backend/apps/delivery/` cùng vài dòng ở nơi khác (xem "File đổi"). Dữ liệu trong ví dụ là dữ liệu giả.
+
+### Contract thực tế
+**B5 — `POST /api/delivery/notes/{id}/status/`** với `to_status=FAILED` (quyền `change_deliverynote`, phạm vi dòng như cũ: người giao khác nhận 404).
+```json
+{"to_status": "FAILED", "failure_reason": "OTHER", "failure_note": "Khách hẹn lại chiều mai"}
+```
+→ `200` body phiếu + `already` + `needs_decision` (như S19), có thêm `failure_reason`, `failure_reason_label`.
+
+| `failure_reason` | Nhãn |
+|---|---|
+| `NOT_MET` | Không gặp khách |
+| `REFUSED` | Khách từ chối nhận |
+| `WRONG_ADDRESS` | Sai địa chỉ |
+| `DAMAGED` | Hàng hư khi giao |
+| `OTHER` | Khác |
+
+Lỗi 400: `DELIVERY_FAILURE_REASON_REQUIRED` (thiếu, null, hoặc mã không thuộc 5 mã trên), `DELIVERY_FAILURE_NOTE_REQUIRED` (OTHER mà không có ghi chú), `DELIVERY_FAILURE_NOTE_PII` (ghi chú có dãy từ 9 chữ số, kể cả bị ngăn cách, giống BR-GH-19; thông điệp không lặp lại nội dung), `DELIVERY_FAILURE_NOTE_INVALID` (ghi chú không phải chữ hoặc dài hơn 200 ký tự, mã thêm so với 02b). Lỗi trạng thái cũ (không phải DELIVERING) giữ nguyên.
+Lần giao thất bại sau ghi đè lý do trước; AuditLog giữ lý do của từng lần.
+
+**B6 — `GET /api/delivery/deliverers/`** (quyền `delivery.assign_deliverynote`; không có thì 403, chưa đăng nhập 401; chỉ GET). Trả mảng thuần, một truy vấn, `Cache-Control: no-store`:
+```json
+[{"id": 7, "display_name": "Anh Phúc", "delivering_count": 0, "ready_count": 1},
+ {"id": 8, "display_name": "Anh Lâm", "delivering_count": 2, "ready_count": 0}]
+```
+Chỉ người `is_active` thuộc nhóm `delivery_staff`. Không có SĐT hay tên đăng nhập (không có hồ sơ nhân sự thì `display_name` là tên đăng nhập).
+
+**B6 — `POST /api/delivery/notes/{id}/assign/`** (quyền `delivery.assign_deliverynote`):
+```json
+{"assigned_to": 7, "expected_assigned_to": null}
+```
+→ `200` body phiếu (như `retrieve` ở danh sách, có `assigned_to_name`, `available_actions`) + `already` (`true` khi gán đúng người đang gán, không ghi nhật ký). `expected_assigned_to` tuỳ chọn: có gửi (kể cả `null` = "chưa có ai") thì so với người đang gán trong khoá, lệch thì 409.
+
+| Mã | HTTP | Khi |
+|---|---|---|
+| `DELIVERY_ASSIGN_STATE` | 400 | trạng thái không thuộc CONFIRMING, PREPARING, READY (T6) |
+| `DELIVERY_ASSIGNEE_INVALID` | 400 | thiếu, sai kiểu, không tồn tại, nghỉ việc, hoặc không thuộc `delivery_staff` |
+| `STALE_STATE` | **409** | `expected_assigned_to` khác người đang gán (xem "Chỗ lệch 02b") |
+| (403 / 401 / 404) | | thiếu quyền / chưa đăng nhập / không có phiếu |
+
+AuditLog `assign_deliverynote` với `changes={"assigned_to": {"from": <id>, "to": <id>}}`, chỉ ID.
+`available_actions` có thêm `"assign"` ở CONFIRMING, PREPARING, READY cho người có quyền (CONFIRMING trước đây trả `[]`).
+
+**R4 — `GET /api/delivery/notes/{id}/`** có thêm `phone` (SĐT đủ: `recipient_phone`, không có thì SĐT đơn, rồi SĐT khách) và `failure_note`. Hai trường này, cùng `customer_name`, `address`, `recipient_name`, là `null` (khoá vẫn có) khi người gọi không có full scope và phiếu đã quá cửa sổ SR-PII-02. Tem `.../label/` vẫn che SĐT ("09xx xxx 401").
+**Danh sách** `GET /api/delivery/notes/` có thêm `assigned_to_name`, `failure_reason`, `failure_reason_label`; KHÔNG có `phone` và `failure_note`. Lọc mới: `assigned_to=me|<id>`, `order=<id>`, kết hợp được với `status`, `completed_from`. Giá trị rỗng nghĩa là không lọc; sai (chữ, 0, âm) thì 400 `INVALID_FILTER`. Người giao chỉ được `assigned_to=me` hoặc id của chính mình, hỏi id người khác thì 403 (không lộ phiếu).
+Ví dụ rút gọn một phiếu ở danh sách:
+```json
+{"id": 41, "code": "GH-INV-SO-1", "status": "FAILED", "status_label": "Giao thất bại",
+ "assigned_to": 7, "assigned_to_name": "Anh Phúc", "failed_attempts": 1,
+ "failure_reason": "NOT_MET", "failure_reason_label": "Không gặp khách",
+ "available_actions": ["set_status:DELIVERING"]}
+```
+
+### Quy tắc đã cài
+- **BR-GH-22** (`services.mark_failed`): kiểm lý do và ghi chú trước khi vào khoá; đọc lại trạng thái trong `select_for_update`. Ghi chú là chữ tự do nên CHỈ nằm ở `DeliveryNote.failure_note`: không vào AuditLog (chỉ có mã lý do), không vào log, không vào dòng thời gian (`/api/guidance/delivery/`, `/api/guidance/order/`, `/api/sales/orders/<id>/`), không vào danh sách đơn (chỉ `reason` = mã + nhãn cố định), và `failure_note` đã thêm vào `SCRUB_FREE_TEXT_KEYS` của AI. Cả hai trường bị khoá với PATCH (400).
+- **BR-GH-23** (`services.assign_deliverer`, `list_deliverers`): xem bảng lỗi trên. Quyền do migration cấp cho `owner`, `manager`.
+- Sửa N+1 có sẵn: `DeliveryNoteSerializer._get_allocations` truy vấn `SalesInvoiceLineBatch` theo từng phiếu, bỏ qua prefetch của viewset. Giờ đọc qua prefetch và `select_related("assigned_to__staff_profile")`, số truy vấn của danh sách không còn tăng theo số phiếu (có test).
+
+### Migration
+- `delivery/0005_deliverynote_failure_reason_and_more`: thêm `failure_reason` (CharField 16, mặc định rỗng), `failure_note` (CharField 200, mặc định rỗng) và quyền `assign_deliverynote` vào `Meta.permissions`. Phiếu cũ có lý do rỗng.
+- `delivery/0006_grant_assign_deliverynote`: cấp quyền cho `owner`, `manager` (phụ thuộc `accounts/0013`). Có `revoke` ngược; đã thử `migrate delivery 0004` rồi `migrate delivery` trên DB sqlite tạm: quyền mất rồi có lại đúng.
+- `makemigrations --check --dry-run`: `No changes detected`.
+
+### File đổi
+- `apps/delivery/`: `models.py`, `services.py`, `api.py`, `serializers.py`, migration `0005`, `0006`; test mới `tests/test_assign.py` (24), `tests/test_failure_reason.py` (23), `tests/test_note_detail_filters.py` (22); sửa `tests/test_api.py` (`_post` gửi `failure_reason` khi báo FAILED).
+- `config/api_urls.py` (thêm route `delivery/deliverers/`), `apps/accounts/auth/services.py` (một nhãn `CAPABILITY_LABELS`), `apps/ai/policy/rules.py` (thêm `failure_note`).
+- Sửa test ngoài thư mục `delivery` vì hệ quả trực tiếp của lô (không còn cách nào khác để suite xanh):
+  `apps/accounts/auth/tests/test_s47_me_labels.py` (Quản lý có thêm việc "Giao hoặc đổi người giao của phiếu giao"),
+  `apps/ai/registry/tests/test_discipline.py` (số `@action` 24 thành 25),
+  `apps/ai/registry/tests/snapshots/commands_index_snapshot.json` (thêm `delivery.deliverers`, `delivery.deliverynote.assign`),
+  `apps/accounts/audit/tests/test_s03_migration.py` (loại app `delivery` khỏi đích migrate, cùng lý do đã loại `ai`: `delivery/0006` phụ thuộc `accounts/0013`).
+- Không đụng: `apps/delivery/next_steps.py`, `confirmation`/`cskh` services, `apps/sales/**`, `erp-console/`, `frontend/`, migration cũ.
+
+### Chỗ lệch 02b
+1. `STALE_STATE` trả **409** (`ConflictError`, đúng như phiếu giao việc), không phải 400 như 02b ghi.
+2. Thêm mã `DELIVERY_FAILURE_NOTE_INVALID` (ghi chú sai kiểu hoặc quá 200 ký tự) và `DELIVERY_FAILURE_NOTE_PII` đã có trong 02b nhưng thông điệp không lặp lại nội dung.
+3. `services.mark_failed(reason=None)` (không truyền) là đường nội bộ cũ: phiếu lưu lý do rỗng, vì các test ở `apps/sales` (không được sửa ở lô này) gọi hàm không có lý do. API luôn truyền, nên thiếu hoặc null vẫn 400.
+4. `assign_deliverer` nhận `expected_assignee_id` mặc định "không kiểm"; API chỉ truyền khi body có khoá `expected_assigned_to`.
+5. Lọc `assigned_to=<id khác>` của người giao trả 403 (02b không nói rõ).
+6. Hai AI command mới tự vào registry: `delivery.deliverers` (đọc, chỉ tên hiển thị) và `delivery.deliverynote.assign` (ghi, `form_only`).
+7. 02-stories dùng tên khác (`failed_reason`, `CUSTOMER_ABSENT`, `/shippers/`); contract trên theo 02b và phiếu giao việc.
+
+### Điều còn nợ
+- Điều phối viên sửa dòng `mark_failed` trong `enum-map.md` ("bỏ trường Lý do" nay thành có lý do, theo bảng 02b dòng 66); không có file này trong thư mục tính năng nên tôi không sửa.
+- `python3 scripts/check_naming.py` còn 1 vi phạm ở `erp-console/e2e/ed_lo1_shell.py` (`lo1`), thuộc Lô 1, không phải của lô này.
+
+### Lô 4 — BE: sửa theo review techlead (M1, L1, L2, L5)
+- **M1:** `DeliverersView` khai `permission_classes = [IsAuthenticated]` và `required_perms = ("delivery.assign_deliverynote",)` ở mức lớp, `get` dùng `require_perm`. Lệnh AI `delivery.deliverers` giờ chỉ hiện cho người có quyền. Test: `test_ed16_ac6_ai_command_index_lists_deliverers_only_for_holders_of_the_permission` (`delivery_staff`, `customer_service` không thấy; `manager`, `owner` thấy). Snapshot AI không đổi (tập id lệnh như cũ).
+- **L1:** hàm dùng chung `apps/common/params.py::parse_positive_id(raw)` (chỉ chữ số ASCII, tối đa 19 ký tự kiểm trước khi đổi số, không quá int64; sai thì `ValueError`). `apps/delivery/api.py` và `apps/sales/orders/api.py::_parse_positive_int` (chỉ sửa đúng hàm này, giữ nguyên `InvalidFilter`) cùng gọi hàm chung; hằng `MAX_ID` của `orders/api.py` chuyển sang `common/params.py`. Test mới: `apps/common/tests/test_params.py`; `test_r4_invalid_filters_get_400` thêm số quá int64, `+5`, chuỗi 5000 chữ số, chữ số toàn độ rộng cho cả `order=` và `assigned_to=`. Cũng chặn `assigned_to` trong body của `assign` ngoài 1..int64.
+- **L2:** `services.validate_expected_assignee`: `expected_assigned_to` không phải null hoặc số nguyên dương (kể cả chuỗi, bool, số thực, danh sách, quá int64) thì 400 `DELIVERY_ASSIGNEE_INVALID`, không rơi xuống 409. Test: `test_b6_expected_assigned_to_wrong_type_gets_400_not_409`, `test_b6_assigned_to_beyond_int64_gets_400`.
+- **L5:** `serializers.py` chỉ còn `from . import services`.
+- L4 (`mark_failed(reason=None)`) để lô sau theo yêu cầu.
+
+## Lô 6 — BE (B2)
+> be-dev · 02/10/2026 · 2 migration (`sales/0012`, `sales/0013`). Dữ liệu trong JSON mẫu là giả. Đề xuất mã **BR-PQ-31**.
+
+### Quyền và migration
+- `Customer.Meta.permissions = [("view_customer_list", "Xem khách hàng")]` (`apps/sales/models/customers.py`).
+- `sales/0012_customer_view_customer_list`: `AlterModelOptions` (chỉ thêm).
+- `sales/0013_grant_view_customer_list`: data migration, cấp cho Group `owner`, `manager` (mẫu `sales/0010`; phụ thuộc `accounts/0013` nên dùng tên Group tiếng Anh). `warehouse_staff`, `delivery_staff`, `customer_service` không có. Có `revoke` ngược.
+- Nhãn: `CAPABILITY_LABELS["sales.view_customer_list"] = "Xem khách hàng"` (`accounts/auth/services.py`, chỉ thêm dòng). `GET /api/auth/me/` → `capabilities` hiện mục này cho owner/manager.
+- Không đổi `sales.view_customer` (Tầng 1), `/api/sales/customers/`, test S5/CS-01 (Q4).
+
+### Hàm quyền duy nhất (nợ review Lô 3 L3 + Lô 2)
+`apps/sales/customers/permissions.py::can_view_customer_directory(user)` = `user.is_authenticated and user.has_perm("sales.view_customer_list")`. Hằng `VIEW_CUSTOMER_LIST_PERM`, `CHANGE_CUSTOMER_PERM`. Ba nơi gọi hàm này:
+1. `directory_api.py` (danh bạ khách).
+2. `apps/sales/customers/next_steps.py`: provider timeline `customer` (Lô 2) truyền thẳng hàm làm `can_view`. Bỏ nhánh "quyền chưa khai thì dùng `sees_customer_directory`".
+3. `apps/sales/orders/scope.py::can_filter_orders_by_customer` (Lô 3) chỉ còn `return can_view_customer_directory(user)`.
+Hành vi giữ nguyên: owner, manager được; ba nhóm còn lại không (403 ở `?customer=` và timeline). Khác trước: nay theo quyền, nên Chủ tắt quyền của Quản lý (hoặc cấp riêng cho một user) thì cả danh bạ, timeline khách và lọc đơn cùng đổi. `sees_customer_directory` ở `common/api.py` vẫn còn vì endpoint cũ `/api/sales/customers/` dùng (Q4 giữ nguyên).
+
+### Endpoint (`apps/sales/customers/directory_api.py::CustomerDirectoryViewSet`, route `sales/customer-directory`)
+`NoStoreMixin`, `StandardPagination` (20/trang), `BusinessModelPermissions` với `required_perms`: GET = `sales.view_customer_list`; PATCH thêm `sales.change_customer`. Không `AiDeclarable`. Chưa đăng nhập 401; thiếu quyền 403 (body chỉ `{"detail": "Thiếu quyền: …"}`); POST/PUT/DELETE 405.
+
+**`GET /api/sales/customer-directory/?q=&ordering=&page=`**
+- `q`: tên (không dấu, không phân biệt hoa thường) hoặc SĐT khi `q` có từ 4 chữ số trở lên (dưới 4 chữ số không dò SĐT).
+- `ordering` cho phép: `last_order_at`, `order_count`, `total_spent`, `name`, `created_at` (thêm `-` để giảm). Mặc định `-last_order_at`, khách chưa mua xếp cuối. Giá trị lạ thì dùng mặc định (không 400, không 500).
+```json
+{"count": 126, "next": "https://…/api/sales/customer-directory/?page=2", "previous": null, "results": [
+ {"id": 41, "name": "Khách Thử A", "phone": "0900000123", "order_count": 6, "total_spent": "750000",
+  "cancelled_count": 2, "last_order_at": "2026-10-06T09:00:00Z", "note": "Giao trước 11 giờ"}]}
+```
+**`GET /api/sales/customer-directory/{id}/`** (404 nếu không có id)
+```json
+{"id": 41, "name": "Khách Thử A", "phone": "0900000123", "order_count": 6, "total_spent": "750000",
+ "cancelled_count": 2, "last_order_at": "2026-10-06T09:00:00Z", "note": "Giao trước 11 giờ",
+ "default_address": "[Địa chỉ giao]", "created_at": "2026-08-12T10:14:00Z", "first_order_at": "2026-10-01T09:00:00Z",
+ "orders": [{"id": 77, "code": "SO-D6", "status": "BOOKED", "status_label": "Giữ chỗ", "total_amount": "100000", "created_at": "2026-10-06T09:00:00Z"}],
+ "refunds": [{"id": 5, "order_code": "SO-D2", "status": "REFUNDED", "status_label": "Đã hoàn", "amount": "50000", "created_at": "2026-10-02T03:00:00Z"}]}
+```
+`orders`: 50 đơn mới nhất; `refunds`: 50 phiếu mới nhất của khách, **không có `reason`/`failure_reason`** (chữ tự do, xem ở trang phiếu hoàn). Thời gian là ISO UTC theo cấu hình DRF của repo (FE đổi sang giờ VN).
+
+**`PATCH /api/sales/customer-directory/{id}/`** body chỉ gồm `name`, `default_address`, `note` (chuỗi; `name` ≤ 200, hai trường kia ≤ 1000 ký tự). Trả `200` body chi tiết như trên. Lỗi 400 dạng `{"detail", "code"}`:
+
+| code | Khi |
+|---|---|
+| `INPUT_NOT_ALLOWED` | có khoá khác ba khoá trên, kể cả `phone`, `id`, `created_at`, số liệu. Thông điệp cố định, không lặp lại giá trị gửi lên. Không lưu gì |
+| `INPUT_EMPTY` | body rỗng |
+| (DRF `field: [...]`) | giá trị không phải chuỗi (object, list), quá dài |
+
+Audit: `update_customer`, `changes={"fields": ["note"]}` (tên trường theo thứ tự chữ cái, chỉ trường thật sự đổi); không đổi gì thì không ghi. `object_repr` = `KH-<id>` (không dùng `str(Customer)` vì chứa tên + SĐT; xem `services._CustomerAuditRef`). Không có `logger`/`print` nào trong luồng này.
+
+### Công thức số liệu (annotate Subquery, không N+1; test so số câu SQL của 1 khách và 9 khách bằng nhau)
+- `order_count` = số `SalesOrder` của khách (mọi trạng thái). `cancelled_count` = `CANCELLED` + `AUTO_CANCELLED`.
+- `last_order_at` / `first_order_at` = max / min `SalesOrder.created_at`; `null` khi chưa có đơn.
+- `total_spent` = Σ `SalesInvoice.amount` (`ISSUED`) của đơn **không** huỷ, trừ Σ `Refund.amount` ở trạng thái `REFUNDED` của chính các hoá đơn đó (hoàn một phần BR-HT-02). Phiếu hoàn `PENDING`/`FAILED` không trừ. Chuỗi thập phân qua `money_str`.
+
+### Chặn AI (`apps/ai/policy/rules.py`, chỉ thêm dòng)
+`FORBIDDEN_PREFIXES` thêm `/api/sales/customer-directory/` và `/api/sales/customers/`; `SCRUB_PII_KEYS` thêm `default_address`. Trang khách không có khối AI.
+
+### Test thêm (`apps/sales/customers/tests/`)
+- `test_directory_api.py` (danh sách, số liệu, tìm kiếm, phân trang, N+1, chi tiết, 401/403 từng nhóm, quyền riêng `extra`, Chủ tắt quyền Quản lý, không rò giá vốn bằng token manager, PATCH đủ ca, audit không chứa tên/SĐT/địa chỉ/ghi chú, `no-store`, hồi quy ED-13-AC7).
+- `test_directory_permission.py` (hàm quyền duy nhất, timeline `customer` với quyền mới, `?customer=` 403 với 3 nhóm, nhãn `/api/auth/me/`, chặn AI).
+- Sửa 2 test của lô khác vì 2 migration/quyền mới: `accounts/audit/tests/test_s03_migration.py` (loại thêm app `sales` khi lùi migration, cùng lý do như `delivery` ở Lô 4: `sales/0013` phụ thuộc `accounts/0013`), `accounts/auth/tests/test_s47_me_labels.py` (thêm `sales.view_customer_list` vào danh sách việc của Quản lý).
+
+### Lệch giữa 02b, 02-stories và code (code theo 02b, ghi để điều phối viên/FE biết)
+1. Tên khoá số đơn huỷ: 02b `cancelled_count`, ED-13 viết `cancelled_order_count`. Code dùng **`cancelled_count`** (02b là contract đã duyệt). FE/mock theo 02b.
+2. `total_spent`: 02b ghi "Σ hoá đơn ISSUED", ED-13-AC2 ghi "đơn đã thanh toán, chưa huỷ, trừ số đã hoàn". Hoá đơn của đơn đã huỷ vẫn ở `ISSUED` (chứng từ đảo xử lý riêng), nên đúng theo chữ 02b sẽ cộng cả đơn đã huỷ. Code theo ý **ED-13-AC2** (loại đơn huỷ, trừ khoản hoàn `REFUNDED`).
+3. PATCH SĐT: ED-13-AC5/AC6 cho đổi SĐT (kèm lỗi trùng). 02b chốt SĐT **khoá** (khoá tự nhiên) và trả 400 `INPUT_NOT_ALLOWED`. Code theo 02b; AC5/AC6 không áp dụng. FE không làm ô SĐT sửa được.
+4. URL/route 02b/ED-13 khác nhau (`/api/sales/customers/…` trong ED-13, `customer-directory` trong 02b). Code theo 02b, như phiếu giao việc.
+5. `orders[]` ở chi tiết dùng `total_amount` (02b), không phải `total` như ED-13.
+6. Đã thêm giới hạn độ dài `default_address`, `note` ≤ 1000 ký tự ở đầu vào PATCH (02b không nêu); model là `TextField` không giới hạn.
+7. Chưa có cơ chế "denied perm" theo từng người (Django chỉ có Group + quyền cấp thêm). Bài test "bị tắt quyền" thay bằng: Chủ gỡ quyền khỏi Group `manager`. Ma trận B4 (Lô 14) sẽ là chỗ quản lý việc này.
+
+### Điều còn nợ
+- Timeline `customer` hiện nhãn "Cập nhật hồ sơ khách" cho `update_customer` đã có sẵn trong `ACTION_LABELS` (Lô 2), không cần sửa.
+- `python3 scripts/check_naming.py` exit 0.
+
+## Lô 1 — FE (khung + mẫu danh sách; ED-01, ED-02, ED-03 phần khung, ED-04 phần mẫu, G1–G10)
+
+Làm trong `erp-console/`. Không commit, không push, không deploy. Không đụng `backend/`, `frontend/`, `adapter/`, màn hình nghiệp vụ.
+
+### File đã tạo / sửa (đường dẫn tính từ `erp-console/`)
+- Mới trong `shared/ui/`:
+  - `shell/{Shell,Sidebar,Topbar,AvatarMenu,CommandSearch}.tsx`: khung 2 cột, sidebar 240 ↔ 60px (lưu `cave_ui_sidebar`), topbar có ô ⌘K và avatar. Dưới 768px vẫn giữ ngăn kéo và thanh menu dưới (T4).
+  - `list/{ListPage,DataTable,FilterBar}.tsx`: mẫu danh sách (đủ trạng thái tải / lỗi / rỗng / 403).
+  - `states/{OfflineBanner,ErrorScreen,NotFoundScreen,NoPermission}.tsx`.
+  - `overlay/Toast.tsx` (toast mới), `Chip.tsx`, `Tabs.tsx`, `AiBar.tsx`.
+- `shared/ui/Shell.tsx` (chỉ còn re-export), `Figure.tsx`, `Toolbar.tsx`, `globals.css`, `tokens.css` (2 token mới, đã ghi vào `DESIGN.md`).
+- `shared/ui/NotFoundScreen.tsx` đã xoá (chuyển sang `states/`).
+- `shared/lib/`: `nav.ts` (27 `ViewKey`, 7 nhóm theo UI-RULES §2.1, cờ `menu?`/`soon?`), `enums.ts` (bảng nhãn; giá trị lạ hiện đúng mã gốc, giá trị rỗng hiện "—"), `format.ts` (`vnd` = `540.000 đ`, `dateTime` = `dd/mm/yyyy hh:mm`, `remaining` = `mm:ss`), `status.ts`, `useOnline.ts`.
+- `features/auth/components/{ConsoleGate,ViewGuard}.tsx`, `app/(console)/{layout,error}.tsx`, `app/not-found.tsx`.
+- `features/orders/mock.ts`: chỉ sửa import (`vnd` -> `money as formatMoney`) và thêm `beVnd()` để mock BE giữ ký hiệu "₫" như BE thật (xem lệch số 9).
+- `scripts/subset-material-symbols.py` + `public/fonts/ms/material-symbols-outlined.woff2` (file font bị `.gitignore`, sinh lại bằng script): thêm 25 icon mới; sửa script vì font Google hiện dùng feature `rclt/rlig` chứ không phải `liga`, nên lệnh cũ cắt mất ligature (icon hiện thành chữ cái đầu). Lệnh mới: `--layout-features=liga,rlig,rclt --no-layout-closure`, ra 93 KB, 110/110 icon. Trên máy Mac cần `SSL_CERT_FILE=/etc/ssl/cert.pem`.
+- Test vitest: `shared/lib/{nav.test,enums.test}.ts` (mới), `format.test.ts`, `noLocalTime.test.ts` (sửa).
+- E2E mới: `e2e/ed_batch1_shell.py` (đặt tên này vì `check_naming` từ chối "lo1"). E2E cũ phải sửa theo thay đổi của lô: `s7_shell`, `s8_views`, `s10_s11_orders`, `s12_s13_queue`, `s14_s16_cancel_refund`, `s41_s47_staff`, `s48_password`, `p8_lo7_fe_erp`, `p8_lo8_fe_erp_tz`.
+
+### Kiểm chứng (chạy lại sau sửa font cuối cùng)
+| Lệnh | Kết quả |
+|---|---|
+| `npx tsc --noEmit` | sạch |
+| `npx vitest run` | 29 file / 298 test đạt (gốc 27 / 272) |
+| `NEXT_PUBLIC_USE_MOCK=0 npm run build` | xanh; `check-no-mock` XANH; `check-ai-chunks` XANH |
+| `NEXT_PUBLIC_USE_MOCK=1 npm run build` | xanh |
+| grep hex/rgba ngoài `tokens.css` | 553 dòng, bằng số gốc, không có file của tôi |
+| `python3 scripts/check_naming.py` | OK, không phát sinh mới |
+| `e2e/ed_batch1_shell.py` | 56/56 |
+| `e2e/s7_shell.py` | 24/24 |
+| `e2e/s8_views.py` | 43 đạt, 1 hỏng (360px `/inventory/` vùng bấm ≥ 44px, lỗi có sẵn ở gốc) |
+| `s12` | 97 đạt, 2 hỏng (vùng bấm 360px, có sẵn ở gốc) |
+| `s14` 42/42, `s41_s47` 72/72, `s48` 41/41, `p8_lo7` 79/79, `p8_lo8` 64/64, `p8_lo5` 77/77 | đạt |
+| `confirmation_route`, `l7_1_open_redirect`, `ra_soat_cs02_cs05_mobile_360`, `ra_soat_x_ac4_storage`, `sr07_*`, `sr09_ac4_stale_state` | đạt |
+| `p8_lo6_fe_sr19_sr20` | 17 đạt, 5 hỏng (lỗi thời, xem lệch số 8) |
+| `s10_s11_orders` | dừng ở assertion "BR-TT-03" (có sẵn ở gốc), phần phía sau file chưa chạy tới |
+
+E2E dùng build MOCK phục vụ bằng `python3 -m http.server`. Chưa chạy e2e cần backend thật (`ra_soat_cms*`, `*_real*`, `qa_*`).
+Ảnh chụp: `/tmp/ed1/shots/` (`ed-lo1-desktop-1280-*.png` gồm chữ, thu gọn, avatar, 404; `ed-lo1-mobile-360-*.png` gồm ngăn kéo, avatar; `fontcheck.png` là Tổng quan 1280 với icon đã đúng).
+
+### Sửa e2e cũ (chỉ chuỗi / menu / khung, không đổi nghiệp vụ)
+- Ký hiệu tiền do FE dựng: "₫" -> "đ" (`s8`, `s10_s11`, `s12`, `p8_lo7`, `p8_lo8`). Regex nhận cả hai.
+- Ngày giờ `dd/mm/yyyy hh:mm` (`p8_lo8`); đếm ngược `mm:ss` (`s8`).
+- Menu chủ mới 11 mục (`s7`, `s8`); bỏ kiểm tra cột phải, nút "Làm mới", tab Hoạt động / Trợ lý; đăng xuất qua menu avatar (`s7`, `s41_s47`, `s48`).
+- Mục con "Hàng chờ thanh toán", "Phiếu hoàn chờ chuyển" không còn trong sidebar nên `s12`/`s14` mở thẳng theo URL, mong mục cha "Đơn & tiền" sáng.
+
+### Việc chưa làm / để lô sau
+- Xoá file cũ vẫn còn dùng: `RightRail`, `ThemeToggle`, `EmptyRow`, `StatusChip`, `status.ts`, `Sheet`, `Toast` cũ, CSS `.rr-*` (Lô 17).
+- Nối `ListPage`/`DataTable` vào từng màn hình (các lô 3 trở đi).
+- (đã xong ở vòng 2) `DESIGN.md` mục Layout nay ghi 2 cột, không nút sáng/tối.
+
+### Lệch so với 02b / cần quyết định
+1. Tài khoản chủ trong mock là `loc`, không phải `chu`.
+2. Cờ `soon` ẩn khỏi menu các màn chưa dựng (customers, suppliers, returns, ledger, sales-invoices, purchase-invoices, permissions). Quyền mock cũ thiếu perm mới nên menu mỗi vai là tập con của UI-RULES §2.1.
+3. Menu avatar có 3 mục; người không có view `ai-settings` (chỉ giao hàng) chỉ thấy 2 mục.
+4. ⌘K là nút + phím Ctrl/⌘+K mở hộp thoại, chỉ nhảy tới mục menu (T5); tìm không phân biệt dấu.
+5. `OfflineBanner` gắn toàn cục trong `Shell`; màn hình đăng ký mốc dữ liệu và nút Thử lại qua `useOfflineRegistration` (vòng 2).
+6. Nhãn DAMAGED = "Hàng hư khi giao".
+7. **Cần quyết định (hồi quy)**: `features/orders/orders.module.css` dòng ~222 (`@media (min-width:768px){.tabs{display:none}}`) ẩn `.orders-tabs` trên desktop. Mục con menu đã bỏ theo spec nên hai màn "Hàng chờ thanh toán" và "Phiếu hoàn chờ chuyển" trên desktop chỉ vào được bằng URL cho tới Lô 3. Sửa một dòng là xoá luật đó, nhưng file nằm ngoài danh sách được sửa.
+8. `ActivityFeed` và `AiAssistantGate` không còn được gắn (đã bỏ cột phải theo spec). `p8_lo6_fe_sr19_sr20` (5 ca) lỗi thời tới khi khối AI chuyển vào trang.
+9. Ký hiệu tiền: điều phối viên chốt ERP thống nhất "đ"; FE tự định dạng từ số, không hiện chuỗi `vnd_display` của BE. Mock BE giữ "₫" cho giống BE thật.
+10. Lỗi có sẵn ở gốc, không liên quan, để nguyên: `s8` 360px `/inventory/` (vùng bấm), `s12` 360px (vùng bấm), `s10_s11` BR-TT-03, `ra_soat_cs11_ac6_label_pdf` (selector label-qr), `p8_lo6` console 404. Hai file `ra_soat_cms*` cần backend thật nên bỏ qua.
+
+### Vòng 2: sửa theo Techlead (CHANGES REQUESTED) và QA (REJECTED vòng 1)
+Mỗi mục có test riêng. Đường dẫn tính từ `erp-console/`.
+
+| Mục | Sửa | Test |
+|---|---|---|
+| H1 (ED-02-AC4) | `shared/lib/enums.ts`: `enumOf` trả đúng mã gốc khi không có trong bảng; rỗng/null -> "—" (`EMPTY_ENUM`, `isEmptyEnumValue`, thay `UNKNOWN_ENUM`). `Chip.tsx` theo đó. | `shared/lib/enums.test.ts`, `shared/ui/Chip.test.ts` |
+| H2 (ED-01-AC4) | `shared/ui/Tabs.tsx`: `useTabParam` dùng `pushState` khi đổi tab và nghe `popstate`; bấm lại tab đang chọn không thêm bước lịch sử; giá trị rác trên URL -> tab đầu. Xuất `tabFromSearch`, `tabHref`. | `shared/ui/Tabs.test.ts` (hàm thuần) + e2e `ed_shell_fixes.py` (Back, Forward, tab rác, không chồng lịch sử) trên harness `?m=tabparam` |
+| M1 = QA B1 (ED-03-AC4) | Mới `shared/ui/states/offlineSource.ts` (`useOfflineRegistration`, kho module dùng `useSyncExternalStore`). `OfflineBanner` có dòng "Dữ liệu lúc dd/mm/yyyy hh:mm" và nút Thử lại. `ListPage` nhận `asOf`/`onRetry`; `usePagedList` tự đăng ký (có `asOf`) nên `/orders/`, danh mục, nhật ký có đủ. `useResource` có `asOf` nhưng không tự đăng ký. `Shell` làm mờ nội dung (`.is-stale`, mờ một lần dù DataTable cũng mờ, không chuyển động). | e2e `ed_shell_fixes.py` (thật trên `/orders/`: dòng Dữ liệu lúc, nút Thử lại, mờ, hết mờ khi có mạng, bấm Thử lại không vỡ); `qa_ed_batch1_shell.py` |
+| M4 + QA B3 | `DataTable` nhận bắt buộc `canViewCost`; cột `locked` ẩn khi không có quyền; `stale` mặc định theo `useOffline()`. `.lt-scroll{position:relative}` hết cuộn ngang trang ở 360px. | `shared/ui/list/DataTable.test.ts` (9 ca: tải, lỗi, rỗng, rỗng do tìm, cột khoá, có/không quyền, mờ, liên kết dòng) + e2e 360px (`scrollWidth` <= 360, bảng tự cuộn) |
+| M2 | `OrdersScreen.tsx` đúng một chỗ: `useNow(..., 1000)`, đếm ngược `mm:ss` nhảy từng giây. | e2e `ed_shell_fixes.py` (chữ "còn mm:ss" đổi trong 5 giây) |
+| QA B2 | `shared/lib/nav.ts` thêm `homeLabel(href)`; `NotFoundScreen`, `ErrorScreen`, `NoPermission` ghi "Về <trang chính>". Mới `features/auth/components/AppStates.tsx` (`NotFoundInApp`, `ErrorInApp`) lấy `homePath(me)`; `app/not-found.tsx` và `app/(console)/error.tsx` dùng chúng. `giao1` thấy "Về Việc giao của tôi" -> `/my-deliveries/`. | `nav.test.ts` (`homeLabel`), `shared/ui/states/states.test.ts`, e2e (giao1 và loc) |
+| B4 | `table.lt th`: `text-transform:none; letter-spacing:normal`. | quan sát bằng `qa_ed_batch1_template.py` |
+| B5 | `ErrorScreen` theo board W6h: icon đỏ nhạt, câu "Màn này chưa tải được ... kèm giờ dd/mm/yyyy hh:mm", nút "Về ..." (phụ) rồi "Thử lại" (chính). | `states.test.ts`, `qa_ed_batch1_shell.py` |
+| B6 | `CommandSearch.tsx`: Esc nghe ở cấp tài liệu (đóng được cả khi ô nhập chưa kịp nhận focus), trả focus đồng bộ về nút đã mở, hoặc nút tìm đang hiện nếu mở bằng phím tắt; huỷ `requestAnimationFrame` khi đóng sớm. | e2e `ed_shell_fixes.py` (mở bằng nút và bằng Ctrl+K) + `qa_ed_batch1_shell.py` |
+| L1 | `Toast.tsx` đọc `duration` (`toastDuration`, `makeToastItem`). | `shared/ui/overlay/Toast.test.ts` |
+| DESIGN.md | Mục Layout: 2 cột, bỏ nút sáng/tối và cột phải. | không có |
+
+Không làm (theo yêu cầu): B8 (menu avatar `giao1` 2 mục là đúng), P1 (`/ai/policy/` để Lô 15). Chưa dọn L2 (`dateTimeFull`), L3 (xoá `shared/ui/Shell.tsx` re-export).
+
+File ngoài danh sách gốc nhưng được phép/cần: `features/orders/components/OrdersScreen.tsx` (một dòng `useNow`), `DESIGN.md`, `vitest.config.ts` (thêm `oxc.jsx.runtime: "automatic"` để vitest dịch được JSX khi `tsconfig` đặt `jsx: preserve`; test component chạy bằng `react-dom/server`, không cần jsdom), harness `e2e/qa_harness_ed_batch1/main.tsx` (thêm `canViewCost`, `stale`, chế độ `?m=tabparam`), `e2e/qa_ed_batch1_shell.py` (cập nhật mong đợi của ca 404 theo B2: giao1 nay thấy "Về Việc giao của tôi"). E2E mới: `e2e/ed_shell_fixes.py`.
+
+#### Kiểm chứng vòng 2 (chạy lại trong lượt này, sau sửa cuối)
+| Lệnh | Kết quả |
+|---|---|
+| `npx tsc --noEmit` | sạch |
+| `npx vitest run` | 34 file / 329 test đạt (trước vòng 2: 29 / 298) |
+| `NEXT_PUBLIC_USE_MOCK=0 npm run build` + `check-no-mock` + `check-ai-chunks` | xanh, cả hai XANH |
+| `NEXT_PUBLIC_USE_MOCK=1 npm run build` | xanh |
+| grep hex/rgba ngoài `tokens.css` | 553 dòng, bằng số gốc; file của tôi 0 |
+| `python3 scripts/check_naming.py` (ở gốc repo) | OK, không phát sinh mới |
+| `e2e/ed_shell_fixes.py` (mới) | 21/21 |
+| `e2e/ed_batch1_shell.py` | 56/56 |
+| `e2e/s7_shell.py` | 24 đạt, 0 hỏng |
+| `e2e/s12_s13_queue.py` | 97/99; 2 hỏng là vùng bấm 360px của nút "Làm mới" 88x28 và "Thực hiện" 79x25 trong `GuidancePanel` (đã ghi P3 ở QA, có sẵn ở gốc, ngoài Lô 1) |
+| `e2e/qa_ed_batch1_shell.py` | 98/99; 1 hỏng là ca "không đẩy nội dung lỗi ra console" do chính React production ghi `console.error` khi bắt lỗi giả lập (QA đã ghi nhận là nói quá ở ghi chú, không phải lỗi mã; ghi chú trong `error.tsx` đã sửa) |
+| `e2e/qa_ed_batch1_template.py` (harness vite, cổng 3102) | 66/66 |
+| `e2e/qa_ed_batch1_roles.py` | 47/48; 1 hỏng là G9 `/ai/policy/` (P1, để Lô 15) |
+
+Ảnh chụp vòng 2: `/tmp/ed_fix/ed-fix-360-locked.png`, `/tmp/ed_fix/ed-fix-offline-orders.png`. Hai server tĩnh (3101, 3102) đã tắt.
+
+Lệch so với yêu cầu: không có lệch contract. `vitest.config.ts` đổi một khoá (xem trên). Hook `useTabParam` không chạy được trên vitest môi trường node (không có DOM), nên hành vi Back được kiểm bằng e2e thật trên harness, còn vitest chỉ kiểm hàm thuần.
+
+## Lô 7 — BE (R5, R6, R7, R7b)
+> be-dev · 02/10/2026 · Không migration (`makemigrations --check` = No changes detected). Dữ liệu trong JSON mẫu là giả. 78 test mới.
+
+### File đã sửa / thêm (chỉ `backend/apps/inventory/`)
+- Sửa: `batches/api.py`, `batches/serializers.py` (R5); `stock/api.py`, `stock/serializers.py` (R6, R7, R7b); README của `batches` và `stock`.
+- Thêm: `stock/filters.py` (đọc tham số lọc dùng chung), `stock/references.py` (dịch `reference` của sổ), `stock/warehouse_services.py` (thêm kho).
+- Test thêm: `batches/tests/test_list_filters_receipt.py` (13), `stock/tests/base.py` (dữ liệu nền), `test_ledger_api.py` (30), `test_warehouses_api.py` (22), `test_stock_entries_api.py` (13).
+- Không đụng: `batches/services.py`, `stock/services.py`, migration, `config/api_urls.py` (route đã có sẵn), `cost_keys.py` (không thêm khoá mới), `common/params.py` (chỉ dùng lại `parse_positive_id`).
+
+### Lỗi chung của các bộ lọc
+400 `{"detail":"…","code":"INVALID_FILTER"}`; `detail` chỉ nêu tên tham số, không lặp lại giá trị gửi lên. Giá trị rỗng/chỉ khoảng trắng = không lọc. Id: số nguyên dương ASCII (`parse_positive_id`); id không tồn tại thì danh sách rỗng, không lỗi. Ngày: `YYYY-MM-DD`, lọc theo ngày giờ Việt Nam (`created_at__date`).
+
+### R5 — `GET /api/inventory/batches/`
+Query mới: `supplier=<id>`, `warehouse=<id>` (chỉ ở list). Giữ nguyên `item_code`, `status`, `has_stock`. Field mới `receipt`:
+```json
+{"id": 41, "batch_id": "LO-20261002-001", "item_code": "CA01", "item_name": "Cá thu", "supplier": 3, "supplier_name": "Đầu mối A",
+ "warehouse": 1, "warehouse_name": "Kho chính", "qty_available": "50.000", "status": "SELLING",
+ "receipt": {"id": 12, "code": "PR-12"}}
+```
+`receipt` là `null` với lô tạo tay (không có dòng phiếu nhập). Chỉ có `id`, `code`; không có đầu mối hay tiền. `purchase_rate`, `landed_unit_cost` vẫn chỉ Chủ thấy. Không N+1 (`select_related("source_line")`).
+
+### R6 — `GET /api/inventory/ledger/` (Sổ nhập xuất, chỉ đọc, phân trang 20)
+Quyền `view_stockledgerentry` (Chủ, Quản lý, Nhân viên kho). Mới nhất trước (`-created_at, -id`). Query: `batch=<id>`, `movement_type=SALE,WRITE_OFF` (nhiều, cách bằng dấu phẩy), `warehouse=<id>`, `item=<id>`, `date_from`, `date_to`.
+```json
+{"id": 901, "batch": 41, "batch_code": "LO-20261002-001", "item": 7, "item_name": "Cá thu",
+ "warehouse": 1, "warehouse_name": "Kho chính", "movement_type": "WRITE_OFF", "type_label": "Ghi lỗ, huỷ hàng",
+ "qty_change": "-3.000", "balance_after": "47.000", "reference": "cancel_expired_batch LO-20261002-001",
+ "reference_display": "LO-20261002-001", "reference_link": {"kind": "batch", "id": 41},
+ "created_at": "2026-10-02T09:15:00+07:00", "created_by": 5, "created_by_name": "Kho Thử"}
+```
+- `balance_after` = tồn của lô SAU dòng này (cộng mọi dòng cùng lô tới dòng này). Không đổi khi lọc: lọc `movement_type=SALE` vẫn ra tồn thật, không phải tổng cộng dồn của các dòng còn lại (có test).
+- `reference_link.kind` thuộc `stocktake | return | supplier_return | receipt | invoice | order | batch`; `reference_link` là `null` khi không tra ra (chuỗi cũ không nhận ra, hoặc mã đơn/hoá đơn đã không còn). `reference_display` khi đó là chuỗi gốc. `create_batch` trỏ về phiếu nhập `PR-n` nếu lô sinh từ phiếu, ngược lại trỏ về lô. Tra mã đơn/hoá đơn gộp tối đa 2 truy vấn mỗi trang.
+- `created_by_name`: tên hiển thị của hồ sơ nhân viên, không có thì tên đăng nhập, `created_by = null` thì "Hệ thống". Không bao giờ là SĐT.
+- Không có khoá giá vốn nào (có test quét đệ quy với số giá mua dễ nhận biết).
+
+### R7 — `GET/POST/PATCH /api/inventory/warehouses/`
+```json
+{"id": 1, "name": "Kho chính", "is_group": false, "is_group_label": "Kho", "active_batch_count": 3, "total_qty": "142.500"}
+```
+`active_batch_count`, `total_qty` chỉ tính lô còn tồn (`qty_available > 0`), tính trong một truy vấn (có test N+1). Quyền xem: Chủ, Quản lý, Nhân viên kho. Danh sách xếp theo tên.
+`POST` body `{"name":"Kho đông lạnh","is_group":false}` (`is_group` mặc định false) → 201 (cùng JSON trên). Chỉ Chủ (`add_warehouse`); nhóm khác 403; chưa đăng nhập 401. Mã lỗi (đều 400, không lặp lại tên gửi lên):
+
+| `code` | Khi nào |
+|---|---|
+| `WAREHOUSE_NAME_REQUIRED` | tên trống / chỉ khoảng trắng |
+| `WAREHOUSE_NAME_TOO_LONG` | quá 120 ký tự |
+| `WAREHOUSE_NAME_TAKEN` | trùng tên kho khác (không phân biệt hoa thường, gộp khoảng trắng) |
+
+Ghi `AuditLog` `create_warehouse`, `changes = {"is_group": bool}` (không ghi tên). Kho không có trường "mã" trong model nên không trả mã.
+
+### R7b — `GET /api/inventory/stock-entries/` (chỉ đọc theo ý nghĩa, phân trang 20)
+Query: `purpose=MATERIAL_RECEIPT,ADJUSTMENT` (nhiều), `date_from`, `date_to`.
+```json
+{"id": 8, "code": "SE-8", "purpose": "ADJUSTMENT", "purpose_label": "Điều chỉnh", "batch": 41, "batch_code": "LO-20261002-001",
+ "item_name": "Cá thu", "qty_change": "-1.000", "reason": "kiểm đếm", "created_by": 5, "created_by_name": "Kho Thử", "created_at": "2026-10-02T10:00:00+07:00"}
+```
+D-1: BE vẫn giữ `POST` cũ (có test `test_s4_actor_fields` dựa vào), nhưng nó **không đổi tồn, không ghi Sổ nhập xuất** (có test). FE không dựng form tạo. D-2: không có "Ngừng bán lô".
+
+### Lệch so với 02b / quyết định đã đặt
+1. `balance_after` dùng truy vấn con tương quan, không dùng `Window` như 02b ghi hướng cài đặt: `Window` chạy sau `WHERE` nên sai khi lọc (có test chứng minh).
+2. Kho: giữ `PATCH/PUT` đổi tên (hành vi cũ, và để registry AI không mất lệnh `inventory.warehouse.partial_update`); bỏ `DELETE` (kho đã có lô bị `PROTECT`, trước đây gây 500). Đổi tên trùng trả lỗi field của DRF (hành vi cũ), không phải `WAREHOUSE_NAME_TAKEN`.
+3. Kiểm trùng tên kho so sánh bằng Python `casefold`, vì `iexact` của SQLite không phân biệt hoa thường với chữ có dấu (production dùng Postgres, kết quả giống nhau).
+4. `BatchListQuery` (chỉ để sinh tài liệu) không mở rộng; bộ lọc mới đọc qua `parse_id_param`.
+5. Snapshot `commands_index_snapshot.json` (file của Lô 2) không bị đổi bởi lô này; `test_discovery` xanh.
+
+### Nợ / lưu ý cho FE và lô sau
+- FE nối `reference_link.kind` sang đường dẫn: `stocktake` → kiểm kê, `return` → hàng hoàn, `supplier_return` → trả NCC, `receipt` → phiếu nhập, `invoice` → hoá đơn bán, `order` → đơn hàng, `batch` → lô.
+- Phiếu điều chỉnh cũ có thể có `created_by_name` là tên đăng nhập nếu người đó chưa có hồ sơ nhân viên.
+
+### Kiểm chứng (chạy lại trong lượt này)
+- `makemigrations --check --dry-run`: No changes detected.
+- `manage.py test apps.inventory apps.reports apps.common apps.ai apps.accounts`: Ran 1116 tests, OK.
+- `manage.py test` (toàn bộ): Ran 2141 tests, OK (nền trước lô: 2063).
+- `python3 scripts/check_naming.py`: OK, không phát sinh vi phạm mới.
+
+## Lô 8 — BE (B1, R8)
+
+Phạm vi: Kiểm kê (BE). Không có số tiền / giá vốn trong bất kỳ phản hồi nào của kiểm kê; test dò rò dùng giá nhập mẫu 123457 và dò `COST_KEYS` ở mọi mức JSON (`warehouse_staff`, `manager`). Không cần thêm khoá vào `COST_KEYS`.
+
+### File đã sửa / thêm
+- `backend/apps/inventory/models/stocktake.py`: thêm `StockReconciliation.updated_at` (`auto_now`, `null=True`) làm phiên bản phiếu.
+- `backend/apps/inventory/migrations/0005_stockreconciliation_updated_at.py` (mới, cộng thêm): `AddField` + `RunPython` đặt `updated_at = created_at` cho phiếu cũ (reverse là no-op, gỡ cột thì mất dữ liệu cột). Có test thuận / ngược trên DB tạm.
+- `backend/apps/inventory/stocktake/services.py`: `create_reconciliation`, `replace_lines`, `update_reconciliation`, `has_counted`, `apply_reconciliation` (nay `@transaction.atomic`, `select_for_update`, audit trong giao dịch).
+- `backend/apps/inventory/stocktake/queries.py` (mới): queryset chống N+1 (Prefetch dòng + lô + kho + mặt hàng, annotation người sửa gần nhất, `edited_lines_by_me`) và bộ lọc danh sách.
+- `backend/apps/inventory/stocktake/serializers.py`, `api.py`: viết lại theo contract dưới đây.
+- Test mới trong `backend/apps/inventory/stocktake/tests/`: `base.py`, `test_lines.py`, `test_list_detail.py`, `test_migration_updated_at.py` (60 test).
+- Sửa test cũ cho khớp contract mới (ngoài danh sách được sửa, báo để điều phối biết): `backend/apps/common/tests/test_s4_actor_fields.py` (`created_by` / `approved_by` nay là đối tượng nên đọc `["id"]`), `backend/apps/ai/registry/tests/test_discipline.py` (số `@action` 25 → 26), `backend/apps/ai/registry/tests/snapshots/commands_index_snapshot.json` (thêm `inventory.stockreconciliation.replace_lines`). Hai file sau là file của Lô 2 và cũng đang bị lô khác sửa trong working tree, cần gộp cẩn thận.
+- Không đụng `next_steps.py`, `config/api_urls.py`, `cost_keys.py`.
+
+### Endpoint
+Quyền: xem `view_stockreconciliation`, tạo `add_`, sửa dòng `change_` (owner, manager, warehouse_staff OK; delivery_staff, customer_service 403; chưa đăng nhập 401), duyệt `approve_stockreconciliation` (owner, manager).
+
+**R8 — `GET /api/inventory/reconciliations/`** (phân trang 20). Query: `status=DRAFT,APPROVED` (nhiều), `warehouse=<id>`, `date_from`, `date_to` (theo `count_date`). Lọc sai → 400 `INVALID_FILTER`.
+```json
+{"count": 1, "next": null, "previous": null, "results": [
+ {"id": 7, "code": "KK-7", "count_date": "2026-10-02", "status": "DRAFT", "status_label": "Chờ duyệt", "note": "Kiểm cuối tuần",
+  "created_by": {"id": 5, "display_name": "Kho Thử"}, "approved_by": null, "approved_at": null,
+  "updated_at": "2026-10-02T10:15:00+07:00", "updated_by_name": "Kho Thử",
+  "warehouse_names": ["Kho lạnh 1", "Kho lạnh 2"], "line_count": 3, "short_count": 1, "over_count": 1, "match_count": 1,
+  "short_qty": "2.000", "over_qty": "1.500", "net_difference": "-0.500",
+  "available_actions": ["edit_lines"], "approve_blocked_reason": null}]}
+```
+`GET /api/inventory/reconciliations/{id}/` = các trường trên + `lines`:
+```json
+"lines": [{"id": 21, "batch": 41, "batch_code": "LO-20261002-001", "item_name": "Cá thu", "warehouse_name": "Kho lạnh 1",
+           "system_qty": "10.000", "counted_qty": "8.000", "difference_qty": "-2.000", "reason": ""}]
+```
+`available_actions` chỉ gồm `edit_lines` (có quyền sửa và phiếu `DRAFT`) và `approve` (có quyền duyệt, `DRAFT`, không bị chặn). Khi có quyền duyệt nhưng là người nhập / người sửa số thì `approve` bị bỏ và `approve_blocked_reason = {"code": "BR-KK-02" | "BR-KK-08", "label": "..."}` để FE hiển thị lý do.
+
+**B1 — `POST /api/inventory/reconciliations/`** (tạo, trả 201 dạng chi tiết). `lines` không bắt buộc (không gửi = phiếu nháp rỗng).
+```json
+{"count_date": "2026-10-02", "note": "Kiểm cuối tuần",
+ "lines": [{"batch": 41, "counted_qty": "8.000", "reason": ""}, {"batch": 42, "counted_qty": "5.000", "reason": "Cân lại"}]}
+```
+Server tự chụp `system_qty = batch.qty_available` và tính `difference_qty`; client không gửi hai trường này.
+
+**B1 — `POST /api/inventory/reconciliations/{id}/lines/`** thay TOÀN BỘ dòng (200, dạng chi tiết). `expected_updated_at` bắt buộc, lấy từ `updated_at` của phiếu đang xem.
+```json
+{"expected_updated_at": "2026-10-02T10:15:00+07:00", "lines": [{"batch": 41, "counted_qty": "9.000", "reason": ""}]}
+```
+Phiếu đã bị người khác sửa → **409**:
+```json
+{"detail": "Phiếu vừa được người khác cập nhật, tải lại để xem.", "code": "STALE_STATE", "updated_by_name": "Kho Thử 2", "updated_at": "2026-10-02T10:16:30+07:00"}
+```
+`PATCH /api/inventory/reconciliations/{id}/` chỉ đổi `count_date`, `note` (và từ chối khoá `lines`, mã `RECON_USE_LINES_ENDPOINT`). `POST …/{id}/approve/` giữ nguyên đường dẫn.
+
+### Mã lỗi (400 trừ khi ghi khác)
+| Mã | Khi |
+|---|---|
+| `RECON_LINE_INVALID` (kèm `line_index`) | lô trùng, lô không tồn tại / đã huỷ / đã đóng, số đếm âm hoặc sai định dạng, lý do > 500 ký tự, rỗng hoặc quá 500 dòng |
+| `BR-KK-04` (kèm `line_index`) | đếm nhiều hơn sổ mà thiếu lý do |
+| `RECON_NOT_DRAFT` | sửa dòng / sửa phiếu đã duyệt (kiểm trước khi kiểm phiên bản) |
+| `EXPECTED_UPDATED_AT_REQUIRED` / `_INVALID` | thiếu hoặc sai định dạng `expected_updated_at` (cần ISO có múi giờ) |
+| `STALE_STATE` (409) | phiên bản lệch, kèm `updated_by_name`, `updated_at` |
+| `BR-KK-02` | người tạo phiếu tự duyệt |
+| `BR-KK-08` | người đã nhập / sửa số đếm tự duyệt |
+
+### Quy tắc đã cài
+- BR-KK-08 (đề xuất, chưa có trong `doc/` nên cần PO chốt): "đã nhập / sửa số" = người tạo phiếu, hoặc có `AuditLog` hành động `update_reconciliation_lines` (người dùng hoặc `ai_actor`). Không cần thêm cột; lịch sử lấy từ AuditLog (`changes` chỉ chứa `line_count` / tên trường, không chứa số đếm hay tên khách).
+- Hai người sửa cùng lúc: khoá dòng phiếu rồi so `updated_at`, người sau nhận 409 (có test chạy hai phiên tuần tự trên cùng bản chụp). Duyệt đồng thời: chỉ một người chạy, người kia thấy `RECON_NOT_DRAFT`.
+- `warehouse_names`: suy ra từ kho của các lô trong dòng, không trùng, sắp xếp theo tên.
+
+### Lệch so với 02b / quyết định đã đặt
+1. 02b §3.9 gợi ý lưu người nhập vào cột mới; tôi dùng `AuditLog` + `created_by` thay vì thêm cột `counted_by`, vì việc ghi AuditLog đã bắt buộc và nhiều người có thể cùng sửa. Migration vẫn cộng thêm (`updated_at`).
+2. `created_by`, `approved_by` đổi từ id sang `{id, display_name}` (R8 cần tên). Đây là đổi contract so với bản cũ nên đã sửa 2 test S4 (xem trên). FE cũ nào đọc `created_by` như số cần cập nhật.
+3. `POST …/lines/` thay toàn bộ dòng (không thêm từng dòng), để một lần lưu = một phiên bản; muốn thêm dòng thì gửi lại cả danh sách.
+4. Không đưa số tiền (giá trị chênh) vào kiểm kê, nên không có khoá mới trong `COST_KEYS`.
+
+### Nợ / lưu ý
+- PO cần chốt chính thức BR-KK-08 trong `doc/` (hiện chỉ ở 02b / story).
+- `next_steps.py` (Lô 2, cấm sửa) chỉ có nhãn cho `approve_stockreconciliation`; chưa có hành động AI `replace_lines` vì lệnh này là `form_only` (đã vào snapshot).
+- Phiếu cũ không có AuditLog sửa dòng thì chỉ tính người tạo là "người nhập".
+
+### Kiểm chứng (chạy lại trong lượt này)
+- `makemigrations --check --dry-run`: No changes detected.
+- `manage.py test apps.inventory apps.common apps.ai apps.accounts`: Ran 1115 tests, OK.
+- `manage.py test` (toàn bộ): Ran 2199 tests, OK (nền trước lô: 2141).
+- `python3 scripts/check_naming.py`: OK, không phát sinh vi phạm mới.
+
+## Lô 9 — BE (R9)
+
+### File đã sửa / thêm (đều trong `backend/apps/inventory/returns/` trừ ghi chú)
+- Thêm: `scope.py`, `creation.py`, `filters.py`, `tests/{base,test_create_validation,test_list_scope,test_approve,test_timeline_scope}.py`.
+- Viết lại: `serializers.py`, `api.py`; sửa `next_steps.py` (dùng `scope_returns_for`), `README.md`.
+- Sửa ngoài thư mục: `apps/common/tests/test_s4_actor_fields.py::test_s4_hang_hoan_created_by_la_nv_giao` (tạo hàng hoàn nay phải từ phiếu giao hợp lệ) và đổi tên biến `giao1` → `courier1` trong file để qua `check_naming`.
+- Không đụng `services.py` (`apply_return`), không migration, không sửa `config/api_urls.py` (route `returns` đã có).
+
+### Contract (dữ liệu giả)
+`GET /api/inventory/returns/?status=DRAFT,APPROVED&month=2026-10&page=1` (20 dòng/trang, `Cache-Control: no-store`)
+```json
+{"count": 1, "next": null, "previous": null, "results": [{
+  "id": 7, "code": "RT-7",
+  "delivery_note": 12, "delivery_note_code": "DN-SO-R9-A", "order_code": "SO-R9-A",
+  "batch": 3, "batch_code": "LO-2026-10-01-A", "item_name": "Cá thử",
+  "qty": "2.000", "left_warehouse_at": "2026-10-02T08:30:00+07:00", "returned_at": "2026-10-02T10:05:00+07:00",
+  "outside_minutes": 95, "decision": "PENDING", "decision_label": "Chờ quyết định",
+  "status": "DRAFT", "status_label": "Chờ duyệt",
+  "created_by": 5, "created_by_name": "Phúc Thử", "approved_by": null, "approved_by_name": null,
+  "created_at": "2026-10-02T10:05:00+07:00", "note": "Khách hẹn lại"
+}]}
+```
+- Người giao chỉ thấy dòng thuộc phiếu giao gán cho mình; phiếu của người khác 404 (cả chi tiết, PATCH, approve). `owner/manager/warehouse_staff` thấy hết. `customer_service` 403, chưa đăng nhập 401.
+- `GET …/{id}/` cùng shape. Lọc sai (`status` không thuộc enum, `month` sai dạng/ngoài 2000–2100) → 400 `INVALID_FILTER`, thông điệp không lặp lại giá trị gửi lên.
+
+`POST /api/inventory/returns/` (quyền `add_returntostock`; người giao chỉ tạo cho phiếu giao của mình)
+```json
+{"delivery_note": 12, "batch": 3, "qty": "2", "note": "Khách không có nhà"}
+```
+→ 201, body như một dòng ở trên (`status: DRAFT`, `decision: PENDING`). Kho tồn chưa đổi tới khi duyệt.
+
+`POST …/{id}/approve/` `{"decision": "RESTOCK"}` hoặc `{"decision": "WRITE_OFF"}` (quyền `approve_returntostock`: owner, manager) → 200, body như trên với `status: APPROVED`, `approved_by`, `approved_by_name`.
+
+`PATCH …/{id}/` chỉ đổi `note`, chỉ khi `DRAFT`. Không có DELETE (405).
+
+### Mã lỗi
+| Mã | HTTP | Khi |
+|---|---|---|
+| (DRF field error) | 400 | thiếu/sai kiểu `delivery_note`, `batch`, `qty` (< 0.001), `note` > 500 ký tự, id quá int64 |
+| `RETURN_NOTE_STATUS` | 400 | phiếu giao không ở ĐANG GIAO / GIAO THẤT BẠI |
+| `RETURN_BATCH_NOT_IN_NOTE` | 400 | lô không nằm trong phân bổ của phiếu giao |
+| `RETURN_QTY_EXCEEDS` | 400 | tổng kg hoàn (đã tạo + lần này) lớn hơn kg đã giao của lô; kèm `delivered_qty`, `already_returned_qty` |
+| `RETURN_DECISION_REQUIRED` | 400 | approve thiếu / sai `decision` |
+| `RETURN_NOT_EDITABLE` | 400 | PATCH phiếu đã duyệt |
+| `BR-PQ-14` / `BR-PQ-16` | 400 | gửi field khoá (`status`, `decision`, `approved_by`, `left_warehouse_at`, `returned_at`, `qty`/`batch`/`delivery_note` khi PATCH) hoặc `created_by` |
+| `BR-HV-04` | 400 | duyệt vào lô đã chốt (`decision` không được lưu) |
+| `STALE_STATE` | 409 | duyệt phiếu đã duyệt |
+| (không thấy phiếu giao) | 404 | phiếu giao không tồn tại hoặc không thuộc người giao đó, hai trường hợp không phân biệt được |
+
+### Quy tắc đã cài
+- BR-HV-01/02/04 giữ nguyên (`apply_return`). Duyệt khoá dòng (`select_for_update`) rồi mới ghi `decision`; lỗi thì rollback cả `decision`.
+- Không vượt kg đã giao: kg đã giao = tổng `SalesInvoiceLineBatch.qty` của lô đó trong hoá đơn của phiếu giao; trừ phần đã có phiếu hoàn (DRAFT lẫn APPROVED). Khoá dòng phiếu giao khi tạo nên hai request cùng lúc không vượt được.
+- `left_warehouse_at`: hệ thống suy ra từ `AuditLog` của `delivery_advance_status` sang ĐANG GIAO; phiếu không có log thì `null` và `outside_minutes` là `null`.
+- Không giá vốn: response chỉ có kg (test quét `COST_KEYS` + giá trị mốc 123457). Không dữ liệu khách: không có tên/SĐT/địa chỉ; `note` chỉ ở API này, không vào AuditLog, dòng thời gian, AI (có test với SĐT giả).
+- Dòng thời gian `return` dùng chung `scope_returns_for` (người giao khác 404).
+
+### Lệch so với 02b / quyết định đã đặt
+1. `delivery_note` bắt buộc khi tạo (bản cũ cho null). Bản cũ cho tạo bất kỳ lô/số kg nào, đó là lỗ hổng.
+2. `left_warehouse_at`, `returned_at` thành chỉ đọc (02b không nêu). Thêm `approved_by_name`, `created_at`, ba mã lỗi `RETURN_NOTE_STATUS`, `RETURN_BATCH_NOT_IN_NOTE`, `RETURN_DECISION_REQUIRED`/`RETURN_NOT_EDITABLE`.
+3. PATCH giới hạn ở `note` khi còn DRAFT.
+4. Danh sách có phân trang 20 dòng (trước là mảng trần): FE cũ đọc mảng cần đổi sang `results`.
+5. Đã duyệt lại → 409 `STALE_STATE` (không phải 400) để đồng nhất với kiểm kê; làm ở API vì không được sửa `apply_return`.
+
+### Nợ / lưu ý
+- Đã xử lý (review techlead L2): `month_bounds(raw)` nay ở `apps/common/params.py` (có test ở `apps/common/tests/test_params.py`), `returns/filters.py` và `sales/refunds/api.py` cùng gọi; thông điệp và mã `INVALID_FILTER` của refunds giữ nguyên. `inventory/stock/filters.py` chỉ có `date_from`/`date_to` (ngày ISO), khác logic tháng nên để nguyên.
+- FE có thể cần trường "số kg còn hoàn được" để chặn trước ở form; hiện chỉ có `RETURN_QTY_EXCEEDS` kèm `delivered_qty`/`already_returned_qty`, chưa có endpoint tra trước. Chưa thêm vì ngoài contract 02b.
+- Test `S4ReconciliationTests.test_s4_ac3_nguoi_khac_duyet_duoc` từng đỏ giữa chừng do WIP Lô 8 (kiểm kê), không thuộc lô này.
+
+### Kiểm chứng
+- `makemigrations --check --dry-run`: No changes detected.
+- `manage.py test apps.inventory apps.delivery apps.common apps.ai apps.accounts`: Ran 1442 tests, OK.
+- `manage.py test` (toàn bộ): Ran 2266 tests, OK (59 test mới ở `apps.inventory.returns`; nền 2199 đã gồm cả WIP Lô 8 chạy song song).
+- `python3 scripts/check_naming.py`: OK, không phát sinh vi phạm mới.
+
+### Lô 8 — BE: sửa theo review techlead (H1, M1, L1, L3, L4)
+
+**H1 — BR-KK-09 (ĐỀ XUẤT, CHỜ DUY CHỐT, làm theo Phương án B).** Duyệt áp đúng chênh lệch đã chụp lúc nhập số (`counted_qty - system_qty`, bằng `difference_qty` với dòng qua service), không tính lại theo tồn hiện tại, không ghi đè `system_qty` / `difference_qty`. BR-KK-04 kiểm theo số đã chụp (dòng qua service luôn hợp lệ nên nhánh này chỉ bắt dữ liệu cũ). Nếu áp vào mà tồn lô ra âm: 400 `RECON_STOCK_INSUFFICIENT` kèm `line_index`, không ghi sổ dòng nào, phiếu vẫn `DRAFT` (cả giao dịch duyệt rollback). Phần đổi nằm gọn trong `stocktake/services.py`: hàm `_applied_difference(line)` và `_apply_line(...)`; chuyển sang Phương án A (tồn đổi thì 409 `RECON_STOCK_CHANGED`, bắt đếm lại) chỉ cần sửa hai hàm này. `record_movement` không bị đụng.
+Hai test tái hiện theo review (`tests/test_approval_snapshot.py`): đếm 48 / tồn 50, bán 5, duyệt thành tồn 43 và sổ RECONCILE -2; đếm 49 không lý do, bán 5, duyệt thành 200 và tồn 44.
+
+**M1.** `create` bỏ qua `lines` khi request đến từ dispatch AI (`ai_audit_scope` đang được đặt). Dòng số đếm chỉ nhập qua `…/lines/` bởi người. Có test: AI tạo kèm `lines` thì phiếu rỗng; chủ AI mức C không duyệt được phiếu mang số do AI mình soạn (phiếu rỗng, `RECON_EMPTY`); UI vẫn tạo kèm `lines` như cũ.
+
+**L3.** Duyệt phiếu không có dòng: 400 `RECON_EMPTY`. Test S4 `test_s4_ac3_nguoi_khac_duyet_duoc` (`apps/common/tests/test_s4_actor_fields.py`) phải tạo phiếu có một dòng.
+
+**L4.** Lỗi BR-KK-04 lúc duyệt kèm `line_index`.
+
+**L1.** Bỏ hằng `COUNTER_AUDIT_ACTIONS`. Hàm tên nhân viên gom về `stocktake/services.py::staff_name` (`SYSTEM_NAME` cũng ở đó), `serializers.py` import lại.
+
+Mã lỗi thêm vào bảng ở trên: `RECON_EMPTY`, `RECON_STOCK_INSUFFICIENT`.
+
+Kiểm chứng (lượt này): `makemigrations --check --dry-run` No changes detected; `manage.py test apps.inventory apps.common` Ran 638 tests OK; `manage.py test` Ran 2266 tests OK; `python3 scripts/check_naming.py` OK.
+
+## Lô 10 — BE (R10)
+
+> be-dev · 02/10/2026 · Không migration. Dữ liệu trong JSON mẫu là giả.
+
+### File đã sửa / thêm
+- Sửa: `backend/apps/purchasing/receipts/api.py` (chọn serializer theo action, prefetch, phân trang, lọc), `serializers.py` (thêm bản đọc, giữ nguyên `PurchaseReceiptSerializer` cho ghi), `README.md`; `backend/apps/common/cost_keys.py` (thêm 1 dòng `purchase_amount`).
+- Thêm: `receipts/filters.py`, `receipts/tests/{api_base,test_receipt_list,test_receipt_detail}.py`.
+- Không đụng `receipts/services.py`, `costs/services.py`, `next_steps.py`, migration, `config/api_urls.py` (route `purchasing/receipts` đã có).
+
+### Contract
+`GET /api/purchasing/receipts/?status=DRAFT,SUBMITTED&supplier=3&month=2026-09&date_from=&date_to=&has_invoice=1|0|true|false&page=1`
+Quyền `purchasing.view_purchasereceipt` (owner, manager, warehouse_staff). `delivery_staff`/`customer_service`/không nhóm: 403; chưa đăng nhập: 401. Phân trang chuẩn 20 dòng/trang (`count/next/previous/results`), sắp xếp `-received_date, -id`.
+Dòng dưới là của **owner** (có `view_costprice`):
+```json
+{"count": 1, "next": null, "previous": null, "results": [{
+  "id": 12, "code": "PR-12",
+  "supplier": 3, "supplier_name": "Đầu mối Thử A", "warehouse": 1, "warehouse_name": "Kho Thử",
+  "received_date": "2026-09-28", "status": "SUBMITTED", "status_label": "Đã ghi nhận",
+  "created_by": 5, "created_by_name": "Tâm Thử", "created_at": "2026-09-28T08:55:00+07:00", "note": "",
+  "items_summary": "Cá thu, Tôm sú", "line_count": 2, "total_qty": "15.000",
+  "batch_codes": ["CA01-260928-12", "TOM01-260928-12"],
+  "invoice": {"id": 41},
+  "purchase_amount": "1634570.00"
+}]}
+```
+- `invoice`: `{"id"}` của hoá đơn mới nhất gắn phiếu, hoặc `null`. `batch_codes` rỗng khi phiếu `DRAFT` (chưa sinh lô).
+- **`manager`/`warehouse_staff`**: cùng body nhưng **không có** `purchase_amount`.
+
+`GET /api/purchasing/receipts/{id}/` (cùng quyền; 404 nếu không có). Thêm vào các field trên:
+```json
+{"lines": [{
+   "id": 20, "item": 1, "item_code": "CA01", "item_name": "Cá thu", "qty": "10.000",
+   "rate": "123457.00", "purchase_amount": "1234570.00", "shelf_life_days": null,
+   "batch": 7, "batch_code": "CA01-260928-12", "batch_status": "DRAFT", "expiry_date": "2026-12-27",
+   "landed_unit_cost": "123457.00"}],
+ "invoices": [{"id": 41, "code": "#41", "invoice_date": "2026-09-28", "is_paid": true, "amount": "555551.00"}],
+ "costs": [{"id": 9, "cost_type": "ICE", "cost_type_label": "Đá", "allocation_method": "BY_QTY",
+            "allocation_method_label": "Theo số kg", "incurred_date": "2026-09-28",
+            "amount": "987654.00", "allocated_amount": "987654.00", "batch_count": 2}],
+ "allocated_amount": "987654.00"}
+```
+- Khoá nhạy cảm (chỉ `view_costprice`, tức owner): `purchase_amount` (đầu phiếu và từng dòng), `rate`, `landed_unit_cost`, `costs`, `allocated_amount`. Với manager/warehouse_staff: **không có khoá nào trong số này**; vẫn có `lines[]` (mã hàng, kg, lô, hạn) và `invoice: {"id"}|null`.
+- **`invoices[]` (L1)** chỉ có khi người xem có `purchasing.view_purchaseinvoice` (owner, manager): mỗi phần tử `id, code, invoice_date, is_paid, amount`. `warehouse_staff` **không nhận khoá `invoices`** (chỉ còn `invoice: {"id"}`); phiếu chưa có hoá đơn thì owner/manager nhận `[]`.
+- **`invoices[].amount` theo D-3** (Duy chốt, 02b §6 Q3: Quản lý thấy tiền hoá đơn mua): ẩn theo quyền `purchasing.view_purchaseinvoice` (accounts/0002: `owner` và `manager` có `r`; `warehouse_staff` không có), không theo `view_costprice`. owner và manager thấy `amount`, warehouse_staff không. `amount` không nằm trong `COST_KEYS` (ngoại lệ D-3 ghi trong test).
+- `costs`: chi phí phụ có phân bổ vào lô của phiếu. `amount` là cả chứng từ, `allocated_amount` là phần rơi vào lô của phiếu này (một chi phí chia cho nhiều phiếu thì hai số khác nhau), `batch_count` là số lô của phiếu nhận phần chia. Không trả `note` của chi phí.
+- **Thứ tự (L2):** `lines[]`, `items_summary`, `batch_codes` theo `id` dòng nhập tăng dần (prefetch có `order_by("id")`).
+- **Hiệu năng (L3):** `costs` và `allocated_amount` dùng chung một lần gom phân bổ cho mỗi phiếu (cache trên instance), không tính hai lần.
+- Dòng `purchase_amount` = `qty x rate`, làm tròn 2 chữ số; đầu phiếu = tổng các dòng đã làm tròn (khớp cộng tay trên màn).
+- Phản hồi POST/PATCH/`submit`/`receive-batches` giữ nguyên shape cũ (`PurchaseReceiptSerializer`), `rate` vẫn ẩn với người không có `view_costprice`.
+
+Lỗi lọc: tham số sai → 400 `{"detail": "...", "code": "INVALID_FILTER"}`, thông điệp chỉ nêu tên tham số, không lặp giá trị. Sai khi: `status` ngoài `DRAFT|SUBMITTED|CANCELLED`; `supplier` không phải số nguyên dương ASCII ≤ int64; `month` không đúng `YYYY-MM` hoặc ngoài 2000–2100; `date_from`/`date_to` không phải ngày thật; `has_invoice` khác `1/0/true/false`. Giá trị rỗng = không lọc.
+
+### Quy tắc đã cài
+- BR-MH-06 / bất biến 1: serializer đọc dùng `CostFieldSerializerMixin`, liệt kê field tường minh. `purchase_amount` thêm vào `COST_KEYS` (một dòng).
+- Chi phí phụ chỉ nạp (`prefetch`) khi người xem có `view_costprice`, nên người khác không kéo thêm dữ liệu giá vốn khỏi DB.
+- Không N+1: danh sách và chi tiết có test đếm câu truy vấn (số truy vấn không đổi khi thêm phiếu, dòng, hoá đơn, chi phí). Đã thử bỏ prefetch thì hai test này đỏ.
+- Không có dữ liệu cá nhân của khách trong các phản hồi này.
+
+### Lệch so với 02b / quyết định đã đặt
+1. **Phân trang 20 dòng/trang** (`StandardPagination`) thay mặc định 50 của DRF: 02b không nói rõ cho R10, chọn theo quy ước console như R6/R7b/R9. FE đọc `results`.
+2. ~~Số tiền hoá đơn chỉ owner~~ **Đã sửa theo D-3**: `invoices[].amount` cho `owner` và `manager` (quyền `view_purchaseinvoice`), không cho `warehouse_staff`. Bản đầu tiên ẩn với manager là sai quyết định, đã bỏ. `rate`, `purchase_amount`, `landed_unit_cost`, `costs`, `allocated_amount` vẫn chỉ `owner`.
+3. Thêm `date_from`/`date_to`, `line_count`, `invoices[]`, `costs[]`, `allocated_amount` (02b R10 chỉ liệt kê `status`, `supplier`, `month`, `has_invoice`; W2b cần phần chi tiết). `warehouse_name` chỉ ở đầu phiếu (mọi dòng cùng kho), không lặp ở từng dòng.
+4. `purchase_amount` dùng cho cả đầu phiếu lẫn từng dòng (cùng một khoá trong `COST_KEYS`), không thêm khoá thứ hai.
+5. `PurchaseCost` không có FK tới phiếu nhập, nên "chi phí phụ của phiếu" được suy ra qua phân bổ vào lô của phiếu (`PurchaseCostAllocation`). Chi phí chưa phân bổ lô nào thì không hiện ở phiếu nào.
+
+### Nợ / lưu ý
+- Ma trận spec ghi `warehouse_staff` chỉ xem "phiếu của mình, trong ngày" (Tầng 3, dấu `*`) nhưng code hiện tại chưa có phạm vi dòng cho phiếu nhập: mọi người có `view_purchasereceipt` thấy mọi phiếu. Giữ nguyên, không đổi trong lô này. ED-20-AC5 chỉ yêu cầu ẩn giá, đã đạt.
+- Chưa có tìm theo mã phiếu (`q`) cho ô tìm kiếm W2a; ngoài contract 02b.
+- Danh sách chưa trả tổng số kg toàn bộ kết quả lọc (design W2a ghi "9 phiếu · 205,2 kg"); FE chỉ cộng được trang đang xem.
+- `PurchaseReceiptSerializer` (ghi) và `PurchaseReceiptLineSerializer` giữ nguyên.
+
+### Kiểm chứng (lượt này, sau khi sửa L1/L2/L3 và D-3)
+- `makemigrations --check --dry-run`: No changes detected.
+- `manage.py test apps.purchasing`: Ran 78 tests, OK.
+- `manage.py test apps.purchasing apps.inventory apps.common apps.ai apps.accounts`: Ran 1264 tests, OK.
+- `manage.py test` (toàn bộ, chạy 2361 test): 22 lỗi, **tất cả** ở `apps.catalog.pricing.tests.test_r14_pricing` (test R14 của Lô 13, be-dev khác đang làm, chưa có code). Không có lỗi nào ngoài chỗ đó.
+- `manage.py test apps.accounts apps.ai apps.common apps.content apps.delivery apps.inventory apps.purchasing apps.reports apps.sales apps.catalog.items apps.catalog.images` (mọi thứ trừ `catalog.pricing`): Ran 2326 tests, OK.
+- `python3 scripts/check_naming.py`: OK, không phát sinh vi phạm mới.
+- Test của lô: `apps.purchasing.receipts.tests.test_receipt_list` và `test_receipt_detail` (33 test, mã R10; trong đó có L1, L2, L3 và D-3).
+
+## Lô 13 — BE (R14)
+
+> be-dev · 2026-10-02 · Story: phần BE của ED-30, ED-31 (02b §3.8 R14, §5.2 Lô 13). Chưa commit.
+
+### File đã sửa / thêm
+- `backend/apps/catalog/items/api.py`, `serializers.py`, **mới** `filters.py`.
+- `backend/apps/catalog/pricing/api.py`, `serializers.py`, `services.py`.
+- Test mới: `items/tests/api_base.py` (dữ liệu nền dùng chung), `items/tests/test_r14_items.py` (24 test), `pricing/tests/test_r14_pricing.py` (37 test), `pricing/tests/test_set_item_price.py` (24 test).
+- README của `items/` và `pricing/`.
+- Không đụng: `config/api_urls.py` (route đã có sẵn, không cần thêm dòng), `cost_keys.py`, `apps/catalog/images/`, `apps/sales/**`, migration, Shop API.
+
+### Endpoint và contract thật
+Mọi danh sách vẫn phân trang mặc định DRF (**50 dòng/trang**, `{count,next,previous,results}`), không đổi so với trước.
+Lọc: rỗng hoặc chỉ khoảng trắng = không lọc; sai → 400 `{"detail":"Tham số <tên> …","code":"INVALID_FILTER"}`, `detail` không lặp lại giá trị gửi lên; id không tồn tại → 200 rỗng. Id là số nguyên dương ASCII ≤ int64 (`parse_positive_id`); bool là `1|true|0|false`; enum phải đúng mã (`SIMPLE|BUNDLE`, `ITEM|ORDER`). Chỉ áp ở `list`, không áp ở chi tiết.
+
+**`GET /api/catalog/items/` và `GET /api/catalog/items/{id}/`** (quyền `catalog.view_item`: owner, manager, warehouse_staff)
+Query mới: `item_group=<id>`, `is_active=1|0`, `item_type=SIMPLE|BUNDLE` (giữ `has_image`).
+```json
+{"id": 7, "code": "CA01", "name": "Cá thu", "item_group": 1, "group_name": "Cá", "item_type": "SIMPLE",
+ "stock_uom": "Kg", "shelf_life_in_days": 365, "has_batch_no": true, "has_expiry_date": true,
+ "is_active": true, "description": "", "bundle_lines": [], "image": null,
+ "current_price": {"rate": "120000.00", "valid_from": "2026-09-02", "valid_upto": null}}
+```
+- `current_price` = giá bán đang hiệu lực hôm nay (giờ VN) theo đúng thứ tự Shop dùng (bảng giá mặc định, rồi `valid_from` muộn nhất, rồi `id` lớn nhất), hoặc `null` khi chưa có giá.
+- Chỉ có khi người xem có `catalog.view_itemprice` (owner, manager). `warehouse_staff`: **không có khoá** `current_price` (ở cả danh sách và chi tiết). Kể cả phản hồi POST/PATCH.
+- Không có giá vốn, không có giá vốn ước tính (W2h): không có khoá nào của `COST_KEYS` (trừ `rate`, vốn là giá bán).
+- Không N+1: giá nạp bằng một `Prefetch` (chỉ khi có quyền xem giá); `bundle_lines__component` cũng được prefetch (trước đó mỗi mặt hàng thêm truy vấn).
+
+**`GET /api/catalog/item-prices/`** (`catalog.view_itemprice`: owner, manager; warehouse_staff 403). Query: `item=<id>`.
+```json
+{"id": 3, "price_list": 1, "item": 7, "item_name": "Cá thu", "item_code": "CA01",
+ "rate": "120000.00", "valid_from": "2026-09-02", "valid_upto": null}
+```
+
+**`GET /api/catalog/pricing-rules/`** (`catalog.view_pricingrule`: owner, manager). Query: `is_active=1|0`, `apply_on=ITEM|ORDER`.
+```json
+{"id": 2, "name": "Mua 5 kg giảm 10%", "is_active": true, "apply_on": "ITEM", "item": 7, "item_name": "Cá thu",
+ "min_qty": "5.000", "min_amount": null, "discount_type": "PERCENT", "discount_value": "10.00",
+ "valid_from": null, "valid_upto": null}
+```
+`item_name` là `null` với ưu đãi theo đơn (`apply_on = ORDER`).
+
+**`GET /api/catalog/item-groups/`** (`catalog.view_itemgroup`: owner, manager, warehouse_staff)
+```json
+{"id": 4, "name": "Cá biển", "parent": 1, "parent_name": "Cá", "item_count": 0}
+```
+`parent_name` null khi là nhóm gốc. `item_count` = số mặt hàng thuộc nhóm đó (kể cả mặt hàng đang ẩn; không cộng nhóm con). Phản hồi POST nhóm mới: `item_count: 0`.
+
+**`GET /api/catalog/price-lists/`**: giữ nguyên `{id, name, currency, is_default}` (02b R14 không đòi thêm gì; không thêm bộ lọc).
+
+**Sửa sau review techlead:** (L2) PATCH ưu đãi chỉ chứa `{"is_active": false}` được qua mà không kiểm ràng buộc khác, để tắt được ưu đãi cũ sai dữ liệu; bật lại hoặc sửa thêm field khác vẫn kiểm đủ. (L5) `items?has_image=` nhận `1|true|yes|0|false|no`, rỗng = không lọc, sai → 400 `INVALID_FILTER` (trước đây giá trị lạ bị hiểu là `false`, và rỗng cũng là `false`). (Phát hiện khi chạy toàn bộ) `current_price.valid_from/valid_upto` là chuỗi ISO; bản trước trả đối tượng `date` làm đường lệnh AI (`serializer.data` rồi `json.dumps`) lỗi `TypeError` ở 3 test quét AI; có test mới giữ lại.
+
+**Ghi** (`POST/PATCH` `item-prices`, `pricing-rules`, `price-lists`, `item-groups`, `items`): Tầng 1 như cũ, kết quả theo ma trận `accounts/0002`: **chỉ owner** ghi. Manager, warehouse_staff, delivery_staff, customer_service nhận 403 (dữ liệu không đổi); chưa đăng nhập 401. Đã đối chiếu `accounts/0002` và chạy thật: manager chỉ có `view_*` cho `itemprice`, `pricingrule`, `pricelist`, `itemgroup`, `item`; warehouse_staff không có `view_itemprice`, `view_pricingrule`, `view_pricelist` nên 403 cả khi đọc. **Không cần data migration.**
+
+### Đặt giá mới (ED-31-AC1, BR-DM-02/03) — thêm sau khi điều phối viên chọn phương án (b)
+Logic ở `apps/catalog/pricing/services.py` (`set_item_price`, `update_item_price`); view `ItemPriceViewSet.perform_create/perform_update` chỉ gọi service. Quyền không đổi: chỉ owner ghi (manager, warehouse_staff 403, chưa đăng nhập 401).
+
+**`POST /api/catalog/item-prices/`** body như cũ: `{"price_list": 1, "item": 7, "rate": "130000", "valid_from": "2026-10-05", "valid_upto": null}` (`valid_upto` tuỳ chọn). → `201` cùng shape đọc (`item_name`, `item_code`…).
+- Trong một giao dịch: khoá dòng bảng giá rồi các giá cùng mặt hàng + cùng bảng giá (`select_for_update`; khoá cả bảng giá vì mặt hàng chưa có giá nào thì không có dòng giá để khoá). Giá có `valid_from` sớm hơn và còn hiệu lực tới ngày `valid_from` mới được **đóng**: `valid_upto = valid_from mới − 1 ngày`.
+- Chồng lấn: khoảng mới giao với một giá có `valid_from` **cùng ngày hoặc muộn hơn** (giá hiện hành bắt đầu muộn hơn, hoặc giá tương lai) → `400` `{"detail": "Khoảng hiệu lực chồng lấn với một giá đã có của mặt hàng này (BR-DM-03). …", "code": "BR-DM-03"}`; không đổi gì, không tự sửa hay xoá giá tương lai. Muốn đặt giá chen trước giá tương lai thì gửi kèm `valid_upto` nằm trước ngày bắt đầu của giá tương lai.
+- Chỉ đụng giá cùng mặt hàng và cùng bảng giá. Giá của mặt hàng hay bảng giá khác giữ nguyên.
+- Kết quả: luôn tối đa một giá mở (`valid_upto = null`) mỗi mặt hàng và bảng giá; các giá liền mạch. Shop (`effective_price`) và `current_price` ở ERP đọc ra giá mới từ ngày hiệu lực, giá cũ vẫn là giá hiện hành đến ngày hôm trước.
+- AuditLog (không có SĐT, tên khách; không có giá vốn): `create_itemprice` với `changes = {"item": id, "item_code", "price_list": id, "valid_from", "valid_upto", "sell_rate"}`; mỗi giá bị đóng có `close_itemprice` với `changes = {"valid_upto": {"from", "to"}, "replaced_by": <id giá mới>}`. Giá bán ghi bằng khoá `sell_rate` vì `rate` nằm trong `COST_KEYS` (bị che khi xem log thiếu `view_costprice`).
+
+**`PATCH /api/catalog/item-prices/{id}/`**: đổi `valid_from`, `valid_upto`, `item` hoặc `price_list` thì kiểm chồng lấn (BR-DM-03) với các giá khác → 400 mã `BR-DM-03`; chỉ đổi `rate` thì không kiểm (dữ liệu cũ đã chồng lấn vẫn sửa được đơn giá). Ghi audit `update_itemprice` với `changes = {trường: {"from", "to"}}` (`sell_rate` cho đơn giá).
+
+Chống mất giá (review M1): nếu giá mới có `valid_upto` mà giá cũ còn hiệu lực sau ngày đó (giá cũ đang mở, hoặc kết thúc muộn hơn `valid_upto` mới) thì `400` mã `BR-DM-03`, thông điệp: "Giá đang áp dụng còn hiệu lực sau ngày kết thúc bạn chọn … Hãy để trống \"đến ngày\", hoặc chọn ngày kết thúc không ngắn hơn giá đang áp dụng." Không đổi gì. Giá cũ kết thúc đúng bằng hoặc sớm hơn `valid_upto` mới thì vẫn đặt được. Ví dụ: giá cũ mở, giá mới `+5..+9` → 400.
+Khoá (review L3): POST và PATCH cùng thứ tự: khoá dòng `PriceList` trước (id tăng dần), rồi tới dòng giá.
+Giữ nguyên theo điều phối viên: đặt giá lùi ngày (`valid_from` trước hôm nay) vẫn được nhận (review L1, chờ Duy quyết).
+Test: `pricing/tests/test_set_item_price.py` (24 test: đóng đúng ngày, một giá mở, Shop đọc giá mới theo ngày, 400 chồng lấn, giá tương lai nguyên vẹn, giá khác mặt hàng/bảng giá nguyên vẹn, hai lần đặt nối tiếp cùng ngày, khoá dòng, chỉ owner, audit, PATCH). SQLite bỏ qua khoá dòng nên test tuần tự và kiểm có yêu cầu `select_for_update`; PostgreSQL mới khoá thật.
+
+### Quy tắc đã cài
+- T9 / BR-PQ: sửa giá bán và ưu đãi chỉ Chủ (test 403 cho manager và warehouse_staff khi POST, PATCH, DELETE).
+- BR-DM-02: `current_price` cùng nguồn với Shop (`pricing/services.py`: `current_item_price`, `effective_price` dùng chung một thứ tự chọn; có test khớp giá Shop).
+- BR-DM-08 (ED-31-AC2/AC3): `PricingRuleSerializer.validate` (trước đây API không gọi `Model.clean`, nên nhận cả dữ liệu sai). Nay 400 theo từng field, thông điệp nói cách sửa:
+  - `discount_value` > 100 khi `discount_type = PERCENT` (giảm tiền `AMOUNT` không giới hạn 100);
+  - `valid_upto` < `valid_from` (cả ưu đãi lẫn `item-prices`);
+  - `apply_on = ITEM` thiếu `item` hoặc `min_qty`; `apply_on = ORDER` thiếu `min_amount`.
+  - PATCH một phần (vd chỉ `{"is_active": false}`) kiểm cùng giá trị đang lưu.
+- Bất biến 1: không có giá vốn trong mọi phản hồi mới (test quét khoá và mốc `purchase_rate` cho owner, manager, warehouse_staff).
+- Bất biến 9: các phản hồi này không có dữ liệu khách.
+
+### Lệch so với 02b / việc cần người khác quyết
+1. **Đặt giá mới đóng giá cũ + chặn chồng lấn (BR-DM-03)**: điều phối viên chọn phương án (b) cho ED-31-AC1, đã làm ở mục "Đặt giá mới" bên dưới. Không còn là việc mở.
+2. 02b R14 chỉ nêu "lọc/field" cho `items`, `item-prices`, `pricing-rules`, `item-groups`. Bảng giá (`price-lists`) không có field hay bộ lọc mới: yêu cầu "lọc/field cho price-lists" trong phiếu giao không có dòng tương ứng trong 02b.
+3. Thêm ngoài 02b: kiểm dữ liệu ở `PricingRuleSerializer` / `ItemPriceSerializer` (xem trên) để đạt ED-31-AC3; `bundle_lines__component` prefetch ở `items`.
+4. **Phân trang giữ mặc định 50 dòng/trang** (điều phối viên chốt giữ), không đổi sang `StandardPagination` 20. FE đọc `results` và dùng `next` nếu cần.
+
+### Nợ / lưu ý
+- L4 (review): `apps/sales/orders/services.py::_effective_price` vẫn là bản cài riêng của giá hiệu lực, chưa gọi `pricing.services.current_item_price`; gom lại ở đợt sau (ngoài phạm vi, không sửa `apps/sales`). Hiện hai bản khớp nhau.
+- `item_count` không tính mặt hàng của nhóm con.
+- `current_price` không trả tên bảng giá; V1 chỉ có một bảng "Bán lẻ".
+- Chưa có tìm theo tên/mã (`q`) cho danh sách mặt hàng; ngoài 02b.
+
+### Kiểm chứng (lượt này)
+- `makemigrations --check --dry-run`: No changes detected.
+- `manage.py test apps.catalog apps.sales`: Ran 660 tests, OK (sau khi sửa theo review techlead M1, L2, L3, L5).
+- `manage.py test apps.catalog apps.sales apps.common apps.ai apps.accounts`: Ran 1370 tests, OK (lượt trước, trước khi thêm đặt giá mới).
+- `manage.py test` (toàn bộ): Ran 2438 tests, OK.
+- `python3 scripts/check_naming.py`: OK, không phát sinh vi phạm mới.
+- Test Shop (`apps.catalog.items.tests.test_shop_api`) vẫn xanh, contract Shop không đổi.
+- Đã thử bỏ `Prefetch` giá thì test đếm truy vấn đỏ (6 != 14).
+
+## Lô 11 — BE (B3)
+
+> be-dev · 02/10/2026 · Không migration. Dữ liệu trong JSON mẫu là giả.
+
+### File đã sửa / thêm
+- Sửa: `backend/apps/purchasing/receipts/serializers.py` (chỉ `SupplierSerializer`), `api.py` (chỉ `SupplierViewSet`), `README.md`, `next_steps.py` (thêm 1 nhãn `supplier_create` cho dòng thời gian), `backend/apps/common/cost_keys.py` (thêm `purchase_total`).
+- Thêm: `receipts/supplier_queries.py` (annotate số liệu, tổng tiền mua, lọc), `receipts/supplier_services.py` (tạo/sửa + AuditLog), `receipts/tests/test_supplier_aggregates.py`, `receipts/tests/test_supplier_crud.py` (40 test).
+- Không đụng: phần phiếu nhập của Lô 10, `receipts/services.py`, `filters.py` (chỉ import `parse_bool_param`), migration, `config/api_urls.py` (route `purchasing/suppliers` đã có), `frontend/`, `erp-console/`, `adapter/`.
+
+### Contract
+`GET /api/purchasing/suppliers/?q=&supplier_type=INDIVIDUAL,COMPANY&is_active=1|0|true|false&page=1` và `GET …/{id}/`.
+Quyền Tầng 1: xem = `purchasing.view_supplier` (owner, manager, warehouse_staff); `delivery_staff`, `customer_service`, không nhóm: 403; chưa đăng nhập: 401. Sắp xếp `name, id`. Phân trang `PageNumberPagination` mặc định của dự án (`count/next/previous/results`, 50 dòng/trang).
+Dòng dưới là của **owner** (có `view_costprice`):
+```json
+{"count": 1, "next": null, "previous": null, "results": [{
+  "id": 3, "name": "Ghe Tư Hải", "supplier_type": "INDIVIDUAL", "supplier_type_label": "Cá nhân",
+  "phone": "0900000907", "note": "mối ruột", "is_active": true,
+  "receipt_count": 4, "last_received_at": "2026-09-29T05:40:00+07:00", "purchase_total": "14326000.00"}]}
+```
+- **manager / warehouse_staff**: cùng body, **không có** `purchase_total`. Nhà cung cấp chưa có phiếu: `receipt_count` 0, `last_received_at` `null`, `purchase_total` `"0.00"`.
+- `POST /api/purchasing/suppliers/` body `{"name" (bắt buộc, ≤200), "supplier_type" (INDIVIDUAL mặc định | COMPANY), "phone" (≤20), "note", "is_active"}` → 201, body như dòng trên. `PATCH …/{id}/` nhận các field đó; `receipt_count`, `last_received_at`, `purchase_total`, `supplier_type_label` là chỉ-đọc (bị bỏ qua). Quyền `add_supplier`/`change_supplier`: owner, manager; warehouse_staff 403. Phản hồi ghi trả số liệu tổng hợp mới, `purchase_total` vẫn chỉ cho owner.
+- "Ngừng hợp tác" = `PATCH {"is_active": false}`. **`DELETE` và `PUT` trả 405** cho mọi người đã đăng nhập (kể cả người thiếu quyền `delete_supplier`); `http_method_names = ["get", "post", "patch", "head", "options"]` kèm `check_permissions` trả 405 trước kiểm quyền. Chưa đăng nhập vẫn 401. Registry AI và snapshot không lệch.
+- Lỗi: tên trùng (không phân biệt hoa thường, bỏ khoảng trắng hai đầu) → 400 `{"name": ["Đã có nhà cung cấp trùng tên này."]}`; tên rỗng, quá dài, `supplier_type` lạ → 400 của DRF. Lọc sai → 400 `{"detail", "code": "INVALID_FILTER"}`, thông điệp không lặp giá trị: `is_active` khác `1/0/true/false`, `supplier_type` ngoài `INDIVIDUAL|COMPANY`, `q` quá 100 ký tự. Rỗng = không lọc. `q` khớp tên hoặc SĐT, không phân biệt hoa thường (so ở Python, kết quả giống nhau trên SQLite và Postgres).
+- Chi tiết không kèm danh sách phiếu/lô: FE gọi `receipts/?supplier=` (R10) và `batches/?supplier=&has_stock=1` (R5) như 02b W5d. Dòng thời gian: R2 `supplier` (đã có, Lô 2).
+
+### Quy tắc đã cài
+- **Chỉ phiếu `SUBMITTED` được tính** cho cả `receipt_count`, `last_received_at` (max `created_at`), `purchase_total` (Σ `qty x rate`, mỗi dòng làm tròn 2 chữ số rồi cộng, khớp `purchase_amount` của R10; có test đối chiếu). Hằng `COUNTED_STATUSES` ở `supplier_queries.py`.
+- BR-MH-06 / bất biến 1: `SupplierSerializer` dùng `CostFieldSerializerMixin`, `sensitive_fields = ("purchase_total",)`, thêm vào `COST_KEYS`. Người không có `view_costprice` còn không bị truy vấn dòng nhập (view bỏ qua bước tính tổng).
+- Không N+1: `receipt_count`, `last_received_at` annotate trong truy vấn chính; `purchase_total` tính một truy vấn cho cả trang. Test đếm câu truy vấn khi thêm 20 nhà cung cấp (số truy vấn không đổi); đã thử bỏ bước gom thì test đỏ.
+- BR-PQ-04/05: `POST` ghi AuditLog `supplier_create`, `PATCH` ghi `supplier_update`, `changes={"fields": [tên trường]}` (chỉ khi có đổi thật). **Không chép giá trị** nên SĐT và ghi chú không vào log; test quét `changes`, `note`, `object_repr`.
+- Tên nhà cung cấp không trùng: kiểm trong serializer, so bằng `casefold` trong Python (không dựa `iexact` vì SQLite không phân biệt chữ hoa có dấu).
+
+### Lựa chọn và chỗ lệch so với 02b (cần Duy/điều phối xem)
+1. **`purchase_total` chỉ người có `view_costprice` (owner) thấy**, Quản lý không thấy. 02b B3 ghi đúng như vậy (`sensitive_fields`, thêm vào `COST_KEYS`) nên làm theo. D-3 (Duy: Quản lý thấy tiền hoá đơn mua) chỉ nói về `PurchaseInvoice.amount`, là một con số khác; `purchase_total` là Σ qty x rate của dòng nhập, cùng loại với `purchase_amount` của phiếu (R10), mà phiếu 1 dòng chia ra được giá mua/kg nên coi là giá vốn. Muốn Quản lý thấy thì đổi `sensitive_fields` sang kiểm `view_purchaseinvoice` như `invoices[].amount`, nhưng khi đó phải bỏ khỏi `COST_KEYS` (ngoại lệ D-3).
+2. **Phiếu Nháp không tính** (02b B3 ghi `receipt_count` và `last_received_at` tính mọi phiếu khác `CANCELLED`, tức gồm Nháp). Chọn theo câu Duy trả lời 01/10 "Q1–Q7 trong 02-stories dùng giá trị mặc định": Q4 mặc định là chỉ phiếu Đã ghi nhận, cho cả ba số. Cũng nhất quán với `purchase_total` (02b chỉ tính `SUBMITTED`). Đổi lại bằng một dòng `COUNTED_STATUSES` nếu Duy muốn tính Nháp.
+3. **Tên khoá theo 02b, không theo mẫu trong 02-stories ED-21**: `last_received_at`, `purchase_total` (story ghi `last_receipt_at`, `total_purchase_amount`). 02b là contract kỹ thuật, FE Lô 11 đọc 02b. Tiền là chuỗi 2 chữ số thập phân (`"0.00"`, không `"0"`), cùng định dạng với R10.
+4. **Chi tiết không trả `receipts[]`, `selling_batches[]`** như contract dự kiến của story ED-21; theo 02b dùng R10 (`?supplier=`) và R5 (`?supplier=`).
+5. Phân trang giữ mặc định 50 dòng/trang thay vì 20 của `StandardPagination`: form Nhập lô (`ReceiveBatchesForm`) đang gọi endpoint này, lấy trang đầu và lọc `is_active` ở FE, đổi sang 20 sẽ làm hụt danh sách khi có trên 20 nhà cung cấp. FE màn W5c cần ≤ 50 hoặc đọc `next`.
+6. Sửa 1 dòng `next_steps.py` (Lô 2, nhãn `supplier_create`) ngoài danh sách file được sửa: cần để dòng thời gian R2 hiện "Thêm nhà cung cấp" cho audit mới.
+7. AI: không thêm `/api/purchasing/suppliers/` vào `FORBIDDEN_PREFIXES` vì 02b không yêu cầu; khoá `phone` đã nằm trong `SCRUB_PII_KEYS` và `purchase_total` nằm trong `COST_KEYS` nên đầu ra cho AI vẫn bị lọc.
+
+### Còn nợ
+- Không còn. (Mục DELETE nhà cung cấp đã xử lý: 405.)
+
+### Kiểm chứng (lượt này)
+- `makemigrations --check --dry-run`: No changes detected.
+- `manage.py test apps.purchasing apps.inventory apps.common apps.ai apps.accounts`: Ran 1302 tests, OK (trước khi thêm 405).
+- `manage.py test apps.purchasing apps.ai` (sau khi thêm 405): Ran 418 tests, OK.
+- `manage.py test` (toàn bộ): Ran 2421 tests, OK (không đỏ ở `catalog.pricing`).
+- `python3 scripts/check_naming.py`: OK, không phát sinh vi phạm mới.

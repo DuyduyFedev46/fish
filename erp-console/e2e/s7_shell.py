@@ -48,15 +48,12 @@ with sync_playwright() as p:
     page.wait_for_load_state("networkidle")
     labels = nav_labels(page)
     labels = [l.split("\n")[-1].strip() for l in labels]
-    # S12 (L8): Chủ có thêm mục con "Hàng chờ thanh toán" ngay dưới "Đơn & tiền" (sales.confirm_payment_manual).
-    # S16 (L9): thêm mục con "Phiếu hoàn chờ chuyển" ngay sau đó (sales.view_refund).
-    # S03 (AI Lô 1): thêm mục "Nhật ký hoạt động" (accounts.view_auditlog — owner, manager) ở cuối mục Quản trị.
-    # Về sau thêm: "Việc AI" (cuối mục Điều hành), "Nội dung" + "Chuyên mục" (mục Sổ sách), "AI của tôi" (cuối mục Quản trị).
-    # Thứ tự = thứ tự trong shared/lib/nav.ts, gom theo mục (Điều hành, Sổ sách, Quản trị).
-    expected = ["Tổng quan", "Đơn & tiền", "Hàng chờ thanh toán", "Phiếu hoàn chờ chuyển", "Giao hàng", "Kho & lô", "Mua hàng", "Kiểm kê", "Việc AI", "Báo cáo lãi lỗ", "Danh mục & giá", "Nội dung", "Chuyên mục", "Nhân sự · Nhật ký", "Nhật ký hoạt động", "AI của tôi"]
+    # ERP theo design Lô 1: menu theo UI-RULES §2.1 (nhóm Bán hàng / Hàng hoá & kho / Kế toán / Website / Quản trị), mục con
+    # (Hàng chờ thanh toán, Phiếu hoàn, Chuyên mục) là tab trong màn cha, "Việc AI"/"AI của tôi" không còn dòng ở menu trái.
+    # Mock chưa có quyền mới nên mục chưa làm (Khách hàng, Nhà cung cấp…) chưa hiện. Chi tiết 4 vai: e2e/ed_batch1_shell.py.
+    expected = ["Tổng quan", "Đơn & tiền", "Giao hàng", "Mua hàng", "Kho & lô", "Kiểm kê", "Danh mục & giá", "Báo cáo lãi lỗ", "Nội dung", "Nhân sự", "Nhật ký hoạt động"]
     ok("AC1 menu Chủ", labels == expected, str(labels))
-    rr = page.locator("#rail-right")
-    ok("AC7 1280: 3 cột (cột phải hiện)", rr.is_visible() and rr.bounding_box()["x"] > 900, str(rr.bounding_box()))
+    ok("AC7 1280: 2 cột (menu trái hiện, không còn cột phải)", page.locator("#rail-left").is_visible() and page.locator("#rail-right").count() == 0)
     ok("AC7 1280: không có menu đáy", not page.locator(".bottom-nav").is_visible())
     fonts_ready(page)
     page.screenshot(path=f"{SHOTS}/s7-desktop-1280-chu.png")
@@ -100,7 +97,8 @@ with sync_playwright() as p:
     ok("AC3 không gọi API báo cáo", all("report" not in x for x in log) and log == ["GET /api/auth/me/"], str(log))
 
     # AC5: admin (không Group)
-    page.locator(".who .iconbtn").click()  # đăng xuất
+    page.locator(".avatar-btn").click()  # đăng xuất nằm trong menu avatar
+    page.get_by_role("menuitem", name="Đăng xuất").click()
     page.wait_for_url("**/login/")
     login(page, "admin")
     page.wait_for_url("**/no-role/")
@@ -130,7 +128,7 @@ with sync_playwright() as p:
     ok("AC7 360 menu đáy hiện", bottom.is_visible())
     bl = [t.split("\n")[-1].strip() for t in bottom.locator("a, button").all_inner_texts()]
     ok("AC7 360 menu đáy ≤5 mục (4 + Thêm)", len(bl) <= 5 and bl[-1] == "Thêm", str(bl))
-    ok("AC7 360 cột phải ẩn (ngăn kéo)", not page.locator("#rail-right").is_visible())
+    ok("AC7 360 không có cột phải", page.locator("#rail-right").count() == 0)
     small = page.evaluate("""() => [...document.querySelectorAll('button, a')].filter(e => {
         const r = e.getBoundingClientRect(); const s = getComputedStyle(e);
         return r.width > 0 && r.height > 0 && s.visibility !== 'hidden' && r.x >= 0 && r.x < 360 && (r.height < 44 || r.width < 44);
@@ -145,10 +143,6 @@ with sync_playwright() as p:
     page.screenshot(path=f"{SHOTS}/s7-mobile-360-menu.png")
     page.keyboard.press("Escape")
     expect(page.locator("#rail-left.open")).to_have_count(0)
-    page.get_by_role("button", name="Mở ghi chú, trợ lý, hoạt động").click()
-    expect(page.locator("#rail-right")).to_be_visible()
-    ok("AC7 360 cột phải là ngăn kéo mở được", page.locator("#rail-right").is_visible())
-    page.screenshot(path=f"{SHOTS}/s7-mobile-360-rightrail.png")
     ctx.close()
     browser.close()
 

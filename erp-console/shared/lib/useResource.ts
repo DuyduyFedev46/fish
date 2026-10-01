@@ -67,6 +67,8 @@ export type Resource<T> = {
   error: unknown;
   /** Đang có request bay (lần đầu hoặc tải lại). */
   loading: boolean;
+  /** Giờ (ISO) tải thành công gần nhất; màn có thể đưa vào `useOfflineRegistration({ asOf, onRetry: reload })`. */
+  asOf: string | null;
   reload: () => Promise<void>;
 };
 
@@ -92,5 +94,5 @@ export function useResource<T>(key: string | null, loader: () => Promise<T>, max
   );
 
   const e = key ? cache.get(key) : undefined;
-  return { data: e?.data as T | undefined, error: e?.error ?? null, loading: !!e?.inflight, reload };
+  return { data: e?.data as T | undefined, error: e?.error ?? null, loading: !!e?.inflight, asOf: e?.at ? new Date(e.at).toISOString() : null, reload };
 }

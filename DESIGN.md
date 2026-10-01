@@ -251,9 +251,10 @@ Mọi cặp chữ/nền ở trên đã đo ≥ 4.5:1. Nút nguy hiểm dạng đ
 - **Khoảng cách** theo bước 4 px: `--space-1` 4 · `-2` 8 · `-3` 12 · `-4` 16 · `-5` 20 · `-6` 24 · `-8` 32 · `-10` 40.
   Nhóm chặt bên trong (8–12), tách nhóm rộng hơn (16–24); phía trên tiêu đề nhiều hơn phía dưới.
 - **Console ERP (mobile-first):**
-  - < 768 px: topbar 56 px (nút ☰, tiêu đề, đổi giao diện, cột phải) · nội dung · **menu đáy** 60 px + `safe-area-inset-bottom`, tối đa 5 mục (4 + "Thêm"). Menu trái và cột phải là ngăn kéo.
-  - 768–1023 px: menu trái cố định 240 px; cột phải là ngăn kéo.
-  - ≥ 1024 px: **3 cột** 240 px · nội dung · 320 px.
+  - < 768 px: topbar 56 px (nút ☰, tiêu đề) · nội dung · **menu đáy** 60 px + `safe-area-inset-bottom`, tối đa 5 mục (4 + "Thêm"). Menu trái là ngăn kéo.
+  - 768–1023 px: menu trái cố định 240 px.
+  - ≥ 1024 px: **2 cột** 240 px (hoặc 60 px khi thu gọn) · nội dung. Không có nút đổi sáng/tối.
+- **Cỡ khung ERP (khung 2 cột, P9 Lô 1):** `--rail-left-w` 240 px (menu trái mở) · `--rail-left-w-collapsed` 60 px (thu gọn, chỉ icon) · `--action-bar-h` 64 px (thanh nút dưới trang chi tiết/biểu mẫu).
 - Chiều cao khung dùng `100dvh`. 360 px không được cuộn ngang. Nội dung giữa rộng tối đa 1280 px.
 - Safe-area: topbar/ngăn kéo/menu đáy/tấm trượt dùng `env(safe-area-inset-*)`; khung `.app` chừa trái/phải khi xoay ngang (`viewport-fit=cover`).
 - **Vùng bấm** `--tap` 44 px trên điện thoại, 40 px từ 768 px (chuột).

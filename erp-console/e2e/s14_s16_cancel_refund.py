@@ -125,10 +125,8 @@ with sync_playwright() as p:
     login(page, "loc")
     page.wait_for_url("**/overview/")
     labels = nav_labels(page)
-    ok("S16: menu Chủ có mục con 'Phiếu hoàn chờ chuyển' ngay sau 'Hàng chờ thanh toán'",
-       "Phiếu hoàn chờ chuyển" in labels and labels.index("Phiếu hoàn chờ chuyển") == labels.index("Hàng chờ thanh toán") + 1,
-       str(labels))
-    ok("S16: mục con thụt vào (lớp .sub)", page.locator(".nav a.sub", has_text="Phiếu hoàn chờ chuyển").count() == 1)
+    # ERP theo design Lô 1: "Phiếu hoàn chờ chuyển" không còn dòng riêng ở menu trái (là tab của Đơn & tiền, Lô 3).
+    ok("S16: menu Chủ không còn mục con 'Phiếu hoàn chờ chuyển'", "Phiếu hoàn chờ chuyển" not in labels and "Đơn & tiền" in labels, str(labels))
 
     dlg = open_order(page, 104)
     expect(dlg.locator('[data-action="cancel"]')).to_be_visible()
@@ -279,7 +277,7 @@ with sync_playwright() as p:
     ctx3, page3 = new_page()
     login(page3, "ql1")
     page3.wait_for_url("**/overview/")
-    ok("S16-AC7: menu Quản lý CÓ 'Phiếu hoàn chờ chuyển' (chỉ không có nút)", "Phiếu hoàn chờ chuyển" in nav_labels(page3))
+    ok("S16-AC7: Quản lý vẫn được mở danh sách phiếu hoàn (menu chỉ còn 'Đơn & tiền')", "Đơn & tiền" in nav_labels(page3))
     page3.goto(BASE + "/orders/refunds/")
     page3.wait_for_load_state("networkidle")
     idle(page3)
