@@ -386,3 +386,47 @@ Không đổi: Group (`cskh`, `chu`...), id lệnh AI, mã quyền, tên model/b
 - N5: `ai/execution/tests/test_scheduled_action_after_key_rename.py`: việc SCHEDULED tạo bằng id cũ + cấu hình ghim khoá cũ; sau migrate job chạy lệnh mới (DONE), và cấu hình cũ đặt OFF vẫn hạ mức (không nới).
 - N6: comment/log `run_due_ai_actions.py`, `actions/api.py` nhắc `owner` thay `chu`.
 - Kiểm chứng: `manage.py test` 1807 OK, `makemigrations --check` không đổi, `check_naming.py` OK, migrate/rollback SQLite sạch OK.
+
+## Lô 4b — FE (01/10): đổi GIÁ TRỊ hằng sang tiếng Anh
+
+Chỉ sửa `erp-console/` (Shop `frontend/` không dùng Group/nhóm lệnh/mức nhạy cảm nên không đụng). Không đổi route, không thêm API. Khớp contract BE Lô 4a, không lệch.
+
+### Giá trị đã đổi
+| Hằng | Trước | Sau |
+|---|---|---|
+| `ROLE` (`shared/lib/roles.ts`) | `chu quan_ly nv_kho nv_giao cskh` | `owner manager warehouse_staff delivery_staff customer_service` |
+| `HOME_CONFIRMATION_QUEUE` | `cskh-queue` | `confirmation-queue` |
+| `COMMAND_GROUP` (`features/ai/commandGroups.ts`) | `thu_mua ban_hang cskh` | `purchasing sales customer_service` |
+| `SENSITIVITY` | `cao trung_binh thap` | `high medium low` |
+| `RECEIVE_BATCHES_COMMAND_ID` | `purchasing.purchasereceipt.nhap_lo` | `purchasing.purchasereceipt.receive_batches` |
+
+- Lớp `normalize*` (`roles.ts`, `legacyIds.ts`) giữ nguyên bảng, vẫn nhận CẢ tên cũ và đổi về tên mới (gỡ ở Lô 5). Chỉ sửa chú thích cho đúng chiều mới.
+- Đường ghi gửi tên MỚI: nhân viên (`groups` lấy từ `ROLE.*`), my-config (`group`, `overrides` theo id BE trả, nay là id mới), chính sách AI `caps`. Mock đổi theo vì mock dùng hằng (`ROLE.*`, `COMMAND_GROUP.*`, `HOME_CONFIRMATION_QUEUE`).
+
+### Thay đổi ngoài bảng giá trị (có lý do)
+1. **Bộ tìm lệnh AI (ghi chú của techlead 03b mục 4a):** `COMMAND_GROUP_SEARCH_LABEL` (`commandGroups.ts`) = nhãn tiếng Việt `thu mua` / `bán hàng` / `cskh`; `commands/search.ts` đưa nhãn này vào văn bản chỉ mục thay cho khoá nhóm (nhận cả khoá nhóm cũ lẫn mới qua `normalizeAiGroup`; nhóm lạ giữ nguyên khoá như trước). Dùng nhãn THAY khoá (không cộng thêm) để độ dài tài liệu BM25 không đổi, nên thứ hạng giống hệt trước.
+2. **Ghi `caps` ở màn chính sách AI:** trước đây ghi ngược đúng khoá BE trả (cũ hay mới). Nay luôn gửi id mới và bỏ khoá cũ của cùng lệnh (`features/ai/policy/caps.ts`, hàm thuần `buildCapsForSave`, có test).
+3. **Màn chính sách AI, cột Nhóm của nhân viên:** hiện `groupLabel(code)` (Chủ, Nhân viên kho…) thay vì mã thô `u.groups.join(", ")`. Cần vì mã thô nay là tiếng Anh (`warehouse_staff`) sẽ lộ ra giao diện; đây là sửa nhỏ, không đổi hành vi khác.
+4. `features/ai/mock.ts`: chữ mô tả nhật ký mẫu `nhap_lo` -> `receive_batches`.
+5. e2e Python (`erp-console/e2e/*.py`, 13 file): literal Group (`nv_giao`, `nv_kho`, `quan_ly`, `"chu"`) đổi sang tên mới, gồm cả assert JSON `groups` ở `s41_s47_staff.py`, `s41_s47_real.py` và nhãn Group ở `a2_catalog_real.py`. Các file chỉ nhắc tên trong comment cũng đổi cho khớp. Giữ nguyên: khoá nháp cũ `cave_draft_nhap_lo` ở `sr07_*` (kiểm đường chuyển khoá của Lô 3) và `/cskh/` ở `p8b_confirmation_route_redirect.py` (kiểm redirect).
+
+### Test
+- Mới: `shared/lib/englishNames.test.ts` (chốt giá trị khớp BE; chạy với nguồn cũ thì **7 ca ĐỎ**, sau đổi xanh), `features/ai/commands/groupSearch.test.ts` (recall bộ tìm; chỉ mục khoá cũ và mới cho cùng thứ tự), `features/ai/policy/caps.test.ts` (3 ca).
+- Test cũ (`legacyNames.test.ts`…) không phải sửa assert vì dùng hằng; xanh nguyên văn.
+
+### Recall bộ tìm lệnh AI (chỉ mục THẬT 111 lệnh lấy từ registry BE 4a: `get_registry().get_specs()`, top-5)
+Mỗi câu so danh sách top-5 của chỉ mục "kiểu cũ" (`thu_mua`, `…nhap_lo`) với chỉ mục "kiểu mới" (`purchasing`, `…receive_batches`):
+- Chưa thêm nhãn: **9/14 câu lệch** thứ hạng (`thu mua`, `bán hàng`, `khách hàng`, `mua hàng`, `cskh`, `nhập hàng tại cảng`, `tạo đơn bán`, `hàng thu mua`, `bán`). Riêng `nhập lô`, `nhap lo`, `lệnh nhập lô`, `gọi xác nhận`, `chăm sóc khách` vẫn giống.
+- Sau khi thêm nhãn: **0/14 lệch**; top-5 giống hệt kiểu cũ ở cả 14 câu. Lệnh `receive_batches` đứng đầu với `nhập lô`, `nhap lo`, `lệnh nhập lô`, `mua hàng`, `thu mua`, `nhập hàng tại cảng`, `hàng thu mua`. Câu `bán hàng`, `khách hàng` không có lệnh nhập lô trong top-5, đúng như trước.
+
+### Kiểm chứng (chạy trong lượt này)
+- `npx tsc --noEmit`: sạch. `npm test`: **22 file, 251 test xanh** (nền trước Lô 4b: 19 file, 236 test).
+- Build mock (`NEXT_PUBLIC_USE_MOCK=1`) phục vụ e2e ở cổng 3270 (bản sao `out` trong scratchpad `p8b-l4b/mock-out`): `p8_lo7_fe_erp` 79/79, `sr07_receive_batches_draft` 20/20, `p8b_confirmation_route_redirect` 8/8, `sr09_ac4_stale_state` 22/22, thêm `s41_s47_staff` 72/72 (vì đã sửa literal Group). Server đã tắt.
+- Thử tay màn chính sách AI bằng Playwright 375px (mock, tài khoản `loc`): mở được, cột Nhóm hiện "Chủ", "Nhân viên kho", lưu trần thành công "Đã cập nhật chính sách AI phiên bản v2.", không có pageerror. Ảnh: `/private/tmp/claude-501/-Users-dangthiduyen-Downloads-loc/3e0d9f3d-14ce-4b8b-a1cd-6fbcdc0b2f2d/scratchpad/p8b-l4b/shots/p8b-l4b-ai-policy-375.png`.
+- Build thật cuối cùng (`NEXT_PUBLIC_USE_MOCK=0`, `NEXT_PUBLIC_API_BASE=https://cangca-api-675411800433.asia-southeast1.run.app`): biên dịch thành công, `check-no-mock.mjs` XANH, `check-ai-chunks.mjs` XANH. `erp-console/out` hiện là bản thật trỏ production (chưa deploy).
+- `python3 scripts/check_naming.py`: OK, không phát sinh mới. Chạy `--update`: baseline **6554 -> 6536 vi phạm, 203 -> 195 file**; phần giảm đến từ file BE đã sửa ở Lô 4a (8 file), không phải từ FE.
+
+### Lưu ý / còn nợ
+- `features/ai/commands/budget.ts` dòng 62 đưa `Nhóm: ${c.group}` vào prompt LLM; giá trị nay là `purchasing`/`sales`/`customer_service`. Không đổi (không ảnh hưởng chọn lệnh bằng BM25; test ngân sách xanh). Nếu muốn prompt dùng nhãn tiếng Việt thì nói, 1 dòng.
+- Comment trong code nhắc tên Group cũ (`nv_kho`, `quan_ly` trong `nav.ts`, `mock.ts`…) giữ nguyên, thuộc dọn dẹp Lô 5 cùng bảng chuẩn hoá.
+- Chưa deploy, chưa commit.

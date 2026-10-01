@@ -3,7 +3,7 @@
 #   MODE=mock  BASE=http://127.0.0.1:3212  (build NEXT_PUBLIC_USE_MOCK=1, tài khoản demo1234)
 #   MODE=real  BASE=http://127.0.0.1:3213  API=http://127.0.0.1:8123  (Django thật + DB sqlite tạm, loc/kho1 mật khẩu PW)
 #     build:  NEXT_PUBLIC_USE_MOCK=0 NEXT_PUBLIC_API_BASE=http://127.0.0.1:8123 npm run build
-#     Django: DATABASE_URL=sqlite:///<tmp>.sqlite3 manage.py migrate + bootstrap_masterdata, tạo loc (chu), kho1 (nv_kho),
+#     Django: DATABASE_URL=sqlite:///<tmp>.sqlite3 manage.py migrate + bootstrap_masterdata, tạo loc (owner), kho1 (warehouse_staff),
 #             1 Item CA-GIA-1, 1 Supplier; CORS_ALLOWED_ORIGINS=<BASE> runserver 127.0.0.1:8123 --noreload
 # Ca: tab khác / phiên (context) khác · hết phiên không bấm đăng xuất · khoá cũ + đăng xuất mà chưa mở form ·
 #     nháp hỏng / nháp cũ có rate · console + URL sạch · (real) bấm đúp gửi, mất mạng sau khi server đã ghi rồi F5 gửi lại.
@@ -131,7 +131,7 @@ with sync_playwright() as p:
     ok("B2 phiên khác: key khác", bool(key_of(pb)) and key_of(pb) != key1)
     ctx_b.close()
 
-    # ---------- C. Hết phiên (không bấm đăng xuất): Chủ gõ giá -> token mất -> nv_kho vào cùng tab ----------
+    # ---------- C. Hết phiên (không bấm đăng xuất): Chủ gõ giá -> token mất -> warehouse_staff vào cùng tab ----------
     page.screenshot(path=os.path.join(SHOTS, "qa-sr07-C0-chu-dang-go.png"), full_page=True)
     tok_key = page.evaluate("() => Object.keys(localStorage).find(k => /token/i.test(k)) || null")
     ok("C0 tìm thấy khoá token để giả lập hết phiên", tok_key is not None, str(tok_key))
@@ -140,18 +140,18 @@ with sync_playwright() as p:
     page.wait_for_load_state("networkidle")
     login(page, "kho1")
     open_receive_batches(page)
-    ok("C1 hết phiên rồi nv_kho vào cùng tab: ô số lượng + ô giá rỗng", qty_box(page).input_value() == "" and rate_box(page).input_value() == "")
+    ok("C1 hết phiên rồi warehouse_staff vào cùng tab: ô số lượng + ô giá rỗng", qty_box(page).input_value() == "" and rate_box(page).input_value() == "")
     ok("C2 storage không chứa 81234", no_rate(page))
-    # C2b: nháp của Chủ (userId khác) còn sót ở sessionStorage cùng tab -> nv_kho không đọc được
+    # C2b: nháp của Chủ (userId khác) còn sót ở sessionStorage cùng tab -> warehouse_staff không đọc được
     page.evaluate("() => sessionStorage.setItem('cave_draft_receive_batches:1', JSON.stringify({supplierId: 1, receivedDate: '2026-09-30', lines: [{item_code: '', qty: '77', shelf_life_days: null}], idempotencyKey: 'key-cua-chu'}))")
     page.reload()
     page.wait_for_load_state("networkidle")
     page.wait_for_selector("input[placeholder='80000']", timeout=15_000)
     page.wait_for_timeout(400)
-    ok("C2b nháp của Chủ (userId 1) còn ở sessionStorage: nv_kho không thấy (qty rỗng) và không dùng key của Chủ", qty_box(page).input_value() != "77" and page.evaluate("() => { const k = Object.keys(sessionStorage).find(x => x.startsWith('cave_draft_receive_batches:') && !x.endsWith(':1')); return k ? JSON.parse(sessionStorage.getItem(k)).idempotencyKey : null }") not in (None, "key-cua-chu"))
+    ok("C2b nháp của Chủ (userId 1) còn ở sessionStorage: warehouse_staff không thấy (qty rỗng) và không dùng key của Chủ", qty_box(page).input_value() != "77" and page.evaluate("() => { const k = Object.keys(sessionStorage).find(x => x.startsWith('cave_draft_receive_batches:') && !x.endsWith(':1')); return k ? JSON.parse(sessionStorage.getItem(k)).idempotencyKey : null }") not in (None, "key-cua-chu"))
     dumped = storages(page)["session"]
     ok("C3 nháp còn sót của Chủ (nếu có) không chứa trường rate", '"rate"' not in dumped and "rate" not in dumped.replace("idempotencyKey", ""), dumped[:200])
-    ok("C4 key của nv_kho khác key của Chủ", key_of(page) != key1 and bool(key_of(page)))
+    ok("C4 key của warehouse_staff khác key của Chủ", key_of(page) != key1 and bool(key_of(page)))
     page.screenshot(path=os.path.join(SHOTS, "qa-sr07-C1-nv-kho-sau-het-phien.png"), full_page=True)
     logout(page)
 

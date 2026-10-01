@@ -487,3 +487,84 @@ Trong khoảng *code 4a chạy trên DB chưa migrate*, các kiểm tra theo tê
 - `git add` rõ 11 file mới: 2 migration, `legacy_ids.py`, `preview_group_rename.py`, 7 file test trong `accounts/staff/tests/`,
   `ai/policy/tests/`, `ai/registry/tests/`, `ai/settings/tests/`.
 - Nếu sửa N1, N2 thì chạy lại bộ test của 4 app, `makemigrations --check` và `check_naming` trong cùng lượt báo xong.
+
+## Lô 4b
+
+Phạm vi: diff chưa commit ở `erp-console/` (5 hằng, `search.ts`, `policy/caps.ts`, `AiPolicyScreen.tsx`, `mock.ts`, 13 file e2e Python),
+`scripts/naming_baseline.json`, `03-dev-notes.md` mục "Lô 4b — FE". Đối chiếu BE Lô 4a đã commit `fd3b3bb`.
+
+### Kết luận: **REVIEW PASS** (vòng 1, 01/10)
+
+Không có lỗi chặn. Ở mục 3 có 3 ghi chú không chặn và 1 ràng buộc deploy bắt buộc (mục 4).
+
+### Lệnh đã chạy trong lượt review
+- `cd erp-console && npx tsc --noEmit`: sạch.
+- `cd erp-console && npm test`: 22 file, 251 test xanh.
+- `python3 scripts/check_naming.py`: OK, 6536 vi phạm cũ trong 195 file, không phát sinh mới (exit 0).
+- Grep chuỗi cũ (`chu quan_ly nv_kho nv_giao cskh thu_mua ban_hang cao trung_binh thap cskh-queue nhap_lo`) trong
+  `features/ shared/ app/`: chỉ còn ở bảng chuẩn hoá `roles.ts`/`legacyIds.ts`, test của lớp chuẩn hoá, khoá nháp cũ
+  `cave_draft_nhap_lo` (đường chuyển nháp Lô 3) và nhãn tìm kiếm `"cskh"`. Đúng phạm vi.
+- `git show dd49133:backend/apps/accounts/staff/services.py`: BE trước 4a báo lỗi "Nhóm không tồn tại" khi nhận tên mới. Đây là căn cứ của mục 4.
+
+### 1. Lỗi chặn
+Không có.
+
+### 2. Đạt yêu cầu (đã soát)
+- **Giá trị hằng khớp BE thật.**
+  - `ROLE` khớp `backend/apps/accounts/roles.py` (`owner manager warehouse_staff delivery_staff customer_service`).
+  - `HOME_CONFIRMATION_QUEUE = "confirmation-queue"` khớp `backend/apps/accounts/auth/services.py:29`.
+  - `COMMAND_GROUP` và `SENSITIVITY` khớp `backend/apps/ai/command_groups.py`.
+  - `RECEIVE_BATCHES_COMMAND_ID = "purchasing.purchasereceipt.receive_batches"` khớp registry và snapshot 4a.
+  - `englishNames.test.ts` chốt các giá trị này bằng chuỗi thẳng, nên đổi nhầm thì test đỏ.
+- **`normalize*` vẫn nhận tên cũ.** Bảng `LEGACY_ROLE_NAMES`, `LEGACY_COMMAND_IDS/GROUPS/SENSITIVITIES` không đổi, cả hai chiều
+  đều trỏ về hằng mới. `legacyNames.test.ts` xanh y nguyên, và `englishNames.test.ts` thêm ca cũ -> mới.
+- **Đường ghi gửi tên mới.**
+  - Staff: `StaffDetail` gửi `groups` lấy từ `ROLE.*` / member đã `normalizeRoles` (`features/staff/api.ts:21-26`).
+  - my-config: `overrides` khoá theo `cmd.id` do BE trả, sau 4a là id mới.
+  - caps: `buildCapsForSave` luôn ghi `RECEIVE_BATCHES_COMMAND_ID`.
+- **`buildCapsForSave` không làm mất cap đặt bằng khoá cũ.**
+  - Giá trị của khoá cũ được trộn vào khoá mới (`{...existing.value, ...next}`). Ví dụ `max_level` vẫn giữ, có test `caps.test.ts` ca 2.
+  - Các lệnh khác giữ nguyên.
+  - Thực tế BE 4a đã chuẩn hoá `caps` khi ĐỌC (`backend/apps/ai/policy/services.py:27`) và khi GHI (`:122`), nên FE không còn nhận khoá cũ. Nhánh bỏ khoá cũ chỉ là lưới an toàn.
+- **Recall bộ tìm lệnh.**
+  - `COMMAND_GROUP_SEARCH_LABEL` thay khoá nhóm trong văn bản chỉ mục. Sau khi bỏ dấu và tách từ, `"thu mua"`/`"bán hàng"`/`"cskh"`
+    ra đúng các token của khoá cũ `thu_mua`/`ban_hang`/`cskh`, nên độ dài tài liệu BM25 không đổi.
+  - `groupSearchText` nhận cả khoá cũ và mới qua `normalizeAiGroup`. Nhóm lạ giữ nguyên khoá như trước.
+  - `groupSearch.test.ts` chứng minh chỉ mục khoá cũ và chỉ mục khoá mới cho cùng thứ tự kết quả.
+  - Phép đo 14 câu trên chỉ mục thật 111 lệnh: 9/14 câu lệch khi chưa có nhãn, 0/14 sau khi thêm. Đủ thuyết phục, dù phép đo này không commit (xem 3c).
+- **`groupLabel` ở màn chính sách AI.** `u.groups` đã qua `normalizeAiPolicy` (tên mới), nên `groupLabel` ra "Chủ", "Nhân viên kho"… Không để lộ mã
+  tiếng Anh ra giao diện. Nhóm lệnh trong my-config và modal hiện `grp.label` do BE trả, không phải mã. `sensitivity` không được render thô.
+- **PII và giá vốn.** Diff không thêm field, không thêm log hay console. `mock.ts` chỉ đổi chữ mô tả nhật ký giả. Dev chạy `check-no-mock.mjs` xanh trên build thật.
+- **e2e literal.** Các assert JSON `groups` (`s41_s47_staff.py`, `s41_s47_real.py`), `patchUser(... groups: [...])` và nhãn tài khoản ở
+  `a2_catalog_real.py` đã đổi đúng sang tên mới. Hai literal cố ý giữ: `cave_draft_nhap_lo` (kiểm chuyển nháp) và `/cskh/` (kiểm redirect).
+- **Baseline naming.** Baseline chỉ xoá 8 mục BE đã về 0 vi phạm sau 4a, không nới file nào.
+
+### 3. Nên sửa (không chặn)
+- **3a. `features/ai/commands/budget.ts:62`: prompt LLM có `Nhóm: purchasing`.** Đề xuất **giữ nguyên**, không đổi sang nhãn Việt.
+  - Khoá tiếng Anh rõ nghĩa với LLM hơn `thu_mua` cũ, và tốn ít token hơn.
+  - Không chứa PII.
+  - Việc chọn lệnh do BM25 làm. LLM chỉ chọn trong top-5 nên nhóm chỉ là gợi ý phụ.
+  - Nếu sau này muốn prompt thuần Việt, đừng dùng lại `COMMAND_GROUP_SEARCH_LABEL`, vì hằng đó là để tìm kiếm, không phải để hiển thị. Nên tạo một nhãn hiển thị riêng.
+- **3b. `features/ai/policy/caps.ts:16`: `findByCommand` lấy khoá khớp ĐẦU TIÊN.** Nếu bảng có cả khoá cũ lẫn khoá mới, field phụ (vd `max_level`)
+  có thể lấy từ khoá cũ, trái quy tắc "khoá mới thắng" của BE (`legacy_ids.normalize_command_keys`). Hiện không xảy ra vì BE chuẩn hoá khi đọc.
+  Nếu sửa: ưu tiên `caps[RECEIVE_BATCHES_COMMAND_ID]` trước, rồi mới `findByCommand`, kèm 1 ca test. Có thể dồn vào Lô 5, lúc gỡ hẳn khoá cũ.
+- **3c. Chú thích lệch:**
+  - `erp-console/e2e/s7_shell.py` còn ghi "chu, manager" (nửa cũ nửa mới). Sửa thành "owner, manager".
+  - Phép đo recall 14 câu trên chỉ mục thật chỉ nằm ở scratchpad. Nếu muốn giữ làm hồi quy thì cần commit một snapshot chỉ mục (không PII) kèm test, có thể làm ở Lô 5.
+
+### 4. Ràng buộc deploy (bắt buộc, điều phối ghi vào kế hoạch deploy)
+FE 4b **GHI** tên mới:
+- `PUT /api/staff/{id}/groups/` và tạo nhân viên với `owner`/`warehouse_staff`…
+- khoá caps `…receive_batches`.
+
+BE trước 4a báo 400 "Nhóm không tồn tại" (kiểm ở `dd49133:backend/apps/accounts/staff/services.py:77-81`). Vì vậy, ở **mỗi môi trường**, FE 4b chỉ được deploy
+**sau khi** BE 4a đã chạy migrate `accounts.0013` + `ai.0003` ở môi trường đó.
+- Staging: BE 4a đã lên (api:v8), nên deploy được.
+- Production: BE 4a phải lên trước, Duy duyệt theo hướng dẫn ở mục 4 của Lô 4a.
+
+Chiều ĐỌC an toàn ở cả hai phía nhờ lớp `normalize*`.
+
+### 5. Lưu ý khi commit (điều phối)
+- Commit chung `erp-console/` (gồm 4 file mới `caps.ts`, `caps.test.ts`, `groupSearch.test.ts`, `englishNames.test.ts`), `scripts/naming_baseline.json`, `03-dev-notes.md`
+  và file review này. Không commit `erp-console/out/`.
+- `erp-console/out` hiện là bản build thật trỏ API **production**. Khi deploy staging, phải build lại với `NEXT_PUBLIC_API_BASE` của staging (`doc/ops/moi-truong.md`).

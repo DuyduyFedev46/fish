@@ -207,7 +207,7 @@ with sync_playwright() as p:
     fill_pw(dlg, "Mật khẩu tạm", "Songbien2026")
     # chờ nháp đã ghi (useDraft ghi sau 400ms) — điều kiện, không ngủ
     page.wait_for_function("""() => { const d = JSON.parse(localStorage.getItem('cave_erp_draft:staff:create') || 'null');
-        return !!d && d.data.display_name === 'Anh Năm' && d.data.groups.includes('nv_giao'); }""")
+        return !!d && d.data.display_name === 'Anh Năm' && d.data.groups.includes('delivery_staff'); }""")
     ok("S48-AC5 nháp KHÔNG chứa mật khẩu", "Songbien2026" not in page.evaluate(
         "() => Object.keys(localStorage).filter(k => k.startsWith('cave_erp_draft:')).map(k => localStorage.getItem(k)).join('')"))
     page.evaluate("() => window.__caveMock.expire()")
@@ -228,7 +228,7 @@ with sync_playwright() as p:
         "pw": dlg.get_by_label("Mật khẩu tạm", exact=True).input_value(),
     }
     ok("S7-AC6 form tạo tài khoản mở lại đủ nội dung (trừ mật khẩu)",
-       vals == {"u": "giao4", "n": "Anh Năm", "p": "0909333444", "g": ["nv_giao"], "pw": ""}, str(vals))
+       vals == {"u": "giao4", "n": "Anh Năm", "p": "0909333444", "g": ["delivery_staff"], "pw": ""}, str(vals))
     ok("S7-AC6 báo đã mở lại nháp, nhắc nhập lại mật khẩu", dlg.get_by_text(smsg(page, "draftRestored")).count() == 1)
     page.screenshot(path=f"{SHOTS}/s41-desktop-1280-create-restored.png")
 
@@ -245,7 +245,7 @@ with sync_playwright() as p:
     ok("Tạo xong thì nháp bị xoá", page.evaluate("() => localStorage.getItem('cave_erp_draft:staff:create')") in (None,) or
        '"username":""' in (page.evaluate("() => localStorage.getItem('cave_erp_draft:staff:create')") or ""))
 
-    # ---- S41-AC3: bỏ nv_giao của kho1 ----
+    # ---- S41-AC3: bỏ delivery_staff của kho1 ----
     dlg = open_staff(page, "kho1")
     dlg.get_by_role("button", name="Đổi nhóm").click()
     dlg.get_by_text("Nhân viên giao", exact=True).click()
@@ -396,8 +396,8 @@ with sync_playwright() as p:
     page.wait_for_url("**/overview/")
     ok("S46-AC2 mật khẩu mới đăng nhập được", True)
 
-    # ---- S47-AC2: Chủ thêm lại nv_giao cho kho1 → kho1 bấm 'Tải lại quyền' (hoặc mở lại app) → menu có Việc giao ----
-    page.evaluate("() => window.__caveMock.patchUser('kho1', {groups: ['nv_kho', 'nv_giao']})")
+    # ---- S47-AC2: Chủ thêm lại delivery_staff cho kho1 → kho1 bấm 'Tải lại quyền' (hoặc mở lại app) → menu có Việc giao ----
+    page.evaluate("() => window.__caveMock.patchUser('kho1', {groups: ['warehouse_staff', 'delivery_staff']})")
     page.locator(".who-link").click()
     page.wait_for_url("**/account/")
     page.get_by_role("button", name="Tải lại quyền").click()

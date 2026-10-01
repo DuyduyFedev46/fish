@@ -423,7 +423,7 @@ with sync_playwright() as p:
     ok("kho1: màn Đơn có dữ liệu (không bị 403)", rows(page).count() == 20)
     ctx.close()
 
-    # ================= giao1 (chỉ nv_giao): menu không có Đơn, gõ URL bị chặn, không gọi API =================
+    # ================= giao1 (chỉ delivery_staff): menu không có Đơn, gõ URL bị chặn, không gọi API =================
     ctx, page = new_page()
     login(page, "giao1")
     page.wait_for_url("**/my-deliveries/")

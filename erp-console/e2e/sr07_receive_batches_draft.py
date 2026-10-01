@@ -1,5 +1,5 @@
 # SR-07-AC3 (P8 Lô 2): nháp "Nhập lô" không giữ giá mua giữa các người dùng.
-# Chủ (loc) đăng nhập, gõ giá mua 81234, đăng xuất; nv_kho (kho1) đăng nhập, mở Nhập lô -> ô giá rỗng,
+# Chủ (loc) đăng nhập, gõ giá mua 81234, đăng xuất; warehouse_staff (kho1) đăng nhập, mở Nhập lô -> ô giá rỗng,
 # localStorage/sessionStorage không chứa 81234. Dữ liệu giả (mock, tài khoản demo).
 # Chạy: cd erp-console && NEXT_PUBLIC_USE_MOCK=1 npm run build && cp -R out <thư-mục-riêng>/out
 #       (cd <thư-mục-riêng>/out && python3 -m http.server 3212 &)
@@ -127,14 +127,14 @@ with sync_playwright() as p:
        f"local={st['localKeys']} session={st['sessionKeys']}")
     ok("Sau đăng xuất: storage không chứa 81234", RATE not in st["local"] and RATE not in st["session"])
 
-    # 3) nv_kho đăng nhập trên cùng máy/tab
+    # 3) warehouse_staff đăng nhập trên cùng máy/tab
     login(page, "kho1")
     open_receive_batches(page)
-    ok("nv_kho: ô giá mua rỗng", page.locator("input[placeholder='80000']").first.input_value() == "")
-    ok("nv_kho: ô số lượng rỗng (nháp Chủ không sang)", page.locator("input[placeholder='0.000']").first.input_value() == "")
+    ok("warehouse_staff: ô giá mua rỗng", page.locator("input[placeholder='80000']").first.input_value() == "")
+    ok("warehouse_staff: ô số lượng rỗng (nháp Chủ không sang)", page.locator("input[placeholder='0.000']").first.input_value() == "")
     st = storages(page)
-    ok("nv_kho: storage không chứa 81234", RATE not in st["local"] and RATE not in st["session"])
-    ok("AC4(b) nv_kho: idempotencyKey mới, khác của Chủ", bool(draft_key_of(page)) and draft_key_of(page) != key_chu)
+    ok("warehouse_staff: storage không chứa 81234", RATE not in st["local"] and RATE not in st["session"])
+    ok("AC4(b) warehouse_staff: idempotencyKey mới, khác của Chủ", bool(draft_key_of(page)) and draft_key_of(page) != key_chu)
     page.screenshot(path=os.path.join(SHOTS, "sr07-2-nv-kho-o-gia-rong.png"), full_page=True)
     key_kho = draft_key_of(page)
 
@@ -150,7 +150,7 @@ with sync_playwright() as p:
     ok("F5 cùng người: giá mua rỗng (không lưu)", page.locator("input[placeholder='80000']").first.input_value() == "")
     st = storages(page)
     ok("F5: storage không chứa 55555", "55555" not in st["local"] and "55555" not in st["session"])
-    ok("AC4(a) F5 nv_kho: giữ đúng key", draft_key_of(page) == key_kho)
+    ok("AC4(a) F5 warehouse_staff: giữ đúng key", draft_key_of(page) == key_kho)
     page.screenshot(path=os.path.join(SHOTS, "sr07-3-f5-cung-nguoi.png"), full_page=True)
 
     # 5) Gửi thành công -> nháp xoá; nhập phiếu tiếp -> key mới

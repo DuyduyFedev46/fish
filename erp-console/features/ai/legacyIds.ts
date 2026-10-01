@@ -1,20 +1,20 @@
 // Lớp chuẩn hoá id lệnh AI, nhóm lệnh, mức nhạy cảm (P8b Lô 3).
-// Từ Lô 4 BE trả tên tiếng Anh (`…receive_batches`, `purchasing`, `high`…). Trong lúc hai phía deploy lệch nhau, FE nhận CẢ tên cũ và
-// tên mới rồi đổi về giá trị nội bộ hiện tại (./commandGroups.ts) khi ĐỌC / SO SÁNH / HIỂN THỊ.
-// Không ghi đè id trong dữ liệu BE trả về: lệnh gọi lại BE (URL `/call/`, khoá `caps`/`overrides`) dùng đúng chuỗi BE đã đưa,
-// nên dù BE ở phía nào của Lô 4 thì request vẫn khớp. Gỡ tên cũ ở Lô 5 (phiên bản AI cũ được ghim vẫn có thể còn khoá cũ).
+// Từ Lô 4a BE trả tên tiếng Anh (`…receive_batches`, `purchasing`, `high`…) và FE (Lô 4b) dùng tên Anh ở ./commandGroups.ts.
+// Lớp này vẫn nhận CẢ tên cũ (BE chưa migrate, phiên bản AI cũ được ghim còn khoá cũ) rồi đổi về tên mới khi ĐỌC / SO SÁNH / HIỂN THỊ.
+// Không ghi đè id trong dữ liệu BE trả về: lệnh gọi lại BE (URL `/call/`, khoá `overrides`) dùng đúng chuỗi BE đã đưa; riêng ghi
+// `caps` ở màn chính sách AI luôn gửi id mới. Gỡ tên cũ ở Lô 5.
 
 import { normalizeRoles } from "@/shared/lib/roles";
 import { COMMAND_GROUP, RECEIVE_BATCHES_COMMAND_ID, SENSITIVITY, type AiCommandGroup, type AiSensitivity } from "./commandGroups";
 import type { AiCommandDescriptor, AiCommandsIndexResponse, AiPolicy, MyConfig } from "./types";
 
-/** Id lệnh (cũ và mới) → id nội bộ hiện tại. */
+/** Id lệnh (cũ và mới) → id mới. */
 export const LEGACY_COMMAND_IDS: ReadonlyMap<string, string> = new Map<string, string>([
   ["purchasing.purchasereceipt.nhap_lo", RECEIVE_BATCHES_COMMAND_ID],
   ["purchasing.purchasereceipt.receive_batches", RECEIVE_BATCHES_COMMAND_ID],
 ]);
 
-/** Nhóm lệnh (cũ và mới) → giá trị nội bộ hiện tại. */
+/** Nhóm lệnh (cũ và mới) → giá trị mới. */
 export const LEGACY_COMMAND_GROUPS: ReadonlyMap<string, string> = new Map<string, string>([
   ["thu_mua", COMMAND_GROUP.purchasing],
   ["purchasing", COMMAND_GROUP.purchasing],
@@ -24,7 +24,7 @@ export const LEGACY_COMMAND_GROUPS: ReadonlyMap<string, string> = new Map<string
   ["customer_service", COMMAND_GROUP.customerService],
 ]);
 
-/** Mức nhạy cảm (cũ và mới) → giá trị nội bộ hiện tại. */
+/** Mức nhạy cảm (cũ và mới) → giá trị mới. */
 export const LEGACY_SENSITIVITIES: ReadonlyMap<string, string> = new Map<string, string>([
   ["cao", SENSITIVITY.high],
   ["high", SENSITIVITY.high],

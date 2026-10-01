@@ -7,7 +7,7 @@
 #   1) Django:  DATABASE_URL=sqlite:////<tmp>/qa.sqlite3 ITEM_IMAGE_STORAGE=local \
 #               CORS_ALLOWED_ORIGINS=http://localhost:3100 .venv/bin/python manage.py migrate
 #               rồi bootstrap_masterdata, seed_demo, và tạo User + StaffProfile (must_change_password=False)
-#               cho các Group chu/quan_ly/nv_kho/nv_giao (script mẫu ở scratchpad QA, không commit).
+#               cho các Group owner/manager/warehouse_staff/delivery_staff (script mẫu ở scratchpad QA, không commit).
 #               .venv/bin/python manage.py runserver 8000
 #   2) Console: NEXT_PUBLIC_API_BASE=http://localhost:8000 NEXT_PUBLIC_USE_MOCK=0 npm run dev -- -p 3100
 #   3) BASE=http://localhost:3100 API=http://localhost:8000 python3 e2e/a2_catalog_real.py
@@ -61,9 +61,9 @@ def check_catalog_loads(browser, user, label):
 
 with sync_playwright() as p:
     browser = p.chromium.launch(headless=True)
-    check_catalog_loads(browser, "loc", "chu")
-    check_catalog_loads(browser, "quanly1", "quan_ly")
-    check_catalog_loads(browser, "kho1", "nv_kho")
+    check_catalog_loads(browser, "loc", "owner")
+    check_catalog_loads(browser, "quanly1", "manager")
+    check_catalog_loads(browser, "kho1", "warehouse_staff")
     browser.close()
 
 print("\n=== SUMMARY A2 catalog (real BE) ===")

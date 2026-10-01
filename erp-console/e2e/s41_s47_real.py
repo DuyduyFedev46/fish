@@ -1,14 +1,14 @@
 # E2E S41, S42, S46, S47 trên BACKEND THẬT (Django), KHÔNG mock.
 #   1) Django:  cd backend && DATABASE_URL=sqlite:////<tmp>/realbe.sqlite3 .venv/bin/python manage.py migrate
 #               rồi bootstrap_masterdata, rồi seed tài khoản (mật khẩu chung PW) bằng `manage.py shell`: tạo User + StaffProfile
-#               (phone, display_name) và gán Group cho loc (chu), ql1 (quan_ly), kho1 (nv_kho+nv_giao), giao1 (nv_giao),
-#               nghi1 (nv_kho, is_active=False); rồi
+#               (phone, display_name) và gán Group cho loc (owner), ql1 (manager), kho1 (warehouse_staff+delivery_staff), giao1 (delivery_staff),
+#               nghi1 (warehouse_staff, is_active=False); rồi
 #               CORS_ALLOWED_ORIGINS=http://127.0.0.1:3102 .venv/bin/python manage.py runserver 127.0.0.1:8000
 #   2) Console: cd erp-console && npm run build && (cd out && python3 -m http.server 3102 &)
 #   3) SHOTS=<thư mục ảnh> python3 e2e/s41_s47_real.py        # tắt cả hai server sau khi xong
 #
 # Không gõ lại câu lỗi nào: kịch bản bắt RESPONSE THẬT của API rồi so với chữ UI hiện ra (hiện nguyên văn `detail`),
-# và kiểm `code` trong JSON. Seed: loc (chu), ql1 (quan_ly), kho1 (nv_kho+nv_giao), giao1 (nv_giao), nghi1 (đã nghỉ).
+# và kiểm `code` trong JSON. Seed: loc (owner), ql1 (manager), kho1 (warehouse_staff+delivery_staff), giao1 (delivery_staff), nghi1 (đã nghỉ).
 # Kịch bản sửa dữ liệu (tạo giao4, cho giao1 nghỉ, đổi mật khẩu kho1) → chạy lại thì seed lại DB tạm.
 # Lô L6b: thêm S48 trên BE thật (contract "Lô L6b (BE)"): Chủ đặt lại mật khẩu → kho1 bị ép đặt mật khẩu mới,
 # API nghiệp vụ 403 AUTH_MUST_CHANGE_PASSWORD; ô "Nhập lại" lệch → không có request. Không ngủ: chờ điều kiện.
@@ -148,7 +148,7 @@ with sync_playwright() as p:
     dlg.get_by_text("Nhân viên giao", exact=True).click()
     fill_pw(dlg, "Mật khẩu tạm", PW)
     page.wait_for_function("""() => { const d = JSON.parse(localStorage.getItem('cave_erp_draft:staff:create') || 'null');
-        return !!d && d.data.display_name === 'Anh Năm' && d.data.groups.includes('nv_giao'); }""")
+        return !!d && d.data.display_name === 'Anh Năm' && d.data.groups.includes('delivery_staff'); }""")
     ok("S48-AC5 nháp không chứa mật khẩu", PW not in (page.evaluate("() => localStorage.getItem('cave_erp_draft:staff:create')") or ""))
     page.evaluate("() => localStorage.setItem('cave_erp_token', 'token-da-bi-thu-hoi')")
     st, _ = submit_and_capture(page, lambda: dlg.get_by_role("button", name="Tạo tài khoản").click(), "/api/staff/", "POST")
@@ -162,7 +162,7 @@ with sync_playwright() as p:
     expect(dlg).to_be_visible()
     ok("S7-AC6 form mở lại đủ nội dung (trừ mật khẩu)",
        dlg.get_by_label("Tên đăng nhập").input_value() == "giao4" and dlg.get_by_label("Tên hiển thị").input_value() == "Anh Năm"
-       and dlg.locator("input[name=groups]:checked").evaluate_all("els => els.map(e => e.value)") == ["nv_giao"])
+       and dlg.locator("input[name=groups]:checked").evaluate_all("els => els.map(e => e.value)") == ["delivery_staff"])
 
     # ---- S48-AC3: Nhập lại lệch → không có request POST ----
     posts = []
@@ -175,17 +175,17 @@ with sync_playwright() as p:
     # ---- S41-AC1: tạo giao4 thật (Q2: bấm là có POST) ----
     fill_pw(dlg, "Mật khẩu tạm", PW)
     st, body = submit_and_capture(page, lambda: dlg.get_by_role("button", name="Tạo tài khoản").click(), "/api/staff/", "POST")
-    ok("S41-AC1 POST 201, nhóm nv_giao", st == 201 and body.get("groups") == ["nv_giao"], f"{st} {body}")
+    ok("S41-AC1 POST 201, nhóm delivery_staff", st == 201 and body.get("groups") == ["delivery_staff"], f"{st} {body}")
     dlg.get_by_role("button", name="Xong").click()
     expect(staff_row(page, "giao4")).to_be_visible()
     page.screenshot(path=f"{SHOTS}/real-s41-desktop-1280-staff.png")
 
-    # ---- S41-AC3: bỏ nv_giao của kho1 ----
+    # ---- S41-AC3: bỏ delivery_staff của kho1 ----
     dlg = open_staff(page, "kho1")
     dlg.get_by_role("button", name="Đổi nhóm").click()
     dlg.get_by_text("Nhân viên giao", exact=True).click()
     st, body = submit_and_capture(page, lambda: dlg.get_by_role("button", name="Lưu nhóm").click(), "/groups/", "PUT")
-    ok("S41-AC3 PUT groups 200, removed nv_giao", st == 200 and body.get("removed") == ["nv_giao"], f"{st} {body}")
+    ok("S41-AC3 PUT groups 200, removed delivery_staff", st == 200 and body.get("removed") == ["delivery_staff"], f"{st} {body}")
     expect(staff_row(page, "kho1").locator(".group-tag")).to_have_text(["Nhân viên kho"])
 
     # ---- S42-AC1: cho giao1 nghỉ → token máy giao1 chết ----

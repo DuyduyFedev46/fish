@@ -120,7 +120,7 @@ def sr19(browser):
     page.screenshot(path=f"{SHOTS}/sr19-v2-mobile360.png")
     ctx.close()
 
-    # --- AC3: quan_ly thấy liên kết, nv_kho không thấy (nv_kho không vào được danh sách đơn)
+    # --- AC3: manager thấy liên kết, warehouse_staff không thấy (warehouse_staff không vào được danh sách đơn)
     ctx = browser.new_context(viewport={"width": 1280, "height": 860}, reduced_motion="reduce")
     page = ctx.new_page()
     login(page, "ql1")

@@ -5,6 +5,8 @@ import { getAiPolicy, getUserAiConfig, killUserAi, updateAiPolicy } from "../api
 import { AiPolicy, AiPolicyUserSummary, MyConfig } from "../../types";
 import { RECEIVE_BATCHES_COMMAND_ID } from "../../commandGroups";
 import { findByCommand } from "../../legacyIds";
+import { buildCapsForSave } from "../caps";
+import { groupLabel } from "@/shared/lib/groups";
 
 export default function AiPolicyScreen() {
   const [policy, setPolicy] = useState<AiPolicy | null>(null);
@@ -90,17 +92,12 @@ export default function AiPolicyScreen() {
       setError(null);
       setSuccess(null);
 
-      // Ghi ngược đúng khoá BE đang dùng (tên cũ hay mới); chưa có khoá nào thì dùng id hiện hành.
-      const existingCap = findByCommand(policy.caps, RECEIVE_BATCHES_COMMAND_ID);
-      const newCaps: Record<string, any> = {
-        ...(policy.caps || {}),
-        [existingCap?.key ?? RECEIVE_BATCHES_COMMAND_ID]: {
-          ...(existingCap?.value || {}),
-          kg: kgNum !== null ? String(kgNum) : null,
-          vnd: vndNum !== null ? String(vndNum) : null,
-          daily: dailyNum !== null ? dailyNum : null,
-        },
-      };
+      // Ghi bằng id MỚI (Lô 4b), bỏ khoá cũ của cùng lệnh nếu BE còn trả (xem ../caps.ts).
+      const newCaps = buildCapsForSave(policy.caps, {
+        kg: kgNum !== null ? String(kgNum) : null,
+        vnd: vndNum !== null ? String(vndNum) : null,
+        daily: dailyNum !== null ? dailyNum : null,
+      });
 
       const updated = await updateAiPolicy({
         base_version: policy.version,
@@ -506,7 +503,7 @@ export default function AiPolicyScreen() {
                 <tr key={u.user_id} className="hover:bg-gray-50 transition">
                   <td className="px-4 py-3 font-medium text-gray-900">{u.display_name}</td>
                   <td className="px-4 py-3 text-gray-500">
-                    {u.groups.length > 0 ? u.groups.join(", ") : "—"}
+                    {u.groups.length > 0 ? u.groups.map(groupLabel).join(", ") : "—"}
                   </td>
                   <td className="px-4 py-3 font-mono text-gray-700">v{u.config_version}</td>
                   <td className="px-4 py-3">

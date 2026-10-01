@@ -443,3 +443,125 @@ Không có lỗi chặn.
 | `python3 scripts/check_naming.py` | OK |
 
 Tệp tạm: `/private/tmp/claude-501/-Users-dangthiduyen-Downloads-loc/3e0d9f3d-14ce-4b8b-a1cd-6fbcdc0b2f2d/scratchpad/qa-p8b-l4a/` (script, DB bản sao, JSON so sánh, log). Không sửa mã sản phẩm, không commit, không deploy.
+
+
+## Lô 4b — ERP đổi GIÁ TRỊ hằng sang tên tiếng Anh (`ROLE`, `commandGroups.ts`, `receive_batches`, `confirmation-queue`, `caps.ts`) · lần 1 · 01/10/2026
+
+### Kết luận: APPROVED (Lô 4b) — FE mới chạy đúng trên Django thật đã migrate, 9 tài khoản giống hệt trước Lô 4, không mất hay nới quyền AI do Lô 4b; kèm 3 lỗi CÓ TỪ TRƯỚC ở màn AI (B1 High) cần giao FE riêng
+### Tổng: 43 ca · ✅ 39 · ❌ 2 (cả hai là lỗi có từ trước, HEAD y hệt, không do Lô 4b) · ⏸ 2
+
+Cách kiểm: Django cây làm việc trên SQLite tạm, migrate từ đầu (`accounts 0013`, `ai 0003`), dữ liệu giả: 5 Group tên mới, 9 tài khoản (`qa_owner`, `qa_manager`, `qa_warehouse`, `qa_delivery`, `qa_cs`, `qa_mgr_cs` = quản lý + CSKH, `qa_wh_del` = kho + giao, `qa_owner_cs` = chủ + CSKH, `qa_pin` = nhân viên kho ghim phiên bản cấu hình AI khoá cũ) và `qa_nogroup`; phiếu nhập, đơn, việc AI giả. ERP Lô 4b bản build thật (`NEXT_PUBLIC_USE_MOCK=0`, API `127.0.0.1:8272`) ở cổng 3272. Đối chứng: ERP HEAD (Lô 3) build thật ở cổng 3273 trên cùng DB. Playwright Python điều khiển Chromium thật; SĐT giả `09033…`, giá nhập giả `987000` được dò trong storage, URL, console.
+
+### Theo yêu cầu giao (`02c` §3 Lô 4, `03-dev-notes.md` "Lô 4b")
+| Mã | Ca | Kết quả | Bằng chứng |
+|---|---|---|---|
+| S1 | `npm ci` (cache trong scratchpad, không `--legacy-peer-deps`) | ✅ | `out/npmci.log` exit 0 |
+| S2 | `npx tsc --noEmit` | ✅ | exit 0, không lỗi |
+| S3 | `npm test` | ✅ | 22 file, 251 test đạt (khớp dev: 19/236 trước Lô 4b, thêm 3 file, 15 test) |
+| S4a | `englishNames.test.ts` đỏ trên nguồn cũ | ✅ | bản sao với `roles.ts`, `commandGroups.ts`, `search.ts` lấy từ HEAD: 7/7 test đỏ (ví dụ `expected 'chu' to be 'owner'`, `expected 'cskh-queue' to be 'confirmation-queue'`); trả nguồn mới: xanh |
+| S4b | `groupSearch.test.ts` đỏ khi bỏ nhãn nhóm | ✅ | trên nguồn HEAD test vẫn xanh (HEAD tìm bằng chính chuỗi nhóm, nên không phải bằng chứng); đột biến `groupSearchText(doc.group)` thành `doc.group` trong bản sao: 4/5 đỏ ('thu mua', 'bán hàng', 'cskh', chỉ mục khoá cũ). Test này bảo vệ nhãn nhóm Việt, không bảo vệ việc đổi giá trị |
+| S4c | `caps.test.ts` | ✅ | 4 test đạt trên nguồn mới (`caps.ts` là tệp mới, không có bản HEAD để đối chiếu đỏ); `AiPolicyScreen` thật chạy qua `buildCapsForSave` (ca A3) |
+| S5 | Build thật `next build` | ✅ | `out/erp-build-real8272.log` exit 0 |
+| S6 | `check-no-mock.mjs` (build 8272 và build production) | ✅ | XANH: 13 file mock, 32 chuỗi seed, 135 file build, không thấy seed |
+| S7 | `check-ai-chunks.mjs` | ✅ | XANH: 4 màn nghiệp vụ và 2 layout không có `new Worker`, `wllama`, `/call/` |
+| S8 | Dựng lại bản thật với API production (bước cuối) | ✅ | `NEXT_PUBLIC_USE_MOCK=0 NEXT_PUBLIC_API_BASE=https://cangca-api-675411800433.asia-southeast1.run.app npm run build` exit 0; `out/` có URL production ở 3 tệp, 0 tệp tham chiếu `127.0.0.1:8…`; `check-no-mock` và `check-ai-chunks` XANH |
+| S9 | Toàn bộ test backend | ✅ | `manage.py test`: Ran 1807 OK (132 s) |
+| S10 | `makemigrations --check` | ✅ | No changes detected; `git status backend` sạch |
+| S11 | `scripts/check_naming.py` | ✅ | OK, 6536 vi phạm cũ trong 195 file, không phát sinh mới |
+| U1 | `qa_owner` (Group `owner`): trang đích, menu, ViewGuard | ✅ | `/overview/`, 20 mục menu, mọi trang menu mở được, nhãn "Chủ"; giống ERP HEAD |
+| U2 | `qa_manager` (`manager`) | ✅ | `/overview/`, 15 mục, nhãn "Quản lý"; giống HEAD |
+| U3 | `qa_warehouse` (`warehouse_staff`) | ✅ | `/overview/`, 10 mục, nhãn "Nhân viên kho"; `/confirmation/` báo "Bạn không có quyền xem mục này"; giống HEAD |
+| U4 | `qa_delivery` (`delivery_staff`) | ✅ | trang đích `/my-deliveries/`, 2 mục; không có form nhập lô; giống HEAD |
+| U5 | `qa_cs` (`customer_service`) | ✅ | trang đích `/confirmation/` (qua `me.home = confirmation-queue`), 5 mục, thấy hàng đợi (1 thẻ giả); giống HEAD |
+| U6 | `qa_mgr_cs` (quản lý + CSKH) | ✅ | `/overview/`, 15 mục, nhãn "Quản lý · CSKH", thấy hàng đợi |
+| U7 | `qa_wh_del` (kho + giao) | ✅ | `/overview/`, 11 mục, nhãn "Nhân viên kho · Nhân viên giao", không thấy hàng đợi |
+| U8 | `qa_owner_cs` (chủ + CSKH) | ✅ | `/overview/`, 20 mục (đúng như chủ), nhãn "Chủ · CSKH", thấy hàng đợi |
+| U9 | `qa_pin` (kho, cấu hình AI ghim khoá cũ) | ✅ | `/overview/`, 10 mục như `qa_warehouse`; màn "AI của tôi" mở được, "Phiên bản: v2" |
+| U10 | `qa_nogroup` (không Group) đăng nhập vào ERP | ⏸ | không chạy trên giao diện; phần BE đã đo ở Lô 4a (403 ở mọi API nghiệp vụ); phần FE chỉ có test vitest cho `normalizeRole` với giá trị lạ |
+| R1 | Màn xác nhận đơn và `/cskh/` chuyển hướng (9 tài khoản) | ✅ | `/cskh/?x=1#y` về `/confirmation/?x=1#y` ở cả 9; `owner`, `manager`, `customer_service`, `mgr_cs`, `owner_cs` thấy 1 thẻ dữ liệu giả; `warehouse_staff`, `delivery_staff`, `wh_del`, `pin` thấy thông báo không có quyền |
+| R2 | Nhập lô gửi `receive-batches` và nhận 201 | ✅ | 7 tài khoản có quyền (`owner`, `manager`, `warehouse`, `mgr_cs`, `wh_del`, `pin`, `owner_cs`): `POST /api/purchasing/receipts/receive-batches/` 201; `delivery` và `cs` không có form, không gọi API. 0 request 4xx/5xx ở cả 9 tài khoản |
+| G1 | Màn Nhân viên: đọc nhóm tên mới, nhãn Việt | ✅ | `GET /api/staff/` trả `owner, manager, warehouse_staff, delivery_staff, customer_service`; giao diện hiện "Chủ", "Quản lý", "Nhân viên kho", "Nhân viên giao", "CSKH", không lộ mã Anh (cả 375px); hộp đánh dấu sẵn đúng cho `mgr_cs` |
+| G2 | Màn Nhân viên: đổi Group gửi và lưu tên mới | ✅ | `qa_mgr_cs` thành `manager` + `warehouse_staff` (200, `added: warehouse_staff`, `removed: customer_service`, DB `manager, warehouse_staff`); `qa_wh_del` ba vai (200, DB đúng); `qa_nogroup` thêm `delivery_staff` rồi bỏ về rỗng (200); hoàn nguyên đúng; 15/15 kiểm |
+| G3 | Không pageerror, console không lỗi khi đổi Group | ✅ | 0 pageerror, 0 `console error` |
+| A1 | "Chính sách AI" mở, hiện đúng giá trị khoá mới (`owner`) | ✅ | dòng "Nhập lô mua tại cảng" hiện trần 100 kg / 10 triệu / 3 lần từ chính sách khoá cũ đã migrate; cột Nhóm hiện nhãn Việt (`ảnh erp-owner-aipolicy.png`) |
+| A2 | "Chính sách AI": lưu qua giao diện trên BE thật | ❌ | **B1**: `PUT /api/ai/policy/` 400 `Invalid data. Expected a dictionary, but got str.`; ERP HEAD cho kết quả y hệt (lỗi có từ trước, không do Lô 4b) |
+| A3 | "Chính sách AI": nội dung lưu chỉ có khoá mới, không mất/nới trần | ✅ | phát lại đúng nội dung `caps` mà màn dựng (giải mã lớp mã hoá kép) với mã hoá đúng: 200, phiên bản v5 chỉ có `purchasing.purchasereceipt.receive_batches` (không còn `nhap_lo`), `max_level: C` và `daily: 3` giữ, trần `kg` 80 chỉ siết; khoá không liên quan (`inventory.batch.close: {daily: 2}`) còn nguyên |
+| A4 | `effective_level` trước/sau Lô 4b giống nhau (mọi người × mọi lệnh) | ✅ | `eff.py` trên DB trước (HEAD) và sau lưu bằng FE mới: 0 khác biệt về mức hiệu lực/trần; chỉ khác tên khoá trong danh sách khoá cấu hình (`nhap_lo` thành `receive_batches`, `thu_mua`/`ban_hang` thành tên mới); kết quả FE mới và FE HEAD trùng từng byte |
+| A5 | "AI của tôi": đọc mức và trần đúng | ✅ | `qa_warehouse` thấy "Nhập lô mua tại cảng", mức B, "Trần của Chủ" đúng; `qa_pin` mở được, v2 |
+| A6 | "AI của tôi": lưu qua giao diện trên BE thật | ❌ | **B1** (cùng nguyên nhân 400) và **B2**/**B3** (hình dạng `limits`, mất `groups`); HEAD y hệt |
+| F1 | Tìm lệnh AI "nhập lô" đưa `receive_batches` lên đầu | ✅ | 22 truy vấn so FE mới/FE HEAD trên cùng chỉ mục thật: "nhập lô" hạng 1 là `receive_batches` |
+| F2 | "thu mua" có `receive_batches` trong top 5 | ✅ | có (nhãn nhóm `COMMAND_GROUP_SEARCH_LABEL`); "bán hàng", "cskh" cũng đúng nhóm |
+| F3 | Tác động riêng của FE lên xếp hạng | ✅ | cố định chỉ mục BE mới, đổi FE mới/HEAD: 0/22 truy vấn khác |
+| F4 | Bảng điều khiển trợ lý AI (wllama/WebGPU) | ⏸ | không điều khiển được WebGPU/tải mô hình trong Chromium headless; chỉ phủ bằng test vitest tìm lệnh và `check-ai-chunks` |
+| E1 | Mock e2e `p8_lo7_fe_erp.py` | ✅ | 79/79 PASS |
+| E2 | Mock e2e `s41_s47_staff.py` | ✅ | 72/72 PASS |
+| E3 | Mock e2e `p8b_confirmation_route_redirect.py` | ✅ | 8/8 đạt |
+| L1 | Không rò SĐT/địa chỉ vào `localStorage`/`sessionStorage` (9 tài khoản) | ✅ | khoá chỉ có `cave_erp_token`, `cave_erp_last_user`, và `cave_erp_draft:staff:create` (nháp form tạo nhân viên, không chứa SĐT khách) |
+| L2 | Không rò vào URL | ✅ | 0 URL chứa SĐT giả hay giá nhập giả |
+| L3 | Không rò vào console | ✅ | 0 dòng chứa SĐT/giá nhập; 0 `console error` ở cả 9 tài khoản (hai dòng "Failed to fetch RSC payload" của máy chủ tĩnh ở lượt thử AI là nhiễu điều hướng, không ở lượt 9 tài khoản) |
+| L4 | Không rò giá vốn/giá nhập | ✅ | `987000` không có trong storage/URL/console; request AI/chính sách chỉ mang khoá, mức, trần kg/vnd/lần (không có tiền gắn với lô hay mặt hàng) |
+
+### Ngoại lệ và biên
+- Dữ liệu đã từng có giao dịch: DB có việc AI cũ và cấu hình AI phiên bản khoá cũ đã được `ai 0003` đổi; FE mới đọc đúng (A1, A4, A5).
+- Màn hình cũ / phiên bản cũ: FE HEAD (Lô 3) trên BE mới chạy y hệt FE Lô 4b ở 7 tài khoản (U1 đến U8; so ma trận trang đích, menu, ViewGuard, thẻ hàng đợi, mã `receive-batches`); khoá cũ trong cấu hình `qa_pin` được `buildCapsForSave` gom về khoá mới và không mất `max_level`.
+- Đồng thời / bấm đúp: bấm "Nhập lô" một lần chỉ ra một `POST` 201 (R2); chưa thử hai người lưu chính sách cùng lúc (không thể lưu qua giao diện vì B1; phía BE `base_version` cũ 409 đã đo ở Lô 4a, D4 và D5).
+- Cờ tắt/bật: `NEXT_PUBLIC_USE_MOCK=0` và `=1` đều build và qua `check-no-mock`; mock e2e 3 bộ đạt.
+
+### Phân quyền (ERP, Django thật, đã migrate; tài khoản × hành động)
+| Hành động | owner | manager | warehouse_staff | delivery_staff | customer_service | mgr+cs | wh+del | owner+cs | pin (kho) |
+|---|---|---|---|---|---|---|---|---|---|
+| Trang đích | `/overview/` | `/overview/` | `/overview/` | `/my-deliveries/` | `/confirmation/` | `/overview/` | `/overview/` | `/overview/` | `/overview/` |
+| Số mục menu | 20 | 15 | 10 | 2 | 5 | 15 | 11 | 20 | 10 |
+| Thấy hàng đợi xác nhận | có | có | không | không | có | có | không | có | không |
+| `POST receive-batches` | 201 | 201 | 201 | không có form | không có form | 201 | 201 | 201 | 201 |
+| Màn `/ai/policy/` trong menu | có | không | không | không | không | không | không | có | không |
+| Màn `/staff/` trong menu | có | không | không | không | không | không | không | có | không |
+| Đổi Group nhân viên | gửi tên mới, 200 | không có màn | không có màn | không có màn | không có màn | không có màn | không có màn | có | không có màn |
+Chưa đăng nhập và `qa_nogroup`: không chạy trên giao diện lượt này (⏸ U10); phần BE đã đo ở Lô 4a (401 và 403). Không tài khoản nào có thêm hay mất mục menu so với FE HEAD.
+
+### Rò giá vốn
+Không phát hiện. Khoá mới trong cấu hình/chính sách AI chỉ là id lệnh, mức A/B/C/OFF và trần kg/vnd/lần: không tiền gắn với lô hay mặt hàng nên không tính ngược ra giá vốn (tiền ÷ kg) được. Giá nhập giả `987000` gõ vào form nhập lô không xuất hiện ở storage, URL, console của bất kỳ tài khoản nào.
+
+### Rò dữ liệu cá nhân
+Không phát hiện do Lô 4b: 6 SĐT giả không có trong `localStorage`, `sessionStorage`, URL, console của 9 tài khoản; khoá cấu hình AI mới không mang tên/SĐT/địa chỉ. Ghi chú: `qa_warehouse`, `qa_wh_del` vẫn đọc được dữ liệu khách qua `/api/sales/orders/`, `/api/delivery/notes/` (ghi nhận N-1 từ Lô 1/4a, chờ Duy xét, không đổi ở Lô 4b). Ảnh chụp và dữ liệu đều giả.
+
+### Hồi quy
+1807 test backend OK, `makemigrations --check` sạch, `check_naming` OK; vitest 251/251; 3 bộ mock e2e liền kề (tổng quan/đơn/kho, nhân viên + tài khoản của tôi, chuyển hướng `/cskh/`) 79/79, 72/72, 8/8; ERP HEAD và ERP Lô 4b chạy trên cùng DB cho cùng kết quả ở ma trận 7 tài khoản. Không chạy lại pytest adapter (Lô 4b không đụng `adapter/`; 68 đạt ở Lô 4a).
+
+### Lỗi
+Không có lỗi chặn do Lô 4b. Ba lỗi dưới đây CÓ TỪ TRƯỚC (tệp không thuộc diff 4b: `features/ai/policy/api.ts`, `features/ai/settings/api.ts`, `shared/lib/http.ts`; ERP HEAD cho kết quả y hệt); tìm thấy vì lần đầu có QA lưu qua giao diện trên Django thật. Mock giấu được lỗi, nên ghi chú dev "lưu trần thành công" của Lô 4b chỉ đúng trên mock.
+
+#### B1 — Lưu "Chính sách AI", "AI của tôi" và các lệnh PUT/POST của AI trả 400 trên BE thật (mã hoá JSON hai lần) · High · AC A2, A6 (có từ trước, không thuộc Lô 4b)
+Bước tái hiện: dựng Django thật + ERP build thật; đăng nhập `qa_owner`; mở `/ai/policy/`; sửa trần kg của "Nhập lô mua tại cảng"; bấm lưu. (Tương tự: `qa_warehouse`, `/ai/settings/`, đổi mức rồi lưu.) Mong đợi: 200, phiên bản mới. Thực tế: `400 {"non_field_errors":["Invalid data. Expected a dictionary, but got str."]}`; thân yêu cầu là chuỗi JSON bị mã hoá hai lần (`updateAiPolicy` ở `features/ai/policy/api.ts` dòng 96 và `sendReal` ở `shared/lib/http.ts` dòng 128 cùng `JSON.stringify`). Cùng kiểu ở `features/ai/settings/api.ts` dòng 101 và 123, `features/content/api.ts` dòng 61 và 72 (chưa chạy). Ảnh hưởng: không ai lưu được chính sách/cấu hình AI qua ERP thật; nên sửa trước khi bật AI cho người dùng thật. Không chặn Lô 4b (HEAD giống hệt), nhưng điều phối viên cần giao FE riêng.
+
+#### B2 — "AI của tôi": ô trần kg/vnd hiện trống và lưu gửi chuỗi rỗng (400) khi BE trả `limits` dạng phẳng · Medium · AC A6 (có từ trước)
+Bước tái hiện: `qa_warehouse` có trần 60 kg / 6 triệu cho lệnh nhập lô (`GET /api/ai/my-config/` trả `"limits": {"kg": "60", "vnd": "6000000"}`); mở `/ai/settings/`. Mong đợi: ô hiện 60 và 6.000.000. Thực tế: `MyConfigScreen.tsx` đọc `cmd.limits.kg?.mine` (hình dạng lồng) nên ô trống; lưu gửi `""` và BE trả 400. Ảnh hưởng: không đặt được trần cá nhân qua ERP; kèm B1.
+
+#### B3 — "AI của tôi": lưu bỏ trường `groups`, `group_levels` bị đặt về `{}` và người dùng ghim bị nới mức · High (khi B1 được sửa) · AC A4, A6 (có từ trước)
+Bước tái hiện: với `qa_pin` (cấu hình ghim khoá cũ, nhiều lệnh đang OFF), phát lại thân yêu cầu giống màn lưu (chỉ `overrides`, `limits`, không `groups`). Mong đợi: `group_levels` và mức OFF giữ nguyên. Thực tế: `group_levels` bị đặt về `{}` (BE: `groups=vdata.get("groups", {})`) và 14 lệnh của `qa_pin` đổi từ OFF sang A/C. Ảnh hưởng: nới quyền AI không chủ ý, chỉ hiện ra khi B1 được sửa. Nhắc cùng B1: mã gửi phải mang đủ `groups` hiện có.
+
+### Ghi nhận (không chặn)
+- O1 (Thấp): thứ hạng cuối danh sách tìm lệnh đổi ở 6/22 truy vấn do BE Lô 4a đổi từ khoá/id lệnh (hạng 1 giữ nguyên; "receive batches" tốt hơn). Không phải do FE.
+- O2 (Thấp): `features/ai/commands/budget.ts` đưa khoá nhóm tiếng Anh (`purchasing`, `sales`, `customer_service`) vào lời nhắc cho LLM (dev đã ghi). Không ảnh hưởng chọn lệnh bằng BM25.
+- O3 (Thấp): `groupSearch.test.ts` xanh cả trên nguồn HEAD, chỉ đỏ khi bỏ nhãn nhóm Việt (S4b). Chấp nhận được vì mục đích là bảo vệ tìm kiếm.
+- O4 (Thấp): `caps.ts` mới nên không có bản HEAD để chứng minh test đỏ (S4c); `AiPolicyScreen` thật chạy qua nó ở A3.
+- N-1 (Trung bình, từ Lô 1, chờ Duy xét): xem mục Rò dữ liệu cá nhân.
+
+### Lệnh đã chạy (tóm tắt)
+| Lệnh | Kết quả |
+|---|---|
+| `cd erp-console && npm ci --cache <scratchpad>/npm-cache` | exit 0 |
+| `npx tsc --noEmit` | exit 0 |
+| `npm test` (vitest) | 22 file, 251 test đạt |
+| `npx vitest run englishNames/groupSearch/caps` trên bản sao với nguồn HEAD, rồi đột biến `search.ts` | 7/15 đỏ; sau đột biến 4/5 đỏ; trả nguồn mới 15/15 xanh |
+| `NEXT_PUBLIC_USE_MOCK=0 NEXT_PUBLIC_API_BASE=http://127.0.0.1:8272 npm run build` rồi `node scripts/check-no-mock.mjs`, `check-ai-chunks.mjs` | exit 0; XANH; XANH |
+| Django cây làm việc (SQLite tạm, `migrate` từ đầu, `seed`) + `erp_stack.py` (Playwright) 7 tài khoản rồi `erp_stack_extra.py` cho `qa_pin`, `qa_owner_cs` | như U1 đến U9, R1, R2, L1 đến L4 |
+| `staff_groups.py`, `ai_flow.py`, `eff.py`, `probe_ai.py`, `vt/cmp.test.ts` (22 truy vấn) | như G1 đến G3, A1 đến A6, F1 đến F3 |
+| ERP HEAD build thật (cổng 3273) chạy lại cùng luồng | kết quả B1 và ma trận 7 tài khoản y hệt |
+| `NEXT_PUBLIC_USE_MOCK=1 npm run build`, phục vụ tĩnh cổng 3274, chạy `p8_lo7_fe_erp.py`, `s41_s47_staff.py`, `p8b_confirmation_route_redirect.py` | 79/79, 72/72, 8/8 |
+| `cd backend && DJANGO_DEBUG=1 env -u DATABASE_URL .venv/bin/python manage.py test` | Ran 1807 OK |
+| `manage.py makemigrations --check --dry-run` | No changes detected |
+| `python3 scripts/check_naming.py` | OK |
+| Dựng lại ERP với API production, `check-no-mock`, `check-ai-chunks`; tắt cổng 3272, 3273, 3274, 8272 | build exit 0, XANH, XANH; `lsof` không còn tiến trình |
+
+Tệp tạm: `/private/tmp/claude-501/-Users-dangthiduyen-Downloads-loc/3e0d9f3d-14ce-4b8b-a1cd-6fbcdc0b2f2d/scratchpad/qa-p8b-l4b/` (script, log, JSON, ảnh `erp-*.png`, bản sao đối chứng). Không sửa mã sản phẩm, không commit, không deploy. `erp-console/out` hiện là bản thật trỏ production.

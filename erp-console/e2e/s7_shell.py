@@ -50,7 +50,7 @@ with sync_playwright() as p:
     labels = [l.split("\n")[-1].strip() for l in labels]
     # S12 (L8): Chủ có thêm mục con "Hàng chờ thanh toán" ngay dưới "Đơn & tiền" (sales.confirm_payment_manual).
     # S16 (L9): thêm mục con "Phiếu hoàn chờ chuyển" ngay sau đó (sales.view_refund).
-    # S03 (AI Lô 1): thêm mục "Nhật ký hoạt động" (accounts.view_auditlog — chu, quan_ly) ở cuối mục Quản trị.
+    # S03 (AI Lô 1): thêm mục "Nhật ký hoạt động" (accounts.view_auditlog — chu, manager) ở cuối mục Quản trị.
     expected = ["Tổng quan", "Đơn & tiền", "Hàng chờ thanh toán", "Phiếu hoàn chờ chuyển", "Giao hàng", "Kho & lô", "Mua hàng", "Kiểm kê", "Báo cáo lãi lỗ", "Danh mục & giá", "Nhân sự · Nhật ký", "Nhật ký hoạt động"]
     ok("AC1 menu Chủ", labels == expected, str(labels))
     rr = page.locator("#rail-right")

@@ -1,5 +1,5 @@
 """QA Lô 7 — L5-1 với BACKEND THẬT (Django SQLite 8118) + ERP build thật (3219): danh sách lô EXPIRED dùng has_stock=1.
-Dữ liệu giả. Dấu vết giá vốn: 777001/777002 (giá mua) không được xuất hiện với nv_kho."""
+Dữ liệu giả. Dấu vết giá vốn: 777001/777002 (giá mua) không được xuất hiện với warehouse_staff."""
 import json, os, re, sys, urllib.request
 from playwright.sync_api import sync_playwright
 BASE = "http://127.0.0.1:3219"; API = "http://127.0.0.1:8118"; SHOTS = os.environ["SHOTS"]
@@ -67,7 +67,7 @@ with sync_playwright() as p:
         ok(f"{tag}: storage/URL/console không có giá vốn hay dữ liệu khách", not re.search(r"77700\d", ls + page.url + " ".join(cons) + " ".join(reqs)) if user == "kho1" else True)
         page.screenshot(path=f"{SHOTS}/real-l51-{user}-{vp[0]}.png", full_page=True)
         ctx.close()
-    # nv_giao vào thẳng URL
+    # delivery_staff vào thẳng URL
     ctx = b.new_context(viewport={"width": 1280, "height": 800}); page = ctx.new_page(); login(page, "giao1")
     page.goto(BASE + "/inventory/?status=EXPIRED"); page.wait_for_load_state("networkidle"); page.wait_for_timeout(800)
     t = page.inner_text("body")

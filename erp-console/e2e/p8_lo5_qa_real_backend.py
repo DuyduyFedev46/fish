@@ -1,6 +1,6 @@
 # QA P8 Lô 5 — Django THẬT (SQLite tạm, cổng 8115) + build USE_MOCK=0 phục vụ cổng 3216. Dữ liệu giả.
 #   Chủ (loc): mở lô EXPIRED còn 6,5 kg -> Chốt khoá -> Trả NCC 2 kg (kèm tiền NCC hoàn giả 999888) -> Trả hết (bấm đúp)
-#   -> tồn 0 -> Chốt lô mở -> Chốt. nv_kho (kho1): không thấy nút. Không rò tiền/PII ở DOM, URL, storage, console.
+#   -> tồn 0 -> Chốt lô mở -> Chốt. warehouse_staff (kho1): không thấy nút. Không rò tiền/PII ở DOM, URL, storage, console.
 import json
 import os
 import re
@@ -95,7 +95,7 @@ def run(browser, tag, viewport):
         pass
     ctx.close()
 
-    # nv_kho
+    # warehouse_staff
     ctx = browser.new_context(viewport=viewport, reduced_motion="reduce")
     page = ctx.new_page()
     resp2 = []
@@ -109,14 +109,14 @@ def run(browser, tag, viewport):
     page.get_by_role("dialog", name=re.compile("Chi tiết lô")).wait_for(timeout=10_000)
     page.locator("[data-testid=qty-available]").wait_for()
     page.wait_for_timeout(600)
-    ok(f"[{tag}] nv_kho: thấy lô quá hạn còn tồn nhưng không có nút Huỷ/Trả NCC/Chốt",
+    ok(f"[{tag}] warehouse_staff: thấy lô quá hạn còn tồn nhưng không có nút Huỷ/Trả NCC/Chốt",
        page.locator("[data-action=cancel_expired]").count() == 0 and page.locator("[data-action=return_to_supplier]").count() == 0 and page.locator("[data-action=close]").count() == 0 and "3" in qty(page))
     page.screenshot(path=f"{SHOTS}/real-{tag}-4-nvkho-khong-nut.png")
     page.goto(BASE + "/overview/")
     page.wait_for_load_state("networkidle")
     page.wait_for_timeout(600)
-    ok(f"[{tag}] nv_kho: Tổng quan không có thẻ Lô quá hạn", page.locator("[data-attention=expired_batches_open]").count() == 0)
-    ok(f"[{tag}] nv_kho: bảng đơn không có cột Khách", "Khách" not in [h.strip() for h in page.locator("section[aria-labelledby=ov-orders] thead th").all_inner_texts()])
+    ok(f"[{tag}] warehouse_staff: Tổng quan không có thẻ Lô quá hạn", page.locator("[data-attention=expired_batches_open]").count() == 0)
+    ok(f"[{tag}] warehouse_staff: bảng đơn không có cột Khách", "Khách" not in [h.strip() for h in page.locator("section[aria-labelledby=ov-orders] thead th").all_inner_texts()])
     ctx.close()
 
 

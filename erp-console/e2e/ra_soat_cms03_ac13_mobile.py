@@ -6,7 +6,7 @@ duyệt.
 
 Chạy thật: backend Django tại :8104 (BE thật, KHÔNG mock), erp-console build tĩnh phục vụ ở
 :3204 (NEXT_PUBLIC_API_BASE=http://localhost:8104). Tài khoản QA tự tạo (`ra_soat_quanly`,
-nhóm quan_ly), dữ liệu giả.
+nhóm manager), dữ liệu giả.
 
 Dùng: python3 erp-console/e2e/ra_soat_cms03_ac13_mobile.py
 """
