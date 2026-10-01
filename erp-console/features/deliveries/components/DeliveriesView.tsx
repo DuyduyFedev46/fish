@@ -1,216 +1,181 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
-import { todayInVietnam } from "@/shared/lib/format";
-import { fetchDeliveryNotes } from "../api";
-import { DeliveryDetailModal } from "./DeliveryDetailModal";
-import {
-  DeliveryNoteItem,
-  DeliveryStatusGroup,
-  STATUS_GROUP_TABS,
-} from "../types";
-import s from "../deliveries.module.css";
+// ED-17 — Danh sách phiếu giao (Chủ, Quản lý, NV kho). Khung ListPage: tab theo trạng thái (đồng bộ ?tab=), thanh lọc, bảng, "Tải thêm".
+// Bấm một dòng → /deliveries/detail/?id=<số> (URL chỉ mang id). Tìm kiếm chạy trên các dòng đã tải, không gửi từ khoá đi đâu.
+// Cột người nhận dùng PersonalText (null = đã ẩn theo thời hạn). Không có giá vốn trong màn này.
+import { useMemo, useState } from "react";
+import { ENUMS, deliveryLabelText } from "@/shared/lib/enums";
+import { kg, todayInVietnam } from "@/shared/lib/format";
+import { loadErrorText } from "@/shared/lib/http";
+import { usePagedList } from "@/shared/lib/usePagedList";
+import { Chip } from "@/shared/ui/Chip";
+import { Icon } from "@/shared/ui/Icon";
 import { PersonalText } from "@/shared/ui/PersonalText";
-import { personalText } from "@/shared/lib/personalData";
+import { Tabs, useTabParam } from "@/shared/ui/Tabs";
+import { DataTable, type Column } from "@/shared/ui/list/DataTable";
+import { FilterBar } from "@/shared/ui/list/FilterBar";
+import { ListPage } from "@/shared/ui/list/ListPage";
+import { fetchDeliveryNotes } from "../api";
+import { detailHref, lineNames, loadedOnlyNote } from "../deliveryUi";
+import { STATUS_GROUP_TABS, type DeliveryNoteItem, type DeliveryStatusGroup } from "../types";
+import s from "../deliveries.module.css";
+
+type Params = { status: string; completed_from?: string };
+
+const TAB_KEYS = STATUS_GROUP_TABS.map((t) => t.key);
+const DEFAULT_TAB: DeliveryStatusGroup = "PREPARING";
+const LABEL_ALL = "";
+const COURIER_ALL = "";
+const COURIER_NONE = "none";
+
+function matches(row: DeliveryNoteItem, q: string): boolean {
+  const needle = q.trim().toLowerCase();
+  if (!needle) return true;
+  return [row.code, row.order?.code, row.invoice_code, row.lines_summary].some((v) => (v || "").toLowerCase().includes(needle));
+}
 
 export function DeliveriesView() {
-  const [activeTab, setActiveTab] = useState<DeliveryStatusGroup>("PREPARING");
-  const [notes, setNotes] = useState<DeliveryNoteItem[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
-  const [selectedNote, setSelectedNote] = useState<DeliveryNoteItem | null>(null);
+  const [tab, setTab] = useTabParam(TAB_KEYS, DEFAULT_TAB);
+  const [query, setQuery] = useState("");
+  const [label, setLabel] = useState(LABEL_ALL);
+  const [courier, setCourier] = useState(COURIER_ALL);
 
-  const loadData = useCallback(() => {
-    setLoading(true);
-    setError(null);
+  const params: Params = useMemo(
+    () => (tab === "COMPLETED" ? { status: "COMPLETED", completed_from: todayInVietnam() } : { status: tab }),
+    [tab],
+  );
+  const list = usePagedList<DeliveryNoteItem, Params>((p, page) => fetchDeliveryNotes({ ...p, page }), params, true);
 
-    const params =
-      activeTab === "COMPLETED"
-        ? { status: "COMPLETED", completed_from: todayInVietnam() }
-        : { status: activeTab };
+  const rows = list.rows;
+  const courierOptions = useMemo(() => {
+    const names = new Map<number, string>();
+    for (const r of rows ?? []) if (r.assigned_to && r.assigned_to_name) names.set(r.assigned_to, r.assigned_to_name);
+    return [
+      { value: COURIER_ALL, label: "Mọi người giao" },
+      { value: COURIER_NONE, label: "Chưa giao cho ai" },
+      ...Array.from(names, ([id, name]) => ({ value: String(id), label: name })),
+    ];
+  }, [rows]);
 
-    fetchDeliveryNotes(params)
-      .then((res) => {
-        setNotes(res.results || []);
-        setLoading(false);
-      })
-      .catch((err) => {
-        setError(err?.message || "Không thể tải danh sách phiếu giao.");
-        setLoading(false);
-      });
-  }, [activeTab]);
+  const shown = useMemo(() => {
+    if (!rows) return null;
+    return rows.filter((r) => {
+      if (!matches(r, query)) return false;
+      if (label === "printed" && !r.label.printed) return false;
+      if (label === "unprinted" && r.label.printed) return false;
+      if (courier === COURIER_NONE && r.assigned_to) return false;
+      if (courier && courier !== COURIER_NONE && String(r.assigned_to ?? "") !== courier) return false;
+      return true;
+    });
+  }, [rows, query, label, courier]);
 
-  useEffect(() => {
-    loadData();
-  }, [loadData]);
+  const columns: Column<DeliveryNoteItem>[] = [
+    { key: "code", header: "Mã phiếu", mono: true, render: (r) => r.code, width: "180px" },
+    { key: "order", header: "Đơn hàng", mono: true, render: (r) => r.order?.code || "—", width: "150px" },
+    { key: "name", header: "Người nhận", render: (r) => <PersonalText value={r.customer_name} whenEmpty="—" /> },
+    { key: "lines", header: "Hàng", render: (r) => <span className={s.lines}>{lineNames(r.lines_summary) || "—"}</span> },
+    { key: "kg", header: "Tổng kg", num: true, render: (r) => kg(r.total_kg), width: "100px" },
+    { key: "courier", header: "Người giao", render: (r) => r.assigned_to_name || <span className="muted">Chưa giao</span>, width: "140px" },
+    { key: "label", header: "Tem", render: (r) => <Chip entry={deliveryLabelText(r.label.printed ? r.label.valid_print_no ?? 1 : null)} />, width: "130px" },
+    { key: "status", header: "Trạng thái", render: (r) => <Chip table={ENUMS.deliveryStatus} value={r.status} />, width: "140px" },
+  ];
 
-  const renderBadge = (status: string, label: string) => {
-    let cls = s.badge;
-    if (status === "CONFIRMING") cls += ` ${s.badgeConfirming}`;
-    else if (status === "PREPARING") cls += ` ${s.badgePreparing}`;
-    else if (status === "READY") cls += ` ${s.badgeReady}`;
-    else if (status === "DELIVERING") cls += ` ${s.badgeDelivering}`;
-    else if (status === "FAILED") cls += ` ${s.badgeFailed}`;
-    else cls += ` ${s.badgeCompleted}`;
-
-    return <span className={cls}>{label}</span>;
-  };
-
-  const renderLabelBadge = (item: DeliveryNoteItem) => {
-    if (item.label.printed) {
-      return (
-        <span className={`${s.badge} ${s.badgeLabelPrinted}`}>
-          Đã in {item.label.valid_print_no ? `(lần ${item.label.valid_print_no})` : ""}
-        </span>
-      );
-    }
-    return <span className={`${s.badge} ${s.badgeLabelUnprinted}`}>Chưa in tem</span>;
-  };
+  const tabLabel = STATUS_GROUP_TABS.find((t) => t.key === tab)?.label ?? "";
+  const filtered = !!(query.trim() || label || courier);
+  // Bộ lọc/tìm kiếm chạy trên các dòng đã tải: còn trang chưa tải thì nói rõ để khỏi hiểu nhầm là không có.
+  const noMatchWhileMore = filtered && Boolean(shown) && shown!.length === 0;
+  const loadedNote = loadedOnlyNote(rows?.length ?? 0);
+  const errorText = list.error && !list.rows ? loadErrorText(list.error) : null;
 
   return (
-    <div className={s.screen}>
-      <div className={s.header}>
-        <h1 className={s.title}>Giao hàng</h1>
-        <p className={s.desc}>
-          Bảng điều phối và theo dõi phiếu giao hàng theo trạng thái xử lý và đóng gói.
-        </p>
-      </div>
-
-      <div className={s.tabs} role="tablist">
-        {STATUS_GROUP_TABS.map((tab) => {
-          const isActive = activeTab === tab.key;
-          return (
-            <button
-              key={tab.key}
-              type="button"
-              role="tab"
-              aria-selected={isActive}
-              className={`${s.tab} ${isActive ? s.tabActive : ""}`}
-              onClick={() => setActiveTab(tab.key)}
-            >
-              <span>{tab.label}</span>
-              {isActive && notes.length > 0 && (
-                <span className={s.tabCount}>{notes.length}</span>
-              )}
-            </button>
-          );
-        })}
-      </div>
-
-      {error && <div className={`${s.alertBox} ${s.alertError}`}>{error}</div>}
-
-      {loading ? (
-        <div className={s.emptyState}>Đang tải danh sách phiếu giao...</div>
-      ) : notes.length === 0 ? (
-        <div className={s.emptyState}>Không có phiếu giao nào trong mục này.</div>
-      ) : (
-        <>
-          {/* Bảng máy tính / Tablet */}
-          <div className={s.tableWrapper}>
-            <table className={s.table}>
-              <thead>
-                <tr>
-                  <th>Mã phiếu</th>
-                  <th>Đơn / Hoá đơn</th>
-                  <th>Người nhận & Địa chỉ</th>
-                  <th>Tóm tắt hàng</th>
-                  <th>Tổng kg</th>
-                  <th>Tem</th>
-                  <th>Trạng thái</th>
-                </tr>
-              </thead>
-              <tbody>
-                {notes.map((item) => (
-                  <tr
-                    key={item.id}
-                    className={s.rowClickable}
-                    onClick={() => setSelectedNote(item)}
-                  >
-                    <td>
-                      <div className={s.codeCell}>{item.code}</div>
-                    </td>
-                    <td>
-                      <div>{item.order?.code || "—"}</div>
-                      <div className={s.subCode}>{item.invoice_code || "—"}</div>
-                    </td>
-                    <td>
-                      <div className={s.customerName}>
-                        <PersonalText value={item.customer_name} whenEmpty="" />
-                      </div>
-                      {/* Cả tên và địa chỉ đã ẩn → chỉ hiện một dòng "Đã ẩn", khỏi lặp. */}
-                      {!(item.customer_name === null && item.address === null) && (
-                        <div className={s.customerAddress} title={personalText(item.address, "")}>
-                          <PersonalText value={item.address} whenEmpty="" />
-                        </div>
-                      )}
-                    </td>
-                    <td>
-                      <div className={s.linesSummary}>{item.lines_summary || "—"}</div>
-                    </td>
-                    <td>
-                      <span className={s.totalKg}>{item.total_kg} kg</span>
-                    </td>
-                    <td>{renderLabelBadge(item)}</td>
-                    <td>{renderBadge(item.status, item.status_label)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Dạng thẻ cho điện thoại (360x640) */}
-          <div className={s.cardsContainer}>
-            {notes.map((item) => (
-              <div
-                key={item.id}
-                className={s.cardItem}
-                onClick={() => setSelectedNote(item)}
-              >
-                <div className={s.cardTop}>
-                  <div className={s.cardCodes}>
-                    <div className={s.codeCell}>{item.code}</div>
-                    <div className={s.subCode}>
-                      Đơn: {item.order?.code || "—"} · HĐ: {item.invoice_code || "—"}
-                    </div>
-                  </div>
-                  <div>{renderBadge(item.status, item.status_label)}</div>
-                </div>
-
-                <div className={s.cardMid}>
-                  <div className={s.customerName}>
-                    <PersonalText value={item.customer_name} whenEmpty="" />
-                  </div>
-                  {!(item.customer_name === null && item.address === null) && (
-                    <div className={s.customerAddress}>
-                      <PersonalText value={item.address} whenEmpty="" />
-                    </div>
-                  )}
-                  <div className={s.linesSummary} style={{ marginTop: 4 }}>
-                    {item.lines_summary}
-                  </div>
-                </div>
-
-                <div className={s.cardBottom}>
-                  <div>{renderLabelBadge(item)}</div>
-                  <div>
-                    <span className={s.totalKg}>{item.total_kg} kg</span>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </>
-      )}
-
-      {selectedNote && (
-        <DeliveryDetailModal
-          item={selectedNote}
-          onClose={() => setSelectedNote(null)}
-          onUpdated={() => {
-            loadData();
-          }}
+    <ListPage
+      id="deliveries-panel"
+      asOf={list.asOf}
+      onRetry={() => void list.reload()}
+      tabs={
+        <Tabs
+          label="Nhóm phiếu giao theo trạng thái"
+          panelId="deliveries-panel"
+          tabs={STATUS_GROUP_TABS.map((t) => ({ key: t.key, label: t.label, count: t.key === tab && !filtered ? list.count : null }))}
+          value={tab}
+          onChange={setTab}
         />
-      )}
-    </div>
+      }
+      filters={
+        <FilterBar
+          query={query}
+          onQuery={setQuery}
+          placeholder="Tìm mã phiếu, mã đơn, mặt hàng"
+          searchLabel="Tìm phiếu giao"
+          selects={[
+            {
+              key: "label",
+              label: "Lọc theo tem",
+              value: label,
+              onChange: setLabel,
+              options: [
+                { value: LABEL_ALL, label: "Mọi tem" },
+                { value: "unprinted", label: "Chưa in tem" },
+                { value: "printed", label: "Đã in tem" },
+              ],
+            },
+            { key: "courier", label: "Lọc theo người giao", value: courier, onChange: setCourier, options: courierOptions },
+          ]}
+          summary={shown && rows ? `Đang hiện ${shown.length} / ${list.count} phiếu` : undefined}
+        />
+      }
+      footer={
+        list.hasMore ? (
+          <>
+            {noMatchWhileMore && query.trim() && (
+              <p className="muted" role="status">
+                {loadedNote}
+              </p>
+            )}
+            <button type="button" className="btn" onClick={() => void list.loadMore()} disabled={list.moreLoading}>
+              {list.moreLoading ? <Icon name="progress_activity" className="spin" /> : null}
+              <span>{list.moreLoading ? "Đang tải…" : "Tải thêm"}</span>
+            </button>
+          </>
+        ) : undefined
+      }
+      banner={
+        list.moreError != null ? (
+          <div className="alert-box err" role="alert">
+            <Icon name="sync_problem" />
+            <span>Chưa tải thêm được. Bấm Tải thêm để thử lại.</span>
+          </div>
+        ) : list.error && list.rows ? (
+          <div className="alert-box err" role="alert">
+            <Icon name="sync_problem" />
+            <span>{loadErrorText(list.error)}</span>
+          </div>
+        ) : undefined
+      }
+    >
+      <DataTable
+        columns={columns}
+        rows={shown}
+        rowKey={(r) => r.id}
+        rowHref={(r) => detailHref(r.id)}
+        loading={list.loading && !list.rows}
+        error={errorText}
+        onRetry={() => void list.reload()}
+        query={query}
+        onClearQuery={() => setQuery("")}
+        noun="phiếu giao"
+        empty={{
+          icon: "local_shipping",
+          title: filtered ? "Không có phiếu nào khớp bộ lọc" : `Chưa có phiếu giao nào ở mục ${tabLabel}`,
+          hint: filtered
+            ? list.hasMore
+              ? loadedNote
+              : "Bỏ bớt bộ lọc để xem lại các phiếu đã tải."
+            : "Phiếu mới sẽ hiện ở đây khi đơn đã thanh toán chuyển sang giao hàng.",
+        }}
+        canViewCost={false}
+        caption={`Danh sách phiếu giao, mục ${tabLabel}`}
+      />
+    </ListPage>
   );
 }

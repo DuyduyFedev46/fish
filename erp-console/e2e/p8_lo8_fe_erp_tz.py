@@ -82,10 +82,12 @@ def collect(browser, tz):
         page.screenshot(path=f"{SHOTS}/lo8-erp-2-don-chi-tiet-ny.png")
     goto(page, "/deliveries/")
     out["deliveries"] = page.inner_text("body")
-    page.locator("[class*='card'], tr").nth(1).click()
-    d2 = page.get_by_role("dialog")
+    # ERP theo design Lô 4: chi tiết phiếu giao là trang riêng (/deliveries/detail/?id=…), không còn hộp thoại
+    page.locator("table.lt tbody tr.lt-click").first.click()
+    page.wait_for_url("**/deliveries/detail/**", timeout=10_000)
+    d2 = page.locator("main")
     d2.wait_for(timeout=10_000)
-    page.wait_for_timeout(500)
+    page.wait_for_timeout(800)
     out["delivery_detail"] = d2.inner_text()
     goto(page, "/inventory/")
     out["inventory"] = page.inner_text("body")
@@ -151,7 +153,7 @@ def main():
                    time_tokens(d[key]) == time_tokens(base[key]) and len(time_tokens(base[key])) > 0,
                    f"{time_tokens(d[key])[:6]} vs {time_tokens(base[key])[:6]}")
             ok(f"AC4 [{tz}] Ngày nhập lô mặc định = ngày VN", d["received_date_default"] == "2026-10-01", d["received_date_default"])
-            ok(f"AC2 [{tz}] HSD phiếu giao dạng dd/mm/yyyy", "HSD: 20/09/2027" in d["delivery_detail"], "")
+            ok(f"AC2 [{tz}] HSD phiếu giao dạng dd/mm/yyyy", "20/09/2027" in d["delivery_detail"], "")
             ok(f"[{tz}] không có pageerror", not d["errs"], str(d["errs"][:2]))
 
         # ---- tiền

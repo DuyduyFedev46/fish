@@ -59,17 +59,17 @@ with sync_playwright() as p:
 
     ok("CS-02-AC6: không cuộn ngang ở 360x640", no_horizontal_scroll(page1))
 
-    # Bảng dạng table phải bị ẩn (CSS @media max-width:768px ẩn .tableWrapper)
-    table_visible = page1.eval_on_selector_all(
-        "table", "els => els.some(e => e.offsetParent !== null)"
+    # ERP theo design (ED-04): danh sách là bảng cuộn NGAY TRONG thẻ (.lt-scroll), không cuộn cả trang; dòng bấm được cao >= 44px.
+    in_scroll = page1.eval_on_selector_all(
+        "table.lt", "els => els.length > 0 && els.every(e => !!e.closest('.lt-scroll'))"
     )
-    ok("CS-02-AC6: bảng dạng table (desktop) không hiển thị ở mobile", not table_visible)
+    ok("CS-02-AC6: bảng nằm trong vùng cuộn riêng của thẻ (không đẩy trang rộng ra)", in_scroll)
 
-    card_ok, card_violations, card_boxes = min_tap_target_ok(page1, "[class*='cardItem']")
+    row_ok, row_violations, row_boxes = min_tap_target_ok(page1, "table.lt tbody tr.lt-click")
     ok(
-        f"CS-02-AC6: {len(card_boxes)} thẻ phiếu giao có vùng bấm >= 44px",
-        card_ok,
-        str(card_violations[:3]),
+        f"CS-02-AC6: {len(row_boxes)} dòng phiếu giao có vùng bấm >= 44px",
+        row_ok,
+        str(row_violations[:3]),
     )
 
     # ---------- CS-05-AC8: Hàng chờ CSKH 360x640, link tel:, nút kết quả >= 44px ở nửa dưới màn hình ----------

@@ -8,9 +8,11 @@ import { NoPermission } from "@/shared/ui/states/NoPermission";
 import { canView, homePath, type ViewKey } from "@/shared/lib/nav";
 import { useAuth } from "./AuthProvider";
 
-export function ViewGuard({ view, children }: { view: ViewKey; children: React.ReactNode }) {
+/** `view` là một màn, hoặc nhiều màn (qua được nếu thấy ÍT NHẤT một): trang dùng chung giữa hai vai, vd chi tiết phiếu giao. */
+export function ViewGuard({ view, children }: { view: ViewKey | ViewKey[]; children: React.ReactNode }) {
   const { me } = useAuth();
-  if (!me || !canView(me, view)) {
+  const views = Array.isArray(view) ? view : [view];
+  if (!me || !views.some((v) => canView(me, v))) {
     return <NoPermission homeHref={me ? homePath(me) : undefined} />;
   }
   return <>{children}</>;

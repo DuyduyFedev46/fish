@@ -1,16 +1,23 @@
 import { apiFetch } from "@/shared/lib/http";
 import {
+  mockGetDeliverers,
   mockGetDeliveryLabel,
   mockGetDeliveryNoteDetail,
   mockListDeliveryNotes,
+  mockPostDeliveryAssign,
   mockPostDeliveryLabelPrint,
   mockPostDeliveryLabelVoid,
   mockPostDeliveryNoteStatus,
 } from "./mock";
 import type {
+  AssignDeliveryResponse,
+  Deliverer,
+  DeliveryFailureReason,
   DeliveryListResponse,
   DeliveryNoteDetail,
+  DeliveryNoteItem,
   LabelData,
+  LabelPrintReason,
   PrintDeliveryLabelResponse,
   VoidLabelResponse,
 } from "./types";
@@ -19,6 +26,8 @@ export async function fetchDeliveryNotes(
   params: {
     status?: string;
     completed_from?: string;
+    /** `me` = chỉ phiếu gán cho mình (Việc giao của tôi); số = id người giao (chỉ vai đủ phạm vi). */
+    assigned_to?: string;
     page?: number;
   },
   signal?: AbortSignal
@@ -27,6 +36,7 @@ export async function fetchDeliveryNotes(
   const query = new URLSearchParams();
   if (params.status) query.set("status", params.status);
   if (params.completed_from) query.set("completed_from", params.completed_from);
+  if (params.assigned_to) query.set("assigned_to", params.assigned_to);
   if (params.page) query.set("page", String(params.page));
 
   const qs = query.toString();
@@ -86,7 +96,8 @@ export async function fetchDeliveryLabel(
 export async function printDeliveryLabel(
   id: number,
   requestId?: string,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  reason?: LabelPrintReason
 ): Promise<PrintDeliveryLabelResponse> {
   const isMock = process.env.NEXT_PUBLIC_USE_MOCK === "1";
   const reqId =
@@ -96,7 +107,7 @@ export async function printDeliveryLabel(
       : undefined);
   return apiFetch<PrintDeliveryLabelResponse>(`/api/delivery/notes/${id}/label/print/`, {
     method: "POST",
-    body: { request_id: reqId },
+    body: reason ? { request_id: reqId, reason } : { request_id: reqId },
     signal,
     mock: isMock ? (req) => mockPostDeliveryLabelPrint(req, id) : undefined,
   });
@@ -117,3 +128,64 @@ export async function voidDeliveryLabel(
 }
 
 
+
+/** Trả về phiếu theo bản danh sách (không có dòng hàng, SĐT): màn tải lại chi tiết sau khi đổi trạng thái. */
+export type DeliveryStatusResponse = DeliveryNoteItem & { already?: boolean; needs_decision?: boolean };
+
+async function postStatus(id: number, body: Record<string, unknown>, signal?: AbortSignal): Promise<DeliveryStatusResponse> {
+  const isMock = process.env.NEXT_PUBLIC_USE_MOCK === "1";
+  return apiFetch<DeliveryStatusResponse>(`/api/delivery/notes/${id}/status/`, {
+    method: "POST",
+    body,
+    signal,
+    mock: isMock ? mockPostDeliveryNoteStatus : undefined,
+  });
+}
+
+/** READY → DELIVERING (nhận hàng đi giao; cũng dùng để giao lại phiếu FAILED). `from_status` chặn thao tác trên bản đã cũ. */
+export function startDelivery(id: number, fromStatus: string, signal?: AbortSignal): Promise<DeliveryStatusResponse> {
+  return postStatus(id, { to_status: "DELIVERING", from_status: fromStatus }, signal);
+}
+
+/** DELIVERING → COMPLETED. */
+export function completeDelivery(id: number, signal?: AbortSignal): Promise<DeliveryStatusResponse> {
+  return postStatus(id, { to_status: "COMPLETED", from_status: "DELIVERING" }, signal);
+}
+
+/**
+ * B5: DELIVERING → FAILED. `failure_reason` bắt buộc; "Khác" bắt buộc `failure_note`; ghi chú tối đa 200 ký tự và
+ * không được chứa dãy 9 chữ số trở lên (400 `DELIVERY_FAILURE_*`). Ghi chú là chữ tự do: không log, không lưu máy.
+ */
+export function reportDeliveryFailure(
+  id: number,
+  input: { reason: DeliveryFailureReason; note?: string },
+  signal?: AbortSignal
+): Promise<DeliveryStatusResponse> {
+  const body: Record<string, unknown> = { to_status: "FAILED", from_status: "DELIVERING", failure_reason: input.reason };
+  if (input.note && input.note.trim()) body.failure_note = input.note.trim();
+  return postStatus(id, body, signal);
+}
+
+/** B6: người giao đang làm kèm số phiếu đang giao / chờ lấy (cần quyền giao người). Mảng thường, không phân trang. */
+export async function fetchDeliverers(signal?: AbortSignal): Promise<Deliverer[]> {
+  const isMock = process.env.NEXT_PUBLIC_USE_MOCK === "1";
+  return apiFetch<Deliverer[]>("/api/delivery/deliverers/", { signal, mock: isMock ? mockGetDeliverers : undefined });
+}
+
+/**
+ * B6: giao / đổi người giao. `expectedAssignedTo` = người giao màn đang hiển thị (null = chưa có); lệch → 409 `STALE_STATE`
+ * (màn hiện ConflictBanner). Cùng người → 200 kèm `already: true`.
+ */
+export async function assignDeliveryNote(
+  id: number,
+  input: { assignedTo: number; expectedAssignedTo: number | null },
+  signal?: AbortSignal
+): Promise<AssignDeliveryResponse> {
+  const isMock = process.env.NEXT_PUBLIC_USE_MOCK === "1";
+  return apiFetch<AssignDeliveryResponse>(`/api/delivery/notes/${id}/assign/`, {
+    method: "POST",
+    body: { assigned_to: input.assignedTo, expected_assigned_to: input.expectedAssignedTo },
+    signal,
+    mock: isMock ? mockPostDeliveryAssign : undefined,
+  });
+}

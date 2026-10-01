@@ -1,11 +1,11 @@
 import { ViewGuard } from "@/features/auth/components/ViewGuard";
-import { Placeholder } from "@/shared/ui/Placeholder";
+import { MyDeliveriesScreen } from "@/features/deliveries/components/MyDeliveriesScreen";
 
-// Màn chưa làm (xem plannedIn trong shared/lib/nav.ts). Khi làm: thay <Placeholder> bằng màn của features/<module>.
+// ED-19: Việc giao của tôi (nhân viên giao). ViewGuard chặn người không thuộc nhóm giao hàng trước khi gọi API.
 export default function Page() {
   return (
     <ViewGuard view="my-deliveries">
-      <Placeholder view="my-deliveries" />
+      <MyDeliveriesScreen />
     </ViewGuard>
   );
 }

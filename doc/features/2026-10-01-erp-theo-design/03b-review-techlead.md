@@ -1378,3 +1378,139 @@ khác vừa sửa") và M2 (nút Đồng ý kẹt khi tải chi tiết đề xu�
 ### Kết luận re-review Lô 2 — FE: **APPROVED**
 M1, M2, B1–B5 đều đạt. Không còn lỗi Critical, High hay Medium. Lô sẵn sàng cho QA chạy lại. Khi commit phải kèm
 `erp-console/public/fonts/ms/material-symbols-outlined.woff2`. L8 và L9 cùng L2–L7 để Lô 3 xử lý.
+
+## Lô 4 — FE (Giao hàng ED-17 + Việc giao của tôi ED-19)
+> Review 02/10/2026 trên worktree `loc-wt-b` (nhánh `ed-stream-b`, tách từ `c1f1179`), diff chưa commit trong `erp-console/`.
+> Căn cứ: 02b §0 dòng 3, §0b T1/T4/T6/T7, §0c F2l/F2o, §1, §2.3, §2.4, §5.2 Lô 4; contract "Lô 4 — BE" trong dev-notes; 02-stories ED-17, ED-19; UI-RULES.
+
+**Kết luận: CHANGES REQUESTED (nhẹ).** Lô không có lỗi Critical hay High. Không rò dữ liệu khách, không rò giá vốn, không vượt quyền.
+Có 2 lỗi Medium, đều là AC của 02-stories bị thiếu và sửa được trong vài dòng. Các lỗi Low có thể để lô sau.
+
+### Kiểm chứng (Tech Lead tự chạy trong lượt này, ở worktree)
+- `npx tsc --noEmit`: sạch. `npx vitest run`: 44 file, 405 test đều đạt.
+- `NEXT_PUBLIC_USE_MOCK=0 npm run build`: OK. Có các route `/deliveries` (7,36 kB), `/deliveries/detail` (14,3 kB), `/my-deliveries` (6,19 kB), `/print/label` (13 kB).
+- `check-ai-chunks`: XANH, gồm 4 mục tiêu mới. `check-no-mock`: XANH (15 file mock, 34 seed, 143 file build).
+- `python3 scripts/check_naming.py`: OK, không có vi phạm mới.
+- Grep màu cứng (`#hex`, `rgb()`, `hsl()`) trên `features/deliveries/**`, `app/(console)/deliveries/**`, `my-deliveries/page.tsx`, `app/print/label/page.tsx`: **0**.
+- Grep `console.`, `localStorage`, `sessionStorage`, `router.push`, `searchParams.set` trong các file của lô: không có lệnh nào, chỉ có chú thích.
+- `out/deliveries/detail/index.html`, `out/my-deliveries/index.html`: không có chuỗi SĐT.
+
+### Đối chiếu trọng tâm
+| Mục | Kết quả | Căn cứ |
+|---|---|---|
+| Tem in che SĐT (T1) | Đạt | `app/print/label/page.tsx` chỉ hiện `recipient_phone_masked`, có chú thích T1. Vẫn kiểm `delivery.print_label`. QR vẫn là ảnh data-URI. `@page` nằm trong `<style>` của trang. Thanh công cụ ẩn khi in (`label.module.css`, `@media print`) |
+| Ghi chú giao thất bại | Đạt | `ReportFailureModal` giữ ghi chú trong `useState`. `Field` và `useSubmit` không ghi vào máy. Không có `console`. URL không đổi. Thông điệp lỗi lấy từ BE và BE không lặp lại nội dung. `reportDeliveryFailure` chỉ gửi trong body POST |
+| SĐT đủ chỉ lấy từ R4 | Đạt (xem L1) | Chi tiết và "Gọi khách" đọc `detail.phone`. Danh sách không có SĐT. `telHref` chỉ lọc chữ số từ chuỗi BE trả, không ghép từ nguồn khác. Còn dòng dự phòng `recipient_phone` là code chết (L1) |
+| `tel:` | Đạt | `DeliveryDetailScreen.tsx:357`, `MyDeliveriesScreen.tsx:87`. Số quá ngắn thì không dựng link. `null` (đã ẩn theo SR-PII-02) thì hiện "đã ẩn" |
+| `delivery_staff` chỉ thấy phiếu của mình | Đạt | `MyDeliveriesScreen` gọi `assigned_to=me`. BE chặn ở `get_queryset`, mock cũng mô phỏng như vậy. `/deliveries/detail/` đặt `ViewGuard view="deliveries"`, nên người chỉ thuộc `delivery_staff` vào bằng URL sẽ thấy "Không có quyền" trước khi gọi API |
+| Menu S7-AC2 | Đạt, không đổi | `shared/lib/nav.ts:233` `!onlyDelivery(me)`, `:245` "Việc giao của tôi" theo nhóm. Lô không sửa `nav.ts`. `nav.test.ts:70-72` vẫn xanh |
+| F2o: quyền và trạng thái | Đạt | `canAssign` (`deliveryUi.ts:60`) đòi cả trạng thái thuộc T6 **và** BE trả `"assign"` trong `available_actions`. BE chỉ trả khi có `delivery.assign_deliverynote`. Mục khoá "Đổi người giao" kèm lý do chỉ hiện với người có quyền (`DeliveryDetailScreen.tsx:227`). Hộp hiện "Đang giao n phiếu · Chờ lấy m phiếu" (T7) |
+| 409 `STALE_STATE` và `expected_assigned_to` | Đạt | `AssignCourierModal.tsx:59` gửi `expected_assigned_to = note.assigned_to`, kể cả `null`. 409 vào `sub.conflict`, hiện `ConflictBanner` trong hộp. "Tải lại" xoá lựa chọn, nạp lại danh sách người giao và phiếu cha, giữ hộp mở. Prop `note` là phiếu cha mới nạp, nên lần gửi sau dùng đúng người đang gán. `isConflictError` (đã sửa ở Lô 2 M1) chỉ nhận `STALE_STATE` và `STALE_VERSION`. Báo thất bại sai trạng thái trả 400 không mã `STALE_STATE` nên hiện alert đỏ thường, không bị im lặng |
+| Khối AI và `check-ai-chunks` | Đạt | Trang chi tiết gắn `AiDocBlockGate` (`delivery.deliverynote`). Bốn route mới có trong `TARGETS` và đã chạy XANH trên bản build thật. Đã thay L3 của Lô 2 cho phần giao hàng |
+| Màu cứng | Đạt | 0 trong các file của lô. Tem dùng `Canvas`/`CanvasText` cùng `color-scheme: light` |
+| Giá vốn | Đạt | Bảng dòng hàng chỉ có Mặt hàng, Lô, HSD, Số kg. Danh sách truyền `canViewCost={false}` |
+
+### Phát hiện
+
+**M1 — Medium — Thẻ "Việc giao của tôi" thiếu "Đơn" và dòng "Đã thanh toán, không thu thêm" (ED-19-AC1).** Vị trí: `features/deliveries/components/MyDeliveriesScreen.tsx:56-76`.
+- AC: mỗi thẻ có Người nhận, **Đơn**, Địa chỉ, Số kg, Hàng; đơn đã thanh toán có dòng "Đã thanh toán, không thu thêm".
+- Thực tế: thẻ chỉ có mã phiếu, không có `note.order.code`, và không có dòng thanh toán. Người giao đứng ở cửa nhà khách cần dòng này nhất, vì không có nó thì có thể thu tiền thêm của khách đã chuyển khoản.
+- Tái hiện: `NEXT_PUBLIC_USE_MOCK=1`, đăng nhập `giao1`, mở `/my-deliveries/`. Thẻ GH-HD-0036-DELI không có mã đơn và không có chữ "Đã thanh toán".
+- Sửa: thêm dòng `Đơn {note.order?.code}` (mono). Thêm dòng cố định "Đã thanh toán, không thu thêm", vì phiếu giao chỉ sinh sau khi đơn đã thanh toán (BR-TT). Nếu muốn dựa vào dữ liệu, dùng trường thanh toán có sẵn trong bản danh sách và không tự suy. Thêm 1 assert vào `e2e/ed_batch4_delivery.py`.
+
+**M2 — Medium — Menu "…" của chi tiết phiếu thiếu các mục khoá của ED-17-AC3.** Vị trí: `features/deliveries/components/DeliveryDetailScreen.tsx:225-232`.
+- AC: phiếu chưa in tem thì "…" có "In lại tem" bị khoá với lý do "Chưa in tem lần nào.", cùng "Huỷ xác nhận đơn" và "Huỷ đơn" kèm lý do.
+- Thực tế: không có mục nào trong 3 mục này.
+- Tái hiện: mở `/deliveries/detail/?id=<phiếu PREPARING chưa in tem>` bằng `ql1`, bấm "…". Menu chỉ có "Giao cho người giao/Đổi người giao" hoặc trống.
+- Sửa ngay trong lô này: thêm `{ key: "reprint", label: "In lại tem", blockedReason: "Chưa in tem lần nào." }` khi `printAction === "print"`.
+- "Huỷ đơn" và "Huỷ xác nhận đơn" dẫn sang trang đơn của Lô 3 (nợ 5). Được phép để lại, nhưng phải ghi thành dòng nợ trong 02c để làm ngay sau khi Lô 3 vào `main`, và báo PO là ED-17-AC3 mới đạt một phần.
+
+**L1 — Low — Code chết: dự phòng `recipient_phone`.** Vị trí: `DeliveryDetailScreen.tsx:268`, `MyDeliveriesScreen.tsx:146`, `types.ts` (`recipient_phone?`), cùng 15 dòng `recipient_phone: null` trong `mock.ts`.
+- `DeliveryNoteDetailSerializer` (BE) không có `recipient_phone`, chỉ có `phone` (R4). Nhánh `?? recipient_phone` không bao giờ chạy và làm người đọc hiểu nhầm rằng FE có nguồn SĐT thứ hai.
+- Sửa: bỏ khỏi type, mock và hai dòng trên, để "SĐT chỉ đến từ R4" đúng cả trên mặt code.
+
+**L2 — Low — Test chống lưu SĐT trên máy không bắt được số đã định dạng.** Vị trí: `e2e/ed_batch4_delivery.py:78`, `:117`.
+- `:78` tìm `0900000\d{3}`, nhưng số mock có dạng `0900 000 036`. Nếu FE lỡ lưu số đã định dạng thì assert vẫn xanh.
+- `:117` chỉ kiểm ghi chú bị chặn, tức là ghi chú chưa từng gửi đi. Ca cần kiểm là ghi chú hợp lệ đã gửi ("Khách hẹn giao lại ngày mai") không còn trong storage và URL.
+- Sửa: chuẩn hoá bỏ khoảng trắng trước khi so (hoặc regex `0900\s?000\s?\d{3}`), và kiểm thêm sau bước 4.
+
+**L3 — Low — Kiểm ghi chú ở FE lệch BE với số có dấu cách.** Vị trí: `deliveryUi.ts:67`.
+- `PII_NOTE_RE = /\d{9,}/` chỉ bắt dãy số liền. BE (`has_long_digit_run`) bắt cả dãy bị ngăn cách, ví dụ `0912 345 678`.
+- Không lọt dữ liệu, vì BE trả 400 `DELIVERY_FAILURE_NOTE_PII` và `failureFieldOfCode` đưa lỗi xuống dưới ô. Chỉ tốn một lượt gọi API.
+- Sửa (tuỳ chọn): bỏ ký tự không phải chữ số giữa các chữ số rồi mới so, theo đúng luật BE.
+
+**L4 — Low — Câu kết của `check-ai-chunks` đã cũ.** Vị trí: `scripts/check-ai-chunks.mjs:97` vẫn in "4 màn nghiệp vụ và 2 layout". Nay đã có 8 màn. Sửa: in theo `TARGETS.length`.
+
+**L5 — Low — Lệch chữ và bố cục nhỏ so với AC (báo PO, không chặn).**
+- ED-19-AC2: nút ghi "Nhận hàng đi giao", AC ghi "Đã lấy hàng, bắt đầu giao".
+- ED-19-AC3: hộp báo thất bại chỉ tóm tắt mã phiếu, thiếu Đơn, Khách hàng, Bắt đầu giao. Nút là "Huỷ · Báo thất bại", AC ghi "Quay lại · Báo giao thất bại".
+- ED-19-AC5: thẻ thất bại gộp Lý do và Lần thành một dòng, không có "Lúc". "Mang hàng về kho" để Lô 9 (nợ 3, đồng ý).
+- ED-19-AC6: người giao mở URL phiếu của người khác thì thấy "Không có quyền" (do `ViewGuard`), AC ghi "Không tìm thấy". Không lộ việc phiếu có tồn tại hay không, nên chấp nhận được. PO cần biết.
+- ED-17-AC6: hộp in lại chọn sẵn "In lại", AC ghi "phải chọn lý do". Chấp nhận được vì người dùng luôn thấy và có thể đổi lựa chọn.
+- ED-17-AC7: bảng không có cột "Kho". BE (`_get_allocations`) không trả kho. Hiện chỉ có một kho, nên để lại.
+
+**L6 — Low — "Việc giao của tôi" gọi chi tiết cho từng thẻ.** Vị trí: `MyDeliveriesScreen.tsx:151-155`.
+- Mỗi phiếu Đang giao hoặc Thất bại tốn thêm một `GET /notes/{id}/` để lấy SĐT. Với một người giao (dưới 20 phiếu) thì chấp nhận được.
+- Nếu sau này chậm, có thể chỉ tải số khi bấm "Gọi khách". Không dùng cách đưa `phone` vào danh sách, vì 02b R4 cố ý không làm vậy.
+
+### Hai khoản nợ điều phối viên hỏi
+- **Nợ 4 (danh sách chưa gắn `AiBar`): không bắt buộc trong lô này.**
+  - Lý do:
+    - Hiện chưa màn danh sách nào gắn `AiBar`. `shared/ui/AiBar.tsx` chỉ nhận props.
+    - Thiếu phần cổng dùng chung: đọc `/api/ai/status` và đếm đề xuất (R1), đồng thời AI tắt thì **0 request `/api/ai/*`** (BR-AI-17, SR-20).
+    - Nếu từng lô tự gắn thì mỗi màn sẽ gác AI một kiểu. Đó đúng là rủi ro mà L2 và L3 của Lô 2 đã nêu.
+  - Đề nghị:
+    - Làm một lô ngang, có thể gộp vào Lô 15 hoặc làm lô riêng sau Lô 3: một `AiBarGate` dùng chung (nạp động, không import `features/ai` vào chunk danh sách), gắn cho mọi `ListPage`, rồi chạy `check-ai-chunks`.
+    - Ghi một dòng vào 02c để không quên.
+    - 4 màn SR-20 (đơn, thanh toán, hoàn tiền, kho) vẫn không gắn.
+- **Nợ 6 (tìm kiếm chỉ lọc client trên các trang đã tải): chấp nhận tạm.**
+  - Tab đã chia theo trạng thái, và tab Hoàn tất chỉ lấy hôm nay. Vì vậy số dòng mỗi tab nhỏ, và phần lớn đã nằm trong trang đầu.
+  - Từ khoá không đi đâu: không lên URL, không vào máy, không gửi BE. Tìm theo mã phiếu, mã đơn, mặt hàng, không theo tên khách. Như vậy là tốt cho bất biến 9.
+  - Cần sửa nhỏ (Low, gộp với M1/M2): khi đang lọc và `list.hasMore`, câu rỗng ở `DeliveriesView.tsx:159-160` phải nói rõ "Chỉ tìm trong n phiếu đã tải. Bấm Tải thêm để tìm tiếp", vì câu hiện tại dễ khiến người dùng tưởng là không có phiếu.
+  - Thêm `q` phía BE (tìm theo mã) đưa vào backlog, không cần trong lô này.
+
+### Việc cần làm để APPROVED
+1. Sửa M1 và M2 (phần "In lại tem" khoá), mỗi lỗi kèm một assert e2e.
+2. Sửa L2 (test chống lưu SĐT) và câu rỗng ở nợ 6. Hai việc này nhỏ và đi cùng lượt.
+3. Ghi vào 02c: nợ "Huỷ đơn / Huỷ xác nhận đơn" sau Lô 3, và lô `AiBar` dùng chung.
+4. L1, L3, L4, L5, L6 để lô sau hoặc làm luôn nếu tiện. Tech Lead re-review chỉ phần diff của M1 và M2.
+
+### Re-review Lô 4 — FE (vòng sửa 02/10/2026)
+> Phạm vi: các điểm ở mục "Vòng sửa sau Techlead…" của dev-notes (M1, M2, L1–L4, nợ 6, B1–B12 của QA).
+
+**Kiểm chứng (Tech Lead tự chạy):** `npx tsc --noEmit` sạch. `npx vitest run`: 44 file, 410 test đều đạt.
+
+| Điểm | Kết quả | Căn cứ |
+|---|---|---|
+| M1 (thẻ có Đơn và "Đã thanh toán, không thu thêm") | Đạt | `MyDeliveriesScreen.tsx:68-69`, `:93`. Luôn hiện dòng thanh toán là đúng, vì phiếu giao chỉ sinh sau khi đơn đã thanh toán (dev-notes, lệch 9) |
+| M2 (menu "…" theo ED-17-AC3) | Đạt | `DeliveryDetailScreen.tsx:240-244`. "In lại tem" bị khoá khi chưa in. "Huỷ xác nhận đơn" và "Huỷ đơn" bị khoá kèm lý do, chỉ hiện với vai vận hành (`opsView`) và khi phiếu chưa lên xe. Nối link khi Lô 3 xong đã ghi nợ |
+| B7: `ViewGuard` nhận danh sách màn | Đạt | `ViewGuard.tsx`: qua được nếu `canView` đúng với ít nhất một màn, và vẫn không mount children khi thiếu quyền. Chỉ `/deliveries/detail/` dùng dạng mảng. `/deliveries/` vẫn là `view="deliveries"`. `shared/lib/nav.ts` không đổi, nên menu S7-AC2 giữ nguyên |
+| B7: phạm vi dữ liệu | Đạt | BE `get_queryset` lọc theo `assigned_to` với người không có full scope, nên phiếu người khác trả **404** và màn hiện "Không tìm thấy trang này" (ED-19-AC6). Dòng thời gian `/api/guidance/delivery/` cũng lọc phạm vi như vậy (`apps/delivery/next_steps.py:39-43`), nên không lộ lịch sử phiếu người khác. Nút quay lại và `homeHref` trỏ về "Việc giao của tôi". e2e `ed_batch4_delivery.py:102-107` kiểm cả hai chiều |
+| L1 (bỏ `recipient_phone`) | Đạt | Không còn trong type, mock và hai màn. SĐT chỉ còn một nguồn là `phone` (R4) |
+| L2 (test chống lưu SĐT) | Đạt | Regex bắt cả số có dấu cách. Có kiểm ghi chú hợp lệ sau khi gửi |
+| L3 / B12 (`hasLongDigitRun`) | Đạt | `deliveryUi.ts:70-74` khớp từng ký tự với `apps/common/pii.py:46-47` |
+| L4 (`check-ai-chunks`) | Đạt | Câu kết dùng `TARGETS.length` |
+| Nợ 6 (câu "Chỉ tìm trong n phiếu đã tải…") | Đạt | `loadedOnlyNote` có vitest |
+| B2 (cột Kho đọc `warehouse_name`) | Chấp nhận | BE chưa trả trường này nên hiện "—". Ghi ở lệch 8a. Cần BE thêm `warehouse_name` vào `_get_allocations`, hoặc PO bỏ cột |
+
+**Ghi nhận nhỏ (không chặn):** Ở "Huỷ xác nhận đơn", lý do khoá đang chép nguyên câu AC "Đưa đơn về Gọi xác nhận.". Câu này mô tả việc mục đó làm, chưa nói vì sao đang khoá. Khi nối link ở Lô 3, mục sẽ hết khoá, nên không cần sửa bây giờ.
+
+### Ý kiến TL-L6: có nên trả `phone` ở danh sách `assigned_to=me` không
+**Nên, nhưng làm thành một bổ sung BE nhỏ (R4b), không chặn lô này.**
+- Không mở rộng phạm vi lộ dữ liệu:
+  - Người giao vốn đã lấy được đúng số đó cho đúng các phiếu đó qua `GET /notes/{id}/`. Hiện màn cũng đang gọi như vậy cho từng thẻ.
+  - R4 tách `phone` khỏi danh sách là để màn vận hành (danh sách mọi phiếu của Chủ, Quản lý, NV kho) không trải SĐT của cả trăm khách ra một payload. Ca "của tôi" không thuộc mục đích đó.
+  - Bất biến 9 ("chỉ lộ cho ai cần") vẫn giữ, vì người giao cần số để gọi khách.
+- Điều kiện bắt buộc để BE làm:
+  1. Chỉ thêm `phone` khi query có `assigned_to=me`. Kể cả với Chủ hay Quản lý, chỉ trả cho phiếu gán cho chính người gọi. Mọi query danh sách khác **không có khoá `phone`**, và phải có test assert điều này.
+  2. Chỉ trả cho phiếu `DELIVERING` hoặc `FAILED`, đúng những phiếu có nút "Gọi khách". Các trạng thái khác trả `null`.
+  3. Áp cùng cửa sổ SR-PII-02 như chi tiết (`pii_scope`). Giữ `Cache-Control: no-store`.
+  4. Có test cho cả 3 điều kiện, cộng 403 khi người giao hỏi `assigned_to=<id khác>` (đã có).
+- Sau khi BE có R4b: FE bỏ vòng gọi chi tiết ở `MyDeliveriesScreen.tsx` (`loadPhone`) và đọc `phone` từ dòng danh sách. Nếu thiếu khoá (BE cũ) thì giữ đường gọi chi tiết làm dự phòng.
+- Thủ tục: đây là điều chỉnh contract kỹ thuật, không đổi phạm vi dữ liệu, nên Tech Lead tự duyệt được và sẽ ghi vào 02b §3.7. Nhưng vì đụng dữ liệu cá nhân, điều phối viên nên báo Duy một dòng trước khi giao BE.
+
+### Kết luận re-review Lô 4 — FE: **APPROVED**
+M1, M2, L1–L4, nợ 6 và B7 đều đạt. Không còn lỗi Critical, High hay Medium. Lô sẵn sàng cho QA chạy lại. Khi chạy lại, QA cần sửa script theo mục "QA cần sửa script" trong dev-notes; tôi đồng ý cả 4 điểm đó. TL-L6 chuyển thành việc BE R4b như trên. Các dòng nợ còn lại phải được ghi vào 02c:
+- Nối link "Huỷ đơn" và "Huỷ xác nhận đơn" sau Lô 3.
+- Lô `AiBar` dùng chung.
+- BE thêm `warehouse_name` và mốc "Bắt đầu giao" / "Lúc thất bại" (lệch 8).
