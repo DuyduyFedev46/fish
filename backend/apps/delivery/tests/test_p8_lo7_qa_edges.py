@@ -11,10 +11,10 @@ from django.utils import timezone
 from apps.accounts.models import AuditLog
 from apps.delivery.confirmation import services as confirmation_services
 from apps.delivery.models import ConfirmationTask, DeliveryNote
-from apps.delivery.tests import test_cskh_l3
+from apps.delivery.tests import test_confirmation_escalation
 
 
-class QaF08Tests(test_cskh_l3.ConfirmationL3BaseTestCase):
+class QaF08Tests(test_confirmation_escalation.ConfirmationL3BaseTestCase):
     def setUp(self):
         super().setUp()
         self.t0 = timezone.now().replace(hour=9, minute=0, second=0, microsecond=0)

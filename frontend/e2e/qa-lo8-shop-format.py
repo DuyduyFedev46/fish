@@ -36,7 +36,7 @@ SITE = {"seller": {"name": "Vựa Thử Nghiệm QA", "business_type": "Hộ kin
                    "tax_code": "0000000002", "address": "1 Đường Giả, Phường Giả, Tỉnh Giả", "phone": "0900000000",
                    "email": "lienhe@example.com"},
         "seller_complete": True, "privacy_consent_required": False, "confirm_call_notice": True,
-        "confirm_call_hours": "7:00–20:00", "cskh_notice": None}
+        "confirm_call_hours": "7:00–20:00"}
 CATALOG = [{"item_code": "CA-QA-01", "name": "Cá QA giả định 1", "group": "ca", "item_type": "SIMPLE", "unit": "Kg",
             "price": "260000.00", "sellable_qty": "50.000", "image": None},
            {"item_code": "CA-QA-02", "name": "Cá QA giả định 2", "group": "ca", "item_type": "SIMPLE", "unit": "Kg",

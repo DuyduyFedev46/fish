@@ -2,13 +2,12 @@
 // Tiêu chí: recall@5 >= 95%, không cần model, chỉ mục lưu trong RAM.
 
 import { COMMAND_GROUP_SEARCH_LABEL, type AiCommandGroup } from "../commandGroups";
-import { normalizeAiGroup } from "../legacyIds";
 import type { AiCommandIndexItem } from "../types";
 
-/** Chữ của nhóm đưa vào chỉ mục: nhãn tiếng Việt (nhận cả khoá nhóm cũ lẫn mới); nhóm lạ giữ nguyên khoá. */
+/** Chữ của nhóm đưa vào chỉ mục: nhãn tiếng Việt của khoá nhóm; nhóm lạ giữ nguyên khoá. */
 function groupSearchText(group: string | undefined): string {
   if (!group) return "";
-  return COMMAND_GROUP_SEARCH_LABEL[normalizeAiGroup(group) as AiCommandGroup] ?? group;
+  return COMMAND_GROUP_SEARCH_LABEL[group as AiCommandGroup] ?? group;
 }
 
 export function removeVietnameseDiacritics(str: string): string {

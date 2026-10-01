@@ -24,7 +24,7 @@ Story: **S10** (danh sách + chi tiết đơn) và **S11** (Chủ xác nhận đ
   thanh toán, giao hàng, hoàn tiền, `available_actions`. Ngoài phạm vi (NV giao, S5) → 404.
 - `POST /api/sales/orders/{id}/confirm-payment/` `{bank_txn_id, amount}` → `PAID` / `UNDERPAID` / `ORPHAN` (+ `duplicate`).
   Cần `sales.confirm_payment_manual` (chỉ Chủ). Nút chỉ hiện khi `available_actions` có `confirm_payment` (đơn Giữ chỗ và Tự huỷ).
-- Quyền xem màn (menu, `ViewGuard`): `sales.view_salesorder` và không phải người CHỈ thuộc `nv_giao`.
+- Quyền xem màn (menu, `ViewGuard`): `sales.view_salesorder` và không phải người CHỈ thuộc `delivery_staff`.
 - FE không tự suy luật: nút theo `available_actions`; kết quả xác nhận theo `result` BE; lỗi BE hiện nguyên văn `detail`.
   `cancel` (S14) mở `CancelOrderForm`; `create_refund` (S15) mở `RefundForm` với `target.kind: "invoice"`.
 

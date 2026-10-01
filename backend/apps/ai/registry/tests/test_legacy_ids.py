@@ -60,9 +60,10 @@ class LegacyIdMappingTests(SimpleTestCase):
         self.assertEqual(legacy_ids.normalize_command_keys(None), {})
         self.assertEqual(legacy_ids.normalize_group_levels({}), {})
 
-    def test_legacy_role_names_cover_all_five_roles(self):
+    def test_old_role_names_map_to_all_five_roles_for_preview_and_old_ai_actions(self):
+        """Bảng tên Group cũ -> mới còn ở `legacy_ids` (đọc `AiAction` cũ, `preview_group_rename`); `roles` không còn nhận tên cũ."""
         self.assertEqual(
-            roles.LEGACY_ROLE_NAMES,
+            legacy_ids.LEGACY_ASSIGNEE_GROUPS,
             {
                 "chu": roles.OWNER,  # naming: allow - tên Group cũ
                 "quan_ly": roles.MANAGER,  # naming: allow - tên Group cũ
@@ -71,9 +72,9 @@ class LegacyIdMappingTests(SimpleTestCase):
                 "cskh": roles.CUSTOMER_SERVICE,  # naming: allow - tên Group cũ
             },
         )
-        self.assertEqual(roles.normalize_role_name("nv_kho"), roles.WAREHOUSE_STAFF)  # naming: allow - tên Group cũ
-        self.assertEqual(roles.normalize_role_name(roles.OWNER), roles.OWNER)
-        self.assertEqual(roles.normalize_role_name("khong_co"), "khong_co")
+        self.assertEqual(sorted(legacy_ids.LEGACY_ASSIGNEE_GROUPS.values()), sorted(roles.ALL_ROLES))
+        self.assertFalse(hasattr(roles, "LEGACY_ROLE_NAMES"))
+        self.assertFalse(hasattr(roles, "normalize_role_name"))
 
 
 @override_settings(AI_ENABLED=True)

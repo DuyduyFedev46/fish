@@ -50,7 +50,7 @@ class NhapLoTests(TestCase):
                 {"item_code": "MUC01", "qty": "30.000", "rate": "120000.00"},  # không gửi shelf_life_days -> lấy mặc định 60
             ],
         }
-        res = self.client_kho.post("/api/purchasing/receipts/nhap-lo/", payload, format="json")
+        res = self.client_kho.post("/api/purchasing/receipts/receive-batches/", payload, format="json")
         self.assertEqual(res.status_code, 201)
         data = res.json()
         self.assertIn("receipt", data)
@@ -84,7 +84,7 @@ class NhapLoTests(TestCase):
                 {"item_code": "MUC01", "qty": "30.000", "rate": "120000.00", "shelf_life_days": 100},  # MUC01 mặc định 60
             ],
         }
-        res = self.client_kho.post("/api/purchasing/receipts/nhap-lo/", payload_bad_expiry, format="json")
+        res = self.client_kho.post("/api/purchasing/receipts/receive-batches/", payload_bad_expiry, format="json")
         self.assertEqual(res.status_code, 400)
         self.assertEqual(res.json().get("code"), "BR-MH-02")
         self.assertEqual(PurchaseReceipt.objects.count(), 0)
@@ -95,7 +95,7 @@ class NhapLoTests(TestCase):
             "supplier": self.sup.pk,
             "lines": [],
         }
-        res2 = self.client_kho.post("/api/purchasing/receipts/nhap-lo/", payload_empty_lines, format="json")
+        res2 = self.client_kho.post("/api/purchasing/receipts/receive-batches/", payload_empty_lines, format="json")
         self.assertEqual(res2.status_code, 400)
         self.assertEqual(PurchaseReceipt.objects.count(), 0)
         self.assertEqual(Batch.objects.count(), 0)
@@ -111,12 +111,12 @@ class NhapLoTests(TestCase):
                 {"item_code": "TOM01", "qty": "50.000", "rate": "80000.00"},
             ],
         }
-        res1 = self.client_kho.post("/api/purchasing/receipts/nhap-lo/", payload, format="json")
+        res1 = self.client_kho.post("/api/purchasing/receipts/receive-batches/", payload, format="json")
         self.assertEqual(res1.status_code, 201)
         r1_id = res1.json()["receipt"]["id"]
 
         # Gửi lại lần 2
-        res2 = self.client_kho.post("/api/purchasing/receipts/nhap-lo/", payload, format="json")
+        res2 = self.client_kho.post("/api/purchasing/receipts/receive-batches/", payload, format="json")
         self.assertEqual(res2.status_code, 201)
         r2_id = res2.json()["receipt"]["id"]
         self.assertEqual(r1_id, r2_id)
@@ -129,7 +129,7 @@ class NhapLoTests(TestCase):
             "supplier": self.sup.pk,
             "lines": [{"item_code": "TOM01", "qty": "10.000", "rate": "50000.00"}],
         }
-        res = self.client_giao.post("/api/purchasing/receipts/nhap-lo/", payload, format="json")
+        res = self.client_giao.post("/api/purchasing/receipts/receive-batches/", payload, format="json")
         self.assertEqual(res.status_code, 403)
         self.assertEqual(PurchaseReceipt.objects.count(), 0)
 
@@ -141,7 +141,7 @@ class NhapLoTests(TestCase):
             "lines": [{"item_code": "TOM01", "qty": "20.000", "rate": "95000.00"}],
         }
         # 1. nv_kho
-        res_kho = self.client_kho.post("/api/purchasing/receipts/nhap-lo/", payload, format="json")
+        res_kho = self.client_kho.post("/api/purchasing/receipts/receive-batches/", payload, format="json")
         self.assertEqual(res_kho.status_code, 201)
         data_kho = res_kho.json()
         line_kho = data_kho["receipt"]["lines"][0]
@@ -156,7 +156,7 @@ class NhapLoTests(TestCase):
             "received_date": "2026-09-28",
             "lines": [{"item_code": "MUC01", "qty": "15.000", "rate": "150000.00"}],
         }
-        res_chu = self.client_chu.post("/api/purchasing/receipts/nhap-lo/", payload2, format="json")
+        res_chu = self.client_chu.post("/api/purchasing/receipts/receive-batches/", payload2, format="json")
         self.assertEqual(res_chu.status_code, 201)
         data_chu = res_chu.json()
         line_chu = data_chu["receipt"]["lines"][0]
@@ -235,7 +235,7 @@ class NhapLoTests(TestCase):
             "received_date": "2026-09-28",
             "lines": [{"item_code": "TOM01", "qty": "10.000", "rate": "70000.00"}],
         }
-        res = self.client_kho.post("/api/purchasing/receipts/nhap-lo/", payload, format="json")
+        res = self.client_kho.post("/api/purchasing/receipts/receive-batches/", payload, format="json")
         res_text = res.content.decode("utf-8")
         self.assertNotIn("customer", res_text)
         self.assertNotIn("delivery_address", res_text)
@@ -249,6 +249,6 @@ class NhapLoTests(TestCase):
             "received_date": "2026-09-28",
             "lines": [{"item_code": "TOM01", "qty": "10.000", "rate": "70000.00"}],
         }
-        res = self.client_kho.post("/api/purchasing/receipts/nhap-lo/", payload, format="json")
+        res = self.client_kho.post("/api/purchasing/receipts/receive-batches/", payload, format="json")
         self.assertEqual(res.status_code, 201)
         self.assertEqual(PurchaseReceipt.objects.count(), 1)

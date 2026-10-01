@@ -1,7 +1,7 @@
 # accounts — Nhân sự, phân quyền, nhật ký (§1)
 
 `StaffProfile` (mở rộng User: SĐT…), `AuditLog` (append-only, BR-PQ-04/05/06), seed 4 Group
-`owner`/`manager`/`warehouse_staff`/`delivery_staff` trong `migrations/0002` (seed tên cũ `chu`/`quan_ly`/`nv_kho`/`nv_giao`; `migrations/0013` đổi tên sang tiếng Anh, giữ id; tên cũ vẫn nhận ở mọi đường ghi qua `roles.LEGACY_ROLE_NAMES`, gỡ ở P8b Lô 5). App còn phẳng (`models.py`, `admin.py`).
+`owner`/`manager`/`warehouse_staff`/`delivery_staff` trong `migrations/0002` (seed tên cũ `chu`/`quan_ly`/`nv_kho`/`nv_giao`; `migrations/0013` đổi tên sang tiếng Anh, giữ id; đường ghi từ chối tên cũ bằng 400 BR-PQ-08; `roles.LEGACY_ROLE_NAMES` đã gỡ ở P8b Lô 5). App còn phẳng (`models.py`, `admin.py`).
 `auth/`: `GET /api/auth/me/` (S6, S47 nhãn nhóm/việc), `POST /api/auth/logout/`, `POST /api/auth/change-password/` (S46). `staff/`: quản lý nhân viên `/api/staff/` (S41, S42 — BR-PQ-17/18).
 `admin.py`: trang User/Group trong Admin chỉ superuser; superuser đổi nhóm ghi AuditLog `staff_groups_change`.
 Migration `0003`: gán `reports.view_dashboard` cho owner/manager/warehouse_staff (S6).

@@ -66,7 +66,7 @@ export const PERM = {
   viewSalesOrder: "sales.view_salesorder",
   /** S11/S12: chỉ Chủ — xác nhận tiền tay, xử lý hàng chờ thanh toán lệch (BR-TT-07, BR-TT-09). */
   confirmPaymentManual: "sales.confirm_payment_manual",
-  /** S16: xem danh sách phiếu hoàn (Chủ, Quản lý có — nv_kho/nv_giao không). Nút xác nhận/thất bại/thử lại theo
+  /** S16: xem danh sách phiếu hoàn (Chủ, Quản lý có — warehouse_staff/delivery_staff không). Nút xác nhận/thất bại/thử lại theo
    * `available_actions` của từng phiếu (chỉ Chủ có sales.confirm_refund, S16-AC7). */
   viewRefund: "sales.view_refund",
   viewDeliveryNote: "delivery.view_deliverynote",
@@ -75,10 +75,10 @@ export const PERM = {
   viewStockReconciliation: "inventory.view_stockreconciliation",
   viewItem: "catalog.view_item",
   /** A2 (02-stories.md, hồ sơ 2026-09-26-anh-mat-hang): Tầng 2 riêng cho ảnh mặt hàng — Chủ, Quản lý có;
-   * nv_kho/nv_giao không. KHÔNG mở rộng sang sửa mặt hàng (change_item) — đó vẫn là S38. */
+   * warehouse_staff/delivery_staff không. KHÔNG mở rộng sang sửa mặt hàng (change_item) — đó vẫn là S38. */
   changeItemImage: "catalog.change_item_image",
   manageStaff: "accounts.manage_staff",
-  /** S03 (AI Lô 1, chốt Duy 27/09): xem màn Nhật ký hoạt động — chu + quan_ly; nv_kho/nv_giao không (S03-AC5). */
+  /** S03 (AI Lô 1, chốt Duy 27/09): xem màn Nhật ký hoạt động — owner + manager; warehouse_staff/delivery_staff không (S03-AC5). */
   viewAuditLog: "accounts.view_auditlog",
   /** DW-13: quản lý chính sách AI — chỉ Chủ có (ai.manage_ai_policy). */
   manageAiPolicy: "ai.manage_ai_policy",
@@ -103,7 +103,7 @@ export const PERM = {
 
 const has = (me: Me, perm: string) => me.permissions.includes(perm);
 const inGroup = (me: Me, ...groups: string[]) => me.groups.some((g) => groups.includes(g));
-/** Chỉ thuộc nv_giao (không kèm Group nào khác). */
+/** Chỉ thuộc delivery_staff (không kèm Group nào khác). */
 export const onlyDelivery = (me: Me) => me.groups.length > 0 && me.groups.every((g) => g === ROLE.deliveryStaff);
 
 export const NAV: NavItem[] = [
@@ -116,7 +116,7 @@ export const NAV: NavItem[] = [
     short: "Tổng quan",
     icon: "dashboard",
     section: "Điều hành",
-    // S6 (BE đã chốt): quyền thật reports.view_dashboard (chu/quan_ly/nv_kho); /api/dashboard/summary/ đòi quyền này.
+    // S6 (BE đã chốt): quyền thật reports.view_dashboard (owner/manager/warehouse_staff); /api/dashboard/summary/ đòi quyền này.
     visible: (me) => has(me, PERM.viewDashboard),
   },
   {
@@ -129,7 +129,7 @@ export const NAV: NavItem[] = [
     icon: "receipt_long",
     section: "Điều hành",
     // S10 (L7): màn Đơn đọc endpoint riêng GET /api/sales/orders/ (đòi sales.view_salesorder) → bỏ điều kiện tạm
-    // reports.view_dashboard của code review trước deploy 1. Vẫn ẩn với người CHỈ thuộc nv_giao (S7-AC2, L-4).
+    // reports.view_dashboard của code review trước deploy 1. Vẫn ẩn với người CHỈ thuộc delivery_staff (S7-AC2, L-4).
     visible: (me) => has(me, PERM.viewSalesOrder) && !onlyDelivery(me),
   },
   {
@@ -249,7 +249,7 @@ export const NAV: NavItem[] = [
     short: "Danh mục",
     icon: "sell",
     section: "Sổ sách",
-    // Điều phối chốt 2026-09-24: menu hiện khi có catalog.view_item (nv_kho cũng có); phần GIÁ bên trong màn
+    // Điều phối chốt 2026-09-24: menu hiện khi có catalog.view_item (warehouse_staff cũng có); phần GIÁ bên trong màn
     // chỉ hiện khi có catalog.view_itemprice (S38/S39 làm).
     visible: (me) => has(me, PERM.viewItem),
   },
@@ -296,7 +296,7 @@ export const NAV: NavItem[] = [
     short: "Nhật ký",
     icon: "history",
     section: "Quản trị",
-    // S03: chu + quan_ly (accounts.view_auditlog); NV kho/giao không đọc toàn bộ nhật ký (S03-AC5).
+    // S03: owner + manager (accounts.view_auditlog); NV kho/giao không đọc toàn bộ nhật ký (S03-AC5).
     visible: (me) => has(me, PERM.viewAuditLog) && !onlyDelivery(me),
   },
   {
@@ -352,7 +352,7 @@ export const ACCOUNT_LABEL = "Tài khoản của tôi";
 /**
  * Ghi chú S7 bảng quyền: "Đơn & tiền" chỉ ghi `sales.view_salesorder`. NV giao có quyền đó (để xem
  * đơn của phiếu mình, S5) nhưng S7-AC2 yêu cầu menu của giao1 CHỈ có "Việc giao của tôi" → ẩn
- * "Đơn & tiền" với người chỉ thuộc nv_giao. Đã ghi lệch này ở 03-dev-notes.md.
+ * "Đơn & tiền" với người chỉ thuộc delivery_staff. Đã ghi lệch này ở 03-dev-notes.md.
  */
 export function visibleNav(me: Me | null): NavItem[] {
   if (!me || me.home === "no-role") return [];

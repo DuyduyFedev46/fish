@@ -2,18 +2,18 @@
 // và S46 (logout, change-password) + S47 (group_labels, capabilities) (03-dev-notes.md "Lô L6").
 //
 // Tài khoản mock (mật khẩu ban đầu: "demo1234"):
-//   loc   = chu                 → home "dashboard", xem giá vốn + lãi lỗ, có accounts.manage_staff
-//   ql1   = quan_ly             → home "dashboard", không xem giá vốn
-//   kho1  = nv_kho + nv_giao    → home "dashboard" (S6-AC2)
-//   giao1 = nv_giao             → home "my-deliveries" (S6-AC3)
-//   cs2   = cskh + nv_giao      → home "dashboard"; kiêm nhiệm, KHÔNG có chủ/quản lý/NV kho nên dữ liệu khách của phiếu
+//   loc   = owner               → home "dashboard", xem giá vốn + lãi lỗ, có accounts.manage_staff
+//   ql1   = manager             → home "dashboard", không xem giá vốn
+//   kho1  = warehouse_staff + delivery_staff    → home "dashboard" (S6-AC2)
+//   giao1 = delivery_staff             → home "my-deliveries" (S6-AC3)
+//   cs2   = customer_service + delivery_staff      → home "dashboard"; kiêm nhiệm, KHÔNG có chủ/quản lý/NV kho nên dữ liệu khách của phiếu
 //                                 giao đã kết thúc quá 7 ngày bị ẩn (SR-PII-02) — thử màn Đơn/Giao hàng
-//   giao2 = nv_giao             → còn 2 phiếu Đang giao → Chủ cho nghỉ bị BR-GH-08 (S42-AC4)
-//   ql9   = quan_ly + quyền lẻ accounts.manage_staff (không thuộc chu) → thử BR-PQ-17 403 (S41-AC6, S42-AC7)
-//   sa1   = superuser + quan_ly → thử BR-PQ-18 (bỏ nhóm Chủ của loc — Chủ cuối cùng, S41-AC7)
+//   giao2 = delivery_staff             → còn 2 phiếu Đang giao → Chủ cho nghỉ bị BR-GH-08 (S42-AC4)
+//   ql9   = manager + quyền lẻ accounts.manage_staff (không thuộc owner) → thử BR-PQ-17 403 (S41-AC6, S42-AC7)
+//   sa1   = superuser + manager → thử BR-PQ-18 (bỏ nhóm Chủ của loc — Chủ cuối cùng, S41-AC7)
 //   admin = superuser, không Group → home "no-role" (S6-AC4, S47-AC5)
 //   nghi1 = is_active=False     → đăng nhập 400 (S7-AC4)
-//   kho5  = nv_kho, còn mật khẩu tạm (must_change_password) → chỉ mở được màn "Đặt mật khẩu mới" (S48-AC1)
+//   kho5  = warehouse_staff, còn mật khẩu tạm (must_change_password) → chỉ mở được màn "Đặt mật khẩu mới" (S48-AC1)
 //
 // S48: Chủ tạo tài khoản / đặt lại mật khẩu → must_change_password=true; tự đổi mật khẩu → false (không bật lại);
 // superuser không bị ép. Cổng chung (setMockGate) chặn mọi API nghiệp vụ bằng 403 AUTH_MUST_CHANGE_PASSWORD,
@@ -43,7 +43,7 @@ const USERS_KEY = "cave_erp_mock_users";
 const TOKEN_PREFIX = "mock-token-";
 
 // ---- Quyền theo Group: COPY NGUYÊN `permissions` thật của GET /api/auth/me/ (BE L3–L4, 03-dev-notes.md,
-// dữ liệu seed migration). Mọi quyền của nv_giao nằm trong nv_kho. Đổi ở BE thì chép lại ở đây. ----
+// dữ liệu seed migration). Mọi quyền của delivery_staff nằm trong warehouse_staff. Đổi ở BE thì chép lại ở đây. ----
 const GROUP_PERMS: Record<string, string[]> = {
   [ROLE.owner]: [
     "accounts.add_staffprofile", "accounts.change_staffprofile", "accounts.delete_staffprofile",
@@ -83,7 +83,7 @@ const GROUP_PERMS: Record<string, string[]> = {
     "sales.view_customer", "sales.view_paymenttransaction", "sales.view_refund", "sales.view_salesinvoice",
     "sales.view_salesinvoiceline", "sales.view_salesinvoicelinebatch", "sales.view_salesorder",
     "sales.view_salesorderline", "sales.view_salesorderlinebatch", "sales.view_privacy_consent",
-    // CMS: BE migration content/0002 gán 8 quyền này cho chu và quan_ly (nv_kho/nv_giao không có).
+    // CMS: BE migration content/0002 gán 8 quyền này cho owner và manager (warehouse_staff/delivery_staff không có).
     "content.add_category", "content.change_category", "content.view_category", "content.add_entry",
     "content.change_entry", "content.delete_entry", "content.view_entry", "content.publish_entry",
   ],
@@ -106,7 +106,7 @@ const GROUP_PERMS: Record<string, string[]> = {
     "sales.change_customer", "sales.change_refund", "sales.create_refund", "sales.view_customer",
     "sales.view_paymenttransaction", "sales.view_refund", "sales.view_salesinvoice", "sales.view_salesinvoiceline",
     "sales.view_salesorder", "sales.view_salesorderline", "sales.view_privacy_consent",
-    // CMS: BE migration content/0002 gán 8 quyền này cho chu và quan_ly (nv_kho/nv_giao không có).
+    // CMS: BE migration content/0002 gán 8 quyền này cho owner và manager (warehouse_staff/delivery_staff không có).
     "content.add_category", "content.change_category", "content.view_category", "content.add_entry",
     "content.change_entry", "content.delete_entry", "content.view_entry", "content.publish_entry",
   ],
@@ -154,7 +154,7 @@ export type MockUser = {
   must_change_password?: boolean;
   /**
    * CHỈ để thử (patchUser): quyền bị gỡ khỏi user dù Group có — giả lập admin gỡ quyền khỏi Group ở BE
-   * (vd nv_kho mất reports.view_dashboard; code review trước deploy 1). BE không có field này.
+   * (vd warehouse_staff mất reports.view_dashboard; code review trước deploy 1). BE không có field này.
    */
   denied_perms?: string[];
 };
@@ -247,7 +247,7 @@ const CAPABILITIES: [string, string][] = [
 
 const GROUP_ORDER: readonly string[] = GROUP_CODES;
 
-/** Thứ tự nhóm cố định chu, quan_ly, nv_kho, nv_giao (như BE `sorted_groups`). */
+/** Thứ tự nhóm cố định owner, manager, warehouse_staff, delivery_staff (như BE `sorted_groups`). */
 export function sortGroups(groups: string[]): string[] {
   return Array.from(new Set(groups)).sort((a, b) => GROUP_ORDER.indexOf(a) - GROUP_ORDER.indexOf(b));
 }

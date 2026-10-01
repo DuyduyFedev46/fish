@@ -43,7 +43,7 @@ EXPECTED = {
     "GET /api/sales/refunds/": {"owner": 200, "manager": 200, "warehouse_staff": 403, "delivery_staff": 403, "customer_service": 403, "no_group": 403, "anonymous": 401},
     "GET /api/staff/": {"owner": 200, "manager": 403, "warehouse_staff": 403, "delivery_staff": 403, "customer_service": 403, "no_group": 403, "anonymous": 401},
     "POST /api/confirmation/search/": {"owner": 400, "manager": 400, "warehouse_staff": 403, "delivery_staff": 403, "customer_service": 400, "no_group": 403, "anonymous": 401},
-    "POST /api/purchasing/receipts/nhap-lo/": {"owner": 400, "manager": 400, "warehouse_staff": 400, "delivery_staff": 403, "customer_service": 403, "no_group": 403, "anonymous": 401},
+    "POST /api/purchasing/receipts/receive-batches/": {"owner": 400, "manager": 400, "warehouse_staff": 400, "delivery_staff": 403, "customer_service": 403, "no_group": 403, "anonymous": 401},
     "POST /api/purchasing/receipts/receive-batches/": {"owner": 400, "manager": 400, "warehouse_staff": 400, "delivery_staff": 403, "customer_service": 403, "no_group": 403, "anonymous": 401},
 }
 

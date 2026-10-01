@@ -16,7 +16,7 @@ from apps.accounts.models import AuditLog
 from apps.common.cost_keys import COST_KEYS
 from apps.common.exceptions import BusinessError
 from apps.common.tests.fixtures import client_for, make_user
-from apps.delivery.tests.test_cskh_l3 import ConfirmationL3BaseTestCase
+from apps.delivery.tests.test_confirmation_escalation import ConfirmationL3BaseTestCase
 from apps.inventory.batches import services as batch_services
 from apps.inventory.models import Batch
 from apps.purchasing.models import PurchaseReceipt

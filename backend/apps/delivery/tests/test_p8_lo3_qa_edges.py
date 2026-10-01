@@ -17,7 +17,7 @@ from apps.common.exceptions import BusinessError, ConflictError
 from apps.common.tests.fixtures import client_for
 from apps.delivery.confirmation import services as confirmation_services
 from apps.delivery.models import ConfirmationTask, CustomerCall, DeliveryNote
-from apps.delivery.tests.test_cskh_l3 import ConfirmationL3BaseTestCase
+from apps.delivery.tests.test_confirmation_escalation import ConfirmationL3BaseTestCase
 from apps.sales.models import Refund, SalesInvoice, SalesOrder
 from apps.sales.orders import services as order_services
 
@@ -102,7 +102,7 @@ class QaSR09Edges(ConfirmationL3BaseTestCase):
     def test_qa_huy_tay_api_409_body_dung_hop_dong(self):
         order, note, task = self._escalated()
         order_services.cancel_paid_order(order=order, actor=self.chu, reason="x", reason_code="OTHER")
-        resp = client_for(self.cs1).post(f"/api/cskh/queue/{note.pk}/calls/", {"result": "CONFIRMED"}, format="json")
+        resp = client_for(self.cs1).post(f"/api/confirmation/queue/{note.pk}/calls/", {"result": "CONFIRMED"}, format="json")
         self.assertEqual(resp.status_code, 409)
         self.assertEqual(resp.json(), {"detail": STALE, "code": "STALE_STATE"})
 
@@ -212,12 +212,12 @@ class QaSR09Edges(ConfirmationL3BaseTestCase):
         with self.assertRaises(BusinessError) as ctx:
             confirmation_services.record_call(task.pk, self.cs1, result="KHONG_CO", now=self.t0)
         self.assertEqual(ctx.exception.code, "INVALID_INPUT")
-        resp = client_for(self.cs1).post(f"/api/cskh/queue/{note.pk}/calls/", {"result": "KHONG_CO"}, format="json")
+        resp = client_for(self.cs1).post(f"/api/confirmation/queue/{note.pk}/calls/", {"result": "KHONG_CO"}, format="json")
         self.assertEqual(resp.status_code, 400)
 
     def test_qa_luong_thuan_confirmed_van_201(self):
         order, note, task = self._create_order_with_confirmation()
-        resp = client_for(self.cs1).post(f"/api/cskh/queue/{note.pk}/calls/", {"result": "CONFIRMED"}, format="json")
+        resp = client_for(self.cs1).post(f"/api/confirmation/queue/{note.pk}/calls/", {"result": "CONFIRMED"}, format="json")
         self.assertEqual(resp.status_code, 201, resp.content)
         note.refresh_from_db()
         self.assertEqual(note.status, DeliveryNote.Status.PREPARING)
@@ -232,7 +232,7 @@ class QaSR09Edges(ConfirmationL3BaseTestCase):
         root.addHandler(handler)
         root.setLevel(logging.DEBUG)
         try:
-            resp = client_for(self.cs1).post(f"/api/cskh/queue/{note.pk}/calls/", {"result": "CONFIRMED"}, format="json")
+            resp = client_for(self.cs1).post(f"/api/confirmation/queue/{note.pk}/calls/", {"result": "CONFIRMED"}, format="json")
         finally:
             root.removeHandler(handler)
             root.setLevel(old_level)
@@ -250,7 +250,7 @@ class QaSR09Edges(ConfirmationL3BaseTestCase):
     def test_qa_phan_quyen_stale_khach_401_va_nhom_khong_quyen_403(self):
         order, note, task = self._escalated()
         self._auto_cancel()
-        url = f"/api/cskh/queue/{note.pk}/calls/"
+        url = f"/api/confirmation/queue/{note.pk}/calls/"
         self.assertEqual(client_for(None).post(url, {"result": "CONFIRMED"}, format="json").status_code, 401)
         self.assertEqual(client_for(self.kho).post(url, {"result": "CONFIRMED"}, format="json").status_code, 403)
         # cs2 chưa từng gọi phiếu này -> ngoài phạm vi CSKH (BR-GH-18) -> 404, không lộ trạng thái/PII
@@ -260,5 +260,5 @@ class QaSR09Edges(ConfirmationL3BaseTestCase):
             self.assertNotIn(s, r.content.decode())
         self.assertEqual(client_for(self.chu).post(url, {"result": "CONFIRMED"}, format="json").status_code, 409)
         self.assertEqual(client_for(self.ql).post(url, {"result": "CONFIRMED"}, format="json").status_code, 409)
-        self.assertEqual(client_for(self.cs1).post("/api/cskh/queue/999999/calls/",
+        self.assertEqual(client_for(self.cs1).post("/api/confirmation/queue/999999/calls/",
                                                    {"result": "CONFIRMED"}, format="json").status_code, 404)

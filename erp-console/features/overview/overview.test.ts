@@ -16,12 +16,10 @@ describe("Overview Attention Tests (CS-15)", () => {
     expect(managerRes.status).toBe(200);
     const managerBody = managerRes.body as Record<string, number>;
     expect(managerBody.confirmation_queue_waiting).toBeDefined();
-    expect(managerBody["cskh_queue_waiting"]).toBeDefined(); // khoá cũ BE còn trả song song tới Lô 5
     expect(managerBody.refund_calls_open).toBeDefined();
     expect(managerBody.confirmation_escalated).toBeDefined();
     expect(managerBody.confirmation_auto_cancel_blocked).toBeDefined();
-    expect(managerBody["cskh_escalated"]).toBeDefined();
-    expect(managerBody["cskh_auto_cancel_blocked"]).toBeDefined();
+    expect(Object.keys(managerBody).filter((k) => k.startsWith("cskh_"))).toEqual([]); // khoá cũ đã gỡ ở Lô 5
     expect(managerBody.labels_not_printed).toBeDefined();
     expect(managerBody.labels_to_void).toBeDefined();
     expect(managerBody.expired_batches_open).toBeUndefined();
@@ -38,7 +36,6 @@ describe("Overview Attention Tests (CS-15)", () => {
     expect(csBody.confirmation_queue_waiting).toBeDefined();
     expect(csBody.refund_calls_open).toBeDefined();
     expect(csBody.confirmation_escalated).toBeUndefined();
-    expect(csBody["cskh_escalated"]).toBeUndefined();
     expect(csBody.labels_not_printed).toBeUndefined();
     expect(csBody.expired_batches_open).toBeUndefined();
 
@@ -54,9 +51,7 @@ describe("Overview Attention Tests (CS-15)", () => {
     expect(warehouseBody.labels_not_printed).toBeDefined();
     expect(warehouseBody.labels_to_void).toBeDefined();
     expect(warehouseBody.confirmation_queue_waiting).toBeUndefined();
-    expect(warehouseBody["cskh_queue_waiting"]).toBeUndefined();
     expect(warehouseBody.confirmation_escalated).toBeUndefined();
-    expect(warehouseBody["cskh_escalated"]).toBeUndefined();
     expect(warehouseBody.expired_batches_open).toBeUndefined();
 
     // Giao: 403
@@ -103,20 +98,17 @@ describe("Overview orders (SR-17-AC3)", () => {
   });
 });
 
-describe("readConfirmationCounts (P8b Lô 3: khoá mới, khoá cũ làm dự phòng)", () => {
-  it("payload cũ (chỉ cskh_*) và payload mới (confirmation_*) cho cùng một kết quả", () => {
-    const oldPayload = { "cskh_queue_waiting": 3, "cskh_escalated": 2, "cskh_auto_cancel_blocked": 1 };
-    const newPayload = { confirmation_queue_waiting: 3, confirmation_escalated: 2, confirmation_auto_cancel_blocked: 1 };
-    const expected = { queueWaiting: 3, escalated: 2, autoCancelBlocked: 1 };
-    expect(readConfirmationCounts(oldPayload)).toEqual(expected);
-    expect(readConfirmationCounts(newPayload)).toEqual(expected);
+describe("readConfirmationCounts (P8b Lô 5: chỉ khoá confirmation_*)", () => {
+  it("đọc đúng 3 số liệu từ khoá confirmation_*", () => {
+    const payload = { confirmation_queue_waiting: 3, confirmation_escalated: 2, confirmation_auto_cancel_blocked: 1 };
+    expect(readConfirmationCounts(payload)).toEqual({ queueWaiting: 3, escalated: 2, autoCancelBlocked: 1 });
   });
 
-  it("BE trả cả hai họ khoá: ưu tiên khoá mới, số 0 của khoá mới không bị khoá cũ đè", () => {
-    const both = { confirmation_queue_waiting: 0, "cskh_queue_waiting": 9, confirmation_escalated: 4, "cskh_escalated": 4 };
-    const r = readConfirmationCounts(both);
+  it("số 0 vẫn là 0; khoá vắng là undefined; khoá cũ cskh_* không được đọc nữa", () => {
+    const payload = { confirmation_queue_waiting: 0, "cskh_queue_waiting": 9, "cskh_escalated": 4 } as never;
+    const r = readConfirmationCounts(payload);
     expect(r.queueWaiting).toBe(0);
-    expect(r.escalated).toBe(4);
+    expect(r.escalated).toBeUndefined();
     expect(r.autoCancelBlocked).toBeUndefined();
   });
 });

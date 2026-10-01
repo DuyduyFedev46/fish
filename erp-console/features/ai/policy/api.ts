@@ -1,7 +1,6 @@
 import { apiFetch, type MockRequest } from "@/shared/lib/http";
 import { ROLE } from "@/shared/lib/roles";
 import { RECEIVE_BATCHES_COMMAND_ID } from "../commandGroups";
-import { normalizeAiPolicy, normalizeMyConfig } from "../legacyIds";
 import { AiPolicy, MyConfig, PolicyCaps } from "../types";
 
 export interface UpdateAiPolicyPayload {
@@ -78,12 +77,10 @@ const mockAiPolicy: AiPolicy = {
 
 export async function getAiPolicy(signal?: AbortSignal): Promise<AiPolicy> {
   const isMock = process.env.NEXT_PUBLIC_USE_MOCK === "1";
-  return normalizeAiPolicy(
-    await apiFetch<AiPolicy>("/api/ai/policy/", {
-      signal,
-      mock: isMock ? (_req: MockRequest) => ({ status: 200, body: mockAiPolicy }) : undefined,
-    })
-  );
+  return apiFetch<AiPolicy>("/api/ai/policy/", {
+    signal,
+    mock: isMock ? (_req: MockRequest) => ({ status: 200, body: mockAiPolicy }) : undefined,
+  });
 }
 
 export async function updateAiPolicy(
@@ -91,7 +88,7 @@ export async function updateAiPolicy(
   signal?: AbortSignal
 ): Promise<AiPolicy> {
   const isMock = process.env.NEXT_PUBLIC_USE_MOCK === "1";
-  return normalizeAiPolicy(await apiFetch<AiPolicy>("/api/ai/policy/", {
+  return apiFetch<AiPolicy>("/api/ai/policy/", {
     method: "PUT",
     body: payload,
     signal,
@@ -122,7 +119,7 @@ export async function updateAiPolicy(
           };
         }
       : undefined,
-  }));
+  });
 }
 
 export async function killUserAi(
@@ -149,7 +146,7 @@ export async function killUserAi(
 
 export async function getUserAiConfig(userId: number, signal?: AbortSignal): Promise<MyConfig> {
   const isMock = process.env.NEXT_PUBLIC_USE_MOCK === "1";
-  return normalizeMyConfig(await apiFetch<MyConfig>(`/api/ai/policy/users/${userId}/config/`, {
+  return apiFetch<MyConfig>(`/api/ai/policy/users/${userId}/config/`, {
     signal,
     mock: isMock
       ? (_req: MockRequest) => ({
@@ -165,5 +162,5 @@ export async function getUserAiConfig(userId: number, signal?: AbortSignal): Pro
           },
         })
       : undefined,
-  }));
+  });
 }

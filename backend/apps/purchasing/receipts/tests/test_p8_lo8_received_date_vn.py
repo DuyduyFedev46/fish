@@ -36,7 +36,7 @@ class ReceivedDateVnTests(TestCase):
 
     def test_l8_2_api_khong_truyen_ngay_sau_nua_dem_vn_lay_ngay_vn(self):
         with patch("django.utils.timezone.now", return_value=AFTER_MIDNIGHT_VN):
-            res = client_for(self.kho).post("/api/purchasing/receipts/nhap-lo/", self._payload(), format="json")
+            res = client_for(self.kho).post("/api/purchasing/receipts/receive-batches/", self._payload(), format="json")
         self.assertEqual(res.status_code, 201, res.content)
         receipt = PurchaseReceipt.objects.get(pk=res.json()["receipt"]["id"])
         self.assertEqual(receipt.received_date, datetime.date(2026, 10, 1))
@@ -57,7 +57,7 @@ class ReceivedDateVnTests(TestCase):
 
     def test_l8_2_ca_10h_utc_van_la_ngay_30_khong_doi(self):
         with patch("django.utils.timezone.now", return_value=SAME_DAY_VN):
-            res = client_for(self.kho).post("/api/purchasing/receipts/nhap-lo/", self._payload(), format="json")
+            res = client_for(self.kho).post("/api/purchasing/receipts/receive-batches/", self._payload(), format="json")
         self.assertEqual(res.status_code, 201, res.content)
         receipt = PurchaseReceipt.objects.get(pk=res.json()["receipt"]["id"])
         self.assertEqual(receipt.received_date, datetime.date(2026, 9, 30))
@@ -66,5 +66,5 @@ class ReceivedDateVnTests(TestCase):
     def test_l8_2_truyen_received_date_tuong_minh_van_duoc_giu(self):
         payload = dict(self._payload(), received_date="2026-09-28")
         with patch("django.utils.timezone.now", return_value=AFTER_MIDNIGHT_VN):
-            res = client_for(self.kho).post("/api/purchasing/receipts/nhap-lo/", payload, format="json")
+            res = client_for(self.kho).post("/api/purchasing/receipts/receive-batches/", payload, format="json")
         self.assertEqual(PurchaseReceipt.objects.get(pk=res.json()["receipt"]["id"]).received_date, datetime.date(2026, 9, 28))

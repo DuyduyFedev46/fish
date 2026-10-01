@@ -91,7 +91,6 @@ export function AttentionBlock() {
     });
   }
 
-  // P8b Lô 3: khoá mới `confirmation_*`; BE còn trả thêm khoá cũ `cskh_*` đến hết Lô 5 → đọc mới trước, cũ làm dự phòng.
   const { queueWaiting, escalated, autoCancelBlocked } = readConfirmationCounts(data);
 
   if (typeof queueWaiting === "number" && queueWaiting > 0) {

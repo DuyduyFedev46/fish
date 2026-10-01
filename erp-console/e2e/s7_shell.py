@@ -50,8 +50,10 @@ with sync_playwright() as p:
     labels = [l.split("\n")[-1].strip() for l in labels]
     # S12 (L8): Chủ có thêm mục con "Hàng chờ thanh toán" ngay dưới "Đơn & tiền" (sales.confirm_payment_manual).
     # S16 (L9): thêm mục con "Phiếu hoàn chờ chuyển" ngay sau đó (sales.view_refund).
-    # S03 (AI Lô 1): thêm mục "Nhật ký hoạt động" (accounts.view_auditlog — chu, manager) ở cuối mục Quản trị.
-    expected = ["Tổng quan", "Đơn & tiền", "Hàng chờ thanh toán", "Phiếu hoàn chờ chuyển", "Giao hàng", "Kho & lô", "Mua hàng", "Kiểm kê", "Báo cáo lãi lỗ", "Danh mục & giá", "Nhân sự · Nhật ký", "Nhật ký hoạt động"]
+    # S03 (AI Lô 1): thêm mục "Nhật ký hoạt động" (accounts.view_auditlog — owner, manager) ở cuối mục Quản trị.
+    # Về sau thêm: "Việc AI" (cuối mục Điều hành), "Nội dung" + "Chuyên mục" (mục Sổ sách), "AI của tôi" (cuối mục Quản trị).
+    # Thứ tự = thứ tự trong shared/lib/nav.ts, gom theo mục (Điều hành, Sổ sách, Quản trị).
+    expected = ["Tổng quan", "Đơn & tiền", "Hàng chờ thanh toán", "Phiếu hoàn chờ chuyển", "Giao hàng", "Kho & lô", "Mua hàng", "Kiểm kê", "Việc AI", "Báo cáo lãi lỗ", "Danh mục & giá", "Nội dung", "Chuyên mục", "Nhân sự · Nhật ký", "Nhật ký hoạt động", "AI của tôi"]
     ok("AC1 menu Chủ", labels == expected, str(labels))
     rr = page.locator("#rail-right")
     ok("AC7 1280: 3 cột (cột phải hiện)", rr.is_visible() and rr.bounding_box()["x"] > 900, str(rr.bounding_box()))

@@ -87,7 +87,7 @@ class TestCS12ChangeRecipient(ConfirmationL4BaseTestCase):
 
         client_cs1 = client_for(self.cs1)
         resp = client_cs1.post(
-            f"/api/cskh/queue/{note.pk}/recipient/",
+            f"/api/confirmation/queue/{note.pk}/recipient/",
             {
                 "delivery_address": "Số 2 Đường Thử, P. Thử, Lâm Đồng",
                 "recipient_name": "Người Nhận Hộ",
@@ -122,7 +122,7 @@ class TestCS12ChangeRecipient(ConfirmationL4BaseTestCase):
         order, note, task = self._create_order_with_confirmation()
         client_cs1 = client_for(self.cs1)
         resp = client_cs1.post(
-            f"/api/cskh/queue/{note.pk}/calls/",
+            f"/api/confirmation/queue/{note.pk}/calls/",
             {"result": "CONFIRMED_CHANGED", "note": "Đã đổi địa chỉ"},
             format="json",
         )
@@ -145,7 +145,7 @@ class TestCS12ChangeRecipient(ConfirmationL4BaseTestCase):
         # CSKH đổi địa chỉ
         client_cs1 = client_for(self.cs1)
         resp = client_cs1.post(
-            f"/api/cskh/queue/{note.pk}/recipient/",
+            f"/api/confirmation/queue/{note.pk}/recipient/",
             {"delivery_address": "Số 99 Đường Mới, P. Mới, Đà Lạt"},
             format="json",
         )
@@ -171,7 +171,7 @@ class TestCS12ChangeRecipient(ConfirmationL4BaseTestCase):
 
         client_ql = client_for(self.ql)
         resp = client_ql.post(
-            f"/api/cskh/queue/{note.pk}/recipient/",
+            f"/api/confirmation/queue/{note.pk}/recipient/",
             {"delivery_address": "Số 3 Đường Thử"},
             format="json",
         )
@@ -181,7 +181,7 @@ class TestCS12ChangeRecipient(ConfirmationL4BaseTestCase):
         note.status = DeliveryNote.Status.DELIVERING
         note.save(update_fields=["status"])
         resp2 = client_ql.post(
-            f"/api/cskh/queue/{note.pk}/recipient/",
+            f"/api/confirmation/queue/{note.pk}/recipient/",
             {"delivery_address": "Số 3 Đường Thử"},
             format="json",
         )
@@ -195,7 +195,7 @@ class TestCS12ChangeRecipient(ConfirmationL4BaseTestCase):
 
         # SĐT sai (9 số)
         resp = client_cs1.post(
-            f"/api/cskh/queue/{note.pk}/recipient/",
+            f"/api/confirmation/queue/{note.pk}/recipient/",
             {"recipient_phone": "091234567"},
             format="json",
         )
@@ -204,7 +204,7 @@ class TestCS12ChangeRecipient(ConfirmationL4BaseTestCase):
 
         # Địa chỉ rỗng
         resp2 = client_cs1.post(
-            f"/api/cskh/queue/{note.pk}/recipient/",
+            f"/api/confirmation/queue/{note.pk}/recipient/",
             {"delivery_address": "   "},
             format="json",
         )
@@ -254,7 +254,7 @@ class TestCS12ChangeRecipient(ConfirmationL4BaseTestCase):
         for u in (self.kho, self.giao):
             c = client_for(u)
             resp = c.post(
-                f"/api/cskh/queue/{note.pk}/recipient/",
+                f"/api/confirmation/queue/{note.pk}/recipient/",
                 {"recipient_name": "Người Nhận"},
                 format="json",
             )
@@ -267,7 +267,7 @@ class TestCS13CustomerCancellationAndChange(ConfirmationL4BaseTestCase):
         order, note, task = self._create_order_with_confirmation()
         client_cs1 = client_for(self.cs1)
         resp = client_cs1.post(
-            f"/api/cskh/queue/{note.pk}/calls/",
+            f"/api/confirmation/queue/{note.pk}/calls/",
             {"result": "WANT_CANCEL", "note": "Khách đổi ý không lấy nữa"},
             format="json",
         )
@@ -277,7 +277,7 @@ class TestCS13CustomerCancellationAndChange(ConfirmationL4BaseTestCase):
         self.assertEqual(task.escalation_reason, ConfirmationTask.EscalationReason.WANT_CANCEL)
 
         # Xem qua hàng chờ CSKH
-        resp_q = client_cs1.get(f"/api/cskh/queue/{note.pk}/")
+        resp_q = client_cs1.get(f"/api/confirmation/queue/{note.pk}/")
         self.assertEqual(resp_q.status_code, 200)
         data = resp_q.json()
         self.assertEqual(data["escalation_label"], "Khách muốn huỷ")
@@ -290,7 +290,7 @@ class TestCS13CustomerCancellationAndChange(ConfirmationL4BaseTestCase):
 
         client_ql = client_for(self.ql)
         resp = client_ql.post(
-            f"/api/cskh/queue/{note.pk}/decide/",
+            f"/api/confirmation/queue/{note.pk}/decide/",
             {"decision": "CANCEL", "reason_code": "CUSTOMER_CHANGED_MIND", "reason": "Khách xác nhận huỷ"},
             format="json",
         )
@@ -307,7 +307,7 @@ class TestCS13CustomerCancellationAndChange(ConfirmationL4BaseTestCase):
         order, note, task = self._create_order_with_confirmation()
         client_cs1 = client_for(self.cs1)
         resp = client_cs1.post(
-            f"/api/cskh/queue/{note.pk}/calls/",
+            f"/api/confirmation/queue/{note.pk}/calls/",
             {"result": "WANT_CHANGE", "note": "Muốn đổi sang mực lá"},
             format="json",
         )
@@ -316,7 +316,7 @@ class TestCS13CustomerCancellationAndChange(ConfirmationL4BaseTestCase):
         self.assertEqual(task.state, ConfirmationTask.State.ESCALATED)
         self.assertEqual(task.escalation_reason, ConfirmationTask.EscalationReason.WANT_CHANGE)
 
-        resp_q = client_cs1.get(f"/api/cskh/queue/{note.pk}/")
+        resp_q = client_cs1.get(f"/api/confirmation/queue/{note.pk}/")
         data = resp_q.json()
         self.assertEqual(data["escalation_label"], "Khách muốn đổi món – huỷ + hoàn + đặt lại")
         self.assertIsNone(data["decide_deadline"])
@@ -482,21 +482,20 @@ class TestCS14LabelReprintAndVoid(ConfirmationL4BaseTestCase):
 
 class TestCS15DashboardAttention(ConfirmationL4BaseTestCase):
     def test_cs15_ac1_owner_sees_all_6_keys(self):
-        """Chủ gọi GET /api/dashboard/attention/ -> có đủ 6 khoá + expired_batches_open (P8 Lô 5, BR-LO-07)."""
+        """Chủ gọi GET /api/dashboard/attention/ -> có đủ 6 khoá + expired_batches_open (P8 Lô 5, BR-LO-07); không còn khoá `cskh_*` (P8b Lô 5)."""
         client_chu = client_for(self.chu)
         resp = client_chu.get("/api/dashboard/attention/")
         self.assertEqual(resp.status_code, 200)
         data = resp.json()
         expected_keys = {
             "confirmation_queue_waiting", "confirmation_escalated", "confirmation_auto_cancel_blocked",
-            "cskh_queue_waiting", "cskh_escalated", "cskh_auto_cancel_blocked",  # naming: allow - khoá cũ, gỡ ở Lô 5
             "refund_calls_open", "labels_not_printed", "labels_to_void",
             "expired_batches_open",
         }
         self.assertEqual(set(data.keys()), expected_keys)
 
-    def test_cs15_ac2_cskh_queue_waiting_threshold(self):
-        """Phiếu PENDING trả tiền 61 phút trước -> tính vào cskh_queue_waiting; 59 phút -> không tính."""
+    def test_cs15_ac2_confirmation_queue_waiting_threshold(self):
+        """Phiếu PENDING trả tiền 61 phút trước -> tính vào confirmation_queue_waiting; 59 phút -> không tính."""
         order, note, task = self._create_order_with_confirmation()
         inv = note.sales_invoice
 
@@ -507,14 +506,14 @@ class TestCS15DashboardAttention(ConfirmationL4BaseTestCase):
 
         client_chu = client_for(self.chu)
         resp1 = client_chu.get("/api/dashboard/attention/")
-        self.assertEqual(resp1.json()["cskh_queue_waiting"], 0)
+        self.assertEqual(resp1.json()["confirmation_queue_waiting"], 0)
 
         # Đơn trả 61 phút trước (>= 60')
         inv.issued_at = now - timedelta(minutes=61)
         inv.save(update_fields=["issued_at"])
 
         resp2 = client_chu.get("/api/dashboard/attention/")
-        self.assertEqual(resp2.json()["cskh_queue_waiting"], 1)
+        self.assertEqual(resp2.json()["confirmation_queue_waiting"], 1)
 
     def test_cs15_ac3_labels_not_printed_threshold(self):
         """Phiếu PREPARING xác nhận 16 phút trước, chưa in -> labels_not_printed=1; 14 phút -> 0."""
@@ -537,11 +536,11 @@ class TestCS15DashboardAttention(ConfirmationL4BaseTestCase):
         self.assertEqual(resp2.json()["labels_not_printed"], 1)
 
     def test_cs15_ac4_permissions_filter_keys(self):
-        """cs1: chỉ cskh_queue_waiting, refund_calls_open. kho1: chỉ labels_not_printed, labels_to_void. ql: cả 6."""
+        """cs1: chỉ confirmation_queue_waiting, refund_calls_open. kho1: chỉ labels_not_printed, labels_to_void. ql: cả 6."""
         client_cs1 = client_for(self.cs1)
         resp_cs1 = client_cs1.get("/api/dashboard/attention/")
         self.assertEqual(resp_cs1.status_code, 200)
-        self.assertEqual(set(resp_cs1.json().keys()), {"confirmation_queue_waiting", "cskh_queue_waiting", "refund_calls_open"})
+        self.assertEqual(set(resp_cs1.json().keys()), {"confirmation_queue_waiting", "refund_calls_open"})
 
         client_kho = client_for(self.kho)
         resp_kho = client_kho.get("/api/dashboard/attention/")
@@ -551,7 +550,7 @@ class TestCS15DashboardAttention(ConfirmationL4BaseTestCase):
         client_ql = client_for(self.ql)
         resp_ql = client_ql.get("/api/dashboard/attention/")
         self.assertEqual(resp_ql.status_code, 200)
-        self.assertEqual(len(resp_ql.json().keys()), 9)  # 6 khoá + 3 khoá cskh_* cũ (alias tới Lô 5)
+        self.assertEqual(len(resp_ql.json().keys()), 6)  # khoá `cskh_*` cũ đã gỡ ở Lô 5
 
     def test_cs15_ac5_delivery_staff_forbidden(self):
         """giao1 gọi -> 403."""

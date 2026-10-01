@@ -8,7 +8,7 @@
 //   POST /api/sales/orders/{id}/confirm-payment[/]   {bank_txn_id, amount?}
 //
 // Luật mock (mô phỏng BE, FE KHÔNG dùng lại các luật này — nút chỉ theo `available_actions`):
-//  - Cần sales.view_salesorder (thiếu → 403). Người CHỈ thuộc nv_giao chỉ thấy đơn của phiếu giao gán cho mình; đơn khác → 404 (S5).
+//  - Cần sales.view_salesorder (thiếu → 403). Người CHỈ thuộc delivery_staff chỉ thấy đơn của phiếu giao gán cho mình; đơn khác → 404 (S5).
 //  - `q` khớp một phần mã đơn (không phân biệt hoa thường), SĐT, hoặc tên khách bỏ dấu ("chi hoa" → "Chị Hoa");
 //    ngày lọc theo ngày tạo (giờ VN), sai dạng → 400 INVALID_FILTER.
 //  - `allocations[].unit_cost` chỉ có KEY khi có inventory.view_costprice (BR-PQ-15).
@@ -221,7 +221,7 @@ const PLAN: Plan[] = [
 ];
 
 // SR-PII-02: hai đơn đã giao xong 10–11 ngày trước → người có phạm vi giao hạn chế thấy tên/SĐT/địa chỉ = null:
-// đơn 143 gán cho giao1 (id 4, chỉ nv_giao), đơn 142 gán cho cs2 (id 12, cskh + nv_giao).
+// đơn 143 gán cho giao1 (id 4, chỉ delivery_staff), đơn 142 gán cho cs2 (id 12, customer_service + delivery_staff).
 // Đặt vào chỗ hai đơn cũ COMPLETED (42, 41) để tổng số đơn (45) và các id khác không đổi.
 const OLD_COURIER_PLANS: Record<number, Plan> = {
   42: ["COMPLETED", 10 * 24 * 60, "old-giao1"],
@@ -596,7 +596,7 @@ function inScope(me: Me, o: Order): boolean {
 }
 
 /**
- * SR-PII-02: người có phạm vi giao hạn chế (nv_giao không kèm chủ/quản lý/NV kho) không thấy dữ liệu khách của đơn có phiếu giao đã kết thúc quá 7 ngày.
+ * SR-PII-02: người có phạm vi giao hạn chế (delivery_staff không kèm chủ/quản lý/NV kho) không thấy dữ liệu khách của đơn có phiếu giao đã kết thúc quá 7 ngày.
  * Như BE: hết ngày lịch thứ N tính từ ngày kết thúc (giờ VN); phiếu chưa kết thúc (kể cả FAILED) luôn thấy.
  */
 function piiHidden(me: Me, o: Order): boolean {

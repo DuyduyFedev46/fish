@@ -8,10 +8,6 @@ export type DashboardAttentionData = {
   confirmation_queue_waiting?: number;
   confirmation_escalated?: number;
   confirmation_auto_cancel_blocked?: number;
-  /** Khoá cũ (P8b Lô 3: BE trả song song, gỡ ở Lô 5). Đọc `confirmation_*` trước, thiếu mới dùng khoá này. */
-  cskh_queue_waiting?: number;
-  cskh_escalated?: number;
-  cskh_auto_cancel_blocked?: number;
   refund_calls_open?: number;
   labels_not_printed?: number;
   labels_to_void?: number;

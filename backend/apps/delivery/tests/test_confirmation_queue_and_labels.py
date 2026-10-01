@@ -135,7 +135,7 @@ class CS05QueueAndSearchTests(ConfirmationL2BaseTestCase):
         o2, _, n2, _ = self._create_paid_order("DH-Q2", "0902222222")
 
         client = client_for(self.cs1)
-        resp = client.get("/api/cskh/queue/")
+        resp = client.get("/api/confirmation/queue/")
         self.assertEqual(resp.status_code, 200)
         results = resp.json().get("results", [])
         self.assertGreaterEqual(len(results), 2)
@@ -150,12 +150,12 @@ class CS05QueueAndSearchTests(ConfirmationL2BaseTestCase):
         client2 = client_for(self.cs2)
 
         # cs1 claim
-        resp1 = client1.post(f"/api/cskh/queue/{n1.pk}/claim/")
+        resp1 = client1.post(f"/api/confirmation/queue/{n1.pk}/claim/")
         self.assertEqual(resp1.status_code, 200)
         self.assertEqual(resp1.json()["claimed_by"]["id"], self.cs1.pk)
 
         # cs2 claim -> 409 CLAIMED
-        resp2 = client2.post(f"/api/cskh/queue/{n1.pk}/claim/")
+        resp2 = client2.post(f"/api/confirmation/queue/{n1.pk}/claim/")
         self.assertEqual(resp2.status_code, 409)
         self.assertEqual(resp2.json()["code"], "CLAIMED")
         self.assertIn("xử lý", resp2.json()["detail"])
@@ -165,7 +165,7 @@ class CS05QueueAndSearchTests(ConfirmationL2BaseTestCase):
         t1.claimed_until = timezone.now() - datetime.timedelta(minutes=1)
         t1.save(update_fields=["claimed_until"])
 
-        resp2_retry = client2.post(f"/api/cskh/queue/{n1.pk}/claim/")
+        resp2_retry = client2.post(f"/api/confirmation/queue/{n1.pk}/claim/")
         self.assertEqual(resp2_retry.status_code, 200)
         self.assertEqual(resp2_retry.json()["claimed_by"]["id"], self.cs2.pk)
 
@@ -181,7 +181,7 @@ class CS05QueueAndSearchTests(ConfirmationL2BaseTestCase):
 
         client = client_for(self.cs1)
         # Xem queue với state=DONE (hoặc gọi search)
-        resp = client.get(f"/api/cskh/queue/?state=DONE")
+        resp = client.get(f"/api/confirmation/queue/?state=DONE")
         results = [r for r in resp.json().get("results", []) if r["note_id"] == n1.pk]
         if results:
             row = results[0]
@@ -197,22 +197,22 @@ class CS05QueueAndSearchTests(ConfirmationL2BaseTestCase):
         client = client_for(self.cs1)
 
         # GET -> 405
-        resp_get = client.get("/api/cskh/search/?q=0908889999")
+        resp_get = client.get("/api/confirmation/search/?q=0908889999")
         self.assertEqual(resp_get.status_code, 405)
 
         # POST tìm SĐT đầy đủ
-        resp_phone = client.post("/api/cskh/search/", {"q": "0908889999"}, format="json")
+        resp_phone = client.post("/api/confirmation/search/", {"q": "0908889999"}, format="json")
         self.assertEqual(resp_phone.status_code, 200)
         results = resp_phone.json().get("results", [])
         self.assertTrue(any(r["note_id"] == n1.pk for r in results))
 
         # POST tìm mã đơn
-        resp_code = client.post("/api/cskh/search/", {"q": "DH-SRCH-01"}, format="json")
+        resp_code = client.post("/api/confirmation/search/", {"q": "DH-SRCH-01"}, format="json")
         self.assertEqual(resp_code.status_code, 200)
         self.assertTrue(any(r["note_id"] == n1.pk for r in resp_code.json().get("results", [])))
 
         # POST tìm SĐT một phần (< 9 số) -> 400 INVALID_QUERY
-        resp_short = client.post("/api/cskh/search/", {"q": "090888"}, format="json")
+        resp_short = client.post("/api/confirmation/search/", {"q": "090888"}, format="json")
         self.assertEqual(resp_short.status_code, 400)
         self.assertEqual(resp_short.json()["code"], "INVALID_QUERY")
 
@@ -220,20 +220,20 @@ class CS05QueueAndSearchTests(ConfirmationL2BaseTestCase):
     def test_cs05_search_throttling(self):
         """CS-05-AC6: Throttle customer_search trả 429 khi vượt ngưỡng."""
         client = client_for(self.cs1)
-        r1 = client.post("/api/cskh/search/", {"q": "0908889999"}, format="json")
-        r2 = client.post("/api/cskh/search/", {"q": "0908889999"}, format="json")
-        r3 = client.post("/api/cskh/search/", {"q": "0908889999"}, format="json")
+        r1 = client.post("/api/confirmation/search/", {"q": "0908889999"}, format="json")
+        r2 = client.post("/api/confirmation/search/", {"q": "0908889999"}, format="json")
+        r3 = client.post("/api/confirmation/search/", {"q": "0908889999"}, format="json")
         self.assertEqual(r3.status_code, 429)
 
     def test_cs05_headers_and_permissions(self):
         """CS-05: Cache-Control: no-store và chặn người thiếu quyền."""
         client = client_for(self.cs1)
-        resp = client.get("/api/cskh/queue/")
+        resp = client.get("/api/confirmation/queue/")
         self.assertEqual(resp.headers.get("Cache-Control"), "no-store")
 
         kho_client = client_for(self.kho)
-        self.assertEqual(kho_client.get("/api/cskh/queue/").status_code, 403)
-        self.assertEqual(kho_client.post("/api/cskh/search/", {"q": "0908889999"}, format="json").status_code, 403)
+        self.assertEqual(kho_client.get("/api/confirmation/queue/").status_code, 403)
+        self.assertEqual(kho_client.post("/api/confirmation/search/", {"q": "0908889999"}, format="json").status_code, 403)
 
 
 class CS06RecordCallAndUnconfirmTests(ConfirmationL2BaseTestCase):
@@ -245,7 +245,7 @@ class CS06RecordCallAndUnconfirmTests(ConfirmationL2BaseTestCase):
 
         # Cuộc gọi xác nhận lần đầu
         resp = client.post(
-            f"/api/cskh/queue/{note.pk}/calls/",
+            f"/api/confirmation/queue/{note.pk}/calls/",
             {"result": "CONFIRMED", "note": "Giao sau 17h", "request_id": req_id},
             format="json",
         )
@@ -263,7 +263,7 @@ class CS06RecordCallAndUnconfirmTests(ConfirmationL2BaseTestCase):
 
         # Gửi lại cùng request_id -> 200 duplicate=True
         resp_dup = client.post(
-            f"/api/cskh/queue/{note.pk}/calls/",
+            f"/api/confirmation/queue/{note.pk}/calls/",
             {"result": "CONFIRMED", "note": "Giao sau 17h", "request_id": req_id},
             format="json",
         )
@@ -278,7 +278,7 @@ class CS06RecordCallAndUnconfirmTests(ConfirmationL2BaseTestCase):
         future_time = timezone.now() + datetime.timedelta(hours=2)
 
         resp = client.post(
-            f"/api/cskh/queue/{note.pk}/calls/",
+            f"/api/confirmation/queue/{note.pk}/calls/",
             {"result": "CALLBACK", "callback_at": future_time.isoformat()},
             format="json",
         )
@@ -290,7 +290,7 @@ class CS06RecordCallAndUnconfirmTests(ConfirmationL2BaseTestCase):
         # callback_at quá khứ -> 400 INVALID_INPUT
         past_time = timezone.now() - datetime.timedelta(hours=1)
         resp_bad = client.post(
-            f"/api/cskh/queue/{note.pk}/calls/",
+            f"/api/confirmation/queue/{note.pk}/calls/",
             {"result": "CALLBACK", "callback_at": past_time.isoformat()},
             format="json",
         )
@@ -302,28 +302,28 @@ class CS06RecordCallAndUnconfirmTests(ConfirmationL2BaseTestCase):
         client = client_for(self.cs1)
 
         # Lần 1: UNREACHABLE -> attempts=1
-        r1 = client.post(f"/api/cskh/queue/{note.pk}/calls/", {"result": "UNREACHABLE"}, format="json")
+        r1 = client.post(f"/api/confirmation/queue/{note.pk}/calls/", {"result": "UNREACHABLE"}, format="json")
         self.assertEqual(r1.status_code, 201)
         task.refresh_from_db()
         self.assertEqual(task.attempts, 1)
         self.assertEqual(task.state, ConfirmationTask.State.PENDING)
 
         # Gọi tiếp ngay -> 400 BR-GH-13
-        r_too_soon = client.post(f"/api/cskh/queue/{note.pk}/calls/", {"result": "UNREACHABLE"}, format="json")
+        r_too_soon = client.post(f"/api/confirmation/queue/{note.pk}/calls/", {"result": "UNREACHABLE"}, format="json")
         self.assertEqual(r_too_soon.status_code, 400)
         self.assertEqual(r_too_soon.json()["code"], "BR-GH-13")
 
         # Chỉnh last_unreachable_at lùi 11 phút để gọi lần 2
         task.last_unreachable_at = timezone.now() - datetime.timedelta(minutes=11)
         task.save(update_fields=["last_unreachable_at"])
-        r2 = client.post(f"/api/cskh/queue/{note.pk}/calls/", {"result": "UNREACHABLE"}, format="json")
+        r2 = client.post(f"/api/confirmation/queue/{note.pk}/calls/", {"result": "UNREACHABLE"}, format="json")
         self.assertEqual(r2.status_code, 201)
 
         # Chỉnh lùi 11 phút để gọi lần 3 -> chuyển ESCALATED
         task.refresh_from_db()
         task.last_unreachable_at = timezone.now() - datetime.timedelta(minutes=11)
         task.save(update_fields=["last_unreachable_at"])
-        r3 = client.post(f"/api/cskh/queue/{note.pk}/calls/", {"result": "UNREACHABLE"}, format="json")
+        r3 = client.post(f"/api/confirmation/queue/{note.pk}/calls/", {"result": "UNREACHABLE"}, format="json")
         self.assertEqual(r3.status_code, 201)
 
         task.refresh_from_db()
@@ -344,7 +344,7 @@ class CS06RecordCallAndUnconfirmTests(ConfirmationL2BaseTestCase):
             "A" * 201,  # vượt 200 ký tự
         ]
         for bn in bad_notes:
-            resp = client.post(f"/api/cskh/queue/{note.pk}/calls/", {"result": "CALLBACK", "note": bn}, format="json")
+            resp = client.post(f"/api/confirmation/queue/{note.pk}/calls/", {"result": "CALLBACK", "note": bn}, format="json")
             self.assertEqual(resp.status_code, 400)
             self.assertIn(resp.json()["code"], ("BR-GH-19", "INVALID_INPUT"))
 
@@ -354,7 +354,7 @@ class CS06RecordCallAndUnconfirmTests(ConfirmationL2BaseTestCase):
         client = client_for(self.cs1)
 
         # Xác nhận đơn
-        client.post(f"/api/cskh/queue/{note.pk}/calls/", {"result": "CONFIRMED"}, format="json")
+        client.post(f"/api/confirmation/queue/{note.pk}/calls/", {"result": "CONFIRMED"}, format="json")
         note.refresh_from_db()
         self.assertEqual(note.status, DeliveryNote.Status.PREPARING)
 
@@ -363,13 +363,13 @@ class CS06RecordCallAndUnconfirmTests(ConfirmationL2BaseTestCase):
         self.assertTrue(note.label_prints.exists())
 
         # Thử huỷ xác nhận khi tem đã in -> 400 BR-GH-16
-        resp_blocked = client.post(f"/api/cskh/queue/{note.pk}/unconfirm/", {"reason": "Nhầm đơn"}, format="json")
+        resp_blocked = client.post(f"/api/confirmation/queue/{note.pk}/unconfirm/", {"reason": "Nhầm đơn"}, format="json")
         self.assertEqual(resp_blocked.status_code, 400)
         self.assertEqual(resp_blocked.json()["code"], "BR-GH-16")
 
         # Huỷ tem đi để thử huỷ xác nhận thành công
         note.label_prints.all().delete()
-        resp_ok = client.post(f"/api/cskh/queue/{note.pk}/unconfirm/", {"reason": "Nhầm đơn"}, format="json")
+        resp_ok = client.post(f"/api/confirmation/queue/{note.pk}/unconfirm/", {"reason": "Nhầm đơn"}, format="json")
         self.assertEqual(resp_ok.status_code, 200)
         note.refresh_from_db()
         task.refresh_from_db()
@@ -382,7 +382,7 @@ class CS06RecordCallAndUnconfirmTests(ConfirmationL2BaseTestCase):
         client = client_for(self.cs1)
 
         resp = client.post(
-            f"/api/cskh/queue/{note.pk}/recipient/",
+            f"/api/confirmation/queue/{note.pk}/recipient/",
             {"recipient_name": "Anh Ba Nhận Hộ", "recipient_phone": "0988776655"},
             format="json",
         )

@@ -1,9 +1,9 @@
 """
-P8b Lô 3: tên mới cho env, lệnh quản trị, logger và khoá JSON công khai của module xác nhận đơn.
-- Env: `CONFIRMATION_*` đọc trước, `CSKH_*` là fallback tới Lô 5 (R11).
-- Lệnh: `process_confirmation_deadlines` / `check_confirmation_job_health` là lệnh thật; tên cũ chỉ bọc gọi.
+Tên env, lệnh quản trị, logger và khoá JSON công khai của module xác nhận đơn (P8b Lô 3, alias tên cũ gỡ ở Lô 5).
+- Env: chỉ đọc `CONFIRMATION_*` và `THROTTLE_CUSTOMER_SEARCH`; `CSKH_*`, `THROTTLE_CSKH_SEARCH` bị bỏ qua (R11).
+- Lệnh: `process_confirmation_deadlines` / `check_confirmation_job_health`; lệnh bọc tên cũ không còn tồn tại.
 - Logger: `cangca.delivery.confirmation`, không ghi dữ liệu khách (bất biến 9).
-- site-info: `confirmation_policy` cùng nội dung với `cskh_notice`, không có dữ liệu khách.
+- site-info: chỉ còn `confirmation_policy`, không có dữ liệu khách; khoá cũ `cskh_notice` đã gỡ.
 Dữ liệu dùng SĐT và địa chỉ giả.
 """
 import json
@@ -14,13 +14,13 @@ from datetime import timedelta
 from io import StringIO
 from pathlib import Path
 
-from django.core.management import call_command
+from django.core.management import CommandError, call_command
 from django.utils import timezone
 
 from apps.common.tests.fixtures import client_for
 from apps.delivery.confirmation import services as confirmation_services
 from apps.delivery.models import ConfirmationTask, DeliveryNote
-from apps.delivery.tests.test_cskh_l2 import ConfirmationL2BaseTestCase  # naming: allow - tên tệp test_cskh_l*.py đổi ở Lô 5 (02c), khi đó sửa import này
+from apps.delivery.tests.test_confirmation_queue_and_labels import ConfirmationL2BaseTestCase
 
 BACKEND_DIR = Path(__file__).resolve().parents[3]
 FAKE_PHONE = "0906667778"
@@ -42,6 +42,7 @@ ENV_CASES = (
     ("THROTTLE_CUSTOMER_SEARCH", "THROTTLE_CSKH_SEARCH", "5/min", "CAVEVE_THROTTLE_RATES.customer_search", "5/min"),
 )
 ALL_ENV_NAMES = {name for case in ENV_CASES for name in case[:2]}
+REMOVED_COMMANDS = ("process_cskh_deadlines", "check_cskh_job_health")  # lệnh bọc tên cũ, gỡ ở Lô 5
 
 
 def _load_settings(extra_env):
@@ -72,12 +73,16 @@ class ConfirmationEnvNamesTests(ConfirmationL2BaseTestCase):
             with self.subTest(env=new):
                 self.assertEqual(_load_settings({new: raw})[attr], expected)
 
-    def test_env_legacy_name_still_works_as_fallback(self):
+    def test_env_legacy_name_is_ignored(self):
+        """Lô 5: env tên cũ không còn được đọc; đặt riêng tên cũ thì giá trị về mặc định."""
+        defaults = _load_settings({})
         for _new, old, raw, attr, expected in ENV_CASES:
             with self.subTest(env=old):
-                self.assertEqual(_load_settings({old: raw})[attr], expected)
+                got = _load_settings({old: raw})[attr]
+                self.assertEqual(got, defaults[attr])
+                self.assertNotEqual(got, expected, "giá trị thử phải khác mặc định để phép so sánh có nghĩa")
 
-    def test_env_new_name_wins_over_legacy_when_both_set(self):
+    def test_env_new_name_is_used_even_when_legacy_name_is_also_set(self):
         for new, old, raw, attr, expected in ENV_CASES:
             with self.subTest(env=new):
                 # Giá trị env cũ phải khác giá trị env mới để chứng minh tên mới thắng.
@@ -124,46 +129,46 @@ class ConfirmationCommandTests(ConfirmationL2BaseTestCase):
         out2, _ = self._run("process_confirmation_deadlines")
         self.assertIn("Đã chuyển Quản lý 0 phiếu", out2)
 
-    def test_old_process_command_wraps_new_and_gives_same_effect(self):
+    def test_old_command_names_no_longer_exist_and_change_nothing(self):
+        """Lô 5: lệnh bọc tên cũ đã gỡ. Gọi tên cũ lỗi `Unknown command`, phiếu quá hạn không bị đụng."""
         _, task = self._make_escalatable_task("DH-CMD-2")
-        out, _ = self._run("process_cskh_deadlines")
-        self.assertIn("Đã chuyển Quản lý 1 phiếu", out)
-        task.refresh_from_db()
-        self.assertEqual(task.state, ConfirmationTask.State.ESCALATED)
-        out2, _ = self._run("process_confirmation_deadlines")
-        self.assertIn("Đã chuyển Quản lý 0 phiếu", out2)
-
-    def test_process_commands_leave_no_personal_data_in_output(self):
-        self._make_escalatable_task("DH-CMD-3")
-        for name in ("process_confirmation_deadlines", "process_cskh_deadlines"):
-            out, err = self._run(name)
-            self.assertNotIn(FAKE_PHONE, out + err)
-            self.assertNotIn("Nguyễn Huệ", out + err)
-
-    def test_health_commands_ok_when_nothing_stale(self):
-        for name in ("check_confirmation_job_health", "check_cskh_job_health"):
-            out, err = self._run(name)
-            self.assertIn("khoẻ", out, name)
-            self.assertEqual(err, "", name)
-
-    def test_health_commands_exit_1_and_log_to_new_logger_without_personal_data(self):
-        self._make_escalatable_task("DH-CMD-4")
-        for name in ("check_confirmation_job_health", "check_cskh_job_health"):
+        for name in REMOVED_COMMANDS:
             with self.subTest(command=name):
-                with self.assertLogs(NEW_LOGGER, level="ERROR") as logs:
-                    with self.assertRaises(SystemExit) as exit_ctx:
-                        self._run(name)
-                self.assertEqual(exit_ctx.exception.code, 1)
-                joined = "\n".join(logs.output)
-                self.assertIn("quá hạn", joined)
-                self.assertNotIn(FAKE_PHONE, joined)
-                self.assertNotIn("Nguyễn Huệ", joined)
-                self.assertNotIn("Khách DH-CMD-4", joined)
+                with self.assertRaises(CommandError) as ctx:
+                    self._run(name)
+                self.assertIn("Unknown command", str(ctx.exception))
+        task.refresh_from_db()
+        self.assertEqual(task.state, ConfirmationTask.State.PENDING)
+        out, _ = self._run("process_confirmation_deadlines")  # lệnh thật vẫn chạy: phép thử trên có nghĩa
+        self.assertIn("Đã chuyển Quản lý 1 phiếu", out)
 
-    def test_old_health_command_passes_grace_minutes_through(self):
+    def test_process_command_leaves_no_personal_data_in_output(self):
+        self._make_escalatable_task("DH-CMD-3")
+        out, err = self._run("process_confirmation_deadlines")
+        self.assertNotIn(FAKE_PHONE, out + err)
+        self.assertNotIn("Nguyễn Huệ", out + err)
+
+    def test_health_command_ok_when_nothing_stale(self):
+        out, err = self._run("check_confirmation_job_health")
+        self.assertIn("khoẻ", out)
+        self.assertEqual(err, "")
+
+    def test_health_command_exit_1_and_logs_to_new_logger_without_personal_data(self):
+        self._make_escalatable_task("DH-CMD-4")
+        with self.assertLogs(NEW_LOGGER, level="ERROR") as logs:
+            with self.assertRaises(SystemExit) as exit_ctx:
+                self._run("check_confirmation_job_health")
+        self.assertEqual(exit_ctx.exception.code, 1)
+        joined = "\n".join(logs.output)
+        self.assertIn("quá hạn", joined)
+        self.assertNotIn(FAKE_PHONE, joined)
+        self.assertNotIn("Nguyễn Huệ", joined)
+        self.assertNotIn("Khách DH-CMD-4", joined)
+
+    def test_health_command_passes_grace_minutes_through(self):
         """Với --grace-minutes đủ lớn thì phiếu trễ 60 phút chưa bị coi là quá hạn."""
         self._make_escalatable_task("DH-CMD-5")
-        out, _ = self._run("check_cskh_job_health", grace_minutes=10_000)
+        out, _ = self._run("check_confirmation_job_health", grace_minutes=10_000)
         self.assertIn("khoẻ", out)
 
     def test_services_use_new_logger_name(self):
@@ -171,11 +176,11 @@ class ConfirmationCommandTests(ConfirmationL2BaseTestCase):
 
 
 class ConfirmationPolicyPublicKeyTests(ConfirmationL2BaseTestCase):
-    def test_site_info_has_confirmation_policy_equal_to_legacy_notice(self):
+    def test_site_info_has_confirmation_policy_and_no_legacy_notice_key(self):
         res = client_for(None).get("/api/public/site-info/")
         self.assertEqual(res.status_code, 200)
         body = res.json()
-        self.assertEqual(body["confirmation_policy"], body["cskh_notice"])
+        self.assertNotIn("cskh_notice", body)
         self.assertEqual(
             set(body["confirmation_policy"]),
             {"enabled", "working_hours", "max_attempts", "window_minutes", "decision_minutes",
@@ -198,4 +203,4 @@ class ConfirmationPolicyPublicKeyTests(ConfirmationL2BaseTestCase):
             body = client_for(None).get("/api/public/site-info/").json()
         self.assertEqual(body["confirmation_policy"]["max_attempts"], 2)
         self.assertIs(body["confirmation_policy"]["enabled"], False)
-        self.assertEqual(body["confirmation_policy"], body["cskh_notice"])
+        self.assertNotIn("cskh_notice", body)

@@ -3,7 +3,7 @@
 // Màn Danh mục tối thiểu (A2, 02-stories.md — hồ sơ 2026-09-26-anh-mat-hang): danh sách mặt hàng có
 // ảnh thu nhỏ, bộ lọc "Chưa có ảnh" (UC-A5, lọc PHÍA SERVER qua ?has_image=), tải lên/thay ảnh, "Tải
 // thêm" khi còn trang kế (DRF phân trang thật — xem `useCatalogList`/`shared/lib/usePagedList`). Trang
-// bọc <ViewGuard view="catalog"> (cần catalog.view_item — nv_kho cũng có, chỉ không thấy nút ảnh). Phần
+// bọc <ViewGuard view="catalog"> (cần catalog.view_item — warehouse_staff cũng có, chỉ không thấy nút ảnh). Phần
 // sửa tên, nhóm, hạn dùng, ẩn/hiện vẫn thuộc S38 — CHƯA làm ở màn này (theo phạm vi A2 đã chốt).
 //
 // QA REJECTED lô 1 (B1, 04-qa-report.md): bản trước đọc `GET /api/catalog/items/` như mảng trần nên

@@ -42,12 +42,4 @@ describe("bộ tìm lệnh AI sau khi nhóm đổi sang tiếng Anh", () => {
     expect(top).toContain("sales.customer.list");
     expect(top).toContain("sales.confirmation.claim");
   });
-
-  it("chỉ mục còn khoá nhóm cũ (BE chưa migrate) cho cùng thứ tự kết quả", () => {
-    const legacy: Record<string, string> = { purchasing: "thu_mua", sales: "ban_hang", customer_service: "cskh" };
-    const oldIndex = INDEX.map((c) => ({ ...c, group: (legacy[c.group] ?? c.group) as AiCommandIndexItem["group"] }));
-    for (const q of ["nhập lô", "thu mua", "bán hàng", "cskh", "khách hàng"]) {
-      expect(ids(q, oldIndex)).toEqual(ids(q));
-    }
-  });
 });

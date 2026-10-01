@@ -3,7 +3,7 @@
 Màn nghiệp vụ CHUNG (không nằm trong `features/ai/` — chốt Duy 27/09: dù admin hay nhân viên đều
 xem ở ERP, tính năng phải làm xong ở ERP chứ không chỉ Django Admin).
 
-- Route: `/audit-logs/` (bọc `ViewGuard view="audit-logs"` — cần `accounts.view_auditlog`, chu + quan_ly).
+- Route: `/audit-logs/` (bọc `ViewGuard view="audit-logs"` — cần `accounts.view_auditlog`, owner + manager).
 - Menu: `shared/lib/nav.ts` — mục "Nhật ký hoạt động" (Quản trị, sau Nhân sự), `PERM.viewAuditLog`.
 - Endpoint: `GET /api/audit-logs/?page=&actor_kind=&action=` — thuộc hồ sơ AI (S03) nên hàm `getAuditLogs`
   và kiểu `AuditLogRow` đặt ở `features/ai/api.ts` / `features/ai/types.ts`; màn này import từ đó.

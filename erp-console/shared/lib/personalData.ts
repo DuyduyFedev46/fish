@@ -12,9 +12,9 @@ export function personalText(value: string | null | undefined, whenEmpty = "—"
 }
 
 /**
- * Người dùng chỉ có phạm vi giao hàng HẠN CHẾ: có Group nv_giao nhưng KHÔNG có chủ, quản lý hay NV kho
+ * Người dùng chỉ có phạm vi giao hàng HẠN CHẾ: có Group delivery_staff nhưng KHÔNG có chủ, quản lý hay NV kho
  * (đảo của BE `has_full_delivery_scope`). Với họ: (1) chỉ thấy phiếu/đơn gán cho mình, (2) dữ liệu khách của phiếu đã
- * kết thúc quá 7 ngày bị ẩn (SR-PII-02). Người kiêm nhiệm như cskh + nv_giao cũng thuộc diện này.
+ * kết thúc quá 7 ngày bị ẩn (SR-PII-02). Người kiêm nhiệm như customer_service + delivery_staff cũng thuộc diện này.
  * Dùng chung cho mock Đơn và mock Giao hàng; BE thật mới là lớp chặn, FE chỉ dựng lại cho khớp.
  */
 export function hasLimitedCourierScope(me: Pick<Me, "groups">): boolean {

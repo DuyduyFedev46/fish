@@ -565,3 +565,93 @@ Bước tái hiện: với `qa_pin` (cấu hình ghim khoá cũ, nhiều lệnh 
 | Dựng lại ERP với API production, `check-no-mock`, `check-ai-chunks`; tắt cổng 3272, 3273, 3274, 8272 | build exit 0, XANH, XANH; `lsof` không còn tiến trình |
 
 Tệp tạm: `/private/tmp/claude-501/-Users-dangthiduyen-Downloads-loc/3e0d9f3d-14ce-4b8b-a1cd-6fbcdc0b2f2d/scratchpad/qa-p8b-l4b/` (script, log, JSON, ảnh `erp-*.png`, bản sao đối chứng). Không sửa mã sản phẩm, không commit, không deploy. `erp-console/out` hiện là bản thật trỏ production.
+
+---
+
+## Lô 5 — gỡ alias tên cũ · lần 1 · 2026-10-01
+
+### Kết luận: APPROVED — không có lỗi chặn; đường cũ đã gỡ sạch, đường mới chạy đủ 7 tài khoản trên Django thật + ERP/Shop build thật
+Chạy trên cây làm việc chưa commit. Dữ liệu giả hoàn toàn, không đụng dữ liệu thật.
+
+### Tổng: 30 ca (checklist Lô 5) · ✅ 29 · ❌ 0 · ⏸ 1 (pytest adapter, không đổi mã)
+Kèm: 42 kiểm tra BE trực tiếp (`probe_be.py`), 16 kiểm tra nháp thật, 15 kiểm tra Shop (14 xanh, 1 ghi nhận Low), 201 kiểm tra mock e2e, 1827 test BE, 272 vitest, 26 + 40 test Shop.
+
+### Theo yêu cầu của Lô 5
+| Mã | Kết quả | Bằng chứng |
+|---|---|---|
+| G1 `/api/cskh/queue/`, `/api/cskh/search/` → 404 | ✅ | `probe_be.py` B1: 70 lời gọi x 10 người (kể cả anon) đều 404 |
+| G2 `POST …/nhap-lo/` không tạo phiếu | ✅ | B2/B2b: không 2xx, không 500, số phiếu/lô giữ nguyên (0, 7) |
+| G3 attention/site-info không còn `cskh_*`, `cskh_notice` | ✅ | D1 (4 vai), D2; có `confirmation_*`, `confirmation_policy` (D1b, D2b) |
+| G4 `manage.py process_cskh_deadlines` → Unknown command | ✅ | chạy thật, báo lệnh không tồn tại; lệnh `process_confirmation_deadlines` còn chạy |
+| G5 PUT groups tên cũ → 400, không lưu | ✅ | E1: `nv_kho, chu, quan_ly, nv_giao, cskh` và trộn tên cũ + mới đều 400, DB không đổi; E5 tạo nhân viên bằng tên cũ 400, không tạo user |
+| G6 env `CSKH_WORKING_HOURS` đặt một mình không có hiệu lực | ✅ | `envshow.py`: giữ mặc định; có `CONFIRMATION_*` thì thắng |
+| N1 `/confirmation/` + `/api/confirmation/*` chạy | ✅ | C1–C4: owner/manager/customer_service 200, warehouse/delivery 403, anon 401; thẻ 2/vai; ERP thật `qa_cs` gọi, ghi cuộc gọi, hoãn hoạt động (ảnh `cs-*.png`) |
+| N2 `receive-batches` 201 | ✅ | B3: 7 người 201 (owner, manager, warehouse, mgr_cs, wh_del, owner_cs, pin); delivery/cs 403; anon 401; payload sai 400; GET 405 |
+| N3 "AI của tôi" và "Chính sách AI" lưu được | ✅ | `ai_flow.py` trên ERP thật: PUT policy 200 (v5), PUT my-config 200, không pageerror. B1–B3 của Lô 4b đã được sửa (không còn mã hoá JSON hai lần; `groups` được giữ) |
+| N4 `effective_level` người ghim khoá cũ không đổi | ✅ | `eff.py`: 10 người x 111 lệnh, 0 khác biệt, kể cả sau khi lưu qua giao diện (`eff_after_ui.json`) |
+| N5 Shop hiện thông báo từ `confirmation_policy` | ✅ | `shop_flow.py`: thông báo xác nhận hiện ở checkout và sau đặt hàng (ảnh `shop-*-390.png`) |
+| N6 ERP `/cskh/` → 404 tĩnh | ✅ | `erp_stack.py`: `old_route_status` 404 cho cả 9 tài khoản |
+| I1 chỉ mục AI không có lệnh dưới `/api/cskh/` hay `/api/confirmation/` | ✅ | `reg.py`: 0 lệnh; chính sách chặn tiền tố vẫn có |
+| I2 nháp cũ `cave_draft_nhap_lo` (có `rate`) bị xoá | ✅ | `draft_real.py` (16/16): mở Nhập lô thì nháp cũ không còn `rate`; đăng xuất xoá hết `cave_draft_*`; không còn giá vốn trong storage |
+
+### Ngoại lệ và biên
+| Ca | Kết quả | Ghi chú |
+|---|---|---|
+| Quản lý leo quyền bằng tên cũ (`chu`) hoặc tên mới `owner` | ✅ | E2/E2b: 403, không lưu |
+| Giới hạn tần suất tìm khách | ✅ | `thr.py`: 30 lần/phút đầu 200, sau đó 429 (biến `settings.THROTTLE_CUSTOMER_SEARCH` đã gỡ không còn ai đọc, mức thật nằm ở `DEFAULT_THROTTLE_RATES`) |
+| Tra đơn công khai: giới hạn 10 lần/giờ mỗi đơn | ✅ | 1 lần đúng 200, 8 lần sai 404, rồi 429 liên tiếp |
+| Tra đơn công khai 200 | ✅ | thân trả `order_code`, trạng thái, dòng hàng, `delivery: null`; không có họ tên, SĐT, địa chỉ khách |
+| Bấm `/cskh/?state=CALLBACK` trên màn cũ | ✅ | mock e2e `confirmation_route.py` 8/8 và ERP thật: 404 tĩnh, không rơi vào màn khác |
+| Người kiêm nhiệm (mgr_cs, wh_del, owner_cs) | ✅ | ma trận menu 9 người khớp Lô 4b, không khác biệt do Lô 5 |
+| Migration cũ | ✅ | `git status` không có migration nào bị đổi; `makemigrations --check` sạch |
+
+### Phân quyền (đường mới)
+| Group | `/api/confirmation/queue,search,detail` | `receive-batches` | PUT staff groups |
+|---|---|---|---|
+| owner | 200 | 201 | 200 (tên mới) |
+| manager | 200 | 201 | 403 |
+| warehouse_staff | 403 | 201 | 403 |
+| delivery_staff | 403 | 403 | 403 |
+| customer_service | 200 | 403 | 403 |
+| anon | 401 | 401 | 401 |
+
+### Rò giá vốn
+`receive-batches`: chỉ `owner` và `owner_cs` thấy trường giá vốn (`has=True`), các vai còn lại không (B3). `cave_draft_nhap_lo` cũ có `rate` bị dọn (I2). Không có giá vốn trong storage/URL/console (`draft_real.py`).
+
+### Rò dữ liệu cá nhân
+- API công khai: site-info không PII (D2c); tra đơn 200 không có tên, SĐT, địa chỉ khách; 400/404/429 không phản chiếu đầu vào.
+- AuditLog sau luồng xác nhận trên đường mới: không có tên/SĐT/địa chỉ, không có khoá tính ngược giá vốn.
+- Log Django (`dj8292.log`), console trình duyệt, `localStorage`, URL: không có dữ liệu cá nhân.
+- Ảnh chụp chỉ dùng dữ liệu giả.
+
+### Hồi quy
+- BE: `manage.py test` Ran 1827 OK; `makemigrations --check --dry-run` sạch.
+- ERP: `npm ci` (không `--legacy-peer-deps`), `tsc --noEmit` exit 0, vitest 27 file 272/272.
+- Shop: `tsc --noEmit` exit 0, `test-format` 26/26, `test-safe-href` 40/40.
+- Build thật cả hai FE (`NEXT_PUBLIC_USE_MOCK=0`): exit 0; `check-no-mock` XANH cả hai; `check-ai-chunks` XANH (ERP).
+- Mock e2e ERP: `p8_lo7_fe_erp.py` 79/79, `confirmation_route.py` 8/8, `sr07_receive_batches_draft.py` 20/20, `s41_s47_staff.py` 72/72, `sr09_ac4_stale_state.py` 22/22.
+- `python3 scripts/check_naming.py`: OK (6485 vi phạm cũ, không phát sinh mới).
+- ⏸ pytest adapter: không chạy được (môi trường backend không có `pytest`); `git status adapter/` sạch nên không bị ảnh hưởng.
+
+### Lỗi
+Không có lỗi chặn.
+
+### Ghi nhận (không chặn)
+- L5-O1 (Thấp, có từ trước): console Shop báo một 404 khi mở trang chính sách quyền riêng tư vì DB demo chưa có trang đó; không phải do Lô 5. Không có dữ liệu cá nhân trong thông báo.
+- L5-O2 (Thấp): `erp-console/shared/lib/removedAliases.test.ts` đang untracked; nhớ `git add` khi commit.
+- B1–B3 của Lô 4b (JSON mã hoá hai lần, ô trần, `groups` bị bỏ) đã được kiểm lại trên ERP thật: đã sửa, chuyển từ đỏ sang xanh.
+
+### Lệnh đã chạy (tóm tắt)
+| Lệnh | Kết quả |
+|---|---|
+| `cd backend && DJANGO_DEBUG=1 env -u DATABASE_URL .venv/bin/python manage.py test` | Ran 1827 OK |
+| `manage.py makemigrations --check --dry-run` | No changes detected |
+| Django cây làm việc (SQLite tạm, migrate, seed, 9 người dùng, cấu hình AI ghim khoá cũ) + `probe_be.py`, `reg.py`, `envshow.py`, `thr.py`, `eff.py`, `conf_*.py` | 42/42, như G1–G6, N1–N4, I1 |
+| `cd erp-console && npm ci --cache <scratchpad>/npm-cache && npx tsc --noEmit && npm test` | exit 0; 272/272 |
+| ERP build thật (API 8292, cổng 3292) + `erp_stack.py`, `ai_flow.py`, `draft_real.py` (Playwright) | như N1, N3, N6, I2 |
+| Shop `npm ci`, `tsc --noEmit`, `test-format`, `test-safe-href`; build thật (cổng 3293) + `shop_flow.py` | exit 0; 26/26; 40/40; 14/15 (1 Low) |
+| ERP `NEXT_PUBLIC_USE_MOCK=1 npm run build`, cổng 3294, 5 bộ e2e mock | 79/79, 8/8, 20/20, 72/72, 22/22 |
+| `python3 scripts/check_naming.py` | OK |
+| Dựng lại hai FE với API production + `check-no-mock` + `check-ai-chunks`; không còn `127.0.0.1` trong `out/`; tắt cổng 8292, 3292, 3293, 3294 | exit 0; XANH; `lsof` không còn tiến trình |
+
+Tệp tạm: `/private/tmp/claude-501/-Users-dangthiduyen-Downloads-loc/3e0d9f3d-14ce-4b8b-a1cd-6fbcdc0b2f2d/scratchpad/qa-p8b-l5/` (script, log, JSON, ảnh). Không sửa mã sản phẩm, không commit, không deploy. `erp-console/out` và `frontend/out` hiện là bản thật trỏ production.

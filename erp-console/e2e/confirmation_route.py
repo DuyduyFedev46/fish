@@ -1,8 +1,8 @@
-# P8b Lô 3 — đường dẫn /cskh/ (cũ) chuyển sang /confirmation/ (mới), giữ query; FE chỉ gọi API mới.
+# P8b Lô 5 — màn Gọi xác nhận ở /confirmation/; đường dẫn cũ /cskh/ đã gỡ (404 tĩnh, không còn trang chuyển hướng); FE chỉ gọi API mới.
 # Mock (NEXT_PUBLIC_USE_MOCK=1), tài khoản demo cs1 (dữ liệu giả).
 # Chạy: cd erp-console && NEXT_PUBLIC_USE_MOCK=1 npm run build && cp -R out <thư-mục-out-riêng>
 #       (cd <thư-mục-out-riêng> && python3 -m http.server 3242 &)
-#       SHOTS=<thư mục ảnh> python3 e2e/p8b_confirmation_route_redirect.py     # tắt server sau khi xong
+#       SHOTS=<thư mục ảnh> python3 e2e/confirmation_route.py     # tắt server sau khi xong
 import os
 import sys
 
@@ -40,27 +40,23 @@ with sync_playwright() as p:
     page.on("pageerror", lambda e: errors.append(str(e)))
 
     login(page, "cs1")
-    # (Mock không mô phỏng me.home = hàng đợi xác nhận; phần đó do vitest shared/lib/legacyNames.test.ts kiểm.)
+    # (Mock không mô phỏng me.home = hàng đợi xác nhận; phần đó do vitest shared/lib/removedAliases.test.ts kiểm.)
 
-    # Đường dẫn cũ: chuyển tới đường dẫn mới, giữ nguyên query
-    page.goto(BASE + "/cskh/?state=CALLBACK")
-    page.wait_for_url("**/confirmation/?state=CALLBACK", timeout=10_000)
-    page.wait_for_load_state("networkidle")
-    ok("/cskh/?state=CALLBACK chuyển sang /confirmation/?state=CALLBACK (giữ query)", page.url.endswith("/confirmation/?state=CALLBACK"), page.url)
-    ok("màn Gọi xác nhận hiện sau khi chuyển", page.get_by_text("Gọi xác nhận", exact=False).count() > 0)
-
-    page.go_back()
-    page.wait_for_timeout(500)
-    ok("nút Back không kẹt ở trang chuyển hướng", "/cskh/" not in page.url, page.url)
+    # Đường dẫn cũ đã gỡ: Firebase trả 404 tĩnh, không còn trang chuyển hướng; trình duyệt ở nguyên URL cũ.
+    resp = page.goto(BASE + "/cskh/?state=CALLBACK")
+    page.wait_for_timeout(800)
+    ok("/cskh/ trả 404 (đã gỡ)", resp is not None and resp.status == 404, str(resp.status if resp else None))
+    ok("/cskh/ không chuyển sang /confirmation/", "/confirmation/" not in page.url, page.url)
 
     page.goto(BASE + "/confirmation/")
     page.wait_for_load_state("networkidle")
     page.wait_for_timeout(600)
     log = page.evaluate("() => window.__caveMock.log")
+    ok("màn Gọi xác nhận hiện ở /confirmation/", page.get_by_text("Gọi xác nhận", exact=False).count() > 0)
     ok("FE gọi /api/confirmation/queue/", any("/api/confirmation/queue/" in x for x in log), str(log[-4:]))
     ok("FE không gọi /api/cskh/ nào", not any("/api/cskh/" in x for x in log), str([x for x in log if "cskh" in x]))
     ok("360px: không cuộn ngang", no_horizontal_scroll(page))
-    page.screenshot(path=os.path.join(SHOTS, "p8b-l3-confirmation-360.png"), full_page=True)
+    page.screenshot(path=os.path.join(SHOTS, "p8b-l5-confirmation-360.png"), full_page=True)
 
     # Menu: mục Gọi xác nhận trỏ /confirmation/
     hrefs = page.evaluate("() => Array.from(document.querySelectorAll('a[href]')).map(a => a.getAttribute('href'))")

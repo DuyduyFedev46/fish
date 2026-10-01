@@ -51,7 +51,7 @@ export function mockStatus(req: MockRequest): MockResponse {
 }
 
 // ================= S03 — /api/audit-logs/ (màn Nhật ký hoạt động) =================
-// Contract: quyền accounts.view_auditlog (chu + quan_ly); nv_kho/nv_giao → 403 (S03-AC5).
+// Contract: quyền accounts.view_auditlog (owner + manager); warehouse_staff/delivery_staff → 403 (S03-AC5).
 // Dòng AI: actor_display = "ai:<tên user>" (S03-AC2). changes/note CHỈ chứa mã đơn/mã lệnh/mã đề xuất (S03-AC4).
 
 const AI_PERM = "accounts.view_auditlog";

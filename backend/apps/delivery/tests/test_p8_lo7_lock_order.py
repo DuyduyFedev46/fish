@@ -10,10 +10,10 @@ from django.utils import timezone
 
 from apps.delivery.confirmation import services as confirmation_services
 from apps.delivery.models import ConfirmationTask, DeliveryNote
-from apps.delivery.tests import test_cskh_l3
+from apps.delivery.tests import test_confirmation_escalation
 
 
-class F08LockOrderTests(test_cskh_l3.ConfirmationL3BaseTestCase):
+class F08LockOrderTests(test_confirmation_escalation.ConfirmationL3BaseTestCase):
     def test_f08_escalate_expired_windows_khoa_phieu_truoc_task(self):
         t0 = timezone.now().replace(hour=9, minute=0, second=0, microsecond=0)
         order, note, task = self._create_order_with_confirmation()

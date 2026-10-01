@@ -4,7 +4,6 @@ import React, { useEffect, useState } from "react";
 import { getAiPolicy, getUserAiConfig, killUserAi, updateAiPolicy } from "../api";
 import { AiPolicy, AiPolicyUserSummary, MyConfig } from "../../types";
 import { RECEIVE_BATCHES_COMMAND_ID } from "../../commandGroups";
-import { findByCommand } from "../../legacyIds";
 import { buildCapsForSave } from "../caps";
 import { groupLabel } from "@/shared/lib/groups";
 
@@ -49,7 +48,7 @@ export default function AiPolicyScreen() {
       });
       setRedZoneState(rzInit);
 
-      const receiveBatchesCap = findByCommand(data.caps, RECEIVE_BATCHES_COMMAND_ID)?.value || {};
+      const receiveBatchesCap = data.caps?.[RECEIVE_BATCHES_COMMAND_ID] || {};
       setCapsState({
         receive_kg: receiveBatchesCap.kg != null ? String(receiveBatchesCap.kg) : "",
         receive_vnd: receiveBatchesCap.vnd != null ? String(receiveBatchesCap.vnd) : "",

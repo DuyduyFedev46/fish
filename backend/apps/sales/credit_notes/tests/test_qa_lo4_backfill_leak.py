@@ -264,7 +264,7 @@ class QALeakTests(QAItem2Base):
             urls += [f"/api/sales/orders/{o.pk}/", f"/api/guidance/order/{o.code}/",
                      f"/api/sales/invoices/{o.invoice.pk}/"]
         urls += ["/api/sales/orders/", "/api/sales/invoices/", "/api/sales/refunds/", "/api/dashboard/summary/",
-                 "/api/dashboard/attention/", "/api/audit-logs/", "/api/cskh/queue/", "/api/delivery/notes/",
+                 "/api/dashboard/attention/", "/api/audit-logs/", "/api/confirmation/queue/", "/api/delivery/notes/",
                  f"/api/inventory/batches/{self.batch2.pk}/", "/api/inventory/ledger/",
                  "/api/reports/period/?year=%d&month=%d" % ym_back(0),
                  f"/api/reports/batch/{self.batch2.batch_id}/"]

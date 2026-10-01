@@ -73,8 +73,8 @@ def _check_can_touch(actor, target):
 def _resolve_groups(names):
     if not isinstance(names, (list, tuple)) or not all(isinstance(n, str) for n in names):
         raise BusinessError("Danh sách nhóm phải là mảng tên nhóm.", code=INPUT_CODE)
-    # R5: nhận tên Group cũ (client cũ), chuẩn hoá sang tên mới rồi mới bỏ trùng và tra DB.
-    names = list(dict.fromkeys(roles.normalize_role_name(n) for n in names))
+    # Chỉ nhận tên Group tiếng Anh (P8b Lô 5 đã gỡ chuẩn hoá tên cũ); tên cũ hay tên lạ đều bị báo "Nhóm không tồn tại".
+    names = list(dict.fromkeys(names))
     found = {g.name: g for g in Group.objects.filter(name__in=names)}
     unknown = [n for n in names if n not in found]
     if unknown:

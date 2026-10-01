@@ -75,19 +75,11 @@ EXEMPT_PATH_PREFIXES = (
     "frontend/app/bai-viet/",
     "frontend/app/trang/",
 )
-# Chỉ miễn CHUỖI literal (định danh vẫn bị xét): file này là nơi DUY NHẤT chứa giá trị chuỗi cũ của Group /
-# nhóm lệnh AI / mức nhạy cảm cho tới khi Lô 4 đổi giá trị, và khối LEGACY_ROLE_NAMES (tên Group cũ) sau đó.
-# Việc dọn: Lô 4 bỏ command_groups.py / commandGroups.ts khỏi danh sách này (giá trị đã sang tiếng Anh);
-# Lô 5 bỏ roles.py / roles.ts khi LEGACY_ROLE_NAMES đã được gỡ.
+# Chỉ miễn CHUỖI literal (định danh vẫn bị xét), giữ vĩnh viễn: file chứa map id/nhóm AI cũ -> mới cho các phiên bản
+# cấu hình AI đã ghim (append-only, 02c Lô 4). Tên hàm/biến trong file này vẫn phải là tiếng Anh (review Lô 0, R3).
+# Lô 5 đã bỏ roles.py, command_groups.py, roles.ts khỏi danh sách này (giá trị đã là tiếng Anh); legacyIds.ts đã xoá.
 EXEMPT_STRING_FILES = (
-    # Map id/nhóm AI cũ -> mới cho phiên bản cấu hình được ghim (append-only), giữ vĩnh viễn (02c Lô 4).
-    # Chỉ miễn chuỗi: tên hàm/biến trong hai file này vẫn phải là tiếng Anh (review Lô 0, R3).
     "backend/apps/ai/registry/legacy_ids.py",
-    "erp-console/features/ai/legacyIds.ts",
-    "backend/apps/accounts/roles.py",
-    "backend/apps/ai/command_groups.py",
-    "erp-console/shared/lib/roles.ts",
-    "erp-console/features/ai/commandGroups.ts",
 )
 # Dòng KHAI BÁO hằng này được miễn: khoá nháp cũ có giá mua phải bị xoá vĩnh viễn (R4, SR-07).
 # Chỉ dòng khai báo (`LEGACY_RECEIVE_BATCHES_DRAFT_PREFIX = ...`), dòng chỉ nhắc tên hằng không được miễn.
@@ -735,8 +727,10 @@ def self_test() -> int:
     test_py = 'def test_x(self):\n    user = "kho1"\n    self.chu = 1\n    self.assertEqual("nhap-lo", 1)\n'
     assert hits("backend/apps/x/tests/test_a.py", test_py) == ["chu"], hits("backend/apps/x/tests/test_a.py", test_py)
     # file riêng chứa giá trị Group cũ: chuỗi được miễn, định danh vẫn bị xét
-    assert hits("backend/apps/accounts/roles.py", 'OWNER = "chu"\nLEGACY_ROLE_NAMES = {"quan_ly": OWNER}\n') == []
-    assert hits("backend/apps/accounts/roles.py", "chu = 1\n") == ["chu"]
+    assert hits("backend/apps/ai/registry/legacy_ids.py", 'LEGACY = {"quan_ly": "manager"}\n') == []
+    assert hits("backend/apps/ai/registry/legacy_ids.py", "chu = 1\n") == ["chu"]
+    # Lô 5: roles.py / command_groups.py không còn được miễn chuỗi (giá trị đã là tiếng Anh)
+    assert hits("backend/apps/accounts/roles.py", 'OWNER = "chu"\n') == ["chu"], hits("backend/apps/accounts/roles.py", 'OWNER = "chu"\n')
 
     ts = (
         "// comment kho\n"

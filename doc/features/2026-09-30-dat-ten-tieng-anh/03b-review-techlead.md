@@ -568,3 +568,82 @@ Chiều ĐỌC an toàn ở cả hai phía nhờ lớp `normalize*`.
 - Commit chung `erp-console/` (gồm 4 file mới `caps.ts`, `caps.test.ts`, `groupSearch.test.ts`, `englishNames.test.ts`), `scripts/naming_baseline.json`, `03-dev-notes.md`
   và file review này. Không commit `erp-console/out/`.
 - `erp-console/out` hiện là bản build thật trỏ API **production**. Khi deploy staging, phải build lại với `NEXT_PUBLIC_API_BASE` của staging (`doc/ops/moi-truong.md`).
+
+## Lô 5
+
+**Kết luận: REVIEW PASS** (01/10, techlead). Diff chưa commit (89 file). Có 3 việc dọn nhỏ, không chặn (mục 3). Phải làm đúng ràng buộc deploy ở mục 4.
+
+### 1. Lệnh kiểm chứng (chạy trong lượt review)
+- `DJANGO_DEBUG=1 env -u DATABASE_URL manage.py test apps.delivery apps.accounts apps.ai apps.purchasing apps.content`: chạy **899 test, OK**, 0 FAIL/ERROR (không `--parallel`).
+- `manage.py makemigrations --check --dry-run`: No changes detected.
+- `erp-console npm test`: 27 file, **272/272 xanh**.
+- `python3 scripts/check_naming.py`: OK, 6485 vi phạm cũ trong 187 file, không phát sinh mới. `--self-test` OK. So baseline HEAD với bản mới: mọi file chỉ giảm hoặc biến mất. 4 file `test_confirmation_*` mới (đổi tên từ `test_cskh_l*`) có số đếm nhỏ hơn bản gốc.
+- Không build (theo chỉ thị). FE dev đã build thật, `check-no-mock` xanh (03-dev-notes).
+
+### 2. Đối chiếu yêu cầu
+**(1) Những thứ phải giữ: đạt**
+- `"/api/cskh/"` vẫn ở `ai/policy/rules.py:17` (file không đổi). `test_forbidden_prefixes.py` vẫn assert cả 2 tiền tố nằm trong danh sách cấm, có thêm assert "URLconf không còn route `/api/cskh/`". Ca "có răng" giờ chỉ chứng minh cho tiền tố đang sống. Như vậy là đúng, vì tiền tố đã gỡ thì không còn route để lọt.
+- `drafts.ts:19,109`: `LEGACY_RECEIVE_BATCHES_DRAFT_PREFIX = "cave_draft_nhap_lo"` vẫn nằm trong vòng xoá của `clearAllDrafts()`. `draftStorage.ts` và test không đổi (R4, bất biến 1).
+- `legacy_ids.py` chỉ đổi docstring và comment. `normalize_*` vẫn được gọi ở `ai/settings/services.py`, `ai/policy/services.py`, `ai/policy/effective.py` và `settings/serializers.py`, nên các phiên bản AI đã ghim bằng khoá cũ vẫn đọc ra đúng mức.
+- Không có file `migrations/` nào trong diff. `commands_index_snapshot.json` không đổi. `makemigrations --check` sạch.
+
+**(2) Phạm vi gỡ: đúng**
+- `config/api_urls.py` gỡ `cskh/queue` (router), `cskh/search/` và `nhap-lo/`. Test `test_confirmation_routes.py` khẳng định 404 cho mọi vai và cả khách chưa đăng nhập. `test_receive_batches_route.py` khẳng định `nhap-lo/` không trả 200/201, không tạo `PurchaseReceipt`/`Batch`, và `resolve()` không trỏ tới `receive_batches`. Mã 405 thực tế đến từ route chi tiết của router, test không ghim cứng mã này. Chấp nhận.
+- Khoá `cskh_*` ở `attention_api.py` và `cskh_notice` ở `content/site/api.py` đã gỡ. Test khẳng định không còn khoá nào bắt đầu bằng `cskh`.
+- `settings.py`: `_env_first`/`_bool_first` đã xoá, `_rate()` bỏ tham số `legacy_name`. Hằng `THROTTLE_CUSTOMER_SEARCH` ở mức module cũng xoá; đã grep, không còn nơi nào đọc nó (throttle đọc `CAVEVE_THROTTLE_RATES`). `test_env_legacy_name_is_ignored` chạy subprocess, đủ 12 biến.
+- Hai lệnh `process_cskh_deadlines`/`check_cskh_job_health` đã `git rm`. Có test `CommandError`.
+- `roles.LEGACY_ROLE_NAMES`/`normalize_role_name` đã xoá. `_resolve_groups` trả 400 `BR-PQ-08` khi gặp tên cũ. Test phủ PUT groups, tạo nhân viên, trộn tên cũ với tên mới (bị từ chối toàn bộ), và Quản lý gán `chu` (không có đường vòng leo quyền BR-PQ-17).
+- `preview_group_rename` đổi nguồn sang `legacy_ids.LEGACY_ASSIGNEE_GROUPS`. Bảng này có đúng 5 cặp như `LEGACY_ROLE_NAMES` cũ, `test_preview_group_rename.py` xanh. Vẫn dùng được cho production (chưa chạy 0013).
+- Đường ghi AI (`PUT /api/ai/policy/` khoá `caps`, `PUT /api/ai/my-config/`) vẫn chuẩn hoá khoá cũ sang khoá mới trước khi lưu, qua `legacy_ids`. 02c Lô 5 chỉ yêu cầu gỡ `LEGACY_ROLE_NAMES` ở đầu vào BE, và việc này không lưu tên cũ xuống DB, nên **chấp nhận giữ**.
+
+**(3) FE: đạt**
+- grep `/api/cskh/|nhap-lo|cskh_` trong code chạy thật của `erp-console` và `frontend` chỉ còn comment, test khẳng định "không còn", và hằng nháp cũ (giữ có chủ đích).
+- `legacyIds.ts` và mọi `normalize*` đã gỡ. `app/(console)/cskh/page.tsx` đã xoá nên `/cskh/` là 404 tĩnh. e2e `confirmation_route.py` có ca này.
+- `caps.ts`: `{ ...caps, [RECEIVE_BATCHES_COMMAND_ID]: { ...caps?.[RECEIVE_BATCHES_COMMAND_ID], ...next } }`. Giá trị phụ lấy từ khoá mới, đóng mục 3b của review Lô 4b. Có test trong `removedAliases.test.ts` và `caps.test.ts`. BE `GET /api/ai/policy/` đã chuẩn hoá khoá (`policy/services.py:27`) nên FE không còn gặp khoá cũ.
+- Shop: `confirmationPolicy()` chỉ đọc `confirmation_policy`, type và mock đã bỏ `cskh_notice`.
+
+**(4) `check_naming` miễn chuỗi: chốt**
+- BE bỏ miễn cho `roles.py` và `command_groups.py`: đúng.
+- FE: mô phỏng bỏ miễn bằng chính `scan_file` của script. Kết quả: `roles.ts` cho **0 vi phạm**, tức danh sách miễn không còn tác dụng. `commandGroups.ts` chỉ còn đúng **1 vi phạm** ở dòng 31, là `"cskh"` trong `COMMAND_GROUP_SEARCH_LABEL`. Đây là nhãn tìm kiếm có chủ ý (recall BM25), được giữ.
+- Chốt: bỏ `roles.ts` khỏi `EXEMPT_STRING_FILES`. Với `commandGroups.ts`, đổi miễn cả file sang marker `// naming: allow` trên đúng dòng 31, để sau này ai thêm lại giá trị nhóm tiếng Việt thì máy vẫn bắt. Việc này không chặn (mục 3).
+
+**(5) Ops: đạt**, có một bổ sung ở mục 4. `doc/ops/moi-truong.md` đã ghi `CSKH_*`/`THROTTLE_CSKH_SEARCH` không còn được đọc, hai lệnh cũ trả `Unknown command`, và việc kiểm args job trước khi deploy.
+
+**(6) PII, giá vốn, quyền: đạt**
+- Không thêm serializer hay field.
+- Ma trận Group (`test_role_permission_matrix.py`) chỉ đổi literal và comment, không đổi assert quyền.
+- Quét PII/giá vốn theo vai có số 200 > 0 (03-dev-notes).
+- Snapshot chỉ mục AI không đổi.
+- `removedAliases.test.ts` dùng SĐT giả `0900000000`. Test BE dùng `09000000xx`.
+- Không có log mới.
+
+### 3. Nên sửa (không chặn; làm cùng commit Lô 5 hoặc đầu P9)
+- **3a.** `scripts/check_naming.py:86`: xoá `"erp-console/features/ai/legacyIds.ts"`, vì file đã xoá nên mục miễn này chết. Dòng 87: bỏ `roles.ts`, vì không còn chuỗi nào cần miễn. Dòng 88: đổi miễn cả file `commandGroups.ts` sang `// naming: allow` ở `commandGroups.ts:31`. Sau đó chạy `--self-test`, rồi chạy lại không có `--update` (phải OK, không tăng).
+- **3b.** `scripts/check_naming.py:78-81`: comment đã lỗi thời ("FE Lô 5 dọn rồi bỏ khỏi danh sách", "cho tới khi Lô 4 đổi giá trị"). Viết lại theo trạng thái sau 3a.
+- **3c.** Nợ đã ghi, không thuộc Lô 5: danh sách menu mong đợi trong `erp-console/e2e/s7_shell.py` (1 FAIL "AC1 menu Chủ" do script cũ), và tên file `test_nhap_lo.py`/`test_p8_*` đổi dần theo §5.
+
+### 4. Checklist deploy Lô 5 (bắt buộc)
+**Thứ tự chung ở mỗi môi trường:** BE (có migrate) → kiểm → FE ERP + Shop.
+- FE Lô 5 bỏ hết lớp chuẩn hoá ĐỌC, nên chỉ chạy đúng khi BE trả tên Group mới (`owner`…, `home = "confirmation-queue"`).
+- FE cũ (Lô 4b trở về trước) chạy với BE Lô 5 thì gãy ở hàng đợi xác nhận, vì `/api/cskh/*` đã 404.
+
+**Staging** (đang ở api:v9, đã migrate 0012/0013/ai 0003):
+1. `gcloud run jobs describe` cho các job xác nhận đơn: args phải là `process_confirmation_deadlines`/`check_confirmation_job_health`, không còn `*_cskh_*`.
+2. `gcloud run services describe cangca-api-staging`: không có biến `CSKH_*`/`THROTTLE_CSKH_SEARCH`. Đã ghi là chưa đặt; kiểm lại.
+3. Deploy BE Lô 5 (image mới, không có migration). Chạy `manage.py migrate --plan` bằng job `cangca-migrate-staging`, kết quả phải là "No planned migration operations".
+4. Smoke: `/api/cskh/queue/` → 404. `POST /api/purchasing/receipts/nhap-lo/` → 405, không có phiếu mới. `GET /api/public/site-info/` không có `cskh_notice`. `GET /api/dashboard/attention/` không có `cskh_*`.
+5. Build ERP + Shop với `NEXT_PUBLIC_*` của staging, truyền trực tiếp (không dùng `.env.local`). `check-no-mock` phải xanh. Deploy Firebase staging.
+6. E2E 5 vai trên staging: `/confirmation/` chạy, `/cskh/` → 404, Nhập lô tạo phiếu được, đăng xuất xoá nháp `cave_draft_nhap_lo*`, PUT groups bằng tên mới → 200.
+
+**Production** (chỉ khi Duy duyệt; production **chưa chạy** `accounts 0012/0013` và `ai 0003`):
+1. Trước deploy: `gcloud run services describe` cho production. Nếu có `CSKH_*`/`THROTTLE_CSKH_SEARCH` thì đổi sang `CONFIRMATION_*`/`THROTTLE_CUSTOMER_SEARCH`, giữ giá trị. Đặc biệt `CSKH_NOTICE_ENABLED=0` sẽ bị bỏ qua và lật về mặc định 1. `CSKH_AUTO_CANCEL_ENABLED=1` sẽ về 0, tức về chiều an toàn hơn, nhưng vẫn phải đổi đúng tên.
+2. Job/Scheduler production: đổi args sang tên lệnh mới, hoặc ghi nhận là chưa tạo.
+3. Chạy `manage.py preview_group_rename` bằng image mới trên DB production **trước** migrate, và lưu output: phải có 0 xung đột và 0 Group lạ.
+4. `migrate` (gồm `accounts 0012`, `accounts 0013`, `ai 0003`, cùng mọi migration P1–P8 còn thiếu), rồi chạy lại `preview_group_rename`. Id, số quyền và số thành viên phải giữ nguyên. Riêng `warehouse_staff` giảm đúng 1 quyền (`view_customer`).
+5. Chuyển traffic sang BE Lô 5 **chỉ sau** bước 4. BE Lô 5 chạy trên DB còn tên Group cũ sẽ làm mọi kiểm tra theo `roles.OWNER`… sai, kéo theo lệch phạm vi PII và giá vốn. Rollback dữ liệu Group: `migrate accounts 0011` bằng image Lô 4a trở lên.
+6. Smoke giống staging bước 4, rồi build và deploy FE production. Production chưa từng chạy alias nên không có client cũ cần chờ (02c §7b Q-A).
+
+### 5. Lưu ý commit (điều phối)
+- Commit chung BE, FE, `scripts/`, `doc/ops/moi-truong.md`, `03-dev-notes.md` và mục review này. Gồm cả file mới chưa track: `erp-console/shared/lib/removedAliases.test.ts`.
+- Các rename đã `git mv` (giữ lịch sử). Kiểm `git status` không có `erp-console/out/` và `.env`.
+- Commit gợi ý: `P8b Lô 5: gỡ alias tên cũ — route /api/cskh/*, nhap-lo, khoá cskh_*/cskh_notice, env CSKH_*, 2 lệnh bọc, tên Group cũ ở đường ghi, lớp normalize FE; giữ FORBIDDEN_PREFIXES /api/cskh/, nháp cave_draft_nhap_lo, legacy_ids`.

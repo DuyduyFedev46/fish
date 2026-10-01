@@ -182,7 +182,7 @@ class TestCS07EscalationAndDecide(ConfirmationL3BaseTestCase):
 
         client_ql = client_for(self.ql)
         resp = client_ql.post(
-            f"/api/cskh/queue/{note.pk}/decide/",
+            f"/api/confirmation/queue/{note.pk}/decide/",
             {"decision": "DELIVER_WITHOUT_CONFIRM", "reason": "Khách quen, địa chỉ đã giao 2 lần"},
             format="json",
         )
@@ -210,7 +210,7 @@ class TestCS07EscalationAndDecide(ConfirmationL3BaseTestCase):
         client_ql = client_for(self.ql)
         future_time = timezone.now() + timedelta(hours=3)
         resp = client_ql.post(
-            f"/api/cskh/queue/{note.pk}/decide/",
+            f"/api/confirmation/queue/{note.pk}/decide/",
             {"decision": "EXTEND", "until": future_time.isoformat(), "reason": "Khách nhắn đang họp"},
             format="json",
         )
@@ -231,7 +231,7 @@ class TestCS07EscalationAndDecide(ConfirmationL3BaseTestCase):
         client_ql = client_for(self.ql)
         # Thiếu reason
         resp1 = client_ql.post(
-            f"/api/cskh/queue/{note.pk}/decide/",
+            f"/api/confirmation/queue/{note.pk}/decide/",
             {"decision": "DELIVER_WITHOUT_CONFIRM", "reason": ""},
             format="json",
         )
@@ -239,7 +239,7 @@ class TestCS07EscalationAndDecide(ConfirmationL3BaseTestCase):
 
         # EXTEND quá 24h
         resp2 = client_ql.post(
-            f"/api/cskh/queue/{note.pk}/decide/",
+            f"/api/confirmation/queue/{note.pk}/decide/",
             {"decision": "EXTEND", "until": (timezone.now() + timedelta(hours=25)).isoformat()},
             format="json",
         )
@@ -254,7 +254,7 @@ class TestCS07EscalationAndDecide(ConfirmationL3BaseTestCase):
 
         client_ql = client_for(self.ql)
         resp = client_ql.post(
-            f"/api/cskh/queue/{note.pk}/decide/",
+            f"/api/confirmation/queue/{note.pk}/decide/",
             {"decision": "CANCEL", "reason_code": "UNREACHABLE", "note": "Không liên lạc được"},
             format="json",
         )
@@ -279,7 +279,7 @@ class TestCS07EscalationAndDecide(ConfirmationL3BaseTestCase):
 
         client_cs1 = client_for(self.cs1)
         resp1 = client_cs1.post(
-            f"/api/cskh/queue/{note.pk}/decide/",
+            f"/api/confirmation/queue/{note.pk}/decide/",
             {"decision": "DELIVER_WITHOUT_CONFIRM", "reason": "test"},
             format="json",
         )
@@ -287,7 +287,7 @@ class TestCS07EscalationAndDecide(ConfirmationL3BaseTestCase):
 
         client_kho = client_for(self.kho)
         resp2 = client_kho.post(
-            f"/api/cskh/queue/{note.pk}/decide/",
+            f"/api/confirmation/queue/{note.pk}/decide/",
             {"decision": "DELIVER_WITHOUT_CONFIRM", "reason": "test"},
             format="json",
         )
@@ -511,7 +511,7 @@ class TestCS09RefundCalls(ConfirmationL3BaseTestCase):
         order, note, task = self._create_auto_cancelled_order()
 
         client_cs1 = client_for(self.cs1)
-        resp = client_cs1.get("/api/cskh/queue/?state=REFUND_CALL")
+        resp = client_cs1.get("/api/confirmation/queue/?state=REFUND_CALL")
         self.assertEqual(resp.status_code, 200)
         results = resp.json()["results"]
         self.assertEqual(len(results), 1)
@@ -532,7 +532,7 @@ class TestCS09RefundCalls(ConfirmationL3BaseTestCase):
 
         client_cs1 = client_for(self.cs1)
         resp = client_cs1.post(
-            f"/api/cskh/queue/{note.pk}/calls/",
+            f"/api/confirmation/queue/{note.pk}/calls/",
             {"result": "NOTIFIED", "note": "Đã gọi thông báo khách"},
             format="json",
         )
@@ -550,7 +550,7 @@ class TestCS09RefundCalls(ConfirmationL3BaseTestCase):
         client_cs1 = client_for(self.cs1)
         for i in range(3):
             resp = client_cs1.post(
-                f"/api/cskh/queue/{note.pk}/calls/",
+                f"/api/confirmation/queue/{note.pk}/calls/",
                 {"result": "UNREACHABLE", "note": f"Gọi lần {i+1} không nghe"},
                 format="json",
             )
@@ -565,7 +565,7 @@ class TestCS09RefundCalls(ConfirmationL3BaseTestCase):
         order, note, task = self._create_auto_cancelled_order()
 
         client_cs2 = client_for(self.cs2)
-        resp = client_cs2.get("/api/cskh/queue/?state=REFUND_CALL")
+        resp = client_cs2.get("/api/confirmation/queue/?state=REFUND_CALL")
         self.assertEqual(resp.status_code, 200)
         results = resp.json()["results"]
         self.assertEqual(len(results), 1)
@@ -585,7 +585,7 @@ class TestCS09RefundCalls(ConfirmationL3BaseTestCase):
         refund_services.confirm_refund(refund=refund, bank_txn_ref="VNPAY123456", actor=self.chu)
 
         client_cs1 = client_for(self.cs1)
-        resp = client_cs1.get("/api/cskh/queue/?state=REFUND_CALL")
+        resp = client_cs1.get("/api/confirmation/queue/?state=REFUND_CALL")
         self.assertEqual(resp.status_code, 200)
         results = resp.json()["results"]
         self.assertEqual(results[0]["refund"]["status"], "REFUNDED")
@@ -603,7 +603,7 @@ class TestCS09RefundCalls(ConfirmationL3BaseTestCase):
         order, note, task = self._create_auto_cancelled_order()
         client_cs1 = client_for(self.cs1)
         resp = client_cs1.post(
-            f"/api/cskh/queue/{note.pk}/calls/",
+            f"/api/confirmation/queue/{note.pk}/calls/",
             {"result": "NOTIFIED", "note": "STK 123456789012 Techcombank"},
             format="json",
         )
@@ -614,26 +614,27 @@ class TestCS09RefundCalls(ConfirmationL3BaseTestCase):
         """Chi tiết mục chờ gọi REFUND_CALL có guidance D5."""
         order, note, task = self._create_auto_cancelled_order()
         client_cs1 = client_for(self.cs1)
-        resp = client_cs1.get(f"/api/cskh/queue/{note.pk}/")
+        resp = client_cs1.get(f"/api/confirmation/queue/{note.pk}/")
         self.assertEqual(resp.status_code, 200)
         self.assertIn("Không ghi số tài khoản khách vào hệ thống", resp.json()["guidance"])
 
 
 class TestCS10ShopNotices(ConfirmationL3BaseTestCase):
     def test_cs10_ac1_site_info_api(self):
-        """GET /api/public/site-info/ trả cskh_notice; đổi max_attempts trả đúng số."""
+        """GET /api/public/site-info/ trả confirmation_policy (khoá `cskh_notice` đã gỡ ở Lô 5); đổi max_attempts trả đúng số."""
         client = client_for(None)
         resp = client.get("/api/public/site-info/")
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(resp["Cache-Control"], "public, max-age=300")
-        notice = resp.json()["cskh_notice"]
+        self.assertNotIn("cskh_notice", resp.json())
+        notice = resp.json()["confirmation_policy"]
         self.assertIn("working_hours", notice)
         self.assertEqual(notice["max_attempts"], 3)
         self.assertEqual(notice["window_minutes"], 30)
 
         with override_settings(CONFIRMATION_MAX_UNREACHABLE_ATTEMPTS=2):
             resp2 = client.get("/api/public/site-info/")
-            self.assertEqual(resp2.json()["cskh_notice"]["max_attempts"], 2)
+            self.assertEqual(resp2.json()["confirmation_policy"]["max_attempts"], 2)
 
     def test_cs10_ac2_order_lookup_confirming(self):
         """Đơn CONFIRMING -> Shop tra đơn thấy status_label Chờ vựa gọi xác nhận."""

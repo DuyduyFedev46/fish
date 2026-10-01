@@ -9,7 +9,7 @@ from django.utils import timezone
 from apps.common.tests.fixtures import make_user
 from apps.delivery.confirmation import services as confirmation_services
 from apps.delivery.models import ConfirmationTask
-from apps.delivery.tests.test_cskh_l3 import ConfirmationL3BaseTestCase
+from apps.delivery.tests.test_confirmation_escalation import ConfirmationL3BaseTestCase
 from apps.accounts import roles
 
 # Sentinel dữ liệu cá nhân giả — không được xuất hiện ở chứng từ/timeline/audit/output lệnh.

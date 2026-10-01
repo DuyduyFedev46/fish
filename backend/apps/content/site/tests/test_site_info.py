@@ -98,14 +98,13 @@ class SiteInfoApiTests(TestCase):
         self.assertEqual(resp.status_code, 200)
         data = resp.json()
 
-        # Tập khoá gốc: cho phép 5 khoá của khung go-live + cskh_notice của CSKH Lô 3
+        # Tập khoá gốc: 5 khoá của khung go-live + confirmation_policy (khoá cũ `cskh_notice` đã gỡ ở P8b Lô 5)
         expected_root_keys = {
             "seller",
             "seller_complete",
             "privacy_consent_required",
             "confirm_call_notice",
             "confirm_call_hours",
-            "cskh_notice",
             "confirmation_policy",
         }
         self.assertEqual(set(data.keys()), expected_root_keys)

@@ -5,7 +5,8 @@ Khoá AI cũ (trước P8b Lô 4) -> khoá tiếng Anh (R5).
 phiên bản đó và mọi đường GHI nhận khoá cũ đều đi qua các hàm ở đây để tính ra đúng mức như khoá mới. Các hàm thuần:
 không sửa đối tượng truyền vào, chịu được `None`. Khi cả khoá cũ lẫn khoá mới cùng có, khoá mới thắng.
 
-File chỉ chứa dữ liệu và hàm thuần, không import model, để import ở đâu cũng không vòng. Gỡ cùng route cũ ở Lô 5.
+File chỉ chứa dữ liệu và hàm thuần, không import model, để import ở đâu cũng không vòng. GIỮ VĨNH VIỄN (P8b Lô 5): phiên bản
+cấu hình/chính sách AI đã ghim vẫn mang khoá cũ nên còn phải đọc được.
 """
 
 # id lệnh AI cũ -> mới (chỉ lệnh nhập lô đổi id ở Lô 4; hàm view `nhap_lo` đổi thành `receive_batches`).
@@ -32,7 +33,9 @@ LEGACY_SENSITIVITY = {
     "thap": "low",
 }
 
-# Tên Group (vai) cũ -> mới, dùng cho `AiAction.assignee_group`. Nguồn duy nhất vẫn là `apps.accounts.roles`.
+# Tên Group (vai) cũ -> mới. Dùng cho `AiAction.assignee_group` cũ và cho `preview_group_rename` (xem trước migration
+# accounts/0013 trên môi trường chưa chạy nó). Không dùng để nhận tên cũ ở đường ghi: đã gỡ ở P8b Lô 5.
+# Tên Group đang dùng trong code vẫn chỉ ở `apps.accounts.roles`.
 LEGACY_ASSIGNEE_GROUPS = {
     "chu": "owner",
     "quan_ly": "manager",

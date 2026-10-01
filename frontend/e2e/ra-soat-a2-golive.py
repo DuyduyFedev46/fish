@@ -36,7 +36,6 @@ SITE_INFO_OK = {
     "privacy_consent_required": True,
     "confirm_call_notice": False,
     "confirm_call_hours": "7:00–20:00",
-    "cskh_notice": None,
 }
 FOOTER_LINKS_OK = [
     {"title": "Chính sách bảo mật", "slug": "chinh-sach-bao-mat"},

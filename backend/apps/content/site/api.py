@@ -30,7 +30,6 @@ class SiteInfoView(APIView):
             "hotline": str(getattr(settings, "SHOP_HOTLINE", "")),
         }
         data["confirmation_policy"] = policy
-        data["cskh_notice"] = dict(policy)  # naming: allow - khoá JSON cũ, gỡ ở Lô 5
         resp = Response(data)
         resp["Cache-Control"] = "public, max-age=300"
         return resp

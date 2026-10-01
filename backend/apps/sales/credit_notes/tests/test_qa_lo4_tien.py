@@ -101,7 +101,7 @@ class QAPathsTests(QABase):
         self._escalate(task)
         inv_before = SalesInvoice.objects.filter(pk=order.invoice.pk).values().get()
         resp = client_for(self.ql).post(
-            f"/api/cskh/queue/{task.pk}/decide/", {"decision": "CANCEL", "reason_code": "UNREACHABLE"}, format="json",
+            f"/api/confirmation/queue/{task.pk}/decide/", {"decision": "CANCEL", "reason_code": "UNREACHABLE"}, format="json",
         )
         self.assertEqual(resp.status_code, 200, resp.content)
         cn = SalesCreditNote.objects.get()
@@ -116,7 +116,7 @@ class QAPathsTests(QABase):
 
         # màn hình cũ: quản lý bấm quyết định lần 2, rồi Chủ huỷ tay -> vẫn 1 chứng từ, lỗi 4xx
         again = client_for(self.ql).post(
-            f"/api/cskh/queue/{task.pk}/decide/", {"decision": "CANCEL", "reason_code": "UNREACHABLE"}, format="json",
+            f"/api/confirmation/queue/{task.pk}/decide/", {"decision": "CANCEL", "reason_code": "UNREACHABLE"}, format="json",
         )
         self.assertGreaterEqual(again.status_code, 400, again.content)
         self.assertLess(again.status_code, 500, again.content)
@@ -135,7 +135,7 @@ class QAPathsTests(QABase):
             client = client_for(self.ql)
             client.raise_request_exception = False
             try:
-                resp = client.post(f"/api/cskh/queue/{task.pk}/decide/",
+                resp = client.post(f"/api/confirmation/queue/{task.pk}/decide/",
                                    {"decision": "CANCEL", "reason_code": "UNREACHABLE"}, format="json")
                 self.assertGreaterEqual(resp.status_code, 500)
             except RuntimeError:

@@ -1,6 +1,6 @@
 // Màn Nhật ký hoạt động (S03-FE, chốt Duy 27/09: dù admin hay nhân viên đều xem ở ERP).
 // Contract: GET /api/audit-logs/?page=&actor_kind=&action= (02b mục 3 S03) — quyền accounts.view_auditlog
-// (chu + quan_ly); nv_kho/nv_giao → 403 (S03-AC5) → ViewGuard đã chặn trước khi gọi API.
+// (owner + manager); warehouse_staff/delivery_staff → 403 (S03-AC5) → ViewGuard đã chặn trước khi gọi API.
 // S03-AC2: dòng AI hiện actor "ai:<tên user>" rõ ràng kèm lệnh + thời điểm.
 // S03-AC4: KHÔNG chép tên/SĐT/địa chỉ khách vào hiển thị — chỉ hiện nguyên văn các trường API trả
 // (BE đảm bảo changes/note chỉ chứa mã đơn/mã lệnh/mã đề xuất); màn này không tự nối thêm gì.

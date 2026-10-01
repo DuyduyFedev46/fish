@@ -325,7 +325,7 @@ export const MOCK_DELIVERY_NOTES: DeliveryNoteDetail[] = [
 ];
 
 /**
- * SR-PII-02: bản nhìn của người có phạm vi giao hạn chế (nv_giao không kèm chủ/quản lý/NV kho). Phiếu COMPLETED/CANCELLED kết thúc trước đầu ngày (hôm nay − 7)
+ * SR-PII-02: bản nhìn của người có phạm vi giao hạn chế (delivery_staff không kèm chủ/quản lý/NV kho). Phiếu COMPLETED/CANCELLED kết thúc trước đầu ngày (hôm nay − 7)
  * → customer_name, address, note, recipient_name = null (khoá vẫn có). Vai khác: nguyên bản.
  */
 function viewFor<T extends DeliveryNoteItem>(me: ReturnType<typeof mockRequireUser>, note: T): T {

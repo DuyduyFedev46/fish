@@ -48,7 +48,7 @@ SELLER = {
 }
 SITE_OK = {
     "seller": SELLER, "seller_complete": True, "privacy_consent_required": True,
-    "confirm_call_notice": False, "confirm_call_hours": "7:00–20:00", "confirmation_policy": None, "cskh_notice": None,
+    "confirm_call_notice": False, "confirm_call_hours": "7:00–20:00", "confirmation_policy": None,
 }
 LINKS_OK = [
     {"title": "Chính sách bảo mật", "slug": "chinh-sach-bao-mat"},
@@ -654,7 +654,7 @@ def main():
         sweep_pii(page, rec, "GL-04-AC3 [màn thanh toán, cờ bật]")
         ctx.close()
 
-        # Ghi nhận (không chấm lỗi): cả confirm_call_notice và cskh_notice bật -> hai câu, hai khung giờ (review F10, Lô 7)
+        # Ghi nhận (không chấm lỗi): cả confirm_call_notice và confirmation_policy bật -> hai câu, hai khung giờ (review F10, Lô 7)
         ctx, page, rec = new_page(browser, {"site": dict(site_on, confirmation_policy={"enabled": True, "working_hours": "07:00-21:00", "max_attempts": 3, "window_minutes": 180, "decision_minutes": 30, "auto_cancel_enabled": False, "refund_deadline_days": 3, "hotline": "0900000000"})})
         add_to_cart_and_open_checkout(page); fill_form(page); submit_btn(page).click(); page.wait_for_timeout(600)
         body = page.inner_text("body")

@@ -10,7 +10,7 @@ export type StaffMember = {
   display_name: string;
   /** "" khi user chưa có StaffProfile (vd admin). */
   phone: string;
-  /** Thứ tự cố định chu, quan_ly, nv_kho, nv_giao. */
+  /** Thứ tự cố định owner, manager, warehouse_staff, delivery_staff. */
   groups: string[];
   is_active: boolean;
   /** ISO giờ VN hoặc null. */

@@ -1,5 +1,4 @@
 import { apiFetch, type Paginated } from "@/shared/lib/http";
-import { normalizeRole } from "@/shared/lib/roles";
 import type { AiActionDetail, AiActionRow } from "../types";
 import {
   mockConfirmAiAction,
@@ -12,11 +11,6 @@ import {
 
 // Điều kiện mock viết nguyên văn tại từng chỗ dùng (không gán ra biến) để bundler cắt nhánh mock khỏi bản build thật.
 // Seed và bộ xử lý mock nằm ở ./mock.ts.
-
-// P8b Lô 3: `assignee_group` là tên Group; BE Lô 4 trả tên Anh → chuẩn hoá về giá trị nội bộ để hiển thị thống nhất.
-function normalizeAction<T extends AiActionRow>(action: T): T {
-  return action.assignee_group ? { ...action, assignee_group: normalizeRole(action.assignee_group) } : action;
-}
 
 export type FetchAiActionsParams = {
   status?: string;
@@ -38,18 +32,17 @@ export async function fetchAiActions(
     signal,
     mock: process.env.NEXT_PUBLIC_USE_MOCK === "1" ? () => mockFetchAiActions(params) : undefined,
   });
-  return { ...page, results: (page.results ?? []).map(normalizeAction) };
+  return { ...page, results: page.results ?? [] };
 }
 
 export async function fetchAiActionDetail(
   id: string,
   signal?: AbortSignal
 ): Promise<AiActionDetail> {
-  const detail = await apiFetch<AiActionDetail>(`/api/ai/actions/${encodeURIComponent(id)}/`, {
+  return apiFetch<AiActionDetail>(`/api/ai/actions/${encodeURIComponent(id)}/`, {
     signal,
     mock: process.env.NEXT_PUBLIC_USE_MOCK === "1" ? () => mockFetchAiActionDetail(id) : undefined,
   });
-  return normalizeAction(detail);
 }
 
 export async function confirmAiAction(
@@ -114,11 +107,10 @@ export async function escalateStep(
   payload: EscalatePayload,
   signal?: AbortSignal
 ): Promise<EscalateResponse> {
-  const res = await apiFetch<EscalateResponse>("/api/ai/actions/escalate/", {
+  return apiFetch<EscalateResponse>("/api/ai/actions/escalate/", {
     method: "POST",
     body: payload,
     signal,
     mock: process.env.NEXT_PUBLIC_USE_MOCK === "1" ? () => mockEscalateStep(payload) : undefined,
   });
-  return { ...res, assignee_group: normalizeRole(res.assignee_group) };
 }

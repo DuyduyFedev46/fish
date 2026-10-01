@@ -11,7 +11,7 @@ from apps.common.exceptions import ConflictError
 from apps.common.tests.fixtures import client_for
 from apps.delivery.confirmation import services as confirmation_services
 from apps.delivery.models import ConfirmationTask
-from apps.delivery.tests import test_cskh_l3 as l3
+from apps.delivery.tests import test_confirmation_escalation as l3
 from apps.sales.models import Refund
 
 # 17:30Z ngày 30/09 = 00:30 ngày 01/10 giờ VN; +30 ngày => hạn 31/10 (giờ VN), không phải 30/10 (UTC)
@@ -48,7 +48,7 @@ class Lo8CskhFormatTests(l3.ConfirmationL3BaseTestCase):
         """Phiếu hoàn tạo 17:30Z (00:30 VN ngày kế) -> hạn = ngày VN + 30 ngày."""
         order, note, task = self._auto_cancelled()
         Refund.objects.filter(pk=task.refund.pk).update(created_at=LATE_UTC)
-        resp = client_for(self.cs1).get("/api/cskh/queue/?state=REFUND_CALL")
+        resp = client_for(self.cs1).get("/api/confirmation/queue/?state=REFUND_CALL")
         self.assertEqual(resp.status_code, 200)
         item = resp.json()["results"][0]
         self.assertEqual(item["refund"]["deadline"], "2026-10-31")

@@ -81,15 +81,17 @@ Bảng dưới là **khuyến nghị**; tạo job và lịch thật là việc d
 | Thời hạn xác nhận đơn (nhắc, chuyển Quản lý, tự huỷ nếu bật) | `python manage.py process_confirmation_deadlines` | mỗi 5 phút (`*/5 * * * *`) | Có | Có, sau khi `legal-vn` duyệt câu thông báo huỷ (xem `doc/ops/go-live-phap-ly.md`) |
 | Giám sát job xác nhận đơn | `python manage.py check_confirmation_job_health` | mỗi 15 phút, exit code 1 thì cảnh báo | Có | Có |
 
-**Đổi tên (P8b Lô 3, 2026-10-01):** lệnh `process_cskh_deadlines` và `check_cskh_job_health` vẫn chạy, chỉ bọc gọi lệnh mới cùng tham số (`--grace-minutes`) và cùng exit code.
-Job Cloud Run đang dùng tên cũ không gãy; đổi args sang tên mới trong lần deploy sau, tên cũ gỡ ở P8b Lô 5. Logger đổi `cangca.delivery.cskh` thành
+**Đổi tên (P8b Lô 3, gỡ ở Lô 5):** hai lệnh tên cũ `process_cskh_deadlines` và `check_cskh_job_health` **đã bị xoá** ở P8b Lô 5. Job Cloud Run nào còn
+chạy tên cũ sẽ báo `Unknown command` và không chạy việc gì. Kiểm tra args của job staging và production trước khi deploy Lô 5, đổi sang
+`process_confirmation_deadlines` / `check_confirmation_job_health` (cùng tham số `--grace-minutes`, cùng exit code). Logger đổi `cangca.delivery.cskh` thành
 `cangca.delivery.confirmation`: nếu có bộ lọc log hay cảnh báo theo tên logger cũ thì cập nhật cùng lúc.
 
-### Biến môi trường xác nhận đơn (P8b Lô 3)
-Backend đọc **tên mới trước**, không có thì mới đọc tên cũ (alias tới Lô 5). Đang chạy với tên cũ trên Cloud Run thì vẫn đúng; đặt cả hai thì tên mới thắng.
-Đổi tên trên staging trước, production sau khi Duy duyệt. Không đổi giá trị, chỉ đổi tên.
+### Biến môi trường xác nhận đơn (P8b Lô 3, gỡ tên cũ ở Lô 5)
+Từ P8b Lô 5 backend **chỉ đọc tên mới**. Các biến `CSKH_*` và `THROTTLE_CSKH_SEARCH` **không còn được đọc**: nếu Cloud Run còn đặt tên cũ, giá trị bị bỏ qua
+và hệ thống chạy bằng mặc định (không báo lỗi). Duy cần đổi tên (không đổi giá trị) trước khi deploy Lô 5 nếu có đặt. Hiện staging chưa đặt biến `CSKH_*` nào;
+production kiểm tra lại bằng `gcloud run services describe` trước khi lên.
 
-| Tên mới | Tên cũ (fallback) | Mặc định | Ý nghĩa |
+| Tên (duy nhất được đọc) | Tên cũ (không còn đọc) | Mặc định | Ý nghĩa |
 |---|---|---|---|
 | `CONFIRMATION_MAX_UNREACHABLE_ATTEMPTS` | `CSKH_MAX_UNREACHABLE_ATTEMPTS` | 3 | Số lần gọi không được trước khi chuyển Quản lý |
 | `CONFIRMATION_UNREACHABLE_WINDOW_MINUTES` | `CSKH_UNREACHABLE_WINDOW_MINUTES` | 30 | Cửa sổ (phút) để chuyển Quản lý |
@@ -102,7 +104,7 @@ Backend đọc **tên mới trước**, không có thì mới đọc tên cũ (a
 | `CONFIRMATION_QUEUE_ALERT_MINUTES` | `CSKH_QUEUE_ALERT_MINUTES` | 60 | Ngưỡng cảnh báo phiếu chờ gọi lâu |
 | `CONFIRMATION_AUTO_CANCEL_ENABLED` | `CSKH_AUTO_CANCEL_ENABLED` | 0 | Cờ tự huỷ (chỉ bật sau khi `legal-vn` duyệt) |
 | `CONFIRMATION_NOTICE_ENABLED` | `CSKH_NOTICE_ENABLED` | 1 | Hiện thông báo quy trình gọi trên Shop |
-| `THROTTLE_CUSTOMER_SEARCH` | `THROTTLE_CSKH_SEARCH` | `30/min` | Giới hạn tốc độ tìm kiếm khách (cả `confirmation/search/` và `cskh/search/` dùng chung một bộ đếm) |
+| `THROTTLE_CUSTOMER_SEARCH` | `THROTTLE_CSKH_SEARCH` | `30/min` | Giới hạn tốc độ tìm kiếm khách (route `confirmation/search/`; route `cskh/search/` đã gỡ) |
 
 ### Biến môi trường phạm vi dữ liệu khách (SR-PII-02)
 | Tên | Mặc định | Ý nghĩa |
@@ -189,3 +191,8 @@ không có lệnh `gcloud` chuẩn cho budget theo project + label).
 - **2026-10-01 — P8b Lô 3 lên staging** (commit `849494d`): image `api:v7`, revision `cangca-api-staging-00005-7fp` (rollback: `00004-xqj`). Không migration. Route mới `/api/confirmation/*`, `receive-batches`, khoá `confirmation_*`/`confirmation_policy` chạy song song tên cũ. Shop/ERP staging build lại; ERP route `/confirmation/` (redirect `/cskh/`). Env `CSKH_*` chưa đặt trên staging (dùng mặc định) — không cần đổi. Logger đổi tên `cangca.delivery.confirmation`.
 - **2026-10-01 — P8b Lô 4a + phạm vi dữ liệu khách lên staging** (commit `fd3b3bb`): image `api:v8`, revision `cangca-api-staging-00007-leg` (rollback: chạy job `cangca-migrate-staging` image v8 `--args manage.py,migrate,accounts,0011` rồi chuyển traffic về `00005-7fp`/v7). Migration: `accounts 0012` (gỡ `view_customer` của NV kho), `accounts 0013` (đổi tên 5 Group giữ id: owner, manager, warehouse_staff, delivery_staff, customer_service), `ai 0003` (khoá AI tiếng Anh, append phiên bản). `preview_group_rename` trước/sau: 0 xung đột, 0 Group lạ, số quyền/thành viên giữ nguyên (warehouse_staff 37→36). Env mới: `DELIVERY_PII_RECENT_DAYS` (mặc định 7, chưa đặt).
 - **2026-10-01 — P8b Lô 4b + lưu cài đặt AI + RA-04 lên staging** (commit `48d5321`): image `api:v9`, revision `cangca-api-staging-00007-gck` (không migration; rollback về revision v8). Job `cangca-migrate-staging` đổi image v9. Shop + ERP staging build lại (ERP dùng tên Group/lệnh AI tiếng Anh — chỉ chạy được với BE đã migrate `accounts 0013` + `ai 0003`). AI vẫn tắt trên staging.
+
+> ⚠️ **Trước khi đưa P8b Lô 5 lên production (techlead 01/10):** từ Lô 5 backend **không còn đọc** env `CSKH_*` / `THROTTLE_CSKH_SEARCH` và đã xoá lệnh `process_cskh_deadlines`, `check_cskh_job_health`.
+> 1. Đổi tên mọi env `CSKH_*` → `CONFIRMATION_*` (giữ nguyên giá trị) trên `cangca-api` **trước** khi deploy. Không đổi thì mặc định chạy thay: ví dụ `CSKH_NOTICE_ENABLED=0` sẽ thành **bật**, `CSKH_AUTO_CANCEL_ENABLED=1` sẽ thành **tắt**.
+> 2. Đổi args Cloud Run Job / Scheduler sang `process_confirmation_deadlines`, `check_confirmation_job_health`.
+> 3. Chạy `preview_group_rename` (image mới) → 0 xung đột, 0 Group lạ → `migrate` (gồm `accounts 0012/0013`, `ai 0003` và mọi migration P1–P8 còn thiếu) → chạy lại preview (id/quyền/thành viên giữ, `warehouse_staff` −1 quyền) → **mới** chuyển traffic BE → smoke → deploy FE. BE Lô 5 không được chạy trên DB còn tên Group cũ.

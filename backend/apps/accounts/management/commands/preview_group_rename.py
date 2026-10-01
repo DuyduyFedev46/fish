@@ -14,7 +14,6 @@ Không ghi gì vào DB. Đối chiếu kết quả trước và sau `migrate`: i
 from django.contrib.auth.models import Group
 from django.core.management.base import BaseCommand
 
-from apps.accounts import roles
 from apps.ai.models import AiAction
 from apps.ai.models.config import AiConfigVersion
 from apps.ai.models.policy import AiPolicyVersion
@@ -36,7 +35,7 @@ class Command(BaseCommand):
         out = self.stdout.write
         conflicts = 0
         out("Vai (Group):")
-        for old_name, new_name in roles.LEGACY_ROLE_NAMES.items():
+        for old_name, new_name in legacy_ids.LEGACY_ASSIGNEE_GROUPS.items():
             old = Group.objects.filter(name=old_name).first()
             new = Group.objects.filter(name=new_name).first()
             if old and new:
@@ -53,7 +52,7 @@ class Command(BaseCommand):
                 f"{group.permissions.count()} quyền, {group.user_set.count()} thành viên"
             )
 
-        known_names = set(roles.LEGACY_ROLE_NAMES) | set(roles.LEGACY_ROLE_NAMES.values())
+        known_names = set(legacy_ids.LEGACY_ASSIGNEE_GROUPS) | set(legacy_ids.LEGACY_ASSIGNEE_GROUPS.values())
         unknown_groups = Group.objects.exclude(name__in=known_names).count()
         out(f"Group lạ (ngoài 10 tên cũ và mới): {unknown_groups}")
 

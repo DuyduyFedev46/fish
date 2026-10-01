@@ -1,5 +1,5 @@
 // Nhóm lệnh AI và mức nhạy cảm — NƠI DUY NHẤT chứa chuỗi giá trị của chúng ở console (P8b Lô 1).
-// Giá trị là khoá BE trả (`group`, `sensitivity` trong /api/ai/commands/); từ Lô 4b là tên tiếng Anh, khớp BE Lô 4a.
+// Giá trị là khoá BE trả (`group`, `sensitivity` trong /api/ai/commands/); tên tiếng Anh, khớp BE (P8b Lô 4a).
 // Nơi khác dùng `COMMAND_GROUP.*` / `SENSITIVITY.*` và các kiểu bên dưới.
 
 export const COMMAND_GROUP = {
@@ -18,7 +18,7 @@ export const SENSITIVITY = {
 
 export type AiSensitivity = (typeof SENSITIVITY)[keyof typeof SENSITIVITY];
 
-/** Id lệnh AI "Nhập lô" (BE Lô 4a; id cũ `…nhap_lo` được chuẩn hoá ở ./legacyIds.ts). */
+/** Id lệnh AI "Nhập lô" (BE Lô 4a). */
 export const RECEIVE_BATCHES_COMMAND_ID = "purchasing.purchasereceipt.receive_batches";
 
 /**
@@ -28,5 +28,5 @@ export const RECEIVE_BATCHES_COMMAND_ID = "purchasing.purchasereceipt.receive_ba
 export const COMMAND_GROUP_SEARCH_LABEL: Record<AiCommandGroup, string> = {
   [COMMAND_GROUP.purchasing]: "thu mua",
   [COMMAND_GROUP.sales]: "bán hàng",
-  [COMMAND_GROUP.customerService]: "cskh",
+  [COMMAND_GROUP.customerService]: "cskh", // naming: allow - nhãn tìm kiếm "cskh" có chủ ý
 };

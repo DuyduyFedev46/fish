@@ -430,3 +430,85 @@ Mỗi câu so danh sách top-5 của chỉ mục "kiểu cũ" (`thu_mua`, `…nh
 - `features/ai/commands/budget.ts` dòng 62 đưa `Nhóm: ${c.group}` vào prompt LLM; giá trị nay là `purchasing`/`sales`/`customer_service`. Không đổi (không ảnh hưởng chọn lệnh bằng BM25; test ngân sách xanh). Nếu muốn prompt dùng nhãn tiếng Việt thì nói, 1 dòng.
 - Comment trong code nhắc tên Group cũ (`nv_kho`, `quan_ly` trong `nav.ts`, `mock.ts`…) giữ nguyên, thuộc dọn dẹp Lô 5 cùng bảng chuẩn hoá.
 - Chưa deploy, chưa commit.
+
+## Lô 5 — BE (01/10): gỡ alias tên cũ
+
+Chỉ sửa `backend/`, `scripts/check_naming.py` + baseline, `doc/ops/moi-truong.md`, README. Không đổi contract, không migration, không đụng `frontend/` và `erp-console/`.
+
+### Đã gỡ
+- Route: `/api/cskh/queue/*`, `/api/cskh/search/` (trong `config/api_urls.py`) và `/api/purchasing/receipts/nhap-lo/`. Route còn lại: `/api/confirmation/queue/*`, `/api/confirmation/search/`, `/api/purchasing/receipts/receive-batches/`.
+  Trạng thái thực tế của route cũ: `/api/cskh/...` trả **404**. `POST .../receipts/nhap-lo/` rơi vào route chi tiết của router (`pk="nhap-lo"`) nên trả **405**, không tạo phiếu nhập, không chạy view `receive_batches` (test khẳng định "không phải 200/201, không tạo `PurchaseReceipt`, không resolve tới `receive_batches`").
+- JSON: `cskh_queue_waiting`, `cskh_escalated`, `cskh_auto_cancel_blocked` (attention); `cskh_notice` (site-info). Còn `confirmation_*` và `confirmation_policy`.
+- Env: `settings.py` bỏ `_bool_first`/`_env_first`; chỉ đọc `CONFIRMATION_*` và `THROTTLE_CUSTOMER_SEARCH`. `CSKH_*` và `THROTTLE_CSKH_SEARCH` bị bỏ qua (dùng mặc định, không báo lỗi). Đã ghi vào `doc/ops/moi-truong.md` để Duy đổi tên nếu có đặt; staging chưa đặt biến nào.
+- Lệnh: xoá `process_cskh_deadlines`, `check_cskh_job_health` (`git rm`). Job Cloud Run còn dùng tên cũ sẽ báo `Unknown command`; đã ghi cảnh báo trong `moi-truong.md`.
+- Tên Group cũ ở đường ghi: `roles.LEGACY_ROLE_NAMES` và `normalize_role_name` bị xoá; `staff/services._resolve_groups` chỉ khử trùng lặp, tên cũ nhận 400 `BR-PQ-08` ("Nhóm không tồn tại"), không lưu gì.
+
+### Giữ vĩnh viễn (đúng chỉ thị)
+- `"/api/cskh/"` trong `FORBIDDEN_PREFIXES` (`ai/policy/rules.py` không đổi).
+- `ai/registry/legacy_ids.py` và việc đọc phiên bản AI đã ghim. Hai hàm chuẩn hoá phục vụ cả đọc lẫn ghi của `AiConfigVersion`/`AiPolicyVersion`/`AiAction` nên giữ nguyên cả đường ghi AI; 02c không mâu thuẫn. Chỉ sửa comment/docstring.
+- Migration đã chạy không đổi. Snapshot chỉ mục lệnh AI (`commands_index_snapshot.json`) không đổi (git không báo diff). Ma trận Group không đổi.
+
+### Quyết định nhỏ
+- `preview_group_rename` (công cụ ops cho production, chưa chạy migration 0013) trước đây lấy map cũ->mới từ `roles.LEGACY_ROLE_NAMES`; chuyển sang `legacy_ids.LEGACY_ASSIGNEE_GROUPS` thay vì xoá lệnh.
+- `scripts/check_naming.py` (đã dọn theo review techlead Lô 5): `EXEMPT_STRING_FILES` chỉ còn `backend/apps/ai/registry/legacy_ids.py`; bỏ `roles.py`, `command_groups.py`, `roles.ts` (0 vi phạm) và `legacyIds.ts` (file đã xoá). `commandGroups.ts` không còn miễn cả file: dòng 31 (`"cskh"`, nhãn tìm kiếm có chủ ý) mang `// naming: allow - nhãn tìm kiếm "cskh" có chủ ý` (chỉ thêm comment cuối dòng). Comment đầu khối viết lại cho đúng hiện trạng. `--self-test` và `check_naming.py` đều OK (6485 / 187 file, không `--update`).
+
+### File test
+- Đổi tên bằng `git mv` (đã sửa import ở các file `test_p8_*`, `credit_notes/tests/base.py`...): `delivery/tests/test_cskh_l1..l4.py` thành `test_confirmation_role_scope.py`, `test_confirmation_queue_and_labels.py`, `test_confirmation_escalation.py`, `test_confirmation_operations.py`; `test_confirmation_route_aliases.py` thành `test_confirmation_routes.py`; `receipts/tests/test_receive_batches_alias.py` thành `test_receive_batches_route.py`; `accounts/staff/tests/test_legacy_role_names.py` thành `test_old_role_names_rejected.py`.
+- Test mới/đổi nghĩa: route cũ 404 cho 6 vai x 5 lời gọi và view không chạy; `nhap-lo` không tạo phiếu; env tên cũ bị bỏ qua (`test_env_legacy_name_is_ignored`, chạy subprocess vì settings đọc lúc import); hai lệnh cũ `CommandError`; site-info không có `cskh_notice`; attention chỉ có khoá `confirmation_*`; tên Group cũ bị từ chối (gồm Quản lý không cấp được `owner` bằng tên cũ); `FORBIDDEN_PREFIXES` vẫn có `/api/cskh/` và không còn route nào dưới tiền tố đó. Đã bỏ các marker `naming: allow` liên quan.
+- URL cũ trong các test khác được thay bằng URL mới.
+
+### Kiểm chứng
+- `manage.py test`: **Ran 1827 tests, OK** (nền 1822; +5 ròng sau khi bỏ và thêm test alias). 0 failure.
+- `makemigrations --check --dry-run`: No changes detected. `adapter/` không sửa nên không chạy pytest.
+- Quét PII/giá vốn: số phản hồi 200 theo vai > 0 (owner 43, manager 39, warehouse_staff 28, delivery_staff 5, customer_service 3); admin sweep vẫn 403 đúng với vai không có `view_costprice`.
+- `check_naming.py`: OK; `--update`: **6536 -> 6485 vi phạm, 195 -> 187 file**.
+- RED: chỉ chứng minh riêng cho nhóm test route (404 cũ ra 401/201 trước khi sửa code). Với nhóm env/lệnh/Group tôi sửa code trước khi chạy test nên không có RED riêng; test hiện khẳng định đúng hành vi mới.
+
+### Còn nợ
+- 47 dòng `naming: allow` vẫn chứa dữ liệu cũ làm test data (không thuộc Lô 5); tên lớp test còn mã lô (`P8Lo*`), `test_nhap_lo.py`, `test_ra_soat_cskh.py`, các file `test_p8_*` chưa đổi tên.
+- Duy phải rà env/args job Cloud Run trước khi deploy Lô 5 (xem `moi-truong.md`).
+
+## Lô 5 — FE (01/10): gỡ alias tên cũ (erp-console + frontend)
+
+FE nay chỉ dùng tên mới; không còn gọi `/api/cskh/*`, `nhap-lo/`, không còn đọc khoá `cskh_*` / `cskh_notice`. Không đổi contract, không thêm API. Không phát hiện chỗ lệch contract với BE Lô 5.
+
+### Đã gỡ (ERP)
+- `shared/lib/roles.ts`: bảng `LEGACY_ROLE_NAMES` và `normalizeRole`, `normalizeRoles`, `normalizeHome`. Còn `ROLE`, `RoleCode`, `HOME_CONFIRMATION_QUEUE`.
+- `features/ai/legacyIds.ts`: xoá file (`git rm`). `normalizeAction`, `normalizeRole` ở `ai/actions/api.ts`, các `normalize*` ở `ai/settings/api.ts`, `ai/policy/api.ts`, `ai/commands/index.ts`, `auth/api.ts` (`normalizeMe`), `staff/api.ts`: các hàm API trả thẳng `apiFetch`.
+- `features/overview`: `readConfirmationCounts` chỉ đọc `confirmation_queue_waiting`, `confirmation_escalated`, `confirmation_auto_cancel_blocked`; bỏ `cskh_*` ở `types.ts`, `mock.ts`, `AttentionBlock.tsx`.
+- `app/(console)/cskh/page.tsx`: xoá (`git rm`). Theo 02c, redirect `/cskh/` -> `/confirmation/` được gỡ; trang cũ nay là 404 tĩnh (đã kiểm: `out/cskh` không tồn tại).
+- Mock: bỏ nhánh khoá cũ. Comment trong 16 file nhắc tên Group cũ đổi sang tên mới (chỉ comment).
+- README: `erp-console/README.md`, `features/ai/README.md`.
+
+### Đã gỡ (Shop)
+- `features/site/types.ts`: trường `cskh_notice`. `ConfirmationPolicyNotice.tsx`: `confirmationPolicy()` chỉ đọc `confirmation_policy`. `features/site/mock.ts`: bỏ khối `cskh_notice`.
+- e2e: `qa-lo7-shop-real.py` (vòng BE cũ/mới thành một ca "P8b-L5"), `qa-lo6-sr21-shop.py`, `qa-lo8-shop-format.py`, `ra-soat-a2-golive.py`.
+
+### GIỮ VĨNH VIỄN (02c §7c, bất biến 1)
+- `shared/lib/drafts.ts`: `LEGACY_RECEIVE_BATCHES_DRAFT_PREFIX = "cave_draft_nhap_lo"` trong `clearAllDrafts()` (nháp cũ chứa giá mua nên phải xoá khi đăng xuất).
+- `features/purchasing/components/draftStorage.ts`: `migrateLegacyDraft` / `purgeLegacyDraft` (02c không cho gỡ phần đọc/xoá nháp cũ). Không đổi `AuthProvider.tsx`.
+- BE `FORBIDDEN_PREFIXES` giữ `/api/cskh/` (phía be-dev).
+
+### Ghi chú techlead 03b
+- 3b (Lô 4b): `features/ai/policy/caps.ts` ghi `{ ...caps, [RECEIVE_BATCHES_COMMAND_ID]: { ...caps?.[id], ...next } }`, khoá id mới thắng. Có test trong `caps.test.ts`.
+- 3c: sửa comment `e2e/s7_shell.py`. Phần tuỳ chọn "recall snapshot" chưa làm.
+
+### Test
+- `shared/lib/legacyNames.test.ts` xoá (chỉ kiểm bảng alias đã gỡ). Mới `shared/lib/removedAliases.test.ts` (ép không còn export alias, `cskh_*` không được đọc). Sửa `englishNames.test.ts`, `caps.test.ts`, `groupSearch.test.ts`, `overview.test.ts`, `apiPaths.test.ts` (khẳng định không URL nào chứa `/api/cskh/` hay `nhap-lo`).
+- Số test ERP: nền 289 -> **272** (27 file). Giảm vì các ca khẳng định "tên cũ vẫn được nhận" đã xoá cùng alias, không phải mất kiểm tra hành vi mới.
+- e2e: `p8b_confirmation_route_redirect.py` đổi tên (`git mv`) thành `confirmation_route.py`: `/cskh/` = 404 không redirect; `/confirmation/` gọi `/api/confirmation/queue/` và không gọi `/api/cskh/`.
+
+### Kiểm chứng (chạy trong lượt này)
+- ERP: `npx tsc --noEmit` sạch; `npm test` 27 file, 272 test xanh.
+- Shop: `npx tsc --noEmit` sạch; `test-format.mjs` 26/26; `test-safe-href.mjs` 40/40.
+- e2e ERP (build mock, cổng 3290, out copy ở scratchpad `p8b-l5-fe`): `p8_lo7_fe_erp` 79/79, `sr07_receive_batches_draft` 20/20, `sr09_ac4_stale_state` 22/22, `p8_lo6_fe_sr19_sr20` 74/74, `confirmation_route` 8/8, `s41_s47_staff` 72/72.
+- `s7_shell`: 1 FAIL "AC1 menu Chủ" vì danh sách mong đợi trong script đã cũ (menu thực có thêm "Việc AI", "Nội dung", "Chuyên mục", "AI của tôi"). Tôi chỉ sửa 1 comment ở file này; chưa đối chiếu với nền sạch, coi là không liên quan Lô 5, còn nợ cập nhật script.
+- e2e Shop (cổng 3291, `API_BASE=http://localhost:8199`): `qa-lo7-shop-real` 23 ca 0 FAIL; `ra-soat-a2-golive` đạt; `qa-lo6-sr21-shop` 279 ca 0 FAIL.
+- grep `/api/cskh/|nhap-lo|cskh_` trong `erp-console` + `frontend`: chỉ còn chuỗi trong test khẳng định "không còn" (`apiPaths.test.ts`, `overview.test.ts`, `confirmation_route.py`), một chú thích ở `overview/api.ts`, và khoá cục bộ `cskh_after_callback` trong `e2e/p8_lo8_fe_erp_tz.py` (biến của script, không phải API). Hằng nháp cũ `cave_draft_nhap_lo` giữ có chủ đích.
+- Build thật cuối cùng (`NEXT_PUBLIC_USE_MOCK=0`, `NEXT_PUBLIC_API_BASE=https://cangca-api-675411800433.asia-southeast1.run.app`): ERP biên dịch thành công, `check-no-mock` XANH, `check-ai-chunks` XANH; Shop biên dịch thành công, `check-no-mock` XANH.
+- `python3 scripts/check_naming.py` (không `--update`): OK, 6485 vi phạm cũ trong 187 file, không phát sinh mới.
+
+### Thứ tự deploy / còn nợ
+- Deploy BE Lô 5 TRƯỚC hoặc CÙNG FE này. Nếu FE mới chạy với BE cũ thì vẫn hoạt động (BE cũ trả cả khoá mới); ngược lại FE cũ với BE Lô 5 sẽ hỏng (route `/api/cskh/*` biến mất). Sau deploy `/cskh/` trả 404.
+- Còn nợ: cập nhật danh sách menu mong đợi trong `e2e/s7_shell.py`; `features/ai/commands/budget.ts` vẫn đưa mã nhóm tiếng Anh vào prompt (không đổi, như đã ghi ở Lô 4b); recall snapshot tuỳ chọn.
+- Chưa deploy, chưa commit.

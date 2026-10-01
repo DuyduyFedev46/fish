@@ -5,7 +5,7 @@ Chuyển từ test tái hiện R2 (repro/review_repro_tests.py). Dữ liệu gi�
 - SR-09-AC1: đơn bị auto_cancel_overdue, record_call(CONFIRMED) -> 409 STALE_STATE, phiếu vẫn CANCELLED, task vẫn REFUND_CALL.
 - SR-09-AC2: task REFUND_CALL chỉ nhận UNREACHABLE, NOTIFIED; mọi kết quả khác -> 409 STALE_STATE.
 - SR-09-AC3: tranh chấp hai chiều (a) CSKH trước, job sau -> job bỏ qua; (b) job trước, CSKH bấm sau -> như AC1.
-- SR-09-AC4: POST /api/cskh/queue/<id>/calls/ trả 409 body {"detail", "code": "STALE_STATE"}.
+- SR-09-AC4: POST /api/confirmation/queue/<id>/calls/ trả 409 body {"detail", "code": "STALE_STATE"}.
 - Ma trận: có quyền confirm_with_customer: CONFIRMED 409, NOTIFIED/UNREACHABLE 2xx; không quyền 403; khách 401.
 """
 from datetime import timedelta
@@ -18,7 +18,7 @@ from apps.common.exceptions import ConflictError
 from apps.common.tests.fixtures import client_for, make_user
 from apps.delivery.confirmation import services as confirmation_services
 from apps.delivery.models import ConfirmationTask, CustomerCall, DeliveryNote
-from apps.delivery.tests.test_cskh_l3 import ConfirmationL3BaseTestCase
+from apps.delivery.tests.test_confirmation_escalation import ConfirmationL3BaseTestCase
 from apps.sales.models import SalesOrder
 from apps.accounts import roles
 
@@ -152,7 +152,7 @@ class SR09RecordCallStaleTests(ConfirmationL3BaseTestCase):
     def test_sr09_ac4_api_409_body_detail_code(self):
         order, note, task = self._auto_cancelled()
         resp = client_for(self.cs1).post(
-            f"/api/cskh/queue/{note.pk}/calls/", {"result": "CONFIRMED"}, format="json",
+            f"/api/confirmation/queue/{note.pk}/calls/", {"result": "CONFIRMED"}, format="json",
         )
         self.assertEqual(resp.status_code, 409)
         self.assertEqual(resp.json(), {"detail": STALE_TEXT, "code": "STALE_STATE"})
@@ -168,14 +168,14 @@ class SR09RecordCallStaleTests(ConfirmationL3BaseTestCase):
         client = client_for(self.cs1)
         for result in ("CONFIRMED", "CONFIRMED_CHANGED", "WRONG_NUMBER", "WANT_CANCEL", "WANT_CHANGE"):
             with self.subTest(result=result):
-                resp = client.post(f"/api/cskh/queue/{note.pk}/calls/", {"result": result}, format="json")
+                resp = client.post(f"/api/confirmation/queue/{note.pk}/calls/", {"result": result}, format="json")
                 self.assertEqual(resp.status_code, 409)
                 self.assertEqual(resp.json()["code"], "STALE_STATE")
 
     # --- Ma trận Group -------------------------------------------------------
     def test_sr09_ma_tran_group_refund_call_confirmed(self):
         order, note, task = self._auto_cancelled()
-        url = f"/api/cskh/queue/{note.pk}/calls/"
+        url = f"/api/confirmation/queue/{note.pk}/calls/"
         # có delivery.confirm_with_customer (cskh đã gọi, chu, quan_ly): CONFIRMED -> 409
         for user in (self.cs1, self.chu, self.ql):
             with self.subTest(user=user.username):
@@ -192,7 +192,7 @@ class SR09RecordCallStaleTests(ConfirmationL3BaseTestCase):
 
     def test_sr09_ma_tran_group_refund_call_notified_unreachable(self):
         order, note, task = self._auto_cancelled()
-        url = f"/api/cskh/queue/{note.pk}/calls/"
+        url = f"/api/confirmation/queue/{note.pk}/calls/"
         for user in (self.chu, self.ql):
             resp = client_for(user).post(url, {"result": "UNREACHABLE"}, format="json")
             self.assertIn(resp.status_code, (200, 201), user.username)

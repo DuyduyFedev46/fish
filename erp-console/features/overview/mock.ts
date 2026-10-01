@@ -35,14 +35,11 @@ export function mockAttention(req: MockRequest): MockResponse {
   const res: Record<string, number> = {};
   if (canConfirm) {
     res.confirmation_queue_waiting = 0;
-    res.cskh_queue_waiting = 0; // khoá cũ BE còn trả song song tới Lô 5
     res.refund_calls_open = 0;
   }
   if (canDecide) {
     res.confirmation_escalated = 0;
     res.confirmation_auto_cancel_blocked = 0;
-    res.cskh_escalated = 0; // khoá cũ BE còn trả song song tới Lô 5
-    res.cskh_auto_cancel_blocked = 0;
   }
   if (canPrint) {
     res.labels_not_printed = 0;

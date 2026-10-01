@@ -4,7 +4,7 @@
 
 import { ROLE } from "./roles";
 
-/** Thứ tự cố định như BE `sorted_groups`: chu, quan_ly, nv_kho, nv_giao. */
+/** Thứ tự cố định như BE `sorted_groups`: owner, manager, warehouse_staff, delivery_staff. */
 export const GROUP_CODES = [ROLE.owner, ROLE.manager, ROLE.warehouseStaff, ROLE.deliveryStaff, ROLE.customerService] as const;
 
 export const GROUP_LABEL: Record<string, string> = {

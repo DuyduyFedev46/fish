@@ -4,7 +4,7 @@
 // ngày, tìm mã đơn / SĐT (BE lọc, khớp một phần), 20 dòng/trang + "Tải thêm". Bấm một đơn → chi tiết trong tấm bên
 // (phải trên máy tính, trượt đáy trên điện thoại). Thao tác trên đơn (S11 xác nhận đã nhận tiền) nằm trong chi tiết,
 // chỉ hiện theo `available_actions` BE trả. Page bọc <ViewGuard view="orders"> (sales.view_salesorder, không phải người
-// chỉ thuộc nv_giao).
+// chỉ thuộc delivery_staff).
 
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { ApiError, loadErrorText } from "@/shared/lib/http";

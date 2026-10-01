@@ -5,7 +5,7 @@ Màn đầu của Chủ/Quản lý/NV kho: 4 KPI (doanh thu hôm nay, đơn ch�
 
 - Endpoint: `GET /api/dashboard/summary/` — BE chỉ đòi đăng nhập (`IsAuthenticated`). Contract + kiểu đầy đủ ở
   `shared/lib/dashboardSummary.ts` (dùng chung với `orders`, `inventory`), cache chung qua `shared/lib/useResource.ts`.
-- Quyền xem màn (FE): `reports.view_dashboard` hoặc thuộc `chu`/`quan_ly`/`nv_kho` (`shared/lib/nav.ts`).
+- Quyền xem màn (FE): `reports.view_dashboard` hoặc thuộc `owner`/`manager`/`warehouse_staff` (`shared/lib/nav.ts`).
 - Giá vốn: cột "Giá vốn/kg" và ô "Giá trị tồn kho" chỉ hiện khi `user.can_cost` (bất biến #1).
 - Bảng đơn gần đây không có tên khách/SĐT (SR-17, bất biến 9). Tìm kiếm phía máy (mã đơn, mặt hàng, kho, trạng thái; không phân biệt dấu).
 - Khối Cần chú ý (`GET /api/dashboard/attention/`) có thẻ `expired_batches_open` (Chủ) → `/inventory/?status=EXPIRED` (P8 Lô 5). Nút Làm mới tải lại cả 3 màn.
