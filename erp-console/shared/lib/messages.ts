@@ -29,6 +29,8 @@ export const MSG = {
   /** S7-AC3: mở màn không có quyền. */
   noViewPermission: "Bạn không có quyền xem mục này",
   noViewPermissionHint: "Nếu cần dùng mục này, hãy nhờ Chủ vựa cấp quyền cho tài khoản của bạn.",
+  /** SR-PII-02: BE trả `null` cho dữ liệu khách của NV giao khi phiếu đã kết thúc quá hạn xem (mặc định 7 ngày). */
+  personalDataHidden: "Đã ẩn (quá 7 ngày)",
   /** UI5: nút gửi không bị tắt khi thiếu ô — bấm thì báo ngay tại ô còn trống (nói cách sửa). */
   needUsername: "Nhập tên tài khoản của bạn.",
   needPassword: "Nhập mật khẩu.",

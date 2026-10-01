@@ -19,6 +19,7 @@ import { ConfirmPaymentForm } from "./ConfirmPaymentForm";
 import { OrderDetailView } from "./OrderDetailView";
 import { RefundForm } from "./RefundForm";
 import s from "../orders.module.css";
+import { PersonalText } from "@/shared/ui/PersonalText";
 
 type Mode = "view" | "confirm" | "cancel" | "refund";
 /**
@@ -174,7 +175,7 @@ export function OrderDetailSheet({ summary, initialMode = "view", onChanged, onC
           target={{ kind: "invoice", id: detail.invoice.id, invoiceTotal: detail.total_amount ?? summary.total_amount }}
           refundableMax={refundableOfOrder(detail)}
           reasonDefault={detail.status === "CANCELLED" ? ORDERS_MSG.refundFromOrderReasonCancelled : ""}
-          subLabel={<>{detail.code} · {detail.customer.name}</>}
+          subLabel={<>{detail.code} · <PersonalText value={detail.customer.name} whenEmpty="" /></>}
           onBusy={setBusy}
           onCancel={backToView}
           onDone={onRefundCreated}

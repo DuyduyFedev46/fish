@@ -17,6 +17,7 @@ import { QUEUE_MSG } from "../messages";
 import type { OrderListItem, PaymentQueueItem, QueueOrderRef, ResolveResult } from "../types";
 import { Consequences, FormFooter, FormHead, NoteField, useSubmit } from "./QueueFormParts";
 import s from "../orders.module.css";
+import { PersonalText } from "@/shared/ui/PersonalText";
 
 type Props = {
   item: PaymentQueueItem;
@@ -93,7 +94,7 @@ export function AttachOrderForm({ item, onBusy, onCancel, onDone }: Props) {
       status_label: picked.status_label,
       total_amount: picked.total_amount,
       paid_total: "0",
-      customer_name: picked.customer_name,
+      customer_name: picked.customer_name ?? undefined,
     };
     void sub.run(
       () => resolvePayment(item.id, { action: "ATTACH_TO_ORDER", order_id: picked.id, note: note.trim() }),
@@ -211,7 +212,7 @@ export function AttachOrderForm({ item, onBusy, onCancel, onDone }: Props) {
                       </span>
                       <span className={s.pickSub}>
                         <span>
-                          {o.customer_name}
+                          <PersonalText value={o.customer_name} whenEmpty="" />
                           {o.customer_phone ? <span className="num"> · …{o.customer_phone.slice(-4)}</span> : null}
                         </span>
                         <StatusChip map={ORDER_STATUS} status={o.status} label={o.status_label} />

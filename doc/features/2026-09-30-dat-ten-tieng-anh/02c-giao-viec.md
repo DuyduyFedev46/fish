@@ -84,7 +84,7 @@ Các mục khác (lô hàng `batch`, phiếu nhập `purchase_receipt`, NCC `sup
 lãi lỗ `pnl`/`profit`, bài viết/trang `post`/`page`…) giữ như glossary mục 2 của `01-ra-soat-dat-ten.md` (đã cập nhật dòng CSKH).
 
 ### 1d. Không đổi (chốt)
-- **Migration đã chạy** (`accounts/0011_seed_group_cskh.py`, `delivery/0004_cskh_confirmation.py`, `0002_seed_permission_groups`…):
+- **Migration đã chạy** (`accounts/0011_seed_group_cskh.py`, `accounts/0012_revoke_customer_view_warehouse_staff.py`, `delivery/0004_cskh_confirmation.py`, `0002_seed_permission_groups`…):
   không đổi tên file, không sửa nội dung. DB mới chạy chúng trước migration đổi tên nên kết quả cuối vẫn đúng.
 - **`AuditLog.action` đã ghi** (`execute_purchasing.purchasereceipt.nhap_lo`…): append-only, không UPDATE.
 - **Bản ghi phiên bản cấu hình AI cũ** (`AiConfigVersion`, `AiPolicyVersion` là append-only): không sửa dòng cũ, xem Lô 4.
@@ -103,7 +103,7 @@ lãi lỗ `pnl`/`profit`, bài viết/trang `post`/`page`…) giữ như glossar
 | ☑ | 0 | Chặn tên tiếng Việt mới: script `check_naming` + baseline + luật trong skill | BE (1 người) | 0,5 ngày | `scripts/check_naming.py`, `scripts/naming_blocklist.txt`, `scripts/naming_baseline.json` (mới); `.claude/skills/{caveve-domain,django-drf-patterns,nextjs-shop-patterns,tdd-workflow,e2e-playwright}/SKILL.md` (chỉ thêm mục "Đặt tên"); `AGENTS.md` (chỉ thêm mục "Đặt tên"); `03-dev-notes.md` | mọi code sản phẩm, `doc/decisions.md`, migration | `3d30789` |
 | ☑ | 1 | M1 nội bộ: dời module `cskh`→`confirmation`, đổi class/hàm/type, gom tên Group về **1 file hằng mỗi phía** (giá trị vẫn cũ), thống nhất tên múi giờ | BE ∥ FE | 1,5 ngày | xem §3 Lô 1 | route, khoá JSON, env, id lệnh AI, giá trị Group, snapshot chỉ mục AI, migration | `323d9b5` |
 | ☑ | 3 | M2 contract có alias: route/khoá JSON/env/lệnh mới chạy song song tên cũ; FE dùng tên mới + lớp chuẩn hoá nhận cả giá trị Lô 4 | BE ∥ FE (1 commit) | 2 ngày + E2E staging | xem §3 Lô 3 | giá trị Group, id lệnh AI, nhóm/mức nhạy cảm AI, migration | `e24e7e9` |
-| ☐ | 4 | M3 dữ liệu: đổi 5 Group giữ id, migrate khoá AI (append phiên bản mới), đổi id/nhóm/mức lệnh AI; sửa `decisions.md` dòng tên Group | 4a BE → 4b FE (2 commit) | 2 ngày + nghiệm thu staging | xem §3 Lô 4 | `AuditLog`, dòng `AiConfigVersion`/`AiPolicyVersion` cũ, migration cũ, chứng từ | — |
+| ☐ | 4 | M3 dữ liệu: đổi 5 Group giữ id (migration `accounts/0013`, sau `0012_revoke_customer_view_warehouse_staff`), migrate khoá AI (append phiên bản mới), đổi id/nhóm/mức lệnh AI; sửa `decisions.md` dòng tên Group | 4a BE → 4b FE (2 commit) | 2 ngày + nghiệm thu staging | xem §3 Lô 4 | `AuditLog`, dòng `AiConfigVersion`/`AiPolicyVersion` cũ, migration cũ, chứng từ | — |
 | ☐ | 5 | Gỡ alias tạm (route `/api/cskh/`, `nhap-lo`, khoá JSON cũ, env `CSKH_*`, lệnh bọc, chuẩn hoá tên cũ FE) — **đề xuất, chờ Duy (🔴 Q-A)** | BE ∥ FE | 0,5 ngày | xem §3 Lô 5 | những thứ giữ vĩnh viễn ở §3 Lô 5 | — |
 
 ~~Lô 2 (đổi tên test hàng loạt)~~ — **bỏ** theo Q3: test tiếng Việt đổi dần (xem §5).
@@ -282,13 +282,17 @@ Trước khi deploy BE: điều phối viên kiểm env `CSKH_*` và args của 
 
 ### Lô 4 — M3 dữ liệu và quyền (4a BE → 4b FE; nghiệm thu staging)
 **4a BE (`be-dev`):**
-- Migration `backend/apps/accounts/migrations/0012_rename_groups_to_english.py` (RunPython, `atomic`):
+- Migration `backend/apps/accounts/migrations/0013_rename_groups_to_english.py` (RunPython, `atomic`), phụ thuộc
+  `accounts.0012_revoke_customer_view_warehouse_staff`. Số `0012` đã thuộc lô dữ liệu khách (`doc/features/2026-10-01-pham-vi-du-lieu-khach/`,
+  SR-PII-01, gỡ `sales.view_customer` khỏi `nv_kho`). Lô 4 **không sửa** 0012, giữ nguyên chuỗi `"nv_kho"` viết thẳng trong đó,
+  vì migration đã chạy thì không đổi (§1d). Thứ tự bắt buộc: 0012 gỡ quyền theo tên cũ, rồi 0013 đổi tên giữ id, nên quyền đi theo id.
+  Cập nhật 01/10 theo review techlead `03b-review-techlead.md` (D1):
   - Với từng cặp (`chu`→`owner`, `quan_ly`→`manager`, `nv_kho`→`warehouse_staff`, `nv_giao`→`delivery_staff`, `cskh`→`customer_service`):
     `Group.objects.filter(name=old).update(name=new)` — **giữ id**, nên `group.permissions` và `user.groups` không đổi. **Không**
     xoá rồi tạo lại Group.
   - Chỉ có tên mới → bỏ qua (idempotent). Có **cả hai** tên → `raise` (dừng migrate, không đoán). Không có cả hai → bỏ qua.
   - Reverse đổi ngược lại. Migration **không đọc/không in** dữ liệu người dùng; chỉ in số Group đã đổi.
-- Migration `backend/apps/ai/migrations/0003_rename_ai_keys_to_english.py` (phụ thuộc `accounts.0012`):
+- Migration `backend/apps/ai/migrations/0003_rename_ai_keys_to_english.py` (phụ thuộc `accounts.0013`):
   - `AiAction.assignee_group`: tên Group cũ → mới (mọi dòng). `AiAction.command`: `…nhap_lo` → `…receive_batches` (mọi dòng;
     việc chờ/hẹn giờ phải tra được spec mới). Không đụng `AuditLog`.
   - `AiConfigVersion`, `AiPolicyVersion` là **append-only** → **không UPDATE dòng cũ**. Với mỗi user có phiên bản mới nhất chứa
@@ -306,8 +310,9 @@ Trước khi deploy BE: điều phối viên kiểm env `CSKH_*` và args của 
 - `HOME_CONFIRMATION_QUEUE = "confirmation-queue"`.
 - Regenerate `commands_index_snapshot.json`. **Diff chỉ được phép:** id + path lệnh nhập lô, giá trị `group`, giá trị `sensitivity`,
   keyword snake bị xoá. Techlead đọc diff từng dòng.
-- Test mới (tên tiếng Anh): `accounts/staff/tests/test_group_rename_migration.py` (dùng `MigrationExecutor` từ `0011` → `0012`: id Group,
-  tập permission từng Group, thành viên từng user giống hệt trước/sau; chạy 2 lần; reverse; trường hợp có cả hai tên → lỗi);
+- Test mới (tên tiếng Anh): `accounts/staff/tests/test_group_rename_migration.py` (dùng `MigrationExecutor` từ `0012` → `0013`: id Group,
+  tập permission từng Group, thành viên từng user giống hệt trước/sau; chạy 2 lần; reverse; trường hợp có cả hai tên → lỗi.
+  Thêm assert: sau 0013, tập quyền của `warehouse_staff` **không** có `sales.view_customer`; `delivery_staff`, `owner`, `manager` vẫn có);
   `ai/policy/tests/test_ai_key_migration.py` (trước/sau: `effective_level` và trần kg/VND/lần/ngày của lệnh nhập lô **bằng nhau** cho user
   có override; phiên bản cũ không bị sửa; `run_due_ai_actions` chạy được việc tạo bằng id cũ; `assignee_group` giao đúng người).
   Toàn bộ test chống rò giá vốn (`test_permissions_matrix`, `test_dashboard_cost_leak`, `test_l3_cost_redaction`, `batches/tests/test_api.py`)
@@ -324,15 +329,15 @@ Trước khi deploy BE: điều phối viên kiểm env `CSKH_*` và args của 
 `normalizeSensitivity`/`normalizeCommandId` giờ map **cũ → mới** (giữ tới Lô 5); mock + vitest + e2e Python (tên Group literal trong
 `erp-console/e2e/*.py`, `frontend/e2e/*.py`) sang tên mới.
 
-**Được sửa:** 4a — `backend/apps/accounts/{roles.py,migrations/0012_*,management/commands/preview_group_rename.py,staff/tests/}`,
+**Được sửa:** 4a — `backend/apps/accounts/{roles.py,migrations/0013_*,management/commands/preview_group_rename.py,staff/tests/}`,
 `backend/apps/ai/{migrations/0003_*,registry/,policy/effective.py,policy/tests/}`, `backend/apps/purchasing/receipts/api.py`,
 `backend/apps/accounts/auth/services.py`, `backend/apps/accounts/staff/**` (chỉ chuẩn hoá đầu vào), `backend/apps/**/api.py`
 (chỉ `AiMeta` keyword/sensitivity), snapshot, và 7 file tài liệu nêu trên. 4b — `erp-console/shared/lib/roles.ts`,
 `erp-console/features/**`, `erp-console/e2e/**`, `frontend/e2e/**`. Cả hai: `scripts/naming_baseline.json` (giảm), `03-dev-notes.md`.
-**Không được đụng:** migration cũ; bảng `AuditLog`, `StockLedgerEntry`, `*LineBatch`, chứng từ; dòng `AiConfigVersion`/`AiPolicyVersion`
+**Không được đụng:** migration cũ (gồm `accounts/0012_revoke_customer_view_warehouse_staff.py`); bảng `AuditLog`, `StockLedgerEntry`, `*LineBatch`, chứng từ; dòng `AiConfigVersion`/`AiPolicyVersion`
 đã có; permission codename; nội dung (không phải mã) của `doc/decisions.md`; `FORBIDDEN_PREFIXES` (chỉ được thêm, không bớt).
-**Lệnh kiểm chứng:** bộ §4, cộng: `manage.py migrate` trên DB test sạch từ đầu; `manage.py migrate accounts 0011 && manage.py migrate`
-(reverse rồi tiến lại) trên DB test; `manage.py preview_group_rename` trước/sau (dán output); đọc lại 2 file migration.
+**Lệnh kiểm chứng:** bộ §4, cộng: `manage.py migrate` trên DB test sạch từ đầu; `manage.py migrate accounts 0012 && manage.py migrate`
+(reverse riêng 0013 rồi tiến lại; sau mỗi chiều kiểm `warehouse_staff`/`nv_kho` không có `sales.view_customer`) trên DB test; `manage.py preview_group_rename` trước/sau (dán output); đọc lại 2 file migration.
 **Thứ tự deploy (mỗi bước cần Duy cho phép; staging trước):**
 1. Điều kiện: FE Lô 3 (có lớp chuẩn hoá) **đã chạy trên staging**.
 2. Chạy `preview_group_rename` trên staging qua job `cangca-migrate-staging` (`--args`), dán số liệu.

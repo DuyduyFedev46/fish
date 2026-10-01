@@ -104,6 +104,13 @@ Backend đọc **tên mới trước**, không có thì mới đọc tên cũ (a
 | `CONFIRMATION_NOTICE_ENABLED` | `CSKH_NOTICE_ENABLED` | 1 | Hiện thông báo quy trình gọi trên Shop |
 | `THROTTLE_CUSTOMER_SEARCH` | `THROTTLE_CSKH_SEARCH` | `30/min` | Giới hạn tốc độ tìm kiếm khách (cả `confirmation/search/` và `cskh/search/` dùng chung một bộ đếm) |
 
+### Biến môi trường phạm vi dữ liệu khách (SR-PII-02)
+| Tên | Mặc định | Ý nghĩa |
+|---|---|---|
+| `DELIVERY_PII_RECENT_DAYS` | 7 | NV giao còn thấy tên, SĐT, địa chỉ, ghi chú của khách ở phiếu giao đã kết thúc (hoàn tất, huỷ) trong N ngày lịch giờ VN, kể từ ngày kết thúc. Quá hạn thì API trả `null` cho các trường đó. Không cần đặt nếu dùng 7 |
+
+Deploy bản này có kèm data migration `accounts/0012` (gỡ `sales.view_customer` khỏi nhóm NV kho), chạy `manage.py migrate` như thường.
+
 Các job đều idempotent (khoá dòng, chạy lại không làm hai lần). Log job chỉ ghi mã việc/mã giao dịch/tên lỗi, không ghi tên, SĐT, địa chỉ hay nội dung chuyển khoản.
 
 ## Deploy

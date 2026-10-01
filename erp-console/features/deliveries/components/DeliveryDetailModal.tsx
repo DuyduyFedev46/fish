@@ -5,6 +5,7 @@ import { dateOnly } from "@/shared/lib/format";
 import { fetchDeliveryNoteDetail, packDeliveryNote, printDeliveryLabel, voidDeliveryLabel } from "../api";
 import type { DeliveryNoteDetail, DeliveryNoteItem } from "../types";
 import s from "../deliveries.module.css";
+import { PersonalText } from "@/shared/ui/PersonalText";
 
 type Props = {
   item: DeliveryNoteItem;
@@ -232,12 +233,18 @@ export function DeliveryDetailModal({ item, onClose, onUpdated }: Props) {
             <div>
               <div className={s.infoItemLabel}>Người nhận</div>
               <div className={s.infoItemValue}>
-                {detail?.recipient_name || current.customer_name || "—"}
+                {current.customer_name === null ? (
+                  <PersonalText value={null} />
+                ) : (
+                  detail?.recipient_name || current.customer_name || "—"
+                )}
               </div>
             </div>
             <div>
               <div className={s.infoItemLabel}>Địa chỉ giao</div>
-              <div className={s.infoItemValue}>{current.address || "—"}</div>
+              <div className={s.infoItemValue}>
+                <PersonalText value={current.address} />
+              </div>
             </div>
             <div>
               <div className={s.infoItemLabel}>Tổng khối lượng</div>
@@ -255,10 +262,12 @@ export function DeliveryDetailModal({ item, onClose, onUpdated }: Props) {
                 )}
               </div>
             </div>
-            {current.note && (
+            {(current.note || current.note === null) && (
               <div>
                 <div className={s.infoItemLabel}>Ghi chú đơn</div>
-                <div className={s.infoItemValue}>{current.note}</div>
+                <div className={s.infoItemValue}>
+                  <PersonalText value={current.note} />
+                </div>
               </div>
             )}
           </div>

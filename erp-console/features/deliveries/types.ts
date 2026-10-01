@@ -30,14 +30,16 @@ export type DeliveryNoteItem = {
   confirm_skipped: boolean;
   assigned_to: number | null;
   failed_attempts: number;
-  note: string;
+  /** `null` = đã ẩn theo thời hạn (SR-PII-02); "" = không có ghi chú. */
+  note: string | null;
   created_at: string;
   completed_at: string | null;
   lines_summary: string;
   total_kg: string;
   label: LabelInfo;
-  customer_name: string;
-  address: string;
+  /** `null` = đã ẩn theo thời hạn (NV giao, phiếu kết thúc quá 7 ngày — SR-PII-02); "" = chưa có. */
+  customer_name: string | null;
+  address: string | null;
   available_actions: string[];
 };
 
@@ -50,6 +52,7 @@ export type DeliveryLine = {
 
 export type DeliveryNoteDetail = DeliveryNoteItem & {
   lines: DeliveryLine[];
+  /** Rỗng thật cũng là `null` — KHÔNG dùng để biết "đã ẩn"; xem `customer_name === null`. */
   recipient_name: string | null;
   recipient_phone: string | null;
 };

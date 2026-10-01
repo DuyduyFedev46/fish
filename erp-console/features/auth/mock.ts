@@ -6,6 +6,8 @@
 //   ql1   = quan_ly             → home "dashboard", không xem giá vốn
 //   kho1  = nv_kho + nv_giao    → home "dashboard" (S6-AC2)
 //   giao1 = nv_giao             → home "my-deliveries" (S6-AC3)
+//   cs2   = cskh + nv_giao      → home "dashboard"; kiêm nhiệm, KHÔNG có chủ/quản lý/NV kho nên dữ liệu khách của phiếu
+//                                 giao đã kết thúc quá 7 ngày bị ẩn (SR-PII-02) — thử màn Đơn/Giao hàng
 //   giao2 = nv_giao             → còn 2 phiếu Đang giao → Chủ cho nghỉ bị BR-GH-08 (S42-AC4)
 //   ql9   = quan_ly + quyền lẻ accounts.manage_staff (không thuộc chu) → thử BR-PQ-17 403 (S41-AC6, S42-AC7)
 //   sa1   = superuser + quan_ly → thử BR-PQ-18 (bỏ nhóm Chủ của loc — Chủ cuối cùng, S41-AC7)
@@ -191,6 +193,7 @@ function seed(): MockUser[] {
     u(9, "sa1", "Kỹ thuật", "0909000777", [ROLE.manager], { is_superuser: true }),
     u(10, "kho5", "Chị Sáu", "0909000888", [ROLE.warehouseStaff], { must_change_password: true }),
     u(11, "cs1", "Chị Cúc", "0909000999", [ROLE.customerService], { last_login: "2026-09-28T08:00:00+07:00" }),
+    u(12, "cs2", "Chị Đào", "0909001000", [ROLE.customerService, ROLE.deliveryStaff], { last_login: "2026-10-01T08:00:00+07:00" }),
   ];
 }
 

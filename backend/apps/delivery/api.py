@@ -50,12 +50,18 @@ class DeliveryNoteViewSet(NoStoreMixin, DocumentViewSet):
             return DeliveryNoteDetailSerializer
         return DeliveryNoteSerializer
 
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        # SR-PII-02: người không có full scope (NV giao) bị ẩn dữ liệu khách của phiếu quá cửa sổ.
+        context["pii_restricted"] = not has_full_delivery_scope(self.request.user)
+        return context
+
     def get_queryset(self):
         qs = super().get_queryset()
         user = self.request.user
         if has_full_delivery_scope(user):
             return qs
-        return qs.filter(assigned_to=user)  # nv_giao: chỉ phiếu của mình
+        return qs.filter(assigned_to=user)  # nv_giao: chỉ phiếu của mình (dữ liệu khách: pii_scope.py)
 
     def filter_queryset(self, queryset):
         queryset = super().filter_queryset(queryset)

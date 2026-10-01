@@ -118,6 +118,17 @@ def has_full_delivery_scope(user) -> bool:
     )
 
 
+# Chỉ Chủ, Quản lý (và superuser) thấy toàn bộ danh bạ khách. NV kho không dùng full scope giao hàng
+# để vòng qua: quyền xem khách của người kiêm nhiệm đến từ nv_giao (SR-PII-01).
+CUSTOMER_DIRECTORY_GROUPS = frozenset({roles.OWNER, roles.MANAGER})
+
+
+def sees_customer_directory(user) -> bool:
+    return bool(
+        user.is_superuser or user.groups.filter(name__in=CUSTOMER_DIRECTORY_GROUPS).exists()
+    )
+
+
 def require_perm(user, perm: str):
     """Chặn ở tầng service-call trong view cho custom action (Tầng 2)."""
     if not (user and user.has_perm(perm)):

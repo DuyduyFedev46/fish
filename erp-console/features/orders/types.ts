@@ -10,8 +10,9 @@ export type OrderListItem = {
   code: string;
   status: OrderStatus | string;
   status_label: string;
-  customer_name: string;
-  customer_phone: string;
+  /** `null` = đã ẩn theo thời hạn (NV giao, phiếu giao kết thúc quá 7 ngày — SR-PII-02); "" = chưa có. */
+  customer_name: string | null;
+  customer_phone: string | null;
   total_amount: string;
   created_at: string;
   /** Mốc hết giữ chỗ (BR-BH-03) — BE trả; FE chỉ đếm lùi, không tự tính. */
@@ -125,7 +126,8 @@ export type OrderDetail = {
   total_amount?: string;
   created_at?: string;
   reserved_until?: string | null;
-  customer: { name: string; phone: string; address: string };
+  /** Cả ba trường là `null` khi đã ẩn theo thời hạn (NV giao, phiếu giao kết thúc quá 7 ngày — SR-PII-02). */
+  customer: { name: string | null; phone: string | null; address: string | null };
   lines: OrderLine[];
   allocations: OrderAllocation[];
   invoice: { id: number; code: string; issued_at: string | null } | null;

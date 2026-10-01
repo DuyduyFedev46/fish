@@ -60,10 +60,9 @@ class S5ScopeTests(TestCase):
             self._ids(client_for(kho1).get("/api/sales/orders/")),
             sorted([self.d1.pk, self.d2.pk, self.d3.pk]),
         )
-        self.assertEqual(
-            self._ids(client_for(kho1).get("/api/sales/customers/")),
-            sorted([self.c1.pk, self.c2.pk, self.c3.pk, self.c4.pk]),
-        )
+        # SR-PII-01 (Q-1): danh bạ khách không còn mở theo full scope của nv_kho. Quyền xem khách của
+        # người kiêm nhiệm đến từ nv_giao nên chỉ thấy khách của phiếu gán cho mình (chưa gán -> rỗng).
+        self.assertEqual(self._ids(client_for(kho1).get("/api/sales/customers/")), [])
 
     def test_s5_ac4_quan_ly_va_chu_thay_moi_don(self):
         for group in (roles.MANAGER, roles.OWNER):

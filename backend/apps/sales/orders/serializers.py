@@ -28,6 +28,12 @@ class KgField(serializers.Field):
         return kg_str(value)
 
 
+def pii_hidden(order) -> bool:
+    """SR-PII-02: True khi `get_queryset` đã gắn `pii_visible=False` (NV giao, phiếu đã quá cửa sổ).
+    Không có annotate (vai full scope) thì dữ liệu khách hiện đủ như cũ."""
+    return getattr(order, "pii_visible", True) is False
+
+
 class SalesOrderListSerializer(serializers.ModelSerializer):
     """Một dòng danh sách đơn. Cần queryset có annotate `delivery_status`, `needs_attention`."""
 
@@ -46,6 +52,13 @@ class SalesOrderListSerializer(serializers.ModelSerializer):
             "total_amount", "created_at", "reserved_until", "delivery_status", "needs_attention",
         ]
         read_only_fields = fields
+
+    def to_representation(self, instance):
+        ret = super().to_representation(instance)
+        if pii_hidden(instance):
+            ret["customer_name"] = None
+            ret["customer_phone"] = None
+        return ret
 
 
 class OrderLineSerializer(serializers.Serializer):
@@ -104,6 +117,8 @@ class SalesOrderDetailSerializer(serializers.ModelSerializer):
 
     # --- fields --------------------------------------------------------------
     def get_customer(self, order):
+        if pii_hidden(order):
+            return {"name": None, "phone": None, "address": None}
         return {
             "name": order.customer.name,
             "phone": order.phone,

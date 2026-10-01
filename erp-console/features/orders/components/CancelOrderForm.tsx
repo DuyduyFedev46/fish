@@ -15,6 +15,7 @@ import { cancelOrder } from "../api";
 import type { CancelOrderResult, CancelReasonCode, OrderDetail } from "../types";
 import { Consequences, FormFooter, FormHead, NoteField, useSubmit } from "./QueueFormParts";
 import s from "../orders.module.css";
+import { PersonalText } from "@/shared/ui/PersonalText";
 
 type Props = {
   order: OrderDetail;
@@ -79,7 +80,7 @@ export function CancelOrderForm({ order, onBusy, onCancel, onDone, onError400 }:
         icon="cancel"
         tone="warn"
         question={ORDERS_MSG.cancelQuestion(order.code)}
-        sub={<>{order.customer.name} · Tổng đơn {vnd(order.total_amount)}</>}
+        sub={<><PersonalText value={order.customer.name} whenEmpty="" /> · Tổng đơn {vnd(order.total_amount)}</>}
       />
 
       <fieldset

@@ -55,7 +55,7 @@
 
 import type { MockRequest, MockResponse, Paginated } from "@/shared/lib/http";
 import { beError } from "@/shared/lib/beErrors.mock";
-import { onlyDelivery } from "@/shared/lib/nav";
+import { hasLimitedCourierScope } from "@/shared/lib/personalData";
 import { MOCK_UNAUTHORIZED, mockRequireUser, mockUsers, mockPermsOf } from "@/features/auth/mock";
 import type { Me } from "@/features/auth/types";
 import { vnd } from "@/shared/lib/format";
@@ -127,7 +127,15 @@ type MockOrderRefund = OrderRefund & {
 };
 
 type Line = { item_code: string; item_name: string; qty: number; price: number; discount: number; batches: [string, number, number][] };
-type Delivery = { id: number; code: string; status: string; assigned_to: number | null; failed_attempts: number };
+type Delivery = {
+  id: number;
+  code: string;
+  status: string;
+  assigned_to: number | null;
+  failed_attempts: number;
+  /** Mốc kết thúc (COMPLETED) — nguồn tính cửa sổ xem dữ liệu khách của NV giao (SR-PII-02). */
+  completed_at?: string;
+};
 type Order = {
   id: number;
   code: string;
@@ -212,6 +220,17 @@ const PLAN: Plan[] = [
   ["CANCELLED", 320, "refund-pending"],
 ];
 
+// SR-PII-02: hai đơn đã giao xong 10–11 ngày trước → người có phạm vi giao hạn chế thấy tên/SĐT/địa chỉ = null:
+// đơn 143 gán cho giao1 (id 4, chỉ nv_giao), đơn 142 gán cho cs2 (id 12, cskh + nv_giao).
+// Đặt vào chỗ hai đơn cũ COMPLETED (42, 41) để tổng số đơn (45) và các id khác không đổi.
+const OLD_COURIER_PLANS: Record<number, Plan> = {
+  42: ["COMPLETED", 10 * 24 * 60, "old-giao1"],
+  41: ["COMPLETED", 11 * 24 * 60, "old-cs2"],
+};
+const OLD_COURIER_BY_TAG: Record<string, number> = { "old-giao1": 4, "old-cs2": 12 };
+/** Số ngày NV giao còn xem được dữ liệu khách của phiếu đã kết thúc (BE `DELIVERY_PII_RECENT_DAYS`, mặc định 7). */
+const PII_RECENT_DAYS = 7;
+
 function pad(n: number, w = 2): string {
   return String(n).padStart(w, "0");
 }
@@ -277,7 +296,7 @@ function seed(): Store {
         const st: OrderStatus = i % 9 === 0 ? "AUTO_CANCELLED" : i % 11 === 0 ? "CANCELLED" : "COMPLETED";
         return [st, 360 + (i - PLAN.length) * 610 + (i % 5) * 37];
       })();
-    const [status, minutesAgo, tag] = plan;
+    const [status, minutesAgo, tag] = OLD_COURIER_PLANS[i] ?? plan;
     const id = 101 + i;
     const createdMs = now - minutesAgo * 60_000;
     const created = isoVN(createdMs);
@@ -311,7 +330,7 @@ function seed(): Store {
       }
     }
     if (status === "PROCESSING" || status === "COMPLETED") {
-      const assigned = tag === "giao1" ? 4 : tag === "giao2" ? 7 : tag === "failed" ? 4 : status === "COMPLETED" ? [4, 7, 3][i % 3] : null;
+      const assigned = tag && OLD_COURIER_BY_TAG[tag] ? OLD_COURIER_BY_TAG[tag] : tag === "giao1" ? 4 : tag === "giao2" ? 7 : tag === "failed" ? 4 : status === "COMPLETED" ? [4, 7, 3][i % 3] : null;
       const dStatus = status === "COMPLETED" ? "COMPLETED" : tag === "giao2" ? "DELIVERING" : tag === "failed" ? "FAILED" : "PREPARING";
       o.delivery = {
         id: ++delId,
@@ -319,6 +338,7 @@ function seed(): Store {
         status: dStatus,
         assigned_to: assigned,
         failed_attempts: tag === "failed" ? 1 : 0,
+        ...(dStatus === "COMPLETED" ? { completed_at: isoVN(createdMs + 3 * 3600_000) } : {}),
       };
       if (tag === "failed") o.needs_attention = true;
     }
@@ -571,8 +591,21 @@ function timelineOf(o: Order): OrderTimelineEntry[] {
 // ---------- Quyền + phạm vi ----------
 const has = (me: Me, p: string) => me.permissions.includes(p);
 function inScope(me: Me, o: Order): boolean {
-  if (!onlyDelivery(me)) return true;
+  if (!hasLimitedCourierScope(me)) return true;
   return !!o.delivery && o.delivery.assigned_to === me.id;
+}
+
+/**
+ * SR-PII-02: người có phạm vi giao hạn chế (nv_giao không kèm chủ/quản lý/NV kho) không thấy dữ liệu khách của đơn có phiếu giao đã kết thúc quá 7 ngày.
+ * Như BE: hết ngày lịch thứ N tính từ ngày kết thúc (giờ VN); phiếu chưa kết thúc (kể cả FAILED) luôn thấy.
+ */
+function piiHidden(me: Me, o: Order): boolean {
+  if (!hasLimitedCourierScope(me) || !o.delivery) return false;
+  const d = o.delivery;
+  if (d.status !== "COMPLETED" && d.status !== "CANCELLED") return false;
+  const endedDay = dayVN(d.completed_at || o.created_at);
+  const cutoffDay = dayVN(isoVN(Date.now() - PII_RECENT_DAYS * 86_400_000));
+  return endedDay < cutoffDay;
 }
 
 /** Phiếu giao còn ở trạng thái huỷ được (Soạn hàng/Chờ lấy/Giao thất bại) — BE `_cancellable_delivery_status`. */
@@ -595,14 +628,15 @@ function actions(me: Me, o: Order): string[] {
   return out;
 }
 
-function listItem(o: Order): OrderListItem {
+function listItem(me: Me, o: Order): OrderListItem {
+  const hidden = piiHidden(me, o);
   return {
     id: o.id,
     code: o.code,
     status: o.status,
     status_label: ORDER_LABEL[o.status],
-    customer_name: o.customer.name,
-    customer_phone: o.customer.phone,
+    customer_name: hidden ? null : o.customer.name,
+    customer_phone: hidden ? null : o.customer.phone,
     total_amount: money(orderTotal(o)),
     created_at: o.created_at,
     reserved_until: o.reserved_until,
@@ -632,7 +666,7 @@ function detail(me: Me, o: Order): OrderDetail {
     total_amount: money(orderTotal(o)),
     created_at: o.created_at,
     reserved_until: o.reserved_until,
-    customer: { ...o.customer },
+    customer: piiHidden(me, o) ? { name: null, phone: null, address: null } : { ...o.customer },
     lines: o.lines.map((l, idx) => ({
       no: idx + 1,
       item_code: l.item_code,
@@ -708,7 +742,13 @@ function listResponse(me: Me, query: URLSearchParams): MockResponse {
     .filter((o) => !statuses.length || statuses.includes(o.status))
     .filter((o) => !from || dayVN(o.created_at) >= from)
     .filter((o) => !to || dayVN(o.created_at) <= to)
-    .filter((o) => !q || o.code.toLowerCase().includes(q) || o.customer.phone.includes(q) || fold(o.customer.name).includes(fold(q)))
+    // Đơn đã ẩn dữ liệu khách chỉ tìm được theo mã đơn (BE chống dò SĐT/tên).
+    .filter(
+      (o) =>
+        !q ||
+        o.code.toLowerCase().includes(q) ||
+        (!piiHidden(me, o) && (o.customer.phone.includes(q) || fold(o.customer.name).includes(fold(q)))),
+    )
     .sort((a, b) => (a.created_at < b.created_at ? 1 : a.created_at > b.created_at ? -1 : b.id - a.id));
   const pages = Math.max(1, Math.ceil(hit.length / PAGE_SIZE));
   if (page > pages) return { status: 404, body: { detail: "Trang không hợp lệ." } };
@@ -721,7 +761,7 @@ function listResponse(me: Me, query: URLSearchParams): MockResponse {
     count: hit.length,
     next: page < pages ? link(page + 1) : null,
     previous: page > 1 ? link(page - 1) : null,
-    results: hit.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE).map(listItem),
+    results: hit.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE).map((o) => listItem(me, o)),
   };
   return { status: 200, body };
 }

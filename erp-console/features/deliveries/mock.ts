@@ -1,4 +1,15 @@
+import { mockRequireUser } from "@/features/auth/mock";
+import { hasLimitedCourierScope } from "@/shared/lib/personalData";
 import { DeliveryListResponse, DeliveryNoteDetail, DeliveryNoteItem, LabelData, PrintDeliveryLabelResponse, VoidLabelResponse } from "./types";
+
+/** ISO giờ VN (+07:00) của `daysAgo` ngày trước, lúc `hour` giờ. */
+function vnIsoDaysAgo(daysAgo: number, hour: number): string {
+  const d = new Date(Date.now() - daysAgo * 86_400_000 + 7 * 3600_000);
+  const p2 = (n: number) => String(n).padStart(2, "0");
+  return `${d.getUTCFullYear()}-${p2(d.getUTCMonth() + 1)}-${p2(d.getUTCDate())}T${p2(hour)}:00:00+07:00`;
+}
+/** Số ngày NV giao còn xem được dữ liệu khách của phiếu đã kết thúc (BE `DELIVERY_PII_RECENT_DAYS`, mặc định 7). */
+const PII_RECENT_DAYS = 7;
 
 export const MOCK_DELIVERY_NOTES: DeliveryNoteDetail[] = [
   {
@@ -205,7 +216,133 @@ export const MOCK_DELIVERY_NOTES: DeliveryNoteDetail[] = [
       },
     ],
   },
+  // SR-PII-02: hai phiếu hoàn tất của giao1 (id 4). Phiếu 40 kết thúc 10 ngày trước → giao1 thấy tên/địa chỉ/ghi chú = null;
+  // phiếu 41 kết thúc hôm qua → giao1 vẫn thấy đủ. Vai khác thấy đủ cả hai.
+  {
+    id: 40,
+    code: "GH-HD-0040-OLD",
+    status: "COMPLETED",
+    status_label: "Hoàn tất",
+    sales_invoice: 20,
+    invoice_code: "HD-0040",
+    order: { id: 143, code: "DH-OLD-0143" },
+    paid_at: vnIsoDaysAgo(10, 8),
+    confirmed_at: vnIsoDaysAgo(10, 8),
+    confirm_skipped: false,
+    assigned_to: 4,
+    failed_attempts: 0,
+    note: "Gọi trước khi tới",
+    created_at: vnIsoDaysAgo(10, 8),
+    completed_at: vnIsoDaysAgo(10, 11),
+    lines_summary: "Cá thu Côn Đảo 2,000 kg",
+    total_kg: "2.000",
+    label: { printed: true, valid_print_no: 1, needs_void: 0, to_void: [] },
+    customer_name: "Khách Thử H",
+    address: "Số 8 Đường Thử, Phường 8, TP. Vũng Tàu",
+    available_actions: [],
+    recipient_name: null,
+    recipient_phone: null,
+    lines: [{ item_name: "Cá thu Côn Đảo", qty_kg: "2.000", batch_id: "CA-THU-260918-VT02", expiry_date: "2027-09-18" }],
+  },
+  {
+    id: 41,
+    code: "GH-HD-0041-NEW",
+    status: "COMPLETED",
+    status_label: "Hoàn tất",
+    sales_invoice: 21,
+    invoice_code: "HD-0041",
+    order: { id: 144, code: "DH-NEW-0144" },
+    paid_at: vnIsoDaysAgo(1, 8),
+    confirmed_at: vnIsoDaysAgo(1, 8),
+    confirm_skipped: false,
+    assigned_to: 4,
+    failed_attempts: 0,
+    note: "",
+    created_at: vnIsoDaysAgo(1, 8),
+    completed_at: vnIsoDaysAgo(1, 11),
+    lines_summary: "Tôm sú loại 1 1,500 kg",
+    total_kg: "1.500",
+    label: { printed: true, valid_print_no: 1, needs_void: 0, to_void: [] },
+    customer_name: "Khách Thử I",
+    address: "Số 9 Đường Thử, Phường 9, TP. Vũng Tàu",
+    available_actions: [],
+    recipient_name: null,
+    recipient_phone: null,
+    lines: [{ item_name: "Tôm sú loại 1", qty_kg: "1.500", batch_id: "TOM-SU-1-260920-AB12C", expiry_date: "2027-09-20" }],
+  },
+  {
+    id: 42,
+    code: "GH-HD-0042-OLD",
+    status: "COMPLETED",
+    status_label: "Hoàn tất",
+    sales_invoice: 22,
+    invoice_code: "HD-0042",
+    order: { id: 142, code: "DH-OLD-0142" },
+    paid_at: vnIsoDaysAgo(11, 8),
+    confirmed_at: vnIsoDaysAgo(11, 8),
+    confirm_skipped: false,
+    assigned_to: 12,
+    failed_attempts: 0,
+    note: "Gọi trước khi tới",
+    created_at: vnIsoDaysAgo(11, 8),
+    completed_at: vnIsoDaysAgo(11, 11),
+    lines_summary: "Cá thu Côn Đảo 2,000 kg",
+    total_kg: "2.000",
+    label: { printed: true, valid_print_no: 1, needs_void: 0, to_void: [] },
+    customer_name: "Khách Thử K",
+    address: "Số 11 Đường Thử, Phường 11, TP. Vũng Tàu",
+    available_actions: [],
+    recipient_name: null,
+    recipient_phone: null,
+    lines: [{ item_name: "Cá thu Côn Đảo", qty_kg: "2.000", batch_id: "CA-THU-260918-VT02", expiry_date: "2027-09-18" }],
+  },
+  {
+    id: 43,
+    code: "GH-HD-0043-NEW",
+    status: "COMPLETED",
+    status_label: "Hoàn tất",
+    sales_invoice: 23,
+    invoice_code: "HD-0043",
+    order: { id: 145, code: "DH-NEW-0145" },
+    paid_at: vnIsoDaysAgo(1, 8),
+    confirmed_at: vnIsoDaysAgo(1, 8),
+    confirm_skipped: false,
+    assigned_to: 12,
+    failed_attempts: 0,
+    note: "",
+    created_at: vnIsoDaysAgo(1, 8),
+    completed_at: vnIsoDaysAgo(1, 11),
+    lines_summary: "Tôm sú loại 1 1,500 kg",
+    total_kg: "1.500",
+    label: { printed: true, valid_print_no: 1, needs_void: 0, to_void: [] },
+    customer_name: "Khách Thử L",
+    address: "Số 12 Đường Thử, Phường 12, TP. Vũng Tàu",
+    available_actions: [],
+    recipient_name: null,
+    recipient_phone: null,
+    lines: [{ item_name: "Tôm sú loại 1", qty_kg: "1.500", batch_id: "TOM-SU-1-260920-AB12C", expiry_date: "2027-09-20" }],
+  },
 ];
+
+/**
+ * SR-PII-02: bản nhìn của người có phạm vi giao hạn chế (nv_giao không kèm chủ/quản lý/NV kho). Phiếu COMPLETED/CANCELLED kết thúc trước đầu ngày (hôm nay − 7)
+ * → customer_name, address, note, recipient_name = null (khoá vẫn có). Vai khác: nguyên bản.
+ */
+function viewFor<T extends DeliveryNoteItem>(me: ReturnType<typeof mockRequireUser>, note: T): T {
+  if (!me || !hasLimitedCourierScope(me)) return note;
+  if (note.status !== "COMPLETED" && note.status !== "CANCELLED") return note;
+  const cutoffDay = vnIsoDaysAgo(PII_RECENT_DAYS, 0).slice(0, 10);
+  const endedDay = (note.completed_at || note.created_at).slice(0, 10);
+  if (endedDay >= cutoffDay) return note;
+  const hidden: T = { ...note, customer_name: null, address: null, note: null };
+  if ("recipient_name" in hidden) (hidden as unknown as DeliveryNoteDetail).recipient_name = null;
+  return hidden;
+}
+
+/** Người có phạm vi giao hạn chế chỉ thấy phiếu gán cho mình (BR-PQ-12). */
+function inCourierScope(me: ReturnType<typeof mockRequireUser>, note: DeliveryNoteItem): boolean {
+  return !me || !hasLimitedCourierScope(me) || note.assigned_to === me.id;
+}
 
 export function getMockDeliveryNotes(params?: {
   status?: string;
@@ -272,20 +409,21 @@ export function mockListDeliveryNotes(req: any): { status: number; body: Deliver
       // ignore
     }
   }
-  return {
-    status: 200,
-    body: getMockDeliveryNotes({ status, completed_from }),
-  };
+  const me = mockRequireUser(req);
+  const base = getMockDeliveryNotes({ status, completed_from });
+  const results = base.results.filter((n) => inCourierScope(me, n)).map((n) => viewFor(me, n));
+  return { status: 200, body: { ...base, count: results.length, results } };
 }
 
 export function mockGetDeliveryNoteDetail(req: any): { status: number; body: DeliveryNoteDetail | { detail: string } } {
   const match = req?.url ? String(req.url).match(/\/api\/delivery\/notes\/(\d+)\//) : null;
   const id = match ? parseInt(match[1], 10) : 31;
   const item = MOCK_DELIVERY_NOTES.find((n) => n.id === id);
-  if (!item) {
+  const me = mockRequireUser(req);
+  if (!item || !inCourierScope(me, item)) {
     return { status: 404, body: { detail: "Không tìm thấy phiếu giao hàng" } };
   }
-  return { status: 200, body: item };
+  return { status: 200, body: viewFor(me, item) };
 }
 
 export function mockPostDeliveryNoteStatus(req: any): { status: number; body: any } {
@@ -340,9 +478,9 @@ export function mockGetDeliveryLabel(
     is_reprint: isReprint,
     reprint_reason: isReprint ? "REPRINT" : null,
     barcode_value: `${item.code}.${pNo}`,
-    recipient_name: item.recipient_name || item.customer_name,
+    recipient_name: item.recipient_name || item.customer_name || "",
     recipient_phone_masked: "09xx xxx 123",
-    address: item.address,
+    address: item.address || "",
     packages: "1/1",
     total_kg: item.total_kg,
     earliest_expiry: item.lines[0]?.expiry_date || "2027-09-20",

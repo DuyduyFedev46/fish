@@ -25,6 +25,7 @@ import { useOrderList } from "../useOrderList";
 import { OrderDetailSheet } from "./OrderDetailSheet";
 import { OrdersTabs } from "./OrdersTabs";
 import s from "../orders.module.css";
+import { PersonalText } from "@/shared/ui/PersonalText";
 
 /** YYYY-MM-DD theo giờ Việt Nam (BE lọc ngày theo Asia/Ho_Chi_Minh). */
 function vnDate(ms: number): string {
@@ -62,7 +63,7 @@ function Row({ o, now, onOpen }: { o: OrderListItem; now: number; onOpen: () => 
       <button type="button" className={`${s.open} order-open`} onClick={onOpen} aria-haspopup="dialog" data-id={o.id}>
         <span className={s.cCode}>{o.code}</span>
         <span className={s.cCust}>
-          <b>{o.customer_name}</b>
+          <b><PersonalText value={o.customer_name} whenEmpty="" /></b>
           {last4 && (
             <span className={`${s.phone} num`}>
               <span className="sr-only">, số điện thoại đuôi </span>…{last4}

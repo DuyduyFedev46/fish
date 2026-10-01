@@ -19,10 +19,12 @@ from apps.common.api import (
     BusinessModelPermissions,
     NoStoreMixin,
     StandardPagination,
+    has_full_delivery_scope,
     require_perm,
 )
 from apps.common.exceptions import BusinessError
 from apps.delivery.models import DeliveryNote
+from apps.delivery.pii_scope import annotate_order_pii_visible
 from apps.sales.models import Customer, PaymentTransaction, SalesOrder
 from apps.sales.payments import services as payment_services
 from apps.sales.utils import ZERO, fold_text, money_str
@@ -92,11 +94,18 @@ class SalesOrderViewSet(NoStoreMixin, AiDeclarable, viewsets.ReadOnlyModelViewSe
                 "invoice__delivery_notes__returns",
             )
         # S5 / BR-PQ-12 (nv_giao) và CS-01 / BR-GH-18 (cskh): phạm vi dòng dùng chung, xem scope.py.
-        return scope_orders_for(self.request.user, qs)
+        user = self.request.user
+        qs = scope_orders_for(user, qs)
+        if not has_full_delivery_scope(user):
+            # SR-PII-02: đơn của phiếu đã kết thúc quá cửa sổ thì serializer ẩn dữ liệu khách.
+            qs = annotate_order_pii_visible(user, qs)
+        return qs
 
     def list(self, request, *args, **kwargs):
         try:
-            self.queryset_filters = self._filters(request.query_params)
+            self.queryset_filters = self._filters(
+                request.query_params, restrict_customer_search=not has_full_delivery_scope(request.user)
+            )
         except InvalidFilter as exc:
             return Response({"detail": str(exc), "code": INVALID_FILTER}, status=400)
         return super().list(request, *args, **kwargs)
@@ -108,8 +117,11 @@ class SalesOrderViewSet(NoStoreMixin, AiDeclarable, viewsets.ReadOnlyModelViewSe
         return queryset
 
     @staticmethod
-    def _filters(params):
-        """UC-02: lọc trạng thái (nhiều, cách dấu phẩy), theo ngày tạo (giờ VN), tìm mã đơn/SĐT/tên khách."""
+    def _filters(params, *, restrict_customer_search=False):
+        """UC-02: lọc trạng thái (nhiều, cách dấu phẩy), theo ngày tạo (giờ VN), tìm mã đơn/SĐT/tên khách.
+
+        `restrict_customer_search` (SR-PII-02): tìm theo SĐT/tên chỉ khớp đơn mà người gọi còn được xem dữ liệu
+        khách (`pii_visible`), để không dò ra SĐT của đơn đã quá cửa sổ. Tìm theo mã đơn không bị giới hạn."""
         cond = Q()
         statuses = [s.strip() for s in params.get("status", "").split(",") if s.strip()]
         if statuses:
@@ -120,10 +132,13 @@ class SalesOrderViewSet(NoStoreMixin, AiDeclarable, viewsets.ReadOnlyModelViewSe
             cond &= Q(created_at__date__lte=_parse_date(params["date_to"], "date_to"))
         q = params.get("q", "").strip()
         if q:
-            cond &= (
-                Q(code__icontains=q) | Q(phone__contains=q) | Q(customer__phone__contains=q)
+            by_customer = (
+                Q(phone__contains=q) | Q(customer__phone__contains=q)
                 | Q(customer_id__in=_customer_ids_by_name(q))
             )
+            if restrict_customer_search:
+                by_customer &= Q(pii_visible=True)
+            cond &= Q(code__icontains=q) | by_customer
         return cond
 
     @action(detail=True, methods=["post"], required_perms=("sales.cancel_paid_order",))

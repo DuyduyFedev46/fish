@@ -31,6 +31,7 @@ import type { OrderAction, OrderDetail, OrderListItem, OrderTimelineEntry } from
 import { mmss, useNow } from "../useNow";
 import type { ResultNote } from "./OrderDetailSheet";
 import s from "../orders.module.css";
+import { PersonalText } from "@/shared/ui/PersonalText";
 
 /** Thao tác FE đã nối theo `available_actions`. Mã lạ → không vẽ nút. */
 const ACTION_UI: Partial<Record<OrderAction, { label: string; icon: string }>> = {
@@ -219,7 +220,7 @@ export function OrderDetailView({
       <dl className={s.props}>
         <div className={s.prop}>
           <dt>Khách</dt>
-          <dd>{o.customer.name || "—"}</dd>
+          <dd><PersonalText value={o.customer.name} /></dd>
         </div>
         <div className={s.prop}>
           <dt>Số điện thoại</dt>
@@ -230,13 +231,15 @@ export function OrderDetailView({
                 {o.customer.phone}
               </a>
             ) : (
-              "—"
+              <PersonalText value={o.customer.phone} />
             )}
           </dd>
         </div>
         <div className={s.prop}>
           <dt>Địa chỉ</dt>
-          <dd>{o.customer.address || <span className={s.muted}>{ORDERS_MSG.noAddress}</span>}</dd>
+          <dd>
+            <PersonalText value={o.customer.address} whenEmpty={ORDERS_MSG.noAddress} mutedWhenEmpty />
+          </dd>
         </div>
         <div className={s.prop}>
           <dt>Hoá đơn</dt>

@@ -10,6 +10,8 @@ import {
   STATUS_GROUP_TABS,
 } from "../types";
 import s from "../deliveries.module.css";
+import { PersonalText } from "@/shared/ui/PersonalText";
+import { personalText } from "@/shared/lib/personalData";
 
 export function DeliveriesView() {
   const [activeTab, setActiveTab] = useState<DeliveryStatusGroup>("PREPARING");
@@ -132,10 +134,15 @@ export function DeliveriesView() {
                       <div className={s.subCode}>{item.invoice_code || "—"}</div>
                     </td>
                     <td>
-                      <div className={s.customerName}>{item.customer_name}</div>
-                      <div className={s.customerAddress} title={item.address}>
-                        {item.address}
+                      <div className={s.customerName}>
+                        <PersonalText value={item.customer_name} whenEmpty="" />
                       </div>
+                      {/* Cả tên và địa chỉ đã ẩn → chỉ hiện một dòng "Đã ẩn", khỏi lặp. */}
+                      {!(item.customer_name === null && item.address === null) && (
+                        <div className={s.customerAddress} title={personalText(item.address, "")}>
+                          <PersonalText value={item.address} whenEmpty="" />
+                        </div>
+                      )}
                     </td>
                     <td>
                       <div className={s.linesSummary}>{item.lines_summary || "—"}</div>
@@ -170,8 +177,14 @@ export function DeliveriesView() {
                 </div>
 
                 <div className={s.cardMid}>
-                  <div className={s.customerName}>{item.customer_name}</div>
-                  <div className={s.customerAddress}>{item.address}</div>
+                  <div className={s.customerName}>
+                    <PersonalText value={item.customer_name} whenEmpty="" />
+                  </div>
+                  {!(item.customer_name === null && item.address === null) && (
+                    <div className={s.customerAddress}>
+                      <PersonalText value={item.address} whenEmpty="" />
+                    </div>
+                  )}
                   <div className={s.linesSummary} style={{ marginTop: 4 }}>
                     {item.lines_summary}
                   </div>

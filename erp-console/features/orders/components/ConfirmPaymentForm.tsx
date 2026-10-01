@@ -18,6 +18,7 @@ import { confirmPayment } from "../api";
 import { ORDERS_MSG } from "../messages";
 import type { ConfirmPaymentResult, OrderDetail } from "../types";
 import s from "../orders.module.css";
+import { PersonalText } from "@/shared/ui/PersonalText";
 
 type Props = {
   order: OrderDetail;
@@ -109,7 +110,7 @@ export function ConfirmPaymentForm({ order, fallbackTotal, onBusy, onCancel, onD
           {amount ? ORDERS_MSG.confirmQuestion(amount, order.code) : ORDERS_MSG.confirmAction}
         </h3>
         <p className={`${s.confirmSum} num`}>
-          {order.customer.name} · Tổng đơn {vnd(total)}
+          <PersonalText value={order.customer.name} whenEmpty="" /> · Tổng đơn {vnd(total)}
         </p>
       </div>
 

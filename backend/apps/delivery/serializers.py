@@ -5,6 +5,7 @@ Tuân thủ Bất biến 1 (không rò giá vốn) và Bất biến 9 (phạm vi
 from rest_framework import serializers
 
 from .models import DeliveryNote, LabelPrint
+from .pii_scope import is_note_pii_expired
 
 
 class DeliveryNoteLineSerializer(serializers.Serializer):
@@ -42,6 +43,17 @@ class DeliveryNoteSerializer(serializers.ModelSerializer):
             "code", "sales_invoice", "status", "assigned_to", "failed_attempts",
             "created_at", "completed_at", "confirmed_at", "confirmed_by", "confirm_skipped",
         ]
+
+    def _customer_data_hidden(self, obj) -> bool:
+        """SR-PII-02: NV giao (view đặt `pii_restricted`) không thấy dữ liệu khách của phiếu đã quá cửa sổ.
+        Ẩn bằng giá trị `null`, giữ nguyên khoá JSON."""
+        return bool(self.context.get("pii_restricted")) and is_note_pii_expired(obj)
+
+    def to_representation(self, instance):
+        ret = super().to_representation(instance)
+        if self._customer_data_hidden(instance):
+            ret["note"] = None
+        return ret
 
     def get_order(self, obj):
         invoice = obj.sales_invoice
@@ -108,6 +120,8 @@ class DeliveryNoteSerializer(serializers.ModelSerializer):
         }
 
     def get_customer_name(self, obj):
+        if self._customer_data_hidden(obj):
+            return None
         if obj.recipient_name:
             return obj.recipient_name
         invoice = obj.sales_invoice
@@ -116,6 +130,8 @@ class DeliveryNoteSerializer(serializers.ModelSerializer):
         return ""
 
     def get_address(self, obj):
+        if self._customer_data_hidden(obj):
+            return None
         invoice = obj.sales_invoice
         if invoice and invoice.sales_order_id:
             return invoice.sales_order.delivery_address or ""
@@ -170,6 +186,8 @@ class DeliveryNoteDetailSerializer(DeliveryNoteSerializer):
         fields = DeliveryNoteSerializer.Meta.fields + ["lines", "recipient_name"]
 
     def get_recipient_name(self, obj):
+        if self._customer_data_hidden(obj):
+            return None
         return obj.recipient_name or None
 
     def get_lines(self, obj):
