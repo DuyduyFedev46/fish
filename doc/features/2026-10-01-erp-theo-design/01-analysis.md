@@ -42,8 +42,8 @@ repo ở `doc/design/erp/`. Tính năng này đưa `erp-console/` (và phần ba
 | B2 | Quyền `view_customer` ("Xem khách hàng"), API danh sách/chi tiết khách có số đơn, tổng mua, đơn huỷ | Khách hàng | Mới |
 | B3 | Số liệu tổng hợp nhà cung cấp (số phiếu nhập, tổng tiền mua, lần nhập gần nhất) | Nhà cung cấp | Mới |
 | B4 | Ma trận phân quyền đọc/ghi được qua API (nhóm × quyền), nếu chưa có | Phân quyền | Kiểm lại |
-| B5 | Lý do giao thất bại | Báo giao thất bại | **Điểm dừng**: hỏi Duy (thiết kế hiện chỉ có Ghi chú theo đúng backend) |
-| B6 | Gán / đổi người giao cho phiếu giao | Giao cho người giao | **Điểm dừng**: hỏi Duy, chưa có cả BE lẫn FE |
+| B5 | Lý do giao thất bại: thêm trường lý do (Không gặp khách / Khách từ chối nhận / Sai địa chỉ / Hàng hư khi giao / Khác) + ghi chú | Báo giao thất bại | Mới. Duy duyệt làm trong đợt này (01/10) |
+| B6 | Gán / đổi người giao cho phiếu giao (Quản lý, Chủ), kèm số phiếu đang giao của từng người | Giao cho người giao | Mới. Duy duyệt làm trong đợt này (01/10) |
 
 Các màn còn lại đã có API (rà ngày 01/10, xem `02b-tech-design.md`).
 
