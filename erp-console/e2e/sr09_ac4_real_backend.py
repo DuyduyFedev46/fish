@@ -37,7 +37,7 @@ def run_case(browser, tag, viewport, trigger):
     page.get_by_role("button", name="Đăng nhập").click()
     page.wait_for_function("() => !window.location.href.includes('/login/')", timeout=10_000)
     page.wait_for_load_state("networkidle")
-    page.goto(BASE + "/cskh/")
+    page.goto(BASE + "/confirmation/")
     page.wait_for_load_state("networkidle")
     page.get_by_role("button", name="Cần quyết định").click()  # phiếu ESCALATED nằm ở tab này
     page.wait_for_timeout(800)

@@ -6,8 +6,10 @@ Endpoint: `/api/delivery/notes/` (list lọc `?status=` nhiều giá trị, dấ
 App 1 tính năng → giữ phẳng (`services.py`, `api.py`, `serializers.py`, `models.py`, `tests/`).
 
 **Module con `confirmation/`** (việc gọi xác nhận đơn cho CSKH, trước đây tên `cskh/`; đổi tên P8b Lô 1): `services.py` (nghiệp vụ hàng chờ, ghi
-kết quả gọi, hạn giờ), `scope.py` (phạm vi dữ liệu cá nhân của vai CSKH, BR-GH-18), `serializers.py`, `api.py`. Route API và tên env
-vẫn là `cskh` đến Lô 3.
+kết quả gọi, hạn giờ), `scope.py` (phạm vi dữ liệu cá nhân của vai CSKH, BR-GH-18), `serializers.py`, `api.py`. Từ P8b Lô 3: route
+`/api/confirmation/...` (route cũ `/api/cskh/...` là alias tới Lô 5, cùng một view), env `CONFIRMATION_*` (env `CSKH_*` là fallback),
+lệnh `process_confirmation_deadlines` / `check_confirmation_job_health` (tên cũ bọc gọi), logger `cangca.delivery.confirmation`.
+Cả hai tiền tố route nằm trong `FORBIDDEN_PREFIXES` của AI vì trả tên, SĐT, địa chỉ khách.
 
 **S14 (Lô L9, sales/orders):** thêm trạng thái `CANCELLED` ("Đã huỷ theo đơn") — không tới qua `advance_status`/`set_status`
 mà do `apps.sales.orders.services.cancel_paid_order` gán thẳng khi huỷ đơn đã thanh toán (BR-GH-07). Không quay lui, giống

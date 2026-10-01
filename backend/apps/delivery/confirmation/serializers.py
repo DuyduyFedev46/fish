@@ -109,19 +109,19 @@ class ConfirmationQueueItemSerializer(serializers.ModelSerializer):
             escalation_label = obj.get_escalation_reason_display()
 
         # Next call after
-        min_retry = getattr(settings, "CSKH_MIN_RETRY_MINUTES", 10)
+        min_retry = getattr(settings, "CONFIRMATION_MIN_RETRY_MINUTES", 10)
         next_call_after = None
         if obj.state == ConfirmationTask.State.PENDING and obj.attempts >= 1 and obj.last_unreachable_at:
             next_call_after = (obj.last_unreachable_at + timedelta(minutes=min_retry)).isoformat()
 
         # Window ends at
-        window_mins = getattr(settings, "CSKH_UNREACHABLE_WINDOW_MINUTES", 30)
+        window_mins = getattr(settings, "CONFIRMATION_UNREACHABLE_WINDOW_MINUTES", 30)
         window_ends_at = None
         if obj.first_unreachable_at:
             window_ends_at = (obj.first_unreachable_at + timedelta(minutes=window_mins)).isoformat()
 
         # Decide deadline (CS-07, CS-13)
-        decision_mins = getattr(settings, "CSKH_MANAGER_DECISION_MINUTES", 30)
+        decision_mins = getattr(settings, "CONFIRMATION_MANAGER_DECISION_MINUTES", 30)
         decide_deadline = None
         if (
             obj.state == ConfirmationTask.State.ESCALATED
@@ -173,7 +173,7 @@ class ConfirmationQueueItemSerializer(serializers.ModelSerializer):
             "escalation_reason": escalation_reason,
             "escalation_label": escalation_label,
             "attempts": obj.attempts,
-            "max_attempts": getattr(settings, "CSKH_MAX_UNREACHABLE_ATTEMPTS", 3),
+            "max_attempts": getattr(settings, "CONFIRMATION_MAX_UNREACHABLE_ATTEMPTS", 3),
             "next_call_after": next_call_after,
             "window_ends_at": window_ends_at,
             "callback_at": obj.callback_at.isoformat() if obj.callback_at else None,

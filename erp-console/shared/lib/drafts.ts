@@ -7,11 +7,16 @@
 const PREFIX = "cave_erp_draft:";
 
 /**
- * Tiền tố khoá nháp form "Nhập lô" (SR-07): khoá mới `cave_draft_nhap_lo:<userId>` ở sessionStorage,
- * khoá cũ `cave_draft_nhap_lo` (dùng chung, có giá mua) ở localStorage. Đăng xuất phải xoá tất cả.
+ * Tiền tố khoá nháp form "Nhập lô" (SR-07, P8b Lô 3): khoá hiện hành `cave_draft_receive_batches:<userId>` ở sessionStorage.
  * Khai ở đây (shared) để `auth` dọn được mà không import vào ruột `purchasing`.
  */
-export const RECEIVE_BATCHES_DRAFT_PREFIX = "cave_draft_nhap_lo";
+export const RECEIVE_BATCHES_DRAFT_PREFIX = "cave_draft_receive_batches";
+
+/**
+ * Tiền tố khoá nháp TRƯỚC Lô 3: `cave_draft_nhap_lo:<userId>` (session) và `cave_draft_nhap_lo` (localStorage, dùng chung,
+ * từng chứa giá mua). GIỮ VĨNH VIỄN: đăng xuất luôn phải xoá, vì máy dùng chung có thể còn sót khoá cũ (R4, SR-07).
+ */
+export const LEGACY_RECEIVE_BATCHES_DRAFT_PREFIX = "cave_draft_nhap_lo";
 
 type Stored<T> = { owner: number; savedAt: string; data: T };
 
@@ -96,9 +101,13 @@ function ss(): Storage | null {
   }
 }
 
-/** Đăng xuất: xoá mọi nháp ERP (localStorage) và mọi nháp Nhập lô của mọi người (session + khoá cũ ở local). */
+/**
+ * Đăng xuất: xoá mọi nháp ERP (localStorage) và mọi nháp Nhập lô của mọi người, cả khoá mới lẫn khoá cũ, ở cả session và local.
+ */
 export function clearAllDrafts(): void {
   removeByPrefix(ls(), PREFIX);
-  removeByPrefix(ls(), RECEIVE_BATCHES_DRAFT_PREFIX);
-  removeByPrefix(ss(), RECEIVE_BATCHES_DRAFT_PREFIX);
+  for (const prefix of [RECEIVE_BATCHES_DRAFT_PREFIX, LEGACY_RECEIVE_BATCHES_DRAFT_PREFIX]) {
+    removeByPrefix(ls(), prefix);
+    removeByPrefix(ss(), prefix);
+  }
 }

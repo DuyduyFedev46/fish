@@ -1,8 +1,18 @@
 // SR-07 (BM-04): nháp "Nhập lô" không giữ giá mua; gắn theo người dùng; nằm ở sessionStorage; đăng xuất xoá sạch.
 // Dữ liệu giả. Môi trường vitest là node nên dựng window + storage giả có length/key để quét khoá.
 import { beforeEach, describe, expect, it } from "vitest";
-import { clearDraft, draftKey, loadDraft, resolveIdempotencyKey, saveDraft, LEGACY_DRAFT_KEY } from "./draftStorage";
-import { clearAllDrafts } from "@/shared/lib/drafts";
+import {
+  clearDraft,
+  draftKey,
+  legacyDraftKey,
+  loadDraft,
+  migrateLegacyDraft,
+  purgeLegacyDraft,
+  resolveIdempotencyKey,
+  saveDraft,
+  LEGACY_DRAFT_KEY,
+} from "./draftStorage";
+import { clearAllDrafts, LEGACY_RECEIVE_BATCHES_DRAFT_PREFIX, RECEIVE_BATCHES_DRAFT_PREFIX } from "@/shared/lib/drafts";
 
 function makeStorage() {
   let store: Record<string, string> = {};
@@ -61,8 +71,8 @@ describe("SR-07 draftStorage", () => {
 
   it("SR-07-AC2: khoá gắn userId, nằm ở sessionStorage, không đụng localStorage", () => {
     saveDraft(7, draftWithRate);
-    expect(draftKey(7)).toBe("cave_draft_nhap_lo:7");
-    expect(session.getItem("cave_draft_nhap_lo:7")).not.toBeNull();
+    expect(draftKey(7)).toBe("cave_draft_receive_batches:7");
+    expect(session.getItem("cave_draft_receive_batches:7")).not.toBeNull();
     expect(local.length).toBe(0);
   });
 
@@ -71,7 +81,7 @@ describe("SR-07 draftStorage", () => {
     expect(loadDraft(8)).toBeNull();
   });
 
-  it("SR-07-AC2: clearAllDrafts xoá mọi khoá cave_draft_nhap_lo* ở cả local (khoá cũ) và session", () => {
+  it("SR-07-AC2: clearAllDrafts xoá mọi khoá nháp Nhập lô (tiền tố mới và cũ) ở cả local và session", () => {
     local.setItem(LEGACY_DRAFT_KEY, JSON.stringify({ lines: [{ rate: "81234" }] }));
     saveDraft(7, draftWithRate);
     saveDraft(8, draftWithRate);
@@ -79,8 +89,8 @@ describe("SR-07 draftStorage", () => {
     local.setItem("khoa_khac", "giu");
     clearAllDrafts();
     expect(local.getItem(LEGACY_DRAFT_KEY)).toBeNull();
-    expect(session.getItem("cave_draft_nhap_lo:7")).toBeNull();
-    expect(session.getItem("cave_draft_nhap_lo:8")).toBeNull();
+    expect(session.getItem("cave_draft_receive_batches:7")).toBeNull();
+    expect(session.getItem("cave_draft_receive_batches:8")).toBeNull();
     expect(session.getItem("khoa_khac")).toBe("giu");
     expect(local.getItem("khoa_khac")).toBe("giu");
   });
@@ -89,7 +99,7 @@ describe("SR-07 draftStorage", () => {
     saveDraft(7, { ...draftWithRate, idempotencyKey: "key-cua-7" });
     expect(loadDraft(7)!.idempotencyKey).toBe("key-cua-7");
     expect(resolveIdempotencyKey(7, () => "key-moi")).toBe("key-cua-7");
-    expect(session.getItem("cave_draft_nhap_lo:7")).toContain("key-cua-7");
+    expect(session.getItem("cave_draft_receive_batches:7")).toContain("key-cua-7");
     expect(local.length).toBe(0);
   });
 
@@ -116,9 +126,9 @@ describe("SR-07 draftStorage", () => {
   });
 
   it("nháp cũ/hỏng: JSON hỏng hoặc còn rate → không lỗi, không trả rate", () => {
-    session.setItem("cave_draft_nhap_lo:7", "{hỏng");
+    session.setItem("cave_draft_receive_batches:7", "{hỏng");
     expect(loadDraft(7)).toBeNull();
-    session.setItem("cave_draft_nhap_lo:7", JSON.stringify({ supplierId: 1, receivedDate: "2026-09-30", lines: [{ item_code: "X", qty: "1", rate: "999" }] }));
+    session.setItem("cave_draft_receive_batches:7", JSON.stringify({ supplierId: 1, receivedDate: "2026-09-30", lines: [{ item_code: "X", qty: "1", rate: "999" }] }));
     const back = loadDraft(7);
     expect(back!.lines[0]).not.toHaveProperty("rate");
   });
@@ -128,5 +138,81 @@ describe("SR-07 draftStorage", () => {
     expect(() => saveDraft(7, draftWithRate)).not.toThrow();
     expect(loadDraft(7)).toBeNull();
     expect(() => clearAllDrafts()).not.toThrow();
+  });
+
+  // ---- P8b Lô 3: đổi tiền tố khoá nháp; khoá cũ phải được chuyển rồi xoá, và luôn bị dọn khi đăng xuất ----
+
+  it("P8b-L3: tên tiền tố mới và cũ đúng như 02c (cũ giữ vĩnh viễn)", () => {
+    expect(RECEIVE_BATCHES_DRAFT_PREFIX).toBe("cave_draft_receive_batches");
+    expect(LEGACY_RECEIVE_BATCHES_DRAFT_PREFIX).toBe("cave_draft_nhap_lo");
+    expect(LEGACY_DRAFT_KEY).toBe(LEGACY_RECEIVE_BATCHES_DRAFT_PREFIX);
+    expect(legacyDraftKey(7)).toBe("cave_draft_nhap_lo:7");
+  });
+
+  it("P8b-L3: mở form → nháp session khoá cũ của CHÍNH người đó được chuyển sang khoá mới, bỏ rate, xoá khoá cũ", () => {
+    session.setItem(legacyDraftKey(7), JSON.stringify({ ...draftWithRate, idempotencyKey: "key-cu-cua-7" }));
+    const back = loadDraft(7);
+    expect(back).not.toBeNull();
+    expect(back!.supplierId).toBe(3);
+    expect(back!.lines[0].item_code).toBe("CA-THU");
+    expect("rate" in back!.lines[0]).toBe(false);
+    expect(resolveIdempotencyKey(7, () => "key-moi")).toBe("key-cu-cua-7");
+    expect(session.getItem(legacyDraftKey(7))).toBeNull();
+    expect(session.getItem(draftKey(7))).not.toBeNull();
+    expect(session.dump()).not.toContain("81234");
+    expect(local.length).toBe(0);
+  });
+
+  it("P8b-L3: nháp khoá cũ của người khác không bị đọc hay chuyển; vẫn bị dọn khi đăng xuất", () => {
+    session.setItem(legacyDraftKey(8), JSON.stringify(draftWithRate));
+    expect(loadDraft(7)).toBeNull();
+    expect(session.getItem(draftKey(8))).toBeNull();
+    expect(session.getItem(legacyDraftKey(8))).not.toBeNull();
+    clearAllDrafts();
+    expect(session.getItem(legacyDraftKey(8))).toBeNull();
+  });
+
+  it("P8b-L3: khoá mới đã có thì giữ khoá mới, chỉ xoá khoá cũ (không ghi đè)", () => {
+    saveDraft(7, { ...draftWithRate, receivedDate: "2026-10-01" });
+    session.setItem(legacyDraftKey(7), JSON.stringify({ ...draftWithRate, receivedDate: "2026-01-01" }));
+    migrateLegacyDraft(7);
+    expect(loadDraft(7)!.receivedDate).toBe("2026-10-01");
+    expect(session.getItem(legacyDraftKey(7))).toBeNull();
+  });
+
+  it("P8b-L3: khoá cũ hỏng → xoá, không ném lỗi, không tạo khoá mới", () => {
+    session.setItem(legacyDraftKey(7), "{hỏng");
+    expect(() => migrateLegacyDraft(7)).not.toThrow();
+    expect(session.getItem(legacyDraftKey(7))).toBeNull();
+    expect(session.getItem(draftKey(7))).toBeNull();
+  });
+
+  it("P8b-L3: khoá cũ ở localStorage (có giá mua) chỉ bị xoá, không được chuyển sang khoá mới", () => {
+    local.setItem(LEGACY_DRAFT_KEY, JSON.stringify({ ...draftWithRate }));
+    expect(loadDraft(7)).toBeNull();
+    expect(session.length).toBe(0);
+    purgeLegacyDraft();
+    expect(local.getItem(LEGACY_DRAFT_KEY)).toBeNull();
+    expect(local.dump()).not.toContain("81234");
+  });
+
+  it("P8b-L3: xoá nháp sau khi gửi thành công xoá cả khoá cũ còn sót của người đó", () => {
+    session.setItem(legacyDraftKey(7), JSON.stringify(draftWithRate));
+    saveDraft(7, draftWithRate);
+    clearDraft(7);
+    expect(session.getItem(draftKey(7))).toBeNull();
+    expect(session.getItem(legacyDraftKey(7))).toBeNull();
+  });
+
+  it("P8b-L3: clearAllDrafts dọn vĩnh viễn cả hai tiền tố ở cả local lẫn session, giữ khoá khác", () => {
+    local.setItem(LEGACY_RECEIVE_BATCHES_DRAFT_PREFIX, "x");
+    local.setItem(`${RECEIVE_BATCHES_DRAFT_PREFIX}:1`, "x");
+    session.setItem(`${LEGACY_RECEIVE_BATCHES_DRAFT_PREFIX}:1`, "x");
+    session.setItem(`${RECEIVE_BATCHES_DRAFT_PREFIX}:2`, "x");
+    local.setItem("khoa_khac", "giu");
+    clearAllDrafts();
+    expect(local.length).toBe(1);
+    expect(local.getItem("khoa_khac")).toBe("giu");
+    expect(session.length).toBe(0);
   });
 });

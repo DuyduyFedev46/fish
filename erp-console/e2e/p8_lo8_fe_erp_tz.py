@@ -103,7 +103,7 @@ def collect(browser, tz):
     page = ctx.new_page()
     page.on("pageerror", lambda e: errs.append(str(e)))
     login(page, "cs1")
-    goto(page, "/cskh/")
+    goto(page, "/confirmation/")
     out["cskh"] = page.inner_text("body")
     if tz == "America/New_York":
         page.screenshot(path=f"{SHOTS}/lo8-erp-4-cskh-ny.png")

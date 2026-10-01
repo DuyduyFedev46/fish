@@ -38,7 +38,7 @@ class _ListHandler(logging.Handler):
             self.lines.append(str(record.msg))
 
 
-@override_settings(CSKH_AUTO_CANCEL_ENABLED=True)
+@override_settings(CONFIRMATION_AUTO_CANCEL_ENABLED=True)
 class QaSR09Edges(ConfirmationL3BaseTestCase):
     def setUp(self):
         super().setUp()

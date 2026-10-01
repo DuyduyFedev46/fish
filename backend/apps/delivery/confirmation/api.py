@@ -316,7 +316,7 @@ class CustomerSearchView(NoStoreMixin, APIView):
     """
     Tìm kiếm nhanh đơn hàng cho CSKH (02b §4.3).
     - Chỉ nhận POST (GET trả 405)
-    - Throttle cskh_search
+    - Throttle customer_search
     - Chống rò PII ngoài phạm vi
     """
     throttle_classes = [CustomerSearchThrottle]

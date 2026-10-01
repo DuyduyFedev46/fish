@@ -4,7 +4,7 @@ Hằng số trong code — review qua PR, không chỉnh từ DB/Admin.
 """
 from apps.common.cost_keys import COST_KEYS
 
-# Tiền tố URL cấm hẳn không bao giờ vào chỉ mục (H11, H14, bất biến 9, go-live, cskh)
+# Tiền tố URL cấm hẳn không bao giờ vào chỉ mục (H11, H14, bất biến 9, go-live, hàng đợi gọi xác nhận)
 FORBIDDEN_PREFIXES = (
     "/api/shop/",
     "/api/internal/",
@@ -14,7 +14,8 @@ FORBIDDEN_PREFIXES = (
     "/api/audit-logs/",
     "/api/commands/",
     "/api/public/",
-    "/api/cskh/",
+    "/api/cskh/",  # giữ vĩnh viễn: tên cũ của hàng đợi gọi xác nhận (phòng thủ nhiều lớp)
+    "/api/confirmation/",  # hàng đợi gọi xác nhận đơn: tên, SĐT, địa chỉ khách (P8b Lô 3, R1)
     "/api/dashboard/attention/",
 )
 

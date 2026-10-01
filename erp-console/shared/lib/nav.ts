@@ -164,7 +164,7 @@ export const NAV: NavItem[] = [
     key: "confirmation",
     summary: "Hàng chờ gọi xác nhận đơn, hẹn gọi lại và xử lý đơn.",
     plannedIn: "CS-05",
-    href: "/cskh/",
+    href: "/confirmation/",
     label: "Gọi xác nhận",
     short: "Xác nhận",
     icon: "phone_in_talk",
@@ -387,7 +387,7 @@ export function homePath(me: Me): string {
   if (me.must_change_password) return SET_PASSWORD_HREF;
   if (me.home === "no-role") return "/no-role/";
   if (me.home === "my-deliveries") return "/my-deliveries/";
-  if (me.home === HOME_CONFIRMATION_QUEUE) return "/cskh/";
+  if (me.home === HOME_CONFIRMATION_QUEUE) return "/confirmation/";
   const first = visibleNav(me)[0];
   return canView(me, "overview") ? "/overview/" : first ? first.href : "/no-role/";
 }

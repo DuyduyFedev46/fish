@@ -1,5 +1,7 @@
 import { apiFetch, type MockRequest } from "@/shared/lib/http";
 import { ROLE } from "@/shared/lib/roles";
+import { RECEIVE_BATCHES_COMMAND_ID } from "../commandGroups";
+import { normalizeAiPolicy, normalizeMyConfig } from "../legacyIds";
 import { AiPolicy, MyConfig, PolicyCaps } from "../types";
 
 export interface UpdateAiPolicyPayload {
@@ -48,7 +50,7 @@ const mockAiPolicy: AiPolicy = {
     },
   ],
   caps: {
-    "purchasing.purchasereceipt.nhap_lo": {
+    [RECEIVE_BATCHES_COMMAND_ID]: {
       kg: "200",
       vnd: "30000000",
       daily: 20,
@@ -76,10 +78,12 @@ const mockAiPolicy: AiPolicy = {
 
 export async function getAiPolicy(signal?: AbortSignal): Promise<AiPolicy> {
   const isMock = process.env.NEXT_PUBLIC_USE_MOCK === "1";
-  return apiFetch<AiPolicy>("/api/ai/policy/", {
-    signal,
-    mock: isMock ? (_req: MockRequest) => ({ status: 200, body: mockAiPolicy }) : undefined,
-  });
+  return normalizeAiPolicy(
+    await apiFetch<AiPolicy>("/api/ai/policy/", {
+      signal,
+      mock: isMock ? (_req: MockRequest) => ({ status: 200, body: mockAiPolicy }) : undefined,
+    })
+  );
 }
 
 export async function updateAiPolicy(
@@ -87,7 +91,7 @@ export async function updateAiPolicy(
   signal?: AbortSignal
 ): Promise<AiPolicy> {
   const isMock = process.env.NEXT_PUBLIC_USE_MOCK === "1";
-  return apiFetch<AiPolicy>("/api/ai/policy/", {
+  return normalizeAiPolicy(await apiFetch<AiPolicy>("/api/ai/policy/", {
     method: "PUT",
     body: JSON.stringify(payload),
     signal,
@@ -110,7 +114,7 @@ export async function updateAiPolicy(
           };
         }
       : undefined,
-  });
+  }));
 }
 
 export async function killUserAi(
@@ -137,7 +141,7 @@ export async function killUserAi(
 
 export async function getUserAiConfig(userId: number, signal?: AbortSignal): Promise<MyConfig> {
   const isMock = process.env.NEXT_PUBLIC_USE_MOCK === "1";
-  return apiFetch<MyConfig>(`/api/ai/policy/users/${userId}/config/`, {
+  return normalizeMyConfig(await apiFetch<MyConfig>(`/api/ai/policy/users/${userId}/config/`, {
     signal,
     mock: isMock
       ? (_req: MockRequest) => ({
@@ -153,5 +157,5 @@ export async function getUserAiConfig(userId: number, signal?: AbortSignal): Pro
           },
         })
       : undefined,
-  });
+  }));
 }

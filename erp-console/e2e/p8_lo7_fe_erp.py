@@ -105,7 +105,7 @@ def confirmation_case(browser, tag, w, h):
     # --- đổi người nhận
     ctx, page, logs = new_page(browser, w, h)
     login(page, "cs1")
-    page.goto(BASE + "/cskh/")
+    page.goto(BASE + "/confirmation/")
     page.wait_for_load_state("networkidle")
     modal = open_card(page, "DH-260928-0030")
     page.evaluate("() => window.__caveMock.confirmationArmStale(30)")
@@ -124,7 +124,7 @@ def confirmation_case(browser, tag, w, h):
     # --- huỷ xác nhận (phiếu đã sang Soạn hàng)
     ctx, page, logs = new_page(browser, w, h)
     login(page, "cs1")
-    page.goto(BASE + "/cskh/")
+    page.goto(BASE + "/confirmation/")
     page.wait_for_load_state("networkidle")
     page.evaluate("() => window.__caveMock.confirmationSetStatus(36, 'PREPARING')")
     page.get_by_role("button", name="Chờ gọi").first.click()
@@ -145,7 +145,7 @@ def confirmation_case(browser, tag, w, h):
     # --- quyết định Quản lý (phiếu Cần quyết định)
     ctx, page, logs = new_page(browser, w, h)
     login(page, "cs1")  # mock không phân quyền quyết định; BE thật kiểm quyền Quản lý riêng
-    page.goto(BASE + "/cskh/")
+    page.goto(BASE + "/confirmation/")
     page.wait_for_load_state("networkidle")
     page.get_by_role("button", name="Cần quyết định").first.click()
     page.wait_for_timeout(600)

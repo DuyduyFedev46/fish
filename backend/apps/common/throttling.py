@@ -86,7 +86,7 @@ class LoginUserThrottle(SettingsRateThrottle):
 
 
 class CustomerSearchThrottle(SettingsRateThrottle):
-    scope = "cskh_search"
+    scope = "customer_search"
 
     def get_cache_key(self, request, view):
         if not (request.user and request.user.is_authenticated):

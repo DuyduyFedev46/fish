@@ -78,8 +78,31 @@ Bảng dưới là **khuyến nghị**; tạo job và lịch thật là việc d
 |---|---|---|---|---|
 | Chạy việc AI mức B tới hạn (trì hoãn 30 phút, hạ mức, đưa việc quá hạn lên Chủ) | `python manage.py run_due_ai_actions` | mỗi 5 phút (`*/5 * * * *`) | Có, khi `AI_ENABLED=1` | Chỉ khi Duy mở mức B. Tắt AI vẫn chạy được để hạ mức việc đang chờ |
 | Tự khớp giao dịch chuyển khoản khớp tuyệt đối (DW-26) | `python manage.py auto_confirm_exact_payments` | mỗi 5 phút | Có, khi `AI_PRODUCTION_READY=1` và Chủ mở công tắc `system.auto_confirm_exact_match` | **Không tạo job** (job chạy cũng chỉ trả `PRODUCTION_NOT_READY`) |
-| Thời hạn CSKH (nhắc, chuyển Quản lý, tự huỷ nếu bật) | `python manage.py process_cskh_deadlines` | mỗi 5 phút (`*/5 * * * *`) | Có | Có, sau khi `legal-vn` duyệt câu thông báo huỷ (xem `doc/ops/go-live-phap-ly.md`) |
-| Giám sát job CSKH | `python manage.py check_cskh_job_health` | mỗi 15 phút, exit code 1 thì cảnh báo | Có | Có |
+| Thời hạn xác nhận đơn (nhắc, chuyển Quản lý, tự huỷ nếu bật) | `python manage.py process_confirmation_deadlines` | mỗi 5 phút (`*/5 * * * *`) | Có | Có, sau khi `legal-vn` duyệt câu thông báo huỷ (xem `doc/ops/go-live-phap-ly.md`) |
+| Giám sát job xác nhận đơn | `python manage.py check_confirmation_job_health` | mỗi 15 phút, exit code 1 thì cảnh báo | Có | Có |
+
+**Đổi tên (P8b Lô 3, 2026-10-01):** lệnh `process_cskh_deadlines` và `check_cskh_job_health` vẫn chạy, chỉ bọc gọi lệnh mới cùng tham số (`--grace-minutes`) và cùng exit code.
+Job Cloud Run đang dùng tên cũ không gãy; đổi args sang tên mới trong lần deploy sau, tên cũ gỡ ở P8b Lô 5. Logger đổi `cangca.delivery.cskh` thành
+`cangca.delivery.confirmation`: nếu có bộ lọc log hay cảnh báo theo tên logger cũ thì cập nhật cùng lúc.
+
+### Biến môi trường xác nhận đơn (P8b Lô 3)
+Backend đọc **tên mới trước**, không có thì mới đọc tên cũ (alias tới Lô 5). Đang chạy với tên cũ trên Cloud Run thì vẫn đúng; đặt cả hai thì tên mới thắng.
+Đổi tên trên staging trước, production sau khi Duy duyệt. Không đổi giá trị, chỉ đổi tên.
+
+| Tên mới | Tên cũ (fallback) | Mặc định | Ý nghĩa |
+|---|---|---|---|
+| `CONFIRMATION_MAX_UNREACHABLE_ATTEMPTS` | `CSKH_MAX_UNREACHABLE_ATTEMPTS` | 3 | Số lần gọi không được trước khi chuyển Quản lý |
+| `CONFIRMATION_UNREACHABLE_WINDOW_MINUTES` | `CSKH_UNREACHABLE_WINDOW_MINUTES` | 30 | Cửa sổ (phút) để chuyển Quản lý |
+| `CONFIRMATION_MIN_RETRY_MINUTES` | `CSKH_MIN_RETRY_MINUTES` | 10 | Giãn cách tối thiểu giữa hai lần gọi |
+| `CONFIRMATION_MANAGER_DECISION_MINUTES` | `CSKH_MANAGER_DECISION_MINUTES` | 30 | Hạn Quản lý quyết định trước khi tự huỷ |
+| `CONFIRMATION_PII_RECENT_DAYS` | `CSKH_PII_RECENT_DAYS` | 7 | Số ngày dữ liệu khách còn thấy được với vai CSKH |
+| `CONFIRMATION_CLAIM_MINUTES` | `CSKH_CLAIM_MINUTES` | 5 | Thời gian giữ phiếu khi nhận gọi |
+| `CONFIRMATION_EXTEND_MAX_HOURS` | `CSKH_EXTEND_MAX_HOURS` | 24 | Giới hạn gia hạn |
+| `CONFIRMATION_WORKING_HOURS` | `CSKH_WORKING_HOURS` | `07:00-21:00` | Khung giờ gọi (cũng hiện trên Shop) |
+| `CONFIRMATION_QUEUE_ALERT_MINUTES` | `CSKH_QUEUE_ALERT_MINUTES` | 60 | Ngưỡng cảnh báo phiếu chờ gọi lâu |
+| `CONFIRMATION_AUTO_CANCEL_ENABLED` | `CSKH_AUTO_CANCEL_ENABLED` | 0 | Cờ tự huỷ (chỉ bật sau khi `legal-vn` duyệt) |
+| `CONFIRMATION_NOTICE_ENABLED` | `CSKH_NOTICE_ENABLED` | 1 | Hiện thông báo quy trình gọi trên Shop |
+| `THROTTLE_CUSTOMER_SEARCH` | `THROTTLE_CSKH_SEARCH` | `30/min` | Giới hạn tốc độ tìm kiếm khách (cả `confirmation/search/` và `cskh/search/` dùng chung một bộ đếm) |
 
 Các job đều idempotent (khoá dòng, chạy lại không làm hai lần). Log job chỉ ghi mã việc/mã giao dịch/tên lỗi, không ghi tên, SĐT, địa chỉ hay nội dung chuyển khoản.
 

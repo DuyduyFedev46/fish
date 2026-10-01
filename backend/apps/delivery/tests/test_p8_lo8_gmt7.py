@@ -32,7 +32,7 @@ class Lo8CskhFormatTests(l3.ConfirmationL3BaseTestCase):
         order.refresh_from_db()
         return order, note, task
 
-    @override_settings(CSKH_AUTO_CANCEL_ENABLED=True, REFUND_DEADLINE_DAYS=30)
+    @override_settings(CONFIRMATION_AUTO_CANCEL_ENABLED=True, REFUND_DEADLINE_DAYS=30)
     def test_sr25_ac1_cancel_notice_message_tien_vnd_dau_cham(self):
         """Câu báo khách tự huỷ: `Số tiền 300.000 ₫ sẽ được hoàn`; JSON refund.amount vẫn là chuỗi thô."""
         order, _note, _task = self._auto_cancelled()
@@ -43,7 +43,7 @@ class Lo8CskhFormatTests(l3.ConfirmationL3BaseTestCase):
         self.assertNotIn("300000đ", notice["message"])
         self.assertEqual(notice["refund"]["amount"], "300000")  # contract khoá, không đổi
 
-    @override_settings(CSKH_AUTO_CANCEL_ENABLED=True, REFUND_DEADLINE_DAYS=30)
+    @override_settings(CONFIRMATION_AUTO_CANCEL_ENABLED=True, REFUND_DEADLINE_DAYS=30)
     def test_sr25_ac2_cskh_queue_refund_deadline_theo_ngay_vn(self):
         """Phiếu hoàn tạo 17:30Z (00:30 VN ngày kế) -> hạn = ngày VN + 30 ngày."""
         order, note, task = self._auto_cancelled()
@@ -53,7 +53,7 @@ class Lo8CskhFormatTests(l3.ConfirmationL3BaseTestCase):
         item = resp.json()["results"][0]
         self.assertEqual(item["refund"]["deadline"], "2026-10-31")
 
-    @override_settings(CSKH_AUTO_CANCEL_ENABLED=True, REFUND_DEADLINE_DAYS=30)
+    @override_settings(CONFIRMATION_AUTO_CANCEL_ENABLED=True, REFUND_DEADLINE_DAYS=30)
     def test_sr25_ac2_shop_cancel_notice_deadline_theo_ngay_vn(self):
         order, note, task = self._auto_cancelled()
         Refund.objects.filter(pk=task.refund.pk).update(created_at=LATE_UTC)

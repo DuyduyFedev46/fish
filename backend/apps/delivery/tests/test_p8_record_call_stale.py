@@ -26,7 +26,7 @@ STALE_TEXT = "Đơn đã bị huỷ — tải lại màn hình."
 PII_SENTINELS = ("0900000123", "Khách Thử A", "Số 1 Đường Thử")
 
 
-@override_settings(CSKH_AUTO_CANCEL_ENABLED=True)
+@override_settings(CONFIRMATION_AUTO_CANCEL_ENABLED=True)
 class SR09RecordCallStaleTests(ConfirmationL3BaseTestCase):
     def setUp(self):
         super().setUp()

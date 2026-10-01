@@ -79,8 +79,10 @@ router.register("sales/refunds", RefundViewSet)
 router.register("sales/payments", PaymentTransactionViewSet)
 # delivery
 router.register("delivery/notes", DeliveryNoteViewSet)
-# cskh
-router.register("cskh/queue", ConfirmationQueueViewSet, basename="cskh-queue")
+# confirmation — hàng đợi gọi xác nhận đơn. Route mới `confirmation/` và route cũ `cskh/` cùng một view
+# (alias tới Lô 5); cả hai tiền tố nằm trong FORBIDDEN_PREFIXES của AI (P8b Lô 3, R1).
+router.register("confirmation/queue", ConfirmationQueueViewSet, basename="confirmation-queue")
+router.register("cskh/queue", ConfirmationQueueViewSet, basename="cskh-queue-legacy")
 # accounts — quản lý nhân viên (S41, S42)
 router.register("staff", StaffViewSet, basename="staff")
 # AI Actions — Việc AI (DW-11)
@@ -116,8 +118,9 @@ urlpatterns = [
     # Thông tin công khai cho Shop web (CS-10, GL-01, GL-04)
     path("public/site-info/", SiteInfoView.as_view(), name="public-site-info"),
 
-    # CSKH tìm kiếm nhanh (chỉ POST)
-    path("cskh/search/", CustomerSearchView.as_view(), name="cskh-search"),
+    # Tìm kiếm nhanh đơn cho việc gọi xác nhận (chỉ POST); `cskh/search/` là alias tên cũ tới Lô 5.
+    path("confirmation/search/", CustomerSearchView.as_view(), name="confirmation-search"),
+    path("cskh/search/", CustomerSearchView.as_view(), name="cskh-search-legacy"),
     # Shop công khai (guest)
     path("shop/catalog/", ShopCatalogView.as_view()),
     path("shop/catalog/<str:item_code>/", ShopItemDetailView.as_view()),
@@ -168,6 +171,11 @@ urlpatterns = [
     path("ai/policy/", AiPolicyView.as_view(), name="ai-policy"),
     # Báo cáo AI cuối ngày (02b §6.6, DW-22)
     path("ai/report/daily/", AiDailyReportView.as_view(), name="ai-report-daily"),
+    # P8b Lô 3: nhập lô mua tại cảng. `receive-batches/` là tên mới, `nhap-lo/` là tên cũ (alias tới Lô 5);
+    # cả hai cùng trỏ hàm `nhap_lo` nên chỉ mục lệnh AI không thêm id (R8). Đặt trước router vì route chi tiết
+    # `<pk>/` của router sẽ nuốt `receive-batches/`. Route cũ đứng trước để đường dẫn của lệnh AI giữ nguyên.
+    path("purchasing/receipts/nhap-lo/", PurchaseReceiptViewSet.as_view({"post": "nhap_lo"})),  # naming: allow - route cũ, gỡ ở Lô 5
+    path("purchasing/receipts/receive-batches/", PurchaseReceiptViewSet.as_view({"post": "nhap_lo"})),  # naming: allow - tên hàm giữ để id lệnh AI không đổi (Lô 4)
     # Back-office (router)
     path("", include(router.urls)),
 ]

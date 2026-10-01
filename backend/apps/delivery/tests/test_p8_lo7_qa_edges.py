@@ -84,7 +84,7 @@ class QaF08Tests(test_cskh_l3.ConfirmationL3BaseTestCase):
             return real(qs, *a, **k)
 
         with mock.patch.object(QuerySet, "select_for_update", spy):
-            with self.assertLogs("cangca.delivery.cskh", level="ERROR") as cm:
+            with self.assertLogs("cangca.delivery.confirmation", level="ERROR") as cm:
                 n = confirmation_services.escalate_expired_windows(now=self.t0 + timedelta(minutes=31))
         self.assertEqual(n, 1)
         self.assertEqual(ConfirmationTask.objects.filter(state=ConfirmationTask.State.ESCALATED).count(), 1)

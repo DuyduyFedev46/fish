@@ -144,7 +144,7 @@ class CS05QueueAndSearchTests(ConfirmationL2BaseTestCase):
         self.assertIn(n2.pk, note_ids)
 
     def test_cs05_ac3_ac4_claim_task_soft_lock_and_expiry(self):
-        """CS-05-AC3, AC4: Claim khoá mềm trong CSKH_CLAIM_MINUTES, trả 409 khi người khác giữ."""
+        """CS-05-AC3, AC4: Claim khoá mềm trong CONFIRMATION_CLAIM_MINUTES, trả 409 khi người khác giữ."""
         _, _, n1, t1 = self._create_paid_order("DH-CLAIM", "0903333333")
         client1 = client_for(self.cs1)
         client2 = client_for(self.cs2)
@@ -216,9 +216,9 @@ class CS05QueueAndSearchTests(ConfirmationL2BaseTestCase):
         self.assertEqual(resp_short.status_code, 400)
         self.assertEqual(resp_short.json()["code"], "INVALID_QUERY")
 
-    @override_settings(CAVEVE_THROTTLE_RATES={"cskh_search": "2/min"})
+    @override_settings(CAVEVE_THROTTLE_RATES={"customer_search": "2/min"})
     def test_cs05_search_throttling(self):
-        """CS-05-AC6: Throttle cskh_search trả 429 khi vượt ngưỡng."""
+        """CS-05-AC6: Throttle customer_search trả 429 khi vượt ngưỡng."""
         client = client_for(self.cs1)
         r1 = client.post("/api/cskh/search/", {"q": "0908889999"}, format="json")
         r2 = client.post("/api/cskh/search/", {"q": "0908889999"}, format="json")

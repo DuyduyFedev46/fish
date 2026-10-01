@@ -22,10 +22,10 @@ def customer_service_note_q(user, *, now=None, prefix=""):
     Q trên DeliveryNote: phiếu CSKH được thấy đủ tên/SĐT/địa chỉ (BR-GH-18).
     Bao gồm:
     1. Phiếu CONFIRMING và ConfirmationTask thuộc {PENDING, CALLBACK, ESCALATED}.
-    2. Hoặc phiếu mà user đã từng gọi trong vòng CSKH_PII_RECENT_DAYS ngày.
+    2. Hoặc phiếu mà user đã từng gọi trong vòng CONFIRMATION_PII_RECENT_DAYS ngày.
     """
     now = now or timezone.now()
-    days = getattr(settings, "CSKH_PII_RECENT_DAYS", 7)
+    days = getattr(settings, "CONFIRMATION_PII_RECENT_DAYS", 7)
     since = now - timedelta(days=days)
     p = prefix
 
@@ -56,7 +56,7 @@ def note_in_customer_service_scope(user, note, *, now=None) -> bool:
             return True
 
     now = now or timezone.now()
-    days = getattr(settings, "CSKH_PII_RECENT_DAYS", 7)
+    days = getattr(settings, "CONFIRMATION_PII_RECENT_DAYS", 7)
     since = now - timedelta(days=days)
     from apps.delivery.models import CustomerCall
 

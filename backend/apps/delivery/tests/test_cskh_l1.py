@@ -180,7 +180,7 @@ class CskhL1Tests(TestCase):
         self.assertEqual(resp.status_code, 403)
 
     def test_cs01_ac5_cskh_pii_recent_days(self):
-        """CS-01-AC5: Cuộc gọi cách đây 8 ngày -> 404; CSKH_PII_RECENT_DAYS=10 -> 200."""
+        """CS-01-AC5: Cuộc gọi cách đây 8 ngày -> 404; CONFIRMATION_PII_RECENT_DAYS=10 -> 200."""
         o5, _, n5 = self._create_order_invoice_note("D5", status=DeliveryNote.Status.PREPARING)
         eight_days_ago = timezone.now() - datetime.timedelta(days=8)
         call = CustomerCall.objects.create(
@@ -191,12 +191,12 @@ class CskhL1Tests(TestCase):
         CustomerCall.objects.filter(pk=call.pk).update(created_at=eight_days_ago)
 
         client = client_for(self.cs1)
-        # Mặc định CSKH_PII_RECENT_DAYS = 7 ngày -> quá hạn -> 404
+        # Mặc định CONFIRMATION_PII_RECENT_DAYS = 7 ngày -> quá hạn -> 404
         resp = client.get(f"/api/sales/orders/{o5.id}/")
         self.assertEqual(resp.status_code, 404)
 
         # Mở rộng tham số thành 10 ngày -> 200
-        with override_settings(CSKH_PII_RECENT_DAYS=10):
+        with override_settings(CONFIRMATION_PII_RECENT_DAYS=10):
             resp2 = client.get(f"/api/sales/orders/{o5.id}/")
             self.assertEqual(resp2.status_code, 200)
 

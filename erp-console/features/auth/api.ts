@@ -4,6 +4,7 @@ import { ApiError, apiFetch } from "@/shared/lib/http";
 import type { ChangePasswordResponse, Me, TokenResponse } from "./types";
 import { mockChangePassword, mockLogin, mockLogout, mockMe } from "./mock";
 import { MSG } from "@/shared/lib/messages";
+import { normalizeHome, normalizeRole, normalizeRoles } from "@/shared/lib/roles";
 
 // Viết đúng nguyên biểu thức `process.env.NEXT_PUBLIC_USE_MOCK === "1" ? mockX : undefined` tại chỗ
 // (không qua biến/hằng import): webpack gập được biểu thức này lúc build, nên bản build thật
@@ -29,9 +30,23 @@ export async function login(username: string, password: string): Promise<string>
   }
 }
 
+/**
+ * Chuẩn hoá `me` ngay khi nhận (P8b Lô 3): tên Group và `home` do BE trả có thể là tên cũ hoặc tên tiếng Anh (Lô 4);
+ * mọi nơi còn lại chỉ thấy giá trị nội bộ của `ROLE` / `HOME_CONFIRMATION_QUEUE`.
+ */
+export function normalizeMe(me: Me): Me {
+  return {
+    ...me,
+    groups: normalizeRoles(me.groups),
+    home: normalizeHome(me.home) as Me["home"],
+    ...(me.group_labels ? { group_labels: me.group_labels.map((g) => ({ ...g, code: normalizeRole(g.code) })) } : {}),
+  };
+}
+
 /** GET /api/auth/me/ — contract S6. */
-export function getMe(signal?: AbortSignal): Promise<Me> {
-  return apiFetch<Me>("/api/auth/me/", { signal, mock: process.env.NEXT_PUBLIC_USE_MOCK === "1" ? mockMe : undefined });
+export async function getMe(signal?: AbortSignal): Promise<Me> {
+  const me = await apiFetch<Me>("/api/auth/me/", { signal, mock: process.env.NEXT_PUBLIC_USE_MOCK === "1" ? mockMe : undefined });
+  return normalizeMe(me);
 }
 
 /**

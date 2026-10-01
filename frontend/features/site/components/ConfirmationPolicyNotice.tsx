@@ -1,17 +1,24 @@
-import type { SiteInfoResponse } from "../types";
+import type { ConfirmationPolicyConfig, SiteInfoResponse } from "../types";
 import s from "./ConfirmationPolicyNotice.module.css";
 
 /** Khung giờ gọi mặc định khi backend chưa trả gì (giữ đúng mặc định `SHOP_CONFIRM_CALL_HOURS` cũ). */
 export const DEFAULT_CALL_HOURS = "7:00–20:00";
 
 /**
+ * Cấu hình thông báo xác nhận đơn từ `site-info`: khoá mới `confirmation_policy`, vắng thì dùng khoá cũ (P8b Lô 3; BE trả song song đến Lô 5).
+ */
+export function confirmationPolicy(info: SiteInfoResponse | null | undefined): ConfirmationPolicyConfig | null | undefined {
+  return info?.confirmation_policy ?? info?.cskh_notice; // naming: allow - đọc khoá JSON cũ làm dự phòng tới Lô 5
+}
+
+/**
  * MỘT nguồn khung giờ gọi cho mọi câu thông báo (SR-23 F10).
- * Ưu tiên `cskh_notice.working_hours` (= `settings.CSKH_WORKING_HOURS`, giờ thật CSKH làm việc);
+ * Ưu tiên `confirmation_policy.working_hours` (= `settings.CONFIRMATION_WORKING_HOURS`, env cũ `CSKH_WORKING_HOURS` còn là fallback; giờ thật CSKH làm việc);
  * chỉ khi khối CSKH tắt/vắng (backend cũ) mới dùng `confirm_call_hours` (`SHOP_CONFIRM_CALL_HOURS`).
  * Trước đây hai câu trên cùng một màn dùng hai nguồn nên có thể hiện hai khung giờ khác nhau.
  */
 export function callHours(info: SiteInfoResponse | null | undefined): string {
-  const policy = info?.cskh_notice;
+  const policy = confirmationPolicy(info);
   if (policy?.enabled && policy.working_hours) return policy.working_hours;
   return info?.confirm_call_hours || DEFAULT_CALL_HOURS;
 }
@@ -28,7 +35,7 @@ export function ConfirmationPolicyNotice({
   info: SiteInfoResponse | null | undefined;
   variant: "form" | "paid";
 }) {
-  const policy = info?.cskh_notice;
+  const policy = confirmationPolicy(info);
   if (!policy?.enabled) return null;
 
   return (

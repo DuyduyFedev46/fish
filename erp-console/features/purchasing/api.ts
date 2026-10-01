@@ -16,7 +16,7 @@ export async function submitReceiveBatches(
   signal?: AbortSignal
 ): Promise<ReceiveBatchesResponse> {
   const isMock = process.env.NEXT_PUBLIC_USE_MOCK === "1";
-  return apiFetch<ReceiveBatchesResponse>("/api/purchasing/receipts/nhap-lo/", {
+  return apiFetch<ReceiveBatchesResponse>("/api/purchasing/receipts/receive-batches/", {
     method: "POST",
     body: payload,
     signal,

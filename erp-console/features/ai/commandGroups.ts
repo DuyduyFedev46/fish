@@ -17,3 +17,6 @@ export const SENSITIVITY = {
 } as const;
 
 export type AiSensitivity = (typeof SENSITIVITY)[keyof typeof SENSITIVITY];
+
+/** Id lệnh AI "Nhập lô" theo giá trị BE đang dùng (đổi sang `receive_batches` ở Lô 4; chuẩn hoá ở ./legacyIds.ts). */
+export const RECEIVE_BATCHES_COMMAND_ID = "purchasing.purchasereceipt.nhap_lo";

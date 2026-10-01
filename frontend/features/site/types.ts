@@ -8,7 +8,7 @@ export interface SellerInfo {
   email: string | null;
 }
 
-/** Cấu hình thông báo CSKH (`settings.CSKH_*`). `working_hours` = `CSKH_WORKING_HOURS`: nguồn duy nhất của khung giờ gọi. */
+/** Cấu hình thông báo xác nhận đơn (BE: `settings.CONFIRMATION_*`). `working_hours` = `CONFIRMATION_WORKING_HOURS` (env cũ `CSKH_WORKING_HOURS` còn là fallback): nguồn duy nhất của khung giờ gọi. */
 export interface ConfirmationPolicyConfig {
   enabled: boolean;
   working_hours: string;
@@ -26,8 +26,11 @@ export interface SiteInfoResponse {
   privacy_consent_required: boolean;
   confirm_call_notice: boolean;
   confirm_call_hours: string;
-  // `null`/vắng = backend cũ hoặc chưa cấu hình -> không hiện khối CSKH.
-  cskh_notice?: ConfirmationPolicyConfig | null;
+  // `null`/vắng = backend cũ hoặc chưa cấu hình -> không hiện khối thông báo.
+  /** Khoá mới (P8b Lô 3). Đọc khoá này trước: `confirmation_policy ?? cskh_notice` (xem `confirmationPolicy()`). */
+  confirmation_policy?: ConfirmationPolicyConfig | null;
+  /** Khoá cũ, BE còn trả song song tới Lô 5 (có thể vắng nếu BE đã gỡ). */
+  cskh_notice?: ConfirmationPolicyConfig | null; // naming: allow - khoá JSON cũ BE còn trả song song tới Lô 5, FE chỉ đọc làm dự phòng
 }
 
 export interface FooterLinkItem {

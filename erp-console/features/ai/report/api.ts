@@ -1,5 +1,6 @@
 import { apiFetch, type MockRequest } from "@/shared/lib/http";
 import { todayInVietnam } from "@/shared/lib/format";
+import { RECEIVE_BATCHES_COMMAND_ID } from "../commandGroups";
 import type { AiDailyReport } from "../types";
 
 export const mockDailyAiReport: AiDailyReport = {
@@ -39,7 +40,7 @@ export const mockDailyAiReport: AiDailyReport = {
   items: [
     {
       id: "rpt-1",
-      command: "purchasing.purchasereceipt.nhap_lo",
+      command: RECEIVE_BATCHES_COMMAND_ID,
       title: "Nhập lô mua tại cảng",
       level: "B",
       status: "DONE",
@@ -61,7 +62,7 @@ export const mockDailyAiReport: AiDailyReport = {
     },
     {
       id: "rpt-3",
-      command: "purchasing.purchasereceipt.nhap_lo",
+      command: RECEIVE_BATCHES_COMMAND_ID,
       title: "Nhập lô mua tại cảng",
       level: "B",
       status: "UNDONE",

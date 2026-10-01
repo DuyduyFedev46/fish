@@ -253,7 +253,7 @@ class QALeakTests(QAItem2Base):
         t2.escalation_reason = ConfirmationTask.EscalationReason.UNREACHABLE
         t2.escalated_at = t0
         t2.save()
-        with override_settings(CSKH_AUTO_CANCEL_ENABLED=True):
+        with override_settings(CONFIRMATION_AUTO_CANCEL_ENABLED=True):
             self.assertEqual(confirmation_services.auto_cancel_overdue(now=t0 + td(minutes=31))["cancelled"], 1)
         o3, n3, t3 = self._paid2(phone="0900000333")     # còn PAID
         return o1, o2, o3

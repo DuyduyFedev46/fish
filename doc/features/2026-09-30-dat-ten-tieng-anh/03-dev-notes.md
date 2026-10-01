@@ -222,3 +222,117 @@ Route `/cskh/`, `/nhap-lo`; đường dẫn `/api/cskh/*`; khoá JSON `cskh_*` v
 - e2e trên build mock erp (cổng 3230): `p8_lo7_fe_erp.py` **79/79 PASS**; `p8_lo8_fe_erp_tz.py` **71/71 PASS**.
 - e2e Shop (cổng 3232, build USE_MOCK=0 chặn /api bằng page.route): `qa-lo6-sr21-shop.py` **279 ca, 0 FAIL**. Bản out copy ở `scratchpad/p8b-l1-fe/{erp-mock,shop}`. Server đã tắt.
 - `python3 scripts/check_naming.py`: `OK - 6724 vi phạm cũ trong 224 file, không phát sinh mới` (46 file đã giảm; chưa `--update`, chờ điều phối).
+
+## Lô 3 — BE
+
+Ngày 2026-10-01. Phạm vi: đổi CONTRACT sang tên tiếng Anh, tên cũ chạy song song (alias) tới Lô 5. Không đổi giá trị Group, id lệnh AI, migration. Không thêm field dữ liệu khách hay giá vốn.
+
+### File đã sửa
+- `backend/config/settings.py`: hàm `_env_first` / `_bool_first`; `CSKH_*` thành `CONFIRMATION_*` (đọc tên mới trước, tên cũ là fallback); throttle scope `customer_search` (env `THROTTLE_CUSTOMER_SEARCH`, fallback `THROTTLE_CSKH_SEARCH`).
+- `backend/config/api_urls.py`: route `confirmation/queue`, `confirmation/search/` cùng view với `cskh/queue`, `cskh/search/`; route nhập lô `receive-batches/` và `nhap-lo/`.
+- `backend/apps/ai/policy/rules.py`: `FORBIDDEN_PREFIXES` thêm `/api/confirmation/` (giữ `/api/cskh/`).
+- `backend/apps/common/throttling.py`: `CustomerSearchThrottle.scope = "customer_search"` (một bộ đếm cho cả hai route).
+- `backend/apps/delivery/attention_api.py`: thêm khoá `confirmation_*` cạnh khoá `cskh_*`.
+- `backend/apps/content/site/api.py`: thêm `confirmation_policy` cạnh `cskh_notice` (cùng nội dung).
+- `backend/apps/delivery/confirmation/services.py`: logger `cangca.delivery.confirmation`.
+- `backend/apps/delivery/management/commands/`: `process_confirmation_deadlines.py`, `check_confirmation_job_health.py` (lệnh thật, `git mv` từ tên cũ); `process_cskh_deadlines.py`, `check_cskh_job_health.py` giờ chỉ bọc `call_command`.
+- Đổi tên setting trong code và test: `delivery/confirmation/{scope,serializers,services}.py`, `sales/orders/customer_notices.py`, các test delivery và credit_notes.
+- Docs: `doc/ops/moi-truong.md` (bảng env mới/cũ, lệnh job, logger), `backend/README.md`, `backend/apps/delivery/README.md`.
+
+### Bảng contract cũ → mới (THỰC TẾ, cho fe-dev)
+| Loại | Cũ (vẫn chạy tới Lô 5) | Mới | Ghi chú |
+|---|---|---|---|
+| Route hàng đợi | `/api/cskh/queue/`, `/api/cskh/queue/{id}/`, `.../claim/`, `.../calls/`, các action khác | `/api/confirmation/queue/...` | Cùng `ConfirmationQueueViewSet`, cùng ma trận vai, cùng trạng thái |
+| Route tìm kiếm | `POST /api/cskh/search/` | `POST /api/confirmation/search/` | Chỉ POST, dùng chung một bộ đếm throttle |
+| Route nhập lô | `POST /api/purchasing/receipts/nhap-lo/` | `POST /api/purchasing/receipts/receive-batches/` | Cùng hàm `nhap_lo`, body và response không đổi |
+| Khoá JSON `GET /api/dashboard/attention/` | `cskh_queue_waiting`, `cskh_escalated`, `cskh_auto_cancel_blocked` | `confirmation_queue_waiting`, `confirmation_escalated`, `confirmation_auto_cancel_blocked` | Cùng giá trị, cùng quyền (CSKH chỉ thấy nhóm hàng đợi; Quản lý thấy thêm nhóm quyết định). `refund_calls_open`, `labels_*`, `expired_batches_open` không đổi |
+| Khoá JSON `GET /api/public/site-info/` | `cskh_notice` | `confirmation_policy` | Cùng 8 khoá con: `enabled, working_hours, max_attempts, window_minutes, decision_minutes, auto_cancel_enabled, refund_deadline_days, hotline` |
+| Env | `CSKH_*`, `THROTTLE_CSKH_SEARCH` | `CONFIRMATION_*`, `THROTTLE_CUSTOMER_SEARCH` | Tên mới đọc trước; bảng đầy đủ ở `doc/ops/moi-truong.md` |
+| Lệnh quản trị | `process_cskh_deadlines`, `check_cskh_job_health` | `process_confirmation_deadlines`, `check_confirmation_job_health` | Lệnh cũ bọc gọi lệnh mới, cùng `--grace-minutes`, cùng exit code 1 |
+| Logger | `cangca.delivery.cskh` | `cangca.delivery.confirmation` | Đổi hẳn (không chạy song song); không ghi dữ liệu khách |
+
+Không đổi: Group (`cskh`, `chu`...), id lệnh AI, mã quyền, tên model/bảng, giá trị trong DB.
+
+### Lệch thiết kế so với 02c (cần techlead biết)
+02c viết "thêm `@action receive_batches` thật" nhưng cũng bắt buộc snapshot chỉ mục lệnh AI giữ nguyên. Hai yêu cầu này xung đột vì registry đánh chỉ mục mọi action (`app.model.action`), nên action mới sẽ thêm id `purchasing.purchasereceipt.receive_batches` vào snapshot (id này là việc của Lô 4). Đã chọn: alias ở tầng route (`PurchaseReceiptViewSet.as_view({"post": "nhap_lo"})`), hàm `nhap_lo` giữ nguyên, `custom_perm_actions` không đổi (R10 không phát sinh vì không có action mới). Route cũ đứng trước route mới để `spec.path` của lệnh AI giữ `/nhap-lo/`. Hai route phải đứng trước `include(router.urls)` vì route chi tiết `<pk>/` của router sẽ nuốt `receive-batches/`. Lô 4 đổi id lệnh AI thì đổi tên hàm và snapshot cùng lúc.
+
+### Test
+- Trước: 1674. Sau: **1714**, 0 failure (+40 test mới).
+- `apps/ai/registry/tests/test_forbidden_prefixes.py` (4): cả hai tiền tố nằm trong `FORBIDDEN_PREFIXES`; registry thật không có lệnh nào dưới hai tiền tố; URLconf thật có route dưới cả hai tiền tố; test đột biến (bỏ guard thì route lọt vào chỉ mục).
+- `apps/delivery/tests/test_confirmation_route_aliases.py` (14): ma trận vai (chủ, quản lý, kho, giao, CSKH, ẩn danh: 200/403/401) cho list, retrieve, claim, search trên cả hai tiền tố; trạng thái nhận phiếu dùng chung; chỉ POST cho search; throttle một bộ đếm; che SĐT và không có tên/địa chỉ với đơn ngoài phạm vi trên cả hai tiền tố; `Cache-Control: no-store`; khoá attention mới = cũ, cùng quyền, toàn số đếm.
+- `apps/purchasing/receipts/tests/test_receive_batches_alias.py` (8): ma trận vai 201/403/401 trên hai route, response cùng hình dạng, 405 với GET, 400 payload sai, không lộ khoá giá vốn, không có id `receive_batches` trong chỉ mục AI và `spec.path` vẫn là `/nhap-lo/`.
+- `apps/delivery/tests/test_confirmation_env_commands.py` (14): env mới, env cũ, cả hai (mới thắng), mặc định (tiến trình con nạp `config.settings`); lệnh mới và cũ cho cùng kết quả, idempotent, exit 1 khi job chết, log đúng logger mới và không chứa SĐT/tên/địa chỉ; `site-info` có `confirmation_policy` = `cskh_notice`, không chứa dữ liệu khách hay giá vốn.
+- Test cũ phải sửa: `test_cskh_l4.py` (tập khoá attention: owner 10 khoá, cs 3 khoá, quản lý 9), `test_site_info.py` (thêm `confirmation_policy` vào tập khoá gốc), hai test `assertLogs` đổi tên logger.
+- Quét PII/giá vốn theo vai (QA-LO2) vẫn xanh: số phản hồi 200 theo nhóm `{'chu': 43, 'quan_ly': 39, 'nv_kho': 28, 'nv_giao': 5, 'cskh': 3}`, khoá giống-PII ngoài tập lọc `{}`.
+
+### Kiểm chứng (chạy trong lượt này)
+- `DJANGO_DEBUG=1 env -u DATABASE_URL .venv/bin/python manage.py test`: Ran 1714 tests, OK.
+- `makemigrations --check --dry-run`: No changes detected. `git diff --stat -- '*/migrations/*'`: rỗng.
+- `git diff --exit-code backend/apps/ai/registry/tests/snapshots/commands_index_snapshot.json`: exit 0 (snapshot không đổi, không có diff).
+- `adapter`: `pytest -q`: 68 passed (adapter không sửa).
+- `python3 scripts/check_naming.py`: exit 0 (không dùng `--update`). Các literal cũ được giữ có `# naming: allow` kèm lý do.
+
+### Còn nợ / lưu ý
+- Nhắc Duy trước khi deploy: kiểm env `CSKH_*` và args của Cloud Run Job trên staging. Code đọc được cả hai tên nên deploy không gãy; đổi sang tên mới là việc ops. Bộ lọc log/cảnh báo theo tên logger `cangca.delivery.cskh` (nếu có) phải đổi sang `cangca.delivery.confirmation`.
+- Lô 5 gỡ: route `cskh/...`, route `nhap-lo/`, khoá `cskh_*`, `cskh_notice`, env `CSKH_*`, lệnh `*_cskh_*`; `FORBIDDEN_PREFIXES` giữ `/api/cskh/` hay bỏ thì techlead quyết.
+- Tên tệp test `test_cskh_l*.py` chưa đổi (có `# naming: allow` ở chỗ import), để Lô 5.
+- `erp-console/features/overview/*` đang bị `check_naming` bắt literal `cskh_*` trước khi fe-dev đánh dấu hoặc đổi sang khoá mới; không thuộc phạm vi BE (lần chạy cuối của tôi exit 0, có thể fe-dev đã xử lý).
+
+## Lô 3 — FE (01/10)
+
+Đổi CONTRACT mà FE gọi sang tên tiếng Anh, vẫn đọc được tên cũ (alias) tới Lô 5. Không đổi hành vi người dùng. Đã đối chiếu với bảng contract THỰC TẾ của be-dev (mục `## Lô 3 — BE`): khớp hoàn toàn, không lệch.
+
+### Contract FE gọi
+| Việc | Trước | Sau |
+|---|---|---|
+| Hàng đợi gọi xác nhận (list, detail, claim, calls, unconfirm, recipient, decide) | `/api/cskh/queue/...` | `/api/confirmation/queue/...` |
+| Tìm kiếm nhanh (POST, từ khoá nằm trong body, không ở URL) | `/api/cskh/search/` | `/api/confirmation/search/` |
+| Nhập lô mua tại cảng | `/api/purchasing/receipts/nhap-lo/` | `/api/purchasing/receipts/receive-batches/` |
+| Khoá attention | `cskh_queue_waiting`, `cskh_escalated`, `cskh_auto_cancel_blocked` | `confirmation_*` ưu tiên, `cskh_*` là fallback (`readConfirmationCounts`: `confirmation_* ?? cskh_*`, số 0 vẫn thắng) |
+| Shop site-info | `cskh_notice` | `confirmationPolicy(info) = info.confirmation_policy ?? info.cskh_notice` |
+| Route ERP | `/cskh/` | `/confirmation/`; `/cskh/` giữ làm redirect phía client, giữ query và hash (không có server nên không 301) |
+| Khoá nháp sessionStorage | `cave_draft_nhap_lo:<user>` | `cave_draft_receive_batches:<user>`; khoá cũ được chuyển sang khoá mới (đã `sanitize`, không có `rate`) rồi xoá; đăng xuất xoá cả hai tiền tố |
+
+### Chuẩn hoá ở biên API (Lô 4 chỉ đổi giá trị ở hằng, không đụng nơi dùng)
+- `erp-console/shared/lib/roles.ts`: `LEGACY_ROLE_NAMES`, `normalizeRole`, `normalizeRoles`, `normalizeHome` (nhận `cskh-queue` lẫn `confirmation-queue`, trả `HOME_CONFIRMATION_QUEUE`). Vẫn là nơi DUY NHẤT chứa tên Group.
+- `erp-console/features/ai/legacyIds.ts` (mới): `normalizeCommandId`, `normalizeAiGroup`, `normalizeSensitivity`, `isSameCommand`, `findByCommand`, `normalizeIndexResponse`, `normalizeDescriptor`, `normalizeMyConfig`, `normalizeAiPolicy`. `commandGroups.ts` thêm `RECEIVE_BATCHES_COMMAND_ID`.
+- Áp dụng ở `features/auth/api.ts` (`normalizeMe`), `features/staff/api.ts` (`normalizeMember`, `normalizeGroupsResult`), `features/ai/{commands,settings,policy,actions,report}`.
+- KHÔNG viết lại id lệnh AI hay khoá `caps`/`overrides` khi gửi lên: FE trả lại đúng khoá BE đã gửi (`findByCommand` trả khoá thật). Chỉ chuẩn hoá để so sánh/hiển thị.
+
+### Trang và component đã sửa
+- ERP: `app/(console)/confirmation/page.tsx` (git mv từ `cskh/page.tsx`), `app/(console)/cskh/page.tsx` (redirect), `shared/lib/nav.ts`, `shared/lib/drafts.ts`, `features/confirmation/api.ts`, `features/purchasing/api.ts`, `features/purchasing/components/draftStorage.ts`, `features/overview/{types,api,mock}.ts` + `AttentionBlock.tsx`, `features/ai/policy/components/AiPolicyScreen.tsx`.
+- Shop: `features/site/types.ts`, `features/site/components/ConfirmationPolicyNotice.tsx`, `features/site/mock.ts`.
+- README: `erp-console/README.md`, `erp-console/features/ai/README.md`.
+- Giao diện không đổi; không thêm màn hình.
+
+### Test
+- Mới: `shared/lib/legacyNames.test.ts` (17: payload cũ và mới cho cùng `visibleNav`/`homePath`/policy/my-config/index), `features/confirmation/apiPaths.test.ts` (5: `fetch` bị chặn, mọi URL là tên mới, không có `/api/cskh/` hay `nhap-lo`, search là POST và từ khoá không nằm trong URL).
+- Mở rộng: `draftStorage.test.ts` (+8: chuyển khoá cũ sang mới, cách ly theo user, khoá mới đã có thì giữ, khoá cũ hỏng chỉ bị xoá, localStorage cũ chỉ bị xoá, `clearDraft` xoá cả khoá cũ, `clearAllDrafts` dọn hai tiền tố), `overview.test.ts` (+`readConfirmationCounts`), `purchasing.test.ts`.
+- e2e ERP: thay `/cskh/`, `/api/cskh/`, `nhap-lo` bằng tên mới; `git mv sr07_nhap_lo_draft.py sr07_receive_batches_draft.py` (thêm kiểm chuyển khoá cũ và đăng xuất xoá hai tiền tố); mới `e2e/p8b_confirmation_route_redirect.py`.
+- e2e Shop: `qa-lo7-shop-real.py` thêm ca "chỉ có `confirmation_policy`" và "chỉ có `cskh_notice`"; `qa-lo6-sr21-shop.py` thêm khoá mới vào site-info giả.
+
+### Kiểm chứng (chạy trong lượt này)
+- erp `npx tsc --noEmit`: sạch. `npm test`: 16 file, **217/217 pass** (trước 185).
+- frontend `npx tsc --noEmit`: sạch; `test-format.mjs` 26/26; `test-safe-href.mjs` 40/40.
+- Build thật erp (`NEXT_PUBLIC_USE_MOCK=0`): `check-no-mock.mjs` XANH, `check-ai-chunks.mjs` XANH; route `/confirmation` 12 kB và `/cskh` 404 B. Build thật Shop (USE_MOCK=0, API `http://localhost:8199`): `check-no-mock.mjs` XANH. `erp-console/out` và `frontend/out` hiện là build thật.
+- `python3 scripts/check_naming.py`: exit 0, `6554 vi phạm cũ trong 203 file, không phát sinh mới` (chưa `--update`).
+- e2e trên build mock erp (cổng 3240): `sr09_ac4_stale_state` 22/22, `sr07_receive_batches_draft` 20/20, `p8_lo7_fe_erp` 79/79, `p8b_confirmation_route_redirect` 8/8, `sr07_qa_edges` 23/23, `ra_soat_x_ac4_storage` 32/32, `ra_soat_cs02_cs05_mobile_360` 9/9.
+- e2e Shop build thật + API giả (cổng 3241): `qa-lo7-shop-real.py` 25 ca, 0 FAIL. Server đã tắt.
+- Ảnh chụp 360px: `/private/tmp/claude-501/-Users-dangthiduyen-Downloads-loc/3e0d9f3d-14ce-4b8b-a1cd-6fbcdc0b2f2d/scratchpad/p8b-l3-fe/shots/p8b-l3-confirmation-360.png` (icon Material Symbols hiện thành chữ vì server tĩnh đơn giản, đã có từ trước).
+
+### Lệch / rủi ro cần biết
+- Contract BE khớp FE. Điểm BE báo lệch với 02c (alias ở tầng route, giữ hàm `nhap_lo`, không thêm id lệnh AI) không ảnh hưởng FE: FE chỉ đổi đường dẫn `receive-batches/`, còn id lệnh AI vẫn `...nhap_lo`.
+- Đường GHI vẫn gửi giá trị nội bộ cũ: tên Group trong `PUT /api/staff/{id}/groups/`, khoá nhóm và khoá `overrides`/`caps` trong `PUT /api/ai/my-config/` và `/api/ai/policy/`. Lô 4 (BE) phải tiếp tục nhận tên cũ ở đầu vào; FE sẽ đổi ở Lô 4b bằng cách lật giá trị trong `roles.ts` / `commandGroups.ts`.
+- Giá trị `me.home` mới được ĐOÁN là `confirmation-queue` (BE Lô 3 chưa đổi Group/home). `normalizeHome` nhận cả hai nên an toàn.
+- Mock ERP không phát ra home `cskh-queue` cho tài khoản CSKH (có từ trước); phần `home` được vitest phủ, không phủ bằng e2e.
+- Marker `naming: allow - <lý do>` mới ở 3 file sản phẩm, techlead cần duyệt: `features/overview/api.ts` (đọc khoá `cskh_*` cũ), `frontend/features/site/types.ts` (`cskh_notice`), `ConfirmationPolicyNotice.tsx` (`cskh_notice`). `overview/types.ts` giữ các khoá `cskh_*` dưới dạng trường legacy, cũng có marker. Tất cả gỡ ở Lô 5.
+- `LEGACY_RECEIVE_BATCHES_DRAFT_PREFIX` (khai báo một dòng, được miễn) và redirect `/cskh/` gỡ ở Lô 5.
+- `erp-console/features/confirmation/README.md` chưa có, không tạo (ngoài phạm vi Lô 3).
+- `git mv` của `cskh/page.tsx` và `sr07_nhap_lo_draft.py` để lại rename trong index, chưa commit.
+- Chưa commit, chưa deploy.
+
+### Lô 3 — BE: sửa sau review techlead (2026-10-01)
+- S1: `test_receive_batches_cost_fields_follow_view_costprice_on_both_paths` viết lại theo `test_nhap_lo.py` DW-17-AC5, chạy cả `nhap-lo/` và `receive-batches/`. NV kho và Quản lý: `purchase_rate`, `landed_unit_cost` không có trong `batches[0]`, `rate` không có trong mọi `receipt.lines`. Chủ: các field này có, `rate` = 80000.00. Chứng minh không xanh giả: tạm đặt `sensitive_fields = ()` ở `ReceivedBatchOutput` thì test đỏ 4 ca (`purchase_rate` bị lộ); tạm đặt ở `PurchaseReceiptLineSerializer` thì đỏ 4 ca (`rate` bị lộ). Đã khôi phục, `git diff` serializer rỗng.
+- N1: test env đọc giá trị thật `CAVEVE_THROTTLE_RATES["customer_search"]` (mặc định `30/min`, env mới `5/min`, env cũ `5/min`, mới thắng cũ).
+- N3: marker import `test_cskh_l2` ghi rõ tên tệp `test_cskh_l*.py` đổi ở Lô 5 (02c, điều phối cập nhật).
+- Kiểm chứng: `manage.py test` 1714 OK, `makemigrations --check` không đổi, `check_naming.py` OK (exit 0), snapshot AI không diff.

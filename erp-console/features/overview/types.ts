@@ -5,6 +5,10 @@ export type OverviewData = DashboardSummary;
 export type { DashboardBatch, ExpiryAlert, RecentOrder } from "@/shared/lib/dashboardSummary";
 
 export type DashboardAttentionData = {
+  confirmation_queue_waiting?: number;
+  confirmation_escalated?: number;
+  confirmation_auto_cancel_blocked?: number;
+  /** Khoá cũ (P8b Lô 3: BE trả song song, gỡ ở Lô 5). Đọc `confirmation_*` trước, thiếu mới dùng khoá này. */
   cskh_queue_waiting?: number;
   cskh_escalated?: number;
   cskh_auto_cancel_blocked?: number;

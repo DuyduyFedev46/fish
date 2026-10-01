@@ -4,6 +4,7 @@
 
 import type { Paginated } from "@/shared/lib/http";
 import { ROLE } from "@/shared/lib/roles";
+import { RECEIVE_BATCHES_COMMAND_ID } from "../commandGroups";
 import type { AiActionDetail, AiActionRow } from "../types";
 import type { EscalatePayload } from "./api";
 
@@ -46,7 +47,7 @@ export const mockAiActions: Paginated<AiActionRow> = {
     },
     {
       id: "c3d4e5f6-a7b8-9012-cdef-123456789012",
-      command: "purchasing.purchasereceipt.nhap_lo",
+      command: RECEIVE_BATCHES_COMMAND_ID,
       title: "Nhập lô mua tại cảng",
       level: "B",
       status: "DONE",

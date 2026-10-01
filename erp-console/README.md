@@ -29,15 +29,15 @@ erp-console/
                           S12 hàng chờ thanh toán lệch (/orders/payments/, menu con), S13 phiếu hoàn cho khoản không có hoá đơn,
                           S14 huỷ đơn đã thanh toán, S15 phiếu hoàn từ đơn có hoá đơn, S16 phiếu hoàn chờ chuyển
                           (/orders/refunds/, menu con — xác nhận/thất bại/thử lại)
-    confirmation/         CS-05 gọi xác nhận đơn: hàng chờ, gọi, hẹn gọi lại, xử lý (route /cskh/ giữ tới Lô 3; API /api/cskh/)
+    confirmation/         CS-05 gọi xác nhận đơn: hàng chờ, gọi, hẹn gọi lại, xử lý (route /confirmation/; /cskh/ là trang chuyển hướng giữ vĩnh viễn, giữ query; API /api/confirmation/)
     inventory/            S8 Kho & lô + tab "Hoạt động" (sổ kho) của cột phải — S25 mở rộng
                           (mỗi module: api.ts mock.ts types.ts components/ README.md)
   shared/                 dùng chung, KHÔNG phụ thuộc features/
     lib/                  http.ts (apiFetch + Token + mock), token.ts, nav.ts (menu ↔ quyền, hằng PERM),
-                          roles.ts (NƠI DUY NHẤT chứa chuỗi tên Group: hằng ROLE),
+                          roles.ts (NƠI DUY NHẤT chứa chuỗi tên Group: hằng ROLE; + lớp chuẩn hoá normalizeRole/normalizeHome nhận cả tên cũ lẫn tên Anh),
                           messages.ts (MỌI thông điệp lỗi/thông báo FE tự sinh), groups.ts (mã + nhãn nhóm),
                           beErrors.mock.ts (mã lỗi + detail của BE chép từ contract — chỉ mock import),
-                          drafts.ts + useDraft.ts (giữ nháp), format.ts (tiền, kg, giờ),
+                          drafts.ts + useDraft.ts (giữ nháp; tiền tố nháp Nhập lô mới + cũ, đăng xuất dọn cả hai), format.ts (tiền, kg, giờ),
                           useResource.ts (cache đọc dùng chung: 1 request cho nhiều màn),
                           dashboardSummary.ts (+ .mock.ts = seed) — contract /api/dashboard/summary/ dùng chung 3 module S8,
                           search.ts (tìm phía máy, bỏ dấu), status.ts (màu/icon trạng thái đơn, lô),

@@ -76,7 +76,7 @@ with sync_playwright() as p:
     ctx2 = browser.new_context(viewport={"width": 360, "height": 640})
     page2 = ctx2.new_page()
     login(page2, "cs1")
-    page2.goto(BASE + "/cskh/")
+    page2.goto(BASE + "/confirmation/")
     page2.wait_for_load_state("networkidle")
     page2.wait_for_timeout(500)
     page2.screenshot(path=f"{SHOTS}/cs05-ac8-queue-360x640.png", full_page=True)

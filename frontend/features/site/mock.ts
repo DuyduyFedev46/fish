@@ -14,6 +14,17 @@ export const MOCK_SELLER_INFO: SiteInfoResponse = {
   privacy_consent_required: true,
   confirm_call_notice: false,
   confirm_call_hours: "7:00–20:00",
+  confirmation_policy: {
+    enabled: true,
+    working_hours: "07:00-21:00",
+    max_attempts: 3,
+    window_minutes: 30,
+    decision_minutes: 30,
+    auto_cancel_enabled: false,
+    refund_deadline_days: 30,
+    hotline: "1900 xxxx",
+  },
+  // Khoá cũ: BE còn trả song song tới Lô 5 (cùng nội dung với confirmation_policy).
   cskh_notice: {
     enabled: true,
     working_hours: "07:00-21:00",

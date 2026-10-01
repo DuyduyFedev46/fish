@@ -3,7 +3,7 @@
 import Link from "next/link";
 import React, { useEffect, useState } from "react";
 import { Icon } from "@/shared/ui/Icon";
-import { getDashboardAttention } from "../api";
+import { getDashboardAttention, readConfirmationCounts } from "../api";
 import type { DashboardAttentionData } from "../types";
 
 export function AttentionBlock() {
@@ -91,32 +91,35 @@ export function AttentionBlock() {
     });
   }
 
-  if (typeof data.cskh_queue_waiting === "number" && data.cskh_queue_waiting > 0) {
+  // P8b Lô 3: khoá mới `confirmation_*`; BE còn trả thêm khoá cũ `cskh_*` đến hết Lô 5 → đọc mới trước, cũ làm dự phòng.
+  const { queueWaiting, escalated, autoCancelBlocked } = readConfirmationCounts(data);
+
+  if (typeof queueWaiting === "number" && queueWaiting > 0) {
     items.push({
-      key: "cskh_queue_waiting",
-      count: data.cskh_queue_waiting,
+      key: "confirmation_queue_waiting",
+      count: queueWaiting,
       label: "đơn chờ gọi xác nhận quá hạn",
-      href: "/cskh/",
+      href: "/confirmation/",
       crit: true,
     });
   }
 
-  if (typeof data.cskh_escalated === "number" && data.cskh_escalated > 0) {
+  if (typeof escalated === "number" && escalated > 0) {
     items.push({
-      key: "cskh_escalated",
-      count: data.cskh_escalated,
+      key: "confirmation_escalated",
+      count: escalated,
       label: "đơn cần Quản lý quyết định",
-      href: "/cskh/",
+      href: "/confirmation/",
       crit: true,
     });
   }
 
-  if (typeof data.cskh_auto_cancel_blocked === "number" && data.cskh_auto_cancel_blocked > 0) {
+  if (typeof autoCancelBlocked === "number" && autoCancelBlocked > 0) {
     items.push({
-      key: "cskh_auto_cancel_blocked",
-      count: data.cskh_auto_cancel_blocked,
+      key: "confirmation_auto_cancel_blocked",
+      count: autoCancelBlocked,
       label: "đơn quá hạn bị hoãn tự huỷ",
-      href: "/cskh/",
+      href: "/confirmation/",
       crit: true,
     });
   }
@@ -126,7 +129,7 @@ export function AttentionBlock() {
       key: "refund_calls_open",
       count: data.refund_calls_open,
       label: "cuộc gọi cần nhắc báo hoàn/huỷ",
-      href: "/cskh/",
+      href: "/confirmation/",
       crit: false,
     });
   }

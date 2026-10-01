@@ -19,7 +19,7 @@ from apps.common.pii import has_long_digit_run, normalize_phone
 from apps.delivery import services as delivery_services
 from apps.delivery.models import ConfirmationTask, CustomerCall, DeliveryNote, LabelPrint
 
-logger = logging.getLogger("cangca.delivery.cskh")
+logger = logging.getLogger("cangca.delivery.confirmation")
 
 
 def start_confirmation(invoice) -> tuple[DeliveryNote, ConfirmationTask]:
@@ -62,7 +62,7 @@ def close_task_on_cancel(note: DeliveryNote):
 
 def claim_task(task_id: int, user, *, now=None) -> ConfirmationTask:
     """
-    CSKH nhận đơn để gọi — khoá mềm trong CSKH_CLAIM_MINUTES (CS-05-AC3, CS-05-AC4, §1.4).
+    CSKH nhận đơn để gọi — khoá mềm trong CONFIRMATION_CLAIM_MINUTES (CS-05-AC3, CS-05-AC4, §1.4).
     """
     now = now or timezone.now()
     with transaction.atomic():
@@ -86,7 +86,7 @@ def claim_task(task_id: int, user, *, now=None) -> ConfirmationTask:
                     extra={"claimed_until": task.claimed_until.isoformat()},
                 )
 
-        claim_mins = getattr(settings, "CSKH_CLAIM_MINUTES", 5)
+        claim_mins = getattr(settings, "CONFIRMATION_CLAIM_MINUTES", 5)
         task.claimed_by = user
         task.claimed_until = now + timedelta(minutes=claim_mins)
         task.save(update_fields=["claimed_by", "claimed_until", "updated_at"])
@@ -214,9 +214,9 @@ def record_call(
             )
 
         elif result == CustomerCall.Result.UNREACHABLE:
-            min_retry = getattr(settings, "CSKH_MIN_RETRY_MINUTES", 10)
-            max_attempts = getattr(settings, "CSKH_MAX_UNREACHABLE_ATTEMPTS", 3)
-            window_mins = getattr(settings, "CSKH_UNREACHABLE_WINDOW_MINUTES", 30)
+            min_retry = getattr(settings, "CONFIRMATION_MIN_RETRY_MINUTES", 10)
+            max_attempts = getattr(settings, "CONFIRMATION_MAX_UNREACHABLE_ATTEMPTS", 3)
+            window_mins = getattr(settings, "CONFIRMATION_UNREACHABLE_WINDOW_MINUTES", 30)
 
             if task.state != ConfirmationTask.State.REFUND_CALL:
                 # Kiểm tra khoảng cách tối thiểu giữa 2 lần không liên lạc được (BR-GH-13)
@@ -511,7 +511,7 @@ def decide(
     Thứ tự khoá chuẩn: SalesOrder -> DeliveryNote -> ConfirmationTask.
     Các lựa chọn:
     - DELIVER_WITHOUT_CONFIRM: giao luôn không cần xác nhận
-    - EXTEND: gia hạn thêm (tối đa CSKH_EXTEND_MAX_HOURS)
+    - EXTEND: gia hạn thêm (tối đa CONFIRMATION_EXTEND_MAX_HOURS)
     - CANCEL: huỷ đơn + hoàn kho lô gốc
     """
     now = now or timezone.now()
@@ -588,7 +588,7 @@ def decide(
             if until <= now:
                 raise BusinessError("Giờ gia hạn phải ở tương lai.", code="BR-GH-13")
 
-            max_hours = getattr(settings, "CSKH_EXTEND_MAX_HOURS", 24)
+            max_hours = getattr(settings, "CONFIRMATION_EXTEND_MAX_HOURS", 24)
             if until > now + timedelta(hours=max_hours):
                 raise BusinessError(f"Gia hạn tối đa {max_hours} giờ.", code="BR-GH-13")
 
@@ -649,7 +649,7 @@ def escalate_expired_windows(*, now=None) -> int:
     Idempotent. (CS-07-AC4, §5.1)
     """
     now = now or timezone.now()
-    window_mins = getattr(settings, "CSKH_UNREACHABLE_WINDOW_MINUTES", 30)
+    window_mins = getattr(settings, "CONFIRMATION_UNREACHABLE_WINDOW_MINUTES", 30)
     cutoff = now - timedelta(minutes=window_mins)
 
     task_rows = list(
@@ -701,7 +701,7 @@ def escalate_expired_windows(*, now=None) -> int:
 
 def auto_cancel_overdue(*, now=None) -> dict:
     """
-    Chỉ khi settings.CSKH_AUTO_CANCEL_ENABLED:
+    Chỉ khi settings.CONFIRMATION_AUTO_CANCEL_ENABLED:
     ESCALATED[UNREACHABLE|WRONG_NUMBER], auto_cancel_blocked_code == "",
     escalated_at + D ≤ now → khoá đơn→phiếu→task, đọc lại, kiểm lô CLOSED (→ chặn BR-LO-05),
     cancel_paid_order(actor=None, reason="Không liên lạc được khách (Hệ thống tự huỷ)", reason_code="UNREACHABLE_AUTO"),
@@ -712,10 +712,10 @@ def auto_cancel_overdue(*, now=None) -> dict:
     Trả {"cancelled": n, "blocked": m}. (CS-08, §5.1)
     """
     now = now or timezone.now()
-    if not getattr(settings, "CSKH_AUTO_CANCEL_ENABLED", False):
+    if not getattr(settings, "CONFIRMATION_AUTO_CANCEL_ENABLED", False):
         return {"cancelled": 0, "blocked": 0}
 
-    decision_mins = getattr(settings, "CSKH_MANAGER_DECISION_MINUTES", 30)
+    decision_mins = getattr(settings, "CONFIRMATION_MANAGER_DECISION_MINUTES", 30)
     cutoff = now - timedelta(minutes=decision_mins)
 
     from apps.sales.models import SalesInvoiceLineBatch, SalesOrder

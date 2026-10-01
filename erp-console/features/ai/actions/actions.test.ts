@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { callCommand } from "../commands/call";
 import { fetchAiActions, undoAiAction, escalateStep } from "./api";
 import { ROLE } from "@/shared/lib/roles";
+import { RECEIVE_BATCHES_COMMAND_ID } from "../commandGroups";
 import { mockAiActions, mockUndoAiAction } from "./mock";
 import { fetchDailyAiReport } from "../report/api";
 
@@ -35,7 +36,7 @@ describe("DW-19, DW-21, DW-22 & DW-23 Frontend AI Tests", () => {
                 items: [
                   {
                     id: "rpt-1",
-                    command: "purchasing.purchasereceipt.nhap_lo",
+                    command: RECEIVE_BATCHES_COMMAND_ID,
                     title: "Nhập lô mua tại cảng",
                     level: "B",
                     status: "DONE",
@@ -145,7 +146,7 @@ describe("DW-19, DW-21, DW-22 & DW-23 Frontend AI Tests", () => {
   });
 
   it("DW-19-AC1: callCommand trả về undo_until khi lệnh ghi đạt mức B (outcome === done)", async () => {
-    const res = await callCommand("purchasing.purchasereceipt.nhap_lo", {
+    const res = await callCommand(RECEIVE_BATCHES_COMMAND_ID, {
       args: { _level: "B" },
     });
     expect(res.outcome).toBe("done");
@@ -230,7 +231,7 @@ describe("DW-19, DW-21, DW-22 & DW-23 Frontend AI Tests", () => {
     expect(report.by_user.length).toBeGreaterThan(0);
     expect(report.by_user[0].display_name).toBe("Duy (Chủ)");
     expect(report.items.length).toBeGreaterThan(0);
-    expect(report.items[0].command).toBe("purchasing.purchasereceipt.nhap_lo");
+    expect(report.items[0].command).toBe(RECEIVE_BATCHES_COMMAND_ID);
   });
 });
 

@@ -145,7 +145,7 @@ with sync_playwright() as p:
         page.on("console", lambda m: cons.append(m.text) if m.type == "error" else None)
         page.on("request", lambda r: reqs.append(r.url))
         login(page, "cs1")
-        goto(page, "/cskh/")
+        goto(page, "/confirmation/")
         code = CS[i]
         txt = page.inner_text("body")
         ok(f"[{tag}] CSKH: 'Trả tiền: 01/10 00:30' cho đơn mốc (giờ VN, không giờ máy)", "01/10 00:30" in txt, txt[:600])
@@ -164,7 +164,7 @@ with sync_playwright() as p:
         modal.get_by_role("button", name="Lưu hẹn gọi lại").click()
         page.wait_for_timeout(1500)
         page.wait_for_load_state("networkidle")
-        q = api("cs1", "/api/cskh/queue/?state=CALLBACK")
+        q = api("cs1", "/api/confirmation/queue/?state=CALLBACK")
         rows = [r for r in q["results"] if r["order_code"] == code]
         cb = rows[0]["callback_at"] if rows else None
         ok(f"[{tag}] BE lưu callback_at = 2026-10-02T02:00Z (09:00 VN) — máy ở {tz}", cb is not None and cb.startswith("2026-10-02T02:00:00"), cb)

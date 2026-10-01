@@ -3,6 +3,7 @@
 // Tải lại khi index_version đổi (DW-09-AC6).
 
 import { apiFetch } from "@/shared/lib/http";
+import { normalizeDescriptor, normalizeIndexResponse } from "../legacyIds";
 import type { AiCommandDescriptor, AiCommandsIndexResponse } from "../types";
 
 let cachedIndex: AiCommandsIndexResponse | null = null;
@@ -29,9 +30,11 @@ export async function fetchCommandIndex(force = false, signal?: AbortSignal): Pr
     return cachedIndex;
   }
 
-  const res = await apiFetch<AiCommandsIndexResponse>("/api/ai/commands/index/", {
-    signal,
-  });
+  const res = normalizeIndexResponse(
+    await apiFetch<AiCommandsIndexResponse>("/api/ai/commands/index/", {
+      signal,
+    })
+  );
 
   if (cachedIndex && cachedIndex.index_version !== res.index_version) {
     cachedDescriptors.clear();
@@ -51,9 +54,11 @@ export async function fetchCommandDescriptor(
   const cached = cachedDescriptors.get(commandId);
   if (cached) return cached;
 
-  const desc = await apiFetch<AiCommandDescriptor>(`/api/ai/commands/${encodeURIComponent(commandId)}/`, {
-    signal,
-  });
+  const desc = normalizeDescriptor(
+    await apiFetch<AiCommandDescriptor>(`/api/ai/commands/${encodeURIComponent(commandId)}/`, {
+      signal,
+    })
+  );
 
   cachedDescriptors.set(commandId, desc);
   return desc;

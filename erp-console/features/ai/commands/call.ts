@@ -1,4 +1,6 @@
 import { apiFetch, type MockRequest } from "@/shared/lib/http";
+import { RECEIVE_BATCHES_COMMAND_ID } from "../commandGroups";
+import { isSameCommand } from "../legacyIds";
 import type { CallRequest, CallResponse } from "../types";
 
 export async function callCommand(
@@ -14,7 +16,7 @@ export async function callCommand(
       commandId.endsWith(".defer") ||
       (request.args && (request.args as Record<string, unknown>)._defer === true);
     const isLevelBWrite =
-      commandId === "purchasing.purchasereceipt.nhap_lo" ||
+      isSameCommand(commandId, RECEIVE_BATCHES_COMMAND_ID) ||
       commandId.includes(".b_action") ||
       (request.args && (request.args as Record<string, unknown>)._level === "B");
 

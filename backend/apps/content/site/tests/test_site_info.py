@@ -106,6 +106,7 @@ class SiteInfoApiTests(TestCase):
             "confirm_call_notice",
             "confirm_call_hours",
             "cskh_notice",
+            "confirmation_policy",
         }
         self.assertEqual(set(data.keys()), expected_root_keys)
 

@@ -20,8 +20,10 @@ class DashboardAttentionView(APIView):
     """
     GET /api/dashboard/attention/
     Trả về số việc đang chờ xử lý theo từng phân quyền:
-    - confirm_with_customer: cskh_queue_waiting, refund_calls_open
-    - decide_unconfirmed: cskh_escalated, cskh_auto_cancel_blocked
+    - confirm_with_customer: confirmation_queue_waiting (+ alias cskh_queue_waiting), refund_calls_open
+    - decide_unconfirmed: confirmation_escalated, confirmation_auto_cancel_blocked
+      (+ alias cskh_escalated, cskh_auto_cancel_blocked)
+    Khoá `cskh_*` là tên cũ, giữ song song tới P8b Lô 5 (FE đổi sang khoá mới ở Lô 3).
     - print_label: labels_not_printed, labels_to_void
     - inventory.cancel_expired_batch (Chủ): expired_batches_open — số lô Quá hạn còn tồn (BR-LO-07, SR-15)
     Không có quyền nào trong 4 quyền trên -> 403.
@@ -43,9 +45,9 @@ class DashboardAttentionView(APIView):
 
         # 1. Nhóm CSKH (confirm_with_customer)
         if has_confirm:
-            queue_alert_mins = getattr(settings, "CSKH_QUEUE_ALERT_MINUTES", 60)
+            queue_alert_mins = getattr(settings, "CONFIRMATION_QUEUE_ALERT_MINUTES", 60)
             queue_cutoff = now - timedelta(minutes=queue_alert_mins)
-            cskh_queue_waiting = ConfirmationTask.objects.filter(
+            confirmation_queue_waiting = ConfirmationTask.objects.filter(
                 state=ConfirmationTask.State.PENDING,
                 note__status=DeliveryNote.Status.CONFIRMING,
                 attempts=0,
@@ -56,21 +58,24 @@ class DashboardAttentionView(APIView):
                 state=ConfirmationTask.State.REFUND_CALL,
             ).count()
 
-            res["cskh_queue_waiting"] = cskh_queue_waiting
+            res["confirmation_queue_waiting"] = confirmation_queue_waiting
+            res["cskh_queue_waiting"] = confirmation_queue_waiting  # naming: allow - khoá JSON cũ, gỡ ở Lô 5
             res["refund_calls_open"] = refund_calls_open
 
         # 2. Nhóm Quản lý (decide_unconfirmed)
         if has_decide:
-            cskh_escalated = ConfirmationTask.objects.filter(
+            confirmation_escalated = ConfirmationTask.objects.filter(
                 state=ConfirmationTask.State.ESCALATED,
             ).count()
 
-            cskh_auto_cancel_blocked = ConfirmationTask.objects.exclude(
+            confirmation_auto_cancel_blocked = ConfirmationTask.objects.exclude(
                 auto_cancel_blocked_code="",
             ).count()
 
-            res["cskh_escalated"] = cskh_escalated
-            res["cskh_auto_cancel_blocked"] = cskh_auto_cancel_blocked
+            res["confirmation_escalated"] = confirmation_escalated
+            res["confirmation_auto_cancel_blocked"] = confirmation_auto_cancel_blocked
+            res["cskh_escalated"] = confirmation_escalated  # naming: allow - khoá JSON cũ, gỡ ở Lô 5
+            res["cskh_auto_cancel_blocked"] = confirmation_auto_cancel_blocked  # naming: allow - khoá JSON cũ, gỡ ở Lô 5
 
         # 3. Nhóm Kho (print_label)
         if has_print:

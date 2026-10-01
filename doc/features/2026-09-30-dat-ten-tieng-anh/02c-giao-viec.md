@@ -418,6 +418,11 @@ cd frontend && rm -rf node_modules && npm ci && npx tsc --noEmit && npm run buil
 - **Q-C:** ngoài repo **không có** tài liệu/script nhắc mã Group.
 - Duyệt phiếu, đội Claude làm Lô 0 → 1 → 3 → 4 → 5 (Lô 3/4 deploy **staging** để E2E; production không đụng).
 
+## 7c. Ghi chú điều phối sau review Lô 3 (01/10)
+- Lệch thiết kế Lô 3 được chấp nhận: `receive-batches` là **alias tầng route** trỏ hàm `nhap_lo` (snapshot AI không đổi); Lô 4 đổi tên method + `custom_perm_actions` + route mới đứng trước.
+- Chốt cho Lô 4 (techlead 03b): `me.home = "confirmation-queue"`; BE 4a nhận tên cũ trên MỌI đường ghi (`PUT /api/staff/{id}/groups/`, khoá `caps` của `PUT /api/ai/policy/`, `overrides`/`limits` của `PUT /api/ai/my-config/`) và chuẩn hoá sang khoá mới trước khi lưu phiên bản (R5).
+- Lô 5 thêm: đổi tên file test `test_cskh_l*.py`; giữ `/api/cskh/` trong `FORBIDDEN_PREFIXES` và tiền tố nháp cũ vĩnh viễn.
+
 ## Điểm dừng chung
 - Contract/thiết kế không khớp code → ghi "Lệch thiết kế" trong `03-dev-notes.md`, dừng lô, báo Tech Lead.
 - Bất kỳ việc nào đụng tiền, giá vốn, phân quyền, dữ liệu cá nhân ngoài phạm vi đổi tên.

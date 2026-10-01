@@ -19,16 +19,18 @@ class SiteInfoView(APIView):
 
     def get(self, request, *args, **kwargs):
         data = site_info()
-        data["cskh_notice"] = {
-            "enabled": bool(getattr(settings, "CSKH_NOTICE_ENABLED", True)),
-            "working_hours": str(getattr(settings, "CSKH_WORKING_HOURS", "07:00-21:00")),
-            "max_attempts": int(getattr(settings, "CSKH_MAX_UNREACHABLE_ATTEMPTS", 3)),
-            "window_minutes": int(getattr(settings, "CSKH_UNREACHABLE_WINDOW_MINUTES", 30)),
-            "decision_minutes": int(getattr(settings, "CSKH_MANAGER_DECISION_MINUTES", 30)),
-            "auto_cancel_enabled": bool(getattr(settings, "CSKH_AUTO_CANCEL_ENABLED", False)),
+        policy = {
+            "enabled": bool(getattr(settings, "CONFIRMATION_NOTICE_ENABLED", True)),
+            "working_hours": str(getattr(settings, "CONFIRMATION_WORKING_HOURS", "07:00-21:00")),
+            "max_attempts": int(getattr(settings, "CONFIRMATION_MAX_UNREACHABLE_ATTEMPTS", 3)),
+            "window_minutes": int(getattr(settings, "CONFIRMATION_UNREACHABLE_WINDOW_MINUTES", 30)),
+            "decision_minutes": int(getattr(settings, "CONFIRMATION_MANAGER_DECISION_MINUTES", 30)),
+            "auto_cancel_enabled": bool(getattr(settings, "CONFIRMATION_AUTO_CANCEL_ENABLED", False)),
             "refund_deadline_days": int(getattr(settings, "REFUND_DEADLINE_DAYS", 30)),
             "hotline": str(getattr(settings, "SHOP_HOTLINE", "")),
         }
+        data["confirmation_policy"] = policy
+        data["cskh_notice"] = dict(policy)  # naming: allow - khoá JSON cũ, gỡ ở Lô 5
         resp = Response(data)
         resp["Cache-Control"] = "public, max-age=300"
         return resp

@@ -3,7 +3,7 @@
 # localStorage/sessionStorage không chứa 81234. Dữ liệu giả (mock, tài khoản demo).
 # Chạy: cd erp-console && NEXT_PUBLIC_USE_MOCK=1 npm run build && cp -R out <thư-mục-riêng>/out
 #       (cd <thư-mục-riêng>/out && python3 -m http.server 3212 &)
-#       python3 e2e/sr07_nhap_lo_draft.py     # tắt server sau khi xong
+#       python3 e2e/sr07_receive_batches_draft.py     # tắt server sau khi xong
 import os
 import sys
 
@@ -41,7 +41,7 @@ def logout(page):
     page.wait_for_load_state("networkidle")
 
 
-def open_nhap_lo(page):
+def open_receive_batches(page):
     page.goto(BASE + "/purchasing/")
     page.wait_for_load_state("networkidle")
     page.wait_for_selector("input[placeholder='80000']", timeout=10_000)
@@ -58,7 +58,7 @@ def storages(page):
 def draft_key_of(page):
     """idempotencyKey trong nháp sessionStorage của người đang đăng nhập (chỉ để kiểm, không in ra khoá cá nhân)."""
     return page.evaluate(
-        """() => { const k = Object.keys(sessionStorage).find(x => x.startsWith('cave_draft_nhap_lo:'));
+        """() => { const k = Object.keys(sessionStorage).find(x => x.startsWith('cave_draft_receive_batches:'));
                    if (!k) return null; try { return JSON.parse(sessionStorage.getItem(k)).idempotencyKey || null } catch (e) { return null } }"""
     )
 
@@ -78,7 +78,7 @@ with sync_playwright() as p:
 
     # 1) Chủ gõ giá mua
     login(page, "loc")
-    open_nhap_lo(page)
+    open_receive_batches(page)
     ok("Khoá cũ ở localStorage bị dọn khi mở Nhập lô", page.evaluate("() => localStorage.getItem('cave_draft_nhap_lo')") is None)
     rate_input = page.locator("input[placeholder='80000']").first
     page.locator("input[placeholder='0.000']").first.fill("12")
@@ -87,7 +87,7 @@ with sync_playwright() as p:
     ok("Chủ: ô giá mua đang hiện 81234", rate_input.input_value() == RATE)
     st = storages(page)
     ok("Chủ: localStorage/sessionStorage KHÔNG chứa 81234 dù đang gõ", RATE not in st["local"] and RATE not in st["session"], str(st["sessionKeys"]))
-    ok("Chủ: nháp nằm ở sessionStorage khoá theo userId", any(k.startswith("cave_draft_nhap_lo:") for k in st["sessionKeys"]), str(st["sessionKeys"]))
+    ok("Chủ: nháp nằm ở sessionStorage khoá theo userId", any(k.startswith("cave_draft_receive_batches:") for k in st["sessionKeys"]), str(st["sessionKeys"]))
     key_chu = draft_key_of(page)
     ok("Chủ: nháp có idempotencyKey", bool(key_chu))
     page.reload()
@@ -95,6 +95,26 @@ with sync_playwright() as p:
     page.wait_for_selector("input[placeholder='80000']", timeout=10_000)
     page.wait_for_timeout(300)
     ok("AC4(a) F5 cùng người: giữ đúng idempotencyKey", draft_key_of(page) == key_chu)
+
+    # P8b Lô 3: nháp session khoá CŨ của chính người này -> chuyển sang khoá mới (bỏ giá mua), khoá cũ bị xoá
+    uid = page.evaluate("() => Object.keys(sessionStorage).find(x => x.startsWith('cave_draft_receive_batches:')).split(':')[1]")
+    page.evaluate(
+        """([u, rate]) => {
+            sessionStorage.removeItem('cave_draft_receive_batches:' + u);
+            sessionStorage.setItem('cave_draft_nhap_lo:' + u, JSON.stringify({supplierId: 1, receivedDate: '2026-09-30',
+              lines: [{item_code: 'X', qty: '33', rate, shelf_life_days: null}], idempotencyKey: 'legacy-key-1'}));
+        }""",
+        [uid, "99999"],
+    )
+    page.reload()
+    page.wait_for_load_state("networkidle")
+    page.wait_for_selector("input[placeholder='80000']", timeout=10_000)
+    page.wait_for_timeout(300)
+    st = storages(page)
+    ok("P8b-L3 khoá cũ của chính người này đã chuyển sang khoá mới và bị xoá", "cave_draft_nhap_lo:" + uid not in st["sessionKeys"] and "cave_draft_receive_batches:" + uid in st["sessionKeys"], str(st["sessionKeys"]))
+    ok("P8b-L3 nháp chuyển sang giữ số lượng 33, idempotencyKey cũ, và KHÔNG có giá mua 99999",
+       page.locator("input[placeholder='0.000']").first.input_value() == "33" and draft_key_of(page) == "legacy-key-1"
+       and "99999" not in st["local"] and "99999" not in st["session"] and page.locator("input[placeholder='80000']").first.input_value() == "")
     page.locator("input[placeholder='80000']").first.fill(RATE)
     page.wait_for_timeout(300)
     page.screenshot(path=os.path.join(SHOTS, "sr07-1-chu-go-gia-81234.png"), full_page=True)
@@ -102,14 +122,14 @@ with sync_playwright() as p:
     # 2) Đăng xuất -> mọi khoá nháp Nhập lô biến mất
     logout(page)
     st = storages(page)
-    ok("Sau đăng xuất: không còn khoá cave_draft_nhap_lo* ở local/session",
-       not any(k.startswith("cave_draft_nhap_lo") for k in st["localKeys"] + st["sessionKeys"]),
+    ok("Sau đăng xuất: không còn khoá cave_draft_receive_batches* và cave_draft_nhap_lo* (tiền tố cũ) ở local/session",
+       not any(k.startswith(("cave_draft_receive_batches", "cave_draft_nhap_lo")) for k in st["localKeys"] + st["sessionKeys"]),
        f"local={st['localKeys']} session={st['sessionKeys']}")
     ok("Sau đăng xuất: storage không chứa 81234", RATE not in st["local"] and RATE not in st["session"])
 
     # 3) nv_kho đăng nhập trên cùng máy/tab
     login(page, "kho1")
-    open_nhap_lo(page)
+    open_receive_batches(page)
     ok("nv_kho: ô giá mua rỗng", page.locator("input[placeholder='80000']").first.input_value() == "")
     ok("nv_kho: ô số lượng rỗng (nháp Chủ không sang)", page.locator("input[placeholder='0.000']").first.input_value() == "")
     st = storages(page)

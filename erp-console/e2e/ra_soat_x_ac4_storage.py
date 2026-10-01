@@ -73,7 +73,7 @@ with sync_playwright() as p:
     login(page, "cs1")
 
     # 1) Mở hàng chờ CSKH, mở chi tiết đơn (tự động claim), đổi người nhận hộ, ghi kết quả cuộc gọi
-    page.goto(BASE + "/cskh/")
+    page.goto(BASE + "/confirmation/")
     page.wait_for_load_state("networkidle")
     page.locator("text=DH-260928-0001").first.click()
     page.wait_for_timeout(400)

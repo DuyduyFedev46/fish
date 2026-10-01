@@ -11,6 +11,7 @@ Module này chỉ đặt logic AI của **erp-console** — không đụng `fron
 | `api.ts` | Gọi HTTP: status, catalog, audit-logs (nhẹ — **không** import runtime) |
 | `commands.ts` | Kênh thực thi lệnh (execute/propose/confirm) (nhẹ — **không** import runtime) |
 | `mock.ts` | Mock toàn bộ endpoint Lô 1–2 (status, catalog, execute/propose, **audit-logs**) — dữ liệu giả |
+| `commandGroups.ts` + `legacyIds.ts` | Giá trị nhóm lệnh / mức nhạy cảm / id lệnh "Nhập lô" hiện hành (`commandGroups.ts`) và lớp chuẩn hoá nhận CẢ tên cũ lẫn tên Anh của Lô 4 (`legacyIds.ts`, P8b Lô 3). Id lệnh và khoá `caps`/`overrides` giữ nguyên như BE trả để gửi ngược đúng khoá (`findByCommand`) |
 | `consent.ts` | Cờ đồng ý tải model (boolean thuần, localStorage — không dữ liệu cá nhân) |
 | `messages.ts` | Chuỗi tiếng Việt (e2e đọc qua `__caveMock.msg`) |
 | `runtime/feature-detect.ts` | Kiểm tra máy: WebGPU / RAM (≥8 GB) / Wi-Fi / iOS |

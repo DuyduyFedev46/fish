@@ -40,7 +40,7 @@ def run_case(browser, tag, viewport):
     logs = []
     page.on("console", lambda m: logs.append(m.text))
     login(page, "cs1")
-    page.goto(BASE + "/cskh/")
+    page.goto(BASE + "/confirmation/")
     page.wait_for_load_state("networkidle")
     card = page.locator("[class*='queueCard']", has_text=CODE)
     card.first.wait_for(timeout=10_000)

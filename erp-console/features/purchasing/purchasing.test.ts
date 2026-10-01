@@ -82,7 +82,7 @@ describe("Purchasing feature tests (DW-17)", () => {
 
     const res = mockSubmitReceiveBatches({
       method: "POST",
-      path: "/api/purchasing/receipts/nhap-lo/",
+      path: "/api/purchasing/receipts/receive-batches/",
       body: payload,
       token: "mock-token",
     });
@@ -166,7 +166,7 @@ describe("Purchasing feature tests (DW-17)", () => {
 
     const submitRes = mockSubmitReceiveBatches({
       method: "POST",
-      path: "/api/purchasing/receipts/nhap-lo/",
+      path: "/api/purchasing/receipts/receive-batches/",
       body: payload,
       token: "mock-token",
     });

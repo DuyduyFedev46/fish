@@ -80,8 +80,8 @@ def build_cancel_notice(order: SalesOrder) -> dict | None:
             "refunded_at": None,
         }
 
-    max_attempts = getattr(settings, "CSKH_MAX_UNREACHABLE_ATTEMPTS", 3)
-    window_minutes = getattr(settings, "CSKH_UNREACHABLE_WINDOW_MINUTES", 30)
+    max_attempts = getattr(settings, "CONFIRMATION_MAX_UNREACHABLE_ATTEMPTS", 3)
+    window_minutes = getattr(settings, "CONFIRMATION_UNREACHABLE_WINDOW_MINUTES", 30)
     hotline = getattr(settings, "SHOP_HOTLINE", "")
 
     if is_auto:

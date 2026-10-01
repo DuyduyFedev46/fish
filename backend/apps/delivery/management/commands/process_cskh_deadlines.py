@@ -1,21 +1,13 @@
 """
-Cloud Run Job / Cron: Quét các mốc thời gian CSKH (02b §5.1, CS-07, CS-08).
-- Bước 1: PENDING quá W phút -> ESCALATED
-- Bước 2: ESCALATED quá D phút -> Tự huỷ (nếu CSKH_AUTO_CANCEL_ENABLED=1)
+Lệnh cũ `process_cskh_deadlines` (tên tiếng Việt), giữ tới P8b Lô 5 để Cloud Run Job/Cron đang chạy
+không gãy. Chỉ bọc gọi lệnh mới `process_confirmation_deadlines`.
 """
+from django.core.management import call_command
 from django.core.management.base import BaseCommand
-from django.utils import timezone
-
-from apps.delivery.confirmation import services as confirmation_services
 
 
 class Command(BaseCommand):
-    help = "Quét các mốc thời gian CSKH: chuyển Quản lý khi hết cửa sổ và tự huỷ khi Quản lý không xử lý."
+    help = "[Tên cũ] Gọi process_confirmation_deadlines. Dùng tên mới; tên cũ gỡ ở P8b Lô 5."
 
     def handle(self, *args, **options):
-        now = timezone.now()
-        escalated_n = confirmation_services.escalate_expired_windows(now=now)
-        auto_res = confirmation_services.auto_cancel_overdue(now=now)
-        m = auto_res.get("cancelled", 0)
-        k = auto_res.get("blocked", 0)
-        self.stdout.write(f"Đã chuyển Quản lý {escalated_n} phiếu; tự huỷ {m} đơn; chặn {k} đơn.")
+        call_command("process_confirmation_deadlines", stdout=self.stdout, stderr=self.stderr)

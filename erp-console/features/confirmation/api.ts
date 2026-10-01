@@ -37,7 +37,7 @@ export async function fetchConfirmationQueue(
   if (params?.page) query.set("page", String(params.page));
 
   const qs = query.toString();
-  const url = `/api/cskh/queue/${qs ? `?${qs}` : ""}`;
+  const url = `/api/confirmation/queue/${qs ? `?${qs}` : ""}`;
 
   return apiFetch<ConfirmationQueueResponse>(url, {
     signal,
@@ -50,7 +50,7 @@ export async function fetchConfirmationDetail(
   signal?: AbortSignal
 ): Promise<ConfirmationQueueDetail> {
   const isMock = process.env.NEXT_PUBLIC_USE_MOCK === "1";
-  return apiFetch<ConfirmationQueueDetail>(`/api/cskh/queue/${noteId}/`, {
+  return apiFetch<ConfirmationQueueDetail>(`/api/confirmation/queue/${noteId}/`, {
     signal,
     mock: isMock ? (req) => mockGetConfirmationDetail(req, noteId) : undefined,
   });
@@ -61,7 +61,7 @@ export async function claimConfirmationTask(
   signal?: AbortSignal
 ): Promise<ClaimTaskResponse> {
   const isMock = process.env.NEXT_PUBLIC_USE_MOCK === "1";
-  return apiFetch<ClaimTaskResponse>(`/api/cskh/queue/${noteId}/claim/`, {
+  return apiFetch<ClaimTaskResponse>(`/api/confirmation/queue/${noteId}/claim/`, {
     method: "POST",
     body: {},
     signal,
@@ -75,7 +75,7 @@ export async function recordConfirmationCall(
   signal?: AbortSignal
 ): Promise<RecordCallResponse> {
   const isMock = process.env.NEXT_PUBLIC_USE_MOCK === "1";
-  return apiFetch<RecordCallResponse>(`/api/cskh/queue/${noteId}/calls/`, {
+  return apiFetch<RecordCallResponse>(`/api/confirmation/queue/${noteId}/calls/`, {
     method: "POST",
     body: payload,
     signal,
@@ -89,7 +89,7 @@ export async function unconfirmDelivery(
   signal?: AbortSignal
 ): Promise<UnconfirmResponse> {
   const isMock = process.env.NEXT_PUBLIC_USE_MOCK === "1";
-  return apiFetch<UnconfirmResponse>(`/api/cskh/queue/${noteId}/unconfirm/`, {
+  return apiFetch<UnconfirmResponse>(`/api/confirmation/queue/${noteId}/unconfirm/`, {
     method: "POST",
     body: payload,
     signal,
@@ -103,7 +103,7 @@ export async function changeRecipient(
   signal?: AbortSignal
 ): Promise<ChangeRecipientResponse> {
   const isMock = process.env.NEXT_PUBLIC_USE_MOCK === "1";
-  return apiFetch<ChangeRecipientResponse>(`/api/cskh/queue/${noteId}/recipient/`, {
+  return apiFetch<ChangeRecipientResponse>(`/api/confirmation/queue/${noteId}/recipient/`, {
     method: "POST",
     body: payload,
     signal,
@@ -119,7 +119,7 @@ export async function searchCustomers(
   signal?: AbortSignal
 ): Promise<CustomerSearchResponse> {
   const isMock = process.env.NEXT_PUBLIC_USE_MOCK === "1";
-  return apiFetch<CustomerSearchResponse>("/api/cskh/search/", {
+  return apiFetch<CustomerSearchResponse>("/api/confirmation/search/", {
     method: "POST",
     body: { q },
     signal,
@@ -133,7 +133,7 @@ export async function decideConfirmation(
   signal?: AbortSignal
 ): Promise<DecideResponse> {
   const isMock = process.env.NEXT_PUBLIC_USE_MOCK === "1";
-  return apiFetch<DecideResponse>(`/api/cskh/queue/${noteId}/decide/`, {
+  return apiFetch<DecideResponse>(`/api/confirmation/queue/${noteId}/decide/`, {
     method: "POST",
     body: payload,
     signal,

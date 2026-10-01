@@ -169,9 +169,9 @@ class QAPathsTests(QABase):
                 raise RuntimeError("boom")
             return real(invoice=invoice, **kw)
 
-        with override_settings(CSKH_AUTO_CANCEL_ENABLED=True):
+        with override_settings(CONFIRMATION_AUTO_CANCEL_ENABLED=True):
             with mock.patch("apps.sales.credit_notes.services.issue_cancel_credit_note", side_effect=flaky):
-                with self.assertLogs("cangca.delivery.cskh", level="ERROR") as logs:
+                with self.assertLogs("cangca.delivery.confirmation", level="ERROR") as logs:
                     res = confirmation_services.auto_cancel_overdue(now=t0 + timedelta(minutes=31))
             # log lỗi không chứa dữ liệu cá nhân giả
             blob = "\n".join(logs.output)

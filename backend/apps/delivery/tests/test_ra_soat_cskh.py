@@ -79,7 +79,7 @@ class CS08AC6RaceConditionTests(TestCase):
         task.save()
         return order, note, task
 
-    @override_settings(CSKH_AUTO_CANCEL_ENABLED=True)
+    @override_settings(CONFIRMATION_AUTO_CANCEL_ENABLED=True)
     def test_cs08_ac6_job_wins_then_manager_decide_gets_stale_state(self):
         """Job tự huỷ chạy (thắng) trước; Quản lý `decide()` gọi sau trên cùng task phải nhận STALE_STATE,
         KHÔNG được huỷ đơn lần hai, không tạo phiếu hoàn thứ hai, không thêm AuditLog `order_auto_cancelled`."""
@@ -117,7 +117,7 @@ class CS08AC6RaceConditionTests(TestCase):
             AuditLog.objects.filter(action="order_auto_cancelled", object_id=str(order.pk)).count(), 1,
         )
 
-    @override_settings(CSKH_AUTO_CANCEL_ENABLED=True)
+    @override_settings(CONFIRMATION_AUTO_CANCEL_ENABLED=True)
     def test_cs08_ac6_manager_wins_then_job_skips(self):
         """Chiều ngược lại: Quản lý quyết định (giao luôn) trước; job tự huỷ chạy sau trên cùng task phải bỏ
         qua, không huỷ đơn đã được Quản lý xử lý (khớp CS-08-AC4, kiểm lại như một cặp tranh chấp hai chiều)."""

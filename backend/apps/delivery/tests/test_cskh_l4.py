@@ -488,7 +488,8 @@ class TestCS15DashboardAttention(ConfirmationL4BaseTestCase):
         self.assertEqual(resp.status_code, 200)
         data = resp.json()
         expected_keys = {
-            "cskh_queue_waiting", "cskh_escalated", "cskh_auto_cancel_blocked",
+            "confirmation_queue_waiting", "confirmation_escalated", "confirmation_auto_cancel_blocked",
+            "cskh_queue_waiting", "cskh_escalated", "cskh_auto_cancel_blocked",  # naming: allow - khoá cũ, gỡ ở Lô 5
             "refund_calls_open", "labels_not_printed", "labels_to_void",
             "expired_batches_open",
         }
@@ -540,7 +541,7 @@ class TestCS15DashboardAttention(ConfirmationL4BaseTestCase):
         client_cs1 = client_for(self.cs1)
         resp_cs1 = client_cs1.get("/api/dashboard/attention/")
         self.assertEqual(resp_cs1.status_code, 200)
-        self.assertEqual(set(resp_cs1.json().keys()), {"cskh_queue_waiting", "refund_calls_open"})
+        self.assertEqual(set(resp_cs1.json().keys()), {"confirmation_queue_waiting", "cskh_queue_waiting", "refund_calls_open"})
 
         client_kho = client_for(self.kho)
         resp_kho = client_kho.get("/api/dashboard/attention/")
@@ -550,7 +551,7 @@ class TestCS15DashboardAttention(ConfirmationL4BaseTestCase):
         client_ql = client_for(self.ql)
         resp_ql = client_ql.get("/api/dashboard/attention/")
         self.assertEqual(resp_ql.status_code, 200)
-        self.assertEqual(len(resp_ql.json().keys()), 6)
+        self.assertEqual(len(resp_ql.json().keys()), 9)  # 6 khoá + 3 khoá cskh_* cũ (alias tới Lô 5)
 
     def test_cs15_ac5_delivery_staff_forbidden(self):
         """giao1 gọi -> 403."""

@@ -1,5 +1,6 @@
 import { apiFetch, type MockRequest } from "@/shared/lib/http";
-import { COMMAND_GROUP } from "../commandGroups";
+import { COMMAND_GROUP, RECEIVE_BATCHES_COMMAND_ID } from "../commandGroups";
+import { normalizeMyConfig } from "../legacyIds";
 import type { MyConfig } from "../types";
 
 export const mockMyConfig: MyConfig = {
@@ -41,7 +42,7 @@ export const mockMyConfig: MyConfig = {
           limits: null,
         },
         {
-          id: "purchasing.purchasereceipt.nhap_lo",
+          id: RECEIVE_BATCHES_COMMAND_ID,
           title: "Nhập lô mua tại cảng",
           kind: "write",
           level: "C",
@@ -76,10 +77,12 @@ export const mockMyConfig: MyConfig = {
 
 export async function getMyConfig(signal?: AbortSignal): Promise<MyConfig> {
   const isMock = process.env.NEXT_PUBLIC_USE_MOCK === "1";
-  return apiFetch<MyConfig>("/api/ai/my-config/", {
-    signal,
-    mock: isMock ? (_req: MockRequest) => ({ status: 200, body: mockMyConfig }) : undefined,
-  });
+  return normalizeMyConfig(
+    await apiFetch<MyConfig>("/api/ai/my-config/", {
+      signal,
+      mock: isMock ? (_req: MockRequest) => ({ status: 200, body: mockMyConfig }) : undefined,
+    })
+  );
 }
 
 export async function updateMyConfig(
@@ -93,7 +96,7 @@ export async function updateMyConfig(
   signal?: AbortSignal
 ): Promise<MyConfig> {
   const isMock = process.env.NEXT_PUBLIC_USE_MOCK === "1";
-  return apiFetch<MyConfig>("/api/ai/my-config/", {
+  return normalizeMyConfig(await apiFetch<MyConfig>("/api/ai/my-config/", {
     method: "PUT",
     body: JSON.stringify(payload),
     signal,
@@ -107,7 +110,7 @@ export async function updateMyConfig(
           },
         })
       : undefined,
-  });
+  }));
 }
 
 export async function killMyConfig(

@@ -1,4 +1,4 @@
-# QA P8 Lô 2 — SR-07: ca NGOÀI đường thuận của nháp "Nhập lô" (bổ sung cho sr07_nhap_lo_draft.py).
+# QA P8 Lô 2 — SR-07: ca NGOÀI đường thuận của nháp "Nhập lô" (bổ sung cho sr07_receive_batches_draft.py).
 # Dữ liệu giả. Hai chế độ:
 #   MODE=mock  BASE=http://127.0.0.1:3212  (build NEXT_PUBLIC_USE_MOCK=1, tài khoản demo1234)
 #   MODE=real  BASE=http://127.0.0.1:3213  API=http://127.0.0.1:8123  (Django thật + DB sqlite tạm, loc/kho1 mật khẩu PW)
@@ -52,7 +52,7 @@ def logout(page):
     page.wait_for_load_state("networkidle")
 
 
-def open_nhap_lo(page):
+def open_receive_batches(page):
     page.goto(BASE + "/purchasing/")
     page.wait_for_load_state("networkidle")
     page.wait_for_selector("input[placeholder='80000']", timeout=15_000)
@@ -68,7 +68,7 @@ def storages(page):
 
 def draft_of(page):
     return page.evaluate(
-        """() => { const k = Object.keys(sessionStorage).find(x => x.startsWith('cave_draft_nhap_lo:'));
+        """() => { const k = Object.keys(sessionStorage).find(x => x.startsWith('cave_draft_receive_batches:'));
                    if (!k) return null; try { return JSON.parse(sessionStorage.getItem(k)) } catch (e) { return null } }"""
     )
 
@@ -105,7 +105,7 @@ with sync_playwright() as p:
     page = ctx.new_page()
     watch(page)
     login(page, "loc")
-    open_nhap_lo(page)
+    open_receive_batches(page)
     qty_box(page).fill("12")
     rate_box(page).fill(RATE)
     page.wait_for_timeout(400)
@@ -113,7 +113,7 @@ with sync_playwright() as p:
     ok("A0 tab 1: có nháp + key", bool(key1) and draft_of(page)["lines"][0]["qty"] == "12")
     tab2 = ctx.new_page()
     watch(tab2)
-    open_nhap_lo(tab2)
+    open_receive_batches(tab2)
     ok("A1 tab 2 (cùng người): ô số lượng rỗng, ô giá rỗng (sessionStorage không chia sẻ giữa tab)",
        qty_box(tab2).input_value() == "" and rate_box(tab2).input_value() == "")
     ok("A2 tab 2: key khác tab 1", bool(key_of(tab2)) and key_of(tab2) != key1)
@@ -126,7 +126,7 @@ with sync_playwright() as p:
     pb = ctx_b.new_page()
     watch(pb)
     login(pb, "loc")
-    open_nhap_lo(pb)
+    open_receive_batches(pb)
     ok("B1 phiên khác (cùng Chủ): ô rỗng, không nháp của phiên 1", qty_box(pb).input_value() == "" and rate_box(pb).input_value() == "")
     ok("B2 phiên khác: key khác", bool(key_of(pb)) and key_of(pb) != key1)
     ctx_b.close()
@@ -139,16 +139,16 @@ with sync_playwright() as p:
     page.goto(BASE + "/login/")
     page.wait_for_load_state("networkidle")
     login(page, "kho1")
-    open_nhap_lo(page)
+    open_receive_batches(page)
     ok("C1 hết phiên rồi nv_kho vào cùng tab: ô số lượng + ô giá rỗng", qty_box(page).input_value() == "" and rate_box(page).input_value() == "")
     ok("C2 storage không chứa 81234", no_rate(page))
     # C2b: nháp của Chủ (userId khác) còn sót ở sessionStorage cùng tab -> nv_kho không đọc được
-    page.evaluate("() => sessionStorage.setItem('cave_draft_nhap_lo:1', JSON.stringify({supplierId: 1, receivedDate: '2026-09-30', lines: [{item_code: '', qty: '77', shelf_life_days: null}], idempotencyKey: 'key-cua-chu'}))")
+    page.evaluate("() => sessionStorage.setItem('cave_draft_receive_batches:1', JSON.stringify({supplierId: 1, receivedDate: '2026-09-30', lines: [{item_code: '', qty: '77', shelf_life_days: null}], idempotencyKey: 'key-cua-chu'}))")
     page.reload()
     page.wait_for_load_state("networkidle")
     page.wait_for_selector("input[placeholder='80000']", timeout=15_000)
     page.wait_for_timeout(400)
-    ok("C2b nháp của Chủ (userId 1) còn ở sessionStorage: nv_kho không thấy (qty rỗng) và không dùng key của Chủ", qty_box(page).input_value() != "77" and page.evaluate("() => { const k = Object.keys(sessionStorage).find(x => x.startsWith('cave_draft_nhap_lo:') && !x.endsWith(':1')); return k ? JSON.parse(sessionStorage.getItem(k)).idempotencyKey : null }") not in (None, "key-cua-chu"))
+    ok("C2b nháp của Chủ (userId 1) còn ở sessionStorage: nv_kho không thấy (qty rỗng) và không dùng key của Chủ", qty_box(page).input_value() != "77" and page.evaluate("() => { const k = Object.keys(sessionStorage).find(x => x.startsWith('cave_draft_receive_batches:') && !x.endsWith(':1')); return k ? JSON.parse(sessionStorage.getItem(k)).idempotencyKey : null }") not in (None, "key-cua-chu"))
     dumped = storages(page)["session"]
     ok("C3 nháp còn sót của Chủ (nếu có) không chứa trường rate", '"rate"' not in dumped and "rate" not in dumped.replace("idempotencyKey", ""), dumped[:200])
     ok("C4 key của nv_kho khác key của Chủ", key_of(page) != key1 and bool(key_of(page)))
@@ -167,16 +167,16 @@ with sync_playwright() as p:
 
     # ---------- E. Nháp hỏng / nháp theo userId nhưng có rate (định dạng cũ) ----------
     login(page, "loc")
-    open_nhap_lo(page)
-    uid = page.evaluate("() => { const k = Object.keys(sessionStorage).find(x => x.startsWith('cave_draft_nhap_lo:')); return k ? k.split(':')[1] : null }")
+    open_receive_batches(page)
+    uid = page.evaluate("() => { const k = Object.keys(sessionStorage).find(x => x.startsWith('cave_draft_receive_batches:')); return k ? k.split(':')[1] : null }")
     ok("E0 lấy được userId từ khoá nháp", uid is not None, str(uid))
-    page.evaluate("([u]) => sessionStorage.setItem('cave_draft_nhap_lo:' + u, '{hỏng')", [uid])
+    page.evaluate("([u]) => sessionStorage.setItem('cave_draft_receive_batches:' + u, '{hỏng')", [uid])
     page.reload()
     page.wait_for_load_state("networkidle")
     page.wait_for_selector("input[placeholder='80000']", timeout=15_000)
     ok("E1 nháp JSON hỏng: form vẫn mở, ô rỗng", rate_box(page).input_value() == "" and qty_box(page).input_value() == "")
     page.evaluate(
-        "([u, r]) => sessionStorage.setItem('cave_draft_nhap_lo:' + u, JSON.stringify({supplierId: 1, receivedDate: '2026-09-30', "
+        "([u, r]) => sessionStorage.setItem('cave_draft_receive_batches:' + u, JSON.stringify({supplierId: 1, receivedDate: '2026-09-30', "
         "lines: [{item_code: '', qty: '9', rate: r, shelf_life_days: null}], idempotencyKey: 'k-cu'}))",
         [uid, RATE],
     )
@@ -214,10 +214,10 @@ with sync_playwright() as p:
 
         base_n = len(receipts())
         posts = []
-        page.on("request", lambda rq: rq.method == "POST" and "nhap-lo" in rq.url and posts.append(json.loads(rq.post_data or "{}")))
+        page.on("request", lambda rq: rq.method == "POST" and "receive-batches" in rq.url and posts.append(json.loads(rq.post_data or "{}")))
 
         # R1: bấm đúp
-        open_nhap_lo(page)
+        open_receive_batches(page)
         pick_supplier(page)
         page.locator("table select").first.select_option(index=1)
         qty_box(page).fill("3")
@@ -245,7 +245,7 @@ with sync_playwright() as p:
             else:
                 route.continue_()
 
-        page.route("**/api/purchasing/receipts/nhap-lo/", flaky)
+        page.route("**/api/purchasing/receipts/receive-batches/", flaky)
         before = len(receipts())
         pick_supplier(page)
         page.locator("table select").first.select_option(index=1)
@@ -272,7 +272,7 @@ with sync_playwright() as p:
         page.wait_for_timeout(1500)
         ok("R2e gửi lại cùng key: server KHÔNG tạo phiếu thứ hai", len(receipts()) - before == 1, str(len(receipts()) - before))
         page.screenshot(path=os.path.join(SHOTS, "qa-sr07-R2-gui-lai-sau-f5.png"), full_page=True)
-        page.unroute("**/api/purchasing/receipts/nhap-lo/")
+        page.unroute("**/api/purchasing/receipts/receive-batches/")
         ok("R3 storage cuối không chứa 81000", no_rate(page, RSUB))
         errs = [m for m in console_msgs if m[0] == "pageerror"]
         ok("R4 không có pageerror", not errs, str(errs)[:200])

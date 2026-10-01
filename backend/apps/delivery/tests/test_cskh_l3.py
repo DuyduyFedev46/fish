@@ -2,7 +2,7 @@
 Kiểm thử tự động Lô 3 CSKH: Không liên lạc được, tự huỷ, báo khách (2026-09-28-cskh-xac-nhan-in-tem).
 Bao phủ:
 - CS-07: 3 lần trong 30' chuyển Quản lý quyết định (DELIVER_WITHOUT_CONFIRM, EXTEND, CANCEL)
-- CS-08: Hệ thống tự huỷ khi Quản lý không xử lý trong 30' (cờ CSKH_AUTO_CANCEL_ENABLED), chặn BR-LO-05
+- CS-08: Hệ thống tự huỷ khi Quản lý không xử lý trong 30' (cờ CONFIRMATION_AUTO_CANCEL_ENABLED), chặn BR-LO-05
 - CS-09: Nhắc việc gọi báo huỷ & hoàn tiền (REFUND_CALL, NOTIFIED, guidance D5)
 - CS-10: Shop báo trước luật gọi (site-info) và báo lý do khi đơn bị tự huỷ (cancel_notice)
 - Bất biến 1 (không rò giá vốn) & Bất biến 9 (không rò PII)
@@ -151,9 +151,9 @@ class TestCS07EscalationAndDecide(ConfirmationL3BaseTestCase):
         self.assertEqual(task.state, ConfirmationTask.State.ESCALATED)
         self.assertEqual(task.escalation_reason, ConfirmationTask.EscalationReason.WRONG_NUMBER)
 
-    @override_settings(CSKH_MAX_UNREACHABLE_ATTEMPTS=2)
+    @override_settings(CONFIRMATION_MAX_UNREACHABLE_ATTEMPTS=2)
     def test_cs07_ac6_config_max_attempts(self):
-        """CSKH_MAX_UNREACHABLE_ATTEMPTS=2 -> ghi UNREACHABLE lần 2 chuyển ESCALATED."""
+        """CONFIRMATION_MAX_UNREACHABLE_ATTEMPTS=2 -> ghi UNREACHABLE lần 2 chuyển ESCALATED."""
         t0 = timezone.now().replace(hour=9, minute=0, second=0, microsecond=0)
         order, note, task = self._create_order_with_confirmation()
 
@@ -295,7 +295,7 @@ class TestCS07EscalationAndDecide(ConfirmationL3BaseTestCase):
 
 
 class TestCS08AutoCancel(ConfirmationL3BaseTestCase):
-    @override_settings(CSKH_AUTO_CANCEL_ENABLED=True)
+    @override_settings(CONFIRMATION_AUTO_CANCEL_ENABLED=True)
     def test_cs08_ac1_auto_cancel_overdue_when_enabled(self):
         """ESCALATED 09:25. Job chạy 09:56 -> đơn CANCELLED UNREACHABLE_AUTO; phiếu hoàn created_by=None; REFUND_CALL."""
         t0 = timezone.now().replace(hour=9, minute=25, second=0, microsecond=0)
@@ -335,7 +335,7 @@ class TestCS08AutoCancel(ConfirmationL3BaseTestCase):
         self.assertIsNone(audit.actor)
         self.assertEqual(audit.changes.get("reason_code"), "UNREACHABLE_AUTO")
 
-    @override_settings(CSKH_AUTO_CANCEL_ENABLED=True)
+    @override_settings(CONFIRMATION_AUTO_CANCEL_ENABLED=True)
     def test_cs08_ac2_job_does_not_cancel_before_deadline(self):
         """Job chạy 09:54 (< 30') -> không đổi gì."""
         t0 = timezone.now().replace(hour=9, minute=25, second=0, microsecond=0)
@@ -352,7 +352,7 @@ class TestCS08AutoCancel(ConfirmationL3BaseTestCase):
         order.refresh_from_db()
         self.assertNotEqual(order.status, SalesOrder.Status.CANCELLED)
 
-    @override_settings(CSKH_AUTO_CANCEL_ENABLED=True)
+    @override_settings(CONFIRMATION_AUTO_CANCEL_ENABLED=True)
     def test_cs08_ac3_job_idempotent(self):
         """AC1 đã chạy, job chạy thêm 2 lần -> vẫn 1 lần huỷ, 1 phiếu hoàn, 1 AuditLog."""
         t0 = timezone.now().replace(hour=9, minute=25, second=0, microsecond=0)
@@ -376,7 +376,7 @@ class TestCS08AutoCancel(ConfirmationL3BaseTestCase):
         self.assertEqual(Refund.objects.count(), refund_count)
         self.assertEqual(AuditLog.objects.filter(action="order_auto_cancelled").count(), audit_count)
 
-    @override_settings(CSKH_AUTO_CANCEL_ENABLED=True)
+    @override_settings(CONFIRMATION_AUTO_CANCEL_ENABLED=True)
     def test_cs08_ac4_job_skips_resolved_task(self):
         """Quản lý đã chọn DELIVER_WITHOUT_CONFIRM -> job chạy không huỷ."""
         t0 = timezone.now().replace(hour=9, minute=25, second=0, microsecond=0)
@@ -394,7 +394,7 @@ class TestCS08AutoCancel(ConfirmationL3BaseTestCase):
         order.refresh_from_db()
         self.assertNotEqual(order.status, SalesOrder.Status.CANCELLED)
 
-    @override_settings(CSKH_AUTO_CANCEL_ENABLED=True)
+    @override_settings(CONFIRMATION_AUTO_CANCEL_ENABLED=True)
     def test_cs08_ac5_job_skips_manually_cancelled_order(self):
         """Đơn đã bị Quản lý huỷ tay -> job chạy không tạo phiếu hoàn thứ hai."""
         t0 = timezone.now().replace(hour=9, minute=25, second=0, microsecond=0)
@@ -410,7 +410,7 @@ class TestCS08AutoCancel(ConfirmationL3BaseTestCase):
         res = confirmation_services.auto_cancel_overdue(now=t_job)
         self.assertEqual(res["cancelled"], 0)
 
-    @override_settings(CSKH_AUTO_CANCEL_ENABLED=True)
+    @override_settings(CONFIRMATION_AUTO_CANCEL_ENABLED=True)
     def test_cs08_ac7_job_blocks_auto_cancel_when_batch_closed(self):
         """Lô L đã CLOSED -> không huỷ, auto_cancel_blocked_code=BR-LO-05, AuditLog."""
         t0 = timezone.now().replace(hour=9, minute=25, second=0, microsecond=0)
@@ -438,9 +438,9 @@ class TestCS08AutoCancel(ConfirmationL3BaseTestCase):
         self.assertIsNotNone(audit)
         self.assertEqual(audit.changes.get("code"), "BR-LO-05")
 
-    @override_settings(CSKH_AUTO_CANCEL_ENABLED=True, CSKH_MANAGER_DECISION_MINUTES=60)
+    @override_settings(CONFIRMATION_AUTO_CANCEL_ENABLED=True, CONFIRMATION_MANAGER_DECISION_MINUTES=60)
     def test_cs08_ac8_configurable_decision_minutes(self):
-        """CSKH_MANAGER_DECISION_MINUTES=60 -> 09:56 không huỷ, 10:26 thì huỷ."""
+        """CONFIRMATION_MANAGER_DECISION_MINUTES=60 -> 09:56 không huỷ, 10:26 thì huỷ."""
         t0 = timezone.now().replace(hour=9, minute=25, second=0, microsecond=0)
         order, note, task = self._create_order_with_confirmation()
         task.state = ConfirmationTask.State.ESCALATED
@@ -456,7 +456,7 @@ class TestCS08AutoCancel(ConfirmationL3BaseTestCase):
         res2 = confirmation_services.auto_cancel_overdue(now=t0 + timedelta(minutes=61))
         self.assertEqual(res2["cancelled"], 1)
 
-    @override_settings(CSKH_AUTO_CANCEL_ENABLED=True)
+    @override_settings(CONFIRMATION_AUTO_CANCEL_ENABLED=True)
     def test_cs08_ac10_want_cancel_does_not_auto_cancel(self):
         """Phiếu ESCALATED vì WANT_CANCEL -> quá hạn không tự huỷ."""
         t0 = timezone.now().replace(hour=9, minute=25, second=0, microsecond=0)
@@ -473,7 +473,7 @@ class TestCS08AutoCancel(ConfirmationL3BaseTestCase):
         order.refresh_from_db()
         self.assertNotEqual(order.status, SalesOrder.Status.CANCELLED)
 
-    @override_settings(CSKH_AUTO_CANCEL_ENABLED=False)
+    @override_settings(CONFIRMATION_AUTO_CANCEL_ENABLED=False)
     def test_cs08_flag_disabled_does_not_cancel(self):
         """Khi cờ tự huỷ tắt -> quá hạn không huỷ."""
         t0 = timezone.now().replace(hour=9, minute=25, second=0, microsecond=0)
@@ -489,7 +489,7 @@ class TestCS08AutoCancel(ConfirmationL3BaseTestCase):
 
 
 class TestCS09RefundCalls(ConfirmationL3BaseTestCase):
-    @override_settings(CSKH_AUTO_CANCEL_ENABLED=True)
+    @override_settings(CONFIRMATION_AUTO_CANCEL_ENABLED=True)
     def _create_auto_cancelled_order(self):
         t0 = timezone.now().replace(hour=9, minute=25, second=0, microsecond=0)
         order, note, task = self._create_order_with_confirmation()
@@ -631,7 +631,7 @@ class TestCS10ShopNotices(ConfirmationL3BaseTestCase):
         self.assertEqual(notice["max_attempts"], 3)
         self.assertEqual(notice["window_minutes"], 30)
 
-        with override_settings(CSKH_MAX_UNREACHABLE_ATTEMPTS=2):
+        with override_settings(CONFIRMATION_MAX_UNREACHABLE_ATTEMPTS=2):
             resp2 = client.get("/api/public/site-info/")
             self.assertEqual(resp2.json()["cskh_notice"]["max_attempts"], 2)
 
@@ -647,7 +647,7 @@ class TestCS10ShopNotices(ConfirmationL3BaseTestCase):
         self.assertEqual(data["delivery"]["status_label"], "Chờ vựa gọi xác nhận")
         self.assertIsNone(data["cancel_notice"])
 
-    @override_settings(CSKH_AUTO_CANCEL_ENABLED=True)
+    @override_settings(CONFIRMATION_AUTO_CANCEL_ENABLED=True)
     def test_cs10_ac3_order_lookup_auto_cancelled(self):
         """Đơn tự huỷ -> Shop tra đơn có cancel_notice đủ 4 phần."""
         t0 = timezone.now().replace(hour=9, minute=25, second=0, microsecond=0)
@@ -672,7 +672,7 @@ class TestCS10ShopNotices(ConfirmationL3BaseTestCase):
         self.assertEqual(notice["refund"]["amount"], str(int(order.total_amount)))
         self.assertEqual(notice["refund"]["status_label"], "Đang chờ hoàn")
 
-    @override_settings(CSKH_AUTO_CANCEL_ENABLED=True)
+    @override_settings(CONFIRMATION_AUTO_CANCEL_ENABLED=True)
     def test_cs10_ac4_order_lookup_refunded(self):
         """Chủ xác nhận hoàn -> status_label Đã hoàn."""
         t0 = timezone.now().replace(hour=9, minute=25, second=0, microsecond=0)

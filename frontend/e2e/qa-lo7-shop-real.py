@@ -27,10 +27,10 @@ CORS = {"access-control-allow-origin": "*", "access-control-allow-headers": "*",
 SELLER = {"name": "Vựa Thử Nghiệm QA", "business_type": "Hộ kinh doanh", "registration_no": "0000000001",
           "tax_code": "0000000002", "address": "1 Đường Giả, Phường Giả, Tỉnh Giả", "phone": "0900000000",
           "email": "lienhe@example.com"}
-CSKH = {"enabled": True, "working_hours": "07:00-21:00", "max_attempts": 3, "window_minutes": 30, "decision_minutes": 60,
+POLICY = {"enabled": True, "working_hours": "07:00-21:00", "max_attempts": 3, "window_minutes": 30, "decision_minutes": 60,
         "auto_cancel_enabled": True, "refund_deadline_days": 7, "hotline": "1900000000"}
 SITE = {"seller": SELLER, "seller_complete": True, "privacy_consent_required": False, "confirm_call_notice": True,
-        "confirm_call_hours": "7:00–20:00", "cskh_notice": CSKH}
+        "confirm_call_hours": "7:00–20:00", "confirmation_policy": POLICY, "cskh_notice": POLICY}
 CODES = ["CA-QA-01", "CA-QA-02", "CA-QA-03"]
 CATALOG = [{"item_code": c, "name": f"Cá QA giả định {i+1}", "group": "ca", "item_type": "SIMPLE", "unit": "Kg",
             "price": "100000", "sellable_qty": "50", "image": None} for i, c in enumerate(CODES)]
@@ -155,7 +155,7 @@ def main():
         goto(page, "/shop/checkout/")
         check("F10 mở checkout (form) -> site-info đúng 1 request (footer + form dùng chung)", n(calls, "/api/public/site-info/") == 1, str(n(calls, "/api/public/site-info/")))
         txt = page.locator('[data-testid="confirmation-policy-notice"]').inner_text()
-        check("F10 khối CSKH ở form hiện giờ 07:00-21:00 (nguồn cskh_notice.working_hours)", "07:00-21:00" in txt and "7:00–20:00" not in txt, txt)
+        check("F10 khối CSKH ở form hiện giờ 07:00-21:00 (nguồn confirmation_policy.working_hours)", "07:00-21:00" in txt and "7:00–20:00" not in txt, txt)
         page.screenshot(path=f"{SHOT_DIR}/lo7-f10-checkout-form-390.png", full_page=True)
         page.fill("#name", "Khách QA Ẩn Danh")
         page.fill("#phone", "0912345678")
@@ -166,10 +166,10 @@ def main():
         body = page.inner_text("body")
         check("F10 màn thanh toán hiện 'Đặt hàng thành công'", "Đặt hàng thành công" in body)
         call_box = page.locator('[data-testid="confirm-call-notice"]')
-        cskh_box = page.locator('[data-testid="confirmation-policy-notice"]')
+        policy_box = page.locator('[data-testid="confirmation-policy-notice"]')
         check("F10 hộp 'sẽ gọi số đuôi ...' hiện đúng 1 lần và giờ = 07:00-21:00 (cùng nguồn với khối CSKH)",
               call_box.count() == 1 and "07:00-21:00" in call_box.inner_text() and "5678" in call_box.inner_text(), call_box.inner_text() if call_box.count() else "none")
-        check("F10 khối CSKH ở màn thanh toán hiện đúng 1 lần, cùng giờ", cskh_box.count() == 1 and "07:00-21:00" in cskh_box.inner_text() and "Sau khi thanh toán" in cskh_box.inner_text())
+        check("F10 khối CSKH ở màn thanh toán hiện đúng 1 lần, cùng giờ", policy_box.count() == 1 and "07:00-21:00" in policy_box.inner_text() and "Sau khi thanh toán" in policy_box.inner_text())
         check("F10 SĐT đầy đủ không lộ ra ngoài form (chỉ 4 số cuối)", "0912345678" not in body)
         check("F10 không pageerror", not errs, str(errs))
         page.screenshot(path=f"{SHOT_DIR}/lo7-f10-thanh-toan-390.png", full_page=True)
@@ -178,7 +178,7 @@ def main():
         # cờ CSKH tắt -> giờ lấy từ confirm_call_hours, không có khối CSKH
         ctx = b.new_context()
         page = ctx.new_page()
-        calls, errs = setup(page, {"site": dict(SITE, cskh_notice=None)})
+        calls, errs = setup(page, {"site": dict(SITE, confirmation_policy=None, cskh_notice=None)})
         goto(page, "/shop/")
         page.get_by_role("button", name="Thêm vào giỏ").first.click()
         goto(page, "/shop/checkout/")
@@ -186,9 +186,28 @@ def main():
         page.get_by_role("button", name=re.compile("Đặt hàng")).click()
         page.wait_for_timeout(700)
         cb = page.locator('[data-testid="confirm-call-notice"]')
-        check("F10 cskh_notice=null -> hộp gọi xác nhận dùng confirm_call_hours (7:00–20:00), không có khối CSKH",
+        check("F10 confirmation_policy=null và cskh_notice=null -> hộp gọi xác nhận dùng confirm_call_hours (7:00–20:00), không có khối CSKH",
               cb.count() == 1 and "7:00–20:00" in cb.inner_text() and page.locator('[data-testid="confirmation-policy-notice"]').count() == 0, cb.inner_text() if cb.count() else "none")
         ctx.close()
+
+        # P8b Lô 3: BE mới chỉ trả confirmation_policy; BE cũ chỉ trả cskh_notice -> khối thông báo và giờ gọi vẫn đúng
+        only_new = {k: v for k, v in SITE.items() if k != "cskh_notice"}
+        only_old = {k: v for k, v in SITE.items() if k != "confirmation_policy"}
+        for label, site in (("chỉ confirmation_policy (BE mới)", only_new), ("chỉ cskh_notice (BE cũ)", only_old)):
+            ctx = b.new_context()
+            page = ctx.new_page()
+            calls, errs = setup(page, {"site": site})
+            goto(page, "/shop/")
+            page.get_by_role("button", name="Thêm vào giỏ").first.click()
+            goto(page, "/shop/checkout/")
+            box = page.locator('[data-testid="confirmation-policy-notice"]')
+            check(f"P8b-L3 {label}: form hiện khối thông báo, giờ 07:00-21:00", box.count() == 1 and "07:00-21:00" in box.inner_text(), box.inner_text() if box.count() else "none")
+            page.fill("#name", "Khách QA Ẩn Danh"); page.fill("#phone", "0912345678"); page.fill("#address", "999 Đường Bí Mật QA")
+            page.get_by_role("button", name=re.compile("Đặt hàng")).click()
+            page.wait_for_timeout(700)
+            cb = page.locator('[data-testid="confirm-call-notice"]')
+            check(f"P8b-L3 {label}: hộp 'gọi số đuôi' dùng giờ 07:00-21:00, không pageerror", cb.count() == 1 and "07:00-21:00" in cb.inner_text() and not errs, cb.inner_text() if cb.count() else "none")
+            ctx.close()
 
         # site-info lỗi -> checkout không vỡ, không khối nào hiện
         ctx = b.new_context()

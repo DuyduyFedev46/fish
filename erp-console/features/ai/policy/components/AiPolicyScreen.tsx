@@ -3,6 +3,8 @@
 import React, { useEffect, useState } from "react";
 import { getAiPolicy, getUserAiConfig, killUserAi, updateAiPolicy } from "../api";
 import { AiPolicy, AiPolicyUserSummary, MyConfig } from "../../types";
+import { RECEIVE_BATCHES_COMMAND_ID } from "../../commandGroups";
+import { findByCommand } from "../../legacyIds";
 
 export default function AiPolicyScreen() {
   const [policy, setPolicy] = useState<AiPolicy | null>(null);
@@ -45,7 +47,7 @@ export default function AiPolicyScreen() {
       });
       setRedZoneState(rzInit);
 
-      const receiveBatchesCap = data.caps?.["purchasing.purchasereceipt.nhap_lo"] || {};
+      const receiveBatchesCap = findByCommand(data.caps, RECEIVE_BATCHES_COMMAND_ID)?.value || {};
       setCapsState({
         receive_kg: receiveBatchesCap.kg != null ? String(receiveBatchesCap.kg) : "",
         receive_vnd: receiveBatchesCap.vnd != null ? String(receiveBatchesCap.vnd) : "",
@@ -88,10 +90,12 @@ export default function AiPolicyScreen() {
       setError(null);
       setSuccess(null);
 
+      // Ghi ngược đúng khoá BE đang dùng (tên cũ hay mới); chưa có khoá nào thì dùng id hiện hành.
+      const existingCap = findByCommand(policy.caps, RECEIVE_BATCHES_COMMAND_ID);
       const newCaps: Record<string, any> = {
         ...(policy.caps || {}),
-        "purchasing.purchasereceipt.nhap_lo": {
-          ...(policy.caps?.["purchasing.purchasereceipt.nhap_lo"] || {}),
+        [existingCap?.key ?? RECEIVE_BATCHES_COMMAND_ID]: {
+          ...(existingCap?.value || {}),
           kg: kgNum !== null ? String(kgNum) : null,
           vnd: vndNum !== null ? String(vndNum) : null,
           daily: dailyNum !== null ? dailyNum : null,
@@ -293,7 +297,7 @@ export default function AiPolicyScreen() {
                   Nhập lô mua tại cảng
                 </span>
                 <span className="ml-2 font-mono text-[10px] text-gray-500">
-                  purchasing.purchasereceipt.nhap_lo
+                  {RECEIVE_BATCHES_COMMAND_ID}
                 </span>
               </div>
               <span className="text-[11px] px-2 py-0.5 bg-blue-50 text-blue-700 rounded border border-blue-200 font-medium">

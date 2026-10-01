@@ -28,3 +28,16 @@ export function filterRecentOrders(rows: RecentOrder[], q: string): RecentOrder[
 export function filterBatches(rows: DashboardBatch[], q: string): DashboardBatch[] {
   return fefoOrder(rows.filter((b) => matches(q, b.batch_id, b.item, b.warehouse, b.status_label)));
 }
+
+/** P8b Lô 3: đọc 3 số liệu Gọi xác nhận — khoá mới `confirmation_*` trước, thiếu thì dùng khoá cũ `cskh_*` (BE trả song song đến Lô 5). */
+export function readConfirmationCounts(data: DashboardAttentionData): {
+  queueWaiting: number | undefined;
+  escalated: number | undefined;
+  autoCancelBlocked: number | undefined;
+} {
+  return {
+    queueWaiting: data.confirmation_queue_waiting ?? data.cskh_queue_waiting, // naming: allow - đọc khoá JSON cũ làm dự phòng tới Lô 5
+    escalated: data.confirmation_escalated ?? data.cskh_escalated, // naming: allow - đọc khoá JSON cũ làm dự phòng tới Lô 5
+    autoCancelBlocked: data.confirmation_auto_cancel_blocked ?? data.cskh_auto_cancel_blocked, // naming: allow - đọc khoá JSON cũ làm dự phòng tới Lô 5
+  };
+}

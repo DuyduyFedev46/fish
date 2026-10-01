@@ -1,27 +1,30 @@
 import { describe, it, expect } from "vitest";
 import { buildDashboardSummaryMock } from "@/shared/lib/dashboardSummary.mock";
-import { filterRecentOrders } from "./api";
+import { filterRecentOrders, readConfirmationCounts } from "./api";
 import { mockAttention } from "./mock";
 import type { RecentOrder } from "./types";
 
 describe("Overview Attention Tests (CS-15)", () => {
   it("CS-15-AC4: mockAttention filters keys based on user permissions", () => {
     // Quản lý: 6 khoá (không có expired_batches_open — chỉ Chủ có quyền xử lý lô quá hạn)
-    const qlReq = {
+    const managerReq = {
       method: "GET",
       path: "/api/dashboard/attention/",
       token: "mock-token-ql1-9999999999999",
     };
-    const qlRes = mockAttention(qlReq as any);
-    expect(qlRes.status).toBe(200);
-    const qlBody = qlRes.body as Record<string, number>;
-    expect(qlBody.cskh_queue_waiting).toBeDefined();
-    expect(qlBody.refund_calls_open).toBeDefined();
-    expect(qlBody.cskh_escalated).toBeDefined();
-    expect(qlBody.cskh_auto_cancel_blocked).toBeDefined();
-    expect(qlBody.labels_not_printed).toBeDefined();
-    expect(qlBody.labels_to_void).toBeDefined();
-    expect(qlBody.expired_batches_open).toBeUndefined();
+    const managerRes = mockAttention(managerReq as any);
+    expect(managerRes.status).toBe(200);
+    const managerBody = managerRes.body as Record<string, number>;
+    expect(managerBody.confirmation_queue_waiting).toBeDefined();
+    expect(managerBody["cskh_queue_waiting"]).toBeDefined(); // khoá cũ BE còn trả song song tới Lô 5
+    expect(managerBody.refund_calls_open).toBeDefined();
+    expect(managerBody.confirmation_escalated).toBeDefined();
+    expect(managerBody.confirmation_auto_cancel_blocked).toBeDefined();
+    expect(managerBody["cskh_escalated"]).toBeDefined();
+    expect(managerBody["cskh_auto_cancel_blocked"]).toBeDefined();
+    expect(managerBody.labels_not_printed).toBeDefined();
+    expect(managerBody.labels_to_void).toBeDefined();
+    expect(managerBody.expired_batches_open).toBeUndefined();
 
     // CSKH: only queue and refund calls
     const csReq = {
@@ -32,35 +35,38 @@ describe("Overview Attention Tests (CS-15)", () => {
     const csRes = mockAttention(csReq as any);
     expect(csRes.status).toBe(200);
     const csBody = csRes.body as Record<string, number>;
-    expect(csBody.cskh_queue_waiting).toBeDefined();
+    expect(csBody.confirmation_queue_waiting).toBeDefined();
     expect(csBody.refund_calls_open).toBeDefined();
-    expect(csBody.cskh_escalated).toBeUndefined();
+    expect(csBody.confirmation_escalated).toBeUndefined();
+    expect(csBody["cskh_escalated"]).toBeUndefined();
     expect(csBody.labels_not_printed).toBeUndefined();
     expect(csBody.expired_batches_open).toBeUndefined();
 
     // Kho: only labels
-    const khoReq = {
+    const warehouseReq = {
       method: "GET",
       path: "/api/dashboard/attention/",
       token: "mock-token-kho1-9999999999999",
     };
-    const khoRes = mockAttention(khoReq as any);
-    expect(khoRes.status).toBe(200);
-    const khoBody = khoRes.body as Record<string, number>;
-    expect(khoBody.labels_not_printed).toBeDefined();
-    expect(khoBody.labels_to_void).toBeDefined();
-    expect(khoBody.cskh_queue_waiting).toBeUndefined();
-    expect(khoBody.cskh_escalated).toBeUndefined();
-    expect(khoBody.expired_batches_open).toBeUndefined();
+    const warehouseRes = mockAttention(warehouseReq as any);
+    expect(warehouseRes.status).toBe(200);
+    const warehouseBody = warehouseRes.body as Record<string, number>;
+    expect(warehouseBody.labels_not_printed).toBeDefined();
+    expect(warehouseBody.labels_to_void).toBeDefined();
+    expect(warehouseBody.confirmation_queue_waiting).toBeUndefined();
+    expect(warehouseBody["cskh_queue_waiting"]).toBeUndefined();
+    expect(warehouseBody.confirmation_escalated).toBeUndefined();
+    expect(warehouseBody["cskh_escalated"]).toBeUndefined();
+    expect(warehouseBody.expired_batches_open).toBeUndefined();
 
     // Giao: 403
-    const giaoReq = {
+    const deliveryReq = {
       method: "GET",
       path: "/api/dashboard/attention/",
       token: "mock-token-giao1-9999999999999",
     };
-    const giaoRes = mockAttention(giaoReq as any);
-    expect(giaoRes.status).toBe(403);
+    const deliveryRes = mockAttention(deliveryReq as any);
+    expect(deliveryRes.status).toBe(403);
   });
 
   it("SR-15-AC4: Chủ (loc) có expired_batches_open = số lô quá hạn còn tồn; người khác không có", () => {
@@ -94,5 +100,23 @@ describe("Overview orders (SR-17-AC3)", () => {
       expect(Object.keys(o)).not.toContain("phone_last4");
     }
     expect(JSON.stringify(body)).not.toMatch(/Chị Mai|Anh Khoa|Nhà hàng|Quán Ốc|Khách lẻ/);
+  });
+});
+
+describe("readConfirmationCounts (P8b Lô 3: khoá mới, khoá cũ làm dự phòng)", () => {
+  it("payload cũ (chỉ cskh_*) và payload mới (confirmation_*) cho cùng một kết quả", () => {
+    const oldPayload = { "cskh_queue_waiting": 3, "cskh_escalated": 2, "cskh_auto_cancel_blocked": 1 };
+    const newPayload = { confirmation_queue_waiting: 3, confirmation_escalated: 2, confirmation_auto_cancel_blocked: 1 };
+    const expected = { queueWaiting: 3, escalated: 2, autoCancelBlocked: 1 };
+    expect(readConfirmationCounts(oldPayload)).toEqual(expected);
+    expect(readConfirmationCounts(newPayload)).toEqual(expected);
+  });
+
+  it("BE trả cả hai họ khoá: ưu tiên khoá mới, số 0 của khoá mới không bị khoá cũ đè", () => {
+    const both = { confirmation_queue_waiting: 0, "cskh_queue_waiting": 9, confirmation_escalated: 4, "cskh_escalated": 4 };
+    const r = readConfirmationCounts(both);
+    expect(r.queueWaiting).toBe(0);
+    expect(r.escalated).toBe(4);
+    expect(r.autoCancelBlocked).toBeUndefined();
   });
 });

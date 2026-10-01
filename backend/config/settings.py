@@ -22,6 +22,21 @@ def _bool(name: str, default: str = "0") -> bool:
     return os.getenv(name, default).strip().lower() in {"1", "true", "yes", "on"}
 
 
+def _bool_first(name: str, legacy_name: str, default: str = "0") -> bool:
+    return _env_first(name, legacy_name, default).strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _env_first(name: str, legacy_name: str, default: str) -> str:
+    """
+    Đọc biến môi trường: tên mới trước, tên cũ sau, rồi mới tới mặc định (P8b, Lô 3).
+    Tên cũ (`CSKH_*`) còn đọc để Cloud Run đang đặt tên cũ không bị bỏ qua; gỡ ở Lô 5.
+    """
+    value = os.getenv(name)
+    if value is None:
+        value = os.getenv(legacy_name)
+    return default if value is None else value
+
+
 # `manage.py test` (dùng thêm ở dưới cho PASSWORD_HASHERS).
 TESTING = len(sys.argv) > 1 and sys.argv[1] == "test"
 
@@ -200,8 +215,8 @@ REST_FRAMEWORK = {
 }
 
 # --- Giới hạn tần suất throttle (S03 / L-5, doc/features/2026-09-28-sua-loi-bao-mat) ----
-def _rate(name: str, default: str) -> str | None:
-    val = os.getenv(name, default).strip()
+def _rate(name: str, default: str, legacy_name: str | None = None) -> str | None:
+    val = (_env_first(name, legacy_name, default) if legacy_name else os.getenv(name, default)).strip()
     if not val or val.lower() in {"off", "none", "0"}:
         return None
     return val
@@ -213,7 +228,7 @@ _DEFAULT_THROTTLE_RATES = {
     "shop_checkout": _rate("THROTTLE_SHOP_CHECKOUT", "30/hour"),
     "login_ip": _rate("THROTTLE_LOGIN_IP", "10/min"),
     "login_user": _rate("THROTTLE_LOGIN_USER", "30/hour"),
-    "cskh_search": _rate("THROTTLE_CSKH_SEARCH", "30/min"),
+    "customer_search": _rate("THROTTLE_CUSTOMER_SEARCH", "30/min", legacy_name="THROTTLE_CSKH_SEARCH"),
     "public_content": _rate("THROTTLE_PUBLIC_CONTENT", "120/min"),
 }
 
@@ -277,22 +292,23 @@ AI_SCHEMA_MAX_TOKENS = int(os.getenv("AI_SCHEMA_MAX_TOKENS", "450"))
 AI_CALL_RATE = os.getenv("AI_CALL_RATE", "30/min")
 AI_CONFIRM_MIN_SECONDS = int(os.getenv("AI_CONFIRM_MIN_SECONDS", "3"))
 
-# --- CSKH: Xác nhận đơn & In tem (2026-09-28-cskh-xac-nhan-in-tem) ---------
-CSKH_MAX_UNREACHABLE_ATTEMPTS = int(os.getenv("CSKH_MAX_UNREACHABLE_ATTEMPTS", "3"))
-CSKH_UNREACHABLE_WINDOW_MINUTES = int(os.getenv("CSKH_UNREACHABLE_WINDOW_MINUTES", "30"))
-CSKH_MIN_RETRY_MINUTES = int(os.getenv("CSKH_MIN_RETRY_MINUTES", "10"))
-CSKH_MANAGER_DECISION_MINUTES = int(os.getenv("CSKH_MANAGER_DECISION_MINUTES", "30"))
-CSKH_PII_RECENT_DAYS = int(os.getenv("CSKH_PII_RECENT_DAYS", "7"))
-CSKH_CLAIM_MINUTES = int(os.getenv("CSKH_CLAIM_MINUTES", "5"))
-CSKH_EXTEND_MAX_HOURS = int(os.getenv("CSKH_EXTEND_MAX_HOURS", "24"))
-CSKH_WORKING_HOURS = os.getenv("CSKH_WORKING_HOURS", "07:00-21:00")
-CSKH_QUEUE_ALERT_MINUTES = int(os.getenv("CSKH_QUEUE_ALERT_MINUTES", "60"))
+# --- Xác nhận đơn (confirmation) & In tem (2026-09-28-cskh-xac-nhan-in-tem) ---------
+# Tên biến môi trường mới `CONFIRMATION_*` đọc trước; tên cũ `CSKH_*` còn đọc tới Lô 5 (P8b, R11).
+CONFIRMATION_MAX_UNREACHABLE_ATTEMPTS = int(_env_first("CONFIRMATION_MAX_UNREACHABLE_ATTEMPTS", "CSKH_MAX_UNREACHABLE_ATTEMPTS", "3"))
+CONFIRMATION_UNREACHABLE_WINDOW_MINUTES = int(_env_first("CONFIRMATION_UNREACHABLE_WINDOW_MINUTES", "CSKH_UNREACHABLE_WINDOW_MINUTES", "30"))
+CONFIRMATION_MIN_RETRY_MINUTES = int(_env_first("CONFIRMATION_MIN_RETRY_MINUTES", "CSKH_MIN_RETRY_MINUTES", "10"))
+CONFIRMATION_MANAGER_DECISION_MINUTES = int(_env_first("CONFIRMATION_MANAGER_DECISION_MINUTES", "CSKH_MANAGER_DECISION_MINUTES", "30"))
+CONFIRMATION_PII_RECENT_DAYS = int(_env_first("CONFIRMATION_PII_RECENT_DAYS", "CSKH_PII_RECENT_DAYS", "7"))
+CONFIRMATION_CLAIM_MINUTES = int(_env_first("CONFIRMATION_CLAIM_MINUTES", "CSKH_CLAIM_MINUTES", "5"))
+CONFIRMATION_EXTEND_MAX_HOURS = int(_env_first("CONFIRMATION_EXTEND_MAX_HOURS", "CSKH_EXTEND_MAX_HOURS", "24"))
+CONFIRMATION_WORKING_HOURS = _env_first("CONFIRMATION_WORKING_HOURS", "CSKH_WORKING_HOURS", "07:00-21:00")
+CONFIRMATION_QUEUE_ALERT_MINUTES = int(_env_first("CONFIRMATION_QUEUE_ALERT_MINUTES", "CSKH_QUEUE_ALERT_MINUTES", "60"))
 LABEL_UNPRINTED_ALERT_MINUTES = int(os.getenv("LABEL_UNPRINTED_ALERT_MINUTES", "15"))
 REFUND_DEADLINE_DAYS = int(os.getenv("REFUND_DEADLINE_DAYS", "30"))
 SHOP_HOTLINE = os.getenv("SHOP_HOTLINE", "1900 xxxx")
-CSKH_AUTO_CANCEL_ENABLED = _bool("CSKH_AUTO_CANCEL_ENABLED", "0")
-CSKH_NOTICE_ENABLED = _bool("CSKH_NOTICE_ENABLED", "1")
-THROTTLE_CSKH_SEARCH = os.getenv("THROTTLE_CSKH_SEARCH", "30/min")
+CONFIRMATION_AUTO_CANCEL_ENABLED = _bool_first("CONFIRMATION_AUTO_CANCEL_ENABLED", "CSKH_AUTO_CANCEL_ENABLED", "0")
+CONFIRMATION_NOTICE_ENABLED = _bool_first("CONFIRMATION_NOTICE_ENABLED", "CSKH_NOTICE_ENABLED", "1")
+THROTTLE_CUSTOMER_SEARCH = _env_first("THROTTLE_CUSTOMER_SEARCH", "THROTTLE_CSKH_SEARCH", "30/min")
 
 # --- Content / CMS (2026-09-28-cms-viet-bai) -------------------------------
 CONTENT_TITLE_MAX = int(os.getenv("CONTENT_TITLE_MAX", "200"))

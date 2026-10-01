@@ -230,3 +230,108 @@ Không có lỗi chặn (Critical/High/Medium). Không có lỗi Low phát sinh 
 - `nav_compare.py` (12 tổ hợp) và `real_stack.py` (Django thật + ERP thật, 5 vai): SAME ở cả 5, `DIFF users: 0`.
 - Bước cuối, dựng lại hai bản thật với API base production `https://cangca-api-675411800433.asia-southeast1.run.app` (truyền `NEXT_PUBLIC_USE_MOCK=0` và `NEXT_PUBLIC_API_BASE` trên dòng lệnh): ERP và Shop đều build exit 0, `check-no-mock` XANH, ERP `check-ai-chunks` XANH, `out/_next` chứa URL production (ERP 3 tệp, Shop 5 tệp), 0 tham chiếu `127.0.0.1:8236`/`localhost:8199`.
 - Đã dừng mọi `http.server`/`runserver` do tôi mở (cổng 3233–3237, 8236–8237).
+
+---
+
+## Lô 3 — Contract sang tên tiếng Anh, tên cũ chạy song song · lần 1 · 01/10/2026
+
+### Kết luận: APPROVED — tên mới trả đúng như tên cũ, tên cũ không đổi so với HEAD, chỉ mục AI không lộ route mới, không có lỗi chặn
+### Tổng: 42 ca · ✅ 40 · ❌ 0 · ⏸ 2 (cả hai cần môi trường staging, ngoài phạm vi lượt local này) · kèm 2 phát hiện có từ trước ở "Ghi nhận", không do Lô 3
+
+Cách chứng minh: dựng 3 biến thể cạnh nhau trên cùng dữ liệu giả (`seed_demo` + 5 tài khoản demo), cùng bộ request, rồi so JSON đã chuẩn hoá (bỏ id, giờ, hậu tố ngẫu nhiên):
+HEAD gọi tên cũ (`git archive HEAD`), cây làm việc gọi tên cũ, cây làm việc gọi tên mới. Mỗi biến thể 1902 request (1716 GET + 186 POST) × 6 danh tính
+(ẩn danh, `chu`, `quan_ly`, `nv_kho`, `nv_giao`, `cskh`). Dấu vân tay cây mã (bỏ `doc/`) `f12adb06f169`, đo đầu lượt, giữa lượt và cuối lượt, không đổi;
+dev có sửa 3 tệp test và 2 comment FE theo review Techlead giữa chừng, nên bộ test đầy đủ, tsc, vitest và build cuối chạy lại ở cây này.
+
+### Theo yêu cầu giao (§3 Lô 3, §4, §6 của `02c-giao-viec.md`)
+| Mã | Kết quả | Bằng chứng |
+|---|---|---|
+| A1 Backend đầy đủ, không `--parallel` | ✅ | `manage.py test` ở cây cuối: `Ran 1714 tests in 78.343s … OK` (lượt đầu 1714 OK, 79.6s); log `backend-test-final.log` |
+| A2 `makemigrations --check --dry-run` | ✅ | `No changes detected`; `git status -- '*/migrations/*'` rỗng |
+| A3 Adapter | ✅ | `adapter/.venv/bin/python -m pytest -q`: `68 passed` |
+| A4 `python3 scripts/check_naming.py` | ✅ | `OK - 6554 vi phạm cũ trong 203 file, không phát sinh mới`, exit 0 |
+| A5 Snapshot chỉ mục AI không đổi | ✅ | `git diff --exit-code -- backend/apps/ai/registry/tests/snapshots/` exit 0 |
+| A6 `npm ci` (không `--legacy-peer-deps`, cache trong thư mục tạm) + tsc + vitest | ✅ | ERP và Shop `npm ci` exit 0; `tsc --noEmit` exit 0 cả hai; ERP vitest `16 files, 217 passed (217)` |
+| B1 Hàng đợi/tìm kiếm tên mới == tên cũ (list, chi tiết, claim, claim lần 2, calls hợp lệ/sai/rỗng, search) | ✅ | work-new == work-old: 0 dòng khác trên 1902 request (`cmp3.py`: `get equal True`, `post equal True`) |
+| B2 `receive-batches` == `nhap-lo` (ok, phát lại cùng khoá, thiếu dòng, số lượng âm, số lượng 0, DELETE) | ✅ | cùng ma trận: `chu`/`quan_ly`/`nv_kho` 201, `nv_giao`/`cskh` 403, ẩn danh 401, payload sai 400 (3 ca), DELETE 405. Replay trả 201 cùng phiếu |
+| B3 `attention`: `confirmation_*` == `cskh_*` | ✅ | cùng giá trị, cùng điều kiện theo vai trong bản so JSON; vai thiếu quyền không thấy cả hai nhóm khoá |
+| B4 `site-info`: `confirmation_policy` == `cskh_notice` | ✅ | cùng object 8 khoá cấu hình; ẩn danh, không có SĐT khách và không có khoá giá vốn |
+| B5 Ma trận 401/403 giống nhau trên hai prefix | ✅ | queue GET: ẩn danh 401, `nv_kho`/`nv_giao` 403, `cskh`/`quan_ly`/`chu` 200, cả hai prefix |
+| B6 Tên cũ vẫn chạy | ✅ | work-old trả đủ mọi route `/api/cskh/*` và `nhap-lo/`; FE bản HEAD chạy trên BE mới (ca E9) |
+| B7 Endpoint cũ không đổi so với HEAD | ✅ | 1806 cặp key chung, sau chuẩn hoá còn 5 khác biệt, đều chủ định: gốc `GET /api/` (DRF api root) liệt kê thêm `confirmation/queue` cho 5 danh tính có đăng nhập. Hai nhiễu đã loại: trang 404 HTML của DEBUG dài hơn (liệt kê thêm route), và giờ trong câu "tới HH:MM" của lỗi 409 |
+| B8 AuditLog, Group, thao tác ghi không đổi | ✅ | `audit_actions`, `audit_count`, `groups_in_db`, `ai_index` HEAD == cây làm việc; không action AuditLog mới |
+| C1 Chỉ mục AI không có lệnh dưới `/api/cskh/` hay `/api/confirmation/` (R1) | ✅ | `ai_probe.py`: 111 spec, `specs under cskh/confirmation/receive-batches: []`; không spec nào có path chứa `search`/`queue` |
+| C2 `receive-batches` không phải lệnh AI mới | ✅ | chỉ mục không có id `…receive_batches`; gọi `…receive_batches/call/` trả 404 `COMMAND_UNKNOWN` |
+| C3 Lệnh `…nhap_lo` còn gọi được | ✅ | spec duy nhất, path `/api/purchasing/receipts/nhap-lo/`, gọi mức B: 200 `outcome: done` |
+| C4 R1 có tác dụng thật (đột biến) | ✅ | bản sao `mut/`: bỏ `"/api/confirmation/"` khỏi `FORBIDDEN_PREFIXES` thì `test_forbidden_prefixes.py` đỏ; trả lại thì xanh |
+| C5 Khoá idempotency dùng chung hai path | ✅ | `idem_probe.py`: `receive-batches k1`, `receive-batches k1`, `nhap-lo k1`, `nhap-lo k2`, `receive-batches k2` đều 201; tổng +2 phiếu, +2 lô |
+| D1 Env: không đặt gì | ✅ | `envprobe.py`: `07:00-21:00 3 False True 30/min` (mặc định cũ) |
+| D2 Env: chỉ có tên cũ `CSKH_*` | ✅ | `08:00-17:00 5 True False 4/min`: vẫn đọc được cả giờ, số lần, cờ tự huỷ, cờ thông báo, throttle |
+| D3 Env: có cả hai, tên mới thắng | ✅ | `09:00-18:00 7 False True 6/min` |
+| D4 Throttle `customer_search` dùng chung một bộ đếm | ✅ | `THROTTLE_CUSTOMER_SEARCH=2/min` và riêng `THROTTLE_CSKH_SEARCH=2/min`: chuỗi gọi xen kẽ confirmation, cskh cho 200, 200, 429, 429, 429, 429 |
+| D5 Lệnh quản trị cũ và mới, mỗi lệnh chạy 2 lần | ✅ | `process_*` rồi `process_*`: trạng thái task/phiếu/AuditLog sau lần 1 và lần 2 giống nhau (không làm 2 lần), giống HEAD; `check_*` exit code `1, 1, 1` ở cả cũ và mới (có 1 task ESCALATED quá hạn) và thông báo giống nhau |
+| E1 `/cskh/?x=1#y` chuyển sang `/confirmation/?x=1#y` | ✅ | `p8b_confirmation_route_redirect.py` (bản build mock, cổng 3243): `8/8 đạt`; bản build thật + Django thật: cả 5 vai kết thúc ở `/confirmation/?x=1#y` |
+| E2 Màn hình xác nhận đơn cho 5 vai (bản build ERP thật + Django thật, cổng 3245/8244) | ✅ | `real_stack3.py`: `chu`, `quan_ly`, `cskh` thấy 3 thẻ hàng đợi qua `GET /api/confirmation/queue/` 200; `nv_kho`, `nv_giao` thấy thông báo không có quyền và không gọi API; không có request nào tới `/api/cskh/` |
+| E3 Nhập lô qua tên mới | ✅ | `POST /api/purchasing/receipts/receive-batches/` trả 201 cho `chu`, `quan_ly`, `nv_kho`; không request nào tới `nhap-lo`; `nv_giao` không có form |
+| E4 Nháp cũ được chuyển, không mang giá mua | ✅ | `sr07_receive_batches_draft.py`: `20/20 PASS`; trong đó: khoá local `cave_draft_nhap_lo` (có `rate`) bị xoá khi mở form; khoá session `cave_draft_nhap_lo:<id>` chuyển sang `cave_draft_receive_batches:<id>`, giữ số lượng 33 và idempotencyKey cũ, ô giá mua trống, `99999` không còn trong storage |
+| E5 Đăng xuất xoá cả hai tiền tố | ✅ | cùng script: sau đăng xuất không còn khoá `cave_draft_receive_batches*` lẫn `cave_draft_nhap_lo*` ở local và session |
+| E6 Trạng thái cũ, hai người cùng thao tác (SR-09 AC4) | ✅ | `sr09_ac4_stale_state.py`: `22/22 PASS` (desktop 1280 và mobile 375x667) |
+| E7 ERP tổng thể P8 Lô 7 | ✅ | `p8_lo7_fe_erp.py`: `79/79 PASS` |
+| E8 Shop: khối "Lưu ý xác nhận đơn" ở checkout, kể cả khi BE cũ chỉ trả `cskh_notice` | ✅ | bản build thật + API giả cổng 3244: `frontend/e2e/qa-lo7-shop-real.py` `Tổng 25 ca, 0 FAIL`, trong đó ca "chỉ `cskh_notice` (BE cũ)" dùng giờ 07:00-21:00, không pageerror |
+| E9 Ngoài đường thuận: FE bản cũ (HEAD) + BE Lô 3 | ✅ | ERP HEAD build thật (cổng 3246) + Django cây làm việc (8246): 5 vai vào được, `/cskh/` mở với 3 thẻ, `GET /api/cskh/queue/` 200, `POST …/nhap-lo/` 201 cho 3 vai, `GET /api/dashboard/attention/` 200, không 404, không pageerror |
+| E10 Build thật + `check-no-mock` + `check-ai-chunks` | ✅ | ERP và Shop `next build` exit 0; `check-no-mock: XANH` ở cả hai; `check-ai-chunks: XANH` (4 màn nghiệp vụ và 2 layout sạch); Shop `scripts/test-format.mjs` và `scripts/test-safe-href.mjs` exit 0 |
+| E11 Build lại cả hai FE với API production | ✅ | `NEXT_PUBLIC_USE_MOCK=0 NEXT_PUBLIC_API_BASE=https://cangca-api-675411800433.asia-southeast1.run.app`: exit 0; `check-no-mock` XANH (ERP 135 file, Shop 46 file); `check-ai-chunks` XANH; `out/_next` chỉ còn chữ `localhost` trong thư viện (`polyfills`, `1916…`), không có URL localhost; ERP `out/` chỉ chứa `/api/confirmation/queue/`, `/api/confirmation/search/`, `receive-batches`, không còn `api/cskh` hay `nhap-lo` |
+| E12 Cổng thử đã tắt | ✅ | `lsof` các cổng 3243, 3244, 3245, 3246, 8244, 8246: không còn tiến trình nào |
+| F1 Rò giá vốn: JSON `receive-batches` | ✅ | `quan_ly` và `nv_kho`: không có `purchase_rate`, `landed_unit_cost`, `rate`; chỉ `chu` có đủ ba field (giống `nhap-lo`) |
+| F2 Rò dữ liệu cá nhân: API công khai và Shop | ✅ | ẩn danh: 0 số điện thoại 10 chữ số, 0 khoá giá vốn trong mọi body GET; `out/` của Shop không có chuỗi giá vốn hay số điện thoại |
+| F3 Storage, URL, console trong bản build thật, 5 vai | ✅ | 6 số điện thoại giả của seed và giá mua gõ thử `987000`: không có trong localStorage/sessionStorage (cả lúc đang gõ lẫn sau khi gửi), URL điều hướng hay console; sau đăng xuất storage chỉ còn `cave_erp_last_user`, `cave_erp_token` |
+| F4 Nhóm không cần thì không thấy dữ liệu khách | ✅ | tập (vai × route) có chứa số điện thoại giống HEAD, chỉ thêm `/api/confirmation/queue/` cho `cskh`/`quan_ly`/`chu`, đúng bằng `/api/cskh/queue/`; `nv_kho`, `nv_giao` không thêm route nào |
+| G1 Staging: E2E 5 vai sau khi deploy BE rồi FE | ⏸ | cần deploy, chưa có yêu cầu của Duy |
+| G2 Env `CSKH_*` và args Cloud Run Job trên staging/production | ⏸ | việc của điều phối viên trước khi deploy BE (§3 Lô 3); tôi không có quyền vào GCP trong lượt này |
+
+### Ngoại lệ và biên
+Số lượng âm và bằng 0, payload thiếu dòng (đều 400); phát lại cùng khoá idempotency và khoá dùng chéo hai path (cùng một phiếu); gọi `calls` với kết quả sai, rỗng và đơn đang bị người khác nhận (409 `CLAIMED`) trên cả hai prefix; job chạy 2 lần; hai cấu hình env đồng thời; bộ đếm throttle bị vượt (429) qua cả hai prefix; FE cũ trên BE mới; BE cũ (chỉ khoá `cskh_notice`) trên Shop mới.
+
+### Phân quyền (kết quả giống nhau ở tên cũ và tên mới)
+| Hành động | chu | quan_ly | nv_kho | nv_giao | cskh | ẩn danh |
+|---|---|---|---|---|---|---|
+| `GET queue/` (`/api/confirmation/` và `/api/cskh/`) | 200 | 200 | 403 | 403 | 200 | 401 |
+| `POST receive-batches/` và `nhap-lo/` | 201 | 201 | 201 | 403 | 403 | 401 |
+| `DELETE receive-batches/` | 405 | 405 | 405 | 405 | 405 | 401 |
+| `/confirmation/` trên màn hình | thấy hàng đợi | thấy hàng đợi | báo không có quyền | báo không có quyền | thấy hàng đợi | về `/login/` |
+
+### Rò giá vốn
+Không phát hiện: xem F1. Khoá mới `confirmation_*` của `attention` chỉ là số đếm, `confirmation_policy` chỉ gồm 8 field cấu hình (giờ làm, số lần, phút, cờ, hotline); không có tiền hay khối lượng nên không suy ngược ra giá vốn. Không có AuditLog action mới.
+
+### Rò dữ liệu cá nhân
+Không phát hiện: xem F2, F3, F4. Không có tên, SĐT hay địa chỉ khách trong `site-info`, `attention`, log, console, storage, URL. Ảnh chụp lưu ở `scratchpad/qa-p8b-l3/shots/` chỉ có dữ liệu giả.
+
+### Hồi quy
+Toàn bộ 1714 test backend, 68 test adapter, 217 test vitest ERP, 4 script e2e ERP (8, 20, 22, 79 ca), 25 ca Shop và các script `test-*.mjs` cùng chạy xanh ở cây cuối.
+
+### Lỗi
+Không có lỗi chặn.
+
+### Ghi nhận (không chặn, không do Lô 3, giống hệt HEAD)
+- N-1 (Trung bình, có từ Lô 1, đã ghi ở mục Lô 1): `nv_giao` và `nv_kho` đọc được SĐT khách qua `/api/sales/orders/` và `/api/sales/customers/` (cùng 2 route đó ở HEAD và ở cây làm việc). Lô 3 không thêm, không bớt. Cần Duy quyết định ở review quyền dữ liệu khách.
+- N-2 (Thấp): `POST /api/cskh/queue/<id>/calls/` với `request_id` không phải UUID (ví dụ `"not-a-uuid"`) trả 500 thay vì 400, ở HEAD cũng vậy (`uuid_probe.py`, chạy trên HEAD và cây làm việc đều 500). Đề xuất kiểm `request_id` ở serializer khi có dịp; không ảnh hưởng dữ liệu vì lỗi xảy ra trước khi ghi cuộc gọi, nhưng tôi chưa chứng minh bằng đếm bản ghi.
+- N-3 (Thấp): cảnh báo `check_*_job_health` in 2 lần cùng một dòng trong một lần chạy (cũ và mới giống nhau, có từ HEAD).
+
+### Lệnh đã chạy (tóm tắt)
+| Lệnh | Kết quả |
+|---|---|
+| `manage.py test` (backend, `DJANGO_DEBUG=1`, bỏ `DATABASE_URL`, không `--parallel`) | 1714 OK (hai lần) |
+| `manage.py makemigrations --check --dry-run` | No changes detected |
+| `adapter/.venv/bin/python -m pytest -q` | 68 passed |
+| `python3 scripts/check_naming.py` | OK, 6554/203, exit 0 |
+| `git diff --exit-code -- backend/apps/ai/registry/tests/snapshots/` | exit 0 |
+| `driver3.py` × 3 biến thể (HEAD tên cũ, cây tên cũ, cây tên mới) + `cmp3.py` | 1902 request mỗi biến thể; new == old; HEAD == cây cũ ngoài 5 chỗ chủ định |
+| `ai_probe.py`, `idem_probe.py`, `throttle_probe.py`, `envprobe.py` (+ `env_run.sh`), `jobs_run.sh old|new`, `uuid_probe.py` | như bảng trên |
+| `cd erp-console && npm ci && npx tsc --noEmit && npm test` | exit 0; 217 passed |
+| `cd frontend && npm ci && npx tsc --noEmit` | exit 0 |
+| ERP build mock + e2e `p8b_confirmation_route_redirect.py`, `sr07_receive_batches_draft.py`, `sr09_ac4_stale_state.py`, `p8_lo7_fe_erp.py` | 8/8, 20/20, 22/22, 79/79 |
+| ERP build thật + Django thật (`real_stack3.py`), ERP HEAD build thật + Django cây làm việc (`real_stack3_oldfe.py`) | 5 vai mỗi lượt, không rò storage/URL/console |
+| Shop build thật (API giả `localhost:8199`) + `frontend/e2e/qa-lo7-shop-real.py` + `check-no-mock.mjs` + `test-format.mjs` + `test-safe-href.mjs` | 25 ca 0 FAIL; XANH; exit 0 |
+| Build cuối cả hai FE với `NEXT_PUBLIC_USE_MOCK=0` và API production, `check-no-mock`, `check-ai-chunks` | exit 0, XANH; không còn URL localhost trong `out/_next` |
+
+Tệp tạm: `/private/tmp/claude-501/-Users-dangthiduyen-Downloads-loc/3e0d9f3d-14ce-4b8b-a1cd-6fbcdc0b2f2d/scratchpad/qa-p8b-l3/` (script, log, ảnh, JSON so sánh). Không sửa mã sản phẩm, không commit, không deploy.

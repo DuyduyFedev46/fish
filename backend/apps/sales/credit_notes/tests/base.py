@@ -43,7 +43,7 @@ class CreditNoteBase(ConfirmationL3BaseTestCase):
         order, note, task = self._create_order_with_confirmation(phone=phone, name=name, qty=qty)
         return order, note, task
 
-    @override_settings(CSKH_AUTO_CANCEL_ENABLED=True)
+    @override_settings(CONFIRMATION_AUTO_CANCEL_ENABLED=True)
     def _auto_cancel(self, task):
         """Đường job tự huỷ CSKH (`auto_cancel_overdue`) — actor=None."""
         t0 = timezone.now().replace(hour=9, minute=25, second=0, microsecond=0)

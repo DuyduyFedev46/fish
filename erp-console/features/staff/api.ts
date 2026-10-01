@@ -5,6 +5,7 @@
 import { apiFetch } from "@/shared/lib/http";
 import { matches } from "@/shared/lib/search";
 import { groupLabel } from "@/shared/lib/groups";
+import { normalizeRoles } from "@/shared/lib/roles";
 import { mockStaffApi } from "./mock";
 import type {
   SetGroupsResult,
@@ -16,39 +17,52 @@ import type {
 
 const BASE = "/api/staff/";
 
+// P8b Lô 3: tên Group BE trả có thể là tên cũ hoặc tên tiếng Anh (Lô 4) → chuẩn hoá ngay khi nhận.
+function normalizeMember(m: StaffMember): StaffMember {
+  return { ...m, groups: normalizeRoles(m.groups) };
+}
+
+function normalizeGroupsResult(r: SetGroupsResult): SetGroupsResult {
+  return { groups: normalizeRoles(r.groups), added: normalizeRoles(r.added), removed: normalizeRoles(r.removed) };
+}
+
 /** GET /api/staff/?is_active=true|false (bỏ trống = tất cả; BE sắp theo username). Không phân trang. */
-export function listStaff(filter: StaffFilter): Promise<StaffMember[]> {
+export async function listStaff(filter: StaffFilter): Promise<StaffMember[]> {
   const q = filter === "active" ? "?is_active=true" : filter === "inactive" ? "?is_active=false" : "";
-  return apiFetch<StaffMember[]>(BASE + q, {
+  const rows = await apiFetch<StaffMember[]>(BASE + q, {
     mock: process.env.NEXT_PUBLIC_USE_MOCK === "1" ? mockStaffApi : undefined,
   });
+  return rows.map(normalizeMember);
 }
 
 /** POST /api/staff/ → 201 một dòng đầy đủ. */
-export function createStaff(input: StaffCreateInput): Promise<StaffMember> {
-  return apiFetch<StaffMember>(BASE, {
+export async function createStaff(input: StaffCreateInput): Promise<StaffMember> {
+  const m = await apiFetch<StaffMember>(BASE, {
     method: "POST",
     body: input,
     mock: process.env.NEXT_PUBLIC_USE_MOCK === "1" ? mockStaffApi : undefined,
   });
+  return normalizeMember(m);
 }
 
 /** PATCH /api/staff/{id}/ — chỉ display_name, phone. */
-export function updateStaff(id: number, input: StaffProfileInput): Promise<StaffMember> {
-  return apiFetch<StaffMember>(`${BASE}${id}/`, {
+export async function updateStaff(id: number, input: StaffProfileInput): Promise<StaffMember> {
+  const m = await apiFetch<StaffMember>(`${BASE}${id}/`, {
     method: "PATCH",
     body: input,
     mock: process.env.NEXT_PUBLIC_USE_MOCK === "1" ? mockStaffApi : undefined,
   });
+  return normalizeMember(m);
 }
 
 /** PUT /api/staff/{id}/groups/ — THAY toàn bộ tập nhóm. */
-export function setStaffGroups(id: number, groups: string[]): Promise<SetGroupsResult> {
-  return apiFetch<SetGroupsResult>(`${BASE}${id}/groups/`, {
+export async function setStaffGroups(id: number, groups: string[]): Promise<SetGroupsResult> {
+  const r = await apiFetch<SetGroupsResult>(`${BASE}${id}/groups/`, {
     method: "PUT",
     body: { groups },
     mock: process.env.NEXT_PUBLIC_USE_MOCK === "1" ? mockStaffApi : undefined,
   });
+  return normalizeGroupsResult(r);
 }
 
 /** POST /api/staff/{id}/deactivate/ — cho nghỉ: is_active=False + xoá token (đăng xuất mọi máy). */
