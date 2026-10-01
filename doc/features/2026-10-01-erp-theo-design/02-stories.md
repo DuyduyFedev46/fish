@@ -16,7 +16,7 @@ Ngoài: Shop khách mua, ERP điện thoại (`ERP-M*`), đổi quy tắc nghi�
 **Vai:** Chủ · Quản lý · Nhân viên kho · Nhân viên giao · CSKH. Quyền mặc định của từng vai lấy theo ma trận ở `ERP-W3h-Phan-quyen`; FE luôn đọc quyền thật (UI-RULES §8.1), không so tên nhóm.
 
 **Nguyên tắc khi thiết kế lệch code** (01-analysis §4): code/DB thắng về dữ liệu, trạng thái và mã chứng từ; thiết kế thắng về bố cục và câu chữ. Các chỗ lệch đã thấy:
-- `ERP-D1` dùng mã `DH-…` và ghi "Hết giữ chỗ sau 12 phút" trong cột Lý do. Khi code: dùng mã `SO…`, đếm ngược để ở cột riêng.
+- `ERP-D1` ghi "Hết giữ chỗ sau 12 phút" trong cột Lý do. Khi code: đếm ngược để ở cột riêng.
 - Thiết kế che số điện thoại "…0412". Khi code: hiện đủ cho người có quyền (quyết định 14).
 - Mã lô, mã phiếu nhập và mã phiếu kiểm kê trên thiết kế (`L0914-CT01`, `PR-92`, `KK-13`) là minh hoạ. Khi code: dùng mã thật trong DB, chứng từ không có số thì hiện `#<id>` (§1.4).
 
