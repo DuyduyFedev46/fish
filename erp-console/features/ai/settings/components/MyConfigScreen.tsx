@@ -2,8 +2,10 @@
 
 import React, { useEffect, useState } from "react";
 import { getMyConfig, killMyConfig, updateMyConfig } from "../api";
-import type { MyConfig, MyConfigCommandItem, AiCommandLevel } from "../../types";
-import { dateTimeFull, vnd } from "@/shared/lib/format";
+import type { MyConfig } from "../../types";
+import { buildMyConfigPayload, readLimitInputs, type LimitInputs } from "../payload";
+import { commandChoices, describeSaveError, displayLevel, limitFieldsOf } from "../levels";
+import { dateTimeFull } from "@/shared/lib/format";
 
 export default function MyConfigScreen() {
   const [config, setConfig] = useState<MyConfig | null>(null);
@@ -15,33 +17,33 @@ export default function MyConfigScreen() {
 
   // Form state
   const [overrides, setOverrides] = useState<Record<string, string>>({});
-  const [limits, setLimits] = useState<Record<string, { kg?: string; vnd?: string }>>({});
+  const [limits, setLimits] = useState<LimitInputs>({});
   const [ack, setAck] = useState(false);
+
+  // Dựng lại ô nhập từ cấu hình BE vừa trả (lúc tải và sau khi lưu), để ô khớp với phiên bản đang có.
+  const applyConfig = (data: MyConfig) => {
+    setConfig(data);
+    const initialOverrides: Record<string, string> = {};
+    const initialLimits: LimitInputs = {};
+    data.groups.forEach((grp) => {
+      grp.commands.forEach((cmd) => {
+        if (cmd.source === "override") {
+          initialOverrides[cmd.id] = cmd.level;
+        }
+        if (cmd.limits) {
+          initialLimits[cmd.id] = readLimitInputs(cmd.limits);
+        }
+      });
+    });
+    setOverrides(initialOverrides);
+    setLimits(initialLimits);
+  };
 
   const loadData = async () => {
     try {
       setLoading(true);
       setError(null);
-      const data = await getMyConfig();
-      setConfig(data);
-      // Khởi tạo overrides và limits từ danh sách lệnh
-      const initialOverrides: Record<string, string> = {};
-      const initialLimits: Record<string, { kg?: string; vnd?: string }> = {};
-      data.groups.forEach((grp) => {
-        grp.commands.forEach((cmd) => {
-          if (cmd.source === "override") {
-            initialOverrides[cmd.id] = cmd.level;
-          }
-          if (cmd.limits) {
-            initialLimits[cmd.id] = {
-              kg: cmd.limits.kg?.mine || "",
-              vnd: cmd.limits.vnd?.mine || "",
-            };
-          }
-        });
-      });
-      setOverrides(initialOverrides);
-      setLimits(initialLimits);
+      applyConfig(await getMyConfig());
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Không thể tải cấu hình AI.");
     } finally {
@@ -82,17 +84,17 @@ export default function MyConfigScreen() {
       setSaving(true);
       setError(null);
       setSuccess(null);
-      const updated = await updateMyConfig({
-        base_version: config.version,
-        overrides,
-        limits,
-        acknowledge_responsibility: true,
-      });
-      setConfig(updated);
-      setSuccess(`Đã lưu cấu hình AI phiên bản v${updated.version}.`);
-      setAck(false);
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Lỗi khi lưu cấu hình.");
+      // BE thay thế toàn bộ cấu hình mỗi lần lưu: thân phải mang đủ nhóm, mức từng lệnh và ngưỡng (xem ../payload.ts).
+      const payload = buildMyConfigPayload(config, { overrides, limits });
+      try {
+        const updated = await updateMyConfig(payload);
+        applyConfig(updated);
+        setSuccess(`Đã lưu cấu hình AI phiên bản v${updated.version}.`);
+        setAck(false);
+      } catch (err: unknown) {
+        // Nêu rõ lệnh nào gây lỗi (BR-AI-19, BR-AI-27) thay vì chỉ câu chung của BE.
+        setError(describeSaveError(err, config, payload));
+      }
     } finally {
       setSaving(false);
     }
@@ -122,32 +124,6 @@ export default function MyConfigScreen() {
     } finally {
       setKilling(false);
     }
-  };
-
-  // DW-19 & DW-20: Tính danh sách choices hợp lệ theo write_levels_allowed
-  const computeChoices = (cmd: MyConfigCommandItem): AiCommandLevel[] => {
-    if (cmd.kind === "read") {
-      return cmd.choices || ["OFF", "A"];
-    }
-
-    // Lệnh ghi:
-    // Chỉ cho chọn B nếu:
-    // 1. write_levels_allowed có "B" (staging)
-    // 2. cmd.max_level === "B" hoặc cmd.choices?.includes("B")
-    // 3. Không bị vùng đỏ (cmd.red_zone)
-    // 4. Không bị khoá (cmd.locked_reason === null)
-    const isWriteAllowedB = Boolean(config?.write_levels_allowed?.includes("B"));
-    const canChooseB =
-      isWriteAllowedB &&
-      (cmd.max_level === "B" || cmd.choices?.includes("B")) &&
-      !cmd.red_zone &&
-      !cmd.locked_reason;
-
-    const choices: AiCommandLevel[] = ["OFF", "C"];
-    if (canChooseB) {
-      choices.push("B");
-    }
-    return choices;
   };
 
   if (loading) {
@@ -242,8 +218,10 @@ export default function MyConfigScreen() {
             ) : (
               <div className="divide-y divide-gray-100">
                 {grp.commands.map((cmd) => {
-                  const currentLevel = overrides[cmd.id] || cmd.level;
-                  const allowedChoices = computeChoices(cmd);
+                  // Mức hiệu lực hiển thị: B không giữ được (môi trường chỉ cho C, vùng đỏ đóng...) thì hiện C, không rơi về OFF.
+                  const currentLevel = displayLevel(config, cmd, overrides[cmd.id] || cmd.level);
+                  const allowedChoices = commandChoices(config, cmd, currentLevel);
+                  const limitFields = limitFieldsOf(cmd);
                   return (
                     <div
                       key={cmd.id}
@@ -301,16 +279,17 @@ export default function MyConfigScreen() {
                       </div>
 
                       {/* Hiển thị cấu hình ngưỡng nếu lệnh hỗ trợ limits */}
-                      {cmd.limits && currentLevel === "B" && (
+                      {limitFields.length > 0 && currentLevel === "B" && (
                         <div className="mt-2 rounded-md border border-gray-200 bg-gray-50 p-3 text-xs">
                           <span className="font-semibold text-gray-700">Ngưỡng tự ghi an toàn:</span>
                           <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            {cmd.limits.kg && (
+                            {limitFields.includes("kg") && (
                               <div>
-                                <label className="block text-gray-600 mb-1">
-                                  Giới hạn kg mỗi lần (Trần của Chủ: {cmd.limits.kg.cap || "không giới hạn"} kg)
+                                <label className="block text-gray-600 mb-1" htmlFor={`limit-kg-${cmd.id}`}>
+                                  Giới hạn kg mỗi lần (không vượt trần của Chủ; để trống nếu không đặt)
                                 </label>
                                 <input
+                                  id={`limit-kg-${cmd.id}`}
                                   type="number"
                                   min="0"
                                   value={limits[cmd.id]?.kg || ""}
@@ -320,12 +299,13 @@ export default function MyConfigScreen() {
                                 />
                               </div>
                             )}
-                            {cmd.limits.vnd && (
+                            {limitFields.includes("vnd") && (
                               <div>
-                                <label className="block text-gray-600 mb-1">
-                                  Giới hạn tiền mỗi lần (Trần của Chủ: {cmd.limits.vnd.cap ? vnd(cmd.limits.vnd.cap) : "không giới hạn"})
+                                <label className="block text-gray-600 mb-1" htmlFor={`limit-vnd-${cmd.id}`}>
+                                  Giới hạn tiền mỗi lần, VNĐ (không vượt trần của Chủ; để trống nếu không đặt)
                                 </label>
                                 <input
+                                  id={`limit-vnd-${cmd.id}`}
                                   type="number"
                                   min="0"
                                   value={limits[cmd.id]?.vnd || ""}

@@ -19,11 +19,17 @@ export const USE_MOCK = process.env.NEXT_PUBLIC_USE_MOCK === "1";
 export class ApiError extends Error {
   status: number;
   code?: string;
-  constructor(message: string, status: number, code?: string) {
+  /**
+   * Phần còn lại của thân lỗi BE ngoài `detail` và `code` (BE trải `details` dạng object ra ngang hàng, vd BR-AI-19 trả
+   * `{ errors: { <id lệnh>: "lý do" }, detail, code }` thì đây là `{ errors: {...} }`), để màn nêu rõ chỗ sai. Không bắt buộc.
+   */
+  details?: unknown;
+  constructor(message: string, status: number, code?: string, details?: unknown) {
     super(message);
     this.name = "ApiError";
     this.status = status;
     this.code = code;
+    this.details = details;
   }
 }
 
@@ -95,13 +101,29 @@ if (USE_MOCK && typeof window !== "undefined") {
   };
 }
 
+/**
+ * Thân yêu cầu như BE thấy: `apiFetch` TỰ `JSON.stringify` object, nên người gọi truyền object, KHÔNG truyền chuỗi JSON
+ * (chuỗi bị mã hoá lần hai, DRF trả 400 `Expected a dictionary, but got str`). FormData đi nguyên.
+ */
+function mockWireBody(body: unknown): { ok: true; body: unknown } | { ok: false } {
+  if (body === undefined || (typeof FormData !== "undefined" && body instanceof FormData)) return { ok: true, body };
+  const parsed: unknown = JSON.parse(JSON.stringify(body));
+  if (typeof parsed === "string") return { ok: false };
+  return { ok: true, body: parsed };
+}
+
 async function sendMock(path: string, init: ApiInit, token: string | null): Promise<MockResponse> {
   const method = init.method || "GET";
   mockRequestLog.push(`${method} ${path}`);
   mockPending += 1;
   try {
     await new Promise((r) => setTimeout(r, 250));
-    const req: MockRequest = { method, path, body: init.body, token };
+    // Mock đọc thân sau một vòng JSON y như trên dây; thân là chuỗi (mã hoá hai lần) thì trả 400 như BE thật.
+    const wire = mockWireBody(init.body);
+    if (!wire.ok) {
+      return { status: 400, body: { non_field_errors: ["Invalid data. Expected a dictionary, but got str."] } };
+    }
+    const req: MockRequest = { method, path, body: wire.body, token };
     const blocked = mockGate ? mockGate(req) : null;
     if (blocked) return blocked;
     if (!init.mock) {
@@ -144,12 +166,13 @@ async function sendReal(path: string, init: ApiInit, token: string | null): Prom
   return { status: res.status, body };
 }
 
-function detailOf(body: unknown): { detail?: string; code?: string } {
+function detailOf(body: unknown): { detail?: string; code?: string; details?: unknown } {
   if (body && typeof body === "object") {
-    const b = body as Record<string, unknown>;
+    const { detail, code, ...rest } = body as Record<string, unknown>;
     return {
-      detail: typeof b.detail === "string" ? b.detail : undefined,
-      code: typeof b.code === "string" ? b.code : undefined,
+      detail: typeof detail === "string" ? detail : undefined,
+      code: typeof code === "string" ? code : undefined,
+      details: Object.keys(rest).length > 0 ? rest : undefined,
     };
   }
   return {};
@@ -161,7 +184,7 @@ export async function apiFetch<T>(path: string, init: ApiInit = {}): Promise<T> 
 
   if (status >= 200 && status < 300) return (status === 204 ? undefined : body) as T;
 
-  const { detail, code } = detailOf(body);
+  const { detail, code, details } = detailOf(body);
   if (status === 401) {
     if (token && onUnauthorized) onUnauthorized();
     throw new ApiError(detail || MSG.unauthorized, 401, code);
@@ -174,7 +197,7 @@ export async function apiFetch<T>(path: string, init: ApiInit = {}): Promise<T> 
     // BR-PQ-12: ngoài phạm vi dòng cũng 404 — không tiết lộ bản ghi có tồn tại.
     throw new ApiError(detail || MSG.notFound, 404, code);
   }
-  if (status === 400) throw new ApiError(detail || MSG.badRequest, 400, code);
+  if (status === 400) throw new ApiError(detail || MSG.badRequest, 400, code, details);
   throw new ApiError(detail || MSG.server(status), status, code);
 }
 

@@ -319,3 +319,11 @@ Việc Duy trên staging (không phải QA): `backfill_credit_notes` dry-run tr�
 | Mã | Mức | Mô tả | Chỗ |
 |---|---|---|---|
 | Q1-PII | **Critical nếu xác nhận** (bất biến 9) | `nv_giao` nhận `customer_phone`/`customer_name` ở `GET /api/sales/orders/` và `phone`/`default_address` ở `GET /api/sales/customers/` — nghi thấy cả khách **ngoài** phiếu được giao; `nv_kho` nhận `customer_name`/`address` ở `GET /api/delivery/notes/` và xem được danh sách khách. Cần xác minh phạm vi + quyết định Duy (NV giao cần SĐT/địa chỉ của **phiếu mình** để giao; NV kho có cần không?) | `sales/orders/api.py`, `sales/customers/api.py`, `delivery/api.py` + serializer |
+
+### Phát hiện QA lô "lưu cài đặt AI" (01/10) — đưa P10 (có từ trước)
+| Mã | Mức | Mô tả | Chỗ |
+|---|---|---|---|
+| AIS-O1 | Medium | `record_audit(target_model=…, target_id=…)` bị `**kwargs` nuốt → AuditLog của kill/policy/config không ghi đối tượng (không biết Chủ tắt AI của ai) | `backend/apps/common/audit.py` + chỗ gọi trong `ai/settings`, `ai/policy` |
+| AIS-O2 | Low | AuditLog không ghi thay đổi trần chính sách / ngưỡng "AI của tôi" (`changes={}`); lần lưu chính sách đầu không ghi `global_mode` | `ai/policy/services.py`, `ai/settings/services.py` |
+| AIS-O3 | Low | `POST /api/content/categories/` thân JSON là chuỗi → 500 thay vì 400 | `content` API |
+| AIS-N | — | Nợ P9: cờ `killed_by_owner` để ẩn nút "Bật lại AI"; trần của Chủ trong `my-config`; màn AI dùng class Tailwind (ERP không có Tailwind) → viết lại CSS Module | `erp-console/features/ai/*` |

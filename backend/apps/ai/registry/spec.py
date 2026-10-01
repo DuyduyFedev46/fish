@@ -29,6 +29,7 @@ class CommandSpec:
     undo: str = ""                          # "cancel_action:<act>" | "defer" | ""
     undo_missing: bool = False              # True nếu undo trỏ tới action chưa có
     red_zone: bool = False
+    limits: dict = field(default_factory=dict)  # khai báo ngưỡng của AiMeta: {"<field>": "kg"|"vnd"}
     force_c: bool = False
     form_only: bool = False
     is_forbidden: bool = False

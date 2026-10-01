@@ -583,6 +583,9 @@ PUT /api/ai/my-config/
 → 400 {"code": "BR-AI-19", "errors": {"inventory.batch.close": "Vượt trần: tối đa C"}}
 → 400 {"code": "BR-AI-19", "errors": {"sales.refund.confirm": "Lệnh ngoài quyền của bạn"}}   // H1
 → 409 {"code": "AI_CONFIG_CONFLICT", "current_version": 8}         // hai tab — không ghi đè im lặng
+```
+> **Đính chính 01/10 (theo code thật, lô `2026-10-01-luu-cai-dat-ai`):** (L1) GET trả `limits` **phẳng** `{"kg": "…"|null, "vnd": "…"|null} | null` — chỉ giá trị người dùng đã lưu, **không** kèm trần của Chủ (dạng lồng `{mine, cap}` ở trên là thiết kế cũ, chưa làm). (L2) `PUT /api/ai/my-config/` **thay thế toàn bộ** `groups`, `overrides`, `limits` — khoá vắng = rỗng, nên client phải gửi lại đủ cả ba. Từ P8b, id/nhóm dùng tên tiếng Anh (`purchasing.purchasereceipt.receive_batches`, nhóm `purchasing|sales|customer_service`). (L3) Mỗi command thêm `supports_limits: bool` (`true` khi `AiMeta.limits` của lệnh khai báo ngưỡng, hiện chỉ lệnh nhập lô `receive_batches`); FE vẽ ô ngưỡng theo cờ này, không theo việc `limits` có khoá. Trần của Chủ vẫn chưa trả (để P9).
+```text
 
 POST /api/ai/my-config/kill/ {"killed": true}  → 200 {"version": 9, "killed": true}
 GET  /api/ai/my-config/versions/?page= → {count, results: [{"version": 8, "created_at": "…",

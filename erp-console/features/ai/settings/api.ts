@@ -1,132 +1,41 @@
-import { apiFetch, type MockRequest } from "@/shared/lib/http";
-import { COMMAND_GROUP, RECEIVE_BATCHES_COMMAND_ID } from "../commandGroups";
+import { apiFetch } from "@/shared/lib/http";
 import { normalizeMyConfig } from "../legacyIds";
 import type { MyConfig } from "../types";
+import type { MyConfigSavePayload } from "./payload";
+import { mockGetMyConfig, mockKillMyConfig, mockUpdateMyConfig } from "./mock";
 
-export const mockMyConfig: MyConfig = {
-  ai_enabled: true,
-  version: 1,
-  killed: false,
-  updated_at: new Date().toISOString(),
-  global_mode: "on",
-  write_levels_allowed: ["OFF", "C", "B"],
-  groups: [
-    {
-      group: COMMAND_GROUP.purchasing,
-      label: "Thu mua",
-      read_level: "A",
-      write_level: "C",
-      commands: [
-        {
-          id: "inventory.batch.list",
-          title: "Xem tồn kho theo lô",
-          kind: "read",
-          level: "A",
-          source: "default",
-          choices: ["OFF", "A"],
-          max_level: "A",
-          locked_reason: null,
-          red_zone: false,
-          limits: null,
-        },
-        {
-          id: "purchasing.purchasereceipt.submit",
-          title: "Gửi phiếu nhập kho",
-          kind: "write",
-          level: "C",
-          source: "default",
-          choices: ["OFF", "C"],
-          max_level: "C",
-          locked_reason: null,
-          red_zone: false,
-          limits: null,
-        },
-        {
-          id: RECEIVE_BATCHES_COMMAND_ID,
-          title: "Nhập lô mua tại cảng",
-          kind: "write",
-          level: "C",
-          source: "default",
-          choices: ["OFF", "C", "B"],
-          max_level: "B",
-          locked_reason: null,
-          red_zone: false,
-          limits: {
-            kg: { mine: null, cap: "200" },
-            vnd: { mine: null, cap: "30000000" },
-          },
-        },
-      ],
-    },
-    {
-      group: COMMAND_GROUP.sales,
-      label: "Bán hàng",
-      read_level: "A",
-      write_level: "C",
-      commands: [],
-    },
-    {
-      group: COMMAND_GROUP.customerService,
-      label: "CSKH",
-      read_level: "A",
-      write_level: "C",
-      commands: [],
-    },
-  ],
-};
+// Điều kiện mock viết nguyên văn tại từng chỗ dùng (không gán ra biến): bundler mới cắt nhánh mock khỏi bản build thật.
+// Mọi thân yêu cầu truyền là OBJECT: `apiFetch` tự JSON.stringify (không tự stringify lần nữa, SR-AIS-01).
 
 export async function getMyConfig(signal?: AbortSignal): Promise<MyConfig> {
-  const isMock = process.env.NEXT_PUBLIC_USE_MOCK === "1";
   return normalizeMyConfig(
     await apiFetch<MyConfig>("/api/ai/my-config/", {
       signal,
-      mock: isMock ? (_req: MockRequest) => ({ status: 200, body: mockMyConfig }) : undefined,
+      mock: process.env.NEXT_PUBLIC_USE_MOCK === "1" ? () => ({ status: 200, body: mockGetMyConfig() }) : undefined,
     })
   );
 }
 
+/** Thân phải đủ `groups`, `overrides`, `limits` (BE thay thế toàn bộ, xem ./payload.ts) — dựng bằng `buildMyConfigPayload`. */
 export async function updateMyConfig(
-  payload: {
-    base_version: number;
-    groups?: Record<string, { read?: string; write?: string }>;
-    overrides?: Record<string, string>;
-    limits?: Record<string, unknown>;
-    acknowledge_responsibility: boolean;
-  },
+  payload: MyConfigSavePayload,
   signal?: AbortSignal
 ): Promise<MyConfig> {
-  const isMock = process.env.NEXT_PUBLIC_USE_MOCK === "1";
-  return normalizeMyConfig(await apiFetch<MyConfig>("/api/ai/my-config/", {
-    method: "PUT",
-    body: JSON.stringify(payload),
-    signal,
-    mock: isMock
-      ? (_req: MockRequest) => ({
-          status: 200,
-          body: {
-            ...mockMyConfig,
-            version: payload.base_version + 1,
-            updated_at: new Date().toISOString(),
-          },
-        })
-      : undefined,
-  }));
+  return normalizeMyConfig(
+    await apiFetch<MyConfig>("/api/ai/my-config/", {
+      method: "PUT",
+      body: payload,
+      signal,
+      mock: process.env.NEXT_PUBLIC_USE_MOCK === "1" ? (req) => mockUpdateMyConfig(req.body) : undefined,
+    })
+  );
 }
 
-export async function killMyConfig(
-  killed: boolean,
-  signal?: AbortSignal
-): Promise<{ version: number; killed: boolean }> {
-  const isMock = process.env.NEXT_PUBLIC_USE_MOCK === "1";
+export async function killMyConfig(killed: boolean, signal?: AbortSignal): Promise<{ version: number; killed: boolean }> {
   return apiFetch<{ version: number; killed: boolean }>("/api/ai/my-config/kill/", {
     method: "POST",
-    body: JSON.stringify({ killed }),
+    body: { killed },
     signal,
-    mock: isMock
-      ? (_req: MockRequest) => ({
-          status: 200,
-          body: { version: mockMyConfig.version + 1, killed },
-        })
-      : undefined,
+    mock: process.env.NEXT_PUBLIC_USE_MOCK === "1" ? (req) => mockKillMyConfig(req.body) : undefined,
   });
 }

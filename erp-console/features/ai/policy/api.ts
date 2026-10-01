@@ -93,17 +93,25 @@ export async function updateAiPolicy(
   const isMock = process.env.NEXT_PUBLIC_USE_MOCK === "1";
   return normalizeAiPolicy(await apiFetch<AiPolicy>("/api/ai/policy/", {
     method: "PUT",
-    body: JSON.stringify(payload),
+    body: payload,
     signal,
     mock: isMock
-      ? (_req: MockRequest) => {
-          mockAiPolicy.version = payload.base_version + 1;
-          if (payload.global_mode) mockAiPolicy.global_mode = payload.global_mode;
-          if (payload.caps) mockAiPolicy.caps = payload.caps;
-          if (payload.red_zone) {
+      ? (req: MockRequest) => {
+          // Mock đọc thân đã qua JSON như BE thấy (không đọc `payload` của closure), và kiểm như BE: xác nhận trách nhiệm + phiên bản.
+          const sent = req.body as UpdateAiPolicyPayload;
+          if (!sent.acknowledge_responsibility) {
+            return { status: 400, body: { detail: "Bạn phải xác nhận chịu trách nhiệm cho chính sách AI.", code: "BR-AI-14" } };
+          }
+          if (sent.base_version !== mockAiPolicy.version) {
+            return { status: 409, body: { detail: "Chính sách AI đã thay đổi ở phiên khác.", code: "AI_POLICY_CONFLICT" } };
+          }
+          mockAiPolicy.version = sent.base_version + 1;
+          if (sent.global_mode) mockAiPolicy.global_mode = sent.global_mode;
+          if (sent.caps) mockAiPolicy.caps = sent.caps;
+          if (sent.red_zone) {
             mockAiPolicy.red_zone = mockAiPolicy.red_zone.map((rz) => ({
               ...rz,
-              open: payload.red_zone?.[rz.perm] !== undefined ? payload.red_zone[rz.perm] : rz.open,
+              open: sent.red_zone?.[rz.perm] !== undefined ? sent.red_zone[rz.perm] : rz.open,
             }));
           }
           return {
@@ -127,7 +135,7 @@ export async function killUserAi(
     `/api/ai/policy/users/${userId}/kill/`,
     {
       method: "POST",
-      body: JSON.stringify({ killed }),
+      body: { killed },
       signal,
       mock: isMock
         ? (_req: MockRequest) => ({

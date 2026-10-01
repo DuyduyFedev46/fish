@@ -219,11 +219,20 @@ export type MyConfigCommandItem = {
   max_level: AiCommandLevel;
   locked_reason: { code: string; text: string } | null;
   red_zone: boolean;
-  limits: {
-    kg?: { mine: string | null; cap: string | null };
-    vnd?: { mine: string | null; cap: string | null };
-  } | null;
+  /**
+   * Ngưỡng RIÊNG của người dùng cho lệnh này, dạng PHẲNG như BE thật trả (`AiConfigVersion.limits[id]`, chuỗi thập phân),
+   * `null` khi chưa đặt. BE KHÔNG trả trần của Chủ ở đây (02b §6.5 vẽ dạng lồng `{mine, cap}` nhưng BE không làm vậy).
+   */
+  limits: MyCommandLimits | null;
+  /**
+   * BE báo lệnh này CÓ khai ngưỡng (kg, vnd) hay không, bất kể người dùng đã đặt hay chưa. Ô ngưỡng vẽ theo cờ này, không theo
+   * việc `limits` đang có khoá (xoá ngưỡng xong BE trả `limits` null nhưng ô vẫn phải còn để nhập lại). Cờ mới: BE cũ chưa trả
+   * (undefined) thì FE tạm theo khoá `limits` đang có.
+   */
+  supports_limits?: boolean;
 };
+
+export type MyCommandLimits = { kg?: string | null; vnd?: string | null };
 
 export type MyConfigGroup = {
   group: AiCommandGroup;

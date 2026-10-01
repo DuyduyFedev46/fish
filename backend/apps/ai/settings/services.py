@@ -176,6 +176,7 @@ def get_user_config_data(user) -> dict:
                 "locked_reason": locked_reason,
                 "red_zone": red_zone,
                 "limits": cmd_limits,
+                "supports_limits": bool(getattr(spec, "limits", None)),
             })
 
         groups_data.append({
@@ -367,11 +368,43 @@ def update_user_config(
         return new_config
 
 
+def _killed_by_owner(user) -> bool:
+    """
+    BR-AI-22: lần tắt đang hiệu lực của `user` có do người giữ `ai.manage_ai_policy` (Chủ) làm không.
+
+    "Đang hiệu lực" = chuỗi phiên bản `killed=True` liên tiếp tính từ phiên bản `killed=False` gần nhất.
+    Trong chuỗi đó chỉ cần MỘT phiên bản do Chủ tạo là khoá; nhân viên lưu cấu hình (PUT) khi đang tắt
+    chỉ sinh thêm phiên bản `killed=True` do chính họ tạo nên không làm mất khoá. Không cần field mới.
+    """
+    versions = AiConfigVersion.objects.filter(user=user)
+    last_enabled = versions.filter(killed=False).order_by("-version").first()
+    run = versions.filter(killed=True).select_related("created_by")
+    if last_enabled:
+        run = run.filter(version__gt=last_enabled.version)
+    return any(
+        v.created_by_id != user.id and v.created_by.has_perm("ai.manage_ai_policy") for v in run
+    )
+
+
 def kill_user_config(user, *, killed: bool, created_by=None, note: str = "") -> AiConfigVersion:
-    """Tắt / Bật lại AI của user (DW-12-AC6, DW-13-AC3)."""
+    """
+    Tắt / Bật lại AI của user (DW-12-AC6, DW-13-AC3).
+
+    BR-AI-22 (Duy chốt 30/09): AI do Chủ tắt thì chỉ người giữ `ai.manage_ai_policy` bật lại được;
+    nhân viên tự tắt thì tự bật lại được.
+    """
+    actor = created_by or user
     with transaction.atomic():
         latest = AiConfigVersion.objects.select_for_update().filter(user=user).order_by("-version").first()
         current_version = latest.version if latest else 0
+
+        if not killed and latest and latest.killed and not actor.has_perm("ai.manage_ai_policy"):
+            if _killed_by_owner(user):
+                raise BusinessError(
+                    "Chủ đã tắt AI của bạn — chỉ Chủ bật lại được.",
+                    code="BR-AI-22",
+                    status_code=403,
+                )
         new_version = current_version + 1
 
         new_config = AiConfigVersion.objects.create(

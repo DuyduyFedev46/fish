@@ -58,8 +58,8 @@ export async function createCategory(
 ): Promise<ContentCategory> {
   return apiFetch<ContentCategory>("/api/content/categories/", {
     method: "POST",
-    body: JSON.stringify(payload),
-    mock: process.env.NEXT_PUBLIC_USE_MOCK === "1" ? () => ({ status: 201, body: mockCreateCategory(payload) }) : undefined,
+    body: payload,
+    mock: process.env.NEXT_PUBLIC_USE_MOCK === "1" ? (req) => ({ status: 201, body: mockCreateCategory(req.body as CategoryCreatePayload) }) : undefined,
   });
 }
 
@@ -69,8 +69,8 @@ export async function updateCategory(
 ): Promise<ContentCategory> {
   return apiFetch<ContentCategory>(`/api/content/categories/${id}/`, {
     method: "PATCH",
-    body: JSON.stringify(payload),
-    mock: process.env.NEXT_PUBLIC_USE_MOCK === "1" ? () => ({ status: 200, body: mockUpdateCategory(id, payload) }) : undefined,
+    body: payload,
+    mock: process.env.NEXT_PUBLIC_USE_MOCK === "1" ? (req) => ({ status: 200, body: mockUpdateCategory(id, req.body as CategoryUpdatePayload) }) : undefined,
   });
 }
 
