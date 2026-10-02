@@ -87,5 +87,49 @@ export type CostTargetBatch = {
   rate: string;
 };
 
+// ---- Hoá đơn bán (R13, ED-33) ----
+
+/**
+ * Một dòng GET /api/sales/invoices/. Hoá đơn chỉ do hệ thống phát hành khi đơn đủ tiền (BR-PQ-11), màn này chỉ đọc.
+ * `cogs` và `gross_profit` chỉ có khi người xem có view_costprice; `customer_name` là null khi người xem
+ * không có sales.view_customer_list (không phải chuỗi rỗng).
+ */
+export type SalesInvoiceRow = {
+  id: number;
+  /** Mã hoá đơn, dạng INV…. */
+  code: string;
+  sales_order: number;
+  order_code: string;
+  customer_name: string | null;
+  issued_at: string;
+  amount: string;
+  /** ISSUED | CANCELLED. */
+  status: string;
+  status_label: string;
+  cogs?: string;
+  gross_profit?: string;
+};
+
+/** Tổng trên TOÀN BỘ kết quả đã lọc (mọi trang), đã bỏ hoá đơn có trạng thái Đã huỷ. `gross_profit` chỉ khi có view_costprice. */
+export type SalesInvoiceTotals = { amount: string; gross_profit?: string };
+
+export type SalesInvoicePage = {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: SalesInvoiceRow[];
+  totals: SalesInvoiceTotals;
+};
+
+export type SalesInvoiceListParams = {
+  /** Mã hoá đơn hoặc mã đơn (BE không tìm theo tên hay SĐT khách). */
+  q: string;
+  /** "" = cả hai; ISSUED hoặc CANCELLED. */
+  status: string;
+  /** YYYY-MM-DD, ngày Việt Nam của `issued_at`. */
+  date_from: string;
+  date_to: string;
+};
+
 export type SupplierOption = { id: number; name: string };
 export type ReceiptOption = { id: number; code: string; supplier: number; label: string };

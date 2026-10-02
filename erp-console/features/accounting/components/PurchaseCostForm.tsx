@@ -7,12 +7,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/features/auth/components/AuthProvider";
-import { fetchReceipt, fetchReceipts } from "@/features/purchasing/api";
+import { fetchReceipt, fetchSuppliers } from "@/features/purchasing/api";
 import { receiptAbility } from "@/features/purchasing/receiptView";
 import type { ReceiptDetail } from "@/features/purchasing/types";
 import { ApiError } from "@/shared/lib/http";
 import { ENUMS } from "@/shared/lib/enums";
-import { dateOnly, kg, todayInVietnam, vnd } from "@/shared/lib/format";
+import { kg, todayInVietnam, vnd } from "@/shared/lib/format";
 import { formatMoneyInput } from "@/shared/lib/moneyInput";
 import { useResource } from "@/shared/lib/useResource";
 import { Field } from "@/shared/ui/form/Field";
@@ -29,6 +29,7 @@ import { createPurchaseCost } from "../api";
 import { checkAllocation, splitCost, type AllocationMethod } from "../costAllocation";
 import { CURRENCY_UNIT, moneyBody, moneyMessage, parseMoney } from "../money";
 import type { CostTargetBatch } from "../types";
+import { ReceiptSelect } from "./ReceiptSelect";
 import s from "../accounting.module.css";
 
 const COST_TYPE_OPTIONS = Object.entries(ENUMS.purchaseCostType).map(([value, entry]) => ({ value, label: entry.label }));
@@ -55,10 +56,11 @@ function PickOrForm({ initialId }: { initialId: number | null }) {
 }
 
 function ReceiptPicker({ onPick }: { onPick: (id: number) => void }) {
-  const list = useResource("accounting:receipts-for-cost", () => fetchReceipts({ status: "SUBMITTED", supplier: "", date_from: "", date_to: "", has_invoice: "" }, 1), 0);
+  // Nhà cung cấp lọc ở BE và "Tải thêm" trong ReceiptSelect, nên phiếu thứ 21 trở đi vẫn chọn được (nợ Lô 10).
+  const suppliers = useResource("accounting:cost-supplier-filter", () => fetchSuppliers(), 60_000);
+  const [supplier, setSupplier] = useState("");
   const [value, setValue] = useState("");
-  const options = [{ value: "", label: "Chọn phiếu nhập" }, ...(list.data?.results ?? []).map((r) => ({ value: String(r.id), label: `${r.code} · ${r.supplier_name} · ${dateOnly(r.received_date)}` }))];
-  if (list.error && !list.data) return <ErrorScreen onRetry={() => void list.reload()} homeHref="/purchasing/" />;
+  const supplierOptions = [{ value: "", label: "Mọi nhà cung cấp" }, ...(suppliers.data ?? []).map((x) => ({ value: String(x.id), label: x.name }))];
   return (
     <FormPage
       title="Nhập chi phí mua"
@@ -67,8 +69,8 @@ function ReceiptPicker({ onPick }: { onPick: (id: number) => void }) {
       primaryText="Tiếp tục"
       primaryDisabled={!value}
     >
-      <Field as="select" label="Phiếu nhập nhận chi phí" name="receipt" required value={value} onChange={setValue} options={options} />
-      {list.data && list.data.results.length === 0 && <p className="muted">Chưa có phiếu nhập đã ghi nhận để chia chi phí.</p>}
+      <Field as="select" label="Lọc theo nhà cung cấp" name="supplier_filter" value={supplier} onChange={setSupplier} options={supplierOptions} />
+      <ReceiptSelect label="Phiếu nhập nhận chi phí" name="receipt" required value={value} supplier={supplier} hasInvoice="" emptyLabel="Chọn phiếu nhập" onChange={(v) => setValue(v)} />
     </FormPage>
   );
 }

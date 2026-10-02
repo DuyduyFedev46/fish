@@ -53,6 +53,10 @@ const TARGETS = [
   // Nhà cung cấp (Lô 11): trang chi tiết có AiDocBlockGate (purchasing.supplier); danh sách không có AI. Cả hai phải xanh.
   ["/(console)/suppliers/page", "/suppliers"],
   ["/(console)/suppliers/detail/page", "/suppliers/detail"],
+  // Kế toán (Lô 12): Báo cáo lãi lỗ, Hoá đơn bán, Hoá đơn mua và chi phí phụ. Không có khối AI, phải xanh.
+  ["/(console)/reports/page", "/reports"],
+  ["/(console)/accounting/sales-invoices/page", "/accounting/sales-invoices"],
+  ["/(console)/accounting/purchase-invoices/page", "/accounting/purchase-invoices"],
 ];
 
 // Chuỗi đặc trưng của code AI chạy trên máy (worker, thư viện wllama, gọi lệnh AI).

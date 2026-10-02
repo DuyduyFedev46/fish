@@ -1,15 +1,16 @@
 "use client";
 
-// Tab "Hoá đơn mua" của màn Mua hàng (ED-20, R11: GET /api/purchasing/invoices/, 20 dòng/trang).
+// Danh sách hoá đơn mua (R11: GET /api/purchasing/invoices/, 20 dòng/trang), dùng ở hai nơi: tab của màn Mua hàng (ED-20)
+// và tab "Hoá đơn mua" của màn Hoá đơn mua & chi phí phụ (ED-34).
 // Cần purchasing.view_purchaseinvoice (Chủ, Quản lý). Quản lý thấy số tiền hoá đơn (quyết định D-3) nhưng không thêm được hoá đơn;
-// nhân viên kho không có tab này (và nếu vào thẳng thì BE trả 403 → màn "Không có quyền").
+// nhân viên kho không có màn này (và nếu vào thẳng thì BE trả 403 → màn "Không có quyền").
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { fetchSuppliers } from "@/features/purchasing/api";
 import { referenceHref } from "@/features/ledger/referenceRoutes";
 import { ApiError, loadErrorText } from "@/shared/lib/http";
 import { ENUMS } from "@/shared/lib/enums";
-import { dateOnly, todayInVietnam, vnd } from "@/shared/lib/format";
+import { dateOnly, dateTime, todayInVietnam, vnd } from "@/shared/lib/format";
 import { useResource } from "@/shared/lib/useResource";
 import { usePagedList } from "@/shared/lib/usePagedList";
 import { matches } from "@/shared/lib/search";
@@ -37,9 +38,19 @@ type Props = {
   canAdd: boolean;
   /** Có quyền chọn nhà cung cấp để lọc (purchasing.view_supplier). */
   canPickSupplier: boolean;
+  /** id vùng nội dung để nối aria-controls của tab. */
+  panelId?: string;
+  /** Nơi "Về trang chính" khi 403. */
+  homeHref?: string;
 };
 
-export function PurchaseInvoiceList({ tabs, canAdd, canPickSupplier }: Props) {
+/** "Đang hiện 8 / 8 hoá đơn · 3 chưa trả". Số chưa trả đếm trong các dòng đã tải; còn trang sau thì ghi rõ để không hiểu nhầm là tổng. */
+export function summaryText(rows: PurchaseInvoiceRow[], count: number, hasMore: boolean): string {
+  const unpaid = rows.filter((r) => !r.is_paid).length;
+  return `Đang hiện ${rows.length} / ${count} hoá đơn · ${unpaid} chưa trả${hasMore ? " (trong số đã tải)" : ""}`;
+}
+
+export function PurchaseInvoiceList({ tabs, canAdd, canPickSupplier, panelId = "purchasing-panel", homeHref = "/purchasing/" }: Props) {
   const toast = useToast();
   const [query, setQuery] = useState("");
   const [paid, setPaid] = useState("");
@@ -63,7 +74,7 @@ export function PurchaseInvoiceList({ tabs, canAdd, canPickSupplier }: Props) {
     setMonth("");
   };
 
-  if (list.error instanceof ApiError && list.error.status === 403) return <NoPermission homeHref="/purchasing/" />;
+  if (list.error instanceof ApiError && list.error.status === 403) return <NoPermission homeHref={homeHref} />;
 
   const columns: Column<PurchaseInvoiceRow>[] = [
     { key: "code", header: "Hoá đơn", mono: true, width: "96px", render: (r) => r.code },
@@ -85,19 +96,21 @@ export function PurchaseInvoiceList({ tabs, canAdd, canPickSupplier }: Props) {
       },
     },
     { key: "date", header: "Ngày hoá đơn", num: true, render: (r) => dateOnly(r.invoice_date) },
-    { key: "amount", header: "Số tiền", num: true, render: (r) => vnd(r.amount) },
+    // Số tiền có icon khoá nhưng Quản lý vẫn thấy (quyết định D-3): cột này không phụ thuộc view_costprice, nên màn luôn truyền canViewCost.
+    { key: "amount", header: "Số tiền", num: true, locked: true, render: (r) => vnd(r.amount) },
     { key: "paid", header: "Tình trạng", render: (r) => <Chip table={ENUMS.purchaseInvoicePaid} value={String(r.is_paid)} /> },
+    { key: "paidAt", header: "Trả lúc", num: true, render: (r) => (r.paid_at ? dateTime(r.paid_at) : <span className="muted">—</span>) },
   ];
 
   return (
     <>
       <ListPage
-        id="purchasing-panel"
+        id={panelId}
         tabs={tabs}
         actions={
           canAdd ? (
             <button type="button" className="btn primary" onClick={() => setAdding(true)} data-testid="add-invoice">
-              Thêm hoá đơn
+              Thêm hoá đơn mua
             </button>
           ) : undefined
         }
@@ -115,7 +128,7 @@ export function PurchaseInvoiceList({ tabs, canAdd, canPickSupplier }: Props) {
                 ...(canPickSupplier ? [{ key: "supplier", label: "Nhà cung cấp", value: supplier, options: supplierOptions, onChange: setSupplier }] : []),
                 { key: "month", label: "Tháng hoá đơn", value: month, options: monthOptions, onChange: setMonth },
               ]}
-              summary={rows && list.count >= 0 ? `Đang hiện ${rows.length} / ${list.count} hoá đơn` : undefined}
+              summary={rows && list.count >= 0 ? summaryText(rows, list.count, list.hasMore) : undefined}
             >
               {filtering && (
                 <button type="button" className="btn" onClick={clear}>

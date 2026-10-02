@@ -2117,3 +2117,42 @@ FE `erp-console/`, theo quyết định của Duy 02/10/2026. Không sửa `back
 - **TLA-FE-L3:** nhờ xong thì mục "Nhờ người xử lý" ẩn khỏi menu "…" ở màn đơn và màn lô (theo khoá bước, trong phiên trang).
 - **TLA-FE-L5:** mock kiểm kê dùng nhãn "Gửi duyệt" / "Trả về nháp để sửa" và câu `RECON_NOT_DRAFT` nguyên văn của BE (cả ba chỗ trong mock); `TT_WRONG_STATUS` là "Đơn không ở trạng thái Giữ chỗ." Thêm helper mock `stocktakeSubmitByOther` và ca e2e `stale_submit` trong `ed_batch8_stocktake.py`; thêm kiểm L3 trong `ed_bonusA_ui.py`.
 - **TLA-FE-L6:** sửa dòng `COST_LANDED_OVERFLOW` ở trên (alert đầu form) và comment `onReload` của `EscalateModal`.
+
+## Lô 12 — FE (Kế toán: ED-32 Báo cáo lãi lỗ, ED-33 Hoá đơn bán, ED-34 Hoá đơn mua & chi phí phụ)
+
+FE `erp-console/` (02/10/2026). Không sửa `backend/`, `adapter/`, `features/catalog/**`, `features/purchasing/**`; không push, không deploy. Mỗi màn có nhánh mock (`NEXT_PUBLIC_USE_MOCK=1`) và lời gọi API thật.
+
+### Trang và component
+- **ED-32 `/reports/`** (`app/(console)/reports/page.tsx`, `features/reports/`): `ProfitReportScreen` (dải 6 số liệu của tháng + so với tháng trước, "Cấu thành lãi", bảng "Lãi lỗ theo lô" có tab Tất cả / Đã chốt / Tạm tính, "Tải thêm", tấm chi tiết lô). Dưới bộ chọn tháng ghi rõ tiêu chí "lô phát sinh trong tháng: nhập, có hoá đơn bán hoặc chốt trong tháng". Chỉ Chủ. Kỳ trống hiện trạng thái trống, không số 0 giả. Tiền cộng trừ bằng chuỗi thập phân (`decimal.ts`, BigInt), không dùng số thực. Lỗi tải lại thì ẩn số cũ, hiện "Thử lại".
+- **ED-33 `/accounting/sales-invoices/`** (`SalesInvoiceListScreen`): tìm theo mã hoá đơn / mã đơn (chữ gõ chạy qua debounce), lọc trạng thái, khoảng ngày xuất (ngày ngược thì báo dưới ô, không gọi API). Chân bảng: tổng số tiền của cả kết quả đã lọc (BE tính, không cộng trang đang hiện), kèm Lãi gộp khi có quyền giá vốn; "Tải thêm". Banner ghi: tổng gồm hoá đơn của đơn đã huỷ, doanh thu thực ở Báo cáo lãi lỗ (có liên kết khi người xem là Chủ).
+- **ED-34 `/accounting/purchase-invoices/`** (`PurchaseAccountingScreen`): hai tab theo quyền, "Hoá đơn mua" và "Chi phí phụ"; tái dùng `PurchaseInvoiceList` / `PurchaseCostList` của Lô 10 (thêm props `panelId`, `homeHref`). Danh sách hoá đơn mua có dòng tóm tắt "Đang hiện n / m hoá đơn · k chưa trả", cột Số tiền (Quản lý vẫn thấy, quyết định D-3) và cột "Trả lúc". Nút "Thêm hoá đơn mua" và "Thêm chi phí phụ" chỉ Chủ.
+- `PurchaseInvoiceForm` viết lại: chọn nhà cung cấp trước, rồi phiếu nhập (chỉ phiếu chưa có hoá đơn, lọc ở máy chủ); chọn phiếu thì điền gợi ý số tiền theo tiền mua đã làm tròn đồng (`suggestedAmount`, ".50" làm tròn lên); tick "Đã trả tiền" thì hiện "Trả lúc" (giờ mặc định là bây giờ theo giờ Việt Nam, gửi dạng ISO có múi giờ).
+- `ReceiptSelect` (mới): bộ chọn phiếu nhập có "Tải thêm phiếu nhập" và đếm "Đang hiện n / m phiếu nhập" (khắc phục nợ Lô 10: bộ chọn chỉ tải 20 phiếu). Dùng ở form hoá đơn mua và form chi phí (form chi phí thêm ô "Lọc theo nhà cung cấp").
+- Menu (`shared/lib/nav.ts`): "Hoá đơn bán" và "Hoá đơn mua & chi phí" bỏ nhãn `soon`, trỏ tới hai đường dẫn trên; "Báo cáo lãi lỗ" đã có từ trước.
+- Phân quyền xem (đã kiểm bằng e2e): Chủ thấy cả ba; Quản lý chỉ Hoá đơn bán (không Giá vốn / Lãi gộp) và Hoá đơn mua (thấy số tiền, không tab Chi phí phụ, không nút thêm); NV kho chỉ Hoá đơn bán, không giá vốn, không cột Khách hàng; giao1 và cs2 không có menu, vào thẳng URL thấy "Không có quyền".
+
+### Hàm API mới
+`fetchPeriodReport(year, month)`, `fetchBatchReport(params, page)` (`features/reports/api.ts`); `fetchSalesInvoices(params, page)` (`features/accounting/api.ts`). Mock: `window.__caveMock.reports("ok"|"fail")`, `window.__caveMock.salesInvoices("ok"|"fail")`.
+
+### Kiểm chứng (chạy lại trong lượt này)
+- `npm ci`; `npx tsc --noEmit`: sạch. `npx vitest run`: 71 file, 788 test đạt (mới: `decimal`, `reportView`, `receiptOptions`, `suggestedAmount`).
+- `NEXT_PUBLIC_USE_MOCK=0 npm run build` + `check-no-mock.mjs` + `check-ai-chunks.mjs`: XANH (32 màn nghiệp vụ và 2 layout không kéo `new Worker`, `wllama`, `/call/`).
+- `python3 scripts/check_naming.py`: OK, không vi phạm mới. Màu hex/rgba trong phần Lô 12: không có (còn vài mã hex cũ ở `app/(console)/content/edit/edit.module.css`, không thuộc lô này).
+- E2E trên bản build mock, cổng 3501 (đã tắt): `ed_batch12_accounting` 90/90 (5 vai, kỳ trống, chế độ lỗi, lọc, hộp thêm hoá đơn, 360px, không rò dữ liệu cá nhân); hồi quy `ed_batch1_shell` 56/56, `ed_batch2_patterns` 75/75, `ed_batch10_purchasing` 115/115, `ed_batch11_suppliers` 103/103.
+- Sửa e2e cũ vì menu đổi: `ed_batch1_shell.py` (ROLE_MENU) và `qa_ed_batch1_common.py` (EXPECTED_MENU) thêm mục Kế toán mới cho loc, ql1, kho1. `scripts/check-ai-chunks.mjs` thêm 3 route Lô 12 vào TARGETS.
+- `qa_ed_batch1_roles.py` còn 3 lỗi không do lô này (giao1 có thêm mục "Hàng hoàn về kho" từ Lô 8, `/ai/policy/` mở cho mọi vai trong mock, `KeyError: 'Khách hàng'`); script cũ, chưa cập nhật theo các lô sau Lô 1.
+
+### Ảnh chụp (`doc/features/2026-10-01-erp-theo-design/shots/lo12/`)
+`ed12-1-loc-bao-cao.png`, `ed12-2-loc-chi-tiet-lo.png`, `ed12-3-loc-ky-trong.png`, `ed12-4-loc-loi.png`, `ed12-5-loc-hoa-don-ban.png`, `ed12-6-loc-hoa-don-mua.png`, `ed12-7-loc-them-hoa-don.png`, `ed12-8-loc-chi-phi-phu.png`, `ed12-9-loc-form-chi-phi.png`, `ed12-10-ql1-hoa-don-ban.png`, `ed12-11-ql1-hoa-don-mua.png`, `ed12-12-kho1-hoa-don-ban.png`, `ed12-13-m-bao-cao.png`, `ed12-14-m-hoa-don-ban.png`, `ed12-15-m-hoa-don-mua.png`, `ed12-16-m-them-hoa-don.png` (m = 360px).
+
+### Chỗ lệch contract và việc còn nợ
+- **kho1 xem Hoá đơn bán (lệch story):** ED-33-AC4 / ED-34-AC5 trong `02-stories.md` viết khác; làm theo quyết định #12 của Duy và BE: NV kho thấy Hoá đơn bán, không cột Giá vốn / Lãi gộp. Tên khách khi thiếu quyền xem khách hàng: ẩn cả cột (BE trả `null`) thay vì để ô trống.
+- **Báo cáo theo năm:** API chỉ có `year` + `month`, nên bộ chọn kỳ chỉ có tháng (12 tháng gần nhất); chưa có "Năm" và chưa có khối AI ở W3a.
+- **Nhãn tab ở màn Mua hàng:** vẫn là "Chi phí mua" (e2e `ed_batch10` kiểm nhãn cũ); màn mới ghi "Chi phí phụ". Nên thống nhất một nhãn khi sửa e2e Lô 10.
+- **Chưa có màn sửa chi phí:** nên chưa có chỗ hiện `COST_ALLOCATED_LOCKED` (chỉ tạo mới). Form chi phí vẫn có liên kết quay lại `/purchasing/?tab=costs`.
+- **Bộ chọn phiếu nhập:** BE danh sách phiếu nhập có lọc `supplier` và `has_invoice` nhưng KHÔNG có `q`, nên thay tìm chữ bằng lọc nhà cung cấp ở máy chủ + "Tải thêm". Ca "Tải thêm" của bộ chọn chưa chạy e2e được trên mock (mock Lô 10 có chưa tới 21 phiếu đã ghi nhận và `features/purchasing/mock.ts` ngoài phạm vi); được phủ bằng test đơn vị của `receiptOptions`. Tương tự bảng "Lãi lỗ theo lô" của mock chỉ có 12 lô mỗi tháng nên nút "Tải thêm" chưa chạy e2e (dùng chung `usePagedList` với các danh sách khác đã kiểm).
+- **BE không kiểm `paid_at`** khi tạo hoá đơn mua (không bắt buộc, không ngăn giờ ở tương lai); FE chỉ bắt buộc có giờ khi tick "Đã trả tiền".
+- **Người có `viewPurchaseCost` nhưng không có `can_view_cost`:** màn "Hoá đơn mua & chi phí" cho họ tab Chi phí phụ theo quyền xem chi phí, danh sách cột tiền sẽ bị khoá; hiện chỉ Chủ có quyền này nên chưa phát sinh.
+- **Icon:** `trending_*` không có trong tập con font nên đã đổi sang `north_east` / `south_west`; thêm icon mới phải chạy `scripts/subset-material-symbols.py`.
+- **Chưa kiểm với BE thật:** R11/R12/R13 và hai endpoint báo cáo (cần QA chạy e2e `*_real` khi BE Lô 12 sẵn sàng).
+- Kho mock `cave_erp_mock_orders` (Lô 5, chỉ có ở bản build mock) lưu đơn bịa có tên và SĐT mẫu trong sessionStorage; e2e Lô 12 bỏ qua các khoá `cave_erp_mock_*` khi kiểm rò dữ liệu cá nhân. Bản thật không có kho này (check-no-mock xanh).
