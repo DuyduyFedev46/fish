@@ -32,3 +32,13 @@ describe("tabHref", () => {
     expect(tabHref(at(""), "pay", "all")).not.toMatch(/phone|name|address/i);
   });
 });
+
+describe("tham số tab tuỳ chọn (một trang có hai thanh tab)", () => {
+  it("đọc/ghi đúng tên tham số, không đụng ?tab=", () => {
+    expect(tabFromSearch("?status=resolved", ["open", "resolved"], "open", "status")).toBe("resolved");
+    expect(tabFromSearch("?tab=resolved", ["open", "resolved"], "open", "status")).toBe("open");
+    const loc = { pathname: "/orders/payments/", search: "?tab=x", hash: "" };
+    expect(tabHref(loc, "resolved", "open", "status")).toBe("/orders/payments/?tab=x&status=resolved");
+    expect(tabHref({ ...loc, search: "?status=resolved" }, "open", "open", "status")).toBe("/orders/payments/");
+  });
+});

@@ -10,14 +10,37 @@
 import { useSyncExternalStore } from "react";
 import { hasAiConsent, subscribeAiConsent } from "./consent";
 
+/** Mỗi "người hỏi status" là một chủ: cờ = có ít nhất một chủ đang báo bật. Trang chi tiết (AiDocBlockGate) là chủ riêng
+ * và nhả khi rời trang, nên cờ không dính theo lịch sử điều hướng (review Lô 2, L2). Cổng trợ lý ở khung dùng chủ chung. */
+export type AiGateOwner = symbol;
+const SHARED_OWNER: AiGateOwner = Symbol("shared");
+const owners = new Map<AiGateOwner, boolean>();
 let enabled = false;
 const listeners = new Set<() => void>();
 
-/** Chỉ `getAiStatus` (features/ai/api.ts) gọi hàm này. */
-export function publishAiEnabled(v: boolean): void {
-  if (enabled === v) return;
-  enabled = v;
+function recompute(): void {
+  const next = [...owners.values()].some(Boolean);
+  if (next === enabled) return;
+  enabled = next;
   listeners.forEach((cb) => cb());
+}
+
+/** Chỉ `getAiStatus` (features/ai/api.ts) gọi hàm này. `owner` bỏ trống = chủ chung (không bao giờ nhả). */
+export function publishAiEnabled(v: boolean, owner: AiGateOwner = SHARED_OWNER): void {
+  owners.set(owner, v);
+  recompute();
+}
+
+/** Chủ riêng nhả phần của mình (rời trang). Chủ chung không nhả. */
+export function releaseAiEnabled(owner: AiGateOwner): void {
+  if (owner === SHARED_OWNER) return;
+  owners.delete(owner);
+  recompute();
+}
+
+/** Cờ "AI bật" thô (chưa tính đồng ý) — để test. */
+export function isAiFlagOn(): boolean {
+  return enabled;
 }
 
 function subscribe(cb: () => void): () => void {

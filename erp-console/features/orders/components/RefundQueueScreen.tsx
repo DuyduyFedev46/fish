@@ -1,200 +1,150 @@
 "use client";
 
-// S16 — Phiếu hoàn chờ chuyển (menu con "Phiếu hoàn chờ chuyển" của "Đơn & tiền", ưu tiên điện thoại). Danh sách
-// GET /api/sales/refunds/?status=PENDING,FAILED (Chờ hoàn + Thất bại gộp chung — cả hai đều "đang chờ Lộc xử lý"),
-// 20 dòng/trang + "Tải thêm". Bấm một phiếu → tấm chi tiết (RefundSheet) với nút theo `available_actions`: xác nhận đã
-// chuyển, báo thất bại, thử lại (S16-AC7: Quản lý thấy danh sách nhưng không có nút vì thiếu sales.confirm_refund).
-// Page bọc <ViewGuard view="refunds">.
+// Phiếu hoàn (ED-12, tab 3 của "Đơn & tiền"). Chip Chờ hoàn · Đã hoàn · Thất bại; cột "Số tiền hoàn". Mặc định hiện phiếu
+// còn phải chuyển (Chờ hoàn + Thất bại); lọc theo tháng (`month=YYYY-MM`) thì có thêm câu tổng tiền của tháng đó theo từng trạng thái (Chờ hoàn, Đã hoàn; không tính Thất bại).
+// Quản lý xem được danh sách, không có nút xử lý (BE trả `available_actions` rỗng). Bấm dòng → /orders/refunds/detail/?id=.
 
-import { useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useAuth } from "@/features/auth/components/AuthProvider";
 import { ApiError, loadErrorText } from "@/shared/lib/http";
 import { dateTime, vnd } from "@/shared/lib/format";
-import { Figure } from "@/shared/ui/Figure";
-import { Icon } from "@/shared/ui/Icon";
-import { SkeletonScreen, SkeletonTable } from "@/shared/ui/Skeleton";
-import { ErrorBox } from "@/shared/ui/StateBox";
-import { StatusChip } from "@/shared/ui/StatusChip";
-import { Toast } from "@/shared/ui/Toast";
-import { listRefundQueue } from "../api";
-import { REFUND_LABEL, REFUND_STATUS, labelOf } from "../labels";
-import { REFUND_Q_MSG } from "../messages";
-import type { RefundQueueItem } from "../types";
+import { ENUMS } from "@/shared/lib/enums";
 import { usePagedList } from "@/shared/lib/usePagedList";
-import { OrdersTabs } from "./OrdersTabs";
-import { RefundSheet } from "./RefundSheet";
+import { Chip } from "@/shared/ui/Chip";
+import { Icon } from "@/shared/ui/Icon";
+import { DataTable, type Column } from "@/shared/ui/list/DataTable";
+import { FilterBar } from "@/shared/ui/list/FilterBar";
+import { ListPage } from "@/shared/ui/list/ListPage";
+import { NoPermission } from "@/shared/ui/states/NoPermission";
+import { listRefunds } from "../api";
+import { recentMonths } from "../filters";
+import { ORDERS_MSG as M } from "../messages";
+import type { RefundListParams, RefundQueueItem } from "../types";
+import { OrdersSectionTabs } from "./OrdersSectionTabs";
 import s from "../orders.module.css";
 
-const NO_PARAMS: Record<string, never> = {};
+const STATUS_OPTIONS = [
+  { value: "PENDING,FAILED", label: "Chờ chuyển (Chờ hoàn, Thất bại)" },
+  { value: "PENDING", label: "Chờ hoàn" },
+  { value: "FAILED", label: "Thất bại" },
+  { value: "REFUNDED", label: "Đã hoàn" },
+  { value: "", label: "Mọi trạng thái" },
+];
 
-function Row({ r, onOpen }: { r: RefundQueueItem; onOpen: () => void }) {
-  const statusLabel = r.status_label || labelOf(REFUND_LABEL, r.status);
-  return (
-    <li className={s.row}>
-      <button type="button" className={`${s.open} ${s.rOpen} refund-open`} onClick={onOpen} aria-haspopup="dialog" data-id={r.id}>
-        <span className={s.rType}>
-          <StatusChip map={REFUND_STATUS} status={r.status} label={statusLabel} />
-        </span>
-        <span className={`${s.cAmt} num`}>
-          <span className="sr-only">, số tiền </span>
-          <Figure text={vnd(r.amount)} />
-        </span>
-        <span className={s.rOrder}>
-          {r.order_code ? (
-            <>
-              <span className="sr-only">, đơn </span>
-              <code className={s.qCode}>{r.order_code}</code>
-            </>
-          ) : (
-            <span className={s.sub}>{REFUND_Q_MSG.noOrder}</span>
-          )}
-          {r.customer_name && <span className={s.qCust}>{r.customer_name}</span>}
-        </span>
-        <span className={s.rCreated}>
-          <span className={s.sub}>
-            <span className="sr-only">, lập bởi </span>
-            {r.created_by === null || r.created_by === undefined
-              ? "Hệ thống"
-              : typeof r.created_by === "string"
-              ? r.created_by
-              : `#${r.created_by}`}
-          </span>
-          {r.created_at && (
-            <span className={`${s.sub} num`}>
-              <span className="sr-only">, lúc </span>
-              {dateTime(r.created_at)}
-            </span>
-          )}
-        </span>
-      </button>
-    </li>
-  );
+export type MonthPart = { status: "PENDING" | "REFUNDED"; count: number; total: string };
+
+/**
+ * Cộng tiền phiếu hoàn theo TỪNG trạng thái (Chờ hoàn, Đã hoàn) để câu tổng nói rõ đang cộng những phiếu nào theo bộ lọc.
+ * Phiếu Thất bại không tính (tiền chưa rời túi), chỉ đếm riêng để câu chữ nhắc. Số tiền là chuỗi, cộng bằng số nguyên đồng.
+ */
+export function monthBreakdown(rows: readonly RefundQueueItem[]): { parts: MonthPart[]; failedCount: number } {
+  const parts: MonthPart[] = [];
+  for (const status of ["PENDING", "REFUNDED"] as const) {
+    const hit = rows.filter((r) => r.status === status);
+    if (hit.length > 0) parts.push({ status, count: hit.length, total: String(hit.reduce((sum, r) => sum + Math.round(Number(r.amount) || 0), 0)) });
+  }
+  return { parts, failedCount: rows.filter((r) => r.status === "FAILED").length };
 }
 
 export function RefundQueueScreen() {
-  const list = usePagedList<RefundQueueItem, Record<string, never>>(listRefundQueue, NO_PARAMS, true);
-  const [openItem, setOpenItem] = useState<RefundQueueItem | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
-  const pendingToast = useRef<string | null>(null);
-  const changed = useRef(false);
+  const { me } = useAuth();
+  const [status, setStatus] = useState("PENDING,FAILED");
+  const [month, setMonth] = useState("");
+  const [q, setQ] = useState("");
+  const params: RefundListParams = useMemo(() => ({ status, month }), [status, month]);
+  const list = usePagedList<RefundQueueItem, RefundListParams>(listRefunds, params, !!me);
+  const months = useMemo(() => recentMonths(), []);
 
-  const forbidden = list.error instanceof ApiError && list.error.status === 403;
+  // Có lọc tháng → tải hết các trang để dòng tổng đúng cho cả tháng.
+  useEffect(() => {
+    if (month && list.hasMore && !list.moreLoading && !list.loading && list.moreError == null) void list.loadMore();
+  }, [month, list]);
 
-  const afterClose = () => {
-    if (changed.current) {
-      changed.current = false;
-      void list.reload();
-    }
-    if (pendingToast.current) {
-      setToast(pendingToast.current);
-      pendingToast.current = null;
-    }
-  };
+  if (list.error instanceof ApiError && list.error.status === 403) return <NoPermission />;
+
+  const needle = q.trim().toLowerCase();
+  const rows = list.rows
+    ? needle
+      ? list.rows.filter((r) => (r.order_code ?? "").toLowerCase().includes(needle) || String(r.id).includes(needle))
+      : list.rows
+    : null;
+  const summary = month && list.rows && !list.hasMore ? monthBreakdown(list.rows) : null;
+  const monthLabel = months.find((m) => m.value === month)?.label ?? month;
+
+  const columns: Column<RefundQueueItem>[] = [
+    { key: "id", header: M.colRefundId, mono: true, render: (r) => `#${r.id}` },
+    { key: "order", header: M.colRefundOrder, mono: true, render: (r) => r.order_code ?? <span className="muted">{M.noInvoice}</span> },
+    { key: "status", header: M.colStatus, render: (r) => <Chip table={ENUMS.refundStatus} value={r.status} /> },
+    { key: "amount", header: M.colRefundAmount, num: true, render: (r) => vnd(r.amount) },
+    { key: "at", header: M.colRefundCreatedAt, num: true, render: (r) => dateTime(r.created_at) },
+  ];
+  const refreshFailed = list.rows !== undefined && list.error != null && !list.loading;
 
   return (
-    <div className="screen">
-      <OrdersTabs current="refunds" />
-      <p className="view-head">{REFUND_Q_MSG.intro}</p>
-
-      {list.rows === undefined ? (
-        list.error && !list.loading ? (
-          <ErrorBox icon={forbidden ? "lock" : undefined} message={loadErrorText(list.error)} onRetry={() => void list.reload()} />
-        ) : (
-          <SkeletonScreen label={REFUND_Q_MSG.loading}>
-            <SkeletonTable rows={5} cols={4} />
-          </SkeletonScreen>
-        )
-      ) : (
-        <section className="sect" aria-labelledby="refund-h" aria-busy={list.loading}>
-          <div className="sect-h">
-            <h2 id="refund-h">{REFUND_Q_MSG.listTitle}</h2>
-            <span className="sub num" aria-live="polite">
-              {list.loading ? "Đang tải…" : REFUND_Q_MSG.shown(list.rows.length, list.count)}
-            </span>
-            <button type="button" className="link" onClick={() => void list.reload()} disabled={list.loading}>
-              <Icon name="refresh" className={list.loading ? "spin" : undefined} />
-              {REFUND_Q_MSG.refresh}
-            </button>
-          </div>
-          {list.error != null && !list.loading && (
+    <ListPage
+      tabs={<OrdersSectionTabs current="refunds" />}
+      filters={
+        <FilterBar
+          query={q}
+          onQuery={setQ}
+          placeholder="Tìm mã đơn hoặc số phiếu"
+          searchLabel={M.refundsSearchLabel}
+          selects={[
+            { key: "status", label: M.refundsFilterStatus, value: status, options: STATUS_OPTIONS, onChange: setStatus },
+            { key: "month", label: M.refundsFilterMonth, value: month, options: [{ value: "", label: "Mọi tháng" }, ...months], onChange: setMonth },
+          ]}
+          summary={list.rows ? M.refundsShown(list.rows.length, list.count) : undefined}
+        />
+      }
+      banner={
+        <>
+          {summary && (
+            <p className={`${s.summaryLine} num`} role="status">
+              {M.refundsMonthSummary(monthLabel, summary.parts, summary.failedCount)}
+            </p>
+          )}
+          {refreshFailed && (
             <div className="alert-box err" role="alert">
               <Icon name="sync_problem" />
               <span>{loadErrorText(list.error)}</span>
             </div>
           )}
-          {list.rows.length ? (
-            <>
-              <div className={`${s.head} ${s.rHead}`} aria-hidden="true">
-                <span>Trạng thái</span>
-                <span>Đơn liên quan</span>
-                <span>Lập lúc</span>
-                <span className={s.hAmt}>Số tiền</span>
-              </div>
-              <ul className={`${s.rows} refund-list`}>
-                {list.rows.map((r) => (
-                  <Row
-                    key={r.id}
-                    r={r}
-                    onOpen={() => {
-                      setToast(null);
-                      pendingToast.current = null;
-                      setOpenItem(r);
-                    }}
-                  />
-                ))}
-              </ul>
-              {list.moreError != null && (
-                <div className="alert-box err" role="alert">
-                  <Icon name="error" />
-                  <span>{loadErrorText(list.moreError)}</span>
-                </div>
-              )}
-              {list.hasMore && (
-                <div className={s.more}>
-                  <button
-                    type="button"
-                    className="btn"
-                    onClick={() => void list.loadMore()}
-                    disabled={list.moreLoading}
-                    aria-busy={list.moreLoading || undefined}
-                  >
-                    {list.moreLoading ? <Icon name="progress_activity" className="spin" /> : <Icon name="expand_more" />}
-                    {list.moreLoading ? REFUND_Q_MSG.loadingMore : REFUND_Q_MSG.loadMore}
-                  </button>
-                </div>
-              )}
-            </>
-          ) : (
-            <div className={`state ${s.emptyState}`}>
-              <span className="state-ic">
-                <Icon name="task_alt" />
-              </span>
-              <h3 className="state-title">{REFUND_Q_MSG.emptyTitle}</h3>
-              <p>{REFUND_Q_MSG.emptyHint}</p>
-              <button type="button" className="btn" onClick={() => void list.reload()}>
-                <Icon name="refresh" />
-                Làm mới danh sách
-              </button>
-            </div>
+        </>
+      }
+      footer={
+        <>
+          {list.moreError != null && (
+            <span className="field-err" role="alert">
+              {M.loadMoreFailed} {loadErrorText(list.moreError)}
+            </span>
           )}
-        </section>
-      )}
-
-      {openItem && (
-        <RefundSheet
-          key={openItem.id}
-          item={openItem}
-          onChanged={(message) => {
-            changed.current = true;
-            pendingToast.current = message;
-          }}
-          onClose={() => {
-            setOpenItem(null);
-            afterClose();
-          }}
-        />
-      )}
-
-      {toast && !openItem && <Toast key={toast} message={toast} onClose={() => setToast(null)} />}
-    </div>
+          {list.hasMore && (
+            <button type="button" className="btn" onClick={() => void list.loadMore()} disabled={list.moreLoading} aria-busy={list.moreLoading || undefined}>
+              {list.moreLoading ? M.loadingMore : M.refundsLoadMore}
+            </button>
+          )}
+        </>
+      }
+    >
+      <DataTable
+        caption={M.refundsListTitle}
+        columns={columns}
+        rows={rows}
+        rowKey={(r) => r.id}
+        rowHref={(r) => `/orders/refunds/detail/?id=${r.id}`}
+        loading={list.loading && list.rows === undefined}
+        error={list.rows === undefined && list.error != null ? loadErrorText(list.error) : null}
+        onRetry={() => void list.reload()}
+        query={q}
+        onClearQuery={() => setQ("")}
+        noun={M.refundsNoun}
+        empty={
+          month
+            ? { icon: "inbox", title: M.refundsEmptyMonthTitle, hint: M.refundsEmptyMonthHint }
+            : { icon: "task_alt", title: M.refundsEmptyTitle, hint: M.refundsEmptyHint }
+        }
+        canViewCost={false}
+      />
+    </ListPage>
   );
 }

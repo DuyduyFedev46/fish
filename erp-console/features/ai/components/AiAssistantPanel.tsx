@@ -142,9 +142,11 @@ type PanelProps = {
   /** Câu mở đầu chuyển từ khung hỏi nhanh của trang chứng từ. `autoSend` = gửi ngay (chip / bấm gửi); không thì đặt vào ô và focus. */
   initialText?: string;
   autoSend?: boolean;
+  /** Gọi một lần khi panel đã nạp xong và nhận câu chuyển sang: trang chứng từ lúc đó mới gỡ khung hỏi nhanh tĩnh (B6). */
+  onReady?: () => void;
 };
 
-export function AiAssistantPanel({ status, initialText, autoSend = false }: PanelProps) {
+export function AiAssistantPanel({ status, initialText, autoSend = false, onReady }: PanelProps) {
   const { me } = useAuth();
   const engine = selectEngineName();
   const [cap, setCap] = useState<AiCapability>(() => detectAiCapability());
@@ -393,7 +395,8 @@ export function AiAssistantPanel({ status, initialText, autoSend = false }: Pane
     handedOff.current = true;
     if (autoSend && initialText && initialText.trim()) void send(initialText);
     else if (initialText !== undefined) inputRef.current?.focus({ preventScroll: true });
-  }, [autoSend, initialText, send]);
+    onReady?.();
+  }, [autoSend, initialText, send, onReady]);
 
   return (
     <div className={`rr-pane ${s.panel}`} ref={rootRef}>

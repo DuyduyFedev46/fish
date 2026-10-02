@@ -40,7 +40,8 @@ class ConfirmationQueuePagination(PageNumberPagination):
 class ConfirmationQueueViewSet(NoStoreMixin, viewsets.GenericViewSet):
     """
     ViewSet quản lý hàng chờ CSKH (02b §4.3).
-    Hỗ trợ lookup qua note_id hoặc id.
+    Tra theo `note_id` duy nhất (contract `/api/confirmation/queue/<note_id>/`). Không tra theo pk của task:
+    pk task có thể trùng note_id của task khác và làm lệnh ghi rơi nhầm chứng từ (TL5-BE1).
     """
     lookup_field = "note_id"
     pagination_class = ConfirmationQueuePagination
@@ -58,13 +59,13 @@ class ConfirmationQueueViewSet(NoStoreMixin, viewsets.GenericViewSet):
         )
 
     def get_object(self):
-        lookup_val = self.kwargs.get(self.lookup_field) or self.kwargs.get("pk")
+        lookup_val = self.kwargs.get(self.lookup_field)
         try:
-            val_int = int(lookup_val)
+            note_id = int(lookup_val)
         except (ValueError, TypeError):
             raise Http404("Mục chờ gọi không hợp lệ.")
 
-        task = self.get_queryset().filter(Q(note_id=val_int) | Q(pk=val_int)).first()
+        task = self.get_queryset().filter(note_id=note_id).first()
         if not task:
             raise Http404("Không tìm thấy mục chờ gọi.")
         return task

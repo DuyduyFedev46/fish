@@ -15,8 +15,8 @@ Thứ tự chạy từ trên xuống. Cột "Song song" = lô được giao cùn
 |---|---|---|---|---|---|---|---|
 | ☑ | 1 | ED-01, ED-02, ED-03 (phần khung), ED-04 (mẫu danh sách) | FE | sidebar/topbar mọi board, W6g, W6h, W4h | — | BE của Lô 4, 6, 8 | a25edbc |
 | ☑ | 2 | ED-03, ED-04 (trang chi tiết), ED-05 ∥ R1, R2 | BE ∥ FE | D2b (mẫu), W6a–W6f, W6i, modal F* | FE: 1 | BE Lô 4, 6, 8 | BE 1237d9b · FE da93d77 |
-| ☐ | 3 | ED-09, ED-10, ED-11, ED-12 ∥ R3 + số điện thoại đủ | BE ∥ FE | D2, D2b, D2c, W1a, W1a2, W1b, W1b2, F2a–F2g | FE: 1, 2 | Lô 7 (BE) | — |
-| ☐ | 4 | ED-16, ED-17, ED-18, ED-19 ∥ B5, B6, R4 | BE ∥ FE | W1d, W1d2, W1e, W2e, F2l, F2o | FE: 1, 2 | Lô 5 | — |
+| ☑ | 3 | ED-09, ED-10, ED-11, ED-12 ∥ R3 + số điện thoại đủ | BE ∥ FE | D2, D2b, D2c, W1a, W1a2, W1b, W1b2, F2a–F2g | FE: 1, 2 | Lô 7 (BE) | BE 1237d9b · FE 70b23ca |
+| ☑ | 4 | ED-16, ED-17, ED-18, ED-19 ∥ B5, B6, R4 | BE ∥ FE | W1d, W1d2, W1e, W2e, F2l, F2o | FE: 1, 2 | Lô 5 | BE 1237d9b · FE 7f3b7b1 (merge 4374ebb) |
 | ☐ | 5 | ED-15 | FE | W1c, W1c2, F2h–F2k | 1, 2 | Lô 4 | — |
 | ☐ | 6 | ED-13, ED-14 ∥ B2 | BE ∥ FE | W5a, W5b | FE: 1, 2, 3 | Lô 7 | — |
 | ☐ | 7 | ED-23, ED-24, ED-25 (chỉ danh sách), ED-29 ∥ R5, R6, R7, R7b | BE ∥ FE | D3, W2f, W5i, W5k, W5l, F1e, F1g, F1h, F1i, F3m | FE: 1, 2 | Lô 6 | — |

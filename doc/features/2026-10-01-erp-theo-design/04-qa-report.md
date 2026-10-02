@@ -1055,6 +1055,26 @@ Không rò. B1 đã đóng: không `note`/`reason`/`description`... nào lên gi
 
 Server 3101–3104 đã tắt. File: `erp-console/e2e/qa_ed_batch2_followup.py` (mới), `qa_ed_batch2_patterns.py` và `qa_ed_batch2_harness.py` (siết các ca "luôn đúng"), ảnh `qa2-*.png` (13 ảnh) ở `shots/lot2/`.
 
+---
+
+## Lô 3 — FE (Đơn & tiền: ED-09, ED-10, ED-11, ED-12) · lần 1 · 2026-10-02
+
+### Kết luận: REJECTED — 1 lỗi Medium chặn (B1: popup "Lập phiếu hoàn" hiện 2 dòng "Còn hoàn được"), cộng B2 cần PO quyết (chip sau khi xác nhận tiền là "Đang xử lý", AC viết "Đã thanh toán"). Phần còn lại đạt, gồm toàn bộ ca ngoài đường thuận (bấm đúp, huỷ khi đang giao, hoàn quá số tiền, 409, mất mạng, id rác, 5 vai) chạy trên mock và BE thật.
+
+### Tổng: 468 ca QA mới (319 mock + 149 BE thật) + 160 ca dev chạy lại + 280 ca hồi quy · ✅ 460 · ❌ 8 ca đỏ (3 lỗi thật B1, B2, B3, đếm cả mock lẫn BE thật; 2 ca là nhiễu SQLite, không phải lỗi sản phẩm) · ⏸ 6 mục
+
+| Bộ | Ca | Đạt | Hỏng / ⏸ |
+|---|---|---|---|
+| `e2e/qa_ed_batch3_orders.py` (mock, cổng 3101) | 319 | 315 | 4 (B1 x2, B2, B3) |
+| `e2e/qa_ed_batch3_real.py` (BE thật, SQLite tạm + `seed_demo`, console MOCK=0, cổng 3102) | 149 + 2 ⏸ | 145 | 2 thật (B2, B3) + 2 nhiễu môi trường (xem dưới) |
+| `ed_batch3_orders.py` (dev, chạy lại) | 141 | 141 | 0 |
+| `ed_batch3_real.py` (dev, chạy lại) | 19 | 19 | 0 |
+| Hồi quy: `s10_s11_orders` 42/42, `s12_s13_queue` 66/66, `s14_s16_cancel_refund` 41/41, `ed_batch1_shell` 56/56, `ed_batch2_patterns` 75/75 | 280 | 280 | 0 |
+
+Hai ca "BE log: không có 5xx / Traceback" đỏ là do chính ca đua song song: SQLite khoá ghi ("database is locked" -> 500). Đã chuyển 2 ca đua thành ⏸ (cần Postgres); các ca tuần tự cùng `request_id` đạt. Không tính là lỗi sản phẩm.
+
+Ảnh đặt cạnh board: `shots/lot3/` (`qa-*.png`, bản mock; `qa-real-*.png`, BE thật). Chỉ dữ liệu giả (mock và `seed_demo`, mã đơn `SO261002-*`, mã giao dịch `FTQA000x`).
+
 
 ---
 
@@ -1069,6 +1089,242 @@ Hồi quy do dev viết, chạy lại trên bản mock mình build: `ed_batch4_d
 ### Theo AC
 | Mã AC | Kết quả | Bằng chứng |
 |---|---|---|
+| ED-09-AC1 (3 tab, cột, "Đang hiện n / m") | ✅ | `qa-list-1280.png`, `qa-real-list.png`; so với `board-ERP-D2-Don-tien.png` |
+| ED-09-AC2 (chip theo enum-map, cột Lý do) | ✅ (B-Low: dòng BOOKED để trống Lý do) | mọi trạng thái đúng chữ enum-map; Lý do hiện cho huỷ/hoàn |
+| ED-09-AC3 (tìm, lọc, không tìm thấy, rỗng, đang tải, lỗi) | ✅ | `qa-list-notfound/loading/empty/error-1280.png`; xoá tìm kiếm trả lại danh sách |
+| ED-09-AC4 (đơn BOOKED: đếm ngược, hết giờ -> Đã huỷ) | ✅ | chip + đếm ngược mm:ss |
+| ED-09-AC5 (hết giờ thì chip đổi, không cần tải lại) | ✅ | đồng hồ giả Playwright: đang giữ chỗ "Giữ chỗ" + mm:ss, giảm sau 5 giây; tua 21 phút -> chip "Đã huỷ", StatusPath bước đỏ, vẫn còn "Xác nhận đã nhận tiền" (tiền về muộn); `qa-hold-expired-live.png` |
+| ED-09-AC6..AC9 (chi tiết D2b: StatusPath Tiếp theo/Đã làm, SĐT đầy đủ, mỗi ô một giá trị, Dòng thời gian, khối AI) | ✅ | `qa-detail-booked-1440.png`, `qa-detail-delivering-1440.png`, `qa-real-detail-delivering.png`; khối AI: tắt thì không khối + 0 request `/api/ai/*` |
+| ED-10-AC1 (xác nhận đã nhận tiền: popup F2a, bấm đúp = 1 request, chip "Đã thanh toán") | ❌ một phần | popup, tóm tắt, bấm đúp = 1 POST, toast "Đã thanh toán" đạt; chip sau xác nhận là "Đang xử lý" (B2) |
+| ED-10-AC2 (huỷ 2 bước F2b; đơn đang giao bị chặn trong "…" kèm lý do) | ✅ | `qa-F2b-cancel-step1/step2.png`, `qa-menu-delivering-1280.png`, `qa-real-menu-delivering.png`; ép bấm mục bị chặn = 0 request |
+| ED-10-AC3 (lập phiếu hoàn F2c, vượt số tiền bị chặn) | ❌ một phần | vượt số tiền: chặn ở FE (viền đỏ, 0 request) và BE trả 400 được hiển thị; popup lặp "Còn hoàn được" (B1) |
+| ED-10-AC6 (gắn giao dịch F2d, đơn xác nhận F2e) | ✅ | `qa-F2d-attach.png`, `qa-F2e-confirm-order.png`, `qa-real-F2d.png` |
+| ED-10-AC4/AC5 | không thuộc lô này (nằm ở /confirmation) | |
+| ED-11-AC1 (hàng đợi tiền: chỉ Chủ) | ✅ | 5 vai x 2 chế độ; Quản lý/Kho/Giao: không có mục menu, vào thẳng URL ra "Không có quyền" |
+| ED-11-AC2 (giao dịch không khớp, gắn đơn) | ✅ | `qa-payments-1280.png`, `qa-real-payment-unmatched.png` |
+| ED-11-AC3 (xác nhận từ hàng đợi) | ❌ một phần | đạt; chip "Đang xử lý" như B2 |
+| ED-11-AC4..AC6 (rỗng/lỗi/phân trang, URL chỉ có id) | ✅ | `qa-payments-empty-1280.png`; id rác -> "Không tìm thấy", không vỡ |
+| ED-12-AC1 (danh sách hoàn: Quản lý chỉ xem) | ✅ | Quản lý: không nút "Xác nhận đã hoàn tiền"/"Thử lại"; `qa-refunds-1280.png` |
+| ED-12-AC2 (xác nhận hoàn F2f, đánh dấu lỗi F2g, thử lại) | ✅ | `qa-F2f-confirm-refund.png`, `qa-F2g-mark-failed.png`, `qa-real-refund-failed.png`, `qa-real-F2f.png` |
+| ED-12-AC3, AC4 (rỗng, 409, mất mạng) | ✅ | `qa-409-banner.png`, `qa-real-offline.png` |
+
+### Ngoại lệ và biên (chạy thật, mock + BE thật)
+- Bấm đúp "Xác nhận đã nhận tiền", "Huỷ đơn", "Lập phiếu hoàn", "Xác nhận đã hoàn": đúng 1 request (cùng `request_id`); chạy tuần tự lại cùng `request_id` trên BE thật trả cùng kết quả, không tạo bản ghi thứ hai.
+- Huỷ khi đang giao: mục bị chặn mờ + lý do; BE thật cũng từ chối (400/409), UI hiện câu tiếng Việt.
+- Hoàn quá số tiền / 0 / âm / chữ: chặn trước khi gửi; BE 400 vẫn hiện đúng ô; số tiền còn lại giảm sau mỗi lần hoàn, hoàn đủ rồi thì nút hoàn mờ.
+- Màn cũ (trạng thái đã đổi): mở popup xác nhận, đơn đã được người khác xác nhận -> 409 -> ConflictBanner "Tải lại", không alert đỏ chung, giá trị đang gõ còn.
+- Mất mạng giữa lúc gửi: giữ giá trị, hiện "Thử lại", thử lại thành công thì lỗi mất, không gửi đôi.
+- 500, 403, 404, id rác (`?id=abc`, `?id=999999`, `?id=`): câu tiếng Việt, không `undefined/null/NaN`, không stack/URL.
+- Đơn hết hạn (AUTO_CANCELLED) vẫn xác nhận được tiền về muộn (đúng 02b); dev-notes mục 15 hỏi PO/BE có muốn chặn không: chưa quyết, ghi nhận.
+- 360 px: danh sách 3 tab, chi tiết, 6 popup: không cuộn ngang, nút cao >= 44 px (`qa-360-*.png`, `qa-real-360-detail.png`). StatusPath bị cắt ở mép (Low, xem dưới).
+- Không `console.error`/`pageerror` ngoài ca lỗi cố ý.
+
+### Phân quyền (BE thật + mock; Group x hành động)
+| Hành động | loc (owner) | ql1 (manager) | kho1 | giao1 | cs2 |
+|---|---|---|---|---|---|
+| Thấy menu Đơn hàng | ✅ | ✅ | ✅ | ✅ (chỉ phiếu được giao) | ✅ (theo phạm vi gọi) |
+| Xác nhận đã nhận tiền | ✅ | ẩn (BE 403 nếu gọi thẳng) | ẩn | ẩn | ẩn |
+| Huỷ đơn đã thanh toán | ✅ | ẩn/chặn | ẩn | ẩn | ẩn |
+| Lập phiếu hoàn | ✅ | ✅ nếu có `create_refund` (BE kiểm) | ẩn | ẩn | ẩn |
+| Hàng đợi tiền (`/orders/payments`) | ✅ | "Không có quyền" | "Không có quyền" | "Không có quyền" | "Không có quyền" |
+| Hàng đợi hoàn: xem | ✅ | ✅ chỉ xem | không | không | không |
+| Hàng đợi hoàn: xác nhận/thử lại | ✅ | ẩn (BE 403) | ẩn | ẩn | ẩn |
+| Chưa đăng nhập | chuyển về /login | | | | |
+Kiểm trên BE thật bằng token từng vai (gọi thẳng API) và bằng giao diện; mọi ô "ẩn" có cặp kiểm BE từ chối, không chỉ ẩn nút.
+
+### Rò giá vốn
+Không phát hiện. JSON đơn/phiếu hoàn/giao dịch với Quản lý/Kho/Giao/CSKH không có `unit_cost`, `landed_unit_cost`, `cost`, `margin`; HTML không có "Giá vốn"/"Lãi". Chủ thấy phân bổ lô (đúng quyền). Mục "Lãi lỗ" không có trong menu của vai không phải Chủ. Dòng thời gian/`note` của AuditLog không có khoá cho phép tính ngược (tiền / kg).
+
+### Rò dữ liệu cá nhân
+Không phát hiện. SĐT trên chi tiết đơn hiện đầy đủ chỉ cho vai có quyền xem đơn (theo D2b); danh sách, hàng đợi hoàn, LookupCard không có tên/SĐT/địa chỉ; `localStorage` chỉ có token, id người dùng, cờ AI; URL chỉ có `?id=`; console không có SĐT; log BE không in SĐT/tên (grep dữ liệu giả = 0). Ảnh và báo cáo chỉ dùng dữ liệu giả.
+
+### Hồi quy
+`s10_s11_orders` 42/42, `s12_s13_queue` 66/66, `s14_s16_cancel_refund` 41/41, `ed_batch1_shell` 56/56, `ed_batch2_patterns` 75/75. `p8_lo6`/`p8_lo7` hỏng do CSS cũ bị gỡ (dev-notes đã ghi, thuộc lô thay màn cũ, không tính).
+
+### Chấm theo UI-RULES (mục áp dụng cho Lô 3)
+| Mục | Kết quả |
+|---|---|
+| §1.5 ngày giờ `dd/mm/yyyy hh:mm` (GMT+7) | ✅ |
+| §1.6 tiền ghi "đ" | ❌ B3 (BE tự dựng chuỗi "₫", có sẵn từ gốc) |
+| §2 chip theo enum-map, mỗi ô một giá trị | ✅ |
+| §3.2 chữ cấm (mã BR, khoá kỹ thuật) | ✅ |
+| §5.1-5.3 header, StatusPath, "…" | ✅ (Low: StatusPath 360 px bị cắt) |
+| §6 popup F2a-F2g (khối tóm tắt, Quay lại, Thử lại, chống gửi đôi) | ❌ B1 ở F2c (còn lại ✅) |
+| §7 trạng thái rỗng/tải/lỗi/mất mạng/409 | ✅ |
+
+### Lỗi
+#### B1 — Popup "Lập phiếu hoàn" hiện 2 dòng "Còn hoàn được" · Medium (chặn) · ED-10-AC3 / §6
+- Tái hiện: mock (`window.__caveMock.orders('on')`) hoặc BE thật; mở đơn đã thanh toán, "…" -> "Lập phiếu hoàn" (cũng từ `/orders/payments/detail?id=...`). Đếm dòng khối tóm tắt.
+- Mong đợi: mỗi dòng một lần (UI-RULES §6, board F2c).
+- Thực tế: "Còn hoàn được" xuất hiện 2 lần (`RefundModal.tsx` dòng 82 thêm `M.rowRefundable`, trong khi `OrderDetailScreen.tsx` ~408 và `PaymentDetailScreen.tsx` ~220 đã truyền sẵn dòng đó vào `summary`). Ảnh `qa-F2c-create-refund.png`, `qa-F2c-from-payment.png`, `qa-real-F2c-over.png`.
+- Ảnh hưởng: giao diện lặp trong popup tiền; không sai số. Gợi ý: bỏ dòng thêm trong `RefundModal` hoặc bỏ ở hai màn gọi.
+
+#### B2 — Chip sau khi xác nhận tiền là "Đang xử lý", AC viết "Đã thanh toán" · Medium (PO quyết) · ED-10-AC1 / ED-11-AC3
+- Tái hiện: xác nhận đã nhận tiền cho đơn BOOKED/CONFIRMED (mock và BE thật, `SO261002-A00001`). Chip sau xác nhận: "Đang xử lý"; toast: "Đã thanh toán".
+- Mong đợi theo AC: chip "Đã thanh toán". Có thể enum-map coi PAID là "Đang xử lý" (bước kế tiếp là giao); `labels.ts` theo enum-map. Cần PO chốt chữ AC hay chữ enum-map.
+- Ảnh hưởng: lệch chữ AC, người dùng thấy toast và chip khác nhau; không sai dữ liệu.
+
+#### B3 — Tiền trong Dòng thời gian và "Đã làm" ghi "₫" · Low · §1.6 (có sẵn từ gốc)
+- Tái hiện: chi tiết đơn có xác nhận tiền; Dòng thời gian hiện "420.000 ₫" (mock `features/guidance/mock.ts`, BE `common/formatting.vnd_display` SR-25 viết "₫").
+- Ghi nhận: chuỗi do BE dựng sẵn, không phải FE Lô 3; sửa ở BE (đổi sang "đ") hoặc FE chuẩn hoá khi hiển thị.
+
+#### Ghi chú Low (không chặn)
+- Tab Giao dịch (hàng đợi tiền) chưa có huy hiệu số lượng và control phân đoạn như board.
+- StatusPath ở 360 px bị cắt ở mép; nhãn "Đã làm" dài.
+- Ô số tiền hoàn không định dạng nghìn khi gõ.
+- Dòng BOOKED để trống cột Lý do (nên "—" hoặc "Chờ thanh toán").
+
+### Có sẵn từ gốc, không tính vào lô
+- P1: `/ai/policy/` mở cho vai không phải Chủ (như Lô 1, 2).
+- Nhiễu `Failed to fetch RSC payload` khi phục vụ bản tĩnh bằng `http.server`.
+- BE lưu chữ tự do trong Dòng thời gian (nợ kỹ thuật đã biết).
+- `p8_lo6`/`p8_lo7` hỏng do CSS cũ bị gỡ (dev-notes).
+- B3 ("₫").
+
+### ⏸ Chưa kiểm được
+1. Đua thật (2 lệnh lập hoàn cùng lúc, 2 người xác nhận cùng đơn): SQLite khoá ghi, cần Postgres.
+2. Khối AI trên BE thật: AI tắt theo chính sách, chỉ kiểm được trạng thái tắt (không khối, 0 request).
+3. dev-notes mục 15 (tiền về muộn cho AUTO_CANCELLED được nhận): chờ PO/BE quyết.
+4. Lên staging có BE Postgres: chưa chạy.
+5. Thiết bị thật (iOS/Android) cho 360 px: chỉ giả lập viewport.
+6. Phục hồi trạng thái cuộn danh sách khi quay lại từ chi tiết trên điện thoại thật.
+
+### Lệnh đã chạy (output tóm tắt)
+- `cd erp-console && npm ci` exit 0 (không `--legacy-peer-deps`); `npx tsc --noEmit` exit 0; `npx vitest run` 44 file, 405 test đạt.
+- `NEXT_PUBLIC_USE_MOCK=0 npm run build` + `check-no-mock` XANH + `check-ai-chunks` XANH.
+- `NEXT_PUBLIC_USE_MOCK=1 npm run build`, `http.server 3101`: `qa_ed_batch3_orders.py` 315/319; `ed_batch3_orders.py` 141/141; hồi quy `s10_s11` 42/42, `s12_s13` 66/66, `s14_s16` 41/41, `ed_batch1_shell` 56/56, `ed_batch2_patterns` 75/75.
+- BE `python manage.py runserver 127.0.0.1:8000` trên SQLite tạm (`seed_demo`, không DB thật) + build `NEXT_PUBLIC_USE_MOCK=0` cổng 3102: `qa_ed_batch3_real.py` 145/149 + 2 ⏸; `ed_batch3_real.py` 19/19.
+- `python3 scripts/check_naming.py`: OK, không vi phạm mới.
+- Không sửa mã sản phẩm. Mã QA mới: `erp-console/e2e/qa_ed_batch3_orders.py`, `erp-console/e2e/qa_ed_batch3_real.py`; ảnh `shots/lot3/qa-*.png`. Đã tắt máy chủ 3101, 3102, 8000 (không đụng 3201).
+
+---
+
+### Lô 3 — FE lần 2 (ED-09..ED-12) · 2026-10-02
+
+## Kết luận: REJECTED — B4 (High, sai tiền): Backspace trong ô số tiền hoàn làm hoàn nhỏ hơn 100 lần so với ý người dùng.
+
+## Tổng (các script lần 2)
+| Script | Kết quả |
+|---|---|
+| `qa_ed_batch3_orders.py` (mock 3101) | 318/318 ✅ |
+| `qa_ed_batch3_followup.py` (mock, mới) | 105/108: ✅ 105, ❌ 3 (cả 3 cùng gốc B4) |
+| `qa_ed_batch3_real.py` (BE thật, SQLite tạm) | 146 ✅, 2 ⏸ (đua thật), 2 ❌ là nhiễu SQLite (log 5xx/Traceback do "database is locked" ở ca đua, không phải lỗi sản phẩm) |
+| `qa_ed_batch3_real_ai.py` (BE thật, AI tắt, mới) | 24/26: 2 ❌ cùng gốc N1 (BE thiếu route `/api/ai/status/`) |
+| Dev + hồi quy: `ed_batch3_orders`, `ed_batch3_fixes`, `p8_lo6`, `p8_lo7`, `s10_s11`, `s12_s13`, `s14_s16`, `ed_batch1_shell`, `ed_batch2_patterns` | xanh hết |
+
+### Trạng thái lỗi lần 1 / techlead
+| Mã | Kết quả | Bằng chứng |
+|---|---|---|
+| B1 (popup hoàn hiện 2 hàng "Còn hoàn được") | ✅ đã sửa | `followup` mục 5: đúng 1 hàng khi mở từ đơn, từ khoản tiền, và ở 360 px; ảnh `qa2-F2c-one-row*.png` |
+| B2 (chip sau xác nhận) | ✅ theo PO chốt: chip "Đang xử lý", toast "Đã nhận tiền" | `qa_ed_batch3_orders` đã đổi ca, chạy xanh |
+| B3 ("₫") | Nợ BE, không tính vào lô | chuỗi do BE dựng |
+| H1, H2, M1–M3 | ✅ không thấy tái phát | `ed_batch3_fixes`, `qa_ed_batch3_orders`, `followup` |
+| Low "ô số tiền hoàn không nhóm nghìn" | ❌ sửa xong nhưng sinh B4 | xem dưới |
+| Low "StatusPath 360 px bị cắt" | ✅ | `followup` mục 7, ảnh `qa2-statuspath-360.png` |
+
+### Theo yêu cầu điều phối
+| Mục | Kết quả | Bằng chứng |
+|---|---|---|
+| SR-20: AI tắt → 0 request `actions`/`counts`/chat/summary/commands trên 3 danh sách + 3 chi tiết | ✅ (mock và BE thật) | `followup` mục 1, `real_ai` AI_EXPECT=off. Chi tiết chỉ gọi tối đa 1 `/api/ai/status/`, không tải chunk model/worker |
+| Khối AI ở chi tiết đơn / khoản tiền / phiếu hoàn (mock, AI bật) | ✅ | gửi đúng `target_model`/`target_id` (`sales.salesorder` "mã,pk", `sales.paymenttransaction` pk, `sales.refund` pk); đề xuất đúng chứng từ; id rác không hiện khối; vai không có quyền gọi 0 request `actions`. Ảnh `qa2-ai-*-detail-1280.png` |
+| Gõ nhanh vào ô hỏi AI không mất chữ | ✅ | 3 điều kiện: chunk bị giữ 1,5 s gõ liên tục; giữ 0,8 s gõ 35 ms/phím; mạng nhanh. Chữ đủ, 1 ô nhập, không tự gửi, giữ focus; đường chưa đồng ý vẫn giữ chữ. Ảnh `qa2-ai-typing-slow-1280.png`, `qa2-ai-consent-typed-1280.png` |
+| Popup hoàn 1 hàng "Còn hoàn được" | ✅ | xem B1 |
+| Ca ngoài đường thuận | ✅ | id rác, vai thiếu quyền, hold hết hạn thật (`pg.clock`, ảnh `qa2-hold-expired-live.png`), trạng thái đã đổi, số tiền không hợp lệ (0, âm, chữ, rỗng: bấm gửi → 0 POST + báo lỗi), console sạch (trừ nhiễu có sẵn) |
+| Khối AI bật trên BE thật | ⏸ | bị chặn bởi N1 |
+
+## Lỗi
+
+### B4 — Backspace trong ô số tiền hoàn đọc nhầm nhóm cuối thành số lẻ · **High (sai tiền)** · ED-12 (popup lập hoàn)
+Bước tái hiện (mock `http://localhost:3101`, đăng nhập `ql1`/`demo1234`; hoặc chạy `qa_ed_batch3_followup.py` mục 6):
+1. Mở một đơn đã thanh toán, bấm "Lập hoàn tiền".
+2. Xoá sạch ô số tiền, gõ `150000` → ô hiện `150.000`.
+3. Bấm Backspace 1 lần.
+Mong đợi: `15.000` (hoặc ít nhất giá trị 15.000 đ).
+Thực tế: ô hiện `150.00`; `parseAmount` coi `.00` là phần thập phân → giá trị 150, nhãn nút và POST đều theo số sai. Tương tự `1.500.000` → `1.500.00` đọc thành 1.500; gõ `12345` rồi xoá lùi 2 lần → `12.3` → 12.
+Đã tái hiện đến cùng: hoàn thật được tạo ở 1.500 đ trong khi người dùng định 150.000 đ (probe, dữ liệu giả).
+Ảnh hưởng: sai số tiền hoàn gấp 100 lần (nhỏ hơn); BE không biết ý định nên không chặn; chỉ `RefundModal` dùng `formatAmountInput` nên chỉ ảnh hưởng ô này. Phát sinh do bản sửa Low "nhóm nghìn khi gõ".
+Gợi ý: khi chuỗi chỉ gồm chữ số và dấu chấm mà có ≥ 2 dấu chấm, hoặc nhóm cuối có 1–2 chữ số sau một chuỗi đã nhóm, coi dấu chấm là phân nhóm và nhóm lại; thêm vitest cho Backspace (`formatAmountInput("150.00")` → `15.000`). Ca tái hiện đỏ→xanh nằm sẵn trong `followup` mục 6 (3 ca).
+
+### N1 — BE thiếu route `/api/ai/status/` · Medium (có từ trước, không do Lô 3)
+FE (`features/ai/api.ts`) gọi `GET /api/ai/status/` và đóng cửa khi lỗi (S05-AC5). `backend/config/api_urls.py` ở HEAD không có route này (README `backend/apps/ai` ghi `status.py` nhưng file không tồn tại). Hệ quả trên BE thật: gate nhận 404 → khối AI không bao giờ hiện dù `AI_ENABLED=1`; mỗi trang chi tiết có thêm 1 lỗi 404 trong console. Ca `real_ai` AI_EXPECT=off thất bại 2 ca vì lý do này (404 console). Nhờ điều phối hỏi BE/PO: thêm route hoặc ghi rõ khối AI chỉ chạy ở mock. Không chặn Lô 3 FE.
+
+## Phân quyền (chạy lại)
+Không đổi so với lần 1: `loc` (owner) đủ quyền; `ql1` (manager) thấy khối AI chi tiết phiếu hoàn ở dạng chỉ xem; `kho1`, `giao1` không thấy màn tiền và gọi 0 request `actions`; `cs2` theo phạm vi cũ; chưa đăng nhập về trang đăng nhập. Xanh trong `followup` mục 3 và `real_ai`.
+
+## Rò giá vốn / dữ liệu cá nhân
+Không phát hiện: JSON/DOM các trang đơn, khoản tiền, phiếu hoàn không có trường giá vốn; ảnh và log chỉ dùng dữ liệu giả; `localStorage` chỉ có khoá `cave_erp_ai_consent` (không dữ liệu khách); URL chỉ chứa mã/pk.
+
+## Có sẵn từ gốc (không tính vào lô)
+B3 ("₫"), nhiễu `Failed to fetch RSC payload` khi dùng `http.server`, `/ai/policy/` mở cho vai không phải Chủ, N1.
+
+### ⏸ Chưa kiểm được
+1. Đua thật (2 lệnh hoàn / 2 người xác nhận cùng đơn): SQLite khoá ghi, cần Postgres.
+2. Khối AI bật trên BE thật: chờ N1.
+3. dev-notes mục 15 (tiền về muộn cho AUTO_CANCELLED): chờ PO/BE.
+4. Staging Postgres; thiết bị thật (iOS/Android) cho 360 px.
+
+### Lệnh đã chạy (output tóm tắt)
+- `cd erp-console && npm ci` exit 0 (không `--legacy-peer-deps`); `npx tsc --noEmit` exit 0; `npx vitest run` 442 test đạt.
+- `NEXT_PUBLIC_USE_MOCK=0 npm run build` + `check-no-mock` + `check-ai-chunks` XANH; `NEXT_PUBLIC_USE_MOCK=1 npm run build` XANH, phục vụ cổng 3101.
+- BE `runserver 127.0.0.1:8000` trên SQLite tạm (không DB thật) + build mock=0 cổng 3102: `qa_ed_batch3_real.py`, `qa_ed_batch3_real_ai.py` (kết quả ở bảng trên).
+- `python3 scripts/check_naming.py`: OK, không phát sinh mới.
+- Không sửa mã sản phẩm. Mã QA mới: `erp-console/e2e/qa_ed_batch3_followup.py`, `erp-console/e2e/qa_ed_batch3_real_ai.py`; ảnh `shots/lot3/qa2-*.png`. Đã tắt máy chủ 3101, 3102, 8000 (không đụng 3201).
+
+---
+
+### Lô 3 — FE lần 3 (ô số tiền của 2 popup) · 2026-10-02
+
+## Kết luận: APPROVED — B4 và ca dán phần lẻ đã sửa đúng, 0 ca đỏ trên mock lẫn BE thật; còn 2 ghi nhận (N2, N3) không chặn, chờ PO quyết.
+
+## Tổng: 1.140 ca · ✅ 1.140 · ❌ 0 · ⏸ 4 mục
+| Script | Kết quả |
+|---|---|
+| `qa_ed_batch3_money.py` MODE=mock (mới, cổng 3101) | 229/229 ✅ |
+| `qa_ed_batch3_money.py` MODE=real (mới, BE thật + SQLite tạm, cổng 3102) | 233/233 ✅ (BE log: 0 Traceback, 0 phản hồi 5xx) |
+| Hồi quy mock: `qa_ed_batch3_followup` 108/108, `qa_ed_batch3_orders` 318/318, `ed_batch3_fixes` 103/103, `s10_s11` 42/42, `s12_s13` 66/66, `s14_s16` 41/41 | ✅ hết |
+
+### Ô tiền: từng ca (chạy ở cả popup "Lập phiếu hoàn" và "Xác nhận đã nhận tiền", mock + BE thật)
+| Ca | Kết quả | Bằng chứng |
+|---|---|---|
+| Gõ thường (1, 12, 123, 1234, 150000, 1500000, 12345678, 000150, 0), gõ kèm dấu `.`/`,` kiểu nhóm nghìn; nhãn nút ghi đúng số; xoá hết | ✅ | `money` mục 1; ảnh `qa3-money-*-typed-*.png` |
+| Backspace và Delete ở MỌI vị trí của `1.234.567` (10 vị trí x 2 phím), kể cả ngay trước/sau dấu chấm: giá trị VÀ vị trí con trỏ đúng mô hình | ✅ | mục 2; `150|.000` + Delete ra `15.000`, `150.|000` + Backspace ra `15.000` |
+| Xoá lùi từng phím tới hết ô từ 5 giá trị (150.000, 1.500.000, 15.000.000, 12.345, 999.999.999): luôn dạng nhóm nghìn hợp lệ, nút gửi = ô (không còn `150.00`) | ✅ | mục 2 (B4 đã hết) |
+| Chọn đoạn rồi xoá (`234`, `1.234`, chọn hết) | ✅ | mục 2 |
+| Chèn chữ số vào giữa ở cả 10 vị trí; chèn nhiều chữ số; chèn `0` đầu ô; gõ đè đoạn chọn | ✅ | mục 3 |
+| Dán bằng Ctrl+V thật: `150.000`, `1,500,000`, `150.000,00`, `150,000.00`, `1.500.000 đ`, `1.500.000₫`, `150000`, `150 000`, `150000 VND`, `  150.000  `, `1.500.000,00 đ`, `0.00` | ✅ ra đúng giá trị, không báo lỗi phần lẻ, nút ghi đúng số | mục 4 |
+| Dán `150,000.50`, `150.000,50`, `0.5`, `540,5`, `1.500.000,5`: TỪ CHỐI, ô giữ giá trị cũ, hiện "Số tiền là số nguyên đồng, không có phần lẻ. Nhập lại, ví dụ 150.000.", nút gửi vẫn ghi số cũ; gõ tiếp chữ số hợp lệ thì lỗi tự mất | ✅ | mục 4; ảnh `qa3-money-real-paste-fraction-refund.png` |
+| Dán chèn vào giữa ô; dán `,5` vào cuối `100.000` | ✅ giữ nguyên + báo lỗi | mục 4 |
+| Gõ chữ (`abc`, `12a3b`, `ba trăm`, `1đ`, emoji, chữ số toàn góc): chữ bị bỏ ngay tại ô | ✅ | mục 5 |
+| Số âm (`-5`, `-150.000`, `−5`, `5-0`): giữ nguyên chuỗi, bấm gửi → 0 POST + câu "không được âm"; `-5` rồi Backspace 2 lần ra ô rỗng | ✅ | mục 5; ảnh `qa3-money-*-negative-*.png` |
+| Số rất lớn: 30 chữ số giữ đủ, nhóm đúng, gửi → 0 POST + "tối đa 12 chữ số"; 13 chữ số bị chặn; dán 40 chữ số không treo; 12 chữ số `999.999.999.999` giữ nguyên | ✅ | mục 5; ảnh `qa3-money-*-huge-*.png` |
+| Tiền GỬI LÊN API đúng từng đồng, BE thật (đọc thân request trong trình duyệt + phản hồi + `GET /sales/orders/{id}/`): xác nhận tiền gõ `150000` ra `150000`; gõ `1500000` rồi Backspace ra `150000`; `1234567` + Delete đầu ra `234567` (BE tách đúng phần thừa 134567); hoàn gõ `60000`, `500000`+Backspace ra `50000`, `123456`+Delete ra `23456`, dán `40.000,00` ra `40000`, dán `1,000` ra `1000`, dán `1.000 đ` ra `1000` | ✅ mỗi ca đúng 1 request, `amount` khớp, BE 2xx, số lưu trong DB khớp | mục 7 |
+| Tiền ghi vào kho mock đúng từng đồng (cả `1500000` bằng dán `1,500,000` / `1.500.000 đ` / chèn giữa ô `1050000`) | ✅ | mục 7 mock |
+| Ngoài đường thuận: vượt "Còn hoàn được" 1 đ → khoá nút + 0 POST + "Nhập tối đa"; đúng bằng tối đa → nút bật; bấm đúp → đúng 1 POST (thân có `request_id`); bỏ trống mã giao dịch → báo lỗi, số đã gõ còn nguyên; số khác tổng đơn → cảnh báo lệch, ô giữ nguyên; mở lại popup → ô về giá trị gốc; 360 px gõ được, không cuộn ngang; số còn lại của phiếu BE thật (đơn 14) chặn đúng khi dùng hết (nút khoá) | ✅ | mục 8 |
+| localStorage/sessionStorage, URL không chứa số tiền hay dữ liệu khách; console không lỗi đỏ | ✅ | mục 9 |
+
+### Trạng thái lỗi
+| Mã | Trạng thái |
+|---|---|
+| B4 (Backspace đọc thành số lẻ, hoàn nhỏ hơn 100 lần) | ✅ ĐÃ SỬA. Cả 3 ca đỏ ở `followup` lần 2 nay xanh; thêm 20 ca vị trí Backspace/Delete mọi chỗ |
+| Dán `150.000,00` gấp 100 lần; `0.5` ra 5 đ (dev tự phát hiện) | ✅ ĐÃ SỬA đúng luật "không đoán" |
+
+### Ghi nhận mới (không chặn; chờ PO)
+- **N2 — gõ dấu thập phân TỪNG PHÍM không bị bắt (Medium, giới hạn có chủ ý).** Luật phần lẻ chỉ áp khi dán nguyên chuỗi. Gõ tay `150.000,50` ra `15.000.050`, `150000,5` ra `1.500.005`, `0.5` ra `5`, `1,5` ra `15`; dấu gõ tay bị coi là dấu nhóm nghìn nên không phân biệt được (gõ `150.000` từng phím cũng phải ra `150.000`). Nút gửi và ô luôn hiện số đang hiểu (`Hoàn 15.000.050 đ`), hoàn bị chặn bởi "Còn hoàn được", xác nhận tiền có cảnh báo lệch tổng đơn và BE kiểm lại, nên không gửi lén. Nếu PO muốn chặt hơn: bỏ dấu `,` ở ô tiền (vì VN dùng `,` làm dấu thập phân) hoặc báo khi gõ `,` rồi 1-2 chữ số ở cuối.
+- **N3 — chữ viết tắt bị bỏ lặng lẽ (Low, dev-notes đã nêu cho PO).** `150k` ra `150`, `1tr5` ra `15`, `1e6` ra `16`. Ô không báo; nút gửi ghi `150 đ`.
+
+### ⏸ Chưa kiểm được
+1. Bàn phím điện thoại thật (Gboard/iOS, IME, dán từ ứng dụng ngân hàng, tự điền): chỉ chạy Chromium giả lập `ControlOrMeta+V`, `inputType` thật là `insertFromPaste`.
+2. Đua thật (2 người cùng xác nhận/hoàn): SQLite khoá ghi, cần Postgres (như lần 1, 2).
+3. Khối AI bật trên BE thật: vẫn chờ N1 (thiếu route `/api/ai/status/`, ghi ở lần 2).
+4. Staging Postgres.
+
+### Lệnh đã chạy (output tóm tắt)
+- `cd erp-console && npm ci` (không `--legacy-peer-deps`) xong; `npx tsc --noEmit` exit 0; `npx vitest run` 49 file, 478 test đạt.
+- `NEXT_PUBLIC_USE_MOCK=0 npm run build` exit 0 + `check-no-mock` XANH + `check-ai-chunks` XANH; `NEXT_PUBLIC_USE_MOCK=1 npm run build` exit 0 (phục vụ 3101); build `MOCK=0 NEXT_PUBLIC_API_BASE=http://localhost:8000` (phục vụ 3102).
+- BE `runserver 127.0.0.1:8000` trên SQLite tạm (bản sao sạch `qa3.sqlite3.pw`, không DB thật).
+- `python3 scripts/check_naming.py`: OK, không phát sinh mới.
+- Không sửa mã sản phẩm. Mã QA mới: `erp-console/e2e/qa_ed_batch3_money.py`; ảnh `shots/lot3/qa3-money-{mock,real}-*.png`. Dữ liệu chỉ là dữ liệu giả. Đã tắt máy chủ 3101, 3102, 8000 (không đụng 3201).
+
 | ED-17-AC1 chip + cột Tem + Người giao riêng | ✅ | `qa_ed_batch4_ac.py`: tab Chờ lấy ghi "Đã in (lần 1)", "Chưa in tem" ở tab khác. Ảnh `lo4_list_tab_cho_lay_ql1_1440.png` |
 | ED-17-AC2 thanh trạng thái + dòng "Tiếp theo" + nút chính | ⚠ chữ lệch (B8) | Chi tiết 31: có StatusPath, nút "In tem" và "Đã đóng gói"; dòng ghi "Tiếp theo: Soạn hàng, in tem rồi bấm Đã đóng gói", AC ghi "In tem, đóng gói, rồi bấm Đã đóng gói…" |
 | ED-17-AC3 "…" của phiếu chưa in tem | ❌ B1 | ql1 mở "…" phiếu 31: chỉ có "Giao cho người giao"; thiếu "In lại tem" (mờ, "Chưa in tem lần nào."), "Huỷ xác nhận đơn", "Huỷ đơn". Ảnh `lo4_detail31_ql1_1440.png` |

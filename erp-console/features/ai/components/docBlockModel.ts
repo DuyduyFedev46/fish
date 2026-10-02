@@ -82,3 +82,23 @@ export function toProposalView(row: AiActionRow, waitSeconds: number): AiProposa
     waitSeconds: row.status === "PENDING" ? waitSeconds : 0,
   };
 }
+
+/** Tên loại chứng từ cho câu hỏi AI (L8). Loại lạ → "chứng từ". */
+const DOC_KIND_LABEL: Record<string, string> = {
+  "sales.salesorder": "đơn hàng",
+  "sales.refund": "phiếu hoàn",
+  "sales.paymenttransaction": "khoản tiền",
+  "purchasing.purchasereceipt": "phiếu nhập hàng",
+  "inventory.batch": "lô hàng",
+};
+
+/**
+ * Gắn loại + mã chứng từ vào câu hỏi: "Về đơn hàng SO261002-4B7E20: Tóm tắt lịch sử chứng từ này".
+ * Chỉ dùng mã chứng từ (không có tên, SĐT, địa chỉ khách). `targetId` có thể là "SO…,123" (mã và pk): lấy mã đầu tiên.
+ * Khi mã không rõ ràng (chỉ là số) vẫn ghi số đó, vì vẫn là mã chứng từ.
+ */
+export function askWithDocContext(question: string, targetModel: string, targetId: string | number): string {
+  const kind = DOC_KIND_LABEL[targetModel] ?? "chứng từ";
+  const code = String(targetId).split(",")[0].trim();
+  return code ? `Về ${kind} ${code}: ${question}` : question;
+}

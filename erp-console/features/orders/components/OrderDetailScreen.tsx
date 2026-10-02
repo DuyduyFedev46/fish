@@ -1,0 +1,431 @@
+"use client";
+
+// Trang chi tiết đơn (ED-09, thay tấm trượt cũ): /orders/detail/?id=<pk>. Khung DetailPage: header (mã đơn · chip · nút chính ·
+// "…"), thanh trạng thái, thông tin, bảng hàng/phân bổ lô/thanh toán/hoàn tiền; cột phải = khối Trợ lý AI (do trang ghép qua
+// `renderAi`, vì feature không được import features/ai) và dòng thời gian. Nút chính/“…” theo bảng trạng thái của ED-09-AC3/4,
+// nhưng nút CHỈ hiện khi `available_actions` của BE có thao tác (BE tính cả luật lẫn quyền). Không có "Hoàn tác": không thao
+// tác nào ở đây hoàn tác được. URL chỉ có id; SĐT/địa chỉ hiện đủ cho người đã được xem đơn.
+
+import { useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/features/auth/components/AuthProvider";
+import { getGuidance } from "@/features/guidance/api";
+import { nextStepLabel } from "@/features/guidance/detailAdapters";
+import { ENUMS } from "@/shared/lib/enums";
+import { dateTime, kg, vnd } from "@/shared/lib/format";
+import { loadErrorText } from "@/shared/lib/http";
+import { PERM, canView } from "@/shared/lib/nav";
+import { Chip } from "@/shared/ui/Chip";
+import { DetailHeader } from "@/shared/ui/detail/DetailHeader";
+import { DetailPage } from "@/shared/ui/detail/DetailPage";
+import { InfoField } from "@/shared/ui/detail/InfoField";
+import { InfoGrid } from "@/shared/ui/detail/InfoGrid";
+import { LookupCard } from "@/shared/ui/detail/LookupCard";
+import type { MoreMenuItem } from "@/shared/ui/detail/MoreMenu";
+import { StatusPath } from "@/shared/ui/detail/StatusPath";
+import { Timeline } from "@/shared/ui/detail/Timeline";
+import type { SubmitConflict } from "@/shared/ui/form/useSubmit";
+import { Icon } from "@/shared/ui/Icon";
+import { DataTable, type Column } from "@/shared/ui/list/DataTable";
+import { useToast } from "@/shared/ui/overlay/Toast";
+import { PersonalText } from "@/shared/ui/PersonalText";
+import { ConflictBanner } from "@/shared/ui/states/ConflictBanner";
+import { getOrder } from "../api";
+import { DetailGate } from "../DetailGate";
+import { ORDERS_MSG as M } from "../messages";
+import {
+  ORDER_STEPS,
+  confirmPaymentToast,
+  customerLinkHref,
+  effectiveOrderStatus,
+  holdInfo,
+  orderActionPlan,
+  orderPath,
+  orderTimeline,
+} from "../orderDetailModel";
+import { refundableOfOrder } from "../refund";
+import type { OrderAllocation, OrderDetail, OrderLine, OrderPayment, OrderRefund } from "../types";
+import { useDetail, type DetailState } from "../useDetail";
+import { useIdParam } from "../useIdParam";
+import { holdLeftText, useHoldExpired, useNow } from "../useNow";
+import { CancelOrderModal } from "./CancelOrderModal";
+import { ConfirmPaymentModal } from "./ConfirmPaymentModal";
+import { RefundModal } from "./RefundModal";
+import s from "../orders.module.css";
+
+type AiTarget = { id: number; code: string };
+
+type Props = {
+  /** Trang ghép khối Trợ lý AI vào đây (feature không import features/ai). `onApplied` = tải lại đơn sau khi AI áp dụng đề xuất. */
+  renderAi?: (target: AiTarget, onApplied: () => void) => React.ReactNode;
+};
+
+export function OrderDetailScreen({ renderAi }: Props) {
+  const id = useIdParam();
+  const detail = useDetail<OrderDetail>(id, getOrder);
+  return (
+    <DetailGate id={id} detail={detail} noun={M.detailNoun}>
+      {(order) => <OrderDetailBody order={order} detail={detail} renderAi={renderAi} />}
+    </DetailGate>
+  );
+}
+
+/** Ô đếm ngược mm:ss: đồng hồ riêng nên chỉ ô này vẽ lại mỗi giây; dừng khi hết giờ. */
+function HoldLeft({ until }: { until: string }) {
+  const end = new Date(until).getTime();
+  const now = useNow(Date.now() < end, 1000);
+  return <>{holdLeftText("BOOKED", until, now)}</>;
+}
+
+type ModalKind = "confirm_payment" | "cancel" | "refund";
+
+function OrderDetailBody({ order: o, detail, renderAi }: { order: OrderDetail; detail: DetailState<OrderDetail>; renderAi?: Props["renderAi"] }) {
+  const { me } = useAuth();
+  const router = useRouter();
+  const toast = useToast();
+  const [modal, setModal] = useState<ModalKind | null>(null);
+  const [conflict, setConflict] = useState<SubmitConflict | null>(null);
+  const [suggest, setSuggest] = useState<string | null>(null);
+  const [lookupDelivery, setLookupDelivery] = useState(false);
+  const [next, setNext] = useState<string | null>(null);
+  const openedRef = useRef(false);
+
+  // L5: trang không vẽ lại mỗi giây. Chỉ có một mốc giờ (chip đổi "Đã huỷ" khi hết giờ) và ô đếm ngược tự giữ đồng hồ (`HoldLeft`).
+  const expired = useHoldExpired(o.status, o.reserved_until);
+  const status = expired ? "AUTO_CANCELLED" : o.status;
+  const hold = holdInfo(o.status, o.reserved_until, 0) ? { until: o.reserved_until as string } : null;
+  const canViewCost = !!me?.can_view_cost;
+  const canViewCustomer = !!me?.permissions.includes(PERM.viewCustomerList);
+  const customerHref = customerLinkHref(o.customer.id, canViewCustomer);
+  const hasRefund = o.available_actions.includes("create_refund") && !!o.invoice;
+
+  const plan = useMemo(
+    () =>
+      orderActionPlan({
+        status,
+        deliveryStatus: o.delivery?.status ?? null,
+        actions: o.available_actions,
+        canCancel: !!me?.permissions.includes(PERM.cancelPaidOrder),
+        canViewAudit: canView(me, "audit-logs"),
+      }),
+    [status, o.delivery?.status, o.available_actions, me],
+  );
+  const timeline = useMemo(() => orderTimeline(o), [o]);
+  const path = orderPath({ status, deliveryStatus: o.delivery?.status ?? null, hasInvoice: !!o.invoice });
+
+  // "Tiếp theo" của thanh trạng thái: lấy từ guidance, im lặng khi lỗi (thanh vẫn đủ nghĩa nếu thiếu dòng này).
+  useEffect(() => {
+    const c = new AbortController();
+    getGuidance("order", o.id, c.signal)
+      // Hướng dẫn của một trạng thái khác (BE chưa kịp cập nhật / dữ liệu cũ) thì bỏ, tránh gợi sai việc.
+      .then((g) => setNext(g.doc?.status && g.doc.status !== o.status ? null : nextStepLabel(g)))
+      .catch(() => setNext(null));
+    return () => c.abort();
+  }, [o.id, o.status, o.payments.length, o.refunds.length]);
+
+  // `?open=refund` (từ màn gọi xác nhận) mở sẵn hộp "Lập phiếu hoàn" — một lần; xong bỏ tham số khỏi thanh địa chỉ.
+  useEffect(() => {
+    if (openedRef.current) return;
+    openedRef.current = true;
+    const q = new URLSearchParams(window.location.search);
+    if (q.get("open") !== "refund") return;
+    window.history.replaceState(null, "", `${window.location.pathname}?id=${o.id}`);
+    if (hasRefund) setModal("refund");
+  }, [o.id, hasRefund]);
+
+  const reload = () => void detail.reload();
+  const onConflict = (c: SubmitConflict) => {
+    setModal(null);
+    setConflict(c);
+  };
+
+  function copyCode() {
+    const done = () => toast.success(M.copyDone);
+    const fail = () => toast.warn(M.copyFailed);
+    if (navigator.clipboard?.writeText) navigator.clipboard.writeText(o.code).then(done, fail);
+    else fail();
+  }
+
+  function run(key: string) {
+    if (key === "confirm_payment" || key === "cancel" || key === "refund") setModal(key);
+    else if (key === "create_refund") setModal("refund");
+    else if (key === "copy_code") copyCode();
+    else if (key === "audit") router.push("/audit-logs/");
+  }
+
+  const primary = plan.primary ? (
+    <button type="button" className={`btn ${plan.primary.danger ? "danger" : "primary"}`} onClick={() => run(plan.primary!.key)}>
+      {plan.primary.label}
+    </button>
+  ) : null;
+  const more: MoreMenuItem[] = plan.menu.map((m) => ({
+    key: m.key,
+    label: m.label,
+    danger: m.danger,
+    blockedReason: m.blockedReason,
+    onSelect: m.blockedReason ? undefined : () => run(m.key),
+  }));
+
+  const lineCols: Column<OrderLine>[] = [
+    { key: "item", header: M.colItem, render: (l) => (
+      <>
+        {l.item_name} <span className={`muted ${s.mono}`}>{l.item_code}</span>
+      </>
+    ) },
+    { key: "qty", header: M.colQty, num: true, render: (l) => kg(l.qty_kg) },
+    { key: "price", header: M.colUnitPrice, num: true, render: (l) => vnd(l.unit_price) },
+    { key: "discount", header: M.colDiscount, num: true, render: (l) => (Number(l.discount) > 0 ? vnd(l.discount) : "—") },
+    { key: "total", header: M.colLineTotal, num: true, render: (l) => vnd(l.line_total) },
+  ];
+  const showCost = canViewCost && o.allocations.some((a) => a.unit_cost !== undefined);
+  const allocCols: Column<OrderAllocation>[] = [
+    { key: "line", header: M.colLine, num: true, render: (a) => a.line_no },
+    { key: "batch", header: M.colBatch, mono: true, render: (a) => a.batch_id },
+    { key: "qty", header: M.colQty, num: true, render: (a) => kg(a.qty_kg) },
+    { key: "cost", header: M.colUnitCost, num: true, locked: true, render: (a) => (a.unit_cost !== undefined ? vnd(a.unit_cost) : "—") },
+  ];
+  const payCols: Column<OrderPayment>[] = [
+    { key: "txn", header: M.colTxn, mono: true, render: (p) => p.bank_txn_id },
+    { key: "amount", header: M.colAmount, num: true, render: (p) => vnd(p.amount) },
+    { key: "match", header: M.colMatch, render: (p) => <Chip table={ENUMS.paymentMatchStatus} value={p.match_status} /> },
+    { key: "at", header: M.colReceivedAt, num: true, render: (p) => (p.received_at ? dateTime(p.received_at) : "—") },
+  ];
+  const refundCols: Column<OrderRefund>[] = [
+    { key: "amount", header: M.colRefundAmount, num: true, render: (r) => vnd(r.amount) },
+    { key: "status", header: M.colStatus, render: (r) => <Chip table={ENUMS.refundStatus} value={r.status} /> },
+    { key: "ref", header: M.colRefundRef, mono: true, render: (r) => r.bank_txn_ref || "—" },
+  ];
+
+  const canOpenPayments = canView(me, "payments");
+  const canOpenRefunds = canView(me, "refunds");
+  const canOpenDelivery = canView(me, "deliveries") || canView(me, "my-deliveries");
+  const consent = "privacy_consent" in o ? o.privacy_consent : undefined;
+
+  return (
+    <DetailPage
+      id="order-detail"
+      header={
+        <DetailHeader
+          back={{ href: "/orders/", label: M.backToOrders }}
+          title={o.code}
+          mono
+          status={<Chip table={ENUMS.salesOrderStatus} value={status} />}
+          primary={primary}
+          more={more}
+        />
+      }
+      banner={
+        <>
+          {conflict && (
+            <ConflictBanner
+              noun={M.conflictNounOrder}
+              updatedByName={conflict.updatedByName}
+              updatedAt={conflict.updatedAt}
+              reloading={detail.reloading}
+              onReload={() => {
+                setConflict(null);
+                reload();
+              }}
+            />
+          )}
+          {detail.error != null && !detail.reloading && (
+            <div className="alert-box err" role="alert">
+              <Icon name="sync_problem" />
+              <span>{loadErrorText(detail.error)}</span>
+              <button type="button" className="btn" onClick={reload}>
+                Thử lại
+              </button>
+            </div>
+          )}
+          {suggest && hasRefund && (
+            <div className={`alert-box warn ${s.suggest}`} role="status">
+              <Icon name="currency_exchange" />
+              <span>{M.cancelSuggestText(suggest)}</span>
+              <button type="button" className="btn primary" onClick={() => setModal("refund")}>
+                {M.cancelSuggestRefund(suggest)}
+              </button>
+            </div>
+          )}
+        </>
+      }
+      aiSlot={renderAi?.({ id: o.id, code: o.code }, reload)}
+      timeline={<Timeline entries={timeline} title={M.timelineDerived} />}
+    >
+      <StatusPath
+        steps={ORDER_STEPS}
+        current={path.current}
+        badEnd={path.badEnd}
+        next={next ?? (plan.primary && plan.primary.key !== "cancel" ? plan.primary.label : null)}
+        done={timeline.slice(0, 3).map((e) => e.label).reverse()}
+      />
+
+      <InfoGrid title={M.sectionInfo}>
+        <InfoField
+          label={M.fieldCustomer}
+          value={
+            <>
+              <PersonalText value={o.customer.name} />
+              {customerHref && (
+                <>
+                  {" · "}
+                  <Link href={customerHref} className="inline-link">
+                    {M.openCustomer}
+                  </Link>
+                </>
+              )}
+            </>
+          }
+        />
+        <InfoField
+          label={M.fieldPhone}
+          num
+          value={
+            o.customer.phone ? (
+              <a href={`tel:${o.customer.phone}`} className="inline-link">
+                {o.customer.phone}
+              </a>
+            ) : (
+              <PersonalText value={o.customer.phone} />
+            )
+          }
+        />
+        <InfoField label={M.fieldAddress} value={<PersonalText value={o.customer.address} />} />
+        <InfoField label={M.fieldTotal} num value={o.total_amount ? vnd(o.total_amount) : null} />
+        <InfoField label={M.fieldPlacedAt} num value={o.created_at ? dateTime(o.created_at) : null} />
+        {hold && <InfoField label={M.fieldHoldLeft} num value={<HoldLeft until={hold.until} />} />}
+        {(hold || (o.status === "AUTO_CANCELLED" && o.reserved_until)) && (
+          <InfoField label={M.fieldHoldUntil} num value={dateTime(o.reserved_until as string)} />
+        )}
+        <InfoField label={M.fieldInvoice} mono value={o.invoice?.code ?? null} />
+        {o.delivery && (
+          <>
+            {canOpenDelivery ? (
+              <InfoField label={M.fieldDelivery} kind="link" mono value={o.delivery.code} onOpen={() => setLookupDelivery(true)} />
+            ) : (
+              <InfoField label={M.fieldDelivery} mono value={o.delivery.code} />
+            )}
+            <InfoField label={M.fieldDeliveryStatus} value={<Chip table={ENUMS.deliveryStatus} value={o.delivery.status} />} />
+          </>
+        )}
+        {consent !== undefined && (
+          <InfoField
+            label={M.fieldConsent}
+            value={
+              consent ? (
+                <>
+                  {M.consentValue(consent.policy_version, consent.accepted_at ? dateTime(consent.accepted_at) : null)}
+                  {" · "}
+                  <Link href={`/content/edit/?id=${consent.policy_entry_id}&version=${consent.policy_version}`} className="inline-link">
+                    {M.consentOpen}
+                  </Link>
+                </>
+              ) : (
+                <span className="muted">{M.consentNone}</span>
+              )
+            }
+          />
+        )}
+      </InfoGrid>
+
+      <section className={s.section} aria-label={M.linesTitle}>
+        <h3 className={s.sectionH}>{M.linesTitle}</h3>
+        <DataTable
+          caption={M.linesCaption}
+          columns={lineCols}
+          rows={o.lines}
+          rowKey={(l) => l.no}
+          noun={M.detailNoun}
+          empty={{ icon: "inbox", title: M.linesEmpty }}
+          canViewCost={false}
+        />
+        <DataTable
+          caption={M.allocCaption}
+          columns={showCost ? allocCols : allocCols.filter((c) => !c.locked)}
+          rows={o.allocations}
+          rowKey={(a) => `${a.line_no}-${a.batch_id}`}
+          noun={M.detailNoun}
+          empty={{ icon: "inventory_2", title: M.allocEmpty, hint: M.allocEmptyHint }}
+          canViewCost={showCost}
+        />
+      </section>
+
+      <section className={s.section} aria-label={M.paymentsTitle}>
+        <h3 className={s.sectionH}>{M.paymentsTitle}</h3>
+        <DataTable
+          caption={M.paymentsCaption}
+          columns={payCols}
+          rows={o.payments}
+          rowKey={(p) => p.id}
+          rowHref={canOpenPayments ? (p) => `/orders/payments/detail/?id=${p.id}` : undefined}
+          noun={M.paymentNoun}
+          empty={{ icon: "payments", title: M.paymentsEmpty }}
+          canViewCost={false}
+        />
+      </section>
+
+      <section className={s.section} aria-label={M.refundsTitle}>
+        <h3 className={s.sectionH}>{M.refundsTitle}</h3>
+        <DataTable
+          caption={M.refundsCaption}
+          columns={refundCols}
+          rows={o.refunds}
+          rowKey={(r) => r.id}
+          rowHref={canOpenRefunds ? (r) => `/orders/refunds/detail/?id=${r.id}` : undefined}
+          noun={M.refundNoun}
+          empty={{ icon: "currency_exchange", title: M.refundsEmpty }}
+          canViewCost={false}
+        />
+      </section>
+
+      {modal === "confirm_payment" && (
+        <ConfirmPaymentModal
+          order={{ id: o.id, code: o.code, status, total_amount: o.total_amount ?? "0" }}
+          onClose={() => setModal(null)}
+          onConflict={onConflict}
+          onDone={(r) => {
+            setModal(null);
+            const t = confirmPaymentToast(r, o.code);
+            if (t.kind === "success") toast.success(t.message);
+            else toast.warn(t.message);
+            reload();
+          }}
+        />
+      )}
+      {modal === "cancel" && (
+        <CancelOrderModal
+          order={{ id: o.id, code: o.code, total_amount: o.total_amount ?? "0", delivery_status: o.delivery?.status ?? null }}
+          onClose={() => setModal(null)}
+          onConflict={onConflict}
+          onDone={(r) => {
+            setModal(null);
+            toast.success(M.cancelResult(o.code));
+            if (r.suggest_refund_amount && Number(r.suggest_refund_amount) > 0) setSuggest(r.suggest_refund_amount);
+            reload();
+          }}
+        />
+      )}
+      {modal === "refund" && o.invoice && (
+        <RefundModal
+          target={{ kind: "invoice", id: o.invoice.id, invoiceTotal: o.total_amount ?? "0" }}
+          refundableMax={suggest ?? refundableOfOrder(o)}
+          reasonDefault={status === "CANCELLED" || status === "AUTO_CANCELLED" ? M.refundReasonCancelled : ""}
+          summary={[
+            { label: M.rowOrder, value: o.code, mono: true },
+            { label: M.rowOrderTotal, value: vnd(o.total_amount ?? "0"), num: true },
+            { label: M.rowRefundable, value: vnd(refundableOfOrder(o)), num: true, strong: true },
+          ]}
+          onClose={() => setModal(null)}
+          onConflict={onConflict}
+          onDone={(r) => {
+            setModal(null);
+            setSuggest(null);
+            toast.success(r.duplicate ? M.resultRefundDup(r.amount) : M.resultRefund(r.amount));
+            reload();
+          }}
+        />
+      )}
+      {lookupDelivery && o.delivery && <LookupCard kind="delivery" id={o.delivery.id} onClose={() => setLookupDelivery(false)} />}
+    </DetailPage>
+  );
+}

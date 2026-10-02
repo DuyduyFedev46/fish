@@ -23,6 +23,10 @@ const TARGETS = [
   ["/(console)/orders/page", "/orders"],
   ["/(console)/orders/payments/page", "/orders/payments"],
   ["/(console)/orders/refunds/page", "/orders/refunds"],
+  // Trang chi tiết có AiDocBlockGate (Lô 3): phải xanh dù có khối AI nhẹ; runtime nặng chỉ nạp động khi chạm khung hỏi.
+  ["/(console)/orders/detail/page", "/orders/detail"],
+  ["/(console)/orders/payments/detail/page", "/orders/payments/detail"],
+  ["/(console)/orders/refunds/detail/page", "/orders/refunds/detail"],
   ["/(console)/inventory/page", "/inventory"],
   ["/(console)/deliveries/page", "/deliveries"],
   ["/(console)/deliveries/detail/page", "/deliveries/detail"],
