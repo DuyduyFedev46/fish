@@ -175,8 +175,9 @@ with sync_playwright() as p:
     page.evaluate("() => window.__caveMock.patchUser('kho1', {denied_perms: ['reports.view_dashboard']})")
     login(page, "kho1", wait_mock=False)
     page.wait_for_url("**/orders/")
-    ok("kho1 thiếu view_dashboard: trang đầu là Đơn & tiền, không có Tổng quan / Kho & lô",
-       "Đơn & tiền" in nav_labels(page) and "Tổng quan" not in nav_labels(page) and "Kho & lô" not in nav_labels(page), str(nav_labels(page)))
+    # ĐỔI (Lô 7, 02b §2.1): Kho & lô không còn phụ thuộc view_dashboard — NV kho thấy Kho & lô theo quyền xem lô.
+    ok("kho1 thiếu view_dashboard: trang đầu là Đơn & tiền, không có Tổng quan, có Kho & lô",
+       "Đơn & tiền" in nav_labels(page) and "Tổng quan" not in nav_labels(page) and "Kho & lô" in nav_labels(page), str(nav_labels(page)))
     expect(rows(page).first).to_be_visible()
     ok("kho1: màn Đơn có dữ liệu (không bị 403)", rows(page).count() == 20)
     ctx.close()

@@ -45,6 +45,11 @@ const TARGETS = [
   ["/print/label/page", "/print/label"],
   ["/(console)/inventory/detail/page", "/inventory/detail"],
   ["/(console)/ledger/page", "/ledger"],
+  // Mua hàng (Lô 10): danh sách + form nhập lô + chi tiết phiếu (có khối AI nhẹ) + form chi phí. Dữ liệu mua là giá vốn, không đưa AI trên máy.
+  ["/(console)/purchasing/page", "/purchasing"],
+  ["/(console)/purchasing/new/page", "/purchasing/new"],
+  ["/(console)/purchasing/detail/page", "/purchasing/detail"],
+  ["/(console)/purchasing/costs/new/page", "/purchasing/costs/new"],
   // Nhà cung cấp (Lô 11): trang chi tiết có AiDocBlockGate (purchasing.supplier); danh sách không có AI. Cả hai phải xanh.
   ["/(console)/suppliers/page", "/suppliers"],
   ["/(console)/suppliers/detail/page", "/suppliers/detail"],

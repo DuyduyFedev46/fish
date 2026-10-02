@@ -1596,6 +1596,99 @@ Script của QA (`qa_ed_batch5_ui.py`, `qa_ed_batch5_round2.py`) không sửa. C
 
 Giới hạn còn lại (xin QA cân nhắc): B10 đòi "Hàng" >= 60px ở viewport 768. Ở 768 có thanh bên mở, khung bảng chỉ 478px, bốn cột lõi (Mã đơn, SĐT, Trạng thái, Hạn gọi) đã 500px nên không thể chừa chỗ cho "Hàng". "Hàng" bị ẩn (display none) chứ không co về 0, bảng cuộn trong khung riêng, trang không cuộn ngang. Muốn thoả B10 cần bỏ Hạn gọi hoặc SĐT ở khổ tablet, tôi không làm vì đó là hai thông tin cần cho người gọi.
 
+## Lô 10 — FE: Mua hàng + phiếu nhập (ED-20) — 02/10
+
+Worktree `loc-wt-c`, nhánh `ed-stream-c`, chỉ sửa `erp-console/`. Chưa commit.
+
+### Trang và thành phần
+- W2a `/purchasing/` có 3 tab (`?tab=receipts|invoices|costs`). Tab Chi phí mua chỉ hiện cho Chủ. Quản lý thấy 2 tab, tab `costs` rơi về Phiếu nhập. NV kho thấy tab Phiếu nhập.
+  - `features/purchasing/components/PurchasingScreen.tsx`, `ReceiptListTab.tsx`
+  - `features/accounting/components/PurchaseInvoiceList.tsx`, `PurchaseCostList.tsx`
+- F1a `/purchasing/new/` (nhập lô tại cảng) dựng lại trên `FormPage`/`Field`: `ReceiveBatchesForm.tsx`. Giữ nguyên nháp theo người (không lưu giá mua), khoá idempotency, màn thành công, nút Huỷ phiếu vừa tạo.
+- W2b `/purchasing/detail/?id=`: `ReceiptDetailScreen.tsx`, `ReceiptSections.tsx`, `ReceiptActionModals.tsx`, `receiptView.ts` (+ test). Thanh bước, Tiếp theo/Đã làm, dòng nhập, hoá đơn, chi phí phụ (chỉ Chủ), khối AI qua `AiDocBlockGate`.
+- F1c Thêm hoá đơn (Modal trong chi tiết phiếu): `PurchaseInvoiceForm.tsx`.
+- F1d `/purchasing/costs/new/?receipt=` (chỉ Chủ, AC4: tổng chia phải bằng số tiền, báo "còn thiếu/đang thừa"): `PurchaseCostForm.tsx`, `costAllocation.ts` (+ test).
+- `features/ledger/referenceRoutes.ts`: Phiếu nhập `ready: true`. `shared/lib/nav.ts`, `scripts/check-ai-chunks.mjs` thêm các route mới.
+- `purchasing.module.css` viết lại, chỉ dùng token (0 mã màu cứng). `.codeCell` đủ vùng chạm 44px.
+- Quyết định #9: NV kho thấy mọi phiếu nhập.
+
+### Hàm API mới (kèm nhánh mock)
+- `features/purchasing/api.ts`: `fetchSuppliers`, `submitReceiveBatches`, `cancelPurchaseReceipt`, `fetchReceipts`, `fetchReceipt`, `submitReceipt`, `fetchReceiptGuidance`.
+- `features/accounting/api.ts`: `fetchPurchaseInvoices`, `createPurchaseInvoice`, `fetchPurchaseCosts`, `createPurchaseCost`.
+
+### Sửa phát sinh ngoài danh sách
+- `shared/lib/moneyInput.ts` (lỗi thật): dán/gõ đè "1000000" lên ô đang "1.000.000" bị coi là xoá lùi và mất một chữ số (thành 100.000). Chỉ coi là xoá khi `inputType` không bắt đầu bằng `insert`. Thêm test trong `moneyInput.test.ts`. Ô Số tiền trong form hoá đơn tự điền sẵn theo tiền mua nên gặp lỗi này ngay.
+- `ReceiptListTab`: "Bỏ lọc" xoá luôn ô tìm (trước đó tìm không ra thì Bỏ lọc không gỡ được).
+- `ReceiveBatchesForm`: tự chọn nhà cung cấp đầu danh sách khi chưa có nháp (như form cũ).
+- Các e2e cũ đổi selector theo form mới: `sr07_receive_batches_draft.py`, `sr07_qa_edges.py`, `p8_lo8_fe_erp_tz.py`, `qa_lo8_real.py` (URL `/purchasing/new/`, `[name=rate-0]`, `[name=qty-0]`, `[name=supplier]`, `[name=received_date]`).
+
+### Kiểm chứng (đã chạy lượt này)
+- `npx tsc --noEmit`: sạch.
+- `npx vitest run`: 59 file, 619 test, đạt hết.
+- `NEXT_PUBLIC_USE_MOCK=0 npm run build` + `check-no-mock.mjs` XANH (18 file mock, 42 chuỗi seed, 180 file build) + `check-ai-chunks.mjs` XANH (21 màn + 2 layout).
+- `e2e/ed_batch10_purchasing.py`: mock 91 ca, kèm Django thật (SQLite tạm, cổng 8130) tổng 105/105 đạt. Kịch bản thật kiểm body gửi lên (rate `"80000"`, qty `"12.5"`, idempotency_key, invoice amount/receipt), khoá `rate/purchase_amount/landed_unit_cost/costs/allocated_amount` không có trong phản hồi của ql1 và kho1, kho1 bị 403 ở `/costs/`.
+- e2e cũ ở mock 3301: `sr07_receive_batches_draft` 20/20, `sr07_qa_edges` 23/23, `ed_batch1_shell` 56/56, `ed_batch7_inventory` 114/114.
+- `scripts/check_naming.py`: OK, không phát sinh tên mới.
+- Hex/rgba trong `features/purchasing`, `features/accounting`, `app/(console)/purchasing`: 0.
+
+### Ảnh chụp
+`doc/features/2026-10-01-erp-theo-design/screens-lo10/`: `ed10-6-m-danh-sach.png`, `ed10-7-m-nhap-lo.png`, `ed10-8-m-chi-tiet.png`, `ed10-9-m-chi-phi.png`, `ed10-10-m-hoa-don.png`, `ed10-11-m-them-hoa-don.png` (360px); `ed10-1..5` (desktop); `ed10-real-1/2` (Django thật).
+
+### Chỗ lệch contract / quyết định cần techlead nhìn
+1. R10 không có tham số `q` và không trả tổng kg cả tập lọc: tìm kiếm làm phía client trên các dòng đã tải ("Tìm trong các phiếu đã tải"), không hiện tổng kg.
+2. `PurchaseCost` không có khoá tới phiếu nhập: chi phí của phiếu hiện qua phần phân bổ vào lô.
+3. 02b ghi đường `receipts/nhap-lo/`, BE thật là `receive-batches/`: FE dùng đường thật.
+4. "Lưu nháp" ở F1a chỉ lưu cục bộ (sessionStorage, không có giá mua), không gọi BE.
+5. Guidance `receipt` chỉ có timeline: Tiếp theo/Đã làm suy ra từ trạng thái phiếu.
+6. Ô Giá mua hiện cho vai có quyền thêm phiếu nhập (Quản lý cũng có `add_purchasereceipt` nên mở được `/purchasing/new/`), còn đọc giá mua và tổng tiền là việc của Chủ.
+7. Thanh gợi ý AI ở W2a chưa làm.
+8. Mock kế toán trùng tên nhà cung cấp cho tới Lô 12.
+9. Lô tạo từ mock `receive-batches` (id 2001+) không có trong mock kho nên link lô ở mock cho 404. Không ảnh hưởng bản thật.
+10. Nút Huỷ phiếu suy ra từ người tạo/nhóm quyền, BE vẫn là nơi chốt.
+11. Bộ lọc tháng ở tab Hoá đơn là ô chọn "12 tháng gần đây".
+12. Ô Giá mua dùng `type="money"` nên chỉ nhận đồng nguyên ("Số tiền là số nguyên đồng"), không nhận số lẻ.
+
+### Còn nợ
+- Thanh gợi ý AI ở W2a (mục 7). QA cần chạy lại với DB thật có nhiều phiếu để xem phân trang (BE trả 50/trang, FE hiện số dòng đã tải).
+
+### Sửa sau QA Lô 10 FE (REJECTED lần 1) — 02/10
+Chỉ sửa `erp-console/`. Chưa commit.
+
+| Mã | Đã sửa |
+|---|---|
+| B5 (High) | Gốc lỗi ở `features/accounting/money.ts`: `moneyBody` giờ **ném lỗi** khi chuỗi không hợp lệ, không bao giờ trả "0" cho giá trị xấu. Thêm `moneyIssue`/`moneyMessage` (âm, quá 12 chữ số, không phải số, rỗng, bằng 0) và dùng làm luật chặn ở mọi form tiền. Giá mua âm, 14 chữ số hoặc bằng 0 báo lỗi ngay dưới ô (viền đỏ, `aria-invalid`) và **không gọi API**. Giới hạn 12 chữ số khớp BE (`max_digits=14`, 2 số lẻ). Đã rà mọi chỗ gọi `moneyBody`: form hoá đơn (số tiền > 0), form chi phí (tổng chi phí > 0, từng phần chia chặn âm/quá dài), form nhập lô (giá mua). |
+| B4 (Medium) | Số kg 0, rỗng, âm, chữ: "Nhập số kg lớn hơn 0." ngay dưới ô số kg, không lên alert đầu form (ED-20-AC3). Bấm Ghi nhận khi còn lỗi thì focus vào ô lỗi đầu tiên. Logic ở `features/purchasing/receiveValidation.ts` (có test). |
+| TL-L1 | `PurchaseCostForm`: sau khi lưu chi phí thành công, nút khoá cho tới khi chuyển trang xong (state `saved`), không tạo được chi phí thứ hai. |
+| TL-L2 | `sr07_receive_batches_draft.py` và `sr07_qa_edges.py` kiểm storage/URL/console theo cả dạng thô lẫn dạng có dấu chấm nghìn (81234 và 81.234). |
+| TL-L3 | Tab Hoá đơn mua và tab Chi phí mua hiện "Bỏ lọc" khi đang tìm; bấm xoá cả ô tìm. |
+| QA-L1 | Bảng phiếu nhập: tên cột theo bảng thiết kế (Mã phiếu, Số kg, Hoá đơn mua) và dòng tiêu đề thẻ "Phiếu nhập · n phiếu · tổng kg" (`receiptTotals`, không tính kg của phiếu đã huỷ; có chữ "(đã tải)" khi còn trang sau). |
+
+Phát sinh trong lúc sửa: `shared/lib/moneyInput.ts` làm mất 1 chữ số khi dán "1000000" đè lên "1.000.000" (heuristic xoá phím nhầm là xoá); đã sửa theo `inputType` và có test.
+
+Quyết định ghi lại:
+- Ô Giá mua để trống ở phiếu nhập nghĩa là "chưa có giá" (gửi "0.00", BE cho phép ở bản nháp). Người dùng chủ động gõ 0 là lỗi, vì có chữ rõ ràng hơn con số 0 im lặng.
+- Ô tiền giữ nguyên "-5000" người dùng gõ (không tự xoá dấu trừ) để hiện được lỗi. `qa_ed_batch10_mock.py` ca "gõ số âm -> không còn dấu '-'" là kỳ vọng cũ và sẽ FAIL; hành vi mới là chủ đích của B5.
+- Nợ thấp: ô "Hạn dùng" biến giá trị sai thành null (không phải ô tiền, không ảnh hưởng tiền).
+- `e2e/qa_ed_batch10_real.py` còn kỳ vọng chữ cũ "Dòng N: Khối lượng phải lớn hơn 0 kg."; QA cần cập nhật theo chữ mới.
+
+Kiểm (chạy lượt này, worktree C): `npx tsc --noEmit` sạch; `npx vitest run` 61 file, 635 test pass; build MOCK=1 và MOCK=0 đều biên dịch; `check-no-mock` XANH; `check-ai-chunks` XANH (21 màn + 2 layout); `ed_batch10_purchasing` mock 112/112 và có Django thật 129/129 (thêm ca B4/B5 gọi BE thật: không có request nhập lô nào được gửi khi giá/số kg sai); `qa_ed_batch10_mock` 31/32 (ca còn lại là kỳ vọng cũ nói trên); `sr07_receive_batches_draft` 20/20; `sr07_qa_edges` 23/23; `ed_batch1_shell` 56/56; `ed_batch7_inventory` 114/114; `check_naming` không phát sinh mới; 0 màu hard-code.
+Ảnh: `/private/tmp/claude-501/-Users-dangthiduyen-Downloads-loc/027d854a-5d5b-47c2-aa50-91d0c28d6319/scratchpad/shots/l10-fix-mobile-form-errors.png` (360px, lỗi dưới từng ô).
+### Sửa sau QA Lô 10 FE lần 2 (N1, N2) — 02/10
+Chỉ sửa `erp-console/`. Đã merge `main` (BE Lô 10 sửa B1–B3 và giới hạn `rate`) vào `ed-stream-c`.
+
+| Mã | Đã sửa |
+|---|---|
+| N1 (Medium) | Ô Giá mua của phiếu nhập giới hạn **10 chữ số** (tối đa 9.999.999.999), khớp BE vừa chặn `rate` ở 10 chữ số phần nguyên (cột giá vốn lô `landed_unit_cost`). `features/accounting/money.ts` thêm `RATE_MAX_DIGITS = 10` và tham số `maxDigits` cho `parseMoney`, `moneyIssue`, `moneyMessage`, `moneyBody`; câu lỗi nêu đúng giới hạn: "Giá mua quá lớn, tối đa 10 chữ số (9.999.999.999)." Form nhập lô (`receiveValidation.ts`) dùng 10 chữ số cho cả kiểm lẫn dựng body. Có test ở `money.test.ts`, `receiveValidation.test.ts`. |
+| N2 (Low) | Mới `shared/lib/ruleCodes.ts` (`stripRuleCodes`, có test): bỏ "(BR-MH-07)" và mã trần "BR-xx-nn" khỏi câu lỗi BE. Gọi một chỗ trong `detailOf` của `shared/lib/http.ts` nên mọi màn ERP đều hưởng; mã vẫn nằm ở `ApiError.code`. Có test ở `http.test.ts` (message sạch, code giữ nguyên). |
+
+Rà giới hạn các ô tiền khác bằng cách gọi BE thật (Django SQLite, DB sạch):
+- Số tiền hoá đơn mua: 999.999.999.999 (12 chữ số) trả 201, 1.000.000.000.000 trả 400. FE giữ 12 chữ số, khớp.
+- Tổng chi phí mua và phần chia theo lô: BE thật trả **500** (`decimal.InvalidOperation`) khi chi phí chia vào một lô làm giá vốn/kg vượt 10 chữ số phần nguyên, ví dụ chia 9.999.999.999 đ vào lô 1 kg (999.999.999 thì 201). Cùng gốc với N1 (`Batch.landed_unit_cost` 14 chữ số, 4 số lẻ) nhưng ở API chi phí, **BE chưa chặn**. FE chưa thể kiểm chính xác vì giới hạn phụ thuộc cả số kg của lô lẫn giá nhập; nên giữ 12 chữ số ở ô chi phí như cũ và nêu cho điều phối viên (đề xuất BE trả 400 theo field `allocations`). Không ảnh hưởng thực tế: chi phí hơn 10 tỷ đ cho một lô không có trong vận hành.
+
+Kiểm (chạy lượt này, worktree C, sau merge `main`): `npx tsc --noEmit` sạch; `npx vitest run` 65 file, 717 test pass; build MOCK=1 và MOCK=0 biên dịch; `check-no-mock` XANH; `check-ai-chunks` XANH (29 màn + 2 layout); `ed_batch10_purchasing` 134/134 (kèm Django thật); `qa_ed_batch10_second_pass` 42/42; `qa_ed_batch10_real` 143/143; `qa_ed_batch10_mock` 33/33; `sr07_receive_batches_draft` 20/20; `sr07_qa_edges` 23/23; `ed_batch1_shell` 56/56; `ed_batch7_inventory` 114/114; 0 màu hard-code.
+Lưu ý khi chạy `qa_ed_batch10_real`: cần user `giao1` (delivery_staff) và `cs2` (customer_service) trong DB, và nâng `THROTTLE_LOGIN_IP`/`THROTTLE_LOGIN_USER` (mặc định 10/min làm 429 giữa chừng). Ca "phản hồi API không có SĐT" từng đỏ ngẫu nhiên vì chuỗi hex của token DRF có thể chứa 10 chữ số bắt đầu bằng 0; nên đổi regex của script QA (chặn theo ranh giới số hoặc loại token khỏi phép quét).
+`check_naming` đang báo `client_kho` trong `backend/apps/purchasing/receipts/tests/test_nhap_lo.py` (commit BE `9c727c0` trên `main`, không thuộc FE).
+
 ## Lô 9 — FE (Hàng hoàn về kho ED-26) — 02/10
 
 **Trang và hộp đã làm (tất cả trong `erp-console/`):**

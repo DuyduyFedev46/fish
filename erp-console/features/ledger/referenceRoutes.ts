@@ -7,7 +7,7 @@ export const REFERENCE_ROUTES: readonly ReferenceRoute[] = [
   { kind: "batch", page: "inventory/detail", ready: true },
   { kind: "order", page: "orders/detail", ready: true }, // Lô 3 đã vào: /orders/detail/?id=
   { kind: "invoice", page: "invoices/detail", ready: false }, // chưa có lô nhận
-  { kind: "receipt", page: "purchasing/detail", ready: false }, // phiếu nhập: Lô 10 chưa vào
+  { kind: "receipt", page: "purchasing/detail", ready: true }, // Lô 10 đã vào: /purchasing/detail/?id=
   { kind: "stocktake", page: "stocktake/detail", ready: false }, // Lô 8
   { kind: "return", page: "returns/detail", ready: false }, // Lô 9
   { kind: "supplier_return", page: "inventory/supplier-returns/detail", ready: false }, // chưa có màn

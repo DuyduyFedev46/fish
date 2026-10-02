@@ -1,0 +1,90 @@
+/* Hoá đơn mua & chi phí mua (Lô 10): chỉ dùng token trong tokens.css, không màu cứng. */
+.twoCols {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-3);
+}
+@media (min-width: 640px) {
+  .twoCols {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+.codeLink {
+  color: var(--accent-text);
+  text-decoration: none;
+  border-radius: var(--radius-xs);
+}
+.codeLink:hover {
+  text-decoration: underline;
+}
+.codeLink:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+.filters {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.hint {
+  margin: 0;
+  color: var(--ink-3);
+  font-size: var(--text-sm);
+}
+.toolbar {
+  display: flex;
+  justify-content: flex-end;
+}
+.allocTable {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.allocRow {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-1);
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+.allocHead {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.allocCode {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+}
+.allocMeta {
+  color: var(--ink-3);
+  font-size: var(--text-sm);
+}
+.totalLine {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--ink-2);
+}
+.totalLine strong {
+  color: var(--ink);
+}
+@media (min-width: 640px) {
+  .allocRow {
+    grid-template-columns: 1fr minmax(160px, 220px);
+    align-items: end;
+    gap: var(--space-3);
+  }
+}
+@media (max-width: 767px) {
+  .codeLink {
+    display: inline-flex;
+    align-items: center;
+    min-height: var(--tap);
+    min-width: var(--tap);
+  }
+}

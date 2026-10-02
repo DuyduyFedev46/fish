@@ -60,6 +60,18 @@ describe("apiFetch chế độ mock", () => {
     expect((error as InstanceType<typeof ApiError>).details).toEqual({ errors: { "a.b.c": "vượt trần" } });
   });
 
+  it("lỗi BE: message hiển thị không có mã luật '(BR-…)', mã vẫn nằm ở ApiError.code (QA Lô 10 N2)", async () => {
+    vi.stubEnv("NEXT_PUBLIC_USE_MOCK", "1");
+    const { apiFetch } = await import("./http");
+    const error = await apiFetch("/api/x/", {
+      method: "POST",
+      body: {},
+      mock: () => ({ status: 400, body: { detail: "Phiếu nhập đã bị huỷ (BR-MH-07).", code: "RECEIPT_CANCELLED" } }),
+    }).catch((e) => e as { message: string; code?: string });
+    expect((error as { message: string }).message).toBe("Phiếu nhập đã bị huỷ.");
+    expect((error as { code?: string }).code).toBe("RECEIPT_CANCELLED");
+  });
+
   it("lỗi 400 chỉ có detail và code: details là undefined", async () => {
     vi.stubEnv("NEXT_PUBLIC_USE_MOCK", "1");
     const { apiFetch } = await import("./http");

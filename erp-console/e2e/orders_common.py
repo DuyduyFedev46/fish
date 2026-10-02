@@ -43,8 +43,23 @@ def posts(page):
     return [x for x in log(page) if x.startswith("POST")]
 
 
+
+_RULE_CODE = r"(?:BR|DW|V|E|P)-[A-Z0-9]+(?:-[A-Z0-9]+)*"
+_PAREN_CODES = re.compile(r"\s*[(（]\s*" + _RULE_CODE + r"(?:\s*[,;/]\s*" + _RULE_CODE + r")*\s*[)）]")
+_BARE_BR = re.compile(r"\s*\bBR-[A-Z]+(?:-\d+)?\b")
+
+
+def strip_rule_codes(msg):
+    """Giống shared/lib/ruleCodes.ts: màn ERP bỏ mã luật (BR-…) khỏi câu lỗi BE trước khi hiển thị."""
+    if not isinstance(msg, str) or not re.search(r"\b(?:BR|DW|V|E|P)-[A-Z0-9]", msg):
+        return msg
+    out = _BARE_BR.sub("", _PAREN_CODES.sub("", msg))
+    out = re.sub(r"[ \t]{2,}", " ", out)
+    return re.sub(r"\s+([.,;:!?])", r"\1", out).strip()
+
+
 def be(page, key, params=None):
-    return page.evaluate("([k, p]) => window.__caveMock.beDetail(k, p || undefined)", [key, params])
+    return strip_rule_codes(page.evaluate("([k, p]) => window.__caveMock.beDetail(k, p || undefined)", [key, params]))
 
 
 def go(page, path):

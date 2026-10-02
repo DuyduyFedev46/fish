@@ -15,6 +15,15 @@ SHOTS = os.environ.get(
     os.path.join(os.path.dirname(__file__), "..", "..", "doc", "features", "2026-09-30-sua-loi-review", "qa-lo2"),
 )
 RATE = "81234"
+
+
+def forms(raw):
+    """Số tiền ở dạng gõ thô và dạng có dấu chấm nghìn (81234 -> 81.234): storage/URL/log không được chứa dạng nào."""
+    return {raw, f"{int(raw):,}".replace(",", ".")}
+
+
+def holds(text, raw):
+    return any(f in text for f in forms(raw))
 results = []
 
 
@@ -42,9 +51,9 @@ def logout(page):
 
 
 def open_receive_batches(page):
-    page.goto(BASE + "/purchasing/")
+    page.goto(BASE + "/purchasing/new/")
     page.wait_for_load_state("networkidle")
-    page.wait_for_selector("input[placeholder='80000']", timeout=10_000)
+    page.wait_for_selector("input[name='rate-0']", timeout=10_000)
     page.wait_for_timeout(300)  # để effect tự lưu nháp chạy
 
 
@@ -80,19 +89,19 @@ with sync_playwright() as p:
     login(page, "loc")
     open_receive_batches(page)
     ok("Khoá cũ ở localStorage bị dọn khi mở Nhập lô", page.evaluate("() => localStorage.getItem('cave_draft_nhap_lo')") is None)
-    rate_input = page.locator("input[placeholder='80000']").first
-    page.locator("input[placeholder='0.000']").first.fill("12")
+    rate_input = page.locator("input[name='rate-0']").first
+    page.locator("input[name='qty-0']").first.fill("12")
     rate_input.fill(RATE)
     page.wait_for_timeout(300)
-    ok("Chủ: ô giá mua đang hiện 81234", rate_input.input_value() == RATE)
+    ok("Chủ: ô giá mua đang hiện 81234", rate_input.input_value().replace(".", "") == RATE)
     st = storages(page)
-    ok("Chủ: localStorage/sessionStorage KHÔNG chứa 81234 dù đang gõ", RATE not in st["local"] and RATE not in st["session"], str(st["sessionKeys"]))
+    ok("Chủ: localStorage/sessionStorage KHÔNG chứa 81234 dù đang gõ", not holds(st["local"], RATE) and not holds(st["session"], RATE), str(st["sessionKeys"]))
     ok("Chủ: nháp nằm ở sessionStorage khoá theo userId", any(k.startswith("cave_draft_receive_batches:") for k in st["sessionKeys"]), str(st["sessionKeys"]))
     key_chu = draft_key_of(page)
     ok("Chủ: nháp có idempotencyKey", bool(key_chu))
     page.reload()
     page.wait_for_load_state("networkidle")
-    page.wait_for_selector("input[placeholder='80000']", timeout=10_000)
+    page.wait_for_selector("input[name='rate-0']", timeout=10_000)
     page.wait_for_timeout(300)
     ok("AC4(a) F5 cùng người: giữ đúng idempotencyKey", draft_key_of(page) == key_chu)
 
@@ -108,14 +117,14 @@ with sync_playwright() as p:
     )
     page.reload()
     page.wait_for_load_state("networkidle")
-    page.wait_for_selector("input[placeholder='80000']", timeout=10_000)
+    page.wait_for_selector("input[name='rate-0']", timeout=10_000)
     page.wait_for_timeout(300)
     st = storages(page)
     ok("P8b-L3 khoá cũ của chính người này đã chuyển sang khoá mới và bị xoá", "cave_draft_nhap_lo:" + uid not in st["sessionKeys"] and "cave_draft_receive_batches:" + uid in st["sessionKeys"], str(st["sessionKeys"]))
     ok("P8b-L3 nháp chuyển sang giữ số lượng 33, idempotencyKey cũ, và KHÔNG có giá mua 99999",
-       page.locator("input[placeholder='0.000']").first.input_value() == "33" and draft_key_of(page) == "legacy-key-1"
-       and "99999" not in st["local"] and "99999" not in st["session"] and page.locator("input[placeholder='80000']").first.input_value() == "")
-    page.locator("input[placeholder='80000']").first.fill(RATE)
+       page.locator("input[name='qty-0']").first.input_value() == "33" and draft_key_of(page) == "legacy-key-1"
+       and not holds(st["local"], "99999") and not holds(st["session"], "99999") and page.locator("input[name='rate-0']").first.input_value() == "")
+    page.locator("input[name='rate-0']").first.fill(RATE)
     page.wait_for_timeout(300)
     page.screenshot(path=os.path.join(SHOTS, "sr07-1-chu-go-gia-81234.png"), full_page=True)
 
@@ -125,43 +134,43 @@ with sync_playwright() as p:
     ok("Sau đăng xuất: không còn khoá cave_draft_receive_batches* và cave_draft_nhap_lo* (tiền tố cũ) ở local/session",
        not any(k.startswith(("cave_draft_receive_batches", "cave_draft_nhap_lo")) for k in st["localKeys"] + st["sessionKeys"]),
        f"local={st['localKeys']} session={st['sessionKeys']}")
-    ok("Sau đăng xuất: storage không chứa 81234", RATE not in st["local"] and RATE not in st["session"])
+    ok("Sau đăng xuất: storage không chứa 81234", not holds(st["local"], RATE) and not holds(st["session"], RATE))
 
     # 3) warehouse_staff đăng nhập trên cùng máy/tab
     login(page, "kho1")
     open_receive_batches(page)
-    ok("warehouse_staff: ô giá mua rỗng", page.locator("input[placeholder='80000']").first.input_value() == "")
-    ok("warehouse_staff: ô số lượng rỗng (nháp Chủ không sang)", page.locator("input[placeholder='0.000']").first.input_value() == "")
+    ok("warehouse_staff: ô giá mua rỗng", page.locator("input[name='rate-0']").first.input_value() == "")
+    ok("warehouse_staff: ô số lượng rỗng (nháp Chủ không sang)", page.locator("input[name='qty-0']").first.input_value() == "")
     st = storages(page)
-    ok("warehouse_staff: storage không chứa 81234", RATE not in st["local"] and RATE not in st["session"])
+    ok("warehouse_staff: storage không chứa 81234", not holds(st["local"], RATE) and not holds(st["session"], RATE))
     ok("AC4(b) warehouse_staff: idempotencyKey mới, khác của Chủ", bool(draft_key_of(page)) and draft_key_of(page) != key_chu)
     page.screenshot(path=os.path.join(SHOTS, "sr07-2-nv-kho-o-gia-rong.png"), full_page=True)
     key_kho = draft_key_of(page)
 
     # 4) Nạp lại nháp cùng người (F5): giữ số lượng, giá mua rỗng
-    page.locator("input[placeholder='0.000']").first.fill("7")
-    page.locator("input[placeholder='80000']").first.fill("55555")
+    page.locator("input[name='qty-0']").first.fill("7")
+    page.locator("input[name='rate-0']").first.fill("55555")
     page.wait_for_timeout(300)
     page.reload()
     page.wait_for_load_state("networkidle")
-    page.wait_for_selector("input[placeholder='80000']", timeout=10_000)
+    page.wait_for_selector("input[name='rate-0']", timeout=10_000)
     page.wait_for_timeout(300)
-    ok("F5 cùng người: số lượng 7 còn (nháp giữ)", page.locator("input[placeholder='0.000']").first.input_value() == "7")
-    ok("F5 cùng người: giá mua rỗng (không lưu)", page.locator("input[placeholder='80000']").first.input_value() == "")
+    ok("F5 cùng người: số lượng 7 còn (nháp giữ)", page.locator("input[name='qty-0']").first.input_value() == "7")
+    ok("F5 cùng người: giá mua rỗng (không lưu)", page.locator("input[name='rate-0']").first.input_value() == "")
     st = storages(page)
-    ok("F5: storage không chứa 55555", "55555" not in st["local"] and "55555" not in st["session"])
+    ok("F5: storage không chứa 55555", not holds(st["local"], "55555") and not holds(st["session"], "55555"))
     ok("AC4(a) F5 warehouse_staff: giữ đúng key", draft_key_of(page) == key_kho)
     page.screenshot(path=os.path.join(SHOTS, "sr07-3-f5-cung-nguoi.png"), full_page=True)
 
     # 5) Gửi thành công -> nháp xoá; nhập phiếu tiếp -> key mới
-    page.locator("table select").first.select_option(index=1)
-    page.locator("input[placeholder='0.000']").first.fill("5")
+    page.locator("select[name='item-0']").select_option(index=1)
+    page.locator("input[name='qty-0']").first.fill("5")
     page.get_by_role("button", name="Ghi nhận phiếu nhập").click()
     page.wait_for_selector("text=Ghi nhận phiếu nhập thành công", timeout=10_000)
     page.wait_for_timeout(300)
     ok("AC4(c) gửi thành công: nháp bị xoá", draft_key_of(page) is None)
     page.get_by_role("button", name="Nhập phiếu tiếp").click()
-    page.wait_for_selector("input[placeholder='80000']", timeout=10_000)
+    page.wait_for_selector("input[name='rate-0']", timeout=10_000)
     page.wait_for_timeout(300)
     ok("AC4(c) nhập phiếu tiếp: idempotencyKey mới", bool(draft_key_of(page)) and draft_key_of(page) != key_kho)
     page.screenshot(path=os.path.join(SHOTS, "sr07-4-sau-gui-thanh-cong-key-moi.png"), full_page=True)

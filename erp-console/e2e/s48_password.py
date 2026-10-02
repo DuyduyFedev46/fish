@@ -1,3 +1,4 @@
+import re
 # E2E S48 — Tài khoản & mật khẩu "làm đàng hoàng": chạy trên bản build MOCK phục vụ tĩnh.
 #   cd erp-console && NEXT_PUBLIC_USE_MOCK=1 npm run build && (cd out && python3 -m http.server 3101 &)
 #   SHOTS=<thư mục ảnh> python3 e2e/s48_password.py      # tắt server sau khi xong
@@ -46,8 +47,23 @@ def msg(page, key):
     return page.evaluate("k => window.__caveMock.msg[k]", key)
 
 
+
+_RULE_CODE = r"(?:BR|DW|V|E|P)-[A-Z0-9]+(?:-[A-Z0-9]+)*"
+_PAREN_CODES = re.compile(r"\s*[(（]\s*" + _RULE_CODE + r"(?:\s*[,;/]\s*" + _RULE_CODE + r")*\s*[)）]")
+_BARE_BR = re.compile(r"\s*\bBR-[A-Z]+(?:-\d+)?\b")
+
+
+def strip_rule_codes(msg):
+    """Giống shared/lib/ruleCodes.ts: màn ERP bỏ mã luật (BR-…) khỏi câu lỗi BE trước khi hiển thị."""
+    if not isinstance(msg, str) or not re.search(r"\b(?:BR|DW|V|E|P)-[A-Z0-9]", msg):
+        return msg
+    out = _BARE_BR.sub("", _PAREN_CODES.sub("", msg))
+    out = re.sub(r"[ \t]{2,}", " ", out)
+    return re.sub(r"\s+([.,;:!?])", r"\1", out).strip()
+
+
 def be(page, key):
-    return page.evaluate("k => window.__caveMock.beDetail(k)", key)
+    return strip_rule_codes(page.evaluate("k => window.__caveMock.beDetail(k)", key))
 
 
 def mock_user(page, username):

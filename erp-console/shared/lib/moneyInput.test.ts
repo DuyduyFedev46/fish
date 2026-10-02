@@ -128,6 +128,11 @@ describe("editMoneyInput: dán", () => {
     // đang "1.000", bôi đen "000" (vị trí 2..5) rồi dán "250" → "1.250" caret 5
     expect(editMoneyInput("1.000", "1.250", 5, "insertFromPaste")).toEqual({ value: "1.250", caret: 5 });
   });
+  it("dán cùng chữ số nhưng không có dấu chấm đè lên số đã nhóm: không mất số", () => {
+    // "1.000.000" bôi đen hết, dán "1000000": chữ số giống hệt, chuỗi ngắn hơn, nhưng đây là dán chứ không phải xoá lùi
+    expect(editMoneyInput("1.000.000", "1000000", 7, "insertFromPaste").value).toBe("1.000.000");
+    expect(editMoneyInput("1.000.000", "1000000", 7, "insertText").value).toBe("1.000.000");
+  });
 });
 
 describe("editMoneyInput: biên", () => {

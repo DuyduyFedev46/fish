@@ -102,6 +102,16 @@ export const PERM = {
   viewWarehouse: "inventory.view_warehouse",
   viewStockEntry: "inventory.view_stockentry",
   viewPurchaseReceipt: "purchasing.view_purchasereceipt",
+  /** Lô 10: lập phiếu nhập (Nhập lô tại cảng). Chủ, Quản lý, NV kho. */
+  addPurchaseReceipt: "purchasing.add_purchasereceipt",
+  /** Lô 10: ghi nhận / huỷ phiếu nhập (BE: change_purchasereceipt; huỷ còn xét người lập hoặc Chủ/Quản lý). */
+  changePurchaseReceipt: "purchasing.change_purchasereceipt",
+  /** Lô 10: xoá/huỷ phiếu của người khác (Chủ). */
+  deletePurchaseReceipt: "purchasing.delete_purchasereceipt",
+  /** Lô 10: thêm hoá đơn mua (chỉ Chủ). */
+  addPurchaseInvoice: "purchasing.add_purchaseinvoice",
+  /** Lô 10: nhập chi phí mua (chỉ Chủ). */
+  addPurchaseCost: "purchasing.add_purchasecost",
   viewStockReconciliation: "inventory.view_stockreconciliation",
   /** ED-28: lập phiếu kiểm kê (Chủ, Quản lý, NV kho). Nút thật theo `available_actions` của BE; quyền này chỉ để hiện nút "Lập phiếu kiểm kê". */
   addStockReconciliation: "inventory.add_stockreconciliation",

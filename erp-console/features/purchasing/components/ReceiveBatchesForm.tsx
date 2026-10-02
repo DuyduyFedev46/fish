@@ -1,21 +1,36 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+// F1a Nhập lô tại cảng (POST /api/purchasing/receipts/receive-batches/), trang /purchasing/new/.
+// Giữ nguyên hành vi Lô 2/P8: nháp theo người dùng ở sessionStorage KHÔNG có giá mua (draftStorage.ts), idempotency key giữ qua F5 và
+// đổi mới sau khi gửi thành công, dòng khối lượng 0 bị chặn trước khi gửi. Giá mua là ô tiền (type="money", số nguyên đồng).
+// Không có dữ liệu cá nhân trong form; tên nhà cung cấp chỉ nằm trong ô chọn.
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Icon } from "@/shared/ui/Icon";
 import { listItems } from "@/features/catalog/api";
 import { useAuth } from "@/features/auth/components/AuthProvider";
-import { dateOnly, todayInVietnam } from "@/shared/lib/format";
-import type { CatalogItem } from "@/features/catalog/types";
+import { stripRuleCodes } from "@/features/inventory/lotView";
+import { ApiError } from "@/shared/lib/http";
+import { dateOnly, kg, todayInVietnam } from "@/shared/lib/format";
+import { useResource } from "@/shared/lib/useResource";
+import { Field } from "@/shared/ui/form/Field";
+import { FormAlert } from "@/shared/ui/form/FormAlert";
+import { FormPage } from "@/shared/ui/form/FormPage";
+import { primaryLabel, useSubmit } from "@/shared/ui/form/useSubmit";
+import { Icon } from "@/shared/ui/Icon";
+import { Modal } from "@/shared/ui/overlay/Modal";
+import { useToast } from "@/shared/ui/overlay/Toast";
+import { SkeletonScreen, SkeletonTable } from "@/shared/ui/Skeleton";
+import { ErrorScreen } from "@/shared/ui/states/ErrorScreen";
+import { NoPermission } from "@/shared/ui/states/NoPermission";
 import { cancelPurchaseReceipt, fetchSuppliers, submitReceiveBatches } from "../api";
-import type { ReceiveBatchesLineInput, ReceiveBatchesResponse, Supplier } from "../types";
+import { receiptAbility } from "../receiptView";
+import { buildReceiveLines, firstErrorKey, validateReceiveForm } from "../receiveValidation";
+import type { ReceiveBatchesLineInput, ReceiveBatchesResponse } from "../types";
 import s from "../purchasing.module.css";
 import { clearDraft, loadDraft, purgeLegacyDraft, resolveIdempotencyKey, saveDraft } from "./draftStorage";
 
 function generateUUID(): string {
-  if (typeof crypto !== "undefined" && crypto.randomUUID) {
-    return crypto.randomUUID();
-  }
+  if (typeof crypto !== "undefined" && crypto.randomUUID) return crypto.randomUUID();
   return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
     const r = (Math.random() * 16) | 0;
     const v = c === "x" ? r : (r & 0x3) | 0x8;
@@ -23,429 +38,267 @@ function generateUUID(): string {
   });
 }
 
-function getTodayString(): string {
-  return todayInVietnam();
+const EMPTY_LINE: ReceiveBatchesLineInput = { item_code: "", qty: "", rate: "", shelf_life_days: null };
+
+type Setup = { supplierId: number | ""; receivedDate: string; lines: ReceiveBatchesLineInput[]; idempotencyKey: string };
+
+/** Khởi tạo từ nháp của CHÍNH người đang đăng nhập (không có giá mua); chưa có nháp thì form trống. */
+function initialSetup(userId: number | null): Setup {
+  const idempotencyKey = resolveIdempotencyKey(userId, generateUUID);
+  purgeLegacyDraft(); // khoá cũ ở localStorage có giá mua, dùng chung mọi người
+  const draft = userId !== null ? loadDraft(userId) : null;
+  return {
+    supplierId: draft?.supplierId ? draft.supplierId : "",
+    receivedDate: draft?.receivedDate ? draft.receivedDate : todayInVietnam(),
+    lines: draft && draft.lines.length > 0 ? draft.lines.map((l) => ({ ...l, rate: "" })) : [{ ...EMPTY_LINE }],
+    idempotencyKey,
+  };
 }
 
 export function ReceiveBatchesForm() {
   const { me } = useAuth();
-  const userId = me?.id ?? null;
-  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
-  const [items, setItems] = useState<CatalogItem[]>([]);
-  const [loadingInitial, setLoadingInitial] = useState(true);
+  if (!me) return null;
+  if (!receiptAbility(me).create) return <NoPermission homeHref="/purchasing/" />;
+  return <FormLoader userId={me.id} />;
+}
 
-  const [supplierId, setSupplierId] = useState<number | "">("");
-  const [receivedDate, setReceivedDate] = useState<string>(getTodayString());
-  const [idempotencyKey, setIdempotencyKey] = useState<string>("");
-  const [lines, setLines] = useState<ReceiveBatchesLineInput[]>([
-    { item_code: "", qty: "", rate: "", shelf_life_days: null },
-  ]);
+function FormLoader({ userId }: { userId: number }) {
+  const lookups = useResource(
+    "purchasing:receive-form-lookups",
+    async () => {
+      const [suppliers, items] = await Promise.all([fetchSuppliers(), listItems("all").then((r) => r.results)]);
+      return { suppliers: suppliers.filter((x) => x.is_active), items: items.filter((i) => i.is_active) };
+    },
+    0,
+  );
+  if (lookups.error && !lookups.data) return <ErrorScreen onRetry={() => void lookups.reload()} homeHref="/purchasing/" />;
+  if (!lookups.data) {
+    return (
+      <SkeletonScreen label="Đang tải nhà cung cấp và mặt hàng…">
+        <SkeletonTable rows={3} cols={2} />
+      </SkeletonScreen>
+    );
+  }
+  return <FormBody userId={userId} suppliers={lookups.data.suppliers} items={lookups.data.items} />;
+}
 
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [successResult, setSuccessResult] = useState<ReceiveBatchesResponse | null>(null);
+function FormBody({ userId, suppliers, items }: { userId: number; suppliers: { id: number; name: string }[]; items: { code: string; name: string }[] }) {
+  const toast = useToast();
+  const [setup] = useState(() => initialSetup(userId));
+  const [supplierId, setSupplierId] = useState<number | "">(setup.supplierId || suppliers[0]?.id || "");
+  const [receivedDate, setReceivedDate] = useState(setup.receivedDate);
+  const [idempotencyKey, setIdempotencyKey] = useState(setup.idempotencyKey);
+  const [lines, setLines] = useState<ReceiveBatchesLineInput[]>(setup.lines);
+  const [touched, setTouched] = useState(false);
+  const [result, setResult] = useState<ReceiveBatchesResponse | null>(null);
 
-  // Huỷ phiếu nhập (DW-18)
-  const [isCancelling, setIsCancelling] = useState(false);
-  const [cancelError, setCancelError] = useState<string | null>(null);
-  const [cancelSuccessMsg, setCancelSuccessMsg] = useState<string | null>(null);
-
-  // Khởi tạo key và nạp dữ liệu ban đầu. SR-07: nháp chỉ của người đang đăng nhập (sessionStorage) và KHÔNG có giá mua;
-  // idempotency key: có trong nháp của CHÍNH người này thì dùng lại (F5 giữ key), không có thì sinh mới.
+  // Tự lưu nháp (không gồm giá mua — xem draftStorage.ts); gửi xong thì xoá.
   useEffect(() => {
-    const key = resolveIdempotencyKey(userId, generateUUID);
-    let initialSupplier: number | "" = "";
-    let initialDate = getTodayString();
-    let initialLines: ReceiveBatchesLineInput[] = [
-      { item_code: "", qty: "", rate: "", shelf_life_days: null },
-    ];
+    if (result) clearDraft(userId);
+    else saveDraft(userId, { supplierId, receivedDate, lines, idempotencyKey });
+  }, [supplierId, receivedDate, lines, idempotencyKey, result, userId]);
 
-    purgeLegacyDraft(); // khoá cũ ở localStorage có giá mua, dùng chung mọi người
-    const draft = userId !== null ? loadDraft(userId) : null;
-    if (draft) {
-      if (draft.supplierId) initialSupplier = draft.supplierId;
-      if (draft.receivedDate) initialDate = draft.receivedDate;
-      if (draft.lines.length > 0) initialLines = draft.lines.map((l) => ({ ...l, rate: "" }));
-    }
+  const supplierOptions = useMemo(() => [{ value: "", label: "Chọn nhà cung cấp" }, ...suppliers.map((x) => ({ value: String(x.id), label: x.name }))], [suppliers]);
+  const itemOptions = useMemo(() => [{ value: "", label: "Chọn mặt hàng" }, ...items.map((i) => ({ value: i.code, label: `${i.code} — ${i.name}` }))], [items]);
 
-    setSupplierId(initialSupplier);
-    setReceivedDate(initialDate);
-    setLines(initialLines);
-    setIdempotencyKey(key);
-
-    Promise.all([
-      fetchSuppliers().catch(() => []),
-      listItems("all").then((r) => r.results).catch(() => []),
-    ]).then(([sups, itms]) => {
-      setSuppliers(sups.filter((s) => s.is_active));
-      setItems(itms.filter((i) => i.is_active));
-      if (!initialSupplier && sups.length > 0) {
-        setSupplierId(sups[0].id);
-      }
-      setLoadingInitial(false);
-    });
-  }, [userId]);
-
-  // Tự động lưu nháp (không gồm giá mua — xem draftStorage.ts)
-  useEffect(() => {
-    if (loadingInitial || userId === null) return;
-    if (successResult) {
-      clearDraft(userId);
-    } else {
-      saveDraft(userId, { supplierId, receivedDate, lines, idempotencyKey });
-    }
-  }, [supplierId, receivedDate, lines, idempotencyKey, loadingInitial, successResult, userId]);
-
-  const handleAddLine = () => {
-    setLines((prev) => [
-      ...prev,
-      { item_code: items[0]?.code || "", qty: "", rate: "", shelf_life_days: null },
-    ]);
-  };
-
-  const handleRemoveLine = (idx: number) => {
-    setLines((prev) => prev.filter((_, i) => i !== idx));
-  };
-
-  const handleLineChange = (idx: number, field: keyof ReceiveBatchesLineInput, val: unknown) => {
-    setLines((prev) => {
-      const copy = [...prev];
-      copy[idx] = { ...copy[idx], [field]: val };
-      return copy;
-    });
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setErrorMessage(null);
-    setCancelError(null);
-    setCancelSuccessMsg(null);
-
-    if (!supplierId) {
-      setErrorMessage("Vui lòng chọn nhà cung cấp.");
-      return;
-    }
-
-    if (lines.length === 0) {
-      setErrorMessage("Phiếu nhập phải có ít nhất 1 mặt hàng.");
-      return;
-    }
-
-    for (let i = 0; i < lines.length; i++) {
-      const l = lines[i];
-      if (!l.item_code) {
-        setErrorMessage(`Dòng ${i + 1}: Chưa chọn mặt hàng.`);
-        return;
-      }
-      const numQty = parseFloat(l.qty);
-      if (isNaN(numQty) || numQty <= 0) {
-        setErrorMessage(`Dòng ${i + 1}: Khối lượng phải lớn hơn 0 kg.`);
-        return;
-      }
-    }
-
-    setIsSubmitting(true);
-    try {
-      const payload = {
+  const sub = useSubmit(
+    () =>
+      submitReceiveBatches({
         supplier: Number(supplierId),
         received_date: receivedDate,
         idempotency_key: idempotencyKey,
-        lines: lines.map((l) => ({
-          item_code: l.item_code,
-          qty: String(parseFloat(l.qty)),
-          rate: l.rate ? String(parseFloat(l.rate)) : "0.00",
-          shelf_life_days: l.shelf_life_days ? Number(l.shelf_life_days) : null,
-        })),
-      };
+        lines: buildReceiveLines(lines),
+      }),
+    {
+      onSuccess: (res) => {
+        setResult(res);
+        clearDraft(userId);
+        setIdempotencyKey(generateUUID()); // key cũ đã dùng; lần nhập sau phải key mới
+      },
+    },
+  );
 
-      const res = await submitReceiveBatches(payload);
-      setSuccessResult(res);
-      if (userId !== null) clearDraft(userId);
-      setIdempotencyKey(generateUUID()); // gửi thành công → key cũ đã dùng, lần nhập sau phải key mới
-    } catch (err: unknown) {
-      const errorObj = err as { detail?: string; code?: string; message?: string };
-      setErrorMessage(
-        errorObj.detail || errorObj.message || "Không thể lưu phiếu nhập. Vui lòng kiểm tra lại."
-      );
-    } finally {
-      setIsSubmitting(false);
+  const setLine = (idx: number, patch: Partial<ReceiveBatchesLineInput>) => setLines((prev) => prev.map((l, i) => (i === idx ? { ...l, ...patch } : l)));
+
+  // Lỗi tính lại mỗi lần gõ; chỉ hiện sau lần bấm Ghi nhận đầu tiên, và hiện ngay dưới từng ô (UI-RULES §3).
+  const errors = validateReceiveForm({ supplierId, lines });
+  const shown = (key: string) => (touched ? errors[key] : undefined);
+
+  const submit = () => {
+    setTouched(true);
+    const first = firstErrorKey(errors, lines.length);
+    if (first) {
+      // Đưa con trỏ tới ô lỗi đầu tiên (ô có thể chưa vẽ lỗi, nên chờ một khung hình).
+      requestAnimationFrame(() => document.getElementsByName(first)[0]?.focus());
+      return;
     }
+    void sub.submit();
   };
 
-  const handleResetNew = () => {
-    setSuccessResult(null);
-    setErrorMessage(null);
-    setCancelError(null);
-    setCancelSuccessMsg(null);
-    setLines([{ item_code: items[0]?.code || "", qty: "", rate: "", shelf_life_days: null }]);
+  const saveNow = () => {
+    saveDraft(userId, { supplierId, receivedDate, lines, idempotencyKey });
+    toast.success("Đã lưu nháp trên máy này. Giá mua không được lưu.");
+  };
+
+  const reset = () => {
+    setResult(null);
+    setTouched(false);
+    setLines([{ ...EMPTY_LINE }]);
     setIdempotencyKey(generateUUID());
   };
 
-  const handleCancelReceipt = async () => {
-    if (!successResult) return;
-    const receiptId = successResult.receipt.id;
-    const confirmed = window.confirm(
-      `Bạn có chắc chắn muốn huỷ phiếu nhập PR-${receiptId}? Các lô cá thuộc phiếu nhập này sẽ bị huỷ và hoàn kho về 0.`
-    );
-    if (!confirmed) return;
+  if (result) return <SuccessView result={result} supplierName={suppliers.find((x) => x.id === Number(supplierId))?.name} onChange={setResult} onReset={reset} />;
 
-    setIsCancelling(true);
-    setCancelError(null);
-    try {
-      await cancelPurchaseReceipt(receiptId);
-      setSuccessResult((prev) =>
-        prev
-          ? {
-              ...prev,
-              receipt: { ...prev.receipt, status: "CANCELLED" },
-              batches: prev.batches.map((b) => ({ ...b, status: "CANCELLED" })),
-            }
-          : null
-      );
-      setCancelSuccessMsg(
-        `Phiếu nhập PR-${receiptId} đã được huỷ. Các lô liên quan đã chuyển trạng thái Đã huỷ (CANCELLED).`
-      );
-    } catch (err: unknown) {
-      const errorObj = err as { detail?: string; code?: string; message?: string };
-      setCancelError(
-        errorObj.detail || errorObj.message || "Không thể huỷ phiếu nhập. Vui lòng thử lại."
-      );
-    } finally {
-      setIsCancelling(false);
-    }
-  };
-
-  if (successResult) {
-    const isCancelled = successResult.receipt.status === "CANCELLED";
-
-    return (
-      <div className={s.successBox}>
-        <h3 className={s.successTitle}>
-          <Icon name={isCancelled ? "cancel" : "check_circle"} />
-          <span>
-            {isCancelled
-              ? `Phiếu nhập PR-${successResult.receipt.id} (ĐÃ HUỶ)`
-              : `Ghi nhận phiếu nhập thành công (Mã: PR-${successResult.receipt.id})`}
-          </span>
-        </h3>
-
-        {cancelSuccessMsg && (
-          <div className={s.cancelledBox}>
-            <Icon name="info" />
-            <span>{cancelSuccessMsg}</span>
-          </div>
-        )}
-
-        {cancelError && (
-          <div className={s.errorBox} style={{ marginTop: "12px", marginBottom: "12px" }}>
-            <strong>Lỗi huỷ phiếu: </strong>
-            <span>{cancelError}</span>
-          </div>
-        )}
-
-        <p className={s.desc}>
-          {isCancelled
-            ? `Các lô cá thuộc phiếu nhập này đã chuyển sang trạng thái Đã huỷ (CANCELLED) và hoàn kho về 0:`
-            : `Hệ thống đã tự động ghi nhận phiếu nhập và sinh ${successResult.batches.length} lô cá mới ở trạng thái Nháp (DRAFT):`}
-        </p>
-
-        <ul className={s.batchList}>
-          {successResult.batches.map((b) => (
-            <li key={b.batch_id} className={s.batchItem}>
-              <span className={b.status === "CANCELLED" ? s.batchBadgeCancelled : s.batchBadge}>
-                {b.batch_id}
-              </span>{" "}
-              — {b.qty_available} kg —{" "}
-              {b.status === "CANCELLED" ? "Trạng thái: Đã huỷ" : `Hạn dùng: ${dateOnly(b.expiry_date)}`}
-            </li>
-          ))}
-        </ul>
-
-        <div className={s.actions} style={{ borderTop: "none", paddingTop: 0 }}>
-          {!isCancelled && (
-            <button
-              type="button"
-              onClick={handleCancelReceipt}
-              className={s.cancelBtn}
-              disabled={isCancelling}
-            >
-              <Icon name="delete_forever" />
-              <span>{isCancelling ? "Đang huỷ phiếu..." : "Huỷ phiếu nhập này"}</span>
-            </button>
-          )}
-          <button type="button" onClick={handleResetNew} className={s.submitBtn}>
-            Nhập phiếu tiếp
-          </button>
-          <Link href="/inventory/" className={s.addLineBtn} style={{ textDecoration: "none" }}>
-            <Icon name="inventory_2" />
-            <span>Xem tồn kho</span>
-          </Link>
-        </div>
-      </div>
-    );
-  }
+  const alert = sub.error ? <FormAlert>{sub.error}</FormAlert> : undefined;
 
   return (
-    <form onSubmit={handleSubmit} className={s.card}>
-      {errorMessage && (
-        <div className={s.errorBox}>
-          <strong>Lỗi: </strong>
-          <span>{errorMessage}</span>
-        </div>
-      )}
-
-      <div className={s.gridTwo}>
-        <div className={s.fieldGroup}>
-          <label htmlFor="supplier-select" className={s.fieldLabel}>
-            Nhà cung cấp / Đầu mối cảng *
-          </label>
-          <select
-            id="supplier-select"
-            value={supplierId}
-            onChange={(e) => setSupplierId(e.target.value ? Number(e.target.value) : "")}
-            className={s.select}
-            disabled={isSubmitting}
-            required
-          >
-            <option value="">-- Chọn nhà cung cấp --</option>
-            {suppliers.map((sup) => (
-              <option key={sup.id} value={sup.id}>
-                {sup.name}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div className={s.fieldGroup}>
-          <label htmlFor="received-date" className={s.fieldLabel}>
-            Ngày nhập hàng *
-          </label>
-          <input
-            id="received-date"
-            type="date"
-            value={receivedDate}
-            onChange={(e) => setReceivedDate(e.target.value)}
-            className={s.input}
-            disabled={isSubmitting}
-            required
-          />
-        </div>
+    <FormPage
+      title="Nhập lô tại cảng"
+      back={{ href: "/purchasing/", label: "Mua hàng" }}
+      alert={alert}
+      onSubmit={submit}
+      primaryText="Ghi nhận phiếu nhập"
+      submitting={sub.submitting}
+      failed={sub.failed}
+      secondary={{ label: "Lưu nháp", onClick: saveNow }}
+    >
+      <div className={s.twoCols}>
+        <Field
+          as="select"
+          label="Nhà cung cấp"
+          name="supplier"
+          required
+          value={supplierId === "" ? "" : String(supplierId)}
+          onChange={(v) => setSupplierId(v ? Number(v) : "")}
+          options={supplierOptions}
+          error={shown("supplier") ?? sub.fieldErrors.supplier}
+        />
+        <Field label="Ngày nhập hàng" name="received_date" type="date" required value={receivedDate} onChange={setReceivedDate} error={sub.fieldErrors.received_date} />
       </div>
-
-      <div className={s.tableContainer}>
-        <table className={s.linesTable}>
-          <thead>
-            <tr>
-              <th style={{ width: "35%" }}>Mặt hàng *</th>
-              <th style={{ width: "20%" }}>Số lượng (kg) *</th>
-              <th style={{ width: "25%" }}>Đơn giá mua (đ/kg)</th>
-              <th style={{ width: "15%" }}>Hạn dùng (ngày)</th>
-              <th style={{ width: "5%" }}></th>
-            </tr>
-          </thead>
-          <tbody>
-            {lines.map((line, idx) => (
-              <tr key={idx}>
-                <td>
-                  <select
-                    value={line.item_code}
-                    onChange={(e) => handleLineChange(idx, "item_code", e.target.value)}
-                    className={s.select}
-                    style={{ width: "100%" }}
-                    disabled={isSubmitting}
-                    required
-                  >
-                    <option value="">-- Chọn mặt hàng --</option>
-                    {items.map((it) => (
-                      <option key={it.code} value={it.code}>
-                        {it.code} — {it.name}
-                      </option>
-                    ))}
-                  </select>
-                </td>
-                <td>
-                  <input
-                    type="number"
-                    step="0.001"
-                    min="0.001"
-                    placeholder="0.000"
-                    value={line.qty}
-                    onChange={(e) => handleLineChange(idx, "qty", e.target.value)}
-                    className={s.input}
-                    style={{ width: "100%" }}
-                    disabled={isSubmitting}
-                    required
-                  />
-                </td>
-                <td>
-                  <input
-                    type="number"
-                    step="1000"
-                    min="0"
-                    placeholder="80000"
-                    value={line.rate}
-                    onChange={(e) => handleLineChange(idx, "rate", e.target.value)}
-                    className={s.input}
-                    style={{ width: "100%" }}
-                    disabled={isSubmitting}
-                  />
-                </td>
-                <td>
-                  <input
-                    type="number"
-                    min="1"
-                    placeholder="Mặc định"
-                    value={line.shelf_life_days ?? ""}
-                    onChange={(e) =>
-                      handleLineChange(
-                        idx,
-                        "shelf_life_days",
-                        e.target.value ? Number(e.target.value) : null
-                      )
-                    }
-                    className={s.input}
-                    style={{ width: "100%" }}
-                    disabled={isSubmitting}
-                  />
-                </td>
-                <td style={{ textAlign: "center" }}>
-                  {lines.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveLine(idx)}
-                      className={s.removeBtn}
-                      title="Xoá dòng"
-                      disabled={isSubmitting}
-                    >
-                      <Icon name="delete" />
-                    </button>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div className={s.lines} role="group" aria-label="Các mặt hàng nhập">
+        {lines.map((line, idx) => (
+          <div key={idx} className={s.lineCard}>
+            <div className={s.lineHead}>
+              <span>Mặt hàng {idx + 1}</span>
+              {lines.length > 1 && (
+                <button type="button" className={s.iconBtn} onClick={() => setLines((prev) => prev.filter((_, i) => i !== idx))} aria-label={`Xoá dòng ${idx + 1}`} disabled={sub.submitting}>
+                  <Icon name="delete" />
+                </button>
+              )}
+            </div>
+            <div className={s.lineGrid}>
+              <Field as="select" label="Mặt hàng" name={`item-${idx}`} required value={line.item_code} onChange={(v) => setLine(idx, { item_code: v })} options={itemOptions} error={shown(`item-${idx}`)} />
+              <Field label="Khối lượng" name={`qty-${idx}`} type="number" required unit="kg" value={line.qty} onChange={(v) => setLine(idx, { qty: v })} error={shown(`qty-${idx}`)} />
+              <Field label="Giá mua" name={`rate-${idx}`} type="money" unit="đ/kg" value={line.rate} onChange={(v) => setLine(idx, { rate: v })} error={shown(`rate-${idx}`)} />
+              <Field
+                label="Hạn dùng"
+                name={`shelf-${idx}`}
+                type="number"
+                unit="ngày"
+                value={line.shelf_life_days ? String(line.shelf_life_days) : ""}
+                onChange={(v) => setLine(idx, { shelf_life_days: v && Number(v) > 0 ? Number(v) : null })}
+              />
+            </div>
+          </div>
+        ))}
       </div>
-
-      <button
-        type="button"
-        onClick={handleAddLine}
-        className={s.addLineBtn}
-        disabled={isSubmitting}
-      >
+      <button type="button" className={`btn ${s.addLine}`} onClick={() => setLines((prev) => [...prev, { ...EMPTY_LINE }])} disabled={sub.submitting}>
         <Icon name="add" />
         <span>Thêm mặt hàng</span>
       </button>
+    </FormPage>
+  );
+}
 
+function SuccessView({ result, supplierName, onChange, onReset }: { result: ReceiveBatchesResponse; supplierName?: string; onChange: (r: ReceiveBatchesResponse) => void; onReset: () => void }) {
+  const [confirming, setConfirming] = useState(false);
+  const code = `PR-${result.receipt.id}`;
+  const cancelled = result.receipt.status === "CANCELLED";
+  return (
+    <div className={s.successBox} data-testid="receive-success">
+      <h2 className={`${s.successTitle} ${cancelled ? s.cancelledTitle : ""}`}>
+        <Icon name={cancelled ? "cancel" : "check_circle"} />
+        <span>{cancelled ? `Phiếu nhập ${code} đã huỷ` : `Ghi nhận phiếu nhập thành công (Mã: ${code})`}</span>
+      </h2>
+      {supplierName && <p className="muted">Nhà cung cấp: {supplierName}</p>}
+      <p className="muted">{cancelled ? "Các lô thuộc phiếu này đã chuyển sang Đã huỷ và hoàn kho về 0." : `Hệ thống đã sinh ${result.batches.length} lô mới ở trạng thái Nháp.`}</p>
+      <ul className={s.batchList}>
+        {result.batches.map((b) => (
+          <li key={b.batch_id} className={s.batchItem}>
+            <span className={`${s.batchCode} ${b.status === "CANCELLED" ? s.batchCodeCancelled : ""}`}>{b.batch_id}</span>
+            <span className="num">{kg(b.qty_available)}</span>
+            <span>{b.status === "CANCELLED" ? "Đã huỷ" : `Hạn dùng ${dateOnly(b.expiry_date)}`}</span>
+          </li>
+        ))}
+      </ul>
       <div className={s.actions}>
-        <button
-          type="submit"
-          className={s.submitBtn}
-          disabled={isSubmitting || lines.length === 0}
-        >
-          {isSubmitting ? "Đang ghi nhận..." : "Ghi nhận phiếu nhập (Nhập lô)"}
+        <button type="button" className="btn primary" onClick={onReset}>
+          Nhập phiếu tiếp
         </button>
+        <Link href={`/purchasing/detail/?id=${result.receipt.id}`} className="btn">
+          Xem phiếu
+        </Link>
+        <Link href="/inventory/" className="btn">
+          Xem tồn kho
+        </Link>
+        {!cancelled && (
+          <button type="button" className="btn danger" onClick={() => setConfirming(true)}>
+            Huỷ phiếu nhập này
+          </button>
+        )}
       </div>
-    </form>
+      {confirming && (
+        <CancelJustCreated
+          code={code}
+          id={result.receipt.id}
+          onClose={() => setConfirming(false)}
+          onDone={() => {
+            setConfirming(false);
+            onChange({ ...result, receipt: { ...result.receipt, status: "CANCELLED" }, batches: result.batches.map((b) => ({ ...b, status: "CANCELLED" })) });
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function CancelJustCreated({ id, code, onClose, onDone }: { id: number; code: string; onClose: () => void; onDone: () => void }) {
+  const toast = useToast();
+  const sub = useSubmit(
+    async () => {
+      try {
+        return await cancelPurchaseReceipt(id);
+      } catch (err) {
+        if (err instanceof ApiError) throw new ApiError(stripRuleCodes(err.message), err.status, err.code, err.details);
+        throw err;
+      }
+    },
+    {
+      onSuccess: () => {
+        toast.success(`Đã huỷ phiếu ${code}.`);
+        onDone();
+      },
+    },
+  );
+  return (
+    <Modal
+      title="Huỷ phiếu nhập"
+      onClose={onClose}
+      busy={sub.submitting}
+      size="sm"
+      footer={
+        <>
+          <button type="button" className="btn" onClick={onClose} disabled={sub.submitting}>
+            Quay lại
+          </button>
+          <button type="button" className="btn danger solid" onClick={() => void sub.submit()} disabled={sub.submitting} aria-busy={sub.submitting} data-autofocus>
+            {sub.submitting ? "Đang huỷ…" : primaryLabel("Huỷ phiếu", sub.failed)}
+          </button>
+        </>
+      }
+    >
+      {sub.error && <FormAlert>{sub.error}</FormAlert>}
+      <p>Huỷ phiếu {code}? Các lô Nháp của phiếu sẽ bị huỷ và hoàn kho về 0.</p>
+    </Modal>
   );
 }

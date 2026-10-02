@@ -2050,6 +2050,82 @@ Worktree `loc-wt-b`, nhánh `ed-stream-b`, phần chưa commit trên `7f3b7b1`.
   - BE: TL5-BE1 và `note_code`.
 - QA cần sửa chỉ số cột "Hạn gọi" trong `qa_ed_batch5_ui.py` G2: cột 6 thành cột 7.
 
+## Lô 10 — FE (Mua hàng + phiếu nhập, ED-20) · review techlead 02/10
+
+Phạm vi: diff chưa commit ở worktree `loc-wt-c` (nhánh `ed-stream-c`): `features/purchasing/**`, mới `features/accounting/**`,
+`app/(console)/purchasing/**`, `features/ledger/referenceRoutes.ts`, `shared/lib/moneyInput.ts`, `shared/lib/nav.ts`,
+`scripts/check-ai-chunks.mjs`, 4 e2e cũ đổi selector cùng `e2e/ed_batch10_purchasing.py`.
+
+### Kiểm chứng techlead tự chạy lượt này
+- `tsc --noEmit`: sạch.
+- `vitest run`: 59 file, 619 test, đạt hết. Riêng `shared/lib/moneyInput.test.ts` đạt 34/34.
+- `NEXT_PUBLIC_USE_MOCK=0 npm run build`: exit 0. `check-ai-chunks.mjs` XANH với 21 màn và 2 layout, đã có 4 route `/purchasing*`. `check-no-mock.mjs` XANH.
+- Tìm hex, `rgb()`, `hsl()` trong `features/purchasing`, `features/accounting`, `app/(console)/purchasing`: không có.
+- `python3 scripts/check_naming.py`: OK, không có vi phạm mới.
+
+### Kết luận theo trọng tâm
+- **Bất biến 1 (giá vốn và tiền mua): đạt.**
+  - Danh sách phiếu: cột "Tiền mua" đặt `locked`. `DataTable` lọc bỏ cột khoá khi `canViewCost=false` (`DataTable.tsx:118`), nên cột không có trong DOM của Quản lý và NV kho.
+  - Chi tiết phiếu: các cột Giá mua/kg, Thành tiền, Giá vốn/kg đều `locked`. Ô "Tiền mua" chỉ hiện khi `viewCost` và có `purchase_amount`. Bảng chi phí phụ chỉ dựng khi `viewCosts` và có `row.costs`.
+  - Mock bám đúng BE: `toRow` và `toDetail` chỉ gắn `rate`, `purchase_amount`, `landed_unit_cost`, `costs`, `allocated_amount` khi `me.can_view_cost`. `mockCostList` trả 403 cho người không phải Chủ.
+  - Tab Chi phí mua và F1d chỉ dành cho Chủ: `viewCosts`/`addCost` = `can_view_cost` AND quyền model. Ai sửa URL thành `?tab=costs` thì bị đưa về tab Phiếu nhập. F1d trả `NoPermission` trước khi gọi API.
+  - D-3: Quản lý thấy số tiền ở hoá đơn mua (`ReceiptInvoicesSection`, `PurchaseInvoiceList`). NV kho không có mảng `invoices`, cột Hoá đơn hay bộ lọc hoá đơn.
+- **Lệch 6 (Quản lý nhập Giá mua ở F1a): không rò.**
+  - Ô Giá mua của form cũ vốn hiện cho mọi người có quyền lập phiếu, nên đây không phải hành vi mới.
+  - Màn thành công (`SuccessView`) chỉ hiện mã phiếu, mã lô, kg và hạn dùng, không hiện giá. Phản hồi `receive-batches` của BE đã ẩn `rate` khi người gọi thiếu `view_costprice`. Mock cũng không trả `rate`.
+  - Nháp không lưu giá: `sanitize` bỏ `rate` ở cả `saveDraft` và lúc chuyển khoá cũ. Lúc nạp nháp, `initialSetup` ép `rate: ""`. Kho lưu là `sessionStorage`, khoá theo userId, và không có dữ liệu khách.
+  - Toast "Lưu nháp" có báo cho người dùng biết giá mua không được lưu.
+- **`moneyInput.ts`: đạt, sửa đúng lỗi thật.**
+  - Điều kiện mới `!/^insert/.test(inputType)` chỉ chặn nhánh "xoá chữ số kề dấu chấm" khi sự kiện là chèn hoặc dán. Backspace và Delete vẫn chạy như cũ vì `inputType` là `delete*`. Trường hợp `inputType` rỗng (gọi từ code hoặc trình duyệt cũ) cũng giữ hành vi cũ. Nhánh phần lẻ đứng trước nên không bị ảnh hưởng.
+  - Các ca Lô 3 vẫn xanh. Sửa này còn khắc phục một ca chưa có test: bôi đen ".0" trong "1.000" rồi gõ "0". Trước đây ca này bị coi là xoá lùi và mất một chữ số.
+- **F1d (tổng phân bổ bằng số tiền): đạt.**
+  - `splitCost` dồn phần dư vào lô cuối. `checkAllocation` khoá nút Lưu và báo rõ "còn thiếu" hoặc "đang thừa".
+  - BE vẫn là lớp chặn thật: `_split_amounts` trả 400 khi tổng không khớp.
+  - `BY_VALUE` dùng `rate`, mà chỉ Chủ mới có `rate`, đúng vì form chỉ dành cho Chủ.
+- **Chống bấm đúp: đạt ở mức chấp nhận được.**
+  - F1a: `useSubmit` có cờ `inFlight` và khoá idempotency. Khoá giữ qua F5 và được sinh mới sau khi gửi thành công.
+  - Hoá đơn, Ghi nhận phiếu, Huỷ phiếu: modal đóng ngay trong `onSuccess`.
+  - F1d còn một kẽ hở nhỏ, xem TL10-L1.
+- **Khối AI: đạt.**
+  - `AiDocBlockGate targetModel="purchasing.purchasereceipt"` được ghép ở `app/(console)/purchasing/detail/page.tsx`, không ghép trong feature. BE `actions/targets.py` có nhận nhãn này.
+  - Cả 4 route đã có trong `check-ai-chunks` và bản build xanh.
+- **Màu cứng: 0.**
+
+### Phát hiện
+
+**TL10-L1 · Low · `features/accounting/components/PurchaseCostForm.tsx:95-103`**
+- Lỗi: `useSubmit` đặt lại `IDLE` (nút bật lại) rồi mới gọi `router.push`. Trong lúc trang chi tiết đang tải chunk, Chủ bấm "Lưu chi phí" lần nữa sẽ tạo chi phí thứ hai. Endpoint `POST /costs/` không có idempotency, và chi phí thừa làm đổi giá vốn lô. Không có chứng từ nào bị xoá, nhưng phải huỷ tay.
+- Tái hiện: chạy mạng chậm (DevTools Slow 3G), lưu chi phí, rồi bấm lại nút ngay sau khi toast hiện.
+- Hướng sửa: thêm state `saved`. Sau `onSuccess` thì đặt `primaryDisabled` và giữ nút khoá cho tới khi rời trang.
+
+**TL10-L2 · Low · e2e `sr07_receive_batches_draft.py:89,128,136,152`, `sr07_qa_edges.py:95-97`**
+- Lỗi: ô Giá mua giờ hiển thị dạng nhóm nghìn ("81.234"). Các assert "storage không chứa giá" chỉ tìm chuỗi thô `81234`/`55555`, nên sẽ không bắt được nếu sau này giá lọt vào storage ở dạng đã định dạng. Hiện chỉ `ed_batch10_purchasing.py:314` kiểm cả "81.234".
+- Hướng sửa: `no_rate()` và các assert storage kiểm thêm cả bản có dấu chấm.
+
+**TL10-L3 · Low · `features/accounting/components/PurchaseInvoiceList.tsx:59`, `PurchaseCostList.tsx:38`**
+- Lỗi: `filtering` không tính ô tìm, nên khi tìm không ra thì không hiện nút "Bỏ lọc" ở thanh lọc. Đây chính là lỗi dev đã sửa ở `ReceiptListTab` nhưng chưa áp sang hai tab còn lại. Ô trống vẫn còn `onClearQuery` của DataTable nên không chặn người dùng.
+- Hướng sửa: dùng cùng cách với `ReceiptListTab`.
+
+**TL10-L4 · Low · `PurchaseInvoiceForm.tsx:54-57` (chọn phiếu chưa có hoá đơn), `PurchaseCostForm.tsx:64` (`ReceiptPicker`)**
+- Lỗi: hai chỗ này chỉ tải trang 1 của R10 (20 phiếu). Phiếu cũ hơn không có trong ô chọn.
+- Tạm chấp nhận được vì Chủ vẫn thêm được từ trang chi tiết phiếu. Nên ghi vào nợ Lô 12 (gom trang như `fetchSuppliers`, hoặc chuyển sang ô tìm).
+
+**TL10-L5 · Low · `ReceiptDetailScreen.tsx` (prop `purchaseAmount: Number(row.purchase_amount)`), `PurchaseInvoiceForm.tsx:44,69`**
+- Lỗi: số tiền gợi ý đi qua `Number` và `Math.round`. Phiếu có lẻ ".50" sẽ gợi ý tròn lên. Đây chỉ là giá trị điền sẵn, Chủ sửa được, và tiền gửi lên BE vẫn là chuỗi số nguyên. Ghi lại để biết.
+
+**TL10-L6 · Low · `features/purchasing/mock.ts:393` (`mockSubmitReceiveBatches`)**
+- Lỗi: mock không kiểm `add_purchasereceipt` và không trả lại phản hồi cũ khi cùng `idempotency_key`. Bản thật không bị ảnh hưởng, nhưng QA ở chế độ mock không thử được ca gửi lại.
+
+**Ghi nhận các lệch dev nêu: chấp nhận cả 12.**
+- Lệch 1, 2, 5, 7 là nợ BE hoặc FE đã ghi.
+- Lệch 3: đường `receive-batches/` mới đúng. 02b §1 còn ghi `nhap-lo/` theo bảng đổi tên P8b.
+- Lệch 12 (giá mua chỉ nhận đồng nguyên) là thay đổi hành vi so với form cũ dùng `parseFloat`. Tiền VNĐ/kg trên thực tế là số nguyên nên chấp nhận được, nhưng PO cần biết.
+- Lệch 6: không rò. Nếu Duy muốn Quản lý không được nhập giá thì đó là đổi nghiệp vụ (BR-MH), không phải lỗi của lô này.
+
+### Kết luận: **APPROVED**
+Không có lỗi Critical, High hay Medium. Có 6 lỗi Low:
+- Nên sửa trong lô này nếu tiện (nhỏ, không đổi contract): TL10-L1, TL10-L2, TL10-L3.
+- Đưa vào nợ Lô 12: TL10-L4, TL10-L5, TL10-L6.
 ## Lô 9 — FE (Hàng hoàn về kho ED-26: W5e, W5f, F2m, F2n) · review techlead 02/10
 
 > Phạm vi: `erp-console/features/returns/**`, `app/(console)/returns/**`, `features/deliveries/components/MyDeliveriesScreen.tsx`,
