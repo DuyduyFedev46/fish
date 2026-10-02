@@ -350,6 +350,22 @@ export function mockGuidanceApi(req: MockRequest): MockResponse {
     return { status: 200, body: data };
   }
 
+  if (docType === "delivery") {
+    // R2 `delivery`: chỉ dòng thời gian (không bước tiếp theo). Nhãn không có tên, SĐT, địa chỉ hay ghi chú (bất biến 9).
+    const data: GuidanceData = {
+      doc: { type: "delivery", id: docId, code: `GH-${docId}`, status: null, status_label: null },
+      next_steps: [],
+      warnings: [],
+      timeline: [
+        { at: "2026-09-28T01:05:00Z", kind: "create", label: "Hệ thống tạo phiếu giao", doc: "", actor: { kind: "system", display: "Hệ thống" } },
+        { at: "2026-09-28T01:40:00Z", kind: "confirm", label: "Xác nhận đơn với khách", doc: "", actor: { kind: "user", display: "Chị Hạnh" } },
+        { at: "2026-09-28T02:10:00Z", kind: "label", label: "In tem giao", doc: "", actor: { kind: "user", display: "Anh Tín" } },
+      ],
+      related: [],
+    };
+    return { status: 200, body: data };
+  }
+
   return {
     status: 404,
     body: { detail: `Chưa hỗ trợ mock loại chứng từ: ${docType}`, code: "NOT_FOUND" },

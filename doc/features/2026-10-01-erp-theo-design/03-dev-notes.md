@@ -1318,3 +1318,77 @@ Sửa (không đổi contract, không migration):
 - `backend/apps/delivery/next_steps.py`: quyền = `view_deliverynote` HOẶC `confirm_with_customer`. Người có `view_deliverynote` giữ nguyên phạm vi cũ (owner/manager/warehouse_staff thấy hết, delivery_staff chỉ phiếu gán cho mình). Người chỉ có `confirm_with_customer` (CSKH) chỉ xem phiếu có mục chờ gọi và qua đúng `note_in_customer_service_scope` của `GET /api/confirmation/queue/<note_id>/` (tái sử dụng, không viết lại; `scope.py` và `services.py` không đổi). Ngoài phạm vi trả 404. Vẫn `Cache-Control: no-store`; nội dung dòng thời gian không đổi, không có dữ liệu khách.
 
 Test (RED trước: 5 đỏ vì 403, đúng lý do): `backend/apps/delivery/tests/test_timeline_customer_service.py`, 8 ca. CSKH trong phạm vi 200 + no-store; ngoài phạm vi 404 (và chi tiết hàng chờ cũng 404); phiếu đã đóng nhưng chính CSKH vừa gọi thì cả chi tiết lẫn timeline 200, CSKH khác 404; id lạ/không phải số 404; body không có SĐT, địa chỉ, tên giả (cả khi AuditLog có chứa chúng); người không quyền 403, chưa đăng nhập 401; owner/warehouse_staff không đổi; delivery_staff giữ phạm vi gán cho mình.
+
+## Lô 4 — FE (Giao hàng ED-17 + Việc giao của tôi ED-19)
+
+Làm trong worktree `/Users/dangthiduyen/Downloads/loc-wt-b`, chỉ trong `erp-console/`. Không commit, không deploy.
+
+### Trang và thành phần
+- **Danh sách phiếu giao** `/deliveries/` (`features/deliveries/components/DeliveriesView.tsx`, viết lại): `ListPage` + `Tabs` (đồng bộ `?tab=`, mặc định "Soạn hàng") + `FilterBar` + `DataTable`. Cột: Mã phiếu, Đơn hàng, Người nhận (`PersonalText`), Hàng, Tổng kg, Người giao, Tem, Trạng thái. Tìm kiếm và lọc tem/người giao làm phía máy khách trên trang đã tải (BE chưa có tham số `q`). Tab "Hoàn tất (hôm nay)" gọi `completed_from=<hôm nay VN>`. Bấm dòng mở trang chi tiết.
+- **Chi tiết phiếu giao** `/deliveries/detail/?id=<số>` (mới): `DeliveryDetailScreen.tsx`. URL chỉ mang id số. Đủ trạng thái tải / không tìm thấy / 403 / lỗi / sẵn sàng. Thanh trạng thái (`StatusPath`, giao thất bại rẽ nhánh sau "Đang giao"), thông tin (SĐT đầy đủ là liên kết `tel:` vì màn nội bộ), bảng "Hàng soạn theo lô" (Mặt hàng · Kho · Lô xuất · Hạn dùng · Số kg), khối AI (`AiDocBlockGate`, `delivery.deliverynote`), dòng thời gian từ `getGuidance("delivery", id)`. Hành động theo `available_actions` của BE: In tem / In lại tem, Đã đóng gói, Giao cho người giao / Đổi người giao (F2o), Đã lấy hàng, bắt đầu giao / Giao lại, Báo giao thất bại (F2l), Đã giao xong (có hộp xác nhận), xác nhận huỷ tem giấy.
+- **Hộp thoại** (cùng thư mục `components/`): `AssignCourierModal` (F2o: "Đang giao n phiếu · Chờ lấy m phiếu", gửi `expected_assigned_to`, 409 -> `ConflictBanner` ngay trong hộp, "Tải lại" nạp lại phiếu và danh sách nhưng giữ hộp mở), `ReportFailureModal` (F2l), `ReprintLabelModal` (lý do in lại: In lại / Đổi địa chỉ), `ConfirmCompleteModal`.
+- **Việc giao của tôi** `/my-deliveries/` (`MyDeliveriesScreen.tsx`): `assigned_to=me`, nhóm Đang giao / Chờ lấy hàng / Giao thất bại / Đã xong (hôm nay), thẻ lớn cho 360px, nút chạm >= 44px. Mỗi thẻ có nhãn Người nhận · Đơn · Địa chỉ · Số kg · Hàng (một giá trị mỗi trường) và dòng "Đã thanh toán, không thu thêm". "Gọi khách" hiện đủ số và mở `tel:`; số lấy từ chi tiết phiếu, chỉ giữ trong state của trang.
+- **Tem** `app/print/label/page.tsx`: chỉ đổi giao diện sang `label.module.css` (hệ màu `Canvas`/`CanvasText`, `color-scheme: light`, không mã màu cứng). Giữ nguyên hành vi: SĐT che (`recipient_phone_masked`), QR là ảnh data-URI, kiểm quyền `delivery.print_label`, chuyển về `/login/?next=…`, tự `window.print()`. `@page { size: 100mm 150mm }` nằm trong thẻ `<style>` của trang để không rò sang trang in khác.
+- File mới: `deliveryUi.ts` (hàm thuần: đường đi trạng thái, `canAssign`, kiểm đầu vào báo thất bại khớp B5, `telHref`, `groupMine`, `idFromSearch`), `label.module.css`. Xoá `DeliveryDetailModal.tsx` (chi tiết đã thành trang). `deliveries.module.css` chỉ dùng token (0 mã màu cứng).
+- `scripts/check-ai-chunks.mjs`: thêm 4 mục tiêu `/(console)/deliveries/page`, `/(console)/deliveries/detail/page`, `/(console)/my-deliveries/page`, `/print/label/page`.
+
+### Hàm API mới/đổi (`features/deliveries/api.ts`, kèm nhánh mock trong `mock.ts`)
+- `fetchDeliveryNotes` nhận thêm `assigned_to` (`me` hoặc id).
+- `printDeliveryLabel(id, requestId?, signal?, reason?)`: `reason` FIRST/REPRINT/ADDRESS_CHANGED.
+- `startDelivery`, `completeDelivery`, `reportDeliveryFailure(id, {reason, note})` (B5), `fetchDeliverers()` (B6, mảng `{id, display_name, delivering_count, ready_count}`), `assignDeliveryNote(id, {assignedTo, expectedAssignedTo})` (B6, 409 `STALE_STATE`).
+- Kiểu mới trong `types.ts`: `DeliveryFailureReason`, `LabelPrintReason`, `Deliverer`, `AssignDeliveryResponse`, `STATUS_GROUP_TABS`.
+- Mock: thêm phiếu 36 (Đang giao, giao1), 37 (Chờ lấy, giao1), 38 (Thất bại, giao1), 39 (Đang giao, giao2/Anh Lâm), 45 (Chờ lấy, chưa gán; lần giao đầu luôn trả 409 để kiểm ca xung đột). Mock áp phạm vi người giao (giao1 chỉ thấy phiếu của mình, id người khác -> 403/404), SĐT chỉ có ở chi tiết (không có ở danh sách), kiểm báo thất bại như BE (mã `DELIVERY_FAILURE_REASON_REQUIRED` / `_NOTE_REQUIRED` / `_NOTE_PII` / `_NOTE_INVALID`).
+
+### Sửa mock ngoài thư mục deliveries (chỉ nhánh mock, không đụng bản thật)
+- `features/auth/mock.ts`: thêm quyền `delivery.assign_deliverynote` cho chủ và quản lý (BE đã có ở B6).
+- `features/guidance/mock.ts`: thêm nhánh `docType = "delivery"` chỉ trả dòng thời gian (không có "bước tiếp theo").
+
+### Ảnh (đã chụp, nằm ở `doc/features/2026-10-01-erp-theo-design/shots-lo4/`; `.gitignore` chặn `*.png` nên không vào git)
+`lo4_my_deliveries_360.png`, `lo4_after_failure_360.png`, `lo4_list_360.png`, `lo4_detail_360.png`, `lo4_detail_ready_360.png`, `lo4_list_1280.png`, `lo4_detail_1280.png`, `lo4_label.png`.
+
+### Vòng sửa sau Techlead CHANGES REQUESTED và QA REJECTED (2026-10-02)
+Đã sửa trong `erp-console/`, cùng worktree, không commit.
+- **B4 / TL-M1** thẻ Việc giao của tôi: nhãn trường, mã đơn, "Đã thanh toán, không thu thêm"; "Hàng" chỉ có tên mặt hàng (`lineNames` cắt phần kg BE ghi kèm, dạng `2.000 kg` của BE), kg chỉ ở trường Số kg qua `format.kg()`.
+- **B1 / TL-M2** menu "…" ở chi tiết (vai Chủ, Quản lý, NV kho; phiếu chưa lên xe): "In lại tem" mờ "Chưa in tem lần nào." (khi chưa in), "Huỷ xác nhận đơn" mờ "Đưa đơn về Gọi xác nhận.", "Huỷ đơn" mờ "Mở đơn để huỷ và hoàn tiền cho khách.". Việc huỷ làm ở trang đơn nên hai mục này chỉ mờ có lý do; nối link khi Lô 3 xong (nợ).
+- **B2 / G7** bảng dòng hàng: Mặt hàng · Kho · Lô xuất · Hạn dùng · Số kg; bỏ "HSD". Cột Kho đọc `warehouse_name` nếu BE trả, hiện "—" khi chưa có (xem chỗ lệch 8).
+- **B3 / G5** mọi số kg (thẻ, danh sách, chi tiết, hộp giao phiếu) qua `format.kg()`. Mock `lines_summary` đổi sang dạng `2.500 kg` như BE thật; phiếu 31 có 2,5 kg + 1 kg để thấy dấu phẩy.
+- **B5** bỏ chữ "Mang hàng về kho (sắp có)" và toast nhắc hàng về kho (F2m để Lô 9 theo PO). Thẻ Giao thất bại: "Lý do" và "Lần thất bại" là hai trường riêng. Chi tiết: "Lý do giao thất bại", "Ghi chú giao thất bại", "Lần giao thất bại".
+- **B6** F2o và F2l có `SummaryBlock` (F2o: Phiếu giao, Đơn, Khối lượng, Người giao hiện tại; F2l: Phiếu giao, Đơn, Khách hàng); hộp "Đã giao xong" cũng có khối tóm tắt. Nút theo UI-RULES §6: "Quay lại" + nút chính theo hành động ("Giao phiếu", "Báo giao thất bại", "Đã giao xong", "In lại tem").
+- **B7 / ED-19-AC6** `ViewGuard` nhận danh sách màn; trang `/deliveries/detail/` cho vai có menu Giao hàng HOẶC Việc giao của tôi. Nhân viên giao mở phiếu của mình bình thường; phiếu người khác (BE 404, mock cũng 404) hiện "Không tìm thấy trang này" kèm nút "Về Việc giao của tôi". `/deliveries/` (danh sách) vẫn chỉ cho vai có menu Giao hàng; menu S7-AC2 không đổi. Nút quay lại ở chi tiết trỏ về Việc giao của tôi khi là nhân viên giao.
+- **B8-B10** dòng "Tiếp theo: In tem, đóng gói, rồi bấm Đã đóng gói"; ba tên trường thất bại như trên; nút "Đã lấy hàng, bắt đầu giao" (thẻ và menu).
+- **B11** mock `loc` (Chủ) có `delivery.pack_deliverynote` và `delivery.print_label` như migration `accounts/0011`.
+- **B12 / TL-L3** `hasLongDigitRun` (khớp `has_long_digit_run` của BE: gộp dấu cách, `.`, `-`, `_`, `/`) dùng cho ô ghi chú ở FE và mock. "0912 345 678", "091.234.5678" bị chặn; `PII_NOTE_RE` bỏ.
+- **TL-L1** bỏ nhánh `recipient_phone` (kiểu, 15 dòng mock, `DeliveryDetailScreen`, `MyDeliveriesScreen`).
+- **TL-L2** e2e dò storage bắt cả số có dấu cách (`0900\s?000\s?\d{3}`) và kiểm ghi chú hợp lệ vừa gửi ("Khách hẹn giao lại ngày mai") không nằm trong storage/URL.
+- **TL-L4** câu kết của `check-ai-chunks.mjs` dùng `TARGETS.length` ("8 màn nghiệp vụ và 2 layout (tổng 10 mục)").
+- **Nợ 6** lọc/tìm không ra mà còn trang chưa tải: "Chỉ tìm trong n phiếu đã tải. Bấm Tải thêm để tìm tiếp." (hàm `loadedOnlyNote`, vitest kiểm).
+- **TL-L6** CHƯA làm, ghi nợ: mỗi thẻ Đang giao/Giao thất bại vẫn gọi chi tiết phiếu để có sẵn số trên nút "Gọi khách". ED-19-AC7 yêu cầu số hiện đủ trên nút gọi, R4 cấm đưa `phone` vào payload danh sách. Lấy khi bấm sẽ mất `tel:` có sẵn và đổi cách hoạt động của nút. Hướng gọn: BE trả `phone` ở danh sách `assigned_to=me` (cần Duy/Techlead duyệt, vì đổi R4).
+
+### Ảnh
+Trong `doc/features/2026-10-01-erp-theo-design/shots-lo4/` (`*.png` bị `.gitignore` chặn): `lo4r_mine_360.png` (Việc giao của tôi, mới), `lo4r_F2l_360.png` (hộp Báo giao thất bại), `lo4r_detail31_menu_1440.png` (chi tiết + menu "…"), cùng bộ `lo4_*` của lượt trước (`lo4_my_deliveries_360.png`, `lo4_list_1280.png`, `lo4_detail_1280.png`, `lo4_label.png`...).
+
+### Kiểm chứng (chạy lại ở vòng sửa)
+- `npx tsc --noEmit` sạch; `vitest run` 44 file, 410 test đạt (thêm ca "0912 345 678", `lineNames`, câu "Tiếp theo", `loc` có quyền in/đóng gói, `loadedOnlyNote`).
+- Build `NEXT_PUBLIC_USE_MOCK=0` OK, `check-no-mock` XANH, `check-ai-chunks` XANH (8 màn + 2 layout); build `MOCK=1` OK, `check-ai-chunks` XANH.
+- E2E (máy chủ tĩnh cổng 3201, đã tắt sau khi chạy): `ed_batch4_delivery.py` 70/70 (thêm ca nhãn thẻ, mã đơn, dòng đã thanh toán, B7, cột bảng, menu "…", 3 trường thất bại, B11, số có dấu cách/dấu chấm, ghi chú sau khi gửi); `ed_batch1_shell` 56/56; `ed_batch2_patterns` 75/75; `ra_soat_cs02_cs05_mobile_360` 9/9; `p8_lo8_fe_erp_tz` 64/64; `ra_soat_cs11_ac6_label_pdf` 5/5; `ra_soat_x_ac4_storage` 32/32.
+- Hai script QA chạy nguyên văn: `qa_ed_batch4_ui.py` 46/49, `qa_ed_batch4_ac.py` 15/16. Các ca còn đỏ đều xung đột với AC hoặc quyết định PO, không phải lỗi mã (xem mục "QA cần sửa script" dưới). Khi đổi sẵn tên nút trong bản sao (Huỷ -> Quay lại, "Nhận hàng đi giao" -> "Đã lấy hàng, bắt đầu giao") thì `qa_ed_batch4_ac.py` 17/17.
+- `python3 scripts/check_naming.py` OK, không vi phạm mới. Màu cứng: 0 mã màu trong file của lô.
+- Còn đỏ có sẵn, không do lô này: `s8_views`, `s10_s11_orders`, `qa_ed_batch1_shell` 98/99, `qa_ed_batch1_roles` 47/48.
+
+### QA cần sửa script (đã xung đột với AC / quyết định PO)
+- `qa_ed_batch4_ui.py` "ED-17-AC7 list: có cột Kho": AC7 nói về bảng "Hàng soạn theo lô" ở chi tiết, không phải danh sách phiếu; danh sách không có dữ liệu kho.
+- `qa_ed_batch4_ui.py` "F2l: khối tóm tắt có kg": ED-19-AC3 liệt kê khối tóm tắt gồm Phiếu giao, Đơn, Khách hàng, Bắt đầu giao (không có kg).
+- `qa_ed_batch4_ui.py` "FAILED: gợi ý mang hàng về kho": PO đã hoãn F2m sang Lô 9, không hiện nút hay chữ nhắc.
+- `qa_ed_batch4_ac.py` bấm nút "Huỷ" ở hộp F2l và "Nhận hàng đi giao": UI-RULES §6 và ED-19-AC2 đặt tên "Quay lại" và "Đã lấy hàng, bắt đầu giao".
+
+### Chỗ lệch hợp đồng và việc còn nợ
+1. Tên và hợp đồng bám BE (B5, B6, R4), không bám tên trong 02-stories: ví dụ danh sách người giao là mảng trơn, 409 chỉ xử lý mã `STALE_STATE`.
+2. **Quyết định mở #4:** luật chặn dãy 9 chữ số của BE có thể chặn cả ngày dạng liền (vd `20260928`), nay cả khi có dấu cách ("12 05 2026 14"). Màn chỉ nhắc "không ghi số điện thoại" và báo lỗi dưới ô; chưa nới.
+3. **F2m "Mang hàng về kho"** để Lô 9 (PO chốt). Lô này không hiện nút hay chữ nhắc.
+4. Danh sách phiếu giao chưa có `AiBar` (thanh AI mảnh dùng chung đã có, chưa gắn vào trang này).
+5. Chi tiết phiếu chưa có liên kết sang trang chi tiết đơn (route đơn là của Lô 3). "Huỷ xác nhận đơn" và "Huỷ đơn" ở menu "…" đang mờ có lý do; nối link khi Lô 3 xong.
+6. Tìm kiếm trên danh sách là phía máy khách (chỉ trên các trang đã tải), vì BE chưa có tham số `q` cho phiếu giao.
+7. SR-PII-02: người giao có phạm vi hạn chế không thấy tên/địa chỉ/SĐT của phiếu đã kết thúc hơn 7 ngày; mock mô phỏng đúng như BE (các trường đó trả null); màn hiển thị theo giá trị BE trả, không tự suy ra.
+8. **Lệch BE (cần BE bổ sung hoặc PO bỏ):** (a) `get_lines` của BE chỉ trả `item_name, qty_kg, batch_id, expiry_date`, không có kho, nên cột "Kho" của bảng hàng soạn hiện "—" (FE đã đọc `warehouse_name` nếu BE thêm); (b) DeliveryNote chưa có mốc "Bắt đầu giao" nên khối tóm tắt F2l thiếu dòng này (ED-19-AC3) và AC2 "thời điểm Bắt đầu giao được ghi" chưa kiểm được; (c) chưa có mốc "Lúc" báo giao thất bại nên thẻ Giao thất bại thiếu trường "Lúc" (ED-19-AC5); thời điểm vẫn xem được ở dòng thời gian của chi tiết phiếu.
+9. Dòng "Đã thanh toán, không thu thêm" luôn hiện trên thẻ, vì phiếu giao chỉ sinh sau khi đơn đã thanh toán (BR-GH); chưa có cờ riêng từ BE.
+10. TL-L6 (xem trên).

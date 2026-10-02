@@ -28,6 +28,10 @@ const TARGETS = [
   ["/(console)/orders/payments/detail/page", "/orders/payments/detail"],
   ["/(console)/orders/refunds/detail/page", "/orders/refunds/detail"],
   ["/(console)/inventory/page", "/inventory"],
+  ["/(console)/deliveries/page", "/deliveries"],
+  ["/(console)/deliveries/detail/page", "/deliveries/detail"],
+  ["/(console)/my-deliveries/page", "/my-deliveries"],
+  ["/print/label/page", "/print/label"],
 ];
 
 // Chuỗi đặc trưng của code AI chạy trên máy (worker, thư viện wllama, gọi lệnh AI).
@@ -94,4 +98,5 @@ if (problems.length > 0) {
   process.exit(1);
 }
 
-console.log("\nXANH: 7 route nghiệp vụ (đơn, thanh toán, hoàn tiền và 3 trang chi tiết, kho) và 2 layout không chứa `new Worker`, `wllama`, `/call/`.");
+const layoutCount = TARGETS.filter(([key]) => key.endsWith("/layout")).length;
+console.log(`\nXANH: ${TARGETS.length - layoutCount} màn nghiệp vụ và ${layoutCount} layout (tổng ${TARGETS.length} mục) không chứa \`new Worker\`, \`wllama\`, \`/call/\`.`);

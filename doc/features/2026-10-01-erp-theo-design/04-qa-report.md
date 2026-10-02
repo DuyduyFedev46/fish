@@ -1075,6 +1075,17 @@ Hai ca "BE log: không có 5xx / Traceback" đỏ là do chính ca đua song son
 
 Ảnh đặt cạnh board: `shots/lot3/` (`qa-*.png`, bản mock; `qa-real-*.png`, BE thật). Chỉ dữ liệu giả (mock và `seed_demo`, mã đơn `SO261002-*`, mã giao dịch `FTQA000x`).
 
+
+---
+
+## Lô 4 — FE · Giao hàng + Việc giao của tôi (ED-17, ED-19) · lần 1 · 2026-10-02
+
+### Kết luận: REJECTED. Nhiều AC chính lệch board/story: thiếu mục "…" của phiếu chưa in tem, bảng lô sai cột (có "HSD", thiếu "Kho"), thẻ Việc giao thiếu "Đã thanh toán, không thu thêm" và nhãn trường, kg sai định dạng, hộp thoại F2o/F2l thiếu khối tóm tắt và đổi chữ nút.
+Điểm tốt đã kiểm chạy thật: giao1 chỉ thấy phiếu của mình, ẩn quyền theo vai, "Gọi khách" mở `tel:` số đủ, tem che SĐT, ghi chú/SĐT không vào localStorage/URL, 409 -> banner -> tải lại, 360px không cuộn ngang, nút chạm >= 44px ở màn của người giao, không `console.error`, không rò giá vốn.
+
+### Tổng (script của QA): 66 ca · ✅ 45 · ❌ 21 · ⏸ 4 (nhiều ❌ cùng một lỗi gốc, gộp thành 10 lỗi B1–B10 bên dưới)
+Hồi quy do dev viết, chạy lại trên bản mock mình build: `ed_batch4_delivery.py` 43/43, `ed_batch1_shell.py` 56/56, `ed_batch2_patterns.py` 75/75.
+
 ### Theo AC
 | Mã AC | Kết quả | Bằng chứng |
 |---|---|---|
@@ -1313,3 +1324,136 @@ B3 ("₫"), nhiễu `Failed to fetch RSC payload` khi dùng `http.server`, `/ai/
 - BE `runserver 127.0.0.1:8000` trên SQLite tạm (bản sao sạch `qa3.sqlite3.pw`, không DB thật).
 - `python3 scripts/check_naming.py`: OK, không phát sinh mới.
 - Không sửa mã sản phẩm. Mã QA mới: `erp-console/e2e/qa_ed_batch3_money.py`; ảnh `shots/lot3/qa3-money-{mock,real}-*.png`. Dữ liệu chỉ là dữ liệu giả. Đã tắt máy chủ 3101, 3102, 8000 (không đụng 3201).
+
+| ED-17-AC1 chip + cột Tem + Người giao riêng | ✅ | `qa_ed_batch4_ac.py`: tab Chờ lấy ghi "Đã in (lần 1)", "Chưa in tem" ở tab khác. Ảnh `lo4_list_tab_cho_lay_ql1_1440.png` |
+| ED-17-AC2 thanh trạng thái + dòng "Tiếp theo" + nút chính | ⚠ chữ lệch (B8) | Chi tiết 31: có StatusPath, nút "In tem" và "Đã đóng gói"; dòng ghi "Tiếp theo: Soạn hàng, in tem rồi bấm Đã đóng gói", AC ghi "In tem, đóng gói, rồi bấm Đã đóng gói…" |
+| ED-17-AC3 "…" của phiếu chưa in tem | ❌ B1 | ql1 mở "…" phiếu 31: chỉ có "Giao cho người giao"; thiếu "In lại tem" (mờ, "Chưa in tem lần nào."), "Huỷ xác nhận đơn", "Huỷ đơn". Ảnh `lo4_detail31_ql1_1440.png` |
+| ED-17-AC4 / F2o giao cho người giao | ⚠ B6 | Chọn người, cột "Đang giao n phiếu", nút "Giao phiếu", đổi trường Người giao, 409 -> banner: ✅. Hộp thiếu khối tóm tắt, nút "Huỷ" thay vì "Quay lại". Ảnh `lo4_F2o_assign_ql1.png` |
+| ED-17-AC5 phiếu Giao thất bại | ⚠ B9 | Ba trường riêng và bước cuối đỏ (`data-state="bad"`) ✅; tên trường là "Lý do thất bại gần nhất / Ghi chú giao thất bại / Số lần giao thất bại", khác AC. Ảnh `lo4_detail38_failed_ql1_1440.png` |
+| ED-17-AC6 in lại tem (W2e) | ✅ (ghi nhận) | kho1 in lại: tem thành "Đã in (lần 2)". Lý do in lại được chọn sẵn 1 mục nên không thể để trống. Ảnh `lo4_W2e_reprint_kho1.png` |
+| ED-17-AC7 bảng hàng soạn theo lô (giá vốn) | ❌ B2 phần cột; ✅ phần giá vốn | Bảng ghi "Mặt hàng · Lô · HSD · Số kg": thiếu "Kho", "Lô xuất", "Hạn dùng". HTML kho1 không có cost/giá vốn |
+| ED-17-AC8 kho1 không sửa người giao; giao1 không có menu Giao hàng | ✅ | kho1 chi tiết 31: có In tem, Đã đóng gói; không có "Giao cho người giao". giao1: menu chỉ "Việc giao của tôi", `/deliveries/` -> không có quyền |
+| ED-19-AC1 các nhóm + thẻ | ❌ B4 | Thứ tự nhóm đúng (Đang giao -> Chờ lấy hàng -> Giao thất bại). Thẻ không có nhãn Người nhận/Đơn/Địa chỉ/Số kg/Hàng, không có mã Đơn, không có "Đã thanh toán, không thu thêm", số kg lặp ("2,000 kg · 2.000 kg"). Ảnh `lo4_mine_giao1_360.png` |
+| ED-19-AC2 bắt đầu giao | ⚠ B10 | Bấm nút ở thẻ Chờ lấy: 0037 sang Đang giao ✅. Nút ghi "Nhận hàng đi giao", AC ghi "Đã lấy hàng, bắt đầu giao" |
+| ED-19-AC3 F2l | ❌ B6 | Có đủ 5 lý do, ghi chú không bắt buộc (trừ "Khác"). Thiếu khối tóm tắt (Phiếu giao, Đơn, Khách hàng, Bắt đầu giao); nút là "Huỷ" / "Báo thất bại" thay vì "Quay lại" / "Báo giao thất bại". Ảnh `lo4_F2l_360.png` |
+| ED-19-AC4 chưa chọn lý do | ✅ | Ô Lý do báo "Chọn lý do giao thất bại.", hộp không đóng |
+| ED-19-AC5 thẻ Giao thất bại | ❌ B5 | Lý do và lần thất bại gộp một dòng "Lần thất bại gần nhất: Khác · đã thất bại 1 lần"; không có nút "Mang hàng về kho" (chỉ có chú thích "sắp có") |
+| ED-19-AC6 giao1 mở URL phiếu giao2 | ❌ B7 | giao1 vào `/deliveries/detail/?id=39`: hiện "Bạn không có quyền xem mục này", AC đòi "Không tìm thấy trang này". Ảnh `lo4_giao1_opens_other_courier_ticket.png` |
+| ED-19-AC7 SĐT đủ trên nút gọi, không lưu localStorage | ✅ | `tel:0900000036`, `tel:0900000038`; storage/URL/console không có SĐT khách hay ghi chú (script đã loại trừ SĐT của tài khoản mock) |
+
+### G1–G10 và UI-RULES
+| Mục | Kết quả | Ghi chú |
+|---|---|---|
+| G1 một giá trị mỗi ô | ❌ | thẻ Việc giao lặp kg (B3/B4) |
+| G3 chip có chữ | ✅ | trạng thái và tem đều có chữ |
+| G5 định dạng kg `18,5 kg` | ❌ B3 | chi tiết "3.000 kg", "2.000" trong bảng; thẻ "2,000 kg · 2.000 kg" |
+| G7 chữ cấm (HSD) | ❌ B2 | cột "HSD" ở chi tiết phiếu |
+| UI-RULES §5 mẫu trang chi tiết | ✅ | header, StatusPath, Timeline, "…" |
+| UI-RULES §6 hộp thoại (Quay lại, tóm tắt) | ❌ B6 | F2o, F2l |
+| UI-RULES §7 trạng thái rỗng | ✅ | tab Hoàn tất hôm nay: "Chưa có phiếu giao nào…" |
+| UI-RULES §7 lỗi mạng/offline | ⏸ | mock không có cách chèn lỗi; chưa chạy với BE thật |
+
+### Ngoại lệ, biên, phân quyền
+| Ca | Kết quả |
+|---|---|
+| giao1 chỉ thấy 0036/0037/0038; giao2 chỉ thấy 0039; không lẫn nhau | ✅ |
+| cs2 (CSKH + giao): menu có Việc giao của tôi; không có "Giao cho người giao" ở chi tiết | ✅ |
+| loc (chủ), ql1, kho1: thấy `Giao hàng`; kho1 không có nút giao người; ql1/loc có "Giao cho người giao" | ✅. Lưu ý B11: mock `loc` không có quyền in/đóng gói (BE thật có) |
+| Chưa đăng nhập `/my-deliveries/` -> `/login/?next=` | ✅ |
+| Báo thất bại: bỏ trống lý do, "Khác" không ghi chú, ghi chú dãy 9 số liền, quá 200 ký tự | ✅ chặn (hoặc cắt ở 200) |
+| Ghi chú "0912 345 678" (có dấu cách) | ❌ B12 (Low): FE cho qua, BE `has_long_digit_run` gộp dấu cách và sẽ chặn. Phần FE hiện lỗi từ 400 `DELIVERY_FAILURE_NOTE_PII`: ⏸ (chỉ đọc code, chưa chạy với BE thật) |
+| Bấm Đã giao xong -> phiếu rời nhóm Đang giao | ✅. F5 màn cũ trong mock reset dữ liệu nên không phải ca có nghĩa: ⏸ cần BE thật |
+| 409 khi giao: banner -> Tải lại -> giao được | ✅ (dev script 43/43 chạy lại) |
+| 360px không cuộn ngang, nút chạm >= 44px (giao1, giao2, cs2) | ✅. "Gọi khách" không xuống dòng (cao 44px, 1 hàng chữ) |
+| Màn quản lý ở 360px: nút lọc cao 32px, mã phiếu 18px | Low, ghi nhận (màn dành cho máy tính) |
+| Id lạ (`abc`, thiếu, 999999) -> "Không tìm thấy", không văng | ✅ |
+| Tem: SĐT che (`09xx xxx 123`), có QR; giao1 không có quyền in | ✅ ảnh `lo4_label_kho1.png` |
+
+### Rò giá vốn / dữ liệu cá nhân
+- Giá vốn: HTML chi tiết phiếu của kho1 không có `cost`/`giá vốn`; bảng lô không có cột tiền. Không rò.
+- Dữ liệu cá nhân: SĐT khách chỉ có ở nút "Gọi khách" của người giao đúng phiếu (theo quyết định 14), tem che SĐT. localStorage/sessionStorage/URL/console không có SĐT khách, ghi chú báo thất bại (chỉ có SĐT giả của tài khoản nhân viên trong `cave_erp_mock_users`, chỉ có ở bản mock). Dữ liệu trong ảnh đều là dữ liệu giả.
+- Phân quyền theo vai: giao1/giao2 không vào `/deliveries/`; cs2 không giao người.
+
+### Lỗi (chặn)
+### B1 — "…" của phiếu chưa in tem thiếu mục · High · ED-17-AC3
+Tái hiện: đăng nhập `ql1`, mở `/deliveries/detail/?id=31`, bấm "…". Mong đợi: "In lại tem" mờ (lý do "Chưa in tem lần nào."), "Huỷ xác nhận đơn", "Huỷ đơn". Thực tế: chỉ "Giao cho người giao". Ảnh hưởng: không đưa được đơn về Gọi xác nhận hay huỷ từ phiếu giao.
+### B2 — Bảng "Hàng soạn theo lô" sai cột · High · ED-17-AC7, G7
+Tái hiện: `kho1` mở `/deliveries/detail/?id=31`. Mong đợi: Mặt hàng · Kho · Lô xuất · Hạn dùng · Số kg. Thực tế: Mặt hàng · Lô · HSD · Số kg (thiếu Kho, dùng chữ cấm "HSD"). Ảnh hưởng: nhân viên kho không biết lấy hàng ở kho nào.
+### B3 — Số kg sai định dạng · Medium · G5, G1
+Tái hiện: `ql1` mở phiếu 31/34/38; `giao1` mở Việc giao. Thực tế: "3.000 kg", "2.000", thẻ giao "2,000 kg · 2.000 kg" (hai lần, hai kiểu). Mong đợi: `18,5 kg` một lần.
+### B4 — Thẻ Việc giao thiếu nhãn, mã Đơn, "Đã thanh toán, không thu thêm" · High · ED-19-AC1
+Tái hiện: `giao1` mở Việc giao của tôi. Thực tế: thẻ không có nhãn trường, không có mã đơn, không có dòng thanh toán. Ảnh hưởng: người giao có thể thu tiền thêm của khách đã trả (rủi ro nghiệp vụ).
+### B5 — Thẻ Giao thất bại gộp trường, thiếu "Mang hàng về kho" · Medium · ED-19-AC5
+Thực tế: "Lần thất bại gần nhất: Khác · đã thất bại 1 lần" một dòng; chú thích "…làm ở màn Hàng hoàn (sắp có)". Cần PO xác nhận nút này thuộc Lô 4 hay hoãn sang Lô 9 (nếu hoãn, hạ AC5 và ghi vào 02c).
+### B6 — F2o và F2l thiếu khối tóm tắt, sai chữ nút · Medium · ED-17-AC4, ED-19-AC3, UI-RULES §6
+Thực tế: nút "Huỷ" / "Giao phiếu" / "Báo thất bại", chỉ một dòng "Phiếu GH-…". Mong đợi: "Quay lại", "Báo giao thất bại", khối tóm tắt (Phiếu giao, Đơn, Khách hàng, Bắt đầu giao).
+### B7 — Phiếu của người khác báo "không có quyền" thay vì "Không tìm thấy" · Medium · ED-19-AC6
+Tái hiện: `giao1` vào `/deliveries/detail/?id=39`. Mong đợi: "Không tìm thấy trang này". Thực tế: "Bạn không có quyền xem mục này".
+
+### Lỗi không chặn
+- B8 (Low) ED-17-AC2: chữ dòng "Tiếp theo" khác AC.
+- B9 (Low) ED-17-AC5: tên ba trường thất bại khác AC.
+- B10 (Low) ED-19-AC2: nút "Nhận hàng đi giao" thay vì "Đã lấy hàng, bắt đầu giao".
+- B11 (Low, mock) `loc` (chủ vựa) trong mock không có quyền in tem và đóng gói, nên màn mock khác BE thật. Cần chỉnh `features/auth/mock.ts`.
+- B12 (Low) PII precheck của FE (`/\d{9,}/`) yếu hơn BE: số có dấu cách vẫn được gửi đi (BE chặn).
+
+### Có sẵn từ gốc / không thuộc lô
+- `e2e/ed_shell_fixes.py` gắn cứng cổng 3102, `s7_shell.py` chạy trên server tĩnh sinh ra "Failed to fetch RSC payload" (ồn, đã biết ở Lô 1–2): không chạy được như hồi quy, ⏸.
+- `check_naming`: OK, không phát sinh vi phạm mới (6482 vi phạm cũ).
+
+### ⏸ Chưa kiểm
+1. FE với BE thật (lỗi 400 `DELIVERY_FAILURE_NOTE_PII` hiện dưới ô, F5 màn cũ sau khi trạng thái đổi).
+2. Trạng thái lỗi mạng/offline (mock không có hook chèn lỗi).
+3. Nút chạm trên thiết bị thật (chỉ giả lập `is_mobile`).
+4. `ed_shell_fixes.py`, `s7_shell.py` như nêu ở trên.
+
+### Lệnh đã chạy
+- `rm -rf node_modules && npm ci && npx tsc --noEmit && npx vitest run`: sạch, vitest 405/405.
+- `NEXT_PUBLIC_USE_MOCK=0 npm run build` + `check-no-mock.mjs` + `check-ai-chunks.mjs`: xanh.
+- `NEXT_PUBLIC_USE_MOCK=1 npm run build`, phục vụ `out/` ở cổng 3201 (đã kiểm bản mock có chuỗi `cave_erp_mock`).
+- `BASE=http://127.0.0.1:3201 python3 e2e/qa_ed_batch4_ui.py` (49 ca, 36 ✅), `e2e/qa_ed_batch4_ac.py` (17 ca, 9 ✅), dev e2e ở trên, `python3 scripts/check_naming.py`.
+- Ảnh: `doc/features/2026-10-01-erp-theo-design/shots/lot4/` (20 ảnh `lo4_*.png`).
+
+
+### Lô 4 — FE lần 2 · 2026-10-02
+
+#### Kết luận: APPROVED (phần FE). B1–B12 đã đóng. Còn một khoảng trống hợp đồng không phải lỗi FE: mốc "Bắt đầu giao" (xem mục "Mở")
+Điều phối viên cần xin PO quyết định mục "Mở" trước khi đóng lô.
+
+#### Tổng: 139 ca của QA · ✅ 137 · ❌ 2 (cả hai ghi ở "Mở"/Low) · ⏸ 3
+- `qa_ed_batch4_ui.py` 49/50, `qa_ed_batch4_ac.py` 17/17, `qa_ed_batch4_round2.py` (mới, kiểm kỹ B1–B7) 71/72.
+- Dev e2e chạy lại: `ed_batch4_delivery` 70/70, `ed_batch1_shell` 56/56, `ed_batch2_patterns` 75/75.
+
+#### Script đã sửa theo PO (không bỏ ca nào khác)
+- "Cột Kho": bỏ khỏi ca danh sách (nay kiểm danh sách KHÔNG có cột Kho); giữ ca bảng "Hàng soạn theo lô" ở chi tiết (Mặt hàng · Kho · Lô xuất · Hạn dùng · Số kg).
+- F2l: khối tóm tắt kiểm theo ED-19-AC3 (Phiếu giao, Đơn, Khách hàng, không kg). Ca "Bắt đầu giao" giữ lại và vẫn đỏ (xem "Mở").
+- "Mang hàng về kho": đổi thành ca kiểm KHÔNG còn chữ "sắp có"/nút này ở thẻ thất bại (Lô 9).
+- Tên nút: "Quay lại", "Đã lấy hàng, bắt đầu giao".
+
+#### Kiểm kỹ B1–B7 (bằng chứng chạy thật)
+| Lỗi | Kết quả | Ca ngoài đường thuận / bằng chứng |
+|---|---|---|
+| B1 menu "…" phiếu chưa in | ✅ | loc, ql1, kho1 mở phiếu 31: "In lại tem · Chưa in tem lần nào.", "Huỷ xác nhận đơn · Đưa đơn về Gọi xác nhận.", "Huỷ đơn · Mở đơn để huỷ và hoàn tiền cho khách."; mục mờ `aria-disabled`, bấm cưỡng bức không mở hộp, không gọi API. Phiếu đã in (32) hết lý do "Chưa in tem"; phiếu Đang giao (33) không có mục Huỷ. Ảnh `lo4r2_menu31_{loc,ql1,kho1}.png` |
+| B2 bảng lô | ✅ | cột đúng, không "HSD"; cột Kho hiện "—" khi BE chưa trả (không "undefined"). Ảnh `lo4r2_detail31_ql1_1440.png` |
+| B3 kg | ✅ | phiếu 30 và 32–38 chi tiết, 4 tab danh sách, thẻ, hộp F2o: không còn "2.000 kg", không NaN. Phiếu 31: "3,5 kg", dòng "2,5 kg" và "1 kg" |
+| B4 thẻ Việc giao | ✅ | 3 thẻ giao1: đủ nhãn Người nhận/Đơn/Địa chỉ/Số kg/Hàng, mã đơn, mỗi thẻ đúng một dòng "Đã thanh toán, không thu thêm", Hàng không kèm kg. Ảnh `lo4r2_mine_giao1_360.png` |
+| B5 | ✅ | thẻ thất bại có "Lý do" và "Lần thất bại" riêng; không còn "sắp có". PO đã hoãn "Mang hàng về kho" sang Lô 9 |
+| B6 hộp thoại | ✅ | F2o (phiếu chưa gán: Phiếu giao/Đơn/Khối lượng; phiếu đã gán 37: thêm Người giao hiện tại + "Đang giữ phiếu này"), F2l (Phiếu giao/Đơn/Khách hàng), Đã giao xong có tóm tắt; "Quay lại" đóng hộp, không đổi dữ liệu; bấm đúp "Giao phiếu" và "Báo giao thất bại": đúng 1 request. Ảnh `lo4_F2o_assign_ql1.png`, `lo4_F2l_360.png`, `lo4r2_F2k_360.png` |
+| B7 | ✅ | giao1 mở phiếu mình (36) được; phiếu giao2 (39), phiếu giao Đang giao của người khác (33), id=9999: "Không tìm thấy trang này" + "Về Việc giao của tôi"; giao2 mở 36: không tìm thấy, mở 39: được; kho1 mở 39 được; `/deliveries/` vẫn chặn giao1; chưa đăng nhập: `/login/` không mang dữ liệu khách. Ảnh `lo4r2_giao1_other_ticket_360.png`, `lo4r2_giao1_own_detail_360.png` |
+| B8–B11 | ✅ | dòng "Tiếp theo: In tem, đóng gói, rồi bấm Đã đóng gói", 3 tên trường thất bại, nút "Đã lấy hàng, bắt đầu giao" (thẻ và menu), `loc` có In tem + Đã đóng gói |
+| B12 | ✅ | ghi chú "0912 345 678", "091.234.5678", "0912-345-678", "091_234_5678", "0912/345/678" bị chặn ở FE, hộp còn mở, 0 request; ghi chú hợp lệ gửi được |
+
+#### Rò giá vốn / dữ liệu cá nhân (kiểm lại)
+Không rò. HTML chi tiết của kho1 và giao1 không có giá vốn/cost; ghi chú báo thất bại và SĐT khách (kể cả dạng có dấu cách) không nằm trong localStorage/sessionStorage/URL; không `console.error` ở mọi vai (loc, ql1, kho1, giao1, giao2, cs2). Ảnh chỉ dùng dữ liệu giả. Quyền: giao1/giao2 chỉ thấy phiếu của mình; cs2 không có nút giao người; kho1 không có "Giao cho người giao".
+
+#### Mở
+- **O1 (Medium, cần PO/BE, không phải lỗi FE) ED-19-AC3 và AC2:** khối tóm tắt F2l thiếu dòng "Bắt đầu giao", và AC2 "thời điểm Bắt đầu giao được ghi" không kiểm được, vì `DeliveryNote` không có trường mốc này (xác minh ở `backend/apps/delivery/models.py`; 02b không có). Hai cách: BE thêm trường (cần migration và Techlead duyệt) hoặc PO bỏ dòng này khỏi AC2/AC3. Ca `F2l (BE chưa có mốc)` trong `qa_ed_batch4_ui.py` vẫn đỏ cho tới khi quyết định.
+- **O2 (Low, có sẵn) :** nút "Đóng thông báo" của toast cao 32px ở 360px (< 44px), thuộc thành phần Toast dùng chung, lô này không sửa.
+- **O3 (Low, ghi nhận):** kho1 thấy "Huỷ xác nhận đơn" và "Huỷ đơn" ở dạng mờ có lý do (kho1 không có quyền huỷ đơn). Chỉ mờ, không bấm được; PO cân nhắc có ẩn hẳn không.
+- Nợ dev đã ghi: cột Kho hiện "—" tới khi BE trả `warehouse_name`; thẻ chưa có "Lúc" thất bại; TL-L6 (`phone` ở danh sách `assigned_to=me`).
+
+#### ⏸ Chưa kiểm
+FE với BE thật (lỗi 400 hiện dưới ô, F5 màn cũ); lỗi mạng/offline (mock không chèn được); nút chạm trên thiết bị thật.
+
+#### Lệnh đã chạy (lần 2)
+`rm -rf node_modules && npm ci` (sạch), `npx tsc --noEmit` (sạch), `npx vitest run` 44 file / 410 test đạt, `NEXT_PUBLIC_USE_MOCK=0 npm run build` + `check-no-mock` XANH + `check-ai-chunks` XANH, `NEXT_PUBLIC_USE_MOCK=1 npm run build` + `check-ai-chunks` XANH (bản mock có `cave_erp_mock`), cổng 3201, các script nêu trên, `python3 scripts/check_naming.py` OK. Ảnh trong `shots/lot4/` (`lo4r2_*.png`).

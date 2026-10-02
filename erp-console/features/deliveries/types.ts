@@ -29,7 +29,12 @@ export type DeliveryNoteItem = {
   confirmed_at: string | null;
   confirm_skipped: boolean;
   assigned_to: number | null;
+  /** Tên người giao (R4). Không có người giao → null. Là tên NHÂN VIÊN, không phải dữ liệu khách. */
+  assigned_to_name?: string | null;
   failed_attempts: number;
+  /** Mã lý do giao thất bại lần gần nhất (B5): NOT_MET | REFUSED | WRONG_ADDRESS | DAMAGED | OTHER; "" = chưa có. */
+  failure_reason?: string;
+  failure_reason_label?: string;
   /** `null` = đã ẩn theo thời hạn (SR-PII-02); "" = không có ghi chú. */
   note: string | null;
   created_at: string;
@@ -48,14 +53,35 @@ export type DeliveryLine = {
   qty_kg: string;
   batch_id: string;
   expiry_date: string;
+  /** Kho xuất (ED-17-AC7). BE `get_lines` CHƯA trả field này: chưa có thì cột Kho hiện "—" (xem dev-notes, chỗ lệch). */
+  warehouse_name?: string | null;
 };
 
 export type DeliveryNoteDetail = DeliveryNoteItem & {
   lines: DeliveryLine[];
   /** Rỗng thật cũng là `null` — KHÔNG dùng để biết "đã ẩn"; xem `customer_name === null`. */
   recipient_name: string | null;
-  recipient_phone: string | null;
+  /** SĐT đủ của người nhận (R4: chỉ ở chi tiết, theo cửa sổ SR-PII-02; `null` = đã ẩn). Chỉ để hiện và `tel:`; không ghi vào log, URL, localStorage. */
+  phone?: string | null;
+  /** Ghi chú giao thất bại (chữ tự do, có thể chứa dữ liệu cá nhân). `null` = đã ẩn theo thời hạn. */
+  failure_note?: string | null;
 };
+
+/** Lý do giao thất bại gửi lên B5 (khớp `ENUMS.deliveryFailureReason`). */
+export type DeliveryFailureReason = "NOT_MET" | "REFUSED" | "WRONG_ADDRESS" | "DAMAGED" | "OTHER";
+
+/** Lý do in tem gửi kèm `label/print/`. */
+export type LabelPrintReason = "FIRST" | "REPRINT" | "ADDRESS_CHANGED";
+
+/** B6 `GET /api/delivery/deliverers/` — người giao kèm số phiếu đang gánh. */
+export type Deliverer = {
+  id: number;
+  display_name: string;
+  delivering_count: number;
+  ready_count: number;
+};
+
+export type AssignDeliveryResponse = DeliveryNoteItem & { already?: boolean };
 
 export type DeliveryListResponse = {
   count: number;
