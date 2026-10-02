@@ -1514,3 +1514,152 @@ M1, M2, L1–L4, nợ 6 và B7 đều đạt. Không còn lỗi Critical, High h
 - Nối link "Huỷ đơn" và "Huỷ xác nhận đơn" sau Lô 3.
 - Lô `AiBar` dùng chung.
 - BE thêm `warehouse_name` và mốc "Bắt đầu giao" / "Lúc thất bại" (lệch 8).
+
+---
+
+## Lô 5 — FE (ED-15 Gọi xác nhận) · review techlead 02/10
+
+Worktree `loc-wt-b`, nhánh `ed-stream-b`, phần chưa commit trên `7f3b7b1`.
+
+**Đã chạy trong lượt này:**
+- `tsc --noEmit`: sạch.
+- `vitest run`: 46 file, 434 test đạt.
+- `NEXT_PUBLIC_USE_MOCK=0 npm run build`: OK. Sau đó `check-no-mock` XANH (15 file mock, 36 seed, 148 file build). `check-ai-chunks` XANH (10 màn + 2 layout, có `/confirmation` và `/confirmation/detail`).
+- `check_naming.py`: OK, không có vi phạm mới.
+- grep mã màu (`#hex`, `rgb`, `hsl`) trong `features/confirmation/**`: 0 kết quả.
+
+### Đạt
+- **Dữ liệu cá nhân (bất biến 9)**
+  - Dòng ngoài phạm vi chỉ hiện `phone_masked` do BE trả, không có `tel:`, không mở được (`rowHref` trả `undefined`). Khớp `serializers.py:151-194` của BE. FE không tự che hay ghép số.
+  - URL chỉ mang `?id=` và `?tab=`.
+  - Không có `console.*`, `localStorage` hay `sessionStorage` trong module.
+  - Ô tìm trên danh sách chỉ nằm trong state.
+  - "Tìm khách gọi lại" gửi bằng `POST /api/confirmation/search/` với body `{q}`.
+  - Chip AI là câu chung và chỉ kèm `target_model=delivery.deliverynote` cùng `target_id`.
+  - Ghi chú có chặn dãy 9 chữ số trở lên ở FE, khớp BR-GH-19.
+- **Phân quyền**
+  - Các nút được vẽ theo `available_actions` của BE. Nút Quyết định chỉ có khi BE trả `decide:*`, mà BE chỉ trả cho người có `decide_unconfirmed`. Như vậy CSKH không có nút này (AC5).
+  - Route có `ViewGuard view="confirmation"`.
+  - Mock `chu` thêm 3 quyền `confirm_with_customer`, `change_recipient`, `decide_unconfirmed`, khớp đúng `accounts/migrations/0011_seed_group_cskh.py:34-37`.
+  - Sửa `e2e/ed_batch1_shell.py` và `qa_ed_batch1_{shell,round2}.py` (số mục menu của `loc` từ 11 lên 12) là hệ quả đúng của việc trên.
+- **409**
+  - `STALE_STATE` vào `useGuardedSubmit.stale`: hộp hiện đúng câu của BE, nút gửi đổi thành "Tải lại", các ô bị khoá. Khi claim gặp `STALE_STATE` thì hiện `ConflictBanner`.
+  - `CLAIMED` là lỗi đỏ thường, hiện câu của BE rồi tải lại chi tiết, đúng 02b §2.3 (sửa M1 Lô 2).
+  - Module BE chỉ phát `STALE_STATE` và `CLAIMED`, nên không có nhánh `conflict` nào bị nuốt.
+- **`useGuardedSubmit` / `ModalAlert`**: không trùng lặp với `shared/ui/form`.
+  - `useGuardedSubmit` là lớp mỏng bọc `useSubmit`, chỉ giữ thêm câu `STALE_STATE`.
+  - `ModalAlert` bọc `FormAlert` và thêm cuộn vào tầm nhìn.
+  - Hai file đặt trong module là chấp nhận được. Nếu màn thứ hai cần, nâng lên `shared/ui/form`.
+- **Cờ mock trong `api.ts`**: sửa đúng. Viết ternary `process.env.NEXT_PUBLIC_USE_MOCK === "1" ? … : undefined` ngay tại chỗ dùng để webpack gập được nhánh lúc parse và tree-shake `./mock`, kéo theo `auth/mock.ts`. Bản build thật đã kiểm XANH.
+- **Tab "Tất cả"**: gộp 4 `state=X`.
+  - Trang vượt (404, `page > 1`) được coi là rỗng.
+  - `count` là tổng của 4 trạng thái. Còn tải thêm được khi một trạng thái còn `next`.
+  - Các trạng thái rời nhau nên không trùng dòng. Có test `queueAll.test.ts`.
+  - Đây là lệch hợp đồng (BE chưa có `state=ALL`), đã ghi ở dev-notes mục 1. Chấp nhận tạm.
+- **Hộp thoại**: Huỷ đơn ở F2k dùng `btn danger` và hỏi lại hai bước (AC4). AC3 có câu "Chọn thời điểm sau dd/mm/yyyy hh:mm.". Mỗi hộp không quá 6 trường.
+
+### Phát hiện
+
+**TL5-M1 · Medium (chặn): thiếu cột "Lý do chuyển quyết định" (ED-15-AC1).**
+- Vị trí: `erp-console/features/confirmation/components/ConfirmationQueueView.tsx:57-91`.
+- AC1 ghi "Lý do chuyển quyết định ở cột riêng". Bảng có 10 cột nhưng không có cột lý do, dù BE đã trả `escalation_label` ở danh sách (`serializers.py:99-105`). Lý do hiện chỉ thấy ở trang chi tiết (`ConfirmationDetailScreen.tsx:281`).
+- Tái hiện: đăng nhập `ql1` trên bản mock, vào `/confirmation/?tab=ESCALATED`. Không có cột nào nói vì sao đơn được chuyển lên.
+- Sửa: thêm cột "Lý do" (`r.escalation_label ?? "—"`), mỗi ô một giá trị. Ở 360px có thể ẩn cột này trên các tab không phải ESCALATED/ALL. Bổ sung một ca vào `e2e/ed_batch5_confirmation.py`.
+
+**TL5-L1 · Low: `loadDetail` đọc `detail` cũ trong closure.**
+- Vị trí: `ConfirmationDetailScreen.tsx:90`, `:96-97`.
+- `useCallback` chỉ phụ thuộc `[id]` và có `eslint-disable`, nên `detail` trong closure luôn là `null` của lần render đầu. Vì vậy nhánh `setActionError("Chưa tải lại được đơn…")` không bao giờ chạy. Sau một thao tác thành công, nếu lần tải lại lỗi mạng thì cả trang bị thay bằng `ErrorScreen` thay vì giữ dữ liệu cũ kèm alert.
+- Tái hiện: ghi một cuộc gọi, chặn mạng đúng request `GET /api/confirmation/queue/<id>/` của lần `refreshAll`. Trang chuyển sang ErrorScreen.
+- Sửa: dùng `useRef` cho "đã có detail", hoặc tách cờ `hasData`.
+
+**TL5-L2 · Low: comment trái với code.**
+- Vị trí: `features/confirmation/api.ts:51` và `:63`.
+- Comment ghi "mới trước cũ sau", nhưng code sắp tăng dần theo `paid_at`, tức cũ trước. Sắp cũ trước là đúng với hàng chờ và với BE, nên chỉ cần sửa comment.
+- Thêm: dòng có `paid_at = null` sẽ lên đầu. Nên ghi rõ trong comment hoặc đẩy các dòng này xuống cuối.
+
+**TL5-L3 · Low: `ConfirmationAiBlock.tsx` chép gần nguyên `features/ai/components/AiDocBlockGate.tsx`.**
+- Hai file chỉ khác nhau ở prop `chips`. Lô này không được sửa `features/ai` nên chấp nhận tạm.
+- Ghi nợ: thêm `chips?` vào `AiDocBlockGate` rồi xoá `ConfirmationAiBlock`. Gộp vào lô `AiBar` dùng chung đã ghi ở Lô 4.
+- Việc screen import `features/ai` giống tiền lệ `DeliveryDetailScreen` của Lô 4. 02b §2.3 muốn ghép ở `page.tsx`, nên gom sửa cùng lúc.
+
+**TL5-L4 · Low: `features/purchasing/api.ts:6,18,31` còn mẫu `const isMock = …; mock: isMock ? …`.**
+- Đã grep bản build thật: chuỗi seed của `purchasing/mock.ts` (`0901234567`, `Lagi`, `BR-MH-07`) không có trong `out/`, nên hiện chưa rò.
+- Mẫu này vẫn mong manh, đúng là lỗi dev vừa sửa ở confirmation. Đề nghị đổi sang ternary tại chỗ trong một lô có quyền đụng purchasing.
+- Không còn `api.ts` nào khác dùng mẫu này. `content/api.ts` đã viết đúng.
+
+**TL5-L5 · Low (sau khi gộp nhánh): link sau "Huỷ đơn" ở F2k còn là đường cũ.**
+- Vị trí: `ConfirmationDetailScreen.tsx:379`, link `/orders/?order=<id>&open=refund`.
+- Lô 3 trên `main` có `legacyOrderRedirect` (`features/orders/filters.ts:45`) nên đường cũ vẫn chạy, nhưng phải đi vòng qua một lần chuyển hướng.
+- Khi gộp `ed-stream-b` vào `main`, đổi thẳng sang `/orders/detail/?id=<id>&open=refund`. Đây là cùng dòng nợ "nối link sau Lô 3" của Lô 4.
+
+**TL5-N1 · Ghi chú, không thuộc lô FE.**
+- `ConfirmationQueueView.tsx:66` và chi tiết `:265` hiện SĐT đúng chuỗi BE trả, chưa nhóm 4-3-3 như 02b §3.7.
+- `shared/lib/format.ts::phone` chưa có ở cả hai nhánh, nên không tính là lỗi của lô này. Khi thêm hàm format thì áp dụng cho cả hai chỗ.
+
+**TL5-BE1 · Medium, việc BE riêng, không chặn lô FE này.**
+- Vị trí: `backend/apps/delivery/confirmation/api.py:67`, `get_object()` lọc `Q(note_id=val) | Q(pk=val)` rồi lấy `.first()`.
+- FE luôn gửi `note_id`. Khi `pk` của một task trùng `note_id` của task khác, BE có thể trả hoặc thao tác nhầm task: claim, ghi cuộc gọi, quyết định trên **đơn khác**.
+- Không rò dữ liệu cá nhân, vì phạm vi được kiểm trên task trả về. Nhưng có thể ghi kết quả gọi vào nhầm đơn.
+- Sửa: chỉ lọc theo `note_id`, kèm test hai task có `pk` và `note_id` chéo nhau. Điều phối viên giao be-dev.
+
+### Ngoài phạm vi review, ghi nhận
+- `mock.ts:522`: `mockClaimConfirmationTask` không áp `viewFor`, nên Chủ mở được dòng 40 nhưng claim bị 404, chỉ xảy ra trên mock. BE thật không bị.
+- Hai script BE thật (`sr09_ac4_real_backend.py`, `qa_lo8_real.py`) còn selector cũ, đang ⏸. QA cần sửa khi dựng được BE.
+
+### Kết luận Lô 5 — FE: **CHANGES REQUESTED**
+- Cần sửa: TL5-M1 (thiếu cột lý do, AC1).
+- Nên sửa cùng lượt: TL5-L1 và TL5-L2, đều nhỏ.
+- Ghi nợ vào 02c: TL5-L3, L4, L5.
+- Giao be-dev: TL5-BE1.
+- Không có lỗi Critical hay High. Dữ liệu cá nhân, phân quyền và giá vốn đạt.
+
+### Re-review Lô 5 — FE (vòng sửa sau review, 02/10)
+
+**Đã chạy lại trong lượt này:** `tsc --noEmit` sạch; `vitest run` 46 file, 437 test đạt.
+
+**Các mục của vòng trước**
+- **TL5-M1 đạt.** Bảng có cột "Lý do" (`reasonText`, `confirmationUi.ts:142`) và đúng thứ tự cột theo board W1c.
+- **TL5-L1 đạt.** Dùng ref `hasDetail` (`ConfirmationDetailScreen.tsx:67,99`). Tải lại bị lỗi thì giữ dữ liệu cũ và hiện cảnh báo.
+- **TL5-L2 đạt.** Comment đã đúng; dòng có `paid_at` null được xếp xuống cuối, có test.
+
+**Thay đổi dùng chung có làm vỡ Lô 1–4 không: không vỡ.**
+- `DataTable` thêm `dense` và `hideOnMobile`. Cả hai là opt-in. Class `lt-dense` và `lt-m-hide` chỉ được gắn khi màn truyền prop. Hiện chỉ màn `/confirmation/` dùng. Bảng của Lô 1–4 vẫn ra cùng markup như cũ.
+- `Field` thêm `counter`. Chỉ hiện khi `as="textarea"`, có `counter` và có `maxLength`. Các nơi dùng cũ không đổi.
+- `globals.css`:
+  - Khối `.fb` dưới 768px: ô tìm, ô chọn và ô ngày đều cao `var(--tap)` = 44. Đây là thay đổi cố ý cho mọi màn có `FilterBar` trên điện thoại, đúng luật vùng bấm ≥ 44px. Cách viết `margin:-1px 0` giống `.search input` đang có. Desktop không đổi.
+  - `.btn[aria-disabled="true"]` làm mờ thêm các nút có thuộc tính này. Đã rà các chỗ có `aria-disabled`:
+    - `FormPage.tsx:65-66` đã có sẵn `disabled`, nên hiển thị không đổi.
+    - `AiBlockFrame.tsx:117` cũng đã có `disabled`.
+    - Mục của `MoreMenu` và `AvatarMenu` không dùng class `.btn`.
+    - Kết luận: không có màn cũ nào đổi giao diện ngoài ý muốn.
+- Đổi chữ "Tổng số kg" ở Lô 4 (`DeliveriesView.tsx`, `DeliveryDetailScreen.tsx`, `app/print/label/page.tsx`) là đổi nhãn, đúng QA-B8.
+- `guidance/mock.ts` thêm công cụ ép mã lỗi. Công cụ nằm sau cờ mock, và `check-no-mock` đã chạy xanh ở vòng dev.
+
+**`aria-disabled` thay cho `disabled` ở nút mở hộp: không cho bấm lặp ra hai hộp hay hai thao tác hỏng.**
+- **Nút "Quyết định"** (`:183`): `onClick` kiểm `busy === null`. Đang bận thì không làm gì.
+- **Nút "Ghi kết quả gọi"** (`:189-192`): đi qua `claimThen`, mà hàm này mở đầu bằng `if (busy) return` (`:146`). Mục "Hẹn gọi lại" trong menu cũng đi qua `claimThen`.
+- **Khe còn lại:** hai lần bấm trong cùng một khung hình vẫn đọc cùng giá trị `busy` cũ, nên có thể gửi 2 lần `POST …/claim/`.
+  - Khe này giống hệt khi còn dùng `disabled`, vì `disabled` cũng chỉ có hiệu lực sau lần render kế tiếp. Vậy đây không phải hồi quy.
+  - Claim là idempotent với cùng một người (chỉ gia hạn giữ chỗ), còn `setModal("call")` gọi hai lần vẫn chỉ ra một hộp. Không có hại.
+  - Nếu muốn chặn tuyệt đối thì thêm ref `inFlight` như `useSubmit`. Ghi mức Low.
+- Nút có `aria-disabled` vẫn nhận focus và vẫn đọc được trên trình đọc màn hình, đúng mục đích QA-B7 (trả focus về nút mở).
+
+**Phát hiện mới (đều Low, không chặn)**
+- **TL5-R1 · Low.** `globals.css:41-42`: `.btn:hover:not(:disabled)` và `.btn:active:not(:disabled)` vẫn áp cho nút có `aria-disabled="true"`. Nút mờ nhưng vẫn đổi nền khi rê chuột và vẫn co lại khi nhấn.
+  - Sửa: thêm `:not([aria-disabled="true"])` vào hai selector.
+- **TL5-R2 · Low.** `DataTable.tsx`, hàm `SkeletonBody` (khoảng dòng 79-83): ô khung xương không được gắn `lt-m-hide`. Ở ≤ 640px, phần đầu bảng chỉ còn 5 cột nhưng mỗi dòng khung xương vẫn có 10 ô, nên lệch cột trong lúc đang tải.
+  - Tái hiện: mở `/confirmation/` ở 360px với mạng chậm.
+  - Sửa: dùng `colClass(c)` cho `td` của khung xương.
+- **TL5-R3 · Low, cần PO xác nhận.** Cột "Lý do" bị `hideOnMobile`, nên ở 360px tab "Cần quyết định" không còn thấy lý do ngay trên danh sách. AC1 không nói gì về điện thoại; ở trang chi tiết vẫn có lý do.
+  - Nếu PO muốn thấy lý do ở điện thoại thì bỏ `hideOnMobile` cho cột này, ít nhất ở tab ESCALATED.
+- **Lệch hợp đồng mới `note_code`** (dev-notes): BE chưa trả trường này, nên trên BE thật ô "Phiếu giao" hiện "—". Ghi việc cho be-dev, gom cùng TL5-BE1.
+
+### Kết luận re-review Lô 5 — FE: **APPROVED**
+- Không còn lỗi Critical, High hay Medium ở FE.
+- Các thay đổi dùng chung là opt-in, hoặc là thay đổi cố ý (FilterBar 44px trên điện thoại), và không làm vỡ Lô 1–4.
+- Các mục ghi vào 02c:
+  - TL5-R1, TL5-R2 (sửa nhỏ, có thể gom vào lô sau)
+  - TL5-R3 (hỏi PO)
+  - TL5-L3, L4, L5
+  - BE: TL5-BE1 và `note_code`.
+- QA cần sửa chỉ số cột "Hạn gọi" trong `qa_ed_batch5_ui.py` G2: cột 6 thành cột 7.

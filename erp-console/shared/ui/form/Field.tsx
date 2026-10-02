@@ -37,6 +37,8 @@ type TextareaProps = Common & {
   onChange: (value: string) => void;
   rows?: number;
   maxLength?: number;
+  /** Hiện bộ đếm "n/max" dưới ô, bên phải (cần `maxLength`). Không phải chữ gợi ý: chỉ là số ký tự đã gõ. */
+  counter?: boolean;
   placeholder?: string;
 };
 
@@ -119,6 +121,12 @@ export function Field(props: InputProps | TextareaProps | SelectProps) {
         {control}
         {unit && props.as !== "textarea" && props.as !== "select" && <span className={s.unit}>{unit}</span>}
       </div>
+      {props.as === "textarea" && props.counter && props.maxLength ? (
+        <p className={s.counter} data-field-counter>
+          <span className="sr-only">Số ký tự đã nhập: </span>
+          {props.value.length}/{props.maxLength}
+        </p>
+      ) : null}
       {invalid && (
         <p className={s.err} id={errId}>
           <Icon name="error" />

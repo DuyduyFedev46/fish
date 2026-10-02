@@ -379,7 +379,7 @@ export function DeliveryDetailScreen() {
         />
         <InfoField label="Địa chỉ giao" value={<PersonalText value={note.address} />} />
         <InfoField label="Người giao" value={note.assigned_to_name || (note.assigned_to ? "Đã giao" : "Chưa giao cho ai")} />
-        <InfoField label="Tổng khối lượng" value={kg(note.total_kg)} num />
+        <InfoField label="Tổng số kg" value={kg(note.total_kg)} num />
         <InfoField label="Tem" value={<Chip entry={deliveryLabelText(note.label.printed ? note.label.valid_print_no ?? 1 : null)} />} />
         <InfoField label="Ghi chú đơn" value={<PersonalText value={note.note} whenEmpty="" />} />
         {hasFailure && <InfoField label="Lý do giao thất bại" value={note.failure_reason_label} />}

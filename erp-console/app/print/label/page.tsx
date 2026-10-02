@@ -179,7 +179,7 @@ function LabelPrintContent() {
             <div className={s.labelGoodsVal}>{labelData.packages}</div>
           </div>
           <div>
-            <div className={s.labelGoodsKey}>Tổng kg</div>
+            <div className={s.labelGoodsKey}>Tổng số kg</div>
             <div className={s.labelGoodsVal}>{labelData.total_kg} kg</div>
           </div>
           <div>

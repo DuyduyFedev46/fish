@@ -1,7 +1,7 @@
 # A4 CSKH — X-AC4: Sau luồng CSKH (gọi xác nhận, đổi người nhận, in tem), localStorage/sessionStorage/
 # IndexedDB/URL/console không được chứa tên, SĐT (đủ 10 số) hay địa chỉ khách.
 # Dữ liệu giả theo 02-stories.md: "Khách Thử A", "0900000123", "Số 1 Đường Thử".
-# Chạy: cd erp-console && NEXT_PUBLIC_USE_MOCK=1 npm run build && (cd out && python3 -m http.server 3203 &)
+# Chạy: cd erp-console && NEXT_PUBLIC_USE_MOCK=1 npm run build && (cd out && python3 -m http.server 3201 &)
 #       python3 e2e/ra_soat_x_ac4_storage.py     # tắt server sau khi xong
 import os
 import re
@@ -9,7 +9,7 @@ import sys
 
 from playwright.sync_api import sync_playwright
 
-BASE = os.environ.get("BASE", "http://127.0.0.1:3203")
+BASE = os.environ.get("BASE", "http://127.0.0.1:3201")
 results = []
 
 # Dữ liệu cá nhân giả cần rà — mẫu tên/SĐT/địa chỉ có trong mock (02-stories.md dùng đúng các chuỗi này)
@@ -73,30 +73,34 @@ with sync_playwright() as p:
     login(page, "cs1")
 
     # 1) Mở hàng chờ CSKH, mở chi tiết đơn (tự động claim), đổi người nhận hộ, ghi kết quả cuộc gọi
+    # (giao diện mới: bảng + trang chi tiết; "Đổi người nhận / địa chỉ" nằm trong menu "…", ghi kết quả là hộp thoại)
     page.goto(BASE + "/confirmation/")
     page.wait_for_load_state("networkidle")
-    page.locator("text=DH-260928-0001").first.click()
-    page.wait_for_timeout(400)
+    page.locator("table.lt tbody tr", has_text="SO260928-3F9A01").first.locator("a").first.click()
+    page.get_by_role("heading", name="SO260928-3F9A01").wait_for(timeout=8000)
+    page.wait_for_load_state("networkidle")
 
-    page.get_by_role("button", name="Đổi người nhận / địa chỉ").click()
-    page.wait_for_timeout(200)
-    # Điền tên/SĐT người nhận hộ (dữ liệu giả theo contract CS-12)
-    name_input = page.locator("input[placeholder*='nhận hộ']").first
-    if name_input.count() > 0:
-        name_input.fill("Người Nhận Thử")
-    phone_inputs = page.locator("input[type='tel'], input[placeholder*='SĐT']")
-    if phone_inputs.count() > 0:
-        phone_inputs.last.fill(NEW_RECIPIENT_PHONE)
-    save_btn = page.get_by_role("button", name=re.compile("Lưu|Cập nhật|Xác nhận đổi"))
-    if save_btn.count() > 0:
-        save_btn.first.click()
-        page.wait_for_timeout(400)
+    page.get_by_role("button", name="Thao tác khác").click()
+    page.get_by_role("menuitem", name="Đổi người nhận / địa chỉ").click()
+    dlg = page.get_by_role("dialog")
+    dlg.wait_for(timeout=5000)
+    # Điền tên/SĐT/địa chỉ người nhận hộ (dữ liệu giả theo contract CS-12)
+    dlg.get_by_label("Tên người nhận").fill("Người Nhận Thử")
+    dlg.get_by_label("Số điện thoại người nhận").fill(NEW_RECIPIENT_PHONE)
+    dlg.get_by_label("Địa chỉ giao hàng").fill("Số 2 Đường Thử")
+    dlg.get_by_role("button", name="Lưu thay đổi").click()
+    dlg.wait_for(state="detached", timeout=8000)
+    page.wait_for_timeout(400)
+    ok("Đổi người nhận xong, màn hiện người nhận mới (dữ liệu đã đi qua giao diện)", "Người Nhận Thử" in page.inner_text("main"))
 
     # Ghi kết quả cuộc gọi: CONFIRMED ("Đã xác nhận") với ghi chú hợp lệ (không SĐT/STK)
-    note_box = page.locator("textarea")
-    if note_box.count() > 0:
-        note_box.first.fill("Giao sau 17h, khách đồng ý")
-    page.get_by_text("Đã xác nhận", exact=False).first.click()
+    page.get_by_role("button", name="Ghi kết quả gọi").click()
+    dlg = page.get_by_role("dialog")
+    dlg.wait_for(timeout=5000)
+    dlg.locator("label", has_text="Đã xác nhận").first.click()
+    dlg.locator("textarea").first.fill("Giao sau 17h, khách đồng ý")
+    dlg.get_by_role("button", name="Lưu kết quả").click()
+    dlg.wait_for(state="detached", timeout=8000)
     page.wait_for_timeout(600)
 
     # Bỏ qua "Failed to fetch RSC payload" — hiện tượng đã biết khi serve static export bằng

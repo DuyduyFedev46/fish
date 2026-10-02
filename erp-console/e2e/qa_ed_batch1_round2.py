@@ -252,7 +252,7 @@ with sync_playwright() as p:
     ctx.close()
 
     # ===================== Hồi quy: menu theo 5 vai =====================
-    exp = {"loc": 11, "ql1": 10, "kho1": 8, "giao1": 1}
+    exp = {"loc": 12, "ql1": 10, "kho1": 8, "giao1": 1}
     for user, n in exp.items():
         ctx, page = new_page(browser, user)
         labels = nav_labels(page)

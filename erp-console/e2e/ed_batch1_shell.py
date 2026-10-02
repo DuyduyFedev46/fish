@@ -27,7 +27,7 @@ FULL_ORDER = [
 SECTIONS = ["Bán hàng", "Hàng hoá & kho", "Kế toán", "Website", "Quản trị"]
 # Mock chưa có quyền mới (xem 03-dev-notes.md, Lô 1 — FE) nên mỗi vai chỉ thấy phần đã làm.
 ROLE_MENU = {
-    "loc": (["Tổng quan", "Đơn & tiền", "Giao hàng", "Mua hàng", "Kho & lô", "Kiểm kê", "Danh mục & giá", "Báo cáo lãi lỗ", "Nội dung", "Nhân sự", "Nhật ký hoạt động"],
+    "loc": (["Tổng quan", "Đơn & tiền", "Gọi xác nhận", "Giao hàng", "Mua hàng", "Kho & lô", "Kiểm kê", "Danh mục & giá", "Báo cáo lãi lỗ", "Nội dung", "Nhân sự", "Nhật ký hoạt động"],
             ["Bán hàng", "Hàng hoá & kho", "Kế toán", "Website", "Quản trị"]),
     "ql1": (["Tổng quan", "Đơn & tiền", "Gọi xác nhận", "Giao hàng", "Mua hàng", "Kho & lô", "Kiểm kê", "Danh mục & giá", "Nội dung", "Nhật ký hoạt động"],
             ["Bán hàng", "Hàng hoá & kho", "Website", "Quản trị"]),

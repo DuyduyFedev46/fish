@@ -63,7 +63,7 @@ def run(browser):
     body = page.inner_text("main")
     ok("ED-17-AC1 list: có tab nhóm trạng thái", page.get_by_role("tab").count() >= 3, str(page.get_by_role("tab").all_inner_texts()))
     heads_list = [h.strip() for h in page.locator("thead").first.inner_text().split("\t")] if page.locator("thead").count() else []
-    ok("ED-17-AC1 list (PO: danh sách không có cột Kho): cột Mã phiếu, Đơn hàng, Người nhận, Hàng, Tổng kg, Người giao, Tem, Trạng thái, không cột Kho", "Kho" not in heads_list and "Tem" in heads_list and "Người giao" in heads_list, str(heads_list))
+    ok("ED-17-AC1 list (PO: danh sách không có cột Kho): cột Mã phiếu, Đơn hàng, Người nhận, Hàng, Tổng số kg, Người giao, Tem, Trạng thái, không cột Kho", "Kho" not in heads_list and "Tem" in heads_list and "Người giao" in heads_list, str(heads_list))
     ok("G5 list: kg dạng 18,5 kg (dấu phẩy, đơn vị)", not re.search(r"\d\.\d{3}\s*kg", body), re.findall(r".{0,15}\d\.\d{3}\s*kg", body)[:3].__str__())
     shot(page, "lo4_list_1440_ql1.png")
     go(page, "/deliveries/detail/?id=31")
