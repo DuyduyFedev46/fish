@@ -70,7 +70,7 @@ class DisciplineTestCase(TestCase):
                     if not perms:
                         missing.append(f"{vs.__name__}.{attr_name}")
 
-        self.assertEqual(count, 29, f"Kỳ vọng đúng 29 @action, tìm thấy {count}")  # +1: return_to_supplier (P8 Lô 5); +1: assign (Lô 4); +1: replace_lines kiểm kê (Lô 8); +3: submit, return_to_draft kiểm kê và cancel phiếu trả (Lô bổ sung A)
+        self.assertEqual(count, 30, f"Kỳ vọng đúng 30 @action, tìm thấy {count}")  # +1: return_to_supplier (P8 Lô 5); +1: assign (Lô 4); +1: replace_lines kiểm kê (Lô 8); +3: submit, return_to_draft kiểm kê và cancel phiếu trả (Lô bổ sung A); +1: soft_delete phiếu hàng hoàn (Duy quyết 03/10 #8)
         self.assertEqual(missing, [], f"Các action sau thiếu required_perms: {missing}")
 
     def test_dw08_ac2_required_perms_khop_require_perm(self):

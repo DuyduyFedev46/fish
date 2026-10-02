@@ -2,7 +2,7 @@
 Dòng thời gian cho Phiếu hoàn tiền (Refund) — READ-ONLY, ghép từ Refund + AuditLog.
 
 Bất biến:
-- Không rò PII khách.
+- Không rò PII khách; không chép chữ tự do (`Refund.reason`, ghi chú báo thất bại) vào nhãn (Duy quyết 03/10 #3).
 - Không rò giá vốn.
 - Sửa L-4: actor AI hiện "AI của <tên>" kèm mức, không hiện "Hệ thống".
 """
@@ -12,7 +12,7 @@ from datetime import datetime
 from apps.accounts.models import AuditLog
 from apps.sales.models import Refund
 from apps.sales.orders.timeline import TimelineEvent, actor_display
-from apps.sales.utils import vnd_display
+from apps.common.formatting import format_vnd_ui
 
 REFUND_MODEL = Refund._meta.label
 SYSTEM = "Hệ thống"
@@ -29,7 +29,7 @@ def build_refund_timeline(refund: Refund) -> list[TimelineEvent]:
         TimelineEvent(
             at=refund.created_at,
             kind="refund_created",
-            label=f"Tạo phiếu hoàn {vnd_display(refund.amount)}" + (f" — {refund.reason}" if refund.reason else ""),
+            label=f"Tạo phiếu hoàn {format_vnd_ui(refund.amount)}",
             actor_display=actor_display(refund.created_by),
             doc="refund",
             actor_kind="user" if refund.created_by else "system",
@@ -61,12 +61,11 @@ def build_refund_timeline(refund: Refund) -> list[TimelineEvent]:
             ai_cfg = None
 
         if a.action == "mark_refund_failed":
-            reason_text = f" — lý do: {a.note}" if a.note else ""
             events.append(
                 TimelineEvent(
                     at=a.created_at,
                     kind="refund_failed",
-                    label=f"Báo thất bại{reason_text}",
+                    label="Báo thất bại",
                     actor_display=who,
                     doc="refund",
                     actor_kind=kind_actor,
@@ -95,7 +94,7 @@ def build_refund_timeline(refund: Refund) -> list[TimelineEvent]:
             TimelineEvent(
                 at=refund.confirmed_at,
                 kind="refund_confirmed",
-                label=f"Đã hoàn {vnd_display(refund.amount)}{ref_text}",
+                label=f"Đã hoàn {format_vnd_ui(refund.amount)}{ref_text}",
                 actor_display=actor_display(refund.confirmed_by),
                 doc="refund",
                 actor_kind="user" if refund.confirmed_by else "system",

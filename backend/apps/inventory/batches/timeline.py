@@ -14,7 +14,8 @@ from apps.accounts.models import AuditLog
 from apps.common.cost_keys import can_view_cost
 from apps.inventory.models import Batch, StockLedgerEntry
 from apps.sales.orders.timeline import TimelineEvent, actor_display
-from apps.sales.utils import kg_str, vnd_display
+from apps.sales.utils import kg_str
+from apps.common.formatting import format_vnd_ui
 
 BATCH_MODEL = Batch._meta.label
 SYSTEM = "Hệ thống"
@@ -118,7 +119,7 @@ def build_batch_timeline(batch: Batch, viewer: Optional[Any] = None) -> list[Tim
             # DW-05-AC3: quan_ly và nv_kho thấy "Chủ đã chốt lô" không có số; chu thấy số
             if user_can_see_cost:
                 cost_val = (a.changes or {}).get("landed_unit_cost", {}).get("final", batch.landed_unit_cost)
-                cost_text = f" (giá vốn {vnd_display(cost_val)}/kg)" if cost_val else ""
+                cost_text = f" (giá vốn {format_vnd_ui(cost_val)}/kg)" if cost_val else ""
                 label_close = f"Chốt lô{cost_text}"
             else:
                 label_close = "Chủ đã chốt lô"
@@ -139,7 +140,7 @@ def build_batch_timeline(batch: Batch, viewer: Optional[Any] = None) -> list[Tim
             # DW-05-AC3: quan_ly và nv_kho thấy "Chủ ghi nhận chi phí mua" không số; chu thấy số
             if user_can_see_cost:
                 amount_val = (a.changes or {}).get("amount") or (a.changes or {}).get("allocated_amount")
-                amount_text = f" ({vnd_display(amount_val)})" if amount_val else ""
+                amount_text = f" ({format_vnd_ui(amount_val)})" if amount_val else ""
                 label_cost = f"Ghi nhận chi phí mua{amount_text}"
             else:
                 label_cost = "Chủ ghi nhận chi phí mua"
@@ -160,7 +161,7 @@ def build_batch_timeline(batch: Batch, viewer: Optional[Any] = None) -> list[Tim
             # DW-06-AC5: quan_ly và nv_kho thấy "Chủ đã huỷ lô" không số; chu thấy số (hoặc nhãn huỷ)
             if user_can_see_cost:
                 loss_val = (a.changes or {}).get("loss_amount")
-                loss_text = f" (lỗ {vnd_display(loss_val)})" if loss_val else ""
+                loss_text = f" (lỗ {format_vnd_ui(loss_val)})" if loss_val else ""
                 label_cancel = f"Huỷ lô quá hạn{loss_text}"
             else:
                 label_cancel = "Chủ đã huỷ lô"

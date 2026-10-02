@@ -168,7 +168,9 @@ class L7TimelineTests(OrderApiBase):
 
     def test_l7_timeline_huy_don_co_ly_do_actor_ten_dang_nhap_khi_khong_ho_so(self):
         order = self._paid_order()
-        order_services.cancel_paid_order(order=order, actor=self.ql, reason="Khách đổi ý")
+        order_services.cancel_paid_order(
+            order=order, actor=self.ql, reason="Khách đổi ý", reason_code="CUSTOMER_CHANGED_MIND",
+        )
         tl = self._timeline(self.chu, order)
         cancel = [r for r in tl if r["kind"] == "cancelled"]
         self.assertEqual(len(cancel), 1)
