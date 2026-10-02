@@ -25,9 +25,10 @@ Mock module staff dùng chung kho người dùng mock: `mockUsers()`, `saveMockU
 | `mock.ts` | tài khoản mock (lưu localStorage), quyền theo Group chép từ BE, `group_labels`/`capabilities` theo BE L6, mock logout/đổi mật khẩu; S48: cờ `must_change_password` + cổng chung `setMockGate` trả 403 `AUTH_MUST_CHANGE_PASSWORD` như lớp xác thực BE |
 | `types.ts` | `Me`, `TokenResponse`, `ChangePasswordResponse` |
 | `session.ts` | id người đăng nhập gần nhất (giữ/xoá nháp, S7-AC6) |
+| `signedInAt.ts` | Lô 15 (ED-06): nhớ MỐC GIỜ đăng nhập của máy này (`cave_erp_signed_in_at`, chỉ chuỗi ISO, không dữ liệu cá nhân) để màn Tài khoản ghi "Đăng nhập từ dd/mm/yyyy hh:mm". Đăng xuất thì xoá |
 | `components/AuthProvider.tsx` | trạng thái đăng nhập, 401/403 toàn cục, `permNotice`, `changePassword` |
 | `components/ConsoleGate.tsx` | cổng vào console, dải "Quyền của bạn vừa thay đổi", link Tài khoản của tôi |
-| `components/AccountScreen.tsx` | màn "Tài khoản của tôi" (route `/account/`, kiểu trang cài đặt, `account.module.css`): nhóm, việc được làm, xem giá vốn/lãi lỗ, mục menu, đổi mật khẩu (tấm bên), đăng xuất. Móc e2e: `.who-card .group-tag`, `.cap-list li`, `.perm-yn` |
+| `components/AccountScreen.tsx` | màn "Tài khoản của tôi" (route `/account/`, kiểu trang cài đặt, `account.module.css`): đầu trang (tên, Tên đăng nhập, Số điện thoại, Vai trò), việc được làm, xem giá vốn/lãi lỗ, mục menu, "Bảo mật và đăng nhập" (phiên, đổi mật khẩu trong tấm bên, AI của tôi, đăng xuất); báo kết quả bằng toast. Móc e2e: `.who-card .group-tag`, `.cap-list li`, `.perm-yn` |
 | `components/ChangePasswordForm.tsx` | form tự đổi mật khẩu (hỏi mật khẩu hiện tại, mới, nhập lại) — dùng cho S46 và S48 (`mustChange`) |
 | `components/SetPasswordScreen.tsx` | S48 màn "Đặt mật khẩu mới" (route `/set-password/`), có nút Đăng xuất |
 | `components/LoginScreen.tsx`, `NoRoleScreen.tsx`, `RootRedirect.tsx`, `ViewGuard.tsx` | đăng nhập, chưa phân quyền, chuyển hướng "/", chặn màn thiếu quyền |

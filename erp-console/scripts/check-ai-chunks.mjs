@@ -62,6 +62,17 @@ const TARGETS = [
   ["/(console)/staff/detail/page", "/staff/detail"],
   ["/(console)/permissions/page", "/permissions"],
   ["/(console)/permissions/detail/page", "/permissions/detail"],
+  // Tổng quan + màn AI + Nhật ký + Tài khoản (Lô 15). Tổng quan chỉ đọc số đếm đề xuất AI (nhẹ, có cổng AI bật);
+  // Cài đặt AI / Chính sách AI / Báo cáo AI chỉ là form và bảng gọi API, không chạy mô hình trên máy — phải xanh.
+  ["/(console)/overview/page", "/overview"],
+  ["/(console)/audit-logs/page", "/audit-logs"],
+  ["/(console)/account/page", "/account"],
+  ["/(console)/ai/settings/page", "/ai/settings"],
+  ["/(console)/ai/policy/page", "/ai/policy"],
+  ["/(console)/ai/report/page", "/ai/report"],
+  ["/login/page", "/login"],
+  ["/set-password/page", "/set-password"],
+  ["/no-role/page", "/no-role"],
 ];
 
 // Chuỗi đặc trưng của code AI chạy trên máy (worker, thư viện wllama, gọi lệnh AI).

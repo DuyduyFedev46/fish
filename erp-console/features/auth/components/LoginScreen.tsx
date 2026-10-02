@@ -8,6 +8,7 @@ import { Icon } from "@/shared/ui/Icon";
 import { PasswordInput } from "@/shared/ui/PasswordInput";
 import { NAV, canView, homePath, safeNext } from "@/shared/lib/nav";
 import { getLastUserId } from "../session";
+import { rememberSignedIn } from "../signedInAt";
 import type { Me } from "../types";
 import { useAuth } from "./AuthProvider";
 import { MSG, errorText } from "@/shared/lib/messages";
@@ -55,6 +56,7 @@ function LoginForm() {
     const prevUser = getLastUserId(); // đọc TRƯỚC khi login() ghi đè
     try {
       const data = await login(username.trim(), password);
+      rememberSignedIn(); // mốc giờ cho dòng "Phiên đăng nhập" ở Tài khoản của tôi
       router.replace(destination(data, next, prevUser));
     } catch (err) {
       setError(errorText(err, MSG.loginFailed));
@@ -100,6 +102,7 @@ function LoginForm() {
             autoCorrect="off"
             spellCheck={false}
             required
+            placeholder="vd: tam.kho"
             aria-invalid={missing === "u" || undefined}
             aria-describedby={missing === "u" ? "u-err" : undefined}
             value={username}

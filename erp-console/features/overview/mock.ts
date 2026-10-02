@@ -10,11 +10,22 @@ import { ROLE } from "@/shared/lib/roles";
 export function mockOverview(req: MockRequest): MockResponse {
   const me = mockRequireUser(req);
   if (!me) return MOCK_UNAUTHORIZED;
-  return dashboardSummaryMockResponse({
+  const res = dashboardSummaryMockResponse({
     username: me.username,
     can_cost: me.can_view_cost,
     can_view_dashboard: me.permissions.includes("reports.view_dashboard"),
   });
+  return res.status === 200 ? { ...res, body: withShopOrderCodes(res.body) } : res;
+}
+
+/**
+ * Seed chung (shared/lib/dashboardSummary.mock.ts) còn mã đơn kiểu cũ "DH-240924-011"; BE thật trả "SO260930-753F06" (ED-08-AC2).
+ * Đổi tiền tố ngay tại mock của màn này để thử đúng dạng mã thật mà không phải sửa seed dùng chung.
+ */
+function withShopOrderCodes(body: unknown): unknown {
+  const b = body as { recent_orders?: { code: string }[] };
+  if (!Array.isArray(b?.recent_orders)) return body;
+  return { ...b, recent_orders: b.recent_orders.map((o) => ({ ...o, code: o.code.replace(/^DH-/, "SO") })) };
 }
 
 export function mockAttention(req: MockRequest): MockResponse {

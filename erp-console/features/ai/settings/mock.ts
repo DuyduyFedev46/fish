@@ -6,6 +6,7 @@
 // Dữ liệu GIẢ, không chứa tên/SĐT/địa chỉ.
 
 import type { MockResponse } from "@/shared/lib/http";
+import { aiEnabled } from "../mock";
 import { COMMAND_GROUP, RECEIVE_BATCHES_COMMAND_ID, type AiCommandGroup } from "../commandGroups";
 import type { AiCommandKind, AiCommandLevel, MyConfig, MyConfigCommandItem, MyConfigGroup } from "../types";
 
@@ -90,7 +91,7 @@ export function mockGetMyConfig(): MyConfig {
     };
   });
   return {
-    ai_enabled: true,
+    ai_enabled: aiEnabled(),
     version: state.version,
     killed: state.killed,
     updated_at: state.updated_at,

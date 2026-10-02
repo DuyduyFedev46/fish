@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { buildDashboardSummaryMock } from "@/shared/lib/dashboardSummary.mock";
 import { filterRecentOrders, readConfirmationCounts } from "./api";
-import { mockAttention } from "./mock";
+import { mockAttention, mockOverview } from "./mock";
 import type { RecentOrder } from "./types";
 
 describe("Overview Attention Tests (CS-15)", () => {
@@ -110,5 +110,23 @@ describe("readConfirmationCounts (P8b Lô 5: chỉ khoá confirmation_*)", () =>
     expect(r.queueWaiting).toBe(0);
     expect(r.escalated).toBeUndefined();
     expect(r.autoCancelBlocked).toBeUndefined();
+  });
+});
+
+describe("Overview mock (ED-08-AC2)", () => {
+  it("mã đơn ở mock dạng SO…, không còn tiền tố DH-", () => {
+    const res = mockOverview({ method: "GET", path: "/api/dashboard/summary/", token: "mock-token-loc-9999999999999" } as any);
+    expect(res.status).toBe(200);
+    const orders = (res.body as { recent_orders: { code: string }[] }).recent_orders;
+    expect(orders.length).toBeGreaterThan(0);
+    for (const o of orders) expect(o.code).toMatch(/^SO\d/);
+  });
+
+  it("ED-08-AC4: Quản lý không có view_costprice thì response không có inventory_value và không có unit_cost", () => {
+    const res = mockOverview({ method: "GET", path: "/api/dashboard/summary/", token: "mock-token-ql1-9999999999999" } as any);
+    expect(res.status).toBe(200);
+    const body = res.body as { kpis: Record<string, unknown>; batches: Record<string, unknown>[] };
+    expect(body.kpis).not.toHaveProperty("inventory_value");
+    for (const b of body.batches) expect(b).not.toHaveProperty("unit_cost");
   });
 });

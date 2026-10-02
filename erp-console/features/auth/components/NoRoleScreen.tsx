@@ -43,8 +43,7 @@ export function NoRoleScreen() {
         </div>
         <h1>Tài khoản chưa được phân quyền</h1>
         <p>
-          Tài khoản <b>{me.username}</b> chưa thuộc nhóm nào nên chưa dùng được console. Liên hệ Chủ vựa để được
-          cấp quyền.
+          Tài khoản <b>{me.username}</b> chưa thuộc nhóm nào. Nhờ Chủ vựa cấp quyền.
         </p>
         <div className="auth-actions">
           <button

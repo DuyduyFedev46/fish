@@ -7,7 +7,7 @@
 // xuất. "Nhập lại" khác "Mật khẩu mới" → báo "Hai mật khẩu không khớp", KHÔNG gọi API (S48-AC3). Lỗi BE
 // (AUTH_OLD_PASSWORD, AUTH_WEAK_PASSWORD, BR-PQ-17) hiện NGUYÊN VĂN. Không giữ nháp: mật khẩu không vào localStorage.
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ApiError } from "@/shared/lib/http";
 import { Icon } from "@/shared/ui/Icon";
 import { PasswordInput } from "@/shared/ui/PasswordInput";
@@ -18,9 +18,13 @@ type Props = {
   onDone: (message: string) => void;
   /** S48: form của màn bắt buộc đặt mật khẩu mới (nhãn nút, gợi ý ô mật khẩu hiện tại). */
   mustChange?: boolean;
+  /** Có thì vẽ nút "Huỷ" (hộp thoại trong Tài khoản của tôi); màn S48 bắt buộc đặt mật khẩu nên không truyền. */
+  onCancel?: () => void;
+  /** Báo cho hộp chứa biết đang gửi, để hộp không đóng được giữa chừng. */
+  onBusyChange?: (busy: boolean) => void;
 };
 
-export function ChangePasswordForm({ onDone, mustChange = false }: Props) {
+export function ChangePasswordForm({ onDone, mustChange = false, onCancel, onBusyChange }: Props) {
   const { me, changePassword } = useAuth();
   const [oldPw, setOldPw] = useState("");
   const [newPw, setNewPw] = useState("");
@@ -31,6 +35,10 @@ export function ChangePasswordForm({ onDone, mustChange = false }: Props) {
   const [mismatch, setMismatch] = useState(false);
   // UI5: nút gửi không bị tắt khi thiếu ô — bấm thì báo tại ô trống đầu tiên và đưa focus vào đó.
   const [missing, setMissing] = useState<"old" | "new" | "again" | null>(null);
+
+  useEffect(() => {
+    onBusyChange?.(busy);
+  }, [busy, onBusyChange]);
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -121,6 +129,11 @@ export function ChangePasswordForm({ onDone, mustChange = false }: Props) {
         error={missing === "again" ? MSG.needAgainPassword : mismatch ? MSG.passwordMismatch : null}
       />
       <div className="form-actions">
+        {onCancel && (
+          <button type="button" className="btn" onClick={onCancel} disabled={busy}>
+            Huỷ
+          </button>
+        )}
         <button type="submit" className="btn primary" disabled={busy} aria-busy={busy || undefined}>
           {busy && <Icon name="progress_activity" className="spin" />}
           {busy ? "Đang lưu…" : mustChange ? "Lưu mật khẩu mới" : "Đổi mật khẩu"}
