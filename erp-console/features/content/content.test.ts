@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { canView, PERM, visibleNav, type Viewer } from "@/shared/lib/nav";
 import { ROLE } from "@/shared/lib/roles";
 import { clearDraft, loadDraft, saveDraft } from "@/shared/lib/drafts";
+import { warningsOf } from "./contentModel";
 import {
   mockCreateCategory,
   mockCreateEntry,
@@ -24,7 +25,10 @@ import {
   mockFetchEntryVersions,
   mockGetEntryVersion,
   mockRestoreEntryVersion,
+  mockOtherEdit,
+  mockUseRawBody,
 } from "./mock";
+import { bodyToTiptap, tiptapToBody } from "./editor/convert";
 
 describe("CMS-01 & CMS-02 Console Tests", () => {
   it("CMS-01-AC6: NV kho không thấy mục Nội dung trong menu và không có quyền xem", () => {
@@ -168,16 +172,12 @@ describe("CMS-01 & CMS-02 Console Tests", () => {
     });
 
     it("CMS-03-AC9: Xoá bài đã từng đăng -> từ chối lỗi BR-ND-02", () => {
-      const entry = mockCreateEntry({
-        kind: "post",
-        title: "Bài đã từng đăng",
-      });
-      // Giả lập bài đã từng xuất bản
-      entry.published_version = 1;
-      entry.first_published_at = new Date().toISOString();
+      // Dùng bài đã đăng có sẵn trong dữ liệu mẫu (mockCreateEntry trả bản sao nên không sửa trực tiếp được).
+      const published = mockListEntries({ status: "published" }).results[0];
+      expect(published).toBeDefined();
 
       expect(() => {
-        mockDeleteEntry(entry.id);
+        mockDeleteEntry(published.id);
       }).toThrowError(/BR-ND-02/);
     });
 
@@ -255,9 +255,11 @@ describe("CMS-01 & CMS-02 Console Tests", () => {
         expect.unreachable("Phải ném lỗi CONTENT_WARNINGS");
       } catch (err: any) {
         expect(err.code).toBe("CONTENT_WARNINGS");
-        expect(err.warnings.length).toBeGreaterThan(0);
-        expect(err.warnings.some((w: any) => w.type === "phone_like")).toBe(true);
-        expect(err.warnings.some((w: any) => w.type === "cost_keyword")).toBe(true);
+        // BE đặt danh sách cảnh báo ở `details.warnings`, không ở chính đối tượng lỗi.
+        const warnings = warningsOf(err);
+        expect(warnings.length).toBeGreaterThan(0);
+        expect(warnings.some((w) => w.type === "phone_like")).toBe(true);
+        expect(warnings.some((w) => w.type === "cost_keyword")).toBe(true);
       }
 
       // 3. Publish với acknowledge_warnings=true -> Thành công 200, status=published, slug_locked=true
@@ -334,8 +336,10 @@ describe("CMS-01 & CMS-02 Console Tests", () => {
         reason: "wrong_content",
       });
       expect(unpubRes.status).toBe("unpublished");
-      expect(unpubRes.return_reason).toBe("wrong_content");
       expect(unpubRes.row_version).toBe(4);
+      // Giống máy chủ thật: chỉ trả { status, row_version }, lý do đọc lại từ chi tiết bài.
+      expect(Object.keys(unpubRes).sort()).toEqual(["row_version", "status"]);
+      expect(mockGetEntry(entry.id).return_reason).toBe("wrong_content");
 
       // 5. Gỡ bài khi bài không ở trạng thái published -> 400 BR-ND-01
       expect(() => {
@@ -641,6 +645,22 @@ describe("CMS-01 & CMS-02 Console Tests", () => {
   });
 });
 
+describe("Lô 16 sửa lỗi QA: mở bài không phải là đã sửa", () => {
+  it("B16-2: thân bài máy chủ dạng chưa chuẩn hoá khác bản Tiptap trả ra, nên màn soạn phải so theo bản chuẩn hoá", () => {
+    expect(mockUseRawBody(42)).toBe(true);
+    const raw = mockGetEntry(42).body;
+    const normalized = tiptapToBody(bodyToTiptap(raw));
+    // Premise của lỗi: sau khi qua trình soạn thảo, thân bài không còn giống từng byte với bản máy chủ.
+    expect(JSON.stringify(normalized)).not.toBe(JSON.stringify(raw));
+    // Chuẩn hoá lần hai không đổi nữa (ổn định), nên chỉ cần bỏ qua lần phát "update" khi nạp.
+    expect(JSON.stringify(tiptapToBody(bodyToTiptap(normalized)))).toBe(JSON.stringify(normalized));
+  });
 
-
+  it("B16-3: người khác sửa thì row_version và tiêu đề đổi", () => {
+    const before = mockGetEntry(42);
+    const v = mockOtherEdit(42, "Tiêu đề do người khác sửa");
+    expect(v).toBe(before.row_version + 1);
+    expect(mockGetEntry(42).title).toBe("Tiêu đề do người khác sửa");
+  });
+});
 

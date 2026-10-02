@@ -1,186 +1,260 @@
-.container {
+/* Module Nội dung (ED-35, ED-36). Chỉ dùng token trong DESIGN.md, không màu hex. Nút dùng class chung .btn / .iconbtn. */
+
+/* ---- Hộp thoại ---- */
+.form,
+.dialogBody {
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  padding: 16px 20px;
-  max-width: 1200px;
-  margin: 0 auto;
+  gap: var(--space-3);
+  min-width: 0;
 }
-
-.header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 12px;
-}
-
-.titleGroup {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.title {
+.dialogIntro {
   margin: 0;
-  font-size: 1.5rem;
-  font-weight: 600;
+  font-size: var(--text-sm);
+  color: var(--ink-2);
 }
-
-.tabs {
+.dialogTitleText {
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.dialogNote {
+  margin: var(--space-4) 0;
+  text-align: center;
+  font-size: var(--text-sm);
+  color: var(--ink-3);
+}
+.confirmBody {
+  margin: 0 0 var(--space-3);
+  color: var(--ink-2);
+}
+.blockedList {
   display: flex;
-  gap: 8px;
-  border-bottom: 1px solid var(--border, #e5e7eb);
-  padding-bottom: 8px;
-  overflow-x: auto;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-3);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
 }
-
-.tab {
+.rowActions {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
-  border-radius: 6px;
-  font-size: 0.875rem;
-  font-weight: 500;
-  color: var(--muted-fg, #6b7280);
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  text-decoration: none;
-}
-
-.tab:hover {
-  background: var(--bg-hover, #f3f4f6);
-  color: var(--fg, #111827);
-}
-
-.tabActive {
-  background: var(--bg-active, #e5e7eb);
-  color: var(--fg, #111827);
-  font-weight: 600;
-}
-
-.badge {
-  display: inline-block;
-  padding: 2px 6px;
-  border-radius: 9999px;
-  font-size: 0.75rem;
-  background: var(--badge-bg, #e5e7eb);
-  color: var(--badge-fg, #374151);
-}
-
-.filterBar {
-  display: flex;
-  gap: 12px;
-  align-items: center;
+  gap: var(--space-2);
   flex-wrap: wrap;
 }
 
-.tableWrap {
-  background: var(--card-bg, #fff);
-  border: 1px solid var(--border, #e5e7eb);
-  border-radius: 8px;
-  overflow-x: auto;
-}
-
-.table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.875rem;
-  text-align: left;
-}
-
-.table th {
-  padding: 10px 16px;
-  background: var(--th-bg, #f9fafb);
-  border-bottom: 1px solid var(--border, #e5e7eb);
-  font-weight: 600;
-  color: var(--muted-fg, #4b5563);
-}
-
-.table td {
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--border, #e5e7eb);
-  vertical-align: middle;
-}
-
-.table tr:last-child td {
-  border-bottom: none;
-}
-
-.table tr:hover td {
-  background: var(--tr-hover, #f9fafb);
-}
-
-.actions {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-
-.modalOverlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.4);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 50;
-  padding: 16px;
-}
-
-.modal {
-  background: #fff;
-  border-radius: 12px;
-  padding: 24px;
-  max-width: 500px;
-  width: 100%;
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+/* Kiểm tra trước khi đăng */
+.checkList {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: var(--space-2);
 }
 
-.formGroup {
+/* Cảnh báo */
+.warnList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--space-2);
+}
+.warnItem {
+  display: flex;
+  gap: var(--space-2);
+  align-items: flex-start;
+  padding: var(--space-2-5) var(--space-3);
+  background: var(--warn-soft);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  color: var(--ink);
+}
+.warnItem :global(.mi) {
+  color: var(--warn);
+  font-size: 18px;
+  flex: none;
+}
+.warnSnippet {
+  display: block;
+  margin-top: var(--space-0-5);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--ink-2);
+  overflow-wrap: anywhere;
 }
 
-.formGroup label {
-  font-size: 0.875rem;
-  font-weight: 500;
+/* Lịch sử phiên bản */
+.historyList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  max-height: 50vh;
+  overflow-y: auto;
+}
+.historyItem {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-2-5) var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+.historyMain {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-0-5);
+  min-width: 0;
+  flex: 1 1 200px;
+  font-size: var(--text-sm);
+}
+.historyTitle {
+  color: var(--ink);
+  overflow-wrap: anywhere;
 }
 
-.input, .textarea {
-  padding: 8px 12px;
-  border: 1px solid var(--border, #d1d5db);
-  border-radius: 6px;
-  font-size: 0.875rem;
+/* ---- Màn soạn bài ---- */
+.editPage {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  max-width: var(--content-max);
+  min-width: 0;
+}
+.backBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  align-self: flex-start;
+  min-height: var(--tap);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink-2);
+  font-size: var(--text-sm);
+}
+.backBtn :global(.mi) {
+  font-size: 18px;
+}
+.backBtn:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+  border-radius: var(--radius-xs);
+}
+.saveStatus {
+  margin: 0;
+  min-height: var(--text-sm);
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+}
+.editGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-4);
+  align-items: start;
+}
+.editMain,
+.editSide {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+@media (min-width: 1024px) {
+  .editGrid {
+    grid-template-columns: minmax(0, 1fr) minmax(280px, var(--rail-right-w));
+    gap: var(--space-6);
+  }
+  .editSide {
+    position: sticky;
+    top: 0;
+  }
+}
+.bodyField {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1-5);
+  min-width: 0;
+}
+.bodyLabel {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--ink);
+}
+.editorLoading {
+  padding: var(--space-6);
+  text-align: center;
+  color: var(--ink-3);
+  font-size: var(--text-sm);
+  border: 1px solid var(--border-input);
+  border-radius: var(--radius-md);
+}
+.fieldNote {
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-xs);
+  color: var(--ink-3);
 }
 
-.input:focus, .textarea:focus {
-  outline: 2px solid var(--primary, #2563eb);
+/* Thẻ thông tin / nhóm thiết lập */
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  min-width: 0;
 }
-
-.errorMsg {
-  color: #ef4444;
-  font-size: 0.875rem;
-  padding: 8px 12px;
-  background: #fef2f2;
-  border-radius: 6px;
-  border: 1px solid #fee2e2;
+.cardTitle {
+  margin: 0;
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
+  color: var(--ink);
 }
-
-.badgeWarning {
-  display: inline-block;
-  padding: 2px 8px;
-  border-radius: 9999px;
-  font-size: 0.75rem;
-  background: #fef3c7;
-  color: #92400e;
-  font-weight: 500;
-  border: 1px solid #fde68a;
+.infoList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2-5);
+  margin: 0;
 }
-
+.infoList > div {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-0-5);
+  min-width: 0;
+}
+.infoList dt {
+  font-size: var(--text-xs);
+  color: var(--ink-3);
+}
+.infoList dd {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.clamp {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.coverPreview {
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--surface-3);
+  max-width: 320px;
+}
+.coverPreview img {
+  display: block;
+  width: 100%;
+  height: auto;
+}

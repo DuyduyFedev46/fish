@@ -42,6 +42,9 @@ def main() -> int:
         page.goto(f"{BASE}/content/edit/?id={ENTRY_ID}")
         page.wait_for_load_state("networkidle")
         page.wait_for_timeout(1000)
+        # Lô 16 (ED-36): phần "Ảnh trong bài" nằm ở màn "Thiết lập bài viết", mở bằng nút cùng tên.
+        page.get_by_role("button", name="Thiết lập bài viết").first.click()
+        page.wait_for_timeout(500)
 
         # --- CMS-05-AC8: nút "Tải ảnh" mở được bộ chọn tệp (camera/thư viện trên máy thật) ---
         upload_btn = page.get_by_role("button", name="Tải ảnh từ máy / điện thoại")

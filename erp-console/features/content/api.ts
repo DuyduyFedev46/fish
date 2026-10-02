@@ -1,4 +1,4 @@
-import { apiFetch, apiUpload } from "@/shared/lib/http";
+import { apiFetch, apiUpload, type Paginated } from "@/shared/lib/http";
 import type {
   CategoryCreatePayload,
   CategoryUpdatePayload,
@@ -12,6 +12,7 @@ import type {
   EntryPublishPayload,
   EntryPublishResponse,
   EntryUnpublishPayload,
+  EntryUnpublishResponse,
   EntryUpdatePayload,
   GoliveStatusResponse,
   ContentEntryVersionDetail,
@@ -82,7 +83,7 @@ export async function fetchEntries(
     page?: number;
   },
   signal?: AbortSignal
-): Promise<{ count: number; results: ContentEntryListItem[] }> {
+): Promise<Paginated<ContentEntryListItem>> {
   const query = new URLSearchParams();
   if (params?.status) query.set("status", params.status);
   if (params?.kind) query.set("kind", params.kind);
@@ -92,7 +93,7 @@ export async function fetchEntries(
   const qs = query.toString();
   const url = `/api/content/entries/${qs ? `?${qs}` : ""}`;
 
-  return apiFetch<{ count: number; results: ContentEntryListItem[] }>(url, {
+  return apiFetch<Paginated<ContentEntryListItem>>(url, {
     signal,
     mock: process.env.NEXT_PUBLIC_USE_MOCK === "1" ? () => ({ status: 200, body: mockListEntries(params) }) : undefined,
   });
@@ -194,8 +195,8 @@ export async function publishEntry(
 export async function unpublishEntry(
   id: number,
   payload: EntryUnpublishPayload
-): Promise<ContentEntryDetail> {
-  return apiFetch<ContentEntryDetail>(`/api/content/entries/${id}/unpublish/`, {
+): Promise<EntryUnpublishResponse> {
+  return apiFetch<EntryUnpublishResponse>(`/api/content/entries/${id}/unpublish/`, {
     method: "POST",
     body: payload,
     mock: process.env.NEXT_PUBLIC_USE_MOCK === "1" ? () => ({ status: 200, body: mockUnpublishEntry(id, payload) }) : undefined,

@@ -31,6 +31,10 @@ const TARGETS = [
   ["/(console)/customers/page", "/customers"],
   ["/(console)/customers/detail/page", "/customers/detail"],
   ["/(console)/inventory/page", "/inventory"],
+  // Nội dung (Lô 16): không có khối AI; trình soạn Tiptap chỉ nạp ở màn soạn bài, không kéo runtime AI.
+  ["/(console)/content/page", "/content"],
+  ["/(console)/content/categories/page", "/content/categories"],
+  ["/(console)/content/edit/page", "/content/edit"],
   ["/(console)/deliveries/page", "/deliveries"],
   ["/(console)/deliveries/detail/page", "/deliveries/detail"],
   ["/(console)/confirmation/page", "/confirmation"],

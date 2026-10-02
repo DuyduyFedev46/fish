@@ -1,315 +1,194 @@
 "use client";
 
-import { useEffect, useState } from "react";
+// Quản lý chuyên mục (ED-36 / W3d, F3h): bảng STT · Tên · Mô tả · Đường dẫn · Bài đăng · Trạng thái · Thao tác.
+// Thêm / Sửa: hộp CategoryFormModal. Ngừng dùng: hộp xác nhận; còn bài đang đăng thì BE chặn (BR-ND-02) và hộp nói rõ
+// "Còn N bài…" kèm link xem các bài đó. Kích hoạt lại không cần hỏi. Quyền theo quyền thật add_category / change_category.
+
 import Link from "next/link";
+import { useState } from "react";
+import { useAuth } from "@/features/auth/components/AuthProvider";
+import { ENUMS } from "@/shared/lib/enums";
+import { ApiError, loadErrorText } from "@/shared/lib/http";
+import { useResource } from "@/shared/lib/useResource";
+import { Chip } from "@/shared/ui/Chip";
 import { Icon } from "@/shared/ui/Icon";
-import { Empty } from "@/shared/ui/StateBox";
-import { createCategory, fetchCategories, updateCategory } from "../api";
-import type { ContentCategory, DeactivateCategoryBlockedError } from "../types";
+import { DataTable, type Column } from "@/shared/ui/list/DataTable";
+import { ListPage } from "@/shared/ui/list/ListPage";
+import { ConfirmModal } from "@/shared/ui/overlay/ConfirmModal";
+import { useToast } from "@/shared/ui/overlay/Toast";
+import { NoPermission } from "@/shared/ui/states/NoPermission";
+import { fetchCategories, updateCategory } from "../api";
+import { CONTENT_PERM, blockedDetailsOf, errorText, hasPerm } from "../contentModel";
+import { CONTENT_MSG as M } from "../messages";
+import type { ContentCategory, DeactivateCategoryBlockedDetails } from "../types";
+import { CategoryFormModal } from "./CategoryFormModal";
 import s from "../content.module.css";
 
+type Modal = { kind: "add" } | { kind: "edit"; category: ContentCategory } | { kind: "deactivate"; category: ContentCategory } | null;
+
 export function CategoriesScreen() {
-  const [categories, setCategories] = useState<ContentCategory[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [editCategory, setEditCategory] = useState<ContentCategory | null>(null);
+  const { me } = useAuth();
+  const toast = useToast();
+  const canView = hasPerm(me, CONTENT_PERM.view);
+  const canAdd = hasPerm(me, CONTENT_PERM.addCategory);
+  const canChange = hasPerm(me, CONTENT_PERM.changeCategory);
+  const res = useResource(me && canView ? "content-categories" : null, () => fetchCategories(), 0);
+  const [modal, setModal] = useState<Modal>(null);
+  const [blocked, setBlocked] = useState<DeactivateCategoryBlockedDetails | null>(null);
+  const [busyId, setBusyId] = useState<number | null>(null);
 
-  // Form states
-  const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
-  const [order, setOrder] = useState<number>(0);
-  const [formError, setFormError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
+  if (me && !canView) return <NoPermission />;
+  if (res.error instanceof ApiError && res.error.status === 403) return <NoPermission />;
 
-  // Error modal for BR-ND-02 (deactivate blocked)
-  const [blockedError, setBlockedError] = useState<DeactivateCategoryBlockedError | null>(null);
+  const rows = res.data;
+  const nextOrder = rows && rows.length > 0 ? Math.max(...rows.map((c) => c.order)) + 1 : 1;
+  const close = () => {
+    setModal(null);
+    setBlocked(null);
+  };
 
-  const loadData = async () => {
-    setLoading(true);
+  const activate = async (c: ContentCategory) => {
+    setBusyId(c.id);
     try {
-      const data = await fetchCategories();
-      setCategories(data);
+      await updateCategory(c.id, { is_active: true });
+      toast.success(M.catActivated);
+      await res.reload();
     } catch (err) {
-      console.error("Lỗi tải chuyên mục:", err);
+      toast.error(errorText(err, M.genericFail));
     } finally {
-      setLoading(false);
+      setBusyId(null);
     }
   };
 
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  const openCreate = () => {
-    setName("");
-    setDescription("");
-    setOrder(categories.length > 0 ? Math.max(...categories.map((c) => c.order)) + 1 : 1);
-    setFormError(null);
-    setEditCategory(null);
-    setShowCreateModal(true);
-  };
-
-  const openEdit = (cat: ContentCategory) => {
-    setName(cat.name);
-    setDescription(cat.description);
-    setOrder(cat.order);
-    setFormError(null);
-    setEditCategory(cat);
-    setShowCreateModal(true);
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!name.trim()) {
-      setFormError("Vui lòng nhập tên chuyên mục");
-      return;
-    }
-    setSaving(true);
-    setFormError(null);
-    try {
-      if (editCategory) {
-        await updateCategory(editCategory.id, {
-          name: name.trim(),
-          description: description.trim(),
-          order: Number(order),
-        });
-      } else {
-        await createCategory({
-          name: name.trim(),
-          description: description.trim(),
-          order: Number(order),
-        });
-      }
-      setShowCreateModal(false);
-      await loadData();
-    } catch (err: any) {
-      setFormError(err?.detail || err?.message || "Có lỗi xảy ra khi lưu");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleToggleActive = async (cat: ContentCategory) => {
-    const nextActive = !cat.is_active;
-    try {
-      await updateCategory(cat.id, { is_active: nextActive });
-      await loadData();
-    } catch (err: any) {
-      if (err?.code === "BR-ND-02") {
-        setBlockedError({
-          detail: err.detail || "Không thể ngừng dùng chuyên mục còn bài đăng.",
-          code: err.code,
-          entries: err.entries || [],
-          total: err.total || 0,
-        });
-      } else {
-        alert(err?.detail || "Không thể cập nhật trạng thái");
-      }
-    }
-  };
+  const columns: Column<ContentCategory>[] = [
+    { key: "index", header: M.catColIndex, num: true, width: "64px", hideBelow: 720, render: (r) => r.order },
+    { key: "name", header: M.catColName, render: (r) => <b>{r.name}</b> },
+    { key: "desc", header: M.catColDesc, hideBelow: 980, render: (r) => r.description || <span className="muted">—</span> },
+    { key: "path", header: M.catColPath, mono: true, hideBelow: 800, render: (r) => r.slug },
+    { key: "count", header: M.catColCount, num: true, render: (r) => r.published_count },
+    { key: "status", header: M.catColStatus, render: (r) => <Chip table={ENUMS.categoryActive} value={r.is_active} /> },
+    {
+      key: "actions",
+      header: M.catColActions,
+      width: "220px",
+      render: (r) =>
+        canChange ? (
+          <span className={s.rowActions}>
+            <button type="button" className="btn" onClick={() => setModal({ kind: "edit", category: r })}>
+              {M.catEditRow}
+            </button>
+            {r.is_active ? (
+              <button type="button" className="btn" onClick={() => setModal({ kind: "deactivate", category: r })}>
+                {M.catDeactivate}
+              </button>
+            ) : (
+              <button type="button" className="btn" onClick={() => void activate(r)} disabled={busyId === r.id} aria-busy={busyId === r.id || undefined}>
+                {M.catActivate}
+              </button>
+            )}
+          </span>
+        ) : (
+          <span className="muted">—</span>
+        ),
+    },
+  ];
 
   return (
-    <div className={s.container}>
-      <div className={s.header}>
-        <div className={s.titleGroup}>
-          <Link href="/content/" className="btn" aria-label="Quay lại danh sách bài">
+    <ListPage
+      actions={
+        <>
+          <Link href="/content/" className="btn">
             <Icon name="arrow_back" />
+            <span>{M.catBack}</span>
           </Link>
-          <h1 className={s.title}>Quản lý chuyên mục</h1>
-        </div>
-        <div className={s.actions}>
-          <button type="button" className="btn btn-primary" onClick={openCreate}>
-            <Icon name="add" />
-            <span>Thêm chuyên mục</span>
-          </button>
-        </div>
-      </div>
-
-      {loading ? (
-        <div className="muted" style={{ padding: "32px 0", textAlign: "center" }}>
-          Đang tải dữ liệu...
-        </div>
-      ) : categories.length === 0 ? (
-        <Empty icon="category" title="Chưa có chuyên mục nào">
-          <span>Hãy bấm &quot;Thêm chuyên mục&quot; để tạo chuyên mục đầu tiên.</span>
-        </Empty>
-      ) : (
-        <div className={s.tableWrap}>
-          <table className={s.table}>
-            <thead>
-              <tr>
-                <th style={{ width: 80 }}>Thứ tự</th>
-                <th>Tên chuyên mục</th>
-                <th>Đường dẫn (Slug)</th>
-                <th>Bài đã đăng</th>
-                <th>Trạng thái</th>
-                <th style={{ textAlign: "right" }}>Thao tác</th>
-              </tr>
-            </thead>
-            <tbody>
-              {categories.map((cat) => (
-                <tr key={cat.id}>
-                  <td>
-                    <span className="code">{cat.order}</span>
-                  </td>
-                  <td>
-                    <b>{cat.name}</b>
-                    {cat.description && <div className="muted">{cat.description}</div>}
-                  </td>
-                  <td>
-                    <code className="code">{cat.slug}</code>
-                  </td>
-                  <td>
-                    <span>{cat.published_count} bài</span>
-                  </td>
-                  <td>
-                    {cat.is_active ? (
-                      <span className="status ok">
-                        <span className="dot" aria-hidden="true" />
-                        Đang hoạt động
-                      </span>
-                    ) : (
-                      <span className="status mute">
-                        <span className="dot" aria-hidden="true" />
-                        Ngừng dùng
-                      </span>
-                    )}
-                  </td>
-                  <td style={{ textAlign: "right" }}>
-                    <div className={s.actions} style={{ justifyContent: "flex-end" }}>
-                      <button
-                        type="button"
-                        className="btn"
-                        onClick={() => openEdit(cat)}
-                        aria-label={`Sửa chuyên mục ${cat.name}`}
-                      >
-                        <Icon name="edit" />
-                        <span>Sửa</span>
-                      </button>
-                      <button
-                        type="button"
-                        className="btn"
-                        onClick={() => handleToggleActive(cat)}
-                        aria-label={cat.is_active ? `Ngừng dùng ${cat.name}` : `Kích hoạt ${cat.name}`}
-                      >
-                        <Icon name={cat.is_active ? "block" : "check_circle"} />
-                        <span>{cat.is_active ? "Ngừng dùng" : "Kích hoạt"}</span>
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+          {canAdd && (
+            <button type="button" className="btn primary" onClick={() => setModal({ kind: "add" })}>
+              <Icon name="add" />
+              <span>{M.catAdd}</span>
+            </button>
+          )}
+        </>
+      }
+      asOf={res.asOf}
+      onRetry={() => void res.reload()}
+    >
+      <DataTable
+        canViewCost={false}
+        caption={M.catListTitle}
+        columns={columns}
+        rows={rows ?? null}
+        rowKey={(r) => r.id}
+        loading={res.loading && rows === undefined}
+        error={rows === undefined && res.error != null ? loadErrorText(res.error) : null}
+        onRetry={() => void res.reload()}
+        noun={M.catNoun}
+        dense
+        empty={{
+          icon: "category",
+          title: M.catEmptyTitle,
+          hint: M.catEmptyHint,
+          action: canAdd ? (
+            <button type="button" className="btn primary" onClick={() => setModal({ kind: "add" })}>
+              {M.catAdd}
+            </button>
+          ) : undefined,
+        }}
+      />
+      {(modal?.kind === "add" || modal?.kind === "edit") && (
+        <CategoryFormModal
+          category={modal.kind === "edit" ? modal.category : undefined}
+          nextOrder={nextOrder}
+          onClose={close}
+          onSaved={() => {
+            toast.success(modal.kind === "edit" ? M.catUpdated : M.catCreated);
+            close();
+            void res.reload();
+          }}
+        />
       )}
-
-      {/* Modal Thêm / Sửa chuyên mục */}
-      {showCreateModal && (
-        <div className={s.modalOverlay} role="dialog" aria-modal="true">
-          <form className={s.modal} onSubmit={handleSubmit}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <h2 style={{ margin: 0, fontSize: "1.125rem", fontWeight: 600 }}>
-                {editCategory ? "Sửa chuyên mục" : "Thêm chuyên mục mới"}
-              </h2>
-              <button
-                type="button"
-                className="btn"
-                style={{ padding: 4 }}
-                onClick={() => setShowCreateModal(false)}
-                aria-label="Đóng"
-              >
-                <Icon name="close" />
-              </button>
+      {modal?.kind === "deactivate" && (
+        <ConfirmModal
+          title={M.catDeactivateTitle}
+          confirmLabel={M.catDeactivate}
+          busyLabel={M.catDeactivateBusy}
+          backLabel={M.catCancel}
+          danger
+          noun={M.catNoun}
+          disabled={blocked !== null}
+          run={() => updateCategory(modal.category.id, { is_active: false })}
+          onError={(err) => setBlocked(blockedDetailsOf(err))}
+          errorText={(err) => {
+            const b = blockedDetailsOf(err);
+            return b ? M.catBlocked(b.total) : errorText(err, M.genericFail);
+          }}
+          onReload={() => {
+            close();
+            void res.reload();
+          }}
+          onDone={() => {
+            toast.success(M.catDeactivated);
+            close();
+            void res.reload();
+          }}
+          onClose={close}
+        >
+          <p className={s.confirmBody}>
+            {M.catDeactivateBody}
+          </p>
+          {blocked && (
+            <div className={s.blockedList}>
+              <ul>
+                {blocked.entries.map((e) => (
+                  <li key={e.id}>{e.title || "Chưa đặt tiêu đề"}</li>
+                ))}
+              </ul>
+              <Link href={`/content/?category=${modal.category.id}`} className="inline-link">
+                {M.catSeeEntries(blocked.total)}
+              </Link>
             </div>
-
-            {formError && <div className={s.errorMsg}>{formError}</div>}
-
-            <div className={s.formGroup}>
-              <label htmlFor="cat-name">Tên chuyên mục *</label>
-              <input
-                id="cat-name"
-                className={s.input}
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="VD: Công thức nấu"
-                autoFocus
-              />
-            </div>
-
-            {editCategory && (
-              <div className={s.formGroup}>
-                <label>Đường dẫn tĩnh (Slug - không đổi khi đổi tên)</label>
-                <input className={s.input} type="text" value={editCategory.slug} disabled readOnly />
-              </div>
-            )}
-
-            <div className={s.formGroup}>
-              <label htmlFor="cat-desc">Mô tả ngắn</label>
-              <textarea
-                id="cat-desc"
-                className={s.textarea}
-                rows={2}
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="Mô tả về chuyên mục..."
-              />
-            </div>
-
-            <div className={s.formGroup}>
-              <label htmlFor="cat-order">Thứ tự hiển thị</label>
-              <input
-                id="cat-order"
-                className={s.input}
-                type="number"
-                value={order}
-                onChange={(e) => setOrder(Number(e.target.value))}
-              />
-            </div>
-
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 8 }}>
-              <button type="button" className="btn" onClick={() => setShowCreateModal(false)}>
-                Huỷ
-              </button>
-              <button type="submit" className="btn btn-primary" disabled={saving}>
-                {saving ? "Đang lưu..." : editCategory ? "Cập nhật" : "Tạo mới"}
-              </button>
-            </div>
-          </form>
-        </div>
+          )}
+        </ConfirmModal>
       )}
-
-      {/* Modal báo lỗi ngừng dùng còn bài đã đăng (CMS-02-AC4) */}
-      {blockedError && (
-        <div className={s.modalOverlay} role="dialog" aria-modal="true">
-          <div className={s.modal}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, color: "#dc2626" }}>
-              <Icon name="warning" />
-              <h2 style={{ margin: 0, fontSize: "1.125rem", fontWeight: 600 }}>Không thể ngừng dùng</h2>
-            </div>
-            <p style={{ margin: 0, fontSize: "0.875rem" }}>
-              Chuyên mục còn <b>{blockedError.total} bài</b> đang ở trạng thái <b>Đã đăng</b>. Bạn cần gỡ hoặc
-              chuyển chuyên mục cho các bài viết này trước khi ngừng dùng:
-            </p>
-            <ul style={{ margin: "4px 0", paddingLeft: 20, fontSize: "0.875rem" }}>
-              {blockedError.entries.map((entry) => (
-                <li key={entry.id}>
-                  <b>#{entry.id}</b>: {entry.title}
-                </li>
-              ))}
-              {blockedError.total > blockedError.entries.length && (
-                <li className="muted">... và còn {blockedError.total - blockedError.entries.length} bài khác</li>
-              )}
-            </ul>
-            <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 8 }}>
-              <button type="button" className="btn btn-primary" onClick={() => setBlockedError(null)}>
-                Đã hiểu
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+    </ListPage>
   );
 }

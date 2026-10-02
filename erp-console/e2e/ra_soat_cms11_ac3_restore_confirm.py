@@ -7,6 +7,7 @@ có thay đổi chưa đăng (has_unpublished_changes=true) — chuẩn bị qua
 
 Dùng: python3 erp-console/e2e/ra_soat_cms11_ac3_restore_confirm.py
 """
+import re
 import sys
 from playwright.sync_api import sync_playwright
 
@@ -34,11 +35,17 @@ def main() -> int:
         page.wait_for_load_state("networkidle")
         page.wait_for_timeout(1000)
 
-        history_btn = page.get_by_role("button", name="📜 Lịch sử")
-        if history_btn.count() == 0:
-            print("FAIL: không tìm thấy nút 'Lịch sử' — dừng test.")
+        # Lô 16 (ED-36): "Lịch sử phiên bản" nằm trong menu "…" (nút "Thêm thao tác") của màn soạn bài.
+        more_btn = page.get_by_role("button", name=re.compile("Thêm|Khác|Thao tác")).last
+        if more_btn.count() == 0:
+            print("FAIL: không tìm thấy menu '…' — dừng test.")
             return 1
-        history_btn.click()
+        more_btn.click()
+        history_item = page.get_by_role("menuitem").filter(has_text="Lịch sử phiên bản").first
+        if history_item.count() == 0:
+            print("FAIL: không tìm thấy mục 'Lịch sử phiên bản' — dừng test.")
+            return 1
+        history_item.click()
         page.wait_for_timeout(500)
 
         restore_btn = page.get_by_role("button", name="Khôi phục phiên bản này").first
@@ -46,16 +53,18 @@ def main() -> int:
             print("FAIL: không tìm thấy nút 'Khôi phục phiên bản này' — dừng test (cần >=1 phiên bản).")
             return 1
 
-        dialogs = []
-        page.on("dialog", lambda d: (dialogs.append(d.message), d.dismiss()))
         restore_btn.click()
         page.wait_for_timeout(300)
 
-        if not dialogs:
+        # Hộp xác nhận "Khôi phục phiên bản này?" (ConfirmModal, role=dialog) phải hiện, có câu nêu bản đang soạn sẽ bị thay.
+        confirm = page.get_by_role("dialog").filter(has_text="Khôi phục phiên bản này?")
+        if confirm.count() == 0:
             failures.append("AC3: bấm 'Khôi phục phiên bản này' khi có thay đổi chưa đăng nhưng KHÔNG hỏi xác nhận")
         else:
-            if "Bản đang soạn" not in dialogs[0] and "sẽ" not in dialogs[0].lower():
-                failures.append(f"AC3: nội dung hộp thoại xác nhận không rõ ràng: {dialogs[0]!r}")
+            body = confirm.first.inner_text()
+            if "Bản đang soạn" not in body:
+                failures.append(f"AC3: nội dung hộp xác nhận không rõ ràng: {body!r}")
+            confirm.first.get_by_role("button", name="Quay lại").click()
 
         # Huỷ hộp thoại (đã dismiss ở trên) -> tiêu đề đang soạn KHÔNG bị đổi
         html = page.content()
