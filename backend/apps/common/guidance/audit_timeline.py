@@ -104,6 +104,7 @@ def make_audit_timeline_provider(
     creator_attr: Optional[str] = None,
     no_store: bool = False,
     exclude_actions: frozenset[str] = frozenset(),
+    object_scope_fn: Optional[Callable[[Any, Any], bool]] = None,
 ):
     """
     model         : model của đối tượng; AuditLog đọc theo `model._meta.label` + pk.
@@ -116,6 +117,8 @@ def make_audit_timeline_provider(
     creator_attr  : tên field FK tới User của người tạo (nếu có).
     no_store      : True với đối tượng gắn dữ liệu khách → response gắn `Cache-Control: no-store`.
     exclude_actions: các `AuditLog.action` bỏ khỏi timeline (nhiễu, vd. "logout" của nhân viên).
+    object_scope_fn: `(user, obj) -> bool`, kiểm phạm vi trên TỪNG đối tượng sau khi tra (khi API chi tiết kiểm
+                     phạm vi bằng hàm theo đối tượng, không phải theo queryset). False → 404 như ngoài phạm vi.
     Timeline chỉ lấy `timeline_max_rows()` dòng AuditLog MỚI nhất; thừa thì `timeline_truncated: true`.
     """
 
@@ -138,6 +141,8 @@ def make_audit_timeline_provider(
         if scope_fn is not None:
             qs = scope_fn(user, qs)
         obj = qs.filter(pk=int(raw)).first()
+        if obj is not None and object_scope_fn is not None and not object_scope_fn(user, obj):
+            obj = None
         if obj is None:
             # Thông điệp cố định: không phân biệt "không tồn tại" với "ngoài phạm vi".
             raise Http404(NOT_FOUND_MESSAGE)
