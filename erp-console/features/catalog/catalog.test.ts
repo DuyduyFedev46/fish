@@ -122,6 +122,36 @@ describe("form mặt hàng", () => {
     expect(e.line[2]?.qty).toMatch(/0,001/);
     expect(e.line[3]?.component).toBeTruthy();
   });
+  it("combo: dòng công thức còn trống hoàn toàn coi như chưa có dòng nào (ED-30-AC3)", () => {
+    const base = { ...emptyItemDraft("BUNDLE"), code: "CB", name: "Combo", itemGroup: "6" };
+    // Form luôn có sẵn 1 dòng trống: phải ra câu ở vùng công thức, không báo lỗi dưới dòng trống.
+    const onlyBlank = validateItem(base);
+    expect(onlyBlank.lines).toBe("Thêm ít nhất một mặt hàng vào công thức.");
+    expect(onlyBlank.line).toEqual({});
+    expect(hasItemErrors(onlyBlank)).toBe(true);
+    const manyBlank = validateItem({ ...base, lines: [{ key: 1, component: "", qty: " " }, { key: 2, component: "", qty: "" }] });
+    expect(manyBlank.lines).toBeTruthy();
+    expect(manyBlank.line).toEqual({});
+    // Có một dòng đã điền: hết câu công thức; dòng trống còn lại và dòng điền dở vẫn báo từng dòng.
+    const mixed = validateItem({
+      ...base,
+      lines: [
+        { key: 1, component: "1", qty: "0,5" },
+        { key: 2, component: "", qty: "" },
+        { key: 3, component: "2", qty: "" },
+      ],
+    });
+    expect(mixed.lines).toBeUndefined();
+    expect(mixed.line[1]).toBeUndefined();
+    expect(mixed.line[2]?.component).toBeTruthy();
+    expect(mixed.line[3]?.qty).toBe("Nhập số kg.");
+    // Chỉ nhập kg mà chưa chọn mặt hàng cũng là dòng đã điền.
+    const qtyOnly = validateItem({ ...base, lines: [{ key: 1, component: "", qty: "1" }] });
+    expect(qtyOnly.lines).toBeUndefined();
+    expect(qtyOnly.line[1]?.component).toBe("Chọn mặt hàng.");
+    // Mặt hàng thường không có công thức nên không bao giờ có lỗi công thức.
+    expect(validateItem({ ...emptyItemDraft("SIMPLE"), code: "A", name: "A", itemGroup: "1" }).lines).toBeUndefined();
+  });
   it("thân gửi: tên cắt khoảng trắng, đơn vị Kg, định mức 3 chữ số thập phân", () => {
     const d = { ...emptyItemDraft("SIMPLE"), code: " CA-A ", name: " Cá A ", itemGroup: "3" };
     expect(itemInputOf(d)).toMatchObject({ code: "CA-A", name: "Cá A", item_group: 3, stock_uom: "Kg", item_type: "SIMPLE" });

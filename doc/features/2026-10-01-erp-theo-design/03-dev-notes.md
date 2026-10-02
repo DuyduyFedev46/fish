@@ -2158,3 +2158,9 @@ Làm trong `erp-console/`, không đụng `backend/`, `features/accounting/**`, 
 - Bảng dùng `dense` (cố định bố cục): đã đặt độ rộng cho cột Mặt hàng, Mã hàng, Giá niêm yết, Trạng thái, Ảnh để tên và giá không bị cắt. Ở 360px bảng cuộn ngang trong thẻ, trang không cuộn.
 - Chưa có sửa/xoá dòng giá và chưa có chọn bảng giá (chờ BE).
 - Chưa push, chưa deploy.
+
+**Sửa B13-1 (QA, Medium, ED-30-AC3) — 02/10.**
+- Nguyên nhân: form combo luôn có sẵn 1 dòng công thức trống và không xoá được dòng cuối, nên `validateItem` không bao giờ thấy "công thức rỗng". `ItemForm.tsx` thực ra đã render `errs.lines` từ đầu; lỗi nằm ở logic kiểm tra, không ở chỗ hiển thị.
+- Sửa `features/catalog/catalogModel.ts` (`validateItem`): dòng nào chưa chọn mặt hàng và chưa nhập kg thì coi như chưa có. Nếu không dòng nào đã điền thì chỉ báo "Thêm ít nhất một mặt hàng vào công thức." ở vùng Thành phần combo, không báo "Chọn mặt hàng." / "Nhập số kg." dưới dòng trống. Có ít nhất một dòng đã điền thì kiểm từng dòng như cũ (dòng điền dở, trùng, kg dưới 0,001; dòng trống còn lại vẫn báo từng dòng).
+- Test: `catalog.test.ts` thêm 1 ca (chỉ dòng trống, nhiều dòng trống, dòng trống lẫn dòng đã điền, chỉ nhập kg, mặt hàng thường). `ed_batch13_catalog.py` thêm 4 kiểm tra (câu AC3 hiện, không báo dưới dòng trống, ở lại form, dòng có mặt hàng thiếu kg vẫn báo "Nhập số kg."), đổi kiểm tra cũ "chưa chọn thành phần → Chọn mặt hàng." cho đúng hành vi mới. Ảnh `lo13-loc-4f-combo-cong-thuc-trong`.
+- Kiểm chứng lại: `tsc` sạch; vitest 69 file, 795 ca đạt; build mock=0 sạch, `check-no-mock` và `check-ai-chunks` XANH; build mock=1 sao `out/` sang thư mục riêng, phục vụ cổng 3701: `ed_batch13_catalog` 128/128 PASS, `ed_batch1_shell` 56/56 PASS; `check_naming` không phát sinh mới.

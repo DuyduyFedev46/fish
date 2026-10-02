@@ -292,7 +292,15 @@ def run_owner(browser, errors):
     page.get_by_label(re.compile("^Tên mặt hàng")).fill("Combo nhậu")
     page.get_by_label(re.compile("^Nhóm hàng")).select_option(label="Combo")
     page.get_by_role("button", name="Lưu combo").click()
-    ok("Thêm combo: chưa chọn thành phần → báo lỗi, không tạo", page.get_by_text("Chọn mặt hàng.").count() >= 1 and "/catalog/new" in page.url)
+    # B13-1 (ED-30-AC3): dòng công thức còn trống hoàn toàn = chưa có dòng nào → báo ở vùng công thức, không báo dưới dòng trống.
+    ok("Thêm combo: công thức còn trống → hiện 'Thêm ít nhất một mặt hàng vào công thức.'", page.get_by_text("Thêm ít nhất một mặt hàng vào công thức.").count() == 1)
+    ok("Thêm combo: công thức trống → không báo 'Chọn mặt hàng.' / 'Nhập số kg.' dưới dòng trống", page.get_by_text("Chọn mặt hàng.").count() == 0 and page.get_by_text("Nhập số kg.").count() == 0)
+    ok("Thêm combo: công thức trống → ở lại form, không tạo", "/catalog/new" in page.url and page.get_by_role("button", name="Lưu combo").count() == 1)
+    page.screenshot(path=f"{SHOTS}/lo13-loc-4f-combo-cong-thuc-trong.png", full_page=True)
+    # Dòng đã chọn mặt hàng mà chưa nhập kg thì vẫn báo từng dòng như cũ.
+    page.get_by_label(re.compile("^Thành phần")).first.select_option(label="Mực ống")
+    page.get_by_role("button", name="Lưu combo").click()
+    ok("Thêm combo: có mặt hàng, thiếu số kg → 'Nhập số kg.' dưới dòng, không còn câu công thức", page.get_by_text("Nhập số kg.").count() == 1 and page.get_by_text("Thêm ít nhất một mặt hàng vào công thức.").count() == 0 and "/catalog/new" in page.url)
     page.get_by_label(re.compile("^Thành phần")).first.select_option(label="Mực ống")
     page.get_by_label(re.compile("^Số kg mỗi combo")).first.fill("0.5")
     page.get_by_role("button", name="Thêm thành phần").click()

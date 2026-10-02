@@ -148,9 +148,11 @@ export function validateItem(draft: ItemDraft): ItemErrors {
   if (!/^\d{1,5}$/.test(draft.shelfLife.trim())) e.shelfLife = M.shelfLifeInvalid;
   if (draft.description.length > ITEM_LIMITS.description) e.description = M.descriptionTooLong;
   if (draft.itemType === "BUNDLE") {
-    if (draft.lines.length === 0) e.lines = M.linesRequired;
+    // Dòng còn trống hoàn toàn (chưa chọn mặt hàng, chưa nhập kg) coi như chưa có dòng nào (ED-30-AC3, QA B13-1).
+    const filledLines = draft.lines.filter((l) => l.component || l.qty.trim());
+    if (filledLines.length === 0) e.lines = M.linesRequired;
     const seen = new Set<string>();
-    for (const line of draft.lines) {
+    for (const line of e.lines ? [] : draft.lines) {
       const le: { component?: string; qty?: string } = {};
       if (!line.component) le.component = M.lineComponentRequired;
       else if (seen.has(line.component)) le.component = M.lineComponentDuplicate;
