@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { canView, PERM, visibleNav, type Viewer } from "@/shared/lib/nav";
 import { ROLE } from "@/shared/lib/roles";
 import { clearDraft, loadDraft, saveDraft } from "@/shared/lib/drafts";
+import { warningsOf } from "./contentModel";
 import {
   mockCreateCategory,
   mockCreateEntry,
@@ -168,16 +169,12 @@ describe("CMS-01 & CMS-02 Console Tests", () => {
     });
 
     it("CMS-03-AC9: Xoá bài đã từng đăng -> từ chối lỗi BR-ND-02", () => {
-      const entry = mockCreateEntry({
-        kind: "post",
-        title: "Bài đã từng đăng",
-      });
-      // Giả lập bài đã từng xuất bản
-      entry.published_version = 1;
-      entry.first_published_at = new Date().toISOString();
+      // Dùng bài đã đăng có sẵn trong dữ liệu mẫu (mockCreateEntry trả bản sao nên không sửa trực tiếp được).
+      const published = mockListEntries({ status: "published" }).results[0];
+      expect(published).toBeDefined();
 
       expect(() => {
-        mockDeleteEntry(entry.id);
+        mockDeleteEntry(published.id);
       }).toThrowError(/BR-ND-02/);
     });
 
@@ -255,9 +252,11 @@ describe("CMS-01 & CMS-02 Console Tests", () => {
         expect.unreachable("Phải ném lỗi CONTENT_WARNINGS");
       } catch (err: any) {
         expect(err.code).toBe("CONTENT_WARNINGS");
-        expect(err.warnings.length).toBeGreaterThan(0);
-        expect(err.warnings.some((w: any) => w.type === "phone_like")).toBe(true);
-        expect(err.warnings.some((w: any) => w.type === "cost_keyword")).toBe(true);
+        // BE đặt danh sách cảnh báo ở `details.warnings`, không ở chính đối tượng lỗi.
+        const warnings = warningsOf(err);
+        expect(warnings.length).toBeGreaterThan(0);
+        expect(warnings.some((w) => w.type === "phone_like")).toBe(true);
+        expect(warnings.some((w) => w.type === "cost_keyword")).toBe(true);
       }
 
       // 3. Publish với acknowledge_warnings=true -> Thành công 200, status=published, slug_locked=true

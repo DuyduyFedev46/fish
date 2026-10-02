@@ -205,12 +205,185 @@ let MOCK_VERSIONS_DB = new Map<number, ContentEntryVersionDetail[]>([
 ]);
 
 
+// ---- Dữ liệu mẫu cho các màn Nội dung (ED-35, ED-36): đủ 4 trạng thái, bài AI, trang bắt buộc, bài có thay đổi chưa đăng.
+// Toàn chữ giả, không có dữ liệu khách. Ảnh mẫu là hình SVG nhúng sẵn (không gọi mạng).
+MOCK_CATEGORIES.push({
+  id: 4,
+  name: "Câu chuyện vựa",
+  slug: "cau-chuyen-vua",
+  description: "Chuyện nghề, chuyện cảng cá",
+  order: 4,
+  is_active: true,
+  published_count: 0,
+});
+
+function sampleImage(id: number, alt: string): ContentImage {
+  const svg = encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" width="640" height="480"><rect width="640" height="480" fill="#d7e6f2"/><circle cx="320" cy="240" r="80" fill="#8fb4d1"/></svg>'
+  );
+  const url = `data:image/svg+xml;utf8,${svg}`;
+  return { id, alt, width: 640, height: 480, urls: { sm: url, md: url, lg: url } };
+}
+
+function paragraphs(...texts: string[]): BodyDoc {
+  return { type: "doc", blocks: texts.map((t) => ({ type: "paragraph" as const, children: [{ text: t }] })) };
+}
+
+type SeedInput = {
+  id: number;
+  kind: "post" | "page";
+  status: ContentEntryDetail["status"];
+  title: string;
+  slug: string;
+  category: number | null;
+  excerpt?: string;
+  body?: BodyDoc;
+  source?: "human" | "ai";
+  pageRole?: ContentEntryDetail["page_role"];
+  coverAlt?: string | null;
+  published?: boolean;
+  hasChanges?: boolean;
+  returnReason?: string;
+  minutesAgo: number;
+};
+
+function addSeed(x: SeedInput): void {
+  const at = new Date(Date.now() - x.minutesAgo * 60000).toISOString();
+  const images = x.coverAlt !== undefined && x.coverAlt !== null ? [sampleImage(8000 + x.id, x.coverAlt)] : [];
+  const published = !!x.published;
+  const detail: ContentEntryDetail = {
+    id: x.id,
+    kind: x.kind,
+    status: x.status,
+    title: x.title,
+    slug: x.slug,
+    slug_locked: published,
+    category: x.category,
+    excerpt: x.excerpt ?? "",
+    seo_title: "",
+    seo_description: "",
+    cover_image: images.length ? images[0].id : null,
+    body: x.body ?? paragraphs("Nội dung mẫu của bài."),
+    images,
+    has_unpublished_changes: !!x.hasChanges,
+    published_version: published ? 1 : null,
+    first_published_at: published ? at : null,
+    last_published_at: published ? at : null,
+    restored_from: null,
+    return_reason: x.returnReason ?? "",
+    page_role: x.pageRole ?? null,
+    required_for_golive: !!x.pageRole,
+    show_in_footer: x.kind === "page",
+    footer_order: x.kind === "page" ? x.id : 0,
+    public_url: published ? (x.kind === "post" ? `/bai-viet?slug=${x.slug}` : `/trang?slug=${x.slug}`) : null,
+    source: x.source ?? "human",
+    row_version: published ? 2 : 1,
+    updated_at: at,
+  };
+  if (published) {
+    (detail as unknown as { _published_snapshot: unknown })._published_snapshot = {
+      title: detail.title,
+      slug: detail.slug,
+      category: detail.category,
+      excerpt: detail.excerpt,
+      seo_title: "",
+      seo_description: "",
+      cover_image: detail.cover_image,
+      body: JSON.parse(JSON.stringify(detail.body)),
+    };
+    MOCK_VERSIONS_DB.set(x.id, [
+      {
+        version: 1,
+        published_at: at,
+        published_by_name: "Chủ vựa (mẫu)",
+        kind: x.kind,
+        title: x.title,
+        slug: x.slug,
+        excerpt: detail.excerpt,
+        seo_title: "",
+        seo_description: "",
+        description: detail.excerpt,
+        category: x.category,
+        cover_image: detail.cover_image,
+        body: JSON.parse(JSON.stringify(detail.body)),
+        restored_from: null,
+      },
+    ]);
+  }
+  MOCK_ENTRY_DETAILS.set(x.id, detail);
+  MOCK_ENTRIES.push({
+    id: x.id,
+    kind: x.kind,
+    status: x.status,
+    title: x.title,
+    slug: x.slug,
+    category: x.category,
+    has_unpublished_changes: !!x.hasChanges,
+    updated_at: at,
+    source: detail.source,
+    page_role: detail.page_role,
+  });
+}
+
+addSeed({ id: 43, kind: "post", status: "pending_review", title: "Cá thu một nắng chiên giòn", slug: "ca-thu-mot-nang-chien-gion", category: 1, excerpt: "Cá thu phơi một nắng, chiên giòn ăn với cơm nóng.", coverAlt: "Đĩa cá thu một nắng chiên vàng", body: paragraphs("Chọn cá thu tươi, phơi một nắng rồi chiên lửa vừa.", "Ăn kèm rau sống và nước mắm gừng."), minutesAgo: 25 });
+addSeed({ id: 44, kind: "post", status: "draft", title: "Gợi ý 5 món từ cá bớp", slug: "goi-y-5-mon-tu-ca-bop", category: 1, source: "ai", body: paragraphs("Cá bớp nấu canh chua, kho tiêu, nướng, chiên và hấp."), minutesAgo: 90 });
+addSeed({ id: 45, kind: "page", status: "draft", title: "Đổi trả và hoàn tiền", slug: "doi-tra-va-hoan-tien", category: null, pageRole: "refund", body: paragraphs("Nội dung mẫu: quy định đổi trả hàng tươi sống trong ngày."), minutesAgo: 180 });
+addSeed({ id: 46, kind: "post", status: "published", title: "Bảo quản tôm sú trong tủ đông", slug: "bao-quan-tom-su-trong-tu-dong", category: 2, excerpt: "Cách cấp đông tôm sú giữ độ ngọt.", coverAlt: "Tôm sú xếp khay", source: "ai", published: true, hasChanges: true, minutesAgo: 300 });
+addSeed({ id: 47, kind: "page", status: "published", title: "Thông tin người bán", slug: "thong-tin-nguoi-ban", category: null, pageRole: "seller_info", published: true, excerpt: "Thông tin giới thiệu vựa.", body: paragraphs("Nội dung mẫu: giới thiệu vựa cá."), minutesAgo: 600 });
+addSeed({ id: 48, kind: "post", status: "published", title: "Mực lá nướng muối ớt", slug: "muc-la-nuong-muoi-ot", category: 1, excerpt: "Mực lá nướng muối ớt, chấm muối tiêu chanh.", coverAlt: "Mực lá nướng trên than", published: true, minutesAgo: 900 });
+addSeed({ id: 49, kind: "post", status: "unpublished", title: "Cá ngừ đại dương mùa lặn biển", slug: "ca-ngu-dai-duong-mua-lan-bien", category: 2, excerpt: "Cá ngừ đại dương về cảng theo mùa.", coverAlt: "Cá ngừ trên bàn cân", published: true, returnReason: "out_of_season", minutesAgo: 1500 });
+
+function publishedInCategory(id: number): ContentEntryListItem[] {
+  return MOCK_ENTRIES.filter((e) => e.category === id && e.status === "published");
+}
+
+// ---- Chế độ giả lập lỗi để kiểm các trạng thái màn hình (chỉ có ở bản build mock, check-no-mock gỡ khỏi bản thật) ----
+//   window.__caveMock.content("ok" | "fail" | "empty" | "forbidden")  — lưu ở localStorage, giữ qua tải lại; không chứa dữ liệu cá nhân.
+//   window.__caveMock.contentBump(id)  — tăng row_version của bài như thể người khác vừa sửa (kiểm xung đột phiên bản).
+type ContentMode = "ok" | "fail" | "empty" | "forbidden";
+const CONTENT_MODE_KEY = "cave_erp_mock_content_mode";
+
+function contentMode(): ContentMode {
+  try {
+    const v = typeof window === "undefined" ? null : window.localStorage.getItem(CONTENT_MODE_KEY);
+    return v === "fail" || v === "empty" || v === "forbidden" ? v : "ok";
+  } catch {
+    return "ok";
+  }
+}
+
+function assertContentReadable(): void {
+  const m = contentMode();
+  if (m === "fail") throw new ApiError("Máy chủ gặp lỗi.", 500);
+  if (m === "forbidden") throw new ApiError("Bạn không có quyền xem nội dung.", 403, "FORBIDDEN");
+}
+
+/** Bản sao độc lập (ảnh, thân bài) để màn đổi state không làm đổi kho mock qua tham chiếu chung. */
+function snapshotOf(e: ContentEntryDetail): ContentEntryDetail {
+  return { ...e, images: (e.images ?? []).map((i) => ({ ...i })), body: { ...e.body, blocks: [...e.body.blocks] } };
+}
+
+function withCount(c: ContentCategory): ContentCategory {
+  return { ...c, published_count: publishedInCategory(c.id).length };
+}
+
+function assertCategoryNameFree(name: string, exceptId?: number): void {
+  const lower = name.trim().toLowerCase();
+  if (MOCK_CATEGORIES.some((c) => c.id !== exceptId && c.name.trim().toLowerCase() === lower)) {
+    throw new ApiError(`Chuyên mục '${name.trim()}' đã tồn tại (BR-ND-04).`, 400, "BR-ND-04");
+  }
+}
+
 export function mockListCategories(): ContentCategory[] {
-  return [...MOCK_CATEGORIES].sort((a, b) => a.order - b.order || a.id - b.id);
+  assertContentReadable();
+  if (contentMode() === "empty") return [];
+  return MOCK_CATEGORIES.map(withCount).sort((a, b) => a.order - b.order || a.id - b.id);
 }
 
 export function mockCreateCategory(payload: CategoryCreatePayload): ContentCategory {
   const name = payload.name.trim();
+  if (!name) throw new ApiError("Tên chuyên mục không được để trống.", 400, "BR-ND-04");
+  assertCategoryNameFree(name);
   const slug = name
     .toLowerCase()
     .normalize("NFD")
@@ -230,7 +403,7 @@ export function mockCreateCategory(payload: CategoryCreatePayload): ContentCateg
     published_count: 0,
   };
   MOCK_CATEGORIES.push(newCat);
-  return newCat;
+  return withCount(newCat);
 }
 
 export function mockUpdateCategory(
@@ -240,12 +413,26 @@ export function mockUpdateCategory(
   const cat = MOCK_CATEGORIES.find((c) => c.id === id);
   if (!cat) throw new ApiError("Category not found", 404, "NOT_FOUND");
 
+  if (payload.name !== undefined) {
+    if (!payload.name.trim()) throw new ApiError("Tên chuyên mục không được để trống.", 400, "BR-ND-04");
+    assertCategoryNameFree(payload.name, id);
+  }
+  if (payload.is_active === false && cat.is_active) {
+    const live = publishedInCategory(id);
+    if (live.length > 0) {
+      throw new ApiError(`Chuyên mục còn ${live.length} bài đang đăng, không thể ngừng dùng (BR-ND-02).`, 400, "BR-ND-02", {
+        entries: live.slice(0, 5).map((e) => ({ id: e.id, title: e.title })),
+        total: live.length,
+      });
+    }
+  }
+
   if (payload.name !== undefined) cat.name = payload.name.trim();
   if (payload.description !== undefined) cat.description = payload.description.trim();
   if (payload.order !== undefined) cat.order = payload.order;
   if (payload.is_active !== undefined) cat.is_active = payload.is_active;
 
-  return { ...cat };
+  return withCount(cat);
 }
 
 export function mockListEntries(params?: {
@@ -253,8 +440,9 @@ export function mockListEntries(params?: {
   kind?: string;
   category?: number;
   page?: number;
-}): { count: number; results: ContentEntryListItem[] } {
-  let list = [...MOCK_ENTRIES];
+}): { count: number; next: string | null; previous: string | null; results: ContentEntryListItem[] } {
+  assertContentReadable();
+  let list = contentMode() === "empty" ? [] : [...MOCK_ENTRIES];
   if (params?.status) {
     list = list.filter((e) => e.status === params.status);
   }
@@ -264,13 +452,18 @@ export function mockListEntries(params?: {
   if (params?.category) {
     list = list.filter((e) => e.category === params.category);
   }
+  list.sort((x, y) => (x.updated_at < y.updated_at ? 1 : x.updated_at > y.updated_at ? -1 : y.id - x.id));
   return {
     count: list.length,
-    results: list,
+    next: null,
+    previous: null,
+    results: list.map((e) => ({ ...e })),
   };
 }
 
 export function mockGetEntryCounts(): ContentCounts {
+  assertContentReadable();
+  if (contentMode() === "empty") return { draft: 0, pending_review: 0, published: 0, unpublished: 0 };
   return {
     draft: MOCK_ENTRIES.filter((e) => e.status === "draft").length,
     pending_review: MOCK_ENTRIES.filter((e) => e.status === "pending_review").length,
@@ -280,9 +473,18 @@ export function mockGetEntryCounts(): ContentCounts {
 }
 
 export function mockGetEntry(id: number): ContentEntryDetail {
+  assertContentReadable();
   const entry = MOCK_ENTRY_DETAILS.get(id);
   if (!entry) throw new ApiError("Không tìm thấy bài viết.", 404, "NOT_FOUND");
-  return { ...entry, body: { ...entry.body, blocks: [...entry.body.blocks] } };
+  return snapshotOf(entry);
+}
+
+function assertSlugFree(slug: string, exceptId?: number): void {
+  const taken = Array.from(MOCK_ENTRY_DETAILS.values()).some((e) => e.id !== exceptId && e.slug === slug);
+  if (!taken) return;
+  let n = 2;
+  while (Array.from(MOCK_ENTRY_DETAILS.values()).some((e) => e.slug === `${slug}-${n}`)) n += 1;
+  throw new ApiError("Đường dẫn bài viết đã tồn tại (BR-ND-04).", 400, "BR-ND-04", { suggestion: `${slug}-${n}` });
 }
 
 export function mockCreateEntry(payload: EntryCreatePayload): ContentEntryDetail {
@@ -301,11 +503,7 @@ export function mockCreateEntry(payload: EntryCreatePayload): ContentEntryDetail
   if (!slug) slug = `bai-${id}`;
 
   // Kiểm tra trùng slug
-  for (const item of Array.from(MOCK_ENTRY_DETAILS.values())) {
-    if (item.slug === slug) {
-      throw new ApiError("Đường dẫn bài viết đã tồn tại (BR-ND-04).", 400, "BR-ND-04");
-    }
-  }
+  assertSlugFree(slug);
 
   const detail: ContentEntryDetail = {
     id,
@@ -351,7 +549,7 @@ export function mockCreateEntry(payload: EntryCreatePayload): ContentEntryDetail
     page_role: null,
   });
 
-  return detail;
+  return snapshotOf(detail);
 }
 
 export function mockUpdateEntry(id: number, payload: EntryUpdatePayload): ContentEntryDetail {
@@ -368,6 +566,7 @@ export function mockUpdateEntry(id: number, payload: EntryUpdatePayload): Conten
     if (entry.slug_locked && newSlug !== entry.slug) {
       throw new ApiError("Không thể đổi đường dẫn bài đã đăng (BR-ND-04).", 400, "BR-ND-04");
     }
+    if (newSlug !== entry.slug) assertSlugFree(newSlug, id);
     entry.slug = newSlug;
   }
   if (payload.category !== undefined) entry.category = payload.category;
@@ -399,7 +598,7 @@ export function mockUpdateEntry(id: number, payload: EntryUpdatePayload): Conten
     }
   }
 
-  return { ...entry };
+  return snapshotOf(entry);
 }
 
 export function mockDeleteEntry(id: number): void {
@@ -473,14 +672,14 @@ export function mockPublishEntry(
   if (!entry.title?.trim()) missing.push("title");
   if (!entry.body?.blocks?.length) missing.push("body");
   if (entry.kind === "post") {
-    if (!entry.category) missing.push("category");
-    if (!entry.excerpt?.trim()) missing.push("excerpt");
+    const cat = MOCK_CATEGORIES.find((c) => c.id === entry.category);
+    if (!cat || !cat.is_active) missing.push("category");
     if (!entry.cover_image) missing.push("cover_image");
+    else if (!entry.images.find((i) => i.id === entry.cover_image)?.alt.trim()) missing.push("cover_image_alt");
   }
+  if (!entry.excerpt?.trim() && !entry.seo_description?.trim()) missing.push("description");
   if (missing.length > 0) {
-    const err = new ApiError("Bài viết chưa đủ điều kiện xuất bản (BR-ND-03).", 400, "BR-ND-03");
-    (err as any).missing = missing;
-    throw err;
+    throw new ApiError("Bài viết chưa đủ điều kiện xuất bản (BR-ND-03).", 400, "BR-ND-03", { missing });
   }
 
   if (payload.checklist_confirmed !== true) {
@@ -493,8 +692,9 @@ export function mockPublishEntry(
 
   // Quét cảnh báo đơn giản cho mock: nếu bài chứa SĐT hoặc từ giá vốn
   const bodyText = JSON.stringify(entry.body);
+  const lowerBody = bodyText.toLowerCase();
   const warnings: ContentWarning[] = [];
-  if (bodyText.includes("0912") || bodyText.includes("giá mua") || bodyText.includes("giá vốn")) {
+  if (bodyText.includes("0912") || lowerBody.includes("giá mua") || lowerBody.includes("giá vốn")) {
     if (bodyText.includes("0912")) {
       warnings.push({
         type: "phone_like",
@@ -502,7 +702,7 @@ export function mockPublishEntry(
         snippet: "…vui lòng gọi 09xx xxx 678 để…",
       });
     }
-    if (bodyText.includes("giá mua") || bodyText.includes("giá vốn")) {
+    if (lowerBody.includes("giá mua") || lowerBody.includes("giá vốn")) {
       warnings.push({
         type: "cost_keyword",
         field: "body",
@@ -512,13 +712,7 @@ export function mockPublishEntry(
   }
 
   if (warnings.length > 0 && payload.acknowledge_warnings !== true) {
-    const err = new ApiError(
-      "Phát hiện cảnh báo trước khi xuất bản (CONTENT_WARNINGS).",
-      409,
-      "CONTENT_WARNINGS"
-    );
-    (err as any).warnings = warnings;
-    throw err;
+    throw new ApiError("Phát hiện cảnh báo trước khi xuất bản (CONTENT_WARNINGS).", 409, "CONTENT_WARNINGS", { warnings });
   }
 
   const now = new Date().toISOString();
@@ -630,7 +824,7 @@ export function mockUnpublishEntry(
     listItem.updated_at = entry.updated_at;
   }
 
-  return { ...entry };
+  return snapshotOf(entry);
 }
 
 export function mockDiscardChanges(
@@ -681,7 +875,7 @@ export function mockDiscardChanges(
     listItem.updated_at = entry.updated_at;
   }
 
-  return { ...entry };
+  return snapshotOf(entry);
 }
 
 export function mockGetGoliveStatus(): GoliveStatusResponse {
@@ -840,6 +1034,22 @@ export function mockRestoreEntryVersion(
     listItem.updated_at = entry.updated_at;
   }
 
-  return { ...entry };
+  return snapshotOf(entry);
 }
 
+
+if (process.env.NEXT_PUBLIC_USE_MOCK === "1" && typeof window !== "undefined") {
+  const w = window as unknown as { __caveMock?: Record<string, unknown> };
+  w.__caveMock = {
+    ...(w.__caveMock || {}),
+    content: (m: ContentMode) => {
+      window.localStorage.setItem(CONTENT_MODE_KEY, m);
+      return `Chế độ mock nội dung: ${m}`;
+    },
+    contentBump: (id: number) => {
+      const e = MOCK_ENTRY_DETAILS.get(id);
+      if (e) e.row_version += 1;
+      return e ? e.row_version : null;
+    },
+  };
+}

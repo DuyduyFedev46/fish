@@ -1,10 +1,24 @@
 "use client";
 
-import React, { useRef, useState } from "react";
-import type { ContentImage } from "../types";
-import { uploadEntryImage } from "../api";
+// Ảnh trong bài (ED-35): tải ảnh lên (camera / thư viện), chèn vào bài, đặt ảnh bìa, sửa mô tả ảnh.
+// Sửa mô tả dùng hộp thoại chung (không dùng prompt/alert của trình duyệt). Chỉ chữ tiếng Việt thường, không mã luật.
+
+import React, { useId, useRef, useState } from "react";
 import { ApiError } from "@/shared/lib/http";
+import { Field } from "@/shared/ui/form/Field";
+import { FormAlert } from "@/shared/ui/form/FormAlert";
+import { primaryLabel, useSubmit } from "@/shared/ui/form/useSubmit";
+import { Icon } from "@/shared/ui/Icon";
+import { Modal } from "@/shared/ui/overlay/Modal";
+import { uploadEntryImage } from "../api";
+import { errorText } from "../contentModel";
+import { CONTENT_MSG as M } from "../messages";
+import type { ContentImage } from "../types";
 import s from "./ImageUploader.module.css";
+
+const MAX_IMAGES = 20;
+const MAX_BYTES = 10 * 1024 * 1024;
+const ALT_MAX = 200;
 
 export interface ImageUploaderProps {
   entryId: number | null;
@@ -16,6 +30,52 @@ export interface ImageUploaderProps {
   onUpdateAlt: (imageId: number, newAlt: string) => Promise<void>;
   defaultAlt?: string;
   disabled?: boolean;
+}
+
+function AltModal({ image, onSave, onClose }: { image: ContentImage; onSave: (alt: string) => Promise<void>; onClose: () => void }) {
+  const formId = useId();
+  const [alt, setAlt] = useState(image.alt);
+  const sub = useSubmit(
+    async () => {
+      try {
+        await onSave(alt.trim());
+      } catch (err) {
+        throw new Error(errorText(err, M.genericFail));
+      }
+    },
+    { onSuccess: onClose },
+  );
+  return (
+    <Modal
+      title={M.imgAltTitle}
+      onClose={onClose}
+      busy={sub.submitting}
+      size="sm"
+      footer={
+        <>
+          <button type="button" className="btn" onClick={onClose} disabled={sub.submitting}>
+            {M.catCancel}
+          </button>
+          <button type="submit" form={formId} className="btn primary" disabled={sub.submitting} aria-busy={sub.submitting || undefined}>
+            {sub.submitting ? M.catBusy : primaryLabel(M.imgAltSave, sub.failed)}
+          </button>
+        </>
+      }
+    >
+      <form
+        id={formId}
+        noValidate
+        className={s.altForm}
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (!sub.submitting) void sub.submit();
+        }}
+      >
+        {sub.error && <FormAlert>{sub.error}</FormAlert>}
+        <Field as="textarea" label={M.imgAltField} value={alt} onChange={setAlt} maxLength={ALT_MAX} counter rows={3} autoFocus />
+      </form>
+    </Modal>
+  );
 }
 
 export default function ImageUploader({
@@ -33,11 +93,12 @@ export default function ImageUploader({
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [editing, setEditing] = useState<ContentImage | null>(null);
 
   const handleTriggerUpload = () => {
     if (disabled || uploading) return;
     if (!entryId) {
-      setError("Vui lòng lưu nháp bài viết trước khi tải ảnh.");
+      setError(M.imgSaveFirst);
       return;
     }
     setError(null);
@@ -47,165 +108,105 @@ export default function ImageUploader({
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
-    // Reset input để có thể chọn lại cùng file nếu muốn
-    e.target.value = "";
-
+    e.target.value = ""; // cho phép chọn lại đúng file đó
     if (!entryId) {
-      setError("Vui lòng lưu nháp bài viết trước khi tải ảnh.");
+      setError(M.imgSaveFirst);
       return;
     }
-
-    if (images.length >= 20) {
-      setError("Bài viết đã có tối đa 20 ảnh (BR-ND-07).");
+    if (images.length >= MAX_IMAGES) {
+      setError("Bài đã có tối đa 20 ảnh. Xoá bớt ảnh trước khi tải thêm.");
       return;
     }
-
-    // Kiểm tra định dạng cơ bản trên client
-    const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
-    if (!allowedTypes.includes(file.type)) {
-      setError("Định dạng ảnh không hợp lệ. Chỉ chấp nhận JPG, PNG, WebP (BR-DM-10).");
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+      setError("Chỉ nhận ảnh JPG, PNG hoặc WebP.");
       return;
     }
-
-    if (file.size > 10 * 1024 * 1024) {
-      setError("Dung lượng ảnh vượt quá giới hạn 10MB (BR-DM-10).");
+    if (file.size > MAX_BYTES) {
+      setError("Ảnh nặng quá 10 MB. Chọn ảnh nhẹ hơn.");
       return;
     }
-
     setUploading(true);
     setProgress(0);
     setError(null);
-
     try {
-      const alt = defaultAlt ? defaultAlt.trim().slice(0, 200) : undefined;
-      const uploaded = await uploadEntryImage(entryId, file, alt, (pct) => {
-        setProgress(pct);
-      });
+      const alt = defaultAlt ? defaultAlt.trim().slice(0, ALT_MAX) : undefined;
+      const uploaded = await uploadEntryImage(entryId, file, alt, (pct) => setProgress(pct));
       onImageUploaded(uploaded);
     } catch (err) {
-      if (err instanceof ApiError) {
-        setError(err.message || "Tải ảnh lỗi, thử lại");
-      } else {
-        setError("Tải ảnh lỗi, thử lại");
-      }
+      setError(err instanceof ApiError ? errorText(err, "Chưa tải được ảnh. Bấm thử lại.") : "Chưa tải được ảnh. Bấm thử lại.");
     } finally {
       setUploading(false);
       setProgress(0);
     }
   };
 
-  const handleEditAlt = async (img: ContentImage) => {
-    const newAlt = window.prompt("Nhập mô tả ảnh (alt):", img.alt);
-    if (newAlt === null) return;
-    if (newAlt.length > 200) {
-      alert("Mô tả ảnh tối đa 200 ký tự.");
-      return;
-    }
-    try {
-      await onUpdateAlt(img.id, newAlt);
-    } catch (err) {
-      alert(err instanceof Error ? err.message : "Cập nhật mô tả ảnh thất bại.");
-    }
-  };
-
-  const isMaxReached = images.length >= 20;
+  const isMaxReached = images.length >= MAX_IMAGES;
 
   return (
-    <div className={s.container}>
+    <section className={s.container} aria-label={M.imagesInPost}>
       <div className={s.header}>
-        <h3 className={s.title}>Ảnh trong bài</h3>
+        <h3 className={s.title}>{M.imagesInPost}</h3>
         <span className={s.count}>
-          {images.length}/20 ảnh {isMaxReached && "(Đã đạt giới hạn)"}
+          {images.length}/{MAX_IMAGES} ảnh {isMaxReached && "(đã đủ)"}
         </span>
       </div>
 
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="image/jpeg,image/png,image/webp"
-        style={{ display: "none" }}
-        onChange={handleFileChange}
-      />
+      <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp" hidden onChange={handleFileChange} />
 
       <div className={s.uploadZone}>
-        <button
-          type="button"
-          className={s.uploadBtn}
-          onClick={handleTriggerUpload}
-          disabled={disabled || uploading || isMaxReached}
-        >
-          {uploading ? "Đang tải ảnh lên..." : "📷 Tải ảnh từ máy / điện thoại"}
+        <button type="button" className={`btn ${s.uploadBtn}`} onClick={handleTriggerUpload} disabled={disabled || uploading || isMaxReached} aria-busy={uploading || undefined}>
+          <Icon name={uploading ? "progress_activity" : "photo_camera"} className={uploading ? "spin" : undefined} />
+          <span>{uploading ? "Đang tải ảnh lên…" : M.imgUploadBtn}</span>
         </button>
-        <p className={s.uploadHint}>Hỗ trợ camera, thư viện ảnh (JPEG, PNG, WebP tối đa 10MB)</p>
-
+        <p className={s.uploadHint}>{M.imgUploadHint} (JPG, PNG, WebP, tối đa 10 MB)</p>
         {uploading && (
-          <div className={s.progressContainer}>
+          <div className={s.progressContainer} role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress} aria-label="Tiến độ tải ảnh">
             <div className={s.progressBar}>
               <div className={s.progressFill} style={{ width: `${progress}%` }} />
             </div>
-            <div className={s.progressText}>Tiến trình tải lên: {progress}%</div>
+            <div className={s.progressText}>{progress}%</div>
           </div>
         )}
       </div>
 
-      {error && <div className={s.errorMsg}>{error}</div>}
+      {error && <FormAlert>{error}</FormAlert>}
 
       {images.length > 0 && (
-        <div className={s.imageList}>
+        <ul className={s.imageList}>
           {images.map((img) => {
             const isCover = coverImageId === img.id;
             return (
-              <div key={img.id} className={s.imageCard}>
+              <li key={img.id} className={s.imageCard}>
                 <div className={s.thumbWrapper}>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={img.urls.sm || img.urls.md || img.urls.lg}
-                    alt={img.alt || "Ảnh bài viết"}
-                    className={s.thumb}
-                    loading="lazy"
-                  />
-                  {isCover && <span className={s.coverBadge}>Ảnh bìa</span>}
+                  <img src={img.urls.sm || img.urls.md || img.urls.lg} alt={img.alt || "Ảnh trong bài"} className={s.thumb} loading="lazy" />
+                  {isCover && <span className={s.coverBadge}>{M.imgIsCover}</span>}
                 </div>
                 <div className={s.cardBody}>
-                  <p className={s.altText} title={img.alt}>
-                    {img.alt || "(Chưa có mô tả alt)"}
+                  <p className={img.alt ? s.altText : `${s.altText} ${s.altMissing}`} title={img.alt}>
+                    {img.alt || M.imgAltMissing}
                   </p>
                   <div className={s.cardActions}>
-                    <button
-                      type="button"
-                      className={`${s.actionBtn} ${s.actionBtnPrimary}`}
-                      onClick={() => onInsertToContent(img)}
-                      disabled={disabled}
-                      title="Chèn ảnh vào vị trí con trỏ trong bài viết"
-                    >
-                      Chèn vào bài
+                    <button type="button" className="btn" onClick={() => onInsertToContent(img)} disabled={disabled}>
+                      {M.imgInsert}
                     </button>
                     {!isCover && (
-                      <button
-                        type="button"
-                        className={s.actionBtn}
-                        onClick={() => onSetCover(img.id)}
-                        disabled={disabled}
-                      >
-                        Đặt làm ảnh bìa
+                      <button type="button" className="btn" onClick={() => onSetCover(img.id)} disabled={disabled}>
+                        {M.imgSetCover}
                       </button>
                     )}
-                    <button
-                      type="button"
-                      className={s.actionBtn}
-                      onClick={() => handleEditAlt(img)}
-                      disabled={disabled}
-                    >
-                      Sửa alt
+                    <button type="button" className="btn" onClick={() => setEditing(img)} disabled={disabled}>
+                      {M.imgEditAlt}
                     </button>
                   </div>
                 </div>
-              </div>
+              </li>
             );
           })}
-        </div>
+        </ul>
       )}
-    </div>
+
+      {editing && <AltModal image={editing} onSave={(alt) => onUpdateAlt(editing.id, alt)} onClose={() => setEditing(null)} />}
+    </section>
   );
 }

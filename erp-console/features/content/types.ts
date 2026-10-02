@@ -51,9 +51,8 @@ export interface CategoryUpdatePayload {
   is_active?: boolean;
 }
 
-export interface DeactivateCategoryBlockedError {
-  detail: string;
-  code: string;
+/** Phần `details` của lỗi BR-ND-02 khi ngừng dùng chuyên mục còn bài đang đăng (BE: tối đa 5 bài kèm tổng số). */
+export interface DeactivateCategoryBlockedDetails {
   entries: Array<{ id: number; title: string }>;
   total: number;
 }
@@ -129,6 +128,9 @@ export interface EntryCreatePayload {
   seo_description?: string;
   cover_image?: number | null;
   body?: BodyDoc;
+  page_role?: ContentPageRole;
+  show_in_footer?: boolean;
+  footer_order?: number;
 }
 
 export interface EntryUpdatePayload {
@@ -146,6 +148,16 @@ export interface EntryUpdatePayload {
   show_in_footer?: boolean;
   footer_order?: number;
 }
+
+/** Trường BE báo thiếu khi đăng/gửi duyệt (400 BR-ND-03, `details.missing`). */
+export type MissingField =
+  | "title"
+  | "slug"
+  | "body"
+  | "category"
+  | "cover_image"
+  | "cover_image_alt"
+  | "description";
 
 export interface ContentWarning {
   type: "phone_like" | "cost_keyword" | "item_unavailable";
