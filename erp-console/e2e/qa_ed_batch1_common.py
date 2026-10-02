@@ -41,10 +41,10 @@ FULL_ORDER = [
 # thêm một màn mới (vd Sổ nhập xuất ở Lô 7) hay cấp thêm quyền cho Chủ chỉ phải sửa MỘT chỗ này.
 EXPECTED_MENU = {
     "loc": ["Tổng quan", "Đơn & tiền", "Khách hàng", "Gọi xác nhận", "Giao hàng", "Mua hàng", "Nhà cung cấp", "Kho & lô", "Kiểm kê", "Sổ nhập xuất", "Danh mục & giá",
-            "Báo cáo lãi lỗ", "Nội dung", "Nhân sự", "Nhật ký hoạt động", "Chính sách AI", "Báo cáo AI"],
+            "Báo cáo lãi lỗ", "Hoá đơn bán", "Hoá đơn mua & chi phí", "Nội dung", "Nhân sự", "Nhật ký hoạt động", "Chính sách AI", "Báo cáo AI"],
     "ql1": ["Tổng quan", "Đơn & tiền", "Khách hàng", "Gọi xác nhận", "Giao hàng", "Mua hàng", "Nhà cung cấp", "Kho & lô", "Kiểm kê", "Sổ nhập xuất", "Danh mục & giá",
-            "Nội dung", "Nhật ký hoạt động"],
-    "kho1": ["Tổng quan", "Đơn & tiền", "Giao hàng", "Việc giao của tôi", "Mua hàng", "Nhà cung cấp", "Kho & lô", "Kiểm kê", "Sổ nhập xuất", "Danh mục & giá"],
+            "Hoá đơn bán", "Hoá đơn mua & chi phí", "Nội dung", "Nhật ký hoạt động"],
+    "kho1": ["Tổng quan", "Đơn & tiền", "Giao hàng", "Việc giao của tôi", "Mua hàng", "Nhà cung cấp", "Kho & lô", "Kiểm kê", "Sổ nhập xuất", "Danh mục & giá", "Hoá đơn bán"],
     "giao1": ["Việc giao của tôi"],
 }
 SECTION_ORDER = ["Bán hàng", "Hàng hoá & kho", "Kế toán", "Website", "Quản trị"]

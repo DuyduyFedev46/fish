@@ -8,7 +8,7 @@ import { todayInVietnam } from "@/shared/lib/format";
 import { MOCK_UNAUTHORIZED, mockRequireUser } from "@/features/auth/mock";
 import type { Me } from "@/features/auth/types";
 import { beDetail } from "@/shared/lib/beErrors.mock";
-import type { PurchaseCostAllocation, PurchaseCostInput, PurchaseCostRow, PurchaseInvoiceInput, PurchaseInvoiceRow } from "./types";
+import type { PurchaseCostAllocation, PurchaseCostInput, PurchaseCostRow, PurchaseInvoiceInput, PurchaseInvoiceRow, SalesInvoiceRow, SalesInvoiceTotals } from "./types";
 
 const DAY = 86_400_000;
 const PAGE_SIZE = 20;
@@ -282,4 +282,100 @@ export function mockCostCreate(req: MockRequest): MockResponse {
   });
   allCosts().unshift(row);
   return { status: 201, body: row };
+}
+
+// ---- Hoá đơn bán (R13, ED-33) ----
+// 27 hoá đơn (hơn một trang 20 dòng), vài hoá đơn của đơn đã huỷ (status CANCELLED). Tên khách là tên bịa.
+//   window.__caveMock.salesInvoices("ok" | "fail")  — đổi chế độ để kiểm trạng thái lỗi.
+// Quyền như BE: đọc = sales.view_salesinvoice; giá vốn và lãi gộp (dòng và tổng) chỉ khi có view_costprice (me.can_view_cost);
+// tên khách chỉ khi có sales.view_customer_list, không thì null.
+
+const MOCK_CUSTOMERS = ["Chị Lan (mẫu)", "Anh Hùng (mẫu)", "Quán Biển Xanh (mẫu)", "Cô Mai (mẫu)", "Anh Tuấn (mẫu)", "Nhà hàng Hải Sản 9 (mẫu)"];
+
+type SalesSeed = { id: number; order: number; customer: number; ago: number; amount: number; cogs: number; cancelled?: boolean };
+const SALES_SEEDS: SalesSeed[] = Array.from({ length: 27 }, (_, i) => {
+  const id = 27 - i;
+  const amount = 180_000 + ((id * 137_000) % 1_650_000);
+  const cogs = Math.round((amount * (id % 7 === 0 ? 1.08 : 0.68 + (id % 5) * 0.03)) / 1000) * 1000;
+  return { id, order: 300 + id, customer: id % MOCK_CUSTOMERS.length, ago: Math.floor(i * 1.2), amount, cogs, cancelled: id === 24 || id === 17 || id === 6 };
+});
+
+type SalesMode = "ok" | "fail";
+let salesMode: SalesMode = "ok";
+
+function salesRows(me: Me): SalesInvoiceRow[] {
+  const showCost = me.can_view_cost;
+  const showName = can(me, "sales.view_customer_list");
+  return SALES_SEEDS.map((x) => {
+    const issued = new Date(Date.now() - x.ago * DAY - ((x.id * 7) % 11) * 3_600_000);
+    const row: SalesInvoiceRow = {
+      id: x.id,
+      code: `INV${String(x.id).padStart(5, "0")}`,
+      sales_order: x.order,
+      order_code: `DH${x.order}`,
+      customer_name: showName ? MOCK_CUSTOMERS[x.customer] : null,
+      issued_at: issued.toISOString(),
+      amount: `${x.amount}.00`,
+      status: x.cancelled ? "CANCELLED" : "ISSUED",
+      status_label: x.cancelled ? "Đã huỷ" : "Đã xuất",
+    };
+    if (showCost) {
+      row.cogs = `${x.cogs}.00`;
+      row.gross_profit = `${x.amount - x.cogs}.00`;
+    }
+    return row;
+  });
+}
+
+/** GET /api/sales/invoices/ (R13): lọc q/status/ngày, 20 dòng/trang, `totals` của cả kết quả (bỏ hoá đơn Đã huỷ). */
+export function mockSalesInvoiceList(req: MockRequest): MockResponse {
+  const me = mockRequireUser(req);
+  if (!me) return MOCK_UNAUTHORIZED;
+  if (!can(me, "sales.view_salesinvoice")) return FORBIDDEN;
+  if (salesMode === "fail") return { status: 500, body: { detail: "Có lỗi xảy ra phía máy chủ." } };
+  const q = params(req.path);
+  let rows = salesRows(me);
+  const status = q.get("status");
+  if (status) {
+    const list = status.split(",").map((t) => t.trim()).filter(Boolean);
+    if (list.some((t) => t !== "ISSUED" && t !== "CANCELLED")) return err(400, "INVALID_FILTER", "Tham số status có giá trị không hợp lệ.");
+    rows = rows.filter((r) => list.includes(r.status));
+  }
+  const from = q.get("date_from");
+  const to = q.get("date_to");
+  if (from && to && from > to) return err(400, "INVALID_FILTER", "Tham số date_from không được sau date_to.");
+  if (from) rows = rows.filter((r) => todayInVietnam(new Date(r.issued_at)) >= from);
+  if (to) rows = rows.filter((r) => todayInVietnam(new Date(r.issued_at)) <= to);
+  const term = (q.get("q") ?? "").trim().toLowerCase();
+  if (term) rows = rows.filter((r) => r.code.toLowerCase().includes(term) || r.order_code.toLowerCase().includes(term));
+  rows.sort((a, b) => (a.issued_at < b.issued_at ? 1 : a.issued_at > b.issued_at ? -1 : b.id - a.id));
+
+  const live = rows.filter((r) => r.status !== "CANCELLED");
+  const amount = live.reduce((sum, r) => sum + Number(r.amount), 0);
+  const totals: SalesInvoiceTotals = { amount: `${amount}.00` };
+  if (me.can_view_cost) totals.gross_profit = `${live.reduce((sum, r) => sum + Number(r.gross_profit ?? 0), 0)}.00`;
+
+  const page = Math.max(1, Number(q.get("page")) || 1);
+  const start = (page - 1) * PAGE_SIZE;
+  return {
+    status: 200,
+    body: {
+      count: rows.length,
+      next: start + PAGE_SIZE < rows.length ? `?page=${page + 1}` : null,
+      previous: page > 1 ? `?page=${page - 1}` : null,
+      results: rows.slice(start, start + PAGE_SIZE),
+      totals,
+    },
+  };
+}
+
+if (process.env.NEXT_PUBLIC_USE_MOCK === "1" && typeof window !== "undefined") {
+  const w = window as unknown as { __caveMock?: Record<string, unknown> };
+  w.__caveMock = {
+    ...(w.__caveMock || {}),
+    salesInvoices: (m: SalesMode) => {
+      salesMode = m;
+      return `Hoá đơn bán (mock): chế độ ${m}`;
+    },
+  };
 }

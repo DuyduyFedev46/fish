@@ -140,7 +140,7 @@ def run_owner(browser, errors):
     go(page, "/purchasing/")
     wait_rows(page)
 
-    ok("Chủ: 3 tab Phiếu nhập · Hoá đơn mua · Chi phí mua", tab_names(page) == ["Phiếu nhập", "Hoá đơn mua", "Chi phí mua"], str(tab_names(page)))
+    ok("Chủ: 3 tab Phiếu nhập · Hoá đơn mua · Chi phí phụ", tab_names(page) == ["Phiếu nhập", "Hoá đơn mua", "Chi phí phụ"], str(tab_names(page)))
     ok("Chủ: mặc định ở tab Phiếu nhập", selected_tab(page) == "Phiếu nhập")
     heads = [squash(h) for h in page.locator("table thead th").all_inner_texts()]
     ok("Chủ: cột Tiền mua có (khoá) và Hoá đơn có", any(h.startswith("Tiền mua") for h in heads) and any(h.startswith("Hoá đơn") for h in heads), str(heads))
@@ -179,7 +179,7 @@ def run_owner(browser, errors):
     page.wait_for_timeout(300)
     ok("Chủ: tab Hoá đơn: Bỏ lọc xoá ô tìm và trả lại các dòng", search.input_value() == "" and page.locator("table tbody tr").count() >= 1, search.input_value())
     go(page, "/purchasing/?tab=costs")
-    ok("Chủ: ?tab=costs mở tab Chi phí mua", selected_tab(page) == "Chi phí mua")
+    ok("Chủ: ?tab=costs mở tab Chi phí phụ", selected_tab(page) == "Chi phí phụ")
     page.locator("table tbody tr").first.wait_for()
     search = page.get_by_placeholder(re.compile("^Tìm"))
     search.first.fill("khong-co-chi-phi-nay")
@@ -474,7 +474,7 @@ def run_manager(browser, errors):
     ctx, page = new_page(browser, "ql1", errors=errors)
     go(page, "/purchasing/")
     wait_rows(page)
-    ok("Quản lý: 2 tab Phiếu nhập · Hoá đơn mua (không có Chi phí mua)", tab_names(page) == ["Phiếu nhập", "Hoá đơn mua"], str(tab_names(page)))
+    ok("Quản lý: 2 tab Phiếu nhập · Hoá đơn mua (không có Chi phí phụ)", tab_names(page) == ["Phiếu nhập", "Hoá đơn mua"], str(tab_names(page)))
     html = page.content()
     t = main_text(page)
     heads = [squash(h) for h in page.locator("table thead th").all_inner_texts()]

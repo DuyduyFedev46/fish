@@ -1,14 +1,15 @@
 "use client";
 
-// F1c Thêm hoá đơn mua (POST /api/purchasing/invoices/). Form ngắn (5 trường) nên là hộp thoại, mở từ trang chi tiết phiếu
-// (gắn sẵn phiếu, nhà cung cấp theo phiếu) hoặc từ tab "Hoá đơn mua" (chọn phiếu chưa có hoá đơn hay để trống). Chỉ Chủ có quyền thêm.
-// Tiền: ô type="money", gửi đúng số nguyên đồng ("1650000"); không làm tròn, không số lẻ.
+// F1c Thêm hoá đơn mua (POST /api/purchasing/invoices/). Form ngắn nên là hộp thoại, mở từ trang chi tiết phiếu
+// (gắn sẵn phiếu, nhà cung cấp theo phiếu) hoặc từ danh sách hoá đơn (chọn phiếu chưa có hoá đơn hay để trống). Chỉ Chủ có quyền thêm.
+// Tiền: ô type="money", gửi đúng số nguyên đồng ("1650000"). Số gợi ý từ tiền mua của phiếu làm tròn .5 lên (không cắt cụt).
+// "Đã trả tiền" bật thì hiện ô "Trả lúc" (giờ Việt Nam, mặc định bây giờ); tắt thì không gửi `paid_at`.
+// Ô chọn phiếu tải theo trang, lọc nhà cung cấp ở BE, có "Tải thêm" (ReceiptSelect).
 import { useMemo, useState } from "react";
-import { fetchReceipts, fetchSuppliers } from "@/features/purchasing/api";
-import type { ReceiptRow } from "@/features/purchasing/types";
+import { fetchSuppliers } from "@/features/purchasing/api";
+import { roundToDong } from "@/features/reports/decimal";
 import { loadErrorText } from "@/shared/lib/http";
-import { todayInVietnam, vnd } from "@/shared/lib/format";
-import { formatMoneyInput } from "@/shared/lib/moneyInput";
+import { timeHM, todayInVietnam, vnInputToIso, vnd } from "@/shared/lib/format";
 import { useResource } from "@/shared/lib/useResource";
 import { Field } from "@/shared/ui/form/Field";
 import { FormAlert } from "@/shared/ui/form/FormAlert";
@@ -16,8 +17,9 @@ import { SummaryBlock } from "@/shared/ui/form/SummaryBlock";
 import { primaryLabel, useSubmit } from "@/shared/ui/form/useSubmit";
 import { Modal } from "@/shared/ui/overlay/Modal";
 import { createPurchaseInvoice } from "../api";
-import { CURRENCY_UNIT, moneyBody, moneyMessage } from "../money";
+import { CURRENCY_UNIT, moneyBody, moneyMessage, suggestedAmount } from "../money";
 import type { PurchaseInvoiceRow } from "../types";
+import { ReceiptSelect } from "./ReceiptSelect";
 import s from "../accounting.module.css";
 
 export type InvoiceReceiptRef = {
@@ -25,8 +27,8 @@ export type InvoiceReceiptRef = {
   code: string;
   supplier: number;
   supplierName: string;
-  /** Tiền mua của phiếu (chỉ Chủ có): gợi ý số tiền hoá đơn. */
-  purchaseAmount?: number | null;
+  /** Tiền mua của phiếu (chỉ Chủ có): gợi ý số tiền hoá đơn. Có thể lẻ ".50", nên làm tròn trước khi đưa vào ô. */
+  purchaseAmount?: number | string | null;
 };
 
 type Props = {
@@ -38,46 +40,52 @@ type Props = {
 
 const NO_RECEIPT = "";
 
+/** "2026-09-30T15:05": giờ Việt Nam hiện tại, dạng ô datetime-local. */
+function nowForInput(): string {
+  return `${todayInVietnam()}T${timeHM(new Date())}`;
+}
+
 export function PurchaseInvoiceForm({ receipt, onClose, onDone }: Props) {
   const [supplier, setSupplier] = useState(receipt ? String(receipt.supplier) : "");
   const [receiptId, setReceiptId] = useState(receipt ? String(receipt.id) : NO_RECEIPT);
-  const [amount, setAmount] = useState(receipt?.purchaseAmount ? formatMoneyInput(String(Math.round(receipt.purchaseAmount))) : "");
+  const [amount, setAmount] = useState(suggestedAmount(receipt?.purchaseAmount));
   const [date, setDate] = useState(todayInVietnam());
-  const [paid, setPaid] = useState("0");
+  const [paid, setPaid] = useState(false);
+  const [paidAt, setPaidAt] = useState(nowForInput);
   const [touched, setTouched] = useState(false);
+  // Nhà cung cấp của phiếu đang chọn (ô chọn phiếu) và số tiền hiện tại có phải số gợi ý từ phiếu không (người gõ thì không phải).
+  const [receiptSupplier, setReceiptSupplier] = useState("");
+  const [amountSuggested, setAmountSuggested] = useState(false);
+
+  // Đổi nhà cung cấp khác với nhà cung cấp của phiếu đang chọn: bỏ phiếu (và số gợi ý của nó), tránh gắn phiếu của nhà cung cấp khác (TL12-FE-M1).
+  const changeSupplier = (value: string) => {
+    setSupplier(value);
+    if (receiptId && receiptSupplier && receiptSupplier !== value) {
+      setReceiptId(NO_RECEIPT);
+      setReceiptSupplier("");
+      if (amountSuggested) {
+        setAmount("");
+        setAmountSuggested(false);
+      }
+    }
+  };
+  const typeAmount = (value: string) => {
+    setAmount(value);
+    setAmountSuggested(false);
+  };
 
   const suppliers = useResource(receipt ? null : "accounting:supplier-options", () => fetchSuppliers(), 60_000);
-  const receipts = useResource(
-    receipt ? null : "accounting:receipts-without-invoice",
-    () => fetchReceipts({ status: "SUBMITTED", supplier: "", date_from: "", date_to: "", has_invoice: "0" }, 1),
-    0,
-  );
-
   const supplierOptions = useMemo(
     () => [{ value: "", label: "Chọn nhà cung cấp" }, ...(suppliers.data ?? []).filter((x) => x.is_active).map((x) => ({ value: String(x.id), label: x.name }))],
     [suppliers.data],
   );
-  const receiptOptions = useMemo(
-    () => [
-      { value: NO_RECEIPT, label: "Không gắn phiếu nhập" },
-      ...(receipts.data?.results ?? []).map((r) => ({ value: String(r.id), label: `${r.code} · ${r.supplier_name}` })),
-    ],
-    [receipts.data],
-  );
-
-  const pickReceipt = (value: string) => {
-    setReceiptId(value);
-    const row: ReceiptRow | undefined = receipts.data?.results.find((r) => String(r.id) === value);
-    if (!row) return;
-    setSupplier(String(row.supplier));
-    if (row.purchase_amount !== undefined && !amount) setAmount(formatMoneyInput(String(Math.round(Number(row.purchase_amount)))));
-  };
 
   const local: Record<string, string> = {};
   if (!supplier) local.supplier = "Chọn nhà cung cấp.";
   const amountProblem = moneyMessage(amount, { noun: "Số tiền", positive: true });
   if (amountProblem) local.amount = amountProblem;
   if (!date) local.invoice_date = "Chọn ngày hoá đơn.";
+  if (paid && !vnInputToIso(paidAt)) local.paid_at = "Chọn giờ trả tiền.";
 
   const sub = useSubmit(
     () =>
@@ -86,8 +94,8 @@ export function PurchaseInvoiceForm({ receipt, onClose, onDone }: Props) {
         receipt: receiptId ? Number(receiptId) : null,
         amount: moneyBody(amount),
         invoice_date: date,
-        is_paid: paid === "1",
-        paid_at: paid === "1" ? new Date().toISOString() : null,
+        is_paid: paid,
+        paid_at: paid ? vnInputToIso(paidAt) : null,
       }),
     { onSuccess: onDone },
   );
@@ -98,7 +106,7 @@ export function PurchaseInvoiceForm({ receipt, onClose, onDone }: Props) {
     void sub.submit();
   };
   const err = (key: string) => (touched ? local[key] : undefined) ?? sub.fieldErrors[key];
-  const loadFailed = !receipt && Boolean(suppliers.error || receipts.error) && !suppliers.data;
+  const loadFailed = !receipt && Boolean(suppliers.error) && !suppliers.data;
 
   return (
     <Modal
@@ -121,37 +129,63 @@ export function PurchaseInvoiceForm({ receipt, onClose, onDone }: Props) {
           <FormAlert>{sub.error}</FormAlert>
         </div>
       )}
-      {loadFailed && <FormAlert>{loadErrorText(suppliers.error ?? receipts.error)}</FormAlert>}
+      {loadFailed && <FormAlert>{loadErrorText(suppliers.error)}</FormAlert>}
       {receipt ? (
         <SummaryBlock
           label="Phiếu nhập"
           rows={[
             { label: "Phiếu nhập", value: receipt.code, mono: true },
             { label: "Nhà cung cấp", value: receipt.supplierName },
-            ...(receipt.purchaseAmount ? [{ label: "Tiền mua của phiếu", value: vnd(receipt.purchaseAmount), num: true }] : []),
+            ...(receipt.purchaseAmount ? [{ label: "Tiền mua của phiếu", value: vnd(roundToDong(String(receipt.purchaseAmount))), num: true }] : []),
           ]}
         />
       ) : (
         <>
-          <Field as="select" label="Phiếu nhập" name="receipt" value={receiptId} onChange={pickReceipt} options={receiptOptions} error={err("receipt")} />
-          <Field as="select" label="Nhà cung cấp" name="supplier" required value={supplier} onChange={setSupplier} options={supplierOptions} error={err("supplier")} />
+          <Field as="select" label="Nhà cung cấp" name="supplier" required value={supplier} onChange={changeSupplier} options={supplierOptions} error={err("supplier")} />
+          <ReceiptSelect
+            label="Phiếu nhập"
+            name="receipt"
+            value={receiptId}
+            supplier={supplier}
+            hasInvoice="0"
+            emptyLabel="Không gắn phiếu nhập"
+            error={err("receipt")}
+            onChange={(value, row) => {
+              setReceiptId(value);
+              if (!row) {
+                // Bỏ phiếu: số tiền đang là số gợi ý của phiếu đó thì bỏ theo.
+                setReceiptSupplier("");
+                if (amountSuggested) {
+                  setAmount("");
+                  setAmountSuggested(false);
+                }
+                return;
+              }
+              setSupplier(String(row.supplier));
+              setReceiptSupplier(String(row.supplier));
+              // Không đè số người dùng đã gõ; số gợi ý của phiếu trước thì cập nhật theo phiếu mới.
+              if (row.purchase_amount !== undefined && (!amount || amountSuggested)) {
+                const next = suggestedAmount(row.purchase_amount);
+                setAmount(next);
+                setAmountSuggested(next !== "");
+              }
+            }}
+          />
         </>
       )}
-      <Field label="Số tiền hoá đơn" name="amount" type="money" required unit={CURRENCY_UNIT} value={amount} onChange={setAmount} error={err("amount")} />
-      <div className={s.twoCols}>
-        <Field label="Ngày hoá đơn" name="invoice_date" type="date" required value={date} onChange={setDate} error={err("invoice_date")} />
-        <Field
-          as="select"
-          label="Tình trạng"
-          name="is_paid"
-          value={paid}
-          onChange={setPaid}
-          options={[
-            { value: "0", label: "Chưa trả tiền" },
-            { value: "1", label: "Đã trả tiền" },
-          ]}
-        />
-      </div>
+      <Field label="Số tiền hoá đơn" name="amount" type="money" required unit={CURRENCY_UNIT} value={amount} onChange={typeAmount} error={err("amount")} />
+      <Field label="Ngày hoá đơn" name="invoice_date" type="date" required value={date} onChange={setDate} error={err("invoice_date")} />
+      <label className="check-row">
+        <input type="checkbox" name="is_paid" checked={paid} onChange={(e) => setPaid(e.target.checked)} />
+        <span>
+          <b>Đã trả tiền</b>
+        </span>
+      </label>
+      {paid && (
+        <div className={s.paidAt} data-testid="paid-at">
+          <Field label="Trả lúc" name="paid_at" type="datetime-local" required value={paidAt} onChange={setPaidAt} error={err("paid_at")} />
+        </div>
+      )}
     </Modal>
   );
 }

@@ -1,7 +1,9 @@
 // Đọc ô tiền VNĐ (Field type="money" giữ chuỗi chữ số nhóm nghìn "1.650.000") thành số nguyên đồng. Hàm thuần.
 // Nguyên tắc (QA Lô 10 B5): tiền không đoán. Giá trị lỗi (âm, quá lớn, có chữ) phải được BÁO cho người dùng và KHÔNG gửi,
 // không bao giờ bị đổi lặng lẽ thành "0". Gọi `moneyIssue`/`moneyMessage` để kiểm trước khi gửi, rồi mới `moneyBody`.
+import { roundToDong } from "@/features/reports/decimal";
 import { vnd } from "@/shared/lib/format";
+import { formatMoneyInput } from "@/shared/lib/moneyInput";
 
 /** BE lưu tiền DecimalField(max_digits=14, decimal_places=2) nên phần nguyên tối đa 12 chữ số (999.999.999.999 đ). */
 export const MONEY_MAX_DIGITS = 12;
@@ -76,4 +78,11 @@ export function moneyBody(text: string, maxDigits: number = MONEY_MAX_DIGITS): s
   const n = parseMoney(text, maxDigits);
   if (n === null) throw new Error(`Số tiền không hợp lệ, không gửi: ${moneyIssue(text, maxDigits) ?? "invalid"}`);
   return String(n);
+}
+
+/** Số gợi ý trong ô tiền từ tiền mua của phiếu: "1650000.50" → "1.650.001" (.5 làm tròn lên, không cắt cụt). Trống khi không có, bằng 0 hoặc sai dạng. */
+export function suggestedAmount(purchaseAmount: number | string | null | undefined): string {
+  if (purchaseAmount === null || purchaseAmount === undefined || purchaseAmount === "") return "";
+  const dong = roundToDong(String(purchaseAmount));
+  return dong && dong !== "0" ? formatMoneyInput(dong) : "";
 }
