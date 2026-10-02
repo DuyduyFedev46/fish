@@ -78,6 +78,14 @@ describe("apiFetch chế độ mock", () => {
     const error = await apiFetch("/api/x/", { method: "PUT", body: {}, mock: () => ({ status: 400, body: { detail: "x", code: "Y" } }) }).catch((e) => e);
     expect((error as { details?: unknown }).details).toBeUndefined();
   });
+
+  it("lỗi 400 DRF của trường tên 'code' ({code:[…]}): không bị nuốt, nằm trong details, ApiError.code vẫn rỗng (Lô 13, Mã hàng trùng)", async () => {
+    vi.stubEnv("NEXT_PUBLIC_USE_MOCK", "1");
+    const { apiFetch } = await import("./http");
+    const error = await apiFetch("/api/x/", { method: "POST", body: {}, mock: () => ({ status: 400, body: { code: ["Mã này đã được dùng."] } }) }).catch((e) => e);
+    expect((error as { code?: string }).code).toBeUndefined();
+    expect((error as { details?: unknown }).details).toEqual({ code: ["Mã này đã được dùng."] });
+  });
 });
 
 describe("apiFetch lỗi 409 (xung đột phiên bản, W6f)", () => {

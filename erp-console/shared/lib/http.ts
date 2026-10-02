@@ -170,10 +170,14 @@ async function sendReal(path: string, init: ApiInit, token: string | null): Prom
 function detailOf(body: unknown): { detail?: string; code?: string; details?: unknown } {
   if (body && typeof body === "object") {
     const { detail, code, ...rest } = body as Record<string, unknown>;
+    // `code` kiểu chuỗi là MÃ LỖI; `code` kiểu mảng là LỖI CỦA TRƯỜNG tên "code" (DRF: {"code": ["Mã này đã dùng…"]}, vd Mã hàng) → giữ lại
+    // trong `details` để form hiện dưới ô, không nuốt mất.
+    const fieldCode = code !== undefined && typeof code !== "string" ? { code } : {};
+    const extra = { ...rest, ...fieldCode };
     return {
       detail: typeof detail === "string" ? stripRuleCodes(detail) : undefined,
       code: typeof code === "string" ? code : undefined,
-      details: Object.keys(rest).length > 0 ? rest : undefined,
+      details: Object.keys(extra).length > 0 ? extra : undefined,
     };
   }
   return {};
