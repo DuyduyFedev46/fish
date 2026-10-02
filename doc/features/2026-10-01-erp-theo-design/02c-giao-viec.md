@@ -30,7 +30,7 @@ Thứ tự chạy từ trên xuống. Cột "Song song" = lô được giao cùn
 | ☐ | 15 | ED-06, ED-08, ED-41, ED-42 | FE | D1, W3f, W4b–W4h, F3g | 1, 2; W3f cần R16 (Lô 14) | Lô 14, 16 | — |
 | ☐ | 16 | ED-35, ED-36 | FE | W3b, W3c, W3d, F3h–F3l | 1, 2 | Lô 15 | — |
 | ☐ | 17 | ED-07 + dọn dẹp + hồi quy toàn bộ | FE | — | 1–16 | — | — |
-| ☐ | bổ sung A | Quyết định Duy 02/10 (#1, 2, 5, 6, 8 huỷ, 10, 11, 14, 15, 17, 18, 19, 20, 21, 22) | BE ∥ FE | — | 1–11 | — | — |
+| ☑ | bổ sung A | Quyết định Duy 02/10 (#1, 2, 5, 6, 8 huỷ, 10, 11, 14, 15, 17, 18, 19, 20, 21, 22) | BE ∥ FE | — | 1–11 | — | 0fe91c4 |
 
 Nợ từ review Lô bổ sung A (03b, TLA-*):
 - TLA-L2 → **Lô 14**: thêm ô "tạo hàng hoàn" vào ma trận phân quyền (registry chưa có năng lực này).
