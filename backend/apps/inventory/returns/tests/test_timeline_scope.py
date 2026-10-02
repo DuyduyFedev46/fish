@@ -11,7 +11,9 @@ GUIDANCE = "/api/guidance/return/"
 class ReturnTimelineScopeTests(ReturnsApiBase):
     def setUp(self):
         super().setUp()
-        self.mine = self.post(self.courier, self.payload(delivery_note=self.note, qty="2", note=NOTE_WITH_PHONE)).json()
+        self.mine = self.post(self.courier, self.payload(delivery_note=self.note, qty="2")).json()
+        # API đã chặn ghi chú có SĐT; gài thẳng vào DB để vẫn kiểm timeline không rò dữ liệu cũ.
+        ReturnToStock.objects.filter(pk=self.mine["id"]).update(note=NOTE_WITH_PHONE)
         self.theirs = self.post(self.warehouse_staff, self.payload(delivery_note=self.other_note, qty="3")).json()
 
     def get(self, user, rt_id):

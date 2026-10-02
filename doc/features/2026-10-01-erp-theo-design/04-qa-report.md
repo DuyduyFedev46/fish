@@ -1813,3 +1813,192 @@ Bước tái hiện: mọi quyền xem hàng chờ, viewport 768 đến 1440px: 
 - Bản copy sạch ngoài worktree: `npm ci`; `tsc --noEmit`; `vitest run` 437/437; `NEXT_PUBLIC_USE_MOCK=1 npm run build` + `check-ai-chunks`; `NEXT_PUBLIC_USE_MOCK=0 NEXT_PUBLIC_API_BASE=http://127.0.0.1:8120 npm run build` + `check-no-mock` + `check-ai-chunks`; `python3 scripts/check_naming.py` ở worktree.
 - Mock: `python3 -m http.server 3201` trên bản build sạch; chạy các script nêu trên.
 - Lưu ý harness: một lần `next build` bị treo (0% CPU), đã tắt và build lại sạch; không ảnh hưởng kết quả.
+
+---
+
+## Lô 9 — FE · Hàng hoàn về kho (ED-26, kèm BE nhỏ `batch_pk`, `returned_qty`) · lần 1 · 2026-10-02
+
+### Kết luận: REJECTED — 1 lỗi Medium chặn (B1: BE không chặn số điện thoại trong ghi chú hàng hoàn, 3 đường ghi chú khác của BE đều chặn). Mọi AC đạt trên BE thật; không có lỗi Critical/High; 4 ghi nhận Low.
+### Tổng: 249 ca của QA · ✅ 244 · ❌ 5 · ⏸ 3 mục
+(Ba script của QA: `qa_ed_batch9_api` 110 ca, `qa_ed_batch9_ui` 90 ca, `qa_ed_batch9_real` 49 ca. Năm ca đỏ: B1 là chặn; B2, B3 là Low; hai ca còn lại là luật "9 chữ số liền" đã được Duy chốt ở quyết định #4, ghi để lưu vết, không tính lỗi mới.)
+
+Dữ liệu: toàn bộ giả (`SO-QA9-*`, SĐT `0900000xxx`, "Khách SO-QA9"). BE thật = Django :8000 trên SQLite tạm đã migrate, phiếu giao Đang giao / Giao thất bại dựng bằng fixture ORM (`make_order_with_note` + `advance_status` + `mark_failed`). Console thật = build `NEXT_PUBLIC_USE_MOCK=0` phục vụ ở :3102. Mock = :3101. Đã tắt các server sau khi chạy.
+
+### Theo AC
+| Mã AC | Kết quả | Bằng chứng |
+|---|---|---|
+| ED-26-AC1 Danh sách: chip, cột Quyết định riêng, cột Ghi chú, không cột Lý do | ✅ (kèm B2 Low) | `qa_ed_batch9_ui`: tiêu đề cột đúng; chip Chờ duyệt/Đã duyệt; BE thật `qa_ed_batch9_real` D3 (loc thấy Tái nhập, Huỷ bỏ, ghi lỗ, Chờ duyệt, Đã duyệt, "2,5 kg"). Ảnh `shots/lot9/impl-list-ql1-1440.png`, `impl-real-list-loc-1280.png`. Cột Ghi chú ở 1440px nằm ngoài khung (phải cuộn trong khung bảng), xem B2 |
+| ED-26-AC2 Nhân viên kho/giao nhập hàng hoàn trong hộp thoại, mới ở Chờ duyệt | ✅ | Real A6, B3, C0: DB có phiếu `DRAFT`/`PENDING`; bấm đúp "Gửi duyệt" chỉ ra đúng 1 phiếu. API S3: BE bỏ qua `status/decision/returned_at/created_by` do client gửi |
+| ED-26-AC3 Duyệt Tái nhập: Đã duyệt, sổ có dòng "Hàng hoàn tái nhập" | ✅ phần BE và danh sách; ⏸ phần hiển thị dòng sổ | Real C2: tồn lô tăng đúng +2,5 kg, đúng 1 dòng `RETURN_RESTOCK +2.5` kể cả khi bấm đúp Duyệt. Nhãn "Hàng hoàn tái nhập" có ở `shared/lib/enums.ts`, nhưng màn Kho & lô (Lô 7) chưa có trong nhánh này (`/inventory/` chỉ có tiêu đề), nên chưa nhìn được dòng sổ trên trình duyệt |
+| ED-26-AC4 Màn cũ duyệt lại: banner xung đột | ✅ | Real C3: BE thật trả 409 `STALE_STATE`, băng xung đột có "Tải lại", không lộ mã, tồn và sổ không đổi, Tải lại ra Đã duyệt. API S6: người khác duyệt lại với quyết định khác cũng 409 |
+| ED-26-AC5 Nhân viên kho không có nút Duyệt, API 403 | ✅ | UI mock `R kho1/giao1/giao2/cs2`; Real F2; API S6: kho1, giao1, cs1, cs2 gọi `approve` ra 403, chưa đăng nhập 401 |
+| Duyệt Huỷ bỏ, ghi lỗ (BR-HV-02) | ✅ | Real D1: tồn không đổi, 1 dòng `WRITE_OFF` ghi "lỗ 2kg"; API S6 tương tự |
+| Yêu cầu thêm của Duy: số kg "Đã giao n kg, đã hoàn m kg, còn hoàn được k kg" | ✅ | Real A4 (lô A của phiếu 2 lô: "Đã giao 5 kg … còn hoàn được 5 kg"), B1/B2/B4 |
+| Quá kg bị chặn tại ô | ✅ | Real A5: 5,5 > 5 chặn ngay ở ô, không có POST nào lên máy chủ, DB không có phiếu. UI mock: 7 giá trị xấu (âm, chữ, 0, 4 số lẻ, `1e1`, vượt 0,001, vượt nhiều) đều bị chặn tại chỗ |
+| Hai tab nhập phần còn lại | ✅ | Real B1 đến B4: cả hai tab thấy "còn hoàn được 10 kg"; tab 1 gửi 6 kg; tab 2 (màn cũ) gửi 6 kg bị BE chặn, lỗi gắn ô số kg, số liệu mới "đã hoàn 6 kg, còn hoàn được 4 kg"; tab 2 gửi đúng 4 kg được (tổng 10 kg); gửi thêm 0,001 kg bị chặn |
+| `batch_pk`, `returned_qty` trên dòng phiếu giao | ✅ | API S1: dòng có đúng 6 khoá, `batch_pk` = pk lô, `returned_qty` `"0.000"` rồi `"10.000"`; phiếu nhiều lô tính riêng từng lô (S1b, S8b); không có giá vốn; người giao khác 404, chưa đăng nhập 401. `backend/apps/delivery/tests/test_line_return_fields.py` chạy xanh trong toàn bộ BE |
+
+### Ngoại lệ và biên
+| Ca | Kết quả | Bằng chứng |
+|---|---|---|
+| qty = 0, âm, chữ, 4 số lẻ, `NaN`, `Infinity`, `1,5`, trống | ✅ 400 | API S2 |
+| qty `1e2` (ký hiệu mũ = 100 kg) | ✅ vẫn bị chặn `RETURN_QTY_EXCEEDS` | API S2. `1e1` được DRF đọc thành 10 kg nhưng vẫn qua kiểm số còn hoàn được; không phải lỗi |
+| Vượt đúng 0,001 kg; đúng phần còn lại (lô cuối); thêm 0,001 sau khi hết | ✅ 400 / 201 / 400 | API S3 |
+| Lô không thuộc phiếu; phiếu READY; phiếu COMPLETED; phiếu/lô không tồn tại | ✅ 400 `RETURN_BATCH_NOT_IN_NOTE` / 400 `RETURN_NOTE_STATUS` / 400 / 404 | API S2 |
+| Duyệt không chọn quyết định, `PENDING`, giá trị lạ | ✅ 400, phiếu không đổi | API S6 |
+| Sửa phiếu đã duyệt hoặc đổi `qty` (cả Chủ), DELETE | ✅ 403/405; DELETE 405, phiếu còn nguyên trong DB | API S6 (chứng từ không bị xoá) |
+| Duyệt lần 2 cùng người / khác người; màn cũ | ✅ 409, không cộng tồn lần nữa | API S6, Real C3 |
+| Lô đã chốt (BR-HV-04) | ✅ duyệt Tái nhập bị từ chối 4xx, tồn/sổ/phiếu không đổi (trạng thái lô giả lập bằng SQL) | API S7 |
+| Tạo hàng hoàn cho lô đã chốt | Ghi nhận B4 (Low) | API S7: 201, nhưng thực tế khó đạt vì chốt lô bị chặn khi còn đơn PROCESSING |
+| Bấm đúp Gửi duyệt, bấm đúp Duyệt | ✅ 1 phiếu, 1 dòng sổ | `qa_ed_batch9_ui`, Real A6, C2 |
+| Esc đóng hộp Duyệt, focus nằm trong hộp, F5, Back | ✅ | UI `run_approve_edges` |
+| Hai yêu cầu POST đồng thời cùng phiếu | ⏸ | SQLite không có khoá hàng: 1 yêu cầu 201, 1 yêu cầu 500 `database is locked`. Tổng đã ghi nhận vẫn ≤ số đã giao. Phải chạy lại trên PostgreSQL mới kết luận được phần `select_for_update` |
+| Tham số lọc xấu (`status=XYZ`, `month=2026-13`, `page=0/abc/999`, id `abc/0/-1/99999999999999999999`) | ✅ không 500 | API S4 |
+| Nhập "0,5" kiểu VN | ✅ nhận | UI `run_create_edges` |
+| Giới hạn ghi chú SĐT ở FE: `0912345678`, `0912 345 678`, `091.234.5678`, `+84 912 345 678`, `84912345678`, `số 0912-345-678` | ✅ bị chặn | UI mock |
+| `0912,345,678` không bị chặn; "khách hẹn 10/10/2026 9h" bị chặn nhầm | ❌ ghi nhận, đúng như quyết định #4 | UI mock. Không tính lỗi mới |
+
+### Phân quyền (Group x hành động; BE thật, token thật)
+| Vai | Xem danh sách | Xem phiếu người khác | Tạo | Duyệt | Ghi chú |
+|---|---|---|---|---|---|
+| `loc` (Chủ) | 200, thấy tất cả | 200 | 201 | 200 | Real D |
+| `ql1` (Quản lý) | 200, thấy tất cả | 200 | 403 (quyết định #21: chưa có `add_returntostock`; FE không hiện nút) | 200 | Real C |
+| `kho1` | 200, thấy tất cả | 200 | 201 | 403 | Real F |
+| `giao1` | 200, chỉ phiếu giao của mình | 404 | 201 cho phiếu của mình; 404 cho phiếu của giao2 | 403 | Real A, B, C0 |
+| `giao2` | 200, chỉ phiếu của mình (rỗng) | 404 (cả chi tiết, sửa, duyệt, dòng thời gian) | 404 khi tạo cho phiếu của giao1 | 403/404 | Real E |
+| `cs1` (CSKH thuần) | 403, FE "Không có quyền", menu không có mục | | 403 | 403 | API S2/S4/S6, Real F3 |
+| `cs2` (CSKH + giao) | 200, chỉ phiếu của mình (rỗng) | 404 | theo phiếu của mình | 403 | API S4, UI R cs2 |
+| Chưa đăng nhập | 401 | | 401 | 401 | API |
+
+### Rò giá vốn
+✅ Không có. Phản hồi hàng hoàn, phiếu giao, dòng thời gian không có `123457`/`unit_cost`/`purchase_rate`/`landed`/`cost` (API S1, S5). Rà toàn bộ phản hồi API các vai `ql1/kho1/giao1/giao2/cs1` gọi trong lúc dùng màn Lô 9: 0 phản hồi chứa giá vốn (Real H1; riêng `dashboard/summary/` của `loc` có giá vốn, đúng vì Chủ có quyền, đã loại khỏi ca). Không có tiền hay đơn giá trên danh sách, chi tiết, hộp Duyệt. `AuditLog.changes` của `approve_returntostock` chỉ có `{"decision": ...}`, không tính ngược ra giá vốn được (Real D2).
+
+### Rò dữ liệu cá nhân
+| Điểm kiểm | Kết quả |
+|---|---|
+| JSON hàng hoàn (22 khoá khai tường minh) không có tên/SĐT/địa chỉ khách; `Cache-Control: no-store` | ✅ API S5 |
+| Dòng thời gian `guidance/return/<id>/` (kho1 và giao1) không có tên/SĐT/địa chỉ khách | ✅ API S5 |
+| `AuditLog` (`return_to_warehouse`, `approve_returntostock`) không có ghi chú tự do, SĐT, tiền; kể cả khi ghi chú có SĐT | ✅ API S5, Real D2 |
+| DOM danh sách và chi tiết không có SĐT hay tên khách | ✅ UI mock |
+| localStorage, sessionStorage, cookie, URL không có ghi chú/SĐT (trừ danh sách người dùng của mock và token, đã loại khỏi ca) | ✅ UI mock |
+| Console không có `error`/`warning` (loc, ql1, kho1, giao1, giao2, cs1, cs2; 360 và 1280; hai tab) | ✅ UI và Real |
+| Người giao khác mở phiếu của người giao kia | ✅ 404, không lộ kg, lô, ghi chú |
+| BE chặn SĐT trong ghi chú hàng hoàn khi gọi thẳng API | ❌ B1: kho1 gửi `note="Khách hẹn gọi 0900000777 buổi sáng"` ra 201 |
+| Ảnh chụp, report | ✅ chỉ dùng dữ liệu giả |
+| Giới hạn tần suất | Không áp dụng cho API này (không có tra đơn công khai) |
+
+### Hồi quy
+| Mục | Kết quả |
+|---|---|
+| Toàn bộ BE `manage.py test` | ✅ 2670 ca OK; riêng `apps.inventory apps.delivery`: 734 ca OK |
+| FE: `npm ci` (bản sao sạch, không `--legacy-peer-deps`) | ✅ không có lỗi peer |
+| FE: `tsc --noEmit` | ✅ 0 lỗi |
+| FE: `vitest run` | ✅ 55 file, 582 ca |
+| FE: `check-no-mock`, `check-ai-chunks` | ✅ XANH (17 màn nghiệp vụ và 2 layout không có `new Worker`/`wllama`) |
+| `python3 scripts/check_naming.py` | ✅ không phát sinh vi phạm mới (sau khi thêm 3 script QA) |
+| `ed_batch9_returns` (dev, mock) | ✅ 105/105 |
+| `ed_batch4_delivery` (Việc giao của tôi, Lô 4, file có sửa) | ✅ 70/70 |
+| `ed_batch1_shell` (khung và menu, file có sửa) | ✅ 56/56 (xem lưu ý harness bên dưới) |
+| `ed_batch6_customers` (Lô 6, liền kề) | ✅ 79/79 |
+| Menu 4 vai sau khi thêm "Hàng hoàn về kho" | ✅ trong `ed_batch1_shell` |
+
+Lưu ý harness: `ed_batch1_shell.py` đọc `erp-console/out/404.html`; vì tôi vừa build bản thật vào `out/` nên ca 404 treo. Chạy lại bằng bản sao script trỏ vào `404.html` của bản mock (scratchpad) thì 56/56. Không phải lỗi sản phẩm.
+
+### Lỗi
+#### B1 — BE không chặn SĐT trong ghi chú phiếu hàng hoàn · Medium (chặn) · bất biến 9, ED-26-AC2
+- Bước tái hiện: đăng nhập `kho1` rồi `POST /api/inventory/returns/` với `{"delivery_note": 4, "batch": 1, "qty": "1", "note": "Khách hẹn gọi 0900000777 buổi sáng"}`. Script: `erp-console/e2e/qa_ed_batch9_api.py`, ca "S5".
+- Mong đợi: 400 như ba đường ghi chú tự do còn lại của BE đều gọi `apps/common/pii.has_long_digit_run` (`delivery/services.py:176`, `delivery/confirmation/services.py:126`, `inventory/batches/services.py:416`).
+- Thực tế: 201. Ghi chú có SĐT nằm trong DB và hiện cho mọi vai xem được hàng hoàn (loc, ql1, kho1, giao). FE có chặn nên người dùng thường không gặp, nhưng chặn chỉ nằm ở trình duyệt.
+- Ảnh hưởng: không rò ra ngoài (không vào AuditLog, dòng thời gian, AI, log; API chỉ cho người có quyền), nên không phải Critical; là hở lớp phòng thủ so với phần còn lại của BE. Đề xuất: `validate_note` ở `ReturnToStockSerializer` gọi `has_long_digit_run` (cùng luật 9 chữ số liền với FE) và test tương ứng. Sửa một dòng.
+
+#### B2 — Cột "Ghi chú" nằm ngoài khung bảng ở 1440px · Low · ED-26-AC1
+- Tái hiện: ql1 vào `/returns/` ở 1440x900. Bảng rộng 1261px trong khung 1150px (`lt-scroll`, `overflow-x: auto`); chữ ở cột "Ghi chú" bị cắt giữa chữ, phải cuộn ngang trong khung mới đọc được. Ảnh `shots/lot9/impl-list-ql1-1440.png`.
+- Mong đợi: 10 cột vừa khung ở màn desktop phổ biến, hoặc cột phụ rút gọn có `title`.
+- Ảnh hưởng: AC1 vẫn đạt (cột có, đọc được khi cuộn); trải nghiệm kém, nhất là với phiếu có ghi chú dài.
+
+#### B3 — Mã Phiếu giao, Đơn, Lô ở trang chi tiết không phải liên kết; "Ngoài kho lạnh" không tô hổ phách khi quá 2 giờ · Low · UI-RULES §Chi tiết mục 4, board W5f
+- Tái hiện: mở `/returns/detail/?id=1`. Chỉ có một liên kết `a[href]` (quay lại danh sách). Ở board `board-ERP-W5f-1440.png` ba trường này là liên kết xanh, và "3 giờ 20 phút" có màu hổ phách. Bản chạy: "2 giờ 15 phút" màu chữ thường.
+- Ảnh hưởng: không chặn AC. `ReturnItem` có `delivery_note` (id) nhưng không có id đơn và id lô nên chỉ một phần làm được ngay; màn Kho & lô (Lô 7) chưa có. Nên ghi vào việc tồn.
+
+#### B4 — Cho tạo hàng hoàn vào lô đã chốt · Low (quan sát)
+- Tái hiện: đặt trạng thái lô `CLOSED` bằng SQL rồi `POST` hàng hoàn cho lô đó: 201. Duyệt thì bị chặn (cả Tái nhập và Huỷ bỏ), phiếu kẹt ở Chờ duyệt, không có nút huỷ phiếu (quyết định #8).
+- Ảnh hưởng: khó xảy ra thật vì không chốt được lô khi còn đơn PROCESSING; ghi nhận để Tech Lead cân nhắc chặn sớm lúc tạo.
+
+Không tính lỗi (đã Duy chốt): Quản lý không nhập được hàng hoàn (#21), không có nút huỷ phiếu nhập sai (#8), luật "9 chữ số liền" chặn nhầm ngày tháng và bỏ sót `0912,345,678` (#4).
+
+### ⏸ Chưa kiểm
+1. Hai yêu cầu tạo hàng hoàn đồng thời trên PostgreSQL (SQLite không có `select_for_update`, xem mục Ngoại lệ).
+2. Dòng "Hàng hoàn tái nhập" nhìn thấy trên màn Sổ nhập xuất (Lô 7 chưa merge). Phần dữ liệu (DB) đã kiểm.
+3. Khối Trợ lý AI ở chi tiết khi AI bật: bản BE thật không gắn URL `ai/status/` (404) nên cổng tắt. Đã kiểm AI tắt: trang chi tiết chỉ hỏi `ai/status/`, không gọi `actions`/chat/proposals (Real D4, A7).
+
+### Lệnh đã chạy (tóm tắt)
+- `cd erp-console && npx tsc --noEmit` (0 lỗi); `npx vitest run` (582/582); `NEXT_PUBLIC_USE_MOCK=1 npm run build` và `NEXT_PUBLIC_USE_MOCK=0 NEXT_PUBLIC_API_BASE=http://127.0.0.1:8000 npm run build` (cả hai thành công; bản mock phục vụ ở :3101, bản thật ở :3102); `node scripts/check-no-mock.mjs`, `node scripts/check-ai-chunks.mjs` (XANH); `npm ci` ở thư mục sạch (không lỗi peer).
+- `cd backend && .venv/bin/python manage.py test` → `Ran 2670 tests ... OK`.
+- BE thật: `DATABASE_URL=sqlite:///… manage.py migrate` rồi nạp fixture, `runserver 8000 --noreload` với `CORS_ALLOWED_ORIGINS=http://127.0.0.1:3102`; nạp lại DB gốc giữa mỗi lần chạy.
+- `QA_DB=… python3 e2e/qa_ed_batch9_api.py` (110 ca: 109 ✅, 1 ❌ là B1); `SHOTS=… python3 e2e/qa_ed_batch9_ui.py` (90 ca: 86 ✅, 4 ❌ gồm B2, B3 và hai ca #4); `QA_DB=… SHOTS=… python3 e2e/qa_ed_batch9_real.py` (49/49).
+- Script của dev: `ed_batch9_returns` 105/105, `ed_batch4_delivery` 70/70, `ed_batch1_shell` 56/56 (có lưu ý), `ed_batch6_customers` 79/79.
+- Ảnh: `doc/features/2026-10-01-erp-theo-design/shots/lot9/` (4 ảnh board `board-ERP-*` và 17 ảnh bản chạy `impl-*`, gồm `impl-real-two-tabs-1280.png`, `impl-real-409-1280.png`, `impl-real-f2n-1280.png`, `impl-*-360.png`).
+
+---
+
+### Lô 9 — FE lần 2 · 2026-10-02
+
+#### Kết luận: APPROVED — B1 (Medium, chặn) đã sửa và xác minh trên BE thật; B2, B3, B4 đã sửa; không còn ca đỏ. Còn 1 ghi nợ đã thoả thuận (Lô chưa là liên kết, chờ Lô 7).
+#### Tổng (script QA): 274 ca · ✅ 273 · ❌ 0 · ⏸ 1 ca bỏ qua có chủ đích (+ 3 mục chưa kiểm của lần 1 vẫn giữ)
+
+| Script | Kết quả |
+|---|---|
+| `qa_ed_batch9_api.py` (BE thật) | 120/120 (lần 1: 109/110) |
+| `qa_ed_batch9_ui.py` (mock :3101) | 97 đạt, 0 lỗi, 1 ⏸ (lần 1: 86/90) |
+| `qa_ed_batch9_real.py` (console thật :3102 + BE :8000) | 49/49 |
+| `qa_ed_batch9_real_closed.py` (mới, B4 trên trình duyệt thật) | 7/7 |
+
+Sửa script theo yêu cầu điều phối viên:
+- **S8b:** lô B nay kỳ vọng 0 kg (S7 tạo vào lô đã chốt bị BE chặn). Thêm 2 ca S7: tạo vào lô đã chốt ra 400 `RETURN_BATCH_CLOSED` và DB không có phiếu mới.
+- **Ca "Lô là liên kết":** chuyển ⏸ (chờ Lô 7). Tách thành 2 ca đạt: Phiếu giao là liên kết (`/deliveries/detail/?id=38`), Đơn là liên kết (`/orders/detail/?id=108`).
+- **Hai ca luật "9 chữ số liền":** theo quyết định #4, nay assert đúng hành vi đã chấp nhận (`0912,345,678` bỏ sót, "khách hẹn 10/10/2026 9h" chặn nhầm), không còn ghi đỏ.
+- Thêm ca mới cho B1 (5 biến thể SĐT gọi thẳng API, ghi chú thường không bị chặn nhầm, PATCH, AuditLog) và B2/B3 (kích thước khung bảng, màu cảnh báo, chữ "(quá 2 giờ)").
+
+#### Xác minh từng lỗi của lần 1
+| Lỗi | Kết quả | Bằng chứng chạy thật |
+|---|---|---|
+| B1 Medium (chặn): BE nhận SĐT trong ghi chú | ✅ đã sửa | API: kho1 gửi "Khách hẹn gọi 0900000777 buổi sáng" ra **400** với khoá `note`, phản hồi không chứa SĐT. 5 biến thể (`0900 000 777`, `0900.000.777`, `+84 900 000 777`, `84900000777`, `0900-000-777`) đều 400, DB không có phiếu nào chứa SĐT. "Mua 2 kg lúc 14h30" và "xe hỏng giữa đường 12km" vẫn 201 (không chặn nhầm). PATCH ghi chú có SĐT ra 400/403. AuditLog không có SĐT. Dev: 2 test BE mới (`test_r9_note_with_phone_is_rejected`) nằm trong 2672 ca xanh |
+| B2 Low: Ghi chú cắt ở 1440 | ✅ đã sửa | 1440: khung 1150px, `scrollWidth 1150 = clientWidth`, đủ 10 cột, "Ghi chú" nằm trọn khung. 1280: khung 990px, `scrollWidth 990 = clientWidth`, cột Ghi chú nằm trọn (ẩn cột phụ "Người nhập"). Ảnh `shots/lot9r2/impl-list-ql1-1280.png`, `impl-list-ql1-1440.png` |
+| B3 Low: không liên kết, không màu hổ phách | ✅ phần Phiếu giao, Đơn, màu cảnh báo; ⏸ phần Lô | Chi tiết: Phiếu giao và Đơn là `a[href]` đúng đích (mock, và BE thật qua `ed_batch9_real` 30/30 gồm bấm Đơn mở được). Dòng "2 giờ 15 phút" màu cam `rgb(168,90,7)` kèm chữ ẩn "(quá 2 giờ)"; các dòng 40 phút, 55 phút, 1 giờ 10 phút giữ màu thường. Ảnh `impl-detail-ql1-1440.png`. Lô vẫn chữ thường, ghi nợ đến khi Lô 7 vào main |
+| B4 Low: tạo hàng hoàn vào lô đã chốt | ✅ đã sửa | API: 400 `RETURN_BATCH_CLOSED`, DB không có phiếu mới. Trình duyệt thật (giao1, 360px): hộp đang mở, lô bị chốt ở màn cũ, bấm Gửi ra câu "đã chốt" dưới ô Lô, hộp còn mở, không lộ mã, không cuộn ngang, đổi sang lô còn mở thì câu lỗi mất và gửi được 201. Ảnh `impl-real-batch-closed-360.png`. Phiếu đã tạo trước khi chốt lô vẫn bị chặn khi duyệt (S7, BR-HV-04: tồn, sổ, trạng thái không đổi) |
+
+Kiểm lại AC và các ca trọng yếu của lần 1 (đều xanh): AC1 đến AC5, quá kg bị chặn tại ô không gửi POST, hai tab nhập phần còn lại, duyệt Tái nhập (+kg, đúng 1 dòng sổ kể cả bấm đúp), Huỷ bỏ ghi lỗ, duyệt lần hai 409, người giao khác 404, cs1 403, DELETE 405, AuditLog không có ghi chú/SĐT/tiền, không rò giá vốn, 360px không cuộn ngang và ô chạm >= 44px, AI tắt không gọi `actions`, không console error.
+
+Phân quyền, rò giá vốn, rò dữ liệu cá nhân: giữ nguyên kết quả lần 1, chạy lại toàn bộ trong `qa_ed_batch9_api` (ma trận 8 vai) và `qa_ed_batch9_real` (quét mọi phản hồi API không có giá vốn, 123457, tên/SĐT/địa chỉ khách). Thêm: BE nay chặn SĐT ở ghi chú nên dữ liệu cá nhân không còn đường vào bằng API trực tiếp.
+
+#### Hồi quy
+| Mục | Kết quả |
+|---|---|
+| `manage.py test` toàn bộ (BE đã sửa) | ✅ 2672 ca OK (lần 1: 2670; +2 test B1/B4) |
+| `npm ci` bản sao sạch (không `--legacy-peer-deps`) | ✅ "added 189 packages, audited 190", không lỗi peer |
+| `tsc --noEmit` | ✅ 0 lỗi |
+| `vitest run` | ✅ 55 file, 586 ca |
+| Build `NEXT_PUBLIC_USE_MOCK=0` + `check-no-mock` + `check-ai-chunks` | ✅ XANH (17 file mock, 36 chuỗi seed, 174 file build; 17 màn và 2 layout không có Worker/wllama) |
+| Build `NEXT_PUBLIC_USE_MOCK=1` | ✅ |
+| `ed_batch9_returns` (dev, mock) | ✅ 144/144 |
+| `ed_batch9_real` (dev, BE thật, fixture riêng của QA 2 phiếu 10 kg) | ✅ 30/30 |
+| `ed_batch4_delivery` (BASE 3101, Việc giao của tôi) | ✅ 70/70 |
+| `ed_batch1_shell` (khung, menu; `out/` hiện là bản mock) | ✅ 56/56 |
+| `python3 scripts/check_naming.py` | ✅ không phát sinh vi phạm mới |
+| Thay đổi dùng chung `DataTable.tsx`, `globals.css` (mốc `hideBelow 1100`) | ✅ chỉ thêm mốc mới; `ed_batch1_shell` và `ed_batch4_delivery` (bảng ở Giao hàng) vẫn xanh |
+
+#### Lỗi còn lại
+Không có lỗi chặn. Ghi nợ (không chặn, đã thoả thuận): "Lô" ở chi tiết chưa là liên kết, chờ Lô 7 (dev ghi ở `03-dev-notes.md`); FE lấy id đơn qua hook đọc phiếu giao vì `ReturnItem` chưa có `order` (đề xuất của dev: BE thêm `order {id, code}`).
+
+#### ⏸ Chưa kiểm
+1. Hai POST đồng thời trên PostgreSQL: trên SQLite vẫn ra [201, 500 "database is locked"] (lỗi của SQLite, không phải sản phẩm), tổng đã ghi nhận không vượt số đã giao.
+2. Dòng "Hàng hoàn tái nhập" nhìn trên màn Sổ kho (Lô 7 chưa vào main); dữ liệu sổ trong DB đã kiểm.
+3. Khối Trợ lý AI khi AI bật (bản chạy không gắn `ai/status/`); nhánh AI tắt đã kiểm.
+4. Liên kết "Lô" ở chi tiết (chờ Lô 7).
+
+#### Lệnh đã chạy (tóm tắt)
+- `cd backend && .venv/bin/python manage.py test` → `Ran 2672 tests in 140.679s ... OK`.
+- `npm ci` ở thư mục sạch; `./node_modules/.bin/tsc --noEmit` (0); `npx vitest run` (586/586).
+- `NEXT_PUBLIC_USE_MOCK=0 NEXT_PUBLIC_API_BASE=http://127.0.0.1:8000 npm run build` + `node scripts/check-no-mock.mjs` + `node scripts/check-ai-chunks.mjs` (XANH); `NEXT_PUBLIC_USE_MOCK=1 npm run build`. Bản mock phục vụ ở :3101, bản thật ở :3102, Django :8000 trên SQLite tạm nạp lại giữa các script. Đã tắt cả ba.
+- `python3 qa_ed_batch9_api.py` 120/120; `qa_ed_batch9_ui.py` 97 đạt + 1 ⏸; `qa_ed_batch9_real.py` 49/49; `qa_ed_batch9_real_closed.py` 7/7; `ed_batch9_returns` 144/144; `ed_batch9_real` 30/30; `ed_batch4_delivery` 70/70; `ed_batch1_shell` 56/56; `python3 scripts/check_naming.py` OK.
+- Ảnh lần 2: `doc/features/2026-10-01-erp-theo-design/shots/lot9r2/` (20 ảnh, dữ liệu giả).

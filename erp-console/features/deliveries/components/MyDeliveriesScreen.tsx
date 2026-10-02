@@ -3,7 +3,8 @@
 // ED-19 — Việc giao của tôi (nhân viên giao): chỉ phiếu gán cho mình (`assigned_to=me`), chia nhóm
 // Đang giao · Chờ lấy hàng · Giao thất bại · Đã xong (hôm nay). Thẻ lớn cho điện thoại 360px.
 // "Gọi khách" hiện đủ số và mở `tel:` (số lấy từ chi tiết phiếu, chỉ giữ trong bộ nhớ trang: không ghi localStorage, URL, log).
-// F2l "Báo giao thất bại" là hộp riêng. "Mang hàng về kho" (F2m) làm ở Lô 9 (PO chốt): Lô này không hiện nút hay ghi chú nhắc.
+// F2l "Báo giao thất bại" là hộp riêng. Lô 9: thẻ Giao thất bại có nút "Mang hàng về kho" mở hộp F2m (CreateReturnModal) với phiếu giao điền sẵn;
+// nút chỉ mở hộp, việc ghi phiếu hoàn do hộp đó làm (BE chặn nếu phiếu không còn Đang giao/Giao thất bại).
 // Nợ TL-L6: mỗi thẻ Đang giao/Giao thất bại gọi chi tiết phiếu để lấy SĐT hiện sẵn trên nút Gọi khách (ED-19-AC7); SĐT không có trong payload danh sách (R4).
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ENUMS } from "@/shared/lib/enums";
@@ -22,6 +23,9 @@ import { MINE_GROUPS, groupMine, hasAction, lineNames, telHref, type MineGroupKe
 import type { DeliveryNoteItem } from "../types";
 import { ConfirmCompleteModal } from "./ConfirmCompleteModal";
 import { ReportFailureModal } from "./ReportFailureModal";
+import { useAuth } from "@/features/auth/components/AuthProvider";
+import { CreateReturnModal } from "@/features/returns/components/CreateReturnModal";
+import { canCreate } from "@/features/returns/returnsModel";
 import s from "../deliveries.module.css";
 
 type Params = { assigned_to: string; status: string; completed_from?: string };
@@ -37,6 +41,7 @@ function MineCard({
   onStart,
   onComplete,
   onFail,
+  onReturn,
   onLoadPhone,
 }: {
   note: DeliveryNoteItem;
@@ -46,6 +51,7 @@ function MineCard({
   onStart: () => void;
   onComplete: () => void;
   onFail: () => void;
+  onReturn: () => void;
   onLoadPhone: () => void;
 }) {
   const showCall = note.status === "DELIVERING" || note.status === "FAILED";
@@ -53,6 +59,9 @@ function MineCard({
   const canStart = (note.status === "READY" || note.status === "FAILED") && hasAction(note, "set_status:DELIVERING");
   const canComplete = note.status === "DELIVERING" && hasAction(note, "set_status:COMPLETED");
   const canFail = note.status === "DELIVERING" && hasAction(note, "set_status:FAILED");
+  // Nút chỉ hiện khi có quyền nhập hàng hoàn (BE vẫn chặn 403).
+  const { me } = useAuth();
+  const canReturn = note.status === "FAILED" && canCreate(me?.permissions);
 
   return (
     <li className={s.card} data-note-id={note.id} data-status={note.status}>
@@ -124,6 +133,12 @@ function MineCard({
             Báo giao thất bại
           </button>
         )}
+        {canReturn && (
+          <button type="button" className="btn" onClick={onReturn} disabled={busy}>
+            <Icon name="assignment_return" />
+            <span>Mang hàng về kho</span>
+          </button>
+        )}
         {canComplete && (
           <button type="button" className={`btn primary ${s.grow}`} onClick={onComplete} disabled={busy}>
             Đã giao xong
@@ -152,6 +167,7 @@ export function MyDeliveriesScreen() {
   const [errors, setErrors] = useState<Record<number, string>>({});
   const [failFor, setFailFor] = useState<DeliveryNoteItem | null>(null);
   const [completeFor, setCompleteFor] = useState<DeliveryNoteItem | null>(null);
+  const [returnFor, setReturnFor] = useState<DeliveryNoteItem | null>(null);
 
   const loadPhone = useCallback((id: number) => {
     asked.current.add(id);
@@ -281,6 +297,7 @@ export function MyDeliveriesScreen() {
                   onStart={() => void onStart(n)}
                   onComplete={() => setCompleteFor(n)}
                   onFail={() => setFailFor(n)}
+                  onReturn={() => setReturnFor(n)}
                   onLoadPhone={() => loadPhone(n.id)}
                 />
               ))}
@@ -302,6 +319,17 @@ export function MyDeliveriesScreen() {
           onReported={(res) => {
             setFailFor(null);
             toast.success(res.needs_decision ? "Đã báo giao thất bại. Phiếu đã hỏng 2 lần, chờ Chủ hoặc Quản lý quyết định." : "Đã báo giao thất bại.");
+            reloadAll();
+          }}
+        />
+      )}
+      {returnFor && (
+        <CreateReturnModal
+          initialNote={{ id: returnFor.id, code: returnFor.code }}
+          onClose={() => setReturnFor(null)}
+          onCreated={() => {
+            setReturnFor(null);
+            toast.success("Đã gửi phiếu hàng hoàn, chờ duyệt.");
             reloadAll();
           }}
         />

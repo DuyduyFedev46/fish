@@ -2,6 +2,8 @@
 Serializer giao hàng (P-06 và CSKH xác nhận đơn).
 Tuân thủ Bất biến 1 (không rò giá vốn) và Bất biến 9 (phạm vi dữ liệu cá nhân).
 """
+from decimal import Decimal
+
 from rest_framework import serializers
 
 from .models import DeliveryNote, LabelPrint
@@ -223,7 +225,12 @@ class DeliveryNoteDetailSerializer(DeliveryNoteSerializer):
         return obj.recipient_name or None
 
     def get_lines(self, obj):
+        """Lô 9: `batch_pk` (pk lô, để tạo phiếu hoàn khi không có quyền xem lô) và `returned_qty` (kg đã hoàn của lô
+        đó trên phiếu này, Chờ duyệt + Đã duyệt; một truy vấn gộp cho cả phiếu). Không phải giá vốn hay dữ liệu cá nhân."""
+        from apps.inventory.returns.creation import returned_qty_by_batch  # import trễ: tránh vòng delivery <-> inventory
+
         allocs = self._get_allocations(obj)
+        returned = returned_qty_by_batch(obj) if allocs else {}
         results = []
         for a in allocs:
             results.append({
@@ -231,5 +238,7 @@ class DeliveryNoteDetailSerializer(DeliveryNoteSerializer):
                 "qty_kg": f"{float(a.qty):.3f}",
                 "batch_id": a.batch.batch_id,
                 "expiry_date": a.batch.expiry_date.isoformat() if a.batch.expiry_date else None,
+                "batch_pk": a.batch_id,
+                "returned_qty": f"{returned.get(a.batch_id, Decimal('0')):.3f}",
             })
         return results

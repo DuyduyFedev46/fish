@@ -292,7 +292,6 @@ export const NAV: NavItem[] = [
     short: "Hoàn kho",
     icon: "assignment_return",
     section: "Hàng hoá & kho",
-    soon: true,
     visible: (me) => has(me, PERM.viewReturn),
   },
   {

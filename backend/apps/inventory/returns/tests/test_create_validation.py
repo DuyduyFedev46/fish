@@ -33,6 +33,26 @@ class CreateReturnTests(ReturnsApiBase):
         self.assertEqual(body["created_by_name"], "Phúc Thử")
         self.assertEqual(body["note"], "Khách vắng nhà")
 
+    def test_r9_note_with_phone_is_rejected(self):
+        """QA Lô 9 B1: ghi chú có dãy số dài (SĐT) bị chặn ở API — cùng luật các ghi chú khác (bất biến 9)."""
+        for note in (NOTE_WITH_PHONE, "gọi 0900 000 777", "stk 0900.000.777"):
+            resp = self.post(self.courier, self.payload(note=note))
+            self.assertEqual(resp.status_code, 400, (note, resp.content))
+            self.assertNotIn(PHONE_SENTINEL, resp.content.decode())
+        self.assertFalse(ReturnToStock.objects.exists())
+        rt = self.make_return(free_note="")
+        resp = client_for(self.owner).patch(f"{URL}{rt.pk}/", {"note": NOTE_WITH_PHONE}, format="json")
+        self.assertEqual(resp.status_code, 400, resp.content)
+
+    def test_r9_closed_batch_rejects_new_return(self):
+        """QA Lô 9 B4: lô đã chốt không nhận hàng hoàn mới (duyệt cũng bị chặn BR-HV-04)."""
+        self.batch.status = self.batch.Status.CLOSED
+        self.batch.save(update_fields=["status"])
+        resp = self.post(self.courier, self.payload())
+        self.assertEqual(resp.status_code, 400, resp.content)
+        self.assertEqual(resp.json()["code"], "RETURN_BATCH_CLOSED")
+        self.assertFalse(ReturnToStock.objects.exists())
+
     def test_r9_br_hv_02_create_does_not_change_stock(self):
         before = self.batch.qty_available
         ledger_before = StockLedgerEntry.objects.count()
@@ -42,7 +62,7 @@ class CreateReturnTests(ReturnsApiBase):
         self.assertEqual(StockLedgerEntry.objects.count(), ledger_before)
 
     def test_r9_audit_return_to_warehouse_written_without_free_text(self):
-        resp = self.post(self.courier, self.payload(note=NOTE_WITH_PHONE))
+        resp = self.post(self.courier, self.payload(note="Khách Nguyễn Thử hẹn lại"))
         self.assertEqual(resp.status_code, 201, resp.content)
         rows = AuditLog.objects.filter(model_name="inventory.ReturnToStock", object_id=str(resp.json()["id"]))
         self.assertEqual([r.action for r in rows], ["return_to_warehouse"])

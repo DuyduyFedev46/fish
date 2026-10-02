@@ -537,6 +537,16 @@ function actionsFor(me: MockMe, note: DeliveryNoteItem): string[] {
 }
 
 /**
+ * Lô 9: BE thêm `batch_pk` và `returned_qty` vào mỗi dòng của chi tiết phiếu giao. Hai số này thuộc module Hàng hoàn, nên mock của module đó
+ * đăng ký hàm tính ở đây (không import ngược để khỏi vòng phụ thuộc). Chưa đăng ký thì dòng không có hai khoá (giống BE cũ).
+ */
+type LineExtras = Record<string, unknown>;
+let lineExtras: ((noteId: number, line: { batch_id: string }) => LineExtras) | null = null;
+export function registerDeliveryLineExtras(fn: (noteId: number, line: { batch_id: string }) => LineExtras): void {
+  lineExtras = fn;
+}
+
+/**
  * Bản nhìn của một phiếu cho người gọi: (1) SR-PII-02 — người có phạm vi giao hạn chế (delivery_staff không kèm chủ/quản lý/NV kho)
  * thấy phiếu COMPLETED/CANCELLED kết thúc trước đầu ngày (hôm nay − 7) với customer_name, address, note, recipient_name,
  * phone, failure_note = null (khoá vẫn có); (2) tên người giao, SĐT và hành động theo quyền như BE (R4).
@@ -552,6 +562,7 @@ function viewFor<T extends DeliveryNoteItem>(me: MockMe, note: T, asDetail = fal
   if (asDetail && "lines" in note) {
     const d = base as unknown as DeliveryNoteDetail;
     d.phone = fakePhone(note.id);
+    if (lineExtras) d.lines = d.lines.map((l) => ({ ...l, ...lineExtras!(note.id, l) }));
     d.failure_note = (note as unknown as DeliveryNoteDetail).failure_note ?? "";
   }
   if (!me || !hasLimitedCourierScope(me)) return base;

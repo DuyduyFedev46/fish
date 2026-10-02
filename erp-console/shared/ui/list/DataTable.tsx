@@ -34,7 +34,7 @@ export type Column<T> = {
   hideBelow?: HideBelow;
 };
 
-export type HideBelow = 720 | 800 | 980;
+export type HideBelow = 720 | 800 | 980 | 1100;
 
 export type EmptyState = {
   icon?: string;
