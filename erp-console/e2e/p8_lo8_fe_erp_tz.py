@@ -181,7 +181,7 @@ def main():
         ok("AC2 Đơn hàng: dòng đầu '01/10/2026 00:20'", "01/10/2026 00:20" in base["orders"], str(time_tokens(base["orders"])[:4]))
         # Lô 3: trang chi tiết đơn ghi "Đặt lúc / Tự huỷ lúc" thành 2 dòng nhãn-giá trị và dòng thời gian có giờ ở dòng riêng.
         ok("AC2 Chi tiết đơn: 'Đặt lúc 01/10/2026 00:20', 'Tự huỷ lúc 01/10/2026 00:50', dòng thời gian '01/10/2026 00:20' + 'Khách đặt đơn'",
-           all(x in base["order_detail"] for x in ("Đặt lúc\n01/10/2026 00:20", "Tự huỷ lúc\n01/10/2026 00:50", "DÒNG THỜI GIAN\n01/10/2026 00:20\nKhách đặt đơn")),
+           all(x in base["order_detail"] for x in ("Đặt lúc\n01/10/2026 00:20", "Tự huỷ lúc\n01/10/2026 00:50", "Dòng thời gian\n01/10/2026 00:20\nKhách đặt đơn")),
            repr(base["order_detail"][700:1100]))
         ok("AC4 Ngày nhập lô mặc định = 2026-10-01 (hôm nay VN)", base["received_date_default"] == "2026-10-01", base["received_date_default"])
         ok("AC2 CSKH: chi tiết phiếu 'Trả tiền lúc 28/09/2026 06:00' (06:00+07:00 = 23:00Z hôm trước)", "Trả tiền lúc 28/09/2026 06:00" in base["cskh_detail"], base["cskh_detail"][:200])

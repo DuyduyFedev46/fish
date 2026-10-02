@@ -33,6 +33,7 @@ export function Timeline({ entries, truncated = false, title = "Dòng thời gia
         <ol className={s.list}>
           {entries.map((e, i) => (
             <li key={`${e.at}-${i}`} className={s.row} data-timeline-row>
+              <span className={s.dot} aria-hidden="true" />
               <time className={`${s.at} num`} dateTime={e.at}>
                 {dateTime(e.at)}
               </time>
