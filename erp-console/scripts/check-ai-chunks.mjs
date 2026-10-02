@@ -33,6 +33,10 @@ const TARGETS = [
   ["/(console)/confirmation/page", "/confirmation"],
   ["/(console)/confirmation/detail/page", "/confirmation/detail"],
   ["/(console)/my-deliveries/page", "/my-deliveries"],
+  ["/(console)/stocktake/page", "/stocktake"],
+  ["/(console)/stocktake/new/page", "/stocktake/new"],
+  ["/(console)/stocktake/edit/page", "/stocktake/edit"],
+  ["/(console)/stocktake/detail/page", "/stocktake/detail"],
   ["/print/label/page", "/print/label"],
 ];
 

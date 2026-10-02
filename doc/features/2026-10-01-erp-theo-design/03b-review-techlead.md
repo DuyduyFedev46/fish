@@ -1885,3 +1885,70 @@ Worktree `loc-wt-b`, nhánh `ed-stream-b`, phần chưa commit trên `7f3b7b1`.
   - TL5-L3, L4, L5
   - BE: TL5-BE1 và `note_code`.
 - QA cần sửa chỉ số cột "Hạn gọi" trong `qa_ed_batch5_ui.py` G2: cột 6 thành cột 7.
+
+## Lô 8 — FE
+
+ED-28 Kiểm kê, review techlead 02/10. Diff trong worktree `loc-wt-b` (nhánh `ed-stream-b`), chưa commit. Phạm vi: `erp-console/features/stocktake/**`, `app/(console)/stocktake/**`, `shared/lib/nav.ts`, `scripts/check-ai-chunks.mjs`, `e2e/ed_batch8_stocktake*.py`.
+
+**Số tự chạy lại:** `tsc --noEmit` sạch. `vitest run` 54 file, 554 test đạt. `scripts/check_naming.py` OK, không phát sinh mới. Màu cứng (hex/rgb/hsl) trong `features/stocktake` và `app/(console)/stocktake`: 0.
+
+**Phần đạt**
+- Chi tiết hiện `difference_qty`, `system_qty`, `counted_qty` và tổng `short_qty`/`over_qty`/`net_difference` lấy thẳng từ BE (`StocktakeDetailScreen.tsx:285-298`, `:245-255`). FE không tự tính lại chênh lệch trên màn chi tiết.
+- Nút Duyệt chỉ hiện khi `available_actions` có `approve` (`StocktakeDetailScreen.tsx:173,189`). Khi bị chặn, mục mờ nằm trong "…" và lấy chữ từ `approve_blocked_reason.label` (`:178-180`). FE không tự suy BR-KK-08.
+- `replaceStocktakeLines` gửi `expected_updated_at` (`api.ts:73-79`). Lỗi 409 giữ nguyên để `useSubmit` bật `ConflictBanner` (`StocktakeForm.tsx:87-90,340`).
+- `line_index` được đổi từ chỉ số trong danh sách đã gửi sang chỉ số dòng trong form qua `sent[]` (`StocktakeForm.tsx:213,225`). Trên màn chi tiết, `lines` (serializer) và vòng duyệt (`services.py:244`) cùng `order_by("id")`, nên chỉ số khớp.
+- Không có field tiền hay giá vốn. `fetchStockBatches` chỉ giữ các trường kg (`api.ts:117-136`). Không có dữ liệu khách, không `console.*`. `localStorage` chỉ dùng trong `mock.ts` (khoá `cave_erp_mock_stocktake`), và `window.__caveMock` bọc trong `NEXT_PUBLIC_USE_MOCK === "1"`.
+- Khối AI ghép `AiDocBlockGate targetModel="inventory.stockreconciliation"` vào `aiSlot` (`StocktakeDetailScreen.tsx:209`). Đây là cách §2.4 quy định và trùng với `DeliveryDetailScreen`. `check-ai-chunks.mjs` đã có 4 route `/stocktake*`.
+- Chặn bấm đúp bằng `busy` cộng `useSubmit`. Trang mỏng, URL chỉ mang `?id=`, đủ các trạng thái tải / lỗi / 403 / 404 / khoá.
+
+**Phát hiện**
+
+**TL8-F1 · High · Lưu nháp hoặc Gửi duyệt né được 409 khi có đổi Ngày kiểm kê hoặc Ghi chú.** Ở `StocktakeForm.tsx:216-222`, khi đầu phiếu đổi, FE gọi PATCH trước. PATCH của BE không kiểm phiên bản (`api.py:85-100`, `services.update_reconciliation`). Sau đó FE gán `updatedAt.current = h.updated_at` (dòng 219) rồi mới POST `…/lines/` với mốc mới này. Kết quả là phiên bản bị "làm mới" ngay trước khi kiểm, nên số đếm của người kia bị ghi đè mà không ai thấy cảnh báo. Đây chính là ca W6f phải chặn.
+- Tái hiện (mock): `kho1` mở `/stocktake/edit/?id=<id>`. Ở console gọi `__caveMock.stocktakeEditByOther(<id>)`. Sửa ô Ghi chú rồi bấm Lưu nháp. Kết quả: lưu thành công, không có `ConflictBanner`. Nếu không sửa Ghi chú thì có 409 đúng như mong đợi.
+- Trên BE thật: hai phiên cùng mở trang sửa. Phiên B lưu số. Phiên A đổi ngày rồi Lưu nháp. Dòng của B mất.
+- Cách sửa: POST `…/lines/` trước bằng mốc đang giữ, rồi mới PATCH đầu phiếu. Hoặc chỉ PATCH khi `lines` đã qua. Không gán `updatedAt.current` từ PATCH trước khi gửi dòng. Cần thêm ca e2e "đổi ghi chú + người khác sửa → 409".
+
+**TL8-F2 · Medium · Chữ trên màn nói "tồn đổi theo số thực đếm", trái BR-KK-09.** BE áp phần chênh đã chụp (`counted − system_qty` lúc lưu), không đặt tồn bằng số đếm. Nếu giữa lúc lưu và lúc duyệt có xuất hoặc nhập, tồn sau duyệt sẽ khác số đếm. Các câu hiện tại làm người duyệt hiểu sai:
+- `stocktakeUi.ts:207` có câu "Tồn của n lô sẽ đổi theo số thực đếm."
+- `StocktakeDetailScreen.tsx:342` có câu "Tồn kho của các lô lệch sẽ đổi theo số thực đếm."
+- `StocktakeDetailScreen.tsx:141` có toast "Tồn kho đã điều chỉnh theo số đếm."
+- Tái hiện (mock): lưu phiếu (lô A tồn 18, đếm 17,5). Gọi `__caveMock.stocktakeSetStock(A, 15)` rồi duyệt. Tồn ra 14,5, không phải 17,5, trong khi hộp xác nhận hứa "theo số thực đếm".
+- Đề xuất câu: "Mỗi lô lệch sẽ được cộng hoặc trừ đúng phần chênh lệch ở bảng." BR-KK-09 còn chờ Duy chốt nên câu chữ nên bám cơ chế hiện có.
+
+**TL8-F3 · Medium · "Tải lại" sau 409 giữ dòng của mình nhưng không cho thấy thay đổi của người kia.** `reloadAfterConflict` (`StocktakeForm.tsx:279-297`) chỉ lấy mốc `updated_at` mới và cập nhật `systemMilli` cho các lô trùng. Lô người kia thêm thì không hiện. Số người kia sửa trên lô trùng bị số đang gõ che mất. Ghi chú và ngày cũng không được nạp lại, trong khi `savedHeader` đã là bản của server. Bấm lưu lần nữa sẽ thay toàn bộ dòng bằng bản của mình. Như vậy 409 chỉ còn là một cú bấm thêm, người dùng không biết mình đang ghi đè.
+- Tái hiện (mock): mở trang sửa, gọi `stocktakeEditByOther(id)`, Lưu nháp ra 409, bấm Tải lại, Lưu nháp lần nữa. Bản của người kia bị thay mà không hiện gì.
+- Tối thiểu cần làm một trong hai việc: (a) sau khi tải lại, đánh dấu những dòng có số server khác số đang gõ, và thêm các lô mới của server vào form; hoặc (b) nạp lại nguyên bản server (giống màn khác) và giữ số đang gõ ở dạng "bản của bạn" để người dùng chọn. Nếu PO chấp nhận hành vi hiện tại thì ghi rõ vào 02b W6f.
+
+**TL8-L1 · Low · Lô mới có thể lập trùng phiếu khi bấm lại lúc đang chuyển trang.** Ở `afterSave` của mode `new` (`StocktakeForm.tsx:237-239`), FE `router.replace` mà không gán `recId.current = res.id`, trong khi `useSubmit` đã nhả `busy`. Nếu bấm Lưu nháp lần nữa trước khi trang edit nạp xong thì `createStocktake` chạy lần hai và tạo phiếu thứ hai. Cách sửa: gán `recId.current = res.id` (và `updatedAt.current`) trước khi `replace`.
+
+**TL8-L2 · Low · Mất "Lý do" đã gõ trên dòng chưa có số.** `toLineInputs` bỏ dòng không có số đếm (`stocktakeUi.ts:138-145`). Ở mode `new`, sau Lưu nháp trang chuyển sang edit và nạp lại từ BE, nên lý do đã gõ trên dòng chưa đếm bị mất mà không báo. Cùng gốc với lệch #2 và #9 của dev (không có unsaved-change guard). Đề xuất: khi lưu nháp, báo "n dòng chưa có số sẽ không được lưu" nếu dòng đó có lý do.
+
+**TL8-L3 · Low · Số "Dòng N:" trong lỗi BE không khớp vị trí trên form.** BE đếm theo danh sách đã gửi, đã bỏ các dòng trống. Lỗi được gắn đúng dòng, nhưng chữ "Dòng 3" có thể nằm trên dòng thứ 5 của form. Nên bỏ tiền tố "Dòng N: " trong `cleanMessage`, hoặc chỉ bỏ ở form, vì lỗi đã nằm ngay trên dòng.
+
+**TL8-L4 · Low · Code thừa.** `StocktakeDetailScreen.tsx:28` import `conflictOf` và `isConflictError` mà không dùng. `StocktakeForm.tsx:332` có biến `unchangedRows` thực chất là `rows.length`, tên gây hiểu nhầm.
+
+**Ghi nhận, không phải lỗi:**
+- Lệch #1: phiếu lưu nháp duyệt được ngay, vì BE không có trạng thái nháp riêng. Cần PO xác nhận cách gọi "Lưu nháp" và "Gửi duyệt".
+- Lệch #7: `ed_batch1_shell.py` đếm `option` toàn trang. Lỗi nằm ở script, không phải ở màn.
+
+**Kết luận: CHANGES REQUESTED.** Bắt buộc sửa TL8-F1 (High). Nên sửa cùng lượt TL8-F2 và TL8-L1, vì mỗi cái chỉ vài dòng. TL8-F3 sửa trong lô này, hoặc PO chấp nhận và ghi vào 02b. Các mục L2–L4 có thể gom vào lô sau.
+
+### Lô 8 — FE, review lại sau vòng sửa (02/10)
+
+**Số tự chạy lại:** `tsc --noEmit` sạch. `vitest run` 54 file, 555 test đạt. `check_naming` OK. Màu cứng 0. Không còn `conflictOf`, `isConflictError`, `unchangedRows`.
+
+| Mục | Kết quả | Căn cứ |
+|---|---|---|
+| TL8-F1 (High) | **Đã sửa** | `StocktakeForm.persist()`: POST `…/lines/` đi trước, kèm `updatedAt.current` của bản đang giữ. Gặp 409 thì `throw` ngay trong `catch`, không chạy tới PATCH. Chỉ khi dòng lưu xong mới gán `updatedAt` mới và PATCH đầu phiếu, và chỉ PATCH khi ngày hoặc ghi chú khác `savedHeader`. Nếu người kia đổi ghi chú trước đó thì `updated_at` đã đổi, nên POST dòng ra 409. Còn một khe nhỏ giữa POST dòng và PATCH (vài trăm ms): PATCH ở BE ghi đè ngày/ghi chú theo kiểu ai lưu sau thắng. Mức này chấp nhận được, vì muốn kín hẳn thì BE phải kiểm phiên bản ở PATCH, nằm ngoài lô FE. PATCH lỗi sau khi dòng đã lưu thì báo đúng "Đã lưu số đếm nhưng chưa lưu được ngày hoặc ghi chú…", và mốc phiên bản đã cập nhật nên lần thử lại không tự gây 409. |
+| TL8-F2 | **Đã sửa** | `stocktakeUi.ts:207-209`, hộp xác nhận `StocktakeDetailScreen.tsx:345` và toast `:141` đều nói "cộng hoặc trừ phần chênh lệch đã ghi", đúng BR-KK-09. Có test quét chặn cụm "theo số (thực) đếm". |
+| TL8-F3 | **Đã sửa** | `reloadAfterConflict` gọi `applyDetail(d)`, nạp nguyên khối dòng, ngày, ghi chú và `updated_at` từ máy chủ, rồi xoá kho đang chọn, lỗi dòng và trạng thái submit. Trước khi bấm có câu báo "Thay đổi chưa lưu của bạn sẽ bị bỏ khi tải lại." |
+| TL8-L1 | **Đã sửa** | `recId.current` và `updatedAt.current` được gán ngay khi `createStocktake` trả về, trước khi `useSubmit` nhả nút. Bấm lần hai sẽ đi nhánh `lines`, không tạo phiếu thứ hai. |
+| `history.replaceState` | **Ổn** | Next là 14.2.35. Từ 14.1, `window.history.replaceState` gốc được App Router tích hợp, nên `useSearchParams` cập nhật theo và cây router được giữ. Repo đã có tiền lệ ở `content/edit/page.tsx:407` và `OrderDetailScreen.tsx:133`. Với static export, `/stocktake/edit/index.html` có sẵn, nên F5 hoặc mở lại URL vào đúng trang sửa. Form vẫn mount ở mode `new`, nhưng `recId` đã có nên không lập lại phiếu. Màn khoá phiếu (`mode === "edit"`) không áp ở đây, và cũng không cần, vì phiếu vừa lập luôn DRAFT và người lập có quyền sửa. |
+| TL8-L2 | **Đã sửa** | Lưu nháp lần đầu ở lại form, lý do trên dòng chưa có số còn nguyên. Toast báo "N lô chưa có số nên chưa được lưu." |
+| TL8-L4 | **Đã sửa** | |
+| Bảng chi tiết bỏ cột Kho | **Ổn** | Cột Kho đã có ở `InfoGrid`. Phiếu nhiều kho (`warehouse_names.length > 1`) thì ghi tên kho sau tên mặt hàng, nên không mất thông tin. Chênh lệch vẫn là `difference_qty` của BE. CSS dùng token, không màu cứng. Selector `table:global(.lt).linesTable` đúng cách viết với CSS Module. |
+| TL8-L3 | Chưa sửa | Low, gom vào lô sau. Lỗi vẫn gắn đúng dòng, chỉ số "Dòng N" có thể lệch vị trí. |
+
+Không phát hiện lỗi mới ở các phần đã sửa. Dev chưa chạy ca "ghi chú + 409" trên BE thật. Thứ tự gọi trong code đủ để bảo đảm ca này, và mock đã chứng minh. QA có thể thêm ca này nếu muốn.
+
+**Kết luận: APPROVED.** Còn nợ: TL8-L3 (Low), thiếu unsaved-change guard, và đề xuất BE kiểm phiên bản ở PATCH phiếu kiểm kê để đóng hẳn khe ghi chú (BE, không chặn lô này).
