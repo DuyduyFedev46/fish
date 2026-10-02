@@ -27,6 +27,23 @@
 | 21 | Lô 9 | **Quản lý có được tự nhập hàng hoàn về kho không?** Hiện nhóm Quản lý chỉ có quyền **duyệt** hàng hoàn, không có quyền **tạo** (`add_returntostock`) → không có nút "Nhập hàng hoàn". NV kho và NV giao (phiếu của mình) tạo được. | Cho Quản lý tạo (data migration nhỏ cấp quyền) — Quản lý thường nhận hàng thay khi kho vắng. Lưu ý: người tạo vẫn duyệt được phiếu của chính mình (chưa có luật tách như kiểm kê). | Giữ như quyền hiện tại. |
 | 22 | Lô 10 | **Nhập lô tại cảng khi chưa biết giá mua**: để trống ô Giá mua thì hệ thống gửi giá 0 đ và **ghi nhận lô ngay** (BE cho giá ≥ 0) → giá vốn lô = 0 cho tới khi có hoá đơn/chi phí. Có phải chủ ý (nhập trước, giá sau) không? | Bắt buộc giá mua > 0 khi nhập lô; nếu thật sự chưa biết giá thì cần luồng "chờ giá" riêng (lô không mở bán khi giá vốn = 0). | Giữ hành vi cũ (cho phép trống = 0 đ). |
 
+
+## Duy trả lời (02/10/2026, chiều)
+| # | Duy chốt | Việc phải làm |
+|---|---|---|
+| 1 | Làm BE `/api/ai/status/` cho hoàn chỉnh (FE cần biết khi nào AI bật/tắt). | BE route + test; FE giữ nguyên contract S05. |
+| 2 | OK bỏ lý do khỏi dòng thời gian đơn, **nhưng phải có link xem chi tiết**. | Dòng "Tạo phiếu hoàn" trên timeline đơn link sang phiếu hoàn. |
+| 3 | Chưa hiểu — em giải thích lại (chờ Duy chốt). | — |
+| 4 | OK giữ luật chặn 9 chữ số. | Không làm gì. |
+| 5 | Cho sửa SĐT khách; trùng thì báo trùng. | BE PATCH nhận `phone` (400 khi trùng, ghi AuditLog không giá trị) + FE ô sửa SĐT. |
+| 6 | Theo phân quyền: ai có quyền nhập và quyền duyệt thì tự duyệt được, chỉ cần ghi sự kiện. | Bỏ chặn cứng BR-KK-08 (và BR-KK-02 — em hiểu cùng ý); giữ AuditLog ai nhập/ai duyệt. |
+| 7 | OK phương án B (BR-KK-09). | Đã code; PO ghi BR-KK-09 vào spec. |
+| 8 | Cho **huỷ** phiếu hoàn rồi tạo phiếu mới; **xoá** chỉ Chủ/admin. | Thao tác huỷ phiếu hoàn (Chờ duyệt) + quyền xoá chỉ Chủ — xem lưu ý về luật "không xoá chứng từ". |
+| 9 | Phạm vi dòng ("chỉ xem của mình") phải là **cấu hình phân quyền**, không viết cứng. | Thiết kế: ma trận phân quyền (Lô 14) có thêm phạm vi theo nhóm × đối tượng (Tất cả / Của mình). Cần BA + Tech Lead. |
+| 10 | Cho sửa giá; giá đã chốt vào đơn không đổi; giá áp theo thời gian hiệu lực; **sửa giá đã dính đơn thì báo không sửa được**. | BE: cho phép đặt giá lùi ngày/sửa giá khi chưa có đơn nào dùng trong khoảng đó; có đơn → 400 kèm lý do. |
+| 11 | OK tìm khách bằng POST. | BE + FE đổi tìm khách sang POST body. |
+| 12 | Xem hoá đơn bán (và tên khách) theo **phân quyền cấu hình**, không viết cứng. | Gộp với #9: quyền xem hoá đơn bán / tên khách bật tắt được trong ma trận. |
+
 ## Đã tự chốt theo nguyên tắc (Duy xem lại nếu muốn lật)
 - 02b viết trước đợt đổi tên P8b Lô 4–5 → dùng tên mới trong code (bảng ở `03-dev-notes.md`).
 - Tên e2e 02b đặt `ed_lo<N>_…` bị `scripts/check_naming.py` chặn (viết tắt tiếng Việt) → dùng `ed_lot<N>_…`.
