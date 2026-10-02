@@ -3,10 +3,11 @@
 > Mọi thứ cần để dev tiếp **đều ở trên GitHub** (`DuyduyFedev46/fish`, nhánh `main`) — trừ các file bí mật ở §2.
 
 ## 0. Trạng thái lúc bàn giao
-- Nhánh duy nhất cần dùng: **`main`**. Các nhánh `ed-stream-b`, `ed-stream-c` đã gộp vào `main`, có thể xoá.
+- Nhánh duy nhất cần dùng: **`main`** (commit cuối lúc bàn giao: xem `git log -1`). Các nhánh tạm `ed-stream-b/c` đã gộp và xoá; worktree tạm đã gỡ.
 - Tính năng đang làm: **ERP theo design** — hồ sơ ở `doc/features/2026-10-01-erp-theo-design/`.
   - Tiến độ từng lô: `02c-giao-viec.md` (☑ = xong, đã QA + push; ☐ = còn lại).
-  - Phần **backend của mọi lô đã xong**. Còn lại là FE các lô ☐ (12 Kế toán, 13 Danh mục & giá, 14 Nhân sự/Phân quyền, 15 Tổng quan + AI, 16 Nội dung, 17 dọn dẹp + hồi quy) — và Lô 10 nếu chưa ☑ (xem 02c).
+  - **Đã xong 11/17 lô** (☑ Lô 1–11). Phần **backend của mọi lô đã xong**. Còn lại FE: **12** Kế toán, **13** Danh mục & giá, **14** Nhân sự + Phân quyền, **15** Tổng quan + màn AI + Nhật ký + Tài khoản, **16** Nội dung, **17** dọn dẹp + ⌘K + thanh AI danh sách + hồi quy toàn bộ.
+  - Số kiểm lúc bàn giao: backend 2694 test OK · ERP vitest 717 · e2e các lô 1–11 xanh.
   - **Việc chờ Duy quyết + nợ chuyển lô sau:** `00-can-duy-quyet.md` (đọc trước khi làm lô mới — nhiều nợ ghi rõ "Lô 17", "Lô 15"…).
   - Ghi chú dev / review / QA từng lô: `03-dev-notes.md`, `03b-review-techlead.md`, `04-qa-report.md`.
 - **Chưa deploy** bản nào của đợt này lên staging/production. Không deploy bản chưa có Lô 2 FE (đã có) — xem điểm dừng trong 02c.
