@@ -56,6 +56,10 @@ Nợ BE từ review Lô 12 (03b, TL12-FE):
 - QA Lô 12 N4/N5 → **Lô 17**: 360px mã hoá đơn cao 18px, cột Đơn cắt mã, dòng Đã huỷ chưa gạch; ô tìm hoá đơn bán đi qua URL GET.
 - Review Lô 12 L-a → **Lô 17**: `ReceiptDetailScreen.tsx:116` còn "Nhập chi phí mua"; `e2e/qa_ed_batch10_real.py` còn kiểm tab "Chi phí mua".
 - Review Lô 13 → **Lô 17**: ô tiền ưu đãi đi qua `Number` không giới hạn chữ số; `toFixed(3)` âm thầm ở định mức combo/kg tối thiểu; đổi tên `ImageUploadSheet`. Nợ BE: `q` danh sách mặt hàng, lọc `price_list`, tồn combo, sự kiện đặt giá trên dòng thời gian mặt hàng.
+- Review Lô 14 L2 (nợ BE): chip "Được gán" ở ma trận là hằng số FE (`permissionsModel.ts:32`) → BE trả phạm vi dữ liệu trong danh sách nhóm. Hỏi Duy: superuser ngoài nhóm Chủ có được ghi phân quyền ở BE không (hiện BE cho, FE chặn).
+- Review Lô 16 L1 → **Lô 17**: `Tabs` dùng chung (`.tab`) rộng 39px ở 360px, dưới 44px.
+- Review Lô 16 L2 → **PO**: ED-35-AC6 lệch quyền mặc định (Quản lý mặc định có quyền đăng bài).
+- **Lô 17**: e2e `ed_batch9_returns` đỏ 5 ca từ 03/10 (mock tính ngày "tháng trước" lệch khi sang đầu tháng) — cố định ngày mock theo tháng.
 - TLA-L4: không chạy lùi migration `inventory/0007` khi đã có phiếu hoàn bị huỷ.
 - Lưu `item_price_id` (FK nullable PROTECT) trên dòng đơn → gộp với nợ Lô 13 L4.
 - Chờ Duy/PO: story "Huỷ chi phí phụ" (TLA-H1b, #14) và "Ghi tiền về muộn ở hàng chờ" (TLA-M3, #15).

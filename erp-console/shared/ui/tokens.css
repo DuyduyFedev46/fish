@@ -43,7 +43,8 @@
   --tap:44px;
   --rail-left-w:240px; --rail-left-w-collapsed:60px; --rail-right-w:320px; --action-bar-h:64px;
   --topbar-h:56px; --bottom-nav-h:60px;
-  --content-max:1280px;
+  /* Duy 03/10: nội dung ERP giãn hết bề ngang màn (trước đây chặn 1280px, màn rộng bị trống bên phải). Form vẫn giữ 720px. */
+  --content-max:none;
 
   /* ---- Chuyển động ---- */
   --dur-fast:120ms; --dur-base:180ms; --dur-slow:240ms;
