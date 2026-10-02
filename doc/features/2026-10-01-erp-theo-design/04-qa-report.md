@@ -2920,3 +2920,102 @@ Tái hiện trên `b249d4a`: Thêm hoá đơn mua → chọn "Đầu mối Nhi�
 - e2e mock chạy từ bản `git archive fea2326` với `BASE=http://127.0.0.1:3612`: `ed_batch12_accounting` 95/95, `ed_batch1_shell` 56/56, `ed_batch2_patterns` 75/75, `ed_batch10_purchasing` 115/115, `ed_batch11_suppliers` 103/103.
 - Ảnh (53 tệp) ở `doc/features/2026-10-01-erp-theo-design/shots/lo12/`, gồm bản vẽ `board-W3a`, `board-W5j`, `board-W5g`, `board-W5g2` để đối chiếu.
 - Dọn: chỉ tắt các tiến trình của mình theo cổng (8611, 3611, 3612). Không sửa mã sản phẩm.
+
+## Lô 13 — FE · Danh mục & giá (ED-30, ED-31) · lần 1 · 2026-10-02
+
+Mã nguồn: worktree `.claude/worktrees/agent-afe626c7234e9ad39`, commit `080a7f6` (BE R14 đã nằm trong cây). Chạy với **BE thật**: Django dựng từ `backend/` của worktree, SQLite tạm + dữ liệu giả (5 tài khoản loc/ql1/kho1/giao1/cs2), cổng 8631; ERP dựng `NEXT_PUBLIC_USE_MOCK=0 NEXT_PUBLIC_API_BASE=http://127.0.0.1:8631`, copy `out/` sang thư mục riêng, phục vụ tĩnh cổng 3631. Bản mock cổng 3632 chỉ dùng cho e2e dev.
+
+### Kết luận cuối (lần 2, commit `76b614e`): APPROVED — B13-1 đã sửa và kiểm lại trên BE thật, không còn lỗi chặn
+_Lần 1 (commit `080a7f6`): REJECTED vì B13-1 (giữ lại bên dưới làm lịch sử)._
+### Tổng (chỉ tính ca có đếm được trong log): 563 ca · ✅ 562 · ❌ 1 (B13-1) · ⏸ 0
+Gồm: e2e mock `ed_batch13_catalog` 125, hồi quy mock 389 (`ed_batch1_shell` 56, `ed_batch2_patterns` 75, `ed_batch3_orders` 143, `ed_batch10_purchasing` 115), `a2_catalog_real` 6/6 trên BE thật, ma trận 5 vai trên BE thật 24/24 (`p8`), 360 px + tiền dạng số 20/20 (`p9`, `p9b`), kiểm localStorage/URL/console 2 vai 4 ca (2 ca báo đỏ do script khớp nhầm chuỗi `customer` trong URL prefetch menu `/customers/`, đã xác minh không phải dữ liệu), ca ED-30-AC3 trên BE thật 1 ca ❌. Chưa tính các luồng tay trên BE thật (đặt giá, lùi ngày, giá đã có đơn, tạo mặt hàng/combo, ưu đãi, nhóm hàng, ảnh, sửa nhanh, ẩn khỏi Shop, id rác): chạy xanh, mỗi luồng có ảnh trong `shots/lo13/` (không ghi số ca vì script dùng chung ca kiểm trong một lượt).
+
+### Theo AC
+| Mã AC | Kết quả | Bằng chứng |
+|---|---|---|
+| ED-30-AC1 (4 tab, loại Mặt hàng thường/Combo, trạng thái Đang kinh doanh/Đang ẩn) | ✅ | BE thật: `lo13-real-loc-1-mat-hang`, `-6-bang-gia`, `-7-uu-dai`, `-9-nhom-hang`; ngoài đường thuận: mặt hàng ẩn khỏi Shop rồi hiện lại (`-11b`), id rác `?id=999999` ra màn "không tìm thấy" (`-11`), ql1 và kho1 thấy tập tab khác nhau |
+| ED-30-AC2 (chi tiết không thanh trạng thái, lịch sử giá không cột Trạng thái/Ghi chú) | ✅ | `lo13-real-loc-2-chi-tiet`; mặt hàng đã có nhiều giá và đã có đơn (BACH-TUOC) |
+| **ED-30-AC3 (combo chưa có dòng công thức báo "Thêm ít nhất một mặt hàng vào công thức.")** | ✅ (lần 2; lần 1 ❌) | Xem B13-1 và Lần 2 (`-4f`). Ảnh `lo13-real-loc-4e-combo-chua-co-dong`, `-4c-combo-thieu-cong-thuc` |
+| ED-30-AC4 (ảnh sai định dạng/quá dung lượng báo rõ, ảnh cũ giữ nguyên) | ✅ | BE thật: GIF và .txt bị từ chối, tệp đuôi .png nhưng nội dung không phải ảnh bị từ chối, `big.png` 12,6 MB bị chặn ở FE bằng câu nói rõ dung lượng; ảnh cũ vẫn hiện sau lỗi; ảnh hợp lệ đổi được, lọc "Chưa có ảnh" cập nhật (`-10`, `-10b`, `-10c`, `-10d`) |
+| ED-30-AC5 (Quản lý xem chi tiết không có giá vốn lô) | ✅ | ql1 BE thật: chi tiết không có "giá vốn/purchase_rate/landed_unit_cost/unit_cost/lãi" (quét DOM và mọi phản hồi API; `ql1-3-chi-tiet`) |
+| ED-31 (giá theo ngày hiệu lực, ưu đãi bật/tắt, kiểm BR-DM-03/08) | ✅ | Đặt giá "từ ngày mai": 200, giá cũ đóng đến hôm nay (`-3c`). Chồng khoảng giá: BE báo lỗi nói cách sửa, không lộ mã BR (`-3d-chong-lan`). Ưu đãi: tạo, tắt (`-7b`), tạo sai/trùng báo lỗi dưới trường (`-8`, `-8b`) |
+| Quyết định #10 (đổi giá được; giá trong đơn không đổi; giá theo ngày hiệu lực; giá đã áp cho đơn thì báo không sửa được) | ✅ | Tạo đơn thật cho BACH-TUOC hôm nay, chỉnh đồng hồ trình duyệt lùi 3 ngày để FE cho qua, BE trả `PRICE_USED_BY_ORDERS`, FE hiện nguyên văn câu của BE, DB không đổi (`-3-gia-da-co-don`). Lùi ngày bị FE chặn trước khi gửi (`-3b`). |
+
+### Ngoại lệ & biên
+| Ca | Kết quả |
+|---|---|
+| Thêm mặt hàng trùng mã: lỗi hiện dưới ô Mã hàng (đổi từ `shared/lib/http.ts`), không lên alert đầu form, focus về ô Mã (`-5-ma-trung`) | ✅ (BE phân biệt hoa/thường nên "ca-thu" và "CA-THU" cùng được nhận: ghi nhận N2) |
+| Nhóm hàng trùng tên: báo dưới ô Tên (`-9b`) | ✅ |
+| Giá 0, rỗng, âm, chữ; "Từ ngày" sau "Đến ngày" | ✅ (e2e mock 125 ca; lỗi ngay dưới ô, không gửi) |
+| Tiền khi BE trả **chuỗi** ("280000.00", mặc định của BE thật) | ✅ `280.000 đ/kg` |
+| Tiền khi BE trả **số** (chặn route đổi `rate`, `current_price_rate`, `price` sang số thực) ở danh sách, chi tiết, lịch sử giá, Bảng giá | ✅ `lo13-real-loc-number-rate`, 3/3 |
+| Sửa nhanh tên/ghi chú ở chi tiết trên BE thật (lưu, huỷ, rỗng) | ✅ |
+| Combo: thêm/bỏ thành phần, số kg 0/âm, tạo combo hợp lệ (`-4d-combo`) | ✅ trừ AC3 |
+| 360 px: 8 màn + hộp "Đặt giá mới" + kho1: không cuộn ngang, vùng bấm >= 44 px (`-360-*`) | ✅ 20/20 |
+| Đặt giá trùng khoảng đã có (dữ liệu đã đổi so với lúc mở màn) | ✅ lỗi BE hiện trong hộp, hộp giữ nguyên, có "Thử lại" |
+| Đăng nhập: giới hạn tần suất (429 "Bạn thao tác quá nhanh…") sau nhiều lần đăng nhập | ✅ đã quan sát trên BE thật |
+
+### Phân quyền (BE thật, UI + API)
+| Vai | Xem Mặt hàng | Xem Bảng giá/Ưu đãi/giá | Tạo/sửa (POST/PATCH) | DELETE | Màn Danh mục & giá |
+|---|---|---|---|---|---|
+| loc (owner) | 200 | 200 | 400 khi dữ liệu sai, 200/201 khi đúng | 500 (N1) | đủ 4 tab, đủ nút |
+| ql1 (manager) | 200 | 200 | 403 cả 6 hành động | 403 | xem được, không nút ghi; vào thẳng `/catalog/new/` hay `/catalog/rules/new/` ra "Bạn không có quyền xem mục này" (`ql1-4`) |
+| kho1 (warehouse_staff) | 200 (chỉ Mặt hàng + Nhóm hàng) | 403 | 403 | 403 | 2 tab; **không có giá**; `?tab=prices` rơi về Mặt hàng, DOM không có "đ/kg", API item không có `current_price` (`kho1-1`, `kho1-2`) |
+| giao1 (delivery_staff) | 403 | 403 | 403 | 403 | không có menu; màn "không có quyền" (`giao1-khong-co-quyen`) |
+| cs2 (customer_service) | 403 | 403 | 403 | 403 | như giao1 (`cs2-khong-co-quyen`) |
+| chưa đăng nhập | 401 | 401 | 401 | 401 | chuyển về đăng nhập |
+
+### Rò giá vốn
+Quét mọi phản hồi API và DOM của loc/ql1/kho1 trên các màn catalog bằng `giá vốn|purchase_rate|landed_unit_cost|unit_cost|lãi|profit`: không có. Các khớp đầu tiên chỉ là cờ `can_view_cost:false` / `can_view_profit:false` trong `/auth/me/` (tên cờ quyền, không chứa số), lỗi của script, đã sửa regex rồi chạy lại, 24/24. Key của kho1 trên item: không có `current_price`, không `rate`. ✅
+
+### Rò dữ liệu cá nhân
+- API catalog (items, item-prices, pricing rules, item-groups) không có `customer`, `phone`, `address`; quét ở ql1 và kho1. ✅
+- Console trình duyệt: 0 lỗi/ cảnh báo nào chứa dữ liệu ở mọi script thật (đã lọc nhiễu "Failed to fetch RSC payload" khi chuyển trang). ✅
+- `localStorage` chỉ có `cave_erp_token` và `cave_erp_last_user` (id), `sessionStorage` rỗng, URL các màn chỉ có `tab`, `id`, `type`. ✅
+- Ảnh và dữ liệu thử đều là dữ liệu giả (mặt hàng QA, tài khoản `loc/ql1/...`). ✅
+- Giới hạn tần suất: đăng nhập có 429 (xem trên). ✅
+
+### Hồi quy
+| Mục | Kết quả |
+|---|---|
+| `ed_batch1_shell` | ✅ 56/56 |
+| `ed_batch2_patterns` | ✅ 75/75 |
+| `ed_batch3_orders` | ✅ 143/143 |
+| `ed_batch10_purchasing` | ✅ 115/115 |
+| `ed_batch13_catalog` (mock, dev viết) | ✅ 125/125 |
+| `a2_catalog_real.py` trên BE thật | ✅ 6/6 (cần seed thêm tài khoản `quanly1`, việc của script, không phải lỗi sản phẩm) |
+| vitest | ✅ 69 file, 794 test |
+| `npx tsc --noEmit` | ✅ exit 0 |
+| `npm ci` (sạch, không `--legacy-peer-deps`) | ✅ exit 0 |
+
+### Lỗi
+#### B13-1 — ĐÃ SỬA ở `76b614e` (xem Lần 2). Combo chưa có công thức không bao giờ hiện câu "Thêm ít nhất một mặt hàng vào công thức." · Medium · ED-30-AC3
+Tái hiện (BE thật hoặc mock): đăng nhập `loc` → Danh mục & giá → Thêm combo (`/catalog/new/?type=BUNDLE`) → để trống Thành phần và Số kg của dòng đầu → Lưu combo.
+- Mong đợi (AC3): báo "Thêm ít nhất một mặt hàng vào công thức."
+- Thực tế: form luôn có sẵn một dòng công thức trống và không cho bỏ dòng cuối (nút Xoá chỉ hiện khi có từ 2 dòng). Lưu thì chỉ hiện "Chọn mặt hàng." và "Nhập số kg." dưới dòng trống, cộng "Chọn nhóm hàng." ở trên. Câu theo AC (`messages.ts` `linesRequired`, `validateItem` có nhánh `lines.length === 0`) là nhánh không bao giờ chạy và `errs.lines` cũng không được hiển thị ở `ItemForm.tsx`. Ảnh `lo13-real-loc-4e-combo-chua-co-dong`.
+- Ảnh hưởng: không mất dữ liệu (không lưu được combo rỗng), nhưng sai câu chữ AC, và lệch này không được ghi trong 13 lệch của dev notes. Cách sửa gợi ý: cho xoá hết dòng (lúc đó AC3 hiện đúng), hoặc hiện câu AC3 khi mọi dòng còn trống, hoặc PO đổi AC. Cần điều phối viên quyết nếu muốn đổi AC thay vì code.
+
+### Ghi nhận ngoài lô (không chặn Lô 13)
+- **N1 (BE, Medium):** `DELETE /api/catalog/items/<id>/` bằng `loc` trả **500** (không phải 405/409). Item đã có chứng từ nên không xoá được là đúng ý, nhưng phải là lỗi 4xx có thông điệp; FE không có nút xoá nên không bị dính. Giao BE khi có lô BE.
+- **N2 (BE, Low):** mã mặt hàng và tên nhóm phân biệt hoa/thường ("ca-thu" ≠ "CA-THU"), dễ tạo trùng nhìn bằng mắt.
+- **N3 (so với quyết định #10):** FE chặn **mọi** lùi ngày "Từ ngày" (kể cả khi chưa có đơn nào dùng giá cũ), chặt hơn #10 nhưng đúng với phiếu giao việc. Nếu Duy muốn cho lùi ngày khi chưa có đơn, FE phải bỏ chặn này và để BE quyết bằng `PRICE_USED_BY_ORDERS`. Chỉ nêu, không chặn.
+- **N4 (Low):** script `a2_catalog_real.py` cần tài khoản `quanly1`; seed mặc định không có.
+
+### Lệnh đã chạy (kèm output tóm tắt)
+- `cd erp-console && npm ci` exit 0; `npx tsc --noEmit` exit 0; `npx vitest run` 69 file, 794 test xanh.
+- `NEXT_PUBLIC_USE_MOCK=1 npm run build` và `NEXT_PUBLIC_USE_MOCK=0 NEXT_PUBLIC_API_BASE=http://127.0.0.1:8631 npm run build` (exit 0); mỗi bản copy `out/` sang thư mục riêng ở scratchpad (`qa13/out_mock`, `qa13/out_real`), phục vụ tĩnh 3632 (mock), 3631 (thật).
+- BE thật: Django `runserver 127.0.0.1:8631` trên SQLite tạm, `ITEM_IMAGE_STORAGE=local`, dữ liệu giả; 5 tài khoản. Script Playwright `p1`–`p9b`, `b1`, `ls`, ma trận API `api_matrix.py` (GET 7 điểm cuối x 6 vai, ghi 6 hành động x 6 vai). Playwright `page.clock.set_fixed_time` để vượt chặn lùi ngày của FE và gọi được `PRICE_USED_BY_ORDERS`.
+- e2e mock từ cây worktree: `ed_batch13_catalog` 125/125, `ed_batch1_shell` 56/56, `ed_batch2_patterns` 75/75, `ed_batch3_orders` 143/143, `ed_batch10_purchasing` 115/115. `a2_catalog_real.py` 6/6 (BASE=3631, API=8631).
+- Bản vẽ render 1440x900 để đối chiếu: `shots/lo13/board-W2d, W2h, W5o, W5h, W5m, F1k, F1l, F1m, F1n, F1o.png`; ảnh BE thật `shots/lo13/lo13-real-*.png` (44 tệp).
+- Dọn: chỉ tắt tiến trình trên cổng 8631, 3631, 3632 của mình. Không sửa mã sản phẩm; cây worktree sạch.
+
+### Lần 2 — kiểm lại B13-1 trên `76b614e` · 2026-10-03
+Dựng lại `npm ci` (exit 0) rồi `NEXT_PUBLIC_USE_MOCK=0 NEXT_PUBLIC_API_BASE=http://127.0.0.1:8631 npm run build`, copy `out/` sang thư mục riêng (cổng 3631), Django 8631 trên cùng DB giả. `tsc --noEmit` exit 0; vitest 795 test (dev báo) chạy lại ở bước này.
+| Ca | Kết quả | Bằng chứng |
+|---|---|---|
+| Combo để trống công thức, lưu: câu "Thêm ít nhất một mặt hàng vào công thức." hiện ở vùng "Thành phần combo"; không còn "Chọn mặt hàng."/"Nhập số kg." dưới dòng trống; không lưu (URL vẫn ở form) | ✅ | `lo13-real-loc-4f-combo-rong-sau-sua.png` |
+| Dòng đã chọn mặt hàng nhưng thiếu kg: vẫn báo "Nhập số kg.", không hiện câu AC3 | ✅ | `lo13-real-loc-4g-combo-thieu-kg.png` |
+| Nhập kg rồi lưu combo hợp lệ: BE có combo `CB-QA-R3` loại BUNDLE, 1 thành phần, form đóng | ✅ | `lo13-real-loc-4h-combo-luu-xong.png`; kiểm bằng `GET /api/catalog/items/` |
+| Console không lỗi trong 3 ca | ✅ | |
+Hồi quy nhanh: `ed_batch13_catalog` (mock) 128/128; `ed_batch1_shell` (mock) 56/56; `a2_catalog_real.py` trên BE thật 6/6. Không còn lỗi mở trong Lô 13. Ghi nhận ngoài lô N1 đến N4 ở trên vẫn giữ nguyên (không chặn). Chỉ tắt tiến trình ở cổng 8631, 3631, 3632; không sửa mã sản phẩm.
+
