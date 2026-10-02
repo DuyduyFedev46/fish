@@ -71,12 +71,14 @@ class SubmitReceiptTests(TestCase):
         r.refresh_from_db()
         self.assertEqual(r.status, PurchaseReceipt.Status.DRAFT)
 
-    def test_idempotent_second_call_creates_no_duplicate(self):
+    def test_second_submit_is_rejected_and_creates_no_duplicate(self):
+        """Ghi nhận lần 2 bị chặn `RECEIPT_NOT_DRAFT` (BR-MH-07); không sinh lô trùng."""
         r = self._receipt()
         PurchaseReceiptLine.objects.create(
             receipt=r, item=self.tom, qty=Decimal("100"), rate=Decimal("200000")
         )
-        first = receipt_services.submit_receipt(receipt=r, actor=self.user)
-        second = receipt_services.submit_receipt(receipt=r, actor=self.user)
+        receipt_services.submit_receipt(receipt=r, actor=self.user)
+        with self.assertRaises(BusinessError) as ctx:
+            receipt_services.submit_receipt(receipt=r, actor=self.user)
+        self.assertEqual(ctx.exception.code, "RECEIPT_NOT_DRAFT")
         self.assertEqual(Batch.objects.count(), 1)
-        self.assertEqual(first[0].pk, second[0].pk)

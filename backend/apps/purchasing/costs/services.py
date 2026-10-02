@@ -12,7 +12,7 @@ from django.db import transaction
 from apps.common.exceptions import BusinessError
 from apps.inventory.batches import services as batches
 from apps.inventory.models import Batch
-from apps.purchasing.models import PurchaseCost, PurchaseCostAllocation
+from apps.purchasing.models import PurchaseCost, PurchaseCostAllocation, PurchaseReceipt
 
 ZERO = Decimal("0")
 CENT = Decimal("0.01")
@@ -47,6 +47,21 @@ def record_purchase_cost(*, cost_type, amount, allocation_method, incurred_date,
     with transaction.atomic():
         resolved = [_resolve_allocation(a) for a in allocations]
 
+        # Khoá các lô đích rồi kiểm trạng thái trong khoá, để huỷ phiếu song song không lọt qua.
+        locked = {
+            b.pk: b for b in Batch.objects.select_for_update(of=("self",)).select_related("source_line__receipt")
+            .filter(pk__in=[batch.pk for batch, _ in resolved]).order_by("pk")
+        }
+        resolved = [(locked[batch.pk], amt) for batch, amt in resolved]
+
+        # BR-MH-07: không phân bổ chi phí vào lô của phiếu nhập đã huỷ (đổi giá vốn chứng từ đã huỷ)
+        for batch, _ in resolved:
+            if _is_cancelled_batch(batch):
+                raise BusinessError(
+                    f"Lô {batch.batch_id} thuộc phiếu nhập đã huỷ, không thêm chi phí được (BR-MH-07).",
+                    code="BATCH_CANCELLED",
+                )
+
         # BR-GV-02: chặn lô đã chốt trước khi ghi bất cứ thứ gì
         for batch, _ in resolved:
             if batch.is_closed:
@@ -74,6 +89,15 @@ def record_purchase_cost(*, cost_type, amount, allocation_method, incurred_date,
             batches.recompute_landed_cost(batch=batch, actor=actor)
 
     return cost
+
+
+def _is_cancelled_batch(batch):
+    """
+    Lô sinh từ phiếu nhập đã huỷ (BR-MH-07). Không xét `batch.status`: lô bị huỷ vì quá hạn
+    (`cancel_expired_batch`, BR-LO-03) là lô thật, chưa chốt, vẫn nhận chi phí đến muộn (E-14, BR-GV-02).
+    """
+    line = getattr(batch, "source_line", None)
+    return line is not None and line.receipt.status == PurchaseReceipt.Status.CANCELLED
 
 
 def _resolve_allocation(entry):

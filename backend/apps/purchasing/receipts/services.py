@@ -2,7 +2,7 @@
 Ghi nhận phiếu nhập tại cảng -> sinh lô (P-02).
 
 `submit_receipt`: mỗi dòng sinh MỘT lô riêng (BR-MH-01), hạn dùng chỉ được sửa XUỐNG
-(BR-MH-02). Idempotent. Sinh lô qua `apps.inventory.batches.services.create_batch`.
+(BR-MH-02). Chỉ ghi nhận được phiếu Nháp (BR-MH-07): gọi lại là 400 `RECEIPT_NOT_DRAFT`. Sinh lô qua `apps.inventory.batches.services.create_batch`.
 """
 from django.db import transaction
 
@@ -11,23 +11,43 @@ from apps.common.exceptions import BusinessError
 from apps.inventory.batches import services as batch_services
 
 
+def lock_draft_receipt(receipt):
+    """
+    Khoá dòng phiếu rồi kiểm trạng thái TRONG khoá: chỉ phiếu Nháp mới ghi nhận hoặc sửa được
+    (BR-MH-07, BR-PQ-10). Phiếu đã ghi nhận hoặc đã huỷ -> BusinessError `RECEIPT_NOT_DRAFT`.
+    Gọi bên trong `transaction.atomic()`; trả bản phiếu vừa khoá.
+    """
+    from apps.purchasing.models import PurchaseReceipt
+
+    locked = PurchaseReceipt.objects.select_for_update().get(pk=receipt.pk)
+    if locked.status != PurchaseReceipt.Status.DRAFT:
+        raise BusinessError(
+            f"Chỉ phiếu nhập đang Nháp mới ghi nhận hoặc sửa được; phiếu này đang ở trạng thái "
+            f"\"{locked.get_status_display()}\" (BR-MH-07).",
+            code="RECEIPT_NOT_DRAFT",
+        )
+    return locked
+
+
 def submit_receipt(*, receipt, actor):
     """
     Ghi nhận phiếu nhập: mỗi PurchaseReceiptLine chưa có lô -> sinh MỘT lô riêng
     (BR-MH-01, không gộp lô). Trả list[Batch] của mọi dòng.
 
+    - Chỉ phiếu Nháp (BR-MH-07): phiếu đã ghi nhận hoặc đã huỷ -> BusinessError `RECEIPT_NOT_DRAFT`,
+      không sinh lô. Trạng thái được kiểm sau khi khoá dòng phiếu, nên hai lần submit song song
+      chỉ một lần thành công.
     - Hạn dùng lô = ngày nhập + shelf_life. Cho phép sửa tay XUỐNG thấp hơn mặc
       định của mặt hàng, KHÔNG cho cao hơn (BR-MH-02) -> vi phạm raise BusinessError.
     - Đặt receipt.status = SUBMITTED.
-    - Idempotent: gọi lại không tạo lô trùng cho dòng đã có batch.
     """
     batches = []
     with transaction.atomic():
-        # khoá phiếu để hai lần submit song song không tạo lô trùng
-        lines = list(receipt.lines.select_for_update().select_related("item"))
+        locked = lock_draft_receipt(receipt)
+        lines = list(locked.lines.select_for_update().select_related("item"))
         for line in lines:
             if line.batch_id is not None:
-                # đã có lô -> giữ nguyên (idempotent), chỉ gom vào kết quả
+                # dòng đã có lô (dữ liệu cũ) -> giữ nguyên, không sinh lô trùng
                 batches.append(line.batch)
                 continue
 
@@ -46,9 +66,9 @@ def submit_receipt(*, receipt, actor):
             line.save(update_fields=["batch"])
             batches.append(batch)
 
-        if receipt.status != receipt.Status.SUBMITTED:
-            receipt.status = receipt.Status.SUBMITTED
-            receipt.save(update_fields=["status"])
+        locked.status = locked.Status.SUBMITTED
+        locked.save(update_fields=["status"])
+        receipt.status = locked.status  # giữ đối tượng của người gọi khớp DB
     return batches
 
 
