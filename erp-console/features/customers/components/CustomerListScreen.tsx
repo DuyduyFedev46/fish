@@ -45,7 +45,7 @@ export function CustomerListScreen() {
     { key: "orders", header: M.colOrders, num: true, render: (c) => c.order_count },
     { key: "cancelled", header: M.colCancelled, num: true, render: (c) => c.cancelled_count },
     { key: "spent", header: M.colSpent, num: true, render: (c) => vnd(c.total_spent) },
-    { key: "last", header: M.colLast, num: true, render: (c) => (c.last_order_at ? dateTime(c.last_order_at) : <span className="muted">—</span>) },
+    { key: "last", header: M.colLast, tabular: true, render: (c) => (c.last_order_at ? dateTime(c.last_order_at) : <span className="muted">—</span>) },
     { key: "note", header: M.colNote, render: (c) => (c.note ? <PersonalText value={c.note} /> : <span className="muted">—</span>) },
   ];
 
@@ -88,6 +88,8 @@ export function CustomerListScreen() {
     >
       <DataTable
         caption={M.listTitle}
+        title={M.listTitle}
+        countText={list.rows ? M.headCount(list.count) : undefined}
         columns={columns}
         rows={list.rows ?? null}
         rowKey={(c) => c.id}

@@ -75,8 +75,8 @@ export function PricingRuleList({ tabs }: { tabs: React.ReactNode }) {
     { key: "apply", header: M.colRuleApplyOn, render: (r) => <Chip table={ENUMS.pricingRuleApplyOn} value={r.apply_on} /> },
     { key: "cond", header: M.colRuleCondition, width: "220px", render: (r) => <span className={s.wrapCell}>{ruleCondition(r) ?? <span className="muted">{M.none}</span>}</span>, hideBelow: 720 },
     { key: "discount", header: M.colRuleDiscount, num: true, render: (r) => ruleDiscountText(r) },
-    { key: "from", header: M.colRuleFrom, num: true, render: (r) => (r.valid_from ? dateOnly(r.valid_from) : <span className="muted">{M.none}</span>), hideBelow: 980 },
-    { key: "upto", header: M.colRuleUpto, num: true, render: (r) => (r.valid_upto ? dateOnly(r.valid_upto) : <span className="muted">{M.none}</span>), hideBelow: 980 },
+    { key: "from", header: M.colRuleFrom, tabular: true, render: (r) => (r.valid_from ? dateOnly(r.valid_from) : <span className="muted">{M.none}</span>), hideBelow: 980 },
+    { key: "upto", header: M.colRuleUpto, tabular: true, render: (r) => (r.valid_upto ? dateOnly(r.valid_upto) : <span className="muted">{M.none}</span>), hideBelow: 980 },
     { key: "status", header: M.colRuleStatus, render: (r) => <Chip table={ENUMS.pricingRuleActive} value={r.is_active} /> },
     ...(ability.changeRule
       ? ([
@@ -160,6 +160,8 @@ export function PricingRuleList({ tabs }: { tabs: React.ReactNode }) {
     >
       <DataTable
         caption={M.rulesCaption}
+        title={M.rulesTitle}
+        countText={rows ? M.rulesHeadCount(list.count, rows.filter((r) => r.is_active).length) : undefined}
         columns={columns}
         rows={rows ?? null}
         rowKey={(r) => r.id}

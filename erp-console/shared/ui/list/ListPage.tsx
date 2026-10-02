@@ -1,4 +1,5 @@
-// Khung màn danh sách (UI-RULES §4): [tiêu đề + nút tạo mới góc phải] · tab · thanh lọc · thanh AI · bảng · chân.
+// Khung màn danh sách (UI-RULES §4): tab · thanh lọc · thanh AI · bảng · chân. Nút chính đặt như board:
+// có tab thì nút nằm cùng hàng tab (bên phải); không tab thì nằm cuối hàng thanh lọc; không cả hai thì hàng riêng.
 // Chỉ là bố cục: dữ liệu, bộ lọc và bảng do màn truyền vào (FilterBar, AiBar, DataTable). Tên màn đã có ở topbar,
 // nên `title` chỉ dùng khi màn cần tiêu đề phụ (vd tên tab); không bắt buộc.
 // Mất mạng: truyền `asOf` + `onRetry` để dải mất mạng chung ghi "Dữ liệu lúc …" và có nút Thử lại
@@ -7,7 +8,7 @@ import { useOfflineRegistration } from "../states/offlineSource";
 
 type Props = {
   title?: string;
-  /** Nút tạo mới / hành động chính, góc phải hàng tiêu đề. */
+  /** Nút tạo mới / hành động chính: cùng hàng tab (bên phải) hoặc cuối hàng thanh lọc. */
   actions?: React.ReactNode;
   /** <Tabs …/> (dưới topbar, trên thanh lọc). */
   tabs?: React.ReactNode;
@@ -31,17 +32,34 @@ type Props = {
 
 export function ListPage({ title, actions, tabs, banner, filters, aiBar, children, footer, id, asOf, onRetry }: Props) {
   useOfflineRegistration(asOf || onRetry ? { asOf, onRetry } : null);
+  const actionsNode = actions ? <div className="lp-actions">{actions}</div> : null;
+  const inTabRow = !!tabs && !!actionsNode;
+  const inFilterRow = !tabs && !!filters && !!actionsNode;
   return (
     <div className="lp" id={id}>
-      {(title || actions) && (
+      {(title || (actionsNode && !inTabRow && !inFilterRow)) && (
         <div className="lp-head">
           {title ? <h2>{title}</h2> : <span />}
-          {actions && <div className="lp-actions">{actions}</div>}
+          {!inFilterRow && !inTabRow && actionsNode}
         </div>
       )}
-      {tabs}
+      {inTabRow ? (
+        <div className="lp-tabrow">
+          {tabs}
+          {actionsNode}
+        </div>
+      ) : (
+        tabs
+      )}
       {banner}
-      {filters}
+      {inFilterRow ? (
+        <div className="lp-filterrow">
+          {filters}
+          {actionsNode}
+        </div>
+      ) : (
+        filters
+      )}
       {aiBar}
       {children}
       {footer && <div className="lp-foot">{footer}</div>}

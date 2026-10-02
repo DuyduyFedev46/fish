@@ -15,6 +15,7 @@ import { useResource } from "@/shared/lib/useResource";
 import { usePagedList } from "@/shared/lib/usePagedList";
 import { matches } from "@/shared/lib/search";
 import { Chip } from "@/shared/ui/Chip";
+import { Icon } from "@/shared/ui/Icon";
 import { DataTable, type Column } from "@/shared/ui/list/DataTable";
 import { FilterBar } from "@/shared/ui/list/FilterBar";
 import { ListPage } from "@/shared/ui/list/ListPage";
@@ -96,11 +97,11 @@ export function PurchaseInvoiceList({ tabs, canAdd, canPickSupplier, panelId = "
         );
       },
     },
-    { key: "date", header: "Ngày hoá đơn", num: true, render: (r) => dateOnly(r.invoice_date) },
+    { key: "date", header: "Ngày hoá đơn", tabular: true, render: (r) => dateOnly(r.invoice_date) },
     // Số tiền có icon khoá nhưng Quản lý vẫn thấy (quyết định D-3): cột này không phụ thuộc view_costprice, nên màn luôn truyền canViewCost.
     { key: "amount", header: "Số tiền", num: true, locked: true, render: (r) => vnd(r.amount) },
     { key: "paid", header: "Tình trạng", render: (r) => <Chip table={ENUMS.purchaseInvoicePaid} value={String(r.is_paid)} /> },
-    { key: "paidAt", header: "Trả lúc", num: true, render: (r) => (r.paid_at ? dateTime(r.paid_at) : <span className="muted">—</span>) },
+    { key: "paidAt", header: "Trả lúc", tabular: true, render: (r) => (r.paid_at ? dateTime(r.paid_at) : <span className="muted">—</span>) },
   ];
 
   return (
@@ -111,7 +112,8 @@ export function PurchaseInvoiceList({ tabs, canAdd, canPickSupplier, panelId = "
         actions={
           canAdd ? (
             <button type="button" className="btn primary" onClick={() => setAdding(true)} data-testid="add-invoice">
-              Thêm hoá đơn mua
+              <Icon name="add" />
+              <span>Thêm hoá đơn mua</span>
             </button>
           ) : undefined
         }
@@ -151,6 +153,8 @@ export function PurchaseInvoiceList({ tabs, canAdd, canPickSupplier, panelId = "
         }
       >
         <DataTable
+          title="Hoá đơn mua"
+          countText={rows ? (rows.some((r) => !r.is_paid) ? `${rows.filter((r) => !r.is_paid).length} chưa trả` : `${list.count} hoá đơn`) : undefined}
           columns={columns}
           rows={rows}
           rowKey={(r) => r.id}

@@ -75,7 +75,7 @@ export function ItemListTab({ tabs }: { tabs: React.ReactNode }) {
     ...(showPrice
       ? ([
           { key: "price", header: M.colPrice, num: true, width: "150px", render: (r) => priceCell(r) ?? <span className="muted">{M.none}</span> },
-          { key: "from", header: M.colPriceFrom, num: true, render: (r) => (r.current_price ? dateOnly(r.current_price.valid_from) : <span className="muted">{M.none}</span>) },
+          { key: "from", header: M.colPriceFrom, tabular: true, render: (r) => (r.current_price ? dateOnly(r.current_price.valid_from) : <span className="muted">{M.none}</span>) },
         ] satisfies Column<CatalogItem>[])
       : []),
     { key: "shelf", header: M.colShelfLife, num: true, render: (r) => shelfLifeText(r.shelf_life_in_days) ?? <span className="muted">{M.none}</span> },
@@ -157,6 +157,8 @@ export function ItemListTab({ tabs }: { tabs: React.ReactNode }) {
     >
       <DataTable
         caption={M.itemsCaption}
+        title={M.itemsTitle}
+        countText={rows ? M.itemsHeadCount(list.count) : undefined}
         columns={columns}
         rows={rows ?? null}
         rowKey={(r) => r.id}

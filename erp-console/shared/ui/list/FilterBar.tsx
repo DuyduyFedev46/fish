@@ -4,7 +4,7 @@
 // Không nút Làm mới. Ô tìm KHÔNG ghi từ khoá đi đâu (không localStorage/URL/log) — màn tự debounce rồi gọi API.
 // Mọi lựa chọn là ô chọn thật (select/input date) để dùng được bằng bàn phím và trên điện thoại.
 
-import { useId } from "react";
+import { useId, useRef } from "react";
 import { Icon } from "../Icon";
 
 export type FilterSelect = {
@@ -36,6 +36,28 @@ type Props = {
   /** Chỗ thêm (nút lọc riêng của màn). */
   children?: React.ReactNode;
 };
+
+// Ô ngày như board (W5i): khung 32px có icon lịch bên trái; vẫn là input date thật (bàn phím, điện thoại).
+// Chạm icon mở bảng chọn ngày (nút chỉ chuột; bàn phím dùng ô nhập như cũ).
+function DateBox({ label, value, min, max, onChange }: { label: string; value: string; min?: string; max?: string; onChange: (v: string) => void }) {
+  const ref = useRef<HTMLInputElement>(null);
+  const openPicker = () => {
+    try {
+      ref.current?.showPicker?.();
+    } catch {
+      ref.current?.focus();
+    }
+  };
+  return (
+    <label className="fb-date">
+      <span className="sr-only">{label}</span>
+      <span className="fb-date-ic" aria-hidden="true" onClick={openPicker}>
+        <Icon name="calendar_today" />
+      </span>
+      <input ref={ref} type="date" value={value} min={min} max={max} onChange={(e) => onChange(e.target.value)} aria-label={label} />
+    </label>
+  );
+}
 
 export function FilterBar({ query, onQuery, placeholder, searchLabel, selects, dateRange, summary, children }: Props) {
   const id = useId();
@@ -77,15 +99,9 @@ export function FilterBar({ query, onQuery, placeholder, searchLabel, selects, d
       ))}
       {dateRange && (
         <div className="fb-dates">
-          <label>
-            <span className="sr-only">Từ ngày</span>
-            <input type="date" value={dateRange.from} max={dateRange.to || undefined} onChange={(e) => dateRange.onFrom(e.target.value)} aria-label="Từ ngày" />
-          </label>
+          <DateBox label="Từ ngày" value={dateRange.from} max={dateRange.to || undefined} onChange={dateRange.onFrom} />
           <span aria-hidden="true">–</span>
-          <label>
-            <span className="sr-only">Đến ngày</span>
-            <input type="date" value={dateRange.to} min={dateRange.from || undefined} onChange={(e) => dateRange.onTo(e.target.value)} aria-label="Đến ngày" />
-          </label>
+          <DateBox label="Đến ngày" value={dateRange.to} min={dateRange.from || undefined} onChange={dateRange.onTo} />
         </div>
       )}
       {children}

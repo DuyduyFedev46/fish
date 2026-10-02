@@ -2308,3 +2308,31 @@ Chỉ sửa trong `erp-console/`. Không đụng `convert.ts`, `safeHref.ts`, `f
 - **Mock** thêm hook `__caveMock.contentOtherEdit(id, title)` (người khác sửa tiêu đề + tăng `row_version`) và `__caveMock.contentRawBody(id)` (thân bài dạng chưa chuẩn hoá: chữ liền kề tách đoạn, đoạn trống, `marks: []`).
 - **Kiểm:** vitest 825 đạt (thêm 6 ca: chuẩn hoá ổn định, `mockOtherEdit`, `draftDiffers`/`draftIsCurrent`, `mockUnpublishEntry` trả đúng hình dạng). E2E mock `ed_batch16_content.py` 121/121 (thêm 23 ca cho B16-1/2/3), `ed_batch1_shell.py` 56/56, `ed_batch2_patterns.py` 75/75. Mới: `e2e/ed_batch16_real.py` chạy trên Django thật (SQLite tạm, `DJANGO_DEBUG=1`, `collectstatic`, cổng 8661) + bản build `MOCK=0` phục vụ cổng 3661: 25/25 đạt, gồm thân bài chưa chuẩn hoá thật từ BE, ql1 sửa qua API rồi mở lại (cảnh báo, 409, BE giữ bản của ql1), gỡ bài thật rồi sửa và lưu tiếp. Cách dựng môi trường nằm ở đầu script.
 - **Còn nợ / lưu ý:** vitest chạy môi trường node nên không dựng được Tiptap; ca "mở bài không bị coi là sửa" kiểm bằng e2e (mock và BE thật). Ba ghi chú nhẹ của QA (L2 Quản lý mặc định có quyền đăng, L3 hai toast sau lần lưu đầu của bài mới, L4 tab 39px) giữ nguyên, không chặn.
+
+## Sửa theo rà soát giao diện (04b) — Nhóm A: màn danh sách thiếu thẻ có đầu 44px · FE (03/10/2026)
+
+Chỉ sửa trong `erp-console/` (khối danh sách dùng chung + các màn danh sách). Không đụng `backend/`, hợp đồng API, quyền hay giá vốn. Nhóm F (che SĐT) và các nhóm B–L của 04b chưa làm ở đợt này.
+
+### Đã sửa (theo cột "Lệch" của nhóm A trong `04b-ra-soat-giao-dien.md`)
+- **Đầu thẻ 44px** (`shared/ui/list/DataTable.tsx`, `globals.css` `.lt-head`): `DataTable` nhận thêm `title`, `countText`, `headAction`; có `title` thì vẽ đầu thẻ (tiêu đề đậm + bộ đếm bên phải + liên kết nhỏ), không có thì giữ như cũ. Đã gắn cho danh sách Khách hàng, Nhà cung cấp, Phiếu nhập, Kho & lô (Tồn theo lô, Điều chỉnh tồn, Kho), Hàng hoàn về kho, Kiểm kê, Sổ nhập xuất, Danh mục & giá (mặt hàng, nhóm, bảng giá, quy tắc), Hoá đơn bán, Hoá đơn mua và chi phí, Nhân sự, Hàng chờ thanh toán, Phiếu hoàn. Nội dung và Gọi xác nhận chỉ đổi vị trí nút chính / ô ngày (không thêm đầu thẻ). Màn Giao hàng chưa sửa riêng, chỉ hưởng thay đổi chung (ô ngày, tiêu đề cột). Chữ đầu thẻ và bộ đếm gom ở `messages.ts` của từng module.
+- **Nút chính cùng hàng tab / cuối hàng thanh lọc** (`ListPage.tsx`, `.lp-tabrow`, `.lp-filterrow`): có tab thì nút nằm bên phải hàng tab, không tab mà có thanh lọc thì nằm cuối hàng lọc, không cả hai thì hàng riêng như cũ. Hết tình trạng "nút chính riêng một hàng phía trên tab".
+- **Tiêu đề cột không còn chữ mono** (`colClass(c, header)`): chỉ ô dữ liệu của cột mã mới mono. Thêm cột kiểu `tabular` (số liệu dạng ngày giờ: tabular-nums nhưng căn trái như board) cho cột Thời gian, Từ ngày, v.v.
+- **Ô ngày** (`FilterBar.tsx` `DateBox`, `.fb-date`): khung 32px (44px ở điện thoại) có icon lịch bên trái, vẫn là `input type=date` thật nên dùng được bàn phím và trên điện thoại; chạm icon mở bảng chọn. Thêm icon `calendar_today` vào tập con font (`scripts/subset-material-symbols.py`, `public/fonts/ms/material-symbols-outlined.woff2` đã sinh lại).
+- Cập nhật `e2e/ed_batch10_purchasing.py`: tiêu đề thẻ bảng Phiếu nhập đọc từ `.lt-head` thay cho `data-testid` cũ.
+
+### Chưa làm / lệch so với 04b (nợ)
+- **Thanh AI không render khi count = 0** (D2), **nút phân đoạn → dropdown** (D2), **số đếm trên tab**, **3 thẻ KPI của W1b**, **bộ cột khác của W1d**, **"Tải thêm" → phân trang** ở chân bảng: chưa làm (đổi hành vi hoặc cần contract, không phải hình thức thuần).
+- **Danh sách Đơn hàng (D2) chưa có đầu thẻ** vì tiêu đề tab đã là "Đơn hàng"; mới sửa cột Thời gian căn trái, nút/lọc và tiêu đề cột. Cần PO xem lại ảnh `fix-1440-orders.png` rồi quyết có thêm đầu thẻ "Đơn hàng · N" không.
+- **SĐT hiện đủ** ở W5a, W3e, W2a, D2 là nhóm F (cần PO quyết cách che), không động ở đây.
+- **Nút "Điều chỉnh tồn" thiếu ở W5k/F1j**: chưa làm (cần xem quyền).
+- **Icon nút "Thêm"** (nhóm H) và **chip màu** của W5g/W5g2: chưa làm.
+
+### Kiểm chứng (đã chạy lại sau khi dọn đĩa, 03/10/2026)
+- `./node_modules/.bin/tsc --noEmit` sạch · `npx vitest run`: 76 file, 900 test đạt.
+- `NEXT_PUBLIC_USE_MOCK=0` build + `check-no-mock.mjs` XANH + `check-ai-chunks.mjs` XANH (39 màn nghiệp vụ, 2 layout).
+- `NEXT_PUBLIC_USE_MOCK=1` build, sao `out/` sang thư mục tạm, phục vụ cổng 3131 (đã tắt, đã xoá).
+- E2E mock: `ed_batch1_shell` 56/56 · `ed_batch2_patterns` 75/75 · `ed_batch3_orders` 143/143 · `ed_batch4_delivery` 70/70 · `ed_batch5_confirmation` 129/129 · `ed_batch6_customers` 79/79 · `ed_batch8_stocktake` 125/125 · `ed_batch11_suppliers` 103/103 · `ed_batch13_catalog` 128/128 · `ed_batch16_content` 121/121 · `ed_bonusA_ui` 49/49.
+- `ed_batch9_returns` **134/139**: 5 ca đỏ là lỗi đã biết do ngày mock (lọc "tháng hiện tại" và 3 ca "thấy cả phiếu của người giao khác" đều đọc RT-4 của tháng trước; hết ca `list_filters` timeout). Thay đổi của nhóm A ở màn này chỉ thêm `title` và `countText`.
+- `ed_batch3_fixes` 2 ca đỏ do `aiOrderProposal` có sẵn trên HEAD gốc (nhóm B xác nhận): không chạy lại.
+- `python3 scripts/check_naming.py`: OK, không vi phạm mới. Không còn mã hex rời trong CSS đã sửa.
+- Ảnh 1440px và 360px của 13 màn danh sách (Đơn, Khách, NCC, Mua hàng, Kho & lô, Hàng hoàn, Kiểm kê, Sổ nhập xuất, Danh mục, Hoá đơn bán, Nội dung, Nhân sự, Gọi xác nhận): `erp-console/shots/audit-fix/fix-{1440,360}-<màn>.png` (thư mục không vào git). Không màn nào cuộn ngang trang ở 360px (bảng cuộn trong thẻ). Dữ liệu là mock giả.

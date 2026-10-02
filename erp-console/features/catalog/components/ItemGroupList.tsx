@@ -106,6 +106,8 @@ export function ItemGroupList({ tabs }: { tabs: React.ReactNode }) {
     >
       <DataTable
         caption={M.groupsCaption}
+        title={M.groupsTitle}
+        countText={rows ? M.groupsHeadCount(list.count) : undefined}
         columns={columns}
         rows={rows ?? null}
         rowKey={(g) => g.id}

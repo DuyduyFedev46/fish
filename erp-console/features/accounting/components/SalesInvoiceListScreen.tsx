@@ -95,7 +95,7 @@ export function SalesInvoiceListScreen() {
         ),
     },
     ...(showCustomer ? [{ key: "customer", header: "Khách hàng", hideBelow: 800 as const, render: (r: SalesInvoiceRow) => r.customer_name || <span className="muted">—</span> }] : []),
-    { key: "issued", header: "Ngày xuất", num: true, width: "140px", render: (r) => dateTime(r.issued_at) },
+    { key: "issued", header: "Ngày xuất", tabular: true, width: "140px", render: (r) => dateTime(r.issued_at) },
     { key: "amount", header: "Số tiền", num: true, render: (r) => vnd(r.amount) },
     { key: "cogs", header: "Giá vốn", num: true, locked: true, hideBelow: 800, render: (r) => (r.cogs === undefined ? "—" : vnd(r.cogs)) },
     { key: "profit", header: "Lãi gộp", num: true, locked: true, hideBelow: 720, render: (r) => (r.gross_profit === undefined ? "—" : vnd(r.gross_profit)) },
@@ -166,6 +166,8 @@ export function SalesInvoiceListScreen() {
       }
     >
       <DataTable
+        title="Hoá đơn bán"
+        countText={list.rows ? `${list.count} hoá đơn` : undefined}
         columns={columns}
         rows={list.rows ?? null}
         rowKey={(r) => r.id}

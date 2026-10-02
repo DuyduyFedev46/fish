@@ -51,7 +51,7 @@ export function PaymentQueueScreen() {
     { key: "match", header: M.colMatch, render: (p) => <Chip table={ENUMS.paymentMatchStatus} value={p.match_status} /> },
     { key: "state", header: M.colResolution, render: (p) => <Chip table={ENUMS.paymentResolutionStatus} value={p.resolution_status} /> },
     { key: "order", header: M.colOrder, mono: true, render: (p) => p.order?.code ?? <span className="muted">{M.noOrder}</span> },
-    { key: "at", header: M.colReceivedAt, num: true, render: (p) => dateTime(p.received_at) },
+    { key: "at", header: M.colReceivedAt, tabular: true, render: (p) => dateTime(p.received_at) },
   ];
   const refreshFailed = list.rows !== undefined && list.error != null && !list.loading;
 
@@ -105,6 +105,8 @@ export function PaymentQueueScreen() {
     >
       <DataTable
         caption={M.queueTitle}
+        title={M.queueHeadTitle}
+        countText={rows ? M.queueHeadCount(list.count) : undefined}
         columns={columns}
         rows={rows}
         rowKey={(p) => p.id}

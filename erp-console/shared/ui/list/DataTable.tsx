@@ -20,6 +20,8 @@ export type Column<T> = {
   mono?: boolean;
   /** Số: tabular-nums + căn phải. */
   num?: boolean;
+  /** Ngày giờ, mã số: tabular-nums nhưng căn TRÁI (board: cột "Thời gian", "Đơn gần nhất" căn trái). */
+  tabular?: boolean;
   /**
    * Cột giá vốn / lãi lỗ / tiền nhà cung cấp: icon khoá nhỏ ở tiêu đề (§1.7). DataTable tự BỎ cột này (cả tiêu đề
    * lẫn ô) khi `canViewCost` là false; BE vẫn là lớp chặn thật.
@@ -68,12 +70,26 @@ type Props<T> = {
   caption: string;
   /** Số dòng khung xương. */
   skeletonRows?: number;
+  /** Tiêu đề đầu thẻ 44px ("Khách hàng"). Có thì vẽ đầu thẻ như board; bỏ trống = bảng không đầu thẻ. */
+  title?: string;
+  /** Bộ đếm bên phải đầu thẻ ("126 khách", "9 phiếu · 205,2 kg"). Chỉ hiện khi có `title`. */
+  countText?: string;
+  /** Liên kết nhỏ ở cuối đầu thẻ, sau bộ đếm (vd "Xem sổ nhập xuất"). Chỉ hiện khi có `title`. */
+  headAction?: React.ReactNode;
   /** Bảng nhiều cột: lề ô hẹp + cột cố định, chữ dài cắt bằng dấu … (cột không khai `width` chia phần còn lại). */
   dense?: boolean;
 };
 
-function colClass<T>(c: Column<T>): string {
-  return [c.num || c.align === "right" ? "r" : "", c.num ? "num" : "", c.mono ? "mono" : "", c.hideBelow ? `lt-hb-${c.hideBelow}` : ""].filter(Boolean).join(" ");
+function colClass<T>(c: Column<T>, header = false): string {
+  // Tiêu đề cột không dùng mono (board): chỉ ô dữ liệu của cột mã mới mono.
+  return [
+    c.num || c.align === "right" ? "r" : "",
+    c.num || c.tabular ? "num" : "",
+    c.mono && !header ? "mono" : "",
+    c.hideBelow ? `lt-hb-${c.hideBelow}` : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
 }
 
 function SkeletonBody<T>({ columns, rows }: { columns: Column<T>[]; rows: number }) {
@@ -110,6 +126,9 @@ export function DataTable<T>({
   caption,
   skeletonRows = 6,
   dense,
+  title,
+  countText,
+  headAction,
 }: Props<T>) {
   const router = useRouter();
   const offline = useOffline();
@@ -202,6 +221,17 @@ export function DataTable<T>({
 
   return (
     <div className={`lt-card${stale ? " is-stale" : ""}`} aria-busy={isLoading || undefined}>
+      {title && (
+        <div className="lt-head">
+          <h2>{title}</h2>
+          {(countText || headAction) && (
+            <span className="lt-headend">
+              {countText && <span className="lt-count">{countText}</span>}
+              {headAction}
+            </span>
+          )}
+        </div>
+      )}
       <div className="lt-scroll">
         <table className={dense ? "lt lt-dense" : "lt"}>
           <caption className="sr-only">{caption}</caption>
@@ -213,7 +243,7 @@ export function DataTable<T>({
           <thead>
             <tr>
               {columns.map((c) => (
-                <th key={c.key} scope="col" className={colClass(c) || undefined}>
+                <th key={c.key} scope="col" className={colClass(c, true) || undefined}>
                   {c.header}
                   {c.locked && (
                     <>

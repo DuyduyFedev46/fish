@@ -11,6 +11,7 @@ export const CUSTOMERS_MSG = {
   emptyTitle: "Chưa có khách hàng nào",
   emptyHint: "Khách xuất hiện ở đây sau khi đặt đơn đầu tiên trên cửa hàng.",
   shown: (n: number, total: number) => `Đang hiện ${n} / ${total} khách`,
+  headCount: (total: number) => `${total} khách`,
   loadMore: "Tải thêm khách",
   loadingMore: "Đang tải thêm…",
   loadMoreFailed: "Không tải thêm được.",

@@ -54,7 +54,7 @@ export function SupplierListScreen() {
     { key: "type", header: M.colType, render: (r) => r.supplier_type_label || <span className="muted">—</span> },
     { key: "phone", header: M.colPhone, mono: true, render: (r) => r.phone || <span className="muted">—</span> },
     { key: "receipts", header: M.colReceipts, num: true, render: (r) => r.receipt_count },
-    { key: "last", header: M.colLast, num: true, render: (r) => (r.last_received_at ? dateTime(r.last_received_at) : <span className="muted">—</span>) },
+    { key: "last", header: M.colLast, tabular: true, render: (r) => (r.last_received_at ? dateTime(r.last_received_at) : <span className="muted">—</span>) },
     { key: "status", header: M.colStatus, render: (r) => <Chip table={ENUMS.supplierActive} value={r.is_active} /> },
     { key: "total", header: M.colTotal, num: true, locked: true, render: (r) => (r.purchase_total === undefined ? <span className="muted">—</span> : vnd(r.purchase_total)) },
   ];
@@ -110,6 +110,8 @@ export function SupplierListScreen() {
     >
       <DataTable
         caption={M.listTitle}
+        title={M.listTitle}
+        countText={list.rows ? M.headCount(list.count) : undefined}
         columns={columns}
         rows={list.rows ?? null}
         rowKey={(r) => r.id}

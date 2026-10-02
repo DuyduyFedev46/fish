@@ -14,6 +14,7 @@ import { usePagedList } from "@/shared/lib/usePagedList";
 import { useResource } from "@/shared/lib/useResource";
 import { PERM } from "@/shared/lib/nav";
 import { Chip } from "@/shared/ui/Chip";
+import { Icon } from "@/shared/ui/Icon";
 import { DataTable, type Column } from "@/shared/ui/list/DataTable";
 import { FilterBar } from "@/shared/ui/list/FilterBar";
 import { ListPage } from "@/shared/ui/list/ListPage";
@@ -65,7 +66,7 @@ export function ReceiptListTab({ tabs, me }: { tabs: React.ReactNode; me: Me }) 
 
   const columns: Column<ReceiptRow>[] = [
     { key: "code", header: "Mã phiếu", mono: true, width: "104px", render: (r) => <span className={s.codeCell}>{r.code}</span> },
-    { key: "date", header: "Ngày nhập", num: true, render: (r) => dateOnly(r.received_date) },
+    { key: "date", header: "Ngày nhập", tabular: true, render: (r) => dateOnly(r.received_date) },
     { key: "supplier", header: "Nhà cung cấp", render: (r) => r.supplier_name },
     { key: "items", header: "Mặt hàng", render: (r) => r.items_summary || <span className="muted">—</span> },
     { key: "qty", header: "Số kg", num: true, render: (r) => kg(r.total_qty) },
@@ -85,7 +86,8 @@ export function ReceiptListTab({ tabs, me }: { tabs: React.ReactNode; me: Me }) 
       actions={
         ability.create ? (
           <Link href="/purchasing/new/" className="btn primary" data-testid="new-receipt">
-            Nhập lô tại cảng
+            <Icon name="add" />
+            <span>Nhập lô tại cảng</span>
           </Link>
         ) : undefined
       }
@@ -125,12 +127,9 @@ export function ReceiptListTab({ tabs, me }: { tabs: React.ReactNode; me: Me }) 
         ) : null
       }
     >
-      {rows && rows.length > 0 && (
-        <h3 className={s.tableTitle} data-testid="receipt-table-title">
-          Phiếu nhập <span className="muted">{totals.count} phiếu · {kg(totals.qty)}{list.hasMore ? " (đã tải)" : ""}</span>
-        </h3>
-      )}
       <DataTable
+        title="Phiếu nhập"
+        countText={rows && rows.length > 0 ? `${totals.count} phiếu · ${kg(totals.qty)}${list.hasMore ? " (đã tải)" : ""}` : undefined}
         columns={columns}
         rows={rows}
         rowKey={(r) => r.id}

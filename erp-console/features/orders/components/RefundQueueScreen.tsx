@@ -76,7 +76,7 @@ export function RefundQueueScreen() {
     { key: "order", header: M.colRefundOrder, mono: true, render: (r) => r.order_code ?? <span className="muted">{M.noInvoice}</span> },
     { key: "status", header: M.colStatus, render: (r) => <Chip table={ENUMS.refundStatus} value={r.status} /> },
     { key: "amount", header: M.colRefundAmount, num: true, render: (r) => vnd(r.amount) },
-    { key: "at", header: M.colRefundCreatedAt, num: true, render: (r) => dateTime(r.created_at) },
+    { key: "at", header: M.colRefundCreatedAt, tabular: true, render: (r) => dateTime(r.created_at) },
   ];
   const refreshFailed = list.rows !== undefined && list.error != null && !list.loading;
 
@@ -128,6 +128,8 @@ export function RefundQueueScreen() {
     >
       <DataTable
         caption={M.refundsListTitle}
+        title={M.refundsListTitle}
+        countText={list.rows ? M.refundsHeadCount(list.count) : undefined}
         columns={columns}
         rows={rows}
         rowKey={(r) => r.id}
