@@ -60,6 +60,7 @@ Nợ BE từ review Lô 12 (03b, TL12-FE):
 - Review Lô 16 L1 → **Lô 17**: `Tabs` dùng chung (`.tab`) rộng 39px ở 360px, dưới 44px.
 - Review Lô 16 L2 → **PO**: ED-35-AC6 lệch quyền mặc định (Quản lý mặc định có quyền đăng bài).
 - **Lô 17**: e2e `ed_batch9_returns` đỏ 5 ca từ 03/10 (mock tính ngày "tháng trước" lệch khi sang đầu tháng) — cố định ngày mock theo tháng.
+- Re-review Lô 14 → **Lô 17**: (QA N2: sửa bộ chọn `.screen` → `main` trong `e2e/s41_s47_real.py`; comment cũ `PermissionMatrixScreen.tsx:45`; cột "Thành viên" ở bảng nhóm W3h) hộp "Cho nghỉ" chỉ đếm trang đầu (20) phiếu Đang giao; danh sách là ảnh chụp lúc mở hồ sơ (giao xong phải tải lại).
 - TLA-L4: không chạy lùi migration `inventory/0007` khi đã có phiếu hoàn bị huỷ.
 - Lưu `item_price_id` (FK nullable PROTECT) trên dòng đơn → gộp với nợ Lô 13 L4.
 - Chờ Duy/PO: story "Huỷ chi phí phụ" (TLA-H1b, #14) và "Ghi tiền về muộn ở hàng chờ" (TLA-M3, #15).

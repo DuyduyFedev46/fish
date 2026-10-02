@@ -2795,3 +2795,100 @@ Không có Critical, High hay Medium.
 
 ### Kết luận Lô 13 — FE: **APPROVED**
 Đạt cả bốn trọng tâm: #10 của Duy, tiền dạng chuỗi (R14 không lặp lỗi H1), phân quyền kho1 và Quản lý, contract R14. Duyệt sửa `shared/lib/http.ts` (`detailOf`). L1 và L2 nên sửa khi tiện, mỗi lỗi vài dòng trong `catalogModel.ts`, không chặn lô. L3 và L4 ghi nợ. Điều kiện trước khi commit: QA chạy `a2_catalog_real.py` cùng các ca BE thật ở điểm 13. Nợ BE đưa vào 02c: `q` cho items, lọc `price_list` cho item-prices, tồn của combo, nhãn timeline cho đặt giá.
+
+## Lô 14 — FE
+> techlead · 03/10/2026 · Worktree `agent-aadebb07acbec8743`, commit `6267120` (base `b5a2bb9`). Đọc diff `erp-console/features/{staff,permissions,returns}`, `shared/lib/nav.ts`, `scripts/check-ai-chunks.mjs`, `backend/apps/accounts/capabilities/registry.py` + test, đối chiếu `capabilities/{api,services}.py`, `accounts/staff/services.py`, `inventory/returns/api.py`, `delivery/api.py`. Tự chạy `python3 scripts/check_naming.py`: OK, không vi phạm mới. Số test, build và e2e lấy theo điều phối viên đã chạy.
+
+### Đã soát, đạt
+| Trọng tâm | Kết quả | Căn cứ |
+|---|---|---|
+| Leo quyền ma trận | Đạt | FE: `PermissionMatrixScreen.tsx:46` và `GroupDetailScreen.tsx:84-85` chỉ cho người thuộc nhóm `owner` bấm công tắc, cột Chủ và ô "Chỉ Chủ" là ô cố định (`cellMode`). BE chặn thật: `GroupCapabilitiesView` (`CanManageStaff`) rồi `set_group_capabilities` gọi `actor_is_owner` (`capabilities/services.py:310`), nhóm `owner` bị khoá, ô `owner_only` không bật được, khoá lạ bị từ chối. Không có cập nhật lạc quan, ô chỉ đổi khi BE nhận |
+| Thêm/gỡ thành viên | Đạt | `GroupDetailScreen.tsx:86`: cần `manage_staff`, riêng nhóm Chủ thì người xem phải thuộc nhóm Chủ. Đi qua `PUT /api/staff/{id}/groups/`, BE giữ BR-PQ-17/18. Thêm vào nhóm Chủ có bước xác nhận |
+| Quyết định #13 | Đạt | Không viết cứng ai được gì: công tắc gửi đúng khoá việc, registry lấy từ BE (`getGroup("owner").registry`). "Tất cả khách" hiện ở ô `view_customers` đang bật (`PermissionMatrixScreen.tsx:311`), còn trang nhóm hiện chuỗi `scopes.customers` do BE tính (M2 của BE) |
+| Dữ liệu cá nhân | Đạt | URL chỉ mang id số hoặc mã nhóm (`parseStaffId`, `parseGroupCode` có regex). Không `localStorage`/`sessionStorage`/`console` trong code thật của staff và permissions. Bỏ nháp biểu mẫu, nên tên, SĐT, mật khẩu không vào storage. Mật khẩu tạm sinh bằng `crypto.getRandomValues`. `fetchStaffDelivering` chỉ giữ `id, code, status_label, started_at`, không giữ trường của khách. Mock `permissions` chỉ lưu khoá việc → true/false vào `sessionStorage` và có cổng `NEXT_PUBLIC_USE_MOCK`. `check-no-mock` xanh. Mật khẩu trong mock staff là của dữ liệu demo đã có từ trước, không phải mật khẩu thật |
+| TLA-L2 | Đạt | `registry.py:72` thêm `create_return` → `inventory.add_returntostock`, `owner_only=False`, tập perm vẫn rời nhau. Có test `test_registry.py:61-74` |
+| TLA-FE-L4 | Đạt | `returnsModel.ts:101-107`: `canCancel` đòi `add_returntostock` trước, khớp cổng `required_perms` của BE. Test bao cả ca có quyền duyệt nhưng thiếu cổng |
+| Cổng huỷ phiếu hoàn ở BE | **Không cần sửa** | `inventory/returns/api.py:92` đã khai `required_perms=("inventory.add_returntostock",)` từ Lô bổ sung A (`0fe91c4`). `BusinessModelPermissions` (`common/api.py:58-69`) kiểm quyền này trước thân hàm. Dòng "Nợ BE" cuối mục Lô 14 trong dev-notes là thừa, **không** đưa vào 02c |
+| Luật L4 (`requires`) | Đạt | Việc mới `create_return` không cần `requires`. `cancel` đòi `create_return`, rồi trong thân hàm xét `approve_returntostock` **hoặc** `change_returntostock` **hoặc** là người tạo. Đó là nhánh OR, nên `approve_return` vẫn dùng được một mình (action `approve` chỉ đòi perm của chính nó). `create` chỉ đòi `add_returntostock`. Không phát sinh cặp phụ thuộc mới |
+| Contract `/api/staff/groups/…` | Đạt | `features/permissions/api.ts` và `types.ts` khớp `capabilities/api.py` và `describe_group`: GET list, GET detail, PUT `{capabilities}`. Việc có `requires` được gửi cùng một yêu cầu (`planToggle`), nên không dính 400 `CAPABILITY_REQUIRES` |
+| UI-RULES | Đạt | Không có mã hex, không có "SĐT/NCC/BR-" trong chữ hiển thị. Công tắc dùng `role="switch"`, ô cố định có chữ cho trình đọc màn hình, 360px không cuộn ngang (đã sửa `position: relative`) |
+| Không có AI | Đạt | 4 route mới đã vào `check-ai-chunks` |
+
+### Lỗi
+Không có Critical hay High.
+
+**TL14-FE-M1 · Medium · ED-38-AC3 chưa đạt: hộp "Cho nghỉ" không nêu số phiếu đang giao.**
+- Vị trí: `features/staff/components/ActiveModal.tsx:38-43` chỉ có 3 dòng hậu quả cố định. `StaffDetailScreen.tsx:92` đã tải `delivering` nhưng không truyền vào hộp.
+- Hiện trạng: Chủ bấm "Cho nghỉ" với `giao2` thì hộp không nói gì về 2 phiếu Đang giao. Chỉ sau khi bấm xác nhận mới thấy câu lỗi BR-GH-08 của BE.
+- AC yêu cầu "Khối tóm tắt nêu số phiếu đang gán". BE chặn cho nghỉ khi còn phiếu Đang giao (`accounts/staff/services.py:261-270`), nên phần "tài khoản bị khoá" của AC không xảy ra trong ca này. Đây là cách BE đã nghiệm thu.
+- **Sửa:** truyền `delivering.data` vào `ActiveModal`. Khi có từ 1 phiếu trở lên, hiện dòng "Còn N phiếu Đang giao (mã…), phải giao xong hoặc chuyển người trước khi cho nghỉ" và khoá nút xác nhận. Khi khối không tải được (thiếu quyền xem phiếu, hoặc lỗi), giữ hành vi hiện tại để BE quyết. Thêm 1 ca e2e cho `giao2`. Sửa khoảng 15 dòng.
+
+**TL14-FE-L1 · Low · Ghi chú sai về superuser.**
+- `features/permissions/README.md:8` và dev-notes ghi "BE chỉ cho Chủ ghi". Thực tế `actor_is_owner` (`accounts/staff/services.py:52-54`) trả True cho cả superuser, nên BE cho superuser ghi ma trận. `features/permissions/api.ts:3` thì ghi đúng ("Chủ/superuser").
+- FE chặt hơn BE, nên không có lỗ hổng: superuser vốn có mọi quyền ở Django. Nhưng nếu Duy thật sự muốn "superuser ngoài nhóm Chủ chỉ được xem", thì đó là việc của BE và cần hỏi Duy. Đề xuất giữ như hiện tại và chỉ sửa câu trong README.
+
+**TL14-FE-L2 · Low · Ô "Được gán" là hằng số FE.**
+- `permissionsModel.ts:32` (`ASSIGNED_ONLY`) chép một phần `GROUP_SCOPES` của BE, vì `GET /api/staff/groups/` không trả `scopes`.
+- Đây là phạm vi dòng Tầng 3 do code cố định, không phải quyền tuỳ admin, nên không trái quyết định #13. Rủi ro là lệch khi BE đổi Tầng 3.
+- Ghi nợ BE: thêm `scopes` vào từng dòng của danh sách nhóm, rồi FE bỏ hằng số.
+
+**TL14-FE-L3 · Low · Ghi nhận.** "Hoạt động gần đây" lấy `note` của AuditLog làm nhãn (`staffModel.ts:89-91`). Màn Nhật ký hoạt động cũng hiện đúng dữ liệu này cho cùng quyền `view_auditlog`, nên không mở thêm đường lộ dữ liệu nào.
+
+### Chốt 8 điểm lệch dev nêu
+1. Đường dẫn `/api/staff/groups/…`: **đúng**. 02b B4 đặt ở đây, story ghi sai.
+2. Registry lấy từ chi tiết nhóm Chủ: **chấp nhận**.
+3. Thiếu Ghi chú, ngày đi làm, `must_change_password`, thống kê tháng: **chấp nhận**, không bịa số. PO quyết có cần BE bổ sung không.
+4. SĐT nhân viên hiện đủ cho người có `manage_staff`: **chấp nhận**. Đây là dữ liệu nhân viên, không phải dữ liệu khách, và không vào URL, storage hay log.
+5. Bỏ nháp biểu mẫu: **đúng**, vì tránh để mật khẩu nằm trong storage.
+6. Cho nghỉ để BE quyết: hướng đúng, nhưng phải sửa theo TL14-FE-M1.
+7. Superuser chỉ xem: **chấp nhận**, sửa câu chữ theo L1.
+8. Không có ô mô tả nhóm, không nút "Lưu thay đổi", chỉ hỏi lại khi tắt việc phá luồng: **chấp nhận**. Nên hỏi lại thêm khi tắt `create_return` của nhóm `delivery_staff`, vì nhóm này sẽ mất nút "Mang hàng về kho". Không bắt buộc.
+
+### Kết luận Lô 14 — FE: **CHANGES REQUESTED** (nhẹ)
+- Chặn leo quyền đúng ở cả hai lớp. TLA-L2 và TLA-FE-L4 đạt. Không rò dữ liệu cá nhân hay giá vốn. Contract khớp.
+- Chỉ cần sửa **TL14-FE-M1** (ED-38-AC3), kèm 1 ca e2e. Tech Lead re-review riêng phần diff này.
+- L1 sửa câu chữ cùng lượt. L2 ghi nợ BE vào 02c. L3 chỉ ghi nhận.
+- **Không** ghi nợ "cổng huỷ phiếu hoàn ở BE" vào 02c, vì BE đã có cổng đó.
+- QA cần chạy `s41_s47_real.py` trên BE thật, vì dev chưa chạy.
+
+## Lô 16 — FE
+> techlead · 03/10/2026 · Worktree `agent-af89abe3ba42b33d1`, commit `57f0eda`. Đọc diff `erp-console/features/content/**`, `app/(console)/content/edit/page.tsx`, đối chiếu `backend/apps/content/{entries,categories}/` và `common/api.py` (cách trải `extra` ra thân lỗi). Tự chạy `check_naming.py`: OK.
+
+### Đã soát, đạt
+| Trọng tâm | Kết quả | Căn cứ |
+|---|---|---|
+| XSS | Đạt | Không có `dangerouslySetInnerHTML` hay `innerHTML` trong module. Thân bài lưu dạng JSON `BodyDoc`, chuyển đổi qua `convert.ts` (không bị sửa). Tiptap dựng DOM theo schema, nên HTML dán vào cũng bị lọc theo schema. Link `validate: isSafeHref`, `autolink: false`. `CaveImageExtension`, `ItemCardExtension`, `safeHref.ts` không bị sửa. Liên kết "Xem trên website" có `isSafeHref` (`EntryEditScreen.tsx:866`) cùng `rel="noopener noreferrer"`. Tiêu đề, lý do, tên chuyên mục đều hiện bằng React. BE còn một lớp làm sạch nữa (`content/body/sanitize.py`) |
+| Cảnh báo SĐT, giá vốn | Đạt | Đăng hoặc gửi duyệt mà BE trả 409 `CONTENT_WARNINGS` thì mở `WarningsModal`. Người dùng phải chủ động bấm thì mới gửi lại với `acknowledge_warnings: true`. Hộp không in lại `snippet`, nên SĐT không bị chép ra thêm chỗ nào. `warningsOf` lọc kiểu cảnh báo theo danh sách cho phép |
+| Quyền đăng, gỡ, trả về | Đạt | Nút đọc từ `me.permissions` (`EntryEditScreen.tsx:163-167`): Đăng, Gỡ, Trả về cần `content.publish_entry`. Khớp BE (`entries/api.py:93,126,194`). Sửa và tự lưu cần `change_entry`, xoá cần `delete_entry`. Trang Chủ chốt go-live bị khoá Gỡ, kèm lý do. Theo quyết định #13, FE bám quyền thật chứ không theo tên nhóm |
+| Xung đột phiên bản | Đạt | Mọi lệnh ghi đều gửi `row_version` (`updatePayloadOf`, publish, submit, return, unpublish, discard, restore). 409 `STALE_VERSION` thì hiện banner và khoá nút chính. Tự lưu dừng khi đang xung đột. "Tải lại" phải xác nhận rồi mới bỏ nháp trên máy |
+| Contract `backend/apps/content` | Đạt | Phần thêm của lỗi (`missing`, `suggestion`, `entries`+`total`, `warnings`) được BE trải ra thân lỗi (`common/api.py:168-173`), rồi `http.ts` gom vào `ApiError.details`. Mã lỗi khớp: BR-ND-02/03/04, `STALE_VERSION`, `CONTENT_WARNINGS`. `page_role`, `show_in_footer`, `footer_order` chỉ gửi khi là trang |
+| Mock | Đạt | `window.__caveMock` chỉ gắn khi `NEXT_PUBLIC_USE_MOCK === "1"` (`mock.ts:1041`). `check-no-mock` xanh |
+| UI-RULES | Đạt | Chữ hiển thị dùng "Đường dẫn", "Tóm tắt", "chân trang". Mã luật bị bỏ khỏi câu BE (`stripRuleCodes`). CSS chỉ dùng token. Tiptap nạp lười |
+
+### Lỗi
+Không có Critical, High hay Medium.
+
+**TL16-FE-L1 · Low · Ghi nhận: tab rộng 39px ở 360px.** Lỗi nằm ở `Tabs` dùng chung (`.tab` trong `shared/ui/globals.css` không có padding ngang). Chiều cao đạt 44px. Sửa ở Lô 17 (khung): thêm `min-width: 44px` hoặc padding ngang cho `.tab`, rồi chạy lại các e2e có kiểm vùng bấm. Không chặn lô này.
+
+**TL16-FE-L2 · Low · Cho PO: ED-35-AC6 lệch dữ liệu quyền mặc định.** Nhóm `manager` mặc định có `content.publish_entry`, nên Quản lý thấy nút Đăng. FE làm đúng quyết định #13 (bám quyền thật). PO cần sửa AC thành "Người không có quyền Đăng bài lên Shop…", hoặc Chủ tắt việc này cho Quản lý trên ma trận. Không sửa code.
+
+**TL16-FE-L3 · Low · Chưa kiểm với BE thật.** Phần `ApiError.details`, 409 và lý do dạng khoá mới chỉ chạy trên mock. QA **bắt buộc** chạy `ra_soat_cms03/04/05/11*` cùng một vòng đăng, gỡ, trả về, xung đột trên BE thật trước khi APPROVED.
+
+### Kết luận Lô 16 — FE: **APPROVED**
+Đạt cả XSS, cảnh báo SĐT và giá vốn, quyền đăng và gỡ, xung đột phiên bản, contract và UI-RULES. L1 ghi nợ cho Lô 17. L2 chuyển PO. Điều kiện trước khi commit: QA làm đủ L3.
+
+## Lô 14 — FE (re-review)
+> techlead · 03/10/2026 · `git diff 6267120 1684ffd` (10 file). Số kiểm chứng lấy theo điều phối viên: tsc sạch, vitest 838, e2e mock batch14 101/101, s41_s47 74/74, s48 41/41.
+
+- **TL14-FE-M1: đã sửa, đạt.**
+  - `staffModel.ts` `deliveringBlock` dựng câu "Còn N phiếu Đang giao (mã…)". Câu này hiện tối đa 5 mã rồi ghi "và K phiếu nữa", chỉ dùng mã phiếu, không có dữ liệu khách.
+  - `ActiveModal.tsx` hiện khối `role="alert"`, khoá nút xác nhận bằng `disabled` của `ConfirmModal` (`ConfirmModal.tsx:83`) và bỏ dòng "bị khoá ngay" khi đang bị chặn. "Cho làm lại" không bị ảnh hưởng.
+  - `StaffDetailScreen.tsx:307` chỉ truyền danh sách khi khối đã tải xong (`status === "ok"`). Nếu thiếu quyền xem phiếu, đang tải hoặc lỗi thì truyền `null`, không chặn và để BE quyết (BR-GH-08). Fail-open ở FE là chấp nhận được vì BE vẫn là lớp chặn thật.
+  - Có 3 unit test. e2e có ca `giao2`: hộp nêu 2 mã, nút bị khoá, không có request `deactivate`, không có SĐT. Có ca đối chứng `giao1`: không chặn. `s41_s47_staff.py` đã sửa theo.
+- **TL14-FE-L1: đã sửa, đạt.** `features/permissions/README.md` nay ghi đúng: BE cho cả Chủ và superuser ghi, FE cố ý chặt hơn.
+- **Ghi nhận mới, Low, không chặn:**
+  - `fetchStaffDelivering` chỉ đọc trang đầu (`StandardPagination`, 20 dòng), nên khi có hơn 20 phiếu Đang giao thì số N trong câu sẽ thấp hơn thực tế. Nút vẫn bị khoá đúng. Khi tiện thì lấy `count` của trang.
+  - Danh sách phiếu là ảnh chụp lúc mở hồ sơ. Nếu phiếu vừa giao xong thì người dùng phải tải lại trang mới cho nghỉ được.
+
+### Kết luận re-review Lô 14 — FE: **APPROVED**
+M1 và L1 đạt. Không còn lỗi Critical, High hay Medium. QA cần chạy `s41_s47_real.py` trên BE thật, gồm ca `giao2` có phiếu Đang giao.

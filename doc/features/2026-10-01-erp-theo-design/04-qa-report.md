@@ -3019,3 +3019,240 @@ Dựng lại `npm ci` (exit 0) rồi `NEXT_PUBLIC_USE_MOCK=0 NEXT_PUBLIC_API_BAS
 | Console không lỗi trong 3 ca | ✅ | |
 Hồi quy nhanh: `ed_batch13_catalog` (mock) 128/128; `ed_batch1_shell` (mock) 56/56; `a2_catalog_real.py` trên BE thật 6/6. Không còn lỗi mở trong Lô 13. Ghi nhận ngoài lô N1 đến N4 ở trên vẫn giữ nguyên (không chặn). Chỉ tắt tiến trình ở cổng 8631, 3631, 3632; không sửa mã sản phẩm.
 
+
+
+---
+
+## Lô 16 — FE · Nội dung (ED-35 Danh sách bài viết và chuyên mục, ED-36 Soạn bài, thiết lập, đăng, gỡ, trả về) · lần 1 · 2026-10-03
+
+Code kiểm: worktree `.claude/worktrees/agent-af89abe3ba42b33d1`, commit `57f0eda`. Chạy với **BE thật** (Django từ `backend/` của worktree, SQLite tạm, seed, `DJANGO_DEBUG=1`) ở cổng 8651; ERP build `NEXT_PUBLIC_USE_MOCK=0 NEXT_PUBLIC_API_BASE=http://127.0.0.1:8651` phục vụ ở 3651; bản build mock ở 3652; Shop (`frontend/`) ở 3653 trỏ về cùng BE. Tài khoản: `loc` (owner), `ql1` (manager), `qlnp` (manager đã bỏ quyền đăng, dựng riêng cho AC6), `kho1`, `giao1`, `cs2`. Toàn bộ dữ liệu là dữ liệu giả.
+
+### Kết luận: REJECTED — 3 lỗi chặn trên BE thật (B16-3 High: mở bài chưa sửa gì rồi quay lại sau khi người khác sửa, bấm Lưu nháp là ghi đè mất bản của người kia; B16-1 Medium: sau "Gỡ bài" màn không cập nhật; B16-2 Medium: mở bài là bị tính "có thay đổi chưa lưu")
+
+### Tổng: 348 ca tự động · ✅ 339 · ❌ 9 (gom thành B16-1, B16-2, B16-3 và 1 ghi nhận Low) · ⏸ 0
+Cách đếm: 154 ca mock (`ed_batch16_content` 98 + `ed_batch1_shell` 56) + 190 ca Playwright/HTTP trên BE thật + 4 script `ra_soat_cms*`. Có 8 ca báo đỏ do script cũ lệch với màn mới (ghi rõ ở "Script ra_soat"), đã kiểm lại bằng ca thay thế và tính ✅. Ngoài ra vitest 819/819.
+
+### Theo AC (mã theo `02-stories.md`)
+| Mã AC | Kết quả | Bằng chứng |
+|---|---|---|
+| ED-35-AC1 Danh sách: chip Nháp / Chờ duyệt / Đã đăng / Đã gỡ, Loại Bài viết / Trang, cột Tiêu đề, Đường dẫn, Chuyên mục, Cập nhật, đếm "Đang hiện n / N bài" | ✅ (chip "AI" ở cột riêng: không có bài AI trong dữ liệu thử, chỉ kiểm phần còn lại) | p2b trên BE thật; `lo16-real-loc-10-danh-sach-3-bai.png`, `-11-tab-cho-duyet-rong.png`, `-12-tim-khong-thay.png` |
+| ED-35-AC2 Thiết lập bài viết dùng chữ "Đường dẫn", "Tóm tắt", "Chân trang", không có slug/excerpt/footer | ✅ | p2b, p9 (không có từ kỹ thuật trong màn); `lo16-real-loc-96-thiet-lap-trang.png`, `-25-sau-thiet-lap.png` |
+| ED-35-AC3 Bấm Đăng: hộp kiểm tra liệt kê mục chưa đạt, còn mục chưa đạt thì nút Đăng khoá/dẫn sang Thiết lập; bảng tự kiểm; ảnh bìa bắt buộc có mô tả; cảnh báo SĐT/giá vốn | ✅ | `lo16-real-loc-22-bang-tick-F3k.png`, `-23-thieu-thong-tin.png`, `-24-anh-bia-thieu-mo-ta.png`, `-26-canh-bao.png`, `-27-da-dang.png` |
+| ED-35-AC4 Trả về nháp: bắt buộc chọn lý do, 4 lý do bằng chữ, bấm đúp an toàn, banner nêu lý do | ✅ | p3; `lo16-real-loc-41-tra-ve-F3i.png`, `-42-da-tra-ve.png` |
+| ED-35-AC5 Gỡ bài: nút đỏ, bắt buộc lý do, bài chuyển Đã gỡ không bị xoá, Shop trả 410 | ✅ phần BE/Shop và hộp thoại · ❌ phần màn ngay sau khi gỡ (B16-1) | p2c, p2d; `lo16-real-loc-31-go-bai-F3j.png`, `-32-da-go.png`, `-35-sau-go-ngay.png` |
+| ED-35-AC6 (quyền) Quản lý mở bài: viết và sửa được, không có nút Đăng hay Gỡ bài | ✅ với `qlnp` · L2 với `ql1` mặc định | p3; `lo16-real-qlnp-1-soan-khong-quyen-dang.png`, `lo16-real-ql1-1-soan-co-quyen-dang-mac-dinh.png` |
+| ED-36-AC1 Chuyên mục: chip Đang hoạt động / Ngừng dùng | ✅ | `lo16-real-loc-5-chuyen-muc-2-dong.png`, `-6-chuyen-muc-ngung-dung.png` |
+| ED-36-AC2 Thêm chuyên mục (hộp thoại): có trong danh sách chọn của Thiết lập bài viết | ✅ | p2a/p2b; `lo16-real-loc-3-them-chuyen-muc-hop.png` |
+| ED-36-AC3 (lỗi) Tên trùng: ô báo lỗi | ✅ | `lo16-real-loc-4-chuyen-muc-trung-ten.png` |
+| ED-36-AC4 (quyền) Nhân viên kho mở URL: màn "Không có quyền" | ✅ cả `kho1`, `giao1`, `cs2` | p7; `lo16-real-kho1-1-khong-quyen.png`, `-giao1-`, `-cs2-` |
+| Ca chuẩn không có mã AC: xung đột 2 tab, lịch sử + khôi phục, mất mạng, 360px, XSS | ✅ 2 tab · ❌ "mở lại bài" (B16-3) · ✅ còn lại | p6, p8b, p7, p5 |
+
+### Ngoại lệ và biên (ngoài đường thuận)
+| Ca | KQ | Ghi chú |
+|---|---|---|
+| Bài đã từng đăng: ô Đường dẫn bị khoá, nút Xoá khoá, DELETE API bị từ chối 400 (BR-ND-02), bài còn nguyên | ✅ | p2c, p4c |
+| Bài nháp chưa từng đăng: DELETE 204 (xoá cứng, đúng thiết kế BR-ND-02, không phải chứng từ) | ✅ | ghi nhận, không phải lỗi |
+| Màn cũ (trạng thái đã đổi): bấm Gỡ bài ở màn cũ | ✅ | `lo16-real-loc-34-man-cu-go-bai.png` |
+| Bấm đúp "Gỡ bài" và "Trả về nháp" | ✅ | BE chỉ ghi 1 lần, màn không lỗi (p2c, p3 dùng dblclick) |
+| Mở bài đã gỡ, sửa đường dẫn ngay sau khi gỡ không tải lại | ❌ | B16-1 |
+| Mở bài (chưa sửa gì) rồi rời đi | ❌ | B16-2 |
+| Mở bài, rời đi, người khác sửa, mở lại, Lưu nháp | ❌ | B16-3 |
+| Hai tab cùng sửa, tab B lưu sau | ✅ | p6, không ghi đè |
+| Mất mạng thật (offline), có mạng lại | ✅ | p8b |
+| Tải ảnh ở 375px | ✅ | thêm ảnh thành công, đếm tăng |
+| Ảnh bìa không mô tả | ✅ | báo lỗi bằng chữ (`-24-anh-bia-thieu-mo-ta.png`) |
+| Gửi duyệt khi thiếu thông tin (BR-ND-03) | ✅ | báo "Còn thiếu", chuyển sang Thiết lập |
+| Thiết lập của Trang có "Vai trò trang", "Hiện ở chân trang", không có Chuyên mục | ✅ | p9; `lo16-real-loc-96-thiet-lap-trang.png` |
+
+### Phân quyền (BE thật, UI + API)
+| Group | Thấy menu Nội dung | Xem danh sách/chi tiết | Tạo bài + chuyên mục | Đăng/Gỡ/Trả về | Gửi duyệt |
+|---|---|---|---|---|---|
+| `loc` (owner) | có | 200 | 201 | 200 | n/a |
+| `ql1` (manager mặc định) | có | 200 | 201 | 200 (xem L2) | có |
+| `qlnp` (manager bỏ quyền đăng) | có | 200 | 201 | 403 cả 3 API; UI không có nút | có, BE chuyển `pending_review` |
+| `kho1` | không | 403 | 403 | 403 | n/a |
+| `giao1` | không | 403 | 403 | 403 | n/a |
+| `cs2` | không | 403 | 403 | 403 | n/a |
+| Chưa đăng nhập | | 401 | 401 | 401 | |
+
+Vào thẳng `/content/`, `/content/edit/?id=1`, `/content/categories/` bằng `kho1`/`giao1`/`cs2`: hiện màn "không có quyền", không lộ nội dung hay nút (có ảnh `lo16-real-{kho1,giao1,cs2}-1-khong-quyen.png`). Console sạch.
+
+### Rò giá vốn
+API công khai `/api/public/content/entries/`, `…/<slug>/`, `/categories/`, `/footer-links/` và HTML Shop không chứa `purchase_rate`, `landed_unit_cost`, `unit_cost`, `profit`. Khoá `author` trong chi tiết công khai có giá trị thương hiệu "Cá Về", không phải tên người. Khoá của AuditLog (`entry_id`, `version`, `kind`, `reason`) không tính ngược ra giá vốn được. Không có lỗi.
+
+### Rò dữ liệu cá nhân
+- API công khai không có tên, SĐT, địa chỉ, email, `created_by`, `row_version`. Đạt.
+- AuditLog (17 bản ghi `content_*`): khoá `entry_id`, `version`, `kind`, `reason` (khoá lý do, không có chữ tự do). Không có dữ liệu khách. Đạt.
+- Console trình duyệt: sạch ở mọi ca (loc, qlnp, ql1, kho1, giao1, cs2, 360px). URL chỉ có `?id=<số>`. `localStorage` chỉ có token, tên người dùng cuối, và bản nháp tạm `cave_erp_draft:content_entry_<id>`. Bản nháp tạm lưu **toàn bộ chữ của bài**, nên nếu nhân viên dán SĐT vào bài thì SĐT nằm trong `localStorage` tới khi lưu; gắn với B16-2 (bản tạm còn bị tạo ra cả khi không sửa gì). Ghi nhận, chưa phải rò vì chỉ ở máy người soạn.
+- Tra cứu công khai không giới hạn tần suất (70 lượt liên tiếp đều 200); đây là danh sách bài công khai, không phải tra đơn, nên không tính lỗi.
+- Ảnh chụp và report chỉ dùng dữ liệu giả.
+
+### XSS
+- Tiêu đề, tóm tắt, alt ảnh bìa, thân bài chứa `<script>…</script>`, `<img src=x onerror=…>`, block `html`, mark `onclick`, link `javascript:`: BE lưu thành chữ thường, loại block lạ, mark lạ và href `javascript:`; giữ link `https://` hợp lệ.
+- ERP (danh sách, màn soạn, dán HTML độc vào editor qua sự kiện paste): không chạy script, không có `<script>`/`<iframe>`/`onerror` trong DOM, không có hộp thoại alert. Thân bài sau khi lưu chỉ còn đoạn chữ.
+- Shop `/bai-viet/?slug=`: `window.__xss` không được đặt, không có phần tử nguy hiểm, payload hiện thành chữ, link ngoài có `rel` chứa `noopener`. Ảnh: `lo16-shop-xss-bai-viet.png`, `lo16-real-loc-50-xss-danh-sach.png`, `-51-xss-soan.png`, `-52-dan-xss.png`. Đạt.
+
+### Script ra_soat_cms* trên BE thật (sửa cổng về 3651 và 8651, tài khoản `ra_soat_quanly` nhóm manager)
+| Script | KQ | Ghi chú |
+|---|---|---|
+| `ra_soat_cms03_ac13_mobile` | ✅ PASS | |
+| `ra_soat_cms11_ac3_restore_confirm` | ✅ PASS | cần bài đã đăng có "sua nhap" chưa đăng; dựng qua API |
+| `ra_soat_cms04_autosave` | script lỗi thời | AC2 giả lập mất mạng bằng `dispatchEvent('offline')`, nhưng màn mới đọc `navigator.onLine` nên không đổi; đã kiểm lại bằng `context.set_offline(True)`: hiện "Chưa lưu, đang giữ trên máy", có bản tạm, có mạng lại tự lưu và xoá bản tạm. Tính ✅ |
+| `ra_soat_cms05_upload_mobile` | script lỗi thời | script tìm "n/20 ảnh" sau khi bấm "Thiết lập bài viết", nhưng ở màn mới "Ảnh trong bài" nằm ở màn Viết. Đã kiểm lại ở 375px: tải ảnh thành công, đếm tăng. Tính ✅ |
+
+### Hồi quy
+`ed_batch1_shell` 56/56 (cần `out/404.html` bản mock, script lấy file này; đã đặt đúng bản mock), `ed_batch16_content` 98/98, vitest 819/819, `tsc --noEmit` exit 0, `npm ci` sạch (không `--legacy-peer-deps`), `npm run build` đạt cho ERP (real, mock) và Shop, `scripts/check_naming.py` không phát sinh vi phạm mới. Chức năng liền kề không phải của lô (Shop trang bài viết, API công khai) vẫn chạy.
+
+### Lỗi
+#### B16-3 — Mở bài chưa sửa gì rồi quay lại sau khi người khác sửa, bấm "Lưu nháp" ghi đè mất bản của người kia · **High** · ngoại lệ lưu/xung đột (ED-03-AC5), liên quan ED-35 soạn bài
+Bước tái hiện (BE thật, `loc`):
+1. Tạo bài nháp "Tiêu đề cũ" qua API. Mở `/content/edit/?id=<id>` ở ERP, đợi 4 giây, không gõ gì, bấm menu "Nội dung" để rời đi.
+2. `ql1` sửa bài qua API (`PATCH`, tiêu đề "Tiêu đề MỚI…", thân "Nội dung MỚI.").
+3. `loc` mở lại bài.
+4. Màn hiển thị tiêu đề cũ và thân cũ (kèm dòng "Đã khôi phục bản nháp chưa lưu từ thiết bị này."). Bấm "Lưu nháp": hiện "Đã lưu nháp.", `row_version` tăng, BE giờ giữ "Tiêu đề cũ", bản MỚI của `ql1` mất. Không có cảnh báo xung đột.
+Mong đợi: bài chưa sửa thì không có bản tạm; hoặc khi mở lại, bản máy chủ mới hơn phải thắng, hoặc báo xung đột.
+Thực tế: bản tạm trên máy (không phải thay đổi của người dùng) đè lên bản máy chủ mới và được lưu thẳng.
+Ảnh hưởng: mất nội dung do người khác sửa, im lặng. Ảnh: `lo16-real-loc-61-ban-cu-de-ban-moi.png`, `lo16-real-loc-62-ghi-de-sua-nguoi-khac.png`. Script: `p5f.py` trong scratchpad.
+Nguyên nhân gần nhất (chưa sửa, theo quan sát): xem B16-2.
+
+#### B16-2 — Chỉ mở bài là màn coi như "có thay đổi chưa lưu" · **Medium** · ngoại lệ lưu/rời trang của màn soạn (ED-35)
+Bước tái hiện: mở bất kỳ bài nháp hoặc bài đã đăng trên BE thật, không gõ gì, chạy `window.dispatchEvent(new Event('beforeunload',{cancelable:true}))` và đọc `defaultPrevented`.
+Mong đợi: `false` khi chưa sửa. Thực tế: `true` ngay sau khi tải; tải lại hoặc đóng tab hiện hộp hỏi rời trang; `localStorage` có `cave_erp_draft:content_entry_<id>`; mở lại bài thì hiện dòng giả "Đã khôi phục bản nháp chưa lưu từ thiết bị này." (`lo16-real-loc-60-khoi-phuc-gia.png`). Trang Chuyên mục không bị.
+Nghi nguyên nhân: `TiptapEditor.tsx` gọi `editor.commands.setContent(...)` khi `value` từ máy chủ khác định dạng với Tiptap, kích hoạt `onUpdate` rồi `edit()` đặt `dirty=true` (`EntryEditScreen.tsx` dòng 53-54 của editor và 235/276 của màn). Cần BE/FE dev xác nhận.
+Ảnh hưởng: hộp hỏi rời trang sai, dòng khôi phục giả, bản tạm chứa chữ của bài nằm trong `localStorage`, và là điều kiện gây ra B16-3. Mock e2e không bắt được vì nội dung mock đã đúng định dạng Tiptap.
+
+#### B16-1 — Sau "Gỡ bài" màn không cập nhật theo kết quả thật của BE · **Medium** · AC ED-35-AC5
+Bước tái hiện (BE thật): mở bài đã đăng, "…" > "Gỡ bài", chọn lý do, xác nhận. Không tải lại.
+Mong đợi: banner nêu lý do gỡ bằng chữ; ô Đường dẫn vẫn khoá (bài đã từng đăng); không hiện "Bản sửa #undefined".
+Thực tế: BE trả `{status, row_version}` rỗng các khoá khác nên `setMeta(metaOf(d))` làm mất `returnReason`, `slugLocked`, `publishedVersion`: banner lý do không hiện, ô Đường dẫn mở sửa được, thấy "Bản sửa #undefined". Sửa đường dẫn rồi lưu thì BE từ chối (đường dẫn BE vẫn như cũ) nhưng FE báo sai "Đường dẫn này đã có bài khác dùng." Tải lại trang thì đúng.
+Chỗ cần sửa: `erp-console/features/content/components/EntryEditScreen.tsx`, hàm `runUnpublish`: chỉ gộp `status`, `row_version` và giữ `slugLocked: true`, `returnReason = reason` (cách `runPublish`/`runReturn` đã làm); kiểu trả về `unpublishEntry` trong `api.ts` cần là phần trả về thật.
+Ảnh: `lo16-real-loc-35-sau-go-ngay.png`, `-36-sau-go-tai-lai.png`, `-37-sua-duong-dan-sau-go.png`. Script: p2d, p2e.
+
+### Ghi nhận không chặn
+- **L1 (Low)** Tên lý do trả về/gỡ lệch chữ AC: "Rủi ro pháp lý hoặc bản quyền" (trả về), "Khiếu nại hoặc rủi ro pháp lý" và "Lý do khác" (gỡ). Chốt chữ với PO.
+- **L2 (PO quyết)** Nhóm `manager` mặc định có `content.publish_entry` nên `ql1` thấy nút Đăng bài; AC6 chỉ đúng khi bỏ quyền này khỏi nhóm (đúng với `qlnp`). Trùng TL16-FE-L2.
+- **L3 (Low)** Sau lần lưu nháp đầu tiên của bài mới hiện 2 toast xếp chồng.
+- **L4 (Low)** Tab "Tất cả" rộng 39px ở 360px (đã biết TL16-FE-L1).
+- Đường dẫn ảnh bìa của API công khai trả `http://localhost:8000/...` do cấu hình môi trường chạy thử, không phải lỗi lô.
+
+### Lệnh đã chạy
+- `cd erp-console && npm ci` (đạt, không cờ), `npx tsc --noEmit` (exit 0), `npm run build` (real, mock, và Shop `frontend/` đều đạt), `npx vitest run` 819/819.
+- `python3 erp-console/e2e/ed_batch16_content.py` 98/98 (mock); `ed_batch1_shell.py` 56/56 (mock).
+- Playwright trên BE thật: `p2a`–`p2e` (danh sách, chuyên mục, soạn, đăng, gỡ, lịch sử), `p3` (qlnp gửi duyệt, loc trả về, ql1) 20/20, `p4*` (ma trận API 6 vai + chưa đăng nhập, public không rò khoá), `p5` (XSS ERP + Shop) 17/17, `p6` (2 tab) 4/4, `p7` (kho1/giao1/cs2 + 360px) 20/20, `p8` (mất mạng + tải ảnh 375px), `p9` (ngừng dùng chuyên mục có bài, Thiết lập của Trang) 6/6, `p5c`–`p5f` (B16-2, B16-3). Script nằm ở scratchpad `qa16/`.
+- 4 script `ra_soat_cms*` (xem bảng trên).
+- Chỉ dừng tiến trình ở cổng 8651, 3651, 3652, 3653. Không sửa mã sản phẩm, không commit.
+
+## Lô 14 — FE · Nhân sự + Phân quyền (ED-37, ED-38, ED-40; ED-39 là BE đã có) · lần 1 · 2026-10-03
+
+Mã nguồn: worktree `.claude/worktrees/agent-aadebb07acbec8743`. Kiểm hai mốc: `6267120` (bản đầu) và `1684ffd` (sửa TL14-FE-M1, hộp "Cho nghỉ" nêu số phiếu đang giao và khoá nút). Cây còn có một sửa nhỏ ở BE `backend/apps/accounts/capabilities/registry.py` (thêm việc `create_return` ↔ `inventory.add_returntostock`). Chạy với **BE thật**: Django dựng từ `backend/` của worktree, SQLite tạm + dữ liệu giả (loc, ql1, kho1, giao1, giao2, cs2, nghi1, su1), cổng 8641; ERP dựng `NEXT_PUBLIC_USE_MOCK=0 NEXT_PUBLIC_API_BASE=http://127.0.0.1:8641`, cổng 3641. Mỗi mốc được trích bằng `git archive` ra thư mục riêng rồi build (không đụng `out/` của fe-dev). `check-no-mock` XANH ở cả hai bản.
+
+### Kết luận: APPROVED (trên `1684ffd`) — không còn lỗi chặn; TL14-FE-M1 đã sửa và kiểm trên BE thật
+_Trên `6267120` thì chưa kết luận, theo yêu cầu điều phối (chờ sửa TL14-FE-M1). Mọi mục dưới được chạy lại trên `1684ffd`, trừ các ca API cấp BE (BE không đổi giữa hai commit)._
+
+### Tổng: 513 ca · ✅ 512 · ❌ 1 (không chặn, N1: lệch tài liệu, đã được dev sửa ở `1684ffd`) · ⏸ 0
+Gồm (đều là số lấy từ log chạy thật):
+- e2e mock trên `1684ffd`: `ed_batch14_permissions` 101/101, `s41_s47_staff` 74/74, `s48_password` 41/41, `ed_batch1_shell` 56/56 = 272.
+- `s41_s47_real` trên BE thật 40/40 (bản sao đổi bộ chọn `.screen` thành `main`, xem N2).
+- UI trên BE thật do QA viết: ma trận + kho1 thật + lỗi lưu + bấm đúp + màn cũ 23/23; 5 vai × `/permissions/` `/staff/` 37/37; hàng hoàn + 360 px 13/13; hộp "Cho nghỉ" 20/20 = 93.
+- API trực tiếp (BE): ma trận/quyền 67/68, nhân sự 40/40 = 108.
+- Ngoài bảng đếm: vitest 838/838 (74 file), `npx tsc --noEmit` exit 0, `npm ci` sạch (không cờ) exit 0, build real + mock đạt, BE `manage.py test apps.accounts apps.inventory.returns` 418/418 (sau `collectstatic`; trước đó 5 lỗi chỉ vì thiếu manifest staticfiles ở môi trường test của tôi).
+- `ed_batch9_returns` mock trên `6267120`: 134/139, 5 ca đỏ là ca ngày mock đã biết (đỏ cả trên main), không tính ở đây.
+
+### Theo AC
+| Mã AC | Kết quả | Bằng chứng |
+|---|---|---|
+| ED-37-AC1 (Đang làm / Đã nghỉ / Tất cả, nhóm là cột riêng) | ✅ | BE thật `real-s41-desktop-1280-staff`; `nghi1` chỉ ở tab Đã nghỉ; `s41_s47_real` 40/40 |
+| ED-37-AC2 (thêm nhân viên, chọn nhóm, ép đổi mật khẩu lần đầu) | ✅ | BE thật: POST 201 đúng nhóm; người mới đăng nhập bị `AUTH_MUST_CHANGE_PASSWORD` cho tới khi đặt mật khẩu (`real-s48-desktop-1280-set-password`); ô "Nhập lại" lệch thì không gửi POST |
+| ED-37-AC3 (tạo tài khoản Chủ: bước xác nhận riêng) | ✅ | BE thật + mock (batch14/s41) |
+| ED-37-AC4 (trùng tên đăng nhập: báo lỗi, giữ giá trị) | ✅ | BE thật: 400 `BR-PQ-08`, chữ trên UI = `detail` của BE; thiếu SĐT, mật khẩu yếu cũng đúng |
+| ED-37-AC5 (Quản lý mở Nhân sự) | ✅ | ql1, kho1, giao1, cs2: API `/api/staff/` và `/groups/` 403; `/staff/` ra "Không có quyền" (`lo14-real-role-ql1-khong-quyen`, `-cs2-`); menu không có Nhân sự; FE không gọi `/api/staff/` |
+| ED-38-AC1 (đổi nhóm có hiệu lực ngay, có dòng thời gian) | ✅ | BE thật: PUT groups 200, `removed: [delivery_staff]`; kho1 mất quyền giao ở lần gọi kế tiếp |
+| ED-38-AC2 (đặt lại mật khẩu → ép đổi) | ✅ | BE thật: reset 200, token cũ máy kho → 401, đăng nhập lại bị ép đặt mật khẩu (`s41_s47_real`, S48) |
+| **ED-38-AC3 (cho nghỉ: nêu số phiếu Đang giao, nút đỏ, không xoá)** | ✅ (lần `1684ffd`) | BE thật, xem "TL14-FE-M1" dưới. Ảnh `lo14-real-cho-nghi-bi-chan`, `-360-cho-nghi-bi-chan`, `-cho-nghi-man-cu`, `-cho-nghi-be-chan-thieu-quyen-xem` |
+| ED-38-AC4 (tự cho mình nghỉ, Chủ cuối cùng) | ✅ | BE thật: tự cho nghỉ/tự đổi nhóm → 400 `BR-PQ-17`, hộp giữ mở (`s41_s47_real`; API: su1 tự gán Chủ cũng 400) |
+| ED-38-AC5 (Quản lý không có nút) | ✅ | ql1 không vào được cả màn (xem AC5 của ED-37) |
+| ED-39 (BE: GET/PUT ma trận) | ✅ | API trực tiếp 67/68: AC1 khớp DB; AC2 tắt "Xem khách hàng" của kho → kho 403 ngay, AuditLog `change_group_capabilities` có; AC3 bật `owner_only` (`view_cost`, `view_profit`, …) cho nhóm khác → 400 `BR-PQ-32`; AC4 sửa nhóm Chủ → 400 `GROUP_LOCKED`; AC5 token ql1/kho1/giao1/cs2 → 403; không leo thang quyền khi gọi API thẳng |
+| ED-40-AC1 (khu, "Chỉ Chủ" có khoá, ô "Được gán") | ✅ | `lo14-real-matrix-truoc`, `-matrix-bat-xem-khach`: 5 khu, cột "Chỉ Chủ", "Được gán" ở cột Nhân viên giao; việc "Chỉ Chủ" không có công tắc ở nhóm khác |
+| ED-40-AC2 (chi tiết nhóm không thanh trạng thái, đủ khối) | ✅ | BE thật `lo14-real-360-group`; mock batch14: Thông tin nhóm, Thành viên, Việc được làm, Phạm vi dữ liệu, Dòng thời gian. Bảng danh sách nhóm ở trang ma trận thiếu cột "Thành viên" như bảng W3h (L1) |
+| ED-40-AC3 (bấm là lưu, toast "Hoàn tác", dòng thời gian mới) | ✅ | BE thật: bật "Xem khách hàng — Nhân viên kho" → toast "Hoàn tác"; Hoàn tác → kho1 mất quyền ngay (API 403), menu mất "Khách hàng" sau tải lại |
+| ED-40-AC4 (lưu thất bại → ô trả về, toast lỗi) | ✅ | BE thật + chặn route: 500 và 403 khi PUT → công tắc về giá trị cũ, có thông báo lỗi, BE không đổi (`lo14-real-matrix-loi-luu`) |
+| ED-40-AC5 (Quản lý mở URL Phân quyền) | ✅ | 4 vai không phải Chủ: "Không có quyền", không có công tắc, không gọi `/api/staff/groups/` |
+| Quyết định #13 (quyền cấu hình được, "Tất cả khách" khi bật Xem khách hàng) | ✅ | BE thật: bật cho kho → nhãn "Tất cả khách" (`lo14-real-matrix-bat-xem-khach`), kho1 phiên cũ sau tải lại thấy menu Khách hàng và danh sách khách giả thật (`lo14-real-kho1-thay-khach`); tắt → API 403, vào `/customers/` ra "Không có quyền", không lộ khách (`lo14-real-kho1-mat-quyen`) |
+| Tạo hàng hoàn (`create_return`) có trong ma trận, nút huỷ phiếu khớp quyền | ✅ | Có công tắc "Ghi hàng hoàn về kho"; ql1 (bật) thấy "Huỷ phiếu hoàn"; Chủ tắt → ql1 gọi API huỷ 403, màn không còn nút, không còn "Nhập hàng hoàn"; bật lại → ql1 huỷ được 200 (`lo14-real-returns-ql1-co-huy`, `-het-huy`, `-matrix-tat-ghi-hang-hoan`) |
+
+### TL14-FE-M1 — hộp "Cho nghỉ" (kiểm trên `1684ffd`, BE thật)
+| Ca | Kết quả |
+|---|---|
+| Nhân viên có phiếu Đang giao (giao2): hộp có khối đỏ "Còn 1 phiếu Đang giao (mã phiếu). Phải giao xong hoặc chuyển người trước khi cho nghỉ."; nút "Cho nghỉ" khoá | ✅ |
+| Bấm Enter khi nút khoá: không có POST `/deactivate/`, hộp vẫn mở; "Thôi" đóng hộp, nhân viên vẫn Đang làm | ✅ |
+| Khối chặn chỉ có số phiếu và mã phiếu: không tên, SĐT, địa chỉ khách, không lộ mã `BR-GH` | ✅ |
+| Người xem thiếu quyền xem phiếu giao (giả lập API phiếu trả 403): hộp KHÔNG chặn, nút bật; bấm xác nhận thì BE thật trả 400 `BR-GH-08`, UI hiện nguyên văn câu của BE, câu sạch (không `BR-GH`, không PII), hộp giữ mở | ✅ |
+| Màn cũ: mở hộp khi giao1 rảnh, sau đó giao1 bị gán phiếu Đang giao ở nơi khác → bấm xác nhận: BE vẫn chặn `BR-GH-08`, hộp giữ mở, câu lỗi sạch | ✅ |
+| Giao xong hết phiếu → mở lại: không chặn, "Cho nghỉ" 200 | ✅ |
+| 360 px: hộp không tràn ngang, nút khoá vẫn thấy (`lo14-real-360-cho-nghi-bi-chan`) | ✅ |
+| Từ 2 phiếu trở lên và cắt mã sau 5 phiếu ("và N phiếu nữa") | ✅ vitest `deliveringBlock` + mock batch14 101/101 (BE thật ở đây chỉ có 1 phiếu mỗi người) |
+
+### Ngoại lệ & biên
+| Ca | Kết quả |
+|---|---|
+| Bấm đúp một công tắc (`dblclick`): chỉ một PUT, UI và BE khớp nhau | ✅ |
+| Hai tab của Chủ cùng ma trận, tab cũ bấm sau khi tab kia đã đổi: không lỗi, UI hiện đúng trạng thái BE | ✅ |
+| Tắt một việc đang bật: có hộp xác nhận; "Giữ nguyên" thì không đổi (mock batch14) | ✅ |
+| Việc có `requires` (in tem cần giao): tắt việc nền thì BE báo `CAPABILITY_REQUIRES` | ✅ API |
+| Khoá ngoài danh sách / sai kiểu: 400 `INPUT_NOT_ALLOWED` / `INVALID_INPUT`; nhóm không có: 404 `GROUP_NOT_FOUND`; PUT là atomic (một khoá sai thì không khoá nào đổi) | ✅ API |
+| Chưa đăng nhập: `/api/staff/*` 401 | ✅ API |
+| Nhân viên đã nghỉ: không đăng nhập được, token cũ chết ngay | ✅ |
+| Cho làm lại: nhân viên đăng nhập được lại | ✅ |
+| 360 px: ma trận, trang nhóm, danh sách nhân sự, hồ sơ, tài khoản: không cuộn ngang, công tắc >= 24 px | ✅ |
+| Tìm trong ma trận không khớp: "Không có việc nào khớp" | ✅ mock |
+
+### Phân quyền (BE thật, UI + API)
+| Vai | `GET /api/staff/` · `/groups/` | Ghi ma trận (PUT) | Menu | `/permissions/`, `/staff/` |
+|---|---|---|---|---|
+| loc (Chủ) | 200 | 200 (việc `owner_only` cho nhóm khác → 400) | có Nhân sự, Phân quyền | đủ nút, có công tắc |
+| ql1 (Quản lý) | 403 | 403 | không có | "Không có quyền", FE không gọi `/api/staff/` |
+| kho1 (Nhân viên kho) | 403 | 403 | không có | như trên |
+| giao1 (Nhân viên giao) | 403 | 403 | không có | như trên |
+| cs2 (CSKH) | 403 | 403 | không có | như trên |
+| su1 (superuser, nhóm Quản lý) | 200 | 200 ở BE (`actor_is_owner` = Chủ hoặc superuser) | có | FE chỉ xem, 0 công tắc (có chủ ý, an toàn hơn BE; ghi chú dev đã sửa ở `1684ffd`) |
+| su1 (superuser, không nhóm nào) | — | — | — | `/no-role/` (hành vi cũ ngoài phạm vi Lô 14) |
+| chưa đăng nhập | 401 | 401 | — | về đăng nhập |
+Không leo thang quyền: ql1/kho1/giao1/cs2 gọi thẳng API ghi đều 403; Chủ không bật được việc "Chỉ Chủ" cho nhóm khác; không sửa được nhóm Chủ; không tự đổi nhóm của chính mình (400 `BR-PQ-17`). Kiểm AuditLog: mọi lần đổi ma trận có `change_group_capabilities`; hành động Tầng 2 của nhân sự có AuditLog.
+
+### Rò giá vốn
+AuditLog `changes`/`note` và dòng thời gian nhóm sau khi đổi ma trận được quét với `77777` (giá vốn lô giả), `landed`, `purchase_rate`: không có. Các cờ `can_view_cost` chỉ là cờ quyền. Ma trận chỉ nói "việc" và "nhóm", không có số tiền hay kg, nên không thể tính ngược ra giá vốn (tiền ÷ kg). Quản lý/kho/giao/CSKH không có công tắc bật "Xem giá vốn" (Chỉ Chủ). ✅
+
+### Rò dữ liệu cá nhân
+- Dòng thời gian nhóm và AuditLog sau khi đổi quyền, đổi nhóm, đặt lại mật khẩu, cho nghỉ: không có tên khách, SĐT khách, địa chỉ khách (quét `Khách Giả`, `0900000301`, `Địa chỉ giả`). ✅
+- Hộp "Cho nghỉ" chỉ có số phiếu và mã phiếu; câu lỗi BE `BR-GH-08` cũng chỉ có mã phiếu. ✅
+- kho1 khi không có quyền "Xem khách hàng": API 403, `/customers/` không lộ khách; chỉ khi Chủ bật thì mới thấy (đúng quyết định #13). ✅
+- Console trình duyệt, URL (kể cả URL request), `localStorage`, `sessionStorage` của loc, ql1, kho1, giao1, cs2: không có dữ liệu khách, không có `pageerror`. ✅
+- Số điện thoại hiện ở hồ sơ nhân viên là của nhân viên giả (`09000001xx`), không phải khách. Ảnh và log dùng dữ liệu giả hoàn toàn. ✅
+- Giới hạn tần suất tra đơn: không thuộc Lô 14.
+
+### Hồi quy
+| Mục | Kết quả |
+|---|---|
+| `ed_batch1_shell` (mock, `1684ffd`) | ✅ 56/56 |
+| `s48_password` (mock) | ✅ 41/41 |
+| `s41_s47_staff` (mock) | ✅ 74/74 |
+| `ed_batch14_permissions` (mock) | ✅ 101/101 |
+| `s41_s47_real` trên BE thật | ✅ 40/40 |
+| vitest | ✅ 838/838 |
+| `npx tsc --noEmit` | ✅ exit 0 |
+| `npm ci` (sạch, không cờ), `npm run build` real + mock | ✅ |
+| Backend `apps.accounts` + `apps.inventory.returns` (418 test) | ✅ OK |
+| `ed_batch9_returns` (mock, `6267120`) | 134/139, 5 ca ngày mock đã biết, đỏ cả trên main |
+
+### Lỗi và ghi nhận (không có lỗi chặn)
+- **N1 (Low, đã xử lý)** — Ghi chú dev trên `6267120` nói "BE chỉ cho Chủ ghi" nhưng BE cho cả Chủ và superuser (`actor_is_owner`). Ca API "superuser ngoài nhóm Chủ PUT → 403" đỏ (1 ca ❌ ở bảng tổng). Không phải leo thang: superuser vốn có mọi quyền ở Django. `1684ffd` đã sửa ghi chú và README. Còn sót một bình luận cũ ở `PermissionMatrixScreen.tsx:45` ("sẽ bị 403") nên sửa cho khớp.
+- **N2 (Low)** — `erp-console/e2e/s41_s47_real.py` còn bộ chọn cũ `.screen` (sau Lô 14 là `main`), chạy trên BE thật dừng ở dòng 335. Tôi chạy bản sao đã đổi bộ chọn: 40/40. Nên sửa script gốc.
+- **L1 (Low)** — Bảng "Các nhóm quyền" ở trang ma trận chưa có cột "Thành viên" (tên người) như bảng W3h; tên thành viên có ở trang chi tiết nhóm.
+- **N3 (ghi nhận)** — Tài khoản superuser không thuộc nhóm nào vào `/no-role/` (hành vi cũ, ngoài Lô 14).
+
+### Lệnh đã chạy (tóm tắt)
+- `git archive 6267120` / `1684ffd` → thư mục riêng; `npm ci` (sạch); `npx tsc --noEmit` exit 0; `npx vitest run` 838/838; `npm run build` real + mock; `node scripts/check-no-mock.mjs out` XANH.
+- Mock (cổng 3643): `python3 e2e/ed_batch14_permissions.py` 101/101, `s41_s47_staff.py` 74/74, `s48_password.py` 41/41, `ed_batch1_shell.py` 56/56.
+- BE thật (Django 8641, ERP 3641): `s41_s47_real` (bản sao đổi bộ chọn) 40/40; script QA `q14_ui.py` 23/23, `q14_ui2_e.py` 37/37, `q14_ui2_fg.py` 13/13, `q14_ui3.py` 20/20; `q14_api.py` 67/68, `q14_api2.py` 40/40. Script nằm ở scratchpad.
+- `manage.py test apps.accounts apps.inventory.returns` 418 OK.
+- Ảnh: `doc/features/2026-10-01-erp-theo-design/shots/lo14/lo14-real-*.png` (cạnh các bảng design `board-W3e/W3g/W3h/W3i/F3a–F3f`). Chỉ dừng tiến trình ở cổng 8641, 3641, 3643. Không sửa mã sản phẩm, không commit.
