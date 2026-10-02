@@ -128,10 +128,11 @@ class NhapLoTests(TestCase):
         def payload(rate, key):
             return {"supplier": self.sup.pk, "received_date": "2026-09-28", "idempotency_key": key,
                     "lines": [{"item_code": "TOM01", "qty": "1.000", "rate": rate}]}
-        ok = self.client_kho.post("/api/purchasing/receipts/receive-batches/", payload("9999999999", "n1-ok"), format="json")
+        warehouse_client = self.client_kho  # naming: allow - fixture cũ của file, đổi tên ngoài phạm vi
+        ok = warehouse_client.post("/api/purchasing/receipts/receive-batches/", payload("9999999999", "n1-ok"), format="json")
         self.assertEqual(ok.status_code, 201, ok.content)
         for i, rate in enumerate(("10000000000", "999999999999")):
-            res = self.client_kho.post("/api/purchasing/receipts/receive-batches/", payload(rate, f"n1-bad-{i}"), format="json")
+            res = warehouse_client.post("/api/purchasing/receipts/receive-batches/", payload(rate, f"n1-bad-{i}"), format="json")
             self.assertEqual(res.status_code, 400, res.content)
         self.assertEqual(PurchaseReceipt.objects.count(), 1)
         self.assertEqual(Batch.objects.count(), 1)
