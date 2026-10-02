@@ -3142,6 +3142,38 @@ Chỗ cần sửa: `erp-console/features/content/components/EntryEditScreen.tsx`
 - 4 script `ra_soat_cms*` (xem bảng trên).
 - Chỉ dừng tiến trình ở cổng 8651, 3651, 3652, 3653. Không sửa mã sản phẩm, không commit.
 
+### Lô 16 — lần 2 · 2026-10-03 · commit sửa `c86ebfd` (chạy lại trên BE thật)
+
+#### Kết luận lần 2: APPROVED. B16-1, B16-2, B16-3 đã sửa và kiểm trên BE thật, không phát sinh lỗi mới.
+
+Tổng lần 2 trên BE thật (đếm theo script): `ed_batch16_real` 25 + `p10` 22 + `p11` 5 + `p2d` 5 + 2 script RA = 59 ca · ✅ 59 · ❌ 0 · ⏸ 0, chưa tính các kiểm B16-2 riêng (`p5c/p5d/p5e`), vitest và mock e2e. Một ca ❌ trong `p10` (nút "Tải lại") là lỗi script của tôi: nút ở biểu ngữ chỉ mở hộp xác nhận, phải bấm "Tải lại" lần nữa trong hộp. Sửa script (`p11`) thì 5/5 xanh; hành vi của màn đúng và hợp UI-RULES (thao tác thay nội dung đang gõ có xác nhận).
+
+| Lỗi lần 1 | Kết quả | Bằng chứng chạy thật (BE Django 8651, ERP real 3651, 2 người dùng `loc` và `ql1`) |
+|---|---|---|
+| B16-1 (Medium) gỡ bài mất lý do và khoá đường dẫn | ✅ đã sửa | `p2d` 5/5 và `ed_batch16_real` mục B16-1 (7 ca): gỡ xong, không tải lại, vẫn thấy biểu ngữ "Lý do: Hết mùa vụ"; đường dẫn vẫn khoá kèm chú thích; không có chữ `undefined` hay `#undefined`; sau khi gỡ sửa rồi lưu được, không báo trùng đường dẫn, không báo xung đột; BE ghi `unpublished` + lý do `out_of_season`. Ảnh `lo16-real2-4-go-bai-giu-lydo.png`. |
+| B16-2 (Medium) chỉ mở bài là bị coi đã sửa | ✅ đã sửa | `p5c/p5d/p5e` và `p10` ca A: sự kiện `beforeunload` không bị chặn sau khi chỉ mở bài; rời trang không có hộp hỏi; không sinh khoá `cave_erp_draft:*`; `row_version` đứng yên sau 9 giây; mở lại không có dòng "Đã khôi phục bản nháp". Mặt trái: gõ thật thì có bản tạm và `beforeunload` chặn (ca B, C đỏ-xanh đúng). Ảnh `lo16-real2-1-mo-bai-sach.png`. |
+| B16-3 (High) nháp cũ trên máy tự đè bản mới của người khác | ✅ đã sửa | `p10` + `p11` + `ed_batch16_real` mục B16-3 (9 ca). Kịch bản hai người: `loc` gõ dở rồi rời đi, `ql1` sửa qua giao diện và lưu (`row_version` 1 sang 2), `loc` mở lại. Màn không tự đè: ô tiêu đề là bản của ql1, hiện cảnh báo "Bài đã được người khác sửa sau lần bạn soạn trên máy này… Chưa đổi gì cho đến khi bạn chọn" với hai nút. "Dùng bản mới nhất": giữ bản ql1, xoá bản tạm, hết cảnh báo, lưu tiếp không mất gì. "Giữ bản trên máy": hiện chữ của loc nhưng chưa coi là đã sửa; bấm Lưu nháp thì BE trả 409, màn hiện hộp xung đột, bản ql1 còn nguyên trên BE; "Tải lại" (qua hộp xác nhận) về bản ql1 và xoá nháp. Không có ai sửa thì khôi phục bình thường kèm dòng "Đã khôi phục bản nháp…" và lưu lên BE được. Cảnh báo không lộ `row_version`/`base_version`/`STALE`. Ảnh `lo16-real2-B-keep-canh-bao-nhap-cu.png`, `lo16-real2-B-keep-xung-dot.png`, `lo16-real2-B-keep-hop-tai-lai.png`, `lo16-real2-B-keep-sau-tai-lai.png`, `lo16-real2-B-server-canh-bao-nhap-cu.png`, `lo16-real2-C-khoi-phuc-dung-phien-ban.png`. |
+
+Ca ngoài đường thuận của lần 2: nháp cũ + người khác đã sửa (B16-3), nháp cũ + máy chủ chưa đổi (khôi phục đúng), mở bài lần hai sau khi rời trang (B16-2), gỡ bài rồi sửa tiếp trên màn cũ không tải lại (B16-1), hai người dùng cùng bài, lưu từ nháp cũ gây 409.
+
+Rò dữ liệu và quyền: `c86ebfd` chỉ đổi FE (12 file trong `erp-console/` và hồ sơ), không đụng BE nên kết quả phân quyền 5 vai, giá vốn và XSS của lần 1 giữ nguyên. Kiểm lại phần mới: nháp trong `localStorage` chỉ có chữ giả của bài, `base_version` là số phiên bản (không tính ngược ra giá vốn, không có tên/SĐT/địa chỉ khách); console không có lỗi hay `pageerror`.
+
+Hồi quy:
+| Mục | Kết quả |
+|---|---|
+| `e2e/ed_batch16_real.py` (BE thật, bản sao đổi mật khẩu thành mật khẩu tài khoản QA) | ✅ 25/25 |
+| `ra_soat_cms03_ac13_mobile.py` (BE thật) | ✅ PASS |
+| `ra_soat_cms11_ac3_restore_confirm.py` (BE thật) | ✅ PASS |
+| `ed_batch16_content` (mock) | ✅ 121/121 |
+| vitest | ✅ 825/825 (73 file) |
+| `npm ci` (sạch) + `npx tsc --noEmit` exit 0 + `npm run build` real và mock | ✅ |
+| `python3 scripts/check_naming.py` | ✅ không phát sinh vi phạm mới |
+
+Lệnh đã chạy lần 2: `git archive c86ebfd` sang thư mục riêng; `npm ci`; `tsc --noEmit`; `vitest run`; build real (`NEXT_PUBLIC_USE_MOCK=0 NEXT_PUBLIC_API_BASE=http://127.0.0.1:8651`) và mock; Django 8651 (SQLite tạm, seed), ERP 3651 và 3652. Chỉ dừng tiến trình ở cổng 8651, 3651, 3652. Không sửa mã sản phẩm, không commit.
+
+Ghi nhận (Low, không chặn): script `e2e/ed_batch16_real.py` ghi cứng mật khẩu `Songbien2026`, người chạy phải tạo `loc`/`ql1` đúng mật khẩu đó (đã nêu trong chú thích đầu file).
+
+
 ## Lô 14 — FE · Nhân sự + Phân quyền (ED-37, ED-38, ED-40; ED-39 là BE đã có) · lần 1 · 2026-10-03
 
 Mã nguồn: worktree `.claude/worktrees/agent-aadebb07acbec8743`. Kiểm hai mốc: `6267120` (bản đầu) và `1684ffd` (sửa TL14-FE-M1, hộp "Cho nghỉ" nêu số phiếu đang giao và khoá nút). Cây còn có một sửa nhỏ ở BE `backend/apps/accounts/capabilities/registry.py` (thêm việc `create_return` ↔ `inventory.add_returntostock`). Chạy với **BE thật**: Django dựng từ `backend/` của worktree, SQLite tạm + dữ liệu giả (loc, ql1, kho1, giao1, giao2, cs2, nghi1, su1), cổng 8641; ERP dựng `NEXT_PUBLIC_USE_MOCK=0 NEXT_PUBLIC_API_BASE=http://127.0.0.1:8641`, cổng 3641. Mỗi mốc được trích bằng `git archive` ra thư mục riêng rồi build (không đụng `out/` của fe-dev). `check-no-mock` XANH ở cả hai bản.
