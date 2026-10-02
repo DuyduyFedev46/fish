@@ -25,7 +25,7 @@ Thứ tự chạy từ trên xuống. Cột "Song song" = lô được giao cùn
 | ☑ | 10 | ED-20 ∥ R10 | BE ∥ FE | W2a, W2b, F1a, F1c, F1d | FE: 1, 2 | Lô 8 | BE 1237d9b, bb0137c, 9c727c0 · FE 5593a26 (merge c4ee720) |
 | ☑ | 11 | ED-21, ED-22 ∥ B3 | BE ∥ FE | W5c, W5d, F1b | FE: 1, 2; BE sau 10 | Lô 9 | BE 1237d9b · FE 46f601b |
 | ☑ | 12 | ED-32, ED-33, ED-34 ∥ R11, R12, R13, R15 | BE ∥ FE | W3a, W5j, W5g, W5g2 | FE: 1, 2, 10; BE sau 11 | Lô 13 | FE b249d4a, fea2326 (merge 68a38c2) |
-| ☐ | 13 | ED-30, ED-31 ∥ R14 | BE ∥ FE | W2d, W2h, W5o, W5h, W5m, F1k–F1o | FE: 1, 2 | Lô 12 | — |
+| ☑ | 13 | ED-30, ED-31 ∥ R14 | BE ∥ FE | W2d, W2h, W5o, W5h, W5m, F1k–F1o | FE: 1, 2 | Lô 12 | FE 080a7f6, 76b614e (merge 812edbc) |
 | ☐ | 14 | ED-37, ED-38, ED-39, ED-40 ∥ B4, R16 | BE ∥ FE | W3e, W3g, W3h, W3i, F3a–F3f | FE: 1, 2; BE sau 4 và 6 | Lô 15 | — |
 | ☐ | 15 | ED-06, ED-08, ED-41, ED-42 | FE | D1, W3f, W4b–W4h, F3g | 1, 2; W3f cần R16 (Lô 14) | Lô 14, 16 | — |
 | ☐ | 16 | ED-35, ED-36 | FE | W3b, W3c, W3d, F3h–F3l | 1, 2 | Lô 15 | — |
