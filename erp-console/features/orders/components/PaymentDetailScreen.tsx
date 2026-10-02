@@ -16,6 +16,7 @@ import { DetailHeader } from "@/shared/ui/detail/DetailHeader";
 import { DetailPage } from "@/shared/ui/detail/DetailPage";
 import { InfoField } from "@/shared/ui/detail/InfoField";
 import { InfoGrid } from "@/shared/ui/detail/InfoGrid";
+import { Section } from "@/shared/ui/detail/Section";
 import type { MoreMenuItem } from "@/shared/ui/detail/MoreMenu";
 import { StatusPath } from "@/shared/ui/detail/StatusPath";
 import { Timeline } from "@/shared/ui/detail/Timeline";
@@ -144,37 +145,35 @@ function PaymentDetailBody({ payment: p, detail, renderAi }: { payment: PaymentQ
         {p.resolution_note && <InfoField label={M.fieldNote} value={p.resolution_note} />}
       </InfoGrid>
 
-      <section className={s.section} aria-label={M.fieldRelatedOrder}>
-        <h3 className={s.sectionH}>{M.fieldRelatedOrder}</h3>
-        {order ? (
-          <InfoGrid label={M.fieldRelatedOrder}>
-            <InfoField
-              label={M.rowOrder}
-              mono
-              value={
-                canOpenOrder ? (
-                  <Link href={`/orders/detail/?id=${order.id}`} className="inline-link">
-                    {order.code}
-                  </Link>
-                ) : (
-                  order.code
-                )
-              }
-            />
-            <InfoField label={M.colStatus} value={<Chip table={ENUMS.salesOrderStatus} value={order.status} />} />
-            <InfoField label={M.fieldOrderTotal} num value={vnd(order.total_amount)} />
-            <InfoField label={M.fieldOrderPaid} num value={vnd(order.paid_total)} />
-            {diff > 0 && <InfoField label={M.fieldOrderMissing} num value={vnd(String(diff))} />}
-            {diff < 0 && <InfoField label={M.fieldOrderOver} num value={vnd(String(-diff))} />}
-          </InfoGrid>
-        ) : (
+      {order ? (
+        <InfoGrid title={M.fieldRelatedOrder} label={M.fieldRelatedOrder}>
+          <InfoField
+            label={M.rowOrder}
+            mono
+            value={
+              canOpenOrder ? (
+                <Link href={`/orders/detail/?id=${order.id}`} className="inline-link">
+                  {order.code}
+                </Link>
+              ) : (
+                order.code
+              )
+            }
+          />
+          <InfoField label={M.colStatus} value={<Chip table={ENUMS.salesOrderStatus} value={order.status} />} />
+          <InfoField label={M.fieldOrderTotal} num value={vnd(order.total_amount)} />
+          <InfoField label={M.fieldOrderPaid} num value={vnd(order.paid_total)} />
+          {diff > 0 && <InfoField label={M.fieldOrderMissing} num value={vnd(String(diff))} />}
+          {diff < 0 && <InfoField label={M.fieldOrderOver} num value={vnd(String(-diff))} />}
+        </InfoGrid>
+      ) : (
+        <Section title={M.fieldRelatedOrder} aria-label={M.fieldRelatedOrder}>
           <p className="muted">{M.noOrderHint}</p>
-        )}
-      </section>
+        </Section>
+      )}
 
       {(p.refunds?.length ?? 0) > 0 && (
-        <section className={s.section} aria-label={M.paymentRefundsTitle}>
-          <h3 className={s.sectionH}>{M.paymentRefundsTitle}</h3>
+        <Section title={M.paymentRefundsTitle} count={p.refunds?.length} aria-label={M.paymentRefundsTitle} flush>
           <DataTable
             caption={M.paymentRefundsCaption}
             columns={refundCols}
@@ -185,7 +184,7 @@ function PaymentDetailBody({ payment: p, detail, renderAi }: { payment: PaymentQ
             empty={{ icon: "currency_exchange", title: M.refundsEmpty }}
             canViewCost={false}
           />
-        </section>
+        </Section>
       )}
 
       {modal === "attach_to_order" && (

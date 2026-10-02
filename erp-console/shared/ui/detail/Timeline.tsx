@@ -3,6 +3,7 @@
 // `truncated` (BE cắt bớt dòng cũ — `timeline_truncated`) → ghi rõ "Chỉ hiện N việc gần nhất" để không tưởng là hết lịch sử.
 import Link from "next/link";
 import { dateTime } from "@/shared/lib/format";
+import { Section } from "./Section";
 import s from "./Timeline.module.css";
 
 export type TimelineEntry = {
@@ -25,8 +26,7 @@ type Props = {
 
 export function Timeline({ entries, truncated = false, title = "Dòng thời gian" }: Props) {
   return (
-    <section className={s.block} aria-label={title}>
-      <h3 className={s.title}>{title}</h3>
+    <Section title={title} flush aria-label={title}>
       {entries.length === 0 ? (
         <p className={s.empty}>Chưa có việc nào được ghi lại.</p>
       ) : (
@@ -59,6 +59,6 @@ export function Timeline({ entries, truncated = false, title = "Dòng thời gia
         </ol>
       )}
       {truncated && entries.length > 0 && <p className={s.cut}>Chỉ hiện {entries.length} việc gần nhất.</p>}
-    </section>
+    </Section>
   );
 }

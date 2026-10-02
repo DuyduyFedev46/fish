@@ -2308,3 +2308,37 @@ Chỉ sửa trong `erp-console/`. Không đụng `convert.ts`, `safeHref.ts`, `f
 - **Mock** thêm hook `__caveMock.contentOtherEdit(id, title)` (người khác sửa tiêu đề + tăng `row_version`) và `__caveMock.contentRawBody(id)` (thân bài dạng chưa chuẩn hoá: chữ liền kề tách đoạn, đoạn trống, `marks: []`).
 - **Kiểm:** vitest 825 đạt (thêm 6 ca: chuẩn hoá ổn định, `mockOtherEdit`, `draftDiffers`/`draftIsCurrent`, `mockUnpublishEntry` trả đúng hình dạng). E2E mock `ed_batch16_content.py` 121/121 (thêm 23 ca cho B16-1/2/3), `ed_batch1_shell.py` 56/56, `ed_batch2_patterns.py` 75/75. Mới: `e2e/ed_batch16_real.py` chạy trên Django thật (SQLite tạm, `DJANGO_DEBUG=1`, `collectstatic`, cổng 8661) + bản build `MOCK=0` phục vụ cổng 3661: 25/25 đạt, gồm thân bài chưa chuẩn hoá thật từ BE, ql1 sửa qua API rồi mở lại (cảnh báo, 409, BE giữ bản của ql1), gỡ bài thật rồi sửa và lưu tiếp. Cách dựng môi trường nằm ở đầu script.
 - **Còn nợ / lưu ý:** vitest chạy môi trường node nên không dựng được Tiptap; ca "mở bài không bị coi là sửa" kiểm bằng e2e (mock và BE thật). Ba ghi chú nhẹ của QA (L2 Quản lý mặc định có quyền đăng, L3 hai toast sau lần lưu đầu của bài mới, L4 tab 39px) giữ nguyên, không chặn.
+
+## Rà soát giao diện — nhóm B (trang chi tiết) — 03/10
+
+Nguồn: `04b-ra-soat-giao-dien.md` nhóm B (D2b, W2b/f/g/h, W5b/d/f, W3i). Mẫu: thẻ Dòng thời gian (commit `e2e7b54`).
+Quy tắc áp dụng: mọi khối trên trang chi tiết là một **thẻ**, đầu thẻ cao 44px, tiêu đề chữ thường nằm **trong** thẻ; không còn tiêu đề HOA nằm ngoài thẻ.
+
+**Component chung (`erp-console/shared/ui/detail/`)**
+- `Section.tsx` + `.module.css` (MỚI): thẻ chung. Props `title`, `count`, `action`, `flush` (bảng sát mép, DataTable bỏ viền riêng để khỏi thẻ lồng thẻ). Giữ `aria-label` để e2e (`section[aria-label=...]`) chạy như cũ.
+- `InfoGrid`: bọc bằng `Section`; thêm `groups` (cột có tiêu đề HOA nhỏ, vd. THANH TOÁN | GIAO HÀNG của D2b). Ô `InfoField` đổi đường kẻ/độ cao theo board (tối thiểu 60px, kẻ dưới mảnh), vẫn là `div[data-kind]` + dt/dd.
+- `InfoStrip` (MỚI): dải "Tóm tắt đơn" của D2b (Đặt lúc | Còn giữ chỗ | Tự huỷ lúc), ô là `InfoField`.
+- `Timeline`, `AiBlockFrame`: chuyển sang `Section` (khối AI giờ có đầu thẻ 44px, ô thay đổi dạng hộp viền, nút Áp dụng/Bỏ qua chia đều).
+- Đã xoá `.section/.sectionH/.sectionCount` chép tay ở CSS các module: orders, customers, suppliers, staff, permissions, catalog, confirmation, deliveries (giữ `.section` ở deliveries vì hộp thoại Giao cho người khác còn dùng); purchasing, inventory bỏ `.subSection/.sectionHead/.panelHead`.
+
+**Màn đã chuyển**
+- D2b Đơn (`orders/OrderDetailScreen`): dải tóm tắt; thẻ "Thông tin đơn" chia THANH TOÁN / GIAO HÀNG; gộp "Hàng" và "Phân bổ lô" thành MỘT thẻ "Hàng & phân bổ lô" (bảng 1 dòng/lô: Mặt hàng, Lô, Giá vốn/kg (khoá, chỉ người có quyền), Số lượng, Đơn giá, Giảm giá, Thành tiền, chân "Tổng cộng"); thẻ Thanh toán, Hoàn tiền.
+- `PaymentDetailScreen`, `RefundDetailScreen`(đã dùng InfoGrid), `CustomerDetailScreen`, `SupplierDetailScreen`, `StaffDetailScreen`, `StaffScreen` (khối nhóm quyền dưới bảng), `GroupDetailScreen` + `PermissionMatrixScreen` (W3i: chỉ đổi khung thẻ), `ItemDetailScreen` (Thành phần combo, Lịch sử giá), `ReceiptSections` (Dòng nhập, Hoá đơn mua, Chi phí phụ), `BatchSections` (Nhập xuất của lô, Đơn lấy hàng từ lô), `StocktakeDetailScreen` (Số đếm từng lô, tổng hụt/dư ở đầu thẻ), `ConfirmationDetailScreen` (Lịch sử cuộc gọi), `DeliveryDetailScreen` (Hàng soạn theo lô).
+
+**Chưa làm / không làm được (và lý do)**
+- D2b cột "Kho", "Hạn dùng" trong bảng phân bổ: API phân bổ lô không trả (không sửa `backend/`).
+- D2b các ô "Nguồn", "Cách thanh toán", "Đã nhận", "Người nhận", "Ghi chú đơn" và bút chì sửa tại chỗ/khoá: chưa có dữ liệu hoặc hành vi sửa ở BE; không dựng ô giả.
+- Cột phải D2b: khối Trợ lý AI + nút thao tác. Trang không import `features/ai` (giữ `check-ai-chunks` XANH); khung AI nằm sẵn trong `aiSlot`. Ở bản mock khối AI không có đề xuất vì hook `__caveMock.aiOrderProposal` chỉ có khi mô-đun AI được nạp ở trang tổng quan (lệch có sẵn, xem ed_batch3_fixes bên dưới), nên ảnh chụp D2b không có đề xuất AI.
+- Số điện thoại hiện đầy đủ cho người có quyền: thuộc nhóm F (PO quyết), không đổi ở đợt này.
+- W3i ma trận quyền (nhóm I) và W3g (không so sánh được): ngoài phạm vi, chỉ đổi khung thẻ.
+- `StatusPath` ở 360px: nhãn "Đã thanh toán" xuống dòng giữa chữ (component không thuộc nhóm B).
+- `ReturnDetailScreen`, `RefundDetailScreen`, bảng của lô `BatchDetailScreen`: chỉ có `InfoGrid`, tự theo thẻ mới.
+
+**Kiểm chứng (tự chạy, 03/10)**
+- `tsc --noEmit`: sạch. `vitest`: 76 file, 900/900 đạt.
+- Build `NEXT_PUBLIC_USE_MOCK=0` + `check-no-mock` XANH + `check-ai-chunks` XANH (39 màn nghiệp vụ + 2 layout).
+- Build mock=1, phục vụ cổng 3141. E2E: ed_batch1 56/56 · 2 75/75 · 3_orders 143/143 · 4 70/70 · 5 129/129 · 6 79/79 · 7 114/114 · 8 125/125 · 10 115/115 · 11 103/103 · 12 95/95 · 13 128/128 · 14 101/101 · 16 121/121 · ed_bonusA_ui 49/49 · p8_lo8_fe_erp_tz 83/83 · s14_s16_cancel_refund 41/41.
+- Không sửa selector nào của e2e (giữ `section[aria-label]`, `div[data-kind]`, dt/dd).
+- Đỏ có sẵn, KHÔNG do đợt này (đã dựng lại bản build ở HEAD `b2e8345` để đối chứng): `ed_batch9_returns` 134/139 (5 ca ngày mock); `ed_batch3_fixes` 95/97 (2 ca gọi `__caveMock.aiOrderProposal/aiRefundProposal` ở /overview/ nhưng hook không có; bản gốc cũng đỏ đúng 2 ca này).
+- 360px: 12 màn chi tiết không cuộn ngang. Ảnh: `erp-console/shots/audit-fix/*-d.png` (1440) và `*-m.png` (360).
+- `check_naming.py`: không phát sinh vi phạm mới. Không dùng màu cứng trong CSS đã đổi.

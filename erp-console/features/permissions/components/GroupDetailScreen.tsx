@@ -20,6 +20,7 @@ import { DetailHeader } from "@/shared/ui/detail/DetailHeader";
 import { DetailPage } from "@/shared/ui/detail/DetailPage";
 import { InfoField } from "@/shared/ui/detail/InfoField";
 import { InfoGrid } from "@/shared/ui/detail/InfoGrid";
+import { Section } from "@/shared/ui/detail/Section";
 import { Timeline } from "@/shared/ui/detail/Timeline";
 import { Icon } from "@/shared/ui/Icon";
 import { DataTable, type Column } from "@/shared/ui/list/DataTable";
@@ -200,15 +201,14 @@ function GroupDetailBody({ group: g, detail }: { group: GroupDetail; detail: Loa
       }
       timeline={
         <div className={s.rail}>
-          <section className={s.railCard} aria-label={M.scopesTitle}>
-            <h3 className={s.sectionH}>{M.scopesTitle}</h3>
+          <Section title={M.scopesTitle} aria-label={M.scopesTitle}>
             <p className={s.sectionHint}>{M.scopesIntro}</p>
             <dl className={s.scopes}>
               <ScopeRow term={M.scopeOrders} value={g.scopes.orders} />
               <ScopeRow term={M.scopeDeliveries} value={g.scopes.deliveries} />
               <ScopeRow term={M.scopeCustomers} value={g.scopes.customers} highlight={g.scopes.customers.includes(ALL_CUSTOMERS_LABEL)} />
             </dl>
-          </section>
+          </Section>
           <div id="group-timeline" tabIndex={-1}>
             <Timeline entries={toTimelineEntries(g.timeline)} title={M.timelineTitle} />
           </div>
@@ -222,10 +222,7 @@ function GroupDetailBody({ group: g, detail }: { group: GroupDetail; detail: Loa
         <InfoField kind="locked" label={M.fieldCost} value={g.can_view_cost ? M.yes : M.no} reason={M.lockedReason} />
       </InfoGrid>
 
-      <section className={s.section} aria-label={M.membersTitle}>
-        <h3 className={s.sectionH}>
-          {M.membersTitle} <span className={s.sectionCount}>{M.members(g.members.length)}</span>
-        </h3>
+      <Section title={M.membersTitle} count={M.members(g.members.length)} aria-label={M.membersTitle} flush>
         <DataTable
           caption={M.membersCaption}
           columns={memberCols}
@@ -236,10 +233,9 @@ function GroupDetailBody({ group: g, detail }: { group: GroupDetail; detail: Loa
           empty={{ icon: "group_off", title: M.membersEmpty, hint: canManageMembers ? M.membersEmptyHint : undefined }}
           canViewCost={false}
         />
-      </section>
+      </Section>
 
-      <section className={s.section} aria-label={M.tasksTitle}>
-        <h3 className={s.sectionH}>{M.tasksTitle}</h3>
+      <Section title={M.tasksTitle} aria-label={M.tasksTitle}>
         <p className={s.sectionHint}>{M.tasksIntro}</p>
         <div className={s.tasks}>
           {sections.map((sec) => (
@@ -261,7 +257,7 @@ function GroupDetailBody({ group: g, detail }: { group: GroupDetail; detail: Loa
             </div>
           ))}
         </div>
-      </section>
+      </Section>
 
       {toggler.pendingOff && (
         <ConfirmOffModal pending={toggler.pendingOff} onConfirm={toggler.confirmOff} onClose={toggler.cancelOff} labelOf={toggler.labelOf} />

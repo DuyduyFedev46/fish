@@ -14,6 +14,7 @@ import { loadErrorText } from "@/shared/lib/http";
 import { ROLE } from "@/shared/lib/roles";
 import { homePath } from "@/shared/lib/nav";
 import { Icon } from "@/shared/ui/Icon";
+import { Section } from "@/shared/ui/detail/Section";
 import { DataTable, type Column } from "@/shared/ui/list/DataTable";
 import { FilterBar } from "@/shared/ui/list/FilterBar";
 import { ListPage } from "@/shared/ui/list/ListPage";
@@ -113,8 +114,7 @@ export function PermissionMatrixScreen() {
     >
       <p className={s.intro}>{M.matrixIntro}</p>
 
-      <section className={s.section} aria-label={M.groupsCaption}>
-        <h3 className={s.sectionH}>{M.groupsCaption}</h3>
+      <Section title={M.groupsCaption} aria-label={M.groupsCaption} flush>
         <DataTable
           caption={M.groupsCaption}
           columns={groupColumns}
@@ -128,10 +128,9 @@ export function PermissionMatrixScreen() {
           empty={{ icon: "groups", title: M.groupsEmpty, hint: M.groupsEmptyHint }}
           canViewCost={false}
         />
-      </section>
+      </Section>
 
-      <section className={s.section} aria-label={M.matrixCaption}>
-        <h3 className={s.sectionH}>{M.matrixCaption}</h3>
+      <Section title={M.matrixCaption} aria-label={M.matrixCaption}>
         {!canEdit && !loading && !failed && (
           <p className={s.note} role="note">
             <Icon name="lock" />
@@ -181,7 +180,7 @@ export function PermissionMatrixScreen() {
             />
           )}
         </div>
-      </section>
+      </Section>
 
       {toggler.pendingOff && (
         <ConfirmOffModal pending={toggler.pendingOff} onConfirm={toggler.confirmOff} onClose={toggler.cancelOff} labelOf={toggler.labelOf} />

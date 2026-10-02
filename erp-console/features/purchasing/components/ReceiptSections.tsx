@@ -8,6 +8,7 @@ import { referenceHref } from "@/features/ledger/referenceRoutes";
 import { ENUMS } from "@/shared/lib/enums";
 import { dateOnly, kg, vnd } from "@/shared/lib/format";
 import { Chip } from "@/shared/ui/Chip";
+import { Section } from "@/shared/ui/detail/Section";
 import { DataTable, type Column } from "@/shared/ui/list/DataTable";
 import type { ReceiptCost, ReceiptInvoice, ReceiptLine } from "../types";
 import s from "../purchasing.module.css";
@@ -44,8 +45,7 @@ export function ReceiptLinesSection({ lines, canViewCost, canOpenBatch }: { line
     { key: "landed", header: "Giá vốn/kg", num: true, locked: true, render: (l) => (l.landed_unit_cost ? vnd(l.landed_unit_cost) : "—") },
   ];
   return (
-    <section className={s.subSection} aria-label="Dòng nhập">
-      <h3 className={s.sectionHead}>Dòng nhập</h3>
+    <Section title="Dòng nhập" count={lines.length} aria-label="Dòng nhập" flush>
       <DataTable
         columns={columns}
         rows={lines}
@@ -56,7 +56,7 @@ export function ReceiptLinesSection({ lines, canViewCost, canOpenBatch }: { line
         caption="Dòng nhập của phiếu"
         skeletonRows={3}
       />
-    </section>
+    </Section>
   );
 }
 
@@ -68,11 +68,7 @@ export function ReceiptInvoicesSection({ invoices, action }: { invoices: Receipt
     { key: "paid", header: "Tình trạng", render: (i) => <Chip table={ENUMS.purchaseInvoicePaid} value={String(i.is_paid)} /> },
   ];
   return (
-    <section className={s.subSection} aria-label="Hoá đơn mua" data-testid="receipt-invoices">
-      <div className={s.panelHead}>
-        <h3 className={s.sectionHead}>Hoá đơn mua</h3>
-        {action}
-      </div>
+    <Section title="Hoá đơn mua" count={invoices.length} action={action} aria-label="Hoá đơn mua" data-testid="receipt-invoices" flush>
       <DataTable
         columns={columns}
         rows={invoices}
@@ -83,7 +79,7 @@ export function ReceiptInvoicesSection({ invoices, action }: { invoices: Receipt
         caption="Hoá đơn mua của phiếu"
         skeletonRows={2}
       />
-    </section>
+    </Section>
   );
 }
 
@@ -98,11 +94,7 @@ export function ReceiptCostsSection({ costs, allocatedTotal, action }: { costs: 
   ];
   const total = allocatedTotal !== undefined ? allocatedTotal : costs.reduce((a, c) => a + num(c.allocated_amount), 0);
   return (
-    <section className={s.subSection} aria-label="Chi phí phụ" data-testid="receipt-costs">
-      <div className={s.panelHead}>
-        <h3 className={s.sectionHead}>Chi phí phụ</h3>
-        {action}
-      </div>
+    <Section title="Chi phí phụ" count={costs.length} action={action} aria-label="Chi phí phụ" data-testid="receipt-costs" flush>
       <DataTable
         columns={columns}
         rows={costs}
@@ -114,10 +106,10 @@ export function ReceiptCostsSection({ costs, allocatedTotal, action }: { costs: 
         skeletonRows={2}
       />
       {costs.length > 0 && (
-        <p className={s.hint}>
+        <p className={s.sectionSum}>
           Tổng chi phí phụ đã chia vào phiếu này: <span className="num">{vnd(total)}</span>
         </p>
       )}
-    </section>
+    </Section>
   );
 }

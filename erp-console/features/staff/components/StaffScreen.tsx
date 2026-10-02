@@ -18,6 +18,7 @@ import { Chip } from "@/shared/ui/Chip";
 import { Icon } from "@/shared/ui/Icon";
 import { DataTable, type Column } from "@/shared/ui/list/DataTable";
 import { FilterBar } from "@/shared/ui/list/FilterBar";
+import { Section } from "@/shared/ui/detail/Section";
 import { ListPage } from "@/shared/ui/list/ListPage";
 import { useToast } from "@/shared/ui/overlay/Toast";
 import { NoPermission } from "@/shared/ui/states/NoPermission";
@@ -139,11 +140,7 @@ export function StaffScreen() {
         />
 
         {showGroups && groups.status !== "forbidden" && (
-          <section className={s.section} aria-label={M.groupsTitle}>
-            <h3 className={s.sectionH}>
-              {M.groupsTitle}
-              {groups.data && <span className={s.sectionCount}>{groups.data.length}</span>}
-            </h3>
+          <Section title={M.groupsTitle} count={groups.data ? groups.data.length : undefined} aria-label={M.groupsTitle} flush>
             <DataTable
               caption={M.groupsCaption}
               columns={groupCols}
@@ -158,7 +155,7 @@ export function StaffScreen() {
               canViewCost={false}
               dense
             />
-          </section>
+          </Section>
         )}
       </div>
 

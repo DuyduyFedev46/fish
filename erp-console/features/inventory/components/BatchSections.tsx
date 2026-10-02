@@ -9,6 +9,7 @@ import { referenceHref } from "@/features/ledger/referenceRoutes";
 import { ENUMS } from "@/shared/lib/enums";
 import { dateTime, vnd } from "@/shared/lib/format";
 import { Chip } from "@/shared/ui/Chip";
+import { Section } from "@/shared/ui/detail/Section";
 import { DataTable, type Column } from "@/shared/ui/list/DataTable";
 import type { OrderUsingBatch } from "../types";
 import s from "../inventory.module.css";
@@ -18,15 +19,18 @@ export type Remote<T> = { data: T | null; error: string | null; loading: boolean
 export function BatchLedgerSection({ batchId, state, onRetry }: { batchId: number; state: Remote<{ rows: LedgerEntry[]; count: number }>; onRetry: () => void }) {
   const rows = state.data?.rows ?? null;
   return (
-    <section className={s.subSection} aria-label="Nhập xuất của lô">
-      <div className={s.panelHead}>
-        <h3 className={s.sectionHead}>Nhập xuất của lô</h3>
-        {rows && state.data && (
-          <span className={s.hint}>
+    <Section
+      title="Nhập xuất của lô"
+      aria-label="Nhập xuất của lô"
+      flush
+      action={
+        rows && state.data ? (
+          <span>
             Đang hiện {rows.length} / {state.data.count} dòng
           </span>
-        )}
-      </div>
+        ) : undefined
+      }
+    >
       <LedgerTable
         rows={rows}
         loading={state.loading && !state.data}
@@ -42,7 +46,7 @@ export function BatchLedgerSection({ batchId, state, onRetry }: { batchId: numbe
           Xem đủ {state.data.count} dòng trong sổ nhập xuất
         </Link>
       )}
-    </section>
+    </Section>
   );
 }
 
@@ -69,15 +73,18 @@ export function BatchOrdersSection({ state, onRetry }: { state: Remote<{ rows: O
     { key: "total", header: "Giá trị đơn", num: true, render: (o) => vnd(o.total_amount) },
   ];
   return (
-    <section className={s.subSection} aria-label="Đơn lấy hàng từ lô">
-      <div className={s.panelHead}>
-        <h3 className={s.sectionHead}>Đơn lấy hàng từ lô</h3>
-        {rows && state.data && (
-          <span className={s.hint}>
+    <Section
+      title="Đơn lấy hàng từ lô"
+      aria-label="Đơn lấy hàng từ lô"
+      flush
+      action={
+        rows && state.data ? (
+          <span>
             Đang hiện {rows.length} / {state.data.count} đơn
           </span>
-        )}
-      </div>
+        ) : undefined
+      }
+    >
       <DataTable
         columns={columns}
         rows={rows}
@@ -91,6 +98,6 @@ export function BatchOrdersSection({ state, onRetry }: { state: Remote<{ rows: O
         caption="Đơn lấy hàng từ lô"
         skeletonRows={3}
       />
-    </section>
+    </Section>
   );
 }
