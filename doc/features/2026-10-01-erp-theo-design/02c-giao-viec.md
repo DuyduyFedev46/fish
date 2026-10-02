@@ -28,7 +28,7 @@ Thứ tự chạy từ trên xuống. Cột "Song song" = lô được giao cùn
 | ☑ | 13 | ED-30, ED-31 ∥ R14 | BE ∥ FE | W2d, W2h, W5o, W5h, W5m, F1k–F1o | FE: 1, 2 | Lô 12 | FE 080a7f6, 76b614e (merge 812edbc) |
 | ☑ | 14 | ED-37, ED-38, ED-39, ED-40 ∥ B4, R16 | BE ∥ FE | W3e, W3g, W3h, W3i, F3a–F3f | FE: 1, 2; BE sau 4 và 6 | Lô 15 | FE+BE 6267120, 1684ffd (merge c385dcd) |
 | ☐ | 15 | ED-06, ED-08, ED-41, ED-42 | FE | D1, W3f, W4b–W4h, F3g | 1, 2; W3f cần R16 (Lô 14) | Lô 14, 16 | — |
-| ☐ | 16 | ED-35, ED-36 | FE | W3b, W3c, W3d, F3h–F3l | 1, 2 | Lô 15 | — |
+| ☑ | 16 | ED-35, ED-36 | FE | W3b, W3c, W3d, F3h–F3l | 1, 2 | Lô 15 | FE 57f0eda, c86ebfd (merge d38ce85) |
 | ☐ | 17 | ED-07 + dọn dẹp + hồi quy toàn bộ | FE | — | 1–16 | — | — |
 | ☑ | bổ sung A | Quyết định Duy 02/10 (#1, 2, 5, 6, 8 huỷ, 10, 11, 14, 15, 17, 18, 19, 20, 21, 22) | BE ∥ FE | — | 1–11 | — | 0fe91c4 |
 
