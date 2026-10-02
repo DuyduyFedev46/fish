@@ -2,7 +2,7 @@
 
 // Hộp thoại nổi trên đúng màn mở ra nó (UI-RULES §6.1): nền màn cha mờ (--scrim), giữ focus trong hộp,
 // Esc / bấm nền / nút X để đóng, trả focus về nút đã mở. Đang gửi (`busy`) thì KHÔNG đóng được (tránh bỏ dở thao tác).
-// Điện thoại = tấm trượt từ đáy; từ 640px = hộp giữa màn. Dành cho form ngắn (≤ 6 trường) và bước xác nhận;
+// Điện thoại = tấm trượt từ đáy; từ 640px = hộp neo cạnh trên màn (board). Dành cho form ngắn (≤ 6 trường) và bước xác nhận;
 // form dài là trang riêng (shared/ui/form/FormPage).
 // Nhiều hộp chồng nhau: Esc chỉ đóng hộp trên cùng.
 
@@ -19,8 +19,8 @@ type Props = {
   busy?: boolean;
   /** Thanh nút cuối hộp: [phụ … chính]. */
   footer?: React.ReactNode;
-  /** `sm` cho xác nhận ngắn, mặc định `md`. */
-  size?: "sm" | "md";
+  /** Bề ngang trên màn rộng (board): `xs` 440 · `sm` 480 (xác nhận ngắn) · `narrow` 520 · `md` 560 mặc định · `lg` 640 (form nhiều ô) · `xl` 720 (có bảng). */
+  size?: "xs" | "sm" | "narrow" | "md" | "lg" | "xl";
   children: React.ReactNode;
 };
 
@@ -79,7 +79,7 @@ export function Modal({ title, onClose, busy = false, footer, size = "md", child
       <button type="button" className={s.scrim} aria-label="Đóng" tabIndex={-1} onClick={() => !busy && onClose()} />
       <div
         ref={boxRef}
-        className={`${s.box} ${size === "sm" ? s.sm : ""}`}
+        className={`${s.box} ${size === "md" ? "" : s[size]}`}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}

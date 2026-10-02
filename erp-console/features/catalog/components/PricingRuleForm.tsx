@@ -10,9 +10,11 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useAuth } from "@/features/auth/components/AuthProvider";
 import { ENUMS } from "@/shared/lib/enums";
+import { RadioGroup, Switch } from "@/shared/ui/form/Choice";
 import { Field } from "@/shared/ui/form/Field";
 import { FormAlert } from "@/shared/ui/form/FormAlert";
 import { FormPage } from "@/shared/ui/form/FormPage";
+import { FormGrid, FormSection, FormSpan } from "@/shared/ui/form/FormSection";
 import { useSubmit } from "@/shared/ui/form/useSubmit";
 import { Icon } from "@/shared/ui/Icon";
 import { useToast } from "@/shared/ui/overlay/Toast";
@@ -22,7 +24,6 @@ import { CURRENCY_UNIT, emptyRuleDraft, ruleInputOf, validateRule, type RuleDraf
 import { CATALOG_MSG as M } from "../messages";
 import { catalogAbility } from "../permissions";
 import { useItemOptions } from "../useCatalogOptions";
-import s from "../catalog.module.css";
 
 const APPLY_OPTIONS = [
   { value: "ITEM", label: M.optApplyItem },
@@ -95,12 +96,26 @@ function PricingRuleFormBody() {
       primaryDisabled={optionsFailed}
       secondary={{ label: M.cancel, onClick: () => router.push("/catalog/?tab=rules") }}
     >
-      <div className={s.formBody}>
-        <div className={s.formGroup}>
-          <Field label={M.fieldRuleName} required name="name" value={draft.name} onChange={set("name")} maxLength={200} error={errs.name ?? fe.name} autoFocus />
-          <Field as="select" label={M.fieldRuleApplyOn} required name="apply_on" value={draft.applyOn} onChange={(v) => set("applyOn")(v === "ORDER" ? "ORDER" : "ITEM")} options={APPLY_OPTIONS} error={fe.apply_on} />
+      <FormSection title={M.ruleSectionTitle}>
+        <FormGrid>
+          <FormSpan>
+            <Field label={M.fieldRuleName} required name="name" value={draft.name} onChange={set("name")} maxLength={200} error={errs.name ?? fe.name} autoFocus />
+          </FormSpan>
+          <RadioGroup label={M.fieldRuleApplyOn} required name="apply_on" value={draft.applyOn} onChange={(v) => set("applyOn")(v === "ORDER" ? "ORDER" : "ITEM")} options={APPLY_OPTIONS} error={fe.apply_on} />
+          <RadioGroup
+            label={M.fieldDiscountType}
+            required
+            name="discount_type"
+            value={draft.discountType}
+            onChange={(v) => {
+              setDraft((d) => ({ ...d, discountType: v === "AMOUNT" ? "AMOUNT" : "PERCENT", discountValue: "" }));
+              setErrs((e) => ({ ...e, discountValue: undefined }));
+            }}
+            options={DISCOUNT_OPTIONS}
+            error={fe.discount_type}
+          />
           {isItem ? (
-            <div className={s.formRow}>
+            <>
               <Field
                 as="select"
                 label={M.fieldRuleItem}
@@ -112,42 +127,20 @@ function PricingRuleFormBody() {
                 error={errs.item ?? fe.item}
               />
               <Field label={M.fieldMinQty} type="number" unit="kg" required name="min_qty" value={draft.minQty} onChange={set("minQty")} error={errs.minQty ?? fe.min_qty} />
-            </div>
+            </>
           ) : (
             <Field label={M.fieldMinAmount} type="money" unit={CURRENCY_UNIT} required name="min_amount" value={draft.minAmount} onChange={set("minAmount")} error={errs.minAmount ?? fe.min_amount} />
           )}
-          <div className={s.formRow}>
-            <Field
-              as="select"
-              label={M.fieldDiscountType}
-              required
-              name="discount_type"
-              value={draft.discountType}
-              onChange={(v) => {
-                setDraft((d) => ({ ...d, discountType: v === "AMOUNT" ? "AMOUNT" : "PERCENT", discountValue: "" }));
-                setErrs((e) => ({ ...e, discountValue: undefined }));
-              }}
-              options={DISCOUNT_OPTIONS}
-              error={fe.discount_type}
-            />
-            {draft.discountType === "AMOUNT" ? (
-              <Field label={M.fieldDiscountValue} type="money" unit={CURRENCY_UNIT} required name="discount_value" value={draft.discountValue} onChange={set("discountValue")} error={errs.discountValue ?? fe.discount_value} />
-            ) : (
-              <Field label={M.fieldDiscountValue} type="number" unit="%" required name="discount_value" value={draft.discountValue} onChange={set("discountValue")} error={errs.discountValue ?? fe.discount_value} />
-            )}
-          </div>
-          <div className={s.formRow}>
-            <Field label={M.fieldRuleFrom} type="date" name="valid_from" value={draft.validFrom} onChange={set("validFrom")} error={errs.validFrom ?? fe.valid_from} />
-            <Field label={M.fieldRuleUpto} type="date" name="valid_upto" value={draft.validUpto} onChange={set("validUpto")} error={errs.validUpto ?? fe.valid_upto} />
-          </div>
-          <label className="check-row">
-            <input type="checkbox" checked={draft.isActive} onChange={(e) => set("isActive")(e.target.checked)} />
-            <span>
-              <b>{M.fieldRuleActive}</b>
-            </span>
-          </label>
-        </div>
-      </div>
+          {draft.discountType === "AMOUNT" ? (
+            <Field label={M.fieldDiscountValue} type="money" unit={CURRENCY_UNIT} required name="discount_value" value={draft.discountValue} onChange={set("discountValue")} error={errs.discountValue ?? fe.discount_value} />
+          ) : (
+            <Field label={M.fieldDiscountValue} type="number" unit="%" required name="discount_value" value={draft.discountValue} onChange={set("discountValue")} error={errs.discountValue ?? fe.discount_value} />
+          )}
+          <Field label={M.fieldRuleFrom} type="date" name="valid_from" value={draft.validFrom} onChange={set("validFrom")} error={errs.validFrom ?? fe.valid_from} />
+          <Field label={M.fieldRuleUpto} type="date" name="valid_upto" value={draft.validUpto} onChange={set("validUpto")} error={errs.validUpto ?? fe.valid_upto} />
+        </FormGrid>
+        <Switch label={M.fieldRuleActive} checked={draft.isActive} onChange={set("isActive")} />
+      </FormSection>
     </FormPage>
   );
 }

@@ -8,10 +8,10 @@
 /* ---- Form /stocktake/new/ và /stocktake/edit/ ---- */
 .head { display: grid; grid-template-columns: 1fr; gap: var(--space-4); min-width: 0; }
 @media (min-width: 720px) { .head { grid-template-columns: minmax(0, 12rem) minmax(0, 18rem) minmax(0, 1fr); } }
-
-.section { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
+.section { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; padding: var(--space-4); background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); }
+@media (min-width: 640px) { .section { padding: var(--space-5); gap: 18px; } }
 .sectionHead { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; }
-.sectionTitle { margin: 0; font-size: var(--text-md); font-weight: var(--weight-semibold); color: var(--ink); }
+.sectionTitle { margin: 0; font-size: var(--text-base); font-weight: var(--weight-semibold); color: var(--ink); }
 .sectionCount { font-size: var(--text-sm); color: var(--ink-3); font-variant-numeric: tabular-nums; }
 .loadNote { display: flex; align-items: center; gap: var(--space-2); margin: 0; font-size: var(--text-sm); color: var(--ink-2); }
 .loadErr { display: flex; align-items: center; gap: var(--space-2); margin: 0; font-size: var(--text-sm); font-weight: var(--weight-medium); color: var(--crit); }
@@ -43,8 +43,8 @@
 .drop:focus-visible { outline: none; box-shadow: 0 0 0 1px var(--focus), 0 0 0 4px var(--accent-soft); }
 
 .control {
-  width: 100%; min-height: var(--tap); padding: var(--space-2-5) var(--space-3);
-  font: inherit; font-size: var(--text-input); color: var(--ink);
+  width: 100%; height: var(--control-h); padding: 0 var(--space-3);
+  font: inherit; font-size: var(--control-text); color: var(--ink);
   background: var(--surface); border: 1px solid var(--border-input); border-radius: var(--radius-md);
   box-shadow: var(--shadow-xs); outline: none;
   transition: border-color var(--dur-fast) ease, box-shadow var(--dur-fast) ease;

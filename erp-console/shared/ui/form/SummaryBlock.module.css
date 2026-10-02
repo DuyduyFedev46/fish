@@ -1,7 +1,11 @@
-.block { margin: 0; padding: var(--space-2) var(--space-3); border-radius: var(--radius-md); background: var(--surface-2); display: flex; flex-direction: column; }
-.row { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3); padding: var(--space-1-5) 0; min-width: 0; }
-.row + .row { border-top: 1px solid var(--border); }
-.k { margin: 0; font-size: var(--text-sm); color: var(--ink-2); flex: none; }
-.v { margin: 0; font-size: var(--text-sm); color: var(--ink); text-align: right; min-width: 0; overflow-wrap: anywhere; }
+/* Khối tóm tắt như board (F1l/F2a/F2h): thẻ có viền, nền --canvas, mỗi dòng lưới 140px | 1fr, nhãn xám – giá trị đậm vừa (không còn nền xám đặc). */
+.block { margin: 0; display: flex; flex-direction: column; overflow: hidden; background: var(--canvas); border: 1px solid var(--border); border-radius: var(--radius-md); }
+.row { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-0-5) var(--space-3); padding: var(--space-2) var(--space-3); min-width: 0; font-size: var(--text-sm); }
+.row + .row { border-top: 1px solid var(--surface-3); }
+.k { margin: 0; color: var(--ink-3); }
+.v { margin: 0; color: var(--ink); font-weight: var(--weight-medium); min-width: 0; overflow-wrap: anywhere; }
+@media (min-width: 640px) {
+  .row { grid-template-columns: 140px minmax(0, 1fr); }
+}
 .mono { font-family: var(--font-mono); font-size: var(--text-xs); }
 .strong { font-weight: var(--weight-semibold); }

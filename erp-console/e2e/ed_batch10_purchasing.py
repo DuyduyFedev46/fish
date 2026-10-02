@@ -439,7 +439,7 @@ def run_receive_form(browser, errors):
     page.locator("input[name=alloc-1]").fill(str(parts[1] + 50000))
     page.wait_for_timeout(250)
     ok("F1d AC4 (3 lô): lệch thì khoá nút và nói thừa 50.000 đ", page.get_by_role("button", name="Lưu chi phí").is_disabled() and "đang thừa 50.000 đ" in alert_text(page))
-    page.locator("select[name=allocation_method]").select_option(index=1)
+    page.locator("input[name=allocation_method]").nth(1).check()
     page.wait_for_timeout(250)
     parts2 = [int(page.locator(f"input[name=alloc-{i}]").input_value().replace(".", "") or 0) for i in range(3)]
     ok("F1d: đổi cách chia thì chia lại đủ tổng, nút mở", sum(parts2) == 1000001 and page.get_by_role("button", name="Lưu chi phí").is_enabled(), str(parts2))

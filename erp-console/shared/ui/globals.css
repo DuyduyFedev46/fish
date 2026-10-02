@@ -401,26 +401,36 @@ table.data tbody tr.empty-row td{white-space:normal;border-bottom:1px solid var(
 /* ---------- Màn ngoài console: đăng nhập · đặt mật khẩu · chưa phân quyền · 404 ---------- */
 .login{min-height:100vh;min-height:100dvh;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:max(var(--space-10),env(safe-area-inset-top)) var(--space-5) max(var(--space-6),env(safe-area-inset-bottom));background:var(--surface)}
 .card{background:var(--surface);width:min(400px,100%);padding:0;animation:rise-in var(--dur-slow) var(--ease-out)}
-.lg{display:flex;align-items:center;gap:var(--space-2-5);margin-bottom:var(--space-8)}
+.lg{display:flex;align-items:center;gap:var(--space-2-5);margin-bottom:var(--space-5)}
 .lg .mark{width:32px;height:32px}
 .lg .mark .mi{font-size:20px}
 .lg b{font-size:var(--text-md);font-weight:var(--weight-semibold);display:block;line-height:var(--leading-tight)}
 .lg small{color:var(--ink-3);font-size:var(--text-xs);display:block;line-height:var(--leading-tight)}
-.card h1{font-size:var(--text-xl);margin:0 0 var(--space-1-5)}
-.card > p{margin:0 0 var(--space-6);color:var(--ink-2);font-size:var(--text-sm)}
-.card .auth-icon{width:44px;height:44px;border-radius:var(--radius-lg);background:var(--surface-2);color:var(--ink-2);display:grid;place-items:center;margin-bottom:var(--space-4)}
+.card h1{font-size:var(--text-xl);font-weight:var(--weight-semibold);letter-spacing:var(--tracking-tight);margin:0 0 var(--space-5)}
+.card h1:has(+ p){margin-bottom:var(--space-1-5)}
+.card > p{margin:0 0 var(--space-5);color:var(--ink-2);font-size:var(--text-sm);line-height:var(--leading-normal)}
+.card > p b{color:var(--ink)}
+.card .auth-icon{width:44px;height:44px;border-radius:var(--radius-lg);background:var(--surface-2);color:var(--ink-2);display:grid;place-items:center;margin-bottom:var(--space-5)}
 .card .auth-icon .mi{font-size:24px}
 .card .auth-actions{display:flex;gap:var(--space-2);flex-wrap:wrap}
 .card .auth-actions .btn{flex:1 1 160px}
+/* Hộp đăng nhập như board W4f/g/h: nền --canvas, thẻ trắng chỉ viền (không đổ bóng), lề 28px, bo 12px; nút phụ "Đăng xuất" canh phải. */
 @media (min-width:480px){
-  .login{justify-content:center;background:var(--sidebar);padding:var(--space-10) var(--space-6)}
-  .card{border:1px solid var(--border);border-radius:var(--radius-xl);box-shadow:var(--shadow-sm);padding:var(--space-8)}
+  .login{justify-content:center;background:var(--canvas);padding:var(--space-10) var(--space-6)}
+  .card{border:1px solid var(--border);border-radius:var(--radius-card);padding:var(--space-7)}
+  .card .auth-actions{justify-content:flex-end}
+  .card .auth-actions .btn{flex:0 0 auto}
 }
+.card .field input{height:var(--tap);font-size:var(--control-text)}
+.card .field input[aria-invalid=true]{border-color:var(--crit)}
+.card .btn.block{height:var(--tap);margin-top:0;font-size:var(--control-text)}
+.card .hint{margin-top:var(--space-5);padding-top:var(--space-4);border-top:1px solid var(--surface-3)}
 .field{display:flex;flex-direction:column;gap:var(--space-1-5);margin-bottom:var(--space-4)}
 .field label{font-size:var(--text-sm);font-weight:var(--weight-medium);color:var(--ink-2)}
-.field input,.field textarea{border:1px solid var(--border-input);border-radius:var(--radius-md);background:var(--surface);color:var(--ink);font-family:inherit;font-size:var(--text-input);min-height:44px;padding:var(--space-2-5) var(--space-3);outline:none;width:100%;box-shadow:var(--shadow-xs);transition:border-color var(--dur-fast) ease,box-shadow var(--dur-fast) ease}
+.field input,.field textarea{border:1px solid var(--border-input);border-radius:var(--radius-md);background:var(--surface);color:var(--ink);font-family:inherit;font-size:var(--control-text);height:var(--control-h);padding:0 var(--space-3);outline:none;width:100%;box-shadow:var(--shadow-xs);transition:border-color var(--dur-fast) ease,box-shadow var(--dur-fast) ease}
+.field textarea{height:auto;padding-block:var(--space-2)}
 .field input:focus,.field textarea:focus{border-color:var(--focus);box-shadow:0 0 0 1px var(--focus),0 0 0 4px var(--accent-soft)}
-.btn.block{width:100%;margin-top:var(--space-2);min-height:44px}
+.btn.block{width:100%;margin-top:var(--space-2);min-height:var(--tap)}
 .alert-box{font-size:var(--text-sm);padding:var(--space-2-5) var(--space-3);border-radius:var(--radius-md);margin-bottom:var(--space-4);display:flex;gap:var(--space-2);align-items:flex-start;line-height:var(--leading-snug);animation:rise-in var(--dur-base) var(--ease-out)}
 .alert-box .mi{font-size:18px}
 .alert-box.err{color:var(--crit);background:var(--crit-soft)}
@@ -456,7 +466,7 @@ table.data tbody tr.empty-row td{white-space:normal;border-bottom:1px solid var(
 .mono-input{font-family:var(--font-mono)!important}
 .pw-row{display:flex;gap:var(--space-2);flex-wrap:wrap}
 .pw-row input{flex:1 1 150px;min-width:0}
-.pw-row .btn{flex:none;min-height:44px}
+.pw-row .btn{flex:none;min-height:var(--control-h)}
 .form-actions{display:flex;gap:var(--space-2);flex-wrap:wrap;margin-top:var(--space-1)}
 .form-actions .btn{flex:1 1 140px}
 .sheet-form{display:flex;flex-direction:column;gap:var(--space-3)}
@@ -496,7 +506,7 @@ table.data tbody tr.empty-row td{white-space:normal;border-bottom:1px solid var(
 
 /* ---- Ô mật khẩu dùng chung (shared/ui/PasswordInput.tsx, S48) ---- */
 .pw-box{position:relative;flex:1 1 180px;min-width:0;display:flex}
-.pw-box input{min-height:44px;padding-right:48px}
+.pw-box input{padding-right:48px}
 .pw-eye{position:absolute;right:0;top:50%;transform:translateY(-50%);width:44px;height:44px;border:0;background:transparent;color:var(--ink-3)}
 .pw-eye:active:not(:disabled){transform:translateY(-50%) scale(.94);background:transparent}
 @media (hover:hover) and (pointer:fine){.pw-eye:hover:not(:disabled){background:transparent;color:var(--ink)}}
@@ -641,3 +651,6 @@ table.lt tr.lt-click{cursor:pointer}
 .toast-undo{border:0;background:transparent;padding:0 var(--space-2);min-height:var(--tap);font:inherit;font-weight:var(--weight-semibold);color:var(--accent-text)}
 .toast-close{width:32px;height:32px}
 @media (max-width:767px){.toast-stack{bottom:calc(var(--bottom-nav-h) + var(--space-3));right:var(--space-3)}}
+/* Trang form có thanh nút dính đáy (FormPage, nút canh phải): đẩy toast lên trên thanh để không che nút Lưu / Gửi. */
+body:has([data-action-bar]) .toast-stack{bottom:calc(var(--action-bar-h) + var(--space-3))}
+@media (max-width:767px){body:has([data-action-bar]) .toast-stack{bottom:calc(var(--bottom-nav-h) + var(--action-bar-h) + var(--space-3))}}

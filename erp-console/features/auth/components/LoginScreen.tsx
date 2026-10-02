@@ -75,7 +75,6 @@ function LoginForm() {
           </div>
         </div>
         <h1>Đăng nhập vận hành</h1>
-        <p>Mỗi người dùng tài khoản riêng của mình.</p>
 
         {notice && !error && (
           <div className="alert-box info" role="status">

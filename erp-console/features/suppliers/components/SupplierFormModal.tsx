@@ -8,6 +8,7 @@
 // hiện đủ trong hộp, chỉ nằm trong state của hộp (không nháp, không storage, không URL, không log).
 
 import { useId, useState } from "react";
+import { RadioGroup, Switch } from "@/shared/ui/form/Choice";
 import { Field } from "@/shared/ui/form/Field";
 import { FormAlert } from "@/shared/ui/form/FormAlert";
 import { primaryLabel, useSubmit } from "@/shared/ui/form/useSubmit";
@@ -87,6 +88,7 @@ export function SupplierFormModal({ supplier, onClose, onSaved }: Props) {
   return (
     <Modal
       title={title}
+      size="narrow"
       onClose={onClose}
       busy={sub.submitting}
       footer={
@@ -119,8 +121,7 @@ export function SupplierFormModal({ supplier, onClose, onSaved }: Props) {
         {topError && <FormAlert>{topError}</FormAlert>}
         {nothing && <FormAlert kind="warn">{M.nothingChanged}</FormAlert>}
         <Field label={M.fieldName} required name="name" value={draft.name} onChange={setText("name")} maxLength={FIELD_LIMITS.name} error={nameError} autoFocus />
-        <Field
-          as="select"
+        <RadioGroup
           label={M.fieldType}
           name="supplier_type"
           value={draft.supplier_type}
@@ -130,14 +131,7 @@ export function SupplierFormModal({ supplier, onClose, onSaved }: Props) {
         />
         <Field label={M.fieldPhone} type="tel" name="phone" value={draft.phone} onChange={setText("phone")} maxLength={FIELD_LIMITS.phone} error={errs.phone ?? sub.fieldErrors.phone} />
         <Field as="textarea" label={M.fieldNote} name="note" value={draft.note} onChange={setText("note")} maxLength={FIELD_LIMITS.note} error={errs.note ?? sub.fieldErrors.note} />
-        {!editing && (
-          <label className="check-row">
-            <input type="checkbox" name="is_active" checked={draft.is_active} onChange={(e) => setDraft((d) => ({ ...d, is_active: e.target.checked }))} />
-            <span>
-              <b>{M.fieldActive}</b>
-            </span>
-          </label>
-        )}
+        {!editing && <Switch label={M.fieldActive} name="is_active" checked={draft.is_active} onChange={(on) => setDraft((d) => ({ ...d, is_active: on }))} />}
       </form>
     </Modal>
   );
