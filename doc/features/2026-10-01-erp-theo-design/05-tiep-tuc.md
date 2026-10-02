@@ -49,3 +49,7 @@ Worktree trên máy vẫn còn; nếu mất thì tạo lại bằng `git worktre
 - Đã sửa: M1, M2, L1–L3; bảng Chính sách AI (bỏ cột thừa, container query); nhãn tiếng Việt cho lệnh AI (`features/ai/commandLabels.ts`); cột "Lý do" Tổng quan hiện ở 1280; nhãn ô số liệu 360px; "AI đang tắt cho cả vựa".
 - Kiểm: tsc sạch, vitest 941, build mock=0 + 2 check xanh, `ed_batch15` 192/193 (ca đỏ là selector e2e mới đếm 8 span thay vì 5 — sửa selector).
 - Còn: sửa selector đó; chạy `ed_batch1`, `s48_password`, `ed_batch14`; ghi dev-notes (lệch contract: `recent_orders` không có lý do → BE thêm `cancel_reason`; BE nên có `AiMeta.title` tiếng Việt); `git rebase main` + chuyển sang `DataTable title/countText`, `Section`; techlead re-review; QA trên BE thật.
+
+### Nhóm C/D/E — trạng thái chi tiết lúc dừng (`wip/ra-soat-cde` = `46c2535`)
+- Đạt: tsc, vitest 900, build mock=0 + 2 check, e2e 1, 2, 3_orders, 4–8, 10–14, 16, bonusA, s41_s47 (9 và 3_fixes đỏ đã biết).
+- Còn: build lại mock=1, chạy lại 5, 6, 7, 8 và `s48_password` sau 4 thay đổi cuối (radio gradient, toast trên thanh nút, `.pw-eye` 44px, FormPage min-height 100dvh); rà ảnh so board; gộp vào main (`globals.css` chỉ sửa login/.field/.pw-*/toast/.btn.block).
