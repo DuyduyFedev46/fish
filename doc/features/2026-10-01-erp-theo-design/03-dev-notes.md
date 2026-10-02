@@ -2166,3 +2166,50 @@ FE `erp-console/` (02/10/2026). Không sửa `backend/`, `adapter/`, `features/c
 - **Kiểm chứng sau sửa (chạy lại):** `npx tsc --noEmit` sạch; `npx vitest run` 72 file, 797 test đạt (trước 788); `NEXT_PUBLIC_USE_MOCK=0` build + `check-no-mock` + `check-ai-chunks` xanh; `check_naming.py` OK; không có hex/rgba mới. E2E bản mock cổng 3501 (đã tắt): `ed_batch12_accounting` 95/95, `ed_batch1_shell` 56/56, `ed_batch10_purchasing` 115/115, `ed_batch11_suppliers` 103/103.
 - **BE thật:** Django từ `backend/` của worktree (SQLite tạm, `migrate`, `bootstrap_masterdata`, `seed_demo`, người dùng loc và ql1, cổng 8621), console build mock=0 trỏ `http://127.0.0.1:8621` ở cổng 3521 (đã xoá `.next` và `out` trước khi build vì cache giữ địa chỉ API cũ). Script mới `e2e/ed_batch12_real.py` 16/16: shape number của BE, báo cáo không sập, Lãi/lỗ 430.000 đ, "Cấu thành lãi" 6 dòng, bảng lô, chi tiết lô trong hộp thoại, tháng trống, 360px, console không lỗi, Hoá đơn bán và câu chân bảng, Quản lý không có báo cáo và không thấy Giá vốn / Lãi gộp. Ảnh: `shots/lo12/ed12-real-1-bao-cao.png`, `ed12-real-2-chi-tiet-lo.png`, `ed12-real-3-hoa-don-ban.png`, `ed12-real-4-bao-cao-360.png`. Hai cổng 8621 và 3521 đã tắt.
 - **Nợ còn lại:** (1) menu "Nhập chi phí mua" ở `features/purchasing/components/ReceiptDetailScreen.tsx:116` vẫn nhãn cũ (ngoài phạm vi, cần lô sau); (2) `qa_ed_batch10_real.py` còn dùng nhãn tab cũ "Chi phí mua"; (3) nợ BE ghi vào 02c: tiền dạng chuỗi ở `/api/reports/*` (khi BE đổi sang chuỗi thì FE vẫn chạy nhờ `toDecimalString`), kiểm cặp nhà cung cấp/phiếu nhập khi tạo hoá đơn mua, kiểm `paid_at`, báo cáo theo năm, tham số `q` cho danh sách phiếu nhập; (4) PO chỉnh ED-33-AC4 / ED-34-AC5 theo quyết định #12.
+
+## Lô 13 — FE (Danh mục & giá: ED-30, ED-31) — 02/10
+
+Làm trong `erp-console/`, không đụng `backend/`, `features/accounting/**`, `features/reports/**`. Quyết định #10 của Duy: sửa giá được nhưng giá trong đơn đã đặt không đổi; giá áp dụng "từ ngày"; giá đã có đơn dùng thì BE trả `PRICE_USED_BY_ORDERS` và màn hiện nguyên văn `detail`; "từ ngày" trước hôm nay (giờ Việt Nam) bị chặn ngay trên form, gợi ý "từ ngày mai".
+
+**Trang và component.**
+- Trang: `app/(console)/catalog/page.tsx` (4 tab, `?tab=`), `catalog/new/page.tsx` (`?type=BUNDLE` cho Thêm combo), `catalog/detail/page.tsx` (`?id=`, bọc `Suspense`, khối AI `catalog.item` qua `AiDocBlockGate`), `catalog/rules/new/page.tsx`.
+- `features/catalog/components/`: `CatalogScreen` (khung 4 tab, tab nào không có quyền thì không hiện và `?tab=` rác về Mặt hàng), `ItemListTab` (W2d: Mặt hàng, Mã hàng, Nhóm, Giá niêm yết, Áp dụng từ, Hạn dùng, Trạng thái, Ảnh; bộ lọc nhóm, trạng thái, ảnh, loại chạy phía máy chủ; ô tìm lọc phía máy trong phần đã tải), `PriceListTab` (Bảng giá), `PricingRuleList` (Ưu đãi + nút Bật/Tắt), `ItemGroupList` + `ItemGroupModal` (Nhóm hàng), `ItemDetailScreen` (W2e: Thông tin sửa tại chỗ, Giá niêm yết, Lịch sử giá, Thành phần combo, Ảnh, dòng thời gian, menu "…"), `ItemForm` (Thêm mặt hàng và Thêm combo), `SetPriceModal` (F1l Đặt giá mới), `PricingRuleForm` (Tạo ưu đãi), `ImageUploadSheet` (A2, nay mở từ trang chi tiết).
+- Logic thuần và hook: `permissions.ts`, `catalogModel.ts` (kiểm "từ ngày", câu lỗi, dòng điều kiện ưu đãi), `useCatalogList`, `useCatalogOptions`, `useItemDetail`, `useItemTimeline`, `messages.ts`, `README.md`.
+- Hàm API (`features/catalog/api.ts`, mỗi hàm có nhánh mock): `listItems` (còn nhận `"all"` như `ReceiveBatchesForm` đang gọi), `getItem`, `createItem`, `updateItem`, `createBundleLine`, `getItemTimeline`, `uploadItemImage`, `listItemGroups`, `createItemGroup`, `listPriceLists`, `listItemPrices`, `setItemPrice`, `listPricingRules`, `createPricingRule`, `setPricingRuleActive`. Không có hàm xoá, không sửa dòng giá (BE không có).
+- Mock: `window.__caveMock.catalog(mode)` với `ok / fail / empty / forbidden / detailfail / savefail / priceUsed / pricesfail`.
+- Quyền: Chủ viết được tất cả; Quản lý chỉ xem (mặt hàng, giá, ưu đãi, nhóm); NV kho thấy tab Mặt hàng và Nhóm hàng, KHÔNG có giá, bảng giá, ưu đãi (BE R14 không trả `current_price`; FE không dựng cột khi khoá vắng); giao1 và cs2 không có menu, vào thẳng thấy "không có quyền".
+- Giá vốn: không có ở bất kỳ màn nào của lô (cột, ô, chữ). Không có dữ liệu cá nhân trong mock, storage, URL, console.
+
+**Lệch contract / board (cần PO biết).**
+1. F1l vẽ ô ngày giờ nhưng BE là `DateField`: dùng ô ngày. "Từ ngày" mặc định là ngày mai.
+2. W2d: bỏ cột "Ghi chú" và cột ghi chú AI (02b 0c, chưa có dữ liệu). "Giá vốn ước tính" bỏ (02b 0c). Lịch sử giá không có cột "Người đặt" (BE `ItemPrice` không có người đặt).
+3. Bảng Thành phần combo không có "Tồn" và "Đủ cho" (BE `BundleLine` không trả tồn).
+4. `PATCH /items/` BE chỉ cho Chủ; Quản lý không có bút sửa, "Ẩn khỏi Shop" bị chặn kèm lý do "Chỉ Chủ vựa".
+5. Danh sách mặt hàng không có tham số `q`: ô tìm lọc phía máy trong các trang đã tải (8 dòng mỗi trang). Lọc nhóm, trạng thái, ảnh, loại chạy phía máy chủ.
+6. Không vẽ dòng "Tiếp theo" của board; câu "Mã này đã dùng cho <tên>" của board không có trong contract, FE hiện câu BE trả ("Mã này đã được dùng.") dưới ô Mã.
+7. Tab Bảng giá không có ô chọn bảng giá: `item-prices` không lọc theo `price_list`.
+8. Tải ảnh chuyển từ dòng danh sách sang trang chi tiết (danh sách nay là bảng DataTable một giá trị mỗi ô).
+9. 02b đặt tên e2e `ed_lo13_catalog.py`; theo phiếu giao đổi thành `ed_batch13_catalog.py` cho khớp các lô trước.
+10. NV kho cũng thấy tab Nhóm hàng (có quyền `view_itemgroup`), ngoài phần "chỉ Mặt hàng" của story.
+11. **Sửa ngoài danh sách file được phép** (nhỏ, dùng chung, đề nghị techlead duyệt): `shared/lib/http.ts` hàm `detailOf` nuốt lỗi 400 của DRF cho trường tên `code` (`{"code":["Mã này đã được dùng."]}`) vì coi `code` là mã lỗi. Nay `code` không phải chuỗi thì giữ trong `details` (field error), `ApiError.code` vẫn rỗng. BE thật trả đúng dạng này khi Mã hàng trùng nên đây là lỗi thật, không chỉ của mock. Thêm 1 ca vào `shared/lib/http.test.ts`.
+12. `scripts/check-ai-chunks.mjs` nằm ngoài danh sách được sửa: không sửa, chạy vẫn XANH (màn catalog không nằm trong danh sách màn nghiệp vụ của nó).
+13. `e2e/a2_catalog_real.py` (cần BE thật): chỉ đổi bộ chọn `li` thành `tbody tr` cho khớp danh sách mới; chưa chạy vì không có BE thật trong lượt này.
+
+**Kiểm (chạy 02/10/2026, số thật).**
+- `npx tsc --noEmit` sạch. `npx vitest run`: 69 file, **794 ca đạt** (module mới `catalog.test.ts` 32 ca + 1 ca `http.test.ts`).
+- `NEXT_PUBLIC_USE_MOCK=0 npm run build` sạch; `check-no-mock.mjs` XANH (21 file mock, 42 chuỗi seed, 218 file build); `check-ai-chunks.mjs` XANH (29 màn + 2 layout).
+- Build `NEXT_PUBLIC_USE_MOCK=1` phục vụ ở cổng 3701: `e2e/ed_batch13_catalog.py` **125/125 PASS** (Chủ: lọc, tìm không dấu, tải thêm, đặt giá, chặn lùi ngày không gọi máy chủ, `PRICE_USED_BY_ORDERS`, mã hàng trùng, combo, ưu đãi, nhóm hàng; ql1 chỉ xem; kho1 không giá ở DOM kể cả `?tab=prices`; giao1 và cs2 bị chặn; `?id=` rác; lỗi 500, rỗng, 403; 360px không cuộn ngang và vùng bấm ≥ 44px; không có dữ liệu nhập tay trong storage hay URL; không console.error). Hồi quy: `ed_batch1_shell` 56/56, `ed_batch2_patterns` 75/75, `ed_batch3_orders` 143/143.
+- `python3 scripts/check_naming.py` OK, không phát sinh mới (đã đổi `kho`, `ql` trong test thành `warehouse`, `manager`). Màu cứng trong `features/catalog`: 0.
+- Ảnh (`doc/features/2026-10-01-erp-theo-design/shots/lo13/`, không vào git): `lo13-loc-1-mat-hang`, `lo13-loc-2-chi-tiet`, `lo13-loc-3-gia-da-co-don`, `lo13-loc-4-combo`, `lo13-loc-5-ma-trung`, `lo13-loc-6-bang-gia`, `lo13-loc-7-uu-dai`, `lo13-loc-8-tao-uu-dai-loi`, `lo13-ql1-chi-tiet`, `lo13-kho1-mat-hang`, `lo13-kho1-chi-tiet`, `lo13-loc-loi-500`, `lo13-loc-rong`, `lo13-loc-lich-su-gia-loi`, `lo13-loc-360-*` (9 ảnh), `lo13-loc-1280-mat-hang`, `lo13-loc-1280-uu-dai`.
+
+**Còn nợ / lưu ý.**
+- Chưa chạy với BE thật (`a2_catalog_real.py`, lỗi `PRICE_USED_BY_ORDERS`, `details` của R14); QA nên chạy khi BE sẵn sàng.
+- Bảng dùng `dense` (cố định bố cục): đã đặt độ rộng cho cột Mặt hàng, Mã hàng, Giá niêm yết, Trạng thái, Ảnh để tên và giá không bị cắt. Ở 360px bảng cuộn ngang trong thẻ, trang không cuộn.
+- Chưa có sửa/xoá dòng giá và chưa có chọn bảng giá (chờ BE).
+- Chưa push, chưa deploy.
+
+**Sửa B13-1 (QA, Medium, ED-30-AC3) — 02/10.**
+- Nguyên nhân: form combo luôn có sẵn 1 dòng công thức trống và không xoá được dòng cuối, nên `validateItem` không bao giờ thấy "công thức rỗng". `ItemForm.tsx` thực ra đã render `errs.lines` từ đầu; lỗi nằm ở logic kiểm tra, không ở chỗ hiển thị.
+- Sửa `features/catalog/catalogModel.ts` (`validateItem`): dòng nào chưa chọn mặt hàng và chưa nhập kg thì coi như chưa có. Nếu không dòng nào đã điền thì chỉ báo "Thêm ít nhất một mặt hàng vào công thức." ở vùng Thành phần combo, không báo "Chọn mặt hàng." / "Nhập số kg." dưới dòng trống. Có ít nhất một dòng đã điền thì kiểm từng dòng như cũ (dòng điền dở, trùng, kg dưới 0,001; dòng trống còn lại vẫn báo từng dòng).
+- Test: `catalog.test.ts` thêm 1 ca (chỉ dòng trống, nhiều dòng trống, dòng trống lẫn dòng đã điền, chỉ nhập kg, mặt hàng thường). `ed_batch13_catalog.py` thêm 4 kiểm tra (câu AC3 hiện, không báo dưới dòng trống, ở lại form, dòng có mặt hàng thiếu kg vẫn báo "Nhập số kg."), đổi kiểm tra cũ "chưa chọn thành phần → Chọn mặt hàng." cho đúng hành vi mới. Ảnh `lo13-loc-4f-combo-cong-thuc-trong`.
+- Kiểm chứng lại: `tsc` sạch; vitest 69 file, 795 ca đạt; build mock=0 sạch, `check-no-mock` và `check-ai-chunks` XANH; build mock=1 sao `out/` sang thư mục riêng, phục vụ cổng 3701: `ed_batch13_catalog` 128/128 PASS, `ed_batch1_shell` 56/56 PASS; `check_naming` không phát sinh mới.

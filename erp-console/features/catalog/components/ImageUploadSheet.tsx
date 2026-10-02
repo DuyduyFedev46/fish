@@ -1,17 +1,19 @@
 "use client";
 
-// Tấm tải/thay ảnh mặt hàng (A2). Một tệp, xem trước ngay bằng blob URL của tệp đã chọn (không gọi
-// mạng trước khi bấm Lưu). Đủ trạng thái theo contract: thiếu tệp (báo tại chỗ, không gọi API),
-// đang gửi (khoá nút, chặn bấm đúp — A2-AC17), rớt mạng (A2-AC12, nút "Thử lại" giữ nguyên tệp đã
-// chọn), xung đột ghi đè (A2-AC13, nút "Tải lại"), lỗi BE khác hiện NGUYÊN VĂN `detail`.
+// Hộp tải/thay ảnh mặt hàng (A2, nay là Modal chung). Một tệp, xem trước ngay bằng blob URL của tệp đã chọn (không gọi mạng
+// trước khi bấm Lưu). Đủ trạng thái theo contract: thiếu tệp (báo tại chỗ, không gọi API), đang gửi (khoá nút, chặn bấm đúp,
+// A2-AC17), rớt mạng (A2-AC12, nút "Thử lại" giữ nguyên tệp đã chọn), xung đột ghi đè (A2-AC13, nút "Tải lại"), lỗi BE khác
+// hiện NGUYÊN VĂN `detail`. Tệp và mô tả chỉ nằm trong state của hộp (không storage, không URL, không log).
 
 import { useEffect, useId, useRef, useState } from "react";
 import { ApiError } from "@/shared/lib/http";
 import { errorText } from "@/shared/lib/messages";
+import { Field } from "@/shared/ui/form/Field";
+import { FormAlert } from "@/shared/ui/form/FormAlert";
 import { Icon } from "@/shared/ui/Icon";
-import { Sheet } from "@/shared/ui/Sheet";
+import { Modal } from "@/shared/ui/overlay/Modal";
 import { uploadItemImage } from "../api";
-import { CATALOG_MSG } from "../messages";
+import { CATALOG_MSG as M } from "../messages";
 import type { CatalogItem, UploadImageResponse } from "../types";
 import s from "../catalog.module.css";
 
@@ -22,7 +24,7 @@ type Props = {
   item: CatalogItem;
   onClose: () => void;
   onUploaded: (item: CatalogItem, res: UploadImageResponse) => void;
-  /** A2-AC13: 409 vì ảnh vừa bị người khác đổi — tải lại danh sách rồi đóng tấm này. */
+  /** A2-AC13: 409 vì ảnh vừa bị người khác đổi — tải lại rồi đóng hộp này. */
   onConflictReload: () => void;
 };
 
@@ -39,14 +41,15 @@ export function ImageUploadSheet({ item, onClose, onUploaded, onConflictReload }
   /** Tệp chọn không phải ảnh giải mã được (vd .txt đổi đuôi .jpg) — trình duyệt không vẽ được xem trước. */
   const [previewBroken, setPreviewBroken] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
-  const uid = useId();
+  const formId = useId();
 
-  // Dọn blob URL khi đổi tệp / đóng tấm — tránh rò bộ nhớ.
-  useEffect(() => () => {
-    if (previewUrl) URL.revokeObjectURL(previewUrl);
-  }, [previewUrl]);
-
-  const pickFile = () => inputRef.current?.click();
+  // Dọn blob URL khi đổi tệp / đóng hộp — tránh rò bộ nhớ.
+  useEffect(
+    () => () => {
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+    },
+    [previewUrl],
+  );
 
   const onFileChange = (f: File | null) => {
     setPreviewUrl((old) => {
@@ -62,17 +65,16 @@ export function ImageUploadSheet({ item, onClose, onUploaded, onConflictReload }
   };
 
   const isNew = !item.image;
-  const title = isNew ? `Tải ảnh — ${item.name}` : `Thay ảnh — ${item.name}`;
+  const title = isNew ? M.imageModalTitleNew(item.name) : M.imageModalTitleReplace(item.name);
 
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const submit = async () => {
     if (busy) return; // A2-AC17: bấm hai lần không gửi hai lần
     if (!file) {
       setFileMissing(true);
       return;
     }
     if (file.size > MAX_BYTES) {
-      setError("Ảnh vượt 10 MB.");
+      setError(M.imageTooBig);
       return;
     }
     setBusy(true);
@@ -80,12 +82,7 @@ export function ImageUploadSheet({ item, onClose, onUploaded, onConflictReload }
     setNetworkDrop(false);
     setConflict(false);
     try {
-      const res = await uploadItemImage(item.id, {
-        file,
-        altText,
-        isIllustration,
-        expectedImageId: item.image?.id ?? "",
-      });
+      const res = await uploadItemImage(item.id, { file, altText, isIllustration, expectedImageId: item.image?.id ?? "" });
       onUploaded(item, res);
     } catch (err) {
       if (err instanceof ApiError && err.status === 0) {
@@ -100,11 +97,56 @@ export function ImageUploadSheet({ item, onClose, onUploaded, onConflictReload }
     }
   };
 
-  const altId = `${uid}-alt`;
+  const failed = networkDrop || error !== null;
 
   return (
-    <Sheet title={title} onClose={onClose} busy={busy}>
-      <form className="sheet-form" onSubmit={submit} noValidate>
+    <Modal
+      title={title}
+      onClose={onClose}
+      busy={busy}
+      footer={
+        <>
+          <button type="button" className="btn" onClick={onClose} disabled={busy}>
+            {M.cancel}
+          </button>
+          <button type="submit" form={formId} className="btn primary" disabled={busy} aria-busy={busy || undefined}>
+            {busy ? (
+              <>
+                <Icon name="progress_activity" className="spin" />
+                <span>{M.busy}</span>
+              </>
+            ) : failed ? (
+              M.retry
+            ) : isNew ? (
+              M.submitUploadNew
+            ) : (
+              M.submitUploadReplace
+            )}
+          </button>
+        </>
+      }
+    >
+      <form
+        id={formId}
+        noValidate
+        className={s.form}
+        onSubmit={(e) => {
+          e.preventDefault();
+          void submit();
+        }}
+      >
+        {networkDrop && <FormAlert>{M.networkDrop}</FormAlert>}
+        {conflict && (
+          <div className="alert-box err" role="alert">
+            <Icon name="sync_problem" />
+            <span>{M.imageConflict}</span>
+            <button type="button" className="btn" onClick={onConflictReload}>
+              {M.reload}
+            </button>
+          </div>
+        )}
+        {error && <FormAlert>{error}</FormAlert>}
+
         <div className={s.previewRow}>
           <span className={s.previewBox}>
             {previewUrl && !previewBroken ? (
@@ -118,16 +160,16 @@ export function ImageUploadSheet({ item, onClose, onUploaded, onConflictReload }
             )}
           </span>
           <div className={s.previewActions}>
-            <button type="button" className="btn" onClick={pickFile} disabled={busy} data-autofocus>
+            <button type="button" className="btn" onClick={() => inputRef.current?.click()} disabled={busy} data-autofocus>
               <Icon name="photo_camera" />
-              {file ? CATALOG_MSG.changeFile : CATALOG_MSG.chooseFile}
+              <span>{file ? M.changeFile : M.chooseFile}</span>
             </button>
-            <p className="help">{CATALOG_MSG.dropHint}</p>
+            <p className="muted">{M.dropHint}</p>
             {file && <p className={s.fileName}>{file.name}</p>}
             {fileMissing && (
               <p className="field-err" role="alert">
                 <Icon name="error" />
-                Chọn một ảnh trước khi lưu.
+                {M.imageMissing}
               </p>
             )}
           </div>
@@ -136,72 +178,27 @@ export function ImageUploadSheet({ item, onClose, onUploaded, onConflictReload }
             type="file"
             accept={ACCEPT}
             className="sr-only"
-            aria-label={CATALOG_MSG.chooseFile}
+            aria-label={M.chooseFile}
             onChange={(e) => onFileChange(e.target.files?.[0] ?? null)}
             disabled={busy}
           />
         </div>
 
-        <div className="field">
-          <label htmlFor={altId}>Mô tả ảnh (alt text)</label>
-          <input
-            id={altId}
-            value={altText}
-            onChange={(e) => setAltText(e.target.value)}
-            placeholder={item.name}
-            maxLength={125}
-            disabled={busy}
-          />
-          <span className="help">Để trống thì dùng tên mặt hàng.</span>
-        </div>
+        <Field label={M.fieldAltText} name="alt_text" value={altText} onChange={setAltText} maxLength={125} placeholder={item.name} disabled={busy} />
 
         <label className="check-row">
           <input type="checkbox" checked={isIllustration} onChange={(e) => setIsIllustration(e.target.checked)} disabled={busy} />
           <span>
-            <b>Ảnh minh hoạ</b>
-            <small>Không phải ảnh Lộc tự chụp — Shop sẽ ghi rõ &quot;Ảnh minh hoạ&quot;.</small>
+            <b>{M.fieldIllustration}</b>
+            <small>{M.illustrationNote}</small>
           </span>
         </label>
 
         <p className={s.privacy}>
           <Icon name="visibility_off" />
-          {CATALOG_MSG.privacyReminder}
+          {M.privacyReminder}
         </p>
-
-        {networkDrop && (
-          <div className="alert-box err" role="alert">
-            <Icon name="wifi_off" />
-            <span>{CATALOG_MSG.networkDrop}</span>
-          </div>
-        )}
-        {conflict && (
-          <div className="alert-box err" role="alert">
-            <Icon name="sync_problem" />
-            <span>
-              Ảnh vừa được người khác đổi, tải lại để xem.{" "}
-              <button type="button" className="inline-link" onClick={onConflictReload}>
-                Tải lại
-              </button>
-            </span>
-          </div>
-        )}
-        {error && (
-          <div className="alert-box err" role="alert">
-            <Icon name="error" />
-            <span>{error}</span>
-          </div>
-        )}
-
-        <div className="form-actions">
-          <button type="button" className="btn" onClick={onClose} disabled={busy}>
-            Huỷ
-          </button>
-          <button type="submit" className="btn primary" disabled={busy} aria-busy={busy || undefined}>
-            {busy && <Icon name="progress_activity" className="spin" />}
-            {busy ? "Đang gửi…" : networkDrop ? "Thử lại" : isNew ? "Tải ảnh lên" : "Lưu ảnh mới"}
-          </button>
-        </div>
       </form>
-    </Sheet>
+    </Modal>
   );
 }

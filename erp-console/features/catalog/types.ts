@@ -1,12 +1,6 @@
-// Kiểu dữ liệu module catalog (A2, A3 — doc/features/2026-09-26-anh-mat-hang/02-stories.md).
-// Màn Danh mục tối thiểu: danh sách mặt hàng có ảnh thu nhỏ + tải/thay ảnh. Phần sửa tên, nhóm,
-// hạn dùng, ẩn/hiện vẫn thuộc S38 (chưa làm ở đây).
-//
-// Mẫu JSON rút gọn của A2 (02-stories.md) chỉ liệt `item_group` (ID số); BE thật (04-qa-report.md,
-// đối chiếu qua e2e/a2_catalog_real.py) trả kèm `group_name` (chuỗi) — dùng field đó để hiện tên
-// nhóm thay vì "Nhóm #<id>". Response còn nhiều field khác của `ItemSerializer` đầy đủ (stock_uom,
-// shelf_life_in_days, has_batch_no, has_expiry_date, description, bundle_lines…) — TS bỏ qua field
-// thừa không khai ở đây, an toàn vì FE chỉ đọc field mình cần.
+// Kiểu dữ liệu module catalog: A2 (ảnh mặt hàng) và Lô 13 (ED-30, ED-31: mặt hàng, bảng giá, ưu đãi, nhóm hàng).
+// Hình dạng theo contract BE R14 (backend/apps/catalog/items, pricing). Tiền là chuỗi thập phân ("215000.00");
+// ngày hiệu lực là NGÀY THUẦN ("2026-10-05"), không phải ngày giờ. Không có field giá vốn nào ở module này.
 
 export type ItemType = "SIMPLE" | "BUNDLE";
 
@@ -24,17 +18,57 @@ export type CatalogItemImage = {
 /** `image` trong response tải/thay ảnh (POST) — có thêm `uploaded_by`. */
 export type UploadedItemImage = CatalogItemImage & { uploaded_by: string };
 
+/** Giá BÁN đang hiệu lực. BE chỉ trả cho người có `catalog.view_itemprice` (Chủ, Quản lý); NV kho không có key. */
+export type CurrentPrice = { rate: string; valid_from: string; valid_upto: string | null };
+
+/** Một thành phần của combo: định mức kg cho MỘT combo. */
+export type BundleLine = {
+  id: number;
+  bundle: number;
+  component: number;
+  component_code: string;
+  component_name: string;
+  qty_per_bundle: string;
+};
+
 export type CatalogItem = {
   id: number;
   code: string;
   name: string;
   item_group: number;
-  /** Tên nhóm hàng — BE thật trả kèm dù không có trong mẫu JSON rút gọn của 02-stories.md. */
+  /** Tên nhóm hàng — BE trả kèm. */
   group_name: string;
   item_type: ItemType;
+  stock_uom: string;
+  shelf_life_in_days: number;
+  has_batch_no: boolean;
+  has_expiry_date: boolean;
   is_active: boolean;
+  description: string;
+  bundle_lines: BundleLine[];
   image: CatalogItemImage | null;
+  /** Không có key với người thiếu `catalog.view_itemprice`; `null` = chưa có giá hiệu lực. */
+  current_price?: CurrentPrice | null;
 };
+
+/** Thân POST /api/catalog/items/. Combo: công thức gửi riêng qua `bundle-lines`. */
+export type ItemInput = {
+  code: string;
+  name: string;
+  item_group: number;
+  item_type: ItemType;
+  stock_uom: string;
+  shelf_life_in_days: number;
+  has_batch_no: boolean;
+  has_expiry_date: boolean;
+  is_active: boolean;
+  description: string;
+};
+
+/** PATCH một phần: chỉ trường đổi. Chủ mới được (catalog.change_item). */
+export type ItemPatch = Partial<Pick<ItemInput, "name" | "description" | "is_active">>;
+
+export type BundleLineInput = { bundle: number; component: number; qty_per_bundle: string };
 
 export type ImageWarning = { code: string; message: string };
 
@@ -54,5 +88,82 @@ export type UploadImageInput = {
   expectedImageId: string;
 };
 
-/** Bộ lọc màn Danh mục — UC-A5: "Chưa có ảnh" để Chủ gắn ảnh dần. */
+/** Bộ lọc ảnh cũ của A2 — `listItems("all")` vẫn dùng ở form Nhập lô (features/purchasing). */
 export type ImageFilter = "all" | "with_image" | "without_image";
+
+/** Tham số danh sách mặt hàng. Rỗng = không lọc (BE: rỗng hoặc khoảng trắng không lọc, sai giá trị → 400 INVALID_FILTER). */
+export type ItemListParams = {
+  group: string;
+  type: "" | ItemType;
+  /** "" | "1" | "0". */
+  active: string;
+  /** "" | "1" (có ảnh) | "0" (chưa có ảnh). */
+  hasImage: string;
+};
+
+export const EMPTY_ITEM_PARAMS: ItemListParams = { group: "", type: "", active: "", hasImage: "" };
+
+export type ItemGroup = {
+  id: number;
+  name: string;
+  parent: number | null;
+  parent_name: string | null;
+  /** Số mặt hàng thuộc nhóm, kể cả đang ẩn. */
+  item_count: number;
+};
+
+export type ItemGroupInput = { name: string; parent: number | null };
+
+export type PriceList = { id: number; name: string; currency: string; is_default: boolean };
+
+export type ItemPrice = {
+  id: number;
+  price_list: number;
+  item: number;
+  item_name: string;
+  item_code: string;
+  rate: string;
+  valid_from: string;
+  valid_upto: string | null;
+};
+
+export type ItemPriceInput = { price_list: number; item: number; rate: string; valid_from: string; valid_upto: string | null };
+
+export type RuleApplyOn = "ITEM" | "ORDER";
+export type RuleDiscountType = "AMOUNT" | "PERCENT";
+
+export type PricingRule = {
+  id: number;
+  name: string;
+  is_active: boolean;
+  apply_on: RuleApplyOn;
+  item: number | null;
+  item_name: string | null;
+  min_qty: string | null;
+  min_amount: string | null;
+  discount_type: RuleDiscountType;
+  discount_value: string;
+  valid_from: string | null;
+  valid_upto: string | null;
+};
+
+export type PricingRuleInput = {
+  name: string;
+  is_active: boolean;
+  apply_on: RuleApplyOn;
+  item: number | null;
+  min_qty: string | null;
+  min_amount: string | null;
+  discount_type: RuleDiscountType;
+  discount_value: string;
+  valid_from: string | null;
+  valid_upto: string | null;
+};
+
+export type PricingRuleListParams = {
+  /** "" | "1" | "0". */
+  active: string;
+  applyOn: "" | RuleApplyOn;
+};
+
+export type ItemPriceListParams = { item: number | null };

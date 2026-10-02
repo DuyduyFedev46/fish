@@ -55,7 +55,7 @@ def check_catalog_loads(browser, user, label):
     if not page_errors:
         # Có danh sách mặt hàng thật (seed_demo tạo >=1 mặt hàng) thay vì màn trắng/vỡ.
         ok(f"[{label}] Danh sách mặt hàng render (có ít nhất 1 dòng)",
-           page.locator("li").count() > 0)
+           page.locator("tbody tr").count() > 0)
     ctx.close()
 
 
