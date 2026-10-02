@@ -44,3 +44,8 @@
 | `wip/ra-soat-cde` | Rà soát giao diện nhóm C/D/E (form, popup, đăng nhập) | `1180092` |
 | `wip/lo15` | Lô 15 + sửa review M1/M2/L1–L3 | `50c0859` |
 Worktree trên máy vẫn còn; nếu mất thì tạo lại bằng `git worktree add .claude/worktrees/<tên> <nhánh>`.
+
+### Lô 15 — trạng thái chi tiết lúc dừng (`wip/lo15` = `50c0859`)
+- Đã sửa: M1, M2, L1–L3; bảng Chính sách AI (bỏ cột thừa, container query); nhãn tiếng Việt cho lệnh AI (`features/ai/commandLabels.ts`); cột "Lý do" Tổng quan hiện ở 1280; nhãn ô số liệu 360px; "AI đang tắt cho cả vựa".
+- Kiểm: tsc sạch, vitest 941, build mock=0 + 2 check xanh, `ed_batch15` 192/193 (ca đỏ là selector e2e mới đếm 8 span thay vì 5 — sửa selector).
+- Còn: sửa selector đó; chạy `ed_batch1`, `s48_password`, `ed_batch14`; ghi dev-notes (lệch contract: `recent_orders` không có lý do → BE thêm `cancel_reason`; BE nên có `AiMeta.title` tiếng Việt); `git rebase main` + chuyển sang `DataTable title/countText`, `Section`; techlead re-review; QA trên BE thật.
