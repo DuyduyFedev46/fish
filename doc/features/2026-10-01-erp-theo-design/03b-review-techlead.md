@@ -2663,3 +2663,135 @@ Ghi nhận (không lỗi): `escalatedKey` chỉ ẩn bước đầu tiên bị k
 
 ### Kết luận cuối Lô bổ sung A — FE: **APPROVED**
 Lô qua review, chuyển QA hoặc commit được. Đưa vào 02c thành nợ, giữ như kết luận trước: TLA-FE-M1 (cờ `blocked_by` ở BE), TLA-FE-L4 (đi cùng TLA-L2), câu `STEP_NOT_FOUND` của BE, và việc dời các hộp xác nhận riêng của từng module sang `ConfirmModal`.
+
+## Lô 12 — FE
+
+Review techlead 02/10. Commit `b249d4a` (nhánh `worktree-agent-a196a7d7c53cd4085`), diff `54b4113..b249d4a`, ED-32, ED-33, ED-34. Đối chiếu BE thật trong `backend/` cùng worktree. Không sửa code. Điều phối viên đã chạy lại tsc, vitest 788, build mock=0, check-no-mock, check-ai-chunks, e2e batch12 90/90, batch1, batch10, batch11. Tôi tự chạy thêm `JSONRenderer().render({"a": Decimal("1650000.50")})` để kiểm cách BE trả số ở hai endpoint báo cáo. Kết quả là `{"a":1650000.5}`, tức là số, không phải chuỗi.
+
+### Kết quả theo trọng tâm
+| Mục | Kết luận | Căn cứ |
+|---|---|---|
+| Rò giá vốn ở Hoá đơn bán | Đạt | BE chặn thật. `SalesInvoiceListSerializer` có `sensitive_fields = ("cogs","gross_profit")` (`backend/apps/sales/payments/serializers.py:55`). `totals.gross_profit` chỉ có khi `has_perm(view_costprice)` (`backend/apps/sales/payments/api.py:59`). Test BE `test_invoice_list.py` assert không có key với vai khác. FE còn ẩn thêm cột `locked` theo `me.can_view_cost` (`SalesInvoiceListScreen.tsx:69,100-101,156`). |
+| Báo cáo lãi lỗ chỉ Chủ | Đạt | Ba view `/api/reports/*` đều `require_perm(view_profitreport)` (`backend/apps/reports/api.py`). FE có ViewGuard, `canRead=me.can_view_profit` thì không gọi API, và 403 thì hiện NoPermission (`ProfitReportScreen.tsx:46-57`). Menu chỉ hiện cho người có quyền. |
+| D-3: Quản lý thấy tiền hoá đơn mua | Đạt | `PurchaseInvoiceSerializer` không có `sensitive_fields`. FE luôn truyền `canViewCost` cho cột Số tiền có khoá (`PurchaseInvoiceList.tsx:99-100,167`). Tab Chi phí phụ theo `viewCosts`, và BE `/costs/` chỉ cho Chủ. |
+| Dữ liệu cá nhân | Đạt | BE trả `customer_name=null` khi thiếu `view_customer_list` hoặc `pii_visible=False` (`serializers.py:86-87`). `q` không tìm theo tên. Response `no-store`. FE ẩn cả cột theo quyền (`SalesInvoiceListScreen.tsx:70,97`). Mock dùng tên có đuôi "(mẫu)", không có SĐT. Không có `console.*`. Không đưa dữ liệu cá nhân lên URL. |
+| Làm tròn ".50" | Đạt | `roundToDong` cộng `FACTOR/2` rồi chia nguyên, tức là làm tròn nửa lên, xa số 0. Cách này khớp `ROUND_HALF_UP` của `money()` ở BE (`receipts/serializers.py:79-81`). `suggestedAmount` gửi số nguyên đồng. Có test đơn vị. |
+| Cộng trừ bằng chuỗi | Đạt về thuật toán (BigInt, 6 số lẻ), nhưng **giả định đầu vào sai**. Xem TL12-FE-H1. | |
+| Contract R11, R12, R13 | Khớp | Đường dẫn, tham số (`is_paid`, `supplier`, `month`, `cost_type`, `status`, `date_from`, `date_to`, `q`, `has_invoice=0`, `status=SUBMITTED`) và shape `{count,next,previous,results,totals}` đều khớp. Tiền ở R11, R12, R13 là chuỗi (`money_str`/DecimalField). |
+| Contract R15 và `/reports/period/` | **Lệch kiểu dữ liệu** | Đường dẫn, tham số (`year`, `month`, `month=YYYY-MM`, `state`, `page`), tên key và trang 20 dòng đều khớp. Nhưng mọi số tiền và số kg là JSON number, vì view trả dict `Decimal` thô qua `Response` và DRF đổi `Decimal` thành `float`. Xem H1. |
+
+### Lỗi
+
+**TL12-FE-H1 (High, phải sửa trước khi QA với BE thật): màn Báo cáo lãi lỗ sập khi chạy với BE thật.**
+- `features/reports/types.ts` và comment ghi tiền là chuỗi (`"1650000.00"`). Thực tế `/api/reports/period/` và `/api/reports/batches/` trả số, ví dụ `"cogs_reversed": 0.0`.
+- `reportView.ts:49` đưa thẳng `p.cogs_reversed`, giá trị kiểu number, vào `amount`. Sau đó `ProfitReportScreen.tsx:282` gọi `row.amount.startsWith("-")`. Lệnh này ném `TypeError`, nên mọi tháng có giao dịch đều rơi vào error boundary. Mock trả chuỗi, vì vậy e2e 90/90 không bắt được lỗi.
+- Các chỗ khác chạy được nhờ may: `parseDecimal` gọi `RegExp.exec` nên tự ép số thành chuỗi. Khi số lớn hơn hoặc bằng 1e21, hoặc nhỏ hơn 1e-6, `String(n)` cho ra dạng mũ và `parseDecimal` trả `null`.
+- **Sửa (chỉ FE, trong lô này):** chuẩn hoá ở `features/reports/api.ts`. Với cả `fetchPeriodReport` và `fetchBatchReport`, đổi mọi field tiền và kg sang chuỗi bằng `String(v)`, giữ nguyên chuỗi nếu đã là chuỗi. Kiểu trả về giữ `string`. Thêm test vitest đưa payload dạng số, như BE thật (`revenue: 1650000.5`, `cogs_reversed: 0`, `profit: -250000`), qua hàm chuẩn hoá rồi qua `profitBreakdown`, `periodIsEmpty` và `batchDetail`. Đổi mock reports trả **số** như BE, để e2e chạy đúng shape thật. Bỏ `.startsWith("-")` ở dòng 282, thay bằng `signOf(row.amount) === -1`.
+- **Nợ BE, ghi vào 02c, không chặn lô FE:** cho `BatchPnlView`, `BatchPnlListView` và `PeriodPnlView` trả tiền dạng chuỗi giống R13 (`money_str`), để thống nhất contract. Phải kiểm người dùng khác của `batch_pnl`/`period_pnl` trước (AI, dashboard). FE đã chuẩn hoá ở H1 thì vẫn đúng với cả hai kiểu.
+
+**TL12-FE-M1 (Medium, sửa trong lô): hoá đơn mua có thể gắn phiếu nhập của nhà cung cấp khác.**
+`PurchaseInvoiceForm.tsx:124-139`: khi chọn phiếu, form tự đặt nhà cung cấp theo phiếu. Nếu sau đó người dùng đổi nhà cung cấp, `receiptId` vẫn giữ nguyên. `ReceiptSelect` cố ý giữ phiếu đang chọn trong danh sách (`receiptOptions.ts`), nên form gửi được cặp nhà cung cấp X với phiếu của nhà cung cấp Y. BE không kiểm cặp này (`purchasing/invoices/serializers.py:28-34` chỉ kiểm phiếu đã huỷ). Hậu quả là công nợ nhà cung cấp bị sai.
+**Sửa FE:** khi đổi nhà cung cấp mà phiếu đang chọn thuộc nhà cung cấp khác, xoá `receiptId` và xoá luôn số tiền nếu số đó đang là số gợi ý. Thêm ca e2e cho tình huống này. **Nợ BE (02c):** `PurchaseInvoiceSerializer.validate` phải từ chối khi `receipt.supplier_id != supplier.id`, kèm test 400.
+
+**TL12-FE-M2 (Medium, sửa trong lô): chi tiết lô dùng `SideSheet`.**
+`ProfitReportScreen.tsx:20,339-354` mở chi tiết lô bằng tấm trượt bên phải. Cách này trái UI-RULES §4.1 ("không trượt panel") và 02b §shared/ui. 02b dòng 193 và 587 đã ghi `SideSheet` sẽ bị thay bằng `Modal` và xoá ở Lô 17, nên Lô 12 không được thêm chỗ dùng mới. **Sửa:** dùng `shared/ui/overlay/Modal` (chỉ đọc, nút Đóng), giữ nguyên nội dung `batchDetail`.
+
+**TL12-FE-L1 (Low, sửa trong lô): một việc một tên, "Chi phí phụ".**
+Chốt: dùng **"Chi phí phụ"** ở mọi chỗ, theo ED-34 và UI-RULES §3.4. Chỗ còn ghi "Chi phí mua":
+- `features/purchasing/components/PurchasingScreen.tsx:27` (nhãn tab). Cho phép sửa đúng một dòng này, dù `purchasing/**` nằm ngoài phạm vi lô.
+- `PurchaseCostForm.tsx:66,168,180` (tiêu đề "Nhập chi phí mua", đổi thành "Thêm chi phí phụ" cho khớp nút) và `:67` (nhãn quay lại).
+- `PurchaseCostList.tsx:119` ("Chưa có chi phí mua").
+- Sửa e2e `ed_batch10_purchasing.py` theo nhãn mới.
+
+**TL12-FE-L2 (Low, nên sửa): chữ thừa so với UI-RULES §1.1, §1.7, §3.3.**
+- Ở các ô số liệu, nên bỏ dòng phụ giải thích: `foot` ở `ProfitReportScreen.tsx:244,245,266,267,268`. Chỉ giữ dòng so sánh tháng trước ở ô Lãi/lỗ, vì đó là một số liệu chứ không phải lời giải thích.
+- `PurchaseInvoiceList.summaryText` có hậu tố "(trong số đã tải)". Nên đổi thành chỉ đếm chưa trả khi đã tải hết, hoặc bỏ.
+- Banner hoá đơn bán (`SalesInvoiceListScreen.tsx:111-119`) và câu ở chân bảng (`:166`) đang nói hai ý gần nhau. Giữ một câu ngắn ở chân: "Không tính hoá đơn Đã huỷ".
+- Câu tiêu chí dưới bộ chọn tháng (`:123-125`) giữ lại, vì 02b yêu cầu ghi rõ tiêu chí.
+
+**TL12-FE-L3 (Low, ghi nhận):** chọn phiếu thứ hai thì số tiền không đổi theo, vì có điều kiện `!amount` ở `PurchaseInvoiceForm.tsx:137`. Chấp nhận được (không đè số người dùng đã gõ). Nếu sửa M1 thì xử lý luôn: đánh dấu số tiền là "gợi ý" để đổi phiếu thì cập nhật lại.
+
+### Chốt các chỗ dev ghi lệch
+- **kho1 xem Hoá đơn bán:** đúng. BE cấp `view_salesinvoice` cho `warehouse_staff`, có test `test_r13_ac1_owner_manager_warehouse_staff_200`, và Duy đã chốt ở #12. Cột Giá vốn và Lãi gộp không có key trong response. ED-33-AC4 và ED-34-AC5 trong `02-stories.md` đã cũ. Đề nghị PO sửa AC theo #12. Techlead không sửa story.
+- **Không có chế độ xem theo năm:** chấp nhận, vì R15 chỉ có `year`+`month`. Ghi nợ 02c: cần BE `period_pnl` theo năm, hoặc endpoint năm, rồi FE mới thêm. Không cộng 12 tháng ở FE (dễ lệch căn cứ).
+- **Bộ chọn phiếu nhập không có `q`:** chấp nhận. Lọc nhà cung cấp ở BE, kèm "Tải thêm" và đếm n/m, là đủ để trả nợ Lô 10. `q` cho phiếu nhập là nợ BE, ưu tiên thấp.
+- **Nhãn "Chi phí mua" và "Chi phí phụ":** chốt "Chi phí phụ", xem L1.
+- **BE không kiểm `paid_at`:** ghi nợ BE (từ chối giờ ở tương lai, bắt buộc `paid_at` khi `is_paid`). FE hiện bắt buộc có giờ khi tick là đúng.
+- **Chưa kiểm với BE thật:** H1 cho thấy đây là rủi ro thật. QA phải chạy e2e `*_real` cho `/reports/` sau khi sửa H1.
+
+### Kết luận Lô 12 — FE: **CHANGES REQUESTED**
+Không có lỗi rò giá vốn, rò dữ liệu cá nhân hay leo quyền. BE là lớp chặn thật ở cả ba màn. Contract R11, R12, R13 khớp.
+
+Phải sửa trong lô, chỉ đụng FE: **TL12-FE-H1** (báo cáo sập với BE thật), **M1** (lệch nhà cung cấp và phiếu), **M2** (bỏ `SideSheet`), **L1** (nhãn "Chi phí phụ"). L2 nên làm cùng lúc.
+File được sửa: `features/reports/{api.ts,types.ts,mock.ts,reportView.ts,components/ProfitReportScreen.tsx}` và test; `features/accounting/components/{PurchaseInvoiceForm.tsx,PurchaseCostForm.tsx,PurchaseCostList.tsx,PurchaseInvoiceList.tsx,SalesInvoiceListScreen.tsx}`; `features/purchasing/components/PurchasingScreen.tsx:27`; e2e `ed_batch12_accounting.py` và `ed_batch10_purchasing.py`.
+Đưa vào 02c thành nợ BE: tiền dạng chuỗi ở `/api/reports/*`, kiểm cặp nhà cung cấp với phiếu khi tạo hoá đơn mua, kiểm `paid_at`, báo cáo theo năm, `q` cho phiếu nhập. PO sửa ED-33-AC4 và ED-34-AC5 theo #12.
+
+## Lô 12 — FE (re-review)
+
+Re-review techlead 02/10. Commit sửa `fea2326`, diff `b249d4a..fea2326` (worktree `agent-a196a7d7c53cd4085`). Không sửa code. Điều phối viên đã chạy tsc, vitest 797, build mock=0, e2e mock batch12 95/95, batch10 115/115, batch11 103/103, batch1 56/56. Dev chạy `e2e/ed_batch12_real.py` 16/16 trên BE thật. Lượt này tôi tự chạy `check_naming.py` (OK) và đo `toDecimalString` từ đầu đến cuối: Python `json.dumps(float(Decimal(x)))` → JSON → `toDecimalString` của JS.
+
+| Mục cũ | Kết luận | Căn cứ |
+|---|---|---|
+| TL12-FE-H1 | Đã sửa | `features/reports/api.ts:34-49` chuẩn hoá cả hai endpoint ngay ở lớp API. Danh sách field khớp đúng key của `batch_pnl`/`period_pnl` trong `backend/apps/reports/services.py`. `item_name`, `status`, `status_label`, `provisional`, `invoice_count`, `refund_count` giữ nguyên. `ProfitReportScreen.tsx:282` dùng `signOf`. Mock trả number qua `asWire` (`mock.ts:137-139`), nên e2e mock đi đúng đường của BE thật. Có test `api.test.ts` với payload số. Không còn chỗ nào khác gọi `/api/reports/*`. |
+| M1 | Đã sửa | `PurchaseInvoiceForm.tsx:56-75,155-172`: đổi nhà cung cấp khác với nhà cung cấp của phiếu thì bỏ phiếu. Số tiền gợi ý bị bỏ theo, số người dùng tự gõ thì giữ lại. Có ca e2e cho cả hai nhánh. L3 được xử lý cùng lúc (`amountSuggested`). |
+| M2 | Đã sửa | `ProfitReportScreen.tsx:20,340-362` dùng `Modal` có nút Đóng và đóng được bằng Esc. Không còn import `SideSheet`. |
+| L1 | Đã sửa trong phạm vi lô | Tab, tiêu đề form và màn rỗng đã dùng "Chi phí phụ". Còn 2 chỗ ngoài phạm vi, xem L-a. |
+| L2 | Đã sửa | Đã bỏ `foot` giải thích và chỉ giữ dòng so sánh ở ô Lãi/lỗ. `summaryText` không đếm số chưa trả khi vẫn còn trang sau. Hoá đơn bán chỉ còn một câu ở chân bảng. |
+
+**`toDecimalString` và độ chính xác (`features/reports/decimal.ts:62-75`): đạt.**
+- Kết quả đo: 1650000.50 → `"1650000.5"`; 999999999999.99 → `"999999999999.99"`; 123456789012345.67 → `"123456789012345.67"`; 12345678.123456 → `"12345678.123456"`. JS `String(n)` cho ra dạng ngắn nhất, đọc lại đúng số double đó, nên FE không làm mất thêm chữ số nào so với số BE đã gửi.
+- Độ chính xác chỉ mất ở BE, tại bước DRF gọi `float(Decimal)`. Ví dụ 9007199254740993 → …992. Mức này là từ khoảng 9 triệu tỷ đồng (2^53) trở lên, hoặc khi số có hơn khoảng 15–16 chữ số có nghĩa. Số tiền của vựa không chạm tới mức đó. Muốn hết hẳn rủi ro thì phải trả nợ BE (trả tiền dạng chuỗi ở `/api/reports/*`). Việc này đã có trong danh sách nợ của review trước, và FE vẫn đúng khi BE đổi sang chuỗi, vì chuỗi được giữ nguyên.
+- Nhánh dạng mũ: `>= 1e21` đi qua `BigInt(value)`, chính xác vì double ở dải đó luôn là số nguyên. `< 1e-6` đi qua `toFixed(6)`, ra `"0.000000"` hoặc `"-0.000000"`, và `parseDecimal` đọc thành 0. `NaN`/`Infinity` cho `""`, rồi `parseDecimal` trả null và màn không sập. `null`/`undefined` giữ nguyên, không bị đoán thành 0.
+
+**Còn lại (Low, không chặn):**
+- **L-a:** `features/purchasing/components/ReceiptDetailScreen.tsx:116` vẫn ghi "Nhập chi phí mua". `e2e/qa_ed_batch10_real.py:369,514,744,754,777` vẫn kiểm nhãn tab cũ, nên lần chạy BE thật tới của Lô 10 sẽ đỏ 1–2 ca. Cả hai file nằm ngoài phạm vi lô. Ghi vào 02c để sửa ở lô chạm `purchasing/**` gần nhất (hoặc Lô 17). QA cần biết điều này trước khi chạy `qa_ed_batch10_real.py`.
+- `e2e/ed_batch12_real.py:49` có mật khẩu demo `Songbien2026`. Mật khẩu này đã có trong 9 script `*_real` khác, và chỉ dùng cho DB SQLite tạm. Tôi chấp nhận, không coi là bí mật mới.
+
+### Kết luận Lô 12 — FE (re-review): **APPROVED**
+H1, M1, M2, L1 và L2 đã sửa đúng như yêu cầu, có test đơn vị, e2e mock và e2e trên BE thật. Không rò giá vốn, không rò dữ liệu cá nhân, không leo quyền. Nợ BE giữ như review trước (tiền dạng chuỗi ở `/api/reports/*`, kiểm cặp nhà cung cấp với phiếu, `paid_at`, báo cáo theo năm, `q` cho phiếu nhập), thêm L-a.
+
+## Lô 13 — FE
+
+Review techlead 02/10. Commit `080a7f6`, base `54b4113` (worktree `agent-afe626c7234e9ad39`), ED-30 và ED-31. Đối chiếu BE thật trong `backend/apps/catalog` của cùng worktree (đã có M1, L1, L2, L3 của review BE Lô 13 và `PRICE_USED_BY_ORDERS`). Không sửa code. Điều phối viên đã chạy tsc, vitest 794, build mock=0, e2e mock batch13 125/125, batch1 56/56, batch3 143/143, batch10 115/115. Lượt này tôi tự chạy `check_naming.py`: OK, không phát sinh vi phạm mới.
+
+### Kết quả theo trọng tâm
+| Mục | Kết luận | Căn cứ |
+|---|---|---|
+| #10 của Duy: giá đã dùng | Đạt | BE: `pricing/services.py:16-20,168-172` (POST) và `:236-237` (PATCH) raise `BusinessError(code="PRICE_USED_BY_ORDERS")` và trả 400. FE: `SetPriceModal.tsx:69,96` hiện nguyên văn `detail` (đã bỏ mã BR ở `http.ts`), giữ số đã nhập, nút chính đổi thành "Thử lại". Mock trả cùng mã và câu với BE (`mock.ts:82,560`). FE không có đường sửa dòng giá (không gọi PATCH item-prices), nên chỉ POST gặp lỗi này. |
+| #10: chặn đặt lùi ngày, mặc định từ ngày mai | Đạt | `SetPriceModal.tsx:34-40` mặc định `tomorrowOf(todayInVietnam())`. `catalogModel.ts:62` chặn `validFrom < today` ngay trên form, kèm gợi ý ngày mai, và không gọi máy chủ (có ca e2e). FE chặt hơn BE: BE chỉ chặn lùi ngày khi khoảng đó đã có đơn. Như vậy là đúng ý Duy. `addDays` tính theo lịch UTC thuần nên không lệch do múi giờ của máy. |
+| Tiền: BE trả chuỗi hay số | Đạt, **không lặp lỗi H1 của Lô 12** | Mọi tiền và kg của R14 đi qua `ModelSerializer` DecimalField (DRF mặc định `COERCE_DECIMAL_TO_STRING=True`, `config/` không tắt), nên là chuỗi: `ItemPrice.rate`, `PricingRule.min_qty/min_amount/discount_value`, `BundleLine.qty_per_bundle`. `current_price.rate` được BE dựng tay bằng `f"{price.rate:.2f}"` (`items/serializers.py:89`), cũng là chuỗi. Không có endpoint catalog nào trả dict `Decimal` thô qua `Response`. FE khai báo tất cả là `string` (`types.ts`) và gửi lên dạng chuỗi (`"<digits>.00"`). |
+| Phân quyền: kho1 không thấy giá | Đạt | Ma trận `accounts/migrations/0002:42-44`: `warehouse_staff` chỉ có `view_item/itemgroup/bundleline`, không có `itemprice/pricelist/pricingrule`. BE gỡ hẳn `current_price` (`items/serializers.py:73-77`). FE: tab Bảng giá và Ưu đãi chỉ hiện khi có quyền (`CatalogScreen.tsx:28-30`). `PriceListTab.tsx:32,37` và `PricingRuleList.tsx:56` không gọi API khi thiếu quyền, và 403 thì hiện NoPermission. Lịch sử giá ở trang chi tiết gọi theo `viewPrices` (`ItemDetailScreen.tsx:87,286`). Dòng thời gian (`/api/guidance/item/`) không đưa `changes` ra ngoài, và audit giá ghi trên `ItemPrice` chứ không phải `Item`, nên kho1 không thấy giá qua đường này. e2e kiểm DOM của kho1 kể cả khi vào `?tab=prices`. |
+| Quản lý chỉ PATCH những gì BE cho | Đạt | Quản lý chỉ có `r` với cả nhóm catalog, cộng thêm `change_item_image` (migration 0006). FE: không có bút sửa tại chỗ, "Ẩn khỏi Shop" bị khoá kèm lý do (`ItemDetailScreen.tsx:122-125`). Đặt giá, tạo ưu đãi, bật/tắt ưu đãi và thêm nhóm đều ẩn theo `add_*/change_*`. Tải ảnh vẫn mở cho Quản lý, đúng theo BE. `/catalog/new/` và `/catalog/rules/new/` trả NoPermission khi thiếu `add_item`/`add_pricingrule` (`ItemForm.tsx:44`, `PricingRuleForm.tsx:40`). |
+| `shared/lib/http.ts` `detailOf` (sửa ngoài phạm vi) | **Duyệt** | `http.ts:170-181`: `code` dạng chuỗi vẫn là mã lỗi, còn `code` dạng mảng hay object (lỗi của field tên `code` theo DRF) được giữ trong `details`. Thay đổi hẹp và không đổi nhánh cũ (ca `{detail, code:"Y"}` vẫn cho `details` undefined, có test). Đây là lỗi thật trên BE thật (Mã hàng trùng trả `{"code":[…]}`), và còn sửa luôn cho các form khác có field `code` (nhà cung cấp, kho). Có test mới ở `http.test.ts:82-88`. |
+| Contract R14 | Khớp | Tham số `item_group`, `is_active`, `item_type`, `has_image`, `item`, `apply_on` và `page` khớp `items/api.py:37-50` và `pricing/api.py:37-74`. Shape phân trang DRF đúng. Key `current_price {rate, valid_from, valid_upto}`, `item_name/item_code`, `parent_name/item_count` và `group_name` khớp serializer. Không có DELETE (BE `NoHardDeleteMixin`). `listItems` vẫn nhận `"all"`, giữ được `ReceiveBatchesForm` (người gọi duy nhất ngoài module). |
+| UI-RULES | Đạt | `features/catalog` không có màu cứng, không có "SĐT/NCC/BR-/Làm mới/FEFO/TTL" trong chữ hiển thị. Không dùng `SideSheet`/`Sheet`: ảnh và đặt giá đều qua `shared/ui/overlay/Modal`. Ba trạng thái tải, lỗi, rỗng đủ ở các tab và lịch sử giá. 360px không cuộn ngang, vùng bấm từ 44px trở lên (e2e). `localStorage` chỉ giữ tên chế độ mock, chỉ trong bản mock. URL chỉ có `id`, `type`, `tab`. Không có `console.*`. |
+| Giá vốn và dữ liệu cá nhân | Đạt | Module không có field giá vốn nào. `canViewCost={false}` chỉ để không khoá cột (giá bán không phải giá vốn). Mock không có dữ liệu khách. |
+
+### Lỗi
+Không có Critical, High hay Medium.
+
+**TL13-FE-L1 (Low, nên sửa khi tiện):** ô tiền của ưu đãi đổi sang `Number` rồi ghép chuỗi. `catalogModel.ts:215-217,250`: `discount_value: \`${value}.00\`` với `value = Number(digits)`. Ô "Mức giảm" (kiểu tiền) và "Giá trị đơn tối thiểu" lại không giới hạn số chữ số như ô giá bán (`digits.length > 10`). Gõ quá 15 chữ số thì gửi số đã bị làm tròn, quá 21 chữ số thì gửi `"1e+21.00"`. BE vẫn chặn được nhờ `max_digits` và trả 400 cho field, nên không sai dữ liệu. **Sửa:** với kiểu AMOUNT, gửi thẳng `\`${moneyDigits(...)}.00\``, và thêm kiểm `length > 10` cho cả hai ô, giống `validatePrice`.
+
+**TL13-FE-L2 (Low):** định mức combo và số kg tối thiểu bị làm tròn mà người dùng không biết. `catalogModel.ts:187-189,248`: `parseDecimal(...).toFixed(3)`. Gõ "1,2345" thì gửi "1.234" hoặc "1.235" mà không báo. **Sửa:** trong `validateItem` và `validateRule`, báo lỗi khi phần lẻ quá 3 chữ số ("Tối đa 3 chữ số sau dấu phẩy").
+
+**TL13-FE-L3 (Low, ghi nhận):** sau khi đặt giá, `ItemDetailScreen` tăng `version` để tải lại dòng thời gian, nhưng dòng thời gian của `item` không có sự kiện giá. Audit `create_itemprice` gắn với `ItemPrice` và `items/next_steps.py` không đọc nó, nên người dùng không thấy dòng mới. Phần lịch sử giá vẫn hiện đúng. Ghi nợ BE ưu tiên thấp: thêm nhãn "Đặt giá mới" vào timeline của mặt hàng, **không** kèm số tiền, nếu PO muốn.
+
+**TL13-FE-L4 (Low, ghi nhận):** `ImageUploadSheet.tsx` nay là Modal nhưng tên file và tên component vẫn là "Sheet". Đổi thành `ImageUploadModal` ở Lô 17 (dọn dẹp) để `grep Sheet` không báo nhầm.
+
+### Chốt 13 điểm lệch dev nêu
+1. Ô ngày thay ô ngày giờ: **chấp nhận**, vì BE là `DateField` và #10 nói "từ ngày".
+2. Bỏ cột Ghi chú, ghi chú AI, Giá vốn ước tính và "Người đặt": **chấp nhận**. Ba cột đầu theo 02b 0c. `ItemPrice` không có người đặt. Nếu cần thì lấy từ audit, ghi nợ ưu tiên thấp.
+3. Combo không có "Tồn" và "Đủ cho": **chấp nhận**. Ghi nợ BE nếu PO cần, và không tự tính tồn ở FE.
+4. Quản lý không sửa mặt hàng, "Ẩn khỏi Shop" chỉ Chủ: **đúng ma trận BE** (Quản lý chỉ có `r` với catalog). Nếu Duy muốn uỷ cho Quản lý thì đó là đổi quyền, cần hồ sơ riêng.
+5. Tìm phía máy trong phần đã tải: **chấp nhận tạm**, giống Lô 12. Ghi nợ BE `q` cho `/api/catalog/items/`. Khi danh mục vượt vài trang, ô tìm sẽ sót. Màn phải giữ dòng đếm "Đang hiện n / m" để người dùng biết còn trang chưa tải.
+6. Không có "Tiếp theo", câu báo mã trùng lấy theo BE: **chấp nhận**. Không bịa câu ngoài contract.
+7. Tab Bảng giá không có ô chọn bảng giá: **chấp nhận**. Hiện chỉ có một bảng mặc định. Ghi nợ BE lọc `price_list` khi có bảng thứ hai.
+8. Tải ảnh chuyển sang trang chi tiết: **chấp nhận**. Bảng một giá trị mỗi ô đúng UI-RULES. A2 vẫn đủ đường.
+9. Tên e2e `ed_batch13_catalog.py`: **chấp nhận** (đúng quy ước đặt tên, không đưa mã lô kiểu `lo13`).
+10. kho1 thấy tab Nhóm hàng: **chấp nhận**, vì BE cấp `view_itemgroup` và nhóm hàng không có giá. PO cập nhật AC.
+11. `detailOf`: **duyệt** (xem bảng trên).
+12. Không sửa `check-ai-chunks.mjs`: đúng.
+13. `a2_catalog_real.py` mới đổi bộ chọn, chưa chạy: **QA bắt buộc chạy trên BE thật** trước khi APPROVED, cùng với các ca: đặt giá ngày mai, `PRICE_USED_BY_ORDERS` (tạo đơn hôm nay rồi đặt giá lùi bằng API để thấy 400; trên form thì bị chặn trước), mã hàng trùng hiện dưới ô Mã, kho1 không có `current_price` trong response.
+
+### Kết luận Lô 13 — FE: **APPROVED**
+Đạt cả bốn trọng tâm: #10 của Duy, tiền dạng chuỗi (R14 không lặp lỗi H1), phân quyền kho1 và Quản lý, contract R14. Duyệt sửa `shared/lib/http.ts` (`detailOf`). L1 và L2 nên sửa khi tiện, mỗi lỗi vài dòng trong `catalogModel.ts`, không chặn lô. L3 và L4 ghi nợ. Điều kiện trước khi commit: QA chạy `a2_catalog_real.py` cùng các ca BE thật ở điểm 13. Nợ BE đưa vào 02c: `q` cho items, lọc `price_list` cho item-prices, tồn của combo, nhãn timeline cho đặt giá.

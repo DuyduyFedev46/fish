@@ -2813,3 +2813,110 @@ Không có lỗi chặn. (Không B-mã nào mở.)
 - `cd backend && python manage.py test` (2848 OK); Django SQLite tạm trên 8601 với `INTERNAL_SERVICE_TOKEN=tok`; `makemigrations --check --dry-run`; `python3 scripts/check_naming.py` (exit 0).
 - Script QA ở scratchpad: `qaA_part1..6b` (API), `qaA_ui1b/2b/2c/3/4/5/6` (UI thật); e2e mock `ed_bonusA_ui` + 11 script hồi quy.
 - Dọn: chỉ tắt các tiến trình của mình theo cổng (8601, 3601, 3411).
+
+---
+
+## Lô 12 — FE · Kế toán (ED-32 Báo cáo lãi lỗ, ED-33 Hoá đơn bán, ED-34 Hoá đơn mua và chi phí phụ) · lần 2 · 2026-10-02
+
+Commit kiểm: `fea2326` (sửa theo techlead sau `b249d4a`). Worktree `.claude/worktrees/agent-a196a7d7c53cd4085`, ERP ở `erp-console/`. Lần 1 trên `b249d4a` chỉ ghi nhận lỗi, chưa kết luận (theo lời điều phối viên).
+
+### Kết luận: APPROVED (trên `fea2326`) — không còn lỗi chặn ở FE; 3 điểm ngoài phạm vi FE ghi ở mục "Ghi nhận ngoài lô" để điều phối viên quyết.
+
+### Tổng: 732 ca · ✅ 731 · ❌ 1 · ⏸ 0
+- 132 ca API trên BE thật (SQLite tạm, dữ liệu giả): 131 ✅, 1 ❌ (BE trả tiền kỳ báo cáo dạng số thực, xem N2; không chặn vì FE đã xử lý).
+- 156 ca giao diện trên BE thật, Chromium 1366 và 360 px: 156 ✅.
+- 444 ca e2e mock: batch12 95, batch1 56, batch2 75, batch10 115, batch11 103: đều ✅.
+- vitest 72 file / 797 test ✅ (không tính vào 732).
+- Lỗi lần 1 (`b249d4a`) đã chuyển xanh trên `fea2326`: TL12-FE-H1, M1, M2, L1, L2.
+
+### Theo AC (kiểm trên `fea2326`, BE thật trừ khi ghi khác)
+| Mã AC | Kết quả | Bằng chứng |
+|---|---|---|
+| ED-32-AC1 | ✅ | `/reports/` của Chủ mở được trên BE thật (H1 đã sửa). Doanh thu 5.600.000, Giá vốn 2.337.478, Lãi/lỗ 3.261.522, Hoàn tiền 1.000, 27 hoá đơn, 1 phiếu hoàn: khớp từng số với `reports/period/` (làm tròn đồng). Cấu thành lãi cộng ra đúng lãi kỳ (5.750.000 − 150.000 − 2.415.255 + 77.777 − 1.000 = 3.261.522). Mọi ô tiền có icon khoá. "so với T9" khớp API tháng 9. Bảng lô 20 dòng + Tải thêm → 30 lô; tab Đã chốt 1, Tạm tính 29, khớp `reports/batches/`. Chi tiết 4 lô (có lô bán lãi, lô lỗ −664.029, lô đã chốt) khớp `reports/batch/<id>/`. Ảnh `report-loc-1366.png`, `report-loc-batch-detail-*.png` |
+| ED-32-AC2 | ✅ | Chọn tháng 7/2026: trạng thái trống "chưa có giao dịch", không có số 0 đ giả, bảng lô báo trống. Ảnh `report-loc-empty-month.png` |
+| ED-32-AC3 | ✅ | ql1, kho1, giao1, cs2 mở `/reports/` → "Bạn không có quyền xem mục này"; 0 response 200 từ `/api/reports/`; DOM không có doanh thu/cấu thành lãi. API trả 403 (script API). Ảnh `report-*-no-permission.png` |
+| ED-33-AC1 | ✅ | Chủ: đủ 8 cột; dòng đầu khớp API (mã HĐ, mã đơn, số tiền, giá vốn, lãi gộp, tên khách). "Đang hiện 20 / 29", Tải thêm → 29 dòng không trùng. Chân bảng khớp `totals` API (5.850.000 và 3.338.342), không tính hoá đơn Đã huỷ. Bấm dòng mở `/orders/detail/?id=` đúng đơn. Ảnh `sales-loc-1366.png` |
+| ED-33-AC2 | ✅ | Cả 3 vai thấy màn: không có nút Tạo/Thêm/Sửa/Xoá/Phát hành |
+| ED-33-AC3 | ✅ | ql1: không cột Giá vốn/Lãi gộp, không `data-testid="total-profit"`, DOM không có chữ "Giá vốn"/"Lãi gộp"; response `sales/invoices` không có key `cogs`, `gross_profit`, `unit_cost`. Ảnh `sales-ql1-1366.png` |
+| ED-33-AC4 | ⚠ lệch story, ✅ theo quyết định | giao1, cs2: menu không có, vào URL → "không có quyền", 0 response 200. NV kho (kho1) thấy màn (story viết "Không có quyền", dev làm theo quyết định #12 và 02b R13). Với kho1: không cột Khách hàng, không giá vốn/lãi gộp, `customer_name` null cả trang, HTML không có tên/SĐT. Cần Duy xác nhận (câu hỏi mở ở dev-notes) |
+| ED-34-AC1 | ✅ | Cột Hoá đơn · NCC · Phiếu nhập · Ngày hoá đơn · Số tiền (khoá) · Tình trạng · Trả lúc; mã `#<id>`; Đã trả/Chưa trả; số dòng và số tiền khớp API; tóm tắt "Đang hiện 5 / 5 hoá đơn · 2 chưa trả" |
+| ED-34-AC2 | ✅ | Hộp thoại "Thêm hoá đơn mua"; bật "Đã trả tiền" hiện ô "Trả lúc"; lưu với `paid_at` 09:30 giờ VN gửi `02:30Z`, API lưu 09:30 giờ VN; dòng mới có ngay trong bảng, toast "Đã thêm hoá đơn #…". Gợi ý số tiền từ phiếu (phiếu ở trang 2 → 250.000). Ảnh `purchase-loc-add-form-paid.png`, `purchase-loc-after-add-1366.png` |
+| ED-34-AC3 | ✅ | Bỏ trống: "Chọn nhà cung cấp.", "Nhập số tiền lớn hơn 0.", "Chọn ngày hoá đơn."; số 0 và số âm bị chặn tại chỗ ("Số tiền không được âm. Nhập lại, ví dụ 150.000."); gõ chữ vào ô tiền chỉ giữ chữ số; không có POST nào |
+| ED-34-AC4 | ✅ | Tab Chi phí phụ: Loại Đá/Vận chuyển, Cách chia "Theo số kg"/"Theo giá trị", số tiền khớp API (987.654 và 424.242), nút "Thêm chi phí phụ" cho Chủ |
+| ED-34-AC5 | ✅ (chặt hơn story) | kho1, giao1, cs2: menu không có mục; vào thẳng URL và `?tab=costs` → "không có quyền", 0 response 200 của `purchasing/invoices` và `purchasing/costs`. ql1 thấy số tiền hoá đơn (D-3), không có tab Chi phí phụ, không nút Thêm, 0 request `purchasing/costs`, `?tab=costs` không lộ số nào |
+
+### Ngoại lệ và biên
+| Ca | Kết quả | Ghi chú |
+|---|---|---|
+| Hoá đơn bán: khoảng ngày ngược (Từ 05/10, Đến 01/10) | ✅ | Không gọi API với khoảng sai, không 400 |
+| Hoá đơn bán: tìm theo tên khách, SĐT, ký tự `%` | ✅ | Tên và SĐT không khớp (không thành "oracle" dò tên); `%` không gây 5xx |
+| Hoá đơn bán: lọc Đã huỷ, lọc tháng 9, lọc không có kết quả | ✅ | 1 dòng và tổng 0 đ; 1 hoá đơn 100.000 đ; lời trống + "Bỏ lọc" |
+| Hoá đơn bán: hoá đơn có trạng thái Đã huỷ trong danh sách | ✅ | Chip "Đã huỷ", không tính vào tổng (API và UI cùng 5.850.000) |
+| Mất mạng ở 3 màn (chặn `/api/...`) | ✅ | Có báo lỗi và nút "Thử lại", không giữ số cũ; bấm Thử lại số liệu về lại |
+| Form hoá đơn mua: bấm đúp Lưu | ✅ | Đúng 1 POST |
+| Form hoá đơn mua: mất mạng lúc lưu | ✅ | Hộp thoại còn, giữ giá trị đã nhập, báo lỗi; có mạng lại bấm lưu được; không tạo trùng |
+| Bộ chọn phiếu nhập (NCC có 25 phiếu, 2 đã có hoá đơn) | ✅ | "Đang hiện 20 / 23 phiếu nhập" → Tải thêm → "23 / 23", thêm 3 lựa chọn; phiếu vừa gắn hoá đơn biến khỏi bộ chọn (còn 22) |
+| M1 đổi nhà cung cấp sau khi chọn phiếu | ✅ (đã sửa) | `b249d4a`: ô Phiếu nhập vẫn giữ phiếu của NCC cũ (PR-6 của "Nhiều Phiếu" khi đã đổi sang QA1, ảnh `b249d4a-m1-supplier-switch.png`). `fea2326`: phiếu về "Không gắn phiếu nhập", số tiền gợi ý bị xoá, số gõ tay (777.000) được giữ. Ảnh `m1-after-fix.png` |
+| M2 chi tiết lô dùng Modal | ✅ (đã sửa) | Mở bằng `role=dialog`, Esc đóng, 360 px không cuộn ngang |
+| L1 nhãn "Chi phí phụ" thống nhất, L2 bỏ chữ thừa | ✅ | Form/danh sách/tab/e2e Lô 10 dùng "Chi phí phụ"; banner Hoá đơn bán và dòng tóm tắt không còn chữ thừa |
+| Màn 360 px (báo cáo, hoá đơn bán, hoá đơn mua, form thêm, chi tiết lô) | ✅ | Trang không cuộn ngang; bảng cuộn trong khung; hộp thoại vừa 360 px. Ảnh `m360-*.png`. Ghi nhận Low ở N4 |
+
+### Phân quyền (BE thật, Chromium; ✓ thấy và dùng được, ✗ không thấy/chặn)
+| Hành động | loc (owner) | ql1 (manager) | kho1 (warehouse) | giao1 (delivery) | cs2 (customer_service) | Chưa đăng nhập |
+|---|---|---|---|---|---|---|
+| Menu Báo cáo lãi lỗ, `/reports/` | ✓ | ✗ | ✗ | ✗ | ✗ | 401 (API) |
+| Menu Hoá đơn bán | ✓ có giá vốn và lãi gộp | ✓ không giá vốn | ✓ không giá vốn, không tên khách | ✗ | ✗ | 401 (API) |
+| Menu Hoá đơn mua và chi phí | ✓ thêm hoá đơn mua, thêm chi phí | ✓ chỉ xem hoá đơn mua | ✗ | ✗ | ✗ | 401 (API) |
+| Tab Chi phí phụ, `?tab=costs` | ✓ | ✗ (0 request) | ✗ | ✗ | ✗ | 401 (API) |
+Script API 132 ca xác nhận phía BE: 403 đúng ở từng cặp Group x endpoint, 401 khi thiếu token.
+
+### Rò giá vốn
+- Hoá đơn bán, ql1 và kho1: DOM không có chữ "Giá vốn"/"Lãi gộp"; response không có `cogs`, `gross_profit`, `unit_cost`; không có `total-profit`. ✅
+- Hoá đơn mua: ql1 thấy số tiền theo quyết định D-3 (không phải giá vốn trên kg); kho1, giao1, cs2 không nhận response 200 nào. ✅
+- Chi tiết hoá đơn `GET /sales/invoices/{id}/`: `unit_cost` chỉ trả cho owner. ✅
+- Không ghi khoá mới vào AuditLog/`changes`/`note` ở lô này (FE), nên không có đường tính ngược tiền ÷ kg thêm. ✅
+
+### Rò dữ liệu cá nhân (chỉ dùng dữ liệu giả "Khách Giả…", SĐT 09000002xx/03xx, địa chỉ "[Địa chỉ giao giả]")
+- `/reports/` (Chủ): DOM, response `reports/*`, localStorage/sessionStorage, URL, console: không có tên/SĐT/địa chỉ. ✅
+- Hoá đơn bán, kho1: `customer_name` null toàn trang, DOM/HTML/storage/URL sạch. ql1 và Chủ thấy tên (có quyền xem khách), không thấy SĐT/địa chỉ trên danh sách. ✅
+- Hoá đơn mua: không có dữ liệu khách ở mọi vai. ✅
+- Console trình duyệt: 0 lỗi, 0 dữ liệu cá nhân ở mọi ca (các dòng `net::ERR_FAILED` là do chính script chặn mạng để thử lỗi). ✅
+- Ảnh và report chỉ dùng dữ liệu giả. ✅
+- Xem N1: NV kho vẫn đọc được tên/SĐT/địa chỉ qua màn Đơn và tiền (có từ trước, không do lô này).
+
+### Hồi quy
+| Mục | Kết quả |
+|---|---|
+| e2e mock `ed_batch1_shell` (vỏ ERP) | ✅ 56/56 |
+| `ed_batch2_patterns` | ✅ 75/75 |
+| `ed_batch10_purchasing` (Mua hàng và phiếu nhập, đã đổi nhãn "Chi phí phụ") | ✅ 115/115 |
+| `ed_batch11_suppliers` | ✅ 103/103 |
+| `ed_batch12_accounting` (dev viết, bản mới) | ✅ 95/95 |
+| `check-ai-chunks` (32 màn + 2 layout) và `check-no-mock` | ✅ XANH |
+
+### Lỗi
+Không còn lỗi chặn trên `fea2326`. Lỗi đã ghi ở lần 1 trên `b249d4a`, nay đã xanh:
+
+#### B1 — Báo cáo lãi lỗ sập trên BE thật (TL12-FE-H1) · High · AC ED-32-AC1 — ĐÃ SỬA
+Tái hiện trên `b249d4a`: đăng nhập `loc` trên BE thật, mở `/reports/` → "Có lỗi xảy ra", console `TypeError: e.amount.startsWith is not a function` (BE `reports/period/` trả số thực JSON, FE chỉ nhận chuỗi). Ảnh `b249d4a-reports-crash.png`. Trên `fea2326`: màn mở được, số khớp API (ca ✅ ở trên).
+
+#### B2 — Đổi nhà cung cấp vẫn giữ phiếu nhập của NCC cũ (M1) · Medium · AC ED-34-AC2 — ĐÃ SỬA
+Tái hiện trên `b249d4a`: Thêm hoá đơn mua → chọn "Đầu mối Nhiều Phiếu" → chọn phiếu PR-6 → đổi NCC sang "Đầu mối QA1": ô Phiếu nhập vẫn là PR-6. Lưu được hoá đơn lệch NCC. Trên `fea2326`: phiếu và số gợi ý bị xoá khi đổi NCC.
+
+#### B3, B4, B5 — M2 SideSheet → Modal, L1 nhãn, L2 chữ thừa · Medium/Low — ĐÃ SỬA (xem bảng ngoại lệ)
+
+### Ghi nhận ngoài lô (cần điều phối viên/Duy quyết, không chặn Lô 12 FE)
+- **N1 (dữ liệu khách, có từ trước, nên quyết cùng hồ sơ "Phạm vi dữ liệu cấu hình"):** kho1 bấm một dòng ở Hoá đơn bán → mở `/orders/detail/?id=28`, API `sales/orders/28/` trả 200 kèm `customer.name`, `phone`, `address`; danh sách `/orders/` của kho1 cũng hiện tên khách. Cột tên đã ẩn ở Hoá đơn bán nhưng dữ liệu vẫn đọc được qua đường khác. Ảnh `obs-kho1-order-detail-from-invoice.png`. Mức nếu coi NV kho không cần dữ liệu khách: Critical, nhưng thuộc quyền xem đơn hiện hành, không thuộc diff Lô 12.
+- **N2 (BE, tiền dạng float):** `GET /reports/period/` trả `revenue: 5600000.0`, `cogs: 2337478.42`... (số thực JSON) trong khi quy ước tiền là Decimal dạng chuỗi (như `sales/invoices/`); cần đổi sang chuỗi thập phân để khớp quy ước tiền Decimal. FE `fea2326` đã nhận được cả hai dạng. Medium, giao BE khi có lô BE.
+- **N3 (BE, kiểm hợp lệ hoá đơn mua):** `POST /purchasing/invoices/` nhận `supplier` lệch với `receipt` (201, hoá đơn NCC QA1 gắn phiếu của NCC Nhiều Phiếu) và nhận `amount` = 0. FE đã chặn cả hai, nhưng BE nên tự kiểm (Medium).
+- **N4 (Low, giao diện):** ở 360 px mã hoá đơn là liên kết cao 18 px (cả dòng vẫn bấm được); cột Đơn cắt mã `SO261002-3…` ở 1366 px (bản vẽ W5j hiện đủ mã); dòng Đã huỷ chưa gạch ngang như bản vẽ W5j.
+- **N5 (Low):** chữ gõ vào ô tìm kiếm được gửi qua URL GET nên nằm trong log truy cập của server; BE không tìm theo SĐT/tên nên không lộ gì thêm.
+
+### Lệnh đã chạy (kèm output tóm tắt)
+- `cd erp-console && npm ci` (sạch, không `--legacy-peer-deps`, exit 0) → `npx tsc --noEmit` (exit 0) → `npx vitest run` (72 file, 797 test OK). Chạy trên `fea2326`; lần 1 trên `b249d4a`: 71 file, 788 test OK.
+- `NEXT_PUBLIC_USE_MOCK=1 npm run build` (exit 0); `NEXT_PUBLIC_USE_MOCK=0 NEXT_PUBLIC_API_BASE=http://127.0.0.1:8611 npm run build` (exit 0); mỗi bản copy `out/` sang thư mục riêng ở scratchpad rồi phục vụ tĩnh (3612 mock, 3611 thật). Lần dựng đầu bị lẫn `out/` với build của fe-dev (bản thật gọi `localhost:8000`), đã xoá `out/` và `.next` rồi dựng lại cả hai bản.
+- `node scripts/check-no-mock.mjs` XANH; `node scripts/check-ai-chunks.mjs` XANH (32 màn + 2 layout).
+- BE thật: Django từ worktree `backend/` trên SQLite tạm, cổng 8611, dữ liệu giả (5 tài khoản loc/ql1/kho1/giao1/cs2, 29 hoá đơn bán gồm 1 Đã huỷ và 1 tháng 9, 30 lô, 25 phiếu của 1 NCC, 5 hoá đơn mua, 2 chi phí phụ, 1 hoàn tiền). Script `q12_api.py`: 132 ca, 131 ✅ 1 ❌ (N2). Script UI `q12_real.py` (khối roles, report, sales, purchase, m360) cùng các probe: 156 ca ✅ trên `fea2326`.
+- e2e mock chạy từ bản `git archive fea2326` với `BASE=http://127.0.0.1:3612`: `ed_batch12_accounting` 95/95, `ed_batch1_shell` 56/56, `ed_batch2_patterns` 75/75, `ed_batch10_purchasing` 115/115, `ed_batch11_suppliers` 103/103.
+- Ảnh (53 tệp) ở `doc/features/2026-10-01-erp-theo-design/shots/lo12/`, gồm bản vẽ `board-W3a`, `board-W5j`, `board-W5g`, `board-W5g2` để đối chiếu.
+- Dọn: chỉ tắt các tiến trình của mình theo cổng (8611, 3611, 3612). Không sửa mã sản phẩm.

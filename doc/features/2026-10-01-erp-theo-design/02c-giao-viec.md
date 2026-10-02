@@ -44,6 +44,18 @@ Nợ từ review Lô bổ sung A (03b, TLA-*):
 - QA N1 → **Lô 17**: BE `/ai/actions/escalate/` không loại trùng (tải lại trang rồi nhờ lại tạo thêm action) → trả action ESCALATED cũ nếu đã có.
 - QA N2 → **Lô 17**: hộp Gửi duyệt khi phiếu đã đổi vẫn có nút "Thử lại" vô ích → đổi thành "Tải lại".
 - QA N4: chi phí phụ `amount: "0"` vẫn được nhận (có từ trước) → gộp story huỷ chi phí.
+
+Nợ BE từ review Lô 12 (03b, TL12-FE):
+- `/api/reports/*` trả tiền/kg dạng number (Decimal → float) → đổi sang chuỗi; trước khi đổi rà các chỗ dùng chung (AI, dashboard). FE Lô 12 đã tự chuẩn hoá.
+- Hoá đơn mua: BE chưa từ chối phiếu nhập khác nhà cung cấp (FE đã chặn).
+- `paid_at`: bắt buộc khi đã trả, không cho giờ tương lai.
+- Báo cáo theo năm; `q` cho danh sách phiếu nhập (ưu tiên thấp).
+- PO: sửa ED-33-AC4 / ED-34-AC5 trong `02-stories.md` cho khớp #12 (kho xem hoá đơn bán, không giá vốn).
+- QA Lô 12 N1 (**chờ Duy**, có từ trước): NV kho mở được `/orders/detail/` và API `sales/orders/<id>/` trả tên/SĐT/địa chỉ khách; `/orders/` hiện tên khách → gộp "Phạm vi dữ liệu cấu hình" hoặc vá ngay nếu Duy muốn.
+- QA Lô 12 N3: BE hoá đơn mua nhận `amount = 0` (FE đã chặn).
+- QA Lô 12 N4/N5 → **Lô 17**: 360px mã hoá đơn cao 18px, cột Đơn cắt mã, dòng Đã huỷ chưa gạch; ô tìm hoá đơn bán đi qua URL GET.
+- Review Lô 12 L-a → **Lô 17**: `ReceiptDetailScreen.tsx:116` còn "Nhập chi phí mua"; `e2e/qa_ed_batch10_real.py` còn kiểm tab "Chi phí mua".
+- Review Lô 13 → **Lô 17**: ô tiền ưu đãi đi qua `Number` không giới hạn chữ số; `toFixed(3)` âm thầm ở định mức combo/kg tối thiểu; đổi tên `ImageUploadSheet`. Nợ BE: `q` danh sách mặt hàng, lọc `price_list`, tồn combo, sự kiện đặt giá trên dòng thời gian mặt hàng.
 - TLA-L4: không chạy lùi migration `inventory/0007` khi đã có phiếu hoàn bị huỷ.
 - Lưu `item_price_id` (FK nullable PROTECT) trên dòng đơn → gộp với nợ Lô 13 L4.
 - Chờ Duy/PO: story "Huỷ chi phí phụ" (TLA-H1b, #14) và "Ghi tiền về muộn ở hàng chờ" (TLA-M3, #15).
