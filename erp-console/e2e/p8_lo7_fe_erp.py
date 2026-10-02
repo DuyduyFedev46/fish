@@ -234,14 +234,20 @@ def expired_case(browser, tag, w, h):
     page.on("request", lambda r: reqs.append(r.url))
     page.goto(BASE + "/inventory/?status=EXPIRED")
     page.wait_for_load_state("networkidle")
-    page.locator("table.data tbody tr").first.wait_for(timeout=10_000)
+    page.locator("table.lt tbody tr").first.wait_for(timeout=10_000)
+    page.wait_for_function("() => document.querySelectorAll('table.lt tr.lt-skel').length === 0")
     # mock không đi qua mạng: URL `status=EXPIRED&has_stock=1` được kiểm bằng grep bản build thật (03-dev-notes), ở đây kiểm kết quả hiển thị
-    heads = [t.strip().upper() for t in page.locator("table.data thead th").all_inner_texts()]
-    ok(f"L5-1[{tag}] bảng có đủ cột NCC và Kho ở chế độ lọc (heads={heads})", "NCC" in heads and "KHO" in heads)
-    body = page.locator("table.data tbody").inner_text()
-    ok(f"L5-1[{tag}] hiện tên mặt hàng/NCC/kho từ BE (item_name, supplier_name, warehouse_name)", all(x in body for x in ("Cá thu phi lê", "Mực lá câu", "Ghe Tư Hải", "Vựa Bà Năm", "Tàu Phước Lộc 07", "Kho lạnh Bến Đá")), re.sub(r"\s+", " ", body)[:160])
+    # ERP theo design Lô 7: bảng lô không còn cột nhà cung cấp (tên nằm ở trang chi tiết lô, tìm theo tên vẫn được).
+    heads = [t.strip() for t in page.locator("table.lt").first.locator("thead th").all_inner_texts()]
+    ok(f"L5-1[{tag}] bảng có cột Kho và Trạng thái ở chế độ lọc (heads={heads})", "Kho" in heads and "Trạng thái" in heads)
+    body = page.locator("table.lt").first.locator("tbody").inner_text()
+    ok(f"L5-1[{tag}] hiện tên mặt hàng/kho từ BE (item_name, warehouse_name)", all(x in body for x in ("Cá thu phi lê", "Mực lá câu", "Tôm sú size 20", "Kho lạnh Bến Đá")), re.sub(r"\s+", " ", body)[:160])
     ok(f"L5-1[{tag}] hiện status_label 'Quá hạn' của BE", body.count("Quá hạn") >= 3)
-    ok(f"L5-1[{tag}] 3 lô còn tồn", page.locator("table.data tbody tr").count() == 3)
+    ok(f"L5-1[{tag}] 3 lô còn tồn", page.locator("table.lt").first.locator("tbody tr").count() == 3)
+    page.get_by_placeholder("Tìm mã lô, mặt hàng, nhà cung cấp").fill("Vựa Bà Năm")
+    page.wait_for_function("() => document.querySelectorAll('table.lt')[0].querySelectorAll('tbody tr').length === 1")
+    ok(f"L5-1[{tag}] tìm theo tên nhà cung cấp (supplier_name từ BE) ra đúng 1 lô", "L0909-MU00" in page.locator("table.lt").first.locator("tbody").inner_text())
+    page.get_by_role("button", name="Xoá tìm kiếm").first.click()
     ok(f"L5-1[{tag}] không cuộn ngang", no_hscroll(page))
     page.screenshot(path=f"{SHOTS}/l5-1-{tag}-lo-qua-han.png")
     ctx.close()

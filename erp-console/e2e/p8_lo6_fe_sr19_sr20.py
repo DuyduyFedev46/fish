@@ -1,9 +1,10 @@
 # P8 Lô 6 (FE) — SR-19 AC1-AC3 (link bằng chứng đồng ý mở đúng phiên bản chính sách) và SR-20 AC3/AC5 (màn nghiệp vụ không tải AI khi AI tắt).
 # + F6-2: nút "Để AI làm" hiện theo step.ai của server (không cần đồng ý model, không cần mở tab Trợ lý).
-# + F6-1: nút "Nhờ" (DW-23) không phải tính năng AI -> AI tắt vẫn có nút và chạy được.
+# + F6-1: nút "Nhờ" (DW-23) không phải tính năng AI -> AI tắt vẫn làm được việc thật (xem các ca F6-1 bên dưới).
+# ERP theo design Lô 7: màn Kho & lô là bảng + trang chi tiết lô (/inventory/detail/?id=); ca "lô kho" viết lại theo trang đó (xem các ghi chú "Lô 7" bên dưới).
 # VIẾT LẠI sau ERP theo design Lô 3 (02/10): đơn, khoản tiền, phiếu hoàn là TRANG chi tiết (/orders/detail/?id=...), không còn hộp bên phải
 # (.order-open, .queue-open, .refund-open, ul.order-list đã bỏ). Ca nào còn đối tượng thì giữ ý cũ trên trang mới; ca nào hết đối tượng thì
-# ghi rõ lý do bỏ ngay tại chỗ (dòng "BỎ:"). Lô kho (/inventory) chưa đổi nên giữ nguyên ca F6-1/F6-2 ở đó.
+# ghi rõ lý do bỏ ngay tại chỗ (dòng "BỎ:"). Lô kho đã đổi ở Lô 7 (xem dòng trên), các ca lô kho viết theo trang chi tiết lô.
 # Chạy trên bản build MOCK phục vụ tĩnh (dữ liệu bịa). Trạng thái mock nằm trong bộ nhớ trang: mỗi context mới bắt đầu từ seed.
 #   cd erp-console && NEXT_PUBLIC_USE_MOCK=1 npm run build && cp -R out <thư-mục-out-riêng>
 #   (cd <thư-mục-out-riêng> && python3 -m http.server 3216 --bind 127.0.0.1 &)
@@ -58,6 +59,28 @@ def open_order(page, oid):
     settle(page)
     return page.locator("main")
 
+
+def lot_links(page):
+    """Danh sách lô của /inventory/: chờ hết dòng khung chờ rồi trả về các liên kết mở chi tiết lô (ô đầu mỗi dòng)."""
+    page.wait_for_function("() => document.querySelectorAll('table.lt tr.lt-skel').length === 0", timeout=10_000)
+    return page.locator("table.lt tbody tr a")
+
+
+def open_first_lot(page):
+    """Mở chi tiết lô đầu tiên bằng liên kết trong bảng (giữ trạng thái mock), chờ số tồn hiện."""
+    lot_links(page).first.click()
+    page.wait_for_url(re.compile(r"/inventory/detail/\?id=\d+"))
+    page.locator("[data-testid=qty-available]").wait_for(timeout=10_000)
+    settle(page)
+    page.wait_for_timeout(500)
+
+
+AI_RUN = re.compile(r"/api/ai/commands|/call/|/api/ai/actions")
+
+
+def goto_client(page, path):
+    """Đi bằng liên kết trong app (giữ trạng thái mock trong bộ nhớ), không tải lại trang."""
+    page.evaluate("(p) => { window.history.pushState({}, '', p); window.dispatchEvent(new PopStateEvent('popstate')); }", path)
 
 def orders_list_ready(page):
     expect(page.locator("tbody tr").first).to_be_visible()
@@ -186,9 +209,15 @@ def sr20_off(browser):
     page.goto(BASE + "/inventory/")
     page.wait_for_load_state("networkidle")
     settle(page)
-    expect(page.locator('button[title^="Xem chi tiết lô"]').first).to_be_visible()
+    expect(lot_links(page).first).to_be_visible()
     ok("SR20-AC3 /inventory: 0 request /api/ai/*", len(ai_calls(page)) == 0, str(ai_calls(page)))
     page.screenshot(path=f"{SHOTS}/sr20-ac3-inventory-desktop.png")
+    # Lô 7: chi tiết lô là trang riêng; AI tắt thì không có khối Trợ lý và không có lệnh AI nào chạy.
+    open_first_lot(page)
+    ok("SR20-AC3 /inventory/detail: AI tắt, không có lệnh AI (commands, call, actions)", not [c for c in ai_calls(page) if AI_RUN.search(str(c))], str(ai_calls(page)))
+    ok("SR20-AC3 /inventory/detail: AI tắt, không có khối Trợ lý (ô hỏi nhanh, 'Để AI làm')",
+       page.get_by_role("button", name="Tóm tắt lịch sử chứng từ này").count() == 0 and page.get_by_role("button", name=re.compile("Để AI làm")).count() == 0)
+    page.screenshot(path=f"{SHOTS}/sr20-ac3-inventory-detail-desktop.png")
     ok("SR20-AC3 không tải chunk model/worker AI ở bất kỳ màn nào trên", len(chunk_urls) == 0, str(chunk_urls[:3]))
     ctx.close()
     return errors
@@ -240,6 +269,32 @@ def sr20_on(browser):
     return errors
 
 
+def sr20_inventory_on(browser):
+    """Lô 7 (thay phần lô kho của ca AI bật): AI bật + đã đồng ý, trang chi tiết lô có khối Trợ lý, hỏi đúng chứng từ lô."""
+    errors = []
+    ctx = browser.new_context(viewport={"width": 1280, "height": 860}, reduced_motion="reduce")
+    page = ctx.new_page()
+    page.on("console", lambda m: m.type == "error" and errors.append(m.text))
+    login(page, "loc")
+    page.evaluate("() => { window.__caveMock.ai('on'); window.__caveMock.aiConsent(true); window.__caveMock.clearLog(); }")
+    page.get_by_role("link", name=re.compile("Kho & lô")).first.click()
+    page.wait_for_url(re.compile(r"/inventory/?$"))
+    page.wait_for_load_state("networkidle")
+    settle(page)
+    ok("SR20-AC5 /inventory (danh sách) AI bật: chưa gọi AI", len(ai_calls(page)) == 0, str(ai_calls(page)))
+    lot_links(page).filter(has_text="L0908-CT00").first.click()
+    page.locator("[data-testid=qty-available]").wait_for(timeout=10_000)
+    settle(page)
+    page.wait_for_timeout(600)
+    ok("SR20-AC5 chi tiết lô AI bật: có khối Trợ lý (ô hỏi nhanh)", page.get_by_role("button", name="Tóm tắt lịch sử chứng từ này").count() == 1)
+    asks = [c for c in ai_calls(page) if "target_model=inventory.batch" in str(c)]
+    ok("SR20-AC5 khối Trợ lý hỏi theo mã lô VÀ pk (TL7-M1: 'L0908-CT00,901')", asks and "L0908-CT00" in str(asks[-1]) and "901" in str(asks[-1]), str(asks)[:200])
+    ok("SR20-AC5 mở chi tiết lô chưa chạy lệnh AI nào (chỉ khi người dùng chạm)", not [c for c in ai_calls(page) if AI_RUN.search(str(c)) and "/call/" in str(c)], str(ai_calls(page))[:200])
+    page.screenshot(path=f"{SHOTS}/sr20-ac5-inventory-detail-ai-on-desktop.png")
+    ctx.close()
+    return errors
+
+
 NHO = re.compile("Nhờ")
 
 
@@ -269,17 +324,6 @@ def press_nho(page, scope, label, shot):
     page.screenshot(path=f"{SHOTS}/f61-nho-{shot}-desktop.png")
 
 
-def open_first_batch(page):
-    page.goto(BASE + "/inventory/")
-    page.wait_for_load_state("networkidle")
-    settle(page)
-    page.locator('button[title^="Xem chi tiết lô"]').first.click()
-    d = page.get_by_role("dialog")
-    expect(d).to_be_visible()
-    settle(page)
-    return d
-
-
 def f61_off(browser):
     errors = []
     ctx = browser.new_context(viewport={"width": 1280, "height": 860}, reduced_motion="reduce")
@@ -294,31 +338,53 @@ def f61_off(browser):
     page.wait_for_load_state("networkidle")
     settle(page)
     ok("F6-1 đơn (trang mới): AI tắt không có 'Để AI làm'", page.get_by_role("button", name=re.compile("Để AI làm")).count() == 0)
+    # 3) lô kho. Lô 7: trang chi tiết lô KHÔNG còn nút "Nhờ" (đó là nút của tấm GuidancePanel cũ, đã bị thay bằng khối Trợ lý
+    #    AiBlockFrame, chỉ hiện khi AI bật; việc ESCALATED khi AI tắt để Lô 15). Ý kiểm của F6-1 là "AI tắt vẫn làm được việc
+    #    thật" nên viết lại thành: menu 'Thao tác khác' của lô quá hạn vẫn đủ mục, mở được hộp Trả nhà cung cấp, 0 lệnh AI.
     page.get_by_role("link", name=re.compile("Kho & lô")).first.click()
     page.wait_for_url(re.compile(r"/inventory/?$"))
     page.wait_for_load_state("networkidle")
     settle(page)
-    page.locator('button[title^="Xem chi tiết lô"]').first.click()
-    d = page.get_by_role("dialog")
-    expect(d).to_be_visible()
+    page.evaluate("() => window.__caveMock.clearLog()")
+    lot_links(page).filter(has_text="L0908-CT00").first.click()
+    page.locator("[data-testid=qty-available]").wait_for(timeout=10_000)
     settle(page)
-    ok("F6-1 lô kho: AI tắt không có 'Để AI làm'", d.get_by_role("button", name=re.compile("Để AI làm")).count() == 0)
-    press_nho(page, d, "lô kho", "inventory")
+    page.get_by_role("button", name="Thao tác khác").click()
+    items = [re.sub(r"\s+", " ", x).strip() for x in page.get_by_role("menuitem").all_inner_texts()]
+    ok("F6-1 lô kho: AI tắt, menu 'Thao tác khác' vẫn đủ mục xử lý lô quá hạn", any(i.startswith("Trả nhà cung cấp") for i in items) and any(i.startswith("Huỷ phần tồn") for i in items), str(items))
+    page.get_by_role("menuitem", name=re.compile("^Trả nhà cung cấp")).click()
+    rts = page.get_by_role("dialog", name="Trả nhà cung cấp")
+    expect(rts).to_be_visible()
+    ok("F6-1 lô kho: AI tắt, mở được hộp 'Trả nhà cung cấp' và 0 lệnh AI", not [c for c in ai_calls(page) if AI_RUN.search(str(c))], str(ai_calls(page)))
+    page.screenshot(path=f"{SHOTS}/f61-lo-kho-ai-tat-desktop.png")
+    page.keyboard.press("Escape")
     ctx.close()
     return errors
 
 
+def open_lot_detail_fresh(page, lot="L0908-CT00"):
+    """Mở chi tiết lô bằng liên kết trong bảng (giữ mock), chờ số tồn."""
+    page.goto(BASE + "/inventory/")  # menu bị thu gọn ở 360px nên đi thẳng bằng địa chỉ; cờ mock nằm ở localStorage nên còn nguyên
+    page.wait_for_load_state("networkidle")
+    settle(page)
+    lot_links(page).filter(has_text=lot).first.click()
+    page.locator("[data-testid=qty-available]").wait_for(timeout=10_000)
+    settle(page)
+    page.wait_for_timeout(500)
+
+
 def f61_on(browser):
-    """AI bật + đã đồng ý: 'Nhờ' (lô kho) hiện, hành vi như trước."""
+    """Lô 7: AI bật + đã đồng ý. Trang chi tiết lô không còn nút 'Nhờ' (tấm GuidancePanel cũ đã bị thay bằng khối Trợ lý);
+    việc ESCALATED khi AI tắt để Lô 15. Ý kiểm giữ lại: AI bật thì khối Trợ lý có đủ, mobile 360 không cuộn ngang."""
     errors = []
     ctx = browser.new_context(viewport={"width": 1280, "height": 860}, reduced_motion="reduce")
     page = ctx.new_page()
     page.on("console", lambda m: m.type == "error" and "Failed to fetch RSC payload" not in m.text and errors.append(m.text))
     login(page, "loc")
     page.evaluate("() => { window.__caveMock.ai('on'); window.__caveMock.aiConsent(true); window.__caveMock.clearLog(); }")
-    d = open_first_batch(page)
-    ok("F6-1 AI bật: lô kho có nút 'Nhờ'", d.get_by_role("button", name=NHO).count() >= 1)
-    press_nho(page, d, "AI bật (lô kho)", "inventory-ai-on")
+    open_lot_detail_fresh(page)
+    ok("F6-1 AI bật: chi tiết lô có khối Trợ lý (ô hỏi nhanh)", page.get_by_role("button", name="Tóm tắt lịch sử chứng từ này").count() == 1)
+    ok("F6-1 AI bật: chi tiết lô không còn nút 'Nhờ' (thay bằng khối Trợ lý, Lô 15 lo việc chuyển nhóm)", page.get_by_role("button", name=NHO).count() == 0)
     ctx.close()
 
     ctx = browser.new_context(viewport={"width": 360, "height": 780}, reduced_motion="reduce")
@@ -326,35 +392,25 @@ def f61_on(browser):
     page.on("console", lambda m: m.type == "error" and "Failed to fetch RSC payload" not in m.text and errors.append(m.text))
     login(page, "loc")
     page.evaluate("() => { window.__caveMock.ai('on'); window.__caveMock.aiConsent(false); window.__caveMock.clearLog(); }")
-    d = open_first_batch(page)
-    press_nho(page, d, "mobile 360 (lô kho)", "inventory-mobile360")
-    ok("F6-1 mobile 360 không cuộn ngang (Nhờ + thông báo)", no_hscroll(page))
+    open_lot_detail_fresh(page)
+    ok("F6-1 mobile 360 (chi tiết lô, AI bật chưa đồng ý) không cuộn ngang", no_hscroll(page))
+    page.screenshot(path=f"{SHOTS}/f61-lot-detail-mobile360.png")
     ctx.close()
     return errors
 
 
 def f62(browser):
     errors = []
-    # --- step.ai = null (server tắt AI): lô kho tải lại, không 'Để AI làm', 0 request AI; 'Nhờ' vẫn có
+    # Lô 7: chi tiết lô là trang riêng; step.ai = null (AI tắt) thì không 'Để AI làm', không huy hiệu AI, 0 request AI.
     ctx = browser.new_context(viewport={"width": 360, "height": 780}, reduced_motion="reduce")
     page = ctx.new_page()
     page.on("console", lambda m: m.type == "error" and "Failed to fetch RSC payload" not in m.text and errors.append(m.text))
     login(page, "loc")
-    page.evaluate("() => { window.__caveMock.ai('off'); window.__caveMock.aiConsent(true); }")
-    page.goto(BASE + "/inventory/")
-    page.wait_for_load_state("networkidle")
-    settle(page)
-    expect(page.locator('button[title^="Xem chi tiết lô"]').first).to_be_visible()
-    page.evaluate("() => window.__caveMock.clearLog()")
-    page.locator('button[title^="Xem chi tiết lô"]').first.click()
-    d = page.get_by_role("dialog")
-    expect(d).to_be_visible()
-    settle(page)
-    expect(d.get_by_role("button", name=NHO).first).to_be_visible()
-    ok("F6-2 step.ai=null: không có 'Để AI làm' (kể cả đã đồng ý model)", d.get_by_role("button", name=re.compile("Để AI làm")).count() == 0)
-    ok("F6-2 step.ai=null: không có huy hiệu 'AI (C)'", d.get_by_text(re.compile(r"AI \(C\)")).count() == 0)
-    ok("F6-2 step.ai=null: 0 request /api/ai/*", len(ai_calls(page)) == 0, str(ai_calls(page)))
-    ok("F6-2 step.ai=null: 'Nhờ' vẫn còn", d.get_by_role("button", name=NHO).count() >= 1)
+    page.evaluate("() => { window.__caveMock.ai('off'); window.__caveMock.aiConsent(true); window.__caveMock.clearLog(); }")
+    open_lot_detail_fresh(page)
+    ok("F6-2 step.ai=null: không có 'Để AI làm' (kể cả đã đồng ý model)", page.get_by_role("button", name=re.compile("Để AI làm")).count() == 0)
+    ok("F6-2 step.ai=null: không có huy hiệu 'AI (C)'", page.get_by_text(re.compile(r"AI \(C\)")).count() == 0)
+    ok("F6-2 step.ai=null: 0 lệnh AI chạy (commands, call, actions)", not [c for c in ai_calls(page) if AI_RUN.search(str(c))], str(ai_calls(page)))
     ok("F6-2 mobile 360 không cuộn ngang", no_hscroll(page))
     page.screenshot(path=f"{SHOTS}/f62-step-ai-null-mobile360.png")
     ctx.close()
@@ -366,7 +422,7 @@ def f62(browser):
 with sync_playwright() as p:
     browser = p.chromium.launch()
     errs = []
-    for fn in (sr19, sr20_off, sr20_on, f61_off, f61_on, f62):
+    for fn in (sr19, sr20_off, sr20_on, sr20_inventory_on, f61_off, f61_on, f62):
         try:
             errs += fn(browser)
         except Exception as e:  # noqa: BLE001

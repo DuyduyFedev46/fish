@@ -308,7 +308,8 @@ def ai_block(browser):
 
     # --- M2: tải chi tiết đề xuất lỗi -> báo lỗi + "Thử lại", Đồng ý không kẹt ở "Đồng ý (3)", ngừng đếm
     ctx, page = new_page(browser, 1280, 900, errors)
-    page.evaluate("() => window.__caveMock.aiDetailFail(true)")
+    # Sau merge Lô 3 trang sau đăng nhập không còn nạp mô-đun mock AI (GuidancePanel cũ đã bỏ) nên đặt cờ thẳng ở localStorage (cùng khoá với aiDetailFail).
+    page.evaluate("() => window.localStorage.setItem('cave_erp_mock_ai_detail_fail', '1')")
     open_demo(page, ai=True, consent=True)
     block = page.locator("[data-ai-block]")
     expect(block.get_by_role("alert")).to_be_visible()

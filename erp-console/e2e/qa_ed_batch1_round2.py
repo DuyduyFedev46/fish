@@ -14,7 +14,7 @@ import time
 
 from playwright.sync_api import expect, sync_playwright
 
-from qa_ed_batch1_common import (BASE, SHOTS, fulfil_404, login, nav_labels, ok, relevant_errors, summary)
+from qa_ed_batch1_common import (BASE, EXPECTED_MENU, SHOTS, fulfil_404, login, nav_labels, ok, relevant_errors, summary)
 
 HARNESS = os.environ.get("HARNESS", "http://127.0.0.1:3102")
 ASOF_RE = re.compile(r"Dữ liệu lúc (\d{2})/(\d{2})/(\d{4}) (\d{2}):(\d{2})")
@@ -252,11 +252,10 @@ with sync_playwright() as p:
     ctx.close()
 
     # ===================== Hồi quy: menu theo 5 vai =====================
-    exp = {"loc": 12, "ql1": 10, "kho1": 8, "giao1": 1}
-    for user, n in exp.items():
+    for user, expected in EXPECTED_MENU.items():
         ctx, page = new_page(browser, user)
         labels = nav_labels(page)
-        ok(f"Hồi quy menu [{user}] {n} mục (bằng vòng 1)", len(labels) == n, labels)
+        ok(f"Hồi quy menu [{user}] đúng danh sách mong đợi của vai ({len(expected)} mục)", labels == expected, labels)
         if user == "giao1":
             ok("Hồi quy menu [giao1] chỉ 'Việc giao của tôi', vào / về /my-deliveries/", labels == ["Việc giao của tôi"] and "/my-deliveries/" in page.url, page.url)
         ctx.close()

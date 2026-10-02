@@ -89,6 +89,13 @@ const GROUP_PERMS: Record<string, string[]> = {
     // CMS: BE migration content/0002 gán 8 quyền này cho owner và manager (warehouse_staff/delivery_staff không có).
     "content.add_category", "content.change_category", "content.view_category", "content.add_entry",
     "content.change_entry", "content.delete_entry", "content.view_entry", "content.publish_entry",
+    // Quyền BE thật cấp cho owner mà bản mock còn thiếu (đối chiếu với nhóm owner sau migrate, 02/10; Lô 7). Thiếu
+    // inventory.cancel_expired_batch khiến FE phải đoán Chủ theo tên nhóm. Ba quyền delivery.assign_deliverynote,
+    // delivery.pack_deliverynote, delivery.print_label do Lô 4 thêm ở dòng riêng, không lặp ở đây.
+    "inventory.cancel_expired_batch", "inventory.view_batchsupplierreturn", "ai.manage_ai_policy",
+    "accounts.view_demorecord", "catalog.add_itemimage", "catalog.change_itemimage", "catalog.delete_itemimage",
+    "catalog.view_itemimage", "delivery.change_recipient", "delivery.confirm_with_customer", "delivery.decide_unconfirmed",
+    "sales.view_customer_list", "sales.view_salescreditnote", "sales.view_salescreditnoteline",
   ],
   [ROLE.manager]: [
     "accounts.view_auditlog", "accounts.view_staffprofile", "auth.view_user", "catalog.change_item_image",

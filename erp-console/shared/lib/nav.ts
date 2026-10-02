@@ -91,6 +91,16 @@ export const PERM = {
   cancelPaidOrder: "sales.cancel_paid_order",
   viewDeliveryNote: "delivery.view_deliverynote",
   viewBatch: "inventory.view_batch",
+  /** Lô 7: mở bán lô (Quản lý, Chủ). */
+  publishBatch: "inventory.publish_batch",
+  /** Lô 7: chốt lô (chỉ Chủ). */
+  closeBatch: "inventory.close_batch",
+  /** Lô 7: huỷ phần tồn quá hạn và trả nhà cung cấp (chỉ Chủ). */
+  cancelExpiredBatch: "inventory.cancel_expired_batch",
+  /** Lô 7: thêm kho (chỉ Chủ). */
+  addWarehouse: "inventory.add_warehouse",
+  viewWarehouse: "inventory.view_warehouse",
+  viewStockEntry: "inventory.view_stockentry",
   viewPurchaseReceipt: "purchasing.view_purchasereceipt",
   viewStockReconciliation: "inventory.view_stockreconciliation",
   viewItem: "catalog.view_item",
@@ -272,16 +282,15 @@ export const NAV: NavItem[] = [
   },
   {
     key: "inventory",
-    summary: "Tồn theo lô, xuất theo hạn dùng sớm nhất (FEFO), mở bán và chốt lô.",
+    summary: "Tồn theo lô, xuất theo hạn dùng sớm nhất, mở bán và chốt lô.",
     plannedIn: "S8, S25",
     href: "/inventory/",
     label: "Kho & lô",
     short: "Kho",
     icon: "inventory_2",
     section: "Hàng hoá & kho",
-    // Màn Kho & lô hiện còn đọc TẠM /api/dashboard/summary/ → cần CẢ inventory.view_batch VÀ reports.view_dashboard.
-    // TODO(Lô 7): chuyển sang endpoint lô riêng (R5) thì bỏ điều kiện viewDashboard.
-    visible: (me) => has(me, PERM.viewBatch) && has(me, PERM.viewDashboard),
+    // Lô 7: màn đọc từ R5 (GET /api/inventory/batches/) nên chỉ cần inventory.view_batch.
+    visible: (me) => has(me, PERM.viewBatch),
   },
   {
     key: "returns",
@@ -314,7 +323,6 @@ export const NAV: NavItem[] = [
     short: "Sổ kho",
     icon: "swap_vert",
     section: "Hàng hoá & kho",
-    soon: true,
     visible: (me) => has(me, PERM.viewLedger),
   },
   {
