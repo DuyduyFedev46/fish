@@ -60,7 +60,7 @@ def money_good(text):
 
 
 def collect(browser, tz):
-    """Trả về dict văn bản các màn (Tổng quan, Đơn + chi tiết, Giao hàng, Lô, hoạt động kho, CSKH) dưới múi giờ `tz`."""
+    """Trả về dict văn bản các màn (Tổng quan, Đơn + chi tiết, Giao hàng, Lô, Sổ nhập xuất, chi tiết lô, CSKH) dưới múi giờ `tz`."""
     out = {}
     ctx = new_ctx(browser, tz)
     page = ctx.new_page()
@@ -91,7 +91,29 @@ def collect(browser, tz):
     out["inventory"] = page.inner_text("body")
     if tz == "America/New_York":
         page.screenshot(path=f"{SHOTS}/lo8-erp-3-lo-ny.png")
-    out["activity"] = ""  # tab Hoạt động ở cột phải đã bỏ (ERP theo design Lô 1); sổ kho có màn riêng ở Lô 7
+    # Màn danh sách mới không còn chip "Cập nhật hh:mm" (ERP theo design Lô 7); ý kiểm "giờ hiển thị = giờ VN" của Lô giờ chuyển sang
+    # (a) cột "Thời gian" của Sổ nhập xuất, (b) dòng nhập xuất MỚI GHI trên trang chi tiết lô: mock đóng dấu Date.now() (đồng hồ cố định
+    # 00:30 giờ VN), nên dòng đó phải hiện đúng "01/10/2026 00:30" dù máy ở múi giờ nào.
+    goto(page, "/ledger/")
+    page.wait_for_function("() => document.querySelectorAll('table.lt tr.lt-skel').length === 0")
+    out["ledger"] = page.inner_text("body")
+    if tz == "America/New_York":
+        page.screenshot(path=f"{SHOTS}/lo8-erp-3b-so-nhap-xuat-ny.png")
+    goto(page, "/inventory/?status=EXPIRED")
+    page.wait_for_function("() => document.querySelectorAll('table.lt tr.lt-skel').length === 0")
+    page.locator("table.lt tbody tr", has_text="L0908-CT00").first.locator("a").first.click()
+    page.locator("[data-testid=qty-available]").wait_for()
+    page.wait_for_timeout(600)
+    page.get_by_role("button", name="Thao tác khác").click()
+    page.get_by_role("menuitem", name=re.compile("^Trả nhà cung cấp")).click()
+    rts = page.get_by_role("dialog", name="Trả nhà cung cấp")
+    rts.get_by_label("Số kg đã trả").fill("1")
+    rts.get_by_role("button", name="Ghi nhận đã trả").click()
+    rts.wait_for(state="detached", timeout=10_000)
+    page.wait_for_timeout(900)
+    out["lot_detail"] = page.inner_text("body")
+    if tz == "America/New_York":
+        page.screenshot(path=f"{SHOTS}/lo8-erp-3c-chi-tiet-lo-ny.png")
     goto(page, "/purchasing/")
     page.wait_for_selector("#received-date", timeout=10_000)
     out["received_date_default"] = page.input_value("#received-date")
@@ -135,7 +157,8 @@ def main():
         base = data["Asia/Ho_Chi_Minh"]
         # ---- giá trị tuyệt đối (mốc VN) -> chứng minh đúng, không chỉ nhất quán
         ok("AC2 Tổng quan: 'Cập nhật 00:30' (17:30Z = 00:30 VN)", "Cập nhật 00:30" in base["overview"])
-        ok("AC2 Lô: 'Cập nhật 00:30'", "Cập nhật 00:30" in base["inventory"])
+        ok("AC2 Lô: dòng nhập xuất vừa ghi hiện '01/10/2026 00:30' (00:30 giờ VN)", "01/10/2026 00:30" in base["lot_detail"], str(time_tokens(base["lot_detail"])[:6]))
+        ok("AC2 Sổ nhập xuất: cột Thời gian có mốc giờ dạng dd/mm/yyyy hh:mm", len(re.findall(r"\d{2}/\d{2}/\d{4} \d{2}:\d{2}", base["ledger"])) >= 5, str(time_tokens(base["ledger"])[:4]))
         ok("AC2 Đơn hàng: dòng đầu '01/10/2026 00:20'", "01/10/2026 00:20" in base["orders"], str(time_tokens(base["orders"])[:4]))
         ok("AC2 Chi tiết đơn: 'Đặt 01/10/2026 00:20', 'Tới 00:50', timeline '01/10/2026 00:10'",
            all(x in base["order_detail"] for x in ("Đặt 01/10/2026 00:20", "Tới 00:50", "01/10/2026 00:10", "01/10/2026 00:20 · Hệ thống")))
@@ -146,7 +169,7 @@ def main():
         # ---- mọi múi giờ máy khác phải cho đúng kết quả như giờ VN
         for tz in TZS[:-1]:
             d = data[tz]
-            for key in ("overview", "orders", "order_detail", "inventory", "cskh", "cskh_after_callback"):
+            for key in ("overview", "orders", "order_detail", "inventory", "ledger", "lot_detail", "cskh", "cskh_after_callback"):
                 ok(f"AC2 [{tz}] {key}: giờ/ngày hiển thị = giờ VN ({len(time_tokens(base[key]))} mốc)",
                    time_tokens(d[key]) == time_tokens(base[key]) and len(time_tokens(base[key])) > 0,
                    f"{time_tokens(d[key])[:6]} vs {time_tokens(base[key])[:6]}")
@@ -157,7 +180,7 @@ def main():
         # ---- tiền
         for tz in TZS:
             d = data[tz]
-            for key in ("overview", "orders", "order_detail", "inventory", "deliveries", "delivery_detail", "cskh"):
+            for key in ("overview", "orders", "order_detail", "inventory", "ledger", "lot_detail", "deliveries", "delivery_detail", "cskh"):
                 bad = money_bad(d[key])
                 ok(f"AC1 [{tz}] {key}: không có tiền sai kiểu", not bad, str(bad[:3]))
         allmoney = sum(len(money_good(base[k])) for k in ("overview", "orders", "order_detail", "inventory"))

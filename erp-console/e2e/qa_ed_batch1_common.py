@@ -37,6 +37,16 @@ FULL_ORDER = [
     "Nội dung",
     "Nhân sự", "Phân quyền", "Nhật ký hoạt động", "Chính sách AI", "Báo cáo AI",
 ]
+# Menu mong đợi của từng vai trên mock (theo quyền mock cấp). Các kịch bản so với danh sách này thay vì đếm số mục cứng:
+# thêm một màn mới (vd Sổ nhập xuất ở Lô 7) hay cấp thêm quyền cho Chủ chỉ phải sửa MỘT chỗ này.
+EXPECTED_MENU = {
+    "loc": ["Tổng quan", "Đơn & tiền", "Gọi xác nhận", "Giao hàng", "Mua hàng", "Kho & lô", "Kiểm kê", "Sổ nhập xuất", "Danh mục & giá",
+            "Báo cáo lãi lỗ", "Nội dung", "Nhân sự", "Nhật ký hoạt động", "Chính sách AI", "Báo cáo AI"],
+    "ql1": ["Tổng quan", "Đơn & tiền", "Gọi xác nhận", "Giao hàng", "Mua hàng", "Kho & lô", "Kiểm kê", "Sổ nhập xuất", "Danh mục & giá",
+            "Nội dung", "Nhật ký hoạt động"],
+    "kho1": ["Tổng quan", "Đơn & tiền", "Giao hàng", "Việc giao của tôi", "Mua hàng", "Kho & lô", "Kiểm kê", "Sổ nhập xuất", "Danh mục & giá"],
+    "giao1": ["Việc giao của tôi"],
+}
 SECTION_ORDER = ["Bán hàng", "Hàng hoá & kho", "Kế toán", "Website", "Quản trị"]
 SECTION_OF = {
     **{k: "" for k in ["Tổng quan"]},

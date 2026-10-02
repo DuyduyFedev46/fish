@@ -114,26 +114,31 @@ with sync_playwright() as p:
 
     # (Nút "Làm mới" đã bỏ ở ERP theo design Lô 1 — UI-RULES §2.2; kiểm "gọi lại summary 1 lần" không còn đối tượng.)
 
-    # Cache chung: sang Kho & lô bằng menu → không request thêm (cột phải/tab Hoạt động đã bỏ ở ERP theo design Lô 1)
+    # ERP theo design Lô 7: Kho & lô đọc danh sách lô riêng (GET /api/inventory/batches/), không còn dùng chung summary của Tổng quan.
     clear_log(page)
     page.locator(".nav a", has_text="Kho & lô").click()
     page.wait_for_url("**/inventory/")
     expect(page.locator("th", has_text="Giá vốn/kg")).to_have_count(1)
-    ok("Tổng quan + Đơn + Kho & lô dùng chung 1 response (không gọi thêm)", mock_log(page) == [], str(mock_log(page)))
-    new_inv = table_rows(page, ".screen tbody")
-    ok("AC3 Kho & lô Chủ: ô giá vốn có tiền", all("đ" in c for c in page.eval_on_selector_all(".screen tbody tr td:nth-child(6)", "t => t.map(x => x.textContent)")))
+    lots_table = page.locator("table.lt").first
+    expect(lots_table.locator("tbody tr").first).to_be_visible()
+    expect(lots_table.locator("tr.lt-skel")).to_have_count(0)  # chờ dữ liệu thật, không đếm dòng khung xương
+    ok("Kho & lô: gọi danh sách lô riêng, không gọi lại summary", SUMMARY not in mock_log(page) and any("/api/inventory/batches/" in l for l in mock_log(page)), str(mock_log(page)))
+    new_inv = lots_table.locator("tbody tr").count()
+    cost_cells = lots_table.locator("tbody tr td:nth-child(8)").all_inner_texts()
+    ok("AC3 Kho & lô Chủ: ô giá vốn có tiền", len(cost_cells) == new_inv and all("đ" in c for c in cost_cells), str(cost_cells[:3]))
     page.screenshot(path=f"{SHOTS}/s8-desktop-1280-inventory-chu.png")
 
     # Tìm kiếm phía máy (bỏ dấu)
-    search = page.get_by_placeholder("Tìm lô, mặt hàng, NCC, kho…")
+    search = page.get_by_placeholder("Tìm mã lô, mặt hàng, nhà cung cấp")
     search.fill("ca thu")
-    expect(page.locator(".screen tbody tr")).to_have_count(2)
-    items = page.eval_on_selector_all(".screen tbody tr td:nth-child(2)", "t => t.map(x => x.textContent)")
-    ok("Tìm 'ca thu' (không dấu) → chỉ các lô Cá thu", len(items) == 2 and all("Cá thu" in i for i in items), str(items))
+    expect(lots_table.locator("tbody tr")).to_have_count(3)
+    items = lots_table.locator("tbody tr td:nth-child(2)").all_inner_texts()
+    ok("Tìm 'ca thu' (không dấu) → chỉ các lô Cá thu", len(items) == 3 and all("Cá thu" in i for i in items), str(items))
     search.fill("zzz-khong-co")
-    expect(page.get_by_text("Không khớp tìm kiếm")).to_be_visible()
-    page.get_by_role("button", name="Xoá tìm").click()
-    ok("Xoá tìm → hiện lại đủ lô", page.locator(".screen tbody tr").count() == len(new_inv))
+    expect(page.get_by_text("Không tìm thấy lô khớp với")).to_be_visible()
+    page.get_by_role("button", name="Xoá tìm kiếm").first.click()
+    expect(lots_table.locator("tbody tr")).to_have_count(new_inv)
+    ok("Xoá tìm → hiện lại đủ lô", lots_table.locator("tbody tr").count() == new_inv)
 
     # Đơn — L7/S10: màn Đơn thôi đọc 8 đơn của dashboard, chuyển sang GET /api/sales/orders/ (danh sách ul.order-list,
     # BE tìm theo mã/SĐT). Kiểm đầy đủ ở e2e/s10_s11_orders.py; ở đây giữ các ý S8: có đếm lùi giữ chỗ, tìm theo SĐT.
@@ -192,18 +197,21 @@ with sync_playwright() as p:
     # ("Failed to fetch RSC payload" do prefetch bị huỷ bởi page.goto trước đó) — lần đó app khởi động lại nên gọi /me
     # là đúng; chỉ chấm các lần điều hướng mềm (dấu window.__softNav còn).
     soft = []
-    # L7: màn Đơn không còn đọc summary (S10) → bỏ khỏi vòng này.
-    for label, url in [("Kho & lô", "inventory"), ("Tổng quan", "overview"), ("Kho & lô", "inventory")]:
+    # L7: màn Đơn và Kho & lô không còn đọc summary → chỉ Tổng quan được tính; Kho & lô xen giữa để mount lại Tổng quan.
+    for label, url in [("Kho & lô", "inventory"), ("Tổng quan", "overview"), ("Kho & lô", "inventory"), ("Tổng quan", "overview")]:
         clear_log(page)
         page.evaluate("() => { window.__softNav = true; }")
         page.locator(".nav a", has_text=label).click()
         page.wait_for_url(f"**/{url}/")
+        if url == "inventory":
+            expect(page.locator("table.lt").first.locator("tbody tr").first).to_be_visible()
+            continue
         page.wait_for_function("s => window.__caveMock && window.__caveMock.log.includes(s)", arg=SUMMARY)
         expect(page.get_by_role("button", name="Thử lại")).to_be_visible()
         if page.evaluate("() => window.__softNav === true"):
             soft.append((url, mock_log(page)))
     ok("Review #1: 403 ổn định, mount lại màn (điều hướng mềm) → gọi summary nhưng KHÔNG gọi lại /me",
-       len(soft) >= 2 and all(lg == [SUMMARY] for _, lg in soft), str(soft))
+       len(soft) >= 1 and all(lg == [SUMMARY] for _, lg in soft), str(soft))
     ok("Review #1: 403 ổn định → không báo 'Quyền vừa thay đổi'", page.locator(".perm-notice").count() == 0)
     set_mode(page, "ok")
     ctx.close()
@@ -219,15 +227,17 @@ with sync_playwright() as p:
     # L7/S10: menu Đơn chỉ còn đòi sales.view_salesorder (bỏ điều kiện tạm view_dashboard, TODO(S10)) → trang đầu là Đơn.
     page.wait_for_url("**/orders/")
     labels = [l.split("\n")[-1].strip() for l in page.locator(".nav a").all_inner_texts()]
-    ok("Review #1 kho1 thiếu view_dashboard: menu KHÔNG có Tổng quan / Kho & lô; CÓ Đơn & tiền (S10 có endpoint riêng)",
-       labels == ["Đơn & tiền", "Giao hàng", "Việc giao của tôi", "Mua hàng", "Kiểm kê", "Danh mục & giá"], str(labels))
-    for path in ["/inventory/"]:
-        page.goto(BASE + path)
-        page.wait_for_load_state("networkidle")
-        expect(page.get_by_text("Bạn không có quyền xem mục này")).to_be_visible()
-        lg = mock_log(page)
-        ok(f"Review #1 kho1 gõ {path}: ViewGuard chặn, không gọi summary, /me đúng 1 lần", lg == ["GET /api/auth/me/"], str(lg))
-    ok("Review #1 kho1: không gọi summary", SUMMARY not in mock_log(page), str(mock_log(page)))
+    # ERP theo design Lô 7: Kho & lô đòi inventory.view_batch (không còn mượn quyền xem Tổng quan) → kho1 vẫn thấy Kho & lô và Sổ nhập xuất.
+    ok("Review #1 kho1 thiếu view_dashboard: menu KHÔNG có Tổng quan; CÓ Đơn & tiền, Kho & lô, Sổ nhập xuất",
+       labels == ["Đơn & tiền", "Giao hàng", "Việc giao của tôi", "Mua hàng", "Kho & lô", "Kiểm kê", "Sổ nhập xuất", "Danh mục & giá"], str(labels))
+    page.goto(BASE + "/inventory/")
+    expect(page.locator("table.lt").first.locator("tbody tr").first).to_be_visible()
+    ok("Review #1 kho1 gõ /inventory/: vào được (view_batch), không gọi summary", SUMMARY not in mock_log(page), str(mock_log(page)))
+    page.goto(BASE + "/overview/")
+    page.wait_for_load_state("networkidle")
+    expect(page.get_by_text("Bạn không có quyền xem mục này")).to_be_visible()
+    lg = mock_log(page)
+    ok("Review #1 kho1 gõ /overview/: ViewGuard chặn, không gọi summary, /me đúng 1 lần", lg == ["GET /api/auth/me/"], str(lg))
     page.screenshot(path=f"{SHOTS}/review-desktop-1280-kho1-no-dashboard.png")
     ctx.close()
 
@@ -241,8 +251,8 @@ with sync_playwright() as p:
     ok("AC2 Quản lý: KPI giá trị tồn ẩn", page.get_by_text("cần quyền xem giá vốn").is_visible())
     ok("AC2 Quản lý: Tổng quan không có cột giá vốn", page.locator("th", has_text="Giá vốn").count() == 0)
     page.goto(BASE + "/inventory/")
-    expect(page.locator(".screen tbody tr").first).to_be_visible()
-    ok("AC2 Quản lý: Kho & lô không có cột giá vốn", page.locator("th", has_text="Giá vốn").count() == 0 and not re.search(r"\d\s?[đ₫]", page.locator(".screen tbody").inner_text()))
+    expect(page.locator("table.lt").first.locator("tbody tr").first).to_be_visible()
+    ok("AC2 Quản lý: Kho & lô không có cột giá vốn", page.locator("th", has_text="Giá vốn").count() == 0 and not re.search(r"\d\s?[đ₫]", page.locator("table.lt").first.locator("tbody").inner_text()))
     ql_json = page.evaluate("() => window.__caveMock.dashboardJson('ql1')")
     ok("AC2 JSON (mock theo BE) không có key unit_cost", all("unit_cost" not in b for b in ql_json["batches"]) and len(ql_json["batches"]) > 0)
     ok("AC2 JSON (mock theo BE L6) không có key kpis.inventory_value", "inventory_value" not in ql_json["kpis"], str(ql_json["kpis"]))
@@ -256,9 +266,9 @@ with sync_playwright() as p:
     for user, expected in [
         # S16 (L9): Quản lý có sales.view_refund → thấy mục con "Phiếu hoàn chờ chuyển" (không có nút, chỉ xem).
         # S03 (AI Lô 1): Quản lý có accounts.view_auditlog → thấy "Nhật ký hoạt động".
-        ("ql1", ["Tổng quan", "Đơn & tiền", "Gọi xác nhận", "Giao hàng", "Mua hàng", "Kho & lô", "Kiểm kê", "Danh mục & giá", "Nội dung", "Nhật ký hoạt động"]),
+        ("ql1", ["Tổng quan", "Đơn & tiền", "Gọi xác nhận", "Giao hàng", "Mua hàng", "Kho & lô", "Kiểm kê", "Sổ nhập xuất", "Danh mục & giá", "Nội dung", "Nhật ký hoạt động"]),
         # warehouse_staff có catalog.view_item thật → thấy "Danh mục & giá" (điều phối chốt; phần giá ẩn ở S38/S39)
-        ("kho1", ["Tổng quan", "Đơn & tiền", "Giao hàng", "Việc giao của tôi", "Mua hàng", "Kho & lô", "Kiểm kê", "Danh mục & giá"]),
+        ("kho1", ["Tổng quan", "Đơn & tiền", "Giao hàng", "Việc giao của tôi", "Mua hàng", "Kho & lô", "Kiểm kê", "Sổ nhập xuất", "Danh mục & giá"]),
     ]:
         ctx = browser.new_context(viewport={"width": 1280, "height": 800}, reduced_motion="reduce")
         page = ctx.new_page()
@@ -296,7 +306,7 @@ with sync_playwright() as p:
     for path, shot in [("/overview/", "overview"), ("/orders/", "orders"), ("/inventory/", "inventory")]:
         if path != "/overview/":
             page.goto(BASE + path)
-            expect(page.locator("ul.order-list > li" if path == "/orders/" else ".screen tbody tr").first).to_be_visible()
+            expect(page.locator("ul.order-list > li" if path == "/orders/" else "table.lt tbody tr").first).to_be_visible()
             fonts_ready(page)
         ok(f"360 {path} không cuộn ngang", no_hscroll(page) <= 360, str(no_hscroll(page)))
         small = page.evaluate(SMALL_TAPS_JS)
@@ -354,7 +364,7 @@ with sync_playwright() as p:
         ok("AC1 Tổng quan: bảng lô trùng", new_ov_batches == old_ov_batches, f"\nmới={new_ov_batches[:2]}\ncũ={old_ov_batches[:2]}")
         ok("AC1 cận hạn trùng", alert_norm(new_alerts) == alert_norm(old_alerts), f"\nmới={new_alerts}\ncũ={old_alerts}")
         # L7/S10: màn Đơn không còn là bản chép 8 đơn của bản cũ (đọc /api/sales/orders/) → bỏ so sánh màn Đơn.
-        ok("AC1 màn Kho & lô trùng", new_inv == old_inv, f"\nmới={new_inv[:2]}\ncũ={old_inv[:2]}")
+        # ERP theo design Lô 7: màn Kho & lô là danh sách lô riêng (bảng + cột khác bản cũ) → bỏ so sánh với bản cũ.
     else:
         print("SKIP AC1 so với bản cũ (không có LEGACY_BASE)")
 

@@ -1,4 +1,5 @@
 # P8 Lô 5 (FE) — SR-15 AC3/AC4/AC7, SR-16 AC8, SR-17 AC3: lô Quá hạn còn tồn + bỏ cột Khách ở Tổng quan.
+# Cập nhật ERP theo design Lô 7: chi tiết lô là TRANG (/inventory/detail/?id=), hành động nằm ở menu 'Thao tác khác', nhãn 'nhà cung cấp' thay 'NCC'.
 # Chạy trên bản build MOCK phục vụ tĩnh (dữ liệu bịa; 3 lô quá hạn L0908-CT00 sạch, L0909-MU00 đang giữ chỗ, L0910-TS00 sạch).
 #   cd erp-console && NEXT_PUBLIC_USE_MOCK=1 npm run build && cp -R out <thư-mục-out-riêng>
 #   (cd <thư-mục-out-riêng> && python3 -m http.server 3215 --bind 127.0.0.1 &)
@@ -42,15 +43,37 @@ def no_hscroll(page):
     return page.evaluate("() => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1")
 
 
+def lots_table(page):
+    t = page.locator("table.lt").first
+    t.locator("tbody tr").first.wait_for()
+    page.wait_for_function("() => document.querySelectorAll('table.lt tr.lt-skel').length === 0")
+    return t
+
+
 def open_lot(page, code):
-    page.locator("tbody tr", has_text=code).first.locator("button").first.click()
-    page.get_by_role("dialog", name=re.compile(f"Chi tiết lô {code}")).wait_for(timeout=10_000)
+    lots_table(page).locator("tbody tr", has_text=code).first.locator("a").first.click()
     page.locator("[data-testid=qty-available]").wait_for()
     settle(page)
 
 
 def sheet_qty(page):
     return re.sub(r"\s+", " ", page.locator("[data-testid=qty-available]").inner_text()).strip()
+
+
+def menu_items(page):
+    page.get_by_role("button", name="Thao tác khác").click()
+    return [re.sub(r"\s+", " ", x).strip() for x in page.get_by_role("menuitem").all_inner_texts()]
+
+
+def pick_menu(page, label):
+    page.get_by_role("button", name="Thao tác khác").click()
+    page.get_by_role("menuitem", name=re.compile("^" + re.escape(label))).click()
+
+
+def back_to_list(page):
+    page.go_back()
+    lots_table(page)
+    settle(page)
 
 
 def run_chu(browser, tag, viewport, errors):
@@ -83,137 +106,127 @@ def run_chu(browser, tag, viewport, errors):
     card.get_by_role("link").click()
     page.wait_for_url("**/inventory/?status=EXPIRED")
     page.wait_for_load_state("networkidle")
-    page.locator("tbody tr").first.wait_for()
+    t = lots_table(page)
     settle(page)
-    rows = page.locator("tbody tr")
+    rows = t.locator("tbody tr")
     codes = [r.locator("td").first.inner_text().strip() for r in rows.all()]
     ok(f"[{tag}] SR-15-AC4 bấm thẻ → /inventory/?status=EXPIRED, danh sách chỉ 3 lô quá hạn ({codes})", len(codes) == 3 and set(codes) == {"L0908-CT00", "L0909-MU00", "L0910-TS00"})
-    chips = page.locator("tbody tr .chip, tbody tr [class*=chip]").all_inner_texts()
     ok(f"[{tag}] mọi dòng đều 'Quá hạn'", all("Quá hạn" in r.inner_text() for r in rows.all()))
-    ok(f"[{tag}] có nút 'Bỏ lọc, xem tất cả lô'", page.get_by_test_id("clear-status-filter").count() == 1)
+    ok(f"[{tag}] có nút 'Bỏ lọc'", page.get_by_test_id("clear-status-filter").count() == 1)
     ok(f"[{tag}] không cuộn ngang (danh sách)", no_hscroll(page))
     page.screenshot(path=f"{SHOTS}/lo5-{tag}-2-danh-sach-loc-qua-han.png")
 
-    # ---- SR-15-AC3: lô còn tồn có 2 nút + Chốt bị khoá kèm lý do ----
+    # ---- SR-15-AC3: lô còn tồn có Trả nhà cung cấp + Huỷ phần tồn; Chốt bị khoá kèm lý do còn tồn ----
     open_lot(page, "L0908-CT00")
-    acts = page.get_by_test_id("batch-actions")
-    acts.wait_for()
-    b_cancel = acts.locator("[data-action=cancel_expired]")
-    b_return = acts.locator("[data-action=return_to_supplier]")
-    b_close = acts.locator("[data-action=close]")
-    ok(f"[{tag}] SR-15-AC3 nút 'Xác nhận Đã huỷ phần tồn' bật", b_cancel.count() == 1 and b_cancel.is_enabled() and "Xác nhận Đã huỷ phần tồn" in b_cancel.inner_text())
-    ok(f"[{tag}] SR-15-AC3 nút 'Xác nhận Đã trả NCC' bật", b_return.count() == 1 and b_return.is_enabled() and "Xác nhận Đã trả NCC" in b_return.inner_text())
-    lock = page.locator("[data-lock=close]")
-    ok(f"[{tag}] SR-15-AC3 'Chốt lô' bị khoá kèm lý do tồn = 0", b_close.count() == 1 and b_close.is_disabled() and "tồn = 0" in lock.inner_text(), lock.inner_text())
-    heights = [round(b.bounding_box()["height"]) for b in (b_cancel, b_return, b_close)]
-    ok(f"[{tag}] nút cao >= 44px trên điện thoại ({heights})", viewport["width"] > 500 or all(h >= 44 for h in heights))
+    items = menu_items(page)
+    ok(f"[{tag}] SR-15-AC3 menu có 'Huỷ phần tồn, ghi lỗ' bật", "Huỷ phần tồn, ghi lỗ" in items, str(items))
+    ok(f"[{tag}] SR-15-AC3 menu có 'Trả nhà cung cấp' bật", "Trả nhà cung cấp" in items, str(items))
+    ok(f"[{tag}] SR-15-AC3 'Chốt lô' bị khoá kèm lý do còn tồn", any(i.startswith("Chốt lô · ") and "Lô còn 6,5 kg" in i for i in items), str(items))
+    page.keyboard.press("Escape")
     ok(f"[{tag}] tồn hiển thị 6,5 kg", sheet_qty(page).startswith("6,5"), sheet_qty(page))
-    page.screenshot(path=f"{SHOTS}/lo5-{tag}-3-chi-tiet-lo-hai-nut-chot-khoa.png")
+    page.screenshot(path=f"{SHOTS}/lo5-{tag}-3-chi-tiet-lo.png")
 
-    # ---- SR-16-AC8: form Đã trả NCC. 400 khi tồn phía máy chủ đã đổi (còn 2 kg, màn vẫn hiện 6,5) ----
+    # ---- SR-16-AC8: form Trả nhà cung cấp. 400 khi tồn phía máy chủ đã đổi (còn 2 kg, màn vẫn hiện 6,5) ----
     page.evaluate("() => window.__caveMock.expiredSetQty('L0908-CT00', 2)")
-    b_return.click()
-    dlg = page.get_by_role("dialog", name="Xác nhận Đã trả NCC")
+    pick_menu(page, "Trả nhà cung cấp")
+    dlg = page.get_by_role("dialog", name="Trả nhà cung cấp")
     dlg.wait_for()
     qty = dlg.get_by_label("Số kg đã trả")
     ok(f"[{tag}] SR-16-AC8 ô kg có inputMode=decimal", qty.get_attribute("inputmode") == "decimal")
-    ok(f"[{tag}] focus rơi vào ô số kg", page.evaluate("() => document.activeElement && document.activeElement.id") == "rts-qty")
-    page.screenshot(path=f"{SHOTS}/lo5-{tag}-4-form-da-tra-ncc.png")
+    ok(f"[{tag}] focus rơi vào ô số kg", page.evaluate("() => document.activeElement === document.querySelector('[role=dialog] input')"))
+    page.screenshot(path=f"{SHOTS}/lo5-{tag}-4-form-tra-nha-cung-cap.png")
 
     # kiểm tra phía form: vượt tồn ĐANG HIỂN THỊ bị chặn ngay, không gọi API
     page.evaluate("() => window.__caveMock.clearLog()")
     qty.fill("9")
     dlg.get_by_role("button", name="Ghi nhận đã trả").click()
-    ok(f"[{tag}] nhập 9 kg (> 6,5 đang hiển thị) bị chặn ngay ở form, không gọi API", dlg.locator("#rts-qty-err").count() == 1 and not [l for l in page.evaluate("() => window.__caveMock.log") if "return-to-supplier" in l])
+    ok(f"[{tag}] nhập 9 kg (> 6,5 đang hiển thị) bị chặn ngay ở form, không gọi API", dlg.get_by_text(re.compile("không vượt tồn 6,5 kg")).count() == 1 and not [l for l in page.evaluate("() => window.__caveMock.log") if "return-to-supplier" in l])
     # 5 kg hợp lệ theo màn nhưng máy chủ chỉ còn 2 kg → 400
     qty.fill("5")
     dlg.get_by_role("button", name="Ghi nhận đã trả").click()
     err = page.get_by_test_id("rts-error")
     err.wait_for(timeout=10_000)
     ok(f"[{tag}] SR-16-AC8 400 hiện đúng `detail` tiếng Việt", "không vượt tồn 2,000 kg" in err.inner_text(), err.inner_text().replace("\n", " | "))
-    ok(f"[{tag}] form vẫn mở, nút gửi bật lại", dlg.get_by_role("button", name="Ghi nhận đã trả").is_enabled())
+    ok(f"[{tag}] form vẫn mở, nút gửi bật lại", dlg.get_by_role("button", name=re.compile("Ghi nhận đã trả|Thử lại")).is_enabled())
     page.screenshot(path=f"{SHOTS}/lo5-{tag}-5-form-loi-400.png")
     err.get_by_role("button", name="Tải lại tồn").click()
-    page.get_by_role("dialog", name="Xác nhận Đã trả NCC").wait_for(state="detached")
+    page.get_by_role("dialog", name="Trả nhà cung cấp").wait_for(state="detached")
     settle(page)
     page.wait_for_function("() => document.querySelector('[data-testid=qty-available]').innerText.startsWith('2')", timeout=10_000)
     ok(f"[{tag}] 'Tải lại tồn' → tồn hiển thị cập nhật 2 kg", sheet_qty(page).startswith("2"), sheet_qty(page))
 
-    # bấm đúp "Ghi nhận" khi Trả hết: chỉ 1 request, gửi kèm tiền NCC hoàn (không hiện lại sau khi lưu)
-    b_return.click()
-    dlg = page.get_by_role("dialog", name="Xác nhận Đã trả NCC")
+    # bấm đúp "Ghi nhận" khi Trả hết: chỉ 1 request, gửi kèm tiền nhà cung cấp hoàn (không hiện lại sau khi lưu)
+    pick_menu(page, "Trả nhà cung cấp")
+    dlg = page.get_by_role("dialog", name="Trả nhà cung cấp")
     dlg.wait_for()
     dlg.get_by_role("button", name="Trả hết").click()
     ok(f"[{tag}] 'Trả hết' điền 2", dlg.get_by_label("Số kg đã trả").input_value() == "2")
-    dlg.get_by_label("Tiền NCC hoàn").fill("150000")
+    dlg.get_by_label("Tiền nhà cung cấp hoàn").fill("150000")
     dlg.get_by_label("Ghi chú").fill("Trả về ghe buổi sáng")
     page.evaluate("() => window.__caveMock.clearLog()")
     dlg.get_by_role("button", name="Ghi nhận đã trả").dblclick()
-    page.get_by_test_id("batch-notice").wait_for(timeout=10_000)
+    page.get_by_text("Đã ghi nhận trả 2 kg cho nhà cung cấp.").wait_for(timeout=10_000)
     calls = [l for l in page.evaluate("() => window.__caveMock.log") if "return-to-supplier" in l]
     ok(f"[{tag}] SR-16-AC8 bấm đúp → đúng 1 request return-to-supplier ({len(calls)})", len(calls) == 1)
     settle(page)
-    notice = page.get_by_test_id("batch-notice").inner_text()
-    ok(f"[{tag}] thông báo 'Đã ghi nhận trả NCC 2 kg', tồn còn 0 kg", "Đã ghi nhận trả NCC 2 kg" in notice and "0 kg" in notice, notice)
+    ok(f"[{tag}] tồn còn 0 kg", sheet_qty(page).startswith("0"), sheet_qty(page))
     all_text = page.locator("body").inner_text()
-    ok(f"[{tag}] SR-16 không hiện lại tiền NCC hoàn sau khi lưu", "150.000" not in all_text and "150000" not in all_text)
-    b_close = page.locator("[data-action=close]")
-    ok(f"[{tag}] SR-15-AC7 tồn = 0 → nút 'Chốt lô' mở", b_close.is_enabled() and page.locator("[data-lock=close]").count() == 0)
-    ok(f"[{tag}] nút Huỷ / Trả NCC biến mất khi hết tồn", page.locator("[data-action=cancel_expired]").count() == 0 and page.locator("[data-action=return_to_supplier]").count() == 0)
+    ok(f"[{tag}] SR-16 không hiện lại tiền nhà cung cấp hoàn sau khi lưu", "150.000" not in all_text and "150000" not in all_text)
+    items = menu_items(page)
+    ok(f"[{tag}] SR-15-AC7 tồn = 0 → 'Chốt lô' mở, không còn lý do", "Chốt lô" in items, str(items))
+    ok(f"[{tag}] Huỷ / Trả nhà cung cấp bị khoá 'Lô không còn tồn.'", "Huỷ phần tồn, ghi lỗ · Lô không còn tồn." in items and "Trả nhà cung cấp · Lô không còn tồn." in items, str(items))
+    page.keyboard.press("Escape")
     page.screenshot(path=f"{SHOTS}/lo5-{tag}-6-tra-het-chot-lo-mo.png")
 
-    b_close.click()
+    pick_menu(page, "Chốt lô")
     cd = page.get_by_role("dialog", name="Chốt lô")
     cd.wait_for()
     cd.get_by_role("button", name="Chốt lô").click()
-    page.wait_for_function("() => document.querySelector('[data-testid=batch-notice]')?.innerText.includes('Đã chốt lô')", timeout=10_000)
+    page.get_by_text(re.compile("Đã chốt lô L0908-CT00")).wait_for(timeout=10_000)
     settle(page)
-    ok(f"[{tag}] chốt lô xong: trạng thái 'Đã chốt'", "Đã chốt" in page.get_by_role("dialog", name=re.compile("Chi tiết lô")).inner_text())
-    page.keyboard.press("Escape")
-    page.wait_for_timeout(300)
-    page.wait_for_load_state("networkidle")
+    ok(f"[{tag}] chốt lô xong: trạng thái 'Đã chốt'", "Đã chốt" in page.locator("main").inner_text())
+    back_to_list(page)
 
-    # ---- Đã huỷ phần tồn: hộp xác nhận nêu kg, confirm_qty lệch → 400, tải lại, huỷ thành công ----
+    # ---- Huỷ phần tồn: hộp xác nhận nêu kg, confirm_qty lệch → 400, tải lại, huỷ thành công ----
     open_lot(page, "L0910-TS00")
     page.evaluate("() => window.__caveMock.expiredSetQty('L0910-TS00', 5)")
-    page.locator("[data-action=cancel_expired]").click()
-    cdlg = page.get_by_role("dialog", name="Xác nhận Đã huỷ phần tồn")
+    pick_menu(page, "Huỷ phần tồn, ghi lỗ")
+    cdlg = page.get_by_role("dialog", name="Huỷ phần tồn, ghi lỗ")
     cdlg.wait_for()
-    ok(f"[{tag}] SR-15-AC3 hộp huỷ nêu đúng số kg đang hiển thị (3 kg) và không nêu tiền", cdlg.get_by_test_id("cancel-qty").inner_text().startswith("3") and "₫" not in cdlg.inner_text(), cdlg.inner_text().replace("\n", " | "))
+    ok(f"[{tag}] SR-15-AC3 hộp huỷ nêu đúng số kg đang hiển thị (3 kg)", cdlg.get_by_test_id("cancel-qty").inner_text().startswith("3") and "Không hoàn tác được" in cdlg.inner_text(), cdlg.inner_text().replace("\n", " | "))
     page.screenshot(path=f"{SHOTS}/lo5-{tag}-7-hop-huy-phan-ton.png")
     page.evaluate("() => window.__caveMock.clearLog()")
-    cdlg.get_by_role("button", name=re.compile("Xác nhận huỷ")).click()
+    cdlg.get_by_role("button", name=re.compile("^Huỷ 3")).click()
     derr = page.get_by_test_id("dialog-error")
     derr.wait_for(timeout=10_000)
     ok(f"[{tag}] SR-15 confirm_qty lệch → 400 'Tồn đã đổi (5,000 kg) — tải lại.'", "Tồn đã đổi (5,000 kg) — tải lại." in derr.inner_text(), derr.inner_text())
     page.screenshot(path=f"{SHOTS}/lo5-{tag}-8-huy-ton-da-doi-400.png")
-    derr.get_by_role("button", name="Tải lại").click()
-    page.get_by_role("dialog", name="Xác nhận Đã huỷ phần tồn").wait_for(state="detached")
+    derr.get_by_role("button", name=re.compile("Tải lại")).click()
+    page.get_by_role("dialog", name="Huỷ phần tồn, ghi lỗ").wait_for(state="detached")
     settle(page)
     page.wait_for_function("() => document.querySelector('[data-testid=qty-available]').innerText.startsWith('5')", timeout=10_000)
-    page.locator("[data-action=cancel_expired]").click()
-    cdlg = page.get_by_role("dialog", name="Xác nhận Đã huỷ phần tồn")
+    pick_menu(page, "Huỷ phần tồn, ghi lỗ")
+    cdlg = page.get_by_role("dialog", name="Huỷ phần tồn, ghi lỗ")
     cdlg.wait_for()
     ok(f"[{tag}] sau tải lại hộp huỷ nêu 5 kg", cdlg.get_by_test_id("cancel-qty").inner_text().startswith("5"))
-    cdlg.get_by_role("button", name=re.compile("Xác nhận huỷ")).click()
-    page.wait_for_function("() => document.querySelector('[data-testid=batch-notice]')?.innerText.includes('Đã huỷ phần tồn')", timeout=10_000)
-    ok(f"[{tag}] huỷ thành công: lô 'Đã huỷ'", "Đã huỷ" in page.get_by_role("dialog", name=re.compile("Chi tiết lô")).inner_text())
-    page.keyboard.press("Escape")
-    page.wait_for_timeout(300)
+    cdlg.get_by_role("button", name=re.compile("^Huỷ 5")).click()
+    page.get_by_text(re.compile("Đã huỷ 5 kg của lô L0910-TS00")).wait_for(timeout=10_000)
+    ok(f"[{tag}] huỷ thành công: lô 'Đã huỷ'", "Đã huỷ" in page.locator("main").inner_text())
     settle(page)
+    back_to_list(page)
 
-    # ---- Lô đang giữ chỗ: cả hai nút bị khoá kèm lý do (SR-08) ----
+    # ---- Lô đang giữ chỗ: cả ba mục bị khoá kèm lý do (SR-08) ----
     open_lot(page, "L0909-MU00")
-    ok(f"[{tag}] lô giữ chỗ: Huỷ/Trả NCC/Chốt đều bị khoá", all(page.locator(f"[data-action={k}]").is_disabled() for k in ("cancel_expired", "return_to_supplier", "close")))
-    reason = page.locator("[data-lock=cancel_expired]").inner_text()
-    ok(f"[{tag}] lý do nêu giữ chỗ 1,5 kg", "giữ chỗ" in reason and "1,5" in reason, reason)
-    page.screenshot(path=f"{SHOTS}/lo5-{tag}-9-lo-giu-cho-khoa.png")
+    items = menu_items(page)
+    locked = [i for i in items if re.match(r"Trả|Huỷ|Chốt", i)]
+    ok(f"[{tag}] lô giữ chỗ: Huỷ/Trả/Chốt đều bị khoá kèm lý do", len(locked) == 3 and all(" · " in i for i in locked), str(items))
+    ok(f"[{tag}] lý do nêu giữ chỗ 1,5 kg", any("giữ chỗ" in i and "1,5" in i for i in locked), str(locked))
     page.keyboard.press("Escape")
-    page.wait_for_timeout(300)
+    page.screenshot(path=f"{SHOTS}/lo5-{tag}-9-lo-giu-cho-khoa.png")
+    back_to_list(page)
 
     # ---- danh sách sau các thao tác: chỉ còn lô giữ chỗ ----
-    settle(page)
-    left = [r.locator("td").first.inner_text().strip() for r in page.locator("tbody tr").all()]
+    left = [r.locator("td").first.inner_text().strip() for r in page.locator("table.lt").first.locator("tbody tr").all()]
     ok(f"[{tag}] danh sách sau thao tác chỉ còn L0909-MU00 ({left})", left == ["L0909-MU00"])
     page.goto(BASE + "/overview/")
     page.wait_for_load_state("networkidle")
@@ -235,11 +248,12 @@ def run_kho(browser, tag, viewport, errors):
     page.screenshot(path=f"{SHOTS}/lo5-{tag}-10-tong-quan-nv-kho-khong-co-the.png")
     page.goto(BASE + "/inventory/?status=EXPIRED")
     page.wait_for_load_state("networkidle")
-    page.locator("tbody tr").first.wait_for()
+    lots_table(page)
     settle(page)
     open_lot(page, "L0908-CT00")
-    page.wait_for_timeout(300)
-    ok(f"[{tag}] SR-15-AC3 warehouse_staff mở lô quá hạn: không có nút Huỷ / Trả NCC / Chốt", page.get_by_test_id("batch-actions").count() == 0 and page.locator("[data-action]").count() == 0)
+    items = menu_items(page)
+    page.keyboard.press("Escape")
+    ok(f"[{tag}] SR-15-AC3 warehouse_staff mở lô quá hạn: không có Huỷ / Trả nhà cung cấp / Chốt", not [i for i in items if re.match(r"Trả|Huỷ|Chốt", i)], str(items))
     page.screenshot(path=f"{SHOTS}/lo5-{tag}-11-nv-kho-chi-tiet-khong-nut.png")
     ctx.close()
 

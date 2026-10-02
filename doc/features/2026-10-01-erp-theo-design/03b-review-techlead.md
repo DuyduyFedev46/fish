@@ -1378,3 +1378,114 @@ khác vừa sửa") và M2 (nút Đồng ý kẹt khi tải chi tiết đề xu�
 ### Kết luận re-review Lô 2 — FE: **APPROVED**
 M1, M2, B1–B5 đều đạt. Không còn lỗi Critical, High hay Medium. Lô sẵn sàng cho QA chạy lại. Khi commit phải kèm
 `erp-console/public/fonts/ms/material-symbols-outlined.woff2`. L8 và L9 cùng L2–L7 để Lô 3 xử lý.
+
+---
+
+## Lô 7 — FE (Kho & lô, Sổ nhập xuất, Kho; ED-23, ED-24, ED-25 chỉ danh sách, ED-29)
+> techlead · 02/10/2026 · Worktree `loc-wt-c` (nhánh `ed-stream-c`, chưa commit, nền db4b3e7).
+
+### Lệnh đã chạy trong lượt này (trong worktree)
+- `erp-console: ./node_modules/.bin/tsc --noEmit` → sạch.
+- `erp-console: npx vitest run` → 45 file, 403 test đạt.
+- `python3 scripts/check_naming.py` → OK, không có vi phạm mới.
+- Grep màu cứng (`#hex`, `rgb(a)`, `hsl(a)`) trong `features/inventory`, `features/ledger`, `app/(console)/inventory`, `app/(console)/ledger` → 0.
+- Grep `console.log/error/warn`, `"DELETE"`, nút "Ngừng bán", hàm tạo phiếu điều chỉnh trong hai module → 0. Chữ "Điều chỉnh tồn" chỉ còn ở nhãn tab đọc và comment.
+- `git status` và `git diff HEAD --stat -- erp-console/features/orders` → **không có thay đổi nào ở `features/orders`** (mục 12/13 của dev: 16 file lấy từ db4b3e7, lô này không xoá cũng không sửa).
+- Chưa chạy build và e2e. Dev báo `check-ai-chunks` và `check-no-mock` XANH. QA chạy lại hai lệnh này.
+
+### Kiểm theo trọng tâm
+| Mục | Kết quả | Căn cứ |
+|---|---|---|
+| Giá vốn ở danh sách lô | Đạt | `LotsTab.tsx:92-93`: cột `locked`, `DataTable canViewCost={me.can_view_cost}`. Thiếu khoá thì hiện "—". Mock bỏ khoá theo `can_view_cost` (`mock.ts:284,305`), giống BE |
+| Giá vốn ở chi tiết lô | Đạt | `BatchDetailScreen.tsx:189-191,290-296`: ba ô chỉ render khi `ability.viewCost` **và** BE có trả cả hai khoá. Người khác không có ô trong DOM. "Tiền ghi lỗ" ở F1h cũng cần `viewCost` (`CancelExpiredModal.tsx:28`) |
+| F1i chỉ gọi lãi lỗ khi có quyền | Đạt | `CloseBatchModal.tsx:23-32`: `if (!viewProfit) return` trước `fetchBatchProfit`. `viewProfit = me.can_view_profit \|\| has(reports.view_profitreport)` (`lotView.ts:49`), cả hai đều lấy từ BE nên Quản lý không gọi. Khoá JSON `BatchProfitReport` khớp `reports/services.py:117-138` |
+| "Chủ" = quyền HOẶC nhóm owner (mục 4 dev-notes) | Không rò, không gọi thừa (xem L1) | Chỉ dùng cho `cancelExpired`/`returnToSupplier`, **không** dùng cho giá vốn hay lãi lỗ (hai thứ đó lấy `can_view_cost`/`can_view_profit`). Trên BE thật, nhóm owner luôn có `cancel_expired_batch` (migration `accounts/0009`). Nếu nhóm owner bị rút quyền, guidance trả `BR-PQ-12` thì `stepLacksPermission` ẩn mục, và BE vẫn 403. Không có API nào bị gọi chỉ vì nhánh này: chỉ bấm mục trong menu mới POST |
+| D-1 | Đạt | Tab "Điều chỉnh tồn" chỉ đọc (`StockEntriesTab.tsx`), `api.ts` không có hàm tạo. Không có nút "Điều chỉnh tồn" |
+| D-2 | Đạt | Không có "Ngừng bán lô" |
+| Thao tác lô theo quyền và trạng thái | Đạt | Mở bán: chỉ khi `DRAFT` và có `publish_batch` (`BatchDetailScreen.tsx:180-185`). Trả NCC / Huỷ phần tồn: Chủ, mục mờ kèm lý do khi chưa Quá hạn, hết tồn hay còn giữ chỗ (`lotView.ts:64-70`). Chốt lô: có `close_batch`, mờ khi còn tồn hoặc theo lý do của guidance đã bỏ mã BR (`lotView.ts:82-88`). Quản lý không thấy mục Chốt |
+| Bấm đúp | Đạt | Mọi hộp gửi qua `useSubmit` (`inFlight` ref) và nút bị `disabled` khi đang gửi. F1g giữ một `request_id` suốt lần mở hộp (`ReturnToSupplierModal.tsx:18-19`), nên thử lại sau lỗi mạng không trừ tồn lần hai. F1h gửi `confirm_qty` = số đang hiện |
+| `useActionSubmit` có trùng `useSubmit` không | Không trùng | Nó **bọc** `useSubmit` và chỉ thêm hai việc: nhớ `ApiError.code` để quyết định có hiện "Tải lại tồn", và đẩy `conflict` lên màn cha để bật `ConflictBanner`. Không viết lại cơ chế chặn bấm đúp. Xem L2 về danh sách mã |
+| Sổ nhập xuất: `reference_link` | Đạt | `referenceRoutes.ts`: chỉ `batch` có `ready: true`, các loại khác hiện chữ. URL chỉ mang id số. Có vitest kiểm route `ready` phải có trang thật. Bảng không có cột hay nút sửa, xoá. `created_by_name` theo contract BE không bao giờ là SĐT |
+| Dữ liệu khách | Đạt | "Đơn lấy hàng từ lô" chỉ khai `id, code, status, total_amount, created_at` (`types.ts:91-97`) và chỉ render 4 cột đó. BE vẫn trả `customer_name/customer_phone` cho người có `view_salesorder`, tức người đã xem được danh sách đơn, nên không mở thêm phạm vi. Ghi chú F1g chặn dãy 8 số. Mock không có SĐT. Không ghi gì vào URL ngoài `?id=`, `?batch=`, `?status=`, `?tab=` |
+| SR-20 / khối AI | Đạt một phần (xem M1) | `targetModel="inventory.batch"` đúng. BE chấp nhận nhãn này (`resolve_target_label` + `stored_variants`). `check-ai-chunks.mjs` đã thêm `/inventory/detail` và `/ledger` |
+| Nav | Đạt | Bỏ điều kiện `viewDashboard` đúng 02b §5.2. `view_batch` chỉ có ở owner, manager, warehouse_staff (`accounts/0002`, `0011`), nên delivery_staff và customer_service không thấy thêm mục. "Sổ nhập xuất" bỏ `soon`, cần `view_stockledgerentry` |
+| Màu cứng | 0 | |
+
+### Phát hiện
+
+**M1 — Medium — Khối AI của lô chỉ lọc theo pk, và feature screen import thẳng `features/ai`.**
+- Vị trí: `features/inventory/components/BatchDetailScreen.tsx:14` (import `AiDocBlockGate`), `:239` (`targetId={row.id}`).
+- Vấn đề 1, chức năng: `BatchViewSet.get_object` nhận cả pk lẫn mã lô (`batches/api.py`, nhánh `not isdigit()` thì tra theo `batch_id`). Pipeline AI lưu `AiAction.target_id = str(target_id)` đúng như lệnh được gọi (`ai/execution/pipeline.py:237,448,506`), nên một đề xuất trên lô có thể nằm dưới `"LO-…"` hoặc dưới `"41"`. FE chỉ gửi pk, vì vậy đề xuất lưu theo mã lô sẽ không hiện trên trang lô. Lô 3 đã xử lý đúng ca này bằng `targetId={\`${t.code},${t.id}\`}` (BE tách dấu phẩy, tối đa `MAX_TARGET_IDS`).
+- Vấn đề 2, kiến trúc: 02b §2.3 ghi "Page (`app/…/page.tsx`) ghép vào `aiSlot`; feature screen không import `features/ai`". Lô 3 làm theo cách này với prop `renderAi` (`app/(console)/orders/detail/page.tsx`). Lô 7 import thẳng trong screen. Hiện chưa làm nặng chunk vì cổng mỏng, nhưng lệch mẫu chung và trái điều 02b đã ghi.
+- Tái hiện: ở mock, tạo một AiAction `target_model="inventory.batch"`, `target_id="<mã lô>"`, trạng thái `PENDING`, rồi mở `/inventory/detail/?id=<pk>`. Khối AI không hiện đề xuất. Gửi `target_id=<mã lô>,<pk>` thì hiện.
+- Sửa: chuyển `AiDocBlockGate` lên `app/(console)/inventory/detail/page.tsx` theo mẫu `renderAi` của Lô 3, và gửi `targetId={\`${row.batch_id},${row.id}\`}`.
+
+**M2 — Medium — Hai bộ e2e cũ đang đỏ hoặc đã lỗi thời mà chưa được sửa hay ghi miễn.**
+- Vị trí: `erp-console/e2e/p8_lo8_fe_erp_tz.py` (AC2 Lô: 63/64, theo dev-notes mục 12), `erp-console/e2e/p8_lo6_fe_sr19_sr20.py` (các ca tồn kho còn bám `BatchDetailSheet` đã xoá).
+- 02b §5.2 Lô 7 yêu cầu e2e cũ của vùng tồn kho phải xanh. Hai file này kiểm hành vi của màn đã bị lô này thay, nên đỏ là do lô này.
+- Tái hiện: `NEXT_PUBLIC_USE_MOCK=1` chạy console, rồi `python3 e2e/p8_lo8_fe_erp_tz.py` → AC2 "Cập nhật hh:mm" fail.
+- Sửa: viết lại các ca đó theo trang mới. AC2 giờ VN kiểm bằng chỉ báo `asOf` của `ListPage` hoặc cột "Thời gian" của Sổ nhập xuất. Ca SR-19/SR-20 tồn kho chuyển sang `/inventory/detail/`. Nếu ca nào không còn nghĩa thì ghi rõ lý do bỏ trong `03-dev-notes.md`, không im lặng xoá.
+
+**L1 — Low — Nhánh "nhóm owner" vá cho mock nhưng nằm trong code chạy thật.**
+- Vị trí: `features/inventory/lotView.ts:41`, `features/inventory/mock.ts:205` (`me.username === "loc"`).
+- Không rò giá vốn, không gọi API thừa (xem bảng). Tuy vậy FE đang suy quyền từ tên nhóm, trái nguyên tắc "FE theo quyền, BE là lớp chặn". Chỗ nên sửa là `features/auth/mock.ts`: thêm `inventory.cancel_expired_batch` vào quyền của nhóm owner. Sau đó bỏ `|| me.groups.includes(ROLE.owner)` và nhánh `username === "loc"`. File auth không nằm trong danh sách được sửa của lô, nên điều phối viên mở cho fe-dev, hoặc để sang lô dọn.
+
+**L2 — Low — "Tải lại tồn" hiện cả khi lỗi không phải do số liệu cũ.**
+- Vị trí: `features/inventory/components/useActionSubmit.tsx:11`.
+- `BR-MH-08` là mã chung cho mọi lỗi của F1g ở BE: vượt tồn (cũ thật), nhưng cũng gồm "Mã yêu cầu đã được dùng cho lô khác", "Tiền NCC hoàn…", "Ghi chú tối đa…" (`batches/services.py:399-415`). Ba ca sau vẫn hiện nút "Tải lại tồn", gây hiểu nhầm. Không hỏng dữ liệu.
+- Sửa: chỉ mời tải lại với `BR-LO-07`, `BR-LO-04`, `BR-MH-05`. Với `BR-MH-08`, chỉ mời khi câu báo là vượt tồn, hoặc xin BE tách mã riêng ở lô sau.
+
+**L3 — Low — Chứng từ không tra được thì hiện chuỗi gốc của sổ.**
+- Vị trí: `features/ledger/components/LedgerTable.tsx:63`.
+- Hiện `reference_display || reference`. Theo contract, `reference_display` đã là chuỗi gốc khi không tra được, nên nhánh `|| reference` gần như không chạy. Nếu BE cũ trả rỗng thì người dùng thấy chuỗi kỹ thuật kiểu `cancel_expired_batch LO-…`. Nên bỏ nhánh `reference` và hiện "—".
+
+**L4 — Low — Việc khi ghép nhánh.**
+- `referenceRoutes.ts:8,10`: Lô 3 (`orders/detail`) và Lô 6 (`purchasing/detail`) xong thì đổi `ready: true`. Vitest `referenceRoutes.test.ts` sẽ bắt nếu bật mà thiếu trang.
+- Nợ ngoài phạm vi, chỉ ghi nhận (không tính vào kết luận): dev-notes mục 6 (BE thiếu `GET /api/ai/status/`, gây một dòng 404 ở console) và mục 7 (nhãn dòng thời gian `kg_str` ra "18.000 kg", dễ đọc nhầm thành 18 nghìn). Mục 7 nên vào lô BE gần nhất vì đó là số hiển thị cho người dùng.
+
+### Kết luận Lô 7 — FE: **CHANGES REQUESTED**
+Không có lỗi Critical hay High. Giá vốn, lãi lỗ, dữ liệu khách, D-1, D-2 và chặn bấm đúp đều đạt. Diff không đụng `features/orders`.
+
+Cần sửa trước khi QA:
+- **M1**: chuyển khối AI lên page theo mẫu `renderAi` và gửi `targetId` dạng mã lô kèm pk.
+- **M2**: sửa hoặc ghi miễn có lý do cho `p8_lo8_fe_erp_tz.py` AC2 và các ca tồn kho của `p8_lo6_fe_sr19_sr20.py`.
+
+L1–L3 nên sửa cùng lượt nếu rẻ. L1 cần mở quyền sửa `features/auth/mock.ts`.
+
+### Re-review Lô 7 — FE (sau khi dev sửa M1, M2, L1, L2, L3)
+> techlead · 02/10/2026 · worktree `loc-wt-c`.
+
+**Lệnh đã chạy trong lượt này**
+- `tsc --noEmit`: sạch. `vitest run`: 45 file, 407 test đạt.
+- `check_naming`: OK, không có vi phạm mới (có 1 file giảm vi phạm).
+- `git status`: không có thay đổi nào ở `features/orders`.
+- Đối chiếu quyền thật: chép `backend/` của worktree ra scratchpad, `migrate` từ đầu trên SQLite, rồi in quyền của 5 Group và so với `features/auth/mock.ts`.
+
+| Mục | Kết quả | Căn cứ |
+|---|---|---|
+| M1 | Đạt | `BatchDetailScreen` nhận prop `renderAi`, không còn import `features/ai` (grep `features/inventory` và `features/ledger` = 0). `app/(console)/inventory/detail/page.tsx` ghép `AiDocBlockGate` với `targetModel="inventory.batch"`, `targetId={\`${t.code},${t.id}\`}`, giống mẫu Lô 3. `Fragment key={aiApplied}` remount khối sau khi áp dụng |
+| M2 | Đạt, kèm điều kiện ở mục N1 | `p8_lo6` (78/78) và `p8_lo8` (79/79) được viết lại theo trang mới; dev báo kết quả, QA chạy lại. AC2 giờ kiểm giờ VN ở chi tiết lô và Sổ nhập xuất, chạy ở nhiều múi giờ |
+| L1 | Đạt | `lotView.batchAbility` chỉ đọc `inventory.cancel_expired_batch`; `inventory/mock.ts` cũng vậy. Xem bảng quyền dưới |
+| L2 | Đạt | `isStaleLotError` (`lotView.ts:172-177`, có vitest): `BR-MH-05` và `BR-LO-04` luôn mời tải lại; `BR-LO-07` mời trừ ca "không hợp lệ"; `BR-MH-08` chỉ mời khi câu báo có "vượt tồn". Việc dò theo chữ trong câu báo dễ gãy nếu BE đổi câu; nếu muốn chắc thì xin BE tách mã ở lô sau (Low, không chặn) |
+| L3 | Đạt | `LedgerTable.tsx:64` chỉ dùng `reference_display`, rỗng thì hiện "—" |
+| L4 | Để lại | Bật `ready` cho đơn và phiếu nhập sau khi ghép Lô 3 và Lô 6 |
+
+**Quyền Chủ trong mock (L1) so với BE sau `migrate` từ đầu**
+- 14 quyền dev thêm đều có trong nhóm `owner` thật: `inventory.cancel_expired_batch`, `inventory.view_batchsupplierreturn`, `ai.manage_ai_policy`, `accounts.view_demorecord`, `catalog.{add,change,delete,view}_itemimage`, `delivery.{change_recipient,confirm_with_customer,decide_unconfirmed}`, `sales.view_customer_list`, `sales.view_salescreditnote(line)`.
+- Mock Chủ có 146 quyền. Không quyền nào thừa so với BE. BE có thêm đúng 3 quyền, `delivery.assign_deliverynote`, `pack_deliverynote`, `print_label`: dev cố ý không thêm vì `main` (Lô 4) đã thêm ở dòng riêng. Sau khi ghép `main`, mock khớp BE hoàn toàn.
+- Cùng bộ 17 quyền ở các nhóm khác: Quản lý thật có `delivery.{change_recipient,confirm_with_customer,decide_unconfirmed,assign,pack,print_label}` và `sales.view_customer_list`; Nhân viên kho có `pack`, `print_label`; Chăm sóc khách có `change_recipient`, `confirm_with_customer`; Nhân viên giao không có quyền nào trong bộ. Dev không sửa mock của các nhóm này nên không lệch thêm.
+- Menu Chủ trong mock thấy thêm "Gọi xác nhận", "Chính sách AI", "Báo cáo AI". Đây là đúng vì BE thật cũng cho Chủ thấy các mục này.
+- **Lưu ý (Low, BE, không thuộc lô):** `accounts/0002` cấp cho `owner` *mọi* quyền của app nghiệp vụ, tính theo model có trong code **lúc migration chạy**. Một DB dựng từ đầu thì Chủ có đủ. Production đã migrate từng bước, nên các quyền của model sinh sau (`itemimage`, `salescreditnote`, `batchsupplierreturn`, `demorecord`) chỉ có nếu một migration sau cấp tường minh. Nên chạy truy vấn chỉ đọc trên staging để so `owner` với danh sách trên. Nếu thiếu thì BE thêm data migration. Việc này không ảnh hưởng Lô 7, vì Lô 7 chỉ dùng `cancel_expired_batch`, quyền đã được cấp tường minh ở `accounts/0009`.
+- `qa_ed_batch1_roles.py` còn thiếu nhãn "Sổ nhập xuất" trong bảng của QA. QA sửa khi chạy lại.
+
+**N1 — Medium, không chặn code Lô 7, cần Duy quyết: bỏ nút "Nhờ" khỏi trang chi tiết lô.**
+- Trước lô này, `BatchDetailSheet` gắn `GuidancePanel`. Trong panel đó có `GuidanceEscalate`, tức nút "Nhờ" (DW-23), với AC7 "AI tắt thì Nhờ vẫn chạy". Trang mới không còn panel này nên nút "Nhờ" biến mất. Khi AI tắt, trên trang lô không còn cách nào chuyển một bước mình không đủ quyền sang người có quyền.
+- Lý do dev ghi trong ca miễn là "việc chuyển lên người xử lý khi AI tắt do Lô 15 làm". Lý do này **không có căn cứ**: 02b §5.2 Lô 15 không có việc này, và 02c cũng không. Trang đơn của Lô 3 cũng đã bỏ panel, nên đây là thay đổi chung của đợt redesign, không riêng Lô 7.
+- **Có thể chấp nhận việc miễn ca e2e**, vì e2e chỉ phản ánh tính năng còn hay mất. Nhưng tính năng DW-23 đang mất mà không có quyết định nào ghi lại. Điều phối viên hỏi Duy chọn một trong ba:
+  - (a) Thêm mục "Nhờ người xử lý" vào menu "Thao tác khác" cho bước bị chặn vì thiếu quyền. Gọi `escalateStep` (http thuần, không kéo runtime AI) ở một lô FE sau. Techlead đề xuất cách này.
+  - (b) Bỏ hẳn DW-23 khỏi trang chi tiết và ghi vào `decisions.md`.
+  - (c) Giao rõ cho một lô cụ thể trong 02c.
+- Dev sửa câu "do Lô 15 làm" trong `03-dev-notes.md` cho khớp quyết định của Duy.
+
+### Kết luận re-review Lô 7 — FE: **APPROVED**
+M1, M2, L1, L2, L3 đạt. Không còn Critical, High hay Medium nào trong code của lô. Lô sẵn sàng cho QA. Trước deploy, điều phối viên mang N1 (nút "Nhờ" DW-23 mất ở trang chi tiết lô và đơn) lên Duy. Khi ghép nhánh thì làm L4.

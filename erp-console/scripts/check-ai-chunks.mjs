@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Kiểm tra sau `npm run build`: màn nghiệp vụ KHÔNG được tải code AI khi AI tắt (BR-AI-17, DW-09-AC8, SR-20).
 //
-// Đọc `.next/app-build-manifest.json`, với 4 route nghiệp vụ và 2 layout, liệt kê từng chunk JS
+// Đọc `.next/app-build-manifest.json`, với 6 route nghiệp vụ và 2 layout, liệt kê từng chunk JS
 // rồi tìm chuỗi đặc trưng của runtime AI: `new Worker`, `wllama`, `/call/`.
 // Có chunk chứa các chuỗi này -> in ra route + chunk + chuỗi trùng và thoát mã 1.
 // Cuối cùng in bảng "First Load JS" (tổng byte chưa nén của các chunk JS) để ghi vào 03-dev-notes.md.
@@ -24,6 +24,8 @@ const TARGETS = [
   ["/(console)/orders/payments/page", "/orders/payments"],
   ["/(console)/orders/refunds/page", "/orders/refunds"],
   ["/(console)/inventory/page", "/inventory"],
+  ["/(console)/inventory/detail/page", "/inventory/detail"],
+  ["/(console)/ledger/page", "/ledger"],
 ];
 
 // Chuỗi đặc trưng của code AI chạy trên máy (worker, thư viện wllama, gọi lệnh AI).
@@ -90,4 +92,4 @@ if (problems.length > 0) {
   process.exit(1);
 }
 
-console.log("\nXANH: 4 màn nghiệp vụ và 2 layout không chứa `new Worker`, `wllama`, `/call/`.");
+console.log("\nXANH: 6 màn nghiệp vụ và 2 layout không chứa `new Worker`, `wllama`, `/call/`.");

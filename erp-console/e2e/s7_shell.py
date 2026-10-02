@@ -51,7 +51,8 @@ with sync_playwright() as p:
     # ERP theo design Lô 1: menu theo UI-RULES §2.1 (nhóm Bán hàng / Hàng hoá & kho / Kế toán / Website / Quản trị), mục con
     # (Hàng chờ thanh toán, Phiếu hoàn, Chuyên mục) là tab trong màn cha, "Việc AI"/"AI của tôi" không còn dòng ở menu trái.
     # Mock chưa có quyền mới nên mục chưa làm (Khách hàng, Nhà cung cấp…) chưa hiện. Chi tiết 4 vai: e2e/ed_batch1_shell.py.
-    expected = ["Tổng quan", "Đơn & tiền", "Giao hàng", "Mua hàng", "Kho & lô", "Kiểm kê", "Danh mục & giá", "Báo cáo lãi lỗ", "Nội dung", "Nhân sự", "Nhật ký hoạt động"]
+    # Lô 7: thêm "Sổ nhập xuất"; sửa sau Techlead L1: mock cấp Chủ đủ quyền như BE thật nên thấy thêm Gọi xác nhận, Chính sách AI, Báo cáo AI.
+    expected = ["Tổng quan", "Đơn & tiền", "Gọi xác nhận", "Giao hàng", "Mua hàng", "Kho & lô", "Kiểm kê", "Sổ nhập xuất", "Danh mục & giá", "Báo cáo lãi lỗ", "Nội dung", "Nhân sự", "Nhật ký hoạt động", "Chính sách AI", "Báo cáo AI"]
     ok("AC1 menu Chủ", labels == expected, str(labels))
     ok("AC7 1280: 2 cột (menu trái hiện, không còn cột phải)", page.locator("#rail-left").is_visible() and page.locator("#rail-right").count() == 0)
     ok("AC7 1280: không có menu đáy", not page.locator(".bottom-nav").is_visible())

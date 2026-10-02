@@ -1054,3 +1054,167 @@ Không rò. B1 đã đóng: không `note`/`reason`/`description`... nào lên gi
 3. Chạy FE với BE thật.
 
 Server 3101–3104 đã tắt. File: `erp-console/e2e/qa_ed_batch2_followup.py` (mới), `qa_ed_batch2_patterns.py` và `qa_ed_batch2_harness.py` (siết các ca "luôn đúng"), ảnh `qa2-*.png` (13 ảnh) ở `shots/lot2/`.
+
+## Lô 7 — FE: Kho & lô, Sổ nhập xuất, Kho (ED-23, ED-24, ED-25 phần đọc/danh sách, ED-29) · lần 1 · 2026-10-02
+
+### Kết luận: REJECTED — 1 lỗi Medium (B1: màn cũ báo lỗi mà không có đường tải lại). Không có Critical/High.
+Kiểm trên **bản sau sửa Techlead** (có M1, M2, L1, L2, L3): `npm ci` sạch, build lại cả hai bản từ code hiện tại trong worktree `loc-wt-c`.
+
+### Tổng: 556 ca của riêng lô · ✅ 555 · ❌ 1 · ⏸ 0
+- Mock (cổng 3301): `qa_ed_batch7_mock.py` **336/336** (chạy 2 lần liên tiếp, cùng kết quả).
+- Backend thật (Django 8130, SQLite tạm + `bootstrap_masterdata` + `seed_demo` + lô Quá hạn dựng bằng ORM; console `MOCK=0` cổng 3302): `qa_ed_batch7_real.py` **219/220**, 2 lần chạy trên DB sạch, cùng kết quả. Ca đỏ duy nhất = B1.
+
+### Theo AC
+| Mã AC | Kết quả | Bằng chứng |
+|---|---|---|
+| ED-23-AC1 (3 tab, chip, Tồn/Giữ chỗ tách cột, hạn dùng ngày thuần) | ✅ | mock + real, ảnh `q7-loc-list.png`, `q7r-360-inventory.png` |
+| ED-23-AC2 (thanh trạng thái, Nhập xuất của lô, Đơn lấy hàng, khối AI) | ✅ | mock + real; khối AI chỉ hiện khi AI bật, hỏi đúng mã lô + pk (p8_lo6 78/78) |
+| ED-23-AC3 (Cận hạn: mục "…" mờ có lý do) | ✅ | mock; lý do "Lô chưa quá hạn." / "Lô còn 18,5 kg." đúng chữ |
+| ED-23-AC4 (giá vốn, Quản lý) | ✅ | HTML + response: ql1/kho1 không có `purchase_rate`, `landed_unit_cost`, `unit_cost`, "Giá mua/Giá vốn/Chi phí phụ", số tiền giá mua |
+| ED-23-AC5 (quyền vào màn) | ✅ | ma trận 5 vai x 5 đường dẫn (mock) + API thật 401/403 |
+| ED-24 F1e Mở bán lô (Chủ, Quản lý) | ✅ | real: Nháp -> Đang bán, AuditLog `publish_batch`; bấm đúp = 1 request |
+| ED-24 F1g Trả nhà cung cấp (từng phần/hết) | ✅ | real: 5 kg rồi phần còn lại; sổ ghi `RETURN_TO_SUPPLIER`, `balance_after` khớp BE; kiểm tra âm/0/vượt tồn bị chặn |
+| ED-24 F1h Huỷ phần tồn, ghi lỗ | ✅ | real: dòng sổ `WRITE_OFF`, tồn về 0; Quản lý không thấy nút; bấm đúp = 1 request |
+| ED-24 F1i Chốt lô (Chủ; có lãi/lỗ; Quản lý không có) | ✅ | real: chốt được lô Hết hàng sạch; lô thiếu hoá đơn mua bị chặn có lý do (AC3); lô còn tồn mờ |
+| ED-24 (màn cũ, trạng thái đã đổi) | ❌ cho Huỷ phần tồn, ✅ cho Mở bán | xem B1 |
+| ED-25-AC (tab Kho: chỉ Chủ thêm, trùng tên báo lỗi, trống, 120 ký tự) | ✅ | real: trùng (kể cả HOA, thừa khoảng trắng) -> 400 `WAREHOUSE_NAME_TAKEN`, hộp còn mở, không lộ mã; ô tên chặn gõ quá 120; BE 400 `WAREHOUSE_NAME_TOO_LONG` không lặp lại tên |
+| ED-29 (Sổ nhập xuất: cột, lọc, `Tồn sau`, chứng từ) | ✅ | real: 8 cột đúng thứ tự; "Đang hiện x / y" = số dòng thật trong BE; lọc Loại/ngày/lô; trạng thái trống có hướng dẫn; chuỗi `balance_after` khớp từng dòng |
+
+### Ngoại lệ & biên
+- Bấm đúp: Mở bán, Huỷ, Trả NCC, Chốt, Thêm kho: đều đúng 1 POST (mock + real). Ledger không thêm dòng.
+- Màn cũ: Chủ mở lô Quá hạn ở 2 tab, tab 1 huỷ, tab 2 huỷ lần nữa: BE từ chối, **không** ghi thêm dòng sổ, tồn không âm (✅ dữ liệu); nhưng giao diện xem B1. Mở bán lần 2 từ màn cũ: báo lỗi, có "Tải lại tồn".
+- Trả NCC vượt tồn / 0 / âm / thập phân: chặn, giữ giá trị đã nhập.
+- Lô cuối (tồn đúng bằng số huỷ), lô đã kiểm kê duyệt rồi chốt: đúng.
+- Lỗi 500, danh sách trống, tải chậm (có hàng khung xương), id lạ (`?id=999999`, `abc`, rỗng) ra "Không tìm thấy", không vỡ, không lộ traceback.
+- 360px: không cuộn ngang, vùng bấm >= 44px (mock + real, kể cả hộp thoại Trả NCC / Huỷ phần tồn).
+
+### Phân quyền (Group x hành động) — real BE + UI
+| Group | Xem Kho & lô, Sổ | Mở bán | Trả NCC / Huỷ / Chốt | Thêm kho | Thấy giá vốn |
+|---|---|---|---|---|---|
+| owner (loc) | ✅ | ✅ | ✅ | ✅ | ✅ |
+| manager (ql1) | ✅ | ✅ | API 403, UI không có nút | API 403, UI không có nút | ❌ (đúng) |
+| warehouse_staff (kho1) | ✅ | API 403, UI không có nút | API 403 | API 403 | ❌ (đúng) |
+| delivery_staff (giao1) | 403, màn "Không có quyền", 0 request kho | 403 | 403 | 403 | n/a |
+| customer_service (cs2) | 403, như trên | 403 | 403 | 403 | n/a |
+| chưa đăng nhập | 401 | 401 | 401 | 401 | n/a |
+
+### Rò giá vốn — ✅
+- DOM/HTML của danh sách, 3 tab, chi tiết 4 lô, hộp thoại, Sổ: ql1/kho1 không có từ khoá hay số giá vốn. API thật cho ql1/kho1 (lô, chi tiết, sổ, kho, phiếu điều chỉnh) không có khoá giá vốn, lãi/lỗ, tiền NCC.
+- **AuditLog** (khoá mới có thể tính ngược): `cancel_expired_batch` có `loss_amount` (tiền ÷ kg = giá vốn), `return_batch_to_supplier` có `supplier_refund_amount`, `close_batch` có `landed_unit_cost.final`. Chủ thấy đủ (được phép). **Quản lý gọi `/api/audit-logs/` thấy các dòng này nhưng đã bị che hết các khoá tiền** (`changes` chỉ còn `status`, `qty`) — ✅. kho1, giao1, cs2: 403.
+- F1i của Quản lý: không có Lãi/lỗ.
+
+### Rò dữ liệu cá nhân — ✅
+API kho/sổ/AuditLog cho mọi Group và HTML không có SĐT/tên/địa chỉ khách; "Đơn lấy hàng từ lô" chỉ có mã đơn, giờ, trạng thái, tổng tiền. `localStorage`/`sessionStorage`/cookie chỉ có token và tuỳ chọn giao diện; URL chỉ có `?id=`/`?tab=`. Console: không có SĐT. Dữ liệu 100% giả.
+
+### Hồi quy (cùng mock 3301, bản mới)
+| Bộ | Kết quả |
+|---|---|
+| `ed_batch7_inventory` (dev) | 99/99 |
+| `p8_lo5_fe_lo_qua_han` | 75/75 |
+| `p8_lo6_fe_sr19_sr20` (viết lại) | 78/78 |
+| `p8_lo7_fe_erp` | 81/81 |
+| `p8_lo8_fe_erp_tz` (viết lại) | 79/79 |
+| `ed_batch1_shell` (cần `out/` là bản mock vì đọc `out/404.html`) | 56/56 |
+| `s7_shell` / `s8_views` | 24/0 lỗi / 44/44 |
+| `ed_batch2_patterns` / `qa_ed_batch2_patterns` | 75/75 / 79/79 |
+| `qa_ed_batch1_roles` (đã thêm "Sổ nhập xuất", `/ledger/`, "Chính sách AI", "Báo cáo AI" vào bảng nhãn) | 46/48; 2 đỏ là có sẵn từ gốc (`/ai/policy/` không bọc ViewGuard, Lô 15) |
+| `tsc --noEmit` / `vitest run` | sạch / 45 file, 407 test đạt |
+| build `MOCK=0` + `check-no-mock` + `check-ai-chunks` / build `MOCK=1` | OK / XANH, XANH (6 màn + 2 layout) / OK |
+| `check_naming` | OK, không vi phạm mới |
+Không do Lô 7 (script lô trước, đếm cứng số mục menu hoặc cần harness riêng): `qa_ed_batch1_round2` 3 ca "Hồi quy menu 11/10/8 mục" (menu nay dài hơn do Sổ nhập xuất + mục AI của Chủ trong mock, theo L1); `qa_ed_batch1_shell` 9 ca (`len(nav_labels) == 11` + 1 ca cố tình gây lỗi render in ra console); `qa_ed_batch2_harness` ⏸ cần trang harness riêng (6/17). Cần chủ lô đó cập nhật số kỳ vọng; không chặn Lô 7.
+
+### Lỗi
+#### B1 — Màn cũ bấm "Huỷ phần tồn" báo lỗi nhưng không có đường tải lại · Medium · ED-24 (ngoại lệ "màn hình cũ")
+- Tái hiện (real BE, ảnh `shots/lot7/q7r-stale-cancel.png`): (1) mở lô Quá hạn còn tồn (vd QA-EXP-B, 7 kg) bằng Chủ ở 2 tab; (2) tab 1: Huỷ phần tồn -> Huỷ 7 kg, thành công; (3) tab 2 (chưa tải lại): Huỷ phần tồn -> Huỷ.
+- Mong đợi: thông báo tiếng Việt kèm cách khôi phục (nút "Tải lại tồn" như ca Mở bán), không mời "Thử lại" vô ích.
+- Thực tế: hộp thoại hiện đúng "Chỉ huỷ được lô Quá hạn." (mã `BR-LO-03`), nút chính vẫn là "Thử lại" (bấm lại sẽ lỗi y hệt), không có "Tải lại tồn"; màn phía sau vẫn hiện lô Quá hạn còn 7 kg và nút huỷ. Nguyên nhân: `isStaleLotError` (`features/inventory/lotView.ts`, L2) chỉ nhận `BR-MH-05`, `BR-LO-04`, `BR-LO-07`, `BR-MH-08`; trạng thái lô đổi (`BR-LO-03`) không được nhận ra là số liệu cũ. Cùng lớp lỗi với mã báo "sai trạng thái" khác của F1g/F1i cần rà.
+- Ảnh hưởng: không sai tiền/tồn (BE chặn, đã kiểm sổ); người dùng bị kẹt vòng "Thử lại" cho tới khi tự tải lại trang. Nên sửa: coi lỗi sai trạng thái lô (BR-LO-03 và mã tương đương của Trả NCC/Chốt) là số liệu cũ để hiện "Tải lại tồn" và bỏ "Thử lại".
+
+#### Ghi nhận mức Low (không chặn)
+- L-a. (BE) Chuỗi lỗi "Chỉ publish được lô đang ở trạng thái Nháp." còn chữ tiếng Anh "publish" (UI chuẩn là "Mở bán lô"); FE hiện nguyên văn BE. Giao BE đổi chữ.
+- L-b. Lệch ảnh thiết kế nhỏ: F1g thiếu icon khoá cạnh nhãn tiền hoàn; F1h vị trí khoá và dải vàng cảnh báo; F3m dùng ô chọn thay công tắc và chưa có bộ lọc "Mọi loại"; D3 chưa có dải "lô quá hạn còn tồn", cột nhà cung cấp, dải AI; Cận hạn hiện "Không còn việc nào cần làm." khi chưa chốt được; tiêu đề F1i chưa có mã lô; chứng từ ở Sổ nhập xuất mới chỉ `batch` là link (dev đã ghi nợ L4); tiêu đề mục "Số lượng & giá vốn" vẫn hiện với người không có quyền (không lộ số).
+
+### Có sẵn từ gốc, không tính vào lô này
+1. `GET /api/ai/status/` trả 404 trên BE thật: mỗi lần mở trang chi tiết lô, Chủ và NV kho có 1 dòng lỗi console (ql1 không có). Giao diện vẫn lành.
+2. BE nhãn dòng thời gian của lô dùng `kg_str`: "Nhập kho 18.000 kg" (dấu chấm nghìn hiểu nhầm). Lô 7 kg trong ảnh hiện "7.000 kg".
+3. `/ai/policy/` không bọc ViewGuard (vai nào cũng thấy khung màn): Lô 15.
+
+### Lưu ý phương pháp
+- Harness mock dùng `pushState` + `popstate` giả làm Next huỷ prefetch đang bay, sinh lỗi console "Failed to fetch RSC payload" (45 lỗi/8 lần). Bấm menu thật: 0 lỗi/8 lần. Ca `check_click_console` (9 ca: loc, ql1, kho1) chứng minh sản phẩm sạch khi bấm thật; lỗi do điều hướng giả đã được loại có chủ đích khỏi ca "Console".
+- Bản thật: console chỉ có 404 `/api/ai/status/`; không có lỗi HTTP nào khác.
+
+### Ảnh (dữ liệu giả) — `shots/lot7/` (đặt cạnh `board/`)
+Mock: `q7-loc-list`, `q7-loc-detail-*`, `q7-loc-F1g/F1h/F1i`, `q7-ql1-F1e`, `q7-loc-F3m`, `q7-loc-ledger-full`, `q7-loc-warehouses`, `q7-giao1-khong-co-quyen`, `q7-360-*`. Backend thật: `q7r-F1e`, `q7r-F1g-before`, `q7r-F1h`, `q7r-F1i`, `q7r-F3m-error`, `q7r-ledger`, `q7r-ledger-error`, `q7r-ledger-empty`, `q7r-menu-noinvoice`, `q7r-stale-cancel` (B1), `q7r-stale-publish`, `q7r-360-*`.
+
+### Lệnh đã chạy
+```
+cd erp-console && npm ci && npx tsc --noEmit && npx vitest run     # sạch · 45 file/407 test
+NEXT_PUBLIC_USE_MOCK=1 npm run build ; NEXT_PUBLIC_USE_MOCK=0 NEXT_PUBLIC_API_BASE=http://127.0.0.1:8130 npm run build
+node scripts/check-no-mock.mjs ; node scripts/check-ai-chunks.mjs   # XANH · XANH
+BASE=http://127.0.0.1:3301 python3 e2e/qa_ed_batch7_mock.py          # 336/336 (x2)
+BASE=http://127.0.0.1:3302 API=http://127.0.0.1:8130 python3 e2e/qa_ed_batch7_real.py   # 219/220 (x2), đỏ = B1
+python3 e2e/{p8_lo5,p8_lo6,p8_lo7,p8_lo8,ed_batch1_shell,ed_batch2_patterns,s7_shell,s8_views,qa_ed_batch1_roles}...   # xem bảng Hồi quy
+python3 scripts/check_naming.py                                       # OK
+```
+Máy chủ tạm của QA (3301, 3302, 3303, Django 8130) đã tắt.
+
+---
+
+### Lô 7 — FE lần 2 · 2026-10-02
+
+#### Kết luận: APPROVED — B1 đã sửa và kiểm trên BE thật (2 tab: Huỷ, Trả NCC, Mở bán, Chốt lô); không còn lỗi chặn trong phạm vi Lô 7
+Tổng gồm 1.480 ca pass; 3 ca đỏ đều có sẵn từ gốc, ngoài Lô 7 (xem mục dưới). Lô 7 FE: 336/336 (mock) + 253/253 (BE thật, chạy 2 lần trên DB sạch: lần 3 và lần 4 đều xanh sau khi sửa lỗi test của QA).
+
+#### Lỗi lần 1 đã đóng
+| Mã | Kết quả | Bằng chứng |
+|---|---|---|
+| B1 — màn cũ huỷ/trả/mở bán không có "Tải lại tồn" | ✅ ĐÃ SỬA | `qa_ed_batch7_real` ca `real stale *` (BE thật, 2 tab thật) + ca cũ "Màn cũ Mở bán". Ảnh `shots/lot7/q7r2-stale-*.png` |
+
+#### Ca 2 tab trên BE thật (lô dựng bằng ORM, Django 8130, DB tạm)
+Tab 1 và tab 2 cùng mở một lô. Tab 1 (hoặc ORM) làm đổi lô, rồi tab 2 bấm thao tác trên màn cũ.
+| Ca | Mã BE | Hộp lỗi tiếng Việt | "Tải lại tồn" | Nút chính | Sổ có thêm dòng? | Sau "Tải lại tồn" |
+|---|---|---|---|---|---|---|
+| Huỷ phần tồn, lô đã bị huỷ ở tab 1 (QA-S-CANCEL) | BR-LO-03 | ✅ | ✅ | khoá, không còn "Thử lại" ✅ | không ✅ | hộp đóng, 0 kg, "Đã huỷ" khớp BE ✅ |
+| Trả NCC, lô đã bị huỷ ở tab 1 (QA-S-RETURN) | BR-LO-07 | ✅ | ✅ | không khoá (xem L-c) | không ✅ | khớp BE, "Đã huỷ" ✅ |
+| Trả NCC vượt tồn do tab 1 đã trả 5/8 kg (QA-S-OVER) | BR-MH-08 | ✅ | ✅ | còn dùng được để sửa số (đúng thiết kế) ✅ | không ✅ | tồn 3 kg khớp BE ✅ |
+| Mở bán lô đã Mở bán ở tab 1 (QA-DRAFT) | BR-MH-05 | ✅ | ✅ | khoá, không "Thử lại" ✅ | không ✅ | khớp BE ✅ |
+| Chốt lô lần 2, tab 1 đã chốt (QA-S-CLOSE) | BR-LO-05 | ✅ | ✅ | khoá ✅ | không ✅ | "Đã chốt" ✅ |
+| Chốt lô, tồn đổi thành 2 kg sau khi mở hộp (QA-S-CLOSE2, ORM) | BR-LO-04 | ✅ | ✅ | khoá ✅ | không ✅ | tồn 2 kg khớp BE ✅ |
+| Chốt lô, phiếu kiểm kê bị đưa về nháp sau khi mở hộp (QA-S-CLOSE3, ORM) | BR-KK-05 | ✅ | ✅ | khoá ✅ | không ✅ | khớp BE ✅ |
+
+#### Hồi quy (cổng 3301 build mock)
+| Bộ | Kết quả |
+|---|---|
+| `qa_ed_batch7_mock` | 336/336 |
+| `ed_batch7_inventory` | 114/114 |
+| `p8_lo5_fe_lo_qua_han` / `p8_lo6_fe_sr19_sr20` / `p8_lo7_fe_erp` / `p8_lo8_fe_erp_tz` | 75 / 78 / 81 / 79, 0 đỏ |
+| `ed_batch1_shell` / `s7_shell` / `s8_views` | 56 / 24 / 44, 0 đỏ |
+| `ed_batch2_patterns` / `qa_ed_batch2_patterns` / `qa_ed_batch1_round2` | 75 / 79 / 42, 0 đỏ |
+| `qa_ed_batch1_roles` | 46/48; 2 đỏ do `/ai/policy/` thiếu ViewGuard (Lô 15, có sẵn, không tính) |
+| `qa_ed_batch1_shell` | 98/99; 1 đỏ "Bất biến 9: lỗi giả lập không ra console" — xem mục có sẵn |
+
+#### Có sẵn từ gốc, không tính vào Lô 7
+1. `/ai/policy/` không bọc ViewGuard (Lô 15): làm đỏ 2 ca của `qa_ed_batch1_roles`.
+2. `qa_ed_batch1_shell`, ca "lỗi giả lập có tên không ra console": React ghi nguyên lỗi render bị ném ra `console.error` ở bản production. Khung lỗi/ErrorBoundary nằm ở `shared/` và `app/`, Lô 7 không sửa các thư mục này (`git diff main` rỗng). Lỗi thật hiếm khi chứa dữ liệu khách, nhưng nên để techlead Lô 1 quyết (bọc `onError`/chặn log), ghi nhận.
+3. `GET /api/ai/status/` 404 (đã nêu ở lần 1), nhãn timeline BE "18.000 kg".
+
+#### Ghi nhận mức Low (không chặn)
+- L-a. (BE) "Chỉ publish được lô…" còn chữ "publish" (lần 1).
+- L-c. Trả NCC trên màn cũ sau khi lô đã huỷ (BR-LO-07): có "Tải lại tồn" nhưng nút "Ghi nhận đã trả" vẫn bấm được; bấm lại lỗi y hệt, không gây hại (không ghi sổ). Có thể thêm mã này vào danh sách khoá cho nhất quán.
+- L-d. (BE) Thông báo Chốt lô kèm mã quy tắc trong ngoặc: "…(BR-LO-04)", "…(BR-KK-05)". FE hiện nguyên văn.
+- L-e. (BE) Thông báo vượt tồn dùng dấu phẩy kiểu Mỹ: "không vượt tồn 3,000 kg".
+
+#### Lỗi test của chính QA đã sửa trong lần này (không phải lỗi sản phẩm)
+Hàm `ui_stale_two_tabs` thêm mới; sửa 3 ca cũ lệch do dữ liệu nhiều hơn 20 dòng sổ (đợi "Tải thêm" xong, theo link `next`) và regex trễ giả lập khung xương (`/api/inventory/batches/` không có `?`). Ca khung xương, Sổ x/y và "Sổ: số dòng UI = BE" xanh ở lần chạy cuối.
+
+#### Lệnh đã chạy
+```
+cd erp-console && npm ci && npx tsc --noEmit && npx vitest run     # sạch · 420 test
+NEXT_PUBLIC_USE_MOCK=1 npm run build ; NEXT_PUBLIC_USE_MOCK=0 NEXT_PUBLIC_API_BASE=http://127.0.0.1:8130 npm run build
+node scripts/check-no-mock.mjs ; node scripts/check-ai-chunks.mjs   # XANH · XANH
+BASE=http://127.0.0.1:3301 python3 e2e/qa_ed_batch7_mock.py          # 336/336
+BASE=http://127.0.0.1:3302 API=http://127.0.0.1:8130 python3 e2e/qa_ed_batch7_real.py   # 253/253 (DB sạch, lần cuối)
+python3 e2e/{ed_batch7_inventory,p8_lo5..p8_lo8,ed_batch1_shell,s7_shell,s8_views,qa_ed_batch1_*,ed_batch2_patterns,qa_ed_batch2_patterns}.py   # xem bảng Hồi quy
+python3 scripts/check_naming.py                                       # OK
+```
+Máy chủ tạm (3301, 3302, Django 8130) đã tắt. Ảnh (dữ liệu giả): `shots/lot7/q7r2-stale-{cancel,return-after-cancel,return-over,close-twice,close-qty-changed,close-stocktake-draft}[-after-reload].png`.

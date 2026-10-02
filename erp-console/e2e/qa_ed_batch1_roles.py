@@ -14,7 +14,7 @@ from qa_ed_batch1_common import (BASE, FULL_ORDER, SECTION_OF, SECTION_ORDER, SH
                                  nav_heads, nav_labels, ok, relevant_errors, summary)
 
 ROUTES = ["/overview/", "/orders/", "/orders/payments/", "/orders/refunds/", "/confirmation/", "/deliveries/",
-          "/my-deliveries/", "/purchasing/", "/inventory/", "/stocktake/", "/catalog/", "/reports/", "/content/",
+          "/my-deliveries/", "/purchasing/", "/inventory/", "/stocktake/", "/ledger/", "/catalog/", "/reports/", "/content/",
           "/content/categories/", "/staff/", "/audit-logs/", "/ai/policy/", "/ai/report/", "/ai/settings/",
           "/ai/actions/", "/account/"]
 USERS = ["loc", "ql1", "kho1", "giao1", "cs2"]
@@ -100,7 +100,7 @@ with sync_playwright() as p:
     ok("ED-01-AC5 giao1: menu chỉ có 'Việc giao của tôi'", menu_of["giao1"] == ["Việc giao của tôi"], str(menu_of["giao1"]))
     ok("ED-01-AC5 giao1: Đơn & tiền, Giao hàng, Tổng quan, báo cáo, nhân sự... đều không có quyền khi vào thẳng URL",
        all(m["giao1"][r] == "noperm" for r in ["/overview/", "/orders/", "/orders/payments/", "/orders/refunds/", "/deliveries/",
-                                              "/purchasing/", "/inventory/", "/stocktake/", "/catalog/", "/reports/", "/content/",
+                                              "/purchasing/", "/inventory/", "/stocktake/", "/ledger/", "/catalog/", "/reports/", "/content/",
                                               "/staff/", "/audit-logs/", "/ai/report/", "/confirmation/"]),
        {r: m["giao1"][r] for r in ROUTES})
     # Có sẵn từ gốc (màn AI chưa chuyển, thuộc lô 15): /ai/policy/ không bọc ViewGuard nên vai nào cũng thấy khung màn.
@@ -117,7 +117,7 @@ with sync_playwright() as p:
     ok("G9 ql1/kho1 không vào được hàng chờ thanh toán (chỉ chủ)", m["ql1"]["/orders/payments/"] == "noperm" and m["kho1"]["/orders/payments/"] == "noperm")
     # đồng bộ menu và bảo vệ màn: mục menu hiện thì vào được, khớp 1-1
     label_route = {"Tổng quan": "/overview/", "Đơn & tiền": "/orders/", "Gọi xác nhận": "/confirmation/", "Giao hàng": "/deliveries/",
-                   "Việc giao của tôi": "/my-deliveries/", "Mua hàng": "/purchasing/", "Kho & lô": "/inventory/", "Kiểm kê": "/stocktake/",
+                   "Việc giao của tôi": "/my-deliveries/", "Mua hàng": "/purchasing/", "Kho & lô": "/inventory/", "Kiểm kê": "/stocktake/", "Sổ nhập xuất": "/ledger/", "Chính sách AI": "/ai/policy/", "Báo cáo AI": "/ai/report/",
                    "Danh mục & giá": "/catalog/", "Báo cáo lãi lỗ": "/reports/", "Nội dung": "/content/", "Nhân sự": "/staff/",
                    "Nhật ký hoạt động": "/audit-logs/"}
     mismatch = []

@@ -11,7 +11,7 @@ import sys
 
 from playwright.sync_api import expect, sync_playwright
 
-from qa_ed_batch1_common import (BASE, FULL_ORDER, SHOTS, fonts_ready, fulfil_404, login, nav_labels, ok, relevant_errors,
+from qa_ed_batch1_common import (BASE, EXPECTED_MENU, FULL_ORDER, SHOTS, fonts_ready, fulfil_404, login, nav_labels, ok, relevant_errors,
                                  summary)
 
 errors = []
@@ -81,7 +81,7 @@ with sync_playwright() as p:
         page.reload()
         page.wait_for_selector("#rail-left .nav a", state="attached")
         settle(page)
-        good = page.locator("#rail-left.collapsed").count() == 0 and abs(rail.bounding_box()["width"] - 240) <= 1 and len(nav_labels(page)) == 11
+        good = page.locator("#rail-left.collapsed").count() == 0 and abs(rail.bounding_box()["width"] - 240) <= 1 and nav_labels(page) == EXPECTED_MENU["loc"]
         ok(f"ED-01-AC2 localStorage rác ({junk[:14]!r}) -> mở rộng, menu đủ, không vỡ", good)
     page.evaluate("() => localStorage.setItem('cave_ui_sidebar', 'collapsed')")
     page.reload()

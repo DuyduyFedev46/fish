@@ -1,0 +1,52 @@
+/* Sổ nhập xuất (Lô 7): chỉ dùng token trong tokens.css. */
+.codeLink {
+  color: var(--accent-text);
+  text-decoration: none;
+  border-radius: var(--radius-xs);
+}
+.codeLink:hover {
+  text-decoration: underline;
+}
+.codeLink:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+.in {
+  color: var(--good);
+}
+.out {
+  color: var(--crit);
+}
+.hint {
+  margin: 0;
+  color: var(--ink-3);
+  font-size: var(--text-sm);
+}
+.dateError {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1-5);
+  margin: 0;
+  color: var(--crit);
+  font-size: var(--text-sm);
+}
+
+/* Điện thoại: mã trong bảng là mục tiêu chạm đủ 44px; ô lọc cao đủ 44px (bộ lọc dùng chung thấp hơn mức này). */
+@media (max-width: 767px) {
+  .codeLink {
+    display: inline-flex;
+    align-items: center;
+    min-height: var(--tap);
+    min-width: var(--tap);
+  }
+  .filters :global(.fb input),
+  .filters :global(.fb .clr) {
+    min-height: var(--tap);
+  }
+  .filters :global(.fb-search) {
+    min-height: var(--tap);
+  }
+  .filters :global(.fb-select select) {
+    min-height: var(--tap);
+  }
+}

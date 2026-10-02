@@ -27,11 +27,12 @@ FULL_ORDER = [
 SECTIONS = ["Bán hàng", "Hàng hoá & kho", "Kế toán", "Website", "Quản trị"]
 # Mock chưa có quyền mới (xem 03-dev-notes.md, Lô 1 — FE) nên mỗi vai chỉ thấy phần đã làm.
 ROLE_MENU = {
-    "loc": (["Tổng quan", "Đơn & tiền", "Giao hàng", "Mua hàng", "Kho & lô", "Kiểm kê", "Danh mục & giá", "Báo cáo lãi lỗ", "Nội dung", "Nhân sự", "Nhật ký hoạt động"],
+    # Lô 7 (sửa sau Techlead L1): mock cấp cho Chủ đủ quyền như BE thật, nên Chủ thấy thêm Gọi xác nhận, Chính sách AI, Báo cáo AI.
+    "loc": (["Tổng quan", "Đơn & tiền", "Gọi xác nhận", "Giao hàng", "Mua hàng", "Kho & lô", "Kiểm kê", "Sổ nhập xuất", "Danh mục & giá", "Báo cáo lãi lỗ", "Nội dung", "Nhân sự", "Nhật ký hoạt động", "Chính sách AI", "Báo cáo AI"],
             ["Bán hàng", "Hàng hoá & kho", "Kế toán", "Website", "Quản trị"]),
-    "ql1": (["Tổng quan", "Đơn & tiền", "Gọi xác nhận", "Giao hàng", "Mua hàng", "Kho & lô", "Kiểm kê", "Danh mục & giá", "Nội dung", "Nhật ký hoạt động"],
+    "ql1": (["Tổng quan", "Đơn & tiền", "Gọi xác nhận", "Giao hàng", "Mua hàng", "Kho & lô", "Kiểm kê", "Sổ nhập xuất", "Danh mục & giá", "Nội dung", "Nhật ký hoạt động"],
             ["Bán hàng", "Hàng hoá & kho", "Website", "Quản trị"]),
-    "kho1": (["Tổng quan", "Đơn & tiền", "Giao hàng", "Việc giao của tôi", "Mua hàng", "Kho & lô", "Kiểm kê", "Danh mục & giá"],
+    "kho1": (["Tổng quan", "Đơn & tiền", "Giao hàng", "Việc giao của tôi", "Mua hàng", "Kho & lô", "Kiểm kê", "Sổ nhập xuất", "Danh mục & giá"],
              ["Bán hàng", "Hàng hoá & kho"]),
     "giao1": (["Việc giao của tôi"], ["Bán hàng"]),
 }

@@ -1,218 +1,119 @@
-/* Style cho chi tiết lô hàng (BatchDetailSheet) — theo Notion / Linear */
-
-.sheetBody {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-  padding: var(--space-4) 0;
-}
-
-.sheetHeader {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1-5);
-  padding-bottom: var(--space-3);
-  border-bottom: 1px solid var(--border);
-}
-
-.headerTop {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-
-.batchTitle {
-  font-size: var(--text-lg);
-  font-weight: var(--weight-semibold);
-  color: var(--ink);
-  margin: 0;
-}
-
-.batchCode {
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  color: var(--ink-3);
-  margin: 0;
-}
-
-.propList {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  margin: 0;
-}
-
-.propRow {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: var(--space-2);
-  font-size: var(--text-sm);
-  padding: var(--space-1) 0;
-}
-
-.propRow dt {
-  color: var(--ink-3);
-  flex-shrink: 0;
-}
-
-.propRow dd {
-  margin: 0;
-  color: var(--ink);
-  text-align: right;
-}
-
-.rowClickable {
-  cursor: pointer;
-  transition: background-color var(--dur-fast) ease;
-}
-
-.rowClickable:hover {
-  background-color: var(--surface-2);
-}
-
-.batchLink {
-  border: 0;
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-  text-decoration: underline;
-  text-underline-offset: 2px;
-}
-
-.batchLink:hover {
-  color: var(--accent);
-}
-
-.actionRow {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-2);
-  margin-top: var(--space-2);
-}
-
-.lockList {
-  list-style: none;
-  margin: var(--space-2) 0 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-  font-size: var(--text-sm);
-  color: var(--ink-3);
-  line-height: var(--leading-snug);
-}
-
-.lockList strong {
-  color: var(--ink-2);
-  font-weight: var(--weight-medium);
-}
-
-.filterChip {
+/* Kho & lô (Lô 7): chỉ dùng token trong tokens.css, không màu cứng. */
+.codeCell {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-1);
-  min-height: var(--tap);
-  padding: 0 var(--space-3);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-md);
-  background: var(--surface);
-  color: var(--ink-2);
-  font-size: var(--text-sm);
-  text-decoration: none;
 }
-
-.filterChip :global(.mi) {
-  font-size: 16px;
+.warnText {
+  color: var(--warn);
 }
-
-.filterChip:hover {
-  background: var(--surface-2);
-  color: var(--ink);
-}
-
-/* Hộp thoại nhỏ mở trên tấm chi tiết lô (ModalDialog) */
-.modalOverlay {
-  position: fixed;
-  inset: 0;
-  z-index: calc(var(--z-sheet) + 1);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: var(--space-4);
-}
-
-.modalScrim {
-  position: absolute;
-  inset: 0;
-  border: 0;
-  padding: 0;
-  background: var(--scrim);
-  animation: fade-in var(--dur-base) var(--ease-out);
-}
-
-.modalCard {
-  position: relative;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  padding: var(--space-5);
-  max-width: 440px;
-  width: 100%;
-  max-height: calc(100dvh - var(--space-8));
-  overflow-y: auto;
-  box-shadow: var(--shadow-lg);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  outline: none;
-}
-
-.modalTitle {
-  font-size: var(--text-base);
-  font-weight: var(--weight-semibold);
-  color: var(--ink);
-  margin: 0;
-}
-
-.modalTitleDanger {
+.critText {
   color: var(--crit);
 }
-
-.modalDesc {
-  font-size: var(--text-sm);
-  color: var(--ink-2);
-  line-height: var(--leading-normal);
+.hint {
   margin: 0;
+  color: var(--ink-3);
+  font-size: var(--text-sm);
 }
-
-.modalForm {
+.dateError {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1-5);
+  margin: 0;
+  color: var(--crit);
+  font-size: var(--text-sm);
+}
+.clearBtn {
+  min-height: 32px;
+}
+.panel {
   display: flex;
   flex-direction: column;
-  gap: var(--space-1);
-}
-
-.qtyRow {
-  display: flex;
   gap: var(--space-2);
 }
-
-.qtyRow input {
+.panelHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+.panelTitle {
+  margin: 0;
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
+}
+.panelLink {
+  color: var(--accent-text);
+  text-decoration: none;
+  font-size: var(--text-sm);
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--tap);
+}
+.panelLink:hover {
+  text-decoration: underline;
+}
+.qtyRow {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-2);
+}
+.qtyRow > :first-child {
   flex: 1;
   min-width: 0;
 }
-
-.modalForm :global(.alert-box) {
-  margin-bottom: var(--space-2);
+.sectionHead {
+  margin: 0;
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
+}
+.subSection {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.warnLine {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin: 0;
+  color: var(--warn);
+  font-size: var(--text-sm);
+}
+.codeLink {
+  color: var(--accent-text);
+  text-decoration: none;
+  border-radius: var(--radius-xs);
+}
+.codeLink:hover {
+  text-decoration: underline;
+}
+.codeLink:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
 }
 
-.modalActions {
-  display: flex;
-  justify-content: flex-end;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-  margin-top: var(--space-2);
+/* Điện thoại: mã trong bảng đủ 44px để chạm; ô lọc cao đủ 44px (bộ lọc dùng chung thấp hơn mức này). */
+@media (max-width: 767px) {
+  .codeCell,
+  .codeLink {
+    display: inline-flex;
+    align-items: center;
+    min-height: var(--tap);
+    min-width: var(--tap);
+  }
+  .filters :global(.fb input),
+  .filters :global(.fb .clr),
+  .filters :global(.fb-search),
+  .filters :global(.fb-select select) {
+    min-height: var(--tap);
+  }
+  .clearBtn {
+    min-height: var(--tap);
+  }
+}
+
+/* Tab ngắn ("Kho") vẫn đủ vùng bấm trên điện thoại. */
+.tabsWrap :global(.tab) {
+  min-width: var(--tap);
+  justify-content: center;
 }
