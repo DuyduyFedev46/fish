@@ -1,6 +1,7 @@
 // Dòng thời gian của chứng từ (UI-RULES §5.5): mỗi dòng = thời gian `dd/mm/yyyy hh:mm` (giờ Việt Nam) | việc (+ người làm).
 // Dữ liệu = `timeline` của guidance. KHÔNG hiện mã BR (`why.br`) hay mã nội bộ. Người làm là AI thì có nhãn "AI".
 // `truncated` (BE cắt bớt dòng cũ — `timeline_truncated`) → ghi rõ "Chỉ hiện N việc gần nhất" để không tưởng là hết lịch sử.
+import Link from "next/link";
 import { dateTime } from "@/shared/lib/format";
 import s from "./Timeline.module.css";
 
@@ -11,6 +12,8 @@ export type TimelineEntry = {
   actor?: string;
   /** AI làm → nhãn "AI" cạnh tên. */
   byAi?: boolean;
+  /** Có thì nhãn việc là liên kết sang chứng từ (vd phiếu hoàn). Màn chỉ đặt khi người xem có quyền mở chứng từ đó. */
+  href?: string;
 };
 
 type Props = {
@@ -34,7 +37,13 @@ export function Timeline({ entries, truncated = false, title = "Dòng thời gia
                 {dateTime(e.at)}
               </time>
               <span className={s.what}>
-                {e.label}
+                {e.href ? (
+                  <Link href={e.href} className={s.link}>
+                    {e.label}
+                  </Link>
+                ) : (
+                  e.label
+                )}
                 {e.actor ? (
                   <span className={s.who}>
                     {" · "}

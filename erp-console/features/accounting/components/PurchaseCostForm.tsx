@@ -155,7 +155,10 @@ function CostFormBody({ receipt, onBackToPick }: { receipt: ReceiptDetail; onBac
 
   // Hiện lỗi tổng ngay khi đã gõ gì đó (nút Lưu khoá, người dùng phải thấy vì sao); ô trống thì chờ tới lần bấm.
   const amountError = (touched || amount.trim() !== "" ? totalProblem : null) ?? sub.fieldErrors.amount;
-  const alert = sub.error ? <FormAlert>{sub.error}</FormAlert> : check.message ? <FormAlert>{check.message}</FormAlert> : undefined;
+  // Lô bổ sung A #14: lỗi của BE gắn với ô Tổng chi phí (COST_AMOUNT_TOO_LARGE, INVALID_AMOUNT) chỉ hiện dưới ô, không lặp ở alert.
+  // COST_LANDED_OVERFLOW gắn với phần chia vào lô (khoá `allocations`): hiện ở alert đầu form vì không có một ô riêng.
+  const errorBelowField = Boolean(sub.fieldErrors.amount) && sub.error === sub.fieldErrors.amount;
+  const alert = sub.error && !errorBelowField ? <FormAlert>{sub.error}</FormAlert> : check.message ? <FormAlert>{check.message}</FormAlert> : undefined;
 
   if (targets.length === 0) {
     return (
@@ -195,7 +198,7 @@ function CostFormBody({ receipt, onBackToPick }: { receipt: ReceiptDetail; onBac
         <Field label="Ngày phát sinh" name="incurred_date" type="date" required value={date} onChange={setDate} error={sub.fieldErrors.incurred_date} />
       </div>
       <div className={s.twoCols}>
-        <Field label="Tổng chi phí" name="amount" type="money" required unit={CURRENCY_UNIT} value={amount} onChange={setAmount} error={amountError} />
+        <Field label="Tổng chi phí" name="amount" type="money" required unit={CURRENCY_UNIT} value={amount} onChange={(v) => { setAmount(v); if (sub.failed) sub.reset(); }} error={amountError} />
         <Field as="select" label="Cách chia vào lô" name="allocation_method" value={method} onChange={(v) => setMethod(v as AllocationMethod)} options={METHOD_OPTIONS} />
       </div>
       <div className={s.allocTable} role="group" aria-label="Chia vào từng lô">

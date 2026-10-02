@@ -7,12 +7,16 @@ import type { MockRequest, MockResponse } from "@/shared/lib/http";
 import { todayInVietnam } from "@/shared/lib/format";
 import { MOCK_UNAUTHORIZED, mockRequireUser } from "@/features/auth/mock";
 import type { Me } from "@/features/auth/types";
+import { beDetail } from "@/shared/lib/beErrors.mock";
 import type { PurchaseCostAllocation, PurchaseCostInput, PurchaseCostRow, PurchaseInvoiceInput, PurchaseInvoiceRow } from "./types";
 
 const DAY = 86_400_000;
 const PAGE_SIZE = 20;
 const FORBIDDEN: MockResponse = { status: 403, body: { detail: "Bạn không có quyền để thực hiện thao tác này." } };
 const err = (status: number, code: string, detail: string): MockResponse => ({ status, body: { code, detail } });
+/** Cột amount của BE: 12 chữ số nguyên (nhỏ hơn 10^12). */
+const MAX_COST_AMOUNT = 1_000_000_000_000;
+const LANDED_OVERFLOW_PART = 400_000_000_000;
 const can = (me: Me, perm: string) => me.permissions.includes(perm);
 const canReadCosts = (me: Me) => can(me, "purchasing.view_purchasecost") && me.can_view_cost;
 
@@ -247,12 +251,26 @@ export function mockCostCreate(req: MockRequest): MockResponse {
   const body = (req.body ?? {}) as Partial<PurchaseCostInput>;
   if (!body.cost_type || !COST_TYPE_LABEL[body.cost_type]) return err(400, "BR-GV-01", "Loại chi phí không hợp lệ.");
   const amount = Number(body.amount);
-  if (!Number.isFinite(amount) || amount < 0) return err(400, "BR-GV-01", "Số tiền chi phí không được âm.");
+  // Lô bổ sung A #14: BE trả kèm khoá `amount` / `allocations` để form hiện lỗi dưới đúng ô (beErrors.mock.ts chép nguyên văn câu của BE).
+  if (body.amount === undefined || body.amount === null || String(body.amount).trim() === "" || !Number.isFinite(amount)) {
+    const detail = "Số tiền chi phí không hợp lệ.";
+    return { status: 400, body: { code: "INVALID_AMOUNT", detail, amount: [detail] } };
+  }
+  if (amount < 0) return err(400, "BR-GV-01", "Số tiền chi phí không được âm.");
+  if (amount >= MAX_COST_AMOUNT) {
+    const detail = beDetail("COST_AMOUNT_TOO_LARGE");
+    return { status: 400, body: { code: "COST_AMOUNT_TOO_LARGE", detail, amount: [detail] } };
+  }
   if (!body.incurred_date) return { status: 400, body: { incurred_date: [required] } };
   const parts = body.allocations ?? [];
   if (parts.length === 0) return err(400, "BR-GV-04", "Phải chỉ định ít nhất một lô nhận phân bổ.");
   const sum = parts.reduce((s, a) => s + Number(a.amount), 0);
   if (sum !== amount) return err(400, "BR-GV-04", "Tổng số tiền phân bổ truyền vào không khớp số tiền chi phí.");
+  // Giá vốn mỗi kg của lô phải dưới 10 chữ số phần nguyên. Mock không biết số kg từng lô nên giả định lô cỡ 40 kg: một phần chia từ 4×10^11 trở lên là tràn.
+  if (parts.some((a) => Number(a.amount) >= LANDED_OVERFLOW_PART)) {
+    const detail = beDetail("COST_LANDED_OVERFLOW");
+    return { status: 400, body: { code: "COST_LANDED_OVERFLOW", detail, allocations: [detail] } };
+  }
   const row = costRow({
     id: nextCostId++,
     cost_type: body.cost_type,

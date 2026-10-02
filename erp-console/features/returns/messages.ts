@@ -56,6 +56,13 @@ export const RETURNS_MSG = {
   approvedRestock: "Đã duyệt. Hàng đã nhập lại vào lô.",
   approvedWriteOff: "Đã duyệt. Hàng đã huỷ bỏ, ghi lỗ.",
 
+  // ---- Huỷ phiếu hoàn (Lô bổ sung A #8) ----
+  cancelMenu: "Huỷ phiếu hoàn",
+  cancelTitle: "Huỷ phiếu hoàn",
+  cancelConfirm: "Huỷ phiếu hoàn",
+  cancelBody: (code: string) => `Huỷ phiếu ${code}. Số kg của phiếu này không còn tính vào số đã hoàn của phiếu giao, và phiếu không khôi phục lại được.`,
+  cancelled: "Đã huỷ phiếu hoàn.",
+
   // ---- F2n Duyệt ----
   approveTitle: "Duyệt hàng hoàn",
   approveSummary: "Phiếu hàng hoàn cần duyệt",

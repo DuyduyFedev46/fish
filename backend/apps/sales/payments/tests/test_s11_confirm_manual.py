@@ -77,25 +77,24 @@ class S11ConfirmManualTests(OrderApiBase):
         self.assertEqual(pay.source, PaymentTransaction.Source.MANUAL)
         self.assertTrue(AuditLog.objects.filter(action="confirm_payment_manual", actor=self.chu).exists())
 
-    def test_s11_ac3_don_tu_huy_thi_orphan_khong_khoi_phuc_kho_khong_doi(self):
+    def test_s11_ac3_don_tu_huy_xac_nhan_tay_400_khong_ghi_gi_kho_khong_doi(self):
+        # Lô bổ sung A #15 (Duy chốt 02/10/2026): trước đây trả 200 ORPHAN; nay chặn bằng ORDER_AUTO_CANCELLED.
+        # Tiền về muộn qua webhook vẫn vào hàng chờ (ORPHAN) — xem orders/tests/test_auto_cancelled_locked.py.
         order_services.cancel_unpaid_expired(now=timezone.now() + timezone.timedelta(hours=2))
         self.order.refresh_from_db()
         self.assertEqual(self.order.status, SalesOrder.Status.AUTO_CANCELLED)
         before = Batch.objects.get(pk=self.batch.pk)
 
         resp = self._post(self.chu, self.order, {"bank_txn_id": "FT003", "amount": "540000"})
-        self.assertEqual(resp.status_code, 200, resp.content)
-        self.assertEqual(resp.json(), {
-            "result": "ORPHAN", "duplicate": False, "order_status": "AUTO_CANCELLED",
-        })
+        self.assertEqual(resp.status_code, 400, resp.content)
+        self.assertEqual(resp.json()["code"], "ORDER_AUTO_CANCELLED")
         self.order.refresh_from_db()
         self.assertEqual(self.order.status, SalesOrder.Status.AUTO_CANCELLED)
         after = Batch.objects.get(pk=self.batch.pk)
         self.assertEqual((after.qty_available, after.qty_reserved),
                          (before.qty_available, before.qty_reserved))
         self.assertFalse(SalesInvoice.objects.exists())
-        self.assertEqual(PaymentTransaction.objects.get().match_status,
-                         PaymentTransaction.MatchStatus.ORPHAN)
+        self.assertFalse(PaymentTransaction.objects.exists())
 
     def test_s11_ac4_bam_hai_lan_duplicate_mot_giao_dich_mot_hoa_don(self):
         first = self._post(self.chu, self.order, {"bank_txn_id": "FT001", "amount": "540000"}).json()
@@ -165,14 +164,14 @@ class S11ConfirmManualTests(OrderApiBase):
         self.order.refresh_from_db()
         self.assertEqual(self.order.status, SalesOrder.Status.BOOKED)
 
-    def test_s11_don_khong_o_giu_cho_hoac_tu_huy_400(self):
+    def test_s11_don_khong_o_giu_cho_400(self):
         self._post(self.chu, self.order, {"bank_txn_id": "FT001"})
         self.order.refresh_from_db()
         self.assertEqual(self.order.status, SalesOrder.Status.PROCESSING)
         resp = self._post(self.chu, self.order, {"bank_txn_id": "FT777", "amount": "540000"})
         self.assertEqual(resp.status_code, 400)
         self.assertEqual(resp.json(), {
-            "code": "BR-TT-08", "detail": "Đơn không ở trạng thái Giữ chỗ/Tự huỷ.",
+            "code": "BR-TT-08", "detail": "Đơn không ở trạng thái Giữ chỗ.",
         })
         self.assertEqual(PaymentTransaction.objects.count(), 1)
 

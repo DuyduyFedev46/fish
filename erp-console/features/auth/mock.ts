@@ -103,7 +103,7 @@ const GROUP_PERMS: Record<string, string[]> = {
     "catalog.view_item", "catalog.view_itemgroup", "catalog.view_itemprice", "catalog.view_pricelist", "catalog.view_pricingrule",
     "delivery.add_deliverynote", "delivery.change_deliverynote", "delivery.view_deliverynote", "delivery.assign_deliverynote",
     "delivery.confirm_with_customer", "delivery.change_recipient", "delivery.decide_unconfirmed", "delivery.pack_deliverynote", "delivery.print_label",
-    "inventory.add_stockentry", "inventory.add_stockreconciliation", "inventory.add_stockreconciliationline",
+    "inventory.add_returntostock", "inventory.add_stockentry", "inventory.add_stockreconciliation", "inventory.add_stockreconciliationline",
     "inventory.approve_returntostock", "inventory.approve_stockreconciliation", "inventory.change_stockentry",
     "inventory.change_stockreconciliation", "inventory.change_stockreconciliationline", "inventory.publish_batch",
     "inventory.view_batch", "inventory.view_returntostock", "inventory.view_stockentry",

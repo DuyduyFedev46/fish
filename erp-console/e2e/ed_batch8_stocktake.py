@@ -3,8 +3,7 @@
 #   BASE=http://127.0.0.1:3201 SHOTS=<thư mục ảnh> python3 e2e/ed_batch8_stocktake.py      # tắt server sau khi xong
 # Kiểm: loc / ql1 / kho1 vào được, giao1 / cs2 không · danh sách (cột kho, hụt, dư, lọc, tìm, rỗng) · lập phiếu: chọn kho nạp lô,
 # lưu nháp rồi gửi duyệt, lỗi (số âm, thiếu số, đếm dư không lý do, kho rỗng, ngày trống) · chi tiết: bảng chênh lệch, dòng thời gian ·
-# người nhập số không duyệt được (nút mờ trong "…" kèm lý do), người khác duyệt được, tồn kho đổi đúng số đã chụp (BR-KK-09) ·
-# người đã sửa số đếm cũng bị chặn (BR-KK-08) · 409 STALE_STATE -> ConflictBanner · RECON_EMPTY · RECON_STOCK_INSUFFICIENT đúng dòng ·
+# Lô bổ sung A #6/#20: Nháp → Gửi duyệt (hộp xác nhận) → Chờ duyệt (Trả về nháp / Duyệt) · tồn kho đổi đúng số đã chụp (BR-KK-09) · 409 STALE_STATE -> ConflictBanner · RECON_EMPTY · RECON_STOCK_INSUFFICIENT đúng dòng ·
 # phiếu đã duyệt không sửa · 404 · 360px không cuộn ngang · không có tiền, không có dữ liệu khách ở localStorage / URL / console.
 import os
 import re
@@ -139,7 +138,7 @@ def list_screen(browser):
     ok("KK-17 (phiếu trống): kho và hụt/dư là gạch, số lô 0", c17[2] == "—" and c17[3] == "0" and c17[4] == "—" and c17[5] == "—", str(c17))
     ok("KK-13: Đã duyệt, người duyệt Lộc", "Đã duyệt" in row_of(page, "KK-13").inner_text() and "Lộc" in row_of(page, "KK-13").inner_text())
     summary = page.locator(".fb").inner_text()
-    ok("có dòng tóm tắt 'Đang hiện n / m phiếu' kèm số chờ duyệt", re.search(r"Đang hiện 6 / 6 phiếu · 4 chờ duyệt", summary) is not None, summary.replace("\n", "|"))
+    ok("có dòng tóm tắt 'Đang hiện n / m phiếu' kèm số chờ duyệt", re.search(r"Đang hiện 6 / 6 phiếu · 1 chờ duyệt", summary) is not None, summary.replace("\n", "|"))
     # lọc
     page.get_by_label("Lọc theo trạng thái").select_option("APPROVED")
     page.wait_for_load_state("networkidle")
@@ -239,7 +238,7 @@ def create_flow(browser):
     diffs = [r.locator("[data-diff]").inner_text() for r in page.locator("table.lt tbody tr[data-line-row]").all()]
     ok("chênh lệch từng lô đúng (+1,75 −0,4 −25,25 0 0)", sorted(diffs) == sorted(["+1,75", "−0,4", "−25,25", "0", "0"]), str(diffs))
     ok("nhân viên kho (người nhập số) không có nút Duyệt, không có menu chặn", page.get_by_role("button", name="Duyệt và điều chỉnh tồn").count() == 0 and page.get_by_role("button", name="Thao tác khác").count() == 0)
-    ok("người nhập số có nút Sửa số đếm", page.get_by_role("link", name="Sửa số đếm").count() == 1)
+    ok("Chờ duyệt: không sửa số đếm trực tiếp, có Trả về nháp (Lô bổ sung A #6/#20)", page.get_by_role("link", name="Sửa số đếm").count() == 0 and page.get_by_role("button", name="Trả về nháp").count() == 1)
     ok("không có lỗi console", not errors, str(errors[:2]))
     # KHÔNG tạo hai phiếu
     go(page, "/stocktake/")
@@ -267,31 +266,34 @@ def create_flow(browser):
 # ---------------------------------------------------------------- chi tiết, quyền duyệt, chặn
 def detail_and_approval(browser):
     ctx, page, errors = new_page(browser, "ql1")
-    go(page, "/stocktake/detail/?id=15")  # do Chị Hạnh (ql1) nhập số
-    ok("KK-15: ql1 là người nhập số, không có nút chính Duyệt", page.get_by_role("button", name="Duyệt và điều chỉnh tồn").count() == 0)
-    menu = more_menu(page)
-    item = menu.get_by_role("menuitem", name=re.compile("Duyệt và điều chỉnh tồn"))
-    ok("KK-15: Duyệt nằm mờ trong '…' kèm lý do BE trả", item.count() == 1 and item.get_attribute("aria-disabled") == "true" and "không tự duyệt được" in item.inner_text(), item.inner_text().replace("\n", "|") if item.count() else "")
-    item.click(force=True)
-    ok("KK-15: bấm mục mờ không mở hộp", page.get_by_role("dialog").count() == 0)
-    page.keyboard.press("Escape")
-    ok("KK-15: câu Tiếp theo nói cần người khác", page.get_by_text("Cần người khác duyệt phiếu này.", exact=False).first.is_visible())
-    # người nhập số sửa số đếm của phiếu khác -> bị chặn duyệt (BR-KK-08)
+    go(page, "/stocktake/detail/?id=15")  # Nháp, do Chị Hạnh (ql1) nhập số
+    ok("KK-15 Nháp: có Sửa số đếm và Gửi duyệt, chưa có nút Duyệt", page.get_by_role("link", name="Sửa số đếm").count() == 1 and page.get_by_role("button", name="Gửi duyệt").count() == 1 and page.get_by_role("button", name="Duyệt và điều chỉnh tồn").count() == 0)
+    page.get_by_role("button", name="Gửi duyệt").click()
+    dlg = page.get_by_role("dialog")
+    ok("Gửi duyệt hiện hộp xác nhận nói rõ sau khi gửi không sửa số đếm", dlg.get_by_text("không sửa số đếm được", exact=False).is_visible(), dlg.inner_text())
+    dlg.get_by_role("button", name="Gửi duyệt").click()
+    page.get_by_text("Đã gửi duyệt. Phiếu chờ Chủ hoặc Quản lý duyệt.", exact=False).first.wait_for()
+    ok("KK-15 sau khi gửi: chip Chờ duyệt, hết Sửa số đếm, có Trả về nháp", "Chờ duyệt" in page.inner_text("main") and page.get_by_role("link", name="Sửa số đếm").count() == 0 and page.get_by_role("button", name="Trả về nháp").count() == 1)
+    page.get_by_role("button", name="Trả về nháp").click()
+    page.get_by_role("dialog").get_by_role("button", name="Trả về nháp").click()
+    page.get_by_text("Đã trả phiếu về nháp.", exact=False).first.wait_for()
+    ok("Trả về nháp: phiếu về Nháp, có lại Sửa số đếm", "Nháp" in page.inner_text("main") and page.get_by_role("link", name="Sửa số đếm").count() == 1)
+    # sửa số đếm ở phiếu Nháp rồi gửi duyệt
     go(page, "/stocktake/edit/?id=16")
-    ok("KK-16: ql1 mở được trang sửa", rows(page).count() == 2)
+    ok("KK-16 (Nháp): ql1 mở được trang sửa", rows(page).count() == 2)
     count(page, 202, "19,5")
     page.get_by_role("button", name="Lưu nháp").click()
     page.get_by_text("Đã lưu nháp", exact=False).first.wait_for()
     go(page, "/stocktake/detail/?id=16")
-    ok("KK-16: ql1 đã sửa số đếm nên không có nút Duyệt", page.get_by_role("button", name="Duyệt và điều chỉnh tồn").count() == 0)
-    item = more_menu(page).get_by_role("menuitem", name=re.compile("Duyệt và điều chỉnh tồn"))
-    ok("KK-16: lý do nói đã sửa số đếm (BR-KK-08)", item.count() == 1 and "đã sửa số đếm" in item.inner_text(), item.inner_text() if item.count() else "")
-    page.keyboard.press("Escape")
     ok("KK-16: cột Cập nhật lần cuối ghi tên người sửa", "Chị Hạnh" in page.inner_text("main"))
+    page.get_by_role("button", name="Gửi duyệt").click()
+    page.get_by_role("dialog").get_by_role("button", name="Gửi duyệt").click()
+    page.get_by_text("Đã gửi duyệt. Phiếu chờ Chủ hoặc Quản lý duyệt.", exact=False).first.wait_for()
+    ok("KK-16 đã gửi duyệt: dòng thời gian cập nhật", page.get_by_text("Chờ duyệt", exact=False).count() >= 1)
     # Chủ duyệt được cả hai
     switch_user(page, "loc")
     go(page, "/stocktake/detail/?id=16")
-    ok("loc thấy nút Duyệt ở KK-16", page.get_by_role("button", name="Duyệt và điều chỉnh tồn").is_visible())
+    ok("loc thấy nút Duyệt ở KK-16 (phiếu đã Chờ duyệt)", page.get_by_role("button", name="Duyệt và điều chỉnh tồn").is_visible())
     page.get_by_role("button", name="Duyệt và điều chỉnh tồn").click()
     page.get_by_role("dialog").get_by_role("button", name="Duyệt phiếu").click()
     page.get_by_text("Đã duyệt. Tồn kho đã cộng hoặc trừ theo chênh lệch đã ghi", exact=False).first.wait_for()
@@ -326,13 +328,17 @@ def approve_errors(browser):
     ctx, page, errors = new_page(browser, "loc")
     go(page, "/stocktake/detail/?id=17")
     ok("KK-17 trống: hiện trạng thái rỗng của bảng", page.locator("[data-stocktake-empty]").is_visible())
-    page.get_by_role("button", name="Duyệt và điều chỉnh tồn").click()
-    page.get_by_role("dialog").get_by_role("button", name="Duyệt phiếu").click()
-    page.get_by_text("chưa có dòng số đếm nào", exact=False).first.wait_for()
-    ok("RECON_EMPTY: câu của BE hiện đầu trang, hộp đóng lại, phiếu còn Chờ duyệt", page.get_by_role("dialog").count() == 0 and "Chờ duyệt" in page.inner_text("main"))
+    page.get_by_role("button", name="Gửi duyệt").click()
+    page.get_by_role("dialog").get_by_role("button", name="Gửi duyệt").click()
+    page.get_by_role("dialog").get_by_text("chưa có dòng số đếm nào", exact=False).first.wait_for()
+    ok("RECON_EMPTY khi gửi duyệt: câu của BE hiện trong hộp, phiếu vẫn Nháp", page.get_by_role("dialog").count() == 1 and "Nháp" in page.inner_text("main"))
+    page.keyboard.press("Escape")
     # RECON_STOCK_INSUFFICIENT với line_index
     page.evaluate("() => window.__caveMock.stocktakeSetStock(202, 0.1)")
     go(page, "/stocktake/detail/?id=16")
+    page.get_by_role("button", name="Gửi duyệt").click()
+    page.get_by_role("dialog").get_by_role("button", name="Gửi duyệt").click()
+    page.get_by_text("Đã gửi duyệt. Phiếu chờ Chủ hoặc Quản lý duyệt.", exact=False).first.wait_for()
     page.get_by_role("button", name="Duyệt và điều chỉnh tồn").click()
     page.get_by_role("dialog").get_by_role("button", name="Duyệt phiếu").click()
     page.locator("[data-line-error]").first.wait_for()
@@ -383,6 +389,24 @@ def conflicts(browser):
     page.get_by_role("button", name="Tải lại").click()
     page.wait_for_function("() => !document.querySelector('[data-conflict-banner]')", timeout=10_000)
     ok("Tải lại: ô ghi chú là của chị Lan", page.get_by_label("Ghi chú").input_value() == "Ghi chú của chị Lan", page.get_by_label("Ghi chú").input_value())
+    ctx.close()
+
+
+# ---------------------------------------------------------------- TLA-FE-L1: câu lỗi BE không mã luật
+def stale_submit(browser):
+    ctx, page, errors = new_page(browser, "ql1")
+    go(page, "/stocktake/detail/?id=15")  # Nháp
+    # Tab khác đã gửi duyệt phiếu này: máy chủ nay là Chờ duyệt, trang này vẫn tưởng Nháp.
+    page.evaluate("() => window.__caveMock.stocktakeSubmitByOther(15)")
+    page.get_by_role("button", name="Gửi duyệt").click()
+    dlg = page.get_by_role("dialog")
+    dlg.get_by_role("button", name="Gửi duyệt").click()
+    alert = dlg.locator("[data-form-alert='error']")
+    alert.wait_for()
+    txt = " ".join(dlg.inner_text().split())
+    ok("Gửi duyệt phiếu đã gửi ở tab khác: hộp báo lỗi bằng câu của BE", "không sửa dòng được" in txt, txt)
+    ok("câu lỗi không hiện mã luật 'BR-' (UI-RULES 4.1)", "BR-" not in txt, txt)
+    ok("hộp còn mở để người dùng đọc lỗi, nút đổi 'Thử lại'", dlg.get_by_role("button", name="Thử lại").count() == 1)
     ctx.close()
 
 
@@ -451,7 +475,7 @@ def mobile(browser):
 
 with sync_playwright() as p:
     browser = p.chromium.launch(headless=True)
-    for fn in (role_access, list_screen, create_flow, detail_and_approval, approve_errors, conflicts, form_edges, mobile):
+    for fn in (role_access, list_screen, create_flow, detail_and_approval, approve_errors, conflicts, stale_submit, form_edges, mobile):
         try:
             fn(browser)
         except Exception as exc:  # một nhóm lỗi không làm mất kết quả các nhóm khác

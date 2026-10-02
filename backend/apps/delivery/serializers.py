@@ -40,7 +40,7 @@ class DeliveryNoteSerializer(serializers.ModelSerializer):
             "paid_at", "confirmed_at", "confirm_skipped",
             "assigned_to", "assigned_to_name", "failed_attempts", "note",
             "failure_reason", "failure_reason_label",
-            "created_at", "completed_at",
+            "created_at", "completed_at", "delivery_started_at", "failed_at",
             "lines_summary", "total_kg", "label",
             "customer_name", "address",
             "available_actions",
@@ -48,6 +48,7 @@ class DeliveryNoteSerializer(serializers.ModelSerializer):
         read_only_fields = [
             "code", "sales_invoice", "status", "assigned_to", "failed_attempts", "failure_reason",
             "created_at", "completed_at", "confirmed_at", "confirmed_by", "confirm_skipped",
+            "delivery_started_at", "failed_at",
         ]
 
     def _customer_data_hidden(self, obj) -> bool:
@@ -60,6 +61,18 @@ class DeliveryNoteSerializer(serializers.ModelSerializer):
         if self._customer_data_hidden(instance):
             ret["note"] = None
         return ret
+
+    def _full_phone(self, obj):
+        """SĐT đủ của người nhận (SR-PII-02): None nếu quá cửa sổ cho người giao. `recipient_phone` > SĐT đơn > SĐT khách."""
+        if self._customer_data_hidden(obj):
+            return None
+        if obj.recipient_phone:
+            return obj.recipient_phone
+        invoice = obj.sales_invoice
+        order = invoice.sales_order if invoice and invoice.sales_order_id else None
+        if order is not None:
+            return order.phone or (order.customer.phone if order.customer_id else "") or ""
+        return ""
 
     def get_assigned_to_name(self, obj):
         if not obj.assigned_to_id:
@@ -192,6 +205,24 @@ class DeliveryNoteSerializer(serializers.ModelSerializer):
         return actions
 
 
+class CourierDeliveryNoteListSerializer(DeliveryNoteSerializer):
+    """
+    #17 (R4b): dòng danh sách cho `GET /notes/?assigned_to=me` — thêm `phone` để người giao gọi khách ngay từ danh sách.
+    `phone` khác null chỉ khi phiếu ĐANG GIAO hoặc GIAO THẤT BẠI và còn trong cửa sổ SR-PII-02 (cùng điều kiện với chi tiết).
+    View chỉ dùng lớp này khi `assigned_to=me`, nên chỉ phiếu gán cho chính người gọi; các truy vấn khác không có khoá `phone`.
+    """
+
+    phone = serializers.SerializerMethodField()
+
+    class Meta(DeliveryNoteSerializer.Meta):
+        fields = DeliveryNoteSerializer.Meta.fields + ["phone"]
+
+    def get_phone(self, obj):
+        if obj.status not in (DeliveryNote.Status.DELIVERING, DeliveryNote.Status.FAILED):
+            return None
+        return self._full_phone(obj)
+
+
 class DeliveryNoteDetailSerializer(DeliveryNoteSerializer):
     lines = serializers.SerializerMethodField()
     recipient_name = serializers.SerializerMethodField()
@@ -203,15 +234,7 @@ class DeliveryNoteDetailSerializer(DeliveryNoteSerializer):
 
     def get_phone(self, obj):
         """R4: SĐT đủ của người nhận, chỉ ở chi tiết và chỉ cho người trong phạm vi (SR-PII-02). Tem vẫn che."""
-        if self._customer_data_hidden(obj):
-            return None
-        if obj.recipient_phone:
-            return obj.recipient_phone
-        invoice = obj.sales_invoice
-        order = invoice.sales_order if invoice and invoice.sales_order_id else None
-        if order is not None:
-            return order.phone or (order.customer.phone if order.customer_id else "") or ""
-        return ""
+        return self._full_phone(obj)
 
     def get_failure_note(self, obj):
         """BR-GH-22: chữ tự do, có thể chứa dữ liệu cá nhân; chỉ ở chi tiết, theo cửa sổ SR-PII-02."""

@@ -2,11 +2,11 @@
 
 // ED-19 — Việc giao của tôi (nhân viên giao): chỉ phiếu gán cho mình (`assigned_to=me`), chia nhóm
 // Đang giao · Chờ lấy hàng · Giao thất bại · Đã xong (hôm nay). Thẻ lớn cho điện thoại 360px.
-// "Gọi khách" hiện đủ số và mở `tel:` (số lấy từ chi tiết phiếu, chỉ giữ trong bộ nhớ trang: không ghi localStorage, URL, log).
+// "Gọi khách" hiện đủ số và mở `tel:`. Lô bổ sung A #17: số lấy thẳng từ `phone` trong danh sách `assigned_to=me` (không gọi thêm chi tiết từng phiếu);
+// số chỉ nằm trong bộ nhớ trang: không ghi localStorage, URL, log.
 // F2l "Báo giao thất bại" là hộp riêng. Lô 9: thẻ Giao thất bại có nút "Mang hàng về kho" mở hộp F2m (CreateReturnModal) với phiếu giao điền sẵn;
 // nút chỉ mở hộp, việc ghi phiếu hoàn do hộp đó làm (BE chặn nếu phiếu không còn Đang giao/Giao thất bại).
-// Nợ TL-L6: mỗi thẻ Đang giao/Giao thất bại gọi chi tiết phiếu để lấy SĐT hiện sẵn trên nút Gọi khách (ED-19-AC7); SĐT không có trong payload danh sách (R4).
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { ENUMS } from "@/shared/lib/enums";
 import { kg, todayInVietnam } from "@/shared/lib/format";
 import { ApiError, loadErrorText } from "@/shared/lib/http";
@@ -18,7 +18,7 @@ import { SkeletonScreen } from "@/shared/ui/Skeleton";
 import { ErrorBox } from "@/shared/ui/StateBox";
 import { isConflictError } from "@/shared/ui/form/useSubmit";
 import { useToast } from "@/shared/ui/overlay/Toast";
-import { fetchDeliveryNoteDetail, fetchDeliveryNotes, startDelivery } from "../api";
+import { fetchDeliveryNotes, startDelivery } from "../api";
 import { MINE_GROUPS, groupMine, hasAction, lineNames, telHref, type MineGroupKey } from "../deliveryUi";
 import type { DeliveryNoteItem } from "../types";
 import { ConfirmCompleteModal } from "./ConfirmCompleteModal";
@@ -29,33 +29,29 @@ import { canCreate } from "@/features/returns/returnsModel";
 import s from "../deliveries.module.css";
 
 type Params = { assigned_to: string; status: string; completed_from?: string };
-type PhoneState = string | null | "error" | undefined; // undefined = đang tải · null = đã ẩn · "error" = tải lỗi
 
 const ACTIVE: Params = { assigned_to: "me", status: "READY,DELIVERING,FAILED" };
 
 function MineCard({
   note,
-  phone,
   busy,
   error,
   onStart,
   onComplete,
   onFail,
   onReturn,
-  onLoadPhone,
 }: {
   note: DeliveryNoteItem;
-  phone: PhoneState;
   busy: boolean;
   error: string | undefined;
   onStart: () => void;
   onComplete: () => void;
   onFail: () => void;
   onReturn: () => void;
-  onLoadPhone: () => void;
 }) {
   const showCall = note.status === "DELIVERING" || note.status === "FAILED";
-  const tel = typeof phone === "string" && phone !== "error" ? telHref(phone) : null;
+  const phone = note.phone ?? null; // null/thiếu = đã ẩn theo cửa sổ 7 ngày
+  const tel = phone ? telHref(phone) : null;
   const canStart = (note.status === "READY" || note.status === "FAILED") && hasAction(note, "set_status:DELIVERING");
   const canComplete = note.status === "DELIVERING" && hasAction(note, "set_status:COMPLETED");
   const canFail = note.status === "DELIVERING" && hasAction(note, "set_status:FAILED");
@@ -115,18 +111,8 @@ function MineCard({
               <span>Gọi khách</span>
               <span className="num">{phone}</span>
             </a>
-          ) : phone === "error" ? (
-            <button type="button" className="btn" onClick={onLoadPhone}>
-              <Icon name="refresh" />
-              <span>Tải số điện thoại</span>
-            </button>
-          ) : phone === null ? (
-            <span className={s.cardMeta}>Số điện thoại đã ẩn (quá 7 ngày)</span>
           ) : (
-            <button type="button" className="btn" disabled>
-              <Icon name="progress_activity" className="spin" />
-              <span>Gọi khách</span>
-            </button>
+            <span className={s.cardMeta}>Số điện thoại đã ẩn (quá 7 ngày)</span>
           ))}
         {canFail && (
           <button type="button" className="btn danger" onClick={onFail} disabled={busy}>
@@ -161,28 +147,11 @@ export function MyDeliveriesScreen() {
   const active = usePagedList<DeliveryNoteItem, Params>((p, page) => fetchDeliveryNotes({ ...p, page }), ACTIVE, true);
   const done = usePagedList<DeliveryNoteItem, Params>((p, page) => fetchDeliveryNotes({ ...p, page }), doneParams, true);
 
-  const [phones, setPhones] = useState<Record<number, PhoneState>>({});
-  const asked = useRef<Set<number>>(new Set());
   const [busyId, setBusyId] = useState<number | null>(null);
   const [errors, setErrors] = useState<Record<number, string>>({});
   const [failFor, setFailFor] = useState<DeliveryNoteItem | null>(null);
   const [completeFor, setCompleteFor] = useState<DeliveryNoteItem | null>(null);
   const [returnFor, setReturnFor] = useState<DeliveryNoteItem | null>(null);
-
-  const loadPhone = useCallback((id: number) => {
-    asked.current.add(id);
-    setPhones((p) => ({ ...p, [id]: undefined }));
-    fetchDeliveryNoteDetail(id)
-      .then((d) => setPhones((p) => ({ ...p, [id]: d.phone ?? null })))
-      .catch(() => setPhones((p) => ({ ...p, [id]: "error" })));
-  }, []);
-
-  // Lấy số điện thoại của phiếu cần gọi (Đang giao, Giao thất bại) ngay khi danh sách về, để nút Gọi khách là link tel: thật.
-  useEffect(() => {
-    for (const n of active.rows ?? []) {
-      if ((n.status === "DELIVERING" || n.status === "FAILED") && !asked.current.has(n.id)) loadPhone(n.id);
-    }
-  }, [active.rows, loadPhone]);
 
   const reloadAll = () => {
     void active.reload();
@@ -291,14 +260,12 @@ export function MyDeliveriesScreen() {
                 <MineCard
                   key={n.id}
                   note={n}
-                  phone={phones[n.id]}
                   busy={busyId === n.id}
                   error={errors[n.id]}
                   onStart={() => void onStart(n)}
                   onComplete={() => setCompleteFor(n)}
                   onFail={() => setFailFor(n)}
                   onReturn={() => setReturnFor(n)}
-                  onLoadPhone={() => loadPhone(n.id)}
                 />
               ))}
             </ul>

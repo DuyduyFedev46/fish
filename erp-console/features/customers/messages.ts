@@ -41,7 +41,7 @@ export const CUSTOMERS_MSG = {
   fieldOrders: "Số đơn",
   fieldSpent: "Tổng đã mua",
   fieldCancelled: "Đơn huỷ",
-  phoneLockedReason: "Số điện thoại là khoá của khách, không đổi được.",
+  phoneFixAlert: "Chưa lưu được. Sửa số điện thoại rồi lưu lại.",
   derivedReason: "Tự tính từ đơn hàng.",
   ordersTitle: "Đơn hàng",
   ordersCaption: "Đơn hàng của khách",

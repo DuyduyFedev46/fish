@@ -26,7 +26,7 @@ from apps.common.params import parse_positive_id
 
 from . import services
 from .models import DeliveryNote
-from .serializers import DeliveryNoteDetailSerializer, DeliveryNoteSerializer
+from .serializers import CourierDeliveryNoteListSerializer, DeliveryNoteDetailSerializer, DeliveryNoteSerializer
 
 INVALID_FILTER = "INVALID_FILTER"
 
@@ -62,11 +62,14 @@ class DeliveryNoteViewSet(NoStoreMixin, DocumentViewSet):
         "status", "assigned_to", "failed_attempts", "completed_at", "sales_invoice",
         "confirmed_at", "confirmed_by", "confirm_skipped", "recipient_name", "recipient_phone",
         "failure_reason", "failure_note",  # BR-GH-22: chỉ ghi qua `status` (mark_failed)
+        "delivery_started_at", "failed_at",  # #18: hệ thống ghi khi đổi trạng thái
     )
 
     def get_serializer_class(self):
         if self.action == "retrieve":
             return DeliveryNoteDetailSerializer
+        if self.action == "list" and (self.request.query_params.get("assigned_to") or "").strip() == "me":
+            return CourierDeliveryNoteListSerializer  # #17 (R4b): chỉ phiếu của chính người gọi, có `phone`
         return DeliveryNoteSerializer
 
     def get_serializer_context(self):

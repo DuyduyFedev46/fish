@@ -4,7 +4,9 @@
 //   POST /api/inventory/reconciliations/                            lập phiếu {count_date, note, lines?}
 //   PATCH /api/inventory/reconciliations/<id>/                      sửa ngày / ghi chú
 //   POST /api/inventory/reconciliations/<id>/lines/                 thay TOÀN BỘ dòng {expected_updated_at, lines} (409 STALE_STATE khi lệch)
-//   POST /api/inventory/reconciliations/<id>/approve/               duyệt và cân đối tồn
+//   POST /api/inventory/reconciliations/<id>/submit/                gửi duyệt (Nháp → Chờ duyệt; phiếu rỗng 400 RECON_EMPTY)
+//   POST /api/inventory/reconciliations/<id>/return-to-draft/       trả về nháp (Chờ duyệt → Nháp)
+//   POST /api/inventory/reconciliations/<id>/approve/               duyệt và cân đối tồn (chỉ phiếu Chờ duyệt; không còn chặn người nhập số tự duyệt)
 // Mỗi hàm nối mock qua `process.env.NEXT_PUBLIC_USE_MOCK === "1" ? mockStocktakeApi : undefined` ghi thẳng tại chỗ
 // (ghi qua biến trung gian sẽ làm mock lọt vào bản build thật; scripts/check-no-mock.mjs bắt lỗi này).
 import type { GuidanceData } from "@/features/guidance/types";
@@ -67,6 +69,24 @@ export function replaceStocktakeLines(id: number, expectedUpdatedAt: string, lin
   return apiFetch<StocktakeDetail>(`${BASE}${id}/lines/`, {
     method: "POST",
     body: { expected_updated_at: expectedUpdatedAt, lines },
+    mock: process.env.NEXT_PUBLIC_USE_MOCK === "1" ? mockStocktakeApi : undefined,
+  });
+}
+
+/** Gửi duyệt: Nháp → Chờ duyệt. Từ đó không sửa số đếm được, chỉ duyệt hoặc trả về nháp. */
+export function submitStocktake(id: number): Promise<StocktakeDetail> {
+  return apiFetch<StocktakeDetail>(`${BASE}${id}/submit/`, {
+    method: "POST",
+    body: {},
+    mock: process.env.NEXT_PUBLIC_USE_MOCK === "1" ? mockStocktakeApi : undefined,
+  });
+}
+
+/** Trả phiếu Chờ duyệt về Nháp để sửa số đếm. Phiếu không ở Chờ duyệt → 400 RECON_NOT_SUBMITTED. */
+export function returnStocktakeToDraft(id: number): Promise<StocktakeDetail> {
+  return apiFetch<StocktakeDetail>(`${BASE}${id}/return-to-draft/`, {
+    method: "POST",
+    body: {},
     mock: process.env.NEXT_PUBLIC_USE_MOCK === "1" ? mockStocktakeApi : undefined,
   });
 }

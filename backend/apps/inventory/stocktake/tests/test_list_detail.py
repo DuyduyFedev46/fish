@@ -58,7 +58,7 @@ class ListDetailTests(StocktakeApiBase):
         self.assertEqual(set(row), LIST_KEYS)
         self.assertNotIn("lines", row)
         self.assertEqual(row["code"], f"KK-{rec['id']}")
-        self.assertEqual(row["status_label"], "Chờ duyệt")
+        self.assertEqual(row["status_label"], "Nháp")
         self.assertEqual(
             (row["line_count"], row["short_count"], row["over_count"], row["match_count"]), (3, 1, 1, 1)
         )
@@ -89,7 +89,7 @@ class ListDetailTests(StocktakeApiBase):
 
     def test_r8_approved_reconciliation_shows_approver_and_no_actions(self):
         rec = self.make_draft(self.warehouse_staff)
-        self.api(self.owner).post(f"{URL}{rec['id']}/approve/")
+        self.approve_via_api(self.owner, rec)
         body = self.api(self.owner).get(f"{URL}{rec['id']}/").json()
         self.assertEqual(body["status"], "APPROVED")
         self.assertEqual(body["status_label"], "Đã duyệt")
@@ -104,32 +104,23 @@ class ListDetailTests(StocktakeApiBase):
         rec = self.make_draft(self.warehouse_staff)
         url = f"{URL}{rec['id']}/"
         as_staff = self.api(self.warehouse_staff).get(url).json()
-        self.assertEqual(as_staff["available_actions"], ["edit_lines"])  # không có quyền duyệt
+        self.assertEqual(as_staff["available_actions"], ["edit_lines", "submit"])  # không có quyền duyệt
         self.assertIsNone(as_staff["approve_blocked_reason"])
         as_owner = self.api(self.owner).get(url).json()
-        self.assertEqual(as_owner["available_actions"], ["edit_lines", "approve"])
+        self.assertEqual(as_owner["available_actions"], ["edit_lines", "submit"])  # nháp: phải gửi duyệt trước (#20)
         self.assertIsNone(as_owner["approve_blocked_reason"])
 
-    def test_r8_creator_with_approve_permission_sees_blocked_reason(self):
+    def test_r8_creator_and_editor_with_permission_are_not_blocked_kk06(self):
+        """#6 (Duy chốt 02/10): bỏ BR-KK-02/08, `approve_blocked_reason` luôn null."""
         rec = self.make_draft(self.manager)
-        body = self.api(self.manager).get(f"{URL}{rec['id']}/").json()
-        self.assertEqual(body["available_actions"], ["edit_lines"])
-        self.assertEqual(body["approve_blocked_reason"]["code"], "BR-KK-02")
-        self.assertTrue(body["approve_blocked_reason"]["label"])
-
-    def test_r8_editor_sees_blocked_reason_br_kk_08_other_user_does_not(self):
-        rec = self.make_draft(self.warehouse_staff)
         self.replace_via_api(self.manager, rec, [line(self.batch, "49")])
+        self.api(self.manager).post(f"{URL}{rec['id']}/submit/")
         url = f"{URL}{rec['id']}/"
-        as_editor = self.api(self.manager).get(url).json()
-        self.assertNotIn("approve", as_editor["available_actions"])
-        self.assertEqual(as_editor["approve_blocked_reason"]["code"], "BR-KK-08")
-        as_other = self.api(self.owner).get(url).json()
-        self.assertIn("approve", as_other["available_actions"])
-        self.assertIsNone(as_other["approve_blocked_reason"])
-        # Cũng đúng trong danh sách.
+        body = self.api(self.manager).get(url).json()
+        self.assertEqual(body["available_actions"], ["return_to_draft", "approve"])
+        self.assertIsNone(body["approve_blocked_reason"])
         row = next(r for r in self.api(self.manager).get(URL).json()["results"] if r["id"] == rec["id"])
-        self.assertEqual(row["approve_blocked_reason"]["code"], "BR-KK-08")
+        self.assertIsNone(row["approve_blocked_reason"])
 
     def test_r8_delivery_and_customer_service_get_403_and_anonymous_401(self):
         rec = self.make_draft()
@@ -149,7 +140,7 @@ class ListDetailTests(StocktakeApiBase):
         StockReconciliation.objects.filter(pk=old["id"]).update(count_date=datetime.date(2026, 8, 1))
         cold = self.make_draft(self.warehouse_staff, [line(self.batch2, "29")])
         approved = self.make_draft(self.warehouse_staff, [line(self.batch3, "9")])
-        self.api(self.owner).post(f"{URL}{approved['id']}/approve/")
+        self.approve_via_api(self.owner, approved)
         client = self.api(self.warehouse_staff)
 
         def ids(query):

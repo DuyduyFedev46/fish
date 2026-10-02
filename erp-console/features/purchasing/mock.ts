@@ -407,6 +407,9 @@ export function mockSubmitReceiveBatches(req: MockRequest): { status: number; bo
   }
 
   const me = mockRequireUser(req);
+  // Lô bổ sung A #22: BE từ chối giá mua <= 0 hoặc thiếu, báo theo từng dòng như DRF.
+  const rateErrors = body.lines.map((l) => (Number(l.rate) > 0 ? {} : { rate: ["Giá mua phải lớn hơn 0."] }));
+  if (rateErrors.some((e) => "rate" in e)) return { status: 400, body: { lines: rateErrors } as unknown as { detail: string; code: string } };
   const receiptId = nextReceiptId++;
   const receivedDate = body.received_date || todayInVietnam();
 

@@ -54,7 +54,7 @@ export function StocktakeListScreen() {
   const rows = list.rows;
   const shown = useMemo(() => (rows ? rows.filter((r) => matches(r, query)) : null), [rows, query]);
   const filtered = Boolean(query.trim() || status || warehouse);
-  const pending = rows ? rows.filter((r) => r.status === "DRAFT").length : 0;
+  const pending = rows ? rows.filter((r) => r.status === "SUBMITTED").length : 0;
   const mayCreate = Boolean(me?.permissions.includes(PERM.addStockReconciliation));
   const errorText = list.error && !list.rows ? loadErrorText(list.error) : null;
 
@@ -118,6 +118,7 @@ export function StocktakeListScreen() {
               options: [
                 { value: ALL, label: "Mọi trạng thái" },
                 { value: "DRAFT", label: ENUMS.stockReconciliationStatus.DRAFT.label },
+                { value: "SUBMITTED", label: ENUMS.stockReconciliationStatus.SUBMITTED.label },
                 { value: "APPROVED", label: ENUMS.stockReconciliationStatus.APPROVED.label },
               ],
             },

@@ -28,6 +28,7 @@ const STATUS_OPTIONS = [
   { value: "", label: M.allStatuses },
   { value: "DRAFT", label: ENUMS.returnToStockStatus.DRAFT.label },
   { value: "APPROVED", label: ENUMS.returnToStockStatus.APPROVED.label },
+  { value: "CANCELLED", label: ENUMS.returnToStockStatus.CANCELLED.label },
 ];
 
 export function ReturnListScreen() {

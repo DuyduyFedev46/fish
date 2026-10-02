@@ -3,7 +3,9 @@ API nội bộ — kiểm kê (P-09).
 
 - Tạo phiếu kèm dòng số đếm: `POST /api/inventory/reconciliations/` (Tầng 1 `add_stockreconciliation`).
 - Thay toàn bộ dòng: `POST …/{id}/lines/` (cần `expected_updated_at`; lệch → 409 `STALE_STATE`).
-- Duyệt: `POST …/{id}/approve/` (Tầng 2 `approve_stockreconciliation`); người duyệt ≠ người nhập/sửa số (BR-KK-02, BR-KK-08).
+- Gửi duyệt: `POST …/{id}/submit/` (DRAFT → SUBMITTED, cần `change_stockreconciliation`); trả về nháp: `POST …/{id}/return-to-draft/`.
+- Duyệt: `POST …/{id}/approve/` (Tầng 2 `approve_stockreconciliation`), chỉ phiếu SUBMITTED. Người có quyền được tự duyệt
+  phiếu mình nhập (Duy chốt 02/10, #6); AuditLog ghi ai nhập, ai gửi, ai duyệt.
 Không có DELETE (BR-PQ-10).
 """
 from django.utils.dateparse import parse_datetime
@@ -48,7 +50,7 @@ class StockReconciliationViewSet(DocumentViewSet):
     pagination_class = StandardPagination
     custom_perm_actions = ("approve",)
     locked_fields = ("status", "approved_by", "approved_at", "updated_at")  # BR-PQ-14
-    actor_fields = ("created_by",)  # BR-PQ-16 → BR-KK-02 có nghĩa
+    actor_fields = ("created_by",)  # BR-PQ-16: người nhập số do server gán
 
     def get_queryset(self):
         return reconciliation_queryset(self.request.user)
@@ -118,4 +120,21 @@ class StockReconciliationViewSet(DocumentViewSet):
         """Duyệt phiếu kiểm kê kho và cân đối sổ kho."""
         require_perm(request.user, "inventory.approve_stockreconciliation")
         rec = services.apply_reconciliation(reconciliation=self.get_object(), approver=request.user)
+        return self._detail(rec.pk)
+
+    @action(detail=True, methods=["post"], required_perms=("inventory.change_stockreconciliation",))
+    def submit(self, request, pk=None):
+        """Gửi phiếu kiểm kê đi duyệt (Nháp → Chờ duyệt). Sau đó không sửa dòng được."""
+        require_perm(request.user, "inventory.change_stockreconciliation")
+        rec = services.submit_reconciliation(reconciliation=self.get_object(), actor=request.user)
+        return self._detail(rec.pk)
+
+    @action(
+        detail=True, methods=["post"], url_path="return-to-draft",
+        required_perms=("inventory.change_stockreconciliation",),
+    )
+    def return_to_draft(self, request, pk=None):
+        """Trả phiếu chờ duyệt về nháp để sửa lại số đếm."""
+        require_perm(request.user, "inventory.change_stockreconciliation")
+        rec = services.return_to_draft(reconciliation=self.get_object(), actor=request.user)
         return self._detail(rec.pk)

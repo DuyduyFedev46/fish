@@ -2,9 +2,11 @@
 
 // F2a — "Xác nhận đã nhận tiền" (ED-10-AC1). Mã giao dịch + số tiền (điền sẵn tổng đơn); chặn trước tại ô: âm, 0, chữ,
 // quá 12 chữ số → báo tại ô, KHÔNG gửi. BE vẫn là lớp chặn chính (BR-TT-08, 403 cho Quản lý). Kết quả PAID / UNDERPAID /
-// ORPHAN / duplicate do BE quyết, màn mở hộp chỉ báo lại.
+// duplicate do BE quyết, màn mở hộp chỉ báo lại. Đơn Tự huỷ không còn xác nhận tay (Lô bổ sung A #15): hộp mở lúc đơn còn Giữ chỗ mà
+// BE báo ORDER_AUTO_CANCELLED thì hộp đóng, màn báo câu của BE và tải lại đơn (nút xác nhận biến mất cùng trạng thái mới).
 
 import { useState } from "react";
+import { ApiError } from "@/shared/lib/http";
 import { vnd } from "@/shared/lib/format";
 import { Field } from "@/shared/ui/form/Field";
 import { FormAlert } from "@/shared/ui/form/FormAlert";
@@ -21,9 +23,11 @@ type Props = {
   onClose: () => void;
   onDone: (r: ConfirmPaymentResult) => void;
   onConflict: (c: SubmitConflict) => void;
+  /** BE trả 400 ORDER_AUTO_CANCELLED: đơn vừa hết giờ giữ chỗ. `message` là câu của BE. */
+  onAutoCancelled?: (message: string) => void;
 };
 
-export function ConfirmPaymentModal({ order, onClose, onDone, onConflict }: Props) {
+export function ConfirmPaymentModal({ order, onClose, onDone, onConflict, onAutoCancelled }: Props) {
   const total = digits(order.total_amount);
   const [txn, setTxn] = useState("");
   const [amountRaw, setAmountRaw] = useState(formatAmountInput(total));
@@ -31,9 +35,18 @@ export function ConfirmPaymentModal({ order, onClose, onDone, onConflict }: Prop
   const check = parseAmount(amountRaw);
   const amount = check.value ?? "";
   const diff = amount && total ? Number(amount) - Number(total) : 0;
-  const lateMoney = order.status === "AUTO_CANCELLED";
 
-  const sub = useSubmit(() => confirmPayment(order.id, { bank_txn_id: txn.trim().slice(0, TXN_MAX_LENGTH), amount }), { onSuccess: onDone });
+  const sub = useSubmit(
+    async () => {
+      try {
+        return await confirmPayment(order.id, { bank_txn_id: txn.trim().slice(0, TXN_MAX_LENGTH), amount });
+      } catch (err) {
+        if (err instanceof ApiError && err.code === "ORDER_AUTO_CANCELLED") onAutoCancelled?.(err.message);
+        throw err;
+      }
+    },
+    { onSuccess: onDone },
+  );
 
   const submit = () => {
     const next: { txn?: string; amount?: string } = {};
@@ -57,7 +70,6 @@ export function ConfirmPaymentModal({ order, onClose, onDone, onConflict }: Prop
       busyLabel={M.confirming}
       onSubmit={submit}
     >
-      {lateMoney && <FormAlert kind="warn">{M.alertAutoCancelled}</FormAlert>}
       <SummaryBlock
         rows={[
           { label: M.rowOrder, value: order.code, mono: true },

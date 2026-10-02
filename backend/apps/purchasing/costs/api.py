@@ -6,10 +6,11 @@ R12 (ERP theo design Lô 12): `GET /api/purchasing/costs/?cost_type=ICE,TRANSPOR
 `GET …/{id}/`. Tiền chi phí phụ là giá vốn: đọc cần `view_purchasecost` (Tầng 1, chỉ owner) VÀ `view_costprice`
 (bất biến 1). Sai tham số lọc → 400.
 """
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 
 from rest_framework.response import Response
 
+from apps.common.exceptions import BusinessError
 from apps.common.api import (
     VIEW_COSTPRICE_PERM, BusinessModelPermissions, DocumentViewSet, StandardPagination, require_perm,
 )
@@ -18,6 +19,11 @@ from apps.purchasing.models import PurchaseCost
 from . import services
 from .filters import filter_costs
 from .serializers import PurchaseCostSerializer
+
+
+# #14 (Duy 02/10): chi phí đã phân bổ vào giá vốn lô thì không sửa tiền / cách chia / danh sách lô.
+ALLOCATION_LOCKED_FIELDS = ("amount", "allocations", "allocation_method")
+COST_ALLOCATED_LOCKED_MESSAGE = "Chi phí đã phân bổ vào giá vốn lô nên không sửa được số tiền. Liên hệ Chủ để xử lý."
 
 
 class PurchaseCostViewSet(DocumentViewSet):
@@ -39,14 +45,28 @@ class PurchaseCostViewSet(DocumentViewSet):
             queryset = filter_costs(queryset, self.request.query_params)
         return queryset
 
+    def update(self, request, *args, **kwargs):
+        """PATCH/PUT: chỉ `note`, `incurred_date`, `cost_type` sửa được; đụng tiền/phân bổ -> 400 (#14)."""
+        keys = set(request.data.keys()) if hasattr(request.data, "keys") else set()
+        if keys & set(ALLOCATION_LOCKED_FIELDS) and self.get_object().allocations.exists():
+            raise BusinessError(COST_ALLOCATED_LOCKED_MESSAGE, code="COST_ALLOCATED_LOCKED")
+        return super().update(request, *args, **kwargs)
+
     def create(self, request, *args, **kwargs):
         # Ghi chi phí + phân bổ vào giá vốn lô — chỉ Chủ (add_purchasecost builtin).
         require_perm(request.user, "purchasing.add_purchasecost")
         self.reject_protected_fields(request.data)
         d = request.data or {}
+        try:
+            amount = Decimal(str(d.get("amount")))
+            if not amount.is_finite():
+                raise InvalidOperation
+        except InvalidOperation:
+            message = "Số tiền chi phí không hợp lệ."
+            raise BusinessError(message, code="INVALID_AMOUNT", extra={"amount": [message]})
         cost = services.record_purchase_cost(
             cost_type=d.get("cost_type"),
-            amount=Decimal(str(d.get("amount"))),
+            amount=amount,
             allocation_method=d.get("allocation_method", PurchaseCost.AllocationMethod.BY_QTY),
             incurred_date=d.get("incurred_date"),
             allocations=d.get("allocations") or [],

@@ -30,6 +30,23 @@ Thứ tự chạy từ trên xuống. Cột "Song song" = lô được giao cùn
 | ☐ | 15 | ED-06, ED-08, ED-41, ED-42 | FE | D1, W3f, W4b–W4h, F3g | 1, 2; W3f cần R16 (Lô 14) | Lô 14, 16 | — |
 | ☐ | 16 | ED-35, ED-36 | FE | W3b, W3c, W3d, F3h–F3l | 1, 2 | Lô 15 | — |
 | ☐ | 17 | ED-07 + dọn dẹp + hồi quy toàn bộ | FE | — | 1–16 | — | — |
+| ☐ | bổ sung A | Quyết định Duy 02/10 (#1, 2, 5, 6, 8 huỷ, 10, 11, 14, 15, 17, 18, 19, 20, 21, 22) | BE ∥ FE | — | 1–11 | — | — |
+
+Nợ từ review Lô bổ sung A (03b, TLA-*):
+- TLA-L2 → **Lô 14**: thêm ô "tạo hàng hoàn" vào ma trận phân quyền (registry chưa có năng lực này).
+- TLA-L3 → **Lô 17**: bỏ GET `customer-directory/?q=` sau khi FE đã dùng POST search.
+- TLA-L5: câu `COST_ALLOCATED_LOCKED` "Liên hệ Chủ" trong khi chỉ Chủ gọi được → sửa cùng story huỷ chi phí.
+- Nhãn guidance kiểm kê `update_reconciliation_lines` / `update_stockreconciliation` còn "Có thay đổi" → Lô 17.
+- TLA-FE-M1 → **Lô 17**: "Nhờ người xử lý" hiện cả khi bước bị luật chặn (không chỉ thiếu quyền) → BE thêm cờ `blocked_by` cho từng bước, FE lọc theo.
+- TLA-FE-L4 → **Lô 14** (cùng TLA-L2): `canCancel` phiếu hoàn tính cả quyền `add_returntostock`.
+- TLA-FE-L6 → **Lô 17**: câu lỗi `STEP_NOT_FOUND` của BE lộ mã bước nội bộ.
+- **Lô 17**: dời các hộp xác nhận riêng từng module sang `shared/ui/overlay/ConfirmModal`; "Nhờ người xử lý" chỉ ẩn bước kẹt đầu tiên sau khi nhờ (gộp TLA-FE-M1).
+- QA N1 → **Lô 17**: BE `/ai/actions/escalate/` không loại trùng (tải lại trang rồi nhờ lại tạo thêm action) → trả action ESCALATED cũ nếu đã có.
+- QA N2 → **Lô 17**: hộp Gửi duyệt khi phiếu đã đổi vẫn có nút "Thử lại" vô ích → đổi thành "Tải lại".
+- QA N4: chi phí phụ `amount: "0"` vẫn được nhận (có từ trước) → gộp story huỷ chi phí.
+- TLA-L4: không chạy lùi migration `inventory/0007` khi đã có phiếu hoàn bị huỷ.
+- Lưu `item_price_id` (FK nullable PROTECT) trên dòng đơn → gộp với nợ Lô 13 L4.
+- Chờ Duy/PO: story "Huỷ chi phí phụ" (TLA-H1b, #14) và "Ghi tiền về muộn ở hàng chờ" (TLA-M3, #15).
 
 Ghi chú:
 - "Song song" là gợi ý; nếu hai lô cùng sửa một file chung (02b §5.1) thì commit lần lượt, lô sau rebase/merge lô trước.

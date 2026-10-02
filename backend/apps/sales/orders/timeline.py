@@ -7,7 +7,7 @@ Nguồn:
   (`Refund.created_at` / `confirmed_at`, người tạo / người xác nhận).
 - AuditLog (BR-PQ-04/05): `cancel_unpaid_expired`, `cancel_paid_order` (đơn);
   `delivery_advance_status`, `delivery_mark_failed` (phiếu giao);
-  `return_to_warehouse`, `approve_returntostock` (hàng hoàn về kho, P-08);
+  `return_to_warehouse`, `approve_returntostock`, `cancel_returntostock` (hàng hoàn về kho, P-08);
   `confirm_payment_manual` chỉ dùng để lấy NGƯỜI xác nhận tay, không thành dòng riêng.
 
 Bất biến: KHÔNG đưa `changes` thô ra ngoài — nhãn tự dựng, chỉ chứa mã chứng từ, số tiền khách
@@ -42,6 +42,7 @@ class TimelineEvent:
     label: str
     actor_display: str
     doc: str = "order"
+    doc_id: int | None = None  # pk chứng từ để FE làm link (chi tiết đơn: `doc: {type, id}`); None = không link
     actor_kind: str = "system"  # "system" | "user" | "ai"
     ai_level: str | None = None
     ai_config_version: int | None = None
@@ -138,7 +139,7 @@ def build_timeline(order):
                 # Bất biến 9: KHÔNG ghép `Refund.reason` (chữ tự do, có thể chứa SĐT/tên). Lý do xem ở phiếu hoàn.
                 f"Tạo phiếu hoàn {vnd_display(r.amount)}",
                 actor_display(r.created_by),
-                doc="refund",
+                doc="refund", doc_id=r.pk,
                 actor_kind="user" if r.created_by else "system",
             ))
             if r.confirmed_at is not None:
@@ -230,9 +231,17 @@ def _audit_event(a, notes_by_id, returns_by_id, refunds_by_id):
         if rt is None:
             return None
         if a.action == "return_to_warehouse":
+            # Phiếu đã huỷ không còn "chờ duyệt" (TLA-L1); dòng huỷ riêng ngay sau đó.
+            pending = "" if rt.status == ReturnToStock.Status.CANCELLED else " — chờ duyệt"
             return TimelineEvent(
                 a.created_at, "return_to_warehouse",
-                f"Mang hàng về kho {kg_str(rt.qty)} kg — chờ duyệt", who,
+                f"Mang hàng về kho {kg_str(rt.qty)} kg{pending}", who,
+                doc="return", actor_kind=kind_actor, ai_level=ai_lvl, ai_config_version=ai_cfg,
+            )
+        if a.action == "cancel_returntostock":
+            return TimelineEvent(
+                a.created_at, "return_cancelled",
+                f"Huỷ phiếu hàng về kho {kg_str(rt.qty)} kg", who,
                 doc="return", actor_kind=kind_actor, ai_level=ai_lvl, ai_config_version=ai_cfg,
             )
         if a.action == "approve_returntostock":

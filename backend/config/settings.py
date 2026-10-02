@@ -278,6 +278,13 @@ AI_RESULT_MAX_CHARS = int(os.getenv("AI_RESULT_MAX_CHARS", "3000"))
 AI_SCHEMA_MAX_TOKENS = int(os.getenv("AI_SCHEMA_MAX_TOKENS", "450"))
 AI_CALL_RATE = os.getenv("AI_CALL_RATE", "30/min")
 AI_CONFIRM_MIN_SECONDS = int(os.getenv("AI_CONFIRM_MIN_SECONDS", "3"))
+# GET /api/ai/status/ (S05): model on-device (trống = chưa chốt, S17), công tắc cloud (mặc định tắt, Q5), trần chi phí cloud (BR-AI-11).
+AI_MODEL_NAME = os.getenv("AI_MODEL_NAME", "").strip()
+AI_MODEL_VERSION = os.getenv("AI_MODEL_VERSION", "").strip()
+AI_MODEL_GGUF_URL = os.getenv("AI_MODEL_GGUF_URL", "").strip()
+AI_CLOUD_ENABLED = _bool("AI_CLOUD_ENABLED", "0")
+AI_CLOUD_MONTHLY_BUDGET_VND = int(os.getenv("AI_CLOUD_MONTHLY_BUDGET_VND", "200000"))
+AI_CLOUD_ALERT_PCT = int(os.getenv("AI_CLOUD_ALERT_PCT", "80"))
 
 # --- Xác nhận đơn (confirmation) & In tem (2026-09-28-cskh-xac-nhan-in-tem) ---------
 # Chỉ đọc biến môi trường `CONFIRMATION_*`; tên cũ `CSKH_*` đã bỏ ở P8b Lô 5 (đặt trên Cloud Run thì bị bỏ qua, xem doc/ops/moi-truong.md).

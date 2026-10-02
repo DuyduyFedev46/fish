@@ -4,18 +4,22 @@ API nội bộ — hàng giao thất bại về kho (P-08, R9). Tầng 2: approv
 - `GET /api/inventory/returns/` (20 dòng/trang; lọc `status`, `month=YYYY-MM`) và `GET …/{id}/`.
 - `POST /api/inventory/returns/` `{delivery_note, batch, qty, note?}`: tạo từ phiếu giao (xem `creation.py`).
 - `POST …/{id}/approve/` `{decision: RESTOCK|WRITE_OFF}`: duyệt bằng `services.apply_return`; đã duyệt → 409 STALE_STATE.
+- `POST …/{id}/cancel/` (body rỗng): huỷ phiếu còn Chờ duyệt (#8). Quyền: `approve_returntostock` / `change_returntostock`, hoặc
+  người tạo phiếu (có quyền tạo) huỷ phiếu của chính mình. Phiếu đã duyệt hoặc đã huỷ → 409 STALE_STATE.
 - `PATCH …/{id}/`: chỉ đổi `note` khi còn Chờ duyệt. Không có DELETE (BR-PQ-10).
 Phạm vi dòng: `scope.scope_returns_for` (người giao chỉ thấy phiếu của phiếu giao gán cho mình, ngoài ra 404).
 Phản hồi có `Cache-Control: no-store` vì `note` là chữ tự do có thể chứa dữ liệu cá nhân (bất biến 9).
 """
 from django.db import transaction
 from rest_framework import status as http_status
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from apps.common.api import (
     BusinessModelPermissions, DocumentViewSet, NoStoreMixin, StandardPagination, reject_protected_fields, require_perm,
 )
+from apps.common.audit import record_audit
 from apps.common.exceptions import BusinessError, ConflictError
 from apps.inventory.models import ReturnToStock
 
@@ -37,7 +41,7 @@ class ReturnToStockViewSet(NoStoreMixin, DocumentViewSet):
     serializer_class = ReturnToStockSerializer
     permission_classes = [BusinessModelPermissions]
     pagination_class = StandardPagination
-    custom_perm_actions = ("approve",)
+    custom_perm_actions = ("approve", "cancel")
     # BR-PQ-14: giờ rời kho / giờ về do hệ thống ghi, không nhận từ client.
     locked_fields = ("status", "decision", "approved_by", "left_warehouse_at", "returned_at")
     actor_fields = ("created_by",)  # BR-PQ-16
@@ -62,7 +66,9 @@ class ReturnToStockViewSet(NoStoreMixin, DocumentViewSet):
     def update(self, request, *args, **kwargs):
         reject_protected_fields(request.data, locked=IMMUTABLE_AFTER_CREATE)
         if self.get_object().status != ReturnToStock.Status.DRAFT:
-            raise BusinessError("Phiếu hàng hoàn đã duyệt, không sửa được (BR-PQ-10).", code="RETURN_NOT_EDITABLE")
+            raise BusinessError(
+                "Phiếu hàng hoàn đã duyệt hoặc đã huỷ, không sửa được (BR-PQ-10).", code="RETURN_NOT_EDITABLE",
+            )
         return super().update(request, *args, **kwargs)
 
     @action(detail=True, methods=["post"], required_perms=("inventory.approve_returntostock",))
@@ -81,4 +87,27 @@ class ReturnToStockViewSet(NoStoreMixin, DocumentViewSet):
             rt.decision = decision
             rt.save(update_fields=["decision"])
             services.apply_return(return_to_stock=rt, approver=request.user)  # lỗi → rollback cả `decision`
+        return Response(self.get_serializer(self.get_queryset().get(pk=rt.pk)).data, status=http_status.HTTP_200_OK)
+
+    @action(detail=True, methods=["post"], required_perms=("inventory.add_returntostock",))
+    def cancel(self, request, pk=None):
+        """Huỷ phiếu hàng hoàn còn Chờ duyệt (#8). Số kg của phiếu huỷ không còn tính vào số đã hoàn của phiếu giao."""
+        # Cổng chung: người tạo/duyệt phiếu hàng hoàn đều có add_returntostock (chủ, quản lý, nv kho, nv giao).
+        scoped = self.get_object()  # 404 nếu ngoài phạm vi
+        user = request.user
+        is_creator = scoped.created_by_id == user.pk and user.has_perm("inventory.add_returntostock")
+        if not (
+            user.has_perm("inventory.approve_returntostock") or user.has_perm("inventory.change_returntostock") or is_creator
+        ):
+            raise PermissionDenied("Chỉ người có quyền duyệt hoặc người tạo phiếu mới huỷ được phiếu hàng hoàn.")
+        with transaction.atomic():
+            rt = ReturnToStock.objects.select_for_update().get(pk=scoped.pk)
+            if rt.status != ReturnToStock.Status.DRAFT:
+                raise ConflictError("Phiếu hàng hoàn đã được xử lý, hãy tải lại.", code="STALE_STATE")
+            rt.status = ReturnToStock.Status.CANCELLED
+            rt.save(update_fields=["status"])
+            record_audit(
+                "cancel_returntostock", actor=user, obj=rt,
+                changes={"status": {"from": ReturnToStock.Status.DRAFT, "to": ReturnToStock.Status.CANCELLED}},
+            )
         return Response(self.get_serializer(self.get_queryset().get(pk=rt.pk)).data, status=http_status.HTTP_200_OK)

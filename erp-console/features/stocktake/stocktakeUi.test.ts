@@ -13,6 +13,7 @@ import {
   idFromSearch,
   lineErrorOf,
   nextStepText,
+  PATH_STEPS,
   parseCount,
   previewDiff,
   qty,
@@ -138,35 +139,75 @@ describe("stocktakeUi: lỗi của BE và đường dẫn", () => {
     expect(warehouseText(["A"])).toBe("A");
     expect(warehouseText(["A", "B", "C"])).toBe("A +2 kho");
   });
-  it("câu Tiếp theo theo quyền", () => {
-    const base = { status: "DRAFT", available_actions: ["approve"], approve_blocked_reason: null, short_count: 1, over_count: 1, net_difference: "-0.500" } as unknown as StocktakeListItem;
+  it("câu Tiếp theo theo trạng thái và quyền", () => {
+    const base = { status: "SUBMITTED", available_actions: ["approve"], short_count: 1, over_count: 1, net_difference: "-0.500" } as unknown as StocktakeListItem;
     expect(changedLineCount(base)).toBe(2);
     expect(nextStepText(base)).toMatch(/2 lô/);
     // BR-KK-09: nói đúng cơ chế (áp chênh lệch đã ghi), không hứa "theo số thực đếm".
     expect(nextStepText(base)).toContain("chênh lệch đã ghi lúc đếm (−0,5 kg)");
     expect(nextStepText(base)).not.toMatch(/theo số (thực )?đếm/);
-    expect(nextStepText({ ...base, available_actions: [], approve_blocked_reason: { code: "X", label: "y" } })).toMatch(/người khác/);
+    expect(nextStepText({ ...base, available_actions: [] })).toMatch(/Chờ Chủ hoặc Quản lý duyệt/);
+    expect(nextStepText({ ...base, status: "DRAFT", available_actions: ["edit_lines", "submit"] })).toMatch(/gửi duyệt/);
+    expect(nextStepText({ ...base, status: "DRAFT", available_actions: [] })).toMatch(/người lập phiếu/);
     expect(nextStepText({ ...base, status: "APPROVED" })).toBeNull();
+  });
+  it("StatusPath có đủ Nháp, Chờ duyệt, Đã duyệt (#6)", () => {
+    expect(PATH_STEPS.map((s) => s.label)).toEqual(["Nháp", "Chờ duyệt", "Đã duyệt"]);
   });
 });
 
 const token = (user: string) => `mock-token-${user}-${Date.now() + 100000}`;
 const call = (user: string, path: string) => mockStocktakeApi({ method: "GET", path, token: token(user) });
 
-describe("mock Kiểm kê: phân quyền, duyệt bị chặn, không lộ giá vốn", () => {
-  it("người nhập số không duyệt được phiếu của mình; người khác duyệt được (BR-KK-02)", () => {
-    const own = call("ql1", "/api/inventory/reconciliations/15/");
-    expect(own.status).toBe(200);
-    const detail = own.body as StocktakeDetail;
-    expect(detail.available_actions).not.toContain("approve");
-    expect(detail.approve_blocked_reason?.label).toBeTruthy();
-    // Nhân viên kho không có quyền duyệt: không có nút và cũng không có câu "bị chặn".
-    const warehouse = call("kho1", "/api/inventory/reconciliations/15/").body as StocktakeDetail;
-    expect(warehouse.available_actions).not.toContain("approve");
-    expect(warehouse.approve_blocked_reason).toBeNull();
-    const other = call("loc", "/api/inventory/reconciliations/15/").body as StocktakeDetail;
-    expect(other.available_actions).toContain("approve");
-    expect(other.approve_blocked_reason).toBeNull();
+const post = (user: string, path: string) => mockStocktakeApi({ method: "POST", path, body: {}, token: token(user) });
+const det = (user: string, id: number) => call(user, `/api/inventory/reconciliations/${id}/`).body as StocktakeDetail;
+
+describe("mock Kiểm kê: luồng Nháp, Chờ duyệt, Đã duyệt (Lô bổ sung A #6, #20)", () => {
+  it("người nhập số tự duyệt được phiếu của mình: không còn chặn BR-KK-02/08", () => {
+    // KK-14 (Chờ duyệt) do nhân viên kho nhập: Chủ và Quản lý đều có nút Duyệt; Quản lý nhập số phiếu 15 rồi gửi duyệt thì tự duyệt được.
+    expect(det("loc", 14).available_actions).toContain("approve");
+    expect(det("ql1", 14).available_actions).toContain("approve");
+    expect(det("ql1", 14)).not.toHaveProperty("approve_blocked_reason");
+    const sent = post("ql1", "/api/inventory/reconciliations/15/submit/");
+    expect(sent.status).toBe(200);
+  });
+  it("Nháp: có Sửa số đếm và Gửi duyệt, chưa có Duyệt; Chờ duyệt: có Duyệt và Trả về nháp, hết Sửa", () => {
+    const draft = det("loc", 15);
+    expect(draft.status).toBe("DRAFT");
+    expect(draft.status_label).toBe("Nháp");
+    expect(draft.available_actions).toEqual(["edit_lines", "submit"]);
+    const waiting = det("loc", 14);
+    expect(waiting.status).toBe("SUBMITTED");
+    expect(waiting.status_label).toBe("Chờ duyệt");
+    expect(waiting.available_actions).toEqual(["return_to_draft", "approve"]);
+  });
+  it("nhân viên kho: gửi duyệt và trả về nháp được, không có Duyệt (thiếu quyền)", () => {
+    expect(det("kho1", 14).available_actions).toEqual(["return_to_draft"]);
+    expect(post("kho1", "/api/inventory/reconciliations/14/approve/").status).toBe(403);
+  });
+  it("duyệt phiếu chưa gửi: 400 RECON_NOT_SUBMITTED kèm câu của BE", () => {
+    const res = post("loc", "/api/inventory/reconciliations/15/approve/");
+    expect(res.status).toBe(400);
+    expect(res.body).toMatchObject({ code: "RECON_NOT_SUBMITTED", detail: "Phiếu kiểm kê chưa gửi duyệt. Hãy gửi duyệt trước khi duyệt." });
+  });
+  it("trả về nháp phiếu không ở Chờ duyệt: 400 RECON_NOT_SUBMITTED", () => {
+    const res = post("loc", "/api/inventory/reconciliations/15/return-to-draft/");
+    expect(res.status).toBe(400);
+    expect(res.body).toMatchObject({ code: "RECON_NOT_SUBMITTED", detail: "Chỉ trả về nháp được phiếu đang chờ duyệt." });
+  });
+  it("gửi duyệt phiếu rỗng: 400 RECON_EMPTY; phiếu đã gửi: RECON_NOT_DRAFT", () => {
+    expect(post("loc", "/api/inventory/reconciliations/17/submit/").body).toMatchObject({ code: "RECON_EMPTY" });
+    expect(post("loc", "/api/inventory/reconciliations/14/submit/").body).toMatchObject({ code: "RECON_NOT_DRAFT" });
+  });
+  it("gửi duyệt rồi: chuyển sang Chờ duyệt", () => {
+    const res = post("loc", "/api/inventory/reconciliations/15/submit/");
+    expect((res.body as StocktakeDetail).status).toBe("SUBMITTED");
+    expect((res.body as StocktakeDetail).available_actions).toEqual(["return_to_draft", "approve"]);
+  });
+  it("trả về nháp rồi: Nháp, sửa số đếm lại được", () => {
+    const res = post("loc", "/api/inventory/reconciliations/14/return-to-draft/").body as StocktakeDetail;
+    expect(res.status).toBe("DRAFT");
+    expect(res.available_actions).toEqual(["edit_lines", "submit"]);
   });
   it("giao1 và cs2 bị 403", () => {
     expect(call("giao1", "/api/inventory/reconciliations/").status).toBe(403);

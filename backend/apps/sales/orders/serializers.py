@@ -211,11 +211,14 @@ class SalesOrderDetailSerializer(serializers.ModelSerializer):
     def get_timeline(self, order):
         """L7: dòng thời gian tăng dần — không giá vốn, actor là tên hiển thị (None → Hệ thống)."""
         dt = serializers.DateTimeField()
-        return [
-            {"at": dt.to_representation(e.at), "kind": e.kind, "label": e.label,
-             "actor_display": e.actor_display}
-            for e in build_timeline(order)
-        ]
+        rows = []
+        for e in build_timeline(order):
+            row = {"at": dt.to_representation(e.at), "kind": e.kind, "label": e.label,
+                   "actor_display": e.actor_display}
+            if e.doc_id is not None:  # chỉ khoá mới, chỉ dòng có link (vd "Tạo phiếu hoàn")
+                row["doc"] = {"type": e.doc, "id": e.doc_id}
+            rows.append(row)
+        return rows
 
     def get_privacy_consent(self, order):
         """GL-05 / BR-PQ: Thông tin bằng chứng đồng ý. Chỉ tính khi user có quyền."""

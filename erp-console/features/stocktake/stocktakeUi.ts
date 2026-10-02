@@ -190,7 +190,8 @@ export function warehouseText(names: string[]): string {
 export const hasAction = (s: Pick<StocktakeListItem, "available_actions">, a: StocktakeAction) => s.available_actions.includes(a);
 
 export const PATH_STEPS: { key: string; label: string }[] = [
-  { key: "DRAFT", label: "Chờ duyệt" },
+  { key: "DRAFT", label: "Nháp" },
+  { key: "SUBMITTED", label: "Chờ duyệt" },
   { key: "APPROVED", label: "Đã duyệt" },
 ];
 
@@ -202,6 +203,10 @@ export function changedLineCount(s: Pick<StocktakeListItem, "short_count" | "ove
 /** Câu "Tiếp theo" của StatusPath; null khi phiếu đã xong. */
 export function nextStepText(s: StocktakeListItem): string | null {
   if (s.status === "APPROVED") return null;
+  if (s.status === "DRAFT") {
+    if (hasAction(s, "submit")) return "Kiểm lại số đếm rồi gửi duyệt. Sau khi gửi không sửa số đếm được, trừ khi trả về nháp.";
+    return "Phiếu còn là nháp, chờ người lập phiếu gửi duyệt.";
+  }
   if (hasAction(s, "approve")) {
     const n = changedLineCount(s);
     // BR-KK-09: duyệt áp phần chênh lệch đã ghi lúc đếm (counted − tồn lúc lưu), không đặt tồn bằng số đếm.
@@ -209,7 +214,6 @@ export function nextStepText(s: StocktakeListItem): string | null {
       ? `Xem chênh lệch từng lô rồi duyệt. Duyệt sẽ điều chỉnh tồn của ${n} lô theo chênh lệch đã ghi lúc đếm (${signedQtyText(s.net_difference)} kg).`
       : "Xem chênh lệch từng lô rồi duyệt. Số đếm khớp sổ, tồn không đổi.";
   }
-  if (s.approve_blocked_reason) return "Cần người khác duyệt phiếu này.";
   return "Chờ Chủ hoặc Quản lý duyệt.";
 }
 
@@ -217,6 +221,7 @@ export function nextStepText(s: StocktakeListItem): string | null {
 export function doneSteps(d: StocktakeDetail): string[] {
   const out = [`Đếm ${d.line_count} lô`];
   if (d.lines.some((l) => (toMilli(l.difference_qty) ?? 0) > 0 && l.reason.trim())) out.push("Ghi lý do lô dư");
+  if (d.status === "SUBMITTED" || d.status === "APPROVED") out.push("Đã gửi duyệt");
   if (d.status === "APPROVED") out.push("Đã điều chỉnh tồn");
   return out;
 }

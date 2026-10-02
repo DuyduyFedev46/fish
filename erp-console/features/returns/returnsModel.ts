@@ -7,6 +7,7 @@ import type { BatchChoice, QtyExceedsExtras, ReturnItem, ReturnableLine } from "
 
 export const PERM_APPROVE_RETURN = "inventory.approve_returntostock";
 export const PERM_ADD_RETURN = "inventory.add_returntostock";
+export const PERM_CHANGE_RETURN = "inventory.change_returntostock";
 
 export const NOTE_MAX = 500;
 const QTY_DECIMALS = 3;
@@ -81,6 +82,7 @@ export function nextStepText(r: Pick<ReturnItem, "status" | "outside_minutes" | 
 
 export function doneSteps(r: Pick<ReturnItem, "status" | "decision">): string[] {
   const out = ["Ghi số kg", "Ghi giờ về kho"];
+  if (r.status === "CANCELLED") out.push("Huỷ phiếu");
   if (r.status === "APPROVED") out.push(r.decision === "WRITE_OFF" ? "Huỷ bỏ, ghi lỗ" : "Tái nhập vào lô");
   return out;
 }
@@ -88,6 +90,17 @@ export function doneSteps(r: Pick<ReturnItem, "status" | "decision">): string[] 
 /** Nút Duyệt chỉ cho người có quyền duyệt và phiếu còn Chờ duyệt. */
 export function canApprove(permissions: readonly string[] | undefined, r: Pick<ReturnItem, "status">): boolean {
   return !!permissions?.includes(PERM_APPROVE_RETURN) && r.status === "DRAFT";
+}
+
+/**
+ * "Huỷ phiếu hoàn": phiếu còn Chờ duyệt, người xem có quyền duyệt hoặc sửa phiếu, hoặc là người tạo phiếu (có quyền nhập hàng hoàn).
+ * Đây là luật BE (#8); FE chỉ ẩn mục để khỏi bấm vô ích, BE vẫn là lớp chặn thật (403).
+ */
+export function canCancel(me: { id: number; permissions: readonly string[] } | null | undefined, r: Pick<ReturnItem, "status" | "created_by">): boolean {
+  if (!me || r.status !== "DRAFT") return false;
+  const perms = me.permissions;
+  if (perms.includes(PERM_APPROVE_RETURN) || perms.includes(PERM_CHANGE_RETURN)) return true;
+  return r.created_by !== null && r.created_by === me.id && perms.includes(PERM_ADD_RETURN);
 }
 
 export function canCreate(permissions: readonly string[] | undefined): boolean {

@@ -8,6 +8,7 @@
 // "Trợ lý đang được nối, sắp có" và không phát sinh request). Bật nhanh trong DevTools:
 //   window.__caveMock.ai("on" | "off")   — bật/tắt cờ AI (localStorage)
 //   window.__caveMock.aiConsent(true)    — đặt cờ đã đồng ý tải model
+//   window.__caveMock.aiBudget("ok" | "warning" | "blocked") — hạn mức chi phí giả (chỉ Chủ thấy, khi AI bật)
 
 import type { MockRequest, MockResponse } from "@/shared/lib/http";
 import { MOCK_UNAUTHORIZED, mockRequireUser, mockUsers } from "@/features/auth/mock";
@@ -16,6 +17,20 @@ import { ROLE } from "@/shared/lib/roles";
 import type { AuditLogRow } from "./types";
 
 const AI_ON_KEY = "cave_erp_mock_ai";
+/** Trạng thái hạn mức giả cho e2e: "warning" | "blocked" (mặc định "ok"). Không chứa dữ liệu cá nhân. */
+const AI_BUDGET_KEY = "cave_erp_mock_ai_budget";
+
+function budgetStatus(): { spent_vnd: number; limit_vnd: number; status: string } {
+  let v: string | null = null;
+  try {
+    v = typeof window === "undefined" ? null : window.localStorage.getItem(AI_BUDGET_KEY);
+  } catch {
+    v = null;
+  }
+  if (v === "warning") return { spent_vnd: 170000, limit_vnd: 200000, status: "warning" };
+  if (v === "blocked") return { spent_vnd: 200000, limit_vnd: 200000, status: "blocked" };
+  return { spent_vnd: 0, limit_vnd: 200000, status: "ok" };
+}
 
 /** Cờ AI toàn cục của mock (server thật: Chủ tắt AI → mọi `step.ai` = null). Dùng cả ở features/guidance/mock. */
 export function aiEnabled(): boolean {
@@ -39,13 +54,15 @@ export function mockStatus(req: MockRequest): MockResponse {
   if (!me) return MOCK_UNAUTHORIZED;
   const name = process.env.NEXT_PUBLIC_AI_MODEL_NAME;
   const url = process.env.NEXT_PUBLIC_AI_MODEL_GGUF_URL;
+  const enabled = aiEnabled();
+  // Như BE: AI tắt → không có model, không có budget; AI bật → budget chỉ có với Chủ.
   return {
     status: 200,
     body: {
-      ai_enabled: aiEnabled(),
+      ai_enabled: enabled,
       cloud_enabled: false,
-      model: name && url ? { name, version: "dev", gguf_url: url } : null,
-      budget: me.groups.includes(ROLE.owner) ? { spent_vnd: 0, limit_vnd: 200000, status: "ok" } : null,
+      model: enabled && name && url ? { name, version: "dev", gguf_url: url } : null,
+      budget: enabled && me.groups.includes(ROLE.owner) ? budgetStatus() : null,
     },
   };
 }
@@ -160,5 +177,14 @@ if (process.env.NEXT_PUBLIC_USE_MOCK === "1" && typeof window !== "undefined") {
       return aiEnabled();
     },
     aiConsent: (v: boolean) => setAiConsent(v),
+    aiBudget: (v: "ok" | "warning" | "blocked") => {
+      try {
+        if (v === "ok") window.localStorage.removeItem(AI_BUDGET_KEY);
+        else window.localStorage.setItem(AI_BUDGET_KEY, v);
+      } catch {
+        /* storage chặn → giữ nguyên */
+      }
+      return v;
+    },
   };
 }

@@ -2693,3 +2693,123 @@ Như vòng 1: thiết bị cảm ứng thật; bảng chênh lệch ở 768px v�
 
 #### Lệnh đã chạy (tóm tắt)
 `rm -rf node_modules && npm ci`, `npx tsc --noEmit`, `npx vitest run`; hai bản build (MOCK=0 trỏ 8140, MOCK=1) kèm `check-no-mock` và `check-ai-chunks`; Django 8140 (SQLite tạm, dựng lại DB trước mỗi script) + console MOCK=0 ở 3202 + mock ở 3201; các script ở bảng trên; `python3 scripts/check_naming.py`.
+
+---
+
+## Lô bổ sung A — BE + FE (quyết định #1, 2, 5, 6, 8, 10, 11, 14, 15, 17, 18, 19, 20, 21, 22) · lần 1 · 2026-10-02
+
+### Kết luận: APPROVED — mọi quyết định của Duy trong phạm vi chạy đúng trên BE thật (Django 8601 + ERP build MOCK=0 ở 3601) và trên bản mock; không có lỗi Critical/High/Medium; còn 4 ghi nhận Low (N1 đến N4) và 6 ca ⏸ (cần Postgres/thiết bị thật).
+
+### Tổng
+- Ca QA tự viết chạy trên BE thật (API + UI Playwright): khoảng 425 ca · ✅ khoảng 420 · ❌ 0 lỗi sản phẩm · 5 ca đỏ do kịch bản kỳ vọng sai (đã chứng minh từng ca, mục "Ca đỏ do kịch bản") · ⏸ 6.
+- `manage.py test` toàn bộ: 2848 test OK (235 s). `vitest run`: 68 file, 761/761.
+- E2E mock: `ed_bonusA_ui.py` 49/49; hồi quy 11 script 1154/1154.
+- `npm ci` sạch (không `--legacy-peer-deps`), `tsc --noEmit` sạch, hai bản build (MOCK=0 trỏ 8601; MOCK=1) build 0; bản MOCK=0 không còn `__caveMock`.
+- `scripts/check_naming.py` exit 0 (không phát sinh vi phạm mới); `makemigrations --check --dry-run`: "No changes detected".
+
+### Lưu ý về bản build (đã xử lý)
+Lần dựng đầu của tôi (20:46) có trước đợt fe-dev sửa TLA-FE-L1/L2/L3/L5/L6 (file `StocktakeDetailScreen`, `ConfirmModal`, `EscalateModal`, `OrderDetailScreen`, `BatchDetailScreen`, `stocktake/mock.ts`, `beErrors.mock.ts`, hai script e2e). Bản đó cho một ca đỏ giả ("Nhờ người xử lý" không biến mất sau khi nhờ). Tôi đã dựng lại cả hai bản từ mã hiện tại và chạy lại toàn bộ UI thật + e2e mock; kết quả dưới đây là của bản mới. Ba việc điều phối nhờ kiểm thêm: xem mục "Theo sửa review".
+
+### Theo AC (quyết định Duy)
+| Mã | Kết quả | Bằng chứng (API = BE thật qua HTTP; UI = Playwright trên build MOCK=0; ảnh ở `shots/bonusA/`) |
+|---|---|---|
+| #1 `/api/ai/status/` | ✅ | API: chủ nhận `budget {spent_vnd, limit_vnd, status}`, ql1/kho1/giao1/cs2 nhận `budget: null`, chưa đăng nhập 401. UI thật `ui5`: Chủ thấy "Đã dùng 0 đ / 200.000 đ", ql1/kho1/cs2 không có khối hạn mức, không có chữ "Đã dùng". Ảnh `bonusA_ai_budget_owner_1280.png`. Trạng thái cảnh báo/chặn của hạn mức ⏸ trên BE thật (không ép được), mock `ed_bonusA_ui` phủ. |
+| #2 link phiếu hoàn trên timeline đơn | ✅ | API: dòng "Tạo phiếu hoàn" có `link` tới phiếu hoàn, không còn lý do chữ tự do. UI: bấm link ra chi tiết phiếu hoàn (ảnh `bonusA_order_timeline_refund_link_1280.png`, `bonusA_refund_detail_from_link_1280.png`). Ngoài đường thuận: người không xem được phiếu hoàn thì dòng không có link (part6). |
+| #5 sửa SĐT khách | ✅ | API (part3): PATCH `phone` hợp lệ 200 đổi và ghi AuditLog (không có SĐT ở `changes`); trùng khách khác 400; sai định dạng 400; kho1/giao1/cs2 403. UI: ô sửa, báo trùng, báo sai, lưu được (ảnh `bonusA_customer_phone_*`); không lưu SĐT vào localStorage/URL. Ca trùng: khách khác giữ nguyên số. |
+| #6 duyệt kiểm kê không chặn người lập (BR-KK-08/02 bỏ) | ✅ | API (part2) và UI `ui1b`: ql1 tự lập, tự gửi duyệt, tự duyệt thành công; AuditLog ghi ai lập/ai duyệt. Ảnh `bonusA_stocktake_approved_1280.png`. |
+| #8 huỷ phiếu hoàn | ✅ | API: người tạo (giao1) và ql1/loc huỷ được phiếu Chờ duyệt, số `returned_qty` của phiếu giao về 0, phiếu giữ lại với trạng thái CANCELLED (không xoá, có AuditLog); phiếu đã duyệt huỷ -> 409; kho1 không phải người tạo không có mục Huỷ; DELETE bị chặn. UI `ui2b`/`ui2c`: hộp xác nhận nêu "không khôi phục", chip Đã huỷ, danh sách còn phiếu; màn cũ (đã duyệt ở nơi khác) -> hộp báo xung đột có Tải lại, phiếu vẫn Đã duyệt. Ảnh `bonusA_return_cancel_*`. |
+| #10 sửa giá, giá đã dính đơn không sửa | ✅ (API) | API (part5): sửa giá khi chưa có đơn dùng 200; đơn đã chốt giữ giá cũ; sửa/đặt lùi ngày vào khoảng đã có đơn 400 `PRICE_USED_BY_ORDERS`; đặt giá hiệu lực tương lai OK. Chưa có màn FE cho việc này (ghi nhận ở N5), chỉ owner sửa giá. Đua hai người đặt giá ⏸. |
+| #11 tìm khách bằng POST | ✅ | API: POST `/customer-directory/search/` đúng quyền (chỉ loc, ql1; 403 cho kho1/giao1/cs2), giới hạn tần suất 429 khi đặt ngưỡng thấp. UI: log Django có 46 lần POST search và 0 lần GET `?q=` do giao diện (ảnh `bonusA_customer_search_1280.png`). GET `?q=` còn dùng được (nợ TLA-L3, N3). |
+| #14 chặn sửa tiền chi phí đã phân bổ | ✅ (API) | API (part5b): PATCH `amount` chi phí đã phân bổ -> 400 `COST_ALLOCATED_LOCKED` kèm hướng dẫn huỷ + nhập lại; chi phí chưa phân bổ vẫn sửa được; phân bổ vượt -> 400 `COST_LANDED_OVERFLOW`; số quá lớn -> `COST_AMOUNT_TOO_LARGE`. UI: ảnh `bonusA_cost_overflow_1280.png`. Chỉ owner thấy/sửa tiền chi phí (xem Rò giá vốn). |
+| #15 đơn tự huỷ không còn thao tác | ✅ | API: đơn AUTO_CANCELLED không có `confirm_payment` trong `available_actions`; gọi thẳng API xác nhận tiền -> 400/409 `ORDER_AUTO_CANCELLED`; webhook SePay tới sau đơn tự huỷ không đổi đơn mà vào hàng chờ thanh toán (part6, gửi webhook 2 lần: lần hai không nhân đôi). Đơn BOOKED vẫn xác nhận được (hồi quy). UI: đơn Tự huỷ không có nút xác nhận tiền (ảnh `bonusA_order_autocancelled_1280.png`); đơn BOOKED còn nút (`bonusA_order_booked_*`). |
+| #17 SĐT trong "Việc giao của tôi" | ✅ | API (part4, 47 ca): `?assigned_to=me` của giao1 có `phone` đầy đủ cho phiếu đang xử lý, `phone: null` (có khoá) với phiếu đã xong/thất bại; giao1 không xem được phiếu của giao2 (không lộ SĐT). Danh sách chung không có khoá `phone`. UI: ảnh `bonusA_my_deliveries_1280.png`. |
+| #18 "Bắt đầu giao", "Lúc báo thất bại" | ✅ | API: `delivery_started_at` ghi khi chuyển Đang giao, `failed_at` khi báo thất bại, giờ ISO +07:00; phiếu cũ trước migration là null (không lỗi). UI: hiện đúng giờ GMT+7 (ảnh `bonusA_delivery_delivering_1280.png`, `bonusA_delivery_failed_1280.png`). Migration `delivery/0007` chỉ thêm cột. |
+| #19 "Nhờ người xử lý" | ✅ (kèm N1) | UI thật (`ui5`): ql1 ở đơn có bước thiếu quyền thấy mục; đơn mà ql1 làm được hết thì không có mục; Chủ không có mục; lô Đang bán ql1 có mục (Chốt lô cần Chủ). "Quay lại" không gọi POST; xác nhận gọi đúng 1 POST `/api/ai/actions/escalate/`, body chỉ `doc_type`, `doc_id`, `step_key`; trạng thái ESCALATED giao cho nhóm owner; toast; mục biến khỏi menu trong phiên trang. N1: sau khi tải lại trang mục hiện lại và BE không chặn nhờ lặp. |
+| #20 trạng thái Chờ duyệt kiểm kê | ✅ | API (part2, part2b): Nháp -> gửi duyệt -> Chờ duyệt -> trả về nháp/duyệt; duyệt khi Nháp 400 `RECON_NOT_SUBMITTED`; gửi lần hai/duyệt lần hai báo lỗi mã rõ; phiếu rỗng 400 `RECON_EMPTY`; sửa dòng khi Chờ duyệt bị chặn; tồn chỉ đổi lúc duyệt (BR-KK-09: cộng trừ theo chênh lệch đã chụp). UI `ui1b` 19/19: kho1 lưu nháp (URL chỉ `?id=`), gửi duyệt, chip Chờ duyệt, kho1 không có nút Duyệt, có "Trả về nháp"; ql1 duyệt; màn cũ bấm Gửi duyệt khi phiếu đã đổi -> hiện lỗi từ BE, tải lại thấy trạng thái đúng. Ảnh `bonusA_stocktake_*`. AI: lệnh `submit`/`approve` kiểm kê qua `/ai/commands` đúng quyền, AuditLog ghi người duyệt. |
+| #21 Quản lý tạo hàng hoàn | ✅ | Migration `inventory/0008` cấp `add_returntostock` cho nhóm Quản lý; API: ql1 tạo phiếu hoàn 201, giao1 vẫn tạo được, cs2 403; migration chạy trọn trong 2848 test BE (gồm `test_manager_create`); chạy lại hai lần trên DB đã có dữ liệu: ⏸ (chỉ kiểm bằng test BE, không tự chạy tay). |
+| #22 giá mua > 0 | ✅ | API (part5): `receive-batches` với `rate` 0, âm, rỗng -> 400 (mã lỗi theo dòng); `rate` dương lưu được. UI thật (`ui4`): nhập 0 -> báo đỏ dưới ô giá, không gửi; nhập đúng -> lưu (ảnh `bonusA_receipt_rate0_1280.png`, `bonusA_receipt_saved_1280.png`). |
+
+### Theo sửa review (bổ sung điều phối)
+| Mục | Kết quả | Bằng chứng |
+|---|---|---|
+| L1: lỗi ở hộp Gửi duyệt/Trả về nháp không còn mã "BR-" | ✅ | `ui6` trên BE thật: (A) ql1 mở hộp Gửi duyệt, kho1 gửi trước, ql1 xác nhận -> hộp hiện "Phiếu kiểm kê đã gửi duyệt hoặc đã duyệt, không sửa dòng được. Muốn sửa, hãy trả phiếu về nháp." Không có "BR-" trong toàn trang. (B) ql1 mở hộp Trả về nháp, phiếu bị duyệt ở nơi khác -> hộp hiện "Chỉ trả về nháp được phiếu đang chờ duyệt." Không có "BR-". Ảnh `bonusA_stocktake_stale_submit_fixed_1280.png`, `bonusA_stocktake_stale_return_fixed_1280.png`. |
+| L3: nhờ xong thì mục biến khỏi menu "…" | ✅ (kèm N1) | `ui5`/probe: sau xác nhận menu còn "Huỷ đơn", "Sao chép mã đơn", "Xem nhật ký của đơn", không còn "Nhờ người xử lý". Tải lại trang thì mục hiện lại (N1). |
+| L5: nút đỏ trong hộp xác nhận là nút đặc | ✅ | `ui6`: nút "Huỷ phiếu hoàn" có class `btn danger solid`, nền `rgb(192, 49, 43)`, chữ trắng. Ảnh `bonusA_confirm_danger_solid_1280.png`. |
+| L2/L6 (kho mock, `beErrors.mock`) | ✅ | e2e mock `ed_bonusA_ui` 49/49 và `ed_batch8_stocktake` 125/125 trên bản dựng mới. |
+
+### Ngoại lệ & biên (đã chạy)
+- Số 0, âm, rỗng: giá mua (#22), `amount` chi phí 0/âm/quá lớn (#14), `counted_qty` âm ở kiểm kê (400), SĐT sai định dạng (#5).
+- Trạng thái cũ/màn cũ: gửi duyệt khi phiếu đã gửi; trả về nháp khi phiếu đã duyệt; huỷ phiếu hoàn đã duyệt (409 + Tải lại); duyệt phiếu Nháp -> 400.
+- Dữ liệu đã có giao dịch: sửa giá lùi vào khoảng đã có đơn; sửa tiền chi phí đã phân bổ; huỷ phiếu hoàn rồi tạo lại phiếu mới cho cùng dòng giao (số đã hoàn khôi phục về 0).
+- Chạy hai lần: webhook SePay gửi hai lần trên đơn tự huỷ không nhân đôi (part6); gửi duyệt lần hai trên phiếu đã gửi -> BE trả lỗi mã rõ, phiếu không đổi (API và màn cũ `ui1b`); migration 0008 chỉ dựa vào test BE.
+- Cờ AI bật/tắt: `ai/status` khi `AI_ENABLED=1`; trạng thái tắt/hạn mức cảnh báo/chặn phủ bằng mock.
+- Chứng từ không bị xoá: phiếu hoàn đã huỷ vẫn ở danh sách; DELETE phiếu hoàn/kiểm kê/đơn bị chặn; đơn tự huỷ giữ nguyên chứng từ.
+- AuditLog Tầng 2: tạo, gửi duyệt, trả về nháp, duyệt kiểm kê; huỷ phiếu hoàn; đổi SĐT khách; sửa giá; chặn chi phí; có `actor` đúng người, không có khoá giá vốn và không có SĐT/tên/địa chỉ trong `changes`/`note`.
+- Đua hai người cùng lúc (hai POST duyệt, hai người đặt giá, hai huỷ/duyệt phiếu hoàn): SQLite không có `select_for_update` nên ⏸ (xem mục ⏸).
+
+### Phân quyền (Group x hành động, kiểm bằng API thật)
+| Hành động | owner (loc) | manager (ql1) | warehouse_staff (kho1) | delivery_staff (giao1) | customer_service (cs2) | Chưa đăng nhập |
+|---|---|---|---|---|---|---|
+| `GET /api/ai/status/` có `budget` | có số | `null` | `null` | `null` | `null` | 401 |
+| Danh sách / tìm khách (GET, POST search) | 200 | 200 | 403 | 403 | 403 | 401 |
+| PATCH SĐT khách | 200 | 200 | 403 | 403 | 403 | 401 |
+| Lập phiếu kiểm kê | được | được | được | 403 | 403 | 401 |
+| Gửi duyệt / trả về nháp kiểm kê | được | được | được (người lập) | 403 | 403 | 401 |
+| Duyệt kiểm kê | được | được (kể cả tự lập, #6) | 403 | 403 | 403 | 401 |
+| Tạo phiếu hoàn | được | được (#21, sau 0008) | được | được | 403 | 401 |
+| Huỷ phiếu hoàn | được | được | chỉ phiếu của mình | chỉ phiếu của mình | 403 | 401 |
+| Duyệt phiếu hoàn | được | được | 403 | 403 | 403 | 401 |
+| Sửa giá bán (#10) | được | 403 | 403 | 403 | 403 | 401 |
+| Sửa tiền chi phí phụ (#14) | được (nếu chưa phân bổ) | 403 | 403 | 403 | 403 | 401 |
+| Danh sách giao `?assigned_to=me` có `phone` (#17) | n/a | n/a | n/a | phiếu của mình | 403 | 401 |
+
+### Rò giá vốn
+- `/api/ai/status/`: chỉ có `spent_vnd`/`limit_vnd` của hạn mức AI (ngân sách AI, không phải giá vốn hàng) và chỉ owner thấy; các vai khác `budget: null`.
+- JSON kiểm kê, phiếu hoàn, danh sách giao, timeline đơn, AuditLog, ESCALATED action: quét đệ quy `COST_KEYS` với 5 vai, không có. Dòng "Tạo phiếu hoàn" trên timeline không có số tiền.
+- Chi phí phụ (#14) và `rate` mua (#22): chỉ owner thấy/sửa; lỗi `COST_LANDED_OVERFLOW`/`COST_ALLOCATED_LOCKED` không nêu số tiền hay kg, nên không tính ngược ra giá vốn (tiền ÷ kg). AuditLog của chi phí không ghi số tiền lẫn kg.
+- UI thật: ql1/kho1/cs2 không thấy khối tiền chi phí, không thấy ngân sách AI.
+
+### Rò dữ liệu cá nhân
+- Dữ liệu giả toàn bộ (tên "Quán…", SĐT dãy 0900…, địa chỉ "…giả"); ảnh chụp và báo cáo không có dữ liệu thật; báo cáo này không chép SĐT.
+- API công khai/Shop không đụng tới. API ERP: kiểm kê, phiếu hoàn, AuditLog, ESCALATED action (body chỉ `doc_type/doc_id/step_key`), timeline: quét regex SĐT 10 số + chuỗi địa chỉ -> không có. (Một ca quét "ESCALATED action" từng đỏ vì regex `0\d{9}` khớp một đoạn của UUID; không phải SĐT, đã xác minh bằng in ngữ cảnh.)
+- Người không cần thì không thấy: danh sách khách/SĐT sửa chỉ owner/manager; cs2 không có quyền danh sách khách (403, UI vào `/customers/` không thấy gì); giao1 chỉ thấy SĐT phiếu được giao cho mình, null khi phiếu đã xong.
+- Log Django (2 file, 3600 dòng), log máy chủ tĩnh, console trình duyệt, `localStorage`, URL: không có SĐT/tên/địa chỉ do giao diện sinh ra. Duy nhất một dòng log `GET …/customer-directory/?q=<SĐT giả>` do chính script API của tôi gọi (nợ TLA-L3, N3); giao diện dùng POST nên 0 dòng như vậy từ UI.
+- Tìm khách có giới hạn tần suất (429 khi hạ ngưỡng).
+
+### Hồi quy
+- Backend toàn bộ 2848 OK (gồm accounts, ai, catalog, delivery, inventory, purchasing, sales, common).
+- Bản mock hồi quy (BASE trỏ build MOCK=1 trên cổng 3411 của tôi): `ed_batch1_shell` 56, `ed_batch2_patterns` 75, `ed_batch3_orders` 143, `ed_batch4_delivery` 70, `ed_batch5_confirmation` 129, `ed_batch6_customers` 79, `ed_batch7_inventory` 114, `ed_batch8_stocktake` 125 (dev báo 122; script đã thêm ca), `ed_batch9_returns` 145, `ed_batch10_purchasing` 115, `ed_batch11_suppliers` 103; không ca đỏ. Tổng 1154.
+- BE thật: đơn BOOKED xác nhận tiền, giao hàng đủ chu kỳ, phiếu hoàn duyệt, kiểm kê cũ vẫn chạy.
+
+### Ca đỏ do kịch bản (không phải lỗi sản phẩm, 5 ca)
+1. `ui2`: "SĐT trùng khách khác" so khớp chuỗi quá hẹp; xác minh bằng ảnh và API: báo trùng, không lưu.
+2. `ui2` chạy lại: dừng ở phiếu hoàn số 7 đã được huỷ ở lần chạy trước (dữ liệu dùng một lần); phần huỷ phiếu hoàn chạy lại bằng `ui2c` (5/5) và `ui2b` (3/3).
+3. `ui3`: đơn Tự huỷ vẫn có các mục "Tóm tắt lịch sử"/"Chứng từ này còn thiếu gì?" (khối AI) — kỳ vọng "không có thao tác nào" sai; không có nút xác nhận tiền.
+4. `ui4`: kiểm ngân sách AI đặt nhầm chỗ; chuyển sang `ui5` và đạt 4/4.
+5. `ui5`: regex SĐT khớp UUID (mục trên).
+`ui1` chạy lại đỏ vì lô (batch) đổi sau lần duyệt trước; bản `ui1b` (chọn dòng động) 19/19.
+
+### Ghi nhận (Low, không chặn)
+- N1 · Low · #19: sau khi "Nhờ người xử lý" xong, mục chỉ ẩn trong phiên trang; tải lại trang mục hiện lại, và BE `/ai/actions/escalate/` không loại trùng nên bấm lần nữa tạo thêm một ESCALATED action cho cùng bước (đã thấy 1 -> 3 hành động cùng bước trong DB thử). Đề xuất: BE trả lại action cũ nếu đã có ESCALATED còn hiệu lực cho `(doc_type, doc_id, step_key)`. Dev-notes đã nói giới hạn "trong phiên".
+- N2 · Low: hộp Gửi duyệt khi phiếu đã đổi vẫn hiện nút "Thử lại" dù thử lại sẽ luôn lỗi; thông điệp đúng nhưng nên chỉ để "Quay lại"/"Tải lại".
+- N3 · Low (nợ TLA-L3): GET `/customer-directory/?q=<SĐT>` còn dùng được nên SĐT có thể vào log truy cập nếu client cũ gọi; FE đã chuyển POST. Đề xuất bỏ GET `q` sau Lô 6.
+- N4 · Low (có sẵn từ trước): `amount: "0"` chi phí phụ được chấp nhận (không phải phạm vi lô này).
+- N5 · Thông tin: #10 và #14 chưa có màn FE (chỉ API). Không phải lỗi, ghi để PO biết.
+
+### ⏸ Chưa kiểm
+1. Đua hai yêu cầu cùng lúc (hai duyệt kiểm kê, hai huỷ/duyệt phiếu hoàn, hai người đặt giá): SQLite không có khoá dòng, cần Postgres staging.
+2. Hạn mức AI ở trạng thái cảnh báo/chặn trên BE thật (không ép được chi tiêu); mock phủ.
+3. Chốt lô khi còn phiếu kiểm kê Chờ duyệt qua HTTP: BR-LO-04 chặn trước; phủ bằng test BE đơn vị (`test_submit_flow`).
+4. Thiết bị cảm ứng thật, 768 và 1024 px (đã chụp 1280 và 360).
+5. Migration `inventory/0006-0008`, `delivery/0007` trên bản sao dữ liệu thật của staging (chỉ chạy trên SQLite mới và `makemigrations --check`).
+6. `ed_shell_fixes.py`, `ed_batch3_fixes.py` của dev: không chạy được trên cổng tuỳ chọn / có 2 ca đỏ sẵn từ trước (dev báo 95/97); không thuộc lô này.
+
+### Lỗi
+Không có lỗi chặn. (Không B-mã nào mở.)
+
+### Lệnh đã chạy (tóm tắt)
+- `cd erp-console && npm ci` (sạch, log `qaA-npmci.log`); `npx tsc --noEmit` (0 lỗi); `npx vitest run` (68 file, 761 test OK).
+- `NEXT_PUBLIC_USE_MOCK=0 NEXT_PUBLIC_API_BASE=http://127.0.0.1:8601 npm run build` (dựng lại sau đợt sửa của fe-dev) -> serve tĩnh cổng 3601; `NEXT_PUBLIC_USE_MOCK=1 npm run build` -> serve cổng 3411.
+- `cd backend && python manage.py test` (2848 OK); Django SQLite tạm trên 8601 với `INTERNAL_SERVICE_TOKEN=tok`; `makemigrations --check --dry-run`; `python3 scripts/check_naming.py` (exit 0).
+- Script QA ở scratchpad: `qaA_part1..6b` (API), `qaA_ui1b/2b/2c/3/4/5/6` (UI thật); e2e mock `ed_bonusA_ui` + 11 script hồi quy.
+- Dọn: chỉ tắt các tiến trình của mình theo cổng (8601, 3601, 3411).

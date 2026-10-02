@@ -42,6 +42,9 @@
   color: var(--ink-2);
 }
 
+.budgetWarn { color: var(--warn); font-weight: var(--weight-semibold); }
+.budgetBlocked { color: var(--crit); font-weight: var(--weight-semibold); }
+
 .notice {
   display: flex;
   align-items: flex-start;

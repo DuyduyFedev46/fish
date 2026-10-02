@@ -5,7 +5,7 @@ Quy tắc (mã lỗi 400):
 - `RETURN_NOTE_STATUS`: phiếu giao phải đang giao hoặc giao thất bại.
 - `RETURN_BATCH_NOT_IN_NOTE`: lô phải thuộc phân bổ của hoá đơn của phiếu giao (BR-HV-01: về đúng lô gốc).
 - `RETURN_QTY_EXCEEDS`: tổng số kg đã ghi nhận hoàn của (phiếu giao, lô), kể cả phiếu mới, không quá số kg đã giao của
-  lô đó trên phiếu. Tính cả phiếu Chờ duyệt lẫn Đã duyệt. Khoá dòng phiếu giao trong lúc kiểm để hai yêu cầu cùng lúc
+  lô đó trên phiếu. Tính cả phiếu Chờ duyệt lẫn Đã duyệt, không tính phiếu đã huỷ. Khoá dòng phiếu giao trong lúc kiểm để hai yêu cầu cùng lúc
   không cùng lọt qua.
 Việc tạo phiếu + ghi `AuditLog` `return_to_warehouse` dùng lại `delivery.services.return_to_warehouse`. Ghi chú tự do
 chỉ nằm ở `ReturnToStock.note`, không vào AuditLog (bất biến 9).
@@ -35,9 +35,9 @@ def delivered_qty(delivery_note, batch):
 
 
 def returned_qty_by_batch(delivery_note, batch_ids=None):
-    """Số kg đã ghi nhận hoàn của từng lô trên phiếu giao: {batch_pk: kg}, tính cả Chờ duyệt lẫn Đã duyệt.
-    Một truy vấn gộp cho mọi lô. Dùng chung cho kiểm vượt số kg (`create_return`) và cho dòng phiếu giao (Lô 9)."""
-    qs = ReturnToStock.objects.filter(delivery_note=delivery_note)
+    """Số kg đã ghi nhận hoàn của từng lô trên phiếu giao: {batch_pk: kg}, tính cả Chờ duyệt lẫn Đã duyệt, KHÔNG tính
+    phiếu đã huỷ (#8). Một truy vấn gộp cho mọi lô. Dùng chung cho kiểm vượt số kg (`create_return`) và cho dòng phiếu giao (Lô 9)."""
+    qs = ReturnToStock.objects.filter(delivery_note=delivery_note).exclude(status=ReturnToStock.Status.CANCELLED)
     if batch_ids is not None:
         qs = qs.filter(batch_id__in=batch_ids)
     return {row["batch_id"]: row["total"] or ZERO for row in qs.order_by().values("batch_id").annotate(total=Sum("qty"))}

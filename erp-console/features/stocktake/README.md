@@ -27,7 +27,7 @@ URL chỉ mang `?id=`. Không có tên khách, số điện thoại hay địa c
 - Chọn kho chỉ để nạp lô còn tồn (`batches/?warehouse=&has_stock=1`); phiếu tính theo lô.
 - Lô đếm nhiều hơn sổ phải ghi lý do (BR-KK-04). Không nhập số âm, không trùng lô.
 - Tồn hệ thống hiện trong form chỉ để xem trước; BE chụp lại tồn mỗi lần lưu (BR-KK-01).
-- Người lập phiếu và người đã sửa số đếm không tự duyệt được (BR-KK-02, BR-KK-08): nút Duyệt nằm mờ trong "…" kèm lý do BE trả.
+- Lô bổ sung A (#6, #20): luồng Nháp, Chờ duyệt, Đã duyệt. "Gửi duyệt" chuyển Nháp sang Chờ duyệt (phiếu không có dòng thì BE từ chối RECON_EMPTY), "Trả về nháp" đưa phiếu Chờ duyệt về Nháp để sửa số đếm, "Duyệt" chỉ khi Chờ duyệt. Không còn luật người lập hay người sửa số đếm không tự duyệt được (BR-KK-02, BR-KK-08 bỏ); BE vẫn gửi `approve_blocked_reason` nhưng luôn null và FE bỏ qua. Việc gửi/trả về/duyệt đều qua hộp xác nhận.
 - Hai người cùng sửa: BE trả 409 `STALE_STATE`, màn hiện ConflictBanner "Phiếu vừa được <tên> sửa lúc …".
 - Không có số tiền: chênh lệch chỉ tính bằng kg (bất biến 1).
 - Không xoá phiếu (BR-PQ-10).

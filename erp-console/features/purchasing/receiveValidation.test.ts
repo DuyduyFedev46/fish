@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { QTY_MESSAGE, buildReceiveLines, firstErrorKey, normalizeQty, qtyMessage, rateMessage, validateReceiveForm } from "./receiveValidation";
 
-const line = (patch: Partial<{ item_code: string; qty: string; rate: string; shelf_life_days: number | null }> = {}) => ({ item_code: "CA-THU", qty: "10", rate: "", shelf_life_days: null, ...patch });
+const line = (patch: Partial<{ item_code: string; qty: string; rate: string; shelf_life_days: number | null }> = {}) => ({ item_code: "CA-THU", qty: "10", rate: "80.000", shelf_life_days: null, ...patch });
 
 describe("qtyMessage (ED-20-AC3)", () => {
   it("0, âm, trống, chữ đều báo 'Nhập số kg lớn hơn 0.'", () => {
@@ -21,12 +21,13 @@ describe("qtyMessage (ED-20-AC3)", () => {
 });
 
 describe("rateMessage (QA Lô 10 B5)", () => {
-  it("trống hợp lệ; âm, quá lớn, bằng 0 báo lỗi", () => {
-    expect(rateMessage("")).toBeNull();
+  it("Lô bổ sung A #22: bắt buộc và lớn hơn 0; trống, bằng 0, âm, quá lớn báo lỗi", () => {
+    expect(rateMessage("")).toBe("Nhập giá mua lớn hơn 0.");
+    expect(rateMessage("   ")).toBe("Nhập giá mua lớn hơn 0.");
     expect(rateMessage("80.000")).toBeNull();
     expect(rateMessage("-5000")).toContain("không được âm");
     expect(rateMessage("99.999.999.999.999")).toContain("quá lớn");
-    expect(rateMessage("0")).toContain("lớn hơn 0");
+    expect(rateMessage("0")).toBe("Nhập giá mua lớn hơn 0.");
   });
   it("giới hạn 10 chữ số (QA Lô 10 N1): 9.999.999.999 được, 10.000.000.000 và 999.999.999.999 báo lỗi, không gửi", () => {
     expect(rateMessage("9.999.999.999")).toBeNull();
@@ -39,6 +40,10 @@ describe("rateMessage (QA Lô 10 B5)", () => {
 });
 
 describe("validateReceiveForm", () => {
+  it("giá mua trống hoặc 0 → lỗi đúng ô rate của dòng đó", () => {
+    const errors = validateReceiveForm({ supplierId: 1, lines: [line(), line({ rate: "" }), line({ rate: "0" })] });
+    expect(Object.keys(errors).sort()).toEqual(["rate-1", "rate-2"]);
+  });
   it("hợp lệ → rỗng", () => {
     expect(validateReceiveForm({ supplierId: 1, lines: [line(), line({ rate: "80.000" })] })).toEqual({});
   });
@@ -55,13 +60,14 @@ describe("validateReceiveForm", () => {
 });
 
 describe("buildReceiveLines", () => {
-  it("giá trống gửi '0.00' (chưa có giá), giá có thì đúng số nguyên đồng", () => {
+  it("giá đúng số nguyên đồng, không còn gửi '0.00'", () => {
     const [a, b] = buildReceiveLines([line({ qty: "12,5" }), line({ rate: "80.000", shelf_life_days: 3 })]);
-    expect(a).toEqual({ item_code: "CA-THU", qty: "12.5", rate: "0.00", shelf_life_days: null });
+    expect(a).toEqual({ item_code: "CA-THU", qty: "12.5", rate: "80000", shelf_life_days: null });
     expect(b.rate).toBe("80000");
     expect(b.shelf_life_days).toBe(3);
   });
   it("giá âm / quá lớn / số kg lỗi: ném lỗi, không bao giờ gửi '0'", () => {
+    expect(() => buildReceiveLines([line({ rate: "" })])).toThrow();
     expect(() => buildReceiveLines([line({ rate: "-5000" })])).toThrow();
     expect(() => buildReceiveLines([line({ rate: "99.999.999.999.999" })])).toThrow();
     expect(() => buildReceiveLines([line({ qty: "0" })])).toThrow();

@@ -7,6 +7,7 @@ import {
   approveErrorText,
   batchChoices,
   canApprove,
+  canCancel,
   canCreate,
   createErrorOf,
   currentMonth,
@@ -266,6 +267,65 @@ describe("mock hàng hoàn (theo contract BE Lô 9)", () => {
     const res = call("loc", "GET", `/api/guidance/return/${first.id}/`);
     expect(res.status).toBe(200);
     expect(JSON.stringify(res.body)).not.toContain(first.note);
+  });
+});
+
+describe("Huỷ phiếu hoàn (Lô bổ sung A #8)", () => {
+  const me = (id: number, permissions: string[]) => ({ id, permissions });
+  const row = (status: ReturnItem["status"], created_by: number | null) => ({ status, created_by });
+
+  it("canCancel: người duyệt/sửa huỷ được phiếu Chờ duyệt; người tạo huỷ phiếu của mình; phiếu đã duyệt hoặc đã huỷ thì không", () => {
+    expect(canCancel(me(1, ["inventory.approve_returntostock"]), row("DRAFT", 9))).toBe(true);
+    expect(canCancel(me(1, ["inventory.change_returntostock"]), row("DRAFT", 9))).toBe(true);
+    expect(canCancel(me(4, ["inventory.add_returntostock"]), row("DRAFT", 4))).toBe(true);
+    expect(canCancel(me(4, ["inventory.add_returntostock"]), row("DRAFT", 9))).toBe(false);
+    expect(canCancel(me(4, ["inventory.view_returntostock"]), row("DRAFT", 4))).toBe(false);
+    expect(canCancel(me(1, ["inventory.approve_returntostock"]), row("APPROVED", 9))).toBe(false);
+    expect(canCancel(me(1, ["inventory.approve_returntostock"]), row("CANCELLED", 9))).toBe(false);
+    expect(canCancel(null, row("DRAFT", 9))).toBe(false);
+  });
+  it("doneSteps của phiếu đã huỷ có 'Huỷ phiếu', không có quyết định", () => {
+    expect(doneSteps({ status: "CANCELLED", decision: "PENDING" })).toEqual(["Ghi số kg", "Ghi giờ về kho", "Huỷ phiếu"]);
+  });
+  it("mock: người tạo huỷ phiếu của mình; huỷ lần hai và duyệt phiếu đã huỷ → 409 STALE_STATE", () => {
+    const made = call("kho1", "POST", BASE, { delivery_note: 36, batch: 203, qty: "0.1" }).body as ReturnItem;
+    const done = call("kho1", "POST", `${BASE}${made.id}/cancel/`);
+    expect(done.status).toBe(200);
+    expect((done.body as ReturnItem).status).toBe("CANCELLED");
+    const again = call("kho1", "POST", `${BASE}${made.id}/cancel/`);
+    expect(again.status).toBe(409);
+    expect(again.body).toMatchObject({ code: "STALE_STATE", detail: "Phiếu hàng hoàn đã được xử lý, hãy tải lại." });
+    expect(call("ql1", "POST", `${BASE}${made.id}/approve/`, { decision: "RESTOCK" }).status).toBe(409);
+  });
+  it("mock: người có quyền duyệt huỷ phiếu của người khác; người không tạo và không có quyền duyệt → 403 câu của BE", () => {
+    const made = call("kho1", "POST", BASE, { delivery_note: 36, batch: 203, qty: "0.1" }).body as ReturnItem;
+    const refused = call("giao1", "POST", `${BASE}${made.id}/cancel/`);
+    expect(refused.status).toBe(403);
+    expect((refused.body as { detail: string }).detail).toBe("Chỉ người có quyền duyệt hoặc người tạo phiếu mới huỷ được phiếu hàng hoàn.");
+    expect(call("ql1", "POST", `${BASE}${made.id}/cancel/`).status).toBe(200);
+  });
+  it("mock: GET không phải cách huỷ (405); phiếu không có → 404; thiếu quyền nhập hàng hoàn (CSKH) → 403", () => {
+    expect(call("loc", "GET", `${BASE}1/cancel/`).status).toBe(405);
+    expect(call("loc", "POST", `${BASE}9999/cancel/`).status).toBe(404);
+    expect(call("cs1", "POST", `${BASE}1/cancel/`).status).toBe(403);
+  });
+  it("mock: số kg của phiếu đã huỷ không còn tính vào số đã hoàn của phiếu giao", () => {
+    // Hỏi số còn hoàn được từ chính lỗi của mock (đã giao − đã hoàn, phiếu huỷ không tính).
+    const over = call("kho1", "POST", BASE, { delivery_note: 36, batch: 203, qty: "99" });
+    expect(over.status).toBe(400);
+    const d = over.body as { delivered_qty: string; already_returned_qty: string };
+    const left = (Number(d.delivered_qty) - Number(d.already_returned_qty)).toFixed(3);
+    expect(Number(left)).toBeGreaterThan(0);
+    const big = call("kho1", "POST", BASE, { delivery_note: 36, batch: 203, qty: left });
+    expect(big.status).toBe(201);
+    expect(call("kho1", "POST", BASE, { delivery_note: 36, batch: 203, qty: "0.001" }).status).toBe(400);
+    expect(call("kho1", "POST", `${BASE}${(big.body as ReturnItem).id}/cancel/`).status).toBe(200);
+    expect(call("kho1", "POST", BASE, { delivery_note: 36, batch: 203, qty: left }).status).toBe(201);
+  });
+  it("lọc trạng thái Đã huỷ chỉ ra phiếu đã huỷ", () => {
+    const rows = (call("loc", "GET", `${BASE}?status=CANCELLED`).body as Page).results;
+    expect(rows.length).toBeGreaterThan(0);
+    expect(rows.every((r) => r.status === "CANCELLED")).toBe(true);
   });
 });
 

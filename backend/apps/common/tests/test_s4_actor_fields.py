@@ -57,21 +57,31 @@ class S4ReconciliationTests(TestCase):
         rec.refresh_from_db()
         self.assertEqual(rec.created_by, self.ql1)
 
-    def test_s4_ac3_ql_tu_tao_roi_tu_duyet_bi_chan_br_kk_02(self):
-        resp = client_for(self.ql1).post(self.url, self.payload, format="json")
+    def test_s4_ac3_manager_creates_then_self_approves_after_submit(self):
+        """Duy chốt 02/10 (#6): bỏ BR-KK-02; phải gửi duyệt (#20) rồi người có quyền tự duyệt được."""
+        batch = make_batch(*make_master())
+        payload = {**self.payload, "lines": [{"batch": batch.pk, "counted_qty": "49", "reason": ""}]}
+        manager = self.ql1
+        resp = client_for(manager).post(self.url, payload, format="json")
         self.assertEqual(resp.status_code, 201, resp.content)
         rec_id = resp.json()["id"]
-        resp = client_for(self.ql1).post(f"{self.url}{rec_id}/approve/")
+        resp = client_for(manager).post(f"{self.url}{rec_id}/approve/")
         self.assertEqual(resp.status_code, 400, resp.content)
-        self.assertEqual(resp.json()["code"], "BR-KK-02")
-        self.assertEqual(StockReconciliation.objects.get(pk=rec_id).status, "DRAFT")
+        self.assertEqual(resp.json()["code"], "RECON_NOT_SUBMITTED")
+        self.assertEqual(client_for(manager).post(f"{self.url}{rec_id}/submit/").status_code, 200)
+        resp = client_for(manager).post(f"{self.url}{rec_id}/approve/")
+        self.assertEqual(resp.status_code, 200, resp.content)
+        self.assertEqual(resp.json()["created_by"]["id"], manager.pk)
+        self.assertEqual(resp.json()["approved_by"]["id"], manager.pk)
 
     def test_s4_ac3_nguoi_khac_duyet_duoc(self):
         # L3 (Lô 8): phiếu rỗng không duyệt được, nên phiếu này có một dòng số đếm.
         batch = make_batch(*make_master())
         payload = {**self.payload, "lines": [{"batch": batch.pk, "counted_qty": "49", "reason": ""}]}
-        resp = client_for(self.kho1).post(self.url, payload, format="json")
+        creator = self.kho1
+        resp = client_for(creator).post(self.url, payload, format="json")
         rec_id = resp.json()["id"]
+        self.assertEqual(client_for(creator).post(f"{self.url}{rec_id}/submit/").status_code, 200)
         resp = client_for(self.ql1).post(f"{self.url}{rec_id}/approve/")
         self.assertEqual(resp.status_code, 200, resp.content)
         self.assertEqual(resp.json()["approved_by"]["id"], self.ql1.pk)  # 02b R8: {"id", "display_name"}

@@ -110,7 +110,6 @@ export const ORDERS_MSG = {
   amountTooBig: `Số tiền quá lớn: tối đa 12 chữ số (${vnd("999999999999")}). Đối chiếu lại số trên sao kê.`,
   amountLess: (diff: string) => `Ít hơn tổng đơn ${vnd(diff)}: khoản này vào hàng chờ thanh toán, đơn vẫn Giữ chỗ.`,
   amountMore: (diff: string) => `Nhiều hơn tổng đơn ${vnd(diff)}: phần thừa vào hàng chờ thanh toán để hoàn cho khách.`,
-  alertAutoCancelled: "Đơn đã tự huỷ: xác nhận KHÔNG khôi phục đơn. Khoản tiền vào hàng chờ thanh toán để xử lý hoàn.",
   confirmSubmit: (amount: string) => `Xác nhận đã nhận ${vnd(amount)}`,
   confirmSubmitNoAmount: "Xác nhận đã nhận tiền",
   confirming: "Đang xác nhận…",

@@ -134,6 +134,9 @@ def advance_status(*, note, to_status, actor, from_status=None):
         if to_status == Status.COMPLETED:
             note.completed_at = _now()
             update_fields.append("completed_at")
+        elif to_status == Status.DELIVERING:  # #18: mốc bắt đầu giao (giao lại thì ghi đè)
+            note.delivery_started_at = _now()
+            update_fields.append("delivery_started_at")
         note.save(update_fields=update_fields)
 
     record_audit(
@@ -148,6 +151,7 @@ def _lock_note(note):
     locked = DeliveryNote.objects.select_for_update().get(pk=note.pk)
     for field in (
         "status", "failed_attempts", "assigned_to_id", "failure_reason", "failure_note", "completed_at",
+        "delivery_started_at", "failed_at",
     ):
         setattr(note, field, getattr(locked, field))
     return note
@@ -207,7 +211,8 @@ def mark_failed(*, note, actor, reason=None, reason_note=""):
         note.failed_attempts += 1
         note.failure_reason = reason
         note.failure_note = reason_note
-        note.save(update_fields=["status", "failed_attempts", "failure_reason", "failure_note"])
+        note.failed_at = _now()  # #18
+        note.save(update_fields=["status", "failed_attempts", "failure_reason", "failure_note", "failed_at"])
 
         needs_decision = note.failed_attempts >= threshold
         changes = {

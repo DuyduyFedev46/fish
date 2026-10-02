@@ -13,6 +13,8 @@ import { useAuth } from "@/features/auth/components/AuthProvider";
 import type { Me } from "@/features/auth/types";
 import { nextStepLabel, toTimelineEntries } from "@/features/guidance/detailAdapters";
 import { getGuidance } from "@/features/guidance/api";
+import { EscalateModal } from "@/features/guidance/components/EscalateModal";
+import { ESCALATE_MSG, escalatableStep } from "@/features/guidance/escalation";
 import type { GuidanceData } from "@/features/guidance/types";
 import { fetchLedger } from "@/features/ledger/api";
 import type { LedgerEntry } from "@/features/ledger/types";
@@ -59,7 +61,7 @@ import { ReturnToSupplierModal } from "./ReturnToSupplierModal";
 import s from "../inventory.module.css";
 
 type Load = { k: "loading" } | { k: "ready"; row: BatchApiRow; asOf: string } | { k: "error" } | { k: "notfound" } | { k: "forbidden" };
-type ModalKind = "publish" | "return" | "cancel" | "close" | null;
+type ModalKind = "publish" | "return" | "cancel" | "close" | "escalate" | null;
 
 const IDLE = { data: null, error: null, loading: true } as const;
 
@@ -88,6 +90,8 @@ function Loaded({ id, me, renderAi }: { id: number; me: Me; renderAi?: RenderAi 
   const [ledger, setLedger] = useState<Remote<{ rows: LedgerEntry[]; count: number }>>(IDLE);
   const [orders, setOrders] = useState<Remote<{ rows: OrderUsingBatch[]; count: number }>>(IDLE);
   const [modal, setModal] = useState<ModalKind>(null);
+  // Bước đã nhờ xong trong phiên trang này: ẩn mục menu để khỏi nhờ lặp (BE không chống trùng).
+  const [escalatedKey, setEscalatedKey] = useState<string | null>(null);
   const [conflict, setConflict] = useState<SubmitConflict | null>(null);
   const [aiApplied, setAiApplied] = useState(0);
   const seq = useRef(0);
@@ -160,6 +164,10 @@ function Loaded({ id, me, renderAi }: { id: number; me: Me; renderAi?: RenderAi 
   }
   if (ability.close && !stepLacksPermission(closeStep)) {
     more.push({ key: "close", label: "Chốt lô", blockedReason: closeBlockReason(row, stepReason(closeStep)), onSelect: () => setModal("close") });
+  }
+  const stuckStep = escalatableStep(guidance);
+  if (stuckStep && stuckStep.key !== escalatedKey) {
+    more.push({ key: "escalate", label: ESCALATE_MSG.menuLabel, onSelect: () => setModal("escalate") });
   }
   more.push({
     key: "copy",
@@ -306,6 +314,23 @@ function Loaded({ id, me, renderAi }: { id: number; me: Me; renderAi?: RenderAi 
       {modal === "return" && <ReturnToSupplierModal {...common} />}
       {modal === "cancel" && <CancelExpiredModal {...common} viewCost={ability.viewCost} />}
       {modal === "close" && <CloseBatchModal {...common} viewProfit={ability.viewProfit} />}
+      {modal === "escalate" && stuckStep && (
+        <EscalateModal
+          docType="batch"
+          docId={row.id}
+          step={stuckStep}
+          onClose={() => setModal(null)}
+          onReload={() => {
+            setModal(null);
+            reload();
+          }}
+          onDone={(who) => {
+            setModal(null);
+            setEscalatedKey(stuckStep.key);
+            toast.success(ESCALATE_MSG.done(who));
+          }}
+        />
+      )}
     </DetailPage>
   );
 }

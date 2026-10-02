@@ -16,10 +16,6 @@ from .services import MAX_LINES, RECON_LINE_INVALID, SYSTEM_NAME, staff_name
 
 ZERO = Decimal("0")
 QTY_QUANT = Decimal("0.001")
-BLOCKED_REASON_LABELS = {
-    "BR-KK-02": "Bạn là người nhập số của phiếu này nên không tự duyệt được.",
-    "BR-KK-08": "Bạn đã sửa số đếm của phiếu này nên không duyệt được. Nhờ người khác duyệt.",
-}
 
 
 def _user_ref(user):
@@ -206,34 +202,26 @@ class StockReconciliationSerializer(serializers.ModelSerializer):
     def get_net_difference(self, obj):
         return self._summary(obj)["net_difference"]
 
-    def _blocked_code(self, obj, user):
-        """Mã lý do người này không duyệt được dù có quyền, hoặc None."""
-        if obj.status != StockReconciliation.Status.DRAFT or user is None:
-            return None
-        if not user.has_perm("inventory.approve_stockreconciliation"):
-            return None
-        if obj.created_by_id == user.pk:
-            return "BR-KK-02"
-        if getattr(obj, "edited_lines_by_me", False):
-            return "BR-KK-08"
-        return None
-
     def get_available_actions(self, obj):
         request = self.context.get("request")
         user = getattr(request, "user", None)
-        if obj.status != StockReconciliation.Status.DRAFT or user is None:
+        if user is None or obj.status == StockReconciliation.Status.APPROVED:
             return []
+        can_change = user.has_perm("inventory.change_stockreconciliation")
         actions = []
-        if user.has_perm("inventory.change_stockreconciliation"):
-            actions.append("edit_lines")
-        if user.has_perm("inventory.approve_stockreconciliation") and self._blocked_code(obj, user) is None:
-            actions.append("approve")
+        if obj.status == StockReconciliation.Status.DRAFT:
+            if can_change:
+                actions += ["edit_lines", "submit"]
+        elif obj.status == StockReconciliation.Status.SUBMITTED:
+            if can_change:
+                actions.append("return_to_draft")
+            if user.has_perm("inventory.approve_stockreconciliation"):
+                actions.append("approve")
         return actions
 
     def get_approve_blocked_reason(self, obj):
-        request = self.context.get("request")
-        code = self._blocked_code(obj, getattr(request, "user", None))
-        return None if code is None else {"code": code, "label": BLOCKED_REASON_LABELS[code]}
+        """Luôn None: BR-KK-02/BR-KK-08 đã bỏ (Duy chốt 02/10, #6), không còn lý do nào chặn người có quyền duyệt."""
+        return None
 
 
 class StockReconciliationDetailSerializer(StockReconciliationSerializer):

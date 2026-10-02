@@ -121,12 +121,47 @@ describe("R4 assigned_to=me và SĐT ở chi tiết", () => {
     expect(mockListDeliveryNotes(req("giao1", "/api/delivery/notes/?assigned_to=7")).status).toBe(403);
   });
 
-  it("danh sách không có SĐT; chi tiết có phone; giao1 không mở được phiếu của người khác", () => {
-    const list = (mockListDeliveryNotes(req("giao1", "/api/delivery/notes/?assigned_to=me")).body as DeliveryListResponse).results;
-    expect(list.every((n) => !(n as { phone?: string | null }).phone)).toBe(true);
+  it("Lô bổ sung A #17: assigned_to=me có phone cho phiếu Đang giao/Giao thất bại, null cho phiếu còn lại; danh sách khác không có khoá phone", () => {
+    const mine = (mockListDeliveryNotes(req("giao1", "/api/delivery/notes/?assigned_to=me")).body as DeliveryListResponse).results;
+    const active = mine.filter((n) => n.status === "DELIVERING" || n.status === "FAILED");
+    expect(active.length).toBeGreaterThan(0);
+    expect(active.every((n) => typeof n.phone === "string" && n.phone.length > 0)).toBe(true);
+    expect(mine.filter((n) => n.status !== "DELIVERING" && n.status !== "FAILED").every((n) => n.phone === null)).toBe(true);
+    const other = (mockListDeliveryNotes(req("ql1", "/api/delivery/notes/?status=DELIVERING")).body as DeliveryListResponse).results;
+    expect(other.every((n) => !("phone" in n))).toBe(true);
+  });
+
+  it("chi tiết có phone; giao1 không mở được phiếu của người khác", () => {
     const detail = mockGetDeliveryNoteDetail(req("giao1", "/api/delivery/notes/36/")).body as DeliveryNoteDetail;
     expect(detail.phone).toBeTruthy();
     expect(mockGetDeliveryNoteDetail(req("giao1", "/api/delivery/notes/39/")).status).toBe(404);
+  });
+});
+
+describe("Lô bổ sung A #18: mốc Bắt đầu giao và Giao thất bại", () => {
+  it("phiếu Đang giao có delivery_started_at, chưa có failed_at; phiếu Chờ lấy chưa có cả hai", () => {
+    const rows = (mockListDeliveryNotes(req("ql1", "/api/delivery/notes/")).body as DeliveryListResponse).results;
+    const delivering = rows.find((n) => n.status === "DELIVERING")!;
+    expect(delivering.delivery_started_at).toBeTruthy();
+    expect(delivering.failed_at).toBeNull();
+    const ready = rows.find((n) => n.status === "READY")!;
+    expect(ready.delivery_started_at).toBeNull();
+    expect(ready.failed_at).toBeNull();
+  });
+
+  it("báo thất bại ghi failed_at; giao lại ghi đè delivery_started_at", () => {
+    const post = (to: string, extra: object = {}) => mockPostDeliveryNoteStatus(req("giao2", "/api/delivery/notes/39/status/", "POST", { to_status: to, ...extra }));
+    const snapshot = { ...note(39) };
+    const failed = post("FAILED", { failure_reason: "NOT_MET", failure_note: "Khách đi vắng" });
+    expect(failed.status).toBe(200);
+    const f = failed.body as { failed_at: string; delivery_started_at: string };
+    expect(Date.parse(f.failed_at)).toBeGreaterThan(0);
+    const again = post("DELIVERING");
+    expect(again.status).toBe(200);
+    const a = again.body as { delivery_started_at: string; failed_at: string };
+    expect(Date.parse(a.delivery_started_at)).toBeGreaterThanOrEqual(Date.parse(f.failed_at) - 1000);
+    expect(a.failed_at).toBe(f.failed_at);
+    Object.assign(note(39), snapshot);
   });
 });
 

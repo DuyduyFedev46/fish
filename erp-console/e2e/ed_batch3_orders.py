@@ -239,7 +239,7 @@ with sync_playwright() as p:
     # ======================================================= Bảng trạng thái → nút (Chủ)
     ctx, page = new_page(browser, "loc", errors=errors)
     table = [
-        (103, ["Xác nhận đã nhận tiền"], "Đã huỷ"),   # tự huỷ, tiền về muộn
+        (103, [], "Đã huỷ"),   # tự huỷ: không còn nút nào (#15)
         (104, ["Huỷ đơn"], "Đang xử lý"),             # Soạn hàng
         (105, ["Huỷ đơn"], "Đã thanh toán"),
         (107, [], "Đang xử lý"),                       # Đang giao: không nút
@@ -325,16 +325,22 @@ with sync_playwright() as p:
     expect(page.locator(".toast-item")).to_contain_text("đã được ghi trước đó")
     idle(page)
     ok("ED-11-AC4: trùng mã GD (webhook ghi trước) → báo đã ghi trước đó, không xử lý lần hai", len(posts(page)) == 1 and page.locator(".toast-item.warn").count() >= 1)
-    # ORPHAN
+    # Lô bổ sung A #15: đơn tự huỷ thì KHÔNG còn nút xác nhận; đơn tự huỷ "trong lúc đang xem" thì BE trả ORDER_AUTO_CANCELLED
     open_order(page, 103)
+    ok("Lô bổ sung A #15: đơn Tự huỷ không có nút Xác nhận đã nhận tiền, không có nút nào ở đầu trang",
+       page.get_by_role("button", name="Xác nhận đã nhận tiền").count() == 0 and header_buttons(page) == [], str(header_buttons(page)))
+    open_order(page, 102)
+    page.evaluate("() => window.__caveMock.expireOrder(102)")
     page.get_by_role("button", name="Xác nhận đã nhận tiền").click()
     dlg = dialog(page, "Xác nhận đã nhận tiền")
-    ok("ED-10: đơn tự huỷ → hộp nêu 'KHÔNG khôi phục đơn'", "KHÔNG khôi phục" in dlg.inner_text())
     dlg.get_by_label("Mã giao dịch ngân hàng").fill("FT2626799503")
+    clear_log(page)
     submit_btn(dlg).click()
-    expect(page.locator(".toast-item").last).to_contain_text("không khôi phục")
+    expect(page.locator(".toast-item").last).to_contain_text(be(page, "ORDER_AUTO_CANCELLED"))
     idle(page)
-    ok("ED-10: ORPHAN → đơn vẫn 'Đã huỷ'", "Đã huỷ" in header_text(page))
+    ok("Lô bổ sung A #15: ORDER_AUTO_CANCELLED -> hộp đóng, toast vàng nêu lý do, chỉ gửi 1 POST", page.get_by_role("dialog").count() == 0 and page.locator(".toast-item.warn").count() >= 1 and len(posts(page)) == 1, str(posts(page)))
+    expect(page.locator("main header")).to_contain_text("Đã huỷ")
+    ok("Lô bổ sung A #15: sau khi tải lại đơn thành Đã huỷ, hết nút Xác nhận", page.get_by_role("button", name="Xác nhận đã nhận tiền").count() == 0 and header_buttons(page) == [], str(header_buttons(page)))
     # thành công trên 101: chip đổi, timeline có dòng mới, toast
     open_order(page, 101)
     n0 = page.locator("[aria-label='Dòng thời gian'] li, section:has(h3:text('Dòng thời gian')) li").count()

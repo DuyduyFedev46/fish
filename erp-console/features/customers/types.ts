@@ -46,8 +46,8 @@ export type CustomerDetail = CustomerListItem & {
   refunds: CustomerRefundRow[];
 };
 
-/** Chỉ ba trường này sửa được; số điện thoại bị khoá (quyết định #5). */
-export type CustomerEditableField = "name" | "default_address" | "note";
+/** Bốn trường sửa được; số điện thoại sửa được từ 02/10 (Lô bổ sung A #5), BE chuẩn hoá và chặn trùng khách khác. */
+export type CustomerEditableField = "name" | "phone" | "default_address" | "note";
 export type CustomerPatch = Partial<Record<CustomerEditableField, string>>;
 
 /** Giá trị `ordering` BE cho phép; thêm "-" phía trước để giảm dần. */

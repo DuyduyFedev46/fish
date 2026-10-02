@@ -48,9 +48,9 @@ Mã `DH-…` chỉ có trong mock, placeholder và test của FE (`deliveries/mo
 | Batch.status | DRAFT Nháp · SELLING Đang bán · NEAR_EXPIRY Cận hạn · SOLD_OUT Hết hàng · EXPIRED Quá hạn · CANCELLED Đã huỷ · CLOSED Đã chốt | như model | như model |
 | StockLedgerEntry.movement_type (type_label = get_display) | RECEIPT Nhập lô · SALE Bán ra · RETURN_RESTOCK Hàng hoàn tái nhập · RECONCILE Điều chỉnh kiểm kê · WRITE_OFF Hạch toán lỗ / huỷ · CANCEL_RESTORE Hoàn kho do huỷ đơn · SUPPLIER_RETURN Trả nhà cung cấp | type_label từ BE | như model; WRITE_OFF → "Ghi lỗ, huỷ hàng" ⚑ |
 | StockEntry.purpose | MATERIAL_RECEIPT Nhập vật tư · ADJUSTMENT Điều chỉnh (+ `reason` "Lý do" tự do) | — | như model. Không ghi vào sổ nhập xuất |
-| StockReconciliation.status | DRAFT Chờ duyệt · APPROVED Đã duyệt | — | như model |
+| StockReconciliation.status | DRAFT Nháp · SUBMITTED Chờ duyệt · APPROVED Đã duyệt | — | như model (Duy chốt 02/10, #6/#20) |
 | StockReconciliationLine.reason | TextField tự do | — | — |
-| ReturnToStock.status | DRAFT Chờ duyệt · APPROVED Đã duyệt | — | như model |
+| ReturnToStock.status | DRAFT Chờ duyệt · APPROVED Đã duyệt · CANCELLED Đã huỷ | — | như model (CANCELLED: Duy chốt 02/10, #8) |
 | ReturnToStock.decision | PENDING Chờ quyết định · RESTOCK Tái nhập · WRITE_OFF Huỷ bỏ (hạch toán lỗ) | — | Tái nhập · "Huỷ bỏ, ghi lỗ" ⚑ |
 | ReturnToStock.note | "Ghi chú" (không có trường lý do) | — | cột "Ghi chú" |
 | Warehouse.is_group | Là nhóm kho | — | Kho / Nhóm kho |

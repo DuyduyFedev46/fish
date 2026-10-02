@@ -55,6 +55,10 @@ class DeliveryNote(models.Model):
     note = models.TextField("Ghi chú", blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     completed_at = models.DateTimeField("Thời điểm hoàn tất", null=True, blank=True)
+    # Duy chốt 02/10 (#18): mốc cho "đã giao bao lâu" và "thất bại lúc nào". Ghi đè mỗi lần (giao lại, thất bại lại);
+    # lịch sử từng lần nằm ở AuditLog. Phiếu cũ để null.
+    delivery_started_at = models.DateTimeField("Bắt đầu giao lúc", null=True, blank=True)
+    failed_at = models.DateTimeField("Giao thất bại lúc", null=True, blank=True)
 
     # CSKH xác nhận & người nhận hộ (2026-09-28-cskh-xac-nhan-in-tem)
     confirmed_at = models.DateTimeField("Thời điểm xác nhận", null=True, blank=True)

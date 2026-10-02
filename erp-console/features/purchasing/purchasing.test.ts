@@ -98,6 +98,24 @@ describe("Purchasing feature tests (DW-17)", () => {
     expect(body.batches[1].qty_available).toBe("40");
   });
 
+  it("Lô bổ sung A #22: mock từ chối giá mua 0, âm hoặc thiếu bằng 400 theo từng dòng; dòng đúng không bị đánh lỗi", () => {
+    const send = (rates: Array<string | undefined>) =>
+      mockSubmitReceiveBatches({
+        method: "POST",
+        path: "/api/purchasing/receipts/receive-batches/",
+        body: { supplier: 1, lines: rates.map((rate) => ({ item_code: "CA-THU", qty: "5", rate, shelf_life_days: null })) },
+        token: "mock-token",
+      });
+    for (const bad of ["0", "0.00", "-5", "", undefined]) {
+      const res = send(["180000", bad]);
+      expect(res.status).toBe(400);
+      const lines = (res.body as unknown as { lines: Array<{ rate?: string[] }> }).lines;
+      expect(lines[0]).toEqual({});
+      expect(lines[1].rate).toEqual(["Giá mua phải lớn hơn 0."]);
+    }
+    expect(send(["180000"]).status).toBe(201);
+  });
+
   it("DW-17-AC1 & AC8: submitReceiveBatches calls API and handles success response", async () => {
     const mockResponse = {
       receipt: {
@@ -203,4 +221,3 @@ describe("Purchasing feature tests (DW-17)", () => {
     expect(res.status).toBe("CANCELLED");
   });
 });
-

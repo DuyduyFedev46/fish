@@ -189,7 +189,7 @@ function FormBody({ userId, suppliers, items }: { userId: number; suppliers: { i
             <div className={s.lineGrid}>
               <Field as="select" label="Mặt hàng" name={`item-${idx}`} required value={line.item_code} onChange={(v) => setLine(idx, { item_code: v })} options={itemOptions} error={shown(`item-${idx}`)} />
               <Field label="Khối lượng" name={`qty-${idx}`} type="number" required unit="kg" value={line.qty} onChange={(v) => setLine(idx, { qty: v })} error={shown(`qty-${idx}`)} />
-              <Field label="Giá mua" name={`rate-${idx}`} type="money" unit="đ/kg" value={line.rate} onChange={(v) => setLine(idx, { rate: v })} error={shown(`rate-${idx}`)} />
+              <Field label="Giá mua" name={`rate-${idx}`} type="money" required unit="đ/kg" value={line.rate} onChange={(v) => setLine(idx, { rate: v })} error={shown(`rate-${idx}`)} />
               <Field
                 label="Hạn dùng"
                 name={`shelf-${idx}`}

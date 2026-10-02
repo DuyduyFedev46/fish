@@ -1,5 +1,6 @@
 // Kiểm form Nhập lô tại cảng (F1a) trước khi gửi, và dựng body gửi BE. Hàm thuần.
 // ED-20-AC3: số kg không hợp lệ báo NGAY DƯỚI ô. QA Lô 10 B5: giá mua lỗi báo dưới ô và không gửi, không tự đổi thành 0.
+// Lô bổ sung A #22: giá mua bắt buộc và phải lớn hơn 0 (không còn gửi "0.00").
 import { moneyBody, moneyMessage, RATE_MAX_DIGITS } from "@/features/accounting/money";
 import type { ReceiveBatchesLineInput } from "./types";
 
@@ -27,9 +28,9 @@ export function qtyMessage(value: string): string | null {
   return null;
 }
 
-/** Giá mua: để trống = chưa có giá (hợp lệ); đã nhập thì phải là số nguyên đồng lớn hơn 0. */
+/** Giá mua: bắt buộc, số nguyên đồng lớn hơn 0 (Lô bổ sung A #22; BE từ chối giá 0 và để trống không còn nghĩa "chưa có giá"). */
 export function rateMessage(value: string): string | null {
-  return moneyMessage(value, { noun: "Giá mua", allowEmpty: true, positive: true, maxDigits: RATE_MAX_DIGITS });
+  return moneyMessage(value, { noun: "Giá mua", positive: true, maxDigits: RATE_MAX_DIGITS });
 }
 
 export type ReceiveFormErrors = Record<string, string>;
@@ -57,7 +58,7 @@ export function firstErrorKey(errors: ReceiveFormErrors, lineCount: number): str
   return null;
 }
 
-/** Dòng gửi BE. Chỉ gọi khi `validateReceiveForm` rỗng; giá mua trống gửi "0.00" (chưa có giá), giá sai thì NÉM LỖI chứ không thành 0. */
+/** Dòng gửi BE. Chỉ gọi khi `validateReceiveForm` rỗng; giá mua trống hoặc không hợp lệ thì NÉM LỖI chứ không thành 0. */
 export function buildReceiveLines(lines: ReceiveBatchesLineInput[]): ReceiveBatchesLineInput[] {
   return lines.map((l) => {
     const qty = normalizeQty(l.qty);
@@ -65,7 +66,7 @@ export function buildReceiveLines(lines: ReceiveBatchesLineInput[]): ReceiveBatc
     return {
       item_code: l.item_code,
       qty: String(Number(qty)),
-      rate: l.rate.trim() === "" ? "0.00" : moneyBody(l.rate, RATE_MAX_DIGITS),
+      rate: moneyBody(l.rate, RATE_MAX_DIGITS),
       shelf_life_days: l.shelf_life_days ? Number(l.shelf_life_days) : null,
     };
   });

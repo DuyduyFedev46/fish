@@ -1,8 +1,9 @@
 // Mock module Khách hàng (ED-14) — CHỈ dùng khi NEXT_PUBLIC_USE_MOCK=1 (bản build thật loại bỏ file này).
 // Dựng JSON theo contract THỰC TẾ BE Lô 6 / B2 (03-dev-notes.md "Lô 6 — BE (B2)"):
-//   GET   /api/sales/customer-directory/?q=&ordering=&page=   (20 dòng/trang, DRF {count,next,previous,results})
+//   POST  /api/sales/customer-directory/search/               thân {q, ordering, page} (Lô bổ sung A #11: từ khoá không nằm trong URL)
+//   GET   /api/sales/customer-directory/?q=&ordering=&page=   (còn để tương thích; 20 dòng/trang, DRF {count,next,previous,results})
 //   GET   /api/sales/customer-directory/{id}/                 (thêm default_address, created_at, first_order_at, orders[50], refunds[50])
-//   PATCH /api/sales/customer-directory/{id}/                 chỉ name / default_address / note (chuỗi)
+//   PATCH /api/sales/customer-directory/{id}/                 name / phone / default_address / note (chuỗi)
 //   GET   /api/guidance/customer/{id}/                        chỉ phần `timeline` (cùng quyền xem danh bạ)
 //
 // Luật mock (mô phỏng BE, FE KHÔNG dùng lại các luật này):
@@ -11,7 +12,8 @@
 //  - `ordering` chỉ nhận last_order_at · order_count · total_spent · name · created_at (có thể thêm "-"); mặc định -last_order_at,
 //    khách chưa có đơn xếp cuối. Khoá lạ → quay về mặc định (như BE).
 //  - total_spent = tổng đơn KHÔNG huỷ, trừ phiếu hoàn REFUNDED của các đơn đó (đơn đã huỷ loại cả khoản hoàn). cancelled_count = đơn huỷ + tự huỷ.
-//  - PATCH: thân rỗng → 400 INPUT_EMPTY; khoá khác (kể cả phone) → 400 INPUT_NOT_ALLOWED; không phải chuỗi / quá dài → 400 {field:[...]}.
+//  - PATCH: thân rỗng → 400 INPUT_EMPTY; khoá khác → 400 INPUT_NOT_ALLOWED; không phải chuỗi / quá dài → 400 {field:[...]}.
+//    phone: chuẩn hoá (+84/84 → 0), sai dạng → 400 INVALID_PHONE, trùng khách khác → 400 CUSTOMER_PHONE_TAKEN (câu lỗi không lặp lại số).
 //
 // Dữ liệu CHỈ nằm trong bộ nhớ trang (mất khi tải lại): không ghi tên/SĐT/địa chỉ vào localStorage/sessionStorage (bất biến 9),
 // kể cả dữ liệu giả, để e2e quét storage được sạch. Tên giả "Khách Thử A…", SĐT giả 0900000xxx.
@@ -23,6 +25,7 @@ import { MOCK_UNAUTHORIZED, mockRequireUser } from "@/features/auth/mock";
 import type { Me } from "@/features/auth/types";
 import { fold } from "@/shared/lib/search";
 import type { GuidanceData, GuidanceTimelineEntry } from "@/features/guidance/types";
+import { normalizePhone } from "./customersModel";
 import type { CustomerDetail, CustomerListItem, CustomerOrderRow, CustomerRefundRow } from "./types";
 
 const MODE_KEY = "cave_erp_mock_customers_mode";
@@ -30,8 +33,8 @@ const PAGE_SIZE = 20;
 const PERM_VIEW = "sales.view_customer_list";
 const PERM_CHANGE = "sales.change_customer";
 const MIN_PHONE_DIGITS = 4;
-const EDITABLE = ["name", "default_address", "note"] as const;
-const MAX_LEN: Record<(typeof EDITABLE)[number], number> = { name: 200, default_address: 1000, note: 1000 };
+const EDITABLE = ["name", "phone", "default_address", "note"] as const;
+const MAX_LEN: Record<(typeof EDITABLE)[number], number> = { name: 200, phone: 40, default_address: 1000, note: 1000 };
 
 type Mode = "ok" | "fail" | "empty" | "forbidden" | "detailfail" | "patchfail";
 function mode(): Mode {
@@ -158,10 +161,11 @@ function detail(p: Person): CustomerDetail {
 const NOT_FOUND: MockResponse = { status: 404, body: { detail: "Không tìm thấy." } };
 const FORBIDDEN: MockResponse = { status: 403, body: { detail: "Bạn không được cấp quyền để thực hiện hành động này." } };
 
-function parsePath(path: string): { id: number | null; query: URLSearchParams } {
+function parsePath(path: string): { id: number | null; query: URLSearchParams; search: boolean } {
   const [p, q = ""] = path.split("?");
-  const m = /^\/api\/sales\/customer-directory\/(?:(\d+)\/)?$/.exec(p);
-  return { id: m && m[1] ? Number(m[1]) : null, query: new URLSearchParams(q) };
+  const m = /^\/api\/sales\/customer-directory\/(?:(\d+|search)\/)?$/.exec(p);
+  const search = !!m && m[1] === "search";
+  return { id: m && m[1] && !search ? Number(m[1]) : null, query: new URLSearchParams(q), search };
 }
 
 const SORTERS: Record<string, (a: CustomerListItem, b: CustomerListItem) => number> = {
@@ -172,16 +176,18 @@ const SORTERS: Record<string, (a: CustomerListItem, b: CustomerListItem) => numb
   created_at: (a, b) => a.id - b.id, // id tăng theo ngày tạo trong seed
 };
 
-function listResponse(query: URLSearchParams): MockResponse {
-  const q = (query.get("q") || "").trim();
+type SearchInput = { q: string; ordering: string; page: number };
+
+function listResponse(input: SearchInput): MockResponse {
+  const q = input.q.trim();
   const digits = q.replace(/\D/g, "");
-  const raw = query.get("ordering") || "";
+  const raw = input.ordering;
   const desc = raw.startsWith("-");
   const key = desc ? raw.slice(1) : raw;
   const ordering = SORTERS[key] ? raw : "-last_order_at";
   const field = ordering.replace(/^-/, "");
   const sign = ordering.startsWith("-") ? -1 : 1;
-  const page = Math.max(1, Number(query.get("page") || "1") || 1);
+  const page = input.page;
 
   const rows = (mode() === "empty" ? [] : load())
     .map(listItem)
@@ -219,7 +225,7 @@ function patch(p: Person, body: unknown): MockResponse {
   if (Object.keys(data).some((k) => !(EDITABLE as readonly string[]).includes(k))) {
     return {
       status: 400,
-      body: { code: "INPUT_NOT_ALLOWED", detail: "Chỉ sửa được tên, địa chỉ giao mặc định và ghi chú. Số điện thoại là khoá của khách, không đổi được." },
+      body: { code: "INPUT_NOT_ALLOWED", detail: "Chỉ sửa được tên, số điện thoại, địa chỉ giao mặc định và ghi chú." },
     };
   }
   const next: Partial<Record<(typeof EDITABLE)[number], string>> = {};
@@ -227,8 +233,15 @@ function patch(p: Person, body: unknown): MockResponse {
     if (!(k in data)) continue;
     const v = data[k];
     if (typeof v !== "string") return badField(k, "Not a valid string.");
-    const t = v.trim();
+    let t = v.trim();
     if (t.length > MAX_LEN[k]) return badField(k, `Đảm bảo trường này có không quá ${MAX_LEN[k]} ký tự.`);
+    if (k === "phone") {
+      t = normalizePhone(t);
+      if (!/^0\d{9,10}$/.test(t)) return { status: 400, body: { code: "INVALID_PHONE", detail: "Số điện thoại không hợp lệ." } };
+      if (t !== p.phone && load().some((x) => x.id !== p.id && x.phone === t)) {
+        return { status: 400, body: { code: "CUSTOMER_PHONE_TAKEN", detail: "Số điện thoại này đã thuộc về một khách hàng khác." } };
+      }
+    }
     next[k] = t;
   }
   const changed = EDITABLE.filter((k) => k in next && next[k] !== p[k]);
@@ -243,15 +256,24 @@ export function mockCustomersApi(req: MockRequest): MockResponse {
   // Thiếu quyền → 403 TRƯỚC khi tra bản ghi (BE Tầng 2); PATCH đòi thêm change_customer.
   if (!has(me, PERM_VIEW) || mode() === "forbidden") return FORBIDDEN;
   if (req.method === "PATCH" && !has(me, PERM_CHANGE)) return FORBIDDEN;
-  if (req.method !== "GET" && req.method !== "PATCH") {
+  if (req.method !== "GET" && req.method !== "PATCH" && req.method !== "POST") {
     return { status: 405, body: { detail: `Phương thức "${req.method}" không được chấp nhận.` } };
   }
-  const { id, query } = parsePath(req.path);
+  const { id, query, search } = parsePath(req.path);
+  if (search) {
+    if (req.method !== "POST") return { status: 405, body: { detail: `Phương thức "${req.method}" không được chấp nhận.` } };
+    if (mode() === "fail") return { status: 500, body: null };
+    const data = req.body && typeof req.body === "object" && !Array.isArray(req.body) ? (req.body as Record<string, unknown>) : {};
+    const page = Number(data.page ?? 1);
+    if (typeof (data.q ?? "") !== "string" || !Number.isInteger(page) || page < 1) return { status: 400, body: { detail: "Dữ liệu không hợp lệ." } };
+    return listResponse({ q: String(data.q ?? ""), ordering: typeof data.ordering === "string" ? data.ordering : "", page });
+  }
   if (id === null) {
     if (req.method !== "GET") return { status: 405, body: { detail: `Phương thức "${req.method}" không được chấp nhận.` } };
     if (mode() === "fail") return { status: 500, body: null };
-    return listResponse(query);
+    return listResponse({ q: query.get("q") || "", ordering: query.get("ordering") || "", page: Math.max(1, Number(query.get("page") || "1") || 1) });
   }
+  if (req.method === "POST") return { status: 405, body: { detail: `Phương thức "${req.method}" không được chấp nhận.` } };
   const p = load().find((x) => x.id === id);
   if (!p) return NOT_FOUND;
   if (req.method === "PATCH") return mode() === "patchfail" ? { status: 500, body: null } : patch(p, req.body);

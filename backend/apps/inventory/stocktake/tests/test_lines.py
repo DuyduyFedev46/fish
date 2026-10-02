@@ -198,7 +198,7 @@ class ReplaceLinesTests(StocktakeApiBase):
 
     def test_ed27_ac3_replace_on_approved_is_400_recon_not_draft(self):
         rec = self.make_draft(self.warehouse_staff)
-        self.assertEqual(self.api(self.owner).post(f"{URL}{rec['id']}/approve/").status_code, 200)
+        self.assertEqual(self.approve_via_api(self.owner, rec).status_code, 200)
         approved = self.api(self.owner).get(f"{URL}{rec['id']}/").json()
         resp = self.replace_via_api(self.warehouse_staff, approved, [line(self.batch, "10")])
         self.assertEqual(resp.status_code, 400, resp.content)
@@ -263,7 +263,7 @@ class ReplaceLinesTests(StocktakeApiBase):
 
     def test_ed27_ac3_patch_on_approved_is_400_and_data_unchanged(self):
         rec = self.make_draft(self.warehouse_staff)
-        self.api(self.owner).post(f"{URL}{rec['id']}/approve/")
+        self.approve_via_api(self.owner, rec)
         resp = self.api(self.owner).patch(f"{URL}{rec['id']}/", {"note": "Sửa sau khi duyệt"}, format="json")
         self.assertEqual(resp.status_code, 400, resp.content)
         self.assertEqual(resp.json()["code"], "RECON_NOT_DRAFT")
@@ -300,29 +300,12 @@ class ReplaceLinesTests(StocktakeApiBase):
 
 
 class ApproverRuleTests(StocktakeApiBase):
-    """BR-KK-08 (đề xuất): người đã nhập hoặc sửa số đếm không được duyệt chính phiếu đó."""
+    """Duyệt kiểm kê. BR-KK-02/BR-KK-08 đã bỏ (Duy chốt 02/10, #6): xem thêm `test_submit_flow.py`."""
 
     def approve(self, user, rec):
-        return self.api(user).post(f"{URL}{rec['id']}/approve/")
+        return self.approve_via_api(user, rec)
 
-    def test_br_kk_08_creator_cannot_approve(self):
-        rec = self.make_draft(self.manager)
-        resp = self.approve(self.manager, rec)
-        self.assertEqual(resp.status_code, 400, resp.content)
-        self.assertEqual(resp.json()["code"], "BR-KK-02")
-        self.assertEqual(self.recon(rec["id"]).status, StockReconciliation.Status.DRAFT)
-
-    def test_br_kk_08_person_who_edited_lines_cannot_approve(self):
-        rec = self.make_draft(self.warehouse_staff)
-        self.assertEqual(self.replace_via_api(self.manager, rec, [line(self.batch, "49")]).status_code, 200)
-        resp = self.approve(self.manager, rec)
-        self.assertEqual(resp.status_code, 400, resp.content)
-        self.assertEqual(resp.json()["code"], "BR-KK-08")
-        self.batch.refresh_from_db()
-        self.assertEqual(self.batch.qty_available, Decimal("50.000"))
-        self.assertEqual(self.recon(rec["id"]).status, StockReconciliation.Status.DRAFT)
-
-    def test_br_kk_08_other_person_can_approve_and_stock_changes(self):
+    def test_other_person_can_approve_and_stock_changes(self):
         rec = self.make_draft(self.warehouse_staff)
         self.replace_via_api(self.manager, rec, [line(self.batch, "49")])
         resp = self.approve(self.owner, rec)
@@ -333,24 +316,6 @@ class ApproverRuleTests(StocktakeApiBase):
         self.assertEqual(self.batch.qty_available, Decimal("49.000"))
         entry = StockLedgerEntry.objects.get(movement_type="RECONCILE")
         self.assertEqual(entry.qty_change, Decimal("-1.000"))
-
-    def test_br_kk_08_editor_stays_blocked_even_after_someone_else_edits_later(self):
-        rec = self.make_draft(self.warehouse_staff)
-        first = self.replace_via_api(self.manager, rec, [line(self.batch, "49")])
-        self.assertEqual(self.replace_via_api(self.owner, first.json(), [line(self.batch, "48")]).status_code, 200)
-        self.assertEqual(self.approve(self.manager, rec).json()["code"], "BR-KK-08")
-        self.assertEqual(self.approve(self.owner, rec).json()["code"], "BR-KK-08")
-        self.assertEqual(self.approve(self.manager2, rec).status_code, 200)
-
-    def test_br_kk_08_ai_edit_on_behalf_of_user_also_counts(self):
-        from apps.common.audit import record_audit
-
-        rec = self.make_draft(self.warehouse_staff)
-        record_audit(
-            "update_reconciliation_lines", obj=self.recon(rec["id"]), actor_kind="ai", ai_actor=self.manager,
-            changes={"line_count": 1},
-        )
-        self.assertEqual(self.approve(self.manager, rec).json()["code"], "BR-KK-08")
 
     def test_approve_requires_approve_permission(self):
         rec = self.make_draft(self.manager)

@@ -12,6 +12,9 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/features/auth/components/AuthProvider";
 import { getGuidance } from "@/features/guidance/api";
 import { nextStepLabel } from "@/features/guidance/detailAdapters";
+import { EscalateModal } from "@/features/guidance/components/EscalateModal";
+import { ESCALATE_MSG, escalatableStep } from "@/features/guidance/escalation";
+import type { GuidanceNextStep } from "@/features/guidance/types";
 import { ENUMS } from "@/shared/lib/enums";
 import { dateTime, kg, vnd } from "@/shared/lib/format";
 import { loadErrorText } from "@/shared/lib/http";
@@ -78,7 +81,7 @@ function HoldLeft({ until }: { until: string }) {
   return <>{holdLeftText("BOOKED", until, now)}</>;
 }
 
-type ModalKind = "confirm_payment" | "cancel" | "refund";
+type ModalKind = "confirm_payment" | "cancel" | "refund" | "escalate";
 
 function OrderDetailBody({ order: o, detail, renderAi }: { order: OrderDetail; detail: DetailState<OrderDetail>; renderAi?: Props["renderAi"] }) {
   const { me } = useAuth();
@@ -89,6 +92,10 @@ function OrderDetailBody({ order: o, detail, renderAi }: { order: OrderDetail; d
   const [suggest, setSuggest] = useState<string | null>(null);
   const [lookupDelivery, setLookupDelivery] = useState(false);
   const [next, setNext] = useState<string | null>(null);
+  // #19: bước mình chưa làm được (guidance) → mục "Nhờ người xử lý" trong menu "…". Không có thì không hiện mục.
+  const [stuckStep, setStuckStep] = useState<GuidanceNextStep | null>(null);
+  // Bước đã nhờ xong trong phiên trang này: ẩn mục menu để khỏi nhờ lặp (BE không chống trùng).
+  const [escalatedKey, setEscalatedKey] = useState<string | null>(null);
   const openedRef = useRef(false);
 
   // L5: trang không vẽ lại mỗi giây. Chỉ có một mốc giờ (chip đổi "Đã huỷ" khi hết giờ) và ô đếm ngược tự giữ đồng hồ (`HoldLeft`).
@@ -108,10 +115,12 @@ function OrderDetailBody({ order: o, detail, renderAi }: { order: OrderDetail; d
         actions: o.available_actions,
         canCancel: !!me?.permissions.includes(PERM.cancelPaidOrder),
         canViewAudit: canView(me, "audit-logs"),
+        canEscalate: !!stuckStep && stuckStep.key !== escalatedKey,
       }),
-    [status, o.delivery?.status, o.available_actions, me],
+    [status, o.delivery?.status, o.available_actions, me, stuckStep, escalatedKey],
   );
-  const timeline = useMemo(() => orderTimeline(o), [o]);
+  const canOpenRefunds = canView(me, "refunds");
+  const timeline = useMemo(() => orderTimeline(o, { canOpenRefund: canOpenRefunds }), [o, canOpenRefunds]);
   const path = orderPath({ status, deliveryStatus: o.delivery?.status ?? null, hasInvoice: !!o.invoice });
 
   // "Tiếp theo" của thanh trạng thái: lấy từ guidance, im lặng khi lỗi (thanh vẫn đủ nghĩa nếu thiếu dòng này).
@@ -119,8 +128,15 @@ function OrderDetailBody({ order: o, detail, renderAi }: { order: OrderDetail; d
     const c = new AbortController();
     getGuidance("order", o.id, c.signal)
       // Hướng dẫn của một trạng thái khác (BE chưa kịp cập nhật / dữ liệu cũ) thì bỏ, tránh gợi sai việc.
-      .then((g) => setNext(g.doc?.status && g.doc.status !== o.status ? null : nextStepLabel(g)))
-      .catch(() => setNext(null));
+      .then((g) => {
+        const stale = !!g.doc?.status && g.doc.status !== o.status;
+        setNext(stale ? null : nextStepLabel(g));
+        setStuckStep(stale ? null : escalatableStep(g));
+      })
+      .catch(() => {
+        setNext(null);
+        setStuckStep(null);
+      });
     return () => c.abort();
   }, [o.id, o.status, o.payments.length, o.refunds.length]);
 
@@ -150,6 +166,7 @@ function OrderDetailBody({ order: o, detail, renderAi }: { order: OrderDetail; d
   function run(key: string) {
     if (key === "confirm_payment" || key === "cancel" || key === "refund") setModal(key);
     else if (key === "create_refund") setModal("refund");
+    else if (key === "escalate") setModal("escalate");
     else if (key === "copy_code") copyCode();
     else if (key === "audit") router.push("/audit-logs/");
   }
@@ -198,7 +215,6 @@ function OrderDetailBody({ order: o, detail, renderAi }: { order: OrderDetail; d
   ];
 
   const canOpenPayments = canView(me, "payments");
-  const canOpenRefunds = canView(me, "refunds");
   const canOpenDelivery = canView(me, "deliveries") || canView(me, "my-deliveries");
   const consent = "privacy_consent" in o ? o.privacy_consent : undefined;
 
@@ -383,12 +399,34 @@ function OrderDetailBody({ order: o, detail, renderAi }: { order: OrderDetail; d
           order={{ id: o.id, code: o.code, status, total_amount: o.total_amount ?? "0" }}
           onClose={() => setModal(null)}
           onConflict={onConflict}
+          onAutoCancelled={(message) => {
+            setModal(null);
+            toast.warn(message);
+            reload();
+          }}
           onDone={(r) => {
             setModal(null);
             const t = confirmPaymentToast(r, o.code);
             if (t.kind === "success") toast.success(t.message);
             else toast.warn(t.message);
             reload();
+          }}
+        />
+      )}
+      {modal === "escalate" && stuckStep && (
+        <EscalateModal
+          docType="order"
+          docId={o.id}
+          step={stuckStep}
+          onClose={() => setModal(null)}
+          onReload={() => {
+            setModal(null);
+            reload();
+          }}
+          onDone={(who) => {
+            setModal(null);
+            setEscalatedKey(stuckStep.key);
+            toast.success(ESCALATE_MSG.done(who));
           }}
         />
       )}

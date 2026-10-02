@@ -92,7 +92,8 @@ class L7TimelineTests(OrderApiBase):
         self.assertEqual(resp.status_code, 200, resp.content)
         tl = resp.json()["timeline"]
         for row in tl:
-            self.assertEqual(set(row.keys()), TIMELINE_KEYS)
+            # `doc` {type,id} chỉ có ở dòng có chứng từ liên quan (Lô bổ sung A #2: phiếu hoàn).
+            self.assertEqual(set(row.keys()) - {"doc"}, TIMELINE_KEYS)
         ats = [datetime.datetime.fromisoformat(r["at"]) for r in tl]
         self.assertEqual(ats, sorted(ats), "timeline phải tăng dần theo thời gian")
         return tl

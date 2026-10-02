@@ -3,7 +3,8 @@
 // Chi tiết hàng hoàn về kho (ED-26 / W5f): /returns/detail/?id=<pk>. Khung DetailPage: header (mã mono · chip · [Tái nhập vào lô] [Huỷ bỏ, ghi lỗ]),
 // StatusPath (Chờ duyệt → Đã duyệt) kèm Tiếp theo / Đã làm, khối thông tin, cột phải = Trợ lý AI + dòng thời gian.
 // Hai nút duyệt chỉ hiện cho người có inventory.approve_returntostock khi phiếu còn Chờ duyệt; cả hai mở hộp F2n (chọn sẵn quyết định đã bấm).
-// Nút "Từ chối / huỷ phiếu hàng hoàn" CHƯA làm (quyết định #8, chờ Duyệt). Không có tiền hay giá vốn. Ghi chú là chữ tự do: chỉ hiện trong trang.
+// "Huỷ phiếu hoàn" (Lô bổ sung A #8) nằm trong menu "…": phiếu còn Chờ duyệt, người có quyền duyệt/sửa hoặc người tạo phiếu; có hộp xác nhận
+// vì không khôi phục được. Phiếu đã huỷ: chip Đã huỷ, StatusPath kết thúc đỏ, hết mọi nút. Không có tiền hay giá vốn. Ghi chú là chữ tự do: chỉ hiện trong trang.
 import Link from "next/link";
 import { useState, type ReactNode } from "react";
 import { useAuth } from "@/features/auth/components/AuthProvider";
@@ -13,6 +14,7 @@ import { loadErrorText } from "@/shared/lib/http";
 import { canView, homePath } from "@/shared/lib/nav";
 import { Chip } from "@/shared/ui/Chip";
 import { DetailHeader } from "@/shared/ui/detail/DetailHeader";
+import type { MoreMenuItem } from "@/shared/ui/detail/MoreMenu";
 import { DetailPage } from "@/shared/ui/detail/DetailPage";
 import { InfoField } from "@/shared/ui/detail/InfoField";
 import { InfoGrid } from "@/shared/ui/detail/InfoGrid";
@@ -20,12 +22,14 @@ import { StatusPath } from "@/shared/ui/detail/StatusPath";
 import { Timeline } from "@/shared/ui/detail/Timeline";
 import { Icon } from "@/shared/ui/Icon";
 import { PersonalText } from "@/shared/ui/PersonalText";
+import { ConfirmModal } from "@/shared/ui/overlay/ConfirmModal";
 import { useToast } from "@/shared/ui/overlay/Toast";
 import { ErrorScreen } from "@/shared/ui/states/ErrorScreen";
 import { NoPermission } from "@/shared/ui/states/NoPermission";
 import { NotFoundScreen } from "@/shared/ui/states/NotFoundScreen";
 import { RETURNS_MSG as M } from "../messages";
-import { PATH_STEPS, canApprove, doneSteps, isOutsideLong, nextStepText, outsideText } from "../returnsModel";
+import { PATH_STEPS, canApprove, canCancel, doneSteps, isOutsideLong, nextStepText, outsideText } from "../returnsModel";
+import { cancelReturn } from "../api";
 import type { ApproveDecision, ReturnItem } from "../types";
 import { useReturnOrderId } from "../useReturnOrderId";
 import { useReturnDetail, useReturnId, type ReturnDetailState } from "../useReturnDetail";
@@ -72,6 +76,7 @@ function ReturnDetailBody({ item: r, detail, renderAi }: { item: ReturnItem; det
   const { me } = useAuth();
   const toast = useToast();
   const [modal, setModal] = useState<{ decision: ApproveDecision } | null>(null);
+  const [cancelling, setCancelling] = useState(false);
   const [version, setVersion] = useState(0);
   const timeline = useReturnTimeline(r.id, version);
 
@@ -86,6 +91,9 @@ function ReturnDetailBody({ item: r, detail, renderAi }: { item: ReturnItem; det
     setVersion((n) => n + 1);
     void detail.reload();
   };
+
+  const more: MoreMenuItem[] = [];
+  if (canCancel(me, r)) more.push({ key: "cancel", label: M.cancelMenu, danger: true, onSelect: () => setCancelling(true) });
 
   const primary = mayApprove ? (
     <>
@@ -108,6 +116,7 @@ function ReturnDetailBody({ item: r, detail, renderAi }: { item: ReturnItem; det
           mono
           status={<Chip table={ENUMS.returnToStockStatus} value={r.status} />}
           primary={primary}
+          more={more}
         />
       }
       banner={
@@ -142,7 +151,11 @@ function ReturnDetailBody({ item: r, detail, renderAi }: { item: ReturnItem; det
         </>
       }
     >
-      <StatusPath steps={PATH_STEPS} current={r.status} next={nextStepText(r)} done={doneSteps(r)} />
+      {r.status === "CANCELLED" ? (
+        <StatusPath steps={PATH_STEPS.slice(0, 1)} current="DRAFT" badEnd={{ label: ENUMS.returnToStockStatus.CANCELLED.label, after: "DRAFT" }} next={null} done={doneSteps(r)} />
+      ) : (
+        <StatusPath steps={PATH_STEPS} current={r.status} next={nextStepText(r)} done={doneSteps(r)} />
+      )}
 
       <InfoGrid title={M.sectionInfo}>
         <InfoField
@@ -196,6 +209,27 @@ function ReturnDetailBody({ item: r, detail, renderAi }: { item: ReturnItem; det
         <InfoField label={M.fieldNote} value={<PersonalText value={r.note} whenEmpty="" />} />
       </InfoGrid>
 
+      {cancelling && (
+        <ConfirmModal
+          title={M.cancelTitle}
+          confirmLabel={M.cancelConfirm}
+          danger
+          noun="phiếu"
+          run={() => cancelReturn(r.id)}
+          onDone={() => {
+            setCancelling(false);
+            toast.success(M.cancelled);
+            refresh();
+          }}
+          onClose={() => setCancelling(false)}
+          onReload={() => {
+            setCancelling(false);
+            refresh();
+          }}
+        >
+          <p>{M.cancelBody(r.code)}</p>
+        </ConfirmModal>
+      )}
       {modal && (
         <ApproveReturnModal
           item={r}

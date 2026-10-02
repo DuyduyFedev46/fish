@@ -2,7 +2,7 @@
 #   cd erp-console && NEXT_PUBLIC_USE_MOCK=1 npm run build && (cd out && python3 -m http.server 3101 &)
 #   SHOTS=<thư mục ảnh> python3 e2e/ed_batch6_customers.py      # tắt server sau khi xong
 # Kiểm: kho1 / giao1 / cs2 không thấy menu Khách hàng và vào URL thì "Không có quyền" · loc và ql1 xem và sửa được ·
-# trang chi tiết KHÔNG có khối AI · số điện thoại không có ô sửa (khoá) · PATCH chỉ gửi trường đổi, không bao giờ có phone ·
+# trang chi tiết KHÔNG có khối AI · số điện thoại sửa được (Lô bổ sung A #5) · PATCH chỉ gửi trường đổi (phone chỉ khi người dùng sửa số) ·
 # tìm kiếm (không thấy -> Xoá tìm kiếm), sắp xếp, tải thêm · lỗi tải, danh sách rỗng, chi tiết lỗi, lưu lỗi giữ chữ đã gõ ·
 # id sai / không có -> Không tìm thấy · tên khách, SĐT, địa chỉ không nằm trong URL / localStorage / sessionStorage / console ·
 # 360px không cuộn ngang.
@@ -151,9 +151,9 @@ def detail_behaviour(browser):
     body = page.inner_text("main")
     ok("Chi tiết: có tên khách ở tiêu đề", page.locator("main h2").first.inner_text().startswith("Khách Thử"), page.locator("main h2").first.inner_text())
     ok("Chi tiết: KHÔNG có khối AI", page.locator("[data-ai-block], [aria-label*='AI'], [data-testid*='ai']").count() == 0 and "Trợ lý" not in body and "Gợi ý của AI" not in body)
-    ok("Chi tiết: số điện thoại hiện đủ và có biểu tượng khoá", PHONE_RE.search(body) is not None and page.locator("[data-kind='locked']", has_text="Số điện thoại").count() == 1)
-    ok("Chi tiết: số điện thoại KHÔNG có nút sửa", page.get_by_label("Sửa số điện thoại").count() == 0)
-    ok("Chi tiết: tên · địa chỉ · ghi chú có nút sửa", all(page.get_by_label(f"Sửa {l}").count() == 1 for l in ("tên", "địa chỉ giao mặc định", "ghi chú")))
+    ok("Chi tiết: số điện thoại hiện đủ, sửa được (Lô bổ sung A #5, không còn khoá)", PHONE_RE.search(body) is not None and page.locator("[data-kind='locked']", has_text="Số điện thoại").count() == 0)
+    ok("Chi tiết: số điện thoại có nút sửa", page.get_by_label("Sửa số điện thoại").count() == 1)
+    ok("Chi tiết: tên · địa chỉ · ghi chú có nút sửa", all(page.get_by_label(f"Sửa {l}").count() == 1 for l in ("tên", "số điện thoại", "địa chỉ giao mặc định", "ghi chú")))
     ok("Chi tiết: có Đơn hàng, Phiếu hoàn, Dòng thời gian", all(t in body.upper() for t in ("ĐƠN HÀNG", "PHIẾU HOÀN", "DÒNG THỜI GIAN")))
     ok("Chi tiết: URL chỉ id", page.url.endswith("?id=3"), page.url)
 
@@ -181,7 +181,7 @@ def detail_behaviour(browser):
     page.get_by_role("button", name="Sửa thông tin").first.click()
     dlg = page.get_by_role("dialog")
     expect(dlg).to_be_visible()
-    ok("Hộp Sửa thông tin: có Tên · Địa chỉ · Ghi chú, KHÔNG có ô số điện thoại", dlg.get_by_label("Tên").count() == 1 and dlg.get_by_label("Số điện thoại").count() == 0 and dlg.get_by_label("Địa chỉ giao mặc định").count() == 1)
+    ok("Hộp Sửa thông tin: có Tên · Số điện thoại · Địa chỉ · Ghi chú (#5)", dlg.get_by_label("Tên").count() == 1 and dlg.get_by_label("Số điện thoại").count() == 1 and dlg.get_by_label("Địa chỉ giao mặc định").count() == 1)
     dlg.get_by_role("button", name="Lưu thay đổi").click()
     ok("Hộp Sửa thông tin: không đổi gì thì báo 'Chưa có gì thay đổi'", dlg.get_by_text("Chưa có gì thay đổi để lưu.").count() >= 1)
     dlg.get_by_label("Địa chỉ giao mặc định").fill("Số 1 Đường Thử, Vũng Tàu")
@@ -201,7 +201,7 @@ def detail_behaviour(browser):
     ctx, page, errors = new_page(browser, "ql1")
     go(page, "/customers/detail/?id=4")
     ok("ql1: có nút Sửa thông tin và sửa được ghi chú", page.get_by_role("button", name="Sửa thông tin").count() >= 1 and page.get_by_label("Sửa ghi chú").count() == 1)
-    ok("ql1: số điện thoại vẫn khoá", page.get_by_label("Sửa số điện thoại").count() == 0)
+    ok("ql1: sửa được cả số điện thoại (#5)", page.get_by_label("Sửa số điện thoại").count() == 1)
     ctx.close()
 
 

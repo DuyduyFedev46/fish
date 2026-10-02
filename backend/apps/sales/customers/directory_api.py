@@ -1,7 +1,8 @@
 """
 API danh bạ khách cho ERP — Lô 6 / B2 (ED-13, BR-PQ-31, bất biến 9).
 
-`GET /api/sales/customer-directory/` · `GET|PATCH /api/sales/customer-directory/{id}/`.
+`GET /api/sales/customer-directory/` · `POST /api/sales/customer-directory/search/` ·
+`GET|PATCH /api/sales/customer-directory/{id}/`.
 
 - Quyền: Tầng 2 `sales.view_customer_list` (owner + manager, Chủ bật/tắt được); `PATCH` thêm `sales.change_customer`.
   Không có phạm vi dòng: quyền này = xem mọi khách. NV kho, NV giao, CSKH nhận 403 (kể cả khi có `view_customer`
@@ -9,14 +10,19 @@ API danh bạ khách cho ERP — Lô 6 / B2 (ED-13, BR-PQ-31, bất biến 9).
 - Số liệu (đơn, tổng mua, đơn huỷ, đơn đầu/cuối) tính bằng `annotate` Subquery trong một câu SQL, không N+1.
   `total_spent` là doanh thu của khách (không phải giá vốn) và không dính lãi lỗ.
 - Không có `AiDeclarable`, và `/api/sales/customer-directory/` nằm trong `FORBIDDEN_PREFIXES` của chính sách AI.
+- `POST .../search/` (Lô bổ sung A #11, Duy chốt 02/10): body `{q, ordering?, page?}`, cùng quyền, cùng shape với danh sách,
+  vì từ khoá tìm (tên/SĐT khách) không được nằm trong URL/log truy cập. `GET ?q=` giữ để tương thích; FE sẽ chuyển sang POST.
+  `next`/`previous` trong kết quả chỉ để biết còn trang hay không; muốn sang trang khác thì gửi lại POST với `page`.
 - Response gắn `Cache-Control: no-store` (chứa tên, SĐT, địa chỉ).
-- `PATCH` chỉ nhận `name`, `default_address`, `note`; SĐT khoá (khoá tự nhiên). AuditLog chỉ ghi tên trường.
+- `PATCH` nhận `name`, `phone`, `default_address`, `note`. `phone` chuẩn hoá bằng `normalize_phone`, trùng khách khác thì
+  400 `CUSTOMER_PHONE_TAKEN` (không lặp lại số). AuditLog chỉ ghi tên trường.
 """
 from decimal import Decimal
 
 from django.db.models import Count, DateTimeField, DecimalField, F, IntegerField, Max, Min, OuterRef, Q, Subquery, Sum
 from django.db.models.functions import Coalesce
-from rest_framework import viewsets
+from rest_framework import serializers, viewsets
+from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from apps.common.api import BusinessModelPermissions, NoStoreMixin, StandardPagination
@@ -94,13 +100,26 @@ def _name_matches(query):
     return [pk for pk, name in Customer.objects.values_list("pk", "name") if needle in fold_text(name)]
 
 
+class SearchBodyPagination(StandardPagination):
+    """Cùng 20 dòng/trang, nhưng số trang lấy từ body JSON (`page`) thay vì query string."""
+
+    def get_page_number(self, request, paginator):
+        return request.data.get("page", 1) if hasattr(request.data, "get") else 1
+
+
+class SearchBodySerializer(serializers.Serializer):
+    q = serializers.CharField(max_length=200, allow_blank=True, required=False, default="")
+    ordering = serializers.CharField(max_length=40, allow_blank=True, required=False, default="")
+    page = serializers.IntegerField(min_value=1, required=False, default=1)
+
+
 class CustomerDirectoryViewSet(NoStoreMixin, viewsets.GenericViewSet):
     """Danh bạ khách (list, retrieve, partial_update). Không có create/put/delete: 405."""
 
     queryset = Customer.objects.all()
     permission_classes = [BusinessModelPermissions]
     pagination_class = StandardPagination
-    http_method_names = ["get", "patch", "head", "options"]
+    http_method_names = ["get", "post", "patch", "head", "options"]  # POST chỉ có `search/`; create vẫn 405
 
     @property
     def required_perms(self):
@@ -116,19 +135,38 @@ class CustomerDirectoryViewSet(NoStoreMixin, viewsets.GenericViewSet):
         qs = annotate_purchase_stats(Customer.objects.all())
         if self.action != "list":
             return qs
-        query = self.request.query_params.get("q", "").strip()
+        return self.search_queryset(
+            qs, self.request.query_params.get("q", ""), self.request.query_params.get("ordering", ""),
+        )
+
+    @staticmethod
+    def search_queryset(qs, query, ordering_key):
+        """Lọc theo `q` (tên không dấu hoặc SĐT ≥ 4 số) và sắp xếp; dùng chung cho GET `?q=` và POST `search/`."""
+        query = (query or "").strip()
         if query:
             cond = Q(pk__in=_name_matches(query))
             digits = "".join(ch for ch in query if ch.isdigit())
             if len(digits) >= MIN_PHONE_DIGITS:
                 cond |= Q(phone__contains=digits)
             qs = qs.filter(cond)
-        ordering = ORDERING.get(self.request.query_params.get("ordering", ""), ORDERING[DEFAULT_ORDERING])
+        ordering = ORDERING.get(ordering_key or "", ORDERING[DEFAULT_ORDERING])
         return qs.order_by(ordering, "-id")
 
     def list(self, request, *args, **kwargs):
         page = self.paginate_queryset(self.get_queryset())
         return self.get_paginated_response(self.get_serializer(page, many=True).data)
+
+    @action(detail=False, methods=["post"], url_path="search")
+    def search(self, request):
+        """POST /api/sales/customer-directory/search/ — tìm khách, từ khoá nằm trong body (không vào URL/log)."""
+        body = SearchBodySerializer(data=request.data if hasattr(request.data, "get") else {})
+        body.is_valid(raise_exception=True)
+        queryset = self.search_queryset(
+            annotate_purchase_stats(Customer.objects.all()), body.validated_data["q"], body.validated_data["ordering"],
+        )
+        paginator = SearchBodyPagination()
+        page = paginator.paginate_queryset(queryset, request, view=self)
+        return paginator.get_paginated_response(DirectoryListSerializer(page, many=True).data)
 
     def retrieve(self, request, *args, **kwargs):
         return Response(self.get_serializer(self.get_object()).data)
@@ -140,8 +178,7 @@ class CustomerDirectoryViewSet(NoStoreMixin, viewsets.GenericViewSet):
             raise BusinessError("Không có thông tin nào để cập nhật.", code="INPUT_EMPTY")
         if set(data.keys()) - set(services.EDITABLE_PROFILE_FIELDS):
             raise BusinessError(
-                "Chỉ sửa được tên, địa chỉ giao mặc định và ghi chú. "
-                "Số điện thoại là khoá của khách, không đổi được.",
+                "Chỉ sửa được tên, số điện thoại, địa chỉ giao mặc định và ghi chú.",
                 code="INPUT_NOT_ALLOWED",
             )
         serializer = DirectoryUpdateSerializer(data=data, partial=True)

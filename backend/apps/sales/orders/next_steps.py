@@ -65,6 +65,11 @@ def get_order_next_steps(order: SalesOrder, user: Any) -> list[NextStep]:
     steps: list[NextStep] = []
     invoice = getattr(order, "invoice", None)
 
+    # Đơn Tự huỷ là đơn đã chết (Duy chốt 02/10/2026): không còn bước hay thao tác ghi nào.
+    # Tiền về muộn xử lý ở hàng chờ thanh toán (hoàn tiền), không trên đơn này.
+    if order.status == SalesOrder.Status.AUTO_CANCELLED:
+        return steps
+
     # 1. Đơn BOOKED -> có bước hệ thống tự huỷ
     if order.status == SalesOrder.Status.BOOKED:
         deadline_str = order.booked_expires_at.isoformat() if order.booked_expires_at else None

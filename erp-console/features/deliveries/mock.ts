@@ -551,6 +551,10 @@ export function registerDeliveryLineExtras(fn: (noteId: number, line: { batch_id
  * thấy phiếu COMPLETED/CANCELLED kết thúc trước đầu ngày (hôm nay − 7) với customer_name, address, note, recipient_name,
  * phone, failure_note = null (khoá vẫn có); (2) tên người giao, SĐT và hành động theo quyền như BE (R4).
  */
+function plusHours(iso: string, hours: number): string {
+  return new Date(Date.parse(iso) + hours * 3_600_000).toISOString();
+}
+
 function viewFor<T extends DeliveryNoteItem>(me: MockMe, note: T, asDetail = false): T {
   const base: T = {
     ...note,
@@ -559,6 +563,10 @@ function viewFor<T extends DeliveryNoteItem>(me: MockMe, note: T, asDetail = fal
     failure_reason_label: note.failure_reason ? FAILURE_REASONS[note.failure_reason as DeliveryFailureReason] ?? "" : "",
     available_actions: me ? actionsFor(me, note) : note.available_actions,
   };
+  // Lô bổ sung A #18: mốc giờ cho phiếu đã đi giao / thất bại. Seed không ghi sẵn thì suy ra từ giờ tạo phiếu.
+  const started = note.status === "DELIVERING" || note.status === "COMPLETED" || note.status === "FAILED";
+  base.delivery_started_at = note.delivery_started_at ?? (started ? plusHours(note.created_at, 2) : null);
+  base.failed_at = note.failed_at ?? (note.status === "FAILED" ? plusHours(note.created_at, 4) : null);
   if (asDetail && "lines" in note) {
     const d = base as unknown as DeliveryNoteDetail;
     d.phone = fakePhone(note.id);
@@ -652,7 +660,12 @@ export function mockListDeliveryNotes(req: MockRequest | { url?: string; token?:
   if (assignedTo === "me") rows = rows.filter((n) => me && n.assigned_to === me.id);
   else if (assignedTo) rows = rows.filter((n) => n.assigned_to === Number(assignedTo));
   if (completedFrom) rows = rows.filter((n) => n.status !== "COMPLETED" || (n.completed_at ?? "").slice(0, 10) >= completedFrom);
-  const results = rows.map((n) => viewFor(me, n));
+  const results = rows.map((n) => {
+    const v = viewFor(me, n);
+    // Lô bổ sung A #17: chỉ danh sách `assigned_to=me` có `phone`; chỉ phiếu Đang giao/Giao thất bại, còn trong cửa sổ 7 ngày (như chi tiết).
+    if (assignedTo === "me") v.phone = n.status === "DELIVERING" || n.status === "FAILED" ? fakePhone(n.id) : null;
+    return v;
+  });
   return { status: 200, body: { ...base, count: results.length, results } };
 }
 
@@ -720,6 +733,7 @@ export function mockPostDeliveryNoteStatus(req: MockRequest | { url?: string; bo
     item.failed_attempts += 1;
     item.failure_reason = body.failure_reason;
     item.failure_note = (body.failure_note ?? "").trim();
+    item.failed_at = new Date().toISOString();
     return { status: 200, body: { ...viewFor(me, item), already: false, needs_decision: item.failed_attempts >= 2 } };
   }
 
@@ -741,6 +755,7 @@ export function mockPostDeliveryNoteStatus(req: MockRequest | { url?: string; bo
     item.status = to as DeliveryNoteItem["status"];
     item.status_label = STATUS_LABELS[to];
     if (to === "COMPLETED") item.completed_at = new Date().toISOString();
+    if (to === "DELIVERING") item.delivery_started_at = new Date().toISOString();
     return { status: 200, body: { ...viewFor(me, item), already: false } };
   }
   return failure(400, "DELIVERY_STATUS_INVALID", "Trạng thái không hợp lệ.");

@@ -14,6 +14,7 @@ import { ErrorBox } from "@/shared/ui/StateBox";
 import { Icon } from "@/shared/ui/Icon";
 import { AI_MSG } from "../messages";
 import type { AiStatus } from "../types";
+import { budgetView } from "../budgetView";
 import { canDownloadModel, detectAiCapability, type AiCapability, type DownloadVerdict } from "../runtime/feature-detect";
 import { getCachedModel, putCachedModel, removeCachedModel } from "../runtime/model-store";
 import { GgufDownloader, type DownloadState } from "../runtime/model-downloader";
@@ -163,6 +164,7 @@ export function AiAssistantPanel({ status, initialText, autoSend = false, onRead
   const verdict = canDownloadModel(cap);
   const block = verdict.ok ? null : verdict.reason;
   const modelUrl = status.model?.gguf_url ?? null;
+  const budget = budgetView(status.budget);
 
   // ---- Vòng đời worker: ẩn tab 60s → dọn; unmount → dọn ----
   useEffect(() => {
@@ -423,6 +425,21 @@ export function AiAssistantPanel({ status, initialText, autoSend = false, onRead
           </span>
         </div>
       </section>
+
+      {/* ---- Hạn mức chi phí: BE chỉ trả cho Chủ; vai khác không thấy khối này ---- */}
+      {budget && (
+        <section className={s.section} aria-label={AI_MSG.budgetTitle}>
+          <h3 className={s.sectionTitle}>{AI_MSG.budgetTitle}</h3>
+          <div className={s.metrics}>
+            <span className="num" data-testid="ai-budget-usage">{budget.usage}</span>
+            {budget.note && (
+              <span role="status" className={budget.tone === "blocked" ? s.budgetBlocked : s.budgetWarn}>
+                {budget.note}
+              </span>
+            )}
+          </div>
+        </section>
+      )}
 
       {/* ---- Model ---- */}
       <section className={s.section} aria-label={AI_MSG.downloadTitle}>

@@ -2444,3 +2444,222 @@ Review ngày 02/10 trên diff chưa commit của `backend/apps/purchasing` và f
 **TL10B-L3 · Low · Thứ tự khoá lô ở `cancel_receipt`.** `receipts/services.py` khoá lô bằng `filter(id__in=…)` mà không `order_by("pk")`, còn `record_purchase_cost` khoá theo pk. Hai thao tác này về lý thuyết có thể deadlock. Postgres sẽ huỷ một bên và trả 500, không hỏng dữ liệu. Lỗi có từ trước, nên thêm `.order_by("pk")` khi tiện.
 
 **Kết luận: CHANGES REQUESTED.** Bắt buộc sửa TL10B-M1 kèm test lô huỷ quá hạn vẫn nhận chi phí. TL10B-L1 sửa cùng lượt. L2 và L3 gom vào lô sau được. Phần B1, B2 và khoá dòng đạt.
+
+## Lô bổ sung A — BE
+
+Review techlead 02/10. Phạm vi: diff chưa commit ở `backend/` cho các việc #1, #2, #5, #10, #11, #15 (phần 1) và #6, #8, #14, #17, #18, #20, #21, #22, N3 (phần 2), theo bảng "Duy trả lời" trong `00-can-duy-quyet.md`.
+
+### Kiểm chứng (tôi tự chạy lượt này)
+- `manage.py test apps.sales apps.inventory apps.purchasing apps.delivery apps.ai apps.catalog`: **2072 test, OK**.
+- `makemigrations --check --dry-run`: No changes detected.
+- `python3 scripts/check_naming.py`: OK, không phát sinh vi phạm mới.
+- Quyền theo nhóm (chạy trên DB test mới migrate): `manager` có `add_returntostock` (mới), `approve_returntostock`, `approve_stockreconciliation`, `change_stockreconciliation`. `warehouse_staff` có `change_stockreconciliation` nhưng không có quyền duyệt. `delivery_staff` có `add_returntostock` và `view_returntostock`. Chỉ `owner` có `manage_ai_policy`.
+
+### Sửa đường dẫn trong dev-notes (FE bám theo route thật ở `config/api_urls.py`)
+| Dev-notes ghi | Route thật |
+|---|---|
+| `/api/inventory/stock-reconciliations/{id}/submit/`, `…/return-to-draft/`, `…/approve/` | `/api/inventory/reconciliations/{id}/submit/`, `…/return-to-draft/`, `…/approve/` |
+| `/api/inventory/return-to-stock/{id}/cancel/` | `/api/inventory/returns/{id}/cancel/` |
+| `/api/delivery/delivery-notes/?assigned_to=me` | `/api/delivery/notes/?assigned_to=me` |
+
+### Kết quả theo trọng tâm
+
+| Việc | Kết luận | Ghi chú |
+|---|---|---|
+| #15 tiền về muộn của đơn Tự huỷ | Đạt, kèm TLA-M3 | Kiểm ở service (`payments/services.py:158`) và kiểm lại dưới khoá dòng (`:267`). Lỗi trả trước khi ghi gì, nên không có giao dịch, audit hay đổi kho. Webhook/IPN vẫn đi `_record_payment` không giới hạn trạng thái, nên vẫn ra `ORPHAN` mở. Hàng chờ có thao tác hoàn (`test_a15_late_money_via_*`). `resolve_payment` → `CONFIRM_ORDER` vẫn chặn đơn huỷ (`_check_order_bookable`), nên không "hồi sinh" được đơn. Không mất tiền nếu tiền về qua webhook. Ca webhook không về xem TLA-M3. |
+| #10 giá đã dùng | Đạt về an toàn, kèm TLA-M2 | Cách chọn "giá thắng" (`EFFECTIVE_ORDER`) trùng với `orders/services.py:_effective_price`, và ngày được tính theo giờ VN (`TIME_ZONE = Asia/Ho_Chi_Minh`). Không có đường nào làm đổi `SalesOrderLine.rate`. Bỏ sót: không thấy. Chặn thừa (chấp nhận được): tính cả đơn đã huỷ, và bảng giá không mặc định có thể bị chặn dù một bảng không mặc định khác thắng. Ý kiến về `item_price_id` ở cuối mục. |
+| #14 khoá sửa chi phí đã phân bổ | Đạt về code, kèm TLA-H1 | Trước lô này, PATCH `amount` ghi được tiền mới mà không phân bổ lại (giá vốn lô và tổng phân bổ lệch nhau). Chặn là đúng hướng. Kiểm quyền Tầng 1 chạy trước `update()`, nên vai khác vẫn ra 403. |
+| #20/#6 kiểm kê | Đạt | `check_close_batch` chặn cả DRAFT lẫn SUBMITTED (`batches/services.py:228`). Phiếu DRAFT cũ không kẹt: người có `change_stockreconciliation` bấm Gửi duyệt rồi duyệt như thường (`test_submit_flow`). Sửa dòng chỉ ở DRAFT. `has_counted` và annotate `edited_lines_by_me` đã gỡ hết, không còn chỗ gọi. |
+| #8 huỷ hàng hoàn | Đạt | `returned_qty_by_batch` loại `CANCELLED`. Báo cáo lỗ (`reports/services.py:88`) chỉ tính `APPROVED`. Điều kiện chốt lô chỉ xét `DRAFT`, nên phiếu huỷ không chặn chốt lô. Huỷ và duyệt cùng `select_for_update`, bên đến sau nhận 409. Người được huỷ: owner, manager (có quyền duyệt), và người tạo phiếu (NV kho, NV giao huỷ phiếu của chính mình). NV giao vẫn bị giới hạn phạm vi 404. Phần "xoá chỉ Chủ" **không làm** là đúng bất biến 3. Viewset không có DELETE, nên ra 405. |
+| #22 giá mua > 0 | Đạt | Validator model và Django Admin vẫn cho 0. Nợ đã ghi, chấp nhận. |
+| N3 tràn cột | Đạt | `InvalidOperation` phát sinh ở bước Python quantize trước khi chạy SQL, nên transaction Postgres không bị hỏng, và cả khối được rollback. |
+| #17 R4b | Đạt đủ 4 điều kiện duyệt ở Lô 4 | (1) Serializer có `phone` chỉ khi `assigned_to=me`. `_filter_assigned_to` dùng đúng cách `strip()` như `get_serializer_class`, nên không có khe để có `phone` mà không có bộ lọc. Các query khác không có khoá (có test). (2) Chỉ `DELIVERING`/`FAILED`, còn lại `null`. (3) Dùng chung `_full_phone` với chi tiết (cửa sổ SR-PII-02), giữ `NoStoreMixin`. (4) 403 khi `assigned_to=<id khác>` có sẵn. Không phát sinh N+1 vì đã `select_related("sales_invoice__sales_order__customer")`. |
+| #18 mốc giao | Đạt | Chỉ có một đường vào DELIVERING (`advance_status`) và một đường vào FAILED (`mark_failed`). Field nằm trong `locked_fields` và `read_only_fields`. |
+| #5 sửa SĐT | Đạt | AuditLog chỉ ghi `{"fields": [...]}`. Thông điệp `INVALID_PHONE`/`CUSTOMER_PHONE_TAKEN` không lặp số. Lỗi `max_length` của DRF không echo giá trị. Dạng trùng kiểm cả `0…` và `+84…`, cộng `IntegrityError` trong savepoint. |
+| #11 POST search | Đạt, kèm TLA-L3 | Action `search` chạy qua `NoStoreMixin.finalize_response` nên có `no-store`, có test. Quyền giống GET (`required_perms` của view). `create` vẫn 405. |
+| #1 `ai/status` | Đạt | `budget` gắn với `ai.manage_ai_policy`. Việc `ai_policy` trong registry là `owner_only=True` (`capabilities/registry.py:90`), nên chỉ nhóm Chủ (và superuser) có quyền này, kể cả khi Chủ chỉnh ma trận. Điều kiện bật/tắt trùng `effective_level` (AI_ENABLED và `global_mode != off`). Không có dữ liệu nhạy cảm. |
+| #21 migration cấp quyền | Đạt, kèm TLA-L2 | `inventory/0008` theo mẫu `delivery/0006`, phụ thuộc `accounts/0013`, có hàm revoke. |
+| #2 link phiếu hoàn | Đạt | `doc: {type, id}` chỉ có ở dòng `refund_created`. Không thêm chữ tự do. |
+| Migration | Đạt, kèm TLA-L4 | `inventory` 0006–0008 và `delivery` 0007 nối tiếp đúng, không trùng số. Tất cả là AlterField choices, AddField nullable hoặc RunPython có hàm đảo. |
+
+### Phát hiện
+
+**TLA-H1 · High (nợ chức năng, không phải lỗi hồi quy) · #14: chặn sửa chi phí nhưng chưa có cách huỷ, nên chi phí nhập sai sẽ sai mãi.** `purchasing/costs/api.py:26` (thông điệp) và `:48-53`.
+- Tái hiện: Chủ `POST /api/purchasing/costs/` với `amount` 5.000.000 thay cho 500.000, phân bổ vào lô X. Sau đó `PATCH {"amount": "500000"}` trả 400 `COST_ALLOCATED_LOCKED` với câu "Hãy huỷ và nhập lại". Hệ thống không có endpoint huỷ chi phí. `amount < 0` cũng bị chặn (`record_purchase_cost`), nên không bù được bằng một chi phí âm.
+- Hệ quả: `landed_unit_cost` của lô X bị đội lên vĩnh viễn. Giá vốn hàng bán, lãi gộp hoá đơn, báo cáo lãi lỗ theo lô và tháng đều sai. Khi lô đã chốt (BR-GV-02) thì không còn đường sửa trong hệ thống. Đây **không** phải hồi quy: trước lô này, PATCH `amount` chỉ đổi con số trên phiếu, không phân bổ lại, nên giá vốn cũng không được sửa.
+- Cách xử lý:
+  - (a) Sửa ngay trong lô này: đổi thông điệp để không chỉ người dùng tới một thao tác không có. Ví dụ: "Chi phí đã phân bổ vào giá vốn lô, không sửa số tiền được. Chức năng huỷ chi phí chưa có, hãy báo quản trị." Giữ nguyên `code`.
+  - (b) Cần story riêng "Huỷ chi phí phụ" trước go-live, đề xuất **BR-GV-0x**. Story này gồm: trạng thái `CANCELLED` cho `PurchaseCost`, bút toán đảo phân bổ (append-only, không xoá `PurchaseCostAllocation`), gọi `recompute_landed_cost` cho từng lô, chặn khi lô đã chốt, ghi AuditLog, và chỉ Chủ được làm. Điều phối viên cần báo Duy và PO.
+
+**TLA-M1 · Medium · Chặn H6 của AI vẫn áp BR-KK-02, trái quyết định #6.** `apps/ai/actions/services.py:99-109` (và docstring `:41`).
+- Tái hiện: Chủ có AI đề xuất `inventory.stockreconciliation.approve` trên phiếu SUBMITTED. Chủ bấm xác nhận thì nhận 400 `BR-KK-02`, dù Chủ duyệt trực tiếp trên màn thì được. Chặn này còn khoá cả `create` và `replace_lines` khi người xác nhận là chủ AI (QA Lô 8 N8-2), nên AI kiểm kê hiện không dùng được.
+- **Quyết:** gỡ hẳn khối H6. Đề xuất AI vẫn phải có người xác nhận (`approve_stockreconciliation` nằm trong `FORCE_C_PERMS`, `ai/policy/rules.py:75`). Người xác nhận vẫn phải có đủ quyền (H1). Service duyệt chỉ nhận phiếu SUBMITTED. AuditLog ghi đủ người. Đây đúng với ý "cứ event là được".
+- Test: viết lại `apps/ai/actions/tests/test_actions_api.py:231` (`test_dw11_ac6_…`) thành ca "chủ AI xác nhận được, không ra BR-KK-02". Thêm ca người thiếu `approve_stockreconciliation` xác nhận thì 403 `BR-AI-04`. Sửa trong lô này, chỉ đụng 2 file AI.
+
+**TLA-M2 · Medium · #10: giá bắt đầu từ hôm nay mà đã có đơn thì không sửa được, và thông điệp chỉ sai đường.** `catalog/pricing/services.py:17` (thông điệp), `:165`, `:234`, cùng nhánh BR-DM-03 trong `set_item_price`.
+- Tái hiện: sáng nay Chủ đặt giá 15.000 (định gõ 150.000) cho mặt hàng A, `valid_from` là hôm nay, bảng mặc định. Một khách đặt đơn A. Sau đó:
+  - `PATCH rate=150000` trả 400 `PRICE_USED_BY_ORDERS`, thông điệp "Hãy đặt giá mới từ hôm nay".
+  - Làm theo thông điệp, `POST valid_from=hôm nay` trả 400 `BR-DM-03`, vì đã có giá bắt đầu cùng ngày.
+  - Chỉ còn cách đặt giá từ ngày mai, nên hết hôm nay Shop vẫn bán giá sai.
+- Hành vi chặn là đúng chữ Duy chốt ("sửa giá đã dính đơn thì báo không sửa được"). Hai chỗ sai là thông điệp chỉ tới một thao tác chắc chắn bị chặn, và Duy chưa biết hệ quả "sai giá trong ngày thì giữ tới hết ngày".
+- Cách sửa trong lô này: khi khoảng bị chặn có chứa hôm nay, hoặc giá bị sửa bắt đầu từ hôm nay, thông điệp đổi thành "…Hãy đặt giá mới bắt đầu từ ngày mai. Muốn ngừng bán ngay thì tạm ẩn mặt hàng." Thêm 1 test cho ca này.
+- Câu hỏi cho Duy (điều phối viên hỏi, không chặn lô): có cần cho đặt giá mới **ngay trong ngày** (theo giờ) khi gõ nhầm giá không? Nếu cần thì phải đổi `valid_from` sang mốc thời điểm, tức là đổi schema và cần story riêng.
+
+**TLA-M3 · Medium (cần Duy biết) · #15: webhook không về và đơn đã Tự huỷ thì không còn đường ghi khoản tiền vào hệ thống.** `sales/payments/services.py:43`, `:158`.
+- Tái hiện: khách chuyển khoản lúc 10:29, đơn tự huỷ lúc 10:30, webhook SePay lỗi và không về (đúng ca E-05 mà S11 sinh ra để xử lý). Trước lô này, Chủ xác nhận tay trên đơn thì giao dịch thành ORPHAN, vào hàng chờ, rồi hoàn. Nay xác nhận tay trả 400. Hàng chờ chỉ nhận giao dịch do webhook ghi, và `PaymentTransactionAdmin` chỉ cho superuser thêm. Kết quả: không ghi được khoản tiền, không tạo được phiếu hoàn (`create_refund_for_payment` cần giao dịch), và việc hoàn tiền ngoài hệ thống không để lại vết.
+- Không mất tiền nếu webhook về muộn hoặc SePay gửi lại. Code đúng chữ #15, nên không yêu cầu sửa trong lô.
+- Đề xuất story nhỏ "Ghi tiền về muộn vào hàng chờ" (đề xuất BR-TT-1x): Chủ nhập mã GD và số tiền ở **màn hàng chờ** (không phải trên đơn). Hệ thống tạo dòng `ORPHAN`/`UNMATCHED` với `source=MANUAL`, kiểm trùng mã GD theo BR-TT-03, rồi hoàn như thường. Dòng này không đụng đơn, nên không phạm ý "xác nhận tiền trên đơn đã chết là sai".
+
+**TLA-L1 · Low · Dòng thời gian chưa hiểu các sự kiện mới.** Sửa trong lô này, chỉ thêm nhãn và không đổi dữ liệu.
+- `sales/orders/timeline.py:229-250`: chưa xử lý `cancel_returntostock`. Đơn có phiếu hoàn bị huỷ vẫn hiện "Mang hàng về kho 3 kg — chờ duyệt", rồi thêm một dòng phiếu mới, nên người xem dễ hiểu là đã hoàn 6 kg. Cần thêm sự kiện `kind: "return_cancelled"`, nhãn "Huỷ phiếu hàng về kho {kg} kg", `doc="return"`.
+- `inventory/returns/next_steps.py:12-15` cần nhãn `cancel_returntostock` ("Huỷ phiếu hàng hoàn").
+- `inventory/stocktake/next_steps.py:6-8` cần nhãn `submit_stockreconciliation` ("Gửi duyệt") và `return_stockreconciliation_to_draft` ("Trả về nháp để sửa"). Hiện cả ba sự kiện hiện thành "Có thay đổi".
+- Test: một ca cho mỗi nhãn, assert không có chữ tự do và không có số tiền.
+
+**TLA-L2 · Low · Quyền "tạo phiếu hàng hoàn" chưa có trong ma trận năng lực (Lô 14).** `accounts/capabilities/registry.py:72` mới có `approve_return`. Cấp quyền bằng migration là đúng chữ #21. Tuy vậy, #9/#12 muốn quyền bật tắt được, mà hiện Chủ không có ô nào để tắt `add_returntostock`. **Hoãn sang lô #9 (ma trận phạm vi)**: thêm Capability `create_return` ("Ghi hàng hoàn về kho", `("inventory.add_returntostock",)`). Đồng thời đổi cổng của `returns/api.py:92` (`cancel`) từ `add_returntostock` sang `view_returntostock`. Lý do: nếu tắt "tạo" thì người có quyền duyệt vẫn huỷ được. Thân hàm đã kiểm "duyệt hoặc sửa, hoặc người tạo có quyền tạo". Không cần làm trong lô này.
+
+**TLA-L3 · Low · #11: GET `?q=` vẫn mở.** `sales/customers/directory_api.py:139`. Từ khoá tên hoặc SĐT vẫn có thể vào access log nếu client cũ gọi GET. Khi FE đã chuyển sang POST, lô FE kế tiếp cần bỏ đọc `q` ở GET, hoặc trả 400 khi có `q`. Ghi thành nợ trong 02c.
+
+**TLA-L4 · Low · Migration lùi khi đã có dữ liệu.** `inventory/0006` và `0007` đảo được về schema, nhưng các dòng `SUBMITTED`/`CANCELLED` sẽ còn giá trị ngoài `choices`. Không phải lỗi DB, chỉ là dữ liệu lạc. Kế hoạch deploy cần ghi: không lùi migration sau khi đã có phiếu Gửi duyệt hoặc phiếu huỷ. Nếu buộc phải lùi thì chuyển `SUBMITTED` về `DRAFT` trước. Phiếu `CANCELLED` không có trạng thái nào để chuyển về, nên **không lùi** 0007. Không cần sửa code.
+
+**Ghi nhận (không lỗi):**
+- #6: Quản lý có cả `change` lẫn `approve`, nên một mình nhập, gửi và duyệt được. Đây đúng là ý Duy chốt. AuditLog ghi đủ `create_stockreconciliation` / `update_reconciliation_lines` / `submit_stockreconciliation` / `approve_stockreconciliation`.
+- Django Admin vẫn có inline sửa dòng kiểm kê ở mọi trạng thái (`inventory/admin.py:79`). Lỗi này có từ trước và chỉ superuser dùng. Gom vào lô dọn dẹp: inline chỉ đọc khi phiếu khác DRAFT.
+
+### Ý kiến: có nên lưu `item_price_id` vào dòng đơn?
+**Nên, nhưng làm ở lô sau, không làm trong lô này.** Đề xuất `SalesOrderLine.item_price = FK(ItemPrice, PROTECT, null=True)`, chỉ thêm và nullable. Field được gán lúc tạo đơn, ngay ở bước chọn giá. Nên làm cùng nợ Lô 13 L4: tạo đơn dùng `current_item_price` thay `_effective_price`, trả về object `ItemPrice` thay vì chỉ `rate`. Sau đó:
+- Kiểm "đã dùng" thành chính xác: có dòng với `item_price_id = pk` là đã dùng. Dòng cũ (null) vẫn dùng cách suy theo ngày hiện tại.
+- Hết chặn thừa với bảng giá không mặc định và với đơn huỷ, nếu Duy muốn loại đơn huỷ.
+- Truy vết được "đơn này bán theo giá nào" để đối soát.
+- Không thay đổi TLA-M2: Duy vẫn chặn sửa giá đã dính đơn, chỉ là chặn đúng hơn.
+Đây là thay đổi schema của `sales`. Cần ghi lý do vào hồ sơ tính năng (bất biến 8) và đưa vào 02c thành một dòng lô.
+
+### Kết luận: **CHANGES REQUESTED**
+Phải sửa trong lô này:
+- **TLA-M1**: gỡ H6 và viết lại test.
+- **TLA-M2**: sửa thông điệp cho ca hôm nay, kèm test.
+- **TLA-L1**: thêm nhãn timeline cho 3 sự kiện, cộng sự kiện huỷ trên dòng thời gian đơn.
+- **TLA-H1 (a)**: đổi thông điệp `COST_ALLOCATED_LOCKED`.
+
+File được sửa: `apps/ai/actions/services.py`, `apps/ai/actions/tests/test_actions_api.py`, `apps/catalog/pricing/services.py` + test, `apps/sales/orders/timeline.py` + test, `apps/inventory/returns/next_steps.py`, `apps/inventory/stocktake/next_steps.py`, `apps/purchasing/costs/api.py` + test. Không đụng migration.
+
+Cần Duy hoặc PO quyết, không chặn commit lô sau khi sửa xong các mục trên:
+- **TLA-H1 (b)**: story huỷ chi phí phụ. Đề nghị làm trước go-live production.
+- **TLA-M3**: story ghi tiền về muộn ở hàng chờ.
+- **TLA-M2**: câu hỏi về đặt giá trong ngày.
+
+Đưa vào 02c thành nợ: **TLA-L2**, **TLA-L3**, **TLA-L4** (ghi chú deploy), `item_price_id`.
+
+Không có lỗi rò giá vốn, rò dữ liệu cá nhân hay leo quyền.
+
+### Re-review sửa TLA-M1/M2/L1/H1a (02/10)
+Kiểm chứng tôi tự chạy: `manage.py test apps.ai.actions apps.catalog.pricing apps.sales.orders apps.inventory.returns apps.inventory.stocktake apps.purchasing.costs`, 598 test, OK. Điều phối viên đã chạy toàn bộ: 2848 OK, makemigrations sạch, check_naming OK.
+
+| Mục | Kết luận | Ghi chú |
+|---|---|---|
+| TLA-M1 | Đạt | Đã gỡ khối H6 ở `ai/actions/services.py`, docstring ghi lý do. H1 (`BR-AI-04`, 403) vẫn chạy trước khi dispatch. Có test: chủ AI có quyền tự xác nhận được, người thiếu quyền duyệt nhận 403 và phiếu không đổi. |
+| TLA-M2 | Đạt | Một thông điệp dùng chung cho mọi nhánh, giữ `code`. Có test cho ca hôm nay: "từ hôm nay" ra `BR-DM-03`, "từ ngày mai" làm được. |
+| TLA-L1 | Đạt | Thêm `return_cancelled`. Dòng `return_to_warehouse` của phiếu đã huỷ bỏ chữ "chờ duyệt". Đã thêm nhãn guidance cho 3 sự kiện. Nhãn không có chữ tự do, không có tiền (có test). |
+| TLA-H1 (a) | Đạt, kèm TLA-L5 | Thông điệp không còn chỉ tới thao tác không có. |
+
+**Điểm lệch (dòng `return_cancelled` không có `doc`): chấp nhận.** Đề xuất của tôi là `doc="return"` ở trường nội bộ `TimelineEvent.doc`, và code đã làm đúng như vậy. Tôi không yêu cầu object link `doc: {type, id}`. Link chi tiết chỉ áp cho `refund_created` theo #2. Giữ shape cũ như `test_other_lines_keep_old_shape` là đúng.
+
+**TLA-L5 · Low · không chặn.** `purchasing/costs/api.py:26` ghi "Liên hệ Chủ để xử lý". Endpoint này chỉ Chủ gọi được (`view_purchasecost` và `view_costprice`), nên người đọc câu này chính là Chủ. Sửa câu khi làm story huỷ chi phí (TLA-H1 b), chẳng hạn "…Chức năng huỷ chi phí đang được bổ sung."
+
+**Nợ dev tự ghi (chấp nhận, gom lô dọn dẹp):** guidance kiểm kê còn hiện "Có thay đổi" cho `update_reconciliation_lines` và `update_stockreconciliation`.
+
+### Kết luận cuối Lô bổ sung A — BE: **APPROVED**
+Lô qua review, chuyển QA được. Các mục chờ Duy/PO (TLA-H1 b, TLA-M3, câu hỏi TLA-M2) và nợ đưa vào 02c (TLA-L2, L3, L4, L5, `item_price_id`) giữ như kết luận trước.
+
+## Lô bổ sung A — FE
+
+Review techlead 02/10. Phạm vi: diff chưa commit ở `erp-console/` và `doc/design/erp/enum-map.md` (62 file sửa, 8 file mới), đối chiếu route thật ở `backend/config/api_urls.py` và code BE đã APPROVED ở mục "Lô bổ sung A — BE" phía trên.
+
+### Kiểm chứng
+- Điều phối viên đã chạy: tsc sạch, vitest 761, build mock=0 kèm check-no-mock và check-ai-chunks, build mock=1 với `ed_bonusA_ui` 47/47 và hồi quy các batch.
+- Tôi tự chạy lượt này: `tsc --noEmit` sạch. `vitest` cho guidance, returns, stocktake, customers: 97/97. `check_naming.py` OK.
+
+### Kết quả theo trọng tâm
+
+| Trọng tâm | Kết luận | Ghi chú |
+|---|---|---|
+| Route kiểm kê | Đạt | `stocktake/api.ts` dùng `BASE=/api/inventory/reconciliations/` với `{id}/submit/` và `{id}/return-to-draft/`, cả hai POST `{}`. Khớp `url_path` và `required_perms=change_stockreconciliation` ở `stocktake/api.py:125-136`. Nút hiện theo `available_actions` (`edit_lines`, `submit`, `return_to_draft`, `approve`), khớp `serializers.py:205-220`. Bỏ hẳn `approve_blocked_reason`. |
+| Route huỷ phiếu hoàn | Đạt | `POST /api/inventory/returns/{id}/cancel/`. 409 `STALE_STATE` đi qua `ConflictBanner`. |
+| Tìm khách (#11) | Đạt | `POST /api/sales/customer-directory/search/` với body `{q, ordering, page?}`, khớp `SearchBodySerializer`. Phân trang lấy `page` từ body, nên link `next` của BE không mang từ khoá. Module customers không đẩy `q` lên URL trang. |
+| `ai/status` và hạn mức (#1) | Đạt | `budgetView()` trả null khi `budget` null, nên vai khác Chủ không có khối này. FE không tự tính trạng thái. BE chỉ trả cho người có `ai.manage_ai_policy` (`ai/status/services.py:52`). Mock khớp, chỉ nhóm owner có. |
+| SĐT (#5, #11, #17) | Đạt | Không có `console.*`, storage hay URL nào chứa SĐT trong diff. Riêng `localStorage` của mock budget chỉ chứa chuỗi trạng thái. #17 lấy `phone` từ danh sách `assigned_to=me`, đã gỡ lần gọi chi tiết cho từng thẻ (TL-L6 cũ). `normalizePhone` FE trùng `apps/common/pii.normalize_phone`, regex hợp lệ trùng `_VALID_PHONE`. Câu lỗi `CUSTOMER_PHONE_TAKEN` và `INVALID_PHONE` không lặp số. |
+| Giá vốn | Đạt | Không thêm field giá vốn nào. Lỗi `COST_*` chỉ ở `PurchaseCostForm`, màn này chỉ Chủ vào. Câu lỗi không có số giá vốn. Khối hạn mức AI chỉ có tiền cloud, không phải giá vốn. |
+| Phân quyền nút | Đạt, kèm TLA-FE-L4 | Gửi duyệt, Trả về nháp và Duyệt theo `available_actions` của BE. Huỷ phiếu hoàn theo `canCancel` (`returnsModel.ts:99`). Nhờ người xử lý theo `allowed=false` của guidance. |
+| #2 link phiếu hoàn | Đạt | `timelineDocHref` chỉ dựng link khi `doc.type==="refund"`, id nguyên dương và người xem có `canView(me,"refunds")`. URL chỉ mang `id`. Route `/orders/refunds/detail/` có sẵn. |
+| #15 đơn Tự huỷ | Đạt | `orderActionPlan` thoát sớm với `AUTO_CANCELLED`, khớp BE (`next_steps.py:70` không trả bước nào). `ORDER_AUTO_CANCELLED` làm đóng hộp, hiện toast vàng và tải lại đơn. Câu mock chép đúng nguyên văn BE. |
+| #19 Nhờ người xử lý | Đạt về contract, kèm TLA-FE-M1 và L3 | Gọi `escalateStep` sẵn có, tức `POST /api/ai/actions/escalate/` (`ai/actions/api.py:192`). Endpoint có thật, trả 201 `{action_id, assignee_group}`. Không gọi endpoint lạ. `docType` là `order`/`batch`, cả hai có trong `_LAZY_MODULES`. Không phụ thuộc cờ AI. |
+| ConfirmModal mới | Chấp nhận, kèm TLA-FE-L2 | Không trùng component shared nào. Hiện có các hộp riêng theo module cùng khuôn (`orders/ActionModal`, `suppliers/ConfirmActiveModal`, `purchasing/ReceiptActionModals`). Đưa lên `shared/ui/overlay/` là đúng hướng. Không bắt dời các hộp cũ trong lô này, sẽ gom vào lô dọn dẹp. |
+| enum-map | Đạt | `stockReconciliationStatus` có Nháp, Chờ duyệt, Đã duyệt. `returnToStockStatus` thêm Đã huỷ. Khớp choices BE. |
+| #22, #14, #18 | Đạt | Giá mua bắt buộc và lớn hơn 0, không còn gửi `"0.00"`. Lỗi `COST_AMOUNT_TOO_LARGE` nằm dưới ô. Mốc giao dùng `dateTime` theo giờ VN. |
+
+### Phát hiện
+
+**TLA-FE-M1 · Medium · không chặn, ghi nợ · "Nhờ người xử lý" hiện cả với bước bị chặn do luật, không chỉ do thiếu quyền.** `features/guidance/escalation.ts:10`.
+- `escalatableStep` lấy bước `allowed=false` đầu tiên. BE đặt `allowed=false` cả khi thiếu quyền lẫn khi vướng luật (`missing_biz`), ví dụ `batches/next_steps.py:139` và `orders/next_steps.py:97,119`.
+- Tái hiện: Chủ mở lô còn tồn. Bước `close` bị chặn bởi BR-LO-04, nên menu "…" hiện "Nhờ người xử lý" và Chủ chuyển việc cho chính nhóm `owner`. Ca thứ hai: Chủ mở đơn có phiếu giao Đang giao. Bước `cancel` bị chặn, Chủ chuyển việc "Huỷ đơn" cho Quản lý, trong khi Quản lý cũng không huỷ được.
+- Điều kiện này giống hệt AC1 của DW-23 cũ (`GuidanceEscalate.tsx:30`), nên đây không phải lỗi mới. Trang chi tiết mới đưa mục này vào menu chính nên dễ gặp hơn.
+- Hướng sửa ở lô sau: BE thêm cờ `blocked_by: "permission" | "rule"` cho `NextStep`. Không lọc ở FE theo mã `missing`, vì mã thiếu quyền chưa thống nhất (`BR-PQ-12` ở chỗ này, `BR-TT-07` ở `orders/next_steps.py:95`). Đồng thời `escalate_guidance_step` nên từ chối khi người gọi có quyền nhưng bị luật chặn. Đưa vào 02c thành nợ.
+
+**TLA-FE-L1 · Low · phải sửa · Hộp Gửi duyệt và Trả về nháp hiện nguyên mã luật của BE.** `features/stocktake/components/StocktakeDetailScreen.tsx:343-386`.
+- Hai `ConfirmModal` không truyền `errorText`. Với BE thật, bấm Gửi duyệt trên phiếu vừa được gửi ở tab khác thì nhận `RECON_NOT_DRAFT` với câu "...không sửa dòng được (BR-PQ-10). Muốn sửa..." (`stocktake/services.py:88`). Câu này hiện nguyên văn, trái UI-RULES §4.1 ("Không mã luật").
+- Nhánh Duyệt và form lập phiếu đều đã qua `cleanMessage`. Mock trả câu khác nên e2e không bắt được (xem L5).
+- Sửa: truyền `errorText={(e) => e instanceof ApiError ? cleanMessage(e.message) : ...}` cho cả hai hộp.
+
+**TLA-FE-L2 · Low · phải sửa · Nút chính đỏ của ConfirmModal lệch idiom.** `shared/ui/overlay/ConfirmModal.tsx:81`.
+- Code dùng `btn danger`, là nút viền đỏ. Mọi hộp xác nhận phá huỷ đang có đều dùng `btn danger solid` cho nút chính: `orders/ActionModal.tsx:74`, `ReceiptActionModals.tsx:113`, `ConfirmActiveModal.tsx:50`, `FormPage.tsx:64`, `staff/parts.tsx:126`.
+- Hệ quả: "Huỷ phiếu hoàn" trông như nút phụ. Sửa thành `danger solid`.
+
+**TLA-FE-L3 · Low · phải sửa · Nhờ xong vẫn nhờ lại được, mỗi lần tạo thêm một `AiAction` ESCALATED.** `OrderDetailScreen.tsx:424`, `BatchDetailScreen.tsx:325`.
+- `onDone` chỉ đóng hộp. `stuckStep` vẫn còn nên mục menu vẫn hiện. BE không chống trùng (`ai/actions/services.py`, `AiAction.objects.create`).
+- `GuidanceEscalate` cũ khoá nút sau khi nhờ xong, nên đây là bước lùi.
+- Sửa: sau khi xong thì ẩn mục, hoặc đổi thành mục mờ "Đã nhờ {who}", trong phạm vi phiên trang.
+
+**TLA-FE-L4 · Low · không chặn · `canCancel` thiếu cổng chung của BE.** `features/returns/returnsModel.ts:99`.
+- BE `cancel` có `required_perms=("inventory.add_returntostock",)` chạy trước (`returns/api.py:92`). FE cho hiện mục khi có `approve` hoặc `change` mà không cần `add`.
+- Hiện không lộ ra: owner và manager có đủ cả ba quyền (#21). Khi làm TLA-L2 (đổi cổng BE sang `view_returntostock`), hai bên sẽ khớp lại. Ghi cùng nợ TLA-L2, không sửa lẻ.
+
+**TLA-FE-L5 · Low · phải sửa · Mock lệch BE.**
+- `features/stocktake/mock.ts:93,393`: nhãn timeline mock là "Gửi duyệt kiểm kê", BE là "Gửi duyệt" (`stocktake/next_steps.py:7`).
+- `features/stocktake/mock.ts:403`: mock là "Trả phiếu kiểm kê về nháp", BE là "Trả về nháp để sửa".
+- `features/stocktake/mock.ts:389`: mock trả câu "Chỉ gửi duyệt được phiếu đang ở trạng thái nháp." cho `RECON_NOT_DRAFT`. BE dùng chung câu của `_require_draft`, có "(BR-PQ-10)". Chép nguyên văn để e2e bắt được L1.
+- `shared/lib/beErrors.mock.ts:86` `TT_WRONG_STATUS`: mock là "Đơn không ở trạng thái Giữ chỗ/Tự huỷ.", BE nay là "Đơn không ở trạng thái Giữ chỗ." (`payments/services.py:270`).
+- Mock huỷ phiếu hoàn khớp BE: nhãn "Huỷ phiếu hàng hoàn", 403, 409 `STALE_STATE`, phiếu huỷ không cộng vào số đã hoàn.
+
+**TLA-FE-L6 · Low · không chặn · Lặt vặt về tài liệu và câu chữ.**
+- Dev-notes ghi `COST_LANDED_OVERFLOW` hiện "dưới danh sách lô phân bổ", còn code (`PurchaseCostForm.tsx:159`) hiện ở alert đầu form. Hành vi của code chấp nhận được (UI-RULES §6.3), chỉ cần sửa dev-notes cho khớp.
+- `EscalateModal.tsx:18`: comment nói `onReload` chạy khi gặp `STEP_NOT_FOUND`/`BR-AI-25`, nhưng hai mã đó là 400. `ConfirmModal` chỉ gọi `onReload` khi xung đột phiên bản, nên lỗi chỉ hiện trong hộp. Cần sửa comment.
+- Câu `STEP_NOT_FOUND` của BE có mã nội bộ của bước ("Bước 'close' không tồn tại..."). Đây là nợ BE, gom vào lô dọn dẹp.
+
+### Kết luận Lô bổ sung A — FE: **CHANGES REQUESTED (nhẹ)**
+Không có lỗi rò giá vốn, rò dữ liệu cá nhân hay leo quyền. Contract và route khớp BE thật.
+
+Phải sửa trong lô này, chỉ đụng FE:
+- **TLA-FE-L1**: thêm `errorText` dùng `cleanMessage` cho hai hộp kiểm kê.
+- **TLA-FE-L2**: đổi nút chính đỏ của ConfirmModal sang `danger solid`.
+- **TLA-FE-L3**: ẩn hoặc khoá "Nhờ người xử lý" sau khi nhờ xong, ở cả màn đơn lẫn màn lô.
+- **TLA-FE-L5**: chép đúng nhãn và câu của BE vào mock. Thêm một ca e2e: Gửi duyệt khi phiếu đã gửi thì không hiện "BR-".
+
+File được sửa: `features/stocktake/components/StocktakeDetailScreen.tsx`, `features/stocktake/mock.ts`, `shared/ui/overlay/ConfirmModal.tsx`, `features/orders/components/OrderDetailScreen.tsx`, `features/inventory/components/BatchDetailScreen.tsx`, `shared/lib/beErrors.mock.ts`, e2e liên quan. Sửa thêm comment `EscalateModal.tsx:18` và dev-notes (L6).
+
+Đưa vào 02c thành nợ: **TLA-FE-M1** (cờ `blocked_by` ở BE), **TLA-FE-L4** (đi cùng TLA-L2), câu `STEP_NOT_FOUND` của BE, và việc dời các hộp xác nhận riêng của từng module sang `ConfirmModal`.
+
+### Re-review sửa TLA-FE-L1/L2/L3/L5/L6 (02/10)
+Điều phối viên đã chạy lại: tsc, vitest 761, build mock=0 kèm check-no-mock và check-ai-chunks. E2E: `ed_bonusA` 49/49, `ed_batch8` 125/125, `ed_batch3` 143/143, `ed_batch7` 114/114, `ed_batch9` 145/145. Tôi tự chạy lại `tsc --noEmit`: sạch.
+
+| Mục | Kết luận | Ghi chú |
+|---|---|---|
+| TLA-FE-L1 | Đạt | Hai hộp Gửi duyệt và Trả về nháp truyền `errorText={cleanErrorText}` (`StocktakeDetailScreen.tsx:356,379`). Hàm này dùng chung `cleanMessage`. Có ca e2e `ed_batch8:400-408`: mock `stocktakeSubmitByOther` gây `RECON_NOT_DRAFT` thật, và câu lỗi không còn "BR-". |
+| TLA-FE-L2 | Đạt | `ConfirmModal.tsx:81` dùng `danger solid`. Hiện chỉ "Huỷ phiếu hoàn" dùng `danger`, nên không ảnh hưởng màn khác. |
+| TLA-FE-L3 | Đạt | Nhờ xong thì `escalatedKey` ẩn mục khỏi menu, ở cả màn đơn (`OrderDetailScreen.tsx:118,428`) lẫn màn lô (`BatchDetailScreen.tsx:169,329`). E2E kiểm đúng 1 POST và mục không còn sau khi nhờ. |
+| TLA-FE-L5 | Đạt | Nhãn mock "Gửi duyệt" và "Trả về nháp để sửa" khớp `stocktake/next_steps.py`. Câu `RECON_NOT_DRAFT` chép nguyên văn `_require_draft`, ở ba nhánh lines, PATCH và submit, đúng ba chỗ BE gọi. `TT_WRONG_STATUS` khớp BE. |
+| TLA-FE-L6 | Đạt | Dev-notes ghi đúng: `COST_LANDED_OVERFLOW` hiện ở alert đầu form. Comment `onReload` của `EscalateModal` đã sửa. |
+
+Ghi nhận (không lỗi): `escalatedKey` chỉ ẩn bước đầu tiên bị kẹt. Nếu chứng từ có hai bước kẹt thì sau khi nhờ bước đầu, mục sẽ không chuyển sang bước thứ hai. Hiện chưa có chứng từ nào rơi vào ca này. Gom chung vào nợ TLA-FE-M1.
+
+### Kết luận cuối Lô bổ sung A — FE: **APPROVED**
+Lô qua review, chuyển QA hoặc commit được. Đưa vào 02c thành nợ, giữ như kết luận trước: TLA-FE-M1 (cờ `blocked_by` ở BE), TLA-FE-L4 (đi cùng TLA-L2), câu `STEP_NOT_FOUND` của BE, và việc dời các hộp xác nhận riêng của từng module sang `ConfirmModal`.

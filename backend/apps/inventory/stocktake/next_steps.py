@@ -4,6 +4,8 @@ from apps.common.guidance.audit_timeline import make_audit_timeline_provider
 from apps.inventory.models import StockReconciliation
 
 ACTION_LABELS = {
+    "submit_stockreconciliation": "Gửi duyệt",
+    "return_stockreconciliation_to_draft": "Trả về nháp để sửa",
     "approve_stockreconciliation": "Duyệt kiểm kê và cân đối sổ kho",
 }
 

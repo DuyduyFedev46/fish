@@ -1,15 +1,12 @@
 """
-Truy vấn đọc phiếu kiểm kê (R8): một câu truy vấn có sẵn người sửa gần nhất và "người dùng hiện tại đã đếm chưa",
-nên danh sách không bị N+1 (02b §3 B1).
+Truy vấn đọc phiếu kiểm kê (R8): một câu truy vấn có sẵn người thao tác gần nhất, nên danh sách không bị N+1 (02b §3 B1).
 """
-from django.db.models import CharField, Exists, OuterRef, Prefetch, Q, Subquery
+from django.db.models import CharField, Exists, OuterRef, Prefetch, Subquery
 from django.db.models.functions import Cast
 
 from apps.accounts.models import AuditLog
 from apps.inventory.models import StockReconciliation, StockReconciliationLine
 from apps.inventory.stock.filters import parse_choice_list_param, parse_date_param, parse_id_param
-
-from .services import LINES_AUDIT_ACTION
 
 LABEL = StockReconciliation._meta.label
 
@@ -21,7 +18,7 @@ def _audit_of_reconciliation():
 def reconciliation_queryset(user):
     """
     Phiếu kèm: người tạo/duyệt (select_related), dòng + lô + kho + mặt hàng (prefetch), và các cột suy ra:
-    `last_*` (người thao tác gần nhất theo AuditLog), `edited_lines_by_me` (user từng sửa dòng số đếm).
+    `last_*` (người thao tác gần nhất theo AuditLog).
     """
     latest = _audit_of_reconciliation().order_by("-created_at", "-id")
     lines = StockReconciliationLine.objects.select_related("batch__warehouse", "batch__item").order_by("id")
@@ -38,14 +35,7 @@ def reconciliation_queryset(user):
             last_ai_actor_display_name=Subquery(latest.values("ai_actor__staff_profile__display_name")[:1]),
         )
     )
-    user_id = getattr(user, "pk", None)
-    if user_id is None:
-        return qs
-    return qs.annotate(
-        edited_lines_by_me=Exists(
-            _audit_of_reconciliation().filter(Q(actor_id=user_id) | Q(ai_actor_id=user_id), action=LINES_AUDIT_ACTION)
-        )
-    )
+    return qs
 
 
 def filter_list(queryset, params):

@@ -171,7 +171,7 @@ class CreateReturnTests(ReturnsApiBase):
 
     # --- quyền --------------------------------------------------------------------------------------------------
     def test_r9_forbidden_groups_403(self):
-        for user in (self.manager, self.customer_service, self.no_group):
+        for user in (self.customer_service, self.no_group):  # Quản lý đã được tạo (#21, Duy chốt 02/10)
             resp = self.post(user, self.payload())
             self.assertEqual(resp.status_code, 403, (user.username, resp.content))
         self.assertFalse(ReturnToStock.objects.exists())

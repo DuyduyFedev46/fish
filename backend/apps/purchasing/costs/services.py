@@ -5,7 +5,7 @@ Chi phí mua hàng & giá vốn lô — landed cost (P-03, BR-GV).
 landed_unit_cost qua `apps.inventory.batches.services.recompute_landed_cost`.
 Chặn lô đã chốt (BR-GV-02). Lỗi nghiệp vụ -> BusinessError.
 """
-from decimal import ROUND_HALF_UP, Decimal
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 
 from django.db import transaction
 
@@ -16,6 +16,7 @@ from apps.purchasing.models import PurchaseCost, PurchaseCostAllocation, Purchas
 
 ZERO = Decimal("0")
 CENT = Decimal("0.01")
+MAX_COST_AMOUNT = Decimal("1000000000000")  # cột amount: max_digits=14, 2 số lẻ -> 12 chữ số nguyên
 
 
 def record_purchase_cost(*, cost_type, amount, allocation_method, incurred_date,
@@ -41,6 +42,9 @@ def record_purchase_cost(*, cost_type, amount, allocation_method, incurred_date,
     amount = Decimal(amount)
     if amount < ZERO:
         raise BusinessError("Số tiền chi phí không được âm.")
+    if amount >= MAX_COST_AMOUNT:
+        message = "Số tiền chi phí quá lớn (tối đa 999.999.999.999 đ)."
+        raise BusinessError(message, code="COST_AMOUNT_TOO_LARGE", extra={"amount": [message]})
     if not allocations:
         raise BusinessError("Phải chỉ định ít nhất một lô nhận phân bổ.")
 
@@ -85,8 +89,13 @@ def record_purchase_cost(*, cost_type, amount, allocation_method, incurred_date,
             )
 
         # tính lại giá vốn hiện hành cho từng lô nhận (giá vốn hồi tố hợp lệ)
-        for batch, _ in resolved:
-            batches.recompute_landed_cost(batch=batch, actor=actor)
+        try:
+            for batch, _ in resolved:
+                batches.recompute_landed_cost(batch=batch, actor=actor)
+        except InvalidOperation:
+            # N3: giá vốn/kg vượt cột landed_unit_cost (max_digits=14, 4 số lẻ) -> 400 theo field, rollback toàn bộ.
+            message = "Chi phí quá lớn: giá vốn mỗi kg của lô vượt giới hạn cho phép. Kiểm tra lại số tiền."
+            raise BusinessError(message, code="COST_LANDED_OVERFLOW", extra={"allocations": [message]})
 
     return cost
 

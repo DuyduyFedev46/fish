@@ -2,13 +2,13 @@
 Kiểm kê định kỳ & hao hụt (P-09, BR-KK) — nhập số đếm theo lô rồi duyệt để điều chỉnh tồn.
 
 B1 (ERP theo design, Lô 8): `create_reconciliation`, `replace_lines`, `update_reconciliation` ghi dòng số đếm khi phiếu còn
-`DRAFT`; `apply_reconciliation` duyệt (BR-KK-02, BR-KK-08). `AuditLog.changes` chỉ chứa số dòng / tên trường, không chép
+`DRAFT`; `submit_reconciliation` gửi duyệt (DRAFT → SUBMITTED); `apply_reconciliation` duyệt (chỉ phiếu SUBMITTED).
+Duy chốt 02/10 (#6): bỏ BR-KK-02 và BR-KK-08, người có quyền duyệt tự duyệt được; AuditLog vẫn ghi từng người. `AuditLog.changes` chỉ chứa số dòng / tên trường, không chép
 tên, ghi chú hay lý do của dòng.
 """
 from decimal import Decimal
 
 from django.db import transaction
-from django.db.models import Q
 from django.utils import timezone
 
 from apps.accounts.models import AuditLog
@@ -20,6 +20,7 @@ from apps.inventory.stock import services as stock
 ZERO = Decimal("0")
 
 RECON_NOT_DRAFT = "RECON_NOT_DRAFT"
+RECON_NOT_SUBMITTED = "RECON_NOT_SUBMITTED"
 RECON_LINE_INVALID = "RECON_LINE_INVALID"
 STALE_STATE = "STALE_STATE"
 MAX_LINES = 500  # chặn payload quá lớn
@@ -85,7 +86,11 @@ def _lock(reconciliation):
 
 def _require_draft(reconciliation):
     if reconciliation.status != StockReconciliation.Status.DRAFT:
-        raise BusinessError("Phiếu kiểm kê đã duyệt, không sửa được (BR-PQ-10).", code=RECON_NOT_DRAFT)
+        raise BusinessError(
+            "Phiếu kiểm kê đã gửi duyệt hoặc đã duyệt, không sửa dòng được (BR-PQ-10). "
+            "Muốn sửa, hãy trả phiếu về nháp.",
+            code=RECON_NOT_DRAFT,
+        )
 
 
 SYSTEM_NAME = "Hệ thống"
@@ -119,23 +124,11 @@ def _format_instant(value):
     return DateTimeField().to_representation(value)
 
 
-def has_counted(reconciliation, user):
-    """True nếu `user` đã nhập số (người tạo) hoặc từng sửa dòng số đếm của phiếu này (kể cả AI làm thay user)."""
-    if user is None:
-        return False
-    if reconciliation.created_by_id == user.pk:
-        return True
-    return AuditLog.objects.filter(
-        Q(actor=user) | Q(ai_actor=user),
-        model_name=StockReconciliation._meta.label, object_id=str(reconciliation.pk), action=LINES_AUDIT_ACTION,
-    ).exists()
-
-
 @transaction.atomic
 def create_reconciliation(*, count_date, note, lines, actor):
     """
     Tạo phiếu `DRAFT`. `lines` là danh sách đã parse (xem `_prepare_lines`) hoặc None (phiếu rỗng, điền sau).
-    `actor` là người nhập số (BR-KK-02).
+    `actor` là người nhập số (ghi vào `created_by` và AuditLog).
     """
     prepared = _prepare_lines(lines) if lines is not None else []
     reconciliation = StockReconciliation.objects.create(count_date=count_date, note=note or "", created_by=actor)
@@ -156,7 +149,7 @@ def replace_lines(*, reconciliation, lines, expected_updated_at, actor):
     - Phiếu không còn `DRAFT` → 400 `RECON_NOT_DRAFT`.
     - `expected_updated_at` khác `updated_at` hiện tại → 409 `STALE_STATE` kèm `updated_at`, `updated_by_name`.
     - Dòng sai → 400 `RECON_LINE_INVALID`/`BR-KK-04`; dữ liệu cũ giữ nguyên (cả giao dịch rollback).
-    Người gọi hàm này bị tính là người đã sửa số đếm: không duyệt được phiếu (BR-KK-08).
+    Người gọi được ghi vào AuditLog (`update_reconciliation_lines`); không còn chặn tự duyệt (Duy chốt 02/10, #6).
     """
     locked = _lock(reconciliation)
     _require_draft(locked)
@@ -222,25 +215,48 @@ def _apply_line(reconciliation, line, *, index, approver):
 
 
 @transaction.atomic
+def submit_reconciliation(*, reconciliation, actor):
+    """Gửi duyệt: DRAFT → SUBMITTED (#20). Phiếu rỗng → `RECON_EMPTY`. Từ lúc này không sửa dòng, chỉ duyệt hoặc trả về nháp."""
+    locked = _lock(reconciliation)
+    _require_draft(locked)
+    line_count = locked.lines.count()
+    if not line_count:
+        raise BusinessError("Phiếu chưa có dòng số đếm nào, không gửi duyệt được.", code=RECON_EMPTY)
+    locked.status = StockReconciliation.Status.SUBMITTED
+    locked.save(update_fields=["status", "updated_at"])
+    record_audit("submit_stockreconciliation", actor=actor, obj=locked, changes={"line_count": line_count})
+    return locked
+
+
+@transaction.atomic
+def return_to_draft(*, reconciliation, actor):
+    """Trả phiếu đã gửi duyệt về nháp để sửa lại số đếm (#20). Chỉ từ SUBMITTED."""
+    locked = _lock(reconciliation)
+    if locked.status != StockReconciliation.Status.SUBMITTED:
+        raise BusinessError("Chỉ trả về nháp được phiếu đang chờ duyệt.", code=RECON_NOT_SUBMITTED)
+    locked.status = StockReconciliation.Status.DRAFT
+    locked.save(update_fields=["status", "updated_at"])
+    record_audit("return_stockreconciliation_to_draft", actor=actor, obj=locked, changes={})
+    return locked
+
+
+@transaction.atomic
 def apply_reconciliation(*, reconciliation, approver):
     """
-    Duyệt kiểm kê -> điều chỉnh tồn theo số thực đếm (BR-KK).
-    BR-KK-02: người duyệt phải khác người nhập số. BR-KK-08: cũng phải khác người đã sửa số đếm.
+    Duyệt kiểm kê -> điều chỉnh tồn theo số thực đếm (BR-KK). Chỉ phiếu `SUBMITTED` (đã gửi duyệt) mới duyệt được.
+    Duy chốt 02/10 (#6): bỏ BR-KK-02 và BR-KK-08; người có quyền duyệt tự duyệt phiếu mình nhập được.
+    AuditLog giữ người nhập (`create_*`, `update_reconciliation_lines`), người gửi (`submit_*`) và người duyệt.
     BR-KK-09 (đề xuất): áp chênh lệch đã chụp lúc nhập số (xem `_applied_difference`). Phiếu không có dòng → `RECON_EMPTY`.
     Khoá dòng phiếu: hai người duyệt cùng lúc chỉ một người chạy.
     """
     _lock(reconciliation)
     reconciliation.refresh_from_db()  # trạng thái mới nhất sau khi giữ khoá
-    if reconciliation.status != StockReconciliation.Status.DRAFT:
+    if reconciliation.status == StockReconciliation.Status.APPROVED:
         raise BusinessError("Phiếu kiểm kê đã được duyệt.")
-    if approver is not None:
-        if reconciliation.created_by_id == getattr(approver, "id", None):
-            raise BusinessError("Người duyệt kiểm kê phải khác người nhập số (BR-KK-02).")
-        if has_counted(reconciliation, approver):
-            raise BusinessError(
-                "Bạn đã nhập hoặc sửa số đếm của phiếu này nên không duyệt được, cần người khác duyệt (BR-KK-08).",
-                code="BR-KK-08",
-            )
+    if reconciliation.status != StockReconciliation.Status.SUBMITTED:
+        raise BusinessError(
+            "Phiếu kiểm kê chưa gửi duyệt. Hãy gửi duyệt trước khi duyệt.", code=RECON_NOT_SUBMITTED,
+        )
     lines = list(reconciliation.lines.select_related("batch").order_by("id"))
     if not lines:
         raise BusinessError("Phiếu chưa có dòng số đếm nào, không duyệt được.", code=RECON_EMPTY)

@@ -228,22 +228,76 @@ class AiActionApiTestCase(TestCase):
         res_scope_chu = self.client_chu.get("/api/ai/actions/?scope=all")
         self.assertEqual(res_scope_chu.status_code, 200)
 
-    def test_dw11_ac6_stocktake_h6_constraint(self):
-        """DW-11-AC6: Kiểm kê H6 (BR-KK-02): người duyệt không được là chủ AI đã nhập số kiểm kê."""
-        action = AiAction.objects.create(
+    def _make_stocktake_users(self):
+        self.stocktake_owner = make_user("ai_st_owner", roles.OWNER)
+        self.stocktake_warehouse = make_user("ai_st_warehouse", roles.WAREHOUSE_STAFF)
+
+    def _submitted_reconciliation(self, creator):
+        """Phiếu kiểm kê SUBMITTED có 1 dòng (lô giả), do `creator` nhập."""
+        from apps.inventory.batches import services as batch_services
+        from apps.inventory.models import StockReconciliation
+        from apps.inventory.stocktake import services as stocktake_services
+        from apps.inventory.models import StockReconciliationLine
+
+        batch = batch_services.create_batch(
+            item=self.item, supplier=self.sup, warehouse=self.wh,
+            received_date=timezone.now().date(), qty=Decimal("50"), purchase_rate=Decimal("90000"),
+        )
+        rec = stocktake_services.create_reconciliation(
+            count_date=timezone.now().date(), note="", lines=None, actor=creator,
+        )
+        StockReconciliationLine.objects.create(
+            reconciliation=rec, batch=batch, system_qty=Decimal("50"),
+            counted_qty=Decimal("49"), difference_qty=Decimal("-1"), reason="hao hụt",
+        )
+        rec = stocktake_services.submit_reconciliation(reconciliation=rec, actor=creator)
+        self.assertEqual(rec.status, StockReconciliation.Status.SUBMITTED)
+        return rec
+
+    def _approve_action(self, owner, rec):
+        return AiAction.objects.create(
             command="inventory.stockreconciliation.approve",
             kind="write",
             level="C",
             status="PENDING",
-            owner=self.user_chu,
+            owner=owner,
             target_model="stockreconciliation",
-            target_id="1",
+            target_id=str(rec.pk),
             viewed_at=timezone.now() - datetime.timedelta(seconds=5),
             expires_at=timezone.now() + datetime.timedelta(minutes=15),
         )
-        res = self.client_chu.post(f"/api/ai/actions/{action.id}/confirm/", {}, format="json")
-        self.assertEqual(res.status_code, 400)
-        self.assertEqual(res.json()["code"], "BR-KK-02")
+
+    def test_dw11_ac6_owner_of_ai_with_approve_perm_can_self_confirm_stocktake(self):
+        """DW-11-AC6 (đổi theo TLA-M1, quyết định #6): người có quyền duyệt kiểm kê và là chủ việc AI thì
+        tự xác nhận được, không còn chặn BR-KK-02. Phiếu chuyển APPROVED, AuditLog ghi người duyệt."""
+        from apps.inventory.models import StockReconciliation
+
+        self._make_stocktake_users()
+        rec = self._submitted_reconciliation(self.stocktake_owner)
+        action = self._approve_action(self.stocktake_owner, rec)
+        res = client_for(self.stocktake_owner).post(f"/api/ai/actions/{action.id}/confirm/", {}, format="json")
+        self.assertEqual(res.status_code, 200, res.content)
+        self.assertNotEqual(res.json().get("code"), "BR-KK-02")
+        rec.refresh_from_db()
+        self.assertEqual(rec.status, StockReconciliation.Status.APPROVED)
+        action.refresh_from_db()
+        self.assertEqual(action.status, AiAction.Status.CONFIRMED)
+        self.assertEqual(action.decided_by, self.stocktake_owner)
+
+    def test_dw11_ac6_confirmer_without_approve_perm_gets_403_on_stocktake(self):
+        """DW-11-AC6 (TLA-M1): người xác nhận thiếu approve_stockreconciliation -> 403 BR-AI-04, phiếu không đổi."""
+        from apps.inventory.models import StockReconciliation
+
+        self._make_stocktake_users()
+        rec = self._submitted_reconciliation(self.stocktake_warehouse)
+        action = self._approve_action(self.stocktake_warehouse, rec)
+        res = client_for(self.stocktake_warehouse).post(f"/api/ai/actions/{action.id}/confirm/", {}, format="json")
+        self.assertEqual(res.status_code, 403, res.content)
+        self.assertEqual(res.json()["code"], "BR-AI-04")
+        rec.refresh_from_db()
+        self.assertEqual(rec.status, StockReconciliation.Status.SUBMITTED)
+        action.refresh_from_db()
+        self.assertEqual(action.status, AiAction.Status.PENDING)
 
     def test_dw11_ac7_args_preview_scrub_cost_keys(self):
         """DW-11-AC7: args_preview không có rate với người thiếu view_costprice; chu thấy rate."""

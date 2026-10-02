@@ -225,7 +225,7 @@ def check_close_batch(batch):
     ).exists()
     has_draft_recon = StockReconciliationLine.objects.filter(
         batch=batch,
-        reconciliation__status=StockReconciliation.Status.DRAFT,
+        reconciliation__status__in=(StockReconciliation.Status.DRAFT, StockReconciliation.Status.SUBMITTED),
     ).exists()
     if not has_approved_recon or has_draft_recon:
         missing.append(Missing("BR-KK-05", "Lô phải được kiểm kê và duyệt trước khi chốt (BR-KK-05)."))

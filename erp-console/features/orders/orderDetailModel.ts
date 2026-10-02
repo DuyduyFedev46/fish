@@ -10,6 +10,7 @@ import type {
   ConfirmPaymentResult,
   OrderAction,
   OrderDetail,
+  OrderTimelineEntry,
   PaymentAction,
   PaymentQueueItem,
   RefundQueueAction,
@@ -66,6 +67,8 @@ type PlanInput = {
   /** Có quyền huỷ đơn đã thanh toán (để hiện mục "Huỷ đơn" mờ kèm lý do khi đang bị chặn). */
   canCancel: boolean;
   canViewAudit: boolean;
+  /** Có việc đang chờ người khác (bước guidance mình chưa làm được) → hiện mục "Nhờ người xử lý" (Lô bổ sung A #19). */
+  canEscalate?: boolean;
 };
 
 /** Nút chính + mục "…" của một đơn (ED-09-AC3, AC4). Quyền đã nằm sẵn trong `actions` (BE tính cả luật lẫn quyền). */
@@ -73,6 +76,13 @@ export function orderActionPlan(i: PlanInput): ActionPlan {
   const has = (a: string) => i.actions.includes(a);
   let primary: ActionItem | null = null;
   const menu: ActionItem[] = [];
+
+  // #15: đơn Tự huỷ là đơn đã chết — mọi thao tác ghi bị ẩn, dù `actions` (bản cũ của BE / đơn vừa hết giờ giữ chỗ) còn mục nào.
+  if (i.status === "AUTO_CANCELLED") {
+    menu.push({ key: "copy_code", label: "Sao chép mã đơn" });
+    if (i.canViewAudit) menu.push({ key: "audit", label: "Xem nhật ký của đơn" });
+    return { primary, menu };
+  }
 
   if (has("confirm_payment")) primary = { key: "confirm_payment", label: "Xác nhận đã nhận tiền" };
   else if (has("cancel")) primary = { key: "cancel", label: "Huỷ đơn", danger: true };
@@ -87,6 +97,7 @@ export function orderActionPlan(i: PlanInput): ActionPlan {
       menu.push({ key: "cancel", label: "Huỷ đơn", danger: true, blockedReason: BLOCKED_CANCEL_DELIVERING });
   }
 
+  if (i.canEscalate) menu.push({ key: "escalate", label: "Nhờ người xử lý" });
   menu.push({ key: "copy_code", label: "Sao chép mã đơn" });
   if (i.canViewAudit) menu.push({ key: "audit", label: "Xem nhật ký của đơn" });
   return { primary, menu };
@@ -172,11 +183,21 @@ export function refundActionPlan(actions: readonly RefundQueueAction[]): ActionP
 
 const byNewest = (a: TimelineEntry, b: TimelineEntry) => Date.parse(b.at) - Date.parse(a.at);
 
+/** Liên kết của mốc có chứng từ: phiếu hoàn → màn chi tiết phiếu hoàn, chỉ khi người xem mở được màn đó (không thì chỉ là chữ). */
+export function timelineDocHref(doc: OrderTimelineEntry["doc"], opts: { canOpenRefund?: boolean } = {}): string | undefined {
+  if (!doc || !Number.isInteger(doc.id) || doc.id <= 0) return undefined;
+  if (doc.type === "refund" && opts.canOpenRefund) return `/orders/refunds/detail/?id=${doc.id}`;
+  return undefined;
+}
+
 /** Dòng thời gian của đơn: ưu tiên `timeline` của BE; thiếu thì ghép tạm từ các mốc giờ đang có. */
-export function orderTimeline(o: Pick<OrderDetail, "timeline" | "created_at" | "invoice" | "payments">): TimelineEntry[] {
+export function orderTimeline(
+  o: Pick<OrderDetail, "timeline" | "created_at" | "invoice" | "payments">,
+  opts: { canOpenRefund?: boolean } = {},
+): TimelineEntry[] {
   if (o.timeline && o.timeline.length > 0) {
     return o.timeline
-      .map((e) => ({ at: e.at, label: e.label, actor: e.actor_display || undefined }))
+      .map((e) => ({ at: e.at, label: e.label, actor: e.actor_display || undefined, href: timelineDocHref(e.doc, opts) }))
       .sort(byNewest);
   }
   const out: TimelineEntry[] = [];

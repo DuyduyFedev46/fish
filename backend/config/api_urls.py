@@ -25,6 +25,7 @@ from apps.ai.policy.api import (
 from apps.ai.registry.api import AiCommandDetailView, AiCommandsIndexView
 from apps.ai.report.api import AiDailyReportView
 from apps.ai.settings.api import MyConfigKillView, MyConfigVersionsView, MyConfigView
+from apps.ai.status.api import AiStatusView
 from apps.common.guidance.api import GuidanceView
 from apps.content.site.api import SiteInfoView
 import apps.sales.orders.next_steps  # noqa: F401 - đăng ký guidance provider cho order
@@ -165,6 +166,7 @@ urlpatterns = [
     # Tiếp theo · Đã làm (02b §6.7, DW-03)
     path("guidance/<str:doc_type>/<str:doc_id>/", GuidanceView.as_view(), name="guidance-detail"),
     # Lệnh AI tự sinh (02b §6.1, §6.2, DW-07, DW-10)
+    path("ai/status/", AiStatusView.as_view(), name="ai-status"),
     path("ai/commands/index/", AiCommandsIndexView.as_view(), name="ai-commands-index"),
     path("ai/commands/<str:command_id>/call/", AiCommandCallView.as_view(), name="ai-commands-call"),
     path("ai/commands/<str:command_id>/", AiCommandDetailView.as_view(), name="ai-commands-detail"),

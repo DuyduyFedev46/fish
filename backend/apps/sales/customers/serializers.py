@@ -88,8 +88,9 @@ class DirectoryDetailSerializer(DirectoryListSerializer):
 
 
 class DirectoryUpdateSerializer(serializers.Serializer):
-    """Đầu vào PATCH: chỉ ba trường được sửa (SĐT khoá). Chuỗi, không nhận object/list."""
+    """Đầu vào PATCH: chỉ bốn trường được sửa. Chuỗi, không nhận object/list. `phone` được chuẩn hoá ở service."""
 
     name = serializers.CharField(max_length=200, allow_blank=True, required=False)
+    phone = serializers.CharField(max_length=40, allow_blank=True, required=False)
     default_address = serializers.CharField(allow_blank=True, required=False, max_length=1000)
     note = serializers.CharField(allow_blank=True, required=False, max_length=1000)

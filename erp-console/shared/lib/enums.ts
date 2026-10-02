@@ -149,12 +149,14 @@ export const ENUMS = {
     ADJUSTMENT: e("Điều chỉnh"),
   },
   stockReconciliationStatus: {
-    DRAFT: e("Chờ duyệt", "warn"),
+    DRAFT: e("Nháp"),
+    SUBMITTED: e("Chờ duyệt", "warn"),
     APPROVED: e("Đã duyệt", "good"),
   },
   returnToStockStatus: {
     DRAFT: e("Chờ duyệt", "warn"),
     APPROVED: e("Đã duyệt", "good"),
+    CANCELLED: e("Đã huỷ"),
   },
   returnToStockDecision: {
     PENDING: e("Chờ quyết định", "warn"),

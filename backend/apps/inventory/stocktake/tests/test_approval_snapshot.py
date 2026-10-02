@@ -13,7 +13,7 @@ from .base import URL, StocktakeApiBase, line
 
 class ApproveSnapshotTests(StocktakeApiBase):
     def approve(self, user, rec):
-        return self.api(user).post(f"{URL}{rec['id']}/approve/")
+        return self.approve_via_api(user, rec)
 
     def sell(self, batch, qty):
         stock.record_movement(batch=batch, qty_change=-Decimal(qty), movement_type=StockLedgerEntry.MovementType.SALE)
@@ -51,7 +51,7 @@ class ApproveSnapshotTests(StocktakeApiBase):
         self.assertEqual(self.batch.qty_available, Decimal("47.000"))
 
     def test_br_kk_09_would_go_negative_is_400_with_code_and_nothing_written(self):
-        """Chênh -2 nhưng lô đã bán hết còn 1 kg -> 400 RECON_STOCK_INSUFFICIENT, không ghi sổ, phiếu vẫn DRAFT."""
+        """Chênh -2 nhưng lô đã bán hết còn 1 kg -> 400 RECON_STOCK_INSUFFICIENT, không ghi sổ, phiếu vẫn chờ duyệt (SUBMITTED)."""
         rec = self.make_draft(self.warehouse_staff, [line(self.batch2, "28", "hao"), line(self.batch, "48", "hao")])
         self.sell(self.batch, "49")
         resp = self.approve(self.owner, rec)
@@ -64,7 +64,7 @@ class ApproveSnapshotTests(StocktakeApiBase):
         self.batch2.refresh_from_db()
         self.assertEqual(self.batch.qty_available, Decimal("1.000"))
         self.assertEqual(self.batch2.qty_available, Decimal("30.000"))
-        self.assertEqual(self.recon(rec["id"]).status, StockReconciliation.Status.DRAFT)
+        self.assertEqual(self.recon(rec["id"]).status, StockReconciliation.Status.SUBMITTED)
 
     def test_approve_legacy_surplus_without_reason_is_400_with_line_index(self):
         """L4: dòng chênh dương thiếu lý do (dữ liệu cũ, không qua service) -> BR-KK-04 kèm line_index."""
@@ -81,10 +81,11 @@ class ApproveSnapshotTests(StocktakeApiBase):
     def test_approve_empty_reconciliation_is_400_recon_empty(self):
         """L3."""
         rec = self.create_via_api(self.warehouse_staff)
+        self.force_submitted(rec)
         resp = self.approve(self.owner, rec)
         self.assertEqual(resp.status_code, 400, resp.content)
         self.assertEqual(resp.json()["code"], "RECON_EMPTY")
-        self.assertEqual(self.recon(rec["id"]).status, StockReconciliation.Status.DRAFT)
+        self.assertEqual(self.recon(rec["id"]).status, StockReconciliation.Status.SUBMITTED)
 
     def test_approve_response_still_has_no_cost_after_snapshot_apply(self):
         rec = self.make_draft(self.warehouse_staff)
@@ -113,7 +114,8 @@ class AiCreateIgnoresLinesTests(StocktakeApiBase):
         payload = {"count_date": str(self.today), "note": "", "lines": [line(self.batch, "10", "x")]}
         with set_ai_audit_scope(ai_actor=self.manager, level="C"):
             rec = self.api(self.warehouse_staff).post(URL, payload, format="json").json()
-        resp = self.api(self.manager).post(f"{URL}{rec['id']}/approve/")
+        self.force_submitted(rec)
+        resp = self.approve_via_api(self.manager, rec)
         self.assertEqual(resp.status_code, 400, resp.content)
         self.assertEqual(resp.json()["code"], "RECON_EMPTY")
         self.batch.refresh_from_db()

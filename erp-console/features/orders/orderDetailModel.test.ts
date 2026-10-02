@@ -9,6 +9,7 @@ import {
   orderActionPlan,
   orderPath,
   orderTimeline,
+  timelineDocHref,
   paymentActionPlan,
   paymentTimeline,
   refundActionPlan,
@@ -18,6 +19,19 @@ import {
 
 const plan = (status: string, actions: string[], extra: { deliveryStatus?: string | null; canCancel?: boolean; canViewAudit?: boolean } = {}) =>
   orderActionPlan({ status, actions, deliveryStatus: extra.deliveryStatus ?? null, canCancel: extra.canCancel ?? true, canViewAudit: extra.canViewAudit ?? true });
+
+describe("orderActionPlan: Tự huỷ và Nhờ người xử lý (Lô bổ sung A #15, #19)", () => {
+  it("AUTO_CANCELLED: ẩn mọi thao tác ghi dù actions còn mục, chỉ còn sao chép mã và nhật ký", () => {
+    const p = orderActionPlan({ status: "AUTO_CANCELLED", actions: ["confirm_payment", "cancel", "create_refund"], deliveryStatus: null, canCancel: true, canViewAudit: true, canEscalate: true });
+    expect(p.primary).toBeNull();
+    expect(p.menu.map((m) => m.key)).toEqual(["copy_code", "audit"]);
+  });
+  it("canEscalate thêm mục Nhờ người xử lý trước Sao chép mã đơn; không có thì không hiện", () => {
+    const base = { status: "PAID", actions: [], deliveryStatus: null, canCancel: false, canViewAudit: false };
+    expect(orderActionPlan({ ...base, canEscalate: true }).menu.map((m) => m.key)).toEqual(["escalate", "copy_code"]);
+    expect(orderActionPlan(base).menu.map((m) => m.key)).toEqual(["copy_code"]);
+  });
+});
 
 describe("orderActionPlan (ED-09-AC3/AC4)", () => {
   it("BOOKED: nút chính Xác nhận đã nhận tiền; Huỷ đơn mờ kèm lý do", () => {
@@ -45,9 +59,9 @@ describe("orderActionPlan (ED-09-AC3/AC4)", () => {
   it("COMPLETED: nút chính Lập phiếu hoàn", () => {
     expect(plan("COMPLETED", ["create_refund"]).primary?.label).toBe("Lập phiếu hoàn");
   });
-  it("AUTO_CANCELLED tiền về muộn: Xác nhận đã nhận tiền; không có mục Huỷ đơn mờ", () => {
+  it("AUTO_CANCELLED: không còn Xác nhận đã nhận tiền (#15), không có mục Huỷ đơn mờ", () => {
     const p = plan("AUTO_CANCELLED", ["confirm_payment"]);
-    expect(p.primary?.key).toBe("confirm_payment");
+    expect(p.primary).toBeNull();
     expect(p.menu.some((m) => m.key === "cancel")).toBe(false);
   });
   it("luôn có Sao chép mã đơn; Xem nhật ký chỉ khi có quyền", () => {
@@ -125,6 +139,26 @@ describe("dòng thời gian", () => {
     });
     expect(t.map((e) => e.label)).toEqual(["B", "A"]);
     expect(t[1].actor).toBe("Hệ thống");
+  });
+  it("#2: mốc refund_created có doc → liên kết sang phiếu hoàn, chỉ khi có quyền mở màn phiếu hoàn", () => {
+    const base = {
+      timeline: [
+        { at: "2026-10-01T01:00:00Z", kind: "order_placed", label: "Khách đặt đơn" },
+        { at: "2026-10-01T03:00:00Z", kind: "refund_created", label: "Tạo phiếu hoàn 100.000 đ", doc: { type: "refund", id: 7 } },
+      ],
+      created_at: undefined,
+      invoice: null,
+      payments: [],
+    };
+    const withPerm = orderTimeline(base, { canOpenRefund: true });
+    expect(withPerm[0].href).toBe("/orders/refunds/detail/?id=7");
+    expect(withPerm[1].href).toBeUndefined(); // mốc không có doc: chỉ là chữ
+    expect(orderTimeline(base)[0].href).toBeUndefined(); // không quyền: không liên kết
+  });
+  it("#2: doc lạ hoặc id hỏng không tạo liên kết", () => {
+    expect(timelineDocHref({ type: "refund", id: 0 }, { canOpenRefund: true })).toBeUndefined();
+    expect(timelineDocHref({ type: "invoice", id: 3 }, { canOpenRefund: true })).toBeUndefined();
+    expect(timelineDocHref(null, { canOpenRefund: true })).toBeUndefined();
   });
   it("đơn: BE cũ không có timeline thì ghép từ mốc giờ", () => {
     const t = orderTimeline({

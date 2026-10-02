@@ -1,9 +1,11 @@
 "use client";
 
-// ED-28 W2g — Chi tiết phiếu kiểm kê /stocktake/detail/?id=<số>. Khung DetailPage: header (mã mono · chip · [Duyệt] [Sửa số đếm] · …),
-// StatusPath, Thông tin, bảng dòng (tồn hệ thống · đếm được · chênh lệch · lý do); cột phải = Trợ lý AI + dòng thời gian.
-// Nút Duyệt chỉ hiện khi `available_actions` có "approve"; bị chặn (BR-KK-02 / BR-KK-08) thì nằm mờ trong "…" kèm `approve_blocked_reason.label`.
-// Duyệt đổi tồn kho nên có hộp xác nhận. Không có số tiền (chỉ kg). Không có dữ liệu khách. URL chỉ mang ?id=.
+// ED-28 W2g — Chi tiết phiếu kiểm kê /stocktake/detail/?id=<số>. Khung DetailPage: header (mã mono · chip · nút theo trạng thái · …),
+// StatusPath Nháp → Chờ duyệt → Đã duyệt, Thông tin, bảng dòng (tồn hệ thống · đếm được · chênh lệch · lý do); cột phải = Trợ lý AI + dòng thời gian.
+// Nút theo `available_actions` của BE (Duy chốt 02/10, #6/#20): Nháp có [Sửa số đếm] [Gửi duyệt]; Chờ duyệt có [Duyệt và điều chỉnh tồn] [Trả về nháp].
+// Không còn khối chặn người nhập số tự duyệt (BR-KK-02/08 đã bỏ). Mọi việc đổi trạng thái có hộp xác nhận; duyệt đổi tồn kho.
+// RECON_NOT_SUBMITTED / RECON_NOT_DRAFT (phiếu đã đổi trạng thái ở nơi khác): hiện câu của BE rồi tải lại phiếu.
+// Không có số tiền (chỉ kg). Không có dữ liệu khách. URL chỉ mang ?id=.
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -26,6 +28,7 @@ import { StatusPath } from "@/shared/ui/detail/StatusPath";
 import { Timeline, type TimelineEntry } from "@/shared/ui/detail/Timeline";
 import { FormAlert } from "@/shared/ui/form/FormAlert";
 import { primaryLabel, useSubmit, type SubmitConflict } from "@/shared/ui/form/useSubmit";
+import { ConfirmModal } from "@/shared/ui/overlay/ConfirmModal";
 import { Modal } from "@/shared/ui/overlay/Modal";
 import { useToast } from "@/shared/ui/overlay/Toast";
 import { ConflictBanner } from "@/shared/ui/states/ConflictBanner";
@@ -33,7 +36,7 @@ import { ErrorScreen } from "@/shared/ui/states/ErrorScreen";
 import { NoPermission } from "@/shared/ui/states/NoPermission";
 import { NotFoundScreen } from "@/shared/ui/states/NotFoundScreen";
 import { SummaryBlock } from "@/shared/ui/form/SummaryBlock";
-import { approveStocktake, fetchStocktake, fetchStocktakeTimeline } from "../api";
+import { approveStocktake, fetchStocktake, fetchStocktakeTimeline, returnStocktakeToDraft, submitStocktake } from "../api";
 import {
   LIST_HREF,
   PATH_STEPS,
@@ -58,6 +61,11 @@ type History = { state: "loading" } | { state: "error" } | { state: "ready"; ent
 
 const BACK = { href: LIST_HREF, label: "Kiểm kê" };
 
+/** Câu lỗi của BE cho hộp Gửi duyệt / Trả về nháp: bỏ mã luật (UI-RULES §4.1). */
+function cleanErrorText(err: unknown): string {
+  return err instanceof ApiError ? cleanMessage(err.message) : "Không gửi được, thử lại sau.";
+}
+
 export function StocktakeDetailScreen() {
   const id = idFromSearch(useSearchParams().get("id"));
   const { me } = useAuth();
@@ -67,6 +75,7 @@ export function StocktakeDetailScreen() {
   const [detail, setDetail] = useState<StocktakeDetail | null>(null);
   const [history, setHistory] = useState<History>({ state: "loading" });
   const [confirming, setConfirming] = useState(false);
+  const [step, setStep] = useState<"submit" | "return" | null>(null);
   const [conflict, setConflict] = useState<SubmitConflict | null>(null);
   const [lineError, setLineError] = useState<{ index: number; message: string } | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -116,16 +125,26 @@ export function StocktakeDetailScreen() {
 
   const refreshAll = useCallback(() => {
     setConfirming(false);
+    setStep(null);
     setActionError(null);
     void loadDetail(false);
     loadHistory();
   }, [loadDetail, loadHistory]);
+
+  /** Phiếu đã đổi trạng thái ở nơi khác (BE báo sai trạng thái): tải lại để nút khớp trạng thái mới. */
+  const onStaleStatus = (err: unknown) => {
+    if (err instanceof ApiError && (err.code === "RECON_NOT_SUBMITTED" || err.code === "RECON_NOT_DRAFT")) {
+      void loadDetail(false);
+      loadHistory();
+    }
+  };
 
   const approve = useSubmit(
     async () => {
       try {
         return await approveStocktake(id as number);
       } catch (err) {
+        onStaleStatus(err);
         const le = lineErrorOf(err);
         if (le) setLineError(le);
         if (err instanceof ApiError && err.status !== 409) throw new ApiError(cleanMessage(err.message), err.status, err.code, err.details);
@@ -172,13 +191,12 @@ export function StocktakeDetailScreen() {
   const rec = detail;
   const canApprove = hasAction(rec, "approve");
   const canEdit = hasAction(rec, "edit_lines");
+  const canSubmit = hasAction(rec, "submit");
+  const canReturn = hasAction(rec, "return_to_draft");
   const changed = changedLineCount(rec);
   const manyWarehouses = rec.warehouse_names.length > 1;
 
   const more: MoreMenuItem[] = [];
-  if (rec.status === "DRAFT" && !canApprove && rec.approve_blocked_reason) {
-    more.push({ key: "approve", label: "Duyệt và điều chỉnh tồn", blockedReason: rec.approve_blocked_reason.label });
-  }
 
   const primary = (
     <>
@@ -186,6 +204,16 @@ export function StocktakeDetailScreen() {
         <Link href={editHref(rec.id)} className="btn">
           Sửa số đếm
         </Link>
+      )}
+      {canReturn && (
+        <button type="button" className="btn" onClick={() => { setActionError(null); setStep("return"); }}>
+          Trả về nháp
+        </button>
+      )}
+      {canSubmit && (
+        <button type="button" className="btn primary" onClick={() => { setActionError(null); setStep("submit"); }}>
+          Gửi duyệt
+        </button>
       )}
       {canApprove && (
         <button type="button" className="btn primary" onClick={() => { approve.reset(); setActionError(null); setConfirming(true); }}>
@@ -317,6 +345,52 @@ export function StocktakeDetailScreen() {
         )}
       </section>
 
+      {step === "submit" && (
+        <ConfirmModal
+          title="Gửi duyệt phiếu kiểm kê"
+          confirmLabel="Gửi duyệt"
+          busyLabel="Đang gửi…"
+          noun="phiếu"
+          run={() => submitStocktake(rec.id)}
+          onError={onStaleStatus}
+          errorText={cleanErrorText}
+          onReload={refreshAll}
+          onDone={(res) => {
+            setStep(null);
+            setDetail(res);
+            setLineError(null);
+            setConflict(null);
+            toast.success("Đã gửi duyệt. Phiếu chờ Chủ hoặc Quản lý duyệt.");
+            loadHistory();
+          }}
+          onClose={() => setStep(null)}
+        >
+          <p>Gửi phiếu {rec.code} đi duyệt. Sau khi gửi không sửa số đếm được, trừ khi người có quyền trả phiếu về nháp.</p>
+        </ConfirmModal>
+      )}
+      {step === "return" && (
+        <ConfirmModal
+          title="Trả phiếu kiểm kê về nháp"
+          confirmLabel="Trả về nháp"
+          busyLabel="Đang gửi…"
+          noun="phiếu"
+          run={() => returnStocktakeToDraft(rec.id)}
+          onError={onStaleStatus}
+          errorText={cleanErrorText}
+          onReload={refreshAll}
+          onDone={(res) => {
+            setStep(null);
+            setDetail(res);
+            setLineError(null);
+            setConflict(null);
+            toast.success("Đã trả phiếu về nháp. Có thể sửa số đếm lại.");
+            loadHistory();
+          }}
+          onClose={() => setStep(null)}
+        >
+          <p>Phiếu {rec.code} quay về nháp để sửa số đếm. Tồn kho chưa đổi.</p>
+        </ConfirmModal>
+      )}
       {confirming && (
         <Modal
           title="Duyệt và điều chỉnh tồn kho"

@@ -363,18 +363,9 @@ class DirectoryPatchTests(DirectoryBase):
         self.assertEqual(self.patch({"note": "Ghi chú mới"}, who="manager").status_code, 200)
         self.assertEqual(AuditLog.objects.get(action="update_customer").actor, self.manager)
 
-    def test_ed13_patch_phone_is_locked_400_and_unchanged(self):
-        res = self.patch({"phone": "0900000999"})
-        self.assertEqual(res.status_code, 400)
-        self.assertEqual(res.json()["code"], "INPUT_NOT_ALLOWED")
-        self.assertNotIn("0900000999", res.content.decode())
-        self.customer.refresh_from_db()
-        self.assertEqual(self.customer.phone, FAKE_PHONE)
-        self.assertFalse(AuditLog.objects.filter(action="update_customer").exists())
-
     def test_ed13_patch_unknown_or_forbidden_field_is_400_and_nothing_saved(self):
         for payload in ({"id": 5}, {"created_at": "2020-01-01T00:00:00Z"}, {"order_count": 99},
-                        {"total_spent": "1"}, {"note": "ok", "phone": "0900000999"}, {"foo": 1}):
+                        {"total_spent": "1"}, {"note": "ok", "order_count": 1}, {"foo": 1}):
             res = self.patch(payload)
             self.assertEqual(res.status_code, 400, payload)
             self.assertEqual(res.json()["code"], "INPUT_NOT_ALLOWED", payload)

@@ -3,6 +3,8 @@
 //   GET  /api/inventory/returns/{id}/                    (phiếu người khác của người giao → 404)
 //   POST /api/inventory/returns/                         {delivery_note, batch, qty, note?}  (batch = id lô, KHÔNG phải mã lô)
 //   POST /api/inventory/returns/{id}/approve/            {decision: RESTOCK | WRITE_OFF}      (cần inventory.approve_returntostock; đã duyệt → 409 STALE_STATE)
+//   POST /api/inventory/returns/{id}/cancel/            body rỗng: huỷ phiếu còn Chờ duyệt (Lô bổ sung A #8). Quyền: người duyệt/người sửa, hoặc người tạo
+//                                                        phiếu huỷ phiếu của mình; đã duyệt/đã huỷ → 409 STALE_STATE
 //   GET  /api/guidance/return/{id}/                      chỉ dùng `timeline`
 // Hộp F2m lấy phiếu giao và dòng hàng qua hàm công khai của module Giao hàng (fetchDeliveryNotes / fetchDeliveryNoteDetail),
 // không đọc ruột module đó. Mọi dữ liệu nhập (ghi chú) chỉ đi trong thân request, không vào URL, storage hay log.
@@ -40,6 +42,11 @@ export function createReturn(body: CreateReturnBody): Promise<ReturnItem> {
 
 export function approveReturn(id: number, decision: ApproveDecision): Promise<ReturnItem> {
   return apiFetch<ReturnItem>(`${BASE}${id}/approve/`, { method: "POST", body: { decision }, mock: MOCK });
+}
+
+/** Huỷ phiếu hàng hoàn còn Chờ duyệt. Phiếu đã xử lý → 409 STALE_STATE ("hãy tải lại"). */
+export function cancelReturn(id: number): Promise<ReturnItem> {
+  return apiFetch<ReturnItem>(`${BASE}${id}/cancel/`, { method: "POST", body: {}, mock: MOCK });
 }
 
 /** Dòng thời gian của phiếu (guidance `return`, chỉ timeline). */

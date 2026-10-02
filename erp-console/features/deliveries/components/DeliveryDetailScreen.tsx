@@ -11,7 +11,7 @@ import { AiDocBlockGate } from "@/features/ai/components/AiDocBlockGate";
 import { getGuidance } from "@/features/guidance/api";
 import { toTimelineEntries } from "@/features/guidance/detailAdapters";
 import { ENUMS, deliveryLabelText } from "@/shared/lib/enums";
-import { dateOnly, kg } from "@/shared/lib/format";
+import { dateOnly, dateTime, kg } from "@/shared/lib/format";
 import { ApiError } from "@/shared/lib/http";
 import { PERM, canView, homePath } from "@/shared/lib/nav";
 import { Chip } from "@/shared/ui/Chip";
@@ -378,6 +378,8 @@ export function DeliveryDetailScreen() {
           }
         />
         <InfoField label="Địa chỉ giao" value={<PersonalText value={note.address} />} />
+        {note.delivery_started_at ? <InfoField label="Bắt đầu giao" value={dateTime(note.delivery_started_at)} num /> : null}
+        {note.failed_at ? <InfoField label="Giao thất bại" value={dateTime(note.failed_at)} num /> : null}
         <InfoField label="Người giao" value={note.assigned_to_name || (note.assigned_to ? "Đã giao" : "Chưa giao cho ai")} />
         <InfoField label="Tổng số kg" value={kg(note.total_kg)} num />
         <InfoField label="Tem" value={<Chip entry={deliveryLabelText(note.label.printed ? note.label.valid_print_no ?? 1 : null)} />} />

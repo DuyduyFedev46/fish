@@ -13,12 +13,12 @@
 //    ngày lọc theo ngày tạo (giờ VN), sai dạng → 400 INVALID_FILTER.
 //  - `allocations[].unit_cost` chỉ có KEY khi có inventory.view_costprice (BR-PQ-15).
 //  - `needs_attention` = có giao dịch UNDERPAID/ORPHAN hoặc phiếu giao FAILED (giả định 5 của BE).
-//  - available_actions (thứ tự cố định): confirm_payment = BOOKED/AUTO_CANCELLED + sales.confirm_payment_manual;
+//  - available_actions (thứ tự cố định): confirm_payment = BOOKED + sales.confirm_payment_manual (đơn AUTO_CANCELLED: danh sách RỖNG, #15);
 //    cancel = PAID/PROCESSING có hoá đơn + sales.cancel_paid_order; create_refund = có hoá đơn, còn tiền hoàn được + sales.create_refund.
 //  - confirm-payment: thiếu quyền → 403 (kiểm TRƯỚC khi tra đơn); thiếu mã / mã > 100 ký tự / amount ≤ 0 → 400 BR-TT-08;
 //    mã đã ghi cho ĐƠN KHÁC → 400 BR-TT-03; cùng mã cùng đơn (kể cả webhook ghi trước, vd FT2626700002 của đơn "chuyển thiếu")
-//    → kết quả + trạng thái HIỆN TẠI của đơn kèm duplicate:true; đơn không BOOKED/AUTO_CANCELLED → 400 BR-TT-08;
-//    AUTO_CANCELLED → ORPHAN (BR-TT-05); BOOKED: MỘT giao dịch ≥ tổng → PAID (PROCESSING, hoá đơn, phiếu giao PREPARING),
+//    → kết quả + trạng thái HIỆN TẠI của đơn kèm duplicate:true; AUTO_CANCELLED → 400 ORDER_AUTO_CANCELLED (kiểm trước hết, #15;
+//    tiền về muộn chỉ vào hàng chờ qua webhook); đơn không BOOKED → 400 BR-TT-08; BOOKED: MỘT giao dịch ≥ tổng → PAID (PROCESSING, hoá đơn, phiếu giao PREPARING),
 //    thiếu → UNDERPAID (đơn vẫn BOOKED; paid_total = MATCHED + UNDERPAID của đơn, BR-TT-04 khớp theo từng giao dịch).
 //
 // Dữ liệu giữ trong sessionStorage (qua reload trong cùng tab), tự gieo lại sau 25 phút để giờ giữ chỗ còn ý nghĩa.
@@ -582,6 +582,7 @@ function timelineOf(o: Order): OrderTimelineEntry[] {
       // Như BE Lô 3: không ghép `Refund.reason` (chữ tự do) vào nhãn dòng thời gian (bất biến 9).
       label: `Tạo phiếu hoàn ${beVnd(r.amount)}`,
       actor_display: who,
+      doc: { type: "refund", id: r.id }, // BE Lô bổ sung A #2: mốc có chứng từ riêng
     });
     if (r.status === "REFUNDED") {
       out.push({ at: r.confirmed_at || r.created_at || o.created_at, kind: "refund_confirmed", label: `Đã hoàn ${beVnd(r.amount)} (mã GD ${r.bank_txn_ref})`, actor_display: "Lộc" });
@@ -624,7 +625,9 @@ function refundableOfOrderMock(o: Order): number {
 
 function actions(me: Me, o: Order): string[] {
   const out: string[] = [];
-  if ((o.status === "BOOKED" || o.status === "AUTO_CANCELLED") && has(me, PERM_CONFIRM)) out.push("confirm_payment");
+  // Lô bổ sung A #15: đơn Tự huỷ là đơn đã chết, không còn thao tác nào (kể cả xác nhận tiền).
+  if (o.status === "AUTO_CANCELLED") return out;
+  if (o.status === "BOOKED" && has(me, PERM_CONFIRM)) out.push("confirm_payment");
   if ((o.status === "PAID" || o.status === "PROCESSING") && o.invoice && cancellableDeliveryStatus(o.delivery) && has(me, PERM_CANCEL))
     out.push("cancel");
   if (o.invoice && refundableOfOrderMock(o) > 0 && has(me, PERM_REFUND)) out.push("create_refund");
@@ -831,6 +834,8 @@ function markPaid(store: Store, o: Order): void {
 }
 
 function confirm(me: Me, o: Order, body: unknown): MockResponse {
+  // #15: kiểm trạng thái TRƯỚC mọi thứ (như BE): đơn Tự huỷ → 400 ORDER_AUTO_CANCELLED, không ghi giao dịch, không audit.
+  if (o.status === "AUTO_CANCELLED") return beError("ORDER_AUTO_CANCELLED");
   const b = (body && typeof body === "object" ? body : {}) as Record<string, unknown>;
   const txn = typeof b.bank_txn_id === "string" ? b.bank_txn_id.trim() : "";
   if (!txn) return beError("TT_TXN_REQUIRED");
@@ -846,7 +851,7 @@ function confirm(me: Me, o: Order, body: unknown): MockResponse {
   const amount = Math.round(Number(rawAmount) * 100) / 100;
   if (!Number.isFinite(amount) || amount <= 0 || amount >= 1e12) return beError("TT_AMOUNT_INVALID");
   if (amount < 1) return beError("TT_AMOUNT_MIN"); // L8 bổ sung tiền: tối thiểu 1 ₫
-  if (o.status !== "BOOKED" && o.status !== "AUTO_CANCELLED") return beError("TT_WRONG_STATUS");
+  if (o.status !== "BOOKED") return beError("TT_WRONG_STATUS");
 
   const now = Date.now();
   const payment: Pay = {
@@ -859,12 +864,7 @@ function confirm(me: Me, o: Order, body: unknown): MockResponse {
     actor: me.display_name || me.username,
   };
   let result: ConfirmPaymentResult;
-  if (o.status === "AUTO_CANCELLED") {
-    payment.match_status = "ORPHAN";
-    payment.resolution_status = "OPEN"; // vào hàng chờ S12
-    o.needs_attention = true;
-    result = { result: "ORPHAN", duplicate: false, order_status: "AUTO_CANCELLED" };
-  } else if (amount >= total) {
+  if (amount >= total) {
     markPaid(store, o);
     result = { result: "PAID", duplicate: false, order_status: "PROCESSING", invoice_id: o.invoice!.id, delivery_note_code: o.delivery!.code };
     if (amount > total) {

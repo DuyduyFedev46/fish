@@ -1,6 +1,6 @@
 // Mock module Hàng hoàn về kho (ED-26) — CHỈ dùng khi NEXT_PUBLIC_USE_MOCK=1 (bản build thật loại bỏ file này).
 // Dựng JSON theo contract THỰC TẾ BE Lô 9 / R9 (backend/apps/inventory/returns):
-//   GET   /api/inventory/returns/?status=&month=&page=   GET /{id}/   POST /   POST /{id}/approve/
+//   GET   /api/inventory/returns/?status=&month=&page=   GET /{id}/   POST /   POST /{id}/approve/   POST /{id}/cancel/
 //   GET   /api/guidance/return/{id}/
 //
 // Luật mock (mô phỏng BE, FE KHÔNG dùng lại các luật này):
@@ -10,6 +10,8 @@
 //    tổng kg đã ghi nhận (cả Chờ duyệt lẫn Đã duyệt) + kg mới > kg đã giao → 400 RETURN_QTY_EXCEEDS kèm delivered_qty / already_returned_qty.
 //  - POST: lô đã chốt → 400 RETURN_BATCH_CLOSED (chế độ "batchclosed" giả lập); ghi chú có dãy 9 chữ số trở lên → 400 {note: [câu]}
 //    như BE (QA Lô 9 B1; chế độ "noterejected" giả lập BE từ chối mọi ghi chú để thử khi FE đã chặn trước).
+//  - cancel (#8): cần add_returntostock (cổng chung); rồi phải có approve/change_returntostock hoặc là người tạo phiếu, không thì 403 (câu của BE);
+//    chỉ phiếu Chờ duyệt, đã duyệt/đã huỷ → 409 STALE_STATE. Phiếu huỷ không tính vào số kg đã hoàn.
 //  - approve: thiếu decision → 400 RETURN_DECISION_REQUIRED; phiếu đã duyệt → 409 STALE_STATE (không có updated_at).
 //  - Dòng của chi tiết phiếu giao có `batch_pk` (id lô) và `returned_qty` (kg đã hoàn của lô trên phiếu, Chờ duyệt + Đã duyệt), đăng ký vào
 //    mock Giao hàng qua `registerDeliveryLineExtras` (đúng contract "BE cho Lô 9").
@@ -36,6 +38,7 @@ const PAGE_SIZE = 20;
 const PERM_VIEW = "inventory.view_returntostock";
 const PERM_ADD = "inventory.add_returntostock";
 const PERM_APPROVE = "inventory.approve_returntostock";
+const PERM_CHANGE = "inventory.change_returntostock";
 
 type Mode = "ok" | "fail" | "empty" | "forbidden" | "detailfail" | "batchclosed" | "noterejected";
 function mode(): Mode {
@@ -89,7 +92,7 @@ function make(
   id: number,
   noteId: number,
   qty: string,
-  fields: { status: "DRAFT" | "APPROVED"; decision: "PENDING" | "RESTOCK" | "WRITE_OFF"; outside: number; createdMinutesAgo: number; by: number; note?: string; approvedBy?: string },
+  fields: { status: "DRAFT" | "APPROVED" | "CANCELLED"; decision: "PENDING" | "RESTOCK" | "WRITE_OFF"; outside: number; createdMinutesAgo: number; by: number; note?: string; approvedBy?: string },
 ): ReturnItem {
   const n = NOTES[noteId];
   const b = BATCH_CODE[n.batch];
@@ -111,7 +114,7 @@ function make(
     decision: fields.decision,
     decision_label: decisionLabel(fields.decision),
     status: fields.status,
-    status_label: fields.status === "DRAFT" ? "Chờ duyệt" : "Đã duyệt",
+    status_label: statusLabel(fields.status),
     created_by: fields.by,
     created_by_name: COURIER_NAME[fields.by] ?? "Anh Tâm",
     approved_by: fields.approvedBy ? 2 : null,
@@ -119,6 +122,10 @@ function make(
     created_at: returnedAt,
     note: fields.note ?? "",
   };
+}
+
+function statusLabel(s: ReturnItem["status"]): string {
+  return s === "DRAFT" ? "Chờ duyệt" : s === "APPROVED" ? "Đã duyệt" : "Đã huỷ";
 }
 
 function decisionLabel(d: string): string {
@@ -137,6 +144,7 @@ function db(): ReturnItem[] {
       make(3, 33, "1.000", { status: "APPROVED", decision: "RESTOCK", outside: 70, createdMinutesAgo: 1500, by: 14, note: "Sai địa chỉ, giao lại", approvedBy: "Chị Hạnh" }),
       make(4, 34, "0.800", { status: "APPROVED", decision: "WRITE_OFF", outside: 245, createdMinutesAgo: 2900, by: 14, note: "Xe hỏng giữa đường", approvedBy: "Chị Hạnh" }),
       make(5, 36, "0.300", { status: "DRAFT", decision: "PENDING", outside: 40, createdMinutesAgo: 30, by: 4 }),
+      make(6, 36, "0.200", { status: "CANCELLED", decision: "PENDING", outside: 45, createdMinutesAgo: 600, by: 4, note: "Nhập nhầm lô" }),
     ];
   }
   return DB;
@@ -209,7 +217,7 @@ function createResponse(me: Me, req: MockRequest): MockResponse {
     return { status: 400, body: { note: ["Ghi chú không được chứa dãy số dài (số điện thoại, số tài khoản)."] } };
   }
   if (batchId !== note.batch) return err(400, "RETURN_BATCH_NOT_IN_NOTE", "Lô này không nằm trong phiếu giao, hàng hoàn phải về đúng lô gốc (BR-HV-01).");
-  const already = db().filter((r) => r.delivery_note === noteId && r.batch === batchId).reduce((s, r) => s + Number(r.qty), 0) + (HIDDEN_RETURNED[noteId] ?? 0);
+  const already = db().filter((r) => r.delivery_note === noteId && r.batch === batchId && r.status !== "CANCELLED").reduce((s, r) => s + Number(r.qty), 0) + (HIDDEN_RETURNED[noteId] ?? 0);
   if (already + qty > note.delivered + 1e-9) {
     return err(400, "RETURN_QTY_EXCEEDS", "Số kg hoàn vượt số đã giao của lô.", {
       delivered_qty: note.delivered.toFixed(3),
@@ -263,6 +271,22 @@ function approveResponse(me: Me, id: number, req: MockRequest): MockResponse {
   return { status: 200, body: r };
 }
 
+function cancelResponse(me: Me, id: number): MockResponse {
+  if (!has(me, PERM_ADD)) return err(403, "FORBIDDEN", "Bạn không có quyền huỷ phiếu hàng hoàn.");
+  const r = db().find((x) => x.id === id);
+  if (!r || !inScope(me, r)) return NOT_FOUND;
+  const mayCancel = has(me, PERM_APPROVE) || has(me, PERM_CHANGE) || r.created_by === me.id;
+  if (!mayCancel) return err(403, "FORBIDDEN", "Chỉ người có quyền duyệt hoặc người tạo phiếu mới huỷ được phiếu hàng hoàn.");
+  if (r.status !== "DRAFT") return err(409, "STALE_STATE", "Phiếu hàng hoàn đã được xử lý, hãy tải lại.");
+  r.status = "CANCELLED";
+  r.status_label = statusLabel("CANCELLED");
+  cancelledAt[r.id] = new Date().toISOString();
+  return { status: 200, body: r };
+}
+
+/** Giờ huỷ của phiếu bị huỷ trong phiên (cho dòng thời gian). */
+const cancelledAt: Record<number, string> = {};
+
 function timelineResponse(me: Me, id: number): MockResponse {
   const r = db().find((x) => x.id === id);
   if (!r || !inScope(me, r)) return NOT_FOUND;
@@ -278,6 +302,9 @@ function timelineResponse(me: Me, id: number): MockResponse {
       doc: "return",
       actor: { kind: "user", display: r.approved_by_name || "Quản lý" },
     });
+  }
+  if (r.status === "CANCELLED") {
+    entries.push({ at: cancelledAt[r.id] ?? new Date(Date.parse(r.created_at) + 10 * 60_000).toISOString(), kind: "return_cancelled", label: "Huỷ phiếu hàng hoàn", doc: "return", actor: { kind: "user", display: "Quản lý" } });
   }
   const data: GuidanceData = { doc: { type: "return", id: r.id, code: r.code, status: r.status, status_label: r.status_label }, next_steps: [], warnings: [], timeline: entries, related: [] };
   return { status: 200, body: data };
@@ -300,10 +327,13 @@ export function mockReturnsApi(req: MockRequest): MockResponse {
     if (req.method === "POST") return createResponse(me, req);
     return listResponse(me, query);
   }
-  const one = /^\/api\/inventory\/returns\/(\d+)\/(approve\/)?$/.exec(pathname);
+  const one = /^\/api\/inventory\/returns\/(\d+)\/(approve\/|cancel\/)?$/.exec(pathname);
   if (one) {
     const id = Number(one[1]);
-    if (one[2]) return req.method === "POST" ? approveResponse(me, id, req) : err(405, "METHOD_NOT_ALLOWED", "Không hỗ trợ.");
+    if (one[2]) {
+      if (req.method !== "POST") return err(405, "METHOD_NOT_ALLOWED", "Không hỗ trợ.");
+      return one[2] === "cancel/" ? cancelResponse(me, id) : approveResponse(me, id, req);
+    }
     if (mode() === "detailfail") return err(500, "SERVER_ERROR", "Máy chủ đang bận. Thử lại sau.");
     const r = db().find((x) => x.id === id);
     return r && inScope(me, r) ? { status: 200, body: r } : NOT_FOUND;
@@ -316,7 +346,7 @@ export function installDeliveryLineExtras(): void {
   registerDeliveryLineExtras((noteId, line) => {
     const batch = BATCH_PK[line.batch_id];
     const returned = db()
-      .filter((r) => r.delivery_note === noteId && r.batch === batch)
+      .filter((r) => r.delivery_note === noteId && r.batch === batch && r.status !== "CANCELLED")
       .reduce((sum, r) => sum + Number(r.qty), 0) + (HIDDEN_RETURNED[noteId] ?? 0);
     return { batch_pk: batch, returned_qty: returned.toFixed(3) };
   });

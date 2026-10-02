@@ -101,11 +101,12 @@ class QaL7FixApiTests(OrderApiBase):
         self.assertEqual(PaymentTransaction.objects.get().source, PaymentTransaction.Source.MANUAL)
         self.assertEqual(SalesInvoice.objects.count(), 1)
 
-    def test_b12_don_tu_huy_tay_orphan_roi_webhook_chi_mot_dong_orphan(self):
+    def test_b12_auto_cancelled_webhook_orphan_resend_normalized_one_orphan_row(self):
+        # Lô bổ sung A #15: xác nhận tay trên đơn Tự huỷ nay là 400; đường ORPHAN còn lại là webhook.
         order_services.cancel_unpaid_expired(now=timezone.now() + timezone.timedelta(hours=2))
         self.order.refresh_from_db()
         self.assertEqual(self.order.status, SalesOrder.Status.AUTO_CANCELLED)
-        self.assertEqual(self._manual({"bank_txn_id": "FT880004"}).json()["result"], "ORPHAN")
+        self.assertEqual(self._webhook("FT880004").status_code, 200)
         resp = self._webhook(" ft880004")
         self.assertEqual(resp.status_code, 200, resp.content)
         self.assertEqual(

@@ -9,12 +9,14 @@ from .batches import Batch
 
 class StockReconciliation(models.Model):
     """
-    Kiểm kê định kỳ (P-09). Người nhập số ≠ người duyệt (BR-KK-02).
+    Kiểm kê định kỳ (P-09). Luồng DRAFT (nháp) → SUBMITTED (chờ duyệt) → APPROVED (Duy chốt 02/10, #6/#20).
+    Người có quyền duyệt được tự duyệt phiếu của mình; AuditLog vẫn ghi ai nhập, ai gửi, ai duyệt.
     Chưa duyệt thì tồn sổ chưa đổi.
     """
 
     class Status(models.TextChoices):
-        DRAFT = "DRAFT", "Chờ duyệt"
+        DRAFT = "DRAFT", "Nháp"
+        SUBMITTED = "SUBMITTED", "Chờ duyệt"
         APPROVED = "APPROVED", "Đã duyệt"
 
     count_date = models.DateField("Ngày kiểm kê")

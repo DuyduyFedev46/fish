@@ -39,6 +39,10 @@ export type DeliveryNoteItem = {
   note: string | null;
   created_at: string;
   completed_at: string | null;
+  /** Lô bổ sung A #18: lúc nhận hàng đi giao (giao lại thì ghi đè). `null`/thiếu = chưa đi giao. */
+  delivery_started_at?: string | null;
+  /** Lô bổ sung A #18: lúc báo giao thất bại gần nhất. `null`/thiếu = chưa thất bại. */
+  failed_at?: string | null;
   lines_summary: string;
   total_kg: string;
   label: LabelInfo;
@@ -46,6 +50,12 @@ export type DeliveryNoteItem = {
   customer_name: string | null;
   address: string | null;
   available_actions: string[];
+  /**
+   * Lô bổ sung A #17: SĐT đủ của người nhận, CHỈ có khi gọi danh sách với `assigned_to=me` (Việc giao của tôi).
+   * Phiếu Đang giao/Giao thất bại còn trong cửa sổ 7 ngày mới có số; ngoài ra là `null`; truy vấn khác không có khoá này.
+   * Chỉ để hiện và `tel:`; không ghi vào log, URL, localStorage.
+   */
+  phone?: string | null;
 };
 
 export type DeliveryLine = {

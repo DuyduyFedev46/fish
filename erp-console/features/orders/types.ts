@@ -115,6 +115,8 @@ export type OrderTimelineEntry = {
   kind: TimelineKind | string;
   label: string;
   actor_display?: string | null;
+  /** Chứng từ gắn với mốc (BE Lô bổ sung A #2): `refund_created` có `{type:"refund", id}`. Chỉ mốc có chứng từ riêng mới có. */
+  doc?: { type: string; id: number } | null;
 };
 
 /**

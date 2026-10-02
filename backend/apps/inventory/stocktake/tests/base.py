@@ -84,6 +84,16 @@ class StocktakeApiBase(TestCase):
         user = user or self.warehouse_staff
         return self.create_via_api(user, lines if lines is not None else [line(self.batch, "48.500")])
 
+    def approve_via_api(self, user, rec):
+        """Phiếu còn nháp thì owner gửi duyệt trước (#20), rồi `user` duyệt. Trả response của lần duyệt."""
+        if self.recon(rec["id"]).status == StockReconciliation.Status.DRAFT:
+            self.api(self.owner).post(f"{URL}{rec['id']}/submit/")
+        return self.api(user).post(f"{URL}{rec['id']}/approve/")
+
+    def force_submitted(self, rec):
+        """Đặt thẳng SUBMITTED cho phiếu rỗng (service không cho gửi phiếu rỗng) để thử đường duyệt phiếu rỗng."""
+        StockReconciliation.objects.filter(pk=rec["id"]).update(status=StockReconciliation.Status.SUBMITTED)
+
     def assertNoCostLeak(self, response):
         data = response.json()
         self.assertEqual(find_cost_keys(data), set())

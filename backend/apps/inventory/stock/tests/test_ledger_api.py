@@ -143,7 +143,9 @@ class LedgerBalanceTests(LedgerApiBase):
         batch = self.make_batch(qty="100", actor=self.warehouse_staff)
         order, _customer, _note = make_order_with_note("SO-T1", "0900000123")
         self.move(batch, "-30", MT.SALE, order.invoice.code)
-        recon = StockReconciliation.objects.create(count_date=self.today, created_by=self.warehouse_staff)
+        recon = StockReconciliation.objects.create(
+            count_date=self.today, created_by=self.warehouse_staff, status=StockReconciliation.Status.SUBMITTED,
+        )
         StockReconciliationLine.objects.create(
             reconciliation=recon, batch=batch, system_qty=Decimal("70"), counted_qty=Decimal("65"),
         )

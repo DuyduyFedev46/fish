@@ -12,6 +12,7 @@ from .scope import scope_returns_for
 ACTION_LABELS = {
     "return_to_warehouse": "Ghi nhận hàng hoàn về kho, chờ duyệt",
     "approve_returntostock": "Duyệt hàng hoàn về kho",
+    "cancel_returntostock": "Huỷ phiếu hàng hoàn",
 }
 
 register_guidance(

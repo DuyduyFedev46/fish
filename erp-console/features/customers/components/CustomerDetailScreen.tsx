@@ -2,7 +2,7 @@
 
 // Trang chi tiết khách hàng (ED-14 / W5b): /customers/detail/?id=<pk>. Khung DetailPage: header (tên · "Sửa thông tin" · "…"),
 // KHÔNG có thanh trạng thái (khách không có vòng đời) và KHÔNG có khối Trợ lý AI (`aiSlot` để trống; dữ liệu cá nhân không đưa cho AI).
-// Cột trái: Liên hệ (Tên, Địa chỉ, Ghi chú sửa tại chỗ; Số điện thoại khoá) · Mua hàng (4 số tự tính, khoá) · bảng Đơn hàng · bảng Phiếu hoàn.
+// Cột trái: Liên hệ (Tên, Số điện thoại, Địa chỉ, Ghi chú sửa tại chỗ) · Mua hàng (4 số tự tính, khoá) · bảng Đơn hàng · bảng Phiếu hoàn.
 // Cột phải: Dòng thời gian (guidance `customer`). URL chỉ có id; không ghi tên/SĐT/địa chỉ vào storage, log hay tiêu đề tab.
 
 import { useMemo, useState } from "react";
@@ -26,7 +26,7 @@ import { ErrorScreen } from "@/shared/ui/states/ErrorScreen";
 import { NoPermission } from "@/shared/ui/states/NoPermission";
 import { NotFoundScreen } from "@/shared/ui/states/NotFoundScreen";
 import { updateCustomer } from "../api";
-import { saveErrorMessage, validateField } from "../customersModel";
+import { normalizePhone, saveErrorMessage, validateField } from "../customersModel";
 import { CUSTOMERS_MSG as M } from "../messages";
 import type { CustomerDetail, CustomerEditableField, CustomerOrderRow, CustomerRefundRow } from "../types";
 import { useCustomerDetail, useCustomerId, type CustomerDetailState } from "../useCustomerDetail";
@@ -85,8 +85,8 @@ function CustomerDetailBody({ customer: c, detail }: { customer: CustomerDetail;
 
   /** Lưu MỘT trường tại chỗ: chỉ gửi khi giá trị đổi; lỗi ném lên cho ô hiện dưới ô, giữ nguyên giá trị đang gõ. */
   const saveField = (field: CustomerEditableField) => async (next: string) => {
-    const value = next.trim();
-    if (value === (c[field] ?? "")) return;
+    const value = field === "phone" ? normalizePhone(next) : next.trim();
+    if (value === (field === "phone" ? normalizePhone(c.phone ?? "") : (c[field] ?? ""))) return;
     try {
       await updateCustomer(c.id, { [field]: value });
     } catch (err) {
@@ -130,7 +130,7 @@ function CustomerDetailBody({ customer: c, detail }: { customer: CustomerDetail;
 
   const editable = (field: CustomerEditableField, label: string, value: string) =>
     canEdit ? (
-      <InfoField kind="editable" label={label} value={value} display={display(value)} onSave={saveField(field)} required={field === "name"} validate={validate(field)} />
+      <InfoField kind="editable" label={label} value={value} display={display(value)} onSave={saveField(field)} required={field === "name" || field === "phone"} type={field === "phone" ? "tel" : undefined} num={field === "phone"} validate={validate(field)} />
     ) : (
       <InfoField label={label} value={value ? <PersonalText value={value} /> : null} />
     );
@@ -179,7 +179,7 @@ function CustomerDetailBody({ customer: c, detail }: { customer: CustomerDetail;
     >
       <InfoGrid title={M.sectionContact}>
         {editable("name", M.fieldName, c.name ?? "")}
-        <InfoField kind="locked" label={M.fieldPhone} num reason={M.phoneLockedReason} value={<PersonalText value={c.phone} />} />
+        {editable("phone", M.fieldPhone, c.phone ?? "")}
         {editable("default_address", M.fieldAddress, c.default_address ?? "")}
         {editable("note", M.fieldNote, c.note ?? "")}
       </InfoGrid>

@@ -291,11 +291,12 @@ class S10DetailTests(OrderApiBase):
         body = client_for(self.chu).get(f"/api/sales/orders/{paid.pk}/").json()
         self.assertNotIn("create_refund", body["available_actions"])
 
-    def test_s10_available_actions_don_tu_huy_chu_van_ghi_duoc_tien(self):
+    def test_s10_available_actions_don_tu_huy_khong_con_thao_tac_nao(self):
+        # Lô bổ sung A #15 (Duy chốt 02/10/2026): đơn Tự huỷ là đơn đã chết, trước đây còn `confirm_payment`.
         order = self._order()
         SalesOrder.objects.filter(pk=order.pk).update(status=SalesOrder.Status.AUTO_CANCELLED)
         body = client_for(self.chu).get(f"/api/sales/orders/{order.pk}/").json()
-        self.assertEqual(body["available_actions"], ["confirm_payment"])
+        self.assertEqual(body["available_actions"], [])
 
     def test_s10_s5_nv_giao_ngoai_pham_vi_404_trong_pham_vi_200(self):
         mine = self._paid_order()

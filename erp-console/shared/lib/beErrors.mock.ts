@@ -76,11 +76,49 @@ export const BE_ERRORS = {
   /** L8 bổ sung tiền (Duy 2026-09-26): sau làm tròn 0,01 mà 0 < số < 1 ₫. */
   TT_AMOUNT_MIN: { status: 400, code: "BR-TT-08", detail: "Số tiền tối thiểu 1 ₫." },
   TT_TXN_TOO_LONG: { status: 400, code: "BR-TT-08", detail: "Mã giao dịch ngân hàng dài quá 100 ký tự." },
-  TT_WRONG_STATUS: { status: 400, code: "BR-TT-08", detail: "Đơn không ở trạng thái Giữ chỗ/Tự huỷ." },
+  /** Lô bổ sung A #15 (BE 02/10): đơn Tự huỷ là đơn đã chết, xác nhận tay → 400 mã riêng, câu của BE chép nguyên văn. */
+  ORDER_AUTO_CANCELLED: {
+    status: 400,
+    code: "ORDER_AUTO_CANCELLED",
+    detail:
+      "Đơn này đã tự huỷ vì quá hạn giữ chỗ, không xác nhận thanh toán được nữa. Nếu khách đã chuyển tiền, khoản tiền nằm ở hàng chờ thanh toán để hoàn lại.",
+  },
+  TT_WRONG_STATUS: { status: 400, code: "BR-TT-08", detail: "Đơn không ở trạng thái Giữ chỗ." },
   TT_TXN_OTHER: {
     status: 400,
     code: "BR-TT-03",
     detail: "Mã giao dịch này đã được ghi nhận cho giao dịch khác, không dùng lại (BR-TT-03).",
+  },
+  // ---- Lô bổ sung A (BE 02/10): câu lỗi chép nguyên văn từ BE ----
+  /** #14 PATCH chi phí đã phân bổ vào giá vốn lô, đụng tiền/cách chia/danh sách lô. */
+  COST_ALLOCATED_LOCKED: {
+    status: 400,
+    code: "COST_ALLOCATED_LOCKED",
+    detail: "Chi phí đã phân bổ vào giá vốn lô nên không sửa được số tiền. Liên hệ Chủ để xử lý.",
+  },
+  COST_AMOUNT_TOO_LARGE: {
+    status: 400,
+    code: "COST_AMOUNT_TOO_LARGE",
+    // \u0111 = chữ đ: câu của BE chép nguyên văn, viết mã Unicode để khỏi vướng luật cấm tiền hậu tố "đ" viết tay (noLocalTime.test.ts).
+    detail: "Số tiền chi phí quá lớn (tối đa 999.999.999.999 \u0111).",
+  },
+  COST_LANDED_OVERFLOW: {
+    status: 400,
+    code: "COST_LANDED_OVERFLOW",
+    detail: "Chi phí quá lớn: giá vốn mỗi kg của lô vượt giới hạn cho phép. Kiểm tra lại số tiền.",
+  },
+  /** #10 sửa giá đã áp vào đơn. */
+  PRICE_USED_BY_ORDERS: {
+    status: 400,
+    code: "PRICE_USED_BY_ORDERS",
+    detail: "Giá này đã áp vào đơn hàng, không sửa được. Hãy đặt giá mới bắt đầu từ ngày mai. Muốn ngừng bán ngay thì tạm ẩn mặt hàng.",
+  },
+  /** #6/#20 kiểm kê: trả về nháp / duyệt khi phiếu chưa ở trạng thái Chờ duyệt. */
+  RECON_NOT_SUBMITTED_RETURN: { status: 400, code: "RECON_NOT_SUBMITTED", detail: "Chỉ trả về nháp được phiếu đang chờ duyệt." },
+  RECON_NOT_SUBMITTED_APPROVE: {
+    status: 400,
+    code: "RECON_NOT_SUBMITTED",
+    detail: "Phiếu kiểm kê chưa gửi duyệt. Hãy gửi duyệt trước khi duyệt.",
   },
   // ---- S12 POST /api/sales/payments/{id}/resolve — contract THỰC TẾ BE L8 (03-dev-notes.md "Lô L8 — S12, S13 (BE)") ----
   TT_NOT_ENOUGH: { status: 400, code: "BR-TT-09", detail: "Tổng tiền đã nhận {paid} < tổng đơn {total}." },

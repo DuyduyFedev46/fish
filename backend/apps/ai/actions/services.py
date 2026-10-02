@@ -38,7 +38,8 @@ def confirm_ai_action(*, action_id: str, user, confirm_nonce: str | None = None,
     - Kiểm tra trạng thái: PENDING, chưa hết hạn 15 phút, chưa bị từ chối/duyệt trước đó (DW-11-AC3).
     - V5 (BR-AI-14): Phải mở xem chi tiết (viewed_at) và đủ ít nhất AI_CONFIRM_MIN_SECONDS (3 giây).
     - H1/BR-AI-04: Người duyệt phải có đủ quyền 3 tầng của lệnh (DW-11-AC5).
-    - H6/BR-KK-02: Kiểm kê - người duyệt không được là chủ AI đã nhập số kiểm kê (DW-11-AC6).
+    - Kiểm kê (TLA-M1, quyết định #6): người có quyền duyệt tự xác nhận được kể cả là chủ việc AI; đã có H1 và
+      người xác nhận bắt buộc (approve_stockreconciliation nằm trong FORCE_C_PERMS).
     - Chạy view bằng token/user của NGƯỜI DUYỆT.
     - Ghi AuditLog actor_kind="user", actor=người duyệt, proposal_ref=id (DW-11-AC2).
     """
@@ -96,19 +97,7 @@ def confirm_ai_action(*, action_id: str, user, confirm_nonce: str | None = None,
                 status_code=403,
             )
 
-    # 7. Kiểm tra H6: BR-KK-02 (kiểm kê không được tự duyệt cho AI của mình)
-    if (
-        "stockreconciliation" in action.command
-        or "approve_stockreconciliation" in spec.required_perms
-    ):
-        if action.owner_id == user.id:
-            raise BusinessError(
-                "Người duyệt không được là người nhập hoặc chủ AI đã nhập số kiểm kê.",
-                code="BR-KK-02",
-                status_code=400,
-            )
-
-    # 8. Thực thi lệnh trong ngữ cảnh audit của người duyệt
+    # 7. Thực thi lệnh trong ngữ cảnh audit của người duyệt
     with set_ai_audit_scope(
         ai_actor=None,
         level=action.level,
@@ -135,7 +124,7 @@ def confirm_ai_action(*, action_id: str, user, confirm_nonce: str | None = None,
             code = "AI_DISPATCH_FAILED"
         raise BusinessError(detail, code=code, status_code=dispatch_res.status_code)
 
-    # 9. Cập nhật trạng thái AiAction
+    # 8. Cập nhật trạng thái AiAction
     action.status = AiAction.Status.CONFIRMED
     action.decided_by = user
     action.decided_at = timezone.now()

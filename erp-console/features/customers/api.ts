@@ -1,7 +1,7 @@
 // API module Khách hàng (ED-14) — contract BE Lô 6 (B2): 03-dev-notes.md "Lô 6 — BE (B2)".
 // Danh bạ cần sales.view_customer_list (Chủ + Quản lý mặc định); sửa cần thêm sales.change_customer.
 // KHÔNG gọi /api/sales/customers/ (endpoint cũ của CS-01, giữ nguyên cho luồng khác).
-// Mọi tham số tìm kiếm đi vào query của request, không bao giờ vào URL trang hay storage.
+// Từ khoá tìm (tên, số điện thoại) đi trong BODY của POST .../search/, không nằm trong URL hay log truy cập (Lô bổ sung A #11).
 
 import { apiFetch, type Paginated } from "@/shared/lib/http";
 import type { GuidanceData } from "@/features/guidance/types";
@@ -10,18 +10,18 @@ import type { CustomerDetail, CustomerListItem, CustomerListParams, CustomerPatc
 
 const BASE = "/api/sales/customer-directory/";
 
-/** Chuỗi query theo đúng tên tham số contract; bỏ tham số rỗng (mặc định `ordering` vẫn gửi để thứ tự không phụ thuộc BE). */
-export function customerListQuery(params: CustomerListParams, page: number): string {
-  const qs = new URLSearchParams();
-  if (params.q.trim()) qs.set("q", params.q.trim());
-  qs.set("ordering", params.ordering);
-  if (page > 1) qs.set("page", String(page));
-  return `?${qs.toString()}`;
+/** Thân POST search: `q` rỗng vẫn gửi (BE trả cả danh bạ); `ordering` luôn gửi để thứ tự không phụ thuộc mặc định của BE; `page` chỉ từ trang 2. */
+export function customerSearchBody(params: CustomerListParams, page: number): { q: string; ordering: string; page?: number } {
+  const body: { q: string; ordering: string; page?: number } = { q: params.q.trim(), ordering: params.ordering };
+  if (page > 1) body.page = page;
+  return body;
 }
 
-/** GET /api/sales/customer-directory/?q=&ordering=&page= — 20 dòng/trang. */
+/** POST /api/sales/customer-directory/search/ — thân {q, ordering, page}; 20 dòng/trang. URL không có từ khoá. */
 export function listCustomers(params: CustomerListParams, page = 1, signal?: AbortSignal): Promise<Paginated<CustomerListItem>> {
-  return apiFetch<Paginated<CustomerListItem>>(BASE + customerListQuery(params, page), {
+  return apiFetch<Paginated<CustomerListItem>>(`${BASE}search/`, {
+    method: "POST",
+    body: customerSearchBody(params, page),
     signal,
     mock: process.env.NEXT_PUBLIC_USE_MOCK === "1" ? mockCustomersApi : undefined,
   });
@@ -36,8 +36,8 @@ export function getCustomer(id: number, signal?: AbortSignal): Promise<CustomerD
 }
 
 /**
- * PATCH /api/sales/customer-directory/{id}/ — chỉ `name`, `default_address`, `note` (chuỗi).
- * Gửi thêm khoá khác (kể cả `phone`) BE trả 400 INPUT_NOT_ALLOWED; hàm này không nhận khoá nào khác. Trả thân chi tiết mới.
+ * PATCH /api/sales/customer-directory/{id}/ — `name`, `phone`, `default_address`, `note` (chuỗi).
+ * `phone` BE chuẩn hoá về 0…; sai dạng → 400 INVALID_PHONE; trùng khách khác → 400 CUSTOMER_PHONE_TAKEN (không lặp lại số). Trả thân chi tiết mới.
  */
 export function updateCustomer(id: number, patch: CustomerPatch): Promise<CustomerDetail> {
   return apiFetch<CustomerDetail>(`${BASE}${id}/`, {

@@ -38,9 +38,15 @@ from apps.sales.utils import money_str, vnd_display
 
 # --- P-05: xác nhận thanh toán ----------------------------------------------
 
-# BR-TT-08: xác nhận tay chỉ cho đơn Giữ chỗ (ghi nhận tiền) hoặc Tự huỷ (tiền về sau huỷ → ORPHAN).
-MANUAL_CONFIRMABLE_STATUSES = (SalesOrder.Status.BOOKED, SalesOrder.Status.AUTO_CANCELLED)
+# BR-TT-08: xác nhận tay chỉ cho đơn Giữ chỗ. Đơn Tự huỷ là đơn đã chết (Duy chốt 02/10/2026): xác nhận tay bị
+# chặn bằng ORDER_AUTO_CANCELLED; tiền về muộn qua webhook/IPN vẫn vào hàng chờ (ORPHAN) để Chủ hoàn (BR-TT-05).
+MANUAL_CONFIRMABLE_STATUSES = (SalesOrder.Status.BOOKED,)
 MANUAL_CODE = "BR-TT-08"
+AUTO_CANCELLED_CODE = "ORDER_AUTO_CANCELLED"
+AUTO_CANCELLED_MESSAGE = (
+    "Đơn này đã tự huỷ vì quá hạn giữ chỗ, không xác nhận thanh toán được nữa. "
+    "Nếu khách đã chuyển tiền, khoản tiền nằm ở hàng chờ thanh toán để hoàn lại."
+)
 BANK_TXN_ID_MAX_LENGTH = PaymentTransaction._meta.get_field("bank_txn_id").max_length  # 100
 
 
@@ -144,11 +150,13 @@ def confirm_payment_manual(*, order, bank_txn_id, amount=None, actor, received_a
     """
     S11 / BR-TT-08: Chủ xác nhận "đã nhận tiền" trên ĐƠN (E-05, webhook không về).
     Chạy CHUNG `_record_payment` với webhook (đủ / thiếu / đơn đã tự huỷ / trùng mã GD),
-    chỉ thêm: kiểm input, chỉ nhận đơn Giữ chỗ/Tự huỷ, source=MANUAL, AuditLog actor=Chủ.
+    chỉ thêm: kiểm input, chỉ nhận đơn Giữ chỗ (Tự huỷ -> 400 ORDER_AUTO_CANCELLED), source=MANUAL, AuditLog actor=Chủ.
 
     Trả `(payment, duplicate)`. Mã GD đã ghi cho CHÍNH đơn này → trả bản ghi cũ,
     duplicate=True (BR-TT-03); đã ghi cho đơn khác / chưa gắn đơn → BusinessError BR-TT-03.
     """
+    if order.status == SalesOrder.Status.AUTO_CANCELLED:
+        raise BusinessError(AUTO_CANCELLED_MESSAGE, code=AUTO_CANCELLED_CODE)
     bank_txn_id = normalize_bank_txn_id(bank_txn_id)  # B12: cùng hàm với webhook
     if not bank_txn_id:
         raise BusinessError("Thiếu mã giao dịch ngân hàng.", code=MANUAL_CODE)
@@ -257,7 +265,9 @@ def _record_payment(*, order, bank_txn_id, amount, received_at, source, raw_payl
             return existing, False
 
         if allowed_statuses is not None and o.status not in allowed_statuses:
-            raise BusinessError("Đơn không ở trạng thái Giữ chỗ/Tự huỷ.", code=MANUAL_CODE)
+            if o.status == SalesOrder.Status.AUTO_CANCELLED:
+                raise BusinessError(AUTO_CANCELLED_MESSAGE, code=AUTO_CANCELLED_CODE)
+            raise BusinessError("Đơn không ở trạng thái Giữ chỗ.", code=MANUAL_CODE)
 
         old_status = o.status
         if o.status in (SalesOrder.Status.CANCELLED, SalesOrder.Status.AUTO_CANCELLED):

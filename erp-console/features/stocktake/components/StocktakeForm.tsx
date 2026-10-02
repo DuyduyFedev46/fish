@@ -2,7 +2,8 @@
 
 // ED-28 F1f — Lập / sửa phiếu kiểm kê (trang riêng, khung FormPage). Dùng cho /stocktake/new/ và /stocktake/edit/?id=.
 // Chọn kho chỉ để NẠP các lô còn tồn (kho chỉ là bộ lọc, phiếu tính theo LÔ). Nhập số đếm từng lô; lô đếm nhiều hơn sổ phải ghi lý do.
-// "Lưu nháp" chỉ gửi các dòng đã nhập số; "Gửi duyệt" đòi mọi dòng đã nhập. Cả hai gọi cùng endpoint của BE (phiếu ở trạng thái Chờ duyệt).
+// "Lưu nháp" chỉ gửi các dòng đã nhập số, phiếu ở trạng thái Nháp. "Gửi duyệt" đòi mọi dòng đã nhập: lưu dòng rồi gọi
+// POST …/submit/ (Nháp → Chờ duyệt, Duy chốt 02/10 #20). Bước gửi lỗi (vd RECON_EMPTY) thì phiếu vẫn là nháp đã lưu; bấm lại sẽ lưu rồi gửi tiếp.
 // Tồn hệ thống hiện ở đây chỉ để xem trước chênh lệch: BE chụp lại tồn mỗi lần lưu (BR-KK-01).
 // Không có số tiền (chỉ kg). Không có dữ liệu khách. Không ghi gì vào localStorage/URL/log (URL chỉ mang ?id=).
 import Link from "next/link";
@@ -24,7 +25,7 @@ import { ConflictBanner } from "@/shared/ui/states/ConflictBanner";
 import { ErrorScreen } from "@/shared/ui/states/ErrorScreen";
 import { NoPermission } from "@/shared/ui/states/NoPermission";
 import { NotFoundScreen } from "@/shared/ui/states/NotFoundScreen";
-import { createStocktake, fetchStockBatches, fetchStocktake, fetchWarehouses, replaceStocktakeLines, updateStocktakeHeader } from "../api";
+import { createStocktake, fetchStockBatches, fetchStocktake, fetchWarehouses, replaceStocktakeLines, submitStocktake, updateStocktakeHeader } from "../api";
 import {
   LIST_HREF,
   MAX_REASON,
@@ -254,7 +255,7 @@ export function StocktakeForm({ mode }: { mode: "new" | "edit" }) {
 
   const afterSave = (res: StocktakeDetail, kind: "draft" | "send") => {
     if (kind === "send") {
-      toast.success("Đã gửi duyệt. Phiếu chờ người khác duyệt.");
+      toast.success("Đã gửi duyệt. Phiếu chờ Chủ hoặc Quản lý duyệt.");
       router.push(detailHref(res.id));
       return;
     }
@@ -274,7 +275,20 @@ export function StocktakeForm({ mode }: { mode: "new" | "edit" }) {
   };
 
   const draft = useSubmit(persist, { onSuccess: (res) => afterSave(res, "draft") });
-  const send = useSubmit(persist, { onSuccess: (res) => afterSave(res, "send") });
+  const send = useSubmit(
+    async () => {
+      const saved = await persist();
+      recId.current = saved.id;
+      updatedAt.current = saved.updated_at;
+      try {
+        return await submitStocktake(saved.id);
+      } catch (err) {
+        refreshSnapshots(saved);
+        throw normalizeError(err);
+      }
+    },
+    { onSuccess: (res) => afterSave(res, "send") },
+  );
   const busy = draft.submitting || send.submitting;
   const conflict = draft.conflict || send.conflict;
   const error = send.error || draft.error;
@@ -344,7 +358,11 @@ export function StocktakeForm({ mode }: { mode: "new" | "edit" }) {
           <Icon name="lock" />
         </span>
         <h2 className="state-title">Phiếu {detail.code} không sửa được</h2>
-        <p>{detail.status === "APPROVED" ? "Phiếu đã duyệt, số liệu đã vào sổ kho." : "Bạn không có quyền sửa số đếm của phiếu này."}</p>
+        <p>{detail.status === "APPROVED"
+            ? "Phiếu đã duyệt, số liệu đã vào sổ kho."
+            : detail.status === "SUBMITTED"
+              ? "Phiếu đang chờ duyệt. Trả phiếu về nháp rồi mới sửa số đếm được."
+              : "Bạn không có quyền sửa số đếm của phiếu này."}</p>
         <div className="page-state-actions">
           <Link href={detailHref(detail.id)} className="btn">
             Xem phiếu

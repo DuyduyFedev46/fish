@@ -3,14 +3,13 @@
 // không có giá vốn để ẩn (bất biến 1). Không có dữ liệu khách (bất biến 9): chỉ có tên hiển thị của NHÂN VIÊN.
 // Số kg là chuỗi thập phân 3 chữ số ("18.500"); không cộng trừ bằng float (xem stocktakeUi.ts).
 
-export type StocktakeStatus = "DRAFT" | "APPROVED";
+// Luồng Nháp → Chờ duyệt → Đã duyệt (Duy chốt 02/10, #6/#20).
+export type StocktakeStatus = "DRAFT" | "SUBMITTED" | "APPROVED";
 
 /** Việc người xem được làm trên phiếu (BE suy ra từ quyền + BR-KK-02/08). */
-export type StocktakeAction = "edit_lines" | "approve";
+export type StocktakeAction = "edit_lines" | "submit" | "return_to_draft" | "approve";
 
 export type StaffRef = { id: number; display_name: string };
-
-export type BlockedReason = { code: string; label: string };
 
 export type StocktakeListItem = {
   id: number;
@@ -36,8 +35,7 @@ export type StocktakeListItem = {
   over_qty: string;
   net_difference: string;
   available_actions: StocktakeAction[];
-  /** Có giá trị = người xem có quyền duyệt nhưng bị chặn (BR-KK-02 / BR-KK-08). `label` là câu tiếng Việt để hiện. */
-  approve_blocked_reason: BlockedReason | null;
+  // BE vẫn gửi `approve_blocked_reason` (luôn null từ 02/10: bỏ BR-KK-02/08). FE không đọc nữa.
 };
 
 export type StocktakeLine = {

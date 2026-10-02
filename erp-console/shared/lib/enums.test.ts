@@ -23,6 +23,13 @@ describe("enumOf", () => {
     expect(enumLabel(ENUMS.salesOrderStatus, "CANCELLED")).toBe("Đã huỷ");
   });
 
+  it("Kiểm kê: Nháp, Chờ duyệt, Đã duyệt; Phiếu hoàn có thêm Đã huỷ (Lô bổ sung A #6, #8)", () => {
+    expect(enumLabel(ENUMS.stockReconciliationStatus, "DRAFT")).toBe("Nháp");
+    expect(enumLabel(ENUMS.stockReconciliationStatus, "SUBMITTED")).toBe("Chờ duyệt");
+    expect(enumLabel(ENUMS.stockReconciliationStatus, "APPROVED")).toBe("Đã duyệt");
+    expect(enumLabel(ENUMS.returnToStockStatus, "CANCELLED")).toBe("Đã huỷ");
+  });
+
   it("hai nhãn WRITE_OFF khác nhau theo ngữ cảnh", () => {
     expect(enumLabel(ENUMS.stockMovementType, "WRITE_OFF")).toBe("Ghi lỗ, huỷ hàng");
     expect(enumLabel(ENUMS.returnToStockDecision, "WRITE_OFF")).toBe("Huỷ bỏ, ghi lỗ");

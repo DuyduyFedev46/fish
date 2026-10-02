@@ -22,6 +22,7 @@ class ReturnToStock(models.Model):
     class Status(models.TextChoices):
         DRAFT = "DRAFT", "Chờ duyệt"
         APPROVED = "APPROVED", "Đã duyệt"
+        CANCELLED = "CANCELLED", "Đã huỷ"  # Duy chốt 02/10 (#8): huỷ phiếu còn Chờ duyệt, không xoá (BR-PQ-10)
 
     delivery_note = models.ForeignKey(
         "delivery.DeliveryNote", on_delete=models.PROTECT, null=True, blank=True,

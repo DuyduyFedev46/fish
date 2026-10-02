@@ -19,6 +19,7 @@ export const AI_MSG = {
 
   // ---- Kiểm tra máy (S08-AC2/AC3) ----
   capTitle: "Kiểm tra máy",
+  budgetTitle: "Hạn mức chi phí",
   ramLabel: "RAM",
   webgpuLabel: "WebGPU",
   wifiLabel: "Mạng",
