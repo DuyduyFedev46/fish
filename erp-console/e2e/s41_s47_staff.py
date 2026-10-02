@@ -330,11 +330,12 @@ with sync_playwright() as p:
     open_staff(page, "giao2")
     act(page, "Cho nghỉ")
     dlg = page.get_by_role("dialog")
-    expect(dlg).to_contain_text("đăng xuất khỏi mọi máy")
-    dlg.get_by_role("button", name="Cho nghỉ", exact=True).click()
-    expect(dlg.locator(".alert-box.err")).to_be_visible()
-    ok("S42-AC4 BR-GH-08 hiện nguyên văn",
-       alert_text(dlg) == be(page, "DELIVERING_LEFT", count=2, notes="GH-INV-DH01-A1B2C, GH-INV-DH02-K7M3Q"), alert_text(dlg))
+    # Lô 14 (ED-38-AC3): hộp nêu sẵn số phiếu + mã phiếu và khoá nút xác nhận, không còn đợi BE trả BR-GH-08 sau khi bấm.
+    expect(dlg.locator("[data-delivering-block]")).to_be_visible()
+    block = dlg.locator("[data-delivering-block]").inner_text()
+    ok("S42-AC4 BR-GH-08: hộp nêu 2 phiếu Đang giao kèm mã phiếu",
+       "2 phiếu Đang giao" in block and "GH-INV-DH01-A1B2C" in block and "GH-INV-DH02-K7M3Q" in block, block)
+    ok("S42-AC4 nút Cho nghỉ bị khoá khi còn phiếu Đang giao", dlg.get_by_role("button", name="Cho nghỉ", exact=True).is_disabled())
     dlg.get_by_role("button", name="Thôi").click()
     expect(page.get_by_role("dialog")).to_have_count(0)
     page.go_back()

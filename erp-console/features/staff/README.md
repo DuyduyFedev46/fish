@@ -27,6 +27,8 @@ Phân quyền nhóm (ma trận) nằm ở `features/permissions`.
 - Nút thao tác **chỉ** hiện theo `available_actions` của từng người (BE tính cả luật lẫn quyền). Thao tác không làm được
   vẫn hiện trong menu "…" nhưng mờ kèm lý do (`blockedReason` trong `staffModel.ts`), không ẩn.
 - Lỗi BE hiện **nguyên văn** `detail` ở đầu hộp (BR-PQ-08/17/18, BR-GH-08, BR-PQ-01). Biểu mẫu dùng `noValidate`.
+- Hộp "Cho nghỉ" nêu sẵn số phiếu Đang giao kèm mã phiếu và khoá nút xác nhận khi còn từ 1 phiếu (ED-38-AC3, BR-GH-08, `deliveringBlock`).
+  Khối "Việc đang giao" không tải được (thiếu quyền xem phiếu, lỗi) thì không khoá, để BE quyết khi bấm xác nhận.
 - Hỏi lại trước khi: cho nghỉ; thêm hoặc bỏ nhóm Chủ (đổi nhóm và tạo tài khoản có nhóm Chủ).
 - Không có nháp biểu mẫu: tên, SĐT, mật khẩu chỉ ở state của hộp, không vào `localStorage`, URL, log. Số điện thoại hiện đủ
   trong màn quản trị này (người dùng đã có `manage_staff`), không bao giờ đưa vào URL.

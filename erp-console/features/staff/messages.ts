@@ -139,6 +139,9 @@ export const STAFF_MSG = {
   deactivateLock: "Tài khoản bị khoá ngay và bị đăng xuất khỏi mọi máy.",
   deactivateKeep: "Chứng từ cũ vẫn giữ tên người này.",
   deactivateUndo: "Có thể cho làm lại sau.",
+  /** ED-38-AC3 / BR-GH-08: còn phiếu Đang giao thì chưa cho nghỉ được. `codes` đã cắt gọn, `more` là số mã bị bớt. */
+  deactivateDelivering: (n: number, codes: string, more: number) =>
+    `Còn ${n} phiếu Đang giao (${codes}${more > 0 ? `, và ${more} phiếu nữa` : ""}). Phải giao xong hoặc chuyển người trước khi cho nghỉ.`,
   reactivateTitle: (who: string) => `Cho ${who} làm lại?`,
   reactivateOk: "Cho làm lại",
   reactivateBody: "Người này đăng nhập lại bằng mật khẩu cũ (hoặc đặt lại mật khẩu sau).",

@@ -304,6 +304,7 @@ function StaffDetailBody({ member: m, detail }: { member: StaffMember; detail: L
         <ActiveModal
           member={m}
           deactivating={m.is_active}
+          delivering={delivering.status === "ok" ? delivering.data : null}
           onClose={() => setModal(null)}
           onDone={() => {
             setModal(null);

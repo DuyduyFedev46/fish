@@ -2195,11 +2195,16 @@ Làm trong `erp-console/`. Nợ đã trả: **TLA-L2** (`registry.py` thêm Capa
 - **Thiếu trường ở bảng nhân viên của BE** (story có, BE chưa trả): Ghi chú, ngày đi làm, hiển thị `must_change_password`, thống kê theo tháng. FE bỏ các ô này, không bịa số.
 - **Số điện thoại nhân viên** hiện đủ trong màn quản trị (chỉ người có `manage_staff` thấy), không đưa vào URL, log hay storage.
 - **Không còn nháp biểu mẫu:** tên, SĐT, mật khẩu không được nằm trong storage; S7-AC6 chỉ còn kiểm 401 rồi đăng nhập lại.
-- **Cho nghỉ không chặn theo số phiếu đang giao ở FE:** BE quyết (BR-GH-08), FE hiện nguyên văn lỗi. Khối "Việc đang giao" chỉ để người dùng thấy trước.
-- **Ma trận chỉ đọc với superuser ngoài nhóm Chủ:** BE chỉ cho Chủ ghi.
+- **Cho nghỉ khi còn phiếu Đang giao:** (đã sửa theo review TL14-FE-M1, xem mục "Sửa sau review" bên dưới) hộp nêu sẵn số phiếu và mã phiếu, khoá nút xác nhận. BE vẫn là nơi quyết cuối cùng (BR-GH-08).
+- **Ma trận chỉ đọc với superuser ngoài nhóm Chủ:** BE cho cả Chủ và superuser ghi (`actor_is_owner`); FE chặt hơn một cách có chủ ý, chỉ nhóm Chủ được bấm công tắc. Không có lỗ hổng vì superuser vốn có mọi quyền ở Django. Nếu Duy muốn BE cũng chặn superuser ngoài nhóm Chủ thì là việc của BE, cần hỏi Duy.
 - **Không có ô sửa mô tả nhóm:** BE không có endpoint; công tắc có hiệu lực ngay, không có nút "Lưu thay đổi".
 - **Hỏi lại khi tắt** chỉ với việc phá luồng; bật không hỏi.
 - **Mock:** đổi việc trong ma trận không làm đổi quyền lúc đăng nhập mock (bảng quyền mock ở `features/auth/mock.ts`, ngoài phạm vi lô). Thay đổi giữ trong `sessionStorage` khoá `cave_erp_mock_group_caps`. Dòng thời gian và hoạt động của mock chỉ nằm trong bộ nhớ. Câu lỗi mock là xấp xỉ câu BE. Chưa phủ ca BE trả 500 trong `ed_batch14_permissions.py`. Kiểm storage của e2e bỏ qua khoá `cave_erp_mock_*` (chỉ có ở bản build mock).
 - **Bộ tải dùng chung** chuyển thành `features/staff/useLoaded.ts` (permissions import lại); `groupHref` chuyển về `permissionsModel.ts`.
 - **Lỗi bố cục đã sửa:** `.sr-only` (absolute) trong ô ma trận làm trang cuộn ngang ở 360px vì vùng cuộn thiếu `position: relative`; nhãn việc bị căn giữa ở mobile. Sửa trong `permissions.module.css`.
-- **Nợ BE (ghi cho 02c):** cổng huỷ phiếu hoàn ở BE cần kiểm cùng quyền `add_returntostock` như FE đã tính cho `canCancel`.
+- **Cổng huỷ phiếu hoàn ở BE:** BE đã có cổng này (techlead xác nhận ở review), không ghi nợ.
+
+### Sửa sau review Tech Lead (TL14-FE-M1, TL14-FE-L1)
+- **TL14-FE-M1 (ED-38-AC3, BR-GH-08):** `StaffDetailScreen.tsx` truyền phiếu Đang giao đã tải sẵn (chỉ khi khối ở trạng thái `ok`) vào `ActiveModal.tsx`. Hàm thuần `deliveringBlock` (`staffModel.ts`, câu chữ ở `messages.ts` `deactivateDelivering`) tạo câu "Còn N phiếu Đang giao (mã…). Phải giao xong hoặc chuyển người trước khi cho nghỉ."; hộp hiện câu này ở đầu và khoá nút xác nhận (`ConfirmModal disabled`). Quá 5 mã thì cắt, ghi "và K phiếu nữa". Khối không tải được (thiếu quyền xem phiếu, lỗi, còn đang tải) thì không khoá, BE quyết khi bấm xác nhận như cũ. Chỉ dùng số phiếu và mã phiếu, không có dữ liệu khách.
+- **Test:** vitest `staffModel.test.ts` thêm 3 ca (`deliveringBlock`). E2E `ed_batch14_permissions.py` thêm ca giao2 (nêu 2 phiếu kèm mã, nút khoá, chưa gọi POST deactivate, không SĐT) và ca đối chứng giao1 (không phiếu, nút bấm được). `s41_s47_staff.py` S42-AC4 đổi theo: không còn bấm xác nhận để chờ lỗi BE, mà kiểm hộp chặn từ trước; câu BR-GH-08 của BE chỉ còn xuất hiện khi khối phiếu không tải được, mock không tạo được tình huống đó nên chưa có ca e2e riêng cho nhánh này (QA có thể thử với BE thật và người xem thiếu quyền xem phiếu giao).
+- **TL14-FE-L1:** `features/permissions/README.md` và mục trên đã sửa: BE cho Chủ và superuser ghi, FE chặt hơn.

@@ -4,7 +4,7 @@
 import { groupLabel } from "@/shared/lib/groups";
 import { ROLE } from "@/shared/lib/roles";
 import { STAFF_MSG as M } from "./messages";
-import type { StaffAction, StaffActivityRow, StaffMember, StaffTab } from "./types";
+import type { StaffAction, StaffActivityRow, StaffDelivering, StaffMember, StaffTab } from "./types";
 
 export const STAFF_TABS: { key: StaffTab; label: string }[] = [
   { key: "active", label: M.tabActive },
@@ -73,6 +73,19 @@ export function blockedReason(action: "reset_password" | "deactivate" | "reactiv
     if (m.groups.includes(ROLE.owner) && can(m, "set_groups")) return M.lastOwnerBlocked;
   }
   return M.noRightBlocked;
+}
+
+const MAX_CODES_SHOWN = 5;
+
+/**
+ * ED-38-AC3 / BR-GH-08: câu báo "còn phiếu Đang giao" cho hộp Cho nghỉ, hoặc null khi không có gì để chặn.
+ * `notes` null (khối không tải được hoặc người xem thiếu quyền xem phiếu) → null: giữ hành vi cũ, để BE quyết khi bấm xác nhận.
+ * Chỉ dùng số phiếu và mã phiếu, không có dữ liệu khách.
+ */
+export function deliveringBlock(notes: Pick<StaffDelivering, "code">[] | null): string | null {
+  if (!notes || notes.length === 0) return null;
+  const shown = notes.slice(0, MAX_CODES_SHOWN).map((n) => n.code).join(", ");
+  return M.deactivateDelivering(notes.length, shown, notes.length - MAX_CODES_SHOWN);
 }
 
 const ACTION_VERB: Record<string, string> = {

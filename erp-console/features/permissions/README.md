@@ -5,7 +5,8 @@ quyền do admin cấu hình được; Chủ có thể bật "Xem khách hàng" 
 
 Route: `/permissions/` (ma trận) và `/permissions/detail/?group=<mã nhóm>` (một nhóm). Bọc `<ViewGuard view="permissions">`
 (cần `accounts.manage_staff`). Mọi người có quyền xem đều xem được; **chỉ người thuộc nhóm Chủ** thấy công tắc bấm được
-(superuser ngoài nhóm Chủ xem ở chế độ chỉ đọc, vì BE chỉ cho Chủ ghi).
+(superuser ngoài nhóm Chủ xem ở chế độ chỉ đọc: BE cho cả Chủ và superuser ghi, FE chặt hơn một cách có chủ ý,
+không phải do BE chặn).
 
 ## Contract BE (B4, R16: dưới `/api/staff/groups/`, khác chữ ở story)
 

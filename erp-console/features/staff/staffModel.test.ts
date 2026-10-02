@@ -6,6 +6,7 @@ import {
   blockedReason,
   can,
   countByTab,
+  deliveringBlock,
   groupsDiff,
   namesOf,
   ownerChange,
@@ -101,5 +102,28 @@ describe("activityLabel", () => {
     expect(activityLabel({ action: "update", note: "Sửa số điện thoại" })).toBe("Sửa số điện thoại");
     expect(activityLabel({ action: "deactivate", note: null })).toBe("Cho nghỉ");
     expect(activityLabel({ action: "weird", note: " " })).toBe("weird");
+  });
+});
+
+describe("deliveringBlock (ED-38-AC3 / BR-GH-08)", () => {
+  const note = (code: string) => ({ code });
+  it("không có phiếu hoặc chưa tải được thì không chặn, để BE quyết", () => {
+    expect(deliveringBlock(null)).toBeNull();
+    expect(deliveringBlock([])).toBeNull();
+  });
+  it("nêu số phiếu kèm mã phiếu", () => {
+    const text = deliveringBlock([note("GH-0001"), note("GH-0002")]);
+    expect(text).toBe(M.deactivateDelivering(2, "GH-0001, GH-0002", -3));
+    expect(text).toContain("2 phiếu Đang giao");
+    expect(text).toContain("GH-0001, GH-0002");
+    expect(text).not.toContain("nữa");
+  });
+  it("nhiều phiếu thì cắt bớt mã, vẫn đúng tổng", () => {
+    const many = Array.from({ length: 8 }, (_, i) => note(`GH-${i + 1}`));
+    const text = deliveringBlock(many) as string;
+    expect(text).toContain("8 phiếu Đang giao");
+    expect(text).toContain("GH-5");
+    expect(text).not.toContain("GH-6");
+    expect(text).toContain("và 3 phiếu nữa");
   });
 });
