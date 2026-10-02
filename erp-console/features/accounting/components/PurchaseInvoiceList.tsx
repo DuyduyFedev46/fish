@@ -44,10 +44,11 @@ type Props = {
   homeHref?: string;
 };
 
-/** "Đang hiện 8 / 8 hoá đơn · 3 chưa trả". Số chưa trả đếm trong các dòng đã tải; còn trang sau thì ghi rõ để không hiểu nhầm là tổng. */
+/** "Đang hiện 8 / 8 hoá đơn · 3 chưa trả". Số chưa trả chỉ đếm được khi đã tải hết; còn trang sau thì không ghi (tránh hiểu nhầm là tổng). */
 export function summaryText(rows: PurchaseInvoiceRow[], count: number, hasMore: boolean): string {
-  const unpaid = rows.filter((r) => !r.is_paid).length;
-  return `Đang hiện ${rows.length} / ${count} hoá đơn · ${unpaid} chưa trả${hasMore ? " (trong số đã tải)" : ""}`;
+  const shown = `Đang hiện ${rows.length} / ${count} hoá đơn`;
+  if (hasMore) return shown;
+  return `${shown} · ${rows.filter((r) => !r.is_paid).length} chưa trả`;
 }
 
 export function PurchaseInvoiceList({ tabs, canAdd, canPickSupplier, panelId = "purchasing-panel", homeHref = "/purchasing/" }: Props) {

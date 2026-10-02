@@ -2,7 +2,7 @@
 
 // Báo cáo lãi lỗ (W3a, ED-32). CHỈ CHỦ (reports.view_profitreport): vai khác không có menu, vào thẳng URL thì ViewGuard hoặc API 403
 // đều ra "Không có quyền". Tháng chọn nằm trong state (không lên URL). Ba phần: dải số liệu của kỳ so với tháng trước,
-// "Cấu thành lãi", và bảng "Lãi lỗ theo lô" (lô phát sinh trong tháng, 20 lô/trang, mở chi tiết ở tấm bên).
+// "Cấu thành lãi", và bảng "Lãi lỗ theo lô" (lô phát sinh trong tháng, 20 lô/trang, mở chi tiết trong hộp thoại Modal, chỉ đọc).
 // Tiền là chuỗi thập phân, cộng trừ bằng ../decimal.ts. Kỳ không có giao dịch hiện trạng thái trống, không số 0 giả (ED-32-AC2).
 import { useMemo, useState } from "react";
 import { useAuth } from "@/features/auth/components/AuthProvider";
@@ -17,10 +17,10 @@ import { Icon } from "@/shared/ui/Icon";
 import { Tabs, type TabItem } from "@/shared/ui/Tabs";
 import { DataTable, type Column } from "@/shared/ui/list/DataTable";
 import { ListPage } from "@/shared/ui/list/ListPage";
-import { SideSheet } from "@/shared/ui/SideSheet";
+import { Modal } from "@/shared/ui/overlay/Modal";
 import { NoPermission } from "@/shared/ui/states/NoPermission";
 import { fetchBatchReport, fetchPeriodReport } from "../api";
-import { absDecimal, subDecimal } from "../decimal";
+import { absDecimal, signOf, subDecimal } from "../decimal";
 import { batchDetail, monthLabel, parseMonthKey, periodIsEmpty, previousMonthKey, profitBreakdown, profitTone, reportMonthOptions, signedVnd } from "../reportView";
 import type { BatchReportParams, BatchReportRow, PeriodReport } from "../types";
 import s from "../reports.module.css";
@@ -172,7 +172,7 @@ export function ProfitReportScreen() {
           </div>
         </section>
       </ListPage>
-      {selected && <BatchDetailSheet row={selected} onClose={() => setOpenCode(null)} />}
+      {selected && <BatchDetailModal row={selected} onClose={() => setOpenCode(null)} />}
     </>
   );
 }
@@ -241,8 +241,8 @@ function PeriodBlock({
   return (
     <>
       <dl className={s.stats} aria-label={`Số liệu ${where}`}>
-        <Stat label="Doanh thu ghi nhận" locked value={vnd(period.revenue)} foot="hoá đơn xuất trong tháng, đã trừ đơn huỷ" />
-        <Stat label="Giá vốn ghi nhận" locked value={vnd(period.cogs)} foot="giá vốn của hàng đã bán" />
+        <Stat label="Doanh thu ghi nhận" locked value={vnd(period.revenue)} />
+        <Stat label="Giá vốn ghi nhận" locked value={vnd(period.cogs)} />
         <Stat
           label={`Lãi/lỗ ${where.toLowerCase()}`}
           locked
@@ -263,9 +263,9 @@ function PeriodBlock({
             )
           }
         />
-        <Stat label="Số hoá đơn" value={String(period.invoice_count)} foot="hoá đơn còn hiệu lực" />
-        <Stat label="Hoàn tiền trong kỳ" locked value={vnd(period.refunds)} foot="trừ vào lãi của tháng" />
-        <Stat label="Phiếu hoàn đã chuyển" value={String(period.refund_count)} foot="phiếu hoàn tiền xác nhận trong tháng" />
+        <Stat label="Số hoá đơn" value={String(period.invoice_count)} />
+        <Stat label="Hoàn tiền trong kỳ" locked value={vnd(period.refunds)} />
+        <Stat label="Phiếu hoàn đã chuyển" value={String(period.refund_count)} />
       </dl>
 
       <section className={s.card} aria-label="Cấu thành lãi">
@@ -279,7 +279,7 @@ function PeriodBlock({
               <span className={`${s.bAmount} ${row.kind === "total" ? toneClass(row.amount) : ""}`}>{signedVnd(row.amount)}</span>
               {row.kind !== "total" && (
                 <span className={s.bTrack} aria-hidden="true">
-                  <span className={`${s.bFill} ${row.amount.startsWith("-") ? s.bFillMinus : s.bFillPlus}`} style={{ width: `${Math.round(row.share * 100)}%` }} />
+                  <span className={`${s.bFill} ${signOf(row.amount) === -1 ? s.bFillMinus : s.bFillPlus}`} style={{ width: `${Math.round(row.share * 100)}%` }} />
                 </span>
               )}
             </li>
@@ -300,7 +300,8 @@ function Stat({
 }: {
   label: string;
   value: string;
-  foot: React.ReactNode;
+  /** Chỉ dành cho một số liệu phụ (vd so sánh tháng trước), không dùng cho lời giải thích. */
+  foot?: React.ReactNode;
   locked?: boolean;
   valueClass?: string;
   testId?: string;
@@ -319,12 +320,12 @@ function Stat({
       <dd className={`${s.statValue} ${valueClass ?? ""}`} data-testid={testId}>
         <Figure text={value} />
       </dd>
-      <dd className={s.statFoot}>{foot}</dd>
+      {foot ? <dd className={s.statFoot}>{foot}</dd> : null}
     </div>
   );
 }
 
-function BatchDetailSheet({ row, onClose }: { row: BatchReportRow; onClose: () => void }) {
+function BatchDetailModal({ row, onClose }: { row: BatchReportRow; onClose: () => void }) {
   const detail = batchDetail(row, kg);
   const line = (l: { key: string; label: string; value: string; kind?: string; locked?: boolean }) => (
     <div key={l.key} className={`${s.line} ${l.kind === "total" ? s.lineTotal : ""}`} data-line={l.key}>
@@ -336,7 +337,15 @@ function BatchDetailSheet({ row, onClose }: { row: BatchReportRow; onClose: () =
     </div>
   );
   return (
-    <SideSheet title={`Chi tiết lô ${row.batch_id}`} onClose={onClose}>
+    <Modal
+      title={`Chi tiết lô ${row.batch_id}`}
+      onClose={onClose}
+      footer={
+        <button type="button" className="btn" onClick={onClose}>
+          Đóng
+        </button>
+      }
+    >
       <div className={s.detail} data-testid="batch-detail">
         <div className={s.detailTitle}>
           <strong>{row.item_name}</strong>
@@ -351,6 +360,6 @@ function BatchDetailSheet({ row, onClose }: { row: BatchReportRow; onClose: () =
           <dl className={s.detailGroup}>{detail.reference.map(line)}</dl>
         </div>
       </div>
-    </SideSheet>
+    </Modal>
   );
 }

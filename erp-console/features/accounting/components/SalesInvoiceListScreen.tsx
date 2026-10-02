@@ -107,18 +107,6 @@ export function SalesInvoiceListScreen() {
       id="sales-invoices-panel"
       asOf={list.asOf}
       onRetry={() => void list.reload()}
-      banner={
-        <p className={s.hint} data-testid="invoice-note">
-          Tổng số tiền ở chân bảng gồm cả hoá đơn của đơn đã huỷ.{" "}
-          {me.can_view_profit ? (
-            <>
-              Doanh thu thực nằm ở <Link href="/reports/" className={s.codeLink}>Báo cáo lãi lỗ</Link>.
-            </>
-          ) : (
-            "Doanh thu thực nằm ở Báo cáo lãi lỗ của Chủ."
-          )}
-        </p>
-      }
       filters={
         <div className={s.filters}>
           <FilterBar
@@ -163,7 +151,7 @@ export function SalesInvoiceListScreen() {
                   </strong>
                 </span>
               )}
-              <span className={s.hint}>Không tính hoá đơn có trạng thái Đã huỷ.</span>
+              <span className={s.hint} data-testid="invoice-note">Không tính hoá đơn Đã huỷ.</span>
             </div>
           )}
           {list.hasMore && (

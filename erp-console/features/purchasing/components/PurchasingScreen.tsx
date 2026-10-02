@@ -1,8 +1,8 @@
 "use client";
 
-// Mua hàng (W2a, ED-20): ba tab Phiếu nhập · Hoá đơn mua · Chi phí mua. MỘT useTabParam (`?tab=receipts|invoices|costs`) cho cả trang;
+// Mua hàng (W2a, ED-20): ba tab Phiếu nhập · Hoá đơn mua · Chi phí phụ. MỘT useTabParam (`?tab=receipts|invoices|costs`) cho cả trang;
 // mỗi tab tự vẽ ListPage của nó (nhận khối <Tabs> từ đây). Tab thiếu quyền thì không hiện:
-// Hoá đơn mua cần view_purchaseinvoice (Chủ, Quản lý); Chi phí mua chỉ Chủ (view_purchasecost và can_view_cost).
+// Hoá đơn mua cần view_purchaseinvoice (Chủ, Quản lý); Chi phí phụ chỉ Chủ (view_purchasecost và can_view_cost).
 // Form nhập lô tại cảng là trang riêng /purchasing/new/ (F1a).
 import { PurchaseCostList } from "@/features/accounting/components/PurchaseCostList";
 import { PurchaseInvoiceList } from "@/features/accounting/components/PurchaseInvoiceList";
@@ -24,7 +24,7 @@ export function PurchasingScreen() {
   const items: TabItem[] = [
     { key: "receipts", label: "Phiếu nhập" },
     ...(ability.viewInvoices ? [{ key: "invoices", label: "Hoá đơn mua" }] : []),
-    ...(ability.viewCosts ? [{ key: "costs", label: "Chi phí mua" }] : []),
+    ...(ability.viewCosts ? [{ key: "costs", label: "Chi phí phụ" }] : []),
   ];
   const active = items.some((t) => t.key === tab) ? tab : "receipts";
   const tabs =

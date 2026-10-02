@@ -1,6 +1,6 @@
 "use client";
 
-// F1d Nhập chi phí mua (POST /api/purchasing/costs/), trang /purchasing/costs/new/?receipt=<id>. CHỈ CHỦ (chi phí là giá vốn).
+// F1d Thêm chi phí phụ (POST /api/purchasing/costs/), trang /purchasing/costs/new/?receipt=<id>. CHỈ CHỦ (chi phí là giá vốn).
 // Chủ nhập loại, tổng tiền, cách chia; hệ thống chia sẵn cho các lô của phiếu (theo số kg hoặc theo giá trị), Chủ sửa tay từng lô được.
 // AC4: tổng các phần phải đúng bằng tổng chi phí. Lệch thì alert đỏ nói rõ còn thiếu/thừa bao nhiêu và nút "Lưu chi phí" bị khoá.
 // Tiền gửi đúng số nguyên đồng (không làm tròn). Không có dữ liệu cá nhân nào trong form.
@@ -63,8 +63,8 @@ function ReceiptPicker({ onPick }: { onPick: (id: number) => void }) {
   const supplierOptions = [{ value: "", label: "Mọi nhà cung cấp" }, ...(suppliers.data ?? []).map((x) => ({ value: String(x.id), label: x.name }))];
   return (
     <FormPage
-      title="Nhập chi phí mua"
-      back={{ href: "/purchasing/?tab=costs", label: "Chi phí mua" }}
+      title="Thêm chi phí phụ"
+      back={{ href: "/purchasing/?tab=costs", label: "Chi phí phụ" }}
       onSubmit={() => value && onPick(Number(value))}
       primaryText="Tiếp tục"
       primaryDisabled={!value}
@@ -165,7 +165,7 @@ function CostFormBody({ receipt, onBackToPick }: { receipt: ReceiptDetail; onBac
   if (targets.length === 0) {
     return (
       <FormPage
-        title="Nhập chi phí mua"
+        title="Thêm chi phí phụ"
         back={{ href: `/purchasing/detail/?id=${receipt.id}`, label: receipt.code }}
         onSubmit={() => router.push(`/purchasing/detail/?id=${receipt.id}`)}
         primaryText="Quay lại phiếu"
@@ -177,7 +177,7 @@ function CostFormBody({ receipt, onBackToPick }: { receipt: ReceiptDetail; onBac
 
   return (
     <FormPage
-      title="Nhập chi phí mua"
+      title="Thêm chi phí phụ"
       back={{ href: `/purchasing/detail/?id=${receipt.id}`, label: receipt.code }}
       alert={alert}
       onSubmit={submit}

@@ -59,6 +59,21 @@ export function absDecimal(text: string): string {
   return v === null ? "" : formatDecimal(v < ZERO ? -v : v);
 }
 
+/**
+ * Chuẩn hoá một giá trị tiền/kg BE trả về thành chuỗi thập phân. Hai endpoint báo cáo trả JSON number (DRF đổi Decimal
+ * thành float), còn các endpoint khác trả chuỗi; hàm nhận cả hai. Chuỗi giữ nguyên. Số dùng dạng ngắn nhất của JS;
+ * dạng mũ ("1e-7", "1e+21") đổi sang dạng thường để parseDecimal đọc được. null/undefined giữ nguyên (không đoán thành 0).
+ */
+export function toDecimalString(value: string | number | null | undefined): string {
+  if (value === null || value === undefined) return value as unknown as string;
+  if (typeof value === "string") return value;
+  if (!Number.isFinite(value)) return "";
+  const text = String(value);
+  if (!/e/i.test(text)) return text;
+  if (Math.abs(value) >= 1) return BigInt(value).toString();
+  return value.toFixed(SCALE);
+}
+
 /** |a| / |b| dưới dạng số thực 0..1 CHỈ để vẽ độ dài thanh (không phải số tiền). */
 export function ratioOf(a: string, b: string): number {
   const x = parseDecimal(a);

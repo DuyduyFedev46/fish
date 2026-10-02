@@ -150,7 +150,14 @@ def run_owner(browser, errors):
     ok("Báo cáo: chi tiết lô có thành phần doanh thu, chi phí, lãi/lỗ và phần 'chỉ để tham khảo'", "Tôm sú size 30" in dt and "tham khảo" in dt and detail.locator("[data-line=profit]").count() == 1, dt[:300])
     page.screenshot(path=f"{SHOTS}/ed12-2-loc-chi-tiet-lo.png")
     page.keyboard.press("Escape")
-    ok("Báo cáo: Esc đóng tấm chi tiết", page.get_by_test_id("batch-detail").count() == 0)
+    ok("Báo cáo: Esc đóng hộp chi tiết", page.get_by_test_id("batch-detail").count() == 0)
+    # TL12-FE-M2: chi tiết lô là hộp thoại (Modal), có nút Đóng, không phải tấm trượt bên.
+    page.get_by_role("button", name="Xem chi tiết lô LO-0924-D").click()
+    page.get_by_test_id("batch-detail").wait_for()
+    dlg = page.get_by_role("dialog")
+    ok("Báo cáo: chi tiết lô mở trong hộp thoại có nút Đóng", dlg.count() == 1 and dlg.get_by_role("button", name="Đóng", exact=True).count() >= 1, str(dlg.count()))
+    dlg.get_by_role("button", name="Đóng", exact=True).last.click()
+    ok("Báo cáo: bấm Đóng thì hộp chi tiết biến mất", page.get_by_test_id("batch-detail").count() == 0)
 
     # Đổi tháng: tháng trước có lô đã chốt, tháng xa thì kỳ trống
     sel = page.get_by_test_id("report-month")
@@ -186,7 +193,7 @@ def run_owner(browser, errors):
     ok("Hoá đơn bán (Chủ): cột có Giá vốn và Lãi gộp", "Giá vốn" in h and "Lãi gộp" in h and "Khách hàng" in h, str(h))
     ok("Hoá đơn bán: 'Đang hiện 20 / 27 hoá đơn'", "Đang hiện 20 / 27 hoá đơn" in body(page))
     note = page.get_by_test_id("invoice-note")
-    ok("Hoá đơn bán: ghi chú tổng gồm đơn huỷ + đường dẫn Báo cáo lãi lỗ", "đơn đã huỷ" in note.inner_text() and note.get_by_role("link", name="Báo cáo lãi lỗ").count() == 1, note.inner_text())
+    ok("Hoá đơn bán: chỉ một câu ngắn ở chân bảng 'Không tính hoá đơn Đã huỷ.', không còn khối ghi chú phía trên", note.count() == 1 and note.inner_text().strip() == "Không tính hoá đơn Đã huỷ.", note.inner_text() if note.count() else "")
     tot = page.get_by_test_id("invoice-totals")
     ok("Hoá đơn bán: chân bảng có Tổng số tiền và Lãi gộp", page.get_by_test_id("total-amount").count() == 1 and page.get_by_test_id("total-profit").count() == 1 and "đ" in tot.inner_text(), tot.inner_text())
     ok("Hoá đơn bán: có nút Tải thêm; không có nút tạo hoá đơn", page.get_by_role("button", name="Tải thêm").count() == 1 and page.get_by_role("button", name=re.compile("^(Thêm|Tạo)")).count() == 0)
@@ -290,6 +297,29 @@ def run_owner(browser, errors):
         page.wait_for_timeout(200)
         amt = dlg.locator("input[name=amount]").input_value()
         ok("Thêm hoá đơn: chọn phiếu thì gợi ý số tiền nguyên đồng, nhóm nghìn", re.fullmatch(r"\d{1,3}(\.\d{3})*", amt) is not None, amt)
+        # TL12-FE-M1: chọn phiếu rồi đổi sang nhà cung cấp khác thì bỏ phiếu và số gợi ý, không gửi cặp lệch.
+        receipt_supplier = sup.input_value()
+        other = next((v for v in sup.locator("option").evaluate_all("els => els.map(e => e.value)") if v and v != receipt_supplier), None)
+        ok("Thêm hoá đơn: có nhà cung cấp thứ hai để thử đổi", other is not None, receipt_supplier)
+        if other:
+            sup.select_option(value=other)
+            settle(page)
+            page.wait_for_timeout(300)
+            ok("Thêm hoá đơn: đổi nhà cung cấp thì bỏ phiếu đang chọn (M1)", dlg.locator("select[name=receipt]").input_value() == "", dlg.locator("select[name=receipt]").input_value())
+            ok("Thêm hoá đơn: đổi nhà cung cấp thì bỏ số tiền gợi ý của phiếu cũ", dlg.locator("input[name=amount]").input_value() == "", dlg.locator("input[name=amount]").input_value())
+            # Số do người gõ thì giữ khi đổi nhà cung cấp, nhưng phiếu vẫn bị bỏ.
+            sup.select_option(value=receipt_supplier)
+            settle(page)
+            page.wait_for_timeout(300)
+            rsel = dlg.locator("select[name=receipt]")
+            if rsel.locator("option").count() > 1:
+                rsel.select_option(index=1)
+                page.wait_for_timeout(200)
+                dlg.locator("input[name=amount]").fill("123456")
+                sup.select_option(value=other)
+                settle(page)
+                page.wait_for_timeout(300)
+                ok("Thêm hoá đơn: số tiền người gõ được giữ, phiếu vẫn bị bỏ khi đổi nhà cung cấp", dlg.locator("input[name=amount]").input_value() == "123.456" and dlg.locator("select[name=receipt]").input_value() == "", dlg.locator("input[name=amount]").input_value())
     else:
         ok("Thêm hoá đơn: có ít nhất một phiếu nhập để chọn", False, dlg.inner_text()[:200])
     dlg.get_by_role("button", name="Quay lại").click()
@@ -327,7 +357,6 @@ def run_manager(browser, errors):
     h = heads(page)
     ok("Quản lý: Hoá đơn bán có Khách hàng, KHÔNG có Giá vốn / Lãi gộp", "Khách hàng" in h and "Giá vốn" not in h and "Lãi gộp" not in h, str(h))
     ok("Quản lý: chân bảng có tổng số tiền, KHÔNG có Lãi gộp", page.get_by_test_id("total-amount").count() == 1 and page.get_by_test_id("total-profit").count() == 0)
-    ok("Quản lý: ghi chú không có đường dẫn Báo cáo lãi lỗ", page.get_by_test_id("invoice-note").get_by_role("link").count() == 0)
     html = page.content()
     ok("Quản lý: DOM không chứa giá vốn / lãi gộp", "Lãi gộp" not in html and "Giá vốn" not in html)
     page.screenshot(path=f"{SHOTS}/ed12-10-ql1-hoa-don-ban.png")

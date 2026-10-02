@@ -1,6 +1,6 @@
 "use client";
 
-// Danh sách chi phí phụ (R12: GET /api/purchasing/costs/, 20 dòng/trang), dùng ở tab "Chi phí mua" của màn Mua hàng (ED-20)
+// Danh sách chi phí phụ (R12: GET /api/purchasing/costs/, 20 dòng/trang), dùng ở tab "Chi phí phụ" của màn Mua hàng (ED-20)
 // và tab "Chi phí phụ" của màn Hoá đơn mua & chi phí phụ (ED-34). CHỈ CHỦ: cả chứng từ là giá vốn,
 // nên vai khác không có tab, và nếu vào thẳng thì BE trả 403 (màn "Không có quyền"). Số tiền là cột khoá.
 // Chưa có màn sửa chi phí: chi phí đã chia vào lô thì khoá (COST_ALLOCATED_LOCKED), nên danh sách này không có nút sửa/xoá.
@@ -116,7 +116,7 @@ export function PurchaseCostList({ tabs, canAdd, panelId = "purchasing-panel", h
         empty={
           filtering
             ? { icon: "filter_alt_off", title: "Không có chi phí nào khớp bộ lọc", hint: "Bỏ lọc để xem toàn bộ chi phí.", action: <button type="button" className="btn" onClick={clear}>Bỏ lọc</button> }
-            : { icon: "payments", title: "Chưa có chi phí mua", hint: "Đá, vận chuyển, bốc vác chia vào giá vốn của lô." }
+            : { icon: "payments", title: "Chưa có chi phí phụ", hint: "Đá, vận chuyển, bốc vác chia vào giá vốn của lô." }
         }
         canViewCost={canViewCost}
         caption="Danh sách chi phí phụ"

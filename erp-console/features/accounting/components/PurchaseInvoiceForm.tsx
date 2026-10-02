@@ -53,6 +53,26 @@ export function PurchaseInvoiceForm({ receipt, onClose, onDone }: Props) {
   const [paid, setPaid] = useState(false);
   const [paidAt, setPaidAt] = useState(nowForInput);
   const [touched, setTouched] = useState(false);
+  // Nhà cung cấp của phiếu đang chọn (ô chọn phiếu) và số tiền hiện tại có phải số gợi ý từ phiếu không (người gõ thì không phải).
+  const [receiptSupplier, setReceiptSupplier] = useState("");
+  const [amountSuggested, setAmountSuggested] = useState(false);
+
+  // Đổi nhà cung cấp khác với nhà cung cấp của phiếu đang chọn: bỏ phiếu (và số gợi ý của nó), tránh gắn phiếu của nhà cung cấp khác (TL12-FE-M1).
+  const changeSupplier = (value: string) => {
+    setSupplier(value);
+    if (receiptId && receiptSupplier && receiptSupplier !== value) {
+      setReceiptId(NO_RECEIPT);
+      setReceiptSupplier("");
+      if (amountSuggested) {
+        setAmount("");
+        setAmountSuggested(false);
+      }
+    }
+  };
+  const typeAmount = (value: string) => {
+    setAmount(value);
+    setAmountSuggested(false);
+  };
 
   const suppliers = useResource(receipt ? null : "accounting:supplier-options", () => fetchSuppliers(), 60_000);
   const supplierOptions = useMemo(
@@ -121,7 +141,7 @@ export function PurchaseInvoiceForm({ receipt, onClose, onDone }: Props) {
         />
       ) : (
         <>
-          <Field as="select" label="Nhà cung cấp" name="supplier" required value={supplier} onChange={setSupplier} options={supplierOptions} error={err("supplier")} />
+          <Field as="select" label="Nhà cung cấp" name="supplier" required value={supplier} onChange={changeSupplier} options={supplierOptions} error={err("supplier")} />
           <ReceiptSelect
             label="Phiếu nhập"
             name="receipt"
@@ -132,14 +152,28 @@ export function PurchaseInvoiceForm({ receipt, onClose, onDone }: Props) {
             error={err("receipt")}
             onChange={(value, row) => {
               setReceiptId(value);
-              if (!row) return;
+              if (!row) {
+                // Bỏ phiếu: số tiền đang là số gợi ý của phiếu đó thì bỏ theo.
+                setReceiptSupplier("");
+                if (amountSuggested) {
+                  setAmount("");
+                  setAmountSuggested(false);
+                }
+                return;
+              }
               setSupplier(String(row.supplier));
-              if (row.purchase_amount !== undefined && !amount) setAmount(suggestedAmount(row.purchase_amount));
+              setReceiptSupplier(String(row.supplier));
+              // Không đè số người dùng đã gõ; số gợi ý của phiếu trước thì cập nhật theo phiếu mới.
+              if (row.purchase_amount !== undefined && (!amount || amountSuggested)) {
+                const next = suggestedAmount(row.purchase_amount);
+                setAmount(next);
+                setAmountSuggested(next !== "");
+              }
             }}
           />
         </>
       )}
-      <Field label="Số tiền hoá đơn" name="amount" type="money" required unit={CURRENCY_UNIT} value={amount} onChange={setAmount} error={err("amount")} />
+      <Field label="Số tiền hoá đơn" name="amount" type="money" required unit={CURRENCY_UNIT} value={amount} onChange={typeAmount} error={err("amount")} />
       <Field label="Ngày hoá đơn" name="invoice_date" type="date" required value={date} onChange={setDate} error={err("invoice_date")} />
       <label className="check-row">
         <input type="checkbox" name="is_paid" checked={paid} onChange={(e) => setPaid(e.target.checked)} />
