@@ -18,10 +18,12 @@ function buildReport(date: string): AiDailyReport {
   const at = (hm: string) => `${date}T${hm}:00+07:00`;
   return {
     date,
+    // Khớp với `items` bên dưới: 6 việc. Việc "Nhập lô" của Chủ là mức B rồi bị hoàn tác nên nằm ở cả cột B lẫn
+    // "Đã hoàn tác" (đúng như BE đếm) — vì vậy "Tổng việc AI" lấy theo số dòng nhật ký (6), không cộng sáu cột (7).
     by_user: [
-      { user_id: 1, display_name: "Chủ vựa (demo)", A: 5, B: 2, C_confirmed: 3, C_expired: 0, undone: 1, escalated: 0 },
-      { user_id: 2, display_name: "Kho 1 (demo)", A: 12, B: 3, C_confirmed: 1, C_expired: 1, undone: 0, escalated: 1 },
-      { user_id: 3, display_name: "Quản lý 1 (demo)", A: 8, B: 1, C_confirmed: 2, C_expired: 0, undone: 0, escalated: 0 },
+      { user_id: 1, display_name: "Chủ vựa (demo)", A: 0, B: 1, C_confirmed: 0, C_expired: 0, undone: 1, escalated: 0 },
+      { user_id: 2, display_name: "Kho 1 (demo)", A: 0, B: 2, C_confirmed: 0, C_expired: 0, undone: 0, escalated: 1 },
+      { user_id: 3, display_name: "Quản lý 1 (demo)", A: 1, B: 0, C_confirmed: 1, C_expired: 0, undone: 0, escalated: 0 },
     ],
     items: [
       {
@@ -67,6 +69,17 @@ function buildReport(date: string): AiDailyReport {
         created_at: at("09:15"),
         target: { type: "purchasereceipt", code: "PR-260928-01" },
         result_ref: { model: "purchasereceipt", id: 101 },
+      },
+      {
+        id: "rpt-6",
+        command: "inventory.batch.create",
+        title: "Tạo mới batch", // tên tự sinh của BE: màn phải hiện "Tạo lô cá" (commandLabels.ts)
+        level: "B",
+        status: "DONE",
+        owner_display: "Kho 1 (demo)",
+        created_at: at("09:14"),
+        target: null,
+        result_ref: null,
       },
       {
         id: "rpt-5",

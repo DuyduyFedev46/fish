@@ -1,10 +1,11 @@
-// Chữ của màn "AI của tôi" (ED-08 / W4b). Lỗi nghiệp vụ của BE hiện nguyên văn `detail` (qua describeSaveError), không viết lại ở đây.
+// Chữ của màn "AI của tôi" (ED-06 / W4b). Lỗi nghiệp vụ của BE hiện nguyên văn `detail` (qua describeSaveError), không viết lại ở đây.
 
 export const MY_AI_MSG = {
   back: "Tài khoản của tôi",
   subtitle: "Cài đặt cá nhân",
   statusOn: "AI của bạn đang bật",
   statusOff: "AI của bạn đang tắt",
+  statusGlobalOff: "AI đang tắt cho cả vựa",
   chipOn: "Đang hoạt động",
   chipOff: "Đã tắt",
   savedAt: "Lưu lần cuối",
@@ -30,7 +31,7 @@ export const MY_AI_MSG = {
   levelGroupLabel: (task: string) => `Mức tự chủ của việc ${task}`,
   kindRead: "Đọc",
   kindWrite: "Ghi",
-  redZone: "Vùng đỏ",
+  redZone: "Việc nhạy cảm",
   tasksCount: (n: number) => `${n} việc`,
   groupEmpty: "Bạn chưa có việc nào trong nhóm này.",
   limitsTitle: "Ngưỡng tự làm của bạn",

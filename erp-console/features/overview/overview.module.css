@@ -11,6 +11,8 @@
 .band :global(.tile):nth-child(odd) { padding-left: 0; }
 .band :global(.tile):nth-child(even) { border-left: 1px solid var(--border); padding-left: var(--space-4); }
 .band :global(.tile) .labIc { font-size: 14px; vertical-align: -2px; margin-left: var(--space-1); color: var(--ink-3); }
+/* Nhãn số liệu dài ("Lô cận hạn (14 ngày tới)", "Giá trị tồn kho theo giá vốn") xuống dòng thay vì bị cắt "…" ở 360px; chừa sẵn 2 dòng để các số thẳng hàng. */
+.band :global(.tile) :global(.lab) { white-space: normal; overflow: visible; text-overflow: clip; min-height: calc(2 * var(--text-xs) * var(--leading-snug)); }
 @container kpi (min-width: 900px) {
   .band :global(.kpis) { grid-template-columns: repeat(5, minmax(0, 1fr)); }
   .four :global(.kpis) { grid-template-columns: repeat(4, minmax(0, 1fr)); }

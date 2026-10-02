@@ -41,7 +41,6 @@ function orderColumns(now: number): Column<RecentOrder>[] {
     {
       key: "reason",
       header: "Lý do",
-      hideBelow: 720,
       render: (o) => orderLine(o.status, o.expires_at, now).reason ?? <span className="muted">—</span>,
     },
     {
@@ -129,7 +128,7 @@ function Body({ data }: { data: OverviewData }) {
       <section className={s.card} aria-labelledby="ov-batches">
         <div className={s.cardHead}>
           <h2 id="ov-batches">Tồn kho theo lô</h2>
-          <span className={s.cardHint}>Xuất theo hạn dùng sớm nhất (FEFO)</span>
+          <span className={s.cardHint}>Xếp theo hạn dùng sớm nhất</span>
           <Link href="/inventory/" className={s.cardLink}>
             Quản lý kho <Icon name="arrow_forward" />
           </Link>
@@ -145,7 +144,7 @@ function Body({ data }: { data: OverviewData }) {
           empty={{
             icon: "inventory_2",
             title: "Chưa có lô nào đang hoạt động",
-            hint: "Lô nhập ở Mua hàng sẽ hiện ở đây, xếp theo hạn dùng sớm nhất (FEFO).",
+            hint: "Lô nhập ở Mua hàng sẽ hiện ở đây, xếp theo hạn dùng sớm nhất.",
             action: canPurchase ? (
               <Link href="/purchasing/" className="btn">
                 Mở Mua hàng

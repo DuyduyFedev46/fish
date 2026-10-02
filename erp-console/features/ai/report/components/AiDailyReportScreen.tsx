@@ -1,6 +1,6 @@
 "use client";
 
-// "Báo cáo AI cuối ngày" của Chủ (ED-41 / W4d): /ai/report/. Chọn ngày (lùi/tiến, không quá hôm nay) · dải 7 số · bảng "Theo nhân viên"
+// "Báo cáo AI cuối ngày" của Chủ (ED-42 / W4d): /ai/report/. Chọn ngày (lùi/tiến, không quá hôm nay) · dải 7 số · bảng "Theo nhân viên"
 // (có dòng Cộng) · nhật ký việc AI trong ngày. Chỉ đọc. Tên ở đây là tên NHÂN VIÊN nội bộ, không phải khách; không ghi vào storage/URL/log.
 // BE (`report/daily`) không trả vai trò, không trả ghi chú từng việc, không trả đường dẫn chứng từ nên các cột đó không có (xem 03-dev-notes).
 
@@ -13,10 +13,11 @@ import { Icon } from "@/shared/ui/Icon";
 import { ResourceView } from "@/shared/ui/ResourceView";
 import { SkeletonKpis, SkeletonScreen, SkeletonTable } from "@/shared/ui/Skeleton";
 import { DataTable, type Column } from "@/shared/ui/list/DataTable";
+import { commandLabel } from "../../commandLabels";
 import { fetchDailyAiReport } from "../api";
 import { REPORT_MSG as M } from "../messages";
 import type { AiDailyReport, AiDailyReportItem, AiDailyReportUserStat } from "../../types";
-import { canGoNext, clampDay, grandTotal, shiftDay, targetTypeLabel, totalsOf, type ReportTotals } from "../view";
+import { canGoNext, clampDay, dayTotal, shiftDay, targetTypeLabel, totalsOf, type ReportTotals } from "../view";
 import s from "../report.module.css";
 
 type StaffRow = AiDailyReportUserStat | { user_id: "total"; display_name: string; total: ReportTotals };
@@ -52,7 +53,7 @@ const ITEM_COLUMNS: Column<AiDailyReportItem>[] = [
       </span>
     ),
   },
-  { key: "task", header: M.colTask, render: (r) => r.title },
+  { key: "task", header: M.colTask, render: (r) => commandLabel(r.command, r.title) },
   { key: "level", header: M.colLevel, width: "150px", render: (r) => <Chip table={ENUMS.aiLevel} value={r.level} /> },
   { key: "status", header: M.colStatus, width: "140px", render: (r) => <Chip table={ENUMS.aiActionStatus} value={r.status} /> },
   {
@@ -73,7 +74,7 @@ const ITEM_COLUMNS: Column<AiDailyReportItem>[] = [
 function Strip({ report }: { report: AiDailyReport }) {
   const t = totalsOf(report.by_user);
   const cells: [string, number][] = [
-    [M.total, grandTotal(t)],
+    [M.total, dayTotal(report)],
     [M.readOnly, t.A],
     [M.autoWrite, t.B],
     [M.askApproved, t.C_confirmed],
@@ -118,7 +119,7 @@ function ReportBody({ report }: { report: AiDailyReport }) {
       <section className={s.card} aria-label={M.itemsTitle}>
         <div className={s.cardHead}>
           <h2>{M.itemsTitle}</h2>
-          <span className={s.cardHint}>{M.itemsCount(report.items.length, grandTotal(totalsOf(report.by_user)))}</span>
+          <span className={s.cardHint}>{M.itemsCount(dayTotal(report))}</span>
         </div>
         <DataTable
           caption={M.caption}

@@ -1,4 +1,4 @@
-/* "Báo cáo AI cuối ngày" (ED-41 / W4d) — chỉ token trong tokens.css. Dải 7 số: 2 cột ở 360px, 4 cột từ 640px, 7 cột từ 1100px. */
+/* "Báo cáo AI cuối ngày" (ED-42 / W4d) — chỉ token trong tokens.css. Dải 7 số: 2 cột ở 360px, 4 cột từ 640px, 7 cột từ 1100px. */
 
 .page { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }
 

@@ -1,4 +1,4 @@
-# E2E ERP theo design, Lô 15 (ED-06 Tài khoản, ED-08 Tổng quan + AI của tôi, ED-41 Nhật ký + Chính sách AI + Báo cáo AI, ED-42):
+# E2E ERP theo design, Lô 15 (ED-06 Tài khoản + AI của tôi, ED-08 Tổng quan, ED-41 Nhật ký hoạt động, ED-42 Chính sách AI + Báo cáo AI):
 # chạy trên bản build MOCK phục vụ tĩnh.
 #   cd erp-console && NEXT_PUBLIC_USE_MOCK=1 npm run build && cp -R out /tmp/out15 && (cd /tmp/out15 && python3 -m http.server 3951 &)
 #   BASE=http://127.0.0.1:3951 SHOTS=shots/lo15 python3 e2e/ed_batch15_overview_ai_account.py      # tắt server sau khi xong
@@ -24,6 +24,7 @@ results = []
 expect.set_options(timeout=10_000)
 PHONE_RE = re.compile(r"0\d{9}")
 BAD_WORDS = ("undefined", "NaN", "[object", "BR-AI", "AI_POLICY")
+RAW_COMMAND_RE = re.compile(r"\b[a-z_]+\.[a-z_]+\.[a-z_]+\b|\b(batch|salesorder|purchasereceipt|bundleline|pricelist)\b")
 MISSING_ICONS = "() => [...new Set([...document.querySelectorAll('.mi')].filter(e => e.scrollWidth > e.clientWidth + 1).map(e => e.textContent))]"
 
 
@@ -114,6 +115,8 @@ def overview_owner(browser):
     ok("loc: mã đơn dạng SO…, không còn DH-", bool(re.search(r"\bSO\d", text)) and "DH-" not in text)
     ok("loc: bảng đơn có cột Còn giữ chỗ riêng, đang đếm mm:ss", "Còn giữ chỗ" in text and bool(re.search(r"\b\d{2}:\d{2}\b", text)))
     ok("loc: không tên/SĐT khách", not PHONE_RE.search(text), "")
+    heads = [h.strip() for h in page.locator("section[aria-labelledby=ov-orders] thead th").all_inner_texts()]
+    ok("loc: bảng Đơn hàng gần đây có cột Lý do riêng ở 1280px (ED-08-AC2)", heads == ["Mã đơn", "Giá trị", "Trạng thái", "Lý do", "Còn giữ chỗ"], str(heads))
     ok("loc: khối Cần chú ý có dòng lô quá hạn bấm sang kho lọc EXPIRED",
        page.locator("[data-attention=expired_batches_open] a").get_attribute("href") == "/inventory/?status=EXPIRED")
     ai_row = page.locator("[data-attention=ai_proposals]")
@@ -172,6 +175,8 @@ def overview_owner(browser):
     expect(page.locator(".tile[data-kpi]").first).to_be_visible()
     ok("loc 360px: không cuộn ngang trang", no_hscroll(page))
     ok("loc 360px: không icon rỗng", missing_icons(page) == [], str(missing_icons(page)))
+    clipped = page.evaluate("() => [...document.querySelectorAll('.tile .lab')].filter(e => e.scrollWidth > e.clientWidth + 1 || e.scrollHeight > e.clientHeight + 1).map(e => e.textContent.trim())")
+    ok("loc 360px: nhãn ô số liệu xuống dòng, không bị cắt", clipped == [], str(clipped))
     page.screenshot(path=f"{SHOTS}/lo15-overview-loc-360.png", full_page=True)
     ctx.close()
 
@@ -282,6 +287,7 @@ def my_ai(browser):
     ok("loc: AI của tôi hiện trạng thái, bảng mức tự chủ, nhóm việc", "Thu mua" in text and "Bán hàng" in text and "Hỏi trước khi làm" in text)
     ok("loc: không icon rỗng, không cuộn ngang", missing_icons(page) == [] and no_hscroll(page), str(missing_icons(page)))
     clean_text("loc AI của tôi", text)
+    ok("loc: tên việc là tiếng Việt, không mã lệnh hay tên model", not RAW_COMMAND_RE.search(text) and "Tạo lô cá" in text and "Tạo mới batch" not in text, "")
     page.screenshot(path=f"{SHOTS}/lo15-ai-settings-loc-1280.png", full_page=True)
 
     # Lưu khi chưa tích trách nhiệm → báo tại ô, KHÔNG gọi PUT
@@ -326,6 +332,10 @@ def my_ai(browser):
     go(page, "/ai/settings/")
     expect(page.get_by_text("Trợ lý đang tắt cho cả vựa")).to_be_visible()
     ok("loc (AI tắt cả vựa): báo rõ, cài đặt vẫn xem được", page.get_by_role("button", name="Lưu cài đặt").count() == 1)
+    head = page.locator("section[aria-label='Cài đặt cá nhân']").inner_text()
+    ok("loc (AI tắt cả vựa): thẻ trạng thái nói khớp banner, không ghi 'AI của bạn đang bật'",
+       "AI đang tắt cho cả vựa" in head and "Đã tắt" in head and "đang bật" not in head, head.replace("\n", "|"))
+    page.screenshot(path=f"{SHOTS}/lo15-ai-settings-global-off-1280.png", full_page=True)
     ctx.close()
 
     for user in ("ql1", "kho1", "cs2"):
@@ -358,6 +368,15 @@ def policy(browser):
        all(t in text for t in ("Chế độ cho cả vựa", "Việc nhạy cảm", "Tắt trợ lý cho cả vựa", "AI của nhân viên")))
     ok("loc: không icon rỗng, không cuộn ngang", missing_icons(page) == [] and no_hscroll(page), str(missing_icons(page)))
     clean_text("loc chính sách AI", text)
+    cells = page.evaluate("""() => {
+      const row = document.querySelector('[data-perm]');
+      const r = (el) => { const b = el.getBoundingClientRect(); return [Math.round(b.left), Math.round(b.right), Math.round(b.height)]; };
+      const name = row.children[0], desc = row.children[1];
+      const heads = [...document.querySelectorAll('#pol-red')][0].closest('section').querySelectorAll('[aria-hidden=true] > span');
+      return { name: r(name), desc: r(desc), nameFont: parseFloat(getComputedStyle(name).fontSize), headTask: r(heads[0]), headDesc: r(heads[1]), headCount: heads.length };
+    }""")
+    ok("loc: bảng Việc nhạy cảm ở 1280px: cột Việc đủ rộng, không đè cột Mô tả", cells["name"][1] <= cells["desc"][0] and cells["name"][1] - cells["name"][0] >= 130 and cells["name"][2] <= cells["nameFont"] * 3.2, str(cells))
+    ok("loc: tiêu đề cột thẳng hàng với ô (5 cột)", cells["headCount"] == 5 and abs(cells["headTask"][0] - cells["name"][0]) <= 2 and abs(cells["headDesc"][0] - cells["desc"][0]) <= 2, str(cells))
     page.screenshot(path=f"{SHOTS}/lo15-ai-policy-loc-1280.png", full_page=True)
 
     # Lưu thiếu ô trách nhiệm → báo tại ô, không PUT
@@ -422,9 +441,12 @@ def report(browser):
         lab, val = cells.nth(i).inner_text().split("\n")[:2]
         nums[lab.strip()] = int(val.strip())
     parts = sum(v for k, v in nums.items() if k != "Tổng việc AI")
-    ok("loc: Tổng việc AI = cộng sáu cột (board W4d)", nums.get("Tổng việc AI") == parts and parts > 0, str(nums))
+    log_rows = page.locator("section[aria-label='Nhật ký việc AI trong ngày'] tbody tr").count()
+    # TL15-FE-M1: tổng = số dòng nhật ký. Mock có 1 việc mức B bị hoàn tác (đếm ở cả cột B và Đã hoàn tác) nên cộng cột ra nhiều hơn 1.
+    ok("loc: Tổng việc AI = số dòng nhật ký, không cộng đôi việc đã hoàn tác", nums.get("Tổng việc AI") == log_rows and log_rows > 0 and parts == log_rows + 1, f"{nums} rows={log_rows}")
     ok("loc: không SĐT, không icon rỗng, không cuộn ngang", not PHONE_RE.search(text) and missing_icons(page) == [] and no_hscroll(page), str(missing_icons(page)))
     clean_text("loc báo cáo AI", text)
+    ok("loc: báo cáo AI: tên việc là tiếng Việt, không mã lệnh hay tên model", not RAW_COMMAND_RE.search(text) and "Tạo lô cá" in text and "Tạo mới batch" not in text, "")
     page.screenshot(path=f"{SHOTS}/lo15-ai-report-loc-1280.png", full_page=True)
     ok("loc: hôm nay → nút Ngày sau bị khoá", page.get_by_role("button", name="Ngày sau").is_disabled())
 
@@ -502,7 +524,7 @@ def account(browser, user, full=False):
         page.get_by_role("button", name="Đổi mật khẩu").click()
         dlg = page.get_by_role("dialog", name="Đổi mật khẩu")
         expect(dlg).to_be_visible()
-        ok(f"{user}: mở tấm đổi mật khẩu, focus vào ô Mật khẩu hiện tại", page.evaluate("() => document.activeElement && document.activeElement.id") == "cp-old")
+        ok(f"{user}: mở hộp đổi mật khẩu, focus vào ô Mật khẩu hiện tại", page.evaluate("() => document.activeElement && document.activeElement.id") == "cp-old")
         dlg.locator("#cp-old").fill("demo1234")
         dlg.locator("#cp-new").fill("Cavang2026x")
         dlg.locator("#cp-again").fill("Cavang2026y")
@@ -515,18 +537,18 @@ def account(browser, user, full=False):
         dlg.locator("#cp-old").fill("sai-mat-khau-1")
         dlg.get_by_role("button", name="Đổi mật khẩu").click()
         expect(dlg.get_by_role("alert").filter(has_text="Mật khẩu hiện tại không đúng")).to_be_visible()
-        ok(f"{user}: sai mật khẩu hiện tại → lỗi nguyên văn, tấm vẫn mở", dlg.count() == 1)
+        ok(f"{user}: sai mật khẩu hiện tại → lỗi nguyên văn, hộp vẫn mở", dlg.count() == 1)
         # Mật khẩu yếu → lỗi BE
         dlg.locator("#cp-old").fill("demo1234")
         dlg.locator("#cp-new").fill("12345678")
         dlg.locator("#cp-again").fill("12345678")
         dlg.get_by_role("button", name="Đổi mật khẩu").click()
         expect(dlg.get_by_role("alert").first).to_be_visible()
-        ok(f"{user}: mật khẩu toàn số → bị từ chối, tấm vẫn mở", dlg.count() == 1)
+        ok(f"{user}: mật khẩu toàn số → bị từ chối, hộp vẫn mở", dlg.count() == 1)
         # Huỷ
         dlg.get_by_role("button", name="Huỷ").click()
         expect(page.get_by_role("dialog")).to_have_count(0)
-        ok(f"{user}: Huỷ đóng tấm, không đổi mật khẩu", True)
+        ok(f"{user}: Huỷ đóng hộp, không đổi mật khẩu", True)
         # Thành công
         page.get_by_role("button", name="Đổi mật khẩu").click()
         dlg = page.get_by_role("dialog", name="Đổi mật khẩu")
@@ -536,7 +558,7 @@ def account(browser, user, full=False):
         dlg.get_by_role("button", name="Đổi mật khẩu").click()
         expect(page.get_by_role("dialog")).to_have_count(0)
         expect(page.locator(".toast-item").filter(has_text="Đã đổi mật khẩu").first).to_be_visible()
-        ok(f"{user}: đổi mật khẩu thành công → tấm đóng + thông báo", True)
+        ok(f"{user}: đổi mật khẩu thành công → hộp đóng + thông báo", True)
         ok(f"{user}: mật khẩu không nằm trong storage/URL", "Cavang2026x" not in storage_dump(page) and "Cavang2026x" not in page.url)
 
         # Đăng xuất: xoá mốc giờ, về trang đăng nhập
@@ -556,7 +578,7 @@ def account_mobile(browser):
     page.screenshot(path=f"{SHOTS}/lo15-account-kho1-360.png", full_page=True)
     page.get_by_role("button", name="Đổi mật khẩu").click()
     expect(page.get_by_role("dialog")).to_be_visible()
-    ok("kho1 360px: tấm đổi mật khẩu không cuộn ngang", no_hscroll(page))
+    ok("kho1 360px: hộp đổi mật khẩu không cuộn ngang", no_hscroll(page))
     page.screenshot(path=f"{SHOTS}/lo15-account-kho1-360-sheet.png")
     ctx.close()
 

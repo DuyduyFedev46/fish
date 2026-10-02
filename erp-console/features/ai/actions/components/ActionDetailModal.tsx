@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import type { AiActionDetail, AiActionRow } from "../../types";
 import { timeHMS } from "@/shared/lib/format";
+import { commandLabel } from "../../commandLabels";
 
 interface ActionDetailModalProps {
   action: AiActionDetail | AiActionRow | null;
@@ -115,8 +116,7 @@ export function ActionDetailModal({
         <div className="mt-4 space-y-4 text-sm text-gray-600 dark:text-gray-300">
           <div>
             <span className="font-medium text-gray-700 dark:text-gray-200">Lệnh:</span>{" "}
-            <span className="font-semibold text-gray-900 dark:text-gray-100">{action.title}</span> (
-            <code className="text-xs">{action.command}</code>)
+            <span className="font-semibold text-gray-900 dark:text-gray-100">{commandLabel(action.command, action.title)}</span>
           </div>
 
           <div className="grid grid-cols-2 gap-2">

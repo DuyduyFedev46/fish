@@ -1,7 +1,8 @@
-// Phần THUẦN của màn "Chính sách AI" (ED-41 / W4c): nhập liệu trần lệnh, kiểm, so thay đổi, mô tả việc nhạy cảm.
+// Phần THUẦN của màn "Chính sách AI" (ED-42 / W4c): nhập liệu trần lệnh, kiểm, so thay đổi, mô tả việc nhạy cảm.
 // Quy tắc ghi caps vẫn ở ./caps.ts (buildCapsForSave); file này chỉ lo chữ người dùng nhập <-> thứ gửi lên.
 
 import { ENUMS } from "@/shared/lib/enums";
+import { stripRuleCodes } from "@/shared/lib/ruleCodes";
 import type { AiPolicy, AiPolicyRedZoneItem, AiPolicyUserSummary, PolicyCaps } from "../types";
 import { RECEIVE_BATCHES_COMMAND_ID } from "../commandGroups";
 import type { ReceiveBatchesCap } from "./caps";
@@ -22,7 +23,7 @@ const RED_ZONE_SHORT: Record<string, string> = {
 };
 
 export function redZoneDescription(rz: AiPolicyRedZoneItem): string {
-  return RED_ZONE_SHORT[rz.perm] ?? rz.can_do;
+  return RED_ZONE_SHORT[rz.perm] ?? stripRuleCodes(rz.can_do);
 }
 
 // ---- Trần lệnh "Nhập lô mua tại cảng" ----

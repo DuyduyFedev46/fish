@@ -1,4 +1,4 @@
-// ED-41: phần thuần của màn "Chính sách AI".
+// ED-42: phần thuần của màn "Chính sách AI".
 import { describe, expect, it } from "vitest";
 import { RECEIVE_BATCHES_COMMAND_ID } from "../commandGroups";
 import type { AiPolicy, AiPolicyRedZoneItem, AiPolicyUserSummary } from "../types";
@@ -56,6 +56,9 @@ describe("mô tả và nhân viên", () => {
   it("việc nhạy cảm đã biết dùng câu ngắn, việc lạ dùng câu của BE", () => {
     expect(redZoneDescription(rz({ perm: "inventory.close_batch" }))).toBe("Khoá giá vốn của lô.");
     expect(redZoneDescription(rz({ perm: "zzz" }))).toBe("Câu của BE.");
+  });
+  it("câu của BE có mã luật thì bỏ mã trước khi hiện", () => {
+    expect(redZoneDescription(rz({ perm: "zzz", can_do: "Chỉ chốt lô đủ điều kiện (BR-AI-14)." }))).toBe("Chỉ chốt lô đủ điều kiện.");
   });
   it("chữ cái đầu và số việc theo mức", () => {
     expect(userInitial("  lộc")).toBe("L");

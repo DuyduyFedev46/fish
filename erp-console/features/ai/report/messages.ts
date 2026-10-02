@@ -1,4 +1,4 @@
-// Chữ của "Báo cáo AI cuối ngày" (ED-41 / W4d).
+// Chữ của "Báo cáo AI cuối ngày" (ED-42 / W4d).
 
 export const REPORT_MSG = {
   updated: (time: string) => `Cập nhật ${time}`,
@@ -20,7 +20,7 @@ export const REPORT_MSG = {
   byStaffEmptyTitle: "Chưa có việc AI nào trong ngày",
   byStaffEmptyHint: "Khi trợ lý làm việc, số liệu hiện ở đây.",
   itemsTitle: "Nhật ký việc AI trong ngày",
-  itemsCount: (shown: number, total: number) => `${shown} / ${total} việc`,
+  itemsCount: (total: number) => `${total} việc`,
   itemsNoun: "việc AI",
   itemsEmptyTitle: "Không có việc AI nào trong ngày này",
   itemsEmptyHint: "Chọn ngày khác để xem.",

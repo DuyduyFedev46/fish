@@ -1,7 +1,7 @@
-// Phần THUẦN của "Báo cáo AI cuối ngày" (ED-41 / W4d): cộng số, đổi ngày, nhãn chứng từ.
+// Phần THUẦN của "Báo cáo AI cuối ngày" (ED-42 / W4d): cộng số, đổi ngày, nhãn chứng từ.
 
 import { dateKeyInVietnam } from "@/shared/lib/format";
-import type { AiDailyReportUserStat } from "../types";
+import type { AiDailyReport, AiDailyReportUserStat } from "../types";
 
 export type ReportTotals = { A: number; B: number; C_confirmed: number; C_expired: number; undone: number; escalated: number };
 
@@ -19,9 +19,12 @@ export function totalsOf(rows: readonly AiDailyReportUserStat[]): ReportTotals {
   );
 }
 
-/** Tổng việc AI trong ngày = cộng cả sáu cột (board W4d: 29+3+5+1+1+2 = 41). */
-export function grandTotal(t: ReportTotals): number {
-  return t.A + t.B + t.C_confirmed + t.C_expired + t.undone + t.escalated;
+/**
+ * Tổng việc AI trong ngày = số dòng của nhật ký (BE trả đủ mọi việc trong ngày, không phân trang).
+ * KHÔNG cộng sáu cột: việc mức B bị hoàn tác nằm ở cả cột B lẫn cột "Đã hoàn tác" nên cộng cột sẽ đếm đôi.
+ */
+export function dayTotal(report: Pick<AiDailyReport, "items">): number {
+  return report.items.length;
 }
 
 /** Dời ngày "YYYY-MM-DD" theo số ngày (tính trên lịch, không phụ thuộc múi giờ máy). Sai định dạng → trả nguyên. */

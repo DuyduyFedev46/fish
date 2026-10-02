@@ -1,6 +1,6 @@
 "use client";
 
-// Màn "Chính sách AI" của Chủ (ED-41 / W4c): /ai/policy/. Cột chính: chế độ cả vựa (ba thẻ) · việc nhạy cảm (công tắc + thời gian chờ)
+// Màn "Chính sách AI" của Chủ (ED-42 / W4c): /ai/policy/. Cột chính: chế độ cả vựa (ba thẻ) · việc nhạy cảm (công tắc + thời gian chờ)
 // · trần lệnh Nhập lô. Cột phụ: "Tắt toàn bộ AI ngay" (hiệu lực tức thì, qua hộp xác nhận) · AI của từng nhân viên (xem cài đặt chỉ đọc,
 // tắt/bật) · tích cam kết rồi "Lưu chính sách". Không dùng confirm()/alert() của trình duyệt; lỗi BE hiện nguyên văn `detail`.
 // Tên nhân viên ở đây là tên NỘI BỘ, không phải khách; không ghi vào storage/URL/log.
@@ -10,6 +10,7 @@ import { dateTime } from "@/shared/lib/format";
 import { groupLabel } from "@/shared/lib/groups";
 import { ApiError, loadErrorText } from "@/shared/lib/http";
 import { ENUMS } from "@/shared/lib/enums";
+import { stripRuleCodes } from "@/shared/lib/ruleCodes";
 import { Field } from "@/shared/ui/form/Field";
 import { FormAlert } from "@/shared/ui/form/FormAlert";
 import { Icon } from "@/shared/ui/Icon";
@@ -21,6 +22,7 @@ import { ErrorBox, Loading } from "@/shared/ui/StateBox";
 import { ConflictBanner } from "@/shared/ui/states/ConflictBanner";
 import { getAiPolicy, getUserAiConfig, killUserAi, updateAiPolicy } from "../api";
 import { buildCapsForSave } from "../caps";
+import { commandLabel } from "../../commandLabels";
 import { POLICY_MSG as M } from "../messages";
 import type { AiPolicy, AiPolicyUserSummary, MyConfig } from "../../types";
 import { capErrors, capsToSave, countChips, formOf, isPolicyDirty, MODE_CARDS, policySubtitle, redZoneDescription, userInitial, type CapForm, type PolicyForm } from "../view";
@@ -76,7 +78,7 @@ function UserConfigModal({ user, onClose }: { user: AiPolicyUserSummary; onClose
                 <h3>{g.label}</h3>
                 {g.commands.map((c) => (
                   <div key={c.id} className={s.viewRow}>
-                    <span>{c.title}</span>
+                    <span>{commandLabel(c.id, c.title)}</span>
                     <span className="tag">{ENUMS.aiLevel[c.level]?.label ?? c.level}</span>
                   </div>
                 ))}
@@ -236,13 +238,12 @@ export default function AiPolicyScreen() {
             </div>
           </section>
 
-          <section className={s.card} aria-labelledby="pol-red">
+          <section className={`${s.card} ${s.rzCard}`} aria-labelledby="pol-red">
             <div className={s.cardHead}>
               <h2 id="pol-red">{M.sensitiveTitle}</h2>
               <span className={s.cardHint}>{M.sensitiveHint}</span>
             </div>
             <div className={s.rzHead} aria-hidden="true">
-              <span />
               <span>{M.colTask}</span>
               <span>{M.colDesc}</span>
               <span>{M.colState}</span>
@@ -254,7 +255,7 @@ export default function AiPolicyScreen() {
               return (
                 <div key={rz.perm} className={s.rz} data-perm={rz.perm}>
                   <span className={s.rzName}>
-                    <Icon name={RED_ZONE_ICON[rz.perm] ?? "shield"} />
+                    <Icon name={RED_ZONE_ICON[rz.perm] ?? "policy"} />
                     {rz.label}
                   </span>
                   <span className={s.rzDesc}>{redZoneDescription(rz)}</span>
@@ -290,11 +291,11 @@ export default function AiPolicyScreen() {
                     <summary>{M.detail}</summary>
                     <dl>
                       <dt>{M.canDo}</dt>
-                      <dd>{rz.can_do}</dd>
+                      <dd>{stripRuleCodes(rz.can_do)}</dd>
                       <dt>{M.cannotDo}</dt>
-                      <dd>{rz.cannot_do}</dd>
+                      <dd>{stripRuleCodes(rz.cannot_do)}</dd>
                       <dt>{M.legal}</dt>
-                      <dd>{rz.legal_note}</dd>
+                      <dd>{stripRuleCodes(rz.legal_note)}</dd>
                     </dl>
                   </details>
                 </div>

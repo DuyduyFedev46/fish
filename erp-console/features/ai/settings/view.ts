@@ -1,4 +1,4 @@
-// Phần THUẦN của màn "AI của tôi" (ED-08 / W4b): nhãn mức, mức nào bấm được, câu "Ghi chú" khoá, kiểm ô ngưỡng, đếm việc.
+// Phần THUẦN của màn "AI của tôi" (ED-06 / W4b): nhãn mức, mức nào bấm được, câu "Ghi chú" khoá, kiểm ô ngưỡng, đếm việc.
 // Quy tắc mức vẫn ở ./levels.ts (commandChoices, displayLevel, canKeepLevelB) — file này chỉ dựng chữ và hình dáng để vẽ.
 
 import { ENUMS } from "@/shared/lib/enums";

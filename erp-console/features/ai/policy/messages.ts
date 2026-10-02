@@ -1,4 +1,4 @@
-// Chữ của màn "Chính sách AI" (ED-41 / W4c). Lỗi nghiệp vụ của BE hiện nguyên văn `detail`.
+// Chữ của màn "Chính sách AI" (ED-42 / W4c). Lỗi nghiệp vụ của BE hiện nguyên văn `detail`.
 
 export const POLICY_MSG = {
   modeTitle: "Chế độ cho cả vựa",

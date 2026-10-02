@@ -1,4 +1,4 @@
-/* Màn "AI của tôi" (ED-08 / W4b) — chỉ token trong tokens.css. Hàng việc là lưới 4 cột (Việc · Loại · Ghi chú · Mức tự chủ),
+/* Màn "AI của tôi" (ED-06 / W4b) — chỉ token trong tokens.css. Hàng việc là lưới 4 cột (Việc · Loại · Ghi chú · Mức tự chủ),
    dưới 860px mỗi việc thành một thẻ xếp dọc để không phải cuộn ngang ở 360px. */
 
 .page { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }

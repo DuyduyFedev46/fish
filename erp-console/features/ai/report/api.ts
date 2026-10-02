@@ -1,4 +1,4 @@
-// API "Báo cáo AI cuối ngày" (ED-41 / W4d): GET /api/ai/report/daily/?date=YYYY-MM-DD (chỉ Chủ). Mock ở ./mock.ts.
+// API "Báo cáo AI cuối ngày" (ED-42 / W4d): GET /api/ai/report/daily/?date=YYYY-MM-DD (chỉ Chủ). Mock ở ./mock.ts.
 
 import { apiFetch } from "@/shared/lib/http";
 import type { AiDailyReport } from "../types";
