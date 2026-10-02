@@ -22,7 +22,7 @@ Thứ tự chạy từ trên xuống. Cột "Song song" = lô được giao cùn
 | ☑ | 7 | ED-23, ED-24, ED-25 (chỉ danh sách), ED-29 ∥ R5, R6, R7, R7b | BE ∥ FE | D3, W2f, W5i, W5k, W5l, F1e, F1g, F1h, F1i, F3m | FE: 1, 2 | Lô 6 | BE 1237d9b · FE af35b16 (merge 9d8d70e) |
 | ☑ | 8 | ED-27, ED-28 ∥ B1 | BE ∥ FE | W2c, W2g, F1f, W6f | FE: 1, 2; BE sau 7 | Lô 10 | BE 1237d9b · FE 76853c6 (merge ca08d23) |
 | ☑ | 9 | ED-26 ∥ R9 | BE ∥ FE | W5e, W5f, F2m, F2n | FE: 1, 2, 4; BE sau 8 | Lô 11 | BE 1237d9b · FE+BE 0ba9223 |
-| ☐ | 10 | ED-20 ∥ R10 | BE ∥ FE | W2a, W2b, F1a, F1c, F1d | FE: 1, 2 | Lô 8 | — |
+| ☑ | 10 | ED-20 ∥ R10 | BE ∥ FE | W2a, W2b, F1a, F1c, F1d | FE: 1, 2 | Lô 8 | BE 1237d9b, bb0137c, 9c727c0 · FE 5593a26 (merge c4ee720) |
 | ☑ | 11 | ED-21, ED-22 ∥ B3 | BE ∥ FE | W5c, W5d, F1b | FE: 1, 2; BE sau 10 | Lô 9 | BE 1237d9b · FE 46f601b |
 | ☐ | 12 | ED-32, ED-33, ED-34 ∥ R11, R12, R13, R15 | BE ∥ FE | W3a, W5j, W5g, W5g2 | FE: 1, 2, 10; BE sau 11 | Lô 13 | — |
 | ☐ | 13 | ED-30, ED-31 ∥ R14 | BE ∥ FE | W2d, W2h, W5o, W5h, W5m, F1k–F1o | FE: 1, 2 | Lô 12 | — |
