@@ -1,7 +1,7 @@
 "use client";
 
 // Tự đổi mật khẩu (hỏi mật khẩu hiện tại) — dùng ở 2 chỗ:
-// - S46: hộp thoại "Đổi mật khẩu" trong Tài khoản của tôi.
+// - S46: hộp thoại "Đổi mật khẩu" (shared/ui/overlay/Modal, board F3g) trong Tài khoản của tôi; nút ở chân hộp qua `formId`.
 // - S48: màn "Đặt mật khẩu mới" bắt buộc khi còn mật khẩu tạm (`mustChange`).
 // Thành công → máy này nhận token mới, `me` tải lại (S48: cờ tắt → vào home); máy khác của cùng tài khoản bị đăng
 // xuất. "Nhập lại" khác "Mật khẩu mới" → báo "Hai mật khẩu không khớp", KHÔNG gọi API (S48-AC3). Lỗi BE
@@ -22,9 +22,11 @@ type Props = {
   onCancel?: () => void;
   /** Báo cho hộp chứa biết đang gửi, để hộp không đóng được giữa chừng. */
   onBusyChange?: (busy: boolean) => void;
+  /** Đặt id cho <form> khi nút gửi nằm NGOÀI form (chân hộp thoại, `<button form=…>`); có id thì form không tự vẽ hàng nút. */
+  formId?: string;
 };
 
-export function ChangePasswordForm({ onDone, mustChange = false, onCancel, onBusyChange }: Props) {
+export function ChangePasswordForm({ onDone, mustChange = false, onCancel, onBusyChange, formId }: Props) {
   const { me, changePassword } = useAuth();
   const [oldPw, setOldPw] = useState("");
   const [newPw, setNewPw] = useState("");
@@ -72,7 +74,7 @@ export function ChangePasswordForm({ onDone, mustChange = false, onCancel, onBus
   };
 
   return (
-    <form className="sheet-form" onSubmit={onSubmit} aria-label={mustChange ? MSG.mustChangeTitle : "Đổi mật khẩu"} noValidate>
+    <form id={formId} className="sheet-form" onSubmit={onSubmit} aria-label={mustChange ? MSG.mustChangeTitle : "Đổi mật khẩu"} noValidate>
       {error && (
         <div className="alert-box err" role="alert">
           <Icon name="error" />
@@ -128,17 +130,19 @@ export function ChangePasswordForm({ onDone, mustChange = false, onCancel, onBus
         onShownChange={setShownNew}
         error={missing === "again" ? MSG.needAgainPassword : mismatch ? MSG.passwordMismatch : null}
       />
-      <div className="form-actions">
-        {onCancel && (
-          <button type="button" className="btn" onClick={onCancel} disabled={busy}>
-            Huỷ
+      {!formId && (
+        <div className="form-actions">
+          {onCancel && (
+            <button type="button" className="btn" onClick={onCancel} disabled={busy}>
+              Huỷ
+            </button>
+          )}
+          <button type="submit" className="btn primary" disabled={busy} aria-busy={busy || undefined}>
+            {busy && <Icon name="progress_activity" className="spin" />}
+            {busy ? "Đang lưu…" : mustChange ? "Lưu mật khẩu mới" : "Đổi mật khẩu"}
           </button>
-        )}
-        <button type="submit" className="btn primary" disabled={busy} aria-busy={busy || undefined}>
-          {busy && <Icon name="progress_activity" className="spin" />}
-          {busy ? "Đang lưu…" : mustChange ? "Lưu mật khẩu mới" : "Đổi mật khẩu"}
-        </button>
-      </div>
+        </div>
+      )}
     </form>
   );
 }

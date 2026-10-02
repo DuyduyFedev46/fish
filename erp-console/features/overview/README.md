@@ -1,7 +1,7 @@
 # features/overview — Tổng quan (ED-08 / board D1)
 
 Màn đầu của Chủ/Quản lý/NV kho. Dải 5 số liệu (Doanh thu, Đơn chờ xử lý, Sắp hết giữ chỗ, Lô cận hạn, Giá trị tồn kho) ·
-"Cần chú ý" · "Đơn hàng gần đây" · "Tồn kho theo lô" (thứ tự xuất FEFO). Story gốc **S8**, làm lại theo design ở Lô 15.
+"Cần chú ý" · "Đơn hàng gần đây" · "Tồn kho theo lô" (xếp theo hạn dùng sớm nhất). Story gốc **S8**, làm lại theo design ở Lô 15.
 
 - Endpoint: `GET /api/dashboard/summary/` — BE chỉ đòi đăng nhập. Contract + kiểu ở `shared/lib/dashboardSummary.ts`
   (dùng chung với `orders`, `inventory`), cache chung qua `shared/lib/useResource.ts`. Khối "Cần chú ý" gọi riêng

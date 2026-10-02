@@ -7,6 +7,7 @@ import { ViewGuard } from "@/features/auth/components/ViewGuard";
 import { useAuth } from "@/features/auth/components/AuthProvider";
 import { fetchAiActions, confirmAiAction, rejectAiAction, undoAiAction } from "@/features/ai/actions/api";
 import { ActionDetailModal } from "@/features/ai/actions/components/ActionDetailModal";
+import { commandLabel } from "@/features/ai/commandLabels";
 import type { AiActionRow } from "@/features/ai/types";
 import { Icon } from "@/shared/ui/Icon";
 import { Loading } from "@/shared/ui/StateBox";
@@ -277,7 +278,7 @@ function AiActionsContent() {
                   className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50"
                 >
                   <td className="px-4 py-3 font-medium text-gray-900 dark:text-gray-100">
-                    {act.title}
+                    {commandLabel(act.command, act.title)}
                   </td>
                   <td className="px-4 py-3">
                     <span className="rounded bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-950 dark:text-blue-300">

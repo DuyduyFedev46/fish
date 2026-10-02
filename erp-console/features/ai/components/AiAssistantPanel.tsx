@@ -22,6 +22,7 @@ import { askAi, selectEngineName, setRuntimeModelUrl, shutdownRuntime } from "..
 import { fetchCommandIndex, fetchCommandDescriptor } from "../commands/index";
 import { planCommand } from "../commands/planner";
 import { callCommand } from "../commands/call";
+import { commandLabel } from "../commandLabels";
 import { undoAiAction } from "../actions/api";
 import { useAuth } from "@/features/auth/components/AuthProvider";
 import { ROLE } from "@/shared/lib/roles";
@@ -299,16 +300,16 @@ export function AiAssistantPanel({ status, initialText, autoSend = false, onRead
                 const undoUntil =
                   res.undo_until || new Date(Date.now() + 10 * 60 * 1000).toISOString();
                 appendAi(
-                  `AI đã thực hiện thao tác "${plan.command.title}" (Mã việc: ${res.action_id}). Có thể hoàn tác trong vòng 10 phút.`,
+                  `AI đã thực hiện thao tác "${commandLabel(plan.command.id, plan.command.title)}" (Mã việc: ${res.action_id}). Có thể hoàn tác trong vòng 10 phút.`,
                   {
                     actionId: res.action_id,
                     undoUntil,
-                    commandTitle: plan.command.title,
+                    commandTitle: commandLabel(plan.command.id, plan.command.title),
                   }
                 );
               } else {
                 // DW-14-AC1: Mức A - lệnh đọc thành công
-                let reply = `Kết quả thực hiện "${plan.command.title}":\n`;
+                let reply = `Kết quả thực hiện "${commandLabel(plan.command.id, plan.command.title)}":\n`;
                 if (res.result) {
                   if (Array.isArray(res.result.rows)) {
                     reply += `Tìm thấy ${res.result.rows.length} mục:\n`;
@@ -331,15 +332,15 @@ export function AiAssistantPanel({ status, initialText, autoSend = false, onRead
             } else if (res.outcome === "scheduled") {
               // DW-21: Lệnh xếp lịch
               appendAi(
-                `AI đã lên lịch thực thi thao tác "${plan.command.title}" (Mã việc: ${res.action_id}). Dự kiến tự thực thi sau thời gian trì hoãn. Bạn có thể vào màn Việc AI để kiểm tra hoặc huỷ lịch.`
+                `AI đã lên lịch thực thi thao tác "${commandLabel(plan.command.id, plan.command.title)}" (Mã việc: ${res.action_id}). Dự kiến tự thực thi sau thời gian trì hoãn. Bạn có thể vào màn Việc AI để kiểm tra hoặc huỷ lịch.`
               );
             } else if (res.outcome === "proposal") {
               // Mức C - đề xuất nháp
               appendAi(
-                `AI đã tạo đề xuất nháp cho thao tác "${plan.command.title}" (mã: ${res.action_id}). Vui lòng vào màn Việc AI để kiểm tra và duyệt.`
+                `AI đã tạo đề xuất nháp cho thao tác "${commandLabel(plan.command.id, plan.command.title)}" (mã: ${res.action_id}). Vui lòng vào màn Việc AI để kiểm tra và duyệt.`
               );
             } else {
-              appendAi(`Lệnh "${plan.command.title}" đã được ghi nhận.`);
+              appendAi(`Lệnh "${commandLabel(plan.command.id, plan.command.title)}" đã được ghi nhận.`);
             }
           } catch (callErr: unknown) {
             const errMsg = callErr instanceof Error ? callErr.message : "Thao tác gặp lỗi khi thực thi.";
@@ -351,7 +352,7 @@ export function AiAssistantPanel({ status, initialText, autoSend = false, onRead
 
         if (plan.type === "form_only") {
           appendAi(
-            `Thao tác "${plan.command.title}" cần mở biểu mẫu để điền thông tin chi tiết. Vui lòng mở màn hình liên quan.`
+            `Thao tác "${commandLabel(plan.command.id, plan.command.title)}" cần mở biểu mẫu để điền thông tin chi tiết. Vui lòng mở màn hình liên quan.`
           );
           finalizePending();
           return;

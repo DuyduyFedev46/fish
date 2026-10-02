@@ -1,4 +1,4 @@
-/* Màn "Chính sách AI" (ED-41 / W4c) — chỉ token trong tokens.css. Từ 1100px: cột chính (chế độ, việc nhạy cảm, trần)
+/* Màn "Chính sách AI" (ED-42 / W4c) — chỉ token trong tokens.css. Từ 1100px: cột chính (chế độ, việc nhạy cảm, trần)
    + cột phụ (tắt toàn bộ, nhân viên, lưu). Dưới đó xếp dọc; bảng việc nhạy cảm thành thẻ để 360px không cuộn ngang. */
 
 .page { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }
@@ -43,12 +43,15 @@
 .rzDetail dl { margin: 0; display: grid; grid-template-columns: 1fr; gap: var(--space-1-5); padding-bottom: var(--space-2); }
 .rzDetail dt { font-weight: var(--weight-semibold); color: var(--ink); font-size: var(--text-xs); }
 .rzDetail dd { margin: 0; }
-@media (min-width: 860px) {
-  .rzHead, .rz { grid-template-columns: 28px minmax(140px, 1.1fr) minmax(160px, 1.6fr) 96px minmax(150px, 1fr) 64px; gap: var(--space-3); }
+/* Dạng bảng 5 cột theo bề ngang của CHÍNH thẻ (không theo màn hình): cột chính chỉ rộng khoảng 600px ở màn 1280px nên nếu theo
+   media query thì cột "Việc" bị bóp. Thẻ hẹp hơn 580px thì giữ dạng xếp dọc ở trên. */
+.rzCard { container-type: inline-size; }
+@container (min-width: 580px) {
+  .rzHead, .rz { grid-template-columns: minmax(130px, 1.2fr) minmax(120px, 1.6fr) 80px minmax(100px, 0.9fr) 56px; gap: var(--space-3); }
   .rzHead { display: grid; padding: var(--space-2) var(--space-4); background: var(--surface-2); border-bottom: 1px solid var(--border); color: var(--ink-3); font-size: var(--text-xs); font-weight: var(--weight-semibold); }
   .rz { align-items: center; }
   .rzName, .rzDesc, .rzState, .rzDelay, .rzSwitch { grid-column: auto; grid-row: auto; }
-  .rzDetail { grid-column: 2 / -1; }
+  .rzDetail { grid-column: 1 / -1; }
 }
 
 /* Công tắc (role="switch"): vùng bấm >= 44px, nét vẽ nhỏ gọn. */

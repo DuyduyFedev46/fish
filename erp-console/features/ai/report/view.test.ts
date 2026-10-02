@@ -1,6 +1,7 @@
-// ED-41: phần thuần của "Báo cáo AI cuối ngày".
+// ED-42: phần thuần của "Báo cáo AI cuối ngày".
 import { describe, expect, it } from "vitest";
-import { canGoNext, clampDay, grandTotal, shiftDay, targetTypeLabel, totalsOf } from "./view";
+import type { AiDailyReport } from "../types";
+import { canGoNext, clampDay, dayTotal, shiftDay, targetTypeLabel, totalsOf } from "./view";
 
 describe("totalsOf", () => {
   it("cộng từng cột; rỗng thì toàn 0", () => {
@@ -35,11 +36,22 @@ describe("targetTypeLabel", () => {
   });
 });
 
-describe("grandTotal", () => {
-  it("cộng cả sáu cột như board W4d (29+3+5+1+1+2 = 41)", () => {
-    expect(grandTotal({ A: 29, B: 3, C_confirmed: 5, C_expired: 1, undone: 1, escalated: 2 })).toBe(41);
+describe("dayTotal", () => {
+  const item = (id: string, level: "A" | "B" | "C", status: string) => ({
+    id, command: "x.y", title: "t", level, status, owner_display: "u", created_at: "2026-10-03T09:00:00+07:00", target: null, result_ref: null,
   });
-  it("ngày rỗng thì 0", () => {
-    expect(grandTotal(totalsOf([]))).toBe(0);
+  it("việc mức B rồi bị hoàn tác chỉ tính 1 (cột B và cột Đã hoàn tác cùng đếm nó)", () => {
+    const report = {
+      date: "2026-10-03",
+      by_user: [{ user_id: 1, display_name: "x", A: 0, B: 1, C_confirmed: 0, C_expired: 0, undone: 1, escalated: 0 }],
+      items: [item("a", "B", "UNDONE")],
+    } as unknown as AiDailyReport;
+    const t = totalsOf(report.by_user);
+    expect(t.A + t.B + t.C_confirmed + t.C_expired + t.undone + t.escalated).toBe(2); // cộng cột sẽ đếm đôi
+    expect(dayTotal(report)).toBe(1);
+  });
+  it("bằng số dòng nhật ký; ngày rỗng thì 0", () => {
+    expect(dayTotal({ items: [item("a", "A", "DONE"), item("b", "C", "CONFIRMED")] } as unknown as AiDailyReport)).toBe(2);
+    expect(dayTotal({ items: [] })).toBe(0);
   });
 });

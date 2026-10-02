@@ -5,16 +5,16 @@
 // Mục menu thấy được lấy từ bảng menu ↔ quyền (shared/lib/nav.ts) để người dùng hiểu vì sao thấy/không thấy.
 // Trang một cột kiểu trang cài đặt (Linear/Notion): đầu trang người dùng + 3 hàng thông tin, rồi từng phần tiêu đề + nhóm hàng.
 // "Phiên đăng nhập": BE chưa có danh sách phiên, FE chỉ nhớ MỐC GIỜ đăng nhập ở máy này (signedInAt.ts, không có dữ liệu cá nhân).
-// Đổi mật khẩu trong tấm bên (đang gửi thì không đóng được); kết quả báo bằng thông báo nổi.
+// Đổi mật khẩu trong hộp thoại giữa màn (Modal, board F3g; đang gửi thì không đóng được); kết quả báo bằng thông báo nổi.
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { dateTime } from "@/shared/lib/format";
 import { groupLabel } from "@/shared/lib/groups";
 import { AI_SETTINGS_HREF, canView, visibleNav } from "@/shared/lib/nav";
 import { MSG } from "@/shared/lib/messages";
 import { Icon } from "@/shared/ui/Icon";
-import { SideSheet } from "@/shared/ui/SideSheet";
+import { Modal } from "@/shared/ui/overlay/Modal";
 import { useToast } from "@/shared/ui/overlay/Toast";
 import { Loading } from "@/shared/ui/StateBox";
 import { forgetSignedIn, readSignedIn } from "../signedInAt";
@@ -36,6 +36,7 @@ export function AccountScreen() {
   const toast = useToast();
   const [pwOpen, setPwOpen] = useState(false);
   const [pwBusy, setPwBusy] = useState(false);
+  const pwFormId = useId();
   const [busy, setBusy] = useState<"logout" | "refresh" | null>(null);
   // Đọc sau khi mount (trang xuất tĩnh, localStorage chỉ có ở trình duyệt).
   const [signedIn, setSignedIn] = useState<string | null>(null);
@@ -244,18 +245,31 @@ export function AccountScreen() {
       </section>
 
       {pwOpen && (
-        <SideSheet title="Đổi mật khẩu" busy={pwBusy} onClose={() => setPwOpen(false)}>
-          {(close) => (
-            <ChangePasswordForm
-              onCancel={close}
-              onBusyChange={setPwBusy}
-              onDone={(msg) => {
-                toast.success(msg);
-                close();
-              }}
-            />
-          )}
-        </SideSheet>
+        <Modal
+          title="Đổi mật khẩu"
+          busy={pwBusy}
+          onClose={() => setPwOpen(false)}
+          footer={
+            <>
+              <button type="button" className="btn" onClick={() => setPwOpen(false)} disabled={pwBusy}>
+                Huỷ
+              </button>
+              <button type="submit" form={pwFormId} className="btn primary" disabled={pwBusy} aria-busy={pwBusy || undefined}>
+                {pwBusy && <Icon name="progress_activity" className="spin" />}
+                {pwBusy ? "Đang lưu…" : "Đổi mật khẩu"}
+              </button>
+            </>
+          }
+        >
+          <ChangePasswordForm
+            formId={pwFormId}
+            onBusyChange={setPwBusy}
+            onDone={(msg) => {
+              toast.success(msg);
+              setPwOpen(false);
+            }}
+          />
+        </Modal>
       )}
     </div>
   );

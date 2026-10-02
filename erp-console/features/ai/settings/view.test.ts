@@ -1,4 +1,4 @@
-// ED-08: phần thuần của màn "AI của tôi" — nhãn mức, mức bị khoá, ghi chú khoá, ô ngưỡng, thay đổi chưa lưu.
+// ED-06: phần thuần của màn "AI của tôi" — nhãn mức, mức bị khoá, ghi chú khoá, ô ngưỡng, thay đổi chưa lưu.
 import { describe, expect, it } from "vitest";
 import type { MyConfig, MyConfigCommandItem } from "../types";
 import { isDirty, levelChoiceLabel, levelChoices, limitErrors, limitProblem, lockNote } from "./view";

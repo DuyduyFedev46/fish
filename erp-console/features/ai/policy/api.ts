@@ -1,4 +1,4 @@
-// API "Chính sách AI" của Chủ (ED-41 / W4c): đọc/ghi chính sách, tắt/bật AI từng người, xem cấu hình từng người (chỉ đọc).
+// API "Chính sách AI" của Chủ (ED-42 / W4c): đọc/ghi chính sách, tắt/bật AI từng người, xem cấu hình từng người (chỉ đọc).
 // Thân PUT/POST là object một lớp JSON (SR-AIS-01). Nhánh mock ở ./mock.ts, chỉ nối khi NEXT_PUBLIC_USE_MOCK=1.
 
 import { apiFetch } from "@/shared/lib/http";

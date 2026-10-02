@@ -15,6 +15,8 @@ type MockSpec = { id: string; title: string; kind: AiCommandKind; group: AiComma
 const SPECS: MockSpec[] = [
   { id: "inventory.batch.list", title: "Xem tồn kho theo lô", kind: "read", group: COMMAND_GROUP.purchasing, maxLevel: "A", redZone: false },
   { id: "purchasing.purchasereceipt.submit", title: "Gửi phiếu nhập kho", kind: "write", group: COMMAND_GROUP.purchasing, maxLevel: "C", redZone: false },
+  // Tên lệnh do registry BE tự sinh (chưa có tên viết tay): FE phải đổi sang tiếng Việt (commandLabels.ts, Lô 15 QA).
+  { id: "inventory.batch.create", title: "Tạo mới batch", kind: "write", group: COMMAND_GROUP.purchasing, maxLevel: "C", redZone: false },
   { id: RECEIVE_BATCHES_COMMAND_ID, title: "Nhập lô mua tại cảng", kind: "write", group: COMMAND_GROUP.purchasing, maxLevel: "B", redZone: false },
   { id: "sales.salesorder.list", title: "Xem danh sách đơn bán", kind: "read", group: COMMAND_GROUP.sales, maxLevel: "A", redZone: false },
   { id: "sales.salesorder.confirm_payment", title: "Xác nhận thanh toán tay", kind: "write", group: COMMAND_GROUP.sales, maxLevel: "B", redZone: true },
@@ -72,7 +74,7 @@ function commandItem(spec: MockSpec): MyConfigCommandItem {
     source,
     choices: isRead ? ["OFF", "A"] : spec.redZone ? ["OFF", "C"] : [...WRITE_CHOICES],
     max_level: isRead ? "A" : spec.redZone ? "C" : spec.maxLevel,
-    locked_reason: !isRead && spec.redZone ? { code: "BR-AI-18", text: "Chủ chưa mở vùng đỏ cho lệnh này" } : null,
+    locked_reason: !isRead && spec.redZone ? { code: "BR-AI-18", text: "Chủ chưa mở việc nhạy cảm này" } : null,
     red_zone: !isRead && spec.redZone,
     limits: isRead ? null : state.limits[spec.id] ?? null,
     supports_limits: !isRead && spec.id === RECEIVE_BATCHES_COMMAND_ID,
@@ -129,7 +131,7 @@ export function mockUpdateMyConfig(body: unknown): MockResponse {
     const spec = SPECS.find((s) => s.id === id);
     if (!spec) errors[id] = "Lệnh ngoài quyền của bạn";
     else if (spec.kind === "read" ? !READ_LEVELS.has(String(level)) : !WRITE_LEVELS.has(String(level))) errors[id] = "Mức không hợp lệ";
-    else if (spec.redZone && level === "B") errors[id] = "Chủ chưa mở vùng đỏ cho lệnh này";
+    else if (spec.redZone && level === "B") errors[id] = "Chủ chưa mở việc nhạy cảm này";
   }
   for (const [group, cfg] of Object.entries(groups)) {
     if (!isRecord(cfg)) continue;

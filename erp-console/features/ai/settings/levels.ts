@@ -2,6 +2,7 @@
 // Thuần hàm, không React, để vừa vẽ màn vừa dựng thân PUT bằng cùng một quy tắc.
 
 import { ApiError } from "@/shared/lib/http";
+import { commandLabel } from "../commandLabels";
 import type { AiCommandLevel, MyConfig, MyConfigCommandItem } from "../types";
 import type { MyConfigSavePayload } from "./payload";
 
@@ -51,7 +52,7 @@ export function limitFieldsOf(cmd: MyConfigCommandItem): LimitField[] {
 }
 
 function commandTitle(config: MyConfig, id: string): string {
-  return allCommands(config).find((cmd) => cmd.id === id)?.title ?? id;
+  return commandLabel(id, allCommands(config).find((cmd) => cmd.id === id)?.title);
 }
 
 function errorKeyLabel(config: MyConfig, key: string): string {

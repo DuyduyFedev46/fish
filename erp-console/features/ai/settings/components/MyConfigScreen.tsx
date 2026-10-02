@@ -1,6 +1,6 @@
 "use client";
 
-// Màn "AI của tôi" (ED-08 / W4b): /ai/settings/. Thẻ trạng thái + "Tắt trợ lý/Bật lại" (hộp xác nhận) · bảng chú giải mức ·
+// Màn "AI của tôi" (ED-06 / W4b): /ai/settings/. Thẻ trạng thái + "Tắt trợ lý/Bật lại" (hộp xác nhận) · bảng chú giải mức ·
 // mỗi nhóm một bảng Việc · Loại · Ghi chú · Mức tự chủ (nhóm nút radio; mức bị khoá vẫn hiện, kèm ổ khoá và lý do) ·
 // ngưỡng tự làm (chỉ khi việc ở mức Tự ghi) · tích cam kết rồi "Lưu cài đặt".
 // Logic mức/ngưỡng/thân PUT giữ nguyên ở ./levels.ts và ./payload.ts (BE thay thế toàn bộ cấu hình mỗi lần lưu).
@@ -21,6 +21,7 @@ import { useToast } from "@/shared/ui/overlay/Toast";
 import { SkeletonScreen, SkeletonTable } from "@/shared/ui/Skeleton";
 import { ErrorBox } from "@/shared/ui/StateBox";
 import { ConflictBanner } from "@/shared/ui/states/ConflictBanner";
+import { commandLabel } from "../../commandLabels";
 import { getMyConfig, killMyConfig, updateMyConfig } from "../api";
 import { describeSaveError, displayLevel, limitFieldsOf, type LimitField } from "../levels";
 import { MY_AI_MSG as M } from "../messages";
@@ -70,7 +71,7 @@ function CommandRow({
     <div className={s.item} data-command={cmd.id}>
       <div className={s.row}>
         <div className={s.name}>
-          {cmd.title}
+          {commandLabel(cmd.id, cmd.title)}
           {cmd.red_zone && <span className={`tag ${s.kind}`}> {M.redZone}</span>}
         </div>
         <div className={s.kind}>
@@ -86,7 +87,7 @@ function CommandRow({
             <span className="muted">—</span>
           )}
         </div>
-        <div className={s.levels} role="radiogroup" aria-label={M.levelGroupLabel(cmd.title)}>
+        <div className={s.levels} role="radiogroup" aria-label={M.levelGroupLabel(commandLabel(cmd.id, cmd.title))}>
           {choices.map((c) => (
             <label key={c.level} className={s.level}>
               <input
@@ -239,6 +240,10 @@ export default function MyConfigScreen() {
 
   const killed = config.killed;
   const busy = saving;
+  // Chủ tắt AI cả vựa thì trạng thái chính phải nói đúng điều đó, không được ghi "đang bật" trong khi banner báo tắt.
+  const globalOff = !config.ai_enabled;
+  const headOff = globalOff || killed;
+  const headText = globalOff ? M.statusGlobalOff : killed ? M.statusOff : M.statusOn;
 
   return (
     <div className={s.page}>
@@ -256,15 +261,15 @@ export default function MyConfigScreen() {
       {conflict && <ConflictBanner noun={M.noun} onReload={() => void load()} />}
 
       <section className={s.head} aria-label={M.subtitle}>
-        <span className={`${s.headIcon} ${killed ? s.headIconOff : ""}`}>
+        <span className={`${s.headIcon} ${headOff ? s.headIconOff : ""}`}>
           <Icon name="auto_awesome" />
         </span>
         <div className={s.headBody}>
           <div className={s.headTitle}>
-            <span>{killed ? M.statusOff : M.statusOn}</span>
-            <span className={`status ${killed ? "mute" : "good"}`}>
+            <span>{headText}</span>
+            <span className={`status ${headOff ? "mute" : "good"}`}>
               <span className="dot" />
-              {killed ? M.chipOff : M.chipOn}
+              {headOff ? M.chipOff : M.chipOn}
             </span>
           </div>
           <div className={s.headMeta}>
