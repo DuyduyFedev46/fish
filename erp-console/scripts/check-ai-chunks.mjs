@@ -57,6 +57,11 @@ const TARGETS = [
   ["/(console)/reports/page", "/reports"],
   ["/(console)/accounting/sales-invoices/page", "/accounting/sales-invoices"],
   ["/(console)/accounting/purchase-invoices/page", "/accounting/purchase-invoices"],
+  // Nhân sự + Phân quyền (Lô 14): không có khối AI; tên, SĐT nhân viên không đưa cho AI — phải xanh.
+  ["/(console)/staff/page", "/staff"],
+  ["/(console)/staff/detail/page", "/staff/detail"],
+  ["/(console)/permissions/page", "/permissions"],
+  ["/(console)/permissions/detail/page", "/permissions/detail"],
 ];
 
 // Chuỗi đặc trưng của code AI chạy trên máy (worker, thư viện wllama, gọi lệnh AI).

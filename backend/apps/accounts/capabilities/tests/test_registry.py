@@ -56,3 +56,19 @@ class RegistryTests(TestCase):
         labels = {c.key: c.label for c in registry.CAPABILITIES}
         self.assertEqual(labels["create_refund"], CAPABILITY_LABELS["sales.create_refund"])
         self.assertEqual(labels["confirm_payment"], CAPABILITY_LABELS["sales.confirm_payment_manual"])
+
+
+class CreateReturnCapabilityTests(TestCase):
+    """TLA-L2 (Lô 14): ô "Ghi hàng hoàn về kho" để Chủ cấp/gỡ quyền tạo phiếu hàng hoàn cho từng nhóm."""
+
+    def test_create_return_capability_maps_to_add_returntostock(self):
+        capability = registry.BY_KEY["create_return"]
+        self.assertEqual(capability.perms, ("inventory.add_returntostock",))
+        self.assertEqual(capability.section, registry.SECTION_STOCK)
+        self.assertEqual(capability.label, "Ghi hàng hoàn về kho")
+        self.assertFalse(capability.owner_only)
+        self.assertEqual(capability.requires, ())
+
+    def test_create_return_is_not_mixed_with_approve_return(self):
+        # Hai việc tách nhau: duyệt hàng hoàn không kéo theo quyền ghi phiếu.
+        self.assertNotIn("inventory.add_returntostock", registry.BY_KEY["approve_return"].perms)

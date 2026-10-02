@@ -6,8 +6,10 @@
 # máy thứ hai bằng cách giữ lại token cũ rồi gắn lại vào máy (token cũ phải bị 401 sau khi Chủ cho nghỉ /
 # đặt lại mật khẩu / người đó tự đổi mật khẩu hoặc đăng xuất).
 #
-# Ổn định (QA Q2, lô L6b): KHÔNG ngủ (wait_for_timeout) — luôn chờ đúng điều kiện: URL, phần tử, nháp đã ghi vào
-# localStorage, danh sách hết `aria-busy` trước khi bấm một dòng. Context bật reduced_motion → không có hiệu ứng chuyển.
+# Ổn định (QA Q2, lô L6b): KHÔNG ngủ (wait_for_timeout) — luôn chờ đúng điều kiện: URL, phần tử, danh sách hết `aria-busy`
+# trước khi bấm một dòng. Context bật reduced_motion → không có hiệu ứng chuyển.
+# Lô 14 (ERP theo design): màn Nhân sự là danh sách DataTable + trang hồ sơ /staff/detail/?id= (không còn SideSheet);
+# thao tác ở nút trên đầu hồ sơ và menu "…"; thông báo là toast; KHÔNG còn nháp biểu mẫu (S7-AC6 chỉ còn kiểm 401 → đăng nhập lại).
 # S48 (mật khẩu tạm phải đổi lần đầu) kiểm riêng ở s48_password.py; ở đây chỉ đi qua màn đó khi luồng cần.
 
 import os
@@ -54,8 +56,8 @@ def use_token(page, t, path="/overview/"):
 
 def list_idle(page):
     """Danh sách nhân viên không còn đang tải lại (tránh bấm vào dòng sắp bị vẽ lại — flake 'detached')."""
-    expect(page.locator("ul.staff-list > li").first).to_be_visible()
-    expect(page.locator("section[aria-busy=true]")).to_have_count(0)
+    expect(page.locator("main tr.lt-click").first).to_be_visible()
+    expect(page.locator("main [aria-busy=true]")).to_have_count(0)
 
 
 def fill_pw(scope, label, value, again=None):
@@ -88,22 +90,56 @@ def avatar_logout(page):
 
 
 def staff_row(page, username):
-    return page.locator("ul.staff-list > li").filter(
-        has=page.locator("small", has_text=re.compile(rf"^{re.escape(username)}$"))
-    )
+    return page.locator("main tr.lt-click").filter(has=page.locator("td", has_text=re.compile(rf"^{re.escape(username)}$")))
+
+
+def usernames(page):
+    return [t.strip() for t in page.locator("main tr.lt-click td[data-label='Tên đăng nhập']").all_inner_texts()]
 
 
 def open_staff(page, username):
+    """Mở hồ sơ từ danh sách (hồ sơ là trang, không phải hộp). Trả về page."""
     list_idle(page)
-    staff_row(page, username).locator(".staff-open").click()
-    dlg = page.get_by_role("dialog")
-    expect(dlg).to_be_visible()
-    return dlg
+    staff_row(page, username).locator("a.lt-link").click()
+    page.wait_for_url("**/staff/detail/?id=*")
+    expect(page.locator("main h2").first).to_be_visible()
+    page.wait_for_function("() => window.__caveMock.pending() === 0")
+    return page
 
 
 def goto_staff(page):
     page.goto(BASE + "/staff/")
     list_idle(page)
+
+
+def act(page, name):
+    """Bấm một thao tác trên hồ sơ: nút trên đầu (Sửa hồ sơ, Đổi nhóm) hoặc mục trong menu '…'."""
+    btn = page.get_by_role("button", name=name, exact=True)
+    if btn.count():
+        btn.first.click()
+        return
+    page.get_by_role("button", name="Thao tác khác").click()
+    menu_item(page, name).click()
+
+
+def header_buttons(page):
+    return [b.strip() for b in page.locator("main header .btn").all_inner_texts()]
+
+
+def menu_item(page, name):
+    """Mở menu '…' (nếu chưa mở) rồi trả mục `name`. Tên mục mờ có kèm lý do ("Cho nghỉ · Không tự…") nên so khớp phần đầu."""
+    btn = page.get_by_role("button", name="Thao tác khác")
+    if btn.get_attribute("aria-expanded") != "true":
+        btn.click()
+    return page.get_by_role("menuitem", name=re.compile("^" + re.escape(name) + r"( ·|$)"))
+
+
+def is_blocked(item):
+    return item.count() == 1 and (item.get_attribute("aria-disabled") == "true" or item.is_disabled())
+
+
+def toast(page, text):
+    return page.locator(".toast-item", has_text=text)
 
 
 def alert_text(scope):
@@ -132,7 +168,7 @@ def smsg(page, key, *args):
 
 SMALL_TARGETS = """() => [...document.querySelectorAll('button, a, input, label.check-row')].filter(e => {
     const r = e.getBoundingClientRect(); const s = getComputedStyle(e);
-    if (e.classList.contains('sheet-scrim') || e.type === 'checkbox') return false;
+    if (e.classList.contains('lt-link') || e.type === 'checkbox') return false;
     return r.width > 0 && r.height > 0 && s.visibility !== 'hidden' && r.x >= 0 && r.x < 360 && r.y < innerHeight
       && (r.height < 44 || (r.width < 44 && e.tagName !== 'INPUT'));
   }).map(e => (e.getAttribute('aria-label') || e.innerText || e.id).trim().slice(0,30) + ' ' + Math.round(e.getBoundingClientRect().width) + 'x' + Math.round(e.getBoundingClientRect().height))"""
@@ -164,157 +200,172 @@ with sync_playwright() as p:
     ok("Menu Chủ có 'Nhân sự'", "Nhân sự" in nav_labels(page), str(nav_labels(page)))
     page.locator(".nav a", has_text="Nhân sự").click()
     page.wait_for_url("**/staff/")
-    expect(page.locator("ul.staff-list > li").first).to_be_visible()
-    users = page.locator("ul.staff-list > li small").all_inner_texts()
+    list_idle(page)
+    users = usernames(page)
     ok("Lọc 'Đang làm' mặc định: có giao1, kho1; không có nghi1", "giao1" in users and "kho1" in users and "nghi1" not in users, str(users))
-    ok("Lọc 'Đang làm' gọi ?is_active=true", "GET /api/staff/?is_active=true" in log(page), str(log(page)[-3:]))
-    ok("SĐT là link tel:", staff_row(page, "giao1").locator("a[href='tel:0909000333']").count() == 1)
-    page.get_by_role("button", name="Đã nghỉ").click()
-    expect(page.locator("ul.staff-list > li small").first).to_have_text("nghi1")
-    ok("Lọc 'Đã nghỉ' chỉ có nghi1", page.locator("ul.staff-list > li small").all_inner_texts() == ["nghi1"])
-    dlg = open_staff(page, "nghi1")
-    btns = [b.strip() for b in dlg.locator(".staff-actions button").all_inner_texts()]
-    ok("Người đã nghỉ: nút theo available_actions = Sửa hồ sơ, Cho làm lại", [b.split("\n")[-1] for b in btns] == ["Sửa hồ sơ", "Cho làm lại"], str(btns))
-    page.keyboard.press("Escape")
-    page.get_by_role("button", name="Tất cả").click()
+    ok("Danh sách tải một lần GET /api/staff/ (tab tính phía máy)", any(x.startswith("GET /api/staff/") for x in log(page)), str(log(page)[-3:]))
+    ok("SĐT nhân viên hiện ở cột Số điện thoại của danh sách", "0909000333" in staff_row(page, "giao1").inner_text())
+    page.get_by_role("tab", name=re.compile("^Đã nghỉ")).click()
     expect(staff_row(page, "nghi1")).to_be_visible()
-    ok("Lọc 'Tất cả' có cả người đang làm và đã nghỉ", staff_row(page, "loc").count() == 1)
-    page.get_by_role("button", name="Đang làm").click()
+    ok("Tab 'Đã nghỉ' chỉ có nghi1", usernames(page) == ["nghi1"], str(usernames(page)))
+    open_staff(page, "nghi1")
+    ok("Người đã nghỉ: nút trên đầu chỉ có 'Sửa hồ sơ'", header_buttons(page) == ["Sửa hồ sơ"], str(header_buttons(page)))
+    ok("Người đã nghỉ: 'Cho làm lại' dùng được, 'Đặt lại mật khẩu' mờ kèm lý do",
+       not is_blocked(menu_item(page, "Cho làm lại")) and menu_item(page, "Cho nghỉ").count() == 0
+       and is_blocked(menu_item(page, "Đặt lại mật khẩu")))
+    page.keyboard.press("Escape")
+    page.go_back()
+    list_idle(page)
+    page.get_by_role("tab", name=re.compile("^Tất cả")).click()
+    expect(staff_row(page, "nghi1")).to_be_visible()
+    ok("Tab 'Tất cả' có cả người đang làm và đã nghỉ", staff_row(page, "loc").count() == 1)
+    page.get_by_role("tab", name=re.compile("^Đang làm")).click()
     expect(staff_row(page, "loc")).to_be_visible()
 
     # Chính mình: chỉ "Sửa hồ sơ" + chỉ tới Tài khoản của tôi
-    dlg = open_staff(page, "loc")
-    btns = [b.split("\n")[-1].strip() for b in dlg.locator(".staff-actions button").all_inner_texts()]
-    ok("Chính mình: chỉ có 'Sửa hồ sơ' (BR-PQ-17)", btns == ["Sửa hồ sơ"], str(btns))
-    ok("Chính mình: chỉ đường đổi mật khẩu ở Tài khoản của tôi", dlg.get_by_role("link", name="Tài khoản của tôi").count() == 1)
+    open_staff(page, "loc")
+    ok("Chính mình: chỉ có 'Sửa hồ sơ' (BR-PQ-17)", header_buttons(page) == ["Sửa hồ sơ"], str(header_buttons(page)))
+    ok("Chính mình: đổi mật khẩu chỉ ở Tài khoản của tôi", page.get_by_text(smsg(page, "selfNote")).count() == 1
+       and is_blocked(menu_item(page, "Đặt lại mật khẩu")))
     page.keyboard.press("Escape")
-    expect(page.get_by_role("dialog")).to_have_count(0)
+    page.go_back()
+    list_idle(page)
 
     # ---- S41-AC4: lỗi khi tạo — hiện nguyên văn BE ----
-    page.get_by_role("button", name="Thêm nhân viên").click()
+    page.get_by_role("button", name="Thêm nhân viên").first.click()
     dlg = page.get_by_role("dialog")
     expect(dlg.get_by_label("Tên đăng nhập")).to_be_focused()
     dlg.get_by_label("Tên đăng nhập").fill("GIAO1")
     dlg.get_by_label("Số điện thoại").fill("0909333444")
     fill_pw(dlg, "Mật khẩu tạm", "Songbien2026")
-    dlg.get_by_role("button", name="Tạo tài khoản").click()
+    dlg.get_by_role("button", name=re.compile("^(Tạo tài khoản|Thử lại)$")).click()
     expect(dlg.locator(".alert-box.err")).to_be_visible()
     ok("S41-AC4 username trùng → 'Tên đăng nhập đã tồn tại.'", alert_text(dlg) == be(page, "USERNAME_EXISTS"), alert_text(dlg))
     dlg.get_by_label("Tên đăng nhập").fill("giao4")
     dlg.get_by_label("Số điện thoại").fill("")
-    dlg.get_by_role("button", name="Tạo tài khoản").click()
+    dlg.get_by_role("button", name=re.compile("^(Tạo tài khoản|Thử lại)$")).click()
     expect(dlg.locator(".alert-box.err span")).to_have_text(be(page, "PHONE_REQUIRED"))
     ok("S41-AC4 thiếu SĐT → 'Số điện thoại là bắt buộc.'", True)
     dlg.get_by_label("Số điện thoại").fill("0909333444")
     fill_pw(dlg, "Mật khẩu tạm", "abc")
-    dlg.get_by_role("button", name="Tạo tài khoản").click()
+    dlg.get_by_role("button", name=re.compile("^(Tạo tài khoản|Thử lại)$")).click()
     expect(dlg.locator(".alert-box.err span")).to_contain_text(pw_problem(page, "PW_TOO_SHORT"))
     ok("S41-AC4 mật khẩu < 8 ký tự → thông điệp Django nguyên văn", alert_text(dlg).startswith(pw_problem(page, "PW_TOO_SHORT")), alert_text(dlg))
-    ok("S41-AC4 lỗi → không tạo gì", "giao4" not in page.locator("ul.staff-list > li small").all_inner_texts())
+    ok("S41-AC4 lỗi → không tạo gì", "giao4" not in usernames(page))
 
-    # ---- S7-AC6 trên form thật: hết phiên giữa chừng → đăng nhập lại cùng người → form mở lại đủ nội dung ----
+    # ---- S7-AC6: hết phiên giữa chừng → đăng nhập lại → về lại màn Nhân sự. Biểu mẫu KHÔNG giữ nháp (tên, SĐT, mật khẩu không vào storage) ----
     dlg.get_by_label("Tên hiển thị").fill("Anh Năm")
     dlg.get_by_text("Nhân viên giao", exact=True).click()
     fill_pw(dlg, "Mật khẩu tạm", "Songbien2026")
-    # chờ nháp đã ghi (useDraft ghi sau 400ms) — điều kiện, không ngủ
-    page.wait_for_function("""() => { const d = JSON.parse(localStorage.getItem('cave_erp_draft:staff:create') || 'null');
-        return !!d && d.data.display_name === 'Anh Năm' && d.data.groups.includes('delivery_staff'); }""")
-    ok("S48-AC5 nháp KHÔNG chứa mật khẩu", "Songbien2026" not in page.evaluate(
-        "() => Object.keys(localStorage).filter(k => k.startsWith('cave_erp_draft:')).map(k => localStorage.getItem(k)).join('')"))
+    ok("Biểu mẫu không ghi nháp: không có khoá cave_erp_draft:* và không có mật khẩu/SĐT ở đó", page.evaluate(
+        "() => Object.keys(localStorage).filter(k => k.startsWith('cave_erp_draft:')).length") == 0)
     page.evaluate("() => window.__caveMock.expire()")
-    dlg.get_by_role("button", name="Tạo tài khoản").click()
+    dlg.get_by_role("button", name=re.compile("^(Tạo tài khoản|Thử lại)$")).click()
     page.wait_for_url("**/login/**")
     ok("S7-AC6 401 khi gửi form → về đăng nhập, next=/staff/", "next=%2Fstaff" in page.url, page.url)
     page.get_by_label("Tài khoản").fill("loc")
     page.get_by_label("Mật khẩu").fill("demo1234")
     page.get_by_role("button", name="Đăng nhập").click()
     page.wait_for_url("**/staff/")
-    dlg = page.get_by_role("dialog")
-    expect(dlg).to_be_visible()
-    vals = {
-        "u": dlg.get_by_label("Tên đăng nhập").input_value(),
-        "n": dlg.get_by_label("Tên hiển thị").input_value(),
-        "p": dlg.get_by_label("Số điện thoại").input_value(),
-        "g": dlg.locator("input[name=groups]:checked").evaluate_all("els => els.map(e => e.value)"),
-        "pw": dlg.get_by_label("Mật khẩu tạm", exact=True).input_value(),
-    }
-    ok("S7-AC6 form tạo tài khoản mở lại đủ nội dung (trừ mật khẩu)",
-       vals == {"u": "giao4", "n": "Anh Năm", "p": "0909333444", "g": ["delivery_staff"], "pw": ""}, str(vals))
-    ok("S7-AC6 báo đã mở lại nháp, nhắc nhập lại mật khẩu", dlg.get_by_text(smsg(page, "draftRestored")).count() == 1)
-    page.screenshot(path=f"{SHOTS}/s41-desktop-1280-create-restored.png")
+    list_idle(page)
+    ok("S7-AC6 đăng nhập lại: về /staff/, không hộp nào tự mở, không lộ dữ liệu đã gõ", page.get_by_role("dialog").count() == 0
+       and "Songbien2026" not in page.url and "giao4" not in usernames(page))
 
-    # ---- S41-AC1: tạo giao4 (Q2: nháp đã áp xong trước khi gõ → bấm là có POST) ----
+    # ---- S41-AC1: tạo giao4 ----
+    page.get_by_role("button", name="Thêm nhân viên").first.click()
+    dlg = page.get_by_role("dialog")
+    dlg.get_by_label("Tên đăng nhập").fill("giao4")
+    dlg.get_by_label("Tên hiển thị").fill("Anh Năm")
+    dlg.get_by_label("Số điện thoại").fill("0909333444")
+    dlg.get_by_text("Nhân viên giao", exact=True).click()
     fill_pw(dlg, "Mật khẩu tạm", "Songbien2026")
+    page.screenshot(path=f"{SHOTS}/s41-desktop-1280-create-form.png")
     clear_log(page)
-    dlg.get_by_role("button", name="Tạo tài khoản").click()
+    dlg.get_by_role("button", name=re.compile("^(Tạo tài khoản|Thử lại)$")).click()
     expect(dlg.locator(".cred-username")).to_have_text("giao4")
     expect(dlg.locator(".cred-password")).to_have_text("Songbien2026")
     ok("S41-AC1 POST /api/staff/ → màn 'Đã tạo' hiện tên đăng nhập + mật khẩu tạm", "POST /api/staff/" in log(page), str(log(page)))
+    expect(toast(page, smsg(page, "created", "giao4"))).to_be_visible()
+    page.screenshot(path=f"{SHOTS}/s41-desktop-1280-create-done.png")
     dlg.get_by_role("button", name="Xong").click()
     expect(staff_row(page, "giao4")).to_be_visible()
     ok("S41-AC1 giao4 có trong danh sách, nhóm Nhân viên giao", "Nhân viên giao" in staff_row(page, "giao4").inner_text())
-    ok("Tạo xong thì nháp bị xoá", page.evaluate("() => localStorage.getItem('cave_erp_draft:staff:create')") in (None,) or
-       '"username":""' in (page.evaluate("() => localStorage.getItem('cave_erp_draft:staff:create')") or ""))
+    ok("Tạo xong: không có nháp và mật khẩu không ở URL", page.evaluate(
+        "() => Object.keys(localStorage).filter(k => k.startsWith('cave_erp_draft:')).length") == 0 and "Songbien2026" not in page.url)
 
     # ---- S41-AC3: bỏ delivery_staff của kho1 ----
-    dlg = open_staff(page, "kho1")
-    dlg.get_by_role("button", name="Đổi nhóm").click()
+    open_staff(page, "kho1")
+    act(page, "Đổi nhóm")
+    dlg = page.get_by_role("dialog")
     dlg.get_by_text("Nhân viên giao", exact=True).click()
     clear_log(page)
     dlg.get_by_role("button", name="Lưu nhóm").click()
     expect(page.get_by_role("dialog")).to_have_count(0)
     ok("S41-AC3 PUT /api/staff/3/groups/", "PUT /api/staff/3/groups/" in log(page), str(log(page)))
-    expect(page.locator(".alert-box.ok")).to_contain_text(smsg(page, "groupsChanged", "Anh Tâm (kho1)", "", "Nhân viên giao"))
+    expect(toast(page, smsg(page, "groupsChanged", "Anh Tâm (kho1)", "", "Nhân viên giao"))).to_be_visible()
+    page.go_back()
+    list_idle(page)
     expect(staff_row(page, "kho1").locator(".group-tag")).to_have_text(["Nhân viên kho"])
     ok("S41-AC3 kho1 chỉ còn Nhân viên kho", staff_row(page, "kho1").locator(".group-tag").all_inner_texts() == ["Nhân viên kho"],
        str(staff_row(page, "kho1").locator(".group-tag").all_inner_texts()))
 
     # ---- Thêm nhóm Chủ → hỏi xác nhận; Quay lại thì không gọi API ----
-    dlg = open_staff(page, "ql1")
-    dlg.get_by_role("button", name="Đổi nhóm").click()
+    open_staff(page, "ql1")
+    act(page, "Đổi nhóm")
+    dlg = page.get_by_role("dialog")
     dlg.get_by_text("Chủ", exact=True).click()
     clear_log(page)
     dlg.get_by_role("button", name="Lưu nhóm").click()
-    expect(dlg.locator(".confirm-danger")).to_contain_text("thêm nhóm Chủ")
+    expect(page.get_by_role("dialog")).to_contain_text("thêm nhóm Chủ")
     ok("Thêm nhóm Chủ → hỏi xác nhận trước, chưa gọi API", not any(x.startswith("PUT") for x in log(page)), str(log(page)))
     page.screenshot(path=f"{SHOTS}/s41-desktop-1280-confirm-chu.png")
-    dlg.get_by_role("button", name="Quay lại").click()
-    dlg.get_by_role("button", name="Quay lại").click()
-    page.keyboard.press("Escape")
+    page.get_by_role("dialog").get_by_role("button", name="Quay lại").click()
+    expect(page.get_by_role("dialog").get_by_role("button", name="Lưu nhóm")).to_be_visible()
+    page.get_by_role("dialog").get_by_role("button", name="Thôi").click()
+    expect(page.get_by_role("dialog")).to_have_count(0)
+    page.go_back()
+    list_idle(page)
 
     # ---- S42-AC4: BR-GH-08 nguyên văn ----
-    dlg = open_staff(page, "giao2")
-    dlg.get_by_role("button", name="Cho nghỉ").click()
-    expect(dlg.locator(".confirm-danger")).to_contain_text("đăng xuất khỏi mọi máy")
-    dlg.get_by_role("button", name="Cho nghỉ").click()
+    open_staff(page, "giao2")
+    act(page, "Cho nghỉ")
+    dlg = page.get_by_role("dialog")
+    expect(dlg).to_contain_text("đăng xuất khỏi mọi máy")
+    dlg.get_by_role("button", name="Cho nghỉ", exact=True).click()
     expect(dlg.locator(".alert-box.err")).to_be_visible()
     ok("S42-AC4 BR-GH-08 hiện nguyên văn",
        alert_text(dlg) == be(page, "DELIVERING_LEFT", count=2, notes="GH-INV-DH01-A1B2C, GH-INV-DH02-K7M3Q"), alert_text(dlg))
     dlg.get_by_role("button", name="Thôi").click()
-    page.keyboard.press("Escape")
+    expect(page.get_by_role("dialog")).to_have_count(0)
+    page.go_back()
+    list_idle(page)
     ok("S42-AC4 giao2 vẫn đang làm", staff_row(page, "giao2").count() == 1)
 
     # ---- S42-AC1: cho giao1 nghỉ (có xác nhận) ----
-    dlg = open_staff(page, "giao1")
-    dlg.get_by_role("button", name="Cho nghỉ").click()
+    open_staff(page, "giao1")
+    act(page, "Cho nghỉ")
+    dlg = page.get_by_role("dialog")
     ok("S42 cho nghỉ có bước xác nhận", dlg.get_by_role("button", name="Thôi").is_visible())
     page.screenshot(path=f"{SHOTS}/s42-desktop-1280-confirm-deactivate.png")
-    dlg.get_by_role("button", name="Cho nghỉ").click()
+    dlg.get_by_role("button", name="Cho nghỉ", exact=True).click()
     expect(page.get_by_role("dialog")).to_have_count(0)
-    expect(page.locator(".alert-box.ok")).to_contain_text(smsg(page, "deactivated", "Anh Phúc (giao1)"))
+    expect(toast(page, smsg(page, "deactivated", "Anh Phúc (giao1)"))).to_be_visible()
+    page.go_back()
+    list_idle(page)
     expect(staff_row(page, "giao1")).to_have_count(0)
     ok("S42-AC1 giao1 biến khỏi 'Đang làm'", staff_row(page, "giao1").count() == 0)
-    page.get_by_role("button", name="Đã nghỉ").click()
+    page.get_by_role("tab", name=re.compile("^Đã nghỉ")).click()
     expect(staff_row(page, "giao1")).to_be_visible()
     ok("S42-AC1 giao1 ở 'Đã nghỉ'", staff_row(page, "giao1").count() == 1)
-    page.get_by_role("button", name="Đang làm").click()
+    page.get_by_role("tab", name=re.compile("^Đang làm")).click()
     expect(staff_row(page, "loc")).to_be_visible()
 
     # ---- S42-AC3: đặt lại mật khẩu kho1 ----
-    dlg = open_staff(page, "kho1")
-    dlg.get_by_role("button", name="Đặt lại mật khẩu").click()
+    open_staff(page, "kho1")
+    act(page, "Đặt lại mật khẩu")
+    dlg = page.get_by_role("dialog")
     fill_pw(dlg, "Mật khẩu mới", "abc")
-    dlg.get_by_role("button", name="Đặt lại mật khẩu").click()
+    dlg.get_by_role("button", name=re.compile("^(Đặt lại mật khẩu|Thử lại)$")).click()
     expect(dlg.locator(".alert-box.err span")).to_contain_text(pw_problem(page, "PW_TOO_SHORT"))
     ok("S42 mật khẩu yếu → lỗi nguyên văn", True)
     dlg.get_by_role("button", name="Tạo ngẫu nhiên").click()
@@ -323,10 +374,11 @@ with sync_playwright() as p:
        len(gen) == 10 and dlg.get_by_label("Nhập lại mật khẩu mới", exact=True).input_value() == gen
        and dlg.get_by_label("Mật khẩu mới", exact=True).get_attribute("type") == "text", gen)
     fill_pw(dlg, "Mật khẩu mới", "Songbien2026")
-    dlg.get_by_role("button", name="Đặt lại mật khẩu").click()
+    dlg.get_by_role("button", name=re.compile("^(Đặt lại mật khẩu|Thử lại)$")).click()
     expect(dlg.locator(".cred-password")).to_have_text("Songbien2026")
     ok("S42-AC3 xong: hiện mật khẩu mới để đọc cho nhân viên", True)
     dlg.get_by_role("button", name="Xong").click()
+    expect(toast(page, smsg(page, "passwordReset", "Anh Tâm (kho1)"))).to_be_visible()
     # S48: Chủ đặt lại → kho1 phải đổi mật khẩu ở lần đăng nhập kế (kiểm ở s48_password.py). Ở đây bỏ cờ để đi tiếp S46.
     ok("S48-AC6 đặt lại mật khẩu → bật cờ phải đổi",
        page.evaluate("() => JSON.parse(localStorage.getItem('cave_erp_mock_users')).find(u => u.username === 'kho1').must_change_password") is True)
@@ -444,28 +496,38 @@ with sync_playwright() as p:
     login(page, "ql9")
     page.wait_for_url("**/overview/")
     goto_staff(page)
-    dlg = open_staff(page, "loc")
+    open_staff(page, "loc")
     ok("S42-AC7 ql9 xem tài khoản Chủ: không có nút nào (available_actions = [])",
-       dlg.locator(".staff-actions button").count() == 0 and dlg.get_by_text(smsg(page, "noActions")).count() == 1)
+       header_buttons(page) == [] and page.get_by_text(smsg(page, "noActions")).count() == 1, str(header_buttons(page)))
+    ok("S42-AC7 ql9: mọi mục menu '…' mờ kèm lý do",
+       is_blocked(menu_item(page, "Đặt lại mật khẩu")) and is_blocked(menu_item(page, "Cho nghỉ")))
     page.keyboard.press("Escape")
-    dlg = open_staff(page, "kho1")
-    dlg.get_by_role("button", name="Đổi nhóm").click()
+    page.go_back()
+    list_idle(page)
+    open_staff(page, "kho1")
+    act(page, "Đổi nhóm")
+    dlg = page.get_by_role("dialog")
     dlg.get_by_text("Chủ", exact=True).click()
     dlg.get_by_role("button", name="Lưu nhóm").click()
-    dlg.get_by_role("button", name="Thêm nhóm Chủ").click()
+    page.get_by_role("dialog").get_by_role("button", name="Thêm nhóm Chủ").click()
+    dlg = page.get_by_role("dialog")
     expect(dlg.locator(".alert-box.err")).to_be_visible()
     ok("S41-AC6 ql9 gán Chủ → 403 BR-PQ-17 nguyên văn", alert_text(dlg) == be(page, "CHU_GROUP_ONLY"), alert_text(dlg))
     ok("S41-AC6 403 do luật (quyền không đổi) → không báo 'Quyền vừa thay đổi'", page.locator(".perm-notice").count() == 0)
     page.keyboard.press("Escape")
+    expect(page.get_by_role("dialog")).to_have_count(0)
+    page.go_back()
+    list_idle(page)
     # 403 ở trên làm console tải lại /me (mock trả lời sau 250ms, đọc dữ liệu lúc trả lời) → chờ xong rồi mới đổi quyền,
     # nếu không /me đang bay sẽ thấy quyền mới và ẩn màn Nhân viên trước khi kịp mở giao2 (đua thời gian, không phải lỗi).
     page.wait_for_function("() => window.__caveMock.pending() === 0")
     # Chủ gỡ manage_staff của ql9 "từ máy khác", ql9 vẫn đang mở màn → bấm thao tác → 403 → tải lại me
+    open_staff(page, "giao2")
     page.evaluate("() => window.__caveMock.patchUser('ql9', {extra_perms: []})")
-    dlg = open_staff(page, "giao2")
-    dlg.get_by_role("button", name="Đặt lại mật khẩu").click()
+    act(page, "Đặt lại mật khẩu")
+    dlg = page.get_by_role("dialog")
     fill_pw(dlg, "Mật khẩu mới", "Songbien2026")
-    dlg.get_by_role("button", name="Đặt lại mật khẩu").click()
+    dlg.get_by_role("button", name=re.compile("^(Đặt lại mật khẩu|Thử lại)$")).click()
     expect(page.locator(".perm-notice")).to_be_visible()
     ok("S47-AC3 403 → tải lại me, báo 'Quyền của bạn vừa thay đổi'", msg(page, "permChanged") in page.locator(".perm-notice").inner_text())
     expect(page.get_by_text(msg(page, "noViewPermission"))).to_be_visible()
@@ -478,14 +540,17 @@ with sync_playwright() as p:
     login(page, "sa1")
     page.wait_for_url("**/overview/")
     goto_staff(page)
-    dlg = open_staff(page, "loc")
-    btns = [b.split("\n")[-1].strip() for b in dlg.locator(".staff-actions button").all_inner_texts()]
-    ok("Chủ cuối cùng: không có nút 'Cho nghỉ' (BE bỏ deactivate)", "Cho nghỉ" not in btns and "Đổi nhóm" in btns, str(btns))
-    dlg.get_by_role("button", name="Đổi nhóm").click()
+    open_staff(page, "loc")
+    ok("Chủ cuối cùng: 'Đổi nhóm' có, 'Cho nghỉ' mờ kèm lý do (BE bỏ deactivate)",
+       "Đổi nhóm" in header_buttons(page) and is_blocked(menu_item(page, "Cho nghỉ")), str(header_buttons(page)))
+    page.keyboard.press("Escape")
+    act(page, "Đổi nhóm")
+    dlg = page.get_by_role("dialog")
     dlg.get_by_text("Chủ", exact=True).click()
     dlg.get_by_role("button", name="Lưu nhóm").click()
-    expect(dlg.locator(".confirm-danger")).to_contain_text("bỏ nhóm Chủ")
-    dlg.get_by_role("button", name="Bỏ nhóm Chủ").click()
+    expect(page.get_by_role("dialog")).to_contain_text("bỏ nhóm Chủ")
+    page.get_by_role("dialog").get_by_role("button", name="Bỏ nhóm Chủ").click()
+    dlg = page.get_by_role("dialog")
     expect(dlg.locator(".alert-box.err")).to_be_visible()
     ok("S41-AC7 BR-PQ-18 nguyên văn", alert_text(dlg) == be(page, "LAST_CHU_GROUP"), alert_text(dlg))
     page.keyboard.press("Escape")
@@ -506,13 +571,13 @@ with sync_playwright() as p:
     login(page, "loc")
     page.wait_for_url("**/overview/")
     goto_staff(page)
-    page.get_by_role("button", name="Đã nghỉ").click()
+    page.get_by_role("tab", name=re.compile("^Đã nghỉ")).click()
     expect(staff_row(page, "giao1")).to_be_visible()
-    dlg = open_staff(page, "giao1")
-    dlg.get_by_role("button", name="Cho làm lại").click()
-    dlg.get_by_role("button", name="Cho làm lại").click()
+    open_staff(page, "giao1")
+    act(page, "Cho làm lại")
+    page.get_by_role("dialog").get_by_role("button", name="Cho làm lại", exact=True).click()
     expect(page.get_by_role("dialog")).to_have_count(0)
-    expect(page.locator(".alert-box.ok")).to_contain_text(smsg(page, "reactivated", "Anh Phúc (giao1)"))
+    expect(toast(page, smsg(page, "reactivated", "Anh Phúc (giao1)"))).to_be_visible()
     avatar_logout(page)
     page.wait_for_url("**/login/")
     login(page, "giao1")
@@ -533,19 +598,22 @@ with sync_playwright() as p:
     small = page.evaluate(SMALL_TARGETS)
     ok("360 Nhân viên: vùng bấm ≥44px", not small, str(small))
     page.screenshot(path=f"{SHOTS}/s41-mobile-360-staff.png")
-    dlg = open_staff(page, "kho1")
-    expect(dlg.locator(".staff-actions button").first).to_be_visible()
+    open_staff(page, "kho1")
+    expect(page.get_by_role("button", name="Đổi nhóm")).to_be_visible()
     sw = page.evaluate("() => document.documentElement.scrollWidth")
     small = page.evaluate(SMALL_TARGETS)
     ok("360 chi tiết: không cuộn ngang, nút ≥44px", sw <= 360 and not small, f"{sw} {small}")
     page.screenshot(path=f"{SHOTS}/s42-mobile-360-detail.png")
-    dlg.get_by_role("button", name="Đổi nhóm").click()
-    expect(dlg.get_by_role("button", name="Lưu nhóm")).to_be_visible()
+    act(page, "Đổi nhóm")
+    expect(page.get_by_role("dialog").get_by_role("button", name="Lưu nhóm")).to_be_visible()
     small = page.evaluate(SMALL_TARGETS)
     ok("360 đổi nhóm: ô chọn nhóm ≥44px", not small, str(small))
     page.screenshot(path=f"{SHOTS}/s41-mobile-360-groups.png")
     page.keyboard.press("Escape")
-    page.get_by_role("button", name="Thêm nhân viên").click()
+    expect(page.get_by_role("dialog")).to_have_count(0)
+    page.go_back()
+    list_idle(page)
+    page.get_by_role("button", name="Thêm nhân viên").first.click()
     expect(page.get_by_role("dialog").get_by_label("Tên đăng nhập")).to_be_focused()
     sw = page.evaluate("() => document.documentElement.scrollWidth")
     small = page.evaluate(SMALL_TARGETS)

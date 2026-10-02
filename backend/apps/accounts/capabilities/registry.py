@@ -69,6 +69,7 @@ CAPABILITIES = (
         ("inventory.add_stockreconciliation", "inventory.change_stockreconciliation"),
     ),
     Capability("approve_count", "Duyệt kiểm kê", SECTION_STOCK, ("inventory.approve_stockreconciliation",)),
+    Capability("create_return", "Ghi hàng hoàn về kho", SECTION_STOCK, ("inventory.add_returntostock",)),
     Capability("approve_return", "Duyệt hàng hoàn về kho", SECTION_STOCK, ("inventory.approve_returntostock",)),
     Capability(
         "set_price", "Sửa giá bán", SECTION_STOCK,

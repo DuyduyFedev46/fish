@@ -28,7 +28,7 @@ SECTIONS = ["Bán hàng", "Hàng hoá & kho", "Kế toán", "Website", "Quản t
 # Mock chưa có quyền mới (xem 03-dev-notes.md, Lô 1 — FE) nên mỗi vai chỉ thấy phần đã làm.
 ROLE_MENU = {
     # Hợp Lô 7 (mock Chủ đủ quyền như BE: Gọi xác nhận, Chính sách AI, Báo cáo AI; Sổ nhập xuất) + Lô 9 (Hàng hoàn về kho).
-    "loc": (["Tổng quan", "Đơn & tiền", "Khách hàng", "Gọi xác nhận", "Giao hàng", "Mua hàng", "Nhà cung cấp", "Kho & lô", "Hàng hoàn về kho", "Kiểm kê", "Sổ nhập xuất", "Danh mục & giá", "Báo cáo lãi lỗ", "Hoá đơn bán", "Hoá đơn mua & chi phí", "Nội dung", "Nhân sự", "Nhật ký hoạt động", "Chính sách AI", "Báo cáo AI"],
+    "loc": (["Tổng quan", "Đơn & tiền", "Khách hàng", "Gọi xác nhận", "Giao hàng", "Mua hàng", "Nhà cung cấp", "Kho & lô", "Hàng hoàn về kho", "Kiểm kê", "Sổ nhập xuất", "Danh mục & giá", "Báo cáo lãi lỗ", "Hoá đơn bán", "Hoá đơn mua & chi phí", "Nội dung", "Nhân sự", "Phân quyền", "Nhật ký hoạt động", "Chính sách AI", "Báo cáo AI"],
             ["Bán hàng", "Hàng hoá & kho", "Kế toán", "Website", "Quản trị"]),
     "ql1": (["Tổng quan", "Đơn & tiền", "Khách hàng", "Gọi xác nhận", "Giao hàng", "Mua hàng", "Nhà cung cấp", "Kho & lô", "Hàng hoàn về kho", "Kiểm kê", "Sổ nhập xuất", "Danh mục & giá", "Hoá đơn bán", "Hoá đơn mua & chi phí", "Nội dung", "Nhật ký hoạt động"],
             ["Bán hàng", "Hàng hoá & kho", "Kế toán", "Website", "Quản trị"]),

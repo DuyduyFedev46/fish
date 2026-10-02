@@ -77,8 +77,9 @@ def fill_pw(scope, label, value, again=None):
 
 
 def list_idle(page):
-    expect(page.locator("ul.staff-list > li").first).to_be_visible()
-    expect(page.locator("section[aria-busy=true]")).to_have_count(0)
+    """Danh sách nhân viên (DataTable, Lô 14) đã vẽ xong và không còn đang tải."""
+    expect(page.locator("main tr.lt-click").first).to_be_visible()
+    expect(page.locator("main [aria-busy=true]")).to_have_count(0)
 
 
 SMALL_TARGETS = """() => [...document.querySelectorAll('button, a, input')].filter(e => {
@@ -213,7 +214,7 @@ with sync_playwright() as p:
     page.wait_for_url("**/overview/")
     page.goto(BASE + "/staff/")
     list_idle(page)
-    page.get_by_role("button", name="Thêm nhân viên").click()
+    page.get_by_role("button", name="Thêm nhân viên").first.click()
     dlg = page.get_by_role("dialog")
     expect(dlg.get_by_label("Tên đăng nhập")).to_be_focused()
     ok("S48-AC4 form tạo: có gợi ý quy tắc trước khi gửi", dlg.locator(".pw-rules li").count() == 4)
@@ -227,10 +228,12 @@ with sync_playwright() as p:
     expect(dlg.locator(".field-err span")).to_have_text(msg(page, "passwordMismatch"))
     ok("S48-AC3 tạo tài khoản: Nhập lại khác → báo, không POST", log(page) == [], str(log(page)))
     ok("S48-AC4 form tạo: 2 nút mắt", dlg.get_by_role("button", name=msg(page, "pwShow")).count() == 2)
-    page.wait_for_function("""() => { const d = JSON.parse(localStorage.getItem('cave_erp_draft:staff:create') || 'null');
-        return !!d && d.data.username === 'giao6'; }""")
-    draft_raw = page.evaluate("() => localStorage.getItem('cave_erp_draft:staff:create')")
-    ok("S48-AC5 nháp có tên đăng nhập, KHÔNG có mật khẩu", "giao6" in draft_raw and "Songbien" not in draft_raw and "password" not in draft_raw, draft_raw)
+    # Lô 14: biểu mẫu không còn giữ nháp. Tên, SĐT, mật khẩu chỉ ở state của hộp (S48-AC5 siết lại: không có gì để lộ).
+    stored = page.evaluate("""() => Object.keys(localStorage).filter(k => !k.startsWith('cave_erp_mock_'))
+        .map(k => k + '=' + localStorage.getItem(k)).join('|') + '|' + Object.keys(sessionStorage).filter(k => !k.startsWith('cave_erp_mock_'))
+        .map(k => k + '=' + sessionStorage.getItem(k)).join('|')""")
+    ok("S48-AC5 không có nháp: tên đăng nhập, SĐT, mật khẩu không nằm trong storage",
+       "giao6" not in stored and "0909555666" not in stored and "Songbien" not in stored and "cave_erp_draft" not in stored)
     fill_pw(dlg, "Mật khẩu tạm", "Songbien2026")
     clear_log(page)
     dlg.get_by_role("button", name="Tạo tài khoản").click()
@@ -242,9 +245,12 @@ with sync_playwright() as p:
 
     # đặt lại mật khẩu kho5 → cờ bật lại
     list_idle(page)
-    page.locator("ul.staff-list > li").filter(has=page.locator("small", has_text="kho5")).locator(".staff-open").click()
+    page.locator("main tr.lt-click").filter(has=page.locator("td", has_text=re.compile(r"^kho5$"))).locator("a.lt-link").click()
+    page.wait_for_url("**/staff/detail/?id=*")
+    expect(page.locator("main h2").first).to_be_visible()
+    page.get_by_role("button", name="Thao tác khác").click()
+    page.get_by_role("menuitem", name="Đặt lại mật khẩu", exact=True).click()
     dlg = page.get_by_role("dialog")
-    dlg.get_by_role("button", name="Đặt lại mật khẩu").click()
     ok("S48-AC4 đặt lại: có ô Nhập lại + gợi ý quy tắc",
        dlg.get_by_label("Nhập lại mật khẩu mới", exact=True).count() == 1 and dlg.locator(".pw-rules").count() == 1)
     fill_pw(dlg, "Mật khẩu mới", "Songbien2026", again="khac")

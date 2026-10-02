@@ -275,13 +275,17 @@ describe("Huỷ phiếu hoàn (Lô bổ sung A #8)", () => {
   const row = (status: ReturnItem["status"], created_by: number | null) => ({ status, created_by });
 
   it("canCancel: người duyệt/sửa huỷ được phiếu Chờ duyệt; người tạo huỷ phiếu của mình; phiếu đã duyệt hoặc đã huỷ thì không", () => {
-    expect(canCancel(me(1, ["inventory.approve_returntostock"]), row("DRAFT", 9))).toBe(true);
-    expect(canCancel(me(1, ["inventory.change_returntostock"]), row("DRAFT", 9))).toBe(true);
+    const add = "inventory.add_returntostock";
+    expect(canCancel(me(1, [add, "inventory.approve_returntostock"]), row("DRAFT", 9))).toBe(true);
+    expect(canCancel(me(1, [add, "inventory.change_returntostock"]), row("DRAFT", 9))).toBe(true);
+    // TLA-FE-L4: thiếu cổng chung `add_returntostock` (Chủ tắt "Ghi hàng hoàn về kho" của nhóm) thì BE 403 → FE ẩn mục.
+    expect(canCancel(me(1, ["inventory.approve_returntostock"]), row("DRAFT", 9))).toBe(false);
+    expect(canCancel(me(1, ["inventory.change_returntostock"]), row("DRAFT", 1))).toBe(false);
     expect(canCancel(me(4, ["inventory.add_returntostock"]), row("DRAFT", 4))).toBe(true);
     expect(canCancel(me(4, ["inventory.add_returntostock"]), row("DRAFT", 9))).toBe(false);
     expect(canCancel(me(4, ["inventory.view_returntostock"]), row("DRAFT", 4))).toBe(false);
-    expect(canCancel(me(1, ["inventory.approve_returntostock"]), row("APPROVED", 9))).toBe(false);
-    expect(canCancel(me(1, ["inventory.approve_returntostock"]), row("CANCELLED", 9))).toBe(false);
+    expect(canCancel(me(1, [add, "inventory.approve_returntostock"]), row("APPROVED", 9))).toBe(false);
+    expect(canCancel(me(1, [add, "inventory.approve_returntostock"]), row("CANCELLED", 9))).toBe(false);
     expect(canCancel(null, row("DRAFT", 9))).toBe(false);
   });
   it("doneSteps của phiếu đã huỷ có 'Huỷ phiếu', không có quyết định", () => {

@@ -2166,3 +2166,40 @@ FE `erp-console/` (02/10/2026). Không sửa `backend/`, `adapter/`, `features/c
 - **Kiểm chứng sau sửa (chạy lại):** `npx tsc --noEmit` sạch; `npx vitest run` 72 file, 797 test đạt (trước 788); `NEXT_PUBLIC_USE_MOCK=0` build + `check-no-mock` + `check-ai-chunks` xanh; `check_naming.py` OK; không có hex/rgba mới. E2E bản mock cổng 3501 (đã tắt): `ed_batch12_accounting` 95/95, `ed_batch1_shell` 56/56, `ed_batch10_purchasing` 115/115, `ed_batch11_suppliers` 103/103.
 - **BE thật:** Django từ `backend/` của worktree (SQLite tạm, `migrate`, `bootstrap_masterdata`, `seed_demo`, người dùng loc và ql1, cổng 8621), console build mock=0 trỏ `http://127.0.0.1:8621` ở cổng 3521 (đã xoá `.next` và `out` trước khi build vì cache giữ địa chỉ API cũ). Script mới `e2e/ed_batch12_real.py` 16/16: shape number của BE, báo cáo không sập, Lãi/lỗ 430.000 đ, "Cấu thành lãi" 6 dòng, bảng lô, chi tiết lô trong hộp thoại, tháng trống, 360px, console không lỗi, Hoá đơn bán và câu chân bảng, Quản lý không có báo cáo và không thấy Giá vốn / Lãi gộp. Ảnh: `shots/lo12/ed12-real-1-bao-cao.png`, `ed12-real-2-chi-tiet-lo.png`, `ed12-real-3-hoa-don-ban.png`, `ed12-real-4-bao-cao-360.png`. Hai cổng 8621 và 3521 đã tắt.
 - **Nợ còn lại:** (1) menu "Nhập chi phí mua" ở `features/purchasing/components/ReceiptDetailScreen.tsx:116` vẫn nhãn cũ (ngoài phạm vi, cần lô sau); (2) `qa_ed_batch10_real.py` còn dùng nhãn tab cũ "Chi phí mua"; (3) nợ BE ghi vào 02c: tiền dạng chuỗi ở `/api/reports/*` (khi BE đổi sang chuỗi thì FE vẫn chạy nhờ `toDecimalString`), kiểm cặp nhà cung cấp/phiếu nhập khi tạo hoá đơn mua, kiểm `paid_at`, báo cáo theo năm, tham số `q` cho danh sách phiếu nhập; (4) PO chỉnh ED-33-AC4 / ED-34-AC5 theo quyết định #12.
+
+## Lô 14 — FE (Nhân sự ED-37/ED-38 + Phân quyền ED-40; ED-39 là BE đã có)
+
+Làm trong `erp-console/`. Nợ đã trả: **TLA-L2** (`registry.py` thêm Capability `create_return` → `inventory.add_returntostock`, kèm test) và **TLA-FE-L4** (`canCancel` của phiếu hoàn tính theo `add_returntostock`, `features/returns/returnsModel.ts` + test).
+
+### Trang và component
+- **Nhân sự** (`features/staff`, route `/staff/` và `/staff/detail/?id=`): danh sách DataTable với tab Đang làm / Đã nghỉ / Tất cả (tính phía máy từ một lần `GET /api/staff/`, tab nằm trên URL), ô tìm, khối "Nhóm quyền" cho ai có quyền xem. Hồ sơ là một trang (DetailPage): nút trên đầu "Sửa hồ sơ", "Đổi nhóm", menu "…" (Đặt lại mật khẩu, Cho nghỉ / Cho làm lại); thao tác không làm được vẫn hiện, mờ kèm lý do. Khối thông tin, quyền theo nhóm (link sang trang nhóm), việc đang giao (chỉ với người giao hàng và khi có quyền xem phiếu, bỏ hết trường về khách), hoạt động gần đây, dòng thời gian. Hộp: Thêm nhân viên (hỏi lại khi có nhóm Chủ, màn "Đã tạo" hiện mật khẩu tạm), Sửa hồ sơ, Đổi nhóm (hỏi lại khi thêm/bỏ nhóm Chủ), Đặt lại mật khẩu, Cho nghỉ / Cho làm lại. Đã xoá `StaffDetail.tsx`, `StaffCreateForm.tsx`; giữ `GroupPicker`, `PasswordField`, `CopyButton`.
+- **Phân quyền** (`features/permissions`, route `/permissions/` và `/permissions/detail/?group=`): ma trận việc x nhóm (công tắc `role="switch"`, tìm việc, cột Chủ cố định, việc "Chỉ Chủ" khoá, nhãn "Tất cả khách" khi Xem khách hàng bật, hỏi lại chỉ khi tắt việc phá luồng: `view_orders`, `deliver`, `view_audit`). Trang nhóm: việc được làm, phạm vi dữ liệu, thành viên (thêm / gỡ qua `PUT /api/staff/{id}/groups/`), dòng thời gian. Chỉ người thuộc nhóm Chủ bấm được công tắc; người khác (kể cả superuser ngoài nhóm Chủ) chỉ xem. Menu "Phân quyền" bỏ cờ `soon` (`shared/lib/nav.ts`).
+- Tài liệu: `features/staff/README.md` viết lại, `features/permissions/README.md` mới.
+
+### Hàm API
+`features/staff/api.ts`: thêm `getStaff`, `getStaffTimeline`, `fetchStaffActivity`, `fetchStaffDelivering` (đều có nhánh mock). `features/permissions/api.ts` mới: `listGroups`, `getGroup`, `setGroupCapabilities` (mock ở `features/permissions/mock.ts`).
+
+### Kiểm chứng (đã chạy trong lượt làm này)
+- `npx tsc --noEmit` sạch; `npx vitest run`: 74 file, 835 test đạt.
+- Build `NEXT_PUBLIC_USE_MOCK=0` + `check-no-mock` + `check-ai-chunks` xanh (36 màn nghiệp vụ và 2 layout; thêm 4 route Lô 14 vào TARGETS).
+- E2E bản mock cổng 3801: `ed_batch14_permissions.py` **96/96** (ma trận, công tắc, hỏi lại, "Tất cả khách", trang nhóm thêm/gỡ thành viên, nhóm Chủ khoá, danh sách + tab + tìm, hồ sơ sửa / đặt lại / cho nghỉ, giao2 đang giao + BR-GH-08, ca ngoài đường thuận: id và mã nhóm sai, vai không có quyền không thấy menu và không có request `/api/staff`, ql9 chỉ đọc, không có dữ liệu cá nhân trong storage, 360px không cuộn ngang, vùng bấm ≥44px). Hồi quy: `s41_s47_staff.py` **73/73**, `s48_password.py` **41/41**, `ed_batch1_shell.py` 56/56, `ed_batch2_patterns.py` 75/75, `ed_batch9_returns.py` 145/145.
+- Đã đổi cách chọn phần tử trong `s41_s47_staff.py`, `s41_s47_real.py`, `s48_password.py` theo giao diện mới (DataTable `main tr.lt-click`, hồ sơ `/staff/detail/?id=`, `.toast-item`, bỏ ca nháp biểu mẫu vì không còn nháp). `ed_batch1_shell.py` thêm "Phân quyền" vào menu của loc.
+- `s41_s47_real.py` (BE thật) biên dịch được nhưng **chưa chạy lại** trong lô này (cần Django + seed): QA chạy.
+- BE: `manage.py test apps.accounts.capabilities` 83 đạt; `apps.accounts` 338 test, 5 lỗi; toàn bộ 2850 test, 33 lỗi. Đây là lỗi `Missing staticfiles manifest entry` có sẵn từ trước, không do lô này.
+- `check_naming.py`: OK, không vi phạm mới. Không có mã hex trong code mới. Không có `console.log`, `localStorage`, `sessionStorage` trong `features/staff` và `features/permissions` (trừ `mock.ts`).
+- Ảnh chụp: `erp-console/shots/lo14/` (thư mục bị gitignore, chỉ có trên máy): ma trận, "Tất cả khách", trang nhóm, danh sách và hồ sơ nhân sự ở 1280px và 360px, ca vai không có quyền.
+
+### Chỗ lệch contract và việc còn nợ
+- **Đường dẫn ED-39:** story ghi `/api/permissions/matrix/`; BE thật đặt dưới `/api/staff/groups/…`. FE theo BE.
+- **Registry của ma trận** lấy từ `getGroup("owner")` (BE không có endpoint registry riêng); chip "Được gán" là hằng số FE.
+- **Thiếu trường ở bảng nhân viên của BE** (story có, BE chưa trả): Ghi chú, ngày đi làm, hiển thị `must_change_password`, thống kê theo tháng. FE bỏ các ô này, không bịa số.
+- **Số điện thoại nhân viên** hiện đủ trong màn quản trị (chỉ người có `manage_staff` thấy), không đưa vào URL, log hay storage.
+- **Không còn nháp biểu mẫu:** tên, SĐT, mật khẩu không được nằm trong storage; S7-AC6 chỉ còn kiểm 401 rồi đăng nhập lại.
+- **Cho nghỉ không chặn theo số phiếu đang giao ở FE:** BE quyết (BR-GH-08), FE hiện nguyên văn lỗi. Khối "Việc đang giao" chỉ để người dùng thấy trước.
+- **Ma trận chỉ đọc với superuser ngoài nhóm Chủ:** BE chỉ cho Chủ ghi.
+- **Không có ô sửa mô tả nhóm:** BE không có endpoint; công tắc có hiệu lực ngay, không có nút "Lưu thay đổi".
+- **Hỏi lại khi tắt** chỉ với việc phá luồng; bật không hỏi.
+- **Mock:** đổi việc trong ma trận không làm đổi quyền lúc đăng nhập mock (bảng quyền mock ở `features/auth/mock.ts`, ngoài phạm vi lô). Thay đổi giữ trong `sessionStorage` khoá `cave_erp_mock_group_caps`. Dòng thời gian và hoạt động của mock chỉ nằm trong bộ nhớ. Câu lỗi mock là xấp xỉ câu BE. Chưa phủ ca BE trả 500 trong `ed_batch14_permissions.py`. Kiểm storage của e2e bỏ qua khoá `cave_erp_mock_*` (chỉ có ở bản build mock).
+- **Bộ tải dùng chung** chuyển thành `features/staff/useLoaded.ts` (permissions import lại); `groupHref` chuyển về `permissionsModel.ts`.
+- **Lỗi bố cục đã sửa:** `.sr-only` (absolute) trong ô ma trận làm trang cuộn ngang ở 360px vì vùng cuộn thiếu `position: relative`; nhãn việc bị căn giữa ở mobile. Sửa trong `permissions.module.css`.
+- **Nợ BE (ghi cho 02c):** cổng huỷ phiếu hoàn ở BE cần kiểm cùng quyền `add_returntostock` như FE đã tính cho `canCancel`.
