@@ -119,3 +119,5 @@
 
 ### Duy quyết 03/10/2026
 - **SĐT khách trên ERP: hiện đủ** (không che "…0412" như board). Áp cho danh sách/chi tiết khách, Gọi xác nhận, Nhân sự, phiếu giao. Nhóm F trong `04b-ra-soat-giao-dien.md` đóng — không phải lệch. Phạm vi ai được xem vẫn theo phân quyền (bất biến 9 + ma trận Lô 14).
+- **#3 (chốt):** dòng thời gian **không** chép ghi chú tự do — chỉ nhãn chuẩn (mã lý do → nhãn, mã chứng từ, kg, tiền, người làm). Tiền trên timeline ghi "đ".
+- **#8 (chốt):** xoá phiếu hàng hoàn **ở màn chi tiết**, chỉ Chủ/admin. Làm **xoá mềm** (ẩn khỏi mọi danh sách/báo cáo, giữ bản ghi + nhật ký) vì luật "không xoá chứng từ"; chỉ xoá được phiếu Nháp/Đã huỷ — phiếu đã cộng tồn phải huỷ trước.
