@@ -10,7 +10,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { Icon } from "../Icon";
 import { Field } from "../form/Field";
-import { useSubmit, primaryLabel } from "../form/useSubmit";
+import { useSubmit, primaryLabel, type SubmitConflict } from "../form/useSubmit";
 import s from "./InfoField.module.css";
 
 type Base = { label: string };
@@ -31,7 +31,12 @@ type EditableProps = Base & {
   /** Kiểm tại chỗ trước khi gửi; trả chuỗi lỗi hoặc null. */
   validate?: (next: string) => string | null;
   num?: boolean;
+  /** Gọi khi lưu gặp xung đột phiên bản (người khác vừa sửa): màn bật ConflictBanner. Không truyền thì ô vẫn tự báo một câu ngắn (L5). */
+  onConflict?: (conflict: SubmitConflict) => void;
 };
+
+/** Câu ngắn dưới ô khi lưu gặp xung đột (useSubmit đưa 409 vào `conflict`, không vào `error`). */
+export const CONFLICT_FIELD_MESSAGE = "Có người vừa sửa mục này. Tải lại để xem bản mới.";
 
 export type InfoFieldProps = TextProps | LockedProps | LinkProps | EditableProps;
 
@@ -81,7 +86,7 @@ export function validateDraft(draft: string, opts: { required?: boolean; validat
   return opts.validate ? opts.validate(draft) : null;
 }
 
-function Editable({ label, labelId, value, display, onSave, type = "text", unit, required, validate, num }: EditableProps & { labelId: string }) {
+function Editable({ label, labelId, value, display, onSave, type = "text", unit, required, validate, num, onConflict }: EditableProps & { labelId: string }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value);
   const [localError, setLocalError] = useState<string | null>(null);
@@ -89,6 +94,13 @@ function Editable({ label, labelId, value, display, onSave, type = "text", unit,
   const wasEditing = useRef(false);
 
   const sub = useSubmit(() => onSave(draft), { onSuccess: () => setEditing(false) });
+
+  // Xung đột: báo màn cha (banner) một lần mỗi lần gặp; ô cũng hiện câu ngắn bên dưới.
+  const conflictRef = useRef(onConflict);
+  conflictRef.current = onConflict;
+  useEffect(() => {
+    if (sub.conflict) conflictRef.current?.(sub.conflict);
+  }, [sub.conflict]);
 
   // Kiểm tại chỗ TRƯỚC khi gửi: chưa gửi gì nên đây là lỗi nhập, không phải lỗi gửi (nút giữ "Lưu", không thành "Thử lại").
   const submit = () => {
@@ -134,7 +146,7 @@ function Editable({ label, labelId, value, display, onSave, type = "text", unit,
     );
   }
 
-  const error = localError ?? sub.error;
+  const error = localError ?? sub.error ?? (sub.conflict ? CONFLICT_FIELD_MESSAGE : null);
   return (
     <div className={`${s.cell} ${s.editing}`} data-kind="editable" data-editing>
       {/* Đang sửa: nhãn của Field ngay dưới đã hiện, nên nhãn ô chỉ giữ cho trình đọc màn hình (không trùng nhãn trên mắt). */}

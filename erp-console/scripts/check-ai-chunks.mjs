@@ -23,6 +23,10 @@ const TARGETS = [
   ["/(console)/orders/page", "/orders"],
   ["/(console)/orders/payments/page", "/orders/payments"],
   ["/(console)/orders/refunds/page", "/orders/refunds"],
+  // Trang chi tiết có AiDocBlockGate (Lô 3): phải xanh dù có khối AI nhẹ; runtime nặng chỉ nạp động khi chạm khung hỏi.
+  ["/(console)/orders/detail/page", "/orders/detail"],
+  ["/(console)/orders/payments/detail/page", "/orders/payments/detail"],
+  ["/(console)/orders/refunds/detail/page", "/orders/refunds/detail"],
   ["/(console)/inventory/page", "/inventory"],
 ];
 
@@ -90,4 +94,4 @@ if (problems.length > 0) {
   process.exit(1);
 }
 
-console.log("\nXANH: 4 màn nghiệp vụ và 2 layout không chứa `new Worker`, `wllama`, `/call/`.");
+console.log("\nXANH: 7 route nghiệp vụ (đơn, thanh toán, hoàn tiền và 3 trang chi tiết, kho) và 2 layout không chứa `new Worker`, `wllama`, `/call/`.");

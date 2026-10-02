@@ -97,11 +97,62 @@ export function mockUndoAiAction(id: string): { status: number; body: { outcome:
   };
 }
 
-/** Lọc theo R1: `target_model` khớp phần cuối ("purchasing.purchasereceipt" → "purchasereceipt"); `target_id` khớp mã đích (nhiều mã cách phẩy). */
+/** Nhãn `app.model` có thật ở BE (rút từ `DOC_TYPE_LABELS` của `apps/ai/actions/targets.py`). */
+const MOCK_TARGET_LABELS = [
+  "sales.salesorder",
+  "sales.paymenttransaction",
+  "sales.refund",
+  "sales.customer",
+  "inventory.batch",
+  "inventory.stockreconciliation",
+  "inventory.returntostock",
+  "purchasing.purchasereceipt",
+  "purchasing.supplier",
+  "delivery.deliverynote",
+  "catalog.item",
+  "auth.user",
+];
+/** doc_type của guidance → nhãn model (giống `DOC_TYPE_LABELS` ở BE). */
+const MOCK_DOC_TYPES: Record<string, string> = {
+  order: "sales.salesorder",
+  payment: "sales.paymenttransaction",
+  refund: "sales.refund",
+  batch: "inventory.batch",
+  receipt: "purchasing.purchasereceipt",
+  supplier: "purchasing.supplier",
+  stocktake: "inventory.stockreconciliation",
+  return: "inventory.returntostock",
+  delivery: "delivery.deliverynote",
+  item: "catalog.item",
+  customer: "sales.customer",
+  staff: "auth.user",
+};
+
+export const INVALID_TARGET_MODEL = "INVALID_TARGET_MODEL";
+export class InvalidTargetModelError extends Error {
+  readonly code = INVALID_TARGET_MODEL;
+  constructor(value: string) {
+    super(`Loại chứng từ không hợp lệ: ${value}`);
+  }
+}
+
+/** Như `resolve_target_label` của BE: "app.model" phải có thật; không dấu chấm thì là doc_type hoặc tên model duy nhất. Lạ thì null. */
+export function resolveMockTargetLabel(value: string): string | null {
+  const raw = (value || "").trim().toLowerCase();
+  if (!raw) return null;
+  if (raw.includes(".")) return MOCK_TARGET_LABELS.includes(raw) ? raw : null;
+  if (MOCK_DOC_TYPES[raw]) return MOCK_DOC_TYPES[raw];
+  const byName = MOCK_TARGET_LABELS.filter((l) => l.split(".")[1] === raw);
+  return byName.length === 1 ? byName[0] : null;
+}
+
+/** Lọc theo R1. `target_model` lạ thì ném `InvalidTargetModelError` (BE trả 400 INVALID_TARGET_MODEL); `target_id` khớp mã đích (nhiều mã cách phẩy). */
 export function filterByTarget(rows: AiActionRow[], params: { target_model?: string; target_id?: string }): AiActionRow[] {
   let out = rows;
   if (params.target_model) {
-    const want = params.target_model.trim().toLowerCase().split(".").pop();
+    const label = resolveMockTargetLabel(params.target_model);
+    if (!label) throw new InvalidTargetModelError(params.target_model);
+    const want = label.split(".")[1];
     out = out.filter((a) => a.target?.type.toLowerCase() === want);
   }
   if (params.target_id) {
@@ -117,7 +168,12 @@ export function mockFetchAiActions(params: { status?: string; target_model?: str
     const allowed = params.status.split(",").map((s) => s.trim());
     filtered = filtered.filter((act) => allowed.includes(act.status));
   }
-  filtered = filterByTarget(filtered, params);
+  try {
+    filtered = filterByTarget(filtered, params);
+  } catch (err) {
+    if (err instanceof InvalidTargetModelError) return { status: 400, body: { detail: "Loại chứng từ không hợp lệ.", code: INVALID_TARGET_MODEL } };
+    throw err;
+  }
   return {
     status: 200,
     body: { count: filtered.length, next: null, previous: null, results: filtered },
@@ -130,8 +186,7 @@ export function mockFetchAiActionCounts(params: { status?: string }) {
   for (const a of mockAiActions.results) {
     if (allowed && !allowed.includes(a.status)) continue;
     if (!a.target) continue;
-    const app = a.target.type === "purchasereceipt" ? "purchasing" : "inventory";
-    const key = `${app}.${a.target.type}`;
+    const key = resolveMockTargetLabel(a.target.type) ?? a.target.type;
     by_target_model[key] = (by_target_model[key] ?? 0) + 1;
   }
   return { status: 200, body: { by_target_model } };
@@ -146,10 +201,35 @@ function detailFails(): boolean {
     return false;
   }
 }
+function addMockProposal(type: string, code: string, command: string, title: string): void {
+  mockAiActions.results.unshift({
+    id: `${type}-proposal-${code}`,
+    command,
+    title,
+    level: "C",
+    status: "PENDING",
+    owner_display: "AI của Lộc",
+    created_at: new Date(Date.now() - 60 * 1000).toISOString(),
+    expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+    execute_after: null,
+    undo_until: null,
+    target: { type, code },
+    args_preview: null,
+    downgrade_reason: null,
+    result_ref: null,
+  });
+}
+
 if (typeof window !== "undefined") {
   const w = window as unknown as { __caveMock?: Record<string, unknown> };
   w.__caveMock = {
     ...(w.__caveMock || {}),
+    /** Thêm một đề xuất AI chờ duyệt cho đơn có mã `code` (chỉ trong bộ nhớ, mất khi tải lại). */
+    aiOrderProposal: (code: string) => addMockProposal("salesorder", code, "sales.salesorder.confirm", "Xác nhận đơn hàng"),
+    /** Như trên cho khoản tiền (`code` = pk khoản tiền, đúng `target_id` BE lưu). */
+    aiPaymentProposal: (code: string) => addMockProposal("paymenttransaction", code, "sales.paymenttransaction.resolve", "Khớp khoản tiền với đơn"),
+    /** Như trên cho phiếu hoàn (`code` = pk phiếu hoàn). */
+    aiRefundProposal: (code: string) => addMockProposal("refund", code, "sales.refund.confirm", "Xác nhận đã hoàn tiền"),
     aiDetailFail: (v: boolean) => {
       try {
         if (v) window.localStorage.setItem(DETAIL_FAIL_KEY, "1");

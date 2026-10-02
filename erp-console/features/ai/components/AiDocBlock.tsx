@@ -16,7 +16,7 @@ import { confirmAiAction, fetchAiActionDetail, fetchAiActions, rejectAiAction } 
 import { hasAiConsent, setAiConsent, subscribeAiConsent } from "../consent";
 import { AI_MSG } from "../messages";
 import type { AiActionRow, AiStatus } from "../types";
-import { DOC_CHAT_CHIPS, readyAtOf, toProposalView, waitLeft } from "./docBlockModel";
+import { DOC_CHAT_CHIPS, askWithDocContext, readyAtOf, toProposalView, waitLeft } from "./docBlockModel";
 import s from "./ai.module.css";
 import d from "./AiDocBlock.module.css";
 
@@ -54,6 +54,8 @@ export function AiDocBlock({ status, targetModel, targetId, onApplied, chips = D
   const [actionError, setActionError] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const [chatOpen, setChatOpen] = useState(false);
+  // B6/L9: khung hỏi nhanh tĩnh ở lại tới khi panel nạp xong (và đã đồng ý), để phím gõ sớm không rơi mất và focus không về body.
+  const [panelReady, setPanelReady] = useState(false);
   // Khung hỏi nhanh TĨNH: chữ đang gõ và câu chuyển sang trợ lý khi nó được nạp (chỉ nằm trong state, không lưu đâu cả).
   const [draft, setDraft] = useState("");
   const [handoff, setHandoff] = useState<{ text: string; autoSend: boolean }>({ text: "", autoSend: false });
@@ -62,6 +64,7 @@ export function AiDocBlock({ status, targetModel, targetId, onApplied, chips = D
   const ready = useRef<Map<string, Ready>>(new Map());
   const seq = useRef(0);
   const inFlight = useRef(false);
+  const starterInput = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     setConsented(hasAiConsent());
@@ -161,14 +164,16 @@ export function AiDocBlock({ status, targetModel, targetId, onApplied, chips = D
 
   // Trợ lý chỉ được nạp khi người dùng chạm vào khung hỏi nhanh (focus ô, bấm chip, gửi).
   const openChat = (text: string, autoSend: boolean) => {
-    setHandoff({ text, autoSend });
+    // L8: câu hỏi mang theo loại + mã chứng từ ("đơn hàng SO…"), không có dữ liệu khách.
+    setHandoff({ text: autoSend ? askWithDocContext(text, targetModel, targetId) : text, autoSend });
     setChatOpen(true);
   };
+  const onPanelReady = useCallback(() => setPanelReady(true), []);
 
   const chat = chatOpen ? (
-    <div className={d.docChat}>
+    <div className={d.docChat} data-doc-chat>
       {consented ? (
-        <AiAssistantPanel status={status} initialText={handoff.text} autoSend={handoff.autoSend} />
+        <AiAssistantPanel status={status} initialText={handoff.autoSend ? handoff.text : draft} autoSend={handoff.autoSend} onReady={onPanelReady} />
       ) : (
         <div className={s.consent}>
           <h4 className="rr-title">{AI_MSG.consentTitle}</h4>
@@ -178,7 +183,10 @@ export function AiDocBlock({ status, targetModel, targetId, onApplied, chips = D
             <span>{AI_MSG.consentCheck}</span>
           </label>
           <div className={s.consentActions}>
-            <button type="button" className="btn primary" disabled={!agreed} onClick={() => setAiConsent(true)}>
+            <button type="button" className="btn primary" disabled={!agreed} onClick={() => {
+                setAiConsent(true);
+                starterInput.current?.focus({ preventScroll: true }); // nút đồng ý sắp biến mất: trả focus về ô hỏi, gõ tiếp không mất chữ
+              }}>
               {AI_MSG.consentAgree}
             </button>
           </div>
@@ -197,12 +205,14 @@ export function AiDocBlock({ status, targetModel, targetId, onApplied, chips = D
       onReject={(id) => act(id, "reject")}
       onConfirm={(id) => act(id, "confirm")}
       chat={chat}
+      keepStarter={chatOpen && (!consented || !panelReady)}
       starter={{
         chips,
         value: draft,
         onChange: setDraft,
         onFocus: () => openChat(draft, false),
         onAsk: (q) => openChat(q, true),
+        inputRef: starterInput,
       }}
     />
   );

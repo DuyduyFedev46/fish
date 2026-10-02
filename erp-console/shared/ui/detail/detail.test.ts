@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { StatusPath } from "./StatusPath";
 import { Timeline } from "./Timeline";
-import { validateDraft } from "./InfoField";
+import { CONFLICT_FIELD_MESSAGE, validateDraft } from "./InfoField";
 import { AiBlockFrame, type AiProposalView } from "./AiBlockFrame";
 
 const STEPS = [
@@ -60,6 +60,12 @@ describe("InfoField sửa tại chỗ: kiểm nhập trước khi gửi (QA B5)"
   });
 });
 
+describe("InfoField sửa tại chỗ: xung đột phiên bản (L5)", () => {
+  it("có câu ngắn riêng cho xung đột, không để im lặng", () => {
+    expect(CONFLICT_FIELD_MESSAGE).toMatch(/vừa sửa/);
+  });
+});
+
 describe("AiBlockFrame: khung hỏi nhanh tĩnh (QA B3) và nút Đồng ý khi thiếu chi tiết (Techlead M2)", () => {
   const noop = () => {};
   const starter = { chips: ["Tóm tắt lịch sử chứng từ này", "Chứng từ này còn thiếu gì?"], value: "", onChange: noop, onFocus: noop, onAsk: noop };
@@ -96,5 +102,29 @@ describe("AiBlockFrame: khung hỏi nhanh tĩnh (QA B3) và nút Đồng ý khi 
     const html = render({ proposals: [proposal({ state: "ESCALATED", assigneeGroup: "Chủ" })] });
     expect(html).toContain("Đã nhờ nhóm Chủ xử lý.");
     expect(html).not.toContain("Từ chối");
+  });
+});
+
+describe("AiBlockFrame: giữ khung hỏi nhanh trong lúc trợ lý nạp (B6, L9)", () => {
+  const noop = () => {};
+  const starter = { chips: ["Hỏi"], value: "abc", onChange: noop, onFocus: noop, onAsk: noop };
+  const chat = createElement("p", null, "Đang mở trợ lý…");
+  const render = (props: Partial<Parameters<typeof AiBlockFrame>[0]>) =>
+    renderToStaticMarkup(createElement(AiBlockFrame, { proposals: [], onReject: noop, onConfirm: noop, ...props }));
+  it("keepStarter: ô tĩnh và panel cùng có mặt", () => {
+    const html = render({ chat, starter, keepStarter: true });
+    expect(html).toContain("data-ai-starter");
+    expect(html).toContain("Đang mở trợ lý");
+  });
+  it("keepStarter: ô tĩnh luôn đứng TRƯỚC khe chat (một vị trí cố định, React không dựng lại ô nhập)", () => {
+    const html = render({ chat, starter, keepStarter: true });
+    expect(html.indexOf("data-ai-starter")).toBeGreaterThan(-1);
+    expect(html.indexOf("data-ai-starter")).toBeLessThan(html.indexOf("Đang mở trợ lý"));
+    expect(html.match(/data-ai-starter/g)).toHaveLength(1);
+  });
+  it("không keepStarter: panel thay khung tĩnh như cũ", () => {
+    const html = render({ chat, starter });
+    expect(html).not.toContain("data-ai-starter");
+    expect(html).toContain("Đang mở trợ lý");
   });
 });

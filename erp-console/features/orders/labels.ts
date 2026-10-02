@@ -1,70 +1,5 @@
-// Nhãn + tông màu cho các mã trạng thái lồng trong chi tiết đơn. BE L7 bổ sung đã trả `*_label` (match_status_label,
-// source_label, delivery.status_label, refunds[].status_label) → FE LUÔN ưu tiên nhãn BE; bảng dưới (chép nguyên TextChoices
-// của BE) chỉ là DỰ PHÒNG khi thiếu key, và cho danh sách (delivery_status chỉ có mã). Chỉ để HIỂN THỊ, không suy luật.
+// Lựa chọn lọc của các danh sách Đơn & tiền. Nhãn trạng thái KHÔNG viết ở đây: dùng ENUMS (shared/lib/enums.ts).
 
-import type { StatusLook } from "@/shared/lib/status";
-
-export const DELIVERY_LABEL: Record<string, string> = {
-  CONFIRMING: "Chờ xác nhận",
-  PREPARING: "Soạn hàng",
-  READY: "Chờ lấy hàng",
-  DELIVERING: "Đang giao",
-  COMPLETED: "Hoàn tất",
-  FAILED: "Giao thất bại",
-  // S14 (mới): đơn đã thanh toán bị huỷ thì phiếu giao đóng theo.
-  CANCELLED: "Đã huỷ theo đơn",
-};
-export const DELIVERY_STATUS: Record<string, StatusLook> = {
-  CONFIRMING: { tone: "warn", icon: "phone_in_talk" },
-  PREPARING: { tone: "info", icon: "inventory" },
-  READY: { tone: "info", icon: "package_2" },
-  DELIVERING: { tone: "info", icon: "local_shipping" },
-  COMPLETED: { tone: "good", icon: "flag" },
-  FAILED: { tone: "crit", icon: "report" },
-  CANCELLED: { tone: "mute", icon: "cancel" },
-};
-
-export const PAYMENT_LABEL: Record<string, string> = {
-  MATCHED: "Khớp — đã xác nhận",
-  UNDERPAID: "Thiếu tiền — chờ Chủ",
-  ORPHAN: "Đến sau khi đơn đã huỷ — chờ Chủ",
-  UNMATCHED: "Không khớp đơn — chờ Chủ",
-  OVERPAID: "Chuyển thừa — đơn đã thanh toán, chờ Chủ",
-};
-export const PAYMENT_STATUS: Record<string, StatusLook> = {
-  MATCHED: { tone: "good", icon: "check_circle" },
-  UNDERPAID: { tone: "warn", icon: "error" },
-  ORPHAN: { tone: "warn", icon: "error" },
-  UNMATCHED: { tone: "warn", icon: "error" },
-  OVERPAID: { tone: "warn", icon: "error" },
-};
-export const PAYMENT_SOURCE_LABEL: Record<string, string> = {
-  WEBHOOK: "Webhook SePay",
-  MANUAL: "Xác nhận tay",
-};
-
-export const REFUND_LABEL: Record<string, string> = {
-  PENDING: "Chờ hoàn",
-  REFUNDED: "Đã hoàn",
-  FAILED: "Thất bại",
-};
-export const REFUND_STATUS: Record<string, StatusLook> = {
-  PENDING: { tone: "warn", icon: "schedule" },
-  REFUNDED: { tone: "good", icon: "check_circle" },
-  FAILED: { tone: "crit", icon: "error" },
-};
-
-/** Nhãn trạng thái đơn khi chi tiết không có `status_label` (chép TextChoices SalesOrder.Status). */
-export const ORDER_LABEL: Record<string, string> = {
-  BOOKED: "Giữ chỗ",
-  PAID: "Đã thanh toán",
-  PROCESSING: "Đang xử lý",
-  COMPLETED: "Hoàn tất",
-  CANCELLED: "Đã huỷ",
-  AUTO_CANCELLED: "Tự huỷ (quá TTL)",
-};
-
-/** Lựa chọn lọc trạng thái — giá trị gửi thẳng lên `?status=` (nhiều mã nối dấu phẩy). */
 export const STATUS_FILTERS: { value: string; label: string }[] = [
   { value: "", label: "Mọi trạng thái" },
   { value: "BOOKED,PAID,PROCESSING", label: "Chưa xong" },
@@ -72,7 +7,7 @@ export const STATUS_FILTERS: { value: string; label: string }[] = [
   { value: "PAID", label: "Đã thanh toán" },
   { value: "PROCESSING", label: "Đang xử lý" },
   { value: "COMPLETED", label: "Hoàn tất" },
-  { value: "CANCELLED,AUTO_CANCELLED", label: "Đã huỷ / tự huỷ" },
+  { value: "CANCELLED,AUTO_CANCELLED", label: "Đã huỷ" },
 ];
 
 export type DatePreset = "all" | "today" | "7d" | "30d" | "custom";
@@ -84,44 +19,19 @@ export const DATE_FILTERS: { value: DatePreset; label: string }[] = [
   { value: "custom", label: "Chọn khoảng ngày" },
 ];
 
-export function labelOf(map: Record<string, string>, code: string, fromBe?: string): string {
-  return fromBe || map[code] || code;
-}
-
-// ---- S12: hàng chờ thanh toán lệch ----
-// OVERPAID = BR-TT-10 (P5: tiền về cho đơn đã thanh toán). Nhãn ngắn cho cột "Loại lệch"; chi tiết ưu tiên `match_status_label` BE.
-export const QUEUE_TYPE_LABEL: Record<string, string> = {
-  UNDERPAID: "Thiếu tiền",
-  ORPHAN: "Về sau khi đơn tự huỷ",
-  UNMATCHED: "Không khớp đơn",
-  OVERPAID: "Chuyển thừa",
-  MATCHED: "Khớp",
-};
-export const QUEUE_TYPE_STATUS: Record<string, StatusLook> = {
-  UNDERPAID: { tone: "warn", icon: "error" },
-  ORPHAN: { tone: "warn", icon: "error" },
-  UNMATCHED: { tone: "warn", icon: "help" },
-  OVERPAID: { tone: "warn", icon: "add_circle" },
-  MATCHED: { tone: "good", icon: "check_circle" },
-};
-/** Lọc loại lệch — giá trị gửi thẳng lên `?match_status=`. */
+/** Lọc loại khoản tiền ở hàng chờ — giá trị gửi thẳng lên `?match_status=`. */
 export const QUEUE_TYPE_FILTERS: { value: string; label: string }[] = [
-  { value: "", label: "Mọi loại lệch" },
+  { value: "", label: "Mọi loại khoản tiền" },
   { value: "UNDERPAID", label: "Thiếu tiền" },
   { value: "UNMATCHED", label: "Không khớp đơn" },
   { value: "ORPHAN", label: "Về sau khi đơn tự huỷ" },
   { value: "OVERPAID", label: "Chuyển thừa" },
 ];
-export const RESOLUTION_LABEL: Record<string, string> = {
-  ATTACHED: "Đã gắn vào đơn",
-  CONFIRMED: "Đã xác nhận đơn",
-  REFUNDED: "Đã hoàn tiền",
-};
 
-// ---- S14: huỷ đơn đã thanh toán ----
-export const CANCEL_REASONS: { value: string; label: string; hint: string }[] = [
-  { value: "CUSTOMER_CHANGED_MIND", label: "Khách đổi ý", hint: "Khách không muốn nhận hàng nữa." },
-  { value: "DAMAGED_WHEN_PACKING", label: "Hư khi đóng hàng", hint: "Hàng hư/dập trong lúc soạn, không giao được." },
-  { value: "GIVE_UP_AFTER_FAILED", label: "Bỏ sau khi giao thất bại", hint: "Đã giao thất bại, không giao lại nữa." },
-  { value: "OTHER", label: "Khác", hint: "Nêu rõ lý do ở ô ghi chú bên dưới." },
+/** Lý do huỷ đơn (F2b). OTHER bắt buộc ghi chú (S14-AC6). */
+export const CANCEL_REASONS: { value: string; label: string }[] = [
+  { value: "CUSTOMER_CHANGED_MIND", label: "Khách đổi ý" },
+  { value: "DAMAGED_WHEN_PACKING", label: "Hư khi đóng hàng" },
+  { value: "GIVE_UP_AFTER_FAILED", label: "Bỏ sau khi giao thất bại" },
+  { value: "OTHER", label: "Khác" },
 ];

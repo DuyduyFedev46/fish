@@ -8,11 +8,12 @@
 
 import { useEffect, useState } from "react";
 import { getAiStatus } from "../api";
+import { releaseAiEnabled } from "../gate-state";
 import type { AiStatus } from "../types";
 import { AiDocBlock } from "./AiDocBlock";
 
 type Props = {
-  /** Loại chứng từ đích của R1, vd "purchasing.purchasereceipt", "inventory.batch", "sales.order". */
+  /** Loại chứng từ đích của R1, vd "purchasing.purchasereceipt", "inventory.batch", "sales.salesorder". */
   targetModel: string;
   /** Mã chứng từ đích: phiếu nhập / lô = id số; đơn bán = mã SO… (02b R1). */
   targetId: string | number;
@@ -25,12 +26,17 @@ export function AiDocBlockGate({ targetModel, targetId, onApplied }: Props) {
 
   useEffect(() => {
     const ctrl = new AbortController();
-    getAiStatus(ctrl.signal)
+    // Chủ riêng của trang này: rời trang thì nhả cờ, không để "AI bật" dính sang trang khác (L2).
+    const owner = Symbol("ai-doc-block");
+    getAiStatus(ctrl.signal, owner)
       .then((st) => setStatus(st))
       .catch(() => {
         if (!ctrl.signal.aborted) setStatus(null);
       });
-    return () => ctrl.abort();
+    return () => {
+      ctrl.abort();
+      releaseAiEnabled(owner);
+    };
   }, []);
 
   if (!status?.ai_enabled) return null;

@@ -164,31 +164,43 @@ def confirmation_case(browser, tag, w, h):
 
 
 # ---------------------------------------------------------------- Lô 4 L1
+# Viết lại sau ERP theo design Lô 3: đơn mở ở TRANG chi tiết (/orders/detail/?id=), dòng thời gian là `Timeline` dùng chung
+# (`li[data-timeline-row]`, giờ + nhãn). BỎ 1 ca: "mốc có icon riêng" (credit_note_issued dùng icon description) — mẫu Timeline của
+# ERP theo design (ED-04) không vẽ icon theo loại sự kiện nên không còn đối tượng; nội dung nhãn và thứ tự vẫn kiểm đủ.
 def timeline_case(browser, tag, w, h):
     ctx, page, logs = new_page(browser, w, h)
     login(page, "loc")
     page.goto(BASE + "/orders/")
     page.wait_for_load_state("networkidle")
-    page.locator(".order-open").first.wait_for()
-    row = page.locator(".order-open", has_text="Đã huỷ")
-    opened = row.count() >= 1
-    if opened:
-        row.first.click()
+    page.locator("tbody tr").first.wait_for()
+    rows = page.locator("tbody tr", has_text="Đã huỷ")
+    opened = rows.count() >= 1
     ok(f"L1[{tag}] tìm được đơn Đã huỷ trong danh sách", opened)
-    dlg = page.get_by_role("dialog")
-    dlg.wait_for()
-    page.wait_for_timeout(600)
-    ev = dlg.locator('li[data-kind="credit_note_issued"]')
-    ok(f"L1[{tag}] timeline có đúng 1 mốc credit_note_issued", ev.count() == 1)
+    found = False
+    for i in range(min(rows.count(), 6)):
+        page.goto(BASE + "/orders/")
+        page.wait_for_load_state("networkidle")
+        page.locator("tbody tr", has_text="Đã huỷ").nth(i).click()
+        page.wait_for_url(re.compile(r"/orders/detail/\?id=\d+"))
+        page.locator("main header h2").wait_for()
+        page.wait_for_timeout(500)
+        if page.locator("[data-timeline-row]", has_text="Lập chứng từ đảo doanh thu").count() >= 1:
+            found = True
+            break
+    ok(f"L1[{tag}] có đơn Đã huỷ kèm chứng từ đảo trong dòng thời gian", found)
+    ev = page.locator("[data-timeline-row]", has_text="Lập chứng từ đảo doanh thu")
+    ok(f"L1[{tag}] timeline có đúng 1 mốc chứng từ đảo", ev.count() == 1, str(ev.count()))
     txt = re.sub(r"\s+", " ", ev.first.inner_text()) if ev.count() else ""
     ok(f"L1[{tag}] nhãn 'Lập chứng từ đảo doanh thu DC-… (x ₫)' đúng định dạng VNĐ", re.search(r"Lập chứng từ đảo doanh thu DC-INV\d+-[0-9A-Fa-f]+ \(\d{1,3}(\.\d{3})* [đ₫]\)", txt) is not None, txt)
-    ok(f"L1[{tag}] mốc có icon riêng (không dùng icon mặc định)", ev.count() == 1 and ev.first.locator("i.mi").inner_text() == "description")
-    kinds = dlg.locator("ol.order-timeline > li[data-kind]").evaluate_all("els => els.map(e => e.dataset.kind)")
-    ok(f"L1[{tag}] thứ tự: huỷ đơn trước, chứng từ đảo sau", kinds.index("cancelled") < kinds.index("credit_note_issued"), str(kinds))
-    ev.first.scroll_into_view_if_needed()
+    labels = page.locator("[data-timeline-row]").evaluate_all("els => els.map(e => e.innerText)")
+    idx_cancel = next((i for i, t in enumerate(labels) if "Huỷ đơn" in t), -1)
+    idx_credit = next((i for i, t in enumerate(labels) if "Lập chứng từ đảo doanh thu" in t), -1)
+    ok(f"L1[{tag}] thứ tự: huỷ đơn trước, chứng từ đảo sau", 0 <= idx_cancel < idx_credit, str(labels))
+    if ev.count():
+        ev.first.scroll_into_view_if_needed()
     ok(f"L1[{tag}] không cuộn ngang", no_hscroll(page))
-    dlg.locator("ol.order-timeline").scroll_into_view_if_needed()
     page.screenshot(path=f"{SHOTS}/l1-{tag}-timeline-credit-note.png")
+    ok(f"L1[{tag}] console không chứa SĐT/tên khách", not any(re.search(r"09\d{8}", l) or "Chị Hoa" in l for l in logs))
     ctx.close()
 
 

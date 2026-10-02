@@ -1166,3 +1166,155 @@ Mẫu trang chi tiết, popup, form và khối Trợ lý AI (ED-03 phần còn l
 - **Font:** file `public/fonts/ms/material-symbols-outlined.woff2` (112 icon) ĐƯỢC commit; đã sửa các dòng ghi sai ở trên. Commit lô phải kèm file này.
 - **Lệch/ghi chú.** Field lỗi dưới ô (`Field`) không có `role=alert` (dùng `aria-invalid` + `aria-describedby`); giữ nguyên. File QA đã chỉnh cho khớp thiết kế mới: `e2e/qa_ed_batch2_patterns.py` (nút "Hỏi trợ lý" -> nút "Gửi câu hỏi" 44px) và `e2e/qa_ed_batch2_harness.py` (ca 409). File mock mới: cờ `aiDetailFail` trong `features/ai/actions/mock.ts`; `PatternDemo.tsx` thêm nhánh mock 410 -> CLAIMED. Cả hai chỉ nằm trong nhánh mock.
 - **Kiểm chứng (chạy ở lượt này):** `tsc --noEmit` sạch; `vitest run` 42 file, 380 test đạt; build `MOCK=0` OK, `check-no-mock` XANH, `check-ai-chunks` XANH (4 màn nghiệp vụ + 2 layout), bản thật không chứa `aiDetailFail` hay chuỗi demo; build `MOCK=1` OK; e2e: `ed_batch2_patterns` 75/75, `qa_ed_batch2_patterns` 79/79, `qa_ed_batch2_harness` 73/73, `ed_batch1_shell` 56/56, `p8_lo6_fe_sr19_sr20` 75/75 (cần `BASE=http://127.0.0.1:3101`); `check_naming` OK (không vi phạm mới); màu cứng ở file CSS của lô 0. Ảnh: `.../scratchpad/shots/ed2-ai-block-desktop.png`, `ed2-detail-mobile360.png`, `ed2-inplace-empty-desktop.png`, `ed2-ai-detail-error-desktop.png`.
+
+## Lô 3 — FE (Đơn & tiền: ED-09, ED-10, ED-11, ED-12) — 02/10
+
+### File mới (trong `erp-console/`)
+- `features/orders/`: `types.ts` (mở rộng), `useIdParam.ts`, `useDetail.ts`, `DetailGate.tsx`, `orderDetailModel.ts` (kế hoạch nút chính/menu theo `available_actions`, StatusPath, dòng thời gian suy ra), `filters.ts`, `useNow.ts` (đồng hồ giữ chỗ), và `amount.ts` (file có từ trước, nay thêm `formatAmountInput`). `aiCount.ts` và `useAiCount.ts` đã xoá ở lượt sửa 02/10 (xem mục sau).
+- `features/orders/components/`: `OrdersSectionTabs`, `OrderDetailScreen`, `PaymentDetailScreen`, `RefundDetailScreen`, và 8 popup: `ActionModal` (khung chung), `ConfirmPaymentModal` (F2a), `CancelOrderModal` (F2b, có bước xác nhận lần hai), `RefundModal` (F2c), `AttachOrderModal` (F2d), `ConfirmOrderModal` (F2e), `RefundActionModals` (F2f xác nhận đã hoàn, F2g đánh dấu hoàn lỗi/thử lại).
+- Trang mỏng: `app/(console)/orders/detail/page.tsx`, `orders/payments/detail/page.tsx`, `orders/refunds/detail/page.tsx`.
+- Test vitest: `orderDetailModel.test.ts`, `filters.test.ts`, `queueModels.test.ts` (kiểm `monthBreakdown` nằm trong `RefundQueueScreen.tsx` và câu tổng tháng trong `messages.ts`; không có file `queueModels.ts`), `amount.test.ts`, `useNow.test.ts`, `features/ai/gate-state.test.ts`.
+- E2E: `e2e/orders_common.py` (hàm dùng chung), `e2e/ed_batch3_orders.py` (141 ca), `e2e/ed_batch3_real.py` (smoke trên BE thật, 19 ca).
+
+### File sửa
+- `OrdersScreen`, `PaymentQueueScreen`, `RefundQueueScreen` (3 tab dùng `ListPage`/`DataTable`/`FilterBar`, bấm dòng mở trang chi tiết), `api.ts`, `mock.ts`, `messages.ts`, `labels.ts`, `refund.ts`, `orders.module.css`, `README.md`.
+- Nợ các lô trước: `features/ai/{api.ts,gate-state.ts,components/*}`, `shared/ui/detail/{AiBlockFrame,InfoField}`, `shared/ui/Tabs.tsx` (+test), `shared/lib/nav.ts`, `scripts/check-ai-chunks.mjs`.
+- E2E cũ viết lại cho giao diện mới (giữ ca nghiệp vụ mức API): `s10_s11_orders.py` (42), `s12_s13_queue.py` (66), `s14_s16_cancel_refund.py` (41).
+- Đã `git rm` 16 file cũ: các `*Sheet`, `*Form`, `*View`, `OrdersTabs`, `QueueFormParts`.
+
+### Hàm API mới / đổi
+- `getOrder(id)`, `getPayment(id)`, `getRefund(id)` (chi tiết, có nhánh mock), `listOrders` thêm `q`/`status`/khoảng ngày, thêm hàm gọi R3 cho F2a–F2g (`confirmPayment`, `cancelOrder`, `createRefund`, `attachPayment`, `confirmOrderPaid`, `confirmRefund`, `markRefundFailed`, `retryRefund`). Mọi hàm đều có nhánh mock; chỉ `createRefund` gửi `request_id` (idempotency của lập phiếu hoàn); các hàm ghi còn lại không có. Mock thêm hook `conflictNext`.
+- Chuyển hướng cũ: `/orders/?order=<id>&open=refund` mở thẳng chi tiết đơn kèm popup lập phiếu hoàn.
+
+### Ảnh chụp (thư mục `/private/tmp/claude-501/shots3/`, không vào repo)
+`ed3-list-1280-light.png`, `ed3-list-360-light.png`, `ed3-list-360-dark.png`, `ed3-detail-360-light.png`, `ed3-detail-360-dark.png`, `ed3-detail-menu-1280-light.png`, `ed3-confirm-360-light.png`, `ed3-confirm-360-dark.png`, `ed3-cancel-confirm-1280-light.png`, `ed3-conflict-1280-light.png`, `ed3-paid-1280-light.png`, `ed3-detail-error-1280-light.png`, `ed3-payments-1280-light.png`, `ed3-refunds-1280-light.png`, `ed3-refund-failed-1280-light.png`, `ed3-refund-over-1280-light.png`, `s10-*`, `s11-*`, `s12-*`, `s16-*` (360 sáng/tối), và trên BE thật `real3-list.png`, `real3-detail.png`.
+
+### Kiểm chứng (chạy ở lượt này)
+- `npx tsc --noEmit`: sạch. `npx vitest run`: 47 file, 428 test đạt.
+- Build `NEXT_PUBLIC_USE_MOCK=0`: OK; `check-no-mock` XANH; `check-ai-chunks` XANH.
+- Build `MOCK=1` + serve cổng 3101: `ed_batch3_orders` 141/141, `s10_s11_orders` 42/42, `s12_s13_queue` 66/66, `s14_s16_cancel_refund` 41/41, `ed_batch1_shell` 56/56, `ed_batch2_patterns` 75/75.
+- **BE thật** (Django runserver trên SQLite tạm + `seed_demo`, console build `MOCK=0` cổng 3102, đăng nhập Chủ `loc` và Quản lý `ql1`): `ed_batch3_real` 19/19. Phủ: danh sách 6 đơn đúng cột và chip, chi tiết đơn Giữ chỗ, xác nhận đã nhận tiền (POST 200), huỷ đơn có bước xác nhận, lập phiếu hoàn, tab Phiếu hoàn, xác nhận đã hoàn, hàng chờ thanh toán, id không tồn tại hiện màn "Không tìm thấy", không có 5xx, Quản lý không có nút ghi và không thấy giá vốn. Đã tắt server.
+- `check_naming` OK (không vi phạm mới). Màu cứng ở file của lô: 0.
+- Lưu ý: `out/` hiện là bản build `MOCK=0`; build lại `MOCK=1` trước khi chạy e2e mock.
+
+### Chỗ lệch contract / giả định
+1. BE chi tiết đơn không có `customer.id`: không hiện "Mở trang khách".
+2. Phân bổ lô chỉ có mã lô, không có pk: không làm link sang lô.
+3. Dòng thời gian của khoản tiền/phiếu hoàn suy ra từ các trường của chi tiết (ghi rõ "suy ra" trên giao diện), vì BE chưa có sổ sự kiện riêng.
+4. Từ phiếu hoàn sang đơn: tra bằng `listOrders({q: mã đơn})`.
+5. (Đã thay) Ba màn danh sách không còn AiBar/`useAiCount` (xem lượt sửa 02/10, TL-H2). Khoá đếm `sales.salesorder` / `sales.paymenttransaction` / `sales.refund` khi làm thanh AI ở Lô 17 vẫn cần techlead xác nhận với R1.
+6. `GuidancePanel`: bỏ "Để AI làm" và "Nhờ" (đã bỏ ở Lô 2, giữ nguyên).
+7. Sau xác nhận nhận tiền, BE chuyển thẳng BOOKED -> PROCESSING nên chip hiện "Đang xử lý", còn toast và StatusPath ghi "Đã thanh toán". Khác chữ của ED-10-AC1. PO đã chốt (02/10): chip giữ "Đang xử lý", toast đổi thành "Đã nhận tiền"; Duy xem lại ở mục #16.
+8. Mock guidance (không phải của tôi) trả sai nhánh cho id khác "1"; FE canh `doc.status` và lùi về nhãn nút chính.
+9. Danh sách đơn bỏ cột SĐT và cờ `needs_attention`; tìm kiếm khoản tiền làm phía client.
+10. Tổng phiếu hoàn trong tháng = tổng các phiếu không phải FAILED (giả định). Câu rỗng của tab Phiếu hoàn hiện cho mọi bộ lọc.
+11. Lý do "đánh dấu hoàn lỗi" để tuỳ chọn (BE cho phép trống); giao diện chỉ nhắc.
+12. Hàng chờ thanh toán chỉ Chủ vào được (Quản lý: không có quyền, theo S12-AC7); tab Phiếu hoàn Quản lý chỉ xem.
+13. Ô số tiền nay báo "Chỉ nhập chữ số" khi gõ chữ (trước đây lọc im lặng); ô hoàn tiền là ô chữ `inputMode=decimal` (không phải `type=number`) và nay tự nhóm nghìn khi gõ (`formatAmountInput`).
+14. Mock lưu dữ liệu giả của đơn trong `sessionStorage` (có từ trước, chỉ dev); đã kiểm `localStorage` sạch.
+15. Quan sát trên BE thật: đơn đã huỷ vì hết giờ giữ chỗ vẫn nhận `available_actions` gồm "Xác nhận đã nhận tiền" và BE chấp nhận (khách chuyển trễ). FE theo `available_actions`; BE/PO nên xác nhận đây là chủ ý.
+
+### Việc còn nợ
+- F2j và ED-10-AC4/AC5 (đổi người nhận/địa chỉ) thuộc `/confirmation`, không làm ở đây.
+- Link "Nhật ký" chưa lọc theo đơn (chưa có tham số lọc ở nhật ký).
+- (Đã xử lý 02/10) `p8_lo6`/`p8_lo7` đã viết lại cho trang mới, xem mục sau. Lỗi sẵn có: `s8`/`s12` vùng chạm 360px, `ra_soat_cs11_ac6_label_pdf`.
+- Các script e2e cũ nay gọn hơn: bớt kiểm tra vùng chạm 44px theo từng sheet và vài vi kiểm UI (đã có trong `ed_batch3_orders`).
+- `scripts/check_naming.py --update` chưa chạy (2 file giảm vi phạm); để điều phối viên khoá khi commit.
+- Chưa commit/push (theo quy định); font 112 icon `public/fonts/ms/material-symbols-outlined.woff2` của Lô 2 đã commit.
+
+## Lô 3 — FE: sửa sau Techlead CHANGES REQUESTED và QA REJECTED — 02/10
+
+Chưa commit. Mọi số dưới đây chạy lại trong lượt này.
+
+### Đã sửa
+| Mã | Việc | Chỗ sửa |
+|---|---|---|
+| TL-H1 | Trang đơn gửi `targetModel="sales.salesorder"` (trước là `sales.order`, BE trả 400). Bỏ khoá `sales.order` khỏi `DOC_KIND_LABEL`. Mock `filterByTarget` chặt như BE: loại lạ ném lỗi, `mockFetchAiActions` trả 400 `INVALID_TARGET_MODEL` "Loại chứng từ không hợp lệ.". Thêm hook mock `window.__caveMock.aiOrderProposal(code)` để e2e dựng đề xuất cho một đơn. | `app/(console)/orders/detail/page.tsx`, `features/ai/actions/mock.ts`, `features/ai/components/docBlockModel.ts`, test `filter.test.ts` (+3), `docBlockModel.test.ts` |
+| TL-H1 (trang khoản tiền, phiếu hoàn) | Lúc đầu hai trang này chưa có khối AI. Điều phối viên chuyển quyết định của Duy (01 §3.7: mọi trang chi tiết có khối Trợ lý AI, trừ trang khách hàng) nên đã thêm, xem mục "Thêm khối AI cho khoản tiền và phiếu hoàn" dưới. | xem mục dưới |
+| TL-H2 | Gỡ `AiBar` và `useAiCount` khỏi 3 màn danh sách, xoá `aiCount.ts`, `useAiCount.ts`. AI tắt: 3 danh sách gọi 0 request `/api/ai/*`; AI bật cũng không có `counts`. Thanh AI của danh sách làm ở Lô 17 qua `AiBarGate`. | `OrdersScreen`, `PaymentQueueScreen`, `RefundQueueScreen`, `features/orders/README.md` |
+| TL-M1 | `Starter` luôn ở một vị trí con cố định trong `AiBlockFrame` (React không dựng lại ô nhập khi panel nạp). Nút "Bật trợ lý" trả focus về ô hỏi. | `shared/ui/detail/AiBlockFrame.tsx` (thêm `inputRef`), `features/ai/components/AiDocBlock.tsx` (thêm `data-doc-chat`) |
+| TL-M2 | Câu tổng tháng của tab Phiếu hoàn nói rõ cộng loại nào: "Tháng 10/2026: 3 phiếu Chờ hoàn, tổng tiền … (không tính phiếu Thất bại)"; hai loại thì nối " · "; có phiếu Thất bại thì ghi "(không tính N phiếu Thất bại)". Hàm `monthBreakdown` thay `monthTotal`. | `RefundQueueScreen.tsx`, `messages.ts`, `queueModels.test.ts` |
+| TL-M3 | Viết lại `p8_lo6_fe_sr19_sr20.py` (60 ca) và `p8_lo7_fe_erp.py` (81 ca) cho trang mới, giữ ý từng ca. Các ca bỏ hoặc đổi ghi ngay trong file (dòng "BỎ:"), liệt kê ở mục "Ca e2e bỏ hoặc đổi" dưới. `p8_lo6` có ca SR-20 bắt được H2. | `e2e/p8_lo6_fe_sr19_sr20.py`, `e2e/p8_lo7_fe_erp.py` |
+| QA-B1 | Popup "Lập phiếu hoàn" chỉ còn 1 dòng "Còn hoàn được" (bỏ dòng thêm ở popup, hai trang gọi đã truyền sẵn). | `RefundModal.tsx` |
+| QA-B2 | Chip giữ "Đang xử lý" (theo enum). Toast đổi: "Đã nhận tiền đơn <mã>. Đơn đã đủ tiền, chuyển sang bước xử lý." Câu cảnh báo gắn đơn cũng đổi theo. | `messages.ts` |
+| Low | StatusPath 360px: các bước chia đều bề rộng, nhãn xuống dòng, không cắt, không cuộn ngang. Ô số tiền hoàn tự nhóm nghìn (`formatAmountInput`: "1500000" thành "1.500.000"; "0.5", "540,5", chữ giữ nguyên để báo lỗi đúng). L5: trang chi tiết đơn không còn vẽ lại mỗi giây, chỉ ô "Còn giữ chỗ" (`HoldLeft`) có đồng hồ; chip đổi "Đã huỷ" nhờ một lần đặt giờ tới mốc (`useHoldExpired`). L2: bỏ `PERM.createRefund`/`confirmRefund` không dùng ở `nav.ts`; câu cuối `check-ai-chunks.mjs` ghi 7 route; sửa các câu sai trong chính tệp này. | `StatusPath.module.css`, `amount.ts`, `useNow.ts`, `OrderDetailScreen.tsx`, `nav.ts`, `scripts/check-ai-chunks.mjs` |
+
+### Test thêm
+- vitest: `filter.test.ts` +3 (loại lạ bị từ chối như BE, nhãn đúng được nhận), `amount.test.ts` +3 (`formatAmountInput`), `useNow.test.ts` mới (`holdLeftText`, `mmss`), `detail.test.ts` +1 (Starter đứng trước khe chat, chỉ một ô), `queueModels.test.ts` viết lại.
+- e2e mới `e2e/ed_batch3_fixes.py`, 52 ca: H2 (6 trang với AI tắt, 3 danh sách với AI bật không có `counts`), H1 (`target_model=sales.salesorder`, đề xuất của đơn hiện không có cảnh báo), M1 (chặn chunk panel 900ms: bấm ô giữ focus, gõ ngay giữ chữ "abc"+"def"+"ghi", focus không rơi về BODY ở mọi mẫu đo, luồng chưa đồng ý "xyz" rồi tick, bấm "Bật trợ lý", gõ "123" còn nguyên), M2 (5 bộ lọc trạng thái), B1 (một dòng "Còn hoàn được", nhóm nghìn), B2 (toast và chip), StatusPath 360px cho 4 đơn, L5 (ô đếm ngược đổi mỗi giây, phần còn lại không vẽ lại).
+
+### Kiểm chứng (chạy lượt này)
+- `npx tsc --noEmit`: sạch. `npx vitest run`: 48 file, 442 test đạt.
+- Build `MOCK=0` (truyền `NEXT_PUBLIC_API_BASE`): `check-no-mock` XANH, `check-ai-chunks` XANH (7 route + 2 layout).
+- Build `MOCK=1`, serve cổng 3101: `ed_batch3_orders` 142/142, `ed_batch3_fixes` 52/52, `s10_s11_orders` 42/42, `s12_s13_queue` 66/66, `s14_s16_cancel_refund` 41/41, `p8_lo6` 60/60, `p8_lo7` 81/81, `ed_batch1_shell` 56/56, `ed_batch2_patterns` 75/75.
+- `qa_ed_batch3_orders` (QA viết): 317/319. 2 ca đỏ đều đã biết: (1) "'đ' ở mọi chỗ" vì chuỗi do mock/BE dựng còn "₫" (nợ B3, ở BE); (2) "chip đổi thành 'Đã thanh toán'" là ca cũ, đã trái với chốt của PO (QA-B2). QA nên sửa ca (2) thành "Đang xử lý".
+- BE thật (Django runserver + SQLite tạm, console build `MOCK=0` cổng 3102): `ed_batch3_real` 19/19. `qa_ed_batch3_real` (trên bản sao DB QA): 145/149 đạt, 2 chưa chạy. 4 đỏ: cùng ca chip "Đã thanh toán" và "₫" như trên, cộng 2 ca "BE log không có 5xx / Traceback" do SQLite `database is locked` ở ca đua 2 yêu cầu (nhiễu do SQLite, không phải lỗi mã). Đã tắt mọi server.
+- `check_naming` OK; màu cứng ở file của lô: 0.
+- `out/` hiện là bản build `MOCK=1`.
+
+### Ca e2e bỏ hoặc đổi (ghi lý do, không xoá lặng lẽ)
+- `p8_lo6` SR19: mở bằng trang chi tiết đơn thay cho hộp bên phải; ý giữ nguyên.
+- `p8_lo6` SR20-AC3: danh sách phải 0 request AI; trang chi tiết đơn được tối đa 1 request `/api/ai/status/` (cổng cần biết có hiện khối không, theo QA Lô 2), không gì khác. Thêm ca "không tải chunk model/worker".
+- `p8_lo6` SR20-AC5 và F6-2: **bỏ** ca bấm "Để AI làm" ở chi tiết đơn (ba trang chi tiết mới không dùng `GuidancePanel`, chỗ lệch #6). Thay bằng ca: AI bật thì thấy khối Trợ lý AI và ô hỏi; chưa chạm ô thì chưa nạp panel và chưa gọi lệnh/chat; chạm mới nạp; chưa đồng ý model thì chạm ô ra thẻ "Bật trợ lý trên máy".
+- `p8_lo6` F6-1 ("Nhờ"): chỉ còn ở lô kho (`/inventory`, vẫn dùng `GuidancePanel`); **bỏ** các ca ở hộp đơn, khoản tiền, phiếu hoàn vì không còn nút.
+- `p8_lo6` F6-2 nhánh `step.ai=C` ở chi tiết đơn: bỏ, và mock guidance của lô kho không trả `step.ai` nên không có chỗ khác để kiểm. Nhánh vẫn có vitest ở `features/guidance`.
+- `p8_lo7` L1 (dòng thời gian chứng từ đảo): đổi sang `Timeline` mới (`li[data-timeline-row]`); **bỏ** ca "mốc có icon riêng" vì Timeline mẫu mới không vẽ icon theo loại sự kiện. Nội dung nhãn, thứ tự, không cuộn ngang vẫn kiểm.
+
+### Thêm khối AI cho khoản tiền và phiếu hoàn (điều phối viên giao 02/10, theo 01 §3.7)
+- `app/(console)/orders/payments/detail/page.tsx` ghép `AiDocBlockGate targetModel="sales.paymenttransaction" targetId={pk khoản tiền}`; `app/(console)/orders/refunds/detail/page.tsx` ghép `targetModel="sales.refund" targetId={pk phiếu hoàn}`. Cách ghép giống trang đơn: `PaymentDetailScreen`/`RefundDetailScreen` nhận prop `renderAi(target, onApplied)` (feature không import `features/ai`) và đưa vào `aiSlot` của `DetailPage`; `onApplied` = tải lại chứng từ. `target_id` là pk vì BE lưu `str(payment.id)` ở `auto_confirm.py`; trang đơn vẫn dùng "mã,pk".
+- Mock: thêm hook `window.__caveMock.aiPaymentProposal(pk)` và `aiRefundProposal(pk)` (cùng hàm `addMockProposal` với `aiOrderProposal`).
+- `scripts/check-ai-chunks.mjs` đã có sẵn hai route chi tiết này nên không phải thêm; chạy lại vẫn XANH (/orders/payments/detail 444.5 kB, /orders/refunds/detail 432.5 kB First Load).
+- e2e: `ed_batch3_fixes.py` thêm `ai_block_payment_refund` (AI tắt: không khối, không `/api/ai/actions`, tối đa 1 `/api/ai/status/`; AI bật: khối ở cột phải, gửi đúng `target_model` + `target_id`, có đề xuất đúng chứng từ, không cảnh báo lỗi, 360px không cuộn ngang) và sửa ca H1/H2 của hai trang; `p8_lo6` SR20-AC3 đổi theo (hai trang chi tiết được tối đa 1 request status). Kết quả: `ed_batch3_fixes` 78/78, `ed_batch3_orders` 142/142, `p8_lo6` 62/62; `qa_ed_batch3_orders` 317/319 (2 ca cũ), `s10_s11` 42/42, `s12_s13` 66/66, `s14_s16` 41/41, `p8_lo7` 81/81, `ed_batch1_shell` 56/56, `ed_batch2_patterns` 75/75; vitest 48 file/442 test; tsc sạch; build MOCK=0 + check-no-mock + check-ai-chunks XANH.
+- Chưa chạy với BE thật (BE chấp nhận `sales.paymenttransaction` và `sales.refund` theo `resolve_target_label`); nên chạy một lượt khi QA kiểm. Ảnh: scratchpad `shots/fix-ai-{payment,refund}-{1280,360}.png`.
+
+
+### Sửa B4 của QA lần 2: ô số tiền hoàn đọc sai gấp 1.000 lần (02/10)
+- **Lỗi:** gõ `150000` ra `150.000`, Backspace ra `150.00`, `parseAmount` đọc luật "dấu cuối + 1–2 chữ số là phần lẻ" thành 150 đ; đi hết luồng tạo phiếu hoàn 1.500 đ thay vì 150.000 đ.
+- **Sửa theo hướng chắc chắn:** tiền VNĐ là số nguyên nên giá trị thật của ô chỉ gồm chữ số.
+  - `shared/lib/moneyInput.ts` (mới, một hàm dùng chung): `editMoneyInput(prev, next, caret, inputType)` bỏ mọi ký tự không phải số (kể cả `.` `,` `đ` chữ), bỏ số 0 đầu, nhóm nghìn lại từ chuỗi chữ số, tính lại vị trí con trỏ theo số chữ số đứng trước con trỏ. Xoá lùi/xoá tới đúng một dấu chấm phân nhóm thì xoá chữ số liền kề (phím không đứng im). `formatMoneyInput` cho giá trị ban đầu.
+  - `shared/ui/form/Field.tsx`: kiểu mới `type="money"` (type=text, `inputMode="numeric"`) gọi `editMoneyInput` ở mỗi `onChange`, đặt lại con trỏ bằng `useLayoutEffect` và microtask (cả khi giá trị không đổi vì chữ bị bỏ). Các ô `type="number"` khác (kg, v.v.) không đổi.
+  - Hai ô tiền của lô đều dùng `type="money"`: `RefundModal` (số tiền hoàn) và `ConfirmPaymentModal` (số tiền đã nhận; trước đó không nhóm nghìn và cùng bị luật phần lẻ). Rà `features/orders`: không còn ô tiền nào khác.
+  - `features/orders/amount.ts`: `parseAmount` dùng chung `splitFraction` với ô nhập (xem mục "Phần lẻ kiểu sao kê" bên dưới); `formatAmountInput` gọi `formatMoneyInput`.
+- **Thay đổi hành vi (cần PO biết):** (1) chữ gõ vào ô tiền bị bỏ ngay tại ô, không còn câu "Chỉ nhập chữ số" (mã lỗi `notNumber` vẫn còn trong `parseAmount` cho chuỗi lập trình, nhưng ô không tạo ra nó nữa). (2) Dấu trừ không bị bỏ lặng lẽ: `-5` giữ nguyên để báo "không được âm" (nếu bỏ dấu trừ thì -5 thành 5 đ, sai tiền). (3) Cách xử lý `0.5` / `540,5` ở lần sửa đầu (đọc thành 5 / 5.405) là SAI, đã thay bằng luật phần lẻ ngay dưới.
+- **Test:** vitest mới `shared/lib/moneyInput.test.ts` (26 ca: gõ, gõ chữ, số 0 đầu, Backspace từ 150.000 và 1.500.000, gõ 12345 xoá lùi 2 lần, xoá lùi qua dấu chấm, Delete, dán `150.000` / `1,500,000` / `1,190,000 đ`, dán đè, xoá hết, số 30 chữ số, ranh giới 12/13 chữ số, dấu trừ, mọi chuỗi sinh ra đọc lại đúng) và `amount.test.ts` (đọc chỉ chữ số). e2e `ed_batch3_fixes.py` thêm các ca B4 trên trình duyệt (con trỏ, Backspace, Delete, Backspace qua dấu chấm, chèn đầu ô, chữ bị bỏ, dán, số lớn, xoá hết). `s10_s11` (ca "1abc00000" nay còn `100.000`) và `s12_s13` (ca 0.5 → 0/00) sửa theo hành vi mới; `orders_common.finish` in được lỗi dạng tuple. (Số liệu và ca `0.5`/`540,5` trong đoạn này thuộc lần sửa đầu, luật phần lẻ ở mục dưới thay thế.)
+- **Số thật lần sửa đầu (đã cũ):** xem số mới ở mục dưới.
+
+### Phần lẻ kiểu sao kê: không đoán (02/10, sau QA lần 3)
+- **Lỗi còn sót:** dán `150.000,00` (sao kê ngân hàng) ra 15.000.000 (gấp 100 lần), `0.5` ra 5 đ, vì ô chỉ lấy chữ số.
+- **Luật mới (một hàm `splitFraction` trong `shared/lib/moneyInput.ts`, ô nhập và `parseAmount` cùng dùng):** chuỗi khớp `[.,]\d{1,2}\s*(đ|₫|vnd)?\s*$` là có phần lẻ. Nhóm cuối đúng 3 chữ số (`1.500.000 đ`, `150.000`) không phải phần lẻ.
+  - Phần lẻ toàn số 0 (`150.000,00`, `150,000.00`, `150.000,0`, `0.00`): nhận, bỏ phần lẻ (`150.000`; `0.00` thành `0` rồi báo "phải lớn hơn 0").
+  - Phần lẻ khác 0 (`150.000,50`, `150,000.50`, `0.5`, `540,5`): **không đoán**. Ô giữ nguyên giá trị cũ (nút gửi vẫn ghi số cũ), `Field type="money"` hiện lỗi dưới ô: "Số tiền là số nguyên đồng, không có phần lẻ. Nhập lại, ví dụ 150.000." (hằng `MONEY_FRACTION_MESSAGE`, `ORDERS_MSG.amountFraction` trỏ về cùng hằng). Gõ tiếp chữ số hợp lệ thì lỗi tự mất. `parseAmount` trả `problem: "fraction"` với cùng câu.
+  - Xoá lùi/xoá tới (`inputType` `delete*`/`history*`) không bị xét là phần lẻ: Backspace từ `1.500.000` tạm ra `1.500.00` vẫn ra `150.000`.
+  - Dấu trừ giữ như cũ (đi qua nguyên văn để báo "không được âm").
+- **Test:** vitest `moneyInput.test.ts` thêm 8 ca (`150.000,00`, `150,000.00` thành 150.000; `150.000,50`, `150,000.50`, `0.5`, `540,5` bị từ chối và giữ giá trị cũ; `1.500.000 đ`; `0.00`; Backspace; dấu trừ; câu lỗi; `splitFraction`), `amount.test.ts` viết lại theo luật mới. e2e `ed_batch3_fixes.py` thêm 13 ca B5 dán vào ô trong popup hoàn tiền (giá trị, lỗi dưới ô, nút gửi vẫn ghi `20.000 đ`, lỗi tự mất, dấu trừ).
+- **Số thật:** tsc sạch; vitest 49 file/478 test; build MOCK=0 + `check-no-mock` + `check-ai-chunks` XANH; e2e mock: `ed_batch3_fixes` 103/103, `qa_ed_batch3_followup` 108/108, `s10_s11` 42/42, `s12_s13` 66/66, `s14_s16` 41/41; `check_naming` không phát sinh mới (cần `--update` khi commit); 0 hex/rgba trong file đã sửa.
+- **Chưa kiểm:** bàn phím điện thoại thật (dán từ ứng dụng ngân hàng), BE thật. `s12_s13` không còn ca `0.5` đọc thành số; ca đó giờ do vitest và B5 phủ.
+
+
+### Điều còn nợ
+- B3: "₫" trong chuỗi do BE dựng (dòng thời gian, `Đã làm`); sửa ở BE.
+- L3: `refundable_amount` nên do BE trả (FE đang tự tính "Còn hoàn được" từ tổng đã hoàn).
+- L1 (Techlead): câu gõ trực tiếp trong panel chưa kèm ngữ cảnh chứng từ (`docContext` chưa truyền xuống `AiAssistantPanel`); có thể để Lô 15.
+- L4 (Techlead): giữ như đã ghi trong `03b`.
+- `qa_ed_batch3_orders.py` ca chip "Đã thanh toán" cần QA cập nhật (QA-B2).
+- Chưa commit/push.
+
+## Sửa TL5-BE1
+
+Lỗi (Medium, techlead review Lô 5): `ConfirmationQueueViewSet.get_object` tra `Q(note_id=val) | Q(pk=val)` rồi `.first()`. Khi `pk` của task A trùng `note_id` của task B, retrieve/claim/calls/recipient/decide gọi với `id` của B có thể ghi nhầm sang A. Không rò dữ liệu (kiểm phạm vi chạy trên task trả về) nhưng ghi sai chứng từ.
+
+Sửa: `backend/apps/delivery/confirmation/api.py` chỉ tra `note_id` (đúng contract `/api/confirmation/queue/<note_id>/`), bỏ nhánh `pk`. Không trùng thì 404; giá trị không phải số cũng 404. Không đổi contract, không migration.
+
+FE: `erp-console/features/confirmation/api.ts` (chỉ đọc) luôn dựng URL `/api/confirmation/queue/${noteId}/...` với `noteId`; không có chỗ nào gửi `pk` của task.
+
+Test (RED trước: 7 đỏ, đúng lý do): `backend/apps/delivery/tests/test_confirmation_lookup.py`, 9 ca. Dựng 2 task có `pk` task A == `note_id` của B; retrieve, claim, calls, recipient, decide với `note_B` chỉ tác động B, A giữ nguyên; id lạ trả 404 trên mọi route; pk task không phải note_id nào trả 404; phiếu ngoài phạm vi trả 404 và không ghi; id không phải số trả 404.
+
+## Sửa QA5-B2 (timeline delivery cho CSKH)
+
+Lỗi (High, QA Lô 5): `GET /api/guidance/delivery/<note_id>/` luôn 403 với `customer_service`, vì provider chỉ nhận `delivery.view_deliverynote`. Theo 02b §3.8 R2, quyền xem dòng thời gian phải bằng quyền xem chi tiết; CSKH xem chi tiết phiếu trong phạm vi gọi xác nhận nên màn Gọi xác nhận không hiện được dòng thời gian.
+
+Sửa (không đổi contract, không migration):
+- `backend/apps/common/guidance/audit_timeline.py`: thêm tham số tuỳ chọn `object_scope_fn(user, obj) -> bool` cho `make_audit_timeline_provider`, kiểm sau khi tra đối tượng; False thì 404 như ngoài phạm vi (thông điệp cố định). Provider khác không đổi.
+- `backend/apps/delivery/next_steps.py`: quyền = `view_deliverynote` HOẶC `confirm_with_customer`. Người có `view_deliverynote` giữ nguyên phạm vi cũ (owner/manager/warehouse_staff thấy hết, delivery_staff chỉ phiếu gán cho mình). Người chỉ có `confirm_with_customer` (CSKH) chỉ xem phiếu có mục chờ gọi và qua đúng `note_in_customer_service_scope` của `GET /api/confirmation/queue/<note_id>/` (tái sử dụng, không viết lại; `scope.py` và `services.py` không đổi). Ngoài phạm vi trả 404. Vẫn `Cache-Control: no-store`; nội dung dòng thời gian không đổi, không có dữ liệu khách.
+
+Test (RED trước: 5 đỏ vì 403, đúng lý do): `backend/apps/delivery/tests/test_timeline_customer_service.py`, 8 ca. CSKH trong phạm vi 200 + no-store; ngoài phạm vi 404 (và chi tiết hàng chờ cũng 404); phiếu đã đóng nhưng chính CSKH vừa gọi thì cả chi tiết lẫn timeline 200, CSKH khác 404; id lạ/không phải số 404; body không có SĐT, địa chỉ, tên giả (cả khi AuditLog có chứa chúng); người không quyền 403, chưa đăng nhập 401; owner/warehouse_staff không đổi; delivery_staff giữ phạm vi gán cho mình.

@@ -22,6 +22,7 @@ import type {
   OrderListParams,
   PaymentQueueItem,
   PaymentQueueParams,
+  RefundListParams,
   RefundQueueItem,
   ResolveInput,
   ResolveResult,
@@ -37,6 +38,8 @@ export function orderListQuery(params: OrderListParams, page: number): string {
   if (params.date_from) qs.set("date_from", params.date_from);
   if (params.date_to) qs.set("date_to", params.date_to);
   if (params.q.trim()) qs.set("q", params.q.trim());
+  if (params.customer) qs.set("customer", params.customer);
+  if (params.batch) qs.set("batch", params.batch);
   if (page > 1) qs.set("page", String(page));
   const s = qs.toString();
   return s ? `?${s}` : "";
@@ -141,11 +144,27 @@ export function createRefund(input: CreateRefundInput): Promise<CreateRefundResu
 
 const REFUNDS = "/api/sales/refunds/";
 
-/** GET /api/sales/refunds/?status=PENDING,FAILED&page= — cần sales.view_refund (Chủ, Quản lý). */
-export function listRefundQueue(_params: Record<string, never>, page = 1, signal?: AbortSignal): Promise<Paginated<RefundQueueItem>> {
-  const qs = new URLSearchParams({ status: "PENDING,FAILED" });
+/** Chuỗi query phiếu hoàn: `status` (nhiều giá trị), `month=YYYY-MM` (Lô 3 R3), `page`. */
+export function refundListQuery(params: RefundListParams, page: number): string {
+  const qs = new URLSearchParams();
+  if (params.status) qs.set("status", params.status);
+  if (params.month) qs.set("month", params.month);
   if (page > 1) qs.set("page", String(page));
-  return apiFetch<Paginated<RefundQueueItem>>(`${REFUNDS}?${qs.toString()}`, {
+  const s = qs.toString();
+  return s ? `?${s}` : "";
+}
+
+/** GET /api/sales/refunds/?status=&month=&page= — cần sales.view_refund (Chủ, Quản lý). */
+export function listRefunds(params: RefundListParams, page = 1, signal?: AbortSignal): Promise<Paginated<RefundQueueItem>> {
+  return apiFetch<Paginated<RefundQueueItem>>(`${REFUNDS}${refundListQuery(params, page)}`, {
+    signal,
+    mock: process.env.NEXT_PUBLIC_USE_MOCK === "1" ? mockRefundQueueApi : undefined,
+  });
+}
+
+/** GET /api/sales/refunds/{id}/ — cùng hình một dòng danh sách (không có id đơn, chỉ `order_code`). */
+export function getRefund(id: number, signal?: AbortSignal): Promise<RefundQueueItem> {
+  return apiFetch<RefundQueueItem>(`${REFUNDS}${id}/`, {
     signal,
     mock: process.env.NEXT_PUBLIC_USE_MOCK === "1" ? mockRefundQueueApi : undefined,
   });
