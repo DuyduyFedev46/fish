@@ -22,7 +22,7 @@ Hàng giao thất bại mang về kho: nhân viên giao hoặc nhân viên kho n
 - Xem: `inventory.view_returntostock` (Chủ, Quản lý, NV kho, NV giao). NV giao chỉ thấy phiếu của phiếu giao gán cho mình, phiếu khác báo "Không tìm thấy". CSKH thuần không có quyền.
 - Nhập: `inventory.add_returntostock` (Chủ, Quản lý, NV kho, NV giao; Quản lý được cấp thêm theo #21).
 - Duyệt: `inventory.approve_returntostock` (Chủ, Quản lý), chỉ khi phiếu còn Chờ duyệt.
-- Huỷ phiếu (#8): phiếu còn Chờ duyệt; người có quyền duyệt hoặc sửa huỷ được mọi phiếu, người tạo phiếu huỷ phiếu của mình. BE không trả cờ `can_cancel`, nên `canCancel` ở `returnsModel.ts` tính theo quyền và `created_by`; BE vẫn là chỗ chặn cuối (403, 409). Số kg của phiếu đã huỷ không còn tính vào số đã hoàn của phiếu giao.
+- Huỷ phiếu (#8): phiếu còn Chờ duyệt; BE đòi trước `inventory.add_returntostock` (cổng chung, TLA-FE-L4: Chủ tắt "Ghi hàng hoàn về kho" của nhóm ở màn Phân quyền thì nhóm đó không còn mục Huỷ), rồi người có quyền duyệt hoặc sửa huỷ được mọi phiếu, người tạo phiếu huỷ phiếu của mình. BE không trả cờ `can_cancel`, nên `canCancel` ở `returnsModel.ts` tính theo quyền và `created_by`; BE vẫn là chỗ chặn cuối (403, 409). Số kg của phiếu đã huỷ không còn tính vào số đã hoàn của phiếu giao.
 
 ## Dữ liệu cá nhân
 

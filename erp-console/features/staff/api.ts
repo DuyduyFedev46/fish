@@ -5,21 +5,63 @@
 import { apiFetch } from "@/shared/lib/http";
 import { matches } from "@/shared/lib/search";
 import { groupLabel } from "@/shared/lib/groups";
-import { mockStaffApi } from "./mock";
+import type { GuidanceData } from "@/features/guidance/types";
+import { mockStaffApi, mockStaffRelatedApi } from "./mock";
 import type {
   SetGroupsResult,
+  StaffActivity,
   StaffCreateInput,
+  StaffDelivering,
   StaffFilter,
   StaffMember,
   StaffProfileInput,
 } from "./types";
 
 const BASE = "/api/staff/";
+const relatedMock = () => (process.env.NEXT_PUBLIC_USE_MOCK === "1" ? mockStaffRelatedApi : undefined);
+
+/** GET /api/staff/{id}/ — một người (trang chi tiết). 404 nếu không có. */
+export function getStaff(id: number, signal?: AbortSignal): Promise<StaffMember> {
+  return apiFetch<StaffMember>(`${BASE}${id}/`, {
+    signal,
+    mock: process.env.NEXT_PUBLIC_USE_MOCK === "1" ? mockStaffApi : undefined,
+  });
+}
+
+/** GET /api/guidance/staff/{id}/ — dòng thời gian của nhân viên (cần manage_staff). Chỉ dùng `timeline`. */
+export function getStaffTimeline(id: number, signal?: AbortSignal): Promise<GuidanceData> {
+  return apiFetch<GuidanceData>(`/api/guidance/staff/${id}/`, { signal, mock: relatedMock() });
+}
+
+type AuditPage = {
+  count: number;
+  results: { id: number; action: string; object_repr: string | null; note: string | null; created_at: string }[];
+};
+
+/** GET /api/audit-logs/?actor={id} — hoạt động gần đây của một người (cần view_auditlog). Trang đầu, chỉ giữ trường cần hiện. */
+export async function fetchStaffActivity(id: number, signal?: AbortSignal): Promise<StaffActivity> {
+  const page = await apiFetch<AuditPage>(`/api/audit-logs/?actor=${id}`, { signal, mock: relatedMock() });
+  return {
+    total: page.count,
+    rows: page.results.map((r) => ({ id: r.id, action: r.action, object_repr: r.object_repr, note: r.note, created_at: r.created_at })),
+  };
+}
+
+type DeliveringPage = {
+  results: { id: number; code: string; status_label: string; delivery_started_at?: string | null }[];
+};
+
+/** GET /api/delivery/notes/?assigned_to={id}&status=DELIVERING — phiếu người này đang giao (cần quyền xem phiếu giao). Bỏ hết trường về khách. */
+export async function fetchStaffDelivering(id: number, signal?: AbortSignal): Promise<StaffDelivering[]> {
+  const page = await apiFetch<DeliveringPage>(`/api/delivery/notes/?assigned_to=${id}&status=DELIVERING`, { signal, mock: relatedMock() });
+  return page.results.map((n) => ({ id: n.id, code: n.code, status_label: n.status_label, started_at: n.delivery_started_at ?? null }));
+}
 
 /** GET /api/staff/?is_active=true|false (bỏ trống = tất cả; BE sắp theo username). Không phân trang. */
-export async function listStaff(filter: StaffFilter): Promise<StaffMember[]> {
+export async function listStaff(filter: StaffFilter, signal?: AbortSignal): Promise<StaffMember[]> {
   const q = filter === "active" ? "?is_active=true" : filter === "inactive" ? "?is_active=false" : "";
   return apiFetch<StaffMember[]>(BASE + q, {
+    signal,
     mock: process.env.NEXT_PUBLIC_USE_MOCK === "1" ? mockStaffApi : undefined,
   });
 }

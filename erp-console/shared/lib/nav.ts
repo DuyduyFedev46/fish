@@ -433,7 +433,6 @@ export const NAV: NavItem[] = [
     short: "Phân quyền",
     icon: "admin_panel_settings",
     section: "Quản trị",
-    soon: true,
     visible: (me) => has(me, PERM.manageStaff),
   },
   {

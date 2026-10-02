@@ -2213,3 +2213,45 @@ Làm trong `erp-console/`, không đụng `backend/`, `features/accounting/**`, 
 - Sửa `features/catalog/catalogModel.ts` (`validateItem`): dòng nào chưa chọn mặt hàng và chưa nhập kg thì coi như chưa có. Nếu không dòng nào đã điền thì chỉ báo "Thêm ít nhất một mặt hàng vào công thức." ở vùng Thành phần combo, không báo "Chọn mặt hàng." / "Nhập số kg." dưới dòng trống. Có ít nhất một dòng đã điền thì kiểm từng dòng như cũ (dòng điền dở, trùng, kg dưới 0,001; dòng trống còn lại vẫn báo từng dòng).
 - Test: `catalog.test.ts` thêm 1 ca (chỉ dòng trống, nhiều dòng trống, dòng trống lẫn dòng đã điền, chỉ nhập kg, mặt hàng thường). `ed_batch13_catalog.py` thêm 4 kiểm tra (câu AC3 hiện, không báo dưới dòng trống, ở lại form, dòng có mặt hàng thiếu kg vẫn báo "Nhập số kg."), đổi kiểm tra cũ "chưa chọn thành phần → Chọn mặt hàng." cho đúng hành vi mới. Ảnh `lo13-loc-4f-combo-cong-thuc-trong`.
 - Kiểm chứng lại: `tsc` sạch; vitest 69 file, 795 ca đạt; build mock=0 sạch, `check-no-mock` và `check-ai-chunks` XANH; build mock=1 sao `out/` sang thư mục riêng, phục vụ cổng 3701: `ed_batch13_catalog` 128/128 PASS, `ed_batch1_shell` 56/56 PASS; `check_naming` không phát sinh mới.
+
+## Lô 14 — FE (Nhân sự ED-37/ED-38 + Phân quyền ED-40; ED-39 là BE đã có)
+
+Làm trong `erp-console/`. Nợ đã trả: **TLA-L2** (`registry.py` thêm Capability `create_return` → `inventory.add_returntostock`, kèm test) và **TLA-FE-L4** (`canCancel` của phiếu hoàn tính theo `add_returntostock`, `features/returns/returnsModel.ts` + test).
+
+### Trang và component
+- **Nhân sự** (`features/staff`, route `/staff/` và `/staff/detail/?id=`): danh sách DataTable với tab Đang làm / Đã nghỉ / Tất cả (tính phía máy từ một lần `GET /api/staff/`, tab nằm trên URL), ô tìm, khối "Nhóm quyền" cho ai có quyền xem. Hồ sơ là một trang (DetailPage): nút trên đầu "Sửa hồ sơ", "Đổi nhóm", menu "…" (Đặt lại mật khẩu, Cho nghỉ / Cho làm lại); thao tác không làm được vẫn hiện, mờ kèm lý do. Khối thông tin, quyền theo nhóm (link sang trang nhóm), việc đang giao (chỉ với người giao hàng và khi có quyền xem phiếu, bỏ hết trường về khách), hoạt động gần đây, dòng thời gian. Hộp: Thêm nhân viên (hỏi lại khi có nhóm Chủ, màn "Đã tạo" hiện mật khẩu tạm), Sửa hồ sơ, Đổi nhóm (hỏi lại khi thêm/bỏ nhóm Chủ), Đặt lại mật khẩu, Cho nghỉ / Cho làm lại. Đã xoá `StaffDetail.tsx`, `StaffCreateForm.tsx`; giữ `GroupPicker`, `PasswordField`, `CopyButton`.
+- **Phân quyền** (`features/permissions`, route `/permissions/` và `/permissions/detail/?group=`): ma trận việc x nhóm (công tắc `role="switch"`, tìm việc, cột Chủ cố định, việc "Chỉ Chủ" khoá, nhãn "Tất cả khách" khi Xem khách hàng bật, hỏi lại chỉ khi tắt việc phá luồng: `view_orders`, `deliver`, `view_audit`). Trang nhóm: việc được làm, phạm vi dữ liệu, thành viên (thêm / gỡ qua `PUT /api/staff/{id}/groups/`), dòng thời gian. Chỉ người thuộc nhóm Chủ bấm được công tắc; người khác (kể cả superuser ngoài nhóm Chủ) chỉ xem. Menu "Phân quyền" bỏ cờ `soon` (`shared/lib/nav.ts`).
+- Tài liệu: `features/staff/README.md` viết lại, `features/permissions/README.md` mới.
+
+### Hàm API
+`features/staff/api.ts`: thêm `getStaff`, `getStaffTimeline`, `fetchStaffActivity`, `fetchStaffDelivering` (đều có nhánh mock). `features/permissions/api.ts` mới: `listGroups`, `getGroup`, `setGroupCapabilities` (mock ở `features/permissions/mock.ts`).
+
+### Kiểm chứng (đã chạy trong lượt làm này)
+- `npx tsc --noEmit` sạch; `npx vitest run`: 74 file, 835 test đạt.
+- Build `NEXT_PUBLIC_USE_MOCK=0` + `check-no-mock` + `check-ai-chunks` xanh (36 màn nghiệp vụ và 2 layout; thêm 4 route Lô 14 vào TARGETS).
+- E2E bản mock cổng 3801: `ed_batch14_permissions.py` **96/96** (ma trận, công tắc, hỏi lại, "Tất cả khách", trang nhóm thêm/gỡ thành viên, nhóm Chủ khoá, danh sách + tab + tìm, hồ sơ sửa / đặt lại / cho nghỉ, giao2 đang giao + BR-GH-08, ca ngoài đường thuận: id và mã nhóm sai, vai không có quyền không thấy menu và không có request `/api/staff`, ql9 chỉ đọc, không có dữ liệu cá nhân trong storage, 360px không cuộn ngang, vùng bấm ≥44px). Hồi quy: `s41_s47_staff.py` **73/73**, `s48_password.py` **41/41**, `ed_batch1_shell.py` 56/56, `ed_batch2_patterns.py` 75/75, `ed_batch9_returns.py` 145/145.
+- Đã đổi cách chọn phần tử trong `s41_s47_staff.py`, `s41_s47_real.py`, `s48_password.py` theo giao diện mới (DataTable `main tr.lt-click`, hồ sơ `/staff/detail/?id=`, `.toast-item`, bỏ ca nháp biểu mẫu vì không còn nháp). `ed_batch1_shell.py` thêm "Phân quyền" vào menu của loc.
+- `s41_s47_real.py` (BE thật) biên dịch được nhưng **chưa chạy lại** trong lô này (cần Django + seed): QA chạy.
+- BE: `manage.py test apps.accounts.capabilities` 83 đạt; `apps.accounts` 338 test, 5 lỗi; toàn bộ 2850 test, 33 lỗi. Đây là lỗi `Missing staticfiles manifest entry` có sẵn từ trước, không do lô này.
+- `check_naming.py`: OK, không vi phạm mới. Không có mã hex trong code mới. Không có `console.log`, `localStorage`, `sessionStorage` trong `features/staff` và `features/permissions` (trừ `mock.ts`).
+- Ảnh chụp: `erp-console/shots/lo14/` (thư mục bị gitignore, chỉ có trên máy): ma trận, "Tất cả khách", trang nhóm, danh sách và hồ sơ nhân sự ở 1280px và 360px, ca vai không có quyền.
+
+### Chỗ lệch contract và việc còn nợ
+- **Đường dẫn ED-39:** story ghi `/api/permissions/matrix/`; BE thật đặt dưới `/api/staff/groups/…`. FE theo BE.
+- **Registry của ma trận** lấy từ `getGroup("owner")` (BE không có endpoint registry riêng); chip "Được gán" là hằng số FE.
+- **Thiếu trường ở bảng nhân viên của BE** (story có, BE chưa trả): Ghi chú, ngày đi làm, hiển thị `must_change_password`, thống kê theo tháng. FE bỏ các ô này, không bịa số.
+- **Số điện thoại nhân viên** hiện đủ trong màn quản trị (chỉ người có `manage_staff` thấy), không đưa vào URL, log hay storage.
+- **Không còn nháp biểu mẫu:** tên, SĐT, mật khẩu không được nằm trong storage; S7-AC6 chỉ còn kiểm 401 rồi đăng nhập lại.
+- **Cho nghỉ khi còn phiếu Đang giao:** (đã sửa theo review TL14-FE-M1, xem mục "Sửa sau review" bên dưới) hộp nêu sẵn số phiếu và mã phiếu, khoá nút xác nhận. BE vẫn là nơi quyết cuối cùng (BR-GH-08).
+- **Ma trận chỉ đọc với superuser ngoài nhóm Chủ:** BE cho cả Chủ và superuser ghi (`actor_is_owner`); FE chặt hơn một cách có chủ ý, chỉ nhóm Chủ được bấm công tắc. Không có lỗ hổng vì superuser vốn có mọi quyền ở Django. Nếu Duy muốn BE cũng chặn superuser ngoài nhóm Chủ thì là việc của BE, cần hỏi Duy.
+- **Không có ô sửa mô tả nhóm:** BE không có endpoint; công tắc có hiệu lực ngay, không có nút "Lưu thay đổi".
+- **Hỏi lại khi tắt** chỉ với việc phá luồng; bật không hỏi.
+- **Mock:** đổi việc trong ma trận không làm đổi quyền lúc đăng nhập mock (bảng quyền mock ở `features/auth/mock.ts`, ngoài phạm vi lô). Thay đổi giữ trong `sessionStorage` khoá `cave_erp_mock_group_caps`. Dòng thời gian và hoạt động của mock chỉ nằm trong bộ nhớ. Câu lỗi mock là xấp xỉ câu BE. Chưa phủ ca BE trả 500 trong `ed_batch14_permissions.py`. Kiểm storage của e2e bỏ qua khoá `cave_erp_mock_*` (chỉ có ở bản build mock).
+- **Bộ tải dùng chung** chuyển thành `features/staff/useLoaded.ts` (permissions import lại); `groupHref` chuyển về `permissionsModel.ts`.
+- **Lỗi bố cục đã sửa:** `.sr-only` (absolute) trong ô ma trận làm trang cuộn ngang ở 360px vì vùng cuộn thiếu `position: relative`; nhãn việc bị căn giữa ở mobile. Sửa trong `permissions.module.css`.
+- **Cổng huỷ phiếu hoàn ở BE:** BE đã có cổng này (techlead xác nhận ở review), không ghi nợ.
+
+### Sửa sau review Tech Lead (TL14-FE-M1, TL14-FE-L1)
+- **TL14-FE-M1 (ED-38-AC3, BR-GH-08):** `StaffDetailScreen.tsx` truyền phiếu Đang giao đã tải sẵn (chỉ khi khối ở trạng thái `ok`) vào `ActiveModal.tsx`. Hàm thuần `deliveringBlock` (`staffModel.ts`, câu chữ ở `messages.ts` `deactivateDelivering`) tạo câu "Còn N phiếu Đang giao (mã…). Phải giao xong hoặc chuyển người trước khi cho nghỉ."; hộp hiện câu này ở đầu và khoá nút xác nhận (`ConfirmModal disabled`). Quá 5 mã thì cắt, ghi "và K phiếu nữa". Khối không tải được (thiếu quyền xem phiếu, lỗi, còn đang tải) thì không khoá, BE quyết khi bấm xác nhận như cũ. Chỉ dùng số phiếu và mã phiếu, không có dữ liệu khách.
+- **Test:** vitest `staffModel.test.ts` thêm 3 ca (`deliveringBlock`). E2E `ed_batch14_permissions.py` thêm ca giao2 (nêu 2 phiếu kèm mã, nút khoá, chưa gọi POST deactivate, không SĐT) và ca đối chứng giao1 (không phiếu, nút bấm được). `s41_s47_staff.py` S42-AC4 đổi theo: không còn bấm xác nhận để chờ lỗi BE, mà kiểm hộp chặn từ trước; câu BR-GH-08 của BE chỉ còn xuất hiện khi khối phiếu không tải được, mock không tạo được tình huống đó nên chưa có ca e2e riêng cho nhánh này (QA có thể thử với BE thật và người xem thiếu quyền xem phiếu giao).
+- **TL14-FE-L1:** `features/permissions/README.md` và mục trên đã sửa: BE cho Chủ và superuser ghi, FE chặt hơn.

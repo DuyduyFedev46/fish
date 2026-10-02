@@ -18,7 +18,7 @@ import {
   type MockUser,
 } from "@/features/auth/mock";
 import { beError } from "@/shared/lib/beErrors.mock";
-import { GROUP_CODES } from "@/shared/lib/groups";
+import { GROUP_CODES, groupLabel } from "@/shared/lib/groups";
 import { PERM } from "@/shared/lib/nav";
 import { ROLE } from "@/shared/lib/roles";
 import type { MockRequest, MockResponse } from "@/shared/lib/http";
@@ -37,6 +37,24 @@ const MANAGE_STAFF = PERM.manageStaff;
 const DELIVERING: Record<string, string[]> = {
   giao2: ["GH-INV-DH01-A1B2C", "GH-INV-DH02-K7M3Q"],
 };
+
+// Nhật ký thao tác của màn Nhân sự, chỉ trong bộ nhớ trang (tải lại trang thì mất): nuôi dòng thời gian của nhân viên
+// (guidance `staff`) và "Hoạt động gần đây" (audit ?actor=). Chỉ ghi tên đăng nhập/nhóm, không SĐT, không mật khẩu.
+type StaffEvent = { id: number; at: string; actorId: number; targetId: number; actorName: string; targetName: string; action: string; label: string };
+const EVENTS: StaffEvent[] = [];
+
+function record(viewer: MockUser, target: MockUser, action: string, label: string) {
+  EVENTS.push({
+    id: EVENTS.length + 1,
+    at: new Date().toISOString(),
+    actorId: viewer.id,
+    targetId: target.id,
+    actorName: viewer.display_name || viewer.username,
+    targetName: target.username,
+    action,
+    label,
+  });
+}
 
 const isOwner = (u: MockUser) => u.groups.includes(ROLE.owner);
 const activeOwners = (list: MockUser[]) => list.filter((u) => u.is_active && isOwner(u));
@@ -116,6 +134,7 @@ function create(viewer: MockUser, list: MockUser[], body: Record<string, unknown
   };
   list.push(u);
   saveMockUsers(list);
+  record(viewer, u, "create", "Tạo tài khoản");
   return { status: 201, body: row(viewer, u, list) };
 }
 
@@ -133,6 +152,7 @@ function patch(viewer: MockUser, list: MockUser[], target: MockUser, body: Recor
   }
   if (typeof body.display_name === "string") target.display_name = body.display_name.trim();
   saveMockUsers(list);
+  record(viewer, target, "update", "Sửa hồ sơ");
   return { status: 200, body: row(viewer, target, list) };
 }
 
@@ -153,6 +173,8 @@ function setGroups(viewer: MockUser, list: MockUser[], target: MockUser, body: R
   if (removed.includes(ROLE.owner) && target.is_active && activeOwners(list).length <= 1) return beError("LAST_CHU_GROUP");
   target.groups = next;
   saveMockUsers(list);
+  const diff = [added.length ? `thêm ${added.map(groupLabel).join(", ")}` : "", removed.length ? `bỏ ${removed.map(groupLabel).join(", ")}` : ""].filter(Boolean).join("; ");
+  record(viewer, target, "set_groups", `Đổi nhóm${diff ? `: ${diff}` : ""}`);
   return { status: 200, body: { groups: next, added, removed } };
 }
 
@@ -167,6 +189,7 @@ function deactivate(viewer: MockUser, list: MockUser[], target: MockUser): MockR
   target.is_active = false;
   mockRevokeUserTokens(list, target.id); // xoá token → lần gọi kế tiếp của người đó 401 (S42-AC1)
   saveMockUsers(list);
+  record(viewer, target, "deactivate", "Cho nghỉ");
   return { status: 200, body: { is_active: false } };
 }
 
@@ -176,6 +199,7 @@ function reactivate(viewer: MockUser, list: MockUser[], target: MockUser): MockR
   if (target.is_active) return beError("ALREADY_ACTIVE");
   target.is_active = true;
   saveMockUsers(list);
+  record(viewer, target, "reactivate", "Cho làm lại");
   return { status: 200, body: { is_active: true } };
 }
 
@@ -193,7 +217,81 @@ function resetPassword(viewer: MockUser, list: MockUser[], target: MockUser, bod
   target.must_change_password = true; // S48-AC6: Chủ đặt lại → cờ bật lại
   mockRevokeUserTokens(list, target.id); // máy đang đăng nhập của người đó → 401 (S42-AC3)
   saveMockUsers(list);
+  record(viewer, target, "reset_password", "Đặt lại mật khẩu");
   return { status: 200, body: {} };
+}
+
+const DELIVERY_STARTED_AT = "2026-10-01T08:30:00+07:00";
+
+/**
+ * Các đường PHỤ của trang chi tiết nhân viên (mỗi đường BE có quyền riêng, nên tách khỏi /api/staff/):
+ *   GET /api/guidance/staff/{id}/                          (manage_staff)   dòng thời gian
+ *   GET /api/audit-logs/?actor={id}                        (view_auditlog)  hoạt động gần đây
+ *   GET /api/delivery/notes/?assigned_to={id}&status=DELIVERING  (xem phiếu giao)  việc đang giao
+ */
+export function mockStaffRelatedApi(req: MockRequest): MockResponse {
+  const viewer = mockRequireRecord(req);
+  if (!viewer) return MOCK_UNAUTHORIZED;
+  const perms = mockPermsOf(viewer);
+  const [pathOnly, query = ""] = req.path.split("?");
+  const params = new URLSearchParams(query);
+  const list = mockUsers();
+
+  const guide = /^\/api\/guidance\/staff\/(\d+)\/$/.exec(pathOnly);
+  if (guide) {
+    if (!perms.includes(MANAGE_STAFF)) return beError("DRF_FORBIDDEN");
+    const target = list.find((u) => u.id === Number(guide[1]));
+    if (!target) return beError("NOT_FOUND");
+    const timeline = EVENTS.filter((e) => e.targetId === target.id).map((e) => ({
+      at: e.at,
+      kind: e.action,
+      label: e.label,
+      doc: "staff",
+      actor: { kind: "user" as const, display: e.actorName },
+    }));
+    return {
+      status: 200,
+      body: { doc: { type: "staff", id: target.id, code: target.username, status: null, status_label: null }, next_steps: [], warnings: [], timeline, related: [] },
+    };
+  }
+
+  if (pathOnly === "/api/audit-logs/") {
+    if (!perms.includes(PERM.viewAuditLog)) return beError("DRF_FORBIDDEN");
+    const actor = Number(params.get("actor"));
+    const rows = EVENTS.filter((e) => e.actorId === actor)
+      .slice()
+      .reverse()
+      .map((e) => ({
+        id: e.id,
+        actor_kind: "user",
+        actor_display: e.actorName,
+        ai_actor: null,
+        action: e.action,
+        model_name: "User",
+        object_id: e.targetId,
+        object_repr: e.targetName,
+        changes: null,
+        note: e.label,
+        proposal_ref: null,
+        created_at: e.at,
+      }));
+    return { status: 200, body: { count: rows.length, next: null, previous: null, results: rows } };
+  }
+
+  if (pathOnly === "/api/delivery/notes/") {
+    if (!perms.includes(PERM.viewDeliveryNote)) return beError("DRF_FORBIDDEN");
+    const target = list.find((u) => u.id === Number(params.get("assigned_to")));
+    const notes = target ? DELIVERING[target.username] ?? [] : [];
+    const results = notes.map((code, i) => ({
+      id: 900 + i,
+      code,
+      status: "DELIVERING",
+      status_label: "Đang giao",
+      delivery_started_at: DELIVERY_STARTED_AT,
+    }));
+    return { status: 200, body: { count: results.length, next: null, previous: null, results } };
+  }
+  return beError("NOT_FOUND");
 }
 
 /** Một handler cho mọi đường /api/staff/… (api.ts truyền chung). */

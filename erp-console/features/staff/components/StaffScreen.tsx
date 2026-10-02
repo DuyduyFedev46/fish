@@ -1,288 +1,177 @@
 "use client";
 
-// Màn Nhân viên (S41, S42): danh sách (lọc đang làm / đã nghỉ / tất cả), tạo tài khoản, sửa hồ sơ, đổi nhóm,
-// cho nghỉ / cho làm lại, đặt lại mật khẩu. Page bọc <ViewGuard view="staff"> (cần accounts.manage_staff → 403 do
-// ViewGuard vẽ). UI4: danh sách hàng thoáng kiểu Linear (avatar chữ cái, tên, nhãn nhóm nhẹ, chấm trạng thái), chi
-// tiết/tạo trong tấm bên, kết quả báo bằng thông báo nổi.
+// Màn Nhân sự (ED-37 / W3f): /staff/. Khung ListPage: nút "Thêm nhân viên" · ba tab Đang làm / Đã nghỉ / Tất cả (có số đếm) · ô tìm
+// "Tìm tên, số điện thoại, nhóm…" · bảng nhân viên (bấm dòng → trang hồ sơ /staff/detail/?id=) · bảng "Nhóm quyền" (bấm → trang nhóm).
+// Danh sách tải MỘT lần (mọi tài khoản), tab và tìm kiếm tính phía máy nên số đếm luôn khớp. Thao tác (đổi nhóm, đặt lại mật khẩu, cho nghỉ…)
+// nằm ở trang hồ sơ. SĐT/tên nhân viên chỉ ở bộ nhớ trang: không URL (chỉ `?tab=`), không storage, không log.
 
-import { useId, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { useAuth } from "@/features/auth/components/AuthProvider";
-import { SideSheet } from "@/shared/ui/SideSheet";
-import { Toast } from "@/shared/ui/Toast";
+import { groupHref } from "@/features/permissions/permissionsModel";
+import { useGroupList } from "@/features/permissions/useGroupData";
+import type { GroupSummary } from "@/features/permissions/types";
+import { ENUMS } from "@/shared/lib/enums";
 import { dateTime } from "@/shared/lib/format";
-import { useDraft } from "@/shared/lib/useDraft";
-import { useResource } from "@/shared/lib/useResource";
+import { ApiError, loadErrorText } from "@/shared/lib/http";
+import { canView } from "@/shared/lib/nav";
+import { Chip } from "@/shared/ui/Chip";
 import { Icon } from "@/shared/ui/Icon";
-import { ResourceView } from "@/shared/ui/ResourceView";
-import { Toolbar } from "@/shared/ui/Toolbar";
-import { filterStaff, listStaff } from "../api";
-import type { StaffFilter, StaffMember } from "../types";
-import { EMPTY_CREATE_DRAFT, StaffCreateForm, hasDraftContent, type CreateDraft } from "./StaffCreateForm";
-import { StaffDetail } from "./StaffDetail";
-import { Avatar, Credentials, GroupTags, StatusLine } from "./parts";
-import { STAFF_MSG } from "../messages";
+import { DataTable, type Column } from "@/shared/ui/list/DataTable";
+import { FilterBar } from "@/shared/ui/list/FilterBar";
+import { ListPage } from "@/shared/ui/list/ListPage";
+import { useToast } from "@/shared/ui/overlay/Toast";
+import { NoPermission } from "@/shared/ui/states/NoPermission";
+import { Tabs, useTabParam, type TabItem } from "@/shared/ui/Tabs";
+import { filterStaff } from "../api";
+import { STAFF_MSG as M } from "../messages";
+import { STAFF_TABS, asTab, countByTab, rowsOfTab } from "../staffModel";
+import type { StaffMember } from "../types";
+import { useStaffList } from "../useStaffData";
+import { StaffFormModal } from "./StaffFormModal";
+import { GroupTags } from "./parts";
 import s from "../staff.module.css";
 
-const FILTERS: { key: StaffFilter; label: string; empty: string; emptyHint: string }[] = [
-  {
-    key: "active",
-    label: "Đang làm",
-    empty: "Chưa có nhân viên nào đang làm",
-    emptyHint: "Bấm “Thêm nhân viên” để tạo tài khoản đầu tiên.",
-  },
-  { key: "inactive", label: "Đã nghỉ", empty: "Không có ai đã nghỉ", emptyHint: "Người được cho nghỉ sẽ hiện ở đây." },
-  { key: "all", label: "Tất cả", empty: "Chưa có tài khoản nào", emptyHint: "Bấm “Thêm nhân viên” để tạo tài khoản đầu tiên." },
-];
-
-function Row({ m, onOpen }: { m: StaffMember; onOpen: () => void }) {
-  const name = m.display_name || m.username;
-  const metaId = useId();
-  return (
-    <li className={`${s.row}${m.is_active ? "" : ` ${s.off}`}`}>
-      {/* Tên nút chỉ gồm tên + tên đăng nhập (không lẫn với nút lọc "Đang làm"); nhóm, trạng thái là mô tả. */}
-      <button
-        type="button"
-        className={`${s.open} staff-open`}
-        onClick={onOpen}
-        aria-haspopup="dialog"
-        aria-label={`${name}, ${m.username}`}
-        aria-describedby={metaId}
-      >
-        <Avatar name={name} className={s.avatar} />
-        <span className={s.name}>
-          <b>{name}</b>
-          <small>{m.username}</small>
-        </span>
-        <span className={s.meta} id={metaId}>
-          <GroupTags groups={m.groups} />
-          <span className={s.status}>
-            <StatusLine active={m.is_active} />
-            <span className={s.seen}>
-              <span className="sr-only">Đăng nhập gần nhất: </span>
-              {m.last_login ? <span className="num">{dateTime(m.last_login)}</span> : STAFF_MSG.neverLoggedIn}
-            </span>
-          </span>
-        </span>
-      </button>
-      {m.phone ? (
-        <a className={s.call} href={`tel:${m.phone}`} aria-label={`Gọi ${name}: ${m.phone}`}>
-          <Icon name="call" />
-          <span className={s.callNum}>{m.phone}</span>
-        </a>
-      ) : (
-        <span className={s.noCall} aria-hidden="true">
-          <span className={s.callNum}>—</span>
-        </span>
-      )}
-    </li>
-  );
-}
-
-/** Khung chờ đúng hình danh sách — dùng vạch `.sk` chung (shared/ui/Skeleton), đứng yên khi giảm chuyển động. */
-function Skeleton() {
-  return (
-    <section className={`sect ${s.list}`} aria-busy="true" aria-label="Danh sách nhân viên">
-      <span className="sr-only" role="status">
-        Đang tải danh sách nhân viên…
-      </span>
-      <div className="sect-h" aria-hidden="true">
-        <span className="sk sk-s" />
-      </div>
-      <div className={s.rowsWrap} aria-hidden="true">
-        {[0, 1, 2, 3, 4].map((i) => (
-          <div key={i} className={s.skel}>
-            <span className={`sk ${s.boneAv}`} />
-            <span className={s.boneLines}>
-              <span className={`sk ${i % 2 ? "sk-s" : "sk-m"}`} />
-              <span className={`sk ${i % 3 ? "sk-s" : "sk-m"} ${s.boneSub}`} />
-            </span>
-          </div>
-        ))}
-      </div>
-    </section>
-  );
-}
+const TAB_KEYS = STAFF_TABS.map((t) => t.key);
 
 export function StaffScreen() {
   const { me } = useAuth();
-  const [filter, setFilter] = useState<StaffFilter>("active");
+  const toast = useToast();
+  const [tabKey, selectTab] = useTabParam(TAB_KEYS, "active");
+  const tab = asTab(tabKey);
   const [q, setQ] = useState("");
-  // maxAge 0: đổi bộ lọc / mở lại màn luôn tải lại (danh sách đổi sau mỗi thao tác của Chủ).
-  const res = useResource(me ? `staff:${me.id}:${filter}` : null, () => listStaff(filter), 0);
-  const [openId, setOpenId] = useState<number | null>(null);
-  const [snapshot, setSnapshot] = useState<StaffMember | null>(null);
-  const [createBusy, setCreateBusy] = useState(false);
-  const [toast, setToast] = useState<string | null>(null);
-  const [created, setCreated] = useState<{ username: string; password: string } | null>(null);
-  const [draft, setDraft, clearDraft, restored] = useDraft<CreateDraft>(me?.id ?? null, "staff:create", EMPTY_CREATE_DRAFT);
-  const discarding = useRef(false);
+  const [adding, setAdding] = useState(false);
+  const list = useStaffList(!!me);
+  const showGroups = canView(me, "permissions");
+  const groups = useGroupList(!!me && showGroups);
 
-  const current = openId != null ? res.data?.find((m) => m.id === openId) || snapshot : null;
-  const fconf = FILTERS.find((f) => f.key === filter)!;
+  const rows = list.data;
+  const counts = useMemo(() => (rows ? countByTab(rows) : null), [rows]);
+  const shown = useMemo(() => (rows ? filterStaff(rowsOfTab(rows, tab), q.trim()) : null), [rows, tab, q]);
 
-  const open = (m: StaffMember) => {
-    setToast(null);
-    setSnapshot(m);
-    setOpenId(m.id);
-  };
-  const closeDetail = () => {
-    setOpenId(null);
-    setSnapshot(null);
-  };
-  const changed = (message: string) => {
-    setToast(message);
-    void res.reload();
-  };
+  if (list.error instanceof ApiError && list.error.status === 403) return <NoPermission />;
 
-  const createOpen = draft.open || created !== null;
-  const openCreate = () => {
-    setToast(null);
-    setDraft({ ...draft, open: true });
-  };
-  // Gọi SAU chuyển động ra của tấm (SideSheet). "Bỏ nháp" đặt cờ trước rồi mới đóng.
-  const closeCreate = () => {
-    if (created) {
-      setCreated(null);
-    } else if (discarding.current) {
-      discarding.current = false;
-      clearDraft();
-    } else {
-      setDraft({ ...draft, open: false });
-    }
-  };
+  const tabs: TabItem[] = STAFF_TABS.map((t) => ({ key: t.key, label: t.label, count: counts ? counts[t.key] : null }));
+
+  const columns: Column<StaffMember>[] = [
+    { key: "name", header: M.colName, render: (r) => r.display_name || r.username },
+    { key: "user", header: M.colUsername, mono: true, hideBelow: 720, render: (r) => r.username },
+    { key: "phone", header: M.colPhone, mono: true, hideBelow: 800, render: (r) => r.phone || <span className="muted">—</span> },
+    { key: "groups", header: M.colGroups, render: (r) => <GroupTags groups={r.groups} /> },
+    { key: "status", header: M.colStatus, render: (r) => <Chip table={ENUMS.staffStatus} value={r.is_active ? "ACTIVE" : "INACTIVE"} /> },
+    { key: "last", header: M.colLastLogin, num: true, hideBelow: 980, render: (r) => (r.last_login ? dateTime(r.last_login) : <span className="muted">{M.neverLoggedIn}</span>) },
+  ];
+
+  const groupCols: Column<GroupSummary>[] = [
+    { key: "name", header: M.colGroupName, render: (g) => g.label },
+    { key: "members", header: M.colMembers, num: true, render: (g) => M.groupMembers(g.member_count) },
+    {
+      key: "tasks",
+      header: M.colTasks,
+      num: true,
+      render: (g) => {
+        const all = Object.values(g.capabilities);
+        return M.groupTasks(all.filter((v) => v === "on").length, all.length);
+      },
+    },
+  ];
+
+  const emptyTitle = tab === "active" ? M.emptyActiveTitle : tab === "inactive" ? M.emptyInactiveTitle : M.emptyAllTitle;
+  const emptyHint = tab === "inactive" ? M.emptyInactiveHint : tab === "active" ? M.emptyActiveHint : M.emptyAllHint;
+  const refreshFailed = rows !== null && list.error != null && !list.reloading;
 
   return (
-    <div className="screen">
-      <p className="view-head">
-        Mỗi người một tài khoản riêng. Chọn một hay nhiều nhóm; cho nghỉ thì người đó bị đăng xuất khỏi mọi máy ngay.
-      </p>
-
-      <div className={s.bar}>
-        <div className="seg" role="group" aria-label="Lọc theo trạng thái">
-          {FILTERS.map((f) => (
-            <button key={f.key} type="button" aria-pressed={filter === f.key} onClick={() => setFilter(f.key)}>
-              {f.label}
-            </button>
-          ))}
-        </div>
-        <button type="button" className="btn primary" onClick={openCreate} aria-haspopup="dialog">
-          <Icon name="person_add" />
-          Thêm nhân viên
+    <ListPage
+      id="staff-panel"
+      actions={
+        <button type="button" className="btn primary" onClick={() => setAdding(true)}>
+          <Icon name="add" />
+          <span>{M.add}</span>
         </button>
-        <Toolbar
+      }
+      tabs={<Tabs tabs={tabs} value={tab} onChange={selectTab} label={M.tabsLabel} panelId="staff-panel" />}
+      filters={
+        <FilterBar
           query={q}
           onQuery={setQ}
-          placeholder="Tìm tên, SĐT, nhóm…"
-          onRefresh={() => void res.reload()}
-          refreshing={res.loading}
+          placeholder={M.searchPlaceholder}
+          searchLabel={M.searchLabel}
+          summary={shown && rows ? M.shown(shown.length, rowsOfTab(rows, tab).length) : undefined}
         />
+      }
+      banner={
+        refreshFailed ? (
+          <div className="alert-box err" role="alert">
+            <Icon name="sync_problem" />
+            <span>{loadErrorText(list.error)}</span>
+            <button type="button" className="btn" onClick={() => void list.reload()}>
+              {M.retry}
+            </button>
+          </div>
+        ) : undefined
+      }
+      onRetry={() => void list.reload()}
+    >
+      <div className={s.pageStack}>
+        <DataTable
+          caption={M.listTitle}
+          columns={columns}
+          rows={shown}
+          rowKey={(r) => r.id}
+          rowHref={(r) => `/staff/detail/?id=${r.id}`}
+          loading={list.status === "loading"}
+          error={rows === null && list.error != null ? loadErrorText(list.error) : null}
+          onRetry={() => void list.reload()}
+          query={q.trim()}
+          onClearQuery={() => setQ("")}
+          noun={M.noun}
+          empty={{
+            icon: "group_off",
+            title: emptyTitle,
+            hint: emptyHint,
+            action:
+              tab !== "inactive" ? (
+                <button type="button" className="btn primary" onClick={() => setAdding(true)}>
+                  {M.add}
+                </button>
+              ) : undefined,
+          }}
+          canViewCost={false}
+        />
+
+        {showGroups && groups.status !== "forbidden" && (
+          <section className={s.section} aria-label={M.groupsTitle}>
+            <h3 className={s.sectionH}>
+              {M.groupsTitle}
+              {groups.data && <span className={s.sectionCount}>{groups.data.length}</span>}
+            </h3>
+            <DataTable
+              caption={M.groupsCaption}
+              columns={groupCols}
+              rows={groups.data}
+              rowKey={(g) => g.code}
+              rowHref={(g) => groupHref(g.code)}
+              loading={groups.status === "loading"}
+              error={groups.status === "error" || groups.status === "notfound" ? M.groupsFailed : null}
+              onRetry={() => void groups.reload()}
+              noun="nhóm"
+              empty={{ icon: "shield_person", title: M.groupsFailed }}
+              canViewCost={false}
+              dense
+            />
+          </section>
+        )}
       </div>
 
-      {!draft.open && hasDraftContent(draft) && (
-        <div className="alert-box info" role="status">
-          <Icon name="edit_note" />
-          <span>
-            Có tài khoản <b>{draft.username.trim() || "mới"}</b> đang tạo dở.{" "}
-            <button type="button" className="inline-link" onClick={() => setDraft({ ...draft, open: true })}>
-              Tiếp tục
-            </button>
-          </span>
-        </div>
-      )}
-
-      {res.data === undefined && res.loading ? (
-        <Skeleton />
-      ) : (
-        <ResourceView res={res}>
-          {(rows) => {
-            const shown = filterStaff(rows, q);
-            const searching = !!q.trim();
-            return (
-              // aria-busy: đang tải lại danh sách (sau mỗi thao tác) — E2E chờ điều kiện này thay vì ngủ.
-              <section className={`sect ${s.list}`} aria-labelledby="staff-h" aria-busy={res.loading}>
-                <div className="sect-h">
-                  <h2 id="staff-h">Nhân viên</h2>
-                  <span className="sub num">
-                    {searching ? `${shown.length} / ${rows.length} người khớp` : `${rows.length} người · ${fconf.label.toLowerCase()}`}
-                  </span>
-                </div>
-                {shown.length ? (
-                  <ul className={`${s.rows} ${s.rowsWrap} staff-list`}>
-                    {shown.map((m) => (
-                      <Row key={m.id} m={m} onOpen={() => open(m)} />
-                    ))}
-                  </ul>
-                ) : (
-                  <div className={`state ${s.rowsWrap}`}>
-                    <span className="state-ic">
-                      <Icon name={searching ? "search_off" : filter === "inactive" ? "person_off" : "group"} />
-                    </span>
-                    <h3 className="state-title">{searching ? "Không ai khớp tìm kiếm" : fconf.empty}</h3>
-                    <p>{searching ? `Không có ai khớp “${q.trim()}”. Thử tên khác hoặc số điện thoại.` : fconf.emptyHint}</p>
-                    {searching ? (
-                      <button type="button" className="btn" onClick={() => setQ("")}>
-                        <Icon name="close" />
-                        Xoá tìm kiếm
-                      </button>
-                    ) : filter === "inactive" ? (
-                      <button type="button" className="btn" onClick={() => setFilter("active")}>
-                        Xem người đang làm
-                      </button>
-                    ) : null}
-                  </div>
-                )}
-              </section>
-            );
+      {adding && (
+        <StaffFormModal
+          onClose={() => setAdding(false)}
+          onCreated={(m) => {
+            toast.success(M.created(m.username));
+            void list.reload();
+            if (showGroups) void groups.reload();
           }}
-        </ResourceView>
+        />
       )}
-
-      {current && (
-        <StaffDetail key={current.id} member={current} isSelf={current.id === me?.id} onChanged={changed} onClose={closeDetail} />
-      )}
-
-      {createOpen && (
-        <SideSheet title="Thêm nhân viên" onClose={closeCreate} busy={createBusy}>
-          {(close) =>
-            created ? (
-              <div className={s.pane}>
-                <div className={s.success} role="status">
-                  <span className={s.successIcon} aria-hidden="true">
-                    <Icon name="check" />
-                  </span>
-                  <h3>Đã tạo tài khoản {created.username}</h3>
-                  <p>Đọc hoặc gửi tên đăng nhập và mật khẩu tạm cho nhân viên. Lần đầu đăng nhập, nhân viên phải đặt mật khẩu mới.</p>
-                </div>
-                <Credentials username={created.username} password={created.password} passwordLabel="Mật khẩu tạm" />
-                <div className={`form-actions ${s.footer}`}>
-                  <button type="button" className="btn primary" onClick={close} data-autofocus>
-                    Xong
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <StaffCreateForm
-                draft={draft}
-                setDraft={setDraft}
-                restored={restored}
-                onBusy={setCreateBusy}
-                onDiscard={() => {
-                  discarding.current = true;
-                  close();
-                }}
-                onCreated={(m, password) => {
-                  setCreated({ username: m.username, password });
-                  clearDraft(); // đã gửi xong → bỏ nháp
-                  setToast(STAFF_MSG.created(m.username));
-                  void res.reload();
-                }}
-              />
-            )
-          }
-        </SideSheet>
-      )}
-
-      {toast && !current && !createOpen && <Toast key={toast} message={toast} onClose={() => setToast(null)} />}
-    </div>
+    </ListPage>
   );
 }

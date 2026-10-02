@@ -35,3 +35,25 @@ export type StaffProfileInput = { display_name?: string; phone?: string };
 
 /** PUT /api/staff/{id}/groups/ → 200 */
 export type SetGroupsResult = { groups: string[]; added: string[]; removed: string[] };
+
+/** Tab danh sách: đang làm / đã nghỉ / tất cả (lọc phía máy trên MỘT lần tải `all`). */
+export type StaffTab = "active" | "inactive" | "all";
+
+/** Một phiếu giao đang trên tay nhân viên (chỉ mã + trạng thái + giờ nhận; KHÔNG tên/SĐT/địa chỉ khách). */
+export type StaffDelivering = {
+  id: number;
+  code: string;
+  status_label: string;
+  started_at: string | null;
+};
+
+/** Một dòng nhật ký hoạt động của nhân viên (GET /api/audit-logs/?actor=<id>). Chỉ trường cần hiện. */
+export type StaffActivityRow = {
+  id: number;
+  action: string;
+  object_repr: string | null;
+  note: string | null;
+  created_at: string;
+};
+
+export type StaffActivity = { rows: StaffActivityRow[]; total: number };
