@@ -52,6 +52,8 @@ import {
   createPayloadOf,
   deleteBlockedReason,
   discardBlockedReason,
+  draftDiffers,
+  draftIsCurrent,
   emptyForm,
   errorText,
   formOf,
@@ -184,6 +186,8 @@ export function EntryEditScreen() {
   const [savedAt, setSavedAt] = useState<string | null>(null);
   const [online, setOnline] = useState(true);
   const [restoredLocal, setRestoredLocal] = useState(false);
+  // Bản nháp trên máy cũ hơn bản máy chủ (người khác đã sửa sau đó): chưa áp, chờ người dùng chọn.
+  const [staleDraft, setStaleDraft] = useState<LocalDraft | null>(null);
   const [loadAttempt, setLoadAttempt] = useState(0);
 
   // Bản mới nhất cho các hàm async (tránh đọc state cũ trong closure).
@@ -247,11 +251,20 @@ export function EntryEditScreen() {
         loadedRef.current = d.id;
         const ld = loadDraft<LocalDraft>(draftKeyOf(d.id), me.id);
         if (ld) {
-          const f = applyLocalDraft(formOf(d), ld);
-          formRef.current = f;
-          setForm(f);
-          setDirty(true);
-          setRestoredLocal(true);
+          const serverForm = formOf(d);
+          if (!draftDiffers(serverForm, ld)) {
+            // Nháp giống hệt bản máy chủ: không có gì để khôi phục.
+            clearDraft(draftKeyOf(d.id));
+          } else if (draftIsCurrent(ld, d.row_version)) {
+            const f = applyLocalDraft(serverForm, ld);
+            formRef.current = f;
+            setForm(f);
+            setDirty(true);
+            setRestoredLocal(true);
+          } else {
+            // Máy chủ đã đổi sau lần soạn này: không tự đè, để người dùng chọn.
+            setStaleDraft(ld);
+          }
         }
         setLoad("ready");
       })
@@ -289,7 +302,7 @@ export function EntryEditScreen() {
   // ---- Giữ bản nháp trên máy (chữ do người viết soạn, không có dữ liệu khách) ----
   useEffect(() => {
     if (!me || !dirty || load !== "ready") return;
-    const t = setTimeout(() => saveDraft(draftKeyOf(entryId), me.id, localDraftOf(form)), LOCAL_SAVE_MS);
+    const t = setTimeout(() => saveDraft(draftKeyOf(entryId), me.id, localDraftOf(form, entryId === null ? undefined : metaRef.current.rowVersion)), LOCAL_SAVE_MS);
     return () => clearTimeout(t);
   }, [me, dirty, form, entryId, load]);
 
@@ -577,7 +590,8 @@ export function EntryEditScreen() {
     if (id === null) return;
     try {
       const d = await unpublishEntry(id, { row_version: metaRef.current.rowVersion, reason: reason as "other" });
-      setMeta(metaOf(d));
+      // Máy chủ chỉ trả { status, row_version }: gộp vào meta hiện có, không thay cả meta.
+      setMeta((m) => ({ ...m, status: d.status, rowVersion: d.row_version, slugLocked: true, returnReason: reason }));
       setDialog(null);
       toast.success(M.unpublished);
     } catch (err) {
@@ -590,6 +604,26 @@ export function EntryEditScreen() {
     }
   };
 
+  /** Giữ bản trên máy: dựng lại trên phiên bản cũ, nên lưu sẽ bị máy chủ báo xung đột thay vì đè âm thầm. */
+  const keepStaleDraft = () => {
+    if (!staleDraft) return;
+    const f = applyLocalDraft(formRef.current, staleDraft);
+    formRef.current = f;
+    setForm(f);
+    setMeta((m) => ({ ...m, rowVersion: staleDraft.base_version ?? 0 }));
+    metaRef.current = { ...metaRef.current, rowVersion: staleDraft.base_version ?? 0 };
+    setStaleDraft(null);
+    setDirty(true);
+    setRestoredLocal(false);
+    setNotice({ kind: "warn", text: M.staleDraftKept });
+  };
+
+  const dropStaleDraft = () => {
+    const id = entryIdRef.current;
+    if (id !== null) clearDraft(draftKeyOf(id));
+    setStaleDraft(null);
+  };
+
   const reloadFromServer = async (): Promise<ContentEntryDetail> => {
     const id = entryIdRef.current;
     if (id === null) throw new Error(M.genericFail);
@@ -599,6 +633,7 @@ export function EntryEditScreen() {
     setConflict(null);
     setNotice(null);
     setRestoredLocal(false);
+    setStaleDraft(null);
     return d;
   };
 
@@ -732,6 +767,20 @@ export function EntryEditScreen() {
           {conflictBanner}
           {noticeBox}
           {restoredLocal && <FormAlert kind="warn">{M.restoredLocal}</FormAlert>}
+          {staleDraft && canChange && (
+            <div className="alert-box warn" role="status" data-stale-draft>
+              <Icon name="warning" />
+              <span>
+                <strong>{M.staleDraftTitle}</strong> {M.staleDraftBody}
+              </span>
+              <button type="button" className="btn primary" onClick={dropStaleDraft}>
+                {M.staleDraftUseServer}
+              </button>
+              <button type="button" className="btn" onClick={keepStaleDraft}>
+                {M.staleDraftKeep}
+              </button>
+            </div>
+          )}
           {meta.status === "pending_review" && (
             <div className="alert-box info" role="status">
               <Icon name="info" />

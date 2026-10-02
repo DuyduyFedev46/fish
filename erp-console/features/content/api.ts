@@ -12,6 +12,7 @@ import type {
   EntryPublishPayload,
   EntryPublishResponse,
   EntryUnpublishPayload,
+  EntryUnpublishResponse,
   EntryUpdatePayload,
   GoliveStatusResponse,
   ContentEntryVersionDetail,
@@ -194,8 +195,8 @@ export async function publishEntry(
 export async function unpublishEntry(
   id: number,
   payload: EntryUnpublishPayload
-): Promise<ContentEntryDetail> {
-  return apiFetch<ContentEntryDetail>(`/api/content/entries/${id}/unpublish/`, {
+): Promise<EntryUnpublishResponse> {
+  return apiFetch<EntryUnpublishResponse>(`/api/content/entries/${id}/unpublish/`, {
     method: "POST",
     body: payload,
     mock: process.env.NEXT_PUBLIC_USE_MOCK === "1" ? () => ({ status: 200, body: mockUnpublishEntry(id, payload) }) : undefined,

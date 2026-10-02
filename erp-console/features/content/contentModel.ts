@@ -221,10 +221,13 @@ export type LocalDraft = Partial<{
   seo_description: string;
   cover_image: number | null;
   body: BodyDoc;
+  /** row_version của bài lúc người viết bắt đầu sửa; để biết bản trên máy có cũ hơn bản máy chủ không. */
+  base_version: number;
 }>;
 
-export function localDraftOf(f: EntryForm): LocalDraft {
+export function localDraftOf(f: EntryForm, baseVersion?: number): LocalDraft {
   return {
+    ...(baseVersion !== undefined ? { base_version: baseVersion } : {}),
     title: f.title,
     slug: f.slug,
     excerpt: f.excerpt,
@@ -234,6 +237,21 @@ export function localDraftOf(f: EntryForm): LocalDraft {
     cover_image: f.coverImageId,
     body: f.body,
   };
+}
+
+/** Bản nháp trên máy có khác bản máy chủ không (so phần chữ, bỏ qua row_version). */
+export function draftDiffers(server: EntryForm, d: LocalDraft): boolean {
+  const a = localDraftOf(server);
+  const b = localDraftOf(applyLocalDraft(server, d));
+  return JSON.stringify(a) !== JSON.stringify(b);
+}
+
+/**
+ * Bản nháp còn "mới" so với máy chủ khi dựng trên đúng phiên bản máy chủ đang giữ.
+ * Thiếu base_version (nháp cũ) hoặc khác phiên bản = máy chủ đã đổi sau đó, không tự khôi phục.
+ */
+export function draftIsCurrent(d: LocalDraft, serverRowVersion: number): boolean {
+  return d.base_version !== undefined && d.base_version === serverRowVersion;
 }
 
 export function applyLocalDraft(f: EntryForm, d: LocalDraft): EntryForm {

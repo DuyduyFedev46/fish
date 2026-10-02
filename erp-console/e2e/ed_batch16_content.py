@@ -249,8 +249,11 @@ def run_owner(browser, errors):
     # ---- Soạn bài mới
     go_menu(page, "Nội dung", "/content/")
     open_new_post(page)
+    ok("Soạn: bài mới mở ra chưa gõ gì thì chưa báo 'Chưa lưu' (không tự coi là đã sửa)", "Chưa lưu, đang giữ trên máy" not in main_text(page) and not is_guarded(page))
+    page.get_by_label("Tiêu đề", exact=False).first.fill("a")
+    page.get_by_label("Tiêu đề", exact=False).first.fill("")
     t = main_text(page)
-    ok("Soạn: bài mới có trạng thái 'Chưa lưu, đang giữ trên máy'", "Chưa lưu, đang giữ trên máy" in t, t[:300])
+    ok("Soạn: bài mới đã gõ thì có trạng thái 'Chưa lưu, đang giữ trên máy'", "Chưa lưu, đang giữ trên máy" in t, t[:300])
     ok("Soạn: tiêu đề trang 'Viết bài mới', có thanh Nháp → Chờ duyệt → Đã đăng", "Viết bài mới" in t and "Chờ duyệt" in t)
     ok("Soạn: chủ có nút Lưu nháp + Đăng bài", page.get_by_role("button", name="Lưu nháp").count() >= 1 and page.get_by_role("button", name="Đăng bài").count() >= 1)
     ok("Soạn: không có từ cấm / mã BR", not banned_words(t), str(banned_words(t)))
@@ -586,12 +589,117 @@ def run_mobile(browser, errors):
     ctx.close()
 
 
+# ---------------------------------------------------------------- Sửa lỗi QA lần 1 (B16-1, B16-2, B16-3), chạy trên mock
+def draft_keys(page):
+    return page.evaluate("() => Object.keys(localStorage).filter(k => k.startsWith('cave_erp_draft:'))")
+
+
+def is_guarded(page):
+    return page.evaluate("() => { const e = new Event('beforeunload', { cancelable: true }); window.dispatchEvent(e); return e.defaultPrevented; }")
+
+
+def open_entry_by_title(page, title):
+    go_menu(page, "Nội dung", "/content/")
+    wait_table(page)
+    page.locator("table.lt tbody tr", has_text=title).first.click()
+    page.wait_for_url("**/content/edit/?id=**")
+    expect(editor(page)).to_be_visible()
+    settle(page)
+    page.wait_for_timeout(1500)
+
+
+def run_regression_fixes(browser, errors):
+    ctx, page = new_page(browser, "loc", errors=errors)
+    go_menu(page, "Nội dung", "/content/")
+    wait_table(page)
+
+    # B16-2: máy chủ trả thân bài dạng chưa chuẩn hoá; chỉ mở bài, không gõ gì.
+    page.evaluate("window.__caveMock.contentRawBody(42)")
+    open_entry_by_title(page, "Cách rã đông cá thu")
+    t = main_text(page)
+    ok("B16-2: chỉ mở bài (thân bài chưa chuẩn hoá) thì không chặn rời trang", not is_guarded(page))
+    ok("B16-2: chỉ mở bài thì không ghi bản nháp nào vào máy", draft_keys(page) == [], str(draft_keys(page)))
+    ok("B16-2: chỉ mở bài thì không hiện dòng 'đã khôi phục bản nháp'", "Đã khôi phục bản nháp" not in t and "Chưa lưu" not in t, t[:300])
+    ok("B16-2: thân bài chưa chuẩn hoá vẫn hiện đủ chữ trong ô soạn", "Chọn cá thu tươi có mắt trong." in editor(page).inner_text(), editor(page).inner_text())
+    open_entry_by_title(page, "Cách rã đông cá thu")
+    ok("B16-2: mở lại lần hai vẫn sạch, không có dòng khôi phục", "Đã khôi phục bản nháp" not in main_text(page) and draft_keys(page) == [] and not is_guarded(page))
+    page.get_by_label("Tiêu đề", exact=False).first.fill("Cách rã đông cá thu (sửa)")
+    ok("B16-2: gõ thật vào tiêu đề thì mới bị coi là đã sửa", is_guarded(page))
+    page.get_by_label("Tiêu đề", exact=False).first.fill("Cách rã đông cá thu")
+    editor(page).click()
+    page.keyboard.type("x")
+    ok("B16-2: gõ vào thân bài cũng được coi là đã sửa", is_guarded(page))
+    page.keyboard.press("Backspace")
+
+    # Nháp trên máy còn mới (máy chủ chưa đổi): khôi phục như cũ.
+    page.get_by_label("Tiêu đề", exact=False).first.fill("Bản của tôi gõ dở")
+    page.wait_for_timeout(1500)
+    ok("B16-3: gõ dở thì có 1 bản nháp trên máy", draft_keys(page) == ["cave_erp_draft:content_entry_42"], str(draft_keys(page)))
+    open_entry_by_title(page, "Cách rã đông cá thu")
+    t = main_text(page)
+    ok("B16-3: máy chủ chưa đổi thì khôi phục bản nháp như cũ", page.get_by_label("Tiêu đề", exact=False).first.input_value() == "Bản của tôi gõ dở" and "Đã khôi phục bản nháp" in t, t[:300])
+
+    # Người khác sửa bài trong lúc bản nháp còn nằm trên máy.
+    page.evaluate("window.__caveMock.contentOtherEdit(42, 'Tiêu đề do người khác sửa')")
+    open_entry_by_title(page, "Tiêu đề do người khác sửa")
+    t = main_text(page)
+    ok("B16-3: máy chủ đã đổi thì KHÔNG tự đè: tiêu đề là bản của người khác", page.get_by_label("Tiêu đề", exact=False).first.input_value() == "Tiêu đề do người khác sửa", page.get_by_label("Tiêu đề", exact=False).first.input_value())
+    ok("B16-3: có cảnh báo 'đã được người khác sửa' + 2 lựa chọn, không có dòng 'đã khôi phục'", "Bài đã được người khác sửa" in t and page.get_by_role("button", name="Giữ bản trên máy").count() == 1 and page.get_by_role("button", name="Dùng bản mới nhất").count() == 1 and "Đã khôi phục bản nháp" not in t, t[:400])
+    ok("B16-3: chưa chọn thì chưa bị coi là đã sửa", not is_guarded(page))
+    page.screenshot(path=f"{SHOTS}/lo16-60-nhap-cu-canh-bao.png", full_page=True)
+    page.get_by_role("button", name="Giữ bản trên máy").click()
+    ok("B16-3: chọn 'Giữ bản trên máy' thì ô tiêu đề về bản của tôi", page.get_by_label("Tiêu đề", exact=False).first.input_value() == "Bản của tôi gõ dở")
+    page.get_by_role("button", name="Lưu nháp").first.click()
+    settle(page)
+    t = main_text(page)
+    ok("B16-3: lưu bản giữ lại thì bị báo xung đột, không đè âm thầm", "vừa được người khác sửa" in t and "Tải lại" in t, t[:400])
+    page.screenshot(path=f"{SHOTS}/lo16-61-nhap-cu-xung-dot.png", full_page=True)
+    page.get_by_role("button", name="Tải lại").first.click()
+    if dialog(page).count():
+        dialog(page).get_by_role("button", name="Tải lại").click()
+    settle(page)
+    ok("B16-3: tải lại thì về bản của người khác, nháp trên máy được xoá", page.get_by_label("Tiêu đề", exact=False).first.input_value() == "Tiêu đề do người khác sửa" and draft_keys(page) == [], str(draft_keys(page)))
+
+    # Chọn 'Dùng bản mới nhất'.
+    page.get_by_label("Tiêu đề", exact=False).first.fill("Bản gõ dở thứ hai")
+    page.wait_for_timeout(1500)
+    page.evaluate("window.__caveMock.contentOtherEdit(42, 'Người khác sửa lần hai')")
+    open_entry_by_title(page, "Người khác sửa lần hai")
+    page.get_by_role("button", name="Dùng bản mới nhất").click()
+    ok("B16-3: chọn 'Dùng bản mới nhất' thì giữ bản máy chủ, xoá nháp, hết cảnh báo", page.get_by_label("Tiêu đề", exact=False).first.input_value() == "Người khác sửa lần hai" and draft_keys(page) == [] and "Bài đã được người khác sửa" not in main_text(page) and not is_guarded(page))
+
+    # B16-1: gỡ bài rồi không tải lại trang.
+    open_entry_by_title(page, "Mực lá nướng muối ớt")
+    path_input = page.get_by_label("Đường dẫn", exact=True).first
+    ok("B16-1: bài đã đăng có đường dẫn bị khoá từ đầu", path_input.is_disabled())
+    page.get_by_role("button", name=re.compile("Thêm|Khác|Thao tác")).last.click()
+    page.get_by_role("menuitem").filter(has_text="Gỡ bài").first.click()
+    dialog(page).wait_for()
+    dialog(page).get_by_role("combobox").select_option(label="Hết mùa vụ")
+    dialog(page).get_by_role("button", name="Gỡ bài").click()
+    settle(page)
+    page.wait_for_function("() => !document.querySelector('[role=dialog]')")
+    t = main_text(page)
+    ok("B16-1: gỡ xong (không tải lại) thì còn biểu ngữ 'Lý do: Hết mùa vụ'", "Bài đã gỡ khỏi website. Lý do: Hết mùa vụ" in t, t[:400])
+    ok("B16-1: gỡ xong thì đường dẫn vẫn bị khoá, vẫn có chú thích", page.get_by_label("Đường dẫn", exact=True).first.is_disabled() and "không đổi được đường dẫn" in t)
+    ok("B16-1: không có chữ undefined / null / '#undefined' trên màn", "undefined" not in t and "null" not in t and "#undefined" not in t, t[:400])
+    page.get_by_label("Tiêu đề", exact=False).first.fill("Mực lá nướng muối ớt (sửa)")
+    page.get_by_role("button", name="Lưu nháp").first.click()
+    settle(page)
+    t = main_text(page)
+    ok("B16-1: sau khi gỡ, sửa và lưu được, không báo 'đường dẫn đã có bài khác dùng', không báo xung đột", "Đường dẫn này đã có bài khác dùng" not in t and "vừa được người khác sửa" not in t, t[:400])
+    ok("B16-1: lưu xong vẫn còn lý do gỡ và trạng thái Đã gỡ", "Lý do: Hết mùa vụ" in t and "Đã gỡ" in t)
+    page.screenshot(path=f"{SHOTS}/lo16-62-go-bai-giu-lydo.png", full_page=True)
+    ctx.close()
+
+
 def main():
     errors = []
     with sync_playwright() as p:
         browser = p.chromium.launch()
         run_owner(browser, errors)
         run_manager(browser, errors)
+        run_regression_fixes(browser, errors)
         for u in ("kho1", "giao1", "cs2"):
             run_denied(browser, errors, u)
         run_states(browser, errors)

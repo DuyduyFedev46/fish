@@ -193,6 +193,12 @@ export interface EntryUnpublishPayload {
   reason: UnpublishReason;
 }
 
+/** Máy chủ chỉ trả trạng thái mới và phiên bản dòng, không trả cả bài. */
+export interface EntryUnpublishResponse {
+  status: ContentStatus;
+  row_version: number;
+}
+
 export interface EntryDiscardPayload {
   row_version: number;
 }

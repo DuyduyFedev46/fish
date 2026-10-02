@@ -4,6 +4,8 @@ import { ApiError } from "@/shared/lib/http";
 import {
   CONTENT_PERM,
   applyLocalDraft,
+  draftDiffers,
+  draftIsCurrent,
   blockedDetailsOf,
   canDeleteEntry,
   coverAltMissing,
@@ -247,5 +249,27 @@ describe("mock giống BE thật", () => {
     } catch (err) {
       expect((err as ApiError).code).toBe("STALE_VERSION");
     }
+  });
+});
+
+describe("Lô 16: bản nháp trên máy so với bản máy chủ (B16-2, B16-3)", () => {
+  const server = { ...emptyForm("post"), title: "Bản máy chủ" };
+
+  it("nháp giống hệt bản máy chủ thì không có gì để khôi phục", () => {
+    expect(draftDiffers(server, localDraftOf(server, 3))).toBe(false);
+  });
+
+  it("nháp có chữ khác thì coi là khác", () => {
+    expect(draftDiffers(server, localDraftOf({ ...server, title: "Bản của tôi" }, 3))).toBe(true);
+  });
+
+  it("nháp chỉ còn mới khi dựng đúng trên phiên bản máy chủ đang giữ", () => {
+    const d = localDraftOf({ ...server, title: "Bản của tôi" }, 3);
+    expect(draftIsCurrent(d, 3)).toBe(true);
+    expect(draftIsCurrent(d, 4)).toBe(false);
+  });
+
+  it("nháp cũ không ghi phiên bản thì không tự khôi phục", () => {
+    expect(draftIsCurrent(localDraftOf({ ...server, title: "Bản của tôi" }), 3)).toBe(false);
   });
 });

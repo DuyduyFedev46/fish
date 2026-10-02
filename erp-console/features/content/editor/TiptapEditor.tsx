@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useImperativeHandle, forwardRef, useState } from "react";
+import React, { useEffect, useImperativeHandle, useRef, forwardRef, useState } from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Link from "@tiptap/extension-link";
@@ -28,6 +28,8 @@ export interface TiptapEditorProps {
 
 const TiptapEditor = forwardRef<TiptapEditorHandle, TiptapEditorProps>(({ value, onChange, disabled }, ref) => {
   const [dialog, setDialog] = useState<"item" | "link" | null>(null);
+  const valueRef = useRef<BodyDoc>(value);
+  valueRef.current = value;
 
   const editor = useEditor({
     editable: !disabled,
@@ -51,7 +53,12 @@ const TiptapEditor = forwardRef<TiptapEditorHandle, TiptapEditorProps>(({ value,
     ],
     content: bodyToTiptap(value),
     onUpdate: ({ editor }) => {
-      onChange(tiptapToBody(editor.getJSON()));
+      const next = tiptapToBody(editor.getJSON());
+      // Chỉ báo "đã sửa" khi nội dung thật sự khác bản đang giữ (nội dung máy chủ ở dạng chưa chuẩn hoá
+      // hay bật/tắt chế độ chỉ đọc đều không được tính là người dùng đã gõ).
+      if (JSON.stringify(next) === JSON.stringify(valueRef.current)) return;
+      valueRef.current = next;
+      onChange(next);
     },
   });
 
@@ -85,12 +92,14 @@ const TiptapEditor = forwardRef<TiptapEditorHandle, TiptapEditorProps>(({ value,
     if (!editor) return;
     const currentBody = tiptapToBody(editor.getJSON());
     if (JSON.stringify(currentBody) !== JSON.stringify(value)) {
-      editor.commands.setContent(bodyToTiptap(value));
+      // emitUpdate = false: đồng bộ từ ngoài vào không phải việc người dùng gõ.
+      editor.commands.setContent(bodyToTiptap(value), false);
     }
   }, [value, editor]);
 
   useEffect(() => {
-    if (editor) editor.setEditable(!disabled);
+    // emitUpdate = false: Tiptap mặc định phát "update" khi đổi chế độ sửa, làm bài vừa mở đã bị coi là đã sửa.
+    if (editor) editor.setEditable(!disabled, false);
   }, [disabled, editor]);
 
   if (!editor) {

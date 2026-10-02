@@ -13,6 +13,7 @@ import {
   EntryPublishPayload,
   EntryPublishResponse,
   EntryUnpublishPayload,
+  EntryUnpublishResponse,
   EntryUpdatePayload,
   GoliveStatusResponse,
   ContentEntryVersionDetail,
@@ -780,7 +781,7 @@ export function mockPublishEntry(
 export function mockUnpublishEntry(
   id: number,
   payload: EntryUnpublishPayload
-): ContentEntryDetail {
+): EntryUnpublishResponse {
   const entry = MOCK_ENTRY_DETAILS.get(id);
   if (!entry) throw new ApiError("Không tìm thấy bài viết.", 404, "NOT_FOUND");
 
@@ -824,7 +825,8 @@ export function mockUnpublishEntry(
     listItem.updated_at = entry.updated_at;
   }
 
-  return snapshotOf(entry);
+  // Giống máy chủ thật: chỉ trả trạng thái mới và phiên bản dòng.
+  return { status: entry.status, row_version: entry.row_version };
 }
 
 export function mockDiscardChanges(
@@ -1037,6 +1039,37 @@ export function mockRestoreEntryVersion(
   return snapshotOf(entry);
 }
 
+/** Giả lập người khác vừa sửa tiêu đề bài (đổi chữ + tăng row_version), để kiểm bản nháp cũ trên máy. */
+export function mockOtherEdit(id: number, title: string): number | null {
+  const e = MOCK_ENTRY_DETAILS.get(id);
+  if (!e) return null;
+  e.title = title;
+  e.row_version += 1;
+  e.updated_at = new Date().toISOString();
+  const listItem = MOCK_ENTRIES.find((x) => x.id === id);
+  if (listItem) listItem.title = title;
+  return e.row_version;
+}
+
+/**
+ * Đặt thân bài về dạng "chưa chuẩn hoá" như máy chủ thật có thể trả: chữ liền kề bị tách thành nhiều đoạn,
+ * đoạn trống, ghi chú định dạng rỗng. Tiptap gộp lại khi nạp, nhưng mở bài không được tính là người dùng đã sửa.
+ */
+export function mockUseRawBody(id: number): boolean {
+  const e = MOCK_ENTRY_DETAILS.get(id);
+  if (!e) return false;
+  e.body = {
+    type: "doc",
+    blocks: [
+      { type: "heading", level: 3, text: "Cách chọn cá" },
+      { type: "paragraph", children: [{ text: "Chọn cá " }, { text: "thu tươi", marks: [] }, { text: " có mắt trong." }] },
+      { type: "paragraph", children: [] },
+      { type: "quote", children: [{ text: "Tươi ngon " }, { text: "là nhờ giữ lạnh.", marks: [] }] },
+    ],
+  };
+  return true;
+}
+
 
 if (process.env.NEXT_PUBLIC_USE_MOCK === "1" && typeof window !== "undefined") {
   const w = window as unknown as { __caveMock?: Record<string, unknown> };
@@ -1051,5 +1084,7 @@ if (process.env.NEXT_PUBLIC_USE_MOCK === "1" && typeof window !== "undefined") {
       if (e) e.row_version += 1;
       return e ? e.row_version : null;
     },
+    contentOtherEdit: (id: number, title: string) => mockOtherEdit(id, title),
+    contentRawBody: (id: number) => mockUseRawBody(id),
   };
 }
