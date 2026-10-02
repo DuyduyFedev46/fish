@@ -36,13 +36,23 @@
 | 3 | Chưa hiểu — em giải thích lại (chờ Duy chốt). | — |
 | 4 | OK giữ luật chặn 9 chữ số. | Không làm gì. |
 | 5 | Cho sửa SĐT khách; trùng thì báo trùng. | BE PATCH nhận `phone` (400 khi trùng, ghi AuditLog không giá trị) + FE ô sửa SĐT. |
-| 6 | Theo phân quyền: ai có quyền nhập và quyền duyệt thì tự duyệt được, chỉ cần ghi sự kiện. | Bỏ chặn cứng BR-KK-08 (và BR-KK-02 — em hiểu cùng ý); giữ AuditLog ai nhập/ai duyệt. |
+| 6 | Theo phân quyền: ai có quyền nhập và quyền duyệt thì tự duyệt được, chỉ cần ghi sự kiện ("cứ event là được"). | Bỏ chặn cứng BR-KK-08 (và BR-KK-02 — em hiểu cùng ý); giữ AuditLog ai nhập/ai duyệt. |
 | 7 | OK phương án B (BR-KK-09). | Đã code; PO ghi BR-KK-09 vào spec. |
 | 8 | Cho **huỷ** phiếu hoàn rồi tạo phiếu mới; **xoá** chỉ Chủ/admin. | Thao tác huỷ phiếu hoàn (Chờ duyệt) + quyền xoá chỉ Chủ — xem lưu ý về luật "không xoá chứng từ". |
 | 9 | Phạm vi dòng ("chỉ xem của mình") phải là **cấu hình phân quyền**, không viết cứng. | Thiết kế: ma trận phân quyền (Lô 14) có thêm phạm vi theo nhóm × đối tượng (Tất cả / Của mình). Cần BA + Tech Lead. |
 | 10 | Cho sửa giá; giá đã chốt vào đơn không đổi; giá áp theo thời gian hiệu lực; **sửa giá đã dính đơn thì báo không sửa được**. | BE: cho phép đặt giá lùi ngày/sửa giá khi chưa có đơn nào dùng trong khoảng đó; có đơn → 400 kèm lý do. |
 | 11 | OK tìm khách bằng POST. | BE + FE đổi tìm khách sang POST body. |
 | 12 | Xem hoá đơn bán (và tên khách) theo **phân quyền cấu hình**, không viết cứng. | Gộp với #9: quyền xem hoá đơn bán / tên khách bật tắt được trong ma trận. |
+| 13 | Không chặn cứng: bật "Xem khách hàng" cho nhóm nào là do admin quyết. | Giữ như hiện tại (màn hiện "Tất cả khách" khi bật). |
+| 14 | Chọn cách an toàn: **chặn sửa tiền chi phí phụ sau khi đã phân bổ** — sai thì huỷ + nhập lại (em chọn theo câu Duy dán; Duy muốn "sửa có phân bổ lại" thì báo). | BE PATCH `amount`/phân bổ của chi phí đã phân bổ → 400; hướng dẫn huỷ + nhập lại. |
+| 15 | Đơn đã tự huỷ (hết giờ giữ chỗ) là huỷ hẳn: **không còn thao tác** trên FE (xác nhận tiền sẽ sai). | BE bỏ `confirm_payment` khỏi `available_actions` và chặn API với đơn AUTO_CANCELLED; tiền về muộn xử lý ở Hàng chờ thanh toán → hoàn. |
+| 16 | Giữ "Đang xử lý" như hiện tại. | Không làm gì. |
+| 17 | Làm R4b (SĐT sẵn trong "Việc giao của tôi"). | BE + FE. |
+| 18 | BE thêm 2 trường thời điểm "Bắt đầu giao", "Lúc báo thất bại" (migration chỉ thêm). | BE + FE hiện. |
+| 19 | (a) Thêm "Nhờ người xử lý" vào menu "…" trang chi tiết. | FE (dùng API chuyển việc sẵn có). |
+| 20 | Thêm trạng thái "Chờ duyệt" cho phiếu kiểm kê (gửi duyệt rồi mới duyệt). | BE migration + FE nút Gửi duyệt. |
+| 21 | Cho Quản lý quyền tạo hàng hoàn (phân quyền, cấp thêm). | Data migration cấp `add_returntostock` cho nhóm Quản lý. |
+| 22 | Giá mua bắt buộc > 0. | BE + FE. |
 
 ## Đã tự chốt theo nguyên tắc (Duy xem lại nếu muốn lật)
 - 02b viết trước đợt đổi tên P8b Lô 4–5 → dùng tên mới trong code (bảng ở `03-dev-notes.md`).
@@ -104,3 +114,5 @@
 - Lô 17 dùng chung: `.lt-link` trong DataTable phủ cả ô (display:block + min-height 44px) để bàn phím/nhấn giữ/mở tab mới có vùng bấm đủ; bỏ loại trừ `.lt-link` trong e2e vùng bấm (review Lô 11). Mock nhà cung cấp còn `NCC-${id}`.
 - BE nhỏ (Lô 8): PATCH phiếu kiểm kê (ngày/ghi chú) kiểm `expected_updated_at` để đóng khe "ghi chú ai lưu sau thắng"; FE cảnh báo rời trang khi chưa lưu (Lô 17).
 - BE nợ (Lô 10 N3): `POST /api/purchasing/costs/` trả 500 khi chi phí chia vào một lô làm giá vốn/kg vượt 10 chữ số phần nguyên (cùng gốc cột `landed_unit_cost`) → bắt lỗi trả 400 theo `allocations`. Rủi ro vận hành thấp. PO: số kg gõ "1.000" được hiểu là 1 kg (có thể nhầm thành một nghìn).
+
+- Duy dặn 02/10 chiều: làm các quyết định trên **ở máy này luôn**. Còn chờ: #3 (giải thích lại), #8 (xoá thật hay ẩn), #9/#12 (thiết kế phạm vi cấu hình — BA + Tech Lead).
