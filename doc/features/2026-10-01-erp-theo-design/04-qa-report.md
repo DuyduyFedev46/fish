@@ -1476,6 +1476,18 @@ Phạm vi: `erp-console/features/customers/`, `app/(console)/customers/`, `nav.t
 ### Dữ liệu giả của QA
 35 khách giả (`Khách Thử A…`), khách A (pk 7) có 6 đơn: COMPLETED (hoàn 50.000 đã hoàn), PROCESSING, CANCELLED (hoàn 300.000 đã hoàn), AUTO_CANCELLED, BOOKED, PROCESSING (hoàn 40.000 chờ). Kỳ vọng tính tay: 6 đơn, 2 huỷ, tổng đã mua 350.000 đ. Cũng có khách 55 đơn, khách chưa mua, khách tên chứa HTML. Chỉ dữ liệu giả, SĐT dạng `09000001xx`.
 
+---
+
+## Lô 5 — FE · Gọi xác nhận (ED-15) · lần 1 · 2026-10-02
+
+### Kết luận: REJECTED. 2 lỗi High (thiếu cột "Lý do" riêng theo AC1; CSKH không xem được Dòng thời gian vì BE trả 403) và 5 lỗi Medium (bảng cuộn ngang ở 1280, thanh trạng thái sai bước, ô tìm 30px ở 360, gợi ý xám dưới lựa chọn, thiếu bộ đếm 0/200).
+Điểm tốt đã kiểm chạy thật: phạm vi dữ liệu cá nhân của CSKH (dòng ngoài phạm vi chỉ có số che, dòng trong phạm vi có số đủ và `tel:`), 6 kết quả cuộc gọi + "Đã báo hoàn tiền", chặn giờ hẹn quá khứ, đổi người nhận, Quyết định (nút Huỷ đơn đỏ có bước xác nhận), 409 CLAIMED và STALE_STATE (cả trên BE thật), ghi chú có SĐT bị chặn, không dữ liệu khách trong console / storage / URL, không gọi bên thứ ba, AuditLog sạch tên/SĐT/địa chỉ và không có khoá giá vốn.
+
+### Tổng (script của QA, mock + BE thật): 310 ca · ✅ 289 · ❌ 21 (gộp thành 9 lỗi B1–B9) · ⏸ 3 (job chạy 2 lần, `qa_lo8_real.py`, cờ AI)
+- Mock (`qa_ed_batch5_ui.py`, 12 khối): 251 ca · ✅ 233 · ❌ 18.
+- BE thật (`qa_ed_batch5_real.py` + phần đuôi chạy riêng sau khi script treo): 59 ca · ✅ 56 · ❌ 2 (cùng lỗi gốc B2) + 1 ca script sai kỳ vọng (huỷ đơn thủ công kết thúc ở DONE là đúng thiết kế, chỉ job tự huỷ mới sang REFUND_CALL; đã sửa kỳ vọng, ghi ✅).
+- Dữ liệu 100% giả (seed_demo + "Khách Thử …"), SQLite tạm ở scratchpad, không chạm DB thật. Ảnh: `shots/lot5/` (38 ảnh).
+
 ### Theo AC
 | Mã AC | Kết quả | Bằng chứng |
 |---|---|---|
@@ -1565,3 +1577,239 @@ Không rò. Không có trường giá vốn, lãi, lô nhập ở JSON `customer
 
 ### Lệnh đã chạy
 `rm -rf node_modules && npm ci` · `npx tsc --noEmit` · `npx vitest run` (525) · `NEXT_PUBLIC_USE_MOCK=0|1 npm run build` · `node scripts/check-no-mock.mjs` · `node scripts/check-ai-chunks.mjs` · `python3 manage.py test apps.sales` (554) · `python3 e2e/ed_batch6_customers.py` (79), `ed_batch1_shell.py` (56), `ed_batch2_patterns.py` (142) trên cổng 3101 · `QA_DB=… python3 e2e/qa_ed_batch6_api.py` (98/98) · `QA_DB=… SHOTS=…/shots/lot6 python3 e2e/qa_ed_batch6_real.py` (154/154) · `python3 scripts/check_naming.py` (OK). Ảnh trong `shots/lot6/` (`qa6_*.png` và hai ảnh board). Đã tắt máy chủ cổng 3101, 3102, 8000.
+
+| ED-15-AC1 6 tab + chip theo `ConfirmTask.state` | ✅ | 6 tab đúng thứ tự (Cần gọi ngay, Hẹn gọi lại, Cần quyết định, Gọi báo hoàn tiền, Chờ gọi, Tất cả), chip "Gọi báo hoàn tiền" cho REFUND_CALL, cột "Hạn gọi". Ảnh `qa5-queue-*` |
+| ED-15-AC1 "Lý do chuyển quyết định ở cột riêng" | ❌ B1 | 10 cột: Mã đơn, Khách hàng, Số điện thoại, Hàng, Tổng kg, Tổng tiền, Hạn gọi, Lần gọi, Đang gọi, Trạng thái. Không có cột Lý do; tab Cần quyết định không hiện "Không nghe máy" ở ô nào |
+| ED-15-AC1 che / hiện số theo phạm vi (BR-GH-18) | ✅ | Mock: cs2 thấy dòng ngoài phạm vi chỉ có số che, dòng trong phạm vi số đủ, link `tel:`. BE thật: API cs2 trả `phone_masked`, tên / SĐT / địa chỉ rỗng cho dòng ngoài phạm vi; DOM không chứa số thật |
+| ED-15-AC2 Ghi kết quả gọi (7 lựa chọn) | ✅ | Mỗi kết quả (CONFIRMED, CALLBACK, UNREACHABLE, WRONG_NUMBER, WANT_CHANGE, WANT_CANCEL, NOTIFIED) chạy thật, bấm đúp Lưu chỉ ghi 1 lần; BE thật: bảng "Lịch sử cuộc gọi" cập nhật + toast |
+| ED-15-AC2 Dòng thời gian có dòng mới (CSKH) | ❌ B2 | BE thật, cs2: `GET /api/guidance/delivery/<id>/` -> 403 "Bạn không có quyền xem lịch sử này."; màn hiện "Chưa tải được lịch sử của đơn. [Thử lại]". ql1 và loc nhận 200 và có dòng mới. Ảnh `qa5-real-detail-after-call-cs2-1280.png` |
+| ED-15-AC3 Hẹn gọi lại (F2i) | ✅ | Chặn giờ quá khứ, biên đúng phút hiện tại, múi giờ GMT+7 -> UTC đúng |
+| ED-15-AC3 Đổi người nhận / địa chỉ (F2j) | ✅ | Lưu đổi, không đổi gì thì không gửi, 409 STALE_STATE đúng; AuditLog `recipient_changed` không chứa tên / địa chỉ |
+| ED-15-AC4 Quyết định (F2k): Giao không xác nhận, Gia hạn (<=24h), Huỷ đơn | ✅ nội dung / ⚠ B5 | Nút "Huỷ đơn" đỏ, bấm lần đầu chỉ hỏi lại ("Xác nhận huỷ đơn"), "Quay lại" không huỷ; BE thật: Giao không xác nhận -> phiếu PREPARING, huỷ -> phiếu CANCELLED + task DONE. CSKH không có nút Quyết định |
+| ED-15-AC5 chặn đơn lệch trạng thái (409) | ✅ | BE thật: job tự huỷ chạy lúc hộp Quyết định đang mở -> STALE_STATE, hộp giữ nguyên, có alert câu của BE, "Tải lại" đóng hộp, phiếu vẫn CANCELLED, không ai giao; CLAIMED: cs1 giữ, cs2 bấm -> không mở hộp, thấy "đang được cs1 xử lý" |
+| ED-15-AC6 AuditLog + không rò | ✅ | 11 loại hành động (delivery_call_recorded, delivery_confirmed, delivery_confirm_skipped, delivery_extended, delivery_unconfirmed, recipient_changed, order_auto_cancelled…), changes/note không chứa SĐT 10 số, tên, địa chỉ; không có `purchase_rate`/`landed`/`unit_cost`; không có bản ghi nào chứa đồng thời tiền, kg và qty để tính ngược giá vốn |
+| Mẫu trang chi tiết (ED-04 áp cho Gọi xác nhận): StatusPath, thông tin, lịch sử gọi, Timeline | ⚠ B5, B8, B9 | Có đủ khối, nhưng StatusPath hiện bước giao hàng thay vì bước việc gọi |
+| Ghi chú có SĐT | ✅ | Chặn cả 9 biến thể (có khoảng trắng, dấu chấm, +84, …), hiện lỗi, không gửi request |
+| 360px | ⚠ B4 | Không cuộn ngang, không lỗi console; riêng ô tìm `q` của hàng chờ cao 30px (< 44px) |
+
+### Ngoại lệ & biên
+| Ca | Kết quả | Ghi chú |
+|---|---|---|
+| Bấm đúp Lưu cuộc gọi | ✅ | 1 bản ghi (mock + BE thật) |
+| Màn cũ: phiếu đã bị huỷ / đổi trạng thái khi hộp đang mở | ✅ | STALE_STATE trên BE thật (job chạy thật), hộp khoá ô nhập, Tải lại ổn |
+| Hai người cùng một việc (giữ phiếu) | ✅ | CLAIMED trên BE thật. Lưu ý: nếu cs2 mở màn SAU khi cs1 đã giữ thì BE không trả `record_call`, màn chỉ hiện cảnh báo "Đơn đang được cs1 xử lý tới hh:mm" và nút "Gọi khách" (xem L2) |
+| Gia hạn 24h / 24h01 | ✅ | chặn đúng biên |
+| Hẹn gọi lại: quá khứ / đúng bây giờ | ✅ | |
+| Số lần gọi 3/3, ESCALATED | ✅ | Chip "Cần quyết định", Lần gọi 3/3 |
+| Ghi chú > 200 ký tự | ✅ | Ô nhập không cho quá 200 |
+| Mất mạng khi lưu (BE thật, `set_offline`) | ✅ | Hộp còn mở, có thông báo lỗi, 0 bản ghi cuộc gọi. Ảnh `qa5-real-offline-cs2-1280.png` |
+| Job tự huỷ chạy 2 lần | ⏸ | Chỉ chạy 1 lần trong lúc hộp mở (lần đó huỷ 1 phiếu đúng); chưa chạy lần 2 để kiểm tính lặp |
+| Cờ AI tắt / bật | ⏸ | Không thuộc Lô 5; endpoint `/api/ai/status/` trên BE worktree trả 404 (xem pre-existing) |
+
+### Phân quyền (Group x hành động), kiểm chạy thật trên UI + API
+| Vai | Thấy menu | Mở hàng chờ | Thấy số thật | Ghi kết quả gọi | Nút Quyết định | Dòng thời gian |
+|---|---|---|---|---|---|---|
+| cs2 (CSKH) | có | ✅ | chỉ dòng trong phạm vi | ✅ | không có (đúng) | ❌ 403 (B2) |
+| ql1 (Quản lý) | có | ✅ | ✅ | ✅ | ✅ | ✅ |
+| loc (Chủ) | có | ✅ | ✅ | ✅ | ✅ | ✅ |
+| kho1 | không có mục | "Không có quyền", DOM không chứa dữ liệu khách | không | không | không | không |
+| giao1 | không có mục | như kho1 | không | không | không | không |
+| Chưa đăng nhập | | chuyển /login | | | | |
+
+### Rò giá vốn
+Không thấy. API hàng chờ / chi tiết, AuditLog `changes`/`note` và DOM không có `purchase_rate`, `landed`, `unit_cost`, "giá vốn", "lãi". Không có khoá nào ghi cùng lúc tiền và kg đủ để tính ngược.
+
+### Rò dữ liệu cá nhân
+Không thấy rò. Console (mọi vai, cả mock lẫn BE thật phần chạy được), `localStorage`/`sessionStorage`, URL, `document.title`, request tới bên thứ ba (không có), AuditLog: sạch. Dòng ngoài phạm vi chỉ trả `phone_masked`. Ảnh chụp và report chỉ dùng tên giả.
+
+### Hồi quy
+- `npm ci` sạch (không `--legacy-peer-deps`), `npx tsc --noEmit` sạch, vitest 434 xanh, build MOCK=0 và MOCK=1 xanh, `check-no-mock` và `check-ai-chunks` xanh, `scripts/check_naming.py` OK (không vi phạm mới).
+- `ed_batch5_confirmation.py` (dev) xanh; `ed_batch1_shell.py` 56/56 trên bản sao (lần đầu quá hạn vì tiến trình khác build lại `out/`, lỗi của khay chạy, không phải lỗi sản phẩm).
+- ❌ `sr09_ac4_real_backend.py`: gãy ở bộ chọn cũ (`role=button` cho tab, `queueCard`, test id `confirmation-stale-alert`). Luồng STALE_STATE tương đương đã được phủ bằng `qa_ed_batch5_real.py`. Cần dev viết lại script này cho giao diện mới.
+- ⏸ `qa_lo8_real.py` (phần CSKH): gãy trước khi tới phần CSKH ở `button.order-open` (Lô 3) và cần dữ liệu đồng hồ cố định; chưa kiểm được.
+
+### Lỗi
+#### B1 — Hàng chờ thiếu cột "Lý do chuyển quyết định" · High · AC ED-15-AC1
+Tái hiện: đăng nhập `ql1`, mở `/confirmation/`, tab "Cần quyết định".
+Mong đợi: có cột riêng ghi lý do (vd "Không nghe máy").
+Thực tế: 10 cột, không cột nào ghi lý do; dòng ESCALATED chỉ có chip "Cần quyết định".
+Ảnh hưởng: Quản lý phải mở từng phiếu mới biết vì sao cần quyết định.
+
+#### B2 — CSKH không xem được Dòng thời gian của phiếu (BE 403, FE không xử lý nhẹ nhàng) · High · AC ED-15-AC2
+Tái hiện (BE thật): đăng nhập `cs2`, mở một phiếu CONFIRMING đang trong phạm vi, ghi một cuộc gọi. `GET /api/guidance/delivery/<note_id>/` trả 403 "Bạn không có quyền xem lịch sử này." (`apps/common/guidance/audit_timeline.py:131`). Cùng yêu cầu với `ql1` và `loc` trả 200.
+Mong đợi (02b R2): quyền = `view_<model>` + phạm vi giống API chi tiết; CSKH được xem chi tiết phiếu trong phạm vi nên phải xem được timeline, và có dòng mới sau khi ghi.
+Thực tế: cột phải hiện "Chưa tải được lịch sử của đơn. [Thử lại]" mỗi lần mở; Thử lại vẫn 403; console có 1 lỗi 403 mỗi lần mở chi tiết.
+Giao: BE (provider `delivery` cho vai CSKH, kèm test `customer_service` -> 200 trong phạm vi, ngoài phạm vi vẫn 403/che). FE (khi 403 hiện "Bạn không có quyền xem lịch sử" thay vì nút Thử lại vô nghĩa).
+
+#### B3 — Bảng hàng chờ ở 1280px cuộn ngang, chip "Trạng thái" nằm ngoài khung · Medium
+Tái hiện: `ql1`, cửa sổ 1280x800, `/confirmation/`.
+Mong đợi: bảng vừa khung, nhìn thấy chip trạng thái.
+Thực tế: bảng rộng 1225px trong khung 990px, chip Trạng thái ở x≈1357. (Một phần do thêm cột "Đang gọi", "Lần gọi"; khi sửa B1 cần cân lại cột.)
+
+#### B4 — Ô tìm của hàng chờ cao 30px ở 360px · Medium
+Tái hiện: `cs2` hoặc `ql1`, cửa sổ 360x740, `/confirmation/`, đo ô `input[name=q]`.
+Mong đợi: >= 44px (dev ghi đã đo >= 40).
+Thực tế: 30px. `/orders/` và `/` cùng cửa sổ cho 44px. (Cũng 30px ở `/deliveries/` của Lô 4, vì dùng chung FilterBar: gốc nằm ở thành phần dùng chung.)
+
+#### B5 — Thanh trạng thái chi tiết không khớp việc đang làm · Medium
+Tái hiện: mở chi tiết việc "Cần quyết định" (cs2, loc, ql1).
+Mong đợi (board W1c2): Chờ gọi > Cần quyết định > Hoàn tất, bước hiện tại là "Cần quyết định".
+Thực tế: hiện các bước của phiếu giao (Chờ xác nhận > Soạn hàng > Chờ lấy hàng > Đang giao > Hoàn tất), bước hiện tại "Chờ xác nhận" trong khi chip ghi "Cần quyết định".
+
+#### B6 — F2h và F2k có chữ gợi ý xám dưới từng lựa chọn, F2h thiếu bộ đếm "0/200" · Medium · UI-RULES §6.2
+Tái hiện: bấm "Ghi kết quả gọi" (6 dòng gợi ý, vd "Khách đồng ý nhận hàng. Đơn sẽ chuyển sang Soạn hàng để kho đóng gói."), và "Quyết định" (3 dòng).
+Mong đợi: chỉ tên lựa chọn như board; ô ghi chú có bộ đếm "0/200".
+Thực tế: có gợi ý xám dưới mỗi lựa chọn; ô ghi chú không có bộ đếm.
+
+#### B7 — Đóng hộp bằng Esc hoặc "Quay lại" làm focus rơi về đầu trang · Low · a11y
+Tái hiện: mở F2h bằng bàn phím, nhấn Esc; `document.activeElement` là `BODY` / "Bỏ qua menu". Modal chung ở Lô 2 trả focus đúng (ED-05-AC1) nên nghi ngờ nút mở bị tạm vô hiệu hoá trong lúc giữ phiếu ("Đang giữ đơn…") rồi dựng lại.
+Mong đợi: focus về nút "Ghi kết quả gọi" / "Quyết định".
+
+#### B8 — Chữ cấm theo G7 · Low
+"Tổng kg" (tiêu đề cột hàng chờ) và "Tổng khối lượng" (chi tiết) phải là "Tổng số kg". Cùng lỗi ở Lô 4 Giao hàng và trang in tem (xem mục riêng).
+
+#### B9 — Chi tiết thiếu vài trường so với board · Low
+Thiếu "Người nhận", "Phiếu giao", "Người gọi"; nhãn "Hạn quyết định" chưa có (hiện "Hạn gọi").
+
+### Quan sát (không tính lỗi)
+- L1: Trên BE thật, CSKH mở phiếu đang bị người khác giữ vẫn thấy nút "Gọi khách" (link `tel:`); bấm sẽ gọi claim và nhận lỗi CLAIMED. Hợp lý nhưng nên ẩn / mờ nút khi BE không cho `record_call`.
+- L2: Console có 1 lỗi 404 từ `/api/ai/status/` trên BE trong worktree (pre-existing, xem dưới).
+
+### Lỗi có sẵn từ trước / thành phần dùng chung (không tính cho Lô 5)
+- "Tổng kg" / "Tổng khối lượng" ở Lô 4 Giao hàng và trang in tem (cùng mẫu B8).
+- Ô tìm `q` 30px ở `/deliveries/` (FilterBar dùng chung; B4 cần sửa ở gốc).
+- Nút đóng toast cao 32px (đã ghi từ Lô 2).
+- `/api/ai/status/` trả 404 trên BE chạy từ worktree này (route chưa đăng ký); FE xử lý fail-closed nên chỉ để lại 1 dòng 404 trong console ở mọi trang có khối Trợ lý AI.
+
+### Test QA đã thêm
+- `erp-console/e2e/qa_ed_batch5_ui.py` (mock, 12 khối, chạy: `BASE=http://127.0.0.1:3201 SHOTS=... python3 e2e/qa_ed_batch5_ui.py`).
+- `erp-console/e2e/qa_ed_batch5_real.py` (BE thật, biến `QA_ERP`, `QA_API`, `QA_DB`, `QA_SHOTS`, `QA_JOB`, `QA_IDS`; dùng SQLite tạm + seed_demo).
+
+### Lệnh đã chạy (tóm tắt)
+- `npm ci` sạch; `npx tsc --noEmit` sạch; `npx vitest run` 434 xanh; `npm run build` ở MOCK=1 và MOCK=0 xanh; `node scripts/check-no-mock.mjs`, `check-ai-chunks.mjs` xanh; `python3 scripts/check_naming.py` OK.
+- Mock: `python3 -m http.server 3201` trên `out-mock/`; `qa_ed_batch5_ui.py` 233/251.
+- BE thật: Django runserver 8120 trên SQLite tạm + `seed_demo`, console MOCK=0 cổng 3202; `qa_ed_batch5_real.py` (sau đó phần đuôi chạy riêng) 56/59 + 1 sửa kỳ vọng.
+- `ed_batch5_confirmation.py` xanh; `ed_batch1_shell.py` 56/56; `sr09_ac4_real_backend.py` gãy bộ chọn cũ; `qa_lo8_real.py` ⏸.
+
+### Lô 5 — FE lần 2 · 2026-10-02
+
+#### Kết luận: REJECTED. Dev đã sửa đúng B1, B2 (phần FE), B4 đến B9 và TL5-M1/L1/L2; B3 mới sửa một phần: ở 768 đến khoảng 1100px cột "Khách hàng" và "Hàng" bị co về 0px, bảng vẫn cuộn ngang (R2-1, Medium). Thêm R2-2 (mã đơn bị cắt chữ, Low).
+
+#### Tổng (script QA, chạy trình duyệt thật): 507 ca · ✅ 497 · ❌ 5 lỗi gộp thành R2-1, R2-2 (+ 4 ca nhiễu đã loại, xem dưới) · ⏸ 6
+- `qa_ed_batch5_ui.py` (mock): 251/251 (đã sửa ca `G2 'Hạn gọi'` đọc cột theo tên).
+- `qa_ed_batch5_round2.py` (mới, mock, 14 khối): 123/131; 8 ca đỏ đều thuộc R2-1/R2-2.
+- `qa_ed_batch5_real.py` (BE thật SQLite tạm, cổng 8120 + 3202): 55 xanh, 4 đỏ đã phân loại: 3 là 403 timeline của CSKH trên BE worktree (⏸, đúng như điều phối đã báo) + console có 1 dòng "Failed to fetch RSC payload /orders/" (nhiễu: Next prefetch bị huỷ khi script `goto` ngay sau đăng nhập; chạy lại không `goto` thì console sạch, `index.txt` trả 200) + 1 ca STALE đếm "tự huỷ 1|2" trong khi job huỷ 7 đơn (lỗi kỳ vọng của script QA, đã sửa thành `tự huỷ [1-9]`; các ca 409 STALE kế tiếp đều xanh).
+- `ed_batch5_confirmation.py` 129/129; `ed_batch4_delivery.py` 70/70; `ed_batch2_patterns.py` 75/75; `ed_batch1_shell.py` 56/56 (bản copy trỏ `OUT_404` về bản build sạch, vì `http.server` không có 404 fallback); `qa_ed_batch4_ui.py` 49/50 (ca F2l "Bắt đầu giao" là nợ BE 8b có sẵn, không thuộc Lô 5).
+- vitest 437/437.
+
+#### Theo lỗi lần 1
+| Mã | Kết quả | Bằng chứng |
+|---|---|---|
+| B1 cột "Lý do" riêng | ✅ | `qa_ed_batch5_ui` + `round2` "reason_column": thứ tự cột đúng, đủ 4 nhóm lý do, ảnh `shots/lot5r2/r2-queue-ql1-1280.png` |
+| B2 CSKH xem Dòng thời gian (FE) | ✅ FE · ⏸ BE | 403 hiện câu "Bạn không có quyền xem lịch sử này.", không có nút Thử lại; 404 hiện câu riêng (`r2-timeline-403-cs2-1280.png`, `r2-timeline-404-cs2-1280.png`). BE thật từ worktree vẫn 403 cho cs2 (fix `cd2c9b7` nằm ở main, chưa merge) nên ca "timeline có dòng mới" ⏸ |
+| B3 bảng không cuộn ngang | ❌ một phần | Xanh ở 1440/1280/390/360 (cột ẩn trên mobile, thẻ không cuộn). ĐỎ ở 1024 và 768, xem R2-1 |
+| B4 ô tìm cao 44px dưới 768 | ✅ | `round2` "filter 44px" ở 360/390/768, kể cả `/deliveries/` và `/orders/` |
+| B5 thanh trạng thái | ✅ | Chờ gọi > Cần quyết định > Hoàn tất; nhánh "Gọi báo hoàn tiền" cho REFUND_CALL; "Đã huỷ theo đơn" chạy trong vitest (không dựng được CANCELLED trong mock) |
+| B6 bỏ gợi ý xám dưới lựa chọn | ✅ | không còn `.hint` dưới radio ở hộp Quyết định và Ghi kết quả gọi (`r2-F2h-ql1-1280.png`, `r2-F2k-ql1-1280.png`) |
+| B7 bộ đếm 0/200 | ✅ | ô Lý do và Ghi chú có đếm, vượt 200 bị chặn |
+| B8 từ cấm "Tổng kg" | ✅ | toàn bộ DOM màn Lô 5, Lô 4 và trang in không còn "Tổng kg" / "Tổng khối lượng"; cột là "Tổng số kg" |
+| B9 trả focus khi nút khoá | ✅ | dùng `aria-disabled`, focus quay về nút kích hoạt sau khi đóng hộp |
+| TL5-M1/L1/L2 | ✅ | `loadDetail` giữ dữ liệu cũ + cảnh báo "Chưa tải lại được đơn" khi nạp lại lỗi (`r2-detail-reload-fail-keep-ql1-1280.png`); lỗi nạp lần đầu hiện khối lỗi + Thử lại |
+
+#### Lỗi
+##### R2-1 — Cột "Khách hàng" và "Hàng" co về 0px ở 768 đến khoảng 1100px, bảng vẫn cuộn ngang · Medium · AC1 / B3
+Bước tái hiện: đăng nhập `ql1` (hoặc `cs2`), viewport 1024x700 hoặc 768x700, mở `/confirmation/`, tab "Tất cả", đo `th` trong `table.lt`.
+Mong đợi: bảng vừa khung, mỗi cột đọc được (hoặc cột phụ ẩn theo kích cỡ).
+Thực tế: bảng cố định 808px trong khung 734px (1024px, sidebar mở): `Khách hàng` 0px, `Hàng` 0px, các cột cố định (Mã đơn 116, SĐT 100, Lý do 112, Hạn gọi 136...) giữ nguyên nên ăn hết chỗ; "Lần gọi" và một phần "Đang gọi" ra ngoài khung. Script: `round2` ca `B3 [cs2/ql1] 1024px` và `B10 1024px / 768px`. Ảnh: `shots/lot5r2/r2-queue-ql1-1024-collapsed-cols.png`, `r2-queue-ql1-768-collapsed-cols.png`.
+Ảnh hưởng: ở laptop nhỏ và tablet CSKH không thấy tên khách và hàng khi đang gọi; mục tiêu B3 (không cuộn ngang) chưa đạt ở dải này. Gợi ý: ẩn thêm cột phụ (`hideOnMobile` mở rộng đến 1100px hoặc ẩn "Lần gọi" / "Hạn gọi" theo breakpoint), hoặc để `Khách hàng` và `Hàng` có `min-width`.
+
+##### R2-2 — Mã đơn bị cắt chữ, thiếu tooltip · Low · AC1
+Bước tái hiện: mọi quyền xem hàng chờ, viewport 768 đến 1440px: ô Mã đơn rộng 116px mà chữ `DH-260928-0040` cần 126px (scrollWidth > clientWidth), cắt bằng dấu "...", không có thuộc tính `title`. Tên khách và "Hàng" cũng bị cắt ở 1280/1440 trong khi cột "Hạn gọi" (136px) và "Lý do" (112px) còn dư chỗ. Ca `B11` (4 độ rộng). Mã đơn là khoá CSKH đọc ra khi gọi nên nên cho cột này đủ rộng (>= 130px) hoặc có `title`. Low, ghi nhận, không chặn riêng.
+
+#### Quan sát (không tính lỗi)
+- Mock tab "Gọi báo hoàn tiền": cột Lý do là "Hoàn 280.000 đ" còn Lý do ở trang chi tiết là "Không nghe máy" (dữ liệu mock, hai nguồn khác nhau).
+- `.btn:hover:not(:disabled)` vẫn đổi màu ở nút `aria-disabled`.
+- Khoảng hở hợp đồng (dev đã nêu): BE chưa trả `note_code`, "Phiếu giao" hiện "—" trên BE thật.
+
+#### Phân quyền / rò dữ liệu (chạy thật UI + API, BE SQLite tạm)
+| Nhóm | Xem hàng chờ | Ghi kết quả gọi | Quyết định | Ghi chú |
+|---|---|---|---|---|
+| cs2 (CSKH) | ✅ 200, ngoài phạm vi che `09xx xxx 555`, không nhấp được | ✅ | không có nút; API 403 | mở thẳng đơn ngoài phạm vi: 404, DOM sạch |
+| ql1 (Quản lý), loc (Chủ) | ✅ | ✅ | ✅ (409 STALE, CLAIMED đúng) | |
+| kho1, giao1 | 403 | 403 | 403 | |
+| chưa đăng nhập | 401 | | | |
+- Rò giá vốn: JSON hàng chờ, chi tiết, AuditLog (`changes`, `note`) không có khoá giá vốn/lãi; không có cặp tiền ÷ kg trong cùng một bản ghi.
+- Rò dữ liệu cá nhân: DOM, URL (cả sau Huỷ đơn chuyển sang `?order&open=refund`), AuditLog không chứa tên, SĐT, địa chỉ khách ngoài phạm vi; ghi chú có SĐT bị 400 (BR-GH-19); dữ liệu hoàn toàn giả.
+
+#### Hồi quy
+- `/deliveries/` (dùng chung `DataTable`/`FilterBar`): `ed_batch4_delivery` 70/70, ô tìm 44px dưới 768, không cuộn ngang trang; `qa_ed_batch4_ui` 49/50 (F2l là nợ BE 8b có sẵn).
+- `/orders/` trong worktree vẫn là danh sách thẻ cũ (chưa có Lô 3, không dùng `DataTable`): chỉ kiểm được ô lọc 44px và không cuộn ngang, xanh.
+- Shell, mẫu trang (Lô 1, 2): 56/56 và 75/75.
+
+#### ⏸ Chưa kiểm
+1. Timeline cho CSKH trên BE thật (fix `cd2c9b7` chưa vào worktree; chờ merge).
+2. StatusPath trạng thái CANCELLED trong trình duyệt (mock không dựng được; chỉ có vitest).
+3. Job tự huỷ chạy 2 lần (chưa dựng).
+4. `qa_lo8_real.py` phần CSKH.
+5. Cờ AI tắt/bật ở khối Trợ lý AI trên BE thật.
+6. Chạy lại `qa_ed_batch5_real.py` sau khi sửa kỳ vọng STALE (sửa script nhỏ, chưa chạy lại vì seed đã dùng hết).
+
+#### Test QA thêm / đổi
+- `erp-console/e2e/qa_ed_batch5_round2.py` (mới); `qa_ed_batch5_ui.py` (G2 đọc cột theo tên); `qa_ed_batch5_real.py` (kỳ vọng STALE).
+- Ảnh: `doc/features/2026-10-01-erp-theo-design/shots/lot5r2/` (48 ảnh, dữ liệu giả).
+
+#### Lệnh đã chạy (tóm tắt)
+- Bản copy sạch ngoài worktree: `npm ci` sạch; `npx tsc --noEmit` sạch; `npx vitest run` 437/437; `npm run build` MOCK=1 và MOCK=0 xanh; `check-no-mock`, `check-ai-chunks`, `check_naming` xanh.
+- Mock: `python3 -m http.server 3201` trên bản build sạch; BE: `manage.py runserver 127.0.0.1:8120` (SQLite tạm, `CORS_ALLOWED_ORIGINS`, throttle nới) + `http.server 3202` trên `out-real`.
+- Lưu ý harness: lần đầu cổng 3201 phục vụ nhầm thư mục cũ (14 ca xanh) nên loại; chạy lại đúng thư mục mới ra kết quả trên.
+
+### Lô 5 — FE lần 3 · 2026-10-02
+
+#### Kết luận: APPROVED. R2-1 và R2-2 đã sửa, đo bằng trình duyệt thật ở 6 bề rộng (360, 768, 1024, 1100, 1280, 1440); không còn lỗi chặn của Lô 5.
+
+#### Tổng (mock, cổng 3201, bản build sạch từ `npm ci`): 783 ca · ✅ 782 · ❌ 1 (nợ BE 8b có sẵn, không thuộc Lô 5) · ⏸ 5
+- `qa_ed_batch5_round2.py` 153/153 (đã đổi mã đơn, thêm B10 ở 6 bề rộng, B11 kèm kiểm `title`).
+- `qa_ed_batch5_ui.py` 251/251; `ed_batch5_confirmation.py` 129/129; `ed_batch4_delivery.py` 70/70; `ed_batch2_patterns.py` 75/75; `ed_batch1_shell.py` 56/56 (bản copy trỏ `OUT_404` về bản build sạch); `qa_ed_batch4_ui.py` 49/50 (ca F2l "Bắt đầu giao" là nợ BE 8b).
+- vitest 437/437; `tsc` sạch; `npm ci` sạch (không `--legacy-peer-deps`); build MOCK=1 và MOCK=0 xanh; `check-no-mock`, `check-ai-chunks`, `check_naming` xanh.
+
+#### Sửa script QA theo yêu cầu điều phối
+- Đổi mã `DH-260928-00xx` sang mã mới của mock: 0001→`SO260928-3F9A01`, 0027→`9C6B27` (nhánh REFUND_CALL, `endswith("9C6B27")`), 0028→`A40F28`, 0030→`B27C30`, 0035→`5D1E35`, 0036→`E83D36`, 0040→`1B7A40`, 0041→`C05E41`, tiền tố `"DH-260928"` → `"SO260928"`. Không bỏ ca nào (251 và 131+22 ca vẫn đủ).
+- B10 theo chốt của PO (02b T4): từ 1024px trở lên "Khách hàng" và "Hàng" >= 60px; dưới 1024px "Hàng" ẩn hoặc >= 60px; không cột nào đang hiện rộng 0 (bỏ qua cột `display:none`); thêm ca "trang không cuộn ngang" và "ô bị cắt chữ đều có `title`".
+
+#### Đo 6 bề rộng (ql1, tab Tất cả, rộng từng cột, px)
+| Viewport | Khung bảng | Mã đơn | Khách hàng | Hàng | Cột ẩn | Trang cuộn ngang | Mã đơn bị cắt |
+|---|---|---|---|---|---|---|---|
+| 1440 | 1150 | 132 | 169 | 169 | không | không | không |
+| 1280 | 990 | 132 | 89 | 89 | không | không | không |
+| 1100 | khoảng 810 | 132 | 63 | 63 | Đang gọi, Lần gọi | không | không |
+| 1024 | 734 | 132 | 63 | 63 | Tổng số kg, Đang gọi, Lần gọi | không | không |
+| 768 | 478 (bảng 600, cuộn trong khung) | 132 | 100 | ẩn | Tổng số kg, Hàng, Lý do, Đang gọi, Lần gọi | không | không |
+| 360 | 326 (bảng 600, cuộn trong khung) | ẩn cột phụ như 768 | | ẩn | như 768 | không | không |
+Ảnh: `shots/lot5r3/r3-queue-ql1-{1440,1280,1100,1024,768,360}.png`. Mọi ô có thể bị cắt chữ (tên khách, Hàng, Lý do, người đang gọi) đều có `title`; mã đơn không còn bị cắt ở cả 6 bề rộng. Mã đơn mới `SO<yymmdd>-<6 HEX>` hiển thị đúng ở hàng chờ, chi tiết, URL tìm và DOM (không có SĐT hay tên khách ngoài phạm vi).
+
+#### Theo lỗi
+| Mã | Kết quả | Bằng chứng |
+|---|---|---|
+| R2-1 cột co về 0 / cuộn ngang | ✅ | B3 + B10 ở 6 bề rộng; dưới 1024px "Hàng" ẩn, trang không cuộn ngang (PO chốt) |
+| R2-2 mã đơn bị cắt, thiếu tooltip | ✅ | B11 ở 6 bề rộng: không ô nào bị cắt mà thiếu `title`; mã đơn đủ chữ |
+| B1 đến B9, TL5-M1/L1/L2 | ✅ giữ nguyên | `qa_ed_batch5_ui` 251/251 và `round2` 153/153 trên mã mới |
+
+#### Quan sát (không tính lỗi)
+- 1024px: tên khách chỉ còn 63px, các dòng đều hiện "Khách…" nên khó phân biệt nếu chỉ nhìn tên; vẫn phân biệt được qua SĐT, mã đơn và `title`.
+- 768px: cột "Hạn gọi" nằm ngoài khung bảng, phải cuộn trong khung và không có gợi ý cuộn (đúng chốt PO: khổ < 1024 giữ hành vi tối thiểu).
+- Vẫn còn khoảng hở `note_code` (BE chưa trả, "Phiếu giao" là "—" trên BE thật) và nhãn Lý do "Hoàn 280.000 đ" khác trang chi tiết trong mock.
+
+#### Phân quyền, rò dữ liệu, hồi quy
+- `qa_ed_batch5_ui` giữ nguyên các ca phân quyền (cs2, ql1, loc, kho1, giao1, chưa đăng nhập) và rò dữ liệu (DOM/URL/storage sạch, dòng ngoài phạm vi che `09xx xxx 555`) trên mã mới: 251/251. Không có giá vốn trong DOM mock.
+- `/deliveries/` (dùng chung `DataTable`/`FilterBar`): `ed_batch4_delivery` 70/70; `/orders/` trong worktree vẫn là danh sách thẻ cũ (chưa có Lô 3).
+
+#### ⏸ Chưa kiểm
+1. Timeline cho CSKH trên BE thật (fix `cd2c9b7` chưa merge vào worktree).
+2. StatusPath CANCELLED trong trình duyệt (mock không dựng được; có vitest).
+3. Job tự huỷ chạy 2 lần; `qa_lo8_real.py` phần CSKH; cờ AI tắt/bật trên BE thật.
+4. Không chạy lại `qa_ed_batch5_real.py` lần này: lần 3 chỉ đổi mã trong mock, độ rộng cột và `title`, không đổi lời gọi API (kết quả lần 2: 55 xanh, các ca đỏ đã phân loại ở mục lần 2).
+
+#### Lệnh đã chạy (tóm tắt)
+- Bản copy sạch ngoài worktree: `npm ci`; `tsc --noEmit`; `vitest run` 437/437; `NEXT_PUBLIC_USE_MOCK=1 npm run build` + `check-ai-chunks`; `NEXT_PUBLIC_USE_MOCK=0 NEXT_PUBLIC_API_BASE=http://127.0.0.1:8120 npm run build` + `check-no-mock` + `check-ai-chunks`; `python3 scripts/check_naming.py` ở worktree.
+- Mock: `python3 -m http.server 3201` trên bản build sạch; chạy các script nêu trên.
+- Lưu ý harness: một lần `next build` bị treo (0% CPU), đã tắt và build lại sạch; không ảnh hưởng kết quả.

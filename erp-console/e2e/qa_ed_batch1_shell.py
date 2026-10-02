@@ -81,7 +81,7 @@ with sync_playwright() as p:
         page.reload()
         page.wait_for_selector("#rail-left .nav a", state="attached")
         settle(page)
-        good = page.locator("#rail-left.collapsed").count() == 0 and abs(rail.bounding_box()["width"] - 240) <= 1 and len(nav_labels(page)) == 11
+        good = page.locator("#rail-left.collapsed").count() == 0 and abs(rail.bounding_box()["width"] - 240) <= 1 and len(nav_labels(page)) == 12
         ok(f"ED-01-AC2 localStorage rác ({junk[:14]!r}) -> mở rộng, menu đủ, không vỡ", good)
     page.evaluate("() => localStorage.setItem('cave_ui_sidebar', 'collapsed')")
     page.reload()

@@ -9,7 +9,7 @@ import re
 
 from playwright.sync_api import sync_playwright
 
-BASE = os.environ.get("BASE", "http://127.0.0.1:3219")
+BASE = os.environ.get("BASE", "http://127.0.0.1:3201")
 SHOTS = os.environ.get("SHOTS", "/tmp")
 FIXED = "2026-09-30T17:30:00Z"
 TZS = ["America/New_York", "UTC", "Pacific/Pago_Pago", "Asia/Ho_Chi_Minh"]  # cuối = mốc đối chiếu (giờ máy = giờ VN)
@@ -43,7 +43,7 @@ def goto(page, path):
     page.wait_for_timeout(500)
 
 
-TIME_TOKENS = re.compile(r"\d{2}/\d{2}/\d{4} \d{2}:\d{2}|\d{2}/\d{2} \d{2}:\d{2}|(?:Cập nhật|Tới|Trả tiền:|Hẹn gọi lại) \d{2}:\d{2}|Hôm nay|Hôm qua")
+TIME_TOKENS = re.compile(r"\d{2}/\d{2}/\d{4} \d{2}:\d{2}|\d{2}/\d{2} \d{2}:\d{2}|(?:Cập nhật|Tới|Trả tiền:|Trả tiền lúc|Hẹn gọi lại) \d{2}:\d{2}|Hôm nay|Hôm qua")
 
 
 def time_tokens(text):
@@ -108,12 +108,25 @@ def collect(browser, tz):
     if tz == "America/New_York":
         page.screenshot(path=f"{SHOTS}/lo8-erp-4-cskh-ny.png")
     # Vòng đi-về giờ nhập: ô datetime-local là GIỜ VN -> hẹn 09:00 phải hiện lại 09:00 (không lệch theo múi giờ máy)
-    card = page.locator("[class*='queueCard']", has_text="DH-260928-0030")
-    card.first.click()
+    # Giờ trả tiền nằm ở trang chi tiết phiếu (ô "Trả tiền lúc"), không còn trên thẻ hàng chờ
+    page.locator("table.lt tbody tr", has_text="SO260928-E83D36").first.locator("a").first.click()
+    page.get_by_role("heading", name="SO260928-E83D36").wait_for(timeout=10_000)
+    page.wait_for_load_state("networkidle")
+    page.wait_for_timeout(400)
+    out["cskh_detail"] = re.sub(r"\s+", " ", page.locator("main").inner_text())
+    page.get_by_role("link", name="Gọi xác nhận").first.click()
+    page.wait_for_load_state("networkidle")
+    page.locator("table.lt tbody tr").first.wait_for(timeout=10_000)
+    # ERP theo design (ED-15): bảng + trang chi tiết; "Hẹn gọi lại" nằm trong menu "Thao tác khác" và mở hộp thoại riêng
+    page.locator("table.lt tbody tr", has_text="SO260928-B27C30").first.locator("a").first.click()
+    page.get_by_role("heading", name="SO260928-B27C30").wait_for(timeout=10_000)
+    page.wait_for_load_state("networkidle")
+    page.wait_for_timeout(500)
+    page.get_by_role("button", name="Thao tác khác").click()
+    page.get_by_role("menuitem", name="Hẹn gọi lại").click()
     modal = page.get_by_role("dialog")
     modal.wait_for(timeout=10_000)
     page.wait_for_timeout(500)
-    modal.get_by_role("button", name="Hẹn gọi lại").first.click()
     modal.locator("input[type=datetime-local]").fill("2026-10-02T09:00")
     modal.get_by_role("button", name="Lưu hẹn gọi lại").click()
     page.wait_for_timeout(1000)
@@ -121,7 +134,9 @@ def collect(browser, tz):
     if page.get_by_role("dialog").count():
         page.keyboard.press("Escape")
         page.wait_for_timeout(300)
-    page.get_by_role("button", name="Hẹn gọi lại", exact=True).first.click()
+    page.get_by_role("link", name="Gọi xác nhận").first.click()
+    page.wait_for_load_state("networkidle")
+    page.get_by_role("tab", name="Hẹn gọi lại").click()
     page.wait_for_timeout(700)
     out["cskh_after_callback"] = page.inner_text("body")
     ctx.close()
@@ -142,13 +157,14 @@ def main():
         ok("AC2 Chi tiết đơn: 'Đặt 01/10/2026 00:20', 'Tới 00:50', timeline '01/10/2026 00:10'",
            all(x in base["order_detail"] for x in ("Đặt 01/10/2026 00:20", "Tới 00:50", "01/10/2026 00:10", "01/10/2026 00:20 · Hệ thống")))
         ok("AC4 Ngày nhập lô mặc định = 2026-10-01 (hôm nay VN)", base["received_date_default"] == "2026-10-01", base["received_date_default"])
-        ok("AC2 CSKH: 'Trả tiền: 28/09/2026 06:00'", "Trả tiền: 28/09/2026 06:00" in base["cskh"])
-        ok("AC4 CSKH: hẹn gọi lại nhập 09:00 hiện 'Hẹn gọi lại 09:00'", "Hẹn gọi lại 09:00" in base["cskh_after_callback"])
+        ok("AC2 CSKH: chi tiết phiếu 'Trả tiền lúc 28/09/2026 06:00' (06:00+07:00 = 23:00Z hôm trước)", "Trả tiền lúc 28/09/2026 06:00" in base["cskh_detail"], base["cskh_detail"][:200])
+        ok("AC2 CSKH: hàng chờ hiện 'Hạn gọi' đúng giờ VN '28/09/2026 09:10'", "28/09/2026 09:10" in base["cskh"])
+        ok("AC4 CSKH: hẹn gọi lại nhập 09:00 hiện '02/10/2026 09:00' ở cột Hạn gọi", "02/10/2026 09:00" in base["cskh_after_callback"])
 
         # ---- mọi múi giờ máy khác phải cho đúng kết quả như giờ VN
         for tz in TZS[:-1]:
             d = data[tz]
-            for key in ("overview", "orders", "order_detail", "inventory", "cskh", "cskh_after_callback"):
+            for key in ("overview", "orders", "order_detail", "inventory", "cskh", "cskh_detail", "cskh_after_callback"):
                 ok(f"AC2 [{tz}] {key}: giờ/ngày hiển thị = giờ VN ({len(time_tokens(base[key]))} mốc)",
                    time_tokens(d[key]) == time_tokens(base[key]) and len(time_tokens(base[key])) > 0,
                    f"{time_tokens(d[key])[:6]} vs {time_tokens(base[key])[:6]}")

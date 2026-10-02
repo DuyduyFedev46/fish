@@ -74,7 +74,7 @@ export function DeliveriesView() {
     { key: "order", header: "Đơn hàng", mono: true, render: (r) => r.order?.code || "—", width: "150px" },
     { key: "name", header: "Người nhận", render: (r) => <PersonalText value={r.customer_name} whenEmpty="—" /> },
     { key: "lines", header: "Hàng", render: (r) => <span className={s.lines}>{lineNames(r.lines_summary) || "—"}</span> },
-    { key: "kg", header: "Tổng kg", num: true, render: (r) => kg(r.total_kg), width: "100px" },
+    { key: "kg", header: "Tổng số kg", num: true, render: (r) => kg(r.total_kg), width: "100px" },
     { key: "courier", header: "Người giao", render: (r) => r.assigned_to_name || <span className="muted">Chưa giao</span>, width: "140px" },
     { key: "label", header: "Tem", render: (r) => <Chip entry={deliveryLabelText(r.label.printed ? r.label.valid_print_no ?? 1 : null)} />, width: "130px" },
     { key: "status", header: "Trạng thái", render: (r) => <Chip table={ENUMS.deliveryStatus} value={r.status} />, width: "140px" },

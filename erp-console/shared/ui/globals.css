@@ -35,7 +35,7 @@ input,textarea{caret-color:var(--accent)}
 .btn .mi{font-size:18px}
 .btn:active:not(:disabled){transform:scale(var(--press-scale))}
 .btn.primary{background:var(--accent);border-color:transparent;color:var(--on-accent);box-shadow:none}
-.btn:disabled{opacity:.55;cursor:not-allowed;box-shadow:none}
+.btn:disabled,.btn[aria-disabled="true"]{opacity:.55;cursor:not-allowed;box-shadow:none}
 @media (hover:hover) and (pointer:fine){
   .btn:hover:not(:disabled){background:var(--surface-2)}
   .btn.primary:hover:not(:disabled){background:var(--accent-hover)}
@@ -567,18 +567,30 @@ table.data tbody tr.empty-row td{white-space:normal;border-bottom:1px solid var(
 .fb-dates input{height:32px;padding:0 var(--space-2);border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);color:var(--ink);font:inherit;font-size:var(--text-sm)}
 .fb-summary{margin-left:auto;font-size:var(--text-sm);color:var(--ink-3);font-variant-numeric:tabular-nums}
 @media (max-width:767px){
-  .fb .fb-search{flex:1 1 100%}
+  .fb .fb-search{flex:1 1 100%;min-height:var(--tap)}
+  .fb .fb-search input{height:var(--tap);margin:-1px 0;font-size:var(--text-input)}
+  .fb-select select,.fb-dates input{height:var(--tap)}
   .fb-summary{margin-left:0;flex:1 1 100%}
 }
 
 /* Bảng danh sách: thẻ trắng viền mảnh, tiêu đề cột trên nền canvas, dòng cao 44 */
 .lt-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;transition:opacity var(--dur-base) ease}
-.lt-scroll{overflow-x:auto;position:relative} /* khối chứa cho .sr-only absolute trong th: không tràn ra ngoài vùng cuộn (360px) */
+.lt-scroll{overflow-x:auto;position:relative;container:lt-list/inline-size} /* khối chứa cho .sr-only absolute trong th: không tràn ra ngoài vùng cuộn (360px) */
 table.lt{width:100%;border-collapse:collapse;font-size:var(--text-sm)}
 table.lt th{text-transform:none;letter-spacing:normal;padding:var(--space-2) var(--space-4);background:var(--canvas);border-bottom:1px solid var(--border);color:var(--ink-3);font-size:var(--text-xs);font-weight:var(--weight-medium);text-align:left;white-space:nowrap}
 table.lt th .mi{font-size:13px;margin-left:var(--space-1);vertical-align:-2px}
 table.lt td{height:44px;padding:var(--space-1-5) var(--space-4);border-bottom:1px solid var(--surface-3);color:var(--ink);vertical-align:middle}
 table.lt tbody tr:last-child td{border-bottom:0}
+/* Bảng nhiều cột (Gọi xác nhận, 10 cột): lề ô hẹp, cột cố định, chữ dài cắt bằng dấu … để vừa khung 1280 không cuộn ngang */
+table.lt.lt-dense{table-layout:fixed}
+table.lt.lt-dense th,table.lt.lt-dense td{padding-left:var(--space-1-5);padding-right:var(--space-1-5);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+table.lt.lt-dense th:first-child,table.lt.lt-dense td:first-child{padding-left:var(--space-3)}
+table.lt.lt-dense th:last-child,table.lt.lt-dense td:last-child{padding-right:var(--space-3)}
+/* Cột phụ ẩn dần theo bề rộng khung bảng (DataTable `hideBelow`); dưới 600px bảng cuộn trong khung riêng */
+@container lt-list (max-width:979px){table.lt .lt-hb-980{display:none}}
+@container lt-list (max-width:799px){table.lt .lt-hb-800{display:none}}
+@container lt-list (max-width:719px){table.lt .lt-hb-720{display:none}}
+@container lt-list (max-width:599px){table.lt.lt-dense{min-width:600px}}
 table.lt .r{text-align:right}
 table.lt .num{font-variant-numeric:tabular-nums}
 table.lt .mono,table.lt td.mono{font-family:var(--font-mono);font-size:var(--text-xs);color:var(--ink-2)}

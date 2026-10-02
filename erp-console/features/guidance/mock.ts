@@ -22,6 +22,19 @@ function ownerOnlyStep(key: string, label: string, br: string, text: string) {
   };
 }
 
+// Công cụ thử (chỉ mock): window.__caveMock.guidanceForceDeliveryStatus(403 | 404 | null) — dòng thời gian phiếu giao trả mã lỗi này (kiểm trạng thái 403/404 của chi tiết Gọi xác nhận).
+let FORCED_DELIVERY_STATUS: 403 | 404 | null = null;
+if (process.env.NEXT_PUBLIC_USE_MOCK === "1" && typeof window !== "undefined") {
+  const w = window as unknown as { __caveMock?: Record<string, unknown> };
+  w.__caveMock = {
+    ...(w.__caveMock || {}),
+    guidanceForceDeliveryStatus: (status: 403 | 404 | null) => {
+      FORCED_DELIVERY_STATUS = status;
+      return status === null ? "Dòng thời gian phiếu giao: bình thường" : `Dòng thời gian phiếu giao: trả ${status}`;
+    },
+  };
+}
+
 export function mockGuidanceApi(req: MockRequest): MockResponse {
   const match = req.path.match(/^\/api\/guidance\/([a-z_]+)\/([^/]+)\/$/);
   if (!match) {
@@ -351,6 +364,10 @@ export function mockGuidanceApi(req: MockRequest): MockResponse {
   }
 
   if (docType === "delivery") {
+    if (FORCED_DELIVERY_STATUS !== null) {
+      const code = FORCED_DELIVERY_STATUS;
+      return { status: code, body: { detail: code === 403 ? "Bạn không có quyền xem lịch sử này." : "Không tìm thấy.", code: code === 403 ? "FORBIDDEN" : "NOT_FOUND" } };
+    }
     // R2 `delivery`: chỉ dòng thời gian (không bước tiếp theo). Nhãn không có tên, SĐT, địa chỉ hay ghi chú (bất biến 9).
     const data: GuidanceData = {
       doc: { type: "delivery", id: docId, code: `GH-${docId}`, status: null, status_label: null },

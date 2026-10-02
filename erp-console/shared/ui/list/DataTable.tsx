@@ -27,7 +27,14 @@ export type Column<T> = {
   locked?: boolean;
   /** Độ rộng cột (CSS), vd "136px". Mặc định chia đều. */
   width?: string;
+  /**
+   * Ẩn cột phụ khi khung bảng hẹp hơn N px (đo theo khung chứa bảng, không theo màn hình, nên gập thanh bên
+   * cũng đúng). Chỉ dùng cùng `dense`; chỉ nhận các mốc có sẵn trong globals.css. Thông tin vẫn có ở trang chi tiết.
+   */
+  hideBelow?: HideBelow;
 };
+
+export type HideBelow = 720 | 800 | 980;
 
 export type EmptyState = {
   icon?: string;
@@ -61,10 +68,12 @@ type Props<T> = {
   caption: string;
   /** Số dòng khung xương. */
   skeletonRows?: number;
+  /** Bảng nhiều cột: lề ô hẹp + cột cố định, chữ dài cắt bằng dấu … (cột không khai `width` chia phần còn lại). */
+  dense?: boolean;
 };
 
 function colClass<T>(c: Column<T>): string {
-  return [c.num || c.align === "right" ? "r" : "", c.num ? "num" : "", c.mono ? "mono" : ""].filter(Boolean).join(" ");
+  return [c.num || c.align === "right" ? "r" : "", c.num ? "num" : "", c.mono ? "mono" : "", c.hideBelow ? `lt-hb-${c.hideBelow}` : ""].filter(Boolean).join(" ");
 }
 
 function SkeletonBody<T>({ columns, rows }: { columns: Column<T>[]; rows: number }) {
@@ -74,7 +83,7 @@ function SkeletonBody<T>({ columns, rows }: { columns: Column<T>[]; rows: number
       {Array.from({ length: rows }, (_, r) => (
         <tr key={r} className="lt-skel" aria-hidden="true">
           {columns.map((c, i) => (
-            <td key={c.key}>
+            <td key={c.key} className={colClass(c) || undefined}>
               <span className={`sk sk-${w[(r + i) % w.length]}`} />
             </td>
           ))}
@@ -100,6 +109,7 @@ export function DataTable<T>({
   stale: staleProp,
   caption,
   skeletonRows = 6,
+  dense,
 }: Props<T>) {
   const router = useRouter();
   const offline = useOffline();
@@ -193,11 +203,11 @@ export function DataTable<T>({
   return (
     <div className={`lt-card${stale ? " is-stale" : ""}`} aria-busy={isLoading || undefined}>
       <div className="lt-scroll">
-        <table className="lt">
+        <table className={dense ? "lt lt-dense" : "lt"}>
           <caption className="sr-only">{caption}</caption>
           <colgroup>
             {widths.map((w, i) => (
-              <col key={columns[i].key} style={w === "auto" ? undefined : { width: w }} />
+              <col key={columns[i].key} className={columns[i].hideBelow ? `lt-hb-${columns[i].hideBelow}` : undefined} style={w === "auto" ? undefined : { width: w }} />
             ))}
           </colgroup>
           <thead>

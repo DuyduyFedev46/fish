@@ -11,7 +11,7 @@ from urllib.parse import parse_qs, urlparse
 
 from playwright.sync_api import sync_playwright
 
-BASE = os.environ.get("BASE", "http://127.0.0.1:3217")
+BASE = os.environ.get("BASE", "http://127.0.0.1:3201")
 SHOTS = os.environ.get("SHOTS", "/tmp")
 results = []
 
@@ -77,23 +77,37 @@ def f14(browser, tag, w, h):
 
 
 # ---------------------------------------------------------------- Lô 3 L4
-def open_card(page, code):
-    card = page.locator("[class*='queueCard']", has_text=code)
-    card.first.wait_for(timeout=10_000)
-    card.first.click()
+# Giao diện ERP mới (ED-15): hàng chờ là bảng, mở đơn ra TRANG chi tiết (không còn thẻ + hộp thoại), hành động phụ nằm trong
+# menu "Thao tác khác", mỗi hành động mở một hộp thoại riêng. Ý kiểm cũ giữ nguyên, chỉ đổi cách thao tác.
+def open_row(page, code):
+    row = page.locator("table.lt tbody tr", has_text=code)
+    row.first.wait_for(timeout=10_000)
+    row.first.locator("a").first.click()
+    page.get_by_role("heading", name=code).wait_for(timeout=10_000)
+    page.wait_for_load_state("networkidle")
+    page.wait_for_timeout(300)
+
+
+def open_more_item(page, name):
+    page.get_by_role("button", name="Thao tác khác").click()
+    page.get_by_role("menuitem", name=name).click()
     modal = page.get_by_role("dialog")
     modal.wait_for(timeout=10_000)
-    page.wait_for_timeout(500)
+    page.wait_for_timeout(400)
     return modal
 
 
 def check_stale(page, modal, tag, what, submit_btn):
-    alert = page.get_by_test_id("confirmation-stale-alert")
+    # Hộp thoại mới: lỗi 409 hiện trong hộp (role=alert); nút gửi được THAY bằng "Tải lại", các ô nhập bị khoá.
+    alert = modal.get_by_role("alert").first
     alert.wait_for(timeout=10_000)
     ok(f"L4[{tag}] {what}: hiện đúng `detail` của BE", "Đơn đã bị huỷ — tải lại màn hình." in alert.inner_text(), alert.inner_text().replace("\n", " | "))
-    reload_btn = alert.get_by_role("button", name="Tải lại")
-    ok(f"L4[{tag}] {what}: có nút Tải lại (cao >= 44px)", reload_btn.count() == 1 and reload_btn.bounding_box()["height"] >= 43.5)
-    ok(f"L4[{tag}] {what}: nút gửi của biểu mẫu bị khoá (không gửi lại)", submit_btn.is_disabled())
+    reload_btn = modal.get_by_role("button", name="Tải lại")
+    min_h = 43.5 if page.viewport_size["width"] < 768 else 30  # >= 44px trên điện thoại; cỡ gọn của bộ nút ERP trên máy tính
+    ok(f"L4[{tag}] {what}: có nút Tải lại (cao >= {int(min_h + 0.5)}px)", reload_btn.count() == 1 and reload_btn.bounding_box()["height"] >= min_h)
+    fields = modal.locator("input:not([type=hidden]), textarea")
+    locked = fields.count() > 0 and all(fields.nth(i).is_disabled() for i in range(fields.count()))
+    ok(f"L4[{tag}] {what}: nút gửi của biểu mẫu bị khoá (không gửi lại)", submit_btn.count() == 0 and locked, f"nút gửi còn {submit_btn.count()}, ô nhập khoá={locked}")
     box = alert.bounding_box()
     vp = page.viewport_size
     ok(f"L4[{tag}] {what}: cảnh báo nằm trong khung nhìn", box and box["y"] >= 0 and box["y"] + box["height"] <= vp["height"], str(box))
@@ -107,10 +121,10 @@ def confirmation_case(browser, tag, w, h):
     login(page, "cs1")
     page.goto(BASE + "/confirmation/")
     page.wait_for_load_state("networkidle")
-    modal = open_card(page, "DH-260928-0030")
+    open_row(page, "SO260928-B27C30")
     page.evaluate("() => window.__caveMock.confirmationArmStale(30)")
-    modal.get_by_role("button", name="Đổi người nhận / địa chỉ").click()
-    modal.get_by_placeholder("VD: Anh Minh (nhận hộ)").fill("Người Nhận Thử")
+    modal = open_more_item(page, "Đổi người nhận / địa chỉ")
+    modal.get_by_label("Tên người nhận").fill("Người Nhận Thử")
     submit = modal.get_by_role("button", name="Lưu thay đổi")
     submit.click()
     alert, reload_btn = check_stale(page, modal, tag, "đổi người nhận", submit)
@@ -118,7 +132,10 @@ def confirmation_case(browser, tag, w, h):
     reload_btn.click()
     page.wait_for_timeout(700)
     page.wait_for_load_state("networkidle")
-    ok(f"L4[{tag}] đổi người nhận: Tải lại đóng hộp thoại, phiếu rời hàng chờ", page.get_by_role("dialog").count() == 0 and page.locator("[class*='queueCard']", has_text="DH-260928-0030").count() == 0)
+    page.get_by_role("link", name="Gọi xác nhận").first.click()
+    page.wait_for_load_state("networkidle")
+    page.locator("table.lt tbody tr").first.wait_for(timeout=10_000)
+    ok(f"L4[{tag}] đổi người nhận: Tải lại đóng hộp thoại, phiếu rời hàng chờ", page.get_by_role("dialog").count() == 0 and page.locator("table.lt tbody tr", has_text="SO260928-B27C30").count() == 0)
     ctx.close()
 
     # --- huỷ xác nhận (phiếu đã sang Soạn hàng)
@@ -127,13 +144,15 @@ def confirmation_case(browser, tag, w, h):
     page.goto(BASE + "/confirmation/")
     page.wait_for_load_state("networkidle")
     page.evaluate("() => window.__caveMock.confirmationSetStatus(36, 'PREPARING')")
-    page.get_by_role("button", name="Chờ gọi").first.click()
-    page.wait_for_timeout(600)
-    modal = open_card(page, "DH-260928-0036")
+    # đổi trạng thái giả rồi mở bằng điều hướng trong ứng dụng (tải lại trang sẽ làm mất trạng thái giả)
+    page.evaluate("() => window.next.router.push('/confirmation/detail/?id=36')")
+    page.get_by_role("heading", name="SO260928-E83D36").wait_for(timeout=10_000)
+    page.wait_for_load_state("networkidle")
+    page.wait_for_timeout(300)
     page.evaluate("() => window.__caveMock.confirmationArmStale(36)")
-    modal.get_by_role("button", name="Huỷ xác nhận đơn").click()
-    modal.get_by_placeholder("VD: Bấm nhầm đơn, khách đổi giờ hẹn...").fill("Khách đổi ý về giờ giao")
-    submit = modal.get_by_role("button", name="Xác nhận huỷ")
+    modal = open_more_item(page, "Huỷ xác nhận đơn")
+    modal.get_by_label("Lý do", exact=False).fill("Khách đổi ý về giờ giao")
+    submit = modal.get_by_role("button", name="Huỷ xác nhận", exact=True)
     submit.click()
     alert, reload_btn = check_stale(page, modal, tag, "huỷ xác nhận", submit)
     page.screenshot(path=f"{SHOTS}/l4-{tag}-2-huy-xac-nhan-stale.png")
@@ -142,17 +161,20 @@ def confirmation_case(browser, tag, w, h):
     ok(f"L4[{tag}] huỷ xác nhận: Tải lại đóng hộp thoại", page.get_by_role("dialog").count() == 0)
     ctx.close()
 
-    # --- quyết định Quản lý (phiếu Cần quyết định)
+    # --- quyết định Quản lý (phiếu Cần quyết định). Giao diện mới chỉ cho Chủ / Quản lý quyết định (CSKH không có nút) nên đăng nhập ql1.
     ctx, page, logs = new_page(browser, w, h)
-    login(page, "cs1")  # mock không phân quyền quyết định; BE thật kiểm quyền Quản lý riêng
-    page.goto(BASE + "/confirmation/")
+    login(page, "ql1")
+    page.goto(BASE + "/confirmation/detail/?id=28")
+    page.get_by_role("heading", name="SO260928-A40F28").wait_for(timeout=10_000)
     page.wait_for_load_state("networkidle")
-    page.get_by_role("button", name="Cần quyết định").first.click()
-    page.wait_for_timeout(600)
-    modal = open_card(page, "DH-260928-0028")
     page.evaluate("() => window.__caveMock.confirmationArmStale(28)")
-    modal.get_by_placeholder("VD: Khách quen, địa chỉ đã giao nhiều lần...").fill("Khách quen giao nhiều lần")
-    submit = modal.get_by_role("button", name="Xác nhận chuyển soạn hàng")
+    page.get_by_role("button", name="Quyết định", exact=True).click()
+    modal = page.get_by_role("dialog")
+    modal.wait_for(timeout=10_000)
+    page.wait_for_timeout(400)
+    modal.locator("label", has_text="Giao không xác nhận").first.click()
+    modal.get_by_label("Lý do", exact=False).or_(modal.get_by_label("Ghi chú", exact=False)).first.fill("Khách quen giao nhiều lần")
+    submit = modal.get_by_role("button", name="Lưu quyết định")
     submit.click()
     alert, reload_btn = check_stale(page, modal, tag, "quyết định Quản lý", submit)
     page.screenshot(path=f"{SHOTS}/l4-{tag}-3-quyet-dinh-stale.png")
