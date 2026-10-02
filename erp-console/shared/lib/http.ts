@@ -11,6 +11,7 @@
 
 import { getToken } from "./token";
 import { MSG } from "./messages";
+import { stripRuleCodes } from "./ruleCodes";
 
 export const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8000";
 export const USE_MOCK = process.env.NEXT_PUBLIC_USE_MOCK === "1";
@@ -170,7 +171,7 @@ function detailOf(body: unknown): { detail?: string; code?: string; details?: un
   if (body && typeof body === "object") {
     const { detail, code, ...rest } = body as Record<string, unknown>;
     return {
-      detail: typeof detail === "string" ? detail : undefined,
+      detail: typeof detail === "string" ? stripRuleCodes(detail) : undefined,
       code: typeof code === "string" ? code : undefined,
       details: Object.keys(rest).length > 0 ? rest : undefined,
     };

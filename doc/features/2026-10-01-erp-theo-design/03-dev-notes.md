@@ -1673,6 +1673,22 @@ Quyết định ghi lại:
 
 Kiểm (chạy lượt này, worktree C): `npx tsc --noEmit` sạch; `npx vitest run` 61 file, 635 test pass; build MOCK=1 và MOCK=0 đều biên dịch; `check-no-mock` XANH; `check-ai-chunks` XANH (21 màn + 2 layout); `ed_batch10_purchasing` mock 112/112 và có Django thật 129/129 (thêm ca B4/B5 gọi BE thật: không có request nhập lô nào được gửi khi giá/số kg sai); `qa_ed_batch10_mock` 31/32 (ca còn lại là kỳ vọng cũ nói trên); `sr07_receive_batches_draft` 20/20; `sr07_qa_edges` 23/23; `ed_batch1_shell` 56/56; `ed_batch7_inventory` 114/114; `check_naming` không phát sinh mới; 0 màu hard-code.
 Ảnh: `/private/tmp/claude-501/-Users-dangthiduyen-Downloads-loc/027d854a-5d5b-47c2-aa50-91d0c28d6319/scratchpad/shots/l10-fix-mobile-form-errors.png` (360px, lỗi dưới từng ô).
+### Sửa sau QA Lô 10 FE lần 2 (N1, N2) — 02/10
+Chỉ sửa `erp-console/`. Đã merge `main` (BE Lô 10 sửa B1–B3 và giới hạn `rate`) vào `ed-stream-c`.
+
+| Mã | Đã sửa |
+|---|---|
+| N1 (Medium) | Ô Giá mua của phiếu nhập giới hạn **10 chữ số** (tối đa 9.999.999.999), khớp BE vừa chặn `rate` ở 10 chữ số phần nguyên (cột giá vốn lô `landed_unit_cost`). `features/accounting/money.ts` thêm `RATE_MAX_DIGITS = 10` và tham số `maxDigits` cho `parseMoney`, `moneyIssue`, `moneyMessage`, `moneyBody`; câu lỗi nêu đúng giới hạn: "Giá mua quá lớn, tối đa 10 chữ số (9.999.999.999)." Form nhập lô (`receiveValidation.ts`) dùng 10 chữ số cho cả kiểm lẫn dựng body. Có test ở `money.test.ts`, `receiveValidation.test.ts`. |
+| N2 (Low) | Mới `shared/lib/ruleCodes.ts` (`stripRuleCodes`, có test): bỏ "(BR-MH-07)" và mã trần "BR-xx-nn" khỏi câu lỗi BE. Gọi một chỗ trong `detailOf` của `shared/lib/http.ts` nên mọi màn ERP đều hưởng; mã vẫn nằm ở `ApiError.code`. Có test ở `http.test.ts` (message sạch, code giữ nguyên). |
+
+Rà giới hạn các ô tiền khác bằng cách gọi BE thật (Django SQLite, DB sạch):
+- Số tiền hoá đơn mua: 999.999.999.999 (12 chữ số) trả 201, 1.000.000.000.000 trả 400. FE giữ 12 chữ số, khớp.
+- Tổng chi phí mua và phần chia theo lô: BE thật trả **500** (`decimal.InvalidOperation`) khi chi phí chia vào một lô làm giá vốn/kg vượt 10 chữ số phần nguyên, ví dụ chia 9.999.999.999 đ vào lô 1 kg (999.999.999 thì 201). Cùng gốc với N1 (`Batch.landed_unit_cost` 14 chữ số, 4 số lẻ) nhưng ở API chi phí, **BE chưa chặn**. FE chưa thể kiểm chính xác vì giới hạn phụ thuộc cả số kg của lô lẫn giá nhập; nên giữ 12 chữ số ở ô chi phí như cũ và nêu cho điều phối viên (đề xuất BE trả 400 theo field `allocations`). Không ảnh hưởng thực tế: chi phí hơn 10 tỷ đ cho một lô không có trong vận hành.
+
+Kiểm (chạy lượt này, worktree C, sau merge `main`): `npx tsc --noEmit` sạch; `npx vitest run` 65 file, 717 test pass; build MOCK=1 và MOCK=0 biên dịch; `check-no-mock` XANH; `check-ai-chunks` XANH (29 màn + 2 layout); `ed_batch10_purchasing` 134/134 (kèm Django thật); `qa_ed_batch10_second_pass` 42/42; `qa_ed_batch10_real` 143/143; `qa_ed_batch10_mock` 33/33; `sr07_receive_batches_draft` 20/20; `sr07_qa_edges` 23/23; `ed_batch1_shell` 56/56; `ed_batch7_inventory` 114/114; 0 màu hard-code.
+Lưu ý khi chạy `qa_ed_batch10_real`: cần user `giao1` (delivery_staff) và `cs2` (customer_service) trong DB, và nâng `THROTTLE_LOGIN_IP`/`THROTTLE_LOGIN_USER` (mặc định 10/min làm 429 giữa chừng). Ca "phản hồi API không có SĐT" từng đỏ ngẫu nhiên vì chuỗi hex của token DRF có thể chứa 10 chữ số bắt đầu bằng 0; nên đổi regex của script QA (chặn theo ranh giới số hoặc loại token khỏi phép quét).
+`check_naming` đang báo `client_kho` trong `backend/apps/purchasing/receipts/tests/test_nhap_lo.py` (commit BE `9c727c0` trên `main`, không thuộc FE).
+
 ## Lô 9 — FE (Hàng hoàn về kho ED-26) — 02/10
 
 **Trang và hộp đã làm (tất cả trong `erp-console/`):**

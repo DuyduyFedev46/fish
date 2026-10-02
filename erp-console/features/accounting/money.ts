@@ -6,27 +6,30 @@ import { vnd } from "@/shared/lib/format";
 /** BE lưu tiền DecimalField(max_digits=14, decimal_places=2) nên phần nguyên tối đa 12 chữ số (999.999.999.999 đ). */
 export const MONEY_MAX_DIGITS = 12;
 
-const MONEY = new RegExp(`^\\d{1,${MONEY_MAX_DIGITS}}$`);
+/** Giá mua/kg của phiếu nhập: tối đa 10 chữ số phần nguyên, khớp cột giá vốn lô (Batch.landed_unit_cost, max_digits=14, 4 số lẻ); BE trả 400 nếu vượt (QA Lô 10 N1). */
+export const RATE_MAX_DIGITS = 10;
+
+const digitsPattern = (maxDigits: number) => new RegExp(`^\\d{1,${maxDigits}}$`);
 
 /** Đơn vị tiền trong ô nhập (lấy từ vnd() để không viết tay hậu tố tiền). */
 export const CURRENCY_UNIT = vnd(0).replace(/^[\d.,\s]+/, "");
 
 /** "1.650.000" → 1650000; rỗng, chữ, âm hay quá 12 chữ số → null. Không bao giờ làm tròn. */
-export function parseMoney(text: string): number | null {
+export function parseMoney(text: string, maxDigits: number = MONEY_MAX_DIGITS): number | null {
   const digits = text.replace(/\./g, "");
-  return MONEY.test(digits) ? Number(digits) : null;
+  return digitsPattern(maxDigits).test(digits) ? Number(digits) : null;
 }
 
 export type MoneyIssue = "empty" | "negative" | "too_long" | "invalid";
 
 /** Lý do một ô tiền không dùng được; `null` = hợp lệ (kể cả số 0). */
-export function moneyIssue(text: string): MoneyIssue | null {
+export function moneyIssue(text: string, maxDigits: number = MONEY_MAX_DIGITS): MoneyIssue | null {
   const raw = text.trim();
   if (raw === "") return "empty";
   if (/[-−]/.test(raw)) return "negative";
   const digits = raw.replace(/\./g, "");
   if (!/^\d+$/.test(digits)) return "invalid";
-  if (!MONEY.test(digits)) return "too_long";
+  if (!digitsPattern(maxDigits).test(digits)) return "too_long";
   return null;
 }
 
@@ -37,20 +40,28 @@ export type MoneyRule = {
   allowEmpty?: boolean;
   /** Phải lớn hơn 0 (kể cả khi gõ "0"). Mặc định: cho phép 0. */
   positive?: boolean;
+  /** Số chữ số phần nguyên tối đa. Mặc định MONEY_MAX_DIGITS (12). */
+  maxDigits?: number;
 };
+
+/** Số lớn nhất ghi bằng chữ số có dấu chấm nghìn: 10 chữ số → "9.999.999.999". */
+function maxMoneyText(maxDigits: number): string {
+  return "9".repeat(maxDigits).replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+}
 
 /** Câu báo tiếng Việt dưới ô (nói cách sửa), hoặc `null` khi hợp lệ. */
 export function moneyMessage(text: string, rule: MoneyRule = {}): string | null {
   const noun = rule.noun ?? "Số tiền";
-  const issue = moneyIssue(text);
+  const maxDigits = rule.maxDigits ?? MONEY_MAX_DIGITS;
+  const issue = moneyIssue(text, maxDigits);
   if (issue === "empty") {
     if (rule.allowEmpty) return null;
     return rule.positive ? `Nhập ${noun.toLowerCase()} lớn hơn 0.` : `Nhập ${noun.toLowerCase()}.`;
   }
   if (issue === "negative") return `${noun} không được âm. Nhập lại, ví dụ 150.000.`;
-  if (issue === "too_long") return `${noun} quá lớn, tối đa ${MONEY_MAX_DIGITS} chữ số (999.999.999.999).`;
+  if (issue === "too_long") return `${noun} quá lớn, tối đa ${maxDigits} chữ số (${maxMoneyText(maxDigits)}).`;
   if (issue === "invalid") return `${noun} chỉ gồm chữ số. Nhập lại, ví dụ 150.000.`;
-  if (rule.positive && parseMoney(text) === 0) {
+  if (rule.positive && parseMoney(text, maxDigits) === 0) {
     return rule.allowEmpty ? `${noun} phải lớn hơn 0, hoặc để trống nếu chưa có.` : `Nhập ${noun.toLowerCase()} lớn hơn 0.`;
   }
   return null;
@@ -61,8 +72,8 @@ export function moneyMessage(text: string, rule: MoneyRule = {}): string | null 
  * NÉM LỖI khi ô trống hoặc không hợp lệ: không có đường nào đổi giá trị lỗi thành "0".
  * Người gọi phải kiểm bằng `moneyMessage` trước (và tự quyết ô trống nghĩa là gì).
  */
-export function moneyBody(text: string): string {
-  const n = parseMoney(text);
-  if (n === null) throw new Error(`Số tiền không hợp lệ, không gửi: ${moneyIssue(text) ?? "invalid"}`);
+export function moneyBody(text: string, maxDigits: number = MONEY_MAX_DIGITS): string {
+  const n = parseMoney(text, maxDigits);
+  if (n === null) throw new Error(`Số tiền không hợp lệ, không gửi: ${moneyIssue(text, maxDigits) ?? "invalid"}`);
   return String(n);
 }

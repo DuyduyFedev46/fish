@@ -1,6 +1,6 @@
 // Kiểm form Nhập lô tại cảng (F1a) trước khi gửi, và dựng body gửi BE. Hàm thuần.
 // ED-20-AC3: số kg không hợp lệ báo NGAY DƯỚI ô. QA Lô 10 B5: giá mua lỗi báo dưới ô và không gửi, không tự đổi thành 0.
-import { moneyBody, moneyMessage } from "@/features/accounting/money";
+import { moneyBody, moneyMessage, RATE_MAX_DIGITS } from "@/features/accounting/money";
 import type { ReceiveBatchesLineInput } from "./types";
 
 export const QTY_MESSAGE = "Nhập số kg lớn hơn 0.";
@@ -29,7 +29,7 @@ export function qtyMessage(value: string): string | null {
 
 /** Giá mua: để trống = chưa có giá (hợp lệ); đã nhập thì phải là số nguyên đồng lớn hơn 0. */
 export function rateMessage(value: string): string | null {
-  return moneyMessage(value, { noun: "Giá mua", allowEmpty: true, positive: true });
+  return moneyMessage(value, { noun: "Giá mua", allowEmpty: true, positive: true, maxDigits: RATE_MAX_DIGITS });
 }
 
 export type ReceiveFormErrors = Record<string, string>;
@@ -65,7 +65,7 @@ export function buildReceiveLines(lines: ReceiveBatchesLineInput[]): ReceiveBatc
     return {
       item_code: l.item_code,
       qty: String(Number(qty)),
-      rate: l.rate.trim() === "" ? "0.00" : moneyBody(l.rate),
+      rate: l.rate.trim() === "" ? "0.00" : moneyBody(l.rate, RATE_MAX_DIGITS),
       shelf_life_days: l.shelf_life_days ? Number(l.shelf_life_days) : null,
     };
   });

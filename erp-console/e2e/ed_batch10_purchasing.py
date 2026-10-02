@@ -370,7 +370,7 @@ def run_receive_form(browser, errors):
 
     # B5: giá mua âm / quá lớn / bằng 0 -> báo dưới ô, không gửi, không bao giờ thành 0 đ
     page.locator("input[name=qty-0]").fill("12.5")
-    for label, bad, expect in (("âm", "-5000", "không được âm"), ("14 chữ số", "99999999999999", "quá lớn"), ("bằng 0", "0", "lớn hơn 0")):
+    for label, bad, expect in (("âm", "-5000", "không được âm"), ("11 chữ số (N1)", "10000000000", "tối đa 10 chữ số"), ("12 chữ số (N1)", "999999999999", "tối đa 10 chữ số"), ("14 chữ số", "99999999999999", "quá lớn"), ("bằng 0", "0", "lớn hơn 0")):
         page.evaluate("() => window.__caveMock.clearLog()")
         rate0.fill("")
         page.wait_for_timeout(100)
@@ -383,6 +383,11 @@ def run_receive_form(browser, errors):
     rate0.fill("")
     page.wait_for_timeout(100)
     ok("F1a B5: xoá hẳn ô giá mua thì hết lỗi (trống = chưa có giá)", field_error(page, "rate-0") is None, str(field_error(page, "rate-0")))
+    rate0.type("9999999999")
+    page.wait_for_timeout(100)
+    ok("F1a N1: biên 10 chữ số (9.999.999.999) hợp lệ, không báo lỗi", field_error(page, "rate-0") is None and rate0.input_value() == "9.999.999.999", f"{field_error(page, 'rate-0')} {rate0.input_value()}")
+    rate0.fill("")
+    page.wait_for_timeout(100)
     rate0.type("80000")
     ok("F1a B5: nhập lại giá hợp lệ thì hết lỗi", field_error(page, "rate-0") is None and rate0.input_value() == "80.000", f"{field_error(page, 'rate-0')} {rate0.input_value()}")
 
@@ -595,7 +600,7 @@ def run_real(browser):
     page.locator("select[name='item-0']").select_option(index=1)
     page.locator("input[name='qty-0']").fill("12.5")
     # B5: giá mua sai (âm, 14 chữ số, 0) và số kg 0 -> không gửi gì lên BE thật, không biến thành rate "0"
-    for bad_rate in ("-5000", "99999999999999", "0"):
+    for bad_rate in ("-5000", "99999999999999", "999999999999", "10000000000", "0"):
         page.locator("input[name='rate-0']").fill(bad_rate)
         page.get_by_role("button", name="Ghi nhận phiếu nhập").click()
         page.wait_for_timeout(400)

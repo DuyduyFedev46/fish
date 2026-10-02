@@ -36,6 +36,17 @@ describe("moneyMessage", () => {
   });
 });
 
+describe("giới hạn số chữ số tuỳ chọn", () => {
+  it("maxDigits 10: 9.999.999.999 hợp lệ, 11 chữ số báo too_long và câu báo nêu đúng giới hạn", () => {
+    expect(moneyIssue("9.999.999.999", 10)).toBeNull();
+    expect(moneyIssue("10.000.000.000", 10)).toBe("too_long");
+    expect(moneyMessage("10.000.000.000", { noun: "Giá mua", maxDigits: 10 })).toBe("Giá mua quá lớn, tối đa 10 chữ số (9.999.999.999).");
+    expect(moneyMessage("1.000.000.000.000", { noun: "Số tiền" })).toBe("Số tiền quá lớn, tối đa 12 chữ số (999.999.999.999).");
+    expect(moneyBody("9.999.999.999", 10)).toBe("9999999999");
+    expect(() => moneyBody("10.000.000.000", 10)).toThrow();
+  });
+});
+
 describe("moneyBody", () => {
   it("giá trị hợp lệ → số nguyên đồng; giá trị lỗi → ném lỗi, không bao giờ '0'", () => {
     expect(moneyBody("1.650.000")).toBe("1650000");

@@ -28,6 +28,14 @@ describe("rateMessage (QA Lô 10 B5)", () => {
     expect(rateMessage("99.999.999.999.999")).toContain("quá lớn");
     expect(rateMessage("0")).toContain("lớn hơn 0");
   });
+  it("giới hạn 10 chữ số (QA Lô 10 N1): 9.999.999.999 được, 10.000.000.000 và 999.999.999.999 báo lỗi, không gửi", () => {
+    expect(rateMessage("9.999.999.999")).toBeNull();
+    expect(rateMessage("10.000.000.000")).toBe("Giá mua quá lớn, tối đa 10 chữ số (9.999.999.999).");
+    expect(rateMessage("999.999.999.999")).toContain("tối đa 10 chữ số");
+    expect(buildReceiveLines([line({ rate: "9.999.999.999" })])[0].rate).toBe("9999999999");
+    expect(() => buildReceiveLines([line({ rate: "10.000.000.000" })])).toThrow();
+    expect(validateReceiveForm({ supplierId: 1, lines: [line({ rate: "999.999.999.999" })] })).toHaveProperty("rate-0");
+  });
 });
 
 describe("validateReceiveForm", () => {
