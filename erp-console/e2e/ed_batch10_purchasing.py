@@ -145,7 +145,7 @@ def run_owner(browser, errors):
     heads = [squash(h) for h in page.locator("table thead th").all_inner_texts()]
     ok("Chủ: cột Tiền mua có (khoá) và Hoá đơn có", any(h.startswith("Tiền mua") for h in heads) and any(h.startswith("Hoá đơn") for h in heads), str(heads))
     ok("Chủ: tên cột theo bảng thiết kế: Mã phiếu, Số kg, Hoá đơn mua", any(h.startswith("Mã phiếu") for h in heads) and any(h.startswith("Số kg") for h in heads) and any(h.startswith("Hoá đơn mua") for h in heads), str(heads))
-    title = squash(page.locator("[data-testid=receipt-table-title]").inner_text())
+    title = squash(page.locator(".lt-head").inner_text())
     ok("Chủ: dòng tiêu đề thẻ bảng 'Phiếu nhập 17 phiếu · … kg'", title.startswith("Phiếu nhập 17 phiếu · ") and title.endswith(" kg"), title)
     row104 = page.locator("table tbody tr", has_text="PR-104").first
     ok("Chủ: PR-104 hiện tiền mua 7.620.000 đ và trạng thái Nháp", "7.620.000 đ" in row104.inner_text() and "Nháp" in row104.inner_text(), row104.inner_text())

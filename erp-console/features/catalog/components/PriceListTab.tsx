@@ -39,8 +39,8 @@ export function PriceListTab({ tabs }: { tabs: React.ReactNode }) {
   const columns: Column<ItemPrice>[] = [
     { key: "item", header: M.colPriceItem, render: (r) => r.item_name },
     { key: "rate", header: M.colPriceRate, num: true, render: (r) => money(r.rate) },
-    { key: "from", header: M.colPriceFrom, num: true, render: (r) => dateOnly(r.valid_from) },
-    { key: "upto", header: M.colPriceUpto, num: true, render: (r) => (r.valid_upto ? dateOnly(r.valid_upto) : <span className="muted">{M.none}</span>) },
+    { key: "from", header: M.colPriceFrom, tabular: true, render: (r) => dateOnly(r.valid_from) },
+    { key: "upto", header: M.colPriceUpto, tabular: true, render: (r) => (r.valid_upto ? dateOnly(r.valid_upto) : <span className="muted">{M.none}</span>) },
   ];
 
   const optionsReady = items.status === "ok" && lists.status === "ok";
@@ -109,6 +109,8 @@ export function PriceListTab({ tabs }: { tabs: React.ReactNode }) {
     >
       <DataTable
         caption={M.pricesCaption}
+        title={M.pricesTitle}
+        countText={rows ? M.pricesHeadCount(list.count) : undefined}
         columns={columns}
         rows={rows ?? null}
         rowKey={(r) => r.id}

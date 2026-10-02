@@ -18,7 +18,6 @@ import { Chip } from "@/shared/ui/Chip";
 import { Icon } from "@/shared/ui/Icon";
 import { DataTable, type Column } from "@/shared/ui/list/DataTable";
 import { FilterBar } from "@/shared/ui/list/FilterBar";
-import { Section } from "@/shared/ui/detail/Section";
 import { ListPage } from "@/shared/ui/list/ListPage";
 import { useToast } from "@/shared/ui/overlay/Toast";
 import { NoPermission } from "@/shared/ui/states/NoPermission";
@@ -59,7 +58,7 @@ export function StaffScreen() {
     { key: "phone", header: M.colPhone, mono: true, hideBelow: 800, render: (r) => r.phone || <span className="muted">—</span> },
     { key: "groups", header: M.colGroups, render: (r) => <GroupTags groups={r.groups} /> },
     { key: "status", header: M.colStatus, render: (r) => <Chip table={ENUMS.staffStatus} value={r.is_active ? "ACTIVE" : "INACTIVE"} /> },
-    { key: "last", header: M.colLastLogin, num: true, hideBelow: 980, render: (r) => (r.last_login ? dateTime(r.last_login) : <span className="muted">{M.neverLoggedIn}</span>) },
+    { key: "last", header: M.colLastLogin, tabular: true, hideBelow: 980, render: (r) => (r.last_login ? dateTime(r.last_login) : <span className="muted">{M.neverLoggedIn}</span>) },
   ];
 
   const groupCols: Column<GroupSummary>[] = [
@@ -115,6 +114,8 @@ export function StaffScreen() {
       <div className={s.pageStack}>
         <DataTable
           caption={M.listTitle}
+          title={M.listTitle}
+          countText={shown ? M.headCount(shown.length) : undefined}
           columns={columns}
           rows={shown}
           rowKey={(r) => r.id}
@@ -140,9 +141,11 @@ export function StaffScreen() {
         />
 
         {showGroups && groups.status !== "forbidden" && (
-          <Section title={M.groupsTitle} count={groups.data ? groups.data.length : undefined} aria-label={M.groupsTitle} flush>
+          <section aria-label={M.groupsTitle}>
             <DataTable
               caption={M.groupsCaption}
+              title={M.groupsTitle}
+              countText={groups.data ? String(groups.data.length) : undefined}
               columns={groupCols}
               rows={groups.data}
               rowKey={(g) => g.code}
@@ -155,7 +158,7 @@ export function StaffScreen() {
               canViewCost={false}
               dense
             />
-          </Section>
+          </section>
         )}
       </div>
 

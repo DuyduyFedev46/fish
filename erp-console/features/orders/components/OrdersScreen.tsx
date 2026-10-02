@@ -77,7 +77,7 @@ export function OrdersScreen() {
       render: (o) => reasonText(o.reason, effectiveOrderStatus(o.status, o.reserved_until, now)) ?? <span className="muted">—</span>,
     },
     { key: "total", header: M.colTotal, num: true, render: (o) => vnd(o.total_amount) },
-    { key: "time", header: M.colTime, num: true, render: (o) => dateTime(o.created_at) },
+    { key: "time", header: M.colTime, tabular: true, render: (o) => dateTime(o.created_at) },
   ];
 
   const filtered = !!(status || qDeb || params.date_from || params.date_to);

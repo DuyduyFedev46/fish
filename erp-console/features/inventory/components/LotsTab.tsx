@@ -136,6 +136,8 @@ export function LotsTab({ tabs, me }: { tabs: React.ReactNode; me: Me }) {
       }
     >
       <DataTable
+        title="Tồn theo lô"
+        countText={rows && list.count >= 0 ? `${list.count} lô` : undefined}
         columns={columns}
         rows={rows}
         rowKey={(r) => r.id}
@@ -165,14 +167,15 @@ function RecentLedger() {
   const res = useResource("inventory:recent-ledger", () => fetchLedger({}, 1), 0);
   const rows = res.data ? res.data.results.slice(0, RECENT_LEDGER_ROWS) : null;
   return (
-    <section className={s.panel} aria-label="Nhập xuất gần đây">
-      <div className={s.panelHead}>
-        <h3 className={s.panelTitle}>Nhập xuất gần đây</h3>
-        <Link href="/ledger/" className={s.panelLink}>
-          Xem sổ nhập xuất
-        </Link>
-      </div>
+    <section aria-label="Nhập xuất gần đây">
       <LedgerTable
+        title="Nhập xuất gần đây"
+        countText={rows ? `${rows.length} lần` : undefined}
+        headAction={
+          <Link href="/ledger/" className={s.panelLink}>
+            Xem sổ nhập xuất
+          </Link>
+        }
         rows={rows}
         loading={res.loading && !res.data}
         error={res.error && !res.data ? loadErrorText(res.error) : null}

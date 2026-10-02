@@ -554,6 +554,13 @@ table.data tbody tr.empty-row td{white-space:normal;border-bottom:1px solid var(
 .lp-head{display:flex;align-items:center;justify-content:space-between;gap:var(--space-3)}
 .lp-head h2{font-size:var(--text-lg)}
 .lp-actions{display:flex;align-items:center;gap:var(--space-2);margin-left:auto}
+/* Nút chính cùng hàng tab (bên phải) hoặc cuối hàng thanh lọc, như board */
+.lp-tabrow{display:flex;align-items:center;gap:var(--space-3);border-bottom:1px solid var(--border);flex-wrap:wrap}
+.lp-tabrow .tabs{flex:1 1 auto;min-width:0;border-bottom:0}
+.lp-tabrow .tab{margin-bottom:0}
+.lp-tabrow .lp-actions{padding-bottom:var(--space-1)}
+.lp-filterrow{display:flex;align-items:center;gap:var(--space-3);flex-wrap:wrap}
+.lp-filterrow > :first-child{flex:1 1 auto;min-width:0}
 .lp-foot{display:flex;align-items:center;justify-content:center;gap:var(--space-3);color:var(--ink-3);font-size:var(--text-sm)}
 
 /* Thanh lọc */
@@ -564,14 +571,27 @@ table.data tbody tr.empty-row td{white-space:normal;border-bottom:1px solid var(
 .fb-select select{appearance:none;-webkit-appearance:none;height:32px;padding:0 calc(var(--space-2-5) + 20px) 0 var(--space-2-5);border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);color:var(--ink);font:inherit;font-size:var(--text-sm)}
 .fb-select .mi{position:absolute;right:var(--space-2);font-size:16px;color:var(--ink-3);pointer-events:none}
 .fb-dates{display:inline-flex;align-items:center;gap:var(--space-1-5);color:var(--ink-3)}
-.fb-dates input{height:32px;padding:0 var(--space-2);border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);color:var(--ink);font:inherit;font-size:var(--text-sm)}
+.fb-date{display:inline-flex;align-items:center;gap:var(--space-1-5);height:32px;padding:0 var(--space-2);border:1px solid var(--border-strong);border-radius:var(--radius-sm);background:var(--surface);color:var(--ink)}
+.fb-date:focus-within{outline:2px solid var(--accent);outline-offset:1px}
+.fb-date-ic{display:inline-flex;color:var(--ink-3);cursor:pointer}
+.fb-date-ic .mi{font-size:16px}
+.fb-date input{height:30px;padding:0;border:0;outline:0;background:transparent;color:inherit;font:inherit;font-size:var(--text-sm);font-variant-numeric:tabular-nums;color-scheme:light dark}
+.fb-date input::-webkit-calendar-picker-indicator{display:none}
 .fb-summary{margin-left:auto;font-size:var(--text-sm);color:var(--ink-3);font-variant-numeric:tabular-nums}
 @media (max-width:767px){
   .fb .fb-search{flex:1 1 100%;min-height:var(--tap)}
   .fb .fb-search input{height:var(--tap);margin:-1px 0;font-size:var(--text-input)}
-  .fb-select select,.fb-dates input{height:var(--tap)}
+  .fb-select select{height:var(--tap)}
+  .fb-date{height:var(--tap)}
+  .fb-date input{height:var(--tap);margin:-1px 0;font-size:var(--text-input)}
   .fb-summary{margin-left:0;flex:1 1 100%}
 }
+
+/* Đầu thẻ 44px: tiêu đề + bộ đếm (board W5a, W2a…) */
+.lt-head{height:44px;padding:0 var(--space-4);display:flex;align-items:center;justify-content:space-between;gap:var(--space-3);border-bottom:1px solid var(--border)}
+.lt-head h2{margin:0;font-size:var(--text-base);font-weight:var(--weight-semibold)}
+.lt-headend{display:inline-flex;align-items:center;gap:var(--space-4);min-width:0}
+.lt-count{font-size:var(--text-sm);color:var(--ink-3);font-variant-numeric:tabular-nums}
 
 /* Bảng danh sách: thẻ trắng viền mảnh, tiêu đề cột trên nền canvas, dòng cao 44 */
 .lt-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;transition:opacity var(--dur-base) ease}

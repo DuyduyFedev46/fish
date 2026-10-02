@@ -26,7 +26,7 @@ pending person_add person_check person_off photo_camera price_check progress_act
 receipt_long refresh replay report rule schedule search search_off sell send set_meal shield_person shopping_bag
 shopping_cart sync sync_alt sync_problem task_alt timer timer_off two_wheeler undo visibility visibility_off
 warning wifi_off chat forward_to_inbox
-add admin_panel_settings arrow_back article assignment_return category content_copy delete_forever done handshake insights left_panel_close left_panel_open north_east person phone_in_talk play_arrow policy receipt remove_moderator request_quote smart_toy south_west storefront swap_vert
+add calendar_today admin_panel_settings arrow_back article assignment_return category content_copy delete_forever done handshake insights left_panel_close left_panel_open north_east person phone_in_talk play_arrow policy receipt remove_moderator request_quote smart_toy south_west storefront swap_vert
 """.split()))
 
 from fontTools.ttLib import TTFont

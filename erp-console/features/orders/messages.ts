@@ -171,6 +171,8 @@ export const ORDERS_MSG = {
 
   // ---- Danh sách hàng chờ thanh toán ----
   queueTitle: "Hàng chờ thanh toán",
+  queueHeadTitle: "Khoản tiền lệch",
+  queueHeadCount: (total: number) => `${total} khoản`,
   queueSearchLabel: "Tìm khoản tiền",
   queueNoun: "khoản tiền",
   queueOpenTab: "Chờ xử lý",
@@ -244,6 +246,7 @@ export const ORDERS_MSG = {
 
   // ---- Danh sách phiếu hoàn ----
   refundsListTitle: "Phiếu hoàn",
+  refundsHeadCount: (total: number) => `${total} phiếu`,
   refundsSearchLabel: "Tìm phiếu hoàn",
   refundsNoun: "phiếu hoàn",
   refundsFilterStatus: "Lọc theo trạng thái",

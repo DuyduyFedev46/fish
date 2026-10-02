@@ -122,6 +122,8 @@ export function LedgerScreen() {
       }
     >
       <LedgerTable
+        title="Biến động kho"
+        countText={rows && list.count >= 0 ? `${list.count} dòng` : undefined}
         rows={rows}
         loading={list.loading && !list.rows}
         error={list.error ? loadErrorText(list.error) : null}

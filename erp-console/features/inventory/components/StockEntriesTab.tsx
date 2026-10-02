@@ -46,7 +46,7 @@ export function StockEntriesTab({ tabs }: { tabs: React.ReactNode }) {
 
   const columns: Column<StockEntry>[] = [
     { key: "code", header: "Mã phiếu", mono: true, width: "112px", render: (r) => <span className={s.codeCell}>{r.code}</span> },
-    { key: "at", header: "Thời gian", num: true, width: "148px", render: (r) => dateTime(r.created_at) },
+    { key: "at", header: "Thời gian", tabular: true, width: "148px", render: (r) => dateTime(r.created_at) },
     { key: "purpose", header: "Mục đích", render: (r) => <Chip table={ENUMS.stockEntryPurpose} value={r.purpose} /> },
     {
       key: "batch",
@@ -103,6 +103,8 @@ export function StockEntriesTab({ tabs }: { tabs: React.ReactNode }) {
       }
     >
       <DataTable
+        title="Phiếu điều chỉnh tồn"
+        countText={rows ? `${list.count} phiếu` : undefined}
         columns={columns}
         rows={rows}
         rowKey={(r) => r.id}

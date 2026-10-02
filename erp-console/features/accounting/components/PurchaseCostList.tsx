@@ -14,6 +14,7 @@ import { dateOnly, todayInVietnam, vnd } from "@/shared/lib/format";
 import { usePagedList } from "@/shared/lib/usePagedList";
 import { matches } from "@/shared/lib/search";
 import { Chip } from "@/shared/ui/Chip";
+import { Icon } from "@/shared/ui/Icon";
 import { DataTable, type Column } from "@/shared/ui/list/DataTable";
 import { FilterBar } from "@/shared/ui/list/FilterBar";
 import { ListPage } from "@/shared/ui/list/ListPage";
@@ -53,7 +54,7 @@ export function PurchaseCostList({ tabs, canAdd, panelId = "purchasing-panel", h
     { key: "type", header: "Loại chi phí", render: (r) => <Chip table={ENUMS.purchaseCostType} value={r.cost_type} /> },
     { key: "amount", header: "Số tiền", num: true, locked: true, render: (r) => vnd(r.amount) },
     { key: "method", header: "Cách chia", render: (r) => <Chip table={ENUMS.purchaseCostAllocation} value={r.allocation_method} /> },
-    { key: "date", header: "Ngày phát sinh", num: true, width: "132px", render: (r) => dateOnly(r.incurred_date) },
+    { key: "date", header: "Ngày phát sinh", tabular: true, width: "132px", render: (r) => dateOnly(r.incurred_date) },
     { key: "lots", header: "Số lô được chia", num: true, render: (r) => r.batch_count },
     { key: "note", header: "Ghi chú", render: (r) => r.note || <span className="muted">—</span> },
   ];
@@ -65,7 +66,8 @@ export function PurchaseCostList({ tabs, canAdd, panelId = "purchasing-panel", h
       actions={
         canAdd ? (
           <Link href="/purchasing/costs/new/" className="btn primary" data-testid="add-cost">
-            Thêm chi phí phụ
+            <Icon name="add" />
+            <span>Thêm chi phí phụ</span>
           </Link>
         ) : undefined
       }
@@ -104,6 +106,8 @@ export function PurchaseCostList({ tabs, canAdd, panelId = "purchasing-panel", h
       }
     >
       <DataTable
+        title="Chi phí phụ"
+        countText={rows ? `${list.count} khoản` : undefined}
         columns={columns}
         rows={rows}
         rowKey={(r) => r.id}

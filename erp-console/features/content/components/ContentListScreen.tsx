@@ -123,7 +123,7 @@ export function ContentListScreen() {
         return note || <span className="muted">—</span>;
       },
     },
-    { key: "updated", header: M.colUpdated, num: true, hideBelow: 720, render: (r) => dateTime(r.updated_at) },
+    { key: "updated", header: M.colUpdated, tabular: true, hideBelow: 720, render: (r) => dateTime(r.updated_at) },
   ];
 
   return (
