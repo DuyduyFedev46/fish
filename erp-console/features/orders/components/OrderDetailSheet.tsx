@@ -1,0 +1,230 @@
+"use client";
+
+// Chi tiết một đơn trong tấm bên (S10): tải GET /api/sales/orders/{id}/, vẽ dòng hàng, phân bổ lô, thanh toán, giao hàng,
+// hoàn tiền, dòng thời gian. Nút thao tác CHỈ theo `available_actions` (FE không tự suy luật); L7 nối "confirm_payment"
+// (S11). Xác nhận xong: báo kết quả ngay trong tấm (theo `result` BE trả), tải lại chi tiết, sửa dòng trong danh sách,
+// và khi đóng tấm thì hiện thông báo nổi (chỉ với kết quả PAID).
+
+import { useCallback, useEffect, useRef, useState } from "react";
+import { ApiError, loadErrorText } from "@/shared/lib/http";
+import { SideSheet } from "@/shared/ui/SideSheet";
+import { ErrorBox } from "@/shared/ui/StateBox";
+import { getOrder } from "../api";
+import { ORDER_LABEL } from "../labels";
+import { ORDERS_MSG, QUEUE_MSG } from "../messages";
+import { refundableOfOrder } from "../refund";
+import type { CancelOrderResult, ConfirmPaymentResult, CreateRefundResult, OrderDetail, OrderListItem } from "../types";
+import { CancelOrderForm } from "./CancelOrderForm";
+import { ConfirmPaymentForm } from "./ConfirmPaymentForm";
+import { OrderDetailView } from "./OrderDetailView";
+import { RefundForm } from "./RefundForm";
+import s from "../orders.module.css";
+import { PersonalText } from "@/shared/ui/PersonalText";
+
+type Mode = "view" | "confirm" | "cancel" | "refund";
+/**
+ * `queueLink` = kèm liên kết tới hàng chờ thanh toán (khoản thiếu / về sau khi huỷ / chuyển thừa vào hàng chờ).
+ * `cancelSuggestRefund` = vừa huỷ đơn thành công → hiện ngay nút "Tạo phiếu hoàn toàn phần" điền sẵn số tiền (S14-AC7).
+ */
+export type ResultNote = { tone: "ok" | "warn"; text: string; duplicate: boolean; queueLink?: boolean; cancelSuggestRefund?: string };
+
+type Props = {
+  /** Dòng đã bấm trong danh sách — để có tiêu đề/tổng tiền ngay khi chi tiết đang tải. */
+  summary: OrderListItem;
+  /** Mở sẵn form xác nhận, huỷ hay hoàn tiền (vd ?open=refund). */
+  initialMode?: Mode;
+  /** Chi tiết đổi sau thao tác → sửa dòng trong danh sách; `toast` = câu hiện khi đóng tấm (nếu có). */
+  onChanged: (change: Partial<OrderListItem>, toast?: string) => void;
+  onClose: () => void;
+};
+
+function resultNote(r: ConfirmPaymentResult, code: string): ResultNote {
+  let text: string;
+  let tone: ResultNote["tone"] = "warn";
+  if (r.result === "PAID") {
+    tone = "ok";
+    text = ORDERS_MSG.resultPaid(code, r.delivery_note_code) + (r.overpaid_amount ? ORDERS_MSG.resultOverpaid(r.overpaid_amount) : "");
+  } else if (r.result === "UNDERPAID") {
+    text = ORDERS_MSG.resultUnder(r.paid_total || "0", r.missing || "0");
+  } else if (r.result === "ORPHAN") {
+    text = ORDERS_MSG.resultOrphan;
+  } else {
+    text = ORDERS_MSG.resultOther(ORDER_LABEL[r.order_status] || r.order_status);
+  }
+  return { tone, text, duplicate: r.duplicate, queueLink: !!r.overpaid_amount || r.result === "UNDERPAID" || r.result === "ORPHAN" };
+}
+
+export function OrderDetailSheet({ summary, initialMode = "view", onChanged, onClose }: Props) {
+  const [detail, setDetail] = useState<OrderDetail | null>(null);
+  const [error, setError] = useState<unknown>(null);
+  const [loading, setLoading] = useState(true);
+  const [mode, setMode] = useState<Mode>(initialMode);
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState<ResultNote | null>(null);
+  const [guidanceRefreshKey, setGuidanceRefreshKey] = useState(0);
+  const seq = useRef(0);
+  const noteRef = useRef<HTMLDivElement>(null);
+  const actionRef = useRef<HTMLButtonElement>(null);
+  const onChangedRef = useRef(onChanged);
+  onChangedRef.current = onChanged;
+
+  const load = useCallback(
+    async (after?: (d: OrderDetail) => void) => {
+      const id = ++seq.current;
+      setLoading(true);
+      setError(null);
+      try {
+        const d = await getOrder(summary.id);
+        if (id !== seq.current) return;
+        setDetail(d);
+        after?.(d);
+      } catch (err) {
+        if (id !== seq.current) return;
+        if (!(err instanceof ApiError && err.status === 401)) setError(err);
+      } finally {
+        if (id === seq.current) setLoading(false);
+      }
+    },
+    [summary.id],
+  );
+
+  useEffect(() => {
+    void load();
+    return () => {
+      seq.current += 1;
+    };
+  }, [load]);
+
+  // Có kết quả mới → đưa focus vào dòng báo để người dùng (và trình đọc màn hình) thấy ngay.
+  useEffect(() => {
+    if (note && mode === "view") noteRef.current?.focus();
+  }, [note, mode]);
+
+  const code = detail?.code || summary.code;
+  const title =
+    mode === "confirm"
+      ? ORDERS_MSG.confirmTitle(code)
+      : mode === "cancel"
+        ? ORDERS_MSG.cancelTitle(code)
+        : mode === "refund"
+          ? ORDERS_MSG.refundFromOrderTitle(code)
+          : `Đơn ${code}`;
+
+  const backToView = () => {
+    setMode("view");
+    requestAnimationFrame(() => actionRef.current?.focus());
+  };
+
+  const onConfirmed = (r: ConfirmPaymentResult) => {
+    const n = resultNote(r, code);
+    setNote(n);
+    setMode("view");
+    void load((d) => {
+      onChangedRef.current(
+        {
+          status: d.status,
+          status_label: d.status_label || ORDER_LABEL[d.status] || d.status,
+          reserved_until: d.reserved_until ?? null,
+          delivery_status: d.delivery ? d.delivery.status : null,
+        },
+        r.result === "PAID" && !r.duplicate ? n.text : undefined,
+      );
+    });
+  };
+
+  const onCancelled = (r: CancelOrderResult) => {
+    const text = ORDERS_MSG.cancelResult(code, r.stock_restored);
+    setNote({ tone: "warn", text, duplicate: false, cancelSuggestRefund: r.suggest_refund_amount });
+    setMode("view");
+    void load((d) => {
+      onChangedRef.current(
+        { status: d.status, status_label: d.status_label || ORDER_LABEL[d.status] || d.status, delivery_status: d.delivery ? d.delivery.status : null },
+        text,
+      );
+    });
+  };
+
+  const onRefundCreated = (r: CreateRefundResult) => {
+    const text = r.duplicate ? QUEUE_MSG.resultRefundDup(r.amount) : QUEUE_MSG.resultRefund(r.amount);
+    setNote({ tone: r.duplicate ? "warn" : "ok", text, duplicate: !!r.duplicate });
+    setMode("view");
+    void load(() => onChangedRef.current({}, text));
+  };
+
+  return (
+    <SideSheet title={title} onClose={onClose} busy={busy}>
+      {mode === "confirm" && detail ? (
+        <ConfirmPaymentForm
+          order={detail}
+          fallbackTotal={summary.total_amount}
+          onBusy={setBusy}
+          onCancel={backToView}
+          onDone={onConfirmed}
+          onError400={() => setGuidanceRefreshKey((k) => k + 1)}
+        />
+      ) : mode === "cancel" && detail ? (
+        <CancelOrderForm
+          order={detail}
+          onBusy={setBusy}
+          onCancel={backToView}
+          onDone={onCancelled}
+          onError400={() => setGuidanceRefreshKey((k) => k + 1)}
+        />
+      ) : mode === "refund" && detail?.invoice ? (
+        <RefundForm
+          target={{ kind: "invoice", id: detail.invoice.id, invoiceTotal: detail.total_amount ?? summary.total_amount }}
+          refundableMax={refundableOfOrder(detail)}
+          reasonDefault={detail.status === "CANCELLED" ? ORDERS_MSG.refundFromOrderReasonCancelled : ""}
+          subLabel={<>{detail.code} · <PersonalText value={detail.customer.name} whenEmpty="" /></>}
+          onBusy={setBusy}
+          onCancel={backToView}
+          onDone={onRefundCreated}
+        />
+      ) : detail ? (
+        <OrderDetailView
+          order={detail}
+          fallback={summary}
+          refreshing={loading}
+          refreshError={error ? loadErrorText(error) : null}
+          onRetry={() => void load()}
+          note={note}
+          noteRef={noteRef}
+          actionRef={actionRef}
+          guidanceRefreshKey={guidanceRefreshKey}
+          onAction={(a) => {
+            if (a === "confirm_payment") {
+              setNote(null);
+              setMode("confirm");
+            } else if (a === "cancel") {
+              setNote(null);
+              setMode("cancel");
+            } else if (a === "create_refund") {
+              setNote(null);
+              setMode("refund");
+            }
+          }}
+        />
+      ) : error ? (
+        <div className={s.pane}>
+          <ErrorBox
+            icon={error instanceof ApiError && error.status === 403 ? "lock" : undefined}
+            message={loadErrorText(error)}
+            onRetry={() => void load()}
+          />
+        </div>
+      ) : (
+        <div className={s.pane} role="status" aria-busy="true">
+          <span className="sr-only">{ORDERS_MSG.detailLoading}</span>
+          <div className={s.skel} aria-hidden="true">
+            <span className="sk sk-s" />
+            <span className={`sk sk-m ${s.skBig}`} />
+            <span className="sk sk-l" />
+            <span className="sk sk-m" />
+            <span className="sk sk-l" />
+            <span className="sk sk-s" />
+          </div>
+        </div>
+      )}
+    </SideSheet>
+  );
+}
