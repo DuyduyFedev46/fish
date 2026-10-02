@@ -27,6 +27,9 @@ const TARGETS = [
   ["/(console)/orders/detail/page", "/orders/detail"],
   ["/(console)/orders/payments/detail/page", "/orders/payments/detail"],
   ["/(console)/orders/refunds/detail/page", "/orders/refunds/detail"],
+  // Khách hàng (Lô 6): không có khối AI, dữ liệu cá nhân không đưa cho AI — phải xanh, không kéo runtime AI.
+  ["/(console)/customers/page", "/customers"],
+  ["/(console)/customers/detail/page", "/customers/detail"],
   ["/(console)/inventory/page", "/inventory"],
   ["/(console)/deliveries/page", "/deliveries"],
   ["/(console)/deliveries/detail/page", "/deliveries/detail"],

@@ -82,7 +82,7 @@ const GROUP_PERMS: Record<string, string[]> = {
     "sales.cancel_paid_order", "sales.change_customer", "sales.change_paymenttransaction", "sales.change_refund",
     "sales.change_salesinvoice", "sales.change_salesorder", "sales.confirm_payment_manual", "sales.confirm_refund",
     "sales.create_refund", "sales.delete_customer", "sales.delete_paymenttransaction", "sales.delete_refund",
-    "sales.view_customer", "sales.view_paymenttransaction", "sales.view_refund", "sales.view_salesinvoice",
+    "sales.view_customer", "sales.view_customer_list", "sales.view_paymenttransaction", "sales.view_refund", "sales.view_salesinvoice",
     "sales.view_salesinvoiceline", "sales.view_salesinvoicelinebatch", "sales.view_salesorder",
     "sales.view_salesorderline", "sales.view_salesorderlinebatch", "sales.view_privacy_consent",
     // CMS: BE migration content/0002 gán 8 quyền này cho owner và manager (warehouse_staff/delivery_staff không có).
@@ -105,7 +105,7 @@ const GROUP_PERMS: Record<string, string[]> = {
     "purchasing.change_purchasereceiptline", "purchasing.change_supplier", "purchasing.view_purchaseinvoice",
     "purchasing.view_purchasereceipt", "purchasing.view_purchasereceiptline", "purchasing.view_supplier",
     "reports.view_dashboard", "sales.add_customer", "sales.add_refund", "sales.cancel_paid_order",
-    "sales.change_customer", "sales.change_refund", "sales.create_refund", "sales.view_customer",
+    "sales.change_customer", "sales.change_refund", "sales.create_refund", "sales.view_customer", "sales.view_customer_list",
     "sales.view_paymenttransaction", "sales.view_refund", "sales.view_salesinvoice", "sales.view_salesinvoiceline",
     "sales.view_salesorder", "sales.view_salesorderline", "sales.view_privacy_consent",
     // CMS: BE migration content/0002 gán 8 quyền này cho owner và manager (warehouse_staff/delivery_staff không có).

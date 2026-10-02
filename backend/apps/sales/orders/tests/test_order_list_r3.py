@@ -293,6 +293,29 @@ class OrderPhoneFullTests(R3Base):
         body = client_for(self.owner).get(f"/api/sales/orders/{order.pk}/").json()
         self.assertEqual(body["customer"]["phone"], PHONE_A)
 
+    def test_order_detail_customer_id_for_people_who_see_the_order(self):
+        """Lô 6: ERP mở trang khách từ đơn. `customer.id` có khi dữ liệu khách hiện đủ."""
+        order = self._order(phone=PHONE_A, name="Khách Thử A")
+        for user in (self.owner, self.manager):
+            body = client_for(user).get(f"/api/sales/orders/{order.pk}/").json()
+            self.assertEqual(body["customer"]["id"], order.customer_id, user.username)
+
+    def test_order_detail_customer_id_hidden_when_personal_data_hidden(self):
+        """NV giao quá cửa sổ che dữ liệu khách: không có id (không dẫn tới hồ sơ khách)."""
+        import datetime
+
+        from django.utils import timezone
+
+        order = self._paid_order(phone=PHONE_A)
+        note = DeliveryNote.objects.get(sales_invoice__sales_order=order)
+        DeliveryNote.objects.filter(pk=note.pk).update(
+            assigned_to=self.courier, status=DeliveryNote.Status.COMPLETED,
+            completed_at=timezone.now() - datetime.timedelta(days=30),
+        )
+        resp = client_for(self.courier).get(f"/api/sales/orders/{order.pk}/")
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.json()["customer"], {"name": None, "phone": None, "address": None})
+
     def test_s37_courier_sees_phone_only_for_in_scope_order(self):
         order = self._paid_order(phone=PHONE_A)
         other = self._paid_order(phone=PHONE_B, txn="FT2626799990")

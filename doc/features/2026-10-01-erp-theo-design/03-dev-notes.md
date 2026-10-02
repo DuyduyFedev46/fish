@@ -1392,3 +1392,55 @@ Trong `doc/features/2026-10-01-erp-theo-design/shots-lo4/` (`*.png` bị `.gitig
 8. **Lệch BE (cần BE bổ sung hoặc PO bỏ):** (a) `get_lines` của BE chỉ trả `item_name, qty_kg, batch_id, expiry_date`, không có kho, nên cột "Kho" của bảng hàng soạn hiện "—" (FE đã đọc `warehouse_name` nếu BE thêm); (b) DeliveryNote chưa có mốc "Bắt đầu giao" nên khối tóm tắt F2l thiếu dòng này (ED-19-AC3) và AC2 "thời điểm Bắt đầu giao được ghi" chưa kiểm được; (c) chưa có mốc "Lúc" báo giao thất bại nên thẻ Giao thất bại thiếu trường "Lúc" (ED-19-AC5); thời điểm vẫn xem được ở dòng thời gian của chi tiết phiếu.
 9. Dòng "Đã thanh toán, không thu thêm" luôn hiện trên thẻ, vì phiếu giao chỉ sinh sau khi đơn đã thanh toán (BR-GH); chưa có cờ riêng từ BE.
 10. TL-L6 (xem trên).
+
+## Lô 6 — FE (Khách hàng ED-14) — 02/10
+
+Phần FE của Lô 6, làm trong `erp-console/`. Chưa commit.
+
+### File
+- Mới, module `erp-console/features/customers/`: `types.ts`, `api.ts`, `customersModel.ts` (phần thuần), `messages.ts`, `customers.module.css`, `useCustomerList.ts`, `useCustomerDetail.ts`, `useCustomerTimeline.ts`, `mock.ts`, `components/CustomerListScreen.tsx`, `components/CustomerDetailScreen.tsx`, `components/EditCustomerModal.tsx`, `customers.test.ts`, `README.md`.
+- Mới, trang mỏng: `erp-console/app/(console)/customers/page.tsx`, `erp-console/app/(console)/customers/detail/page.tsx` (bọc `ViewGuard view="customers"`, không bọc khối AI).
+- Sửa: `shared/lib/nav.ts` (bỏ `soon` của mục Khách hàng, hiện khi có `sales.view_customer_list`), `features/auth/mock.ts` (Chủ và Quản lý có `sales.view_customer_list`), `scripts/check-ai-chunks.mjs` (thêm hai route khách), `e2e/ed_batch1_shell.py` (menu mong đợi của `loc` và `ql1` nay có "Khách hàng"; đây là hệ quả của việc bật menu).
+- Mới: `e2e/ed_batch6_customers.py`.
+- BE (ngoại lệ được duyệt, chỉ thêm `customer.id`): `backend/apps/sales/orders/serializers.py` (`get_customer` thêm `"id": order.customer_id` ở nhánh KHÔNG che dữ liệu cá nhân; NV giao ngoài cửa sổ vẫn nhận `{name,phone,address}` toàn `None`, không có `id`). Test: cập nhật `test_s10_api.py` và `apps/common/tests/test_customer_data_scope.py` (thêm khoá `id`), thêm 2 ca vào `test_order_list_r3.py` (Chủ và Quản lý nhận `customer.id`; NV giao quá cửa sổ không nhận).
+
+### Hàm API mới (`features/customers/api.ts`)
+- `listCustomers(params, page)` -> `GET /api/sales/customer-directory/?q=&ordering=&page=` (q cắt khoảng trắng, bỏ khi rỗng; luôn gửi `ordering`; `page` từ trang 2).
+- `getCustomer(id)` -> `GET /api/sales/customer-directory/{id}/`.
+- `updateCustomer(id, patch)` -> `PATCH` chỉ `name`, `default_address`, `note`; trả thân chi tiết. FE chỉ gửi trường đã đổi, không bao giờ gửi `phone`.
+- `getCustomerTimeline(id)` -> `GET /api/guidance/customer/{id}/`.
+Mỗi hàm có nhánh mock; chế độ mock: `window.__caveMock.customers("ok"|"fail"|"empty"|"forbidden"|"detailfail"|"patchfail")`.
+
+### Màn hình
+- `/customers/`: `ListPage` + `DataTable` + `FilterBar`. Cột: Khách hàng, Số điện thoại, Số đơn, Đơn huỷ, Tổng đã mua, Đơn gần nhất, Ghi chú. Tìm kiếm (chờ 300 ms), sắp xếp, "Tải thêm khách" (20 dòng một lần). Đủ trạng thái: tải, lỗi + Thử lại, rỗng, không khớp + Xoá tìm kiếm, 403.
+- `/customers/detail/?id=`: không có khối AI (`aiSlot` trống). Khối Liên hệ (Tên, Địa chỉ giao mặc định, Ghi chú sửa tại chỗ; Số điện thoại khoá), khối Mua hàng (Khách từ, Số đơn, Tổng đã mua, Đơn huỷ, đều khoá "Tự tính từ đơn hàng."), bảng Đơn hàng (dòng bấm sang `/orders/detail/?id=` khi có quyền xem đơn), bảng Phiếu hoàn (dòng bấm khi có quyền xem hoàn tiền), Dòng thời gian bên phải. Nút chính "Sửa thông tin" (mở hộp Tên/Địa chỉ/Ghi chú) chỉ khi có `sales.change_customer`; menu "…" có "Sao chép số điện thoại". Id sai, thiếu, bằng 0, không tồn tại: "Không tìm thấy". Lưu lỗi giữ nguyên chữ đã gõ, nút đổi thành "Thử lại".
+- Từ trang đơn, liên kết "Mở trang khách" dùng `customer.id` BE trả (ngoại lệ BE ở trên). Chỉ hiện khi người xem có `sales.view_customer_list`.
+
+### Dữ liệu cá nhân
+URL chỉ có `?id=`; từ khoá tìm kiếm chỉ ở trạng thái màn, không lên URL; không có tên, số, địa chỉ, ghi chú trong `localStorage`/`sessionStorage` (e2e quét sau khi sửa, kể cả sau lưu lỗi); không `console.log`; không gửi sang AI. Mock không lưu dữ liệu khách vào storage, nên sửa trong mock chỉ giữ qua điều hướng trong trang, mất khi tải lại.
+
+### Kiểm chứng (chạy trong lượt này)
+- `npx tsc --noEmit`: sạch.
+- `npx vitest run`: 52 file, 525 test, xanh (Lô 6 thêm `customers.test.ts` với 17 test: câu truy vấn, mô hình, quyền kho1/giao1/cs2 = 403, 401, tìm kiếm bỏ dấu, SĐT cần từ 4 chữ số, sắp xếp và khách chưa mua xuống cuối, khoá dòng đúng contract, PATCH chặn `phone` bằng `INPUT_NOT_ALLOWED`, thân rỗng `INPUT_EMPTY`, 404, timeline không chứa số điện thoại).
+- `NEXT_PUBLIC_USE_MOCK=0 npm run build` (có `NEXT_PUBLIC_API_BASE`): xanh. `node scripts/check-no-mock.mjs`: XANH (16 file mock, 34 chuỗi seed, 163 file build). `node scripts/check-ai-chunks.mjs`: XANH, 13 màn nghiệp vụ và 2 layout (kể cả `/customers` và `/customers/detail`) không chứa `new Worker`, `wllama`, `/call/`.
+- Build `NEXT_PUBLIC_USE_MOCK=1`, phục vụ tĩnh cổng 3101: `e2e/ed_batch6_customers.py` 79/79 PASS; `e2e/ed_batch1_shell.py` 56/56 PASS (sau khi sửa menu mong đợi); `e2e/ed_batch3_orders.py` 142/142 PASS. Ca phủ: kho1/giao1/cs2 không có menu và "Không có quyền" ở cả hai URL; loc/ql1 xem và sửa; không có khối AI; không có ô sửa số điện thoại; PATCH không chứa `phone`; tìm kiếm không khớp, "090" (dưới 4 số) không dò số; sắp xếp; tải thêm; chế độ fail/empty/forbidden/detailfail/patchfail; id abc/thiếu/0/999999; sửa tên để trống; không đổi gì thì báo; lưu lỗi giữ chữ rồi Thử lại; không dữ liệu khách trong URL/storage/console; 360px không cuộn ngang (danh sách, chi tiết, hộp sửa).
+- BE thật (SQLite tạm + `seed_demo`, tạo user loc/ql1/kho1, BE cổng 8000, console MOCK=0 cổng 3102): 17/17 PASS: 6 khách, cột đúng, `customer-directory` 200, tìm "chi hong" ra Chị Hồng, sắp A-Z, chi tiết, PATCH 200 và còn sau khi tải lại, dòng thời gian có bản ghi cập nhật, đổi tên qua hộp, liên kết đơn -> khách đúng (customer.id từ BE), kho1 không có menu và "Không có quyền". Script tạm ở scratchpad, không đưa vào repo (cần seed người dùng tay).
+- BE: `manage.py test apps.sales` 554 test OK; `manage.py test` toàn bộ 2661 test OK (lần đầu 1 fail vì test `test_customer_data_scope` so sánh nguyên dict khách, đã cập nhật thêm khoá `id`).
+- `python3 scripts/check_naming.py`: OK, không vi phạm mới. Màu cứng trong file của lô: 0.
+
+### Ảnh
+`doc/features/2026-10-01-erp-theo-design/shots-lo6/` (`*.png` bị `.gitignore` chặn): `lo6_desktop_list.png`, `lo6_desktop_detail.png`, `lo6_mobile_list.png`, `lo6_mobile_detail.png`, `lo6_mobile_edit.png`, và trên BE thật `lo6_real_list.png`, `lo6_real_detail.png`.
+
+### Chỗ lệch contract / story
+1. ED-14 AC nói số điện thoại sửa được; theo 02b và quyết định #5 số điện thoại bị khoá (BE từ chối `phone`), nên không có ô sửa; AC5/AC6 của ED-13 không áp dụng.
+2. Sắp xếp là ô chọn "Sắp xếp" trong thanh lọc (ánh xạ sang `ordering` của BE), không bấm tiêu đề cột, để không đụng `DataTable` dùng chung.
+3. Phân trang theo "Tải thêm khách" (20 dòng một lần) chứ không phải số trang.
+4. Bộ lọc "Mọi khách" trên bản design chưa làm vì BE không có bộ lọc đó.
+5. Số điện thoại hiện đủ trên màn nội bộ (UI-RULES §1.8), bản design hiện "…0412".
+6. FE bắt buộc tên không rỗng ở ô sửa; BE cho phép rỗng. FE chặt hơn, không lệch dữ liệu.
+7. Ô sửa tại chỗ dùng câu chung của `InfoField` "Nhập giá trị cho ô này." khi để trống; hộp "Sửa thông tin" dùng "Nhập tên khách.".
+
+### Nợ
+- Mock của Đơn (`features/orders/mock.ts`) chưa trả `customer.id` (ngoài phạm vi lô này), nên "Mở trang khách" không hiện ở e2e mock; trên BE thật đã kiểm hiện và dẫn đúng. Mã đơn trong mock khách (id từ 301) không khớp mock đơn (101-145): bấm dòng đơn trong mock có thể ra "Không tìm thấy".
+- `customer.id` hiện cũng nằm trong chi tiết đơn của NV kho (người xem được đơn); ERP vẫn ẩn liên kết khi không có `sales.view_customer_list`, còn `/customer-directory/{id}/` thì BE chặn 403. Nếu muốn chặt hơn, BE chỉ trả `id` cho người có quyền xem danh bạ.
+- Dòng thời gian khách trong mock là mock riêng của module (mock `guidance` chưa có loại `customer`).

@@ -1457,3 +1457,111 @@ FE với BE thật (lỗi 400 hiện dưới ô, F5 màn cũ); lỗi mạng/offl
 
 #### Lệnh đã chạy (lần 2)
 `rm -rf node_modules && npm ci` (sạch), `npx tsc --noEmit` (sạch), `npx vitest run` 44 file / 410 test đạt, `NEXT_PUBLIC_USE_MOCK=0 npm run build` + `check-no-mock` XANH + `check-ai-chunks` XANH, `NEXT_PUBLIC_USE_MOCK=1 npm run build` + `check-ai-chunks` XANH (bản mock có `cave_erp_mock`), cổng 3201, các script nêu trên, `python3 scripts/check_naming.py` OK. Ảnh trong `shots/lot4/` (`lo4r2_*.png`).
+
+
+## Lô 6 — FE · Khách hàng (ED-13 phần hiển thị, ED-14) · 2026-10-02
+
+### Kết luận: APPROVED (phần FE). Không có lỗi Critical/High/Medium mới. Còn một quyết định của Duy đã mở sẵn (#11, L6-N2: tìm khách đặt từ khoá trong URL API)
+Phạm vi: `erp-console/features/customers/`, `app/(console)/customers/`, `nav.ts`, `mock.ts`, và đổi nhỏ ở BE `apps/sales/orders/serializers.py` (thêm `customer.id` vào chi tiết đơn). Mã chưa commit lúc QA.
+
+### Tổng: 252 ca của QA · ✅ 252 · ❌ 0 · ⏸ 4 (mục "Chưa kiểm")
+- `e2e/qa_ed_batch6_api.py` (API thật, SQLite tạm + `seed_demo`): 98/98.
+- `e2e/qa_ed_batch6_real.py` (giao diện thật, console build `USE_MOCK=0` ở cổng 3102 gọi Django thật cổng 8000): 154/154, vai `loc`, `ql1`, `kho1`, `giao1`, `cs2`, 360px và 1440px.
+- Dev e2e chạy lại: `ed_batch6_customers` 79/79, `ed_batch1_shell` 56/56, `ed_batch2_patterns` 142/142 (mock, cổng 3101).
+- Lần chạy đầu của script thật có 2 ca đỏ do lỗi script của QA (đợi chưa đủ sau khi gõ ô tìm; kiểm thẻ `<b>` quá rộng), đã sửa script, nạp lại DB và chạy lại từ đầu 154/154. Không có ca nào bị bỏ để được xanh.
+
+### Cổng tự động
+`rm -rf node_modules && npm ci` sạch (không `--legacy-peer-deps`) · `npx tsc --noEmit` sạch · `npx vitest run` 525 đạt · `NEXT_PUBLIC_USE_MOCK=0 npm run build` + `check-no-mock.mjs` + `check-ai-chunks.mjs` xanh · `NEXT_PUBLIC_USE_MOCK=1 npm run build` xanh · `python3 manage.py test apps.sales` 554 đạt · `python3 scripts/check_naming.py` OK (QA đã đổi tên biến `ql1_can_patch` thành `manager_can_patch` trong script của mình để không phát sinh vi phạm mới).
+
+### Dữ liệu giả của QA
+35 khách giả (`Khách Thử A…`), khách A (pk 7) có 6 đơn: COMPLETED (hoàn 50.000 đã hoàn), PROCESSING, CANCELLED (hoàn 300.000 đã hoàn), AUTO_CANCELLED, BOOKED, PROCESSING (hoàn 40.000 chờ). Kỳ vọng tính tay: 6 đơn, 2 huỷ, tổng đã mua 350.000 đ. Cũng có khách 55 đơn, khách chưa mua, khách tên chứa HTML. Chỉ dữ liệu giả, SĐT dạng `09000001xx`.
+
+### Theo AC
+| Mã AC | Kết quả | Bằng chứng |
+|---|---|---|
+| ED-13-AC2 (hiển thị) | ✅ | Danh sách và chi tiết khách A: Số đơn 6, Đơn huỷ 2, `350.000 đ`, đúng số tính tay. Đổi dữ liệu rồi xem lại: xác nhận hoàn 40.000 đang chờ, rồi huỷ thêm đơn đã trả 100.000, thì số thành 310.000 đ rồi 210.000 đ, đơn huỷ 3, danh sách khớp chi tiết. Ảnh `qa6_real_desktop_detail_1440.png` |
+| ED-13-AC3 (quyền, phía FE) | ✅ | `kho1`, `giao1`, `cs2`: 0 request tới `customer-directory` hoặc `guidance/customer` (đếm ở mọi đường dẫn thử); API 403 không có dữ liệu khách (98 ca API) |
+| ED-14-AC1 | ✅ có ghi nhận | Đủ cột Khách hàng, Số điện thoại (đủ số), Số đơn, Tổng đã mua, Đơn gần nhất `dd/mm/yyyy hh:mm`, Ghi chú; mặc định `-last_order_at`; không thanh AI. Có thêm cột "Đơn huỷ" (xem L-1). Ảnh `qa6_real_desktop_list_1440.png`, so với `board-ERP-W5a-Khach-hang-1440.png` |
+| ED-14-AC2 | ✅ | Có "Sửa thông tin" và "…" (menu có "Sao chép số điện thoại"); không thanh trạng thái, không khối Trợ lý AI, 0 request `/api/ai/*`; Tên/Địa chỉ/Ghi chú có nút sửa; SĐT, Khách từ, Số đơn, Tổng đã mua, Đơn huỷ có icon khoá; bảng Đơn hàng (6 dòng, bấm dòng sang đơn), bảng Phiếu hoàn (3 dòng, đủ Chờ hoàn/Đã hoàn), Dòng thời gian. Ảnh `qa6_real_desktop_detail_1440.png`, so với `board-ERP-W5b-Chi-tiet-khach-hang-1440.png` |
+| ED-14-AC3 (SĐT trùng) | ⏸ Không áp dụng được | Theo quyết định đã chốt ở 02b/BE, SĐT là khoá, màn không có ô sửa SĐT và PATCH từ chối `phone` (`INPUT_NOT_ALLOWED`). AC này lỗi thời so với thiết kế: nhờ PO đổi thành "không có ô SĐT, PATCH không mang `phone`" (đã có ca đạt). Thay bằng ca lỗi lưu: mất mạng khi lưu thì hộp còn, giá trị đã gõ còn nguyên, có lời báo và nút "Thử lại", thử lại lưu được. Ảnh `qa6_real_save_error.png` |
+| ED-14-AC4 | ✅ | Chủ tắt "Xem khách hàng" của nhóm Quản lý (thao tác trực tiếp trên DB thật), `ql1` đăng nhập lại: menu Khách hàng ẩn, `/customers/` và `/customers/detail/?id=7` ra "Không có quyền", 0 request `customer-directory`, trang đơn không còn "Mở trang khách". Cấp lại thì xem được. Tắt riêng "Sửa khách hàng": vẫn xem được, không còn nút Sửa. Ảnh `qa6_ql1_view_revoked.png` |
+| ED-14-AC5 | ✅ có ghi nhận | URL trang không đổi khi tìm (`/customers/`), không từ khoá nào trong URL; `localStorage`, `sessionStorage`, `document.title`, console không chứa tên/SĐT/địa chỉ/ghi chú; không `console.log` dữ liệu khách. Riêng URL **API** `?q=` có từ khoá (xem O1) |
+
+### Yêu cầu tối thiểu của điều phối viên
+| Mục | Kết quả |
+|---|---|
+| `kho1`/`giao1`/`cs2`: không có menu, `/customers/`, `/customers/detail/?id=7`, `?id=abc`, không `id` đều ra "Không có quyền", không lộ dữ liệu, 0 request `customer-directory` | ✅ (3 vai × 4 đường dẫn). Ảnh `qa6_kho1_no_permission.png` |
+| Không có dữ liệu khách trong URL, `localStorage`, `sessionStorage`, console, `title` | ✅ quét sau khi tìm theo tên, theo SĐT, sau khi sửa, và toàn bộ URL đã đi qua (chỉ có `?id=`) |
+| Chi tiết không có khối AI, 0 request `/api/ai/*` | ✅ |
+| Không có ô sửa SĐT; PATCH không có `phone` | ✅ Hộp "Sửa thông tin" không có ô SĐT; mọi PATCH quan sát chỉ có `{note}`, `{name}`, `{address}`, không có `phone` |
+| Tìm tên không dấu (`khach thu a`, `nguyen van an`), tìm SĐT đủ số và 4 số cuối, `090` (3 số) không khớp và có "Xoá tìm kiếm" | ✅ |
+| Sắp xếp (A–Z, Tổng đã mua nhiều nhất, Nhiều đơn nhất, Đơn gần nhất cũ trước/mới trước) | ✅ hàng đầu đúng từng cách; URL không đổi |
+| Tải thêm | ✅ `20 / 35` rồi `35 / 35`, request `page=2` mang `ordering`, đúng 35 hàng không trùng, hết nút |
+| Số đơn, tổng `n.nnn đ`, đơn huỷ, "Đơn gần nhất" `dd/mm/yyyy hh:mm` | ✅ không có "vừa xong/hôm qua", không `NaN`/`Invalid Date` |
+| `total_spent` khi có đơn huỷ và hoàn tiền | ✅ 350.000 → 310.000 → 210.000 đ, kiểm cả trên màn đang mở sau khi sửa và sau F5 |
+| Sửa tên/địa chỉ/ghi chú rồi tải lại vẫn còn | ✅ ghi chú, địa chỉ, tên đều còn sau F5; Dòng thời gian thêm bản ghi "Cập nhật hồ sơ khách"; số liệu không đổi |
+| Liên kết "Mở trang khách" từ trang đơn | ✅ trỏ đúng `/customers/detail/?id=7`, mở đúng khách; `kho1`/`ql1` bị tắt quyền: không có liên kết |
+| 360px không cuộn ngang | ✅ danh sách, chi tiết, và hộp sửa. Ảnh `qa6_real_mobile_list_360.png`, `qa6_real_mobile_detail_360.png`, `qa6_real_mobile_edit_360.png` |
+| Không console error | ✅ mọi vai (đã lọc "Failed to fetch RSC payload" do Next prefetch bị huỷ khi điều hướng, một lần xuất hiện ở phiên 360px lần chạy trước, không tái hiện ở lần thăm dò riêng; nhiễu hạ tầng đã biết từ Lô 1 và 4) |
+| Không rò giá vốn | ✅ HTML chi tiết và danh sách không có giá vốn/lãi/lô nhập |
+
+### Ngoại lệ & biên đã chạy (ngoài đường thuận)
+| Ca | Kết quả |
+|---|---|
+| Bấm đúp "Lưu thay đổi" | ✅ đúng 1 PATCH |
+| Ghi chú 1001 ký tự | ✅ chặn tại chỗ, 0 PATCH, báo "tối đa 1000" |
+| Esc khi đang sửa | ✅ không lưu, giữ giá trị cũ |
+| Mất mạng khi lưu rồi "Thử lại" | ✅ giữ giá trị đã gõ, lưu được |
+| Mất mạng khi tải danh sách | ✅ có thông báo lỗi và "Thử lại", không trang trắng, bấm thử lại tải được. Ảnh `qa6_real_list_offline.png` |
+| Màn đã mở, dữ liệu đổi ở nơi khác (hoàn tiền, huỷ đơn) | ✅ số cập nhật sau lưu/F5; xem O3 về việc không có cảnh báo chủ động |
+| Xoá trắng ghi chú | ✅ PATCH `{note:""}` 200 |
+| id không tồn tại, chữ, 0, âm, thiếu, `7%20OR%201=1` | ✅ "Không tìm thấy", không 500 |
+| Tên khách chứa `<b>` và ghi chú chứa `<script>` | ✅ hiện nguyên văn, không in đậm, không chạy script, 0 hộp thoại |
+| Khách chưa có đơn | ✅ lời trống cho bảng Đơn hàng và Phiếu hoàn, `0 đ`, không NaN |
+| Khách 55 đơn | ✅ "50 đơn mới nhất trong 55 đơn", đúng 50 dòng |
+| Gõ `%` vào ô tìm | ✅ không 5xx |
+| Quyền đổi giữa phiên (Chủ tắt/bật lại quyền của Quản lý) | ✅ xem AC4 |
+| API 98 ca: 401/403/404/400, `INPUT_NOT_ALLOWED`, `INPUT_EMPTY`, phân trang, thứ tự, AuditLog `update_customer` chỉ ghi tên trường, `ordering` lạ, chống SQL | ✅ 98/98 |
+
+### Phân quyền (Group × hành động)
+| Hành động | owner (`loc`) | manager (`ql1`) | warehouse_staff (`kho1`) | delivery_staff (`giao1`) | CSKH (`cs2`) | Chưa đăng nhập |
+|---|---|---|---|---|---|---|
+| Menu Khách hàng | có | có | ẩn | ẩn | ẩn | không vào được |
+| Mở `/customers/`, chi tiết | xem được | xem được | "Không có quyền" | "Không có quyền" | "Không có quyền" | chuyển `/login/`, không mang dữ liệu |
+| API `customer-directory` | 200 | 200 | 403 | 403 | 403 | 401 |
+| Sửa tên/địa chỉ/ghi chú | có | có (xem L-4) | không | không | không | không |
+| "Mở trang khách" ở trang đơn | có | có | không | không | không | không |
+| Tắt "Xem khách hàng" (manager) | n/a | ẩn menu + "Không có quyền" + 0 request | | | | |
+
+### Rò giá vốn
+Không rò. Không có trường giá vốn, lãi, lô nhập ở JSON `customer-directory` (98 ca API) và ở HTML danh sách/chi tiết. `total_spent` là tiền bán, không suy ngược ra giá vốn. AuditLog `update_customer` chỉ có tên trường (`{"fields":["note"]}`), không chứa giá trị, tiền hay kg.
+
+### Rò dữ liệu cá nhân
+- Danh sách và chi tiết có tên/SĐT đủ số: đúng thiết kế (nội bộ, chỉ owner/manager). Ba vai còn lại không nhận được và không gọi API.
+- `localStorage`, `sessionStorage`, `title`, URL trang, console: sạch ở mọi vai và mọi bước (tìm, sửa, lỗi, mất mạng).
+- AI: trang khách không có khối AI, 0 request `/api/ai/*`; `FORBIDDEN_PREFIXES` có `customer-directory` (test BE xanh).
+- AuditLog: không chép giá trị tên, địa chỉ, ghi chú.
+- Ảnh chụp và script chỉ dùng dữ liệu giả.
+- **O1 bên dưới: URL API `?q=` mang từ khoá tìm (tên hoặc SĐT) vào nhật ký máy chủ.**
+
+### Hồi quy
+`ed_batch1_shell` 56/56 và `ed_batch2_patterns` 142/142 (mock); `apps.sales` 554 đạt (gồm `customer.id` mới ở serializer đơn); trang đơn mở bình thường với `loc`, `ql1`, `kho1`; menu các vai khác không đổi.
+
+### Mở / ghi nhận (không chặn)
+- **O1 (đã có trong `00-can-duy-quyet.md` mục 11, QA BE gọi là L6-N2, Medium, chờ Duy quyết):** tìm khách bằng `GET …/customer-directory/?q=<tên hoặc SĐT>`. Từ khoá nằm trong URL API nên vào nhật ký truy cập máy chủ (đã thấy trong `be-qa6.log`; Cloud Run cũng ghi URL yêu cầu). Giao diện này khiến rủi ro thành thực tế: mỗi lần chủ/quản lý gõ tìm là một dòng log có SĐT. Màn Gọi xác nhận đã dùng POST body cho lý do này; N11-2 (nhà cung cấp) và `q=` của danh sách đơn cũng cùng loại, nợ chung. Cách sửa (khi Duy chọn): POST tìm kiếm (BE + FE, cần Techlead). Tôi không nâng thành chặn vì quyết định đã nằm ở Duy và 02b chốt GET; nếu Duy cho rằng đây là rò dữ liệu cá nhân Critical thì lô này phải REJECTED tới khi đổi.
+- **L-1 (Low):** thêm cột "Đơn huỷ" ngoài danh sách cột của AC1 và board W5a. Dev đã ghi nhận.
+- **L-2 (Low):** không có bộ lọc "Mọi khách"; sắp xếp dùng ô chọn và "Tải thêm khách" thay vì cuộn vô hạn/phân trang (dev đã ghi nhận lệch so với board).
+- **L-3 (Low):** tìm có khoảng trắng giữa từ lặp nhiều lần (`khach   thu a`) trả 0 kết quả (khoảng trắng đầu/cuối đã được cắt); FE chưa gộp khoảng trắng. Gợi ý gộp khoảng trắng ở FE hoặc BE.
+- **L-4 (ghi nhận):** `ql1` (Quản lý) có quyền sửa khách mặc định; AC4 chỉ quy định quyền Xem. Báo PO nếu muốn Quản lý chỉ xem.
+- **O3 (ghi nhận):** hai người cùng sửa một khách: người lưu sau thắng, không có cảnh báo "người khác vừa sửa". Dòng thời gian cho thấy cả hai bản ghi. Số liệu "chỉ đọc" cũ trên màn đang mở chỉ cập nhật sau khi lưu hoặc F5.
+- **L-5 (ghi nhận):** `customer.id` ở chi tiết đơn cũng đến tay `kho1` (đã có sẵn trong phiên bản đơn của kho; dev đã ghi). Danh bạ khách vẫn 403 với kho1, không rò thêm tên/SĐT.
+- **L-6 (ghi nhận):** Dòng thời gian của khách seed trên DB thật chỉ có "Tạo hồ sơ khách" vì dữ liệu tạo không qua audit; không phải lỗi FE.
+
+### ⏸ Chưa kiểm
+1. ED-14-AC3 (SĐT trùng): không áp dụng được vì SĐT khoá; chờ PO sửa AC.
+2. Nút chạm trên thiết bị thật (chỉ giả lập khung nhìn 360px).
+3. Staging/production (QA chỉ chạy máy cục bộ, SQLite tạm).
+4. Tải lớn (hàng nghìn khách): chỉ kiểm 35 và 55 đơn.
+
+### Lệnh đã chạy
+`rm -rf node_modules && npm ci` · `npx tsc --noEmit` · `npx vitest run` (525) · `NEXT_PUBLIC_USE_MOCK=0|1 npm run build` · `node scripts/check-no-mock.mjs` · `node scripts/check-ai-chunks.mjs` · `python3 manage.py test apps.sales` (554) · `python3 e2e/ed_batch6_customers.py` (79), `ed_batch1_shell.py` (56), `ed_batch2_patterns.py` (142) trên cổng 3101 · `QA_DB=… python3 e2e/qa_ed_batch6_api.py` (98/98) · `QA_DB=… SHOTS=…/shots/lot6 python3 e2e/qa_ed_batch6_real.py` (154/154) · `python3 scripts/check_naming.py` (OK). Ảnh trong `shots/lot6/` (`qa6_*.png` và hai ảnh board). Đã tắt máy chủ cổng 3101, 3102, 8000.

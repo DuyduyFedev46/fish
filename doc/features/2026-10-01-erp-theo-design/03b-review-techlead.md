@@ -1736,3 +1736,56 @@ M1, M2, L1–L4, nợ 6 và B7 đều đạt. Không còn lỗi Critical, High h
 - Nối link "Huỷ đơn" và "Huỷ xác nhận đơn" sau Lô 3.
 - Lô `AiBar` dùng chung.
 - BE thêm `warehouse_name` và mốc "Bắt đầu giao" / "Lúc thất bại" (lệch 8).
+
+## Lô 6 — FE (Khách hàng ED-14, W5a, W5b) + ngoại lệ BE `customer.id` — 02/10
+
+Tech Lead review diff chưa commit: `erp-console/features/customers/**`, `app/(console)/customers/**`, `shared/lib/nav.ts`,
+`features/auth/mock.ts`, `scripts/check-ai-chunks.mjs`, `e2e/ed_batch6_customers.py`, `e2e/ed_batch1_shell.py`; BE
+`apps/sales/orders/serializers.py` cùng 3 file test. Căn cứ: 02b §1 (W5a, W5b), §3 B2, §5.2 Lô 6; 00-can-duy-quyet #5, #11, #13; UI-RULES; bất biến 9.
+
+### Lệnh kiểm chứng (Tech Lead tự chạy trong lượt này)
+- `cd erp-console && npx tsc --noEmit`: sạch. `npx vitest run`: 52 file, 525 test, xanh.
+- `cd backend && .venv/bin/python manage.py test apps.sales`: 554 test, OK.
+- `python3 scripts/check_naming.py`: OK, không vi phạm mới.
+- Grep màu cứng (`#hex`, `rgb(`, `hsl(`) trong `features/customers` và `app/(console)/customers`: 0.
+- Grep `localStorage|sessionStorage|console.|document.title|history.` trong `features/customers`: chỉ khoá chế độ mock `cave_erp_mock_customers_mode` (`mock.ts:39,294`), không chứa dữ liệu khách.
+- e2e (`ed_batch6_customers.py`, `ed_batch1_shell.py`) **không** chạy lại ở lượt review; QA chạy ở bước sau.
+
+### Kết quả theo trọng tâm
+| Mục | Kết quả | Căn cứ |
+|---|---|---|
+| Danh bạ chỉ cho `sales.view_customer_list` | Đạt | Menu: `nav.ts:212` `visible: has(me, PERM.viewCustomerList)` (chỉ bỏ `soon`). URL: hai trang bọc `ViewGuard view="customers"`, nên thiếu quyền thì không mount màn và **không gọi API**. BE chặn thật: `test_directory_api.py:246-285` (kho, giao, CSKH 403; 401; Chủ tắt quyền của Quản lý thì 403) |
+| Liên kết từ đơn | Đạt | `OrderDetailScreen.tsx:99-100` + `orderDetailModel.ts:121-124`: chỉ dựng href khi có `customer.id` **và** quyền `view_customer_list` |
+| URL chỉ có id, từ khoá không lên URL | Đạt | `rowHref` = `/customers/detail/?id=${c.id}`; `q` chỉ là state, debounce 300 ms rồi vào query của request BE (đã chấp nhận ở #11). `parseCustomerId` chỉ nhận số nguyên dương ≤ 12 chữ số |
+| Storage, console, tiêu đề tab, AI | Đạt | Không có ghi storage dữ liệu khách, không `console.*`. `DetailPage` không truyền `aiSlot`. `check-ai-chunks.mjs` có thêm hai route. BE `ai/policy/rules.py:20-21,99` cấm hai tiền tố và lọc cả nhánh `customer` |
+| Mock không ghi storage | Đạt | Dữ liệu giả nằm trong bộ nhớ trang. Chỉ chế độ mock lưu `localStorage`. Dữ liệu giả có dạng `Khách Thử A`, `0900000xxx` |
+| PATCH chỉ `name`/`default_address`/`note`, không có ô SĐT | Đạt | `CustomerPatch` = `Partial<Record<"name"\|"default_address"\|"note", string>>`. Hộp sửa gửi `changedFields(...)`, sửa tại chỗ gửi `{[field]: value}`. SĐT là `InfoField kind="locked"` (`CustomerDetailScreen.tsx:182`), đúng #5 |
+| Nút sửa theo quyền | Đạt | `canEdit` = `sales.change_customer`. Thiếu quyền thì không có nút "Sửa thông tin" và ô hiện dạng chỉ đọc |
+| Hồi quy menu các vai | Đạt | Mock chỉ thêm `view_customer_list` cho owner và manager. `ed_batch1_shell.py` chỉ đổi kỳ vọng của `loc`, `ql1`; kho1, giao1, cs2 giữ nguyên |
+| Màu cứng | Đạt (0) | `customers.module.css` chỉ dùng token |
+| 3 trạng thái, 403/404, giữ chữ khi lưu lỗi | Đạt | List: tải, lỗi + Thử lại, rỗng, không khớp, 403. Detail: id sai/thiếu → NotFound, 403, 404, lỗi; lưu lỗi thì giữ draft, nút chuyển "Thử lại" |
+
+### BE `customer.id` trong chi tiết đơn: kết luận
+- **Đúng nhánh:** `serializers.py:126-135` chỉ trả `id` ở nhánh không che. NV giao quá cửa sổ nhận `{name, phone, address}` toàn `None`, không có `id`. Test `test_order_list_r3.py` (ca mới thứ hai) khoá hành vi này.
+- **Có cần giới hạn theo `view_customer_list` không? Không cần, không sửa, không ghi nợ bắt buộc.** Lý do:
+  1. `id` là khoá thay thế, không phải dữ liệu cá nhân. Nó chỉ xuất hiện khi người xem đã thấy tên, SĐT và địa chỉ của chính đơn đó.
+  2. Có `id` không mở thêm được gì. `/customer-directory/{id}/` và `/guidance/customer/{id}/` đều đòi `view_customer_list`.
+  3. Nhánh `customer` của đơn bị bộ lọc AI loại bỏ hoàn toàn.
+  4. Nếu gắn thêm điều kiện quyền vào serializer thì phải đọc `request.user` trong `get_customer`, tức thêm một luật nữa mà lợi ích gần như bằng 0.
+
+  Dev ghi điểm này ở mục Nợ. Tech Lead đóng điểm đó.
+
+### Phát hiện
+| Mã | Mức | File:dòng | Mô tả / tái hiện | Hướng xử lý |
+|---|---|---|---|---|
+| TL-L6F-1 | Low | `backend/apps/sales/orders/serializers.py:127-128` | Hai nhánh trả hình dạng khác nhau. Nhánh che không có khoá `id`, nhánh thường có. Tái hiện: NV giao gọi `/api/sales/orders/{id}/` của phiếu quá cửa sổ → `customer` có 3 khoá; Chủ gọi → 4 khoá. FE xử lý được vì `customerLinkHref` coi `undefined` là không có link | Không chặn. Nếu đụng lại thì trả `"id": None` ở nhánh che và sửa assert ở `test_order_list_r3.py` + `test_customer_data_scope.py` |
+| TL-L6F-2 | Low | `erp-console/features/orders/types.ts:136` | Comment ghi "BE Lô 3 chưa trả" `customer.id`, nay đã sai | Sửa comment khi đụng file (ngoài phạm vi lô) |
+| TL-L6F-3 | Low | `erp-console/features/customers/components/CustomerDetailScreen.tsx:37` | Hằng `PERM_CHANGE_CUSTOMER` khai cục bộ, lệch idiom gom quyền vào `PERM` ở `shared/lib/nav.ts` | Lần sau chuyển vào `PERM.changeCustomer` |
+| TL-L6F-4 | Low | `CustomerDetailScreen.tsx:80-84`, `EditCustomerModal.tsx:37` | PATCH đã trả thân chi tiết mới nhưng FE bỏ đi rồi gọi thêm một GET (`detail.reload`). Kết quả đúng, chỉ dư một request | Không chặn. Có thể dùng thân PATCH để cập nhật state |
+| TL-L6F-5 | Low (nợ đã ghi) | `features/orders/mock.ts`, `features/customers/mock.ts` | Mock đơn chưa có `customer.id`, và id đơn trong mock khách (từ 301) không khớp mock đơn (101-145). Liên kết hai chiều chưa kiểm được ở e2e mock. Trên BE thật dev đã kiểm | Giữ nợ. Làm khi có lô đụng mock đơn |
+
+Bảy điểm lệch dev ghi ở 03-dev-notes đều hợp lệ. Điểm 1 đúng #5. Các điểm 2-4 nằm trong phạm vi component dùng chung và contract BE. Điểm 5 đúng UI-RULES §1.8 cho màn nội bộ. Điểm 6 chặt hơn BE nên không lệch dữ liệu. Điểm 7 chỉ là câu chữ.
+
+Không có Critical, High hay Medium. Không rò dữ liệu cá nhân, không vượt quyền, không có migration.
+
+**Kết luận: APPROVED** (REVIEW PASS). Bốn mục Low không chặn commit.

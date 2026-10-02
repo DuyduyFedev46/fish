@@ -1,0 +1,17 @@
+/* Kiểu riêng của module Khách hàng (ED-14). Chỉ token trong DESIGN.md — không màu cứng. Bảng, lưới thông tin, dòng thời gian
+   dùng component chung (shared/ui); file này chỉ có khung form trong hộp thoại, khung xương và khối phụ ở trang chi tiết. */
+
+/* Khung form trong hộp thoại "Sửa thông tin": các ô cách đều nhau. */
+.form { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; }
+
+/* Khung xương trang chi tiết. */
+.detailSkel { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-4) 0; }
+.detailSkel > div { display: flex; flex-direction: column; gap: var(--space-3); }
+
+/* Khối phụ trên trang chi tiết (đơn hàng, phiếu hoàn). */
+.section { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
+.sectionH { display: flex; align-items: baseline; gap: var(--space-2); margin: 0; font-size: var(--text-xs); font-weight: var(--weight-semibold); letter-spacing: var(--tracking-caps); text-transform: uppercase; color: var(--ink-3); }
+.sectionCount { font-weight: var(--weight-regular); letter-spacing: 0; text-transform: none; color: var(--ink-3); }
+
+/* Dòng báo lỗi tải dòng thời gian (không chặn trang). */
+.railNote { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); margin: 0; color: var(--ink-2); font-size: var(--text-sm); }

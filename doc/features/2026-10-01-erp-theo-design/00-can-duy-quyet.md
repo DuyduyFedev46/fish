@@ -22,6 +22,7 @@
 | 16 | Lô 3 | Sau "Xác nhận đã nhận tiền", đơn chuyển thẳng sang **Đang xử lý** (BE), trong khi story ED-10-AC1 viết "Đã thanh toán". | Giữ theo code (code thắng về trạng thái); sửa chữ AC. | Chip "Đang xử lý", toast "Đã nhận tiền". |
 | 17 | Lô 4 | (Báo trước, dữ liệu cá nhân) **R4b**: danh sách "Việc giao của tôi" trả sẵn SĐT khách cho chính người giao (chỉ phiếu của họ, chỉ khi Đang giao/Giao thất bại, cùng cửa sổ thời gian như trang chi tiết). Hiện mỗi thẻ phải gọi API chi tiết riêng để lấy số cho nút Gọi khách. Không mở rộng ai được xem gì. | Làm (Tech Lead đã duyệt contract). | Chưa làm — chờ anh gật vì đụng dữ liệu khách. |
 | 18 | Lô 4 | Phiếu giao **không lưu mốc "Bắt đầu giao"** (và "Lúc báo thất bại"). Story ED-19-AC2/AC3/AC5 yêu cầu hiện các mốc này. | BE thêm 2 trường thời điểm (migration nhỏ, chỉ thêm) — giúp đo thời gian giao. Hoặc bỏ khỏi AC (xem ở dòng thời gian). | Chưa làm; thời điểm xem được ở dòng thời gian của phiếu. |
+| 19 | Lô 3, 7 | Nút **"Nhờ" (chuyển việc cho người khác xử lý, DW-23)** nằm trong bảng hướng dẫn cũ (GuidancePanel) — trang chi tiết mới thay bằng khối Trợ lý AI nên **nút Nhờ mất** ở trang đơn và trang lô (AC7 cũ: "AI tắt thì Nhờ vẫn chạy"). Thiết kế mới không vẽ nút này. | (a) Thêm mục "Nhờ người xử lý" vào menu "…" của trang chi tiết (làm chung ở Lô 17). (b) Bỏ hẳn, ghi vào decisions. | Đang thiếu; em đề xuất (a). |
 
 ## Đã tự chốt theo nguyên tắc (Duy xem lại nếu muốn lật)
 - 02b viết trước đợt đổi tên P8b Lô 4–5 → dùng tên mới trong code (bảng ở `03-dev-notes.md`).
@@ -74,3 +75,4 @@
 - Đã tự chốt (Lô 5): màn < 1024px (tablet) bảng hàng chờ gọi xác nhận ẩn cột "Hàng" (xem ở chi tiết) theo T4 — ERP chỉ thiết kế cho máy tính. Mock giao hàng còn mã `DH-` → đổi sang `SO…` ở Lô 17.
 - BE nhỏ: nhãn dòng thời gian lô (`backend/apps/inventory/batches/timeline.py` `kg_str`) ra "Nhập kho 18.000 kg" — đọc nhầm thành mười tám nghìn; đổi sang "18 kg" / "18,5 kg". Màn ERP chưa có thao tác ghi lô trên BE thật (seed không có lô Quá hạn còn tồn) → viết lại `p8_lo5_qa_real_backend.py` (Lô 7 nợ).
 - PO (Lô 3 QA N2/N3): ô tiền gõ tay dấu thập phân không bị bắt ("150.000,50" → 15.000.050; "150k" → 150) — nút gửi luôn hiện số đang hiểu, hoàn bị chặn bởi "Còn hoàn được", BE kiểm lại. Đề xuất Lô 17: báo lỗi khi gõ "," + 1–2 chữ số cuối và khi có chữ (k, tr).
+- Staging (chỉ đọc): kiểm nhóm owner có đủ quyền các model sinh sau migration `accounts/0002` (`itemimage`, `salescreditnote`, `batchsupplierreturn`, `demorecord`) — review Lô 7.

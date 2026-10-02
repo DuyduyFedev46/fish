@@ -209,7 +209,6 @@ export const NAV: NavItem[] = [
     short: "Khách",
     icon: "group",
     section: "Bán hàng",
-    soon: true,
     visible: (me) => has(me, PERM.viewCustomerList),
   },
   {
