@@ -36,3 +36,11 @@
 - Deploy staging: quyền đã có trong `.claude/settings.local.json` (job migrate, service api-staging, firebase staging). Build image: `gcloud builds submit backend --tag …/api:vNN`. Nhật ký deploy ghi ở `doc/ops/moi-truong.md`.
 - `ed_batch9_returns` đỏ 5 ca do ngày mock (đã biết, nợ Lô 17). `ed_batch3_fixes` đỏ 2 ca `aiOrderProposal` (có sẵn từ trước).
 - Worktree còn lại: `agent-a0b18110f65579b39` (nhóm B) và `agent-a73704f8c60108a8c` (nhóm A) đã gộp, gỡ được. `agent-adb46da0acecd2601` (C/D/E) và `agent-adeaae51549099388` (Lô 15) còn việc.
+
+## Nhánh WIP đã push lên GitHub (03/10, lúc tắt máy)
+| Nhánh | Nội dung | Commit |
+|---|---|---|
+| `wip/duy-quyet-03-10` | #3 timeline + #8 xoá mềm phiếu hoàn (BE) | `1ec71cd` |
+| `wip/ra-soat-cde` | Rà soát giao diện nhóm C/D/E (form, popup, đăng nhập) | `1180092` |
+| `wip/lo15` | Lô 15 + sửa review M1/M2/L1–L3 | `50c0859` |
+Worktree trên máy vẫn còn; nếu mất thì tạo lại bằng `git worktree add .claude/worktrees/<tên> <nhánh>`.
