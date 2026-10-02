@@ -6,6 +6,8 @@ Lộc là chủ vựa, Duy là PO. Chuỗi `cangca` trong tên hạ tầng là t
 
 **Tài liệu hệ thống đầy đủ: [`doc/he-thong/`](doc/he-thong/README.md)** (kiến trúc, nghiệp vụ, backend, ERP, Shop, quy trình đội, thuật ngữ).
 
+**Chuyển sang máy mới / dev tiếp: [`doc/ops/ban-giao-may-moi.md`](doc/ops/ban-giao-may-moi.md)** (cài đặt, file bí mật cần tự chuyển, trạng thái dự án, cách làm tiếp bằng Claude Code).
+
 ## Kiến trúc
 
 ```

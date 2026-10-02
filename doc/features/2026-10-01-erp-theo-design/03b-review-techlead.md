@@ -2339,3 +2339,32 @@ ED-28 Kiểm kê, review techlead 02/10. Diff trong worktree `loc-wt-b` (nhánh 
 Không phát hiện lỗi mới ở các phần đã sửa. Dev chưa chạy ca "ghi chú + 409" trên BE thật. Thứ tự gọi trong code đủ để bảo đảm ca này, và mock đã chứng minh. QA có thể thêm ca này nếu muốn.
 
 **Kết luận: APPROVED.** Còn nợ: TL8-L3 (Low), thiếu unsaved-change guard, và đề xuất BE kiểm phiên bản ở PATCH phiếu kiểm kê để đóng hẳn khe ghi chú (BE, không chặn lô này).
+
+## QA Lô 10 B1–B3 — BE
+
+Review ngày 02/10 trên diff chưa commit của `backend/apps/purchasing` và file mới `receipts/tests/test_cancelled_receipt_guards.py`.
+
+**Số tự chạy lại:** `manage.py test apps.purchasing apps.inventory` chạy 628 test, OK. `check_naming` OK.
+
+| Điểm kiểm | Kết quả | Căn cứ |
+|---|---|---|
+| Khoá dòng, kiểm trạng thái trong khoá (submit, PATCH) | **Ổn** | `lock_draft_receipt` gọi `select_for_update` rồi mới kiểm `DRAFT`. `submit_receipt` khoá phiếu trước khi khoá dòng. `perform_update` bọc `atomic` và khoá trước `serializer.save()`. Hai lần submit song song thì lần sau chờ khoá, đọc thấy `SUBMITTED` và trả 400. |
+| Khoá lô ở `record_purchase_cost` | **Ổn** | Lô được khoá theo `order_by("pk")` và kiểm trạng thái sau khi khoá. Tranh chấp với `cancel_receipt` được chặn cả hai chiều. Nếu huỷ chạy trước thì lô đã `CANCELLED`, chi phí bị chặn. Nếu chi phí chạy trước thì `cancel_receipt` thấy `cost_allocations` và từ chối. |
+| `select_for_update(of=("self",))` trên Postgres | **Đúng** | `Batch.source_line` là quan hệ OneToOne ngược nên Django sinh `LEFT OUTER JOIN`. Postgres báo lỗi khi `FOR UPDATE` chạm phía nullable của outer join, còn `of=("self",)` sinh `FOR UPDATE OF "inventory_batch"`. Hàng của phiếu không bị khoá, nhưng điều kiện chặn dựa trên `batch.status` vốn được đọc lại sau khi khoá, nên vẫn đủ. Test chạy SQLite nên chưa kiểm được trên Postgres, cần QA thử staging một lần. |
+| Công thức phân bổ | **Không đổi** | `_split_amounts` và `recompute_landed_cost` giữ nguyên. Thay đổi duy nhất là danh sách `resolved` dùng bản lô vừa khoá, cùng pk và cùng thứ tự. |
+| FE gửi lại submit | **Không có đường nào** | `erp-console/features/**` không gọi `POST …/receipts/{id}/submit/`. ERP chỉ dùng `receive-batches/` và `cancel/`. Bỏ kiểu idempotent ở submit nên không ảnh hưởng FE hiện tại. Khi sau này có nút ghi nhận phiếu nháp, FE cần hiểu `RECEIPT_NOT_DRAFT` là "phiếu đã được ghi nhận hoặc đã huỷ" rồi tải lại chi tiết, không báo lỗi đỏ. Không nên cho BE trả 200: không có idempotency key thì BE không phân biệt được "cùng request gửi lại" với "người khác đã ghi nhận". |
+| `receive-batches` | **Không ảnh hưởng** | `create_and_submit_receipt` trả phiếu cũ theo `idempotency_key` trước khi gọi `submit_receipt`. Phiếu mới tạo ở trạng thái `DRAFT` rồi submit một lần trong cùng giao dịch. Bộ test receive-batches vẫn xanh. |
+| Hoá đơn gắn phiếu đã huỷ | **Ổn** | `validate_receipt` áp dụng cho cả POST và PATCH. Lỗi `BusinessError` đi qua exception handler thành 400 kèm `code`. |
+| Rò giá vốn / dữ liệu cá nhân | **Không có** | Thông điệp lỗi chỉ có mã lô và tên trạng thái. Không log payload. |
+
+**TL10B-M1 · Major · Lô bị huỷ vì quá hạn không nhận chi phí được nữa, sai BR-GV-02 và E-14.** `costs/services.py:94-99` (`_is_cancelled_batch`) chặn mọi lô `status == CANCELLED`. Theo `models/batches.py:20`, trạng thái này chủ yếu sinh ra từ `cancel_expired_batch` (BR-LO-03): lô thật, đã bán một phần, chưa chốt. Spec chỉ chặn chi phí với lô **đã chốt** (BR-GV-02). Ca E-14 ("Chi phí mua về sau khi lô đã bán hết") yêu cầu nhập chi phí trước khi chốt để báo cáo lô tính lại. Nếu chặn thì tiền đá hay cước của lô đó không vào được giá vốn. `landed_unit_cost` thấp hơn thực tế, giá vốn hàng bán và lỗ hàng hết hạn (BR-LO-03) cùng sai, và sai từ lúc chốt lô trở đi (bất biến về kỳ cũ). QA B3 chỉ nhắm lô thuộc **phiếu nhập đã huỷ**.
+- Cách sửa: chỉ chặn khi `source_line.receipt.status == CANCELLED`. `cancel_receipt` luôn đặt phiếu và lô `CANCELLED` cùng lúc, nên điều kiện này đủ cho B3. Lô của phiếu đã huỷ luôn có `source_line`. Nếu muốn giữ lớp phòng thủ cho lô có `status == CANCELLED` mà không có phiếu, chỉ chặn khi lô chưa từng có bút toán ngoài RECEIPT và WRITE_OFF huỷ phiếu. Cách đơn giản hơn là bỏ hẳn nhánh này.
+- Test cần thêm: lô bán một phần → `EXPIRED` → `cancel_expired_batch`, sau đó `POST costs/` trả 201 và `landed_unit_cost` tăng. Ca `test_b3_*` hiện có phải giữ xanh.
+
+**TL10B-L1 · Low · Docstring cũ còn ghi "idempotent".** `receipts/services.py:4-5` và `receipts/README.md:3` vẫn ghi submit là idempotent, trái với hành vi mới. Cần sửa cùng lượt.
+
+**TL10B-L2 · Low · Hoá đơn và huỷ phiếu có khe tranh chấp.** `validate_receipt` đọc trạng thái mà không khoá phiếu, còn `cancel_receipt` chỉ kiểm `invoices.exists()` dưới khoá phiếu. Khi tạo hoá đơn và huỷ phiếu chạy song song, hoá đơn vẫn có thể gắn vào phiếu vừa huỷ. Ca này hiếm (thao tác tay, Chủ), nên không chặn lô. Muốn kín thì tạo hoá đơn trong `atomic` và `select_for_update` phiếu trong `perform_create/perform_update` của viewset hoá đơn.
+
+**TL10B-L3 · Low · Thứ tự khoá lô ở `cancel_receipt`.** `receipts/services.py` khoá lô bằng `filter(id__in=…)` mà không `order_by("pk")`, còn `record_purchase_cost` khoá theo pk. Hai thao tác này về lý thuyết có thể deadlock. Postgres sẽ huỷ một bên và trả 500, không hỏng dữ liệu. Lỗi có từ trước, nên thêm `.order_by("pk")` khi tiện.
+
+**Kết luận: CHANGES REQUESTED.** Bắt buộc sửa TL10B-M1 kèm test lô huỷ quá hạn vẫn nhận chi phí. TL10B-L1 sửa cùng lượt. L2 và L3 gom vào lô sau được. Phần B1, B2 và khoá dòng đạt.

@@ -1801,3 +1801,34 @@ Story ED-28 (Kiểm kê), 02/10/2026, worktree `loc-wt-b` (nhánh `ed-stream-b`)
 - Ảnh: `/tmp/ed28shots/detail-1280.png`, `detail-1024.png`, `detail-1440.png`.
 
 **Còn nợ / chưa làm**: vẫn không có unsaved-change guard khi rời trang; chưa có ca "ghi chú + 409" trên BE thật (đã chứng minh bằng mock và bằng K1 trên BE thật ở phần dòng).
+
+## Sửa QA Lô 10 B1–B3 (BE chặn phiếu nhập đã huỷ)
+
+Cùng một họ lỗi: thiếu chốt chặn trạng thái CANCELLED. Không đổi contract thành công, không migration. Lỗi 400 theo dạng `{"detail", "code"}`, thông điệp tĩnh, không lặp lại giá trị người gửi.
+
+**Mã lỗi mới**
+| Mã | Khi nào | BR |
+|---|---|---|
+| `RECEIPT_NOT_DRAFT` | `POST receipts/{id}/submit/` hoặc `PATCH receipts/{id}/` lên phiếu đã ghi nhận hay đã huỷ | BR-MH-07 |
+| `RECEIPT_CANCELLED` | `POST/PATCH invoices/` gắn hoá đơn vào phiếu đã huỷ | BR-MH-07 |
+| `BATCH_CANCELLED` | `POST costs/` có lô đích đã huỷ hoặc lô thuộc phiếu đã huỷ (cả request bị từ chối, không ghi gì) | BR-MH-07 |
+
+**File đã sửa (`backend/apps/purchasing/`)**
+- `receipts/services.py`: thêm `lock_draft_receipt(receipt)` (select_for_update rồi kiểm `status == DRAFT` trong khoá); `submit_receipt` gọi nó, bỏ nhánh "idempotent" cũ. Ghi nhận lần 2 và phiếu đã huỷ giờ trả 400, không sinh lô. `cancel_receipt` đã khoá và kiểm sẵn (huỷ lần 2 trả 400 `BR-MH-07`, phiếu có lô không còn DRAFT thì bị chặn), giữ nguyên.
+- `receipts/api.py`: `perform_update` bọc `transaction.atomic` + `lock_draft_receipt` nên PATCH phiếu không ở Nháp trả 400. `submit` lấy phiếu một lần.
+- `invoices/serializers.py`: `validate_receipt` chặn phiếu CANCELLED (áp cả POST và PATCH đổi phiếu).
+- `costs/services.py`: khoá các lô đích (`select_for_update(of=("self",))`, vì join `source_line` là phía nullable) rồi chặn lô CANCELLED hoặc `source_line.receipt` CANCELLED, trước kiểm lô đã chốt. Không đổi công thức phân bổ.
+- Test: mới `receipts/tests/test_cancelled_receipt_guards.py` (19 ca: submit phiếu huỷ, phiếu nháp rồi huỷ, submit 2 lần, đường thuận, 403, không lặp giá trị gửi, huỷ 2 lần, PATCH, hoá đơn, chi phí lẫn lô sống và lô huỷ, lô của phiếu huỷ dù trạng thái lô lệch). Sửa `receipts/tests/test_services.py`: ca "idempotent lần 2" đổi thành "lần 2 bị chặn `RECEIPT_NOT_DRAFT`, không lô trùng" (đổi chủ ý theo yêu cầu).
+
+**Ghi chú**: `create_and_submit_receipt` (nhập lô tại cảng) tạo phiếu Nháp rồi submit trong cùng giao dịch nên không bị ảnh hưởng; idempotency của nó dựa trên `idempotency_key`, không dựa vào submit lặp. 
+
+**Số thật (02/10/2026)**: test đỏ trước (10 fail) rồi xanh; `manage.py test apps.purchasing apps.inventory` 628 test OK; `manage.py test` 2691 test OK, 0 failure; `makemigrations --check --dry-run` "No changes detected"; `check_naming` OK.
+
+**Còn nợ**: test chạy SQLite nên `select_for_update` chưa được kiểm tranh chấp thật trên Postgres (đã dùng `of=("self",)` để tránh lỗi outer join).
+
+**Sửa theo review techlead (TL10B-M1, L1, L2)**
+- **M1**: `_is_cancelled_batch` ở `costs/services.py` chỉ chặn khi `source_line.receipt.status == CANCELLED`; không còn xét `batch.status`. Lô quá hạn bị huỷ (`cancel_expired_batch`, BR-LO-03) chưa chốt vẫn nhận chi phí đến muộn (E-14, BR-GV-02). Test mới: lô bán 2 kg, EXPIRED, `cancel_expired_batch`, `POST costs/` 201 và `landed_unit_cost` tăng; lô đã chốt vẫn bị chặn (không phải `BATCH_CANCELLED`). Ca chặn lô của phiếu huỷ giữ xanh.
+- **L1**: sửa docstring `receipts/services.py` và `receipts/README.md` (không còn ghi submit là idempotent).
+- **L2**: `invoices/api.py` `perform_create`/`perform_update` khoá phiếu (`select_for_update`) và kiểm lại CANCELLED trong cùng transaction với lúc lưu; `validate_receipt` ở serializer giữ làm cổng sớm.
+- **L3** (thứ tự khoá lô ở `cancel_receipt`): để lô sau, theo techlead.
+- Số thật: `apps.purchasing apps.inventory` 630 test OK; toàn bộ 2693 test OK; `makemigrations --check` sạch; `check_naming` OK.
