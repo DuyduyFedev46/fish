@@ -70,7 +70,8 @@ export function editMoneyInput(prev: string, next: string, caret: number, inputT
   let before = onlyDigits(next.slice(0, at)).length;
   let digits = onlyDigits(next);
 
-  if (digits === onlyDigits(prev) && next.length < prev.length) {
+  // Chỉ coi là xoá khi sự kiện không phải chèn/dán: dán "1000000" đè lên "1.000.000" giữ nguyên chữ số, không được mất một số.
+  if (!/^insert/.test(inputType) && digits === onlyDigits(prev) && next.length < prev.length) {
     if (inputType === "deleteContentForward") {
       if (before < digits.length) digits = digits.slice(0, before) + digits.slice(before + 1);
     } else if (before > 0) {

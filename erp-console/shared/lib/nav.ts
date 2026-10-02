@@ -102,6 +102,16 @@ export const PERM = {
   viewWarehouse: "inventory.view_warehouse",
   viewStockEntry: "inventory.view_stockentry",
   viewPurchaseReceipt: "purchasing.view_purchasereceipt",
+  /** Lô 10: lập phiếu nhập (Nhập lô tại cảng). Chủ, Quản lý, NV kho. */
+  addPurchaseReceipt: "purchasing.add_purchasereceipt",
+  /** Lô 10: ghi nhận / huỷ phiếu nhập (BE: change_purchasereceipt; huỷ còn xét người lập hoặc Chủ/Quản lý). */
+  changePurchaseReceipt: "purchasing.change_purchasereceipt",
+  /** Lô 10: xoá/huỷ phiếu của người khác (Chủ). */
+  deletePurchaseReceipt: "purchasing.delete_purchasereceipt",
+  /** Lô 10: thêm hoá đơn mua (chỉ Chủ). */
+  addPurchaseInvoice: "purchasing.add_purchaseinvoice",
+  /** Lô 10: nhập chi phí mua (chỉ Chủ). */
+  addPurchaseCost: "purchasing.add_purchasecost",
   viewStockReconciliation: "inventory.view_stockreconciliation",
   viewItem: "catalog.view_item",
   /** A2 (02-stories.md, hồ sơ 2026-09-26-anh-mat-hang): Tầng 2 riêng cho ảnh mặt hàng — Chủ, Quản lý có;

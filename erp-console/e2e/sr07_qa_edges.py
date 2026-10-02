@@ -19,6 +19,15 @@ API = os.environ.get("API", "http://127.0.0.1:8123")
 PW = os.environ.get("PW", "demo1234" if MODE == "mock" else "Songbien2026")
 SHOTS = os.environ.get("SHOTS", "/tmp")
 RATE = "81234"
+
+
+def forms(raw):
+    """Số tiền ở dạng gõ thô và dạng có dấu chấm nghìn (81234 -> 81.234): storage/URL/log không được chứa dạng nào."""
+    return {raw, f"{int(raw):,}".replace(",", ".")}
+
+
+def holds(text, raw):
+    return any(f in text for f in forms(raw))
 RSUB = "81000"  # ô giá có step=1000 -> số hợp lệ để gửi thật
 results = []
 console_msgs = []
@@ -53,9 +62,9 @@ def logout(page):
 
 
 def open_receive_batches(page):
-    page.goto(BASE + "/purchasing/")
+    page.goto(BASE + "/purchasing/new/")
     page.wait_for_load_state("networkidle")
-    page.wait_for_selector("input[placeholder='80000']", timeout=15_000)
+    page.wait_for_selector("input[name='rate-0']", timeout=15_000)
     page.wait_for_timeout(400)
 
 
@@ -79,22 +88,22 @@ def key_of(page):
 
 
 def rate_box(page):
-    return page.locator("input[placeholder='80000']").first
+    return page.locator("input[name='rate-0']").first
 
 
 def pick_supplier(page):
-    sel = page.locator("select").first
+    sel = page.locator("select[name='supplier']")
     if sel.input_value() == "":
         sel.select_option(index=1)
 
 
 def qty_box(page):
-    return page.locator("input[placeholder='0.000']").first
+    return page.locator("input[name='qty-0']").first
 
 
 def no_rate(page, val=RATE):
     st = storages(page)
-    return val not in st["local"] and val not in st["session"]
+    return not holds(st["local"], val) and not holds(st["session"], val)
 
 
 with sync_playwright() as p:
@@ -118,7 +127,7 @@ with sync_playwright() as p:
        qty_box(tab2).input_value() == "" and rate_box(tab2).input_value() == "")
     ok("A2 tab 2: key khác tab 1", bool(key_of(tab2)) and key_of(tab2) != key1)
     ok("A3 tab 2: storage không chứa 81234", no_rate(tab2))
-    ok("A4 localStorage dùng chung giữa 2 tab không chứa 81234", RATE not in storages(page)["local"])
+    ok("A4 localStorage dùng chung giữa 2 tab không chứa 81234", not holds(storages(page)["local"], RATE))
     tab2.close()
 
     # ---------- B. Phiên/trình duyệt khác (context riêng) ----------
@@ -146,7 +155,7 @@ with sync_playwright() as p:
     page.evaluate("() => sessionStorage.setItem('cave_draft_receive_batches:1', JSON.stringify({supplierId: 1, receivedDate: '2026-09-30', lines: [{item_code: '', qty: '77', shelf_life_days: null}], idempotencyKey: 'key-cua-chu'}))")
     page.reload()
     page.wait_for_load_state("networkidle")
-    page.wait_for_selector("input[placeholder='80000']", timeout=15_000)
+    page.wait_for_selector("input[name='rate-0']", timeout=15_000)
     page.wait_for_timeout(400)
     ok("C2b nháp của Chủ (userId 1) còn ở sessionStorage: warehouse_staff không thấy (qty rỗng) và không dùng key của Chủ", qty_box(page).input_value() != "77" and page.evaluate("() => { const k = Object.keys(sessionStorage).find(x => x.startsWith('cave_draft_receive_batches:') && !x.endsWith(':1')); return k ? JSON.parse(sessionStorage.getItem(k)).idempotencyKey : null }") not in (None, "key-cua-chu"))
     dumped = storages(page)["session"]
@@ -173,7 +182,7 @@ with sync_playwright() as p:
     page.evaluate("([u]) => sessionStorage.setItem('cave_draft_receive_batches:' + u, '{hỏng')", [uid])
     page.reload()
     page.wait_for_load_state("networkidle")
-    page.wait_for_selector("input[placeholder='80000']", timeout=15_000)
+    page.wait_for_selector("input[name='rate-0']", timeout=15_000)
     ok("E1 nháp JSON hỏng: form vẫn mở, ô rỗng", rate_box(page).input_value() == "" and qty_box(page).input_value() == "")
     page.evaluate(
         "([u, r]) => sessionStorage.setItem('cave_draft_receive_batches:' + u, JSON.stringify({supplierId: 1, receivedDate: '2026-09-30', "
@@ -182,15 +191,15 @@ with sync_playwright() as p:
     )
     page.reload()
     page.wait_for_load_state("networkidle")
-    page.wait_for_selector("input[placeholder='80000']", timeout=15_000)
+    page.wait_for_selector("input[name='rate-0']", timeout=15_000)
     page.wait_for_timeout(400)
     ok("E2 nháp cũ có rate: ô số lượng 9 còn, ô giá rỗng", qty_box(page).input_value() == "9" and rate_box(page).input_value() == "")
     ok("E3 sau khi nạp, nháp ghi lại đã bỏ rate (storage không còn 81234)", no_rate(page), storages(page)["session"][:200])
     ok("E4 key trong nháp cũ được giữ (cùng người)", key_of(page) == "k-cu")
 
     # ---------- F. URL + console ----------
-    ok("F1 URL không có query/giá mua/dữ liệu cá nhân", "?" not in page.url and RATE not in page.url, page.url)
-    bad = [m for m in console_msgs if RATE in m[1] or "0900" in m[1]]
+    ok("F1 URL không có query/giá mua/dữ liệu cá nhân", "?" not in page.url and not holds(page.url, RATE), page.url)
+    bad = [m for m in console_msgs if holds(m[1], RATE) or "0900" in m[1]]
     ok("F2 console không có 81234 hay SĐT", not bad, str(bad)[:200])
     # "Failed to fetch RSC payload" = prefetch của Next bị huỷ khi page.goto() chuyển trang giữa chừng (http.server tĩnh) — nhiễu môi trường, không thuộc SR-07.
     errs = [m for m in console_msgs if m[0] in ("error", "pageerror") and "favicon" not in m[1] and "Failed to fetch RSC payload" not in m[1]]
@@ -219,7 +228,7 @@ with sync_playwright() as p:
         # R1: bấm đúp
         open_receive_batches(page)
         pick_supplier(page)
-        page.locator("table select").first.select_option(index=1)
+        page.locator("select[name='item-0']").select_option(index=1)
         qty_box(page).fill("3")
         rate_box(page).fill(RSUB)
         btn = page.get_by_role("button", name="Ghi nhận phiếu nhập")
@@ -230,7 +239,7 @@ with sync_playwright() as p:
            f"posts={len(posts)} receipts_moi={len(receipts()) - base_n}")
         ok("R1b sau thành công: storage không chứa 81000", no_rate(page, RSUB))
         page.get_by_role("button", name="Nhập phiếu tiếp").click()
-        page.wait_for_selector("input[placeholder='80000']", timeout=10_000)
+        page.wait_for_selector("input[name='rate-0']", timeout=10_000)
         page.wait_for_timeout(400)
 
         # R2: server đã ghi nhưng mạng đứt lúc trả về -> người dùng F5 rồi gửi lại
@@ -248,7 +257,7 @@ with sync_playwright() as p:
         page.route("**/api/purchasing/receipts/receive-batches/", flaky)
         before = len(receipts())
         pick_supplier(page)
-        page.locator("table select").first.select_option(index=1)
+        page.locator("select[name='item-0']").select_option(index=1)
         qty_box(page).fill("4")
         rate_box(page).fill(RSUB)
         page.wait_for_timeout(400)
@@ -259,14 +268,14 @@ with sync_playwright() as p:
         ok("R2b server đã ghi 1 phiếu dù trình duyệt không nhận phản hồi", len(receipts()) - before == 1, str(len(receipts()) - before))
         page.reload()
         page.wait_for_load_state("networkidle")
-        page.wait_for_selector("input[placeholder='80000']", timeout=15_000)
+        page.wait_for_selector("input[name='rate-0']", timeout=15_000)
         page.wait_for_timeout(400)
         ok("R2c F5: nháp giữ số lượng 4, giá rỗng, cùng key", qty_box(page).input_value() == "4" and rate_box(page).input_value() == "" and key_of(page) == key_before,
            f"key_before={bool(key_before)} same={key_of(page) == key_before}")
         ok("R2d F5: storage không chứa 81000", no_rate(page, RSUB))
         pick_supplier(page)
-        if page.locator("table select").first.input_value() == "":
-            page.locator("table select").first.select_option(index=1)  # mặt hàng chưa được nháp lưu -> chọn lại
+        if page.locator("select[name='item-0']").input_value() == "":
+            page.locator("select[name='item-0']").select_option(index=1)  # mặt hàng chưa được nháp lưu -> chọn lại
         rate_box(page).fill(RSUB)  # người dùng gõ lại giá vì không được lưu
         page.get_by_role("button", name="Ghi nhận phiếu nhập").click()
         page.wait_for_timeout(1500)

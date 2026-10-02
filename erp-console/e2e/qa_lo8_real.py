@@ -122,9 +122,9 @@ with sync_playwright() as p:
         ok(f"[{tag}] Giao hàng/Hoàn tất: thấy phiếu GH-INV261001-* hoàn tất lúc 00:30 VN hôm nay", "GH-INV261001" in txt, txt[:500])
         page.screenshot(path=f"{SHOTS}/real-{tag}-deliveries-done.png")
         # Nhập lô: ngày mặc định
-        goto(page, "/purchasing/")
-        page.wait_for_selector("#received-date", timeout=10000)
-        ok(f"[{tag}] Nhập lô: ngày nhập mặc định = 2026-10-01 (hôm nay VN)", page.input_value("#received-date") == "2026-10-01", page.input_value("#received-date"))
+        goto(page, "/purchasing/new/")
+        page.wait_for_selector("[name=received_date]", timeout=10000)
+        ok(f"[{tag}] Nhập lô: ngày nhập mặc định = 2026-10-01 (hôm nay VN)", page.input_value("[name=received_date]") == "2026-10-01", page.input_value("[name=received_date]"))
         goto(page, "/overview/")
         txt = page.inner_text("body")
         ok(f"[{tag}] Tổng quan: không ISO thô, không token tiền sai", not re.search(r"\d{4}-\d{2}-\d{2}T\d{2}", txt) and not bad_money(txt), (bad_money(txt), txt[:300]))

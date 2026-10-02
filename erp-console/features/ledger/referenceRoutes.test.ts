@@ -16,9 +16,9 @@ describe("referenceHref", () => {
     expect(referenceHref({ kind: "weird", id: 7 })).toBeNull();
     expect(referenceHref(null)).toBeNull();
   });
-  it("đơn hàng → trang chi tiết đơn (Lô 3); phiếu nhập (Lô 10) chưa có trang → null", () => {
+  it("đơn hàng → trang chi tiết đơn (Lô 3); phiếu nhập → trang chi tiết phiếu (Lô 10)", () => {
     expect(referenceHref({ kind: "order", id: 12 })).toBe("/orders/detail/?id=12");
-    expect(referenceHref({ kind: "receipt", id: 12 })).toBeNull();
+    expect(referenceHref({ kind: "receipt", id: 12 })).toBe("/purchasing/detail/?id=12");
   });
   it("id không hợp lệ → null", () => {
     expect(referenceHref({ kind: "batch", id: 0 })).toBeNull();

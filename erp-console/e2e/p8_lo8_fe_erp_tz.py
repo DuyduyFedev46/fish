@@ -118,9 +118,9 @@ def collect(browser, tz):
     out["lot_detail"] = page.inner_text("body")
     if tz == "America/New_York":
         page.screenshot(path=f"{SHOTS}/lo8-erp-3c-chi-tiet-lo-ny.png")
-    goto(page, "/purchasing/")
-    page.wait_for_selector("#received-date", timeout=10_000)
-    out["received_date_default"] = page.input_value("#received-date")
+    goto(page, "/purchasing/new/")
+    page.wait_for_selector("[name=received_date]", timeout=10_000)
+    out["received_date_default"] = page.input_value("[name=received_date]")
     ctx.close()
 
     ctx = new_ctx(browser, tz)

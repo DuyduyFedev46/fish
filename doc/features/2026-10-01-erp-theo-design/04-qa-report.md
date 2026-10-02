@@ -1974,3 +1974,220 @@ Bước tái hiện: mọi quyền xem hàng chờ, viewport 768 đến 1440px: 
 - Bản copy sạch ngoài worktree: `npm ci`; `tsc --noEmit`; `vitest run` 437/437; `NEXT_PUBLIC_USE_MOCK=1 npm run build` + `check-ai-chunks`; `NEXT_PUBLIC_USE_MOCK=0 NEXT_PUBLIC_API_BASE=http://127.0.0.1:8120 npm run build` + `check-no-mock` + `check-ai-chunks`; `python3 scripts/check_naming.py` ở worktree.
 - Mock: `python3 -m http.server 3201` trên bản build sạch; chạy các script nêu trên.
 - Lưu ý harness: một lần `next build` bị treo (0% CPU), đã tắt và build lại sạch; không ảnh hưởng kết quả.
+
+## Lô 10 — FE · Mua hàng + phiếu nhập (ED-20) · lần 1 · 2026-10-02
+
+### Kết luận: REJECTED — 2 lỗi High và 3 lỗi Medium chặn. B1 là Critical của BE: gọi ghi nhận (submit) vào phiếu đã huỷ thì phiếu sống lại và sinh lô (sai tồn). B5 là lỗi FE: ô giá mua gõ "-5000" hoặc 14 chữ số bị gửi lặng lẽ thành 0 đ, không báo lỗi. Phần còn lại đạt.
+
+### Tổng: 801 ca · ✅ 792 · ❌ 9 · ⏸ 5 mục
+
+Worktree `loc-wt-c` (nhánh `ed-stream-c`, chưa commit). Mọi dữ liệu là dữ liệu giả. Bản chạy thật dùng Django 8130 trên SQLite tạm, console build trỏ 8130 phục vụ ở 3302; bản mock phục vụ ở 3301.
+
+**Lưu ý chạy lại:** QA Lô 11 đã chạy `pkill -f "manage.py runserver"` giữa chừng nên Django 8130 của tôi có thể đã bị tắt. Tôi dựng lại Django trên DB mới (migrate, `bootstrap_masterdata`, 5 tài khoản giả theo Group, nạp danh mục hàng và nhà cung cấp) rồi chạy lại **toàn bộ** `qa_ed_batch10_real.py` một lượt: 136 ca, 132 đạt, 4 đỏ (cùng 4 ca đỏ của lượt trước, không phải do tắt server). Số liệu bên dưới lấy từ lượt chạy lại này.
+
+### Theo AC
+
+| Mã AC | Kết quả | Bằng chứng |
+|---|---|---|
+| ED-20-AC1 (danh sách, chip, mã PR-n, khoá cột Tiền mua) | ✅ (kèm Low L1, L2) | Thật: `ph_loc_invoice_cost`, `ph_roles` (chip Nháp/Đã ghi nhận/Đã huỷ, mã mono, icon khoá). Mock: `qa_ed_batch10_mock.py`. Ảnh `qa10-w2a-loc-danh-sach.png` |
+| ED-20-AC2 (3 dòng, lưu, toast, bấm đúp = 1 phiếu) | ✅ | Thật: `ph_warehouse_receive` gửi đúng 3 dòng, đúng `item_code`, `idempotency_key` cố định; bấm đúp chỉ tạo 1 phiếu (đếm lại ở BE); F5 giữ nhà cung cấp và dòng. Ảnh `qa10-f1a-thanh-cong.png`, `qa10-f1a-sau-f5-nhap.png` |
+| ED-20-AC3 (lỗi: số kg 0) | ❌ B4 | Giữ nguyên các dòng khác: đạt. Nhưng câu báo là "Dòng 1: Khối lượng phải lớn hơn 0 kg." (không phải "Nhập số kg lớn hơn 0.") và nằm ở alert đầu form, ô không có `aria-invalid`, không có dòng đỏ dưới ô (UI-RULES §3). Ảnh `qa10-mock-f1a-qty-0.png`, `qa10-f1a-qty-0.png` |
+| ED-20-AC4 (chi phí phụ, tổng chia lệch) | ✅ | Thật: tự chia 2 lô, tổng chi phí 1.000.001 đ gửi đúng đồng, lô 0 đồng bị bỏ; chia lệch hiện alert đỏ và khoá nút Lưu; lỗi 503 giữ giá trị và hiện "Thử lại", thử lại bấm đúp ra đúng 1 chi phí. Ảnh `qa10-f1d-tu-chia.png`, `qa10-f1d-lech.png`, `qa10-f1d-loi-thu-lai.png` |
+| ED-20-AC5 (giá vốn với kho) | ✅ | Thật: `kho1` mở chi tiết phiếu, response R10 không có `rate`, `purchase_amount`, `landed_unit_cost`, `costs`; HTML không có giá bait 77777/66666/55555. Ảnh `qa10-w2b-kho1.png` |
+| ED-20-AC6 (quyền) | ✅ | Thật: `ql1` và `kho1` không thấy "Thêm chi phí phụ"; `POST /api/purchasing/costs/` bằng `ql1` nhận 403 |
+| Phụ: F1a lưu nháp không có giá mua | ✅ | Thật (`ph_draft_submit`): Lưu nháp gửi không có `rate` và toast nói rõ "Giá mua không được lưu"; ghi nhận nháp ra lô |
+| Phụ: W2b đủ thông tin theo bảng, khoá cạnh giá | ✅ (kèm Low L1, L3) | Mock + thật, so với `board-ERP-W2b-*.png`; ảnh `qa10-mock-w2b-loc-1366.png`, `qa10-w2b-loc-sau-chi-phi.png` |
+| Phụ: F1c thêm hoá đơn | ✅ (kèm L4) | Thật: amount `1650000.00` đúng đồng, `receipt` đúng, `is_paid` false; lỗi 400 giữ giá trị và có "Thử lại"; bấm đúp chỉ 1 hoá đơn. Ảnh `qa10-f1c-sau-luu.png`, `qa10-f1c-loi-400.png` |
+| Phụ: giá vốn qua 2 lô (chỉ Chủ) | ✅ | Thật: `landed_unit_cost` đổi đúng khi chia 1.000.001 đ vào 2 lô (cột Giá vốn/kg đọc 128.000 và 152.143); AuditLog `recompute_landed_cost` ghi đủ cho lô đổi giá |
+| Phụ: hồi quy `moneyInput` ở popup Lô 3 | ✅ | `qa_ed_batch3_money.py` MODE=mock: 231/231, 0 đỏ trên bản build mới (có sửa `moneyInput.ts`) |
+| Phụ: 360 px không cuộn ngang, console sạch | ✅ | `ph_mobile` thật: 6 màn x 360 px không cuộn ngang, chi tiết vẫn thấy mã phiếu và tiền mua; console sạch; ảnh `qa10-360-*.png` |
+| Phụ: hơn 50 phiếu, phân trang | ✅ | Thật: `ph_pagination` tạo 50 phiếu qua API, trang đầu 20, "Tải thêm" gom đủ, không trùng dòng. Ảnh `qa10-w2a-phan-trang.png` |
+
+### Ngoại lệ và biên
+
+| Ca | Kết quả |
+|---|---|
+| Số kg 0, âm, trống | ✅ chặn ở FE, không gửi API (câu báo lệch AC3, xem B4) |
+| Giá mua âm "-5000" | ❌ B5: ô giữ "-5000", không báo lỗi, body gửi `rate` "0" |
+| Giá mua 14 chữ số | ❌ B5: gửi `rate` "0", tạo phiếu, không báo lỗi |
+| Giá mua chữ ("abc") | ✅ ô rỗng |
+| Dán "1650000.5" vào ô tiền hoá đơn | ✅ bị từ chối, ô giữ nguyên (đúng quy ước Lô 3), ghi nhận |
+| Bấm đúp Lưu (F1a, F1c, F1d) | ✅ mỗi chỗ 1 bản ghi |
+| Lỗi 500 / 503 / 400 chèn bằng `page.route` | ✅ F1a, F1c, F1d giữ giá trị và hiện "Thử lại"; W2a hiện lỗi tải kèm nút tải lại, không lộ mã nội bộ BR- |
+| Màn cũ: phiếu bị huỷ ở nơi khác rồi bấm Ghi nhận | ❌ B1 |
+| Màn cũ: thêm hoá đơn vào phiếu đã huỷ | ❌ B2 |
+| Màn cũ: chia chi phí vào lô của phiếu đã huỷ | ❌ B3 |
+| Nhiều hoá đơn trên 1 phiếu | ghi nhận: BE nhận (201 lần 2), FE ẩn nút sau hoá đơn đầu (L4) |
+| Cờ AI / mock | ✅ bản mock và thật cùng chạy; `check-no-mock` sạch |
+
+### Phân quyền (bảng Group × hành động, chạy thật, đối chiếu API và giao diện)
+
+| Group | Xem danh sách / chi tiết phiếu | Tiền mua, giá mua, giá vốn | Tab Hoá đơn | Tab Chi phí / thêm chi phí | Nhập lô (F1a) |
+|---|---|---|---|---|---|
+| owner (`loc`) | có | thấy | có, thấy `amount` | có, tạo được | có |
+| manager (`ql1`) | có | không thấy (khoá) | có, thấy `amount` (D-3) | không, `POST costs` 403 | có |
+| warehouse_staff (`kho1`) | có | không thấy; `rate` không có trong response | không | không | có (nhập giá nhưng không đọc lại) |
+| delivery_staff (`giao1`) | không: API 403, menu không có mục, trang "Bạn không có quyền xem mục này" | không | không | không | không |
+| customer_service (`cs2`) | như `giao1` | không | không | không | không |
+| Chưa đăng nhập | 401 | không | không | không | không |
+
+Cả 3 tab (Phiếu nhập, Hoá đơn mua, Chi phí mua) chỉ hiện đúng theo quyền, ảnh `qa10-tab-hoa-don-loc.png`, `qa10-tab-chi-phi-loc.png`, `qa10-tab-hoa-don-ql1.png`.
+
+### Rò giá vốn
+
+Đạt. Chạy thật với phiếu "mồi" có giá 77777/66666/55555:
+- `ql1` và `kho1` gọi R10 danh sách và chi tiết: không có field nào trong `COST_KEYS` cộng `rate`, `costs`, `purchase_amount`. HTML và DOM của màn chi tiết không chứa số mồi. Token localStorage không chứa giá.
+- `GET /api/audit-logs/` bằng `ql1` (có quyền xem nhật ký): không có dòng `recompute_landed_cost` và không có `landed_unit_cost`. `kho1` nhận 403. AuditLog `changes` của `recompute_landed_cost` (chỉ Chủ đọc được) chứa `landed_unit_cost`, đúng thiết kế, và không có tên/SĐT/địa chỉ.
+- D-3: `ql1` thấy `amount` của hoá đơn đúng quyền `view_purchaseinvoice`, không thấy tiền mua của phiếu.
+
+### Rò dữ liệu cá nhân
+
+Đạt. Phiếu nhập không có dữ liệu khách. URL (`?id=n`), `localStorage` (token, cờ giao diện) và console qua cả 9 pha thật không chứa tên, SĐT, địa chỉ. Tên "Người lập" là tên tài khoản giả (`kho1`). Ảnh chỉ chứa dữ liệu giả. Console sạch ở mọi pha (đã lọc 3 nhiễu có sẵn: RSC prefetch của `http.server` tĩnh, `/api/ai/status/` 404, và "Failed to load resource" do tôi chủ động chèn lỗi).
+
+### Hồi quy (bản mock mới, cổng 3301, cùng bản build có Lô 10)
+
+| Bộ | Kết quả |
+|---|---|
+| `ed_batch10_purchasing.py` (của dev) | 92/92 |
+| `sr07_receive_batches_draft.py` | 20/20 |
+| `sr07_qa_edges.py` | 23/23 |
+| `ed_batch1_shell.py` | 56/56 |
+| `ed_batch7_inventory.py` | 114/114 |
+| `qa_ed_batch3_money.py` MODE=mock | 231/231 |
+| `ed_batch3_fixes.py` | 95/97. 2 ca đỏ (`h1_target_model`, `ai_block_payment_refund`) vì `window.__caveMock.aiOrderProposal is not a function`: khối mock AI nạp lười chưa kịp có khi test gọi. Có sẵn từ Lô 3, lô này không sửa `features/ai`; chạy 2 lần ra đúng 2 ca đó. Không tính vào lô |
+| `check_naming.py` | OK, không phát sinh tên mới (tôi đã đổi tên biến trong script của chính mình cho khớp) |
+
+### Lỗi
+
+#### B1 — Ghi nhận (submit) phiếu đã huỷ làm phiếu sống lại và sinh lô · Critical · BE · AC ED-20 (màn cũ)
+Bước tái hiện (BE thật, đã chạy lại bằng API trên DB mới): (1) `kho1` `POST /api/purchasing/receipts/receive-batches/` lập phiếu; (2) `loc` `POST /receipts/{id}/cancel/` -> 200, phiếu CANCELLED; (3) `loc` `POST /receipts/{id}/submit/` -> 200. Cách giao diện: mở chi tiết phiếu nháp ở tab A, huỷ bằng API/tab B, bấm "Ghi nhận phiếu" ở tab A.
+Mong đợi: 409/400 với thông báo rõ, phiếu vẫn CANCELLED, không sinh lô.
+Thực tế: 200, phiếu về SUBMITTED (đọc lại xác nhận), sinh lô mới. FE vì thế báo thành công (hai ca đỏ ở `ph_stale`: "Ghi nhận phiếu đã bị huỷ -> báo lỗi" và "phiếu đã huỷ KHÔNG được hồi sinh").
+Ảnh hưởng: sai tồn kho, huỷ chứng từ bị đảo ngược. `submit_receipt` đã idempotent cho lô nhưng không có chốt chặn trạng thái CANCELLED (`backend/apps/purchasing/receipts/services.py`).
+
+#### B2 — Hoá đơn gắn được vào phiếu đã huỷ · High · BE · AC ED-20 (màn cũ F1c)
+Bước tái hiện: tạo phiếu rồi huỷ như B1; `POST /api/purchasing/invoices/` bằng `loc` với `receipt` = id phiếu đã huỷ.
+Mong đợi: 400/409, không ghi.
+Thực tế: 201, hoá đơn 100.000 đ gắn vào PR đã huỷ.
+Ảnh hưởng: công nợ nhà cung cấp và tổng "đã có hoá đơn" sai số.
+
+#### B3 — Chia chi phí vào lô của phiếu đã huỷ · Medium · BE · AC ED-20-AC4 (màn cũ F1d)
+Bước tái hiện: như B1 để có phiếu huỷ và `batch` của dòng; `POST /api/purchasing/costs/` bằng `loc` với `receipt`, `allocations: [{batch, amount}]` của lô đã huỷ.
+Mong đợi: 400/409.
+Thực tế: 201, `recompute_landed_cost` chạy trên lô CANCELLED (đọc lại thấy `landed_unit_cost` của lô huỷ đổi từ 70000 sang 94000).
+Ảnh hưởng: giá vốn của lô đã huỷ bị sửa, dữ liệu kế toán lệch. Lô huỷ chưa bán nên chưa sai báo cáo lãi, vì vậy Medium.
+
+#### B4 — Lỗi số kg 0 không đúng câu và không nằm dưới ô · Medium · FE · AC ED-20-AC3
+Bước tái hiện: `/purchasing/new/`, chọn mặt hàng, để số kg 0, bấm Lưu.
+Mong đợi: ô số kg viền đỏ, một dòng đỏ dưới ô "Nhập số kg lớn hơn 0.", `aria-invalid`, các dòng khác giữ nguyên (UI-RULES §3).
+Thực tế: alert đầu form "Dòng 1: Khối lượng phải lớn hơn 0 kg."; ô không có `aria-invalid`, không có dòng đỏ dưới ô. Các dòng khác giữ nguyên (đạt). Ảnh `qa10-f1a-qty-0.png`.
+Ảnh hưởng: lệch AC, khó định vị ô lỗi với phiếu nhiều dòng.
+
+#### B5 — Ô giá mua nhận "-5000" hoặc 14 chữ số rồi lặng lẽ gửi 0 đ · High · FE · AC ED-20-AC2 (biên)
+Bước tái hiện: `/purchasing/new/`, thêm dòng, gõ "-5000" vào ô giá mua (hoặc dán 99.999.999.999.999), điền các ô còn lại, bấm Lưu.
+Mong đợi: báo lỗi dưới ô ("không được âm" hoặc "quá lớn"), không gửi API (theo quy ước ô tiền của `moneyInput.ts`: dấu trừ giữ lại để báo lỗi).
+Thực tế: ô giữ "-5000", không có lỗi nào, body gửi `rate: "0"` (`moneyBody` trả "0" khi regex `^\d{1,13}$` không khớp), phiếu được tạo với giá mua 0 đ (đã thấy PR mới ra giá 0 ở BE). Ảnh `qa10-f1a-gia-am.png`.
+Ảnh hưởng: giá mua sai nhưng không ai biết; dẫn đến giá vốn sai khi Chủ không soát lại. Cùng họ với quy ước "tiền không đoán" của Lô 3.
+
+#### Ghi nhận Low (không chặn)
+- L1: W2a thiếu dòng "Phiếu nhập · n phiếu · tổng kg" trong thẻ bảng như `board-ERP-W2a`; tên cột lệch bảng ("Phiếu" so với "Mã phiếu", "Tổng kg" so với "Số kg", "Hoá đơn" so với "Hoá đơn mua"), thiếu cột Lô, Người nhập, Ghi chú. Chưa rõ bảng nào là chuẩn nên để PO/UI review quyết.
+- L2: Menu "…" ở chi tiết phiếu thiếu "Ghi hoá đơn mua", "Ghi chi phí mua", "Đăng bán lô" so với bảng W2b (có "Nhập chi phí mua", "Huỷ phiếu", "Sao chép mã phiếu", "Xem nhật ký của phiếu").
+- L3: Chi tiết cột Giá mua/kg, Thành tiền, Giá vốn/kg có chữ "(cột giới hạn quyền xem)" kèm icon khoá, đạt yêu cầu; chỉ nhắc để UI review xem độ rộng ở 360 px đã ổn (không cuộn ngang).
+- L4: BE cho nhiều hoá đơn trên một phiếu, FE ẩn nút "Thêm hoá đơn" khi phiếu đã có hoá đơn đầu. Cần PO chốt đây có phải ý định hay không.
+- L5: Gõ từng phím "0,5", "1,5" hay "150.000,50" vào ô tiền bị đọc dấu thập phân như dấu nhóm (chỉ dán nguyên chuỗi mới bắt phần lẻ). Có sẵn từ Lô 3 (đã ghi ở `qa_ed_batch3_money.py`), không do lô này.
+- L6: Tạo hoá đơn mua (`POST invoices`) không ghi AuditLog riêng; chi phí chỉ để lại dấu qua `recompute_landed_cost`. Nhờ techlead xác nhận hành động nào của Tầng 2 phải có bản ghi riêng.
+
+### ⏸ Chưa kiểm
+1. Bộ lọc danh sách phiếu (trạng thái, nhà cung cấp, có/không hoá đơn, khoảng ngày) trên BE thật: chỉ chạy trên mock (nằm trong `ed_batch10_purchasing.py` 92/92).
+2. Đồng thời thật (2 người bấm cùng lúc, 2 đơn tranh 1 lô) trên Postgres: SQLite ghi tuần tự, nên chỉ kiểm được bấm đúp.
+3. Thiết bị di động thật và Safari: chỉ có Chromium giả lập 360 px.
+4. Chạy với dữ liệu Postgres production (số phiếu lớn hơn 50, tiền cỡ tỉ đồng).
+5. Báo cáo tuần/tháng có dùng `landed_unit_cost` sau khi chia chi phí: thuộc lô báo cáo, chưa có màn.
+
+### Lệnh đã chạy (cuối lượt, bản mock 3301, bản thật 3302 + Django 8130)
+- `npm ci` (sạch, không `--legacy-peer-deps`, chạy đầu lượt) -> `npx tsc --noEmit` sạch (chạy lại cuối lượt: exit 0) -> `npx vitest run`: 59 file, 619/619 (gồm cả test của Lô 11 cùng worktree).
+- `npm run build` hai bản: MOCK=1 và MOCK=0 trỏ 8130; `check-no-mock` và `check-ai-chunks` sạch.
+- `python3 -u e2e/qa_ed_batch10_real.py` (BE thật, DB mới): **136 ca, PASS 132, FAIL 4** (B1 x2, B2, B3). Chạy lại trọn vẹn sau khi Django bị tắt.
+- `BASE=http://127.0.0.1:3301 python3 -u e2e/qa_ed_batch10_mock.py`: **32 ca, PASS 29, FAIL 3** (B4, B5, L1). Hai lượt liên tiếp cho cùng kết quả sau khi tôi thêm `settle()` chống ca chập chờn của chính tôi.
+- Các bộ có sẵn: số liệu ở bảng Hồi quy.
+- `python3 scripts/check_naming.py`: OK.
+- Tái hiện B1, B2, B3 bằng gọi API trực tiếp trên DB mới (xem từng lỗi).
+
+Tệp: kịch bản mới `erp-console/e2e/qa_ed_batch10_real.py`, `erp-console/e2e/qa_ed_batch10_mock.py`; ảnh trong `doc/features/2026-10-01-erp-theo-design/shots/lot10/` (`qa10-*.png`). Đã tắt server 3301, 3302, Django 8130 của riêng tôi.
+
+---
+
+### Lô 10 — FE lần 2 · Mua hàng + phiếu nhập (ED-20) · 2026-10-02
+
+#### Kết luận: REJECTED — B1 đến B5 của lần 1 đã sửa xong và qua kiểm trên BE thật. Nhưng lần này tìm thêm N1 (Medium): giá mua từ 11 chữ số trở lên (≥ 10.000.000.000 đ/kg) làm BE trả 500 và FE hiện "Lỗi máy chủ (500)", trong khi FE cho gõ tới 12 chữ số. Medium thì chặn theo luật. Điều phối viên có thể miễn nếu coi đây là nợ BE có sẵn (xem N1).
+
+#### Tổng: 888 ca · ✅ 883 · ❌ 5 · ⏸ 4 mục
+Ba ca ❌ là lỗi của Lô 10 (N1 một ca, N2 hai ca). Hai ca ❌ còn lại là hai ca cũ của `ed_batch3_fixes` (nợ có sẵn, không thuộc Lô 10). Chưa tính 4 cổng build (npm ci, tsc, vitest 635, 2 bản build) đều xanh.
+
+| Bộ kiểm | Kết quả |
+|---|---|
+| `qa_ed_batch10_real.py` (BE thật 8130, DB sạch) | 143/143 |
+| `qa_ed_batch10_mock.py` | 33/33 |
+| `qa_ed_batch10_second_pass.py` (mới: API, lô quá hạn, đồng thời, màn hình cũ) | 39/42, ❌ N1, N2 |
+| `ed_batch10_purchasing.py` (có kịch bản Django thật) | 129/129 |
+| `sr07_receive_batches_draft.py` | 20/20 |
+| `sr07_qa_edges.py` | 23/23 |
+| `ed_batch1_shell.py` (bản copy trỏ `OUT_404` về bản build sạch, vì `http.server` không có 404 fallback) | 56/56 |
+| `ed_batch7_inventory.py` | 114/114 |
+| `ed_batch3_fixes.py` | 95/97 (2 ca cũ: `window.__caveMock.aiRefundProposal` không có; có từ trước Lô 10) |
+| `qa_ed_batch3_money.py` MODE=mock | 231/231 |
+| `qa_ed_batch3_money.py` MODE=real | ⏸ không áp dụng: kịch bản dựng sẵn phiếu hoàn của Lô 3, DB sạch của Lô 10 không có |
+
+#### Bằng chứng theo lỗi lần 1 (chạy thật, BE ở commit `bb0137c`)
+| Mã | Kết quả | Bằng chứng |
+|---|---|---|
+| B1 (Critical, BE) gọi ghi nhận vào phiếu đã huỷ làm phiếu sống lại và sinh lô | ✅ đã sửa | Với `loc`, `ql1`, `kho1`: `POST /receipts/{id}/submit/` trên phiếu huỷ trả 400 `RECEIPT_NOT_DRAFT`, phiếu vẫn `CANCELLED`, số lô và tồn không đổi. Chưa đăng nhập 401. Màn hình cũ (phiếu mở sẵn rồi bị người khác huỷ) bấm "Ghi nhận": báo lỗi, phiếu không sống lại. Ảnh `shots/lot10/qa10-l2-b1-man-cu-ghi-nhan.png` |
+| B2 (High, BE) gắn hoá đơn vào phiếu huỷ | ✅ đã sửa | API trả 400 `RECEIPT_CANCELLED`, không sinh hoá đơn. Màn hình cũ: báo lỗi, form giữ nguyên số tiền. Ảnh `qa10-l2-b2-man-cu-hoa-don.png` |
+| B3 (High, BE) chia chi phí vào lô của phiếu huỷ | ✅ đã sửa | API trả 400 `BATCH_CANCELLED`, giá vốn nhập của lô huỷ không đổi. Lô huỷ vì quá hạn vẫn nhận chi phí đến muộn: trả 201, 54.000 đ (đúng theo yêu cầu điều phối viên). Ảnh `qa10-l2-b3-man-cu-chi-phi.png` |
+| B4 (Medium, FE) | ✅ đã sửa | Ô tiền giờ báo lỗi dưới ô khi nhập sai, không gửi 0 đ lặng lẽ (cả gõ từng phím lẫn dán bằng Ctrl+V thật). Chạy trong `qa_ed_batch10_real.py` và `qa_ed_batch10_mock.py` |
+| B5 (Medium, FE) gõ "-5000" hoặc 14 chữ số | ✅ đã sửa | Gõ "-5000": ô giữ "-5000", dưới ô có câu "Giá mua không được âm. Nhập lại, ví dụ 150.000.", không có POST. 13 và 14 chữ số: lỗi dưới ô, không có POST. Ảnh `qa10-f1a-gia-am.png`, `qa10-f1a-gia-14-chu-so.png` |
+| TL-L1/L2/L3, QA-L1 (theo dev-notes) | ✅ | Ca kg: câu lỗi "Nhập số kg lớn hơn 0." đúng chữ; các ca còn lại nằm trong 143 + 33 ca ở trên, không có ca đỏ |
+
+Mỗi AC nghiệp vụ có ít nhất một ca ngoài đường thuận: màn hình cũ sau khi trạng thái đổi (B1 đến B3), thao tác lặp (submit lần hai nay phải 400, kiểm trong script), đổi vai, lô quá hạn, giá trị biên 0/âm/13 chữ số.
+
+#### Lỗi mới
+##### N1 — Giá mua ≥ 10.000.000.000 đ/kg: BE 500, FE hiện "Lỗi máy chủ (500)" · Medium · AC ghi nhận phiếu nhập (ED-20)
+Bước tái hiện (API, đã chạy lại lượt này, DB sạch):
+1. Đăng nhập `kho1`, `POST /api/purchasing/receipts/receive-batches/` với `supplier=2`, một dòng `item_code=MUC-ONG`, `qty="1"`, `expiry_date` hợp lệ.
+2. `rate="9999999999"` (10 chữ số): 201.
+3. `rate="10000000000"` (11 chữ số) hoặc `rate="999999999999"` (12 chữ số): **500** (`decimal.InvalidOperation`).
+Bước tái hiện (giao diện, bản thật 3302): đăng nhập `kho1`, mở Nhập kho, chọn NCC và mặt hàng, gõ giá mua từng phím `999999999999` (12 chữ số), bấm "Ghi nhận phiếu nhập" → thanh báo "Lỗi máy chủ (500). Thử lại sau."
+Mong đợi: lỗi nhập liệu dưới ô giá, hoặc BE trả 400 có mã. Thực tế: 500.
+Nguyên nhân (đọc ở cả hai bên, đã xác nhận bằng ca chạy thật): `Batch.landed_unit_cost` là `max_digits=14, decimal_places=4`, tức tối đa 10 chữ số phần nguyên, trong khi serializer `rate` cho 12 chữ số và FE cho gõ 12 chữ số. Lỗi này BE có từ trước Lô 10, nhưng dev-notes FE nói giới hạn 12 chữ số "khớp BE" thì chưa đúng.
+Ảnh hưởng: giá 10 tỷ đ/kg không có trong thực tế nên rủi ro vận hành thấp; giao dịch không ghi dở (500 trước khi ghi). Vẫn là lỗi ngoại lệ biên theo luật.
+Cách sửa gợi ý (chọn một): BE giới hạn `rate` ≤ 10 chữ số phần nguyên (trả 400 `field`), hoặc FE hạ giới hạn xuống 10 chữ số. Nên làm cả hai để khớp nhau.
+Ca script: "B5 giá 12 chữ số … không được ra lỗi máy chủ 500" trong `qa_ed_batch10_second_pass.py`.
+
+##### N2 — Lỗi màn hình cũ của B2/B3 hiện mã luật "(BR-MH-07)" trên màn hình · Low · UI-RULES §1
+Bước tái hiện: mở phiếu A bằng hai tab; tab 1 huỷ phiếu; tab 2 (màn hình cũ) bấm "Thêm hoá đơn" rồi lưu, hoặc "Nhập chi phí mua" rồi lưu → thanh lỗi có đuôi "(BR-MH-07)".
+Mong đợi: câu tiếng Việt thường, không mã BR-. Thực tế: có mã. Câu vẫn hiểu được, form và số tiền giữ nguyên. Ghi nhận, không chặn. Hai ca: "B2 giao diện … không chứa 'BR-'" và "B3 giao diện …" trong script second pass.
+
+#### Phân quyền, rò giá vốn, rò dữ liệu cá nhân (chạy lại trên bản mới)
+- Phân quyền: `loc` (owner), `ql1` (manager), `kho1` (warehouse_staff), chưa đăng nhập: bảng ma trận của lần 1 không đổi; thêm ca submit/huỷ/gắn hoá đơn/chi phí trên phiếu huỷ cho cả ba vai và 401 khi chưa đăng nhập; chi phí mua vẫn chỉ owner. Không có ca đỏ.
+- Rò giá vốn: JSON của `ql1`/`kho1` và HTML không có khoá giá vốn; mã lỗi mới `RECEIPT_NOT_DRAFT`, `RECEIPT_CANCELLED`, `BATCH_CANCELLED` không kèm số tiền hay kg, không tính ngược ra giá vốn được. Ghi nhật ký (AuditLog) cho huỷ phiếu và chi phí vẫn có.
+- Rò dữ liệu cá nhân: URL, console, `localStorage` không chứa tên/SĐT/địa chỉ (ca F1/F2/F3 của `sr07_qa_edges` 23/23); chỉ dùng dữ liệu giả.
+
+#### Quan sát cho PO (không phải lỗi)
+- Ô "Giá mua" để trống thì gửi 0 đ và lô ghi giá vốn 0 (điều phối viên đã nêu với Duy là việc #22).
+- Số kg gõ "1.000" được gửi thành qty "1" (hiểu như số thập phân kiểu Mỹ). Người dùng Việt có thể hiểu "1.000" là một nghìn kg. Chưa kết luận lỗi, nhờ PO quyết định có chặn dấu chấm ở ô kg không.
+
+#### ⏸ Chưa kiểm
+1. Đồng thời thật trên Postgres (2 đơn tranh một lô, huỷ và ghi hoá đơn cùng lúc): SQLite báo "database is locked" khi ghi song song nên kết quả không đáng tin, ca đã ghi chú.
+2. Điện thoại thật và Safari (chỉ có viewport 360 px trên Chromium, đạt).
+3. Lọc danh sách trên BE thật (bộ lọc chỉ được phủ ở bản mock, 33/33).
+4. Dữ liệu cỡ production (hàng nghìn phiếu).
+
+#### Ghi chú trung thực về môi trường
+- `git merge main` trong worktree `loc-wt-c` bị từ chối vì có thay đổi chưa commit (không phải xung đột). Tôi không stash hay đụng việc của người khác. Thay vào đó đã `git archive` phần `backend` ở commit `bb0137c` vào thư mục tạm và chạy Django 8130 từ đó, nên BE đã chạy là bản có sửa B1 đến B3. Cần merge thật `main` trước khi commit.
+- Đã khởi động lại Django vài lần và chuyển sang DB sạch `db5` cho các lần chạy chính thức, vì DB cũ bị dữ liệu thử của tôi làm nhiễu số đếm. Mật khẩu `ql1`/`kho1` trong DB tạm đổi thành `Songbien2026` để `ed_batch10_purchasing.py` (dùng một mật khẩu chung) chạy kịch bản thật; đây chỉ là DB tạm của tôi.
+- Ba script QA mình sửa/thêm: `erp-console/e2e/qa_ed_batch10_real.py`, `qa_ed_batch10_mock.py`, `qa_ed_batch10_second_pass.py`. `scripts/check_naming.py` đạt.
+
+#### Lệnh đã chạy
+- `npm ci` (không `--legacy-peer-deps`) sạch; `npx tsc --noEmit` 0 lỗi; `npx vitest run` 61 file / 635 ca xanh.
+- Hai bản build (mock `NEXT_PUBLIC_USE_MOCK=1` cổng 3301, thật `MOCK=0` + `NEXT_PUBLIC_API_BASE=http://127.0.0.1:8130` cổng 3302) xanh; `check-no-mock.mjs` và `check-ai-chunks.mjs` đạt.
+- Các bộ E2E trong bảng trên; kết quả đầy đủ trong bảng.
