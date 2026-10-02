@@ -1,142 +1,228 @@
-// Màn Nhật ký hoạt động (S03-FE, chốt Duy 27/09: dù admin hay nhân viên đều xem ở ERP).
-// Contract: GET /api/audit-logs/?page=&actor_kind=&action= (02b mục 3 S03) — quyền accounts.view_auditlog
-// (owner + manager); warehouse_staff/delivery_staff → 403 (S03-AC5) → ViewGuard đã chặn trước khi gọi API.
-// S03-AC2: dòng AI hiện actor "ai:<tên user>" rõ ràng kèm lệnh + thời điểm.
-// S03-AC4: KHÔNG chép tên/SĐT/địa chỉ khách vào hiển thị — chỉ hiện nguyên văn các trường API trả
-// (BE đảm bảo changes/note chỉ chứa mã đơn/mã lệnh/mã đề xuất); màn này không tự nối thêm gì.
-// Dữ liệu: dùng getAuditLogs/AuditLogRow của features/ai (endpoint thuộc hồ sơ AI Lô 1); mock Lô 1
-// đặt ở features/ai/mock.ts theo phân công — bỏ mock khi BE Lô 1 xong.
-
 "use client";
 
-import { useState } from "react";
+// Màn Nhật ký hoạt động (ED-41 / W3f): /audit-logs/. Khung ListPage: nhóm nút Tất cả/Người/AI/Hệ thống · ô tìm mã chứng từ ·
+// chọn thao tác · (Chủ) chọn người · khoảng ngày · bảng 8 cột · "Tải thêm". Chỉ xem: không sửa, không xoá (BR-PQ-06).
+// Lọc loại người / thao tác / người làm chạy phía BE (`?actor_kind=&action=&actor=`); tìm mã và khoảng ngày lọc phía máy
+// trong các dòng đã tải (BE chưa có) — màn nói rõ điều này. "Người duyệt" suy từ dòng duyệt cùng mã đề xuất (BE chưa có trường).
+// Dữ liệu cá nhân: cột "Thay đổi" chỉ in khoá trong danh sách trắng (auditModel.changeSummary), không bao giờ in JSON thô;
+// tên đăng nhập chỉ ở bộ nhớ trang (không URL, không storage, không log). Giá vốn: BE đã bỏ khoá giá vốn khỏi `changes` khi thiếu quyền.
+
+import { useMemo, useState } from "react";
+import { useAuth } from "@/features/auth/components/AuthProvider";
+import { useStaffList } from "@/features/staff/useStaffData";
 import { dateTime } from "@/shared/lib/format";
+import { ApiError, loadErrorText } from "@/shared/lib/http";
+import { canView } from "@/shared/lib/nav";
 import { usePagedList } from "@/shared/lib/usePagedList";
 import { Icon } from "@/shared/ui/Icon";
-import { Empty, ErrorBox, Loading } from "@/shared/ui/StateBox";
-import { getAuditLogs } from "@/features/ai/api";
-import type { AuditActorKind, AuditLogRow, AuditLogParams } from "@/features/ai/types";
-import { AUDIT_MSG } from "@/features/ai/messages";
+import { DataTable, type Column } from "@/shared/ui/list/DataTable";
+import { FilterBar, type FilterSelect } from "@/shared/ui/list/FilterBar";
+import { ListPage } from "@/shared/ui/list/ListPage";
+import { NoPermission } from "@/shared/ui/states/NoPermission";
+import { getAuditLogs } from "../api";
+import { AUDIT_ACTION_LABELS, AUDIT_FILTER_ACTIONS, KIND_OPTIONS, actionLabel, actorInitial, actorName, approverOf, buildApproverMap, changeSummary, matchesLocal } from "../auditModel";
+import { AUDIT_MSG as M } from "../messages";
+import type { AuditLogParams, AuditLogRow } from "../types";
 import s from "../audit.module.css";
 
-const KINDS: { key: "" | AuditActorKind; label: string }[] = [
-  { key: "", label: AUDIT_MSG.filterAll },
-  { key: "user", label: AUDIT_MSG.filterUser },
-  { key: "ai", label: AUDIT_MSG.filterAi },
-  { key: "system", label: AUDIT_MSG.filterSystem },
-];
-
 function ActorCell({ row }: { row: AuditLogRow }) {
-  if (row.actor_kind === "ai") {
-    return (
-      <span className={s.actor}>
-        <span className={`tag ${s.aiTag}`}>{AUDIT_MSG.actorAi}</span>
-        <b className={s.aiActor}>{row.actor_display}</b>
-      </span>
-    );
-  }
   if (row.actor_kind === "system") {
     return (
       <span className={s.actor}>
-        <span className={s.actorName}>{row.actor_display}</span>
+        <span className={`${s.avatar} ${s.avatarSystem}`} aria-hidden="true">
+          <Icon name="sync_alt" />
+        </span>
+        <span>{M.system}</span>
       </span>
     );
   }
-  return <span className={`${s.actor} ${s.actorName}`}>{row.actor_display}</span>;
+  const isAi = row.actor_kind === "ai";
+  return (
+    <span className={s.actor}>
+      <span className={`${s.avatar} ${isAi ? s.avatarAi : ""}`} aria-hidden="true">
+        {actorInitial(row)}
+      </span>
+      <span className={s.actorText}>
+        <span className={s.actorName}>{actorName(row)}</span>
+        {isAi && <span className={`tag ${s.aiTag}`}>{M.aiTag}</span>}
+      </span>
+    </span>
+  );
 }
 
-function Row({ row }: { row: AuditLogRow }) {
-  const changesKeys = row.changes ? Object.keys(row.changes).length : 0;
+function ChangesCell({ row }: { row: AuditLogRow }) {
+  const parts = changeSummary(row.changes);
+  if (!parts.length) return <span className="muted">{M.noValue}</span>;
   return (
-    <li className={s.row}>
-      <div className={s.main}>
-        <div className={s.line1}>
-          <ActorCell row={row} />
-          <span className={s.action}>{row.action}</span>
-        </div>
-        <div className={s.line2}>
-          {row.object_repr ? <span className={`code ${s.obj}`}>{row.object_repr}</span> : null}
-          {row.note ? <span className={s.note}>{row.note}</span> : null}
-          {row.proposal_ref ? (
-            <span className={s.proposal}>
-              {AUDIT_MSG.proposal} <span className="code">{row.proposal_ref}</span>
-            </span>
-          ) : null}
-        </div>
-        {changesKeys > 0 ? (
-          <details className={s.changes}>
-            <summary>
-              {AUDIT_MSG.changes}: {changesKeys} trường
-            </summary>
-            <pre className={`code ${s.changesJson}`}>{JSON.stringify(row.changes, null, 2)}</pre>
-          </details>
-        ) : null}
-      </div>
-      <time className={`num ${s.time}`} dateTime={row.created_at}>
-        {dateTime(row.created_at)}
-      </time>
-    </li>
+    <ul className={s.changes}>
+      {parts.map((p) => (
+        <li key={p}>{p}</li>
+      ))}
+    </ul>
   );
 }
 
 export function AuditLogScreen() {
-  const [params, setParams] = useState<AuditLogParams>({ actor_kind: "" });
-  const { rows, loading, error, hasMore, moreLoading, moreError, loadMore, reload } = usePagedList<
-    AuditLogRow,
-    AuditLogParams
-  >((p, page) => getAuditLogs(p, page), params, true);
+  const { me } = useAuth();
+  const canPickActor = canView(me, "staff");
+  const staff = useStaffList(!!me && canPickActor);
+
+  const [kind, setKind] = useState<AuditLogParams["actor_kind"]>("");
+  const [action, setAction] = useState("");
+  const [actor, setActor] = useState("");
+  const [q, setQ] = useState("");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+
+  const params = useMemo<AuditLogParams>(() => ({ actor_kind: kind, action, actor: actor ? Number(actor) : undefined }), [kind, action, actor]);
+  const list = usePagedList<AuditLogRow, AuditLogParams>((p, page) => getAuditLogs(p, page), params, !!me);
+
+  const approvers = useMemo(() => buildApproverMap(list.rows ?? []), [list.rows]);
+  const shown = useMemo(() => (list.rows ? list.rows.filter((r) => matchesLocal(r, { query: q, from, to })) : null), [list.rows, q, from, to]);
+
+  if (list.error instanceof ApiError && list.error.status === 403 && !list.rows) return <NoPermission />;
+
+  const localActive = !!(q.trim() || from || to);
+  const serverActive = !!(kind || action || actor);
+
+  const selects: FilterSelect[] = [
+    {
+      key: "action",
+      label: M.actionLabel,
+      value: action,
+      onChange: setAction,
+      options: [{ value: "", label: M.allActions }, ...AUDIT_FILTER_ACTIONS.map((a) => ({ value: a, label: AUDIT_ACTION_LABELS[a] }))],
+    },
+  ];
+  if (canPickActor && staff.data) {
+    selects.push({
+      key: "actor",
+      label: M.actorSelectLabel,
+      value: actor,
+      onChange: setActor,
+      options: [{ value: "", label: M.allActors }, ...staff.data.map((u) => ({ value: String(u.id), label: u.display_name || u.username }))],
+    });
+  }
+
+  const columns: Column<AuditLogRow>[] = [
+    {
+      key: "time",
+      header: M.colTime,
+      num: true,
+      width: "132px",
+      render: (r) => <time dateTime={r.created_at}>{dateTime(r.created_at)}</time>,
+    },
+    { key: "actor", header: M.colActor, width: "176px", render: (r) => <ActorCell row={r} /> },
+    {
+      key: "approver",
+      header: M.colApprover,
+      hideBelow: 980,
+      width: "120px",
+      render: (r) => approverOf(r, approvers) ?? <span className="muted">{M.noValue}</span>,
+    },
+    { key: "action", header: M.colAction, width: "200px", render: (r) => actionLabel(r.action) },
+    { key: "object", header: M.colObject, mono: true, hideBelow: 720, width: "148px", render: (r) => r.object_repr || <span className="muted">{M.noValue}</span> },
+    { key: "note", header: M.colNote, hideBelow: 1100, render: (r) => r.note || <span className="muted">{M.noValue}</span> },
+    { key: "changes", header: M.colChanges, hideBelow: 800, render: (r) => <ChangesCell row={r} /> },
+    { key: "proposal", header: M.colProposal, mono: true, hideBelow: 1100, width: "88px", render: (r) => r.proposal_ref || <span className="muted">{M.noValue}</span> },
+  ];
+
+  const summary =
+    shown && list.rows
+      ? localActive
+        ? M.shownLoaded(shown.length, list.rows.length, list.count)
+        : M.shown(shown.length, list.count)
+      : undefined;
+
+  const refreshFailed = list.rows !== undefined && list.error != null && !list.loading;
+  const clearAll = () => {
+    setQ("");
+    setFrom("");
+    setTo("");
+    setKind("");
+    setAction("");
+    setActor("");
+  };
 
   return (
-    <div className={s.screen}>
-      <div className={s.bar}>
-        <div className="seg" role="group" aria-label={AUDIT_MSG.filterAll}>
-          {KINDS.map((k) => (
-            <button
-              key={k.key || "all"}
-              type="button"
-              className={params.actor_kind === k.key ? "on" : ""}
-              aria-pressed={params.actor_kind === k.key}
-              onClick={() => setParams({ actor_kind: k.key })}
-            >
-              {k.label}
+    <ListPage
+      banner={
+        refreshFailed ? (
+          <div className="alert-box err" role="alert">
+            <Icon name="sync_problem" />
+            <span>{loadErrorText(list.error)}</span>
+            <button type="button" className="btn" onClick={() => void list.reload()}>
+              {M.retry}
             </button>
-          ))}
-        </div>
-        <button type="button" className={`iconbtn ${s.refresh}`} aria-label={AUDIT_MSG.refresh} onClick={() => reload()}>
-          <Icon name="refresh" />
-        </button>
-      </div>
-
-      {loading && rows === undefined ? <Loading label={AUDIT_MSG.title} /> : null}
-      {error && rows === undefined ? (
-        <ErrorBox message={error instanceof Error ? error.message : AUDIT_MSG.empty} />
-      ) : null}
-      {rows && rows.length === 0 && !loading ? (
-        <Empty icon="history" title={AUDIT_MSG.empty}>
-          {AUDIT_MSG.emptyHint}
-        </Empty>
-      ) : null}
-
-      {rows && rows.length > 0 ? (
-        <>
-          <ul className={s.rows}>
-            {rows.map((r) => (
-              <Row key={r.id} row={r} />
-            ))}
-          </ul>
-          <div className={s.more}>
-            {moreError ? (
-              <button type="button" className="btn" onClick={() => loadMore()}>
-                {moreError instanceof Error ? moreError.message : AUDIT_MSG.loadMore}
-              </button>
-            ) : hasMore ? (
-              <button type="button" className="btn" disabled={moreLoading} onClick={() => loadMore()}>
-                {moreLoading ? "Đang tải…" : AUDIT_MSG.loadMore}
-              </button>
-            ) : null}
           </div>
+        ) : undefined
+      }
+      filters={
+        <>
+          <div className={s.kinds}>
+            <div className="seg" role="group" aria-label={M.kindLabel}>
+              {KIND_OPTIONS.map((k) => (
+                <button key={k.key || "all"} type="button" aria-pressed={kind === k.key} onClick={() => setKind(k.key)}>
+                  {k.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <FilterBar
+            query={q}
+            onQuery={setQ}
+            placeholder={M.searchPlaceholder}
+            searchLabel={M.searchLabel}
+            selects={selects}
+            dateRange={{ from, to, onFrom: setFrom, onTo: setTo }}
+            summary={summary}
+          />
         </>
-      ) : null}
-    </div>
+      }
+      footer={
+        <div className={s.foot}>
+          {list.moreError ? (
+            <button type="button" className="btn" onClick={() => void list.loadMore()}>
+              {M.loadMoreFailed}
+            </button>
+          ) : list.hasMore ? (
+            <button type="button" className="btn" disabled={list.moreLoading} onClick={() => void list.loadMore()}>
+              {list.moreLoading ? M.loadingMore : M.loadMore}
+            </button>
+          ) : null}
+          <p className={s.note}>{localActive ? `${M.localNote} ${M.readOnly}` : M.readOnly}</p>
+        </div>
+      }
+      onRetry={() => void list.reload()}
+    >
+      <DataTable
+        caption={M.caption}
+        columns={columns}
+        rows={shown}
+        rowKey={(r) => r.id}
+        dense
+        loading={list.loading && list.rows === undefined}
+        error={list.rows === undefined && list.error != null ? loadErrorText(list.error) : null}
+        onRetry={() => void list.reload()}
+        query={q.trim()}
+        onClearQuery={() => setQ("")}
+        noun={M.noun}
+        empty={
+          serverActive || localActive
+            ? {
+                icon: "filter_alt_off",
+                title: M.emptyFiltered,
+                hint: M.emptyFilteredHint,
+                action: (
+                  <button type="button" className="btn" onClick={clearAll}>
+                    Bỏ lọc
+                  </button>
+                ),
+              }
+            : { icon: "history", title: M.emptyTitle, hint: M.emptyHint }
+        }
+        canViewCost={false}
+      />
+    </ListPage>
   );
 }

@@ -447,7 +447,8 @@ with sync_playwright() as p:
     dlg.get_by_label("Nhập lại mật khẩu mới").fill("Cangca2026x")
     t_before = token(page)
     dlg.get_by_role("button", name="Đổi mật khẩu").click()
-    expect(page.locator(".alert-box.ok span")).to_have_text(msg(page, "passwordChanged"))
+    # Lô 15 (ED-06): đổi mật khẩu ở trang Tài khoản báo bằng thông báo nổi (toast), không còn khung xanh trong tấm.
+    expect(page.locator(".toast-item").filter(has_text=msg(page, "passwordChanged")).first).to_be_visible()
     ok("S46 tự đổi (không bị ép) → không hiện thông báo 'Đã đặt mật khẩu mới' của S48", page.locator(".pw-done-notice").count() == 0)
     ok("S46-AC2 máy A nhận token mới", token(page) not in (None, t_before))
     page.goto(BASE + "/inventory/")
