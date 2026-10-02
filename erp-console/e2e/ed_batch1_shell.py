@@ -135,7 +135,7 @@ with sync_playwright() as p:
     dialog = page.get_by_role("dialog", name="Tìm màn hình")
     expect(dialog).to_be_visible()
     page.get_by_role("combobox", name="Tìm màn hình").fill("kiem ke")
-    options = [t.strip() for t in page.get_by_role("option").all_inner_texts()]
+    options = [t.strip() for t in page.locator(".cmd").get_by_role("option").all_inner_texts()]
     ok("ED-01 ⌘K bỏ dấu vẫn tìm ra 'Kiểm kê'", any("Kiểm kê" in o for o in options), str(options))
     page.keyboard.press("Enter")
     page.wait_for_url("**/stocktake/")
@@ -143,7 +143,7 @@ with sync_playwright() as p:
     ok("ED-01 ⌘K đóng sau khi nhảy", page.get_by_role("dialog", name="Tìm màn hình").count() == 0)
     page.keyboard.press("Control+k")
     page.get_by_role("combobox", name="Tìm màn hình").fill("zzzzzz")
-    ok("ED-01 ⌘K không khớp: có thông báo, không có mục", page.get_by_role("option").count() == 0 and page.locator(".cmd").inner_text().strip() != "")
+    ok("ED-01 ⌘K không khớp: có thông báo, không có mục", page.locator(".cmd").get_by_role("option").count() == 0 and page.locator(".cmd").inner_text().strip() != "")
     page.keyboard.press("Escape")
 
     # 404 trong khung

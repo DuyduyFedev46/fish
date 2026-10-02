@@ -1733,3 +1733,71 @@ Story ED-22 (Nhà cung cấp, W5c danh sách, W5d chi tiết, F1b hộp Thêm). 
 - **L1**: "Chỉ Chủ và Quản lý." chuyển vào `SUPPLIERS_MSG.managerOnly`. **L2**: mock `doc.code` bỏ tiền tố `NCC-`.
 - Số đo: tsc sạch; vitest 59 file / 647 ca; build MOCK=0 + `check-no-mock` + `check-ai-chunks` xanh; `ed_batch11_suppliers` 103/103, `ed_batch1_shell` 56/56, `ed_batch6_customers` 79/79, `ed_batch2_patterns` 75/75 (mock, cổng 3101); `qa_ed_batch11_real` 133/133 trên BE thật (SQLite tạm + seed QA, cổng 3102/8000); `check_naming` không phát sinh mới.
 - Nợ: không. Không đụng backend, adapter, `features/purchasing`.
+
+## Lô 8 — FE
+
+Story ED-28 (Kiểm kê), 02/10/2026, worktree `loc-wt-b` (nhánh `ed-stream-b`). Chưa commit. Chỉ sửa trong `erp-console/`.
+
+**Trang và thành phần**
+
+| Đường dẫn | Việc |
+|---|---|
+| `app/(console)/stocktake/page.tsx` | Thay Placeholder bằng `StocktakeListScreen`. |
+| `app/(console)/stocktake/new/page.tsx`, `edit/page.tsx`, `detail/page.tsx` | Mỏng, `ViewGuard view="stocktake"`; `edit` và `detail` bọc `Suspense` vì dùng `useSearchParams`; URL chỉ mang `?id=`. |
+| `features/stocktake/components/StocktakeListScreen.tsx` | ListPage + FilterBar (kho, trạng thái, tìm) + DataTable. Cột: Mã phiếu, Ngày, Kho, Số lô, Hụt (kg), Dư (kg), Người nhập số, Người duyệt, Trạng thái, Ghi chú. Nút "Lập phiếu kiểm kê" chỉ hiện khi có quyền `inventory.add_stockreconciliation`. |
+| `features/stocktake/components/StocktakeForm.tsx` | Một form cho `mode="new"` và `mode="edit"`. Chọn kho thì nạp các lô của kho (chỉ nạp lô, không đổi kho của phiếu). Mỗi dòng: Tồn hệ thống, Đếm được (kg), Chênh lệch xem trước, Lý do, "Bỏ lô". Lưu nháp (cần >= 1 dòng đã đếm; ở `new` thì chuyển sang `edit?id=`), Gửi duyệt (cần mọi dòng có số, rồi sang chi tiết). 409 `STALE_STATE` hiện `ConflictBanner`, "Tải lại" giữ số đang gõ. Lỗi theo dòng của BE (`line_index`) gắn vào đúng dòng. |
+| `features/stocktake/components/StocktakeDetailScreen.tsx` | DetailPage: StatusPath (Chờ duyệt, Đã duyệt), thông tin, bảng số đếm từng lô, tổng hụt/dư/ròng, dòng thời gian, `AiDocBlockGate`. Nút "Duyệt và điều chỉnh tồn" chỉ khi `available_actions` có `approve`, có hộp xác nhận. Bị chặn thì mục mờ nằm trong "…" kèm `approve_blocked_reason.label`. "Sửa số đếm" chỉ khi có `edit_lines`. |
+| `features/stocktake/{types.ts,api.ts,mock.ts,stocktakeUi.ts,stocktake.module.css,README.md}` | Kiểu, hàm API, mock, hàm thuần (đọc số, kiểm dòng, gộp lô, câu lỗi), CSS module, README. |
+| `shared/lib/nav.ts` | Chỉ thêm `PERM.addStockReconciliation`, `PERM.changeStockReconciliation`. |
+| `scripts/check-ai-chunks.mjs` | Thêm 4 route `/stocktake*` vào TARGETS. |
+| `e2e/ed_batch8_stocktake.py` (mock), `e2e/ed_batch8_stocktake_real.py` (BE thật) | Hai script e2e mới. |
+
+**Hàm API mới (`features/stocktake/api.ts`)**: `fetchStocktakes`, `fetchStocktake`, `createStocktake` (có `lines` tuỳ chọn), `updateStocktakeHeader` (PATCH `count_date`, `note`), `replaceStocktakeLines` (POST `…/lines/` với `expected_updated_at`), `approveStocktake`, `fetchStockBatches`, `fetchWarehouses`, `fetchStocktakeTimeline`. Mock viết ngay trong lời gọi `apiFetch` dạng `process.env.NEXT_PUBLIC_USE_MOCK === "1" ? ... : undefined` nên không lọt vào build thật (`check-no-mock` XANH). Mock có trạng thái (localStorage `cave_erp_mock_stocktake`, chỉ số lô và phiếu, không dữ liệu khách) và các móc thử `window.__caveMock.stocktakeReset/EditByOther/SetStock/Stock`.
+
+**Số đã chạy thật (02/10/2026)**
+- `npx tsc --noEmit` sạch. `npx vitest run`: 54 file, 554 test đạt (19 test mới ở `features/stocktake/stocktakeUi.test.ts`).
+- `NEXT_PUBLIC_USE_MOCK=0 npm run build` OK (`/stocktake` 4,96 kB, `/stocktake/detail` 6,8 kB, `new` và `edit` 160 B mỗi trang). `check-no-mock` XANH (16 file mock, 39 chuỗi seed, 169 file build). `check-ai-chunks` XANH (17 màn nghiệp vụ + 2 layout).
+- Build `MOCK=1`, máy chủ tĩnh cổng 3201: `ed_batch8_stocktake.py` 112/112; `ed_batch2_patterns.py` 75/75; `ed_batch1_shell.py` 55/56 (xem "Lệch" bên dưới, 1 FAIL là lỗi chọn phần tử của script, không phải của màn).
+- `scripts/check_naming.py` OK, không phát sinh mới. Màu cứng trong `features/stocktake` và `app/(console)/stocktake`: 0.
+- BE thật: Django 8140 (SQLite tạm `/tmp/real8/db.sqlite3`, `seed_demo`, user `loc`, `ql1`, `kho1`, mật khẩu `demo1234`), ERP build `NEXT_PUBLIC_API_BASE=http://127.0.0.1:8140 NEXT_PUBLIC_USE_MOCK=0` ở cổng 3202. `ed_batch8_stocktake_real.py` 20/20. Luồng: `kho1` lập phiếu Kho chính (lô 1: 17,5; lô 2: 38 kèm lý do; lô 3: 28), Lưu nháp, mở trang sửa, đổi lô 3 thành 27,5, chọn lại kho nạp thêm lô và thêm lô 4 = 25, Gửi duyệt khi còn 3 lô chưa đếm bị chặn đúng ("Nhập số đếm của lô này." ở 3 dòng), bỏ 3 lô rồi gửi duyệt. `kho1` không thấy nút Duyệt; `ql1` duyệt. Tồn sau duyệt đọc từ DB đúng BR-KK-09 (áp phần chênh đã chụp lúc lưu): lô 1 từ 18 xuống 17,5; lô 2 từ 37 lên 38; lô 3 từ 28 xuống 27,5; lô 4 giữ 25; lô 5 đến 7 không đổi (không có trong phiếu), `qty_reserved` giữ nguyên (3 và 6). Phiếu 2: `kho1` lập, `ql1` sửa số đếm rồi không có nút Duyệt chính (BR-KK-08, mục mờ trong "…"), Chủ duyệt được (lô 5 từ 61 xuống 59). Đã tắt cả hai máy chủ.
+  Để dựng lại: `python3 -m venv` rồi `pip install` các gói trong `backend/requirements.txt` (kho chính không có `.venv`, nên tôi dùng venv tạm `/tmp/ed28venv`), `manage.py migrate`, `seed_demo`, tạo 3 user vào nhóm `owner`, `manager`, `warehouse_staff`, `runserver 127.0.0.1:8140` với `DATABASE_URL=sqlite:////tmp/real8/db.sqlite3 DJANGO_DEBUG=1 CORS_ALLOWED_ORIGINS=http://127.0.0.1:3202`.
+- Ảnh (`*.png` bị gitignore): `/tmp/ed28shots/ed28_list_360.png`, `ed28_form_360.png`, `ed28_form_rows_360.png`, `ed28_detail_360.png`, `ed28_detail_table_360.png`, `ed28_form_desktop.png`, `ed28_blocked_desktop.png`; BE thật ở `/tmp/real8/shots/` (`real-list-360.png`, `real-detail-360.png`, `real-detail-ql1-1280.png`, `real-detail-blocked-1280.png`, `real-detail-approved-1280.png`, `real-edit-1280.png`).
+
+**Lệch và quyết định cần techlead / Duy biết**
+1. "Lưu nháp" và "Gửi duyệt" cùng gọi hai endpoint BE (PATCH đầu phiếu, POST dòng); BE không có trạng thái "đang nháp riêng" nên phiếu đã lưu là "Chờ duyệt" và duyệt được ngay. Gửi duyệt ở FE chỉ khác là bắt mọi dòng phải có số rồi chuyển sang chi tiết. Phiếu đếm dở bằng "Lưu nháp" vẫn duyệt được nếu người khác bấm.
+2. "Lưu nháp" bỏ các dòng chưa nhập số (BE cần >= 1 dòng và chỉ lưu dòng đã đếm). Mở lại trang sửa chỉ thấy các lô đã lưu; muốn đếm thêm thì chọn lại kho để nạp lô (số đã gõ được giữ).
+3. "Lý do" là ô chữ tự do (BE nhận chuỗi <= 500), không phải ô chọn như hình thiết kế.
+4. Duyệt bị chặn (BR-KK-02, BR-KK-08) nằm trong "…" với `approve_blocked_reason.label`, không hiện nút xám ở header. Mã BR không lộ ra màn hình.
+5. Dòng thời gian: provider BE `stocktake` chỉ có timeline; mock guidance chưa có `stocktake` nên mock của lô tự có handler `/api/guidance/stocktake/<id>/`.
+6. Ca "hai người cùng sửa" (409) mô phỏng bằng `stocktakeEditByOther`, vì mock duyệt không tự sinh 409. Trên BE thật chưa thử 409 (cần hai phiên đồng thời).
+7. `ed_batch1_shell.py` ca "ED-01 ⌘K không khớp: có thông báo, không có mục" FAIL 1/56. Nguyên nhân: script đếm `get_by_role("option")` trên cả trang, mà sau khi nhảy tới `/stocktake/` (trước là Placeholder) trang có các ô chọn gốc `<select>` (bộ lọc Kho, Trạng thái), nên đếm ra 4 đến 7 `option`. Hộp ⌘K vẫn đúng ("Không có màn nào khớp." và không có mục). Script nằm ngoài phạm vi được sửa của lô này (và đang có bản sửa khác ở repo chính), nên tôi không đụng; cần khoanh `page.locator(".cmd").get_by_role("option")`. Chạy ở hồ sơ trước đạt 56/56 vì lúc đó `/stocktake/` còn là Placeholder.
+8. Quy tắc BR-KK-09 (duyệt áp phần chênh đã chụp, không đếm lại) và BR-KK-08 vẫn là đề xuất chờ Duy chốt; FE theo đúng BE hiện tại.
+9. Không có unsaved-change guard: rời trang sửa khi chưa Lưu nháp thì mất số đã gõ.
+
+### Lô 8 — FE, vòng sửa sau techlead CHANGES REQUESTED và QA REJECTED (02/10/2026)
+
+**Đã sửa (file trong `erp-console/features/stocktake/`, `e2e/`)**
+- **B1 / TL8-F1 (High)**: `StocktakeForm.persist()` gọi POST `…/lines/` TRƯỚC, kèm `expected_updated_at` của bản đang giữ (lúc mở trang hoặc lần lưu thành công gần nhất). Chỉ khi dòng lưu thành công mới PATCH ngày và ghi chú (BE không kiểm phiên bản ở PATCH, nên thứ tự này là hàng rào). Gặp 409 thì dừng, không PATCH, hiện `ConflictBanner`; ghi chú và dòng của người kia không bị ghi đè. Phiên bản giữ ở ref và cập nhật sau mỗi lần gọi thành công nên tự lưu hai lần không tự gây 409. Nếu dòng đã lưu mà PATCH đầu phiếu lỗi: báo "Đã lưu số đếm nhưng chưa lưu được ngày hoặc ghi chú. Bấm lưu lại để thử lần nữa." và cập nhật snapshot tồn.
+- **B2 / TL8-F3 (High)**: "Tải lại" sau 409 nạp bản máy chủ nguyên khối (dòng, ngày, ghi chú, `updated_at`) và bỏ phần đang gõ. Ngay dưới banner có câu "Thay đổi chưa lưu của bạn sẽ bị bỏ khi tải lại." (`data-conflict-hint`) để người dùng biết trước. Người kia thêm dòng thì dòng đó hiện ra, lưu lần hai không xoá dòng của họ.
+- **B3 / TL8-F2 (Medium)**: câu "Tiếp theo", hộp xác nhận và toast theo BR-KK-09. Ví dụ "Duyệt sẽ điều chỉnh tồn của 3 lô theo chênh lệch đã ghi lúc đếm (−0,5 kg)"; hộp: "Mỗi lô lệch sẽ được cộng hoặc trừ đúng phần chênh lệch đã ghi lúc đếm (không đặt lại bằng số đếm)"; toast: "Đã duyệt. Tồn kho đã cộng hoặc trừ theo chênh lệch đã ghi." Có test quét nguồn cấm cụm "theo số (thực) đếm" trong module.
+- **TL8-L1**: `recId.current`, `updatedAt.current` được gán ngay khi `createStocktake` trả về, trước mọi điều hướng, nên bấm Lưu nháp lần hai sát sau không tạo phiếu thứ hai. Lưu nháp lần đầu ở chế độ "new" không còn `router.replace`: đổi URL bằng `window.history.replaceState` sang `/stocktake/edit/?id=<id>` (URL vẫn chỉ mang `?id=`), tiêu đề đổi thành "Sửa số đếm KK-<id>", form không remount.
+- **TL8-L2**: ở chế độ "new", lý do gõ ở dòng chưa có số vẫn nằm trong form sau Lưu nháp. BE chỉ lưu dòng đã có số nên toast nói rõ: "Đã lưu nháp. N lô chưa có số nên chưa được lưu." Không đổi hợp đồng BE.
+- **TL8-L4**: bỏ import không dùng (`conflictOf, isConflictError`) ở màn chi tiết; đổi tên biến `unchangedRows` gây hiểu nhầm thành `rows.length`.
+- **Low QA, 1280px**: bảng dòng ở trang chi tiết nằm trong cột chính chỉ ~646px nên cột Chênh lệch bị cắt. Nay gộp "Lô và mặt hàng" thành một cột (mã lô mono, tên mặt hàng ở dòng dưới), bỏ cột Kho (kho đã có ở khối Thông tin; phiếu nhiều kho thì ghi kèm sau tên mặt hàng), tiêu đề "Hệ thống (kg)"; `table:global(.lt).linesTable` giảm đệm ngang. Đo ở 1280: `scrollWidth == clientWidth` (646), Chênh lệch và Lý do nằm trọn; 1440 cũng vừa; 1024 cuộn ngang trong thẻ (cột chính chỉ 390px), trang không cuộn. Lưu ý: CSS Module băm tên class nên selector phải viết `table:global(.lt)`, viết `table.lt` thì không khớp.
+- **Script `ed_batch1_shell.py`**: ca ⌘K đếm `option` chỉ trong `.cmd` (không đếm `<option>` của `<select>` trong trang).
+
+**Mock**: `window.__caveMock.stocktakeEditByOther(id, {batch?, counted?, note?})` giờ có thể thêm hoặc đổi một dòng và đổi ghi chú.
+
+**E2E đã cập nhật cho khớp hành vi mới (đổi chủ ý, không bỏ ý kiểm)**
+- `ed_batch8_stocktake.py`: lưu nháp lần đầu ở lại form (4 dòng, lý do ở lô chưa có số còn nguyên, URL chuyển sang edit, tiêu đề, toast "1 lô chưa có số nên chưa được lưu"); bấm đúp Lưu nháp vẫn phiếu 18; toast và hộp xác nhận mới; bảng chi tiết mới (không cột Kho); nhóm 409 viết lại (câu cảnh báo trước khi tải lại, tải lại thì mất số đang gõ về 19,7, dòng người kia thêm hiện ra, lưu lần hai giữ cả hai dòng) và thêm ca ghi chú + 409 (máy chủ giữ ghi chú của người kia, không PATCH); ca 1280px bảng không bị cắt.
+- `ed_batch8_stocktake_real.py`: lưu nháp lần đầu ở lại form với 7 dòng, mở lại từ máy chủ đúng 3 dòng.
+- `qa_ed_batch8_real.py`: A1 (ở lại form 6 dòng, mở lại từ máy chủ 2 dòng), D3 (tải lại về 40,5 của A), F3 (cột mới). `qa_ed_batch8_real_followup.py` không sửa.
+
+**Số thật (02/10/2026)**
+- `tsc --noEmit` sạch; vitest 54 tệp / 555 test (module stocktake 20); `check_naming` OK (không phát sinh mới); 0 màu cứng.
+- Build `MOCK=0` (kèm `NEXT_PUBLIC_API_BASE=http://127.0.0.1:8140`) OK: `check-no-mock` XANH (16 file mock, 39 chuỗi seed, 169 file build), `check-ai-chunks` XANH (17 màn + 2 layout). Build `MOCK=1` OK.
+- Mock, cổng 3201: `ed_batch8_stocktake` 123/123; `ed_batch1_shell` 56/56; `ed_batch2_patterns` 75/75.
+- BE thật (Django 8140, SQLite tạm `/tmp/real8/db.sqlite3`, `seed_demo`, user `loc`, `ql1`, `ql2`, `kho1`, `kho2`, `giao1`, `cs2`, mật khẩu `demo1234`, `THROTTLE_LOGIN_IP/USER` nâng lên chỉ ở môi trường thử; build `MOCK=0` ở cổng 3202; mỗi script chạy trên DB dựng mới): `ed_batch8_stocktake_real` 21/21; `qa_ed_batch8_real_followup` 7/7 (K0, K1, K3, K4, K5); `qa_ed_batch8_real` 168/168 ở lần chạy cuối. Hai lần chạy trước đó mỗi lần 167/168: ca I4 (console warning) đỏ vì Chrome ghi "font … preloaded but not used" cho trang của `ql1`; lần chạy sau không tái hiện nên đây là cảnh báo của trình duyệt tuỳ thời điểm, không phải từ mã Lô 8. Đã tắt cả ba máy chủ.
+- Ảnh: `/tmp/ed28shots/detail-1280.png`, `detail-1024.png`, `detail-1440.png`.
+
+**Còn nợ / chưa làm**: vẫn không có unsaved-change guard khi rời trang; chưa có ca "ghi chú + 409" trên BE thật (đã chứng minh bằng mock và bằng K1 trên BE thật ở phần dòng).
