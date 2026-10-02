@@ -34,6 +34,15 @@ def delivered_qty(delivery_note, batch):
     return total or ZERO
 
 
+def returned_qty_by_batch(delivery_note, batch_ids=None):
+    """Số kg đã ghi nhận hoàn của từng lô trên phiếu giao: {batch_pk: kg}, tính cả Chờ duyệt lẫn Đã duyệt.
+    Một truy vấn gộp cho mọi lô. Dùng chung cho kiểm vượt số kg (`create_return`) và cho dòng phiếu giao (Lô 9)."""
+    qs = ReturnToStock.objects.filter(delivery_note=delivery_note)
+    if batch_ids is not None:
+        qs = qs.filter(batch_id__in=batch_ids)
+    return {row["batch_id"]: row["total"] or ZERO for row in qs.order_by().values("batch_id").annotate(total=Sum("qty"))}
+
+
 def _left_warehouse_at(delivery_note):
     """Giờ rời kho = lần gần nhất phiếu chuyển sang ĐANG GIAO (theo AuditLog). Không có thì None."""
     from apps.accounts.models import AuditLog
@@ -57,13 +66,16 @@ def create_return(*, delivery_note, batch, qty, actor, free_note=""):
         raise BusinessError(
             "Chỉ ghi nhận hàng hoàn khi phiếu giao đang giao hoặc giao thất bại.", code="RETURN_NOTE_STATUS",
         )
+    if batch.is_closed:
+        # Lô đã chốt không nhận hàng hoàn (duyệt cũng bị chặn BR-HV-04) — chặn ngay khi tạo để phiếu không kẹt (QA Lô 9 B4).
+        raise BusinessError("Lô đã chốt, không ghi nhận hàng hoàn vào lô này.", code="RETURN_BATCH_CLOSED")
     delivered = delivered_qty(locked, batch)
     if delivered <= ZERO:
         raise BusinessError(
             "Lô này không nằm trong phiếu giao, hàng hoàn phải về đúng lô gốc (BR-HV-01).",
             code="RETURN_BATCH_NOT_IN_NOTE",
         )
-    already = ReturnToStock.objects.filter(delivery_note=locked, batch=batch).aggregate(total=Sum("qty"))["total"] or ZERO
+    already = returned_qty_by_batch(locked, [batch.pk]).get(batch.pk, ZERO)
     if already + qty > delivered:
         raise BusinessError(
             f"Số kg hoàn vượt số đã giao của lô: đã giao {delivered:f} kg, đã ghi nhận hoàn {already:f} kg.",

@@ -76,7 +76,8 @@ def courier_scope(browser):
     ok("giao1: kg dạng 'n,n kg' và mỗi thẻ chỉ một giá trị kg", re.search(r"\d+,\d+ kg", body) is not None and not re.search(r"\d\.\d{3}\s*kg", body))
     first_card = page.locator("[data-group='DELIVERING'] li").first.inner_text()
     ok("giao1: thẻ Đang giao chỉ có 1 lần 'kg'", len(re.findall(r"\d[\d,.]* kg", first_card)) == 1, first_card.replace("\n", "|")[:200])
-    ok("giao1: không có chữ 'Mang hàng về kho' hay 'sắp có' (F2m để Lô 9)", "Mang hàng về kho" not in body and "sắp có" not in body)
+    # Lô 9: thẻ Giao thất bại có nút "Mang hàng về kho"; các thẻ khác không có.
+    ok("giao1: chỉ thẻ Giao thất bại có nút 'Mang hàng về kho', không có chữ 'sắp có'", page.get_by_role("button", name="Mang hàng về kho").count() == page.locator("[data-group='FAILED'] li").count() and "sắp có" not in body)
     fail_card = page.locator("[data-group='FAILED'] li").first.inner_text()
     ok("giao1: thẻ Giao thất bại có 'Lý do' và 'Lần thất bại' là 2 trường riêng", re.search(r"^Lý do$", fail_card, re.M) is not None and re.search(r"^Lần thất bại$", fail_card, re.M) is not None, fail_card.replace("\n", "|")[:200])
     ok("giao1: thẻ Chờ lấy có nút 'Đã lấy hàng, bắt đầu giao'", page.locator("[data-group='READY']").get_by_role("button", name="Đã lấy hàng, bắt đầu giao").count() == 1)

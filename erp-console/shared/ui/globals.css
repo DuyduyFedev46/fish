@@ -587,6 +587,7 @@ table.lt.lt-dense th,table.lt.lt-dense td{padding-left:var(--space-1-5);padding-
 table.lt.lt-dense th:first-child,table.lt.lt-dense td:first-child{padding-left:var(--space-3)}
 table.lt.lt-dense th:last-child,table.lt.lt-dense td:last-child{padding-right:var(--space-3)}
 /* Cột phụ ẩn dần theo bề rộng khung bảng (DataTable `hideBelow`); dưới 600px bảng cuộn trong khung riêng */
+@container lt-list (max-width:1099px){table.lt .lt-hb-1100{display:none}}
 @container lt-list (max-width:979px){table.lt .lt-hb-980{display:none}}
 @container lt-list (max-width:799px){table.lt .lt-hb-800{display:none}}
 @container lt-list (max-width:719px){table.lt .lt-hb-720{display:none}}

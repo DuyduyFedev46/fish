@@ -263,8 +263,10 @@ class ReceiveBatchesLine(serializers.Serializer):
     qty = serializers.DecimalField(
         max_digits=12, decimal_places=3, min_value=Decimal("0.001"), help_text="Số kg"
     )
+    # Tối đa 10 chữ số phần nguyên: khớp Batch.landed_unit_cost (max_digits=14, decimal_places=4) — vượt thì 400 theo
+    # field thay vì 500 khi ghi lô (QA Lô 10 N1).
     rate = serializers.DecimalField(
-        max_digits=14, decimal_places=2, min_value=Decimal("0"), help_text="Đơn giá mua/kg"
+        max_digits=12, decimal_places=2, min_value=Decimal("0"), help_text="Đơn giá mua/kg"
     )
     shelf_life_days = serializers.IntegerField(
         required=False, allow_null=True, min_value=1, help_text="Hạn dùng (ngày)"

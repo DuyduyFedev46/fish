@@ -1,3 +1,4 @@
+from django.db import transaction
 from django.db.models import Prefetch
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
@@ -131,12 +132,19 @@ class PurchaseReceiptViewSet(DocumentViewSet):
             queryset = filter_list(queryset, self.request.query_params)
         return queryset
 
+    def perform_update(self, serializer):
+        # Chỉ sửa được phiếu Nháp (BR-MH-07): kiểm trạng thái trong khoá, cùng transaction với lúc lưu.
+        with transaction.atomic():
+            services.lock_draft_receipt(serializer.instance)
+            serializer.save()
+
     @action(detail=True, methods=["post"], required_perms=("purchasing.change_purchasereceipt",))
     def submit(self, request, pk=None):
         """Xác nhận phiếu nhập hàng và sinh các lô cá tương ứng."""
         # Sinh lô từ các dòng nhập (cần quyền change phiếu — Tầng 1 đã chặn).
         require_perm(request.user, "purchasing.change_purchasereceipt")
-        batches = services.submit_receipt(receipt=self.get_object(), actor=request.user)
+        receipt = self.get_object()
+        batches = services.submit_receipt(receipt=receipt, actor=request.user)
         return Response(
             {"receipt": self.get_serializer(self.get_object()).data,
              "batches_created": [b.batch_id for b in batches]}

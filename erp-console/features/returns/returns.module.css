@@ -1,0 +1,52 @@
+/* Kiểu riêng của module Hàng hoàn về kho (ED-26). Chỉ token trong DESIGN.md — không màu cứng. Bảng, lưới thông tin, thanh trạng thái,
+   dòng thời gian dùng component chung (shared/ui); file này chỉ có khung form trong hộp thoại, danh sách chọn và khối phụ. */
+
+/* Khung form trong hộp thoại: các ô cách đều nhau. */
+.form { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; }
+
+/* Danh sách chọn Tái nhập / Huỷ bỏ (F2n). */
+.pickList { display: flex; flex-direction: column; gap: var(--space-2); margin: 0; padding: 0; border: 0; min-width: 0; }
+.pickLegend { padding: 0; margin: 0 0 var(--space-2); font-size: var(--text-sm); font-weight: var(--weight-medium); color: var(--ink-2); }
+.pick {
+  display: flex; align-items: center; gap: var(--space-3);
+  min-height: var(--tap); padding: var(--space-2-5) var(--space-3);
+  border: 1px solid var(--border-input); border-radius: var(--radius-md);
+  background: var(--surface); cursor: pointer;
+  transition: border-color var(--dur-fast) ease, background-color var(--dur-fast) ease;
+}
+.pick:hover { border-color: var(--border-strong); }
+.pickOn { border-color: var(--accent); background: var(--accent-soft); }
+.pickErr { border-color: var(--crit); }
+.pick:focus-within { box-shadow: 0 0 0 1px var(--focus), 0 0 0 4px var(--accent-soft); }
+.pickInput { width: 18px; height: 18px; margin: 0; flex: none; accent-color: var(--accent); }
+.pickBody { display: flex; flex-direction: column; gap: var(--space-0-5); min-width: 0; flex: 1; }
+.pickName { font-weight: var(--weight-semibold); color: var(--ink); overflow-wrap: anywhere; }
+.pickMeta { font-size: var(--text-sm); color: var(--ink-3); }
+.pickError { margin: 0; color: var(--crit); font-size: var(--text-sm); }
+
+/* Dòng "Đã giao n kg · đã hoàn m kg" dưới ô chọn lô (F2m). Là số liệu, không phải chữ gợi ý. */
+.qtyFacts { margin: 0; font-size: var(--text-sm); color: var(--ink-2); }
+
+/* Hai ô giờ chỉ đọc (F2m). */
+.times { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); min-width: 0; }
+.timeCell { display: flex; flex-direction: column; gap: var(--space-0-5); min-width: 0; }
+.timeLabel { font-size: var(--text-sm); font-weight: var(--weight-medium); color: var(--ink-2); }
+.timeValue { color: var(--ink); }
+
+/* Ghi chú trong bảng: một dòng, cắt bớt. */
+.noteCell { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Dòng tóm tắt trên bảng. */
+.summaryLine { margin: 0; font-size: var(--text-sm); color: var(--ink-2); }
+
+/* Khung xương trang chi tiết. */
+.detailSkel { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-4) 0; }
+.detailSkel > div { display: flex; flex-direction: column; gap: var(--space-3); }
+.skelRow { height: var(--tap); border-radius: var(--radius-md); background: var(--surface-3); animation: pulse 1.2s ease-in-out infinite; }
+
+/* Dòng báo lỗi tải dòng thời gian (không chặn trang). */
+.railNote { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); margin: 0; color: var(--ink-2); font-size: var(--text-sm); }
+
+@media (max-width: 400px) {
+  .times { grid-template-columns: 1fr; }
+}

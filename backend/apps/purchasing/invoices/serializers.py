@@ -7,7 +7,8 @@ D-3 (Duy chốt, 02b §6 Q3): Quản lý THẤY `amount`. Người xem được 
 """
 from rest_framework import serializers
 
-from apps.purchasing.models import PurchaseInvoice
+from apps.common.exceptions import BusinessError
+from apps.purchasing.models import PurchaseInvoice, PurchaseReceipt
 
 
 class PurchaseInvoiceSerializer(serializers.ModelSerializer):
@@ -23,6 +24,14 @@ class PurchaseInvoiceSerializer(serializers.ModelSerializer):
             "is_paid", "is_paid_label", "invoice_date", "paid_at", "created_by",
         ]
         read_only_fields = ["created_by"]  # BR-PQ-16
+
+    def validate_receipt(self, receipt):
+        """Không gắn hoá đơn vào phiếu nhập đã huỷ (BR-MH-07, BR-PQ-10): 400 `RECEIPT_CANCELLED`."""
+        if receipt is not None and receipt.status == PurchaseReceipt.Status.CANCELLED:
+            raise BusinessError(
+                "Phiếu nhập đã huỷ, không gắn hoá đơn mua vào được (BR-MH-07).", code="RECEIPT_CANCELLED"
+            )
+        return receipt
 
     def get_code(self, invoice):
         return f"#{invoice.pk}"

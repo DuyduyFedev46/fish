@@ -28,6 +28,8 @@ type EditableProps = Base & {
   type?: "text" | "number" | "tel" | "date";
   unit?: string;
   required?: boolean;
+  /** Câu báo khi để trống ô bắt buộc (vd "Nhập tên nhà cung cấp."); không truyền thì dùng câu chung. */
+  requiredMessage?: string;
   /** Kiểm tại chỗ trước khi gửi; trả chuỗi lỗi hoặc null. */
   validate?: (next: string) => string | null;
   num?: boolean;
@@ -81,12 +83,12 @@ export function InfoField(props: InfoFieldProps) {
 }
 
 /** Lỗi nhập của ô sửa tại chỗ (null = hợp lệ): để trống khi bắt buộc, hoặc `validate` của màn. */
-export function validateDraft(draft: string, opts: { required?: boolean; validate?: (next: string) => string | null }): string | null {
-  if (opts.required && !draft.trim()) return "Nhập giá trị cho ô này.";
+export function validateDraft(draft: string, opts: { required?: boolean; requiredMessage?: string; validate?: (next: string) => string | null }): string | null {
+  if (opts.required && !draft.trim()) return opts.requiredMessage ?? "Nhập giá trị cho ô này.";
   return opts.validate ? opts.validate(draft) : null;
 }
 
-function Editable({ label, labelId, value, display, onSave, type = "text", unit, required, validate, num, onConflict }: EditableProps & { labelId: string }) {
+function Editable({ label, labelId, value, display, onSave, type = "text", unit, required, requiredMessage, validate, num, onConflict }: EditableProps & { labelId: string }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value);
   const [localError, setLocalError] = useState<string | null>(null);
@@ -104,7 +106,7 @@ function Editable({ label, labelId, value, display, onSave, type = "text", unit,
 
   // Kiểm tại chỗ TRƯỚC khi gửi: chưa gửi gì nên đây là lỗi nhập, không phải lỗi gửi (nút giữ "Lưu", không thành "Thử lại").
   const submit = () => {
-    const msg = validateDraft(draft, { required, validate });
+    const msg = validateDraft(draft, { required, requiredMessage, validate });
     setLocalError(msg);
     if (msg) return;
     void sub.submit();

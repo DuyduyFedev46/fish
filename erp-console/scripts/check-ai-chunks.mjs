@@ -36,6 +36,12 @@ const TARGETS = [
   ["/(console)/confirmation/page", "/confirmation"],
   ["/(console)/confirmation/detail/page", "/confirmation/detail"],
   ["/(console)/my-deliveries/page", "/my-deliveries"],
+  ["/(console)/returns/page", "/returns"],
+  ["/(console)/returns/detail/page", "/returns/detail"],
+  ["/(console)/stocktake/page", "/stocktake"],
+  ["/(console)/stocktake/new/page", "/stocktake/new"],
+  ["/(console)/stocktake/edit/page", "/stocktake/edit"],
+  ["/(console)/stocktake/detail/page", "/stocktake/detail"],
   ["/print/label/page", "/print/label"],
   ["/(console)/inventory/detail/page", "/inventory/detail"],
   ["/(console)/ledger/page", "/ledger"],
@@ -44,6 +50,9 @@ const TARGETS = [
   ["/(console)/purchasing/new/page", "/purchasing/new"],
   ["/(console)/purchasing/detail/page", "/purchasing/detail"],
   ["/(console)/purchasing/costs/new/page", "/purchasing/costs/new"],
+  // Nhà cung cấp (Lô 11): trang chi tiết có AiDocBlockGate (purchasing.supplier); danh sách không có AI. Cả hai phải xanh.
+  ["/(console)/suppliers/page", "/suppliers"],
+  ["/(console)/suppliers/detail/page", "/suppliers/detail"],
 ];
 
 // Chuỗi đặc trưng của code AI chạy trên máy (worker, thư viện wllama, gọi lệnh AI).

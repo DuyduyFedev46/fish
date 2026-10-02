@@ -2126,3 +2126,292 @@ Phạm vi: diff chưa commit ở worktree `loc-wt-c` (nhánh `ed-stream-c`): `fe
 Không có lỗi Critical, High hay Medium. Có 6 lỗi Low:
 - Nên sửa trong lô này nếu tiện (nhỏ, không đổi contract): TL10-L1, TL10-L2, TL10-L3.
 - Đưa vào nợ Lô 12: TL10-L4, TL10-L5, TL10-L6.
+## Lô 9 — FE (Hàng hoàn về kho ED-26: W5e, W5f, F2m, F2n) · review techlead 02/10
+
+> Phạm vi: `erp-console/features/returns/**`, `app/(console)/returns/**`, `features/deliveries/components/MyDeliveriesScreen.tsx`,
+> `shared/lib/nav.ts`, `scripts/check-ai-chunks.mjs`, `e2e/ed_batch9_*.py`, `e2e/ed_batch1_shell.py`, `e2e/ed_batch4_delivery.py` (chưa commit).
+> Không xem `backend/` (be-dev đang thêm `batch_pk` / `returned_qty` vào dòng phiếu giao).
+> Căn cứ: 02b §0c (F2l), §1 (W5e, W5f, F2m, F2n), §2.3, §2.4, §5.2 Lô 9; contract "Lô 9 — BE (R9)"; ED-26; Q5 (mặc định nút riêng).
+
+**Lệnh đã chạy lượt này**
+- `npx tsc --noEmit`: sạch.
+- `npx vitest run`: 55 file, 575 test đạt.
+- `python3 scripts/check_naming.py`: OK, không vi phạm mới.
+- Màu cứng (`#hex`, `rgb()`, `hsl()`) trong `features/returns`, `app/(console)/returns`, `MyDeliveriesScreen.tsx`: **0**.
+- `console.*` trong `features/returns`: 0. `localStorage` chỉ ở `mock.ts` (khoá chế độ thử, không dữ liệu khách).
+
+**Đã soi, đạt**
+- **Tồn kho.**
+  - `qty` gửi qua `normalizeQty`: đổi dấu phẩy thành chấm, tối đa 3 số lẻ, phải > 0. Không gửi số FE tự tính.
+  - Bấm đúp: `useSubmit` chặn bằng ref `inFlight`, nút chính `disabled` khi đang gửi. Một lần bấm chỉ một `POST`.
+  - `RETURN_QTY_EXCEEDS` được map vào ô số kg bằng câu FE tự viết (không mã BR), kèm "đã hoàn m kg" lấy từ `already_returned_qty`.
+  - BE vẫn là lớp chặn thật: kiểm tổng kg và khoá dòng phiếu giao.
+- **Phạm vi.**
+  - Danh sách và chi tiết dựa vào lọc phía BE (`scope_returns_for`). Phiếu giao cho F2m lấy qua `GET /api/delivery/notes/`, mà `get_queryset` đã lọc `assigned_to=user` cho người giao.
+  - 404 hiện `NotFoundScreen`, 403 hiện `NoPermission` (`ReturnDetailScreen.tsx`, `statusOfError`). Danh sách 403 cũng hiện `NoPermission`.
+- **Dữ liệu cá nhân.**
+  - URL chỉ có `?id=`. Ô tìm lọc phía máy. Bộ lọc tháng/trạng thái không lên URL.
+  - Ghi chú chặn dãy từ 9 chữ số (bỏ khoảng trắng, chấm, gạch) và giới hạn 500 ký tự.
+  - F2m mở từ "Việc giao của tôi" chỉ truyền `{id, code}` của phiếu giao (`MyDeliveriesScreen.tsx`), không kèm tên, SĐT hay địa chỉ.
+  - Chi tiết phiếu giao nạp trong `getNoteLines` chỉ dùng `lines`, không hiện phần khác.
+  - e2e mock kiểm ghi chú không có trong URL, storage, console.
+- **Duyệt.**
+  - Hai nút "Tái nhập vào lô" / "Huỷ bỏ, ghi lỗ" chỉ hiện khi có `inventory.approve_returntostock` và phiếu còn `DRAFT` (ED-26-AC5).
+  - F2n bắt buộc chọn quyết định. 409 `STALE_STATE` → `ConflictBanner`, bấm "Tải lại" thì đóng hộp và tải lại cả phiếu lẫn dòng thời gian (ED-26-AC4).
+- **Giá vốn.** Không có trường tiền nào. `lookupBatchId` chỉ giữ `id` của lô.
+- **Khối AI.** Route `/returns` và `/returns/detail` đã có trong `check-ai-chunks`.
+- **Nav.** Bỏ `soon`, hiện theo `view_returntostock`. Menu của giao1 thêm mục "Hàng hoàn về kho" (e2e batch1 đã sửa theo).
+- **Q5.** Làm nút "Mang hàng về kho" riêng trên thẻ Giao thất bại, đúng mặc định Q5 của 02-stories (không gộp vào F2l).
+
+**Phát hiện**
+
+- **TL9-M1 · Medium · `features/returns/components/ReturnDetailScreen.tsx:8`, `:113`.** Màn chi tiết import thẳng `@/features/ai/components/AiDocBlockGate`.
+  - 02b §2.3 ghi: "Page (`app/…/page.tsx`) ghép vào `aiSlot`; feature screen không import `features/ai`." Mẫu đúng là `app/(console)/orders/detail/page.tsx` (truyền `renderAi`).
+  - Bản này lặp lại lỗi sẵn có ở `DeliveryDetailScreen.tsx:10`. Lỗi ở DeliveryDetailScreen không thuộc lô này, nhưng không được nhân thêm.
+  - Sửa: `ReturnDetailScreen` nhận prop `renderAi?: (id: number, onApplied: () => void) => ReactNode`. `app/(console)/returns/detail/page.tsx` ghép `<AiDocBlockGate targetModel="inventory.returntostock" …/>`. Chạy lại `check-ai-chunks`.
+
+- **TL9-M2 · Medium · `features/returns/components/CreateReturnModal.tsx:101`, `:119-120`, `:141`, `:219`.** Lỗi theo ô "nhảy" lên đầu hộp khi người dùng sửa ô đó.
+  - Nguyên nhân: khi BE trả lỗi theo ô, code vừa đặt `fieldError` vừa ném `new Error(mapped.message)`, nên `sub.error` cũng mang cùng câu. Gõ vào ô số kg gọi `clear("qty")` làm `fieldError = null`. Lúc này `showAlert = Boolean(sub.error) && !fieldError` thành true, nên câu "Số kg hoàn vượt số đã giao…" hiện lại thành alert đỏ ở đầu hộp, dù người dùng đang sửa đúng.
+  - Tái hiện (mock): kho1, mở "Nhập hàng hoàn", chọn phiếu có lô 10 kg, nhập 99, bấm "Gửi duyệt". Lỗi hiện dưới ô số kg (đúng). Xoá ô và gõ 1: lỗi dưới ô mất, alert đỏ cùng nội dung hiện ở đầu hộp.
+  - Lỗi 404 (map vào ô phiếu giao) cũng bị y như vậy khi đổi phiếu giao.
+  - Đây đúng trọng tâm "lỗi `RETURN_QTY_EXCEEDS` hiện đúng chỗ".
+  - Sửa: thêm cờ cục bộ "lỗi lần gửi đã gắn vào ô". Chỉ hiện `FormAlert` khi lỗi lần gửi không gắn ô nào (`mapped.field === null`), không phụ thuộc vào việc người dùng đã xoá lỗi dưới ô. Thêm ca vitest hoặc e2e: sửa ô sau lỗi vượt kg thì không có `role=alert` ở đầu hộp.
+
+- **TL9-L1 · Low · `features/returns/components/CreateReturnModal.tsx` (`trySubmit`).** FE chưa chặn tại chỗ khi `qty` lớn hơn số kg đã giao của lô (`choice.delivered`), cũng chưa chặn khi đã biết `alreadyReturned`. BE chặn đúng, nên đây không phải lỗ hổng, chỉ thừa một lượt gọi.
+  - Khi BE có `returned_qty` trên dòng phiếu giao (đang làm): hiện "đã hoàn m kg" ngay từ đầu, và chặn `qty > delivered − returned` dưới ô số kg trước khi gửi. Dùng lại `exceedsMessage` / `remainingQty`.
+
+- **TL9-L2 · Low · `features/returns/api.ts:54-61`, `mock.ts` (`BATCH_PK`, nhánh tra lô).** Khi BE trả `batch_pk`, `lookupBatchId` thành đường dự phòng.
+  - Dự phòng này gọi `GET /api/inventory/batches/<mã>/`. Với Chủ, payload kèm giá vốn. FE chỉ giữ `id` nên không rò ra màn, nhưng không cần kéo cả bản ghi lô về chỉ để lấy id.
+  - Sau khi be-dev xong `batch_pk`: xoá `lookupBatchId`, cho `resolveBatchId` chỉ đọc `batch_pk` (thiếu thì báo lỗi rõ). Dọn nhánh mock tương ứng, bỏ câu `batchLookupFailed` nếu không còn dùng.
+
+- **TL9-L3 · Low · `features/returns/messages.ts:35`, `:54`, `:59`, `:71`, `:81`.** Năm khoá không dùng: `detailNoun`, `reloadFailed`, `approveBlockedWhy`, `approvedToast`, `notesLoading`.
+  - Nên dùng `notesLoading` cho trạng thái đang tải phiếu giao trong F2m. Hiện chỉ có ô chọn bị mờ, không có chữ nào báo đang tải.
+  - Các khoá còn lại xoá đi.
+
+- **TL9-L4 · Low · `features/deliveries/components/MyDeliveriesScreen.tsx:131`.** Nút "Mang hàng về kho" không xét `inventory.add_returntostock`.
+  - Hiện mọi `delivery_staff` đều có quyền này nên không lỗi thật. Nhưng màn danh sách đã gác nút "Nhập hàng hoàn" bằng `canCreate`, hai chỗ nên cùng cách.
+  - Nên ẩn nút khi thiếu quyền (BE vẫn 403).
+
+- **TL9-L5 · Low · `features/returns/components/ReturnListScreen.tsx:58`.** Cột Ghi chú hiện `r.note` thô. Trang chi tiết lại dùng `PersonalText`, nên cùng một trường có hai cách hiện.
+  - Nếu sau này BE ẩn danh hoá ghi chú thành `null`, danh sách sẽ ra "—", còn chi tiết ra "Đã ẩn". Nên dùng `PersonalText` ở cả hai chỗ.
+
+- **TL9-L6 · Low · `features/returns/api.ts:64`.** `listReturnableNotes` dừng ở 5 trang (100 phiếu Đang giao / Giao thất bại) mà không báo. Với kho1, quá ngưỡng thì phiếu cũ hơn không có trong ô chọn.
+  - Số lượng thực tế còn xa ngưỡng này. Ghi nợ: khi chạm ngưỡng, hiện câu "Chỉ hiện 100 phiếu gần nhất", hoặc đổi sang ô tìm theo mã phiếu giao.
+
+- **Ghi chú kiến trúc (không tính lỗi).** `deliveries` import `returns/components/CreateReturnModal`, còn `returns/api` import `deliveries/api`, nên hai module phụ thuộc vòng.
+  - Cả hai đều chỉ dùng hàm/màn công khai và 02b §5.2 Lô 9 có giao việc nối nút này, nên chấp nhận.
+  - Nếu sau này thêm chỗ nữa thì đưa hộp F2m lên `shared/` hoặc truyền qua prop từ `page.tsx`, giống cách làm với khối AI.
+
+**Lệch hợp đồng dev nêu (6 mục):** đồng ý cả 6.
+- Mục 1 (`batch_pk`) và mục 2 (`returned_qty`): BE đang làm. FE xử lý tiếp theo TL9-L1 và TL9-L2.
+- Mục 3 (cs1/cs2) và mục 4 (Quản lý không có `add_returntostock`): đúng theo BE. Mục 4 cần PO xác nhận Quản lý có được nhập hàng hoàn hay không.
+- Mục 5 (chưa làm nút "Từ chối"): đúng, đang chờ quyết định #8.
+- Mục 6 (sửa e2e batch1, batch4): hợp lý.
+
+### Việc cần làm để APPROVED
+1. TL9-M1: chuyển việc ghép `AiDocBlockGate` sang `app/(console)/returns/detail/page.tsx`.
+2. TL9-M2: alert đầu hộp không được hiện lại lỗi đã gắn vào ô. Thêm test chứng minh.
+3. Chạy lại `tsc`, `vitest`, build `NEXT_PUBLIC_USE_MOCK=0` + `check-ai-chunks` + `check-no-mock`, và `e2e/ed_batch9_returns.py`.
+4. Các mục Low: gom L2 cùng đợt nối `batch_pk` / `returned_qty` (cùng L1). L3–L6 sửa luôn nếu tiện, không chặn.
+
+### Kết luận Lô 9 — FE: **CHANGES REQUESTED (nhẹ)**
+- Không có lỗi Critical hay High.
+- Không rò giá vốn, không rò dữ liệu khách ra URL, storage hay log, không vượt quyền. Bấm đúp không tạo hai phiếu. Màu cứng bằng 0.
+- Hai lỗi Medium (TL9-M1, TL9-M2) sửa nhỏ. Sửa xong chỉ cần re-review hai chỗ này.
+
+### Re-review Lô 9 — FE sau sửa + BE `batch_pk` / `returned_qty` (02/10)
+
+> Phạm vi gồm:
+> - FE: mục "Lô 9 — FE: sửa theo review techlead" trong dev-notes, các file `erp-console/` như ở trên, cộng `features/deliveries/mock.ts`.
+> - BE: `backend/apps/inventory/returns/creation.py` (`returned_qty_by_batch`, `create_return`), `backend/apps/delivery/serializers.py` (`get_lines`) và test mới `backend/apps/delivery/tests/test_line_return_fields.py`.
+
+**Lệnh đã chạy lượt này**
+- `npx tsc --noEmit`: sạch.
+- `npx vitest run`: 55 file, 582 test đạt.
+- `manage.py test apps.delivery apps.inventory`: 734 test OK.
+- `check_naming.py`: OK.
+- Màu cứng trong `features/returns` và `app/(console)/returns`: 0.
+
+**FE: các mục review cũ đều đã đóng**
+- **TL9-M1: đóng.** `ReturnDetailScreen` nhận `renderAi`, không còn import `features/ai`. `app/(console)/returns/detail/page.tsx` ghép `AiDocBlockGate targetModel="inventory.returntostock"`, đúng mẫu `orders/detail/page.tsx`.
+- **TL9-M2: đóng.**
+  - Cờ `errorAttached` được đặt theo `mapped.field !== null` và reset mỗi lần gửi. `showSubmitAlert` chỉ hiện alert đầu hộp khi lỗi không gắn vào ô nào. Sửa ô sau lỗi thì câu lỗi không còn nhảy lên đầu hộp.
+  - Có hàm thuần kèm vitest, và e2e đã ghi ở dev-notes.
+- **TL9-L1: đóng.** Dòng "Đã giao n, đã hoàn m, còn hoàn được k" hiện ngay khi chọn lô. `qtyOverRemaining` chặn tại chỗ khi nhập vượt.
+  - Nếu BE vừa báo `already_returned_qty` mới hơn thì FE dùng số đó.
+  - `returned_qty` không cộng dồn qua các dòng cùng lô. Cách này khớp BE, vì BE gán cùng một tổng cho mọi dòng của lô.
+- **TL9-L2: đóng.**
+  - Đã gỡ `lookupBatchId` và `resolveBatchId`. Trong `features/returns` không còn gọi `/api/inventory/batches/`.
+  - Thiếu `batch_pk` thì báo lỗi dưới ô Lô, không gọi tra lô.
+- **TL9-L3: đóng.** Đã xoá 4 khoá không dùng, `notesLoading` đã được dùng.
+- **TL9-L4: đóng.** Nút "Mang hàng về kho" gác bằng `canCreate`.
+- **TL9-L5: đóng.** Cột Ghi chú ở danh sách dùng `PersonalText`.
+- **TL9-L6: đóng.** Hộp hiện "Chỉ hiện n phiếu giao gần nhất." khi `truncated`. Chưa có e2e cho ca này, chấp nhận.
+- **Mock.** `registerDeliveryLineExtras` trong `features/deliveries/mock.ts` chỉ chạy dưới cờ mock. Mock module Giao hàng không import ngược mock Hàng hoàn. Build `MOCK=0` + `check-no-mock` XANH ở vòng dev.
+
+**BE: soi theo ba trọng tâm**
+1. **Kiểm vượt kg và khoá dòng không đổi hành vi.**
+   - Thứ tự trong `create_return` vẫn giữ nguyên: `select_for_update` phiếu giao, kiểm `RETURN_NOTE_STATUS`, tính `delivered_qty`, rồi mới cộng số đã hoàn. Vì vậy hai yêu cầu đồng thời vẫn xếp hàng trên khoá phiếu giao.
+   - Truy vấn mới là `filter(delivery_note=locked, batch_id__in=[pk]).values("batch_id").annotate(Sum)`, tương đương `aggregate(Sum)` cũ trên cùng tập dòng (cả DRAFT lẫn APPROVED).
+   - Đã kiểm rủi ro `Meta.ordering = ["-created_at", "-id"]` lọt vào GROUP BY (sẽ ra một dòng cho mỗi phiếu hoàn, và dict chỉ giữ dòng cuối). Rủi ro này không xảy ra:
+     - Django 5.1.15 không đưa `Meta.ordering` vào truy vấn GROUP BY (thay đổi từ bản 3.1).
+     - `test_returned_qty_counts_draft_and_approved` (2 + 1,5 = 3,5) và `test_no_n_plus_one_with_many_lines` (4 × 0,5 = 2) bắt được lỗi này nếu có.
+   - 59 test hiện có của `apps.inventory.returns` (vượt kg, phiếu người khác) vẫn xanh.
+2. **N+1: không có.**
+   - `get_lines` chỉ có ở `DeliveryNoteDetailSerializer`, mà serializer này chỉ dùng cho action chi tiết (`api.py:69`). Danh sách không có `lines` (đã có test).
+   - Mỗi phiếu thêm đúng 1 truy vấn gộp, không phụ thuộc số dòng hay số phiếu hoàn (test so với số gốc, cho phép +1). Phiếu không có phân bổ thì không truy vấn.
+3. **Hai khoá mới không lộ gì.**
+   - `batch_pk` là id nội bộ. Mọi endpoint nhận id lô vẫn kiểm quyền riêng (`view_batch`; `POST returns` kiểm lô có thuộc phiếu giao hay không).
+   - `returned_qty` chỉ là số kg, không thuộc `COST_KEYS`, không phải dữ liệu cá nhân. Test quét JSON không có khoá giá vốn và không có giá mua mốc.
+   - Phạm vi chi tiết phiếu giao giữ nguyên: người giao mở phiếu người khác vẫn 404 (có test).
+   - Không có migration, không ghi log hay AuditLog mới.
+
+**Phát hiện mới (Low, không chặn)**
+- **TL9-R1 · Low · `backend/apps/inventory/returns/creation.py` (`returned_qty_by_batch`).** Nên viết `qs.order_by().values("batch_id")…` cho rõ ý, để truy vấn gộp không phụ thuộc hành vi GROUP BY và `Meta.ordering` của từng bản Django. Hiện đúng trên 5.1.
+- **TL9-R2 · Low · `features/returns/types.ts`, chỗ khai báo `BatchChoice`.** Có hai khối JSDoc liền nhau trên cùng một kiểu. Gộp lại làm một.
+
+### Kết luận re-review Lô 9 — FE + BE `batch_pk`/`returned_qty`: **APPROVED** (REVIEW PASS)
+- Các mục TL9-M1, M2 và L1–L6 đã đóng.
+- Phần BE không đổi hành vi kiểm vượt kg hay khoá dòng, không N+1, không lộ giá vốn hay dữ liệu khách.
+- TL9-R1 và R2 là Low, gom vào lô sau.
+- Còn chờ PO: Quản lý có `add_returntostock` hay không (lệch số 4), và quyết định #8 (nút Từ chối).
+
+## Lô 11 — FE (Nhà cung cấp ED-22: W5c, W5d, F1b) · review techlead 02/10
+
+Phạm vi: `erp-console/features/suppliers/**`, `app/(console)/suppliers/**`, `shared/lib/nav.ts`, `scripts/check-ai-chunks.mjs`, `e2e/ed_batch11_*.py`, `e2e/ed_batch1_shell.py`, `e2e/qa_ed_batch1_common.py` (chưa commit). Căn cứ: 02b §1 (W5c, W5d, F1b), §2.3, §2.4, §3 B3, §5.2 Lô 11; contract "Lô 11 — BE" trong 03-dev-notes; 00-can-duy-quyet (tổng tiền mua chỉ Chủ).
+
+**Kiểm chứng (chạy lượt này)**
+- `npx tsc --noEmit`: sạch.
+- `npx vitest run`: 59 file, 646 ca đạt.
+- `python3 scripts/check_naming.py`: OK, không phát sinh vi phạm mới.
+- Grep màu cứng (hex, `rgb(`, `hsl(`) trong `features/suppliers` và `app/(console)/suppliers`: 0.
+- Grep `NCC` trên giao diện: 0. Chỉ còn trong comment ở `messages.ts:2` và trong mock (xem TL11-L2).
+- Grep `console.`, `localStorage`, `sessionStorage` ngoài `mock.ts`: 0.
+
+**Đã soát, đạt**
+1. **Tiền mua (bất biến 1).**
+   - `purchase_total` là khoá tuỳ chọn trong `types.ts:22`. Mock chỉ gắn khoá này khi người xem có `inventory.view_costprice` (`mock.ts:155`), giống BE (`sensitive_fields` + `COST_KEYS`).
+   - Cột danh sách dùng `locked: true` (`SupplierListScreen.tsx:59`). `DataTable.tsx:118` lọc bỏ cột khi `canViewCost=false`, nên cột không có trong DOM.
+   - Ô "Tổng tiền mua" ở chi tiết chỉ render khi `canViewCost && purchase_total !== undefined` (`SupplierDetailScreen.tsx:211`).
+   - Bảng Phiếu nhập: cột "Tiền mua" (`purchase_amount`, R10) cũng `locked` (`:135`). Mock bỏ khoá này với người không phải Chủ (`mock.ts:235`).
+   - e2e kiểm cả trên mock (`ed_batch11_suppliers.py:274-294, 318, 326`) lẫn BE thật (`ed_batch11_real.py:127`) rằng ql1 và kho1 không có chữ hay số tiền trong `page.content()`.
+2. **Quyền ghi.**
+   - Nút Thêm cần `add_supplier`. Nút Sửa, sửa tại chỗ và mục Ngừng/Bật lại cần `change_supplier`.
+   - Kho chỉ thấy `InfoField` thường. Mục "Ngừng hợp tác" của kho bị chặn kèm lý do.
+   - Không có hàm DELETE hay PUT. Ngừng hợp tác là `PATCH {is_active}` qua hộp xác nhận, nút đỏ, có nêu hậu quả (BR-PQ-10).
+   - Guard trang dùng `ViewGuard view="suppliers"`. Menu dựa trên `PERM.viewSupplier`. Nếu 403 từ BE thì hiện `NoPermission`.
+3. **Hai dạng 400 trùng tên.**
+   - `isNameTaken` và `nameTakenMessage` (`suppliersModel.ts:67-83`) bắt được cả `{name:[…]}` (nằm trong `ApiError.details`) lẫn `{detail, code:"SUPPLIER_NAME_TAKEN"}`.
+   - Hộp Thêm/Sửa hiện lỗi dưới ô Tên đúng một lần, `topError` bị nén lại (`SupplierFormModal.tsx:80`), và nút đổi thành "Thử lại".
+   - Sửa tên tại chỗ đi qua `saveErrorMessage`, cũng ra đúng câu của BE cho cả hai dạng. Lý do: `http.ts:169-175` đưa `{name}` vào `details`, còn `detail` vào `message`.
+   - e2e có ca `racename`.
+4. **Số điện thoại nhà cung cấp.**
+   - URL chỉ có `?id=` số, được kiểm bằng `/^\d{1,12}$/`.
+   - Từ khoá chỉ nằm trong state và query của request API, không lên URL trang.
+   - Không ghi storage hay console. Riêng mock lưu khoá chế độ, không chứa dữ liệu.
+   - e2e quét storage và URL trên BE thật (`ed_batch11_real.py:114`).
+   - Đây là dữ liệu đối tác, không thuộc bất biến 9. Phía AI vẫn được lọc qua `SCRUB_PII_KEYS` ở BE.
+5. **Khối AI.**
+   - `AiDocBlockGate targetModel="purchasing.supplier"` được ghép ở `app/(console)/suppliers/detail/page.tsx:14`. Màn hình tính năng không import `features/ai` (02b §2.3).
+   - Target đã có ở BE (`apps/ai/actions/targets.py:21`) và mock FE.
+   - `check-ai-chunks.mjs` có thêm hai route mới.
+6. **Đúng contract BE.** Dùng các khoá `last_received_at`, `purchase_total`, `supplier_type_label`. Danh sách 50 dòng/trang có "Tải thêm". Chi tiết gọi R10 `receipts/?supplier=` và R5 `batches/?supplier=&has_stock=1`, dòng thời gian lấy từ R2 `supplier`. Mỗi bảng phụ lỗi hoặc 403 riêng, không làm hỏng cả trang.
+7. **Idiom.**
+   - Dùng đúng khung `ListPage`/`DataTable`/`DetailPage`/`InfoField`/`useSubmit`/`usePagedList`. Có đủ 3 trạng thái và bỏ kết quả về trễ (`seq` + `AbortController`).
+   - Câu chữ gom ở `messages.ts`. CSS module chỉ dùng token.
+   - Có README module.
+   - Năm chỗ lệch dev ghi ở 03-dev-notes đều hợp lý và khớp contract BE.
+
+**Phát hiện (đều Low, không chặn)**
+- **TL11-L1 · Low · `features/suppliers/components/SupplierDetailScreen.tsx:117`.** Lý do chặn `"Chỉ Chủ và Quản lý."` đang viết cứng trong component. Các câu khác đều nằm trong `messages.ts`. Nên chuyển vào `SUPPLIERS_MSG`.
+- **TL11-L2 · Low · `features/suppliers/mock.ts:262`.** Mock dòng thời gian đặt `doc.code` là `` `NCC-${p.id}` ``. Hiện màn không render `doc.code` nên giao diện chưa lộ chữ "NCC", nhưng nếu sau này `Timeline` hay header dùng `doc.code` thì chữ cấm sẽ lên màn. Nên đổi theo mã BE trả cho guidance `supplier`, hoặc dùng `String(p.id)`.
+  - Tái hiện: `grep -n NCC erp-console/features/suppliers/mock.ts`.
+- **TL11-L3 · Low · `SupplierDetailScreen.tsx:250-268` + `useSupplierRelated.ts:33`.** Bảng Lô đang bán chỉ nạp trang đầu (50 lô). Tiêu đề in `count` của BE, nên khi có trên 50 lô thì số ở tiêu đề sẽ lớn hơn số dòng mà không có "Tải thêm". Dev đã ghi nợ. Thực tế một nhà cung cấp hiếm khi có trên 50 lô còn hàng, nên để lô sau.
+- **TL11-L4 · Low (cho PO) · `SupplierDetailScreen.tsx:132`.** Cột "Nhập lúc" lấy `created_at` (giờ ghi phiếu), không lấy `received_date`. Cách này nhất quán với `last_received_at` của BE (02b B3). Nhưng nếu phiếu được ghi muộn hơn ngày nhận hàng thực tế thì hai mốc lệch nhau. Đây là lệch 3 trong dev-notes, PO biết là đủ.
+- **TL11-L5 · Low · `mock.ts:142`.** Mock cộng tiền bằng `Number` rồi `toFixed(2)`. Chỉ có trong mock, build thật đã loại file này. Không phải sửa, ghi lại để không ai chép mẫu này sang code thật (bất biến 7).
+
+**Ý kiến về `.lt-link` (vùng bấm 44px, phần dùng chung)**
+- Hiện trạng ở `shared/ui/globals.css:598`: `.lt-link` là `inline-block` nên chỉ cao bằng dòng chữ (~19,5px).
+- Chuột và cảm ứng vẫn bấm được cả dòng 44px, vì `tr.lt-click` có `onClick` (`DataTable.tsx:180-183`). Vì vậy đây không phải lỗi chặn của lô này, và cũng đúng với mọi danh sách khác (khách hàng, kho & lô, đơn…).
+- Phần còn hụt:
+  - Liên kết thật, dùng cho bàn phím, trình đọc màn hình, mở tab mới và nhấn giữ trên điện thoại, chỉ phủ phần chữ.
+  - Kiểm tra vùng bấm trong e2e đang phải loại trừ `.lt-link`.
+- Đề xuất làm thành **một việc riêng ở phần dùng chung** (không nhét vào Lô 11), áp cho mọi bảng một lần:
+  - Cho `table.lt td > .lt-link` thành `display:block`, dùng margin âm bằng padding của ô rồi bù lại bằng padding, kèm `min-height:44px`. Như vậy liên kết phủ đúng ô đầu.
+  - Không dùng kiểu "stretched link" `::after` phủ cả `tr`, vì `position:relative` trên `tr` không ổn định giữa các trình duyệt và sẽ đè các nút trong dòng.
+  - Kiểm lại chế độ thẻ ở màn hẹp (`data-label`) cùng các e2e target-size, và bỏ dòng loại trừ `.lt-link` trong e2e.
+- Cách làm cho bút sửa (`.pencil` 28px, `::after` mở rộng ra 44px) đã đạt, giữ nguyên.
+
+### Kết luận Lô 11 — FE: **APPROVED** (REVIEW PASS)
+- Không rò tiền mua với Quản lý hay Kho, cả trong DOM lẫn mock.
+- Quyền ghi đúng: Chủ và Quản lý được ghi, Kho chỉ xem. Không có DELETE hay PUT.
+- Hai dạng 400 trùng tên đều hiện đúng. Số điện thoại không lên URL hay storage. Khối AI ghép ở page.
+- Không còn màu cứng, không còn chữ "NCC" trên giao diện.
+- TL11-L1 đến L5 là Low, gom vào lô sau. Việc `.lt-link` đề xuất tách thành phiếu riêng cho phần dùng chung.
+
+## Lô 8 — FE
+
+ED-28 Kiểm kê, review techlead 02/10. Diff trong worktree `loc-wt-b` (nhánh `ed-stream-b`), chưa commit. Phạm vi: `erp-console/features/stocktake/**`, `app/(console)/stocktake/**`, `shared/lib/nav.ts`, `scripts/check-ai-chunks.mjs`, `e2e/ed_batch8_stocktake*.py`.
+
+**Số tự chạy lại:** `tsc --noEmit` sạch. `vitest run` 54 file, 554 test đạt. `scripts/check_naming.py` OK, không phát sinh mới. Màu cứng (hex/rgb/hsl) trong `features/stocktake` và `app/(console)/stocktake`: 0.
+
+**Phần đạt**
+- Chi tiết hiện `difference_qty`, `system_qty`, `counted_qty` và tổng `short_qty`/`over_qty`/`net_difference` lấy thẳng từ BE (`StocktakeDetailScreen.tsx:285-298`, `:245-255`). FE không tự tính lại chênh lệch trên màn chi tiết.
+- Nút Duyệt chỉ hiện khi `available_actions` có `approve` (`StocktakeDetailScreen.tsx:173,189`). Khi bị chặn, mục mờ nằm trong "…" và lấy chữ từ `approve_blocked_reason.label` (`:178-180`). FE không tự suy BR-KK-08.
+- `replaceStocktakeLines` gửi `expected_updated_at` (`api.ts:73-79`). Lỗi 409 giữ nguyên để `useSubmit` bật `ConflictBanner` (`StocktakeForm.tsx:87-90,340`).
+- `line_index` được đổi từ chỉ số trong danh sách đã gửi sang chỉ số dòng trong form qua `sent[]` (`StocktakeForm.tsx:213,225`). Trên màn chi tiết, `lines` (serializer) và vòng duyệt (`services.py:244`) cùng `order_by("id")`, nên chỉ số khớp.
+- Không có field tiền hay giá vốn. `fetchStockBatches` chỉ giữ các trường kg (`api.ts:117-136`). Không có dữ liệu khách, không `console.*`. `localStorage` chỉ dùng trong `mock.ts` (khoá `cave_erp_mock_stocktake`), và `window.__caveMock` bọc trong `NEXT_PUBLIC_USE_MOCK === "1"`.
+- Khối AI ghép `AiDocBlockGate targetModel="inventory.stockreconciliation"` vào `aiSlot` (`StocktakeDetailScreen.tsx:209`). Đây là cách §2.4 quy định và trùng với `DeliveryDetailScreen`. `check-ai-chunks.mjs` đã có 4 route `/stocktake*`.
+- Chặn bấm đúp bằng `busy` cộng `useSubmit`. Trang mỏng, URL chỉ mang `?id=`, đủ các trạng thái tải / lỗi / 403 / 404 / khoá.
+
+**Phát hiện**
+
+**TL8-F1 · High · Lưu nháp hoặc Gửi duyệt né được 409 khi có đổi Ngày kiểm kê hoặc Ghi chú.** Ở `StocktakeForm.tsx:216-222`, khi đầu phiếu đổi, FE gọi PATCH trước. PATCH của BE không kiểm phiên bản (`api.py:85-100`, `services.update_reconciliation`). Sau đó FE gán `updatedAt.current = h.updated_at` (dòng 219) rồi mới POST `…/lines/` với mốc mới này. Kết quả là phiên bản bị "làm mới" ngay trước khi kiểm, nên số đếm của người kia bị ghi đè mà không ai thấy cảnh báo. Đây chính là ca W6f phải chặn.
+- Tái hiện (mock): `kho1` mở `/stocktake/edit/?id=<id>`. Ở console gọi `__caveMock.stocktakeEditByOther(<id>)`. Sửa ô Ghi chú rồi bấm Lưu nháp. Kết quả: lưu thành công, không có `ConflictBanner`. Nếu không sửa Ghi chú thì có 409 đúng như mong đợi.
+- Trên BE thật: hai phiên cùng mở trang sửa. Phiên B lưu số. Phiên A đổi ngày rồi Lưu nháp. Dòng của B mất.
+- Cách sửa: POST `…/lines/` trước bằng mốc đang giữ, rồi mới PATCH đầu phiếu. Hoặc chỉ PATCH khi `lines` đã qua. Không gán `updatedAt.current` từ PATCH trước khi gửi dòng. Cần thêm ca e2e "đổi ghi chú + người khác sửa → 409".
+
+**TL8-F2 · Medium · Chữ trên màn nói "tồn đổi theo số thực đếm", trái BR-KK-09.** BE áp phần chênh đã chụp (`counted − system_qty` lúc lưu), không đặt tồn bằng số đếm. Nếu giữa lúc lưu và lúc duyệt có xuất hoặc nhập, tồn sau duyệt sẽ khác số đếm. Các câu hiện tại làm người duyệt hiểu sai:
+- `stocktakeUi.ts:207` có câu "Tồn của n lô sẽ đổi theo số thực đếm."
+- `StocktakeDetailScreen.tsx:342` có câu "Tồn kho của các lô lệch sẽ đổi theo số thực đếm."
+- `StocktakeDetailScreen.tsx:141` có toast "Tồn kho đã điều chỉnh theo số đếm."
+- Tái hiện (mock): lưu phiếu (lô A tồn 18, đếm 17,5). Gọi `__caveMock.stocktakeSetStock(A, 15)` rồi duyệt. Tồn ra 14,5, không phải 17,5, trong khi hộp xác nhận hứa "theo số thực đếm".
+- Đề xuất câu: "Mỗi lô lệch sẽ được cộng hoặc trừ đúng phần chênh lệch ở bảng." BR-KK-09 còn chờ Duy chốt nên câu chữ nên bám cơ chế hiện có.
+
+**TL8-F3 · Medium · "Tải lại" sau 409 giữ dòng của mình nhưng không cho thấy thay đổi của người kia.** `reloadAfterConflict` (`StocktakeForm.tsx:279-297`) chỉ lấy mốc `updated_at` mới và cập nhật `systemMilli` cho các lô trùng. Lô người kia thêm thì không hiện. Số người kia sửa trên lô trùng bị số đang gõ che mất. Ghi chú và ngày cũng không được nạp lại, trong khi `savedHeader` đã là bản của server. Bấm lưu lần nữa sẽ thay toàn bộ dòng bằng bản của mình. Như vậy 409 chỉ còn là một cú bấm thêm, người dùng không biết mình đang ghi đè.
+- Tái hiện (mock): mở trang sửa, gọi `stocktakeEditByOther(id)`, Lưu nháp ra 409, bấm Tải lại, Lưu nháp lần nữa. Bản của người kia bị thay mà không hiện gì.
+- Tối thiểu cần làm một trong hai việc: (a) sau khi tải lại, đánh dấu những dòng có số server khác số đang gõ, và thêm các lô mới của server vào form; hoặc (b) nạp lại nguyên bản server (giống màn khác) và giữ số đang gõ ở dạng "bản của bạn" để người dùng chọn. Nếu PO chấp nhận hành vi hiện tại thì ghi rõ vào 02b W6f.
+
+**TL8-L1 · Low · Lô mới có thể lập trùng phiếu khi bấm lại lúc đang chuyển trang.** Ở `afterSave` của mode `new` (`StocktakeForm.tsx:237-239`), FE `router.replace` mà không gán `recId.current = res.id`, trong khi `useSubmit` đã nhả `busy`. Nếu bấm Lưu nháp lần nữa trước khi trang edit nạp xong thì `createStocktake` chạy lần hai và tạo phiếu thứ hai. Cách sửa: gán `recId.current = res.id` (và `updatedAt.current`) trước khi `replace`.
+
+**TL8-L2 · Low · Mất "Lý do" đã gõ trên dòng chưa có số.** `toLineInputs` bỏ dòng không có số đếm (`stocktakeUi.ts:138-145`). Ở mode `new`, sau Lưu nháp trang chuyển sang edit và nạp lại từ BE, nên lý do đã gõ trên dòng chưa đếm bị mất mà không báo. Cùng gốc với lệch #2 và #9 của dev (không có unsaved-change guard). Đề xuất: khi lưu nháp, báo "n dòng chưa có số sẽ không được lưu" nếu dòng đó có lý do.
+
+**TL8-L3 · Low · Số "Dòng N:" trong lỗi BE không khớp vị trí trên form.** BE đếm theo danh sách đã gửi, đã bỏ các dòng trống. Lỗi được gắn đúng dòng, nhưng chữ "Dòng 3" có thể nằm trên dòng thứ 5 của form. Nên bỏ tiền tố "Dòng N: " trong `cleanMessage`, hoặc chỉ bỏ ở form, vì lỗi đã nằm ngay trên dòng.
+
+**TL8-L4 · Low · Code thừa.** `StocktakeDetailScreen.tsx:28` import `conflictOf` và `isConflictError` mà không dùng. `StocktakeForm.tsx:332` có biến `unchangedRows` thực chất là `rows.length`, tên gây hiểu nhầm.
+
+**Ghi nhận, không phải lỗi:**
+- Lệch #1: phiếu lưu nháp duyệt được ngay, vì BE không có trạng thái nháp riêng. Cần PO xác nhận cách gọi "Lưu nháp" và "Gửi duyệt".
+- Lệch #7: `ed_batch1_shell.py` đếm `option` toàn trang. Lỗi nằm ở script, không phải ở màn.
+
+**Kết luận: CHANGES REQUESTED.** Bắt buộc sửa TL8-F1 (High). Nên sửa cùng lượt TL8-F2 và TL8-L1, vì mỗi cái chỉ vài dòng. TL8-F3 sửa trong lô này, hoặc PO chấp nhận và ghi vào 02b. Các mục L2–L4 có thể gom vào lô sau.
+
+### Lô 8 — FE, review lại sau vòng sửa (02/10)
+
+**Số tự chạy lại:** `tsc --noEmit` sạch. `vitest run` 54 file, 555 test đạt. `check_naming` OK. Màu cứng 0. Không còn `conflictOf`, `isConflictError`, `unchangedRows`.
+
+| Mục | Kết quả | Căn cứ |
+|---|---|---|
+| TL8-F1 (High) | **Đã sửa** | `StocktakeForm.persist()`: POST `…/lines/` đi trước, kèm `updatedAt.current` của bản đang giữ. Gặp 409 thì `throw` ngay trong `catch`, không chạy tới PATCH. Chỉ khi dòng lưu xong mới gán `updatedAt` mới và PATCH đầu phiếu, và chỉ PATCH khi ngày hoặc ghi chú khác `savedHeader`. Nếu người kia đổi ghi chú trước đó thì `updated_at` đã đổi, nên POST dòng ra 409. Còn một khe nhỏ giữa POST dòng và PATCH (vài trăm ms): PATCH ở BE ghi đè ngày/ghi chú theo kiểu ai lưu sau thắng. Mức này chấp nhận được, vì muốn kín hẳn thì BE phải kiểm phiên bản ở PATCH, nằm ngoài lô FE. PATCH lỗi sau khi dòng đã lưu thì báo đúng "Đã lưu số đếm nhưng chưa lưu được ngày hoặc ghi chú…", và mốc phiên bản đã cập nhật nên lần thử lại không tự gây 409. |
+| TL8-F2 | **Đã sửa** | `stocktakeUi.ts:207-209`, hộp xác nhận `StocktakeDetailScreen.tsx:345` và toast `:141` đều nói "cộng hoặc trừ phần chênh lệch đã ghi", đúng BR-KK-09. Có test quét chặn cụm "theo số (thực) đếm". |
+| TL8-F3 | **Đã sửa** | `reloadAfterConflict` gọi `applyDetail(d)`, nạp nguyên khối dòng, ngày, ghi chú và `updated_at` từ máy chủ, rồi xoá kho đang chọn, lỗi dòng và trạng thái submit. Trước khi bấm có câu báo "Thay đổi chưa lưu của bạn sẽ bị bỏ khi tải lại." |
+| TL8-L1 | **Đã sửa** | `recId.current` và `updatedAt.current` được gán ngay khi `createStocktake` trả về, trước khi `useSubmit` nhả nút. Bấm lần hai sẽ đi nhánh `lines`, không tạo phiếu thứ hai. |
+| `history.replaceState` | **Ổn** | Next là 14.2.35. Từ 14.1, `window.history.replaceState` gốc được App Router tích hợp, nên `useSearchParams` cập nhật theo và cây router được giữ. Repo đã có tiền lệ ở `content/edit/page.tsx:407` và `OrderDetailScreen.tsx:133`. Với static export, `/stocktake/edit/index.html` có sẵn, nên F5 hoặc mở lại URL vào đúng trang sửa. Form vẫn mount ở mode `new`, nhưng `recId` đã có nên không lập lại phiếu. Màn khoá phiếu (`mode === "edit"`) không áp ở đây, và cũng không cần, vì phiếu vừa lập luôn DRAFT và người lập có quyền sửa. |
+| TL8-L2 | **Đã sửa** | Lưu nháp lần đầu ở lại form, lý do trên dòng chưa có số còn nguyên. Toast báo "N lô chưa có số nên chưa được lưu." |
+| TL8-L4 | **Đã sửa** | |
+| Bảng chi tiết bỏ cột Kho | **Ổn** | Cột Kho đã có ở `InfoGrid`. Phiếu nhiều kho (`warehouse_names.length > 1`) thì ghi tên kho sau tên mặt hàng, nên không mất thông tin. Chênh lệch vẫn là `difference_qty` của BE. CSS dùng token, không màu cứng. Selector `table:global(.lt).linesTable` đúng cách viết với CSS Module. |
+| TL8-L3 | Chưa sửa | Low, gom vào lô sau. Lỗi vẫn gắn đúng dòng, chỉ số "Dòng N" có thể lệch vị trí. |
+
+Không phát hiện lỗi mới ở các phần đã sửa. Dev chưa chạy ca "ghi chú + 409" trên BE thật. Thứ tự gọi trong code đủ để bảo đảm ca này, và mock đã chứng minh. QA có thể thêm ca này nếu muốn.
+
+**Kết luận: APPROVED.** Còn nợ: TL8-L3 (Low), thiếu unsaved-change guard, và đề xuất BE kiểm phiên bản ở PATCH phiếu kiểm kê để đóng hẳn khe ghi chú (BE, không chặn lô này).

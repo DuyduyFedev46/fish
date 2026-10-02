@@ -1,11 +1,11 @@
 import { ViewGuard } from "@/features/auth/components/ViewGuard";
-import { Placeholder } from "@/shared/ui/Placeholder";
+import { StocktakeListScreen } from "@/features/stocktake/components/StocktakeListScreen";
 
-// Màn chưa làm (xem plannedIn trong shared/lib/nav.ts). Khi làm: thay <Placeholder> bằng màn của features/<module>.
+// Kiểm kê (ED-28 W2c): danh sách phiếu. Lập phiếu ở /stocktake/new/, chi tiết ở /stocktake/detail/?id=<số>.
 export default function Page() {
   return (
     <ViewGuard view="stocktake">
-      <Placeholder view="stocktake" />
+      <StocktakeListScreen />
     </ViewGuard>
   );
 }

@@ -1,0 +1,102 @@
+/* Kiểm kê — CHỈ dùng token (shared/ui/tokens.css), không màu viết tay. */
+
+/* ---- Danh sách /stocktake/ ---- */
+.more { display: flex; justify-content: center; }
+.short { color: var(--crit); }
+.over { color: var(--warn); }
+
+/* ---- Form /stocktake/new/ và /stocktake/edit/ ---- */
+.head { display: grid; grid-template-columns: 1fr; gap: var(--space-4); min-width: 0; }
+@media (min-width: 720px) { .head { grid-template-columns: minmax(0, 12rem) minmax(0, 18rem) minmax(0, 1fr); } }
+
+.section { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
+.sectionHead { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; }
+.sectionTitle { margin: 0; font-size: var(--text-md); font-weight: var(--weight-semibold); color: var(--ink); }
+.sectionCount { font-size: var(--text-sm); color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.loadNote { display: flex; align-items: center; gap: var(--space-2); margin: 0; font-size: var(--text-sm); color: var(--ink-2); }
+.loadErr { display: flex; align-items: center; gap: var(--space-2); margin: 0; font-size: var(--text-sm); font-weight: var(--weight-medium); color: var(--crit); }
+
+.rows { display: flex; flex-direction: column; gap: var(--space-3); margin: 0; padding: 0; list-style: none; }
+.rowHead { display: none; }
+.row {
+  display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3);
+  padding: var(--space-3); min-width: 0;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg);
+}
+.row[data-invalid="true"] { border-color: var(--crit); }
+.cell { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; }
+.cellWide { grid-column: 1 / -1; }
+.cellLabel { font-size: var(--text-sm); font-weight: var(--weight-medium); color: var(--ink-2); }
+.batchCode { font-family: var(--font-mono); font-size: var(--text-sm); color: var(--ink); overflow-wrap: anywhere; }
+.itemName { color: var(--ink); overflow-wrap: anywhere; min-width: 0; }
+.value { font-variant-numeric: tabular-nums; color: var(--ink); }
+.diffShort { color: var(--crit); font-weight: var(--weight-semibold); }
+.diffOver { color: var(--warn); font-weight: var(--weight-semibold); }
+.rowTop { grid-column: 1 / -1; display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-2); min-width: 0; }
+.rowTitle { display: flex; flex-direction: column; gap: var(--space-0-5); min-width: 0; }
+.drop {
+  display: inline-flex; align-items: center; justify-content: center; flex: none;
+  width: var(--tap); height: var(--tap); margin: calc(var(--space-2) * -1) calc(var(--space-2) * -1) 0 0;
+  background: transparent; border: 0; border-radius: var(--radius-md); color: var(--ink-3); cursor: pointer;
+}
+.drop:hover { background: var(--surface-3); color: var(--ink); }
+.drop:focus-visible { outline: none; box-shadow: 0 0 0 1px var(--focus), 0 0 0 4px var(--accent-soft); }
+
+.control {
+  width: 100%; min-height: var(--tap); padding: var(--space-2-5) var(--space-3);
+  font: inherit; font-size: var(--text-input); color: var(--ink);
+  background: var(--surface); border: 1px solid var(--border-input); border-radius: var(--radius-md);
+  box-shadow: var(--shadow-xs); outline: none;
+  transition: border-color var(--dur-fast) ease, box-shadow var(--dur-fast) ease;
+}
+.control:focus { border-color: var(--focus); box-shadow: 0 0 0 1px var(--focus), 0 0 0 4px var(--accent-soft); }
+.control[aria-invalid="true"] { border-color: var(--crit); }
+.control[aria-invalid="true"]:focus { box-shadow: 0 0 0 1px var(--crit), 0 0 0 4px var(--crit-soft); }
+.num { text-align: right; font-variant-numeric: tabular-nums; }
+.unitBox { position: relative; display: flex; align-items: center; }
+.unitBox .control { padding-right: calc(var(--space-3) + 3ch); }
+.unit { position: absolute; right: var(--space-3); font-size: var(--text-sm); color: var(--ink-3); pointer-events: none; }
+.err { display: flex; align-items: center; gap: var(--space-1-5); margin: 0; font-size: var(--text-sm); font-weight: var(--weight-medium); color: var(--crit); }
+.err :global(.mi) { font-size: 16px; flex: none; }
+
+.empty {
+  display: flex; flex-direction: column; gap: var(--space-1); padding: var(--space-5) var(--space-4);
+  background: var(--surface); border: 1px dashed var(--border-strong); border-radius: var(--radius-lg); color: var(--ink-2);
+}
+.emptyTitle { margin: 0; font-weight: var(--weight-semibold); color: var(--ink); }
+.emptyHint { margin: 0; font-size: var(--text-sm); }
+
+@media (min-width: 960px) {
+  .rowHead, .row { grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.3fr) 6.5rem 8.5rem 6.5rem minmax(0, 1.5fr) var(--tap); }
+  .rowHead {
+    display: grid; gap: var(--space-3); padding: 0 var(--space-3);
+    font-size: var(--text-sm); font-weight: var(--weight-medium); color: var(--ink-3);
+  }
+  .rowHead .r { text-align: right; }
+  .rows { gap: var(--space-2); }
+  .row { align-items: start; padding: var(--space-2-5) var(--space-3); }
+  .row .cellLabel { display: none; }
+  .rowTop { display: contents; }
+  .rowTitle { display: contents; }
+  .cellWide { grid-column: auto; }
+  .row .cellEnd { text-align: right; }
+  .drop { margin: 0; order: 99; }
+}
+
+/* ---- Trang chi tiết ---- */
+.skelRow { height: var(--tap); border-radius: var(--radius-md); background: var(--surface-3); animation: pulse 1.2s ease-in-out infinite; }
+@keyframes pulse { 50% { opacity: .55; } }
+@media (prefers-reduced-motion: reduce) { .skelRow { animation: none; } }
+.lineErr { margin: var(--space-1) 0 0; color: var(--crit); font-size: var(--text-sm); font-weight: var(--weight-medium); }
+.reason { overflow-wrap: anywhere; }
+.rowInvalid td { background: var(--crit-soft); }
+.totals { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-5); margin: 0; font-size: var(--text-sm); color: var(--ink-2); }
+.totals b { color: var(--ink); font-variant-numeric: tabular-nums; }
+.conflictHint { margin: 0; font-size: var(--text-sm); color: var(--ink-2); }
+
+/* Bảng dòng ở trang chi tiết nằm trong cột chính hẹp (khoảng 640px ở màn 1280): gộp lô + mặt hàng một cột, bỏ cột Kho
+   (kho đã ở khối Thông tin; chỉ ghi kèm khi phiếu nhiều kho), để cột Chênh lệch không bị cắt. */
+table:global(.lt).linesTable th, table:global(.lt).linesTable td { padding-left: var(--space-3); padding-right: var(--space-3); }
+table:global(.lt).linesTable td { height: auto; padding-top: var(--space-2); padding-bottom: var(--space-2); }
+.lineMeta { display: block; margin-top: 2px; font-size: var(--text-xs); color: var(--ink-3); }
+table:global(.lt).linesTable td.reason { min-width: 9rem; white-space: normal; }

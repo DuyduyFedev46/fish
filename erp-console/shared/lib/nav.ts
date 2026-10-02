@@ -113,6 +113,9 @@ export const PERM = {
   /** Lô 10: nhập chi phí mua (chỉ Chủ). */
   addPurchaseCost: "purchasing.add_purchasecost",
   viewStockReconciliation: "inventory.view_stockreconciliation",
+  /** ED-28: lập phiếu kiểm kê (Chủ, Quản lý, NV kho). Nút thật theo `available_actions` của BE; quyền này chỉ để hiện nút "Lập phiếu kiểm kê". */
+  addStockReconciliation: "inventory.add_stockreconciliation",
+  changeStockReconciliation: "inventory.change_stockreconciliation",
   viewItem: "catalog.view_item",
   /** A2 (02-stories.md, hồ sơ 2026-09-26-anh-mat-hang): Tầng 2 riêng cho ảnh mặt hàng — Chủ, Quản lý có;
    * warehouse_staff/delivery_staff không. KHÔNG mở rộng sang sửa mặt hàng (change_item) — đó vẫn là S38. */
@@ -284,10 +287,9 @@ export const NAV: NavItem[] = [
     plannedIn: "Lô 11",
     href: "/suppliers/",
     label: "Nhà cung cấp",
-    short: "Nhà CC",
+    short: "Nhà cung cấp",
     icon: "storefront",
     section: "Hàng hoá & kho",
-    soon: true,
     visible: (me) => has(me, PERM.viewSupplier),
   },
   {
@@ -311,7 +313,6 @@ export const NAV: NavItem[] = [
     short: "Hoàn kho",
     icon: "assignment_return",
     section: "Hàng hoá & kho",
-    soon: true,
     visible: (me) => has(me, PERM.viewReturn),
   },
   {

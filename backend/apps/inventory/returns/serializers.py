@@ -14,6 +14,8 @@ from apps.delivery.models import DeliveryNote
 from apps.inventory.models import Batch, ReturnToStock
 from apps.inventory.stock.serializers import user_display_name
 
+from apps.common.pii import has_long_digit_run
+
 from .scope import scope_delivery_notes_for
 
 NOT_FOUND_MESSAGE = "Không tìm thấy phiếu giao."
@@ -82,6 +84,12 @@ class ReturnToStockSerializer(serializers.ModelSerializer):
             "left_warehouse_at", "returned_at", "decision", "status", "created_by", "approved_by", "created_at",
         ]  # BR-PQ-14/16
         extra_kwargs = {"note": {"max_length": MAX_NOTE_LENGTH}}
+
+    def validate_note(self, value):
+        # Bất biến 9: ghi chú tự do không chứa số điện thoại/số tài khoản — cùng luật với các ghi chú khác (QA Lô 9 B1).
+        if has_long_digit_run(value or ""):
+            raise serializers.ValidationError("Ghi chú không được chứa dãy số dài (số điện thoại, số tài khoản).")
+        return value
 
     def get_code(self, obj):
         return f"RT-{obj.pk}"

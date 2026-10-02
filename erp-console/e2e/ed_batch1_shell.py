@@ -27,14 +27,14 @@ FULL_ORDER = [
 SECTIONS = ["Bán hàng", "Hàng hoá & kho", "Kế toán", "Website", "Quản trị"]
 # Mock chưa có quyền mới (xem 03-dev-notes.md, Lô 1 — FE) nên mỗi vai chỉ thấy phần đã làm.
 ROLE_MENU = {
-    # Lô 7 (sửa sau Techlead L1): mock cấp cho Chủ đủ quyền như BE thật, nên Chủ thấy thêm Gọi xác nhận, Chính sách AI, Báo cáo AI.
-    "loc": (["Tổng quan", "Đơn & tiền", "Khách hàng", "Gọi xác nhận", "Giao hàng", "Mua hàng", "Kho & lô", "Kiểm kê", "Sổ nhập xuất", "Danh mục & giá", "Báo cáo lãi lỗ", "Nội dung", "Nhân sự", "Nhật ký hoạt động", "Chính sách AI", "Báo cáo AI"],
+    # Hợp Lô 7 (mock Chủ đủ quyền như BE: Gọi xác nhận, Chính sách AI, Báo cáo AI; Sổ nhập xuất) + Lô 9 (Hàng hoàn về kho).
+    "loc": (["Tổng quan", "Đơn & tiền", "Khách hàng", "Gọi xác nhận", "Giao hàng", "Mua hàng", "Nhà cung cấp", "Kho & lô", "Hàng hoàn về kho", "Kiểm kê", "Sổ nhập xuất", "Danh mục & giá", "Báo cáo lãi lỗ", "Nội dung", "Nhân sự", "Nhật ký hoạt động", "Chính sách AI", "Báo cáo AI"],
             ["Bán hàng", "Hàng hoá & kho", "Kế toán", "Website", "Quản trị"]),
-    "ql1": (["Tổng quan", "Đơn & tiền", "Khách hàng", "Gọi xác nhận", "Giao hàng", "Mua hàng", "Kho & lô", "Kiểm kê", "Sổ nhập xuất", "Danh mục & giá", "Nội dung", "Nhật ký hoạt động"],
+    "ql1": (["Tổng quan", "Đơn & tiền", "Khách hàng", "Gọi xác nhận", "Giao hàng", "Mua hàng", "Nhà cung cấp", "Kho & lô", "Hàng hoàn về kho", "Kiểm kê", "Sổ nhập xuất", "Danh mục & giá", "Nội dung", "Nhật ký hoạt động"],
             ["Bán hàng", "Hàng hoá & kho", "Website", "Quản trị"]),
-    "kho1": (["Tổng quan", "Đơn & tiền", "Giao hàng", "Việc giao của tôi", "Mua hàng", "Kho & lô", "Kiểm kê", "Sổ nhập xuất", "Danh mục & giá"],
+    "kho1": (["Tổng quan", "Đơn & tiền", "Giao hàng", "Việc giao của tôi", "Mua hàng", "Nhà cung cấp", "Kho & lô", "Hàng hoàn về kho", "Kiểm kê", "Sổ nhập xuất", "Danh mục & giá"],
              ["Bán hàng", "Hàng hoá & kho"]),
-    "giao1": (["Việc giao của tôi"], ["Bán hàng"]),
+    "giao1": (["Việc giao của tôi", "Hàng hoàn về kho"], ["Bán hàng", "Hàng hoá & kho"]),
 }
 
 
@@ -135,7 +135,7 @@ with sync_playwright() as p:
     dialog = page.get_by_role("dialog", name="Tìm màn hình")
     expect(dialog).to_be_visible()
     page.get_by_role("combobox", name="Tìm màn hình").fill("kiem ke")
-    options = [t.strip() for t in page.get_by_role("option").all_inner_texts()]
+    options = [t.strip() for t in page.locator(".cmd").get_by_role("option").all_inner_texts()]
     ok("ED-01 ⌘K bỏ dấu vẫn tìm ra 'Kiểm kê'", any("Kiểm kê" in o for o in options), str(options))
     page.keyboard.press("Enter")
     page.wait_for_url("**/stocktake/")
@@ -143,7 +143,7 @@ with sync_playwright() as p:
     ok("ED-01 ⌘K đóng sau khi nhảy", page.get_by_role("dialog", name="Tìm màn hình").count() == 0)
     page.keyboard.press("Control+k")
     page.get_by_role("combobox", name="Tìm màn hình").fill("zzzzzz")
-    ok("ED-01 ⌘K không khớp: có thông báo, không có mục", page.get_by_role("option").count() == 0 and page.locator(".cmd").inner_text().strip() != "")
+    ok("ED-01 ⌘K không khớp: có thông báo, không có mục", page.locator(".cmd").get_by_role("option").count() == 0 and page.locator(".cmd").inner_text().strip() != "")
     page.keyboard.press("Escape")
 
     # 404 trong khung
