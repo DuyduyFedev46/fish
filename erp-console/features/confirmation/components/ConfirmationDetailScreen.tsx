@@ -21,6 +21,7 @@ import { DetailHeader } from "@/shared/ui/detail/DetailHeader";
 import { DetailPage } from "@/shared/ui/detail/DetailPage";
 import { InfoField } from "@/shared/ui/detail/InfoField";
 import { InfoGrid } from "@/shared/ui/detail/InfoGrid";
+import { Section } from "@/shared/ui/detail/Section";
 import type { MoreMenuItem } from "@/shared/ui/detail/MoreMenu";
 import { StatusPath } from "@/shared/ui/detail/StatusPath";
 import { Timeline, type TimelineEntry } from "@/shared/ui/detail/Timeline";
@@ -306,8 +307,7 @@ export function ConfirmationDetailScreen() {
         {item.refund && <InfoField label="Hoàn tiền" value={item.refund.status_label || "—"} />}
       </InfoGrid>
 
-      <section className={s.section} aria-label="Lịch sử cuộc gọi">
-        <h3 className={s.sectionTitle}>Lịch sử cuộc gọi</h3>
+      <Section title="Lịch sử cuộc gọi" aria-label="Lịch sử cuộc gọi" flush={Boolean(item.calls.length > 0)}>
         {item.calls.length > 0 ? (
           <div className="lt-card">
             <div className="lt-scroll">
@@ -339,7 +339,7 @@ export function ConfirmationDetailScreen() {
         ) : (
           <p className="muted">Chưa có cuộc gọi nào cho đơn này.</p>
         )}
-      </section>
+      </Section>
 
       {(modal === "call" || modal === "callback") && (
         <RecordCallModal

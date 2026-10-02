@@ -29,21 +29,17 @@
   color: var(--ink-3);
   font-size: var(--text-sm);
 }
+.sectionSum {
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  border-top: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--ink-2);
+  font-size: var(--text-sm);
+}
 .tabsWrap :global(.tab) {
   min-width: var(--tap);
   justify-content: center;
-}
-.subSection {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  margin-top: var(--space-4);
-}
-.sectionHead {
-  margin: 0;
-  font-size: var(--text-md);
-  font-weight: var(--weight-semibold);
-  color: var(--ink);
 }
 .tableTitle {
   margin: 0;
@@ -55,12 +51,6 @@
   margin-left: var(--space-2);
   font-size: var(--text-sm);
   font-weight: var(--weight-regular);
-}
-.panelHead {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-2);
 }
 
 /* Form nhập lô (F1a): mỗi mặt hàng là một thẻ, điện thoại xếp dọc, từ 640px xếp lưới. */

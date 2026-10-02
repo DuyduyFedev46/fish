@@ -48,6 +48,8 @@
   display: inline-flex;
   align-items: center;
   min-height: var(--tap);
+  padding: 0 var(--space-4);
+  border-top: 1px solid var(--border);
 }
 .panelLink:hover {
   text-decoration: underline;
@@ -60,16 +62,6 @@
 .qtyRow > :first-child {
   flex: 1;
   min-width: 0;
-}
-.sectionHead {
-  margin: 0;
-  font-size: var(--text-md);
-  font-weight: var(--weight-semibold);
-}
-.subSection {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
 }
 .warnLine {
   display: flex;

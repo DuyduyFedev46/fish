@@ -23,6 +23,7 @@ import { DetailHeader } from "@/shared/ui/detail/DetailHeader";
 import { DetailPage } from "@/shared/ui/detail/DetailPage";
 import { InfoField } from "@/shared/ui/detail/InfoField";
 import { InfoGrid } from "@/shared/ui/detail/InfoGrid";
+import { Section } from "@/shared/ui/detail/Section";
 import type { MoreMenuItem } from "@/shared/ui/detail/MoreMenu";
 import { StatusPath } from "@/shared/ui/detail/StatusPath";
 import { Timeline, type TimelineEntry } from "@/shared/ui/detail/Timeline";
@@ -268,9 +269,12 @@ export function StocktakeDetailScreen() {
         {rec.status === "APPROVED" && <InfoField label="Duyệt lúc" value={rec.approved_at ? dateTime(rec.approved_at) : "—"} />}
       </InfoGrid>
 
-      <section className={s.section} aria-label="Số đếm từng lô">
-        <div className={s.sectionHead}>
-          <h3 className={s.sectionTitle}>Số đếm từng lô</h3>
+      <Section
+        title="Số đếm từng lô"
+        count={rec.lines.length}
+        aria-label="Số đếm từng lô"
+        flush
+        action={
           <p className={s.totals} data-totals>
             <span>
               Lô hụt <b>{rec.short_count}</b> · {qtyText(rec.short_qty)} kg
@@ -282,9 +286,10 @@ export function StocktakeDetailScreen() {
               Chênh lệch ròng <b>{signedQtyText(rec.net_difference)} kg</b>
             </span>
           </p>
-        </div>
+        }
+      >
         {rec.lines.length === 0 ? (
-          <div className={s.empty} data-stocktake-empty>
+          <div className={`${s.empty} ${s.emptyFlat}`} data-stocktake-empty>
             <p className={s.emptyTitle}>Phiếu chưa có dòng nào</p>
             <p className={s.emptyHint}>{canEdit ? "Bấm Sửa số đếm để nạp lô và nhập số đếm." : "Chờ người lập phiếu nhập số đếm."}</p>
           </div>
@@ -343,7 +348,7 @@ export function StocktakeDetailScreen() {
             </div>
           </div>
         )}
-      </section>
+      </Section>
 
       {step === "submit" && (
         <ConfirmModal

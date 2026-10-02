@@ -18,6 +18,7 @@ import { DetailHeader } from "@/shared/ui/detail/DetailHeader";
 import { DetailPage } from "@/shared/ui/detail/DetailPage";
 import { InfoField } from "@/shared/ui/detail/InfoField";
 import { InfoGrid } from "@/shared/ui/detail/InfoGrid";
+import { Section } from "@/shared/ui/detail/Section";
 import type { MoreMenuItem } from "@/shared/ui/detail/MoreMenu";
 import { Timeline } from "@/shared/ui/detail/Timeline";
 import { Icon } from "@/shared/ui/Icon";
@@ -266,10 +267,7 @@ function ItemDetailBody({ item, detail, renderAi }: { item: CatalogItem; detail:
       </InfoGrid>
 
       {item.item_type === "BUNDLE" && (
-        <section className={s.section} aria-label={M.sectionBundle}>
-          <h3 className={s.sectionH}>
-            {M.sectionBundle} <span className={s.sectionCount}>{M.bundleCount(item.bundle_lines.length)}</span>
-          </h3>
+        <Section title={M.sectionBundle} count={M.bundleCount(item.bundle_lines.length)} aria-label={M.sectionBundle} flush>
           <DataTable
             caption={M.bundleCaption}
             columns={lineCols}
@@ -280,7 +278,7 @@ function ItemDetailBody({ item, detail, renderAi }: { item: CatalogItem; detail:
             empty={{ icon: "inventory_2", title: M.bundleEmpty, hint: M.bundleEmptyHint }}
             canViewCost={false}
           />
-        </section>
+        </Section>
       )}
 
       {ability.viewPrices && !(history.error instanceof ApiError && history.error.status === 403) && <PriceHistory history={history} columns={priceCols} />}
@@ -316,10 +314,7 @@ function ItemDetailBody({ item, detail, renderAi }: { item: CatalogItem; detail:
 
 function PriceHistory({ history, columns }: { history: ReturnType<typeof useItemPriceHistory>; columns: Column<ItemPrice>[] }) {
   return (
-    <section className={s.section} aria-label={M.sectionPriceHistory}>
-      <h3 className={s.sectionH}>
-        {M.sectionPriceHistory} {history.rows !== undefined && <span className={s.sectionCount}>{M.priceCount(history.count)}</span>}
-      </h3>
+    <Section title={M.sectionPriceHistory} count={history.rows !== undefined ? M.priceCount(history.count) : undefined} aria-label={M.sectionPriceHistory} flush>
       <DataTable
         caption={M.priceHistoryCaption}
         columns={columns}
@@ -346,6 +341,6 @@ function PriceHistory({ history, columns }: { history: ReturnType<typeof useItem
           )}
         </div>
       )}
-    </section>
+    </Section>
   );
 }

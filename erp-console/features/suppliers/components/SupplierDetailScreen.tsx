@@ -19,6 +19,7 @@ import { DetailHeader } from "@/shared/ui/detail/DetailHeader";
 import { DetailPage } from "@/shared/ui/detail/DetailPage";
 import { InfoField } from "@/shared/ui/detail/InfoField";
 import { InfoGrid } from "@/shared/ui/detail/InfoGrid";
+import { Section } from "@/shared/ui/detail/Section";
 import type { MoreMenuItem } from "@/shared/ui/detail/MoreMenu";
 import { Timeline } from "@/shared/ui/detail/Timeline";
 import { Icon } from "@/shared/ui/Icon";
@@ -213,10 +214,7 @@ function SupplierDetailBody({ supplier: c, detail, renderAi }: { supplier: Suppl
       </InfoGrid>
 
       {canSeeReceipts && !receipts.forbidden && (
-        <section className={s.section} aria-label={M.receiptsTitle}>
-          <h3 className={s.sectionH}>
-            {M.receiptsTitle} {receipts.rows !== undefined && <span className={s.sectionCount}>{M.receiptsValue(receipts.count)}</span>}
-          </h3>
+        <Section title={M.receiptsTitle} count={receipts.rows !== undefined ? M.receiptsValue(receipts.count) : undefined} aria-label={M.receiptsTitle} flush>
           <DataTable
             caption={M.receiptsCaption}
             columns={receiptCols}
@@ -244,14 +242,11 @@ function SupplierDetailBody({ supplier: c, detail, renderAi }: { supplier: Suppl
               )}
             </div>
           )}
-        </section>
+        </Section>
       )}
 
       {canSeeBatches && !batches.forbidden && (
-        <section className={s.section} aria-label={M.batchesTitle}>
-          <h3 className={s.sectionH}>
-            {M.batchesTitle} {batches.rows !== null && <span className={s.sectionCount}>{`${batches.count} lô`}</span>}
-          </h3>
+        <Section title={M.batchesTitle} count={batches.rows !== null ? `${batches.count} lô` : undefined} aria-label={M.batchesTitle} flush>
           <DataTable
             caption={M.batchesCaption}
             columns={batchCols}
@@ -265,7 +260,7 @@ function SupplierDetailBody({ supplier: c, detail, renderAi }: { supplier: Suppl
             empty={{ icon: "inventory_2", title: M.batchesEmpty, hint: M.batchesEmptyHint }}
             canViewCost={false}
           />
-        </section>
+        </Section>
       )}
 
       {modal === "edit" && (
