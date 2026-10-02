@@ -28,9 +28,15 @@ export type ConfirmationQueueItem = {
   total_kg: string;
   total_amount: string;
   in_scope: boolean;
-  customer_name: string;
-  phone: string;
-  address: string;
+  /**
+   * Dữ liệu khách chỉ có khi `in_scope` (bất biến 9): ngoài phạm vi BE trả null và chỉ kèm `phone_masked`.
+   * FE không tự che hay ghép số điện thoại: hiện đúng chuỗi BE trả.
+   */
+  customer_name: string | null;
+  phone: string | null;
+  address: string | null;
+  /** Số đã che sẵn bởi BE (vd "09xx xxx 123"); luôn có, kể cả trong phạm vi. */
+  phone_masked: string;
   recipient_name: string | null;
   recipient_phone: string | null;
   cancelled_at?: string | null;
@@ -48,13 +54,19 @@ export type ConfirmationQueueItem = {
 export type CustomerCall = {
   id: number;
   at: string;
-  by: { id: number; display_name: string };
+  /** BE trả null khi người ghi cuộc gọi đã bị xoá. */
+  by: { id: number; display_name: string } | null;
   result: string;
   result_label: string;
   note: string;
 };
 
+/** Dòng của danh sách: `usePagedList` cần khoá `id`; ở đây `id` chính là `note_id` (phiếu giao). */
+export type ConfirmationQueueRow = ConfirmationQueueItem & { id: number };
+
 export type ConfirmationQueueDetail = ConfirmationQueueItem & {
+  /** Mã phiếu giao ("Phiếu giao" ở chi tiết). BE (02b R1) chưa trả trường này: thiếu thì hiện "—" (lệch hợp đồng, ghi ở 03-dev-notes). */
+  note_code?: string | null;
   calls: CustomerCall[];
   available_actions: string[];
   guidance?: string | null;
@@ -94,49 +106,41 @@ export const CALL_RESULT_OPTIONS: Array<{
   value: CallResult;
   label: string;
   tone: "good" | "warn" | "crit" | "info" | "mute";
-  hint: string;
 }> = [
   {
     value: "CONFIRMED",
     label: "Đã xác nhận",
     tone: "good",
-    hint: "Khách đồng ý nhận hàng. Đơn sẽ chuyển sang Soạn hàng để kho đóng gói.",
   },
   {
     value: "CALLBACK",
     label: "Hẹn gọi lại",
     tone: "warn",
-    hint: "Khách bận hoặc nhờ gọi lại sau. Chọn thời gian hẹn gọi lại.",
   },
   {
     value: "UNREACHABLE",
     label: "Không nghe máy",
     tone: "crit",
-    hint: "Thuê bao / máy bận / không trả lời.",
   },
   {
     value: "WRONG_NUMBER",
     label: "Sai số điện thoại",
     tone: "crit",
-    hint: "Số không có thực hoặc nhầm người. Chuyển ngay sang Quản lý.",
   },
   {
     value: "WANT_CHANGE",
     label: "Khách muốn đổi món",
     tone: "info",
-    hint: "Khách muốn đổi hàng. Chuyển Quản lý xử lý huỷ + hoàn tiền để đặt lại.",
   },
   {
     value: "WANT_CANCEL",
     label: "Khách muốn huỷ đơn",
     tone: "info",
-    hint: "Khách đổi ý không lấy nữa. Chuyển Quản lý xử lý huỷ đơn.",
   },
   {
     value: "NOTIFIED",
     label: "Đã báo hoàn tiền",
     tone: "good",
-    hint: "Đã liên hệ với khách để thông báo đơn bị huỷ và chính sách hoàn tiền.",
   },
 ];
 
@@ -203,7 +207,7 @@ export const QUEUE_TABS: Array<{ key: QueueTabKey; label: string; stateParam?: s
   { key: "DEFAULT", label: "Cần gọi ngay" },
   { key: "CALLBACK", label: "Hẹn gọi lại", stateParam: "CALLBACK" },
   { key: "ESCALATED", label: "Cần quyết định", stateParam: "ESCALATED" },
-  { key: "REFUND_CALL", label: "Báo hoàn tiền", stateParam: "REFUND_CALL" },
+  { key: "REFUND_CALL", label: "Gọi báo hoàn tiền", stateParam: "REFUND_CALL" },
   { key: "PENDING", label: "Chờ gọi", stateParam: "PENDING" },
   { key: "ALL", label: "Tất cả" },
 ];

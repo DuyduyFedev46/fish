@@ -1,0 +1,48 @@
+/* ---- Tem in 100x150 mm (trang /print/label/) ---- */
+/* Giấy tem luôn đen trên nền trắng kể cả khi ERP ở chế độ tối: dùng màu hệ thống (Canvas/CanvasText) cùng color-scheme: light
+   thay cho mã màu viết tay, để token chế độ tối không đảo màu tem. SĐT trên tem luôn che bớt (T1). */
+.labelState { max-width: 32rem; margin: var(--space-10) auto; padding: var(--space-4); }
+.labelBar {
+  display: flex; justify-content: space-between; align-items: center; gap: var(--space-2); flex-wrap: wrap;
+  max-width: 100mm; margin: var(--space-3) auto; padding: var(--space-2) var(--space-3);
+  background: var(--surface-2); border-radius: var(--radius-md); font-size: var(--text-sm); color: var(--ink-2);
+}
+.labelBarBtns { display: flex; gap: var(--space-2); }
+.labelSheet {
+  color-scheme: light; background: Canvas; color: CanvasText;
+  width: 100mm; height: 150mm; max-width: 100%; margin: 0 auto; box-sizing: border-box; overflow: hidden;
+  padding: 6mm 8mm; display: flex; flex-direction: column; justify-content: space-between;
+  border: 1px dashed color-mix(in srgb, CanvasText 30%, Canvas);
+  font-family: var(--font-sans);
+}
+.labelHead { border-bottom: 1.5px solid CanvasText; padding-bottom: 4mm; }
+.labelHeadRow { display: flex; justify-content: space-between; align-items: flex-start; }
+.labelBrand { font-size: 14pt; font-weight: 800; letter-spacing: .5px; }
+.labelSub { font-size: 8pt; text-transform: uppercase; color: color-mix(in srgb, CanvasText 80%, Canvas); }
+.labelReprint { border: 2px solid CanvasText; padding: 2px 6px; font-size: 8.5pt; font-weight: 800; text-transform: uppercase; letter-spacing: .5px; }
+.labelRef { margin-top: 2mm; display: flex; justify-content: space-between; font-size: 9pt; }
+.labelQr { display: flex; flex-direction: column; align-items: center; padding: 2mm 0; border-bottom: 1px solid CanvasText; }
+.labelQrImg { width: 35mm; height: 35mm; display: block; }
+.labelBarcode { font-family: var(--font-mono); font-size: 11pt; font-weight: 700; letter-spacing: 1px; margin-top: 1mm; }
+.labelNote { font-size: 8pt; color: color-mix(in srgb, CanvasText 75%, Canvas); }
+.labelRecipient { padding: 3mm 0; border-bottom: 1px solid CanvasText; }
+.labelKey { font-size: 8pt; font-weight: 700; text-transform: uppercase; color: color-mix(in srgb, CanvasText 70%, Canvas); }
+.labelRecipientRow { display: flex; justify-content: space-between; align-items: baseline; margin-top: 1mm; gap: 2mm; }
+.labelName { font-size: 13pt; font-weight: 800; }
+.labelPhone { font-size: 12pt; font-weight: 700; font-family: var(--font-mono); }
+.labelAddress {
+  font-size: 9.5pt; line-height: 1.35; margin-top: 2mm;
+  display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; text-overflow: ellipsis;
+}
+.labelGoods { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 2mm; padding: 2.5mm 0; border-bottom: 1px solid CanvasText; font-size: 8.5pt; }
+.labelGoodsKey { color: color-mix(in srgb, CanvasText 70%, Canvas); }
+.labelGoodsVal { font-size: 10pt; font-weight: 700; }
+.labelGoodsValSm { font-size: 9pt; font-weight: 600; }
+.labelPaid { border: 2px solid CanvasText; padding: 3.5mm 2mm; text-align: center; margin-top: 1mm; }
+.labelPaidText { font-size: 11pt; font-weight: 900; text-transform: uppercase; letter-spacing: .5px; }
+.labelPaidNote { font-size: 8pt; margin-top: 1mm; font-style: italic; }
+@media print {
+  .labelBar { display: none !important; }
+  .labelSheet { border: 0; }
+}
+/* Khổ giấy @page (100x150 mm) nằm trong <style> của app/print/label/page.tsx: đặt ở đây sẽ áp cho cả các trang khác import CSS này. */

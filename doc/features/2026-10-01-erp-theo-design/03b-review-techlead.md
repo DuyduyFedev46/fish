@@ -1489,3 +1489,563 @@ L1–L3 nên sửa cùng lượt nếu rẻ. L1 cần mở quyền sửa `featur
 
 ### Kết luận re-review Lô 7 — FE: **APPROVED**
 M1, M2, L1, L2, L3 đạt. Không còn Critical, High hay Medium nào trong code của lô. Lô sẵn sàng cho QA. Trước deploy, điều phối viên mang N1 (nút "Nhờ" DW-23 mất ở trang chi tiết lô và đơn) lên Duy. Khi ghép nhánh thì làm L4.
+
+## Lô 3 — FE (Đơn & tiền: ED-09, ED-10, ED-11, ED-12)
+> Review 02/10/2026 trên diff chưa commit: `git diff -- erp-console` cùng các file mới chưa track. Không xét `loc-wt-b` (Lô 4).
+> Căn cứ: 02b §0, §0b, §0c, §1 (D2, D2b, D2c, W1a, W1a2, W1b, W1b2), §2.3, §2.4, §5.2 Lô 3; contract "Lô 2 — BE", "Lô 3 — BE"
+> trong dev-notes; `00-can-duy-quyet.md`; UI-RULES; SR-20 (`doc/features/2026-09-30-sua-loi-review/02-stories.md`).
+
+**Kết luận: CHANGES REQUESTED.** Không có lỗi Critical. Lô không rò giá vốn, không rò dữ liệu khách ra URL, storage
+hay AI, và không vượt quyền: mọi nút ghi đi theo `available_actions`. Có 2 lỗi High, cả hai đều tái hiện được:
+- H1: khối Trợ lý AI trên trang đơn gửi sai `target_model`, nên BE thật trả 400.
+- H2: 3 màn danh sách gọi `/api/ai/*` khi AI tắt, vi phạm SR-20-AC3 đã nghiệm thu.
+
+Ngoài ra có 3 lỗi Medium. M1 là bản sửa B6/L9 không chạy.
+
+### Kiểm chứng (Tech Lead tự chạy trong lượt này)
+- `npx tsc --noEmit`: sạch. `npx vitest run`: 47 file, 428 test đều đạt.
+- `NEXT_PUBLIC_USE_MOCK=0 npm run build`: OK. `check-no-mock`: XANH. `check-ai-chunks`: XANH.
+  - 3 route chi tiết đã có trong `TARGETS`: `/orders/detail` 452,8 kB / 11 chunk, `/orders/payments/detail` 422,9 kB, `/orders/refunds/detail` 410,9 kB.
+  - First Load của `/orders/detail` là 142 kB.
+- `python3 scripts/check_naming.py`: OK. Có 1 file giảm vi phạm, nên chạy `--update` khi commit.
+- Màu cứng trong `features/orders/orders.module.css`: 0.
+- Build `MOCK=1`, phục vụ `out/` ở cổng 3111, chạy Playwright riêng của Tech Lead (script ở scratchpad, không vào repo). Kết quả ở H2 và M1.
+  Sau đó đã build lại `MOCK=0`, nên `out/` vẫn là bản thật như dev để lại.
+- BE: viết tạm một `TestCase` gọi `GET /api/ai/actions/?target_model=…` (đã xoá file ngay sau khi chạy). Kết quả ở H1.
+
+## Lô 4 — FE (Giao hàng ED-17 + Việc giao của tôi ED-19)
+> Review 02/10/2026 trên worktree `loc-wt-b` (nhánh `ed-stream-b`, tách từ `c1f1179`), diff chưa commit trong `erp-console/`.
+> Căn cứ: 02b §0 dòng 3, §0b T1/T4/T6/T7, §0c F2l/F2o, §1, §2.3, §2.4, §5.2 Lô 4; contract "Lô 4 — BE" trong dev-notes; 02-stories ED-17, ED-19; UI-RULES.
+
+**Kết luận: CHANGES REQUESTED (nhẹ).** Lô không có lỗi Critical hay High. Không rò dữ liệu khách, không rò giá vốn, không vượt quyền.
+Có 2 lỗi Medium, đều là AC của 02-stories bị thiếu và sửa được trong vài dòng. Các lỗi Low có thể để lô sau.
+
+### Kiểm chứng (Tech Lead tự chạy trong lượt này, ở worktree)
+- `npx tsc --noEmit`: sạch. `npx vitest run`: 44 file, 405 test đều đạt.
+- `NEXT_PUBLIC_USE_MOCK=0 npm run build`: OK. Có các route `/deliveries` (7,36 kB), `/deliveries/detail` (14,3 kB), `/my-deliveries` (6,19 kB), `/print/label` (13 kB).
+- `check-ai-chunks`: XANH, gồm 4 mục tiêu mới. `check-no-mock`: XANH (15 file mock, 34 seed, 143 file build).
+- `python3 scripts/check_naming.py`: OK, không có vi phạm mới.
+- Grep màu cứng (`#hex`, `rgb()`, `hsl()`) trên `features/deliveries/**`, `app/(console)/deliveries/**`, `my-deliveries/page.tsx`, `app/print/label/page.tsx`: **0**.
+- Grep `console.`, `localStorage`, `sessionStorage`, `router.push`, `searchParams.set` trong các file của lô: không có lệnh nào, chỉ có chú thích.
+- `out/deliveries/detail/index.html`, `out/my-deliveries/index.html`: không có chuỗi SĐT.
+
+### Đối chiếu trọng tâm
+| Mục | Kết quả | Căn cứ |
+|---|---|---|
+| Tiền hiện "đ" từ số, không dùng `vnd_display` | Đạt | Mọi chỗ đi qua `vnd()`. `messages.ts:2` ghi rõ quy ước. Chỉ `mock.ts` còn "₫" vì giả lập câu lỗi của BE (đúng) |
+| FE không tự tính tiền thay BE | Một phần (M2, L3) | Tổng phiếu hoàn theo tháng là FE tự cộng (M2). Số "Còn hoàn được" của đơn là FE tự tính, và FE khoá nút theo số này (L3). "Còn thiếu", "Chuyển thừa" ở khoản tiền chỉ dùng để hiển thị (L3) |
+| Gửi trùng lệnh tiền | Đạt | `useSubmit` chặn bấm đúp bằng `inFlight` ref. Xác nhận nhận tiền idempotent theo `bank_txn_id` (BE trả `duplicate`). `RefundModal` sinh `request_id` một lần mỗi lần mở hộp, nên bấm "Thử lại" sau lỗi mạng gửi cùng id. Huỷ đơn, xác nhận/báo lỗi/chuyển lại phiếu hoàn, gắn khoản tiền: lần thứ hai BE chặn bằng trạng thái (400/409), không có tiền đi hai lần. Ghi chú: dev-notes viết "mọi hàm ghi đều gửi `request_id`", câu này không đúng. Chỉ `createRefund` gửi, các hàm khác không cần |
+| Giá vốn | Đạt | Cột `unit_cost` có `locked` và chỉ hiện khi `me.can_view_cost` **và** BE trả khoá (`OrderDetailScreen.tsx:173`). Bảng hàng, thanh toán, hoàn tiền đều có `canViewCost={false}`. Smoke BE thật đã kiểm Quản lý không thấy "Giá vốn" |
+| SĐT đủ chỉ ở chỗ API trả | Đạt | Chi tiết đơn có `tel:`, chi tiết phiếu hoàn có, hộp Gắn khoản tiền có. Danh sách đơn bỏ cột SĐT, đúng ED-09-AC1 (02b §3.7 ghi "cột riêng", nhưng story đã duyệt thắng). URL chỉ có `id`, `state` hoặc `open=refund` (`useIdParam` chỉ nhận số). Từ khoá tìm đơn chỉ đi vào query của API, không vào thanh địa chỉ. Không có `console.*` trong module |
+| Mock dùng `sessionStorage` | Đạt | Dữ liệu đơn giả nằm trong `sessionStorage` (`mock.ts:446`). `localStorage` chỉ giữ cờ chế độ mock. Bản build thật không có seed (`check-no-mock`) |
+| Chip AI gửi ngữ cảnh chứng từ (L8) | Đạt một phần (L1) | `askWithDocContext` chỉ ghép loại và **mã** chứng từ (`split(",")[0]`), bỏ pk, không có tên, SĐT hay địa chỉ. Chỉ áp dụng khi gửi từ khung hỏi nhanh (`autoSend`). Câu gõ trong panel thì không có ngữ cảnh |
+| Quản lý không thấy "Xác nhận đã nhận tiền" | Đạt | `orderActionPlan` chỉ dựng nút chính từ `available_actions`. Đã kiểm trên BE thật (`ed_batch3_real`) |
+| Hàng chờ thanh toán chỉ Chủ | Đạt | `nav.ts` mục `payments`: cần `confirm_payment_manual`. `ViewGuard view="payments"` bọc cả danh sách lẫn chi tiết. Tab ẩn theo `canView` |
+| Nút hiện theo `available_actions` | Đạt | Đơn, khoản tiền và phiếu hoàn đều dùng plan thuần, có vitest. Mục "Huỷ đơn" mờ chỉ là gợi ý (không có `onSelect`), hiện khi có `cancel_paid_order` |
+| Nợ chung có làm vỡ Lô 1/2 không | Không vỡ. M1: B6/L9 chưa thật sự sửa | `Tabs`: thêm tham số `param`, mặc định `"tab"`, các chỗ gọi cũ không đổi. Có test. `InfoField`: `onConflict` là prop tuỳ chọn và có câu ngắn dưới ô (L5 đạt). `gate-state`: không còn ai gọi `getAiStatus` với chủ chung (`AiAssistantGate` không còn được import), nên L2 đạt. `check-ai-chunks`: L3 đạt |
+| Khoá đếm `AiBar` | Khớp R1 | BE `counts` dùng `resolve_target_label(raw)`, ra đúng `sales.salesorder`, `sales.paymenttransaction`, `sales.refund`. Đã đối chiếu `DOC_TYPE_LABELS` trong `apps/ai/actions/targets.py`. Chỗ lệch 5 của dev được xác nhận. Nhưng xem H1 (khoá lọc khối AI sai) và H2 (gọi khi AI tắt) |
+| E2E cũ `p8_lo6`, `p8_lo7` | **Chưa sửa** (M3) | Dev để thành nợ. Chính `p8_lo6_fe_sr19_sr20.py:162-176` là test sẽ bắt được H2 |
+| Hiệu năng | Đạt (L5) | Trang chi tiết là 142 kB First Load. Panel AI vẫn là `next/dynamic`. Lọc tháng phiếu hoàn tự tải hết các trang, chấp nhận được vì mỗi tháng ít phiếu |
+
+### Phát hiện
+
+**H1 — High — Khối Trợ lý AI trên trang đơn gửi `target_model="sales.order"`, BE thật trả 400.**
+- Vị trí: `app/(console)/orders/detail/page.tsx:13`. Cùng giá trị sai còn ở `features/orders/README.md:14`, chú thích `AiDocBlockGate.tsx:16`, `docBlockModel.ts:88` và test `docBlockModel.test.ts:65-69`.
+- Nguyên nhân:
+  - `resolve_target_label("sales.order")` có dấu chấm nên gọi `apps.get_model("sales.order")`. Hàm này ném `LookupError` và trả `None`.
+  - BE vì vậy trả 400 `INVALID_TARGET_MODEL`.
+  - Nhãn đúng là `sales.salesorder`, hoặc doc_type `order`.
+  - Mock `filterByTarget` chỉ so phần sau dấu chấm (`order`), nên ở mock vẫn "chạy".
+- Hậu quả:
+  - Chủ hoặc Quản lý bật AI rồi mở bất kỳ đơn nào: khối Trợ lý AI luôn báo lỗi kèm "Thử lại".
+  - Đề xuất AI của đơn (T10: nơi duy nhất còn thấy việc AI `ESCALATED` cho đơn) không bao giờ hiện.
+- Tái hiện:
+  - BE: `APIClient` đăng nhập `owner`, gọi `GET /api/ai/actions/?target_model=sales.order&target_id=SO261002-4B7E20,41&status=PENDING,ESCALATED`.
+  - Kết quả: `400 {"detail":"Loại chứng từ không hợp lệ.","code":"INVALID_TARGET_MODEL"}`. Gọi với `sales.salesorder` thì `200`. Tech Lead đã chạy lệnh này.
+- Sửa:
+  1. Đổi thành `targetModel="sales.salesorder"`. Sửa README, chú thích và test cho cùng khoá. Giữ `"sales.salesorder"` trong `DOC_KIND_LABEL`, bỏ khoá `"sales.order"`.
+  2. Sửa mock `filterByTarget` cho chặt như BE: chỉ nhận nhãn `app.model` có thật, hoặc doc_type. Khoá lạ phải trả 400 để e2e mock bắt được lỗi.
+  3. Thêm 1 ca e2e: AI bật, đồng ý, mở đơn có đề xuất. Khối hiện đề xuất, không có alert lỗi.
+
+**H2 — High — `/orders`, `/orders/payments`, `/orders/refunds` gọi `GET /api/ai/actions/counts/` cả khi AI tắt (hồi quy SR-20-AC3).**
+- Vị trí: `features/orders/useAiCount.ts:9-16`, được gọi ở `OrdersScreen.tsx:66`, `PaymentQueueScreen.tsx:46`, `RefundQueueScreen.tsx:49`. Mock đếm cứng ở `aiCount.ts:22`.
+- SR-20-AC3 (đã nghiệm thu) yêu cầu: khi AI tắt, mở 4 màn này thì **0** request tới `/api/ai/*`. Review Lô 2 đã nhắc "Lô 3 trở đi không được gắn khối AI vào 4 màn đó". Nợ ở `00-can-duy-quyet.md:59` cũng ghi `AiBarGate` phải "AI tắt → 0 request".
+- Hậu quả:
+  - Vi phạm nghiệm thu BR-AI-17.
+  - Mỗi lần mở danh sách tốn thêm một request.
+  - Ở mock, khi AI tắt vẫn hiện "AI · Có 2 đề xuất", với link "Xem" trỏ tới `/ai/actions/` (trang mà 02b §0 quyết định 2 sẽ bỏ).
+- Tái hiện (bản `MOCK=1`, Tech Lead đã chạy):
+  1. Đăng nhập `loc` và gọi `__caveMock.ai('off')`.
+  2. Mở lần lượt 3 màn.
+  3. Mỗi màn log đúng 1 request `GET /api/ai/actions/counts/?status=PENDING,ESCALATED`. `/orders` và `/orders/refunds` vẫn vẽ `.ai-bar`.
+- Sửa:
+  - Chỉ đếm khi AI bật. Cách gọn nhất trong phạm vi lô là đọc cờ từ `useAiEnabledAndConsented()`/gate-state. Nhưng hiện chưa có ai publish cờ trên màn danh sách, và màn nghiệp vụ không được import `features/ai`.
+  - Vì vậy đề xuất **bỏ hẳn thanh AI khỏi 3 màn này ở Lô 3** (`aiBar` để trống, xoá `aiCount.ts`/`useAiCount.ts` hoặc để lại không dùng) và dời sang `AiBarGate` ở Lô 17 như nợ đã ghi.
+  - Chưa nên tự viết một cổng mới cho riêng module đơn.
+  - Kèm theo M3 (sửa `p8_lo6`) để có test chặn hồi quy.
+
+**M1 — Medium — Bản sửa B6/L9 không chạy: chạm ô hỏi nhanh thì focus rơi về `body` và mất chữ gõ sớm.**
+- Vị trí: `shared/ui/detail/AiBlockFrame.tsx:133-134`.
+- Nguyên nhân:
+  - `{chat && keepStarter && starter ? <Starter/> : null}` và `{chat ?? <Starter/>}` là **hai vị trí con khác nhau**.
+  - Khi `chatOpen` bật, React gỡ `Starter` ở vị trí 2 và dựng một `Starter` mới ở vị trí 1. Ô nhập bị thay bằng nút DOM mới.
+- Tái hiện (bản `MOCK=1`, Tech Lead đã chạy):
+  1. AI bật, chưa đồng ý: mở `/orders/detail/?id=101` rồi bấm vào ô "Hỏi AI về chứng từ này". Ngay sau đó `document.activeElement` là `BODY`. Gõ "abc" thì ô vẫn rỗng.
+  2. Đã đồng ý: bấm ô, gõ "con bao nhieu", chờ 1,5 giây. Focus nằm ở ô của panel nhưng ô **rỗng**, chữ đã mất.
+- Vitest `detail.test.ts` chỉ render tĩnh, nên không bắt được lỗi remount.
+- Sửa:
+  - Render `Starter` ở **một** vị trí cố định, ví dụ `{starter && (!chat || keepStarter) ? <Starter/> : null}{chat}`. Như vậy Starter không bị gỡ khi `chat` xuất hiện.
+  - Thêm e2e: bấm ô, gõ ngay, kiểm `activeElement` là ô đó và chữ không mất (trước và sau khi panel nạp).
+  - Khi đồng ý xong, chuyển focus vào ô tick đồng ý, như L9 gợi ý.
+
+**M2 — Medium — Dòng "tổng số tiền hoàn" của tháng đổi nghĩa theo bộ lọc trạng thái, mặc định chỉ cộng phiếu Chờ hoàn.**
+- Vị trí: `features/orders/components/RefundQueueScreen.tsx:37-40`, `:44`, `:65`; `messages.ts:246`.
+- Diễn biến:
+  - Chọn tháng mà giữ trạng thái mặc định `PENDING,FAILED`: `monthTotal` bỏ FAILED, nên dòng "n phiếu, tổng số tiền hoàn X đ" chỉ là tổng **chờ chuyển**.
+  - Chọn "Mọi trạng thái" thì thành Chờ hoàn + Đã hoàn.
+  - Chọn "Đã hoàn" thì thành số đã chuyển.
+  - Cùng một câu chữ nhưng ra 3 con số khác nhau, và Chủ có thể đọc nhầm thành "tháng này đã hoàn X".
+- Giả định "không tính FAILED" của dev (chỗ lệch 10) là hợp lý: phiếu thất bại thì tiền chưa rời túi. Chỗ sai là câu chữ không nói rõ đang cộng những gì.
+- Tái hiện (mock): vào tab Phiếu hoàn, chọn tháng hiện tại. Dòng tổng thiếu các phiếu `REFUNDED`. Đổi sang "Mọi trạng thái" thì số đổi mà câu chữ giữ nguyên.
+- Sửa (chọn một):
+  - (a) Khi có tháng, tách thành "Đã hoàn X đ · Chờ hoàn Y đ" theo từng trạng thái đang có trong kết quả.
+  - (b) Câu chữ nêu rõ trạng thái đang lọc, ví dụ "3 phiếu Chờ hoàn, tổng 1.200.000 đ".
+  - Ghi lại cho PO biết W1b vẽ dòng tổng ra sao. Không cần BE vì tổng chỉ cộng `amount` do BE trả.
+
+**M3 — Medium — Chưa sửa `e2e/p8_lo6_fe_sr19_sr20.py`, `e2e/p8_lo7_fe_erp.py`.**
+- Lý do phải sửa ngay: hai file hỏng vì chọn `.order-open`, `.queue-open`, `.refund-open`, `ul.order-list` mà lô này vừa xoá. Phạm vi lô 02b §5.2 cho sửa e2e của Đơn & tiền, và điều phối viên đã yêu cầu sửa trong lô này.
+- Hậu quả: chính các ca SR20-AC3 trong `p8_lo6` (dòng 147-185) sẽ bắt được H2. Để file hỏng tức là mất lưới chặn hồi quy.
+- Sửa:
+  - Đổi selector sang trang mới (dùng `orders_common.open_order`, `go`, `main header`).
+  - Giữ nguyên ý của từng ca. Ca nào không còn đối tượng (ví dụ "Để AI làm" trong GuidancePanel cũ) thì ghi rõ lý do bỏ, đừng xoá lặng lẽ.
+
+**L1 — Low — L8 mới làm một nửa.** Vị trí: `AiDocBlock.tsx:166-167`.
+- Chỉ câu đi qua khung hỏi nhanh (`autoSend`) được ghép "Về đơn hàng SO…:".
+- Người dùng focus ô rồi gõ câu trong panel thì câu gửi đi không có ngữ cảnh. Không rò gì.
+- Sửa: truyền `docContext` xuống `AiAssistantPanel` và ghép vào lúc gửi. Có thể để Lô 15.
+
+**L2 — Low — Dọn dẹp.**
+- `shared/lib/nav.ts`: `PERM.createRefund`, `PERM.confirmRefund` không có chỗ nào dùng. Bỏ đi, hoặc dùng cho "…" mờ như `cancelPaidOrder`.
+- `scripts/check-ai-chunks.mjs:97` vẫn in "4 màn nghiệp vụ", trong khi nay có 7 route.
+- `AiBar href="/ai/actions/"` ở 3 màn (nếu giữ thanh AI sau H2): trang này sẽ bị bỏ theo 02b §0 quyết định 2.
+- Dev-notes ghi `amount.ts`, `queueModels.ts` là "file mới". Thực tế `amount.ts` là file cũ không đổi, còn `queueModels.ts` không tồn tại (chỉ có `queueModels.test.ts`, import hàm từ hai file Screen).
+- `detail.test.ts` ca "xung đột phiên bản (L5)" chỉ kiểm hằng chuỗi, chưa kiểm hành vi. Nên thêm e2e harness (409 `STALE_STATE` thì câu hiện dưới ô và `onConflict` được gọi).
+- Tìm kiếm ở tab Hàng chờ và Phiếu hoàn chỉ lọc trong các dòng đã tải, nhưng dòng "Đang hiện n / m" vẫn lấy `m` của BE. Nên ghi "trong n dòng đã tải" khi có từ khoá.
+
+**L3 — Low — FE tự tính số tiền để khoá nút.**
+- Vị trí: `refund.ts:8-12` (`refundableOfOrder`), `OrderDetailScreen.tsx:403,408`; `PaymentDetailScreen.tsx:61`, `ConfirmOrderModal.tsx:27`.
+- "Còn hoàn được" của đơn là FE tự tính bằng tổng đơn trừ phiếu chưa thất bại, rồi **khoá nút** khi nhập vượt số này (ED-10-AC3).
+  - Logic này có từ S15 và hiện đúng với BR-HT-04.
+  - Nếu sau này BE đổi cách tính (ví dụ trừ thêm phần đã hoàn qua khoản tiền lệch), FE sẽ khoá sai một phiếu hợp lệ.
+- Đề xuất: BE thêm `refundable_amount` vào chi tiết đơn, như khoản tiền đã có. Ghi vào nợ cho lô BE kế tiếp đụng `sales/orders`. Không chặn lô này.
+- "Còn thiếu", "Chuyển thừa" ở khoản tiền chỉ để hiển thị. Chấp nhận.
+
+**L4 — Low — Nhãn dòng thời gian của đơn có thể chứa chữ tự do.**
+- `OrderDetailScreen` hiện `timeline[].label` của BE và lấy 3 nhãn gần nhất vào "Đã làm".
+- Nợ BE `00-can-duy-quyet.md` mục 3 (ghi chú huỷ `OTHER`, lý do báo chuyển hoàn thất bại) vẫn chờ Duy. FE không phải sửa, nhưng khi Duy quyết thì e2e của trang đơn nên kiểm nhãn không chứa ghi chú.
+
+**L5 — Low — Đơn Giữ chỗ re-render cả trang mỗi giây.**
+- Vị trí: `OrderDetailScreen.tsx:87`.
+- `useNow(…, 1000)` nằm ở thân trang, nên mỗi giây vẽ lại cả 4 `DataTable` và khung AI.
+- Không đo được giật ở dữ liệu thật (đơn ít dòng). Nếu muốn gọn thì tách ô "Còn giữ chỗ" và chip thành component con tự giữ `useNow`.
+
+**Ghi nhận (không phải lỗi):**
+- Chỗ lệch 1, 2, 3, 4, 6, 8, 11, 12, 13, 14: đồng ý.
+- Chỗ lệch 7 (chip "Đang xử lý" sau khi nhận tiền) và 15 (đơn tự huỷ vẫn nhận tiền) đã nằm trong `00-can-duy-quyet.md` mục 16 và 15. FE đi theo BE là đúng.
+- Chỗ lệch 9 (bỏ cột SĐT ở danh sách): đúng ED-09-AC1. 02b §3.7/§4 ghi "cột riêng Số điện thoại" là lệch với story. Tech Lead nhận phần này, story đã duyệt thắng. SĐT đủ vẫn có ở chi tiết và hộp Gắn khoản tiền.
+- `s10_s11_orders.py` giảm từ 78 xuống 38 ca. Phần lớn ca bị bỏ là kiểm vùng chạm/vi kiểm của tấm trượt cũ đã có trong `ed_batch3_orders` (141 ca). QA nên soát lại nhanh khi chạy lại.
+
+### Việc cần làm để APPROVED
+1. Sửa H1 (khoá `sales.salesorder` và mock chặt như BE) và H2 (bỏ thanh AI khỏi 3 màn, hoặc chỉ đếm khi AI bật), mỗi lỗi có test.
+2. Sửa M1 (một vị trí cho `Starter`, e2e focus và chữ gõ), M2 (câu tổng tháng nói rõ đang cộng gì) và M3 (viết lại `p8_lo6`, `p8_lo7`, chạy xanh trên bản mock).
+3. Các lỗi Low làm cùng lượt nếu rẻ (L2). L1, L3, L4, L5 ghi nợ.
+4. Tech Lead re-review phần diff của H1, H2, M1–M3.
+
+## QA5-B2 — BE
+
+**Kết luận: APPROVED** (Tech Lead, 02/10). Phạm vi xem gồm `backend/apps/common/guidance/audit_timeline.py`, `backend/apps/delivery/next_steps.py` và `backend/apps/delivery/tests/test_timeline_customer_service.py`.
+
+Kiểm chứng:
+- `manage.py test apps.delivery apps.common` cho kết quả Ran 472, OK.
+- `python3 scripts/check_naming.py` cho kết quả OK, không có vi phạm mới.
+
+1. **IDOR: không có.** Người chỉ có `confirm_with_customer` phải qua hai lớp chặn.
+   - Lớp đầu là queryset `confirmation__isnull=False`.
+   - Lớp sau là `object_scope_fn`, gọi đúng `note_in_customer_service_scope` mà `/api/confirmation/queue/<id>/` đang dùng. Lớp này không viết lại logic nên phạm vi không lệch được.
+   - Phiếu đã đóng mà CSKH không gọi thì trả 404. Test `test_qa5_b2_cs_scope_equals_detail_scope_for_recent_call` đối chiếu trực tiếp với chi tiết, gồm cả nhánh gọi gần đây và CSKH khác.
+2. **404 và 403 nhất quán với `/api/confirmation/queue/<id>/`.**
+   - Thiếu cả hai quyền thì trả 403. Chưa đăng nhập thì trả 401.
+   - Không có mục chờ gọi, ngoài phạm vi, id lạ hoặc id không phải số thì đều trả 404 với thông điệp cố định, nên không phân biệt được "không tồn tại" với "ngoài phạm vi".
+   - Thông điệp khác chữ với API hàng chờ, nhưng mã trạng thái giống. Chấp nhận.
+3. **Quyền các nhóm khác: không đổi.**
+   - owner, manager và warehouse_staff có `view_deliverynote` nên vẫn đi nhánh cũ. owner và manager có thêm `confirm_with_customer` nhưng nhánh view được xét trước.
+   - delivery_staff vẫn chỉ xem phiếu được gán cho mình (có test).
+   - Provider khác không truyền `object_scope_fn` nên giữ hành vi cũ.
+4. **N+1: không có.** Endpoint chỉ tra một đối tượng. `object_scope_fn` tốn một số truy vấn cố định: kiểm group, đọc `note.confirmation` và một `exists` trên `CustomerCall`. Phần AuditLog vẫn `select_related` như cũ.
+5. **Dữ liệu khách trong body: không lộ.** `_audit_event` chỉ dùng nhãn tĩnh trong `ACTION_LABELS` và tên nhân viên, không đọc `changes` hay `note`. Có test gieo SĐT, địa chỉ và tên giả vào AuditLog rồi assert body không chứa chúng. Response vẫn gắn `Cache-Control: no-store`.
+
+Ghi nhận Low, không chặn và ghi nợ:
+- Một người thuộc cả `customer_service` lẫn `delivery_staff` sẽ đi nhánh `view_deliverynote`. Người đó chỉ thấy timeline của phiếu gán cho mình, trong khi chi tiết hàng chờ vẫn trả 200 cho phiếu trong phạm vi CSKH.
+- Đây là thiếu quyền chứ không phải rò dữ liệu. Hiện chưa có tài khoản nào được gán hai vai này cùng lúc.
+- Nếu cần sửa thì cho `_note_in_scope` và `_scope_notes_for` hợp hai phạm vi.
+
+### Re-review Lô 3 — FE (02/10, sau sửa H1, H2, M1–M3, Low, QA-B1/B2 và thêm khối AI cho khoản tiền, phiếu hoàn)
+> Phạm vi: hai mục cuối phần Lô 3 — FE của dev-notes ("sửa sau Techlead CHANGES REQUESTED và QA REJECTED", "Thêm khối AI cho khoản tiền và phiếu hoàn").
+
+**Kiểm chứng (Tech Lead tự chạy trong lượt này):**
+- `npx tsc --noEmit` sạch. `npx vitest run`: 48 file, 442 test đều đạt.
+- `check_naming` OK: 2 file giảm vi phạm, nên chạy `--update` khi commit.
+- Build `MOCK=1` OK. Lần build đầu ở `erp-console/` lỗi `ENOENT .nft.json` vì một phiên khác đang `rm -rf .next out` và build cùng lúc. Tech Lead chuyển sang build trên bản sao ở scratchpad và **không đụng** `erp-console/out` của phiên kia.
+- Playwright riêng của Tech Lead trên bản đó (cổng 3111):
+
+| Route | AI tắt | AI bật |
+|---|---|---|
+| `/orders/`, `/orders/payments/`, `/orders/refunds/` | 0 request `/api/ai/*`, không thanh AI | 0 request (không còn `counts`) |
+| `/orders/detail/?id=101` | đúng 1 `GET /api/ai/status/`, không khối AI | status + `actions?target_model=sales.salesorder&target_id=SO…,101`, có khối, không alert |
+| `/orders/payments/detail/?id=880` | đúng 1 status, không khối | `target_model=sales.paymenttransaction&target_id=880`, có khối, không alert |
+| `/orders/refunds/detail/?id=31` | đúng 1 status, không khối | `target_model=sales.refund&target_id=31`, có khối, không alert |
+
+  Một request status ở trang chi tiết là hành vi cổng đã được chấp nhận ở review Lô 2. SR-20-AC3 chỉ áp cho màn danh sách và `/inventory`.
+
+| Mục | Kết quả | Căn cứ |
+|---|---|---|
+| H1 | Đạt | `orders/detail/page.tsx` gửi `sales.salesorder`. Lượt trước BE thật đã trả 200 cho nhãn này. Mock `filterByTarget` nay chặt như BE: chỉ nhận nhãn có thật hoặc doc_type, khoá lạ trả 400. `DOC_KIND_LABEL` đã bỏ khoá `sales.order` |
+| `target_id` pk cho khoản tiền, phiếu hoàn | Khớp BE | Đã soát 3 chỗ ghi `AiAction`: (1) `apps/sales/payments/auto_confirm.py:210-211` ghi `target_model="paymenttransaction"`, `target_id=str(payment.id)`; (2) `apps/ai/actions/services.py:395-396` (chuyển việc từ guidance) ghi `target_id=str(doc_id)`, và guidance `payment`/`refund` dùng pk; (3) `apps/ai/execution/pipeline.py:237,448` ghi `target_id` là giá trị tra cứu của lệnh, với phiếu hoàn là pk (`Refund.objects.filter(pk=int(target_id))`, dòng 425-426). `resolve_target_label` gom `paymenttransaction`/`payment` về `sales.paymenttransaction` và `refund` về `sales.refund`. Như vậy lọc bằng pk là đúng. Đơn giữ dạng "mã,pk" vì pipeline có thể ghi mã đơn |
+| H2 | Đạt | Đã xoá `aiCount.ts`, `useAiCount.ts`. Không còn `AiBar` trong 3 màn. Thanh AI của danh sách để Lô 17 (`AiBarGate`) |
+| M1 | Đạt | `AiBlockFrame.tsx`: `Starter` có **một** vị trí con cố định, `{chat}` đứng sau. Đo trên trình duyệt: (a) chưa đồng ý: bấm ô rồi gõ "abc", `activeElement` vẫn là ô "Hỏi AI về chứng từ này", giá trị là "abc", ở cả trang đơn lẫn khoản tiền; (b) đã đồng ý, chặn mọi chunk 1,2 giây: bấm ô, gõ "con bao nhieu", lấy mẫu 8 lần mỗi 400 ms, lần đầu và lần cuối focus đều ở INPUT với đủ chữ. Sau khi panel nạp xong, khung tĩnh được gỡ và chữ chuyển sang ô của panel. Nút "Bật trợ lý" trả focus về ô hỏi |
+| M2 | Đạt | `monthBreakdown` tách Chờ hoàn / Đã hoàn, có ghi "(không tính N phiếu Thất bại)" và tên tháng. Câu chữ nay khớp với con số dù lọc trạng thái nào |
+| M3 | Đạt | `p8_lo7` không còn selector cũ. `p8_lo6` còn 1 chỗ khớp `order-list`, nhưng đó là dòng chú thích hoặc ca đã ghi "BỎ:"; mọi ca đi qua trang mới. SR20-AC3 trong `p8_lo6:151-190` kiểm đúng: danh sách 0 request, chi tiết tối đa 1 status. Các ca bỏ đều có lý do trong file và trong dev-notes. Dev báo 62/62; Tech Lead không chạy lại file này |
+| L2, L5 | Đạt | Đã bỏ `PERM.createRefund`/`confirmRefund`. `check-ai-chunks` in "7 route". `useHoldExpired` đặt một lần hẹn giờ tới mốc, còn đồng hồ mm:ss chỉ nằm trong ô `HoldLeft` |
+| QA-B1, B2 | Đạt (đọc diff) | `RefundModal` chỉ còn một dòng "Còn hoàn được". Toast mới đúng chốt của PO (`00-can-duy-quyet.md` mục 16) |
+| Dữ liệu cá nhân trong khối AI mới | Đạt | `targetId` của khoản tiền và phiếu hoàn chỉ là pk. Câu chip qua `askWithDocContext` chỉ có "khoản tiền 880" / "phiếu hoàn 31". Nội dung chuyển khoản (`content`) không đi vào khối AI. BE vẫn lọc `args_preview` theo người xem |
+
+**Còn nợ (không chặn):**
+- L1: câu gõ trong panel chưa kèm ngữ cảnh chứng từ, để Lô 15.
+- L3: BE nên trả `refundable_amount` ở chi tiết đơn.
+- L4: chờ Duy quyết mục 3.
+- B3: chuỗi "₫" do BE dựng.
+- QA cần sửa ca "chip Đã thanh toán" trong `qa_ed_batch3_orders.py`.
+- Khối AI ở khoản tiền và phiếu hoàn **chưa chạy với BE thật**. Nhãn đã đúng ở `resolve_target_label`, nhưng QA nên chạy một lượt trên BE thật, có một `AiAction` gắn `paymenttransaction` để thấy đề xuất hiện ra.
+
+### Kết luận re-review Lô 3 — FE: **APPROVED**
+H1, H2, M1, M2, M3 đều đạt và đã kiểm chạy thật trên trình duyệt. Không còn lỗi Critical, High hay Medium. Lô sẵn sàng cho QA chạy lại.
+Khi commit, chạy `python3 scripts/check_naming.py --update`.
+
+| Tem in che SĐT (T1) | Đạt | `app/print/label/page.tsx` chỉ hiện `recipient_phone_masked`, có chú thích T1. Vẫn kiểm `delivery.print_label`. QR vẫn là ảnh data-URI. `@page` nằm trong `<style>` của trang. Thanh công cụ ẩn khi in (`label.module.css`, `@media print`) |
+| Ghi chú giao thất bại | Đạt | `ReportFailureModal` giữ ghi chú trong `useState`. `Field` và `useSubmit` không ghi vào máy. Không có `console`. URL không đổi. Thông điệp lỗi lấy từ BE và BE không lặp lại nội dung. `reportDeliveryFailure` chỉ gửi trong body POST |
+| SĐT đủ chỉ lấy từ R4 | Đạt (xem L1) | Chi tiết và "Gọi khách" đọc `detail.phone`. Danh sách không có SĐT. `telHref` chỉ lọc chữ số từ chuỗi BE trả, không ghép từ nguồn khác. Còn dòng dự phòng `recipient_phone` là code chết (L1) |
+| `tel:` | Đạt | `DeliveryDetailScreen.tsx:357`, `MyDeliveriesScreen.tsx:87`. Số quá ngắn thì không dựng link. `null` (đã ẩn theo SR-PII-02) thì hiện "đã ẩn" |
+| `delivery_staff` chỉ thấy phiếu của mình | Đạt | `MyDeliveriesScreen` gọi `assigned_to=me`. BE chặn ở `get_queryset`, mock cũng mô phỏng như vậy. `/deliveries/detail/` đặt `ViewGuard view="deliveries"`, nên người chỉ thuộc `delivery_staff` vào bằng URL sẽ thấy "Không có quyền" trước khi gọi API |
+| Menu S7-AC2 | Đạt, không đổi | `shared/lib/nav.ts:233` `!onlyDelivery(me)`, `:245` "Việc giao của tôi" theo nhóm. Lô không sửa `nav.ts`. `nav.test.ts:70-72` vẫn xanh |
+| F2o: quyền và trạng thái | Đạt | `canAssign` (`deliveryUi.ts:60`) đòi cả trạng thái thuộc T6 **và** BE trả `"assign"` trong `available_actions`. BE chỉ trả khi có `delivery.assign_deliverynote`. Mục khoá "Đổi người giao" kèm lý do chỉ hiện với người có quyền (`DeliveryDetailScreen.tsx:227`). Hộp hiện "Đang giao n phiếu · Chờ lấy m phiếu" (T7) |
+| 409 `STALE_STATE` và `expected_assigned_to` | Đạt | `AssignCourierModal.tsx:59` gửi `expected_assigned_to = note.assigned_to`, kể cả `null`. 409 vào `sub.conflict`, hiện `ConflictBanner` trong hộp. "Tải lại" xoá lựa chọn, nạp lại danh sách người giao và phiếu cha, giữ hộp mở. Prop `note` là phiếu cha mới nạp, nên lần gửi sau dùng đúng người đang gán. `isConflictError` (đã sửa ở Lô 2 M1) chỉ nhận `STALE_STATE` và `STALE_VERSION`. Báo thất bại sai trạng thái trả 400 không mã `STALE_STATE` nên hiện alert đỏ thường, không bị im lặng |
+| Khối AI và `check-ai-chunks` | Đạt | Trang chi tiết gắn `AiDocBlockGate` (`delivery.deliverynote`). Bốn route mới có trong `TARGETS` và đã chạy XANH trên bản build thật. Đã thay L3 của Lô 2 cho phần giao hàng |
+| Màu cứng | Đạt | 0 trong các file của lô. Tem dùng `Canvas`/`CanvasText` cùng `color-scheme: light` |
+| Giá vốn | Đạt | Bảng dòng hàng chỉ có Mặt hàng, Lô, HSD, Số kg. Danh sách truyền `canViewCost={false}` |
+
+### Phát hiện
+
+**M1 — Medium — Thẻ "Việc giao của tôi" thiếu "Đơn" và dòng "Đã thanh toán, không thu thêm" (ED-19-AC1).** Vị trí: `features/deliveries/components/MyDeliveriesScreen.tsx:56-76`.
+- AC: mỗi thẻ có Người nhận, **Đơn**, Địa chỉ, Số kg, Hàng; đơn đã thanh toán có dòng "Đã thanh toán, không thu thêm".
+- Thực tế: thẻ chỉ có mã phiếu, không có `note.order.code`, và không có dòng thanh toán. Người giao đứng ở cửa nhà khách cần dòng này nhất, vì không có nó thì có thể thu tiền thêm của khách đã chuyển khoản.
+- Tái hiện: `NEXT_PUBLIC_USE_MOCK=1`, đăng nhập `giao1`, mở `/my-deliveries/`. Thẻ GH-HD-0036-DELI không có mã đơn và không có chữ "Đã thanh toán".
+- Sửa: thêm dòng `Đơn {note.order?.code}` (mono). Thêm dòng cố định "Đã thanh toán, không thu thêm", vì phiếu giao chỉ sinh sau khi đơn đã thanh toán (BR-TT). Nếu muốn dựa vào dữ liệu, dùng trường thanh toán có sẵn trong bản danh sách và không tự suy. Thêm 1 assert vào `e2e/ed_batch4_delivery.py`.
+
+**M2 — Medium — Menu "…" của chi tiết phiếu thiếu các mục khoá của ED-17-AC3.** Vị trí: `features/deliveries/components/DeliveryDetailScreen.tsx:225-232`.
+- AC: phiếu chưa in tem thì "…" có "In lại tem" bị khoá với lý do "Chưa in tem lần nào.", cùng "Huỷ xác nhận đơn" và "Huỷ đơn" kèm lý do.
+- Thực tế: không có mục nào trong 3 mục này.
+- Tái hiện: mở `/deliveries/detail/?id=<phiếu PREPARING chưa in tem>` bằng `ql1`, bấm "…". Menu chỉ có "Giao cho người giao/Đổi người giao" hoặc trống.
+- Sửa ngay trong lô này: thêm `{ key: "reprint", label: "In lại tem", blockedReason: "Chưa in tem lần nào." }` khi `printAction === "print"`.
+- "Huỷ đơn" và "Huỷ xác nhận đơn" dẫn sang trang đơn của Lô 3 (nợ 5). Được phép để lại, nhưng phải ghi thành dòng nợ trong 02c để làm ngay sau khi Lô 3 vào `main`, và báo PO là ED-17-AC3 mới đạt một phần.
+
+**L1 — Low — Code chết: dự phòng `recipient_phone`.** Vị trí: `DeliveryDetailScreen.tsx:268`, `MyDeliveriesScreen.tsx:146`, `types.ts` (`recipient_phone?`), cùng 15 dòng `recipient_phone: null` trong `mock.ts`.
+- `DeliveryNoteDetailSerializer` (BE) không có `recipient_phone`, chỉ có `phone` (R4). Nhánh `?? recipient_phone` không bao giờ chạy và làm người đọc hiểu nhầm rằng FE có nguồn SĐT thứ hai.
+- Sửa: bỏ khỏi type, mock và hai dòng trên, để "SĐT chỉ đến từ R4" đúng cả trên mặt code.
+
+**L2 — Low — Test chống lưu SĐT trên máy không bắt được số đã định dạng.** Vị trí: `e2e/ed_batch4_delivery.py:78`, `:117`.
+- `:78` tìm `0900000\d{3}`, nhưng số mock có dạng `0900 000 036`. Nếu FE lỡ lưu số đã định dạng thì assert vẫn xanh.
+- `:117` chỉ kiểm ghi chú bị chặn, tức là ghi chú chưa từng gửi đi. Ca cần kiểm là ghi chú hợp lệ đã gửi ("Khách hẹn giao lại ngày mai") không còn trong storage và URL.
+- Sửa: chuẩn hoá bỏ khoảng trắng trước khi so (hoặc regex `0900\s?000\s?\d{3}`), và kiểm thêm sau bước 4.
+
+**L3 — Low — Kiểm ghi chú ở FE lệch BE với số có dấu cách.** Vị trí: `deliveryUi.ts:67`.
+- `PII_NOTE_RE = /\d{9,}/` chỉ bắt dãy số liền. BE (`has_long_digit_run`) bắt cả dãy bị ngăn cách, ví dụ `0912 345 678`.
+- Không lọt dữ liệu, vì BE trả 400 `DELIVERY_FAILURE_NOTE_PII` và `failureFieldOfCode` đưa lỗi xuống dưới ô. Chỉ tốn một lượt gọi API.
+- Sửa (tuỳ chọn): bỏ ký tự không phải chữ số giữa các chữ số rồi mới so, theo đúng luật BE.
+
+**L4 — Low — Câu kết của `check-ai-chunks` đã cũ.** Vị trí: `scripts/check-ai-chunks.mjs:97` vẫn in "4 màn nghiệp vụ và 2 layout". Nay đã có 8 màn. Sửa: in theo `TARGETS.length`.
+
+**L5 — Low — Lệch chữ và bố cục nhỏ so với AC (báo PO, không chặn).**
+- ED-19-AC2: nút ghi "Nhận hàng đi giao", AC ghi "Đã lấy hàng, bắt đầu giao".
+- ED-19-AC3: hộp báo thất bại chỉ tóm tắt mã phiếu, thiếu Đơn, Khách hàng, Bắt đầu giao. Nút là "Huỷ · Báo thất bại", AC ghi "Quay lại · Báo giao thất bại".
+- ED-19-AC5: thẻ thất bại gộp Lý do và Lần thành một dòng, không có "Lúc". "Mang hàng về kho" để Lô 9 (nợ 3, đồng ý).
+- ED-19-AC6: người giao mở URL phiếu của người khác thì thấy "Không có quyền" (do `ViewGuard`), AC ghi "Không tìm thấy". Không lộ việc phiếu có tồn tại hay không, nên chấp nhận được. PO cần biết.
+- ED-17-AC6: hộp in lại chọn sẵn "In lại", AC ghi "phải chọn lý do". Chấp nhận được vì người dùng luôn thấy và có thể đổi lựa chọn.
+- ED-17-AC7: bảng không có cột "Kho". BE (`_get_allocations`) không trả kho. Hiện chỉ có một kho, nên để lại.
+
+**L6 — Low — "Việc giao của tôi" gọi chi tiết cho từng thẻ.** Vị trí: `MyDeliveriesScreen.tsx:151-155`.
+- Mỗi phiếu Đang giao hoặc Thất bại tốn thêm một `GET /notes/{id}/` để lấy SĐT. Với một người giao (dưới 20 phiếu) thì chấp nhận được.
+- Nếu sau này chậm, có thể chỉ tải số khi bấm "Gọi khách". Không dùng cách đưa `phone` vào danh sách, vì 02b R4 cố ý không làm vậy.
+
+### Hai khoản nợ điều phối viên hỏi
+- **Nợ 4 (danh sách chưa gắn `AiBar`): không bắt buộc trong lô này.**
+  - Lý do:
+    - Hiện chưa màn danh sách nào gắn `AiBar`. `shared/ui/AiBar.tsx` chỉ nhận props.
+    - Thiếu phần cổng dùng chung: đọc `/api/ai/status` và đếm đề xuất (R1), đồng thời AI tắt thì **0 request `/api/ai/*`** (BR-AI-17, SR-20).
+    - Nếu từng lô tự gắn thì mỗi màn sẽ gác AI một kiểu. Đó đúng là rủi ro mà L2 và L3 của Lô 2 đã nêu.
+  - Đề nghị:
+    - Làm một lô ngang, có thể gộp vào Lô 15 hoặc làm lô riêng sau Lô 3: một `AiBarGate` dùng chung (nạp động, không import `features/ai` vào chunk danh sách), gắn cho mọi `ListPage`, rồi chạy `check-ai-chunks`.
+    - Ghi một dòng vào 02c để không quên.
+    - 4 màn SR-20 (đơn, thanh toán, hoàn tiền, kho) vẫn không gắn.
+- **Nợ 6 (tìm kiếm chỉ lọc client trên các trang đã tải): chấp nhận tạm.**
+  - Tab đã chia theo trạng thái, và tab Hoàn tất chỉ lấy hôm nay. Vì vậy số dòng mỗi tab nhỏ, và phần lớn đã nằm trong trang đầu.
+  - Từ khoá không đi đâu: không lên URL, không vào máy, không gửi BE. Tìm theo mã phiếu, mã đơn, mặt hàng, không theo tên khách. Như vậy là tốt cho bất biến 9.
+  - Cần sửa nhỏ (Low, gộp với M1/M2): khi đang lọc và `list.hasMore`, câu rỗng ở `DeliveriesView.tsx:159-160` phải nói rõ "Chỉ tìm trong n phiếu đã tải. Bấm Tải thêm để tìm tiếp", vì câu hiện tại dễ khiến người dùng tưởng là không có phiếu.
+  - Thêm `q` phía BE (tìm theo mã) đưa vào backlog, không cần trong lô này.
+
+### Việc cần làm để APPROVED
+1. Sửa M1 và M2 (phần "In lại tem" khoá), mỗi lỗi kèm một assert e2e.
+2. Sửa L2 (test chống lưu SĐT) và câu rỗng ở nợ 6. Hai việc này nhỏ và đi cùng lượt.
+3. Ghi vào 02c: nợ "Huỷ đơn / Huỷ xác nhận đơn" sau Lô 3, và lô `AiBar` dùng chung.
+4. L1, L3, L4, L5, L6 để lô sau hoặc làm luôn nếu tiện. Tech Lead re-review chỉ phần diff của M1 và M2.
+
+### Re-review Lô 4 — FE (vòng sửa 02/10/2026)
+> Phạm vi: các điểm ở mục "Vòng sửa sau Techlead…" của dev-notes (M1, M2, L1–L4, nợ 6, B1–B12 của QA).
+
+**Kiểm chứng (Tech Lead tự chạy):** `npx tsc --noEmit` sạch. `npx vitest run`: 44 file, 410 test đều đạt.
+
+| Điểm | Kết quả | Căn cứ |
+|---|---|---|
+| M1 (thẻ có Đơn và "Đã thanh toán, không thu thêm") | Đạt | `MyDeliveriesScreen.tsx:68-69`, `:93`. Luôn hiện dòng thanh toán là đúng, vì phiếu giao chỉ sinh sau khi đơn đã thanh toán (dev-notes, lệch 9) |
+| M2 (menu "…" theo ED-17-AC3) | Đạt | `DeliveryDetailScreen.tsx:240-244`. "In lại tem" bị khoá khi chưa in. "Huỷ xác nhận đơn" và "Huỷ đơn" bị khoá kèm lý do, chỉ hiện với vai vận hành (`opsView`) và khi phiếu chưa lên xe. Nối link khi Lô 3 xong đã ghi nợ |
+| B7: `ViewGuard` nhận danh sách màn | Đạt | `ViewGuard.tsx`: qua được nếu `canView` đúng với ít nhất một màn, và vẫn không mount children khi thiếu quyền. Chỉ `/deliveries/detail/` dùng dạng mảng. `/deliveries/` vẫn là `view="deliveries"`. `shared/lib/nav.ts` không đổi, nên menu S7-AC2 giữ nguyên |
+| B7: phạm vi dữ liệu | Đạt | BE `get_queryset` lọc theo `assigned_to` với người không có full scope, nên phiếu người khác trả **404** và màn hiện "Không tìm thấy trang này" (ED-19-AC6). Dòng thời gian `/api/guidance/delivery/` cũng lọc phạm vi như vậy (`apps/delivery/next_steps.py:39-43`), nên không lộ lịch sử phiếu người khác. Nút quay lại và `homeHref` trỏ về "Việc giao của tôi". e2e `ed_batch4_delivery.py:102-107` kiểm cả hai chiều |
+| L1 (bỏ `recipient_phone`) | Đạt | Không còn trong type, mock và hai màn. SĐT chỉ còn một nguồn là `phone` (R4) |
+| L2 (test chống lưu SĐT) | Đạt | Regex bắt cả số có dấu cách. Có kiểm ghi chú hợp lệ sau khi gửi |
+| L3 / B12 (`hasLongDigitRun`) | Đạt | `deliveryUi.ts:70-74` khớp từng ký tự với `apps/common/pii.py:46-47` |
+| L4 (`check-ai-chunks`) | Đạt | Câu kết dùng `TARGETS.length` |
+| Nợ 6 (câu "Chỉ tìm trong n phiếu đã tải…") | Đạt | `loadedOnlyNote` có vitest |
+| B2 (cột Kho đọc `warehouse_name`) | Chấp nhận | BE chưa trả trường này nên hiện "—". Ghi ở lệch 8a. Cần BE thêm `warehouse_name` vào `_get_allocations`, hoặc PO bỏ cột |
+
+**Ghi nhận nhỏ (không chặn):** Ở "Huỷ xác nhận đơn", lý do khoá đang chép nguyên câu AC "Đưa đơn về Gọi xác nhận.". Câu này mô tả việc mục đó làm, chưa nói vì sao đang khoá. Khi nối link ở Lô 3, mục sẽ hết khoá, nên không cần sửa bây giờ.
+
+### Ý kiến TL-L6: có nên trả `phone` ở danh sách `assigned_to=me` không
+**Nên, nhưng làm thành một bổ sung BE nhỏ (R4b), không chặn lô này.**
+- Không mở rộng phạm vi lộ dữ liệu:
+  - Người giao vốn đã lấy được đúng số đó cho đúng các phiếu đó qua `GET /notes/{id}/`. Hiện màn cũng đang gọi như vậy cho từng thẻ.
+  - R4 tách `phone` khỏi danh sách là để màn vận hành (danh sách mọi phiếu của Chủ, Quản lý, NV kho) không trải SĐT của cả trăm khách ra một payload. Ca "của tôi" không thuộc mục đích đó.
+  - Bất biến 9 ("chỉ lộ cho ai cần") vẫn giữ, vì người giao cần số để gọi khách.
+- Điều kiện bắt buộc để BE làm:
+  1. Chỉ thêm `phone` khi query có `assigned_to=me`. Kể cả với Chủ hay Quản lý, chỉ trả cho phiếu gán cho chính người gọi. Mọi query danh sách khác **không có khoá `phone`**, và phải có test assert điều này.
+  2. Chỉ trả cho phiếu `DELIVERING` hoặc `FAILED`, đúng những phiếu có nút "Gọi khách". Các trạng thái khác trả `null`.
+  3. Áp cùng cửa sổ SR-PII-02 như chi tiết (`pii_scope`). Giữ `Cache-Control: no-store`.
+  4. Có test cho cả 3 điều kiện, cộng 403 khi người giao hỏi `assigned_to=<id khác>` (đã có).
+- Sau khi BE có R4b: FE bỏ vòng gọi chi tiết ở `MyDeliveriesScreen.tsx` (`loadPhone`) và đọc `phone` từ dòng danh sách. Nếu thiếu khoá (BE cũ) thì giữ đường gọi chi tiết làm dự phòng.
+- Thủ tục: đây là điều chỉnh contract kỹ thuật, không đổi phạm vi dữ liệu, nên Tech Lead tự duyệt được và sẽ ghi vào 02b §3.7. Nhưng vì đụng dữ liệu cá nhân, điều phối viên nên báo Duy một dòng trước khi giao BE.
+
+### Kết luận re-review Lô 4 — FE: **APPROVED**
+M1, M2, L1–L4, nợ 6 và B7 đều đạt. Không còn lỗi Critical, High hay Medium. Lô sẵn sàng cho QA chạy lại. Khi chạy lại, QA cần sửa script theo mục "QA cần sửa script" trong dev-notes; tôi đồng ý cả 4 điểm đó. TL-L6 chuyển thành việc BE R4b như trên. Các dòng nợ còn lại phải được ghi vào 02c:
+- Nối link "Huỷ đơn" và "Huỷ xác nhận đơn" sau Lô 3.
+- Lô `AiBar` dùng chung.
+- BE thêm `warehouse_name` và mốc "Bắt đầu giao" / "Lúc thất bại" (lệch 8).
+
+## Lô 6 — FE (Khách hàng ED-14, W5a, W5b) + ngoại lệ BE `customer.id` — 02/10
+
+Tech Lead review diff chưa commit: `erp-console/features/customers/**`, `app/(console)/customers/**`, `shared/lib/nav.ts`,
+`features/auth/mock.ts`, `scripts/check-ai-chunks.mjs`, `e2e/ed_batch6_customers.py`, `e2e/ed_batch1_shell.py`; BE
+`apps/sales/orders/serializers.py` cùng 3 file test. Căn cứ: 02b §1 (W5a, W5b), §3 B2, §5.2 Lô 6; 00-can-duy-quyet #5, #11, #13; UI-RULES; bất biến 9.
+
+### Lệnh kiểm chứng (Tech Lead tự chạy trong lượt này)
+- `cd erp-console && npx tsc --noEmit`: sạch. `npx vitest run`: 52 file, 525 test, xanh.
+- `cd backend && .venv/bin/python manage.py test apps.sales`: 554 test, OK.
+- `python3 scripts/check_naming.py`: OK, không vi phạm mới.
+- Grep màu cứng (`#hex`, `rgb(`, `hsl(`) trong `features/customers` và `app/(console)/customers`: 0.
+- Grep `localStorage|sessionStorage|console.|document.title|history.` trong `features/customers`: chỉ khoá chế độ mock `cave_erp_mock_customers_mode` (`mock.ts:39,294`), không chứa dữ liệu khách.
+- e2e (`ed_batch6_customers.py`, `ed_batch1_shell.py`) **không** chạy lại ở lượt review; QA chạy ở bước sau.
+
+### Kết quả theo trọng tâm
+| Mục | Kết quả | Căn cứ |
+|---|---|---|
+| Danh bạ chỉ cho `sales.view_customer_list` | Đạt | Menu: `nav.ts:212` `visible: has(me, PERM.viewCustomerList)` (chỉ bỏ `soon`). URL: hai trang bọc `ViewGuard view="customers"`, nên thiếu quyền thì không mount màn và **không gọi API**. BE chặn thật: `test_directory_api.py:246-285` (kho, giao, CSKH 403; 401; Chủ tắt quyền của Quản lý thì 403) |
+| Liên kết từ đơn | Đạt | `OrderDetailScreen.tsx:99-100` + `orderDetailModel.ts:121-124`: chỉ dựng href khi có `customer.id` **và** quyền `view_customer_list` |
+| URL chỉ có id, từ khoá không lên URL | Đạt | `rowHref` = `/customers/detail/?id=${c.id}`; `q` chỉ là state, debounce 300 ms rồi vào query của request BE (đã chấp nhận ở #11). `parseCustomerId` chỉ nhận số nguyên dương ≤ 12 chữ số |
+| Storage, console, tiêu đề tab, AI | Đạt | Không có ghi storage dữ liệu khách, không `console.*`. `DetailPage` không truyền `aiSlot`. `check-ai-chunks.mjs` có thêm hai route. BE `ai/policy/rules.py:20-21,99` cấm hai tiền tố và lọc cả nhánh `customer` |
+| Mock không ghi storage | Đạt | Dữ liệu giả nằm trong bộ nhớ trang. Chỉ chế độ mock lưu `localStorage`. Dữ liệu giả có dạng `Khách Thử A`, `0900000xxx` |
+| PATCH chỉ `name`/`default_address`/`note`, không có ô SĐT | Đạt | `CustomerPatch` = `Partial<Record<"name"\|"default_address"\|"note", string>>`. Hộp sửa gửi `changedFields(...)`, sửa tại chỗ gửi `{[field]: value}`. SĐT là `InfoField kind="locked"` (`CustomerDetailScreen.tsx:182`), đúng #5 |
+| Nút sửa theo quyền | Đạt | `canEdit` = `sales.change_customer`. Thiếu quyền thì không có nút "Sửa thông tin" và ô hiện dạng chỉ đọc |
+| Hồi quy menu các vai | Đạt | Mock chỉ thêm `view_customer_list` cho owner và manager. `ed_batch1_shell.py` chỉ đổi kỳ vọng của `loc`, `ql1`; kho1, giao1, cs2 giữ nguyên |
+| Màu cứng | Đạt (0) | `customers.module.css` chỉ dùng token |
+| 3 trạng thái, 403/404, giữ chữ khi lưu lỗi | Đạt | List: tải, lỗi + Thử lại, rỗng, không khớp, 403. Detail: id sai/thiếu → NotFound, 403, 404, lỗi; lưu lỗi thì giữ draft, nút chuyển "Thử lại" |
+
+### BE `customer.id` trong chi tiết đơn: kết luận
+- **Đúng nhánh:** `serializers.py:126-135` chỉ trả `id` ở nhánh không che. NV giao quá cửa sổ nhận `{name, phone, address}` toàn `None`, không có `id`. Test `test_order_list_r3.py` (ca mới thứ hai) khoá hành vi này.
+- **Có cần giới hạn theo `view_customer_list` không? Không cần, không sửa, không ghi nợ bắt buộc.** Lý do:
+  1. `id` là khoá thay thế, không phải dữ liệu cá nhân. Nó chỉ xuất hiện khi người xem đã thấy tên, SĐT và địa chỉ của chính đơn đó.
+  2. Có `id` không mở thêm được gì. `/customer-directory/{id}/` và `/guidance/customer/{id}/` đều đòi `view_customer_list`.
+  3. Nhánh `customer` của đơn bị bộ lọc AI loại bỏ hoàn toàn.
+  4. Nếu gắn thêm điều kiện quyền vào serializer thì phải đọc `request.user` trong `get_customer`, tức thêm một luật nữa mà lợi ích gần như bằng 0.
+
+  Dev ghi điểm này ở mục Nợ. Tech Lead đóng điểm đó.
+
+### Phát hiện
+| Mã | Mức | File:dòng | Mô tả / tái hiện | Hướng xử lý |
+|---|---|---|---|---|
+| TL-L6F-1 | Low | `backend/apps/sales/orders/serializers.py:127-128` | Hai nhánh trả hình dạng khác nhau. Nhánh che không có khoá `id`, nhánh thường có. Tái hiện: NV giao gọi `/api/sales/orders/{id}/` của phiếu quá cửa sổ → `customer` có 3 khoá; Chủ gọi → 4 khoá. FE xử lý được vì `customerLinkHref` coi `undefined` là không có link | Không chặn. Nếu đụng lại thì trả `"id": None` ở nhánh che và sửa assert ở `test_order_list_r3.py` + `test_customer_data_scope.py` |
+| TL-L6F-2 | Low | `erp-console/features/orders/types.ts:136` | Comment ghi "BE Lô 3 chưa trả" `customer.id`, nay đã sai | Sửa comment khi đụng file (ngoài phạm vi lô) |
+| TL-L6F-3 | Low | `erp-console/features/customers/components/CustomerDetailScreen.tsx:37` | Hằng `PERM_CHANGE_CUSTOMER` khai cục bộ, lệch idiom gom quyền vào `PERM` ở `shared/lib/nav.ts` | Lần sau chuyển vào `PERM.changeCustomer` |
+| TL-L6F-4 | Low | `CustomerDetailScreen.tsx:80-84`, `EditCustomerModal.tsx:37` | PATCH đã trả thân chi tiết mới nhưng FE bỏ đi rồi gọi thêm một GET (`detail.reload`). Kết quả đúng, chỉ dư một request | Không chặn. Có thể dùng thân PATCH để cập nhật state |
+| TL-L6F-5 | Low (nợ đã ghi) | `features/orders/mock.ts`, `features/customers/mock.ts` | Mock đơn chưa có `customer.id`, và id đơn trong mock khách (từ 301) không khớp mock đơn (101-145). Liên kết hai chiều chưa kiểm được ở e2e mock. Trên BE thật dev đã kiểm | Giữ nợ. Làm khi có lô đụng mock đơn |
+
+Bảy điểm lệch dev ghi ở 03-dev-notes đều hợp lệ. Điểm 1 đúng #5. Các điểm 2-4 nằm trong phạm vi component dùng chung và contract BE. Điểm 5 đúng UI-RULES §1.8 cho màn nội bộ. Điểm 6 chặt hơn BE nên không lệch dữ liệu. Điểm 7 chỉ là câu chữ.
+
+Không có Critical, High hay Medium. Không rò dữ liệu cá nhân, không vượt quyền, không có migration.
+
+**Kết luận: APPROVED** (REVIEW PASS). Bốn mục Low không chặn commit.
+
+---
+
+## Lô 5 — FE (ED-15 Gọi xác nhận) · review techlead 02/10
+
+Worktree `loc-wt-b`, nhánh `ed-stream-b`, phần chưa commit trên `7f3b7b1`.
+
+**Đã chạy trong lượt này:**
+- `tsc --noEmit`: sạch.
+- `vitest run`: 46 file, 434 test đạt.
+- `NEXT_PUBLIC_USE_MOCK=0 npm run build`: OK. Sau đó `check-no-mock` XANH (15 file mock, 36 seed, 148 file build). `check-ai-chunks` XANH (10 màn + 2 layout, có `/confirmation` và `/confirmation/detail`).
+- `check_naming.py`: OK, không có vi phạm mới.
+- grep mã màu (`#hex`, `rgb`, `hsl`) trong `features/confirmation/**`: 0 kết quả.
+
+### Đạt
+- **Dữ liệu cá nhân (bất biến 9)**
+  - Dòng ngoài phạm vi chỉ hiện `phone_masked` do BE trả, không có `tel:`, không mở được (`rowHref` trả `undefined`). Khớp `serializers.py:151-194` của BE. FE không tự che hay ghép số.
+  - URL chỉ mang `?id=` và `?tab=`.
+  - Không có `console.*`, `localStorage` hay `sessionStorage` trong module.
+  - Ô tìm trên danh sách chỉ nằm trong state.
+  - "Tìm khách gọi lại" gửi bằng `POST /api/confirmation/search/` với body `{q}`.
+  - Chip AI là câu chung và chỉ kèm `target_model=delivery.deliverynote` cùng `target_id`.
+  - Ghi chú có chặn dãy 9 chữ số trở lên ở FE, khớp BR-GH-19.
+- **Phân quyền**
+  - Các nút được vẽ theo `available_actions` của BE. Nút Quyết định chỉ có khi BE trả `decide:*`, mà BE chỉ trả cho người có `decide_unconfirmed`. Như vậy CSKH không có nút này (AC5).
+  - Route có `ViewGuard view="confirmation"`.
+  - Mock `chu` thêm 3 quyền `confirm_with_customer`, `change_recipient`, `decide_unconfirmed`, khớp đúng `accounts/migrations/0011_seed_group_cskh.py:34-37`.
+  - Sửa `e2e/ed_batch1_shell.py` và `qa_ed_batch1_{shell,round2}.py` (số mục menu của `loc` từ 11 lên 12) là hệ quả đúng của việc trên.
+- **409**
+  - `STALE_STATE` vào `useGuardedSubmit.stale`: hộp hiện đúng câu của BE, nút gửi đổi thành "Tải lại", các ô bị khoá. Khi claim gặp `STALE_STATE` thì hiện `ConflictBanner`.
+  - `CLAIMED` là lỗi đỏ thường, hiện câu của BE rồi tải lại chi tiết, đúng 02b §2.3 (sửa M1 Lô 2).
+  - Module BE chỉ phát `STALE_STATE` và `CLAIMED`, nên không có nhánh `conflict` nào bị nuốt.
+- **`useGuardedSubmit` / `ModalAlert`**: không trùng lặp với `shared/ui/form`.
+  - `useGuardedSubmit` là lớp mỏng bọc `useSubmit`, chỉ giữ thêm câu `STALE_STATE`.
+  - `ModalAlert` bọc `FormAlert` và thêm cuộn vào tầm nhìn.
+  - Hai file đặt trong module là chấp nhận được. Nếu màn thứ hai cần, nâng lên `shared/ui/form`.
+- **Cờ mock trong `api.ts`**: sửa đúng. Viết ternary `process.env.NEXT_PUBLIC_USE_MOCK === "1" ? … : undefined` ngay tại chỗ dùng để webpack gập được nhánh lúc parse và tree-shake `./mock`, kéo theo `auth/mock.ts`. Bản build thật đã kiểm XANH.
+- **Tab "Tất cả"**: gộp 4 `state=X`.
+  - Trang vượt (404, `page > 1`) được coi là rỗng.
+  - `count` là tổng của 4 trạng thái. Còn tải thêm được khi một trạng thái còn `next`.
+  - Các trạng thái rời nhau nên không trùng dòng. Có test `queueAll.test.ts`.
+  - Đây là lệch hợp đồng (BE chưa có `state=ALL`), đã ghi ở dev-notes mục 1. Chấp nhận tạm.
+- **Hộp thoại**: Huỷ đơn ở F2k dùng `btn danger` và hỏi lại hai bước (AC4). AC3 có câu "Chọn thời điểm sau dd/mm/yyyy hh:mm.". Mỗi hộp không quá 6 trường.
+
+### Phát hiện
+
+**TL5-M1 · Medium (chặn): thiếu cột "Lý do chuyển quyết định" (ED-15-AC1).**
+- Vị trí: `erp-console/features/confirmation/components/ConfirmationQueueView.tsx:57-91`.
+- AC1 ghi "Lý do chuyển quyết định ở cột riêng". Bảng có 10 cột nhưng không có cột lý do, dù BE đã trả `escalation_label` ở danh sách (`serializers.py:99-105`). Lý do hiện chỉ thấy ở trang chi tiết (`ConfirmationDetailScreen.tsx:281`).
+- Tái hiện: đăng nhập `ql1` trên bản mock, vào `/confirmation/?tab=ESCALATED`. Không có cột nào nói vì sao đơn được chuyển lên.
+- Sửa: thêm cột "Lý do" (`r.escalation_label ?? "—"`), mỗi ô một giá trị. Ở 360px có thể ẩn cột này trên các tab không phải ESCALATED/ALL. Bổ sung một ca vào `e2e/ed_batch5_confirmation.py`.
+
+**TL5-L1 · Low: `loadDetail` đọc `detail` cũ trong closure.**
+- Vị trí: `ConfirmationDetailScreen.tsx:90`, `:96-97`.
+- `useCallback` chỉ phụ thuộc `[id]` và có `eslint-disable`, nên `detail` trong closure luôn là `null` của lần render đầu. Vì vậy nhánh `setActionError("Chưa tải lại được đơn…")` không bao giờ chạy. Sau một thao tác thành công, nếu lần tải lại lỗi mạng thì cả trang bị thay bằng `ErrorScreen` thay vì giữ dữ liệu cũ kèm alert.
+- Tái hiện: ghi một cuộc gọi, chặn mạng đúng request `GET /api/confirmation/queue/<id>/` của lần `refreshAll`. Trang chuyển sang ErrorScreen.
+- Sửa: dùng `useRef` cho "đã có detail", hoặc tách cờ `hasData`.
+
+**TL5-L2 · Low: comment trái với code.**
+- Vị trí: `features/confirmation/api.ts:51` và `:63`.
+- Comment ghi "mới trước cũ sau", nhưng code sắp tăng dần theo `paid_at`, tức cũ trước. Sắp cũ trước là đúng với hàng chờ và với BE, nên chỉ cần sửa comment.
+- Thêm: dòng có `paid_at = null` sẽ lên đầu. Nên ghi rõ trong comment hoặc đẩy các dòng này xuống cuối.
+
+**TL5-L3 · Low: `ConfirmationAiBlock.tsx` chép gần nguyên `features/ai/components/AiDocBlockGate.tsx`.**
+- Hai file chỉ khác nhau ở prop `chips`. Lô này không được sửa `features/ai` nên chấp nhận tạm.
+- Ghi nợ: thêm `chips?` vào `AiDocBlockGate` rồi xoá `ConfirmationAiBlock`. Gộp vào lô `AiBar` dùng chung đã ghi ở Lô 4.
+- Việc screen import `features/ai` giống tiền lệ `DeliveryDetailScreen` của Lô 4. 02b §2.3 muốn ghép ở `page.tsx`, nên gom sửa cùng lúc.
+
+**TL5-L4 · Low: `features/purchasing/api.ts:6,18,31` còn mẫu `const isMock = …; mock: isMock ? …`.**
+- Đã grep bản build thật: chuỗi seed của `purchasing/mock.ts` (`0901234567`, `Lagi`, `BR-MH-07`) không có trong `out/`, nên hiện chưa rò.
+- Mẫu này vẫn mong manh, đúng là lỗi dev vừa sửa ở confirmation. Đề nghị đổi sang ternary tại chỗ trong một lô có quyền đụng purchasing.
+- Không còn `api.ts` nào khác dùng mẫu này. `content/api.ts` đã viết đúng.
+
+**TL5-L5 · Low (sau khi gộp nhánh): link sau "Huỷ đơn" ở F2k còn là đường cũ.**
+- Vị trí: `ConfirmationDetailScreen.tsx:379`, link `/orders/?order=<id>&open=refund`.
+- Lô 3 trên `main` có `legacyOrderRedirect` (`features/orders/filters.ts:45`) nên đường cũ vẫn chạy, nhưng phải đi vòng qua một lần chuyển hướng.
+- Khi gộp `ed-stream-b` vào `main`, đổi thẳng sang `/orders/detail/?id=<id>&open=refund`. Đây là cùng dòng nợ "nối link sau Lô 3" của Lô 4.
+
+**TL5-N1 · Ghi chú, không thuộc lô FE.**
+- `ConfirmationQueueView.tsx:66` và chi tiết `:265` hiện SĐT đúng chuỗi BE trả, chưa nhóm 4-3-3 như 02b §3.7.
+- `shared/lib/format.ts::phone` chưa có ở cả hai nhánh, nên không tính là lỗi của lô này. Khi thêm hàm format thì áp dụng cho cả hai chỗ.
+
+**TL5-BE1 · Medium, việc BE riêng, không chặn lô FE này.**
+- Vị trí: `backend/apps/delivery/confirmation/api.py:67`, `get_object()` lọc `Q(note_id=val) | Q(pk=val)` rồi lấy `.first()`.
+- FE luôn gửi `note_id`. Khi `pk` của một task trùng `note_id` của task khác, BE có thể trả hoặc thao tác nhầm task: claim, ghi cuộc gọi, quyết định trên **đơn khác**.
+- Không rò dữ liệu cá nhân, vì phạm vi được kiểm trên task trả về. Nhưng có thể ghi kết quả gọi vào nhầm đơn.
+- Sửa: chỉ lọc theo `note_id`, kèm test hai task có `pk` và `note_id` chéo nhau. Điều phối viên giao be-dev.
+
+### Ngoài phạm vi review, ghi nhận
+- `mock.ts:522`: `mockClaimConfirmationTask` không áp `viewFor`, nên Chủ mở được dòng 40 nhưng claim bị 404, chỉ xảy ra trên mock. BE thật không bị.
+- Hai script BE thật (`sr09_ac4_real_backend.py`, `qa_lo8_real.py`) còn selector cũ, đang ⏸. QA cần sửa khi dựng được BE.
+
+### Kết luận Lô 5 — FE: **CHANGES REQUESTED**
+- Cần sửa: TL5-M1 (thiếu cột lý do, AC1).
+- Nên sửa cùng lượt: TL5-L1 và TL5-L2, đều nhỏ.
+- Ghi nợ vào 02c: TL5-L3, L4, L5.
+- Giao be-dev: TL5-BE1.
+- Không có lỗi Critical hay High. Dữ liệu cá nhân, phân quyền và giá vốn đạt.
+
+### Re-review Lô 5 — FE (vòng sửa sau review, 02/10)
+
+**Đã chạy lại trong lượt này:** `tsc --noEmit` sạch; `vitest run` 46 file, 437 test đạt.
+
+**Các mục của vòng trước**
+- **TL5-M1 đạt.** Bảng có cột "Lý do" (`reasonText`, `confirmationUi.ts:142`) và đúng thứ tự cột theo board W1c.
+- **TL5-L1 đạt.** Dùng ref `hasDetail` (`ConfirmationDetailScreen.tsx:67,99`). Tải lại bị lỗi thì giữ dữ liệu cũ và hiện cảnh báo.
+- **TL5-L2 đạt.** Comment đã đúng; dòng có `paid_at` null được xếp xuống cuối, có test.
+
+**Thay đổi dùng chung có làm vỡ Lô 1–4 không: không vỡ.**
+- `DataTable` thêm `dense` và `hideOnMobile`. Cả hai là opt-in. Class `lt-dense` và `lt-m-hide` chỉ được gắn khi màn truyền prop. Hiện chỉ màn `/confirmation/` dùng. Bảng của Lô 1–4 vẫn ra cùng markup như cũ.
+- `Field` thêm `counter`. Chỉ hiện khi `as="textarea"`, có `counter` và có `maxLength`. Các nơi dùng cũ không đổi.
+- `globals.css`:
+  - Khối `.fb` dưới 768px: ô tìm, ô chọn và ô ngày đều cao `var(--tap)` = 44. Đây là thay đổi cố ý cho mọi màn có `FilterBar` trên điện thoại, đúng luật vùng bấm ≥ 44px. Cách viết `margin:-1px 0` giống `.search input` đang có. Desktop không đổi.
+  - `.btn[aria-disabled="true"]` làm mờ thêm các nút có thuộc tính này. Đã rà các chỗ có `aria-disabled`:
+    - `FormPage.tsx:65-66` đã có sẵn `disabled`, nên hiển thị không đổi.
+    - `AiBlockFrame.tsx:117` cũng đã có `disabled`.
+    - Mục của `MoreMenu` và `AvatarMenu` không dùng class `.btn`.
+    - Kết luận: không có màn cũ nào đổi giao diện ngoài ý muốn.
+- Đổi chữ "Tổng số kg" ở Lô 4 (`DeliveriesView.tsx`, `DeliveryDetailScreen.tsx`, `app/print/label/page.tsx`) là đổi nhãn, đúng QA-B8.
+- `guidance/mock.ts` thêm công cụ ép mã lỗi. Công cụ nằm sau cờ mock, và `check-no-mock` đã chạy xanh ở vòng dev.
+
+**`aria-disabled` thay cho `disabled` ở nút mở hộp: không cho bấm lặp ra hai hộp hay hai thao tác hỏng.**
+- **Nút "Quyết định"** (`:183`): `onClick` kiểm `busy === null`. Đang bận thì không làm gì.
+- **Nút "Ghi kết quả gọi"** (`:189-192`): đi qua `claimThen`, mà hàm này mở đầu bằng `if (busy) return` (`:146`). Mục "Hẹn gọi lại" trong menu cũng đi qua `claimThen`.
+- **Khe còn lại:** hai lần bấm trong cùng một khung hình vẫn đọc cùng giá trị `busy` cũ, nên có thể gửi 2 lần `POST …/claim/`.
+  - Khe này giống hệt khi còn dùng `disabled`, vì `disabled` cũng chỉ có hiệu lực sau lần render kế tiếp. Vậy đây không phải hồi quy.
+  - Claim là idempotent với cùng một người (chỉ gia hạn giữ chỗ), còn `setModal("call")` gọi hai lần vẫn chỉ ra một hộp. Không có hại.
+  - Nếu muốn chặn tuyệt đối thì thêm ref `inFlight` như `useSubmit`. Ghi mức Low.
+- Nút có `aria-disabled` vẫn nhận focus và vẫn đọc được trên trình đọc màn hình, đúng mục đích QA-B7 (trả focus về nút mở).
+
+**Phát hiện mới (đều Low, không chặn)**
+- **TL5-R1 · Low.** `globals.css:41-42`: `.btn:hover:not(:disabled)` và `.btn:active:not(:disabled)` vẫn áp cho nút có `aria-disabled="true"`. Nút mờ nhưng vẫn đổi nền khi rê chuột và vẫn co lại khi nhấn.
+  - Sửa: thêm `:not([aria-disabled="true"])` vào hai selector.
+- **TL5-R2 · Low.** `DataTable.tsx`, hàm `SkeletonBody` (khoảng dòng 79-83): ô khung xương không được gắn `lt-m-hide`. Ở ≤ 640px, phần đầu bảng chỉ còn 5 cột nhưng mỗi dòng khung xương vẫn có 10 ô, nên lệch cột trong lúc đang tải.
+  - Tái hiện: mở `/confirmation/` ở 360px với mạng chậm.
+  - Sửa: dùng `colClass(c)` cho `td` của khung xương.
+- **TL5-R3 · Low, cần PO xác nhận.** Cột "Lý do" bị `hideOnMobile`, nên ở 360px tab "Cần quyết định" không còn thấy lý do ngay trên danh sách. AC1 không nói gì về điện thoại; ở trang chi tiết vẫn có lý do.
+  - Nếu PO muốn thấy lý do ở điện thoại thì bỏ `hideOnMobile` cho cột này, ít nhất ở tab ESCALATED.
+- **Lệch hợp đồng mới `note_code`** (dev-notes): BE chưa trả trường này, nên trên BE thật ô "Phiếu giao" hiện "—". Ghi việc cho be-dev, gom cùng TL5-BE1.
+
+### Kết luận re-review Lô 5 — FE: **APPROVED**
+- Không còn lỗi Critical, High hay Medium ở FE.
+- Các thay đổi dùng chung là opt-in, hoặc là thay đổi cố ý (FilterBar 44px trên điện thoại), và không làm vỡ Lô 1–4.
+- Các mục ghi vào 02c:
+  - TL5-R1, TL5-R2 (sửa nhỏ, có thể gom vào lô sau)
+  - TL5-R3 (hỏi PO)
+  - TL5-L3, L4, L5
+  - BE: TL5-BE1 và `note_code`.
+- QA cần sửa chỉ số cột "Hạn gọi" trong `qa_ed_batch5_ui.py` G2: cột 6 thành cột 7.

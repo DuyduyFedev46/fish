@@ -5,9 +5,9 @@ export type ReferenceRoute = { kind: string; /** Thư mục trang trong app/(con
 
 export const REFERENCE_ROUTES: readonly ReferenceRoute[] = [
   { kind: "batch", page: "inventory/detail", ready: true },
-  { kind: "order", page: "orders/detail", ready: false }, // Lô 3
+  { kind: "order", page: "orders/detail", ready: true }, // Lô 3 đã vào: /orders/detail/?id=
   { kind: "invoice", page: "invoices/detail", ready: false }, // chưa có lô nhận
-  { kind: "receipt", page: "purchasing/detail", ready: false }, // Lô 6
+  { kind: "receipt", page: "purchasing/detail", ready: false }, // phiếu nhập: Lô 10 chưa vào
   { kind: "stocktake", page: "stocktake/detail", ready: false }, // Lô 8
   { kind: "return", page: "returns/detail", ready: false }, // Lô 9
   { kind: "supplier_return", page: "inventory/supplier-returns/detail", ready: false }, // chưa có màn

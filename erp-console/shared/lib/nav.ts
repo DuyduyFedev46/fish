@@ -87,6 +87,8 @@ export const PERM = {
   /** S16: xem danh sách phiếu hoàn (Chủ, Quản lý có — warehouse_staff/delivery_staff không). Nút xác nhận/thất bại/thử lại theo
    * `available_actions` của từng phiếu (chỉ Chủ có sales.confirm_refund, S16-AC7). */
   viewRefund: "sales.view_refund",
+  /** ED-09/ED-10: huỷ đơn đã thanh toán (Chủ, Quản lý). Nút thật theo `available_actions` của BE; quyền này chỉ để hiện mục "Huỷ đơn" mờ kèm lý do. */
+  cancelPaidOrder: "sales.cancel_paid_order",
   viewDeliveryNote: "delivery.view_deliverynote",
   viewBatch: "inventory.view_batch",
   /** Lô 7: mở bán lô (Quản lý, Chủ). */
@@ -217,7 +219,6 @@ export const NAV: NavItem[] = [
     short: "Khách",
     icon: "group",
     section: "Bán hàng",
-    soon: true,
     visible: (me) => has(me, PERM.viewCustomerList),
   },
   {

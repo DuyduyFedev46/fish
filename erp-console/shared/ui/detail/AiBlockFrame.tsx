@@ -35,6 +35,8 @@ export type AiStarter = {
   onFocus: () => void;
   /** Bấm chip hoặc gửi: cha nạp trợ lý và chuyển câu hỏi sang. */
   onAsk: (question: string) => void;
+  /** Cha giữ ref ô nhập để trả focus về ô sau khi đồng ý dùng trợ lý (phím gõ tiếp không rơi về body). */
+  inputRef?: React.Ref<HTMLInputElement>;
 };
 
 type Props = {
@@ -48,12 +50,14 @@ type Props = {
   chat?: React.ReactNode;
   /** Khung hỏi nhanh tĩnh hiện sẵn khi chưa có `chat` (kể cả khi không có đề xuất nào). */
   starter?: AiStarter;
+  /** true = giữ khung hỏi nhanh cả khi đã có `chat` (panel còn đang nạp / chưa đồng ý): ô gõ không biến mất, phím gõ không rơi mất, focus không về body (B6, L9). */
+  keepStarter?: boolean;
   /** Đang tải đề xuất. */
   loading?: boolean;
   onRetry?: () => void;
 };
 
-export function AiBlockFrame({ proposals, busyId = null, error, onReject, onConfirm, chat, starter, loading = false, onRetry }: Props) {
+export function AiBlockFrame({ proposals, busyId = null, error, onReject, onConfirm, chat, starter, keepStarter = false, loading = false, onRetry }: Props) {
   return (
     <section className={s.block} aria-label="Trợ lý AI" data-ai-block>
       <h3 className={s.title}>
@@ -128,12 +132,14 @@ export function AiBlockFrame({ proposals, busyId = null, error, onReject, onConf
         );
       })}
 
-      {chat ?? (starter ? <Starter {...starter} /> : null)}
+      {/* Starter chỉ có MỘT vị trí cố định (con thứ nhất), `chat` ở vị trí kế: chat xuất hiện/biến mất không làm React dựng lại ô nhập. */}
+      {starter && (!chat || keepStarter) ? <Starter {...starter} /> : null}
+      {chat}
     </section>
   );
 }
 
-function Starter({ chips, value, onChange, onFocus, onAsk }: AiStarter) {
+function Starter({ chips, value, onChange, onFocus, onAsk, inputRef }: AiStarter) {
   return (
     <div className={s.starter} data-ai-starter>
       {chips.length > 0 && (
@@ -153,6 +159,7 @@ function Starter({ chips, value, onChange, onFocus, onAsk }: AiStarter) {
         }}
       >
         <input
+          ref={inputRef}
           className={s.ask}
           value={value}
           onChange={(e) => onChange(e.target.value)}

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Kiểm tra sau `npm run build`: màn nghiệp vụ KHÔNG được tải code AI khi AI tắt (BR-AI-17, DW-09-AC8, SR-20).
 //
-// Đọc `.next/app-build-manifest.json`, với 6 route nghiệp vụ và 2 layout, liệt kê từng chunk JS
+// Đọc `.next/app-build-manifest.json`, với các route nghiệp vụ trong TARGETS và 2 layout, liệt kê từng chunk JS
 // rồi tìm chuỗi đặc trưng của runtime AI: `new Worker`, `wllama`, `/call/`.
 // Có chunk chứa các chuỗi này -> in ra route + chunk + chuỗi trùng và thoát mã 1.
 // Cuối cùng in bảng "First Load JS" (tổng byte chưa nén của các chunk JS) để ghi vào 03-dev-notes.md.
@@ -23,7 +23,20 @@ const TARGETS = [
   ["/(console)/orders/page", "/orders"],
   ["/(console)/orders/payments/page", "/orders/payments"],
   ["/(console)/orders/refunds/page", "/orders/refunds"],
+  // Trang chi tiết có AiDocBlockGate (Lô 3): phải xanh dù có khối AI nhẹ; runtime nặng chỉ nạp động khi chạm khung hỏi.
+  ["/(console)/orders/detail/page", "/orders/detail"],
+  ["/(console)/orders/payments/detail/page", "/orders/payments/detail"],
+  ["/(console)/orders/refunds/detail/page", "/orders/refunds/detail"],
+  // Khách hàng (Lô 6): không có khối AI, dữ liệu cá nhân không đưa cho AI — phải xanh, không kéo runtime AI.
+  ["/(console)/customers/page", "/customers"],
+  ["/(console)/customers/detail/page", "/customers/detail"],
   ["/(console)/inventory/page", "/inventory"],
+  ["/(console)/deliveries/page", "/deliveries"],
+  ["/(console)/deliveries/detail/page", "/deliveries/detail"],
+  ["/(console)/confirmation/page", "/confirmation"],
+  ["/(console)/confirmation/detail/page", "/confirmation/detail"],
+  ["/(console)/my-deliveries/page", "/my-deliveries"],
+  ["/print/label/page", "/print/label"],
   ["/(console)/inventory/detail/page", "/inventory/detail"],
   ["/(console)/ledger/page", "/ledger"],
 ];
@@ -92,4 +105,5 @@ if (problems.length > 0) {
   process.exit(1);
 }
 
-console.log("\nXANH: 6 màn nghiệp vụ và 2 layout không chứa `new Worker`, `wllama`, `/call/`.");
+const layoutCount = TARGETS.filter(([key]) => key.endsWith("/layout")).length;
+console.log(`\nXANH: ${TARGETS.length - layoutCount} màn nghiệp vụ và ${layoutCount} layout (tổng ${TARGETS.length} mục) không chứa \`new Worker\`, \`wllama\`, \`/call/\`.`);

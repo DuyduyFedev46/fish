@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { AiActionDetail, AiActionRow } from "../types";
-import { changesOf, readyAtOf, toProposalView, waitLeft } from "./docBlockModel";
+import { askWithDocContext, changesOf, readyAtOf, toProposalView, waitLeft } from "./docBlockModel";
 
 const row = (over: Partial<AiActionRow> = {}): AiActionRow => ({
   id: "a1", command: "x", title: "Xác nhận phiếu nhập hàng", level: "C", status: "PENDING", owner_display: "AI của Lộc",
@@ -58,4 +58,15 @@ describe("toProposalView", () => {
     expect(esc?.waitSeconds).toBe(0);
   });
   it("trạng thái khác không vẽ", () => expect(toProposalView(row({ status: "DONE" }), 0)).toBeNull());
+});
+
+describe("askWithDocContext (L8)", () => {
+  it("gắn loại + mã chứng từ vào câu hỏi", () => {
+    expect(askWithDocContext("Chứng từ này còn thiếu gì?", "sales.salesorder", "SO261002-4B7E20")).toBe("Về đơn hàng SO261002-4B7E20: Chứng từ này còn thiếu gì?");
+  });
+  it("targetId dạng 'mã,pk' chỉ lấy mã; loại lạ → chứng từ", () => {
+    expect(askWithDocContext("Hỏi", "sales.salesorder", "SO261002-4B7E20,41")).toContain("SO261002-4B7E20");
+    expect(askWithDocContext("Hỏi", "sales.salesorder", "SO261002-4B7E20,41")).not.toContain(",41");
+    expect(askWithDocContext("Hỏi", "x.y", 7)).toBe("Về chứng từ 7: Hỏi");
+  });
 });

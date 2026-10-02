@@ -1,300 +1,127 @@
 "use client";
 
-// S12 — Hàng chờ thanh toán lệch (menu con của "Đơn & tiền", chỉ Chủ). Danh sách GET /api/sales/payments/ lọc tình trạng
-// xử lý (Đang chờ = OPEN · Đã xử lý = RESOLVED) và loại lệch (thiếu / không khớp đơn / về sau khi đơn tự huỷ / chuyển thừa),
-// 20 dòng/trang + "Tải thêm". Bấm một khoản → tấm chi tiết (PaymentSheet) với nút theo `available_actions`: gắn vào đơn,
-// xác nhận đơn khi khách đã bù (S12), lập phiếu hoàn (S13). Từ tấm khoản tiền mở được chi tiết đơn liên quan (OrderDetailSheet
-// — tải mới mỗi lần mở nên luôn thấy trạng thái sau thao tác). Page bọc <ViewGuard view="payments">.
+// Hàng chờ thanh toán (ED-11, tab 2 của "Đơn & tiền"): tiền về lệch với đơn. Bảng: Mã giao dịch · Số tiền · Loại khoản
+// tiền (Khớp · Thiếu tiền · Về sau khi đơn tự huỷ · Không khớp đơn · Chuyển thừa) · Tình trạng xử lý (Chờ xử lý / Đã xử lý,
+// cột riêng) · Đơn · Nhận lúc. Bấm dòng → /orders/payments/detail/?id=. Tìm kiếm chỉ lọc trong các dòng đã tải (BE chưa có
+// tham số tìm cho hàng chờ). "Tình trạng xử lý" lưu ở ?state= (chỉ khoá, không dữ liệu cá nhân).
 
-import { useId, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
+import { useAuth } from "@/features/auth/components/AuthProvider";
 import { ApiError, loadErrorText } from "@/shared/lib/http";
 import { dateTime, vnd } from "@/shared/lib/format";
-import { Figure } from "@/shared/ui/Figure";
-import { Icon } from "@/shared/ui/Icon";
-import { SkeletonScreen, SkeletonTable } from "@/shared/ui/Skeleton";
-import { ErrorBox } from "@/shared/ui/StateBox";
-import { StatusChip } from "@/shared/ui/StatusChip";
-import { Toast } from "@/shared/ui/Toast";
-import { listPaymentQueue } from "../api";
-import { QUEUE_TYPE_FILTERS, QUEUE_TYPE_LABEL, QUEUE_TYPE_STATUS, RESOLUTION_LABEL, labelOf } from "../labels";
-import { QUEUE_MSG } from "../messages";
-import type { OrderListItem, PaymentQueueItem, PaymentQueueParams, QueueOrderRef, ResolutionStatus } from "../types";
+import { ENUMS } from "@/shared/lib/enums";
 import { usePagedList } from "@/shared/lib/usePagedList";
-import { OrderDetailSheet } from "./OrderDetailSheet";
-import { OrdersTabs } from "./OrdersTabs";
-import { PaymentSheet } from "./PaymentSheet";
-import s from "../orders.module.css";
+import { Chip } from "@/shared/ui/Chip";
+import { Icon } from "@/shared/ui/Icon";
+import { DataTable, type Column } from "@/shared/ui/list/DataTable";
+import { FilterBar } from "@/shared/ui/list/FilterBar";
+import { ListPage } from "@/shared/ui/list/ListPage";
+import { NoPermission } from "@/shared/ui/states/NoPermission";
+import { useTabParam } from "@/shared/ui/Tabs";
+import { listPaymentQueue } from "../api";
+import { QUEUE_TYPE_FILTERS } from "../labels";
+import { ORDERS_MSG as M } from "../messages";
+import type { PaymentQueueItem, PaymentQueueParams, ResolutionStatus } from "../types";
+import { OrdersSectionTabs } from "./OrdersSectionTabs";
 
-const RESOLVED_LOOK = { ATTACHED: { tone: "good", icon: "link" }, CONFIRMED: { tone: "good", icon: "check" }, REFUNDED: { tone: "good", icon: "undo" } } as const;
+const STATE_KEYS = ["open", "resolved"] as const;
 
-/** Tóm tắt tối thiểu để mở tấm chi tiết đơn từ hàng chờ (tấm tự tải chi tiết đầy đủ). */
-function orderSummary(o: QueueOrderRef): OrderListItem {
-  return {
-    id: o.id,
-    code: o.code,
-    status: o.status,
-    status_label: o.status_label || o.status,
-    customer_name: o.customer_name || "",
-    customer_phone: "",
-    total_amount: o.total_amount,
-    created_at: "",
-    reserved_until: null,
-    delivery_status: null,
-    needs_attention: false,
-  };
-}
-
-function Row({ p, onOpen }: { p: PaymentQueueItem; onOpen: () => void }) {
-  const resolved = p.resolution_status === "RESOLVED";
-  const pendingRefund = !resolved && (p.refunds || []).some((r) => r.status === "PENDING");
-  const typeLabel = labelOf(QUEUE_TYPE_LABEL, p.match_status);
-  return (
-    <li className={s.row}>
-      <button type="button" className={`${s.open} ${s.qOpen} queue-open`} onClick={onOpen} aria-haspopup="dialog" data-id={p.id}>
-        <span className={s.qType}>
-          {resolved ? (
-            <StatusChip
-              map={RESOLVED_LOOK}
-              status={p.resolution || ""}
-              label={p.resolution_label || labelOf(RESOLUTION_LABEL, p.resolution || "")}
-            />
-          ) : (
-            <StatusChip map={QUEUE_TYPE_STATUS} status={p.match_status} label={typeLabel} />
-          )}
-        </span>
-        <span className={`${s.cAmt} num`}>
-          <span className="sr-only">, số tiền </span>
-          <Figure text={vnd(p.amount)} />
-        </span>
-        <span className={s.qTxn}>
-          <code className={s.qCode}>{p.bank_txn_id}</code>
-          <span className={`${s.sub} num`}>
-            <span className="sr-only">, nhận lúc </span>
-            {dateTime(p.received_at)}
-          </span>
-        </span>
-        <span className={s.qOrder}>
-          {p.order ? (
-            <>
-              <span className="sr-only">, đơn </span>
-              <code className={s.qCode}>{p.order.code}</code>
-              {p.order.customer_name && <span className={s.qCust}>{p.order.customer_name}</span>}
-            </>
-          ) : (
-            <span className={s.sub}>
-              <span className="sr-only">, </span>
-              {QUEUE_MSG.noOrder}
-            </span>
-          )}
-          {resolved && typeof p.resolved_by === "string" && p.resolved_by ? (
-            <span className={s.sub}>
-              <span className="sr-only">, xử lý bởi </span>
-              {p.resolved_by}
-            </span>
-          ) : pendingRefund ? (
-            <span className={`${s.sub} ${s.subWarn}`}>
-              <span className="sr-only">, </span>
-              {QUEUE_MSG.pendingRefund}
-            </span>
-          ) : null}
-        </span>
-      </button>
-    </li>
-  );
+/** Lọc trong các dòng đã tải theo mã giao dịch / mã đơn. */
+export function filterPayments(rows: PaymentQueueItem[], q: string): PaymentQueueItem[] {
+  const needle = q.trim().toLowerCase();
+  if (!needle) return rows;
+  return rows.filter((p) => p.bank_txn_id.toLowerCase().includes(needle) || (p.order?.code ?? "").toLowerCase().includes(needle));
 }
 
 export function PaymentQueueScreen() {
-  const [status, setStatus] = useState<ResolutionStatus>("OPEN");
+  const { me } = useAuth();
+  const [state, setState] = useTabParam(STATE_KEYS, "open", "state");
   const [type, setType] = useState("");
+  const [q, setQ] = useState("");
+  const status: ResolutionStatus = state === "resolved" ? "RESOLVED" : "OPEN";
   const params: PaymentQueueParams = useMemo(() => ({ resolution_status: status, match_status: type }), [status, type]);
-  const list = usePagedList<PaymentQueueItem, PaymentQueueParams>(listPaymentQueue, params, true);
-  const typeId = useId();
+  const list = usePagedList<PaymentQueueItem, PaymentQueueParams>(listPaymentQueue, params, !!me);
 
-  const [openItem, setOpenItem] = useState<PaymentQueueItem | null>(null);
-  const [openOrder, setOpenOrder] = useState<QueueOrderRef | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
-  const pendingToast = useRef<string | null>(null);
-  const changed = useRef(false);
+  if (list.error instanceof ApiError && list.error.status === 403) return <NoPermission />;
 
-  const forbidden = list.error instanceof ApiError && list.error.status === 403;
-  const filtered = !!type;
-
-  const afterClose = () => {
-    if (changed.current) {
-      changed.current = false;
-      void list.reload();
-    }
-    if (pendingToast.current) {
-      setToast(pendingToast.current);
-      pendingToast.current = null;
-    }
-  };
+  const rows = list.rows ? filterPayments(list.rows, q) : null;
+  const columns: Column<PaymentQueueItem>[] = [
+    { key: "txn", header: M.colTxn, mono: true, render: (p) => p.bank_txn_id },
+    { key: "amount", header: M.colAmount, num: true, render: (p) => vnd(p.amount) },
+    { key: "match", header: M.colMatch, render: (p) => <Chip table={ENUMS.paymentMatchStatus} value={p.match_status} /> },
+    { key: "state", header: M.colResolution, render: (p) => <Chip table={ENUMS.paymentResolutionStatus} value={p.resolution_status} /> },
+    { key: "order", header: M.colOrder, mono: true, render: (p) => p.order?.code ?? <span className="muted">{M.noOrder}</span> },
+    { key: "at", header: M.colReceivedAt, num: true, render: (p) => dateTime(p.received_at) },
+  ];
+  const refreshFailed = list.rows !== undefined && list.error != null && !list.loading;
 
   return (
-    <div className="screen">
-      <OrdersTabs current="payments" />
-      <p className="view-head">{QUEUE_MSG.intro}</p>
-
-      <div className={s.bar}>
-        <div className="seg" role="group" aria-label={QUEUE_MSG.filterStatus}>
-          {(["OPEN", "RESOLVED"] as const).map((v) => (
-            <button key={v} type="button" aria-pressed={status === v} onClick={() => setStatus(v)}>
-              {v === "OPEN" ? QUEUE_MSG.openTab : QUEUE_MSG.resolvedTab}
-            </button>
-          ))}
-        </div>
-        <div className={s.qFilters}>
-          <div className={s.select}>
-            <label htmlFor={typeId} className="sr-only">
-              {QUEUE_MSG.filterType}
-            </label>
-            <select id={typeId} name="match_status" value={type} onChange={(e) => setType(e.target.value)}>
-              {QUEUE_TYPE_FILTERS.map((f) => (
-                <option key={f.value} value={f.value}>
-                  {f.label}
-                </option>
-              ))}
-            </select>
-            <Icon name="expand_more" />
+    <ListPage
+      tabs={<OrdersSectionTabs current="payments" />}
+      filters={
+        <FilterBar
+          query={q}
+          onQuery={setQ}
+          placeholder="Tìm mã giao dịch hoặc mã đơn"
+          searchLabel={M.queueSearchLabel}
+          selects={[
+            {
+              key: "state",
+              label: M.queueTabsLabel,
+              value: state,
+              options: [
+                { value: "open", label: M.queueOpenTab },
+                { value: "resolved", label: M.queueResolvedTab },
+              ],
+              onChange: setState,
+            },
+            { key: "type", label: M.queueFilterType, value: type, options: QUEUE_TYPE_FILTERS, onChange: setType },
+          ]}
+          summary={list.rows ? M.queueShown(list.rows.length, list.count) : undefined}
+        />
+      }
+      banner={
+        refreshFailed ? (
+          <div className="alert-box err" role="alert">
+            <Icon name="sync_problem" />
+            <span>{loadErrorText(list.error)}</span>
           </div>
-          <div className="toolbar">
-            <button
-              type="button"
-              className="iconbtn"
-              onClick={() => void list.reload()}
-              disabled={list.loading}
-              aria-label="Làm mới"
-              title="Làm mới"
-            >
-              <Icon name="refresh" className={list.loading ? "spin" : undefined} />
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {list.rows === undefined ? (
-        list.error && !list.loading ? (
-          <ErrorBox icon={forbidden ? "lock" : undefined} message={loadErrorText(list.error)} onRetry={() => void list.reload()} />
-        ) : (
-          <SkeletonScreen label={QUEUE_MSG.loading}>
-            <SkeletonTable rows={5} cols={4} />
-          </SkeletonScreen>
-        )
-      ) : (
-        <section className={`sect ${s.list}`} aria-labelledby="queue-h" aria-busy={list.loading}>
-          <div className="sect-h">
-            <h2 id="queue-h">{QUEUE_MSG.listTitle}</h2>
-            <span className="sub num" aria-live="polite">
-              {list.loading ? "Đang tải…" : QUEUE_MSG.shown(list.rows.length, list.count)}
+        ) : null
+      }
+      footer={
+        <>
+          {list.moreError != null && (
+            <span className="field-err" role="alert">
+              {M.loadMoreFailed} {loadErrorText(list.moreError)}
             </span>
-          </div>
-          {list.error != null && !list.loading && (
-            <div className="alert-box err" role="alert">
-              <Icon name="sync_problem" />
-              <span>{loadErrorText(list.error)}</span>
-            </div>
           )}
-          {list.rows.length ? (
-            <>
-              <div className={`${s.head} ${s.qHead}`} aria-hidden="true">
-                <span>{status === "OPEN" ? "Loại lệch" : "Cách xử lý"}</span>
-                <span>Mã giao dịch</span>
-                <span>Đơn liên quan</span>
-                <span className={s.hAmt}>Số tiền</span>
-              </div>
-              <ul className={`${s.rows} queue-list`}>
-                {list.rows.map((p) => (
-                  <Row
-                    key={p.id}
-                    p={p}
-                    onOpen={() => {
-                      setToast(null);
-                      pendingToast.current = null;
-                      setOpenItem(p);
-                    }}
-                  />
-                ))}
-              </ul>
-              {list.moreError != null && (
-                <div className="alert-box err" role="alert">
-                  <Icon name="error" />
-                  <span>{loadErrorText(list.moreError)}</span>
-                </div>
-              )}
-              {list.hasMore && (
-                <div className={s.more}>
-                  <button
-                    type="button"
-                    className="btn"
-                    onClick={() => void list.loadMore()}
-                    disabled={list.moreLoading}
-                    aria-busy={list.moreLoading || undefined}
-                  >
-                    {list.moreLoading ? <Icon name="progress_activity" className="spin" /> : <Icon name="expand_more" />}
-                    {list.moreLoading ? QUEUE_MSG.loadingMore : QUEUE_MSG.loadMore}
-                  </button>
-                </div>
-              )}
-            </>
-          ) : (
-            <div className={`state ${s.emptyState}`}>
-              <span className="state-ic">
-                <Icon name={filtered ? "filter_alt_off" : status === "OPEN" ? "task_alt" : "inbox"} />
-              </span>
-              <h3 className="state-title">
-                {filtered ? QUEUE_MSG.noMatchTitle : status === "OPEN" ? QUEUE_MSG.emptyOpenTitle : QUEUE_MSG.emptyResolvedTitle}
-              </h3>
-              <p>{filtered ? QUEUE_MSG.noMatchHint : status === "OPEN" ? QUEUE_MSG.emptyOpenHint : QUEUE_MSG.emptyResolvedHint}</p>
-              {filtered ? (
-                <button type="button" className="btn" onClick={() => setType("")}>
-                  <Icon name="filter_alt_off" />
-                  {QUEUE_MSG.showAllTypes}
-                </button>
-              ) : (
-                <button type="button" className="btn" onClick={() => void list.reload()}>
-                  <Icon name="refresh" />
-                  Làm mới danh sách
-                </button>
-              )}
-            </div>
+          {list.hasMore && (
+            <button type="button" className="btn" onClick={() => void list.loadMore()} disabled={list.moreLoading} aria-busy={list.moreLoading || undefined}>
+              {list.moreLoading ? M.loadingMore : M.queueLoadMore}
+            </button>
           )}
-        </section>
-      )}
-
-      {openItem && (
-        <PaymentSheet
-          key={openItem.id}
-          item={openItem}
-          onChanged={(message) => {
-            changed.current = true;
-            pendingToast.current = message;
-          }}
-          onOpenOrder={(o) => {
-            setOpenItem(null);
-            setOpenOrder(o);
-          }}
-          onClose={() => {
-            setOpenItem(null);
-            afterClose();
-          }}
-        />
-      )}
-
-      {openOrder && (
-        <OrderDetailSheet
-          key={`order-${openOrder.id}`}
-          summary={orderSummary(openOrder)}
-          onChanged={() => {
-            changed.current = true; // vd xác nhận tiền trong chi tiết đơn → hàng chờ có thể đổi
-          }}
-          onClose={() => {
-            setOpenOrder(null);
-            afterClose();
-          }}
-        />
-      )}
-
-      {toast && !openItem && !openOrder && <Toast key={toast} message={toast} onClose={() => setToast(null)} />}
-    </div>
+        </>
+      }
+    >
+      <DataTable
+        caption={M.queueTitle}
+        columns={columns}
+        rows={rows}
+        rowKey={(p) => p.id}
+        rowHref={(p) => `/orders/payments/detail/?id=${p.id}`}
+        loading={list.loading && list.rows === undefined}
+        error={list.rows === undefined && list.error != null ? loadErrorText(list.error) : null}
+        onRetry={() => void list.reload()}
+        query={q}
+        onClearQuery={() => setQ("")}
+        noun={M.queueNoun}
+        empty={
+          status === "OPEN"
+            ? { icon: "task_alt", title: M.queueEmptyOpenTitle, hint: M.queueEmptyOpenHint }
+            : { icon: "inbox", title: M.queueEmptyResolvedTitle, hint: M.queueEmptyResolvedHint }
+        }
+        canViewCost={false}
+      />
+    </ListPage>
   );
 }

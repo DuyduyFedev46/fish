@@ -70,16 +70,16 @@ export function Tabs({ tabs, value, onChange, label, panelId }: Props) {
 }
 
 /** Đọc khoá tab từ `?tab=`; khoá lạ hoặc thiếu → `fallback`. */
-export function tabFromSearch(search: string, keys: readonly string[], fallback: string): string {
-  const q = new URLSearchParams(search).get("tab");
+export function tabFromSearch(search: string, keys: readonly string[], fallback: string, param = "tab"): string {
+  const q = new URLSearchParams(search).get(param);
   return q && keys.includes(q) ? q : fallback;
 }
 
 /** Địa chỉ mới khi chọn tab: giữ nguyên các tham số khác; tab mặc định thì bỏ `?tab=`. */
-export function tabHref(loc: { pathname: string; search: string; hash: string }, key: string, fallback: string): string {
+export function tabHref(loc: { pathname: string; search: string; hash: string }, key: string, fallback: string, param = "tab"): string {
   const params = new URLSearchParams(loc.search);
-  if (key === fallback) params.delete("tab");
-  else params.set("tab", key);
+  if (key === fallback) params.delete(param);
+  else params.set(param, key);
   const qs = params.toString();
   return loc.pathname + (qs ? `?${qs}` : "") + loc.hash;
 }
@@ -87,9 +87,10 @@ export function tabHref(loc: { pathname: string; search: string; hash: string },
 /**
  * Tab đang chọn, đồng bộ với `?tab=` (không dùng useSearchParams để khỏi cần Suspense ở trang tĩnh).
  * Lần vẽ đầu luôn là `fallback` (khớp HTML tĩnh), rồi đọc URL ngay sau khi mount. Khoá lạ → về `fallback`.
+ * `param` (mặc định "tab"): tên tham số — một trang có hai thanh tab thì mỗi thanh một tên, không đè nhau.
  * Đổi tab = `pushState` (ED-01-AC4: Back quay về tab trước); Back/Forward bắn `popstate` thì đọc lại URL.
  */
-export function useTabParam(keys: readonly string[], fallback: string): [string, (key: string) => void] {
+export function useTabParam(keys: readonly string[], fallback: string, param = "tab"): [string, (key: string) => void] {
   const [tab, setTab] = useState(fallback);
   const keyList = keys.join("|");
   const current = useRef(fallback);
@@ -97,23 +98,23 @@ export function useTabParam(keys: readonly string[], fallback: string): [string,
   useEffect(() => {
     const valid = keyList.split("|");
     const sync = () => {
-      const next = tabFromSearch(window.location.search, valid, fallback);
+      const next = tabFromSearch(window.location.search, valid, fallback, param);
       current.current = next;
       setTab(next);
     };
     sync();
     window.addEventListener("popstate", sync);
     return () => window.removeEventListener("popstate", sync);
-  }, [keyList, fallback]);
+  }, [keyList, fallback, param]);
 
   const select = useCallback(
     (key: string) => {
       if (key === current.current) return; // bấm lại tab đang chọn: không thêm mục lịch sử
       current.current = key;
       setTab(key);
-      window.history.pushState(window.history.state, "", tabHref(window.location, key, fallback));
+      window.history.pushState(window.history.state, "", tabHref(window.location, key, fallback, param));
     },
-    [fallback],
+    [fallback, param],
   );
 
   return [tab, select];

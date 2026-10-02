@@ -235,7 +235,7 @@ class S10DetailTests(OrderApiBase):
         self.assertEqual(body["code"], order.code)
         self.assertEqual(body["status"], "PROCESSING")
         self.assertEqual(body["customer"], {
-            "name": "Chị Hoa", "phone": "0901234567", "address": "12 Lê Lợi, Vũng Tàu",
+            "id": order.customer_id, "name": "Chị Hoa", "phone": "0901234567", "address": "12 Lê Lợi, Vũng Tàu",
         })
         self.assertEqual(body["lines"], [{
             "no": 1, "item_code": "TOM-SU-1", "item_name": "Tôm sú loại 1", "qty_kg": "2.000",

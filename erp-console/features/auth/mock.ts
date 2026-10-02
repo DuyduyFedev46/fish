@@ -56,7 +56,10 @@ const GROUP_PERMS: Record<string, string[]> = {
     "catalog.delete_itemprice", "catalog.delete_pricelist", "catalog.delete_pricingrule", "catalog.view_bundleline",
     "catalog.view_item", "catalog.view_itemgroup", "catalog.view_itemprice", "catalog.view_pricelist",
     "catalog.view_pricingrule", "delivery.add_deliverynote", "delivery.change_deliverynote",
-    "delivery.delete_deliverynote", "delivery.view_deliverynote", "inventory.add_batch",
+    "delivery.delete_deliverynote", "delivery.view_deliverynote", "delivery.assign_deliverynote",
+    // BE migration accounts/0011 gán thêm cho Chủ (mock phải giống BE thật): gọi xác nhận, đổi người nhận, quyết định đơn không liên lạc được, đóng gói và in tem phiếu giao.
+    "delivery.confirm_with_customer", "delivery.change_recipient", "delivery.decide_unconfirmed",
+    "delivery.pack_deliverynote", "delivery.print_label", "inventory.add_batch",
     "inventory.add_returntostock", "inventory.add_stockentry", "inventory.add_stockreconciliation",
     "inventory.add_stockreconciliationline", "inventory.add_warehouse", "inventory.approve_returntostock",
     "inventory.approve_stockreconciliation", "inventory.change_batch", "inventory.change_returntostock",
@@ -80,7 +83,7 @@ const GROUP_PERMS: Record<string, string[]> = {
     "sales.cancel_paid_order", "sales.change_customer", "sales.change_paymenttransaction", "sales.change_refund",
     "sales.change_salesinvoice", "sales.change_salesorder", "sales.confirm_payment_manual", "sales.confirm_refund",
     "sales.create_refund", "sales.delete_customer", "sales.delete_paymenttransaction", "sales.delete_refund",
-    "sales.view_customer", "sales.view_paymenttransaction", "sales.view_refund", "sales.view_salesinvoice",
+    "sales.view_customer", "sales.view_customer_list", "sales.view_paymenttransaction", "sales.view_refund", "sales.view_salesinvoice",
     "sales.view_salesinvoiceline", "sales.view_salesinvoicelinebatch", "sales.view_salesorder",
     "sales.view_salesorderline", "sales.view_salesorderlinebatch", "sales.view_privacy_consent",
     // CMS: BE migration content/0002 gán 8 quyền này cho owner và manager (warehouse_staff/delivery_staff không có).
@@ -98,7 +101,7 @@ const GROUP_PERMS: Record<string, string[]> = {
     "accounts.view_auditlog", "accounts.view_staffprofile", "auth.view_user", "catalog.change_item_image",
     "catalog.view_bundleline",
     "catalog.view_item", "catalog.view_itemgroup", "catalog.view_itemprice", "catalog.view_pricelist", "catalog.view_pricingrule",
-    "delivery.add_deliverynote", "delivery.change_deliverynote", "delivery.view_deliverynote",
+    "delivery.add_deliverynote", "delivery.change_deliverynote", "delivery.view_deliverynote", "delivery.assign_deliverynote",
     "delivery.confirm_with_customer", "delivery.change_recipient", "delivery.decide_unconfirmed", "delivery.pack_deliverynote", "delivery.print_label",
     "inventory.add_stockentry", "inventory.add_stockreconciliation", "inventory.add_stockreconciliationline",
     "inventory.approve_returntostock", "inventory.approve_stockreconciliation", "inventory.change_stockentry",
@@ -110,7 +113,7 @@ const GROUP_PERMS: Record<string, string[]> = {
     "purchasing.change_purchasereceiptline", "purchasing.change_supplier", "purchasing.view_purchaseinvoice",
     "purchasing.view_purchasereceipt", "purchasing.view_purchasereceiptline", "purchasing.view_supplier",
     "reports.view_dashboard", "sales.add_customer", "sales.add_refund", "sales.cancel_paid_order",
-    "sales.change_customer", "sales.change_refund", "sales.create_refund", "sales.view_customer",
+    "sales.change_customer", "sales.change_refund", "sales.create_refund", "sales.view_customer", "sales.view_customer_list",
     "sales.view_paymenttransaction", "sales.view_refund", "sales.view_salesinvoice", "sales.view_salesinvoiceline",
     "sales.view_salesorder", "sales.view_salesorderline", "sales.view_privacy_consent",
     // CMS: BE migration content/0002 gán 8 quyền này cho owner và manager (warehouse_staff/delivery_staff không có).

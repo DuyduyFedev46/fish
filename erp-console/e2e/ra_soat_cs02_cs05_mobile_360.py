@@ -59,17 +59,17 @@ with sync_playwright() as p:
 
     ok("CS-02-AC6: không cuộn ngang ở 360x640", no_horizontal_scroll(page1))
 
-    # Bảng dạng table phải bị ẩn (CSS @media max-width:768px ẩn .tableWrapper)
-    table_visible = page1.eval_on_selector_all(
-        "table", "els => els.some(e => e.offsetParent !== null)"
+    # ERP theo design (ED-04): danh sách là bảng cuộn NGAY TRONG thẻ (.lt-scroll), không cuộn cả trang; dòng bấm được cao >= 44px.
+    in_scroll = page1.eval_on_selector_all(
+        "table.lt", "els => els.length > 0 && els.every(e => !!e.closest('.lt-scroll'))"
     )
-    ok("CS-02-AC6: bảng dạng table (desktop) không hiển thị ở mobile", not table_visible)
+    ok("CS-02-AC6: bảng nằm trong vùng cuộn riêng của thẻ (không đẩy trang rộng ra)", in_scroll)
 
-    card_ok, card_violations, card_boxes = min_tap_target_ok(page1, "[class*='cardItem']")
+    row_ok, row_violations, row_boxes = min_tap_target_ok(page1, "table.lt tbody tr.lt-click")
     ok(
-        f"CS-02-AC6: {len(card_boxes)} thẻ phiếu giao có vùng bấm >= 44px",
-        card_ok,
-        str(card_violations[:3]),
+        f"CS-02-AC6: {len(row_boxes)} dòng phiếu giao có vùng bấm >= 44px",
+        row_ok,
+        str(row_violations[:3]),
     )
 
     # ---------- CS-05-AC8: Hàng chờ CSKH 360x640, link tel:, nút kết quả >= 44px ở nửa dưới màn hình ----------
@@ -83,47 +83,33 @@ with sync_playwright() as p:
 
     ok("CS-05-AC8: không cuộn ngang ở 360x640 (hàng chờ)", no_horizontal_scroll(page2))
 
-    # Mở chi tiết 1 đơn -> modal gọi
-    page2.locator("text=DH-260928-0001").first.click()
+    # SĐT là link tel: ở danh sách
+    tel_links = page2.eval_on_selector_all("a[href^='tel:']", "els => els.map(e => e.getAttribute('href'))")
+    ok("CS-05-AC8: SĐT hiện dưới dạng link tel: ở danh sách", len(tel_links) > 0, str(tel_links))
+
+    # ERP theo design (ED-15): bấm dòng mở trang chi tiết /confirmation/detail/?id=<số>; nút Gọi khách (tel:) và Ghi kết quả gọi nằm ở header
+    page2.locator("table.lt tbody tr", has_text="SO260928-3F9A01").locator("a").first.click()
+    page2.wait_for_url("**/confirmation/detail/?id=31")
+    page2.get_by_role("heading", name="SO260928-3F9A01").wait_for()
     page2.wait_for_timeout(400)
-    page2.screenshot(path=f"{SHOTS}/cs05-ac8-call-modal-360x640.png", full_page=True)
+    page2.screenshot(path=f"{SHOTS}/cs05-ac8-detail-360x640.png", full_page=True)
+    ok("CS-05-AC8: không cuộn ngang ở 360x640 (chi tiết đơn)", no_horizontal_scroll(page2))
 
-    ok("CS-05-AC8: không cuộn ngang ở 360x640 (modal gọi)", no_horizontal_scroll(page2))
+    call_ok, call_violations, call_boxes = min_tap_target_ok(page2, "a.btn[href^='tel:']")
+    ok("CS-05-AC8: nút Gọi khách (tel:) cao >= 44px", call_ok, str(call_violations))
+    rec_ok, rec_violations, rec_boxes = min_tap_target_ok(page2, "button.btn.primary")
+    ok("CS-05-AC8: nút Ghi kết quả gọi cao >= 44px", rec_ok, str(rec_violations))
 
-    # SĐT là link tel:
-    tel_links = page2.eval_on_selector_all(
-        "a[href^='tel:']", "els => els.map(e => e.getAttribute('href'))"
-    )
-    ok("CS-05-AC8: SĐT hiện dưới dạng link tel:", len(tel_links) > 0, str(tel_links))
-
-    # Nút gọi ngay (callNowBtn) cao >= 44px
-    call_ok, call_violations, call_boxes = min_tap_target_ok(page2, "[class*='callNowBtn']")
-    ok("CS-05-AC8: nút gọi (tel:) cao >= 44px", call_ok, str(call_violations))
-
-    # Nút kết quả cuộc gọi (resultBtn) cao >= 44px
-    result_ok, result_violations, result_boxes = min_tap_target_ok(page2, "[class*='resultBtn']:not([class*='resultBtnSub'])")
-    ok(
-        f"CS-05-AC8: {len(result_boxes)} nút kết quả cuộc gọi cao >= 44px",
-        result_ok,
-        str(result_violations[:3]),
-    )
-
-    # Nút kết quả nằm ở nửa dưới màn hình (viewport height 640 -> y > 320)
-    result_positions = page2.eval_on_selector_all(
-        "[class*='resultBtn']:not([class*='resultBtnSub'])",
-        "els => els.filter(e => e.offsetParent !== null).map(e => e.getBoundingClientRect().top)",
-    )
-    # Modal cuộn được — kiểm phần tử nằm trong nửa dưới của VÙNG NỘI DUNG MODAL (không phải toàn viewport,
-    # vì modal có header cố định ở trên). Ta kiểm tương đối: đa số nút nằm dưới điểm giữa của modal.
-    modal_box = page2.eval_on_selector(
-        "[class*='modal'], [role='dialog']",
-        "e => { const r = e.getBoundingClientRect(); return {top: r.top, bottom: r.bottom}; }",
-    )
-    ok(
-        "CS-05-AC8: có ít nhất 1 nút kết quả (dữ liệu vị trí đã ghi lại để đối chiếu thủ công)",
-        len(result_positions) > 0,
-        f"modal_box={modal_box} positions={result_positions[:4]}",
-    )
+    # Hộp ghi kết quả: không cuộn ngang, các lựa chọn kết quả cao >= 44px, nằm gọn trong màn hình
+    page2.get_by_role("button", name="Ghi kết quả gọi").click()
+    page2.get_by_role("dialog").wait_for()
+    page2.wait_for_timeout(300)
+    page2.screenshot(path=f"{SHOTS}/cs05-ac8-call-modal-360x640.png")
+    ok("CS-05-AC8: không cuộn ngang ở 360x640 (hộp ghi kết quả)", no_horizontal_scroll(page2))
+    pick_ok, pick_violations, pick_boxes = min_tap_target_ok(page2, "[role='dialog'] label[class*='pick']")
+    ok(f"CS-05-AC8: {len(pick_boxes)} lựa chọn kết quả cuộc gọi cao >= 44px", pick_ok and len(pick_boxes) >= 6, str(pick_violations[:3]))
+    box = page2.eval_on_selector("[role='dialog']", "e => { const r = e.getBoundingClientRect(); return [r.left, r.right, window.innerWidth]; }")
+    ok("CS-05-AC8: hộp nằm gọn trong chiều ngang màn hình", box[0] >= -1 and box[1] <= box[2] + 1, str(box))
 
     browser.close()
 

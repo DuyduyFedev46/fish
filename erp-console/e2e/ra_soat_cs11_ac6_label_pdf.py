@@ -62,8 +62,9 @@ with sync_playwright() as p:
     # Note 31 = PREPARING, chưa in tem, có 2 dòng hàng (Tôm sú + Mực lá), địa chỉ mẫu ngắn.
     page.goto(BASE + "/deliveries/")
     page.wait_for_load_state("networkidle")
-    page.get_by_text("GH-HD-0031-PREP").first.click()
-    page.wait_for_timeout(500)
+    page.get_by_text("GH-HD-0031-PREP").first.click()  # ERP theo design Lô 4: mở trang chi tiết phiếu (không còn hộp thoại)
+    page.wait_for_url("**/deliveries/detail/**", timeout=10_000)
+    page.get_by_role("button", name="In tem").wait_for(timeout=10_000)
 
     with ctx.expect_page() as popup_info:
         page.get_by_role("button", name="In tem").click()
@@ -93,16 +94,11 @@ with sync_playwright() as p:
 
     # 2) Giải mã QR: sinh SVG tham chiếu bằng đúng lib+tham số app dùng, so khớp với SVG thật trên trang.
     expected_value = "GH-HD-0031-PREP.1"
-    actual_svg = label_page.eval_on_selector(
-        "[data-testid='label-qr'], svg", "el => el.closest('svg') ? el.closest('svg').outerHTML : el.outerHTML"
-    )
-    # Lấy đúng svg trong khối QR (loại icon khác nếu có)
-    all_svgs = label_page.eval_on_selector_all("svg", "els => els.map(e => e.outerHTML)")
-    qr_svg = None
-    for s in all_svgs:
-        if "shape-rendering=\"crispEdges\"" in s or "viewBox" in s:
-            qr_svg = s
-            break
+    # QR là ảnh data-URI (F14: không chèn HTML thô); giải URI ra lại SVG để so module data
+    from urllib.parse import unquote
+
+    src = label_page.eval_on_selector("img[alt^='Mã QR']", "el => el.getAttribute('src')")
+    qr_svg = unquote(src.split(",", 1)[1]) if src and src.startswith("data:image/svg+xml") else None
     ok("CS-11-AC6 tìm thấy SVG QR trên trang", qr_svg is not None)
 
     ref_svg = gen_reference_svg(expected_value)

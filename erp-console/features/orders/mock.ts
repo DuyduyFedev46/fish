@@ -86,6 +86,7 @@ const PERM_CANCEL = "sales.cancel_paid_order";
 const PERM_REFUND = "sales.create_refund";
 const PERM_COST = "inventory.view_costprice";
 const PERM_VIEW_REFUND = "sales.view_refund";
+const PERM_VIEW_CUSTOMER = "sales.view_customer_list";
 const PERM_CONFIRM_REFUND = "sales.confirm_refund";
 const REFUND_MODE_KEY = "cave_erp_mock_refunds_mode";
 
@@ -152,6 +153,8 @@ type Order = {
   needs_attention: boolean;
   /** S14: có sau khi huỷ — dùng để dựng dòng thời gian đúng lý do/giờ huỷ thật. */
   cancelReasonLabel?: string;
+  /** Mã lý do huỷ (BE `reasons.py`): nguồn của cột "Lý do" ở danh sách. */
+  cancelReasonCode?: string;
   cancelledAt?: string;
   cancelStockRestored?: boolean;
   /** Phiếu giao đã Giao thất bại trước khi bị huỷ (GIVE_UP_AFTER_FAILED) — giữ lại vì `delivery.status` bị ghi đè thành CANCELLED. */
@@ -175,7 +178,7 @@ const ORDER_LABEL: Record<OrderStatus, string> = {
   PROCESSING: "Đang xử lý",
   COMPLETED: "Hoàn tất",
   CANCELLED: "Đã huỷ",
-  AUTO_CANCELLED: "Tự huỷ (quá TTL)",
+  AUTO_CANCELLED: "Đã huỷ",
 };
 
 // [mã, tên, giá bán/kg, lô, giá vốn/kg]
@@ -325,9 +328,8 @@ function seed(): Store {
       const txn = `FT26267${pad(id, 5)}`;
       o.payments.push({ id: ++payId, bank_txn_id: txn, amount: money(total), match_status: "MATCHED", received_at: paidAt, source: "WEBHOOK" });
       txns[txn] = { orderId: id, result: { result: "PAID", duplicate: false, order_status: "PROCESSING" } };
-      if (status !== "PAID") {
-        o.invoice = { id: ++invId, code: `INV${yymmdd(created)}-${hex(invId * 7, 6)}`, issued_at: isoVN(createdMs + 6 * 60_000 + 20_000) };
-      }
+      // Đơn Đã thanh toán cũng có hoá đơn (BR-TT: hoá đơn phát hành ngay khi đủ tiền) để có thể huỷ / hoàn theo ED-09-AC3.
+      o.invoice = { id: ++invId, code: `INV${yymmdd(created)}-${hex(invId * 7, 6)}`, issued_at: isoVN(createdMs + 6 * 60_000 + 20_000) };
     }
     if (status === "PROCESSING" || status === "COMPLETED") {
       const assigned = tag && OLD_COURIER_BY_TAG[tag] ? OLD_COURIER_BY_TAG[tag] : tag === "giao1" ? 4 : tag === "giao2" ? 7 : tag === "failed" ? 4 : status === "COMPLETED" ? [4, 7, 3][i % 3] : null;
@@ -577,7 +579,8 @@ function timelineOf(o: Order): OrderTimelineEntry[] {
     out.push({
       at: r.created_at || o.created_at,
       kind: "refund_created",
-      label: `Tạo phiếu hoàn ${beVnd(r.amount)}${r.reason ? ` — ${r.reason}` : ""}`,
+      // Như BE Lô 3: không ghép `Refund.reason` (chữ tự do) vào nhãn dòng thời gian (bất biến 9).
+      label: `Tạo phiếu hoàn ${beVnd(r.amount)}`,
       actor_display: who,
     });
     if (r.status === "REFUNDED") {
@@ -628,6 +631,31 @@ function actions(me: Me, o: Order): string[] {
   return out;
 }
 
+/** Nhãn cố định theo mã như BE `reasons.py` (không bao giờ chữ tự do). */
+const REASON_LABEL: Record<string, string> = {
+  AUTO_CANCELLED: "Hết giờ giữ chỗ",
+  CUSTOMER_CHANGED_MIND: "Khách đổi ý",
+  DAMAGED_WHEN_PACKING: "Hư hỏng khi soạn hàng",
+  GIVE_UP_AFTER_FAILED: "Bỏ giao sau khi thất bại",
+  OTHER: "Khác",
+  UNDERPAID: "Chuyển thiếu tiền",
+  DELIVERY_FAILED: "Giao thất bại",
+};
+
+function reasonOf(o: Order): { code: string; label: string } | null {
+  let code: string | null = null;
+  if (o.status === "AUTO_CANCELLED") code = "AUTO_CANCELLED";
+  else if (o.status === "CANCELLED") code = o.cancelReasonCode || "CUSTOMER_CHANGED_MIND";
+  else if (o.payments.some((p) => p.match_status === "UNDERPAID" && p.resolution_status === "OPEN")) code = "UNDERPAID";
+  else if (o.delivery?.status === "FAILED") code = "DELIVERY_FAILED";
+  return code ? { code, label: REASON_LABEL[code] ?? "Khác" } : null;
+}
+
+/** Id khách giả của mock = vị trí trong CUSTOMERS + 1 (BE lọc `customer=<id>`; id không bao giờ là SĐT/tên). */
+function customerIdOf(o: Order): number {
+  return CUSTOMERS.findIndex((c) => c[1] === o.customer.phone) + 1;
+}
+
 function listItem(me: Me, o: Order): OrderListItem {
   const hidden = piiHidden(me, o);
   return {
@@ -643,6 +671,7 @@ function listItem(me: Me, o: Order): OrderListItem {
     delivery_status: o.delivery ? o.delivery.status : null,
     // Giả định 5 của BE L7 + S12: chỉ tính khoản lệch CÒN MỞ (khoản đã xử lý không còn cần chú ý).
     needs_attention: o.delivery?.status === "FAILED" || o.payments.some((p) => p.resolution_status === "OPEN"),
+    reason: reasonOf(o),
   };
 }
 
@@ -736,12 +765,23 @@ function listResponse(me: Me, query: URLSearchParams): MockResponse {
   for (const [param, v] of [["date_from", from], ["date_to", to]] as const) {
     if (v && !/^\d{4}-\d{2}-\d{2}$/.test(v)) return beError("INVALID_FILTER", { param });
   }
+  const customer = query.get("customer") || "";
+  const batch = query.get("batch") || "";
+  // Lô 3 R3: `customer` đòi quyền xem khách (403), sai dạng → 400; `batch` sai dạng → 400.
+  if (customer) {
+    if (!has(me, PERM_VIEW_CUSTOMER)) return beError("DRF_FORBIDDEN");
+    if (!/^\d+$/.test(customer)) return beError("INVALID_FILTER", { param: "customer" });
+  }
+  if (batch && !/^\d+$/.test(batch)) return beError("INVALID_FILTER", { param: "batch" });
   const rows = mode() === "empty" ? [] : load().orders;
   const hit = rows
     .filter((o) => inScope(me, o))
     .filter((o) => !statuses.length || statuses.includes(o.status))
     .filter((o) => !from || dayVN(o.created_at) >= from)
     .filter((o) => !to || dayVN(o.created_at) <= to)
+    .filter((o) => !customer || customerIdOf(o) === Number(customer))
+    // Mock không có pk lô: `batch=<n>` khớp lô thứ n của bảng ITEMS (đủ để thử bộ lọc).
+    .filter((o) => !batch || o.lines.some((l) => l.batches.some(([code]) => code === ITEMS[(Number(batch) - 1) % ITEMS.length]?.[3])))
     // Đơn đã ẩn dữ liệu khách chỉ tìm được theo mã đơn (BE chống dò SĐT/tên).
     .filter(
       (o) =>
@@ -875,6 +915,7 @@ function cancel(o: Order, body: unknown): MockResponse {
   o.cancelFromFailedDelivery = d?.status === "FAILED";
   o.status = "CANCELLED";
   if (d) d.status = "CANCELLED";
+  o.cancelReasonCode = reasonCode;
   o.cancelReasonLabel = CANCEL_REASON_LABEL[reasonCode] + (note ? ` — ${note}` : "");
   o.cancelledAt = isoVN(Date.now());
   o.cancelStockRestored = restored;
@@ -892,9 +933,23 @@ function cancel(o: Order, body: unknown): MockResponse {
   };
 }
 
+
+// E2E: window.__caveMock.conflictNext() — thao tác POST kế tiếp (đơn / khoản tiền / phiếu hoàn) trả 409 STALE_STATE như khi
+// người khác vừa xử lý xong (ED-11/ED-12: banner xung đột, không xử lý lần hai). Chỉ một lần.
+let conflictOnce = false;
+function takeConflict(req: MockRequest): MockResponse | null {
+  if (!conflictOnce || req.method !== "POST") return null;
+  conflictOnce = false;
+  return {
+    status: 409,
+    body: { detail: "Bản ghi vừa được người khác xử lý.", code: "STALE_STATE", updated_by_name: "Quản lý", updated_at: new Date().toISOString() },
+  };
+}
+
 export function mockOrdersApi(req: MockRequest): MockResponse {
   const me = mockRequireUser(req);
   if (!me) return MOCK_UNAUTHORIZED;
+  { const c = takeConflict(req); if (c) return c; }
   if (!has(me, PERM_VIEW) || mode() === "forbidden") return beError("DRF_FORBIDDEN");
   const { id, action, query } = parsePath(req.path);
   // S11: thiếu sales.confirm_payment_manual → 403 TRƯỚC khi tra đơn (BE L7).
@@ -1140,6 +1195,7 @@ function resolve(me: Me, id: number, body: unknown): MockResponse {
 export function mockPaymentsApi(req: MockRequest): MockResponse {
   const me = mockRequireUser(req);
   if (!me) return MOCK_UNAUTHORIZED;
+  { const c = takeConflict(req); if (c) return c; }
   // S12-AC7: Quản lý / NV kho (không có confirm_payment_manual) → 403 cả xem lẫn xử lý; kiểm TRƯỚC khi tra giao dịch.
   if (!has(me, PERM_CONFIRM) || queueMode() === "forbidden") return beError("DRF_FORBIDDEN");
   const [path, q = ""] = req.path.split("?");
@@ -1285,6 +1341,7 @@ function createRefundMock(me: Me, body: unknown): MockResponse {
 export function mockRefundsApi(req: MockRequest): MockResponse {
   const me = mockRequireUser(req);
   if (!me) return MOCK_UNAUTHORIZED;
+  { const c = takeConflict(req); if (c) return c; }
   if (!/^\/api\/sales\/refunds\/create\/?$/.test(req.path)) return beError("NOT_FOUND");
   if (req.method !== "POST") return beError("METHOD_NOT_ALLOWED", { method: req.method });
   if (!has(me, PERM_REFUND)) return beError("DRF_FORBIDDEN");
@@ -1346,9 +1403,13 @@ function refundQueueItem(me: Me, store: Store, e: RefundEntry): RefundQueueItem 
 function refundQueueList(me: Me, query: URLSearchParams): MockResponse {
   const statuses = (query.get("status") || "").split(",").map((s) => s.trim()).filter(Boolean);
   const page = Math.max(1, Number(query.get("page") || "1") || 1);
+  const month = query.get("month") || "";
+  if (month && !/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) return beError("INVALID_FILTER", { param: "month" });
   const store = load();
   const hit = (refundQueueMode() === "empty" ? [] : allRefundEntries(store))
     .filter((e) => !statuses.length || statuses.includes(e.r.status))
+    // Lô 3 R3: `month=YYYY-MM` lọc theo ngày tạo phiếu theo giờ Việt Nam.
+    .filter((e) => !month || dayVN(e.r.created_at || "").slice(0, 7) === month)
     .sort((a, b) => ((a.r.created_at || "") < (b.r.created_at || "") ? 1 : (a.r.created_at || "") > (b.r.created_at || "") ? -1 : b.r.id - a.r.id));
   const pages = Math.max(1, Math.ceil(hit.length / PAGE_SIZE));
   if (page > pages) return { status: 404, body: { detail: "Trang không hợp lệ." } };
@@ -1419,12 +1480,20 @@ function retryRefundMock(id: number): MockResponse {
 export function mockRefundQueueApi(req: MockRequest): MockResponse {
   const me = mockRequireUser(req);
   if (!me) return MOCK_UNAUTHORIZED;
+  { const c = takeConflict(req); if (c) return c; }
   if (!has(me, PERM_VIEW_REFUND) || refundQueueMode() === "forbidden") return beError("DRF_FORBIDDEN");
   const [path, q = ""] = req.path.split("?");
   if (path === "/api/sales/refunds/") {
     if (req.method !== "GET") return beError("METHOD_NOT_ALLOWED", { method: req.method });
     if (refundQueueMode() === "fail") return { status: 500, body: null };
     return refundQueueList(me, new URLSearchParams(q));
+  }
+  const one = /^\/api\/sales\/refunds\/(\d+)\/$/.exec(path);
+  if (one) {
+    if (req.method !== "GET") return beError("METHOD_NOT_ALLOWED", { method: req.method });
+    const store = load();
+    const e = findRefundEntry(store, Number(one[1]));
+    return e ? { status: 200, body: refundQueueItem(me, store, e) } : beError("NOT_FOUND");
   }
   const m = /^\/api\/sales\/refunds\/(\d+)\/(confirm|mark-failed|retry)\/?$/.exec(path);
   if (!m) return beError("NOT_FOUND");
@@ -1457,6 +1526,10 @@ if (process.env.NEXT_PUBLIC_USE_MOCK === "1" && typeof window !== "undefined") {
   const w = window as unknown as { __caveMock?: Record<string, unknown> };
   w.__caveMock = {
     ...(w.__caveMock || {}),
+    conflictNext: () => {
+      conflictOnce = true;
+      return "POST kế tiếp sẽ trả 409.";
+    },
     orders: (m: Mode) => {
       window.localStorage.setItem(MODE_KEY, m);
       return `Chế độ mock đơn: ${m}`;

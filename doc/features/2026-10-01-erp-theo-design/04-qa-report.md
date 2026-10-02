@@ -1064,6 +1064,37 @@ Kiểm trên **bản sau sửa Techlead** (có M1, M2, L1, L2, L3): `npm ci` s�
 - Mock (cổng 3301): `qa_ed_batch7_mock.py` **336/336** (chạy 2 lần liên tiếp, cùng kết quả).
 - Backend thật (Django 8130, SQLite tạm + `bootstrap_masterdata` + `seed_demo` + lô Quá hạn dựng bằng ORM; console `MOCK=0` cổng 3302): `qa_ed_batch7_real.py` **219/220**, 2 lần chạy trên DB sạch, cùng kết quả. Ca đỏ duy nhất = B1.
 
+---
+
+## Lô 3 — FE (Đơn & tiền: ED-09, ED-10, ED-11, ED-12) · lần 1 · 2026-10-02
+
+### Kết luận: REJECTED — 1 lỗi Medium chặn (B1: popup "Lập phiếu hoàn" hiện 2 dòng "Còn hoàn được"), cộng B2 cần PO quyết (chip sau khi xác nhận tiền là "Đang xử lý", AC viết "Đã thanh toán"). Phần còn lại đạt, gồm toàn bộ ca ngoài đường thuận (bấm đúp, huỷ khi đang giao, hoàn quá số tiền, 409, mất mạng, id rác, 5 vai) chạy trên mock và BE thật.
+
+### Tổng: 468 ca QA mới (319 mock + 149 BE thật) + 160 ca dev chạy lại + 280 ca hồi quy · ✅ 460 · ❌ 8 ca đỏ (3 lỗi thật B1, B2, B3, đếm cả mock lẫn BE thật; 2 ca là nhiễu SQLite, không phải lỗi sản phẩm) · ⏸ 6 mục
+
+| Bộ | Ca | Đạt | Hỏng / ⏸ |
+|---|---|---|---|
+| `e2e/qa_ed_batch3_orders.py` (mock, cổng 3101) | 319 | 315 | 4 (B1 x2, B2, B3) |
+| `e2e/qa_ed_batch3_real.py` (BE thật, SQLite tạm + `seed_demo`, console MOCK=0, cổng 3102) | 149 + 2 ⏸ | 145 | 2 thật (B2, B3) + 2 nhiễu môi trường (xem dưới) |
+| `ed_batch3_orders.py` (dev, chạy lại) | 141 | 141 | 0 |
+| `ed_batch3_real.py` (dev, chạy lại) | 19 | 19 | 0 |
+| Hồi quy: `s10_s11_orders` 42/42, `s12_s13_queue` 66/66, `s14_s16_cancel_refund` 41/41, `ed_batch1_shell` 56/56, `ed_batch2_patterns` 75/75 | 280 | 280 | 0 |
+
+Hai ca "BE log: không có 5xx / Traceback" đỏ là do chính ca đua song song: SQLite khoá ghi ("database is locked" -> 500). Đã chuyển 2 ca đua thành ⏸ (cần Postgres); các ca tuần tự cùng `request_id` đạt. Không tính là lỗi sản phẩm.
+
+Ảnh đặt cạnh board: `shots/lot3/` (`qa-*.png`, bản mock; `qa-real-*.png`, BE thật). Chỉ dữ liệu giả (mock và `seed_demo`, mã đơn `SO261002-*`, mã giao dịch `FTQA000x`).
+
+
+---
+
+## Lô 4 — FE · Giao hàng + Việc giao của tôi (ED-17, ED-19) · lần 1 · 2026-10-02
+
+### Kết luận: REJECTED. Nhiều AC chính lệch board/story: thiếu mục "…" của phiếu chưa in tem, bảng lô sai cột (có "HSD", thiếu "Kho"), thẻ Việc giao thiếu "Đã thanh toán, không thu thêm" và nhãn trường, kg sai định dạng, hộp thoại F2o/F2l thiếu khối tóm tắt và đổi chữ nút.
+Điểm tốt đã kiểm chạy thật: giao1 chỉ thấy phiếu của mình, ẩn quyền theo vai, "Gọi khách" mở `tel:` số đủ, tem che SĐT, ghi chú/SĐT không vào localStorage/URL, 409 -> banner -> tải lại, 360px không cuộn ngang, nút chạm >= 44px ở màn của người giao, không `console.error`, không rò giá vốn.
+
+### Tổng (script của QA): 66 ca · ✅ 45 · ❌ 21 · ⏸ 4 (nhiều ❌ cùng một lỗi gốc, gộp thành 10 lỗi B1–B10 bên dưới)
+Hồi quy do dev viết, chạy lại trên bản mock mình build: `ed_batch4_delivery.py` 43/43, `ed_batch1_shell.py` 56/56, `ed_batch2_patterns.py` 75/75.
+
 ### Theo AC
 | Mã AC | Kết quả | Bằng chứng |
 |---|---|---|
@@ -1218,3 +1249,728 @@ python3 e2e/{ed_batch7_inventory,p8_lo5..p8_lo8,ed_batch1_shell,s7_shell,s8_view
 python3 scripts/check_naming.py                                       # OK
 ```
 Máy chủ tạm (3301, 3302, Django 8130) đã tắt. Ảnh (dữ liệu giả): `shots/lot7/q7r2-stale-{cancel,return-after-cancel,return-over,close-twice,close-qty-changed,close-stocktake-draft}[-after-reload].png`.
+
+| ED-09-AC1 (3 tab, cột, "Đang hiện n / m") | ✅ | `qa-list-1280.png`, `qa-real-list.png`; so với `board-ERP-D2-Don-tien.png` |
+| ED-09-AC2 (chip theo enum-map, cột Lý do) | ✅ (B-Low: dòng BOOKED để trống Lý do) | mọi trạng thái đúng chữ enum-map; Lý do hiện cho huỷ/hoàn |
+| ED-09-AC3 (tìm, lọc, không tìm thấy, rỗng, đang tải, lỗi) | ✅ | `qa-list-notfound/loading/empty/error-1280.png`; xoá tìm kiếm trả lại danh sách |
+| ED-09-AC4 (đơn BOOKED: đếm ngược, hết giờ -> Đã huỷ) | ✅ | chip + đếm ngược mm:ss |
+| ED-09-AC5 (hết giờ thì chip đổi, không cần tải lại) | ✅ | đồng hồ giả Playwright: đang giữ chỗ "Giữ chỗ" + mm:ss, giảm sau 5 giây; tua 21 phút -> chip "Đã huỷ", StatusPath bước đỏ, vẫn còn "Xác nhận đã nhận tiền" (tiền về muộn); `qa-hold-expired-live.png` |
+| ED-09-AC6..AC9 (chi tiết D2b: StatusPath Tiếp theo/Đã làm, SĐT đầy đủ, mỗi ô một giá trị, Dòng thời gian, khối AI) | ✅ | `qa-detail-booked-1440.png`, `qa-detail-delivering-1440.png`, `qa-real-detail-delivering.png`; khối AI: tắt thì không khối + 0 request `/api/ai/*` |
+| ED-10-AC1 (xác nhận đã nhận tiền: popup F2a, bấm đúp = 1 request, chip "Đã thanh toán") | ❌ một phần | popup, tóm tắt, bấm đúp = 1 POST, toast "Đã thanh toán" đạt; chip sau xác nhận là "Đang xử lý" (B2) |
+| ED-10-AC2 (huỷ 2 bước F2b; đơn đang giao bị chặn trong "…" kèm lý do) | ✅ | `qa-F2b-cancel-step1/step2.png`, `qa-menu-delivering-1280.png`, `qa-real-menu-delivering.png`; ép bấm mục bị chặn = 0 request |
+| ED-10-AC3 (lập phiếu hoàn F2c, vượt số tiền bị chặn) | ❌ một phần | vượt số tiền: chặn ở FE (viền đỏ, 0 request) và BE trả 400 được hiển thị; popup lặp "Còn hoàn được" (B1) |
+| ED-10-AC6 (gắn giao dịch F2d, đơn xác nhận F2e) | ✅ | `qa-F2d-attach.png`, `qa-F2e-confirm-order.png`, `qa-real-F2d.png` |
+| ED-10-AC4/AC5 | không thuộc lô này (nằm ở /confirmation) | |
+| ED-11-AC1 (hàng đợi tiền: chỉ Chủ) | ✅ | 5 vai x 2 chế độ; Quản lý/Kho/Giao: không có mục menu, vào thẳng URL ra "Không có quyền" |
+| ED-11-AC2 (giao dịch không khớp, gắn đơn) | ✅ | `qa-payments-1280.png`, `qa-real-payment-unmatched.png` |
+| ED-11-AC3 (xác nhận từ hàng đợi) | ❌ một phần | đạt; chip "Đang xử lý" như B2 |
+| ED-11-AC4..AC6 (rỗng/lỗi/phân trang, URL chỉ có id) | ✅ | `qa-payments-empty-1280.png`; id rác -> "Không tìm thấy", không vỡ |
+| ED-12-AC1 (danh sách hoàn: Quản lý chỉ xem) | ✅ | Quản lý: không nút "Xác nhận đã hoàn tiền"/"Thử lại"; `qa-refunds-1280.png` |
+| ED-12-AC2 (xác nhận hoàn F2f, đánh dấu lỗi F2g, thử lại) | ✅ | `qa-F2f-confirm-refund.png`, `qa-F2g-mark-failed.png`, `qa-real-refund-failed.png`, `qa-real-F2f.png` |
+| ED-12-AC3, AC4 (rỗng, 409, mất mạng) | ✅ | `qa-409-banner.png`, `qa-real-offline.png` |
+
+### Ngoại lệ và biên (chạy thật, mock + BE thật)
+- Bấm đúp "Xác nhận đã nhận tiền", "Huỷ đơn", "Lập phiếu hoàn", "Xác nhận đã hoàn": đúng 1 request (cùng `request_id`); chạy tuần tự lại cùng `request_id` trên BE thật trả cùng kết quả, không tạo bản ghi thứ hai.
+- Huỷ khi đang giao: mục bị chặn mờ + lý do; BE thật cũng từ chối (400/409), UI hiện câu tiếng Việt.
+- Hoàn quá số tiền / 0 / âm / chữ: chặn trước khi gửi; BE 400 vẫn hiện đúng ô; số tiền còn lại giảm sau mỗi lần hoàn, hoàn đủ rồi thì nút hoàn mờ.
+- Màn cũ (trạng thái đã đổi): mở popup xác nhận, đơn đã được người khác xác nhận -> 409 -> ConflictBanner "Tải lại", không alert đỏ chung, giá trị đang gõ còn.
+- Mất mạng giữa lúc gửi: giữ giá trị, hiện "Thử lại", thử lại thành công thì lỗi mất, không gửi đôi.
+- 500, 403, 404, id rác (`?id=abc`, `?id=999999`, `?id=`): câu tiếng Việt, không `undefined/null/NaN`, không stack/URL.
+- Đơn hết hạn (AUTO_CANCELLED) vẫn xác nhận được tiền về muộn (đúng 02b); dev-notes mục 15 hỏi PO/BE có muốn chặn không: chưa quyết, ghi nhận.
+- 360 px: danh sách 3 tab, chi tiết, 6 popup: không cuộn ngang, nút cao >= 44 px (`qa-360-*.png`, `qa-real-360-detail.png`). StatusPath bị cắt ở mép (Low, xem dưới).
+- Không `console.error`/`pageerror` ngoài ca lỗi cố ý.
+
+### Phân quyền (BE thật + mock; Group x hành động)
+| Hành động | loc (owner) | ql1 (manager) | kho1 | giao1 | cs2 |
+|---|---|---|---|---|---|
+| Thấy menu Đơn hàng | ✅ | ✅ | ✅ | ✅ (chỉ phiếu được giao) | ✅ (theo phạm vi gọi) |
+| Xác nhận đã nhận tiền | ✅ | ẩn (BE 403 nếu gọi thẳng) | ẩn | ẩn | ẩn |
+| Huỷ đơn đã thanh toán | ✅ | ẩn/chặn | ẩn | ẩn | ẩn |
+| Lập phiếu hoàn | ✅ | ✅ nếu có `create_refund` (BE kiểm) | ẩn | ẩn | ẩn |
+| Hàng đợi tiền (`/orders/payments`) | ✅ | "Không có quyền" | "Không có quyền" | "Không có quyền" | "Không có quyền" |
+| Hàng đợi hoàn: xem | ✅ | ✅ chỉ xem | không | không | không |
+| Hàng đợi hoàn: xác nhận/thử lại | ✅ | ẩn (BE 403) | ẩn | ẩn | ẩn |
+| Chưa đăng nhập | chuyển về /login | | | | |
+Kiểm trên BE thật bằng token từng vai (gọi thẳng API) và bằng giao diện; mọi ô "ẩn" có cặp kiểm BE từ chối, không chỉ ẩn nút.
+
+### Rò giá vốn
+Không phát hiện. JSON đơn/phiếu hoàn/giao dịch với Quản lý/Kho/Giao/CSKH không có `unit_cost`, `landed_unit_cost`, `cost`, `margin`; HTML không có "Giá vốn"/"Lãi". Chủ thấy phân bổ lô (đúng quyền). Mục "Lãi lỗ" không có trong menu của vai không phải Chủ. Dòng thời gian/`note` của AuditLog không có khoá cho phép tính ngược (tiền / kg).
+
+### Rò dữ liệu cá nhân
+Không phát hiện. SĐT trên chi tiết đơn hiện đầy đủ chỉ cho vai có quyền xem đơn (theo D2b); danh sách, hàng đợi hoàn, LookupCard không có tên/SĐT/địa chỉ; `localStorage` chỉ có token, id người dùng, cờ AI; URL chỉ có `?id=`; console không có SĐT; log BE không in SĐT/tên (grep dữ liệu giả = 0). Ảnh và báo cáo chỉ dùng dữ liệu giả.
+
+### Hồi quy
+`s10_s11_orders` 42/42, `s12_s13_queue` 66/66, `s14_s16_cancel_refund` 41/41, `ed_batch1_shell` 56/56, `ed_batch2_patterns` 75/75. `p8_lo6`/`p8_lo7` hỏng do CSS cũ bị gỡ (dev-notes đã ghi, thuộc lô thay màn cũ, không tính).
+
+### Chấm theo UI-RULES (mục áp dụng cho Lô 3)
+| Mục | Kết quả |
+|---|---|
+| §1.5 ngày giờ `dd/mm/yyyy hh:mm` (GMT+7) | ✅ |
+| §1.6 tiền ghi "đ" | ❌ B3 (BE tự dựng chuỗi "₫", có sẵn từ gốc) |
+| §2 chip theo enum-map, mỗi ô một giá trị | ✅ |
+| §3.2 chữ cấm (mã BR, khoá kỹ thuật) | ✅ |
+| §5.1-5.3 header, StatusPath, "…" | ✅ (Low: StatusPath 360 px bị cắt) |
+| §6 popup F2a-F2g (khối tóm tắt, Quay lại, Thử lại, chống gửi đôi) | ❌ B1 ở F2c (còn lại ✅) |
+| §7 trạng thái rỗng/tải/lỗi/mất mạng/409 | ✅ |
+
+### Lỗi
+#### B1 — Popup "Lập phiếu hoàn" hiện 2 dòng "Còn hoàn được" · Medium (chặn) · ED-10-AC3 / §6
+- Tái hiện: mock (`window.__caveMock.orders('on')`) hoặc BE thật; mở đơn đã thanh toán, "…" -> "Lập phiếu hoàn" (cũng từ `/orders/payments/detail?id=...`). Đếm dòng khối tóm tắt.
+- Mong đợi: mỗi dòng một lần (UI-RULES §6, board F2c).
+- Thực tế: "Còn hoàn được" xuất hiện 2 lần (`RefundModal.tsx` dòng 82 thêm `M.rowRefundable`, trong khi `OrderDetailScreen.tsx` ~408 và `PaymentDetailScreen.tsx` ~220 đã truyền sẵn dòng đó vào `summary`). Ảnh `qa-F2c-create-refund.png`, `qa-F2c-from-payment.png`, `qa-real-F2c-over.png`.
+- Ảnh hưởng: giao diện lặp trong popup tiền; không sai số. Gợi ý: bỏ dòng thêm trong `RefundModal` hoặc bỏ ở hai màn gọi.
+
+#### B2 — Chip sau khi xác nhận tiền là "Đang xử lý", AC viết "Đã thanh toán" · Medium (PO quyết) · ED-10-AC1 / ED-11-AC3
+- Tái hiện: xác nhận đã nhận tiền cho đơn BOOKED/CONFIRMED (mock và BE thật, `SO261002-A00001`). Chip sau xác nhận: "Đang xử lý"; toast: "Đã thanh toán".
+- Mong đợi theo AC: chip "Đã thanh toán". Có thể enum-map coi PAID là "Đang xử lý" (bước kế tiếp là giao); `labels.ts` theo enum-map. Cần PO chốt chữ AC hay chữ enum-map.
+- Ảnh hưởng: lệch chữ AC, người dùng thấy toast và chip khác nhau; không sai dữ liệu.
+
+#### B3 — Tiền trong Dòng thời gian và "Đã làm" ghi "₫" · Low · §1.6 (có sẵn từ gốc)
+- Tái hiện: chi tiết đơn có xác nhận tiền; Dòng thời gian hiện "420.000 ₫" (mock `features/guidance/mock.ts`, BE `common/formatting.vnd_display` SR-25 viết "₫").
+- Ghi nhận: chuỗi do BE dựng sẵn, không phải FE Lô 3; sửa ở BE (đổi sang "đ") hoặc FE chuẩn hoá khi hiển thị.
+
+#### Ghi chú Low (không chặn)
+- Tab Giao dịch (hàng đợi tiền) chưa có huy hiệu số lượng và control phân đoạn như board.
+- StatusPath ở 360 px bị cắt ở mép; nhãn "Đã làm" dài.
+- Ô số tiền hoàn không định dạng nghìn khi gõ.
+- Dòng BOOKED để trống cột Lý do (nên "—" hoặc "Chờ thanh toán").
+
+### Có sẵn từ gốc, không tính vào lô
+- P1: `/ai/policy/` mở cho vai không phải Chủ (như Lô 1, 2).
+- Nhiễu `Failed to fetch RSC payload` khi phục vụ bản tĩnh bằng `http.server`.
+- BE lưu chữ tự do trong Dòng thời gian (nợ kỹ thuật đã biết).
+- `p8_lo6`/`p8_lo7` hỏng do CSS cũ bị gỡ (dev-notes).
+- B3 ("₫").
+
+### ⏸ Chưa kiểm được
+1. Đua thật (2 lệnh lập hoàn cùng lúc, 2 người xác nhận cùng đơn): SQLite khoá ghi, cần Postgres.
+2. Khối AI trên BE thật: AI tắt theo chính sách, chỉ kiểm được trạng thái tắt (không khối, 0 request).
+3. dev-notes mục 15 (tiền về muộn cho AUTO_CANCELLED được nhận): chờ PO/BE quyết.
+4. Lên staging có BE Postgres: chưa chạy.
+5. Thiết bị thật (iOS/Android) cho 360 px: chỉ giả lập viewport.
+6. Phục hồi trạng thái cuộn danh sách khi quay lại từ chi tiết trên điện thoại thật.
+
+### Lệnh đã chạy (output tóm tắt)
+- `cd erp-console && npm ci` exit 0 (không `--legacy-peer-deps`); `npx tsc --noEmit` exit 0; `npx vitest run` 44 file, 405 test đạt.
+- `NEXT_PUBLIC_USE_MOCK=0 npm run build` + `check-no-mock` XANH + `check-ai-chunks` XANH.
+- `NEXT_PUBLIC_USE_MOCK=1 npm run build`, `http.server 3101`: `qa_ed_batch3_orders.py` 315/319; `ed_batch3_orders.py` 141/141; hồi quy `s10_s11` 42/42, `s12_s13` 66/66, `s14_s16` 41/41, `ed_batch1_shell` 56/56, `ed_batch2_patterns` 75/75.
+- BE `python manage.py runserver 127.0.0.1:8000` trên SQLite tạm (`seed_demo`, không DB thật) + build `NEXT_PUBLIC_USE_MOCK=0` cổng 3102: `qa_ed_batch3_real.py` 145/149 + 2 ⏸; `ed_batch3_real.py` 19/19.
+- `python3 scripts/check_naming.py`: OK, không vi phạm mới.
+- Không sửa mã sản phẩm. Mã QA mới: `erp-console/e2e/qa_ed_batch3_orders.py`, `erp-console/e2e/qa_ed_batch3_real.py`; ảnh `shots/lot3/qa-*.png`. Đã tắt máy chủ 3101, 3102, 8000 (không đụng 3201).
+
+---
+
+### Lô 3 — FE lần 2 (ED-09..ED-12) · 2026-10-02
+
+## Kết luận: REJECTED — B4 (High, sai tiền): Backspace trong ô số tiền hoàn làm hoàn nhỏ hơn 100 lần so với ý người dùng.
+
+## Tổng (các script lần 2)
+| Script | Kết quả |
+|---|---|
+| `qa_ed_batch3_orders.py` (mock 3101) | 318/318 ✅ |
+| `qa_ed_batch3_followup.py` (mock, mới) | 105/108: ✅ 105, ❌ 3 (cả 3 cùng gốc B4) |
+| `qa_ed_batch3_real.py` (BE thật, SQLite tạm) | 146 ✅, 2 ⏸ (đua thật), 2 ❌ là nhiễu SQLite (log 5xx/Traceback do "database is locked" ở ca đua, không phải lỗi sản phẩm) |
+| `qa_ed_batch3_real_ai.py` (BE thật, AI tắt, mới) | 24/26: 2 ❌ cùng gốc N1 (BE thiếu route `/api/ai/status/`) |
+| Dev + hồi quy: `ed_batch3_orders`, `ed_batch3_fixes`, `p8_lo6`, `p8_lo7`, `s10_s11`, `s12_s13`, `s14_s16`, `ed_batch1_shell`, `ed_batch2_patterns` | xanh hết |
+
+### Trạng thái lỗi lần 1 / techlead
+| Mã | Kết quả | Bằng chứng |
+|---|---|---|
+| B1 (popup hoàn hiện 2 hàng "Còn hoàn được") | ✅ đã sửa | `followup` mục 5: đúng 1 hàng khi mở từ đơn, từ khoản tiền, và ở 360 px; ảnh `qa2-F2c-one-row*.png` |
+| B2 (chip sau xác nhận) | ✅ theo PO chốt: chip "Đang xử lý", toast "Đã nhận tiền" | `qa_ed_batch3_orders` đã đổi ca, chạy xanh |
+| B3 ("₫") | Nợ BE, không tính vào lô | chuỗi do BE dựng |
+| H1, H2, M1–M3 | ✅ không thấy tái phát | `ed_batch3_fixes`, `qa_ed_batch3_orders`, `followup` |
+| Low "ô số tiền hoàn không nhóm nghìn" | ❌ sửa xong nhưng sinh B4 | xem dưới |
+| Low "StatusPath 360 px bị cắt" | ✅ | `followup` mục 7, ảnh `qa2-statuspath-360.png` |
+
+### Theo yêu cầu điều phối
+| Mục | Kết quả | Bằng chứng |
+|---|---|---|
+| SR-20: AI tắt → 0 request `actions`/`counts`/chat/summary/commands trên 3 danh sách + 3 chi tiết | ✅ (mock và BE thật) | `followup` mục 1, `real_ai` AI_EXPECT=off. Chi tiết chỉ gọi tối đa 1 `/api/ai/status/`, không tải chunk model/worker |
+| Khối AI ở chi tiết đơn / khoản tiền / phiếu hoàn (mock, AI bật) | ✅ | gửi đúng `target_model`/`target_id` (`sales.salesorder` "mã,pk", `sales.paymenttransaction` pk, `sales.refund` pk); đề xuất đúng chứng từ; id rác không hiện khối; vai không có quyền gọi 0 request `actions`. Ảnh `qa2-ai-*-detail-1280.png` |
+| Gõ nhanh vào ô hỏi AI không mất chữ | ✅ | 3 điều kiện: chunk bị giữ 1,5 s gõ liên tục; giữ 0,8 s gõ 35 ms/phím; mạng nhanh. Chữ đủ, 1 ô nhập, không tự gửi, giữ focus; đường chưa đồng ý vẫn giữ chữ. Ảnh `qa2-ai-typing-slow-1280.png`, `qa2-ai-consent-typed-1280.png` |
+| Popup hoàn 1 hàng "Còn hoàn được" | ✅ | xem B1 |
+| Ca ngoài đường thuận | ✅ | id rác, vai thiếu quyền, hold hết hạn thật (`pg.clock`, ảnh `qa2-hold-expired-live.png`), trạng thái đã đổi, số tiền không hợp lệ (0, âm, chữ, rỗng: bấm gửi → 0 POST + báo lỗi), console sạch (trừ nhiễu có sẵn) |
+| Khối AI bật trên BE thật | ⏸ | bị chặn bởi N1 |
+
+## Lỗi
+
+### B4 — Backspace trong ô số tiền hoàn đọc nhầm nhóm cuối thành số lẻ · **High (sai tiền)** · ED-12 (popup lập hoàn)
+Bước tái hiện (mock `http://localhost:3101`, đăng nhập `ql1`/`demo1234`; hoặc chạy `qa_ed_batch3_followup.py` mục 6):
+1. Mở một đơn đã thanh toán, bấm "Lập hoàn tiền".
+2. Xoá sạch ô số tiền, gõ `150000` → ô hiện `150.000`.
+3. Bấm Backspace 1 lần.
+Mong đợi: `15.000` (hoặc ít nhất giá trị 15.000 đ).
+Thực tế: ô hiện `150.00`; `parseAmount` coi `.00` là phần thập phân → giá trị 150, nhãn nút và POST đều theo số sai. Tương tự `1.500.000` → `1.500.00` đọc thành 1.500; gõ `12345` rồi xoá lùi 2 lần → `12.3` → 12.
+Đã tái hiện đến cùng: hoàn thật được tạo ở 1.500 đ trong khi người dùng định 150.000 đ (probe, dữ liệu giả).
+Ảnh hưởng: sai số tiền hoàn gấp 100 lần (nhỏ hơn); BE không biết ý định nên không chặn; chỉ `RefundModal` dùng `formatAmountInput` nên chỉ ảnh hưởng ô này. Phát sinh do bản sửa Low "nhóm nghìn khi gõ".
+Gợi ý: khi chuỗi chỉ gồm chữ số và dấu chấm mà có ≥ 2 dấu chấm, hoặc nhóm cuối có 1–2 chữ số sau một chuỗi đã nhóm, coi dấu chấm là phân nhóm và nhóm lại; thêm vitest cho Backspace (`formatAmountInput("150.00")` → `15.000`). Ca tái hiện đỏ→xanh nằm sẵn trong `followup` mục 6 (3 ca).
+
+### N1 — BE thiếu route `/api/ai/status/` · Medium (có từ trước, không do Lô 3)
+FE (`features/ai/api.ts`) gọi `GET /api/ai/status/` và đóng cửa khi lỗi (S05-AC5). `backend/config/api_urls.py` ở HEAD không có route này (README `backend/apps/ai` ghi `status.py` nhưng file không tồn tại). Hệ quả trên BE thật: gate nhận 404 → khối AI không bao giờ hiện dù `AI_ENABLED=1`; mỗi trang chi tiết có thêm 1 lỗi 404 trong console. Ca `real_ai` AI_EXPECT=off thất bại 2 ca vì lý do này (404 console). Nhờ điều phối hỏi BE/PO: thêm route hoặc ghi rõ khối AI chỉ chạy ở mock. Không chặn Lô 3 FE.
+
+## Phân quyền (chạy lại)
+Không đổi so với lần 1: `loc` (owner) đủ quyền; `ql1` (manager) thấy khối AI chi tiết phiếu hoàn ở dạng chỉ xem; `kho1`, `giao1` không thấy màn tiền và gọi 0 request `actions`; `cs2` theo phạm vi cũ; chưa đăng nhập về trang đăng nhập. Xanh trong `followup` mục 3 và `real_ai`.
+
+## Rò giá vốn / dữ liệu cá nhân
+Không phát hiện: JSON/DOM các trang đơn, khoản tiền, phiếu hoàn không có trường giá vốn; ảnh và log chỉ dùng dữ liệu giả; `localStorage` chỉ có khoá `cave_erp_ai_consent` (không dữ liệu khách); URL chỉ chứa mã/pk.
+
+## Có sẵn từ gốc (không tính vào lô)
+B3 ("₫"), nhiễu `Failed to fetch RSC payload` khi dùng `http.server`, `/ai/policy/` mở cho vai không phải Chủ, N1.
+
+### ⏸ Chưa kiểm được
+1. Đua thật (2 lệnh hoàn / 2 người xác nhận cùng đơn): SQLite khoá ghi, cần Postgres.
+2. Khối AI bật trên BE thật: chờ N1.
+3. dev-notes mục 15 (tiền về muộn cho AUTO_CANCELLED): chờ PO/BE.
+4. Staging Postgres; thiết bị thật (iOS/Android) cho 360 px.
+
+### Lệnh đã chạy (output tóm tắt)
+- `cd erp-console && npm ci` exit 0 (không `--legacy-peer-deps`); `npx tsc --noEmit` exit 0; `npx vitest run` 442 test đạt.
+- `NEXT_PUBLIC_USE_MOCK=0 npm run build` + `check-no-mock` + `check-ai-chunks` XANH; `NEXT_PUBLIC_USE_MOCK=1 npm run build` XANH, phục vụ cổng 3101.
+- BE `runserver 127.0.0.1:8000` trên SQLite tạm (không DB thật) + build mock=0 cổng 3102: `qa_ed_batch3_real.py`, `qa_ed_batch3_real_ai.py` (kết quả ở bảng trên).
+- `python3 scripts/check_naming.py`: OK, không phát sinh mới.
+- Không sửa mã sản phẩm. Mã QA mới: `erp-console/e2e/qa_ed_batch3_followup.py`, `erp-console/e2e/qa_ed_batch3_real_ai.py`; ảnh `shots/lot3/qa2-*.png`. Đã tắt máy chủ 3101, 3102, 8000 (không đụng 3201).
+
+---
+
+### Lô 3 — FE lần 3 (ô số tiền của 2 popup) · 2026-10-02
+
+## Kết luận: APPROVED — B4 và ca dán phần lẻ đã sửa đúng, 0 ca đỏ trên mock lẫn BE thật; còn 2 ghi nhận (N2, N3) không chặn, chờ PO quyết.
+
+## Tổng: 1.140 ca · ✅ 1.140 · ❌ 0 · ⏸ 4 mục
+| Script | Kết quả |
+|---|---|
+| `qa_ed_batch3_money.py` MODE=mock (mới, cổng 3101) | 229/229 ✅ |
+| `qa_ed_batch3_money.py` MODE=real (mới, BE thật + SQLite tạm, cổng 3102) | 233/233 ✅ (BE log: 0 Traceback, 0 phản hồi 5xx) |
+| Hồi quy mock: `qa_ed_batch3_followup` 108/108, `qa_ed_batch3_orders` 318/318, `ed_batch3_fixes` 103/103, `s10_s11` 42/42, `s12_s13` 66/66, `s14_s16` 41/41 | ✅ hết |
+
+### Ô tiền: từng ca (chạy ở cả popup "Lập phiếu hoàn" và "Xác nhận đã nhận tiền", mock + BE thật)
+| Ca | Kết quả | Bằng chứng |
+|---|---|---|
+| Gõ thường (1, 12, 123, 1234, 150000, 1500000, 12345678, 000150, 0), gõ kèm dấu `.`/`,` kiểu nhóm nghìn; nhãn nút ghi đúng số; xoá hết | ✅ | `money` mục 1; ảnh `qa3-money-*-typed-*.png` |
+| Backspace và Delete ở MỌI vị trí của `1.234.567` (10 vị trí x 2 phím), kể cả ngay trước/sau dấu chấm: giá trị VÀ vị trí con trỏ đúng mô hình | ✅ | mục 2; `150|.000` + Delete ra `15.000`, `150.|000` + Backspace ra `15.000` |
+| Xoá lùi từng phím tới hết ô từ 5 giá trị (150.000, 1.500.000, 15.000.000, 12.345, 999.999.999): luôn dạng nhóm nghìn hợp lệ, nút gửi = ô (không còn `150.00`) | ✅ | mục 2 (B4 đã hết) |
+| Chọn đoạn rồi xoá (`234`, `1.234`, chọn hết) | ✅ | mục 2 |
+| Chèn chữ số vào giữa ở cả 10 vị trí; chèn nhiều chữ số; chèn `0` đầu ô; gõ đè đoạn chọn | ✅ | mục 3 |
+| Dán bằng Ctrl+V thật: `150.000`, `1,500,000`, `150.000,00`, `150,000.00`, `1.500.000 đ`, `1.500.000₫`, `150000`, `150 000`, `150000 VND`, `  150.000  `, `1.500.000,00 đ`, `0.00` | ✅ ra đúng giá trị, không báo lỗi phần lẻ, nút ghi đúng số | mục 4 |
+| Dán `150,000.50`, `150.000,50`, `0.5`, `540,5`, `1.500.000,5`: TỪ CHỐI, ô giữ giá trị cũ, hiện "Số tiền là số nguyên đồng, không có phần lẻ. Nhập lại, ví dụ 150.000.", nút gửi vẫn ghi số cũ; gõ tiếp chữ số hợp lệ thì lỗi tự mất | ✅ | mục 4; ảnh `qa3-money-real-paste-fraction-refund.png` |
+| Dán chèn vào giữa ô; dán `,5` vào cuối `100.000` | ✅ giữ nguyên + báo lỗi | mục 4 |
+| Gõ chữ (`abc`, `12a3b`, `ba trăm`, `1đ`, emoji, chữ số toàn góc): chữ bị bỏ ngay tại ô | ✅ | mục 5 |
+| Số âm (`-5`, `-150.000`, `−5`, `5-0`): giữ nguyên chuỗi, bấm gửi → 0 POST + câu "không được âm"; `-5` rồi Backspace 2 lần ra ô rỗng | ✅ | mục 5; ảnh `qa3-money-*-negative-*.png` |
+| Số rất lớn: 30 chữ số giữ đủ, nhóm đúng, gửi → 0 POST + "tối đa 12 chữ số"; 13 chữ số bị chặn; dán 40 chữ số không treo; 12 chữ số `999.999.999.999` giữ nguyên | ✅ | mục 5; ảnh `qa3-money-*-huge-*.png` |
+| Tiền GỬI LÊN API đúng từng đồng, BE thật (đọc thân request trong trình duyệt + phản hồi + `GET /sales/orders/{id}/`): xác nhận tiền gõ `150000` ra `150000`; gõ `1500000` rồi Backspace ra `150000`; `1234567` + Delete đầu ra `234567` (BE tách đúng phần thừa 134567); hoàn gõ `60000`, `500000`+Backspace ra `50000`, `123456`+Delete ra `23456`, dán `40.000,00` ra `40000`, dán `1,000` ra `1000`, dán `1.000 đ` ra `1000` | ✅ mỗi ca đúng 1 request, `amount` khớp, BE 2xx, số lưu trong DB khớp | mục 7 |
+| Tiền ghi vào kho mock đúng từng đồng (cả `1500000` bằng dán `1,500,000` / `1.500.000 đ` / chèn giữa ô `1050000`) | ✅ | mục 7 mock |
+| Ngoài đường thuận: vượt "Còn hoàn được" 1 đ → khoá nút + 0 POST + "Nhập tối đa"; đúng bằng tối đa → nút bật; bấm đúp → đúng 1 POST (thân có `request_id`); bỏ trống mã giao dịch → báo lỗi, số đã gõ còn nguyên; số khác tổng đơn → cảnh báo lệch, ô giữ nguyên; mở lại popup → ô về giá trị gốc; 360 px gõ được, không cuộn ngang; số còn lại của phiếu BE thật (đơn 14) chặn đúng khi dùng hết (nút khoá) | ✅ | mục 8 |
+| localStorage/sessionStorage, URL không chứa số tiền hay dữ liệu khách; console không lỗi đỏ | ✅ | mục 9 |
+
+### Trạng thái lỗi
+| Mã | Trạng thái |
+|---|---|
+| B4 (Backspace đọc thành số lẻ, hoàn nhỏ hơn 100 lần) | ✅ ĐÃ SỬA. Cả 3 ca đỏ ở `followup` lần 2 nay xanh; thêm 20 ca vị trí Backspace/Delete mọi chỗ |
+| Dán `150.000,00` gấp 100 lần; `0.5` ra 5 đ (dev tự phát hiện) | ✅ ĐÃ SỬA đúng luật "không đoán" |
+
+### Ghi nhận mới (không chặn; chờ PO)
+- **N2 — gõ dấu thập phân TỪNG PHÍM không bị bắt (Medium, giới hạn có chủ ý).** Luật phần lẻ chỉ áp khi dán nguyên chuỗi. Gõ tay `150.000,50` ra `15.000.050`, `150000,5` ra `1.500.005`, `0.5` ra `5`, `1,5` ra `15`; dấu gõ tay bị coi là dấu nhóm nghìn nên không phân biệt được (gõ `150.000` từng phím cũng phải ra `150.000`). Nút gửi và ô luôn hiện số đang hiểu (`Hoàn 15.000.050 đ`), hoàn bị chặn bởi "Còn hoàn được", xác nhận tiền có cảnh báo lệch tổng đơn và BE kiểm lại, nên không gửi lén. Nếu PO muốn chặt hơn: bỏ dấu `,` ở ô tiền (vì VN dùng `,` làm dấu thập phân) hoặc báo khi gõ `,` rồi 1-2 chữ số ở cuối.
+- **N3 — chữ viết tắt bị bỏ lặng lẽ (Low, dev-notes đã nêu cho PO).** `150k` ra `150`, `1tr5` ra `15`, `1e6` ra `16`. Ô không báo; nút gửi ghi `150 đ`.
+
+### ⏸ Chưa kiểm được
+1. Bàn phím điện thoại thật (Gboard/iOS, IME, dán từ ứng dụng ngân hàng, tự điền): chỉ chạy Chromium giả lập `ControlOrMeta+V`, `inputType` thật là `insertFromPaste`.
+2. Đua thật (2 người cùng xác nhận/hoàn): SQLite khoá ghi, cần Postgres (như lần 1, 2).
+3. Khối AI bật trên BE thật: vẫn chờ N1 (thiếu route `/api/ai/status/`, ghi ở lần 2).
+4. Staging Postgres.
+
+### Lệnh đã chạy (output tóm tắt)
+- `cd erp-console && npm ci` (không `--legacy-peer-deps`) xong; `npx tsc --noEmit` exit 0; `npx vitest run` 49 file, 478 test đạt.
+- `NEXT_PUBLIC_USE_MOCK=0 npm run build` exit 0 + `check-no-mock` XANH + `check-ai-chunks` XANH; `NEXT_PUBLIC_USE_MOCK=1 npm run build` exit 0 (phục vụ 3101); build `MOCK=0 NEXT_PUBLIC_API_BASE=http://localhost:8000` (phục vụ 3102).
+- BE `runserver 127.0.0.1:8000` trên SQLite tạm (bản sao sạch `qa3.sqlite3.pw`, không DB thật).
+- `python3 scripts/check_naming.py`: OK, không phát sinh mới.
+- Không sửa mã sản phẩm. Mã QA mới: `erp-console/e2e/qa_ed_batch3_money.py`; ảnh `shots/lot3/qa3-money-{mock,real}-*.png`. Dữ liệu chỉ là dữ liệu giả. Đã tắt máy chủ 3101, 3102, 8000 (không đụng 3201).
+
+| ED-17-AC1 chip + cột Tem + Người giao riêng | ✅ | `qa_ed_batch4_ac.py`: tab Chờ lấy ghi "Đã in (lần 1)", "Chưa in tem" ở tab khác. Ảnh `lo4_list_tab_cho_lay_ql1_1440.png` |
+| ED-17-AC2 thanh trạng thái + dòng "Tiếp theo" + nút chính | ⚠ chữ lệch (B8) | Chi tiết 31: có StatusPath, nút "In tem" và "Đã đóng gói"; dòng ghi "Tiếp theo: Soạn hàng, in tem rồi bấm Đã đóng gói", AC ghi "In tem, đóng gói, rồi bấm Đã đóng gói…" |
+| ED-17-AC3 "…" của phiếu chưa in tem | ❌ B1 | ql1 mở "…" phiếu 31: chỉ có "Giao cho người giao"; thiếu "In lại tem" (mờ, "Chưa in tem lần nào."), "Huỷ xác nhận đơn", "Huỷ đơn". Ảnh `lo4_detail31_ql1_1440.png` |
+| ED-17-AC4 / F2o giao cho người giao | ⚠ B6 | Chọn người, cột "Đang giao n phiếu", nút "Giao phiếu", đổi trường Người giao, 409 -> banner: ✅. Hộp thiếu khối tóm tắt, nút "Huỷ" thay vì "Quay lại". Ảnh `lo4_F2o_assign_ql1.png` |
+| ED-17-AC5 phiếu Giao thất bại | ⚠ B9 | Ba trường riêng và bước cuối đỏ (`data-state="bad"`) ✅; tên trường là "Lý do thất bại gần nhất / Ghi chú giao thất bại / Số lần giao thất bại", khác AC. Ảnh `lo4_detail38_failed_ql1_1440.png` |
+| ED-17-AC6 in lại tem (W2e) | ✅ (ghi nhận) | kho1 in lại: tem thành "Đã in (lần 2)". Lý do in lại được chọn sẵn 1 mục nên không thể để trống. Ảnh `lo4_W2e_reprint_kho1.png` |
+| ED-17-AC7 bảng hàng soạn theo lô (giá vốn) | ❌ B2 phần cột; ✅ phần giá vốn | Bảng ghi "Mặt hàng · Lô · HSD · Số kg": thiếu "Kho", "Lô xuất", "Hạn dùng". HTML kho1 không có cost/giá vốn |
+| ED-17-AC8 kho1 không sửa người giao; giao1 không có menu Giao hàng | ✅ | kho1 chi tiết 31: có In tem, Đã đóng gói; không có "Giao cho người giao". giao1: menu chỉ "Việc giao của tôi", `/deliveries/` -> không có quyền |
+| ED-19-AC1 các nhóm + thẻ | ❌ B4 | Thứ tự nhóm đúng (Đang giao -> Chờ lấy hàng -> Giao thất bại). Thẻ không có nhãn Người nhận/Đơn/Địa chỉ/Số kg/Hàng, không có mã Đơn, không có "Đã thanh toán, không thu thêm", số kg lặp ("2,000 kg · 2.000 kg"). Ảnh `lo4_mine_giao1_360.png` |
+| ED-19-AC2 bắt đầu giao | ⚠ B10 | Bấm nút ở thẻ Chờ lấy: 0037 sang Đang giao ✅. Nút ghi "Nhận hàng đi giao", AC ghi "Đã lấy hàng, bắt đầu giao" |
+| ED-19-AC3 F2l | ❌ B6 | Có đủ 5 lý do, ghi chú không bắt buộc (trừ "Khác"). Thiếu khối tóm tắt (Phiếu giao, Đơn, Khách hàng, Bắt đầu giao); nút là "Huỷ" / "Báo thất bại" thay vì "Quay lại" / "Báo giao thất bại". Ảnh `lo4_F2l_360.png` |
+| ED-19-AC4 chưa chọn lý do | ✅ | Ô Lý do báo "Chọn lý do giao thất bại.", hộp không đóng |
+| ED-19-AC5 thẻ Giao thất bại | ❌ B5 | Lý do và lần thất bại gộp một dòng "Lần thất bại gần nhất: Khác · đã thất bại 1 lần"; không có nút "Mang hàng về kho" (chỉ có chú thích "sắp có") |
+| ED-19-AC6 giao1 mở URL phiếu giao2 | ❌ B7 | giao1 vào `/deliveries/detail/?id=39`: hiện "Bạn không có quyền xem mục này", AC đòi "Không tìm thấy trang này". Ảnh `lo4_giao1_opens_other_courier_ticket.png` |
+| ED-19-AC7 SĐT đủ trên nút gọi, không lưu localStorage | ✅ | `tel:0900000036`, `tel:0900000038`; storage/URL/console không có SĐT khách hay ghi chú (script đã loại trừ SĐT của tài khoản mock) |
+
+### G1–G10 và UI-RULES
+| Mục | Kết quả | Ghi chú |
+|---|---|---|
+| G1 một giá trị mỗi ô | ❌ | thẻ Việc giao lặp kg (B3/B4) |
+| G3 chip có chữ | ✅ | trạng thái và tem đều có chữ |
+| G5 định dạng kg `18,5 kg` | ❌ B3 | chi tiết "3.000 kg", "2.000" trong bảng; thẻ "2,000 kg · 2.000 kg" |
+| G7 chữ cấm (HSD) | ❌ B2 | cột "HSD" ở chi tiết phiếu |
+| UI-RULES §5 mẫu trang chi tiết | ✅ | header, StatusPath, Timeline, "…" |
+| UI-RULES §6 hộp thoại (Quay lại, tóm tắt) | ❌ B6 | F2o, F2l |
+| UI-RULES §7 trạng thái rỗng | ✅ | tab Hoàn tất hôm nay: "Chưa có phiếu giao nào…" |
+| UI-RULES §7 lỗi mạng/offline | ⏸ | mock không có cách chèn lỗi; chưa chạy với BE thật |
+
+### Ngoại lệ, biên, phân quyền
+| Ca | Kết quả |
+|---|---|
+| giao1 chỉ thấy 0036/0037/0038; giao2 chỉ thấy 0039; không lẫn nhau | ✅ |
+| cs2 (CSKH + giao): menu có Việc giao của tôi; không có "Giao cho người giao" ở chi tiết | ✅ |
+| loc (chủ), ql1, kho1: thấy `Giao hàng`; kho1 không có nút giao người; ql1/loc có "Giao cho người giao" | ✅. Lưu ý B11: mock `loc` không có quyền in/đóng gói (BE thật có) |
+| Chưa đăng nhập `/my-deliveries/` -> `/login/?next=` | ✅ |
+| Báo thất bại: bỏ trống lý do, "Khác" không ghi chú, ghi chú dãy 9 số liền, quá 200 ký tự | ✅ chặn (hoặc cắt ở 200) |
+| Ghi chú "0912 345 678" (có dấu cách) | ❌ B12 (Low): FE cho qua, BE `has_long_digit_run` gộp dấu cách và sẽ chặn. Phần FE hiện lỗi từ 400 `DELIVERY_FAILURE_NOTE_PII`: ⏸ (chỉ đọc code, chưa chạy với BE thật) |
+| Bấm Đã giao xong -> phiếu rời nhóm Đang giao | ✅. F5 màn cũ trong mock reset dữ liệu nên không phải ca có nghĩa: ⏸ cần BE thật |
+| 409 khi giao: banner -> Tải lại -> giao được | ✅ (dev script 43/43 chạy lại) |
+| 360px không cuộn ngang, nút chạm >= 44px (giao1, giao2, cs2) | ✅. "Gọi khách" không xuống dòng (cao 44px, 1 hàng chữ) |
+| Màn quản lý ở 360px: nút lọc cao 32px, mã phiếu 18px | Low, ghi nhận (màn dành cho máy tính) |
+| Id lạ (`abc`, thiếu, 999999) -> "Không tìm thấy", không văng | ✅ |
+| Tem: SĐT che (`09xx xxx 123`), có QR; giao1 không có quyền in | ✅ ảnh `lo4_label_kho1.png` |
+
+### Rò giá vốn / dữ liệu cá nhân
+- Giá vốn: HTML chi tiết phiếu của kho1 không có `cost`/`giá vốn`; bảng lô không có cột tiền. Không rò.
+- Dữ liệu cá nhân: SĐT khách chỉ có ở nút "Gọi khách" của người giao đúng phiếu (theo quyết định 14), tem che SĐT. localStorage/sessionStorage/URL/console không có SĐT khách, ghi chú báo thất bại (chỉ có SĐT giả của tài khoản nhân viên trong `cave_erp_mock_users`, chỉ có ở bản mock). Dữ liệu trong ảnh đều là dữ liệu giả.
+- Phân quyền theo vai: giao1/giao2 không vào `/deliveries/`; cs2 không giao người.
+
+### Lỗi (chặn)
+### B1 — "…" của phiếu chưa in tem thiếu mục · High · ED-17-AC3
+Tái hiện: đăng nhập `ql1`, mở `/deliveries/detail/?id=31`, bấm "…". Mong đợi: "In lại tem" mờ (lý do "Chưa in tem lần nào."), "Huỷ xác nhận đơn", "Huỷ đơn". Thực tế: chỉ "Giao cho người giao". Ảnh hưởng: không đưa được đơn về Gọi xác nhận hay huỷ từ phiếu giao.
+### B2 — Bảng "Hàng soạn theo lô" sai cột · High · ED-17-AC7, G7
+Tái hiện: `kho1` mở `/deliveries/detail/?id=31`. Mong đợi: Mặt hàng · Kho · Lô xuất · Hạn dùng · Số kg. Thực tế: Mặt hàng · Lô · HSD · Số kg (thiếu Kho, dùng chữ cấm "HSD"). Ảnh hưởng: nhân viên kho không biết lấy hàng ở kho nào.
+### B3 — Số kg sai định dạng · Medium · G5, G1
+Tái hiện: `ql1` mở phiếu 31/34/38; `giao1` mở Việc giao. Thực tế: "3.000 kg", "2.000", thẻ giao "2,000 kg · 2.000 kg" (hai lần, hai kiểu). Mong đợi: `18,5 kg` một lần.
+### B4 — Thẻ Việc giao thiếu nhãn, mã Đơn, "Đã thanh toán, không thu thêm" · High · ED-19-AC1
+Tái hiện: `giao1` mở Việc giao của tôi. Thực tế: thẻ không có nhãn trường, không có mã đơn, không có dòng thanh toán. Ảnh hưởng: người giao có thể thu tiền thêm của khách đã trả (rủi ro nghiệp vụ).
+### B5 — Thẻ Giao thất bại gộp trường, thiếu "Mang hàng về kho" · Medium · ED-19-AC5
+Thực tế: "Lần thất bại gần nhất: Khác · đã thất bại 1 lần" một dòng; chú thích "…làm ở màn Hàng hoàn (sắp có)". Cần PO xác nhận nút này thuộc Lô 4 hay hoãn sang Lô 9 (nếu hoãn, hạ AC5 và ghi vào 02c).
+### B6 — F2o và F2l thiếu khối tóm tắt, sai chữ nút · Medium · ED-17-AC4, ED-19-AC3, UI-RULES §6
+Thực tế: nút "Huỷ" / "Giao phiếu" / "Báo thất bại", chỉ một dòng "Phiếu GH-…". Mong đợi: "Quay lại", "Báo giao thất bại", khối tóm tắt (Phiếu giao, Đơn, Khách hàng, Bắt đầu giao).
+### B7 — Phiếu của người khác báo "không có quyền" thay vì "Không tìm thấy" · Medium · ED-19-AC6
+Tái hiện: `giao1` vào `/deliveries/detail/?id=39`. Mong đợi: "Không tìm thấy trang này". Thực tế: "Bạn không có quyền xem mục này".
+
+### Lỗi không chặn
+- B8 (Low) ED-17-AC2: chữ dòng "Tiếp theo" khác AC.
+- B9 (Low) ED-17-AC5: tên ba trường thất bại khác AC.
+- B10 (Low) ED-19-AC2: nút "Nhận hàng đi giao" thay vì "Đã lấy hàng, bắt đầu giao".
+- B11 (Low, mock) `loc` (chủ vựa) trong mock không có quyền in tem và đóng gói, nên màn mock khác BE thật. Cần chỉnh `features/auth/mock.ts`.
+- B12 (Low) PII precheck của FE (`/\d{9,}/`) yếu hơn BE: số có dấu cách vẫn được gửi đi (BE chặn).
+
+### Có sẵn từ gốc / không thuộc lô
+- `e2e/ed_shell_fixes.py` gắn cứng cổng 3102, `s7_shell.py` chạy trên server tĩnh sinh ra "Failed to fetch RSC payload" (ồn, đã biết ở Lô 1–2): không chạy được như hồi quy, ⏸.
+- `check_naming`: OK, không phát sinh vi phạm mới (6482 vi phạm cũ).
+
+### ⏸ Chưa kiểm
+1. FE với BE thật (lỗi 400 `DELIVERY_FAILURE_NOTE_PII` hiện dưới ô, F5 màn cũ sau khi trạng thái đổi).
+2. Trạng thái lỗi mạng/offline (mock không có hook chèn lỗi).
+3. Nút chạm trên thiết bị thật (chỉ giả lập `is_mobile`).
+4. `ed_shell_fixes.py`, `s7_shell.py` như nêu ở trên.
+
+### Lệnh đã chạy
+- `rm -rf node_modules && npm ci && npx tsc --noEmit && npx vitest run`: sạch, vitest 405/405.
+- `NEXT_PUBLIC_USE_MOCK=0 npm run build` + `check-no-mock.mjs` + `check-ai-chunks.mjs`: xanh.
+- `NEXT_PUBLIC_USE_MOCK=1 npm run build`, phục vụ `out/` ở cổng 3201 (đã kiểm bản mock có chuỗi `cave_erp_mock`).
+- `BASE=http://127.0.0.1:3201 python3 e2e/qa_ed_batch4_ui.py` (49 ca, 36 ✅), `e2e/qa_ed_batch4_ac.py` (17 ca, 9 ✅), dev e2e ở trên, `python3 scripts/check_naming.py`.
+- Ảnh: `doc/features/2026-10-01-erp-theo-design/shots/lot4/` (20 ảnh `lo4_*.png`).
+
+
+### Lô 4 — FE lần 2 · 2026-10-02
+
+#### Kết luận: APPROVED (phần FE). B1–B12 đã đóng. Còn một khoảng trống hợp đồng không phải lỗi FE: mốc "Bắt đầu giao" (xem mục "Mở")
+Điều phối viên cần xin PO quyết định mục "Mở" trước khi đóng lô.
+
+#### Tổng: 139 ca của QA · ✅ 137 · ❌ 2 (cả hai ghi ở "Mở"/Low) · ⏸ 3
+- `qa_ed_batch4_ui.py` 49/50, `qa_ed_batch4_ac.py` 17/17, `qa_ed_batch4_round2.py` (mới, kiểm kỹ B1–B7) 71/72.
+- Dev e2e chạy lại: `ed_batch4_delivery` 70/70, `ed_batch1_shell` 56/56, `ed_batch2_patterns` 75/75.
+
+#### Script đã sửa theo PO (không bỏ ca nào khác)
+- "Cột Kho": bỏ khỏi ca danh sách (nay kiểm danh sách KHÔNG có cột Kho); giữ ca bảng "Hàng soạn theo lô" ở chi tiết (Mặt hàng · Kho · Lô xuất · Hạn dùng · Số kg).
+- F2l: khối tóm tắt kiểm theo ED-19-AC3 (Phiếu giao, Đơn, Khách hàng, không kg). Ca "Bắt đầu giao" giữ lại và vẫn đỏ (xem "Mở").
+- "Mang hàng về kho": đổi thành ca kiểm KHÔNG còn chữ "sắp có"/nút này ở thẻ thất bại (Lô 9).
+- Tên nút: "Quay lại", "Đã lấy hàng, bắt đầu giao".
+
+#### Kiểm kỹ B1–B7 (bằng chứng chạy thật)
+| Lỗi | Kết quả | Ca ngoài đường thuận / bằng chứng |
+|---|---|---|
+| B1 menu "…" phiếu chưa in | ✅ | loc, ql1, kho1 mở phiếu 31: "In lại tem · Chưa in tem lần nào.", "Huỷ xác nhận đơn · Đưa đơn về Gọi xác nhận.", "Huỷ đơn · Mở đơn để huỷ và hoàn tiền cho khách."; mục mờ `aria-disabled`, bấm cưỡng bức không mở hộp, không gọi API. Phiếu đã in (32) hết lý do "Chưa in tem"; phiếu Đang giao (33) không có mục Huỷ. Ảnh `lo4r2_menu31_{loc,ql1,kho1}.png` |
+| B2 bảng lô | ✅ | cột đúng, không "HSD"; cột Kho hiện "—" khi BE chưa trả (không "undefined"). Ảnh `lo4r2_detail31_ql1_1440.png` |
+| B3 kg | ✅ | phiếu 30 và 32–38 chi tiết, 4 tab danh sách, thẻ, hộp F2o: không còn "2.000 kg", không NaN. Phiếu 31: "3,5 kg", dòng "2,5 kg" và "1 kg" |
+| B4 thẻ Việc giao | ✅ | 3 thẻ giao1: đủ nhãn Người nhận/Đơn/Địa chỉ/Số kg/Hàng, mã đơn, mỗi thẻ đúng một dòng "Đã thanh toán, không thu thêm", Hàng không kèm kg. Ảnh `lo4r2_mine_giao1_360.png` |
+| B5 | ✅ | thẻ thất bại có "Lý do" và "Lần thất bại" riêng; không còn "sắp có". PO đã hoãn "Mang hàng về kho" sang Lô 9 |
+| B6 hộp thoại | ✅ | F2o (phiếu chưa gán: Phiếu giao/Đơn/Khối lượng; phiếu đã gán 37: thêm Người giao hiện tại + "Đang giữ phiếu này"), F2l (Phiếu giao/Đơn/Khách hàng), Đã giao xong có tóm tắt; "Quay lại" đóng hộp, không đổi dữ liệu; bấm đúp "Giao phiếu" và "Báo giao thất bại": đúng 1 request. Ảnh `lo4_F2o_assign_ql1.png`, `lo4_F2l_360.png`, `lo4r2_F2k_360.png` |
+| B7 | ✅ | giao1 mở phiếu mình (36) được; phiếu giao2 (39), phiếu giao Đang giao của người khác (33), id=9999: "Không tìm thấy trang này" + "Về Việc giao của tôi"; giao2 mở 36: không tìm thấy, mở 39: được; kho1 mở 39 được; `/deliveries/` vẫn chặn giao1; chưa đăng nhập: `/login/` không mang dữ liệu khách. Ảnh `lo4r2_giao1_other_ticket_360.png`, `lo4r2_giao1_own_detail_360.png` |
+| B8–B11 | ✅ | dòng "Tiếp theo: In tem, đóng gói, rồi bấm Đã đóng gói", 3 tên trường thất bại, nút "Đã lấy hàng, bắt đầu giao" (thẻ và menu), `loc` có In tem + Đã đóng gói |
+| B12 | ✅ | ghi chú "0912 345 678", "091.234.5678", "0912-345-678", "091_234_5678", "0912/345/678" bị chặn ở FE, hộp còn mở, 0 request; ghi chú hợp lệ gửi được |
+
+#### Rò giá vốn / dữ liệu cá nhân (kiểm lại)
+Không rò. HTML chi tiết của kho1 và giao1 không có giá vốn/cost; ghi chú báo thất bại và SĐT khách (kể cả dạng có dấu cách) không nằm trong localStorage/sessionStorage/URL; không `console.error` ở mọi vai (loc, ql1, kho1, giao1, giao2, cs2). Ảnh chỉ dùng dữ liệu giả. Quyền: giao1/giao2 chỉ thấy phiếu của mình; cs2 không có nút giao người; kho1 không có "Giao cho người giao".
+
+#### Mở
+- **O1 (Medium, cần PO/BE, không phải lỗi FE) ED-19-AC3 và AC2:** khối tóm tắt F2l thiếu dòng "Bắt đầu giao", và AC2 "thời điểm Bắt đầu giao được ghi" không kiểm được, vì `DeliveryNote` không có trường mốc này (xác minh ở `backend/apps/delivery/models.py`; 02b không có). Hai cách: BE thêm trường (cần migration và Techlead duyệt) hoặc PO bỏ dòng này khỏi AC2/AC3. Ca `F2l (BE chưa có mốc)` trong `qa_ed_batch4_ui.py` vẫn đỏ cho tới khi quyết định.
+- **O2 (Low, có sẵn) :** nút "Đóng thông báo" của toast cao 32px ở 360px (< 44px), thuộc thành phần Toast dùng chung, lô này không sửa.
+- **O3 (Low, ghi nhận):** kho1 thấy "Huỷ xác nhận đơn" và "Huỷ đơn" ở dạng mờ có lý do (kho1 không có quyền huỷ đơn). Chỉ mờ, không bấm được; PO cân nhắc có ẩn hẳn không.
+- Nợ dev đã ghi: cột Kho hiện "—" tới khi BE trả `warehouse_name`; thẻ chưa có "Lúc" thất bại; TL-L6 (`phone` ở danh sách `assigned_to=me`).
+
+#### ⏸ Chưa kiểm
+FE với BE thật (lỗi 400 hiện dưới ô, F5 màn cũ); lỗi mạng/offline (mock không chèn được); nút chạm trên thiết bị thật.
+
+#### Lệnh đã chạy (lần 2)
+`rm -rf node_modules && npm ci` (sạch), `npx tsc --noEmit` (sạch), `npx vitest run` 44 file / 410 test đạt, `NEXT_PUBLIC_USE_MOCK=0 npm run build` + `check-no-mock` XANH + `check-ai-chunks` XANH, `NEXT_PUBLIC_USE_MOCK=1 npm run build` + `check-ai-chunks` XANH (bản mock có `cave_erp_mock`), cổng 3201, các script nêu trên, `python3 scripts/check_naming.py` OK. Ảnh trong `shots/lot4/` (`lo4r2_*.png`).
+
+
+## Lô 6 — FE · Khách hàng (ED-13 phần hiển thị, ED-14) · 2026-10-02
+
+### Kết luận: APPROVED (phần FE). Không có lỗi Critical/High/Medium mới. Còn một quyết định của Duy đã mở sẵn (#11, L6-N2: tìm khách đặt từ khoá trong URL API)
+Phạm vi: `erp-console/features/customers/`, `app/(console)/customers/`, `nav.ts`, `mock.ts`, và đổi nhỏ ở BE `apps/sales/orders/serializers.py` (thêm `customer.id` vào chi tiết đơn). Mã chưa commit lúc QA.
+
+### Tổng: 252 ca của QA · ✅ 252 · ❌ 0 · ⏸ 4 (mục "Chưa kiểm")
+- `e2e/qa_ed_batch6_api.py` (API thật, SQLite tạm + `seed_demo`): 98/98.
+- `e2e/qa_ed_batch6_real.py` (giao diện thật, console build `USE_MOCK=0` ở cổng 3102 gọi Django thật cổng 8000): 154/154, vai `loc`, `ql1`, `kho1`, `giao1`, `cs2`, 360px và 1440px.
+- Dev e2e chạy lại: `ed_batch6_customers` 79/79, `ed_batch1_shell` 56/56, `ed_batch2_patterns` 142/142 (mock, cổng 3101).
+- Lần chạy đầu của script thật có 2 ca đỏ do lỗi script của QA (đợi chưa đủ sau khi gõ ô tìm; kiểm thẻ `<b>` quá rộng), đã sửa script, nạp lại DB và chạy lại từ đầu 154/154. Không có ca nào bị bỏ để được xanh.
+
+### Cổng tự động
+`rm -rf node_modules && npm ci` sạch (không `--legacy-peer-deps`) · `npx tsc --noEmit` sạch · `npx vitest run` 525 đạt · `NEXT_PUBLIC_USE_MOCK=0 npm run build` + `check-no-mock.mjs` + `check-ai-chunks.mjs` xanh · `NEXT_PUBLIC_USE_MOCK=1 npm run build` xanh · `python3 manage.py test apps.sales` 554 đạt · `python3 scripts/check_naming.py` OK (QA đã đổi tên biến `ql1_can_patch` thành `manager_can_patch` trong script của mình để không phát sinh vi phạm mới).
+
+### Dữ liệu giả của QA
+35 khách giả (`Khách Thử A…`), khách A (pk 7) có 6 đơn: COMPLETED (hoàn 50.000 đã hoàn), PROCESSING, CANCELLED (hoàn 300.000 đã hoàn), AUTO_CANCELLED, BOOKED, PROCESSING (hoàn 40.000 chờ). Kỳ vọng tính tay: 6 đơn, 2 huỷ, tổng đã mua 350.000 đ. Cũng có khách 55 đơn, khách chưa mua, khách tên chứa HTML. Chỉ dữ liệu giả, SĐT dạng `09000001xx`.
+
+---
+
+## Lô 5 — FE · Gọi xác nhận (ED-15) · lần 1 · 2026-10-02
+
+### Kết luận: REJECTED. 2 lỗi High (thiếu cột "Lý do" riêng theo AC1; CSKH không xem được Dòng thời gian vì BE trả 403) và 5 lỗi Medium (bảng cuộn ngang ở 1280, thanh trạng thái sai bước, ô tìm 30px ở 360, gợi ý xám dưới lựa chọn, thiếu bộ đếm 0/200).
+Điểm tốt đã kiểm chạy thật: phạm vi dữ liệu cá nhân của CSKH (dòng ngoài phạm vi chỉ có số che, dòng trong phạm vi có số đủ và `tel:`), 6 kết quả cuộc gọi + "Đã báo hoàn tiền", chặn giờ hẹn quá khứ, đổi người nhận, Quyết định (nút Huỷ đơn đỏ có bước xác nhận), 409 CLAIMED và STALE_STATE (cả trên BE thật), ghi chú có SĐT bị chặn, không dữ liệu khách trong console / storage / URL, không gọi bên thứ ba, AuditLog sạch tên/SĐT/địa chỉ và không có khoá giá vốn.
+
+### Tổng (script của QA, mock + BE thật): 310 ca · ✅ 289 · ❌ 21 (gộp thành 9 lỗi B1–B9) · ⏸ 3 (job chạy 2 lần, `qa_lo8_real.py`, cờ AI)
+- Mock (`qa_ed_batch5_ui.py`, 12 khối): 251 ca · ✅ 233 · ❌ 18.
+- BE thật (`qa_ed_batch5_real.py` + phần đuôi chạy riêng sau khi script treo): 59 ca · ✅ 56 · ❌ 2 (cùng lỗi gốc B2) + 1 ca script sai kỳ vọng (huỷ đơn thủ công kết thúc ở DONE là đúng thiết kế, chỉ job tự huỷ mới sang REFUND_CALL; đã sửa kỳ vọng, ghi ✅).
+- Dữ liệu 100% giả (seed_demo + "Khách Thử …"), SQLite tạm ở scratchpad, không chạm DB thật. Ảnh: `shots/lot5/` (38 ảnh).
+
+### Theo AC
+| Mã AC | Kết quả | Bằng chứng |
+|---|---|---|
+| ED-13-AC2 (hiển thị) | ✅ | Danh sách và chi tiết khách A: Số đơn 6, Đơn huỷ 2, `350.000 đ`, đúng số tính tay. Đổi dữ liệu rồi xem lại: xác nhận hoàn 40.000 đang chờ, rồi huỷ thêm đơn đã trả 100.000, thì số thành 310.000 đ rồi 210.000 đ, đơn huỷ 3, danh sách khớp chi tiết. Ảnh `qa6_real_desktop_detail_1440.png` |
+| ED-13-AC3 (quyền, phía FE) | ✅ | `kho1`, `giao1`, `cs2`: 0 request tới `customer-directory` hoặc `guidance/customer` (đếm ở mọi đường dẫn thử); API 403 không có dữ liệu khách (98 ca API) |
+| ED-14-AC1 | ✅ có ghi nhận | Đủ cột Khách hàng, Số điện thoại (đủ số), Số đơn, Tổng đã mua, Đơn gần nhất `dd/mm/yyyy hh:mm`, Ghi chú; mặc định `-last_order_at`; không thanh AI. Có thêm cột "Đơn huỷ" (xem L-1). Ảnh `qa6_real_desktop_list_1440.png`, so với `board-ERP-W5a-Khach-hang-1440.png` |
+| ED-14-AC2 | ✅ | Có "Sửa thông tin" và "…" (menu có "Sao chép số điện thoại"); không thanh trạng thái, không khối Trợ lý AI, 0 request `/api/ai/*`; Tên/Địa chỉ/Ghi chú có nút sửa; SĐT, Khách từ, Số đơn, Tổng đã mua, Đơn huỷ có icon khoá; bảng Đơn hàng (6 dòng, bấm dòng sang đơn), bảng Phiếu hoàn (3 dòng, đủ Chờ hoàn/Đã hoàn), Dòng thời gian. Ảnh `qa6_real_desktop_detail_1440.png`, so với `board-ERP-W5b-Chi-tiet-khach-hang-1440.png` |
+| ED-14-AC3 (SĐT trùng) | ⏸ Không áp dụng được | Theo quyết định đã chốt ở 02b/BE, SĐT là khoá, màn không có ô sửa SĐT và PATCH từ chối `phone` (`INPUT_NOT_ALLOWED`). AC này lỗi thời so với thiết kế: nhờ PO đổi thành "không có ô SĐT, PATCH không mang `phone`" (đã có ca đạt). Thay bằng ca lỗi lưu: mất mạng khi lưu thì hộp còn, giá trị đã gõ còn nguyên, có lời báo và nút "Thử lại", thử lại lưu được. Ảnh `qa6_real_save_error.png` |
+| ED-14-AC4 | ✅ | Chủ tắt "Xem khách hàng" của nhóm Quản lý (thao tác trực tiếp trên DB thật), `ql1` đăng nhập lại: menu Khách hàng ẩn, `/customers/` và `/customers/detail/?id=7` ra "Không có quyền", 0 request `customer-directory`, trang đơn không còn "Mở trang khách". Cấp lại thì xem được. Tắt riêng "Sửa khách hàng": vẫn xem được, không còn nút Sửa. Ảnh `qa6_ql1_view_revoked.png` |
+| ED-14-AC5 | ✅ có ghi nhận | URL trang không đổi khi tìm (`/customers/`), không từ khoá nào trong URL; `localStorage`, `sessionStorage`, `document.title`, console không chứa tên/SĐT/địa chỉ/ghi chú; không `console.log` dữ liệu khách. Riêng URL **API** `?q=` có từ khoá (xem O1) |
+
+### Yêu cầu tối thiểu của điều phối viên
+| Mục | Kết quả |
+|---|---|
+| `kho1`/`giao1`/`cs2`: không có menu, `/customers/`, `/customers/detail/?id=7`, `?id=abc`, không `id` đều ra "Không có quyền", không lộ dữ liệu, 0 request `customer-directory` | ✅ (3 vai × 4 đường dẫn). Ảnh `qa6_kho1_no_permission.png` |
+| Không có dữ liệu khách trong URL, `localStorage`, `sessionStorage`, console, `title` | ✅ quét sau khi tìm theo tên, theo SĐT, sau khi sửa, và toàn bộ URL đã đi qua (chỉ có `?id=`) |
+| Chi tiết không có khối AI, 0 request `/api/ai/*` | ✅ |
+| Không có ô sửa SĐT; PATCH không có `phone` | ✅ Hộp "Sửa thông tin" không có ô SĐT; mọi PATCH quan sát chỉ có `{note}`, `{name}`, `{address}`, không có `phone` |
+| Tìm tên không dấu (`khach thu a`, `nguyen van an`), tìm SĐT đủ số và 4 số cuối, `090` (3 số) không khớp và có "Xoá tìm kiếm" | ✅ |
+| Sắp xếp (A–Z, Tổng đã mua nhiều nhất, Nhiều đơn nhất, Đơn gần nhất cũ trước/mới trước) | ✅ hàng đầu đúng từng cách; URL không đổi |
+| Tải thêm | ✅ `20 / 35` rồi `35 / 35`, request `page=2` mang `ordering`, đúng 35 hàng không trùng, hết nút |
+| Số đơn, tổng `n.nnn đ`, đơn huỷ, "Đơn gần nhất" `dd/mm/yyyy hh:mm` | ✅ không có "vừa xong/hôm qua", không `NaN`/`Invalid Date` |
+| `total_spent` khi có đơn huỷ và hoàn tiền | ✅ 350.000 → 310.000 → 210.000 đ, kiểm cả trên màn đang mở sau khi sửa và sau F5 |
+| Sửa tên/địa chỉ/ghi chú rồi tải lại vẫn còn | ✅ ghi chú, địa chỉ, tên đều còn sau F5; Dòng thời gian thêm bản ghi "Cập nhật hồ sơ khách"; số liệu không đổi |
+| Liên kết "Mở trang khách" từ trang đơn | ✅ trỏ đúng `/customers/detail/?id=7`, mở đúng khách; `kho1`/`ql1` bị tắt quyền: không có liên kết |
+| 360px không cuộn ngang | ✅ danh sách, chi tiết, và hộp sửa. Ảnh `qa6_real_mobile_list_360.png`, `qa6_real_mobile_detail_360.png`, `qa6_real_mobile_edit_360.png` |
+| Không console error | ✅ mọi vai (đã lọc "Failed to fetch RSC payload" do Next prefetch bị huỷ khi điều hướng, một lần xuất hiện ở phiên 360px lần chạy trước, không tái hiện ở lần thăm dò riêng; nhiễu hạ tầng đã biết từ Lô 1 và 4) |
+| Không rò giá vốn | ✅ HTML chi tiết và danh sách không có giá vốn/lãi/lô nhập |
+
+### Ngoại lệ & biên đã chạy (ngoài đường thuận)
+| Ca | Kết quả |
+|---|---|
+| Bấm đúp "Lưu thay đổi" | ✅ đúng 1 PATCH |
+| Ghi chú 1001 ký tự | ✅ chặn tại chỗ, 0 PATCH, báo "tối đa 1000" |
+| Esc khi đang sửa | ✅ không lưu, giữ giá trị cũ |
+| Mất mạng khi lưu rồi "Thử lại" | ✅ giữ giá trị đã gõ, lưu được |
+| Mất mạng khi tải danh sách | ✅ có thông báo lỗi và "Thử lại", không trang trắng, bấm thử lại tải được. Ảnh `qa6_real_list_offline.png` |
+| Màn đã mở, dữ liệu đổi ở nơi khác (hoàn tiền, huỷ đơn) | ✅ số cập nhật sau lưu/F5; xem O3 về việc không có cảnh báo chủ động |
+| Xoá trắng ghi chú | ✅ PATCH `{note:""}` 200 |
+| id không tồn tại, chữ, 0, âm, thiếu, `7%20OR%201=1` | ✅ "Không tìm thấy", không 500 |
+| Tên khách chứa `<b>` và ghi chú chứa `<script>` | ✅ hiện nguyên văn, không in đậm, không chạy script, 0 hộp thoại |
+| Khách chưa có đơn | ✅ lời trống cho bảng Đơn hàng và Phiếu hoàn, `0 đ`, không NaN |
+| Khách 55 đơn | ✅ "50 đơn mới nhất trong 55 đơn", đúng 50 dòng |
+| Gõ `%` vào ô tìm | ✅ không 5xx |
+| Quyền đổi giữa phiên (Chủ tắt/bật lại quyền của Quản lý) | ✅ xem AC4 |
+| API 98 ca: 401/403/404/400, `INPUT_NOT_ALLOWED`, `INPUT_EMPTY`, phân trang, thứ tự, AuditLog `update_customer` chỉ ghi tên trường, `ordering` lạ, chống SQL | ✅ 98/98 |
+
+### Phân quyền (Group × hành động)
+| Hành động | owner (`loc`) | manager (`ql1`) | warehouse_staff (`kho1`) | delivery_staff (`giao1`) | CSKH (`cs2`) | Chưa đăng nhập |
+|---|---|---|---|---|---|---|
+| Menu Khách hàng | có | có | ẩn | ẩn | ẩn | không vào được |
+| Mở `/customers/`, chi tiết | xem được | xem được | "Không có quyền" | "Không có quyền" | "Không có quyền" | chuyển `/login/`, không mang dữ liệu |
+| API `customer-directory` | 200 | 200 | 403 | 403 | 403 | 401 |
+| Sửa tên/địa chỉ/ghi chú | có | có (xem L-4) | không | không | không | không |
+| "Mở trang khách" ở trang đơn | có | có | không | không | không | không |
+| Tắt "Xem khách hàng" (manager) | n/a | ẩn menu + "Không có quyền" + 0 request | | | | |
+
+### Rò giá vốn
+Không rò. Không có trường giá vốn, lãi, lô nhập ở JSON `customer-directory` (98 ca API) và ở HTML danh sách/chi tiết. `total_spent` là tiền bán, không suy ngược ra giá vốn. AuditLog `update_customer` chỉ có tên trường (`{"fields":["note"]}`), không chứa giá trị, tiền hay kg.
+
+### Rò dữ liệu cá nhân
+- Danh sách và chi tiết có tên/SĐT đủ số: đúng thiết kế (nội bộ, chỉ owner/manager). Ba vai còn lại không nhận được và không gọi API.
+- `localStorage`, `sessionStorage`, `title`, URL trang, console: sạch ở mọi vai và mọi bước (tìm, sửa, lỗi, mất mạng).
+- AI: trang khách không có khối AI, 0 request `/api/ai/*`; `FORBIDDEN_PREFIXES` có `customer-directory` (test BE xanh).
+- AuditLog: không chép giá trị tên, địa chỉ, ghi chú.
+- Ảnh chụp và script chỉ dùng dữ liệu giả.
+- **O1 bên dưới: URL API `?q=` mang từ khoá tìm (tên hoặc SĐT) vào nhật ký máy chủ.**
+
+### Hồi quy
+`ed_batch1_shell` 56/56 và `ed_batch2_patterns` 142/142 (mock); `apps.sales` 554 đạt (gồm `customer.id` mới ở serializer đơn); trang đơn mở bình thường với `loc`, `ql1`, `kho1`; menu các vai khác không đổi.
+
+### Mở / ghi nhận (không chặn)
+- **O1 (đã có trong `00-can-duy-quyet.md` mục 11, QA BE gọi là L6-N2, Medium, chờ Duy quyết):** tìm khách bằng `GET …/customer-directory/?q=<tên hoặc SĐT>`. Từ khoá nằm trong URL API nên vào nhật ký truy cập máy chủ (đã thấy trong `be-qa6.log`; Cloud Run cũng ghi URL yêu cầu). Giao diện này khiến rủi ro thành thực tế: mỗi lần chủ/quản lý gõ tìm là một dòng log có SĐT. Màn Gọi xác nhận đã dùng POST body cho lý do này; N11-2 (nhà cung cấp) và `q=` của danh sách đơn cũng cùng loại, nợ chung. Cách sửa (khi Duy chọn): POST tìm kiếm (BE + FE, cần Techlead). Tôi không nâng thành chặn vì quyết định đã nằm ở Duy và 02b chốt GET; nếu Duy cho rằng đây là rò dữ liệu cá nhân Critical thì lô này phải REJECTED tới khi đổi.
+- **L-1 (Low):** thêm cột "Đơn huỷ" ngoài danh sách cột của AC1 và board W5a. Dev đã ghi nhận.
+- **L-2 (Low):** không có bộ lọc "Mọi khách"; sắp xếp dùng ô chọn và "Tải thêm khách" thay vì cuộn vô hạn/phân trang (dev đã ghi nhận lệch so với board).
+- **L-3 (Low):** tìm có khoảng trắng giữa từ lặp nhiều lần (`khach   thu a`) trả 0 kết quả (khoảng trắng đầu/cuối đã được cắt); FE chưa gộp khoảng trắng. Gợi ý gộp khoảng trắng ở FE hoặc BE.
+- **L-4 (ghi nhận):** `ql1` (Quản lý) có quyền sửa khách mặc định; AC4 chỉ quy định quyền Xem. Báo PO nếu muốn Quản lý chỉ xem.
+- **O3 (ghi nhận):** hai người cùng sửa một khách: người lưu sau thắng, không có cảnh báo "người khác vừa sửa". Dòng thời gian cho thấy cả hai bản ghi. Số liệu "chỉ đọc" cũ trên màn đang mở chỉ cập nhật sau khi lưu hoặc F5.
+- **L-5 (ghi nhận):** `customer.id` ở chi tiết đơn cũng đến tay `kho1` (đã có sẵn trong phiên bản đơn của kho; dev đã ghi). Danh bạ khách vẫn 403 với kho1, không rò thêm tên/SĐT.
+- **L-6 (ghi nhận):** Dòng thời gian của khách seed trên DB thật chỉ có "Tạo hồ sơ khách" vì dữ liệu tạo không qua audit; không phải lỗi FE.
+
+### ⏸ Chưa kiểm
+1. ED-14-AC3 (SĐT trùng): không áp dụng được vì SĐT khoá; chờ PO sửa AC.
+2. Nút chạm trên thiết bị thật (chỉ giả lập khung nhìn 360px).
+3. Staging/production (QA chỉ chạy máy cục bộ, SQLite tạm).
+4. Tải lớn (hàng nghìn khách): chỉ kiểm 35 và 55 đơn.
+
+### Lệnh đã chạy
+`rm -rf node_modules && npm ci` · `npx tsc --noEmit` · `npx vitest run` (525) · `NEXT_PUBLIC_USE_MOCK=0|1 npm run build` · `node scripts/check-no-mock.mjs` · `node scripts/check-ai-chunks.mjs` · `python3 manage.py test apps.sales` (554) · `python3 e2e/ed_batch6_customers.py` (79), `ed_batch1_shell.py` (56), `ed_batch2_patterns.py` (142) trên cổng 3101 · `QA_DB=… python3 e2e/qa_ed_batch6_api.py` (98/98) · `QA_DB=… SHOTS=…/shots/lot6 python3 e2e/qa_ed_batch6_real.py` (154/154) · `python3 scripts/check_naming.py` (OK). Ảnh trong `shots/lot6/` (`qa6_*.png` và hai ảnh board). Đã tắt máy chủ cổng 3101, 3102, 8000.
+
+| ED-15-AC1 6 tab + chip theo `ConfirmTask.state` | ✅ | 6 tab đúng thứ tự (Cần gọi ngay, Hẹn gọi lại, Cần quyết định, Gọi báo hoàn tiền, Chờ gọi, Tất cả), chip "Gọi báo hoàn tiền" cho REFUND_CALL, cột "Hạn gọi". Ảnh `qa5-queue-*` |
+| ED-15-AC1 "Lý do chuyển quyết định ở cột riêng" | ❌ B1 | 10 cột: Mã đơn, Khách hàng, Số điện thoại, Hàng, Tổng kg, Tổng tiền, Hạn gọi, Lần gọi, Đang gọi, Trạng thái. Không có cột Lý do; tab Cần quyết định không hiện "Không nghe máy" ở ô nào |
+| ED-15-AC1 che / hiện số theo phạm vi (BR-GH-18) | ✅ | Mock: cs2 thấy dòng ngoài phạm vi chỉ có số che, dòng trong phạm vi số đủ, link `tel:`. BE thật: API cs2 trả `phone_masked`, tên / SĐT / địa chỉ rỗng cho dòng ngoài phạm vi; DOM không chứa số thật |
+| ED-15-AC2 Ghi kết quả gọi (7 lựa chọn) | ✅ | Mỗi kết quả (CONFIRMED, CALLBACK, UNREACHABLE, WRONG_NUMBER, WANT_CHANGE, WANT_CANCEL, NOTIFIED) chạy thật, bấm đúp Lưu chỉ ghi 1 lần; BE thật: bảng "Lịch sử cuộc gọi" cập nhật + toast |
+| ED-15-AC2 Dòng thời gian có dòng mới (CSKH) | ❌ B2 | BE thật, cs2: `GET /api/guidance/delivery/<id>/` -> 403 "Bạn không có quyền xem lịch sử này."; màn hiện "Chưa tải được lịch sử của đơn. [Thử lại]". ql1 và loc nhận 200 và có dòng mới. Ảnh `qa5-real-detail-after-call-cs2-1280.png` |
+| ED-15-AC3 Hẹn gọi lại (F2i) | ✅ | Chặn giờ quá khứ, biên đúng phút hiện tại, múi giờ GMT+7 -> UTC đúng |
+| ED-15-AC3 Đổi người nhận / địa chỉ (F2j) | ✅ | Lưu đổi, không đổi gì thì không gửi, 409 STALE_STATE đúng; AuditLog `recipient_changed` không chứa tên / địa chỉ |
+| ED-15-AC4 Quyết định (F2k): Giao không xác nhận, Gia hạn (<=24h), Huỷ đơn | ✅ nội dung / ⚠ B5 | Nút "Huỷ đơn" đỏ, bấm lần đầu chỉ hỏi lại ("Xác nhận huỷ đơn"), "Quay lại" không huỷ; BE thật: Giao không xác nhận -> phiếu PREPARING, huỷ -> phiếu CANCELLED + task DONE. CSKH không có nút Quyết định |
+| ED-15-AC5 chặn đơn lệch trạng thái (409) | ✅ | BE thật: job tự huỷ chạy lúc hộp Quyết định đang mở -> STALE_STATE, hộp giữ nguyên, có alert câu của BE, "Tải lại" đóng hộp, phiếu vẫn CANCELLED, không ai giao; CLAIMED: cs1 giữ, cs2 bấm -> không mở hộp, thấy "đang được cs1 xử lý" |
+| ED-15-AC6 AuditLog + không rò | ✅ | 11 loại hành động (delivery_call_recorded, delivery_confirmed, delivery_confirm_skipped, delivery_extended, delivery_unconfirmed, recipient_changed, order_auto_cancelled…), changes/note không chứa SĐT 10 số, tên, địa chỉ; không có `purchase_rate`/`landed`/`unit_cost`; không có bản ghi nào chứa đồng thời tiền, kg và qty để tính ngược giá vốn |
+| Mẫu trang chi tiết (ED-04 áp cho Gọi xác nhận): StatusPath, thông tin, lịch sử gọi, Timeline | ⚠ B5, B8, B9 | Có đủ khối, nhưng StatusPath hiện bước giao hàng thay vì bước việc gọi |
+| Ghi chú có SĐT | ✅ | Chặn cả 9 biến thể (có khoảng trắng, dấu chấm, +84, …), hiện lỗi, không gửi request |
+| 360px | ⚠ B4 | Không cuộn ngang, không lỗi console; riêng ô tìm `q` của hàng chờ cao 30px (< 44px) |
+
+### Ngoại lệ & biên
+| Ca | Kết quả | Ghi chú |
+|---|---|---|
+| Bấm đúp Lưu cuộc gọi | ✅ | 1 bản ghi (mock + BE thật) |
+| Màn cũ: phiếu đã bị huỷ / đổi trạng thái khi hộp đang mở | ✅ | STALE_STATE trên BE thật (job chạy thật), hộp khoá ô nhập, Tải lại ổn |
+| Hai người cùng một việc (giữ phiếu) | ✅ | CLAIMED trên BE thật. Lưu ý: nếu cs2 mở màn SAU khi cs1 đã giữ thì BE không trả `record_call`, màn chỉ hiện cảnh báo "Đơn đang được cs1 xử lý tới hh:mm" và nút "Gọi khách" (xem L2) |
+| Gia hạn 24h / 24h01 | ✅ | chặn đúng biên |
+| Hẹn gọi lại: quá khứ / đúng bây giờ | ✅ | |
+| Số lần gọi 3/3, ESCALATED | ✅ | Chip "Cần quyết định", Lần gọi 3/3 |
+| Ghi chú > 200 ký tự | ✅ | Ô nhập không cho quá 200 |
+| Mất mạng khi lưu (BE thật, `set_offline`) | ✅ | Hộp còn mở, có thông báo lỗi, 0 bản ghi cuộc gọi. Ảnh `qa5-real-offline-cs2-1280.png` |
+| Job tự huỷ chạy 2 lần | ⏸ | Chỉ chạy 1 lần trong lúc hộp mở (lần đó huỷ 1 phiếu đúng); chưa chạy lần 2 để kiểm tính lặp |
+| Cờ AI tắt / bật | ⏸ | Không thuộc Lô 5; endpoint `/api/ai/status/` trên BE worktree trả 404 (xem pre-existing) |
+
+### Phân quyền (Group x hành động), kiểm chạy thật trên UI + API
+| Vai | Thấy menu | Mở hàng chờ | Thấy số thật | Ghi kết quả gọi | Nút Quyết định | Dòng thời gian |
+|---|---|---|---|---|---|---|
+| cs2 (CSKH) | có | ✅ | chỉ dòng trong phạm vi | ✅ | không có (đúng) | ❌ 403 (B2) |
+| ql1 (Quản lý) | có | ✅ | ✅ | ✅ | ✅ | ✅ |
+| loc (Chủ) | có | ✅ | ✅ | ✅ | ✅ | ✅ |
+| kho1 | không có mục | "Không có quyền", DOM không chứa dữ liệu khách | không | không | không | không |
+| giao1 | không có mục | như kho1 | không | không | không | không |
+| Chưa đăng nhập | | chuyển /login | | | | |
+
+### Rò giá vốn
+Không thấy. API hàng chờ / chi tiết, AuditLog `changes`/`note` và DOM không có `purchase_rate`, `landed`, `unit_cost`, "giá vốn", "lãi". Không có khoá nào ghi cùng lúc tiền và kg đủ để tính ngược.
+
+### Rò dữ liệu cá nhân
+Không thấy rò. Console (mọi vai, cả mock lẫn BE thật phần chạy được), `localStorage`/`sessionStorage`, URL, `document.title`, request tới bên thứ ba (không có), AuditLog: sạch. Dòng ngoài phạm vi chỉ trả `phone_masked`. Ảnh chụp và report chỉ dùng tên giả.
+
+### Hồi quy
+- `npm ci` sạch (không `--legacy-peer-deps`), `npx tsc --noEmit` sạch, vitest 434 xanh, build MOCK=0 và MOCK=1 xanh, `check-no-mock` và `check-ai-chunks` xanh, `scripts/check_naming.py` OK (không vi phạm mới).
+- `ed_batch5_confirmation.py` (dev) xanh; `ed_batch1_shell.py` 56/56 trên bản sao (lần đầu quá hạn vì tiến trình khác build lại `out/`, lỗi của khay chạy, không phải lỗi sản phẩm).
+- ❌ `sr09_ac4_real_backend.py`: gãy ở bộ chọn cũ (`role=button` cho tab, `queueCard`, test id `confirmation-stale-alert`). Luồng STALE_STATE tương đương đã được phủ bằng `qa_ed_batch5_real.py`. Cần dev viết lại script này cho giao diện mới.
+- ⏸ `qa_lo8_real.py` (phần CSKH): gãy trước khi tới phần CSKH ở `button.order-open` (Lô 3) và cần dữ liệu đồng hồ cố định; chưa kiểm được.
+
+### Lỗi
+#### B1 — Hàng chờ thiếu cột "Lý do chuyển quyết định" · High · AC ED-15-AC1
+Tái hiện: đăng nhập `ql1`, mở `/confirmation/`, tab "Cần quyết định".
+Mong đợi: có cột riêng ghi lý do (vd "Không nghe máy").
+Thực tế: 10 cột, không cột nào ghi lý do; dòng ESCALATED chỉ có chip "Cần quyết định".
+Ảnh hưởng: Quản lý phải mở từng phiếu mới biết vì sao cần quyết định.
+
+#### B2 — CSKH không xem được Dòng thời gian của phiếu (BE 403, FE không xử lý nhẹ nhàng) · High · AC ED-15-AC2
+Tái hiện (BE thật): đăng nhập `cs2`, mở một phiếu CONFIRMING đang trong phạm vi, ghi một cuộc gọi. `GET /api/guidance/delivery/<note_id>/` trả 403 "Bạn không có quyền xem lịch sử này." (`apps/common/guidance/audit_timeline.py:131`). Cùng yêu cầu với `ql1` và `loc` trả 200.
+Mong đợi (02b R2): quyền = `view_<model>` + phạm vi giống API chi tiết; CSKH được xem chi tiết phiếu trong phạm vi nên phải xem được timeline, và có dòng mới sau khi ghi.
+Thực tế: cột phải hiện "Chưa tải được lịch sử của đơn. [Thử lại]" mỗi lần mở; Thử lại vẫn 403; console có 1 lỗi 403 mỗi lần mở chi tiết.
+Giao: BE (provider `delivery` cho vai CSKH, kèm test `customer_service` -> 200 trong phạm vi, ngoài phạm vi vẫn 403/che). FE (khi 403 hiện "Bạn không có quyền xem lịch sử" thay vì nút Thử lại vô nghĩa).
+
+#### B3 — Bảng hàng chờ ở 1280px cuộn ngang, chip "Trạng thái" nằm ngoài khung · Medium
+Tái hiện: `ql1`, cửa sổ 1280x800, `/confirmation/`.
+Mong đợi: bảng vừa khung, nhìn thấy chip trạng thái.
+Thực tế: bảng rộng 1225px trong khung 990px, chip Trạng thái ở x≈1357. (Một phần do thêm cột "Đang gọi", "Lần gọi"; khi sửa B1 cần cân lại cột.)
+
+#### B4 — Ô tìm của hàng chờ cao 30px ở 360px · Medium
+Tái hiện: `cs2` hoặc `ql1`, cửa sổ 360x740, `/confirmation/`, đo ô `input[name=q]`.
+Mong đợi: >= 44px (dev ghi đã đo >= 40).
+Thực tế: 30px. `/orders/` và `/` cùng cửa sổ cho 44px. (Cũng 30px ở `/deliveries/` của Lô 4, vì dùng chung FilterBar: gốc nằm ở thành phần dùng chung.)
+
+#### B5 — Thanh trạng thái chi tiết không khớp việc đang làm · Medium
+Tái hiện: mở chi tiết việc "Cần quyết định" (cs2, loc, ql1).
+Mong đợi (board W1c2): Chờ gọi > Cần quyết định > Hoàn tất, bước hiện tại là "Cần quyết định".
+Thực tế: hiện các bước của phiếu giao (Chờ xác nhận > Soạn hàng > Chờ lấy hàng > Đang giao > Hoàn tất), bước hiện tại "Chờ xác nhận" trong khi chip ghi "Cần quyết định".
+
+#### B6 — F2h và F2k có chữ gợi ý xám dưới từng lựa chọn, F2h thiếu bộ đếm "0/200" · Medium · UI-RULES §6.2
+Tái hiện: bấm "Ghi kết quả gọi" (6 dòng gợi ý, vd "Khách đồng ý nhận hàng. Đơn sẽ chuyển sang Soạn hàng để kho đóng gói."), và "Quyết định" (3 dòng).
+Mong đợi: chỉ tên lựa chọn như board; ô ghi chú có bộ đếm "0/200".
+Thực tế: có gợi ý xám dưới mỗi lựa chọn; ô ghi chú không có bộ đếm.
+
+#### B7 — Đóng hộp bằng Esc hoặc "Quay lại" làm focus rơi về đầu trang · Low · a11y
+Tái hiện: mở F2h bằng bàn phím, nhấn Esc; `document.activeElement` là `BODY` / "Bỏ qua menu". Modal chung ở Lô 2 trả focus đúng (ED-05-AC1) nên nghi ngờ nút mở bị tạm vô hiệu hoá trong lúc giữ phiếu ("Đang giữ đơn…") rồi dựng lại.
+Mong đợi: focus về nút "Ghi kết quả gọi" / "Quyết định".
+
+#### B8 — Chữ cấm theo G7 · Low
+"Tổng kg" (tiêu đề cột hàng chờ) và "Tổng khối lượng" (chi tiết) phải là "Tổng số kg". Cùng lỗi ở Lô 4 Giao hàng và trang in tem (xem mục riêng).
+
+#### B9 — Chi tiết thiếu vài trường so với board · Low
+Thiếu "Người nhận", "Phiếu giao", "Người gọi"; nhãn "Hạn quyết định" chưa có (hiện "Hạn gọi").
+
+### Quan sát (không tính lỗi)
+- L1: Trên BE thật, CSKH mở phiếu đang bị người khác giữ vẫn thấy nút "Gọi khách" (link `tel:`); bấm sẽ gọi claim và nhận lỗi CLAIMED. Hợp lý nhưng nên ẩn / mờ nút khi BE không cho `record_call`.
+- L2: Console có 1 lỗi 404 từ `/api/ai/status/` trên BE trong worktree (pre-existing, xem dưới).
+
+### Lỗi có sẵn từ trước / thành phần dùng chung (không tính cho Lô 5)
+- "Tổng kg" / "Tổng khối lượng" ở Lô 4 Giao hàng và trang in tem (cùng mẫu B8).
+- Ô tìm `q` 30px ở `/deliveries/` (FilterBar dùng chung; B4 cần sửa ở gốc).
+- Nút đóng toast cao 32px (đã ghi từ Lô 2).
+- `/api/ai/status/` trả 404 trên BE chạy từ worktree này (route chưa đăng ký); FE xử lý fail-closed nên chỉ để lại 1 dòng 404 trong console ở mọi trang có khối Trợ lý AI.
+
+### Test QA đã thêm
+- `erp-console/e2e/qa_ed_batch5_ui.py` (mock, 12 khối, chạy: `BASE=http://127.0.0.1:3201 SHOTS=... python3 e2e/qa_ed_batch5_ui.py`).
+- `erp-console/e2e/qa_ed_batch5_real.py` (BE thật, biến `QA_ERP`, `QA_API`, `QA_DB`, `QA_SHOTS`, `QA_JOB`, `QA_IDS`; dùng SQLite tạm + seed_demo).
+
+### Lệnh đã chạy (tóm tắt)
+- `npm ci` sạch; `npx tsc --noEmit` sạch; `npx vitest run` 434 xanh; `npm run build` ở MOCK=1 và MOCK=0 xanh; `node scripts/check-no-mock.mjs`, `check-ai-chunks.mjs` xanh; `python3 scripts/check_naming.py` OK.
+- Mock: `python3 -m http.server 3201` trên `out-mock/`; `qa_ed_batch5_ui.py` 233/251.
+- BE thật: Django runserver 8120 trên SQLite tạm + `seed_demo`, console MOCK=0 cổng 3202; `qa_ed_batch5_real.py` (sau đó phần đuôi chạy riêng) 56/59 + 1 sửa kỳ vọng.
+- `ed_batch5_confirmation.py` xanh; `ed_batch1_shell.py` 56/56; `sr09_ac4_real_backend.py` gãy bộ chọn cũ; `qa_lo8_real.py` ⏸.
+
+### Lô 5 — FE lần 2 · 2026-10-02
+
+#### Kết luận: REJECTED. Dev đã sửa đúng B1, B2 (phần FE), B4 đến B9 và TL5-M1/L1/L2; B3 mới sửa một phần: ở 768 đến khoảng 1100px cột "Khách hàng" và "Hàng" bị co về 0px, bảng vẫn cuộn ngang (R2-1, Medium). Thêm R2-2 (mã đơn bị cắt chữ, Low).
+
+#### Tổng (script QA, chạy trình duyệt thật): 507 ca · ✅ 497 · ❌ 5 lỗi gộp thành R2-1, R2-2 (+ 4 ca nhiễu đã loại, xem dưới) · ⏸ 6
+- `qa_ed_batch5_ui.py` (mock): 251/251 (đã sửa ca `G2 'Hạn gọi'` đọc cột theo tên).
+- `qa_ed_batch5_round2.py` (mới, mock, 14 khối): 123/131; 8 ca đỏ đều thuộc R2-1/R2-2.
+- `qa_ed_batch5_real.py` (BE thật SQLite tạm, cổng 8120 + 3202): 55 xanh, 4 đỏ đã phân loại: 3 là 403 timeline của CSKH trên BE worktree (⏸, đúng như điều phối đã báo) + console có 1 dòng "Failed to fetch RSC payload /orders/" (nhiễu: Next prefetch bị huỷ khi script `goto` ngay sau đăng nhập; chạy lại không `goto` thì console sạch, `index.txt` trả 200) + 1 ca STALE đếm "tự huỷ 1|2" trong khi job huỷ 7 đơn (lỗi kỳ vọng của script QA, đã sửa thành `tự huỷ [1-9]`; các ca 409 STALE kế tiếp đều xanh).
+- `ed_batch5_confirmation.py` 129/129; `ed_batch4_delivery.py` 70/70; `ed_batch2_patterns.py` 75/75; `ed_batch1_shell.py` 56/56 (bản copy trỏ `OUT_404` về bản build sạch, vì `http.server` không có 404 fallback); `qa_ed_batch4_ui.py` 49/50 (ca F2l "Bắt đầu giao" là nợ BE 8b có sẵn, không thuộc Lô 5).
+- vitest 437/437.
+
+#### Theo lỗi lần 1
+| Mã | Kết quả | Bằng chứng |
+|---|---|---|
+| B1 cột "Lý do" riêng | ✅ | `qa_ed_batch5_ui` + `round2` "reason_column": thứ tự cột đúng, đủ 4 nhóm lý do, ảnh `shots/lot5r2/r2-queue-ql1-1280.png` |
+| B2 CSKH xem Dòng thời gian (FE) | ✅ FE · ⏸ BE | 403 hiện câu "Bạn không có quyền xem lịch sử này.", không có nút Thử lại; 404 hiện câu riêng (`r2-timeline-403-cs2-1280.png`, `r2-timeline-404-cs2-1280.png`). BE thật từ worktree vẫn 403 cho cs2 (fix `cd2c9b7` nằm ở main, chưa merge) nên ca "timeline có dòng mới" ⏸ |
+| B3 bảng không cuộn ngang | ❌ một phần | Xanh ở 1440/1280/390/360 (cột ẩn trên mobile, thẻ không cuộn). ĐỎ ở 1024 và 768, xem R2-1 |
+| B4 ô tìm cao 44px dưới 768 | ✅ | `round2` "filter 44px" ở 360/390/768, kể cả `/deliveries/` và `/orders/` |
+| B5 thanh trạng thái | ✅ | Chờ gọi > Cần quyết định > Hoàn tất; nhánh "Gọi báo hoàn tiền" cho REFUND_CALL; "Đã huỷ theo đơn" chạy trong vitest (không dựng được CANCELLED trong mock) |
+| B6 bỏ gợi ý xám dưới lựa chọn | ✅ | không còn `.hint` dưới radio ở hộp Quyết định và Ghi kết quả gọi (`r2-F2h-ql1-1280.png`, `r2-F2k-ql1-1280.png`) |
+| B7 bộ đếm 0/200 | ✅ | ô Lý do và Ghi chú có đếm, vượt 200 bị chặn |
+| B8 từ cấm "Tổng kg" | ✅ | toàn bộ DOM màn Lô 5, Lô 4 và trang in không còn "Tổng kg" / "Tổng khối lượng"; cột là "Tổng số kg" |
+| B9 trả focus khi nút khoá | ✅ | dùng `aria-disabled`, focus quay về nút kích hoạt sau khi đóng hộp |
+| TL5-M1/L1/L2 | ✅ | `loadDetail` giữ dữ liệu cũ + cảnh báo "Chưa tải lại được đơn" khi nạp lại lỗi (`r2-detail-reload-fail-keep-ql1-1280.png`); lỗi nạp lần đầu hiện khối lỗi + Thử lại |
+
+#### Lỗi
+##### R2-1 — Cột "Khách hàng" và "Hàng" co về 0px ở 768 đến khoảng 1100px, bảng vẫn cuộn ngang · Medium · AC1 / B3
+Bước tái hiện: đăng nhập `ql1` (hoặc `cs2`), viewport 1024x700 hoặc 768x700, mở `/confirmation/`, tab "Tất cả", đo `th` trong `table.lt`.
+Mong đợi: bảng vừa khung, mỗi cột đọc được (hoặc cột phụ ẩn theo kích cỡ).
+Thực tế: bảng cố định 808px trong khung 734px (1024px, sidebar mở): `Khách hàng` 0px, `Hàng` 0px, các cột cố định (Mã đơn 116, SĐT 100, Lý do 112, Hạn gọi 136...) giữ nguyên nên ăn hết chỗ; "Lần gọi" và một phần "Đang gọi" ra ngoài khung. Script: `round2` ca `B3 [cs2/ql1] 1024px` và `B10 1024px / 768px`. Ảnh: `shots/lot5r2/r2-queue-ql1-1024-collapsed-cols.png`, `r2-queue-ql1-768-collapsed-cols.png`.
+Ảnh hưởng: ở laptop nhỏ và tablet CSKH không thấy tên khách và hàng khi đang gọi; mục tiêu B3 (không cuộn ngang) chưa đạt ở dải này. Gợi ý: ẩn thêm cột phụ (`hideOnMobile` mở rộng đến 1100px hoặc ẩn "Lần gọi" / "Hạn gọi" theo breakpoint), hoặc để `Khách hàng` và `Hàng` có `min-width`.
+
+##### R2-2 — Mã đơn bị cắt chữ, thiếu tooltip · Low · AC1
+Bước tái hiện: mọi quyền xem hàng chờ, viewport 768 đến 1440px: ô Mã đơn rộng 116px mà chữ `DH-260928-0040` cần 126px (scrollWidth > clientWidth), cắt bằng dấu "...", không có thuộc tính `title`. Tên khách và "Hàng" cũng bị cắt ở 1280/1440 trong khi cột "Hạn gọi" (136px) và "Lý do" (112px) còn dư chỗ. Ca `B11` (4 độ rộng). Mã đơn là khoá CSKH đọc ra khi gọi nên nên cho cột này đủ rộng (>= 130px) hoặc có `title`. Low, ghi nhận, không chặn riêng.
+
+#### Quan sát (không tính lỗi)
+- Mock tab "Gọi báo hoàn tiền": cột Lý do là "Hoàn 280.000 đ" còn Lý do ở trang chi tiết là "Không nghe máy" (dữ liệu mock, hai nguồn khác nhau).
+- `.btn:hover:not(:disabled)` vẫn đổi màu ở nút `aria-disabled`.
+- Khoảng hở hợp đồng (dev đã nêu): BE chưa trả `note_code`, "Phiếu giao" hiện "—" trên BE thật.
+
+#### Phân quyền / rò dữ liệu (chạy thật UI + API, BE SQLite tạm)
+| Nhóm | Xem hàng chờ | Ghi kết quả gọi | Quyết định | Ghi chú |
+|---|---|---|---|---|
+| cs2 (CSKH) | ✅ 200, ngoài phạm vi che `09xx xxx 555`, không nhấp được | ✅ | không có nút; API 403 | mở thẳng đơn ngoài phạm vi: 404, DOM sạch |
+| ql1 (Quản lý), loc (Chủ) | ✅ | ✅ | ✅ (409 STALE, CLAIMED đúng) | |
+| kho1, giao1 | 403 | 403 | 403 | |
+| chưa đăng nhập | 401 | | | |
+- Rò giá vốn: JSON hàng chờ, chi tiết, AuditLog (`changes`, `note`) không có khoá giá vốn/lãi; không có cặp tiền ÷ kg trong cùng một bản ghi.
+- Rò dữ liệu cá nhân: DOM, URL (cả sau Huỷ đơn chuyển sang `?order&open=refund`), AuditLog không chứa tên, SĐT, địa chỉ khách ngoài phạm vi; ghi chú có SĐT bị 400 (BR-GH-19); dữ liệu hoàn toàn giả.
+
+#### Hồi quy
+- `/deliveries/` (dùng chung `DataTable`/`FilterBar`): `ed_batch4_delivery` 70/70, ô tìm 44px dưới 768, không cuộn ngang trang; `qa_ed_batch4_ui` 49/50 (F2l là nợ BE 8b có sẵn).
+- `/orders/` trong worktree vẫn là danh sách thẻ cũ (chưa có Lô 3, không dùng `DataTable`): chỉ kiểm được ô lọc 44px và không cuộn ngang, xanh.
+- Shell, mẫu trang (Lô 1, 2): 56/56 và 75/75.
+
+#### ⏸ Chưa kiểm
+1. Timeline cho CSKH trên BE thật (fix `cd2c9b7` chưa vào worktree; chờ merge).
+2. StatusPath trạng thái CANCELLED trong trình duyệt (mock không dựng được; chỉ có vitest).
+3. Job tự huỷ chạy 2 lần (chưa dựng).
+4. `qa_lo8_real.py` phần CSKH.
+5. Cờ AI tắt/bật ở khối Trợ lý AI trên BE thật.
+6. Chạy lại `qa_ed_batch5_real.py` sau khi sửa kỳ vọng STALE (sửa script nhỏ, chưa chạy lại vì seed đã dùng hết).
+
+#### Test QA thêm / đổi
+- `erp-console/e2e/qa_ed_batch5_round2.py` (mới); `qa_ed_batch5_ui.py` (G2 đọc cột theo tên); `qa_ed_batch5_real.py` (kỳ vọng STALE).
+- Ảnh: `doc/features/2026-10-01-erp-theo-design/shots/lot5r2/` (48 ảnh, dữ liệu giả).
+
+#### Lệnh đã chạy (tóm tắt)
+- Bản copy sạch ngoài worktree: `npm ci` sạch; `npx tsc --noEmit` sạch; `npx vitest run` 437/437; `npm run build` MOCK=1 và MOCK=0 xanh; `check-no-mock`, `check-ai-chunks`, `check_naming` xanh.
+- Mock: `python3 -m http.server 3201` trên bản build sạch; BE: `manage.py runserver 127.0.0.1:8120` (SQLite tạm, `CORS_ALLOWED_ORIGINS`, throttle nới) + `http.server 3202` trên `out-real`.
+- Lưu ý harness: lần đầu cổng 3201 phục vụ nhầm thư mục cũ (14 ca xanh) nên loại; chạy lại đúng thư mục mới ra kết quả trên.
+
+### Lô 5 — FE lần 3 · 2026-10-02
+
+#### Kết luận: APPROVED. R2-1 và R2-2 đã sửa, đo bằng trình duyệt thật ở 6 bề rộng (360, 768, 1024, 1100, 1280, 1440); không còn lỗi chặn của Lô 5.
+
+#### Tổng (mock, cổng 3201, bản build sạch từ `npm ci`): 783 ca · ✅ 782 · ❌ 1 (nợ BE 8b có sẵn, không thuộc Lô 5) · ⏸ 5
+- `qa_ed_batch5_round2.py` 153/153 (đã đổi mã đơn, thêm B10 ở 6 bề rộng, B11 kèm kiểm `title`).
+- `qa_ed_batch5_ui.py` 251/251; `ed_batch5_confirmation.py` 129/129; `ed_batch4_delivery.py` 70/70; `ed_batch2_patterns.py` 75/75; `ed_batch1_shell.py` 56/56 (bản copy trỏ `OUT_404` về bản build sạch); `qa_ed_batch4_ui.py` 49/50 (ca F2l "Bắt đầu giao" là nợ BE 8b).
+- vitest 437/437; `tsc` sạch; `npm ci` sạch (không `--legacy-peer-deps`); build MOCK=1 và MOCK=0 xanh; `check-no-mock`, `check-ai-chunks`, `check_naming` xanh.
+
+#### Sửa script QA theo yêu cầu điều phối
+- Đổi mã `DH-260928-00xx` sang mã mới của mock: 0001→`SO260928-3F9A01`, 0027→`9C6B27` (nhánh REFUND_CALL, `endswith("9C6B27")`), 0028→`A40F28`, 0030→`B27C30`, 0035→`5D1E35`, 0036→`E83D36`, 0040→`1B7A40`, 0041→`C05E41`, tiền tố `"DH-260928"` → `"SO260928"`. Không bỏ ca nào (251 và 131+22 ca vẫn đủ).
+- B10 theo chốt của PO (02b T4): từ 1024px trở lên "Khách hàng" và "Hàng" >= 60px; dưới 1024px "Hàng" ẩn hoặc >= 60px; không cột nào đang hiện rộng 0 (bỏ qua cột `display:none`); thêm ca "trang không cuộn ngang" và "ô bị cắt chữ đều có `title`".
+
+#### Đo 6 bề rộng (ql1, tab Tất cả, rộng từng cột, px)
+| Viewport | Khung bảng | Mã đơn | Khách hàng | Hàng | Cột ẩn | Trang cuộn ngang | Mã đơn bị cắt |
+|---|---|---|---|---|---|---|---|
+| 1440 | 1150 | 132 | 169 | 169 | không | không | không |
+| 1280 | 990 | 132 | 89 | 89 | không | không | không |
+| 1100 | khoảng 810 | 132 | 63 | 63 | Đang gọi, Lần gọi | không | không |
+| 1024 | 734 | 132 | 63 | 63 | Tổng số kg, Đang gọi, Lần gọi | không | không |
+| 768 | 478 (bảng 600, cuộn trong khung) | 132 | 100 | ẩn | Tổng số kg, Hàng, Lý do, Đang gọi, Lần gọi | không | không |
+| 360 | 326 (bảng 600, cuộn trong khung) | ẩn cột phụ như 768 | | ẩn | như 768 | không | không |
+Ảnh: `shots/lot5r3/r3-queue-ql1-{1440,1280,1100,1024,768,360}.png`. Mọi ô có thể bị cắt chữ (tên khách, Hàng, Lý do, người đang gọi) đều có `title`; mã đơn không còn bị cắt ở cả 6 bề rộng. Mã đơn mới `SO<yymmdd>-<6 HEX>` hiển thị đúng ở hàng chờ, chi tiết, URL tìm và DOM (không có SĐT hay tên khách ngoài phạm vi).
+
+#### Theo lỗi
+| Mã | Kết quả | Bằng chứng |
+|---|---|---|
+| R2-1 cột co về 0 / cuộn ngang | ✅ | B3 + B10 ở 6 bề rộng; dưới 1024px "Hàng" ẩn, trang không cuộn ngang (PO chốt) |
+| R2-2 mã đơn bị cắt, thiếu tooltip | ✅ | B11 ở 6 bề rộng: không ô nào bị cắt mà thiếu `title`; mã đơn đủ chữ |
+| B1 đến B9, TL5-M1/L1/L2 | ✅ giữ nguyên | `qa_ed_batch5_ui` 251/251 và `round2` 153/153 trên mã mới |
+
+#### Quan sát (không tính lỗi)
+- 1024px: tên khách chỉ còn 63px, các dòng đều hiện "Khách…" nên khó phân biệt nếu chỉ nhìn tên; vẫn phân biệt được qua SĐT, mã đơn và `title`.
+- 768px: cột "Hạn gọi" nằm ngoài khung bảng, phải cuộn trong khung và không có gợi ý cuộn (đúng chốt PO: khổ < 1024 giữ hành vi tối thiểu).
+- Vẫn còn khoảng hở `note_code` (BE chưa trả, "Phiếu giao" là "—" trên BE thật) và nhãn Lý do "Hoàn 280.000 đ" khác trang chi tiết trong mock.
+
+#### Phân quyền, rò dữ liệu, hồi quy
+- `qa_ed_batch5_ui` giữ nguyên các ca phân quyền (cs2, ql1, loc, kho1, giao1, chưa đăng nhập) và rò dữ liệu (DOM/URL/storage sạch, dòng ngoài phạm vi che `09xx xxx 555`) trên mã mới: 251/251. Không có giá vốn trong DOM mock.
+- `/deliveries/` (dùng chung `DataTable`/`FilterBar`): `ed_batch4_delivery` 70/70; `/orders/` trong worktree vẫn là danh sách thẻ cũ (chưa có Lô 3).
+
+#### ⏸ Chưa kiểm
+1. Timeline cho CSKH trên BE thật (fix `cd2c9b7` chưa merge vào worktree).
+2. StatusPath CANCELLED trong trình duyệt (mock không dựng được; có vitest).
+3. Job tự huỷ chạy 2 lần; `qa_lo8_real.py` phần CSKH; cờ AI tắt/bật trên BE thật.
+4. Không chạy lại `qa_ed_batch5_real.py` lần này: lần 3 chỉ đổi mã trong mock, độ rộng cột và `title`, không đổi lời gọi API (kết quả lần 2: 55 xanh, các ca đỏ đã phân loại ở mục lần 2).
+
+#### Lệnh đã chạy (tóm tắt)
+- Bản copy sạch ngoài worktree: `npm ci`; `tsc --noEmit`; `vitest run` 437/437; `NEXT_PUBLIC_USE_MOCK=1 npm run build` + `check-ai-chunks`; `NEXT_PUBLIC_USE_MOCK=0 NEXT_PUBLIC_API_BASE=http://127.0.0.1:8120 npm run build` + `check-no-mock` + `check-ai-chunks`; `python3 scripts/check_naming.py` ở worktree.
+- Mock: `python3 -m http.server 3201` trên bản build sạch; chạy các script nêu trên.
+- Lưu ý harness: một lần `next build` bị treo (0% CPU), đã tắt và build lại sạch; không ảnh hưởng kết quả.

@@ -154,7 +154,9 @@ class WarehouseStaffTests(CustomerDataScopeBase):
     def test_sr_pii_01_ac3_order_detail_still_full_customer(self):
         resp = self.get(self.warehouse, f"/api/sales/orders/{self.order_b.pk}/")
         self.assertEqual(resp.status_code, 200)
+        # Lô 6: có thêm `id` (số, không phải dữ liệu cá nhân) để ERP mở trang khách; ai không có quyền xem danh bạ thì ERP không hiện liên kết.
         self.assertEqual(resp.json()["customer"], {
+            "id": self.order_b.customer_id,
             "name": PII["B"]["name"], "phone": PII["B"]["phone"], "address": PII["B"]["address"],
         })
 

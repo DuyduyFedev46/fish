@@ -20,6 +20,8 @@ export type OrderListItem = {
   /** Mã trạng thái phiếu giao (PREPARING…), null khi chưa có phiếu. */
   delivery_status: string | null;
   needs_attention: boolean;
+  /** Lý do huỷ (Lô 3 R3): tập nhãn cố định của BE; AUTO_CANCELLED → "Hết giờ giữ chỗ". null khi đơn không bị huỷ. */
+  reason?: { code: string; label: string } | null;
 };
 
 /** Bộ lọc danh sách — gửi lên BE đúng tên tham số của contract. */
@@ -31,6 +33,10 @@ export type OrderListParams = {
   date_to: string;
   /** Mã đơn hoặc SĐT, khớp một phần. */
   q: string;
+  /** Lô 3 R3: lọc theo khách (id) — BE trả 403 khi người xem không có quyền xem khách. Chỉ id, không bao giờ là SĐT/tên. */
+  customer?: string;
+  /** Lô 3 R3: lọc theo lô hàng (pk) — BE trả 400 INVALID_FILTER khi sai dạng. */
+  batch?: string;
 };
 
 export type OrderLine = {
@@ -127,7 +133,8 @@ export type OrderDetail = {
   created_at?: string;
   reserved_until?: string | null;
   /** Cả ba trường là `null` khi đã ẩn theo thời hạn (NV giao, phiếu giao kết thúc quá 7 ngày — SR-PII-02). */
-  customer: { name: string | null; phone: string | null; address: string | null };
+  /** `id` là FE đề xuất (BE Lô 3 chưa trả) — có thì mới dựng được liên kết "Mở trang khách". */
+  customer: { id?: number; name: string | null; phone: string | null; address: string | null };
   lines: OrderLine[];
   allocations: OrderAllocation[];
   invoice: { id: number; code: string; issued_at: string | null } | null;
@@ -304,6 +311,9 @@ export type CancelOrderResult = {
 export type RefundQueueStatus = "PENDING" | "REFUNDED" | "FAILED";
 /** Thao tác một phiếu hoàn làm được ở trạng thái hiện tại — BE tính cả luật lẫn quyền (chỉ Chủ có confirm_refund;
  * Quản lý xem được danh sách nhưng `available_actions` luôn rỗng). */
+/** Bộ lọc danh sách phiếu hoàn (Lô 3 R3): `status` nhiều giá trị cách dấu phẩy; `month` = YYYY-MM theo giờ Việt Nam. */
+export type RefundListParams = { status: string; month: string };
+
 export type RefundQueueAction = "confirm" | "mark_failed" | "retry" | string;
 
 /**

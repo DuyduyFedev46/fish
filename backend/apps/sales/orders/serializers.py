@@ -126,7 +126,9 @@ class SalesOrderDetailSerializer(serializers.ModelSerializer):
     def get_customer(self, order):
         if pii_hidden(order):
             return {"name": None, "phone": None, "address": None}
+        # `id` chỉ có ở nhánh không che dữ liệu cá nhân: để ERP mở trang khách (Lô 6). NV giao ngoài phạm vi không có.
         return {
+            "id": order.customer_id,
             "name": order.customer.name,
             "phone": order.phone,
             "address": order.delivery_address,
