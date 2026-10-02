@@ -274,10 +274,9 @@ export const NAV: NavItem[] = [
     plannedIn: "Lô 11",
     href: "/suppliers/",
     label: "Nhà cung cấp",
-    short: "Nhà CC",
+    short: "Nhà cung cấp",
     icon: "storefront",
     section: "Hàng hoá & kho",
-    soon: true,
     visible: (me) => has(me, PERM.viewSupplier),
   },
   {

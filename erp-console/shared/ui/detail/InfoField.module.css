@@ -13,13 +13,12 @@
 .link:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: var(--radius-xs); }
 @media (hover: hover) and (pointer: fine) { .link:hover { text-decoration-color: currentColor; } }
 
-/* Bút chì: cảm ứng luôn hiện; chuột chỉ hiện khi rê / focus. Vùng bấm vẫn đủ lớn nhờ ::after. */
+/* Bút chì: cảm ứng luôn hiện; chuột chỉ hiện khi rê / focus. Vùng bấm thật 44x44 (không dùng pseudo-element); margin âm giữ ô không cao thêm. */
 .pencil {
-  position: relative; flex: none; display: grid; place-items: center; width: 28px; height: 28px; padding: 0;
+  position: relative; flex: none; display: grid; place-items: center; width: 44px; height: 44px; margin: -8px -8px -8px 0; padding: 0;
   border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--ink-3); cursor: pointer;
   transition: opacity var(--dur-fast) ease, background-color var(--dur-fast) ease;
 }
-.pencil::after { content: ""; position: absolute; inset: -8px; }
 .pencil :global(.mi) { font-size: 16px; }
 .pencil:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; opacity: 1; }
 @media (hover: hover) and (pointer: fine) {

@@ -2199,3 +2199,76 @@ Worktree `loc-wt-b`, nhánh `ed-stream-b`, phần chưa commit trên `7f3b7b1`.
 - Phần BE không đổi hành vi kiểm vượt kg hay khoá dòng, không N+1, không lộ giá vốn hay dữ liệu khách.
 - TL9-R1 và R2 là Low, gom vào lô sau.
 - Còn chờ PO: Quản lý có `add_returntostock` hay không (lệch số 4), và quyết định #8 (nút Từ chối).
+
+## Lô 11 — FE (Nhà cung cấp ED-22: W5c, W5d, F1b) · review techlead 02/10
+
+Phạm vi: `erp-console/features/suppliers/**`, `app/(console)/suppliers/**`, `shared/lib/nav.ts`, `scripts/check-ai-chunks.mjs`, `e2e/ed_batch11_*.py`, `e2e/ed_batch1_shell.py`, `e2e/qa_ed_batch1_common.py` (chưa commit). Căn cứ: 02b §1 (W5c, W5d, F1b), §2.3, §2.4, §3 B3, §5.2 Lô 11; contract "Lô 11 — BE" trong 03-dev-notes; 00-can-duy-quyet (tổng tiền mua chỉ Chủ).
+
+**Kiểm chứng (chạy lượt này)**
+- `npx tsc --noEmit`: sạch.
+- `npx vitest run`: 59 file, 646 ca đạt.
+- `python3 scripts/check_naming.py`: OK, không phát sinh vi phạm mới.
+- Grep màu cứng (hex, `rgb(`, `hsl(`) trong `features/suppliers` và `app/(console)/suppliers`: 0.
+- Grep `NCC` trên giao diện: 0. Chỉ còn trong comment ở `messages.ts:2` và trong mock (xem TL11-L2).
+- Grep `console.`, `localStorage`, `sessionStorage` ngoài `mock.ts`: 0.
+
+**Đã soát, đạt**
+1. **Tiền mua (bất biến 1).**
+   - `purchase_total` là khoá tuỳ chọn trong `types.ts:22`. Mock chỉ gắn khoá này khi người xem có `inventory.view_costprice` (`mock.ts:155`), giống BE (`sensitive_fields` + `COST_KEYS`).
+   - Cột danh sách dùng `locked: true` (`SupplierListScreen.tsx:59`). `DataTable.tsx:118` lọc bỏ cột khi `canViewCost=false`, nên cột không có trong DOM.
+   - Ô "Tổng tiền mua" ở chi tiết chỉ render khi `canViewCost && purchase_total !== undefined` (`SupplierDetailScreen.tsx:211`).
+   - Bảng Phiếu nhập: cột "Tiền mua" (`purchase_amount`, R10) cũng `locked` (`:135`). Mock bỏ khoá này với người không phải Chủ (`mock.ts:235`).
+   - e2e kiểm cả trên mock (`ed_batch11_suppliers.py:274-294, 318, 326`) lẫn BE thật (`ed_batch11_real.py:127`) rằng ql1 và kho1 không có chữ hay số tiền trong `page.content()`.
+2. **Quyền ghi.**
+   - Nút Thêm cần `add_supplier`. Nút Sửa, sửa tại chỗ và mục Ngừng/Bật lại cần `change_supplier`.
+   - Kho chỉ thấy `InfoField` thường. Mục "Ngừng hợp tác" của kho bị chặn kèm lý do.
+   - Không có hàm DELETE hay PUT. Ngừng hợp tác là `PATCH {is_active}` qua hộp xác nhận, nút đỏ, có nêu hậu quả (BR-PQ-10).
+   - Guard trang dùng `ViewGuard view="suppliers"`. Menu dựa trên `PERM.viewSupplier`. Nếu 403 từ BE thì hiện `NoPermission`.
+3. **Hai dạng 400 trùng tên.**
+   - `isNameTaken` và `nameTakenMessage` (`suppliersModel.ts:67-83`) bắt được cả `{name:[…]}` (nằm trong `ApiError.details`) lẫn `{detail, code:"SUPPLIER_NAME_TAKEN"}`.
+   - Hộp Thêm/Sửa hiện lỗi dưới ô Tên đúng một lần, `topError` bị nén lại (`SupplierFormModal.tsx:80`), và nút đổi thành "Thử lại".
+   - Sửa tên tại chỗ đi qua `saveErrorMessage`, cũng ra đúng câu của BE cho cả hai dạng. Lý do: `http.ts:169-175` đưa `{name}` vào `details`, còn `detail` vào `message`.
+   - e2e có ca `racename`.
+4. **Số điện thoại nhà cung cấp.**
+   - URL chỉ có `?id=` số, được kiểm bằng `/^\d{1,12}$/`.
+   - Từ khoá chỉ nằm trong state và query của request API, không lên URL trang.
+   - Không ghi storage hay console. Riêng mock lưu khoá chế độ, không chứa dữ liệu.
+   - e2e quét storage và URL trên BE thật (`ed_batch11_real.py:114`).
+   - Đây là dữ liệu đối tác, không thuộc bất biến 9. Phía AI vẫn được lọc qua `SCRUB_PII_KEYS` ở BE.
+5. **Khối AI.**
+   - `AiDocBlockGate targetModel="purchasing.supplier"` được ghép ở `app/(console)/suppliers/detail/page.tsx:14`. Màn hình tính năng không import `features/ai` (02b §2.3).
+   - Target đã có ở BE (`apps/ai/actions/targets.py:21`) và mock FE.
+   - `check-ai-chunks.mjs` có thêm hai route mới.
+6. **Đúng contract BE.** Dùng các khoá `last_received_at`, `purchase_total`, `supplier_type_label`. Danh sách 50 dòng/trang có "Tải thêm". Chi tiết gọi R10 `receipts/?supplier=` và R5 `batches/?supplier=&has_stock=1`, dòng thời gian lấy từ R2 `supplier`. Mỗi bảng phụ lỗi hoặc 403 riêng, không làm hỏng cả trang.
+7. **Idiom.**
+   - Dùng đúng khung `ListPage`/`DataTable`/`DetailPage`/`InfoField`/`useSubmit`/`usePagedList`. Có đủ 3 trạng thái và bỏ kết quả về trễ (`seq` + `AbortController`).
+   - Câu chữ gom ở `messages.ts`. CSS module chỉ dùng token.
+   - Có README module.
+   - Năm chỗ lệch dev ghi ở 03-dev-notes đều hợp lý và khớp contract BE.
+
+**Phát hiện (đều Low, không chặn)**
+- **TL11-L1 · Low · `features/suppliers/components/SupplierDetailScreen.tsx:117`.** Lý do chặn `"Chỉ Chủ và Quản lý."` đang viết cứng trong component. Các câu khác đều nằm trong `messages.ts`. Nên chuyển vào `SUPPLIERS_MSG`.
+- **TL11-L2 · Low · `features/suppliers/mock.ts:262`.** Mock dòng thời gian đặt `doc.code` là `` `NCC-${p.id}` ``. Hiện màn không render `doc.code` nên giao diện chưa lộ chữ "NCC", nhưng nếu sau này `Timeline` hay header dùng `doc.code` thì chữ cấm sẽ lên màn. Nên đổi theo mã BE trả cho guidance `supplier`, hoặc dùng `String(p.id)`.
+  - Tái hiện: `grep -n NCC erp-console/features/suppliers/mock.ts`.
+- **TL11-L3 · Low · `SupplierDetailScreen.tsx:250-268` + `useSupplierRelated.ts:33`.** Bảng Lô đang bán chỉ nạp trang đầu (50 lô). Tiêu đề in `count` của BE, nên khi có trên 50 lô thì số ở tiêu đề sẽ lớn hơn số dòng mà không có "Tải thêm". Dev đã ghi nợ. Thực tế một nhà cung cấp hiếm khi có trên 50 lô còn hàng, nên để lô sau.
+- **TL11-L4 · Low (cho PO) · `SupplierDetailScreen.tsx:132`.** Cột "Nhập lúc" lấy `created_at` (giờ ghi phiếu), không lấy `received_date`. Cách này nhất quán với `last_received_at` của BE (02b B3). Nhưng nếu phiếu được ghi muộn hơn ngày nhận hàng thực tế thì hai mốc lệch nhau. Đây là lệch 3 trong dev-notes, PO biết là đủ.
+- **TL11-L5 · Low · `mock.ts:142`.** Mock cộng tiền bằng `Number` rồi `toFixed(2)`. Chỉ có trong mock, build thật đã loại file này. Không phải sửa, ghi lại để không ai chép mẫu này sang code thật (bất biến 7).
+
+**Ý kiến về `.lt-link` (vùng bấm 44px, phần dùng chung)**
+- Hiện trạng ở `shared/ui/globals.css:598`: `.lt-link` là `inline-block` nên chỉ cao bằng dòng chữ (~19,5px).
+- Chuột và cảm ứng vẫn bấm được cả dòng 44px, vì `tr.lt-click` có `onClick` (`DataTable.tsx:180-183`). Vì vậy đây không phải lỗi chặn của lô này, và cũng đúng với mọi danh sách khác (khách hàng, kho & lô, đơn…).
+- Phần còn hụt:
+  - Liên kết thật, dùng cho bàn phím, trình đọc màn hình, mở tab mới và nhấn giữ trên điện thoại, chỉ phủ phần chữ.
+  - Kiểm tra vùng bấm trong e2e đang phải loại trừ `.lt-link`.
+- Đề xuất làm thành **một việc riêng ở phần dùng chung** (không nhét vào Lô 11), áp cho mọi bảng một lần:
+  - Cho `table.lt td > .lt-link` thành `display:block`, dùng margin âm bằng padding của ô rồi bù lại bằng padding, kèm `min-height:44px`. Như vậy liên kết phủ đúng ô đầu.
+  - Không dùng kiểu "stretched link" `::after` phủ cả `tr`, vì `position:relative` trên `tr` không ổn định giữa các trình duyệt và sẽ đè các nút trong dòng.
+  - Kiểm lại chế độ thẻ ở màn hẹp (`data-label`) cùng các e2e target-size, và bỏ dòng loại trừ `.lt-link` trong e2e.
+- Cách làm cho bút sửa (`.pencil` 28px, `::after` mở rộng ra 44px) đã đạt, giữ nguyên.
+
+### Kết luận Lô 11 — FE: **APPROVED** (REVIEW PASS)
+- Không rò tiền mua với Quản lý hay Kho, cả trong DOM lẫn mock.
+- Quyền ghi đúng: Chủ và Quản lý được ghi, Kho chỉ xem. Không có DELETE hay PUT.
+- Hai dạng 400 trùng tên đều hiện đúng. Số điện thoại không lên URL hay storage. Khối AI ghép ở page.
+- Không còn màu cứng, không còn chữ "NCC" trên giao diện.
+- TL11-L1 đến L5 là Low, gom vào lô sau. Việc `.lt-link` đề xuất tách thành phiếu riêng cho phần dùng chung.

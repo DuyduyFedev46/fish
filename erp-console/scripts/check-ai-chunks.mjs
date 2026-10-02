@@ -41,6 +41,9 @@ const TARGETS = [
   ["/print/label/page", "/print/label"],
   ["/(console)/inventory/detail/page", "/inventory/detail"],
   ["/(console)/ledger/page", "/ledger"],
+  // Nhà cung cấp (Lô 11): trang chi tiết có AiDocBlockGate (purchasing.supplier); danh sách không có AI. Cả hai phải xanh.
+  ["/(console)/suppliers/page", "/suppliers"],
+  ["/(console)/suppliers/detail/page", "/suppliers/detail"],
 ];
 
 // Chuỗi đặc trưng của code AI chạy trên máy (worker, thư viện wllama, gọi lệnh AI).

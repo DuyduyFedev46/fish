@@ -53,6 +53,8 @@ describe("InfoField sửa tại chỗ: kiểm nhập trước khi gửi (QA B5)"
   it("để trống khi bắt buộc là lỗi nhập; có chữ thì hợp lệ", () => {
     expect(validateDraft("  ", { required: true })).toBe("Nhập giá trị cho ô này.");
     expect(validateDraft("", { required: false })).toBeNull();
+    expect(validateDraft("", { required: true, requiredMessage: "Nhập tên nhà cung cấp." })).toBe("Nhập tên nhà cung cấp.");
+    expect(validateDraft("A", { required: true, requiredMessage: "Nhập tên nhà cung cấp." })).toBeNull();
     expect(validateDraft("12", { required: true })).toBeNull();
   });
   it("dùng validate của màn khi đã có giá trị", () => {

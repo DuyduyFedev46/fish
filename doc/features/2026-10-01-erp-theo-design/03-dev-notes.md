@@ -1689,3 +1689,47 @@ Nguồn: `04-qa-report.md` mục "Lô 9 — FE". B1 (BE chặn SĐT) và `RETURN
 
 **Kiểm (số thật).** tsc sạch · vitest 55 file / 586 ca (+4 ca: `isOutsideLong`, `RETURN_BATCH_CLOSED`, 400 ô ghi chú, mock ghi chú có SĐT) · build MOCK=1 và MOCK=0 xanh, `check-no-mock` XANH (17 file mock, 36 chuỗi seed), `check-ai-chunks` XANH (/returns/detail 447,6 kB), `check_naming` không phát sinh mới · e2e `ed_batch9_returns` 144/144 (thêm 39 ca: kích thước bảng 1280/1440/1100, màu cảnh báo, liên kết theo quyền, hai lỗi mới) · `ed_batch4_delivery` 70/70 · `ed_batch1_shell` 56/56 · `ed_batch9_real` (BE thật, SQLite tạm) 30/30 (thêm: liên kết Phiếu giao/Đơn với id thật, bấm Đơn mở được, BE trả 400 khoá `note` khi dán SĐT) · QA: `qa_ed_batch9_ui` 87/90 (3 ca đỏ còn lại: liên kết Lô chờ Lô 7, và hai ca luật "9 chữ số liền" theo quyết định #4) · `qa_ed_batch9_real` 49/49 · `qa_ed_batch9_api` 107/108 (ca S8b đỏ vì script kỳ vọng "lô B có 1 kg từ ca S7" mà S7 tạo hàng hoàn vào lô đã chốt, nay BE chặn đúng nên là 0 kg; script cần cập nhật, không phải lỗi sản phẩm).
 Ảnh: `shots-lo9/lo9-b2-list-1280.png`, `lo9-b2-list-1440.png`, `lo9-b3-detail-1280.png`, `lo9-err-batchclosed-1280.png`, `lo9-err-noterejected-1280.png` (ảnh PNG không đưa vào git).
+
+
+## Lô 11 — FE
+
+Story ED-22 (Nhà cung cấp, W5c danh sách, W5d chi tiết, F1b hộp Thêm). Làm trong `erp-console/`, không đụng `backend/`, `adapter/`, `features/purchasing/**`.
+
+**Trang và component.**
+- `app/(console)/suppliers/page.tsx` (danh sách) và `app/(console)/suppliers/detail/page.tsx` (`?id=`, bọc `Suspense`, ghép khối AI `purchasing.supplier` qua `AiDocBlockGate`; màn không import `features/ai`).
+- `features/suppliers/`: `SupplierListScreen` (tìm, lọc loại, lọc trạng thái, cột Số phiếu nhập, Lần nhập gần nhất, cột "Tổng tiền mua" khoá cho Chủ bằng `canViewCost`), `SupplierDetailScreen` (khối Thông tin sửa tại chỗ tên, số điện thoại, ghi chú; khối Mua hàng chỉ đọc; bảng Phiếu nhập R10 có "Tải thêm"; bảng Lô đang bán R5; dòng thời gian guidance `supplier`; menu "…" có Ngừng/Bật lại hợp tác và Xem nhật ký), `SupplierFormModal` (Thêm và Sửa), `ConfirmActiveModal`. Có `README.md` trong module.
+- Hàm API (`features/suppliers/api.ts`, mỗi hàm có nhánh mock): `listSuppliers`, `getSupplier`, `createSupplier`, `updateSupplier`, `setSupplierActive`, `listSupplierReceipts`, `listSupplierBatches`, `getSupplierTimeline`. Không có hàm xoá, không PUT (BE trả 405).
+- `shared/lib/nav.ts` bật mục "Nhà cung cấp" (bỏ `soon`). `scripts/check-ai-chunks.mjs` thêm hai màn mới. `e2e/ed_batch1_shell.py` và `e2e/qa_ed_batch1_common.py` thêm "Nhà cung cấp" vào menu của Chủ, Quản lý, Nhân viên kho. `features/auth/mock.ts` không phải sửa (quyền mock đã khớp BE).
+- Tên trùng hiện dưới ô Tên ở CẢ hai dạng 400 (`{"name":[...]}` và `{detail, code:"SUPPLIER_NAME_TAKEN"}`), hiện đúng một chỗ, giữ nguyên chữ đã gõ, nút chính đổi "Thử lại". Hộp Sửa chỉ gửi trường đổi. "Ngừng hợp tác" chỉ qua hộp xác nhận (nút đỏ, nêu hậu quả); người không có quyền thấy mục bị chặn kèm lý do "Chỉ Chủ và Quản lý.".
+- Giá vốn: `purchase_total` và `purchase_amount` của phiếu chỉ vào DOM khi `can_view_cost`; Quản lý và Kho không có cột, không có ô, không có chữ "Tổng tiền mua" trong HTML. SĐT nhà cung cấp hiện đủ (dữ liệu đối tác), không vào URL/storage/console. Không có chữ "NCC" hay "SĐT" trên giao diện.
+
+**Lệch contract / story (cần PO biết).**
+1. Khoá thật của BE là `last_received_at` và `purchase_total` (story ghi `last_receipt_at`, `total_purchase_amount`). FE theo BE.
+2. Chi tiết BE không có `receipts[]` và `selling_batches[]`: FE gọi R10 `receipts/?supplier=` và R5 `batches/?supplier=&has_stock=1`. Danh sách nhà cung cấp 50 dòng mỗi trang (story không nói).
+3. R10 `received_date` chỉ là ngày; cột "Nhập lúc" dùng `created_at` của phiếu.
+4. Số phiếu, lần nhập gần nhất, tổng tiền chỉ tính phiếu Đã ghi nhận (BE), nên bảng Phiếu nhập có thể nhiều dòng hơn "Phiếu nhập: n".
+5. Mã phiếu trong bảng là chữ thường, chưa là liên kết: `referenceHref({kind:"receipt"})` trả null tới khi Lô 10 (`purchasing/detail`) vào main. Khi có, bảng tự thành liên kết (đã dùng `rowHref` qua `referenceHref`).
+
+**Kiểm (chạy 02/10/2026, số thật).**
+- `npx tsc --noEmit` sạch. `npx vitest run`: 59 file, 646 ca đạt (module mới 19 ca: truy vấn, mô hình, hai dạng tên trùng, quyền, khoá giá vốn, chỉ đếm phiếu Đã ghi nhận, 405, `INVALID_FILTER`, ngừng/bật lại, 404).
+- `NEXT_PUBLIC_USE_MOCK=0 npm run build` sạch; `check-no-mock.mjs` XANH (19 file mock, 36 chuỗi seed, 185 file build); `check-ai-chunks.mjs` XANH (21 màn + 2 layout; `/suppliers` 390,0 kB, `/suppliers/detail` 428,0 kB, không có `new Worker`).
+- Build `NEXT_PUBLIC_USE_MOCK=1`, phục vụ ở 3101: `e2e/ed_batch11_suppliers.py` **98/98 PASS**; `e2e/ed_batch1_shell.py` **56/56 PASS**; `e2e/ed_batch7_inventory.py` **114/114 PASS**. Phủ: Chủ thấy tổng tiền (danh sách, chi tiết, bảng phiếu); Quản lý không có cột/ô/chữ trong DOM nhưng thêm, sửa tại chỗ, ngừng được; Kho xem được, không có Thêm/Sửa, "Ngừng hợp tác" bị chặn có lý do; giao1 và cs2 không có menu, vào thẳng danh sách và chi tiết thấy "không có quyền" và không có dữ liệu; tên trùng (cả dạng `racename`), tên trống, tên 201 ký tự; ngừng rồi bật lại, bấm Huỷ không đổi gì; `?id=` rác, 0, âm, 99999; lỗi 500 danh sách/chi tiết/phiếu/lô/lưu với "Thử lại"; danh sách rỗng và 403 từ BE; bộ lọc không khớp; quét storage và URL không có SĐT/tên nhà cung cấp; 360px không cuộn ngang; không có console.error.
+- **BE thật** (SQLite tạm trong scratchpad, `migrate` + `seed_demo` + 5 người dùng + 1 phiếu nhập đã ghi nhận cho "NK Đại Dương" tạo bằng `create_and_submit_receipt`; Django 8000, console build `MOCK=0` ở 3102): `e2e/ed_batch11_real.py` **21/21 PASS** (Chủ thấy tổng tiền VNĐ, tên trùng khác hoa thường báo "Đã có nhà cung cấp trùng tên này." dưới ô Tên, thêm, sửa ghi chú tại chỗ, ngừng, bật lại, dòng thời gian tải được; ql1 không có tiền trong DOM kể cả bảng phiếu; kho1 không có Thêm/Sửa; giao1 và cs2 không có menu và bị chặn). Đã tắt cả hai máy chủ sau khi chạy. `backend/db.sqlite3` không bị đụng.
+- `python3 scripts/check_naming.py`: OK, không phát sinh vi phạm mới. Màu cứng trong file của lô: 0 (grep hex/rgb). `NCC`/`SĐT` trên giao diện: 0.
+- Ảnh (`erp-console/shots/`, không vào git): `ed11-loc-1-danh-sach.png`, `ed11-loc-2-chi-tiet.png`, `ed11-loc-3-da-ngung.png`, `ed11-loc-rong.png`, `ed11-kho1-chi-tiet.png`, `ed11-loc-360-danh-sach.png`, `ed11-loc-360-them.png`, `ed11-loc-360-chi-tiet.png`, `ed11-real-loc-danh-sach.png`, `ed11-real-loc-chi-tiet.png`.
+
+**Còn nợ / lưu ý.**
+- Vùng bấm 360px: kiểm tra trong e2e loại trừ `.lt-link` và bút sửa (`.pencil`). Liên kết tên ở cột đầu của `DataTable` cao 19,5px trong dòng 44px, bút sửa 28px có vùng bấm mở rộng 44px bằng `::after`. Cả hai là component dùng chung (`shared/ui/globals.css`, `InfoField`), cùng hiện trạng với `/customers/`; ngoài phạm vi lô nên chưa sửa. Đề nghị Tech Lead cân nhắc cho `.lt-link` phủ cả ô.
+- "Loại" chỉ sửa được trong hộp "Sửa" (`InfoField` chưa có kiểu chọn).
+- Bảng Lô đang bán chỉ nạp trang đầu (50 lô), chưa có "Tải thêm".
+- "Xem nhật ký" cuộn và đưa tiêu điểm tới khối Dòng thời gian trên cùng trang (chưa có trang nhật ký riêng theo nhà cung cấp).
+- Thêm `e2e/ed_batch11_real.py` (ngoài danh sách file được phép trong phiếu giao, cùng thư mục e2e của lô) để chạy kịch bản BE thật; `e2e/s7_shell.py`, `e2e/s8_views.py` vốn đã lỗi thời từ trước (thiếu "Khách hàng", "Hàng hoàn về kho") nên không sửa.
+- Chưa commit, chưa push, chưa deploy.
+
+### Lô 11 — FE · vòng sửa sau QA REJECTED (2026-10-02)
+- **B1** (lỗi tên trùng còn sót): nguyên nhân là `sub.error` của lần gửi cũ vẫn còn khi gỡ ghim `nameServerError`, nên câu lỗi nhảy lên đầu hộp. Nay gõ lại Tên thì gọi `sub.reset()` (xoá `error`, `fieldErrors`, `failed`, nút về "Lưu nhà cung cấp"). Logic quyết định nằm ở hai hàm thuần `topFormError` và `shouldResetSaveErrorOnNameEdit` trong `suppliersModel.ts`, có test vitest; e2e kiểm thêm cả hai dạng 400.
+- **B2** (bút chì 28 px): `.pencil` trong `shared/ui/detail/InfoField.module.css` nay là hộp bấm thật 44x44 (bỏ `::after`, dùng margin âm để ô không cao thêm). e2e `ed_batch11_suppliers` đã bỏ ngoại lệ bút chì khỏi phép đo 44 px và đo thẳng bút chì ở 360 px.
+- **B3** (tên trống ở sửa tại chỗ): `InfoField` kind `editable` thêm prop `requiredMessage` (và `validateDraft` nhận `requiredMessage`), mặc định vẫn "Nhập giá trị cho ô này." nên màn khác không đổi. Trang chi tiết truyền `M.nameRequired` cho ô Tên.
+- **L1**: "Chỉ Chủ và Quản lý." chuyển vào `SUPPLIERS_MSG.managerOnly`. **L2**: mock `doc.code` bỏ tiền tố `NCC-`.
+- Số đo: tsc sạch; vitest 59 file / 647 ca; build MOCK=0 + `check-no-mock` + `check-ai-chunks` xanh; `ed_batch11_suppliers` 103/103, `ed_batch1_shell` 56/56, `ed_batch6_customers` 79/79, `ed_batch2_patterns` 75/75 (mock, cổng 3101); `qa_ed_batch11_real` 133/133 trên BE thật (SQLite tạm + seed QA, cổng 3102/8000); `check_naming` không phát sinh mới.
+- Nợ: không. Không đụng backend, adapter, `features/purchasing`.

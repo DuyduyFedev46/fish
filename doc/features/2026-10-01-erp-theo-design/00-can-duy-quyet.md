@@ -82,3 +82,6 @@
 - BE Low: chuỗi lỗi "Chỉ publish được lô…" còn chữ tiếng Anh (Lô 7 QA). Nhật ký hoạt động: các dòng huỷ/trả NCC/chốt lô có số tiền suy ra giá vốn — Quản lý xem dòng nhưng khoá tiền đã che; kho/giao/CSKH 403 (QA Lô 7 xác nhận không rò).
 - Lô 17 hồi quy: `qa_ed_batch1_shell` 3 ca cũ cần cập nhật theo màn mới (⌘K khớp mục menu "Khách hàng" khi gõ tên khách là khớp nhãn menu, không phải tìm khách; tab `/orders/` đổi bố cục ở Lô 3; console.error của React prod).
 - BE nhỏ: `ReturnToStockSerializer` trả `order: {id, code}` để FE bỏ hook `useReturnOrderId` (đang đọc thêm phiếu giao để lấy id đơn) — Lô 9 nợ. Sau Lô 7 vào main: "Lô" ở chi tiết hàng hoàn thành liên kết.
+- PO biết (Lô 10): ô "Giá mua" nhập lô chỉ nhận đồng nguyên (form cũ nhận số lẻ). Quản lý nhập được giá mua lúc nhập lô (hành vi cũ) nhưng không xem lại được — muốn cấm Quản lý nhập giá là đổi quy tắc. Nợ Lô 12: ô chọn phiếu ở form hoá đơn/chi phí chỉ tải 20 phiếu; gợi ý tiền hoá đơn làm tròn phần lẻ .50.
+- Lô 17 dùng chung: `.lt-link` trong DataTable phủ cả ô (display:block + min-height 44px) để bàn phím/nhấn giữ/mở tab mới có vùng bấm đủ; bỏ loại trừ `.lt-link` trong e2e vùng bấm (review Lô 11). Mock nhà cung cấp còn `NCC-${id}`.
+- BE nhỏ (Lô 8): PATCH phiếu kiểm kê (ngày/ghi chú) kiểm `expected_updated_at` để đóng khe "ghi chú ai lưu sau thắng"; FE cảnh báo rời trang khi chưa lưu (Lô 17).
