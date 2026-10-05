@@ -9,6 +9,7 @@ import React, { useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { Icon } from "@/shared/ui/Icon";
+import { AI_FEATURES_ENABLED } from "@/shared/lib/features";
 import { escalateStep } from "@/features/ai/actions/api";
 import type { GuidanceNextStep } from "../types";
 import s from "./guidance.module.css";
@@ -50,11 +51,14 @@ export default function GuidanceEscalate({ step, docType, docId, disabled, notic
           <Icon name="check_circle" />
           <div className={s.aiNoticeContent}>
             <span>
-              Đã chuyển việc cho nhóm <strong>{escalatedGroup}</strong>. Việc hiển thị trong tab &quot;Được chuyển&quot; của màn Việc AI.
+              Đã chuyển việc cho nhóm <strong>{escalatedGroup}</strong>.
+              {AI_FEATURES_ENABLED && <> Việc hiển thị trong tab &quot;Được chuyển&quot; của màn Việc AI.</>}
             </span>
-            <Link href="/ai/actions?status=ESCALATED" className={s.aiActionsLink}>
-              Đến tab Được chuyển
-            </Link>
+            {AI_FEATURES_ENABLED && (
+              <Link href="/ai/actions?status=ESCALATED" className={s.aiActionsLink}>
+                Đến tab Được chuyển
+              </Link>
+            )}
           </div>
         </div>
       )}

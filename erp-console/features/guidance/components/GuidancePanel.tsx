@@ -18,6 +18,7 @@ import { Icon } from "@/shared/ui/Icon";
 import { getGuidance } from "../api";
 import type { GuidanceData, GuidanceNextStep, GuidanceTimelineEntry } from "../types";
 import GuidanceEscalate from "./GuidanceEscalate";
+import { AI_FEATURES_ENABLED } from "@/shared/lib/features";
 import { useAiEnabledAndConsented } from "@/features/ai/gate-state";
 import s from "./guidance.module.css";
 
@@ -40,7 +41,7 @@ export function GuidancePanel({ docType, docId, onAction, onDataLoaded, refreshS
   const [error, setError] = useState<string | null>(null);
 
   // "Tóm tắt" (model local): "AI bật và đã đồng ý" đọc từ gate-state — không tự gọi /api/ai/status/. KHÔNG dùng cho "Để AI làm".
-  const aiOn = useAiEnabledAndConsented();
+  const aiOn = useAiEnabledAndConsented() && AI_FEATURES_ENABLED;
   // Chỗ đặt kết quả của phần AI (portal) — giữ bố cục cũ dù nút do component nạp động vẽ.
   const [summaryHost, setSummaryHost] = useState<HTMLDivElement | null>(null);
 
@@ -161,7 +162,7 @@ function StepItem({
   const isSystem = step.actor === "system";
   const canAct = step.allowed && onAction && !isSystem;
   // F6-2 / DW-14-AC3, AC8: nút "Để AI làm" theo `step.ai` (server đã lọc quyền/cờ AI) + mức C + có lệnh.
-  const showAiButton = Boolean(step.ai && step.ai.level === "C" && step.command);
+  const showAiButton = AI_FEATURES_ENABLED && Boolean(step.ai && step.ai.level === "C" && step.command);
   // Nơi phần AI (nạp động) đặt thông báo kết quả — ngay dưới đầu bước.
   const [noticeHost, setNoticeHost] = useState<HTMLDivElement | null>(null);
 
@@ -176,7 +177,7 @@ function StepItem({
           {isSystem ? <Icon name="schedule" /> : <Icon name="play_arrow" />}
           <span>{step.label}</span>
           {isSystem && <span className={s.badgeSystem}>Hệ thống</span>}
-          {step.ai && (
+          {AI_FEATURES_ENABLED && step.ai && (
             <span className={s.badgeAi}>AI {step.ai.level ? `(${step.ai.level})` : ""}</span>
           )}
         </div>

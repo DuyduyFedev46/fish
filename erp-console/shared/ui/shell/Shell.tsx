@@ -13,6 +13,7 @@ import { useDrawerFocus } from "../useDrawerFocus";
 import { Sidebar } from "./Sidebar";
 import { Topbar } from "./Topbar";
 import { CommandSearch } from "./CommandSearch";
+import { AI_FEATURES_ENABLED } from "@/shared/lib/features";
 import { OfflineBanner, useOffline } from "../states/OfflineBanner";
 import {
   ACCOUNT_HREF,
@@ -123,7 +124,7 @@ export function Shell({ viewer, userName, roleText, onLogout, accountHref, child
   const bottomItems = overflow ? topItems.slice(0, 4) : topItems;
   const showBottom = topItems.length >= 2;
 
-  const aiSettingsHref = canView(viewer, "ai-settings") ? AI_SETTINGS_HREF : undefined;
+  const aiSettingsHref = AI_FEATURES_ENABLED && canView(viewer, "ai-settings") ? AI_SETTINGS_HREF : undefined;
   const bottomActive = (i: NavItem) => !!current && (current.key === i.key || current.parent === i.key);
 
   return (

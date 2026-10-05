@@ -4,6 +4,7 @@
 // Module mới chỉ thay nội dung trang, không sửa bảng này trừ khi đổi luật.
 
 import { HOME_CONFIRMATION_QUEUE, ROLE } from "./roles";
+import { AI_FEATURES_ENABLED } from "./features";
 
 /** Phần của `me` mà menu cần. Khai ở đây để shared/ không phụ thuộc features/auth; `Me` khớp kiểu này. */
 export type Viewer = {
@@ -456,7 +457,7 @@ export const NAV: NavItem[] = [
     short: "Chính sách AI",
     icon: "policy",
     section: "Quản trị",
-    visible: (me) => has(me, PERM.manageAiPolicy),
+    visible: (me) => AI_FEATURES_ENABLED && has(me, PERM.manageAiPolicy),
   },
   {
     key: "ai-report",
@@ -467,7 +468,7 @@ export const NAV: NavItem[] = [
     short: "Báo cáo AI",
     icon: "insights",
     section: "Quản trị",
-    visible: (me) => has(me, PERM.manageAiPolicy),
+    visible: (me) => AI_FEATURES_ENABLED && has(me, PERM.manageAiPolicy),
   },
 
   // ---- Không có dòng ở menu trái ----
@@ -481,7 +482,7 @@ export const NAV: NavItem[] = [
     icon: "auto_awesome",
     section: "Quản trị",
     menu: false, // vào từ menu avatar (UI-RULES §2.2)
-    visible: (me) => !onlyDelivery(me),
+    visible: (me) => AI_FEATURES_ENABLED && !onlyDelivery(me),
   },
   {
     key: "ai-actions",
@@ -493,7 +494,7 @@ export const NAV: NavItem[] = [
     icon: "smart_toy",
     section: "Quản trị",
     menu: false, // bỏ khỏi menu (02b mục 0 dòng 2); trang cũ còn tới Lô 17
-    visible: (me) => !onlyDelivery(me),
+    visible: (me) => AI_FEATURES_ENABLED && !onlyDelivery(me),
   },
 ];
 

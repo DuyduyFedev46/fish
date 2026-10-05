@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
+import { AiFeatureGuard } from "@/shared/ui/states/AiFeatureGuard";
 import { ViewGuard } from "@/features/auth/components/ViewGuard";
 import { useAuth } from "@/features/auth/components/AuthProvider";
 import { fetchAiActions, confirmAiAction, rejectAiAction, undoAiAction } from "@/features/ai/actions/api";
@@ -13,11 +14,13 @@ import { dateTimeFull } from "@/shared/lib/format";
 
 export default function AiActionsPage() {
   return (
-    <ViewGuard view="ai-actions">
-      <Suspense fallback={<div className="p-6"><Loading label="Đang tải..." /></div>}>
-        <AiActionsContent />
-      </Suspense>
-    </ViewGuard>
+    <AiFeatureGuard>
+      <ViewGuard view="ai-actions">
+        <Suspense fallback={<div className="p-6"><Loading label="Đang tải..." /></div>}>
+          <AiActionsContent />
+        </Suspense>
+      </ViewGuard>
+    </AiFeatureGuard>
   );
 }
 

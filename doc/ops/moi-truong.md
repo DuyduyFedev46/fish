@@ -131,6 +131,7 @@ Các job đều idempotent (khoá dòng, chạy lại không làm hai lần). Lo
   NEXT_PUBLIC_USE_MOCK=0 NEXT_PUBLIC_API_BASE=https://cangca-api-675411800433.asia-southeast1.run.app npm run build
   firebase deploy --only hosting --project keolai-63ec1
   ```
+- **ERP, cờ giao diện AI:** `NEXT_PUBLIC_AI_FEATURES` (đọc ở một chỗ, `erp-console/shared/lib/features.ts`). **Mặc định tắt**: vắng cờ hoặc giá trị khác "1" đều ẩn menu, trang `/ai/*`, khối Trợ lý AI và nút AI (SR-HIDE-AI-01). Build với `NEXT_PUBLIC_AI_FEATURES=1` để bật lại. Cờ chỉ ẩn giao diện, backend `AI_ENABLED` là việc riêng.
 - Sau khi build, grep thư mục `out/_next` để chắc bản build trỏ đúng URL. Thư mục `out/` đang chứa bản build nào thì deploy ra đúng bản đó.
 - Staging được gắn header `X-Robots-Tag: noindex, nofollow` qua `firebase.staging.json` để chặn máy tìm kiếm index; sau deploy kiểm bằng `curl -sI https://cangca-loc-staging.web.app/shop/ | grep -i x-robots-tag` và `https://cangca-erp-staging.web.app/`.
 
