@@ -47,3 +47,40 @@ Gõ `/ai/policy/` với Chủ khi tắt → "Bạn không có quyền xem mục 
 - Build mock: cờ tắt, cờ `=1`, HEAD gốc → 3 bản; Playwright `qa.py`: tắt 41 ca PASS; bật 18 ca PASS (1 "FAIL" giả do script tìm nút "Nhờ" ở `giao1` trong my-deliveries, đã thay bằng ca dev-patterns ở trên)
 - Vitest giá trị cờ lạ: 6/6 passed
 - `python3 scripts/check_naming.py`: OK
+
+---
+
+# Vòng 2 (SR-HIDE-AI-02) · 2026-10-05
+
+## Kết luận: APPROVED — AC1–AC4 chạy thật đạt; L1 và L2 của vòng 1 đã hết; không lỗi chặn.
+## Tổng: 164 ca Playwright (114 cờ tắt + 50 cờ bật) · ✅ 164 · ❌ 0 · ⏸ 1 (xem dưới) + vitest 78 file/912 test xanh
+
+Cách kiểm: build mock (`NEXT_PUBLIC_USE_MOCK=1`) 2 bản trong bản sao tạm của code chưa commit (cờ tắt, và `NEXT_PUBLIC_AI_FEATURES=1`), phục vụ bằng http.server, Playwright Chromium 1280x800, vai `loc`, `kho1`, `ql1` (+ `giao1` cho nút về). Ảnh `qa-shots/r2-*` (70 ảnh, chỉ dữ liệu mock giả). Server đã tắt.
+
+## Theo AC
+| AC | Kết quả | Bằng chứng |
+|---|---|---|
+| AC1 cờ tắt: không điểm vào "Nhờ" | ✅ | 3 vai x tồn kho 901/902/903 và đơn 101/102/103: menu "…" không có "Nhờ", không item rỗng, không separator đầu/cuối/đôi (menu còn "Sao chép mã…", "Xem nhật ký…", "Huỷ đơn…"). `/dev-patterns/` (GuidancePanel) 3 vai: 0 nút "Nhờ". 0 request `/api/ai*` toàn phiên, console 0 lỗi. Ảnh `r2-off-menu-*`, `r2-off-devpatterns-*` |
+| AC1 cờ =1 như cũ | ✅ (⏸ đơn hàng) | Tồn kho 3 vai: mục "Nhờ người xử lý" hiện lại; dev-patterns có nút Nhờ, bấm ra "Đã chuyển việc". ⏸ Mock không có bước `allowed=false` ở màn đơn hàng nên menu đơn không hiện "Nhờ" cả khi bật; chỉ có vitest (`escalatableStep` cờ bật khác null), không có ảnh trình duyệt cho đơn hàng |
+| AC2 `/ai/*` khi tắt | ✅ | `/ai/policy|report|settings|actions/` x 3 vai: "Không tìm thấy trang này", nội dung vùng trang không có "quyền"/"Chủ vựa", 0 request `/api/ai`. Nút "Về Tổng quan" -> `/overview/` = đúng trang sau đăng nhập của loc/kho1/ql1; `giao1` thì nút "Về Việc giao của tôi" -> `/my-deliveries/` đúng vai. Ảnh `r2-off-ai_*` |
+| AC3 câu "màn Việc của AI" | ✅ | Bật: hộp Nhờ (loc/kho1/ql1, tồn kho) còn "Họ sẽ thấy việc này ở màn Việc của AI, tab Được chuyển." Ảnh `r2-on-escalate-*`. Tắt: không mở được hộp Nhờ nên không còn chỗ nhắc |
+| AC4 | ✅ | vitest `npm run test` 78 file / 912 test (vòng 1: 909, thêm 3 ca) xanh; `npm run typecheck` exit 0; `npm run build` không cờ exit 0 |
+
+## Ngoại lệ & biên
+- Cờ bật, `/ai/*` như cũ: policy/settings/actions hiện màn AI; `/ai/report/` với kho1/ql1 hiện "không có quyền xem" (phân quyền cũ của màn, đúng khi cờ bật). ✅
+- Nút về đúng vai cho cả vai chỉ giao hàng. ✅
+- Console 0 lỗi ở cả hai trạng thái. ✅
+- Ghi nhận vòng 1 (mock không bắt được request escalate thật khi cờ tắt) nay không còn vì điểm vào đã ẩn; endpoint BE không đổi. Không còn cần xác nhận AI_ENABLED=0.
+
+## Phân quyền / rò dữ liệu
+Chỉ đổi FE ẩn/hiện; không đổi BE, không thêm field. Không rò giá vốn/dữ liệu cá nhân mới; không log, localStorage, URL mới; ảnh chỉ dữ liệu mock.
+
+## Hồi quy
+Menu "…" tồn kho/đơn hàng: các mục khác (Trả nhà cung cấp, Huỷ phần tồn, Chốt lô, Huỷ đơn, Sao chép mã, Xem nhật ký) vẫn hiện y như bản bật cờ. `python3 scripts/check_naming.py` OK, không phát sinh mới. Sau build `git status` không thêm file lạ.
+
+## Lỗi
+Không có. L1 (nhắc màn AI khi tắt) và L2 (thông báo "không có quyền" ở /ai/*) của vòng 1: ĐÃ SỬA.
+
+## Lệnh đã chạy
+- `npm run test` (erp-console): 78 passed / 912 passed · `npm run typecheck`: exit 0 · `npm run build` (không cờ): exit 0
+- `NEXT_PUBLIC_USE_MOCK=1 npm run build` (tắt) và kèm `NEXT_PUBLIC_AI_FEATURES=1` (bật) trong bản sao tạm; Playwright `r2.py`: tắt 114/114 PASS, bật 50/50 PASS (không FAIL)

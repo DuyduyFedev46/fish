@@ -28,7 +28,7 @@ export default function GuidanceEscalate({ step, docType, docId, disabled, notic
   const [escalateError, setEscalateError] = useState<string | null>(null);
 
   // DW-23-AC1: hiện khi bước chưa được phép thực hiện (allowed === false) và không phải bước hệ thống.
-  const show = !step.allowed && step.actor !== "system" && Boolean(step.key);
+  const show = AI_FEATURES_ENABLED && !step.allowed && step.actor !== "system" && Boolean(step.key);
   if (!show) return null;
 
   const handleEscalate = async () => {

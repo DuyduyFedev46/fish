@@ -15,3 +15,10 @@ Cờ `NEXT_PUBLIC_AI_FEATURES`. Chỉ đúng giá trị `"1"` mới là bật. V
 - Đặt cờ ở một chỗ duy nhất, ví dụ `shared/lib/features.ts` với `AI_FEATURES_ENABLED`. Không rải `process.env` khắp nơi.
 - Ghi cờ vào `erp-console/.env.example` và `doc/ops/moi-truong.md`, kèm câu "mặc định tắt, build với =1 để bật".
 - Không xoá code AI. Chỉ ẩn để có thể bật lại.
+
+## SR-HIDE-AI-02 — Vòng 2 (Duy 2026-10-05: "Ẩn luôn nút Nhờ")
+Lý do: việc "Nhờ" chỉ hiện ở màn Việc AI → tab "Được chuyển", màn này đã ẩn → người được nhờ không thấy (ngõ cụt).
+- **AC1.** Cờ tắt → mọi điểm vào "Nhờ người xử lý" (GuidanceEscalate, EscalateModal, mục "Nhờ" trong menu "…" ở trang chi tiết như tồn kho, và mọi chỗ khác gọi `POST /api/ai/actions/escalate/`) không hiện; không có request escalate. Cờ =1 → như cũ.
+- **AC2.** (L2 QA) Gõ thẳng `/ai/*` khi cờ tắt không hiện câu "không có quyền… nhờ Chủ vựa cấp quyền"; thay bằng "Không có trang này" (dùng trạng thái not-found sẵn có nếu có) hoặc chuyển về trang chủ.
+- **AC3.** (L1 QA) Khi cờ =1 câu nhắc "màn Việc của AI" giữ nguyên; khi tắt không còn chỗ nào nhắc tới màn AI đã ẩn (AC1 đã ẩn hộp Nhờ nên L1 tự hết — kiểm lại).
+- **AC4.** Vitest cả hai trạng thái; test/typecheck/build xanh.

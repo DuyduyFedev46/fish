@@ -19,6 +19,8 @@ import { ROLE } from "@/shared/lib/roles";
 import { AiDocBlockGate } from "@/features/ai/components/AiDocBlockGate";
 import { AiBlockFrame } from "@/shared/ui/detail/AiBlockFrame";
 import { DetailPage } from "@/shared/ui/detail/DetailPage";
+import { escalatableStep } from "@/features/guidance/escalation";
+import GuidanceEscalate from "@/features/guidance/components/GuidanceEscalate";
 import { AiFeatureGuard } from "@/shared/ui/states/AiFeatureGuard";
 
 const OWNER: Viewer = { groups: [ROLE.owner], can_view_profit: true, permissions: Object.values(PERM), home: "dashboard" };
@@ -45,5 +47,12 @@ describe("cờ AI bật", () => {
     expect(renderToStaticMarkup(createElement(AiBlockFrame, { proposals: [], onReject: () => {}, onConfirm: () => {} }))).toContain("Trợ lý AI");
     expect(renderToStaticMarkup(createElement(DetailPage, { header: "H", aiSlot: createElement("i"), children: "trái" }))).toContain("<aside");
     expect(renderToStaticMarkup(createElement(AiFeatureGuard, null, createElement("p", null, "MAN-AI")))).toContain("MAN-AI");
+  });
+
+  it("SR-HIDE-AI-02: cờ bật → 'Nhờ người xử lý' hiện như cũ", () => {
+    const step = { key: "confirm_payment", label: "X", actor: "user", allowed: false, who: ["Chủ"], missing: [], deadline: null, why: null, command: null, ai: null } as never;
+    expect(escalatableStep({ next_steps: [step] })).not.toBeNull();
+    const html = renderToStaticMarkup(createElement(GuidanceEscalate, { step, docType: "sales.salesorder", docId: 1, noticeHost: null }));
+    expect(html).toContain("Nhờ");
   });
 });

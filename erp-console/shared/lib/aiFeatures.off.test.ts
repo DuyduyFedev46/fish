@@ -20,6 +20,8 @@ import { AiDocBlockGate } from "@/features/ai/components/AiDocBlockGate";
 import { ConfirmationAiBlock } from "@/features/confirmation/components/ConfirmationAiBlock";
 import { AiBlockFrame } from "@/shared/ui/detail/AiBlockFrame";
 import { DetailPage } from "@/shared/ui/detail/DetailPage";
+import { escalatableStep } from "@/features/guidance/escalation";
+import GuidanceEscalate from "@/features/guidance/components/GuidanceEscalate";
 import { AiFeatureGuard } from "@/shared/ui/states/AiFeatureGuard";
 
 const OWNER: Viewer = { groups: [ROLE.owner], can_view_profit: true, permissions: Object.values(PERM), home: "dashboard" };
@@ -61,5 +63,19 @@ describe("cờ AI tắt", () => {
   it("trang /ai/*: AiFeatureGuard không mount màn AI", () => {
     const html = renderToStaticMarkup(createElement(AiFeatureGuard, null, createElement("p", null, "MAN-AI")));
     expect(html).not.toContain("MAN-AI");
+  });
+
+  it("SR-HIDE-AI-02: /ai/* hiện 'Không tìm thấy trang này', không nhắc cấp quyền", () => {
+    const html = renderToStaticMarkup(createElement(AiFeatureGuard, null, createElement("p", null, "MAN-AI")));
+    expect(html).toContain("Không tìm thấy trang này");
+    expect(html).not.toContain("Chủ vựa");
+    expect(html).not.toContain("quyền");
+  });
+
+  it("SR-HIDE-AI-02: không còn điểm vào 'Nhờ người xử lý'", () => {
+    const step = { key: "confirm_payment", label: "X", actor: "user", allowed: false, who: ["Chủ"], missing: [], deadline: null, why: null, command: null, ai: null } as never;
+    expect(escalatableStep({ next_steps: [step] })).toBeNull();
+    const html = renderToStaticMarkup(createElement(GuidanceEscalate, { step, docType: "sales.salesorder", docId: 1, noticeHost: null }));
+    expect(html).toBe("");
   });
 });
