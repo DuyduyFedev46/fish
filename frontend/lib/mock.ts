@@ -201,6 +201,13 @@ const DELIVERY_LABELS: Record<string, string> = {
   FAILED: "Giao chưa thành công, vựa sẽ liên hệ lại",
   CANCELLED: "Đã huỷ",
 };
+// Nhãn đơn của khách theo bảng 02b §2.6 (W37 S8, mục 4 thuật ngữ đã duyệt): đơn đã trả tiền chỉ có ba nhãn, ứng với phiếu giao.
+// Đơn Hoàn tất (phiếu Đã giao) hiện "Hoàn tất"; chưa giao xong hiện "Đang xử lý"; phiếu còn chờ gọi xác nhận có câu riêng.
+const PAID_ORDER_LABELS = {
+  confirming: "Đã thanh toán – chờ vựa gọi xác nhận",
+  processing: "Đang xử lý",
+  completed: "Hoàn tất",
+} as const;
 const deliveryLabelOf = (code: string): string => DELIVERY_LABELS[code] ?? "Đang cập nhật";
 
 function nowIso(minutesFromNow: number): string {
@@ -280,11 +287,12 @@ function seedDemoOrders(): Map<string, MockOrderRecord> {
   });
   // Đơn mẫu 5–9: một đơn cho mỗi trạng thái phiếu giao còn lại (E2: Shop tra đơn không lộ mã thô).
   const extra: Array<[string, string, string, string]> = [
-    ["DH-DEMO005", "0909005001", "CONFIRMING", "Đã thanh toán – chờ vựa gọi xác nhận"],
-    ["DH-DEMO006", "0909005002", "READY", "Đã thanh toán, đang soạn hàng"],
-    ["DH-DEMO007", "0909005003", "DELIVERING", "Đã thanh toán, đang soạn hàng"],
-    ["DH-DEMO008", "0909005004", "COMPLETED", "Đã hoàn tất"],
-    ["DH-DEMO009", "0909005005", "FAILED", "Đã thanh toán, đang soạn hàng"],
+    ["DH-DEMO005", "0909005001", "CONFIRMING", PAID_ORDER_LABELS.confirming],
+    ["DH-DEMO006", "0909005002", "READY", PAID_ORDER_LABELS.processing],
+    ["DH-DEMO007", "0909005003", "DELIVERING", PAID_ORDER_LABELS.processing],
+    // W37 S8-AC6: đơn Hoàn tất — badge "Hoàn tất", dòng phiếu "Đã giao" (status COMPLETED suy từ phiếu ở toWireOrderStatus).
+    ["DH-DEMO008", "0909005004", "COMPLETED", PAID_ORDER_LABELS.completed],
+    ["DH-DEMO009", "0909005005", "FAILED", PAID_ORDER_LABELS.processing],
   ];
   for (const [order_code, phone, delivery_code, status_label] of extra) {
     orders.set(order_code, {

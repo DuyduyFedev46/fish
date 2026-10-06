@@ -243,7 +243,7 @@ with sync_playwright() as p:
         (104, ["Huỷ đơn"], "Đang xử lý"),             # Soạn hàng
         (105, ["Huỷ đơn"], "Đã thanh toán"),
         (107, [], "Đang xử lý"),                       # Đang giao: không nút
-        (109, ["Lập phiếu hoàn"], "Hoàn tất"),
+        (109, ["Lập phiếu hoàn tiền"], "Hoàn tất"),  # W37 S7-AC4
     ]
     for oid, want, chip in table:
         open_order(page, oid)

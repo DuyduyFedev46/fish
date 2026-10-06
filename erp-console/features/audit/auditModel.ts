@@ -45,6 +45,7 @@ export const AUDIT_ACTION_LABELS: Readonly<Record<string, string>> = {
   escalate_unmatched_payment: "Chuyển Chủ xử lý tiền lệch",
   split_overpaid_payment: "Tách khoản chuyển thừa",
   create_refund: "Lập phiếu hoàn",
+  complete_order: "Đơn hoàn tất",
   confirm_refund: "Xác nhận hoàn tiền",
   mark_refund_failed: "Ghi hoàn tiền thất bại",
   retry_refund: "Thử hoàn lại",

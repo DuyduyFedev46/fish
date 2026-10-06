@@ -3,6 +3,7 @@ import type { MockRequest } from "@/shared/lib/http";
 import { PERM } from "@/shared/lib/nav";
 import { hasLimitedCourierScope } from "@/shared/lib/personalData";
 import { isDeliveryFinished } from "@/shared/lib/orderCompletion";
+import { isOrderCancelledInMock, publishDeliveryOutcome } from "@/shared/lib/orderLink.mock";
 import { hasLongDigitRun } from "./deliveryUi";
 import type {
   Deliverer,
@@ -768,12 +769,14 @@ const NEXT_FROM: Record<string, string[]> = {
 
 /**
  * W37 S1: trạng thái đơn sau lần chuyển này, theo luật dùng chung BR-BH-18 (`isDeliveryFinished`). Mọi phiếu cùng đơn được xét.
- * Kho phiếu mock này không nối với kho đơn mock (features/orders/mock): hai kho dùng mã đơn khác nhau, và import chéo làm bản build
- * thật giữ lại seed mock (check-no-mock đỏ).
+ * S6-AC8: kết quả được gửi vào kho nối `shared/lib/orderLink.mock.ts` để mock Đơn đổi theo (cùng `id` đơn) — không import chéo
+ * feature, và file nối chỉ có ở mock nên bản build thật không giữ seed.
  */
 function orderStatusAfter(item: DeliveryNoteDetail, statuses: string[]): string | null {
   if (!item.order?.code) return null;
-  return item.status === "CANCELLED" ? "CANCELLED" : isDeliveryFinished(statuses) ? "COMPLETED" : "PROCESSING";
+  const orderStatus = item.status === "CANCELLED" ? "CANCELLED" : isDeliveryFinished(statuses) ? "COMPLETED" : "PROCESSING";
+  if (item.order.id != null) publishDeliveryOutcome({ orderId: item.order.id, deliveryStatus: item.status, orderStatus });
+  return orderStatus;
 }
 
 /** `POST /api/delivery/notes/{id}/status/` — đóng gói, nhận hàng đi giao, hoàn tất, báo thất bại (B5). */
@@ -788,8 +791,9 @@ export function mockPostDeliveryNoteStatus(req: MockRequest | { url?: string; bo
   const siblingStatuses = (n: DeliveryNoteDetail) => MOCK_DELIVERY_NOTES.filter((x) => x.order?.code === n.order?.code).map((x) => x.status as string);
 
   // BR-GH-24: phiếu hoặc đơn đã huỷ → không nhận hàng đi giao, không giao xong, không báo thất bại. 400 kèm `code` (02b §2.3).
-  if ((to === "DELIVERING" || to === "COMPLETED" || to === "FAILED") && item.status === "CANCELLED") {
-    return { status: 400, body: { detail: "Đơn đã huỷ — mang hàng về kho.", code: "BR-GH-24", current_status: item.status } };
+  // Đơn đã huỷ ở mock Đơn mà phiếu cũ chưa huỷ (ca nhiều phiếu, BE §1.2) cũng bị chặn như phiếu đã huỷ.
+  if ((to === "DELIVERING" || to === "COMPLETED" || to === "FAILED") && (item.status === "CANCELLED" || isOrderCancelledInMock(item.order?.id))) {
+    return { status: 400, body: { detail: "Đơn đã huỷ — mang hàng về kho.", code: "BR-GH-24", current_status: "CANCELLED" } };
   }
 
   if (to === "FAILED") {
