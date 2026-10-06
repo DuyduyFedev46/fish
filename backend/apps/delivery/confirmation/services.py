@@ -387,7 +387,7 @@ def unconfirm(task_id: int, user, *, reason: str = "") -> tuple[DeliveryNote, Co
             actor=user,
             obj=note,
             changes={"status": {"from": "PREPARING", "to": "CONFIRMING"}},
-            note=note_marker(clean_reason),
+            note=note_marker(clean_reason, on_document=False),
         )
 
         return note, task
@@ -573,7 +573,7 @@ def decide(
                 actor=user,
                 obj=note_obj,
                 changes={"decision": "DELIVER_WITHOUT_CONFIRM"},
-                note=note_marker(clean_reason),
+                note=note_marker(clean_reason, on_document=False),
             )
             return {
                 "note_status": "PREPARING",
@@ -608,7 +608,7 @@ def decide(
                 actor=user,
                 obj=note_obj,
                 changes={"decision": "EXTEND", "until": until.isoformat()},
-                note=note_marker(clean_reason),
+                note=note_marker(clean_reason, on_document=False),
             )
             return {
                 "note_status": "CONFIRMING",

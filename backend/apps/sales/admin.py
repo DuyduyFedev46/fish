@@ -92,6 +92,7 @@ class PaymentTransactionAdmin(LockedFieldsAdminMixin, admin.ModelAdmin):
         "resolution_status", "resolution", "resolved_at", "resolution_note",
     )
     actor_fields = ("resolved_by",)
+    free_text_fields = ("resolution_note",)
     superuser_only_add = True
 
     list_display = ("bank_txn_id", "sales_order", "amount", "match_status", "resolution_status",
@@ -109,6 +110,7 @@ class RefundAdmin(LockedFieldsAdminMixin, admin.ModelAdmin):
         "confirmed_by", "confirmed_at", "request_id", "failure_reason",
     )
     actor_fields = ("created_by",)
+    free_text_fields = ("bank_txn_ref", "failure_reason")
     superuser_only_add = True
     list_display = ("id", "sales_invoice", "payment_transaction", "amount", "is_partial", "method",
                     "status", "created_by")

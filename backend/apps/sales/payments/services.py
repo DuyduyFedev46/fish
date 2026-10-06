@@ -570,6 +570,8 @@ def _attach_to_order(p, *, order, actor, note):
                 result["overpaid_amount"] = money_str(extra.amount)
         return result
 
+    p.resolution_note = note  # chữ gốc nằm trên giao dịch (không vào Nhật ký)
+    p.save(update_fields=["resolution_note"])
     record_audit(
         "attach_payment", actor=actor, obj=p, note=note_marker(note),
         changes={"order": order.code, "match_status": {"from": status.UNMATCHED, "to": p.match_status},

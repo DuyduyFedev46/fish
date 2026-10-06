@@ -28,17 +28,23 @@ def _json_safe(value):
 
 
 NOTE_PRESENT_LABEL = "Có ghi chú (xem trên chứng từ gốc)"
+# Dùng khi chữ gốc chưa có chỗ lưu trên chứng từ (chờ Duy quyết): không hứa "xem trên chứng từ".
+NOTE_PRESENT_NEUTRAL_LABEL = "Có ghi chú"
 
 
-def note_marker(text):
+def note_marker(text, *, on_document=True):
     """
     Nhãn cố định thay cho chữ người dùng tự gõ (TL-D3-L4, bất biến 9).
 
     Chữ tự do có thể chứa tên/SĐT của khách hay người chuyển khoản, nên KHÔNG chép vào
     `AuditLog.note`/`changes`. Ghi chú vẫn nằm trên chứng từ gốc (có phân quyền riêng);
     Nhật ký chỉ biết "có ghi chú hay không". Trả "" khi không có chữ.
+
+    `on_document=False` khi chữ gốc không được lưu ở chứng từ nào: dùng nhãn trung tính.
     """
-    return NOTE_PRESENT_LABEL if str(text or "").strip() else ""
+    if not str(text or "").strip():
+        return ""
+    return NOTE_PRESENT_LABEL if on_document else NOTE_PRESENT_NEUTRAL_LABEL
 
 
 VALID_ACTOR_KINDS = ("user", "system", "ai")

@@ -2383,7 +2383,7 @@ Trạng thái: code xong, đã commit trên nhánh wip/duy-quyet-03-10 (chưa me
 
 ## Sửa AuditLog.note chữ tự do (06/10)
 
-Mã: TL-D3-L4 / TL15-L5, bất biến 9 (`caveve-domain`). Màn Nhật ký ERP in nguyên văn `AuditLog.note`, nên chữ người dùng gõ tay (có thể có tên/SĐT người chuyển khoản hay khách) bị lộ. Nay Nhật ký chỉ ghi mã lý do, nhãn cố định hoặc "Có ghi chú (xem trên chứng từ gốc)". Chữ gốc vẫn nằm trên chứng từ (`PaymentTransaction.resolution_note`, `Refund.failure_reason`, `PurchaseCost.note`, `CustomerCall.note_text`...) với phân quyền riêng. Không đổi schema, không có migration.
+Mã: TL-D3-L4 / TL15-L5, bất biến 9 (`caveve-domain`). Màn Nhật ký ERP in nguyên văn `AuditLog.note`, nên chữ người dùng gõ tay (có thể có tên/SĐT người chuyển khoản hay khách) bị lộ. Nay Nhật ký chỉ ghi mã lý do, nhãn cố định hoặc "Có ghi chú (xem trên chứng từ gốc)". Chữ gốc chỉ còn trên chứng từ ở các điểm có chỗ lưu: `PaymentTransaction.resolution_note` (attach_payment kể cả nhánh chưa đủ tiền, resolve_payment), `Refund.failure_reason` (mark_refund_failed). **Không phải điểm nào cũng còn chữ gốc**: lý do bỏ qua xác nhận, gia hạn, huỷ xác nhận (`delivery/confirmation`) và ghi chú huỷ đơn OTHER hiện KHÔNG được lưu ở đâu (trước đây chỉ nằm trong AuditLog). Tạm dùng nhãn trung tính "Có ghi chú" (không hứa "xem trên chứng từ"), chờ Duy quyết chỗ lưu (techlead đề xuất `ConfirmationTask.decision_note` + ghi chú huỷ trên CreditNote/SalesOrder, cần migration). Không đổi schema, không có migration.
 
 **Helper mới** `apps/common/audit.py`: `note_marker(text)` trả `NOTE_PRESENT_LABEL` nếu có chữ, `""` nếu không.
 
@@ -2410,3 +2410,9 @@ Mã: TL-D3-L4 / TL15-L5, bất biến 9 (`caveve-domain`). Màn Nhật ký ERP i
 1. **Dữ liệu cũ vẫn còn chữ tự do** trong các dòng AuditLog đã ghi trước bản sửa (action `attach_payment`, `resolve_payment`, `mark_refund_failed`, `cancel_paid_order`, `delivery_unconfirmed`, `delivery_confirm_skipped`, `delivery_extended`, `reject_*`). Không sửa/xoá (AuditLog append-only). Đề xuất: (a) lúc đọc, API Nhật ký ẩn `note` của các action trên cho dòng tạo trước ngày deploy (không đụng DB); hoặc (b) một lệnh quản trị một lần ẩn danh hoá `note` cũ, Duy duyệt, chạy staging trước, ghi lại việc đó vào AuditLog. Khuyên (a), đảo ngược được.
 2. `staff_create` ghi `display_name` và `phone` của NHÂN VIÊN vào `changes` (`accounts/staff/services.py`, thuộc phần `accounts/` đang do agent khác sửa nên không đụng). Đó là dữ liệu cá nhân của nhân viên, không phải khách; hỏi Duy có cần che không.
 3. `changes.bank_txn_ref` (mã GD hoàn do Chủ nhập) vẫn vào Nhật ký vì là mã giao dịch; nếu Duy muốn chặt hơn thì che luôn.
+
+**Bổ sung sau review techlead (TL-AN-M1/M2/L1/L2/L3, 06/10)**
+- M1 phần làm ngay: `attach_payment` nhánh chưa đủ tiền nay lưu `resolution_note` trên giao dịch (không migration). Ba action confirmation dùng `note_marker(..., on_document=False)` ra nhãn `NOTE_PRESENT_NEUTRAL_LABEL` = "Có ghi chú". Phần lưu lý do thật **tạm chưa làm, chờ Duy** (câu hỏi 4).
+- M2: `common/admin.py` `_guarded_changes` ghi `{"changed": true}` cho field TextField/JSONField và field khai trong `free_text_fields` (`PaymentTransaction.resolution_note`, `Refund.bank_txn_ref`, `Refund.failure_reason`). Test admin trong `test_auditlog_note_no_free_text.py`.
+- L1: test quét `ast` duyệt đệ quy cây con `note=`/`changes=` (trừ `note_marker`), bắt `str()`, `.strip()`, `data["note"]`, `.get("note")`, f-string; allowlist theo cặp (file, action); thêm test chặn `AuditLog.objects.create` ngoài `common/audit.py`.
+- L2: `test_dw11_ac4_reject_action` gửi `reason_code` có tên + SĐT giả, assert note/changes sạch. L3: comment trong test hoàn tiền.

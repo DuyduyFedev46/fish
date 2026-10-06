@@ -12,6 +12,8 @@ giá vốn / người phụ trách:
 - `superuser_only_add`: chứng từ chỉ sinh từ nghiệp vụ (lô từ phiếu nhập, phiếu giao từ hoá đơn,
   giao dịch từ webhook, phiếu hoàn từ service) → người thường không tạo tay trong Admin.
 """
+from django.db import models
+
 from apps.common.audit import record_audit
 
 ADMIN_EDIT_ACTION = "admin_edit"
@@ -21,6 +23,8 @@ class LockedFieldsAdminMixin:
     locked_fields: tuple = ()
     actor_fields: tuple = ()
     superuser_only_add: bool = False
+    # Field chữ tự do (CharField) coi như nhạy cảm; TextField/JSONField luôn nhạy cảm (TL-AN-M2).
+    free_text_fields: tuple = ()
 
     def _guarded_fields(self):
         return (*self.locked_fields, *self.actor_fields)
@@ -49,6 +53,10 @@ class LockedFieldsAdminMixin:
                 note="Superuser sửa trực tiếp trong Django Admin (đường cứu hộ, BR-PQ-05).",
             )
 
+    def _is_free_text(self, obj, name):
+        field = obj._meta.get_field(name)
+        return name in self.free_text_fields or isinstance(field, (models.TextField, models.JSONField))
+
     def _guarded_changes(self, obj):
         old = type(obj)._default_manager.get(pk=obj.pk)
         changes = {}
@@ -56,5 +64,9 @@ class LockedFieldsAdminMixin:
             attname = obj._meta.get_field(name).attname
             before, after = getattr(old, attname), getattr(obj, attname)
             if before != after:
-                changes[name] = {"from": before, "to": after}
+                if self._is_free_text(obj, name):
+                    # Chữ tự do / payload có thể chứa tên, SĐT khách: chỉ ghi "đã đổi" (bất biến 9).
+                    changes[name] = {"changed": True}
+                else:
+                    changes[name] = {"from": before, "to": after}
         return changes
