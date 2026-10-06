@@ -106,6 +106,11 @@ export function canCancel(me: { id: number; permissions: readonly string[] } | n
   return r.created_by !== null && r.created_by === me.id;
 }
 
+/** Nút "Xoá phiếu hoàn": chỉ khi BE báo `delete` trong `available_actions` (BE quyết theo Chủ + trạng thái, FE không tự đoán). */
+export function canDelete(r: Pick<ReturnItem, "available_actions">): boolean {
+  return !!r.available_actions?.includes("delete");
+}
+
 export function canCreate(permissions: readonly string[] | undefined): boolean {
   return !!permissions?.includes(PERM_ADD_RETURN);
 }

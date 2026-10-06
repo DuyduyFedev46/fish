@@ -64,6 +64,15 @@ export const RETURNS_MSG = {
   cancelBody: (code: string) => `Huỷ phiếu ${code}. Số kg của phiếu này không còn tính vào số đã hoàn của phiếu giao, và phiếu không khôi phục lại được.`,
   cancelled: "Đã huỷ phiếu hoàn.",
 
+  // ---- Xoá phiếu hoàn (#8, BR-PQ-10) ----
+  deleteMenu: "Xoá phiếu hoàn",
+  deleteTitle: "Xoá phiếu hoàn",
+  deleteConfirm: "Xoá phiếu hoàn",
+  deleteBody: (code: string) => `Xoá phiếu ${code} khỏi danh sách. Phiếu bị xoá không mở lại được.`,
+  /** TL-D8-L3: phiếu Nháp xoá đi thì số kg không về kho; nói rõ để người xoá không tưởng là đã nhập lại. */
+  deleteDraftNote: "Số kg trên phiếu này sẽ không được nhập lại kho.",
+  deleted: "Đã xoá phiếu hoàn.",
+
   // ---- F2n Duyệt ----
   approveTitle: "Duyệt hàng hoàn",
   approveSummary: "Phiếu hàng hoàn cần duyệt",

@@ -6,6 +6,7 @@
 // "Huỷ phiếu hoàn" (Lô bổ sung A #8) nằm trong menu "…": phiếu còn Chờ duyệt, người có quyền duyệt/sửa hoặc người tạo phiếu; có hộp xác nhận
 // vì không khôi phục được. Phiếu đã huỷ: chip Đã huỷ, StatusPath kết thúc đỏ, hết mọi nút. Không có tiền hay giá vốn. Ghi chú là chữ tự do: chỉ hiện trong trang.
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState, type ReactNode } from "react";
 import { useAuth } from "@/features/auth/components/AuthProvider";
 import { ENUMS } from "@/shared/lib/enums";
@@ -28,8 +29,8 @@ import { ErrorScreen } from "@/shared/ui/states/ErrorScreen";
 import { NoPermission } from "@/shared/ui/states/NoPermission";
 import { NotFoundScreen } from "@/shared/ui/states/NotFoundScreen";
 import { RETURNS_MSG as M } from "../messages";
-import { PATH_STEPS, canApprove, canCancel, doneSteps, isOutsideLong, nextStepText, outsideText } from "../returnsModel";
-import { cancelReturn } from "../api";
+import { PATH_STEPS, canApprove, canCancel, canDelete, doneSteps, isOutsideLong, nextStepText, outsideText } from "../returnsModel";
+import { cancelReturn, deleteReturn } from "../api";
 import type { ApproveDecision, ReturnItem } from "../types";
 import { useReturnOrderId } from "../useReturnOrderId";
 import { useReturnDetail, useReturnId, type ReturnDetailState } from "../useReturnDetail";
@@ -76,7 +77,9 @@ function ReturnDetailBody({ item: r, detail, renderAi }: { item: ReturnItem; det
   const { me } = useAuth();
   const toast = useToast();
   const [modal, setModal] = useState<{ decision: ApproveDecision } | null>(null);
+  const router = useRouter();
   const [cancelling, setCancelling] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [version, setVersion] = useState(0);
   const timeline = useReturnTimeline(r.id, version);
 
@@ -94,6 +97,8 @@ function ReturnDetailBody({ item: r, detail, renderAi }: { item: ReturnItem; det
 
   const more: MoreMenuItem[] = [];
   if (canCancel(me, r)) more.push({ key: "cancel", label: M.cancelMenu, danger: true, onSelect: () => setCancelling(true) });
+
+  if (canDelete(r)) more.push({ key: "delete", label: M.deleteMenu, danger: true, onSelect: () => setDeleting(true) });
 
   const primary = mayApprove ? (
     <>
@@ -228,6 +233,27 @@ function ReturnDetailBody({ item: r, detail, renderAi }: { item: ReturnItem; det
           }}
         >
           <p>{M.cancelBody(r.code)}</p>
+        </ConfirmModal>
+      )}
+      {deleting && (
+        <ConfirmModal
+          title={M.deleteTitle}
+          confirmLabel={M.deleteConfirm}
+          danger
+          noun="phiếu"
+          run={() => deleteReturn(r.id)}
+          onDone={() => {
+            toast.success(M.deleted);
+            router.push("/returns/");
+          }}
+          onClose={() => setDeleting(false)}
+          onReload={() => {
+            setDeleting(false);
+            refresh();
+          }}
+        >
+          <p>{M.deleteBody(r.code)}</p>
+          {r.status === "DRAFT" && <p data-testid="delete-draft-note">{M.deleteDraftNote}</p>}
         </ConfirmModal>
       )}
       {modal && (

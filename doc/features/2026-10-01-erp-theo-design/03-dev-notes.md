@@ -2514,3 +2514,16 @@ Làm trong `erp-console/`, theo board `ERP-D1`, `W3f`, `W4b/c/d/e/f/g/h`, `F3g`.
 - RR-L2: `safe_note` dùng `fullmatch`; bỏ mẫu "Hoàn tiền theo phiếu hoàn" thừa của `attach_payment`.
 - RR-L3: API và luồng `decide` không còn ghép/truyền `reason`. Tham số `reason` của `cancel_paid_order` giữ lại chỉ để test và nơi gọi cũ không vỡ (ghi trong docstring).
 - Nhắc triển khai: rollback migration `delivery/0010` và `sales/0014` sẽ mất chữ ghi chú đã lưu.
+
+## #8 FE — nút Xoá phiếu hoàn (07/10)
+
+Nhánh `feat/xoa-phieu-hoan-fe`. Chỉ sửa `erp-console/features/returns/**` và `erp-console/e2e/delete_return.py`.
+- `types.ts`: `ReturnItem.available_actions?: string[]`. `api.ts`: `deleteReturn(id)` (POST `/delete/`). `returnsModel.ts`: `canDelete(r)` chỉ đọc `available_actions` (FE không tự đoán Chủ/trạng thái). `messages.ts`: nhóm chữ xoá.
+- `ReturnDetailScreen.tsx`: mục "Xoá phiếu hoàn" (danger) trong menu "…", mở `ConfirmModal`; phiếu Chờ duyệt có câu TL-D8-L3 "Số kg trên phiếu này sẽ không được nhập lại kho."; xong `toast.success` rồi `router.push("/returns/")`. 400/409 do `ConfirmModal` lo (alert đỏ + "Thử lại"; 409 là ConflictBanner có "Tải lại").
+- `mock.ts`: `available_actions` theo người xem + trạng thái, `POST /delete/` theo contract (Chủ mới xoá, 403 kiểm trước phạm vi; Chờ duyệt/Đã huỷ → 200 rồi 404; Đã duyệt → 400 `RETURN_DELETE_NOT_ALLOWED`); công cụ thử `window.__caveMock.returnsStaleDelete(id)` cho 409.
+- **Lệch nhỏ:** yêu cầu "hiện nguyên detail", nhưng lớp `apiFetch` (chung, ngoài phạm vi) bỏ mã quy tắc "(BR-…)" khỏi câu hiện cho người dùng theo UI-RULES, nên 400 hiện "Phiếu hàng hoàn đã duyệt (đã nhập lại kho hoặc ghi lỗ) không xoá được." (thiếu "(BR-PQ-10)"). Giữ như vậy.
+- Mock không phân biệt superuser `admin` (Me không có `is_superuser`), chỉ nhóm `owner` có `delete`; BE thật tính cả superuser qua `available_actions`.
+- Kiểm (07/10): `tsc --noEmit` sạch; vitest toàn bộ 1018 test xanh (thêm 3 test + `canDelete`); build mock=0 sạch + `check-no-mock` XANH + `check-ai-chunks` XANH; build mock=1 + `e2e/delete_return.py` 18/18 PASS (Chủ xoá Nháp, Đã huỷ có nút, Đã duyệt không nút, Quản lý không thấy, 400, 409, 360px). `check_naming.py` exit 1 cả trên main chưa sửa (vi phạm có sẵn ở `frontend/`, không có file returns).
+- Ảnh: `doc/features/2026-10-01-erp-theo-design/shots/xoa-phieu-hoan/` (1280 và 360).
+- Nợ: chưa có e2e trên BE thật; chưa duyệt UI bởi QA.
+
