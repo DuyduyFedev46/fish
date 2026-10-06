@@ -9,10 +9,9 @@ Cố ý đổi hành vi thì sinh lại mốc rồi đọc diff trước khi com
 
     UPDATE_SCOPE_SNAPSHOT=1 python manage.py test apps.accounts.data_scopes.tests.test_scope_snapshot
 
-Lô 4 (PV-04..06): chỉ SINH LẠI các dòng của tài khoản `direct_permissions` (người không nhóm, quyền gán trực tiếp) ở
-`receipts.*`, `directory.*`, `customers.*`, `guidance.receipt`, `guidance.customer`. Đây là hệ quả 02b §7 D-3 (D6 hẹp
-lại thành "do tôi tạo trong ngày", D7 = none) đã ghi ở dev-notes Lô 4; KHÔNG thêm `APPROVED_DIFFS` cho tài khoản này.
-Mọi tài khoản khác giữ nguyên mốc cũ, kể cả hai mục Q-4 ở `warehouse_staff`, `warehouse_courier`.
+Lô 4 (PV-04..06): tài khoản `direct_permissions` (người không nhóm) bị thu hẹp ở phiếu nhập (D6) và khách (D7), 02b §7 D-3.
+Mốc vẫn ghi hành vi cũ; các lệch đó nằm ở `PENDING_DUY_DIFFS` (CHỜ Duy D-3), không phải `APPROVED_DIFFS`. Không merge main
+khi `PENDING_DUY_DIFFS` còn mục.
 """
 import json
 import os
@@ -148,6 +147,20 @@ class ScopeSnapshotTests(TestCase):
         self.assertFalse([diff for diff in APPROVED_DIFFS if diff[0] == "direct_permissions"])
         source = (Path(__file__).with_name("snapshot.py")).read_text(encoding="utf-8")
         self.assertIn("Duy duyệt 02/10 Q-4", source)
+
+    def test_pv01_pending_duy_diffs_are_direct_permissions_and_narrowing_only(self):
+        """M1 (review Lô 4): mục CHỜ Duy D-3 chỉ của `direct_permissions` và chỉ thu hẹp (dòng biến mất hoặc 200 thành 404)."""
+        from .snapshot import PENDING_DUY_DIFFS
+
+        self.assertTrue(PENDING_DUY_DIFFS)
+        for user, _endpoint, sign, glob in PENDING_DUY_DIFFS:
+            self.assertEqual(user, "direct_permissions")
+            self.assertTrue(sign == "-" or (sign == "+" and glob == "status:*=404"), (sign, glob))
+        self.assertFalse([d for d in APPROVED_DIFFS if d[0] == "direct_permissions"])
+        # Một dòng thấy THÊM của direct_permissions không được miễn.
+        self.assertFalse(is_approved(Diff("direct_permissions", "receipts.list", "+", "visible:receipt_manager_today")))
+        self.assertFalse(is_approved(Diff("direct_permissions", "orders.list", "-", "visible:order_assigned_direct")))
+        self.assertFalse(is_approved(Diff("manager", "receipts.list", "-", "visible:receipt_manager_today")))
 
     def test_pv01_ac3_approved_exception_passes_but_other_diffs_fail(self):
         baseline = load_baseline()

@@ -39,6 +39,23 @@ APPROVED_DIFFS = (
     ("warehouse_courier", "invoices.list", "+", "pii:*:customer_name"),  # Duy duyệt 02/10 Q-4 (thành viên NV kho)
 )
 
+# CHỜ Duy D-3 (review techlead Lô 4, M1): người không nhóm (`direct_permissions`, quyền gán trực tiếp) bị THU HẸP ở phiếu nhập (D6)
+# và khách (D7). Mỗi mục là một thay đổi hành vi chưa được Duy duyệt, nên nằm ở đây thay vì `APPROVED_DIFFS`, và tệp mốc vẫn ghi
+# hành vi cũ. Chỉ được thu hẹp: dòng biến mất (`-`) hoặc 200 thành 404 (`+ status:*=404`). Không merge main khi còn mục nào.
+# Khi Duy trả lời: chuyển sang `APPROVED_DIFFS` kèm "Duy duyệt <ngày> D-3", hoặc sửa code nếu Duy chọn khác.
+_PENDING_DUY_ENDPOINTS = (
+    "receipts.list", "receipts.detail", "guidance.receipt",
+    "directory.list", "directory.detail", "directory.search", "customers.list", "customers.detail", "guidance.customer",
+)
+PENDING_DUY_DIFFS = tuple(
+    entry
+    for endpoint in _PENDING_DUY_ENDPOINTS
+    for entry in (
+        ("direct_permissions", endpoint, "-", "*"),  # CHỜ Duy D-3
+        ("direct_permissions", endpoint, "+", "status:*=404"),  # CHỜ Duy D-3
+    )
+)
+
 
 def pii_paths(node, *, customer_endpoint=False, path=()):
     """Tập đường dẫn (bỏ chỉ số mảng) của ô dữ liệu khách có giá trị khác rỗng trong JSON `node`."""
@@ -369,7 +386,7 @@ def diff_snapshots(expected, actual, *, users=None):
 def is_approved(diff):
     return any(
         diff.user == user and diff.endpoint == endpoint and diff.sign == sign and fnmatch.fnmatchcase(diff.fact, glob)
-        for user, endpoint, sign, glob in APPROVED_DIFFS
+        for user, endpoint, sign, glob in APPROVED_DIFFS + PENDING_DUY_DIFFS
     )
 
 
