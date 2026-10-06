@@ -165,15 +165,30 @@ class PaymentsOrdersRefundsNoFreeTextTests(OrderApiBase):
         self.assertEqual(refund.failure_reason, FREE_PHONE)  # chữ gốc vẫn ở chứng từ
         assert_no_leak(self, SECRET_NAME, FAKE_PHONE)
 
+    def test_cancel_note_rejects_long_digit_run_and_too_long(self):
+        order = self._paid_order()
+        for bad in ("gọi 0900000321 giúp", "x" * 201):
+            resp = client_for(self.manager).post(
+                f"/api/sales/orders/{order.pk}/cancel/", {"reason_code": "OTHER", "note": bad}, format="json",
+            )
+            self.assertEqual(resp.status_code, 400, resp.content)
+            self.assertEqual(resp.json()["code"], "BR-GH-19")
+        order.refresh_from_db()
+        self.assertEqual(order.cancel_note, "")
+
     def test_cancel_paid_order_note_is_reason_label_only(self):
         order = self._paid_order()
         resp = client_for(self.manager).post(
             f"/api/sales/orders/{order.pk}/cancel/",
-            {"reason_code": "OTHER", "note": FREE_PHONE}, format="json",
+            {"reason_code": "OTHER", "note": FREE}, format="json",
         )
         self.assertEqual(resp.status_code, 200, resp.content)
         log = AuditLog.objects.get(action="cancel_paid_order")
-        self.assertEqual(log.note, "Lý do: Khác")
+        self.assertEqual(log.note, f"Lý do: Khác · {NOTE_PRESENT_LABEL}")
+        order.refresh_from_db()
+        self.assertEqual(order.cancel_note, FREE)  # chữ gốc ở đơn
+        detail = client_for(self.owner).get(f"/api/sales/orders/{order.pk}/").json()
+        self.assertEqual(detail["cancel_note"], FREE)
         assert_no_leak(self, SECRET_NAME, FAKE_PHONE)
 
 
@@ -188,23 +203,40 @@ class DeliveryConfirmationNoFreeTextTests(ConfirmationL4BaseTestCase):
         confirmation_services.decide(
             task.pk, self.manager, "EXTEND", reason=FREE, until=timezone.now() + timedelta(hours=2),
         )
+        task.refresh_from_db()
+        self.assertEqual(task.decision_note, FREE)  # chữ gốc nằm trên chứng từ
         log = AuditLog.objects.get(action="delivery_extended")
-        self.assertEqual(log.note, NOTE_PRESENT_NEUTRAL_LABEL)
+        self.assertEqual(log.note, NOTE_PRESENT_LABEL)
         assert_no_leak(self, SECRET_NAME)
 
     def test_decide_deliver_without_confirm_reason_not_in_audit(self):
         _, note, task = self._create_order_with_confirmation()
         confirmation_services.record_call(task.pk, self.cs1, result="WANT_CANCEL")
         confirmation_services.decide(task.pk, self.manager, "DELIVER_WITHOUT_CONFIRM", reason=FREE)
-        self.assertEqual(AuditLog.objects.get(action="delivery_confirm_skipped").note, NOTE_PRESENT_NEUTRAL_LABEL)
+        task.refresh_from_db()
+        self.assertEqual(task.decision_note, FREE)
+        self.assertEqual(AuditLog.objects.get(action="delivery_confirm_skipped").note, NOTE_PRESENT_LABEL)
         assert_no_leak(self, SECRET_NAME)
+
+    def test_decision_note_in_detail_only_for_in_scope_users(self):
+        _, note, task = self._create_order_with_confirmation()
+        confirmation_services.record_call(task.pk, self.cs1, result="WANT_CANCEL")
+        confirmation_services.decide(task.pk, self.manager, "EXTEND", reason=FREE,
+                                     until=timezone.now() + timedelta(hours=2))
+        body = client_for(self.manager).get(f"/api/confirmation/queue/{note.pk}/").json()
+        self.assertEqual(body["decision_note"], FREE)
+        shop = client_for(None).get(f"/api/confirmation/queue/{note.pk}/")
+        self.assertIn(shop.status_code, (401, 403))
+        listing = client_for(self.manager).get("/api/confirmation/queue/").content.decode()
+        self.assertNotIn("decision_note", listing)  # danh sách không mang field này
 
     def test_unconfirm_reason_not_in_audit(self):
         _, note, task = self._create_order_with_confirmation()
         confirmation_services.record_call(task.pk, self.cs1, result="CONFIRMED")
         task.refresh_from_db()
         confirmation_services.unconfirm(task.pk, self.cs1, reason=FREE)
-        self.assertEqual(AuditLog.objects.get(action="delivery_unconfirmed").note, NOTE_PRESENT_NEUTRAL_LABEL)
+        self.assertEqual(ConfirmationTask.objects.get(pk=task.pk).decision_note, FREE)
+        self.assertEqual(AuditLog.objects.get(action="delivery_unconfirmed").note, NOTE_PRESENT_LABEL)
         assert_no_leak(self, SECRET_NAME)
         self.assertEqual(ConfirmationTask.objects.get(pk=task.pk).state, ConfirmationTask.State.PENDING)
 

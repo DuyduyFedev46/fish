@@ -186,6 +186,7 @@ class SalesOrderViewSet(NoStoreMixin, AiDeclarable, viewsets.ReadOnlyModelViewSe
 
         result = services.cancel_paid_order(
             order=self.get_object(), actor=request.user, reason=reason, reason_code=reason_code,
+            cancel_note=note_text,
         )
         order = result["order"]
         note = result["delivery_note"]

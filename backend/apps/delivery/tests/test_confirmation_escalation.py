@@ -200,7 +200,7 @@ class TestCS07EscalationAndDecide(ConfirmationL3BaseTestCase):
         audit = AuditLog.objects.filter(action="delivery_confirm_skipped").first()
         self.assertIsNotNone(audit)
         self.assertEqual(audit.actor, self.ql)
-        self.assertEqual(audit.note, "Có ghi chú")  # TL-D3-L4: nhãn trung tính, chữ tự do không vào Nhật ký
+        self.assertEqual(audit.note, "Có ghi chú (xem trên chứng từ gốc)")  # TL-D3-L4: chữ gốc ở ConfirmationTask.decision_note
 
     def test_cs07_ac9_decide_extend(self):
         """Quản lý chọn EXTEND tới +3 giờ -> confirm_state=CALLBACK, attempts=0."""

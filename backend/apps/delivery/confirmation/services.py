@@ -380,14 +380,15 @@ def unconfirm(task_id: int, user, *, reason: str = "") -> tuple[DeliveryNote, Co
         task.state = ConfirmationTask.State.PENDING
         task.claimed_by = None
         task.claimed_until = None
-        task.save(update_fields=["state", "claimed_by", "claimed_until", "updated_at"])
+        task.decision_note = clean_reason
+        task.save(update_fields=["state", "claimed_by", "claimed_until", "decision_note", "updated_at"])
 
         record_audit(
             "delivery_unconfirmed",
             actor=user,
             obj=note,
             changes={"status": {"from": "PREPARING", "to": "CONFIRMING"}},
-            note=note_marker(clean_reason, on_document=False),
+            note=note_marker(clean_reason),
         )
 
         return note, task
@@ -566,14 +567,15 @@ def decide(
             task.state = ConfirmationTask.State.DONE
             task.claimed_by = None
             task.claimed_until = None
-            task.save(update_fields=["state", "claimed_by", "claimed_until", "updated_at"])
+            task.decision_note = clean_reason
+            task.save(update_fields=["state", "claimed_by", "claimed_until", "decision_note", "updated_at"])
 
             record_audit(
                 "delivery_confirm_skipped",
                 actor=user,
                 obj=note_obj,
                 changes={"decision": "DELIVER_WITHOUT_CONFIRM"},
-                note=note_marker(clean_reason, on_document=False),
+                note=note_marker(clean_reason),
             )
             return {
                 "note_status": "PREPARING",
@@ -598,9 +600,10 @@ def decide(
             task.first_unreachable_at = None
             task.claimed_by = None
             task.claimed_until = None
+            task.decision_note = clean_reason
             task.save(update_fields=[
                 "state", "callback_at", "attempts", "first_unreachable_at",
-                "claimed_by", "claimed_until", "updated_at"
+                "claimed_by", "claimed_until", "decision_note", "updated_at"
             ])
 
             record_audit(
@@ -608,7 +611,7 @@ def decide(
                 actor=user,
                 obj=note_obj,
                 changes={"decision": "EXTEND", "until": until.isoformat()},
-                note=note_marker(clean_reason, on_document=False),
+                note=note_marker(clean_reason),
             )
             return {
                 "note_status": "CONFIRMING",
@@ -627,6 +630,7 @@ def decide(
                 actor=user,
                 reason=clean_reason or clean_note,
                 reason_code=cancel_code,
+                cancel_note=clean_reason or clean_note,
             )
             task.state = ConfirmationTask.State.DONE
             task.claimed_by = None

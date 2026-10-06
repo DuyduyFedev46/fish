@@ -48,7 +48,7 @@ class TimelineLabelsNoFreeTextTests(OrderApiBase):
 
     def _scenario(self, code="OTHER"):
         order = self._paid_order()
-        self.assertEqual(self._cancel(order, code, FREE).status_code, 200)
+        self.assertEqual(self._cancel(order, code, MARK).status_code, 200)  # ghi chú huỷ chặn SĐT (BR-GH-19)
         refund, _ = refund_services.create_invoice_refund(
             invoice=order.invoice, amount=Decimal("100000"), is_partial=True, reason=FREE, actor=self.manager,
         )
@@ -67,8 +67,8 @@ class TimelineLabelsNoFreeTextTests(OrderApiBase):
         for label in self._all_labels(order, refund):
             self.assertNotIn(MARK, label)
             self.assertNotIn(FAKE_PHONE, label)
-        raw = client_for(self.owner).get(f"/api/sales/orders/{order.pk}/").content.decode()
-        self.assertNotIn(MARK, raw.split('"timeline"')[1])
+        body = client_for(self.owner).get(f"/api/sales/orders/{order.pk}/").json()
+        self.assertNotIn(MARK, str(body["timeline"]))  # chữ ghi chú huỷ chỉ ở `cancel_note`, không vào timeline
 
     def test_d3_no_label_contains_dong_sign(self):
         order, refund = self._scenario()

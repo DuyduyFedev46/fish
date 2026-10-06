@@ -233,6 +233,8 @@ class ConfirmationQueueDetailSerializer(ConfirmationQueueItemSerializer):
             calls_qs, many=True, context={"request": request, "in_scope": in_scope}
         )
         data["calls"] = call_serializer.data
+        # Lý do quyết định nằm ở chứng từ: chỉ người trong phạm vi xem được (có thể có tên khách).
+        data["decision_note"] = obj.decision_note if in_scope else ""
 
         # Available actions
         actions = []

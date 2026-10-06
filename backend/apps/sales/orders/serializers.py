@@ -110,6 +110,7 @@ class SalesOrderDetailSerializer(serializers.ModelSerializer):
             "id", "code", "status", "status_label", "total_amount", "created_at",
             "reserved_until", "customer", "lines", "allocations", "invoice", "payments",
             "delivery", "refunds", "available_actions", "timeline", "privacy_consent",
+            "cancel_note",
         ]
         read_only_fields = fields
 
