@@ -3483,3 +3483,28 @@ Nếu QA gặp thì cho lệch tối đa 5 phút, đặt bằng một setting.
 
 Phải sửa M1 và M2, mỗi lỗi kèm test tái hiện như trên. L1 tuỳ chọn. Sửa xong, techlead chỉ soát diff mới và chạy lại `apps.reports` và
 `apps.accounts.audit`.
+
+### Re-review sau a31b8c7
+
+Phạm vi: `git show a31b8c7`, gồm 8 file. Soát M1, M2, L1.
+
+**Lệnh techlead tự chạy** (symlink tạm `staticfiles`, đã gỡ, worktree sạch):
+- `manage.py test apps.reports apps.accounts.audit apps.purchasing.invoices`: 199 test OK.
+- `makemigrations --check --dry-run`: No changes detected.
+- `check_naming.py`: OK, không có vi phạm mới.
+- Con số 3290 OK của toàn bộ suite là do be-dev báo. Tôi không chạy lại toàn bộ.
+
+| Mục | Kết quả |
+|---|---|
+| M1 | **Đóng.** Khoá kết thúc bằng `unit_cost` làm tròn 4 chữ số, đúng `decimal_places=4` của `Batch.landed_unit_cost`. Test qua API thật (`/reports/batch/`, `/reports/batches/`): `85333.3333` ra đúng `"85333.3333"` và bằng giá trị DB. Có thêm test đơn vị cho nửa lẻ (`85333.33335` thành `85333.3334`). Tiền và kg không đổi |
+| M2 | **Đóng.** Kiểm regex `^\d{4}-\d{2}-\d{2}$` (`re.ASCII`, nên chữ số toàn khổ bị loại) trước khi parse. Năm phải trong 2000–2100. Ngày không hợp lệ như `2026-02-30` cũng ra 400. Test cả hai tham số với `9999-12-31`, `0001-01-01`, `1999-12-31`, `2101-01-01`, `20261007`, `2026-W41-1`, chữ số toàn khổ: đều 400 `INVALID_FILTER`. Biên 2000 và 2100 thì 200. Vì `date_to` tối đa là 2100-12-31 nên `+1 ngày` không thể tràn |
+| L1 | **Đóng.** `PURCHASE_INVOICE_PAID_AT_TOLERANCE_MINUTES` đọc từ env, mặc định 5 (bất biến 7). Test: lệch 1 phút thì 201, lệch 6 phút thì 400 |
+
+Không có code chết hay code lặp, và không đụng file nào của lô tên chuẩn. Giá vốn và dữ liệu cá nhân không đổi so với lần review trước.
+
+### Kết luận re-review Lô 17a sau a31b8c7: **APPROVED**
+
+Lưu ý cho QA và các lô sau:
+- QA chạy `/api/reports/*` bằng tài khoản `kho1` và `ql1` (phải 403), và kiểm ngày biên của `audit-logs` trên BE thật.
+- Sau khi gộp, nhắc nhánh `feat/pham-vi-du-lieu` rebase, vì có xung đột ở `dashboard_api.py`.
+- 17b-FE2 (G3) phải sửa mock hoá đơn mua cho khớp luật `paid_at`.
