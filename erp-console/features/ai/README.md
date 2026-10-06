@@ -8,9 +8,10 @@ Module này chỉ đặt logic AI của **erp-console** — không đụng `fron
 | File | Vai trò |
 |---|---|
 | `types.ts` | Kiểu contract Lô 1–2 (S01/S02/S03/S05) |
-| `api.ts` | Gọi HTTP: status, catalog, audit-logs (nhẹ — **không** import runtime) |
+| `api.ts` | Gọi HTTP: status, catalog (nhẹ — **không** import runtime). Nhật ký đã chuyển sang `features/audit` (Lô 15) |
+| `settings/` · `policy/` · `report/` | Lô 15: màn "AI của tôi" (`/ai/settings/`), "Chính sách AI" (`/ai/policy/`), "Báo cáo AI" (`/ai/report/`); mỗi thư mục có `api.ts` + `mock.ts` + `view.ts` (logic thuần) + `components/` + `.module.css` |
 | `commands.ts` | Kênh thực thi lệnh (execute/propose/confirm) (nhẹ — **không** import runtime) |
-| `mock.ts` | Mock toàn bộ endpoint Lô 1–2 (status, catalog, execute/propose, **audit-logs**) — dữ liệu giả |
+| `mock.ts` | Mock endpoint Lô 1–2 (status, catalog, execute/propose) — dữ liệu giả |
 | `commandGroups.ts` | Giá trị nhóm lệnh / mức nhạy cảm / id lệnh "Nhập lô" hiện hành (tên tiếng Anh, khớp BE). P8b Lô 5 đã gỡ `legacyIds.ts` (lớp chuẩn hoá tên cũ); id lệnh và khoá `caps`/`overrides` dùng đúng id BE trả |
 | `consent.ts` | Cờ đồng ý tải model (boolean thuần, localStorage — không dữ liệu cá nhân) |
 | `messages.ts` | Chuỗi tiếng Việt (e2e đọc qua `__caveMock.msg`) |
@@ -29,7 +30,7 @@ Module này chỉ đặt logic AI của **erp-console** — không đụng `fron
 - `GET /api/ai/status/` — luôn 200; `ai_enabled=false` khi tắt; `model=null` khi chưa chốt (S17); `budget` chỉ chu.
 - `GET /api/commands/catalog/` — 12 lệnh active (Phụ lục B), lọc theo `min_permissions`.
 - `POST /api/commands/execute/` · `propose/` · `proposals/<id>/confirm/` — kênh duy nhất, 3 tầng quyền.
-- `GET /api/audit-logs/` — màn Nhật ký hoạt động (S03, module `features/audit` gọi — mock đặt ở đây theo phân công Lô 1, bỏ khi BE xong).
+- `GET /api/audit-logs/` — màn Nhật ký hoạt động: API, kiểu và mock nay nằm trong `features/audit` (Lô 15).
 
 ## Biến môi trường (Phụ lục A)
 
@@ -62,4 +63,4 @@ Module này chỉ đặt logic AI của **erp-console** — không đụng `fron
 - **python http.server phục vụ file test không hỗ trợ Range** → downloader tự chuyển một lượt streaming.
 - **E2E**: QA thêm kịch bản bật `__caveMock.ai("on")` + `__caveMock.aiConsent(true)`; khung chờ "Trợ lý đang được nối, sắp có" giữ nguyên khi AI tắt (mặc định mock tắt).
 - **S02 UI** (đề xuất → xác nhận trên màn) chưa làm — `commands.ts` sẵn hàm, lô sau ghép.
-- **S03 mock**: `mockAuditLogs` ở đây là tạm — BE Lô 1 xong thì bỏ, `features/audit/api.ts` chuyển sang mock riêng (hoặc bỏ mock).
+- **S03 mock**: `mockAuditLogs` đã chuyển sang `features/audit/mock.ts` (Lô 15).

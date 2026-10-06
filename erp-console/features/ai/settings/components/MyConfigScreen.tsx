@@ -1,357 +1,406 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+// Màn "AI của tôi" (ED-06 / W4b): /ai/settings/. Thẻ trạng thái + "Tắt trợ lý/Bật lại" (hộp xác nhận) · bảng chú giải mức ·
+// mỗi nhóm một bảng Việc · Loại · Ghi chú · Mức tự chủ (nhóm nút radio; mức bị khoá vẫn hiện, kèm ổ khoá và lý do) ·
+// ngưỡng tự làm (chỉ khi việc ở mức Tự ghi) · tích cam kết rồi "Lưu cài đặt".
+// Logic mức/ngưỡng/thân PUT giữ nguyên ở ./levels.ts và ./payload.ts (BE thay thế toàn bộ cấu hình mỗi lần lưu).
+// Không dữ liệu cá nhân nào ở đây; không ghi storage/URL/log.
+
+import Link from "next/link";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { ENUMS } from "@/shared/lib/enums";
+import { dateTime } from "@/shared/lib/format";
+import { ApiError, loadErrorText } from "@/shared/lib/http";
+import { ACCOUNT_HREF } from "@/shared/lib/nav";
+import { Chip } from "@/shared/ui/Chip";
+import { Field } from "@/shared/ui/form/Field";
+import { FormAlert } from "@/shared/ui/form/FormAlert";
+import { Icon } from "@/shared/ui/Icon";
+import { ConfirmModal } from "@/shared/ui/overlay/ConfirmModal";
+import { useToast } from "@/shared/ui/overlay/Toast";
+import { SkeletonScreen, SkeletonTable } from "@/shared/ui/Skeleton";
+import { ErrorBox } from "@/shared/ui/StateBox";
+import { ConflictBanner } from "@/shared/ui/states/ConflictBanner";
+import { commandLabel } from "../../commandLabels";
 import { getMyConfig, killMyConfig, updateMyConfig } from "../api";
-import type { MyConfig } from "../../types";
+import { describeSaveError, displayLevel, limitFieldsOf, type LimitField } from "../levels";
+import { MY_AI_MSG as M } from "../messages";
 import { buildMyConfigPayload, readLimitInputs, type LimitInputs } from "../payload";
-import { commandChoices, describeSaveError, displayLevel, limitFieldsOf } from "../levels";
-import { dateTimeFull } from "@/shared/lib/format";
+import { LEVEL_LEGEND, LIMIT_LABEL, LIMIT_UNIT, isDirty, levelChoices, limitErrors, lockNote } from "../view";
+import type { MyConfig, MyConfigCommandItem } from "../../types";
+import s from "../myConfig.module.css";
+
+type Base = { overrides: Record<string, string>; limits: LimitInputs };
+
+function baseOf(data: MyConfig): Base {
+  const overrides: Record<string, string> = {};
+  const limits: LimitInputs = {};
+  for (const grp of data.groups) {
+    for (const cmd of grp.commands) {
+      if (cmd.source === "override") overrides[cmd.id] = cmd.level;
+      if (cmd.limits) limits[cmd.id] = readLimitInputs(cmd.limits);
+    }
+  }
+  return { overrides, limits };
+}
+
+function CommandRow({
+  config,
+  cmd,
+  level,
+  limits,
+  errors,
+  onLevel,
+  onLimit,
+  disabled,
+}: {
+  config: MyConfig;
+  cmd: MyConfigCommandItem;
+  level: string;
+  limits: LimitInputs;
+  errors: Record<string, string>;
+  onLevel: (level: string) => void;
+  onLimit: (field: LimitField, value: string) => void;
+  disabled: boolean;
+}) {
+  const choices = levelChoices(config, cmd, level);
+  const current = displayLevel(config, cmd, level);
+  const note = lockNote(config, cmd);
+  const fields = limitFieldsOf(cmd);
+  return (
+    <div className={s.item} data-command={cmd.id}>
+      <div className={s.row}>
+        <div className={s.name}>
+          {commandLabel(cmd.id, cmd.title)}
+          {cmd.red_zone && <span className={`tag ${s.kind}`}> {M.redZone}</span>}
+        </div>
+        <div className={s.kind}>
+          <span className="tag">{cmd.kind === "read" ? M.kindRead : M.kindWrite}</span>
+        </div>
+        <div className={s.note}>
+          {note ? (
+            <>
+              <Icon name="lock" />
+              <span>{note}</span>
+            </>
+          ) : (
+            <span className="muted">—</span>
+          )}
+        </div>
+        <div className={s.levels} role="radiogroup" aria-label={M.levelGroupLabel(commandLabel(cmd.id, cmd.title))}>
+          {choices.map((c) => (
+            <label key={c.level} className={s.level}>
+              <input
+                type="radio"
+                name={`level-${cmd.id}`}
+                value={c.level}
+                checked={c.selected}
+                disabled={c.locked || disabled}
+                onChange={() => onLevel(c.level)}
+              />
+              <span className={s.levelFace}>
+                {c.locked && <Icon name="lock" />}
+                {c.label}
+              </span>
+            </label>
+          ))}
+        </div>
+      </div>
+      {fields.length > 0 && current === "B" && (
+        <div className={s.limits}>
+          <p className={s.limitsTitle}>{M.limitsTitle}</p>
+          <div className={s.limitsGrid}>
+            {fields.map((f) => (
+              <Field
+                key={f}
+                label={LIMIT_LABEL[f]}
+                type="number"
+                unit={LIMIT_UNIT[f]}
+                value={limits[cmd.id]?.[f] ?? ""}
+                onChange={(v) => onLimit(f, v)}
+                error={errors[`${cmd.id}.${f}`]}
+                disabled={disabled}
+              />
+            ))}
+          </div>
+          <p className={s.limitsHint}>{M.limitsHint}</p>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function MyConfigScreen() {
+  const toast = useToast();
   const [config, setConfig] = useState<MyConfig | null>(null);
+  const [loadError, setLoadError] = useState<unknown>(null);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [killing, setKilling] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
-
-  // Form state
   const [overrides, setOverrides] = useState<Record<string, string>>({});
   const [limits, setLimits] = useState<LimitInputs>({});
+  const [base, setBase] = useState<Base>({ overrides: {}, limits: {} });
   const [ack, setAck] = useState(false);
+  const [ackMissing, setAckMissing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  // Lỗi do MÁY CHỦ trả về mới có nút "Thử lại"; lỗi ngưỡng tự kiểm thì nút vẫn là "Lưu cài đặt".
+  const [serverFailed, setServerFailed] = useState(false);
+  const [conflict, setConflict] = useState(false);
+  const [showErrors, setShowErrors] = useState(false);
+  const [killTarget, setKillTarget] = useState<boolean | null>(null);
 
-  // Dựng lại ô nhập từ cấu hình BE vừa trả (lúc tải và sau khi lưu), để ô khớp với phiên bản đang có.
-  const applyConfig = (data: MyConfig) => {
+  const apply = useCallback((data: MyConfig) => {
+    const b = baseOf(data);
     setConfig(data);
-    const initialOverrides: Record<string, string> = {};
-    const initialLimits: LimitInputs = {};
-    data.groups.forEach((grp) => {
-      grp.commands.forEach((cmd) => {
-        if (cmd.source === "override") {
-          initialOverrides[cmd.id] = cmd.level;
-        }
-        if (cmd.limits) {
-          initialLimits[cmd.id] = readLimitInputs(cmd.limits);
-        }
-      });
-    });
-    setOverrides(initialOverrides);
-    setLimits(initialLimits);
-  };
+    setBase(b);
+    setOverrides(b.overrides);
+    setLimits(b.limits);
+  }, []);
 
-  const loadData = async () => {
+  const load = useCallback(async () => {
+    setLoading(true);
+    setLoadError(null);
     try {
-      setLoading(true);
-      setError(null);
-      applyConfig(await getMyConfig());
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Không thể tải cấu hình AI.");
+      apply(await getMyConfig());
+      setConflict(false);
+      setSaveError(null);
+    } catch (err) {
+      setLoadError(err);
     } finally {
       setLoading(false);
     }
-  };
+  }, [apply]);
 
   useEffect(() => {
-    loadData();
-  }, []);
+    void load();
+  }, [load]);
 
-  const handleLevelChange = (cmdId: string, level: string) => {
-    setOverrides((prev) => ({
-      ...prev,
-      [cmdId]: level,
-    }));
+  const errors = useMemo(() => (config ? limitErrors(config, overrides, limits) : {}), [config, overrides, limits]);
+  const dirty = config ? isDirty(config, overrides, limits, base.overrides, base.limits) : false;
+
+  if (loading && !config) {
+    return (
+      <SkeletonScreen label="Đang tải cài đặt AI…">
+        <SkeletonTable rows={4} cols={4} />
+      </SkeletonScreen>
+    );
+  }
+  if (!config) {
+    const forbidden = loadError instanceof ApiError && loadError.status === 403;
+    return <ErrorBox icon={forbidden ? "lock" : undefined} message={loadError ? loadErrorText(loadError) : M.loadFailed} onRetry={() => void load()} />;
+  }
+
+  const setLevel = (id: string, level: string) => setOverrides((prev) => ({ ...prev, [id]: level }));
+  const setLimit = (id: string, field: LimitField, value: string) =>
+    setLimits((prev) => ({ ...prev, [id]: { ...(prev[id] || {}), [field]: value } }));
+
+  const discard = () => {
+    setOverrides(base.overrides);
+    setLimits(base.limits);
+    setAck(false);
+    setAckMissing(false);
+    setShowErrors(false);
+    setSaveError(null);
+    setServerFailed(false);
   };
 
-  const handleLimitChange = (cmdId: string, field: "kg" | "vnd", val: string) => {
-    setLimits((prev) => ({
-      ...prev,
-      [cmdId]: {
-        ...(prev[cmdId] || {}),
-        [field]: val,
-      },
-    }));
-  };
-
-  const handleSave = async (e: React.FormEvent) => {
+  const save = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!config) return;
-    if (!ack) {
-      setError("Bạn phải xác nhận chịu trách nhiệm cho cấu hình AI (BR-AI-14).");
+    if (saving) return;
+    setShowErrors(true);
+    setAckMissing(!ack);
+    if (Object.keys(errors).length > 0) {
+      setSaveError(M.limitsInvalid);
       return;
     }
-
+    if (!ack) {
+      setSaveError(null);
+      return;
+    }
+    setSaving(true);
+    setSaveError(null);
+    setServerFailed(false);
+    const payload = buildMyConfigPayload(config, { overrides, limits });
     try {
-      setSaving(true);
-      setError(null);
-      setSuccess(null);
-      // BE thay thế toàn bộ cấu hình mỗi lần lưu: thân phải mang đủ nhóm, mức từng lệnh và ngưỡng (xem ../payload.ts).
-      const payload = buildMyConfigPayload(config, { overrides, limits });
-      try {
-        const updated = await updateMyConfig(payload);
-        applyConfig(updated);
-        setSuccess(`Đã lưu cấu hình AI phiên bản v${updated.version}.`);
-        setAck(false);
-      } catch (err: unknown) {
-        // Nêu rõ lệnh nào gây lỗi (BR-AI-19, BR-AI-27) thay vì chỉ câu chung của BE.
-        setError(describeSaveError(err, config, payload));
+      const updated = await updateMyConfig(payload);
+      apply(updated);
+      setAck(false);
+      setShowErrors(false);
+      setConflict(false);
+      toast.success(M.saved(updated.version));
+    } catch (err) {
+      if (err instanceof ApiError && err.code === "AI_CONFIG_CONFLICT") setConflict(true);
+      else {
+        setSaveError(describeSaveError(err, config, payload));
+        setServerFailed(true);
       }
     } finally {
       setSaving(false);
     }
   };
 
-  const handleToggleKill = async () => {
-    if (!config) return;
-    const targetKilled = !config.killed;
-    if (
-      !confirm(
-        targetKilled
-          ? "Bạn có chắc muốn tắt AI của mình? Mọi lệnh ghi sẽ rơi về mức nháp C."
-          : "Bật lại AI của bạn?"
-      )
-    ) {
-      return;
-    }
-
-    try {
-      setKilling(true);
-      setError(null);
-      await killMyConfig(targetKilled);
-      await loadData();
-      setSuccess(targetKilled ? "Đã tắt AI của bạn." : "Đã bật lại AI.");
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Lỗi khi cập nhật trạng thái AI.");
-    } finally {
-      setKilling(false);
-    }
-  };
-
-  if (loading) {
-    return <div className="p-6 text-sm text-gray-500">Đang tải cấu hình AI...</div>;
-  }
-
-  if (!config) {
-    return (
-      <div className="p-6">
-        <div className="p-4 bg-red-50 text-red-700 rounded-md border border-red-200">
-          {error || "Không tìm thấy cấu hình."}
-        </div>
-      </div>
-    );
-  }
+  const killed = config.killed;
+  const busy = saving;
+  // Chủ tắt AI cả vựa thì trạng thái chính phải nói đúng điều đó, không được ghi "đang bật" trong khi banner báo tắt.
+  const globalOff = !config.ai_enabled;
+  const headOff = globalOff || killed;
+  const headText = globalOff ? M.statusGlobalOff : killed ? M.statusOff : M.statusOn;
 
   return (
-    <div className="p-6 max-w-5xl mx-auto space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b pb-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">AI của tôi</h1>
-          <p className="text-sm text-gray-500 mt-1">
-            Phiên bản: <span className="font-semibold text-gray-700">v{config.version}</span>
-            {config.updated_at && (
-              <span className="ml-2 text-xs">
-                (cập nhật: {dateTimeFull(config.updated_at)})
-              </span>
-            )}
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={handleToggleKill}
-            disabled={killing}
-            className={`px-3 py-1.5 text-xs font-semibold rounded shadow-sm border transition ${
-              config.killed
-                ? "bg-green-600 text-white border-green-700 hover:bg-green-700"
-                : "bg-red-50 text-red-700 border-red-300 hover:bg-red-100"
-            }`}
-          >
-            {killing
-              ? "Đang xử lý..."
-              : config.killed
-              ? "Bật lại AI của tôi"
-              : "Tắt khẩn AI của tôi"}
-          </button>
-        </div>
-      </div>
+    <div className={s.page}>
+      <Link href={ACCOUNT_HREF} className={s.back}>
+        <Icon name="arrow_back" />
+        {M.back}
+      </Link>
 
-      {/* Băng thông báo nếu AI tắt toàn cục */}
       {!config.ai_enabled && (
-        <div className="p-3 bg-amber-50 border border-amber-300 rounded text-amber-800 text-xs font-medium">
-          Hệ thống AI hiện đang tắt toàn cục (AI_ENABLED=false). Cấu hình của bạn vẫn được lưu trữ.
+        <div className="alert-box info" role="status">
+          <Icon name="info" />
+          <span>{M.globalOff}</span>
+        </div>
+      )}
+      {conflict && <ConflictBanner noun={M.noun} onReload={() => void load()} />}
+
+      <section className={s.head} aria-label={M.subtitle}>
+        <span className={`${s.headIcon} ${headOff ? s.headIconOff : ""}`}>
+          <Icon name="auto_awesome" />
+        </span>
+        <div className={s.headBody}>
+          <div className={s.headTitle}>
+            <span>{headText}</span>
+            <span className={`status ${headOff ? "mute" : "good"}`}>
+              <span className="dot" />
+              {headOff ? M.chipOff : M.chipOn}
+            </span>
+          </div>
+          <div className={s.headMeta}>
+            <span>{M.savedAt}</span>
+            <span className="num">{dateTime(config.updated_at)}</span>
+          </div>
+        </div>
+        <button type="button" className="btn" onClick={() => setKillTarget(!killed)} disabled={busy}>
+          <Icon name="block" />
+          {killed ? M.turnOn : M.turnOff}
+        </button>
+      </section>
+
+      {killed && (
+        <div className="alert-box warn" role="status">
+          <Icon name="warning" />
+          <span>{M.killedBanner}</span>
         </div>
       )}
 
-      {/* Thông báo nếu AI bị killed */}
-      {config.killed && (
-        <div className="p-3 bg-red-50 border border-red-300 rounded text-red-800 text-xs font-medium">
-          AI của bạn đang ở trạng thái TẮT. Mọi lệnh ghi sẽ được chuyển thành nháp (mức C) để bạn duyệt thủ công.
+      <section className={s.legend} aria-label={M.legendLabel}>
+        <div className={`${s.legendRow} ${s.legendHead}`}>
+          <div>{M.legendLevel}</div>
+          <div>{M.legendMeaning}</div>
         </div>
-      )}
-
-      {error && (
-        <div className="p-3 bg-red-50 border border-red-200 rounded text-red-700 text-sm">
-          {error}
-        </div>
-      )}
-
-      {success && (
-        <div className="p-3 bg-green-50 border border-green-200 rounded text-green-700 text-sm">
-          {success}
-        </div>
-      )}
-
-      {/* Danh sách các nhóm lệnh */}
-      <form onSubmit={handleSave} className="space-y-6">
-        {config.groups.map((grp) => (
-          <div key={grp.group} className="bg-white border rounded-lg overflow-hidden shadow-sm">
-            <div className="bg-gray-50 px-4 py-3 border-b flex justify-between items-center">
-              <h2 className="text-base font-semibold text-gray-800">{grp.label}</h2>
-              <span className="text-xs text-gray-500">
-                {grp.commands.length} lệnh trong quyền của bạn
-              </span>
-            </div>
-            {grp.commands.length === 0 ? (
-              <div className="p-4 text-xs text-gray-400 italic">
-                Bạn không có quyền thao tác các lệnh thuộc nhóm này.
-              </div>
-            ) : (
-              <div className="divide-y divide-gray-100">
-                {grp.commands.map((cmd) => {
-                  // Mức hiệu lực hiển thị: B không giữ được (môi trường chỉ cho C, vùng đỏ đóng...) thì hiện C, không rơi về OFF.
-                  const currentLevel = displayLevel(config, cmd, overrides[cmd.id] || cmd.level);
-                  const allowedChoices = commandChoices(config, cmd, currentLevel);
-                  const limitFields = limitFieldsOf(cmd);
-                  return (
-                    <div
-                      key={cmd.id}
-                      className="p-4 flex flex-col gap-3 hover:bg-gray-50 transition"
-                    >
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium text-sm text-gray-900">{cmd.title}</span>
-                            <span
-                              className={`px-1.5 py-0.5 text-[10px] font-mono rounded uppercase ${
-                                cmd.kind === "read"
-                                  ? "bg-blue-50 text-blue-700 border border-blue-200"
-                                  : "bg-purple-50 text-purple-700 border border-purple-200"
-                              }`}
-                            >
-                              {cmd.kind === "read" ? "Đọc" : "Ghi"}
-                            </span>
-                            {cmd.red_zone && (
-                              <span className="px-1.5 py-0.5 text-[10px] font-medium bg-red-100 text-red-800 rounded">
-                                Vùng đỏ
-                              </span>
-                            )}
-                          </div>
-                          <p className="text-xs text-gray-500 font-mono">{cmd.id}</p>
-                          {cmd.locked_reason && (
-                            <p className="text-xs text-amber-700">
-                              Lưu ý: {cmd.locked_reason.text} ({cmd.locked_reason.code})
-                            </p>
-                          )}
-                        </div>
-
-                        <div className="flex items-center gap-2">
-                          <label className="text-xs text-gray-600 font-medium">Mức tự chủ:</label>
-                          <select
-                            value={currentLevel}
-                            onChange={(e) => handleLevelChange(cmd.id, e.target.value)}
-                            className="text-xs border rounded px-2.5 py-1.5 bg-white font-medium focus:ring-1 focus:ring-blue-500"
-                          >
-                            {allowedChoices.map((choice) => (
-                              <option key={choice} value={choice}>
-                                {choice === "OFF"
-                                  ? "Tắt (OFF)"
-                                  : choice === "A"
-                                  ? "Mức A (Tự đọc)"
-                                  : choice === "C"
-                                  ? "Mức C (Soạn nháp)"
-                                  : choice === "B"
-                                  ? "Mức B (Tự ghi + hoàn tác)"
-                                  : choice}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                      </div>
-
-                      {/* Hiển thị cấu hình ngưỡng nếu lệnh hỗ trợ limits */}
-                      {limitFields.length > 0 && currentLevel === "B" && (
-                        <div className="mt-2 rounded-md border border-gray-200 bg-gray-50 p-3 text-xs">
-                          <span className="font-semibold text-gray-700">Ngưỡng tự ghi an toàn:</span>
-                          <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            {limitFields.includes("kg") && (
-                              <div>
-                                <label className="block text-gray-600 mb-1" htmlFor={`limit-kg-${cmd.id}`}>
-                                  Giới hạn kg mỗi lần (không vượt trần của Chủ; để trống nếu không đặt)
-                                </label>
-                                <input
-                                  id={`limit-kg-${cmd.id}`}
-                                  type="number"
-                                  min="0"
-                                  value={limits[cmd.id]?.kg || ""}
-                                  onChange={(e) => handleLimitChange(cmd.id, "kg", e.target.value)}
-                                  placeholder="Nhập số kg"
-                                  className="w-full rounded border px-2.5 py-1 bg-white"
-                                />
-                              </div>
-                            )}
-                            {limitFields.includes("vnd") && (
-                              <div>
-                                <label className="block text-gray-600 mb-1" htmlFor={`limit-vnd-${cmd.id}`}>
-                                  Giới hạn tiền mỗi lần, VNĐ (không vượt trần của Chủ; để trống nếu không đặt)
-                                </label>
-                                <input
-                                  id={`limit-vnd-${cmd.id}`}
-                                  type="number"
-                                  min="0"
-                                  value={limits[cmd.id]?.vnd || ""}
-                                  onChange={(e) => handleLimitChange(cmd.id, "vnd", e.target.value)}
-                                  placeholder="Nhập số tiền VNĐ"
-                                  className="w-full rounded border px-2.5 py-1 bg-white"
-                                />
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+        {LEVEL_LEGEND.map((l) => (
+          <div key={l.name} className={s.legendRow}>
+            <div className={s.legendName}>{l.name}</div>
+            <div className={s.legendText}>{l.meaning}</div>
           </div>
         ))}
+      </section>
 
-        {/* Cam kết trách nhiệm */}
-        <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 space-y-4">
-          <label className="flex items-start gap-3 cursor-pointer">
+      <form onSubmit={save} className={s.page} noValidate>
+        {config.groups.map((grp) => (
+          <section key={grp.group} className={s.group} aria-labelledby={`grp-${grp.group}`}>
+            <div className={s.groupHead}>
+              <h2 id={`grp-${grp.group}`}>{grp.label}</h2>
+              <span className={s.groupCount}>{M.tasksCount(grp.commands.length)}</span>
+            </div>
+            {grp.commands.length === 0 ? (
+              <p className={s.groupEmpty}>{M.groupEmpty}</p>
+            ) : (
+              <>
+                <div className={s.cols} aria-hidden="true">
+                  <div>{M.colTask}</div>
+                  <div>{M.colKind}</div>
+                  <div>{M.colNote}</div>
+                  <div>{M.colLevel}</div>
+                </div>
+                {grp.commands.map((cmd) => (
+                  <CommandRow
+                    key={cmd.id}
+                    config={config}
+                    cmd={cmd}
+                    level={overrides[cmd.id] || cmd.level}
+                    limits={limits}
+                    errors={showErrors ? errors : {}}
+                    onLevel={(lv) => setLevel(cmd.id, lv)}
+                    onLimit={(f, v) => setLimit(cmd.id, f, v)}
+                    disabled={busy}
+                  />
+                ))}
+              </>
+            )}
+          </section>
+        ))}
+
+        <section className={s.ack}>
+          {saveError && <FormAlert>{saveError}</FormAlert>}
+          <label className={s.ackLabel}>
             <input
               type="checkbox"
               checked={ack}
-              onChange={(e) => setAck(e.target.checked)}
-              className="mt-0.5 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              onChange={(e) => {
+                setAck(e.target.checked);
+                if (e.target.checked) setAckMissing(false);
+              }}
+              aria-invalid={ackMissing || undefined}
+              aria-describedby={ackMissing ? "ack-error" : undefined}
+              disabled={busy}
             />
-            <span className="text-xs text-gray-700 leading-relaxed">
-              Tôi xác nhận chịu hoàn toàn trách nhiệm cho mọi hành động và thao tác mà AI thực hiện
-              thay mặt tôi theo cấu hình này (BR-AI-14).
-            </span>
+            <span>{M.ackLabel}</span>
           </label>
-
-          <div className="flex justify-end">
-            <button
-              type="submit"
-              disabled={saving || !ack}
-              className="px-4 py-2 text-xs font-semibold text-white bg-blue-600 rounded shadow-sm hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
-            >
-              {saving ? "Đang lưu..." : "Lưu cấu hình"}
+          {ackMissing && (
+            <p className={s.ackError} id="ack-error" role="alert">
+              {M.ackMissing}
+            </p>
+          )}
+          <div className={s.actions}>
+            <button type="button" className="btn" onClick={discard} disabled={busy || (!dirty && !ack)}>
+              {M.discard}
+            </button>
+            <button type="submit" className="btn primary" disabled={busy} aria-busy={busy || undefined}>
+              {busy ? (
+                <>
+                  <Icon name="progress_activity" className="spin" />
+                  <span>{M.saving}</span>
+                </>
+              ) : serverFailed && saveError && ack ? (
+                M.retrySave
+              ) : (
+                M.save
+              )}
             </button>
           </div>
-        </div>
+        </section>
       </form>
+
+      {killTarget !== null && (
+        <ConfirmModal
+          title={killTarget ? M.offTitle : M.onTitle}
+          confirmLabel={killTarget ? M.offConfirm : M.onConfirm}
+          danger={killTarget}
+          run={() => killMyConfig(killTarget)}
+          onDone={() => {
+            const next = killTarget;
+            setKillTarget(null);
+            toast.success(next ? M.offDone : M.onDone);
+            void load();
+          }}
+          onClose={() => setKillTarget(null)}
+          onReload={() => {
+            setKillTarget(null);
+            void load();
+          }}
+          noun={M.noun}
+        >
+          <p>{killTarget ? M.offBody : M.onBody}</p>
+        </ConfirmModal>
+      )}
     </div>
   );
 }

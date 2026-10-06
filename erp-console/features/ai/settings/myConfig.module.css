@@ -1,0 +1,117 @@
+/* Màn "AI của tôi" (ED-06 / W4b) — chỉ token trong tokens.css. Hàng việc là lưới 4 cột (Việc · Loại · Ghi chú · Mức tự chủ),
+   dưới 860px mỗi việc thành một thẻ xếp dọc để không phải cuộn ngang ở 360px. */
+
+.page { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }
+
+.back {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: var(--tap);
+  color: var(--ink-2);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  text-decoration: none;
+}
+.back :global(.mi) { font-size: 18px; }
+@media (hover: hover) and (pointer: fine) { .back:hover { color: var(--ink); } }
+
+/* ---- Thẻ trạng thái ---- */
+.head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  padding: var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+.headIcon {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-lg);
+  display: grid;
+  place-items: center;
+  background: var(--accent-soft);
+  color: var(--accent-text);
+}
+.headIconOff { background: var(--surface-2); color: var(--ink-3); }
+.headBody { flex: 1 1 220px; min-width: 0; display: flex; flex-direction: column; gap: var(--space-1); }
+.headTitle { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; font-weight: var(--weight-semibold); font-size: var(--text-md); }
+.headMeta { color: var(--ink-3); font-size: var(--text-xs); display: flex; gap: var(--space-1-5); flex-wrap: wrap; }
+.headMeta :global(.num) { color: var(--ink-2); }
+
+/* ---- Bảng mức tự chủ (chú giải) ---- */
+.legend { border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--surface); overflow: hidden; }
+.legendRow { display: grid; grid-template-columns: minmax(150px, 220px) 1fr; gap: var(--space-3); padding: var(--space-2-5) var(--space-4); border-top: 1px solid var(--border); font-size: var(--text-sm); }
+.legendRow:first-child { border-top: 0; }
+@media (max-width: 519px) {
+  .legendRow { grid-template-columns: minmax(0, 1fr); gap: var(--space-0-5); }
+  .legendHead { display: none; }
+}
+.legendHead { background: var(--surface-2); color: var(--ink-3); font-size: var(--text-xs); font-weight: var(--weight-semibold); }
+.legendName { font-weight: var(--weight-medium); color: var(--ink); }
+.legendText { color: var(--ink-2); }
+
+/* ---- Nhóm việc ---- */
+.group { border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--surface); overflow: hidden; }
+.groupHead { display: flex; align-items: baseline; gap: var(--space-2); padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--border); }
+.groupHead h2 { margin: 0; font-size: var(--text-md); }
+.groupCount { color: var(--ink-3); font-size: var(--text-xs); }
+.groupEmpty { padding: var(--space-4); color: var(--ink-3); font-size: var(--text-sm); margin: 0; }
+
+.cols { display: none; }
+.item { padding: var(--space-3) var(--space-4); border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: var(--space-2-5); }
+.item:first-of-type { border-top: 0; }
+.row { display: grid; grid-template-columns: 1fr; gap: var(--space-2); align-items: center; }
+.name { font-weight: var(--weight-medium); color: var(--ink); min-width: 0; overflow-wrap: anywhere; }
+.kind { display: inline-flex; }
+.note { display: inline-flex; align-items: flex-start; gap: var(--space-1-5); color: var(--ink-2); font-size: var(--text-xs); min-width: 0; }
+.note :global(.mi) { font-size: 14px; color: var(--ink-3); flex: none; margin-top: 1px; }
+
+@media (min-width: 860px) {
+  .cols, .row { grid-template-columns: minmax(180px, 1.3fr) 64px minmax(160px, 1.2fr) minmax(260px, auto); gap: var(--space-3); }
+  .cols { display: grid; padding: var(--space-2) var(--space-4); background: var(--surface-2); color: var(--ink-3); font-size: var(--text-xs); font-weight: var(--weight-semibold); border-bottom: 1px solid var(--border); }
+}
+
+/* ---- Chọn mức: nhóm nút radio (mũi tên đổi mức, Tab vào/ra nhóm) ---- */
+.levels { display: inline-flex; flex-wrap: wrap; gap: var(--space-0-5); padding: var(--space-0-5); border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface-2); max-width: 100%; }
+.level { position: relative; display: inline-flex; }
+.level input { position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; }
+.level input:disabled { cursor: not-allowed; }
+.levelFace {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: var(--tap);
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--ink-2);
+  white-space: nowrap;
+  transition: background-color var(--dur-fast) ease, color var(--dur-fast) ease;
+}
+.levelFace :global(.mi) { font-size: 14px; }
+.level input:checked + .levelFace { background: var(--surface); color: var(--ink); box-shadow: var(--shadow-xs); }
+.level input:focus-visible + .levelFace { outline: 2px solid var(--focus); outline-offset: 1px; }
+.level input:disabled + .levelFace { color: var(--ink-3); }
+@media (hover: hover) and (pointer: fine) { .level input:not(:disabled):not(:checked):hover + .levelFace { color: var(--ink); } }
+
+/* ---- Ngưỡng tự làm ---- */
+.limits { margin-top: var(--space-1); padding: var(--space-3); border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface-2); display: flex; flex-direction: column; gap: var(--space-2); }
+.limitsTitle { font-size: var(--text-xs); font-weight: var(--weight-semibold); color: var(--ink-2); margin: 0; }
+.limitsGrid { display: grid; grid-template-columns: 1fr; gap: var(--space-3); }
+@media (min-width: 560px) { .limitsGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.limitsHint { margin: 0; color: var(--ink-3); font-size: var(--text-xs); }
+
+/* ---- Cam kết + nút ---- */
+.ack { border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--surface); padding: var(--space-4); display: flex; flex-direction: column; gap: var(--space-3); }
+.ackLabel { display: flex; align-items: flex-start; gap: var(--space-2-5); font-size: var(--text-sm); color: var(--ink); cursor: pointer; min-height: var(--tap); }
+.ackLabel input { flex: none; width: 20px; height: 20px; margin: 2px 0 0; accent-color: var(--accent); }
+.ackError { margin: 0; color: var(--crit); font-size: var(--text-sm); }
+.actions { display: flex; justify-content: flex-end; gap: var(--space-2); flex-wrap: wrap; }
+@media (max-width: 559px) { .actions .btn { flex: 1 1 0; justify-content: center; } }

@@ -3,12 +3,16 @@
 
 .page:global(.screen){max-width:720px;width:100%;gap:var(--space-8)}
 
-/* Đầu trang: người dùng */
-.head{display:flex;align-items:center;gap:var(--space-4);min-width:0}
-.headText{display:flex;flex-direction:column;gap:var(--space-1);min-width:0}
-.headText h2{font-size:var(--text-xl)}
-.meta{display:flex;flex-wrap:wrap;align-items:center;gap:0 var(--space-3);color:var(--ink-3);font-size:var(--text-sm)}
-.meta code{font-family:var(--font-mono);font-size:var(--text-sm);color:var(--ink-2)}
+/* Đầu trang: người dùng (avatar + tên, dưới là 3 hàng thông tin) */
+.head{display:flex;flex-wrap:wrap;align-items:center;gap:var(--space-3) var(--space-4);min-width:0}
+.headText{display:flex;flex-direction:column;gap:var(--space-1);min-width:0;flex:1 1 0}
+.headText h2{font-size:var(--text-xl);overflow-wrap:anywhere}
+.info{flex:1 1 100%;margin:0;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden}
+.infoRow{display:flex;align-items:center;justify-content:space-between;gap:var(--space-3);min-height:44px;padding:var(--space-2) var(--space-4)}
+.infoRow + .infoRow{border-top:1px solid var(--border)}
+.infoRow dt{font-size:var(--text-sm);color:var(--ink-3);flex:none}
+.infoRow dd{margin:0;min-width:0;display:flex;flex-wrap:wrap;justify-content:flex-end;font-size:var(--text-base);color:var(--ink)}
+.infoRow code{font-family:var(--font-mono);font-size:var(--text-sm);color:var(--ink-2);overflow-wrap:anywhere}
 .tel{display:inline-flex;align-items:center;gap:var(--space-1-5);min-height:var(--tap);color:var(--accent-text);text-decoration:none;font-variant-numeric:tabular-nums}
 .tel :global(.mi){font-size:16px}
 @media (hover:hover) and (pointer:fine){.tel:hover{text-decoration:underline}}
@@ -57,5 +61,6 @@
 .settingText b{font-weight:var(--weight-semibold);color:var(--ink)}
 .settingText span{font-size:var(--text-sm);color:var(--ink-3);text-wrap:pretty}
 .setting > :global(.btn){flex:1 1 100%}
+.setting > :global(.tag){flex:none}
 @media (min-width:520px){.setting > :global(.btn){flex:none;min-width:148px}}
 .dangerIcon{background:var(--crit-soft);color:var(--crit)}

@@ -592,8 +592,9 @@ table.data tbody tr.empty-row td{white-space:normal;border-bottom:1px solid var(
   .fb .fb-search{flex:1 1 100%;min-height:var(--tap)}
   .fb .fb-search input{height:var(--tap);margin:-1px 0;font-size:var(--text-input)}
   .fb-select select{height:var(--tap)}
-  .fb-date{height:var(--tap)}
-  .fb-date input{height:var(--tap);margin:-1px 0;font-size:var(--text-input)}
+  .fb-dates{flex:1 1 100%;min-width:0}
+  .fb-date{height:var(--tap);flex:1 1 0;min-width:0}
+  .fb-date input{height:var(--tap);margin:-1px 0;font-size:var(--text-input);min-width:0;width:100%}
   .fb-summary{margin-left:0;flex:1 1 100%}
 }
 

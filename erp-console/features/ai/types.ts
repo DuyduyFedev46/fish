@@ -33,33 +33,6 @@ export type AiStatus = {
   budget: AiBudget | null;
 };
 
-// ---- S03 GET /api/audit-logs/ (màn Nhật ký hoạt động — module features/audit dùng) ----
-export type AuditActorKind = "user" | "system" | "ai";
-
-export type AuditLogRow = {
-  id: number;
-  actor_kind: AuditActorKind;
-  /** Dòng AI: "ai:<tên user>" (S03-AC2); dòng user/system: tên như cũ. */
-  actor_display: string;
-  /** Chỉ có ở dòng AI — thông tin người dùng mà AI đại diện. */
-  ai_actor: { id: number; username: string; display_name: string } | null;
-  /** Động từ hành động (vd "create", "update", "execute_command"). */
-  action: string;
-  model_name: string;
-  object_id: number | null;
-  object_repr: string | null;
-  /** JSON thay đổi — KHÔNG chứa tên/SĐT/địa chỉ khách (S03-AC4). */
-  changes: Record<string, unknown> | null;
-  note: string | null;
-  proposal_ref: string | null;
-  created_at: string;
-};
-
-export type AuditLogParams = {
-  actor_kind?: "" | AuditActorKind;
-  action?: string;
-};
-
 // ---- DW-07 & DW-09 Chỉ mục lệnh & Mô tả lệnh (02b §6.1, §6.2) ----
 export type AiCommandKind = "read" | "write";
 export type AiCommandLevel = "OFF" | "C" | "B" | "A";

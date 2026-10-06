@@ -66,21 +66,3 @@ export const AI_MSG = {
   // file này được layout nạp tĩnh, chứa chuỗi runtime sẽ kéo tên thư viện AI vào chunk ban đầu (SR-20, F13).
 } as const;
 
-// ---- Cụm cho màn Nhật ký (S03) — features/audit đọc từ đây để e2e đọc qua __caveMock.msg ----
-export const AUDIT_MSG = {
-  title: "Nhật ký hoạt động",
-  hint: "Mọi thay đổi trong hệ thống đều ghi ở đây, mới nhất trước. Dòng “ai:” là việc do trợ lý đề xuất.",
-  filterAll: "Tất cả",
-  filterUser: "Người",
-  filterAi: "AI",
-  filterSystem: "Hệ thống",
-  actorAi: "AI",
-  actorSystem: "Hệ thống",
-  aiActor: "ai:",
-  proposal: "Đề xuất",
-  changes: "Thay đổi",
-  empty: "Chưa có dòng nhật ký nào",
-  emptyHint: "Các thao tác trên hệ thống sẽ xuất hiện ở đây.",
-  loadMore: "Tải thêm",
-  refresh: "Làm mới",
-} as const;

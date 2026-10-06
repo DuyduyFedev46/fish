@@ -1,21 +1,25 @@
 "use client";
 
-// S47 "Quyền của tôi" + S46 (đổi mật khẩu, đăng xuất). Mọi dữ liệu lấy từ `me` (/api/auth/me/): nhóm
-// (`group_labels`), việc được làm (`capabilities` — quyền Tầng 2), xem giá vốn / lãi lỗ. FE không tự suy quyền.
+// Tài khoản của tôi (ED-06 / W4e; gồm S47 "Quyền của tôi" + S46 đổi mật khẩu, đăng xuất). Mọi dữ liệu lấy từ `me`
+// (/api/auth/me/): nhóm (`group_labels`), việc được làm (`capabilities` — quyền Tầng 2), xem giá vốn / lãi lỗ. FE không tự suy quyền.
 // Mục menu thấy được lấy từ bảng menu ↔ quyền (shared/lib/nav.ts) để người dùng hiểu vì sao thấy/không thấy.
-// UI4: trang một cột kiểu trang cài đặt (Linear/Notion) — đầu trang người dùng, rồi từng phần tiêu đề + nhóm hàng;
-// đổi mật khẩu trong tấm bên; kết quả báo bằng thông báo nổi.
+// Trang một cột kiểu trang cài đặt (Linear/Notion): đầu trang người dùng + 3 hàng thông tin, rồi từng phần tiêu đề + nhóm hàng.
+// "Phiên đăng nhập": BE chưa có danh sách phiên, FE chỉ nhớ MỐC GIỜ đăng nhập ở máy này (signedInAt.ts, không có dữ liệu cá nhân).
+// Đổi mật khẩu trong hộp thoại giữa màn (Modal, board F3g; đang gửi thì không đóng được); kết quả báo bằng thông báo nổi.
 
-import { useState } from "react";
+import Link from "next/link";
+import { useEffect, useId, useState } from "react";
+import { dateTime } from "@/shared/lib/format";
 import { groupLabel } from "@/shared/lib/groups";
-import { visibleNav } from "@/shared/lib/nav";
+import { AI_SETTINGS_HREF, canView, visibleNav } from "@/shared/lib/nav";
+import { MSG } from "@/shared/lib/messages";
 import { Icon } from "@/shared/ui/Icon";
+import { Modal } from "@/shared/ui/overlay/Modal";
+import { useToast } from "@/shared/ui/overlay/Toast";
 import { Loading } from "@/shared/ui/StateBox";
+import { forgetSignedIn, readSignedIn } from "../signedInAt";
 import { useAuth } from "./AuthProvider";
 import { ChangePasswordForm } from "./ChangePasswordForm";
-import { SideSheet } from "@/shared/ui/SideSheet";
-import { Toast } from "@/shared/ui/Toast";
-import { MSG } from "@/shared/lib/messages";
 import s from "./account.module.css";
 
 function YesNo({ value }: { value: boolean }) {
@@ -29,9 +33,14 @@ function YesNo({ value }: { value: boolean }) {
 
 export function AccountScreen() {
   const { me, logout, refreshMe } = useAuth();
+  const toast = useToast();
   const [pwOpen, setPwOpen] = useState(false);
-  const [toast, setToast] = useState<string | null>(null);
+  const [pwBusy, setPwBusy] = useState(false);
+  const pwFormId = useId();
   const [busy, setBusy] = useState<"logout" | "refresh" | null>(null);
+  // Đọc sau khi mount (trang xuất tĩnh, localStorage chỉ có ở trình duyệt).
+  const [signedIn, setSignedIn] = useState<string | null>(null);
+  useEffect(() => setSignedIn(readSignedIn()), []);
 
   if (!me) return <Loading />;
 
@@ -40,6 +49,23 @@ export function AccountScreen() {
     ? me.group_labels
     : me.groups.map((g) => ({ code: g, label: groupLabel(g) }));
   const menu = visibleNav(me);
+  const aiSettings = canView(me, "ai-settings");
+
+  const reloadPerms = async () => {
+    setBusy("refresh");
+    try {
+      await refreshMe();
+      toast.success(MSG.permsReloaded);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const doLogout = async () => {
+    setBusy("logout");
+    forgetSignedIn();
+    await logout();
+  };
 
   return (
     <div className={`screen account ${s.page}`}>
@@ -49,25 +75,40 @@ export function AccountScreen() {
         </div>
         <div className={s.headText}>
           <h2 id="acc-who">{name}</h2>
-          <div className={s.meta}>
-            <code>{me.username}</code>
-            {me.phone ? (
-              <a className={s.tel} href={`tel:${me.phone}`}>
-                <Icon name="call" />
-                {me.phone}
-              </a>
-            ) : (
-              <span>Chưa có số điện thoại</span>
-            )}
-          </div>
-          <div className="tags" aria-label="Nhóm của bạn">
-            {groups.map((g) => (
-              <span key={g.code} className="tag group-tag">
-                {g.label}
-              </span>
-            ))}
-          </div>
         </div>
+        <dl className={s.info}>
+          <div className={s.infoRow}>
+            <dt>Tên đăng nhập</dt>
+            <dd>
+              <code>{me.username}</code>
+            </dd>
+          </div>
+          <div className={s.infoRow}>
+            <dt>Số điện thoại</dt>
+            <dd>
+              {me.phone ? (
+                <a className={s.tel} href={`tel:${me.phone}`}>
+                  <Icon name="call" />
+                  {me.phone}
+                </a>
+              ) : (
+                <span className="muted">Chưa có</span>
+              )}
+            </dd>
+          </div>
+          <div className={s.infoRow}>
+            <dt>Vai trò</dt>
+            <dd>
+              <span className="tags" aria-label="Nhóm của bạn">
+                {groups.map((g) => (
+                  <span key={g.code} className="tag group-tag">
+                    {g.label}
+                  </span>
+                ))}
+              </span>
+            </dd>
+          </div>
+        </dl>
       </section>
 
       <section className={s.section} aria-labelledby="acc-cap">
@@ -130,12 +171,7 @@ export function AccountScreen() {
               className="btn"
               disabled={busy !== null}
               aria-busy={busy === "refresh" || undefined}
-              onClick={async () => {
-                setBusy("refresh");
-                await refreshMe();
-                setBusy(null);
-                setToast(MSG.permsReloaded);
-              }}
+              onClick={() => void reloadPerms()}
             >
               <Icon name={busy === "refresh" ? "progress_activity" : "sync"} className={busy === "refresh" ? "spin" : undefined} />
               Tải lại quyền
@@ -146,11 +182,21 @@ export function AccountScreen() {
 
       <section className={s.section} aria-labelledby="acc-sec">
         <div className={s.sectionHead}>
-          <h2 id="acc-sec">Mật khẩu và đăng xuất</h2>
+          <h2 id="acc-sec">Bảo mật và đăng nhập</h2>
           <p>Mỗi tài khoản chỉ có một phiên.</p>
         </div>
         <div className={s.group}>
-          <div className={s.setting}>
+          <div className={s.setting} data-row="session">
+            <span className={s.settingIcon} aria-hidden="true">
+              <Icon name="schedule" />
+            </span>
+            <div className={s.settingText}>
+              <b>Phiên đăng nhập</b>
+              <span>{signedIn ? `Đăng nhập từ ${dateTime(signedIn)}` : "Đang đăng nhập"}</span>
+            </div>
+            <span className="tag">Máy này</span>
+          </div>
+          <div className={s.setting} data-row="password">
             <span className={s.settingIcon} aria-hidden="true">
               <Icon name="key" />
             </span>
@@ -162,7 +208,21 @@ export function AccountScreen() {
               Đổi mật khẩu
             </button>
           </div>
-          <div className={s.setting}>
+          {aiSettings && (
+            <div className={s.setting} data-row="ai">
+              <span className={s.settingIcon} aria-hidden="true">
+                <Icon name="auto_awesome" />
+              </span>
+              <div className={s.settingText}>
+                <b>AI của tôi</b>
+                <span>Bật tắt trợ lý AI và đặt hạn mức riêng của bạn.</span>
+              </div>
+              <Link href={AI_SETTINGS_HREF} className="btn">
+                Mở cài đặt AI
+              </Link>
+            </div>
+          )}
+          <div className={s.setting} data-row="logout">
             <span className={`${s.settingIcon} ${s.dangerIcon}`} aria-hidden="true">
               <Icon name="logout" />
             </span>
@@ -175,10 +235,7 @@ export function AccountScreen() {
               className="btn danger"
               disabled={busy !== null}
               aria-busy={busy === "logout" || undefined}
-              onClick={async () => {
-                setBusy("logout");
-                await logout();
-              }}
+              onClick={() => void doLogout()}
             >
               {busy === "logout" && <Icon name="progress_activity" className="spin" />}
               {busy === "logout" ? "Đang đăng xuất…" : "Đăng xuất"}
@@ -188,19 +245,32 @@ export function AccountScreen() {
       </section>
 
       {pwOpen && (
-        <SideSheet title="Đổi mật khẩu" onClose={() => setPwOpen(false)}>
-          {(close) => (
-            <ChangePasswordForm
-              onDone={(msg) => {
-                setToast(msg);
-                close();
-              }}
-            />
-          )}
-        </SideSheet>
+        <Modal
+          title="Đổi mật khẩu"
+          busy={pwBusy}
+          onClose={() => setPwOpen(false)}
+          footer={
+            <>
+              <button type="button" className="btn" onClick={() => setPwOpen(false)} disabled={pwBusy}>
+                Huỷ
+              </button>
+              <button type="submit" form={pwFormId} className="btn primary" disabled={pwBusy} aria-busy={pwBusy || undefined}>
+                {pwBusy && <Icon name="progress_activity" className="spin" />}
+                {pwBusy ? "Đang lưu…" : "Đổi mật khẩu"}
+              </button>
+            </>
+          }
+        >
+          <ChangePasswordForm
+            formId={pwFormId}
+            onBusyChange={setPwBusy}
+            onDone={(msg) => {
+              toast.success(msg);
+              setPwOpen(false);
+            }}
+          />
+        </Modal>
       )}
-
-      {toast && !pwOpen && <Toast key={toast} message={toast} onClose={() => setToast(null)} />}
     </div>
   );
 }

@@ -188,7 +188,8 @@ with sync_playwright() as p:
     page.evaluate("() => localStorage.removeItem('cave_ui_sidebar')")
     keys = page.evaluate("() => Object.keys(localStorage)")
     # cave_erp_last_user = mã số người dùng (không phải tên); cave_erp_mock_users chỉ có ở bản MOCK (dữ liệu giả).
-    allowed = ("cave_erp_token", "cave_ui_sidebar", "cave_erp_last_user", "cave_erp_mock_users")
+    # cave_erp_signed_in_at = mốc giờ đăng nhập (Lô 15, ED-06): chỉ một chuỗi thời gian, không có dữ liệu cá nhân.
+    allowed = ("cave_erp_token", "cave_ui_sidebar", "cave_erp_last_user", "cave_erp_mock_users", "cave_erp_signed_in_at")
     ok("Bất biến 9: localStorage chỉ có khoá kỹ thuật", all(k in allowed or k.startswith("cave_erp_draft:") for k in keys), str(keys))
     ctx.close()
 

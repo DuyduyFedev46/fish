@@ -2935,6 +2935,68 @@ M1 và L1 đạt. Không còn lỗi Critical, High hay Medium. QA cần chạy `
 ### Kết luận Lô 15 — FE: **CHANGES REQUESTED**
 Đạt các mục giá vốn, dữ liệu cá nhân, phân quyền, hiệu năng AI và icon. Cần sửa **M1** (tổng việc AI cộng trùng) và **M2** (đổi mật khẩu phải là hộp thoại theo F3g/ED-06-AC3). L1 và L2 sửa cùng lượt. L3 và L5 chuyển lô BE. L4 và hai nợ contract (`id` trong dashboard, lọc ngày/`q` ở audit-logs) ghi vào Lô 17. Sau khi sửa thì chạy lại vitest, `ed_batch15_overview_ai_account.py` và `s48_password.py`.
 
+## Re-review Lô 15 FE (06/10)
+> techlead · 06/10/2026 · `git diff 2d39be8..d406f43` (3 commit, 68 file), worktree `agent-adeaae51549099388`, đã rebase lên main 2d39be8 (có SR-HIDE-AI-01/02). Techlead tự chạy trong lượt này: `tsc --noEmit` sạch; `vitest run` **85 file, 981 test đạt**; `python3 scripts/check_naming.py` OK, không vi phạm mới. Không chạy `npm run build` và e2e (điều phối viên đang build worktree này).
+
+### Các lỗi lần trước
+| Mã | Kết quả | Bằng chứng |
+|---|---|---|
+| M1 tổng việc AI cộng trùng | **Đóng** | `features/ai/report/view.ts:26` `dayTotal = report.items.length`, dùng ở `AiDailyReportScreen.tsx:117`. Test `view.test.ts:46-50` có ca B + hoàn tác: tổng là 1, cộng cột ra 2 |
+| M2 đổi mật khẩu phải là hộp thoại | **Đóng** | `AccountScreen.tsx:247-273` dùng `shared/ui/overlay/Modal`, `busy={pwBusy}` chặn đóng khi đang gửi, nút ở chân hộp qua `form={pwFormId}`. Không còn import `SideSheet` |
+| L1 sai mã story trong comment | **Đóng ở code**, còn ở doc | Code đã ghi ED-06 (AI của tôi) và ED-42 (Chính sách, Báo cáo). Tiêu đề mục ở `03-dev-notes.md:2382` vẫn ghi sai cả bốn mã, xem L-a |
+| L2 chữ "FEFO", "Vùng đỏ" | **Đóng** | Tổng quan dùng "Xếp theo hạn dùng sớm nhất" (`OverviewScreen.tsx:129`). `features/ai/settings` không còn "Vùng đỏ". Có một cách sửa không đúng ở `runtime/worker.ts`, xem L-b |
+| L3 `can_do` có "BR-LO-04", icon `shield` | **Đóng phía FE** | `AiPolicyScreen.tsx:294-298` và `policy/view.ts:26` bọc `stripRuleCodes`. Fallback icon đổi thành `"policy"` (`AiPolicyScreen.tsx:258`). Câu gốc ở BE (`apps/ai/policy/services.py`) vẫn còn mã BR, nhưng không còn hiện ra màn |
+| L4 `forgetSignedIn` chỉ ở một đường đăng xuất | Giữ cho Lô 17 | Đúng như đã chốt. `AuthProvider.logout` vẫn không xoá mốc giờ |
+| L5 `AuditLog.note` là chữ tự do | **Vẫn là nợ BE** | FE vẫn in `note` nguyên văn (`AuditLogScreen.tsx:126`, ẩn dưới 1100px). BE vẫn chép chữ người dùng gõ vào `note`: `sales/payments/services.py:574` (`attach_payment`), `:632` và `:673` (`resolve_payment`, `resolution_note`), `sales/refunds/services.py:254` (lý do hoàn), `sales/orders/services.py:402` (lý do huỷ), `purchasing/costs/services.py:83`. Nếu nhân viên gõ tên người chuyển khoản hay SĐT vào các ô này thì Nhật ký sẽ hiện ra (bất biến 9). Đây không phải hồi quy của lô FE. **Đề xuất cho lô BE gần nhất:** chỉ ghi mã lý do vào `note`, hoặc che SĐT và cắt bớt chữ trước khi `record_audit`. Có test: gửi `note` chứa `0901234567` thì `AuditLog.note` không chứa chuỗi đó. Ghi vào 02c để không bị quên |
+
+### Khi cờ AI tắt (`NEXT_PUBLIC_AI_FEATURES` khác "1", mặc định)
+| Chỗ | Kết quả | Ghi chú |
+|---|---|---|
+| Lồng `AiFeatureGuard` và `ViewGuard` ở `/ai/settings`, `/ai/policy`, `/ai/report` | **Đúng** | `app/(console)/ai/{settings,policy,report}/page.tsx`: `AiFeatureGuard` ở ngoài, `ViewGuard` ở trong, giống `ai/report` và `ai/actions` của main. Cờ tắt thì mọi vai đều thấy cùng "Không tìm thấy trang này" (`AiFeatureGuard.tsx:12`), không mount màn nên không gọi `/api/ai/*`. Không lộ ra route có tồn tại hay không theo quyền. Nếu lồng ngược lại thì người thiếu quyền thấy "Không có quyền", nghĩa là lộ ra trang có thật. Cách lồng hiện tại là đúng |
+| Tổng quan | **Đạt** | `AiProposalsRow.tsx:23` `allowed = AI_FEATURES_ENABLED && canView(...)`; `useEffect` thoát sớm khi `!allowed` nên không gọi `getAiStatus` hay `fetchAiActionCounts`, và không vẽ link `/ai/actions/`. `attentionRows` (`overview/view.ts:37-49`) không có dòng AI. Module `features/ai/api` và `ai/actions/api` vẫn nằm trong chunk (chỉ là hàm HTTP, `check-ai-chunks` xanh theo dev). Chấp nhận |
+| Tài khoản | **Đạt** | Dòng "AI của tôi" chỉ hiện khi `canView(me,"ai-settings")` (`AccountScreen.tsx:52`, `:211`). `nav.ts:485` đã gắn `AI_FEATURES_ENABLED`. "Mục bạn thấy trên menu" lấy từ `visibleNav` nên mục AI cũng bị lọc (`nav.ts:460,471,485,497`). Không có request AI |
+| Nhật ký | **Đạt** | Ẩn nút lọc "AI" (`AuditLogScreen.tsx:165`), ẩn 3 thao tác AI khỏi ô lọc (`:95`, `auditModel.ts AI_ONLY_ACTIONS`), ẩn cột "Đề xuất" (`:128`). Màn chỉ gọi `/api/audit-logs/` (`features/audit/api.ts`), không có link `/ai/`. Còn cột "Người duyệt" (`:117-123`), cột này chỉ có giá trị ở dòng AI. Không sai, xem gợi ý ở câu hỏi sản phẩm |
+| Kiểm bằng máy | **Thiếu** | `ed_batch15` chỉ build với cờ BẬT. Ca cờ tắt ở ba màn này dev mới kiểm tay (dev-notes). Cờ tắt đang là cấu hình production, nên **QA phải chạy một lượt build mock cờ tắt** với vai loc và ql1. Bắt request: trên `/overview/`, `/account/`, `/audit-logs/` không có URL nào chứa `/api/ai/`, DOM không có `a[href^="/ai/"]`, trên Nhật ký không có nút "AI" và cột "Đề xuất"; `/ai/settings/`, `/ai/policy/`, `/ai/report/` hiện "Không tìm thấy trang này" và không có request `/api/ai/`. Đây là điều kiện QA, không phải lỗi code |
+
+### Giá vốn và dữ liệu cá nhân
+- **Tổng quan:** không đổi so với lần trước. Ô "Giá trị tồn kho" chỉ có khi `canCost`. Cột `unit_cost` là `locked` và `canViewCost={canCost}` (`OverviewScreen.tsx:74`, `:140`). Bảng đơn có `canViewCost={false}` và chỉ có mã đơn, giá trị, trạng thái, lý do, giữ chỗ, không có tên hay SĐT khách (`:32-58`). Cột "Lý do" chỉ in chữ cố định "Hết giờ giữ chỗ" (`view.ts:116`), không in chữ tự do. **Đạt.**
+- **Nhật ký:** cột "Thay đổi" vẫn theo danh sách trắng (`auditModel.ts changeSummary`), không in JSON thô. `object_repr` của Khách do BE thay. Tên người làm chỉ nằm ở state, không vào URL hay storage. Lọc theo người là state, không có query string. **Đạt**, trừ L5 (nợ BE).
+- **Tài khoản:** `cave_erp_signed_in_at` chỉ chứa chuỗi ISO (`signedInAt.ts`). SĐT hiện ra là của chính người đăng nhập (`me.phone`), không phải SĐT khách. **Đạt.**
+
+### `Section` / `DataTable` chung
+- **Tổng quan:** "Đơn hàng gần đây" và "Tồn kho theo lô" dùng `DataTable title/countText/headAction` (`OverviewScreen.tsx:109-153`), "Cần chú ý" dùng `Section flush` (`:101-107`). Đã hết thẻ lồng thẻ. **Đúng cách.**
+- **Báo cáo AI:** hai bảng dùng `DataTable title/countText` (`AiDailyReportScreen.tsx:103`, `:115`). **Đúng.**
+- **Chính sách AI giữ thẻ tự dựng:** **chấp nhận.** `Section` cứng `h3` (`shared/ui/detail/Section.tsx:24`), còn trang chỉ có `h1` ở Topbar. Năm thẻ của Chính sách (`AiPolicyScreen.tsx:222,241,306,322,339`) dùng `h2`, `h3` đi bên trong (`:78`). Nếu đổi sang `Section` thì sẽ nhảy bậc tiêu đề từ h1 xuống h3 (WCAG 1.3.1). Nợ cho Lô 17: thêm prop bậc tiêu đề cho `Section` (vd `headingLevel?: 2 | 3`, mặc định 3), rồi chuyển các thẻ của Chính sách sang `Section`.
+- Lý do trên cũng áp dụng cho chính Tổng quan, xem L-c.
+
+### Lỗi mới (đều Low, không chặn)
+**L-a · Low · doc.** Tiêu đề ở `03-dev-notes.md:2382` ghi "Tổng quan ED-06 · AI của tôi ED-08 · … Chính sách AI + Báo cáo AI ED-41 · Tài khoản ED-42". Đúng phải là Tổng quan **ED-08**, AI của tôi + Tài khoản **ED-06**, Nhật ký **ED-41**, Chính sách AI + Báo cáo AI **ED-42** (`02-stories.md:118,144,630,640`). Dòng "AI của tôi (`features/ai/settings`)" bên dưới cũng không ghi mã. Sửa khi commit lô.
+
+**L-b · Low · ngoài phạm vi, sửa không đúng cách.** `erp-console/features/ai/runtime/worker.ts:51` đổi "theo FEFO" thành "theo fefo". (1) Phiếu giao việc Lô 15 ghi không đụng `features/ai/runtime` (dev-notes mục Lô 15, dòng "Không đụng…"). (2) Chữ thường chỉ để lách grep "FEFO" của Lô 17, còn người dùng (mock LLM) vẫn thấy thuật ngữ đó. Nên viết lại câu thành "Nên ưu tiên xuất B-01 trước vì hết hạn sớm nhất.", hoặc hoàn lại thay đổi và để Lô 17 xử lý. Không ảnh hưởng production vì `llmock` chỉ chạy ở mock.
+
+**L-c · Low · a11y.** Tổng quan: "Cần chú ý" là `Section` nên tiêu đề là `h3` (`OverviewScreen.tsx:101`), còn hai bảng bên cạnh là `h2` (`DataTable.tsx:226`). Thứ tự tiêu đề thành h1 → h3 → h2 → h2. Đây đúng là lỗi nhảy bậc mà dev đã tránh ở Chính sách AI. Gộp vào việc thêm prop bậc tiêu đề cho `Section` ở Lô 17 (rồi truyền 2 ở đây). Không chặn lô.
+
+**L-d · Low · code chết.** (1) Prop `onCancel` của `ChangePasswordForm` (`ChangePasswordForm.tsx:22,29,135-139`) không còn chỗ nào truyền vào: Tài khoản dùng `formId` nên nhánh vẽ nút đã tắt, còn S48 không có Huỷ. (2) `auditModel.ts:129` `isSystem` không được dùng. (3) `features/audit/messages.ts` có `aiOf` (`:29`) và `title` (`:4`) không được dùng. Xoá ở Lô 17 hoặc khi chạm lại các file này.
+
+### Câu hỏi sản phẩm: Nhật ký khi cờ AI tắt vẫn hiện dòng lịch sử do AI làm
+**Đề xuất: giữ nguyên, không ẩn dòng.** Lý do:
+1. Nhật ký là vết kiểm toán, chỉ đọc (BR-PQ-04/05/06, bất biến 3/4). Các việc AI đã làm (nhập phiếu, đổi giá, duyệt…) đã đổi chứng từ thật. Nếu giấu dòng thì Chủ nhìn chứng từ sẽ không biết ai đã đổi, và tổng "Đang hiện n / N dòng" sẽ lệch với số BE trả.
+2. Cờ `NEXT_PUBLIC_AI_FEATURES` chỉ ẩn **giao diện dùng AI**, không xoá dữ liệu hay đổi lịch sử (`shared/lib/features.ts`, SR-HIDE-AI-01: "chỉ ẩn giao diện… không xoá code AI").
+3. Ẩn ở FE là lọc trên trang đã tải nên phân trang và đếm sẽ sai. Muốn ẩn đúng thì BE phải lọc, tức là phát sinh việc BE cho một thứ không đem lại giá trị.
+4. Dòng AI đã có nhãn "AI" và tên người sở hữu, nên không gây hiểu nhầm là người làm tay.
+
+Gợi ý nhỏ, không bắt buộc: khi cờ tắt, có thể ẩn luôn cột "Người duyệt" (`AuditLogScreen.tsx:117-123`), vì cột này chỉ có giá trị ở dòng AI. Hoặc giữ cột cho đủ vết. Để Duy chọn. Nếu Duy muốn ẩn hẳn các dòng AI thì đó là việc BE (`?actor_kind=` loại trừ `ai`), không làm ở FE.
+
+### Kết luận re-review Lô 15 — FE: **APPROVED**
+M1 và M2 đã đóng. L1, L2, L3 đóng ở code. Khi cờ AI tắt: cách lồng `AiFeatureGuard` (ngoài) và `ViewGuard` (trong) đúng; Tổng quan, Tài khoản và Nhật ký không gọi `/api/ai/` và không có link hay khối AI. Không rò giá vốn hay dữ liệu cá nhân ở Tổng quan và Nhật ký. Việc dùng `Section` và `DataTable` đúng cách. Chấp nhận giữ thẻ tự dựng ở Chính sách AI.
+
+Điều kiện cho QA: chạy thêm lượt build mock **cờ AI tắt** như mục "Kiểm bằng máy" ở trên, cùng `ed_batch15` (cờ bật), `s48_password.py`, và `s41_s47_real.py` trên BE thật.
+
+Nợ chuyển đi:
+- **BE:** L5 (`AuditLog.note` chữ tự do, bất biến 9). Câu `can_do` có mã BR ở `apps/ai/policy/services.py`. `cancel_reason` trong `dashboard/summary` (dev-notes nợ 1). `AiMeta.title` tiếng Việt (dev-notes nợ 2).
+- **Lô 17:** L4, L-c (prop bậc tiêu đề cho `Section`, áp vào Chính sách AI và Tổng quan), L-d, `id` trong `dashboard/summary`, lọc ngày và `q` ở `audit-logs`.
+- **Sửa khi commit lô:** L-a. L-b nên sửa luôn (một dòng), hoặc hoàn lại.
+
 ---
 
 ## Review #3/#8 BE (06/10)
