@@ -71,3 +71,40 @@ Ghi nhận (không chặn):
 - `manage.py migrate` + seed ORM trên SQLite tạm; `runserver 8765 --noreload`.
 - Kịch bản HTTP bằng `urllib` (thư mục scratchpad): A–G, 16 lượt đua, quét rò, kiểm AuditLog/phiếu đảo bằng `manage.py shell`.
 - `manage.py test apps.delivery.tests.test_order_completion apps.sales.orders.tests.test_completion_rule apps.delivery.tests.test_completion_race_postgres` → 36 OK, skipped 2.
+
+## QA L1 FE (08/10)
+
+### Kết luận: APPROVED — FE ERP khớp S1/S2/S6/S7 trên bản mock và trên BE thật (L1 BE); S6-AC8 chỉ đạt một nửa, để L3 như review đã ghi
+### Tổng: 44 ca · ✅ 43 · ❌ 0 · ⏸ 1 (S6-AC8 phần đồng bộ hai kho mock)
+
+Nhánh `feat/w37-l1-fe` đã merge `feat/w37-l1-be` (chỉ thêm mục QA BE ở trên, không xung đột). Dữ liệu giả (SĐT 0900000xxx, "Khách Giả n").
+
+### Bản mock (NEXT_PUBLIC_USE_MOCK=1, `npm run build` exit 0, phục vụ tĩnh)
+| Kịch bản | Kết quả |
+|---|---|
+| `e2e/order_completion_erp.py` | ✅ 6/6 |
+| `e2e/ed_batch3_orders.py` (hồi quy đơn, kỳ vọng thanh bước 5 bước) | ✅ 143/143 (chạy với `BASE=http://127.0.0.1:3201`, mặc định của script là cổng 3101) |
+| `e2e/ed_batch4_delivery.py` (hồi quy giao hàng) | ✅ 70/70 |
+
+### BE thật (runserver từ worktree này có BE L1, SQLite tạm; erp-console build `NEXT_PUBLIC_USE_MOCK=0 NEXT_PUBLIC_API_BASE=http://127.0.0.1:8766`; Playwright, 30/30)
+| Mã AC | Kết quả | Bằng chứng |
+|---|---|---|
+| S1 (FE): giao xong phiếu cuối | ✅ | NV giao 360px bấm "Đã giao xong" → toast "Đã giao xong. Đơn đã hoàn tất."; API xác nhận đơn `COMPLETED`. Ảnh `shots2/toast_completed_360.png` |
+| S1 ngoài đường thuận: phiếu không phải cuối (đơn 2 phiếu, phiếu kia FAILED) | ✅ | Toast chỉ nói "Đã giao xong", KHÔNG nói "Đơn đã hoàn tất"; đơn vẫn `PROCESSING` |
+| S2 (FE): đơn huỷ khi NV giao đang mở hộp xác nhận | ✅ | Mở hộp, rồi phiếu FAILED + quản lý huỷ đơn qua API, bấm giao xong → hộp hiện đúng "Đơn đã huỷ — mang hàng về kho." và nút chính "Tải lại"; đơn và phiếu vẫn `CANCELLED` (không bị ghi đè). Bấm "Tải lại": hộp đóng, thẻ phiếu huỷ biến mất. Cả 360px (`br_gh_24_360.png`) lẫn 1280px (`br_gh_24_1280.png`) |
+| S6: bộ lọc | ✅ | Chủ: không còn "Đã thanh toán"; còn "Chưa xong", "Đang xử lý", "Hoàn tất". "Chưa xong" = 6 đơn (Giữ chỗ, Đang xử lý), không có đơn Hoàn tất; lọc "Hoàn tất" ra đúng đơn đã hoàn tất, và thêm đơn vừa giao xong sau thao tác (2 đơn). `list_unfinished_1280.png`, `list_completed_*.png` |
+| S6-AC8 | ⏸ | Mock hai kho (Giao hàng và Đơn) chưa nối, theo review thì chuyển L3. Trên BE thật thì đơn đổi đúng (ca S1) |
+| S7: thanh bước | ✅ | Chi tiết đơn: 5 bước (Giữ chỗ, Chờ gọi xác nhận, Soạn hàng, Đang giao, Hoàn tất). Đơn đang giao: bước "Đang giao" sáng, Hoàn tất chưa. Đơn `COMPLETED`: bước Hoàn tất sáng, kèm chip Hoàn tất. Đơn vừa giao xong ở bước trên chuyển sang Hoàn tất khi mở lại. `detail_*` |
+| 360px / 1280px | ✅ | Không cuộn ngang ở mọi màn đã mở (việc giao của tôi, hộp xác nhận, danh sách đơn, chi tiết đơn) |
+| Console | ✅ | Không `console.error` (bỏ qua "Failed to fetch RSC payload" do máy chủ tĩnh, như các e2e có sẵn); 400 BR-GH-24 là chủ ý |
+| Dữ liệu cá nhân | ✅ | `localStorage`, `sessionStorage`, URL và console của NV giao không chứa SĐT hay tên khách. Màn "Việc giao của tôi" hiện tên, SĐT, địa chỉ khách của chính phiếu được giao (đúng Tầng 3) |
+| Giá vốn | ✅ | Không thấy cột hay chuỗi giá vốn ở các màn đã chụp (NV giao không có quyền; chủ chỉ mở danh sách và chi tiết đơn, không có trường giá vốn) |
+
+### Ghi nhận (không chặn)
+- Đường BR-GH-24 trong hộp "Báo giao thất bại" chưa có ca trình duyệt thật (UI không mở được hộp cho phiếu đã huỷ); hộp "Xác nhận đã giao xong" thì đã chụp thật. Phần còn lại do vitest phủ, như review.
+- Không chạy lại `tsc`/`vitest` (điều phối viên đã chạy: tsc sạch, vitest 1031 xanh); QA chạy build mock=1 và mock=0 đều exit 0.
+
+### Lệnh đã chạy
+- `git merge feat/w37-l1-be`; `npm run build` (mock=1) → 3 kịch bản e2e ở trên.
+- Seed ORM 6 đơn + runserver 8766 (CORS 127.0.0.1:3202); `NEXT_PUBLIC_USE_MOCK=0 NEXT_PUBLIC_API_BASE=http://127.0.0.1:8766 npm run build` exit 0; script Playwright (scratchpad) 30/30 PASS; kiểm lưu trữ trình duyệt.
+- Dọn: dừng server, gỡ `out/`, symlink `node_modules`, `.env`, `staticfiles`, DB tạm.
