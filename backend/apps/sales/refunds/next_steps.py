@@ -164,7 +164,7 @@ def get_refund_guidance(doc_id: str, user: Any, request: Optional[Any] = None) -
         if delta_days >= warning_days:
             warnings.append({
                 "code": "GW-02",
-                "text": "Phiếu hoàn gần hạn 30 ngày (BR-AI-33)",
+                "text": "Phiếu hoàn tiền gần hạn 30 ngày",
             })
 
     related: list[dict[str, str]] = []

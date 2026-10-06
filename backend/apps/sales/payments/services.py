@@ -902,7 +902,7 @@ def mark_payment_refunded(*, payment, refund, actor):
     p.resolution = PaymentTransaction.Resolution.REFUNDED
     p.resolved_by = actor
     p.resolved_at = refund.confirmed_at or timezone.now()
-    p.resolution_note = f"Phiếu hoàn #{refund.pk} · mã GD hoàn {refund.bank_txn_ref}"
+    p.resolution_note = f"Phiếu hoàn tiền #{refund.pk} · mã GD hoàn {refund.bank_txn_ref}"
     p.save(update_fields=["resolution_status", "resolution", "resolved_by",
                           "resolved_at", "resolution_note"])
     record_audit(
