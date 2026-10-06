@@ -11,7 +11,7 @@
 //  - `q` khớp tên bỏ dấu, hoặc SĐT khi có từ 4 chữ số trở lên (BE không dò danh bạ bằng "0", "09").
 //  - `ordering` chỉ nhận last_order_at · order_count · total_spent · name · created_at (có thể thêm "-"); mặc định -last_order_at,
 //    khách chưa có đơn xếp cuối. Khoá lạ → quay về mặc định (như BE).
-//  - total_spent = tổng đơn KHÔNG huỷ, trừ phiếu hoàn REFUNDED của các đơn đó (đơn đã huỷ loại cả khoản hoàn). cancelled_count = đơn huỷ + tự huỷ.
+//  - total_spent = tổng đơn KHÔNG huỷ, trừ phiếu hoàn tiền REFUNDED của các đơn đó (đơn đã huỷ loại cả khoản hoàn). cancelled_count = đơn huỷ + tự huỷ.
 //  - PATCH: thân rỗng → 400 INPUT_EMPTY; khoá khác → 400 INPUT_NOT_ALLOWED; không phải chuỗi / quá dài → 400 {field:[...]}.
 //    phone: chuẩn hoá (+84/84 → 0), sai dạng → 400 INVALID_PHONE, trùng khách khác → 400 CUSTOMER_PHONE_TAKEN (câu lỗi không lặp lại số).
 //
@@ -20,6 +20,7 @@
 // Công cụ thử trong DevTools (chỉ có ở mock):
 //   window.__caveMock.customers("ok" | "fail" | "empty" | "forbidden" | "detailfail" | "patchfail") — chế độ (localStorage, giữ qua tải lại; không chứa dữ liệu khách)
 
+import { ENUMS } from "@/shared/lib/enums";
 import type { MockRequest, MockResponse, Paginated } from "@/shared/lib/http";
 import { MOCK_UNAUTHORIZED, mockRequireUser } from "@/features/auth/mock";
 import type { Me } from "@/features/auth/types";
@@ -65,9 +66,9 @@ const ORDER_LABEL: Record<string, string> = {
   PROCESSING: "Đang xử lý",
   COMPLETED: "Hoàn tất",
   CANCELLED: "Đã huỷ",
-  AUTO_CANCELLED: "Đã huỷ",
+  AUTO_CANCELLED: "Hết giờ giữ chỗ",
 };
-const REFUND_LABEL: Record<string, string> = { PENDING: "Chờ hoàn", REFUNDED: "Đã hoàn", FAILED: "Thất bại" };
+const REFUND_LABEL: Record<string, string> = Object.fromEntries(Object.entries(ENUMS.refundStatus).map(([k, v]) => [k, v.label]));
 const CANCELLED = new Set(["CANCELLED", "AUTO_CANCELLED"]);
 
 const LETTERS = "ABCDEGHKLMNPQRSTUVXYZ"; // 21 chữ cái; sau đó gắn thêm số để đủ 27 khách
@@ -100,7 +101,7 @@ function seed(): Person[] {
       const amount = 260000 + ((i * 7 + k * 3) % 6) * 65000;
       orders.push({ id: orderId, code, status, status_label: ORDER_LABEL[status], total_amount: `${amount}.00`, created_at: created.toISOString() });
       if (status === "CANCELLED") {
-        // Đơn đã trả tiền rồi huỷ → phiếu hoàn toàn phần (bị loại khỏi tổng đã mua).
+        // Đơn đã trả tiền rồi huỷ → phiếu hoàn tiền toàn phần (bị loại khỏi tổng đã mua).
         refunds.push({ id: refundId++, order_code: code, status: "REFUNDED", status_label: REFUND_LABEL.REFUNDED, amount: `${amount}.00`, created_at: new Date(at + 3 * 3600_000).toISOString() });
       }
       if (i === 2 && k === 0) {
@@ -281,7 +282,7 @@ export function mockCustomersApi(req: MockRequest): MockResponse {
   return { status: 200, body: detail(p) };
 }
 
-/** Timeline của khách (guidance `customer`): đơn đặt, huỷ, phiếu hoàn và các lần sửa hồ sơ. Không có SĐT/địa chỉ trong nhãn. */
+/** Timeline của khách (guidance `customer`): đơn đặt, huỷ, phiếu hoàn tiền và các lần sửa hồ sơ. Không có SĐT/địa chỉ trong nhãn. */
 export function mockCustomerTimelineApi(req: MockRequest): MockResponse {
   const me = mockRequireUser(req);
   if (!me) return MOCK_UNAUTHORIZED;

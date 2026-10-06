@@ -12,6 +12,7 @@ import {
   dueAt,
   extendError,
   idFromSearch,
+  escalationHint,
   isPhoneValid,
   lineNames,
   matches,
@@ -56,7 +57,7 @@ describe("kết quả cuộc gọi và quyết định theo quyền", () => {
     expect(decisionsOf(["decide:CANCEL", "decide:EXTEND", "decide:DELIVER_WITHOUT_CONFIRM"])).toEqual(["DELIVER_WITHOUT_CONFIRM", "EXTEND", "CANCEL"]);
   });
   it("tab Gọi báo hoàn tiền đúng tên (AC1)", () => {
-    expect(QUEUE_TABS.map((t) => t.label)).toEqual(["Cần gọi ngay", "Hẹn gọi lại", "Cần quyết định", "Gọi báo hoàn tiền", "Chờ gọi", "Tất cả"]);
+    expect(QUEUE_TABS.map((t) => t.label)).toEqual(["Đến giờ gọi", "Hẹn gọi lại", "Cần quyết định", "Gọi báo hoàn tiền", "Chờ gọi", "Tất cả"]);
   });
 });
 
@@ -100,8 +101,8 @@ describe("kiểm tra nhập liệu", () => {
 });
 
 describe("hiển thị theo trạng thái", () => {
-  it("thanh trạng thái theo việc gọi (board W1c2): Chờ gọi > Cần quyết định > Hoàn tất", () => {
-    expect(PATH_STEPS.map((x) => x.label)).toEqual(["Chờ gọi", "Cần quyết định", "Hoàn tất"]);
+  it("thanh trạng thái theo việc gọi (board W1c2): Chờ gọi > Cần quyết định > Đã xong", () => {
+    expect(PATH_STEPS.map((x) => x.label)).toEqual(["Chờ gọi", "Cần quyết định", "Đã xong"]);
     expect(pathOf({ note_status: "CONFIRMING", confirm_state: "PENDING" })).toEqual({ current: "WAITING", badEnd: null });
     expect(pathOf({ note_status: "CONFIRMING", confirm_state: "CALLBACK" })).toEqual({ current: "WAITING", badEnd: null });
     expect(pathOf({ note_status: "CONFIRMING", confirm_state: "ESCALATED" })).toEqual({ current: "DECIDE", badEnd: null });
@@ -142,7 +143,7 @@ describe("hiển thị theo trạng thái", () => {
     expect(claimedByOther(held, 6, NOW.getTime())).toBe(true);
   });
   it("câu toast sau khi ghi cuộc gọi", () => {
-    expect(callToast("CONFIRMED", { confirm_state: null, attempts: 0, duplicate: false }, 3)).toMatch(/Soạn hàng/);
+    expect(callToast("CONFIRMED", { confirm_state: null, attempts: 0, duplicate: false }, 3)).toMatch(/Đang soạn hàng/);
     expect(callToast("UNREACHABLE", { confirm_state: "PENDING", attempts: 1, duplicate: false }, 3)).toBe("Đã ghi không nghe máy (lần 1/3).");
     expect(callToast("UNREACHABLE", { confirm_state: "ESCALATED", attempts: 3, duplicate: false }, 3)).toMatch(/Quản lý/);
     expect(callToast("CALLBACK", { confirm_state: "CALLBACK", attempts: 0, duplicate: false }, 3, "2026-10-02T04:00:00.000Z")).toBe("Đã hẹn gọi lại lúc 02/10/2026 11:00.");
@@ -188,5 +189,14 @@ describe("mock: dòng ngoài phạm vi che dữ liệu khách (bất biến 9)",
       expect(hit.customer_name).toBeUndefined();
       expect(hit.phone_masked).toBe(out.phone_masked);
     } else throw new Error("search phải trả results");
+  });
+});
+
+describe("escalationHint (T37, M1 review Pha A)", () => {
+  it("Khách muốn đổi món: gợi ý huỷ đơn, hoàn tiền rồi đặt lại", () => {
+    expect(escalationHint("WANT_CHANGE")).toBe("Huỷ đơn, hoàn tiền rồi đặt lại đơn mới");
+  });
+  it("lý do khác hoặc trống: không có gợi ý", () => {
+    for (const r of ["WANT_CANCEL", "WRONG_NUMBER", "UNREACHABLE", "", null, undefined]) expect(escalationHint(r)).toBeNull();
   });
 });

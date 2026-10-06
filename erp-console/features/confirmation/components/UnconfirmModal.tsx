@@ -56,7 +56,7 @@ export function UnconfirmModal({ noteId, orderCode, onClose, onDone, onStale }: 
       }
     >
       {(sub.error || sub.stale) && <ModalAlert>{sub.stale ?? sub.error}</ModalAlert>}
-      <SummaryBlock label="Đơn đang sửa" rows={[{ label: "Đơn hàng", value: orderCode, mono: true }, { label: "Sau khi huỷ", value: "Đơn về Chờ xác nhận, gọi lại khách" }]} />
+      <SummaryBlock label="Đơn đang sửa" rows={[{ label: "Đơn hàng", value: orderCode, mono: true }, { label: "Sau khi huỷ", value: "Phiếu giao về Chờ gọi xác nhận, gọi lại khách" }]} />
       <div className={s.form}>
         <Field
           as="textarea"

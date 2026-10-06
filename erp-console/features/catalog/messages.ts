@@ -2,6 +2,8 @@
 // Lỗi nghiệp vụ của BE (định dạng ảnh, giá đã có đơn dùng, chồng lấn ngày…) KHÔNG ở đây: UI hiện nguyên văn `detail`
 // BE trả (đã bỏ mã quy tắc) — xem shared/lib/messages.ts `errorText()`.
 
+import { ENUMS } from "@/shared/lib/enums";
+
 export const CATALOG_MSG = {
   // ---- khung màn ----
   screenTitle: "Danh mục & giá",
@@ -155,7 +157,7 @@ export const CATALOG_MSG = {
   filterRuleActiveAll: "Mọi trạng thái",
   filterApplyOn: "Áp dụng cho",
   filterApplyOnAll: "Mọi loại ưu đãi",
-  optRuleOn: "Đang bật",
+  optRuleOn: ENUMS.pricingRuleActive.true.label,
   optRuleOff: "Đã tắt",
   ruleShown: (shown: number, total: number) => `Đang hiện ${shown} / ${total} ưu đãi`,
   rulesTitle: "Ưu đãi",
@@ -197,7 +199,7 @@ export const CATALOG_MSG = {
   fieldDiscountValue: "Mức giảm",
   fieldRuleFrom: "Từ ngày",
   fieldRuleUpto: "Đến ngày",
-  fieldRuleActive: "Đang bật",
+  fieldRuleActive: ENUMS.pricingRuleActive.true.label,
   ruleNameRequired: "Nhập tên ưu đãi.",
   ruleItemRequired: "Chọn mặt hàng được giảm.",
   minQtyRequired: "Nhập số kg tối thiểu.",

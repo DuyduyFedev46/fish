@@ -1,6 +1,6 @@
 "use client";
 
-// Chi tiết hàng hoàn về kho (ED-26 / W5f): /returns/detail/?id=<pk>. Khung DetailPage: header (mã mono · chip · [Tái nhập vào lô] [Huỷ bỏ, ghi lỗ]),
+// Chi tiết hàng hoàn về kho (ED-26 / W5f): /returns/detail/?id=<pk>. Khung DetailPage: header (mã mono · chip · [Tái nhập vào lô] [Huỷ hàng, ghi lỗ]),
 // StatusPath (Chờ duyệt → Đã duyệt) kèm Tiếp theo / Đã làm, khối thông tin, cột phải = Trợ lý AI + dòng thời gian.
 // Hai nút duyệt chỉ hiện cho người có inventory.approve_returntostock khi phiếu còn Chờ duyệt; cả hai mở hộp F2n (chọn sẵn quyết định đã bấm).
 // "Huỷ phiếu hàng hoàn" (Lô bổ sung A #8) nằm trong menu "…": phiếu còn Chờ duyệt, người có quyền duyệt/sửa hoặc người tạo phiếu; có hộp xác nhận

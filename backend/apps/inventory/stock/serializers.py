@@ -11,10 +11,6 @@ from .references import ReferenceLookup, describe
 SYSTEM_ACTOR_NAME = "Hệ thống"
 ZERO = Decimal("0")
 
-# enum-map: nhãn hiển thị của Sổ nhập xuất khác nhãn model ở đúng một loại. Đổi nhãn ở serializer, không đổi
-# `choices` của model (sẽ sinh migration).
-LEDGER_TYPE_LABEL_OVERRIDES = {StockLedgerEntry.MovementType.WRITE_OFF: "Ghi lỗ, huỷ hàng"}
-
 
 def user_display_name(user):
     """Tên hiển thị của người làm: tên trong hồ sơ nhân viên, không có thì tên đăng nhập. Không bao giờ trả SĐT."""
@@ -97,7 +93,7 @@ class StockLedgerEntrySerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
     def get_type_label(self, obj):
-        return LEDGER_TYPE_LABEL_OVERRIDES.get(obj.movement_type) or obj.get_movement_type_display()
+        return obj.get_movement_type_display()  # một nguồn nhãn từ `choices` (T44)
 
     def _describe(self, obj):
         lookup = self.context.get("reference_lookup") or ReferenceLookup()

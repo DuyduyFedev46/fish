@@ -41,8 +41,8 @@ class SalesCreditNote(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        verbose_name = "Chứng từ đảo doanh thu"
-        verbose_name_plural = "Chứng từ đảo doanh thu"
+        verbose_name = "Phiếu trừ doanh thu"
+        verbose_name_plural = "Phiếu trừ doanh thu"
         default_permissions = ("view",)  # BR-PQ-11: không add/change/delete
         ordering = ["-issued_at", "-id"]
         indexes = [models.Index(fields=["issued_at"])]
@@ -71,8 +71,8 @@ class SalesCreditNoteLine(models.Model):
     )
 
     class Meta:
-        verbose_name = "Dòng chứng từ đảo"
-        verbose_name_plural = "Dòng chứng từ đảo"
+        verbose_name = "Dòng phiếu trừ doanh thu"
+        verbose_name_plural = "Dòng phiếu trừ doanh thu"
         default_permissions = ("view",)
 
     def __str__(self):

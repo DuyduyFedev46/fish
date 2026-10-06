@@ -147,7 +147,7 @@ function OrderDetailBody({ order: o, detail, renderAi }: { order: OrderDetail; d
     return () => c.abort();
   }, [o.id, o.status, o.payments.length, o.refunds.length, beAiEnabled]);
 
-  // `?open=refund` (từ màn gọi xác nhận) mở sẵn hộp "Lập phiếu hoàn" — một lần; xong bỏ tham số khỏi thanh địa chỉ.
+  // `?open=refund` (từ màn gọi xác nhận) mở sẵn hộp "Lập phiếu hoàn tiền" — một lần; xong bỏ tham số khỏi thanh địa chỉ.
   useEffect(() => {
     if (openedRef.current) return;
     openedRef.current = true;

@@ -744,7 +744,7 @@ def resolve_payment(*, payment, action, actor, order_id=None, note=""):
     if action not in ResolveAction.ALL:
         raise BusinessError(
             "Cách xử lý không hợp lệ: ATTACH_TO_ORDER hoặc CONFIRM_ORDER "
-            "(hoàn tiền thì tạo phiếu hoàn).", code=RESOLVE_CODE,
+            "(hoàn tiền thì lập phiếu hoàn tiền).", code=RESOLVE_CODE,
         )
     note = str(note or "").strip()
     if action == ResolveAction.ATTACH_TO_ORDER:
@@ -831,7 +831,7 @@ def _confirm_order(p, *, order, actor, note):
     payments = list(_confirmable_payments(order).select_for_update())
     if p.pk not in {x.pk for x in payments}:
         raise BusinessError(
-            "Giao dịch đang có phiếu hoàn — không dùng để xác nhận đơn.", code=RESOLVE_CODE
+            "Khoản tiền về đang có phiếu hoàn tiền — không dùng để xác nhận đơn.", code=RESOLVE_CODE
         )
     received = order_paid_total(order)
     if received < order.total_amount:
@@ -902,11 +902,11 @@ def mark_payment_refunded(*, payment, refund, actor):
     p.resolution = PaymentTransaction.Resolution.REFUNDED
     p.resolved_by = actor
     p.resolved_at = refund.confirmed_at or timezone.now()
-    p.resolution_note = f"Phiếu hoàn #{refund.pk} · mã GD hoàn {refund.bank_txn_ref}"
+    p.resolution_note = f"Phiếu hoàn tiền #{refund.pk} · mã GD hoàn {refund.bank_txn_ref}"
     p.save(update_fields=["resolution_status", "resolution", "resolved_by",
                           "resolved_at", "resolution_note"])
     record_audit(
-        "resolve_payment", actor=actor, obj=p, note=f"Hoàn tiền theo phiếu hoàn #{refund.pk}",
+        "resolve_payment", actor=actor, obj=p, note=f"Hoàn tiền theo phiếu hoàn tiền #{refund.pk}",
         changes={
             "resolution_status": {"from": old, "to": p.resolution_status},
             "resolution": p.resolution,

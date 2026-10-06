@@ -40,7 +40,7 @@ class S47MeLabelsTests(TestCase):
             [
                 {"code": "inventory.publish_batch", "label": "Mở bán lô"},
                 {"code": "sales.cancel_paid_order", "label": "Huỷ đơn đã thanh toán"},
-                {"code": "sales.create_refund", "label": "Lập phiếu hoàn"},
+                {"code": "sales.create_refund", "label": "Lập phiếu hoàn tiền"},
                 {"code": "inventory.approve_returntostock", "label": "Duyệt hàng hoàn"},
                 {"code": "inventory.approve_stockreconciliation", "label": "Duyệt kiểm kê"},
             ],

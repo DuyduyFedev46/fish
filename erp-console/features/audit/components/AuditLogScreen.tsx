@@ -52,7 +52,7 @@ function ActorCell({ row }: { row: AuditLogRow }) {
 }
 
 function ChangesCell({ row }: { row: AuditLogRow }) {
-  const parts = changeSummary(row.changes);
+  const parts = changeSummary(row.changes, row.model_name);
   if (!parts.length) return <span className="muted">{M.noValue}</span>;
   return (
     <ul className={s.changes}>

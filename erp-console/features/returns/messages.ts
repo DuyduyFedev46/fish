@@ -1,4 +1,5 @@
-// Câu chữ tiếng Việt do FE tự sinh cho module Hàng hoàn về kho (ED-26). Không có mã quy tắc (BR-…), không viết tắt cấm
+import { ENUMS } from "@/shared/lib/enums";
+// Câu chữ tiếng Việt do FE tự sinh cho module Hàng hoàn (ED-26). Không có mã quy tắc (BR-…), không viết tắt cấm
 // (UI-RULES §3). Lỗi BE có mã đã biết được viết lại ở returnsModel.ts; mã lạ thì hiện câu BE đã bỏ phần "(BR-…)".
 
 export const RETURNS_MSG = {
@@ -33,7 +34,7 @@ export const RETURNS_MSG = {
   outsideLong: "quá 2 giờ",
 
   // ---- Chi tiết ----
-  backToList: "Hàng hoàn về kho",
+  backToList: "Hàng hoàn",
   detailNounShort: "phiếu",
   loadingDetail: "Đang tải phiếu hàng hoàn…",
   sectionInfo: "Thông tin hàng hoàn",
@@ -50,12 +51,12 @@ export const RETURNS_MSG = {
   fieldDecision: "Quyết định",
   fieldNote: "Ghi chú",
   restock: "Tái nhập vào lô",
-  writeOff: "Huỷ bỏ, ghi lỗ",
+  writeOff: ENUMS.returnToStockDecision.WRITE_OFF.label,
   retry: "Thử lại",
   timelineTitle: "Dòng thời gian",
   timelineFailed: "Chưa tải được lịch sử của phiếu.",
   approvedRestock: "Đã duyệt. Hàng đã nhập lại vào lô.",
-  approvedWriteOff: "Đã duyệt. Hàng đã huỷ bỏ, ghi lỗ.",
+  approvedWriteOff: "Đã duyệt. Hàng đã huỷ hàng, ghi lỗ.",
 
   // ---- Huỷ phiếu hàng hoàn (Lô bổ sung A #8) ----
   cancelMenu: "Huỷ phiếu hàng hoàn",
@@ -80,7 +81,7 @@ export const RETURNS_MSG = {
   approveTitle: "Duyệt hàng hoàn",
   approveSummary: "Phiếu hàng hoàn cần duyệt",
   approveDecisionLegend: "Quyết định",
-  approveDecisionRequired: "Chọn Tái nhập hoặc Huỷ bỏ, ghi lỗ trước khi duyệt.",
+  approveDecisionRequired: "Chọn Tái nhập hoặc Huỷ hàng, ghi lỗ trước khi duyệt.",
   approveRestockHint: "Cộng lại vào đúng lô gốc, ghi dòng Hàng hoàn tái nhập ở sổ kho.",
   approveWriteOffHint: "Không nhập lại kho, ghi số kg này là hàng lỗi.",
   approveSubmit: "Duyệt",

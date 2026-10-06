@@ -1,6 +1,8 @@
 // Chữ hiển thị của module Nội dung (ED-35, ED-36). Một nơi để kiểm "không có mã luật, không từ kỹ thuật" (UI-RULES §1).
 // Gọi khái niệm bằng tiếng thường: "đường dẫn" (không "slug"), "tóm tắt", "chân trang", "tiêu đề/mô tả khi tìm kiếm".
 
+import { ENUMS } from "@/shared/lib/enums";
+
 export const CONTENT_MSG = {
   // ---- Danh sách ----
   listTitle: "Danh sách bài viết và trang",
@@ -294,19 +296,8 @@ export const WARNING_FIELD_LABELS: Record<string, string> = {
   seo_description: "Mô tả khi tìm kiếm",
 };
 
-/** Lý do trả về nháp (khoá gửi BE) và nhãn người đọc. */
-export const RETURN_REASONS = [
-  { value: "missing_info", label: "Thiếu thông tin hoặc hình ảnh" },
-  { value: "wrong_content", label: "Nội dung chưa chuẩn, cần sửa" },
-  { value: "legal_risk", label: "Rủi ro pháp lý hoặc bản quyền" },
-  { value: "other", label: "Lý do khác" },
-] as const;
+/** Lý do trả về nháp (khoá gửi BE) và nhãn người đọc: dựng từ ENUMS (nguồn duy nhất). */
+export const RETURN_REASONS = (Object.entries(ENUMS.entryReturnReason) as [keyof typeof ENUMS.entryReturnReason, { label: string }][]).map(([value, v]) => ({ value, label: v.label }));
 
-/** Lý do gỡ bài (khoá gửi BE) và nhãn người đọc. */
-export const UNPUBLISH_REASONS = [
-  { value: "wrong_price", label: "Giá chưa đúng" },
-  { value: "complaint", label: "Khiếu nại hoặc rủi ro pháp lý" },
-  { value: "out_of_season", label: "Hết mùa vụ" },
-  { value: "wrong_content", label: "Nội dung chưa chuẩn" },
-  { value: "other", label: "Lý do khác" },
-] as const;
+/** Lý do gỡ bài (khoá gửi BE) và nhãn người đọc: dựng từ ENUMS. */
+export const UNPUBLISH_REASONS = (Object.entries(ENUMS.entryUnpublishReason) as [keyof typeof ENUMS.entryUnpublishReason, { label: string }][]).map(([value, v]) => ({ value, label: v.label }));

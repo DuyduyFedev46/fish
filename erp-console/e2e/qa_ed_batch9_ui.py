@@ -106,7 +106,7 @@ def run_roles(b):
     for u, (menu, add, appr) in exp.items():
         ctx, p = newp(b, u)
         navs = [t.strip() for t in p.locator(".nav a").all_inner_texts()]
-        ok(f"R {u}: menu Hàng hoàn về kho {'có' if menu else 'không'}", any("Hàng hoàn về kho" in t for t in navs) == menu, navs)
+        ok(f"R {u}: menu Hàng hoàn {'có' if menu else 'không'}", any("Hàng hoàn" in t for t in navs) == menu, navs)
         go(p, "/returns/")
         if not menu:
             ok(f"R {u}: URL trực tiếp -> Không có quyền, không lộ dữ liệu", p.get_by_role("heading", name="Không có quyền").count() >= 1 and "RT-" not in p.inner_text("main"))
@@ -115,7 +115,7 @@ def run_roles(b):
             ok(f"R {u}: nút Nhập hàng hoàn {'có' if add else 'không có'}", (p.get_by_role("button", name="Nhập hàng hoàn").count() == 1) == add)
             rows = p.locator("main table tbody tr").count()
             go(p, "/returns/detail/?id=1" if u not in ("giao2", "cs2") else "/returns/detail/?id=5")
-            has_buttons = p.get_by_role("button", name="Tái nhập vào lô").count() + p.get_by_role("button", name="Huỷ bỏ, ghi lỗ").count()
+            has_buttons = p.get_by_role("button", name="Tái nhập vào lô").count() + p.get_by_role("button", name="Huỷ hàng, ghi lỗ").count()
             if u in ("giao2", "cs2"):
                 ok(f"R {u}: phiếu của người khác -> Không tìm thấy", p.get_by_role("heading", name="Không tìm thấy").count() >= 1 and has_buttons == 0)
                 mine = [c.strip() for c in p.locator("main table tbody tr td:first-child").all_inner_texts()] if False else None
@@ -319,7 +319,7 @@ def run_approve_edges(b):
     ctx, p = newp(b, "loc")
     go(p, "/returns/detail/?id=5")
     p.evaluate("() => window.__caveMock.returnsMarkApproved(5)")
-    p.get_by_role("button", name="Huỷ bỏ, ghi lỗ").click()
+    p.get_by_role("button", name="Huỷ hàng, ghi lỗ").click()
     d = dlg(p)
     d.get_by_role("button", name="Duyệt", exact=True).click()
     p.wait_for_function("() => document.querySelector('[role=dialog]') && document.querySelector('[role=dialog]').innerText.includes('Tải lại')")

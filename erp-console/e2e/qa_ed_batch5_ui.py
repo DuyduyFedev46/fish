@@ -161,7 +161,7 @@ def queue_checks(browser):
     ctx, page, errors = new_page(browser, "ql1")
     go(page, "/confirmation/")
     names = [re.sub(r"\s*\d+$", "", t.strip()) for t in page.get_by_role("tab").all_inner_texts()]
-    ok("AC1 tab đúng 6 mục, đúng thứ tự", names == ["Cần gọi ngay", "Hẹn gọi lại", "Cần quyết định", "Gọi báo hoàn tiền", "Chờ gọi", "Tất cả"], str(names))
+    ok("AC1 tab đúng 6 mục, đúng thứ tự", names == ["Đến giờ gọi", "Hẹn gọi lại", "Cần quyết định", "Gọi báo hoàn tiền", "Chờ gọi", "Tất cả"], str(names))
     heads = [h.strip() for h in page.locator("table.lt thead th").all_inner_texts()]
     ok("cột 'Hạn gọi' có", "Hạn gọi" in heads, str(heads))
     ok("AC1 'Lý lo chuyển quyết định ở cột riêng': có cột Lý do", any(h in ("Lý do", "Lý do chuyển lên", "Lý do chuyển quyết định") for h in heads), str(heads))
@@ -171,7 +171,7 @@ def queue_checks(browser):
     cells = [c.strip() for c in row.locator("td").all_inner_texts()]
     ok("AC1 tab Cần quyết định: lý do 'Không nghe máy' nằm trong một ô riêng của dòng", "Không nghe máy" in cells, str(cells))
     # chip theo tab
-    expect_chip = {"Cần gọi ngay": {"Chờ gọi"}, "Hẹn gọi lại": {"Hẹn gọi lại"}, "Cần quyết định": {"Cần quyết định"}, "Gọi báo hoàn tiền": {"Gọi báo hoàn tiền"}, "Chờ gọi": {"Chờ gọi"}}
+    expect_chip = {"Đến giờ gọi": {"Chờ gọi"}, "Hẹn gọi lại": {"Hẹn gọi lại"}, "Cần quyết định": {"Cần quyết định"}, "Gọi báo hoàn tiền": {"Gọi báo hoàn tiền"}, "Chờ gọi": {"Chờ gọi"}}
     for t, want in expect_chip.items():
         pick_tab(page, t)
         chips = set(c.strip() for c in page.locator("table.lt tbody tr .stat-chip").all_inner_texts())
@@ -218,7 +218,7 @@ def queue_checks(browser):
     go(page, "/confirmation/?tab=ESCALATED")
     ok("tải lại với ?tab=ESCALATED giữ đúng tab", page.get_by_role("tab", selected=True).inner_text().strip().startswith("Cần quyết định"))
     go(page, "/confirmation/?tab=zzz")
-    ok("?tab=rác rơi về tab mặc định, không vỡ", page.get_by_role("tab", selected=True).inner_text().strip().startswith("Cần gọi ngay") and page.locator("table.lt").count() == 1)
+    ok("?tab=rác rơi về tab mặc định, không vỡ", page.get_by_role("tab", selected=True).inner_text().strip().startswith("Đến giờ gọi") and page.locator("table.lt").count() == 1)
     # G8: tìm không thấy, xoá tìm
     pick_tab(page, "Tất cả")
     page.locator("input[name=q]").fill("zzzkhongco")
@@ -334,7 +334,7 @@ def record_each_result(browser):
     ]
     for key, label, nid, code in cases:
         ctx, page, errors = new_page(browser, "cs2", tz="America/New_York")  # múi giờ máy lệch: giờ phải theo Việt Nam
-        open_detail_from_queue(page, code, "Cần gọi ngay")
+        open_detail_from_queue(page, code, "Đến giờ gọi")
         tl_before = page.locator("[data-timeline-row]").count()
         calls_before = page.locator("table.lt tbody tr").count()
         att_before = re.search(r"Lần gọi\s*\n?\s*(\d+)/(\d+)", page.inner_text("main"))
@@ -381,7 +381,7 @@ def record_each_result(browser):
 # ====================================================================== 6. F2h giao diện hộp
 def modal_f2h(browser):
     ctx, page, errors = new_page(browser, "cs2")
-    open_detail_from_queue(page, "SO260928-3F9A01", "Cần gọi ngay")
+    open_detail_from_queue(page, "SO260928-3F9A01", "Đến giờ gọi")
     page.get_by_role("button", name="Ghi kết quả gọi").click()
     d = dialog(page)
     d.wait_for()
@@ -427,7 +427,7 @@ def modal_f2h(browser):
 def callback_edges(browser):
     for tz in ("Asia/Ho_Chi_Minh", "America/Los_Angeles"):
         ctx, page, errors = new_page(browser, "cs2", tz=tz)
-        open_detail_from_queue(page, "SO260928-3F9A01", "Cần gọi ngay")
+        open_detail_from_queue(page, "SO260928-3F9A01", "Đến giờ gọi")
         more_menu(page, "Hẹn gọi lại")
         d = dialog(page)
         d.wait_for()
@@ -466,7 +466,7 @@ def callback_edges(browser):
 # ====================================================================== 8. F2j đổi người nhận / địa chỉ
 def change_recipient(browser):
     ctx, page, errors = new_page(browser, "cs2")
-    open_detail_from_queue(page, "SO260928-3F9A01", "Cần gọi ngay")
+    open_detail_from_queue(page, "SO260928-3F9A01", "Đến giờ gọi")
     more_menu(page, "Đổi người nhận")
     d = dialog(page)
     d.wait_for()
@@ -513,7 +513,7 @@ def decide_checks(browser):
         if user == "ql1":
             page.screenshot(path=os.path.join(SHOTS, "qa5-F2k-quyet-dinh-ql1-1280.png"))
         names = [x.strip() for x in d.locator("[class*='pickName']").all_inner_texts()]
-        ok(f"AC4 [{user}] F2k có đủ 3 lựa chọn đúng tên", names == ["Giao không xác nhận", "Gia hạn thêm", "Huỷ đơn"], str(names))
+        ok(f"AC4 [{user}] F2k có đủ 3 lựa chọn đúng tên", names == ["Bỏ qua gọi xác nhận", "Gia hạn gọi", "Huỷ đơn"], str(names))
         metas = d.locator("[class*='pickMeta']").count()
         ok(f"§6.2 [{user}] F2k không chữ gợi ý xám dưới lựa chọn (board F2k chỉ có tên)", metas == 0, f"{metas} dòng gợi ý")
         ok(f"[{user}] F2k <= 6 trường", d.locator("input:not([type=radio]), textarea, select").count() <= 6)
@@ -521,14 +521,14 @@ def decide_checks(browser):
         d.get_by_role("button", name=re.compile("Lưu quyết định")).click()
         ok(f"[{user}] không chọn gì: báo 'Chọn một cách xử lý.'", "Chọn một cách xử lý" in d.inner_text())
         # giao không xác nhận: cần lý do; có SĐT bị chặn
-        d.locator("label", has_text="Giao không xác nhận").first.click()
+        d.locator("label", has_text="Bỏ qua gọi xác nhận").first.click()
         d.get_by_role("button", name=re.compile("Lưu quyết định")).click()
         ok(f"[{user}] giao không xác nhận thiếu lý do: báo 'Nhập lý do.'", "Nhập lý do" in d.inner_text())
         d.get_by_label(re.compile("^Lý do")).fill("khách ở số 0912 345 678")
         d.get_by_role("button", name=re.compile("Lưu quyết định")).click()
         ok(f"[{user}] lý do có SĐT bị chặn, hộp còn mở", "không được chứa số điện thoại" in d.inner_text() and dialog(page).is_visible())
         # gia hạn: biên 24 giờ
-        d.locator("label", has_text="Gia hạn thêm").first.click()
+        d.locator("label", has_text="Gia hạn gọi").first.click()
         d.get_by_label(re.compile("^Lý do")).fill("Khách bận họp")
         for label, dt, bad in (("quá khứ", vn_now() - timedelta(hours=1), True), ("25 giờ", vn_now() + timedelta(hours=25), True), ("24 giờ + 5 phút", vn_now() + timedelta(hours=24, minutes=5), True)):
             d.get_by_label("Gia hạn tới lúc").fill(vn_input(dt))
@@ -559,7 +559,7 @@ def decide_checks(browser):
     open_detail_from_queue(page, "SO260928-A40F28", "Cần quyết định")
     page.get_by_role("button", name="Quyết định", exact=True).click()
     d = dialog(page)
-    d.locator("label", has_text="Gia hạn thêm").first.click()
+    d.locator("label", has_text="Gia hạn gọi").first.click()
     d.get_by_label(re.compile("^Lý do")).fill("Khách hẹn gọi chiều")
     d.get_by_label("Gia hạn tới lúc").fill(vn_input(vn_now() + timedelta(hours=23)))
     d.get_by_role("button", name=re.compile("Lưu quyết định")).dblclick()
@@ -577,7 +577,7 @@ def decide_checks(browser):
 def conflicts_and_stale(browser):
     # CLAIMED / STALE ở từng hộp
     ctx, page, errors = new_page(browser, "cs2")
-    open_detail_from_queue(page, "SO260928-B27C30", "Cần gọi ngay")
+    open_detail_from_queue(page, "SO260928-B27C30", "Đến giờ gọi")
     page.evaluate("() => window.__caveMock.confirmationClaimByOther(30)")
     page.get_by_role("button", name="Ghi kết quả gọi").click()
     page.get_by_text("Chị Lan", exact=False).first.wait_for()
@@ -610,7 +610,7 @@ def conflicts_and_stale(browser):
             d = dialog(page)
             d.wait_for()
             page.evaluate(f"() => window.__caveMock.confirmationArmStale({nid})")
-            d.locator("label", has_text="Giao không xác nhận").first.click()
+            d.locator("label", has_text="Bỏ qua gọi xác nhận").first.click()
             d.get_by_label(re.compile("^Lý do")).fill("Giao luôn")
             d.get_by_role("button", name=re.compile("Lưu quyết định")).click()
         d.get_by_role("button", name="Tải lại").wait_for()
@@ -626,7 +626,7 @@ def conflicts_and_stale(browser):
 
     # màn cũ: đơn đã sang Soạn hàng trong khi màn đang mở -> ghi cuộc gọi không làm vỡ trang
     ctx, page, errors = new_page(browser, "cs2")
-    open_detail_from_queue(page, "SO260928-3F9A01", "Cần gọi ngay")
+    open_detail_from_queue(page, "SO260928-3F9A01", "Đến giờ gọi")
     page.evaluate("() => window.__caveMock.confirmationSetStatus(31, 'PREPARING')")
     page.get_by_role("button", name="Ghi kết quả gọi").click()
     d = dialog(page)

@@ -62,8 +62,8 @@ export function orderStepKey(o: PathInput): string {
 export function refundSummaryLine(summary: { refunded_amount: string; pending_amount: string } | null | undefined): string | null {
   if (!summary) return null;
   const parts: string[] = [];
-  if (Number(summary.refunded_amount) > 0) parts.push(`Đã hoàn ${vnd(summary.refunded_amount)}`);
-  if (Number(summary.pending_amount) > 0) parts.push(`Chờ hoàn ${vnd(summary.pending_amount)}`);
+  if (Number(summary.refunded_amount) > 0) parts.push(`${ENUMS.refundStatus.REFUNDED.label} ${vnd(summary.refunded_amount)}`);
+  if (Number(summary.pending_amount) > 0) parts.push(`${ENUMS.refundStatus.PENDING.label} ${vnd(summary.pending_amount)}`);
   return parts.length ? parts.join(" · ") : null;
 }
 
@@ -102,10 +102,10 @@ export function orderActionPlan(i: PlanInput): ActionPlan {
 
   if (has("confirm_payment")) primary = { key: "confirm_payment", label: "Xác nhận đã nhận tiền" };
   else if (has("cancel")) primary = { key: "cancel", label: "Huỷ đơn", danger: true };
-  else if (has("create_refund") && isCancelledStatus(i.status)) primary = { key: "create_refund", label: "Lập phiếu hoàn" };
+  else if (has("create_refund") && isCancelledStatus(i.status)) primary = { key: "create_refund", label: "Lập phiếu hoàn tiền" };
   else if (has("create_refund") && i.status === "COMPLETED") primary = { key: "create_refund", label: "Lập phiếu hoàn tiền" };
 
-  if (has("create_refund") && primary?.key !== "create_refund") menu.push({ key: "create_refund", label: "Lập phiếu hoàn" });
+  if (has("create_refund") && primary?.key !== "create_refund") menu.push({ key: "create_refund", label: "Lập phiếu hoàn tiền" });
 
   if (!has("cancel") && i.canCancel) {
     if (i.status === "BOOKED") menu.push({ key: "cancel", label: "Huỷ đơn", danger: true, blockedReason: BLOCKED_CANCEL_BOOKED });
@@ -161,7 +161,7 @@ export const PAYMENT_STEPS: PathStep[] = [
 const PAYMENT_LABEL: Record<string, string> = {
   attach_to_order: "Gắn vào đơn",
   confirm_order: "Xác nhận đơn đủ tiền",
-  refund: "Lập phiếu hoàn",
+  refund: "Lập phiếu hoàn tiền",
 };
 
 /** Khoản tiền: thao tác đầu tiên BE cho phép là nút chính, còn lại vào "…". */
@@ -175,12 +175,12 @@ export function paymentActionPlan(actions: readonly PaymentAction[]): ActionPlan
 // Phiếu hoàn
 
 export const REFUND_STEPS: PathStep[] = [
-  { key: "PENDING", label: "Chờ hoàn" },
-  { key: "REFUNDED", label: "Đã hoàn" },
+  { key: "PENDING", label: ENUMS.refundStatus.PENDING.label },
+  { key: "REFUNDED", label: ENUMS.refundStatus.REFUNDED.label },
 ];
 
 export function refundPath(status: string): { current: string; badEnd: { label: string; after: string } | null } {
-  if (status === "FAILED") return { current: "PENDING", badEnd: { label: "Thất bại", after: "PENDING" } };
+  if (status === "FAILED") return { current: "PENDING", badEnd: { label: ENUMS.refundStatus.FAILED.label, after: "PENDING" } };
   return { current: status === "REFUNDED" ? "REFUNDED" : "PENDING", badEnd: null };
 }
 

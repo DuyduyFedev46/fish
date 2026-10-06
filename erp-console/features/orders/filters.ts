@@ -26,7 +26,7 @@ export function currentMonth(now = new Date()): string {
   return todayInVietnam(now).slice(0, 7);
 }
 
-/** 12 tháng gần nhất (mới → cũ) cho ô chọn tháng của phiếu hoàn. */
+/** 12 tháng gần nhất (mới → cũ) cho ô chọn tháng của phiếu hoàn tiền. */
 export function recentMonths(now = new Date(), count = 12): { value: string; label: string }[] {
   const [y, m] = currentMonth(now).split("-").map(Number);
   return Array.from({ length: count }, (_, i) => {

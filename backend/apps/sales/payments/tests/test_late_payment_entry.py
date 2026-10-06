@@ -448,7 +448,7 @@ class LatePrivacyAndCostTests(LateBase):
         received = [e for e in order_events if e["kind"] == "payment_received"]
         self.assertEqual(len(received), 1)
         self.assertIn("Xác nhận tay", received[0]["label"])
-        self.assertIn("Đến sau khi đơn đã huỷ", received[0]["label"])
+        self.assertIn("Về sau khi đơn đã huỷ", received[0]["label"])
         self.assertNotEqual(received[0]["actor_display"], "Hệ thống")
 
     def test_free_text_note_not_stored_anywhere(self):

@@ -108,7 +108,7 @@ class LedgerContractTests(LedgerApiBase):
         batch = self.make_batch()
         self.move(batch, "0", MT.WRITE_OFF, "return 3 (huỷ bỏ, lỗ 0kg)")
         labels = {row["movement_type"]: row["type_label"] for row in self.rows()}
-        self.assertEqual(labels["WRITE_OFF"], "Ghi lỗ, huỷ hàng")
+        self.assertEqual(labels["WRITE_OFF"], "Huỷ hàng, ghi lỗ")
         # Nhãn khác giữ đúng nhãn của model (enum-map).
         self.assertEqual(labels["RECEIPT"], "Nhập lô")
 

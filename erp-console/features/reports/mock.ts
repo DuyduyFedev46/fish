@@ -27,7 +27,7 @@ function monthsAgo(year: number, month: number): number {
 }
 
 // ---- Kỳ ----
-// [doanh thu hoá đơn, giá vốn hoá đơn, chứng từ đảo, giá vốn đảo, hoàn tiền, số hoá đơn, số phiếu hoàn] theo số tháng trước.
+// [doanh thu hoá đơn, giá vốn hoá đơn, chứng từ đảo, giá vốn đảo, hoàn tiền, số hoá đơn, số phiếu hoàn tiền] theo số tháng trước.
 const PERIOD_SEEDS: Record<number, [string, string, string, string, string, number, number]> = {
   0: ["18450000", "12310000", "850000", "560000", "250000", 14, 1],
   1: ["24600000", "16200000", "0", "0", "0", 21, 0],

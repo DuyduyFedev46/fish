@@ -28,7 +28,7 @@ def build_payment_timeline(payment: PaymentTransaction) -> list[TimelineEvent]:
         TimelineEvent(
             at=received_time,
             kind="payment_received",
-            label=f"Nhận giao dịch thanh toán {format_vnd_ui(payment.amount)} (mã GD {payment.bank_txn_id})",
+            label=f"Nhận khoản tiền về {format_vnd_ui(payment.amount)} (mã GD {payment.bank_txn_id})",
             actor_display=SYSTEM,
             doc="payment",
             actor_kind="system",
@@ -83,7 +83,7 @@ def build_payment_timeline(payment: PaymentTransaction) -> list[TimelineEvent]:
                 TimelineEvent(
                     at=a.created_at,
                     kind="payment_resolved",
-                    label=f"Xử lý giao dịch ({res_val})",
+                    label=f"Xử lý khoản tiền về ({res_val})",
                     actor_display=who,
                     doc="payment",
                     actor_kind=kind_actor,
@@ -101,7 +101,7 @@ def build_payment_timeline(payment: PaymentTransaction) -> list[TimelineEvent]:
                 TimelineEvent(
                     at=payment.resolved_at,
                     kind="payment_resolved",
-                    label=f"Xử lý giao dịch ({res_label})",
+                    label=f"Xử lý khoản tiền về ({res_label})",
                     actor_display=actor_display(payment.resolved_by),
                     doc="payment",
                     actor_kind="user" if payment.resolved_by else "system",

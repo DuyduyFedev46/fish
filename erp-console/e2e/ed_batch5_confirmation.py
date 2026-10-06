@@ -104,7 +104,7 @@ def queue_customer_service(browser):
     go(page, "/confirmation/")
     tabs = [t.strip() for t in page.get_by_role("tab").all_inner_texts()]
     names = [re.sub(r"\s*\d+$", "", t).strip() for t in tabs]
-    ok("AC1: tab đúng thứ tự", names == ["Cần gọi ngay", "Hẹn gọi lại", "Cần quyết định", "Gọi báo hoàn tiền", "Chờ gọi", "Tất cả"], str(names))
+    ok("AC1: tab đúng thứ tự", names == ["Đến giờ gọi", "Hẹn gọi lại", "Cần quyết định", "Gọi báo hoàn tiền", "Chờ gọi", "Tất cả"], str(names))
     ok("AC1: không còn chữ 'Báo hoàn tiền' trần ở tab", not any(n == "Báo hoàn tiền" for n in names))
 
     body = page.inner_text("main")
@@ -336,12 +336,12 @@ def decisions(browser):
         dlg = dialog(page)
         dlg.wait_for()
         labels = [x.strip() for x in dlg.locator("[class*='pickName']").all_inner_texts()]
-        ok(f"AC4 {user}: 3 lựa chọn đúng tên", labels == ["Giao không xác nhận", "Gia hạn thêm", "Huỷ đơn"], str(labels))
+        ok(f"AC4 {user}: 3 lựa chọn đúng tên", labels == ["Bỏ qua gọi xác nhận", "Gia hạn gọi", "Huỷ đơn"], str(labels))
         ok(f"AC4 {user}: lựa chọn Huỷ đơn được đánh dấu nguy hiểm", dlg.locator("[class*='pickDanger']").count() == 1)
         dlg.get_by_role("button", name="Lưu quyết định").click()
         ok(f"AC4 {user}: chưa chọn thì báo lỗi, hộp còn mở", dialog(page).is_visible() and re.search(r"Chọn", dlg.inner_text()) is not None)
         # gia hạn thiếu giờ
-        dlg.locator("label", has_text="Gia hạn thêm").first.click()
+        dlg.locator("label", has_text="Gia hạn gọi").first.click()
         dlg.get_by_role("button", name="Lưu quyết định").click()
         ok(f"AC4 {user}: gia hạn thiếu giờ -> lỗi từ ô giờ", re.search(r"Chọn thời điểm", dlg.inner_text()) is not None)
         # huỷ đơn: nút đỏ + xác nhận hai bước
@@ -356,9 +356,9 @@ def decisions(browser):
             page.wait_for_url(re.compile(r"/orders/\?order=\d+&open=refund"), timeout=10_000)
             ok("AC4 loc: huỷ xong chuyển sang hoàn tiền của đơn", True, page.url)
         else:
-            # ql1: quay lại, chọn Giao không xác nhận
+            # ql1: quay lại, chọn Bỏ qua gọi xác nhận
             dlg.get_by_role("button", name="Quay lại").click()
-            dlg.locator("label", has_text="Giao không xác nhận").first.click()
+            dlg.locator("label", has_text="Bỏ qua gọi xác nhận").first.click()
             dlg.get_by_role("button", name="Lưu quyết định").click()
             dlg.wait_for(state="detached")
             settle(page)
@@ -447,7 +447,7 @@ def fix_round(browser):
     go(page, "/confirmation/detail/?id=28")
     page.get_by_role("heading", name="SO260928-A40F28").wait_for()
     steps = [re.sub(r"^check\s*", "", x.strip()) for x in page.locator("ol li[data-state]").all_inner_texts()]
-    ok("B5 thanh trạng thái: Chờ gọi > Cần quyết định > Hoàn tất", steps == ["Chờ gọi", "Cần quyết định", "Hoàn tất"], str(steps))
+    ok("B5 thanh trạng thái: Chờ gọi > Cần quyết định > Đã xong", steps == ["Chờ gọi", "Cần quyết định", "Đã xong"], str(steps))
     now = page.locator("li[data-state='current']").all_inner_texts()
     ok("B5 bước hiện tại là 'Cần quyết định', khớp chip", [x.strip() for x in now] == ["Cần quyết định"] and page.locator("header .stat-chip, main .stat-chip").first.inner_text().strip() == "Cần quyết định", str(now))
     main = page.inner_text("main")
@@ -504,7 +504,7 @@ def fix_round(browser):
     dlg = dialog(page)
     dlg.wait_for()
     ok("B6 F2k: 3 lựa chọn, không dòng gợi ý xám", dlg.locator("[class*='pickName']").count() == 3 and dlg.locator("[class*='pickMeta']").count() == 0 and "Kho vẫn soạn" not in dlg.inner_text())
-    dlg.locator("label", has_text="Giao không xác nhận").first.click()
+    dlg.locator("label", has_text="Bỏ qua gọi xác nhận").first.click()
     ok("B6 F2k: ô ghi chú có bộ đếm 0/200", "0/200" in dlg.inner_text())
     page.screenshot(path=os.path.join(SHOTS, "ed5-fix-F2k.png"))
     page.keyboard.press("Escape")
@@ -517,7 +517,7 @@ def fix_round(browser):
     dbtn.click()
     dlg = dialog(page)
     dlg.wait_for()
-    dlg.locator("label", has_text="Giao không xác nhận").first.click()
+    dlg.locator("label", has_text="Bỏ qua gọi xác nhận").first.click()
     dlg.get_by_label("không ghi số điện thoại", exact=False).fill("Giao luôn")
     dlg.get_by_role("button", name="Lưu quyết định").click()
     dlg.get_by_role("button", name="Tải lại").wait_for()

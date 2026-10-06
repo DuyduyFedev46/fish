@@ -65,7 +65,7 @@ with sync_playwright() as p:
     page.get_by_role("button", name="Quyết định").first.click()
     dlg = page.get_by_role("dialog")
     dlg.wait_for()
-    dlg.get_by_label("Giao không xác nhận").check()
+    dlg.get_by_label("Bỏ qua gọi xác nhận").check()
     dlg.locator("textarea").fill("Khách quen 0901234567")
     dlg.get_by_role("button", name="Lưu quyết định").click()
     page.wait_for_timeout(400)

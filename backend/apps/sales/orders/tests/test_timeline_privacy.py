@@ -41,7 +41,7 @@ class TimelineFreeTextTests(OrderApiBase):
         timeline = client_for(self.owner).get(f"/api/sales/orders/{self.order.pk}/").json()["timeline"]
         labels = [e["label"] for e in timeline if e["kind"] == "refund_created"]
         self.assertEqual(len(labels), 1)
-        self.assertTrue(labels[0].startswith("Tạo phiếu hoàn"))
+        self.assertTrue(labels[0].startswith("Lập phiếu hoàn tiền"))
         self.assertIn("100.000", labels[0])
         self.assertNotIn("—", labels[0])
         refund = client_for(self.owner).get(f"/api/sales/refunds/{self.refund.pk}/").json()

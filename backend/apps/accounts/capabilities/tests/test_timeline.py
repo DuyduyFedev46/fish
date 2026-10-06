@@ -37,7 +37,7 @@ class GroupTimelineTests(TestCase):
     def test_ed39_timeline_shows_on_label(self):
         self.change(roles.WAREHOUSE_STAFF, {"approve_return": True})
         self.assertEqual([e["label"] for e in self.timeline(roles.WAREHOUSE_STAFF)],
-                         ["Bật việc Duyệt hàng hoàn về kho"])
+                         ["Bật việc Duyệt hàng hoàn"])
 
     def test_ed39_timeline_includes_membership_changes_made_through_staff_api(self):
         response = self.client.put(

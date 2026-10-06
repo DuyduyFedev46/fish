@@ -23,7 +23,7 @@ def apply_return(*, return_to_stock, approver):
     if rt.status == ReturnToStock.Status.APPROVED:
         raise BusinessError("Phiếu hàng hoàn đã được duyệt.")
     if rt.decision == ReturnToStock.Decision.PENDING:
-        raise BusinessError("Phải chọn Tái nhập hoặc Huỷ bỏ trước khi duyệt (BR-HV-02).")
+        raise BusinessError("Phải chọn Tái nhập hoặc Huỷ hàng, ghi lỗ trước khi duyệt (BR-HV-02).")
     if rt.batch.is_closed:
         raise BusinessError("Lô đã chốt không nhận hàng hoàn (BR-HV-04).")
 

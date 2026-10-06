@@ -330,7 +330,7 @@ class SR12CreditNoteTests(CreditNoteBase):
         detail = client_for(self.chu).get(f"/api/sales/orders/{order.pk}/").json()
         events = [e for e in detail["timeline"] if e["kind"] == "credit_note_issued"]
         self.assertEqual(len(events), 1)
-        self.assertEqual(events[0]["label"], f"Lập chứng từ đảo doanh thu {cn.code} (300.000 đ)")
+        self.assertEqual(events[0]["label"], f"Lập phiếu trừ doanh thu {cn.code} (300.000 đ)")
         self.assertEqual(events[0]["actor_display"], "Hệ thống")
         self.assertNotIn(SENTINEL_ADDRESS, events[0]["label"])
         self.assertNotIn(SENTINEL_PHONE, events[0]["label"])

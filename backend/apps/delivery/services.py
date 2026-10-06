@@ -149,7 +149,7 @@ def advance_status(*, note, to_status, actor, from_status=None):
                 )
 
         if current == Status.COMPLETED:
-            raise BusinessError("Phiếu giao đã Hoàn tất — không quay lui được (BR-GH-05).", code="BR-GH-05")
+            raise BusinessError("Phiếu giao đã giao xong — không quay lui được (BR-GH-05).", code="BR-GH-05")
 
         allowed = ALLOWED_TRANSITIONS.get(current, set())
         if to_status not in allowed:

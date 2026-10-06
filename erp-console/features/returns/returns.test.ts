@@ -93,7 +93,7 @@ describe("returnsModel — hiển thị", () => {
     expect(nextStepText({ status: "DRAFT", outside_minutes: 135, batch_code: "B1" })).toContain("2 giờ 15 phút");
     expect(nextStepText({ status: "APPROVED", outside_minutes: 10, batch_code: "B1" })).toBeNull();
     expect(doneSteps({ status: "DRAFT", decision: "PENDING" })).toHaveLength(2);
-    expect(doneSteps({ status: "APPROVED", decision: "WRITE_OFF" }).at(-1)).toBe("Huỷ bỏ, ghi lỗ");
+    expect(doneSteps({ status: "APPROVED", decision: "WRITE_OFF" }).at(-1)).toBe("Huỷ hàng, ghi lỗ");
     expect(doneSteps({ status: "APPROVED", decision: "RESTOCK" }).at(-1)).toBe("Tái nhập vào lô");
   });
 });

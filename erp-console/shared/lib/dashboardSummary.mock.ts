@@ -38,7 +38,7 @@ const ORDER_LABEL: Record<OrderStatus, string> = {
   PROCESSING: "Đang xử lý",
   COMPLETED: "Hoàn tất",
   CANCELLED: "Đã huỷ",
-  AUTO_CANCELLED: "Tự huỷ (quá TTL)",
+  AUTO_CANCELLED: "Hết giờ giữ chỗ",
 };
 const BATCH_LABEL: Record<BatchStatus, string> = {
   DRAFT: "Nháp",

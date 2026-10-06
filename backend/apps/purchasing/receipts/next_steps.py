@@ -16,7 +16,7 @@ RECEIPT_ACTION_LABELS = {
 SUPPLIER_ACTION_LABELS = {
     "supplier_create": "Thêm nhà cung cấp",
     "supplier_update": "Cập nhật nhà cung cấp",
-    "admin_edit": "Chỉnh sửa trong trang quản trị",
+    "admin_edit": "Sửa trong trang quản trị kỹ thuật",
 }
 
 register_guidance(

@@ -81,8 +81,8 @@ class PricingRule(models.Model):
     """
 
     class ApplyOn(models.TextChoices):
-        ITEM = "ITEM", "Theo mặt hàng (mua ≥ N kg)"
-        ORDER = "ORDER", "Theo đơn (tổng ≥ M đồng)"
+        ITEM = "ITEM", "Theo mặt hàng"
+        ORDER = "ORDER", "Theo đơn"
 
     class DiscountType(models.TextChoices):
         AMOUNT = "AMOUNT", "Giảm số tiền"

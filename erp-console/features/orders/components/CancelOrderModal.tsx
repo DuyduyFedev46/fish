@@ -1,7 +1,7 @@
 "use client";
 
 // F2b — "Huỷ đơn" (ED-10-AC2): hai bước. Bước 1 chọn lý do (+ ghi chú, bắt buộc khi chọn "Khác"); bước 2 nêu hậu quả rồi
-// mới có nút đỏ "Huỷ đơn". Sau khi huỷ, màn gợi ý "Lập phiếu hoàn" (đơn đã thanh toán).
+// mới có nút đỏ "Huỷ đơn". Sau khi huỷ, màn gợi ý "Lập phiếu hoàn tiền" (đơn đã thanh toán).
 
 import { useState } from "react";
 import { vnd } from "@/shared/lib/format";

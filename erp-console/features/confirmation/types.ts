@@ -1,3 +1,5 @@
+import { ENUMS } from "@/shared/lib/enums";
+
 export type ConfirmationState =
   | "PENDING"
   | "CALLBACK"
@@ -22,6 +24,8 @@ export type ConfirmationQueueItem = {
   escalated_at: string | null;
   decide_deadline: string | null;
   auto_cancel_blocked: string | null;
+  /** T43: chữ người đọc của `auto_cancel_blocked` (vd mã BR-LO-05 → "Lô đã chốt, không tự huỷ được"). BE cũ chưa trả thì thiếu khoá. */
+  auto_cancel_blocked_label?: string | null;
   claimed_by: { id: number; display_name: string } | null;
   claimed_until: string | null;
   lines_summary: string;
@@ -113,37 +117,37 @@ export const CALL_RESULT_OPTIONS: Array<{
 }> = [
   {
     value: "CONFIRMED",
-    label: "Đã xác nhận",
+    label: ENUMS.confirmCallResult.CONFIRMED.label,
     tone: "good",
   },
   {
     value: "CALLBACK",
-    label: "Hẹn gọi lại",
+    label: ENUMS.confirmCallResult.CALLBACK.label,
     tone: "warn",
   },
   {
     value: "UNREACHABLE",
-    label: "Không nghe máy",
+    label: ENUMS.confirmCallResult.UNREACHABLE.label,
     tone: "crit",
   },
   {
     value: "WRONG_NUMBER",
-    label: "Sai số điện thoại",
+    label: ENUMS.confirmCallResult.WRONG_NUMBER.label,
     tone: "crit",
   },
   {
     value: "WANT_CHANGE",
-    label: "Khách muốn đổi món",
+    label: ENUMS.confirmCallResult.WANT_CHANGE.label,
     tone: "info",
   },
   {
     value: "WANT_CANCEL",
-    label: "Khách muốn huỷ đơn",
+    label: ENUMS.confirmCallResult.WANT_CANCEL.label,
     tone: "info",
   },
   {
     value: "NOTIFIED",
-    label: "Đã báo hoàn tiền",
+    label: ENUMS.confirmCallResult.NOTIFIED.label,
     tone: "good",
   },
 ];
@@ -208,11 +212,11 @@ export type ChangeRecipientResponse = {
 export type QueueTabKey = "DEFAULT" | "PENDING" | "CALLBACK" | "ESCALATED" | "REFUND_CALL" | "ALL";
 
 export const QUEUE_TABS: Array<{ key: QueueTabKey; label: string; stateParam?: string }> = [
-  { key: "DEFAULT", label: "Cần gọi ngay" },
-  { key: "CALLBACK", label: "Hẹn gọi lại", stateParam: "CALLBACK" },
-  { key: "ESCALATED", label: "Cần quyết định", stateParam: "ESCALATED" },
-  { key: "REFUND_CALL", label: "Gọi báo hoàn tiền", stateParam: "REFUND_CALL" },
-  { key: "PENDING", label: "Chờ gọi", stateParam: "PENDING" },
+  { key: "DEFAULT", label: ENUMS.confirmQueueTab.DEFAULT.label },
+  { key: "CALLBACK", label: ENUMS.confirmTaskState.CALLBACK.label, stateParam: "CALLBACK" },
+  { key: "ESCALATED", label: ENUMS.confirmTaskState.ESCALATED.label, stateParam: "ESCALATED" },
+  { key: "REFUND_CALL", label: ENUMS.confirmTaskState.REFUND_CALL.label, stateParam: "REFUND_CALL" },
+  { key: "PENDING", label: ENUMS.confirmTaskState.PENDING.label, stateParam: "PENDING" },
   { key: "ALL", label: "Tất cả" },
 ];
 

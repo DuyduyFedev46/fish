@@ -1,6 +1,6 @@
 "use client";
 
-// F2c — "Lập phiếu hoàn" (ED-10-AC3), dùng cho HAI nguồn tiền (đúng một trong hai, BR-HT-01): khoản tiền không có hoá đơn
+// F2c — "Lập phiếu hoàn tiền" (ED-10-AC3), dùng cho HAI nguồn tiền (đúng một trong hai, BR-HT-01): khoản tiền không có hoá đơn
 // (gửi `payment_transaction`) hoặc đơn có hoá đơn (gửi `sales_invoice` + `is_partial`). Số hoàn vượt "Còn hoàn được" thì báo
 // "Nhập tối đa <số> đ." tại ô và KHOÁ nút chính (BE vẫn là lớp chặn thật, BR-HT-04). `request_id` sinh một lần mỗi lần mở
 // hộp: bấm đúp / gửi lại sau lỗi mạng không tạo phiếu thứ hai. Phiếu tạo ra ở trạng thái Chờ hoàn (tiền CHƯA rời túi).
@@ -20,7 +20,7 @@ import type { CreateRefundInput, CreateRefundResult } from "../types";
 import s from "../orders.module.css";
 import { ActionModal } from "./ActionModal";
 
-/** Nguồn tiền của phiếu hoàn. `invoiceTotal` chỉ dùng để tính `is_partial`. */
+/** Nguồn tiền của phiếu hoàn tiền. `invoiceTotal` chỉ dùng để tính `is_partial`. */
 export type RefundTarget = { kind: "payment"; id: number } | { kind: "invoice"; id: number; invoiceTotal: string };
 
 type Props = {

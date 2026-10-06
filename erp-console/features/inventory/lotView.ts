@@ -175,7 +175,7 @@ export function isLotStateError(code: string | undefined): boolean {
 
 export function isStaleLotError(code: string | undefined, message: string): boolean {
   // Trạng thái lô đã đổi ở nơi khác (BE services.py): Mở bán (BR-MH-05: không còn Nháp), Huỷ phần tồn (BR-LO-03: không
-  // còn Quá hạn), Trả nhà cung cấp / Huỷ (BR-LO-05: đã chốt), Chốt lô (BR-LO-04: còn tồn/giữ chỗ/đơn mở/phiếu hoàn/chưa có
+  // còn Quá hạn), Trả nhà cung cấp / Huỷ (BR-LO-05: đã chốt), Chốt lô (BR-LO-04: còn tồn/giữ chỗ/đơn mở/phiếu hoàn tiền/chưa có
   // hoá đơn mua; BR-KK-05: chưa kiểm kê duyệt). Gửi lại không đổi được kết quả, chỉ tải lại mới thấy trạng thái thật.
   if (isLotStateError(code)) return true;
   if (code === "BR-LO-07") return !/không hợp lệ/i.test(message);

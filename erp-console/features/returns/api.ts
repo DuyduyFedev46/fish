@@ -1,4 +1,4 @@
-// API module Hàng hoàn về kho (ED-26) — contract BE Lô 9 (R9): backend/apps/inventory/returns/api.py.
+// API module Hàng hoàn (ED-26) — contract BE Lô 9 (R9): backend/apps/inventory/returns/api.py.
 //   GET  /api/inventory/returns/?status=&month=&page=   (20 dòng/trang; người giao chỉ thấy phiếu của phiếu giao gán cho mình)
 //   GET  /api/inventory/returns/{id}/                    (phiếu người khác của người giao → 404)
 //   POST /api/inventory/returns/                         {delivery_note, batch, qty, note?}  (batch = id lô, KHÔNG phải mã lô)

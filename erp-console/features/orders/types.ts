@@ -188,7 +188,7 @@ export type ConfirmPaymentResult = {
 export type QueueMatchStatus = "UNDERPAID" | "ORPHAN" | "UNMATCHED" | "OVERPAID" | "MATCHED";
 
 export type ResolutionStatus = "OPEN" | "RESOLVED";
-/** Cách đã đóng khoản lệch (BR-TT-09): gắn vào đơn · xác nhận đơn khi khách đã bù · hoàn tiền (S13, qua phiếu hoàn đã xác nhận). */
+/** Cách đã đóng khoản lệch (BR-TT-09): gắn vào đơn · xác nhận đơn khi khách đã bù · hoàn tiền (S13, qua phiếu hoàn tiền đã xác nhận). */
 export type Resolution = "ATTACHED" | "CONFIRMED" | "REFUNDED";
 
 /** Thao tác trên một khoản lệch — BE tính cả luật lẫn quyền; FE chỉ đọc để hiện nút. */
@@ -201,13 +201,13 @@ export type QueueOrderRef = {
   status: OrderStatus | string;
   status_label?: string;
   total_amount: string;
-  /** Tổng tiền đã nhận của đơn (MATCHED + UNDERPAID, trừ giao dịch đang có phiếu hoàn chưa Thất bại) — BE tính. */
+  /** Tổng tiền đã nhận của đơn (MATCHED + UNDERPAID, trừ giao dịch đang có phiếu hoàn tiền chưa Thất bại) — BE tính. */
   paid_total: string;
   /** FE đề xuất (BE L8 chưa trả) — có thì hiện tên khách cạnh mã đơn. */
   customer_name?: string;
 };
 
-/** Phiếu hoàn đã lập cho khoản lệch (S13) — FE ĐỀ XUẤT, BE L8 chưa trả trong dòng hàng chờ; có thì hiện. */
+/** Phiếu hoàn tiền đã lập cho khoản lệch (S13) — FE ĐỀ XUẤT, BE L8 chưa trả trong dòng hàng chờ; có thì hiện. */
 export type QueueRefund = {
   id: number;
   amount: string;
@@ -241,7 +241,7 @@ export type PaymentQueueItem = {
   refunds?: QueueRefund[];
   /** Số tiền còn được hoàn (BR-HT-04) — BE tính; thiếu thì FE mặc định = `amount`, BE vẫn chặn. */
   refundable_amount?: string;
-  /** Nhãn "nghi trùng" (BR-TT-15 / BR-TT-18): có chữ thì lập phiếu hoàn phải tick xác nhận đã đối chiếu sao kê. Rỗng = không nghi. */
+  /** Nhãn "nghi trùng" (BR-TT-15 / BR-TT-18): có chữ thì lập phiếu hoàn tiền phải tick xác nhận đã đối chiếu sao kê. Rỗng = không nghi. */
   duplicate_warning?: string;
   available_actions: PaymentAction[];
 };
@@ -309,19 +309,19 @@ export type CancelOrderResult = {
   order_status: string;
   stock_restored: boolean;
   delivery_status: string | null;
-  /** Gợi ý số tiền hoàn toàn phần — điền sẵn cho nút "Tạo phiếu hoàn toàn phần" (S14-AC7, mở S15). */
+  /** Gợi ý số tiền hoàn toàn phần — điền sẵn cho nút "Lập phiếu hoàn tiền toàn phần" (S14-AC7, mở S15). */
   suggest_refund_amount: string;
   invoice_id: number | null;
 };
 
 // ---------------------------------------------------------------------------------------------------------------------
-// S16 — Phiếu hoàn chờ chuyển: xác nhận, báo thất bại, thử lại (GET /api/sales/refunds/?status=PENDING,FAILED,
+// S16 — Hoàn tiền chờ chuyển: xác nhận, báo thất bại, thử lại (GET /api/sales/refunds/?status=PENDING,FAILED,
 // POST …/{id}/confirm/ | mark-failed/ | retry/). Khớp contract THỰC TẾ ở 03-dev-notes.md "Lô L9 — S14, S15, S16 (BE)".
 
 export type RefundQueueStatus = "PENDING" | "REFUNDED" | "FAILED";
-/** Thao tác một phiếu hoàn làm được ở trạng thái hiện tại — BE tính cả luật lẫn quyền (chỉ Chủ có confirm_refund;
+/** Thao tác một phiếu hoàn tiền làm được ở trạng thái hiện tại — BE tính cả luật lẫn quyền (chỉ Chủ có confirm_refund;
  * Quản lý xem được danh sách nhưng `available_actions` luôn rỗng). */
-/** Bộ lọc danh sách phiếu hoàn (Lô 3 R3): `status` nhiều giá trị cách dấu phẩy; `month` = YYYY-MM theo giờ Việt Nam. */
+/** Bộ lọc danh sách phiếu hoàn tiền (Lô 3 R3): `status` nhiều giá trị cách dấu phẩy; `month` = YYYY-MM theo giờ Việt Nam. */
 export type RefundListParams = { status: string; month: string };
 
 export type RefundQueueAction = "confirm" | "mark_failed" | "retry" | string;

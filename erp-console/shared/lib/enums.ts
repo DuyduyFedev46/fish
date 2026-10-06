@@ -24,16 +24,16 @@ export const ENUMS = {
     PROCESSING: e("Đang xử lý", "info"),
     COMPLETED: e("Hoàn tất", "good"),
     CANCELLED: e("Đã huỷ"),
-    AUTO_CANCELLED: e("Đã huỷ"), // ⚑ lý do (hết giờ giữ chỗ) ở cột riêng
+    AUTO_CANCELLED: e("Hết giờ giữ chỗ"), // T2 (Q-2): chip riêng; nhóm lọc "Đã huỷ" vẫn gộp cả hai
   },
   salesInvoiceStatus: {
     ISSUED: e("Đã xuất", "good"),
     CANCELLED: e("Đã huỷ"),
   },
   paymentMatchStatus: {
-    MATCHED: e("Khớp", "good"),
-    UNDERPAID: e("Thiếu tiền", "warn"),
-    ORPHAN: e("Về sau khi đơn tự huỷ", "warn"),
+    MATCHED: e("Khớp đơn", "good"),
+    UNDERPAID: e("Chuyển thiếu", "warn"),
+    ORPHAN: e("Về sau khi đơn đã huỷ", "warn"),
     UNMATCHED: e("Không khớp đơn", "crit"),
     OVERPAID: e("Chuyển thừa", "warn"),
   },
@@ -47,33 +47,39 @@ export const ENUMS = {
     REFUNDED: e("Đã hoàn tiền", "info"),
   },
   paymentSource: {
-    WEBHOOK: e("Webhook SePay"),
+    WEBHOOK: e("Ngân hàng báo"),
     MANUAL: e("Xác nhận tay"),
     GATEWAY: e("Cổng SePay"),
   },
+  paymentEnvironment: {
+    SANDBOX: e("Chạy thử"),
+    PRODUCTION: e("Chạy thật"),
+  },
   cancelReason: {
     CUSTOMER_CHANGED_MIND: e("Khách đổi ý"),
-    DAMAGED_WHEN_PACKING: e("Hư khi đóng hàng"),
-    GIVE_UP_AFTER_FAILED: e("Bỏ sau khi giao thất bại"),
-    OTHER: e("Khác"),
+    DAMAGED_WHEN_PACKING: e("Hàng hư lúc soạn hàng"),
+    GIVE_UP_AFTER_FAILED: e("Giao thất bại, không giao lại"),
+    UNREACHABLE: e("Không liên lạc được khách"),
+    OTHER: e("Lý do khác"),
+    UNREACHABLE_AUTO: e("Hệ thống tự huỷ: không liên lạc được khách"),
   },
   refundMethod: {
     MANUAL_TRANSFER: e("Chuyển khoản tay"),
-    GATEWAY: e("Qua cổng"),
+    GATEWAY: e("Qua cổng SePay"),
   },
   refundStatus: {
-    PENDING: e("Chờ hoàn", "warn"),
-    REFUNDED: e("Đã hoàn", "good"),
-    FAILED: e("Thất bại", "crit"),
+    PENDING: e("Chờ hoàn tiền", "warn"),
+    REFUNDED: e("Đã hoàn tiền", "good"),
+    FAILED: e("Hoàn thất bại", "crit"),
   },
 
   // ---- delivery ----
   deliveryStatus: {
-    CONFIRMING: e("Chờ xác nhận", "warn"),
-    PREPARING: e("Soạn hàng", "info"),
+    CONFIRMING: e("Chờ gọi xác nhận", "warn"),
+    PREPARING: e("Đang soạn hàng", "info"),
     READY: e("Chờ lấy hàng", "info"),
     DELIVERING: e("Đang giao", "info"),
-    COMPLETED: e("Hoàn tất", "good"),
+    COMPLETED: e("Đã giao", "good"),
     FAILED: e("Giao thất bại", "crit"),
     CANCELLED: e("Đã huỷ theo đơn"),
   },
@@ -100,17 +106,21 @@ export const ENUMS = {
     CALLBACK: e("Hẹn gọi lại", "info"),
     ESCALATED: e("Cần quyết định", "crit"),
     REFUND_CALL: e("Gọi báo hoàn tiền", "warn"),
-    DONE: e("Hoàn tất", "good"),
+    DONE: e("Đã xong", "good"),
+  },
+  /** T39: tab của hàng chờ gọi. */
+  confirmQueueTab: {
+    DEFAULT: e("Đến giờ gọi"),
   },
   confirmEscalationReason: {
     UNREACHABLE: e("Không nghe máy"),
-    WRONG_NUMBER: e("Sai số"),
-    WANT_CANCEL: e("Khách muốn huỷ"),
-    WANT_CHANGE: e("Khách muốn đổi"),
+    WRONG_NUMBER: e("Sai số điện thoại"),
+    WANT_CANCEL: e("Khách muốn huỷ đơn"),
+    WANT_CHANGE: e("Khách muốn đổi món"),
   },
   confirmCallResult: {
     CONFIRMED: e("Đã xác nhận", "good"),
-    CONFIRMED_CHANGED: e("Đã xác nhận, có đổi", "good"),
+    CONFIRMED_CHANGED: e("Đã xác nhận, có đổi thông tin", "good"),
     UNREACHABLE: e("Không nghe máy", "warn"),
     WRONG_NUMBER: e("Sai số điện thoại", "crit"),
     CALLBACK: e("Hẹn gọi lại", "info"),
@@ -120,8 +130,8 @@ export const ENUMS = {
   },
   /** Quyết định đơn chưa xác nhận được. */
   unconfirmedDecision: {
-    DELIVER_WITHOUT_CONFIRM: e("Giao không xác nhận"),
-    EXTEND: e("Gia hạn thêm"),
+    DELIVER_WITHOUT_CONFIRM: e("Bỏ qua gọi xác nhận"),
+    EXTEND: e("Gia hạn gọi"),
     CANCEL: e("Huỷ đơn"),
   },
 
@@ -140,7 +150,7 @@ export const ENUMS = {
     SALE: e("Bán ra", "info"),
     RETURN_RESTOCK: e("Hàng hoàn tái nhập", "good"),
     RECONCILE: e("Điều chỉnh kiểm kê", "info"),
-    WRITE_OFF: e("Ghi lỗ, huỷ hàng", "warn"), // ⚑
+    WRITE_OFF: e("Huỷ hàng, ghi lỗ", "warn"), // T44
     CANCEL_RESTORE: e("Hoàn kho do huỷ đơn"),
     SUPPLIER_RETURN: e("Trả nhà cung cấp"),
   },
@@ -161,7 +171,7 @@ export const ENUMS = {
   returnToStockDecision: {
     PENDING: e("Chờ quyết định", "warn"),
     RESTOCK: e("Tái nhập", "good"),
-    WRITE_OFF: e("Huỷ bỏ, ghi lỗ", "warn"), // ⚑
+    WRITE_OFF: e("Huỷ hàng, ghi lỗ", "warn"), // T45
   },
   warehouseKind: {
     true: e("Nhóm kho"),
@@ -208,7 +218,7 @@ export const ENUMS = {
     false: e("Đang ẩn"),
   },
   pricingRuleActive: {
-    true: e("Đang bật", "good"),
+    true: e("Đang áp dụng", "good"),
     false: e("Đã tắt"),
   },
   pricingRuleApplyOn: {
@@ -236,23 +246,23 @@ export const ENUMS = {
     ai: e("AI", "info"),
   },
   entryPageRole: {
-    privacy: e("Bảo mật"),
-    terms: e("Điều kiện giao dịch"),
-    refund: e("Đổi trả hoàn tiền"),
+    privacy: e("Chính sách bảo mật"),
+    terms: e("Điều kiện giao dịch chung"),
+    refund: e("Chính sách đổi trả và hoàn tiền"),
     seller_info: e("Thông tin người bán"),
   },
   entryReturnReason: {
-    missing_info: e("Thiếu thông tin, hình ảnh"),
-    wrong_content: e("Nội dung chưa chuẩn, cần sửa"),
-    legal_risk: e("Rủi ro pháp lý, bản quyền"),
-    other: e("Khác"),
+    missing_info: e("Thiếu thông tin hoặc hình ảnh"),
+    wrong_content: e("Nội dung chưa chuẩn"),
+    legal_risk: e("Rủi ro pháp lý hoặc bản quyền"),
+    other: e("Lý do khác"),
   },
   entryUnpublishReason: {
     wrong_price: e("Giá chưa đúng"),
-    complaint: e("Khiếu nại, rủi ro pháp lý"),
+    complaint: e("Khiếu nại hoặc rủi ro pháp lý"),
     out_of_season: e("Hết mùa vụ"),
     wrong_content: e("Nội dung chưa chuẩn"),
-    other: e("Khác"),
+    other: e("Lý do khác"),
   },
   categoryActive: {
     true: e("Đang hoạt động", "good"),

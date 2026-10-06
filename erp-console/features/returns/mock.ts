@@ -1,4 +1,4 @@
-// Mock module Hàng hoàn về kho (ED-26) — CHỈ dùng khi NEXT_PUBLIC_USE_MOCK=1 (bản build thật loại bỏ file này).
+// Mock module Hàng hoàn (ED-26) — CHỈ dùng khi NEXT_PUBLIC_USE_MOCK=1 (bản build thật loại bỏ file này).
 // Dựng JSON theo contract THỰC TẾ BE Lô 9 / R9 (backend/apps/inventory/returns):
 //   GET   /api/inventory/returns/?status=&month=&page=   GET /{id}/   POST /   POST /{id}/approve/   POST /{id}/cancel/   POST /{id}/delete/
 //   GET   /api/guidance/return/{id}/
@@ -29,6 +29,7 @@ import { MOCK_UNAUTHORIZED, mockRequireUser } from "@/features/auth/mock";
 import type { Me } from "@/features/auth/types";
 import type { GuidanceData, GuidanceTimelineEntry } from "@/features/guidance/types";
 import type { MockRequest, MockResponse, Paginated } from "@/shared/lib/http";
+import { ENUMS, enumLabel } from "@/shared/lib/enums";
 import { kg } from "@/shared/lib/format";
 import { registerDeliveryLineExtras } from "@/features/deliveries/mock";
 import { ROLE } from "@/shared/lib/roles";
@@ -128,11 +129,11 @@ function make(
 }
 
 function statusLabel(s: ReturnItem["status"]): string {
-  return s === "DRAFT" ? "Chờ duyệt" : s === "APPROVED" ? "Đã duyệt" : "Đã huỷ";
+  return enumLabel(ENUMS.returnToStockStatus, s);
 }
 
 function decisionLabel(d: string): string {
-  return d === "RESTOCK" ? "Tái nhập" : d === "WRITE_OFF" ? "Huỷ bỏ, ghi lỗ" : "Chờ quyết định";
+  return enumLabel(ENUMS.returnToStockDecision, d);
 }
 
 /** Kg "máy khác" đã hoàn thêm cho một phiếu giao mà danh sách này không có (chỉ để e2e thử lỗi vượt kg do người khác nhập trước). */
@@ -286,7 +287,7 @@ function approveResponse(me: Me, id: number, req: MockRequest): MockResponse {
   const r = db().find((x) => x.id === id);
   if (!r || !inScope(me, r)) return NOT_FOUND;
   const decision = bodyOf(req).decision;
-  if (decision !== "RESTOCK" && decision !== "WRITE_OFF") return err(400, "RETURN_DECISION_REQUIRED", "Phải chọn Tái nhập hoặc Huỷ bỏ trước khi duyệt (BR-HV-02).");
+  if (decision !== "RESTOCK" && decision !== "WRITE_OFF") return err(400, "RETURN_DECISION_REQUIRED", "Phải chọn Tái nhập hoặc Huỷ hàng, ghi lỗ trước khi duyệt (BR-HV-02).");
   if (r.status !== "DRAFT") return err(409, "STALE_STATE", "Phiếu hàng hoàn đã được duyệt, hãy tải lại.");
   r.status = "APPROVED";
   r.status_label = "Đã duyệt";
@@ -324,7 +325,7 @@ function timelineResponse(me: Me, id: number): MockResponse {
     entries.push({
       at: new Date(Date.parse(r.created_at) + 20 * 60_000).toISOString(),
       kind: "return_approved",
-      label: r.decision === "WRITE_OFF" ? "Duyệt huỷ bỏ, ghi lỗ" : "Duyệt tái nhập vào lô",
+      label: r.decision === "WRITE_OFF" ? "Duyệt huỷ hàng, ghi lỗ" : "Duyệt tái nhập vào lô",
       doc: "return",
       actor: { kind: "user", display: r.approved_by_name || "Quản lý" },
     });
@@ -387,7 +388,7 @@ if (process.env.NEXT_PUBLIC_USE_MOCK === "1" && typeof window !== "undefined") {
     ...(w.__caveMock || {}),
     returns: (m: Mode) => {
       window.localStorage.setItem(MODE_KEY, m);
-      return `Hàng hoàn về kho (mock): chế độ ${m}`;
+      return `Hàng hoàn (mock): chế độ ${m}`;
     },
     returnsAddHidden: (noteId: number, qty: number) => {
       HIDDEN_RETURNED[noteId] = (HIDDEN_RETURNED[noteId] ?? 0) + qty;

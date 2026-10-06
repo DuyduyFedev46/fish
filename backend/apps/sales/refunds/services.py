@@ -38,7 +38,7 @@ DUPLICATE_WARNING_CODE = "PAYMENT_DUPLICATE_WARNING"  # BR-TT-18: giao dịch c�
 REFUND_STATUS_CODE = "BR-HT-09"  # S16: phiếu hoàn sai trạng thái để đổi (confirm/mark-failed/retry)
 REFUND_AMOUNT_INVALID_MSG = "Số tiền hoàn phải lớn hơn 0."
 REFUND_AMOUNT_MIN_MSG = "Số tiền hoàn tối thiểu 1 ₫."
-REFUND_ALREADY_REFUNDED_MSG = "Phiếu đã hoàn, không đổi trạng thái được."
+REFUND_ALREADY_REFUNDED_MSG = "Phiếu đã hoàn tiền, không đổi trạng thái được."
 
 
 def parse_refund_amount(raw):
@@ -78,7 +78,7 @@ def find_duplicate(*, request_id, invoice=None, payment=None):
         or (payment is not None and existing.payment_transaction_id == payment.pk)
     )
     if not same:
-        raise BusinessError("request_id đã dùng cho phiếu hoàn khác.", code=REFUND_SOURCE_CODE)
+        raise BusinessError("request_id đã dùng cho phiếu hoàn tiền khác.", code=REFUND_SOURCE_CODE)
     return existing
 
 
@@ -109,10 +109,10 @@ def create_refund_for_payment(*, payment, amount, reason, actor, is_partial=None
         if dup is not None:
             return dup, True
         if p.resolution_status == PaymentTransaction.ResolutionStatus.RESOLVED:
-            raise BusinessError("Giao dịch đã được xử lý, không lập phiếu hoàn.", code="BR-TT-09")
+            raise BusinessError("Giao dịch đã được xử lý, không lập phiếu hoàn tiền.", code="BR-TT-09")
         if p.resolution_status != PaymentTransaction.ResolutionStatus.OPEN:
             raise BusinessError(
-                "Giao dịch đã khớp hoá đơn — lập phiếu hoàn từ hoá đơn.", code=REFUND_SOURCE_CODE
+                "Giao dịch đã khớp hoá đơn — lập phiếu hoàn tiền từ hoá đơn.", code=REFUND_SOURCE_CODE
             )
         if p.duplicate_warning and not acknowledge_duplicate_warning:
             raise ConflictError(p.duplicate_warning, code=DUPLICATE_WARNING_CODE)
@@ -250,7 +250,7 @@ def mark_refund_failed(*, refund, reason, actor):
         _block_if_already_refunded(r)
         if r.status != Refund.Status.PENDING:
             raise BusinessError(
-                "Chỉ báo thất bại được khi phiếu đang Chờ hoàn.", code=REFUND_STATUS_CODE,
+                "Chỉ báo thất bại được khi phiếu đang Chờ hoàn tiền.", code=REFUND_STATUS_CODE,
             )
         old_status = r.status
         r.status = Refund.Status.FAILED
@@ -275,7 +275,7 @@ def retry_refund(*, refund, actor):
         _block_if_already_refunded(r)
         if r.status != Refund.Status.FAILED:
             raise BusinessError(
-                "Chỉ thử lại được khi phiếu đang Thất bại.", code=REFUND_STATUS_CODE,
+                "Chỉ thử lại được khi phiếu đang Hoàn thất bại.", code=REFUND_STATUS_CODE,
             )
         if r.sales_invoice_id:
             remaining = refundable_amount(invoice=r.sales_invoice)
