@@ -36,6 +36,7 @@ from apps.catalog.pricing.api import ItemPriceViewSet, PriceListViewSet, Pricing
 from apps.delivery.api import DeliverersView, DeliveryNoteViewSet
 from apps.delivery.attention_api import DashboardAttentionView
 from apps.delivery.confirmation.api import ConfirmationQueueViewSet, CustomerSearchView
+from apps.delivery.confirmation.scripts_api import CallScriptViewSet
 from apps.inventory.batches.api import BatchViewSet
 from apps.inventory.returns.api import ReturnToStockViewSet
 from apps.inventory.stock.api import StockEntryViewSet, StockLedgerEntryViewSet, WarehouseViewSet
@@ -86,6 +87,7 @@ router.register("delivery/notes", DeliveryNoteViewSet)
 # confirmation — hàng đợi gọi xác nhận đơn. Tiền tố `/api/confirmation/` nằm trong FORBIDDEN_PREFIXES của AI (P8b Lô 3, R1);
 # tiền tố cũ `/api/cskh/` đã gỡ ở Lô 5 nhưng vẫn giữ trong FORBIDDEN_PREFIXES vĩnh viễn.
 router.register("confirmation/queue", ConfirmationQueueViewSet, basename="confirmation-queue")
+router.register("confirmation/scripts", CallScriptViewSet, basename="confirmation-scripts")
 # accounts — quản lý nhân viên (S41, S42)
 router.register("staff", StaffViewSet, basename="staff")
 # AI Actions — Việc AI (DW-11)

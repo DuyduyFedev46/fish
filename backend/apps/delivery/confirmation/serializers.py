@@ -289,6 +289,15 @@ class ConfirmationQueueDetailSerializer(ConfirmationQueueItemSerializer):
 
         data["available_actions"] = actions
 
+        # Kịch bản gọi (CS-18): chỉ kèm khi có quyền xem; không chứa dữ liệu cá nhân.
+        scripts = []
+        if user and user.is_authenticated and user.has_perm("delivery.view_callscript"):
+            from apps.delivery.confirmation.call_scripts import scripts_for_note
+            from apps.delivery.confirmation.scripts_api import serialize_script
+
+            scripts = [serialize_script(sc, with_state=False) for sc in scripts_for_note(obj.note)]
+        data["scripts"] = scripts
+
         # Guidance
         if obj.state == ConfirmationTask.State.REFUND_CALL:
             data["guidance"] = (
