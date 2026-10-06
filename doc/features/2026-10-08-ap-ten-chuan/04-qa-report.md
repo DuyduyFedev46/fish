@@ -128,3 +128,27 @@ Các bài kiểm BE hiện chỉ khoá `choices`/`verbose_name`, nên không b�
 | So 28 endpoint main vs nhánh | chỉ khác khoá phụ `auto_cancel_blocked_label` |
 
 Dọn dẹp: đã tắt runserver (8765, 8766) và 2 máy chủ tĩnh theo PID của QA; xoá DB tạm, `out/`, `.next/`, symlink `backend/.env`, `backend/staticfiles`.
+
+## QA lại sau bf0acf6 (lần 2)
+
+Chạy lại trên BE thật (runserver từ worktree, SQLite tạm, `migrate` từ trống, dữ liệu giả; ERP và Shop build `USE_MOCK=0`). Mọi thao tác dưới đây bấm thật trên màn bằng Playwright, vai `loc`.
+
+### Kết luận: APPROVED — B1–B4 và Low B-P7 đã sửa, không lỗi mới
+Tổng lần này: 14 ca · ✅ 14 · ❌ 0 · ⏸ 0.
+
+| Lỗi | Kết quả | Bằng chứng |
+|---|---|---|
+| B1 | ✅ | Hoàn tiền thật phiếu #6 (gắn khoản Chuyển thừa) bằng nút "Xác nhận đã hoàn tiền": chi tiết khoản 16 hiện "Phiếu hoàn tiền #6 · mã GD hoàn FTREFQA6"; khoản 14 (phiếu #2) hiện "Phiếu hoàn tiền #2 · …". Không còn "phiếu hoàn" trơn |
+| B2 phiếu hoàn tiền | ✅ | Hộp xác nhận: "Phiếu chuyển sang Đã hoàn tiền…" và toast "Đã xác nhận chuyển khoản hoàn tiền. Phiếu chuyển sang Đã hoàn tiền." (phiếu #1, #6). Báo chuyển thất bại: hộp "Phiếu chuyển sang Hoàn thất bại…", toast "…Phiếu chuyển sang Hoàn thất bại.", chip "Hoàn thất bại" (phiếu #4). Chuyển lại: hộp "Phiếu quay lại Chờ hoàn tiền…", toast "Phiếu quay lại Chờ hoàn tiền.", chip "Chờ hoàn tiền" |
+| B2 UnconfirmModal | ✅ | Việc gọi #6, "Huỷ xác nhận đơn": "Sau khi huỷ: Phiếu giao về Chờ gọi xác nhận, gọi lại khách" |
+| B2 giao xong | ✅ | Phiếu giao #7, bấm "Đã giao xong": toast "Đã giao xong. Đơn đã hoàn tất.", chip "Đã giao". Câu dự phòng ở `DeliveryDetailScreen.tsx:464` (khi đơn chưa hoàn tất) đã là "Phiếu chuyển sang Đã giao." (đọc mã nguồn, ⏸ về chạy thật vì cần đơn nhiều phiếu giao; cùng nguồn chữ) |
+| B3 | ✅ | Hộp "Đã giao xong": "Đã giao tận tay khách? Phiếu giao đã giao xong thì không sửa lại được." |
+| B4 lỗi API | ✅ | `retry` phiếu chờ: "Chỉ thử lại được khi phiếu đang Hoàn thất bại."; `confirm`/`mark-failed` phiếu đã hoàn: "Phiếu đã hoàn tiền, không đổi trạng thái được."; `approve` không chọn quyết định: "Phải chọn Tái nhập hoặc Huỷ hàng, ghi lỗ trước khi duyệt"; `confirmation/queue/abc/`: 404 "Việc gọi xác nhận không hợp lệ." |
+| B4 ledger | ✅ | `GET inventory/ledger/` `type_label` của WRITE_OFF = "Huỷ hàng, ghi lỗ" |
+| B-P7 | ✅ | `Permission.name` của `create_refund` sau `migrate` từ trống = "Lập phiếu hoàn tiền" |
+| e2e `standard_names_all_routes` BE thật | ✅ 36/36 | 73 route × 5 vai, nhóm A và B sạch, `/permissions/` sạch, Nhật ký W11, Shop 19/19 đơn (8 trạng thái, không mã thô) |
+| Quét API 232 cặp (endpoint × vai) | ✅ | Chỉ còn mã `BR-…` ở khoá `code` của guidance (khoá cấu trúc, không hiển thị) |
+| Console trình duyệt | ✅ | Không lỗi ở mọi luồng trên |
+
+Chạy lại: BE `manage.py test --parallel 4` 3267 OK (skipped=2) · `makemigrations --check --dry-run` sạch · `tsc --noEmit` 0 · vitest 97 file, 1183 test xanh · build ERP và Shop `USE_MOCK=0` 0 · `check-no-mock` XANH · `check-ai-chunks` XANH · `check_naming` OK.
+Giữ nguyên các quan sát Low cũ không thuộc B1–B4 (thanh bước "Soạn hàng", Shop "Chưa thanh toán" của đơn đã huỷ có sẵn trên main, 6 ca đỏ sẵn của `ed_batch9_returns`). Đã tắt server theo PID của QA, xoá DB tạm, `out/`, `.next/`, symlink.
