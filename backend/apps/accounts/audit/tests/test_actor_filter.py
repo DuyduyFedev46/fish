@@ -1,5 +1,5 @@
 """R16 (ERP theo design, 02b §3.8) — lọc nhật ký theo người làm: GET /api/audit-logs/?actor=<user id>."""
-from django.test import TestCase
+from django.test import TestCase, override_settings
 
 from apps.accounts import roles
 from apps.common.audit import record_audit
@@ -8,6 +8,7 @@ from apps.common.tests.fixtures import client_for, make_user
 URL = "/api/audit-logs/"
 
 
+@override_settings(AI_ENABLED=True)  # dòng AI chỉ hiện khi AI bật (TL-D3-L4)
 class AuditActorFilterTests(TestCase):
     def setUp(self):
         self.owner = make_user("owner1", roles.OWNER)

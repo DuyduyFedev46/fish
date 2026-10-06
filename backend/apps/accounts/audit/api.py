@@ -16,7 +16,7 @@ from apps.common.cost_keys import can_view_cost
 from apps.common.exceptions import BusinessError
 from apps.common.params import parse_positive_id
 
-from .serializers import audit_item
+from .serializers import audit_item, exclude_ai_rows
 
 VIEW_AUDITLOG_PERM = "accounts.view_auditlog"
 INVALID_FILTER = "INVALID_FILTER"
@@ -48,6 +48,7 @@ class AuditLogListView(APIView):
 
     def get(self, request):
         qs = AuditLog.objects.select_related("actor", "ai_actor").order_by("-created_at", "-id")
+        qs = exclude_ai_rows(qs)  # AI tắt -> ẩn dòng AI ở cả count và phân trang
         action = (request.query_params.get("action") or "").strip()
         actor_kind = (request.query_params.get("actor_kind") or "").strip()
         actor_id = _actor_filter(request)
