@@ -75,7 +75,7 @@ class DashboardIdsReasonTests(TestCase):
         self._cancelled_order("SO-D5", "OTHER", cancel_note=f"Khách gọi lại số {NOTE_PHONE}")
         response = client_for(self.owner).get(URL)
         self.assertNotIn(NOTE_PHONE, response.content.decode())
-        self.assertEqual(response.json()["recent_orders"][0]["reason"]["label"], "Khác")
+        self.assertEqual(response.json()["recent_orders"][0]["reason"]["label"], "Lý do khác")
 
     def test_tl15_dash_warehouse_staff_sees_no_cost_fields(self):
         data = self._get(self.warehouse_staff)
