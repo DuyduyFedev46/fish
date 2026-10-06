@@ -24,7 +24,6 @@ import type {
   VoidLabelResponse,
 } from "./types";
 
-
 export async function fetchDeliveryNotes(
   params: {
     status?: string;

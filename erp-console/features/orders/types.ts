@@ -145,7 +145,7 @@ export type OrderDetail = {
   delivery: OrderDelivery | null;
   refunds: OrderRefund[];
   /** W37 S5: tiền đã hoàn (REFUNDED) và đang chờ hoàn (PENDING). Phiếu FAILED không tính. Chuỗi Decimal. */
-  refund_summary: { refunded_amount: string; pending_amount: string };
+  refund_summary?: { refunded_amount: string; pending_amount: string };
   /** Có ở BE L7 bổ sung. Thiếu (BE cũ) → FE ghép tạm từ các mốc giờ sẵn có. */
   timeline?: OrderTimelineEntry[];
   available_actions: OrderAction[];
