@@ -12,7 +12,7 @@ L9 (S14): `cancel` nhận `{"reason_code", "note"}` (`CUSTOMER_CHANGED_MIND|DAMA
 OTHER bắt buộc `note`); chặn khi phiếu giao Đang giao (BR-GH-07) hoặc Hoàn tất (BR-GH-05). Hoàn kho lô gốc CHỈ khi hàng còn
 ở kho (Soạn hàng/Chờ lấy) — phiếu Giao thất bại thì KHÔNG hoàn kho (Q8b, tránh cộng kho hai lần với luồng duyệt hàng hoàn
 P-08). `available_actions.cancel` cũng ẩn theo cùng luật. `timeline` thêm `refund_failed`/`refund_retry` (S16).
-File chính: `services.py`, `shop_api.py`, `api.py`, `timeline.py`, `tasks.py`; `tests/base.py` là dữ liệu nền cho test payments/refunds.
+File chính: `services.py`, `completion.py` (W37: luật giao xong phiếu cuối thì đơn PROCESSING sang COMPLETED, khoá đơn rồi phiếu, AuditLog `complete_order` do Hệ thống ghi; BR-BH-18, BR-GH-24), `shop_api.py`, `api.py`, `timeline.py`, `tasks.py`; `tests/base.py` là dữ liệu nền cho test payments/refunds.
 
 P5 (BR-BH-15, Q6): `create_order` làm tròn `total_amount` về **SỐ NGUYÊN ĐỒNG** (half-up,
 `utils.money_vnd`) — dòng đơn (`SalesOrderLine.amount`) vẫn 2 chữ số thập phân như trước.
