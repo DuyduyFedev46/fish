@@ -143,3 +143,25 @@ có ở mọi vai xem được đơn (kể cả NV giao ngoài phạm vi, họ v
   S5-AC2 không phải xanh giả bằng so kỳ hiện tại phải ĐỔI số, kỳ cũ không đổi.
 - S7-AC8 và S5-AC8: đơn `COMPLETED` có `create_refund`, không có `cancel`; hết số còn hoàn thì mất `create_refund`.
 - S7-AC10: duyệt đệ quy JSON, không có `unit_cost`, `landed_unit_cost`, `purchase_rate`, `profit`, `pnl`, `cost`.
+
+## L3 BE (S7 dòng thời gian, S8 Shop) — nhánh `feat/w37-l3-be`
+
+### File
+- Sửa `backend/apps/sales/orders/timeline.py` (giữ nguyên bộ lọc dòng AI của lô dọn chữ AI).
+- Mới `backend/apps/sales/orders/tests/test_timeline_completed.py` (S7-AC6, AC7, AC9), `test_shop_lookup_completed.py` (S8-AC1..AC5, AC7).
+- `shop_api.py`, `shop_labels.py` **không sửa**: bảng nhãn đã đủ 7 dòng (COMPLETED = "Hoàn tất" / "Đã giao", CANCELLED = "Đã huỷ").
+- Không model, không migration.
+
+### Hành vi (BR-BH-18, UC-5)
+- Dòng AuditLog `complete_order` không có `backfill` cho ra tập `merged_note_ids` (từ `delivery_note_id`). Phiếu thuộc tập này:
+  mốc `delivered` đổi nhãn thành `"Đã giao — đơn hoàn tất ({mã phiếu})"`; kind giữ `delivered`. Dòng `complete_order` đó không thành mốc riêng.
+- Dòng `complete_order` có `backfill == "W37"`: mốc `order_completed`, nhãn "Hệ thống chuyển đơn sang Hoàn tất (chuyển bù)", người làm "Hệ thống".
+  Mốc giao cũ của đơn chuyển bù giữ nhãn "Giao hàng thành công ({mã phiếu})".
+- API chi tiết đơn không đổi khoá (`timeline[]` vẫn `at, kind, label, actor_display, doc?`). Nhãn chỉ có mã phiếu; test khoá không có SĐT, tên, địa chỉ, `changes` thô.
+- Shop: test khoá bảng 7 dòng, tập khoá phản hồi không đổi, 404 khi sai 4 số (không lộ trạng thái), 429 theo IP và theo mã đơn.
+
+### Kết quả
+`manage.py test`: 3228 test, OK (skipped=2). `makemigrations --check`: không đổi. `check_naming.py`: exit 0.
+
+### Nợ
+Không. Ghi chú T2 (nhãn phiếu huỷ Shop "Đã huỷ" theo T30, story S8 ghi "Đã huỷ theo đơn") vẫn chờ PO sửa dòng bảng story.

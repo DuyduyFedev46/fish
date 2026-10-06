@@ -5,7 +5,8 @@ Nguồn:
 - Chứng từ: chứng từ đảo doanh thu (`SalesCreditNote.issued_at`, BR-HT-10), đặt đơn (`SalesOrder.created_at`), giao dịch tiền (`PaymentTransaction.received_at`),
   hoá đơn (`SalesInvoice.issued_at`), tạo phiếu giao (`DeliveryNote.created_at`), phiếu hoàn
   (`Refund.created_at` / `confirmed_at`, người tạo / người xác nhận).
-- AuditLog (BR-PQ-04/05): `cancel_unpaid_expired`, `cancel_paid_order` (đơn);
+- AuditLog (BR-PQ-04/05): `cancel_unpaid_expired`, `cancel_paid_order` (đơn); `complete_order` (W37 S7: gộp vào mốc giao,
+  riêng dòng chuyển bù `backfill` thành mốc `order_completed`);
   `delivery_advance_status`, `delivery_mark_failed` (phiếu giao);
   `return_to_warehouse`, `approve_returntostock`, `cancel_returntostock` (hàng hoàn về kho, P-08);
   `confirm_payment_manual` chỉ dùng để lấy NGƯỜI xác nhận tay, không thành dòng riêng.
@@ -26,6 +27,7 @@ from apps.accounts.models import AuditLog
 from apps.common.ai_visibility import exclude_ai_audit_rows
 from apps.delivery.models import DeliveryNote
 from apps.inventory.models import ReturnToStock
+from apps.sales.orders.completion import BACKFILL_MARKER, COMPLETE_ORDER_ACTION
 from apps.sales.models import PaymentTransaction, Refund, SalesOrder
 from apps.sales.utils import kg_str
 from apps.common.formatting import format_vnd_ui
@@ -112,6 +114,13 @@ def build_timeline(order):
     refunds = sorted(invoice.refunds.all(), key=lambda r: r.pk) if invoice is not None else []
     refunds_by_id = {str(r.pk): r for r in refunds}
     audits = _audits(order, notes, returns, refunds)
+    # W37 S7 (BR-BH-18): phiếu làm đơn Hoàn tất qua đường giao xong (không phải chuyển bù) gộp vào mốc giao.
+    merged_note_ids = {
+        str((a.changes or {}).get("delivery_note_id"))
+        for a in audits
+        if a.model_name == ORDER_MODEL and a.action == COMPLETE_ORDER_ACTION
+        and not (a.changes or {}).get("backfill")
+    }
 
     manual_actor = {
         (a.changes or {}).get("bank_txn_id"): a.actor
@@ -153,7 +162,7 @@ def build_timeline(order):
         ))
 
     for a in audits:
-        event = _audit_event(a, notes_by_id, returns_by_id, refunds_by_id)
+        event = _audit_event(a, notes_by_id, returns_by_id, refunds_by_id, merged_note_ids)
         if event is not None:
             events.append(event)
 
@@ -190,7 +199,7 @@ def build_timeline(order):
     return sorted(events, key=lambda e: e.at)
 
 
-def _audit_event(a, notes_by_id, returns_by_id, refunds_by_id):
+def _audit_event(a, notes_by_id, returns_by_id, refunds_by_id, merged_note_ids=frozenset()):
     if a.actor_kind == AuditLog.ActorKind.AI:
         who = f"AI của {actor_display(a.ai_actor)}"
         kind_actor = "ai"
@@ -224,6 +233,13 @@ def _audit_event(a, notes_by_id, returns_by_id, refunds_by_id):
                 a.created_at, "cancelled", f"{label}{reason}", who,
                 doc="order", actor_kind=kind_actor, ai_level=ai_lvl, ai_config_version=ai_cfg,
             )
+        if a.action == COMPLETE_ORDER_ACTION:
+            if changes.get("backfill") != BACKFILL_MARKER:
+                return None  # đã gộp vào mốc "Đã giao — đơn hoàn tất"
+            return TimelineEvent(
+                a.created_at, "order_completed", "Hệ thống chuyển đơn sang Hoàn tất (chuyển bù)", SYSTEM,
+                doc="order", actor_kind="system",
+            )
         return None
     if a.model_name == NOTE_MODEL:
         note = notes_by_id.get(a.object_id)
@@ -232,8 +248,12 @@ def _audit_event(a, notes_by_id, returns_by_id, refunds_by_id):
             status = changes.get("status") or {}
             to = status.get("to")
             if to == DeliveryNote.Status.COMPLETED:
+                label = (
+                    f"Đã giao — đơn hoàn tất ({code})" if a.object_id in merged_note_ids
+                    else f"Giao hàng thành công ({code})"
+                )
                 return TimelineEvent(
-                    a.created_at, "delivered", f"Giao hàng thành công ({code})", who,
+                    a.created_at, "delivered", label, who,
                     doc="delivery", actor_kind=kind_actor, ai_level=ai_lvl, ai_config_version=ai_cfg,
                 )
             return TimelineEvent(
