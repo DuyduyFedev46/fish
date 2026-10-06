@@ -3,6 +3,7 @@
 // Chỉ VẼ, nhận props — không gọi API, không import runtime AI (để chunk màn nghiệp vụ không chứa code AI, BR-AI-17).
 // Dữ liệu thật do features/ai/components/AiDocBlock nạp. Không bao giờ truyền dữ liệu cá nhân của khách vào đây.
 import { Icon } from "../Icon";
+import { AI_FEATURES_ENABLED } from "@/shared/lib/features";
 import { dateTime } from "@/shared/lib/format";
 import { Section } from "./Section";
 import s from "./AiBlockFrame.module.css";
@@ -59,6 +60,7 @@ type Props = {
 };
 
 export function AiBlockFrame({ proposals, busyId = null, error, onReject, onConfirm, chat, starter, keepStarter = false, loading = false, onRetry }: Props) {
+  if (!AI_FEATURES_ENABLED) return null; // SR-HIDE-AI-01
   return (
     <Section
       aria-label="Trợ lý AI"

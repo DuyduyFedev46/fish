@@ -11,6 +11,8 @@ export default defineConfig({
   oxc: { jsx: { runtime: "automatic" } },
   test: {
     environment: "node",
+    // Các test AI có sẵn kiểm giao diện AI đang bật; test của trạng thái tắt mock `@/shared/lib/features` (SR-HIDE-AI-01).
+    env: { NEXT_PUBLIC_AI_FEATURES: "1" },
   },
 });
 

@@ -7,6 +7,7 @@
 // Không được để chuỗi runtime nặng xuất hiện trong file này (check-ai-chunks).
 
 import { useEffect, useState } from "react";
+import { AI_FEATURES_ENABLED } from "@/shared/lib/features";
 import { getAiStatus } from "../api";
 import { releaseAiEnabled } from "../gate-state";
 import type { AiStatus } from "../types";
@@ -25,6 +26,8 @@ export function AiDocBlockGate({ targetModel, targetId, onApplied }: Props) {
   const [status, setStatus] = useState<AiStatus | null>(null);
 
   useEffect(() => {
+    // Cờ AI tắt (SR-HIDE-AI-01): không gọi /api/ai/status/.
+    if (!AI_FEATURES_ENABLED) return;
     const ctrl = new AbortController();
     // Chủ riêng của trang này: rời trang thì nhả cờ, không để "AI bật" dính sang trang khác (L2).
     const owner = Symbol("ai-doc-block");
@@ -39,6 +42,6 @@ export function AiDocBlockGate({ targetModel, targetId, onApplied }: Props) {
     };
   }, []);
 
-  if (!status?.ai_enabled) return null;
+  if (!AI_FEATURES_ENABLED || !status?.ai_enabled) return null;
   return <AiDocBlock status={status} targetModel={targetModel} targetId={String(targetId)} onApplied={onApplied} />;
 }
