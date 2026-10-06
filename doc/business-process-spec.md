@@ -316,15 +316,21 @@ Khách **không phải là `User`** trong hệ thống — không có tài kho�
 stateDiagram-v2
     [*] --> GiuCho: Khách đặt, giữ kg trong lô
     GiuCho --> TuHuy: quá 30' không có tiền (hệ thống)
-    GiuCho --> DaThanhToan: webhook xác nhận đủ tiền
-    DaThanhToan --> DangXuLy: trừ kho thật + ghi doanh thu
-    DangXuLy --> HoanTat: Delivery Note hoàn tất
+    GiuCho --> DangXuLy: tiền về đủ — xuất hoá đơn, trừ kho, ghi doanh thu (một bước)
+    DangXuLy --> HoanTat: phiếu giao cuối cùng Hoàn tất (Hệ thống, BR-BH-18)
     DangXuLy --> DaHuy: cancel_paid_order (P-07)
-    DaThanhToan --> DaHuy: cancel_paid_order (P-07)
     TuHuy --> [*]
     DaHuy --> [*]
     HoanTat --> [*]
 ```
+Trạng thái `PAID` (Đã thanh toán) giữ trong DB nhưng không dùng ở V1 (BR-BH-21). Bước con của Đang xử lý (chờ gọi xác nhận, soạn, giao) đọc từ phiếu giao. *(sửa 2026-10-08, W37, Duy duyệt 07/10)*
+
+| Mã | Luật |
+|---|---|
+| BR-BH-18 | **(D + PA) 2026-10-07** — Đơn `PROCESSING` sang **Hoàn tất** khi mọi phiếu giao chưa huỷ của hoá đơn đều đã Hoàn tất, và có ít nhất một phiếu Hoàn tất. Hệ thống chuyển trong **cùng giao dịch** với thao tác làm phiếu cuối cùng sang Hoàn tất. Đơn đã huỷ không bao giờ sang Hoàn tất, và phiếu của đơn đã huỷ không sang Hoàn tất được (BR-GH-24). Không ai bấm tay "Hoàn tất đơn". Bước chuyển ghi AuditLog `complete_order`, người làm là Hệ thống, kèm mã phiếu giao gây ra; không chép dữ liệu cá nhân. *(D: cạnh này đã có ở §7.2; PA: điều kiện nhiều phiếu, cùng giao dịch. W37, Duy duyệt 07/10)* |
+| BR-BH-19 | **(D + PA) 2026-10-07** — V1 trả trước 100%, nên điều kiện "đã thu đủ tiền" được bảo đảm từ lúc có hoá đơn. Hoàn tất **không** xét lại tiền và không xét phiếu hoàn đang chờ. *(D: decisions 26/09. W37, Duy duyệt 07/10)* |
+| BR-BH-20 | **(PA) 2026-10-07** — Đơn Hoàn tất vẫn lập phiếu hoàn được (một phần hoặc toàn phần), trạng thái đơn **không đổi** vì hoàn tiền. Huỷ đơn Hoàn tất bị chặn (BR-GH-05). *(theo BR-GH-05, BR-HT-01. W37, Duy duyệt 07/10)* |
+| BR-BH-21 | **(PA) 2026-10-07** — Trạng thái `PAID` "Đã thanh toán" **không dùng** ở V1. Thanh toán đủ, xuất hoá đơn và trừ kho là một bước, đơn sang thẳng "Đang xử lý". Bước con (chờ gọi xác nhận, soạn, giao) đọc từ phiếu giao. Giữ mã trong DB, không xoá, ẩn khỏi bộ lọc và thanh bước. *(W37, Duy duyệt 07/10; thay hai cạnh qua `DaThanhToan` của sơ đồ cũ)* |
 
 ## 7.3 Giữ chỗ, tồn hiển thị, tranh lô cuối *(PA)*
 | Mã | Luật |
@@ -377,6 +383,7 @@ stateDiagram-v2
 | BR-GH-04 | "Giao thất bại" là **trạng thái tạm**, đếm số lần thử. Sau 2 lần thất bại hệ thống nhắc Quản lý/Chủ quyết định *(PA — ngưỡng cấu hình được)*. |
 | BR-GH-05 | Chuyển sang **Hoàn tất** là điểm không quay lui. Muốn xử lý sau đó phải qua phiếu hoàn tiền. |
 | BR-GH-06 | `delivery_staff` chỉ thấy và chỉ sửa được **trạng thái** của phiếu được gán cho mình — không sửa dòng hàng, không xem giá vốn (1.6). |
+| BR-GH-24 | **(PA)** — Một phiếu giao chỉ có **một kết cục**. Hoàn tất, Giao thất bại và Huỷ phải xét trạng thái **mới nhất** lúc ghi; thao tác đến sau bị từ chối, **không ghi đè**. Phiếu đã huỷ, hoặc phiếu của đơn đã huỷ, thì bắt đầu giao, giao xong hay báo thất bại đều bị từ chối (400, "Đơn đã huỷ — mang hàng về kho."). *(W37, 2026-10-08: ghi phần "không ghi đè" mà BR-BH-18 cần. Phần huỷ đơn khi phiếu đang giao vẫn **CHỜ DUYỆT** ở hồ sơ riêng `doc/features/2026-10-01-huy-don-dang-giao/`, chưa thuộc spec.)* |
 
 ---
 
@@ -474,6 +481,7 @@ Cả hai báo cáo nằm sau `view_profitreport` — mặc định chỉ Chủ (
 | BR-BC-03 | Hoàn tiền ghi vào **kỳ phát sinh hoàn**, không sửa ngược kỳ đã qua. Chứng từ đảo doanh thu ghi vào kỳ lập chứng từ (BR-HT-06). |
 | BR-BC-04 | Lãi/lỗ theo lô = doanh thu bán từ lô − (giá mua + chi phí phân bổ − tiền NCC hoàn). Tổng chi phí lô = giá mua + chi phí phân bổ − tiền NCC hoàn (BR-MH-08); kg trả NCC hiện riêng, không lẫn hao hụt/huỷ *(bổ sung 2026-09-30, Duy duyệt 30/09)*. Doanh thu (và số kg đã bán) = phân bổ lô của hoá đơn **chưa huỷ** **trừ** dòng chứng từ đảo doanh thu của lô *(sửa 2026-09-30, Duy duyệt 30/09)*; lô đã chốt: chỉ trừ chứng từ lập trước thời điểm chốt *(Duy quyết 30/09)*; kg hoàn về kho rồi bán lại chỉ tính một lần *(hoá đơn đã huỷ vẫn không tính — sửa 2026-09-28, Duy duyệt)*. Giá mua = `purchase_rate` × số kg nhập. Hao hụt (kiểm kê âm) và hàng hỏng (hàng hoàn đã duyệt Huỷ bỏ) **hiển thị riêng** số kg và giá trị (kg × `landed_unit_cost` **hiện hành**, không dùng số ảnh chụp trên đơn) để biết mất bao nhiêu, **không cộng vào tổng chi phí** vì số kg đó đã nằm trong giá mua; phần mất làm giảm lãi qua việc không có doanh thu (BR-KK-03). Ví dụ: nhập 100 kg × 100.000đ, bán 90 kg × 150.000đ, hao 10 kg → lãi 3.500.000đ. *(D — sửa 2026-09-28, Duy duyệt, lý do: công thức cũ "giá mua + chi phí phân bổ + hao hụt + hàng hỏng" tính hai lần hao hụt/hỏng.)* |
 | BR-BC-05 | Lô chưa chốt phải hiển thị nhãn **"tạm tính"** — nếu không, Lộc sẽ đọc số chưa đủ chi phí như số cuối cùng. |
+| BR-BC-06 | **(D) 2026-10-07** — Trạng thái đơn **không** là nguồn của số tiền. Doanh thu, giá vốn, hoàn tiền tính theo hoá đơn, chứng từ đảo, phiếu hoàn và thời điểm của chúng (BR-BC-01..03). Đổi trạng thái đơn, kể cả chuyển bù, không làm đổi số kỳ nào. *(theo BR-BC-01..03 và quyết định "không sửa kỳ cũ". W37, Duy duyệt 07/10)* |
 
 ---
 
@@ -545,3 +553,6 @@ Trường **mới** đáng chú ý: `Item.item_type`, `Batch.status`, `Batch.lan
 
 ---
 *Tài liệu liên quan: `URD.md` (Level 0 — yêu cầu), `ecosystem-l1.md` (Level 1 — hệ sinh thái), `doctype-mapping.md` (Level 2 — ⚠ lỗi thời), `decisions.md` (nhật ký quyết định).*
+
+**Nhật ký thay đổi**
+- 08/10/2026 — W37 S9 (Duy duyệt 07/10): thay sơ đồ §7.2 (bỏ `DaThanhToan`, Hoàn tất do Hệ thống chuyển khi phiếu cuối giao xong); thêm BR-BH-18..21 (§7.2), BR-BC-06 (§12.2), BR-GH-24 phần "không ghi đè" (§8). Hồ sơ: `doc/features/2026-10-06-don-hoan-tat/`.
