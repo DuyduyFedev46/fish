@@ -218,3 +218,33 @@ class LabelPrint(models.Model):
 
     def __str__(self):
         return f"Lượt in #{self.print_no} cho {self.note.code}"
+
+
+class CallScript(models.Model):
+    """
+    Kịch bản gọi soạn sẵn theo tình huống (CS-18, 02b §2.6). Không AI, không chứa dữ liệu cá nhân của khách
+    (service chặn chuỗi số dài, BR-GH-19). Không xoá: tắt bằng `is_active`.
+    """
+
+    class Situation(models.TextChoices):
+        FIRST_ORDER = "FIRST_ORDER", "Khách mua lần đầu"
+        RETURNING = "RETURNING", "Khách quen"
+        COMBO = "COMBO", "Đơn có combo"
+        GENERAL = "GENERAL", "Lời dặn chung"
+
+    situation = models.CharField("Tình huống", max_length=16, choices=Situation.choices, unique=True)
+    content = models.TextField("Nội dung", max_length=2000)
+    is_active = models.BooleanField("Đang dùng", default=True)
+    updated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="+", verbose_name="Người sửa cuối"
+    )
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Kịch bản gọi"
+        verbose_name_plural = "Kịch bản gọi"
+        default_permissions = ("view", "add", "change")
+        ordering = ["situation"]
+
+    def __str__(self):
+        return f"Kịch bản {self.situation}"

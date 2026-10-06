@@ -44,6 +44,7 @@
   "delivery.deliverynote.assign",
   "delivery.deliverynote.create",
   "delivery.deliverynote.list",
+  "delivery.deliverynote.lookup",
   "delivery.deliverynote.partial_update",
   "delivery.deliverynote.retrieve",
   "delivery.deliverynote.set_status",
