@@ -115,3 +115,47 @@ Mock `STALE_STATE` của `status/` trả 409, còn BE trả 400 (02b §2.3). Vô
 ### Gộp nhánh
 `03-dev-notes.md` và `03b-review-techlead.md` đều được tạo mới trên cả `feat/w37-l1-be` lẫn `feat/w37-l1-fe`, nên gộp sẽ xung
 đột cả file. Cách xử lý: giữ cả hai mục (L1 BE trước, L1 FE sau), không ghi đè mục nào.
+
+## Review L2 + L4 BE (08/10)
+
+**Phạm vi:** nhánh `feat/w37-l2-l4-be`, hai commit `b2f5042` (L4, S3) và `3678db9` (L2, S4 + S5 + `refund_summary`), diff
+`ebe7006..HEAD` gồm 8 file. Đối chiếu với `02b-tech-design.md` §1.5, §1.7, §2.5, §4 và §6 (L2, L4).
+
+**Kết luận: APPROVED.** Không có lỗi Critical, High hay Medium. Có 3 điểm Low, không chặn QA.
+
+### Lệnh Tech Lead tự chạy trong worktree
+- 5 file test của W37 (`test_backfill_completed_orders`, `test_order_detail_completed`, `test_refund_completed_order`,
+  `test_close_after_completion`, `delivery/tests/test_order_completion`): **OK**.
+- `manage.py test apps.sales apps.inventory apps.delivery apps.reports` (DJANGO_DEBUG=1): chạy 1664 test, `errors=12`, `skipped=2`.
+  Cả 12 lỗi là test trang admin, lỗi thiếu manifest staticfiles vì worktree không có `backend/staticfiles/`. Lỗi này cùng loại
+  với lỗi đã ghi ở review L1 BE và không do code. Không có FAIL nào.
+- `makemigrations --check --dry-run`: No changes detected.
+- `check_naming.py`: exit 1. Nguyên nhân là 2 file FE đã có sẵn trên main. Không có dòng nào thuộc `backend/`.
+
+### Soát theo yêu cầu
+
+| Mục | Kết quả | Chứng cứ |
+|---|---|---|
+| `refund_summary` chỉ là số tiền | Đạt | `serializers.py`, `get_refund_summary` trả đúng hai khoá `refunded_amount` và `pending_amount`, giá trị qua `money_str`. Test kiểm tập khoá và không có SĐT/tên |
+| Phiếu FAILED không tính | Đạt | Chỉ cộng `REFUNDED` và `PENDING`. Test có đủ ba loại phiếu và trường hợp đơn không có hoá đơn (`"0"/"0"`) |
+| Không thêm query | Đạt | Dùng `invoice.refunds.all()` đã prefetch (`orders/api.py`). `test_no_extra_queries_for_refund_summary` so số query khi có 1 phiếu và khi có 3 phiếu, kết quả bằng nhau |
+| Không đụng phần che dữ liệu của Lô 3 | Đạt | `customer_hidden_reason`, `get_customer` và `pii_hidden` không đổi. Khoá mới chỉ được chèn vào `Meta.fields`. NV giao bị giới hạn phạm vi vẫn thấy `refund_summary`. Đây là tiền, không phải dữ liệu cá nhân, và cùng mức với danh sách `refunds` đã lộ sẵn cho người đó |
+| S3, mỗi đơn một giao dịch có khoá | Đạt | `with transaction.atomic()` → `select_for_update().get(pk=…)` → `complete_order_if_delivered(backfill=True)`. Luật xét lại trong khoá, dùng chung với S1. Lệnh chỉ khoá đơn; mọi đường đổi phiếu đều khoá đơn trước (L1), nên lệnh tuần tự với giao xong và huỷ |
+| S3, idempotent | Đạt | `backfill_candidates` chỉ lấy đơn `PROCESSING`. Chạy lần hai in "Đã chuyển 0 đơn", số AuditLog không tăng (S3-AC3) |
+| S3, AuditLog Hệ thống không có dữ liệu cá nhân | Đạt | `changes` gồm `status`, `delivery_note`, `delivery_note_id`, `backfill: "W37"`. `actor=None`, `actor_kind=system`. Phiếu gây ra là phiếu `COMPLETED` có `completed_at` mới nhất (có test). Output của lệnh (cả `--dry-run`) và câu lỗi chỉ có mã đơn và tên lớp exception, không in nội dung exception |
+| S3, `--dry-run` tính ngoài khoá | Đạt | `_dry_run` đọc không khoá, chỉ dùng `is_delivery_finished`, không ghi DB, không AuditLog (S3-AC4). Kết quả dry-run có thể lệch với lúc chạy thật nếu giữa hai lần có thao tác. Như vậy là đúng ý: dry-run chỉ để ước lượng |
+| S3, exit code | Đạt | Lỗi ở một đơn → đơn đó rollback → `CommandError` (exit 1), in số đơn đã chuyển. Chạy lại thì làm nốt (S3-AC7: đơn 1 xong, đơn 2 và 3 còn `PROCESSING`, lần sau chuyển 2). Lỗi ở AuditLog cũng rollback đơn đó |
+| S3, không có route HTTP | Đạt | Test duyệt toàn bộ `get_resolver().url_patterns`, không có đường nào chứa `backfill`. Đoán URL thì nhận 404/405 |
+| S3, `financial_snapshot` hai kỳ không đổi | Đạt | `test_s3_ac5_r1_…`: hoá đơn lùi 40 ngày, có chứng từ đảo ở kỳ hiện tại. Snapshot trước và sau bằng nhau, tính cả `period_pnl` qua service lẫn API, `batch_pnl` và 5 bảng chứng từ |
+| S5, hoàn tiền đơn Hoàn tất | Đạt | AC1–AC7 đủ. AC2 so `financial_snapshot`: kỳ cũ không đổi số, chỉ kỳ của `confirmed_at` đổi. Đơn giữ `COMPLETED` cả khi hoàn toàn phần (AC3). Có các ca chặn: BR-HT-04, BR-GH-05, phân quyền |
+| S4, chốt lô | Đạt | `inventory/batches/services.py` không bị sửa, đúng 02b §1.5. Test khoá `OPEN_ORDER_STATUSES` không đổi. AC2: đơn `PROCESSING` có phiếu `FAILED` vẫn chặn, đúng câu thông báo. AC3: chạy lệnh S3 rồi chốt được. AC4: các vai thiếu quyền nhận 403 và 401, không có AuditLog. AC5: Quản lý và NV kho không thấy `purchase_rate`, `landed_unit_cost` hay giá thử 99999 |
+| Không rò giá vốn | Đạt | `refund_summary` không chứa giá vốn. Thêm test S7-AC10 (duyệt đệ quy, không có khoá giá vốn với `manager` và `warehouse_staff`) |
+| Marker `naming: allow` | **Duyệt** cả 4 dòng | Các dòng gán bí danh hoặc lặp qua thuộc tính fixture cũ (`self.chu`, `self.quan_ly`, `self.nv_kho`, `self.nv_giao` của `test_l1_close_batch`; `self.kho` của `OrderApiBase`). Có ghi lý do. Cùng tiền lệ đã duyệt ở L1. Đổi tên fixture dùng chung nằm ngoài phạm vi |
+
+### Điểm Low (không chặn)
+- **L1** `backfill_completed_orders.py`, `_dry_run`: mỗi đơn chạy một query đọc trạng thái phiếu (N+1). Không đáng kể với dữ liệu
+  hiện có. Nếu sau này nhiều đơn thì gom một query `values_list("sales_invoice__sales_order_id", "status")`.
+- **L2** `test_close_after_completion.py`: `setUp` gọi thẳng `l1.CloseBatchS04Tests.setUp(self)` và mượn method của lớp khác.
+  Cách này chạy được nhưng phụ thuộc vào nội bộ file test L1 cũ. Khi có dịp thì rút về fixture dùng chung.
+- **L3** Lệnh in danh sách mã đơn đã chuyển. Đúng S3-AC4, nhưng khi chạy production thì **không chép output vào doc hay commit**
+  (repo công khai). Nhắc lại trong bước chạy production của `03-dev-notes.md`.
