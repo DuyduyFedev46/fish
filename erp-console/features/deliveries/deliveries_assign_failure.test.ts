@@ -5,7 +5,7 @@ import {
   mockGetDeliveryNoteDetail,
   mockPostDeliveryAssign,
   mockPostDeliveryNoteStatus,
-  MOCK_DELIVERY_NOTES,
+  mockDeliveryNotes,
 } from "./mock";
 import type { Deliverer, DeliveryListResponse, DeliveryNoteDetail } from "./types";
 
@@ -14,7 +14,7 @@ function token(username: string): string {
   return `mock-token-${username}-${Date.now() + 1000}`;
 }
 const req = (username: string, path: string, method: "GET" | "POST" = "GET", body?: unknown) => ({ method, path, body, token: token(username) });
-const note = (id: number) => MOCK_DELIVERY_NOTES.find((n) => n.id === id)!;
+const note = (id: number) => mockDeliveryNotes().find((n) => n.id === id)!;
 
 describe("B6 deliverers", () => {
   it("ql1 (có quyền giao người) thấy người giao kèm số phiếu đang giao / chờ lấy", () => {

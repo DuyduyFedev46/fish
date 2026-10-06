@@ -26,7 +26,12 @@ function vnIsoDaysAgo(daysAgo: number, hour: number): string {
 /** Số ngày NV giao còn xem được dữ liệu khách của phiếu đã kết thúc (BE `DELIVERY_PII_RECENT_DAYS`, mặc định 7). */
 const PII_RECENT_DAYS = 7;
 
-export const MOCK_DELIVERY_NOTES: DeliveryNoteDetail[] = [
+/**
+ * Seed phiếu giao: dựng LƯỜI lúc mock được gọi lần đầu (`mockDeliveryNotes()`), không chạy ở cấp module. Cấp module mà gọi `Date.now()`
+ * thì bundler coi là có tác dụng phụ và giữ cả module (cùng tên người giao giả) trong bản build thật (W37 L3 FE, review M1).
+ */
+function buildSeed(): DeliveryNoteDetail[] {
+  return [
   {
     id: 30,
     code: "GH-HD-0030-CONF",
@@ -508,7 +513,15 @@ export const MOCK_DELIVERY_NOTES: DeliveryNoteDetail[] = [
     recipient_name: null,
     lines: [{ item_name: "Cá thu Côn Đảo", qty_kg: "1.000", batch_id: "CA-THU-260918-VT02", expiry_date: "2027-09-18" }],
   },
-];
+  ];
+}
+
+let seeded: DeliveryNoteDetail[] | null = null;
+/** Kho phiếu giao mock (một mảng duy nhất, đổi tại chỗ qua các thao tác). */
+export function mockDeliveryNotes(): DeliveryNoteDetail[] {
+  if (!seeded) seeded = buildSeed();
+  return seeded;
+}
 
 type MockMe = ReturnType<typeof mockRequireUser>;
 
@@ -652,7 +665,7 @@ export function getMockDeliveryNotes(params?: {
   completed_from?: string;
   page?: number;
 }): DeliveryListResponse {
-  let filtered = [...MOCK_DELIVERY_NOTES];
+  let filtered = [...mockDeliveryNotes()];
   if (params?.status) {
     const statuses = params.status.split(",").map((s) => s.trim());
     filtered = filtered.filter((n) => statuses.includes(n.status));
@@ -666,7 +679,7 @@ export function getMockDeliveryNotes(params?: {
 }
 
 export function getMockDeliveryNoteDetail(id: number): DeliveryNoteDetail {
-  const item = MOCK_DELIVERY_NOTES.find((n) => n.id === id);
+  const item = mockDeliveryNotes().find((n) => n.id === id);
   if (!item) {
     throw new Error("Không tìm thấy phiếu giao hàng");
   }
@@ -677,7 +690,7 @@ export function mockPackDeliveryNote(
   id: number,
   fromStatus?: string
 ): { note: DeliveryNoteDetail; already: boolean } {
-  const item = MOCK_DELIVERY_NOTES.find((n) => n.id === id);
+  const item = mockDeliveryNotes().find((n) => n.id === id);
   if (!item) {
     throw new Error("Không tìm thấy phiếu giao hàng");
   }
@@ -725,7 +738,7 @@ export function mockListDeliveryNotes(req: MockRequest | { url?: string; token?:
 
 export function mockGetDeliveryNoteDetail(req: MockRequest | { url?: string; token?: string | null }): { status: number; body: DeliveryNoteDetail | { detail: string } } {
   const id = noteIdOf(pathOf(req), "") ?? 31;
-  const item = MOCK_DELIVERY_NOTES.find((n) => n.id === id);
+  const item = mockDeliveryNotes().find((n) => n.id === id);
   const me = mockRequireUser(req as MockRequest);
   if (!item || !inCourierScope(me, item)) {
     return { status: 404, body: { detail: "Không tìm thấy phiếu giao hàng" } };
@@ -769,8 +782,9 @@ const NEXT_FROM: Record<string, string[]> = {
 
 /**
  * W37 S1: trạng thái đơn sau lần chuyển này, theo luật dùng chung BR-BH-18 (`isDeliveryFinished`). Mọi phiếu cùng đơn được xét.
- * S6-AC8: kết quả được gửi vào kho nối `shared/lib/orderLink.mock.ts` để mock Đơn đổi theo (cùng `id` đơn) — không import chéo
- * feature, và file nối chỉ có ở mock nên bản build thật không giữ seed.
+ * S6-AC8: kết quả được gửi vào kho nối `shared/lib/orderLink.mock.ts` để mock Đơn đổi theo (cùng `id` đơn), không import chéo
+ * feature. Bản build thật không giữ file này chỉ vì seed ở trên dựng lười; `check-no-mock` quét `*.mock.ts` để bắt nếu có ai
+ * đưa code chạy ở cấp module trở lại.
  */
 function orderStatusAfter(item: DeliveryNoteDetail, statuses: string[]): string | null {
   if (!item.order?.code) return null;
@@ -784,11 +798,11 @@ export function mockPostDeliveryNoteStatus(req: MockRequest | { url?: string; bo
   const id = noteIdOf(pathOf(req), "status/") ?? 31;
   const body = bodyOf(req) as { to_status?: string; from_status?: string; failure_reason?: string; failure_note?: string };
   const me = mockRequireUser(req as MockRequest);
-  const item = MOCK_DELIVERY_NOTES.find((n) => n.id === id);
+  const item = mockDeliveryNotes().find((n) => n.id === id);
   if (!item || !inCourierScope(me, item)) return { status: 404, body: { detail: "Không tìm thấy phiếu giao hàng" } };
   const to = body.to_status;
   // Trạng thái mọi phiếu cùng đơn (đặt trong hàm này, không tách hàm riêng: tách ra thì bản build thật giữ lại seed mock).
-  const siblingStatuses = (n: DeliveryNoteDetail) => MOCK_DELIVERY_NOTES.filter((x) => x.order?.code === n.order?.code).map((x) => x.status as string);
+  const siblingStatuses = (n: DeliveryNoteDetail) => mockDeliveryNotes().filter((x) => x.order?.code === n.order?.code).map((x) => x.status as string);
 
   // BR-GH-24: phiếu hoặc đơn đã huỷ → không nhận hàng đi giao, không giao xong, không báo thất bại. 400 kèm `code` (02b §2.3).
   // Đơn đã huỷ ở mock Đơn mà phiếu cũ chưa huỷ (ca nhiều phiếu, BE §1.2) cũng bị chặn như phiếu đã huỷ.
@@ -844,8 +858,8 @@ export function mockGetDeliverers(req: MockRequest): { status: number; body: Del
     body: MOCK_DELIVERERS.map((u) => ({
       id: u.id,
       display_name: u.display_name,
-      delivering_count: MOCK_DELIVERY_NOTES.filter((n) => n.assigned_to === u.id && n.status === "DELIVERING").length,
-      ready_count: MOCK_DELIVERY_NOTES.filter((n) => n.assigned_to === u.id && n.status === "READY").length,
+      delivering_count: mockDeliveryNotes().filter((n) => n.assigned_to === u.id && n.status === "DELIVERING").length,
+      ready_count: mockDeliveryNotes().filter((n) => n.assigned_to === u.id && n.status === "READY").length,
     })),
   };
 }
@@ -862,7 +876,7 @@ export function mockPostDeliveryAssign(req: MockRequest): { status: number; body
   const me = mockRequireUser(req);
   if (!me || !hasPerm(me, PERM.assignDelivery)) return { status: 403, body: { detail: "Bạn không có quyền giao phiếu." } };
   const id = noteIdOf(pathOf(req), "assign/");
-  const item = MOCK_DELIVERY_NOTES.find((n) => n.id === id);
+  const item = mockDeliveryNotes().find((n) => n.id === id);
   if (!item) return { status: 404, body: { detail: "Không tìm thấy phiếu giao hàng" } };
   const body = bodyOf(req);
   const to = Number(body.assigned_to);
@@ -890,7 +904,7 @@ export function mockGetDeliveryLabel(
   id: number,
   printNo?: number
 ): { status: number; body: LabelData | { detail: string; code?: string } } {
-  const item = MOCK_DELIVERY_NOTES.find((n) => n.id === id);
+  const item = mockDeliveryNotes().find((n) => n.id === id);
   if (!item) {
     return { status: 404, body: { detail: "Không tìm thấy phiếu giao hàng" } };
   }
@@ -933,7 +947,7 @@ export function mockPostDeliveryLabelPrint(
   req: any,
   id: number
 ): { status: number; body: PrintDeliveryLabelResponse | { detail: string; code?: string } } {
-  const item = MOCK_DELIVERY_NOTES.find((n) => n.id === id);
+  const item = mockDeliveryNotes().find((n) => n.id === id);
   if (!item) {
     return { status: 404, body: { detail: "Không tìm thấy phiếu giao hàng" } };
   }
@@ -978,7 +992,7 @@ export function mockPostDeliveryLabelVoid(
   req: any,
   id: number
 ): { status: number; body: VoidLabelResponse | { detail: string; code?: string } } {
-  const item = MOCK_DELIVERY_NOTES.find((n) => n.id === id);
+  const item = mockDeliveryNotes().find((n) => n.id === id);
   if (!item) {
     return { status: 404, body: { detail: "Không tìm thấy phiếu giao hàng" } };
   }
@@ -1031,7 +1045,7 @@ export function mockLookupDeliveryTag(req: MockRequest): { status: number; body:
   const m = /^(GH-[A-Z0-9-]{3,40})\.(\d{1,3})$/.exec(code);
   if (!m) return { status: 400, body: { detail: "Mã tem không đúng định dạng.", code: "INVALID_INPUT" } };
   const printNo = parseInt(m[2], 10);
-  const note = MOCK_DELIVERY_NOTES.find((n) => n.code === m[1]);
+  const note = mockDeliveryNotes().find((n) => n.code === m[1]);
   const lastPrinted = note ? Math.max(note.label.valid_print_no ?? 0, ...note.label.to_void) : 0;
   if (!note || !inCourierScope(me, note) || !note.label.printed || printNo < 1 || printNo > lastPrinted) {
     return { status: 404, body: { detail: "Không tìm thấy phiếu.", code: "NOT_FOUND" } };

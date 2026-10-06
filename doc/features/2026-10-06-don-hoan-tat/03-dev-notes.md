@@ -199,3 +199,22 @@ có ở mọi vai xem được đơn (kể cả NV giao ngoài phạm vi, họ v
 
 ### Nợ
 Không. Ghi chú T2 (nhãn phiếu huỷ Shop "Đã huỷ" theo T30, story S8 ghi "Đã huỷ theo đơn") vẫn chờ PO sửa dòng bảng story.
+
+### Sửa sau review L3 FE (08/10, M1: mock lọt vào bản build thật)
+- **Câu sai ở mục L3 FE phía trên** ("kho nối chỉ có ở mock nên bản build thật không giữ seed") **không đúng** ở bản `eef6e1b`: build mock=0 chứa
+  `cave_erp_mock_order_link` và tên giả "Anh Phúc/Lâm/Khoa". Nguyên nhân gốc có từ trước L3: `features/deliveries/api.ts` import tĩnh `./mock`, mà
+  module đó có khai báo cấp module (seed gọi `Date.now()`, bảng tên giả), nên bundler giữ lại phần khai báo cấp module kể cả khi hàm mock đã bị bỏ.
+  Bản tương ứng của comment ở `deliveries/mock.ts` đã sửa.
+- **Gate:** `scripts/check-no-mock.mjs` quét thêm `*.mock.ts` và thêm bốn loại chuỗi seed: khoá `cave_erp_mock_*`, tên người giả (Anh/Chị/Cô/Bác…),
+  SĐT giả 10 số, mã mẫu viết hoa-gạch nối có số (trừ mã luật `BR-`). Chạy trên `eef6e1b` + gate mới: **ĐỎ** ("Anh Khoa", `cave_erp_mock_order_link`).
+- **Sửa:** (1) `deliveries/mock.ts`: seed dựng lười trong `buildSeed()`, truy cập qua `mockDeliveryNotes()` (4 test đổi theo). (2) Chỉ làm (1) thì chưa đủ (gate vẫn đỏ), vì
+  import tĩnh vẫn giữ khai báo cấp module. `deliveries/api.ts` nay nạp mock bằng `require("./mock")` đặt sau điều kiện `NEXT_PUBLIC_USE_MOCK === "1"`
+  (`mockApi()`), nên bản build thật bỏ nhánh và không còn module mock.
+- **Kết quả build `NEXT_PUBLIC_USE_MOCK=0`:**
+  - `check-no-mock`: XANH (30 file mock, 232 chuỗi seed, 254 file build).
+  - `grep -rl "cave_erp_mock\|Anh Ph\|Anh Lâm\|Anh Kh" erp-console/out`: rỗng.
+  - Chuỗi seed orders mock `grep -rl "Chị Hoa\|TOM-SU-1\|0901234567\|Khách lẻ\|Bác Tư\|Anh Minh\|FT26267\|cave_erp_mock_orders" out`: rỗng (Low 2).
+  - `check-ai-chunks`: XANH.
+- Kiểm lại: tsc sạch, vitest 95 file / 1070 test xanh; build mock=1 + e2e: `order_completion_detail` 16/16, `order_completion_erp` 6/6, `ed_batch3_orders` 143/143,
+  `ed_batch4_delivery` 70/70.
+- Còn lại: `beErrors.mock.ts` (mã luật `BR-…` và câu lỗi BE, không phải dữ liệu giả) vẫn có thể nằm trong bản build; gate cố ý bỏ qua mã `BR-`. Thụt lề trong `buildSeed()` chưa chỉnh để diff nhỏ.

@@ -198,3 +198,68 @@ dev-notes. `shop_api.py` không bị sửa. Đối chiếu với 02b §1.6, §2.
 
 Ghi chú hành vi, không phải lỗi: khi AI tắt mà phiếu được AI bấm giao xong thì dòng giao bị lọc. Đơn khi đó vẫn có chip Hoàn tất,
 nhưng timeline không có mốc gộp. Lệnh AI đang tắt toàn hệ thống và chưa có lệnh AI nào giao phiếu, nên chưa phải xử lý.
+
+## Review L3 FE (08/10)
+
+**Phạm vi:** commit `eef6e1b` trên `feat/w37-l3-fe` (diff `c0e5522..eef6e1b`, 17 file ở `erp-console/`, `frontend/`, `doc/`). Nhánh
+đã merge L3 BE (HEAD `37146dc`). Đối chiếu với 02b §2.5, §2.6, §6 (L3) và các Low của review L1 FE.
+
+**Kết luận: CHANGES REQUESTED.** Có một lỗi Medium (M1, mock lọt vào bản build thật). Không có lỗi Critical hay High. Mọi mục
+nghiệp vụ còn lại đều đạt; sửa M1 xong thì Tech Lead chỉ soát lại phần M1.
+
+### Lệnh Tech Lead tự chạy
+Build trong bản sao ở thư mục scratchpad (`rsync` mã nguồn, mượn `node_modules` của checkout chính). Worktree **không** bị sửa.
+- `NEXT_PUBLIC_USE_MOCK=0 npm run build` của `eef6e1b`: build xanh. `check-no-mock` báo XANH (27 file mock, 43 chuỗi seed).
+- Tìm thẳng trong `out/`: `grep -rl "cave_erp_mock_order_link" out` → **có**, ở `out/_next/static/chunks/23-9edda6ada01b774d.js`.
+  Chunk này được nạp ở `/my-deliveries/`, `/print/label/`, `/print/pick-sheet/`.
+- So với gốc `c0e5522`: build cùng lệnh, chuỗi `cave_erp_mock` **không có** trong `out/`. Tức là L3 làm phát sinh thêm.
+- `tsc`, `vitest` và build Shop không chạy lại. Dùng số điều phối viên đã chạy trên nhánh đã merge: tsc sạch, vitest 1070,
+  `check-ai-chunks` xanh, Shop build xanh.
+
+### M1 (Medium): kho nối `orderLink.mock.ts` lọt vào bản build thật, và `check-no-mock` không bắt được
+- **Chứng cứ:** trong chunk ở trên có `let T="cave_erp_mock_order_link";function v(){…sessionStorage…}let p={outcomes:[],cancelled:[]}`.
+  Ngay sau đó là các lời gọi ở cấp module của `features/deliveries/mock.ts` (`E(10,8),E(10,8)…`, bảng tên người giao giả,
+  bảng lý do thất bại).
+- **Nguyên nhân gốc:** `features/deliveries/mock.ts` đã bị giữ lại trong bản build thật **từ trước L3**. Ở `c0e5522`, chunk
+  `8984-*.js` đã chứa `{4:"Anh Phúc",7:"Anh Lâm",14:"Anh Khoa"}`. Module này có code chạy ở cấp module (gọi `Date.now()` để
+  dựng seed) nên bundler không bỏ được. L3 thêm `import … from "@/shared/lib/orderLink.mock"` vào đúng module đó, nên kho nối
+  bị kéo theo.
+- **Vì sao gate không bắt:** `scripts/check-no-mock.mjs` chỉ quét file khớp `/^mock[^/]*\.ts$/` và `/^Mock.*\.tsx$/`. Hai file
+  `orderLink.mock.ts` và `dashboardSummary.mock.ts` không khớp mẫu, và bảng tên giả của deliveries mock cũng không nằm trong
+  danh sách chuỗi seed. Câu trong dev-notes và comment ở `deliveries/mock.ts` ("file nối chỉ có ở mock nên bản build thật
+  không giữ seed") vì vậy **sai**.
+- **Mức độ:** không có dữ liệu cá nhân thật hay giá vốn. Phần lọt là code chết và dữ liệu giả. Tuy vậy, L1 đã đặt "mock không
+  lọt vào bản build thật" làm tiêu chí đạt, và gate đang báo xanh giả.
+- **Yêu cầu sửa (trong L3 FE):**
+  1. `check-no-mock.mjs` quét thêm `*.mock.ts` (mẫu `/\.mock\.ts$/`). Có thể thêm chuỗi đặc trưng tự rút từ khoá `KEY`. Sau
+     bước này gate phải **đỏ** trên `eef6e1b`.
+  2. Bỏ phần cấp module của `features/deliveries/mock.ts` khỏi bản build thật. Cách gợi ý: dựng seed lười trong một hàm
+     (`MOCK_DELIVERY_NOTES` thành getter hoặc khởi tạo khi gọi lần đầu), không gọi hàm ở cấp module. Hoặc chuyển phần gọi
+     `publishDeliveryOutcome` và `isOrderCancelledInMock` vào nhánh `if (process.env.NEXT_PUBLIC_USE_MOCK === "1")`.
+  3. Kiểm lại: build mock=0, rồi `grep -rl "cave_erp_mock_order_link\|Anh Ph" erp-console/out` phải rỗng và `check-no-mock`
+     xanh. Đầu ra lệnh grep ghi vào dev-notes.
+  4. Sửa comment ở `deliveries/mock.ts:772-773` và câu tương ứng trong dev-notes cho đúng sự thật.
+
+  Nếu bước 2 phình ra ngoài phạm vi W37, điều phối viên có thể tách bảng tên giả (lỗi có từ trước) thành nợ riêng. Khi đó L3
+  vẫn phải làm bước 1 và bảo đảm `orderLink.mock.ts` không còn trong `out/`.
+
+### Các mục còn lại: đạt
+
+| Mục | Kết quả | Chứng cứ |
+|---|---|---|
+| `refundSummaryLine` | Đạt | Hàm thuần trong `orderDetailModel.ts`. Bỏ phần bằng 0. Cả hai bằng 0 hoặc thiếu khoá (BE cũ) thì không vẽ dòng. Số tiền format bằng `vnd`. Màn chỉ vẽ `<p data-testid="order-refund-summary">` dưới chip, chip vẫn là Hoàn tất (S7-AC5). Có test |
+| Nút "Lập phiếu hoàn tiền" | Đạt | Đơn `COMPLETED` có `create_refund` thì nút chính là "Lập phiếu hoàn tiền" (S7-AC4). Không có mục Huỷ vì BE không trả `cancel`. Quyền vẫn theo `available_actions` (S7-AC8) |
+| `complete_order` trong `auditModel` | Đạt | `complete_order: "Đơn hoàn tất"` |
+| Bộ đơn mẫu S6-AC1 | Đạt | `PLAN_COMPLETION` có 7 đơn: 1 giữ chỗ, 2 đang xử lý (đang giao, giao thất bại), 3 hoàn tất (một đơn có REFUNDED 200.000 và PENDING 100.000), 1 huỷ. Bật bằng khoá mock `cave_erp_mock_orders_dataset` |
+| Low #2 của L1 (gán cứng) | Đã xử lý | Kế hoạch khai `"DELIVERY"` cùng thẻ phiếu. Trạng thái đơn suy từ trạng thái phiếu qua `isDeliveryFinished`, không còn suy ngược từ đơn |
+| Low #3 của L1 (đơn huỷ, phiếu cũ chưa huỷ) | Đã xử lý | `isOrderCancelledInMock(order.id)` chặn BR-GH-24 như BE §1.2. Mock Đơn gọi `publishOrderCancelled` khi huỷ. Phần này dính M1 vì đi qua kho nối |
+| Kho nối mock: chức năng | Đạt | Mock Giao hàng gửi kết quả, mock Đơn đọc ở lần tải sau (S6-AC8). Tổng quan mock lấy `pending_orders` và đơn gần đây từ kho đơn khi dùng bộ mẫu hoặc đã có kết quả nối. Không có dữ liệu khách trong hộp (chỉ id đơn và mã trạng thái) |
+| Shop mock theo §2.6 | Đạt | `PAID_ORDER_LABELS`: CONFIRMING thì "Đã thanh toán – chờ vựa gọi xác nhận"; READY, DELIVERING, FAILED thì "Đang xử lý"; COMPLETED thì "Hoàn tất" và phiếu "Đã giao" (S8-AC6). Hết chuỗi lạc "Đã thanh toán, đang soạn hàng" cho READY, DELIVERING, FAILED. Có e2e `frontend/e2e/order_lookup_completed.py` |
+| Sửa kỳ vọng `ed_batch3_orders` | Duyệt | Đơn 109 (`COMPLETED`) đổi kỳ vọng nút từ "Lập phiếu hoàn" sang "Lập phiếu hoàn tiền", đúng S7-AC4. Không nới kỳ vọng nào khác |
+| Không đụng vùng cấm | Đạt | Không sửa `shared/ui/**`, `enums.ts`, `features/permissions/**`. `OrderDetailScreen.tsx` được sửa đúng như 02b §6 L3 cho phép |
+
+### Low (không chặn)
+- **L1** Cùng một thao tác có hai nhãn. Nút chính của đơn `COMPLETED` là "Lập phiếu hoàn tiền", còn mục "…" và đơn đã huỷ vẫn là
+  "Lập phiếu hoàn". Để lô áp tên chuẩn thống nhất một nhãn.
+- **L2** `features/overview/mock.ts` import `@/features/orders/mock` (mock gọi chéo, có tiền lệ). Sau khi sửa M1, kiểm cùng lúc
+  rằng chuỗi seed của orders mock vẫn không có trong `out/`.
