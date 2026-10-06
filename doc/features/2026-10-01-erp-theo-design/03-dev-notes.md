@@ -2309,7 +2309,6 @@ Chỉ sửa trong `erp-console/`. Không đụng `convert.ts`, `safeHref.ts`, `f
 - **Kiểm:** vitest 825 đạt (thêm 6 ca: chuẩn hoá ổn định, `mockOtherEdit`, `draftDiffers`/`draftIsCurrent`, `mockUnpublishEntry` trả đúng hình dạng). E2E mock `ed_batch16_content.py` 121/121 (thêm 23 ca cho B16-1/2/3), `ed_batch1_shell.py` 56/56, `ed_batch2_patterns.py` 75/75. Mới: `e2e/ed_batch16_real.py` chạy trên Django thật (SQLite tạm, `DJANGO_DEBUG=1`, `collectstatic`, cổng 8661) + bản build `MOCK=0` phục vụ cổng 3661: 25/25 đạt, gồm thân bài chưa chuẩn hoá thật từ BE, ql1 sửa qua API rồi mở lại (cảnh báo, 409, BE giữ bản của ql1), gỡ bài thật rồi sửa và lưu tiếp. Cách dựng môi trường nằm ở đầu script.
 - **Còn nợ / lưu ý:** vitest chạy môi trường node nên không dựng được Tiptap; ca "mở bài không bị coi là sửa" kiểm bằng e2e (mock và BE thật). Ba ghi chú nhẹ của QA (L2 Quản lý mặc định có quyền đăng, L3 hai toast sau lần lưu đầu của bài mới, L4 tab 39px) giữ nguyên, không chặn.
 
-<<<<<<< HEAD
 ## Rà soát giao diện — nhóm C/D/E (FE, WIP chưa kiểm xong)
 
 - **C (FormPage):** form chia thẻ `FormSection`/`FormGrid` (mới), thanh nút dính đáy canh phải (`.page` cao tối thiểu theo `100dvh`, vì `.content` không có chiều cao xác định để dùng `100%`), ô nhập cao `--control-h` (44px di động, 36px từ 768px), `Switch` và `RadioGroup` (mới, vẫn là checkbox/radio native, không `role="switch"`) thay checkbox/select ở ItemForm, PricingRuleForm, PurchaseCostForm, SupplierFormModal. Toast được đẩy lên trên thanh nút (không che nút Lưu). Token mới: `--control-h`, `--control-text`, `--space-7`, `--radius-card`, `--text-title`, `--text-dialog`.
@@ -2318,7 +2317,7 @@ Chỉ sửa trong `erp-console/`. Không đụng `convert.ts`, `safeHref.ts`, `f
 - **Chỉ ghi nhận, không sửa:** F1d khác luồng (wizard); F3a "thiếu mật khẩu" là báo nhầm (ô "Mật khẩu tạm" có, BE `CREATE_FIELDS` nhận `password`); giữ `--border-input` cho ô nhập (a11y); ItemForm không thêm radio "Loại" (loại lấy từ route); `EntrySettings` chỉ hưởng thay đổi chung; nút `.btn` toàn cục vẫn 40px ở desktop (board 36px) ngoài FormPage/Modal.
 - **Kiểm đã chạy:** tsc sạch; vitest 900/900; build mock=0 + `check-no-mock` + `check-ai-chunks` XANH; e2e mock đạt: ed_batch1 56/56, 2 75/75, 3_orders 143/143, 4 70/70, 5 129/129 (lần trước server chết giữa chừng), 6 79/79, 7 114/114, 8 125/125, 9 134/139 (5 đỏ có sẵn), 10 115/115, 11 103/103, 12 95/95, 13 128/128, 14 101/101, 16 121/121, bonusA 49/49, s41_s47 74/74; ed_batch3_fixes 95/97 (2 ca `aiOrderProposal` đỏ có sẵn trên HEAD gốc). e2e sửa selector: batch10 và batch11 (radio), batch13 (radio "Áp dụng cho").
 - **Chưa xong:** chạy lại sau lần sửa cuối (`FormPage.module.css` min-height, `.pw-eye` về 44px, toast, radio gradient): ed_batch5/6/7/8 bị cắt do server tắt, s48_password (lần trước 40/41 vì nút mắt 40px, đã sửa nhưng chưa chạy lại). `check_naming.py` OK (không vi phạm mới). Ảnh chụp ở `shots/audit-fix/` (chưa rà từng ảnh với board).
-=======
+
 ## Rà soát giao diện — nhóm B (trang chi tiết) — 03/10
 
 Nguồn: `04b-ra-soat-giao-dien.md` nhóm B (D2b, W2b/f/g/h, W5b/d/f, W3i). Mẫu: thẻ Dòng thời gian (commit `e2e7b54`).
@@ -2388,4 +2387,3 @@ Trạng thái: code xong trong working tree, CHƯA commit. Toàn bộ `manage.py
 - **#8**: migration `inventory/0009_returntostock_soft_delete` (chỉ thêm `deleted_at`, `deleted_by` PROTECT). Manager mặc định `ReturnToStock.objects` loại phiếu đã xoá, `all_objects` thấy hết. Service `delete_return`, action `soft_delete`, test `apps/inventory/returns/tests/test_soft_delete.py`. AI: thêm `/delete/` vào `FORBIDDEN_SUFFIXES` (AI không bao giờ xoá); `test_discipline` 29 → 30 @action; snapshot AI không đổi.
 - **Contract cho FE**: `POST /api/inventory/returns/{id}/delete/` body rỗng. Chỉ Chủ/superuser (người khác 403, kiểm trước phạm vi dòng). Trạng thái DRAFT hoặc CANCELLED → 200 `{"status":"deleted","id":<pk>}`; APPROVED → 400 `{"code":"RETURN_DELETE_NOT_ALLOWED","detail":"Phiếu đã cộng vào tồn kho. Huỷ phiếu trước rồi mới xoá được."}`; xoá lần 2 hoặc GET sau xoá → 404. Chi tiết và danh sách phiếu có thêm `available_actions: ["approve","cancel","delete"]` (tập con theo quyền + trạng thái); `delete` chỉ khi là Chủ và phiếu DRAFT/CANCELLED.
 - Còn nợ: admin Django của `ReturnToStock` chưa chặn xoá cứng (ngoài phạm vi, nên xét `has_delete_permission=False`).
->>>>>>> main
