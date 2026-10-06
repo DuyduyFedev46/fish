@@ -906,7 +906,7 @@ def mark_payment_refunded(*, payment, refund, actor):
     p.save(update_fields=["resolution_status", "resolution", "resolved_by",
                           "resolved_at", "resolution_note"])
     record_audit(
-        "resolve_payment", actor=actor, obj=p, note=f"Hoàn tiền theo phiếu hoàn #{refund.pk}",
+        "resolve_payment", actor=actor, obj=p, note=f"Hoàn tiền theo phiếu hoàn tiền #{refund.pk}",
         changes={
             "resolution_status": {"from": old, "to": p.resolution_status},
             "resolution": p.resolution,

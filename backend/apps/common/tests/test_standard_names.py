@@ -8,11 +8,13 @@ khoá JSON giữ nguyên (ngoại lệ: khoá phụ thêm `auto_cancel_blocked_l
 Chưa có ở đây (Pha B, chờ W37 L3 gộp): dòng thời gian của đơn `sales/orders/timeline.py` (B9).
 """
 import importlib
+from datetime import timedelta
 from decimal import Decimal
 
 from django.apps import apps as django_apps
 from django.contrib.auth.models import Permission
 from django.test import TestCase
+from django.utils import timezone
 
 from apps.accounts import roles
 from apps.accounts.audit.serializers import safe_note
@@ -27,6 +29,7 @@ from apps.catalog.models import Item, PricingRule
 from apps.content.models import Entry
 from apps.delivery.confirmation.serializers import AUTO_CANCEL_BLOCKED_LABELS
 from apps.delivery.models import ConfirmationTask, CustomerCall, DeliveryNote
+from apps.sales.orders.tests.test_s10_api import OrderApiBase
 from apps.delivery.tests.test_confirmation_escalation import ConfirmationL3BaseTestCase
 from apps.inventory.models import ReturnToStock, StockLedgerEntry
 from apps.sales.models import PaymentTransaction, Refund, SalesOrder
@@ -413,3 +416,91 @@ class RefundReturnsLabelTests(TestCase):
         self.assertEqual(RETURN_LABELS["return_to_warehouse"], "Mang hàng về kho")  # P5
         self.assertEqual(RETURN_LABELS["approve_returntostock"], "Duyệt hàng hoàn")  # P4
         self.assertEqual(RETURN_LABELS["cancel_returntostock"], "Huỷ phiếu hàng hoàn")  # P5
+
+
+class OrderTimelineWordingTests(OrderApiBase):
+    """B9 (Pha B): dòng thời gian của ĐƠN dùng tên chuẩn (P4, P5, P6, P7, T2, T25, C1-C3)."""
+
+    BANNED = ("đảo doanh thu", "phiếu hàng về kho", "hàng về kho:", "Tạo phiếu hoàn ", "Thử chuyển lại phiếu hoàn",
+              "hạch toán", "chờ Chủ", "Webhook", "Soạn hàng)", "Tự huỷ vì")
+
+    def setUp(self):
+        super().setUp()
+        self.owner = make_user("tl_names_owner", roles.OWNER)
+        self.courier = make_user("tl_names_courier", roles.DELIVERY_STAFF)
+
+    def _labels(self, order):
+        rows = client_for(self.owner).get(f"/api/sales/orders/{order.pk}/").json()["timeline"]
+        return [r["label"] for r in rows]
+
+    def _assert_clean(self, labels):
+        for label in labels:
+            for old in self.BANNED:
+                self.assertNotIn(old, label)
+
+    def test_b9_delivery_return_and_refund_lines(self):
+        from apps.delivery import services as delivery_services
+        from apps.common.tests.fixtures import confirm_note_for_test
+        from apps.inventory.returns import services as return_services
+        from apps.sales.refunds import services as refund_services
+
+        order = self._paid_order()
+        note = DeliveryNote.objects.get(sales_invoice=order.invoice)
+        confirm_note_for_test(note)
+        for status in (DeliveryNote.Status.READY, DeliveryNote.Status.DELIVERING):
+            delivery_services.advance_status(note=note, to_status=status, actor=self.courier)
+        delivery_services.mark_failed(note=note, actor=self.courier)
+        rt = delivery_services.return_to_warehouse(
+            note=note, batch=self.batch, qty=Decimal("2"), actor=self.courier,
+        )
+        rt.decision = ReturnToStock.Decision.WRITE_OFF
+        rt.save(update_fields=["decision"])
+        return_services.apply_return(return_to_stock=rt, approver=self.owner)
+        refund, _ = refund_services.create_invoice_refund(
+            invoice=order.invoice, amount=Decimal("100000"), is_partial=True, reason="x", actor=self.owner,
+        )
+        refund_services.mark_refund_failed(refund=refund, reason="x", actor=self.owner)
+        refund_services.retry_refund(refund=refund, actor=self.owner)
+        labels = self._labels(order)
+        self._assert_clean(labels)
+        self.assertTrue(any(l.startswith("Tạo phiếu giao ") and l.endswith("(Đang soạn hàng)") for l in labels), labels)
+        self.assertTrue(any(l.startswith("Mang hàng về kho ") for l in labels), labels)  # giữ nguyên (C1)
+        self.assertIn("Duyệt hàng hoàn: Huỷ hàng, ghi lỗ", labels)  # P4, T45
+        self.assertIn("Lập phiếu hoàn tiền 100.000 đ", labels)  # P7
+        self.assertIn("Phiếu hoàn tiền 100.000 đ chuyển thất bại", labels)  # C3
+        self.assertIn("Thử hoàn tiền lại 100.000 đ", labels)  # P7
+
+    def test_b9_cancel_return_credit_note_and_auto_cancel(self):
+        order = self._paid_order()
+        order_services.cancel_paid_order(order=order, actor=self.owner, reason="x", reason_code="CUSTOMER_CHANGED_MIND")
+        labels = self._labels(order)
+        self._assert_clean(labels)
+        self.assertTrue(any(l.startswith("Lập phiếu trừ doanh thu ") for l in labels), labels)  # P6
+
+        expired = self._order(phone="0901234999")
+        expired.booked_expires_at = timezone.now() - timedelta(minutes=1)
+        expired.save(update_fields=["booked_expires_at"])
+        order_services.cancel_unpaid_expired()
+        labels = self._labels(expired)
+        self._assert_clean(labels)
+        self.assertIn("Hết giờ giữ chỗ, đã nhả hàng giữ", labels)  # T2
+
+
+class CancelAndResolveNoteTests(TestCase):
+    """Low 1 và Low 2: ghi chú AuditLog không lặp chữ, và nhận cả mẫu cũ lẫn mới."""
+
+    def test_new_cancel_note_has_no_repeated_wording(self):
+        text = order_services._cancel_audit_note("OTHER", "")
+        self.assertEqual(text, "Huỷ đơn: Lý do khác")
+        self.assertNotIn("Lý do: Lý do", text)
+
+    def test_cancel_note_old_and_new_prefix_both_pass(self):
+        for note in ("Huỷ đơn: Lý do khác", f"Huỷ đơn: Lý do khác · {NOTE_PRESENT_LABEL}",
+                     "Lý do: Khác", "Lý do: Lý do khác"):
+            self.assertEqual(safe_note("cancel_paid_order", note), note)
+
+    def test_resolve_payment_note_old_and_new_pattern(self):
+        for note in ("Hoàn tiền theo phiếu hoàn tiền #12", "Hoàn tiền theo phiếu hoàn #12"):
+            self.assertEqual(safe_note("resolve_payment", note), note)
+        masked = safe_note("resolve_payment", "Hoàn tiền theo phiếu hoàn tiền #12\n0900000999")
+        self.assertNotIn("0900000999", masked)

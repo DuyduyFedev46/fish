@@ -55,3 +55,13 @@ FE đưa hướng dẫn xử lý vào dòng gợi ý, F10).
   "Huỷ phiếu hàng về kho" (P5), "Duyệt hàng về kho: …" (P4), dòng tự huỷ đơn (T2), "Tạo phiếu giao … (Soạn hàng)" (T25),
   và "Phiếu hoàn … chuyển thất bại". Kèm test B-timeline (02b 3.1) và đổi các test timeline đang khoá chữ cũ.
 - Test "chứa chuỗi cấm" của `build_timeline` đơn chỉ thêm được khi B9 xong.
+
+## BE — Pha B (sau khi W37 L3 vào main 00da7e8)
+- `git merge main` sạch, không xung đột.
+- B9 `sales/orders/timeline.py`: "Lập phiếu trừ doanh thu" (P6), "Lập phiếu hoàn tiền" và "Thử hoàn tiền lại" (P7), "Đã hoàn tiền" (T22),
+  "Huỷ phiếu hàng hoàn" (P5), "Duyệt hàng hoàn: …" (P4), "Hết giờ giữ chỗ, đã nhả hàng giữ" (T2), "(Đang soạn hàng)" (T25),
+  "Phiếu hoàn tiền … chuyển thất bại" (C3). "Mang hàng về kho" giữ. Logic gộp mốc W37 L3 và lọc dòng AI không đổi.
+- Low 1: `_cancel_audit_note` ghi "Huỷ đơn: <nhãn>" (không còn "Lý do: Lý do khác"); `_cancel_note_ok` nhận cả tiền tố "Huỷ đơn:" lẫn "Lý do:" cũ.
+- Low 2: note `resolve_payment` mới ghi "phiếu hoàn tiền #N"; regex nhận cả "phiếu hoàn #N" cũ.
+- Test: thêm `OrderTimelineWordingTests` và `CancelAndResolveNoteTests` vào `test_standard_names.py`; sửa 6 test timeline đang khoá chữ cũ.
+- Kết quả: 3261 test OK (0 failure, 2 skipped), `makemigrations --check` sạch, `check_naming.py` exit 0.

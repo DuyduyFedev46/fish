@@ -338,7 +338,7 @@ def _cancel_audit_note(reason_code, cancel_note):
     """Nhật ký chỉ ghi nhãn lý do + "có ghi chú"; chữ gốc ở `SalesOrder.cancel_note` (bất biến 9)."""
     if not reason_code:
         return ""
-    text = f"Lý do: {CANCEL_REASON_LABELS.get(reason_code, 'Không rõ')}"
+    text = f"Huỷ đơn: {CANCEL_REASON_LABELS.get(reason_code, 'Không rõ')}"
     marker = note_marker(cancel_note)
     return f"{text} · {marker}" if marker else text
 

@@ -17,7 +17,7 @@ _FIXED_NOTES = ("", NOTE_PRESENT_LABEL, NOTE_PRESENT_NEUTRAL_LABEL)
 # khi khớp mẫu cố định do hệ thống sinh, không thì trả nhãn trung tính. Không sửa DB (bất biến 4).
 _GUARDED_ACTIONS = {
     "attach_payment": (),
-    "resolve_payment": (re.compile(r"Hoàn tiền theo phiếu hoàn #\d+"),),
+    "resolve_payment": (re.compile(r"Hoàn tiền theo phiếu hoàn( tiền)? #\d+"),),
     "mark_refund_failed": (),
     "cancel_paid_order": (),  # xử lý riêng: nhãn lý do + nhãn ghi chú
     "delivery_unconfirmed": (),
@@ -37,9 +37,10 @@ def _cancel_note_ok(note):
 
     labels = [*CANCEL_REASON_LABELS.values(), *_LEGACY_CANCEL_LABELS, "Không rõ"]
     for label in labels:
-        base = f"Lý do: {label}"
-        if note in (base, f"{base} · {NOTE_PRESENT_LABEL}", f"{base} · {NOTE_PRESENT_NEUTRAL_LABEL}"):
-            return True
+        for prefix in ("Huỷ đơn", "Lý do"):  # "Lý do:" là mẫu cũ đã ghi trong DB, giữ để không che nhầm
+            base = f"{prefix}: {label}"
+            if note in (base, f"{base} · {NOTE_PRESENT_LABEL}", f"{base} · {NOTE_PRESENT_NEUTRAL_LABEL}"):
+                return True
     return False
 
 

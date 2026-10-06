@@ -102,7 +102,7 @@ class TimelineLabelsNoFreeTextTests(OrderApiBase):
         order, refund = self._scenario()
         rows = client_for(self.owner).get(f"/api/sales/orders/{order.pk}/").json()["timeline"]
         failed = next(r for r in rows if r["kind"] == "refund_failed")
-        self.assertEqual(failed["label"], "Phiếu hoàn 100.000 đ chuyển thất bại")
+        self.assertEqual(failed["label"], "Phiếu hoàn tiền 100.000 đ chuyển thất bại")
         own = [e.label for e in build_refund_timeline(refund)]
         self.assertIn("Lập phiếu hoàn tiền 100.000 đ", own)
         self.assertIn("Báo thất bại", own)
