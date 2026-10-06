@@ -90,3 +90,56 @@ Nhánh `feat/w37-l1-fe`. Chỉ sửa `erp-console/`. Không đụng `OrderDetail
 - Build `NEXT_PUBLIC_USE_MOCK=1`: `ed_batch3_orders` 143/143, `ed_batch4_delivery` 70/70, `order_completion_erp` 6/6.
 - `python3 scripts/check_naming.py`: không báo gì ở `erp-console/` (exit 1 ở main do `frontend/features/site/components/SiteLegalFooter.tsx:60`, có sẵn từ trước, không do lô này).
 - Ảnh: `shots/order_completion_toast_360.png`, `order_completion_filter_1280.png`, `order_completion_steps_1280.png`.
+
+## L4 BE (S3 lệnh chuyển bù) — nhánh `feat/w37-l2-l4-be`
+
+### File
+- Mới: `backend/apps/sales/management/commands/backfill_completed_orders.py`.
+- Sửa: `backend/apps/sales/orders/completion.py` (thêm `backfill_candidates()`, đúng 02b §1.4).
+- Mới: `backend/apps/sales/orders/tests/test_backfill_completed_orders.py` (13 test: S3-AC1..AC8, R1, R4, thêm ca phiếu huỷ và phiếu mới nhất).
+- Không có route HTTP, không có lệnh AI, không migration.
+
+### Cách chạy (mặc định CHẠY THẬT, khác `backfill_credit_notes`)
+```
+python manage.py backfill_completed_orders --dry-run   # bước 1: chỉ in "Sẽ chuyển N đơn:" + mã đơn
+python manage.py backfill_completed_orders             # bước 2: chạy thật, in "Đã chuyển N đơn." + mã đơn
+python manage.py backfill_completed_orders             # bước 3: chạy lại, phải ra "Đã chuyển 0 đơn."
+```
+Sau bước 3, QA so số báo cáo (kỳ và lô) với số trước khi chạy: phải trùng từng đồng. Production chỉ chạy khi Duy duyệt; không chép
+mã đơn production vào doc.
+
+### Hành vi
+- Ứng viên: đơn `PROCESSING` có ít nhất một phiếu `COMPLETED`. Mỗi đơn một `transaction.atomic()`: khoá đơn, đọc lại, gọi
+  `complete_order_if_delivered(backfill=True)` (cùng luật với đường giao xong, S1). `trigger_note` là phiếu `COMPLETED` có
+  `completed_at` mới nhất.
+- Đơn `PAID`, đơn có phiếu `FAILED`/đang giao, đơn `CANCELLED` không đổi. Phiếu `CANCELLED` bỏ qua khi xét.
+- AuditLog `complete_order`, actor Hệ thống, `changes` = `status`, `delivery_note`, `delivery_note_id`, `backfill: "W37"`.
+- Lỗi một đơn: đơn đó rollback, lệnh in "Đã chuyển K đơn trước khi lỗi.", `CommandError` kèm mã đơn (exit khác 0). Đơn trước đã commit,
+  chạy lại làm nốt. Thông báo lỗi chỉ có mã đơn và tên lớp lỗi, không dữ liệu khách.
+- Output chỉ có mã đơn (test R4 xác nhận không có tên, SĐT, địa chỉ).
+- R1: test dựng hoá đơn tháng trước, chứng từ đảo, so `financial_snapshot` trước/sau: bằng nhau.
+
+### Nợ
+- `--dry-run` tính lại luật bằng `is_delivery_finished` ngoài khoá, nên giữa dry-run và chạy thật số có thể lệch nếu có thao tác mới. Chấp nhận.
+
+## L2 BE (S4, S5, `refund_summary`) — nhánh `feat/w37-l2-l4-be`
+
+### File
+- Sửa: `backend/apps/sales/orders/serializers.py` (`refund_summary` trong `SalesOrderDetailSerializer` + `Meta.fields`). Không sửa
+  `api.py`, `scope.py`, `models/`, `batches/services.py`, `next_steps.py`.
+- Mới (test): `sales/orders/tests/test_order_detail_completed.py` (10), `sales/refunds/tests/test_refund_completed_order.py` (7,
+  S5-AC1..AC7), `inventory/batches/tests/test_close_after_completion.py` (6, S4-AC1..AC5, AC3 gọi lệnh L4).
+
+### Contract `GET /api/sales/orders/{id}/` (chỉ thêm một khoá)
+```json
+"refund_summary": {"refunded_amount": "200000", "pending_amount": "100000"}
+```
+Tổng phiếu `REFUNDED` và `PENDING` (chuỗi Decimal, `money_str`), `FAILED` không tính. Không có hoá đơn hoặc không có phiếu: cả hai
+`"0"`. Tính từ `invoice.refunds.all()` đã prefetch: thêm phiếu không thêm query (test so 1 phiếu với 3 phiếu). Không có ô dữ liệu khách,
+có ở mọi vai xem được đơn (kể cả NV giao ngoài phạm vi, họ vẫn thấy `customer` bị che theo Lô 3).
+
+### Kết quả TDD
+- Đỏ thật ở `refund_summary` (KeyError, 5 error). S4 và S5 xanh ngay vì hành vi có từ L1 (02b §1.5, §2.5: "chỉ cần test"); chứng minh
+  S5-AC2 không phải xanh giả bằng so kỳ hiện tại phải ĐỔI số, kỳ cũ không đổi.
+- S7-AC8 và S5-AC8: đơn `COMPLETED` có `create_refund`, không có `cancel`; hết số còn hoàn thì mất `create_refund`.
+- S7-AC10: duyệt đệ quy JSON, không có `unit_cost`, `landed_unit_cost`, `purchase_rate`, `profit`, `pnl`, `cost`.
