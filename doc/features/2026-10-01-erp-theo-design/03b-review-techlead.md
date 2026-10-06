@@ -3251,3 +3251,65 @@ Ghi nhận sự cố: lần chạy đầu của techlead đụng một phiên kh
 **Critical/High/Medium:** không còn.
 
 ### Kết luận re-review sau 3411a13: **APPROVED**
+
+---
+
+## Review #15 BE (08/10)
+
+Phạm vi: `git diff main...feat/tien-ve-muon` (commit fdba607, 17 file). Đối chiếu `02d-tien-ve-muon.md` (LP-AC1…16, §3–§7) và dev-notes "#15 ghi tiền về muộn (BE)".
+
+**Lệnh techlead tự chạy (08/10).** Chạy trên cây đã merge thử `main` (5116d99, có Phạm vi Lô 3) với nhánh. Dùng `git merge-tree`, không xung đột. Worktree tạm nằm ở scratchpad và đã gỡ.
+- `makemigrations --check --dry-run`: No changes detected.
+- `manage.py test apps.sales apps.ai apps.accounts` (`DJANGO_DEBUG=1`): 1421 test, 1411 OK. 10 ERROR đều là test HTML trang admin, lỗi `Missing staticfiles manifest entry`. Đây là lỗi môi trường tạm (chưa `collectstatic`), không phải lỗi code.
+- `check_naming.py`: không có vi phạm mới. Chỉ còn 2 file `frontend/` đã đỏ sẵn trên main.
+
+### Kết quả theo mục được giao
+
+| Mục | Kết quả |
+|---|---|
+| Tiền, làm tròn đồng | **Đạt.** Đi qua `validate_amount` (Decimal, ROUND_HALF_UP 0,01, tối thiểu 1 đ, trần cột). Có test `350000.004 → 350000.00` và 6 giá trị sai. Không dùng float. |
+| Không sửa số kỳ cũ | **Đạt.** `received_at` cho lùi ngày tuỳ ý, nhưng (a) báo cáo không đọc `PaymentTransaction.received_at`; (b) `ORPHAN`/`UNMATCHED` không vào `_countable_payments`; (c) gắn dòng `UNMATCHED` vào đơn (S12) thì xuất hoá đơn với `issued_at=now` (`services.py:841`), không theo giờ ghi muộn; (d) phiếu hoàn ghi sổ lúc xác nhận. Nên ghi muộn không đổi số của kỳ đã qua. |
+| Nghi trùng hai chiều | **Đạt theo 02d, nhưng 02d có lỗ.** Ghi tay sau webhook trả 409 kèm tick. Webhook sau ghi tay thì gắn nhãn. Hai chiều chỉ hoạt động khi **cùng loại**: ORPHAN↔ORPHAN cùng đơn, hoặc UNMATCHED↔UNMATCHED. Ca chéo loại không bị bắt, xem **TL15-H1**. |
+| Job tự khớp bỏ qua MANUAL | **Đạt.** `auto_confirm.py:51` thêm `.exclude(source=MANUAL)`. Có test qua job thật và qua query. |
+| Quyền `confirm_payment_manual` | **Đạt.** Có `required_perms` ở action và `check_permissions` → `require_perm` ở viewset. Có test 401, test 403 cho 4 Group (không ghi dòng nào, không ghi audit), và test user chỉ có perm thì được ghi. Người gọi không có tham số nào để tự đặt `source`, `match_status`, `sales_order` hay `environment` (có test). |
+| `raw_payload`, AuditLog, dữ liệu cá nhân | **Đạt.** Cả hai nhánh đều có `raw_payload={}`. `record_late_payment` chỉ ghi 7 khoá (mã GD, tiền, loại, nguồn, mã đơn, giờ, cờ ack), không có `note`. Có test khoá `note` chứa SĐT giả và kiểm rằng nó không nằm trong model, audit, hai timeline hay response. Response không có `raw_payload`, giá vốn, tên hay SĐT. Có test `assertNoLogs`. Mã GD chỉ nhận ký tự `[A-Z0-9._/-]`. |
+| AI `record_late` | **Giữ, không cấm.** Lệnh nằm trong `RED_ZONE_PERMS` (`confirm_payment_manual`). `effective_level` tính trần theo `spec.max_level`, kể cả khi Chủ mở vùng đỏ (`policy/effective.py:150`), nên trần thực tế là **C**: AI chỉ điền đề xuất, Chủ bấm xác nhận. Mức này giống `sales.salesorder.confirm_payment` và `resolve`. Cấm hẳn AI không thêm an toàn, vì mọi số trên phiếu Chủ vẫn phải tự đối chiếu với sao kê. Còn một điểm nhỏ ở **TL15-L1**. |
+| Đổi contract refund | **Đúng 02d, có điều kiện triển khai** (**TL15-C1**). FE hiện tại (main) không gửi `acknowledge_duplicate_warning`. 409 `PAYMENT_DUPLICATE_WARNING` không thuộc `CONFLICT_CODES` và không có `updated_at`, nên `ConfirmModal`/`useSubmit` hiện nó như lỗi thường, alert đỏ kèm câu nhãn. Không vỡ màn hình. Tuy vậy **Chủ sẽ không lập được phiếu hoàn** cho mọi giao dịch có nhãn, gồm cả dòng `OVERPAID` BR-TT-15 đã có trên production, cho tới khi FE #15 có ô tick. Lối gọi AI `create_refund` cũng không gửi được cờ này. Đây là hành vi đúng (AI không vượt được cảnh báo). |
+| Sửa GW-03 | **Đạt.** `next_steps.py:151` đọc `payment.duplicate_warning`, áp cho mọi loại khoản. Import `DUPLICATE_MANUAL_WARNING` không còn dùng đã được bỏ. Có test. |
+| Va chạm Phạm vi Lô 3 | **Không va chạm.** Ở `sales/payments/api.py`, main chỉ sửa docstring `SalesInvoiceViewSet`, còn nhánh thêm action vào `PaymentTransactionViewSet`. `merge-tree` sạch. `PaymentTransactionSerializer` không bị Lô 3 đổi. Bộ test sales/ai/accounts trên cây merge vẫn xanh (trừ lỗi môi trường đã nêu). |
+| Đúng thiết kế khác | Có `late_serializers.py` tách riêng và đếm 31→32 `@action` (giả định 2, 3 của dev). **Chấp nhận** cả hai. Giả định 1 (ack mà không có khoản giống thì không gắn nhãn) cũng **chấp nhận**. |
+
+### Lỗi
+
+**TL15-H1 · High · lỗ thiết kế 02d §5 (lỗi của techlead, không phải của dev). Nghi trùng không bắt ca chéo loại, nên có thể hoàn hai lần.**
+- `services.py:402-416` `find_similar_payment`: khi không có đơn, hàm chỉ tìm `UNMATCHED` không gắn đơn. Khi có đơn, hàm chỉ tìm giao dịch của chính đơn đó.
+- `services.py:436-446` `flag_possible_duplicate`: nhánh `ORPHAN` chỉ so với `MANUAL ORPHAN` cùng đơn. Nhánh `UNMATCHED` chỉ so với `MANUAL UNMATCHED` không đơn.
+- Tái hiện (ca thật, hay gặp nhất). Đơn SO-A tự huỷ. Chủ thấy 350.000 đ trên sao kê nhưng không chắc của đơn nào, nên ghi muộn **không gắn đơn** (`UNMATCHED`, mã FT…01). Sau đó IPN của cổng về trễ. IPN luôn mang mã đơn, và vì không có FT nên lùi về id SePay (02d R2). Kết quả là dòng `ORPHAN` gắn SO-A với mã GD khác, **không có nhãn**. Cả hai dòng đều OPEN và có `refund` trong `available_actions`, không có tick nào chặn → hoàn hai lần 350.000 đ.
+- Chiều ngược lại cũng lọt. Webhook/IPN đã tạo `ORPHAN` trên SO-A, sau đó Chủ ghi muộn **không gắn đơn** cùng số tiền với mã khác. `find_similar_payment(order=None)` không thấy, nên không trả 409.
+- Sửa: coi "khoản giống" là **cùng số tiền và `received_at` trong cửa sổ `LATE_PAYMENT_DUPLICATE_WINDOW_HOURS`**, không phụ thuộc bên kia có gắn đơn hay không, với các ca sau:
+  - `find_similar_payment(order=None)`: thêm `Q(match_status=ORPHAN)` (đơn bất kỳ) bên cạnh `UNMATCHED` không đơn.
+  - `find_similar_payment(order=X)`: giữ nhánh "giao dịch của X", thêm `UNMATCHED` không đơn trong cửa sổ.
+  - `flag_possible_duplicate` nhánh `ORPHAN`: thêm `MANUAL UNMATCHED` không đơn trong cửa sổ.
+  - `flag_possible_duplicate` nhánh `UNMATCHED`: thêm `MANUAL ORPHAN` (đơn bất kỳ) trong cửa sổ.
+- Test bắt buộc (4 ca): ghi tay không đơn rồi IPN ORPHAN thì dòng IPN có nhãn; IPN ORPHAN rồi ghi tay không đơn thì 409; webhook UNMATCHED rồi ghi tay gắn đơn huỷ thì 409; ghi tay gắn đơn huỷ rồi webhook UNMATCHED thì có nhãn. Mỗi ca thêm một ca ngoài cửa sổ hoặc khác tiền để chứng minh không gắn nhãn thừa.
+- Techlead nhận đây là phần đính chính 02d §5 và R2. Điều phối viên ghi một dòng "đính chính 08/10" vào 02d khi sửa.
+
+**TL15-M1 · Medium · `refunds/services.py:135-139`. Quyết định vượt cảnh báo không để lại dấu vết.** Chủ gửi `acknowledge_duplicate_warning=true` thì phiếu hoàn được tạo, nhưng audit `create_refund` không ghi việc Chủ đã xác nhận qua nhãn nghi trùng. Đây là thao tác làm tiền rời túi, đi ngược một cảnh báo của hệ thống, nên phải truy được ai đã bấm (BR-PQ-04/05). Sửa: khi `p.duplicate_warning` khác rỗng thì thêm `"acknowledged_duplicate_warning": True` vào `changes`, chỉ là cờ, không chép nhãn. Thêm test assert khoá này trong `test_lp_ac13_refund_blocked_without_ack_then_ok_with_ack`.
+
+**TL15-L1 · Low · AI và `acknowledge_possible_duplicate`.** `RecordLatePaymentInput` khai cờ này nên AI có thể đề xuất sẵn `true`, và Chủ bấm xác nhận mà không thấy hộp 409. Nên bỏ cờ khỏi tham số AI được điền, hoặc để pipeline luôn ép `false` với lệnh này. Không chặn lô này, đưa vào nợ AI.
+
+**TL15-L2 · Low · `services.py:368-376`.** `parse_datetime("2026-10-03")` (Python 3.11 `fromisoformat`) nhận chuỗi chỉ có ngày thành 00:00. Ngoài ra không có cận dưới cho giờ nhận, nên gõ nhầm năm 2006 vẫn ghi được. Cả hai đều không đổi số kỳ cũ (xem bảng trên), nhưng làm lệch thứ tự timeline và cửa sổ nghi trùng. Nên đòi có phần giờ và chặn cũ hơn khoảng 400 ngày. Không chặn lô này.
+
+**TL15-L3 · Low · ghi nhận.** Kiểm nghi trùng chạy ngoài khoá, nên hai lần ghi đồng thời **khác** mã GD mà cùng tiền vẫn qua cả hai, không có nhãn. Ca này phải do hai người cùng bấm trong vài trăm ms, khó xảy ra với một Chủ. Chấp nhận.
+
+### Điều kiện (không phải lỗi code)
+
+- **TL15-C1. Phát hành đồng bộ.** Không deploy BE #15 lên staging hay production khi FE #15 (ô tick trong `RefundModal`, nhãn ở hàng chờ và chi tiết) chưa đi cùng đợt. Nếu không, Chủ bị khoá hoàn tiền với mọi giao dịch có nhãn. Merge vào main được, vì merge không phải deploy. Trước khi deploy production, nên đếm số dòng `duplicate_warning <> ''` và `resolution_status='OPEN'` (chỉ đếm, không đọc dữ liệu) để biết bao nhiêu dòng cũ sẽ đòi tick.
+- **TL15-C2. Ghi BR-TT-18 vào spec khi nghiệm thu.** `doc/business-process-spec.md` §P-05 hiện chỉ có tới BR-TT-07 (BR-TT-08…17 còn nằm ở hồ sơ tính năng, nợ cũ). BR-TT-17 đã dùng ở hồ sơ SePay, nên số 18 không trùng. Đề xuất thêm ngay dưới BR-TT-07:
+  > | BR-TT-18 | **Tiền về muộn mà webhook/IPN không báo** (E-05, đơn đã huỷ/tự huỷ hoặc chưa rõ đơn): Chủ (hoặc người có `confirm_payment_manual`) ghi tay ở Hàng chờ thanh toán. Hệ thống tạo giao dịch `MANUAL` đang Chờ xử lý: `ORPHAN` nếu gắn đơn đã huỷ, `UNMATCHED` nếu không gắn đơn. **Không đổi đơn, kho, hoá đơn**; bước sau đi qua hàng chờ (gắn đơn / phiếu hoàn). Không ghi gắn đơn đang giữ chỗ hoặc đã thanh toán. Không có ô ghi chú. Mã GD chống trùng (BR-TT-03). Khoản cùng số tiền trong cửa sổ `LATE_PAYMENT_DUPLICATE_WINDOW_HOURS` bị gắn nhãn nghi trùng; phiếu hoàn trên giao dịch có nhãn phải xác nhận "đã đối chiếu sao kê" (áp cả nhãn BR-TT-15) *(D, 03/10; Q1–Q3 theo mặc định 02d)*. |
+
+  Sửa thêm dòng E-05 ở §13 thành `BR-TT-07, BR-TT-18`.
+
+### Kết luận Review #15 BE (08/10): **CHANGES REQUESTED**
+
+Phải sửa trước khi merge: **TL15-H1** (4 nhánh + 4 test) và **TL15-M1** (1 khoá audit + 1 assert). L1–L3 đưa vào nợ. C1, C2 là điều kiện cho điều phối viên. Sau khi sửa, techlead re-review chỉ phần diff mới và chạy lại `apps.sales.payments` cùng `apps.sales.refunds`.
