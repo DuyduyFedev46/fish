@@ -58,6 +58,20 @@ def build_payment_timeline(payment: PaymentTransaction) -> list[TimelineEvent]:
             ai_lvl = None
             ai_cfg = None
 
+        if a.action == "record_late_payment":
+            # BR-TT-18: nhãn chuẩn, chỉ mã GD + số tiền của chính giao dịch; không chép chữ tự do (#3).
+            events.append(
+                TimelineEvent(
+                    at=a.created_at,
+                    kind="payment_recorded_late",
+                    label=f"Ghi tay tiền về muộn {format_vnd_ui(payment.amount)} (mã GD {payment.bank_txn_id})",
+                    actor_display=who,
+                    doc="payment",
+                    actor_kind=kind_actor,
+                    ai_level=ai_lvl,
+                    ai_config_version=ai_cfg,
+                )
+            )
         if a.action == "resolve_payment":
             code = (a.changes or {}).get("resolution") or ""
             try:

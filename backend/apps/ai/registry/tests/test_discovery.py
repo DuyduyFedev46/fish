@@ -90,6 +90,7 @@ class CommandDiscoveryTestCase(TestCase):
         """DW-07-AC3: Tập red_zone=true đúng bằng các action có close_batch/confirm_refund/confirm_payment_manual."""
         expected_red_zone_ids = {
             "inventory.batch.close",
+            "sales.paymenttransaction.record_late",
             "sales.paymenttransaction.resolve",
             "sales.refund.confirm",
             "sales.refund.mark_failed",
@@ -100,7 +101,7 @@ class CommandDiscoveryTestCase(TestCase):
         self.assertEqual(
             actual_red_zone_ids,
             expected_red_zone_ids,
-            f"Tập red_zone phải đúng bằng 6 action có 3 quyền đỏ. Lệch: {actual_red_zone_ids ^ expected_red_zone_ids}",
+            f"Tập red_zone phải đúng bằng 7 action có 3 quyền đỏ. Lệch: {actual_red_zone_ids ^ expected_red_zone_ids}",
         )
 
         for s in self.specs:
