@@ -332,4 +332,4 @@ quan `row_version` cho mọi lần lưu của nhóm."
 ## 9. Review
 
 - 06/10 Lô 1–2 BE: CHANGES REQUESTED (H1 luật D7), sau d50d082 **APPROVED**. Chi tiết ở `03b-review-techlead.md`.
-- 07/10 Lô F1 FE (dd84536): **CHANGES REQUESTED** (M1 mock D7, M2 Hoàn tác mở rộng, M3 chặn chuyển trang). Chi tiết ở 03b.
+- 07/10 Lô F1 FE (dd84536): **CHANGES REQUESTED** (M1 mock D7, M2 Hoàn tác mở rộng, M3 chặn chuyển trang). Chi tiết ở 03b. Sau a1b5b31 **APPROVED** (còn L10 cho Lô 6; giữ nhánh tới Lô 5 BE).

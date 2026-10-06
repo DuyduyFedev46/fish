@@ -319,3 +319,32 @@ Lô 5 lên với ERP cũ thì PUT không có `version` bị 400. Đề xuất:
 4. L1, L2 (mock), L3, L4, L5 nếu kịp. Không làm L6 khi UI review chưa quyết.
 5. Kiểm chứng: `tsc --noEmit`, `vitest run`, build `NEXT_PUBLIC_USE_MOCK=0` + `check-no-mock.mjs` + `check-ai-chunks.mjs`, build mock +
    `ed_batch14_permissions.py`, `python3 scripts/check_naming.py`. Không đụng file ngoài danh sách F1.
+
+### Re-review sau a1b5b31 (07/10)
+
+Lượt này đọc `git show a1b5b31` (9 file, chỉ trong danh sách F1 + 03-dev-notes). Theo yêu cầu, không build và không chạy lại test.
+Số kiểm chứng lấy từ báo cáo của fe-dev: vitest 1026 PASS, `ed_batch14` 157/157, build mock=0 + 2 check XANH. QA sẽ chạy lại.
+
+#### Kết luận: **APPROVED**
+
+| Mục | Kết quả |
+|---|---|
+| M1 | **Đạt, khớp 02b §2.5 bản 07/10.** `mockScopes.ts` thêm `HAS_CUSTOMER_VIEW = [manager, delivery_staff]`. Hai nhóm này luôn đủ điều kiện D7, nên GET mock của Quản lý tắt "Xem khách hàng" trả `inactive_reason: null`, giống BE Lô 2. `effectiveRank` chặn trần D7 ở `assigned_deliveries` khi việc tắt. Hàm này dùng cho cả `reachBefore`/`reachAfter`, `narrowed` và `already_wider_elsewhere`. Đã thử tay các ca: NV giao đổi D7 `assigned_deliveries` → `all` khi việc tắt thì rank 1 → 1, không mở rộng, không thu hẹp. NV giao lưu `all` rồi bật việc thì 1 → 2, là mở rộng. Quản lý tắt rồi bật lại khi D7 = `all` cũng 1 → 2, là mở rộng. NV kho (không có `view_customer`) bật việc khi D7 = `none` thì PO-Q1 đặt `all`, cổng vừa mở với rank 2, là mở rộng. Cả 4 ca có test trong `mock.test.ts`. Lô 5 BE dùng đúng các ca này làm test đối chiếu. |
+| M2 | **Đạt.** "Hoàn tác" dựng `SendPlan` đảo ngược rồi đi qua `send` (`sendRef`), nên 400 có `impact` mở `pendingWiden`. `saved()` với `isUndo` chỉ báo "Đã hoàn tác", không lồng thêm một nút Hoàn tác. Ca PO-Q1 hoàn tác có kèm `scopes.customers = "none"`. Có e2e tắt "Xem đơn" của Quản lý → Hoàn tác → hộp cảnh báo → "Tôi hiểu, lưu". |
+| M3 | **Đạt cho phạm vi đã yêu cầu.** Listener `click` ở pha capture bắt `<a href>` cùng origin, khác trang hiện tại, bỏ qua phím bổ trợ, `target` khác `_self` và `download`; gỡ listener khi hết nháp. Có e2e cho cả Huỷ (ở lại, nháp còn) lẫn Đồng ý. |
+| L1, L2 | Đạt (`mock.ts:216`, `:371-372`), có test. |
+| L3 | Đạt. `baseVersion` lấy theo lúc nháp còn rỗng. `version` đổi khi đang có nháp thì đặt `conflict`. Khi tự Lưu, `onSaved` và `setDraft(EMPTY)` chạy sau `await`, React 18 gộp chung một lần render, nên lần Lưu của chính mình không bị báo xung đột nhầm. |
+| L4, L5 | Đạt. |
+
+#### Còn mở, không chặn duyệt (làm ở Lô 6, vì Lô 6 FE cũng sửa `features/permissions/**`)
+
+- **L10 (M3 còn sót):** trong bảng Thành viên, chỉ ô đầu của mỗi dòng là `<Link>`. Bấm ô khác (tên đăng nhập, nhóm khác, trạng
+  thái) thì `DataTable.onRowClick` gọi thẳng `router.push` (`shared/ui/list/DataTable.tsx:144-149`), không đi qua listener, nên mất
+  nháp mà không hỏi. ⌘K (`CommandSearch.tsx:76`) và nút Back của trình duyệt cũng chưa chặn. Sửa trong `features/permissions/`:
+  listener capture bắt thêm click trong `tr.lt-click`, trừ khi click vào a, button hay ô nhập, rồi lấy `href` từ `a.lt-link` của dòng
+  đó. ⌘K và Back chấp nhận để sau. QA ghi nhận là hạn chế đã biết.
+- **L11 (contract Lô 5):** khi cổng vừa mở, mục `widened` mang `from`/`to` là giá trị **đã lưu**, nên có ca `{"key": "customers",
+  "from": "all", "to": "all"}`. FE chỉ dùng `key` nên không sao. Lô 5 BE trả đúng như vậy (giá trị lưu, không phải giá trị hiệu lực)
+  để giữ khớp với mock.
+- Vẫn còn: L6 (chờ UI review quyết), L7–L9 (Lô 3/5), câu hỏi superuser không nhóm (điểm dừng 🟡 hỏi Duy), quy tắc deploy theo
+  phương án A ở mục trên (không gộp main hay deploy F1 trước Lô 5 BE).
