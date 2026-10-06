@@ -402,3 +402,37 @@ Test cũ phải sửa vì thay đổi hợp lệ: `delivery/tests/test_confirmat
 
 ### 8. Sửa theo review Tech Lead (03b)
 M1 cấm AI gọi `lookup` (rules.py, snapshot, test). L1 `lookup_label` nhận `queryset=self.get_queryset()` (Tầng 3) và action kiểm thêm `view_deliverynote` (403). L2 body JSON không phải object trả 400 `INVALID_INPUT`. L3 `IntegrityError` khi tạo trùng tình huống đổi thành `BusinessError` 400. L4 `lookup_label` chuyển sang `delivery/labels/services.py`. N1 dùng `exists()` cho `bundle_snapshot`. N2 dọn `setUp` thừa. 02b §4.6 thêm dòng RETURNING. Contract không đổi, chỉ thêm 400 khi body không phải object.
+
+---
+
+## Lô 5 — FE (CS-16, CS-17, CS-18) — nhánh `feat/cskh-lo5-fe`, chỉ sửa `erp-console/`
+
+### 1. Đã làm
+- **CS-16** `/print/pick-sheet/?note=<id>` (`app/print/pick-sheet/page.tsx` + `features/deliveries/components/PickSheetScreen.tsx`, `pickSheet.ts`, `pickSheet.module.css`). Khổ 100×150 mm (`@page` + tờ rộng 100 mm), chỉ mã phiếu, dòng hàng, kg, mã lô, HSD, tổng kg. `toPickSheet` chép đúng 4 trường của dòng hàng, mã phiếu, tổng kg; tên, SĐT, địa chỉ, người nhận hộ, ghi chú, mã đơn bị bỏ ngay, không vào state hay DOM. **Trang tự chặn theo quyền** `print_label` hoặc `pack_deliverynote` TRƯỚC mọi request (NV giao có quyền đọc chi tiết phiếu của mình nên không thể trông vào 403): thiếu quyền hiện "Không có quyền" và không gọi API chi tiết nào. 403 từ API cũng ra màn này. Chỉ in được khi phiếu Soạn hàng; huỷ báo đỏ, chưa xác nhận hoặc đã qua soạn báo vàng. Nút vào: mục "In phiếu soạn" trong menu "…" của chi tiết phiếu giao (chỉ khi Soạn hàng và có quyền), mở tab mới.
+- **CS-17** `/deliveries/lookup/` (`TagLookupScreen.tsx`, `TagCameraScanner.tsx`, `tagCode.ts`, hàm `lookupDeliveryTag`). Mã tem kiểm regex `^GH-[A-Z0-9-]{3,40}\.\d{1,3}$` **ở máy khách trước khi gọi API** (đã chuẩn hoá hoa, bỏ khoảng trắng), nên SĐT gõ nhầm không lên URL của request (QA L1); câu lỗi không lặp lại chuỗi đã gõ. Máy quét USB: ô mã tự focus, nhấn Enter là tra; sau lỗi, ô được chọn sẵn để quét tiếp. Camera chỉ hiện khi trình duyệt có `BarcodeDetector` + `getUserMedia` (không thêm thư viện); lỗi camera báo "gõ mã vào ô". Kết quả: tem còn hiệu lực mở thẳng chi tiết phiếu; `BR-GH-16` cảnh báo vàng "dùng tem lần N"; `BR-GH-07` cảnh báo đỏ "xé tem"; cả hai kèm nút "Mở phiếu". 404 "Không tìm thấy phiếu", 400, 403, lỗi mạng đều có câu riêng. Câu chữ không có mã luật (UI-RULES §3.1). Nút vào: "Quét mã tem" ở màn Giao hàng.
+- **CS-18** `/confirmation/scripts/` (`CallScriptsScreen.tsx`, `CallScriptModal.tsx`, `callScripts.ts`, hàm `fetchCallScripts/createCallScript/updateCallScript`). 4 tình huống cố định. Chủ: soạn, sửa (hộp), bật/tắt (không xoá, đúng BE). Quản lý, CSKH: chỉ đọc, chỉ thấy kịch bản đang bật (nếu chưa có cái nào thì màn rỗng có câu giải thích). Chặn dãy ≥ 9 chữ số (kể cả có dấu cách, chấm, gạch) và rỗng, > 2000 ký tự ở máy khách (BR-GH-19); BE chặn lại. Chi tiết hàng chờ gọi hiện khối "Kịch bản gọi" từ khoá `scripts` (chỉ khi có kịch bản). Nút "Kịch bản gọi" ở màn Gọi xác nhận, chỉ hiện khi có `delivery.view_callscript`.
+- Quyền: thêm `PERM.viewCallScript/addCallScript/changeCallScript`; ViewKey `delivery-lookup` (cần `print_label` + `view_deliverynote`, không phải người chỉ giao hàng) và `call-scripts` (`view_callscript`). Cả hai là mục con (không có dòng ở menu trái).
+- Không có chỗ nào gọi `/api/ai/` (e2e xác nhận trên mọi màn mới). Chạy được khi cờ AI tắt: các màn mới không dùng khối AI.
+
+### 2. Hàm API mới và mock
+`lookupDeliveryTag(code)` → `GET /api/delivery/notes/lookup/?code=`; `fetchCallScripts()` → `GET /api/confirmation/scripts/`; `createCallScript()` → `POST`; `updateCallScript(situation, {content?|is_active?})` → `PATCH /api/confirmation/scripts/<situation>/`. Mock theo contract thật ở mục 2 và 8 của phần BE: `mockLookupDeliveryTag` (trong `deliveries/mock.ts`, thêm phiếu 46 đã in lại tem lần 2 và phiếu 47 đã huỷ), `confirmation/mockScripts.ts` (kho kịch bản, 403/400/404, `scripts` của chi tiết). Quyền mock của owner, manager, customer_service cập nhật theo migration `delivery/0009`. Nhớ: các hàm API viết `process.env.NEXT_PUBLIC_USE_MOCK === "1" ? mock : undefined` trực tiếp (không bọc hàm) để bản build thật loại bỏ mock; lần đầu tôi bọc hàm và `check-no-mock` bắt được `demo1234` lọt vào chunk.
+
+### 3. Lệch contract / quyết định cần Duy biết
+- **Menu:** UI-RULES §2.1 cố định danh mục menu, nên "Quét mã tem" và "Kịch bản gọi" là màn con vào bằng nút trong Giao hàng và Gọi xác nhận, không có dòng riêng. Nếu muốn dòng menu riêng thì đổi `menu: false` ở hai mục trong `shared/lib/nav.ts`.
+- **Tên file e2e:** giao việc ghi `e2e/cskh_lo5.py` nhưng `check_naming.py` cấm `cskh` và mã lô trong tên file, nên đặt `e2e/confirmation_scripts_tag_lookup.py`.
+- Phiếu soạn chỉ in khi phiếu **Soạn hàng** (CS-16-AC1 chỉ nói PREPARING). Phiếu đã Chờ lấy trở đi không có mục "In phiếu soạn".
+- 02b ghi đường dẫn `/api/cskh/scripts/`; dùng `/api/confirmation/scripts/` như BE thật. BE chưa nói rõ thân 400 của kịch bản: FE hiện `detail` của BE nếu có, và chặn trước ở máy khách.
+- Tình huống `RETURNING` (khách quen) chọn ở BE; mock coi phiếu 28 và 36 là khách quen để thử.
+- Phiếu soạn nhiều dòng thì tờ dài thêm xuống trang sau (không cắt dòng); với khổ 150 mm chứa được khoảng 8 dòng hàng.
+
+### 4. Kiểm chứng (chạy trong lượt này, trong worktree, `node_modules` symlink đã gỡ trước khi commit)
+- `tsc --noEmit`: sạch. `vitest run`: **81 file, 945 test pass** (thêm 33 test: `tagCode.test.ts`, `pickSheet.test.ts`, `callScripts.test.ts`, 3 ca trong `nav.test.ts`).
+- Build `NEXT_PUBLIC_USE_MOCK=0` + `node scripts/check-no-mock.mjs`: XANH (251 file). `node scripts/check-ai-chunks.mjs`: XANH.
+- Build `NEXT_PUBLIC_USE_MOCK=1` + `e2e/confirmation_scripts_tag_lookup.py`: **92/92 PASS**. Phủ: phân quyền 5 vai (loc, ql1, kho1, giao1, cs1) cho 3 màn; DOM phiếu soạn không có tên, SĐT, địa chỉ, ghi chú đơn, mã đơn, giá; tờ rộng 100 mm; giao1 và cs1 "Không có quyền" và không có request chi tiết phiếu; mã tem sai (SĐT) không sinh request lookup; tem cũ vàng, huỷ đỏ, 404, tem tốt mở thẳng phiếu; máy quét USB (gõ + Enter); camera giả (BarcodeDetector giả + camera giả của Chromium) và trường hợp không có BarcodeDetector; kịch bản có SĐT bị chặn, không có POST; Chủ soạn, sửa, tắt, chi tiết gọi hiện/ẩn; không `/api/ai/`; 360px và 1280px không cuộn ngang; không dữ liệu khách ở localStorage, URL, console.
+- `python3 scripts/check_naming.py`: OK, không phát sinh vi phạm mới. Không có mã màu viết tay trong file mới (chỉ token và màu hệ thống `Canvas/CanvasText` cho giấy in như tem).
+- Ảnh (thư mục `shots/` bị .gitignore nên chỉ nằm trên máy, không commit): `doc/features/2026-09-28-cskh-xac-nhan-in-tem/shots/lo5-fe/` (12 ảnh: phiếu soạn, tra tem 404/cũ/huỷ, kịch bản Chủ, hộp lỗi SĐT, chi tiết gọi có kịch bản; 360 và 1280).
+
+### 5. Còn nợ
+- Chưa có chỉ số thực với `BarcodeDetector` trên điện thoại thật (e2e dùng bản giả); cần thử một lần trên Android Chrome khi lên staging. Safari iOS chưa có `BarcodeDetector` nên chỉ gõ tay hoặc máy quét.
+- `window.print()` tự chạy sau 400 ms như tem; chưa thử máy in 100×150 thật.
+- Dark mode: tờ phiếu luôn đen trên trắng (giống tem); các màn còn lại dùng token nên theo dark mode, chưa chụp ảnh dark.

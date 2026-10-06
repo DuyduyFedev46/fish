@@ -50,3 +50,11 @@
 .skelRow { height: var(--tap); border-radius: var(--radius-md); background: var(--surface-3); animation: pulse 1.2s ease-in-out infinite; }
 @keyframes pulse { 50% { opacity: .55; } }
 @media (prefers-reduced-motion: reduce) { .skelRow { animation: none; } }
+
+/* ---- CS-18: kịch bản gọi ---- */
+.scriptList { display: flex; flex-direction: column; gap: var(--space-3); }
+.scriptText { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; line-height: var(--leading-normal, 1.5); }
+.scriptActions { display: inline-flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+.scriptItem { display: flex; flex-direction: column; gap: var(--space-1); padding: var(--space-2) 0; }
+.scriptItem + .scriptItem { border-top: 1px solid var(--border); }
+.scriptName { margin: 0; font-size: var(--text-sm); font-weight: var(--weight-semibold); color: var(--ink-2); }

@@ -70,6 +70,8 @@ export type ConfirmationQueueDetail = ConfirmationQueueItem & {
   calls: CustomerCall[];
   available_actions: string[];
   guidance?: string | null;
+  /** CS-18: kịch bản gọi hợp với đơn này (chỉ kịch bản đang bật, chỉ khi người xem có quyền xem kịch bản; không thì rỗng hoặc thiếu). */
+  scripts?: QueueScript[];
 };
 
 export type ConfirmationQueueResponse = {
@@ -211,3 +213,21 @@ export const QUEUE_TABS: Array<{ key: QueueTabKey; label: string; stateParam?: s
   { key: "PENDING", label: "Chờ gọi", stateParam: "PENDING" },
   { key: "ALL", label: "Tất cả" },
 ];
+
+// ---- CS-18: kịch bản gọi soạn sẵn ----
+/** FIRST_ORDER khách mua lần đầu · RETURNING khách quen · COMBO đơn có combo · GENERAL lời dặn chung. */
+export type CallScriptSituation = "FIRST_ORDER" | "RETURNING" | "COMBO" | "GENERAL";
+
+export type CallScript = {
+  situation: CallScriptSituation;
+  situation_label: string;
+  content: string;
+  is_active: boolean;
+};
+
+export type QueueScript = Pick<CallScript, "situation" | "situation_label" | "content">;
+
+export type CallScriptsResponse = { results: CallScript[] };
+
+export type CallScriptCreatePayload = { situation: CallScriptSituation; content: string; is_active: boolean };
+export type CallScriptUpdatePayload = { content?: string; is_active?: boolean };

@@ -35,6 +35,7 @@ import { NoPermission } from "@/shared/ui/states/NoPermission";
 import { NotFoundScreen } from "@/shared/ui/states/NotFoundScreen";
 import { fetchDeliveryNoteDetail, packDeliveryNote, printDeliveryLabel, startDelivery, voidDeliveryLabel } from "../api";
 import { canAssign, doneSteps, hasAction, idFromSearch, nextStepText, pathOf, PATH_STEPS, telHref } from "../deliveryUi";
+import { PICK_SHEET_HREF, canOpenPickSheet } from "../pickSheet";
 import type { DeliveryNoteDetail, LabelPrintReason } from "../types";
 import { AssignCourierModal } from "./AssignCourierModal";
 import { ConfirmCompleteModal } from "./ConfirmCompleteModal";
@@ -232,6 +233,10 @@ export function DeliveryDetailScreen() {
 
   // ---- header
   const more: MoreMenuItem[] = [];
+  // CS-16: phiếu soạn nội bộ (không có thông tin khách), mở ở tab mới để in khổ 100x150 mm. Chỉ khi đang Soạn hàng và có quyền in tem hoặc đóng gói.
+  if (note.status === "PREPARING" && me && canOpenPickSheet(me.permissions)) {
+    more.push({ key: "pick-sheet", label: "In phiếu soạn", onSelect: () => void window.open(PICK_SHEET_HREF(note.id), "_blank", "noopener") });
+  }
   if (assignable && !assignIsPrimary) more.push({ key: "assign", label: assignLabel, onSelect: () => setModal("assign") });
   if (!assignable && mayAssign) {
     const reason = note.status === "DELIVERING" || note.status === "FAILED" ? "Phiếu đã lên xe, không đổi người giao." : "Phiếu đã kết thúc.";

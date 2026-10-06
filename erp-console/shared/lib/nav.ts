@@ -24,7 +24,9 @@ export type ViewKey =
   | "refunds"
   | "customers"
   | "confirmation"
+  | "call-scripts"
   | "deliveries"
+  | "delivery-lookup"
   | "my-deliveries"
   | "purchasing"
   | "suppliers"
@@ -136,6 +138,10 @@ export const PERM = {
   decideUnconfirmed: "delivery.decide_unconfirmed",
   /** CS-03: đóng gói chuyển READY. */
   packDeliveryNote: "delivery.pack_deliverynote",
+  /** CS-18: kịch bản gọi soạn sẵn. Xem = Chủ, Quản lý, CSKH; thêm / sửa = chỉ Chủ. */
+  viewCallScript: "delivery.view_callscript",
+  addCallScript: "delivery.add_callscript",
+  changeCallScript: "delivery.change_callscript",
   /** CMS-01: Quyền xem, soạn, đăng nội dung và quản lý chuyên mục */
   viewContentEntry: "content.view_entry",
   publishContentEntry: "content.publish_entry",
@@ -247,6 +253,19 @@ export const NAV: NavItem[] = [
     visible: (me) => has(me, PERM.confirmWithCustomer),
   },
   {
+    key: "call-scripts",
+    summary: "Câu gọi và lời tư vấn soạn sẵn theo tình huống.",
+    plannedIn: "CS-18",
+    href: "/confirmation/scripts/",
+    label: "Kịch bản gọi",
+    short: "Kịch bản",
+    icon: "chat",
+    section: "Bán hàng",
+    parent: "confirmation",
+    menu: false, // nút trong màn Gọi xác nhận (UI-RULES §2.1: menu cố định)
+    visible: (me) => has(me, PERM.viewCallScript),
+  },
+  {
     key: "deliveries",
     summary: "Bảng phiếu giao, gán và đổi người giao.",
     plannedIn: "S17",
@@ -256,6 +275,20 @@ export const NAV: NavItem[] = [
     icon: "local_shipping",
     section: "Bán hàng",
     visible: (me) => has(me, PERM.viewDeliveryNote) && !onlyDelivery(me),
+  },
+  {
+    key: "delivery-lookup",
+    summary: "Quét hoặc gõ mã trên tem để mở đúng phiếu soạn.",
+    plannedIn: "CS-17",
+    href: "/deliveries/lookup/",
+    label: "Quét mã tem",
+    short: "Quét tem",
+    icon: "search",
+    section: "Bán hàng",
+    parent: "deliveries",
+    menu: false, // nút trong màn Giao hàng
+    // BE `lookup`: delivery.print_label + view_deliverynote (Chủ, Quản lý, NV kho). CSKH và NV giao nhận 403.
+    visible: (me) => has(me, PERM.printLabel) && has(me, PERM.viewDeliveryNote) && !onlyDelivery(me),
   },
   {
     key: "my-deliveries",

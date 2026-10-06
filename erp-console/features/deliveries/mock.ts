@@ -11,6 +11,7 @@ import type {
   DeliveryNoteItem,
   LabelData,
   PrintDeliveryLabelResponse,
+  TagLookup,
   VoidLabelResponse,
 } from "./types";
 
@@ -451,6 +452,57 @@ export const MOCK_DELIVERY_NOTES: DeliveryNoteDetail[] = [
     customer_name: "Khách Thử Q",
     address: "Số 17 Đường Thử, Phường 7, TP. Vũng Tàu",
     available_actions: ["reprint_label"],
+    recipient_name: null,
+    lines: [{ item_name: "Cá thu Côn Đảo", qty_kg: "1.000", batch_id: "CA-THU-260918-VT02", expiry_date: "2027-09-18" }],
+  },
+  // CS-17: phiếu đã in lại tem lần 2 (tem lần 1 cũ, chờ xé) và phiếu đã huỷ (tem lần 1 chờ xé). Dữ liệu khách là chữ bịa.
+  {
+    id: 46,
+    code: "GH-HD-0046-REPR",
+    status: "PREPARING",
+    status_label: "Soạn hàng",
+    sales_invoice: 25,
+    invoice_code: "HD-0046",
+    order: { id: 147, code: "DH-260928-0047" },
+    paid_at: "2026-09-28T08:40:00+07:00",
+    confirmed_at: "2026-09-28T08:50:00+07:00",
+    confirm_skipped: false,
+    assigned_to: null,
+    failed_attempts: 0,
+    note: "",
+    created_at: "2026-09-28T08:40:00+07:00",
+    completed_at: null,
+    lines_summary: "Cá thu Côn Đảo 2.000 kg",
+    total_kg: "2.000",
+    label: { printed: true, valid_print_no: 2, needs_void: 1, to_void: [1] },
+    customer_name: "Khách Thử R",
+    address: "Số 18 Đường Thử, Phường 8, TP. Vũng Tàu",
+    available_actions: [],
+    recipient_name: null,
+    lines: [{ item_name: "Cá thu Côn Đảo", qty_kg: "2.000", batch_id: "CA-THU-260918-VT02", expiry_date: "2027-09-18" }],
+  },
+  {
+    id: 47,
+    code: "GH-HD-0047-CANC",
+    status: "CANCELLED",
+    status_label: "Đã huỷ",
+    sales_invoice: 26,
+    invoice_code: "HD-0047",
+    order: { id: 148, code: "DH-260928-0048" },
+    paid_at: "2026-09-28T08:45:00+07:00",
+    confirmed_at: "2026-09-28T08:55:00+07:00",
+    confirm_skipped: false,
+    assigned_to: null,
+    failed_attempts: 0,
+    note: "",
+    created_at: "2026-09-28T08:45:00+07:00",
+    completed_at: null,
+    lines_summary: "Cá thu Côn Đảo 1.000 kg",
+    total_kg: "1.000",
+    label: { printed: true, valid_print_no: null, needs_void: 1, to_void: [1] },
+    customer_name: "Khách Thử S",
+    address: "Số 19 Đường Thử, Phường 9, TP. Vũng Tàu",
+    available_actions: [],
     recipient_name: null,
     lines: [{ item_name: "Cá thu Côn Đảo", qty_kg: "1.000", batch_id: "CA-THU-260918-VT02", expiry_date: "2027-09-18" }],
   },
@@ -942,3 +994,27 @@ export function mockPostDeliveryLabelVoid(
 }
 
 
+
+/**
+ * CS-17 `GET /api/delivery/notes/lookup/?code=`. Như BE: 400 sai định dạng (lỗi không lặp lại giá trị đã gửi), 403 khi thiếu
+ * `delivery.print_label` hoặc `view_deliverynote`, 404 khi không có phiếu hoặc phiếu chưa từng in lần đó.
+ * Phản hồi chỉ có mã phiếu, trạng thái, số lần in; không tên, SĐT, địa chỉ, mã đơn, giá.
+ */
+export function mockLookupDeliveryTag(req: MockRequest): { status: number; body: TagLookup | { detail: string; code: string } } {
+  const me = mockRequireUser(req);
+  if (!me || !hasPerm(me, PERM.printLabel) || !hasPerm(me, PERM.viewDeliveryNote)) {
+    return { status: 403, body: { detail: "Bạn không có quyền thực hiện thao tác này.", code: "PERMISSION_DENIED" } };
+  }
+  const code = paramsOf(pathOf(req)).get("code") ?? "";
+  const m = /^(GH-[A-Z0-9-]{3,40})\.(\d{1,3})$/.exec(code);
+  if (!m) return { status: 400, body: { detail: "Mã tem không đúng định dạng.", code: "INVALID_INPUT" } };
+  const printNo = parseInt(m[2], 10);
+  const note = MOCK_DELIVERY_NOTES.find((n) => n.code === m[1]);
+  const lastPrinted = note ? Math.max(note.label.valid_print_no ?? 0, ...note.label.to_void) : 0;
+  if (!note || !inCourierScope(me, note) || !note.label.printed || printNo < 1 || printNo > lastPrinted) {
+    return { status: 404, body: { detail: "Không tìm thấy phiếu.", code: "NOT_FOUND" } };
+  }
+  const valid = note.status === "CANCELLED" ? null : note.label.valid_print_no;
+  const warning = note.status === "CANCELLED" ? "BR-GH-07" : printNo !== valid ? "BR-GH-16" : null;
+  return { status: 200, body: { note_id: note.id, status: note.status, print_no: printNo, valid_print_no: valid, warning } };
+}

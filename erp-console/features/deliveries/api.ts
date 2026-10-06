@@ -1,6 +1,7 @@
 import { apiFetch } from "@/shared/lib/http";
 import {
   mockGetDeliverers,
+  mockLookupDeliveryTag,
   mockGetDeliveryLabel,
   mockGetDeliveryNoteDetail,
   mockListDeliveryNotes,
@@ -19,6 +20,7 @@ import type {
   LabelData,
   LabelPrintReason,
   PrintDeliveryLabelResponse,
+  TagLookup,
   VoidLabelResponse,
 } from "./types";
 
@@ -187,5 +189,16 @@ export async function assignDeliveryNote(
     body: { assigned_to: input.assignedTo, expected_assigned_to: input.expectedAssignedTo },
     signal,
     mock: isMock ? mockPostDeliveryAssign : undefined,
+  });
+}
+
+/**
+ * CS-17: tra mã tem `GH-….n` → phiếu + cảnh báo tem cũ / đơn huỷ. Mã đã qua `checkTagCode` (tagCode.ts) ở màn gọi hàm này,
+ * nên chuỗi gõ nhầm không bao giờ lên URL. Mã tem không chứa dữ liệu cá nhân.
+ */
+export async function lookupDeliveryTag(code: string, signal?: AbortSignal): Promise<TagLookup> {
+  return apiFetch<TagLookup>(`/api/delivery/notes/lookup/?code=${encodeURIComponent(code)}`, {
+    signal,
+    mock: process.env.NEXT_PUBLIC_USE_MOCK === "1" ? mockLookupDeliveryTag : undefined,
   });
 }

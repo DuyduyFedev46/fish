@@ -65,3 +65,12 @@
 .cardAlert { margin: 0; }
 .returnHint { margin: 0; color: var(--ink-3); font-size: var(--text-sm); }
 .mineHead { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; }
+
+/* ---- CS-17: quét / gõ mã tem ---- */
+.lookupForm { display: flex; flex-direction: column; gap: var(--space-3); max-width: 32rem; }
+.lookupRow { display: flex; align-items: flex-end; gap: var(--space-2); flex-wrap: wrap; }
+.lookupRow > :first-child { flex: 1 1 14rem; min-width: 0; }
+.lookupResult { display: flex; flex-direction: column; gap: var(--space-3); max-width: 32rem; margin-top: var(--space-4); }
+.lookupActions { display: flex; gap: var(--space-2); flex-wrap: wrap; }
+.camera { display: flex; flex-direction: column; gap: var(--space-2); max-width: 32rem; margin-top: var(--space-3); }
+.cameraVideo { width: 100%; max-height: 18rem; border-radius: var(--radius-md); background: var(--surface-2); object-fit: cover; }

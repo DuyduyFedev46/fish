@@ -271,6 +271,19 @@ export function ConfirmationDetailScreen() {
         </div>
       )}
 
+      {item.scripts && item.scripts.length > 0 && (
+        <Section title="Kịch bản gọi" count={item.scripts.length} aria-label="Kịch bản gọi">
+          <div className={s.scriptList}>
+            {item.scripts.map((sc) => (
+              <div className={s.scriptItem} key={sc.situation}>
+                <h4 className={s.scriptName}>{sc.situation_label}</h4>
+                <p className={s.scriptText}>{sc.content}</p>
+              </div>
+            ))}
+          </div>
+        </Section>
+      )}
+
       <InfoGrid title="Đơn & người nhận">
         <InfoField label="Mã đơn" value={item.order_code} mono />
         <InfoField label="Khách hàng" value={<PersonalText value={item.customer_name} />} />

@@ -19,6 +19,7 @@ import type { Me } from "@/features/auth/types";
 import { timeHM } from "@/shared/lib/format";
 import type { MockRequest } from "@/shared/lib/http";
 import { ROLE } from "@/shared/lib/roles";
+import { scriptsForQueueItem } from "./mockScripts";
 
 export const MOCK_CONFIRMATION_ITEMS: ConfirmationQueueDetail[] = [
   {
@@ -516,7 +517,10 @@ export function mockGetConfirmationDetail(
       body: { detail: "Không tìm thấy phiếu trong phạm vi CSKH." },
     };
   }
-  return { status: 200, body: { ...item, note_code: `GH-${item.order_code.replace(/^SO/, "")}`, available_actions: actionsFor(item, me) } };
+  return {
+    status: 200,
+    body: { ...item, note_code: `GH-${item.order_code.replace(/^SO/, "")}`, available_actions: actionsFor(item, me), scripts: scriptsForQueueItem(item, me) },
+  };
 }
 
 export function mockClaimConfirmationTask(
