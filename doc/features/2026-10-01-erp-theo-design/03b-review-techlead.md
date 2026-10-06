@@ -3420,3 +3420,66 @@ Việc của QA: chạy lại `npm ci`, `tsc --noEmit`, `vitest`, build mock=0 k
 
 ### Kết luận re-review sau b97fe68: **APPROVED**
 
+
+## Review Lô 17a (08/10)
+
+Phạm vi: `git diff db1cebd..HEAD`, commit 14107a3 trên `feat/lo17a-be`, gồm 28 file. Đối chiếu `02e-lo17.md` mục 2 và dev-notes mục "Lô 17a".
+
+**Lệnh techlead tự chạy** (worktree `lo17a`, `DJANGO_DEBUG=1`, venv của checkout chính):
+- `makemigrations --check --dry-run`: No changes detected.
+- `manage.py test apps.common apps.reports apps.accounts.audit apps.purchasing apps.inventory apps.delivery apps.sales`: 2215 test, 28 lỗi.
+  Cả 28 lỗi đều là `Missing staticfiles manifest entry` (test HTML Django Admin), do môi trường. Tôi gắn symlink tạm `staticfiles`
+  rồi chạy lại 7 module đó cùng `apps.accounts`, `apps.ai`: 19 + 891 test OK. Symlink đã gỡ, worktree sạch.
+- `python3 scripts/check_naming.py`: OK, không có vi phạm mới.
+- Một test tạm, chạy xong đã xoá, để tái hiện M1 và M2 ở dưới.
+
+### Soát theo yêu cầu
+
+| Mục | Kết quả |
+|---|---|
+| A1 404 | **Đạt.** Chỉ thay `Http404` có câu mặc định của Django hoặc câu rỗng. Câu tiếng Việt riêng giữ nguyên (`reports/batch` "Không tìm thấy lô.", guidance). Test quét mọi route chi tiết của `router.registry` (ít nhất 15 route), kiểm không có `matches the given query`, không có tên model, không lặp id. Tôi chạy thử `orders`, `batches` (id số và mã chữ), `purchasing/invoices`: đều 404 `{"detail":"Không tìm thấy."}` |
+| A2 `reason`, prefetch | **Đạt.** Dùng `order_reason` (nhãn cố định). Test ghi `cancel_note` có SĐT giả, assert không lộ. Có `select_related("invoice")` và prefetch 3 quan hệ. Có test số truy vấn không tăng theo số đơn. NV kho không có `unit_cost`/`inventory_value`, NV giao 403 |
+| A3 lọc trước phân trang, `q`, dòng AI | **Đạt một phần, xem M2.** Bộ lọc nằm trên cùng queryset với `exclude_ai_rows` và trước `paginate_queryset`, nên `count` khớp. Câu lỗi `q` không lặp giá trị (có test). Có test AI tắt vẫn ẩn dòng AI. Biên giờ VN có test |
+| A4 chuỗi, làm tròn | **Chưa đạt, xem M1.** `ROUND_HALF_UP`. Tiền 2 chữ số, kg 3 chữ số, `int` giữ number. Không thêm hay bớt khoá, nên quyền `view_profitreport` không đổi |
+| A5 dữ liệu cũ | **Đạt.** `validate()` chạy trên giá trị đã gộp. PATCH không gửi `is_paid`/`paid_at` thì bỏ qua luật `paid_at` (có test với dòng cũ `is_paid=True, paid_at=NULL`). Khai `amount` tường minh để trả mã `AMOUNT_NOT_POSITIVE` |
+| A5 POST mặc định `is_paid` | **Không làm vỡ FE hiện tại.** `PurchaseInvoiceForm.tsx:97-98` luôn gửi `is_paid` tường minh. Khi đã trả, form gửi `paid_at` (bắt buộc ở client, mặc định là giờ hiện tại). Khi chưa trả, form gửi `null`. Lệnh AI `purchasing.purchaseinvoice.create` có thể bị 400 nếu không điền `paid_at`, nhưng AI đang tắt, đó là hành vi đúng. Mock FE (`accounting/mock.ts:217-218`) còn tự điền `paid_at`, nên khác BE: sửa ở 17b-FE2 (G3) |
+| A6 | **Đạt.** Hai nhãn hằng, có test |
+| A7 khoá rồi mới so | **Đạt.** `update_reconciliation` gọi `_lock` (`select_for_update`), rồi `_require_draft`, rồi `_require_fresh`. `save` có `updated_at` trong `update_fields`, nên lần PATCH sau thấy mốc mới. `_require_fresh` dùng chung với `replace_lines`, không chép code |
+| A8 | **Đạt.** Không đổi hành vi |
+| A9 phạm vi | **Đạt.** Lọc `code__iexact` trong `filter_queryset`, chạy trên `get_queryset()` đã có phạm vi. Test: NV giao tra mã phiếu của người khác thì `count` 0, không khớp một phần, 403 và 401 |
+| Giá vốn, dữ liệu cá nhân | **Đạt.** Không có khoá mới nào chứa giá vốn. `reason` chỉ là nhãn. `q` của Nhật ký chặn dãy chữ số giống SĐT. Không có log mới |
+
+### Các lệch dev đã ghi
+
+- **A5 câu lỗi không kèm mã BR:** chấp nhận. Lô tên chuẩn cấm chữ `BR-` trên giao diện (nhóm A, 3.3), còn mã BR đã nằm ở docstring. 02e ghi "kèm BR" là sai, tôi chịu phần đó.
+- **POST mặc định `is_paid=true` mà thiếu `paid_at` thì bị chặn:** chấp nhận, vì đúng nghĩa của luật. FE thật không vỡ (xem bảng).
+- **3 file test ngoài danh sách 2.3** (`common/tests/test_s4_actor_fields.py`, `purchasing/invoices/tests/test_invoice_list.py`,
+  `purchasing/receipts/tests/test_cancelled_receipt_guards.py`): chấp nhận. Cả ba đang tạo hoá đơn nhờ luật cũ lỏng. Sửa bằng cách gửi
+  `is_paid: false` hoặc kèm `paid_at` hợp lệ, không nới assert nào. Cả ba không thuộc lô tên chuẩn.
+- **`test_p8_lo5_qa_edges` bỏ khoá `id` trước khi dò chuỗi PII:** chấp nhận. `id` là số tự tăng nên có thể tình cờ chứa "0456". Test vẫn
+  khoá tập khoá bằng `set(row) == RECENT_KEYS`, nên không thể lén thêm khoá chứa dữ liệu cá nhân. Hàm chỉ bỏ đúng khoá tên `id`.
+
+### Lỗi
+
+**M1 · Medium · `backend/apps/reports/decimal_strings.py:19-21`. Giá vốn/kg bị làm tròn mất 2 chữ số.**
+`Batch.landed_unit_cost` có `decimal_places=4` (`inventory/models/batches.py:56`). Hàm làm tròn mọi khoá không phải kg về 0.01, nên
+`/api/reports/batch/<mã>/` và `/reports/batches/` trả `"85333.33"` cho giá trị `85333.3333` (tôi đã tái hiện). Trước lô này, float vẫn còn
+đủ 4 chữ số. Số này hiện ở `CloseBatchModal` khi chốt lô, nên lệch với DB và với chỗ khác in giá vốn.
+**Sửa:** khoá `landed_unit_cost` (nên viết tổng quát là khoá kết thúc bằng `_unit_cost`) dùng 0.0001. Thêm ca `85333.3333` vào
+`test_reports_decimal_strings.py`, và assert `Decimal(res["landed_unit_cost"]) == batch.landed_unit_cost`.
+
+**M2 · Medium · `backend/apps/accounts/audit/api.py:43-56,106-107`. Ngày biên làm API trả 500.**
+`GET /api/audit-logs/?date_to=9999-12-31` ném `OverflowError: date value out of range` ở `date_to + timedelta(days=1)`, thành 500 (tôi đã
+tái hiện). `date_from=0001-01-01` cũng có nguy cơ tương tự khi đổi sang UTC. Ngoài ra, `date.fromisoformat` của Python 3.11 nhận cả
+`20261007` và `2026-W41-1`, rộng hơn contract `YYYY-MM-DD`.
+**Sửa:** kiểm bằng regex `^\d{4}-\d{2}-\d{2}$` trước khi parse, giới hạn năm trong khoảng hợp lý (ví dụ 2000–2100), và bắt `OverflowError`.
+Mọi trường hợp đó trả 400 `INVALID_FILTER`. Thêm test cho `9999-12-31`, `0001-01-01`, `20261007`.
+
+**L1 · Low · `purchasing/invoices/serializers.py` (`PAID_AT_IN_FUTURE`).** So thẳng với `timezone.now()`, không có độ lệch cho phép. Form
+lấy "bây giờ" theo đồng hồ máy khách, cắt tới phút, nên chỉ máy có đồng hồ chạy nhanh hơn khoảng một phút mới bị chặn nhầm. Không chặn lô.
+Nếu QA gặp thì cho lệch tối đa 5 phút, đặt bằng một setting.
+
+### Kết luận Review Lô 17a (08/10): **CHANGES REQUESTED**
+
+Phải sửa M1 và M2, mỗi lỗi kèm test tái hiện như trên. L1 tuỳ chọn. Sửa xong, techlead chỉ soát diff mới và chạy lại `apps.reports` và
+`apps.accounts.audit`.
