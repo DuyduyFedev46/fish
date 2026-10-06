@@ -159,3 +159,42 @@ Mock `STALE_STATE` của `status/` trả 409, còn BE trả 400 (02b §2.3). Vô
   Cách này chạy được nhưng phụ thuộc vào nội bộ file test L1 cũ. Khi có dịp thì rút về fixture dùng chung.
 - **L3** Lệnh in danh sách mã đơn đã chuyển. Đúng S3-AC4, nhưng khi chạy production thì **không chép output vào doc hay commit**
   (repo công khai). Nhắc lại trong bước chạy production của `03-dev-notes.md`.
+
+## Review L3 BE (08/10)
+
+**Phạm vi:** commit `af05872` trên nhánh `feat/w37-l3-be`, diff `c0e5522..HEAD`. Gồm `timeline.py`, hai file test mới và
+dev-notes. `shop_api.py` không bị sửa. Đối chiếu với 02b §1.6, §2.5 (timeline), §2.6 (Shop) và §4 (R4).
+
+**Kết luận: APPROVED.** Không có lỗi Critical, High hay Medium. Có 3 điểm Low, không chặn QA.
+
+### Lệnh Tech Lead tự chạy trong worktree
+- `manage.py test apps.sales.orders apps.delivery` (DJANGO_DEBUG=1): chạy 636 test, `errors=1`, `skipped=2`. Lỗi duy nhất là
+  `test_f5b_gl03_ac10_admin_…`, do thiếu manifest staticfiles vì worktree không có `backend/staticfiles/`. Lỗi này có từ trước và
+  thuộc môi trường, không do code.
+- `apps.common.tests.test_ai_visibility`: OK.
+- `makemigrations --check --dry-run`: sạch.
+- `check_naming.py`: **OK (exit 0)**, không phát sinh vi phạm mới.
+
+### Soát theo yêu cầu
+
+| Mục | Kết quả | Chứng cứ |
+|---|---|---|
+| Logic gộp mốc | Đạt | `merged_note_ids` lấy từ AuditLog `complete_order` không có `backfill`, khoá theo `delivery_note_id`. Mốc `delivery_advance_status → COMPLETED` của phiếu thuộc tập này có nhãn "Đã giao — đơn hoàn tất (mã)", kind `delivered`, người làm là NV giao. Phiếu khác giữ "Giao hàng thành công (mã)". Dòng `complete_order` thường trả `None` (đã gộp). Dòng có `backfill == "W37"` thành mốc `order_completed` "Hệ thống chuyển đơn sang Hoàn tất (chuyển bù)", người làm là Hệ thống. Khớp 02b §1.6, S7-AC6 và AC7 |
+| Không dữ liệu cá nhân hay `changes` thô | Đạt | Nhãn tự dựng, chỉ ghép mã phiếu. `test_s7_ac9` kiểm JSON timeline không có SĐT, tên, địa chỉ, và cũng không có chuỗi `complete_order`, `delivery_note_id` hay `changes` |
+| Lọc dòng AI của lô dọn chữ vẫn giữ | Đạt | `_audits` vẫn bọc `exclude_ai_audit_rows(...)`, diff không đụng hàm này. `complete_order` là dòng Hệ thống, không có `proposal_ref`, nên không bị lọc. Test `test_ai_visibility` xanh |
+| Shop đủ 7 dòng | Đạt | `TABLE` khớp đúng 02b §2.6. Dòng CANCELLED đã theo T30 "Đã huỷ" như chốt T2. Assert cả `status_label` lẫn `delivery.status_label`, và nhãn ≠ mã thô. `shop_api.py` không sửa vì bảng nhãn của lô dọn chữ đã đủ, đúng điều kiện ở 02b §6 L3 |
+| Shop 404/429 | Đạt | Sai 4 số cuối trả 404, thân phản hồi không có "Hoàn tất", "COMPLETED" hay "Đã giao" (S8-AC4). Có test throttle theo IP và test throttle theo mã đơn đổi IP, đều ra 429 (S8-AC5). Tập khoá phản hồi bằng đúng tập khoá của đơn đang xử lý (S8-AC3). Khách không đăng nhập không đổi được trạng thái (AC7) |
+| Giá vốn, phân quyền | Đạt | Không đụng serializer hay route. Timeline không có số tiền mới |
+
+### Điểm Low (không chặn)
+- **L1** `timeline.py`: hai điều kiện "có phải chuyển bù" không cùng một dạng. Tập gộp xét `not changes.get("backfill")`, còn
+  nhánh hiện mốc xét `changes.get("backfill") != BACKFILL_MARKER`. Nếu sau này có giá trị `backfill` khác "W37", dòng đó sẽ
+  không được gộp mà cũng không hiện. Nên dùng chung một hàm `_is_backfill(changes)`.
+- **L2** `test_timeline_completed.py`, `test_s7_ac7`: test dựng dữ liệu cũ bằng cách **xoá dòng AuditLog** (`.delete()`) của bảng
+  append-only. Trong test thì vô hại, nhưng là mẫu xấu dễ bị chép lại. Nên dựng như `BackfillBase._legacy` (đặt thẳng trạng
+  thái phiếu và đơn), không xoá AuditLog.
+- **L3** Cùng dòng đó có marker `# naming: allow - dựng dữ liệu cũ`, nhưng dòng không có định danh tiếng Việt nào, nên marker
+  thừa và gây nhiễu cho lần soát marker sau. Bỏ marker (hoặc bỏ cả dòng nếu sửa theo L2).
+
+Ghi chú hành vi, không phải lỗi: khi AI tắt mà phiếu được AI bấm giao xong thì dòng giao bị lọc. Đơn khi đó vẫn có chip Hoàn tất,
+nhưng timeline không có mốc gộp. Lệnh AI đang tắt toàn hệ thống và chưa có lệnh AI nào giao phiếu, nên chưa phải xử lý.
