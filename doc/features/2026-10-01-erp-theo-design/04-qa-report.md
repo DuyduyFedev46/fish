@@ -3365,3 +3365,22 @@ Thực tế: ô "Mô tả" ở y 327–394, thanh nút bắt đầu y 295, thanh
 - F1c, F1e, F1g–F1i, F1n, F1o(chụp popup nhưng chưa so từng chi tiết), F2b–F2g, F2i–F2o, F3b–F3f, F3m–F3l: chỉ chụp F1b, F1k, F1l, F1m, F1a, F1c(trang), F1f, F2a, F3a, F3h, F3m, F1o ở app. Phần còn lại cùng component `Modal`/`Field` nên dự đoán đúng, nhưng chưa có ảnh nên ghi ⏸.
 - `ed_batch2_patterns` sau `ai_block`; các bản `*_real` (cần BE thật); đổi mật khẩu của W4e (ngăn kéo).
 - Không đối chiếu hành vi trước/sau khi sửa nhóm C cho B1.
+
+### QA lại sau ab326ca (06/10)
+
+**Kết luận: APPROVED.** B1 (Medium) đã hết, hai sửa L1 chạy đúng, 1280 không đổi. Còn 1 ghi nhận Thấp mới (popup).
+Bản kiểm: HEAD ab326ca, build mock=1 một lần, cổng 3201 (đã tắt, `out/` đã xoá). Ảnh: `shots/cde-qa/recheck-*.png`.
+
+| Ca | Kết quả | Bằng chứng |
+|---|---|---|
+| `ed_form_keyboard_focus.py` | ✅ 4/4 | chạy lượt này |
+| `ed_batch13_catalog` 128/128 · `s48_password` 41/41 · `ed_batch3_orders` 143/143 | ✅ | chạy lượt này |
+| B1 `/catalog/new/` 360x420, Tab 14 lần + focus ô giữa + ô cuối ("Mô tả") | ✅ | không ô nhập nào nằm dưới thanh nút (đỉnh thanh y=256, đáy ô "Mô tả" y=199); `recheck-F1k-mota-360x420.png` thấy ô trên thanh nút |
+| B1 `/catalog/rules/new/` và `/purchasing/new/` | ✅ | Tab 14 lần: 0 ô bị che; ô cuối (y đáy 250 / 267) nằm trên thanh (295) |
+| B1 popup có ô nhập (Thêm nhà cung cấp, focus "Ghi chú") | ✅ | đáy ô 287,6 nhỏ hơn đỉnh nút chân hộp 362; `recheck-F1b-ghichu-360x420.png` |
+| L1 form: bấm Lưu khi rỗng | ✅ | focus vào ô `code`, `aria-invalid=true` |
+| L1 đăng nhập sai | ✅ | focus vào ô mật khẩu, ô tài khoản giữ chữ |
+| Hồi quy 1280 | ✅ | vị trí nút Lưu (y 810,5) và ô Mã hàng không đổi trước/sau Tab, focus ô cuối, bấm Lưu lỗi; scrollTop 0 |
+| Console | ✅ | 0 lỗi |
+
+Ghi nhận Thấp (không chặn): L1 chưa phủ popup. Bấm "Lưu nhà cung cấp" khi để trống thì ô lỗi hiện đỏ nhưng focus vẫn ở nút Lưu. Các ghi nhận Thấp L2–L4 ở trên giữ nguyên.
