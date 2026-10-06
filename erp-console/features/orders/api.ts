@@ -22,6 +22,8 @@ import type {
   OrderListParams,
   PaymentQueueItem,
   PaymentQueueParams,
+  RecordLatePaymentInput,
+  RecordLatePaymentResult,
   RefundListParams,
   RefundQueueItem,
   ResolveInput,
@@ -127,10 +129,24 @@ export function resolvePayment(id: number, input: ResolveInput): Promise<Resolve
   });
 }
 
+/**
+ * POST /api/sales/payments/record-late/ (#15, BR-TT-18) — ghi tay khoản tiền đã vào tài khoản mà webhook không báo. Cần
+ * sales.confirm_payment_manual. 201 dòng mới · 200 `duplicate:true`. Lỗi 400 có khoá trùng tên ô; 409 LATE_PAYMENT_POSSIBLE_DUPLICATE
+ * → gửi lại kèm `acknowledge_possible_duplicate: true`. Không ghi thân yêu cầu vào log.
+ */
+export function recordLatePayment(input: RecordLatePaymentInput): Promise<RecordLatePaymentResult> {
+  return apiFetch<RecordLatePaymentResult>(`${PAYMENTS}record-late/`, {
+    method: "POST",
+    body: input,
+    mock: process.env.NEXT_PUBLIC_USE_MOCK === "1" ? mockPaymentsApi : undefined,
+  });
+}
+
 // ---------------------------------------------------------------------------------------------------------------------
 // S13 — phiếu hoàn cho khoản tiền không có hoá đơn
 
-/** POST /api/sales/refunds/create/ {payment_transaction, amount, reason, request_id} → 201 phiếu PENDING (200 + duplicate khi trùng request_id). */
+/** POST /api/sales/refunds/create/ {payment_transaction, amount, reason, request_id, acknowledge_duplicate_warning?} → 201 phiếu PENDING (200 + duplicate khi trùng request_id).
+ * Khoản có nhãn nghi trùng mà thiếu cờ → 409 PAYMENT_DUPLICATE_WARNING (`detail` = nhãn). */
 export function createRefund(input: CreateRefundInput): Promise<CreateRefundResult> {
   return apiFetch<CreateRefundResult>("/api/sales/refunds/create/", {
     method: "POST",

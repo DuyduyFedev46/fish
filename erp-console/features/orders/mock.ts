@@ -31,7 +31,8 @@
 //   GET  /api/sales/payments/?resolution_status=OPEN|RESOLVED&match_status=&page=     (20 dòng/trang, mới → cũ)
 //   GET  /api/sales/payments/{id}/
 //   POST /api/sales/payments/{id}/resolve[/]   {action: ATTACH_TO_ORDER, order_id, note} | {action: CONFIRM_ORDER, note}
-//   POST /api/sales/refunds/create[/]          {payment_transaction, amount, reason, request_id}
+//   POST /api/sales/refunds/create[/]          {payment_transaction, amount, reason, request_id, acknowledge_duplicate_warning?}
+//   POST /api/sales/payments/record-late/      {bank_txn_id, amount, received_at, order_code?, acknowledge_possible_duplicate?}  (#15, xem khối "#15" bên dưới)
 // Hàng chờ = mọi giao dịch có `resolution_status` (UNDERPAID/ORPHAN/UNMATCHED/OVERPAID lúc ghi). Webhook MATCHED không vào.
 // Luật mock (giả định FE, BE chốt thì chép lại):
 //  - Cần sales.confirm_payment_manual (thiếu → 403, kiểm TRƯỚC khi tra giao dịch) — Quản lý/NV kho 403 (S12-AC7).
@@ -52,6 +53,7 @@
 //   window.__caveMock.expireOrder(id)                 — đơn tự huỷ "trong lúc chờ" (S12-AC5)
 //   window.__caveMock.confirmRefund(refundId, ref)    — giả lập S16: phiếu REFUNDED → khoản RESOLVED/REFUNDED (S13-AC2)
 //   window.__caveMock.queueJson(username)             — JSON hàng chờ OPEN đúng như người đó nhận
+//   window.__caveMock.flagDuplicate(paymentId)        — #15: gắn nhãn nghi trùng cho khoản (như webhook về sau khi màn đã mở)
 
 import type { MockRequest, MockResponse, Paginated } from "@/shared/lib/http";
 import { beError } from "@/shared/lib/beErrors.mock";
@@ -71,6 +73,7 @@ import type {
   OrderTimelineEntry,
   PaymentQueueItem,
   QueueRefund,
+  RecordLatePaymentResult,
   RefundQueueItem,
   ResolveResult,
 } from "./types";
@@ -101,6 +104,8 @@ type Pay = OrderPayment & {
   resolved_by?: string | null;
   resolved_at?: string | null;
   resolution_note?: string;
+  /** #15: nhãn nghi trùng (BR-TT-15 / BR-TT-18); rỗng/thiếu = không nghi. */
+  duplicate_warning?: string;
 };
 /**
  * Phiếu hoàn gắn `payment_transaction` (S13). S16 bổ sung: người lập/xác nhận (ID số — giả định dev BE #5, chưa đổi
@@ -1081,6 +1086,7 @@ function queueItem(me: Me, store: Store, p: Pay, o: Order | null): PaymentQueueI
     resolved_at: p.resolved_at ?? null,
     resolution_note: p.resolution_note || "",
     refundable_amount: money(refundableOf(store, p)),
+    duplicate_warning: p.duplicate_warning || "",
     available_actions: queueActions(me, store, p, o),
   };
 }
@@ -1202,6 +1208,101 @@ function resolve(me: Me, id: number, body: unknown): MockResponse {
   };
 }
 
+
+// ---------- #15: ghi tiền về muộn (BR-TT-18) ----------
+// Luật mock theo contract BE (03-dev-notes.md "#15 ghi tiền về muộn (BE)"): thiếu quyền → 403 (đã chặn ở đầu mockPaymentsApi, kể cả
+// Quản lý); mã GD chuẩn hoá (bỏ khoảng trắng, in hoa) ≤ 100 ký tự, chỉ A-Z 0-9 . _ - /; số tiền > 0, ≤ 999.999.999.999,99; giờ nhận
+// không muộn quá now+5 phút; mã đơn không phân biệt hoa thường: không thấy → 400, Giữ chỗ → 400 kèm order_id, đã thanh toán → 400;
+// mã GD đã có: đúng khoản MANUAL ORPHAN/UNMATCHED cũ (cùng tiền, cùng đơn) → 200 duplicate:true, còn lại → 400 BR-TT-03;
+// khoản giống (cùng tiền; có đơn: mọi giao dịch của đơn, bỏ dòng -THUA, hoặc UNMATCHED không đơn trong 72 giờ; không đơn: UNMATCHED
+// không đơn hoặc ORPHAN trong 72 giờ) mà chưa ack → 409; ack → gắn nhãn nghi trùng. Không ghi chú, khoá lạ bị bỏ qua. Không đổi đơn/kho.
+const LATE_WINDOW_MS = 72 * 3600_000;
+const LATE_WARNING = "Nghi trùng khoản ghi tay tiền về muộn, đối chiếu sao kê trước khi hoàn";
+
+function allPays(store: Store): { p: Pay; o: Order | null }[] {
+  const out: { p: Pay; o: Order | null }[] = [];
+  store.orders.forEach((o) => o.payments.forEach((p) => out.push({ p, o })));
+  store.unmatched.forEach((p) => out.push({ p, o: null }));
+  return out;
+}
+
+function lateAmount(raw: unknown): { value: number } | { err: MockResponse } {
+  const bad = (key: "LATE_AMOUNT_INVALID" | "LATE_AMOUNT_MIN" | "LATE_AMOUNT_TOO_LARGE") => ({ err: beError(key, undefined, { amount: "$detail" }) });
+  if (raw === null || raw === undefined || typeof raw === "boolean" || typeof raw === "object") return bad("LATE_AMOUNT_INVALID");
+  const n = Number(String(raw).trim());
+  if (String(raw).trim() === "" || !Number.isFinite(n) || n <= 0) return bad("LATE_AMOUNT_INVALID");
+  if (n > 999_999_999_999.99) return bad("LATE_AMOUNT_TOO_LARGE");
+  const v = Math.round(n * 100) / 100;
+  if (v <= 0) return bad("LATE_AMOUNT_INVALID");
+  if (v < 1) return bad("LATE_AMOUNT_MIN");
+  return { value: v };
+}
+
+function recordLate(me: Me, body: unknown): MockResponse {
+  const b = (body && typeof body === "object" ? body : {}) as Record<string, unknown>; // khoá lạ (note, source…) bị bỏ qua
+  const txn = String(b.bank_txn_id ?? "").replace(/\s+/g, "").toUpperCase();
+  if (!txn) return beError("LATE_TXN_MISSING", undefined, { bank_txn_id: "$detail" });
+  if (txn.length > 100) return beError("LATE_TXN_TOO_LONG", undefined, { bank_txn_id: "$detail" });
+  if (!/^[A-Z0-9._/-]+$/.test(txn)) return beError("LATE_TXN_CHARS", undefined, { bank_txn_id: "$detail" });
+  const amt = lateAmount(b.amount);
+  if ("err" in amt) return amt.err;
+  const at = typeof b.received_at === "string" ? new Date(b.received_at.trim()) : null;
+  if (!at || Number.isNaN(at.getTime())) return beError("LATE_AT_INVALID", undefined, { received_at: "$detail" });
+  if (at.getTime() > Date.now() + 5 * 60_000) return beError("LATE_AT_FUTURE", undefined, { received_at: "$detail" });
+
+  const store = load();
+  const code = typeof b.order_code === "string" ? b.order_code.trim() : "";
+  let order: Order | null = null;
+  if (code) {
+    order = store.orders.find((x) => x.code.toLowerCase() === code.toLowerCase()) ?? null;
+    if (!order) return beError("LATE_ORDER_NOT_FOUND", undefined, { order_code: "$detail" });
+    if (order.status === "BOOKED") return beError("LATE_ORDER_BOOKED", undefined, { order_code: "$detail", order_id: order.id });
+    if (order.status !== "CANCELLED" && order.status !== "AUTO_CANCELLED") return beError("LATE_ORDER_PAID", undefined, { order_code: "$detail" });
+  }
+
+  const amount = money(amt.value);
+  const existing = allPays(store).find((e) => e.p.bank_txn_id === txn);
+  if (existing) {
+    const same =
+      existing.p.source === "MANUAL" &&
+      (existing.p.match_status === "ORPHAN" || existing.p.match_status === "UNMATCHED") &&
+      existing.p.amount === amount &&
+      (existing.o?.id ?? null) === (order?.id ?? null);
+    if (same) return { status: 200, body: { duplicate: true, payment: queueItem(me, store, existing.p, existing.o) } satisfies RecordLatePaymentResult };
+    return beError("LATE_TXN_EXISTS", { id: existing.p.id }, { bank_txn_id: "$detail", existing_payment_id: existing.p.id });
+  }
+
+  const near = (p: Pay) => Math.abs(new Date(p.received_at || 0).getTime() - at.getTime()) <= LATE_WINDOW_MS;
+  const sameAmount = allPays(store).filter((e) => Number(e.p.amount) === amt.value);
+  const similar = order
+    ? (sameAmount.find((e) => e.o?.id === order!.id && !e.p.bank_txn_id.endsWith("-THUA")) ?? sameAmount.find((e) => !e.o && e.p.match_status === "UNMATCHED" && near(e.p)))
+    : sameAmount.find((e) => near(e.p) && ((!e.o && e.p.match_status === "UNMATCHED") || e.p.match_status === "ORPHAN"));
+  if (similar && b.acknowledge_possible_duplicate !== true) {
+    return beError("LATE_POSSIBLE_DUPLICATE", undefined, {
+      similar_payment_id: similar.p.id,
+      similar_bank_txn_id: similar.p.bank_txn_id,
+      similar_received_at: similar.p.received_at,
+    });
+  }
+
+  const pay: Pay = {
+    id: ++store.seq + 900,
+    bank_txn_id: txn,
+    amount,
+    match_status: order ? "ORPHAN" : "UNMATCHED",
+    received_at: isoVN(at.getTime()),
+    source: "MANUAL",
+    actor: me.display_name || me.username,
+    resolution_status: "OPEN",
+    duplicate_warning: similar ? LATE_WARNING : "",
+  };
+  if (order) order.payments.push(pay);
+  else store.unmatched.push(pay);
+  store.txns[txn] = { orderId: order?.id ?? 0, result: { result: pay.match_status, duplicate: false, order_status: order?.status ?? "" } };
+  save(store);
+  return { status: 201, body: { duplicate: false, payment: queueItem(me, store, pay, order) } satisfies RecordLatePaymentResult };
+}
+
 export function mockPaymentsApi(req: MockRequest): MockResponse {
   const me = mockRequireUser(req);
   if (!me) return MOCK_UNAUTHORIZED;
@@ -1213,6 +1314,10 @@ export function mockPaymentsApi(req: MockRequest): MockResponse {
     if (req.method !== "GET") return beError("METHOD_NOT_ALLOWED", { method: req.method });
     if (queueMode() === "fail") return { status: 500, body: null };
     return queueList(me, new URLSearchParams(q));
+  }
+  if (path === "/api/sales/payments/record-late/") {
+    if (req.method !== "POST") return beError("METHOD_NOT_ALLOWED", { method: req.method });
+    return recordLate(me, req.body);
   }
   const one = /^\/api\/sales\/payments\/(\d+)\/$/.exec(path);
   if (one) {
@@ -1273,6 +1378,11 @@ function createPaymentRefund(me: Me, store: Store, b: Record<string, unknown>, r
     return { status: 200, body: { ...paymentRefundShape(dup.r), duplicate: true } }; // cùng request_id → không tạo phiếu thứ hai
   }
   if (e.p.resolution_status === "RESOLVED") return beError("HT_TXN_RESOLVED");
+  // #15: khoản có nhãn nghi trùng mà thiếu cờ xác nhận → 409, `detail` = chính nhãn (BE kiểm trước số tiền).
+  if (e.p.duplicate_warning && b.acknowledge_duplicate_warning !== true) {
+    const r = beError("PAYMENT_DUPLICATE_WARNING");
+    return { status: r.status, body: { ...(r.body as object), detail: e.p.duplicate_warning } };
+  }
   const amount = Math.round(Number(b.amount) * 100) / 100;
   if (b.amount === null || b.amount === "" || !Number.isFinite(amount) || amount <= 0) return beError("HT_AMOUNT_INVALID");
   if (amount < 1) return beError("HT_AMOUNT_MIN"); // L8 bổ sung tiền: tối thiểu 1 ₫
@@ -1577,6 +1687,15 @@ if (process.env.NEXT_PUBLIC_USE_MOCK === "1" && typeof window !== "undefined") {
       if (!loc) return null;
       const res = confirmRefundMock(loc, refundId, { bank_txn_ref: ref });
       return res.status === 200 ? (res.body as { status: string }).status : null;
+    },
+    /** #15 (E2E): webhook về muộn khác mã làm khoản có nhãn nghi trùng SAU khi màn đã tải (409 PAYMENT_DUPLICATE_WARNING lúc lập phiếu hoàn). */
+    flagDuplicate: (paymentId: number) => {
+      const store = load();
+      const e = findEntry(store, paymentId);
+      if (!e) return null;
+      e.p.duplicate_warning = LATE_WARNING;
+      save(store);
+      return e.p.duplicate_warning;
     },
     /** E2E: gọi thẳng luật resolve như gọi API (kiểm lớp chặn "BE": S12-AC4/AC6). */
     resolveJson: (username: string, id: number, body: unknown) => {

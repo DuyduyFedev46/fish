@@ -108,7 +108,8 @@ export type TimelineKind =
   | "refund_created"
   | "refund_confirmed"
   | "credit_note_issued"
-  | "order_completed";
+  | "order_completed"
+  | "payment_recorded_late";
 
 /** Một mốc trên dòng thời gian (BE L7 bổ sung: ghép chứng từ + AuditLog, `at` tăng dần). `actor_display` "Hệ thống" khi actor=None. */
 export type OrderTimelineEntry = {
@@ -238,6 +239,8 @@ export type PaymentQueueItem = {
   refunds?: QueueRefund[];
   /** Số tiền còn được hoàn (BR-HT-04) — BE tính; thiếu thì FE mặc định = `amount`, BE vẫn chặn. */
   refundable_amount?: string;
+  /** Nhãn "nghi trùng" (BR-TT-15 / BR-TT-18): có chữ thì lập phiếu hoàn phải tick xác nhận đã đối chiếu sao kê. Rỗng = không nghi. */
+  duplicate_warning?: string;
   available_actions: PaymentAction[];
 };
 
@@ -273,7 +276,7 @@ export type ResolveResult = {
  * không có hoá đơn); S15 gửi `sales_invoice` + `is_partial` (huỷ đơn / hoàn một phần đơn có hoá đơn).
  */
 export type CreateRefundInput =
-  | { payment_transaction: number; amount: string; reason: string; request_id: string }
+  | { payment_transaction: number; amount: string; reason: string; request_id: string; acknowledge_duplicate_warning?: boolean }
   | { sales_invoice: number; amount: string; is_partial: boolean; reason: string; request_id: string };
 
 /** 201 phiếu mới · 200 + `duplicate: true` khi cùng `request_id` (phiếu đã tạo trước đó). */
@@ -363,3 +366,20 @@ export type MarkRefundFailedResult = { status: string; status_label?: string; fa
 
 /** 200 của POST …/retry/ (thân rỗng). `failure_reason` về "". */
 export type RetryRefundResult = { status: string; status_label?: string; failure_reason?: string };
+
+/** Thân gửi POST /api/sales/payments/record-late/ (BR-TT-18). KHÔNG có ô ghi chú: BE bỏ qua mọi khoá lạ. */
+export type RecordLatePaymentInput = {
+  bank_txn_id: string;
+  amount: string;
+  /** ISO 8601 (đổi từ ô giờ Việt Nam bằng `vnInputToIso`). */
+  received_at: string;
+  /** Rỗng / bỏ = không gắn đơn (khoản UNMATCHED). */
+  order_code?: string;
+  acknowledge_possible_duplicate?: boolean;
+};
+
+/** 201 (dòng mới) / 200 + `duplicate: true` (gửi lại đúng khoản đã ghi). `payment` cùng hình một dòng hàng chờ. */
+export type RecordLatePaymentResult = { duplicate: boolean; payment: PaymentQueueItem };
+
+/** Thân lỗi 409 LATE_PAYMENT_POSSIBLE_DUPLICATE: khoản giống đã có (chỉ id, mã GD, giờ — không dữ liệu cá nhân). */
+export type SimilarPayment = { id: number; bank_txn_id: string; received_at: string };

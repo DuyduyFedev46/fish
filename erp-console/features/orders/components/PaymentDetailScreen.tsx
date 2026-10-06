@@ -21,6 +21,7 @@ import type { MoreMenuItem } from "@/shared/ui/detail/MoreMenu";
 import { StatusPath } from "@/shared/ui/detail/StatusPath";
 import { Timeline } from "@/shared/ui/detail/Timeline";
 import type { SubmitConflict } from "@/shared/ui/form/useSubmit";
+import { FormAlert } from "@/shared/ui/form/FormAlert";
 import { Icon } from "@/shared/ui/Icon";
 import { DataTable, type Column } from "@/shared/ui/list/DataTable";
 import { useToast } from "@/shared/ui/overlay/Toast";
@@ -33,6 +34,7 @@ import { digits } from "../amount";
 import type { PaymentQueueItem, QueueRefund } from "../types";
 import { useDetail, type DetailState } from "../useDetail";
 import { useIdParam } from "../useIdParam";
+import { hasDuplicateWarning } from "../latePayment";
 import { AttachOrderModal } from "./AttachOrderModal";
 import { ConfirmOrderModal } from "./ConfirmOrderModal";
 import { RefundModal } from "./RefundModal";
@@ -129,6 +131,10 @@ function PaymentDetailBody({ payment: p, detail, renderAi }: { payment: PaymentQ
       aiSlot={renderAi?.({ id: p.id }, reload)}
       timeline={<Timeline entries={timeline} title={M.timelineDerived} />}
     >
+      {hasDuplicateWarning(p) && (
+        <FormAlert kind="warn">{p.duplicate_warning}</FormAlert>
+      )}
+
       <StatusPath steps={PAYMENT_STEPS} current={p.resolution_status === "RESOLVED" ? "RESOLVED" : "OPEN"} />
 
       <InfoGrid title={M.sectionInfo}>
@@ -219,6 +225,7 @@ function PaymentDetailBody({ payment: p, detail, renderAi }: { payment: PaymentQ
           target={{ kind: "payment", id: p.id }}
           refundableMax={refundMax}
           reasonDefault={M.refundReasonByStatus[p.match_status] ?? ""}
+          duplicateWarning={p.duplicate_warning ?? ""}
           summary={[
             { label: M.rowSourcePayment, value: p.bank_txn_id, mono: true },
             { label: M.fieldAmount, value: vnd(p.amount), num: true },
