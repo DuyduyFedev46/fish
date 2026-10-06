@@ -327,3 +327,4 @@ quan `row_version` cho mọi lần lưu của nhóm."
 ## 9. Review
 
 - 06/10 Lô 1–2 BE: CHANGES REQUESTED (H1 luật D7), sau d50d082 **APPROVED**. Chi tiết ở `03b-review-techlead.md`.
+- 07/10 Lô 3 BE (`30bbc87`): **APPROVED**, kèm điều kiện C1 (D1 cho phiếu hoàn tiền và dashboard phải vào trước hoặc cùng Lô 5, chờ D-3) và C2. Lô 3 sửa thêm `ai/policy/rules.py`; migration sales là 0015/0016.
