@@ -3718,3 +3718,18 @@ Gợi ý giao lại: FE (`ConfirmModal` hoặc xử lý trong `ReturnDetailScree
 
 ### Dọn dẹp
 Đã tắt runserver 8000, http.server 3108/3109/3110; xoá SQLite tạm, `out/`, symlink `node_modules`, worktree tạm main.
+
+### QA lại sau 5096889 (08/10)
+
+**Kết luận: APPROVED** — B1 đã sửa, kiểm lại trên BE thật và mock; không còn lỗi chặn.
+
+BE thật (runserver từ main, SQLite tạm, seed giả, build mock=0), Playwright 10/10:
+| Ca | Kết quả |
+|---|---|
+| Đua hai tab: tab B bấm xoá phiếu tab A đã xoá → BE 404, hộp hiện "Phiếu này đã bị xoá hoặc không còn tồn tại.", không còn "ReturnToStock"/câu tiếng Anh, không có "Thử lại", có "Đóng" và "Về danh sách"; bấm "Về danh sách" về `/returns/` | ✅ |
+| Id không tồn tại: mở chi tiết `?id=9999` ra trang "Không tìm thấy trang này", không có câu thô; đường xoá trả cùng 404 như ca đua (id 99 trả 404 ở lượt trước) | ✅ |
+| Hồi quy: xoá Nháp (có câu "không được nhập lại kho", toast, phiếu biến mất), xoá Đã huỷ, phiếu Đã duyệt không có nút | ✅ |
+| Console không lỗi (trừ dòng 4xx chủ đích) | ✅ |
+
+Mock=1: build sạch, `e2e/delete_return.py` **21/21 PASS** (gồm ca 404 mới).
+Dọn: tắt runserver và http.server, xoá SQLite tạm, `out/`, symlink `node_modules`.
