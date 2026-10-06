@@ -3285,3 +3285,19 @@ Phạm vi: `git diff main...feat/xoa-phieu-hoan-fe` (commit 273cda0, 10 file tro
 ### Kết luận Review #8 FE (08/10): **CHANGES REQUESTED**
 
 Lý do duy nhất là **TL8F-M1** (đổi chữ hiển thị và selector e2e, không đổi logic). Sửa xong thì chạy lại `tsc --noEmit`, `vitest` và `e2e/delete_return.py` (mock). Techlead chỉ cần soát diff chữ, không cần review lại toàn bộ. L1, L2 sửa cùng lần nếu tiện. L3 chuyển BE.
+
+### Re-review sau b97fe68
+
+Phạm vi: `git show b97fe68`, 8 file, chỉ đổi chữ, comment, selector e2e và thứ tự hook. Logic không đổi. Theo yêu cầu, techlead không build và không chạy e2e. `check_naming.py`: không có vi phạm mới.
+
+| Mục | Kết quả |
+|---|---|
+| TL8F-M1 | **Đóng.** `messages.ts` đổi đủ 4 khoá `cancel*` và 4 khoá `delete*` sang "phiếu hàng hoàn". README, docstring `api.ts`/`returnsModel.ts` và tên `describe` trong vitest cũng đã đổi. `cancelBody`/`deleteBody` vẫn viết "Huỷ/Xoá phiếu {code}": có mã RT-… nên không nhầm được với phiếu hoàn tiền, chấp nhận. Grep toàn `erp-console`: chuỗi cũ không còn ở nhãn hàng hoàn nào. Ba chỗ còn "phiếu hoàn" đều là hoàn **tiền** hoặc comment chung, đúng nghĩa: `guidance/mock.ts:208` (`cancel_refund`), comment ví dụ ở `ConfirmModal.tsx:3`, và comment đầu `e2e/ed_bonusA_ui.py:5`. |
+| Selector e2e | **Đạt.** `delete_return.py` và `ed_bonusA_ui.py` dùng nhãn mới. Có sửa đúng một hệ quả của #8: sau khi Chủ huỷ RT-1, menu "…" vẫn còn mục "Xoá phiếu hàng hoàn". Assert cũ "không còn nút Thao tác khác" nay thành "không còn mục Huỷ, có mục Xoá". Ca RT-6 của `giao1` vẫn kỳ vọng không có menu, đúng vì `giao1` không phải Chủ. |
+| TL8F-L1 | **Đóng.** Comment đầu `ReturnDetailScreen.tsx` nay nói rõ Chủ còn mục Xoá trên phiếu đã huỷ. |
+| TL8F-L2 | **Đóng.** `useRouter()` chuyển lên cùng nhóm với `useAuth`/`useToast`, bỏ dòng trống thừa. |
+| TL8F-L3 | Vẫn là nợ BE (`available_actions` chưa xét `add_returntostock`), không thuộc lô FE. |
+
+Việc của QA: chạy lại `npm ci`, `tsc --noEmit`, `vitest`, build mock=0 kèm `check-no-mock`, rồi build mock=1 và chạy `e2e/delete_return.py` cùng `e2e/ed_bonusA_ui.py`, vì selector đã đổi.
+
+### Kết luận re-review sau b97fe68: **APPROVED**
