@@ -3288,3 +3288,89 @@ AuditLog `changes`/`note` và dòng thời gian nhóm sau khi đổi ma trận �
 - BE thật (Django 8641, ERP 3641): `s41_s47_real` (bản sao đổi bộ chọn) 40/40; script QA `q14_ui.py` 23/23, `q14_ui2_e.py` 37/37, `q14_ui2_fg.py` 13/13, `q14_ui3.py` 20/20; `q14_api.py` 67/68, `q14_api2.py` 40/40. Script nằm ở scratchpad.
 - `manage.py test apps.accounts apps.inventory.returns` 418 OK.
 - Ảnh: `doc/features/2026-10-01-erp-theo-design/shots/lo14/lo14-real-*.png` (cạnh các bảng design `board-W3e/W3g/W3h/W3i/F3a–F3f`). Chỉ dừng tiến trình ở cổng 8641, 3641, 3643. Không sửa mã sản phẩm, không commit.
+
+---
+
+## QA Lô 15 (06/10) — FE · Tổng quan (ED-08), Nhật ký hoạt động (ED-41), Tài khoản + AI của tôi (ED-06), Chính sách AI + Báo cáo AI (ED-42) · lần 1 · 2026-10-06
+Worktree `agent-adeaae51549099388`, HEAD bc58151. Không sửa code sản phẩm. Không chạy hai build cùng lúc (build tuần tự: cờ tắt, cờ bật, mock=0).
+
+### Kết luận: REJECTED — 1 lỗi Medium (cột "Giờ" của Nhật ký bị cắt chữ ở mọi cỡ màn hình); phần còn lại đạt, không có lỗi Critical/High
+### Tổng: ~590 ca · ✅ ~589 · ❌ 1 · ⏸ 0
+(Gồm: cờ tắt 64; cờ bật `ed_batch15` 193 + `ed_batch1_shell` 56 + `ed_batch14_permissions` 101 + `s48_password` 41; `s41_s47_real` trên BE thật 40; script QA riêng 12 + 82 trên BE thật. Trong 82 ca BE thật có 6 dòng "FAIL" do kỳ vọng sai của script (tìm chữ "SO" trong mã đơn; chữ SO chỉ do mock đổi khi hiển thị, BE thật là `DH-…`), không phải lỗi sản phẩm, không tính.)
+
+### 1. Cờ AI tắt (build mock=1, KHÔNG đặt `NEXT_PUBLIC_AI_FEATURES`) — vai `loc`, `ql1`, 1280 và 360 — 64/64 đạt
+Lưu ý phương pháp: ở bản mock, request không đi qua mạng nên bắt `page.on("request")` sẽ rỗng (vô nghĩa). Dùng `window.__caveMock.log` (nhật ký request do `shared/lib/http.ts` ghi) và có ca đối chứng (log có `GET /api/audit-logs/` thì mới tin log đang ghi).
+| Route | Kết quả đo |
+|---|---|
+| `/overview/` | log chỉ `auth/me`, `dashboard/summary`, `dashboard/attention`; 0 URL chứa `/ai/`; 0 `a[href^="/ai/"]`; `\bAI\b` 0 lần; không có "trợ lý" |
+| `/account/` | log chỉ `auth/me`; 0 link `/ai/`; không có chữ AI (không có dòng "AI của tôi", không có mục AI ở "Mục bạn thấy trên menu") |
+| `/audit-logs/` | log `auth/me`, (`staff` với Chủ), `audit-logs`; 0 URL `/ai/`; 0 link `/ai/`; không có nút lọc "AI"; không có cột "Đề xuất". Còn 13 chữ "AI" ở các dòng lịch sử do AI làm (đúng quyết định techlead: giữ vết kiểm toán) |
+| `/ai/settings/`, `/ai/policy/`, `/ai/report/`, `/ai/actions/` | cả `loc` lẫn `ql1` đều "Không tìm thấy trang này", log không có request `/ai/` |
+| Console | 0 lỗi |
+Ảnh: `shots/lo15/qa-flagoff-{overview,audit}-{loc,ql1}-{1280,360}.png`.
+
+### 2. Cờ AI bật (build mock=1 + `NEXT_PUBLIC_AI_FEATURES=1`)
+| Kịch bản | Kết quả |
+|---|---|
+| `ed_batch15_overview_ai_account.py` | 193/193 |
+| `ed_batch1_shell.py` | 56/56 |
+| `ed_batch14_permissions.py` | 101/101 |
+| `s48_password.py` | 41/41 |
+
+### 3. BE thật (Django main, SQLite tạm `/tmp`, build mock=0 trỏ `localhost:8000`, dữ liệu giả: `seed_demo` + 5 tài khoản giả + 71 dòng nhật ký giả)
+- `e2e/s41_s47_real.py`: **40/40 sau khi sửa 1 selector lỗi thời** (bản sao ở scratchpad). Bản gốc chết ở dòng 335: `expect(page.locator(".screen"))` sau khi mở `/inventory/`, vì trang Kho đã bỏ class `.screen` từ lô redesign. Đây là test cũ lỗi thời, không phải lỗi sản phẩm; đề xuất dev sửa dòng đó thành `main` (QA không sửa file `e2e/` có sẵn trong lượt này, chỉ chạy bản sao).
+- Quyền API thật: `loc`, `ql1`, `kho1` gọi `dashboard/summary/` 200; `giao1` 403; `audit-logs/` `loc` và `ql1` 200, `kho1` và `giao1` 403, chưa đăng nhập 401.
+- Tổng quan theo vai (1280 và 360):
+  - Chủ: có ô "Giá trị tồn kho theo giá vốn" và cột "Giá vốn/kg" (có quyền `view_costprice`).
+  - Quản lý (`ql1`) và NV kho (`kho1`): JSON `dashboard/summary` KHÔNG có `unit_cost`, `inventory_value` hay field giá vốn nào; DOM không có "Giá vốn" hay "Giá trị tồn kho".
+  - Cả ba vai: JSON và DOM không chứa tên hay SĐT của 6 khách giả; không có chữ AI hay link `/ai/`; localStorage và URL không có tên hay SĐT khách; không cuộn ngang; console sạch.
+  - Log Django (runserver) 0 lần chứa SĐT hay tên khách giả, 0 lần chứa mật khẩu.
+- Nhật ký (Chủ, Quản lý): tải 20/71 dòng; "Tải thêm" 20 → 40; lọc "Hệ thống" gọi `?actor_kind=system` và còn đúng 1 dòng; ô thao tác có đủ lựa chọn tiếng Việt (không có thao tác AI vì cờ tắt); không tên/SĐT khách. NV kho vào `/audit-logs/` thì "Không có quyền" và không có request `audit-logs`.
+- Ảnh: `shots/lo15/qa-real-overview-{loc,ql1,kho1}-{1280,360}.png`, `qa-real-audit-{loc,ql1}-{1280,360}.png`, `qa-real-audit-system-*.png`. Ảnh đối chiếu board (render từ `doc/design/erp/screens`): `board-erp-d1-.png`, `board-erp-w3f.png`, `board-erp-w4b.png`, `board-erp-w4e.png`. Ảnh các màn còn lại (Chính sách, Báo cáo, AI của tôi, Tài khoản, Đăng nhập, chưa phân quyền, đặt mật khẩu mới, 1280 và 360) từ `ed_batch15`: `shots/lo15/qa-lo15-*.png`.
+
+### 4. Ca ngoài đường thuận (mỗi ca chạy ở 1280 và 360, đều đạt, có ảnh `qa-*`)
+1. Tổng quan lỗi 500 → hiện lỗi và nút "Thử lại" (`qa-overview-error-*.png`).
+2. Tổng quan rỗng → không có "undefined"/"NaN" (`qa-overview-empty-*.png`).
+3. Nhật ký tìm "ZZZ-KHONG-CO" → trạng thái rỗng theo bộ lọc, nút "Xoá tìm kiếm" (`qa-audit-empty-*.png`).
+4. Đổi mật khẩu: sai mật khẩu hiện tại → báo "Mật khẩu hiện tại không đúng.", hộp vẫn mở (`qa-password-wrong-*.png`). Trên BE thật (`s41_s47_real`): `AUTH_OLD_PASSWORD`, `AUTH_WEAK_PASSWORD`, token cũ → 401 sau khi đổi.
+5. Có sẵn trong `ed_batch15`: Esc ở các hộp hỏi lại không gọi API; thiếu ô trách nhiệm không gọi PUT; ngưỡng âm báo đỏ; báo cáo lùi ngày rỗng; ngày tương lai bị kéo về hôm nay; báo cáo lỗi 500; giao diện tối; không icon rỗng.
+6. Mất mạng thật không tạo được ở bản mock (không có request mạng): ⏸ chưa kiểm; thay bằng ca lỗi 500 ở mục 1.
+
+### 5. Phân quyền (BE thật, token từng vai) và bảng ma trận mock
+| Vai | Tổng quan | Giá vốn ở Tổng quan | Nhật ký | AI của tôi | Chính sách, Báo cáo AI |
+|---|---|---|---|---|---|
+| owner | 200 | có | 200 | có (cờ bật) | có (cờ bật) |
+| manager | 200 | không | 200 | có (cờ bật) | Không có quyền |
+| warehouse_staff | 200 | không | 403, UI "Không có quyền", không gọi API | có (cờ bật) | Không có quyền |
+| delivery_staff | 403, UI "Không có quyền" (mock) | n/a | 403 | chặn (mock) | Không có quyền (mock) |
+| chưa đăng nhập | 401 | n/a | 401 | n/a | n/a |
+Cờ AI tắt: mọi vai thấy "Không tìm thấy trang này" ở 4 route `/ai/*` (không lộ route có thật).
+
+### 6. Rò giá vốn, rò dữ liệu cá nhân, chứng từ
+- Giá vốn: không rò (mục 3). Cột và ô giá vốn không có trong DOM khi thiếu quyền (không chỉ ẩn bằng CSS).
+- Dữ liệu cá nhân: Tổng quan và Nhật ký không có tên/SĐT khách (JSON và DOM); storage, URL, console, log máy chủ sạch; `cave_erp_signed_in_at` chỉ chứa chuỗi ISO. Ảnh và report dùng dữ liệu giả.
+- Nhật ký chỉ đọc (không nút sửa hay xoá). Chứng từ không bị xoá.
+- Nợ đã biết, không phải lỗi lô này: L5 (BE ghi chữ tự do vào `AuditLog.note`, cột "Ghi chú" của Nhật ký in nguyên văn). Chưa kiểm được trên dữ liệu thật vì nhật ký giả không có `note`; theo dõi ở lô BE.
+
+### 7. Hồi quy
+`ed_batch1_shell` 56/56, `ed_batch14_permissions` 101/101, `s48_password` 41/41, `s41_s47_real` 40/40 (xem lưu ý selector), `/orders/` và `/customers/` ở 360 cùng kiểu cuộn ngang trong bảng như Nhật ký (mẫu chung của DataTable).
+
+### Lỗi
+#### B1 — Cột "Giờ" của Nhật ký bị cắt chữ ("06/10/2026 21:…"), không đọc được giờ phút · Medium · AC ED-41 (cột Giờ), board W3f
+- Bước tái hiện: đăng nhập `loc` (mock hay BE thật) → Nhật ký hoạt động ở 1280, 1440 hay 1920px → nhìn cột "Giờ".
+- Mong đợi: hiện đủ `dd/mm/yyyy hh:mm` như board W3f (`01/10/2026 10:32`).
+- Thực tế: ô `td` rộng cố định 132px nhưng nội dung cần 136px (`td.clientWidth=132`, `td.scrollWidth=136`, `text-overflow: ellipsis`), nên thấy `06/10/2026 21:…`. Lặp lại ở 1280, 1440, 1920. Ảnh `qa-real-audit-loc-1280.png` và `qa-lo15-audit-loc-1280.png` (cả bản của dev cũng bị cắt).
+- Ảnh hưởng: nhật ký kiểm toán không đọc được phút xảy ra việc. Gợi ý sửa: `features/audit/components/AuditLogScreen.tsx` đổi `width: "132px"` của cột `time` thành khoảng 148px (hoặc bỏ giới hạn).
+- Vì sao `ed_batch15` không bắt được: test chỉ kiểm "không cuộn ngang" cấp trang, không kiểm cắt chữ trong ô.
+
+### Ghi nhận mức Low (không chặn)
+- L-QA1: ở 360px ô ngày thứ hai của bộ lọc Nhật ký tràn khoảng 4px (mép phải 364 > 360, bị cắt mép), không gây cuộn ngang trang.
+- L-QA2: ở 360px bảng Nhật ký cuộn ngang bên trong khung, chỉ thấy "Giờ" và "Người làm"; cột "Thao tác" nằm ngoài màn hình đầu. Cùng kiểu với `/orders/`, `/customers/` (mẫu chung của DataTable), nên xếp vào hạng mục thiết kế bảng trên di động chung, không riêng Lô 15.
+- L-QA3: Tổng quan trên BE thật hiện mã đơn `DH-2609-…` (mock đổi thành `SO…` theo board); khớp nợ "dashboard/summary" đã ghi, chỉ lưu ý để khỏi lệch kỳ vọng.
+- L-QA4: `e2e/s41_s47_real.py:335` còn selector `.screen` lỗi thời (xem mục 3).
+
+### Lệnh đã chạy
+- `NEXT_PUBLIC_USE_MOCK=1 npm run build` (cờ tắt) rồi `flag_off.py` (scratchpad): 64/64.
+- `NEXT_PUBLIC_USE_MOCK=1 NEXT_PUBLIC_AI_FEATURES=1 npm run build` rồi 4 kịch bản: 193, 56, 101, 41 đạt.
+- `NEXT_PUBLIC_USE_MOCK=0 NEXT_PUBLIC_API_BASE=http://localhost:8000 npm run build`; Django `runserver` từ `/Users/dangthiduyen/Downloads/loc/backend` với `DATABASE_URL=sqlite:////tmp/qa15_real.sqlite3`, `migrate`, `bootstrap_masterdata`, `seed_demo`, seed 5 tài khoản giả; `s41_s47_real` (bản sửa selector) 40/40; script `real15.py`, `edge.py`, `trunc.py`, `a360.py`, `cmp360.py`.
+- Đã dọn: tắt Django và các server tĩnh của lượt này (cổng 3102, 3961, 3962), xoá `erp-console/out`, các bản copy build và DB SQLite tạm. Server cổng 3201 là của QA khác, không đụng. Ảnh trong `shots/lo15/` bị gitignore (chỉ có trên máy).
