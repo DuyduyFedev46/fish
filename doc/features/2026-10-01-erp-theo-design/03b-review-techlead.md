@@ -3251,3 +3251,37 @@ Ghi nhận sự cố: lần chạy đầu của techlead đụng một phiên kh
 **Critical/High/Medium:** không còn.
 
 ### Kết luận re-review sau 3411a13: **APPROVED**
+
+---
+
+## Review #8 FE (08/10)
+
+Phạm vi: `git diff main...feat/xoa-phieu-hoan-fe` (commit 273cda0, 10 file trong `erp-console/features/returns/**`, `erp-console/e2e/delete_return.py`, dev-notes). Đối chiếu contract BE trên main (`backend/apps/inventory/returns/api.py:9-11,127-138`, `serializers.py:115-130`, `services.py:53-92`) và TL-D8-L3. Theo yêu cầu, techlead không build. Số liệu tsc/vitest/build/e2e lấy theo dev-notes và để QA chạy lại. Techlead chỉ chạy `check_naming.py`: không có vi phạm mới, chỉ còn 2 file `frontend/` đã đỏ sẵn trên main.
+
+| Mục | Kết quả |
+|---|---|
+| Đúng contract BE | **Đạt.** `POST /api/inventory/returns/{id}/delete/` gửi body rỗng và nhận 200 `{status:"deleted", id}`. `canDelete` chỉ đọc `available_actions` của BE (`returnsModel.ts:110`), không tự đoán Chủ hay trạng thái, đúng như BE (Chủ/superuser, phiếu `DRAFT`/`CANCELLED`). Khai `available_actions?` optional là phòng thủ hợp lý: BE luôn trả khoá này, nếu thiếu thì coi như không có nút. |
+| Hộp xác nhận có câu TL-D8-L3 | **Đạt.** `messages.ts:72` có câu "Số kg trên phiếu này sẽ không được nhập lại kho.", chỉ hiện khi phiếu `DRAFT` (`ReturnDetailScreen.tsx:256`). Phiếu Đã huỷ không có câu này, đúng vì kg của phiếu đó đã không còn tính. |
+| 400 / 409 | **Đạt.** Dùng `ConfirmModal` có sẵn. 400 `RETURN_DELETE_NOT_ALLOWED` hiện alert đỏ, nút đổi thành "Thử lại". 409 `STALE_STATE` hiện `ConflictBanner` với nút "Tải lại" → `refresh()`. Nếu phiếu đã bị xoá thì sau khi tải lại ra `NotFoundScreen`. |
+| Lệch: `apiFetch` bỏ "(BR-…)" | **Chấp nhận.** UI-RULES §1 mục 1 cấm hiện mã luật trên màn. Câu "hiện nguyên `detail`" ở TL-D8 nghĩa là không thay bằng câu chung chung, không bắt hiện mã BR. |
+| Không `console` | **Đạt.** Không có `console.*` trong `features/returns`. Trong e2e chỉ có bộ nghe `console.error` để kiểm lỗi. Không đưa dữ liệu vào URL hay storage. |
+| Mock không lọt build thật | **Đạt theo pattern có sẵn.** `MOCK = process.env.NEXT_PUBLIC_USE_MOCK === "1" ? mockReturnsApi : undefined` (`api.ts:21`). Công cụ thử `returnsStaleDelete` nằm trong khối `if (process.env.NEXT_PUBLIC_USE_MOCK === "1" && …)`, giống các module khác. `check-no-mock.mjs` tự lấy chuỗi seed từ `mock*.ts`. Dev-notes ghi build mock=0 cùng `check-no-mock` và `check-ai-chunks` đều XANH. QA phải chạy lại trên `npm ci` sạch. |
+| Lệch: mock chỉ cho `owner` | **Chấp nhận.** Chỉ ảnh hưởng chế độ mock. BE thật tính cả superuser qua `available_actions`, và FE không tự đoán. |
+| Không giá vốn, không dữ liệu cá nhân | **Đạt.** Màn không có tiền. Response xoá chỉ có `status`, `id`. |
+
+### Lỗi
+
+**TL8F-M1 · Medium · `features/returns/messages.ts:68-74` (và 60-65 cũ). Sai tên chuẩn, trùng nghĩa với phiếu hoàn TIỀN.** UI-RULES (bảng từ ngữ, dòng 49) dùng "phiếu hoàn" cho **hoàn tiền** ("Lập phiếu hoàn", "Tạo phiếu hoàn"). Màn hàng chờ thanh toán và chi tiết đơn đều có "phiếu hoàn" theo nghĩa đó. Ở màn này, nút đỏ "Xoá phiếu hoàn" và toast "Đã xoá phiếu hoàn." dễ khiến Chủ tưởng đang xoá phiếu hoàn tiền, trong khi đây là thao tác không khôi phục được. Tiêu đề, danh sách và toast tạo của chính module đã dùng "phiếu hàng hoàn".
+- Sửa `deleteMenu`, `deleteTitle`, `deleteConfirm` thành "Xoá phiếu hàng hoàn", và `deleted` thành "Đã xoá phiếu hàng hoàn.". Câu `deleteBody` dùng "Xoá phiếu hàng hoàn {code} …".
+- Cùng lần, sửa cụm `cancel*` (60-65, cùng story #8) cho thống nhất: "Huỷ phiếu hàng hoàn", "Đã huỷ phiếu hàng hoàn.".
+- Cập nhật `features/returns/README.md` (dòng mới), selector/nhãn trong `e2e/delete_return.py` (dòng 70, 83, 87, 91, 98, 111, 120) và test vitest nếu có so chuỗi.
+
+**TL8F-L1 · Low · `ReturnDetailScreen.tsx:7`.** Comment đầu file vẫn ghi "Phiếu đã huỷ: … hết mọi nút". Thực tế Chủ còn mục "Xoá phiếu hàng hoàn" trong menu "…". Sửa comment cho khớp.
+
+**TL8F-L2 · Low · nhỏ.** Dòng trống thừa trước `if (canDelete(r))` (dòng 100). `useRouter()` nên khai cùng nhóm với `useAuth`/`useToast`, không chen giữa các `useState`. Sửa cùng lần với M1 nếu tiện.
+
+**TL8F-L3 · Low · ghi nhận cho BE (không thuộc lô FE).** `soft_delete` đòi `required_perms=("inventory.add_returntostock",)` (`api.py:129`), nhưng `available_actions` trả `delete` chỉ theo "là Chủ" mà không xét perm này. Nếu Chủ tắt "Ghi hàng hoàn về kho" của nhóm `owner` ở màn Phân quyền, FE vẫn hiện nút và bấm vào thì nhận 403. Hiếm gặp, BE vẫn chặn đúng. Ghi nợ BE: `get_available_actions` thêm điều kiện `has_perm("inventory.add_returntostock")`.
+
+### Kết luận Review #8 FE (08/10): **CHANGES REQUESTED**
+
+Lý do duy nhất là **TL8F-M1** (đổi chữ hiển thị và selector e2e, không đổi logic). Sửa xong thì chạy lại `tsc --noEmit`, `vitest` và `e2e/delete_return.py` (mock). Techlead chỉ cần soát diff chữ, không cần review lại toàn bộ. L1, L2 sửa cùng lần nếu tiện. L3 chuyển BE.
