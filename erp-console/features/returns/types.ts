@@ -37,6 +37,8 @@ export type ReturnItem = {
   approved_by_name: string;
   created_at: string;
   note: string;
+  /** Việc người xem được làm trên phiếu (BE #8): tập con của "approve" | "cancel" | "delete". `delete` chỉ khi là Chủ và phiếu Chờ duyệt hoặc Đã huỷ. */
+  available_actions?: string[];
 };
 
 export type ReturnListParams = { status: string; month: string };

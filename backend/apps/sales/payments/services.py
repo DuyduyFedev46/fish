@@ -13,14 +13,18 @@ Thanh toán (P-05): ghi nhận tiền vào + xuất hoá đơn (chuyển giữ c
                    SalesInvoiceLineBatch là NGUỒN giá vốn. KHÔNG tạo DeliveryNote
                    (delivery tự bắt qua signal).
 """
+import re
+from datetime import timedelta
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 
 from django.conf import settings
-from django.db import transaction
+from django.db import IntegrityError, transaction
+from django.db.models import Q
 from django.utils import timezone
+from django.utils.dateparse import parse_datetime
 
 from apps.common.audit import note_marker, record_audit
-from apps.common.exceptions import BusinessError
+from apps.common.exceptions import BusinessError, ConflictError
 
 from apps.inventory.batches import services as batches
 from apps.inventory.models import Batch, StockLedgerEntry
@@ -299,18 +303,7 @@ def _record_payment(*, order, bank_txn_id, amount, received_at, source, raw_payl
             received_at=received_at,
         )
 
-        # BR-TT-15 (UC-5): khoản OVERPAID này (mã GD khác) trùng số tiền với một khoản đã
-        # MATCHED bằng xác nhận tay của CHÍNH đơn -> rất có thể là cùng một lần chuyển khoản,
-        # không phải tiền thừa thật. Gắn nhãn để Chủ đối chiếu sao kê trước khi hoàn.
-        if match_status == PaymentTransaction.MatchStatus.OVERPAID and source != PaymentTransaction.Source.MANUAL:
-            manual_duplicate = o.payments.filter(
-                source=PaymentTransaction.Source.MANUAL,
-                match_status=PaymentTransaction.MatchStatus.MATCHED,
-                amount=amount,
-            ).exclude(pk=payment.pk).exists()
-            if manual_duplicate:
-                payment.duplicate_warning = DUPLICATE_MANUAL_WARNING
-                payment.save(update_fields=["duplicate_warning"])
+        flag_possible_duplicate(payment, o)  # BR-TT-15 / BR-TT-18
 
         # Chỉ chuyển tồn thành bán thật khi khớp đủ & đơn còn ở BOOKED.
         if match_status == PaymentTransaction.MatchStatus.MATCHED and (
@@ -335,6 +328,247 @@ def _record_payment(*, order, bank_txn_id, amount, received_at, source, raw_payl
             )
 
     return payment, True
+
+
+# --- BR-TT-18 (#15): Chủ ghi tay khoản tiền về muộn ----------------------------------------------------------
+
+LATE_ENTRY_CODE = "BR-TT-18"
+LATE_ENTRY_ORDER_STATUSES = (SalesOrder.Status.CANCELLED, SalesOrder.Status.AUTO_CANCELLED)
+DUPLICATE_LATE_MANUAL_WARNING = "Nghi trùng khoản ghi tay tiền về muộn, đối chiếu sao kê trước khi hoàn"
+BANK_TXN_ID_PATTERN = r"^[A-Z0-9._/-]+$"
+LATE_RECEIVED_AT_TOLERANCE = timedelta(minutes=5)
+LATE_NOT_FOUND_CODE = "LATE_PAYMENT_ORDER_NOT_FOUND"
+LATE_BOOKED_CODE = "LATE_PAYMENT_ORDER_BOOKED"
+LATE_PAID_CODE = "LATE_PAYMENT_ORDER_PAID"
+LATE_POSSIBLE_DUPLICATE_CODE = "LATE_PAYMENT_POSSIBLE_DUPLICATE"
+DUPLICATE_TXN_CODE = "BR-TT-03"
+DUPLICATE_TXN_MESSAGE = "Mã giao dịch này đã có trong hệ thống (giao dịch #{id}), không ghi lại."
+
+
+def _late_error(field, message):
+    return BusinessError(message, code=LATE_ENTRY_CODE, extra={field: message})
+
+
+def _late_duplicate_window():
+    return timedelta(hours=max(int(getattr(settings, "LATE_PAYMENT_DUPLICATE_WINDOW_HOURS", 72)), 0))
+
+
+def _validate_late_input(bank_txn_id, amount, received_at):
+    """Kiểm mã GD / số tiền / giờ nhận; sai → BusinessError BR-TT-18 kèm khoá ô lỗi. Trả (mã chuẩn, Decimal, datetime)."""
+    txn = normalize_bank_txn_id(bank_txn_id)
+    if not txn:
+        raise _late_error("bank_txn_id", "Thiếu mã giao dịch ngân hàng.")
+    if len(txn) > BANK_TXN_ID_MAX_LENGTH:
+        raise _late_error("bank_txn_id", f"Mã giao dịch ngân hàng dài quá {BANK_TXN_ID_MAX_LENGTH} ký tự.")
+    if not re.match(BANK_TXN_ID_PATTERN, txn):
+        raise _late_error("bank_txn_id", "Mã giao dịch chỉ gồm chữ không dấu, số và các ký tự . _ - /")
+    try:
+        value = validate_amount(amount)
+    except ValueError as exc:
+        raise _late_error("amount", str(exc)) from None
+    if isinstance(received_at, str):
+        try:
+            received_at = parse_datetime(received_at.strip())
+        except ValueError:
+            received_at = None
+    if received_at is None or not hasattr(received_at, "tzinfo"):
+        raise _late_error("received_at", "Thiếu hoặc sai giờ nhận tiền (ISO 8601).")
+    if timezone.is_naive(received_at):
+        received_at = timezone.make_aware(received_at)
+    if received_at > timezone.now() + LATE_RECEIVED_AT_TOLERANCE:
+        raise _late_error("received_at", "Giờ nhận tiền không được ở tương lai.")
+    return txn, value, received_at
+
+
+def _late_order(order_code):
+    """Tra đơn theo mã (không phân biệt hoa thường); None khi để trống mã. Đơn không hợp lệ → 400."""
+    code = str(order_code or "").strip()
+    if not code:
+        return None
+    order = SalesOrder.objects.filter(code__iexact=code).first()
+    if order is None:
+        message = "Không tìm thấy đơn mang mã này. Kiểm tra lại mã đơn, hoặc để trống nếu chưa biết khách chuyển cho đơn nào."
+        raise BusinessError(message, code=LATE_NOT_FOUND_CODE, extra={"order_code": message})
+    if order.status == SalesOrder.Status.BOOKED:
+        message = "Đơn còn đang giữ chỗ. Xác nhận tiền ngay trên đơn (nút Xác nhận đã nhận tiền)."
+        raise BusinessError(message, code=LATE_BOOKED_CODE, extra={"order_code": message, "order_id": order.pk})
+    if order.status not in LATE_ENTRY_ORDER_STATUSES:
+        message = (
+            "Đơn đã thanh toán. Nếu khách chuyển thêm, để trống mã đơn để ghi khoản không gắn đơn rồi hoàn."
+        )
+        raise BusinessError(message, code=LATE_PAID_CODE, extra={"order_code": message})
+    return order
+
+
+def _in_window(received_at):
+    """Q: giờ nhận trong cửa sổ nghi trùng quanh `received_at` (BR-TT-18, TL15-H1)."""
+    window = _late_duplicate_window()
+    return Q(received_at__gte=received_at - window, received_at__lte=received_at + window)
+
+
+def find_similar_payment(*, order, amount, received_at, exclude_pk=None):
+    """
+    BR-TT-18 (đính chính 08/10, TL15-H1): khoản đã có mà khoản ghi tay mới có thể trùng, KHÔNG phụ thuộc bên kia
+    có gắn đơn hay không. Cùng số tiền và:
+    - có đơn X: giao dịch bất kỳ của X (bỏ dòng tách thừa `-THUA`), hoặc UNMATCHED không đơn trong cửa sổ giờ;
+    - không đơn: UNMATCHED không đơn, hoặc ORPHAN của đơn bất kỳ, đều trong cửa sổ giờ.
+    """
+    status = PaymentTransaction.MatchStatus
+    unmatched = Q(sales_order__isnull=True, match_status=status.UNMATCHED) & _in_window(received_at)
+    if order is not None:
+        candidates = order.payments.filter(amount=amount).exclude(pk=exclude_pk).order_by("received_at", "pk")
+        own = next((p for p in candidates if "split_from" not in (p.raw_payload or {})), None)
+        if own is not None:
+            return own
+        cond = unmatched
+    else:
+        cond = unmatched | (Q(match_status=status.ORPHAN) & _in_window(received_at))
+    return (
+        PaymentTransaction.objects.filter(cond, amount=amount).exclude(pk=exclude_pk)
+        .order_by("received_at", "pk").first()
+    )
+
+
+def flag_possible_duplicate(payment, order):
+    """
+    BR-TT-15 + BR-TT-18: gắn nhãn nghi trùng cho giao dịch mới của webhook/IPN (không phải ghi tay).
+    - OVERPAID mà đơn có khoản MANUAL MATCHED cùng số tiền  -> DUPLICATE_MANUAL_WARNING (BR-TT-15).
+    - ORPHAN: có khoản MANUAL ORPHAN cùng đơn, hoặc MANUAL UNMATCHED không đơn trong cửa sổ giờ, cùng số tiền.
+    - UNMATCHED: có khoản MANUAL UNMATCHED không đơn, hoặc MANUAL ORPHAN của đơn bất kỳ, trong cửa sổ giờ.
+    Hai chiều khớp với `find_similar_payment` (TL15-H1). Trả nhãn đã gắn, hoặc "". Gọi trong transaction của người ghi.
+    """
+    if payment.source == PaymentTransaction.Source.MANUAL:
+        return ""
+    status = PaymentTransaction.MatchStatus
+    manual = PaymentTransaction.objects.filter(source=PaymentTransaction.Source.MANUAL, amount=payment.amount)
+    manual = manual.exclude(pk=payment.pk)
+    in_window = _in_window(payment.received_at)
+    manual_unmatched = Q(sales_order__isnull=True, match_status=status.UNMATCHED) & in_window
+    warning = ""
+    if payment.match_status == status.OVERPAID and order is not None:
+        if manual.filter(sales_order=order, match_status=status.MATCHED).exists():
+            warning = DUPLICATE_MANUAL_WARNING
+    elif payment.match_status == status.ORPHAN and order is not None:
+        cond = Q(sales_order=order, match_status=status.ORPHAN) | manual_unmatched
+        if manual.filter(cond).exists():
+            warning = DUPLICATE_LATE_MANUAL_WARNING
+    elif payment.match_status == status.UNMATCHED:
+        cond = manual_unmatched | (Q(match_status=status.ORPHAN) & in_window)
+        if manual.filter(cond).exists():
+            warning = DUPLICATE_LATE_MANUAL_WARNING
+    if warning:
+        payment.duplicate_warning = warning
+        payment.save(update_fields=["duplicate_warning"])
+    return warning
+
+
+def record_unmatched_payment(*, bank_txn_id, amount, received_at, source, raw_payload=None):
+    """
+    Ghi khoản không khớp đơn nào vào hàng chờ (UNMATCHED, OPEN), idempotent theo mã GD (BR-TT-03).
+    Dùng chung cho webhook/IPN và ghi tay tiền về muộn. Trả `(payment, created)`.
+    """
+    bank_txn_id = normalize_bank_txn_id(bank_txn_id)
+    payment, created = PaymentTransaction.objects.get_or_create(
+        bank_txn_id=bank_txn_id,
+        defaults={
+            "sales_order": None,
+            "amount": amount,
+            "match_status": PaymentTransaction.MatchStatus.UNMATCHED,
+            "resolution_status": initial_resolution_status(PaymentTransaction.MatchStatus.UNMATCHED),  # BR-TT-09
+            "source": source,
+            "environment": environment_for_source(source),  # BR-TT-14
+            "raw_payload": raw_payload or {},
+            "received_at": received_at,
+        },
+    )
+    if created:
+        flag_possible_duplicate(payment, None)
+    return payment, created
+
+
+def _late_existing_outcome(existing, *, order, amount):
+    """
+    Mã GD đã có (LP-AC4/LP-AC5): đúng khoản ghi tay cũ (MANUAL, ORPHAN/UNMATCHED, cùng tiền, cùng đơn)
+    → trả lại dòng cũ; còn lại → 400 BR-TT-03 kèm id khoản đã có.
+    """
+    status = PaymentTransaction.MatchStatus
+    same = (
+        existing.source == PaymentTransaction.Source.MANUAL
+        and existing.match_status in (status.ORPHAN, status.UNMATCHED)
+        and existing.amount == amount
+        and existing.sales_order_id == (order.pk if order is not None else None)
+    )
+    if same:
+        return existing, True
+    message = DUPLICATE_TXN_MESSAGE.format(id=existing.pk)
+    raise BusinessError(
+        message, code=DUPLICATE_TXN_CODE, extra={"bank_txn_id": message, "existing_payment_id": existing.pk},
+    )
+
+
+def record_late_payment(*, bank_txn_id, amount, received_at, actor, order_code=None,
+                        acknowledge_possible_duplicate=False):
+    """
+    BR-TT-18 (#15): Chủ ghi tay khoản tiền đã vào tài khoản mà webhook/IPN không báo (E-05).
+    Tạo giao dịch source=MANUAL, OPEN: ORPHAN khi gắn đơn Đã huỷ/Tự huỷ, UNMATCHED khi không gắn đơn.
+    KHÔNG đổi đơn, kho hay hoá đơn; bước sau đi qua hàng chờ (S12 gắn đơn, S13 phiếu hoàn). Không có chữ tự do:
+    chỉ mã GD, số tiền, giờ nhận, mã đơn. AuditLog chỉ chứa mã và số. Trả `(payment, duplicate)`.
+    """
+    txn, amount, received_at = _validate_late_input(bank_txn_id, amount, received_at)
+    order = _late_order(order_code)
+
+    existing = PaymentTransaction.objects.filter(bank_txn_id=txn).first()
+    if existing is not None:
+        return _late_existing_outcome(existing, order=order, amount=amount)
+
+    similar = find_similar_payment(order=order, amount=amount, received_at=received_at)
+    if similar is not None and not acknowledge_possible_duplicate:
+        message = "Có khoản giống (cùng số tiền). Đối chiếu sao kê: nếu là khoản khác thì xác nhận để ghi tiếp."
+        raise ConflictError(message, code=LATE_POSSIBLE_DUPLICATE_CODE, extra={
+            "similar_payment_id": similar.pk,
+            "similar_bank_txn_id": similar.bank_txn_id,
+            "similar_received_at": similar.received_at.isoformat(),
+        })
+
+    try:
+        with transaction.atomic():
+            if order is not None:
+                payment, created = _record_payment(
+                    order=order, bank_txn_id=txn, amount=amount, received_at=received_at,
+                    source=PaymentTransaction.Source.MANUAL, actor=actor, raw_payload={},
+                    allowed_statuses=LATE_ENTRY_ORDER_STATUSES, audit_action=None,
+                )
+            else:
+                payment, created = record_unmatched_payment(
+                    bank_txn_id=txn, amount=amount, received_at=received_at,
+                    source=PaymentTransaction.Source.MANUAL, raw_payload={},
+                )
+            if not created:
+                return _late_existing_outcome(payment, order=order, amount=amount)
+            acknowledged = similar is not None
+            if acknowledged:
+                payment.duplicate_warning = DUPLICATE_LATE_MANUAL_WARNING
+                payment.save(update_fields=["duplicate_warning"])
+            record_audit(
+                "record_late_payment", actor=actor, obj=payment,
+                changes={
+                    "bank_txn_id": payment.bank_txn_id,
+                    "amount": payment.amount,
+                    "match_status": payment.match_status,
+                    "source": payment.source,
+                    "order": order.code if order is not None else None,
+                    "received_at": payment.received_at,
+                    "acknowledged_duplicate": acknowledged,
+                },
+            )
+    except IntegrityError:
+        # Hai lần ghi đồng thời cùng mã GD: ràng buộc unique chặn, trả 400 thay vì 500 (BR-TT-03).
+        existing = PaymentTransaction.objects.filter(bank_txn_id=txn).first()
+        message = DUPLICATE_TXN_MESSAGE.format(id=existing.pk if existing else "?")
+        raise BusinessError(message, code=DUPLICATE_TXN_CODE, extra={
+            "bank_txn_id": message, **({"existing_payment_id": existing.pk} if existing else {}),
+        }) from None
+    return payment, False
 
 
 # --- BR-TT-10 (L8): chuyển thừa ngay lần đầu → tách phần thừa vào hàng chờ -------

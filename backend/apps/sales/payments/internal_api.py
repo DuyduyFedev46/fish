@@ -100,20 +100,9 @@ def _handle_payment_ipn(request, *, source):
         if existing is not None:
             return _existing_response(existing)
         # Không khớp đơn nào -> hàng chờ Chủ (BR-TT-05 tinh thần), idempotent theo txn.
-        payment, _ = PaymentTransaction.objects.get_or_create(
-            bank_txn_id=bank_txn_id,
-            defaults={
-                "sales_order": None,
-                "amount": amount,
-                "match_status": PaymentTransaction.MatchStatus.UNMATCHED,
-                "resolution_status": services.initial_resolution_status(
-                    PaymentTransaction.MatchStatus.UNMATCHED
-                ),  # BR-TT-09: vào hàng chờ
-                "source": source,
-                "environment": services.environment_for_source(source),  # BR-TT-14
-                "raw_payload": d.get("raw") or {},
-                "received_at": received_at,
-            },
+        services.record_unmatched_payment(
+            bank_txn_id=bank_txn_id, amount=amount, received_at=received_at, source=source,
+            raw_payload=d.get("raw") or {},
         )
         return Response({"matched": False, "order_status": None})
 

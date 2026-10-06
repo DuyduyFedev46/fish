@@ -236,6 +236,8 @@ INTERNAL_SERVICE_TOKEN = os.getenv("INTERNAL_SERVICE_TOKEN", "")
 # Secret thật nằm ở GCP Secret Manager (cangca-sepay-sandbox-*) — KHÔNG có giá trị mặc định
 # ở đây, rỗng thì P1 từ chối ký (an toàn hơn ký nhầm bằng chuỗi rỗng).
 SEPAY_ENV = os.getenv("SEPAY_ENV", "SANDBOX").strip().upper()  # SANDBOX | PRODUCTION
+# BR-TT-18 (#15): cửa sổ (giờ) để coi hai khoản không gắn đơn cùng số tiền là nghi trùng khi ghi tiền về muộn.
+LATE_PAYMENT_DUPLICATE_WINDOW_HOURS = int(os.getenv("LATE_PAYMENT_DUPLICATE_WINDOW_HOURS", "72"))
 SEPAY_MERCHANT_ID = os.getenv("SEPAY_MERCHANT_ID", "")
 SEPAY_SECRET_KEY = os.getenv("SEPAY_SECRET_KEY", "")
 SEPAY_CHECKOUT_URL_SANDBOX = os.getenv(

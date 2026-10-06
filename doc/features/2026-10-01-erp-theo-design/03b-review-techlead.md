@@ -3254,6 +3254,7 @@ Ghi nhận sự cố: lần chạy đầu của techlead đụng một phiên kh
 
 ---
 
+
 ## Review #15 FE (08/10)
 
 Phạm vi: `git diff 151b56e..HEAD` (commit 8e56749, 15 file, chỉ trong `erp-console/` và dev-notes). Đối chiếu `02d-tien-ve-muon.md` §3, §7 và contract BE thật (main 4b7554e, sau đính chính TL15-H1). Theo yêu cầu, techlead không build. Số liệu tsc, vitest, build, `check-no-mock` và e2e lấy theo dev-notes. Techlead chỉ chạy `check_naming.py`: không có vi phạm mới (còn 2 file `frontend/` đỏ sẵn trên main).
@@ -3287,3 +3288,135 @@ Phạm vi: `git diff 151b56e..HEAD` (commit 8e56749, 15 file, chỉ trong `erp-c
 - QA #15 phải chạy E2E trên **BE thật**, đủ 4 ca ở 02d §7, cộng ca chéo loại TL15-H1: ghi không gắn đơn, rồi bắn IPN có mã đơn Tự huỷ với mã GD khác, kiểm nhãn và ô tick khi hoàn. Hiện e2e của dev mới chạy trên mock.
 
 ### Kết luận Review #15 FE (08/10): **APPROVED**
+
+## Review #15 BE (08/10)
+
+Phạm vi: `git diff main...feat/tien-ve-muon` (commit fdba607, 17 file). Đối chiếu `02d-tien-ve-muon.md` (LP-AC1…16, §3–§7) và dev-notes "#15 ghi tiền về muộn (BE)".
+
+**Lệnh techlead tự chạy (08/10).** Chạy trên cây đã merge thử `main` (5116d99, có Phạm vi Lô 3) với nhánh. Dùng `git merge-tree`, không xung đột. Worktree tạm nằm ở scratchpad và đã gỡ.
+- `makemigrations --check --dry-run`: No changes detected.
+- `manage.py test apps.sales apps.ai apps.accounts` (`DJANGO_DEBUG=1`): 1421 test, 1411 OK. 10 ERROR đều là test HTML trang admin, lỗi `Missing staticfiles manifest entry`. Đây là lỗi môi trường tạm (chưa `collectstatic`), không phải lỗi code.
+- `check_naming.py`: không có vi phạm mới. Chỉ còn 2 file `frontend/` đã đỏ sẵn trên main.
+
+### Kết quả theo mục được giao
+
+| Mục | Kết quả |
+|---|---|
+| Tiền, làm tròn đồng | **Đạt.** Đi qua `validate_amount` (Decimal, ROUND_HALF_UP 0,01, tối thiểu 1 đ, trần cột). Có test `350000.004 → 350000.00` và 6 giá trị sai. Không dùng float. |
+| Không sửa số kỳ cũ | **Đạt.** `received_at` cho lùi ngày tuỳ ý, nhưng (a) báo cáo không đọc `PaymentTransaction.received_at`; (b) `ORPHAN`/`UNMATCHED` không vào `_countable_payments`; (c) gắn dòng `UNMATCHED` vào đơn (S12) thì xuất hoá đơn với `issued_at=now` (`services.py:841`), không theo giờ ghi muộn; (d) phiếu hoàn ghi sổ lúc xác nhận. Nên ghi muộn không đổi số của kỳ đã qua. |
+| Nghi trùng hai chiều | **Đạt theo 02d, nhưng 02d có lỗ.** Ghi tay sau webhook trả 409 kèm tick. Webhook sau ghi tay thì gắn nhãn. Hai chiều chỉ hoạt động khi **cùng loại**: ORPHAN↔ORPHAN cùng đơn, hoặc UNMATCHED↔UNMATCHED. Ca chéo loại không bị bắt, xem **TL15-H1**. |
+| Job tự khớp bỏ qua MANUAL | **Đạt.** `auto_confirm.py:51` thêm `.exclude(source=MANUAL)`. Có test qua job thật và qua query. |
+| Quyền `confirm_payment_manual` | **Đạt.** Có `required_perms` ở action và `check_permissions` → `require_perm` ở viewset. Có test 401, test 403 cho 4 Group (không ghi dòng nào, không ghi audit), và test user chỉ có perm thì được ghi. Người gọi không có tham số nào để tự đặt `source`, `match_status`, `sales_order` hay `environment` (có test). |
+| `raw_payload`, AuditLog, dữ liệu cá nhân | **Đạt.** Cả hai nhánh đều có `raw_payload={}`. `record_late_payment` chỉ ghi 7 khoá (mã GD, tiền, loại, nguồn, mã đơn, giờ, cờ ack), không có `note`. Có test khoá `note` chứa SĐT giả và kiểm rằng nó không nằm trong model, audit, hai timeline hay response. Response không có `raw_payload`, giá vốn, tên hay SĐT. Có test `assertNoLogs`. Mã GD chỉ nhận ký tự `[A-Z0-9._/-]`. |
+| AI `record_late` | **Giữ, không cấm.** Lệnh nằm trong `RED_ZONE_PERMS` (`confirm_payment_manual`). `effective_level` tính trần theo `spec.max_level`, kể cả khi Chủ mở vùng đỏ (`policy/effective.py:150`), nên trần thực tế là **C**: AI chỉ điền đề xuất, Chủ bấm xác nhận. Mức này giống `sales.salesorder.confirm_payment` và `resolve`. Cấm hẳn AI không thêm an toàn, vì mọi số trên phiếu Chủ vẫn phải tự đối chiếu với sao kê. Còn một điểm nhỏ ở **TL15-L1**. |
+| Đổi contract refund | **Đúng 02d, có điều kiện triển khai** (**TL15-C1**). FE hiện tại (main) không gửi `acknowledge_duplicate_warning`. 409 `PAYMENT_DUPLICATE_WARNING` không thuộc `CONFLICT_CODES` và không có `updated_at`, nên `ConfirmModal`/`useSubmit` hiện nó như lỗi thường, alert đỏ kèm câu nhãn. Không vỡ màn hình. Tuy vậy **Chủ sẽ không lập được phiếu hoàn** cho mọi giao dịch có nhãn, gồm cả dòng `OVERPAID` BR-TT-15 đã có trên production, cho tới khi FE #15 có ô tick. Lối gọi AI `create_refund` cũng không gửi được cờ này. Đây là hành vi đúng (AI không vượt được cảnh báo). |
+| Sửa GW-03 | **Đạt.** `next_steps.py:151` đọc `payment.duplicate_warning`, áp cho mọi loại khoản. Import `DUPLICATE_MANUAL_WARNING` không còn dùng đã được bỏ. Có test. |
+| Va chạm Phạm vi Lô 3 | **Không va chạm.** Ở `sales/payments/api.py`, main chỉ sửa docstring `SalesInvoiceViewSet`, còn nhánh thêm action vào `PaymentTransactionViewSet`. `merge-tree` sạch. `PaymentTransactionSerializer` không bị Lô 3 đổi. Bộ test sales/ai/accounts trên cây merge vẫn xanh (trừ lỗi môi trường đã nêu). |
+| Đúng thiết kế khác | Có `late_serializers.py` tách riêng và đếm 31→32 `@action` (giả định 2, 3 của dev). **Chấp nhận** cả hai. Giả định 1 (ack mà không có khoản giống thì không gắn nhãn) cũng **chấp nhận**. |
+
+### Lỗi
+
+**TL15-H1 · High · lỗ thiết kế 02d §5 (lỗi của techlead, không phải của dev). Nghi trùng không bắt ca chéo loại, nên có thể hoàn hai lần.**
+- `services.py:402-416` `find_similar_payment`: khi không có đơn, hàm chỉ tìm `UNMATCHED` không gắn đơn. Khi có đơn, hàm chỉ tìm giao dịch của chính đơn đó.
+- `services.py:436-446` `flag_possible_duplicate`: nhánh `ORPHAN` chỉ so với `MANUAL ORPHAN` cùng đơn. Nhánh `UNMATCHED` chỉ so với `MANUAL UNMATCHED` không đơn.
+- Tái hiện (ca thật, hay gặp nhất). Đơn SO-A tự huỷ. Chủ thấy 350.000 đ trên sao kê nhưng không chắc của đơn nào, nên ghi muộn **không gắn đơn** (`UNMATCHED`, mã FT…01). Sau đó IPN của cổng về trễ. IPN luôn mang mã đơn, và vì không có FT nên lùi về id SePay (02d R2). Kết quả là dòng `ORPHAN` gắn SO-A với mã GD khác, **không có nhãn**. Cả hai dòng đều OPEN và có `refund` trong `available_actions`, không có tick nào chặn → hoàn hai lần 350.000 đ.
+- Chiều ngược lại cũng lọt. Webhook/IPN đã tạo `ORPHAN` trên SO-A, sau đó Chủ ghi muộn **không gắn đơn** cùng số tiền với mã khác. `find_similar_payment(order=None)` không thấy, nên không trả 409.
+- Sửa: coi "khoản giống" là **cùng số tiền và `received_at` trong cửa sổ `LATE_PAYMENT_DUPLICATE_WINDOW_HOURS`**, không phụ thuộc bên kia có gắn đơn hay không, với các ca sau:
+  - `find_similar_payment(order=None)`: thêm `Q(match_status=ORPHAN)` (đơn bất kỳ) bên cạnh `UNMATCHED` không đơn.
+  - `find_similar_payment(order=X)`: giữ nhánh "giao dịch của X", thêm `UNMATCHED` không đơn trong cửa sổ.
+  - `flag_possible_duplicate` nhánh `ORPHAN`: thêm `MANUAL UNMATCHED` không đơn trong cửa sổ.
+  - `flag_possible_duplicate` nhánh `UNMATCHED`: thêm `MANUAL ORPHAN` (đơn bất kỳ) trong cửa sổ.
+- Test bắt buộc (4 ca): ghi tay không đơn rồi IPN ORPHAN thì dòng IPN có nhãn; IPN ORPHAN rồi ghi tay không đơn thì 409; webhook UNMATCHED rồi ghi tay gắn đơn huỷ thì 409; ghi tay gắn đơn huỷ rồi webhook UNMATCHED thì có nhãn. Mỗi ca thêm một ca ngoài cửa sổ hoặc khác tiền để chứng minh không gắn nhãn thừa.
+- Techlead nhận đây là phần đính chính 02d §5 và R2. Điều phối viên ghi một dòng "đính chính 08/10" vào 02d khi sửa.
+
+**TL15-M1 · Medium · `refunds/services.py:135-139`. Quyết định vượt cảnh báo không để lại dấu vết.** Chủ gửi `acknowledge_duplicate_warning=true` thì phiếu hoàn được tạo, nhưng audit `create_refund` không ghi việc Chủ đã xác nhận qua nhãn nghi trùng. Đây là thao tác làm tiền rời túi, đi ngược một cảnh báo của hệ thống, nên phải truy được ai đã bấm (BR-PQ-04/05). Sửa: khi `p.duplicate_warning` khác rỗng thì thêm `"acknowledged_duplicate_warning": True` vào `changes`, chỉ là cờ, không chép nhãn. Thêm test assert khoá này trong `test_lp_ac13_refund_blocked_without_ack_then_ok_with_ack`.
+
+**TL15-L1 · Low · AI và `acknowledge_possible_duplicate`.** `RecordLatePaymentInput` khai cờ này nên AI có thể đề xuất sẵn `true`, và Chủ bấm xác nhận mà không thấy hộp 409. Nên bỏ cờ khỏi tham số AI được điền, hoặc để pipeline luôn ép `false` với lệnh này. Không chặn lô này, đưa vào nợ AI.
+
+**TL15-L2 · Low · `services.py:368-376`.** `parse_datetime("2026-10-03")` (Python 3.11 `fromisoformat`) nhận chuỗi chỉ có ngày thành 00:00. Ngoài ra không có cận dưới cho giờ nhận, nên gõ nhầm năm 2006 vẫn ghi được. Cả hai đều không đổi số kỳ cũ (xem bảng trên), nhưng làm lệch thứ tự timeline và cửa sổ nghi trùng. Nên đòi có phần giờ và chặn cũ hơn khoảng 400 ngày. Không chặn lô này.
+
+**TL15-L3 · Low · ghi nhận.** Kiểm nghi trùng chạy ngoài khoá, nên hai lần ghi đồng thời **khác** mã GD mà cùng tiền vẫn qua cả hai, không có nhãn. Ca này phải do hai người cùng bấm trong vài trăm ms, khó xảy ra với một Chủ. Chấp nhận.
+
+### Điều kiện (không phải lỗi code)
+
+- **TL15-C1. Phát hành đồng bộ.** Không deploy BE #15 lên staging hay production khi FE #15 (ô tick trong `RefundModal`, nhãn ở hàng chờ và chi tiết) chưa đi cùng đợt. Nếu không, Chủ bị khoá hoàn tiền với mọi giao dịch có nhãn. Merge vào main được, vì merge không phải deploy. Trước khi deploy production, nên đếm số dòng `duplicate_warning <> ''` và `resolution_status='OPEN'` (chỉ đếm, không đọc dữ liệu) để biết bao nhiêu dòng cũ sẽ đòi tick.
+- **TL15-C2. Ghi BR-TT-18 vào spec khi nghiệm thu.** `doc/business-process-spec.md` §P-05 hiện chỉ có tới BR-TT-07 (BR-TT-08…17 còn nằm ở hồ sơ tính năng, nợ cũ). BR-TT-17 đã dùng ở hồ sơ SePay, nên số 18 không trùng. Đề xuất thêm ngay dưới BR-TT-07:
+  > | BR-TT-18 | **Tiền về muộn mà webhook/IPN không báo** (E-05, đơn đã huỷ/tự huỷ hoặc chưa rõ đơn): Chủ (hoặc người có `confirm_payment_manual`) ghi tay ở Hàng chờ thanh toán. Hệ thống tạo giao dịch `MANUAL` đang Chờ xử lý: `ORPHAN` nếu gắn đơn đã huỷ, `UNMATCHED` nếu không gắn đơn. **Không đổi đơn, kho, hoá đơn**; bước sau đi qua hàng chờ (gắn đơn / phiếu hoàn). Không ghi gắn đơn đang giữ chỗ hoặc đã thanh toán. Không có ô ghi chú. Mã GD chống trùng (BR-TT-03). Khoản cùng số tiền trong cửa sổ `LATE_PAYMENT_DUPLICATE_WINDOW_HOURS` bị gắn nhãn nghi trùng; phiếu hoàn trên giao dịch có nhãn phải xác nhận "đã đối chiếu sao kê" (áp cả nhãn BR-TT-15) *(D, 03/10; Q1–Q3 theo mặc định 02d)*. |
+
+  Sửa thêm dòng E-05 ở §13 thành `BR-TT-07, BR-TT-18`.
+
+### Kết luận Review #15 BE (08/10): **CHANGES REQUESTED**
+
+Phải sửa trước khi merge: **TL15-H1** (4 nhánh + 4 test) và **TL15-M1** (1 khoá audit + 1 assert). L1–L3 đưa vào nợ. C1, C2 là điều kiện cho điều phối viên. Sau khi sửa, techlead re-review chỉ phần diff mới và chạy lại `apps.sales.payments` cùng `apps.sales.refunds`.
+
+### Re-review sau d51a89d
+
+Phạm vi: `git show d51a89d`, 4 file (`payments/services.py`, `refunds/services.py`, test, đính chính 02d §5).
+
+**Lệnh techlead đã tự chạy** (`DJANGO_DEBUG=1`, worktree `tien-ve-muon`, không tạo file nào trong worktree):
+- `manage.py test apps.sales.payments apps.sales.refunds apps.sales.orders apps.ai.registry`: 569 test, 568 OK. Còn 1 ERROR là `test_f5b_gl03_ac10_admin_post…`, lỗi HTML trang admin `Missing staticfiles manifest`. Đây là lỗi môi trường, đã gặp ở lần review trước, không liên quan code.
+- `makemigrations --check --dry-run`: No changes detected.
+- `check_naming.py`: không có vi phạm mới.
+
+| Mục | Kết quả |
+|---|---|
+| TL15-H1, chiều ghi tay (`find_similar_payment`, `services.py:409-429`) | **Đóng.** Có hai trường hợp:<br>- **Có đơn X:** lấy giao dịch của chính X trước. Không cửa sổ, giữ như cũ, vẫn bỏ dòng `-THUA`. Không có thì lấy `UNMATCHED` không đơn, cùng tiền, trong cửa sổ.<br>- **Không đơn:** lấy `UNMATCHED` không đơn hoặc `ORPHAN` của đơn bất kỳ, cả hai đều cùng tiền và trong cửa sổ.<br>`ORPHAN` ở đây không lọc theo nguồn, đúng ý: Chủ ghi sau webhook hoặc IPN. |
+| TL15-H1, chiều webhook (`flag_possible_duplicate`, `services.py:432-461`) | **Đóng.** Chỉ so với dòng `MANUAL`, loại chính nó, cùng tiền:<br>- **`ORPHAN`:** so với `MANUAL ORPHAN` cùng đơn (không cửa sổ), hoặc `MANUAL UNMATCHED` không đơn trong cửa sổ.<br>- **`UNMATCHED`:** so với `MANUAL UNMATCHED` không đơn, hoặc `MANUAL ORPHAN` đơn bất kỳ, cả hai trong cửa sổ.<br>Nhánh `OVERPAID` của BR-TT-15 không đổi. Hai hàm đối xứng nhau. |
+| Cửa sổ giờ | **Đúng.** `_in_window` tạo đoạn đóng hai phía `[t − W, t + W]`, với `W = max(LATE_PAYMENT_DUPLICATE_WINDOW_HOURS, 0)` đọc mỗi lần gọi. `override_settings` có hiệu lực, có test với W=1. Cửa sổ áp lên mọi ca chéo loại. Ca cùng đơn không có cửa sổ, đúng như 02d (cùng đơn đã là dấu hiệu mạnh). |
+| Không gắn nhãn thừa | **Đạt.** Có 4 test âm: khác tiền, ngoài cửa sổ (200 giờ so với W=72; 10 giờ so với W=1), cho cả hai chiều ghi tay→IPN và IPN→ghi tay. Dòng không phải `MANUAL` không bao giờ là căn cứ để gắn nhãn cho dòng webhook. Vì vậy hai webhook cùng tiền, không liên quan nhau, vẫn không bị gắn nhãn (giữ hành vi cũ). Phía ghi tay, phạm vi rộng hơn (`ORPHAN` đơn bất kỳ trong 72 giờ) có thể làm số lần hiện 409 tăng lên khi trùng số tiền phổ biến. Cái giá chỉ là Chủ tick một lần. Chấp nhận, vì đây là lớp chặn hoàn hai lần. |
+| TL15-M1 | **Đóng.** `refunds/services.py:138-140` chỉ thêm cờ `acknowledged_duplicate_warning: True` khi giao dịch có nhãn, không chép nội dung nhãn. Có test cả nhánh có cờ (kèm assert nhãn không nằm trong `changes`) và nhánh không nhãn (không có khoá). |
+| Đính chính 02d §5 | **Đạt.** Nội dung khớp code. |
+| Thiếu sót nhỏ (không chặn) | Chưa có test âm "ngoài cửa sổ" cho chiều webhook `UNMATCHED` → ghi tay gắn đơn huỷ. Chiều này dùng chung `_in_window` với các ca đã có test, nên rủi ro thấp. Nên bổ sung khi lần sau có người sửa file test này. |
+
+L1–L3 giữ nguyên là nợ. Điều kiện **C1** (deploy BE #15 cùng đợt với FE #15) và **C2** (ghi BR-TT-18 vào spec khi nghiệm thu) vẫn còn hiệu lực.
+
+### Kết luận re-review sau d51a89d: **APPROVED** (kèm điều kiện C1, C2)
+
+## Review #8 FE (08/10)
+
+Phạm vi: `git diff main...feat/xoa-phieu-hoan-fe` (commit 273cda0, 10 file trong `erp-console/features/returns/**`, `erp-console/e2e/delete_return.py`, dev-notes). Đối chiếu contract BE trên main (`backend/apps/inventory/returns/api.py:9-11,127-138`, `serializers.py:115-130`, `services.py:53-92`) và TL-D8-L3. Theo yêu cầu, techlead không build. Số liệu tsc/vitest/build/e2e lấy theo dev-notes và để QA chạy lại. Techlead chỉ chạy `check_naming.py`: không có vi phạm mới, chỉ còn 2 file `frontend/` đã đỏ sẵn trên main.
+
+| Mục | Kết quả |
+|---|---|
+| Đúng contract BE | **Đạt.** `POST /api/inventory/returns/{id}/delete/` gửi body rỗng và nhận 200 `{status:"deleted", id}`. `canDelete` chỉ đọc `available_actions` của BE (`returnsModel.ts:110`), không tự đoán Chủ hay trạng thái, đúng như BE (Chủ/superuser, phiếu `DRAFT`/`CANCELLED`). Khai `available_actions?` optional là phòng thủ hợp lý: BE luôn trả khoá này, nếu thiếu thì coi như không có nút. |
+| Hộp xác nhận có câu TL-D8-L3 | **Đạt.** `messages.ts:72` có câu "Số kg trên phiếu này sẽ không được nhập lại kho.", chỉ hiện khi phiếu `DRAFT` (`ReturnDetailScreen.tsx:256`). Phiếu Đã huỷ không có câu này, đúng vì kg của phiếu đó đã không còn tính. |
+| 400 / 409 | **Đạt.** Dùng `ConfirmModal` có sẵn. 400 `RETURN_DELETE_NOT_ALLOWED` hiện alert đỏ, nút đổi thành "Thử lại". 409 `STALE_STATE` hiện `ConflictBanner` với nút "Tải lại" → `refresh()`. Nếu phiếu đã bị xoá thì sau khi tải lại ra `NotFoundScreen`. |
+| Lệch: `apiFetch` bỏ "(BR-…)" | **Chấp nhận.** UI-RULES §1 mục 1 cấm hiện mã luật trên màn. Câu "hiện nguyên `detail`" ở TL-D8 nghĩa là không thay bằng câu chung chung, không bắt hiện mã BR. |
+| Không `console` | **Đạt.** Không có `console.*` trong `features/returns`. Trong e2e chỉ có bộ nghe `console.error` để kiểm lỗi. Không đưa dữ liệu vào URL hay storage. |
+| Mock không lọt build thật | **Đạt theo pattern có sẵn.** `MOCK = process.env.NEXT_PUBLIC_USE_MOCK === "1" ? mockReturnsApi : undefined` (`api.ts:21`). Công cụ thử `returnsStaleDelete` nằm trong khối `if (process.env.NEXT_PUBLIC_USE_MOCK === "1" && …)`, giống các module khác. `check-no-mock.mjs` tự lấy chuỗi seed từ `mock*.ts`. Dev-notes ghi build mock=0 cùng `check-no-mock` và `check-ai-chunks` đều XANH. QA phải chạy lại trên `npm ci` sạch. |
+| Lệch: mock chỉ cho `owner` | **Chấp nhận.** Chỉ ảnh hưởng chế độ mock. BE thật tính cả superuser qua `available_actions`, và FE không tự đoán. |
+| Không giá vốn, không dữ liệu cá nhân | **Đạt.** Màn không có tiền. Response xoá chỉ có `status`, `id`. |
+
+### Lỗi
+
+**TL8F-M1 · Medium · `features/returns/messages.ts:68-74` (và 60-65 cũ). Sai tên chuẩn, trùng nghĩa với phiếu hoàn TIỀN.** UI-RULES (bảng từ ngữ, dòng 49) dùng "phiếu hoàn" cho **hoàn tiền** ("Lập phiếu hoàn", "Tạo phiếu hoàn"). Màn hàng chờ thanh toán và chi tiết đơn đều có "phiếu hoàn" theo nghĩa đó. Ở màn này, nút đỏ "Xoá phiếu hoàn" và toast "Đã xoá phiếu hoàn." dễ khiến Chủ tưởng đang xoá phiếu hoàn tiền, trong khi đây là thao tác không khôi phục được. Tiêu đề, danh sách và toast tạo của chính module đã dùng "phiếu hàng hoàn".
+- Sửa `deleteMenu`, `deleteTitle`, `deleteConfirm` thành "Xoá phiếu hàng hoàn", và `deleted` thành "Đã xoá phiếu hàng hoàn.". Câu `deleteBody` dùng "Xoá phiếu hàng hoàn {code} …".
+- Cùng lần, sửa cụm `cancel*` (60-65, cùng story #8) cho thống nhất: "Huỷ phiếu hàng hoàn", "Đã huỷ phiếu hàng hoàn.".
+- Cập nhật `features/returns/README.md` (dòng mới), selector/nhãn trong `e2e/delete_return.py` (dòng 70, 83, 87, 91, 98, 111, 120) và test vitest nếu có so chuỗi.
+
+**TL8F-L1 · Low · `ReturnDetailScreen.tsx:7`.** Comment đầu file vẫn ghi "Phiếu đã huỷ: … hết mọi nút". Thực tế Chủ còn mục "Xoá phiếu hàng hoàn" trong menu "…". Sửa comment cho khớp.
+
+**TL8F-L2 · Low · nhỏ.** Dòng trống thừa trước `if (canDelete(r))` (dòng 100). `useRouter()` nên khai cùng nhóm với `useAuth`/`useToast`, không chen giữa các `useState`. Sửa cùng lần với M1 nếu tiện.
+
+**TL8F-L3 · Low · ghi nhận cho BE (không thuộc lô FE).** `soft_delete` đòi `required_perms=("inventory.add_returntostock",)` (`api.py:129`), nhưng `available_actions` trả `delete` chỉ theo "là Chủ" mà không xét perm này. Nếu Chủ tắt "Ghi hàng hoàn về kho" của nhóm `owner` ở màn Phân quyền, FE vẫn hiện nút và bấm vào thì nhận 403. Hiếm gặp, BE vẫn chặn đúng. Ghi nợ BE: `get_available_actions` thêm điều kiện `has_perm("inventory.add_returntostock")`.
+
+### Kết luận Review #8 FE (08/10): **CHANGES REQUESTED**
+
+Lý do duy nhất là **TL8F-M1** (đổi chữ hiển thị và selector e2e, không đổi logic). Sửa xong thì chạy lại `tsc --noEmit`, `vitest` và `e2e/delete_return.py` (mock). Techlead chỉ cần soát diff chữ, không cần review lại toàn bộ. L1, L2 sửa cùng lần nếu tiện. L3 chuyển BE.
+
+### Re-review sau b97fe68
+
+Phạm vi: `git show b97fe68`, 8 file, chỉ đổi chữ, comment, selector e2e và thứ tự hook. Logic không đổi. Theo yêu cầu, techlead không build và không chạy e2e. `check_naming.py`: không có vi phạm mới.
+
+| Mục | Kết quả |
+|---|---|
+| TL8F-M1 | **Đóng.** `messages.ts` đổi đủ 4 khoá `cancel*` và 4 khoá `delete*` sang "phiếu hàng hoàn". README, docstring `api.ts`/`returnsModel.ts` và tên `describe` trong vitest cũng đã đổi. `cancelBody`/`deleteBody` vẫn viết "Huỷ/Xoá phiếu {code}": có mã RT-… nên không nhầm được với phiếu hoàn tiền, chấp nhận. Grep toàn `erp-console`: chuỗi cũ không còn ở nhãn hàng hoàn nào. Ba chỗ còn "phiếu hoàn" đều là hoàn **tiền** hoặc comment chung, đúng nghĩa: `guidance/mock.ts:208` (`cancel_refund`), comment ví dụ ở `ConfirmModal.tsx:3`, và comment đầu `e2e/ed_bonusA_ui.py:5`. |
+| Selector e2e | **Đạt.** `delete_return.py` và `ed_bonusA_ui.py` dùng nhãn mới. Có sửa đúng một hệ quả của #8: sau khi Chủ huỷ RT-1, menu "…" vẫn còn mục "Xoá phiếu hàng hoàn". Assert cũ "không còn nút Thao tác khác" nay thành "không còn mục Huỷ, có mục Xoá". Ca RT-6 của `giao1` vẫn kỳ vọng không có menu, đúng vì `giao1` không phải Chủ. |
+| TL8F-L1 | **Đóng.** Comment đầu `ReturnDetailScreen.tsx` nay nói rõ Chủ còn mục Xoá trên phiếu đã huỷ. |
+| TL8F-L2 | **Đóng.** `useRouter()` chuyển lên cùng nhóm với `useAuth`/`useToast`, bỏ dòng trống thừa. |
+| TL8F-L3 | Vẫn là nợ BE (`available_actions` chưa xét `add_returntostock`), không thuộc lô FE. |
+
+Việc của QA: chạy lại `npm ci`, `tsc --noEmit`, `vitest`, build mock=0 kèm `check-no-mock`, rồi build mock=1 và chạy `e2e/delete_return.py` cùng `e2e/ed_bonusA_ui.py`, vì selector đã đổi.
+
+### Kết luận re-review sau b97fe68: **APPROVED**
+

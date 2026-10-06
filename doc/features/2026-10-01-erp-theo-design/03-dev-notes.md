@@ -2515,6 +2515,7 @@ Làm trong `erp-console/`, theo board `ERP-D1`, `W3f`, `W4b/c/d/e/f/g/h`, `F3g`.
 - RR-L3: API và luồng `decide` không còn ghép/truyền `reason`. Tham số `reason` của `cancel_paid_order` giữ lại chỉ để test và nơi gọi cũ không vỡ (ghi trong docstring).
 - Nhắc triển khai: rollback migration `delivery/0010` và `sales/0014` sẽ mất chữ ghi chú đã lưu.
 
+
 ## #15 FE — Ghi tiền về muộn (BR-TT-18, LP-AC1…16 phần FE)
 Thiết kế: `02d-tien-ve-muon.md` (§3 contract, §7 phần FE). Contract thật lấy từ dev-notes "#15 ghi tiền về muộn (BE)" ở nhánh `feat/tien-ve-muon` (commit `d51a89d`). Chỉ sửa trong `erp-console/`. **Điều kiện C1 của techlead: FE này phải đi cùng BE** (nếu BE lên mà FE chưa lên thì lập phiếu hoàn khoản có nhãn nghi trùng nhận 409 mà màn không có ô tick để gửi lại).
 
@@ -2541,3 +2542,55 @@ Thiết kế: `02d-tien-ve-muon.md` (§3 contract, §7 phần FE). Contract th�
 4. Tick "Tôi đã đối chiếu sao kê" (hoàn) và "Tôi đã kiểm, đây không phải trùng" (ghi) dùng đúng chữ trong 02d §2 (LP-AC14) và đề bài; không lưu trạng thái tick vào đâu cả.
 
 **Việc còn nợ:** không lỗ hổng nào ở FE. QA #15 nên chạy cùng BE thật (02d §7 ca 1–4) vì e2e ở đây chỉ chạy trên mock.
+
+## #15 ghi tiền về muộn (BE)
+Thiết kế: `02d-tien-ve-muon.md` (BR-TT-18, LP-AC1…16). Mặc định Q1–Q3 như trong 02d: không ghi gắn đơn đã thanh toán; bắt tick khi hoàn khoản có nhãn; chưa có "đóng vì trùng".
+
+**File sửa (backend):** `apps/sales/payments/{services,api,internal_api,next_steps,auto_confirm,timeline,README}`, file mới `payments/late_serializers.py` (input, tách file để tránh xung đột với lô phạm vi dữ liệu), `apps/sales/orders/timeline.py`, `apps/sales/refunds/{services,api}.py`, `config/settings.py` (`LATE_PAYMENT_DUPLICATE_WINDOW_HOURS`=72), snapshot lệnh AI + `test_discipline` (31→32 @action) + `test_discovery` (red zone 6→7: `record_late` có `confirm_payment_manual`). Test mới: `payments/tests/test_late_payment_entry.py` (45 test).
+**Migration:** không có (`makemigrations --check --dry-run` = No changes detected).
+
+**Endpoint** `POST /api/sales/payments/record-late/` (quyền `sales.confirm_payment_manual`; không đăng nhập 401, thiếu quyền 403; AI chỉ đề xuất, `max_level=C`).
+Request:
+```json
+{"bank_txn_id": "FT26100300001", "amount": "350000", "received_at": "2026-10-03T10:29:00+07:00",
+ "order_code": "SO-261003-AB12", "acknowledge_possible_duplicate": false}
+```
+`order_code` bỏ/`""`/`null` = không gắn đơn (UNMATCHED). Khoá lạ (`note`, `source`, `match_status`, `sales_order`) bị bỏ qua.
+Response 201 (dòng mới) hoặc 200 (`duplicate: true`, gửi lại đúng khoản):
+```json
+{"duplicate": false, "payment": {"id": 412, "bank_txn_id": "FT26100300001", "amount": "350000",
+ "match_status": "ORPHAN", "source": "MANUAL", "environment": "", "duplicate_warning": "",
+ "order": {"id": 88, "code": "SO-261003-AB12", "status": "AUTO_CANCELLED"}, "resolution_status": "OPEN",
+ "refundable_amount": "350000", "available_actions": ["refund"]}}
+```
+(`payment` là nguyên `PaymentTransactionSerializer`, không có `raw_payload`, không giá vốn, không tên/SĐT.)
+Lỗi `{"detail","code",...extra}`; khoá extra trùng tên ô:
+| HTTP | code | extra |
+|---|---|---|
+| 400 | `BR-TT-18` (mã GD, tiền, giờ sai) | `bank_txn_id` / `amount` / `received_at` |
+| 400 | `BR-TT-03` (trùng mã GD, kể cả đồng thời) | `bank_txn_id`, `existing_payment_id` |
+| 400 | `LATE_PAYMENT_ORDER_NOT_FOUND` | `order_code` |
+| 400 | `LATE_PAYMENT_ORDER_BOOKED` | `order_code`, `order_id` |
+| 400 | `LATE_PAYMENT_ORDER_PAID` | `order_code` |
+| 409 | `LATE_PAYMENT_POSSIBLE_DUPLICATE` | `similar_payment_id`, `similar_bank_txn_id`, `similar_received_at` |
+
+**Đổi contract nhỏ `POST /api/sales/refunds/create/`** (nhánh `payment_transaction`): khoá tuỳ chọn `acknowledge_duplicate_warning: true`. Giao dịch có `duplicate_warning` mà thiếu cờ → 409 `PAYMENT_DUPLICATE_WARNING`, `detail` = chính nhãn. Áp cho cả nhãn BR-TT-15 cũ.
+
+**Rule cài (BR-TT-18):** ORPHAN/UNMATCHED `MANUAL` OPEN, không đổi đơn/kho/hoá đơn; mã GD `[A-Z0-9._/-]` ≤100 sau chuẩn hoá; `validate_amount` (làm tròn đồng); giờ nhận không muộn quá now+5 phút; nghi trùng hai chiều (ghi tay sau webhook → 409 + tick; webhook sau ghi tay → `flag_possible_duplicate` gắn `DUPLICATE_LATE_MANUAL_WARNING`, job tự khớp đẩy lên Chủ); job tự khớp bỏ qua `MANUAL`; GW-03 đọc `duplicate_warning` (sửa lỗi cũ đọc `resolution_note`).
+**Không chữ tự do / PII:** không có ô ghi chú, `raw_payload={}`; `AuditLog record_late_payment` chỉ `bank_txn_id, amount, match_status, source, order(mã), received_at, acknowledged_duplicate`, không `note`. Timeline giao dịch có sự kiện `payment_recorded_late` ("Ghi tay tiền về muộn 350.000 đ (mã GD …)"); timeline đơn lấy người làm từ audit trên giao dịch. Tách `record_unmatched_payment` từ `internal_api` (hành vi webhook giữ nguyên).
+
+**Giả định/nợ:** (1) khi ghi tay có ack mà không có khoản giống thì KHÔNG gắn nhãn (chỉ gắn khi thật sự có khoản giống). (2) Số @action ở `test_discipline` trên nhánh này là 31→32 (không phải 29→30 như 02d, vì main đã thêm lệnh khác). (3) `RecordLatePaymentInput` đặt ở `late_serializers.py` thay vì `serializers.py` để tránh xung đột với agent Lô 3. (4) Chưa có "đóng vì trùng" (Q3). (5) `check_naming.py` đang đỏ sẵn trên main do 2 file FE (`ContactButton.tsx`, `SiteLegalFooter.tsx`, từ `nguoi`) — không thuộc việc này; file BE của lô sạch.
+
+## #8 FE — nút Xoá phiếu hoàn (07/10)
+
+Nhánh `feat/xoa-phieu-hoan-fe`. Chỉ sửa `erp-console/features/returns/**` và `erp-console/e2e/delete_return.py`.
+- `types.ts`: `ReturnItem.available_actions?: string[]`. `api.ts`: `deleteReturn(id)` (POST `/delete/`). `returnsModel.ts`: `canDelete(r)` chỉ đọc `available_actions` (FE không tự đoán Chủ/trạng thái). `messages.ts`: nhóm chữ xoá.
+- `ReturnDetailScreen.tsx`: mục "Xoá phiếu hoàn" (danger) trong menu "…", mở `ConfirmModal`; phiếu Chờ duyệt có câu TL-D8-L3 "Số kg trên phiếu này sẽ không được nhập lại kho."; xong `toast.success` rồi `router.push("/returns/")`. 400/409 do `ConfirmModal` lo (alert đỏ + "Thử lại"; 409 là ConflictBanner có "Tải lại").
+- `mock.ts`: `available_actions` theo người xem + trạng thái, `POST /delete/` theo contract (Chủ mới xoá, 403 kiểm trước phạm vi; Chờ duyệt/Đã huỷ → 200 rồi 404; Đã duyệt → 400 `RETURN_DELETE_NOT_ALLOWED`); công cụ thử `window.__caveMock.returnsStaleDelete(id)` cho 409.
+- **Lệch nhỏ:** yêu cầu "hiện nguyên detail", nhưng lớp `apiFetch` (chung, ngoài phạm vi) bỏ mã quy tắc "(BR-…)" khỏi câu hiện cho người dùng theo UI-RULES, nên 400 hiện "Phiếu hàng hoàn đã duyệt (đã nhập lại kho hoặc ghi lỗ) không xoá được." (thiếu "(BR-PQ-10)"). Giữ như vậy.
+- Mock không phân biệt superuser `admin` (Me không có `is_superuser`), chỉ nhóm `owner` có `delete`; BE thật tính cả superuser qua `available_actions`.
+- Kiểm (07/10): `tsc --noEmit` sạch; vitest toàn bộ 1018 test xanh (thêm 3 test + `canDelete`); build mock=0 sạch + `check-no-mock` XANH + `check-ai-chunks` XANH; build mock=1 + `e2e/delete_return.py` 18/18 PASS (Chủ xoá Nháp, Đã huỷ có nút, Đã duyệt không nút, Quản lý không thấy, 400, 409, 360px). `check_naming.py` exit 1 cả trên main chưa sửa (vi phạm có sẵn ở `frontend/`, không có file returns).
+- Ảnh: `doc/features/2026-10-01-erp-theo-design/shots/xoa-phieu-hoan/` (1280 và 360).
+- Nợ: chưa có e2e trên BE thật; chưa duyệt UI bởi QA.
+
+
