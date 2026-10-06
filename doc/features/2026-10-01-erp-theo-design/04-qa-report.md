@@ -3552,3 +3552,21 @@ Bản kiểm: HEAD ab326ca, build mock=1 một lần, cổng 3201 (đã tắt, `
 | Console | ✅ | 0 lỗi |
 
 Ghi nhận Thấp (không chặn): L1 chưa phủ popup. Bấm "Lưu nhà cung cấp" khi để trống thì ô lỗi hiện đỏ nhưng focus vẫn ở nút Lưu. Các ghi nhận Thấp L2–L4 ở trên giữ nguyên.
+
+### QA lại sau 7d7c11a (06/10) — APPROVED
+Gồm sửa của fe-dev ở 5867b26 và bản gộp main (nhóm C/D/E) ở 7d7c11a. Build tuần tự, một bản một lúc: mock cờ AI bật, rồi mock=0 trỏ BE thật (Django main, SQLite tạm, dữ liệu giả).
+
+**Kết luận: APPROVED.** B1 đã sửa; không còn lỗi chặn.
+
+| Hạng mục | Kết quả | Bằng chứng |
+|---|---|---|
+| B1 cột "Giờ" Nhật ký | Đạt | Đo `td.scrollWidth <= td.clientWidth` trên cả 20 dòng ở 1280, 1440, 1920: không dòng nào bị cắt. Ảnh `shots/lo15/qa2-audit-{1280,1440,1920}.png` |
+| Ô ngày ở 360px | Đạt | Mép phải ô ngày thứ hai = 335 (trước là 364), `scrollWidth` trang 360. Kiểm Nhật ký, Hoá đơn bán, Sổ nhập xuất, Mua hàng (đều có 2 ô ngày), Báo cáo AI (1 ô): tất cả mép phải <= 360. Đơn, Hoá đơn mua, Kiểm kê, Giao hàng, Hàng hoàn, Thanh toán không có ô ngày. Ảnh `qa2-360-*.png` |
+| `ed_batch15` (cờ AI bật) | 195/195 | |
+| `ed_batch3_orders` | 143/143 | |
+| `ed_batch12_accounting` | 95/95 | |
+| `s48_password` | 41/41 | |
+| `ed_form_keyboard_focus` (hồi quy form C/D/E) | 4/4 | |
+| `s41_s47_real.py` trên BE thật (selector dòng 335 đã sửa) | 40/40 | chạy file gốc, không cần bản sao |
+
+Ghi nhận: lần này không chạy lại bản build cờ AI tắt, vì thay đổi từ 5867b26 chỉ là độ rộng cột, CSS `FilterBar` và test; lượt trước đã đo cờ tắt 64/64. Đã dọn: tắt Django và server tĩnh, xoá `erp-console/out`, bản copy build, DB tạm.
