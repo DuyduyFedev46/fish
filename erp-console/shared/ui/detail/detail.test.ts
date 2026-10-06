@@ -35,7 +35,7 @@ describe("Timeline", () => {
   it("không in mã BR, có nhãn AI, ghi rõ khi bị cắt", () => {
     const html = renderToStaticMarkup(
       createElement(Timeline, {
-        entries: [{ at: "2026-10-01T03:00:00Z", label: "Xác nhận nhập kho", actor: "AI của Lộc", byAi: true }],
+        entries: [{ at: "2026-10-01T03:00:00Z", label: "Xác nhận nhập kho", actor: "AI của Lộc" }],
         truncated: true,
       })
     );

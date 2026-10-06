@@ -7,7 +7,7 @@ kèm nhãn tiếng Việt; tính lại mỗi lần gọi `me` nên đổi nhóm 
 """
 from django.apps import apps
 from django.contrib.auth.models import Group, User
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from rest_framework.authtoken.models import Token
 from rest_framework.test import APIClient
 
@@ -65,6 +65,7 @@ class S47MeLabelsTests(TestCase):
         )
         self.assertIs(body["can_view_cost"], False)
 
+    @override_settings(AI_ENABLED=True)  # AI tắt thì `ai.*` bị ẩn (lô dọn chữ AI)
     def test_s47_ac1_chu_co_du_viec_tang_2(self):
         body = client_for(make_user("loc", roles.OWNER)).get(URL).json()
         self.assertEqual(body["group_labels"], [{"code": roles.OWNER, "label": "Chủ"}])
@@ -157,7 +158,7 @@ class S47MeLabelsTests(TestCase):
     # --- contract: chỉ THÊM key -------------------------------------------------------
     def test_s47_giu_key_s6_them_group_labels_capabilities(self):
         body = client_for(make_user("loc", roles.OWNER)).get(URL).json()
-        self.assertEqual(set(body), S6_KEYS | {"group_labels", "capabilities", "must_change_password"})  # + S48
+        self.assertEqual(set(body), S6_KEYS | {"group_labels", "capabilities", "must_change_password", "ai_features_enabled"})  # + S48
 
     def test_s47_chua_dang_nhap_401(self):
         self.assertEqual(APIClient().get(URL).status_code, 401)

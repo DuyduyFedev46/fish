@@ -11,11 +11,9 @@ const entry = (at: string, label: string, kind: "user" | "ai" | "system" = "user
 });
 
 describe("toTimelineEntries", () => {
-  it("mới nhất trước, cờ AI theo actor.kind, không mang mã BR", () => {
+  it("mới nhất trước, không mang mã BR", () => {
     const rows = toTimelineEntries([entry("2026-09-28T01:00:00Z", "Tạo phiếu"), entry("2026-09-28T03:00:00Z", "Xác nhận", "ai")]);
     expect(rows.map((r) => r.label)).toEqual(["Xác nhận", "Tạo phiếu"]);
-    expect(rows[0].byAi).toBe(true);
-    expect(rows[1].byAi).toBe(false);
     expect(JSON.stringify(rows)).not.toMatch(/BR-/);
   });
   it("null/undefined → rỗng", () => {

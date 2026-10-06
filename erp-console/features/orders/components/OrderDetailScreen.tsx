@@ -123,7 +123,7 @@ function OrderDetailBody({ order: o, detail, renderAi }: { order: OrderDetail; d
       }),
     [status, o.delivery?.status, o.available_actions, me, stuckStep, escalatedKey],
   );
-  const aiOn = me?.ai_features_enabled === true;
+  const beAiEnabled = me?.ai_features_enabled === true;
   const canOpenRefunds = canView(me, "refunds");
   const timeline = useMemo(() => orderTimeline(o, { canOpenRefund: canOpenRefunds }), [o, canOpenRefunds]);
   const path = orderPath({ status, deliveryStatus: o.delivery?.status ?? null, hasInvoice: !!o.invoice });
@@ -136,14 +136,14 @@ function OrderDetailBody({ order: o, detail, renderAi }: { order: OrderDetail; d
       .then((g) => {
         const stale = !!g.doc?.status && g.doc.status !== o.status;
         setNext(stale ? null : nextStepLabel(g));
-        setStuckStep(stale ? null : escalatableStep(g, { ai_features_enabled: aiOn }));
+        setStuckStep(stale ? null : escalatableStep(g, { ai_features_enabled: beAiEnabled }));
       })
       .catch(() => {
         setNext(null);
         setStuckStep(null);
       });
     return () => c.abort();
-  }, [o.id, o.status, o.payments.length, o.refunds.length, aiOn]);
+  }, [o.id, o.status, o.payments.length, o.refunds.length, beAiEnabled]);
 
   // `?open=refund` (từ màn gọi xác nhận) mở sẵn hộp "Lập phiếu hoàn" — một lần; xong bỏ tham số khỏi thanh địa chỉ.
   useEffect(() => {

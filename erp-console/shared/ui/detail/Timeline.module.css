@@ -6,7 +6,6 @@
 .at { color: var(--ink-2); font-size: var(--text-xs); }
 .what { color: var(--ink); min-width: 0; overflow-wrap: anywhere; }
 .who { color: var(--ink-2); }
-.ai { display: inline-block; padding: 0 var(--space-1-5); border-radius: var(--radius-xs); background: var(--accent-soft); color: var(--accent-text); font-size: var(--text-2xs); font-weight: var(--weight-semibold); }
 .empty, .cut { margin: 0; padding: var(--space-3) var(--space-4); font-size: var(--text-sm); color: var(--ink-3); }
 .cut { font-size: var(--text-xs); border-top: 1px solid var(--border); }
 .link { color: var(--accent-text); text-decoration: none; }
