@@ -59,6 +59,8 @@ function LoginForm() {
     } catch (err) {
       setError(errorText(err, MSG.loginFailed));
       setBusy(false);
+      // Đăng nhập sai: đưa tiêu điểm về ô mật khẩu để gõ lại ngay (a11y), sau khi ô hết bị khoá.
+      requestAnimationFrame(() => document.getElementById("p")?.focus());
     }
   };
 

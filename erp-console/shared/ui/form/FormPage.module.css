@@ -32,3 +32,6 @@
 @media (max-width: 479px) {
   .bar > :global(.btn) { flex: 1 1 0; }
 }
+
+/* Phím Tab / focus: trình duyệt cuộn ô vào vùng nhìn, chừa chỗ cho thanh nút dính đáy. */
+.page :is(input, select, textarea) { scroll-margin-bottom: calc(var(--action-bar-h) + var(--space-6)); }
