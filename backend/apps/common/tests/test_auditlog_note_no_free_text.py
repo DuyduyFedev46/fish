@@ -165,6 +165,22 @@ class PaymentsOrdersRefundsNoFreeTextTests(OrderApiBase):
         self.assertEqual(refund.failure_reason, FREE_PHONE)  # chữ gốc vẫn ở chứng từ
         assert_no_leak(self, SECRET_NAME, FAKE_PHONE)
 
+    def test_cancel_note_hidden_when_order_pii_hidden(self):
+        """RR-M1: NV giao có đơn ngoài cửa sổ (pii_visible=False) không thấy cancel_note."""
+        from apps.sales.orders.serializers import SalesOrderDetailSerializer
+
+        order = self._paid_order()
+        resp = client_for(self.manager).post(
+            f"/api/sales/orders/{order.pk}/cancel/", {"reason_code": "OTHER", "note": FREE}, format="json",
+        )
+        self.assertEqual(resp.status_code, 200, resp.content)
+        order.refresh_from_db()
+        self.assertEqual(SalesOrderDetailSerializer(order, context={}).data["cancel_note"], FREE)
+        order.pii_visible = False
+        data = SalesOrderDetailSerializer(order, context={}).data
+        self.assertEqual(data["cancel_note"], "")
+        self.assertNotIn(SECRET_NAME, str(data))
+
     def test_cancel_note_rejects_long_digit_run_and_too_long(self):
         order = self._paid_order()
         for bad in ("gọi 0900000321 giúp", "x" * 201):
@@ -229,6 +245,14 @@ class DeliveryConfirmationNoFreeTextTests(ConfirmationL4BaseTestCase):
         self.assertIn(shop.status_code, (401, 403))
         listing = client_for(self.manager).get("/api/confirmation/queue/").content.decode()
         self.assertNotIn("decision_note", listing)  # danh sách không mang field này
+
+    def test_decision_note_not_overwritten_by_empty_reason(self):
+        """RR-L1: unconfirm không lý do không xoá trắng lý do cũ."""
+        _, note, task = self._create_order_with_confirmation()
+        confirmation_services.record_call(task.pk, self.cs1, result="CONFIRMED")
+        ConfirmationTask.objects.filter(pk=task.pk).update(decision_note="lý do cũ")
+        confirmation_services.unconfirm(task.pk, self.cs1, reason="")
+        self.assertEqual(ConfirmationTask.objects.get(pk=task.pk).decision_note, "lý do cũ")
 
     def test_unconfirm_reason_not_in_audit(self):
         _, note, task = self._create_order_with_confirmation()
@@ -348,3 +372,50 @@ class RecordAuditCallSitesSweepTests(TestCase):
             if re.search(r"AuditLog\.objects\.(bulk_)?create|(?<!class )\bAuditLog\(", text):
                 offenders.append(rel)
         self.assertEqual(offenders, [])
+
+
+class AiScrubCoversFreeTextFieldsTests(TestCase):
+    """RR-H1: field chữ tự do mới không được lọt vào ngữ cảnh AI."""
+
+    def test_scrub_drops_cancel_note_and_decision_note(self):
+        from apps.ai.execution.scrub import scrub_data
+
+        user = User.objects.create_user("scrub_fake", password="x")
+        out = scrub_data(
+            {"cancel_note": FREE, "decision_note": FREE, "note_text": FREE, "code": "SO1"},
+            user=user, is_ai_read=True,
+        )
+        self.assertEqual(out, {"code": "SO1"})
+        out = scrub_data({"cancel_note": FREE, "decision_note": FREE, "code": "SO1"}, user=user, is_ai_read=False)
+        self.assertEqual(out, {"code": "SO1"})  # PII: bỏ ở mọi đường scrub
+
+    # Field cố ý KHÔNG nằm trong danh sách lọc AI, kèm lý do.
+    ALLOWED_UNSCRUBBED = {
+        ("catalog.Item", "description"): "mô tả hàng hoá công khai, không có dữ liệu khách",
+        ("content.Category", "description"): "mô tả chuyên mục công khai",
+        ("content.Entry", "seo_description"): "mô tả SEO công khai",
+        ("content.EntryVersion", "seo_description"): "mô tả SEO công khai",
+        ("content.EntryVersion", "description"): "mô tả bài viết công khai",
+        ("sales.SalesCreditNote", "reason_code"): "mã lý do cố định, không phải chữ tự do",
+        ("content.Entry", "return_reason"): "mã chọn từ danh sách cố định BR-ND-15",
+    }
+
+    def test_every_note_or_reason_field_is_scrubbed_or_allowlisted(self):
+        from django.apps import apps
+        from django.db import models
+
+        from apps.ai.policy.rules import SCRUB_FREE_TEXT_KEYS, SCRUB_PII_KEYS
+
+        pattern = re.compile(r"(^|_)(note|notes|reason|memo|comment|description)(_|$)")
+        scrubbed = SCRUB_FREE_TEXT_KEYS | SCRUB_PII_KEYS
+        missing = []
+        for model in apps.get_models():
+            if not model.__module__.startswith("apps."):
+                continue
+            for field in model._meta.get_fields():
+                if not isinstance(field, (models.CharField, models.TextField)) or field.choices:
+                    continue
+                if pattern.search(field.name) and field.name not in scrubbed \
+                        and (model._meta.label, field.name) not in self.ALLOWED_UNSCRUBBED:
+                    missing.append(f"{model._meta.label}.{field.name}")
+        self.assertEqual(missing, [], "thêm vào SCRUB_FREE_TEXT_KEYS/SCRUB_PII_KEYS hoặc allowlist có lý do")

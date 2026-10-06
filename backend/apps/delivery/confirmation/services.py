@@ -380,7 +380,8 @@ def unconfirm(task_id: int, user, *, reason: str = "") -> tuple[DeliveryNote, Co
         task.state = ConfirmationTask.State.PENDING
         task.claimed_by = None
         task.claimed_until = None
-        task.decision_note = clean_reason
+        if clean_reason:  # không ghi đè lý do cũ bằng chuỗi rỗng
+            task.decision_note = clean_reason
         task.save(update_fields=["state", "claimed_by", "claimed_until", "decision_note", "updated_at"])
 
         record_audit(
@@ -567,7 +568,8 @@ def decide(
             task.state = ConfirmationTask.State.DONE
             task.claimed_by = None
             task.claimed_until = None
-            task.decision_note = clean_reason
+            if clean_reason:  # không ghi đè lý do cũ bằng chuỗi rỗng
+                task.decision_note = clean_reason
             task.save(update_fields=["state", "claimed_by", "claimed_until", "decision_note", "updated_at"])
 
             record_audit(
@@ -600,7 +602,8 @@ def decide(
             task.first_unreachable_at = None
             task.claimed_by = None
             task.claimed_until = None
-            task.decision_note = clean_reason
+            if clean_reason:  # không ghi đè lý do cũ bằng chuỗi rỗng
+                task.decision_note = clean_reason
             task.save(update_fields=[
                 "state", "callback_at", "attempts", "first_unreachable_at",
                 "claimed_by", "claimed_until", "decision_note", "updated_at"
@@ -628,7 +631,6 @@ def decide(
             order_services.cancel_paid_order(
                 order=order,
                 actor=user,
-                reason=clean_reason or clean_note,
                 reason_code=cancel_code,
                 cancel_note=clean_reason or clean_note,
             )

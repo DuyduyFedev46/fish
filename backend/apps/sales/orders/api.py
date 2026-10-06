@@ -181,11 +181,8 @@ class SalesOrderViewSet(NoStoreMixin, AiDeclarable, viewsets.ReadOnlyModelViewSe
             raise BusinessError(
                 "Bắt buộc nhập ghi chú khi chọn lý do khác (OTHER).", code="BR-HT-05",
             )
-        label = services.CANCEL_REASON_LABELS[reason_code]
-        reason = f"{label} — {note_text}" if note_text else label
-
         result = services.cancel_paid_order(
-            order=self.get_object(), actor=request.user, reason=reason, reason_code=reason_code,
+            order=self.get_object(), actor=request.user, reason_code=reason_code,
             cancel_note=note_text,
         )
         order = result["order"]

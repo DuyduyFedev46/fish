@@ -357,6 +357,9 @@ def cancel_paid_order(*, order, actor, reason="", reason_code="", cancel_note=""
     Doanh thu đảo bằng chứng từ đảo (BR-HT-10) lập NGAY tại thời điểm huỷ, trong cùng
     transaction (lỗi thì cả lần huỷ rollback); hoá đơn gốc giữ nguyên ISSUED (BR-HT-06).
     Phiếu hoàn chỉ là dòng tiền, không đảo doanh thu. Trả dict {"order", "stock_restored", "delivery_note"}.
+
+    Tham số `reason` không còn được dùng (chữ lý do nay là `cancel_note`, lưu ở đơn); giữ lại chỉ để
+    các nơi gọi cũ (chủ yếu test) không vỡ. Luồng sản phẩm không truyền nữa.
     """
     cancel_note = (cancel_note or "").strip()
     if len(cancel_note) > CANCEL_NOTE_MAX:

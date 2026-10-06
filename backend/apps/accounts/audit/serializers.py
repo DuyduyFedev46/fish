@@ -18,15 +18,15 @@ _FIXED_NOTES = ("", NOTE_PRESENT_LABEL, NOTE_PRESENT_NEUTRAL_LABEL)
 # Action từng ghi chữ người dùng gõ vào `note` (TL-D3-L4). Dòng cũ có thể còn tên/SĐT: chỉ trả `note`
 # khi khớp mẫu cố định do hệ thống sinh, không thì trả nhãn trung tính. Không sửa DB (bất biến 4).
 _GUARDED_ACTIONS = {
-    "attach_payment": (re.compile(r"^Hoàn tiền theo phiếu hoàn #\d+$"),),
-    "resolve_payment": (re.compile(r"^Hoàn tiền theo phiếu hoàn #\d+$"),),
+    "attach_payment": (),
+    "resolve_payment": (re.compile(r"Hoàn tiền theo phiếu hoàn #\d+"),),
     "mark_refund_failed": (),
     "cancel_paid_order": (),  # xử lý riêng: nhãn lý do + nhãn ghi chú
     "delivery_unconfirmed": (),
     "delivery_confirm_skipped": (),
     "delivery_extended": (),
 }
-_REJECT_NOTE = re.compile(r"^Từ chối đề xuất AI [\w-]+$")
+_REJECT_NOTE = re.compile(r"Từ chối đề xuất AI [\w-]+")
 
 
 def _cancel_note_ok(note):
@@ -45,21 +45,26 @@ def safe_note(action, note):
     if note in _FIXED_NOTES:
         return note
     if action.startswith("reject_"):
-        return note if _REJECT_NOTE.match(note) else NOTE_PRESENT_NEUTRAL_LABEL
+        return note if _REJECT_NOTE.fullmatch(note) else NOTE_PRESENT_NEUTRAL_LABEL
     if action not in _GUARDED_ACTIONS:
         return note
     if action == "cancel_paid_order":
         return note if _cancel_note_ok(note) else NOTE_PRESENT_NEUTRAL_LABEL
-    if any(p.match(note) for p in _GUARDED_ACTIONS[action]):
+    if any(p.fullmatch(note) for p in _GUARDED_ACTIONS[action]):
         return note
     return NOTE_PRESENT_NEUTRAL_LABEL
 
 
 def exclude_ai_rows(qs):
-    """Khi AI tắt (`AI_ENABLED=False`) ẩn dòng do AI làm: actor AI, có mã đề xuất, hoặc action `ai_*`."""
+    """
+    Khi AI tắt (`AI_ENABLED=False`) ẩn các dòng DO AI làm: `actor_kind="ai"` và dòng Hệ thống thuộc vòng đời
+    đề xuất AI (`actor_kind="system"` có `proposal_ref`). GIỮ dòng do người làm: duyệt/từ chối đề xuất,
+    dòng nghiệp vụ do người duyệt thực thi (tự gắn `proposal_ref`), và `ai_config_*`/`ai_policy_*` do Chủ đổi
+    (kiểm toán BR-PQ-04/05).
+    """
     if getattr(settings, "AI_ENABLED", False):
         return qs
-    return qs.exclude(Q(actor_kind="ai") | ~Q(proposal_ref="") | Q(action__startswith="ai_"))
+    return qs.exclude(Q(actor_kind="ai") | (Q(actor_kind="system") & ~Q(proposal_ref="")))
 
 
 def audit_item(row, *, can_view_cost: bool = True) -> dict:
