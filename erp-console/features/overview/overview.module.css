@@ -26,10 +26,6 @@
 /* Theo bề rộng khung chứa (không theo màn hình) vì menu trái chiếm 240px: 2 cột khi nội dung rộng từ 960px. Cột phải tối thiểu 606px vì bảng dense của shared tự ép min-width 600px khi khung hẹp hơn (sẽ cuộn ngang). */
 @container ov (min-width: 960px) { .cols { grid-template-columns: minmax(0, 5fr) minmax(606px, 7fr); align-items: start; } }
 
-.card { border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--surface); overflow: hidden; min-width: 0; }
-.cardHead { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; padding: var(--space-2) var(--space-4); border-bottom: 1px solid var(--border); min-height: var(--tap); }
-.cardHead h2 { margin: 0; font-size: var(--text-md); }
-.cardHint { color: var(--ink-3); font-size: var(--text-xs); }
 .cardLink {
   margin-left: auto;
   display: inline-flex;

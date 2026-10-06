@@ -86,7 +86,7 @@ def run_chu(browser, tag, viewport, errors):
     settle(page)
 
     # ---- SR-17-AC3: bảng đơn không còn cột Khách, DOM không có tên khách mock ----
-    orders = page.locator("section[aria-labelledby=ov-orders]")
+    orders = page.locator(".lt-card:has(h2:text-is('Đơn hàng gần đây'))")
     orders.locator("tbody tr").first.wait_for()
     heads = [h.strip() for h in orders.locator("thead th").all_inner_texts()]
     ok(f"[{tag}] SR-17-AC3 bảng đơn: không có cột 'Khách' (cột: {heads})", "Khách" not in heads and len(heads) == 3)
@@ -244,7 +244,7 @@ def run_kho(browser, tag, viewport, errors):
     page.wait_for_load_state("networkidle")
     settle(page)
     ok(f"[{tag}] SR-15-AC4 warehouse_staff (kho1) không thấy thẻ Lô quá hạn", page.locator("[data-attention=expired_batches_open]").count() == 0)
-    ok(f"[{tag}] SR-17 warehouse_staff: không có cột Khách", "Khách" not in [h.strip() for h in page.locator("section[aria-labelledby=ov-orders] thead th").all_inner_texts()])
+    ok(f"[{tag}] SR-17 warehouse_staff: không có cột Khách", "Khách" not in [h.strip() for h in page.locator(".lt-card:has(h2:text-is('Đơn hàng gần đây')) thead th").all_inner_texts()])
     page.screenshot(path=f"{SHOTS}/lo5-{tag}-10-tong-quan-nv-kho-khong-co-the.png")
     page.goto(BASE + "/inventory/?status=EXPIRED")
     page.wait_for_load_state("networkidle")

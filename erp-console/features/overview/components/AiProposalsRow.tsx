@@ -12,6 +12,7 @@ import { useAuth } from "@/features/auth/components/AuthProvider";
 import { fetchAiActionCounts } from "@/features/ai/actions/api";
 import { getAiStatus } from "@/features/ai/api";
 import { releaseAiEnabled } from "@/features/ai/gate-state";
+import { AI_FEATURES_ENABLED } from "@/shared/lib/features";
 import { canView } from "@/shared/lib/nav";
 import { Icon } from "@/shared/ui/Icon";
 import { summarizeProposals, zonesText, type ProposalSummary } from "../view";
@@ -19,7 +20,7 @@ import s from "../overview.module.css";
 
 export function AiProposalsRow() {
   const { me } = useAuth();
-  const allowed = canView(me, "ai-actions");
+  const allowed = AI_FEATURES_ENABLED && canView(me, "ai-actions"); // cờ AI tắt: không vẽ, không gọi API (SR-HIDE-AI-01)
   const [summary, setSummary] = useState<ProposalSummary | null>(null);
 
   useEffect(() => {

@@ -116,7 +116,7 @@ def run(browser, tag, viewport):
     page.wait_for_load_state("networkidle")
     page.wait_for_timeout(600)
     ok(f"[{tag}] warehouse_staff: Tổng quan không có thẻ Lô quá hạn", page.locator("[data-attention=expired_batches_open]").count() == 0)
-    ok(f"[{tag}] warehouse_staff: bảng đơn không có cột Khách", "Khách" not in [h.strip() for h in page.locator("section[aria-labelledby=ov-orders] thead th").all_inner_texts()])
+    ok(f"[{tag}] warehouse_staff: bảng đơn không có cột Khách", "Khách" not in [h.strip() for h in page.locator(".lt-card:has(h2:text-is('Đơn hàng gần đây')) thead th").all_inner_texts()])
     ctx.close()
 
 

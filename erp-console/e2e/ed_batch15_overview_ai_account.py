@@ -1,6 +1,6 @@
 # E2E ERP theo design, Lô 15 (ED-06 Tài khoản + AI của tôi, ED-08 Tổng quan, ED-41 Nhật ký hoạt động, ED-42 Chính sách AI + Báo cáo AI):
 # chạy trên bản build MOCK phục vụ tĩnh.
-#   cd erp-console && NEXT_PUBLIC_USE_MOCK=1 npm run build && cp -R out /tmp/out15 && (cd /tmp/out15 && python3 -m http.server 3951 &)
+#   cd erp-console && NEXT_PUBLIC_USE_MOCK=1 NEXT_PUBLIC_AI_FEATURES=1 npm run build && cp -R out /tmp/out15 && (cd /tmp/out15 && python3 -m http.server 3951 &)
 #   BASE=http://127.0.0.1:3951 SHOTS=shots/lo15 python3 e2e/ed_batch15_overview_ai_account.py      # tắt server sau khi xong
 # Kiểm 5 vai (loc, ql1, kho1, giao1, cs2):
 #  - Tổng quan: loc thấy 5 ô + giá trị tồn + cột Giá vốn/kg; ql1/kho1 KHÔNG có ô giá trị tồn, không có cột/giá vốn trong DOM; giao1/cs2: Không có quyền.
@@ -115,7 +115,7 @@ def overview_owner(browser):
     ok("loc: mã đơn dạng SO…, không còn DH-", bool(re.search(r"\bSO\d", text)) and "DH-" not in text)
     ok("loc: bảng đơn có cột Còn giữ chỗ riêng, đang đếm mm:ss", "Còn giữ chỗ" in text and bool(re.search(r"\b\d{2}:\d{2}\b", text)))
     ok("loc: không tên/SĐT khách", not PHONE_RE.search(text), "")
-    heads = [h.strip() for h in page.locator("section[aria-labelledby=ov-orders] thead th").all_inner_texts()]
+    heads = [h.strip() for h in page.locator(".lt-card:has(h2:text-is('Đơn hàng gần đây')) thead th").all_inner_texts()]
     ok("loc: bảng Đơn hàng gần đây có cột Lý do riêng ở 1280px (ED-08-AC2)", heads == ["Mã đơn", "Giá trị", "Trạng thái", "Lý do", "Còn giữ chỗ"], str(heads))
     ok("loc: khối Cần chú ý có dòng lô quá hạn bấm sang kho lọc EXPIRED",
        page.locator("[data-attention=expired_batches_open] a").get_attribute("href") == "/inventory/?status=EXPIRED")
@@ -372,7 +372,7 @@ def policy(browser):
       const row = document.querySelector('[data-perm]');
       const r = (el) => { const b = el.getBoundingClientRect(); return [Math.round(b.left), Math.round(b.right), Math.round(b.height)]; };
       const name = row.children[0], desc = row.children[1];
-      const heads = [...document.querySelectorAll('#pol-red')][0].closest('section').querySelectorAll('[aria-hidden=true] > span');
+      const heads = [...document.querySelectorAll('#pol-red')][0].closest('section').querySelector('[class*=rzHead]').children;
       return { name: r(name), desc: r(desc), nameFont: parseFloat(getComputedStyle(name).fontSize), headTask: r(heads[0]), headDesc: r(heads[1]), headCount: heads.length };
     }""")
     ok("loc: bảng Việc nhạy cảm ở 1280px: cột Việc đủ rộng, không đè cột Mô tả", cells["name"][1] <= cells["desc"][0] and cells["name"][1] - cells["name"][0] >= 130 and cells["name"][2] <= cells["nameFont"] * 3.2, str(cells))
@@ -441,7 +441,7 @@ def report(browser):
         lab, val = cells.nth(i).inner_text().split("\n")[:2]
         nums[lab.strip()] = int(val.strip())
     parts = sum(v for k, v in nums.items() if k != "Tổng việc AI")
-    log_rows = page.locator("section[aria-label='Nhật ký việc AI trong ngày'] tbody tr").count()
+    log_rows = page.locator(".lt-card:has(h2:text-is('Nhật ký việc AI trong ngày')) tbody tr").count()
     # TL15-FE-M1: tổng = số dòng nhật ký. Mock có 1 việc mức B bị hoàn tác (đếm ở cả cột B và Đã hoàn tác) nên cộng cột ra nhiều hơn 1.
     ok("loc: Tổng việc AI = số dòng nhật ký, không cộng đôi việc đã hoàn tác", nums.get("Tổng việc AI") == log_rows and log_rows > 0 and parts == log_rows + 1, f"{nums} rows={log_rows}")
     ok("loc: không SĐT, không icon rỗng, không cuộn ngang", not PHONE_RE.search(text) and missing_icons(page) == [] and no_hscroll(page), str(missing_icons(page)))

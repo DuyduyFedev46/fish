@@ -2416,3 +2416,19 @@ Làm trong `erp-console/`, theo board `ERP-D1`, `W3f`, `W4b/c/d/e/f/g/h`, `F3g`.
 - **E2E cũ lỗi thời:** `s8_views.py` còn chọn theo cấu trúc Tổng quan cũ (`section[aria-labelledby=ov-batches]`, `.tile .foot`, `td[data-m-label]`) nên hết khớp từ lô này; thay bằng `ed_batch15_overview_ai_account.py` (phủ ma trận giá vốn, rỗng, lỗi), chưa viết lại `s8_views.py`. `s41_s47_real.py` (BE thật) chưa chạy lại, cần Django + seed: QA chạy.
 - **Bộ biểu tượng:** `public/fonts/ms` là bộ con, chưa thêm glyph (ngoài phạm vi); nếu muốn dùng `chevron_*` hay `settings` thì phải cắt lại font.
 - **Dấu vết lệnh commit:** commit của lô này dùng dòng `Co-Authored-By: Claude Code` và `Claude-Session` theo nhắc của hệ thống, thay cho dòng "Claude Opus 5.5" mà điều phối viên nêu trong phiếu giao việc.
+
+### Lô 15 — phiên hoàn tất (06/10): sửa review, rebase main, tuân cờ AI
+
+- **Sửa review/QA đã có ở commit WIP:** M1/M2/L1–L3; bảng Chính sách AI (bỏ cột thừa, container query); nhãn tiếng Việt cho lệnh AI (`features/ai/commandLabels.ts`); cột "Lý do" ở Tổng quan; nhãn ô số liệu 360px; "AI đang tắt cho cả vựa".
+- **Rebase lên main** (có nhóm A/B, Lô 14, Lô 16, SR-HIDE-AI-01/02). Xung đột `ai/policy/page.tsx`, `ai/settings/page.tsx`: lồng `AiFeatureGuard` (ngoài) rồi `ViewGuard` (trong), cùng kiểu `ai/report/page.tsx`. `03-dev-notes.md` giữ cả hai mục.
+- **Dùng thành phần chung của main:** Tổng quan: "Cần chú ý" dùng `Section` (title + count, `flush`); "Đơn hàng gần đây" và "Tồn kho theo lô" dùng `DataTable title/countText/headAction` (bỏ thẻ tự dựng, hết thẻ lồng thẻ). Báo cáo AI: hai bảng dùng `DataTable title/countText`. Đã xoá CSS `.card/.cardHead/.cardHint` không còn dùng. Các thẻ không phải bảng của Chính sách AI giữ thẻ riêng (`Section` là h3, trang không có h2 phía trên, đổi sẽ nhảy bậc tiêu đề); xem là nợ nhỏ.
+- **Tuân cờ `NEXT_PUBLIC_AI_FEATURES` (tắt mặc định):**
+  - Tổng quan: `AiProposalsRow` không vẽ và không gọi `/api/ai/*` khi cờ tắt.
+  - Tài khoản: dòng "AI của tôi" và các mục AI ở "Mục bạn thấy trên menu" đã ẩn sẵn nhờ `canView`/`visibleNav` (nav gắn cờ).
+  - Nhật ký: bỏ nút lọc "AI", bỏ 3 thao tác AI (`AI_ONLY_ACTIONS`: `ai_config_update`, `ai_policy_update`, `confirm_proposal`) khỏi ô lọc và bỏ cột "Đề xuất" khi cờ tắt. Các **dòng lịch sử** do AI làm vẫn hiện (nhãn "AI", "AI đề xuất"...) vì là chứng từ vết, không xoá/giấu (bất biến 3); ghi để Duy biết nếu muốn ẩn cả dòng.
+  - `/ai/settings|policy|report`: "Không tìm thấy trang này".
+  - Đã kiểm trên bản build mock cờ tắt (loc, ql1): Tổng quan và Tài khoản không có chữ AI, không có link `/ai/`; Nhật ký không có link `/ai/` (chỉ còn chữ AI ở dòng lịch sử).
+- **E2E:** `ed_batch15` phải build bằng `NEXT_PUBLIC_USE_MOCK=1 NEXT_PUBLIC_AI_FEATURES=1`. Sửa selector: tiêu đề cột Việc nhạy cảm lấy theo `[class*=rzHead]` (trước đếm cả span biểu tượng nên ra 8 thay vì 5); các bảng Tổng quan/Báo cáo chọn theo `.lt-card:has(h2:text-is(...))` (cả `p8_lo5_fe_lo_qua_han.py`, `p8_lo5_qa_real_backend.py`).
+- **Lệch contract / nợ BE (không sửa backend):**
+  1. `dashboard/summary/` `recent_orders` không có lý do huỷ: BE cần thêm `cancel_reason` (mã lý do, không văn bản tự do) để cột "Lý do" của Tổng quan có dữ liệu thật.
+  2. BE nên trả `AiMeta.title` tiếng Việt cho từng lệnh AI; hiện FE tự dịch bằng `commandLabels.ts`, lệnh mới thiếu nhãn sẽ rơi về mô tả chung.

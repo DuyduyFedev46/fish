@@ -19,6 +19,7 @@ import { Chip } from "@/shared/ui/Chip";
 import { Icon } from "@/shared/ui/Icon";
 import { ResourceView } from "@/shared/ui/ResourceView";
 import { SkeletonKpis, SkeletonScreen, SkeletonTable } from "@/shared/ui/Skeleton";
+import { Section } from "@/shared/ui/detail/Section";
 import { DataTable, type Column } from "@/shared/ui/list/DataTable";
 import { useOfflineRegistration } from "@/shared/ui/states/offlineSource";
 import { getOverview } from "../api";
@@ -97,63 +98,59 @@ function Body({ data }: { data: OverviewData }) {
       <KpiTiles kpis={data.kpis} canCost={canCost} nearDays={nearExpiryDays(data)} asOf={data.as_of} />
 
       <div className={s.cols}>
-        <section className={s.card} aria-labelledby="ov-alerts">
-          <div className={s.cardHead}>
-            <h2 id="ov-alerts">Cần chú ý</h2>
-            <span className={s.cardHint}>{data.kpis.near_expiry ? `${data.kpis.near_expiry} lô cận hạn` : "Cận hạn"}</span>
-          </div>
+        <Section
+          title="Cần chú ý"
+          count={data.kpis.near_expiry ? `${data.kpis.near_expiry} lô cận hạn` : undefined}
+          flush
+        >
           <AttentionBlock alerts={data.alerts} />
-        </section>
+        </Section>
 
-        <section className={s.card} aria-labelledby="ov-orders">
-          <div className={s.cardHead}>
-            <h2 id="ov-orders">Đơn hàng gần đây</h2>
+        <DataTable
+          title="Đơn hàng gần đây"
+          headAction={
             <Link href="/orders/" className={s.cardLink}>
               Xem tất cả <Icon name="arrow_forward" />
             </Link>
-          </div>
-          <DataTable
-            caption="Đơn hàng gần đây"
-            columns={orderColumns(now)}
-            rows={data.recent_orders}
-            rowKey={(o) => o.code}
-            dense
-            canViewCost={false}
-            noun="đơn hàng"
-            empty={{ icon: "receipt_long", title: "Chưa có đơn nào", hint: "Đơn khách đặt trên Shop sẽ hiện ở đây." }}
-          />
-        </section>
+          }
+          caption="Đơn hàng gần đây"
+          columns={orderColumns(now)}
+          rows={data.recent_orders}
+          rowKey={(o) => o.code}
+          dense
+          canViewCost={false}
+          noun="đơn hàng"
+          empty={{ icon: "receipt_long", title: "Chưa có đơn nào", hint: "Đơn khách đặt trên Shop sẽ hiện ở đây." }}
+        />
       </div>
 
-      <section className={s.card} aria-labelledby="ov-batches">
-        <div className={s.cardHead}>
-          <h2 id="ov-batches">Tồn kho theo lô</h2>
-          <span className={s.cardHint}>Xếp theo hạn dùng sớm nhất</span>
+      <DataTable
+        title="Tồn kho theo lô"
+        countText="Xếp theo hạn dùng sớm nhất"
+        headAction={
           <Link href="/inventory/" className={s.cardLink}>
             Quản lý kho <Icon name="arrow_forward" />
           </Link>
-        </div>
-        <DataTable
-          caption="Tồn kho theo lô"
-          columns={batchColumns()}
-          rows={batches}
-          rowKey={(b) => b.batch_id}
-          dense
-          canViewCost={canCost}
-          noun="lô hàng"
-          empty={{
-            icon: "inventory_2",
-            title: "Chưa có lô nào đang hoạt động",
-            hint: "Lô nhập ở Mua hàng sẽ hiện ở đây, xếp theo hạn dùng sớm nhất.",
-            action: canPurchase ? (
-              <Link href="/purchasing/" className="btn">
-                Mở Mua hàng
-                <Icon name="arrow_forward" />
-              </Link>
-            ) : undefined,
-          }}
-        />
-      </section>
+        }
+        caption="Tồn kho theo lô"
+        columns={batchColumns()}
+        rows={batches}
+        rowKey={(b) => b.batch_id}
+        dense
+        canViewCost={canCost}
+        noun="lô hàng"
+        empty={{
+          icon: "inventory_2",
+          title: "Chưa có lô nào đang hoạt động",
+          hint: "Lô nhập ở Mua hàng sẽ hiện ở đây, xếp theo hạn dùng sớm nhất.",
+          action: canPurchase ? (
+            <Link href="/purchasing/" className="btn">
+              Mở Mua hàng
+              <Icon name="arrow_forward" />
+            </Link>
+          ) : undefined,
+        }}
+      />
     </>
   );
 }

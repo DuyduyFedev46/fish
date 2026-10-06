@@ -100,38 +100,30 @@ function ReportBody({ report }: { report: AiDailyReport }) {
     <>
       <Strip report={report} />
 
-      <section className={s.card} aria-label={M.byStaff}>
-        <div className={s.cardHead}>
-          <h2>{M.byStaff}</h2>
-        </div>
-        <DataTable
-          caption={M.captionStaff}
-          columns={STAFF_COLUMNS}
-          rows={rows}
-          rowKey={(r) => r.user_id}
-          dense
-          canViewCost={false}
-          noun={M.byStaffNoun}
-          empty={{ icon: "insights", title: M.byStaffEmptyTitle, hint: M.byStaffEmptyHint }}
-        />
-      </section>
+      <DataTable
+        title={M.byStaff}
+        caption={M.captionStaff}
+        columns={STAFF_COLUMNS}
+        rows={rows}
+        rowKey={(r) => r.user_id}
+        dense
+        canViewCost={false}
+        noun={M.byStaffNoun}
+        empty={{ icon: "insights", title: M.byStaffEmptyTitle, hint: M.byStaffEmptyHint }}
+      />
 
-      <section className={s.card} aria-label={M.itemsTitle}>
-        <div className={s.cardHead}>
-          <h2>{M.itemsTitle}</h2>
-          <span className={s.cardHint}>{M.itemsCount(dayTotal(report))}</span>
-        </div>
-        <DataTable
-          caption={M.caption}
-          columns={ITEM_COLUMNS}
-          rows={report.items}
-          rowKey={(r) => r.id}
-          dense
-          canViewCost={false}
-          noun={M.itemsNoun}
-          empty={{ icon: "history", title: M.itemsEmptyTitle, hint: M.itemsEmptyHint }}
-        />
-      </section>
+      <DataTable
+        title={M.itemsTitle}
+        countText={M.itemsCount(dayTotal(report))}
+        caption={M.caption}
+        columns={ITEM_COLUMNS}
+        rows={report.items}
+        rowKey={(r) => r.id}
+        dense
+        canViewCost={false}
+        noun={M.itemsNoun}
+        empty={{ icon: "history", title: M.itemsEmptyTitle, hint: M.itemsEmptyHint }}
+      />
     </>
   );
 }

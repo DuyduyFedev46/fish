@@ -84,7 +84,7 @@ const SUBJECTS: Record<string, string> = {
   stockledgerentry: "dòng sổ nhập xuất",
   stockreconciliation: "phiếu kiểm kê",
   supplier: "nhà cung cấp",
-  warehouse: "kho",
+  warehouse: "kho hàng",
 };
 
 /** Động từ (đoạn cuối của id). */
