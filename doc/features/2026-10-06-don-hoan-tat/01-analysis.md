@@ -29,7 +29,7 @@ vĩnh viễn, xem §3.3).
   - 2026-09-26: Shop chưa mở công khai, dữ liệu hiện có là dữ liệu thử, phải dọn DB trước khi mở.
   - 2026-09-30 (BR-HT-06, phương án B): không sửa số kỳ cũ. Memory "Không sửa số kỳ cũ": điều chỉnh ghi vào kỳ hiện tại.
   - 2026-10-06 (tối): lô dọn chữ (gom nhãn về một nguồn) và bảng tên chứng từ do PO đề xuất chạy song song.
-- **Liên quan đang chờ duyệt:** `doc/features/2026-10-01-huy-don-dang-giao/01-analysis.md` (ĐÃ DUYỆT (07/10)). Đề xuất huỷ đơn khi
+- **Liên quan đang chờ duyệt:** `doc/features/2026-10-01-huy-don-dang-giao/01-analysis.md` (CHỜ DUYỆT). Đề xuất huỷ đơn khi
   phiếu Đang giao và BR-GH-24 (một phiếu chỉ có một kết cục, chống ghi đè khi bấm đồng thời). W37 chạm cùng thời điểm
   "phiếu sang Hoàn tất", nên hai hồ sơ phải khớp nhau (xem §8).
 
@@ -155,7 +155,7 @@ Không có quyền mới. Không ai được **bấm tay** "Hoàn tất đơn": 
 | **BR-BC-06** | Trạng thái đơn **không** là nguồn của số tiền. Doanh thu, giá vốn, hoàn tiền tính theo hoá đơn, chứng từ đảo, phiếu hoàn và thời điểm của chúng (BR-BC-01..03). Đổi trạng thái đơn, kể cả chuyển bù, không làm đổi số kỳ nào. | D (BR-BC-01..03, quyết định "không sửa kỳ cũ") | **Mới** (ghi rõ điều đang đúng) |
 | BR-LO-04 | "Đơn đang mở" = Giữ chỗ, Đã thanh toán, Đang xử lý. Đơn Hoàn tất **không** chặn chốt lô. | Đã có | Giữ (text không đổi, nay mới đúng trong thực tế) |
 | BR-GH-05 | Hoàn tất là điểm không quay lui, áp cho cả phiếu và đơn | Đã có | Giữ (mở rộng phạm vi sang đơn) |
-| BR-GH-24 | Một phiếu chỉ có một kết cục. Hoàn tất, Giao thất bại và Huỷ xét trạng thái mới nhất lúc ghi | PA, hồ sơ 2026-10-01 ĐÃ DUYỆT (07/10) | **Phụ thuộc**: BR-BH-18 cần phần "không ghi đè" của rule này, kể cả khi hồ sơ huỷ-đơn-đang-giao chưa duyệt |
+| BR-GH-24 | Một phiếu chỉ có một kết cục. Hoàn tất, Giao thất bại và Huỷ xét trạng thái mới nhất lúc ghi | PA, hồ sơ 2026-10-01 CHỜ DUYỆT | **Phụ thuộc**: BR-BH-18 cần phần "không ghi đè" của rule này, kể cả khi hồ sơ huỷ-đơn-đang-giao chưa duyệt |
 | BR-PQ-04/05 | Đổi trạng thái đơn ghi AuditLog | Đã có | Giữ |
 
 ## 7. Tác động dữ liệu & tích hợp
