@@ -13,7 +13,7 @@ RAW = re.compile(r"\b(BOOKED|PAID|PROCESSING|COMPLETED|CANCELLED|AUTO_CANCELLED|
 # (mã đơn, 4 số cuối SĐT, nhãn giao hàng mong đợi hoặc None, nhãn đơn mong đợi hoặc None)
 CASES = [
     ("DH-DEMO001", "6789", "Đang soạn hàng", None),
-    ("DH-DEMO002", "1234", None, "Đang giữ chỗ, chờ thanh toán"),
+    ("DH-DEMO002", "1234", None, "Chờ thanh toán"),
     ("DH-DEMO003", "4321", "Đã huỷ", "Đã huỷ vì quá giờ thanh toán"),
     ("DH-DEMO004", "5678", "Đã huỷ", None),
     ("DH-DEMO005", "5001", "Chờ vựa gọi xác nhận", None),

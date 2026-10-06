@@ -54,3 +54,24 @@ cập nhật 8 test đang khoá chữ cũ. e2e mới `erp-console/e2e/standard_n
   "Giao phiếu cho người giao", "phiếu hoàn"); thêm Shop `/shop/orders/`; chạy lần hai trên BE thật.
 - `features/permissions/mock.ts:37,40` (nhánh F1) còn chữ cũ.
 - Một số e2e cũ chỉ được thay chuỗi, chưa chạy lại: `qa_ed_batch*`, `ed_batch9_*`, `late_payment_record`, `s12_s13_queue`, `s41_s47_staff`, `note_br_gh_19`, `p8_lo7_fe_erp`, `ed_bonusA_ui`, `ed_batch1_shell`.
+
+## FE (fe-dev) — Pha B (08/10, sau khi W37 L3 vào main 00da7e8, merge sạch không xung đột)
+
+**Đã làm:**
+- `auditModel.ts` (F9): nhãn P1, P3-P9, P11; thêm T67-T76 (gồm `item_image_remove` đã có); T2 cho `order_auto_cancelled`/`cancel_unpaid_expired`; `complete_order` giữ "Đơn hoàn tất".
+  W34: bỏ nhãn chết `auto_cancel`, `confirm_payment` (BE không ghi), bỏ `confirm_proposal` khỏi `AUDIT_FILTER_ACTIONS`.
+  W11 (review M2): `statusLabel` chọn bảng theo `model_name` (`sales.SalesOrder`, `sales.Refund`, `delivery.DeliveryNote`, `inventory.Batch`,
+  `inventory.StockReconciliation`, `inventory.ReturnToStock`); model lạ hoặc thiếu thì không in trạng thái. `changeSummary(changes, modelName)`; mock Nhật ký đổi `model` sang nhãn Django, thêm 2 dòng mẫu.
+- `orderDetailModel.ts`, `OrderDetailScreen.tsx`: "Lập phiếu hoàn tiền" ở mọi chỗ (Low 1), thanh bước phiếu hoàn tiền và dòng `refundSummaryLine` lấy từ ENUMS ("Đã hoàn tiền x · Chờ hoàn tiền y").
+- M1 (review Pha A): `confirmation/messages.ts` (`hintWantChange`), `escalationHint()` trong `confirmationUi.ts`; màn chi tiết hiện dòng "Huỷ đơn, hoàn tiền rồi đặt lại đơn mới" khi `escalation_reason === "WANT_CHANGE"`. Có vitest.
+- Shop `frontend/lib/mock.ts` (F13): BOOKED "Chờ thanh toán", hoàn tiền "Đang chờ hoàn tiền"; `order_lookup_no_raw_codes.py` cập nhật.
+- Test: bỏ `PHASE_B_FILES`; `enums.standardNames.test.ts` thêm 36 ca `actionLabel`; `auditModel.test.ts` thêm ca W11 (phiếu giao FAILED "Giao thất bại", COMPLETED "Đã giao", phiếu hoàn FAILED "Hoàn thất bại").
+  e2e `standard_names_all_routes.py`: `/audit-logs/` ra khỏi `PENDING_ROUTES` (còn `/permissions/` do F1), thêm kiểm Nhật ký và Shop qua `SHOP_BASE`.
+
+**Kiểm (08/10):** tsc sạch · vitest 97 file, 1182 test xanh · ERP build mock=0 + `check-no-mock` (30 file mock, 233 chuỗi seed) + `check-ai-chunks` XANH · Shop `tsc` và build mock=1 sạch ·
+`check_naming` OK. e2e (ERP build mock=1 AI=1): `standard_names_all_routes` 11/11 (kèm Shop 19/19), `ed_batch3_orders` 143/143, `ed_batch5` 129/129, `ed_batch7_inventory` 114/114,
+`late_payment_record` 32/32, `s12_s13_queue` 66/66, `s41_s47_staff` 74/74, `note_br_gh_19` 10/10, `ed_bonusA_ui` 49/49, `ed_batch1_shell` 56/56, `order_completion_erp` 6/6, `order_completion_detail` 16/16.
+Shop: `order_lookup_no_raw_codes` 19/19, `order_lookup_completed` 4/4.
+
+**Còn lại:** `ed_batch9_returns` 133/139. Sáu ca FAIL là lọc tháng và phạm vi danh sách (RT-4 của tháng trước), cộng "F2m SĐT không nằm trong storage". Không liên quan nhãn,
+có vẻ phụ thuộc ngày chạy. Chưa kiểm trên main nên chưa khẳng định là lỗi có sẵn. `ed_batch9_real`, `qa_ed_batch*` (cần BE thật) chưa chạy. `features/permissions/mock.ts` (F1) còn chữ cũ.

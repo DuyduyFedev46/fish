@@ -577,7 +577,7 @@ with sync_playwright() as p:
     page.wait_for_url(re.compile(r"/orders/payments/detail/\?id=\d+$"))
     expect(page.locator("main header h2")).to_be_visible()
     idle(page)
-    ok("ED-11: khoản chuyển thừa → nút chính 'Lập phiếu hoàn'", header_buttons(page) and header_buttons(page)[0] == "Lập phiếu hoàn", str(header_buttons(page)))
+    ok("ED-11: khoản chuyển thừa → nút chính 'Lập phiếu hoàn'", header_buttons(page) and header_buttons(page)[0] == "Lập phiếu hoàn tiền", str(header_buttons(page)))
     page.get_by_role("button", name="Lập phiếu hoàn").first.click()
     dlg = dialog(page, "Lập phiếu hoàn")
     ok("ED-11: hộp hoàn mặc định lý do theo loại khoản", dlg.get_by_label("Lý do hoàn").input_value() != "")

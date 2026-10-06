@@ -100,7 +100,7 @@ with sync_playwright() as p:
     main = page.locator("main").inner_text()
     ok("Chi tiết: loại 'Về sau khi đơn đã huỷ', nguồn 'Xác nhận tay', còn mở", "Về sau khi đơn đã huỷ" in main and "Xác nhận tay" in main and order_code in main, main[:400])
     ok("Dòng thời gian có 'Ghi tay tiền về muộn 350.000 đ (mã GD FTE2E001)'", "Ghi tay tiền về muộn 350.000 đ (mã GD FTE2E001)" in page.locator("main").inner_text())
-    ok("Chi tiết khoản ORPHAN: nút chính là Lập phiếu hoàn", page.locator("main header .btn.primary").first.inner_text().strip() == "Lập phiếu hoàn", page.locator("main header .btn.primary").first.inner_text())
+    ok("Chi tiết khoản ORPHAN: nút chính là Lập phiếu hoàn", page.locator("main header .btn.primary").first.inner_text().strip() == "Lập phiếu hoàn tiền", page.locator("main header .btn.primary").first.inner_text())
     page.screenshot(path=f"{SHOTS}/detail-late-1280.png")
 
     # --- 409 nghi trùng: không đơn, cùng số tiền ---

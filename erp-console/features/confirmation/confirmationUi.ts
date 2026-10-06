@@ -3,6 +3,7 @@
 import type { PathStep } from "@/shared/ui/detail/StatusPath";
 import { ENUMS } from "@/shared/lib/enums";
 import { dateTime, vnd } from "@/shared/lib/format";
+import { CONFIRMATION_MSG } from "./messages";
 import type { CallResult, ConfirmationQueueDetail, ConfirmationQueueItem } from "./types";
 import { CALL_RESULT_OPTIONS } from "./types";
 
@@ -254,3 +255,8 @@ export const DECIDE_REASON_MAX = 200;
 export const CANCEL_REASON_CODES: Array<{ value: "UNREACHABLE" | "CUSTOMER_CHANGED_MIND" | "OTHER"; label: string }> = (
   ["UNREACHABLE", "CUSTOMER_CHANGED_MIND", "OTHER"] as const
 ).map((value) => ({ value, label: ENUMS.cancelReason[value].label }));
+
+/** T37: dòng gợi ý dưới lý do chuyển quyết định. Chỉ "Khách muốn đổi món" có hướng dẫn; lý do khác không có. */
+export function escalationHint(reason: string | null | undefined): string | null {
+  return reason === "WANT_CHANGE" ? CONFIRMATION_MSG.hintWantChange : null;
+}

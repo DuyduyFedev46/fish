@@ -147,7 +147,7 @@ describe("customerLinkHref (ED-09-AC8)", () => {
 describe("khoản tiền và phiếu hoàn", () => {
   it("paymentActionPlan: thao tác đầu là nút chính, rỗng (Quản lý) thì không nút", () => {
     expect(paymentActionPlan(["attach_to_order", "refund"]).primary?.label).toBe("Gắn vào đơn");
-    expect(paymentActionPlan(["confirm_order", "refund"]).menu.map((m) => m.label)).toEqual(["Lập phiếu hoàn"]);
+    expect(paymentActionPlan(["confirm_order", "refund"]).menu.map((m) => m.label)).toEqual(["Lập phiếu hoàn tiền"]);
     expect(paymentActionPlan([])).toEqual({ primary: null, menu: [] });
   });
   it("refundActionPlan: Xác nhận / Chuyển lại chính, Báo chuyển thất bại trong …", () => {
@@ -156,7 +156,7 @@ describe("khoản tiền và phiếu hoàn", () => {
     expect(refundActionPlan([])).toEqual({ primary: null, menu: [] });
   });
   it("refundPath: Thất bại kết thúc đỏ", () => {
-    expect(refundPath("FAILED").badEnd?.label).toBe("Thất bại");
+    expect(refundPath("FAILED").badEnd?.label).toBe("Hoàn thất bại");
     expect(refundPath("REFUNDED").current).toBe("REFUNDED");
   });
 });
@@ -230,9 +230,9 @@ describe("confirmPaymentToast", () => {
 
 describe("refundSummaryLine (W37 S7-AC5)", () => {
   it("đủ hai phần, bỏ phần bằng 0, bỏ cả dòng khi 0/0 hoặc thiếu khoá", () => {
-    expect(refundSummaryLine({ refunded_amount: "200000", pending_amount: "100000" })).toBe("Đã hoàn 200.000 đ · Chờ hoàn 100.000 đ");
-    expect(refundSummaryLine({ refunded_amount: "200000", pending_amount: "0" })).toBe("Đã hoàn 200.000 đ");
-    expect(refundSummaryLine({ refunded_amount: "0", pending_amount: "100000" })).toBe("Chờ hoàn 100.000 đ");
+    expect(refundSummaryLine({ refunded_amount: "200000", pending_amount: "100000" })).toBe("Đã hoàn tiền 200.000 đ · Chờ hoàn tiền 100.000 đ");
+    expect(refundSummaryLine({ refunded_amount: "200000", pending_amount: "0" })).toBe("Đã hoàn tiền 200.000 đ");
+    expect(refundSummaryLine({ refunded_amount: "0", pending_amount: "100000" })).toBe("Chờ hoàn tiền 100.000 đ");
     expect(refundSummaryLine({ refunded_amount: "0", pending_amount: "0" })).toBeNull();
     expect(refundSummaryLine(undefined)).toBeNull();
   });

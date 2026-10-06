@@ -80,8 +80,8 @@ def completed_detail(browser):
     labels = [x[0] for x in st]
     ok("S7-AC1: không có bước 'Đã thanh toán'", "Đã thanh toán" not in labels, str(labels))
     ok("S7-AC1: thanh bước sáng tới Hoàn tất", st[-1] == ["Hoàn tất", "current"] and all(x[1] == "done" for x in st[:-1]), str(st))
-    expect(page.get_by_test_id("order-refund-summary")).to_have_text("Đã hoàn 200.000 đ · Chờ hoàn 100.000 đ")
-    ok("S7-AC5: dòng 'Đã hoàn 200.000 đ · Chờ hoàn 100.000 đ' dưới chip", True)
+    expect(page.get_by_test_id("order-refund-summary")).to_have_text("Đã hoàn tiền 200.000 đ · Chờ hoàn tiền 100.000 đ")
+    ok("S7-AC5: dòng 'Đã hoàn tiền 200.000 đ · Chờ hoàn tiền 100.000 đ' dưới chip", True)
     expect(page.get_by_role("button", name="Lập phiếu hoàn tiền")).to_be_visible()
     ok("S7-AC4: nút chính 'Lập phiếu hoàn tiền'", True)
     page.get_by_role("button", name="Thao tác khác").click()

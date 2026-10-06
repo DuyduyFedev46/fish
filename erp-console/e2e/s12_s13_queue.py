@@ -31,7 +31,7 @@ with sync_playwright() as p:
     expect(rows(page).first).to_be_visible()
     ok("S12: mở màn gọi GET /api/sales/payments/?resolution_status=OPEN", any(x.startswith(QLIST) for x in log(page)), str(log(page)))
     ok("S12: hàng chờ là tab của 'Đơn & tiền' (menu trái sáng đúng 1 mục)",
-       tab_labels(page) == ["Đơn hàng", "Hàng chờ thanh toán", "Phiếu hoàn"] and page.locator(".nav a.active").count() == 1, str(tab_labels(page)))
+       tab_labels(page) == ["Đơn hàng", "Hàng chờ thanh toán", "Phiếu hoàn tiền"] and page.locator(".nav a.active").count() == 1, str(tab_labels(page)))
     j = qjson(page)
     ok("S12-AC1 (mock theo BE): hàng chờ OPEN không có MATCHED, có đủ 4 loại lệch",
        all(r["match_status"] != "MATCHED" and r["resolution_status"] == "OPEN" for r in j["results"])
@@ -39,7 +39,7 @@ with sync_playwright() as p:
     ok("S12-AC1: số dòng = count BE (5)", rows(page).count() == j["count"] == 5, str(rows(page).count()))
     txt = rows(page).all_inner_texts()
     ok("S12-AC1: mỗi dòng có loại lệch + số tiền (đ) + mã GD",
-       all("đ" in t and "FT" in t for t in txt) and any("Thiếu tiền" in t for t in txt) and any("Không khớp đơn" in t for t in txt)
+       all("đ" in t and "FT" in t for t in txt) and any("Chuyển thiếu" in t for t in txt) and any("Không khớp đơn" in t for t in txt)
        and any("Chuyển thừa" in t for t in txt) and any("Về sau khi đơn đã huỷ" in t for t in txt), str(txt[:2]))
     ok("BR-PQ-15: JSON hàng chờ không có field giá vốn", "unit_cost" not in str(j) and "landed" not in str(j))
     # lọc loại lệch
@@ -61,7 +61,7 @@ with sync_playwright() as p:
     ok("S12-AC4: CONFIRM_ORDER khi chưa đủ → 400 BR-TT-09 'Tổng tiền đã nhận … < tổng đơn …'", r["status"] == 400 and r["body"]["code"] == "BR-TT-09" and r["body"]["detail"] == exp, str(r))
     open_payment(page, under["id"])
     ok("S12: trang khoản thiếu hiện Còn thiếu + nút chính 'Lập phiếu hoàn' (không 'Xác nhận đơn đủ tiền')",
-       "Còn thiếu" in page.locator("main").inner_text() and header_buttons(page)[:1] == ["Lập phiếu hoàn"] and "Xác nhận đơn đủ tiền" not in page.locator("main").inner_text(), str(header_buttons(page)))
+       "Còn thiếu" in page.locator("main").inner_text() and header_buttons(page)[:1] == ["Lập phiếu hoàn tiền"] and "Xác nhận đơn đủ tiền" not in page.locator("main").inner_text(), str(header_buttons(page)))
 
     # ---- S12-AC2: gắn khoản không khớp 540.000 vào đơn 101 ----
     open_payment(page, 880)
@@ -152,7 +152,7 @@ with sync_playwright() as p:
     orphan = next(x for x in qjson(page)["results"] if x["match_status"] == "ORPHAN")
     amt = int(orphan["amount"])
     open_payment(page, orphan["id"])
-    ok("S13: khoản ORPHAN chỉ có nút 'Lập phiếu hoàn'", header_buttons(page) == ["Lập phiếu hoàn"] and orphan["available_actions"] == ["refund"], str(header_buttons(page)))
+    ok("S13: khoản ORPHAN chỉ có nút 'Lập phiếu hoàn'", header_buttons(page) == ["Lập phiếu hoàn tiền"] and orphan["available_actions"] == ["refund"], str(header_buttons(page)))
     page.get_by_role("button", name="Lập phiếu hoàn").first.click()
     dlg = dialog(page, "Lập phiếu hoàn")
     ok("S13: số tiền mặc định = số còn được hoàn", dlg.get_by_label("Số tiền hoàn").input_value().replace(".", "") == str(amt), dlg.get_by_label("Số tiền hoàn").input_value())
@@ -203,7 +203,7 @@ with sync_playwright() as p:
     ok("P5/BR-TT-10: khoản chuyển thừa gắn đơn đã xong, chỉ còn 'refund'", over["order"] is not None and over["available_actions"] == ["refund"], str(over))
     open_payment(page, over["id"])
     ok("P5: trang chuyển thừa hiện loại 'Chuyển thừa' + đơn Hoàn tất + nút 'Lập phiếu hoàn'",
-       "Chuyển thừa" in page.locator("main").inner_text() and "Hoàn tất" in page.locator("main").inner_text() and header_buttons(page)[:1] == ["Lập phiếu hoàn"])
+       "Chuyển thừa" in page.locator("main").inner_text() and "Hoàn tất" in page.locator("main").inner_text() and header_buttons(page)[:1] == ["Lập phiếu hoàn tiền"])
     ctx.close()
 
     # ---- Bổ sung tiền (L8): chuyển thừa ngay lần đầu ----
@@ -264,7 +264,7 @@ with sync_playwright() as p:
         expect(rows(page).first).to_be_visible()
         tabs = tab_labels(page)
         if user == "ql1":
-            ok("S12/S16: ql1 thấy tab 'Đơn hàng' + 'Phiếu hoàn', không có 'Hàng chờ thanh toán'", tabs == ["Đơn hàng", "Phiếu hoàn"], str(tabs))
+            ok("S12/S16: ql1 thấy tab 'Đơn hàng' + 'Phiếu hoàn', không có 'Hàng chờ thanh toán'", tabs == ["Đơn hàng", "Phiếu hoàn tiền"], str(tabs))
         else:
             ok("S12: kho1 không có tab 'Hàng chờ thanh toán'", "Hàng chờ thanh toán" not in tabs, str(tabs))
         ctx.close()

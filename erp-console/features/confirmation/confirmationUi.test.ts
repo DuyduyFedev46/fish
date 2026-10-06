@@ -12,6 +12,7 @@ import {
   dueAt,
   extendError,
   idFromSearch,
+  escalationHint,
   isPhoneValid,
   lineNames,
   matches,
@@ -188,5 +189,14 @@ describe("mock: dòng ngoài phạm vi che dữ liệu khách (bất biến 9)",
       expect(hit.customer_name).toBeUndefined();
       expect(hit.phone_masked).toBe(out.phone_masked);
     } else throw new Error("search phải trả results");
+  });
+});
+
+describe("escalationHint (T37, M1 review Pha A)", () => {
+  it("Khách muốn đổi món: gợi ý huỷ đơn, hoàn tiền rồi đặt lại", () => {
+    expect(escalationHint("WANT_CHANGE")).toBe("Huỷ đơn, hoàn tiền rồi đặt lại đơn mới");
+  });
+  it("lý do khác hoặc trống: không có gợi ý", () => {
+    for (const r of ["WANT_CANCEL", "WRONG_NUMBER", "UNREACHABLE", "", null, undefined]) expect(escalationHint(r)).toBeNull();
   });
 });

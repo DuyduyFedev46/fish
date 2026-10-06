@@ -7,13 +7,6 @@ import { describe, expect, it } from "vitest";
 
 const ROOT = path.resolve(__dirname, "../..");
 
-/** TODO Pha B: bỏ khỏi danh sách này sau khi W37 L3 gộp và các file được sửa (02b mục 4). */
-const PHASE_B_FILES = new Set([
-  "features/audit/auditModel.ts",
-  "features/audit/mock.ts",
-  "features/orders/orderDetailModel.ts",
-  "features/orders/components/OrderDetailScreen.tsx",
-]);
 /** Không thuộc lô này: phần AI (lô dọn chữ AI) và permissions (nhánh F1 đang giữ). */
 const SKIP_PREFIXES = ["features/ai/", "features/permissions/"];
 
@@ -49,7 +42,7 @@ describe("không còn chữ cũ của nhóm A trong mã nguồn ERP (02b 3.2)", 
   const files = ["features", "shared", "app"]
     .flatMap((d) => walk(path.join(ROOT, d)))
     .map((f) => path.relative(ROOT, f).split(path.sep).join("/"))
-    .filter((f) => !PHASE_B_FILES.has(f) && !SKIP_PREFIXES.some((p) => f.startsWith(p)));
+    .filter((f) => !SKIP_PREFIXES.some((p) => f.startsWith(p)));
 
   it("quét được nhiều file", () => {
     expect(files.length).toBeGreaterThan(100);

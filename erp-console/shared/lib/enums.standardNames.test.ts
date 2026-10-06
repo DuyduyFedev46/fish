@@ -1,8 +1,8 @@
 // Lô áp tên chuẩn (02b mục 3.2): so từng dòng T của doc/thuat-ngu-va-trang-thai.md mục 4 với ENUMS và menu.
 // Cột "Chuẩn". Dòng chỉ có ở BE hoặc Shop (T1 Shop, T24-T30 Shop, T43...) không nằm ở đây.
-// TODO Pha B: thêm actionLabel() cho T67-T76 và P1, P3-P9, P11 khi auditModel.ts (W37 L3) đã gộp.
 import { describe, expect, it } from "vitest";
 import { ENUMS, enumLabel, type EnumName } from "@/shared/lib/enums";
+import { actionLabel, AUDIT_ACTION_LABELS, AUDIT_FILTER_ACTIONS } from "@/features/audit/auditModel";
 import { NAV } from "@/shared/lib/nav";
 
 /** [mã dòng, bảng ENUMS, mã DB, nhãn chuẩn] */
@@ -95,5 +95,56 @@ describe("tên chuẩn: menu (C1, C3)", () => {
   it("Hàng hoàn (Q-3) và Hoàn tiền chờ chuyển", () => {
     expect(labelOf("returns")).toBe("Hàng hoàn");
     expect(labelOf("refunds")).toBe("Hoàn tiền chờ chuyển");
+  });
+});
+
+/** [mã dòng, `action` của AuditLog, nhãn chuẩn] — T67-T76 và P1, P3-P9, P11. `AuditLog.action` không đổi, chỉ đổi nhãn. */
+const ACTIONS: Array<[string, string, string]> = [
+  ["P1", "confirm_payment_manual", "Xác nhận đã nhận tiền"],
+  ["P2", "publish_batch", "Mở bán lô"],
+  ["P3", "cancel_expired_batch", "Huỷ lô quá hạn (ghi lỗ)"],
+  ["P4", "approve_returntostock", "Duyệt hàng hoàn"],
+  ["P5", "return_to_warehouse", "Mang hàng về kho"],
+  ["P5", "cancel_returntostock", "Huỷ phiếu hàng hoàn"],
+  ["P6", "issue_credit_note", "Lập phiếu trừ doanh thu"],
+  ["P7", "create_refund", "Lập phiếu hoàn tiền"],
+  ["P7", "retry_refund", "Thử hoàn tiền lại"],
+  ["P8", "return_batch_to_supplier", "Trả nhà cung cấp"],
+  ["P9", "assign_deliverynote", "Chọn người giao"],
+  ["P11", "delivery_confirm_skipped", "Bỏ qua gọi xác nhận"],
+  ["P11", "delivery_extended", "Gia hạn gọi"],
+  ["T2", "order_auto_cancelled", "Đơn hết giờ giữ chỗ, tự huỷ"],
+  ["T2", "cancel_unpaid_expired", "Đơn hết giờ giữ chỗ, tự huỷ"],
+  ["T67", "batch_near_expiry", "Lô sang Cận hạn"],
+  ["T67", "batch_expired", "Lô sang Quá hạn"],
+  ["T67", "batch_sold_out", "Lô hết hàng"],
+  ["T68", "batch_selling", "Lô sang Đang bán"],
+  ["T68", "batch_back_in_stock", "Lô có hàng lại (hàng hoàn tái nhập)"],
+  ["T69", "label_printed", "In tem giao"],
+  ["T69", "label_reprinted", "In lại tem giao"],
+  ["T70", "update_reconciliation_lines", "Sửa số đếm kiểm kê"],
+  ["T71", "delete_returntostock", "Ẩn phiếu hàng hoàn"],
+  ["T72", "change_group_capabilities", "Đổi phân quyền nhóm"],
+  ["T73", "item_image_add", "Thêm ảnh mặt hàng"],
+  ["T73", "item_image_replace", "Thay ảnh mặt hàng"],
+  ["T73", "item_image_remove", "Gỡ ảnh mặt hàng"],
+  ["T74", "content_publish", "Đăng bài"],
+  ["T74", "content_republish", "Đăng lại bài"],
+  ["T74", "content_restore_version", "Khôi phục bản cũ"],
+  ["T75", "create_callscript", "Thêm kịch bản gọi"],
+  ["T75", "update_callscript", "Sửa kịch bản gọi"],
+  ["T76", "admin_edit", "Sửa trong trang quản trị kỹ thuật"],
+  ["W37", "complete_order", "Đơn hoàn tất"],
+];
+
+describe("tên chuẩn: nhãn thao tác Nhật ký (actionLabel)", () => {
+  it.each(ACTIONS)("%s %s = %s", (_code, action, label) => {
+    expect(actionLabel(action)).toBe(label);
+  });
+
+  it("W34: không còn nhãn của mã BE không ghi (auto_cancel, confirm_payment) và bộ lọc không có confirm_proposal", () => {
+    expect(AUDIT_ACTION_LABELS).not.toHaveProperty("auto_cancel");
+    expect(AUDIT_ACTION_LABELS).not.toHaveProperty("confirm_payment");
+    expect(AUDIT_FILTER_ACTIONS).not.toContain("confirm_proposal");
   });
 });

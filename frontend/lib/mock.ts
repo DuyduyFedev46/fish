@@ -243,7 +243,7 @@ function seedDemoOrders(): Map<string, MockOrderRecord> {
     is_expired: false,
     booked_expires_at: nowIso(12),
     pay_confirmed_at: null,
-    status_label: "Đang giữ chỗ, chờ thanh toán",
+    status_label: "Chờ thanh toán",
     delivery_code: null,
   });
   // Đơn mẫu 3: đã hết hạn giữ chỗ — test màn "hết hạn, mời đặt lại" (mã DH-DEMO003, SĐT 4321).
@@ -278,7 +278,7 @@ function seedDemoOrders(): Map<string, MockOrderRecord> {
         "Cá Về đã gọi số điện thoại đặt hàng 3 lần trong 30 phút nhưng không liên lạc được, nên đơn được huỷ tự động để hoàn tiền cho quý khách.",
       refund: {
         amount: "540000",
-        status_label: "Đang chờ hoàn",
+        status_label: "Đang chờ hoàn tiền",
         deadline: "2026-10-28",
         refunded_at: null,
       },
@@ -477,7 +477,7 @@ export async function mockCreateOrder(
     is_expired: false,
     booked_expires_at,
     pay_confirmed_at: null,
-    status_label: "Đang giữ chỗ, chờ thanh toán",
+    status_label: "Chờ thanh toán",
     delivery_code: null,
   });
   saveOrders(orders);

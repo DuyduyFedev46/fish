@@ -33,7 +33,7 @@ import { ErrorScreen } from "@/shared/ui/states/ErrorScreen";
 import { NoPermission } from "@/shared/ui/states/NoPermission";
 import { NotFoundScreen } from "@/shared/ui/states/NotFoundScreen";
 import { claimConfirmationTask, fetchConfirmationDetail } from "../api";
-import { PATH_STEPS, callResultsOf, callToast, claimActive, decisionsOf, doneSteps, dueAt, hasAction, idFromSearch, lastCallerName, nextStepText, pathOf, telHref } from "../confirmationUi";
+import { PATH_STEPS, callResultsOf, callToast, claimActive, decisionsOf, doneSteps, dueAt, escalationHint, hasAction, idFromSearch, lastCallerName, nextStepText, pathOf, telHref } from "../confirmationUi";
 import type { CallResult, ConfirmationQueueDetail } from "../types";
 import { ChangeRecipientModal } from "./ChangeRecipientModal";
 import { ConfirmationAiBlock } from "./ConfirmationAiBlock";
@@ -262,6 +262,12 @@ export function ConfirmationDetailScreen() {
         <div className={`alert-box warn ${s.guidance}`} role="status">
           <Icon name="info" />
           <span>{item.guidance}</span>
+        </div>
+      )}
+      {escalationHint(item.escalation_reason) && (
+        <div className={`alert-box warn ${s.guidance}`} role="status">
+          <Icon name="info" />
+          <span>{escalationHint(item.escalation_reason)}</span>
         </div>
       )}
       {item.auto_cancel_blocked_label && (

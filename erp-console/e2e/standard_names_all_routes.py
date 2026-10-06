@@ -6,8 +6,9 @@ Chạy trên bản build MOCK (dữ liệu giả). Mỗi lần chỉ giữ một
     (cd out && python3 -m http.server 3219 --bind 127.0.0.1 &) ; BASE=http://127.0.0.1:3219 python3 e2e/standard_names_all_routes.py
     # tắt server sau khi xong
 Vai: loc (Chủ) và ql1 (Quản lý). Nguồn chữ: doc/thuat-ngu-va-trang-thai.md mục 4.
-TODO Pha B: thêm Shop /shop/orders/ (BOOKED, AUTO_CANCELLED, có hoàn tiền, có phiếu giao, cấm mã thô), cột Thao tác Nhật ký
-(Thao tác khác) có dữ liệu mock sau khi auditModel.ts được sửa, và chạy lần hai trên BE thật (staging local).
+Shop (tuỳ chọn): đặt SHOP_BASE=http://127.0.0.1:3220 (bản build mock của frontend/) để quét thêm /shop/orders/: BOOKED, AUTO_CANCELLED,
+có hoàn tiền, đủ trạng thái phiếu giao, cấm mã thô.
+TODO: chạy lần hai trên BE thật (staging local, dữ liệu giả) khi có.
 """
 import os
 import re
@@ -54,9 +55,8 @@ CHIP_BANNED = {
     "/catalog/": {"Đang bật"},
     "/content/": {"Bảo mật"},
 }
-# TODO Pha B / F1: các route này còn chữ cũ vì nguồn chữ nằm ở file chưa đụng được (Nhật ký: auditModel.ts chờ W37 L3;
-# Phân quyền: features/permissions/mock.ts thuộc nhánh F1). Chỉ in cảnh báo, không đỏ. Bỏ khỏi danh sách khi các file đó được sửa.
-PENDING_ROUTES = {"/audit-logs/", "/permissions/", "/permissions/detail/?group=manager&code=manager"}
+# TODO F1: Phân quyền còn chữ cũ vì features/permissions/mock.ts thuộc nhánh F1. Chỉ in cảnh báo, không đỏ; bỏ khỏi danh sách khi F1 gộp.
+PENDING_ROUTES = {"/permissions/", "/permissions/detail/?group=manager&code=manager"}
 results = []
 
 
@@ -128,13 +128,47 @@ def sweep(browser, user):
         page.wait_for_load_state("networkidle")
         nav = page.locator("nav").all_inner_texts()
         ok(f"[{user}] menu có 'Hàng hoàn', không còn 'Hàng hoàn về kho'", any("Hàng hoàn" in t for t in nav) and not any("Hàng hoàn về kho" in t for t in nav), nav)
+        # Nhật ký (T67-T76, W11, T49): cột Thao tác không còn "Thao tác khác", cột Người không còn "Người dùng".
+        page.goto(BASE + "/audit-logs/")
+        page.wait_for_load_state("networkidle")
+        cells = page.locator("tbody td").all_inner_texts()
+        ok(f"[{user}] Nhật ký: không có ô 'Thao tác khác' hay 'Người dùng'", not any(c.strip() in ("Thao tác khác", "Người dùng") for c in cells), [c for c in cells if c.strip() in ("Thao tác khác", "Người dùng")][:3])
+        body = page.inner_text("main")
+        ok(f"[{user}] Nhật ký: phiếu giao FAILED dịch là 'Giao thất bại' (W11), tem dùng 'In tem giao'", "Đang giao → Giao thất bại" in body and "In tem giao" in body, body[:200])
     ctx.close()
+
+
+SHOP_CASES = [  # (mã đơn, 4 số cuối SĐT, chữ phải có)
+    ("DH-DEMO002", "1234", "Chờ thanh toán"), ("DH-DEMO003", "4321", "Đã huỷ vì quá giờ thanh toán"),
+    ("DH-DEMO004", "5678", "Đang chờ hoàn tiền"), ("DH-DEMO005", "5001", "Chờ vựa gọi xác nhận"),
+    ("DH-DEMO006", "5002", "Đã soạn xong, chờ giao"), ("DH-DEMO007", "5003", "Đang giao"),
+    ("DH-DEMO008", "5004", "Đã giao"), ("DH-DEMO009", "5005", "Giao chưa thành công, vựa sẽ liên hệ lại"),
+]
+RAW = re.compile(r"\b(CONFIRMING|PREPARING|READY|DELIVERING|COMPLETED|FAILED|CANCELLED|BOOKED|AUTO_CANCELLED)\b")
+
+
+def shop_sweep(browser):
+    shop = os.environ.get("SHOP_BASE")
+    if not shop:
+        print("SKIP Shop: chưa đặt SHOP_BASE", flush=True)
+        return
+    page = browser.new_context(viewport={"width": 390, "height": 800}, reduced_motion="reduce").new_page()
+    for code, last4, want in SHOP_CASES:
+        page.goto(shop + "/shop/orders/")
+        page.wait_for_load_state("networkidle")
+        page.fill("#orderCode", code)
+        page.fill("#phoneLast4", last4)
+        page.locator("form button[type=submit]").click()
+        page.locator(".status-badge").wait_for(timeout=8000)
+        body = page.inner_text("main")
+        ok(f"[Shop {code}] có '{want}', không mã thô, không chữ cấm nhóm A", want in body and not RAW.search(body) and not [w for w in GROUP_A if w in body], body[-200:])
 
 
 with sync_playwright() as p:
     browser = p.chromium.launch()
     for user in ("loc", "ql1"):
         sweep(browser, user)
+    shop_sweep(browser)
     browser.close()
 passed = sum(1 for _, c, _ in results if c)
 print(f"== {passed}/{len(results)} PASS")
