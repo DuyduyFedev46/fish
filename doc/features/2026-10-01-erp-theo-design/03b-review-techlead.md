@@ -2981,3 +2981,30 @@ Phạm vi là `git diff main...HEAD` trên nhánh `wip/duy-quyet-03-10` (21 file
 
 ### Kết luận #3/#8 BE: **CHANGES REQUESTED**
 Chỉ cần sửa **M1** (câu báo lỗi, assert test và dòng contract trong 03-dev-notes) rồi hỏi Duy câu hỏi đi kèm. Các bất biến đều đạt: không xoá cứng, không lệch tồn hay giá vốn, chỉ Chủ/superuser xoá được, AuditLog không có dữ liệu cá nhân, timeline không có chữ tự do, migration chạy lùi được. Nên sửa L1 và L2 trong cùng lượt. L3 chuyển cho FE (hộp xác nhận). L4 để lô BE sau. Sửa xong M1 thì techlead chỉ cần soát lại diff của M1, không phải review lại toàn bộ.
+
+### Re-review sau commit 90f66cd (06/10)
+
+Tôi đã soát diff của `git show 90f66cd`, gồm `returns/api.py`, `returns/services.py`, `tests/test_soft_delete.py` và `03-dev-notes.md`.
+
+**Lệnh techlead đã tự chạy:**
+- `manage.py test --parallel 4`: 2880 test, OK.
+- `makemigrations --check --dry-run`: No changes detected.
+- `check_naming.py`: OK.
+
+| Mục | Kết quả |
+|---|---|
+| **TL-D8-M1** | **Đã đóng.** Câu lỗi mới là "Phiếu hàng hoàn đã duyệt (đã nhập lại kho hoặc ghi lỗ) không xoá được (BR-PQ-10)." (`services.py:73-76`). Câu này không còn bảo người dùng huỷ trước, đúng với cả RESTOCK lẫn WRITE_OFF và có mã BR. Mã `RETURN_DELETE_NOT_ALLOWED` giữ nguyên. Assert cũ đã sửa, có thêm test WRITE_OFF, dòng contract trong `03-dev-notes.md` cũng đã đổi theo. Phần đường đảo phiếu đã duyệt không làm, đúng phạm vi. |
+| **TL-D8-L1** | **Đã đóng.** `_lock_or_stale` (`api.py:78-84`) được dùng cho approve và cancel, còn `delete_return` tự bắt `DoesNotExist` (`services.py:68-71`). Cả ba trả 409 `STALE_STATE` với câu tiếng Việt và `from None`, không lộ traceback. Lần khoá vẫn nằm trong `transaction.atomic` như cũ. Có 4 test cho ca này: gọi service trực tiếp, và approve/cancel/delete với `get_object` bị mock trả bản cũ. |
+| **TL-D8-L2** | **Đã đóng.** Đã thêm test approve/cancel/PATCH sau khi xoá đều trả 404, và test xoá phiếu Nháp thì gỡ chặn ở `check_close_batch` lẫn `check_ai_close_batch_conditions`. |
+
+**Nit, không chặn:**
+- `test_soft_delete.py`, `test_d8_l2_delete_draft_lifts_close_batch_blocks`: nhánh AI chỉ `assertFalse(ok)` ở bước trước và `assertNotIn(marker)` ở bước sau. Nếu một điều kiện đứng trước, như giao dịch mở, chặn trước thì assert sau vẫn qua dù khoá hàng hoàn chưa được gỡ. Nên assert thêm `marker in info["text"]` ở bước trước.
+- Logic "khoá hoặc 409" đang lặp ở hai nơi: `_lock_or_stale` ở API và đoạn try/except trong service. Có thể gom về một hàm trong `services.py` khi có dịp sửa module này.
+- `03-dev-notes.md` có dòng "Số chạy 06/10" thiếu dấu chấm cuối và dòng sửa review thừa "..".
+
+**Nợ chuyển lô:**
+- **TL-D8-L3 → lô FE của #8.** Hộp xác nhận xoá phiếu Nháp phải nói rõ "số kg này sẽ không được nhập lại kho". FE hiển thị nguyên `detail` của mã `RETURN_DELETE_NOT_ALLOWED` theo contract mới.
+- **TL-D3-L4 → lô BE sau, gộp với TL15-FE-L5.** `AuditLog.note` vẫn chứa chữ tự do (ghi chú huỷ đơn, lý do báo hoàn thất bại, `resolve_payment`) và màn Nhật ký vẫn in ra.
+- **Câu hỏi cho Duy (từ M1):** phiếu hàng hoàn đã duyệt có cần đường đảo không? Nếu cần thì đó là tính năng BR-HV mới, không thuộc lô này.
+
+### Kết luận #3/#8 BE sau re-review: **APPROVED**
