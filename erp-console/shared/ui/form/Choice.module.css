@@ -1,0 +1,37 @@
+/* Công tắc + radio theo board (F1k): công tắc 34×20 thumb 16, radio 16 viền 1.5, chọn = viền dày 5px màu nhấn. Chỉ dùng token. */
+.switchRow { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); min-height: var(--control-h); font-size: var(--text-sm); color: var(--ink); cursor: pointer; }
+.switchRow[data-disabled] { cursor: not-allowed; opacity: .6; }
+.switch {
+  appearance: none; -webkit-appearance: none;
+  position: relative; flex: none; width: 34px; height: 20px; margin: 0;
+  border-radius: 10px; background: var(--border-strong); cursor: inherit;
+  transition: background-color var(--dur-fast) ease;
+}
+.switch::after {
+  content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 8px;
+  background: var(--on-accent); box-shadow: var(--shadow-xs);
+  transition: transform var(--dur-fast) var(--ease-out);
+}
+.switch:checked { background: var(--accent); }
+.switch:checked::after { transform: translateX(14px); }
+.switch:focus-visible, .radio:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+.group { display: flex; flex-direction: column; gap: var(--space-1-5); min-width: 0; }
+.groupLabel { font-size: var(--text-sm); font-weight: var(--weight-medium); color: var(--ink); }
+.req { color: var(--crit); }
+.options { display: flex; flex-wrap: wrap; gap: 0 var(--space-5); }
+.option { display: inline-flex; align-items: center; gap: var(--space-2); min-height: var(--control-h); font-size: var(--text-sm); color: var(--ink); cursor: pointer; }
+.option[data-disabled] { cursor: not-allowed; opacity: .6; }
+/* Vòng radio vẽ bằng gradient (không dùng viền) để ô <input> có thể to 44px trên di động (vùng bấm ≥ --tap) mà vòng vẫn 16px:
+   ô input = 16px + padding 14px mỗi phía, lề âm 14px để không đẩy dòng. Từ 768px bỏ padding (ô 16px, hàng cao --control-h). */
+.radio {
+  appearance: none; -webkit-appearance: none;
+  flex: none; box-sizing: content-box; width: 16px; height: 16px; padding: 14px; margin: -14px; cursor: inherit;
+  border: 0; border-radius: 50%;
+  background: radial-gradient(circle at center, var(--surface) 0 6.5px, var(--border-input) 7px 8px, transparent 8.5px);
+  transition: background-color var(--dur-fast) ease;
+}
+.radio:checked { background: radial-gradient(circle at center, var(--surface) 0 2.5px, var(--accent) 3px 8px, transparent 8.5px); }
+@media (min-width: 768px) { .radio { padding: 0; margin: 0; } }
+.err { margin: 0; font-size: var(--text-sm); font-weight: var(--weight-medium); color: var(--crit); }
+@media (prefers-reduced-motion: reduce) { .switch, .switch::after, .radio { transition: none; } }

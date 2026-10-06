@@ -2,7 +2,7 @@
    dùng component chung (shared/ui); file này chỉ có khung form trong hộp thoại, khung xương và khối phụ ở trang chi tiết. */
 
 /* Khung form trong hộp thoại "Sửa thông tin": các ô cách đều nhau. */
-.form { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; }
+.form { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }
 
 /* Khung xương trang chi tiết. */
 .detailSkel { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-4) 0; }

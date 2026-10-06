@@ -27,20 +27,22 @@
   --font-sans:var(--font-inter),system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
   --font-mono:var(--font-jetmono),ui-monospace,SFMono-Regular,Menlo,monospace;
   --text-2xs:11px; --text-xs:12px; --text-sm:13px; --text-base:14px; --text-md:15px;
-  --text-lg:17px; --text-xl:20px; --text-2xl:24px; --text-input:16px;
+  --text-lg:17px; --text-xl:20px; --text-2xl:24px; --text-title:22px; --text-dialog:16px; --text-input:16px;
   --weight-regular:400; --weight-medium:500; --weight-semibold:600;
   --leading-tight:1.25; --leading-snug:1.4; --leading-normal:1.5;
   --tracking-tight:-.01em; --tracking-caps:.06em;
 
   /* ---- Khoảng cách (bước 4px) ---- */
   --space-0-5:2px; --space-1:4px; --space-1-5:6px; --space-2:8px; --space-2-5:10px; --space-3:12px;
-  --space-4:16px; --space-5:20px; --space-6:24px; --space-8:32px; --space-10:40px; --space-12:48px;
+  --space-4:16px; --space-5:20px; --space-6:24px; --space-7:28px; --space-8:32px; --space-10:40px; --space-12:48px;
 
   /* ---- Bo góc ---- */
-  --radius-xs:4px; --radius-sm:6px; --radius-md:8px; --radius-lg:10px; --radius-xl:14px; --radius-full:999px;
+  --radius-xs:4px; --radius-sm:6px; --radius-md:8px; --radius-lg:10px; --radius-xl:14px; --radius-card:12px; --radius-full:999px;
 
   /* ---- Kích thước khung ---- */
   --tap:44px;
+  /* Ô nhập / nút trong form: 44px trên điện thoại (chạm), 36px từ 768px như board. Chữ 16px để iOS không phóng to khi focus, 14px trên desktop. */
+  --control-h:44px; --control-text:16px;
   --rail-left-w:240px; --rail-left-w-collapsed:60px; --rail-right-w:320px; --action-bar-h:64px;
   --topbar-h:56px; --bottom-nav-h:60px;
   /* Duy 03/10: nội dung ERP giãn hết bề ngang màn (trước đây chặn 1280px, màn rộng bị trống bên phải). Form vẫn giữ 720px. */
@@ -99,5 +101,5 @@
 }
 
 @media (min-width:768px){
-  :root{ --tap:40px; }
+  :root{ --tap:40px; --control-h:36px; --control-text:14px; }
 }

@@ -11,6 +11,7 @@ import { ROLE } from "@/shared/lib/roles";
 import { errorText } from "@/shared/lib/messages";
 import { Field } from "@/shared/ui/form/Field";
 import { FormAlert } from "@/shared/ui/form/FormAlert";
+import { FormGrid } from "@/shared/ui/form/FormSection";
 import { primaryLabel, useSubmit } from "@/shared/ui/form/useSubmit";
 import { Icon } from "@/shared/ui/Icon";
 import { Modal } from "@/shared/ui/overlay/Modal";
@@ -142,6 +143,7 @@ export function StaffFormModal({ onClose, onCreated }: Props) {
   return (
     <Modal
       title={M.addTitle}
+      size="lg"
       onClose={onClose}
       busy={sub.submitting}
       footer={
@@ -174,9 +176,11 @@ export function StaffFormModal({ onClose, onCreated }: Props) {
       >
         {sub.error && <FormAlert>{sub.error}</FormAlert>}
         <p className={s.sectionNote}>{M.fieldUsernameHelp}</p>
-        <Field label={M.fieldUsernameInput} required name="username" value={username} onChange={setUsername} maxLength={150} disabled={sub.submitting} autoFocus />
-        <Field label={M.fieldNameInput} name="display_name" value={displayName} onChange={setDisplayName} maxLength={150} disabled={sub.submitting} />
-        <Field label={M.fieldPhoneInput} required type="tel" name="phone" value={phone} onChange={setPhone} maxLength={32} disabled={sub.submitting} />
+        <FormGrid>
+          <Field label={M.fieldUsernameInput} required name="username" value={username} onChange={setUsername} maxLength={150} disabled={sub.submitting} autoFocus />
+          <Field label={M.fieldNameInput} name="display_name" value={displayName} onChange={setDisplayName} maxLength={150} disabled={sub.submitting} />
+          <Field label={M.fieldPhoneInput} required type="tel" name="phone" value={phone} onChange={setPhone} maxLength={32} disabled={sub.submitting} />
+        </FormGrid>
         <div className={s.formSection}>
           <GroupPicker value={groups} onChange={setGroups} disabled={sub.submitting} describedBy={groups.length === 0 ? `${formId}-g` : undefined} />
           {groups.length === 0 && (

@@ -2,7 +2,7 @@
    dùng component chung (shared/ui); file này chỉ có khung form trong hộp thoại, khung xương và các khối phụ ở trang chi tiết. */
 
 /* Khung form trong hộp thoại Thêm / Sửa: các ô cách đều nhau. */
-.form { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; }
+.form { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }
 
 /* Hộp xác nhận ngắn: một đoạn nêu hậu quả. */
 .confirmBody { margin: 0; color: var(--ink-2); font-size: var(--text-base); line-height: 1.5; }

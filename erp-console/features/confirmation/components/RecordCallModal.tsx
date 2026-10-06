@@ -87,6 +87,7 @@ export function RecordCallModal({ noteId, orderCode, customerName, phone, attemp
   return (
     <Modal
       title={title}
+      size="xl"
       onClose={onClose}
       busy={sub.submitting}
       footer={

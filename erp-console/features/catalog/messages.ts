@@ -181,6 +181,7 @@ export const CATALOG_MSG = {
 
   // ---- form ưu đãi ----
   ruleFormTitle: "Tạo ưu đãi giảm giá",
+  ruleSectionTitle: "Ưu đãi",
   ruleFormBack: "Ưu đãi",
   ruleSubmit: "Tạo ưu đãi",
   ruleCreated: "Đã tạo ưu đãi.",

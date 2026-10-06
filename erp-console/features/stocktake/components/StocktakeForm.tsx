@@ -18,6 +18,7 @@ import { SkeletonScreen } from "@/shared/ui/Skeleton";
 import { Field } from "@/shared/ui/form/Field";
 import { FormAlert } from "@/shared/ui/form/FormAlert";
 import { FormPage } from "@/shared/ui/form/FormPage";
+import { FormSection } from "@/shared/ui/form/FormSection";
 import { SummaryBlock } from "@/shared/ui/form/SummaryBlock";
 import { useSubmit } from "@/shared/ui/form/useSubmit";
 import { useToast } from "@/shared/ui/overlay/Toast";
@@ -399,6 +400,7 @@ export function StocktakeForm({ mode }: { mode: "new" | "edit" }) {
       failed={send.failed && !conflict}
       secondary={{ label: "Lưu nháp", onClick: () => start("draft") }}
     >
+      <FormSection title="Phiếu kiểm kê">
       <div className={s.head}>
         <Field label="Ngày kiểm kê" required type="date" value={countDate} onChange={setCountDate} name="count_date" error={dateMissing ? "Chọn ngày kiểm kê." : null} />
         <Field
@@ -411,6 +413,7 @@ export function StocktakeForm({ mode }: { mode: "new" | "edit" }) {
         />
         <Field label="Ghi chú" value={note} onChange={setNote} name="note" maxLength={500} />
       </div>
+      </FormSection>
 
       <section className={s.section} aria-label="Các lô cần đếm">
         <div className={s.sectionHead}>

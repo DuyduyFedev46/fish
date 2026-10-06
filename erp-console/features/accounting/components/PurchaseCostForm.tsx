@@ -15,9 +15,11 @@ import { ENUMS } from "@/shared/lib/enums";
 import { kg, todayInVietnam, vnd } from "@/shared/lib/format";
 import { formatMoneyInput } from "@/shared/lib/moneyInput";
 import { useResource } from "@/shared/lib/useResource";
+import { RadioGroup } from "@/shared/ui/form/Choice";
 import { Field } from "@/shared/ui/form/Field";
 import { FormAlert } from "@/shared/ui/form/FormAlert";
 import { FormPage } from "@/shared/ui/form/FormPage";
+import { FormGrid, FormSection } from "@/shared/ui/form/FormSection";
 import { SummaryBlock } from "@/shared/ui/form/SummaryBlock";
 import { useSubmit } from "@/shared/ui/form/useSubmit";
 import { useToast } from "@/shared/ui/overlay/Toast";
@@ -69,8 +71,10 @@ function ReceiptPicker({ onPick }: { onPick: (id: number) => void }) {
       primaryText="Tiếp tục"
       primaryDisabled={!value}
     >
-      <Field as="select" label="Lọc theo nhà cung cấp" name="supplier_filter" value={supplier} onChange={setSupplier} options={supplierOptions} />
-      <ReceiptSelect label="Phiếu nhập nhận chi phí" name="receipt" required value={value} supplier={supplier} hasInvoice="" emptyLabel="Chọn phiếu nhập" onChange={(v) => setValue(v)} />
+      <FormSection title="Chọn phiếu nhập">
+        <Field as="select" label="Lọc theo nhà cung cấp" name="supplier_filter" value={supplier} onChange={setSupplier} options={supplierOptions} />
+        <ReceiptSelect label="Phiếu nhập nhận chi phí" name="receipt" required value={value} supplier={supplier} hasInvoice="" emptyLabel="Chọn phiếu nhập" onChange={(v) => setValue(v)} />
+      </FormSection>
     </FormPage>
   );
 }
@@ -187,44 +191,46 @@ function CostFormBody({ receipt, onBackToPick }: { receipt: ReceiptDetail; onBac
       primaryDisabled={!canSave}
       secondary={{ label: onBackToPick ? "Chọn phiếu khác" : "Quay lại", onClick: onBackToPick ?? (() => router.push(`/purchasing/detail/?id=${receipt.id}`)) }}
     >
-      <SummaryBlock
-        label="Phiếu nhập"
-        rows={[
-          { label: "Phiếu nhập", value: receipt.code, mono: true },
-          { label: "Nhà cung cấp", value: receipt.supplier_name },
-          { label: "Số lô nhận chi phí", value: String(targets.length), num: true },
-        ]}
-      />
-      <div className={s.twoCols}>
-        <Field as="select" label="Loại chi phí" name="cost_type" required value={costType} onChange={setCostType} options={COST_TYPE_OPTIONS} error={sub.fieldErrors.cost_type} />
-        <Field label="Ngày phát sinh" name="incurred_date" type="date" required value={date} onChange={setDate} error={sub.fieldErrors.incurred_date} />
-      </div>
-      <div className={s.twoCols}>
-        <Field label="Tổng chi phí" name="amount" type="money" required unit={CURRENCY_UNIT} value={amount} onChange={(v) => { setAmount(v); if (sub.failed) sub.reset(); }} error={amountError} />
-        <Field as="select" label="Cách chia vào lô" name="allocation_method" value={method} onChange={(v) => setMethod(v as AllocationMethod)} options={METHOD_OPTIONS} />
-      </div>
-      <div className={s.allocTable} role="group" aria-label="Chia vào từng lô">
-        {targets.map((t, i) => (
-          <div key={t.batch} className={s.allocRow}>
-            <Field
-              label={`${t.batch_code} · ${t.item_name} · ${kg(t.qty)}`}
-              name={`alloc-${i}`}
-              type="money"
-              unit={CURRENCY_UNIT}
-              value={parts[i] ?? ""}
-              onChange={(v) => setParts((prev) => prev.map((p, j) => (j === i ? v : p)))}
-              error={partProblems[i] ?? undefined}
-            />
+      <FormSection title="Chi phí">
+        <SummaryBlock
+          label="Phiếu nhập"
+          rows={[
+            { label: "Phiếu nhập", value: receipt.code, mono: true },
+            { label: "Nhà cung cấp", value: receipt.supplier_name },
+            { label: "Số lô nhận chi phí", value: String(targets.length), num: true },
+          ]}
+        />
+        <FormGrid>
+          <Field as="select" label="Loại chi phí" name="cost_type" required value={costType} onChange={setCostType} options={COST_TYPE_OPTIONS} error={sub.fieldErrors.cost_type} />
+          <Field label="Ngày phát sinh" name="incurred_date" type="date" required value={date} onChange={setDate} error={sub.fieldErrors.incurred_date} />
+          <Field label="Tổng chi phí" name="amount" type="money" required unit={CURRENCY_UNIT} value={amount} onChange={(v) => { setAmount(v); if (sub.failed) sub.reset(); }} error={amountError} />
+          <Field as="textarea" label="Ghi chú" name="note" value={note} onChange={setNote} maxLength={200} rows={2} />
+        </FormGrid>
+      </FormSection>
+      <FormSection title="Chia vào lô">
+        <RadioGroup label="Cách chia vào lô" name="allocation_method" value={method} onChange={(v) => setMethod(v as AllocationMethod)} options={METHOD_OPTIONS} />
+        <div className={s.allocTable} role="group" aria-label="Chia vào từng lô">
+          {targets.map((t, i) => (
+            <div key={t.batch} className={s.allocRow}>
+              <Field
+                label={`${t.batch_code} · ${t.item_name} · ${kg(t.qty)}`}
+                name={`alloc-${i}`}
+                type="money"
+                unit={CURRENCY_UNIT}
+                value={parts[i] ?? ""}
+                onChange={(v) => setParts((prev) => prev.map((p, j) => (j === i ? v : p)))}
+                error={partProblems[i] ?? undefined}
+              />
+            </div>
+          ))}
+          <div className={s.totalLine}>
+            <span>Tổng đã chia</span>
+            <strong className="num" data-testid="alloc-total">
+              {vnd(check.allocated)}
+            </strong>
           </div>
-        ))}
-        <div className={s.totalLine}>
-          <span>Tổng đã chia</span>
-          <strong className="num" data-testid="alloc-total">
-            {vnd(check.allocated)}
-          </strong>
         </div>
-      </div>
-      <Field as="textarea" label="Ghi chú" name="note" value={note} onChange={setNote} maxLength={200} rows={2} />
+      </FormSection>
     </FormPage>
   );
 }
