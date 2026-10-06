@@ -2380,3 +2380,33 @@ Trạng thái: code xong, đã commit trên nhánh wip/duy-quyet-03-10 (chưa me
 - Admin Django: `ReturnToStockAdmin.has_delete_permission` trả False (kể cả superuser, mất luôn action delete_selected). Test `apps/inventory/returns/tests/test_admin_no_hard_delete.py` (đỏ trước, xanh sau).
 - **Số chạy 06/10/2026 (sau `git merge main`, merge sạch không xung đột):** `manage.py test` toàn bộ = 2873 test, OK, 0 failure/error (backend/ trong worktree, python từ venv của repo chính, `.env` + `staticfiles/` copy từ repo chính vì worktree không có, cả hai bị gitignore). `makemigrations --check --dry-run` = "No changes detected". `check_naming.py` OK, không phát sinh mới. Kiểm bất biến: xoá mềm (không xoá dòng), `record_audit` chỉ ghi `{"status", "deleted": True}` (không chữ tự do/SĐT), timeline không chép `note`/`reason`, API trả `available_actions` không có giá vốn
 - **Sửa review techlead 06/10 (TL-D8-M1, L1, L2):** M1 đổi câu lỗi xoá phiếu đã duyệt (FE đổi theo contract, mã `RETURN_DELETE_NOT_ALLOWED` giữ nguyên, không làm đường đảo). L1 `delete_return`, `approve`, `cancel` bắt `DoesNotExist` khi phiếu vừa bị xoá song song → 409 `STALE_STATE`. L2 thêm test: approve/cancel/PATCH sau xoá = 404, xoá phiếu Nháp gỡ chặn chốt lô và AI safety. Số chạy: `manage.py test --parallel 4` = 2880 test OK; `makemigrations --check --dry-run` = No changes detected..
+
+## Sửa AuditLog.note chữ tự do (06/10)
+
+Mã: TL-D3-L4 / TL15-L5, bất biến 9 (`caveve-domain`). Màn Nhật ký ERP in nguyên văn `AuditLog.note`, nên chữ người dùng gõ tay (có thể có tên/SĐT người chuyển khoản hay khách) bị lộ. Nay Nhật ký chỉ ghi mã lý do, nhãn cố định hoặc "Có ghi chú (xem trên chứng từ gốc)". Chữ gốc vẫn nằm trên chứng từ (`PaymentTransaction.resolution_note`, `Refund.failure_reason`, `PurchaseCost.note`, `CustomerCall.note_text`...) với phân quyền riêng. Không đổi schema, không có migration.
+
+**Helper mới** `apps/common/audit.py`: `note_marker(text)` trả `NOTE_PRESENT_LABEL` nếu có chữ, `""` nếu không.
+
+**Điểm đã sửa**
+| File | Trước | Sau |
+|---|---|---|
+| `sales/payments/services.py` (attach_payment) | `note=note` | `note_marker(note)` |
+| `sales/payments/services.py` (resolve_payment ATTACH/CONFIRM) | `note=note` | `note_marker(note)` |
+| `sales/payments/services.py` (resolve_payment do hoàn tiền) | `note=p.resolution_note` (có mã GD hoàn người nhập) | "Hoàn tiền theo phiếu hoàn #id" |
+| `sales/refunds/services.py` (mark_refund_failed) | `note=reason` | `note_marker(reason)` |
+| `sales/orders/services.py` (cancel_paid_order) | `note=reason` ("nhãn — chữ tự gõ") | "Lý do: <nhãn của reason_code>" |
+| `delivery/confirmation/services.py` x3 (unconfirm, decide DELIVER_WITHOUT_CONFIRM, decide EXTEND) | `note=clean_reason` | `note_marker(clean_reason)` |
+| `ai/actions/services.py` (reject_ai_action) | `Lý do: {reason_code}` (lấy thẳng `request.data`) | `changes.has_reason_code` (bool) |
+
+**Ghi chú về điểm `purchasing/costs/services.py:83`**: dòng đó ghi `PurchaseCost.note` (chứng từ gốc), không ghi AuditLog, nên không sửa; test xác nhận không có AuditLog nào chứa chữ đó.
+
+**Đã rà, không phải chữ tự do (giữ nguyên)**: `content/entries` (`changes.reason` là mã chọn từ danh sách cố định BR-ND-15), `sales/payments/auto_confirm.py` (lý do do hệ thống sinh), `purchasing/receipts` (tên NCC, không phải khách), các `note` của AI/accounts/inventory (câu cố định hoặc mã, số kg, ngày).
+
+**Test**: `apps/common/tests/test_auditlog_note_no_free_text.py` (11 test; test quét có allowlist 2 file: content/entries và payments/auto_confirm): mỗi điểm sửa tạo thao tác với tên giả + SĐT giả rồi assert `note`/`changes`/`object_repr` không chứa chuỗi đó (đỏ trước khi sửa: 8 test), cộng test quét tĩnh bằng `ast` cho mọi lời gọi `record_audit(` ở `backend/apps` (chặn `note=` hoặc `changes["reason"|"note"]` lấy từ biến thô như `note`, `reason`, `clean_reason`...). Thêm `record_audit` mới với chữ tự do sẽ làm test quét đỏ.
+
+**Sửa test cũ**: `S12` (`test_s12_ac2_...`) và `test_cs07_ac8_...` đổi assert `note` sang nhãn cố định.
+
+**Nợ / cần Duy quyết**
+1. **Dữ liệu cũ vẫn còn chữ tự do** trong các dòng AuditLog đã ghi trước bản sửa (action `attach_payment`, `resolve_payment`, `mark_refund_failed`, `cancel_paid_order`, `delivery_unconfirmed`, `delivery_confirm_skipped`, `delivery_extended`, `reject_*`). Không sửa/xoá (AuditLog append-only). Đề xuất: (a) lúc đọc, API Nhật ký ẩn `note` của các action trên cho dòng tạo trước ngày deploy (không đụng DB); hoặc (b) một lệnh quản trị một lần ẩn danh hoá `note` cũ, Duy duyệt, chạy staging trước, ghi lại việc đó vào AuditLog. Khuyên (a), đảo ngược được.
+2. `staff_create` ghi `display_name` và `phone` của NHÂN VIÊN vào `changes` (`accounts/staff/services.py`, thuộc phần `accounts/` đang do agent khác sửa nên không đụng). Đó là dữ liệu cá nhân của nhân viên, không phải khách; hỏi Duy có cần che không.
+3. `changes.bank_txn_ref` (mã GD hoàn do Chủ nhập) vẫn vào Nhật ký vì là mã giao dịch; nếu Duy muốn chặt hơn thì che luôn.

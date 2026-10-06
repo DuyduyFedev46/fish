@@ -171,7 +171,8 @@ def reject_ai_action(*, action_id: str, user, reason_code: str = "", request=Non
         actor=user,
         actor_kind="user",
         proposal_ref=str(action.id),
-        note=f"Từ chối đề xuất AI {action.id}. Lý do: {reason_code or 'Không'}",
+        note=f"Từ chối đề xuất AI {action.id}",
+        changes={"has_reason_code": bool(reason_code)},
     )
 
     return {"outcome": "rejected", "action_id": str(action.id)}

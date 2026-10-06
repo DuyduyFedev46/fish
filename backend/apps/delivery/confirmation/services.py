@@ -12,7 +12,7 @@ from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 
-from apps.common.audit import record_audit
+from apps.common.audit import note_marker, record_audit
 from apps.common.exceptions import BusinessError, ConflictError
 from apps.common.formatting import format_local_time
 from apps.common.pii import has_long_digit_run, normalize_phone
@@ -387,7 +387,7 @@ def unconfirm(task_id: int, user, *, reason: str = "") -> tuple[DeliveryNote, Co
             actor=user,
             obj=note,
             changes={"status": {"from": "PREPARING", "to": "CONFIRMING"}},
-            note=clean_reason,
+            note=note_marker(clean_reason),
         )
 
         return note, task
@@ -573,7 +573,7 @@ def decide(
                 actor=user,
                 obj=note_obj,
                 changes={"decision": "DELIVER_WITHOUT_CONFIRM"},
-                note=clean_reason,
+                note=note_marker(clean_reason),
             )
             return {
                 "note_status": "PREPARING",
@@ -608,7 +608,7 @@ def decide(
                 actor=user,
                 obj=note_obj,
                 changes={"decision": "EXTEND", "until": until.isoformat()},
-                note=clean_reason,
+                note=note_marker(clean_reason),
             )
             return {
                 "note_status": "CONFIRMING",

@@ -19,7 +19,7 @@ from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 
-from apps.common.audit import record_audit
+from apps.common.audit import note_marker, record_audit
 from apps.common.exceptions import BusinessError
 
 from apps.inventory.batches import services as batches
@@ -571,7 +571,7 @@ def _attach_to_order(p, *, order, actor, note):
         return result
 
     record_audit(
-        "attach_payment", actor=actor, obj=p, note=note,
+        "attach_payment", actor=actor, obj=p, note=note_marker(note),
         changes={"order": order.code, "match_status": {"from": status.UNMATCHED, "to": p.match_status},
                  "paid_total": order_paid_total(order), "total_amount": order.total_amount},
     )
@@ -629,7 +629,7 @@ def _issue_and_close(order, payments, *, clicked, clicked_resolution, actor, not
         x.save(update_fields=["resolution_status", "resolution", "resolved_by",
                               "resolved_at", "resolution_note"])
         record_audit(
-            "resolve_payment", actor=actor, obj=x, note=note,
+            "resolve_payment", actor=actor, obj=x, note=note_marker(note),
             changes={
                 "resolution_status": {"from": PaymentTransaction.ResolutionStatus.OPEN,
                                       "to": x.resolution_status},
@@ -670,7 +670,7 @@ def mark_payment_refunded(*, payment, refund, actor):
     p.save(update_fields=["resolution_status", "resolution", "resolved_by",
                           "resolved_at", "resolution_note"])
     record_audit(
-        "resolve_payment", actor=actor, obj=p, note=p.resolution_note,
+        "resolve_payment", actor=actor, obj=p, note=f"Hoàn tiền theo phiếu hoàn #{refund.pk}",
         changes={
             "resolution_status": {"from": old, "to": p.resolution_status},
             "resolution": p.resolution,

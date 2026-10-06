@@ -399,7 +399,7 @@ def cancel_paid_order(*, order, actor, reason="", reason_code=""):
                 "stock_restored": stock_restored,
                 "reason_code": reason_code,
             },
-            note=reason,
+            note=f"Lý do: {CANCEL_REASON_LABELS.get(reason_code, 'Không rõ')}" if reason_code else "",
         )
         credit_note_services.issue_cancel_credit_note(
             invoice=invoice, actor=actor, reason_code=reason_code,
