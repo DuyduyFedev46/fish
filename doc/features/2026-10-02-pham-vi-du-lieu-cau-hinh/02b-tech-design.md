@@ -295,7 +295,7 @@ Chung mọi lô FE: **không đụng** `erp-console/shared/ui/**` (đợt sửa 
 | Lô | Story | Ai | File được sửa |
 |---|---|---|---|
 | 1 | PV-01 | BE | **chỉ thêm** `backend/apps/accounts/data_scopes/__init__.py`, `data_scopes/tests/**` (fixture, test, tệp mốc). Không sửa code sản phẩm. Commit riêng trước Lô 2 |
-| 2 | PV-02 | BE | `accounts/models.py`, `accounts/migrations/0014,0015`, `accounts/data_scopes/{catalog,resolver,services}.py`, `accounts/capabilities/{registry,services}.py` (bỏ dùng `GROUP_SCOPES`, thêm `version`, `data_scopes`, `data_scope_values`), tests |
+| 2 | PV-02 | BE | `accounts/models.py`, `accounts/migrations/0014,0015`, `accounts/data_scopes/{catalog,resolver,services}.py`, `accounts/capabilities/{registry,services}.py`, `accounts/staff/services.py` (gọi `resolver.forget`, duyệt 06/10) (bỏ dùng `GROUP_SCOPES`, thêm `version`, `data_scopes`, `data_scope_values`), tests |
 | F1 | PV-11, PV-09 FE, PV-10 FE (mock) | FE ∥ Lô 2–5 | `erp-console/features/permissions/**`, `erp-console/e2e/ed_batch14_permissions.py` |
 | 3 | PV-03, PV-07 | BE | `accounts/capabilities/registry.py` (V1, V2), `accounts/auth/services.py` (nhãn V2), `sales/models/orders.py`, `sales/migrations/0014,0015`, `sales/orders/{scope,api,serializers}.py`, `sales/payments/{invoice_list,serializers,api}.py`, `sales/refunds/{api,serializers}.py`, `sales/customers/permissions.py`, `delivery/pii_scope.py`, `reports/dashboard_api.py`, tests |
 | 4 | PV-04, PV-05, PV-06 | BE | `delivery/scope.py` (mới), `delivery/{api,next_steps}.py`, `delivery/confirmation/{scope,api,serializers}.py`, `inventory/returns/{scope,api,serializers}.py`, `sales/customers/{scope.py mới,api,directory_api,next_steps}.py`, `sales/orders/api.py` (lọc `?customer=`), `purchasing/receipts/{scope.py mới,api,services,next_steps}.py`, tests |
@@ -326,4 +326,4 @@ quan `row_version` cho mọi lần lưu của nhóm."
 
 ## 9. Review
 
-- 06/10 Lô 1–2 BE: **CHANGES REQUESTED** (H1 luật D7). Chi tiết ở `03b-review-techlead.md`.
+- 06/10 Lô 1–2 BE: CHANGES REQUESTED (H1 luật D7), sau d50d082 **APPROVED**. Chi tiết ở `03b-review-techlead.md`.
