@@ -368,6 +368,11 @@ def cancel_paid_order(*, order, actor, reason="", reason_code="", cancel_note=""
         raise BusinessError("Không ghi SĐT hay số tài khoản vào ghi chú huỷ.", code="BR-GH-19")
     with transaction.atomic():
         o = SalesOrder.objects.select_for_update().get(pk=order.pk)
+        if o.status == SalesOrder.Status.COMPLETED:
+            # W37 S2: đơn đã Hoàn tất (giao xong thắng cuộc đua) — không quay lui, chỉ còn phiếu hoàn.
+            raise BusinessError(
+                "Đơn đã giao hoàn tất — chỉ còn cách lập phiếu hoàn.", code="BR-GH-05",
+            )
         if o.status not in (SalesOrder.Status.PAID, SalesOrder.Status.PROCESSING):
             raise BusinessError("Chỉ huỷ được đơn đã thanh toán / đang xử lý (P-07).")
         invoice = getattr(o, "invoice", None)

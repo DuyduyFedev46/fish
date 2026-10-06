@@ -141,7 +141,8 @@ class S14CancelPaidOrderTests(OrderApiBase):
         self.assertEqual(resp.json()["code"], "BR-GH-05")
 
         order.refresh_from_db()
-        self.assertEqual(order.status, SalesOrder.Status.PROCESSING)
+        # W37 S1: giao xong phiếu cuối thì đơn đã Hoàn tất (trước đây kẹt PROCESSING).
+        self.assertEqual(order.status, SalesOrder.Status.COMPLETED)
         body = client_for(self.chu).get(f"/api/sales/orders/{order.pk}/").json()
         self.assertNotIn("cancel", body["available_actions"])
 
