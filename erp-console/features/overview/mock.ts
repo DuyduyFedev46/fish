@@ -5,6 +5,7 @@ import type { MockRequest, MockResponse } from "@/shared/lib/http";
 import { dashboardSummaryMockResponse } from "@/shared/lib/dashboardSummary.mock";
 import { MOCK_UNAUTHORIZED, mockRequireUser } from "@/features/auth/mock";
 import { mockExpiredOpenCount } from "@/features/inventory/mock";
+import { mockOrdersOverviewSlice } from "@/features/orders/mock";
 import { ROLE } from "@/shared/lib/roles";
 
 export function mockOverview(req: MockRequest): MockResponse {
@@ -15,7 +16,12 @@ export function mockOverview(req: MockRequest): MockResponse {
     can_cost: me.can_view_cost,
     can_view_dashboard: me.permissions.includes("reports.view_dashboard"),
   });
-  return res.status === 200 ? { ...res, body: withShopOrderCodes(res.body) } : res;
+  if (res.status !== 200) return res;
+  const body = withShopOrderCodes(res.body) as { kpis?: Record<string, unknown>; recent_orders?: unknown[] };
+  // S6-AC5/AC6: khi kho đơn mock đã có bộ mẫu hoặc đã nhận kết quả giao hàng, số đơn chưa xong và danh sách đơn gần đây lấy từ đó.
+  const slice = mockOrdersOverviewSlice();
+  if (!slice || !body.kpis) return { ...res, body };
+  return { ...res, body: { ...body, kpis: { ...body.kpis, pending_orders: slice.pending }, recent_orders: slice.recent } };
 }
 
 /**

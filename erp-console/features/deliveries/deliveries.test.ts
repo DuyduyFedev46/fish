@@ -10,7 +10,7 @@ import {
   mockPackDeliveryNote,
   mockPostDeliveryLabelPrint,
   mockPostDeliveryLabelVoid,
-  MOCK_DELIVERY_NOTES,
+  mockDeliveryNotes,
 } from "./mock";
 
 describe("Deliveries feature tests (CS-02, CS-03)", () => {
@@ -30,13 +30,13 @@ describe("Deliveries feature tests (CS-02, CS-03)", () => {
   });
 
   it("CS-02-AC2: PREPARING note shows printed=false when label not printed", () => {
-    const note = MOCK_DELIVERY_NOTES.find((n) => n.status === "PREPARING");
+    const note = mockDeliveryNotes().find((n) => n.status === "PREPARING");
     expect(note).toBeDefined();
     expect(note?.label.printed).toBe(false);
   });
 
   it("CS-02-AC3: CONFIRMING note has available_actions empty", () => {
-    const confNote = MOCK_DELIVERY_NOTES.find((n) => n.status === "CONFIRMING");
+    const confNote = mockDeliveryNotes().find((n) => n.status === "CONFIRMING");
     expect(confNote).toBeDefined();
     expect(confNote?.available_actions).toEqual([]);
   });
@@ -54,7 +54,7 @@ describe("Deliveries feature tests (CS-02, CS-03)", () => {
 
   it("CS-03-AC2: mockPackDeliveryNote marks note as READY", () => {
     // Clone note 31
-    const testNote = { ...MOCK_DELIVERY_NOTES.find((n) => n.id === 31)! };
+    const testNote = { ...mockDeliveryNotes().find((n) => n.id === 31)! };
     const originalStatus = testNote.status;
     expect(originalStatus).toBe("PREPARING");
 
@@ -75,7 +75,7 @@ describe("Deliveries feature tests (CS-02, CS-03)", () => {
   });
 
   it("X-AC3: No cost keys in mock delivery notes", () => {
-    for (const note of MOCK_DELIVERY_NOTES) {
+    for (const note of mockDeliveryNotes()) {
       const keys = Object.keys(note);
       expect(keys).not.toContain("unit_cost");
       expect(keys).not.toContain("purchase_rate");
@@ -104,7 +104,7 @@ describe("Deliveries feature tests (CS-02, CS-03)", () => {
           json: () =>
             Promise.resolve({
               count: 1,
-              results: [MOCK_DELIVERY_NOTES[0]],
+              results: [mockDeliveryNotes()[0]],
             }),
         })
       )
@@ -125,7 +125,7 @@ describe("Deliveries feature tests (CS-02, CS-03)", () => {
     expect((print2.body as any).print_no).toBe(2);
     expect((print2.body as any).is_reprint).toBe(true);
 
-    const note31 = MOCK_DELIVERY_NOTES.find((n) => n.id === 31)!;
+    const note31 = mockDeliveryNotes().find((n) => n.id === 31)!;
     expect(note31.label.to_void).toContain(1);
 
     const voidActive = mockPostDeliveryLabelVoid({ body: { print_no: 2 } }, 31);

@@ -47,6 +47,7 @@ import {
   holdInfo,
   orderActionPlan,
   orderPath,
+  refundSummaryLine,
   orderTimeline,
 } from "../orderDetailModel";
 import { refundableOfOrder } from "../refund";
@@ -126,6 +127,7 @@ function OrderDetailBody({ order: o, detail, renderAi }: { order: OrderDetail; d
   const beAiEnabled = me?.ai_features_enabled === true;
   const canOpenRefunds = canView(me, "refunds");
   const timeline = useMemo(() => orderTimeline(o, { canOpenRefund: canOpenRefunds }), [o, canOpenRefunds]);
+  const refundLine = refundSummaryLine(o.refund_summary);
   const path = orderPath({ status, deliveryStatus: o.delivery?.status ?? null, hasInvoice: !!o.invoice });
 
   // "Tiếp theo" của thanh trạng thái: lấy từ guidance, im lặng khi lỗi (thanh vẫn đủ nghĩa nếu thiếu dòng này).
@@ -260,6 +262,11 @@ function OrderDetailBody({ order: o, detail, renderAi }: { order: OrderDetail; d
                 Thử lại
               </button>
             </div>
+          )}
+          {refundLine && (
+            <p className={s.summaryLine} data-testid="order-refund-summary">
+              {refundLine}
+            </p>
           )}
           {suggest && hasRefund && (
             <div className={`alert-box warn ${s.suggest}`} role="status">
