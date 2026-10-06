@@ -50,7 +50,7 @@ class S6MeTests(TestCase):
             {"id", "username", "display_name", "phone", "groups", "permissions",
              "can_view_cost", "can_view_profit", "home",
              "group_labels", "capabilities",  # S47 chỉ thêm 2 key
-             "must_change_password"},  # S48 thêm 1 key
+             "must_change_password", "is_superuser"},  # S48 thêm 1 key; PV-14 thêm is_superuser
         )
 
     def test_s6_ac1_khong_co_ho_so_thi_display_name_la_username_phone_rong(self):

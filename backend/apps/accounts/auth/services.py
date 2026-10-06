@@ -125,6 +125,8 @@ def describe_user(user) -> dict:
         ],
         # S48 (BR-PQ-19): cờ hiệu lực — superuser luôn False.
         "must_change_password": must_change_password(user),
+        # PV-14 (review 07/10): FE phân biệt superuser không nhóm (không có phạm vi theo nhóm) với người thường.
+        "is_superuser": bool(user.is_superuser),
     }
 
 

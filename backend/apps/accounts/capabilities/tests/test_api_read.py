@@ -6,7 +6,7 @@ from apps.accounts.capabilities import registry
 from apps.accounts.models import StaffProfile
 from apps.common.tests.fixtures import client_for, make_user
 
-from .base import ALL_CODES, LIST_URL, detail_url, make_staff, put_url, token_client
+from .base import ALL_CODES, LIST_URL, detail_url, make_staff, put_url, token_client, put_caps
 
 LIST_KEYS = {"id", "code", "label", "member_count", "members", "can_view_cost",
              "last_changed_at", "last_changed_by", "capabilities", "version", "data_scope_values"}  # PV-02 thêm 2 khoá
@@ -155,19 +155,22 @@ class DynamicCustomerScopeTests(TestCase):
         self.assertEqual(self.customers_scope(roles.DELIVERY_STAFF), "Được gán")
         self.assertEqual(self.customers_scope(roles.WAREHOUSE_STAFF), "Không xem")
         for code in (roles.DELIVERY_STAFF, roles.WAREHOUSE_STAFF, roles.CUSTOMER_SERVICE):
-            response = self.client.put(put_url(code), {"capabilities": {"view_customers": True}}, format="json")
+            # PV-08 (PO-Q1): bật Xem khách hàng thì D7 khác "Không xem", gửi cùng lúc; mở thêm dữ liệu khách phải xác nhận.
+            response = put_caps(self.client, code, {"view_customers": True}, scopes={"customers": "all"},
+                                confirm_customer_data_widening=True)
             self.assertEqual(response.status_code, 200, code)
             self.assertEqual(response.json()["scopes"]["customers"], "Tất cả khách", code)
             self.assertEqual(self.customers_scope(code), "Tất cả khách", code)
 
     def test_ed39_scope_customers_reverts_after_owner_disables_view_customers(self):
-        self.client.put(put_url(roles.DELIVERY_STAFF), {"capabilities": {"view_customers": True}}, format="json")
-        self.client.put(put_url(roles.DELIVERY_STAFF), {"capabilities": {"view_customers": False}}, format="json")
+        put_caps(self.client, roles.DELIVERY_STAFF, {"view_customers": True}, scopes={"customers": "all"},
+                 confirm_customer_data_widening=True)
+        put_caps(self.client, roles.DELIVERY_STAFF, {"view_customers": False}, scopes={"customers": "assigned_deliveries"})
         self.assertEqual(self.customers_scope(roles.DELIVERY_STAFF), "Được gán")
 
     def test_ed39_scope_customers_none_when_manager_loses_view_customers(self):
         # Bảng cố định cũ ghi "Tất cả" cho Quản lý kể cả khi đã tắt quyền: sai.
-        self.client.put(put_url(roles.MANAGER), {"capabilities": {"view_customers": False}}, format="json")
+        put_caps(self.client, roles.MANAGER, {"view_customers": False})
         self.assertEqual(self.customers_scope(roles.MANAGER), "Không xem")
 
     def test_ed39_scope_customers_matches_directory_access(self):

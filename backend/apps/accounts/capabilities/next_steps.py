@@ -11,7 +11,7 @@ from django.contrib.auth.models import Group
 from apps.common.guidance.api import register_guidance
 from apps.common.guidance.audit_timeline import make_audit_timeline_provider
 
-from .services import ACTION_CHANGE_CAPABILITIES, capability_change_label
+from .services import ACTION_CHANGE_CAPABILITIES, ACTION_CHANGE_DATA_SCOPES, capability_change_label, scope_change_label
 
 register_guidance(
     "group",
@@ -20,6 +20,9 @@ register_guidance(
         "accounts.manage_staff",
         doc_type="group",
         code_fn=lambda group: group.name,
-        action_labels={ACTION_CHANGE_CAPABILITIES: capability_change_label},
+        action_labels={
+            ACTION_CHANGE_CAPABILITIES: capability_change_label,
+            ACTION_CHANGE_DATA_SCOPES: scope_change_label,
+        },
     ),
 )

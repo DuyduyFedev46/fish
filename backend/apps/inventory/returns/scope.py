@@ -19,9 +19,9 @@ def returns_scope_value(user) -> str:
     return resolve_data_scope(user, "returns")
 
 
-def scope_returns_for(user, queryset):
-    """`(user, queryset) -> queryset` — dạng `scope_fn` của `make_audit_timeline_provider`."""
-    if returns_scope_value(user) == ALL:
+def scope_returns_for(user, queryset, *, value=None):
+    """`(user, queryset) -> queryset` — dạng `scope_fn` của `make_audit_timeline_provider`. `value` để xem trước (PV-09)."""
+    if (value or returns_scope_value(user)) == ALL:
         return queryset
     return queryset.filter(delivery_note__assigned_to=user)
 
