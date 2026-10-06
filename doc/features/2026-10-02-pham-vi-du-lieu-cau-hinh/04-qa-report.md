@@ -276,3 +276,18 @@ Chủ, Quản lý, NV kho, NV giao (cả hai người), CSKH, K+G, superuser: **
 - Hồi quy: `reg.py` 1364 lời gọi (mỗi bên), `cmp.py` so thân JSON sau chuẩn hoá thời gian/mã ngẫu nhiên.
 - Kịch bản: `scen1.py` (54, Lô 4 mặc định), `scen2.py` (43, cửa sổ, D6 giờ VN, D5/D3/D4/D7 đổi qua PUT), `scen3.py` (N2), `scen4.py` (38, CAS + lỗi đầu vào + quyền), `scen5.py` (22), `scen6.py` (38, mock F1 + PO-Q1 + `/me` + AuditLog), `scen7.py` (C1 + phiếu đảo), cùng các lượt phụ (AI, hành động ghi ngoài phạm vi, nửa đêm). Chủ đổi cấu hình bằng `PUT /api/staff/groups/<code>/capabilities/` (đường thật); chỉ dùng `manage.py shell` để dựng dữ liệu (đổi `created_at`, gán phiếu, tạo phiếu đảo).
 - `manage.py test --parallel 4` toàn bộ: `Ran 3211 tests … OK (skipped=3)`. `test_group_save_scopes`, `test_query_budget_and_race`, `test_refunds_dashboard_scope`, `test_scope_snapshot`: 73 OK (skipped=1 là đua Postgres). `makemigrations --check --dry-run`: `No changes detected`. `check_naming.py`: chỉ file FE có sẵn từ main.
+
+### QA lại sau 36d9e8a (08/10)
+
+**Kết luận: APPROVED** (nghiệm thu kỹ thuật; merge vẫn chờ Duy D-3). B1 đã đóng, O1 và O4 đã xử lý. Chạy lại trên BE thật: hai `runserver` (mốc `151b56e` cổng 8811, nhánh cổng 8812), DB SQLite tạm, dữ liệu giả; đã tắt theo PID, xoá DB, gỡ symlink.
+**Tổng: 18 ca guidance ✅ 18, ❌ 0; hồi quy 1488 lời gọi; test toàn bộ 3213 OK (skipped=3); `makemigrations --check` không đổi.**
+
+| Ca | Kết quả | Bằng chứng |
+|---|---|---|
+| B1: Chủ thu hẹp D1 Quản lý, `GET /guidance/refund/<ngoài D1>/` | ✅ 404 (trước: 200); chi tiết phiếu hoàn cũng 404; phiếu trong D1 200; Chủ 200 |
+| Guidance ngoài phạm vi: `order` (D1), `delivery` (D3), `return` (D5), `receipt` (D6 hôm nay), `customer` (D7) | ✅ cả 5 đều 404; bản trong phạm vi đều 200 |
+| Guidance trong phạm vi không rò dữ liệu khách/giá vốn | ✅ |
+| Mặc định (D1 `all`): Quản lý guidance phiếu hoàn | ✅ vẫn 200, không đổi |
+| Hồi quy so với `151b56e`, 12 danh tính (thêm K+C của fixture `warehouse_service`) | ✅ K+C (`warehouse_service` và tài khoản K+C của QA) chỉ lệch ở gọi xác nhận (`?state=DONE` 13 dòng `in_scope` true→false, chi tiết 404, tìm xác nhận chỉ còn `phone_masked`) và `is_superuser`; đúng 8 endpoint `warehouse_service` mà `PENDING_DUY_DIFFS` liệt kê. Người không nhóm vẫn chỉ các lệch thu hẹp cũ. Chủ, Quản lý, NV kho, NV giao, CSKH, K+G, superuser: chỉ `is_superuser` |
+
+Còn mở (không chặn): D-3 của Duy cho người không nhóm và K+C (`PENDING_DUY_DIFFS` còn mục, không merge main khi chưa trả lời); ⏸ đua PV-10-AC5 chỉ kiểm được trên Postgres.
