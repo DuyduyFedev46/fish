@@ -76,10 +76,6 @@ def sweep(browser, user, be_ai_on):
         page.wait_for_load_state("networkidle")
         page.wait_for_timeout(250)
         words = ai_words(page)
-        if words and route.startswith("/permissions/") and not visible:
-            # Nợ đã ghi: features/permissions/mock.ts (Lô F1, không sửa ở lô này) còn dòng "ai_policy". BE thật đã ẩn (02b 2.2), E1 thật phải sạch.
-            print(f"NỢ  [{label}] {route}: mock phân quyền còn chữ AI {words[:1]}", flush=True)
-            continue
         if words:
             found[route] = words[:2]
         if route.startswith("/ai/") and not visible:

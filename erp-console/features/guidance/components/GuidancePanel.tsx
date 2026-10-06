@@ -18,6 +18,7 @@ import { Icon } from "@/shared/ui/Icon";
 import { getGuidance } from "../api";
 import type { GuidanceData, GuidanceNextStep, GuidanceTimelineEntry } from "../types";
 import GuidanceEscalate from "./GuidanceEscalate";
+import { isAiTimelineEntry } from "../detailAdapters";
 import { aiVisible } from "@/shared/lib/features";
 import { useAuth } from "@/features/auth/components/AuthProvider";
 import { useAiEnabledAndConsented } from "@/features/ai/gate-state";
@@ -237,7 +238,9 @@ function StepItem({
 }
 
 /** Component hiển thị timeline từ guidance có hỗ trợ tag doc và hiển thị AI actor (L-4). */
-export function GuidanceTimelineView({ entries }: { entries: GuidanceTimelineEntry[] }) {
+export function GuidanceTimelineView({ entries: allEntries }: { entries: GuidanceTimelineEntry[] }) {
+  const { me } = useAuth();
+  const entries = aiVisible(me) ? allEntries : (allEntries ?? []).filter((e) => !isAiTimelineEntry(e));
   if (!entries || entries.length === 0) {
     return <p className={s.nil}>Chưa có lịch sử sự kiện.</p>;
   }

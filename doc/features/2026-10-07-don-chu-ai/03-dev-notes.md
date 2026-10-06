@@ -32,6 +32,8 @@ E2 `frontend/e2e/order_lookup_no_raw_codes.py`: 19/19. E3 `erp-console/e2e/note_
 
 **Sửa theo review (3 việc Low).** L1: harness batch2 có stub `AuthProvider` (alias trong `vite.config.mjs`). L2: xoá code chết `byAi` (Timeline.tsx, Timeline.module.css `.ai`, detailAdapters.ts và test). L3: `OrderDetailScreen` đổi biến thành `beAiEnabled`.
 
+**Sửa B1 của QA (ca W39: BE bật, FE tắt).** Khi `!aiVisible(me)`: `<Timeline/>` và `GuidanceTimelineView` bỏ dòng do AI làm (`actor.kind=ai`, dòng Hệ thống có `proposal_ref`, hoặc tên người làm "AI của …" ở dòng thời gian đơn, vì API đơn không trả `actor_kind`); `/account/` bỏ capability `ai.*`; ma trận `/permissions/` (danh sách và chi tiết) bỏ khoá `ai_policy` qua `visibleRegistry` (chỉ chỗ lọc hiển thị, F1 giữ nguyên phần còn lại). Mock thêm dòng thời gian AI (guidance, đơn) và capability `ai.manage_ai_policy`. E1 không còn dòng "NỢ" cho `/permissions/`.
+
 ## BE (be-dev, nhánh `feat/don-chu-ai-be`)
 
 ### File đã sửa/thêm (đúng danh sách 02b mục 4)

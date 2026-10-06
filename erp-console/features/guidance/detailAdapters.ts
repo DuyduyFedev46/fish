@@ -3,6 +3,11 @@
 import type { TimelineEntry } from "@/shared/ui/detail/Timeline";
 import type { GuidanceData, GuidanceTimelineEntry } from "./types";
 
+/** Dòng do AI làm, hoặc dòng Hệ thống chạy theo đề xuất AI (`proposal_ref`). Khi giao diện AI tắt, `<Timeline/>` bỏ các dòng này. */
+export function isAiTimelineEntry(e: Pick<GuidanceTimelineEntry, "actor" | "proposal_ref">): boolean {
+  return e.actor?.kind === "ai" || (e.actor?.kind === "system" && Boolean(e.proposal_ref));
+}
+
 /** Dòng thời gian của guidance → dòng của <Timeline/>. Mới nhất trước (BE trả cũ → mới thì đảo lại). */
 export function toTimelineEntries(entries: GuidanceTimelineEntry[] | null | undefined): TimelineEntry[] {
   return [...(entries ?? [])]
@@ -11,6 +16,7 @@ export function toTimelineEntries(entries: GuidanceTimelineEntry[] | null | unde
       at: e.at,
       label: e.label,
       actor: e.actor?.display || undefined,
+      ai: isAiTimelineEntry(e) || undefined,
     }));
 }
 

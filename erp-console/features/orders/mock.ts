@@ -538,6 +538,8 @@ function timelineOf(o: Order): OrderTimelineEntry[] {
       actor_display: p.source === "MANUAL" ? p.actor || SYSTEM : SYSTEM,
     });
   });
+  // W39: dòng do AI làm (BE bật AI mới trả; giao diện tắt thì FE phải ẩn).
+  out.push({ at: at(o.created_at, 1), kind: "ai_proposal_confirmed", label: "Duyệt đề xuất của trợ lý", actor_display: "AI của owner1" });
   if (o.invoice) out.push({ at: o.invoice.issued_at, kind: "invoice_issued", label: `Xuất hoá đơn ${o.invoice.code}`, actor_display: SYSTEM });
   const d = o.delivery;
   if (d && o.invoice) {

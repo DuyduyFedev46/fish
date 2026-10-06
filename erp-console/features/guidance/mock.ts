@@ -6,6 +6,15 @@ import { mockExpiredBatchGuidance } from "@/features/inventory/mock";
 import { aiEnabled as mockAiEnabled } from "@/features/ai/mock";
 import type { GuidanceData } from "./types";
 
+/** W39: một dòng do AI làm trong mọi dòng thời gian mock, để e2e bắt được ca "BE bật, giao diện AI tắt". */
+const AI_TIMELINE_ENTRY = {
+  at: new Date(Date.now() - 25 * 60 * 1000).toISOString(),
+  kind: "ai_proposal_confirmed",
+  label: "Duyệt đề xuất của trợ lý",
+  doc: "",
+  actor: { kind: "ai" as const, display: "AI của owner1" },
+};
+
 // F6-1: bước người dùng chưa được phép (viewer thiếu quyền) để màn hiện nút "Nhờ" (DW-23). Chỉ dùng cho mock/e2e.
 function ownerOnlyStep(key: string, label: string, br: string, text: string) {
   return {
@@ -122,6 +131,7 @@ export function mockGuidanceApi(req: MockRequest): MockResponse {
           ],
       warnings: [],
       timeline: [
+        AI_TIMELINE_ENTRY,
         {
           at: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
           kind: "order_placed",
@@ -214,6 +224,7 @@ export function mockGuidanceApi(req: MockRequest): MockResponse {
         },
       ],
       timeline: [
+        AI_TIMELINE_ENTRY,
         {
           at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
           kind: "refund_created",
@@ -274,6 +285,7 @@ export function mockGuidanceApi(req: MockRequest): MockResponse {
       ],
       warnings: [],
       timeline: [
+        AI_TIMELINE_ENTRY,
         {
           at: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
           kind: "payment_received",
@@ -343,6 +355,7 @@ export function mockGuidanceApi(req: MockRequest): MockResponse {
         },
       ],
       timeline: [
+        AI_TIMELINE_ENTRY,
         {
           at: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
           kind: "batch_created",
@@ -374,6 +387,7 @@ export function mockGuidanceApi(req: MockRequest): MockResponse {
       next_steps: [],
       warnings: [],
       timeline: [
+        AI_TIMELINE_ENTRY,
         { at: "2026-09-28T01:05:00Z", kind: "create", label: "Hệ thống tạo phiếu giao", doc: "", actor: { kind: "system", display: "Hệ thống" } },
         { at: "2026-09-28T01:40:00Z", kind: "confirm", label: "Xác nhận đơn với khách", doc: "", actor: { kind: "user", display: "Chị Hạnh" } },
         { at: "2026-09-28T02:10:00Z", kind: "label", label: "In tem giao", doc: "", actor: { kind: "user", display: "Anh Tín" } },

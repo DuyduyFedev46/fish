@@ -256,6 +256,7 @@ const CAPABILITIES: [string, string][] = [
   ["inventory.view_costprice", "Xem giá vốn"],
   ["reports.view_profitreport", "Xem báo cáo lãi lỗ"],
   ["reports.view_dashboard", "Xem Tổng quan"],
+  ["ai.manage_ai_policy", "Quản lý chính sách AI"],
 ];
 
 const GROUP_ORDER: readonly string[] = GROUP_CODES;
