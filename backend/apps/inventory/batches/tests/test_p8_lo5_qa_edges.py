@@ -43,7 +43,17 @@ REFUND = "1234567"           # tiền NCC hoàn giả — dò rò
 PII_NAME = "Khách Giả Năm"
 PII_PHONE = "0900000456"
 PII_ADDR = "Số 5 Đường Giả"
-RECENT_KEYS = {"code", "amount", "status", "status_label", "expires_at"}
+
+
+def _without_ids(value):
+    if isinstance(value, dict):
+        return {k: _without_ids(v) for k, v in value.items() if k != "id"}
+    if isinstance(value, list):
+        return [_without_ids(v) for v in value]
+    return value
+
+
+RECENT_KEYS = {"id", "code", "amount", "status", "status_label", "expires_at", "reason"}  # Lô 17a (TL15-dash)
 
 
 class Base(OrderApiBase):
@@ -624,7 +634,8 @@ class QaDashboardPiiTests(Base):
             self.assertGreaterEqual(len(data["recent_orders"]), 2, name)
             for row in data["recent_orders"]:
                 self.assertEqual(set(row), RECENT_KEYS, name)
-            raw = r.content.decode()
+            # Lô 17a: `id` là số tự tăng, có thể chứa "0456"/"0789" tình cờ → bỏ `id` trước khi dò chuỗi giả của PII.
+            raw = json.dumps(_without_ids(data), ensure_ascii=False)
             for s in (PII_NAME, "Khách Giả Sáu", PII_PHONE, "0900000789", "0456", "0789", PII_ADDR, "NGUYEN VAN GIA",
                       "phone_last4", '"customer"', "delivery_address", "recipient"):
                 self.assertNotIn(s, raw, (name, s))
