@@ -74,6 +74,8 @@ CAPABILITY_LABELS = {
     "delivery.assign_deliverynote": "Giao hoặc đổi người giao của phiếu giao",
     # B2 (ERP theo design, Lô 6): chu + quan_ly. Khác `sales.view_customer` (Tầng 1, phạm vi dòng của NV giao).
     "sales.view_customer_list": "Xem khách hàng",
+    # PV-07 (2026-10-02-pham-vi-du-lieu-cau-hinh): việc V2, cấp cho 5 nhóm (Q-4).
+    "sales.view_order_customer_info": "Xem thông tin khách trên đơn & hoá đơn",
 }
 
 AUTH_OLD_PASSWORD = "AUTH_OLD_PASSWORD"

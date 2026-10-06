@@ -22,7 +22,6 @@ from apps.common.api import (
     BusinessModelPermissions,
     NoStoreMixin,
     StandardPagination,
-    has_full_delivery_scope,
     require_perm,
 )
 from apps.common.exceptions import BusinessError
@@ -34,7 +33,9 @@ from apps.sales.payments import services as payment_services
 from apps.sales.utils import ZERO, fold_text, money_str
 
 from . import services
-from .scope import can_filter_orders_by_customer, scope_orders_for
+from apps.sales.customers.permissions import can_view_order_customer_info
+
+from .scope import ALL, can_filter_orders_by_customer, orders_scope_value, scope_orders_for
 from .serializers import SalesOrderDetailSerializer, SalesOrderListSerializer
 
 INVALID_FILTER = "INVALID_FILTER"
@@ -108,12 +109,13 @@ class SalesOrderViewSet(NoStoreMixin, AiDeclarable, viewsets.ReadOnlyModelViewSe
                 "invoice__delivery_notes__assigned_to__staff_profile",
                 "invoice__delivery_notes__returns",
             )
-        # S5 / BR-PQ-12 (nv_giao) và CS-01 / BR-GH-18 (cskh): phạm vi dòng dùng chung, xem scope.py.
+        # PV-03: phạm vi dòng dùng chung, lấy từ cấu hình D1 của nhóm, xem scope.py.
         user = self.request.user
-        qs = scope_orders_for(user, qs)
-        if not has_full_delivery_scope(user):
+        value = orders_scope_value(user)
+        qs = scope_orders_for(user, qs, value=value)
+        if value != ALL:
             # SR-PII-02: đơn của phiếu đã kết thúc quá cửa sổ thì serializer ẩn dữ liệu khách.
-            qs = annotate_order_pii_visible(user, qs)
+            qs = annotate_order_pii_visible(user, qs, value=value)
         return qs
 
     def list(self, request, *args, **kwargs):
@@ -122,7 +124,9 @@ class SalesOrderViewSet(NoStoreMixin, AiDeclarable, viewsets.ReadOnlyModelViewSe
             raise PermissionDenied("Thiếu quyền xem khách hàng.")
         try:
             self.queryset_filters = self._filters(
-                request.query_params, restrict_customer_search=not has_full_delivery_scope(request.user)
+                request.query_params,
+                restrict_customer_search=orders_scope_value(request.user) != ALL,
+                allow_customer_search=can_view_order_customer_info(request.user),
             )
         except InvalidFilter as exc:
             return Response({"detail": str(exc), "code": INVALID_FILTER}, status=400)
@@ -135,11 +139,12 @@ class SalesOrderViewSet(NoStoreMixin, AiDeclarable, viewsets.ReadOnlyModelViewSe
         return queryset
 
     @staticmethod
-    def _filters(params, *, restrict_customer_search=False):
+    def _filters(params, *, restrict_customer_search=False, allow_customer_search=True):
         """UC-02: lọc trạng thái (nhiều, cách dấu phẩy), theo ngày tạo (giờ VN), tìm mã đơn/SĐT/tên khách.
 
         `restrict_customer_search` (SR-PII-02): tìm theo SĐT/tên chỉ khớp đơn mà người gọi còn được xem dữ liệu
-        khách (`pii_visible`), để không dò ra SĐT của đơn đã quá cửa sổ. Tìm theo mã đơn không bị giới hạn."""
+        khách (`pii_visible`), để không dò ra SĐT của đơn đã quá cửa sổ. Tìm theo mã đơn không bị giới hạn.
+        `allow_customer_search` = có V2 (PV-07): thiếu thì chỉ tìm theo mã đơn, để không dò tên/SĐT khi ô khách bị che."""
         cond = Q()
         statuses = [s.strip() for s in params.get("status", "").split(",") if s.strip()]
         if statuses:
@@ -159,13 +164,16 @@ class SalesOrderViewSet(NoStoreMixin, AiDeclarable, viewsets.ReadOnlyModelViewSe
             ))
         q = params.get("q", "").strip()
         if q:
-            by_customer = (
-                Q(phone__contains=q) | Q(customer__phone__contains=q)
-                | Q(customer_id__in=_customer_ids_by_name(q))
-            )
-            if restrict_customer_search:
-                by_customer &= Q(pii_visible=True)
-            cond &= Q(code__icontains=q) | by_customer
+            matches = Q(code__icontains=q)
+            if allow_customer_search:
+                by_customer = (
+                    Q(phone__contains=q) | Q(customer__phone__contains=q)
+                    | Q(customer_id__in=_customer_ids_by_name(q))
+                )
+                if restrict_customer_search:
+                    by_customer &= Q(pii_visible=True)
+                matches |= by_customer
+            cond &= matches
         return cond
 
     @action(detail=True, methods=["post"], required_perms=("sales.cancel_paid_order",))

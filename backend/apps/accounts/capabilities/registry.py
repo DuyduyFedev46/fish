@@ -40,7 +40,15 @@ class Capability:
 CAPABILITIES = (
     # Bán hàng
     Capability("view_orders", "Xem đơn", SECTION_SALES, ("sales.view_salesorder", "sales.view_salesorderline")),
+    Capability(
+        "view_sales_invoices", "Xem hoá đơn bán", SECTION_SALES,
+        ("sales.view_salesinvoice", "sales.view_salesinvoiceline"),
+    ),
     Capability("view_customers", "Xem khách hàng", SECTION_SALES, ("sales.view_customer_list",)),
+    Capability(
+        "view_order_customer_info", "Xem thông tin khách trên đơn & hoá đơn", SECTION_SALES,
+        ("sales.view_order_customer_info",),
+    ),
     Capability(
         "confirm_calls", "Gọi xác nhận đơn", SECTION_SALES,
         ("delivery.confirm_with_customer", "delivery.change_recipient"),

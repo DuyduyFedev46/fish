@@ -28,7 +28,7 @@ class SalesInvoiceViewSet(NoStoreMixin, viewsets.ReadOnlyModelViewSet):
     R13: `GET /api/sales/invoices/?status=ISSUED[,CANCELLED]&date_from=&date_to=&q=&page=` (20 dòng/trang) trả
     `{"count","next","previous","results":[…],"totals":{"amount","gross_profit"}}`. `cogs`, `gross_profit` (dòng và
     tổng) chỉ khi có `view_costprice`. Có tên khách nên mọi response `no-store`; hoá đơn lọc theo phạm vi dòng.
-    `customer_name` chỉ có giá trị khi người gọi có `sales.view_customer_list` (M1); người khác nhận null.
+    `customer_name` chỉ có giá trị khi người gọi có V2 `sales.view_order_customer_info` (PV-07) và đơn còn trong cửa sổ; không thì null kèm `customer_hidden_reason`.
     `GET …/{id}/` giữ serializer cũ.
     """
 

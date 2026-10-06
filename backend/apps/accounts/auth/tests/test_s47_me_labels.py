@@ -61,6 +61,7 @@ class S47MeLabelsTests(TestCase):
                 "sales.view_privacy_consent",
                 "delivery.assign_deliverynote",
                 "sales.view_customer_list",
+                "sales.view_order_customer_info",  # PV-07: V2 cấp cho cả 5 nhóm
             ],
         )
         self.assertIs(body["can_view_cost"], False)
@@ -85,7 +86,11 @@ class S47MeLabelsTests(TestCase):
 
     def test_s47_ac1_nv_giao_khong_co_viec_tang_2(self):
         body = client_for(make_user("giao1", roles.DELIVERY_STAFF)).get(URL).json()
-        self.assertEqual(body["capabilities"], [])
+        # PV-07: V2 cấp cho cả 5 nhóm (Q-4), nên NV giao có đúng một việc Tầng 2 này.
+        self.assertEqual(
+            body["capabilities"],
+            [{"code": "sales.view_order_customer_info", "label": "Xem thông tin khách trên đơn & hoá đơn"}],
+        )
 
     def test_s47_capabilities_la_tap_con_cua_permissions(self):
         for user in (make_user("loc", roles.OWNER), make_user("ql1", roles.MANAGER),

@@ -72,6 +72,84 @@ Test mốc Lô 1 (`test_scope_snapshot`, 9 test) xanh nguyên sau Lô 2 mà khô
 - `backend/README.md` và `apps/accounts/README.md` chưa cập nhật bản đồ module (ngoài danh sách file của 02b); đã có `data_scopes/README.md`.
 - Môi trường worktree: thư mục `.claude/worktrees/pham-vi/backend/` không có `.env` và `staticfiles/` (gitignored), nên tôi tạo hai symlink tới bản ở `backend/` chính để chạy test (33 test admin lỗi manifest nếu thiếu `staticfiles`). Symlink không được commit.
 
+## Lô 3 — PV-03, PV-07 (đơn, hoá đơn đọc phạm vi cấu hình; việc V1, V2)
+
+> be-dev · 2026-10-07 · nhánh `feat/pham-vi-du-lieu` (đã `git merge main` lên `7110254`). Số migration sales là **0015, 0016**
+> (02b ghi 0014/0015 là số cũ, vì main đã có `sales/0014_salesorder_cancel_note`).
+
+### File đã sửa / thêm
+- Registry: `accounts/capabilities/registry.py` thêm `view_sales_invoices` (V1, perms `sales.view_salesinvoice` + `sales.view_salesinvoiceline`) và
+  `view_order_customer_info` (V2, perm `sales.view_order_customer_info`), cả hai mục "Bán hàng", không `owner_only`, perms rời nhau.
+  `accounts/auth/services.py`: nhãn `CAPABILITY_LABELS` cho V2.
+- Model + migration: `sales/models/orders.py` (permission mới trong `SalesOrder.Meta`),
+  `sales/migrations/0015_salesorder_view_order_customer_info.py` (AlterModelOptions, tự sinh),
+  `sales/migrations/0016_grant_view_order_customer_info.py` (data, cấp V2 cho `owner`, `manager`, `warehouse_staff`, `delivery_staff`, `customer_service`;
+  lùi = gỡ khỏi 5 nhóm; mẫu `sales/0013`). V1 không cần migration.
+- Phạm vi: `sales/orders/scope.py` (`scope_orders_for(user, qs, *, value=None)`, `orders_scope_value`), `delivery/pii_scope.py`
+  (`annotate_order_pii_visible(user, qs, *, value, now=None)`: nhánh gọi xác nhận chỉ khi `value == "assigned_or_confirmation"`),
+  `sales/orders/api.py`, `sales/orders/serializers.py`, `sales/payments/{invoice_list,serializers,api}.py`, `sales/refunds/serializers.py`,
+  `sales/customers/permissions.py` (`can_view_order_customer_info`, `customer_hidden_reason`).
+- Test mới: `accounts/data_scopes/tests/test_orders_invoices_scope.py` (35 test, dùng lại dữ liệu giả của PV-01). Test cũ phải sửa vì hợp đồng đổi có chủ ý:
+  `sales/orders/tests/test_s10_api.py` (thêm khoá), `sales/payments/tests/test_invoice_list.py` (thêm khoá; test M1 viết lại theo V2),
+  `common/tests/test_auditlog_note_no_free_text.py` (serializer không có người gọi thì che), `accounts/auth/tests/test_s47_me_labels.py` (V2 nằm trong danh sách việc Tầng 2 của mọi nhóm),
+  `delivery/tests/test_confirmation_role_scope.py` (CSKH có thêm V2).
+
+### Hành vi
+- **Một hàm cho đơn:** `scope_orders_for` đọc D1 qua `resolve_data_scope` (không còn `has_full_delivery_scope`/`is_customer_service` ở đường đơn). `all` → qs;
+  `assigned_deliveries` → phiếu gán cho tôi; `assigned_or_confirmation` → thêm đơn trong phạm vi gọi xác nhận. Danh sách, chi tiết, tổng, `?q=`,
+  "Tiếp theo · Đã làm" (`orders/next_steps.py`), lệnh "Nhờ" và AI (gọi lại view DRF) đều đi qua đây. Ngoài phạm vi: 404 (S-7).
+- **Hoá đơn:** `scope_invoices_for` dùng D2 (= D1 của chính nhóm có `view_salesinvoice`), nên Q-7 giữ: V1 bật, `view_orders` tắt, D1 = `assigned_deliveries` vẫn 200 theo D1.
+  `build_totals` dùng cùng queryset nên tổng chỉ tính hoá đơn trong phạm vi.
+- **Che ô khách (V2 + cửa sổ):** `customer_hidden_reason(user, obj)` = `"not_permitted"` (thiếu V2) trước `"expired"` (`pii_visible=False`) rồi `null`.
+  Khoá `customer_hidden_reason` mới (chỉ thêm) ở danh sách đơn, chi tiết đơn (cấp trên cùng), danh sách hoá đơn, phiếu hoàn tiền. Khi che: tên/SĐT/địa chỉ = `null`,
+  `cancel_note = ""` (giữ luật cũ, nay che cả khi thiếu V2). Serializer không có `request` (không có người gọi) thì mặc định che.
+- **`?q=`:** thiếu V2 thì chỉ tìm theo mã đơn (không dò SĐT/tên). Khi D1 ≠ `all` giữ ràng buộc `pii_visible`.
+- **Phiếu hoàn tiền:** tên/SĐT theo V2 (D-1: V2 gồm phiếu hoàn). Khi che, `customer_name`/`customer_phone` = `null` (trước đây chuỗi rỗng khi không có đơn).
+- **Dòng `invoices` ở `GET /api/staff/groups/<code>/`:** `gate_capability` nay là `"view_sales_invoices"` (test `test_pv07_invoices_row_gate_capability_is_registry_key`).
+
+### JSON mẫu (chỉ thêm khoá)
+```json
+// GET /api/sales/orders/ (một dòng) khi nhóm thiếu V2
+{"id": 7, "code": "SO-PV-04", "status": "PROCESSING", "customer_name": null, "customer_phone": null,
+ "total_amount": "100000", "customer_hidden_reason": "not_permitted", "...": "..."}
+// GET /api/sales/orders/<id>/ khi phiếu đã kết thúc quá 7 ngày (G có V2, D1 = assigned_deliveries)
+{"customer": {"name": null, "phone": null, "address": null}, "customer_hidden_reason": "expired", "cancel_note": "", "...": "..."}
+// GET /api/sales/invoices/ (một dòng)
+{"id": 3, "code": "INV-PV-04", "order_code": "SO-PV-04", "customer_name": "…hoặc null", "customer_hidden_reason": null, "amount": "100000"}
+```
+Khoá việc cho `PUT /api/staff/groups/<code>/capabilities/`: `view_sales_invoices`, `view_order_customer_info` (02b không đặt tên khoá V2; tôi chọn theo tên permission).
+
+### Rule BR đã cài
+BR-PQ-33/35 (đơn, hoá đơn đọc cấu hình, một hàm cho mọi đường), BR-PQ-34 (cổng quyền Tầng 1 vẫn trước: `all` + tắt `view_orders` → 403), BR-PQ-36 (đổi cấu hình hiệu lực ở request kế),
+BR-PQ-37 (V1, hoá đơn theo D2), BR-PQ-38 (V2), SR-PII-02 (cửa sổ chỉ khi phạm vi ≠ `all`), S-1/bất biến 1 (test không có `unit_cost`/`cogs`/`gross_profit` cho NV kho, NV giao), bất biến 9 (test không tên/SĐT/địa chỉ giả khi che, tra đơn công khai không đổi).
+
+### Lệch so với 02b (cần techlead biết)
+1. **Migration đánh số 0015, 0016** thay vì 0014, 0015 (main đã có 0014).
+2. **Hoãn hai cửa phụ của §1.5: phạm vi D1 cho phiếu hoàn tiền (`refunds/api.py::get_queryset`) và dashboard (`reports/dashboard_api.py`).** Tôi đã cài và test xanh, nhưng khi chạy mốc PV-01 thì
+   **người không nhóm có quyền gán trực tiếp (`direct_permissions`)** đổi hành vi (dashboard: 15 → 1 đơn chờ, doanh thu 200000 → 0, mất 10 dòng; phiếu hoàn: 200 → 404, mất 2 phiếu). Đúng R9/D-3, mà rule giao việc cấm thêm
+   `APPROVED_DIFFS` cho `direct_permissions`, nên tôi gỡ hai phần này (git checkout), KHÔNG để lại code lửng. Hiện: tên/SĐT trên phiếu hoàn đã theo V2, nhưng **dòng** phiếu hoàn và số liệu dashboard vẫn chưa theo D1.
+   Với mặc định (Chủ, Quản lý, NV kho = `all`) không có khác biệt; chỉ hở khi Chủ thu hẹp D1 của nhóm có `view_refund`/`view_dashboard`. Cần Duy trả lời D-3 (hoặc điều phối viên duyệt diff `direct_permissions` cho hai endpoint này) rồi làm tiếp ở Lô 4 hoặc 5.
+3. **`APPROVED_DIFFS` có hai mục** (02b: một mục): thêm `("warehouse_courier", "invoices.list", "+", "pii:*:customer_name")`. Người kiêm nhiệm NV kho + NV giao có V2 qua nhóm NV kho và D2 = `all` như NV kho, nên cùng ngoại lệ Q-4. Test PV-01-AC3 sửa
+   thành kiểm đúng hai mục và không có mục nào cho `direct_permissions`.
+4. **Fixture PV-01: `DIRECT_PERMISSIONS` thêm `sales.view_order_customer_info`** (V2 gán trực tiếp). V2 chỉ được migration cấp cho 5 nhóm; người không nhóm đang xem tên khách trên đơn hôm nay sẽ **mất** tên cho tới khi Chủ cấp V2 cho họ. Đây là
+   hệ quả R9/D-3 của 02b "V2 = `user.has_perm`", không phải ngoại lệ được duyệt: đếm trên production trước deploy (D-3), nếu > 0 thì hỏi Duy từng người hoặc cấp V2 trực tiếp cho họ.
+5. **`apps/ai/policy/rules.py` (ngoài danh sách file của Lô 3): thêm `customer_hidden_reason` vào `SCRUB_PII_KEYS`.** Khoá mới làm mỗi dòng dài hơn nên lệnh AI đọc đơn bị cắt `AI_RESULT_MAX_CHARS` mất một dòng (mốc `ai.orders_list` của Chủ, Quản lý, NV kho, superuser mất `visible:order_assigned_other`).
+   Bỏ khoá này khỏi kết quả AI giữ nguyên đầu ra AI (AI không cần cờ này).
+6. **Khoá `customer_hidden_reason` ở phiếu hoàn tiền** kèm `customer_name`/`customer_phone` thành `null` khi che: FE (Lô 7) cần chịu `null` ở ô này (trước là chuỗi).
+
+### Kiểm chứng Lô 3 (chạy trong lượt làm)
+- Trước Lô 3 (sau merge main): 3022 test OK. Sau Lô 3: `manage.py test` toàn bộ **3057 test, OK** (+35 mới, 0 failure, 0 error). Mốc PV-01 (10 test) xanh.
+- `makemigrations --check --dry-run`: `No changes detected`. `check_naming.py`: không có vi phạm ở file của Lô 3 (chỉ 2 file FE từ main).
+
+### Số truy vấn (R8)
+Test `QueryBudgetTests`: danh sách đơn (NV giao) và danh sách hoá đơn (NV kho) tăng tối đa 3 truy vấn so với khi giả lập resolver trả hằng (phân giải nhớ trên user, gọi nhiều lần vẫn 1 lần).
+
+### Việc còn nợ / chuyển lô
+- Hai cửa phụ hoãn ở mục 2 (refunds, dashboard) chờ D-3.
+- Lô 4 sẽ bỏ `has_full_delivery_scope` ở delivery, returns, confirmation; hàm vẫn còn ở `common/api.py` (Lô 6 xoá). Test mốc AC2 còn mock `apps.delivery.api.has_full_delivery_scope`.
+- `sales/orders/api.py` vẫn kiểm `?customer=` bằng `can_view_customer_directory` (403) và chưa lọc theo D7: thuộc Lô 4 (PV-05-AC6).
+- `naming`: `scripts/check_naming.py` đang báo 2 file FE mới từ main (`frontend/components/ContactButton.tsx`, `frontend/features/site/components/SiteLegalFooter.tsx`, chữ `nguoi` trong khoá `thong-tin-nguoi-ban`), không phải file của Lô này.
+
 ## Kiểm chứng (chạy trong lượt làm)
 - `manage.py test` toàn bộ trước Lô 1: 2850 test (suy ra 2859 − 9). Sau Lô 1: **2859 test, OK**. Sau Lô 2: **2918 test, OK** (0 failure, 0 error).
 - `makemigrations --check --dry-run`: `No changes detected`.
