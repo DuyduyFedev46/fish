@@ -438,3 +438,59 @@ Ghi nhận (Low, không chặn):
 - `sqlite3 ... select ... from accounts_auditlog where action like '%callscript%'`: 9 dòng, không có nội dung kịch bản.
 - `manage.py test apps.delivery.tests.test_call_scripts_and_lookup apps.delivery.tests.test_confirmation_role_scope apps.ai.registry` với `AI_ENABLED=false` và `true`: 111 test OK mỗi lần.
 - Dọn: `pkill runserver`, gỡ symlink `backend/staticfiles`, xoá DB tạm. `git status` sạch trước khi ghi report.
+
+---
+
+## QA Lô 5 FE (06/10) — CS-16, CS-17, CS-18 · HEAD 6de69b5
+
+### Kết luận: APPROVED — 3 story đạt trên cả bản mock lẫn BE thật; không lỗi chặn.
+### Tổng: 92 + 70 + 126 ca mock (đạt 288, 1 đỏ đã biết) · 50 ca BE thật + 23 yêu cầu API trực tiếp · ✅ tất cả trừ ca AI đã biết · ❌ 0 mới · ⏸ 0
+
+Môi trường: `erp-console` build mock=1 (phục vụ tĩnh :3201) rồi build mock=0 (`NEXT_PUBLIC_API_BASE=http://127.0.0.1:8000`, :3102). BE thật = `backend/` của main (có BE Lô 5), `runserver --noreload`, SQLite tạm (`DATABASE_URL`), `AI_ENABLED=0`, seed bằng `manage.py shell`: 5 tài khoản (loc, ql1, kho1, giao1, cs1), 4 phiếu (A tem lần 1 hợp lệ, B đã in lại lần 2, C đã huỷ, D đang chờ xác nhận). Toàn bộ khách, SĐT, địa chỉ là dữ liệu giả ("Khách Thử …", "0907770xxx", "Đường Thử"). Đã dọn server, DB tạm, symlink, `out/`, `.next`.
+
+### Theo AC
+| AC | Kết quả | Bằng chứng |
+|---|---|---|
+| CS-16-AC1 phiếu soạn đủ mã phiếu, dòng, kg, mã lô, HSD, 100×150 | ✅ | BE thật: DOM `[data-testid=pick-sheet]` có mã phiếu, Cá thu 2 kg, Tôm sú 1,5 kg, mã lô, HSD, tổng 3,5 kg; `@page 100mm 150mm`, rộng ≈ 378 px. Ảnh scratchpad `c/pick-sheet.png` |
+| CS-16-AC2 không tên/SĐT/địa chỉ/mã đơn | ✅ | Quét `page.content()` + innerText với 5 chuỗi giả: 0 trùng; URL chỉ `?note=1`; localStorage/sessionStorage sạch |
+| CS-16-AC3 không giá | ✅ | Regex đ/₫/giá/VNĐ và 150000/110000: 0 trùng |
+| CS-16-AC4 quyền | ✅ | `giao1` và `cs1`: màn "Không có quyền", 0 request tới `/api/delivery/notes/<id>` hay `lookup`; `ql1`, `kho1` mở được |
+| CS-17-AC1 tem đúng mở phiếu | ✅ | Gõ `<mã>.1` (A) và `<mã>.2` (B) + Enter: chuyển tới `/deliveries/detail/?id=…`, URL chỉ có id |
+| CS-17-AC2 tem cũ vàng | ✅ | Tem `.1` của B: alert `warn` "Tem này không còn hiệu lực, dùng tem lần 2." Ảnh `c/lookup-old.png` |
+| CS-17-AC3 huỷ đỏ | ✅ | Phiếu C (gõ chữ thường): alert `err` "Đơn đã huỷ, không soạn, xé tem." Ảnh `c/lookup-cancel.png` |
+| CS-17-AC4 lỗi | ✅ | Mã không có: "Không tìm thấy phiếu" (404); thiếu `.số`, rỗng: chặn ở máy khách |
+| CS-17-AC5 quyền | ✅ | API: `giao1`, `cs1` 403 (`Thiếu quyền: delivery.print_label`), chưa đăng nhập 401; UI "Không có quyền" |
+| CS-18-AC1 | ✅ | Chủ soạn "Khách mua lần đầu" qua UI (POST 201); `cs1` mở `/confirmation/detail/?id=4` thấy nội dung. Ảnh `c/cs1-detail-script.png` |
+| CS-18-AC2 | ✅ | Chủ bấm Tắt (PATCH 200): `cs1` tải lại chi tiết, không còn nội dung; Bật lại thì hiện lại |
+| CS-18-AC3 | ✅ | UI: SĐT chặn, không POST; rỗng chặn; ô nhập giới hạn 2000 ký tự (gõ 2001 chỉ nhận 2000). API: 2001 ký tự 400, rỗng 400, chứa SĐT 400 (BR-GH-19) |
+| CS-18-AC4 | ✅ | UI: `ql1`, `cs1` không có nút Soạn/Sửa/Tắt. API: POST của ql1/cs1/kho1/giao1 đều 403; DELETE 405 |
+
+### Ngoại lệ & biên
+- Gõ nhầm SĐT vào ô tra tem: chặn ở máy khách, **0 request lookup**, SĐT không vào URL, localStorage hay request nào. Việc này đóng ghi nhận L1 của QA Lô 5 BE (SĐT lọt access log): chính log `runserver` chỉ chứa SĐT do chính script QA gọi thẳng API.
+- Ngoài đường thuận (3 ca): (1) **màn cũ**: `cs1` mở sẵn chi tiết gọi, Chủ tắt rồi bật kịch bản, `cs1` tải lại thấy đúng trạng thái; (2) **biên 2000 ký tự**: nhập tối đa 2000 lưu được, nội dung 2001 bị chặn ở UI và 400 ở API; (3) **tem sau in lại / đơn huỷ giữa chừng**: tem cũ vàng, huỷ đỏ, tem mới hợp lệ mở thẳng. Thêm: kịch bản đã tắt không hiện, DELETE 405, không 5xx ở mọi request.
+- 360px: `/deliveries/lookup/` và `/print/pick-sheet/` không cuộn ngang.
+- Console 0 lỗi (kho1, cs1); BE log không có tên/địa chỉ khách.
+- Giới hạn tần suất lookup: không có (đã ghi L2 ở QA Lô 5 BE, người dùng đã đăng nhập, không phải API công khai). Đăng nhập có throttle 429 (thấy khi chạy script).
+
+### Phân quyền (kiểm trên BE thật)
+| Hành động | owner | manager | warehouse_staff | delivery_staff | customer_service | Chưa đăng nhập |
+|---|---|---|---|---|---|---|
+| Tra tem (lookup) | 200 | 200 | 200 | 403 | 403 | 401 |
+| Phiếu soạn (UI) | mở | mở | mở | Không có quyền | Không có quyền | |
+| Xem kịch bản | thấy cả đã tắt | chỉ bật | 403 | 403 | chỉ bật | 401 |
+| Soạn/sửa kịch bản | 201 | 403 | 403 | 403 | 403 | 401 |
+
+### Rò giá vốn · Rò dữ liệu cá nhân
+- Phiếu soạn và kết quả tra tem không có giá. JSON `lookup` chỉ có `note_id, status, print_no, valid_print_no, warning`. Kịch bản chặn SĐT/dãy số. AuditLog `create_callscript`/`update_callscript` chỉ ghi tình huống và `is_active`, không chép nội dung, không có tiền hay kg.
+- Dữ liệu cá nhân không ở DOM phiếu soạn, URL, localStorage/sessionStorage, console, log BE.
+
+### Hồi quy (build mock=1)
+- `e2e/confirmation_scripts_tag_lookup.py`: 92/92.
+- `e2e/ed_batch4_delivery.py`: 70/70.
+- `e2e/ed_batch5_confirmation.py`: 126/127, ca đỏ duy nhất `ai_block` (khối AI khi cờ tắt), là ca đã biết.
+
+### Lỗi
+Không có lỗi chặn mới. Ghi nhận Low: không có.
+
+### Lệnh đã chạy
+`NEXT_PUBLIC_USE_MOCK=1 npm run build` rồi 3 script e2e mock (kết quả trên); `NEXT_PUBLIC_API_BASE=http://127.0.0.1:8000 NEXT_PUBLIC_USE_MOCK=0 npm run build`; `manage.py migrate` + seed trên SQLite tạm; `runserver 8000 --noreload`; script Playwright thật (50/50 ca) và script gọi API trực tiếp (23 yêu cầu). Ảnh và script nằm trong scratchpad, không commit.
