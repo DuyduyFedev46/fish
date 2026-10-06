@@ -390,7 +390,7 @@ Test cũ phải sửa vì thay đổi hợp lệ: `delivery/tests/test_confirmat
 
 ### 6. Lệch so với 02b và điều còn nợ
 - Đường dẫn: 02b ghi `/api/cskh/scripts/`; code đã đổi tên sang `/api/confirmation/scripts/` (đợt đặt tên tiếng Anh). Nhóm `cskh` nay là `customer_service`, mã `delivery/cskh/` nay là `delivery/confirmation/`. Không có `accounts/00xx_grant_callscript` như 02b §2.7: thay bằng `delivery/0009` (theo yêu cầu điều phối).
-- `lookup` tự động lọt vào registry lệnh AI (`delivery.deliverynote.lookup`, quyền `print_label`, chỉ đọc, không PII). Chưa chặn riêng. Nếu techlead muốn cấm AI gọi, thêm vào danh sách cấm của registry (việc của hồ sơ AI).
+- (Đã sửa theo review 03b M1) `/api/delivery/notes/lookup/` nằm trong `FORBIDDEN_PREFIXES` của AI; snapshot registry không còn dòng lookup; số `@action` vẫn 30.
 - Tình huống `RETURNING` do BE thêm theo choices của 02b §2.6; 02b §4.6 chưa nói rõ khách quen dùng kịch bản nào, nên đặt: khách có đơn khác đã xử lý thì `RETURNING`.
 - Chưa có FE (CS-16/17/18) và chưa có dữ liệu mẫu kịch bản: bảng rỗng cho đến khi Chủ soạn.
 - Chạy test trong worktree cần symlink `backend/staticfiles` từ checkout chính (test admin cần manifest tĩnh), và `DJANGO_DEBUG=1`. Symlink đã gỡ trước khi commit.
@@ -399,3 +399,6 @@ Test cũ phải sửa vì thay đổi hợp lệ: `delivery/tests/test_confirmat
 - `makemigrations --check --dry-run`: **No changes detected**.
 - `cd backend && python manage.py test`: **Ran 2883 tests, OK** (gồm 33 test mới).
 - `python3 scripts/check_naming.py`: OK, không phát sinh vi phạm mới.
+
+### 8. Sửa theo review Tech Lead (03b)
+M1 cấm AI gọi `lookup` (rules.py, snapshot, test). L1 `lookup_label` nhận `queryset=self.get_queryset()` (Tầng 3) và action kiểm thêm `view_deliverynote` (403). L2 body JSON không phải object trả 400 `INVALID_INPUT`. L3 `IntegrityError` khi tạo trùng tình huống đổi thành `BusinessError` 400. L4 `lookup_label` chuyển sang `delivery/labels/services.py`. N1 dùng `exists()` cho `bundle_snapshot`. N2 dọn `setUp` thừa. 02b §4.6 thêm dòng RETURNING. Contract không đổi, chỉ thêm 400 khi body không phải object.

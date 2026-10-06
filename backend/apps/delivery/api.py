@@ -215,8 +215,10 @@ class DeliveryNoteViewSet(NoStoreMixin, DocumentViewSet):
         """Tra mã trên tem để mở đúng phiếu soạn (CS-17). Chỉ trả mã phiếu, trạng thái, số lần in."""
         if not request.user.has_perm("delivery.print_label"):
             raise PermissionDenied("Bạn không có quyền tra tem giao hàng.")
-        from apps.delivery.confirmation import call_scripts
-        return Response(call_scripts.lookup_label(request.query_params.get("code")))
+        if not request.user.has_perm("delivery.view_deliverynote"):
+            raise PermissionDenied("Bạn không có quyền xem phiếu giao.")
+        from apps.delivery.labels import services as label_services
+        return Response(label_services.lookup_label(request.query_params.get("code"), queryset=self.get_queryset()))
 
     @action(
         detail=True,

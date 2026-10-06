@@ -10,6 +10,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from apps.common.api import NoStoreMixin
+from apps.common.exceptions import BusinessError
 from apps.delivery.confirmation import call_scripts
 from apps.delivery.models import CallScript
 
@@ -22,6 +23,15 @@ def serialize_script(script: CallScript, *, with_state: bool = True) -> dict:
     }
     if with_state:
         data["is_active"] = script.is_active
+    return data
+
+
+def _body_dict(request) -> dict:
+    data = request.data
+    if data is None or data == "":
+        return {}
+    if not isinstance(data, dict) and not hasattr(data, "getlist"):  # JSON object hoặc QueryDict
+        raise BusinessError("Dữ liệu gửi lên không hợp lệ.", code="INVALID_INPUT")
     return data
 
 
@@ -44,7 +54,7 @@ class CallScriptViewSet(NoStoreMixin, viewsets.GenericViewSet):
 
     def create(self, request, *args, **kwargs):
         self._require(request, "add_callscript", "Chỉ Chủ được soạn kịch bản gọi.")
-        data = request.data or {}
+        data = _body_dict(request)
         script = call_scripts.create_script(
             actor=request.user,
             situation=data.get("situation"),
@@ -58,7 +68,7 @@ class CallScriptViewSet(NoStoreMixin, viewsets.GenericViewSet):
         script = CallScript.objects.filter(situation=kwargs.get("situation")).first()
         if not script:
             raise NotFound("Không tìm thấy kịch bản.")
-        data = request.data or {}
+        data = _body_dict(request)
         script = call_scripts.update_script(
             actor=request.user, script=script, content=data.get("content"), is_active=data.get("is_active"),
         )

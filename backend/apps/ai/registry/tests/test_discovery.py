@@ -42,6 +42,13 @@ class CommandDiscoveryTestCase(TestCase):
             self.assertIn(s.group, (command_groups.PURCHASING, command_groups.SALES, command_groups.CUSTOMER_SERVICE), f"Group không hợp lệ: {s.group} của {s.id}")
             self.assertIn(s.kind, ("read", "write"))
 
+    def test_cs17_lookup_label_forbidden_for_ai(self):
+        """CS-17 (02b §4.1): tra mã tem bị cấm với AI và không có trong registry."""
+        from apps.ai.policy.rules import is_url_forbidden
+
+        self.assertTrue(is_url_forbidden("/api/delivery/notes/lookup/"))
+        self.assertNotIn("delivery.deliverynote.lookup", [s.id for s in self.specs])
+
     def test_dw07_ac3_hard_blocklist(self):
         """DW-07-AC3: Không lệnh nào vi phạm danh sách cấm tất định."""
         for s in self.specs:

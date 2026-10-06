@@ -5,17 +5,14 @@ Tuân thủ:
 - Bất biến 1: không có tiền hay giá vốn.
 - Không AI (X-AC5).
 """
-import re
-
-from django.db import transaction
+from django.db import IntegrityError, transaction
 
 from apps.common.audit import record_audit
 from apps.common.exceptions import BusinessError
 from apps.common.pii import has_long_digit_run
-from apps.delivery.models import CallScript, DeliveryNote, LabelPrint
+from apps.delivery.models import CallScript, DeliveryNote
 
 MAX_CONTENT_LENGTH = 2000
-LABEL_CODE_RE = re.compile(r"^GH-[A-Z0-9-]{3,40}\.\d{1,3}$")
 
 
 def _clean_content(content) -> str:
@@ -36,9 +33,14 @@ def create_script(*, actor, situation, content, is_active=True) -> CallScript:
     if not isinstance(is_active, bool):
         raise BusinessError("`is_active` phải là true hoặc false.", code="INVALID_INPUT")
     text = _clean_content(content)
+    exists_error = BusinessError("Tình huống này đã có kịch bản, hãy sửa kịch bản cũ.", code="INVALID_INPUT")
     if CallScript.objects.filter(situation=situation).exists():
-        raise BusinessError("Tình huống này đã có kịch bản, hãy sửa kịch bản cũ.", code="INVALID_INPUT")
-    script = CallScript.objects.create(situation=situation, content=text, is_active=is_active, updated_by=actor)
+        raise exists_error
+    try:
+        with transaction.atomic():  # hai request cùng tình huống: bên thua đua nhận 400 thay vì 500
+            script = CallScript.objects.create(situation=situation, content=text, is_active=is_active, updated_by=actor)
+    except IntegrityError:
+        raise exists_error
     record_audit(
         "create_callscript", actor=actor, obj=script,
         changes={"situation": situation, "is_active": is_active},
@@ -88,38 +90,8 @@ def scripts_for_note(note: DeliveryNote) -> list[CallScript]:
             .exists()
         )
         wanted.append(CallScript.Situation.RETURNING if has_other else CallScript.Situation.FIRST_ORDER)
-        if any(line.bundle_snapshot for line in order.lines.all()):
+        if order.lines.exclude(bundle_snapshot={}).exists():
             wanted.append(CallScript.Situation.COMBO)
     wanted.append(CallScript.Situation.GENERAL)
     by_situation = {s.situation: s for s in CallScript.objects.filter(situation__in=wanted, is_active=True)}
     return [by_situation[s] for s in wanted if s in by_situation]
-
-
-def lookup_label(code: str) -> dict:
-    """
-    Tra mã tem (CS-17, BR-GH-16, BR-GH-07). Chỉ trả mã phiếu, trạng thái và số lần in: không tên, SĐT, địa chỉ, giá.
-    """
-    code = (code or "").strip()
-    if not LABEL_CODE_RE.match(code):
-        raise BusinessError("Mã tem không đúng định dạng.", code="INVALID_INPUT")
-    note_code, print_part = code.rsplit(".", 1)
-    print_no = int(print_part)
-    note = DeliveryNote.objects.filter(code=note_code).first()
-    prints = list(LabelPrint.objects.filter(note=note).order_by("print_no")) if note else []
-    if not note or print_no not in {p.print_no for p in prints}:
-        raise BusinessError("Không tìm thấy phiếu.", code="NOT_FOUND", status_code=404)
-
-    if note.status == DeliveryNote.Status.CANCELLED:
-        valid_print_no = None
-        warning = "BR-GH-07"
-    else:
-        valid = [p.print_no for p in prints if p.superseded_at is None and p.voided_at is None]
-        valid_print_no = max(valid) if valid else None
-        warning = None if valid_print_no == print_no else "BR-GH-16"
-    return {
-        "note_id": note.pk,
-        "status": note.status,
-        "print_no": print_no,
-        "valid_print_no": valid_print_no,
-        "warning": warning,
-    }

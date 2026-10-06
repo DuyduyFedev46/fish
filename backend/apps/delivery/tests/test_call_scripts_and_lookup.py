@@ -93,6 +93,21 @@ class LookupTests(RoleAliasTestCase):
             self.assertEqual(res.json()["code"], "INVALID_INPUT")
         self.assertEqual(c.get(LOOKUP).status_code, 400)
 
+    def test_cs17_l1_out_of_scope_note_404_and_needs_view_perm(self):
+        """Người giao được cấp thêm print_label vẫn chỉ tra được phiếu của mình (Tầng 3)."""
+        from django.contrib.auth.models import Permission
+
+        extra = make_user("giao_print", roles.DELIVERY_STAFF, perms=("delivery.print_label",))
+        res = client_for(extra).get(LOOKUP, {"code": self.code1})
+        self.assertEqual(res.status_code, 404)
+        DeliveryNote.objects.filter(pk=self.note.pk).update(assigned_to=extra)
+        self.assertEqual(client_for(extra).get(LOOKUP, {"code": self.code1}).status_code, 200)
+        # thiếu view_deliverynote -> 403
+        extra.groups.clear()
+        extra.user_permissions.add(Permission.objects.get(codename="print_label"))
+        extra = type(extra).objects.get(pk=extra.pk)
+        self.assertEqual(client_for(extra).get(LOOKUP, {"code": self.code1}).status_code, 403)
+
     def test_cs17_ac5_forbidden_roles_403_and_anonymous_401(self):
         for user in (self.cs1, self.courier):
             self.assertEqual(client_for(user).get(LOOKUP, {"code": self.code1}).status_code, 403)
@@ -122,8 +137,6 @@ class LookupTests(RoleAliasTestCase):
 
 
 class CallScriptApiTests(RoleAliasTestCase):
-    def setUp(self):
-        super().setUp()
     def _create(self, user, situation="FIRST_ORDER", content="Chào anh/chị, em gọi từ Cá Về xác nhận đơn.", **extra):
         return client_for(user).post(
             SCRIPTS, {"situation": situation, "content": content, **extra}, format="json"
@@ -178,6 +191,26 @@ class CallScriptApiTests(RoleAliasTestCase):
         self.assertEqual(res.status_code, 400)
         res = client_for(self.owner).patch(f"{SCRIPTS}FIRST_ORDER/", {"content": "y" * 2001}, format="json")
         self.assertEqual(res.status_code, 400)
+
+    def test_cs18_l2_non_object_body_400(self):
+        self.assertEqual(client_for(self.owner).post(SCRIPTS, [1], format="json").status_code, 400)
+        self._create(self.owner)
+        res = client_for(self.owner).patch(f"{SCRIPTS}FIRST_ORDER/", [1], format="json")
+        self.assertEqual(res.status_code, 400)
+        self.assertEqual(res.json()["code"], "INVALID_INPUT")
+
+    def test_cs18_l3_concurrent_duplicate_is_business_error(self):
+        """Hai request cùng tình huống: bên thua đua (IntegrityError) nhận BusinessError, không 500."""
+        from unittest import mock
+
+        from django.db import IntegrityError
+
+        from apps.common.exceptions import BusinessError
+        from apps.delivery.confirmation import call_scripts
+
+        with mock.patch.object(CallScript.objects, "create", side_effect=IntegrityError("dup")):
+            with self.assertRaises(BusinessError):
+                call_scripts.create_script(actor=self.owner, situation="GENERAL", content="Nội dung")
 
     def test_cs18_invalid_situation_and_duplicate_400(self):
         self.assertEqual(self._create(self.owner, situation="NOPE").status_code, 400)
