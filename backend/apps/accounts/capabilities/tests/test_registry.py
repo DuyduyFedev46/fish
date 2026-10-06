@@ -46,8 +46,11 @@ class RegistryTests(TestCase):
         for capability in registry.CAPABILITIES:
             self.assertTrue(set(capability.perms) <= held, capability.key)
 
-    def test_every_scope_group_is_a_real_role(self):
-        self.assertEqual(set(registry.GROUP_SCOPES), set(roles.ALL_ROLES))
+    def test_every_default_scope_group_is_a_real_role(self):
+        # PV-02: bảng phạm vi cố định cũ đã thay bằng `data_scopes/catalog.py`; nhóm mặc định phải là vai thật (trừ Chủ).
+        from apps.accounts.data_scopes import catalog
+
+        self.assertEqual(set(catalog.DEFAULT_GROUPS), set(roles.ALL_ROLES) - {roles.OWNER})
 
     def test_tier2_permission_labels_use_one_name_per_action(self):
         # 02b §0c: một việc một tên ("Lập phiếu hoàn", "Xác nhận đã nhận tiền").
