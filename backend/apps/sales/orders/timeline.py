@@ -25,7 +25,7 @@ from django.db.models import Q
 from apps.accounts.models import AuditLog
 from apps.delivery.models import DeliveryNote
 from apps.inventory.models import ReturnToStock
-from apps.sales.models import Refund, SalesOrder
+from apps.sales.models import PaymentTransaction, Refund, SalesOrder
 from apps.sales.utils import kg_str
 from apps.common.formatting import format_vnd_ui
 
@@ -35,6 +35,7 @@ ORDER_MODEL = SalesOrder._meta.label
 NOTE_MODEL = DeliveryNote._meta.label
 RETURN_MODEL = ReturnToStock._meta.label
 REFUND_MODEL = Refund._meta.label
+PAYMENT_MODEL = PaymentTransaction._meta.label
 
 
 @dataclass(frozen=True)
@@ -82,6 +83,10 @@ def _cancel_reason_label(changes, note):
 
 def _audits(order, notes, returns, refunds):
     cond = Q(model_name=ORDER_MODEL, object_id=str(order.pk))
+    # #15 (BR-TT-18): khoản ghi tay tiền về muộn không có audit trên đơn; lấy NGƯỜI ghi từ audit trên giao dịch.
+    late_ids = [str(p.pk) for p in order.payments.all() if p.source == p.Source.MANUAL]
+    if late_ids:
+        cond |= Q(model_name=PAYMENT_MODEL, object_id__in=late_ids, action="record_late_payment")
     if notes:
         cond |= Q(model_name=NOTE_MODEL, object_id__in=[str(n.pk) for n in notes])
     if returns:
@@ -110,7 +115,8 @@ def build_timeline(order):
     manual_actor = {
         (a.changes or {}).get("bank_txn_id"): a.actor
         for a in audits
-        if a.model_name == ORDER_MODEL and a.action == "confirm_payment_manual"
+        if (a.model_name == ORDER_MODEL and a.action == "confirm_payment_manual")
+        or (a.model_name == PAYMENT_MODEL and a.action == "record_late_payment")
     }
 
     events = [
