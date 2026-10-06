@@ -62,11 +62,11 @@ class OldNoteRedactionTests(TestCase):
 class AiRowsHiddenWhenAiOffTests(TestCase):
     def setUp(self):
         self.owner = make_user("owner_fake", roles.OWNER)
-        self.kho = make_user("warehouse_fake", roles.WAREHOUSE_STAFF)
+        self.warehouse_user = make_user("warehouse_fake", roles.WAREHOUSE_STAFF)
         for i in range(22):
             record_audit("close_batch", actor=self.owner, note=f"u{i}")
-        record_audit("propose_x", actor_kind="ai", ai_actor=self.kho, proposal_ref="P-1")
-        record_audit("execute_x", actor_kind="ai", ai_actor=self.kho, proposal_ref="P-1")
+        record_audit("propose_x", actor_kind="ai", ai_actor=self.warehouse_user, proposal_ref="P-1")
+        record_audit("execute_x", actor_kind="ai", ai_actor=self.warehouse_user, proposal_ref="P-1")
         record_audit("escalate_overdue_x", actor_kind="system", proposal_ref="P-2")
         record_audit("ai_policy_update", actor=self.owner)
 
