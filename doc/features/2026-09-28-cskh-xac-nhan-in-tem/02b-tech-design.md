@@ -599,6 +599,7 @@ GET /api/cskh/queue/31/ → thêm "scripts": [{"situation": "FIRST_ORDER", "situ
   `customer_name`, `address`, `recipient_*` dù JSON có.
 - Chọn kịch bản: `FIRST_ORDER` nếu khách không có đơn `PROCESSING/COMPLETED` nào khác; `COMBO` nếu có dòng `bundle_snapshot`
   không rỗng; luôn kèm `GENERAL` nếu bật. Kịch bản không qua AI.
+  Khách có đơn khác (không tính đơn đang gọi) ở `PROCESSING/COMPLETED` thì dùng `RETURNING` thay `FIRST_ORDER` (phần bù của quy tắc trên; Tech Lead chấp nhận 06/10).
 
 ### 4.7 FE — kiểu, mock, màn
 | Module / route | Nội dung | Lô |

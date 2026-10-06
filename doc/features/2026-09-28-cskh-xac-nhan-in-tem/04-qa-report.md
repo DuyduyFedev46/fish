@@ -371,3 +371,70 @@ Quy trình: Kiểm thử độc lập theo TDD, kiểm tra ma trận phân quy�
 ### 4. Kết luận
 **APPROVED — Lô 4 hoàn thành xuất sắc toàn bộ tiêu chí nghiệm thu và bất biến.**
 
+
+---
+
+## QA Lô 5 BE (06/10) — CS-17, CS-18, `scripts` trong chi tiết hàng chờ · HEAD 98d7986
+
+### Kết luận: APPROVED — không lỗi chặn; 2 ghi nhận Low
+Tổng: 52 ca chạy thật bằng HTTP · ✅ 52 · ❌ 0 · ⏸ 0 (phần FE CS-16/17/18 chưa làm nên ngoài phạm vi lượt này).
+
+### Cách chạy
+Runserver `localhost:8765`, DB SQLite tạm, `DJANGO_DEBUG=1`, `AI_ENABLED=false`, `migrate` sạch trên DB trống (kiểm luôn `delivery/0008`, `0009`). Seed dữ liệu giả (SĐT `09000000xx`, địa chỉ "123 Đường Giả"): 5 phiếu đủ trạng thái, 2 khách (lần đầu / quen), 6 user thuộc 5 vai (+ 1 NV giao được cấp thêm `print_label`). Gọi bằng Python `requests` với token thật. Symlink `backend/staticfiles` và DB tạm đã gỡ, server đã tắt. Test đối chiếu (cả `AI_ENABLED=false` và `true`): `manage.py test apps.delivery.tests.test_call_scripts_and_lookup apps.delivery.tests.test_confirmation_role_scope apps.ai.registry` → `Ran 111 tests ... OK` (hai lần).
+
+### Theo AC
+| Mã AC | Kết quả | Bằng chứng (output thật) |
+|---|---|---|
+| CS-17-AC1 tem hợp lệ | ✅ | `200 {"note_id":1,"status":"PREPARING","print_no":1,"valid_print_no":1,"warning":null}` |
+| CS-17-AC2 tem cũ | ✅ | tem `.1` sau khi in lại: `200 ... "print_no":1,"valid_print_no":2,"warning":"BR-GH-16"`; tem `.2` `warning:null`. Tem lần 1 đã huỷ (void) cũng `BR-GH-16`, valid 2 |
+| CS-17-AC3 phiếu huỷ | ✅ | `200 {"status":"CANCELLED","valid_print_no":null,"warning":"BR-GH-07"}` |
+| CS-17-AC4 lỗi | ✅ | `abc`, `gh-a-1.1`, `GH-X.1`, SĐT `0900000001`, `GH-AAA.1234`, chuỗi SQL, `code` rỗng, thiếu `code`, `code=a&code=b` → 400 `INVALID_INPUT`; phiếu không có, số lần in chưa từng có (`.7`) → 404. Thông điệp lỗi không lặp lại giá trị gửi lên |
+| CS-17-AC5 quyền | ✅ | owner/manager/warehouse 200; `cs1`, `dl1` 403 "Thiếu quyền: delivery.print_label"; chưa đăng nhập 401 |
+| CS-17 phản hồi tối thiểu | ✅ | đúng 5 khoá `note_id,print_no,status,valid_print_no,warning`; không tên, SĐT, địa chỉ, mã đơn, giá; header `Cache-Control: no-store` |
+| CS-17 NV giao có `print_label` (Tầng 3) | ✅ | `dlp` tra phiếu của người khác: 404; sau khi gán phiếu cho `dlp`: 200 |
+| CS-18-AC1 hiện đúng kịch bản | ✅ | Khách lần đầu có combo: `['FIRST_ORDER','COMBO','GENERAL']`; khách quen: `['RETURNING','GENERAL']` |
+| CS-18-AC2 tắt thì ẩn | ✅ | Tắt `COMBO`: `Q1 after COMBO off ['FIRST_ORDER','GENERAL']`; tắt `FIRST_ORDER`: khách lần đầu chỉ còn `GENERAL`; Quản lý/CSKH không thấy bản tắt, Chủ thấy cả hai |
+| CS-18-AC3 lỗi nội dung | ✅ | rỗng, chỉ khoảng trắng, thiếu `content` → 400; 2001 ký tự → 400 "tối đa 2000"; đúng 2000 ký tự → 200; SĐT liền `0901234567`, cách `090 123 4567`, chấm, gạch ngang, `0901 234 567` → 400 `BR-GH-19` (cả POST lẫn PATCH); tình huống sai → 400; body mảng → 400 (POST và PATCH); JSON hỏng → 400; tạo trùng → 400 `INVALID_INPUT` (không 500) |
+| CS-18-AC4 quyền | ✅ | Chủ POST 201, PATCH 200. Quản lý, CSKH, Kho, Giao POST/PATCH 403, chưa đăng nhập 401. GET: owner/manager/cs 200; Kho, Giao 403 |
+| `scripts` trong chi tiết hàng chờ | ✅ | thứ tự FIRST_ORDER → COMBO → GENERAL như trên. User có `confirm_with_customer` nhưng không `view_callscript` (gỡ quyền khỏi Group trên DB tạm rồi khôi phục): chi tiết `200` với `scripts: []`, còn `/scripts/` 403 |
+| X-AC5 AI | ✅ | `is_url_forbidden("/api/delivery/notes/lookup/")` = True (cả có query); không có đường nào gọi AI từ các code path này; toàn bộ test + toàn bộ lệnh HTTP chạy với `AI_ENABLED=false` đúng; `AI_ENABLED=true` cũng 111 OK |
+
+### Ngoại lệ, biên, ngoài đường thuận (tự nghĩ thêm)
+- DELETE/PUT trên `/scripts/` và `/scripts/GENERAL/` → 405; PATCH kịch bản không tồn tại → 404; POST/DELETE vào `lookup` → 405.
+- Tạo trùng tình huống → 400 (không IntegrityError 500). Bật lại kịch bản đã tắt rồi gọi lại chi tiết: hiện lại đúng.
+- Cập nhật một phần: PATCH chỉ `is_active` không đổi nội dung; PATCH nội dung có SĐT bị chặn, nội dung cũ giữ nguyên.
+- Tem đã huỷ (void) và tem bị thay thế đều cho `BR-GH-16`; tem trong phiếu huỷ ưu tiên `BR-GH-07`.
+- Khoảng trắng đuôi `GH-AAA.1 ` được strip rồi tra → 404 (không 500).
+
+### Phân quyền (Group × hành động)
+| Hành động | owner | manager | warehouse | delivery | customer_service | chưa đăng nhập |
+|---|---|---|---|---|---|---|
+| lookup | 200 | 200 | 200 | 403 | 403 | 401 |
+| GET scripts | 200 (cả bản tắt) | 200 (bản bật) | 403 | 403 | 200 (bản bật) | 401 |
+| POST/PATCH scripts | 201/200 | 403 | 403 | 403 | 403 | 401 |
+
+### Rò giá vốn
+Không liên quan: lookup chỉ 5 khoá, scripts chỉ `situation, situation_label, content, is_active`. Không có số tiền, tỷ lệ, giá.
+
+### Rò dữ liệu cá nhân
+- Lookup: không tên, SĐT, địa chỉ, mã đơn trong thân thư; lỗi không lặp lại input.
+- Kịch bản: BR-GH-19 chặn chuỗi số dài mọi kiểu ngăn cách.
+- AuditLog thật trong DB: `create_callscript {"situation":"FIRST_ORDER","is_active":true}`, `update_callscript {"content_changed":true}`, `update_callscript {"is_active":{"from":true,"to":false}}`; cột `note` rỗng. Không chép nội dung, không có dữ liệu cá nhân, không có số để suy ra giá vốn.
+- Log runserver: tìm `0900000`, địa chỉ giả, tên giả: chỉ 1 dòng, là access log của chính yêu cầu QA cố ý gửi SĐT giả làm `code` (xem L1).
+
+### Hồi quy
+Test `test_confirmation_role_scope` và `apps.ai.registry` (số `@action` 30, snapshot) xanh; migration `0008/0009` chạy được trên DB trống, Chủ có view+add+change, Quản lý/CSKH chỉ view (kiểm bằng hành vi ở bảng quyền). Điều phối viên đã chạy 2887 test OK và `makemigrations --check` sạch (không chạy lại toàn bộ trong lượt này).
+
+### Lỗi
+Không có lỗi chặn.
+
+Ghi nhận (Low, không chặn):
+- **L1** (CS-17): `code` đi trong query string nên xuất hiện trong access log máy chủ. Mã tem chỉ chứa mã phiếu + số lần in (không phải dữ liệu cá nhân), nên chấp nhận được; nhưng nếu người dùng gõ nhầm SĐT vào ô tra thì SĐT lọt vào access log của Cloud Run. Gợi ý FE: kiểm regex `GH-...` ở client trước khi gọi, không gửi chuỗi không khớp.
+- **L2**: không có giới hạn tần suất cho lookup (người dùng đã đăng nhập, có quyền; không phải API công khai nên không vi phạm bất biến 9). Chỉ ghi nhận.
+
+### Lệnh đã chạy
+- `migrate` trên SQLite trống: OK. Seed bằng `manage.py shell`.
+- `runserver 8765 --noreload` + 2 script Python (`requests`) cho ~110 yêu cầu; kết quả đúng như bảng trên.
+- `sqlite3 ... select ... from accounts_auditlog where action like '%callscript%'`: 9 dòng, không có nội dung kịch bản.
+- `manage.py test apps.delivery.tests.test_call_scripts_and_lookup apps.delivery.tests.test_confirmation_role_scope apps.ai.registry` với `AI_ENABLED=false` và `true`: 111 test OK mỗi lần.
+- Dọn: `pkill runserver`, gỡ symlink `backend/staticfiles`, xoá DB tạm. `git status` sạch trước khi ghi report.

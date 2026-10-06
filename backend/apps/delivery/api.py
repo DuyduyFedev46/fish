@@ -55,7 +55,7 @@ class DeliveryNoteViewSet(NoStoreMixin, DocumentViewSet):
     serializer_class = DeliveryNoteSerializer
     pagination_class = StandardPagination
     permission_classes = [BusinessModelPermissions]
-    custom_perm_actions = ("set_status", "label", "label_print", "label_void")
+    custom_perm_actions = ("set_status", "label", "label_print", "label_void", "lookup")
 
     # BR-PQ-14 / BR-GH-06: trạng thái & người giao chỉ đổi qua action nghiệp vụ.
     locked_fields = (
@@ -204,6 +204,21 @@ class DeliveryNoteViewSet(NoStoreMixin, DocumentViewSet):
         if needs_decision is not None:
             data["needs_decision"] = needs_decision
         return Response(data)
+
+    @action(
+        detail=False,
+        methods=["get"],
+        url_path="lookup",
+        required_perms=("delivery.print_label",),
+    )
+    def lookup(self, request):
+        """Tra mã trên tem để mở đúng phiếu soạn (CS-17). Chỉ trả mã phiếu, trạng thái, số lần in."""
+        if not request.user.has_perm("delivery.print_label"):
+            raise PermissionDenied("Bạn không có quyền tra tem giao hàng.")
+        if not request.user.has_perm("delivery.view_deliverynote"):
+            raise PermissionDenied("Bạn không có quyền xem phiếu giao.")
+        from apps.delivery.labels import services as label_services
+        return Response(label_services.lookup_label(request.query_params.get("code"), queryset=self.get_queryset()))
 
     @action(
         detail=True,

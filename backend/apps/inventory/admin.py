@@ -95,6 +95,10 @@ class ReturnToStockAdmin(LockedFieldsAdminMixin, admin.ModelAdmin):
     list_filter = ("decision", "status")
     autocomplete_fields = ("batch", "delivery_note", "created_by", "approved_by")
 
+    def has_delete_permission(self, request, obj=None):
+        # Chứng từ không xoá cứng (BR-PQ-10); chỉ xoá mềm qua API /delete/ (Chủ).
+        return False
+
 
 @admin.register(StockEntry)
 class StockEntryAdmin(admin.ModelAdmin):

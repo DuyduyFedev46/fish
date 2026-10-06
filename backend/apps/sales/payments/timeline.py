@@ -9,7 +9,7 @@ Bất biến:
 from apps.accounts.models import AuditLog
 from apps.sales.models import PaymentTransaction
 from apps.sales.orders.timeline import TimelineEvent, actor_display
-from apps.sales.utils import vnd_display
+from apps.common.formatting import format_vnd_ui
 
 PAYMENT_MODEL = PaymentTransaction._meta.label
 SYSTEM = "Hệ thống"
@@ -27,7 +27,7 @@ def build_payment_timeline(payment: PaymentTransaction) -> list[TimelineEvent]:
         TimelineEvent(
             at=received_time,
             kind="payment_received",
-            label=f"Nhận giao dịch thanh toán {vnd_display(payment.amount)} (mã GD {payment.bank_txn_id})",
+            label=f"Nhận giao dịch thanh toán {format_vnd_ui(payment.amount)} (mã GD {payment.bank_txn_id})",
             actor_display=SYSTEM,
             doc="payment",
             actor_kind="system",
@@ -59,7 +59,11 @@ def build_payment_timeline(payment: PaymentTransaction) -> list[TimelineEvent]:
             ai_cfg = None
 
         if a.action == "resolve_payment":
-            res_val = (a.changes or {}).get("resolution") or "Đã xử lý"
+            code = (a.changes or {}).get("resolution") or ""
+            try:
+                res_val = PaymentTransaction.Resolution(code).label  # mã chuẩn → nhãn; không chép `note` tự gõ
+            except ValueError:
+                res_val = "Đã xử lý"
             events.append(
                 TimelineEvent(
                     at=a.created_at,

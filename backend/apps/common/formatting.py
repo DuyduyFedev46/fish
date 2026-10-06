@@ -19,6 +19,11 @@ def format_vnd(amount) -> str:
     return f"{int(rounded):,}".replace(",", ".") + " ₫"
 
 
+def format_vnd_ui(amount) -> str:
+    """540000 → "540.000 đ" (UI-RULES §1.6 của ERP). Dành riêng cho nhãn dòng thời gian; `format_vnd` (₫) giữ nguyên cho Shop (SR-25)."""
+    return format_vnd(amount).replace(" ₫", " đ")
+
+
 def format_local_time(value) -> str:
     """Giờ VN dạng `HH:MM`. `value` phải là datetime có múi giờ."""
     return timezone.localtime(value).strftime("%H:%M")

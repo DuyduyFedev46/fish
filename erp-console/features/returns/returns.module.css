@@ -2,7 +2,7 @@
    dòng thời gian dùng component chung (shared/ui); file này chỉ có khung form trong hộp thoại, danh sách chọn và khối phụ. */
 
 /* Khung form trong hộp thoại: các ô cách đều nhau. */
-.form { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; }
+.form { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }
 
 /* Danh sách chọn Tái nhập / Huỷ bỏ (F2n). */
 .pickList { display: flex; flex-direction: column; gap: var(--space-2); margin: 0; padding: 0; border: 0; min-width: 0; }

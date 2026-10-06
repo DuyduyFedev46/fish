@@ -15,6 +15,7 @@ import { useResource } from "@/shared/lib/useResource";
 import { Field } from "@/shared/ui/form/Field";
 import { FormAlert } from "@/shared/ui/form/FormAlert";
 import { FormPage } from "@/shared/ui/form/FormPage";
+import { FormGrid, FormSection } from "@/shared/ui/form/FormSection";
 import { primaryLabel, useSubmit } from "@/shared/ui/form/useSubmit";
 import { Icon } from "@/shared/ui/Icon";
 import { Modal } from "@/shared/ui/overlay/Modal";
@@ -162,7 +163,8 @@ function FormBody({ userId, suppliers, items }: { userId: number; suppliers: { i
       failed={sub.failed}
       secondary={{ label: "Lưu nháp", onClick: saveNow }}
     >
-      <div className={s.twoCols}>
+      <FormSection title="Phiếu nhập">
+        <FormGrid>
         <Field
           as="select"
           label="Nhà cung cấp"
@@ -174,7 +176,9 @@ function FormBody({ userId, suppliers, items }: { userId: number; suppliers: { i
           error={shown("supplier") ?? sub.fieldErrors.supplier}
         />
         <Field label="Ngày nhập hàng" name="received_date" type="date" required value={receivedDate} onChange={setReceivedDate} error={sub.fieldErrors.received_date} />
-      </div>
+        </FormGrid>
+      </FormSection>
+      <FormSection title="Mặt hàng">
       <div className={s.lines} role="group" aria-label="Các mặt hàng nhập">
         {lines.map((line, idx) => (
           <div key={idx} className={s.lineCard}>
@@ -206,6 +210,7 @@ function FormBody({ userId, suppliers, items }: { userId: number; suppliers: { i
         <Icon name="add" />
         <span>Thêm mặt hàng</span>
       </button>
+      </FormSection>
     </FormPage>
   );
 }

@@ -341,3 +341,64 @@ gcloud scheduler jobs create http cskh-deadlines-scheduler \
 - `grep -rn "localStorage\|sessionStorage\|useDraft\|console\." erp-console/features/cskh erp-console/features/deliveries erp-console/app/print || true`: **Rỗng** (Bất biến 9).
 - `grep -rn 'fields = "__all__"' backend/apps/delivery backend/apps/common/pii.py erp-console/features/deliveries || true`: **Rỗng**.
 
+
+---
+
+## Lô 5 — BE (CS-16, CS-17, CS-18) — nhánh `feat/cskh-lo5`
+
+### 1. Đã làm (BE)
+- **CS-16**: không cần API mới (02b §4.6). Phiếu soạn dùng `GET /api/delivery/notes/{id}/` như CS-03; FE tự ẩn tên, SĐT, địa chỉ, người nhận hộ, giá khi in.
+- **CS-17** `GET /api/delivery/notes/lookup/?code=<mã tem>` (action `lookup` của `DeliveryNoteViewSet`, `detail=False`). Quyền `delivery.print_label` (Chủ, Quản lý, Kho có; CSKH và Giao 403, chưa đăng nhập 401). Có `Cache-Control: no-store`.
+- **CS-18** model `CallScript` + `/api/confirmation/scripts/` + khoá `scripts` trong chi tiết hàng chờ.
+
+### 2. Contract thực tế cho FE (dữ liệu giả)
+```
+GET /api/delivery/notes/lookup/?code=GH-HD-0001-AB12C.1
+200 {"note_id": 31, "status": "PREPARING", "print_no": 1, "valid_print_no": 2, "warning": "BR-GH-16"}
+    warning: null | "BR-GH-16" (tem cũ/đã huỷ tem, valid_print_no = lần hiệu lực) | "BR-GH-07" (phiếu CANCELLED, valid_print_no = null)
+404 {"detail": "Không tìm thấy phiếu.", "code": "NOT_FOUND"}     # phiếu không có, hoặc phiếu có nhưng chưa từng in lần đó
+400 {"detail": "Mã tem không đúng định dạng.", "code": "INVALID_INPUT"}   # regex ^GH-[A-Z0-9-]{3,40}\.\d{1,3}$, thiếu code cũng 400
+```
+Phản hồi **không** có tên, SĐT, địa chỉ, mã đơn, giá; lỗi không lặp lại giá trị đã gửi.
+
+```
+GET /api/confirmation/scripts/            (view_callscript: Chủ, Quản lý, CSKH)
+200 {"results": [{"situation": "FIRST_ORDER", "situation_label": "Khách mua lần đầu", "content": "Chào anh/chị, em gọi từ Cá Về…", "is_active": true}]}
+    Người có change_callscript (Chủ) thấy cả kịch bản đã tắt; Quản lý/CSKH chỉ thấy is_active=true.
+POST /api/confirmation/scripts/  {"situation": "FIRST_ORDER", "content": "…", "is_active": true}      (add_callscript: Chủ)
+201 {…như trên…}    400 nếu situation sai/đã có, nội dung rỗng hoặc > 2000 ký tự, hoặc có chuỗi ≥ 9 chữ số (code BR-GH-19)
+PATCH /api/confirmation/scripts/FIRST_ORDER/  {"is_active": false}  hoặc {"content": "…"}   (change_callscript: Chủ)
+200 {…}   404 nếu chưa có kịch bản tình huống đó.   DELETE/PUT → 405 (không xoá, tắt bằng is_active)
+```
+Tình huống (`situation`): `FIRST_ORDER` "Khách mua lần đầu", `RETURNING` "Khách quen", `COMBO` "Đơn có combo", `GENERAL` "Lời dặn chung".
+
+```
+GET /api/confirmation/queue/31/  → thêm "scripts": [{"situation": "FIRST_ORDER", "situation_label": "Khách mua lần đầu", "content": "…"}]
+```
+Chọn kịch bản (chỉ khi user có `delivery.view_callscript`, nếu không là `[]`): `FIRST_ORDER` nếu khách chưa có đơn PROCESSING/COMPLETED nào khác, ngược lại `RETURNING`; thêm `COMBO` nếu có dòng đơn có `bundle_snapshot`; luôn thêm `GENERAL` nếu bật. Chỉ kịch bản `is_active`. Thứ tự: FIRST_ORDER/RETURNING, COMBO, GENERAL.
+
+### 3. Migration
+- `delivery/0008_callscript`: `CreateModel CallScript` (`situation` unique, `content`, `is_active`, `updated_by` PROTECT, `updated_at`; `default_permissions = (view, add, change)`).
+- `delivery/0009_grant_callscript` (data migration, **nằm ở app `delivery`, không tạo migration `accounts/`** nên không trùng số với việc phạm vi dữ liệu): `owner` view+add+change; `manager`, `customer_service` chỉ view; Kho, Giao không có. Dùng `add` nên chạy lại không đổi gì; có `reverse`.
+
+### 4. Luật đã cài
+BR-GH-16 (tem cũ), BR-GH-07 (đơn huỷ), BR-GH-19 (kịch bản không chứa chuỗi số dài, tức không dữ liệu cá nhân), BR-PQ-02/12 (Chủ soạn, Quản lý/CSKH chỉ đọc). `AuditLog` ghi `create_callscript` và `update_callscript` (model `delivery.CallScript`); `changes` chỉ có tình huống, cờ bật/tắt và `content_changed: true`, **không chép nội dung**. Không có đường nào gọi AI (test chạy với `AI_ENABLED=False`, X-AC5).
+
+### 5. File
+Sửa: `backend/apps/delivery/models.py`, `delivery/api.py` (action `lookup`), `delivery/confirmation/serializers.py` (khoá `scripts`), `backend/config/api_urls.py` (route scripts). Mới: `delivery/confirmation/call_scripts.py` (service), `delivery/confirmation/scripts_api.py` (viewset), 2 migration trên, `delivery/tests/test_call_scripts_and_lookup.py` (33 test: AC mã CS-17-AC1…5, CS-18-AC1…4, PII, 5 vai, audit, X-AC5).
+Test cũ phải sửa vì thay đổi hợp lệ: `delivery/tests/test_confirmation_role_scope.py` (Group CSKH nay có thêm `view_callscript`), `ai/registry/tests/test_discipline.py` (số `@action` 29 → 30) và `ai/registry/tests/snapshots/commands_index_snapshot.json` (thêm `delivery.deliverynote.lookup`).
+
+### 6. Lệch so với 02b và điều còn nợ
+- Đường dẫn: 02b ghi `/api/cskh/scripts/`; code đã đổi tên sang `/api/confirmation/scripts/` (đợt đặt tên tiếng Anh). Nhóm `cskh` nay là `customer_service`, mã `delivery/cskh/` nay là `delivery/confirmation/`. Không có `accounts/00xx_grant_callscript` như 02b §2.7: thay bằng `delivery/0009` (theo yêu cầu điều phối).
+- (Đã sửa theo review 03b M1) `/api/delivery/notes/lookup/` nằm trong `FORBIDDEN_PREFIXES` của AI; snapshot registry không còn dòng lookup; số `@action` vẫn 30.
+- Tình huống `RETURNING` do BE thêm theo choices của 02b §2.6; 02b §4.6 chưa nói rõ khách quen dùng kịch bản nào, nên đặt: khách có đơn khác đã xử lý thì `RETURNING`.
+- Chưa có FE (CS-16/17/18) và chưa có dữ liệu mẫu kịch bản: bảng rỗng cho đến khi Chủ soạn.
+- Chạy test trong worktree cần symlink `backend/staticfiles` từ checkout chính (test admin cần manifest tĩnh), và `DJANGO_DEBUG=1`. Symlink đã gỡ trước khi commit.
+
+### 7. Kiểm chứng Lô 5 BE
+- `makemigrations --check --dry-run`: **No changes detected**.
+- `cd backend && python manage.py test`: **Ran 2883 tests, OK** (gồm 33 test mới).
+- `python3 scripts/check_naming.py`: OK, không phát sinh vi phạm mới.
+
+### 8. Sửa theo review Tech Lead (03b)
+M1 cấm AI gọi `lookup` (rules.py, snapshot, test). L1 `lookup_label` nhận `queryset=self.get_queryset()` (Tầng 3) và action kiểm thêm `view_deliverynote` (403). L2 body JSON không phải object trả 400 `INVALID_INPUT`. L3 `IntegrityError` khi tạo trùng tình huống đổi thành `BusinessError` 400. L4 `lookup_label` chuyển sang `delivery/labels/services.py`. N1 dùng `exists()` cho `bundle_snapshot`. N2 dọn `setUp` thừa. 02b §4.6 thêm dòng RETURNING. Contract không đổi, chỉ thêm 400 khi body không phải object.

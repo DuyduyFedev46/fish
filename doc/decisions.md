@@ -188,3 +188,15 @@ Hàng đông lạnh có hạn theo niên hạn, nên hạn dùng mặc định l
 - Tổng đơn làm tròn về nguyên đồng.
 
 Hồ sơ: `doc/features/2026-09-26-sepay-cong-thanh-toan/`.
+
+## 2026-10-06 — Chốt các điểm treo đợt ERP theo design — [DUY CHỐT]
+- **Phạm vi dữ liệu (D-1):** NV kho giữ quyền xem tên, SĐT và địa chỉ khách (V2) theo mặc định. Chủ tự tắt ở màn Phân quyền khi muốn. V2 áp cho đơn, hoá đơn và phiếu hoàn tiền.
+- **Superuser ngoài nhóm Chủ** được ghi phân quyền. BE giữ nguyên, FE mở cho superuser.
+- **#14 Huỷ chi phí phụ:** để sau production.
+- **CSKH lô 5** (CS-16 phiếu soạn, CS-17 quét tem, CS-18 kịch bản gọi): làm trong đợt này.
+
+## 2026-10-06 (chiều) — Nhật ký thao tác và hàng hoàn — [DUY CHỐT]
+- **Lý do bắt buộc** (bỏ qua gọi xác nhận, gia hạn, huỷ xác nhận, ghi chú huỷ đơn lý do "Khác") lưu **trên chứng từ** (ô ghi chú ngắn, chặn SĐT), không lưu chữ tự do trong AuditLog. AuditLog chỉ ghi "Có ghi chú".
+- **AuditLog cũ** có chữ tự do: **ẩn lúc hiển thị** (Nhật ký chỉ trả ghi chú khớp mẫu cố định, còn lại "Có ghi chú"). Không sửa dữ liệu gốc.
+- **Tắt AI thì Nhật ký ẩn các dòng do AI làm** (lọc ở BE theo cờ AI).
+- **Huỷ phiếu hàng hoàn đã duyệt:** để sau production. Phiếu đã duyệt không xoá được; duyệt nhầm thì sửa bằng phiếu kiểm kê.

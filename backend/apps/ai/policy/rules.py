@@ -17,6 +17,7 @@ FORBIDDEN_PREFIXES = (
     "/api/cskh/",  # giữ vĩnh viễn: tên cũ của hàng đợi gọi xác nhận (phòng thủ nhiều lớp)
     "/api/confirmation/",  # hàng đợi gọi xác nhận đơn: tên, SĐT, địa chỉ khách (P8b Lô 3, R1)
     "/api/dashboard/attention/",
+    "/api/delivery/notes/lookup/",  # tra mã tem (CS-17): thuộc nghiệp vụ tem, cấm như …/label/
     "/api/sales/customer-directory/",  # danh bạ khách: tên, SĐT, địa chỉ, ghi chú (B2, bất biến 9)
     "/api/sales/customers/",  # endpoint khách cũ (S5/CS-01): cùng dữ liệu cá nhân
 )
@@ -29,6 +30,8 @@ FORBIDDEN_SUFFIXES = (
     "/label",
     "/label/print",
     "/label/void",
+    "/delete/",  # xoá mềm chứng từ (phiếu hàng hoàn, Duy quyết 03/10 #8): chỉ Chủ bấm tay, AI không bao giờ
+    "/delete",
 )
 
 # Phương thức HTTP cấm hẳn (Bất biến 3, H4)

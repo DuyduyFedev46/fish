@@ -177,7 +177,9 @@ class S16RefundQueueTests(OrderApiBase):
         self.assertIn("refund_failed", kinds)
         self.assertIn("refund_retry", kinds)
         failed_row = next(r for r in body["timeline"] if r["kind"] == "refund_failed")
-        self.assertIn("Sai số tài khoản", failed_row["label"])
+        # Duy quyết 03/10 #3: nhãn không chép lý do tự gõ (xem ở phiếu hoàn)
+        self.assertNotIn("Sai số tài khoản", failed_row["label"])
+        self.assertIn("chuyển thất bại", failed_row["label"])
         self.assertEqual(failed_row["actor_display"], "chu1")
 
     def test_s16_ac8_khong_ro_gia_von(self):

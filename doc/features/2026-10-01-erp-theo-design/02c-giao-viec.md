@@ -73,6 +73,12 @@ Nợ BE từ review Lô 12 (03b, TL12-FE):
 - Lưu `item_price_id` (FK nullable PROTECT) trên dòng đơn → gộp với nợ Lô 13 L4.
 - Chờ Duy/PO: story "Huỷ chi phí phụ" (TLA-H1b, #14) và "Ghi tiền về muộn ở hàng chờ" (TLA-M3, #15).
 
+Nợ mới 06/10 (review #3/#8, Lô 15):
+- **TL-D3-L4 / TL15-L5 (dữ liệu cá nhân, BE, ưu tiên cao trước production):** `AuditLog.note` chép chữ người dùng gõ (`sales/payments/services.py:574,632,673`, `sales/refunds/services.py:254`, `sales/orders/services.py:402`, `purchasing/costs/services.py:83`) và màn Nhật ký in nguyên văn → chỉ ghi mã lý do hoặc che SĐT trước `record_audit`, có test.
+- **TL-D8-L3 → FE #8:** hộp xác nhận xoá phiếu hoàn Nháp nói rõ "số kg này sẽ không được nhập lại kho".
+- Lô 15 → **Lô 17:** L-b hoàn lại đổi "FEFO"→"fefo" ở `features/ai/runtime/worker.ts:51`; L-c bậc tiêu đề Tổng quan (`Section` thêm prop bậc tiêu đề); L-d code chết (`ChangePasswordForm.onCancel`, `auditModel.isSystem`, `AUDIT_MSG.aiOf/title`); L-a sai mã ED ở `03-dev-notes.md`.
+- Lô 15 → **BE:** `can_do` còn mã BR (`apps/ai/policy/services.py`), `cancel_reason` + `id` trong `dashboard/summary`, `AiMeta.title` tiếng Việt, lọc ngày + `q` ở `audit-logs/`.
+
 Ghi chú:
 - "Song song" là gợi ý; nếu hai lô cùng sửa một file chung (02b §5.1) thì commit lần lượt, lô sau rebase/merge lô trước.
 - Lô 7: W5k **chỉ danh sách đọc**, không làm form F1j, không có nút "Ngừng bán lô" (Duy chốt 01/10).

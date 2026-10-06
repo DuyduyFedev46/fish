@@ -16,7 +16,7 @@ from .base import (
 EXPECTED_KEYS = {
     "id", "code", "delivery_note", "delivery_note_code", "order_code", "batch", "batch_code", "item_name", "qty",
     "left_warehouse_at", "returned_at", "outside_minutes", "decision", "decision_label", "status", "status_label",
-    "created_by", "created_by_name", "approved_by", "approved_by_name", "created_at", "note",
+    "created_by", "created_by_name", "approved_by", "approved_by_name", "created_at", "note", "available_actions",
 }
 
 

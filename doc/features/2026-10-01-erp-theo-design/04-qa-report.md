@@ -3374,3 +3374,181 @@ Cờ AI tắt: mọi vai thấy "Không tìm thấy trang này" ở 4 route `/ai
 - `NEXT_PUBLIC_USE_MOCK=1 NEXT_PUBLIC_AI_FEATURES=1 npm run build` rồi 4 kịch bản: 193, 56, 101, 41 đạt.
 - `NEXT_PUBLIC_USE_MOCK=0 NEXT_PUBLIC_API_BASE=http://localhost:8000 npm run build`; Django `runserver` từ `/Users/dangthiduyen/Downloads/loc/backend` với `DATABASE_URL=sqlite:////tmp/qa15_real.sqlite3`, `migrate`, `bootstrap_masterdata`, `seed_demo`, seed 5 tài khoản giả; `s41_s47_real` (bản sửa selector) 40/40; script `real15.py`, `edge.py`, `trunc.py`, `a360.py`, `cmp360.py`.
 - Đã dọn: tắt Django và các server tĩnh của lượt này (cổng 3102, 3961, 3962), xoá `erp-console/out`, các bản copy build và DB SQLite tạm. Server cổng 3201 là của QA khác, không đụng. Ảnh trong `shots/lo15/` bị gitignore (chỉ có trên máy).
+
+## QA #3/#8 BE (06/10)
+
+### Kết luận: APPROVED — chạy thật 40 ca qua HTTP (runserver + SQLite tạm, token 5 vai), không lỗi chặn. Chỉ có 2 ghi nhận Low/⏸.
+Nhánh `wip/duy-quyet-03-10`, HEAD 6cc9696 (worktree duy-quyet). Điều phối viên đã chạy: 2880 test OK, `makemigrations --check` sạch. QA chạy thêm `manage.py test apps.inventory.returns apps.sales.orders.tests.test_timeline_no_free_text --parallel 4`: Ran 110 tests, OK.
+
+Cách kiểm: `DATABASE_URL=sqlite:///<scratchpad>/qa.sqlite3 DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1,testserver`, `migrate`, seed dữ liệu giả (Nguyễn Thử, 0900000xxx, địa chỉ giả; giá mua 123457 làm "đèn báo" giá vốn) qua `manage.py shell`, `runserver 8765 --noreload`, gọi API bằng urllib với header `Authorization: Token` của 5 vai (owner, manager, warehouse_staff, delivery_staff, customer_service). Seed: 8 phiếu (Nháp x6, Đã huỷ x1, Duyệt RESTOCK x1, Duyệt WRITE_OFF x1) + 1 đơn đã trả tiền rồi huỷ lý do "OTHER" kèm chữ tự do. Server đã tắt, DB tạm nằm ở scratchpad (không trong repo).
+
+### Tổng: 40 ca · ✅ 38 · ❌ 0 · ⏸ 2
+
+### Theo yêu cầu (#8 xoá mềm)
+| Ca | Kết quả | Bằng chứng (output thật) |
+|---|---|---|
+| Chủ xoá phiếu Nháp | ✅ | `OWNER delete draft 200 {"status":"deleted","id":1}` |
+| Chủ xoá phiếu Đã huỷ | ✅ | `OWNER delete cancelled 200 {"status":"deleted","id":2}` |
+| Sau xoá: biến khỏi danh sách | ✅ | list trước `[8,7,6,5,4,3,2,1]` → sau `[8,7,6,5,4,3]` |
+| Sau xoá: chi tiết 404 | ✅ | `detail draft after 404`, `detail cancelled after 404` |
+| Xoá lần 2 | ✅ | `2nd delete draft 404` |
+| Duyệt/huỷ/PATCH sau xoá (màn hình cũ) | ✅ | `approve after delete 404`, `cancel after delete 404`, `patch after delete 404` |
+| Xoá phiếu Đã duyệt RESTOCK | ✅ | `400 {"detail":"Phiếu hàng hoàn đã duyệt (đã nhập lại kho hoặc ghi lỗ) không xoá được (BR-PQ-10).","code":"RETURN_DELETE_NOT_ALLOWED"}` |
+| Xoá phiếu Đã duyệt WRITE_OFF | ✅ | cùng 400 + cùng mã |
+| Phiếu Đã duyệt không đổi sau khi bị từ chối | ✅ | vẫn nằm trong danh sách, `deleted_at` NULL; số dòng StockLedger giữ 6, AuditLog xoá giữ nguyên (`equal after rejected delete: True True`) |
+| Tồn kho + báo cáo hàng hỏng không đổi (từ chối xoá Đã duyệt, xoá Nháp) | ✅ | `S0 {'qty_received':'50.000','qty_available':'54.000','qty_reserved':'0.000','qty_sellable':'54.000'}`; `/api/reports/batch/<mã>/` (damage_qty 4.0, damage_cost 493828.0, profit) giống hệt trước/sau: `equal after draft delete (stock+report): True`; sổ kho vẫn 6 dòng |
+| Xoá phiếu Nháp không đụng tồn | ✅ | `final equal stock/report: True`, ledger 6 → 6 sau 5 lần xoá Nháp |
+| Xoá Nháp gỡ chặn chốt lô | ✅ | `check_close_batch` có phiếu Nháp: `['BR-LO-04','BR-LO-04','BR-KK-05']`; sau khi Chủ xoá qua API: `['BR-LO-04','BR-KK-05']` (mục "phiếu hàng hoàn DRAFT" biến mất; 2 mục còn lại là tồn > 0 và kiểm kê, không liên quan) |
+| AuditLog không chứa chữ tự do | ✅ | `delete_returntostock`: `changes={'status':'DRAFT','deleted':True}`, `note=''`; quét `changes`/`note` tìm `KHACH-NAME`, `0900000777`: 0 dòng |
+| Chứng từ không bị xoá cứng | ✅ | AuditLog 7 dòng, test `test_soft_delete` kiểm `all_objects` còn dòng + `deleted_by`; 110 test OK |
+
+### Phân quyền (POST …/returns/{id}/delete/ trên phiếu Nháp)
+| Vai | Kết quả mong đợi | Thực tế |
+|---|---|---|
+| owner | 200 | ✅ 200 |
+| manager | 403 | ✅ 403 "Chỉ Chủ mới xoá được phiếu hàng hoàn." |
+| warehouse_staff | 403 | ✅ 403 |
+| delivery_staff | 403 | ✅ 403 |
+| customer_service | 403 | ✅ 403 ("Thiếu quyền: inventory.add_returntostock") |
+| chưa đăng nhập | 401 | ✅ 401 |
+| HTTP DELETE (owner, manager) | 405 | ✅ 405 / 405; GET `…/delete/` cũng 405 |
+Sau chuỗi 403/401/405 phiếu vẫn còn (`draft still exists after rejects 200`). Mọi 403 đều không làm đổi dữ liệu.
+
+### #3 timeline
+| Ca | Kết quả | Bằng chứng |
+|---|---|---|
+| Đơn đã trả tiền huỷ lý do OTHER kèm "Khách Nguyễn Thử hẹn lại, gọi 0900000777" | ✅ | nhãn thực tế: `Huỷ đơn, hoàn hàng về lô gốc — lý do: Lý do khác`; không có chuỗi tên/SĐT/ghi chú trong cả body đơn lẫn `/api/guidance/order/9/` (owner và manager) |
+| Timeline phiếu hoàn (tạo `Mang hàng về kho 2.000 kg — chờ duyệt`, Duyệt `Duyệt hàng về kho: Tái nhập`, Huỷ `Huỷ phiếu hàng về kho 2.000 kg`) với note có tên (`KHACH-NAME-XYZ`) và ghi chú duyệt có tên | ✅ | marks trong timeline/body đơn/guidance đơn/guidance lô: không có. Chi tiết phiếu hoàn của Chủ vẫn hiện `note` (đó là dữ liệu của chính phiếu, không phải timeline) |
+| Phiếu seed ORM có note chứa SĐT giả (WRITE_OFF, RESTOCK) | ✅ | timeline đơn 3 và 4 không có chuỗi nào |
+| Tiền hiện "đ", không còn "₫" | ✅ | `Khách đặt đơn … (540.000 đ)`, `Nhận 540.000 đ`, `Lập chứng từ đảo doanh thu … (540.000 đ)`; không nhãn nào có "₫" |
+| Xoá phiếu thì sự kiện của nó biến khỏi timeline đơn | ✅ | trước: `…'Mang hàng về kho 2.000 kg'`; sau xoá: chỉ còn các sự kiện khác, không lộ ghi chú |
+| Ghi log server không có dữ liệu cá nhân | ✅ | `grep` log runserver tìm `Nguyễn Thử`, `KHACH-NAME`, `0900000`: 0 dòng |
+
+### Rò giá vốn (response không có `purchase_rate`, `landed_unit_cost`, `unit_cost`, `"rate"`, 123457, profit, pnl)
+| Vai | `/returns/` | `/returns/{id}/` |
+|---|---|---|
+| manager | ✅ sạch | ✅ sạch |
+| warehouse_staff | ✅ sạch | ✅ sạch |
+| delivery_staff | ✅ sạch | ✅ sạch |
+| customer_service | 403 | 403 |
+Khoá mới `available_actions` chỉ có chuỗi hành động (`['approve','cancel','delete']`), `status`, không số tiền, nên không tính ngược được giá vốn. AuditLog `changes` chỉ có `{status, deleted}`. Tập `available_actions` theo quyền: Chủ Nháp `[approve,cancel,delete]`, Quản lý Nháp `[approve,cancel]`, delivery_staff của phiếu `[cancel]`, phiếu Đã duyệt `[]`.
+
+### Rò dữ liệu cá nhân
+Timeline: sạch (xem #3). AuditLog: sạch. Log server: sạch. API hàng hoàn: ghi chú có SĐT bị chặn khi tạo (400 "Ghi chú không được chứa dãy số dài", kể cả `0900.000.777` và `090 0000 777`). Dữ liệu seed/ảnh đều là dữ liệu giả.
+
+### Ca ngoài đường thuận tự nghĩ thêm
+1. Tạo phiếu hoàn mới trên đơn đã có phiếu bị xoá → ✅ 201: số đã hoàn được giải phóng sau xoá (200 từ phiếu Nháp cũ).
+2. Phiếu có `note` chứa SĐT dạng chấm/cách → ✅ bị chặn 400 (lớp phòng thủ có sẵn).
+3. Đua 3 request (2 xoá + 1 duyệt) trên cùng một phiếu Nháp, 3 vòng → vòng 1 `[200, approve 500, 500]` (SQLite "database is locked", xem ⏸), vòng 2 `[200, approve 409, 409]` (STALE_STATE), vòng 3 `[200, 404, approve 404]`. Kết quả cuối nhất quán: các phiếu `deleted_at` đặt, không có dòng RESTOCK thừa (số dòng sổ kho RETURN_RESTOCK = 2 = phiếu 3 + RT-10 hợp lệ).
+4. Superuser xoá: được phủ bằng test (`test_d8_superuser_can_delete`, nằm trong 110 test OK).
+5. Phiếu Đã duyệt (RESTOCK) tạo mới sau đó bị Chủ xoá → ✅ 400 cùng mã.
+
+### Ca ⏸ (chưa kiểm được thật)
+- ⏸ Đồng thời thật (2 xoá cùng lúc, hoặc xoá đua với duyệt) trên PostgreSQL: SQLite tạm trả `database is locked` (500) ở vòng 1, đây là hạn chế của SQLite chứ không phải mã sản phẩm. Khoá `select_for_update` + bắt `DoesNotExist` → 409 đã được xác nhận ở vòng 2 và có test đơn vị (`test_soft_delete`, L1). Nên kiểm lại trên staging Postgres nếu cần.
+- ⏸ Giao diện FE (nút Xoá, nhãn "đ" trong ERP): ngoài phạm vi yêu cầu (chỉ BE).
+
+### Ghi nhận Low (không chặn)
+- L1: 403 của customer_service lộ tên quyền kỹ thuật ("Thiếu quyền: inventory.add_returntostock"), khác câu "Chỉ Chủ mới xoá được phiếu hàng hoàn." của 3 vai kia (vì chạy qua lớp quyền model trước). Không lộ dữ liệu, chỉ lệch chữ.
+- L2: `GET /api/reports/batch/<id số>/` trả 404; báo cáo dùng mã lô (`batch_id` dạng `CA01-…`). Chỉ ghi chú cho người viết script, không phải lỗi.
+
+### Hồi quy
+`manage.py test apps.inventory.returns apps.sales.orders.tests.test_timeline_no_free_text --parallel 4` = 110 test OK (cùng lượt). Toàn bộ 2880 test + `makemigrations --check` do điều phối viên chạy. Duyệt RESTOCK/WRITE_OFF, huỷ phiếu, tạo phiếu, timeline đơn, hướng dẫn lô vẫn chạy đúng qua HTTP.
+
+### Dọn dẹp
+`kill` runserver cổng 8765 (đã kiểm `lsof` trống); xoá DB tạm. Script ở scratchpad phiên (`seed.py`, `drive*.py`), không commit.
+
+## QA rà soát nhóm C/D/E (06/10)
+
+Bản kiểm: HEAD 35ad90e (đã gộp main). Build `NEXT_PUBLIC_USE_MOCK=1`, cờ AI mặc định tắt, phục vụ tĩnh cổng 3201 (đã tắt, `out/` đã xoá). Dữ liệu là mock giả. Ảnh nằm ở `shots/cde-qa/` (thư mục bị .gitignore, chỉ có trong worktree): `board-*.png` cạnh `app-*-1280.png` / `app-*-360.png`, ca ngoài đường thuận `app-edge-*`, hồi quy A/B `ab-*`.
+
+### Kết luận: REJECTED — 1 lỗi Medium (B1, chỉ ở màn hẹp khi bàn phím mở). Mọi lệch nhóm C/D/E ở desktop đã sửa đúng board; không lỗi Critical/High.
+Tổng: 41 ca · ✅ 36 · ❌ 1 (Medium) · ⏸ 4 · ghi nhận Thấp 4. Nếu Duy coi mobile ERP chưa duyệt (UI-RULES) nên B1 không chặn thì có thể chuyển thành APPROVED kèm nợ B1.
+
+### Lệnh đã chạy (lượt này)
+| Lệnh | Kết quả |
+|---|---|
+| `NEXT_PUBLIC_USE_MOCK=1 npm run build` | xanh |
+| `e2e/ed_batch4_delivery.py` (dev chưa chạy) | **70/70** |
+| `e2e/s48_password.py` | **41/41** (nút mắt 44px đạt) |
+| `e2e/ed_batch5_confirmation.py` | 126/127, đỏ: `ai_block` (giao diện AI, cờ tắt) |
+| `e2e/ed_batch7_inventory.py` | 113/114, đỏ: "AI bật: khối Trợ lý" (cờ tắt) |
+| `ed_batch3_orders` 143/143 · `ed_batch6_customers` 79/79 · `ed_batch10_purchasing` 115/115 · `ed_batch13_catalog` 128/128 · `ed_batch14_permissions` 101/101 | xanh |
+| `ed_batch1_shell` 54/56 | 2 đỏ là menu AI (ED-01 menu loc, menu avatar thiếu "AI của tôi"), do cờ AI tắt |
+| `ed_batch2_patterns` 46 đạt, dừng ở `ai_block` | ⏸ phần sau `ai_block` chưa chạy trên bản cờ tắt |
+Đỏ AI là đã biết (SR-HIDE-AI-01/02), không tính lỗi. Console: 0 lỗi ở mọi phiên chụp.
+
+### Chấm từng lệch nhóm C/D/E trong 04b (bằng ảnh chạy thật cạnh board)
+| Lệch (04b) | Kết quả | Bằng chứng |
+|---|---|---|
+| C: không có thẻ chia khối | ✅ đã sửa | `app-F1k-catalog-new-1280`, `app-F1m-rule-new-1280`, `app-F1a-purchasing-new-1280`, `app-F1f-stocktake-new-1280` đều có thẻ đầu 44px ("Thông tin", "Phiếu nhập", "Mặt hàng"…) |
+| C: ô nhập 46px thay 36px | ✅ | đo trong trình duyệt: 36px ở 1280, 44px ở 360 (đúng `--control-h`) |
+| C: checkbox/select thay switch/radio | ✅ | switch ở "Quản lý theo lô / Có hạn dùng / Đang bán / Đang bật", radio ở "Áp dụng cho", "Kiểu giảm", "Loại" (F1b). Vẫn là input native, đúng ghi chú dev |
+| C: thanh hành động không dính đáy | ✅ (1280, 360 cao 780) | thanh nút nằm sát đáy, trên thanh điều hướng ở 360. Xem B1 cho viewport thấp |
+| C: F1d Nhập lô (wizard) | ⏸ chưa sửa có chủ ý | luồng một form dài, board chia bước. Dev ghi "chỉ ghi nhận". Cần PO quyết, không phải lỗi |
+| D: popup rộng ~520px, board 560/640 | ✅ | đo: F1b 520, F1o/F1l/F2a/F3h 560, F3a 640, F3m 480; board F1b cũng 520 |
+| D: căn giữa dọc, board neo trên | ✅ | `y=111.8` ở mọi popup 1280; ở 360 trượt từ đáy (bottom sheet) |
+| D: ô nhập 46px | ✅ | F2a: 36/36 ở 1280, 44/44 ở 360 |
+| D: khối tóm tắt nền xám, board thẻ viền | ✅ | `app-F2a-1280` (khối Đơn / Tổng đơn là thẻ có viền); chân hộp nền canvas |
+| D: select/checkbox thay radio/switch | ✅ | `app-F1b-1280` (radio Loại, switch Đang hợp tác) |
+| D: F3a "thiếu ô mật khẩu mới" | ✅ báo nhầm, đồng ý với dev | ô "Mật khẩu tạm" + "Nhập lại mật khẩu tạm" có trong `app-F3a` (nhưng xem L3 dưới) |
+| D: F1l ngày và giờ xếp dọc | ✅ ở 1280 (cùng hàng "Áp dụng từ / đến"); 360 xếp dọc theo thiết kế hẹp | `app-F1l-1280`, `app-F1l-360` |
+| E: nền #F3F4F6, thẻ đổ bóng, padding lớn | ✅ | `app-W4f-login-1280` nền sáng, thẻ chỉ viền, so `board-W4f` |
+| E: W4h nút Đăng xuất full width | ✅ | `app-W4h-no-role-1280` nút nhỏ canh phải như board |
+| E: W4g Đặt mật khẩu | ✅ | `app-W4g-set-password-loi-1280` cùng khung với board W4g |
+
+### Ca ngoài đường thuận
+| Ca | Kết quả | Bằng chứng |
+|---|---|---|
+| Validate rỗng (Thêm mặt hàng) | ✅ | 3 ô đỏ + chữ "Nhập mã hàng." v.v. (`app-edge-F1k-validate-1280`). Tiêu điểm vẫn ở nút Lưu, không nhảy tới ô lỗi đầu tiên (L1) |
+| Lỗi máy chủ (mã hàng trùng) | ✅ | biểu ngữ "Dữ liệu gửi lên chưa hợp lệ." + chữ ở ô mã; nút đổi "Thử lại"; không đè nút Lưu (đo hộp: không chồng lấn) |
+| Validate rỗng trong popup (Thêm nhà cung cấp) | ✅ | popup còn mở, ô Tên đỏ + "Nhập tên nhà cung cấp." |
+| Esc đóng popup | ✅ 12/12 | 6 popup × 2 cỡ màn đều `dialog` về 0, kể cả sau khi đã gõ chữ; tiêu điểm trả về nút mở |
+| Tab bị nhốt trong popup | ✅ | 14 lần Tab, tiêu điểm luôn trong `[role=dialog]` |
+| Bấm nền đóng popup | ✅ | đóng cả khi đã gõ dở, không hỏi lại (L2) |
+| Đăng nhập sai mật khẩu | ✅ | hộp đỏ "Sai tài khoản/mật khẩu hoặc tài khoản đã ngừng hoạt động.", ô tài khoản giữ chữ, không đổi URL, ở 1280 và 360 |
+| Đăng nhập để trống | ✅ | "Nhập tên tài khoản của bạn." |
+| Đặt mật khẩu: nhập lại thiếu | ✅ | "Nhập lại mật khẩu mới để kiểm tra." + checklist đổi màu |
+| Tài khoản chưa nhóm (admin) | ✅ | vào `/no-role/` |
+| **Bàn phím mở: viewport 360x420** | ❌ B1 | xem dưới |
+| Cuộn ngang ở 360 | ✅ | 9 màn form/danh sách/chi tiết: không màn nào cuộn ngang trang |
+| Dữ liệu cá nhân ở storage/URL | ✅ (qua e2e) | ed_batch4_delivery, ed_batch14 có ca "không có dữ liệu cá nhân trong localStorage/URL", đạt |
+
+### Hồi quy nhóm A/B (globals.css gộp)
+✅ Danh sách Đơn, Khách hàng, Kho & lô, Mua hàng, Nhân sự và chi tiết Đơn, Khách hàng, Lô, Nhân sự ở 1280 và 360: đầu thẻ 44px, bảng cuộn trong thẻ, thẻ "Thông tin đơn" chia THANH TOÁN / GIAO HÀNG, StatusPath, dòng thời gian không vỡ; 0 cuộn ngang, 0 lỗi console (`ab-list-*`, `ab-detail-*`). Cộng e2e batch3/6/10/13/14 xanh. Lệch có sẵn: StatusPath ở 360 xuống dòng giữa chữ (nhóm B đã ghi).
+
+### Lỗi
+#### B1 — Ô nhập bị thanh nút dính đáy che khi viewport thấp (bàn phím mở) · Medium · AC nhóm C
+Bước tái hiện: mock build, đăng nhập `loc`, viewport 360x420 (mô phỏng bàn phím điện thoại mở), mở `/catalog/new/` (cũng `/catalog/rules/new/`, `/purchasing/new/`), bấm Tab qua các ô hoặc focus ô "Mô tả" rồi gõ.
+Mong đợi: ô đang gõ nằm trên thanh nút.
+Thực tế: ô "Mô tả" ở y 327–394, thanh nút bắt đầu y 295, thanh điều hướng đáy tiếp ngay dưới → ô bị che hoàn toàn, người dùng gõ mà không thấy (`app-edge-F1k-keyboard-focus-hidden-360x420.png`). Ở viewport 780 không xảy ra. Bằng chứng tự động: `/catalog/new/` 3 ô, `/catalog/rules/new/` 7 lần Tab, `/purchasing/new/` 5 lần Tab có đáy ô lớn hơn đỉnh thanh nút. Gợi ý (cho FE): `scroll-padding-bottom` ≥ chiều cao thanh nút + thanh điều hướng cho vùng cuộn của `FormPage`, hoặc `scrollIntoView({block:"center"})` khi focus. Chưa đối chiếu với trước khi sửa nhóm C nên chưa biết có phải hồi quy.
+Ảnh hưởng: nhập liệu trên điện thoại khó dùng. Phạm vi ERP mobile chưa được duyệt theo UI-RULES nên có thể hạ ưu tiên.
+
+### Ghi nhận Thấp (không chặn)
+- L1: sau khi bấm Lưu mà form báo lỗi, tiêu điểm không nhảy tới ô lỗi đầu tiên (a11y). Cũng sau đăng nhập sai tiêu điểm về `body`.
+- L2: Esc hoặc bấm nền đóng popup khi đã gõ dở không hỏi lại, mất chữ đã nhập.
+- L3: F3a vẫn khác board ở đoạn dẫn "Chữ, số và @ . + - _" phía trên, nhãn "NHÓM QUYỀN" HOA nhỏ; thẻ chọn nhóm nhiều dòng mô tả hơn board (board là hộp kiểm một dòng). Bản 1280 có nội dung dài, cuộn trong popup (chân nút vẫn thấy).
+- L4: biểu ngữ lỗi ở FormPage rộng toàn trang (1256px) trong khi thẻ form 960px (`app-edge-F1k-duplicate-1280`). Placeholder "vd: tam.kho" của board W4f không có trong app. F1a: app dùng thẻ từng mặt hàng, board dùng bảng một dòng kèm hàng "Tổng" (luồng khác như F1d).
+
+### Chưa kiểm (⏸)
+- F1c, F1e, F1g–F1i, F1n, F1o(chụp popup nhưng chưa so từng chi tiết), F2b–F2g, F2i–F2o, F3b–F3f, F3m–F3l: chỉ chụp F1b, F1k, F1l, F1m, F1a, F1c(trang), F1f, F2a, F3a, F3h, F3m, F1o ở app. Phần còn lại cùng component `Modal`/`Field` nên dự đoán đúng, nhưng chưa có ảnh nên ghi ⏸.
+- `ed_batch2_patterns` sau `ai_block`; các bản `*_real` (cần BE thật); đổi mật khẩu của W4e (ngăn kéo).
+- Không đối chiếu hành vi trước/sau khi sửa nhóm C cho B1.
+
+### QA lại sau ab326ca (06/10)
+
+**Kết luận: APPROVED.** B1 (Medium) đã hết, hai sửa L1 chạy đúng, 1280 không đổi. Còn 1 ghi nhận Thấp mới (popup).
+Bản kiểm: HEAD ab326ca, build mock=1 một lần, cổng 3201 (đã tắt, `out/` đã xoá). Ảnh: `shots/cde-qa/recheck-*.png`.
+
+| Ca | Kết quả | Bằng chứng |
+|---|---|---|
+| `ed_form_keyboard_focus.py` | ✅ 4/4 | chạy lượt này |
+| `ed_batch13_catalog` 128/128 · `s48_password` 41/41 · `ed_batch3_orders` 143/143 | ✅ | chạy lượt này |
+| B1 `/catalog/new/` 360x420, Tab 14 lần + focus ô giữa + ô cuối ("Mô tả") | ✅ | không ô nhập nào nằm dưới thanh nút (đỉnh thanh y=256, đáy ô "Mô tả" y=199); `recheck-F1k-mota-360x420.png` thấy ô trên thanh nút |
+| B1 `/catalog/rules/new/` và `/purchasing/new/` | ✅ | Tab 14 lần: 0 ô bị che; ô cuối (y đáy 250 / 267) nằm trên thanh (295) |
+| B1 popup có ô nhập (Thêm nhà cung cấp, focus "Ghi chú") | ✅ | đáy ô 287,6 nhỏ hơn đỉnh nút chân hộp 362; `recheck-F1b-ghichu-360x420.png` |
+| L1 form: bấm Lưu khi rỗng | ✅ | focus vào ô `code`, `aria-invalid=true` |
+| L1 đăng nhập sai | ✅ | focus vào ô mật khẩu, ô tài khoản giữ chữ |
+| Hồi quy 1280 | ✅ | vị trí nút Lưu (y 810,5) và ô Mã hàng không đổi trước/sau Tab, focus ô cuối, bấm Lưu lỗi; scrollTop 0 |
+| Console | ✅ | 0 lỗi |
+
+Ghi nhận Thấp (không chặn): L1 chưa phủ popup. Bấm "Lưu nhà cung cấp" khi để trống thì ô lỗi hiện đỏ nhưng focus vẫn ở nút Lưu. Các ghi nhận Thấp L2–L4 ở trên giữ nguyên.

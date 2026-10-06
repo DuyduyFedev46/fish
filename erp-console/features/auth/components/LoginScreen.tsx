@@ -61,6 +61,8 @@ function LoginForm() {
     } catch (err) {
       setError(errorText(err, MSG.loginFailed));
       setBusy(false);
+      // Đăng nhập sai: đưa tiêu điểm về ô mật khẩu để gõ lại ngay (a11y), sau khi ô hết bị khoá.
+      requestAnimationFrame(() => document.getElementById("p")?.focus());
     }
   };
 
@@ -77,7 +79,6 @@ function LoginForm() {
           </div>
         </div>
         <h1>Đăng nhập vận hành</h1>
-        <p>Mỗi người dùng tài khoản riêng của mình.</p>
 
         {notice && !error && (
           <div className="alert-box info" role="status">
