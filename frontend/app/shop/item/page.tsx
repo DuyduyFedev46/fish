@@ -56,7 +56,7 @@ function ItemDetail() {
         <div className={"item-detail-stock " + (Number(item.sellable_qty) > 0 ? "in-stock" : "out-stock")}>
           {Number(item.sellable_qty) > 0
             ? `Còn ${formatKg(item.sellable_qty)} khả dụng`
-            : "Hiện đã hết hàng"}
+            : "Tạm hết · liên hệ để đặt"}
         </div>
 
         <AddToCartControl item={item} />

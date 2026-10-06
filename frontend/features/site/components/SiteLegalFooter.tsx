@@ -57,7 +57,7 @@ export default function SiteLegalFooter() {
     <footer className={styles.legalFooter} aria-label="Thông tin pháp lý và người bán">
       <div className={styles.inner}>
         {hasSeller && (
-          <section className={styles.sellerSection} aria-label="Thông tin người bán">
+          <section id="thong-tin-nguoi-ban" className={styles.sellerSection} aria-label="Thông tin người bán">
             <h2 className={styles.sellerTitle}>Thông tin đơn vị bán hàng</h2>
             <p className={styles.sellerItem}>
               <strong>Tên đơn vị:</strong> {seller.name || "Đang cập nhật"}
