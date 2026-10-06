@@ -3313,3 +3313,26 @@ Phạm vi: `git diff main...feat/tien-ve-muon` (commit fdba607, 17 file). Đối
 ### Kết luận Review #15 BE (08/10): **CHANGES REQUESTED**
 
 Phải sửa trước khi merge: **TL15-H1** (4 nhánh + 4 test) và **TL15-M1** (1 khoá audit + 1 assert). L1–L3 đưa vào nợ. C1, C2 là điều kiện cho điều phối viên. Sau khi sửa, techlead re-review chỉ phần diff mới và chạy lại `apps.sales.payments` cùng `apps.sales.refunds`.
+
+### Re-review sau d51a89d
+
+Phạm vi: `git show d51a89d`, 4 file (`payments/services.py`, `refunds/services.py`, test, đính chính 02d §5).
+
+**Lệnh techlead đã tự chạy** (`DJANGO_DEBUG=1`, worktree `tien-ve-muon`, không tạo file nào trong worktree):
+- `manage.py test apps.sales.payments apps.sales.refunds apps.sales.orders apps.ai.registry`: 569 test, 568 OK. Còn 1 ERROR là `test_f5b_gl03_ac10_admin_post…`, lỗi HTML trang admin `Missing staticfiles manifest`. Đây là lỗi môi trường, đã gặp ở lần review trước, không liên quan code.
+- `makemigrations --check --dry-run`: No changes detected.
+- `check_naming.py`: không có vi phạm mới.
+
+| Mục | Kết quả |
+|---|---|
+| TL15-H1, chiều ghi tay (`find_similar_payment`, `services.py:409-429`) | **Đóng.** Có hai trường hợp:<br>- **Có đơn X:** lấy giao dịch của chính X trước. Không cửa sổ, giữ như cũ, vẫn bỏ dòng `-THUA`. Không có thì lấy `UNMATCHED` không đơn, cùng tiền, trong cửa sổ.<br>- **Không đơn:** lấy `UNMATCHED` không đơn hoặc `ORPHAN` của đơn bất kỳ, cả hai đều cùng tiền và trong cửa sổ.<br>`ORPHAN` ở đây không lọc theo nguồn, đúng ý: Chủ ghi sau webhook hoặc IPN. |
+| TL15-H1, chiều webhook (`flag_possible_duplicate`, `services.py:432-461`) | **Đóng.** Chỉ so với dòng `MANUAL`, loại chính nó, cùng tiền:<br>- **`ORPHAN`:** so với `MANUAL ORPHAN` cùng đơn (không cửa sổ), hoặc `MANUAL UNMATCHED` không đơn trong cửa sổ.<br>- **`UNMATCHED`:** so với `MANUAL UNMATCHED` không đơn, hoặc `MANUAL ORPHAN` đơn bất kỳ, cả hai trong cửa sổ.<br>Nhánh `OVERPAID` của BR-TT-15 không đổi. Hai hàm đối xứng nhau. |
+| Cửa sổ giờ | **Đúng.** `_in_window` tạo đoạn đóng hai phía `[t − W, t + W]`, với `W = max(LATE_PAYMENT_DUPLICATE_WINDOW_HOURS, 0)` đọc mỗi lần gọi. `override_settings` có hiệu lực, có test với W=1. Cửa sổ áp lên mọi ca chéo loại. Ca cùng đơn không có cửa sổ, đúng như 02d (cùng đơn đã là dấu hiệu mạnh). |
+| Không gắn nhãn thừa | **Đạt.** Có 4 test âm: khác tiền, ngoài cửa sổ (200 giờ so với W=72; 10 giờ so với W=1), cho cả hai chiều ghi tay→IPN và IPN→ghi tay. Dòng không phải `MANUAL` không bao giờ là căn cứ để gắn nhãn cho dòng webhook. Vì vậy hai webhook cùng tiền, không liên quan nhau, vẫn không bị gắn nhãn (giữ hành vi cũ). Phía ghi tay, phạm vi rộng hơn (`ORPHAN` đơn bất kỳ trong 72 giờ) có thể làm số lần hiện 409 tăng lên khi trùng số tiền phổ biến. Cái giá chỉ là Chủ tick một lần. Chấp nhận, vì đây là lớp chặn hoàn hai lần. |
+| TL15-M1 | **Đóng.** `refunds/services.py:138-140` chỉ thêm cờ `acknowledged_duplicate_warning: True` khi giao dịch có nhãn, không chép nội dung nhãn. Có test cả nhánh có cờ (kèm assert nhãn không nằm trong `changes`) và nhánh không nhãn (không có khoá). |
+| Đính chính 02d §5 | **Đạt.** Nội dung khớp code. |
+| Thiếu sót nhỏ (không chặn) | Chưa có test âm "ngoài cửa sổ" cho chiều webhook `UNMATCHED` → ghi tay gắn đơn huỷ. Chiều này dùng chung `_in_window` với các ca đã có test, nên rủi ro thấp. Nên bổ sung khi lần sau có người sửa file test này. |
+
+L1–L3 giữ nguyên là nợ. Điều kiện **C1** (deploy BE #15 cùng đợt với FE #15) và **C2** (ghi BR-TT-18 vào spec khi nghiệm thu) vẫn còn hiệu lực.
+
+### Kết luận re-review sau d51a89d: **APPROVED** (kèm điều kiện C1, C2)
