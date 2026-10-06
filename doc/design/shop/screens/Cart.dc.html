@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<title>Giỏ hàng — Cá Về</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#1A5BC0}a:hover{color:#1A57B5}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.num{font-variant-numeric:tabular-nums}
+a,button{-webkit-tap-highlight-color:transparent;touch-action:manipulation;transition:transform 120ms cubic-bezier(.23,1,.32,1)}
+a:active,button:active{transform:scale(.97)}
+a:focus-visible,button:focus-visible{outline:2px solid #1F66D1;outline-offset:2px}
+@media (prefers-reduced-motion:reduce){a:active,button:active{transform:none}}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; background: #F4F4F6; color: #17171C; font-family: Inter, system-ui, sans-serif; font-size: 14px; line-height: 1.5">
+
+  <header style="height: 56px; background: #FFFFFF; border-bottom: 1px solid #E4E4E9; display: flex; align-items: center; gap: 4px; padding: 0 6px">
+    <a href="Product.dc.html" aria-label="Quay lại" style="width: 44px; height: 44px; display: flex; align-items: center; justify-content: center">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#17171C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"></path></svg>
+    </a>
+    <h1 style="margin: 0; font-size: 17px; font-weight: 600">Giỏ hàng <span class="num" style="font-weight: 500; color: #686874">({{count}})</span></h1>
+  </header>
+
+  <ol aria-label="Bước đặt hàng" style="list-style: none; margin: 0; padding: 12px 16px; background: #FFFFFF; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; font-size: 12px; font-weight: 500">
+    <li aria-current="step" style="display: flex; flex-direction: column; gap: 6px; color: #1A5BC0"><span style="height: 4px; border-radius: 2px; background: {{brand}}"></span>1. Giỏ hàng</li>
+    <li style="display: flex; flex-direction: column; gap: 6px; color: #686874"><span style="height: 4px; border-radius: 2px; background: #EBEBEF"></span>2. Nhận hàng</li>
+    <li style="display: flex; flex-direction: column; gap: 6px; color: #686874"><span style="height: 4px; border-radius: 2px; background: #EBEBEF"></span>3. Thanh toán</li>
+  </ol>
+
+  <div style="height: 844px; overflow-y: auto; padding: 8px 0 220px; box-sizing: border-box">
+    <sc-if value="{{hasItems}}" hint-placeholder-val="{{ true }}">
+      <ul style="list-style: none; margin: 0; padding: 0; background: #FFFFFF">
+        <sc-for list="{{lines}}" as="l" hint-placeholder-count="3">
+          <li style="display: flex; gap: 12px; padding: 14px 16px; border-bottom: 1px solid #E4E4E9">
+            <span style="flex: none; width: 68px; height: 68px; border-radius: 8px; background: #F4F4F6; display: flex; align-items: center; justify-content: center">
+              <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#686874" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{l.icon}}"></path></svg>
+            </span>
+            <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px">
+              <div style="display: flex; justify-content: space-between; gap: 8px">
+                <span style="font-weight: 500; line-height: 1.3">{{l.name}}</span>
+                <button onClick="{{l.remove}}" aria-label="{{l.removeLabel}}" style="flex: none; width: 36px; height: 36px; margin: -8px -8px 0 0; border: 0; background: transparent; cursor: pointer; display: flex; align-items: center; justify-content: center">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#686874" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"></path></svg>
+                </button>
+              </div>
+              <span class="num" style="font-size: 12px; font-weight: 500; color: #686874">{{l.unitPrice}}</span>
+              <div style="display: flex; align-items: center; justify-content: space-between; padding-top: 2px">
+                <div style="display: flex; align-items: center; border: 1px solid #D4D4DB; border-radius: 8px; height: 40px">
+                  <button onClick="{{l.dec}}" aria-label="{{l.decLabel}}" style="width: 40px; height: 38px; border: 0; background: transparent; cursor: pointer; display: flex; align-items: center; justify-content: center"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#17171C" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M5 12h14"></path></svg></button>
+                  <span class="num" style="min-width: 60px; text-align: center; font-weight: 600; font-size: 13px">{{l.qtyText}}</span>
+                  <button onClick="{{l.inc}}" aria-label="{{l.incLabel}}" style="width: 40px; height: 38px; border: 0; background: transparent; cursor: pointer; display: flex; align-items: center; justify-content: center"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#17171C" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg></button>
+                </div>
+                <span class="num" style="font-weight: 600">{{l.lineTotal}}</span>
+              </div>
+            </div>
+          </li>
+        </sc-for>
+      </ul>
+      <div style="margin: 8px 16px 0; padding: 12px; border-radius: 10px; background: #EBF2FE; color: #1A5BC0; font-size: 13px; font-weight: 500; display: flex; gap: 8px">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1A5BC0" stroke-width="1.8" stroke-linecap="round" aria-hidden="true" style="flex: none; margin-top: 1px"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>
+        Mua tối thiểu 1 kg mỗi món.
+      </div>
+    </sc-if>
+    <sc-if value="{{isEmpty}}" hint-placeholder-val="{{ false }}">
+      <div style="margin: 24px 16px; padding: 32px 16px; background: #FFFFFF; border-radius: 12px; display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#8C8C98" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 4h2l2.4 10.2a1.5 1.5 0 0 0 1.5 1.1h8.6a1.5 1.5 0 0 0 1.5-1.1L21 8H6.2"></path></svg>
+        <span style="font-size: 16px; font-weight: 600">Giỏ hàng đang trống</span>
+        <a href="Main.dc.html" style="margin-top: 6px; height: 44px; padding: 0 18px; border-radius: 22px; background: {{brand}}; color: #FFFFFF; font-weight: 600; text-decoration: none; display: flex; align-items: center">Xem hàng đang có</a>
+      </div>
+    </sc-if>
+  </div>
+
+  <sc-if value="{{hasItems}}" hint-placeholder-val="{{ true }}">
+    <div style="position: absolute; left: 0; right: 0; bottom: 0; background: #FFFFFF; box-shadow: 0 -4px 16px rgba(23,23,28,0.08); padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 8px">
+      <div style="display: flex; justify-content: space-between; color: #4E4E58"><span>Tạm tính</span><span class="num">{{total}}</span></div>
+      <div style="display: flex; justify-content: space-between; color: #4E4E58"><span>Phí giao</span><span>Báo khi xác nhận đơn</span></div>
+      <div style="display: flex; justify-content: space-between; align-items: baseline; padding-top: 6px; border-top: 1px solid #E4E4E9">
+        <span style="font-weight: 600; padding-top: 6px">Tổng tiền hàng</span>
+        <span class="num" style="font-size: 20px; font-weight: 600; color: #1A5BC0; padding-top: 6px">{{total}}</span>
+      </div>
+      <a href="Checkout.dc.html" style="margin-top: 4px; height: 48px; border-radius: 24px; background: {{brand}}; color: #FFFFFF; font-weight: 600; text-decoration: none; display: flex; align-items: center; justify-content: center">Tiếp tục: nhập thông tin nhận hàng</a>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"brand":{"editor":"color","default":"#1F66D1","options":["#1F66D1","#0E3A73"]},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { qty: { muc: 1, thu: 1, combo: 1 } };
+  }
+  renderVals() {
+    const brand = this.props.brand ?? '#1F66D1';
+    const vnd = (n) => Math.round(n).toLocaleString('vi-VN') + 'đ';
+    const items = [
+      { id: 'muc', name: 'Mực ống làm sạch', price: 278000, step: 0.5, unit: 'kg', icon: 'M12 3c-3 0-5 3-5 7v3h10v-3c0-4-2-7-5-7zM8 13l-1 7M10.5 13l-.5 8M13.5 13l.5 8M16 13l1 7' },
+      { id: 'thu', name: 'Cá thu cắt khúc', price: 330000, step: 0.5, unit: 'kg', icon: 'M5 12c2.6-3.6 6-5.5 9.5-5.5 2.7 0 4.7 1.9 6.5 5.5-1.8 3.6-3.8 5.5-6.5 5.5C11 17.5 7.6 15.6 5 12zM5 12L2 8.5M5 12l-3 3.5' },
+      { id: 'combo', name: 'Combo lẩu hải sản', price: 259000, step: 1, unit: 'combo', icon: 'M4 8l8-4 8 4v8l-8 4-8-4zM4 8l8 4 8-4M12 12v8' }
+    ];
+    const qty = this.state.qty;
+    const set = (id, n) => {
+      const next = Object.assign({}, this.state.qty);
+      if (n <= 0) delete next[id]; else next[id] = Math.round(n * 10) / 10;
+      this.setState({ qty: next });
+    };
+    let total = 0;
+    const lines = items.filter((i) => qty[i.id] > 0).map((i) => {
+      const q = qty[i.id];
+      total += q * i.price;
+      const stepText = i.unit === 'kg' ? '0,5 kg ' : '1 combo ';
+      return Object.assign({}, i, {
+        qtyText: i.unit === 'kg' ? q.toLocaleString('vi-VN') + ' kg' : q + ' combo',
+        unitPrice: vnd(i.price) + ' / ' + i.unit,
+        lineTotal: vnd(q * i.price),
+        removeLabel: 'Bỏ ' + i.name + ' khỏi giỏ',
+        incLabel: 'Thêm ' + stepText + i.name,
+        decLabel: 'Bớt ' + stepText + i.name,
+        inc: () => set(i.id, q + i.step),
+        dec: () => set(i.id, q - i.step < (i.unit === 'kg' ? 1 : 1) ? 0 : q - i.step),
+        remove: () => set(i.id, 0)
+      });
+    });
+    return {
+      brand, lines,
+      count: lines.length,
+      hasItems: lines.length > 0,
+      isEmpty: lines.length === 0,
+      total: vnd(total)
+    };
+  }
+}
+</script>
+</body>
+</html>

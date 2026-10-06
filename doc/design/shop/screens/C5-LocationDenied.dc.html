@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<title>Không lấy được vị trí — Cá Về</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#1A5BC0}a:hover{color:#1A57B5}
+a:focus-visible,button:focus-visible{outline:2px solid #1F66D1;outline-offset:2px}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; background: #E6ECF2; color: #17171C; font-family: Inter, system-ui, sans-serif; font-size: 14px; line-height: 1.5">
+  <div aria-hidden="true" style="position: absolute; left: 0; right: 0; top: 24px; bottom: 0; background: #FFFFFF; border-radius: 16px 16px 0 0">
+    <div style="height: 56px; border-bottom: 1px solid #E4E4E9; display: flex; align-items: center; padding: 0 16px; font-weight: 600">Chọn vị trí giao hàng</div>
+    <div style="margin: 12px 16px; height: 44px; border: 1px solid #8C8C98; border-radius: 8px"></div>
+    <div style="position: absolute; left: 0; right: 0; top: 130px; bottom: 120px; background: #E6ECF2"></div>
+  </div>
+  <div aria-hidden="true" style="position: absolute; inset: 0; background: rgba(23,23,28,0.48)"></div>
+
+  <div role="dialog" aria-modal="true" aria-labelledby="loc-t" aria-describedby="loc-d" style="position: absolute; left: 24px; right: 24px; top: 50%; transform: translateY(-50%); background: #FFFFFF; border-radius: 14px; padding: 24px 20px 16px; display: flex; flex-direction: column; gap: 10px; text-align: center; align-items: center">
+    <span style="width: 52px; height: 52px; border-radius: 26px; background: #FDF3E3; display: flex; align-items: center; justify-content: center">
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#A85A07" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z"></path><path d="M4 4l16 16"></path></svg>
+    </span>
+    <h2 id="loc-t" style="margin: 0; font-size: 17px; font-weight: 600">Chưa lấy được vị trí của bạn</h2>
+    <p id="loc-d" style="margin: 0; color: #4E4E58">Hãy gõ địa chỉ để tìm, hoặc nhập tay.</p>
+    <div style="align-self: stretch; display: flex; flex-direction: column; gap: 8px; padding-top: 8px">
+      <a href="C1b-MapPicker.dc.html" style="height: 48px; border-radius: 24px; background: #1F66D1; color: #FFFFFF; font-weight: 600; text-decoration: none; display: flex; align-items: center; justify-content: center">Gõ địa chỉ để tìm</a>
+      <a href="Checkout.dc.html" style="height: 44px; border-radius: 22px; color: #17171C; font-weight: 500; text-decoration: none; display: flex; align-items: center; justify-content: center">Nhập tay</a>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

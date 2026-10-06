@@ -1,0 +1,763 @@
+{
+  "v": 3,
+  "attachments": {},
+  "boards": {
+    "A0-Loading.dc.html": {
+      "h": 844,
+      "title": "A8 · Trạng thái · Đang tải",
+      "w": 390,
+      "x": 3290,
+      "y": 0
+    },
+    "A4-Toast.dc.html": {
+      "h": 844,
+      "title": "A4 · [Popup] Đã thêm vào giỏ",
+      "w": 390,
+      "x": 1410,
+      "y": 0
+    },
+    "A5-NotFound.dc.html": {
+      "h": 844,
+      "title": "A5 · Lỗi · Tìm không thấy",
+      "w": 390,
+      "x": 1880,
+      "y": 0
+    },
+    "A6-Offline.dc.html": {
+      "h": 844,
+      "title": "A6 · Lỗi · Mất mạng, không tải được hàng",
+      "w": 390,
+      "x": 2350,
+      "y": 0
+    },
+    "A7-OutOfStock.dc.html": {
+      "h": 844,
+      "title": "A7 · Ngoại lệ · Sản phẩm tạm hết",
+      "w": 390,
+      "x": 2820,
+      "y": 0
+    },
+    "A8-SearchSuggest.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "A9 · [Popup] Gợi ý khi gõ tìm",
+      "w": 390,
+      "x": 3760,
+      "y": 0
+    },
+    "A9-ComboDetail.dc.html": {
+      "h": 1240,
+      "is_interactive": true,
+      "title": "A10 · Happy · Chi tiết combo",
+      "w": 390,
+      "x": 4230,
+      "y": 0
+    },
+    "B2-RemoveConfirm.dc.html": {
+      "h": 844,
+      "title": "B2 · [Popup] Xác nhận bỏ món",
+      "w": 390,
+      "x": 470,
+      "y": 2600
+    },
+    "B3-CartChanged.dc.html": {
+      "h": 844,
+      "title": "B3 · Ngoại lệ · Giá đổi / món đã hết trong giỏ",
+      "w": 390,
+      "x": 940,
+      "y": 2600
+    },
+    "B4-CartEmpty.dc.html": {
+      "h": 844,
+      "title": "B4 · Ngoại lệ · Giỏ trống",
+      "w": 390,
+      "x": 1410,
+      "y": 2600
+    },
+    "C1b-MapPicker.dc.html": {
+      "h": 844,
+      "title": "C1b · [Popup] Chọn vị trí trên Google Maps",
+      "w": 390,
+      "x": 470,
+      "y": 3864
+    },
+    "C1c-AddressFilled.dc.html": {
+      "h": 1000,
+      "title": "C1c · Happy · Địa chỉ tự điền từ bản đồ",
+      "w": 390,
+      "x": 940,
+      "y": 3864
+    },
+    "C2-Invalid.dc.html": {
+      "h": 1000,
+      "title": "C2 · Lỗi · Nhập thiếu / sai",
+      "w": 390,
+      "x": 1410,
+      "y": 3864
+    },
+    "C3-SoldOut.dc.html": {
+      "h": 844,
+      "title": "C3 · [Popup] Hết hàng lúc đặt (E-06)",
+      "w": 390,
+      "x": 1880,
+      "y": 3864
+    },
+    "C4-NetworkError.dc.html": {
+      "h": 844,
+      "title": "C4 · [Popup] Lỗi kết nối khi đặt",
+      "w": 390,
+      "x": 2350,
+      "y": 3864
+    },
+    "C5-LocationDenied.dc.html": {
+      "h": 844,
+      "title": "C5 · [Popup] Không lấy được vị trí / bản đồ lỗi",
+      "w": 390,
+      "x": 2820,
+      "y": 3864
+    },
+    "Cart.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "B1 · Happy · Giỏ hàng",
+      "w": 390,
+      "x": 0,
+      "y": 2600
+    },
+    "Checkout.dc.html": {
+      "h": 1000,
+      "is_interactive": true,
+      "title": "C1 · Happy · Thông tin nhận hàng",
+      "w": 390,
+      "x": 0,
+      "y": 3864
+    },
+    "D2-PayCancelled.dc.html": {
+      "h": 844,
+      "title": "D2 · Lỗi · Huỷ / lỗi trên SePay → thanh toán lại",
+      "w": 390,
+      "x": 470,
+      "y": 5284
+    },
+    "D3-PayPending.dc.html": {
+      "h": 844,
+      "title": "D3 · Ngoại lệ · Đang chờ xác nhận tiền",
+      "w": 390,
+      "x": 940,
+      "y": 5284
+    },
+    "D4-Expired.dc.html": {
+      "h": 844,
+      "title": "D4 · [Popup] Hết giờ giữ hàng (E-01)",
+      "w": 390,
+      "x": 1410,
+      "y": 5284
+    },
+    "D5-Underpaid.dc.html": {
+      "h": 844,
+      "title": "D5 · Ngoại lệ · Chuyển thiếu tiền (E-02)",
+      "w": 390,
+      "x": 1880,
+      "y": 5284
+    },
+    "D6-LeavePayment.dc.html": {
+      "h": 844,
+      "title": "D6 · [Popup] Rời trang thanh toán?",
+      "w": 390,
+      "x": 2350,
+      "y": 5284
+    },
+    "DesktopCart.dc.html": {
+      "expand": "fill",
+      "h": 900,
+      "is_interactive": true,
+      "title": "Happy · 4 · Giỏ hàng",
+      "w": 1280,
+      "x": 4080,
+      "y": 10320
+    },
+    "DesktopCategory.dc.html": {
+      "expand": "fill",
+      "h": 1100,
+      "is_interactive": true,
+      "title": "Happy · 2 · Danh mục",
+      "w": 1280,
+      "x": 1360,
+      "y": 10320
+    },
+    "DesktopCheckout.dc.html": {
+      "expand": "fill",
+      "h": 900,
+      "is_interactive": true,
+      "title": "Happy · 5 · Thông tin nhận hàng",
+      "w": 1280,
+      "x": 5440,
+      "y": 10320
+    },
+    "DesktopHome.dc.html": {
+      "expand": "fill",
+      "h": 1600,
+      "is_interactive": true,
+      "title": "Happy · 1 · Trang chủ",
+      "w": 1280,
+      "x": 0,
+      "y": 10320
+    },
+    "DesktopInvalid.dc.html": {
+      "expand": "fill",
+      "h": 900,
+      "is_interactive": true,
+      "title": "Lỗi · Nhập thiếu / sai",
+      "w": 1280,
+      "x": 2720,
+      "y": 13560
+    },
+    "DesktopLeavePayment.dc.html": {
+      "h": 800,
+      "is_interactive": true,
+      "title": "[Popup] Rời trang thanh toán?",
+      "w": 1280,
+      "x": 9520,
+      "y": 12340
+    },
+    "DesktopLookup.dc.html": {
+      "expand": "fill",
+      "h": 900,
+      "is_interactive": true,
+      "title": "Lỗi · Tra cứu không thấy đơn",
+      "w": 1280,
+      "x": 6800,
+      "y": 13560
+    },
+    "DesktopMapPicker.dc.html": {
+      "h": 800,
+      "title": "[Popup] Chọn vị trí trên Google Maps",
+      "w": 1280,
+      "x": 2720,
+      "y": 12340
+    },
+    "DesktopModalExpired.dc.html": {
+      "h": 800,
+      "title": "[Popup] Hết giờ giữ hàng (E-01)",
+      "w": 1280,
+      "x": 1360,
+      "y": 12340
+    },
+    "DesktopModalSoldOut.dc.html": {
+      "h": 800,
+      "title": "[Popup] Hết hàng lúc đặt (E-06)",
+      "w": 1280,
+      "x": 0,
+      "y": 12340
+    },
+    "DesktopNetworkError.dc.html": {
+      "h": 800,
+      "is_interactive": true,
+      "title": "[Popup] Lỗi kết nối khi đặt",
+      "w": 1280,
+      "x": 8160,
+      "y": 12340
+    },
+    "DesktopNotFound.dc.html": {
+      "expand": "fill",
+      "h": 900,
+      "is_interactive": true,
+      "title": "Lỗi · Tìm không thấy",
+      "w": 1280,
+      "x": 0,
+      "y": 13560
+    },
+    "DesktopOutOfStock.dc.html": {
+      "expand": "fill",
+      "h": 1100,
+      "is_interactive": true,
+      "title": "Ngoại lệ · Sản phẩm hết hàng",
+      "w": 1280,
+      "x": 1360,
+      "y": 13560
+    },
+    "DesktopPayCancelled.dc.html": {
+      "expand": "fill",
+      "h": 900,
+      "is_interactive": true,
+      "title": "Lỗi · Thanh toán chưa thành công",
+      "w": 1280,
+      "x": 4080,
+      "y": 13560
+    },
+    "DesktopPayPending.dc.html": {
+      "expand": "fill",
+      "h": 900,
+      "is_interactive": true,
+      "title": "Ngoại lệ · Đang chờ xác nhận tiền",
+      "w": 1280,
+      "x": 5440,
+      "y": 13560
+    },
+    "DesktopPayment.dc.html": {
+      "expand": "fill",
+      "h": 900,
+      "is_interactive": true,
+      "title": "Happy · 6 · Thanh toán",
+      "w": 1280,
+      "x": 6800,
+      "y": 10320
+    },
+    "DesktopProduct.dc.html": {
+      "expand": "fill",
+      "h": 1100,
+      "is_interactive": true,
+      "title": "Happy · 3 · Chi tiết sản phẩm",
+      "w": 1280,
+      "x": 2720,
+      "y": 10320
+    },
+    "DesktopRemoveConfirm.dc.html": {
+      "h": 800,
+      "is_interactive": true,
+      "title": "[Popup] Xác nhận bỏ món",
+      "w": 1280,
+      "x": 6800,
+      "y": 12340
+    },
+    "DesktopSearchSuggest.dc.html": {
+      "h": 800,
+      "is_interactive": true,
+      "title": "[Popup] Gợi ý khi gõ tìm",
+      "w": 1280,
+      "x": 5440,
+      "y": 12340
+    },
+    "DesktopSuccess.dc.html": {
+      "expand": "fill",
+      "h": 1150,
+      "is_interactive": true,
+      "title": "Happy · 7 · Đơn hàng (sau thanh toán)",
+      "w": 1280,
+      "x": 8160,
+      "y": 10320
+    },
+    "E2-Cancelled.dc.html": {
+      "h": 844,
+      "title": "E2 · Ngoại lệ · Đơn bị huỷ → Cá Về gọi lại (E-03, E-07)",
+      "w": 390,
+      "x": 470,
+      "y": 6548
+    },
+    "E3-Delivered.dc.html": {
+      "h": 1240,
+      "title": "E3 · Happy · Đơn đã giao",
+      "w": 390,
+      "x": 940,
+      "y": 6548
+    },
+    "E4-DeliveryFailed.dc.html": {
+      "h": 844,
+      "title": "E4 · Ngoại lệ · Giao không thành công (E-08)",
+      "w": 390,
+      "x": 1410,
+      "y": 6548
+    },
+    "F1-Lookup.dc.html": {
+      "h": 844,
+      "title": "F1 · Happy · Tra cứu đơn (mã + SĐT)",
+      "w": 390,
+      "x": 0,
+      "y": 8208
+    },
+    "F2-LookupNotFound.dc.html": {
+      "h": 844,
+      "title": "F2 · Lỗi · Không tìm thấy đơn",
+      "w": 390,
+      "x": 470,
+      "y": 8208
+    },
+    "HeaderFooter-Desktop.dc.html": {
+      "h": 2600,
+      "title": "Header & footer · máy tính (đặc tả từng link)",
+      "w": 1280,
+      "x": 960,
+      "y": 17000
+    },
+    "HeaderFooter-Mobile.dc.html": {
+      "h": 2600,
+      "title": "Header & footer · điện thoại (đặc tả từng link)",
+      "w": 880,
+      "x": 0,
+      "y": 17000
+    },
+    "Home.dc.html": {
+      "h": 2150,
+      "is_interactive": true,
+      "title": "A1 · Happy · Trang chủ",
+      "w": 390,
+      "x": 0,
+      "y": 0
+    },
+    "Landing.dc.html": {
+      "expand": "fill",
+      "h": 2700,
+      "is_interactive": true,
+      "title": "Landing page — giới thiệu thương hiệu",
+      "w": 1280,
+      "x": 0,
+      "y": 20020
+    },
+    "Main.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "A2 · Happy · Danh mục",
+      "w": 390,
+      "x": 470,
+      "y": 0
+    },
+    "P1-Policy.dc.html": {
+      "h": 1240,
+      "title": "F3 · Trang chính sách (mẫu)",
+      "w": 390,
+      "x": 940,
+      "y": 8208
+    },
+    "P2-Contact.dc.html": {
+      "h": 844,
+      "title": "F4 · Trang liên hệ",
+      "w": 390,
+      "x": 1410,
+      "y": 8208
+    },
+    "P3-HowToBuy.dc.html": {
+      "h": 1240,
+      "title": "F5 · Trang cách mua hàng",
+      "w": 390,
+      "x": 1880,
+      "y": 8208
+    },
+    "Payment.dc.html": {
+      "h": 844,
+      "is_interactive": true,
+      "title": "D1 · Happy · Thanh toán",
+      "w": 390,
+      "x": 0,
+      "y": 5284
+    },
+    "Product.dc.html": {
+      "h": 1240,
+      "is_interactive": true,
+      "title": "A3 · Happy · Chi tiết sản phẩm",
+      "w": 390,
+      "x": 940,
+      "y": 0
+    },
+    "Success.dc.html": {
+      "h": 1240,
+      "is_interactive": true,
+      "title": "E1 · Happy · Thanh toán xong → vào thẳng trang đơn hàng (tra cứu)",
+      "w": 390,
+      "x": 0,
+      "y": 6548
+    },
+    "G1-KitchenList.dc.html": {
+      "x": 2350,
+      "y": 8208,
+      "w": 390,
+      "h": 1240,
+      "title": "F6 · Góc bếp · danh sách",
+      "is_interactive": true
+    },
+    "G2-KitchenArticle.dc.html": {
+      "x": 2820,
+      "y": 8208,
+      "w": 390,
+      "h": 1600,
+      "title": "F7 · Góc bếp · bài viết",
+      "is_interactive": true
+    },
+    "DesktopToast.dc.html": {
+      "x": 8160,
+      "y": 13560,
+      "w": 1280,
+      "h": 900,
+      "title": "[Toast] Đã thêm vào giỏ + giỏ mini",
+      "is_interactive": true,
+      "expand": "fill"
+    },
+    "DesktopLoading.dc.html": {
+      "x": 9520,
+      "y": 13560,
+      "w": 1280,
+      "h": 1100,
+      "title": "Trạng thái · Đang tải",
+      "is_interactive": true,
+      "expand": "fill"
+    },
+    "DesktopOffline.dc.html": {
+      "x": 10880,
+      "y": 13560,
+      "w": 1280,
+      "h": 900,
+      "title": "Lỗi · Mất mạng",
+      "is_interactive": true,
+      "expand": "fill"
+    },
+    "DesktopComboDetail.dc.html": {
+      "x": 12240,
+      "y": 13560,
+      "w": 1280,
+      "h": 1100,
+      "title": "Happy · Chi tiết combo",
+      "is_interactive": true,
+      "expand": "fill"
+    },
+    "DesktopCartChanged.dc.html": {
+      "x": 13600,
+      "y": 13560,
+      "w": 1280,
+      "h": 900,
+      "title": "Ngoại lệ · Giỏ đổi giá / món hết",
+      "is_interactive": true,
+      "expand": "fill"
+    },
+    "DesktopUnderpaid.dc.html": {
+      "x": 14960,
+      "y": 13560,
+      "w": 1280,
+      "h": 900,
+      "title": "Ngoại lệ · Chuyển thiếu tiền (E-02)",
+      "is_interactive": true,
+      "expand": "fill"
+    },
+    "DesktopOrderStates.dc.html": {
+      "x": 0,
+      "y": 15080,
+      "w": 1280,
+      "h": 1400,
+      "title": "Đơn hàng · Đã giao / Giao không thành công / Bị huỷ",
+      "is_interactive": true,
+      "expand": "fill"
+    },
+    "DesktopPolicy.dc.html": {
+      "x": 1360,
+      "y": 15080,
+      "w": 1280,
+      "h": 1300,
+      "title": "Trang chính sách + cách mua hàng",
+      "is_interactive": true,
+      "expand": "fill"
+    },
+    "DesktopContact.dc.html": {
+      "x": 2720,
+      "y": 15080,
+      "w": 1280,
+      "h": 900,
+      "title": "Trang liên hệ",
+      "is_interactive": true,
+      "expand": "fill"
+    },
+    "DesktopKitchenList.dc.html": {
+      "x": 4080,
+      "y": 15080,
+      "w": 1280,
+      "h": 1200,
+      "title": "Góc bếp · danh sách",
+      "is_interactive": true,
+      "expand": "fill"
+    },
+    "DesktopKitchenArticle.dc.html": {
+      "x": 5440,
+      "y": 15080,
+      "w": 1280,
+      "h": 1500,
+      "title": "Góc bếp · bài viết",
+      "is_interactive": true,
+      "expand": "fill"
+    }
+  },
+  "createdOnFiles": {
+    "at": "2026-10-06T09:00:00Z",
+    "v": 1
+  },
+  "designSystems": [],
+  "launch": {
+    "view": "canvas"
+  },
+  "notes": {
+    "dRow1": {
+      "kind": "title1",
+      "maxW": 8000,
+      "text": "MÁY TÍNH · Luồng mua hàng (happy)",
+      "w": 240,
+      "x": 0,
+      "y": 10060
+    },
+    "dRow2": {
+      "kind": "title1",
+      "maxW": 8000,
+      "text": "MÁY TÍNH · Popup",
+      "w": 240,
+      "x": 0,
+      "y": 12080
+    },
+    "dRow3": {
+      "kind": "title1",
+      "maxW": 8000,
+      "text": "MÁY TÍNH · Trang lỗi & ngoại lệ",
+      "w": 240,
+      "x": 0,
+      "y": 13300
+    },
+    "flow": {
+      "kind": "title1",
+      "maxW": 4620,
+      "text": "ĐIỆN THOẠI · A · Chọn hàng: Trang chủ → Danh mục → Chi tiết",
+      "w": 240,
+      "x": 0,
+      "y": -260
+    },
+    "hf": {
+      "kind": "title1",
+      "maxW": 2240,
+      "text": "Header & Footer · từng link",
+      "w": 240,
+      "x": 0,
+      "y": 16740
+    },
+    "legend": {
+      "fill": "blue",
+      "text": "Cách đọc canvas\n\nMỗi hàng là một luồng. Ô đầu hàng là happy case, các ô kế bên là lỗi và ngoại lệ của bước đó.\n\nTên có [Popup] = trên app hiện dạng popup / bottom sheet / toast đè lên màn.\n\nMã E-0x khớp bảng ngoại lệ trong business-process-spec.md.\n\nPhần MÁY TÍNH (cuộn xuống): cùng luồng ở khổ 1280px. Ca lỗi giống bản điện thoại; popup trên máy tính là hộp thoại giữa màn.\n\nCuộn tiếp: Header & Footer (đặc tả từng link), rồi Landing page.",
+      "w": 300,
+      "x": 4800,
+      "y": 0
+    },
+    "rowB": {
+      "kind": "title1",
+      "maxW": 1800,
+      "text": "B · Giỏ hàng",
+      "w": 240,
+      "x": 0,
+      "y": 2340
+    },
+    "rowC": {
+      "kind": "title1",
+      "maxW": 3210,
+      "text": "C · Đặt hàng: nhập thông tin nhận",
+      "w": 240,
+      "x": 0,
+      "y": 3604
+    },
+    "rowD": {
+      "kind": "title1",
+      "maxW": 2270,
+      "text": "D · Thanh toán VietQR qua SePay",
+      "w": 240,
+      "x": 0,
+      "y": 5024
+    },
+    "rowE": {
+      "kind": "title1",
+      "maxW": 1800,
+      "text": "E · Sau thanh toán (trang đơn hàng = trang tra cứu)",
+      "w": 240,
+      "x": 0,
+      "y": 6288
+    },
+    "rowF": {
+      "kind": "title1",
+      "maxW": 3210,
+      "text": "F · Tra cứu đơn & trang phụ (chính sách, liên hệ, cách mua, góc bếp)",
+      "w": 240,
+      "x": 0,
+      "y": 7948
+    },
+    "rowL": {
+      "kind": "title1",
+      "maxW": 1280,
+      "text": "Landing page thương hiệu",
+      "w": 240,
+      "x": 0,
+      "y": 19760
+    },
+    "dRow4": {
+      "kind": "title1",
+      "maxW": 6720,
+      "text": "MÁY TÍNH · Đơn hàng & trang phụ",
+      "x": 0,
+      "y": 14820
+    }
+  },
+  "order": [
+    "Home.dc.html",
+    "Main.dc.html",
+    "Product.dc.html",
+    "A4-Toast.dc.html",
+    "A5-NotFound.dc.html",
+    "A6-Offline.dc.html",
+    "A7-OutOfStock.dc.html",
+    "Cart.dc.html",
+    "B2-RemoveConfirm.dc.html",
+    "B3-CartChanged.dc.html",
+    "B4-CartEmpty.dc.html",
+    "Checkout.dc.html",
+    "C1b-MapPicker.dc.html",
+    "C1c-AddressFilled.dc.html",
+    "C2-Invalid.dc.html",
+    "C3-SoldOut.dc.html",
+    "C4-NetworkError.dc.html",
+    "C5-LocationDenied.dc.html",
+    "Payment.dc.html",
+    "D2-PayCancelled.dc.html",
+    "D3-PayPending.dc.html",
+    "D4-Expired.dc.html",
+    "D5-Underpaid.dc.html",
+    "Success.dc.html",
+    "E2-Cancelled.dc.html",
+    "A0-Loading.dc.html",
+    "A8-SearchSuggest.dc.html",
+    "A9-ComboDetail.dc.html",
+    "D6-LeavePayment.dc.html",
+    "E3-Delivered.dc.html",
+    "E4-DeliveryFailed.dc.html",
+    "F1-Lookup.dc.html",
+    "F2-LookupNotFound.dc.html",
+    "P1-Policy.dc.html",
+    "P2-Contact.dc.html",
+    "P3-HowToBuy.dc.html",
+    "G1-KitchenList.dc.html",
+    "G2-KitchenArticle.dc.html",
+    "DesktopHome.dc.html",
+    "DesktopCategory.dc.html",
+    "DesktopProduct.dc.html",
+    "DesktopCart.dc.html",
+    "DesktopCheckout.dc.html",
+    "DesktopPayment.dc.html",
+    "DesktopSuccess.dc.html",
+    "DesktopModalSoldOut.dc.html",
+    "DesktopModalExpired.dc.html",
+    "DesktopMapPicker.dc.html",
+    "DesktopSearchSuggest.dc.html",
+    "DesktopRemoveConfirm.dc.html",
+    "DesktopNetworkError.dc.html",
+    "DesktopLeavePayment.dc.html",
+    "DesktopNotFound.dc.html",
+    "DesktopOutOfStock.dc.html",
+    "DesktopInvalid.dc.html",
+    "DesktopPayCancelled.dc.html",
+    "DesktopPayPending.dc.html",
+    "DesktopLookup.dc.html",
+    "DesktopToast.dc.html",
+    "DesktopLoading.dc.html",
+    "DesktopOffline.dc.html",
+    "DesktopComboDetail.dc.html",
+    "DesktopCartChanged.dc.html",
+    "DesktopUnderpaid.dc.html",
+    "DesktopOrderStates.dc.html",
+    "DesktopPolicy.dc.html",
+    "DesktopContact.dc.html",
+    "DesktopKitchenList.dc.html",
+    "DesktopKitchenArticle.dc.html",
+    "Landing.dc.html",
+    "HeaderFooter-Mobile.dc.html",
+    "HeaderFooter-Desktop.dc.html"
+  ],
+  "pages": [],
+  "title": "Cá Về — Bảng hàng prototype"
+}

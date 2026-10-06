@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<title>Đang chờ xác nhận — Cá Về</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#1A5BC0}a:hover{color:#1A57B5}
+.num{font-variant-numeric:tabular-nums}
+a,button{-webkit-tap-highlight-color:transparent;touch-action:manipulation;transition:transform 120ms cubic-bezier(.23,1,.32,1)}
+a:active,button:active{transform:scale(.97)}
+a:focus-visible,button:focus-visible{outline:2px solid #1F66D1;outline-offset:2px}
+.spin{animation:spin 900ms linear infinite;transform-origin:50% 50%}
+@keyframes spin{to{transform:rotate(360deg)}}
+.pulse{animation:pulse 1.4s ease-in-out infinite}
+@keyframes pulse{50%{opacity:.35}}
+@media (prefers-reduced-motion:reduce){a:active,button:active{transform:none}.spin{animation-duration:3s}.pulse{animation:none}}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; background: #F4F4F6; color: #17171C; font-family: Inter, system-ui, sans-serif; font-size: 14px; line-height: 1.5">
+
+  <section role="status" aria-live="polite" style="background: #FFFFFF; padding: 56px 24px 28px; display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center">
+    <span style="width: 72px; height: 72px; border-radius: 36px; background: #EBF2FE; display: flex; align-items: center; justify-content: center">
+      <svg class="spin" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke="#C9DCFB"></circle><path d="M21 12a9 9 0 0 0-9-9" stroke="#1F66D1"></path></svg>
+    </span>
+    <h1 style="margin: 0; font-size: 22px; font-weight: 600; letter-spacing: -0.01em">Đang chờ xác nhận thanh toán</h1>
+    <p style="margin: 0; color: #4E4E58">Ngân hàng thường báo trong vài giây. Trang tự cập nhật, bạn không cần chuyển khoản lại.</p>
+    <div style="margin-top: 6px; padding: 10px 16px; border-radius: 10px; background: #F4F4F6; display: flex; flex-direction: column; gap: 2px">
+      <span style="font-size: 12px; font-weight: 500; color: #686874">Mã đơn</span>
+      <span class="num" style="font-size: 18px; font-weight: 600; letter-spacing: 0.02em">SO[mã đơn]</span>
+    </div>
+  </section>
+
+  <section aria-labelledby="h-st" style="margin: 8px 16px 0; background: #FFFFFF; border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 14px">
+    <h2 id="h-st" style="margin: 0; font-size: 15px; font-weight: 600">Tiến trình</h2>
+    <ol style="list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; font-size: 12px; font-weight: 500">
+      <li style="display: flex; flex-direction: column; gap: 8px; color: #4E4E58">
+        <span style="height: 4px; border-radius: 2px; background: #157F3D"></span>
+        <span style="display: flex; align-items: center; gap: 4px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#157F3D" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"></path></svg>Đặt đơn</span>
+      </li>
+      <li aria-current="step" style="display: flex; flex-direction: column; gap: 8px; color: #1A5BC0">
+        <span class="pulse" style="height: 4px; border-radius: 2px; background: {{brand}}"></span>
+        <span style="font-weight: 600">Chờ ngân hàng</span>
+      </li>
+      <li style="display: flex; flex-direction: column; gap: 8px; color: #686874">
+        <span style="height: 4px; border-radius: 2px; background: #E4E4E9"></span>
+        <span>Thanh toán xong</span>
+      </li>
+    </ol>
+    <div style="display: flex; justify-content: space-between; font-size: 12px; font-weight: 500; color: #686874; border-top: 1px solid #E4E4E9; padding-top: 12px">
+      <span>Tự kiểm tra lại sau mỗi 5 giây</span>
+      <span class="num">Đã chờ {{waited}}</span>
+    </div>
+  </section>
+
+  <section style="margin: 8px 16px 0; background: #FFFFFF; border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 8px">
+    <div style="display: flex; justify-content: space-between; color: #4E4E58"><span>Số tiền của đơn</span><span class="num" style="font-weight: 600; color: #17171C">867.000đ</span></div>
+    <div style="display: flex; justify-content: space-between; color: #4E4E58"><span>Phương thức</span><span>VietQR qua SePay</span></div>
+  </section>
+
+  <div style="position: absolute; left: 0; right: 0; bottom: 0; padding: 12px 16px 16px; display: flex; flex-direction: column; gap: 8px; background: #FFFFFF; box-shadow: 0 -4px 16px rgba(23,23,28,0.08)">
+    <a href="#" style="height: 48px; border-radius: 24px; border: 1px solid {{brand}}; color: {{brand}}; font-weight: 600; text-decoration: none; display: flex; align-items: center; justify-content: center">Tra cứu đơn</a>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"brand":{"editor":"color","default":"#1F66D1","options":["#1F66D1","#0E3A73"]},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { waited: 4 };
+  }
+  componentDidMount() {
+    this.timer = setInterval(() => this.setState({ waited: this.state.waited + 1 }), 1000);
+  }
+  componentWillUnmount() {
+    clearInterval(this.timer);
+  }
+  renderVals() {
+    const w = this.state.waited;
+    return {
+      brand: this.props.brand ?? '#1F66D1',
+      waited: Math.floor(w / 60) + ':' + String(w % 60).padStart(2, '0')
+    };
+  }
+}
+</script>
+</body>
+</html>

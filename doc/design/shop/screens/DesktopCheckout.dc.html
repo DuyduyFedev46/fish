@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<title>Thông tin nhận hàng — Cá Về (máy tính)</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#1A5BC0}a:hover{color:#1A57B5}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.num{font-variant-numeric:tabular-nums}
+.wrap{max-width:1200px;margin:0 auto;padding:0 24px;box-sizing:border-box}
+a,button{transition:transform 120ms cubic-bezier(.23,1,.32,1),background-color 150ms ease-out,border-color 150ms ease-out,color 150ms ease-out}
+a:active,button:active{transform:scale(.97)}
+a:focus-visible,button:focus-visible,input:focus-visible{outline:2px solid #1F66D1;outline-offset:2px}
+.hd{background:#1F66D1;color:#FFFFFF}
+.hd a:focus-visible,.ft a:focus-visible{outline-color:#FFFFFF}
+.hd-a{height:44px;padding:0 12px;border-radius:22px;display:flex;align-items:center;gap:8px;color:#FFFFFF;text-decoration:none;font-size:14px;font-weight:500;white-space:nowrap}
+.hd-a:hover{color:#FFFFFF;background:#1A57B5}
+.ft{background:#0E3A73;color:#D6E4FA;font-size:13px}
+.ft a{color:#D6E4FA;text-decoration:none}
+.ft a:hover{color:#FFFFFF;text-decoration:underline}
+.steps{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;align-items:center;gap:10px 12px;font-weight:500;color:#686874}
+.steps li{display:flex;align-items:center;gap:10px}
+.steps .bar{width:48px;height:2px;border-radius:1px;background:#D4D4DB}
+.steps .dot{width:28px;height:28px;border-radius:14px;border:1.5px solid #D4D4DB;box-sizing:border-box;background:#FFFFFF;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600}
+.steps .done{color:#17171C}
+.steps .cur{color:#1A5BC0;font-weight:600}
+.steps .done .dot,.steps .cur .dot{background:#1F66D1;border-color:#1F66D1;color:#FFFFFF}
+.steps .done .bar,.steps .cur .bar{background:#1F66D1}
+.f{display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:500;color:#4E4E58}
+.f input,.f select{height:46px;box-sizing:border-box;padding:0 12px;border:1px solid #8C8C98;border-radius:10px;background:#FFFFFF;font:inherit;font-size:15px;font-weight:400;color:#17171C;transition:border-color 150ms ease-out,box-shadow 150ms ease-out}
+.f input::placeholder{color:#8C8C98}
+.f input:focus,.f select:focus{outline:none;border-color:#1F66D1;box-shadow:0 0 0 3px #EBF2FE}
+.req{color:#C0312B}
+.addr{display:flex;align-items:stretch;border:1px solid #8C8C98;border-radius:10px;background:#FFFFFF;overflow:hidden;transition:border-color 150ms ease-out,box-shadow 150ms ease-out}
+.addr:focus-within{border-color:#1F66D1;box-shadow:0 0 0 3px #EBF2FE}
+.addr textarea{flex:1;min-width:0;min-height:64px;box-sizing:border-box;padding:10px 12px;border:0;outline:none;resize:vertical;background:transparent;font:inherit;font-size:15px;font-weight:400;line-height:1.45;color:#17171C}
+.addr textarea::placeholder{color:#8C8C98}
+.map{flex:none;margin:8px;padding:0 14px;border-radius:8px;border:1px solid #D4D4DB;background:#FFFFFF;display:flex;align-items:center;gap:6px;text-decoration:none;color:#1A5BC0;font-size:14px;font-weight:600}
+.map:hover{border-color:#1F66D1;background:#EBF2FE;color:#1A5BC0}
+.btn{height:48px;padding:0 24px;border-radius:24px;display:flex;align-items:center;justify-content:center;gap:8px;font:inherit;font-size:15px;font-weight:600;text-decoration:none;cursor:pointer;box-sizing:border-box}
+.btn-p{background:#1F66D1;color:#FFFFFF;border:1px solid #1F66D1}
+.btn-p:hover{background:#1A57B5;border-color:#1A57B5;color:#FFFFFF}
+@media (prefers-reduced-motion:reduce){a:active,button:active{transform:none}}
+</style>
+</helmet>
+<div style="min-height: 900px; display: flex; flex-direction: column; background: #F4F4F6; color: #17171C; font-family: Inter, system-ui, sans-serif; font-size: 14px; line-height: 1.5">
+
+  <header class="hd">
+    <div class="wrap" style="min-height: 72px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 24px">
+      <a href="DesktopHome.dc.html" aria-label="Cá Về — trang chủ" style="flex: none; display: flex; align-items: center; gap: 10px; color: #FFFFFF; text-decoration: none">
+        <span aria-hidden="true" style="width: 40px; height: 40px; border-radius: 9px; border: 1.5px dashed rgba(255,255,255,0.75); font-size: 10px; font-weight: 600; display: flex; align-items: center; justify-content: center">LOGO</span>
+        <span style="display: flex; flex-direction: column; line-height: 1.15">
+          <span style="font-size: 20px; font-weight: 600; letter-spacing: -0.01em">Cá Về</span>
+          <span style="font-size: 12px; font-weight: 500; color: #D6E4FA">Từ cảng về bếp nhà bạn</span>
+        </span>
+      </a>
+      <div style="display: flex; align-items: center; gap: 8px">
+        <span style="display: flex; align-items: center; gap: 8px; padding: 0 12px; font-weight: 500">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"></rect><path d="M8 11V7a4 4 0 0 1 8 0v4"></path></svg>
+          Thanh toán an toàn
+        </span>
+        <span aria-hidden="true" style="width: 1px; height: 20px; background: rgba(255,255,255,0.35)"></span>
+        <a href="tel:[hotline]" class="hd-a">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2"></path></svg>
+          Hotline [hotline]
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <main style="flex: 1; padding: 24px 0 48px">
+    <div class="wrap" style="display: flex; flex-direction: column; gap: 20px">
+      <div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 24px">
+        <div style="display: flex; align-items: center; gap: 4px">
+          <a href="DesktopCart.dc.html" aria-label="Quay lại giỏ hàng" style="width: 44px; height: 44px; margin-left: -12px; border-radius: 22px; display: flex; align-items: center; justify-content: center">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#17171C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"></path></svg>
+          </a>
+          <h1 style="margin: 0; font-size: 24px; font-weight: 600; letter-spacing: -0.01em">Thông tin nhận hàng</h1>
+        </div>
+        <ol aria-label="Bước đặt hàng" class="steps">
+          <li class="done"><span class="dot"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"></path></svg></span>Giỏ hàng</li>
+          <li class="cur" aria-current="step"><span class="bar" aria-hidden="true"></span><span class="dot">2</span>Nhận hàng</li>
+          <li><span class="bar" aria-hidden="true"></span><span class="dot">3</span>Thanh toán</li>
+        </ol>
+      </div>
+
+      <div style="display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start">
+        <form style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column; gap: 16px">
+          <section aria-labelledby="h-nguoi" style="background: #FFFFFF; border-radius: 16px; padding: 20px 24px; display: flex; flex-direction: column; gap: 16px">
+            <h2 id="h-nguoi" style="margin: 0; font-size: 17px; font-weight: 600">Người nhận</h2>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px 20px">
+              <label class="f">Họ và tên <span class="sr">(bắt buộc)</span>
+                <input type="text" name="name" autocomplete="name" placeholder="Nguyễn Văn A" required>
+              </label>
+              <label class="f">Số điện thoại <span class="sr">(bắt buộc)</span>
+                <input type="tel" name="phone" autocomplete="tel" inputmode="tel" placeholder="09xx xxx xxx" required>
+              </label>
+            </div>
+          </section>
+
+          <section aria-labelledby="h-diachi" style="background: #FFFFFF; border-radius: 16px; padding: 20px 24px; display: flex; flex-direction: column; gap: 16px">
+            <h2 id="h-diachi" style="margin: 0; font-size: 17px; font-weight: 600">Địa chỉ giao hàng</h2>
+            <div class="f">
+              <label for="addr">Địa chỉ giao hàng <span class="sr">(bắt buộc)</span></label>
+              <div class="addr">
+                <textarea id="addr" name="address" rows="2" autocomplete="street-address" placeholder="Bấm để tìm trên bản đồ, hoặc gõ địa chỉ" aria-describedby="addr-hint" required></textarea>
+                <a href="DesktopMapPicker.dc.html" class="map" aria-label="Tìm địa chỉ trên bản đồ">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1A5BC0" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z"></path><circle cx="12" cy="9.5" r="2.5"></circle></svg>
+                  Bản đồ
+                </a>
+              </div>
+              <span id="addr-hint" style="font-size: 12px; color: #686874">Thêm hẻm, tầng, toà nhà nếu có</span>
+            </div>
+          </section>
+
+          <section style="background: #FFFFFF; border-radius: 16px; padding: 18px 24px">
+            <label style="display: flex; gap: 12px; align-items: flex-start; cursor: pointer">
+              <input type="checkbox" checked="{{consent}}" onChange="{{toggleConsent}}" style="flex: none; width: 20px; height: 20px; margin: 2px 0 0; accent-color: #1F66D1">
+              <span style="color: #4E4E58">Tôi đồng ý để Cá Về dùng họ tên, số điện thoại và địa chỉ này để giao đơn hàng, theo <a href="#chinh-sach-quyen-rieng-tu">chính sách quyền riêng tư</a>.</span>
+            </label>
+          </section>
+        </form>
+
+        <aside aria-labelledby="h-tom" style="flex: 1 1 300px; position: sticky; top: 24px; align-self: flex-start; background: #FFFFFF; border-radius: 16px; padding: 20px; display: flex; flex-direction: column; gap: 12px">
+          <h2 id="h-tom" style="margin: 0; font-size: 17px; font-weight: 600">Đơn hàng (3 món)</h2>
+          <ul style="list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px">
+            <li style="display: flex; justify-content: space-between; gap: 12px"><span><span style="font-weight: 500">Mực ống làm sạch</span><br><span class="num" style="font-size: 12px; color: #686874">1 kg × 278.000đ</span></span><span class="num">278.000đ</span></li>
+            <li style="display: flex; justify-content: space-between; gap: 12px"><span><span style="font-weight: 500">Cá thu cắt khúc</span><br><span class="num" style="font-size: 12px; color: #686874">1 kg × 330.000đ</span></span><span class="num">330.000đ</span></li>
+            <li style="display: flex; justify-content: space-between; gap: 12px"><span><span style="font-weight: 500">Combo lẩu hải sản</span><br><span class="num" style="font-size: 12px; color: #686874">1 combo × 259.000đ</span></span><span class="num">259.000đ</span></li>
+          </ul>
+          <div style="display: flex; justify-content: space-between; gap: 12px; color: #4E4E58; border-top: 1px solid #E4E4E9; padding-top: 12px"><span>Phí giao</span><span style="text-align: right">Báo khi xác nhận đơn</span></div>
+          <div style="display: flex; justify-content: space-between; align-items: baseline">
+            <span style="font-weight: 600">Tổng tiền hàng</span>
+            <span class="num" style="font-size: 24px; font-weight: 600; color: #1A5BC0; letter-spacing: -0.01em">867.000đ</span>
+          </div>
+          <sc-if value="{{consent}}" hint-placeholder-val="{{ true }}">
+            <a href="DesktopPayment.dc.html" class="btn btn-p" style="margin-top: 4px">Đặt hàng</a>
+          </sc-if>
+          <sc-if value="{{noConsent}}" hint-placeholder-val="{{ false }}">
+            <div aria-disabled="true" style="margin-top: 4px; height: 48px; border-radius: 24px; background: #EBEBEF; color: #686874; font-size: 15px; font-weight: 600; display: flex; align-items: center; justify-content: center">Đặt hàng</div>
+            <span style="font-size: 12px; font-weight: 500; color: #4E4E58; text-align: center">Đánh dấu đồng ý ở bên trái để đặt hàng.</span>
+          </sc-if>
+        </aside>
+      </div>
+    </div>
+  </main>
+
+  <footer class="ft">
+    <div class="wrap" style="padding-top: 20px; padding-bottom: 24px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px 32px">
+      <div style="display: flex; flex-direction: column; gap: 4px">
+        <span>[Tên doanh nghiệp] · MST [mã số thuế] · Địa chỉ [địa chỉ kinh doanh]</span>
+        <span>Giấy CN ĐKKD số [số] do [nơi cấp] cấp ngày [ngày]</span>
+        <span>© 2026 Cá Về</span>
+      </div>
+      <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px 24px">
+        <a href="DesktopPolicy.dc.html">Đổi trả</a>
+        <a href="#chinh-sach-quyen-rieng-tu">Quyền riêng tư</a>
+        <div style="display: flex; align-items: center; gap: 10px; height: 48px; padding: 0 14px; border: 1.5px dashed rgba(214,228,250,0.55); border-radius: 8px">
+          <span aria-hidden="true" style="width: 32px; height: 32px; border-radius: 16px; border: 1.5px dashed rgba(214,228,250,0.7); font-size: 8px; font-weight: 600; display: flex; align-items: center; justify-content: center">BCT</span>
+          <span style="font-weight: 500; color: #FFFFFF">Đã thông báo Bộ Công Thương</span>
+        </div>
+      </div>
+    </div>
+  </footer>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":900}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { consent: true };
+  }
+  renderVals() {
+    const consent = this.state.consent;
+    return {
+      consent,
+      noConsent: !consent,
+      toggleConsent: () => this.setState({ consent: !consent })
+    };
+  }
+}
+</script>
+</body>
+</html>

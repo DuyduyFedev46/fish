@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<title>Header &amp; footer — điện thoại</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#1A5BC0}a:hover{color:#1A57B5}
+.num{font-variant-numeric:tabular-nums}
+.spec{width:100%;border-collapse:collapse;font-size:12px}
+.spec th{text-align:left;font-weight:600;color:#4E4E58;padding:6px 8px;border-bottom:1px solid #D4D4DB;background:#F4F4F6}
+.spec td{padding:6px 8px;border-bottom:1px solid #E4E4E9;vertical-align:top;color:#17171C}
+.spec code{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11px;color:#0E3A73;background:#EBF2FE;padding:1px 4px;border-radius:4px;white-space:nowrap}
+.phone{width:390px;flex:none;background:#FFFFFF;border:1px solid #D4D4DB;border-radius:12px;overflow:hidden}
+.lab{font-size:12px;font-weight:600;color:#686874;text-transform:uppercase;letter-spacing:.04em}
+.ft summary{list-style:none;cursor:pointer;height:48px;display:flex;align-items:center;justify-content:space-between;color:#FFFFFF;font-weight:600;border-bottom:1px solid rgba(255,255,255,0.14)}
+.ft summary::-webkit-details-marker{display:none}
+.ft ul{list-style:none;margin:0;padding:4px 0 12px;display:flex;flex-direction:column}
+.ft li a{display:flex;align-items:center;min-height:40px;color:#D6E4FA;text-decoration:none;font-size:14px}
+</style>
+</helmet>
+<div style="width: 880px; box-sizing: border-box; padding: 40px; background: #FBFBFC; color: #17171C; font-family: Inter, system-ui, sans-serif; font-size: 14px; line-height: 1.5; display: flex; flex-direction: column; gap: 40px">
+  <div style="display: flex; flex-direction: column; gap: 4px">
+    <h1 style="margin: 0; font-size: 24px; font-weight: 600; letter-spacing: -0.015em">Header &amp; footer · điện thoại</h1>
+    <p style="margin: 0; color: #4E4E58">Mọi link là thẻ <code style="font-family: 'JetBrains Mono', monospace; font-size: 12px">&lt;a href&gt;</code> thật. Bảng bên phải ghi nhãn, đích đến và quy tắc của từng link. Đích dạng <code style="font-family: 'JetBrains Mono', monospace; font-size: 12px">/shop/…</code> là route thật khi code.</p>
+  </div>
+
+  <section style="display: flex; gap: 24px; align-items: flex-start">
+    <div style="display: flex; flex-direction: column; gap: 8px">
+      <span class="lab">H1 · Header trang chủ</span>
+      <div class="phone">
+        <header style="background: #1F66D1; padding: 8px 16px 14px; display: flex; flex-direction: column; gap: 10px">
+          <div style="height: 44px; display: flex; align-items: center; justify-content: space-between">
+            <a href="Home.dc.html" aria-label="Cá Về — trang chủ" style="display: flex; align-items: center; gap: 8px; text-decoration: none; color: #FFFFFF">
+              <span aria-hidden="true" style="width: 30px; height: 30px; border-radius: 7px; border: 1.5px dashed rgba(255,255,255,0.7); font-size: 8px; font-weight: 600; display: flex; align-items: center; justify-content: center">LOGO</span>
+              <span style="display: flex; flex-direction: column; line-height: 1.15"><span style="font-size: 18px; font-weight: 600">Cá Về</span><span style="font-size: 11px; font-weight: 500; color: #D6E4FA">Từ cảng về bếp nhà bạn</span></span>
+            </a>
+            <span style="display: flex; gap: 2px">
+              <a href="tel:[hotline]" aria-label="Gọi hotline Cá Về" style="width: 44px; height: 44px; display: flex; align-items: center; justify-content: center"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2"></path></svg></a>
+              <a href="F1-Lookup.dc.html" aria-label="Tra cứu đơn hàng" style="width: 44px; height: 44px; display: flex; align-items: center; justify-content: center"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3h8l3 3v15H5V3h3zM9 10h6M9 14h6M9 18h3"></path></svg></a>
+              <a href="Cart.dc.html" aria-label="Giỏ hàng, 3 món" style="position: relative; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 4h2l2.4 10.2a1.5 1.5 0 0 0 1.5 1.1h8.6a1.5 1.5 0 0 0 1.5-1.1L21 8H6.2"></path><circle cx="9.5" cy="19.5" r="1.3"></circle><circle cx="17" cy="19.5" r="1.3"></circle></svg><span class="num" style="position: absolute; top: 3px; right: 1px; min-width: 18px; height: 18px; padding: 0 5px; box-sizing: border-box; border-radius: 9px; background: #FFFFFF; color: #1A5BC0; font-size: 11px; font-weight: 600; display: flex; align-items: center; justify-content: center">3</span></a>
+            </span>
+          </div>
+          <form role="search" action="Main.dc.html" style="margin: 0">
+            <label style="height: 44px; border-radius: 22px; background: #FFFFFF; display: flex; align-items: center; gap: 8px; padding: 0 6px 0 16px">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#686874" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"></circle><path d="M20 20l-4.2-4.2"></path></svg>
+              <input type="search" aria-label="Tìm sản phẩm" placeholder="Tìm cá, tôm, mực, combo…" style="flex: 1; min-width: 0; border: 0; outline: none; font: inherit; font-size: 16px">
+            </label>
+          </form>
+          <nav aria-label="Tìm nhiều" style="display: flex; gap: 6px; overflow: hidden">
+            <a href="Main.dc.html" style="flex: none; height: 32px; padding: 0 12px; border-radius: 16px; background: rgba(255,255,255,0.14); color: #FFFFFF; font-size: 13px; font-weight: 500; text-decoration: none; display: flex; align-items: center">Cá thu</a>
+            <a href="Main.dc.html" style="flex: none; height: 32px; padding: 0 12px; border-radius: 16px; background: rgba(255,255,255,0.14); color: #FFFFFF; font-size: 13px; font-weight: 500; text-decoration: none; display: flex; align-items: center">Mực ống</a>
+            <a href="Main.dc.html" style="flex: none; height: 32px; padding: 0 12px; border-radius: 16px; background: rgba(255,255,255,0.14); color: #FFFFFF; font-size: 13px; font-weight: 500; text-decoration: none; display: flex; align-items: center">Tôm sú</a>
+            <a href="Main.dc.html" style="flex: none; height: 32px; padding: 0 12px; border-radius: 16px; background: rgba(255,255,255,0.14); color: #FFFFFF; font-size: 13px; font-weight: 500; text-decoration: none; display: flex; align-items: center">Combo lẩu</a>
+          </nav>
+        </header>
+      </div>
+    </div>
+    <table class="spec">
+      <thead><tr><th>Nhãn / phần tử</th><th>Đích (href)</th><th>Ghi chú</th></tr></thead>
+      <tbody>
+        <tr><td>Logo + "Cá Về"</td><td><code>/</code></td><td>aria-label "Cá Về — trang chủ". Ảnh logo Duy upload.</td></tr>
+        <tr><td>Icon điện thoại</td><td><code>tel:[hotline]</code></td><td>Gọi thẳng, mở trình gọi của máy.</td></tr>
+        <tr><td>Icon tra cứu đơn</td><td><code>/shop/orders</code></td><td>Nhập mã đơn + SĐT để tra.</td></tr>
+        <tr><td>Icon giỏ + badge</td><td><code>/shop/cart</code></td><td>Badge = số món (không phải số kg). Ẩn badge khi 0.</td></tr>
+        <tr><td>Ô tìm (form role=search)</td><td><code>/shop?q=…</code></td><td>Enter để tìm. Font 16px tránh iOS phóng to.</td></tr>
+        <tr><td>Chip "Cá thu", "Mực ống"…</td><td><code>/shop?q=cá%20thu</code></td><td>Tối đa 4 chip, Lộc chọn trong ERP. Cuộn ngang.</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section style="display: flex; gap: 24px; align-items: flex-start">
+    <div style="display: flex; flex-direction: column; gap: 8px">
+      <span class="lab">H2 · Header khi cuộn / trang danh mục</span>
+      <div class="phone">
+        <header style="height: 56px; background: #FFFFFF; border-bottom: 1px solid #E4E4E9; padding: 0 6px 0 16px; display: flex; align-items: center; gap: 4px">
+          <a href="Home.dc.html" aria-label="Cá Về — trang chủ" style="display: flex; align-items: center; gap: 8px; text-decoration: none; color: #0E3A73; margin-right: auto">
+            <span aria-hidden="true" style="width: 28px; height: 28px; border-radius: 7px; border: 1.5px dashed #8C8C98; background: #F4F4F6; color: #4E4E58; font-size: 8px; font-weight: 600; display: flex; align-items: center; justify-content: center">LOGO</span>
+            <span style="font-size: 17px; font-weight: 600">Cá Về</span>
+          </a>
+          <a href="Main.dc.html" aria-label="Tìm sản phẩm" style="width: 44px; height: 44px; display: flex; align-items: center; justify-content: center"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#17171C" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"></circle><path d="M20 20l-4.2-4.2"></path></svg></a>
+          <a href="Cart.dc.html" aria-label="Giỏ hàng, 3 món" style="position: relative; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#17171C" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 4h2l2.4 10.2a1.5 1.5 0 0 0 1.5 1.1h8.6a1.5 1.5 0 0 0 1.5-1.1L21 8H6.2"></path><circle cx="9.5" cy="19.5" r="1.3"></circle><circle cx="17" cy="19.5" r="1.3"></circle></svg><span class="num" style="position: absolute; top: 3px; right: 1px; min-width: 18px; height: 18px; padding: 0 5px; box-sizing: border-box; border-radius: 9px; background: #1F66D1; color: #FFFFFF; font-size: 11px; font-weight: 600; display: flex; align-items: center; justify-content: center">3</span></a>
+        </header>
+      </div>
+    </div>
+    <table class="spec">
+      <thead><tr><th>Nhãn / phần tử</th><th>Đích (href)</th><th>Ghi chú</th></tr></thead>
+      <tbody>
+        <tr><td>Logo + "Cá Về"</td><td><code>/</code></td><td>Header dính (sticky), cao 56px. H1 tự thu về H2 khi cuộn quá ô tìm.</td></tr>
+        <tr><td>Icon kính lúp</td><td><code>/shop?focus=search</code></td><td>Mở trang danh mục, con trỏ vào ô tìm.</td></tr>
+        <tr><td>Icon giỏ + badge</td><td><code>/shop/cart</code></td><td>Badge nền accent khi header trắng.</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section style="display: flex; gap: 24px; align-items: flex-start">
+    <div style="display: flex; flex-direction: column; gap: 8px">
+      <span class="lab">H3 · Header trang con · H4 · Header đặt hàng</span>
+      <div class="phone" style="display: flex; flex-direction: column">
+        <header style="height: 56px; background: #FFFFFF; border-bottom: 1px solid #E4E4E9; display: flex; align-items: center; justify-content: space-between; padding: 0 6px">
+          <a href="Main.dc.html" aria-label="Quay lại" style="width: 44px; height: 44px; display: flex; align-items: center; justify-content: center"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#17171C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"></path></svg></a>
+          <span style="font-size: 15px; font-weight: 600">Chi tiết sản phẩm</span>
+          <a href="Cart.dc.html" aria-label="Giỏ hàng, 3 món" style="width: 44px; height: 44px; display: flex; align-items: center; justify-content: center"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#17171C" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 4h2l2.4 10.2a1.5 1.5 0 0 0 1.5 1.1h8.6a1.5 1.5 0 0 0 1.5-1.1L21 8H6.2"></path></svg></a>
+        </header>
+        <div style="height: 12px; background: #F4F4F6"></div>
+        <header style="height: 56px; background: #FFFFFF; border-top: 1px solid #E4E4E9; border-bottom: 1px solid #E4E4E9; display: flex; align-items: center; gap: 4px; padding: 0 12px 0 6px">
+          <a href="Cart.dc.html" aria-label="Quay lại giỏ hàng" style="width: 44px; height: 44px; display: flex; align-items: center; justify-content: center"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#17171C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"></path></svg></a>
+          <span style="font-size: 17px; font-weight: 600; margin-right: auto">Thông tin nhận hàng</span>
+          <span style="font-size: 12px; font-weight: 500; color: #157F3D; display: flex; align-items: center; gap: 4px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#157F3D" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"></rect><path d="M8 11V7a4 4 0 0 1 8 0v4"></path></svg>Bảo mật</span>
+        </header>
+      </div>
+    </div>
+    <table class="spec">
+      <thead><tr><th>Nhãn / phần tử</th><th>Đích (href)</th><th>Ghi chú</th></tr></thead>
+      <tbody>
+        <tr><td>H3 · Mũi tên quay lại</td><td><code>history.back()</code>, dự phòng <code>/shop</code></td><td>Vào thẳng từ link chia sẻ thì không có lịch sử → về <code>/shop</code>.</td></tr>
+        <tr><td>H3 · Icon giỏ</td><td><code>/shop/cart</code></td><td>Dùng cho Danh mục con, Chi tiết, Góc bếp.</td></tr>
+        <tr><td>H4 · Mũi tên quay lại</td><td><code>/shop/cart</code></td><td>Bước đặt hàng: không logo, không giỏ, không menu để khách không rời luồng.</td></tr>
+        <tr><td>H4 · Nhãn "Bảo mật"</td><td>không link</td><td>Chỉ là chữ trấn an, không phải nút.</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section style="display: flex; gap: 24px; align-items: flex-start">
+    <div style="display: flex; flex-direction: column; gap: 8px">
+      <span class="lab">N1 · Thanh điều hướng dưới</span>
+      <div class="phone">
+        <nav aria-label="Điều hướng chính" style="height: 64px; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr))">
+          <a href="Home.dc.html" aria-current="page" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; text-decoration: none; font-size: 11px; font-weight: 600; color: #1F66D1"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1F66D1" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 11l8-6 8 6v8a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1z"></path></svg>Trang chủ</a>
+          <a href="Main.dc.html" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; text-decoration: none; font-size: 11px; font-weight: 500; color: #4E4E58"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#4E4E58" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z"></path></svg>Danh mục</a>
+          <a href="Cart.dc.html" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; text-decoration: none; font-size: 11px; font-weight: 500; color: #4E4E58"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#4E4E58" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 4h2l2.4 10.2a1.5 1.5 0 0 0 1.5 1.1h8.6a1.5 1.5 0 0 0 1.5-1.1L21 8H6.2"></path></svg>Giỏ hàng</a>
+          <a href="F1-Lookup.dc.html" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; text-decoration: none; font-size: 11px; font-weight: 500; color: #4E4E58"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#4E4E58" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3h8l3 3v15H5V3h3zM9 10h6M9 14h6"></path></svg>Đơn hàng</a>
+        </nav>
+      </div>
+    </div>
+    <table class="spec">
+      <thead><tr><th>Nhãn</th><th>Đích (href)</th><th>Ghi chú</th></tr></thead>
+      <tbody>
+        <tr><td>Trang chủ</td><td><code>/</code></td><td>Mục đang ở có <code>aria-current="page"</code>, màu accent.</td></tr>
+        <tr><td>Danh mục</td><td><code>/shop</code></td><td></td></tr>
+        <tr><td>Giỏ hàng</td><td><code>/shop/cart</code></td><td>Có badge số món như header.</td></tr>
+        <tr><td>Đơn hàng</td><td><code>/shop/orders</code></td><td>Tra đơn bằng mã + SĐT (không có tài khoản).</td></tr>
+        <tr><td colspan="3" style="color: #4E4E58">Hiện ở Trang chủ, Danh mục, Góc bếp. Ẩn ở Chi tiết (đã có thanh mua), Giỏ và các bước đặt hàng.</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section style="display: flex; gap: 24px; align-items: flex-start">
+    <div style="display: flex; flex-direction: column; gap: 8px">
+      <span class="lab">F1 · Footer (trang chủ, danh mục, góc bếp)</span>
+      <div class="phone">
+        <footer class="ft" style="background: #0E3A73; color: #D6E4FA; padding: 20px 16px; display: flex; flex-direction: column; gap: 4px; font-size: 14px">
+          <a href="Home.dc.html" aria-label="Cá Về — trang chủ" style="display: flex; align-items: center; gap: 8px; color: #FFFFFF; text-decoration: none; font-weight: 600; font-size: 17px; padding-bottom: 6px">
+            <span aria-hidden="true" style="width: 28px; height: 28px; border-radius: 7px; border: 1.5px dashed rgba(255,255,255,0.7); font-size: 8px; display: flex; align-items: center; justify-content: center">LOGO</span>Cá Về</a>
+          <p style="margin: 0 0 8px">Hải sản cấp đông theo lô, giá tính theo kg, giao tận nhà.</p>
+          <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; padding-bottom: 8px">
+            <a href="tel:[hotline]" style="height: 44px; border-radius: 22px; background: #FFFFFF; color: #0E3A73; font-weight: 600; text-decoration: none; display: flex; align-items: center; justify-content: center">Gọi [hotline]</a>
+            <a href="https://zalo.me/[số]" style="height: 44px; border-radius: 22px; border: 1px solid rgba(255,255,255,0.5); color: #FFFFFF; font-weight: 600; text-decoration: none; display: flex; align-items: center; justify-content: center">Nhắn Zalo</a>
+          </div>
+          <details open="open">
+            <summary>Mua hàng <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg></summary>
+            <ul><li><a href="Main.dc.html">Hàng đang có</a></li><li><a href="Main.dc.html">Combo nấu nhanh</a></li><li><a href="P3-HowToBuy.dc.html">Cách mua hàng</a></li><li><a href="F1-Lookup.dc.html">Tra cứu đơn</a></li></ul>
+          </details>
+          <details>
+            <summary>Chính sách <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg></summary>
+            <ul><li><a href="P1-Policy.dc.html">Chính sách đổi trả</a></li><li><a href="P1-Policy.dc.html">Chính sách giao hàng</a></li><li><a href="P1-Policy.dc.html">Chính sách thanh toán</a></li><li><a href="P1-Policy.dc.html">Chính sách quyền riêng tư</a></li><li><a href="P1-Policy.dc.html">Điều khoản sử dụng</a></li></ul>
+          </details>
+          <details>
+            <summary>Về Cá Về <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg></summary>
+            <ul><li><a href="Landing.dc.html">Giới thiệu</a></li><li><a href="G1-KitchenList.dc.html">Góc bếp</a></li><li><a href="P2-Contact.dc.html">Liên hệ</a></li></ul>
+          </details>
+          <div style="padding-top: 14px; display: flex; flex-direction: column; gap: 6px; font-size: 12px; line-height: 1.5">
+            <span>[Tên doanh nghiệp] · MST [mã số thuế]</span>
+            <span>Địa chỉ: [địa chỉ kinh doanh]</span>
+            <span>GCN ĐKKD số [số] do [nơi cấp] cấp ngày [ngày]</span>
+            <span>Email: <a href="mailto:[email]" style="color: #FFFFFF">[email]</a></span>
+            <a href="#bo-cong-thuong" style="align-self: flex-start; margin-top: 4px; width: 120px; height: 44px; border: 1.5px dashed rgba(255,255,255,0.6); border-radius: 6px; color: #FFFFFF; font-size: 10px; font-weight: 600; text-decoration: none; display: flex; align-items: center; justify-content: center; text-align: center">Logo "Đã thông báo Bộ Công Thương"</a>
+            <span style="color: #A9C4EE">© 2026 Cá Về</span>
+          </div>
+        </footer>
+      </div>
+    </div>
+    <table class="spec">
+      <thead><tr><th>Nhãn</th><th>Đích (href)</th><th>Ghi chú</th></tr></thead>
+      <tbody>
+        <tr><td>Logo + "Cá Về"</td><td><code>/</code></td><td></td></tr>
+        <tr><td>Gọi [hotline]</td><td><code>tel:[hotline]</code></td><td>Nút to, ưu tiên cho khách lớn tuổi.</td></tr>
+        <tr><td>Nhắn Zalo</td><td><code>https://zalo.me/[số]</code></td><td>Mở app Zalo. Không gắn widget chat bên thứ ba khi chưa duyệt.</td></tr>
+        <tr><td colspan="3" style="font-weight: 600; background: #FBFBFC">Nhóm "Mua hàng" (mở sẵn)</td></tr>
+        <tr><td>Hàng đang có</td><td><code>/shop</code></td><td></td></tr>
+        <tr><td>Combo nấu nhanh</td><td><code>/shop?type=combo</code></td><td></td></tr>
+        <tr><td>Cách mua hàng</td><td><code>/trang/cach-mua-hang</code></td><td>Trang tĩnh: chọn kg → đặt → VietQR → giao.</td></tr>
+        <tr><td>Tra cứu đơn</td><td><code>/shop/orders</code></td><td></td></tr>
+        <tr><td colspan="3" style="font-weight: 600; background: #FBFBFC">Nhóm "Chính sách" (thu gọn, danh sách đầy đủ)</td></tr>
+        <tr><td>Chính sách đổi trả</td><td><code>/trang/doi-tra</code></td><td rowspan="5">Bắt buộc với website TMĐT bán hàng. Nội dung chờ <code>legal-vn</code> duyệt (doc/ops/go-live-phap-ly.md).</td></tr>
+        <tr><td>Chính sách giao hàng</td><td><code>/trang/giao-hang</code></td></tr>
+        <tr><td>Chính sách thanh toán</td><td><code>/trang/thanh-toan</code></td></tr>
+        <tr><td>Chính sách quyền riêng tư</td><td><code>/trang/quyen-rieng-tu</code></td></tr>
+        <tr><td>Điều khoản sử dụng</td><td><code>/trang/dieu-khoan</code></td></tr>
+        <tr><td colspan="3" style="font-weight: 600; background: #FBFBFC">Nhóm "Về Cá Về"</td></tr>
+        <tr><td>Giới thiệu</td><td><code>/gioi-thieu</code></td><td>Landing page thương hiệu.</td></tr>
+        <tr><td>Góc bếp</td><td><code>/bai-viet</code></td><td>Đã có route <code>frontend/app/bai-viet</code>.</td></tr>
+        <tr><td>Liên hệ</td><td><code>/trang/lien-he</code></td><td></td></tr>
+        <tr><td colspan="3" style="font-weight: 600; background: #FBFBFC">Dải pháp lý</td></tr>
+        <tr><td>Email</td><td><code>mailto:[email]</code></td><td></td></tr>
+        <tr><td>Logo Bộ Công Thương</td><td><code>[link xác nhận online.gov.vn]</code></td><td>Chỉ gắn khi đã thông báo website. Mở tab mới, <code>rel="noopener"</code>.</td></tr>
+        <tr><td colspan="3" style="color: #4E4E58">Tên DN, MST, địa chỉ, GCN ĐKKD là chữ thường, không link. Điện thoại: footer ẩn ở Giỏ và các bước đặt hàng, thay bằng dải pháp lý gọn (F2 ở bản máy tính).</td></tr>
+      </tbody>
+    </table>
+  </section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":880,"height":2600}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

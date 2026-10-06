@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<title>Đang chờ xác nhận thanh toán — Cá Về (máy tính)</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#1A5BC0}a:hover{color:#1A57B5}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.num{font-variant-numeric:tabular-nums}
+.wrap{max-width:1200px;margin:0 auto;padding:0 24px;box-sizing:border-box}
+a,button{transition:transform 120ms cubic-bezier(.23,1,.32,1),background-color 150ms ease-out,border-color 150ms ease-out,color 150ms ease-out}
+a:active,button:active{transform:scale(.97)}
+a:focus-visible,button:focus-visible{outline:2px solid #1F66D1;outline-offset:2px}
+.hd{background:#1F66D1;color:#FFFFFF}
+.hd a:focus-visible,.ft a:focus-visible{outline-color:#FFFFFF}
+.hd-a{height:44px;padding:0 12px;border-radius:22px;display:flex;align-items:center;gap:8px;color:#FFFFFF;text-decoration:none;font-size:14px;font-weight:500;white-space:nowrap}
+.hd-a:hover{color:#FFFFFF;background:#1A57B5}
+.ft{background:#0E3A73;color:#D6E4FA;font-size:13px}
+.ft a{color:#D6E4FA;text-decoration:none}
+.ft a:hover{color:#FFFFFF;text-decoration:underline}
+.btn{height:48px;padding:0 24px;border-radius:24px;display:flex;align-items:center;justify-content:center;gap:8px;font:inherit;font-size:15px;font-weight:600;text-decoration:none;cursor:pointer;box-sizing:border-box}
+.btn-o{background:#FFFFFF;color:#1A5BC0;border:1px solid #1F66D1}
+.btn-o:hover{background:#EBF2FE;color:#1A5BC0}
+.spin{width:40px;height:40px;border-radius:50%;border:3.5px solid #D6E4FA;border-top-color:#1F66D1;box-sizing:border-box;animation:spin 900ms linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.pg{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;font-size:13px;font-weight:500;color:#686874}
+.pg li{display:flex;flex-direction:column;gap:10px}
+.pg .ln{height:4px;border-radius:2px;background:#E4E4E9}
+.pulse{animation:pulse 1.4s ease-in-out infinite}
+@keyframes pulse{50%{opacity:.4}}
+@media (prefers-reduced-motion:reduce){a:active,button:active{transform:none}.spin{animation-duration:2.4s}.pulse{animation:none}}
+</style>
+</helmet>
+<div style="min-height: 900px; display: flex; flex-direction: column; background: #F4F4F6; color: #17171C; font-family: Inter, system-ui, sans-serif; font-size: 14px; line-height: 1.5">
+
+  <header class="hd">
+    <div class="wrap" style="min-height: 72px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 24px">
+      <a href="DesktopHome.dc.html" aria-label="Cá Về — trang chủ" style="flex: none; display: flex; align-items: center; gap: 10px; color: #FFFFFF; text-decoration: none">
+        <span aria-hidden="true" style="width: 40px; height: 40px; border-radius: 9px; border: 1.5px dashed rgba(255,255,255,0.75); font-size: 10px; font-weight: 600; display: flex; align-items: center; justify-content: center">LOGO</span>
+        <span style="display: flex; flex-direction: column; line-height: 1.15">
+          <span style="font-size: 20px; font-weight: 600; letter-spacing: -0.01em">Cá Về</span>
+          <span style="font-size: 12px; font-weight: 500; color: #D6E4FA">Từ cảng về bếp nhà bạn</span>
+        </span>
+      </a>
+      <div style="display: flex; align-items: center; gap: 8px">
+        <span style="display: flex; align-items: center; gap: 8px; padding: 0 12px; font-weight: 500">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"></rect><path d="M8 11V7a4 4 0 0 1 8 0v4"></path></svg>
+          Thanh toán an toàn
+        </span>
+        <span aria-hidden="true" style="width: 1px; height: 20px; background: rgba(255,255,255,0.35)"></span>
+        <a href="tel:[hotline]" class="hd-a">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2"></path></svg>
+          Hotline [hotline]
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <main style="flex: 1; padding: 48px 0">
+    <div class="wrap" style="display: flex; justify-content: center">
+      <section role="status" aria-live="polite" aria-labelledby="h-wait" style="width: 100%; max-width: 600px; background: #FFFFFF; border-radius: 16px; padding: 40px 40px 32px; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; gap: 12px; text-align: center">
+        <span aria-hidden="true" style="width: 80px; height: 80px; border-radius: 40px; background: #EBF2FE; display: flex; align-items: center; justify-content: center; margin-bottom: 4px">
+          <span class="spin"></span>
+        </span>
+        <h1 id="h-wait" style="margin: 0; font-size: 24px; font-weight: 600; letter-spacing: -0.01em">Đang chờ xác nhận thanh toán</h1>
+        <p style="margin: 0; color: #4E4E58">Trang tự cập nhật, bạn không cần chuyển khoản lại.</p>
+
+        <div style="margin-top: 8px; padding: 12px 20px; border-radius: 12px; background: #F4F4F6; display: flex; flex-direction: column; gap: 2px">
+          <span style="font-size: 12px; font-weight: 500; color: #686874">Mã đơn</span>
+          <span class="num" style="font-size: 20px; font-weight: 600; letter-spacing: 0.02em">SO[mã đơn]</span>
+        </div>
+
+        <ol aria-label="Tiến trình thanh toán" class="pg" style="align-self: stretch; margin-top: 20px; text-align: left">
+          <li style="color: #4E4E58">
+            <span class="ln" style="background: #157F3D"></span>
+            <span style="display: flex; align-items: center; gap: 6px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#157F3D" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"></path></svg>Đặt đơn</span>
+          </li>
+          <li aria-current="step" style="color: #1A5BC0">
+            <span class="ln pulse" style="background: #1F66D1"></span>
+            <span style="font-weight: 600">Chờ ngân hàng</span>
+          </li>
+          <li>
+            <span class="ln"></span>
+            <span>Hoàn tất</span>
+          </li>
+        </ol>
+
+        <div style="align-self: stretch; display: flex; justify-content: space-between; margin-top: 8px; padding-top: 16px; border-top: 1px solid #E4E4E9; color: #4E4E58">
+          <span>Số tiền của đơn</span>
+          <span class="num" style="font-weight: 600; color: #17171C">867.000đ</span>
+        </div>
+
+        <a href="DesktopLookup.dc.html" class="btn btn-o" style="align-self: stretch; margin-top: 12px">Tra cứu đơn</a>
+      </section>
+    </div>
+  </main>
+
+  <footer class="ft">
+    <div class="wrap" style="padding-top: 20px; padding-bottom: 24px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px 32px">
+      <div style="display: flex; flex-direction: column; gap: 4px">
+        <span>[Tên doanh nghiệp] · MST [mã số thuế] · Địa chỉ [địa chỉ kinh doanh]</span>
+        <span>Giấy CN ĐKKD số [số] do [nơi cấp] cấp ngày [ngày]</span>
+        <span>© 2026 Cá Về</span>
+      </div>
+      <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px 24px">
+        <a href="DesktopPolicy.dc.html">Đổi trả</a>
+        <a href="#chinh-sach-quyen-rieng-tu">Quyền riêng tư</a>
+        <div style="display: flex; align-items: center; gap: 10px; height: 48px; padding: 0 14px; border: 1.5px dashed rgba(214,228,250,0.55); border-radius: 8px">
+          <span aria-hidden="true" style="width: 32px; height: 32px; border-radius: 16px; border: 1.5px dashed rgba(214,228,250,0.7); font-size: 8px; font-weight: 600; display: flex; align-items: center; justify-content: center">BCT</span>
+          <span style="font-weight: 500; color: #FFFFFF">Đã thông báo Bộ Công Thương</span>
+        </div>
+      </div>
+    </div>
+  </footer>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>
