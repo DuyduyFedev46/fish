@@ -8,6 +8,11 @@ Mốc nằm ở `scope_snapshot_baseline.json` (chỉ nhãn fixture và sự ki�
 Cố ý đổi hành vi thì sinh lại mốc rồi đọc diff trước khi commit:
 
     UPDATE_SCOPE_SNAPSHOT=1 python manage.py test apps.accounts.data_scopes.tests.test_scope_snapshot
+
+Lô 4 (PV-04..06): chỉ SINH LẠI các dòng của tài khoản `direct_permissions` (người không nhóm, quyền gán trực tiếp) ở
+`receipts.*`, `directory.*`, `customers.*`, `guidance.receipt`, `guidance.customer`. Đây là hệ quả 02b §7 D-3 (D6 hẹp
+lại thành "do tôi tạo trong ngày", D7 = none) đã ghi ở dev-notes Lô 4; KHÔNG thêm `APPROVED_DIFFS` cho tài khoản này.
+Mọi tài khoản khác giữ nguyên mốc cũ, kể cả hai mục Q-4 ở `warehouse_staff`, `warehouse_courier`.
 """
 import json
 import os
@@ -111,7 +116,7 @@ class ScopeSnapshotTests(TestCase):
     def test_pv01_ac2_real_rule_change_turns_red_and_names_user_endpoint_row(self):
         """PV-01-AC2: cố ý cho NV giao thấy mọi phiếu giao -> so với mốc thì đỏ, in tài khoản, endpoint, dòng."""
         baseline = load_baseline()
-        with mock.patch("apps.delivery.api.has_full_delivery_scope", return_value=True):
+        with mock.patch("apps.delivery.scope.resolve_data_scope", return_value="all"):
             actual = self.collector.collect(users={"courier"}, only={"deliveries.list"})
         diffs = unapproved(diff_snapshots(baseline, actual, users={"courier"}))
         self.assertTrue(diffs)

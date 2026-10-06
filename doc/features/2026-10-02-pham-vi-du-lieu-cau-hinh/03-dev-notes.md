@@ -150,6 +150,71 @@ Test `QueryBudgetTests`: danh sách đơn (NV giao) và danh sách hoá đơn (N
 - `sales/orders/api.py` vẫn kiểm `?customer=` bằng `can_view_customer_directory` (403) và chưa lọc theo D7: thuộc Lô 4 (PV-05-AC6).
 - `naming`: `scripts/check_naming.py` đang báo 2 file FE mới từ main (`frontend/components/ContactButton.tsx`, `frontend/features/site/components/SiteLegalFooter.tsx`, chữ `nguoi` trong khoá `thong-tin-nguoi-ban`), không phải file của Lô này.
 
+## Lô 4 — PV-04, PV-05, PV-06 (phiếu giao, hàng hoàn, gọi xác nhận, khách, phiếu nhập đọc phạm vi cấu hình)
+
+> be-dev · 2026-10-07 · nhánh `feat/pham-vi-du-lieu` (đã merge main `151b56e`, có W37 L1).
+
+### File đã sửa / thêm
+- **Mới:** `delivery/scope.py` (D3: `deliveries_scope_value`, `scope_deliveries_for`, `deliveries_window_applies`), `sales/customers/scope.py` (D7: `customers_scope_value`,
+  `sees_all_customers`, `scope_customers_for`), `purchasing/receipts/scope.py` (D6: `receipts_scope_value`, `scope_q`, `scope_receipts_for`, `cancel_scope_q`, `vietnam_day_bounds`).
+- **Đổi:** `delivery/{api,next_steps,serializers}.py`, `delivery/confirmation/{scope,api,serializers}.py` (`note_in_customer_service_scope` đổi tên `note_in_confirmation_scope`, thêm
+  `confirmation_scope_value`; bỏ `is_customer_service`), `inventory/returns/scope.py` (D5), `sales/customers/{api,directory_api,next_steps,serializers}.py`, `sales/orders/api.py` (lọc `?customer=`),
+  `purchasing/receipts/{api,services,next_steps}.py` (tách `can_cancel_receipt`, `can_cancel_any_receipt`, không đổi hành vi huỷ).
+- **Ngoài danh sách file của 02b Lô 4:** `common/api.py` xoá `FULL_SCOPE_GROUPS`, `has_full_delivery_scope`, `CUSTOMER_DIRECTORY_GROUPS`, `sees_customer_directory`. Lý do: PV-05-AC8 đòi grep không còn các tên này
+  và sau Lô 4 không còn nơi dùng (kiểm bằng grep), nên xoá luôn thay vì để tới Lô 6. Phần "dọn" còn lại của Lô 6 (bỏ `scopes` cũ, test quét PV-12) không đổi.
+- **Test mới:** `accounts/data_scopes/tests/test_deliveries_customers_receipts_scope.py` (55 test, dùng lại fixture PV-01). **Test cũ sửa (hợp đồng đổi có chủ ý):** `test_scope_snapshot.py` (mock AC2 đổi sang
+  `apps.delivery.scope.resolve_data_scope`), `sales/customers/tests/test_directory_api.py` và `test_directory_permission.py` (hai test "người chỉ có quyền thêm" nay đặt quyền và D7 = all ở
+  nhóm NV kho, vì người không nhóm có D7 = none), `delivery/tests/test_timeline_customer_service.py` (chỉ docstring), `scope_snapshot_baseline.json` (xem Lệch 2).
+
+### Hành vi
+- **D3 phiếu giao:** `scope_deliveries_for` dùng cho list, detail, `assigned_to=me`, đổi trạng thái, giao người, tem, tra tem, dòng thời gian `delivery`. `assigned` → `assigned_to=user`; `all` → mọi phiếu.
+  `pii_restricted` (cửa sổ SR-PII-02) bật khi D3 khác `all`, nghĩa là nhóm ở `all` không bị cửa sổ (PV-04-AC5). Lọc `assigned_to=<người khác>` vẫn 403 khi D3 khác `all`. Phiếu `CANCELLED` gán cho NV giao
+  vẫn nằm trong queryset nên nhận 400 `BR-GH-24` (W37 S2-AC2, có test). Khoá `order_status` của `POST .../status/` giữ nguyên.
+- **D5 hàng hoàn:** `scope_returns_for`, `scope_delivery_notes_for` (ô chọn phiếu giao ở form tạo) đọc D5, độc lập với D3.
+- **D4 gọi xác nhận:** `note_in_confirmation_scope(user, note, now=, value=)`. `all_pending` → True; `pending_or_called_recently` → điều kiện cũ; view tính D4 một lần, đưa vào context serializer (`scope_value`).
+  `customer_service_note_q` giữ nguyên nghĩa "điều kiện hẹp của D4" cho nhánh `assigned_or_confirmation` của D1.
+- **D7 khách:** `scope_customers_for` cho `/customers/` (cũ), danh bạ mới (list, retrieve, `search`, `PATCH`), dòng thời gian khách và lọc đơn `?customer=`. `all` → mọi khách; `assigned_deliveries` → khách của đơn có phiếu
+  thoả `courier_visible_note_q` (dùng `pk__in`, không `distinct`, để giữ annotate của danh bạ); `none` → rỗng. `?customer=<id>` ngoài D7 → danh sách đơn rỗng (200), cổng 403 theo `view_customer_list` giữ trước.
+  API cũ trả `CustomerSerializer` khi D7 = `all`, ngược lại `CourierCustomerSerializer`. Danh bạ mới: khi D7 khác `all` bỏ `note`, `default_address` (xem Lệch 4).
+- **D6 phiếu nhập:** `scope_receipts_for` cho list, detail, sửa (PATCH), `submit`, dòng thời gian `receipt` (thêm `scope_fn`). `created_by_me_today` dùng `timezone.localtime`, mốc 00:00 giờ VN hôm nay tới 00:00 ngày mai, so với
+  `created_at` UTC. Test ngày giờ cố định: 10:00 06/10, 23:55 05/10, qua nửa đêm 23:59 → 00:01 (nháp mở trước nửa đêm gửi sau nửa đêm: 404, nháp không đổi, Quản lý vẫn sửa được).
+  **Huỷ phiếu:** action `cancel` dùng `cancel_scope_q` = phiếu trong D6 hoặc phiếu qua luật huỷ cũ (người tạo, hoặc Quản lý/Chủ). Phiếu ngoài cả hai → 404; trong D6 mà không phải người tạo/Quản lý → 403 như hôm nay.
+  Lưu ý khi viết: `Q() | Q(x)` bỏ mất vế rỗng; `cancel_scope_q` xử lý riêng trường hợp D6 = `all` (đã có test PV-06-AC6).
+- **Lỗ dữ liệu cá nhân QA W37 N2:** phản hồi `POST /api/delivery/notes/{id}/status/` (và `assign`, danh sách, chi tiết) dùng cùng `DeliveryNoteSerializer._customer_data_hidden`: ẩn tên, địa chỉ, SĐT, `note`,
+  `recipient_*`, `failure_note` (giá trị `null`, giữ khoá) khi (1) người gọi KHÔNG có V2 `sales.view_order_customer_info`, hoặc không có người gọi, hoặc (2) D3 khác `all` và phiếu quá cửa sổ. Trước đây chỉ có (2).
+  Mặc định không đổi gì: Chủ, Quản lý, NV kho, NV giao, CSKH đều có V2 từ migration `sales/0016`. Chủ tắt V2 cho một nhóm thì phiếu giao cũng hết tên, địa chỉ (xem Lệch 3).
+
+### Rule BR đã cài
+BR-PQ-33/35 (phiếu giao, hàng hoàn, gọi xác nhận, khách, phiếu nhập đọc cấu hình, một hàm cho mọi đường), BR-PQ-34 (cổng Tầng 1/2 đứng trước, có test 403 khi `all` nhưng thiếu quyền), BR-PQ-36 (đổi cấu hình hiệu lực ở request kế),
+BR-PQ-10 (huỷ phiếu nhập giữ luật cũ), BR-GH-06/18/24, SR-PII-02 (cửa sổ chỉ khi D3 khác `all`), S-7 (404 không lộ), bất biến 1 (test không khoá giá vốn ở phiếu giao, hàng hoàn, phiếu nhập),
+bất biến 9 (test không tên/SĐT/địa chỉ giả khi che, danh bạ hẹp không có `note`/`default_address`, phiếu giao khi V2 tắt).
+
+### Lệch so với 02b / yêu cầu (cần techlead biết)
+1. **`common/api.py` xoá bốn tên cũ ngay ở Lô 4** (ngoài danh sách file). Lý do ở trên (PV-05-AC8).
+2. **Người không nhóm (quyền gán trực tiếp), R9/D-3: hành vi ĐỔI, đã sinh lại mốc cho đúng tài khoản `direct_permissions`, KHÔNG thêm `APPROVED_DIFFS`.** Phần 02b §7 D-3 đã tiên liệu ("D6 hẹp lại, D7 none, D4 rank 0").
+   Mốc `scope_snapshot_baseline.json`: chỉ đổi dòng của `direct_permissions` ở `receipts.list/detail`, `directory.list/detail/search`, `customers.list/detail`, `guidance.receipt`, `guidance.customer`; các tài khoản khác và hai mục Q-4 giữ y nguyên (so với HEAD bằng script).
+   - D6: người không nhóm chỉ còn thấy phiếu nhập do mình tạo trong ngày (trước: mọi phiếu). Test `UngroupedUserTests.test_ungrouped_receipts_scope_is_created_by_me_today`.
+   - D7: người không nhóm có D7 = `none`: danh bạ mới rỗng, `/customers/` rỗng (trước: danh bạ thấy mọi khách nếu có `view_customer_list`; `/customers/` thấy khách của phiếu gán cho mình).
+   - **D4 là chỗ tôi KHÔNG theo chữ 02b:** 02b ghi "D4 rank 0" (người không nhóm vào phạm vi `pending_or_called_recently`), nhưng đó là MỞ THÊM dữ liệu khách (phiếu đang chờ gọi) cho người chưa từng được cấp phạm vi. Tôi giữ hành vi cũ:
+     `confirmation_scope_value` trả giá trị nội bộ `none` (không mục nào trong phạm vi) cho người không có nhóm đủ điều kiện và không phải superuser. Mốc `confirmation.*` của họ không đổi. Nếu Duy muốn theo chữ 02b thì bỏ nhánh đó (1 chỗ) và sinh lại mốc.
+   - Việc cần làm trước khi migrate production (D-2/D-3, điều phối viên): đếm số người không nhóm có `view_purchasereceipt` hoặc `view_customer_list` hay `view_customer` trực tiếp; họ sẽ mất phạm vi như trên cho tới khi được xếp vào nhóm.
+3. **V2 áp cho phiếu giao (đóng N2).** 02b/D-1 chỉ nêu V2 cho đơn, hoá đơn, phiếu hoàn tiền. Tôi mở rộng sang tên/SĐT/địa chỉ trên phiếu giao vì nếu không, Chủ tắt V2 cho NV kho vẫn lộ khách qua `/delivery/notes/` và qua phản hồi đổi trạng thái.
+   Hệ quả: nếu Chủ tắt V2 cho NV giao thì họ không còn thấy địa chỉ giao trên phiếu. Đó là lựa chọn của Chủ; mặc định V2 bật cho cả 5 nhóm nên không đổi gì. Cần techlead xác nhận hướng này; nếu không muốn thì gỡ dòng V2 trong `_customer_data_hidden`
+   (phản hồi đổi trạng thái vẫn cùng luật với chi tiết).
+4. **Danh bạ mới ẩn `note`, `default_address` khi D7 khác `all`** (02b không nói). Hôm nay nhóm khác Chủ/Quản lý nhận 403 nên không có hợp đồng cũ để giữ; ẩn theo cùng nguyên tắc `CourierCustomerSerializer` (bất biến 9). Mặc định Quản lý (`all`) không đổi.
+5. **`has_full_delivery_scope` còn trong mock của test AC2** đã thay bằng `apps.delivery.scope.resolve_data_scope`; test quét PV-12 sau này không bị vướng.
+
+### Kiểm chứng Lô 4 (chạy trong lượt làm)
+- Trước khi sửa: 28 trong 51 test mới đỏ (đúng lý do: 404/403 sai, tên cũ còn).
+- `manage.py test` toàn bộ (DJANGO_DEBUG=1): **3148 test, OK, skipped=2** (hai test đua Postgres). Mốc PV-01 (10 test) xanh sau khi sinh lại dòng `direct_permissions`.
+- `makemigrations --check --dry-run`: `No changes detected` (không có migration trong Lô này). `check_naming.py`: chỉ báo hai file FE có sẵn từ main (`ContactButton.tsx`, `SiteLegalFooter.tsx`), không có file của Lô 4.
+
+### Việc còn nợ / chuyển lô
+- C1 (Lô 5): phạm vi D1 cho `refunds/api.py::get_queryset` và dashboard vẫn chưa làm (chờ D-3, như review Lô 3). Lô 4 không đụng.
+- Lô 5: ô D7 phải có `note` cho nhóm lưu `all` mà thiếu `view_customer_list` (L4); PUT B4 phải ghi D7 khi bật "Xem khách hàng" (PO-Q1). Lô 4 và Lô 5 lên production CÙNG lượt (M2).
+- Lô 6: `GET /api/staff/groups/` vẫn còn khoá `scopes` cũ; test quét PV-12 nên thêm `is_customer_service`, `has_full_delivery_scope` (đã sạch từ Lô 4).
+- FE (Lô 7): ô khách trên phiếu giao nay có thể `null` vì V2 tắt, ngoài `null` do quá cửa sổ; chưa có `customer_hidden_reason` ở phiếu giao (không thêm khoá mới).
+
 ## Kiểm chứng (chạy trong lượt làm)
 - `manage.py test` toàn bộ trước Lô 1: 2850 test (suy ra 2859 − 9). Sau Lô 1: **2859 test, OK**. Sau Lô 2: **2918 test, OK** (0 failure, 0 error).
 - `makemigrations --check --dry-run`: `No changes detected`.

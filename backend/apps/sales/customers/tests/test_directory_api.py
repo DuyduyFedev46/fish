@@ -265,7 +265,14 @@ class DirectoryPermissionTests(DirectoryBase):
         self.assertEqual(granted, {roles.OWNER, roles.MANAGER})
 
     def test_ed13_user_with_only_the_extra_perm_can_read_but_not_write(self):
-        staff = make_user("dir_extra", perms=(PERM,))
+        # PV-05: phạm vi dòng do cấu hình NHÓM quyết (D7). Việc "Xem khách hàng" được Chủ bật cho nhóm NV kho kèm D7 = all
+        # (người chỉ được gán quyền trực tiếp, không nhóm, có D7 = none: xem test_deliveries_customers_receipts_scope).
+        from apps.accounts.models import GroupDataScope
+
+        warehouse_group = Group.objects.get(name=roles.WAREHOUSE_STAFF)
+        warehouse_group.permissions.add(Permission.objects.get(content_type__app_label="sales", codename="view_customer_list"))
+        GroupDataScope.objects.update_or_create(group=warehouse_group, object_key="customers", defaults={"value": "all"})
+        staff = make_user("dir_extra", roles.WAREHOUSE_STAFF)
         client = client_for(staff)
         self.assertEqual(client.get(LIST_URL).status_code, 200)
         self.assertEqual(client.get(self.detail_url()).status_code, 200)

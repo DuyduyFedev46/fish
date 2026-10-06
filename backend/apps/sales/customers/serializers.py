@@ -34,7 +34,12 @@ class MoneyField(serializers.Field):
 
 
 class DirectoryListSerializer(serializers.ModelSerializer):
-    """Một dòng danh bạ. Đọc các số liệu từ annotate của `CustomerDirectoryViewSet.get_queryset`."""
+    """Một dòng danh bạ. Đọc các số liệu từ annotate của `CustomerDirectoryViewSet.get_queryset`.
+
+    PV-05 (bất biến 9): khi phạm vi D7 không phải `all` (view đặt `full_customer_data` = False; thiếu context cũng coi là
+    False) thì bỏ các field hồ sơ nội bộ `note`, `default_address`, chỉ giữ field cần để giao."""
+
+    NARROW_SCOPE_HIDDEN = ("note", "default_address")
 
     order_count = serializers.IntegerField(read_only=True)
     cancelled_count = serializers.IntegerField(read_only=True)
@@ -47,6 +52,13 @@ class DirectoryListSerializer(serializers.ModelSerializer):
             "id", "name", "phone", "order_count", "total_spent", "cancelled_count", "last_order_at", "note",
         ]
         read_only_fields = fields
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        if not self.context.get("full_customer_data", False):
+            for key in self.NARROW_SCOPE_HIDDEN:
+                data.pop(key, None)
+        return data
 
 
 class DirectoryDetailSerializer(DirectoryListSerializer):

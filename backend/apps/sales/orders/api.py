@@ -7,7 +7,7 @@ S10: `GET /api/sales/orders/?status=BOOKED,PAID&date_from=&date_to=&q=&page=` (2
 và `GET /api/sales/orders/{id}/` (chi tiết + `available_actions`).
 S11: `POST /api/sales/orders/{id}/confirm-payment` (chạy chung service với webhook SePay).
 ERP theo design Lô 3 (R3, 02b §3.8): mỗi dòng danh sách có `reason`; thêm lọc `customer=<id>` (đòi quyền xem
-khách hàng, 403 nếu thiếu) và `batch=<pk>` (đơn có phân bổ từ lô). Sai định dạng → 400 `INVALID_FILTER`.
+khách hàng, 403 nếu thiếu; khách ngoài phạm vi D7 của người gọi thì danh sách rỗng, PV-05-AC6) và `batch=<pk>` (đơn có phân bổ từ lô). Sai định dạng → 400 `INVALID_FILTER`.
 """
 import datetime
 
@@ -34,6 +34,7 @@ from apps.sales.utils import ZERO, fold_text, money_str
 
 from . import services
 from apps.sales.customers.permissions import can_view_order_customer_info
+from apps.sales.customers.scope import scope_customers_for, sees_all_customers
 
 from .scope import ALL, can_filter_orders_by_customer, orders_scope_value, scope_orders_for
 from .serializers import SalesOrderDetailSerializer, SalesOrderListSerializer
@@ -128,14 +129,27 @@ class SalesOrderViewSet(NoStoreMixin, AiDeclarable, viewsets.ReadOnlyModelViewSe
                 restrict_customer_search=orders_scope_value(request.user) != ALL,
                 allow_customer_search=can_view_order_customer_info(request.user),
             )
+            self.customer_outside_scope = self._customer_filter_outside_scope(request)
         except InvalidFilter as exc:
             return Response({"detail": str(exc), "code": INVALID_FILTER}, status=400)
         return super().list(request, *args, **kwargs)
+
+    @staticmethod
+    def _customer_filter_outside_scope(request) -> bool:
+        """PV-05-AC6 (S-7): `?customer=<id>` mà khách nằm ngoài phạm vi D7 của người gọi thì danh sách rỗng, không lộ
+        đơn nào của khách đó. Phạm vi D7 `all` thì không cần kiểm."""
+        raw = request.query_params.get("customer", "").strip()
+        if not raw or sees_all_customers(request.user):
+            return False
+        customer_id = _parse_positive_int(raw, "customer")
+        return not scope_customers_for(request.user, Customer.objects.filter(pk=customer_id)).exists()
 
     def filter_queryset(self, queryset):
         queryset = super().filter_queryset(queryset)
         if self.action == "list":
             queryset = queryset.filter(self.queryset_filters)
+            if getattr(self, "customer_outside_scope", False):
+                queryset = queryset.none()
         return queryset
 
     @staticmethod

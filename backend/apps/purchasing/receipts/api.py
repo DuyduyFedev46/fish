@@ -13,6 +13,7 @@ from apps.purchasing.models import PurchaseCostAllocation, PurchaseReceipt, Purc
 
 from . import services, supplier_services
 from .filters import filter_list
+from .scope import cancel_scope_q, scope_receipts_for
 from .serializers import (
     PurchaseReceiptDetailSerializer,
     PurchaseReceiptListSerializer,
@@ -109,6 +110,12 @@ class PurchaseReceiptViewSet(DocumentViewSet):
 
     def get_queryset(self):
         queryset = super().get_queryset()
+        user = self.request.user
+        if self.action == "cancel":
+            # PV-06-AC5/AC6: huỷ giữ luật cũ, D6 không chặn thêm cũng không mở thêm (xem scope.cancel_scope_q).
+            queryset = queryset.filter(cancel_scope_q(user))
+        else:
+            queryset = scope_receipts_for(user, queryset)  # PV-06: xem, sửa, gửi ghi nhận theo D6 (ngoài phạm vi là 404)
         if self.action not in ("list", "retrieve"):
             return queryset.prefetch_related("lines")
         queryset = queryset.select_related("supplier", "warehouse", "created_by__staff_profile").prefetch_related(

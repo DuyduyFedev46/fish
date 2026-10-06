@@ -17,7 +17,6 @@ from apps.common.api import (
     DocumentViewSet,
     NoStoreMixin,
     StandardPagination,
-    has_full_delivery_scope,
     require_perm,
 )
 
@@ -26,6 +25,7 @@ from apps.common.params import parse_positive_id
 from apps.sales.orders import completion
 
 from . import services
+from .scope import ALL as SCOPE_ALL, deliveries_scope_value, deliveries_window_applies, scope_deliveries_for
 from .models import DeliveryNote
 from .serializers import CourierDeliveryNoteListSerializer, DeliveryNoteDetailSerializer, DeliveryNoteSerializer
 
@@ -75,16 +75,13 @@ class DeliveryNoteViewSet(NoStoreMixin, DocumentViewSet):
 
     def get_serializer_context(self):
         context = super().get_serializer_context()
-        # SR-PII-02: người không có full scope (NV giao) bị ẩn dữ liệu khách của phiếu quá cửa sổ.
-        context["pii_restricted"] = not has_full_delivery_scope(self.request.user)
+        # SR-PII-02: phạm vi D3 khác `all` (NV giao) thì ẩn dữ liệu khách của phiếu quá cửa sổ (PV-04-AC4/AC5).
+        context["pii_restricted"] = deliveries_window_applies(self.request.user)
         return context
 
     def get_queryset(self):
-        qs = super().get_queryset()
-        user = self.request.user
-        if has_full_delivery_scope(user):
-            return qs
-        return qs.filter(assigned_to=user)  # nv_giao: chỉ phiếu của mình (dữ liệu khách: pii_scope.py)
+        # PV-04: phạm vi D3 từ cấu hình nhóm (scope.py); dữ liệu khách theo cửa sổ ở pii_scope.py.
+        return scope_deliveries_for(self.request.user, super().get_queryset())
 
     def filter_queryset(self, queryset):
         queryset = super().filter_queryset(queryset)
@@ -135,8 +132,8 @@ class DeliveryNoteViewSet(NoStoreMixin, DocumentViewSet):
         if raw == "me":
             return queryset.filter(assigned_to=user)
         target = _positive_int_param(raw, "assigned_to")
-        # NV giao chỉ được lọc theo chính mình; hỏi người khác là 403 (không tiết lộ phiếu của họ).
-        if not has_full_delivery_scope(user) and target != user.pk:
+        # Phạm vi D3 `assigned` chỉ được lọc theo chính mình; hỏi người khác là 403 (không tiết lộ phiếu của họ).
+        if deliveries_scope_value(user) != SCOPE_ALL and target != user.pk:
             raise PermissionDenied("Bạn chỉ xem được phiếu giao của mình.")
         return queryset.filter(assigned_to_id=target)
 
