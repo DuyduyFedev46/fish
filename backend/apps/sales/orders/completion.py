@@ -75,3 +75,11 @@ def current_order_status(note):
     return (
         SalesOrder.objects.filter(invoice__pk=note.sales_invoice_id).values_list("status", flat=True).first()
     )
+
+
+def backfill_candidates():
+    """S3: đơn PROCESSING có ít nhất một phiếu COMPLETED, không trùng, theo pk. Lọc thô; luật đầy đủ xét lại trong khoá."""
+    return SalesOrder.objects.filter(
+        status=SalesOrder.Status.PROCESSING,
+        invoice__delivery_notes__status=NoteStatus.COMPLETED,
+    ).distinct().order_by("pk")
