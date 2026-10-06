@@ -3570,3 +3570,111 @@ Gồm sửa của fe-dev ở 5867b26 và bản gộp main (nhóm C/D/E) ở 7d7c
 | `s41_s47_real.py` trên BE thật (selector dòng 335 đã sửa) | 40/40 | chạy file gốc, không cần bản sao |
 
 Ghi nhận: lần này không chạy lại bản build cờ AI tắt, vì thay đổi từ 5867b26 chỉ là độ rộng cột, CSS `FilterBar` và test; lượt trước đã đo cờ tắt 64/64. Đã dọn: tắt Django và server tĩnh, xoá `erp-console/out`, bản copy build, DB tạm.
+
+
+## QA sửa AuditLog.note (06/10)
+
+Mã: TL-D3-L4 / TL15-L5 · bất biến 9 · HEAD 89c7eaa, nhánh `fix/auditlog-note` · phần BE.
+
+### Kết luận: APPROVED — Nhật ký không còn chữ tự do ở mọi thao tác chạy thật; ghi chú nằm trên chứng từ có phân quyền; dòng cũ bị che khi đọc; cờ AI khớp count/phân trang. Không có lỗi chặn.
+
+Tổng: 47 ca · ✅ 45 · ❌ 0 · ⏸ 2 (đua thật 2 request trên Postgres; kiểm FE ngoài phạm vi lượt này).
+
+Cách chạy: `runserver` (cổng 8765) trên SQLite tạm (`DATABASE_URL=sqlite:///…`, không đụng `backend/db.sqlite3` đã track), `migrate` + `seed_demo`, 5 user giả (owner, manager, warehouse_staff, delivery_staff, customer_service) lấy token qua `/api/auth/token/`, gọi API bằng script Python. Tên giả "Nguyễn Văn Giả", SĐT giả 0900000321. Chạy hai lần server: `AI_ENABLED=1` rồi `AI_ENABLED=0`, rồi `1` lại. Symlink `backend/staticfiles` và `.env` đã gỡ, `backend/staticfiles` của repo chính còn nguyên (admin, rest_framework, staticfiles.json) trước và sau. Server đã tắt, DB tạm đã xoá.
+
+### 1. Nhật ký không còn chữ tự do (thao tác thật qua API)
+| Thao tác | Kết quả | Bằng chứng |
+|---|---|---|
+| attach_payment (webhook thiếu tiền -> resolve ATTACH_TO_ORDER, note tên + SĐT) | ✅ | AuditLog #2 note "Có ghi chú (xem trên chứng từ gốc)"; chữ gốc ở `PaymentTransaction.resolution_note` |
+| resolve_payment CONFIRM_ORDER (note tên + SĐT) | ✅ | #7/#8 cùng nhãn |
+| mark-failed hoàn tiền (reason tên + SĐT) | ✅ | #10 nhãn; `Refund.failure_reason` giữ chữ |
+| cancel đơn đã trả, lý do OTHER (tên) | ✅ | #3 "Lý do: Khác · Có ghi chú (xem trên chứng từ gốc)"; `cancel_note` giữ chữ |
+| huỷ đơn lý do khác OTHER | ✅ | #5 "Lý do: Khách đổi ý · Có ghi chú…" |
+| bỏ qua xác nhận (decide DELIVER_WITHOUT_CONFIRM) | ✅ | #13 nhãn |
+| gia hạn (decide EXTEND) | ✅ | #14 nhãn |
+| huỷ xác nhận (unconfirm) | ✅ | #19 nhãn |
+| từ chối đề xuất AI (reason_code tên + SĐT) | ✅ | #17 note "Từ chối đề xuất AI <id>", changes `{"has_reason_code": true}` |
+| `/api/audit-logs/` (Chủ, Quản lý, mọi trang) | ✅ | không chứa "Nguyễn" hay "0900000321" |
+| Dump toàn bộ cột AuditLog trong DB sau thao tác | ✅ | 19 dòng, không chứa tên, SĐT, "321" |
+| Log server (`server1.log`, `server1b.log`) | ✅ | 0 lần xuất hiện tên/SĐT giả |
+| Dòng timeline đơn (đọc từ AuditLog) cho đơn 7, 8, 9, 10 | ✅ | không chứa tên/SĐT |
+Ghi chú SĐT: cancel, decide, unconfirm, call CSKH chặn SĐT bằng 400 BR-GH-19 nên phải gửi lại bản chỉ có tên; resolve và mark-failed nhận cả SĐT (chữ nằm trên chứng từ).
+
+### 2. Ghi chú lưu trên chứng từ
+| Ca | Kết quả | Bằng chứng |
+|---|---|---|
+| `cancel_note` chi tiết đơn: Chủ, Quản lý | ✅ | trả "Nguyễn Văn Giả yêu cầu huỷ" |
+| `cancel_note` trả `""` khi bị che dữ liệu cá nhân (NV giao, phiếu huỷ 20 ngày trước, gán cho NV giao) | ✅ | `customer` toàn null, `cancel_note: ""`; cùng NV giao với đơn trong cửa sổ thì thấy chữ (khớp luật `customer`) |
+| `cancel_note` không có ở API công khai Shop | ✅ | `/api/shop/orders/<mã>/` không có khoá, không có tên |
+| `decision_note` ở chi tiết hàng chờ: Chủ, Quản lý, CSKH trong phạm vi | ✅ | trả chữ; NV kho/NV giao 403, ẩn danh 401 |
+| `decision_note` không có ở danh sách hàng chờ | ✅ | `"decision_note" in list` = False |
+| Ghi chú có SĐT bị 400 BR-GH-19: `0900 000 321`, `090.000.0321`, `+84 900 000 321`, `0900-000-321`, số toàn rộng `０９０…`, `0 9 0 0 …`, dãy tài khoản 13 số | ✅ | 400 BR-GH-19 cho tất cả |
+| Quá 200 ký tự bị 400; đúng 200 ký tự được lưu | ✅ | 201 ký tự -> 400; 200 ký tự -> 200, lưu đủ 200 |
+| OTHER mà ghi chú rỗng/khoảng trắng; mã lý do sai | ✅ | 400 BR-HT-05 |
+| Chặn SĐT ở decide CANCEL, EXTEND, DELIVER_WITHOUT_CONFIRM | ✅ | 400 BR-GH-19; bản chỉ tên 200 |
+
+### 3. Dữ liệu cũ
+Chèn trực tiếp 13 dòng AuditLog kiểu cũ (attach/resolve/mark_refund_failed/cancel/3 action confirmation/reject, kèm chuỗi cố ý bẫy như "Lý do: Khác · Có ghi chú (xem trên chứng từ gốc) Nguyễn Văn Giả" và "Hoàn tiền theo phiếu hoàn #5 Nguyễn Văn Giả"). Kết quả ✅:
+- API trả "Có ghi chú" cho mọi dòng có chữ tự do; chuỗi bẫy bị bắt (fullmatch); "Hoàn tiền theo phiếu hoàn #5" và "Lý do: Khách đổi ý" (mẫu hợp lệ) giữ nguyên.
+- `/api/audit-logs/` không còn "Nguyễn" hay SĐT; DB vẫn còn 11 dòng chứa "Nguyễn" (`note__contains`), tức DB không đổi.
+Ghi nhận: chỉ cột `note` được lọc ở dòng cũ; nếu dòng cũ có chữ tự do trong `changes` (ví dụ `changes.reason` cũ) thì không che. Theo dev notes `changes` chưa từng chép chữ tự do ở các action này, nhưng chưa có dữ liệu thật để chứng minh (ghi Thấp).
+
+### 4. Cờ AI
+| Ca | Kết quả | Bằng chứng |
+|---|---|---|
+| `AI_ENABLED=0`: dòng `actor_kind=ai` ẩn | ✅ | #15, #16 (propose, ai) và dòng thêm tay ai bị ẩn |
+| `AI_ENABLED=0`: dòng Hệ thống có `proposal_ref` (vòng đời AI) ẩn | ✅ | dòng `ai_expired` system + proposal_ref ẩn |
+| `AI_ENABLED=0`: người duyệt/từ chối vẫn hiện | ✅ | #36 `confirm_*`, #17/#31/#32 `reject_*` hiện |
+| `AI_ENABLED=0`: dòng nghiệp vụ người duyệt thực thi (user + proposal_ref) vẫn hiện | ✅ | dòng `cancel_paid_order` user + proposal_ref hiện |
+| `AI_ENABLED=0`: Chủ đổi cấu hình AI vẫn hiện | ✅ | `ai_config_update`, `ai_config_kill` x2, `ai_policy_update` hiện |
+| `AI_ENABLED=0`: dòng Hệ thống không liên quan AI vẫn hiện | ✅ | `escalate_unmatched_payment`, `publish_batch` hiện |
+| `count` và phân trang khớp | ✅ | 41 dòng tổng, ẩn 4 -> count 37, 2 trang (20 + 17), 37 dòng id duy nhất, cả Chủ và Quản lý |
+| Lọc `?actor_kind=ai` và `?action=propose_…` khi tắt | ✅ | count 0 |
+| `AI_ENABLED=1`: hiện đủ | ✅ | count 41, 41 id = 1..41; `?actor_kind=ai` = 3 |
+
+### 5. AI không thấy ghi chú
+✅ Gọi lệnh đọc AI (`/api/ai/commands/<id>/call/`) bằng Chủ trên `sales.salesorder.retrieve` (đơn 7 và 8, đều có `cancel_note` thật), `sales.salesorder.list`, `sales.refund.retrieve/list`, `sales.paymenttransaction.list/retrieve`: kết quả không chứa "Nguyễn", "0900000", `cancel_note`, `decision_note`, `failure_reason`, `resolution_note`. Hàng chờ xác nhận nằm trong tiền tố bị chặn của AI. Test đơn vị `AiScrubCoversFreeTextFieldsTests` xanh.
+
+### 6. Admin
+✅ Qua Django admin thật (Client đăng nhập superuser, form changeform đã đọc từ trang): sửa `PaymentTransaction.resolution_note` + `raw_payload` -> `changes` = `{"raw_payload":{"changed":true},"resolution_note":{"changed":true}}`; sửa `Refund.failure_reason` + `bank_txn_ref` -> `{"changed": true}` cho cả hai; sửa `SalesOrder.status` -> chỉ ghi trạng thái (không phải chữ tự do). Không có tên/SĐT trong `changes` và `note`.
+Ghi nhận Thấp (L-AQ1): `SalesOrder.cancel_note` không nằm trong `locked_fields` của `SalesOrderAdmin`, nên superuser sửa tay chữ này qua Admin không để lại dòng AuditLog nào (đã sửa thành "Nguyễn Văn Giả sửa admin 0900000321", không có `admin_edit`). Không rò dữ liệu qua Nhật ký, nhưng ghi chú huỷ đổi mà không có vết. Đề xuất thêm vào `locked_fields` + `free_text_fields`.
+
+### 7. Ngoài đường thuận
+| Ca | Kết quả | Bằng chứng |
+|---|---|---|
+| Màn cũ: huỷ lại đơn đã huỷ | ✅ | 400 "Chỉ huỷ được đơn đã thanh toán…", không thêm dòng AuditLog, `cancel_note` không đổi |
+| Màn cũ: decide lần hai trên đơn đã quyết định; decide trên đơn chưa lên ESCALATED | ✅ | 409 STALE_STATE |
+| Màn cũ: mark-failed hoàn tiền đã FAILED; reject đề xuất AI lần hai | ✅ | 400 BR-HT-09; 409 AI_ACTION_ALREADY_DECIDED |
+| `unconfirm` không lý do không xoá `decision_note` cũ (RR-L1) | ✅ | giữ "Nguyễn Văn Giả đổi giờ" |
+| Huỷ không ghi chú (lý do không phải OTHER) | ✅ | `cancel_note` `""`, Nhật ký chỉ "Lý do: Khách đổi ý" |
+| decide CANCEL lưu lý do vào `cancel_note` của đơn | ✅ | đơn 19 `cancel_note` = "Nguyễn Văn Giả huỷ" |
+| Phân quyền cancel/mark-failed/resolve/decide | ✅ | bảng dưới |
+| Đồng thời: 4 request huỷ cùng đơn | ⏸ | 1 request 200, 3 request 500 do SQLite "database is locked" (SQLite không có `select_for_update`); chỉ còn đúng 1 dòng AuditLog và 1 `cancel_note`. Cần Postgres để kiểm race thật |
+| Reject AI bởi người không phải chủ đề xuất | ✅ | 404 (BM-05) |
+
+### Phân quyền (chạy thật)
+| Hành động | owner | manager | warehouse_staff | delivery_staff | customer_service | ẩn danh |
+|---|---|---|---|---|---|---|
+| GET `/api/audit-logs/` | 200 | 200 | 403 | 403 | 403 | 401 |
+| POST orders/{id}/cancel | 200 | 200 | 403 | 403 | 403 | 401 |
+| POST refunds/{id}/mark-failed | 200 | 403 | - | - | - | - |
+| POST payments/{id}/resolve | 200 | 403 | - | - | - | 401 |
+| POST confirmation/queue/{id}/decide | - | 200 | 403 | - | 403 | 401 |
+| POST confirmation/queue/{id}/unconfirm | - | - | - | - | 200 (người xác nhận) | - |
+| GET queue/{id}/ (decision_note) | thấy | thấy | 403 | 403 | thấy (trong phạm vi) | 401 |
+| GET orders/{id}/ (cancel_note) | thấy | thấy | thấy | thấy khi trong cửa sổ, `""` khi bị che; 404 nếu không gán | 404 nếu ngoài phạm vi | 401 |
+Ghi nhận (không phải lỗi mới): `warehouse_staff` xem chi tiết đơn thấy `customer` đầy đủ nên `cancel_note` cũng thấy; nhất quán với luật đang có.
+
+### Rò giá vốn
+✅ Không đụng. Nhật ký `changes` không có khoá giá vốn; kết quả AI đọc đơn trả `unit_cost` chỉ khi người gọi là Chủ (có `view_costprice`), như cũ.
+
+### Rò dữ liệu cá nhân
+- `/api/audit-logs/`, timeline đơn, log server, DB AuditLog, kết quả AI: ✅ sạch.
+- API công khai Shop: ✅ không có `cancel_note`/tên.
+- Ghi nhận Thấp (cũ, ngoài phạm vi): `Refund.reason`, `Refund.failure_reason` và `PaymentTransaction.resolution_note` giữ chữ gốc kể cả SĐT (không có chặn BR-GH-19 ở resolve và mark-failed), `GET /api/sales/refunds/` trả cho Quản lý (không cần quyền `confirm_refund`). Đã là chứng từ có phân quyền theo quyết định 06/10, nên không chặn; nên hỏi Duy có muốn chặn SĐT ở hai điểm này không.
+
+### Hồi quy và máy
+- `manage.py test apps.common.tests.test_auditlog_note_no_free_text apps.accounts.audit apps.sales.orders.tests.test_timeline_no_free_text apps.ai.actions`: 155 test OK.
+- Toàn bộ backend: điều phối viên đã chạy 3022 test OK (không chạy lại).
+- `makemigrations --check --dry-run`: No changes detected. `python3 scripts/check_naming.py`: OK, không vi phạm mới.
+- Migration `delivery/0010` và `sales/0014` áp dụng sạch trên DB mới (`migrate`).

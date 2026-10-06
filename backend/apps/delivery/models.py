@@ -118,6 +118,9 @@ class ConfirmationTask(models.Model):
     last_unreachable_at = models.DateTimeField("Lần gần nhất không liên lạc được", null=True, blank=True)
     callback_at = models.DateTimeField("Hẹn gọi lại lúc", null=True, blank=True)
     escalated_at = models.DateTimeField("Chuyển Quản lý lúc", null=True, blank=True, db_index=True)
+    # Lý do của Quản lý/CSKH khi bỏ qua xác nhận, gia hạn, huỷ xác nhận (bắt buộc hoặc tuỳ chọn theo luồng).
+    # Chữ nằm ở chứng từ (có phân quyền), không chép vào AuditLog (bất biến 9, TL-AN-M1). Lọc SĐT BR-GH-19.
+    decision_note = models.CharField("Lý do quyết định", max_length=200, blank=True, default="")
     auto_cancel_blocked_code = models.CharField("Mã chặn tự huỷ", max_length=16, blank=True, default="")
     auto_cancelled_at = models.DateTimeField("Thời điểm Hệ thống tự huỷ", null=True, blank=True)
     refund = models.ForeignKey(

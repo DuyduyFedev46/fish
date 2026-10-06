@@ -103,6 +103,7 @@ class SalesOrderDetailSerializer(serializers.ModelSerializer):
     available_actions = serializers.SerializerMethodField()
     timeline = serializers.SerializerMethodField()
     privacy_consent = serializers.SerializerMethodField()
+    cancel_note = serializers.SerializerMethodField()
 
     class Meta:
         model = SalesOrder
@@ -110,6 +111,7 @@ class SalesOrderDetailSerializer(serializers.ModelSerializer):
             "id", "code", "status", "status_label", "total_amount", "created_at",
             "reserved_until", "customer", "lines", "allocations", "invoice", "payments",
             "delivery", "refunds", "available_actions", "timeline", "privacy_consent",
+            "cancel_note",
         ]
         read_only_fields = fields
 
@@ -219,6 +221,10 @@ class SalesOrderDetailSerializer(serializers.ModelSerializer):
                 row["doc"] = {"type": e.doc, "id": e.doc_id}
             rows.append(row)
         return rows
+
+    def get_cancel_note(self, order):
+        """Ghi chú huỷ có thể có tên khách: che cùng luật với `customer` (SR-PII-02)."""
+        return "" if pii_hidden(order) else order.cancel_note
 
     def get_privacy_consent(self, order):
         """GL-05 / BR-PQ: Thông tin bằng chứng đồng ý. Chỉ tính khi user có quyền."""

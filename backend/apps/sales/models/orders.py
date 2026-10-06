@@ -43,6 +43,9 @@ class SalesOrder(models.Model):
     checkout_attempts = models.PositiveIntegerField(
         "Số lần lập tham số thanh toán cổng", default=0,
     )
+    # Ghi chú khi huỷ đơn đã thanh toán với lý do OTHER (bắt buộc ở API). Chữ nằm ở chứng từ,
+    # không chép vào AuditLog (bất biến 9, TL-AN-M1). Lọc SĐT/số tài khoản theo BR-GH-19.
+    cancel_note = models.CharField("Ghi chú huỷ đơn", max_length=200, blank=True, default="")
     # KHÔNG có trường phí giao hàng (BR-BH-10 — outscope hoàn toàn).
 
     # Khung go-live pháp lý (GL-03, BR-BH-17, bất biến 9)

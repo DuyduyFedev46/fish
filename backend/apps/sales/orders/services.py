@@ -20,8 +20,9 @@ from django.db.models import Q
 from django.utils import timezone
 
 from apps.catalog.models import Item, ItemPrice, PricingRule
-from apps.common.audit import record_audit
+from apps.common.audit import note_marker, record_audit
 from apps.common.exceptions import BusinessError
+from apps.common.pii import has_long_digit_run
 from apps.delivery.models import DeliveryNote
 from apps.inventory.batches import services as batches
 from apps.inventory.models import Batch, StockLedgerEntry
@@ -330,7 +331,19 @@ _STOCK_STILL_IN_WAREHOUSE = (
 )
 
 
-def cancel_paid_order(*, order, actor, reason="", reason_code=""):
+CANCEL_NOTE_MAX = 200
+
+
+def _cancel_audit_note(reason_code, cancel_note):
+    """Nhật ký chỉ ghi nhãn lý do + "có ghi chú"; chữ gốc ở `SalesOrder.cancel_note` (bất biến 9)."""
+    if not reason_code:
+        return ""
+    text = f"Lý do: {CANCEL_REASON_LABELS.get(reason_code, 'Không rõ')}"
+    marker = note_marker(cancel_note)
+    return f"{text} · {marker}" if marker else text
+
+
+def cancel_paid_order(*, order, actor, reason="", reason_code="", cancel_note=""):
     """
     Huỷ đơn đã thanh toán (BR-HT-05, BR-GH-07): chặn khi phiếu giao đang Đang giao
     (BR-GH-07) hoặc đã Hoàn tất (BR-GH-05, không quay lui — chỉ còn cách lập phiếu hoàn).
@@ -344,7 +357,15 @@ def cancel_paid_order(*, order, actor, reason="", reason_code=""):
     Doanh thu đảo bằng chứng từ đảo (BR-HT-10) lập NGAY tại thời điểm huỷ, trong cùng
     transaction (lỗi thì cả lần huỷ rollback); hoá đơn gốc giữ nguyên ISSUED (BR-HT-06).
     Phiếu hoàn chỉ là dòng tiền, không đảo doanh thu. Trả dict {"order", "stock_restored", "delivery_note"}.
+
+    Tham số `reason` không còn được dùng (chữ lý do nay là `cancel_note`, lưu ở đơn); giữ lại chỉ để
+    các nơi gọi cũ (chủ yếu test) không vỡ. Luồng sản phẩm không truyền nữa.
     """
+    cancel_note = (cancel_note or "").strip()
+    if len(cancel_note) > CANCEL_NOTE_MAX:
+        raise BusinessError(f"Ghi chú huỷ tối đa {CANCEL_NOTE_MAX} ký tự.", code="BR-GH-19")
+    if has_long_digit_run(cancel_note):
+        raise BusinessError("Không ghi SĐT hay số tài khoản vào ghi chú huỷ.", code="BR-GH-19")
     with transaction.atomic():
         o = SalesOrder.objects.select_for_update().get(pk=order.pk)
         if o.status not in (SalesOrder.Status.PAID, SalesOrder.Status.PROCESSING):
@@ -384,7 +405,8 @@ def cancel_paid_order(*, order, actor, reason="", reason_code=""):
 
         old_status = o.status
         o.status = SalesOrder.Status.CANCELLED
-        o.save(update_fields=["status"])
+        o.cancel_note = cancel_note
+        o.save(update_fields=["status", "cancel_note"])
 
         if note is not None:
             note.status = DeliveryNote.Status.CANCELLED
@@ -399,7 +421,7 @@ def cancel_paid_order(*, order, actor, reason="", reason_code=""):
                 "stock_restored": stock_restored,
                 "reason_code": reason_code,
             },
-            note=reason,
+            note=_cancel_audit_note(reason_code, cancel_note),
         )
         credit_note_services.issue_cancel_credit_note(
             invoice=invoice, actor=actor, reason_code=reason_code,

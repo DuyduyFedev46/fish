@@ -12,7 +12,7 @@ import uuid
 from django.db import transaction
 from django.db.models import Sum
 
-from apps.common.audit import record_audit
+from apps.common.audit import note_marker, record_audit
 from apps.common.exceptions import BusinessError
 from apps.sales.models import PaymentTransaction, Refund
 from apps.sales.utils import ZERO, vnd_display
@@ -251,7 +251,7 @@ def mark_refund_failed(*, refund, reason, actor):
         record_audit(
             "mark_refund_failed", actor=actor, obj=r,
             changes={"status": {"from": old_status, "to": r.status}},
-            note=reason or "",
+            note=note_marker(reason),
         )
     return r
 

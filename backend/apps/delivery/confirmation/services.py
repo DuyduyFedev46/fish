@@ -12,7 +12,7 @@ from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 
-from apps.common.audit import record_audit
+from apps.common.audit import note_marker, record_audit
 from apps.common.exceptions import BusinessError, ConflictError
 from apps.common.formatting import format_local_time
 from apps.common.pii import has_long_digit_run, normalize_phone
@@ -380,14 +380,16 @@ def unconfirm(task_id: int, user, *, reason: str = "") -> tuple[DeliveryNote, Co
         task.state = ConfirmationTask.State.PENDING
         task.claimed_by = None
         task.claimed_until = None
-        task.save(update_fields=["state", "claimed_by", "claimed_until", "updated_at"])
+        if clean_reason:  # không ghi đè lý do cũ bằng chuỗi rỗng
+            task.decision_note = clean_reason
+        task.save(update_fields=["state", "claimed_by", "claimed_until", "decision_note", "updated_at"])
 
         record_audit(
             "delivery_unconfirmed",
             actor=user,
             obj=note,
             changes={"status": {"from": "PREPARING", "to": "CONFIRMING"}},
-            note=clean_reason,
+            note=note_marker(clean_reason),
         )
 
         return note, task
@@ -566,14 +568,16 @@ def decide(
             task.state = ConfirmationTask.State.DONE
             task.claimed_by = None
             task.claimed_until = None
-            task.save(update_fields=["state", "claimed_by", "claimed_until", "updated_at"])
+            if clean_reason:  # không ghi đè lý do cũ bằng chuỗi rỗng
+                task.decision_note = clean_reason
+            task.save(update_fields=["state", "claimed_by", "claimed_until", "decision_note", "updated_at"])
 
             record_audit(
                 "delivery_confirm_skipped",
                 actor=user,
                 obj=note_obj,
                 changes={"decision": "DELIVER_WITHOUT_CONFIRM"},
-                note=clean_reason,
+                note=note_marker(clean_reason),
             )
             return {
                 "note_status": "PREPARING",
@@ -598,9 +602,11 @@ def decide(
             task.first_unreachable_at = None
             task.claimed_by = None
             task.claimed_until = None
+            if clean_reason:  # không ghi đè lý do cũ bằng chuỗi rỗng
+                task.decision_note = clean_reason
             task.save(update_fields=[
                 "state", "callback_at", "attempts", "first_unreachable_at",
-                "claimed_by", "claimed_until", "updated_at"
+                "claimed_by", "claimed_until", "decision_note", "updated_at"
             ])
 
             record_audit(
@@ -608,7 +614,7 @@ def decide(
                 actor=user,
                 obj=note_obj,
                 changes={"decision": "EXTEND", "until": until.isoformat()},
-                note=clean_reason,
+                note=note_marker(clean_reason),
             )
             return {
                 "note_status": "CONFIRMING",
@@ -625,8 +631,8 @@ def decide(
             order_services.cancel_paid_order(
                 order=order,
                 actor=user,
-                reason=clean_reason or clean_note,
                 reason_code=cancel_code,
+                cancel_note=clean_reason or clean_note,
             )
             task.state = ConfirmationTask.State.DONE
             task.claimed_by = None

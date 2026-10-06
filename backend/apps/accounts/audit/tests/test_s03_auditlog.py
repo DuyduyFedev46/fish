@@ -10,7 +10,7 @@ from decimal import Decimal
 
 from django.contrib.auth.models import Group, Permission
 from django.db.models import ProtectedError
-from django.test import TestCase
+from django.test import TestCase, override_settings
 
 from apps.accounts.models import AuditLog
 from apps.common.audit import record_audit
@@ -73,6 +73,7 @@ class AuditLogPermTests(TestCase):
             self.assertNotIn(perm, Group.objects.get(name=name).permissions.all(), name)
 
 
+@override_settings(AI_ENABLED=True)  # dòng AI chỉ hiện khi AI bật (TL-D3-L4)
 class AuditLogListApiTests(TestCase):
     def setUp(self):
         self.chu = make_user("chu1", roles.OWNER)

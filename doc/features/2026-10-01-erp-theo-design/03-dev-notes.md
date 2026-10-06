@@ -2396,6 +2396,42 @@ Trạng thái: code xong, đã commit trên nhánh wip/duy-quyet-03-10 (chưa me
 - **Số chạy 06/10/2026 (sau `git merge main`, merge sạch không xung đột):** `manage.py test` toàn bộ = 2873 test, OK, 0 failure/error (backend/ trong worktree, python từ venv của repo chính, `.env` + `staticfiles/` copy từ repo chính vì worktree không có, cả hai bị gitignore). `makemigrations --check --dry-run` = "No changes detected". `check_naming.py` OK, không phát sinh mới. Kiểm bất biến: xoá mềm (không xoá dòng), `record_audit` chỉ ghi `{"status", "deleted": True}` (không chữ tự do/SĐT), timeline không chép `note`/`reason`, API trả `available_actions` không có giá vốn
 - **Sửa review techlead 06/10 (TL-D8-M1, L1, L2):** M1 đổi câu lỗi xoá phiếu đã duyệt (FE đổi theo contract, mã `RETURN_DELETE_NOT_ALLOWED` giữ nguyên, không làm đường đảo). L1 `delete_return`, `approve`, `cancel` bắt `DoesNotExist` khi phiếu vừa bị xoá song song → 409 `STALE_STATE`. L2 thêm test: approve/cancel/PATCH sau xoá = 404, xoá phiếu Nháp gỡ chặn chốt lô và AI safety. Số chạy: `manage.py test --parallel 4` = 2880 test OK; `makemigrations --check --dry-run` = No changes detected..
 
+## Sửa AuditLog.note chữ tự do (06/10)
+
+Mã: TL-D3-L4 / TL15-L5, bất biến 9 (`caveve-domain`). Màn Nhật ký ERP in nguyên văn `AuditLog.note`, nên chữ người dùng gõ tay (có thể có tên/SĐT người chuyển khoản hay khách) bị lộ. Nay Nhật ký chỉ ghi mã lý do, nhãn cố định hoặc "Có ghi chú (xem trên chứng từ gốc)". Chữ gốc chỉ còn trên chứng từ ở các điểm có chỗ lưu: `PaymentTransaction.resolution_note` (attach_payment kể cả nhánh chưa đủ tiền, resolve_payment), `Refund.failure_reason` (mark_refund_failed). **Không phải điểm nào cũng còn chữ gốc**: lý do bỏ qua xác nhận, gia hạn, huỷ xác nhận (`delivery/confirmation`) và ghi chú huỷ đơn OTHER hiện KHÔNG được lưu ở đâu (trước đây chỉ nằm trong AuditLog). Tạm dùng nhãn trung tính "Có ghi chú" (không hứa "xem trên chứng từ"), chờ Duy quyết chỗ lưu (techlead đề xuất `ConfirmationTask.decision_note` + ghi chú huỷ trên CreditNote/SalesOrder, cần migration). Không đổi schema, không có migration.
+
+**Helper mới** `apps/common/audit.py`: `note_marker(text)` trả `NOTE_PRESENT_LABEL` nếu có chữ, `""` nếu không.
+
+**Điểm đã sửa**
+| File | Trước | Sau |
+|---|---|---|
+| `sales/payments/services.py` (attach_payment) | `note=note` | `note_marker(note)` |
+| `sales/payments/services.py` (resolve_payment ATTACH/CONFIRM) | `note=note` | `note_marker(note)` |
+| `sales/payments/services.py` (resolve_payment do hoàn tiền) | `note=p.resolution_note` (có mã GD hoàn người nhập) | "Hoàn tiền theo phiếu hoàn #id" |
+| `sales/refunds/services.py` (mark_refund_failed) | `note=reason` | `note_marker(reason)` |
+| `sales/orders/services.py` (cancel_paid_order) | `note=reason` ("nhãn — chữ tự gõ") | "Lý do: <nhãn của reason_code>" |
+| `delivery/confirmation/services.py` x3 (unconfirm, decide DELIVER_WITHOUT_CONFIRM, decide EXTEND) | `note=clean_reason` | `note_marker(clean_reason)` |
+| `ai/actions/services.py` (reject_ai_action) | `Lý do: {reason_code}` (lấy thẳng `request.data`) | `changes.has_reason_code` (bool) |
+
+**Ghi chú về điểm `purchasing/costs/services.py:83`**: dòng đó ghi `PurchaseCost.note` (chứng từ gốc), không ghi AuditLog, nên không sửa; test xác nhận không có AuditLog nào chứa chữ đó.
+
+**Đã rà, không phải chữ tự do (giữ nguyên)**: `content/entries` (`changes.reason` là mã chọn từ danh sách cố định BR-ND-15), `sales/payments/auto_confirm.py` (lý do do hệ thống sinh), `purchasing/receipts` (tên NCC, không phải khách), các `note` của AI/accounts/inventory (câu cố định hoặc mã, số kg, ngày).
+
+**Test**: `apps/common/tests/test_auditlog_note_no_free_text.py` (11 test; test quét có allowlist 2 file: content/entries và payments/auto_confirm): mỗi điểm sửa tạo thao tác với tên giả + SĐT giả rồi assert `note`/`changes`/`object_repr` không chứa chuỗi đó (đỏ trước khi sửa: 8 test), cộng test quét tĩnh bằng `ast` cho mọi lời gọi `record_audit(` ở `backend/apps` (chặn `note=` hoặc `changes["reason"|"note"]` lấy từ biến thô như `note`, `reason`, `clean_reason`...). Thêm `record_audit` mới với chữ tự do sẽ làm test quét đỏ.
+
+**Sửa test cũ**: `S12` (`test_s12_ac2_...`) và `test_cs07_ac8_...` đổi assert `note` sang nhãn cố định.
+
+**Nợ / cần Duy quyết**
+1. **Dữ liệu cũ vẫn còn chữ tự do** trong các dòng AuditLog đã ghi trước bản sửa (action `attach_payment`, `resolve_payment`, `mark_refund_failed`, `cancel_paid_order`, `delivery_unconfirmed`, `delivery_confirm_skipped`, `delivery_extended`, `reject_*`). Không sửa/xoá (AuditLog append-only). Đề xuất: (a) lúc đọc, API Nhật ký ẩn `note` của các action trên cho dòng tạo trước ngày deploy (không đụng DB); hoặc (b) một lệnh quản trị một lần ẩn danh hoá `note` cũ, Duy duyệt, chạy staging trước, ghi lại việc đó vào AuditLog. Khuyên (a), đảo ngược được.
+2. `staff_create` ghi `display_name` và `phone` của NHÂN VIÊN vào `changes` (`accounts/staff/services.py`, thuộc phần `accounts/` đang do agent khác sửa nên không đụng). Đó là dữ liệu cá nhân của nhân viên, không phải khách; hỏi Duy có cần che không.
+3. `changes.bank_txn_ref` (mã GD hoàn do Chủ nhập) vẫn vào Nhật ký vì là mã giao dịch; nếu Duy muốn chặt hơn thì che luôn.
+
+**Bổ sung sau review techlead (TL-AN-M1/M2/L1/L2/L3, 06/10)**
+- M1 phần làm ngay: `attach_payment` nhánh chưa đủ tiền nay lưu `resolution_note` trên giao dịch (không migration). Ba action confirmation dùng `note_marker(..., on_document=False)` ra nhãn `NOTE_PRESENT_NEUTRAL_LABEL` = "Có ghi chú". Phần lưu lý do thật **tạm chưa làm, chờ Duy** (câu hỏi 4).
+- M2: `common/admin.py` `_guarded_changes` ghi `{"changed": true}` cho field TextField/JSONField và field khai trong `free_text_fields` (`PaymentTransaction.resolution_note`, `Refund.bank_txn_ref`, `Refund.failure_reason`). Test admin trong `test_auditlog_note_no_free_text.py`.
+- L1: test quét `ast` duyệt đệ quy cây con `note=`/`changes=` (trừ `note_marker`), bắt `str()`, `.strip()`, `data["note"]`, `.get("note")`, f-string; allowlist theo cặp (file, action); thêm test chặn `AuditLog.objects.create` ngoài `common/audit.py`.
+- L2: `test_dw11_ac4_reject_action` gửi `reason_code` có tên + SĐT giả, assert note/changes sạch. L3: comment trong test hoàn tiền.
+
 - **Contract cho FE**: `POST /api/inventory/returns/{id}/delete/` body rỗng. Chỉ Chủ/superuser (người khác 403, kiểm trước phạm vi dòng). Trạng thái DRAFT hoặc CANCELLED → 200 `{"status":"deleted","id":<pk>}`; APPROVED → 400 `{"code":"RETURN_DELETE_NOT_ALLOWED","detail":"Phiếu đã cộng vào tồn kho. Huỷ phiếu trước rồi mới xoá được."}`; xoá lần 2 hoặc GET sau xoá → 404. Chi tiết và danh sách phiếu có thêm `available_actions: ["approve","cancel","delete"]` (tập con theo quyền + trạng thái); `delete` chỉ khi là Chủ và phiếu DRAFT/CANCELLED.
 - Còn nợ: admin Django của `ReturnToStock` chưa chặn xoá cứng (ngoài phạm vi, nên xét `has_delete_permission=False`).
 
@@ -2457,3 +2493,24 @@ Làm trong `erp-console/`, theo board `ERP-D1`, `W3f`, `W4b/c/d/e/f/g/h`, `F3g`.
 - **B1 (Medium):** `FormPage` — `onFocusCapture` đo ô vừa focus so với thanh nút `[data-action-bar]`; nếu bị che thì `scrollIntoView({block:"center"})`; thêm `scroll-margin-bottom` cho input/select/textarea. Ca e2e mới `e2e/ed_form_keyboard_focus.py` (360x420, Tab qua 7 ô của `/catalog/new/`, ô cuối nằm trên mép thanh nút).
 - **L1:** `FormPage` đưa tiêu điểm tới ô `aria-invalid` đầu tiên sau Lưu (lỗi tại chỗ và lỗi từ máy chủ); `LoginScreen` đưa tiêu điểm về ô mật khẩu sau đăng nhập sai. Cùng ca e2e kiểm cả hai.
 - **Kiểm:** tsc sạch · vitest 912/912 · build mock=1 xanh · ed_form_keyboard_focus 4/4 · ed_batch13 128/128 · s48_password 41/41 · ed_batch5 126/127 và ed_batch7 113/114 (đỏ là 2 ca AI do cờ tắt, như trước).
+
+### Duy chốt 06/10 chiều — lưu lý do trên chứng từ, ẩn Nhật ký cũ, ẩn dòng AI khi AI tắt (BE)
+- **Field mới (2 migration nhỏ, tên rõ):** `delivery/0010_confirmationtask_decision_note` (`ConfirmationTask.decision_note`, CharField 200, blank) và `sales/0014_salesorder_cancel_note` (`SalesOrder.cancel_note`, CharField 200, blank). Lý do theo bất biến 8: chữ lý do bắt buộc trước đây chỉ nằm trong AuditLog, nay nằm ở chứng từ có phân quyền (TL-AN-M1).
+- **Ghi:** `unconfirm`, `decide` DELIVER_WITHOUT_CONFIRM và EXTEND lưu `clean_reason` vào `decision_note` (đã lọc SĐT/số tài khoản BR-GH-19, tối đa 200). `cancel_paid_order(..., cancel_note=)` lọc cùng luật (`has_long_digit_run`, 200 ký tự, mã `BR-GH-19`, HTTP 400) rồi lưu `SalesOrder.cancel_note`; `decide` CANCEL cũng truyền lý do sang. AuditLog ghi `note_marker(..., on_document=True)`: "Có ghi chú (xem trên chứng từ gốc)"; huỷ đơn ghi "Lý do: <nhãn> · Có ghi chú (xem trên chứng từ gốc)" khi có ghi chú. Ghi chú huỷ nay chặn SĐT: client gửi ghi chú có dãy số dài sẽ nhận 400 (trước đây nhận).
+- **Contract cho FE (chỉ thêm field, không đổi field cũ):**
+  - `GET /api/sales/orders/{id}/` thêm `"cancel_note": "<chuỗi, "" nếu không có>"` (cùng quyền xem chi tiết đơn; `""` khi đơn bị che dữ liệu khách `pii_hidden`, vd NV giao ngoài cửa sổ; không có ở API công khai Shop; bị scrub khỏi dữ liệu AI đọc).
+  - `GET /api/confirmation/queue/{note_id}/` thêm `"decision_note": "<chuỗi>"`; trả `""` khi người xem ngoài phạm vi (`in_scope=false`). Không có trong danh sách hàng chờ.
+  - FE có thể hiển thị ô "Ghi chú huỷ" / "Lý do quyết định" khi chuỗi không rỗng.
+- **Nhật ký cũ ẩn lúc hiển thị:** `apps/accounts/audit/serializers.py` `safe_note(action, note)`: với `attach_payment`, `resolve_payment`, `mark_refund_failed`, `cancel_paid_order`, `delivery_unconfirmed`, `delivery_confirm_skipped`, `delivery_extended`, `reject_*`, chỉ trả `note` nếu khớp mẫu cố định (nhãn hệ thống, "Lý do: <nhãn>[ · Có ghi chú...]", "Hoàn tiền theo phiếu hoàn #id", "Từ chối đề xuất AI <id>"); không khớp trả "Có ghi chú". DB không sửa.
+- **AI tắt thì ẩn dòng AI:** `GET /api/audit-logs/` khi `settings.AI_ENABLED` False loại dòng có `actor_kind="ai"`, có `proposal_ref`, hoặc action `ai_*`, trước khi đếm và phân trang (`count` và các trang nhất quán). Lọc `?actor_kind=ai` khi tắt trả 0. Dòng `auto_confirm_exact_match`/`escalate_unmatched_payment` do Hệ thống làm nên vẫn hiện.
+- **Sửa test cũ:** `test_s03_auditlog` và `test_actor_filter` bọc `@override_settings(AI_ENABLED=True)`; `test_timeline_no_free_text` đổi ghi chú huỷ không chứa SĐT và đọc `body["timeline"]`.
+- **Số chạy:** `manage.py test --parallel 4` = 2940 test OK; `makemigrations --check --dry-run` = No changes detected; `check_naming.py` OK.
+
+**Sửa theo re-review techlead (RR-H1/M1/M2/L1/L2/L3, 06/10)**
+- RR-H1: `cancel_note`, `decision_note` vào `SCRUB_FREE_TEXT_KEYS` và `SCRUB_PII_KEYS`; thêm `note_text` (ghi chú cuộc gọi CSKH, lỗ hổng cũ cùng loại) vào `SCRUB_FREE_TEXT_KEYS`. Câu "không vào AI" trước đó sai, đã sửa ở trên. Test chung: mọi CharField/TextField (không choices) tên `note|reason|memo|comment|description` phải nằm trong danh sách lọc hoặc allowlist có lý do (`AiScrubCoversFreeTextFieldsTests`).
+- RR-M1: `cancel_note` là `SerializerMethodField`, trả `""` khi `pii_hidden(order)`.
+- RR-M2: `exclude_ai_rows` chỉ ẩn `actor_kind="ai"` và dòng Hệ thống có `proposal_ref`. Giữ dòng do người làm: `confirm_*`/`reject_*`, dòng nghiệp vụ do người duyệt thực thi (có `proposal_ref`), `ai_config_*`/`ai_policy_*` do Chủ đổi. Test từng loại.
+- RR-L1: `decision_note` chỉ ghi khi lý do không rỗng, nên `unconfirm` không lý do không xoá lý do cũ. Vẫn chỉ có MỘT ô: lý do mới ghi đè lý do cũ (vd gia hạn rồi bỏ qua xác nhận thì còn lý do sau). Đủ lịch sử cần bảng quyết định, để lô sau.
+- RR-L2: `safe_note` dùng `fullmatch`; bỏ mẫu "Hoàn tiền theo phiếu hoàn" thừa của `attach_payment`.
+- RR-L3: API và luồng `decide` không còn ghép/truyền `reason`. Tham số `reason` của `cancel_paid_order` giữ lại chỉ để test và nơi gọi cũ không vỡ (ghi trong docstring).
+- Nhắc triển khai: rollback migration `delivery/0010` và `sales/0014` sẽ mất chữ ghi chú đã lưu.

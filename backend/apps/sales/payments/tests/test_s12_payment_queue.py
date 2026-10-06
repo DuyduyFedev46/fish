@@ -216,7 +216,7 @@ class S12ResolveTests(S12Base):
         log = AuditLog.objects.get(action="resolve_payment")
         self.assertEqual(log.actor, self.chu)
         self.assertEqual(log.object_id, str(pay.pk))
-        self.assertEqual(log.note, "Khách ghi sai nội dung CK")
+        self.assertEqual(log.note, "Có ghi chú (xem trên chứng từ gốc)")  # TL-D3-L4: chữ gốc ở resolution_note
         self.assertEqual(log.changes["resolution"], "ATTACHED")
         self.assertEqual(log.changes["order"], self.order.code)
         self.assertEqual(log.changes["resolution_status"], {"from": "OPEN", "to": "RESOLVED"})
