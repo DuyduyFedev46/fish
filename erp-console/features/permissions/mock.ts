@@ -213,7 +213,7 @@ function parseBody(body: unknown, needVersion: boolean): Parsed | MockResponse {
   const obj = body && typeof body === "object" && !Array.isArray(body) ? (body as Record<string, unknown>) : null;
   if (!obj) return fail(400, "INVALID_INPUT", "Thân yêu cầu phải là một đối tượng.");
   for (const key of Object.keys(obj)) {
-    if (!BODY_KEYS.includes(key) || (!needVersion && key === "version")) return fail(400, "INPUT_NOT_ALLOWED", `Không nhận trường ${key}.`);
+    if (!BODY_KEYS.includes(key)) return fail(400, "INPUT_NOT_ALLOWED", `Không nhận trường ${key}.`);
   }
   const caps = obj.capabilities ?? {};
   const scopes = obj.scopes ?? {};
@@ -368,6 +368,8 @@ export function mockPermissionsApi(req: MockRequest): MockResponse {
     return { status: 200, body: GROUP_CODES.map((g) => summary(g, users, store)) };
   }
   const code = decodeURIComponent(parts[0]);
+  // Bước 1 (403) đứng trước bước 2 (404) khi ghi/xem trước; GET nhóm lạ vẫn 404.
+  if (req.method !== "GET" && !isOwnerViewer(viewer)) return fail(403, "OWNER_ONLY", "Chỉ Chủ mới đổi được việc và phạm vi của nhóm.");
   if (!(GROUP_CODES as readonly string[]).includes(code)) return fail(404, "GROUP_NOT_FOUND", "Không tìm thấy nhóm này.");
   if (parts.length === 1 && req.method === "GET") return { status: 200, body: detail(code, users, store) };
   if (parts[1] === "capabilities" && req.method === "PUT") return put(viewer, code, req.body, users);

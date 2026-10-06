@@ -18,7 +18,7 @@ import { PERM_MSG as M } from "./messages";
 import { breakingWarning, planToggle, toggleMessage, type TogglePlan } from "./permissionsModel";
 import { CUSTOMERS_KEY } from "./permissionsModel";
 import { isGroupChanged, wideningImpactOf } from "./saveErrors";
-import type { CapabilityState, GroupDetail, GroupSaveBody, RegistryItem, ScopePreview } from "./types";
+import type { CapabilityState, GroupDetail, GroupSaveBody, RegistryItem, ScopeChanges, ScopePreview } from "./types";
 
 /** Nhóm bị bấm: mã, nhãn, trạng thái hiện tại các việc, số người (cho câu cảnh báo). */
 export type ToggleGroup = {
@@ -32,9 +32,12 @@ export type ToggleGroup = {
   scopeValues?: Record<string, string>;
 };
 
-export type PendingOff = { group: ToggleGroup; item: RegistryItem; plan: TogglePlan; warning: string };
+/** Kế hoạch bấm/hoàn tác: thêm `scopes` (PO-Q1 hoặc trả phạm vi về như cũ) và cờ hoàn tác. */
+export type SendPlan = TogglePlan & { scopes?: ScopeChanges; isUndo?: boolean };
+
+export type PendingOff = { group: ToggleGroup; item: RegistryItem; plan: SendPlan; warning: string };
 /** Hộp cảnh báo mở rộng dữ liệu khách (BE trả 400 CUSTOMER_DATA_WIDENING_UNCONFIRMED kèm `impact`). */
-export type PendingWiden = { group: ToggleGroup; item: RegistryItem; plan: TogglePlan; impact: ScopePreview };
+export type PendingWiden = { group: ToggleGroup; item: RegistryItem; plan: SendPlan; impact: ScopePreview };
 
 type Args = {
   registry: RegistryItem[];
@@ -45,9 +48,10 @@ type Args = {
 };
 
 /** Thân PUT cho một lần bật/tắt: `version` + việc (+ PO-Q1) (+ xác nhận). */
-function bodyOf(group: ToggleGroup, plan: TogglePlan, confirm: boolean): GroupSaveBody {
+function bodyOf(group: ToggleGroup, plan: SendPlan, confirm: boolean): GroupSaveBody {
   const body: GroupSaveBody = { version: group.version, capabilities: plan.changes };
-  if (plan.changes[CUSTOMERS_KEY] === true && group.scopeValues?.customers === "none") body.scopes = { customers: "all" };
+  if (plan.scopes) body.scopes = plan.scopes;
+  else if (plan.changes[CUSTOMERS_KEY] === true && group.scopeValues?.customers === "none") body.scopes = { customers: "all" };
   if (confirm) body.confirm_customer_data_widening = true;
   return body;
 }
@@ -64,35 +68,38 @@ export function useCapabilityToggle({ registry, onSaved, onConflict }: Args) {
   const inFlight = useRef(false);
   const labelOf = useCallback((key: string) => registry.find((r) => r.key === key)?.label ?? key, [registry]);
 
+  const sendRef = useRef<((group: ToggleGroup, item: RegistryItem, plan: SendPlan) => Promise<void>) | null>(null);
+
   /** Sau khi BE nhận: thay dữ liệu, báo kết quả kèm "Hoàn tác" nếu đưa về đúng cũ được. */
   const saved = useCallback(
-    (group: ToggleGroup, item: RegistryItem, plan: TogglePlan, next: GroupDetail) => {
+    (group: ToggleGroup, item: RegistryItem, plan: SendPlan, next: GroupDetail) => {
       onSaved(next);
+      if (plan.isUndo) {
+        toast.success(`Đã hoàn tác “${item.label}” cho ${group.label}.`);
+        return;
+      }
       const undo = plan.undo;
+      // PO-Q1: nếu lần bấm đã tự đặt Khách hàng = Tất cả thì hoàn tác trả nó về Không xem.
+      const autoScope = plan.changes[CUSTOMERS_KEY] === true && group.scopeValues?.customers === "none";
       toast.success(
         toggleMessage(item, group.label, plan, labelOf),
         undo
           ? {
               undo: () => {
-                void saveGroupChanges(group.code, { version: next.version, capabilities: undo })
-                  .then((back) => {
-                    onSaved(back);
-                    toast.success(`Đã hoàn tác “${item.label}” cho ${group.label}.`);
-                  })
-                  .catch((err) => {
-                    if (isGroupChanged(err)) onConflict?.();
-                    if (!(err instanceof ApiError && err.status === 401)) toast.error(errorText(err, M.saveFailed));
-                  });
+                // Hoàn tác đi cùng đường `send`: mở rộng (vd bật lại Xem đơn) thì mở hộp cảnh báo như lần bấm thường.
+                const back: ToggleGroup = { ...group, states: next.capabilities, version: next.version, scopeValues: next.data_scope_values };
+                const undoPlan: SendPlan = { changes: undo, undo: null, alsoChanged: [], wanted: !plan.wanted, isUndo: true, ...(autoScope ? { scopes: { customers: "none" } } : {}) };
+                void sendRef.current?.(back, item, undoPlan);
               },
             }
           : undefined,
       );
     },
-    [labelOf, onSaved, onConflict, toast],
+    [labelOf, onSaved, toast],
   );
 
   const send = useCallback(
-    async (group: ToggleGroup, item: RegistryItem, plan: TogglePlan): Promise<void> => {
+    async (group: ToggleGroup, item: RegistryItem, plan: SendPlan): Promise<void> => {
       if (inFlight.current) return;
       inFlight.current = true;
       setError(null);
@@ -116,6 +123,7 @@ export function useCapabilityToggle({ registry, onSaved, onConflict }: Args) {
     },
     [saved, onConflict, toast],
   );
+  sendRef.current = send;
 
   /** Bấm một ô của một nhóm. */
   const toggle = useCallback(

@@ -489,7 +489,6 @@ def scopes(browser):
     expect(page.get_by_role("heading", name="Phạm vi dữ liệu")).to_be_visible()
     cust = scope_select(page, "Khách hàng")
     ok("PV-11-AC2: ô Khách hàng mờ, giá trị cũ vẫn hiện, có lý do", cust.is_disabled() and cust.input_value() == "none" and 'bật việc "Xem khách hàng" trước' in scope_li(page, "customers").inner_text(), scope_li(page, "customers").inner_text())
-    ok("PV-11-AC2: gate_capability null (Phiếu giao CSKH) chỉ dựa vào inactive_reason", True)
     go(page, "/permissions/detail/?group=customer_service")
     expect(page.get_by_role("heading", name="Phạm vi dữ liệu")).to_be_visible()
     dsel = scope_select(page, "Phiếu giao")
@@ -617,6 +616,36 @@ def scopes(browser):
     switch(page, "Mở bán lô", "Quản lý").click()
     expect(page.locator(".toast-item", has_text="Đã tắt")).to_have_count(1)
     ok("PV-10 (W3h): bấm lại sau khi tải lại thì thành công", True)
+    # ---------- M3: chuyển trang trong app khi còn nháp phải hỏi (PV-11-AC5) ----------
+    go(page, "/permissions/detail/?group=warehouse_staff")
+    expect(page.get_by_role("heading", name="Phạm vi dữ liệu")).to_be_visible()
+    scope_select(page, "Phiếu nhập").select_option("created_by_me_today")
+    asked = []
+    def on_dialog(d):
+        asked.append(d.message)
+        d.dismiss() if len(asked) == 1 else d.accept()
+    page.on("dialog", on_dialog)
+    page.get_by_role("link", name="Phân quyền").first.click()
+    page.wait_for_timeout(500)
+    ok("PV-11-AC5: bấm '← Phân quyền' khi còn nháp → hỏi; Huỷ thì ở lại, nháp còn", len(asked) == 1 and "thay đổi chưa lưu" in asked[0] and "group=warehouse_staff" in page.url and bar(page).count() == 1, str(asked))
+    page.get_by_role("link", name="Phân quyền").first.click()
+    page.wait_for_url("**/permissions/")
+    ok("PV-11-AC5: đồng ý thì sang trang ma trận", len(asked) == 2)
+    page.remove_listener("dialog", on_dialog)
+
+    # ---------- M2: Hoàn tác ở W3h khi hoàn tác là mở rộng → hộp cảnh báo ----------
+    go(page, "/permissions/")
+    expect(page.get_by_role("switch").first).to_be_visible()
+    sw = switch(page, "Xem đơn", "Quản lý")
+    sw.click()
+    dialog(page).get_by_role("button", name="Tắt việc này").click()
+    expect(sw).to_have_attribute("aria-checked", "false")
+    page.locator(".toast-item", has_text="Đã tắt").get_by_role("button", name="Hoàn tác").click()
+    expect(dialog(page).get_by_role("heading", name=re.compile("Cho thêm người xem dữ liệu khách"))).to_be_visible()
+    ok("M2: Hoàn tác = bật lại Xem đơn (mở rộng) mở hộp cảnh báo, không chỉ toast lỗi", True)
+    dialog(page).get_by_role("button", name="Tôi hiểu, lưu").click()
+    expect(sw).to_have_attribute("aria-checked", "true")
+    ok("M2: 'Tôi hiểu, lưu' → ô bật lại", True)
     ctx.close()
     return errors
 

@@ -168,6 +168,7 @@ export function valuesOf(group: string, overrides: Record<string, string> | unde
 
 /** Quyền Tầng 1 của nhóm mà mock chép từ migration BE (ngoài registry nên Chủ không đổi ở màn này). */
 const HAS_INVOICE_VIEW = [ROLE.manager, ROLE.warehouseStaff];
+const HAS_CUSTOMER_VIEW = [ROLE.manager, ROLE.deliveryStaff];
 const NO_DELIVERY_VIEW = [ROLE.customerService];
 
 /** Nhóm có đủ điều kiện xem đối tượng `obj` (BE `_eligible`: có ít nhất một permission cổng). */
@@ -180,8 +181,8 @@ export function isEligible(obj: ScopeObjectDef, group: string, states: Record<st
     case "returns":
       return !NO_DELIVERY_VIEW.includes(group as never);
     case "customers":
-      // NV giao luôn có `sales.view_customer` (Tầng 1, ngoài registry) nên không bao giờ mờ.
-      return states.view_customers === "on" || group === ROLE.deliveryStaff;
+      // Quản lý và NV giao có `sales.view_customer` (Tầng 1, ngoài registry, migration 0002/0012) nên đủ điều kiện, không bao giờ mờ.
+      return states.view_customers === "on" || HAS_CUSTOMER_VIEW.includes(group as never);
     default:
       return obj.gate_capability !== null && states[obj.gate_capability] === "on";
   }
@@ -213,6 +214,16 @@ export function describeRows(group: string, states: Record<string, CapabilitySta
   });
 }
 
+/**
+ * Rank HIỆU LỰC của một giá trị (02b §2.5, luật H1): D7 thiếu `sales.view_customer_list` (việc "Xem khách hàng" tắt) bị chặn trần
+ * `assigned_deliveries` (rank 1), dù giá trị đã lưu là `all` (Q-7 giữ giá trị khi tắt việc).
+ */
+export function effectiveRank(obj: ScopeObjectDef, value: string, states: Record<string, CapabilityState>): number {
+  const rank = rankOf(obj, value);
+  if (obj.key === "customers" && states.view_customers !== "on") return Math.min(rank, rankOf(obj, "assigned_deliveries"));
+  return rank;
+}
+
 /** "Tầm với" của một nhóm với một đối tượng: cổng mở? rank bao nhiêu? (02b §2.5). */
 export type Reach = { open: boolean; rank: number };
 
@@ -242,8 +253,8 @@ export function buildPreview(before: PreviewGroup, after: PreviewGroup, others: 
   const changedKeys: string[] = [];
   for (const key of STORED_KEYS) {
     const obj = SCOPE_BY_KEY[key];
-    const reachBefore: Reach = { open: isEligible(obj, before.code, before.states), rank: rankOf(obj, before.values[key]) };
-    const reachAfter: Reach = { open: isEligible(obj, after.code, after.states), rank: rankOf(obj, after.values[key]) };
+    const reachBefore: Reach = { open: isEligible(obj, before.code, before.states), rank: effectiveRank(obj, before.values[key], before.states) };
+    const reachAfter: Reach = { open: isEligible(obj, after.code, after.states), rank: effectiveRank(obj, after.values[key], after.states) };
     const changed = before.values[key] !== after.values[key];
     if (changed) changedKeys.push(key);
     if (obj.customer_data && isWidening(reachBefore, reachAfter)) {
@@ -265,12 +276,12 @@ export function buildPreview(before: PreviewGroup, after: PreviewGroup, others: 
   const wider: ScopePreview["already_wider_elsewhere"] = [];
   for (const key of changedKeys) {
     const obj = SCOPE_BY_KEY[key];
-    const newRank = rankOf(obj, after.values[key]);
+    const newRank = effectiveRank(obj, after.values[key], after.states);
     for (const member of after.members) {
       for (const other of others) {
         if (!other.members.some((m) => m.id === member.id)) continue;
         if (!isEligible(obj, other.code, other.states)) continue;
-        if (rankOf(obj, other.values[key]) > newRank && !wider.some((w) => w.id === member.id && w.key === key)) {
+        if (effectiveRank(obj, other.values[key], other.states) > newRank && !wider.some((w) => w.id === member.id && w.key === key)) {
           wider.push({ id: member.id, display_name: member.display_name, via_group: other.code, key });
         }
       }

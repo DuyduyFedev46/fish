@@ -90,6 +90,11 @@ describe("PUT: thứ tự kiểm và CAS version", () => {
     viewer = users[5];
     expect(put("manager", { version: "1", capabilities: { deliver: true } }).status).toBe(200);
   });
+  it("L2: người không phải Chủ gọi PUT/POST vào nhóm lạ nhận 403 trước 404", () => {
+    viewer = users[1];
+    expect(put("zzz", { version: "1", capabilities: { deliver: true } }).status).toBe(403);
+    expect(preview("zzz", { capabilities: { deliver: true } }).status).toBe(403);
+  });
   it("404 nhóm lạ; 400 GROUP_LOCKED nhóm Chủ", () => {
     expect(put("zzz", { version: "1", capabilities: { view_orders: true } }).status).toBe(404);
     expect(codeOf(put("owner", { version: "1", capabilities: { view_orders: true } }))).toBe("GROUP_LOCKED");
@@ -191,7 +196,8 @@ describe("mở rộng dữ liệu khách cần xác nhận (PV-09)", () => {
   it("xem trước không ghi gì, không cần version, chỉ Chủ/superuser", () => {
     preview("delivery_staff", { scopes: { orders: "all" } });
     expect(getGroup("delivery_staff").version).toBe("1");
-    expect(codeOf(preview("delivery_staff", { version: "1", scopes: { orders: "all" } }))).toBe("INPUT_NOT_ALLOWED");
+    expect(preview("delivery_staff", { version: "9", confirm_customer_data_widening: true, scopes: { orders: "all" } }).status).toBe(200); // bỏ qua version/confirm
+    expect(codeOf(preview("delivery_staff", { mode: 1, scopes: { orders: "all" } }))).toBe("INPUT_NOT_ALLOWED");
     viewer = users[1];
     expect(preview("delivery_staff", { scopes: { orders: "all" } }).status).toBe(403);
   });
@@ -199,5 +205,30 @@ describe("mở rộng dữ liệu khách cần xác nhận (PV-09)", () => {
     const text = JSON.stringify(preview("delivery_staff", { scopes: { orders: "all" } }).body);
     expect(text).not.toMatch(/0\d{9}/);
     expect(text).not.toMatch(/địa chỉ:/i);
+  });
+});
+
+describe("D7 theo rank hiệu lực (review F1 M1, luật H1)", () => {
+  it("NV giao: đổi Khách hàng sang Tất cả khi việc còn tắt KHÔNG đòi xác nhận (rank hiệu lực vẫn 1)", () => {
+    const r = put("delivery_staff", { version: "1", scopes: { customers: "all" } });
+    expect(r.status).toBe(200);
+    expect((r.body as GroupDetail).data_scope_values.customers).toBe("all");
+  });
+  it("NV giao lưu Tất cả rồi bật Xem khách hàng: mở rộng (1 → 2) phải đòi xác nhận", () => {
+    put("delivery_staff", { version: "1", scopes: { customers: "all" } });
+    const r = put("delivery_staff", { version: "2", capabilities: { view_customers: true } });
+    expect(codeOf(r)).toBe("CUSTOMER_DATA_WIDENING_UNCONFIRMED");
+    expect((r.body as { impact: ScopePreview }).impact.widened).toEqual([{ key: "customers", from: "all", to: "all" }]);
+    expect(put("delivery_staff", { version: "2", capabilities: { view_customers: true }, confirm_customer_data_widening: true }).status).toBe(200);
+  });
+  it("Quản lý tắt rồi bật lại Xem khách hàng khi Khách hàng = Tất cả: bật lại là mở rộng", () => {
+    expect(put("manager", { version: "1", capabilities: { view_customers: false } }).status).toBe(200);
+    const r = put("manager", { version: "2", capabilities: { view_customers: true } });
+    expect(codeOf(r)).toBe("CUSTOMER_DATA_WIDENING_UNCONFIRMED");
+  });
+  it("Quản lý tắt Xem khách hàng: ô Khách hàng không mờ (có view_customer Tầng 1)", () => {
+    put("manager", { version: "1", capabilities: { view_customers: false } });
+    const row = getGroup("manager").data_scopes.find((r) => r.key === "customers")!;
+    expect(row.inactive_reason).toBeNull();
   });
 });

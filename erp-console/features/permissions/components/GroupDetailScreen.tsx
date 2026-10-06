@@ -391,7 +391,7 @@ function ScopeRowEditor({
             {M.scopeCustomerData}
           </span>
         )}
-        {unsaved && <span className={`tag ${s.tagWarn}`}>Chưa lưu</span>}
+        {unsaved && <span className={`tag ${s.tagWarn}`}>{M.unsaved}</span>}
       </div>
       {editable ? (
         <select
@@ -475,7 +475,7 @@ function TaskRow({
     control = (
       <span className={`${s.taskState} ${on ? s.stateOn : ""}`}>
         <Icon name={on ? "check_circle" : mode === "partial" ? "indeterminate_check_box" : "remove"} />
-        <span>{on ? M.cellOn : mode === "partial" ? "Một phần" : M.cellOff}</span>
+        <span>{on ? M.cellOn : mode === "partial" ? M.cellPartialShort : M.cellOff}</span>
       </span>
     );
   }
@@ -496,7 +496,7 @@ function TaskRow({
               {M.assignedOnly}
             </span>
           )}
-          {unsaved && <span className={`tag ${s.tagWarn}`}>Chưa lưu</span>}
+          {unsaved && <span className={`tag ${s.tagWarn}`}>{M.unsaved}</span>}
         </span>
         {item.requires.length > 0 && <span className={s.taskSub}>{M.requiresNote(item.requires.map(labelOf).join(", "))}</span>}
         {isCustomers && !on && <span className={s.taskSub}>{M.allCustomersHint}</span>}

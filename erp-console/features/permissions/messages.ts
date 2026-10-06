@@ -78,7 +78,6 @@ export const PERM_MSG = {
   scopesIntro: "Nhóm này nhìn thấy dòng dữ liệu nào. Đổi xong bấm “Lưu thay đổi” để áp cho cả nhóm.",
   scopesIntroReadOnly: "Chỉ xem. Chỉ Chủ mới đổi được phạm vi dữ liệu của nhóm.",
   scopeCustomerData: "Có dữ liệu khách",
-  scopeReadOnlyHint: "Chỉ xem",
   scopeSelectLabel: (object: string) => `Phạm vi ${object}`,
   tasksIntroDraft: "Bật hoặc tắt từng việc cho cả nhóm, rồi bấm “Lưu thay đổi”. Việc có nhãn “Chỉ Chủ” không cấp được cho nhóm này.",
   timelineTitle: "Lịch sử thay đổi",
@@ -86,6 +85,8 @@ export const PERM_MSG = {
   groupNotFoundHint: "Nhóm này không tồn tại hoặc đã bị gỡ.",
 
   // ---- Bản nháp W3i (PV-11) ----
+  unsaved: "Chưa lưu",
+  cellPartialShort: "Một phần",
   draftCount: (n: number) => (n === 1 ? "Có 1 thay đổi chưa lưu" : `Có ${n} thay đổi chưa lưu`),
   draftSave: "Lưu thay đổi",
   draftSaving: "Đang lưu…",

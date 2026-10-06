@@ -7,6 +7,7 @@
 // PUT trả 409 GROUP_CHANGED → báo "Tải lại", KHÔNG tự gửi lại; "Tải lại" xoá bản nháp và lấy bản server (PV-10-AC6, AC7).
 // Không lưu bản nháp vào storage/URL, không log thân yêu cầu.
 
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ApiError } from "@/shared/lib/http";
 import { errorText } from "@/shared/lib/messages";
@@ -39,6 +40,7 @@ type Args = {
 
 export function useGroupDraft({ group, onSaved, reload }: Args) {
   const toast = useToast();
+  const router = useRouter();
   const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -53,16 +55,44 @@ export function useGroupDraft({ group, onSaved, reload }: Args) {
   const size = draftSize(draft);
   const problem = useMemo(() => draftProblem(group.code, states, values, draft), [group.code, states, values, draft]);
 
-  // Rời trang khi còn thay đổi chưa lưu: trình duyệt hỏi xác nhận (PV-11-AC5). Chuyển trang trong app không bị chặn.
+  // Rời trang khi còn thay đổi chưa lưu (PV-11-AC5): đóng tab/tải lại → trình duyệt hỏi; bấm link nội bộ trong app → confirm rồi mới chuyển.
+  // (Nút Back của trình duyệt chưa chặn.) Bắt click ở pha capture để chạy trước bộ chuyển trang của Next.
   useEffect(() => {
     if (size === 0) return;
     const warn = (e: BeforeUnloadEvent) => {
       e.preventDefault();
       e.returnValue = "";
     };
+    const onClick = (e: MouseEvent) => {
+      if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      const anchor = (e.target as Element | null)?.closest?.("a[href]") as HTMLAnchorElement | null;
+      if (!anchor || (anchor.target && anchor.target !== "_self") || anchor.hasAttribute("download")) return;
+      const url = new URL(anchor.href, window.location.href);
+      if (url.origin !== window.location.origin) return;
+      if (url.pathname + url.search === window.location.pathname + window.location.search) return;
+      e.preventDefault();
+      e.stopPropagation();
+      if (window.confirm(M.draftLeave)) router.push(url.pathname + url.search + url.hash);
+    };
     window.addEventListener("beforeunload", warn);
-    return () => window.removeEventListener("beforeunload", warn);
-  }, [size]);
+    document.addEventListener("click", onClick, true);
+    return () => {
+      window.removeEventListener("beforeunload", warn);
+      document.removeEventListener("click", onClick, true);
+    };
+  }, [size, router]);
+
+  // L3: `version` đổi (vd sau thêm/bỏ thành viên làm tải lại) khi đang có nháp mà không do lần Lưu của mình → coi là xung đột,
+  // để lần Lưu sau không ngầm đổi base và nuốt thay đổi của người khác chen vào giữa.
+  const baseVersion = useRef<string | null>(null);
+  useEffect(() => {
+    if (size === 0) {
+      baseVersion.current = group.version;
+      return;
+    }
+    if (baseVersion.current === null) baseVersion.current = group.version;
+    else if (baseVersion.current !== group.version) setConflict(true);
+  }, [size, group.version]);
 
   const toggleCap = useCallback(
     (key: string) => {

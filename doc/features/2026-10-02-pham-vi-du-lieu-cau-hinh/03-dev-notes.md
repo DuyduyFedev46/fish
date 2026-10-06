@@ -139,3 +139,11 @@ Thứ tự kiểm 02b §2.3 (403 → 404 → GROUP_LOCKED → INPUT_NOT_ALLOWED 
 - `python3 scripts/check_naming.py`: OK, không phát sinh mới.
 - Ảnh (thư mục `shots/` bị `.gitignore`, không commit): `shots/f1-desktop-1280-{w3i-scopes,w3i-draft,widen-dialog,conflict,superuser}.png`, `shots/f1-mobile-360-{w3i-draft,w3i-full,widen-dialog}.png`.
 - Dọn: đã xoá `out/` và `.next/`, tắt server 3101.
+
+### Vòng sửa theo review techlead F1 (07/10)
+- **M1:** mock D7 theo rank hiệu lực (`effectiveRank`, trần `assigned_deliveries` khi "Xem khách hàng" tắt); Quản lý và NV giao luôn đủ điều kiện D7 (không mờ). Test: NV giao đổi D7 sang `all` khi việc tắt không đòi xác nhận; NV giao lưu `all` rồi bật việc đòi xác nhận; Quản lý tắt rồi bật lại đòi xác nhận.
+- **M2:** "Hoàn tác" ở W3h đi cùng đường `send` (mở rộng thì mở hộp cảnh báo); ca PO-Q1 hoàn tác kèm `scopes.customers = "none"`. e2e: tắt Xem đơn của Quản lý, Hoàn tác, hộp cảnh báo, "Tôi hiểu, lưu".
+- **M3:** link nội bộ khi còn nháp: bắt click pha capture, `confirm(M.draftLeave)`, rồi `router.push`. Nút Back của trình duyệt (`popstate`) CHƯA chặn (QA biết). e2e có ca huỷ ở lại và đồng ý sang trang.
+- **L1, L2:** mock preview nhận `version`/`confirm` (bỏ qua); người không phải Chủ gọi PUT/POST nhóm lạ nhận 403 trước 404. **L3:** `version` đổi khi đang có nháp (sau thêm/bỏ thành viên) → báo xung đột "Tải lại". **L4:** chuỗi "Chưa lưu", "Một phần" vào `messages.ts`, bỏ `scopeReadOnlyHint`. **L5:** bỏ ca đếm khống. L6 để UI review; L7..L9 ghi cho Lô 3/5.
+- Superuser không nhóm (`/no-role/`): không làm, chờ Duy.
+- Kiểm: tsc sạch; vitest 86 file, 1026 test PASS; build mock=0 + check-no-mock + check-ai-chunks XANH; build mock=1 + `ed_batch14_permissions.py` 157/157 PASS. Đã xoá `out/`, gỡ symlink, tắt server.
