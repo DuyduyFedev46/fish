@@ -51,6 +51,10 @@ Mọi đường đọc (list, detail, tổng, timeline, Tiếp theo, Nhờ, AI d
 4. `gate_perms`: D1 `sales.view_salesorder` · D2 `sales.view_salesinvoice` (giá trị lấy từ D1 **của nhóm đó**) ·
    D3 `delivery.view_deliverynote` · D4 `delivery.confirm_with_customer` · D5 `inventory.view_returntostock` ·
    D6 `purchasing.view_purchasereceipt`, `purchasing.add_purchasereceipt` · D7 `sales.view_customer_list`, `sales.view_customer`.
+   **Sửa 06/10 (review Lô 2, H1):** với D7, nhóm có `sales.view_customer_list` đóng góp giá trị đã lưu. Nhóm chỉ có
+   `sales.view_customer` (Tầng 1, ngoài registry, Chủ không tắt được) đóng góp tối đa `assigned_deliveries`, tức
+   `min(giá trị lưu, assigned_deliveries)`. Lý do: tắt "Xem khách hàng" phải đóng "Tất cả khách" dù D7 vẫn lưu `all` (Q-7),
+   nếu không thì nhóm G (luôn có `view_customer`) sẽ thấy mọi khách.
 5. Không cache qua request. Nhớ trong `user._data_scope_cache` (cùng cách Django nhớ `_perm_cache`); mỗi request
    TokenAuthentication nạp user mới, nên đổi phạm vi có hiệu lực từ request kế tiếp (BR-PQ-36). Test đổi cấu hình rồi gọi
    lại bằng `force_authenticate` phải nạp lại user (như với permission). `overrides` (cho xem trước) thì không nhớ.
@@ -230,6 +234,8 @@ class GroupDataScope(models.Model):         # nhóm × đối tượng → giá 
         default_permissions = ()             # chỉ sửa qua service, không qua Admin/ma trận
 ```
 
+`GroupAccessConfig` cũng có `default_permissions = ()` (duyệt lệch 1, review 06/10).
+
 CASCADE vì đây là cấu hình, không phải chứng từ (bất biến 3 chỉ áp FK tới User và chứng từ); Group không bị xoá trong hệ thống.
 Không lưu dòng cho `owner` (luôn rộng nhất). D2, D8 không lưu (suy ra). Chỉ mục: ràng buộc duy nhất `(group_id, object_key)` đủ cho
 resolver.
@@ -320,4 +326,4 @@ quan `row_version` cho mọi lần lưu của nhóm."
 
 ## 9. Review
 
-(để trống)
+- 06/10 Lô 1–2 BE: **CHANGES REQUESTED** (H1 luật D7). Chi tiết ở `03b-review-techlead.md`.
