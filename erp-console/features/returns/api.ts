@@ -50,7 +50,7 @@ export function cancelReturn(id: number): Promise<ReturnItem> {
   return apiFetch<ReturnItem>(`${BASE}${id}/cancel/`, { method: "POST", body: {}, mock: MOCK });
 }
 
-/** Xoá phiếu hoàn (xoá mềm, #8): chỉ Chủ, chỉ phiếu Nháp hoặc Đã huỷ. Đã duyệt → 400 RETURN_DELETE_NOT_ALLOWED; vừa bị xoá/đổi → 409 STALE_STATE; xoá rồi → 404. */
+/** Xoá phiếu hàng hoàn (xoá mềm, #8): chỉ Chủ, chỉ phiếu Nháp hoặc Đã huỷ. Đã duyệt → 400 RETURN_DELETE_NOT_ALLOWED; vừa bị xoá/đổi → 409 STALE_STATE; xoá rồi → 404. */
 export function deleteReturn(id: number): Promise<{ status: "deleted"; id: number }> {
   return apiFetch<{ status: "deleted"; id: number }>(`${BASE}${id}/delete/`, { method: "POST", body: {}, mock: MOCK });
 }

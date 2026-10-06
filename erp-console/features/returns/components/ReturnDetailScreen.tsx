@@ -3,8 +3,8 @@
 // Chi tiết hàng hoàn về kho (ED-26 / W5f): /returns/detail/?id=<pk>. Khung DetailPage: header (mã mono · chip · [Tái nhập vào lô] [Huỷ bỏ, ghi lỗ]),
 // StatusPath (Chờ duyệt → Đã duyệt) kèm Tiếp theo / Đã làm, khối thông tin, cột phải = Trợ lý AI + dòng thời gian.
 // Hai nút duyệt chỉ hiện cho người có inventory.approve_returntostock khi phiếu còn Chờ duyệt; cả hai mở hộp F2n (chọn sẵn quyết định đã bấm).
-// "Huỷ phiếu hoàn" (Lô bổ sung A #8) nằm trong menu "…": phiếu còn Chờ duyệt, người có quyền duyệt/sửa hoặc người tạo phiếu; có hộp xác nhận
-// vì không khôi phục được. Phiếu đã huỷ: chip Đã huỷ, StatusPath kết thúc đỏ, hết mọi nút. Không có tiền hay giá vốn. Ghi chú là chữ tự do: chỉ hiện trong trang.
+// "Huỷ phiếu hàng hoàn" (Lô bổ sung A #8) nằm trong menu "…": phiếu còn Chờ duyệt, người có quyền duyệt/sửa hoặc người tạo phiếu; có hộp xác nhận
+// vì không khôi phục được. Phiếu đã huỷ: chip Đã huỷ, StatusPath kết thúc đỏ, hết nút duyệt và huỷ (Chủ còn mục "Xoá phiếu hàng hoàn" trong menu "…" khi BE cho `delete`). Không có tiền hay giá vốn. Ghi chú là chữ tự do: chỉ hiện trong trang.
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, type ReactNode } from "react";
@@ -76,8 +76,8 @@ export function ReturnDetailScreen({ renderAi }: Props) {
 function ReturnDetailBody({ item: r, detail, renderAi }: { item: ReturnItem; detail: ReturnDetailState; renderAi?: Props["renderAi"] }) {
   const { me } = useAuth();
   const toast = useToast();
-  const [modal, setModal] = useState<{ decision: ApproveDecision } | null>(null);
   const router = useRouter();
+  const [modal, setModal] = useState<{ decision: ApproveDecision } | null>(null);
   const [cancelling, setCancelling] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [version, setVersion] = useState(0);
@@ -97,7 +97,6 @@ function ReturnDetailBody({ item: r, detail, renderAi }: { item: ReturnItem; det
 
   const more: MoreMenuItem[] = [];
   if (canCancel(me, r)) more.push({ key: "cancel", label: M.cancelMenu, danger: true, onSelect: () => setCancelling(true) });
-
   if (canDelete(r)) more.push({ key: "delete", label: M.deleteMenu, danger: true, onSelect: () => setDeleting(true) });
 
   const primary = mayApprove ? (

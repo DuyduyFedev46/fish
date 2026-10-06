@@ -57,21 +57,21 @@ export const RETURNS_MSG = {
   approvedRestock: "Đã duyệt. Hàng đã nhập lại vào lô.",
   approvedWriteOff: "Đã duyệt. Hàng đã huỷ bỏ, ghi lỗ.",
 
-  // ---- Huỷ phiếu hoàn (Lô bổ sung A #8) ----
-  cancelMenu: "Huỷ phiếu hoàn",
-  cancelTitle: "Huỷ phiếu hoàn",
-  cancelConfirm: "Huỷ phiếu hoàn",
+  // ---- Huỷ phiếu hàng hoàn (Lô bổ sung A #8) ----
+  cancelMenu: "Huỷ phiếu hàng hoàn",
+  cancelTitle: "Huỷ phiếu hàng hoàn",
+  cancelConfirm: "Huỷ phiếu hàng hoàn",
   cancelBody: (code: string) => `Huỷ phiếu ${code}. Số kg của phiếu này không còn tính vào số đã hoàn của phiếu giao, và phiếu không khôi phục lại được.`,
-  cancelled: "Đã huỷ phiếu hoàn.",
+  cancelled: "Đã huỷ phiếu hàng hoàn.",
 
-  // ---- Xoá phiếu hoàn (#8, BR-PQ-10) ----
-  deleteMenu: "Xoá phiếu hoàn",
-  deleteTitle: "Xoá phiếu hoàn",
-  deleteConfirm: "Xoá phiếu hoàn",
+  // ---- Xoá phiếu hàng hoàn (#8, BR-PQ-10) ----
+  deleteMenu: "Xoá phiếu hàng hoàn",
+  deleteTitle: "Xoá phiếu hàng hoàn",
+  deleteConfirm: "Xoá phiếu hàng hoàn",
   deleteBody: (code: string) => `Xoá phiếu ${code} khỏi danh sách. Phiếu bị xoá không mở lại được.`,
   /** TL-D8-L3: phiếu Nháp xoá đi thì số kg không về kho; nói rõ để người xoá không tưởng là đã nhập lại. */
   deleteDraftNote: "Số kg trên phiếu này sẽ không được nhập lại kho.",
-  deleted: "Đã xoá phiếu hoàn.",
+  deleted: "Đã xoá phiếu hàng hoàn.",
 
   // ---- F2n Duyệt ----
   approveTitle: "Duyệt hàng hoàn",

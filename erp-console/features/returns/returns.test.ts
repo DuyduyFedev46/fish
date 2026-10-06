@@ -271,7 +271,7 @@ describe("mock hàng hoàn (theo contract BE Lô 9)", () => {
   });
 });
 
-describe("Huỷ phiếu hoàn (Lô bổ sung A #8)", () => {
+describe("Huỷ phiếu hàng hoàn (Lô bổ sung A #8)", () => {
   const me = (id: number, permissions: string[]) => ({ id, permissions });
   const row = (status: ReturnItem["status"], created_by: number | null) => ({ status, created_by });
 
@@ -352,7 +352,7 @@ describe("mock chi tiết phiếu giao có batch_pk và returned_qty (contract B
   });
 });
 
-describe("xoá phiếu hoàn (#8, BR-PQ-10)", () => {
+describe("xoá phiếu hàng hoàn (#8, BR-PQ-10)", () => {
   const make = (qty = "0.1") => {
     return call("kho1", "POST", BASE, { delivery_note: 34, batch: 202, qty }).body as ReturnItem;
   };
