@@ -48,7 +48,7 @@ export default function CatalogGrid({ items }: { items: CatalogItem[] }) {
                   >
                     {Number(item.sellable_qty) > 0
                       ? `Còn ${formatKg(item.sellable_qty)}`
-                      : "Hết hàng"}
+                      : "Tạm hết · liên hệ để đặt"}
                   </div>
                   <AddToCartControl item={item} />
                 </article>

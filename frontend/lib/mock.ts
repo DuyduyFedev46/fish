@@ -122,6 +122,16 @@ const MOCK_CATALOG: MockCatalogItem[] = [
     image: null,
   },
   {
+    item_code: "CUA-HOANG-DE",
+    name: "Cua hoàng đế",
+    group: "Cua ghẹ",
+    item_type: "SIMPLE",
+    unit: "Kg",
+    price: 950000,
+    sellable_qty: 0,
+    image: null,
+  },
+  {
     item_code: "COMBO-HAISAN-GD",
     name: "Combo hải sản gia đình",
     group: "Combo",
