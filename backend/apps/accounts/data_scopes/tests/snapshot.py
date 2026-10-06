@@ -61,7 +61,21 @@ PENDING_DUY_DIFFS = tuple(
     # dòng `-` của số cũ) và đơn của chính họ lọt vào cửa sổ 8 đơn gần nhất khi các đơn khác ra khỏi phạm vi. Không ai thấy thêm đơn.
     ("direct_permissions", "dashboard.summary", "+", "extra:kpis.*"),  # CHỜ Duy D-3
     ("direct_permissions", "dashboard.summary", "+", "visible:order_assigned_direct"),  # CHỜ Duy D-3
+) + tuple(
+    # O1 (QA Lô 4 + 5, L2 review Lô 4): người kiêm nhiệm NV kho + CSKH. Trước PV-05 `has_full_delivery_scope` (NV kho) cho họ thấy mọi
+    # phiếu chờ gọi; nay chỉ nhóm CSKH đủ điều kiện D4 (NV kho không có `confirm_with_customer`) nên còn `pending_or_called_recently`.
+    entry
+    for endpoint in (
+        "confirmation.detail", "confirmation.queue_done", "confirmation.search_called", "confirmation.search_phone",
+        "actions.confirmation_call", "actions.confirmation_claim", "actions.confirmation_recipient",
+        "actions.confirmation_unconfirm",
+    )
+    for entry in (
+        ("warehouse_service", endpoint, "-", "*"),  # CHỜ Duy D-3
+        ("warehouse_service", endpoint, "+", "status:*=404"),  # CHỜ Duy D-3
+    )
 )
+PENDING_DUY_USERS = ("direct_permissions", "warehouse_service")
 
 
 def pii_paths(node, *, customer_endpoint=False, path=()):

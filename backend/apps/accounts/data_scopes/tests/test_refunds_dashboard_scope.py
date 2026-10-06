@@ -135,3 +135,40 @@ class DashboardScopeTests(ScopeSceneBase):
         from rest_framework.test import APIClient
 
         self.assertEqual(APIClient().get(DASHBOARD).status_code, 401)
+
+
+class GuidanceScopeSweepTests(ScopeSceneBase):
+    """B1, O4 (QA Lô 4 + 5): mọi endpoint guidance dùng đúng hàm phạm vi của đối tượng, nên khớp với endpoint chi tiết."""
+
+    def test_b1_refund_guidance_outside_d1_is_404(self):
+        set_scope(roles.MANAGER, "orders", "assigned_deliveries")
+        other = self.scene.refunds["refund_other_order"]
+        self.assertEqual(self.get("manager", f"{REFUNDS}{other.pk}/").status_code, 404)
+        self.assertEqual(self.get("manager", f"/api/guidance/refund/{other.pk}/").status_code, 404)
+        self.assertEqual(self.get("owner", f"/api/guidance/refund/{other.pk}/").status_code, 200)
+
+    def test_o4_guidance_status_matches_detail_status_for_every_scoped_object(self):
+        set_scope(roles.MANAGER, "orders", "assigned_deliveries")
+        set_scope(roles.MANAGER, "deliveries", "assigned")
+        set_scope(roles.MANAGER, "returns", "assigned_deliveries")
+        set_scope(roles.MANAGER, "receipts", "created_by_me")
+        set_scope(roles.MANAGER, "customers", "assigned_deliveries")
+        kinds = (
+            ("order", "orders", "/api/sales/orders/"),
+            ("refund", "refunds", REFUNDS),
+            ("delivery", "notes", "/api/delivery/notes/"),
+            ("return", "returns", "/api/inventory/returns/"),
+            ("receipt", "receipts", "/api/purchasing/receipts/"),
+            ("customer", "customers", "/api/sales/customers/"),
+        )
+        checked = 0
+        for doc_type, attr, detail_base in kinds:
+            for label, obj in getattr(self.scene, attr).items():
+                detail = self.get("manager", f"{detail_base}{obj.pk}/").status_code
+                guidance = self.get("manager", f"/api/guidance/{doc_type}/{obj.pk}/").status_code
+                self.assertEqual(guidance, detail, (doc_type, label, detail, guidance))
+                checked += 1
+        self.assertGreater(checked, 30)
+        # Có cả ca trong lẫn ngoài phạm vi (không phải 404 hết).
+        self.assertEqual(self.get("manager", f"/api/guidance/receipt/{self.scene.receipts['receipt_manager_today'].pk}/").status_code, 200)
+        self.assertEqual(self.get("manager", f"/api/guidance/receipt/{self.scene.receipts['receipt_owner_old'].pk}/").status_code, 404)

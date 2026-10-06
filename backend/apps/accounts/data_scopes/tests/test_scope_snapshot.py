@@ -150,17 +150,17 @@ class ScopeSnapshotTests(TestCase):
 
     def test_pv01_pending_duy_diffs_are_direct_permissions_and_narrowing_only(self):
         """M1 (review Lô 4): mục CHỜ Duy D-3 chỉ của `direct_permissions` và chỉ thu hẹp (dòng biến mất hoặc 200 thành 404)."""
-        from .snapshot import PENDING_DUY_DIFFS
+        from .snapshot import PENDING_DUY_DIFFS, PENDING_DUY_USERS
 
         self.assertTrue(PENDING_DUY_DIFFS)
         for user, _endpoint, sign, glob in PENDING_DUY_DIFFS:
-            self.assertEqual(user, "direct_permissions")
+            self.assertIn(user, PENDING_DUY_USERS)  # direct_permissions (R9) và warehouse_service (O1, K+C)
             narrowing = sign == "-" or (sign == "+" and glob in (
                 "status:*=404", "extra:kpis.*", "visible:order_assigned_direct"))  # hai mục sau chỉ ở dashboard.summary
             self.assertTrue(narrowing, (sign, glob))
             if glob != "status:*=404" and sign == "+":
-                self.assertEqual(_endpoint, "dashboard.summary")
-        self.assertFalse([d for d in APPROVED_DIFFS if d[0] == "direct_permissions"])
+                self.assertEqual((user, _endpoint), ("direct_permissions", "dashboard.summary"))
+        self.assertFalse([d for d in APPROVED_DIFFS if d[0] in PENDING_DUY_USERS])
         # Một dòng thấy THÊM của direct_permissions không được miễn.
         self.assertFalse(is_approved(Diff("direct_permissions", "receipts.list", "+", "visible:receipt_manager_today")))
         self.assertFalse(is_approved(Diff("direct_permissions", "orders.list", "-", "visible:order_assigned_direct")))
