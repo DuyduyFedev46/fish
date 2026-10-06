@@ -74,6 +74,8 @@ class SalesOrder(models.Model):
         permissions = [
             ("cancel_paid_order", "Huỷ đơn đã thanh toán"),
             ("view_privacy_consent", "Xem bằng chứng đồng ý xử lý dữ liệu của đơn"),
+            # PV-07 (BR-PQ-38): tên, SĐT, địa chỉ khách trên đơn, hoá đơn, phiếu hoàn tiền. Khác `view_customer_list`.
+            ("view_order_customer_info", "Xem thông tin khách trên đơn & hoá đơn"),
         ]
 
     def __str__(self):

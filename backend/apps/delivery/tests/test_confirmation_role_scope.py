@@ -109,6 +109,7 @@ class CskhL1Tests(TestCase):
             "confirm_with_customer",
             "change_recipient",
             "view_callscript",  # Lô 5 (CS-18): CSKH chỉ đọc kịch bản gọi, cấp bởi delivery/0009
+            "view_order_customer_info",  # PV-07 (Q-4): việc V2 cấp cho cả 5 nhóm, cấp bởi sales/0016
         }
         self.assertEqual(perm_codes, expected_cskh)
 

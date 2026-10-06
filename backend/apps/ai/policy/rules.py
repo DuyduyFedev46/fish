@@ -83,6 +83,8 @@ FORCE_C_PERMS = frozenset({
 
 # Lọc đầu ra: Khoá PII khách (H2, bất biến 9 — loại bỏ đệ quy kể cả với Chủ)
 SCRUB_PII_KEYS = frozenset({
+    # PV-07: cờ "ô khách bị che" (null | expired | not_permitted) đi kèm tên/SĐT; AI không cần, bỏ để kết quả AI không đổi.
+    "customer_hidden_reason",
     "phone",
     "customer_phone",
     "customer_name",

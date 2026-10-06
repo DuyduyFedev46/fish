@@ -35,6 +35,8 @@ Diff = namedtuple("Diff", "user endpoint sign fact")
 # Duy duyệt 02/10 Q-4 (V2 mặc định bật cho NV kho). Mọi lệch khác -> test đỏ.
 APPROVED_DIFFS = (
     ("warehouse_staff", "invoices.list", "+", "pii:*:customer_name"),  # Duy duyệt 02/10 Q-4
+    # Người kiêm nhiệm NV kho + NV giao: có V2 qua nhóm NV kho nên cùng một ngoại lệ Q-4 (D2 của họ = all, như NV kho).
+    ("warehouse_courier", "invoices.list", "+", "pii:*:customer_name"),  # Duy duyệt 02/10 Q-4 (thành viên NV kho)
 )
 
 
