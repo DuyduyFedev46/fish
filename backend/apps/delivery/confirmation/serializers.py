@@ -16,6 +16,11 @@ from apps.delivery.confirmation.scope import note_in_customer_service_scope
 from apps.delivery.models import ConfirmationTask, CustomerCall, DeliveryNote
 from apps.sales.models.invoices import SalesInvoiceLineBatch
 
+# T43: nhãn chữ cho mã chặn tự huỷ (hằng, không ghép dữ liệu khách). Khoá `auto_cancel_blocked` giữ mã thô.
+AUTO_CANCEL_BLOCKED_LABELS = {
+    "BR-LO-05": "Lô đã chốt, không tự huỷ được",
+}
+
 
 class CustomerCallSerializer(serializers.ModelSerializer):
     id = serializers.IntegerField(read_only=True)
@@ -101,11 +106,8 @@ class ConfirmationQueueItemSerializer(serializers.ModelSerializer):
         # Escalation
         escalation_reason = obj.escalation_reason or None
         escalation_label = None
-        if obj.escalation_reason == ConfirmationTask.EscalationReason.WANT_CHANGE:
-            escalation_label = "Khách muốn đổi món – huỷ + hoàn + đặt lại"
-        elif obj.escalation_reason == ConfirmationTask.EscalationReason.WANT_CANCEL:
-            escalation_label = "Khách muốn huỷ"
-        elif obj.escalation_reason:
+        if obj.escalation_reason:
+            # T36/T37: một chữ cho mọi nơi; hướng dẫn xử lý nằm ở dòng gợi ý của màn, không trong nhãn.
             escalation_label = obj.get_escalation_reason_display()
 
         # Next call after
@@ -180,6 +182,7 @@ class ConfirmationQueueItemSerializer(serializers.ModelSerializer):
             "escalated_at": obj.escalated_at.isoformat() if obj.escalated_at else None,
             "decide_deadline": decide_deadline,
             "auto_cancel_blocked": obj.auto_cancel_blocked_code or None,
+            "auto_cancel_blocked_label": AUTO_CANCEL_BLOCKED_LABELS.get(obj.auto_cancel_blocked_code) or None,  # T43
             "claimed_by": claimed_by_data,
             "claimed_until": claimed_until_data,
             "lines_summary": self._calc_lines_summary(note),

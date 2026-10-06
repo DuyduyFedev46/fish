@@ -22,12 +22,6 @@ from .scope import scope_delivery_notes_for
 
 NOT_FOUND_MESSAGE = "Không tìm thấy phiếu giao."
 MAX_NOTE_LENGTH = 500
-# Nhãn riêng theo thiết kế (02b R9): không đổi `choices` của model (sẽ sinh migration).
-DECISION_LABELS = {
-    ReturnToStock.Decision.PENDING: "Chờ quyết định",
-    ReturnToStock.Decision.RESTOCK: "Tái nhập",
-    ReturnToStock.Decision.WRITE_OFF: "Huỷ bỏ, ghi lỗ",
-}
 
 
 class _IdField(serializers.PrimaryKeyRelatedField):
@@ -104,7 +98,7 @@ class ReturnToStockSerializer(serializers.ModelSerializer):
         return max(0, int((obj.returned_at - obj.left_warehouse_at).total_seconds() // 60))
 
     def get_decision_label(self, obj):
-        return DECISION_LABELS.get(obj.decision, obj.get_decision_display())
+        return obj.get_decision_display()  # nhãn một nguồn từ `choices` (T45)
 
     def get_created_by_name(self, obj):
         return user_display_name(obj.created_by)

@@ -16,7 +16,7 @@ class SalesOrder(models.Model):
         PROCESSING = "PROCESSING", "Đang xử lý"  # đã trừ kho + ghi doanh thu
         COMPLETED = "COMPLETED", "Hoàn tất"
         CANCELLED = "CANCELLED", "Đã huỷ"        # cancel_paid_order (P-07)
-        AUTO_CANCELLED = "AUTO_CANCELLED", "Tự huỷ (quá TTL)"
+        AUTO_CANCELLED = "AUTO_CANCELLED", "Hết giờ giữ chỗ"
 
     code = models.CharField("Mã đơn", max_length=32, unique=True)
     customer = models.ForeignKey(

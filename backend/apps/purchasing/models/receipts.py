@@ -38,8 +38,8 @@ class PurchaseReceipt(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        verbose_name = "Phiếu nhập kho"
-        verbose_name_plural = "Phiếu nhập kho"
+        verbose_name = "Phiếu nhập"
+        verbose_name_plural = "Phiếu nhập"
         ordering = ["-received_date", "-id"]
         constraints = [
             models.UniqueConstraint(

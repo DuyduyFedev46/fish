@@ -97,7 +97,7 @@ def get_payment_next_steps(payment: PaymentTransaction, user: Any) -> list[NextS
         steps.append(
             NextStep(
                 key="refund",
-                label="Tạo phiếu hoàn",
+                label="Lập phiếu hoàn tiền",
                 actor="user",
                 allowed=can_refund,
                 who=["Chủ"],
@@ -120,7 +120,7 @@ def get_payment_guidance(doc_id: str, user: Any, request: Optional[Any] = None) 
 
     # Cùng mã lỗi 403 với PaymentTransactionViewSet (DW-04-AC5)
     if not (user.has_perm("sales.view_paymenttransaction") and user.has_perm(RESOLVE_PERM)):
-        raise PermissionDenied("Bạn không có quyền xem giao dịch thanh toán.")
+        raise PermissionDenied("Bạn không có quyền xem khoản tiền về.")
 
     qs = PaymentTransaction.objects.select_related(
         "sales_order",
@@ -130,7 +130,7 @@ def get_payment_guidance(doc_id: str, user: Any, request: Optional[Any] = None) 
     try:
         payment = qs.get(pk=int(doc_id))
     except (TypeError, ValueError, PaymentTransaction.DoesNotExist):
-        raise Http404("Không tìm thấy giao dịch thanh toán.")
+        raise Http404("Không tìm thấy khoản tiền về.")
 
     # doc: TUYỆT ĐỐI không đưa raw_payload, description, counter_account_name (DW-04-AC4)
     doc_summary = {

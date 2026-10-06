@@ -36,7 +36,7 @@ class Item(models.Model):
 
     class ItemType(models.TextChoices):
         SIMPLE = "SIMPLE", "Mặt hàng thường"
-        BUNDLE = "BUNDLE", "Combo dạng gói (có công thức)"
+        BUNDLE = "BUNDLE", "Combo"
 
     code = models.CharField("Mã hàng", max_length=40, unique=True)
     name = models.CharField("Tên hàng", max_length=200)
@@ -60,7 +60,7 @@ class Item(models.Model):
         permissions = [
             # Q3 (2026-09-26): quyền Tầng 2 riêng cho ảnh — chu + quan_ly. KHÔNG mở
             # `change_item` (Quản lý vẫn không sửa được tên, hạn dùng, ẩn/hiện, giá).
-            ("change_item_image", "Thêm / thay / gỡ ảnh mặt hàng"),
+            ("change_item_image", "Sửa ảnh mặt hàng"),
         ]
 
     def __str__(self):

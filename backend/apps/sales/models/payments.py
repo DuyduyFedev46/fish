@@ -16,11 +16,11 @@ class PaymentTransaction(models.Model):
     """
 
     class MatchStatus(models.TextChoices):
-        MATCHED = "MATCHED", "Khớp — đã xác nhận"
-        UNDERPAID = "UNDERPAID", "Thiếu tiền — chờ Chủ"       # BR-TT-04
-        ORPHAN = "ORPHAN", "Đến sau khi đơn đã huỷ — chờ Chủ"  # BR-TT-05
-        UNMATCHED = "UNMATCHED", "Không khớp đơn — chờ Chủ"
-        OVERPAID = "OVERPAID", "Chuyển thừa — đơn đã thanh toán, chờ Chủ"  # BR-TT-10 (P5)
+        MATCHED = "MATCHED", "Khớp đơn"
+        UNDERPAID = "UNDERPAID", "Chuyển thiếu"       # BR-TT-04
+        ORPHAN = "ORPHAN", "Về sau khi đơn đã huỷ"  # BR-TT-05
+        UNMATCHED = "UNMATCHED", "Không khớp đơn"
+        OVERPAID = "OVERPAID", "Chuyển thừa"  # BR-TT-10 (P5)
 
     class ResolutionStatus(models.TextChoices):
         """BR-TT-09. `null` = giao dịch khớp, không thuộc hàng chờ."""
@@ -28,20 +28,20 @@ class PaymentTransaction(models.Model):
         RESOLVED = "RESOLVED", "Đã xử lý"
 
     class Resolution(models.TextChoices):
-        ATTACHED = "ATTACHED", "Gắn vào đơn"
-        CONFIRMED = "CONFIRMED", "Xác nhận đơn (khách đã bù)"
+        ATTACHED = "ATTACHED", "Đã gắn vào đơn"
+        CONFIRMED = "CONFIRMED", "Đã xác nhận đơn"
         REFUNDED = "REFUNDED", "Đã hoàn tiền"
 
     class Source(models.TextChoices):
-        WEBHOOK = "WEBHOOK", "Webhook SePay"
+        WEBHOOK = "WEBHOOK", "Ngân hàng báo"
         MANUAL = "MANUAL", "Xác nhận tay"
         GATEWAY = "GATEWAY", "Cổng SePay"  # P3/BR-TT-02: IPN Cổng thanh toán SePay (hosted checkout)
 
     class Environment(models.TextChoices):
         """BR-TT-14: môi trường cổng lúc ghi giao dịch — chỉ áp dụng cho Source.GATEWAY.
         Nguồn khác (webhook ngân hàng cũ / xác nhận tay) để trống."""
-        SANDBOX = "SANDBOX", "Sandbox (thử)"
-        PRODUCTION = "PRODUCTION", "Production (thật)"
+        SANDBOX = "SANDBOX", "Chạy thử"
+        PRODUCTION = "PRODUCTION", "Chạy thật"
 
     bank_txn_id = models.CharField("Mã giao dịch ngân hàng", max_length=100, unique=True)
     sales_order = models.ForeignKey(
@@ -81,8 +81,8 @@ class PaymentTransaction(models.Model):
     resolution_note = models.TextField("Ghi chú xử lý", blank=True, default="")
 
     class Meta:
-        verbose_name = "Giao dịch thanh toán"
-        verbose_name_plural = "Giao dịch thanh toán"
+        verbose_name = "Khoản tiền về"
+        verbose_name_plural = "Khoản tiền về"
         ordering = ["-received_at", "-id"]
 
     def __str__(self):

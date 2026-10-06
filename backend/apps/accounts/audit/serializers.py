@@ -27,10 +27,15 @@ _GUARDED_ACTIONS = {
 _REJECT_NOTE = re.compile(r"Từ chối đề xuất AI [\w-]+")
 
 
+# Nhãn lý do huỷ TRƯỚC lô áp tên chuẩn: AuditLog cũ trong DB vẫn mang chữ này (không sửa DB, bất biến 4),
+# nên vẫn phải được coi là mẫu cố định do hệ thống sinh.
+_LEGACY_CANCEL_LABELS = ("Hư hỏng khi soạn hàng", "Bỏ giao sau khi thất bại", "Khác")
+
+
 def _cancel_note_ok(note):
     from apps.sales.orders.services import CANCEL_REASON_LABELS
 
-    labels = [*CANCEL_REASON_LABELS.values(), "Không rõ"]
+    labels = [*CANCEL_REASON_LABELS.values(), *_LEGACY_CANCEL_LABELS, "Không rõ"]
     for label in labels:
         base = f"Lý do: {label}"
         if note in (base, f"{base} · {NOTE_PRESENT_LABEL}", f"{base} · {NOTE_PRESENT_NEUTRAL_LABEL}"):

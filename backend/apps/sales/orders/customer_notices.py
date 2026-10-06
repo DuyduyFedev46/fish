@@ -51,7 +51,7 @@ def build_cancel_notice(order: SalesOrder) -> dict | None:
         total_amount = sum(r.amount for r in refunds)
         all_refunded = all(r.status == Refund.Status.REFUNDED for r in refunds)
         if all_refunded:
-            status_label = "Đã hoàn"
+            status_label = "Đã hoàn tiền"
             latest_confirmed = max((r.confirmed_at for r in refunds if r.confirmed_at), default=None)
             refunded_at = (
                 format_local_date(latest_confirmed)
@@ -59,7 +59,7 @@ def build_cancel_notice(order: SalesOrder) -> dict | None:
                 else None
             )
         else:
-            status_label = "Đang chờ hoàn"
+            status_label = "Đang chờ hoàn tiền"
             refunded_at = None
 
         earliest_created = min((r.created_at for r in refunds if r.created_at), default=order.created_at)
@@ -75,7 +75,7 @@ def build_cancel_notice(order: SalesOrder) -> dict | None:
     else:
         refund_data = {
             "amount": str(int(order.total_amount)),
-            "status_label": "Đang chờ hoàn",
+            "status_label": "Đang chờ hoàn tiền",
             "deadline": format_local_date(order.created_at + timedelta(days=refund_days)),
             "refunded_at": None,
         }

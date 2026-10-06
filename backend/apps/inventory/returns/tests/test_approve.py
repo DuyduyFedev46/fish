@@ -37,7 +37,7 @@ class ApproveReturnTests(ReturnsApiBase):
         before = self.batch.qty_available
         resp = self.approve(self.owner, "WRITE_OFF")
         self.assertEqual(resp.status_code, 200, resp.content)
-        self.assertEqual(resp.json()["decision_label"], "Huỷ bỏ, ghi lỗ")
+        self.assertEqual(resp.json()["decision_label"], "Huỷ hàng, ghi lỗ")
         self.batch.refresh_from_db()
         self.assertEqual(self.batch.qty_available, before)
         self.assertTrue(StockLedgerEntry.objects.filter(movement_type="WRITE_OFF", batch=self.batch).exists())

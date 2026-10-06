@@ -16,9 +16,9 @@ class Entry(models.Model):
         ("unpublished", "Đã gỡ"),
     ]
     PAGE_ROLE_CHOICES = [
-        ("privacy", "Bảo mật"),
-        ("terms", "Điều kiện giao dịch"),
-        ("refund", "Đổi trả hoàn tiền"),
+        ("privacy", "Chính sách bảo mật"),
+        ("terms", "Điều kiện giao dịch chung"),
+        ("refund", "Chính sách đổi trả và hoàn tiền"),
         ("seller_info", "Thông tin người bán"),
     ]
     SOURCE_CHOICES = [("human", "Người dùng"), ("ai", "AI")]

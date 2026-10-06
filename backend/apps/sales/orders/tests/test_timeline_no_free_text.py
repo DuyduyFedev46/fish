@@ -95,7 +95,7 @@ class TimelineLabelsNoFreeTextTests(OrderApiBase):
         rows = client_for(self.owner).get(f"/api/sales/orders/{order.pk}/").json()["timeline"]
         cancelled = next(r for r in rows if r["kind"] == "cancelled")
         self.assertEqual(
-            cancelled["label"], "Huỷ đơn, hoàn hàng về lô gốc — lý do: Hư hỏng khi soạn hàng",
+            cancelled["label"], "Huỷ đơn, hoàn hàng về lô gốc — lý do: Hàng hư lúc soạn hàng",
         )
 
     def test_d3_refund_failed_line_has_no_reason(self):
@@ -104,13 +104,13 @@ class TimelineLabelsNoFreeTextTests(OrderApiBase):
         failed = next(r for r in rows if r["kind"] == "refund_failed")
         self.assertEqual(failed["label"], "Phiếu hoàn 100.000 đ chuyển thất bại")
         own = [e.label for e in build_refund_timeline(refund)]
-        self.assertIn("Tạo phiếu hoàn 100.000 đ", own)
+        self.assertIn("Lập phiếu hoàn tiền 100.000 đ", own)
         self.assertIn("Báo thất bại", own)
 
     def test_d3_payment_resolution_uses_label_not_code_or_note(self):
         order, _ = self._scenario()
         labels = [e.label for e in build_payment_timeline(order.payments.first())]
-        self.assertIn("Xử lý giao dịch (Xác nhận đơn (khách đã bù))", labels)
+        self.assertIn("Xử lý khoản tiền về (Đã xác nhận đơn)", labels)
 
     def test_d3_format_vnd_ui(self):
         self.assertEqual(format_vnd_ui(Decimal("280000")), "280.000 đ")

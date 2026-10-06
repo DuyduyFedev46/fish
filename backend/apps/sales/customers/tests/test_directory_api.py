@@ -213,7 +213,7 @@ class DirectoryDetailTests(DirectoryBase):
             set(refund), {"id", "order_code", "status", "status_label", "amount", "created_at"},
         )
         self.assertIn(refund["order_code"], {"SO-D2", "SO-D3"})
-        self.assertEqual(refund["status_label"], "Đã hoàn")
+        self.assertEqual(refund["status_label"], "Đã hoàn tiền")
 
     def test_ed13_detail_does_not_expose_refund_free_text(self):
         self.seed_history()
