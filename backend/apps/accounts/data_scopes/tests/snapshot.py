@@ -46,6 +46,8 @@ APPROVED_DIFFS = (
 _PENDING_DUY_ENDPOINTS = (
     "receipts.list", "receipts.detail", "guidance.receipt",
     "directory.list", "directory.detail", "directory.search", "customers.list", "customers.detail", "guidance.customer",
+    "refunds.list", "refunds.detail",  # C1 (Lô 5): D1 cho phiếu hoàn tiền
+    "dashboard.summary",  # C1 (Lô 5): D1 cho bảng điều hành
 )
 PENDING_DUY_DIFFS = tuple(
     entry
@@ -54,6 +56,11 @@ PENDING_DUY_DIFFS = tuple(
         ("direct_permissions", endpoint, "-", "*"),  # CHỜ Duy D-3
         ("direct_permissions", endpoint, "+", "status:*=404"),  # CHỜ Duy D-3
     )
+) + (
+    # Bảng điều hành của người không nhóm (D1 = assigned_deliveries): số đếm co lại (`+ extra:kpis.*` là con số MỚI nhỏ hơn, đi cùng
+    # dòng `-` của số cũ) và đơn của chính họ lọt vào cửa sổ 8 đơn gần nhất khi các đơn khác ra khỏi phạm vi. Không ai thấy thêm đơn.
+    ("direct_permissions", "dashboard.summary", "+", "extra:kpis.*"),  # CHỜ Duy D-3
+    ("direct_permissions", "dashboard.summary", "+", "visible:order_assigned_direct"),  # CHỜ Duy D-3
 )
 
 

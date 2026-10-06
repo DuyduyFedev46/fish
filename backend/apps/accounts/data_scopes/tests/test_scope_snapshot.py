@@ -155,7 +155,11 @@ class ScopeSnapshotTests(TestCase):
         self.assertTrue(PENDING_DUY_DIFFS)
         for user, _endpoint, sign, glob in PENDING_DUY_DIFFS:
             self.assertEqual(user, "direct_permissions")
-            self.assertTrue(sign == "-" or (sign == "+" and glob == "status:*=404"), (sign, glob))
+            narrowing = sign == "-" or (sign == "+" and glob in (
+                "status:*=404", "extra:kpis.*", "visible:order_assigned_direct"))  # hai mục sau chỉ ở dashboard.summary
+            self.assertTrue(narrowing, (sign, glob))
+            if glob != "status:*=404" and sign == "+":
+                self.assertEqual(_endpoint, "dashboard.summary")
         self.assertFalse([d for d in APPROVED_DIFFS if d[0] == "direct_permissions"])
         # Một dòng thấy THÊM của direct_permissions không được miễn.
         self.assertFalse(is_approved(Diff("direct_permissions", "receipts.list", "+", "visible:receipt_manager_today")))

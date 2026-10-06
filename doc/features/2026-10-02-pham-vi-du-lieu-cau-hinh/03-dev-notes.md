@@ -236,3 +236,51 @@ Thứ tự đã làm: M1+L1 (commit riêng, sinh lại mốc trên HEAD chưa s�
 - **L4 (Lô 5):** dòng D7 lưu `all` mà nhóm thiếu `view_customer_list` phải có `note`, ví dụ "Bật Xem khách hàng để thấy tất cả khách" (giá trị hiệu lực là `assigned_deliveries`).
 - **L2 phần Lô 5:** bước "trước" của `rows_losing_access` gọi `resolve_data_scopes(member, overrides={})` (`{}` khác `None` nên không bị nhớ). Test Lô 3+ đổi cấu hình dùng `User.objects.get(pk=…)` mới.
 - Lô 3/4 không được thêm `APPROVED_DIFFS` cho `direct_permissions` khi Duy chưa trả lời D-3.
+
+## Lô 4 M1 + Lô 5 — PV-08, PV-09 (BE), PV-10 (BE), C1, L1, L4, `/me`
+
+> be-dev · 2026-10-08 · nhánh `feat/pham-vi-du-lieu`, sau review techlead Lô 4 (`f4eec0b`). Commit: M1 `090e6ef`, Lô 5 `5457c2d`, C1 (commit sau).
+
+### M1 (review Lô 4, chỉ tệp test)
+`scope_snapshot_baseline.json`: dòng `direct_permissions` về như `151b56e`. `snapshot.py` thêm `PENDING_DUY_DIFFS` (mỗi mục chú thích "CHỜ Duy D-3"), `is_approved` chấp nhận `APPROVED_DIFFS + PENDING_DUY_DIFFS`.
+Test: mọi mục thuộc `direct_permissions` và chỉ thu hẹp; `APPROVED_DIFFS` vẫn không có `direct_permissions`. Lô 5 (C1) thêm vào danh sách này `refunds.*` và `dashboard.summary` (xem dưới). **Không merge main khi `PENDING_DUY_DIFFS` còn mục.**
+
+### File đã sửa / thêm (Lô 5)
+- `accounts/capabilities/{services,api,next_steps}.py`, `accounts/data_scopes/services.py`, `config/api_urls.py` (route preview), `accounts/auth/services.py` (`is_superuser`), `inventory/returns/scope.py` (tham số `value` cho xem trước).
+- C1: **mới** `sales/refunds/scope.py`; sửa `sales/refunds/api.py` (`get_queryset`), `reports/dashboard_api.py`.
+- Test mới: `data_scopes/tests/test_group_save_scopes.py` (46), `test_refunds_dashboard_scope.py` (12), `test_query_budget_and_race.py` (3 + 1 đua Postgres, bỏ qua trên SQLite).
+- Test cũ sửa (hợp đồng đổi có chủ ý): mọi lệnh PUT của `capabilities/tests/*` gửi `version` qua helper `put_caps` (`base.py`); `test_api_read`, `test_api_write` (bật Xem khách hàng khi D7 = none phải gửi kèm `scopes.customers`, bật lại việc trên nhóm lưu `all` phải xác nhận, theo 02b §2.3 bước 10, 11); hai test khoá khoá `/me` thêm `is_superuser`.
+
+### Endpoint (đúng 02b §2.3–§2.5, không đổi hợp đồng)
+- `PUT /api/staff/groups/<code>/capabilities/` thân `{"version": "41", "capabilities"?: {...}, "scopes"?: {"receipts": "created_by_me_today"}, "confirm_customer_data_widening"?: true}`. Thứ tự kiểm 1 đến 12 như bảng 02b. 200 trả body như GET chi tiết; không có thay đổi thật thì không AuditLog và không tăng `version`.
+  - 409 `GROUP_CHANGED` "Nhóm này vừa được người khác đổi. Tải lại để xem bản mới." (khoá dòng `GroupAccessConfig`, `row_version` tăng đúng 1 lần cho cả việc lẫn phạm vi).
+  - 400 `CUSTOMER_DATA_WIDENING_UNCONFIRMED` kèm `impact` (cùng nội dung xem trước): `{"impact": {...}, "detail": "...", "code": "..."}`.
+  - AuditLog `change_group_data_scopes`: `changes = {"receipts": {"from": "all", "to": "created_by_me_today"}}` (+ `"customer_data_widening_confirmed": true`). Cờ nằm ở dòng phạm vi nếu có đổi phạm vi, không thì ở dòng việc; dòng thời gian và `capability_change_label` bỏ qua khoá không phải mã việc.
+- `POST /api/staff/groups/<code>/permissions-preview/` thân như PUT không cần `version` và `confirm…`. Trả `{"widens_customer_data", "widened": [{"key","from","to"}], "affected_members": [{"id","display_name"}], "affected_count", "message", "already_wider_elsewhere": [{"id","display_name","via_group","key"}], "narrowed": [{"key","from","to","rows_losing_access"}]}`.
+  `widened[].from/to` là giá trị ĐÃ LƯU (L11, ca cổng vừa mở cho `from == to`). `rows_losing_access` đếm dòng chưa kết thúc (đơn BOOKED/PAID/PROCESSING, phiếu giao chưa xong, hàng hoàn Nháp, phiếu nhập Nháp, việc gọi đang mở), gộp không trùng qua các thành viên; khách = 0.
+- `GET …/<code>/`: `timeline` có sự kiện `kind: "change_group_data_scopes"` (một sự kiện mỗi đối tượng, nhãn dựng từ mã); `last_changed_at/by` tính cả AuditLog phạm vi; dòng `customers` có `note: "Bật Xem khách hàng để thấy tất cả khách"` khi lưu `all` mà nhóm thiếu `view_customer_list` (L4).
+- `GET /api/auth/me/`: thêm `is_superuser` (bool).
+
+### Rule BR đã cài
+BR-PQ-36 (hiệu lực ở request kế, PV-08-AC10; cả yêu cầu hợp lệ hoặc không đổi gì, PV-08-AC6 AuditLog lỗi thì rollback), R1 (BE chặn thiếu xác nhận), R6 (chỉ Chủ ghi và xem trước), Q-8 (CAS), Q-9 (thu hẹp không cần xác nhận, có số dòng), S-8, bất biến 9 (AuditLog và xem trước chỉ có mã, tên nhân viên; test không chuỗi giả của khách).
+
+### Mock F1: 4 ca đối chiếu (`MockParityTests`)
+(1) NV giao đổi D7 `assigned_deliveries` → `all` khi việc tắt: không mở rộng, không thu hẹp. (2) NV giao lưu `all` rồi bật việc: mở rộng, `widened` `{"customers","all","all"}`. (3) Quản lý tắt rồi bật lại khi D7 = `all`: mở rộng. (4) NV kho bật việc kèm `scopes.customers = "all"`: mở rộng `{"none","all"}`; không kèm D7 thì 400 `SCOPE_VALUE_INVALID` (PO-Q1).
+Rank hiệu lực D7 bị chặn trần `assigned_deliveries` khi nhóm thiếu `view_customer_list` (cùng luật H1 của resolver).
+
+### Lệch so với 02b / yêu cầu (cần techlead biết)
+1. **PUT nhận `scopes`, không phải `data_scope_values`.** Yêu cầu giao việc ghi "PUT nhận … `data_scope_values`"; 02b §2.3 và mock F1 gửi `scopes`, còn `data_scope_values` là khoá của GET. Tôi theo 02b.
+2. **PO-Q1 (bước 10) chỉ kiểm khi yêu cầu có đụng `view_customers` hoặc `scopes.customers`.** Mock kiểm mọi lần lưu; làm vậy sẽ chặn nhầm một lần lưu không liên quan khi nhóm có sẵn trạng thái lệch (Xem khách hàng bật, D7 = none, dữ liệu cũ). Hai bên khác nhau chỉ ở ca dữ liệu lệch sẵn.
+3. **Mở rộng tính cả D2 (hoá đơn) và V2** theo 02b §2.5, mock F1 chưa có. `widened[]` có thể chứa `{"key": "invoices", ...}` (from/to = giá trị D1) và `{"key": "view_order_customer_info", "from": "off", "to": "on"}`; FE tra nhãn đối tượng theo `key` nên cần chịu khoá không có trong `SCOPE_BY_KEY` (V2) khi Lô 6 nối BE thật.
+4. **C1: người không nhóm (`direct_permissions`) co lại ở `refunds.*` và `dashboard.summary`** (D1 = hẹp nhất): 15 → 1 đơn chờ, doanh thu 200000 → 0, mất 10 dòng ở dashboard, phiếu hoàn 200 → 404. Đưa vào `PENDING_DUY_DIFFS`; hai mục `+` ở dashboard (`extra:kpis.*`, `visible:order_assigned_direct`) là con số mới nhỏ hơn và đơn của chính họ lọt vào cửa sổ 8 đơn gần nhất, không ai thấy thêm đơn. Test M1 cho phép đúng hai mục đó và chỉ ở `dashboard.summary`.
+5. Phiếu hoàn không gắn đơn nào (giao dịch lệch chưa khớp đơn) bị ẩn khi D1 khác `all`; với `all` thấy như hôm nay.
+6. `legacy_scopes` (chuỗi `scopes` cũ) không đổi; hai test cũ phải gửi kèm `scopes.customers` cho khớp PO-Q1.
+
+### Kiểm chứng (chạy trong lượt làm)
+Kết quả cuối ghi trong báo cáo bàn giao (số test toàn bộ, `makemigrations --check`, `check_naming.py`).
+
+### Việc còn nợ / chuyển lô
+- Superuser không nhóm về `dashboard` (`home_for`): KHÔNG làm, vẫn chờ Duy.
+- Lô 6: bỏ khoá `scopes` cũ; FE nối BE thật cần chịu `widened[].key` ngoài `SCOPE_BY_KEY`; nhãn V2 chờ Duy chốt chữ.
+- Người phạm vi hẹp vẫn `PATCH` được `note`/`default_address` của khách ngoài tầm đọc (ghi chú techlead Lô 4 điểm 4): cần cả `view_customer_list` lẫn `change_customer`; chưa chặn.
+- Đua thật PV-10-AC5 chỉ chạy trên Postgres (bỏ qua trên SQLite); cần chạy ở CI hoặc staging.
