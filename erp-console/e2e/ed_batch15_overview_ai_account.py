@@ -223,6 +223,8 @@ def audit(browser):
     ok("loc: không SĐT, không JSON thô, không chữ lỗi", not PHONE_RE.search(text) and "{" not in text)
     clean_text("loc nhật ký", text)
     ok("loc: không icon rỗng, không cuộn ngang", missing_icons(page) == [] and no_hscroll(page), str(missing_icons(page)))
+    cut = page.evaluate("() => [...document.querySelectorAll('main tbody tr td:first-child')].filter(td => td.scrollWidth > td.clientWidth + 1).map(td => td.textContent)")
+    ok("loc: cột Giờ không bị cắt chữ (không dấu …)", cut == [], str(cut[:2]))
     page.screenshot(path=f"{SHOTS}/lo15-audit-loc-1280.png", full_page=True)
     # lọc Loại = AI
     page.get_by_role("group", name="Lọc theo loại người làm").get_by_role("button", name="AI", exact=True).click()
@@ -266,6 +268,8 @@ def audit(browser):
     go(page, "/audit-logs/")
     expect(page.locator("main tbody tr, main .lt-card").first).to_be_visible()
     ok("loc 360px: nhật ký không cuộn ngang trang", no_hscroll(page))
+    over = page.evaluate("() => [...document.querySelectorAll('main .fb input, main .fb select, main .fb-date')].filter(e => e.getBoundingClientRect().right > window.innerWidth + 0.5).length")
+    ok("loc 360px: ô lọc (kể cả ô ngày thứ hai) nằm trọn trong màn hình", over == 0, str(over))
     page.screenshot(path=f"{SHOTS}/lo15-audit-loc-360.png", full_page=True)
     ctx.close()
 

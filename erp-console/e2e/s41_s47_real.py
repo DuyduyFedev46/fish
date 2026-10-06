@@ -332,7 +332,7 @@ with sync_playwright() as p:
     expect(page.get_by_role("dialog")).to_have_count(0)
     ok("S46-AC2 200 + token mới trên máy, token cũ → 401", st == 200 and token(page) == body.get("token") and api_status(ctx, t_a) == 401, f"{st}")
     page.goto(BASE + "/inventory/")
-    expect(page.locator(".screen")).to_be_visible()
+    expect(page.locator("main")).to_be_visible()
     ok("S46-AC2 máy A làm tiếp bằng token mới", "/inventory" in page.url, page.url)
     avatar_logout(page)
     page.wait_for_url("**/login/")

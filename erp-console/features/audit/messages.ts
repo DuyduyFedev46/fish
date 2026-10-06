@@ -1,7 +1,6 @@
 // Chữ của màn Nhật ký hoạt động (ED-41 / W3f): MỘT chỗ, component không viết chuỗi tại chỗ.
 
 export const AUDIT_MSG = {
-  title: "Nhật ký hoạt động",
   caption: "Nhật ký hoạt động, mới nhất trước",
   noun: "dòng nhật ký",
   kindLabel: "Lọc theo loại người làm",
@@ -26,7 +25,6 @@ export const AUDIT_MSG = {
   aiTag: "AI",
   noValue: "—",
   system: "Hệ thống",
-  aiOf: (name: string) => `AI của ${name}`,
 
   emptyTitle: "Chưa có dòng nhật ký nào",
   emptyHint: "Mọi thao tác trên hệ thống sẽ được ghi lại và hiện ở đây.",

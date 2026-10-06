@@ -48,7 +48,7 @@ function llmockAnswer(prompt: string): string {
     return "Hiện còn 12 kg cá thu tươi trong kho (B-01, B-03). Lô B-01 còn 1 ngày hết hạn dùng — nên bán trước. (Số liệu giả.)";
   }
   if (p.includes("hạn") || p.includes("hết hạn")) {
-    return "Lô sắp tới hạn nhất là B-01 · Cá thu (còn 1 ngày). B-02 · Cá hồi còn 3 ngày. Nên ưu tiên xuất B-01 theo fefo. (Số liệu giả.)";
+    return "Lô sắp tới hạn nhất là B-01 · Cá thu (còn 1 ngày). B-02 · Cá hồi còn 3 ngày. Nên ưu tiên xuất B-01 trước vì hạn dùng sớm hơn. (Số liệu giả.)";
   }
   if (p.includes("đơn")) {
     return "Hôm nay có 4 đơn đang chờ giao và 1 đơn chờ thanh toán. Đơn SO-20260927-041 đang Giữ chỗ. (Số liệu giả.)";

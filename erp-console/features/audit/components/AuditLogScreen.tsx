@@ -110,7 +110,7 @@ export function AuditLogScreen() {
       key: "time",
       header: M.colTime,
       num: true,
-      width: "132px",
+      width: "152px",
       render: (r) => <time dateTime={r.created_at}>{dateTime(r.created_at)}</time>,
     },
     { key: "actor", header: M.colActor, width: "176px", render: (r) => <ActorCell row={r} /> },

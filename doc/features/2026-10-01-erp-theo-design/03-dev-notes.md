@@ -2379,7 +2379,7 @@ Trạng thái: code xong trong working tree, CHƯA commit. Toàn bộ `manage.py
 - **Contract cho FE**: `POST /api/inventory/returns/{id}/delete/` body rỗng. Chỉ Chủ/superuser (người khác 403, kiểm trước phạm vi dòng). Trạng thái DRAFT hoặc CANCELLED → 200 `{"status":"deleted","id":<pk>}`; APPROVED → 400 `{"code":"RETURN_DELETE_NOT_ALLOWED","detail":"Phiếu đã cộng vào tồn kho. Huỷ phiếu trước rồi mới xoá được."}`; xoá lần 2 hoặc GET sau xoá → 404. Chi tiết và danh sách phiếu có thêm `available_actions: ["approve","cancel","delete"]` (tập con theo quyền + trạng thái); `delete` chỉ khi là Chủ và phiếu DRAFT/CANCELLED.
 - Còn nợ: admin Django của `ReturnToStock` chưa chặn xoá cứng (ngoài phạm vi, nên xét `has_delete_permission=False`).
 
-## Lô 15 — FE (Tổng quan ED-06 · AI của tôi ED-08 · Nhật ký + Chính sách AI + Báo cáo AI ED-41 · Tài khoản ED-42)
+## Lô 15 — FE (Tổng quan ED-08 · AI của tôi + Tài khoản ED-06 · Nhật ký ED-41 · Chính sách AI + Báo cáo AI ED-42)
 
 Làm trong `erp-console/`, theo board `ERP-D1`, `W3f`, `W4b/c/d/e/f/g/h`, `F3g`. Không đụng `features/content`, `features/ai/runtime|commands`, `features/auth/session.ts`, AuthProvider, route `ai/actions`, `shared/lib/*` (trừ `nav*`), `globals.css`, `public/fonts/ms`.
 

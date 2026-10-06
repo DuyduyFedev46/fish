@@ -18,15 +18,13 @@ type Props = {
   onDone: (message: string) => void;
   /** S48: form của màn bắt buộc đặt mật khẩu mới (nhãn nút, gợi ý ô mật khẩu hiện tại). */
   mustChange?: boolean;
-  /** Có thì vẽ nút "Huỷ" (hộp thoại trong Tài khoản của tôi); màn S48 bắt buộc đặt mật khẩu nên không truyền. */
-  onCancel?: () => void;
   /** Báo cho hộp chứa biết đang gửi, để hộp không đóng được giữa chừng. */
   onBusyChange?: (busy: boolean) => void;
   /** Đặt id cho <form> khi nút gửi nằm NGOÀI form (chân hộp thoại, `<button form=…>`); có id thì form không tự vẽ hàng nút. */
   formId?: string;
 };
 
-export function ChangePasswordForm({ onDone, mustChange = false, onCancel, onBusyChange, formId }: Props) {
+export function ChangePasswordForm({ onDone, mustChange = false, onBusyChange, formId }: Props) {
   const { me, changePassword } = useAuth();
   const [oldPw, setOldPw] = useState("");
   const [newPw, setNewPw] = useState("");
@@ -132,11 +130,6 @@ export function ChangePasswordForm({ onDone, mustChange = false, onCancel, onBus
       />
       {!formId && (
         <div className="form-actions">
-          {onCancel && (
-            <button type="button" className="btn" onClick={onCancel} disabled={busy}>
-              Huỷ
-            </button>
-          )}
           <button type="submit" className="btn primary" disabled={busy} aria-busy={busy || undefined}>
             {busy && <Icon name="progress_activity" className="spin" />}
             {busy ? "Đang lưu…" : mustChange ? "Lưu mật khẩu mới" : "Đổi mật khẩu"}
