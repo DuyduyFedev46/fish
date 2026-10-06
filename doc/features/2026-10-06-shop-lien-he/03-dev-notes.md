@@ -8,3 +8,9 @@
 - Không đổi giỏ/checkout. `features/content/components/ItemCard.tsx` (nhúng bài viết) vẫn ghi "Tạm hết hàng", ngoài phạm vi.
 - Ảnh: `shots/lien-he-360.png`, `shots/lien-he-1280.png` (mock; tel:0900000000, không cuộn ngang).
 - Kiểm: `npx tsc --noEmit` sạch; `NEXT_PUBLIC_USE_MOCK=0 npm run build` xanh; frontend không có test đơn vị.
+
+## Bổ sung (cùng ngày)
+- Gom logic vào `frontend/components/ContactButton.tsx`, dùng ở `AddToCartControl` và `features/content/components/ItemCard.tsx` (thẻ trong bài viết: nhãn "Tạm hết · liên hệ để đặt", nút "Liên hệ" thay "Xem cửa hàng", cả khi không tìm thấy mặt hàng / API lỗi).
+- Thứ tự: có SĐT thì `tel:`; không có SĐT mà footer đang hiện thì cuộn tới `#thong-tin-nguoi-ban`; footer không hiện (site-info lỗi) thì link thường về `/` nên không chết. Nhánh cuối chưa chụp được vì mock không giả lập site-info lỗi.
+- Ảnh: `shots/lien-he-khong-sdt-360.png` (Shop, không SĐT, bấm không rời trang, cuộn tới footer), `shots/lien-he-bai-viet-360.png` (thẻ trong bài viết).
+- Kiểm: tsc sạch, build mock=0 và mock=1 xanh.
