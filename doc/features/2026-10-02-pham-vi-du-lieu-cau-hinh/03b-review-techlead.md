@@ -224,3 +224,81 @@ nhân hay giá vốn. Ngoài phạm vi trả 404. Số truy vấn trong ngân s�
 - Ghi 02b §6 Lô 3: thêm `ai/policy/rules.py` (điểm 3) vào danh sách file đã sửa; số migration sales là 0015/0016.
 - Chưa tự chạy migrate lùi `sales 0016 → 0014` trên DB thật. Hàm `revoke` là bản chép mẫu `sales/0013` đã chạy trên production. QA
   nên chạy tiến/lùi trên SQLite tạm khi nghiệm thu.
+
+## Review Lô 4 BE (08/10)
+
+> Tech Lead · 2026-10-08 · commit `d861021` (PV-04, PV-05, PV-06) trên `feat/pham-vi-du-lieu`, diff `151b56e..d861021`. Nhánh đã
+> merge main có W37 L1.
+
+### Kết luận: **APPROVED-chờ-Duy**
+
+Code sản phẩm đạt. Tôi không thấy rò dữ liệu cá nhân hay giá vốn. Phạm vi D3–D7 đọc từ cấu hình qua một hàm cho mỗi đối tượng.
+**Chưa merge main** khi chưa đủ hai việc sau:
+- **(a) M1:** sửa tệp test mốc theo mục 1 dưới đây. Chỉ đụng test, techlead soát lại tệp đó, không cần review lại code sản phẩm.
+- **(b) Duy trả lời D-3:** người không nhóm bị thu hẹp D6/D7. Lô 4 vẫn ở trên nhánh. Lô 5 làm tiếp được song song.
+
+### Kiểm chứng đã chạy trong lượt review (HEAD `d861021`)
+
+- `manage.py test apps.accounts apps.delivery apps.purchasing apps.sales apps.inventory.returns apps.common`, chạy với `DJANGO_DEBUG=1`
+  và symlink `staticfiles` tạm (đã gỡ): **2006 test, OK (skipped=2)**. Điều phối viên đang chạy lại toàn bộ.
+- Grep `apps/` (trừ `tests/`) tìm `has_full_delivery_scope`, `sees_customer_directory`, `FULL_SCOPE_GROUPS`,
+  `CUSTOMER_DIRECTORY_GROUPS`, `is_customer_service`: không còn.
+- So mốc `151b56e` với `d861021` bằng script: **chỉ** `direct_permissions` đổi, ở `receipts.list/detail`, `guidance.receipt`,
+  `directory.list/detail/search`, `customers.list/detail`, `guidance.customer`. Mọi chỗ đổi đều là **thu hẹp**: dòng biến mất, hoặc
+  200 thành 404. Không có dòng thấy thêm, không có ô `pii` thêm. Mọi tài khoản khác và hai mục Q-4 giữ nguyên. Nghĩa là phần V2
+  áp lên phiếu giao (mục 3) không đổi gì với cấu hình mặc định.
+- `TIME_ZONE = "Asia/Ho_Chi_Minh"`, `USE_TZ = True`, và không có chỗ nào gọi `timezone.activate` ngoài test.
+
+### Năm điểm lệch
+
+| # | Điểm | Quyết định |
+|---|---|---|
+| 1 | Người không nhóm (R9/D-3): sinh lại mốc cho `direct_permissions` thay vì thêm `APPROVED_DIFFS` | **Đúng là lách luật, về hình thức.** Luật "không thêm `APPROVED_DIFFS` cho `direct_permissions` khi Duy chưa trả lời D-3" nhằm giữ mọi thay đổi hành vi **hiện rõ** cho tới khi Duy duyệt. Sinh lại mốc cho kết quả y như thêm ngoại lệ, mà còn tệ hơn: tệp mốc mới không còn ghi lại "trước đây thế nào", và test không còn nơi nào nói "đang chờ Duy". Không có ý gian: dev-notes ghi rõ. Về nội dung thì **chấp nhận hướng thu hẹp**: không rò, đúng luật PV-02-AC4 đã duyệt, đúng 02b §7 D-3 đã tiên liệu. Giữ hành vi cũ riêng cho người không nhóm sẽ phải thêm nhánh `if not groups` ở ba hàm phạm vi, tức là code chết sau D-3 và lặp lại đúng kiểu gắn cứng tên nhóm mà tính năng này bỏ đi. **Bác cách đó.** **Sửa M1 (bắt buộc trước merge main, chỉ tệp test):** (i) trả các dòng `direct_permissions` trong `scope_snapshot_baseline.json` về như ở `151b56e`; (ii) thêm `PENDING_DUY_DIFFS` trong `snapshot.py`, mỗi mục là `(user, endpoint, sign, glob)` kèm chú thích `"CHỜ Duy D-3"`, và cho `is_approved` chấp nhận; (iii) thêm test: mọi mục `PENDING_DUY_DIFFS` có `user == "direct_permissions"` và chỉ là thu hẹp, tức dấu `-`, hoặc dấu `+` với sự kiện dạng `status:*=404`; (iv) khi Duy trả lời D-3, chuyển các mục sang `APPROVED_DIFFS` kèm "Duy duyệt <ngày> D-3", hoặc sửa code nếu Duy chọn khác. Điều phối viên ghi vào 02c: **không merge main khi `PENDING_DUY_DIFFS` còn mục.** |
+| 2 | D4 của người không nhóm là `none`, thay cho "rank 0" của 02b | **Duyệt. 02b sai ở điểm này.** Rank 0 của D4 (`pending_or_called_recently`) mở **thêm** mọi phiếu đang chờ gọi, kèm tên và SĐT, cho người chưa từng có phạm vi đó. Như vậy là mở rộng dữ liệu khách mà không ai xác nhận, trái nguyên tắc R1. Giữ `none` tức là giữ hành vi cũ, và mốc `confirmation.*` không đổi. Giá trị nội bộ `none` không phải lựa chọn của Chủ và không lưu xuống bảng nên chấp nhận được. PV-14 (`/api/auth/me`) hiển thị D4 = "Không xem" cho trường hợp này, khớp 02b §2.8. Đã sửa 02b §4 R9 trong commit này. |
+| 3 | V2 áp cho phiếu giao (đóng N2) | **Duyệt về kỹ thuật, và phải báo Duy.** Nếu không áp, Chủ tắt V2 cho NV kho vẫn còn lộ khách qua `/delivery/notes/`, vì D3 của NV kho là `all`. Khi đó mục tiêu của D-1 ("tắt V2 là đóng hẳn") không đạt. Mặc định không đổi gì (mốc khớp). Ba điều phải báo Duy cùng D-3: (a) nhãn V2 "trên đơn & hoá đơn" nay phủ cả phiếu giao và phiếu hoàn, nên Lô 5/F1 đổi nhãn sau khi Duy chốt chữ; (b) Chủ tắt V2 cho NV giao thì NV giao không còn thấy địa chỉ giao, nên W3i phải cảnh báo khi tắt V2 của `delivery_staff` (Lô 5/F1); (c) **tem giao hàng** (`GET /delivery/notes/<id>/label/`, `labels/services.py::get_label_data`) vẫn trả tên người nhận và địa chỉ theo quyền `print_label`, không theo V2. Đây là điều cố ý, vì đóng gói cần tem. Hàng chờ gọi xác nhận cũng theo D4 và việc "Gọi xác nhận đơn", không theo V2. Vậy nên "tắt V2 của NV kho" **không** đóng tem: muốn đóng hẳn thì Chủ tắt cả "In tem". Phải ghi điều này vào câu báo Duy, không để Duy hiểu V2 là công tắc duy nhất. |
+| 4 | Danh bạ ẩn `note`/`default_address` khi D7 khác `all` | **Duyệt.** Đây là thu hẹp, giống cách `CourierCustomerSerializer` đang làm. Hôm nay nhóm không có D7 `all` nhận 403 nên không có hợp đồng cũ nào bị phá. Thiếu context cũng ẩn, hướng an toàn. Ghi chú nhỏ, không chặn: người phạm vi hẹp vẫn `PATCH` được `note`/`default_address` dù không đọc được. Hiếm, vì cần cả `view_customer_list` lẫn `change_customer`. Ghi lại để Lô 5 cân nhắc. |
+| 5 | Xoá sớm 4 hàm trong `common/api.py` | **Duyệt.** Grep sạch, test PV-05-AC8 có. Để tới Lô 6 thì chỉ giữ code chết. Ghi vào 02b §6 Lô 4. |
+
+### Soát thêm
+
+- **Ràng buộc W37.** `scope_deliveries_for` với `assigned` chỉ lọc `assigned_to=user`, không lọc trạng thái, nên phiếu CANCELLED của
+  NV giao vẫn nằm trong queryset và nhận 400 `BR-GH-24` (test `test_pv04_courier_still_sees_own_cancelled_note_for_br_gh_24`). Lô 4
+  không sửa `set_status` hay `order_status`; diff `delivery/api.py` chỉ đụng `get_serializer_context`, `get_queryset` và
+  `_filter_assigned_to`. Đạt.
+- **D6 theo ngày lịch VN.** `vietnam_day_bounds` lấy `timezone.localtime` (múi VN theo settings), tính 00:00 đến 00:00 hôm sau rồi so với
+  `created_at` UTC. Có test 10:00, 23:55, qua nửa đêm, và test chứng minh không dùng ranh ngày UTC. Huỷ phiếu: `cancel_scope_q` giữ
+  luật cũ, xử lý đúng bẫy `Q() | Q(x)`, ngoài cả hai thì 404, trong D6 mà không phải người tạo thì 403. Có test AC5/AC6 và test Quản
+  lý có D6 hẹp. Đạt.
+- **404/403.**
+  - Ngoài phạm vi trả 404 ở chi tiết, hành động `get_object` (đổi trạng thái, giao người, tem), dòng thời gian và khách.
+  - `?assigned_to=<người khác>` trả 403 khi D3 khác `all`, như cũ.
+  - `?customer=` ngoài D7 cho danh sách rỗng 200, sau cổng 403.
+  - Cổng Tầng 1/2 vẫn đứng trước: có test 403 khi phạm vi `all` nhưng thiếu quyền, cho phiếu giao, gọi xác nhận, danh bạ và phiếu nhập.
+  - Đạt.
+- **Số truy vấn.** Phân giải nhớ trên user. Gọi xác nhận tính D4 một lần cho mỗi request và đưa vào context. Mỗi dòng phiếu giao chỉ
+  thêm `has_perm` (dùng `_perm_cache`). D7 hẹp là một subquery `pk__in`, không `distinct`, nên annotate của danh bạ còn nguyên.
+  `?customer=` thêm một truy vấn `exists`. Không thấy N+1. **Thiếu** test ngân sách truy vấn cho danh sách phiếu giao và hàng chờ
+  gọi (L1).
+- **Giá vốn.** Không đụng `CostFieldSerializerMixin`. Có test không khoá giá vốn ở phiếu giao, hàng hoàn, phiếu nhập. Đạt.
+- **Dữ liệu cá nhân.**
+  - Phiếu giao: ẩn theo V2 hoặc cửa sổ; phản hồi đổi trạng thái dùng cùng luật (test N2).
+  - Danh bạ hẹp: không có `note`, `default_address`.
+  - `/customers/` hẹp: dùng `CourierCustomerSerializer`.
+  - Tìm gọi xác nhận: ngoài D4 thì SĐT bị che (test `test_pv05_search_masks_outside_scope_by_d4`).
+  - Tem: xem mục 3(c).
+  - Đạt.
+
+### Mục mức thấp (không chặn)
+
+| # | Mức | Vấn đề | Xử lý |
+|---|---|---|---|
+| L1 | Low | Chưa có `assertNumQueries` cho `GET /api/delivery/notes/` và `GET /api/confirmation/queue/` (R8) | Lô 5 thêm: so với lúc giả lập resolver trả hằng, tăng tối đa +3, như `QueryBudgetTests` của Lô 3 |
+| L2 | Low | Người kiêm **NV kho + CSKH**: trước đây `has_full_delivery_scope` cho thấy mọi phiếu chờ gọi; nay chỉ nhóm CSKH đủ điều kiện D4 (NV kho không có `confirm_with_customer`), nên còn `pending_or_called_recently`. Đây là thu hẹp, đúng luật "nhóm đủ điều kiện". Fixture không có tổ hợp này nên mốc không bắt | Lệnh đếm D-2 liệt kê thêm người thuộc cả `warehouse_staff` lẫn `customer_service`. Có người thì báo Duy cùng D-3 |
+| L3 | Low | V2 nay phủ phiếu giao nhưng phiếu giao chưa có `customer_hidden_reason`, nên FE không phân biệt được "quá 7 ngày" với "không có quyền" | Lô 7 thêm khoá này (chỉ thêm), cùng hàm với đơn |
+
+### Gửi Duy (điều phối viên gộp vào câu hỏi D-3)
+
+1. D-3: người không nhóm có quyền gán trực tiếp sẽ (a) chỉ thấy phiếu nhập mình tạo trong ngày, (b) không thấy danh bạ hay `/customers/`,
+   (c) mất tên khách trên đơn, hoá đơn, phiếu hoàn khi chưa được cấp V2 (Lô 3). Hàng chờ gọi giữ như cũ. Kèm số người đếm được trên production.
+2. V2 phủ cả phiếu giao. Tắt V2 cho NV giao thì họ mất địa chỉ giao. Tem vẫn theo "In tem", hàng chờ gọi theo "Gọi xác nhận đơn". Đề nghị
+   đổi nhãn V2 thành "Xem thông tin khách trên đơn, hoá đơn, phiếu giao".

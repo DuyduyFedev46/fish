@@ -264,7 +264,7 @@ Phụ thuộc: `0015_seed…` cần `accounts/0013_rename_groups_to_english`, `s
 | R6 | Leo quyền ghi phạm vi | Cao | `actor_is_owner` trước mọi kiểm; preview cùng luật | PV-08-AC7, PV-09-AC8 |
 | R7 | Ghi đè đồng thời | Trung bình | `select_for_update` + so `row_version` trong transaction | PV-10-AC1..5 (AC5 luồng thật chỉ chạy trên Postgres: `skipUnless(connection.vendor == "postgresql")`; SQLite chạy bản tuần tự) |
 | R8 | Hiệu năng | Thấp | ≤ 3 truy vấn phân giải / request, nhớ trên user; hàng chờ gọi phân giải 1 lần / request | `assertNumQueries` danh sách đơn: tăng tối đa +3 so với số gốc (be-dev ghi số vào 03-dev-notes) |
-| R9 | Người không nhóm có quyền gán trực tiếp đổi hành vi (D6 hẹp lại, D7 thành `none`, D4 từ "không gì" thành rank 0) | Trung bình | PV-02-AC4 đã duyệt; kiểm đếm trên production trước deploy | điểm dừng D-3 |
+| R9 | Người không nhóm có quyền gán trực tiếp đổi hành vi (D6 hẹp lại, D7 thành `none`; **D4 giữ `none`**, không lên rank 0 vì như vậy là mở thêm dữ liệu khách; sửa 08/10, review Lô 4) | Trung bình | PV-02-AC4 đã duyệt; kiểm đếm trên production trước deploy | điểm dừng D-3 |
 | R10 | Sai lệch ma trận production so với migration (Chủ đã đổi việc qua B4) | Trung bình | data migration đọc quyền **thực tế** cho D7; V2 bật cố định theo Q-4 | điểm dừng D-2 |
 | R11 | FE cũ gửi PUT không `version` sau khi BE lên | Thấp | triển khai BE và ERP cùng lượt | ghi ở 02c |
 
@@ -328,3 +328,4 @@ quan `row_version` cho mọi lần lưu của nhóm."
 
 - 06/10 Lô 1–2 BE: CHANGES REQUESTED (H1 luật D7), sau d50d082 **APPROVED**. Chi tiết ở `03b-review-techlead.md`.
 - 07/10 Lô 3 BE (`30bbc87`): **APPROVED**, kèm điều kiện C1 (D1 cho phiếu hoàn tiền và dashboard phải vào trước hoặc cùng Lô 5, chờ D-3) và C2. Lô 3 sửa thêm `ai/policy/rules.py`; migration sales là 0015/0016.
+- 08/10 Lô 4 BE (`d861021`): **APPROVED-chờ-Duy**. M1 (tệp mốc dùng `PENDING_DUY_DIFFS` thay cho sinh lại mốc) và D-3 phải xong trước merge main. Lô 4 xoá sớm 4 hàm của `common/api.py`. V2 áp cho phiếu giao.
