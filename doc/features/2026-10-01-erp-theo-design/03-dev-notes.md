@@ -2594,3 +2594,61 @@ Nhánh `feat/xoa-phieu-hoan-fe`. Chỉ sửa `erp-console/features/returns/**` v
 - Nợ: chưa có e2e trên BE thật; chưa duyệt UI bởi QA.
 
 
+
+## Lô 17a — BE (07/10)
+
+Nhánh `feat/lo17a-be` (tách từ db1cebd). Không migration, không đổi quyền, không đụng file của lô tên chuẩn. Chín việc A1–A9 của `02e-lo17.md` mục 2.
+
+### Contract mới cho FE
+
+| Việc | Endpoint | Thay đổi |
+|---|---|---|
+| A1 | mọi endpoint chi tiết | 404 không có câu riêng trả `{"detail": "Không tìm thấy."}` (không còn "No X matches the given query.", không tên model). Câu 404 tiếng Việt riêng của view giữ nguyên |
+| A2 | `GET /api/dashboard/summary/` | `recent_orders[]` thêm `id` và `reason`; `batches[]`, `alerts[]` thêm `id` (pk lô) |
+| A3 | `GET /api/audit-logs/` | `?date_from=YYYY-MM-DD&date_to=YYYY-MM-DD&q=` |
+| A4 | `GET /api/reports/batch/<mã>/`, `/reports/batches/`, `/reports/period/` | mọi tiền và kg là chuỗi |
+| A5 | `POST/PATCH /api/purchasing/invoices/` | 5 mã lỗi 400 mới |
+| A7 | `PATCH /api/inventory/reconciliations/<id>/` | `expected_updated_at` tuỳ chọn, lệch → 409 |
+| A9 | `GET /api/delivery/notes/?code=` | khớp đúng mã phiếu |
+
+```json
+// A2 recent_orders[] (khoá reason cùng shape cột Lý do của /orders/; reason là null với đơn thường)
+{"id": 812, "code": "SO261007-4F2A1C", "amount": 450000.0, "status": "CANCELLED", "status_label": "Đã huỷ",
+ "expires_at": null, "reason": {"code": "CUSTOMER_CHANGED_MIND", "label": "Khách đổi ý"}}
+// batches[] thêm "id": 57 ; alerts[] thêm "id": 57
+```
+`reason` chỉ là nhãn cố định từ `sales/orders/reasons.py`, không bao giờ `cancel_note`. 8 đơn gần đây được prefetch nên số truy vấn không tăng theo số đơn. (`amount` ở `recent_orders[]` và các KPI dashboard vẫn là number như cũ, ngoài phạm vi A4.)
+
+**A3.** Ngày theo giờ VN, gồm cả hai ngày. Sai định dạng hoặc `date_from > date_to` → 400 `INVALID_FILTER`. `q`: 2–40 ký tự `[0-9A-Za-z#._-]`, khớp `object_repr` hoặc `proposal_ref` (không phân biệt hoa thường). Có dãy từ 9 chữ số trở lên → 400 `INVALID_FILTER` "Chỉ tìm theo mã chứng từ."; ký tự lạ hoặc sai độ dài → 400 `INVALID_FILTER`. Câu lỗi không lặp lại `q`. Lọc trước phân trang, nên `count` đúng; dòng AI vẫn ẩn khi AI tắt. FE có thể bỏ `localNote`.
+
+**A4.** Tiền `"1000000.00"` (2 số lẻ), kg `"50.000"` (3 số lẻ, khoá `qty_*` hoặc `*_qty`), `ROUND_HALF_UP`. `int` (`year`, `month`, `invoice_count`, `refund_count`) và `provisional` giữ nguyên. Không thêm hay bớt khoá. Code: `apps/reports/decimal_strings.py`; `services.batch_pnl/period_pnl` vẫn trả Decimal. Nhóm test cũ đọc `/api/reports/*` (financial_snapshot, refunds, credit_notes…) vẫn xanh không cần sửa vì chúng so qua `Decimal(...)` hoặc service.
+
+**A5.** Mã lỗi 400 (`{"detail","code"}`, câu tiếng Việt, không mã BR):
+`AMOUNT_NOT_POSITIVE` ("Số tiền hoá đơn phải lớn hơn 0."), `INVOICE_SUPPLIER_MISMATCH` (phiếu nhập của NCC khác), `PAID_AT_REQUIRED`, `PAID_AT_IN_FUTURE`, `PAID_AT_WHEN_UNPAID`. Kiểm trên giá trị đã gộp; PATCH không gửi `is_paid`/`paid_at` thì bỏ qua luật `paid_at`, không gửi `amount` thì bỏ qua luật số tiền, không gửi `receipt`/`supplier` thì bỏ qua luật NCC. `amount` âm cũng trả `AMOUNT_NOT_POSITIVE` (serializer khai `amount` tường minh, không kế thừa `MinValueValidator`). Payload FE hiện tại (`PurchaseInvoiceForm.tsx`): `paid_at` là `null` khi chưa trả, khớp luật; không lệch.
+**Khác với 02e:** câu lỗi không kèm mã BR (theo chỉ đạo của điều phối viên). `POST` không gửi `is_paid` mặc định là đã trả (mặc định model) nên thiếu `paid_at` sẽ bị `PAID_AT_REQUIRED`.
+
+**A6.** Hai nhãn mới ở `stocktake/next_steps.py`. Quan sát (không sửa, ngoài phạm vi): dòng audit `create_stockreconciliation` vẫn rơi về "Có thay đổi" ở dòng thời gian, đứng cạnh dòng "Nhập số kiểm kê" tổng hợp.
+
+**A7.** `expected_updated_at` có thì sai định dạng → 400 `EXPECTED_UPDATED_AT_INVALID`, lệch → 409 `STALE_STATE` (kèm `updated_at`, `updated_by_name`, như `…/lines/`); không có thì giữ hành vi cũ. Phiếu được khoá `select_for_update` rồi mới so. Bắt buộc hoá ở lô sau.
+
+**A8.** `lock_order_of_note -> SalesOrder | None`; `test_order_completion.py` đưa import lên đầu file, bỏ 3 biến thừa (`order`, `order2`, `note2`). Không đổi hành vi.
+
+**A9.** `?code=` dùng `code__iexact` trên `get_queryset()` đã có phạm vi: NV giao tra mã của người khác nhận `count: 0`, JSON giống hệt mã không tồn tại.
+
+### File đã sửa (ngoài file test mới)
+`common/api.py` (chỉ `exception_handler` + hằng), `reports/dashboard_api.py`, `reports/api.py`, `reports/decimal_strings.py` (mới), `accounts/audit/api.py` + `README.md`, `purchasing/invoices/serializers.py` + `README.md`, `inventory/stocktake/{next_steps,api,services}.py`, `sales/orders/completion.py`, `delivery/api.py` (chỉ `filter_queryset`).
+
+Test mới: `common/tests/test_not_found_message.py`, `reports/tests/{test_dashboard_ids_reason,test_reports_decimal_strings}.py`, `accounts/audit/tests/test_date_and_code_filters.py`, `purchasing/invoices/tests/test_invoice_validation.py`, `inventory/stocktake/tests/test_update_stale.py`, `delivery/tests/test_list_code_filter.py`; mở rộng `stocktake/tests/test_timeline_labels.py`.
+
+Test cũ phải đổi vì contract đổi có chủ ý (không nới assert): `RECENT_KEYS` thêm `id`, `reason` (`reports/tests/test_p8_lo5_pnl_dashboard.py`, `inventory/batches/tests/test_p8_lo5_qa_edges.py`); ở `test_p8_lo5_qa_edges` còn bỏ khoá `id` trước khi dò chuỗi PII giả vì `id` tự tăng có thể chứa "0456"/"0789" tình cờ (flaky khi chạy cả bộ). Ba chỗ gửi hoá đơn đã trả không có `paid_at` giờ gửi `is_paid: false` hoặc `paid_at`: `purchasing/invoices/tests/test_invoice_list.py`, `purchasing/receipts/tests/test_cancelled_receipt_guards.py`, `common/tests/test_s4_actor_fields.py`.
+
+### Kiểm (07/10)
+`manage.py test`: 3286 test, OK (skipped=2); trước lô 3228. `makemigrations --check --dry-run`: No changes. `check_naming.py`: OK, không phát sinh mới. Không file `migrations/` nào đổi.
+
+**Nợ / lưu ý:** (1) `/api/reports/*` đổi sang chuỗi nên FE `reports` cần giữ chuẩn hoá chuỗi (đã có); `inventory/types.ts:101` khai chuỗi cho `/reports/batch/` nay đúng. (2) Route chi tiết có khoá UUID trả 500 với id sai kiểu (ví dụ `…/999999999/`), có từ trước, chưa sửa; test A1 thử thêm UUID rỗng để không bỏ sót. (3) `feat/pham-vi-du-lieu` cần rebase: xung đột chỉ ở khối "Đơn gần đây" của `dashboard_api.py` (giữ queryset của PV + `prefetch_related` và thân dict mới của 17a).
+
+### Lô 17a — sửa sau review techlead (08/10)
+- **M1:** khoá kết thúc bằng `unit_cost` (vd `landed_unit_cost`) trả chuỗi 4 chữ số (`"85333.3333"`); tiền 2, kg 3. Rà các khoá của `/reports/*`: chỉ `landed_unit_cost` là 4 chữ số trong DB; các khoá còn lại là tiền (2) hoặc kg (3).
+- **M2:** `date_from`/`date_to` chỉ nhận `YYYY-MM-DD` (regex), năm 2000–2100; `9999-12-31`, `0001-01-01`, `20261007`, `2026-W41-1` đều 400 `INVALID_FILTER`, không còn 500.
+- **L1:** `PAID_AT_IN_FUTURE` cho lệch tối đa 5 phút, setting `PURCHASE_INVOICE_PAID_AT_TOLERANCE_MINUTES` (env cùng tên, mặc định 5).
+- Kiểm: 3290 test OK (skipped=2), `makemigrations --check` sạch, `check_naming` OK.

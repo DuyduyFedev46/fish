@@ -27,9 +27,9 @@ def is_delivery_finished(note_statuses) -> bool:
     return bool(live) and all(status == NoteStatus.COMPLETED for status in live)
 
 
-def lock_order_of_note(note) -> SalesOrder:
+def lock_order_of_note(note) -> SalesOrder | None:
     """
-    Khoá dòng đơn của phiếu (gọi TRƯỚC khi khoá phiếu, trong `transaction.atomic`).
+    Khoá dòng đơn của phiếu (gọi TRƯỚC khi khoá phiếu, trong `transaction.atomic`). Trả `None` khi phiếu không có đơn.
     Lấy `sales_order_id` qua hoá đơn không khoá (quan hệ hoá đơn -> đơn không đổi), rồi khoá đúng dòng đơn.
     Không dùng `select_for_update` kèm join để Postgres không khoá luôn dòng phiếu trước dòng đơn.
     """

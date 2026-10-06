@@ -7,6 +7,8 @@ ACTION_LABELS = {
     "submit_stockreconciliation": "Gửi duyệt",
     "return_stockreconciliation_to_draft": "Trả về nháp để sửa",
     "approve_stockreconciliation": "Duyệt kiểm kê và cân đối sổ kho",
+    "update_reconciliation_lines": "Sửa số đếm kiểm kê",  # TLA-KK (Lô 17a): nhãn hằng, không chép `changes`
+    "update_stockreconciliation": "Sửa phiếu kiểm kê",
 }
 
 register_guidance(

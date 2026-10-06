@@ -146,7 +146,8 @@ class S4OtherDocumentsTests(TestCase):
     def test_s4_hoa_don_mua_created_by_la_chu(self):
         self._assert_actor(
             self.chu, "/api/purchasing/invoices/",
-            {"supplier": self.sup.pk, "amount": "1000000", "invoice_date": str(timezone.localdate())},
+            {"supplier": self.sup.pk, "amount": "1000000", "invoice_date": str(timezone.localdate()),
+             "is_paid": False},  # Lô 17a: đã trả thì bắt buộc có paid_at; ca này chỉ kiểm created_by
             PurchaseInvoice,
         )
 

@@ -85,6 +85,15 @@ def _lock(reconciliation):
     return StockReconciliation.objects.select_for_update().get(pk=reconciliation.pk)
 
 
+def _require_fresh(locked, expected_updated_at):
+    """Phiếu đã bị người khác cập nhật sau mốc client đang giữ → 409 `STALE_STATE` kèm `updated_at`, `updated_by_name`."""
+    if locked.updated_at is not None and expected_updated_at != locked.updated_at:
+        raise ConflictError(
+            "Phiếu vừa được người khác cập nhật, tải lại để xem.", code=STALE_STATE,
+            extra={"updated_at": _format_instant(locked.updated_at), "updated_by_name": _last_editor_name(locked)},
+        )
+
+
 def _require_draft(reconciliation):
     if reconciliation.status != StockReconciliation.Status.DRAFT:
         raise BusinessError(
@@ -156,11 +165,7 @@ def replace_lines(*, reconciliation, lines, expected_updated_at, actor):
     """
     locked = _lock(reconciliation)
     _require_draft(locked)
-    if locked.updated_at is not None and expected_updated_at != locked.updated_at:
-        raise ConflictError(
-            "Phiếu vừa được người khác cập nhật, tải lại để xem.", code=STALE_STATE,
-            extra={"updated_at": _format_instant(locked.updated_at), "updated_by_name": _last_editor_name(locked)},
-        )
+    _require_fresh(locked, expected_updated_at)
     prepared = _prepare_lines(lines)
     locked.lines.all().delete()
     for item in prepared:
@@ -173,10 +178,17 @@ def replace_lines(*, reconciliation, lines, expected_updated_at, actor):
 
 
 @transaction.atomic
-def update_reconciliation(*, reconciliation, changes, actor):
-    """Sửa `note` / `count_date` của phiếu `DRAFT` (ED-27-AC3: phiếu đã duyệt → 400). Audit chỉ ghi tên trường."""
+def update_reconciliation(*, reconciliation, changes, actor, expected_updated_at=None):
+    """
+    Sửa `note` / `count_date` của phiếu `DRAFT` (ED-27-AC3: phiếu đã duyệt → 400). Audit chỉ ghi tên trường.
+
+    `expected_updated_at` TUỲ CHỌN (L8-PATCH, Lô 17a): có thì phải bằng `updated_at` hiện tại, lệch → 409 `STALE_STATE`
+    (cùng luật với `replace_lines`); không có thì giữ hành vi cũ (ai lưu sau thì thắng). Sẽ bắt buộc ở lô sau.
+    """
     locked = _lock(reconciliation)
     _require_draft(locked)
+    if expected_updated_at is not None:
+        _require_fresh(locked, expected_updated_at)
     fields = sorted(changes)
     for name in fields:
         setattr(locked, name, changes[name])

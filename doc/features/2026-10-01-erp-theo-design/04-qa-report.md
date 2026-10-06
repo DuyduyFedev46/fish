@@ -3884,3 +3884,76 @@ Không có lỗi chặn.
 
 ### Dọn dẹp
 Tắt runserver 8000 và http.server 3101/3102 của phiên QA, xoá SQLite tạm, `out/`, symlink `node_modules`. (Còn một `http.server 3101 --bind` không phải của phiên này, không đụng.)
+
+## QA Lô 17a (08/10) — BE nợ nhỏ A1–A9 · lần 1 · 2026-10-08
+
+Nhánh `feat/lo17a-be`, HEAD 7b2db0f. Chạy thật qua HTTP: runserver SQLite tạm (cổng 8731, `DJANGO_DEBUG=1`), seed giả, 5 vai (`chu_vua`, `ql1`, `kho1`, `giao1`, `giao2`) và ca chưa đăng nhập. Mọi SĐT/tên trong ca thử là dữ liệu giả.
+
+### Kết luận: APPROVED — A1–A9 đạt qua HTTP, 3290 test xanh, không rò giá vốn hay dữ liệu cá nhân, không lỗi chặn.
+### Tổng: 58 ca · ✅ 58 · ❌ 0 · ⏸ 0 (A8 là refactor không đổi hành vi, kiểm bằng bộ test)
+
+### Theo AC
+| Mã | Kết quả | Bằng chứng |
+|---|---|---|
+| A1 | ✅ | GET id không có (items, batches, orders, invoices, reconciliations, delivery notes, customers, suppliers) → 404 `{"detail":"Không tìm thấy."}`; id `abc`, `-1`, chuỗi `';drop`, số 21 chữ số cũng 404, không lặp id, không tên model. `reports/batch/KHONGCO/` giữ câu riêng "Không tìm thấy lô.". PATCH id không có, vai `giao1` → 404, chưa đăng nhập → 401. Log server 0 dòng 500 |
+| A2 | ✅ | `recent_orders[]`, `batches[]`, `alerts[]` đều có `id`. Đơn huỷ với note chứa tên khách giả: `reason` = `{"code":"OTHER","label":"Khác"}`; JSON không có `cancel_note`, tên, "duong Lang". Đơn thường `reason: null`. Thử note có SĐT: bị BR-GH-19 chặn 400 từ trước. `giao1` 403, chưa đăng nhập 401 |
+| A3 | ✅ | Seed 5 dòng nhật ký ở 23:59:59 và 00:00:00 giờ VN. `5..6` count 3, `5..5` count 1, `6..6` count 2 (gồm 00:00:00 ngày 6, 23:59:59 ngày 6; loại 00:00:00 ngày 7), `7..7` count 3. Chỉ `date_from` hoặc chỉ `date_to` chạy đúng. `q` theo mã (`QAX2`, không phân biệt hoa thường, `PR-QAX3` theo proposal_ref) đúng; `q`+ngày đúng; `q` 8 chữ số → 200 count 0; `q` 9 chữ số hoặc `SO-123456789012` → 400 "Chỉ tìm theo mã chứng từ."; `a b`, `<script>`, `a'--`, 1 ký tự, 41 ký tự → 400, không lặp `q`. Ngày `9999-12-31`, `0001-01-01`, `20261007`, `2026-W41-1`, `2026-13-01`, `2026-02-30`, `abc`, `2026-10-7` → 400 `INVALID_FILTER`, không 500. `from > to` → 400. `ql1` 200; `kho1`/`giao1` 403; chưa đăng nhập 401 |
+| A4 | ✅ | Quét đệ quy cả 3 endpoint: 0 vi phạm (tiền 2 chữ số, kg 3, `*unit_cost` 4, không float). Đặt DB `landed_unit_cost=85333.3333` → API trả `"85333.3333"`; mặc định `"124000.0000"` khớp DB. `invoice_count` giữ số nguyên. `ql1`, `kho1`, `giao1` 403 cả 3 route; chưa đăng nhập 401 |
+| A5 | ✅ | Xem bảng ca ở mục dưới |
+| A6 | ✅ | Dòng thời gian `guidance/stocktake/<id>/`: `update_stockreconciliation` → "Sửa phiếu kiểm kê", `update_reconciliation_lines` → "Sửa số đếm kiểm kê". `changes` ở nhật ký chỉ có `{"fields":["note"]}` / `{"line_count":1}`, không chép nội dung |
+| A7 | ✅ | PATCH `expected_updated_at` cũ → 409 `STALE_STATE` (kèm `updated_at`, `updated_by_name`); đúng mốc → 200; PUT cũ → 409; không gửi → như cũ 200; sai định dạng hoặc không múi giờ → 400 `EXPECTED_UPDATED_AT_INVALID`; phiếu đã gửi duyệt → 400 `RECON_NOT_DRAFT` (ngoài đường thuận); `expected_updated_at` không bị lưu vào phiếu hay nhật ký |
+| A8 | ✅ | Refactor typing và dọn test; `test_order_completion.py` nằm trong 3290 test xanh |
+| A9 | ✅ | `?code=` khớp đúng (không phân biệt hoa thường). `giao1` tra mã của `giao2`: `count: 0`; JSON giống hệt mã không tồn tại. `giao1` thấy phiếu của mình. Khớp một phần (`2609-117`) → 0. `?code=` rỗng → như không lọc. Chủ/quản lý/kho thấy đúng 1 phiếu. Chưa đăng nhập 401 |
+
+### Ngoại lệ & biên (A5, hoá đơn mua; `ql1` chỉ xem)
+| Ca | Kết quả |
+|---|---|
+| POST hợp lệ | 201 |
+| `amount` = 0, âm | 400 `AMOUNT_NOT_POSITIVE` |
+| `receipt` của NCC khác | 400 `INVOICE_SUPPLIER_MISMATCH` |
+| Đã trả, `paid_at` null hoặc không gửi | 400 `PAID_AT_REQUIRED` |
+| `paid_at` +6 phút, +10 phút | 400 `PAID_AT_IN_FUTURE` |
+| `paid_at` +4 phút (lệch đồng hồ) | 201 |
+| Chưa trả mà có `paid_at` | 400 `PAID_AT_WHEN_UNPAID` |
+| Chưa trả, `paid_at` null hoặc không gửi; không có phiếu nhập | 201 |
+| POST không gửi `is_paid` và `paid_at` (mặc định đã trả) | 400 `PAID_AT_REQUIRED` (đúng như dev ghi chú) |
+| Dòng cũ `is_paid=True, paid_at=NULL`: PATCH `amount` | 200 (đường ngoài thuận: dữ liệu đã có từ trước) |
+| PATCH `amount` 0 hoặc âm; đổi `receipt` hoặc `supplier` lệch; `paid_at` tương lai; `is_paid=false` kèm `paid_at` | 400 đúng mã |
+| PATCH `is_paid=true` trên dòng cũ không có `paid_at` | 400 `PAID_AT_REQUIRED` (đúng luật vì có đụng `is_paid`) |
+| `amount` thiếu | 400 (câu mặc định DRF, không kèm mã) |
+
+Ngoài đường thuận khác: huỷ đơn lần 2 trên cùng đơn (màn hình cũ) → 400 BUSINESS_ERROR, không lỗi 500; PATCH phiếu kiểm kê bằng mốc cũ (hai người cùng sửa) → 409; dòng cũ hoá đơn mua thiếu `paid_at`.
+
+### Phân quyền (HTTP thật; ✓ = 200, ✗ = 403, — = 401)
+| Hành động | owner | manager | warehouse | delivery | chưa đăng nhập |
+|---|---|---|---|---|---|
+| `dashboard/summary` | ✓ | ✓ | ✓ | ✗ | — |
+| `audit-logs` (A3) | ✓ | ✓ | ✗ | ✗ | — |
+| `reports/*` (A4) | ✓ | ✗ | ✗ | ✗ | — |
+| `purchasing/invoices` GET | ✓ | ✓ | ✗ | ✗ | — |
+| `purchasing/invoices` POST | 201 | ✗ | ✗ | ✗ | — |
+| PATCH kiểm kê (A7) | — | ✓ | ✓ | ✗ | — |
+| `delivery/notes/?code=` | ✓ tất cả | ✓ tất cả | ✓ tất cả | chỉ phiếu của mình | — |
+
+(`manager` không POST được hoá đơn mua: hành vi có từ trước, lô 17a không đổi quyền; ghi nhận để PO biết nếu muốn Quản lý lập hoá đơn.)
+
+### Rò giá vốn
+`dashboard/summary`: `unit_cost` ở `batches[]` chỉ owner thấy; `ql1` và `kho1` không có (chỉ có `can_cost`). `reports/*` chỉ owner (view_profitreport). Hai khoá mới `id` và `reason` không chứa tiền hay kg, nên không tính ngược ra giá vốn được. `changes` ở nhật ký A6/A7 chỉ chứa tên field hoặc số dòng.
+
+### Rò dữ liệu cá nhân
+Quét `audit-logs`, `dashboard/summary`, `reports/*`, `guidance/stocktake`, `purchasing/invoices`, `inventory/reconciliations`: không có SĐT seed (6 số), không dạng 0xxxxxxxxx, không khoá `phone`/`delivery_address`/`customer_name`. `reason` chỉ là nhãn cố định; note huỷ tên giả không xuất hiện. Log server 271 dòng, không có tên hay SĐT, không Traceback. Không có FE trong lô nên không có ca localStorage/console.
+
+### Hồi quy
+`manage.py test` toàn bộ: Ran 3290 tests, OK (skipped=2), 162 giây. `makemigrations --check --dry-run`: No changes detected; không file migration nào đổi từ db1cebd. `check_naming.py`: OK, không vi phạm mới.
+
+### Lỗi
+Không có lỗi chặn. Ghi nhận (Low, không chặn, đã có trong dev-notes):
+- L-1: dòng nhật ký `create_stockreconciliation` ở dòng thời gian vẫn hiện "Có thay đổi", đứng cạnh dòng "Nhập số kiểm kê". Ngoài phạm vi A6.
+- L-2: route chi tiết có khoá UUID trả 500 với id sai kiểu, có từ trước (dev đã ghi). Không có route UUID trong seed để tái hiện nên chưa tự kiểm.
+- L-3: `POST /purchasing/invoices/` thiếu `amount` trả 400 câu mặc định DRF, không kèm mã.
+
+### Lệnh đã chạy
+- `manage.py migrate` + `seed_demo` (SQLite tạm), tạo 5 user + Token trong DB (tránh throttle đăng nhập 10/phút).
+- `runserver 8731 --noreload` (PID 1674, đã tắt), các script HTTP trong scratchpad: `a1.py`, `a2*.py`, `a3.py`, `a4*.py`, `a5.py`, `a67.py`, quét PII.
+- `manage.py test` (lần chạy `--parallel` bị lỗi pickle của Django, chạy lại tuần tự): OK 3290.
+- Dọn dẹp: server đã tắt theo PID, symlink `staticfiles` đã xoá, `db.sqlite3` của worktree đưa về 0 byte như ban đầu, `git status` sạch trước khi ghi report.

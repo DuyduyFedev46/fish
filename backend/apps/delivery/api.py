@@ -101,6 +101,12 @@ class DeliveryNoteViewSet(NoStoreMixin, DocumentViewSet):
             if order_id is not None:
                 queryset = queryset.filter(sales_invoice__sales_order_id=order_id)
 
+            # ED-07-BE (Lô 17a): `code` khớp ĐÚNG mã phiếu (không phân biệt hoa thường), trên queryset đã có phạm vi:
+            # người giao tra mã phiếu của người khác nhận `count: 0`, giống mã không tồn tại.
+            code = (self.request.query_params.get("code") or "").strip()
+            if code:
+                queryset = queryset.filter(code__iexact=code)
+
             # CS-02: completed_from YYYY-MM-DD
             completed_from = self.request.query_params.get("completed_from")
             if completed_from:
