@@ -139,6 +139,7 @@ PERMISSION_NAMES = [
     ("P2", "inventory", "publish_batch", "Mở bán lô"),
     ("P3", "inventory", "cancel_expired_batch", "Huỷ lô quá hạn (ghi lỗ)"),
     ("P4", "inventory", "approve_returntostock", "Duyệt hàng hoàn"),
+    ("P7", "sales", "create_refund", "Lập phiếu hoàn tiền"),
     ("P9", "delivery", "assign_deliverynote", "Chọn người giao"),
     ("P10", "delivery", "pack_deliverynote", "Soạn hàng"),
     ("P12", "reports", "view_profitreport", "Xem báo cáo lãi lỗ"),
@@ -152,6 +153,7 @@ OLD_PERMISSION_NAMES = {
     "publish_batch": "Publish lô ra Shop",
     "cancel_expired_batch": "Huỷ lô quá hạn (hạch toán lỗ)",
     "approve_returntostock": "Duyệt hàng hoàn về kho",
+    "create_refund": "Tạo phiếu hoàn tiền",
     "assign_deliverynote": "Giao phiếu cho người giao",
     "pack_deliverynote": "Đóng gói phiếu giao",
     "view_profitreport": "Xem báo cáo giá vốn / lãi lỗ",
@@ -256,6 +258,7 @@ class PermissionNameTests(TestCase):
     def test_bp_data_migration_renames_existing_permission_rows(self):
         """Bẫy: Django không đổi `auth_permission.name` của quyền đã có; migration 0017 phải làm."""
         migration = importlib.import_module("apps.accounts.migrations.0017_rename_permission_labels")
+        migration_18 = importlib.import_module("apps.accounts.migrations.0018_rename_create_refund_label")
         group_ids_before = {
             codename: set(Permission.objects.get(codename=codename, content_type__app_label=app)
                           .group_set.values_list("pk", flat=True))
@@ -266,6 +269,8 @@ class PermissionNameTests(TestCase):
                 name=OLD_PERMISSION_NAMES[codename]
             )
         migration.rename_forward(django_apps, None)
+        migration_18.rename_forward(django_apps, None)
+        migration_18.rename_forward(django_apps, None)
         migration.rename_forward(django_apps, None)  # idempotent: chạy hai lần như nhau
         for code, app_label, codename, expected in PERMISSION_NAMES:
             with self.subTest(code=code, codename=codename):
@@ -274,12 +279,14 @@ class PermissionNameTests(TestCase):
                 # Chỉ đổi tên: codename và gán Group giữ nguyên.
                 self.assertEqual(set(perm.group_set.values_list("pk", flat=True)), group_ids_before[codename])
         migration.rename_backward(django_apps, None)  # có chiều ngược
+        migration_18.rename_backward(django_apps, None)
         for _, app_label, codename, _ in PERMISSION_NAMES:
             self.assertEqual(
                 Permission.objects.get(content_type__app_label=app_label, codename=codename).name,
                 OLD_PERMISSION_NAMES[codename],
             )
         migration.rename_forward(django_apps, None)
+        migration_18.rename_forward(django_apps, None)
 
     def test_bp_matrix_labels(self):
         by_key = registry.BY_KEY
