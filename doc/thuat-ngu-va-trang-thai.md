@@ -596,3 +596,188 @@ sinh bước "AI soạn nháp …" và dòng AI. Đề xuất: BE ẩn mọi nh�
 8. W33 — 18 thao tác BE hiện "Thao tác khác" ở Nhật ký: thêm nhãn (nhất là `batch_*`, `label_printed`, `change_group_capabilities`, `content_publish`).
 9. W7 + W16 + W3 — cùng một lý do/kết quả mà chi tiết đơn (nhãn BE) và hộp thoại (nhãn ERP) khác chữ: sửa nhãn `choices`/bảng BE cho khớp ERP.
 10. W17 + W29 + W23 — một chứng từ nhiều tên ("Hàng hoàn về kho", "Chứng từ đảo doanh thu", vai trò trang): Duy chốt một tên, rồi gom nhãn về `enums.ts`.
+
+---
+
+## 4. Đề xuất tên chuẩn (PO, chờ Duy duyệt)
+
+> PO · 06/10/2026 · Trạng thái: **CHỜ DUYỆT** · Theo quyết định Duy 06/10 (tối) "Một tên cho mỗi chứng từ" (`doc/decisions.md`).
+> Nguồn: mục 1 và 2.10 ở trên, `doc/URD.md` (§5–6), `doc/business-process-spec.md` (P-05…P-08), `doc/ops/go-live-phap-ly.md`.
+
+**Nguyên tắc chọn tên**
+1. Lấy chữ Lộc và nhân viên đang nói, theo URD và spec: "hàng hoàn", "phiếu hoàn tiền", "phiếu giao", "giữ chỗ", "tái nhập", "huỷ bỏ".
+2. Nhãn ngắn, không tiếng Anh, không mã (không "TTL", "Webhook", "Publish", "BR-…"). Riêng tên riêng "SePay" được giữ vì Lộc dùng tên này.
+3. **Một tên dùng ở mọi nơi**: `choices`/`verbose_name`/`Meta.permissions` của BE, `enums.ts` của ERP, Nhật ký, dòng thời gian, ma trận phân quyền, "Tài khoản của tôi". Shop chỉ có nhãn riêng khi khách cần chữ dễ hiểu hơn. Khi đó bảng ghi cả hai.
+4. **Không đổi giá trị DB, không đổi `AuditLog.action` đã ghi.** Chỉ đổi nhãn. Đổi nhãn trong `choices` sinh migration chỉ sửa metadata, không đụng dữ liệu.
+5. Tránh hai tên gần giống nhau cho hai thứ khác nhau. Ví dụ "phiếu hoàn" (tiền) và "phiếu hàng hoàn" (hàng), hoặc "Hoàn tất" dùng chung cho đơn, phiếu giao và việc gọi.
+6. Không đụng phần AI (W26, W27, W28, W31, W36, W39 và mọi giá trị `ai`): lô dọn chữ AI đang làm.
+
+Cột "Chuẩn" là chữ áp cho BE, ERP và Nhật ký. Cột "Shop" để trống nghĩa là Shop dùng đúng chữ chuẩn hoặc Shop không hiện. Dòng có **[Q-n]** cần Duy chọn, xem mục 4.4.
+
+### 4.1 Bảng 1: Chứng từ và đối tượng (9 mục)
+
+| # | Đối tượng (code) | Tên chuẩn | Tên đang dùng (vị trí) | Lý do |
+|---|---|---|---|---|
+| C1 | `ReturnToStock` (W17) | **Hàng hoàn**. Một tờ gọi là **phiếu hàng hoàn**. Menu và màn: "Hàng hoàn" **[Q-3]**. Việc người giao làm: "Mang hàng về kho". Việc Chủ/Quản lý làm: "Duyệt hàng hoàn" | "Hàng hoàn về kho" (menu `nav.ts:313`, BE `returns.py:75`, Meta); "Trả hàng về kho", "phiếu trả về kho" (Nhật ký `auditModel.ts:19,29,30`); "Mang hàng về kho", "phiếu hàng về kho", "Duyệt hàng về kho" (dòng thời gian đơn `timeline.py:257-274`); "Duyệt hàng hoàn" (Tài khoản) | URD (§5, dòng 42 và 157) và spec P-08 đều nói "hàng hoàn", "duyệt hàng hoàn". Bỏ chữ "trả" vì dễ lẫn với "Trả nhà cung cấp" (C8). Giữ "Mang hàng về kho" vì đó là động tác, không phải tên chứng từ |
+| C2 | `SalesCreditNote` (W29) | **Phiếu trừ doanh thu** **[Q-1]** | "Chứng từ đảo doanh thu" (BE `credit_notes.py:44`, dòng thời gian, spec BR-HT-06/10); "Lập hoá đơn điều chỉnh" (Nhật ký `auditModel.ts:51`); "Trừ doanh thu đơn huỷ" (báo cáo `reportView.ts:47`); "phiếu giảm trừ" (glossary 01) | "Trừ doanh thu" là chữ báo cáo đang dùng và Lộc đọc là hiểu. "Đảo" là từ kế toán. **Cấm "hoá đơn điều chỉnh"**: đây là khái niệm hoá đơn điện tử (NĐ 123/2020, sửa đổi bởi NĐ 70/2025). Cá Về chưa xuất hoá đơn điện tử, nên dùng chữ này dễ làm người đọc tưởng đã điều chỉnh hoá đơn với thuế |
+| C3 | `Refund` | **Phiếu hoàn tiền**. Luôn viết đủ, không viết "phiếu hoàn" trơn | "Phiếu hoàn tiền" (BE `refunds.py:73`, URD); "Phiếu hoàn chờ chuyển" (menu `nav.ts:218`); "Lập phiếu hoàn" (ma trận, Tài khoản, Nhật ký `auditModel.ts:47`) | "Phiếu hoàn" trơn dễ nhầm với phiếu hàng hoàn (C1). Menu đổi thành "Hoàn tiền chờ chuyển" |
+| C4 | `DeliveryNote` | **Phiếu giao** | "Phiếu giao hàng" (BE `delivery/models.py:74`, URD); "Phiếu giao" (ERP, ma trận quyền) | ERP và nhân viên đã quen "phiếu giao". Ngắn, vừa cột và chip. Admin đổi `verbose_name` theo |
+| C5 | `PaymentTransaction` | **Khoản tiền về** | "Giao dịch thanh toán" (BE `payments.py:84`); "Giao dịch tiền về" (mục 1.3 file này); "Khoản tiền về" (`nav.ts:201`); "tiền về" (Nhật ký) | Bảng này chỉ ghi tiền vào tài khoản. "Thanh toán" không nói rõ chiều tiền, trong khi phiếu hoàn tiền là tiền ra |
+| C6 | `PurchaseReceipt` | **Phiếu nhập** | "Phiếu nhập kho" (BE `receipts.py:41`); "Phiếu nhập" (ERP, Nhật ký) | Ngắn, ERP đã dùng. Động tác vẫn là "Nhập lô" |
+| C7 | `StockEntry` | **Phiếu điều chỉnh tồn** | "Phiếu điều chỉnh kho" (BE `stock.py:65`); "Phiếu điều chỉnh tồn" (ERP `StockEntriesTab.tsx:106`) | Phiếu này đổi số tồn, không đổi kho. ERP đã dùng |
+| C8 | `BatchSupplierReturn` | **Trả nhà cung cấp** | "Trả NCC lô quá hạn" (BE `supplier_returns.py:39`); "Trả lô về nhà cung cấp" (Nhật ký `auditModel.ts:18`); "Trả nhà cung cấp" (Sổ nhập xuất); "Đã trả NCC" (spec BR-LO-07) | Trùng chữ với Sổ nhập xuất. Trên màn viết đủ "nhà cung cấp", tài liệu vẫn được viết tắt NCC |
+| C9 | `ConfirmationTask` | **Việc gọi xác nhận**. Màn: "Gọi xác nhận" | "Mục chờ gọi CSKH" (BE `delivery/models.py:136`); "Gọi xác nhận" (menu, quyền) | Bỏ "CSKH" khỏi tên chứng từ. Vai CSKH vẫn giữ tên |
+
+Không lệch, giữ nguyên: Đơn hàng, Hoá đơn bán, Khách hàng, Lô hàng, Phiếu kiểm kê, Sổ nhập xuất, Hoá đơn mua, Chi phí mua hàng, Mặt hàng, Combo, Bảng giá, Ưu đãi, Tem giao, Kịch bản gọi.
+
+### 4.2 Bảng 2: Trạng thái và lựa chọn đang lệch (T1–T66, cộng 18 nhãn thao tác Nhật ký ở T67–T76)
+
+**Bán hàng và tiền**
+| # | Trường | DB | Chuẩn (BE + ERP) | Shop (khách thấy) | Đang dùng | W |
+|---|---|---|---|---|---|---|
+| T1 | `SalesOrder.status` | BOOKED | Giữ chỗ | **Chờ thanh toán** | "Giữ chỗ" ở cả ba nơi | — |
+| T2 | `SalesOrder.status` | AUTO_CANCELLED | **Hết giờ giữ chỗ** **[Q-2]** | **Đã huỷ vì quá giờ thanh toán** | BE/Shop "Tự huỷ (quá TTL)"; ERP chip "Đã huỷ", lý do "Hết giờ giữ chỗ"; Nhật ký "Tự huỷ đơn hết giờ giữ chỗ" | W1 |
+| T3 | `PaymentTransaction.match_status` | MATCHED | Khớp đơn | | BE "Khớp — đã xác nhận"; ERP "Khớp" | W3 |
+| T4 | 〃 | UNDERPAID | Chuyển thiếu | | BE "Thiếu tiền — chờ Chủ"; ERP "Thiếu tiền"; lý do đơn "Chuyển thiếu tiền" (`reasons.py`) | W3 |
+| T5 | 〃 | ORPHAN | Về sau khi đơn đã huỷ | | BE "Đến sau khi đơn đã huỷ — chờ Chủ"; ERP "Về sau khi đơn tự huỷ". ERP **sai nghĩa**: code gán ORPHAN cho cả đơn huỷ tay (`sales/payments/services.py:273`) | W3 |
+| T6 | 〃 | UNMATCHED | Không khớp đơn | | BE "Không khớp đơn — chờ Chủ" | W3 |
+| T7 | 〃 | OVERPAID | Chuyển thừa | | BE "Chuyển thừa — đơn đã thanh toán, chờ Chủ" | W3 |
+| T8 | `PaymentTransaction.resolution` | ATTACHED | Đã gắn vào đơn | | BE "Gắn vào đơn" | W5 |
+| T9 | 〃 | CONFIRMED | Đã xác nhận đơn | | BE "Xác nhận đơn (khách đã bù)" | W5 |
+| T10 | `PaymentTransaction.source` | WEBHOOK | Ngân hàng báo | | "Webhook SePay" (BE, ERP) | W4 |
+| T11 | 〃 | MANUAL / GATEWAY | Xác nhận tay / Cổng SePay (giữ) | | khớp | W4 |
+| T12 | `PaymentTransaction.environment` | SANDBOX | Chạy thử | | "Sandbox (thử)", ERP chưa có nhãn | W6 |
+| T13 | 〃 | PRODUCTION | Chạy thật | | "Production (thật)" | W6 |
+| T14 | Mã lý do huỷ (`reason_code`) | CUSTOMER_CHANGED_MIND | Khách đổi ý | | khớp | W7 |
+| T15 | 〃 | DAMAGED_WHEN_PACKING | Hàng hư lúc soạn hàng | | BE "Hư hỏng khi soạn hàng"; hộp huỷ "Hư khi đóng hàng" | W7 |
+| T16 | 〃 | GIVE_UP_AFTER_FAILED | Giao thất bại, không giao lại | | BE "Bỏ giao sau khi thất bại"; hộp huỷ "Bỏ sau khi giao thất bại" | W7 |
+| T17 | 〃 | UNREACHABLE | Không liên lạc được khách | | khớp, `enums.ts` thiếu | W7 |
+| T18 | 〃 | OTHER | Lý do khác | | BE và hộp huỷ "Khác"; dòng thời gian và hộp quyết định "Lý do khác" | W7 |
+| T19 | 〃 | UNREACHABLE_AUTO | Hệ thống tự huỷ: không liên lạc được khách | | BE "Hệ thống tự huỷ — không liên lạc được"; `enums.ts` thiếu | W7 |
+| T20 | `Refund.method` | GATEWAY | Qua cổng SePay (ẩn khỏi ô chọn khi chưa làm) | | BE "Qua cổng (chưa hiện thực)"; ERP "Qua cổng" | W8 |
+| T21 | `Refund.status` | PENDING | Chờ hoàn tiền | Đang chờ hoàn tiền | BE/ERP "Chờ hoàn"; Shop "Đang chờ hoàn" | W9 |
+| T22 | 〃 | REFUNDED | Đã hoàn tiền | | "Đã hoàn" | W9 |
+| T23 | 〃 | FAILED | Hoàn thất bại | (Shop không hiện) | "Thất bại"; Nhật ký lấy nhầm chữ này cho phiếu giao | W11 |
+
+Dòng thời gian khoản tiền: bỏ đuôi "— chờ Chủ" khỏi nhãn. Nếu cần báo còn việc thì ghép nhãn `resolution_status` ("Chờ xử lý" / "Đã xử lý") ra sau, để chip và dòng thời gian cùng một chữ.
+
+**Giao hàng và gọi xác nhận**
+| # | Trường | DB | Chuẩn (BE + ERP) | Shop (khách thấy) | Đang dùng | W |
+|---|---|---|---|---|---|---|
+| T24 | `DeliveryNote.status` | CONFIRMING | Chờ gọi xác nhận | Chờ vựa gọi xác nhận | BE/ERP "Chờ xác nhận" (lẫn với xác nhận tiền); Shop mã thô | W2, W10 |
+| T25 | 〃 | PREPARING | Đang soạn hàng | Đang soạn hàng | BE/ERP "Soạn hàng"; Shop mã thô | W2 |
+| T26 | 〃 | READY | Chờ lấy hàng | Đã soạn xong, chờ giao | Shop mã thô | W2 |
+| T27 | 〃 | DELIVERING | Đang giao | Đang giao | Shop mã thô | W2 |
+| T28 | 〃 | COMPLETED | **Đã giao** **[Q-4]** | Đã giao | BE/ERP "Hoàn tất"; Shop mã thô | W2 |
+| T29 | 〃 | FAILED | Giao thất bại | Giao chưa thành công, vựa sẽ liên hệ lại | Nhật ký "Thất bại"; Shop mã thô | W2, W11 |
+| T30 | 〃 | CANCELLED | Đã huỷ theo đơn | Đã huỷ | Nhật ký "Đã huỷ"; Shop mã thô | W2, W11 |
+| T31 | `CustomerCall.result` | CONFIRMED_CHANGED | Đã xác nhận, có đổi thông tin | | BE "Xác nhận có đổi thông tin"; ERP "Đã xác nhận, có đổi" | W12 |
+| T32 | 〃 | WRONG_NUMBER | Sai số điện thoại | | BE "Sai số" | W12 |
+| T33 | 〃 | WANT_CHANGE | Khách muốn đổi món | | BE "Khách muốn đổi món/số lượng" | W12 |
+| T34 | 〃 | WANT_CANCEL | Khách muốn huỷ đơn | | BE "Khách muốn huỷ" | W12 |
+| T35 | `ConfirmationTask.escalation_reason` | WRONG_NUMBER | Sai số điện thoại | | "Sai số" | W13 |
+| T36 | 〃 | WANT_CANCEL | Khách muốn huỷ đơn | | "Khách muốn huỷ" | W13 |
+| T37 | 〃 | WANT_CHANGE | Khách muốn đổi món | | model "Khách muốn đổi"; serializer "Khách muốn đổi món – huỷ + hoàn + đặt lại" | W13 |
+| T38 | `ConfirmationTask.state` | DONE | Đã xong | | "Hoàn tất" (trùng chữ với đơn và phiếu giao) | — |
+| T39 | Tab hàng chờ gọi | DEFAULT | Đến giờ gọi | | "Cần gọi ngay", đứng cạnh tab "Chờ gọi" nên khó phân biệt | W14 |
+| T40 | Quyết định đơn chưa xác nhận | DELIVER_WITHOUT_CONFIRM | Bỏ qua gọi xác nhận | | ERP "Giao không xác nhận"; Nhật ký "Bỏ qua bước gọi xác nhận"; BE không có nhãn | — |
+| T41 | 〃 | EXTEND | Gia hạn gọi | | ERP "Gia hạn thêm"; Nhật ký "Gia hạn giao" (sai việc) | — |
+| T42 | 〃 | CANCEL | Huỷ đơn | | khớp ERP, BE thêm nhãn | — |
+| T43 | `auto_cancel_blocked` | "BR-LO-05" | Lô đã chốt, không tự huỷ được | | API trả mã thô | W40 |
+
+Ghi chú T37: phần "huỷ, hoàn tiền, đặt lại" là hướng dẫn xử lý. Đưa vào dòng gợi ý dưới chip, không nhét vào nhãn.
+
+**Kho và lô**
+| # | Trường | DB | Chuẩn (BE + ERP) | Đang dùng | W |
+|---|---|---|---|---|---|
+| T44 | `StockLedgerEntry.movement_type` | WRITE_OFF | Huỷ hàng, ghi lỗ | BE "Hạch toán lỗ / huỷ"; ERP "Ghi lỗ, huỷ hàng" | W15 |
+| T45 | `ReturnToStock.decision` | WRITE_OFF | Huỷ hàng, ghi lỗ | BE và dòng thời gian "Huỷ bỏ (hạch toán lỗ)"; ERP "Huỷ bỏ, ghi lỗ" | W16 |
+| T46 | `ReturnToStock.decision` | RESTOCK / PENDING | Tái nhập / Chờ quyết định (giữ) | khớp | — |
+| T47 | `ReturnToStock.status` | DRAFT | Chờ duyệt | Nhật ký "Nháp" | W11, W18 |
+
+"Ghi lỗ" thay "hạch toán lỗ" ở mọi nhãn, gồm cả quyền "Huỷ lô quá hạn". Spec vẫn được dùng "hạch toán lỗ" vì đó là tài liệu.
+
+**Danh mục, nhân sự, Nhật ký**
+| # | Trường | DB | Chuẩn (BE + ERP) | Đang dùng | W |
+|---|---|---|---|---|---|
+| T48 | `StaffProfile.status` | INACTIVE | Đã nghỉ | BE "Nghỉ" | W19 |
+| T49 | `AuditLog.actor_kind` | user | Người | BE "Người dùng"; ERP "Người". Giá trị `ai` để lô dọn AI xử lý | W20 |
+| T50 | `Item.item_type` | BUNDLE | Combo | BE "Combo dạng gói (có công thức)" | W21 |
+| T51 | `PricingRule.apply_on` | ITEM | Theo mặt hàng | BE "Theo mặt hàng (mua ≥ N kg)". Phần "≥ N kg" đưa thành chữ gợi ý ở form | W22 |
+| T52 | 〃 | ORDER | Theo đơn | BE "Theo đơn (tổng ≥ M đồng)" | W22 |
+| T53 | `PricingRule.is_active` | true | Đang áp dụng | BE "Đang áp dụng"; ERP "Đang bật" | W22 |
+
+**Nội dung**
+| # | Trường | DB | Chuẩn (BE + ERP) | Đang dùng | W |
+|---|---|---|---|---|---|
+| T54 | `Entry.page_role` | privacy | Chính sách bảo mật | BE/`enums.ts` "Bảo mật" | W23 |
+| T55 | 〃 | terms | **Điều kiện giao dịch chung** **[Q-5]** | BE "Điều kiện giao dịch"; ô chọn "Điều khoản mua hàng" | W23 |
+| T56 | 〃 | refund | Chính sách đổi trả và hoàn tiền | BE "Đổi trả hoàn tiền"; ô chọn "Chính sách đổi trả" | W23 |
+| T57 | 〃 | seller_info | Thông tin người bán | khớp | W23 |
+| T58 | Lý do trả về nháp | missing_info | Thiếu thông tin hoặc hình ảnh | `enums.ts` "Thiếu thông tin, hình ảnh" | W24 |
+| T59 | 〃 | wrong_content | Nội dung chưa chuẩn | hộp thoại "Nội dung chưa chuẩn, cần sửa"; lý do gỡ bài cùng mã ghi "Nội dung chưa chuẩn" | W24 |
+| T60 | 〃 | legal_risk | Rủi ro pháp lý hoặc bản quyền | `enums.ts` "Rủi ro pháp lý, bản quyền" | W24 |
+| T61 | 〃 | other | Lý do khác | `enums.ts` "Khác" | W24 |
+| T62 | Lý do gỡ bài | wrong_price | Giá chưa đúng | khớp | W25 |
+| T63 | 〃 | complaint | Khiếu nại hoặc rủi ro pháp lý | `enums.ts` "Khiếu nại, rủi ro pháp lý" | W25 |
+| T64 | 〃 | out_of_season | Hết mùa vụ | khớp | W25 |
+| T65 | 〃 | wrong_content | Nội dung chưa chuẩn | khớp (trùng T59) | W25 |
+| T66 | 〃 | other | Lý do khác | `enums.ts` "Khác" | W25 |
+
+Quy ước chung cho mã `OTHER`/`other` ở lý do (huỷ đơn, trả về nháp, gỡ bài): dùng **"Lý do khác"**. Mã `OTHER` ở loại chi phí và lý do giao thất bại vẫn là "Khác", vì đó là loại, không phải lý do.
+
+Nhãn Nhật ký cho 18 thao tác đang hiện "Thao tác khác" (W33, không gồm thao tác AI):
+| # | `action` | Chuẩn |
+|---|---|---|
+| T67 | `batch_near_expiry` / `batch_expired` / `batch_sold_out` | Lô sang Cận hạn / Lô sang Quá hạn / Lô hết hàng |
+| T68 | `batch_selling` / `batch_back_in_stock` | Lô sang Đang bán / Lô có hàng lại (hàng hoàn tái nhập) |
+| T69 | `label_printed` / `label_reprinted` | In tem giao / In lại tem giao |
+| T70 | `update_reconciliation_lines` | Sửa số đếm kiểm kê |
+| T71 | `delete_returntostock` | Ẩn phiếu hàng hoàn |
+| T72 | `change_group_capabilities` | Đổi phân quyền nhóm |
+| T73 | `item_image_add` / `item_image_replace` | Thêm ảnh mặt hàng / Thay ảnh mặt hàng |
+| T74 | `content_publish` / `content_republish` / `content_restore_version` | Đăng bài / Đăng lại bài / Khôi phục bản cũ |
+| T75 | `create_callscript` / `update_callscript` | Thêm kịch bản gọi / Sửa kịch bản gọi |
+| T76 | `admin_edit` | Sửa trong trang quản trị kỹ thuật |
+
+T71 dùng "Ẩn" vì phiếu chỉ xoá mềm, chứng từ vẫn còn (bất biến 3).
+
+### 4.3 Tên việc và quyền theo tên chuẩn (W30, W32 và các chỗ kéo theo)
+
+Áp cho `Meta.permissions` (Admin), ma trận `/permissions/` (`registry.py`), "Tài khoản của tôi" (`auth/services.py`) và nhãn Nhật ký (`auditModel.ts`). `AuditLog.action` không đổi.
+
+| # | Codename / action | Chuẩn | Đang dùng |
+|---|---|---|---|
+| P1 | `confirm_payment_manual` (quyền + Nhật ký) | Xác nhận đã nhận tiền | Meta và Nhật ký "Xác nhận thanh toán thủ công" (W30) |
+| P2 | `publish_batch` | Mở bán lô | Meta "Publish lô ra Shop" (W32) |
+| P3 | `cancel_expired_batch` | Huỷ lô quá hạn (ghi lỗ) | Nhật ký "Huỷ lô hết hạn"; Meta "(hạch toán lỗ)" |
+| P4 | `approve_returntostock` | Duyệt hàng hoàn | Meta, ma trận "Duyệt hàng hoàn về kho"; Nhật ký "Duyệt phiếu trả về kho" |
+| P5 | `return_to_warehouse` / `cancel_returntostock` | Mang hàng về kho / Huỷ phiếu hàng hoàn | Nhật ký "Trả hàng về kho" / "Huỷ phiếu trả về kho"; dòng thời gian "Huỷ phiếu hàng về kho" |
+| P6 | `issue_credit_note` | Lập phiếu trừ doanh thu (theo Q-1) | Nhật ký "Lập hoá đơn điều chỉnh"; dòng thời gian "Lập chứng từ đảo doanh thu" |
+| P7 | `create_refund` / `retry_refund` | Lập phiếu hoàn tiền / Thử hoàn tiền lại | "Lập phiếu hoàn", "Tạo phiếu hoàn tiền" / "Thử hoàn lại" |
+| P8 | `return_batch_to_supplier` | Trả nhà cung cấp | Nhật ký "Trả lô về nhà cung cấp" |
+| P9 | `assign_deliverynote` | Chọn người giao | Meta, ma trận "Giao phiếu cho người giao"; Tài khoản "Giao hoặc đổi người giao của phiếu giao"; Nhật ký "Gán phiếu giao" |
+| P10 | `pack_deliverynote` | Soạn hàng | Meta "Đóng gói phiếu giao"; ma trận "Soạn hàng, in tem" |
+| P11 | `delivery_confirm_skipped` / `delivery_extended` | Bỏ qua gọi xác nhận / Gia hạn gọi | Nhật ký "Bỏ qua bước gọi xác nhận" / "Gia hạn giao" |
+| P12 | `view_profitreport` / `view_dashboard` | Xem báo cáo lãi lỗ / Xem Tổng quan | Meta "Xem báo cáo giá vốn / lãi lỗ" / "Xem Tổng quan vận hành" |
+| P13 | `change_item_image` / `content.publish_entry` | Sửa ảnh mặt hàng / Đăng bài lên Shop | Meta "Thêm / thay / gỡ ảnh mặt hàng"; Tài khoản "Đăng bài viết và trang" |
+
+### 4.4 Câu hỏi cần Duy chọn
+
+| Mã | Câu hỏi | Phương án | PO đề xuất |
+|---|---|---|---|
+| Q-1 | Tên chứng từ `SalesCreditNote` (C2, P6) | (a) **Phiếu trừ doanh thu** · (b) giữ "Chứng từ đảo doanh thu" như spec BR-HT-10 · (c) "Phiếu giảm trừ doanh thu" | (a). Trùng chữ báo cáo, Lộc dễ hiểu. Chọn (a) hoặc (c) thì BA sửa chữ trong spec BR-HT-06/10. Chỉ đổi tên, nội dung quyết định 30/09 giữ nguyên |
+| Q-2 | Đơn hết giờ giữ chỗ hiện thế nào ở ERP (T2) | (a) chip riêng **"Hết giờ giữ chỗ"** (xám) · (b) chip chung "Đã huỷ", cột lý do ghi "Hết giờ giữ chỗ" như hiện nay | (a). Một chữ ở chip, lý do, Nhật ký và Admin. Lọc "Đã huỷ" vẫn gộp được cả hai. Shop ghi "Đã huỷ vì quá giờ thanh toán" (cả hai phương án) |
+| Q-3 | Tên menu và màn của C1 | (a) **"Hàng hoàn"** · (b) giữ "Hàng hoàn về kho" | (a). Menu nằm trong nhóm "Kho & lô" nên chữ "về kho" thừa |
+| Q-4 | Phiếu giao COMPLETED (T28) | (a) **"Đã giao"** · (b) giữ "Hoàn tất" | (a). "Hoàn tất" đang dùng cho đơn, phiếu giao và việc gọi. W37 (đơn sang Hoàn tất) đang chạy luồng đầy đủ, nên tách chữ ngay để tránh lẫn |
+| Q-5 | Vai trò trang `terms` (T55) | (a) **"Điều kiện giao dịch chung"** (tên trong Luật TMĐT 2025, NĐ 248) · (b) "Điều khoản mua hàng" (thân thiện) | (a) cho nhãn vai trò ở ERP, để Chủ đối chiếu checklist pháp lý mục 3. Tiêu đề trang khách đọc do người viết đặt, không phụ thuộc nhãn này |
+
+Các nhãn còn lại PO tự chọn theo nguyên tắc. Duy chỉ cần nói "duyệt mục 4" và trả lời Q-1 đến Q-5. Nếu muốn sửa dòng nào thì ghi mã dòng (C, T, P).
+
+### 4.5 Ngoài bảng này
+
+- Phần AI (W26–W28, W31, W36, W39, giá trị `ai` của `actor_kind` và `Entry.source`): lô dọn chữ AI đang làm.
+- W1 và W2 cũng nằm trong lô dọn chữ AI. Nếu Duy duyệt mục 4 trước khi lô đó xong thì lô dùng chữ T2 và T24–T30. Nếu chưa thì lô dùng tạm đề xuất ở "Top 10" và sửa lại theo bảng này sau.
+- Lỗi cách vẽ, không phải chọn tên (W11 dò nhầm bảng, W34 và W35 code chết, W38 thanh bước, W41 chưa có màn): giữ cho lô sửa nhãn. Riêng W11 phải sửa cách dịch theo `model_name`, nếu không thì đổi chữ cũng không hết sai.
+- W37 (đơn không sang Hoàn tất): đang chạy luồng đầy đủ BA → PO → Tech Lead.
+- Cách áp dụng sau khi Duy duyệt: một lô NHANH. BE sửa nhãn `choices`, `verbose_name` và `Meta.permissions` (migration chỉ đổi metadata). ERP gom về `enums.ts`, xoá 6 bản chép (mục 2.10, khuyến nghị chung). Shop dùng `*_label` của BE hoặc bảng nhãn khách riêng. QA kiểm bằng cách so từng dòng C, T, P với màn thật.
