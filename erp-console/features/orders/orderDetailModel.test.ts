@@ -7,7 +7,9 @@ import {
   effectiveOrderStatus,
   holdInfo,
   orderActionPlan,
+  ORDER_STEPS,
   orderPath,
+  orderStepKey,
   orderTimeline,
   timelineDocHref,
   paymentActionPlan,
@@ -79,6 +81,37 @@ describe("orderPath", () => {
   it("đơn đang đi: bước theo trạng thái giao", () => {
     expect(orderPath({ status: "PROCESSING", deliveryStatus: "DELIVERING" }).current).toBe("DELIVERING");
     expect(orderPath({ status: "COMPLETED" })).toEqual({ current: "COMPLETED", badEnd: null });
+  });
+});
+
+describe("thanh bước 5 bước (W37 S7)", () => {
+  const ORDER_STATUSES = ["BOOKED", "PAID", "PROCESSING", "COMPLETED", "CANCELLED", "AUTO_CANCELLED"];
+  const DELIVERY_STATUSES = [null, "CONFIRMING", "PREPARING", "READY", "DELIVERING", "FAILED", "COMPLETED", "CANCELLED"];
+
+  it("có đúng 5 bước, Hoàn tất ở cuối", () => {
+    expect(ORDER_STEPS.map((s) => s.key)).toEqual(["BOOKED", "CONFIRMING", "PREPARING", "DELIVERING", "COMPLETED"]);
+  });
+  it("mọi tổ hợp: bước Hoàn tất sáng khi và chỉ khi đơn COMPLETED (S7-AC3)", () => {
+    for (const status of ORDER_STATUSES) {
+      for (const deliveryStatus of DELIVERY_STATUSES) {
+        const key = orderStepKey({ status, deliveryStatus });
+        expect(ORDER_STEPS.some((s) => s.key === key)).toBe(true);
+        expect(key === "COMPLETED").toBe(status === "COMPLETED");
+      }
+    }
+  });
+  it("phiếu giao xong nhưng đơn còn PROCESSING vẫn ở Đang giao", () => {
+    expect(orderStepKey({ status: "PROCESSING", deliveryStatus: "COMPLETED" })).toBe("DELIVERING");
+  });
+  it("bảng bước theo phiếu của đơn PROCESSING", () => {
+    const at = (d: string | null) => orderStepKey({ status: "PROCESSING", deliveryStatus: d });
+    expect(at("CONFIRMING")).toBe("CONFIRMING");
+    expect(at(null)).toBe("CONFIRMING");
+    expect(at("PREPARING")).toBe("PREPARING");
+    expect(at("READY")).toBe("PREPARING");
+    expect(at("DELIVERING")).toBe("DELIVERING");
+    expect(at("FAILED")).toBe("DELIVERING");
+    expect(orderStepKey({ status: "PAID" })).toBe("CONFIRMING");
   });
 });
 

@@ -59,6 +59,7 @@ import { hasLimitedCourierScope } from "@/shared/lib/personalData";
 import { MOCK_UNAUTHORIZED, mockRequireUser, mockUsers, mockPermsOf } from "@/features/auth/mock";
 import type { Me } from "@/features/auth/types";
 import { money as formatMoney } from "@/shared/lib/format";
+import { isDeliveryFinished } from "@/shared/lib/orderCompletion";
 import type {
   ConfirmPaymentResult,
   OrderAllocation,
@@ -342,6 +343,8 @@ function seed(): Store {
         failed_attempts: tag === "failed" ? 1 : 0,
         ...(dStatus === "COMPLETED" ? { completed_at: isoVN(createdMs + 3 * 3600_000) } : {}),
       };
+      // S6-AC8: đơn Hoàn tất sinh theo luật dùng chung (BR-BH-18), không gán cứng.
+      o.status = isDeliveryFinished([dStatus]) ? "COMPLETED" : "PROCESSING";
       if (tag === "failed") o.needs_attention = true;
     }
     if (status === "CANCELLED") {
@@ -553,7 +556,10 @@ function timelineOf(o: Order): OrderTimelineEntry[] {
     if (d.status === "FAILED" || o.cancelFromFailedDelivery) {
       steps.push([40, "delivery_failed", `Giao thất bại lần ${d.failed_attempts || 1} (${d.code})`]);
     }
-    if (d.status === "COMPLETED") steps.push([45, "delivered", `Giao hàng thành công (${d.code})`]);
+    if (d.status === "COMPLETED") {
+      const label = o.status === "COMPLETED" ? `Đã giao — đơn hoàn tất (${d.code})` : `Giao hàng thành công (${d.code})`;
+      steps.push([45, "delivered", label]);
+    }
     steps.forEach(([m, kind, label]) => out.push({ at: at(base, m), kind, label, actor_display: who }));
   }
   if (o.status === "AUTO_CANCELLED" && o.reserved_until) {
@@ -734,6 +740,10 @@ function detail(me: Me, o: Order): OrderDetail {
     // Chỉ lộ field công khai (contract S10) — reason/request_id/created_by/created_at/confirmed_at/failure_reason
     // là bookkeeping nội bộ cho S16, không nằm trong OrderRefund.
     refunds: o.refunds.map((r) => ({ id: r.id, amount: r.amount, status: r.status, status_label: REFUND_LABEL[r.status], bank_txn_ref: r.bank_txn_ref })),
+    refund_summary: {
+      refunded_amount: money(o.refunds.filter((r) => r.status === "REFUNDED").reduce((s, r) => s + Number(r.amount), 0)),
+      pending_amount: money(o.refunds.filter((r) => r.status === "PENDING").reduce((s, r) => s + Number(r.amount), 0)),
+    },
     timeline: timelineOf(o),
     available_actions: actions(me, o),
     ...(has(me, "sales.view_privacy_consent")

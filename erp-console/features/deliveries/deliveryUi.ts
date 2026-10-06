@@ -1,4 +1,5 @@
 // Hàm thuần của màn Giao hàng / Việc giao của tôi (không React, để vitest). Không ghi dữ liệu khách ra log, URL hay máy.
+import { ApiError } from "@/shared/lib/http";
 import type { PathStep } from "@/shared/ui/detail/StatusPath";
 import { ENUMS } from "@/shared/lib/enums";
 import type { DeliveryFailureReason, DeliveryNoteItem } from "./types";
@@ -148,4 +149,22 @@ export function lineNames(summary: string | null | undefined): string {
 /** Câu báo khi lọc/tìm không ra mà còn trang chưa tải (bộ lọc chỉ chạy trên các phiếu đã tải). */
 export function loadedOnlyNote(loaded: number): string {
   return `Chỉ tìm trong ${loaded} phiếu đã tải. Bấm Tải thêm để tìm tiếp.`;
+}
+
+/** BR-GH-24 (W37 S2): đơn đã huỷ, không giao hay báo thất bại nữa. BE trả 400 kèm `code`; FE nhận theo `code`, không theo HTTP. */
+export const ORDER_CANCELLED_CODE = "BR-GH-24";
+export const ORDER_CANCELLED_TEXT = "Đơn đã huỷ — mang hàng về kho.";
+
+export function isOrderCancelledError(err: unknown): err is ApiError {
+  return err instanceof ApiError && err.code === ORDER_CANCELLED_CODE;
+}
+
+/** Câu hiện cho người giao: đúng `detail` của BE, thiếu thì dùng câu chuẩn. */
+export function orderCancelledMessage(err: unknown): string {
+  return err instanceof Error && err.message ? err.message : ORDER_CANCELLED_TEXT;
+}
+
+/** Toast sau khi giao xong: đơn đã sang Hoàn tất (BR-BH-18) thì nói rõ. */
+export function completeToast(orderStatus: string | null | undefined, fallbackText: string): string {
+  return orderStatus === "COMPLETED" ? "Đã giao xong. Đơn đã hoàn tất." : fallbackText;
 }

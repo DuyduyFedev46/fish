@@ -25,7 +25,7 @@ export type ActionPlan = { primary: ActionItem | null; menu: ActionItem[] };
 
 export const ORDER_STEPS: PathStep[] = [
   { key: "BOOKED", label: "Giữ chỗ" },
-  { key: "PAID", label: "Đã thanh toán" },
+  { key: "CONFIRMING", label: "Chờ gọi xác nhận" },
   { key: "PREPARING", label: "Soạn hàng" },
   { key: "DELIVERING", label: "Đang giao" },
   { key: "COMPLETED", label: "Hoàn tất" },
@@ -36,17 +36,20 @@ export const BLOCKED_CANCEL_DELIVERING = "Đơn đang giao: báo giao thất b�
 
 type PathInput = { status: string; deliveryStatus?: string | null; hasInvoice?: boolean };
 
-/** Bước hiện tại của thanh trạng thái (đơn huỷ: bước cuối cùng đã qua trước khi huỷ). */
+/**
+ * Bước hiện tại của thanh trạng thái (đơn huỷ: bước cuối cùng đã qua trước khi huỷ). W37 S7: bước Hoàn tất CHỈ sáng khi
+ * đơn `COMPLETED`; phiếu giao xong mà đơn còn PROCESSING (đợi phiếu khác) vẫn đứng ở Đang giao.
+ */
 export function orderStepKey(o: PathInput): string {
   if (o.status === "BOOKED" || o.status === "AUTO_CANCELLED") return "BOOKED";
   if (o.status === "COMPLETED") return "COMPLETED";
-  if (o.status === "PAID") return "PAID";
-  const d = o.deliveryStatus;
+  if (o.status === "PAID") return "CONFIRMING";
   if (o.status === "PROCESSING" || o.status === "CANCELLED") {
-    if (d === "DELIVERING" || d === "FAILED") return "DELIVERING";
-    if (d === "COMPLETED") return "COMPLETED";
-    if (d) return "PREPARING";
-    return o.hasInvoice ? "PAID" : "BOOKED";
+    const d = o.deliveryStatus;
+    if (d === "DELIVERING" || d === "FAILED" || d === "COMPLETED") return "DELIVERING";
+    if (d === "PREPARING" || d === "READY") return "PREPARING";
+    if (d === "CONFIRMING") return "CONFIRMING";
+    return o.hasInvoice === false ? "BOOKED" : "CONFIRMING";
   }
   return "BOOKED";
 }

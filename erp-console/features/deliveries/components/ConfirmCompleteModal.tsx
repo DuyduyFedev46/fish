@@ -1,12 +1,14 @@
 "use client";
 
 // Xác nhận "Đã giao xong": phiếu hoàn tất không quay lại được, nên hỏi lại một lần để khỏi bấm nhầm trên điện thoại.
+import { useState } from "react";
 import { FormAlert } from "@/shared/ui/form/FormAlert";
 import { primaryLabel, useSubmit } from "@/shared/ui/form/useSubmit";
 import { SummaryBlock } from "@/shared/ui/form/SummaryBlock";
 import { PersonalText } from "@/shared/ui/PersonalText";
 import { Modal } from "@/shared/ui/overlay/Modal";
 import { completeDelivery, type DeliveryStatusResponse } from "../api";
+import { isOrderCancelledError, orderCancelledMessage } from "../deliveryUi";
 import type { DeliveryNoteItem } from "../types";
 
 type Props = {
@@ -18,8 +20,20 @@ type Props = {
 };
 
 export function ConfirmCompleteModal({ note, onClose, onDone, onConflict }: Props) {
-  const sub = useSubmit(() => completeDelivery(note.id), { onSuccess: onDone });
-  const conflict = sub.conflict;
+  // BR-GH-24: đơn đã huỷ → hiện đúng câu của BE, nút chính thành "Tải lại".
+  const [cancelledText, setCancelledText] = useState<string | null>(null);
+  const sub = useSubmit(
+    async () => {
+      try {
+        return await completeDelivery(note.id);
+      } catch (err) {
+        if (isOrderCancelledError(err)) setCancelledText(orderCancelledMessage(err));
+        throw err;
+      }
+    },
+    { onSuccess: onDone },
+  );
+  const conflict = sub.conflict || cancelledText;
   return (
     <Modal
       title="Xác nhận đã giao xong"
@@ -43,8 +57,9 @@ export function ConfirmCompleteModal({ note, onClose, onDone, onConflict }: Prop
         </>
       }
     >
-      {conflict && <FormAlert kind="warn">Phiếu vừa đổi trạng thái. Tải lại để xem bản mới.</FormAlert>}
-      {sub.error && <FormAlert>{sub.error}</FormAlert>}
+      {sub.conflict && <FormAlert kind="warn">Phiếu vừa đổi trạng thái. Tải lại để xem bản mới.</FormAlert>}
+      {cancelledText && <FormAlert>{cancelledText}</FormAlert>}
+      {sub.error && !cancelledText && <FormAlert>{sub.error}</FormAlert>}
       <SummaryBlock
         label="Phiếu giao cần xác nhận"
         rows={[
