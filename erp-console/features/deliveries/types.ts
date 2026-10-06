@@ -147,3 +147,30 @@ export type VoidLabelResponse = {
   already: boolean;
 };
 
+
+/**
+ * CS-17 `GET /api/delivery/notes/lookup/?code=`: kết quả tra mã tem. KHÔNG có tên, SĐT, địa chỉ, mã đơn hay giá.
+ * `warning`: "BR-GH-16" = tem cũ hoặc đã huỷ tem (`valid_print_no` = lần tem còn hiệu lực), "BR-GH-07" = phiếu đã huỷ.
+ */
+export type TagLookup = {
+  note_id: number;
+  status: DeliveryStatus;
+  print_no: number;
+  valid_print_no: number | null;
+  warning: "BR-GH-16" | "BR-GH-07" | null;
+};
+
+/** CS-16: dòng của phiếu soạn nội bộ. Chỉ 4 trường này được giữ lại từ chi tiết phiếu giao (không tên, SĐT, địa chỉ, giá). */
+export type PickSheetLine = {
+  item_name: string;
+  batch_id: string;
+  expiry_date: string;
+  qty_kg: string;
+};
+
+export type PickSheetData = {
+  note_code: string;
+  status: DeliveryStatus;
+  total_kg: string;
+  lines: PickSheetLine[];
+};

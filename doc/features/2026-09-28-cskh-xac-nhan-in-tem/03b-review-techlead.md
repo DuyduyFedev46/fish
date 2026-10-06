@@ -162,3 +162,102 @@ Phần doc: 02b §4.6 đã thêm dòng RETURNING. `03-dev-notes.md` §6 và §8 
 
 - CS-16-AC4: trang `/print/pick-sheet/` phải chặn theo quyền `delivery.print_label` hoặc `pack_deliverynote` (xem ghi chú lô FE ở trên).
 - Trường hợp biên RETURNING khi khách mới đặt hai đơn gần nhau: giữ như hiện tại trừ khi Duy muốn siết.
+
+## Review Lô 5 FE (06/10)
+
+- **Phạm vi:** worktree `cskh-lo5-fe`, nhánh `feat/cskh-lo5-fe`, `git diff 0b3e4d5..50058f3` (33 file, chỉ `erp-console/` và 03-dev-notes).
+  Đối chiếu với 02-stories (CS-16, CS-17, CS-18), 02b §4.6 và §6, contract BE thật (`delivery/api.py:208-221`,
+  `delivery/labels/services.py:19,208-236`, `delivery/confirmation/scripts_api.py`, `call_scripts.py`, `serializers.py:293-299`,
+  `delivery/migrations/0009_grant_callscript.py`, `accounts/migrations/0011`).
+
+### Kết luận: **APPROVED**
+
+Không có lỗi Critical, High hay Medium. Có 3 điểm Low, không chặn merge (ghi ở cuối).
+
+### Lệnh kiểm chứng techlead tự chạy
+
+| Lệnh | Kết quả |
+|---|---|
+| `python3 scripts/check_naming.py` (trong worktree) | OK, không phát sinh vi phạm mới |
+| grep `console.` / `localStorage` / `sessionStorage` / `/api/ai` trên các file code mới hoặc đã sửa (trừ e2e) | Không có lời gọi nào. Chỉ có comment, và phần `localStorage` có sẵn của `auth/mock.ts` (người dùng mock, không phải khách) |
+
+Không chạy `tsc`, `vitest`, build hay e2e vì worktree không có `node_modules` và điều phối viên đang build. Số liệu 945 test,
+`check-no-mock`, e2e 92/92 lấy từ 03-dev-notes. Điều phối viên tự chạy lại theo quy trình bước 3.
+
+### Soát theo mục được giao
+
+**1. Phiếu soạn (CS-16): ĐẠT.**
+- *Dữ liệu cá nhân và giá:* `toPickSheet` (`features/deliveries/pickSheet.ts:14-21`) chỉ chép `code`, `status`, `total_kg` và
+  đúng 4 khoá của dòng hàng. Hàm chạy ngay trong `.then` (`PickSheetScreen.tsx:52-56`). Đối tượng chi tiết gốc chỉ nằm trong
+  closure, không vào state hay DOM. Kiểu `PickSheetData` không có chỗ cho tên, SĐT hay địa chỉ, nên TypeScript chặn được
+  trường hợp ai đó lỡ thêm vào sau này. Test `pickSheet.test.ts` kiểm cả danh sách khoá. E2e đọc DOM thật để kiểm AC2 và AC3.
+  Trang không hiện `status`, ghi chú hay mã đơn.
+- *Chặn quyền trước mọi request:* effect kiểm `canOpenPickSheet` (cần `print_label` hoặc `pack_deliverynote`) trước khi gọi
+  `fetchDeliveryNoteDetail` (`PickSheetScreen.tsx:41-44`). Chưa đăng nhập thì chuyển sang `/login/?next=`, tham số chỉ mang `?note=<id>`.
+  Cách làm này đúng ghi chú cho lô FE ở trên: API chi tiết trả 200 cho NV giao với phiếu của chính họ. Theo migration 0011,
+  `delivery_staff` và `customer_service` không có quyền nào trong hai quyền đó, nên `giao1` và `cs1` không gọi được chi tiết. Đã
+  có test đơn vị và e2e đếm request.
+- Nếu API vẫn trả 403 hoặc 404 thì trang hiện màn lỗi riêng, không lộ chi tiết. Chỉ in khi phiếu ở trạng thái PREPARING. Phiếu
+  huỷ báo đỏ, các trạng thái khác báo vàng, đúng CS-16-AC1.
+- `@page 100mm 150mm` đặt trong `<style>` giống trang tem (02b §6). Giấy luôn đen trên nền trắng nhờ `Canvas/CanvasText`.
+
+**2. Tra mã tem (CS-17): ĐẠT.**
+- `TAG_CODE_RE` (`tagCode.ts:8`) giống hệt `LABEL_CODE_RE` của BE. `checkTagCode` chạy trước `lookupDeliveryTag`
+  (`TagLookupScreen.tsx:57-63`), nên SĐT hay tên gõ nhầm không bao giờ thành query string, kể cả chuỗi lấy từ camera. Hàm
+  chuyển chữ hoa an toàn: mã phiếu BE sinh ra là `GH-{INV…}-{hex.upper()}` (`delivery/services.py:74`), và QR trên tem là
+  `barcode_value = f"{note.code}.{print_no}"`, khớp regex.
+- Câu lỗi là hằng `TAG_MESSAGES`, không chèn input vào. 400, 403, 404 và lỗi mạng đều dùng câu của FE, không hiện `detail` của BE.
+  Test `tagCode.test.ts` kiểm câu lỗi không chứa input.
+- Không ghi input vào URL, `localStorage` hay console. Mở phiếu bằng `/deliveries/detail/?id=<số>`. Camera chỉ dùng
+  `BarcodeDetector` có sẵn trong trình duyệt, không thêm thư viện, không gửi hình đi đâu, và tắt stream khi unmount.
+- Nút "Quét mã tem" và ViewGuard `delivery-lookup` yêu cầu `print_label` + `view_deliverynote`, trừ người chỉ làm giao hàng.
+  Điều kiện này khớp với 2 lần kiểm 403 của BE (L1 ở review BE).
+
+**3. Kịch bản gọi (CS-18): ĐẠT.**
+- Quyền theo vai: ViewGuard và nút ở màn Gọi xác nhận yêu cầu `view_callscript`. Nút Sửa và Bật/Tắt yêu cầu `change_callscript`,
+  nút Soạn yêu cầu `add_callscript`. Quyền mock của owner, manager và customer_service khớp `delivery/0009`. Không có nút xoá,
+  vì BE trả 405 cho DELETE.
+- BR-GH-19: `scriptError` dùng `hasLongDigitRun`, giống hệt `apps/common/pii.has_long_digit_run` (bỏ `\s.-_/`, từ 9 chữ số).
+  Giới hạn rỗng và 2000 ký tự cũng khớp `_clean_content`. BE vẫn chặn lại, và lỗi BE hiện qua `useSubmit`.
+- Khối "Kịch bản gọi" ở chi tiết hàng chờ đọc khoá `scripts` (BE chỉ trả kịch bản đang bật, không có `is_active`), đặt dưới thanh
+  trạng thái, tức là dưới nút kết quả ở header (AC1). Cấp heading h3 rồi h4 là đúng.
+- Không có `/api/ai/` ở cả ba màn. E2e đã kiểm điều này trên mọi màn mới.
+
+**4. Mock: ĐẠT.**
+- `mockLookupDeliveryTag` khớp contract: kiểm 2 quyền, phạm vi NV giao (`inCourierScope`), 404 khi chưa in hoặc chưa từng in
+  lần đó, `valid_print_no` null cùng `BR-GH-07` khi phiếu huỷ. Thân 400 không lặp lại input.
+- `mockScripts.ts` khớp `scripts_api.py`: người đọc chỉ thấy kịch bản đang bật, POST trả 201, PATCH trả 404 khi chưa có, mã
+  `BR-GH-19`. Hai chỗ lệch nhỏ không ảnh hưởng FE: (a) BE sắp theo `situation` theo thứ tự chữ cái, mock sắp theo thứ tự màn hình,
+  nhưng `slotsOf` sắp lại nên kết quả hiện ra như nhau; (b) PATCH `is_active` không phải bool thì BE trả 400, còn mock bỏ qua.
+- Mock không lọt vào bản thật: cả 4 hàm API mới viết `process.env.NEXT_PUBLIC_USE_MOCK === "1" ? mock : undefined` trực tiếp,
+  giống các hàm có sẵn. Dev ghi là `check-no-mock` đã bắt được lần bọc hàm đầu tiên và đã sửa. Không file thật nào import
+  `mockScripts` ngoài nhánh này. Dữ liệu mock là chữ bịa ("Khách Thử R/S", "Đường Thử").
+
+**5. UI: ĐẠT.**
+- Dùng component chung: `DetailPage`, `DetailHeader`, `Section`, `Field`, `FormAlert`, `SummaryBlock`, `Chip`, `Modal` cùng
+  `useSubmit` (nút đổi thành "Thử lại" khi lỗi, đúng §6.6), `ResourceView` cùng skeleton, `NoPermission`, toast. Không có mã màu
+  viết tay. Câu chữ không chứa mã luật (§3).
+- **Quyết định "không có dòng menu riêng": chấp nhận.** UI-RULES §2.1 cố định danh mục menu Bán hàng. Hai màn này là việc con
+  của "Giao hàng" và "Gọi xác nhận", giống tiền lệ `menu: false` có sẵn (tab Đơn & tiền, nút trong Nội dung). Nhờ `parent`, mục
+  cha vẫn sáng (`nav.test.ts`). NV kho vào được bằng nút ở màn Giao hàng, vì NV kho thấy menu này. Nếu Duy muốn một dòng
+  riêng cho NV kho quét nhanh thì chỉ cần đổi cờ, nhưng đó là đổi UI-RULES §2.1 nên phải hỏi Duy, Tech Lead không tự đổi.
+- Chấp nhận các lệch khác trong 03-dev-notes: tên file e2e theo `check_naming`, `/api/confirmation/scripts/` (đã chấp nhận ở
+  review BE), trang `/print/pick-sheet/?note=` thay cho `/deliveries/31/pick-sheet` của story (02b dòng 60 đã chốt do static export).
+
+**6. Chất lượng và test: ĐẠT.** Code nghiệp vụ nằm ở các hàm thuần (`pickSheet.ts`, `tagCode.ts`, `callScripts.ts`) có vitest. Mock
+có test theo contract. `nav.test.ts` có thêm ca quyền cho 5 vai. E2e phủ được các ca ngoài đường thuận: SĐT gõ nhầm, 404, tem cũ,
+phiếu huỷ, không có BarcodeDetector, 360px. Không có code chết hay code lặp. `hasLongDigitRun` dùng lại hàm có sẵn, không viết lại.
+
+### Low (không chặn, gom vào đợt sửa sau)
+
+| # | Chỗ | Vấn đề | Đề xuất |
+|---|---|---|---|
+| L1 | `features/deliveries/components/TagLookupScreen.tsx:104` | Ô mã tem có `name="tag-code"` và không có `autoComplete="off"`. Trình duyệt có thể lưu chuỗi đã gõ vào lịch sử gợi ý của form. Nếu NV gõ nhầm SĐT trên máy dùng chung ở kho, số đó sẽ hiện lại trong gợi ý. `Field` hiện chưa nhận prop `autoComplete`. Ô "Tìm khách gọi lại" có thể cũng bị như vậy | Thêm prop `autoComplete` vào `Field` rồi đặt `"off"` cho ô này và các ô tìm theo SĐT. Làm một lần cho cả nhóm ô tra cứu |
+| L2 | `features/deliveries/components/PickSheetScreen.tsx:95` | Khi `AuthProvider` ở trạng thái `"error"` (không tải được `me`), trang vẫn hiện "Đang nạp phiếu soạn…" mãi. Trang tem `app/print/label/page.tsx` cũng bị như vậy | Nhánh `status === "error"` thì hiện màn lỗi có nút thử lại. Sửa cả hai trang in cùng lúc |
+| L3 | `e2e/confirmation_scripts_tag_lookup.py:60` | Bộ nghe console chỉ ghi `type == "error"`, nên kiểm tra "không log dữ liệu khách" (dòng 376) không bắt được `console.log` hay `console.warn`. Grep cho thấy code không có lời gọi nào, nên rủi ro thực tế bằng 0 | Ghi mọi loại message rồi lọc PII trên toàn bộ |
+
+### Việc tiếp theo
+
+1. Điều phối viên tự chạy lại `tsc`, `vitest`, build `NEXT_PUBLIC_USE_MOCK=0` + `check-no-mock`, `check-ai-chunks`, rồi giao `qa-tester`.
+2. Hỏi Duy có muốn dòng menu riêng "Quét mã tem" cho NV kho không. Mặc định giữ như hiện tại.
+3. L1 đến L3 ghi vào nợ kỹ thuật của hồ sơ, không chặn lô này.

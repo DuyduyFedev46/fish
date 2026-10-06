@@ -59,7 +59,9 @@ const GROUP_PERMS: Record<string, string[]> = {
     "delivery.delete_deliverynote", "delivery.view_deliverynote", "delivery.assign_deliverynote",
     // BE migration accounts/0011 gán thêm cho Chủ (mock phải giống BE thật): gọi xác nhận, đổi người nhận, quyết định đơn không liên lạc được, đóng gói và in tem phiếu giao.
     "delivery.confirm_with_customer", "delivery.change_recipient", "delivery.decide_unconfirmed",
-    "delivery.pack_deliverynote", "delivery.print_label", "inventory.add_batch",
+    "delivery.pack_deliverynote", "delivery.print_label",
+    // BE delivery/0009_grant_callscript: Chủ xem, thêm, sửa kịch bản gọi; Quản lý và CSKH chỉ xem.
+    "delivery.view_callscript", "delivery.add_callscript", "delivery.change_callscript", "inventory.add_batch",
     "inventory.add_returntostock", "inventory.add_stockentry", "inventory.add_stockreconciliation",
     "inventory.add_stockreconciliationline", "inventory.add_warehouse", "inventory.approve_returntostock",
     "inventory.approve_stockreconciliation", "inventory.change_batch", "inventory.change_returntostock",
@@ -103,6 +105,7 @@ const GROUP_PERMS: Record<string, string[]> = {
     "catalog.view_item", "catalog.view_itemgroup", "catalog.view_itemprice", "catalog.view_pricelist", "catalog.view_pricingrule",
     "delivery.add_deliverynote", "delivery.change_deliverynote", "delivery.view_deliverynote", "delivery.assign_deliverynote",
     "delivery.confirm_with_customer", "delivery.change_recipient", "delivery.decide_unconfirmed", "delivery.pack_deliverynote", "delivery.print_label",
+    "delivery.view_callscript",
     "inventory.add_returntostock", "inventory.add_stockentry", "inventory.add_stockreconciliation", "inventory.add_stockreconciliationline",
     "inventory.approve_returntostock", "inventory.approve_stockreconciliation", "inventory.change_stockentry",
     "inventory.change_stockreconciliation", "inventory.change_stockreconciliationline", "inventory.publish_batch",
@@ -141,7 +144,7 @@ const GROUP_PERMS: Record<string, string[]> = {
   ],
   [ROLE.customerService]: [
     "accounts.view_staffprofile", "auth.view_user", "sales.view_salesorder", "sales.view_salesorderline",
-    "delivery.view_deliverynote", "delivery.confirm_with_customer", "delivery.change_recipient",
+    "delivery.view_deliverynote", "delivery.confirm_with_customer", "delivery.change_recipient", "delivery.view_callscript",
   ],
 };
 
