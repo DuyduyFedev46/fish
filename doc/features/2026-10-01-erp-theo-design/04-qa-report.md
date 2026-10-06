@@ -3288,3 +3288,85 @@ AuditLog `changes`/`note` và dòng thời gian nhóm sau khi đổi ma trận �
 - BE thật (Django 8641, ERP 3641): `s41_s47_real` (bản sao đổi bộ chọn) 40/40; script QA `q14_ui.py` 23/23, `q14_ui2_e.py` 37/37, `q14_ui2_fg.py` 13/13, `q14_ui3.py` 20/20; `q14_api.py` 67/68, `q14_api2.py` 40/40. Script nằm ở scratchpad.
 - `manage.py test apps.accounts apps.inventory.returns` 418 OK.
 - Ảnh: `doc/features/2026-10-01-erp-theo-design/shots/lo14/lo14-real-*.png` (cạnh các bảng design `board-W3e/W3g/W3h/W3i/F3a–F3f`). Chỉ dừng tiến trình ở cổng 8641, 3641, 3643. Không sửa mã sản phẩm, không commit.
+
+## QA #3/#8 BE (06/10)
+
+### Kết luận: APPROVED — chạy thật 40 ca qua HTTP (runserver + SQLite tạm, token 5 vai), không lỗi chặn. Chỉ có 2 ghi nhận Low/⏸.
+Nhánh `wip/duy-quyet-03-10`, HEAD 6cc9696 (worktree duy-quyet). Điều phối viên đã chạy: 2880 test OK, `makemigrations --check` sạch. QA chạy thêm `manage.py test apps.inventory.returns apps.sales.orders.tests.test_timeline_no_free_text --parallel 4`: Ran 110 tests, OK.
+
+Cách kiểm: `DATABASE_URL=sqlite:///<scratchpad>/qa.sqlite3 DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1,testserver`, `migrate`, seed dữ liệu giả (Nguyễn Thử, 0900000xxx, địa chỉ giả; giá mua 123457 làm "đèn báo" giá vốn) qua `manage.py shell`, `runserver 8765 --noreload`, gọi API bằng urllib với header `Authorization: Token` của 5 vai (owner, manager, warehouse_staff, delivery_staff, customer_service). Seed: 8 phiếu (Nháp x6, Đã huỷ x1, Duyệt RESTOCK x1, Duyệt WRITE_OFF x1) + 1 đơn đã trả tiền rồi huỷ lý do "OTHER" kèm chữ tự do. Server đã tắt, DB tạm nằm ở scratchpad (không trong repo).
+
+### Tổng: 40 ca · ✅ 38 · ❌ 0 · ⏸ 2
+
+### Theo yêu cầu (#8 xoá mềm)
+| Ca | Kết quả | Bằng chứng (output thật) |
+|---|---|---|
+| Chủ xoá phiếu Nháp | ✅ | `OWNER delete draft 200 {"status":"deleted","id":1}` |
+| Chủ xoá phiếu Đã huỷ | ✅ | `OWNER delete cancelled 200 {"status":"deleted","id":2}` |
+| Sau xoá: biến khỏi danh sách | ✅ | list trước `[8,7,6,5,4,3,2,1]` → sau `[8,7,6,5,4,3]` |
+| Sau xoá: chi tiết 404 | ✅ | `detail draft after 404`, `detail cancelled after 404` |
+| Xoá lần 2 | ✅ | `2nd delete draft 404` |
+| Duyệt/huỷ/PATCH sau xoá (màn hình cũ) | ✅ | `approve after delete 404`, `cancel after delete 404`, `patch after delete 404` |
+| Xoá phiếu Đã duyệt RESTOCK | ✅ | `400 {"detail":"Phiếu hàng hoàn đã duyệt (đã nhập lại kho hoặc ghi lỗ) không xoá được (BR-PQ-10).","code":"RETURN_DELETE_NOT_ALLOWED"}` |
+| Xoá phiếu Đã duyệt WRITE_OFF | ✅ | cùng 400 + cùng mã |
+| Phiếu Đã duyệt không đổi sau khi bị từ chối | ✅ | vẫn nằm trong danh sách, `deleted_at` NULL; số dòng StockLedger giữ 6, AuditLog xoá giữ nguyên (`equal after rejected delete: True True`) |
+| Tồn kho + báo cáo hàng hỏng không đổi (từ chối xoá Đã duyệt, xoá Nháp) | ✅ | `S0 {'qty_received':'50.000','qty_available':'54.000','qty_reserved':'0.000','qty_sellable':'54.000'}`; `/api/reports/batch/<mã>/` (damage_qty 4.0, damage_cost 493828.0, profit) giống hệt trước/sau: `equal after draft delete (stock+report): True`; sổ kho vẫn 6 dòng |
+| Xoá phiếu Nháp không đụng tồn | ✅ | `final equal stock/report: True`, ledger 6 → 6 sau 5 lần xoá Nháp |
+| Xoá Nháp gỡ chặn chốt lô | ✅ | `check_close_batch` có phiếu Nháp: `['BR-LO-04','BR-LO-04','BR-KK-05']`; sau khi Chủ xoá qua API: `['BR-LO-04','BR-KK-05']` (mục "phiếu hàng hoàn DRAFT" biến mất; 2 mục còn lại là tồn > 0 và kiểm kê, không liên quan) |
+| AuditLog không chứa chữ tự do | ✅ | `delete_returntostock`: `changes={'status':'DRAFT','deleted':True}`, `note=''`; quét `changes`/`note` tìm `KHACH-NAME`, `0900000777`: 0 dòng |
+| Chứng từ không bị xoá cứng | ✅ | AuditLog 7 dòng, test `test_soft_delete` kiểm `all_objects` còn dòng + `deleted_by`; 110 test OK |
+
+### Phân quyền (POST …/returns/{id}/delete/ trên phiếu Nháp)
+| Vai | Kết quả mong đợi | Thực tế |
+|---|---|---|
+| owner | 200 | ✅ 200 |
+| manager | 403 | ✅ 403 "Chỉ Chủ mới xoá được phiếu hàng hoàn." |
+| warehouse_staff | 403 | ✅ 403 |
+| delivery_staff | 403 | ✅ 403 |
+| customer_service | 403 | ✅ 403 ("Thiếu quyền: inventory.add_returntostock") |
+| chưa đăng nhập | 401 | ✅ 401 |
+| HTTP DELETE (owner, manager) | 405 | ✅ 405 / 405; GET `…/delete/` cũng 405 |
+Sau chuỗi 403/401/405 phiếu vẫn còn (`draft still exists after rejects 200`). Mọi 403 đều không làm đổi dữ liệu.
+
+### #3 timeline
+| Ca | Kết quả | Bằng chứng |
+|---|---|---|
+| Đơn đã trả tiền huỷ lý do OTHER kèm "Khách Nguyễn Thử hẹn lại, gọi 0900000777" | ✅ | nhãn thực tế: `Huỷ đơn, hoàn hàng về lô gốc — lý do: Lý do khác`; không có chuỗi tên/SĐT/ghi chú trong cả body đơn lẫn `/api/guidance/order/9/` (owner và manager) |
+| Timeline phiếu hoàn (tạo `Mang hàng về kho 2.000 kg — chờ duyệt`, Duyệt `Duyệt hàng về kho: Tái nhập`, Huỷ `Huỷ phiếu hàng về kho 2.000 kg`) với note có tên (`KHACH-NAME-XYZ`) và ghi chú duyệt có tên | ✅ | marks trong timeline/body đơn/guidance đơn/guidance lô: không có. Chi tiết phiếu hoàn của Chủ vẫn hiện `note` (đó là dữ liệu của chính phiếu, không phải timeline) |
+| Phiếu seed ORM có note chứa SĐT giả (WRITE_OFF, RESTOCK) | ✅ | timeline đơn 3 và 4 không có chuỗi nào |
+| Tiền hiện "đ", không còn "₫" | ✅ | `Khách đặt đơn … (540.000 đ)`, `Nhận 540.000 đ`, `Lập chứng từ đảo doanh thu … (540.000 đ)`; không nhãn nào có "₫" |
+| Xoá phiếu thì sự kiện của nó biến khỏi timeline đơn | ✅ | trước: `…'Mang hàng về kho 2.000 kg'`; sau xoá: chỉ còn các sự kiện khác, không lộ ghi chú |
+| Ghi log server không có dữ liệu cá nhân | ✅ | `grep` log runserver tìm `Nguyễn Thử`, `KHACH-NAME`, `0900000`: 0 dòng |
+
+### Rò giá vốn (response không có `purchase_rate`, `landed_unit_cost`, `unit_cost`, `"rate"`, 123457, profit, pnl)
+| Vai | `/returns/` | `/returns/{id}/` |
+|---|---|---|
+| manager | ✅ sạch | ✅ sạch |
+| warehouse_staff | ✅ sạch | ✅ sạch |
+| delivery_staff | ✅ sạch | ✅ sạch |
+| customer_service | 403 | 403 |
+Khoá mới `available_actions` chỉ có chuỗi hành động (`['approve','cancel','delete']`), `status`, không số tiền, nên không tính ngược được giá vốn. AuditLog `changes` chỉ có `{status, deleted}`. Tập `available_actions` theo quyền: Chủ Nháp `[approve,cancel,delete]`, Quản lý Nháp `[approve,cancel]`, delivery_staff của phiếu `[cancel]`, phiếu Đã duyệt `[]`.
+
+### Rò dữ liệu cá nhân
+Timeline: sạch (xem #3). AuditLog: sạch. Log server: sạch. API hàng hoàn: ghi chú có SĐT bị chặn khi tạo (400 "Ghi chú không được chứa dãy số dài", kể cả `0900.000.777` và `090 0000 777`). Dữ liệu seed/ảnh đều là dữ liệu giả.
+
+### Ca ngoài đường thuận tự nghĩ thêm
+1. Tạo phiếu hoàn mới trên đơn đã có phiếu bị xoá → ✅ 201: số đã hoàn được giải phóng sau xoá (200 từ phiếu Nháp cũ).
+2. Phiếu có `note` chứa SĐT dạng chấm/cách → ✅ bị chặn 400 (lớp phòng thủ có sẵn).
+3. Đua 3 request (2 xoá + 1 duyệt) trên cùng một phiếu Nháp, 3 vòng → vòng 1 `[200, approve 500, 500]` (SQLite "database is locked", xem ⏸), vòng 2 `[200, approve 409, 409]` (STALE_STATE), vòng 3 `[200, 404, approve 404]`. Kết quả cuối nhất quán: các phiếu `deleted_at` đặt, không có dòng RESTOCK thừa (số dòng sổ kho RETURN_RESTOCK = 2 = phiếu 3 + RT-10 hợp lệ).
+4. Superuser xoá: được phủ bằng test (`test_d8_superuser_can_delete`, nằm trong 110 test OK).
+5. Phiếu Đã duyệt (RESTOCK) tạo mới sau đó bị Chủ xoá → ✅ 400 cùng mã.
+
+### Ca ⏸ (chưa kiểm được thật)
+- ⏸ Đồng thời thật (2 xoá cùng lúc, hoặc xoá đua với duyệt) trên PostgreSQL: SQLite tạm trả `database is locked` (500) ở vòng 1, đây là hạn chế của SQLite chứ không phải mã sản phẩm. Khoá `select_for_update` + bắt `DoesNotExist` → 409 đã được xác nhận ở vòng 2 và có test đơn vị (`test_soft_delete`, L1). Nên kiểm lại trên staging Postgres nếu cần.
+- ⏸ Giao diện FE (nút Xoá, nhãn "đ" trong ERP): ngoài phạm vi yêu cầu (chỉ BE).
+
+### Ghi nhận Low (không chặn)
+- L1: 403 của customer_service lộ tên quyền kỹ thuật ("Thiếu quyền: inventory.add_returntostock"), khác câu "Chỉ Chủ mới xoá được phiếu hàng hoàn." của 3 vai kia (vì chạy qua lớp quyền model trước). Không lộ dữ liệu, chỉ lệch chữ.
+- L2: `GET /api/reports/batch/<id số>/` trả 404; báo cáo dùng mã lô (`batch_id` dạng `CA01-…`). Chỉ ghi chú cho người viết script, không phải lỗi.
+
+### Hồi quy
+`manage.py test apps.inventory.returns apps.sales.orders.tests.test_timeline_no_free_text --parallel 4` = 110 test OK (cùng lượt). Toàn bộ 2880 test + `makemigrations --check` do điều phối viên chạy. Duyệt RESTOCK/WRITE_OFF, huỷ phiếu, tạo phiếu, timeline đơn, hướng dẫn lô vẫn chạy đúng qua HTTP.
+
+### Dọn dẹp
+`kill` runserver cổng 8765 (đã kiểm `lsof` trống); xoá DB tạm. Script ở scratchpad phiên (`seed.py`, `drive*.py`), không commit.
