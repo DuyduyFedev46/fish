@@ -7,7 +7,10 @@ khoá JSON giữ nguyên (ngoại lệ: khoá phụ thêm `auto_cancel_blocked_l
 
 Chưa có ở đây (Pha B, chờ W37 L3 gộp): dòng thời gian của đơn `sales/orders/timeline.py` (B9).
 """
+import ast
 import importlib
+import pathlib
+import re
 from datetime import timedelta
 from decimal import Decimal
 
@@ -17,6 +20,7 @@ from django.test import TestCase
 from django.utils import timezone
 
 from apps.accounts import roles
+from apps.common.exceptions import BusinessError
 from apps.accounts.audit.serializers import safe_note
 from apps.accounts.auth.services import CAPABILITY_LABELS
 from apps.accounts.capabilities import registry
@@ -139,6 +143,7 @@ PERMISSION_NAMES = [
     ("P2", "inventory", "publish_batch", "Mở bán lô"),
     ("P3", "inventory", "cancel_expired_batch", "Huỷ lô quá hạn (ghi lỗ)"),
     ("P4", "inventory", "approve_returntostock", "Duyệt hàng hoàn"),
+    ("P7", "sales", "create_refund", "Lập phiếu hoàn tiền"),
     ("P9", "delivery", "assign_deliverynote", "Chọn người giao"),
     ("P10", "delivery", "pack_deliverynote", "Soạn hàng"),
     ("P12", "reports", "view_profitreport", "Xem báo cáo lãi lỗ"),
@@ -152,6 +157,7 @@ OLD_PERMISSION_NAMES = {
     "publish_batch": "Publish lô ra Shop",
     "cancel_expired_batch": "Huỷ lô quá hạn (hạch toán lỗ)",
     "approve_returntostock": "Duyệt hàng hoàn về kho",
+    "create_refund": "Tạo phiếu hoàn tiền",
     "assign_deliverynote": "Giao phiếu cho người giao",
     "pack_deliverynote": "Đóng gói phiếu giao",
     "view_profitreport": "Xem báo cáo giá vốn / lãi lỗ",
@@ -256,6 +262,7 @@ class PermissionNameTests(TestCase):
     def test_bp_data_migration_renames_existing_permission_rows(self):
         """Bẫy: Django không đổi `auth_permission.name` của quyền đã có; migration 0017 phải làm."""
         migration = importlib.import_module("apps.accounts.migrations.0017_rename_permission_labels")
+        migration_18 = importlib.import_module("apps.accounts.migrations.0018_rename_create_refund_label")
         group_ids_before = {
             codename: set(Permission.objects.get(codename=codename, content_type__app_label=app)
                           .group_set.values_list("pk", flat=True))
@@ -266,6 +273,8 @@ class PermissionNameTests(TestCase):
                 name=OLD_PERMISSION_NAMES[codename]
             )
         migration.rename_forward(django_apps, None)
+        migration_18.rename_forward(django_apps, None)
+        migration_18.rename_forward(django_apps, None)
         migration.rename_forward(django_apps, None)  # idempotent: chạy hai lần như nhau
         for code, app_label, codename, expected in PERMISSION_NAMES:
             with self.subTest(code=code, codename=codename):
@@ -274,12 +283,14 @@ class PermissionNameTests(TestCase):
                 # Chỉ đổi tên: codename và gán Group giữ nguyên.
                 self.assertEqual(set(perm.group_set.values_list("pk", flat=True)), group_ids_before[codename])
         migration.rename_backward(django_apps, None)  # có chiều ngược
+        migration_18.rename_backward(django_apps, None)
         for _, app_label, codename, _ in PERMISSION_NAMES:
             self.assertEqual(
                 Permission.objects.get(content_type__app_label=app_label, codename=codename).name,
                 OLD_PERMISSION_NAMES[codename],
             )
         migration.rename_forward(django_apps, None)
+        migration_18.rename_forward(django_apps, None)
 
     def test_bp_matrix_labels(self):
         by_key = registry.BY_KEY
@@ -504,3 +515,111 @@ class CancelAndResolveNoteTests(TestCase):
             self.assertEqual(safe_note("resolve_payment", note), note)
         masked = safe_note("resolve_payment", "Hoàn tiền theo phiếu hoàn tiền #12\n0900000999")
         self.assertNotIn("0900000999", masked)
+
+
+# --- Quét chuỗi literal trong mã nguồn (QA B4) --------------------------------------------------------------------
+
+BANNED_PHRASES = [
+    "TTL", "Webhook", "Sandbox", "Production", "chờ Chủ", "Khớp — đã xác nhận", "Về sau khi đơn tự huỷ",
+    "Hư khi đóng hàng", "Hư hỏng khi soạn hàng", "Bỏ sau khi giao thất bại", "Bỏ giao sau khi thất bại",
+    "chưa hiện thực", "Hàng hoàn về kho", "Trả hàng về kho", "trả về kho", "hàng về kho:", "phiếu hàng về kho",
+    "đảo doanh thu", "hoá đơn điều chỉnh", "phiếu giảm trừ", "Phiếu hoàn chờ chuyển", "Tạo phiếu hoàn", "Thử hoàn lại",
+    "Publish", "hạch toán", "Huỷ bỏ", "Ghi lỗ, huỷ hàng", "Mục chờ gọi", "Phiếu giao hàng", "Giao dịch thanh toán",
+    "Phiếu nhập kho", "Phiếu điều chỉnh kho", "Trả NCC", "Trả lô về nhà cung cấp", "Giao không xác nhận",
+    "Gia hạn thêm", "Gia hạn giao", "Bỏ qua bước", "Cần gọi ngay", "Xác nhận thanh toán thủ công",
+    "Giao phiếu cho người giao", "Gán phiếu giao", "Đóng gói phiếu giao", "Điều khoản mua hàng", "Đổi trả hoàn tiền",
+    "Combo dạng gói", "Khách muốn đổi món –", "BR-AI-",
+]
+# "phiếu hoàn" trơn (không phải "phiếu hoàn tiền"), không phân biệt hoa thường.
+BARE_REFUND = re.compile(r"phiếu hoàn(?! tiền)", re.IGNORECASE)
+
+# Chỗ được giữ chữ cũ có lý do. Khoá = (đường dẫn so với apps/, cụm).
+SCAN_ALLOW_PATHS = (
+    "ai/",  # phần AI không thuộc lô này
+    "sales/management/commands/", "delivery/management/commands/",  # lệnh vận hành, log kỹ thuật cho dev
+    "sales/orders/tasks.py",  # log job
+)
+SCAN_ALLOW = {
+    ("accounts/audit/serializers.py", "Hư hỏng khi soạn hàng"),  # nhận mẫu note cũ đã ghi trong DB
+    ("accounts/audit/serializers.py", "Bỏ giao sau khi thất bại"),
+    ("accounts/audit/serializers.py", "regex"),  # regex nhận note cũ "phiếu hoàn #N"
+    ("sales/refunds/api.py", "regex"),  # keyword AI có dấu giữ nguyên (caveve-domain)
+    ("sales/payments/auto_confirm.py", "Production"),
+    ("sales/payments/auto_confirm.py", "BR-AI-"),  # chuỗi log kỹ thuật, không hiện cho người dùng
+    ("sales/models/orders.py", "TTL"),  # help_text trường booked_expires_at (đổi cần AlterField, ngoài phạm vi)
+    ("common/throttling.py", "TTL"),  # tên biến cấu hình `CAVEVE_THROTTLE_RATES` chứa chuỗi con
+}
+
+
+class SourceStringScanTests(TestCase):
+    def test_no_banned_phrase_in_user_facing_string_literals(self):
+        root = pathlib.Path(__file__).resolve().parents[2]  # backend/apps
+        hits = []
+        for path in sorted(root.rglob("*.py")):
+            rel = path.relative_to(root).as_posix()
+            if "/tests/" in f"/{rel}" or "/migrations/" in f"/{rel}" or rel.startswith(SCAN_ALLOW_PATHS):
+                continue
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+            docstrings = set()
+            for node in ast.walk(tree):
+                if isinstance(node, (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)):
+                    first = node.body[0] if node.body else None
+                    if isinstance(first, ast.Expr) and isinstance(first.value, ast.Constant):
+                        docstrings.add(id(first.value))
+            dict_keys = {id(k) for n in ast.walk(tree) if isinstance(n, ast.Dict) for k in n.keys if k is not None}
+            for node in ast.walk(tree):
+                if not (isinstance(node, ast.Constant) and isinstance(node.value, str)):
+                    continue
+                if id(node) in docstrings or id(node) in dict_keys:  # khoá tra cứu (mã BR) không phải chữ hiển thị
+                    continue
+                for phrase in BANNED_PHRASES:
+                    if phrase in node.value and (rel, phrase) not in SCAN_ALLOW:
+                        hits.append(f"{rel}:{node.lineno} {phrase!r}")
+                if BARE_REFUND.search(node.value) and (rel, "regex") not in SCAN_ALLOW:
+                    hits.append(f"{rel}:{node.lineno} 'phiếu hoàn' trơn")
+        self.assertEqual(hits, [], "Chuỗi còn dùng chữ cũ (nhóm A, 02b mục 3.3):\n" + "\n".join(hits))
+
+
+class ErrorMessageAndApiLabelTests(OrderApiBase):
+    """QA B1, B4: câu lỗi và nhãn API dùng tên chuẩn."""
+
+    def test_b1_resolution_note_after_refund_uses_full_name(self):
+        from apps.sales.payments.services import mark_payment_refunded
+        import inspect
+        self.assertIn('f"Phiếu hoàn tiền #{refund.pk}', inspect.getsource(mark_payment_refunded))
+
+    def test_b4_refund_error_messages(self):
+        from apps.sales.refunds import services as refund_services
+
+        self.assertEqual(refund_services.REFUND_ALREADY_REFUNDED_MSG, "Phiếu đã hoàn tiền, không đổi trạng thái được.")
+        owner = make_user("msg_owner2", roles.OWNER)
+        order = self._paid_order()
+        refund, _ = refund_services.create_invoice_refund(
+            invoice=order.invoice, amount=Decimal("100000"), is_partial=True, reason="x", actor=owner,
+        )
+        with self.assertRaises(BusinessError) as retry:
+            refund_services.retry_refund(refund=refund, actor=owner)
+        self.assertIn("đang Hoàn thất bại", str(retry.exception))
+        refund_services.mark_refund_failed(refund=refund, reason="x", actor=owner)
+        with self.assertRaises(BusinessError) as failed_again:
+            refund_services.mark_refund_failed(refund=refund, reason="x", actor=owner)
+        self.assertIn("đang Chờ hoàn tiền", str(failed_again.exception))
+
+    def test_b4_ledger_type_label_for_write_off(self):
+        from apps.inventory.stock import serializers
+
+        self.assertFalse(hasattr(serializers, "LEDGER_TYPE_LABEL_OVERRIDES"))
+        self.assertEqual(StockLedgerEntry.MovementType.WRITE_OFF.label, "Huỷ hàng, ghi lỗ")
+
+    def test_b4_return_approve_messages(self):
+        from apps.inventory.returns import services as return_services
+        import inspect
+
+        self.assertIn("Huỷ hàng, ghi lỗ", inspect.getsource(return_services.apply_return))
+        self.assertNotIn("Huỷ bỏ", inspect.getsource(return_services.apply_return))
+
+    def test_b4_confirmation_invalid_id_message(self):
+        user = make_user("msg_cs", roles.CUSTOMER_SERVICE)
+        resp = client_for(user).get("/api/confirmation/queue/abc/")
+        self.assertEqual(resp.status_code, 404)
+        self.assertNotIn("Mục chờ gọi", resp.content.decode())

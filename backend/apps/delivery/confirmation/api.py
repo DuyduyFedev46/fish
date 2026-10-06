@@ -63,7 +63,7 @@ class ConfirmationQueueViewSet(NoStoreMixin, viewsets.GenericViewSet):
         try:
             note_id = int(lookup_val)
         except (ValueError, TypeError):
-            raise Http404("Mục chờ gọi không hợp lệ.")
+            raise Http404("Việc gọi xác nhận không hợp lệ.")
 
         task = self.get_queryset().filter(note_id=note_id).first()
         if not task:

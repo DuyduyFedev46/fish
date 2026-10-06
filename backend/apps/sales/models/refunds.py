@@ -83,7 +83,7 @@ class Refund(models.Model):
             ),
         ]
         permissions = [
-            ("create_refund", "Tạo phiếu hoàn tiền"),
+            ("create_refund", "Lập phiếu hoàn tiền"),
             ("confirm_refund", "Xác nhận đã hoàn tiền (tiền rời tài khoản)"),
         ]
 
