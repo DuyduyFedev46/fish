@@ -369,9 +369,9 @@ export function filterEntries(rows: ContentEntryListItem[], query: string): Cont
 }
 
 /** Cột "Ghi chú": suy từ dữ liệu có sẵn của danh sách. Rỗng = hiện "—". */
-export function entryNote(row: ContentEntryListItem): string {
+export function entryNote(row: ContentEntryListItem, aiOn: boolean): string {
   if (row.has_unpublished_changes) return M.noteUnpublished;
-  if (row.source === "ai" && row.status === "draft") return M.noteAiDraft;
+  if (aiOn && row.source === "ai" && row.status === "draft") return M.noteAiDraft;
   if (row.page_role && row.status !== "published") return M.noteGolive;
   return "";
 }

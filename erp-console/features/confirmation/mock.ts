@@ -519,7 +519,7 @@ export function mockGetConfirmationDetail(
   }
   return {
     status: 200,
-    body: { ...item, note_code: `GH-${item.order_code.replace(/^SO/, "")}`, available_actions: actionsFor(item, me), scripts: scriptsForQueueItem(item, me) },
+    body: { ...item, decision_note: item.in_scope ? item.decision_note ?? "" : "", note_code: `GH-${item.order_code.replace(/^SO/, "")}`, available_actions: actionsFor(item, me), scripts: scriptsForQueueItem(item, me) },
   };
 }
 
@@ -896,6 +896,14 @@ export function mockDecideConfirmation(
       } as any,
     };
   }
+
+  // BR-GH-19: lý do / ghi chú quyết định không quá 200 ký tự và không chứa chuỗi ≥ 9 chữ số (SĐT, số tài khoản).
+  const decisionText = (payload.decision === "CANCEL" ? payload.note : payload.reason)?.trim() ?? "";
+  if (decisionText.length > 200) return { status: 400, body: { code: "BR-GH-19", detail: "Ghi chú không quá 200 ký tự." } };
+  if (/\d{9,}/.test(decisionText.replace(/[\s.\-_/]/g, ""))) {
+    return { status: 400, body: { code: "BR-GH-19", detail: "Không ghi SĐT hay số tài khoản vào ghi chú." } };
+  }
+  item.decision_note = decisionText;
 
   if (payload.decision === "DELIVER_WITHOUT_CONFIRM") {
     if (!payload.reason?.trim()) {

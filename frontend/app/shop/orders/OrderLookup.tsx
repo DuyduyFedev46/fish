@@ -228,7 +228,7 @@ export default function OrderLookup({
 
           {result.delivery && (
             <p className="delivery-status">
-              Trạng thái giao hàng: <strong>{result.delivery.status}</strong>
+              Trạng thái giao hàng: <strong>{result.delivery.status_label || "Đang cập nhật"}</strong>
             </p>
           )}
         </div>

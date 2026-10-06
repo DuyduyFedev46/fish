@@ -183,11 +183,25 @@ type MockOrderRecord = {
   // thanh toán mà vẫn sống sót qua một lượt điều hướng thật (xem mockMarkPaymentPending).
   pay_confirmed_at: number | null;
   status_label: string;
-  delivery_status: string;
+  /** Mã trạng thái phiếu giao (CONFIRMING…CANCELLED); null = chưa có phiếu giao (đơn chưa thanh toán). */
+  delivery_code: string | null;
   cancel_notice?: OrderCancelNotice | null;
 };
 
-const ORDERS_STORAGE_KEY = "cangcaloc_mock_orders_v2";
+const ORDERS_STORAGE_KEY = "cangcaloc_mock_orders_v3";
+
+// Nhãn Shop của phiếu giao (T24–T30, chưa duyệt, dùng tạm) — khớp bảng BE ở 02b-tech-design.md mục 2.4.
+// Khách không bao giờ thấy mã thô; mã lạ → "Đang cập nhật".
+const DELIVERY_LABELS: Record<string, string> = {
+  CONFIRMING: "Chờ vựa gọi xác nhận",
+  PREPARING: "Đang soạn hàng",
+  READY: "Đã soạn xong, chờ giao",
+  DELIVERING: "Đang giao",
+  COMPLETED: "Đã giao",
+  FAILED: "Giao chưa thành công, vựa sẽ liên hệ lại",
+  CANCELLED: "Đã huỷ",
+};
+const deliveryLabelOf = (code: string): string => DELIVERY_LABELS[code] ?? "Đang cập nhật";
 
 function nowIso(minutesFromNow: number): string {
   return new Date(Date.now() + minutesFromNow * 60 * 1000).toISOString();
@@ -209,7 +223,7 @@ function seedDemoOrders(): Map<string, MockOrderRecord> {
     booked_expires_at: null,
     pay_confirmed_at: null,
     status_label: "Đã thanh toán, đang soạn hàng",
-    delivery_status: "Đang soạn hàng",
+    delivery_code: "PREPARING",
   });
   // Đơn mẫu 2: đang giữ chỗ, còn hạn — test màn "chưa thanh toán, còn mm:ss" + thanh toán lại
   // (mã DH-DEMO002, 4 số cuối SĐT 1234).
@@ -223,7 +237,7 @@ function seedDemoOrders(): Map<string, MockOrderRecord> {
     booked_expires_at: nowIso(12),
     pay_confirmed_at: null,
     status_label: "Đang giữ chỗ, chờ thanh toán",
-    delivery_status: "Chưa xác nhận thanh toán",
+    delivery_code: null,
   });
   // Đơn mẫu 3: đã hết hạn giữ chỗ — test màn "hết hạn, mời đặt lại" (mã DH-DEMO003, SĐT 4321).
   orders.set("DH-DEMO003", {
@@ -235,8 +249,8 @@ function seedDemoOrders(): Map<string, MockOrderRecord> {
     is_expired: true,
     booked_expires_at: null,
     pay_confirmed_at: null,
-    status_label: "Đơn đã hết hạn giữ hàng",
-    delivery_status: "Đã huỷ (hết hạn giữ chỗ)",
+    status_label: "Đã huỷ vì quá giờ thanh toán",
+    delivery_code: "CANCELLED",
   });
   // Đơn mẫu 4: CS-10 tự huỷ do không liên lạc được kèm hoàn tiền (mã DH-DEMO004, SĐT 5678).
   orders.set("DH-DEMO004", {
@@ -249,7 +263,7 @@ function seedDemoOrders(): Map<string, MockOrderRecord> {
     booked_expires_at: null,
     pay_confirmed_at: null,
     status_label: "Đã huỷ",
-    delivery_status: "Đã huỷ theo đơn",
+    delivery_code: "CANCELLED",
     cancel_notice: {
       reason_code: "UNREACHABLE_AUTO",
       // # CHỜ legal-vn: câu thông báo tự huỷ do không liên lạc được
@@ -264,6 +278,28 @@ function seedDemoOrders(): Map<string, MockOrderRecord> {
       contact: "1900 6868",
     },
   });
+  // Đơn mẫu 5–9: một đơn cho mỗi trạng thái phiếu giao còn lại (E2: Shop tra đơn không lộ mã thô).
+  const extra: Array<[string, string, string, string]> = [
+    ["DH-DEMO005", "0909005001", "CONFIRMING", "Đã thanh toán – chờ vựa gọi xác nhận"],
+    ["DH-DEMO006", "0909005002", "READY", "Đã thanh toán, đang soạn hàng"],
+    ["DH-DEMO007", "0909005003", "DELIVERING", "Đã thanh toán, đang soạn hàng"],
+    ["DH-DEMO008", "0909005004", "COMPLETED", "Đã hoàn tất"],
+    ["DH-DEMO009", "0909005005", "FAILED", "Đã thanh toán, đang soạn hàng"],
+  ];
+  for (const [order_code, phone, delivery_code, status_label] of extra) {
+    orders.set(order_code, {
+      order_code,
+      phone,
+      total_amount: 120000,
+      lines: [{ item_code: "MUC-ONG", name: "Mực ống", qty: 0.5, amount: 120000 }],
+      is_paid: true,
+      is_expired: false,
+      booked_expires_at: null,
+      pay_confirmed_at: null,
+      status_label,
+      delivery_code,
+    });
+  }
   return orders;
 }
 
@@ -308,7 +344,7 @@ function resolveMockOrder(record: MockOrderRecord): { record: MockOrderRecord; c
     record.pay_confirmed_at = null;
     record.booked_expires_at = null;
     record.status_label = "Đã thanh toán, đang soạn hàng";
-    record.delivery_status = "Đang soạn hàng";
+    record.delivery_code = "PREPARING";
     changed = true;
   }
 
@@ -321,8 +357,8 @@ function resolveMockOrder(record: MockOrderRecord): { record: MockOrderRecord; c
     record.is_expired = true;
     record.booked_expires_at = null;
     record.pay_confirmed_at = null;
-    record.status_label = "Đơn đã hết hạn giữ hàng";
-    record.delivery_status = "Đã huỷ (hết hạn giữ chỗ)";
+    record.status_label = "Đã huỷ vì quá giờ thanh toán";
+    record.delivery_code = "CANCELLED";
     changed = true;
   }
 
@@ -335,7 +371,7 @@ function resolveMockOrder(record: MockOrderRecord): { record: MockOrderRecord; c
 // `booked_expires_at` — BE thật hôm nay chưa có 2 field này ở tra đơn (xem lib/types.ts).
 function toWireOrderStatus(record: MockOrderRecord): WireOrderStatus {
   const fulfilment =
-    record.delivery_status === "Đã huỷ theo đơn"
+    (record.delivery_code === "CANCELLED" && !record.is_expired)
       ? "CANCELLED"
       : record.is_paid
       ? "CONFIRMING"
@@ -345,7 +381,7 @@ function toWireOrderStatus(record: MockOrderRecord): WireOrderStatus {
 
   return {
     order_code: record.order_code,
-    status: record.is_paid ? "PROCESSING" : record.is_expired ? "AUTO_CANCELLED" : record.cancel_notice ? "CANCELLED" : "BOOKED",
+    status: record.is_paid ? (record.delivery_code === "COMPLETED" ? "COMPLETED" : "PROCESSING") : record.is_expired ? "AUTO_CANCELLED" : record.cancel_notice ? "CANCELLED" : "BOOKED",
     status_label: record.status_label,
     fulfilment,
     total_amount: String(record.total_amount),
@@ -355,7 +391,7 @@ function toWireOrderStatus(record: MockOrderRecord): WireOrderStatus {
       qty: String(l.qty),
       amount: String(l.amount),
     })),
-    delivery: { status: record.delivery_status },
+    delivery: record.delivery_code ? { status: record.delivery_code, status_label: deliveryLabelOf(record.delivery_code) } : null,
     cancel_notice: record.cancel_notice ?? null,
     ...(record.booked_expires_at ? { booked_expires_at: record.booked_expires_at } : {}),
   };
@@ -434,7 +470,7 @@ export async function mockCreateOrder(
     booked_expires_at,
     pay_confirmed_at: null,
     status_label: "Đang giữ chỗ, chờ thanh toán",
-    delivery_status: "Chưa xác nhận thanh toán",
+    delivery_code: null,
   });
   saveOrders(orders);
 

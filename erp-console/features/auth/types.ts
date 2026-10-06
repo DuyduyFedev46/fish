@@ -31,6 +31,8 @@ export type Me = {
    * Optional: BE chưa có S48 thì coi như false.
    */
   must_change_password?: boolean;
+  /** W39 — BE báo cờ AI (`settings.AI_ENABLED`). Giao diện AI chỉ hiện khi cờ build bật VÀ giá trị này true (`aiVisible`). */
+  ai_features_enabled?: boolean;
 };
 
 /** S48 — `code` của 403 khi còn mật khẩu tạm (logic dựa vào code, không dựa vào câu `detail`). */

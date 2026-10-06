@@ -1,6 +1,8 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+vi.mock("@/features/auth/components/AuthProvider", () => ({ useAuth: () => ({ me: { ai_features_enabled: true } }) }));
 import { StatusPath } from "./StatusPath";
 import { Timeline } from "./Timeline";
 import { CONFLICT_FIELD_MESSAGE, validateDraft } from "./InfoField";

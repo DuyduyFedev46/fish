@@ -15,7 +15,7 @@ import { ApiError, loadErrorText } from "@/shared/lib/http";
 import { canView } from "@/shared/lib/nav";
 import { usePagedList } from "@/shared/lib/usePagedList";
 import { Icon } from "@/shared/ui/Icon";
-import { AI_FEATURES_ENABLED } from "@/shared/lib/features";
+import { aiVisible } from "@/shared/lib/features";
 import { DataTable, type Column } from "@/shared/ui/list/DataTable";
 import { FilterBar, type FilterSelect } from "@/shared/ui/list/FilterBar";
 import { ListPage } from "@/shared/ui/list/ListPage";
@@ -65,6 +65,7 @@ function ChangesCell({ row }: { row: AuditLogRow }) {
 
 export function AuditLogScreen() {
   const { me } = useAuth();
+  const aiOn = aiVisible(me);
   const canPickActor = canView(me, "staff");
   const staff = useStaffList(!!me && canPickActor);
 
@@ -79,7 +80,11 @@ export function AuditLogScreen() {
   const list = usePagedList<AuditLogRow, AuditLogParams>((p, page) => getAuditLogs(p, page), params, !!me);
 
   const approvers = useMemo(() => buildApproverMap(list.rows ?? []), [list.rows]);
-  const shown = useMemo(() => (list.rows ? list.rows.filter((r) => matchesLocal(r, { query: q, from, to })) : null), [list.rows, q, from, to]);
+  // W39: AI tắt thì không hiện dòng do AI làm hay đề xuất của AI, kể cả khi BE chưa lọc (BE bật nhưng giao diện tắt).
+  const shown = useMemo(
+    () => (list.rows ? list.rows.filter((r) => (aiOn || (r.actor_kind !== "ai" && !r.proposal_ref)) && matchesLocal(r, { query: q, from, to })) : null),
+    [list.rows, q, from, to, aiOn],
+  );
 
   if (list.error instanceof ApiError && list.error.status === 403 && !list.rows) return <NoPermission />;
 
@@ -92,7 +97,7 @@ export function AuditLogScreen() {
       label: M.actionLabel,
       value: action,
       onChange: setAction,
-      options: [{ value: "", label: M.allActions }, ...AUDIT_FILTER_ACTIONS.filter((a) => AI_FEATURES_ENABLED || !AI_ONLY_ACTIONS.includes(a)).map((a) => ({ value: a, label: AUDIT_ACTION_LABELS[a] }))],
+      options: [{ value: "", label: M.allActions }, ...AUDIT_FILTER_ACTIONS.filter((a) => aiOn || !AI_ONLY_ACTIONS.includes(a)).map((a) => ({ value: a, label: AUDIT_ACTION_LABELS[a] }))],
     },
   ];
   if (canPickActor && staff.data) {
@@ -125,7 +130,7 @@ export function AuditLogScreen() {
     { key: "object", header: M.colObject, mono: true, hideBelow: 720, width: "148px", render: (r) => r.object_repr || <span className="muted">{M.noValue}</span> },
     { key: "note", header: M.colNote, hideBelow: 1100, render: (r) => r.note || <span className="muted">{M.noValue}</span> },
     { key: "changes", header: M.colChanges, hideBelow: 800, render: (r) => <ChangesCell row={r} /> },
-    ...(AI_FEATURES_ENABLED ? [{ key: "proposal", header: M.colProposal, mono: true, hideBelow: 1100 as const, width: "88px", render: (r: AuditLogRow) => r.proposal_ref || <span className="muted">{M.noValue}</span> }] : []),
+    ...(aiOn ? [{ key: "proposal", header: M.colProposal, mono: true, hideBelow: 1100 as const, width: "88px", render: (r: AuditLogRow) => r.proposal_ref || <span className="muted">{M.noValue}</span> }] : []),
   ];
 
   const summary =
@@ -162,7 +167,7 @@ export function AuditLogScreen() {
         <>
           <div className={s.kinds}>
             <div className="seg" role="group" aria-label={M.kindLabel}>
-              {KIND_OPTIONS.filter((k) => AI_FEATURES_ENABLED || k.key !== "ai").map((k) => (
+              {KIND_OPTIONS.filter((k) => aiOn || k.key !== "ai").map((k) => (
                 <button key={k.key || "all"} type="button" aria-pressed={kind === k.key} onClick={() => setKind(k.key)}>
                   {k.label}
                 </button>

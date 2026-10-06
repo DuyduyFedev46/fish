@@ -43,8 +43,8 @@ erp-console/
                           search.ts (tìm phía máy, bỏ dấu), status.ts (màu/icon trạng thái đơn, lô),
                           passwordRules.ts (gợi ý quy tắc mật khẩu hiện trước khi gửi — BE vẫn kiểm thật)
     ui/                   PasswordInput (Ô MẬT KHẨU DÙNG CHUNG cho mọi form: nút mắt ≥44px, gợi ý quy tắc, lỗi "không khớp"),
-                          Shell (3 cột), RightRail, Icon, Sheet (hộp thoại/tấm trượt đáy), StateBox (tải/lỗi/rỗng), ResourceView (3 trạng thái
-                          cho useResource), Toolbar (ô tìm + Làm mới), StatusChip, EmptyRow, Placeholder,
+                          Shell (3 cột), Icon, Sheet (hộp thoại/tấm trượt đáy), StateBox (tải/lỗi/rỗng), ResourceView (3 trạng thái
+                          cho useResource), Toolbar (ô tìm + Làm mới), EmptyRow, Placeholder,
                           ThemeToggle, themeScript.ts, NotFoundScreen, Skeleton, Figure,
                           SideSheet + Toast + overlay.module.css (tấm bên có chuyển động ra, thông báo nổi — UI5 đưa lên dùng chung),
                           useDrawerFocus.ts (ngăn kéo menu/cột phải: focus vào trong, giữ Tab, trả focus khi đóng),

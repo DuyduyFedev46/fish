@@ -312,6 +312,7 @@ export function ConfirmationDetailScreen() {
 
       <InfoGrid title="Gọi xác nhận">
         {item.escalation_label && <InfoField label="Lý do" value={item.escalation_label} />}
+        {(item.decision_note ?? "").trim() !== "" && <InfoField label="Lý do quyết định" value={item.decision_note} />}
         <InfoField label="Lần gọi" value={`${item.attempts}/${item.max_attempts}`} num />
         <InfoField label={item.confirm_state === "ESCALATED" ? "Hạn quyết định" : "Hạn gọi"} value={dateTime(due)} num />
         <InfoField label="Người gọi" value={lastCallerName(item.calls) ?? "—"} />

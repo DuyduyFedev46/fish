@@ -4,7 +4,7 @@
 // Module mới chỉ thay nội dung trang, không sửa bảng này trừ khi đổi luật.
 
 import { HOME_CONFIRMATION_QUEUE, ROLE } from "./roles";
-import { AI_FEATURES_ENABLED } from "./features";
+import { aiVisible } from "./features";
 
 /** Phần của `me` mà menu cần. Khai ở đây để shared/ không phụ thuộc features/auth; `Me` khớp kiểu này. */
 export type Viewer = {
@@ -14,6 +14,8 @@ export type Viewer = {
   home: "dashboard" | "my-deliveries" | typeof HOME_CONFIRMATION_QUEUE | "no-role";
   /** S48: còn dùng mật khẩu tạm → chỉ được mở màn "Đặt mật khẩu mới". */
   must_change_password?: boolean;
+  /** W39: BE báo cờ AI. Cùng cờ build quyết định có hiện mục AI hay không (`aiVisible`). */
+  ai_features_enabled?: boolean;
 };
 type Me = Viewer;
 
@@ -471,7 +473,7 @@ export const NAV: NavItem[] = [
   },
   {
     key: "audit-logs",
-    summary: "Mọi thay đổi trong hệ thống, kể cả việc do trợ lý AI đề xuất (ai:<tên>).",
+    summary: "Mọi thay đổi trong hệ thống.",
     plannedIn: "S03",
     href: "/audit-logs/",
     label: "Nhật ký hoạt động",
@@ -490,7 +492,7 @@ export const NAV: NavItem[] = [
     short: "Chính sách AI",
     icon: "policy",
     section: "Quản trị",
-    visible: (me) => AI_FEATURES_ENABLED && has(me, PERM.manageAiPolicy),
+    visible: (me) => aiVisible(me) && has(me, PERM.manageAiPolicy),
   },
   {
     key: "ai-report",
@@ -501,7 +503,7 @@ export const NAV: NavItem[] = [
     short: "Báo cáo AI",
     icon: "insights",
     section: "Quản trị",
-    visible: (me) => AI_FEATURES_ENABLED && has(me, PERM.manageAiPolicy),
+    visible: (me) => aiVisible(me) && has(me, PERM.manageAiPolicy),
   },
 
   // ---- Không có dòng ở menu trái ----
@@ -515,7 +517,7 @@ export const NAV: NavItem[] = [
     icon: "auto_awesome",
     section: "Quản trị",
     menu: false, // vào từ menu avatar (UI-RULES §2.2)
-    visible: (me) => AI_FEATURES_ENABLED && !onlyDelivery(me),
+    visible: (me) => aiVisible(me) && !onlyDelivery(me),
   },
   {
     key: "ai-actions",
@@ -527,7 +529,7 @@ export const NAV: NavItem[] = [
     icon: "smart_toy",
     section: "Quản trị",
     menu: false, // bỏ khỏi menu (02b mục 0 dòng 2); trang cũ còn tới Lô 17
-    visible: (me) => AI_FEATURES_ENABLED && !onlyDelivery(me),
+    visible: (me) => aiVisible(me) && !onlyDelivery(me),
   },
 ];
 
