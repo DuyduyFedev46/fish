@@ -22,6 +22,7 @@ import { DetailHeader } from "@/shared/ui/detail/DetailHeader";
 import { DetailPage } from "@/shared/ui/detail/DetailPage";
 import { InfoField } from "@/shared/ui/detail/InfoField";
 import { InfoGrid } from "@/shared/ui/detail/InfoGrid";
+import { Section } from "@/shared/ui/detail/Section";
 import type { MoreMenuItem } from "@/shared/ui/detail/MoreMenu";
 import { Timeline } from "@/shared/ui/detail/Timeline";
 import { Icon } from "@/shared/ui/Icon";
@@ -212,11 +213,7 @@ function StaffDetailBody({ member: m, detail }: { member: StaffMember; detail: L
       </InfoGrid>
 
       {canSeeDelivering && delivering.status !== "forbidden" && (
-        <section className={s.section} aria-label={M.sectionDelivering}>
-          <h3 className={s.sectionH}>
-            {M.sectionDelivering}
-            {delivering.data && <span className={s.sectionCount}>{M.deliveringCount(delivering.data.length)}</span>}
-          </h3>
+        <Section title={M.sectionDelivering} count={delivering.data ? M.deliveringCount(delivering.data.length) : undefined} aria-label={M.sectionDelivering} flush>
           <DataTable
             caption={M.sectionDelivering}
             columns={noteCols}
@@ -231,11 +228,10 @@ function StaffDetailBody({ member: m, detail }: { member: StaffMember; detail: L
             canViewCost={false}
             dense
           />
-        </section>
+        </Section>
       )}
 
-      <section className={s.section} aria-label={M.sectionGroups}>
-        <h3 className={s.sectionH}>{M.sectionGroups}</h3>
+      <Section title={M.sectionGroups} aria-label={M.sectionGroups} flush={m.groups.length > 0}>
         {m.groups.length === 0 ? (
           <p className={s.sectionNote}>{M.groupsEmpty}</p>
         ) : (
@@ -255,11 +251,10 @@ function StaffDetailBody({ member: m, detail }: { member: StaffMember; detail: L
             ))}
           </ul>
         )}
-      </section>
+      </Section>
 
       {canSeeLog && activity.status !== "forbidden" && (
-        <section className={s.section} aria-label={M.sectionActivity}>
-          <h3 className={s.sectionH}>{M.sectionActivity}</h3>
+        <Section title={M.sectionActivity} aria-label={M.sectionActivity} flush>
           <DataTable
             caption={M.sectionActivity}
             columns={activityCols}
@@ -276,7 +271,7 @@ function StaffDetailBody({ member: m, detail }: { member: StaffMember; detail: L
           {activity.data && activity.data.total > activity.data.rows.length && (
             <p className={s.sectionNote}>{M.activityMore(activity.data.rows.length, activity.data.total)}</p>
           )}
-        </section>
+        </Section>
       )}
 
       {modal === "edit" && (

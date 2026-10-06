@@ -18,9 +18,10 @@
 .detailSkel { display: flex; flex-direction: column; gap: var(--space-3); padding: var(--space-4) 0; }
 .detailSkel > div { display: flex; flex-direction: column; gap: var(--space-3); }
 
-/* Khối phụ trên trang chi tiết (hàng hoá, thanh toán, hoàn tiền). */
-.section { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
-.sectionH { margin: 0; font-size: var(--text-xs); font-weight: var(--weight-semibold); letter-spacing: var(--tracking-caps); text-transform: uppercase; color: var(--ink-3); }
+/* Dòng "Tổng cộng" cuối thẻ Hàng & phân bổ lô (board D2b). */
+.totalRow { display: flex; justify-content: space-between; align-items: center; gap: var(--space-3); padding: var(--space-3) var(--space-4); border-top: 1px solid var(--border); background: var(--surface-2); font-size: var(--text-base); }
+.totalRow b { font-weight: var(--weight-semibold); }
+.holdLeft { color: var(--warn); font-weight: var(--weight-semibold); }
 
 /* Dòng tổng của phiếu hoàn theo tháng + gợi ý lập phiếu hoàn sau khi huỷ đơn. */
 .summaryLine { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); margin: 0; color: var(--ink-2); font-size: var(--text-sm); }

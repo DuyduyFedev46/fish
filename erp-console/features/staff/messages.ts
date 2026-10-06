@@ -46,6 +46,7 @@ export const STAFF_MSG = {
   emptyAllTitle: "Chưa có tài khoản nào",
   emptyAllHint: "Bấm “Thêm nhân viên” để tạo tài khoản đầu tiên.",
   shown: (n: number, total: number) => `Đang hiện ${n} / ${total} nhân viên`,
+  headCount: (total: number) => `${total} tài khoản`,
   groupMembers: (n: number) => `${n} người`,
   groupTasks: (on: number, total: number) => `${on} / ${total} việc`,
   groupsFailed: "Chưa tải được danh sách nhóm.",

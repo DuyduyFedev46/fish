@@ -16,6 +16,7 @@ import { DetailHeader } from "@/shared/ui/detail/DetailHeader";
 import { DetailPage } from "@/shared/ui/detail/DetailPage";
 import { InfoField } from "@/shared/ui/detail/InfoField";
 import { InfoGrid } from "@/shared/ui/detail/InfoGrid";
+import { Section } from "@/shared/ui/detail/Section";
 import type { MoreMenuItem } from "@/shared/ui/detail/MoreMenu";
 import { Timeline } from "@/shared/ui/detail/Timeline";
 import { Icon } from "@/shared/ui/Icon";
@@ -191,10 +192,7 @@ function CustomerDetailBody({ customer: c, detail }: { customer: CustomerDetail;
         <InfoField kind="locked" label={M.fieldCancelled} num reason={M.derivedReason} value={String(c.cancelled_count)} />
       </InfoGrid>
 
-      <section className={s.section} aria-label={M.ordersTitle}>
-        <h3 className={s.sectionH}>
-          {M.ordersTitle} <span className={s.sectionCount}>{ordersHint}</span>
-        </h3>
+      <Section title={M.ordersTitle} count={ordersHint} aria-label={M.ordersTitle} flush>
         <DataTable
           caption={M.ordersCaption}
           columns={orderCols}
@@ -205,12 +203,9 @@ function CustomerDetailBody({ customer: c, detail }: { customer: CustomerDetail;
           empty={{ icon: "inbox", title: M.ordersEmpty, hint: M.ordersEmptyHint }}
           canViewCost={false}
         />
-      </section>
+      </Section>
 
-      <section className={s.section} aria-label={M.refundsTitle}>
-        <h3 className={s.sectionH}>
-          {M.refundsTitle} <span className={s.sectionCount}>{refundsHint}</span>
-        </h3>
+      <Section title={M.refundsTitle} count={refundsHint} aria-label={M.refundsTitle} flush>
         <DataTable
           caption={M.refundsCaption}
           columns={refundCols}
@@ -221,7 +216,7 @@ function CustomerDetailBody({ customer: c, detail }: { customer: CustomerDetail;
           empty={{ icon: "currency_exchange", title: M.refundsEmpty, hint: M.refundsEmptyHint }}
           canViewCost={false}
         />
-      </section>
+      </Section>
 
       {editing && (
         <EditCustomerModal

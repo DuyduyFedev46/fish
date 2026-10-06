@@ -2309,6 +2309,7 @@ Chỉ sửa trong `erp-console/`. Không đụng `convert.ts`, `safeHref.ts`, `f
 - **Kiểm:** vitest 825 đạt (thêm 6 ca: chuẩn hoá ổn định, `mockOtherEdit`, `draftDiffers`/`draftIsCurrent`, `mockUnpublishEntry` trả đúng hình dạng). E2E mock `ed_batch16_content.py` 121/121 (thêm 23 ca cho B16-1/2/3), `ed_batch1_shell.py` 56/56, `ed_batch2_patterns.py` 75/75. Mới: `e2e/ed_batch16_real.py` chạy trên Django thật (SQLite tạm, `DJANGO_DEBUG=1`, `collectstatic`, cổng 8661) + bản build `MOCK=0` phục vụ cổng 3661: 25/25 đạt, gồm thân bài chưa chuẩn hoá thật từ BE, ql1 sửa qua API rồi mở lại (cảnh báo, 409, BE giữ bản của ql1), gỡ bài thật rồi sửa và lưu tiếp. Cách dựng môi trường nằm ở đầu script.
 - **Còn nợ / lưu ý:** vitest chạy môi trường node nên không dựng được Tiptap; ca "mở bài không bị coi là sửa" kiểm bằng e2e (mock và BE thật). Ba ghi chú nhẹ của QA (L2 Quản lý mặc định có quyền đăng, L3 hai toast sau lần lưu đầu của bài mới, L4 tab 39px) giữ nguyên, không chặn.
 
+<<<<<<< HEAD
 ## Rà soát giao diện — nhóm C/D/E (FE, WIP chưa kiểm xong)
 
 - **C (FormPage):** form chia thẻ `FormSection`/`FormGrid` (mới), thanh nút dính đáy canh phải (`.page` cao tối thiểu theo `100dvh`, vì `.content` không có chiều cao xác định để dùng `100%`), ô nhập cao `--control-h` (44px di động, 36px từ 768px), `Switch` và `RadioGroup` (mới, vẫn là checkbox/radio native, không `role="switch"`) thay checkbox/select ở ItemForm, PricingRuleForm, PurchaseCostForm, SupplierFormModal. Toast được đẩy lên trên thanh nút (không che nút Lưu). Token mới: `--control-h`, `--control-text`, `--space-7`, `--radius-card`, `--text-title`, `--text-dialog`.
@@ -2317,3 +2318,74 @@ Chỉ sửa trong `erp-console/`. Không đụng `convert.ts`, `safeHref.ts`, `f
 - **Chỉ ghi nhận, không sửa:** F1d khác luồng (wizard); F3a "thiếu mật khẩu" là báo nhầm (ô "Mật khẩu tạm" có, BE `CREATE_FIELDS` nhận `password`); giữ `--border-input` cho ô nhập (a11y); ItemForm không thêm radio "Loại" (loại lấy từ route); `EntrySettings` chỉ hưởng thay đổi chung; nút `.btn` toàn cục vẫn 40px ở desktop (board 36px) ngoài FormPage/Modal.
 - **Kiểm đã chạy:** tsc sạch; vitest 900/900; build mock=0 + `check-no-mock` + `check-ai-chunks` XANH; e2e mock đạt: ed_batch1 56/56, 2 75/75, 3_orders 143/143, 4 70/70, 5 129/129 (lần trước server chết giữa chừng), 6 79/79, 7 114/114, 8 125/125, 9 134/139 (5 đỏ có sẵn), 10 115/115, 11 103/103, 12 95/95, 13 128/128, 14 101/101, 16 121/121, bonusA 49/49, s41_s47 74/74; ed_batch3_fixes 95/97 (2 ca `aiOrderProposal` đỏ có sẵn trên HEAD gốc). e2e sửa selector: batch10 và batch11 (radio), batch13 (radio "Áp dụng cho").
 - **Chưa xong:** chạy lại sau lần sửa cuối (`FormPage.module.css` min-height, `.pw-eye` về 44px, toast, radio gradient): ed_batch5/6/7/8 bị cắt do server tắt, s48_password (lần trước 40/41 vì nút mắt 40px, đã sửa nhưng chưa chạy lại). `check_naming.py` OK (không vi phạm mới). Ảnh chụp ở `shots/audit-fix/` (chưa rà từng ảnh với board).
+=======
+## Rà soát giao diện — nhóm B (trang chi tiết) — 03/10
+
+Nguồn: `04b-ra-soat-giao-dien.md` nhóm B (D2b, W2b/f/g/h, W5b/d/f, W3i). Mẫu: thẻ Dòng thời gian (commit `e2e7b54`).
+Quy tắc áp dụng: mọi khối trên trang chi tiết là một **thẻ**, đầu thẻ cao 44px, tiêu đề chữ thường nằm **trong** thẻ; không còn tiêu đề HOA nằm ngoài thẻ.
+
+**Component chung (`erp-console/shared/ui/detail/`)**
+- `Section.tsx` + `.module.css` (MỚI): thẻ chung. Props `title`, `count`, `action`, `flush` (bảng sát mép, DataTable bỏ viền riêng để khỏi thẻ lồng thẻ). Giữ `aria-label` để e2e (`section[aria-label=...]`) chạy như cũ.
+- `InfoGrid`: bọc bằng `Section`; thêm `groups` (cột có tiêu đề HOA nhỏ, vd. THANH TOÁN | GIAO HÀNG của D2b). Ô `InfoField` đổi đường kẻ/độ cao theo board (tối thiểu 60px, kẻ dưới mảnh), vẫn là `div[data-kind]` + dt/dd.
+- `InfoStrip` (MỚI): dải "Tóm tắt đơn" của D2b (Đặt lúc | Còn giữ chỗ | Tự huỷ lúc), ô là `InfoField`.
+- `Timeline`, `AiBlockFrame`: chuyển sang `Section` (khối AI giờ có đầu thẻ 44px, ô thay đổi dạng hộp viền, nút Áp dụng/Bỏ qua chia đều).
+- Đã xoá `.section/.sectionH/.sectionCount` chép tay ở CSS các module: orders, customers, suppliers, staff, permissions, catalog, confirmation, deliveries (giữ `.section` ở deliveries vì hộp thoại Giao cho người khác còn dùng); purchasing, inventory bỏ `.subSection/.sectionHead/.panelHead`.
+
+**Màn đã chuyển**
+- D2b Đơn (`orders/OrderDetailScreen`): dải tóm tắt; thẻ "Thông tin đơn" chia THANH TOÁN / GIAO HÀNG; gộp "Hàng" và "Phân bổ lô" thành MỘT thẻ "Hàng & phân bổ lô" (bảng 1 dòng/lô: Mặt hàng, Lô, Giá vốn/kg (khoá, chỉ người có quyền), Số lượng, Đơn giá, Giảm giá, Thành tiền, chân "Tổng cộng"); thẻ Thanh toán, Hoàn tiền.
+- `PaymentDetailScreen`, `RefundDetailScreen`(đã dùng InfoGrid), `CustomerDetailScreen`, `SupplierDetailScreen`, `StaffDetailScreen`, `StaffScreen` (khối nhóm quyền dưới bảng), `GroupDetailScreen` + `PermissionMatrixScreen` (W3i: chỉ đổi khung thẻ), `ItemDetailScreen` (Thành phần combo, Lịch sử giá), `ReceiptSections` (Dòng nhập, Hoá đơn mua, Chi phí phụ), `BatchSections` (Nhập xuất của lô, Đơn lấy hàng từ lô), `StocktakeDetailScreen` (Số đếm từng lô, tổng hụt/dư ở đầu thẻ), `ConfirmationDetailScreen` (Lịch sử cuộc gọi), `DeliveryDetailScreen` (Hàng soạn theo lô).
+
+**Chưa làm / không làm được (và lý do)**
+- D2b cột "Kho", "Hạn dùng" trong bảng phân bổ: API phân bổ lô không trả (không sửa `backend/`).
+- D2b các ô "Nguồn", "Cách thanh toán", "Đã nhận", "Người nhận", "Ghi chú đơn" và bút chì sửa tại chỗ/khoá: chưa có dữ liệu hoặc hành vi sửa ở BE; không dựng ô giả.
+- Cột phải D2b: khối Trợ lý AI + nút thao tác. Trang không import `features/ai` (giữ `check-ai-chunks` XANH); khung AI nằm sẵn trong `aiSlot`. Ở bản mock khối AI không có đề xuất vì hook `__caveMock.aiOrderProposal` chỉ có khi mô-đun AI được nạp ở trang tổng quan (lệch có sẵn, xem ed_batch3_fixes bên dưới), nên ảnh chụp D2b không có đề xuất AI.
+- Số điện thoại hiện đầy đủ cho người có quyền: thuộc nhóm F (PO quyết), không đổi ở đợt này.
+- W3i ma trận quyền (nhóm I) và W3g (không so sánh được): ngoài phạm vi, chỉ đổi khung thẻ.
+- `StatusPath` ở 360px: nhãn "Đã thanh toán" xuống dòng giữa chữ (component không thuộc nhóm B).
+- `ReturnDetailScreen`, `RefundDetailScreen`, bảng của lô `BatchDetailScreen`: chỉ có `InfoGrid`, tự theo thẻ mới.
+
+**Kiểm chứng (tự chạy, 03/10)**
+- `tsc --noEmit`: sạch. `vitest`: 76 file, 900/900 đạt.
+- Build `NEXT_PUBLIC_USE_MOCK=0` + `check-no-mock` XANH + `check-ai-chunks` XANH (39 màn nghiệp vụ + 2 layout).
+- Build mock=1, phục vụ cổng 3141. E2E: ed_batch1 56/56 · 2 75/75 · 3_orders 143/143 · 4 70/70 · 5 129/129 · 6 79/79 · 7 114/114 · 8 125/125 · 10 115/115 · 11 103/103 · 12 95/95 · 13 128/128 · 14 101/101 · 16 121/121 · ed_bonusA_ui 49/49 · p8_lo8_fe_erp_tz 83/83 · s14_s16_cancel_refund 41/41.
+- Không sửa selector nào của e2e (giữ `section[aria-label]`, `div[data-kind]`, dt/dd).
+- Đỏ có sẵn, KHÔNG do đợt này (đã dựng lại bản build ở HEAD `b2e8345` để đối chứng): `ed_batch9_returns` 134/139 (5 ca ngày mock); `ed_batch3_fixes` 95/97 (2 ca gọi `__caveMock.aiOrderProposal/aiRefundProposal` ở /overview/ nhưng hook không có; bản gốc cũng đỏ đúng 2 ca này).
+- 360px: 12 màn chi tiết không cuộn ngang. Ảnh: `erp-console/shots/audit-fix/*-d.png` (1440) và `*-m.png` (360).
+- `check_naming.py`: không phát sinh vi phạm mới. Không dùng màu cứng trong CSS đã đổi.
+
+## Sửa theo rà soát giao diện (04b) — Nhóm A: màn danh sách thiếu thẻ có đầu 44px · FE (03/10/2026)
+
+Chỉ sửa trong `erp-console/` (khối danh sách dùng chung + các màn danh sách). Không đụng `backend/`, hợp đồng API, quyền hay giá vốn. Nhóm F (che SĐT) và các nhóm B–L của 04b chưa làm ở đợt này.
+
+### Đã sửa (theo cột "Lệch" của nhóm A trong `04b-ra-soat-giao-dien.md`)
+- **Đầu thẻ 44px** (`shared/ui/list/DataTable.tsx`, `globals.css` `.lt-head`): `DataTable` nhận thêm `title`, `countText`, `headAction`; có `title` thì vẽ đầu thẻ (tiêu đề đậm + bộ đếm bên phải + liên kết nhỏ), không có thì giữ như cũ. Đã gắn cho danh sách Khách hàng, Nhà cung cấp, Phiếu nhập, Kho & lô (Tồn theo lô, Điều chỉnh tồn, Kho), Hàng hoàn về kho, Kiểm kê, Sổ nhập xuất, Danh mục & giá (mặt hàng, nhóm, bảng giá, quy tắc), Hoá đơn bán, Hoá đơn mua và chi phí, Nhân sự, Hàng chờ thanh toán, Phiếu hoàn. Nội dung và Gọi xác nhận chỉ đổi vị trí nút chính / ô ngày (không thêm đầu thẻ). Màn Giao hàng chưa sửa riêng, chỉ hưởng thay đổi chung (ô ngày, tiêu đề cột). Chữ đầu thẻ và bộ đếm gom ở `messages.ts` của từng module.
+- **Nút chính cùng hàng tab / cuối hàng thanh lọc** (`ListPage.tsx`, `.lp-tabrow`, `.lp-filterrow`): có tab thì nút nằm bên phải hàng tab, không tab mà có thanh lọc thì nằm cuối hàng lọc, không cả hai thì hàng riêng như cũ. Hết tình trạng "nút chính riêng một hàng phía trên tab".
+- **Tiêu đề cột không còn chữ mono** (`colClass(c, header)`): chỉ ô dữ liệu của cột mã mới mono. Thêm cột kiểu `tabular` (số liệu dạng ngày giờ: tabular-nums nhưng căn trái như board) cho cột Thời gian, Từ ngày, v.v.
+- **Ô ngày** (`FilterBar.tsx` `DateBox`, `.fb-date`): khung 32px (44px ở điện thoại) có icon lịch bên trái, vẫn là `input type=date` thật nên dùng được bàn phím và trên điện thoại; chạm icon mở bảng chọn. Thêm icon `calendar_today` vào tập con font (`scripts/subset-material-symbols.py`, `public/fonts/ms/material-symbols-outlined.woff2` đã sinh lại).
+- Cập nhật `e2e/ed_batch10_purchasing.py`: tiêu đề thẻ bảng Phiếu nhập đọc từ `.lt-head` thay cho `data-testid` cũ.
+
+### Chưa làm / lệch so với 04b (nợ)
+- **Thanh AI không render khi count = 0** (D2), **nút phân đoạn → dropdown** (D2), **số đếm trên tab**, **3 thẻ KPI của W1b**, **bộ cột khác của W1d**, **"Tải thêm" → phân trang** ở chân bảng: chưa làm (đổi hành vi hoặc cần contract, không phải hình thức thuần).
+- **Danh sách Đơn hàng (D2) chưa có đầu thẻ** vì tiêu đề tab đã là "Đơn hàng"; mới sửa cột Thời gian căn trái, nút/lọc và tiêu đề cột. Cần PO xem lại ảnh `fix-1440-orders.png` rồi quyết có thêm đầu thẻ "Đơn hàng · N" không.
+- **SĐT hiện đủ** ở W5a, W3e, W2a, D2 là nhóm F (cần PO quyết cách che), không động ở đây.
+- **Nút "Điều chỉnh tồn" thiếu ở W5k/F1j**: chưa làm (cần xem quyền).
+- **Icon nút "Thêm"** (nhóm H) và **chip màu** của W5g/W5g2: chưa làm.
+
+### Kiểm chứng (đã chạy lại sau khi dọn đĩa, 03/10/2026)
+- `./node_modules/.bin/tsc --noEmit` sạch · `npx vitest run`: 76 file, 900 test đạt.
+- `NEXT_PUBLIC_USE_MOCK=0` build + `check-no-mock.mjs` XANH + `check-ai-chunks.mjs` XANH (39 màn nghiệp vụ, 2 layout).
+- `NEXT_PUBLIC_USE_MOCK=1` build, sao `out/` sang thư mục tạm, phục vụ cổng 3131 (đã tắt, đã xoá).
+- E2E mock: `ed_batch1_shell` 56/56 · `ed_batch2_patterns` 75/75 · `ed_batch3_orders` 143/143 · `ed_batch4_delivery` 70/70 · `ed_batch5_confirmation` 129/129 · `ed_batch6_customers` 79/79 · `ed_batch8_stocktake` 125/125 · `ed_batch11_suppliers` 103/103 · `ed_batch13_catalog` 128/128 · `ed_batch16_content` 121/121 · `ed_bonusA_ui` 49/49.
+- `ed_batch9_returns` **134/139**: 5 ca đỏ là lỗi đã biết do ngày mock (lọc "tháng hiện tại" và 3 ca "thấy cả phiếu của người giao khác" đều đọc RT-4 của tháng trước; hết ca `list_filters` timeout). Thay đổi của nhóm A ở màn này chỉ thêm `title` và `countText`.
+- `ed_batch3_fixes` 2 ca đỏ do `aiOrderProposal` có sẵn trên HEAD gốc (nhóm B xác nhận): không chạy lại.
+- `python3 scripts/check_naming.py`: OK, không vi phạm mới. Không còn mã hex rời trong CSS đã sửa.
+- Ảnh 1440px và 360px của 13 màn danh sách (Đơn, Khách, NCC, Mua hàng, Kho & lô, Hàng hoàn, Kiểm kê, Sổ nhập xuất, Danh mục, Hoá đơn bán, Nội dung, Nhân sự, Gọi xác nhận): `erp-console/shots/audit-fix/fix-{1440,360}-<màn>.png` (thư mục không vào git). Không màn nào cuộn ngang trang ở 360px (bảng cuộn trong thẻ). Dữ liệu là mock giả.
+
+## Duy quyết 03/10 — #3 timeline, #8 xoá phiếu hoàn (BE)
+
+Trạng thái: code xong trong working tree, CHƯA commit. Toàn bộ `manage.py test`: 2872 test, 1 đỏ (`test_r9_row_fields_are_explicit_and_have_no_cost`, vì thêm key `available_actions`); đã sửa `EXPECTED_KEYS` rồi chạy lại riêng `apps.inventory.returns` + `test_timeline_no_free_text` = 102 test OK. Chưa chạy lại toàn bộ lần cuối, và `makemigrations --check --dry-run` sạch (No changes detected). `check_naming.py` OK.
+- **#3**: `format_vnd_ui` (apps/common/formatting.py, "đ"; `format_vnd` giữ "₫" cho Shop) dùng ở 4 file timeline. Nhãn không còn chữ tự gõ: huỷ đơn chỉ hiện nhãn của `reason_code` ("OTHER"/audit cũ có note không mã → "Lý do khác"); báo hoàn thất bại, phiếu hoàn, resolve_payment không ghép `note`/`reason` (resolution map sang nhãn). Test mới `apps/sales/orders/tests/test_timeline_no_free_text.py`; sửa 3 test cũ (S16 label, SR12 "đ", L7 truyền reason_code).
+- **#8**: migration `inventory/0009_returntostock_soft_delete` (chỉ thêm `deleted_at`, `deleted_by` PROTECT). Manager mặc định `ReturnToStock.objects` loại phiếu đã xoá, `all_objects` thấy hết. Service `delete_return`, action `soft_delete`, test `apps/inventory/returns/tests/test_soft_delete.py`. AI: thêm `/delete/` vào `FORBIDDEN_SUFFIXES` (AI không bao giờ xoá); `test_discipline` 29 → 30 @action; snapshot AI không đổi.
+- **Contract cho FE**: `POST /api/inventory/returns/{id}/delete/` body rỗng. Chỉ Chủ/superuser (người khác 403, kiểm trước phạm vi dòng). Trạng thái DRAFT hoặc CANCELLED → 200 `{"status":"deleted","id":<pk>}`; APPROVED → 400 `{"code":"RETURN_DELETE_NOT_ALLOWED","detail":"Phiếu đã cộng vào tồn kho. Huỷ phiếu trước rồi mới xoá được."}`; xoá lần 2 hoặc GET sau xoá → 404. Chi tiết và danh sách phiếu có thêm `available_actions: ["approve","cancel","delete"]` (tập con theo quyền + trạng thái); `delete` chỉ khi là Chủ và phiếu DRAFT/CANCELLED.
+- Còn nợ: admin Django của `ReturnToStock` chưa chặn xoá cứng (ngoài phạm vi, nên xét `has_delete_permission=False`).
+>>>>>>> main

@@ -135,6 +135,8 @@ export function ReturnListScreen() {
     >
       <DataTable
         caption={M.listTitle}
+        title={M.listTitle}
+        countText={list.rows ? M.headCount(list.count, pending) : undefined}
         columns={columns}
         rows={rows}
         rowKey={(r) => r.id}

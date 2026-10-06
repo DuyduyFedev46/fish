@@ -4,10 +4,7 @@
 .page { display: flex; flex-direction: column; gap: var(--space-4); max-width: var(--content-max); min-width: 0; }
 .intro { margin: 0; color: var(--ink-2); font-size: var(--text-base); line-height: var(--leading-normal); max-width: 70ch; }
 
-/* ---- Khối có tiêu đề (cùng kiểu InfoGrid: tiêu đề nhỏ viết hoa, nội dung trong thẻ) ---- */
-.section { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
-.sectionH { display: flex; align-items: baseline; gap: var(--space-2); margin: 0; font-size: var(--text-xs); font-weight: var(--weight-semibold); letter-spacing: var(--tracking-caps); text-transform: uppercase; color: var(--ink-3); }
-.sectionCount { font-weight: var(--weight-regular); letter-spacing: 0; text-transform: none; color: var(--ink-3); }
+/* ---- Khối có tiêu đề dùng Section chung (shared/ui/detail/Section); ở đây chỉ còn chữ gợi ý ---- */
 .sectionHint { margin: 0; color: var(--ink-3); font-size: var(--text-sm); line-height: var(--leading-snug); }
 
 .note { display: flex; align-items: flex-start; gap: var(--space-2); margin: 0; padding: var(--space-2-5) var(--space-3); border-radius: var(--radius-md); background: var(--surface-2); color: var(--ink-2); font-size: var(--text-sm); line-height: var(--leading-snug); }
@@ -82,7 +79,6 @@
 .scopeRow dd { margin: 0; color: var(--ink); font-size: var(--text-sm); line-height: var(--leading-snug); }
 .scopeAll { display: inline-flex; align-items: center; gap: var(--space-1-5); font-weight: var(--weight-semibold); color: var(--warn); }
 .rail { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }
-.railCard { border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--surface); padding: var(--space-3) var(--space-4); box-shadow: var(--shadow-xs); }
 
 /* ---- Thành viên ---- */
 .memberHead { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-2); }

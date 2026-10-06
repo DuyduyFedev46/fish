@@ -1,5 +1,5 @@
 # Phạm vi dữ liệu cấu hình được (Tầng 3 trong màn Phân quyền) — User stories
-> PO · 2026-10-02 · Nguồn: `01-analysis.md` (ĐÃ DUYỆT 02/10/2026) · Trạng thái: **CHỜ DUYỆT**
+> PO · 2026-10-02 · Nguồn: `01-analysis.md` (ĐÃ DUYỆT 02/10/2026) · Trạng thái: **ĐÃ DUYỆT** (Duy 03/10/2026 — PO-Q1..Q3 theo đề xuất của PO)
 >
 > Hồ sơ mở rộng ma trận B4 (Lô 14, BR-PQ-32). Mã rule mới: BR-PQ-33 … BR-PQ-38 (01-analysis §6.1).
 > Ký hiệu nhóm: **Chủ** `owner` · **Q** Quản lý `manager` · **K** NV kho `warehouse_staff` · **G** NV giao

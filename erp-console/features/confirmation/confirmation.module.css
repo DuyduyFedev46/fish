@@ -8,8 +8,6 @@
 .holder { display: inline-flex; align-items: center; gap: var(--space-1); color: var(--ink-2); }
 
 /* ---- Trang chi tiết ---- */
-.section { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
-.sectionTitle { margin: 0; font-size: var(--text-md); font-weight: var(--weight-semibold); color: var(--ink); }
 .callRow { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
 .callBtn { display: inline-flex; align-items: center; gap: var(--space-1); text-decoration: none; }
 .noteCell { max-width: 36ch; overflow-wrap: anywhere; }

@@ -67,6 +67,8 @@ export function WarehousesTab({ tabs, me }: { tabs: React.ReactNode; me: Me }) {
       }
     >
       <DataTable
+        title="Kho"
+        countText={rows ? `${list.count} kho` : undefined}
         columns={columns}
         rows={rows}
         rowKey={(w) => w.id}

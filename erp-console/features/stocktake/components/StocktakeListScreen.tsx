@@ -60,7 +60,7 @@ export function StocktakeListScreen() {
 
   const columns: Column<StocktakeListItem>[] = [
     { key: "code", header: "Mã phiếu", mono: true, render: (r) => r.code, width: "104px" },
-    { key: "date", header: "Ngày", num: true, render: (r) => dateOnly(r.count_date), width: "112px" },
+    { key: "date", header: "Ngày", tabular: true, render: (r) => dateOnly(r.count_date), width: "112px" },
     { key: "wh", header: "Kho", render: (r) => warehouseText(r.warehouse_names) },
     { key: "lines", header: "Số lô", num: true, render: (r) => r.line_count, width: "72px" },
     {
@@ -149,6 +149,8 @@ export function StocktakeListScreen() {
       }
     >
       <DataTable
+        title="Phiếu kiểm kê"
+        countText={rows ? (pending > 0 ? `${pending} chờ duyệt` : `${list.count} phiếu`) : undefined}
         columns={columns}
         rows={shown}
         rowKey={(r) => r.id}

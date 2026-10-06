@@ -12,6 +12,7 @@ export const RETURNS_MSG = {
   allMonths: "Mọi tháng",
   noun: "phiếu",
   shown: (n: number, total: number) => `Đang hiện ${n} / ${total} phiếu`,
+  headCount: (total: number, pending: number) => (pending > 0 ? `${pending} chờ duyệt` : `${total} phiếu`),
   pending: (n: number) => `${n} phiếu đang chờ duyệt`,
   loadMore: "Tải thêm phiếu",
   loadingMore: "Đang tải thêm…",

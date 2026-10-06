@@ -24,8 +24,10 @@ import { DetailHeader } from "@/shared/ui/detail/DetailHeader";
 import { DetailPage } from "@/shared/ui/detail/DetailPage";
 import { InfoField } from "@/shared/ui/detail/InfoField";
 import { InfoGrid } from "@/shared/ui/detail/InfoGrid";
+import { InfoStrip } from "@/shared/ui/detail/InfoStrip";
 import { LookupCard } from "@/shared/ui/detail/LookupCard";
 import type { MoreMenuItem } from "@/shared/ui/detail/MoreMenu";
+import { Section } from "@/shared/ui/detail/Section";
 import { StatusPath } from "@/shared/ui/detail/StatusPath";
 import { Timeline } from "@/shared/ui/detail/Timeline";
 import type { SubmitConflict } from "@/shared/ui/form/useSubmit";
@@ -58,6 +60,8 @@ import { RefundModal } from "./RefundModal";
 import s from "../orders.module.css";
 
 type AiTarget = { id: number; code: string };
+
+type LineRow = { key: string; line: OrderLine; alloc?: OrderAllocation; first: boolean };
 
 type Props = {
   /** Trang ghép khối Trợ lý AI vào đây (feature không import features/ai). `onApplied` = tải lại đơn sau khi AI áp dụng đề xuất. */
@@ -184,23 +188,25 @@ function OrderDetailBody({ order: o, detail, renderAi }: { order: OrderDetail; d
     onSelect: m.blockedReason ? undefined : () => run(m.key),
   }));
 
-  const lineCols: Column<OrderLine>[] = [
-    { key: "item", header: M.colItem, render: (l) => (
-      <>
-        {l.item_name} <span className={`muted ${s.mono}`}>{l.item_code}</span>
-      </>
-    ) },
-    { key: "qty", header: M.colQty, num: true, render: (l) => kg(l.qty_kg) },
-    { key: "price", header: M.colUnitPrice, num: true, render: (l) => vnd(l.unit_price) },
-    { key: "discount", header: M.colDiscount, num: true, render: (l) => (Number(l.discount) > 0 ? vnd(l.discount) : "—") },
-    { key: "total", header: M.colLineTotal, num: true, render: (l) => vnd(l.line_total) },
-  ];
+  // Một bảng "Hàng & phân bổ lô" (board D2b): mỗi dòng bảng = một lô xuất của một dòng hàng. Dòng hàng có nhiều lô thì
+  // tên hàng / đơn giá / thành tiền chỉ ghi ở dòng đầu (tránh cộng trùng); dòng hàng chưa phân bổ lô ghi "—" ở cột Lô.
+  const rows: LineRow[] = o.lines.flatMap((l) => {
+    const allocs = o.allocations.filter((a) => a.line_no === l.no);
+    return (allocs.length ? allocs : [undefined]).map((a, i) => ({ key: `${l.no}-${a?.batch_id ?? "none"}`, line: l, alloc: a, first: i === 0 }));
+  });
   const showCost = canViewCost && o.allocations.some((a) => a.unit_cost !== undefined);
-  const allocCols: Column<OrderAllocation>[] = [
-    { key: "line", header: M.colLine, num: true, render: (a) => a.line_no },
-    { key: "batch", header: M.colBatch, mono: true, render: (a) => a.batch_id },
-    { key: "qty", header: M.colQty, num: true, render: (a) => kg(a.qty_kg) },
-    { key: "cost", header: M.colUnitCost, num: true, locked: true, render: (a) => (a.unit_cost !== undefined ? vnd(a.unit_cost) : "—") },
+  const lineCols: Column<LineRow>[] = [
+    { key: "item", header: M.colItem, render: (r) => (r.first ? (
+      <>
+        {r.line.item_name} <span className={`muted ${s.mono}`}>{r.line.item_code}</span>
+      </>
+    ) : "") },
+    { key: "batch", header: M.colBatch, mono: true, render: (r) => r.alloc?.batch_id ?? "—" },
+    { key: "cost", header: M.colUnitCost, num: true, locked: true, render: (r) => (r.alloc?.unit_cost !== undefined ? vnd(r.alloc.unit_cost) : "—") },
+    { key: "qty", header: M.colQty, num: true, render: (r) => kg(r.alloc?.qty_kg ?? r.line.qty_kg) },
+    { key: "price", header: M.colUnitPrice, num: true, render: (r) => (r.first ? vnd(r.line.unit_price) : "") },
+    { key: "discount", header: M.colDiscount, num: true, render: (r) => (r.first ? (Number(r.line.discount) > 0 ? vnd(r.line.discount) : "—") : "") },
+    { key: "total", header: M.colLineTotal, num: true, render: (r) => (r.first ? vnd(r.line.line_total) : "") },
   ];
   const payCols: Column<OrderPayment>[] = [
     { key: "txn", header: M.colTxn, mono: true, render: (p) => p.bank_txn_id },
@@ -268,6 +274,14 @@ function OrderDetailBody({ order: o, detail, renderAi }: { order: OrderDetail; d
       aiSlot={renderAi?.({ id: o.id, code: o.code }, reload)}
       timeline={<Timeline entries={timeline} title={M.timelineDerived} />}
     >
+      <InfoStrip label={M.stripLabel}>
+        <InfoField label={M.fieldPlacedAt} num value={o.created_at ? dateTime(o.created_at) : null} />
+        {hold && <InfoField label={M.fieldHoldLeft} num value={<span className={s.holdLeft}><HoldLeft until={hold.until} /></span>} />}
+        {(hold || (o.status === "AUTO_CANCELLED" && o.reserved_until)) && (
+          <InfoField label={M.fieldHoldUntil} num value={dateTime(o.reserved_until as string)} />
+        )}
+      </InfoStrip>
+
       <StatusPath
         steps={ORDER_STEPS}
         current={path.current}
@@ -276,98 +290,105 @@ function OrderDetailBody({ order: o, detail, renderAi }: { order: OrderDetail; d
         done={timeline.slice(0, 3).map((e) => e.label).reverse()}
       />
 
-      <InfoGrid title={M.sectionInfo}>
-        <InfoField
-          label={M.fieldCustomer}
-          value={
-            <>
-              <PersonalText value={o.customer.name} />
-              {customerHref && (
-                <>
-                  {" · "}
-                  <Link href={customerHref} className="inline-link">
-                    {M.openCustomer}
-                  </Link>
-                </>
-              )}
-            </>
-          }
-        />
-        <InfoField
-          label={M.fieldPhone}
-          num
-          value={
-            o.customer.phone ? (
-              <a href={`tel:${o.customer.phone}`} className="inline-link">
-                {o.customer.phone}
-              </a>
-            ) : (
-              <PersonalText value={o.customer.phone} />
-            )
-          }
-        />
-        <InfoField label={M.fieldAddress} value={<PersonalText value={o.customer.address} />} />
-        <InfoField label={M.fieldTotal} num value={o.total_amount ? vnd(o.total_amount) : null} />
-        <InfoField label={M.fieldPlacedAt} num value={o.created_at ? dateTime(o.created_at) : null} />
-        {hold && <InfoField label={M.fieldHoldLeft} num value={<HoldLeft until={hold.until} />} />}
-        {(hold || (o.status === "AUTO_CANCELLED" && o.reserved_until)) && (
-          <InfoField label={M.fieldHoldUntil} num value={dateTime(o.reserved_until as string)} />
-        )}
-        <InfoField label={M.fieldInvoice} mono value={o.invoice?.code ?? null} />
-        {o.delivery && (
-          <>
-            {canOpenDelivery ? (
-              <InfoField label={M.fieldDelivery} kind="link" mono value={o.delivery.code} onOpen={() => setLookupDelivery(true)} />
-            ) : (
-              <InfoField label={M.fieldDelivery} mono value={o.delivery.code} />
-            )}
-            <InfoField label={M.fieldDeliveryStatus} value={<Chip table={ENUMS.deliveryStatus} value={o.delivery.status} />} />
-          </>
-        )}
-        {consent !== undefined && (
-          <InfoField
-            label={M.fieldConsent}
-            value={
-              consent ? (
-                <>
-                  {M.consentValue(consent.policy_version, consent.accepted_at ? dateTime(consent.accepted_at) : null)}
-                  {" · "}
-                  <Link href={`/content/edit/?id=${consent.policy_entry_id}&version=${consent.policy_version}`} className="inline-link">
-                    {M.consentOpen}
-                  </Link>
-                </>
-              ) : (
-                <span className="muted">{M.consentNone}</span>
-              )
-            }
-          />
-        )}
-      </InfoGrid>
+      <InfoGrid
+        title={M.sectionOrderInfo}
+        groups={[
+          {
+            title: M.groupPayment,
+            children: (
+              <>
+                <InfoField label={M.fieldTotal} num value={o.total_amount ? vnd(o.total_amount) : null} />
+                <InfoField label={M.fieldInvoice} mono value={o.invoice?.code ?? null} />
+                <InfoField label={M.fieldMatched} value={o.payments.length ? M.countPayments(o.payments.length) : null} />
+                <InfoField label={M.fieldRefund} value={o.refunds.length ? M.countRefunds(o.refunds.length) : null} />
+              </>
+            ),
+          },
+          {
+            title: M.groupDelivery,
+            children: (
+              <>
+                <InfoField
+                  label={M.fieldCustomer}
+                  value={
+                    <>
+                      <PersonalText value={o.customer.name} />
+                      {customerHref && (
+                        <>
+                          {" · "}
+                          <Link href={customerHref} className="inline-link">
+                            {M.openCustomer}
+                          </Link>
+                        </>
+                      )}
+                    </>
+                  }
+                />
+                <InfoField
+                  label={M.fieldPhone}
+                  num
+                  value={
+                    o.customer.phone ? (
+                      <a href={`tel:${o.customer.phone}`} className="inline-link">
+                        {o.customer.phone}
+                      </a>
+                    ) : (
+                      <PersonalText value={o.customer.phone} />
+                    )
+                  }
+                />
+                <InfoField label={M.fieldAddress} value={<PersonalText value={o.customer.address} />} />
+                {o.delivery &&
+                  (canOpenDelivery ? (
+                    <InfoField label={M.fieldDelivery} kind="link" mono value={o.delivery.code} onOpen={() => setLookupDelivery(true)} />
+                  ) : (
+                    <InfoField label={M.fieldDelivery} mono value={o.delivery.code} />
+                  ))}
+                {o.delivery && <InfoField label={M.fieldDeliveryStatus} value={<Chip table={ENUMS.deliveryStatus} value={o.delivery.status} />} />}
+                {consent !== undefined && (
+                  <InfoField
+                    label={M.fieldConsent}
+                    value={
+                      consent ? (
+                        <>
+                          {M.consentValue(consent.policy_version, consent.accepted_at ? dateTime(consent.accepted_at) : null)}
+                          {" · "}
+                          <Link href={`/content/edit/?id=${consent.policy_entry_id}&version=${consent.policy_version}`} className="inline-link">
+                            {M.consentOpen}
+                          </Link>
+                        </>
+                      ) : (
+                        <span className="muted">{M.consentNone}</span>
+                      )
+                    }
+                  />
+                )}
+              </>
+            ),
+          },
+        ]}
+      />
 
-      <section className={s.section} aria-label={M.linesTitle}>
-        <h3 className={s.sectionH}>{M.linesTitle}</h3>
+      <Section title={M.linesTitle} count={o.lines.length} aria-label={M.linesTitle} flush>
         <DataTable
           caption={M.linesCaption}
           columns={lineCols}
-          rows={o.lines}
-          rowKey={(l) => l.no}
+          rows={rows}
+          rowKey={(r) => r.key}
           noun={M.detailNoun}
           empty={{ icon: "inbox", title: M.linesEmpty }}
-          canViewCost={false}
-        />
-        <DataTable
-          caption={M.allocCaption}
-          columns={showCost ? allocCols : allocCols.filter((c) => !c.locked)}
-          rows={o.allocations}
-          rowKey={(a) => `${a.line_no}-${a.batch_id}`}
-          noun={M.detailNoun}
-          empty={{ icon: "inventory_2", title: M.allocEmpty, hint: M.allocEmptyHint }}
           canViewCost={showCost}
+          dense
         />
-      </section>
+        {o.total_amount && (
+          <div className={s.totalRow}>
+            <span>{M.totalSum}</span>
+            <b className="num">{vnd(o.total_amount)}</b>
+          </div>
+        )}
+      </Section>
 
-      <section className={s.section} aria-label={M.paymentsTitle}>
-        <h3 className={s.sectionH}>{M.paymentsTitle}</h3>
+      <Section title={M.paymentsTitle} count={o.payments.length} aria-label={M.paymentsTitle} flush>
         <DataTable
           caption={M.paymentsCaption}
           columns={payCols}
@@ -378,10 +399,9 @@ function OrderDetailBody({ order: o, detail, renderAi }: { order: OrderDetail; d
           empty={{ icon: "payments", title: M.paymentsEmpty }}
           canViewCost={false}
         />
-      </section>
+      </Section>
 
-      <section className={s.section} aria-label={M.refundsTitle}>
-        <h3 className={s.sectionH}>{M.refundsTitle}</h3>
+      <Section title={M.refundsTitle} count={o.refunds.length} aria-label={M.refundsTitle} flush>
         <DataTable
           caption={M.refundsCaption}
           columns={refundCols}
@@ -392,7 +412,7 @@ function OrderDetailBody({ order: o, detail, renderAi }: { order: OrderDetail; d
           empty={{ icon: "currency_exchange", title: M.refundsEmpty }}
           canViewCost={false}
         />
-      </section>
+      </Section>
 
       {modal === "confirm_payment" && (
         <ConfirmPaymentModal

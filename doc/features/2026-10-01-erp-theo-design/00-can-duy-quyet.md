@@ -116,3 +116,8 @@
 - BE nợ (Lô 10 N3): `POST /api/purchasing/costs/` trả 500 khi chi phí chia vào một lô làm giá vốn/kg vượt 10 chữ số phần nguyên (cùng gốc cột `landed_unit_cost`) → bắt lỗi trả 400 theo `allocations`. Rủi ro vận hành thấp. PO: số kg gõ "1.000" được hiểu là 1 kg (có thể nhầm thành một nghìn).
 
 - Duy dặn 02/10 chiều: làm các quyết định trên **ở máy này luôn**. Còn chờ: #3 (giải thích lại), #8 (xoá thật hay ẩn), #9/#12 (thiết kế phạm vi cấu hình — BA + Tech Lead).
+
+### Duy quyết 03/10/2026
+- **SĐT khách trên ERP: hiện đủ** (không che "…0412" như board). Áp cho danh sách/chi tiết khách, Gọi xác nhận, Nhân sự, phiếu giao. Nhóm F trong `04b-ra-soat-giao-dien.md` đóng — không phải lệch. Phạm vi ai được xem vẫn theo phân quyền (bất biến 9 + ma trận Lô 14).
+- **#3 (chốt):** dòng thời gian **không** chép ghi chú tự do — chỉ nhãn chuẩn (mã lý do → nhãn, mã chứng từ, kg, tiền, người làm). Tiền trên timeline ghi "đ".
+- **#8 (chốt):** xoá phiếu hàng hoàn **ở màn chi tiết**, chỉ Chủ/admin. Làm **xoá mềm** (ẩn khỏi mọi danh sách/báo cáo, giữ bản ghi + nhật ký) vì luật "không xoá chứng từ"; chỉ xoá được phiếu Nháp/Đã huỷ — phiếu đã cộng tồn phải huỷ trước.

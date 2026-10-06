@@ -7,7 +7,6 @@
 
 /* ---- Trang chi tiết: dòng hàng, tem cần huỷ ---- */
 .section { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
-.sectionTitle { margin: 0; font-size: var(--text-md); font-weight: var(--weight-semibold); color: var(--ink); }
 .voidList { display: flex; flex-direction: column; gap: var(--space-2); }
 .voidRow { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; }
 .voidText { flex: 1 1 14rem; min-width: 0; font-weight: var(--weight-medium); }

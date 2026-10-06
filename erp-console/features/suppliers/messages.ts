@@ -19,6 +19,7 @@ export const SUPPLIERS_MSG = {
   emptyFilteredTitle: "Không có nhà cung cấp nào khớp bộ lọc",
   emptyFilteredHint: "Đổi hoặc bỏ bộ lọc để xem thêm.",
   shown: (n: number, total: number) => `Đang hiện ${n} / ${total} nhà cung cấp`,
+  headCount: (total: number) => `${total} nhà cung cấp`,
   loadMore: "Tải thêm nhà cung cấp",
   loadingMore: "Đang tải thêm…",
   loadMoreFailed: "Không tải thêm được.",

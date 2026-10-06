@@ -97,7 +97,7 @@ export function ConfirmationQueueView() {
       width: "136px",
     },
     { key: "reason", header: "Lý do", hideBelow: 720, render: (r) => <span title={reasonText(r)}>{reasonText(r)}</span>, width: "108px" },
-    { key: "due", header: "Hạn gọi", num: true, render: (r) => dateTime(dueAt(r)), width: "132px" },
+    { key: "due", header: "Hạn gọi", tabular: true, render: (r) => dateTime(dueAt(r)), width: "132px" },
     {
       key: "holder",
       header: "Đang gọi",

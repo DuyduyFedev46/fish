@@ -12,10 +12,7 @@
 .detailSkel > div { display: flex; flex-direction: column; gap: var(--space-3); }
 
 /* Khối phụ trên trang chi tiết (phiếu nhập, lô đang bán). */
-.section { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
-.sectionH { display: flex; align-items: baseline; gap: var(--space-2); margin: 0; font-size: var(--text-xs); font-weight: var(--weight-semibold); letter-spacing: var(--tracking-caps); text-transform: uppercase; color: var(--ink-3); }
-.sectionCount { font-weight: var(--weight-regular); letter-spacing: 0; text-transform: none; color: var(--ink-3); }
-.sectionFoot { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.sectionFoot { padding: var(--space-3) var(--space-4); border-top: 1px solid var(--border); display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
 
 /* Dòng báo lỗi của một khối phụ (không chặn trang). */
 .railNote { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); margin: 0; color: var(--ink-2); font-size: var(--text-sm); }

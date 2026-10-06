@@ -3,7 +3,9 @@
 // Chỉ VẼ, nhận props — không gọi API, không import runtime AI (để chunk màn nghiệp vụ không chứa code AI, BR-AI-17).
 // Dữ liệu thật do features/ai/components/AiDocBlock nạp. Không bao giờ truyền dữ liệu cá nhân của khách vào đây.
 import { Icon } from "../Icon";
+import { AI_FEATURES_ENABLED } from "@/shared/lib/features";
 import { dateTime } from "@/shared/lib/format";
+import { Section } from "./Section";
 import s from "./AiBlockFrame.module.css";
 
 export type AiChange = { label: string; before?: string; after: string };
@@ -58,12 +60,19 @@ type Props = {
 };
 
 export function AiBlockFrame({ proposals, busyId = null, error, onReject, onConfirm, chat, starter, keepStarter = false, loading = false, onRetry }: Props) {
+  if (!AI_FEATURES_ENABLED) return null; // SR-HIDE-AI-01
   return (
-    <section className={s.block} aria-label="Trợ lý AI" data-ai-block>
-      <h3 className={s.title}>
-        <Icon name="auto_awesome" />
-        <span>Trợ lý AI</span>
-      </h3>
+    <Section
+      aria-label="Trợ lý AI"
+      data-ai-block
+      title={
+        <>
+          <Icon name="auto_awesome" />
+          <span>Trợ lý AI</span>
+        </>
+      }
+      action={proposals.length > 0 ? `${proposals.length} đề xuất` : undefined}
+    >
 
       {loading && (
         <p className={s.note} role="status">
@@ -88,13 +97,13 @@ export function AiBlockFrame({ proposals, busyId = null, error, onReject, onConf
         const confirmOff = busy || waiting || Boolean(p.blocked);
         return (
           <article key={p.id} className={s.card} data-proposal={p.id} data-state={p.state}>
+            <p className={s.what}>{p.title}</p>
             <p className={s.by}>
               <span className={s.ai}>AI</span>
               <span>
                 {p.proposedBy} · <time className="num" dateTime={p.proposedAt}>{dateTime(p.proposedAt)}</time>
               </span>
             </p>
-            <p className={s.what}>{p.title}</p>
             {p.changes.length > 0 && (
               <dl className={s.changes}>
                 {p.changes.map((c) => (
@@ -135,7 +144,7 @@ export function AiBlockFrame({ proposals, busyId = null, error, onReject, onConf
       {/* Starter chỉ có MỘT vị trí cố định (con thứ nhất), `chat` ở vị trí kế: chat xuất hiện/biến mất không làm React dựng lại ô nhập. */}
       {starter && (!chat || keepStarter) ? <Starter {...starter} /> : null}
       {chat}
-    </section>
+    </Section>
   );
 }
 

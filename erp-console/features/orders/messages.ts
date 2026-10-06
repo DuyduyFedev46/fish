@@ -44,6 +44,15 @@ export const ORDERS_MSG = {
   backToOrders: "Đơn hàng",
   detailNoun: "đơn hàng",
   sectionInfo: "Thông tin",
+  sectionOrderInfo: "Thông tin đơn",
+  stripLabel: "Tóm tắt đơn",
+  groupPayment: "Thanh toán",
+  groupDelivery: "Giao hàng",
+  fieldMatched: "Giao dịch khớp",
+  fieldRefund: "Hoàn tiền",
+  countPayments: (n: number) => `${n} giao dịch`,
+  countRefunds: (n: number) => `${n} phiếu hoàn`,
+  totalSum: "Tổng cộng",
   fieldCustomer: "Khách hàng",
   fieldPhone: "Số điện thoại",
   fieldAddress: "Địa chỉ giao hàng",
@@ -59,7 +68,7 @@ export const ORDERS_MSG = {
   consentValue: (version: number, at: string | null) => `Phiên bản ${version}${at ? `, đồng ý lúc ${at}` : ""}`,
   consentOpen: "Xem phiên bản",
   consentNone: "Không có dữ liệu đồng ý (đơn trước ngày áp dụng)",
-  linesTitle: "Hàng và phân bổ lô",
+  linesTitle: "Hàng & phân bổ lô",
   linesCaption: "Dòng hàng của đơn",
   allocCaption: "Phân bổ lô của đơn",
   colItem: "Mặt hàng",
@@ -162,6 +171,8 @@ export const ORDERS_MSG = {
 
   // ---- Danh sách hàng chờ thanh toán ----
   queueTitle: "Hàng chờ thanh toán",
+  queueHeadTitle: "Khoản tiền lệch",
+  queueHeadCount: (total: number) => `${total} khoản`,
   queueSearchLabel: "Tìm khoản tiền",
   queueNoun: "khoản tiền",
   queueOpenTab: "Chờ xử lý",
@@ -235,6 +246,7 @@ export const ORDERS_MSG = {
 
   // ---- Danh sách phiếu hoàn ----
   refundsListTitle: "Phiếu hoàn",
+  refundsHeadCount: (total: number) => `${total} phiếu`,
   refundsSearchLabel: "Tìm phiếu hoàn",
   refundsNoun: "phiếu hoàn",
   refundsFilterStatus: "Lọc theo trạng thái",

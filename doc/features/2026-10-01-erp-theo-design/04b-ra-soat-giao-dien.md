@@ -151,3 +151,5 @@ F1c, F1e, F1g, F1h, F1i, F1n, F1o, F2b, F2c, F2e, F2f, F2g, F2i, F2j, F2k, F2m, 
 ## Danh sách cặp đã so sánh
 
 D2, D2b, D3, W1a, W1a2, W1b, W1b2, W1c, W1c2, W1d, W1d2, W1e, W2a, W2b, W2c, W2d, W2e, W2f, W2g, W2h, W3a, W3b, W3c, W3d, W3e, W3g, W3h, W3i, W4e, W4f, W4g, W4h, W5a, W5b, W5c, W5d, W5e, W5f, W5g, W5g2, W5h, W5i, W5j, W5k, W5l, W5m, W5o, F1a, F1b, F1d, F1f, F1j, F1k, F1l, F1m, F2a, F2d, F2h, F2l, F3a, F3g.
+
+> **03/10 — Duy quyết nhóm F:** giữ hiện đủ SĐT (đúng ý PO, không theo board). Không sửa.

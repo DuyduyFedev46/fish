@@ -22,6 +22,7 @@ import { DetailHeader } from "@/shared/ui/detail/DetailHeader";
 import { DetailPage } from "@/shared/ui/detail/DetailPage";
 import { InfoField } from "@/shared/ui/detail/InfoField";
 import { InfoGrid } from "@/shared/ui/detail/InfoGrid";
+import { Section } from "@/shared/ui/detail/Section";
 import type { MoreMenuItem } from "@/shared/ui/detail/MoreMenu";
 import { StatusPath } from "@/shared/ui/detail/StatusPath";
 import { Timeline, type TimelineEntry } from "@/shared/ui/detail/Timeline";
@@ -389,8 +390,7 @@ export function DeliveryDetailScreen() {
         {hasFailure && <InfoField label="Lần giao thất bại" value={String(note.failed_attempts)} num />}
       </InfoGrid>
 
-      <section className={s.section} aria-label="Hàng soạn theo lô">
-        <h3 className={s.sectionTitle}>Hàng soạn theo lô</h3>
+      <Section title="Hàng soạn theo lô" aria-label="Hàng soạn theo lô" flush={Boolean(note.lines && note.lines.length > 0)}>
         {note.lines && note.lines.length > 0 ? (
           <div className="lt-card">
             <div className="lt-scroll">
@@ -424,7 +424,7 @@ export function DeliveryDetailScreen() {
         ) : (
           <p className="muted">Phiếu này chưa có dòng hàng nào được soạn.</p>
         )}
-      </section>
+      </Section>
 
       {modal === "assign" && (
         <AssignCourierModal

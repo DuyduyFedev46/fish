@@ -26,11 +26,15 @@ type Props = {
   /** Ẩn cột Lô và Mặt hàng (đã biết ở trang chi tiết lô). */
   hideBatch?: boolean;
   skeletonRows?: number;
+  /** Đầu thẻ như board ("Biến động kho", "11 dòng"). Bỏ trống = không đầu thẻ (khối nằm trong trang chi tiết). */
+  title?: string;
+  countText?: string;
+  headAction?: React.ReactNode;
 };
 
-export function LedgerTable({ rows, loading, error, onRetry, query, onClearQuery, caption, empty, hideBatch = false, skeletonRows }: Props) {
+export function LedgerTable({ rows, loading, error, onRetry, query, onClearQuery, caption, empty, hideBatch = false, skeletonRows, title, countText, headAction }: Props) {
   const columns: Column<LedgerEntry>[] = [
-    { key: "at", header: "Thời gian", num: true, width: "148px", render: (r) => dateTime(r.created_at) },
+    { key: "at", header: "Thời gian", tabular: true, width: "148px", render: (r) => dateTime(r.created_at) },
     { key: "type", header: "Loại", render: (r) => <Chip table={ENUMS.stockMovementType} value={r.movement_type} /> },
     ...(hideBatch
       ? []
@@ -76,6 +80,9 @@ export function LedgerTable({ rows, loading, error, onRetry, query, onClearQuery
   ];
   return (
     <DataTable
+      title={title}
+      countText={countText}
+      headAction={headAction}
       columns={columns}
       rows={rows}
       rowKey={(r) => r.id}

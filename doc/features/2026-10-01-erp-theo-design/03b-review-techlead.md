@@ -2892,3 +2892,45 @@ Không có Critical, High hay Medium.
 
 ### Kết luận re-review Lô 14 — FE: **APPROVED**
 M1 và L1 đạt. Không còn lỗi Critical, High hay Medium. QA cần chạy `s41_s47_real.py` trên BE thật, gồm ca `giao2` có phiếu Đang giao.
+
+## Lô 15 — FE
+> techlead · 03/10/2026 · `git diff c385dcd 7b38b4b` (59 file, worktree `agent-adeaae51549099388`). Số kiểm chứng lấy theo điều phối viên: tsc sạch, vitest 934, build mock=0 + check-no-mock + check-ai-chunks xanh (45 màn), e2e batch15 186/186, batch1 56/56, batch14 101/101, s48 41/41. Techlead tự chạy thêm `scripts/check_naming.py` (OK, không vi phạm mới) và kiểm glyph bằng fontTools: mọi tên icon trong 59 file đều có trong bộ con `public/fonts/ms` (163 glyph).
+
+### Bảng kiểm
+| Mục | Kết quả | Ghi chú |
+|---|---|---|
+| Giá vốn ở Tổng quan (bất biến 1, ED-08-AC4) | Đạt | BE là lớp chặn thật: `dashboard_api.py` chỉ thêm `kpis.inventory_value` và `batches[].unit_cost` khi có `inventory.view_costprice`, thiếu quyền thì không có key. FE: `KpiTiles` không vẽ ô khi `!canCost`, cột `unit_cost` là `locked` nên `DataTable` lọc ra (`DataTable.tsx:118`). Bảng đơn truyền `canViewCost={false}`. Cache `dashboardSummaryKey(me.id)` có id người dùng, nên dữ liệu không lẫn giữa các người dùng |
+| Dữ liệu cá nhân ở Nhật ký (bất biến 9, ED-41-AC3) | Đạt | Cột "Thay đổi" chỉ in khoá trong danh sách trắng (`status`, `quantity`, `amount`, `price`, `is_active`, `groups`) và không còn in JSON thô như bản cũ. `object_repr` của Khách đã được BE thay bằng `_CustomerAuditRef` (`sales/customers/services.py:36`). `?actor=` chỉ gửi khi Chủ chọn trong ô (`canView(me,"staff")`), giá trị nằm trong state, không vào URL hay storage. Cột "Ghi chú" in `note` nguyên văn giống bản cũ. Rủi ro còn lại thuộc BE, xem L5 |
+| Hiệu năng AI (BR-AI-17) | Đạt | `AiProposalsRow` chỉ import `ai/api` (status), `ai/actions/api` (counts) và `gate-state`, không import runtime, worker hay wllama. Đường đi fail-closed: thiếu quyền thì không gọi, AI tắt thì chỉ gọi status. `check-ai-chunks` thêm 9 route và xanh |
+| `/api/ai/status/`, hạn mức chỉ Chủ (#1) | Đạt | Lô này không đổi gì. Tổng quan chỉ đọc `ai_enabled`, không đọc `budget`. Rời màn có `releaseAiEnabled(owner)` |
+| Chính sách AI | Đạt | Route bọc `ViewGuard view="ai-policy"`. Mọi endpoint BE yêu cầu `ai.manage_ai_policy` (chỉ Chủ), nên Quản lý không sửa được việc nhạy cảm. Khoá `rz.perm` chỉ nằm ở `data-perm`, không hiện ra màn. Riêng `can_do` của BE có chữ "BR-LO-04" (L3) |
+| Đổi mật khẩu / đăng xuất | Đạt (có M2, L4) | Mật khẩu chỉ nằm trong state của form. `cave_erp_signed_in_at` chỉ chứa chuỗi ISO, không có id, tên hay SĐT, nên chấp nhận (bất biến 9 ổn) |
+| Font icon | Đạt | `devices`→`schedule`, `power_settings_new`→`block`, `emergency_home`→`warning`, `lock_clock`→`lock`, `chevron_*`→`arrow_*`, Hệ thống→`sync_alt`. Nghĩa vẫn đúng. Fallback `"shield"` (`AiPolicyScreen.tsx:257`) không có trong font, nhưng chỉ lộ ra khi BE thêm việc nhạy cảm mới. Ghi chung vào L3 |
+| Contract | Đạt có điều kiện | Chốt các chỗ lệch ở mục dưới. Riêng Báo cáo AI cộng sai (M1) |
+| UI-RULES | Có L2 | Không bắt các lệch đã thuộc nhóm rà soát A/B/C-D-E (`shared/ui`) |
+
+### Chốt các chỗ lệch contract dev nêu
+- **Tổng quan, dòng lô không mở được chi tiết (ED-08-AC3):** chấp nhận tạm, dẫn sang `/inventory/?status=…`. Nợ BE cho Lô 17: thêm `id` (pk số) vào `alerts[]`, `batches[]` và `recent_orders[]` của `dashboard/summary/`. Field này không có giá vốn hay dữ liệu cá nhân. Khi có thì FE đổi dòng thành link `/inventory/detail/?id=` và `/orders/detail/?id=`. Lúc đó AC3 mới đạt hẳn.
+- **Nhật ký, lọc ngày và tìm mã chạy ở máy (ED-41-AC2):** chấp nhận tạm, vì màn đã nói rõ chỉ lọc trên các dòng đã tải. Nợ BE cho Lô 17: `GET /api/audit-logs/` thêm `?date_from=&date_to=` (ngày theo giờ VN) và `?q=` (`object_repr`/`proposal_ref` icontains). Khi có thì FE chuyển sang lọc ở BE và bỏ `localNote`. Cột "Người duyệt" suy từ `proposal_ref` là đủ, không cần thêm field.
+- **AI của tôi / Chính sách AI:** không có cột "Trần của Chủ", không có bảng mức theo lệnh, ô số để thô. Chấp nhận, vì BE không trả. ED-42-AC2 "có phiên bản lịch sử": board W4c chỉ vẽ dòng "Phiên bản N", FE đã làm đúng như board. Màn danh sách phiên bản (`/api/ai/policy/versions/` đã có) để PO quyết có cần không.
+- **Báo cáo AI bỏ cột Vai trò và Ghi chú:** chấp nhận. Riêng "Tổng việc AI" thì không chấp nhận, xem M1.
+- **Tài khoản, Phiên đăng nhập:** chấp nhận mốc giờ lưu ở máy. Xem L4.
+- **`s8_views.py` lỗi thời:** Lô 17 xoá hoặc viết lại. QA không tính file này vào lô này.
+
+### Lỗi
+**TL15-FE-M1 · Medium · "Tổng việc AI" cộng trùng.** `features/ai/report/view.ts:23` (`grandTotal`) cộng cả sáu cột, dùng ở `AiDailyReportScreen.tsx:76` và `:121`. Nhưng BE (`apps/ai/report/services.py`) không tách các cột ra rời nhau. Một việc mức B bị hoàn tác được đếm cả ở `B` lẫn `undone`. Một việc bị chuyển cấp cũng được đếm ở `escalated` cộng thêm cột mức của nó. Ngược lại, việc mức C đang chờ hoặc bị từ chối thì không nằm ở cột nào. Kết quả là con số Chủ thấy sai, và dòng "n / tổng việc" có thể ra kiểu "5 / 7 việc" trong khi ngày đó chỉ có 5 việc. Cách sửa: tổng việc lấy `report.items.length`, vì BE trả đủ mọi việc trong ngày, không phân trang. Bỏ phần "/ tổng" ở `itemsCount`, hoặc cho hai số luôn bằng nhau. Sửa test `view.test.ts` và mock để có ca B + hoàn tác (tổng phải là 1, không phải 2).
+
+**TL15-FE-M2 · Medium · Đổi mật khẩu mở bằng `SideSheet`, không phải hộp thoại.** `features/auth/components/AccountScreen.tsx:17`, `:247-258`. ED-06-AC3 ghi "Hộp thoại nổi trên màn Tài khoản". Board `ERP-F3g` là popup `role="dialog"` rộng 480px, đặt giữa màn. ED-05-AC1 cũng quy định form từ 6 trường trở xuống dùng hộp thoại. Thêm nữa, 02b đã xếp `SideSheet` vào danh sách xoá ở Lô 17, nên dùng nó ở chỗ mới là tạo thêm phụ thuộc. Cách sửa: dùng `shared/ui/overlay/Modal` (có sẵn `busy` chặn đóng, Esc, trả focus), giữ `onCancel`/`onBusyChange`. E2E đang bám tấm bên thì đổi selector theo.
+
+**TL15-FE-L1 · Low · Sai mã story trong comment.** "AI của tôi" ghi là "ED-08 / W4b" ở `features/ai/settings/{view.ts:1,messages.ts:1,components/MyConfigScreen.tsx:3,myConfig.module.css:1}`, đúng ra là ED-06. Chính sách AI và Báo cáo AI ghi "ED-41" ở `features/ai/policy/view.ts:1`, `features/ai/report/*:1`, đúng ra là ED-42. Mục Lô 15 trong `03-dev-notes.md` cũng ghi sai như vậy. Sửa luôn khi làm M1/M2.
+
+**TL15-FE-L2 · Low · UI-RULES §2 (chữ bị cấm).** Chữ "FEFO" ở `OverviewScreen.tsx:132` và `:148` (board D1 không có), có thể đổi thành "Xếp theo hạn dùng sớm nhất". Chữ "Vùng đỏ" ở `features/ai/settings/messages.ts:33` (dùng tại `MyConfigScreen.tsx:74`, board W4b không có), có thể đổi thành "Việc nhạy cảm" cho khớp màn Chính sách. Lô 17 sẽ grep "FEFO" nên sửa luôn bây giờ.
+
+**TL15-FE-L3 · Low · Nợ BE.** `can_do` của `inventory.close_batch` trong `apps/ai/policy/services.py:38` có chữ "BR-LO-04", và FE in nguyên câu này ở phần "Chi tiết" (`AiPolicyScreen.tsx:293`). Sửa câu ở BE (lô BE gần nhất), hoặc FE dùng `stripRuleCodes` như Lô 16. Gộp luôn việc fallback icon `"shield"` → `"policy"` (glyph có trong font).
+
+**TL15-FE-L4 · Low · Ghi nhận cho Lô 17.** `forgetSignedIn()` chỉ được gọi ở nút Đăng xuất trong Tài khoản (`AccountScreen.tsx:65`). Đăng xuất từ `AvatarMenu`, `ConsoleGate`, `SetPasswordScreen`, `NoRoleScreen` thì mốc giờ vẫn còn. Không rò dữ liệu, vì lần đăng nhập sau ghi đè. Nhưng dev-notes ghi "đăng xuất xoá mốc giờ" thì chỉ đúng với một đường. Lô 17 nên chuyển việc xoá vào `AuthProvider.logout` (lô này không được sửa file đó).
+
+**TL15-FE-L5 · Low · Cho BE, ngoài lô.** Cột "Ghi chú" của Nhật ký in `AuditLog.note` nguyên văn. Có vài chỗ BE ghi chữ do người dùng gõ vào `note`: `resolve_payment` (`resolution_note`), `attach_payment`, lý do hoàn (`refunds/services.py:254`). Nếu nhân viên gõ tên người chuyển khoản vào đó thì nhật ký sẽ lộ ra (bất biến 9 coi nội dung sao kê là dữ liệu cá nhân). Bản cũ cũng in như vậy, nên đây không phải hồi quy. Đề xuất ghi vào lô BE: hoặc không chép chữ tự do vào `AuditLog.note`, hoặc lọc SĐT/tên trước khi ghi.
+
+### Kết luận Lô 15 — FE: **CHANGES REQUESTED**
+Đạt các mục giá vốn, dữ liệu cá nhân, phân quyền, hiệu năng AI và icon. Cần sửa **M1** (tổng việc AI cộng trùng) và **M2** (đổi mật khẩu phải là hộp thoại theo F3g/ED-06-AC3). L1 và L2 sửa cùng lượt. L3 và L5 chuyển lô BE. L4 và hai nợ contract (`id` trong dashboard, lọc ngày/`q` ở audit-logs) ghi vào Lô 17. Sau khi sửa thì chạy lại vitest, `ed_batch15_overview_ai_account.py` và `s48_password.py`.
