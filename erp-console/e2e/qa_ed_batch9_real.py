@@ -208,7 +208,7 @@ with sync_playwright() as p:
     ok("C2 bấm đúp Duyệt: chỉ 1 dòng RETURN_RESTOCK mới trong sổ (không cộng đôi)", len(led) == l0 + 1 and led[-1][0] == "RETURN_RESTOCK" and float(led[-1][1]) == 2.5, led[-2:])
     ok("C2 giao diện: chip Đã duyệt, hết nút duyệt", "Đã duyệt" in page.inner_text("main") and page.get_by_role("button", name="Tái nhập vào lô").count() == 0)
     # màn cũ (page2 còn nút) duyệt lại -> 409
-    page2.get_by_role("button", name="Huỷ bỏ, ghi lỗ").click()
+    page2.get_by_role("button", name="Huỷ hàng, ghi lỗ").click()
     d2 = page2.get_by_role("dialog")
     d2.get_by_role("button", name="Duyệt", exact=True).click()
     page2.wait_for_function("() => document.querySelector('[role=dialog]') && document.querySelector('[role=dialog]').innerText.includes('Tải lại')")
@@ -219,7 +219,7 @@ with sync_playwright() as p:
     d2.get_by_role("button", name="Tải lại").first.click()
     page2.wait_for_function("() => !document.querySelector('[role=dialog]')")
     page2.wait_for_timeout(600)
-    ok("C3 Tải lại: Đã duyệt, hết nút", page2.get_by_role("button", name="Huỷ bỏ, ghi lỗ").count() == 0 and "Đã duyệt" in page2.inner_text("main"))
+    ok("C3 Tải lại: Đã duyệt, hết nút", page2.get_by_role("button", name="Huỷ hàng, ghi lỗ").count() == 0 and "Đã duyệt" in page2.inner_text("main"))
     ok("C4 ql1 không console error/warning", errs == [], errs)
     ctx.close()
 
@@ -227,7 +227,7 @@ with sync_playwright() as p:
     ctx, page, errs = session(b, "loc")
     s0, l0 = stock(1), len(ledger(1))
     go(page, f"/returns/detail/?id={rid_writeoff}")
-    page.get_by_role("button", name="Huỷ bỏ, ghi lỗ").click()
+    page.get_by_role("button", name="Huỷ hàng, ghi lỗ").click()
     page.get_by_role("dialog").get_by_role("button", name="Duyệt", exact=True).click()
     page.wait_for_function("() => !document.querySelector('[role=dialog]')")
     page.wait_for_timeout(800)
@@ -239,7 +239,7 @@ with sync_playwright() as p:
     ok("D2 AuditLog không có ghi chú tự do/SĐT/tên khách/tiền", not any(re.search(r"khách|0900000|123457|amount|rate", json.dumps(a, ensure_ascii=False)) for a in al), al)
     go(page, "/returns/")
     body = page.inner_text("main")
-    ok("D3 loc: danh sách có Tái nhập, Huỷ bỏ, ghi lỗ, Chờ duyệt, Đã duyệt; kg dạng '2,5 kg'", all(x in body for x in ("Tái nhập", "Huỷ bỏ, ghi lỗ", "Chờ duyệt", "Đã duyệt", "2,5 kg")), body[:500])
+    ok("D3 loc: danh sách có Tái nhập, Huỷ hàng, ghi lỗ, Chờ duyệt, Đã duyệt; kg dạng '2,5 kg'", all(x in body for x in ("Tái nhập", "Huỷ hàng, ghi lỗ", "Chờ duyệt", "Đã duyệt", "2,5 kg")), body[:500])
     page.screenshot(path=f"{SHOTS}/impl-real-list-loc-1280.png")
     go(page, f"/returns/detail/?id={rid_writeoff}")
     # AI tắt: không có request /actions

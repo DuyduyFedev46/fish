@@ -1,3 +1,5 @@
+import { ENUMS } from "@/shared/lib/enums";
+
 export type DeliveryStatus =
   | "CONFIRMING"
   | "PREPARING"
@@ -109,12 +111,12 @@ export type DeliveryStatusGroup =
   | "COMPLETED";
 
 export const STATUS_GROUP_TABS: Array<{ key: DeliveryStatusGroup; label: string }> = [
-  { key: "CONFIRMING", label: "Chờ xác nhận" },
-  { key: "PREPARING", label: "Soạn hàng" },
-  { key: "READY", label: "Chờ lấy" },
-  { key: "DELIVERING", label: "Đang giao" },
-  { key: "FAILED", label: "Giao thất bại" },
-  { key: "COMPLETED", label: "Hoàn tất (hôm nay)" },
+  { key: "CONFIRMING", label: ENUMS.deliveryStatus.CONFIRMING.label },
+  { key: "PREPARING", label: ENUMS.deliveryStatus.PREPARING.label },
+  { key: "READY", label: ENUMS.deliveryStatus.READY.label },
+  { key: "DELIVERING", label: ENUMS.deliveryStatus.DELIVERING.label },
+  { key: "FAILED", label: ENUMS.deliveryStatus.FAILED.label },
+  { key: "COMPLETED", label: `${ENUMS.deliveryStatus.COMPLETED.label} (hôm nay)` },
 ];
 
 export type LabelData = {

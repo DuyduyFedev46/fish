@@ -32,7 +32,7 @@ def summary():
 FULL_ORDER = [
     "Tổng quan",
     "Đơn & tiền", "Khách hàng", "Gọi xác nhận", "Giao hàng", "Việc giao của tôi",
-    "Mua hàng", "Nhà cung cấp", "Kho & lô", "Hàng hoàn về kho", "Kiểm kê", "Sổ nhập xuất", "Danh mục & giá",
+    "Mua hàng", "Nhà cung cấp", "Kho & lô", "Hàng hoàn", "Kiểm kê", "Sổ nhập xuất", "Danh mục & giá",
     "Báo cáo lãi lỗ", "Hoá đơn bán", "Hoá đơn mua & chi phí",
     "Nội dung",
     "Nhân sự", "Phân quyền", "Nhật ký hoạt động", "Chính sách AI", "Báo cáo AI",
@@ -51,7 +51,7 @@ SECTION_ORDER = ["Bán hàng", "Hàng hoá & kho", "Kế toán", "Website", "Qu�
 SECTION_OF = {
     **{k: "" for k in ["Tổng quan"]},
     **{k: "Bán hàng" for k in ["Đơn & tiền", "Khách hàng", "Gọi xác nhận", "Giao hàng", "Việc giao của tôi"]},
-    **{k: "Hàng hoá & kho" for k in ["Mua hàng", "Nhà cung cấp", "Kho & lô", "Hàng hoàn về kho", "Kiểm kê", "Sổ nhập xuất", "Danh mục & giá"]},
+    **{k: "Hàng hoá & kho" for k in ["Mua hàng", "Nhà cung cấp", "Kho & lô", "Hàng hoàn", "Kiểm kê", "Sổ nhập xuất", "Danh mục & giá"]},
     **{k: "Kế toán" for k in ["Báo cáo lãi lỗ", "Hoá đơn bán", "Hoá đơn mua & chi phí"]},
     "Nội dung": "Website",
     **{k: "Quản trị" for k in ["Nhân sự", "Phân quyền", "Nhật ký hoạt động", "Chính sách AI", "Báo cáo AI"]},

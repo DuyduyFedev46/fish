@@ -1,6 +1,6 @@
 import type { DeliveryLine } from "@/features/deliveries/types";
 
-// Kiểu dữ liệu module Hàng hoàn về kho (ED-26) — theo contract BE Lô 9 (R9): backend/apps/inventory/returns/serializers.py.
+// Kiểu dữ liệu module Hàng hoàn (ED-26) — theo contract BE Lô 9 (R9): backend/apps/inventory/returns/serializers.py.
 // Chỉ có số kg, không có tiền hay giá vốn. `note` là chữ tự do (có thể chứa dữ liệu cá nhân): chỉ hiện ở màn này.
 
 /** CANCELLED: phiếu bị huỷ khi còn Chờ duyệt (Duy chốt 02/10, #8); số kg của phiếu huỷ không còn tính vào số đã hoàn. */

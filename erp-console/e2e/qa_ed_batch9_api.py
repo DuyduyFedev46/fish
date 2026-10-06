@@ -1,4 +1,4 @@
-# QA độc lập Lô 9 (Hàng hoàn về kho ED-26) ở tầng API trên BE THẬT (Django :8000, SQLite tạm đã nạp qa9/seed.py).
+# QA độc lập Lô 9 (Hàng hoàn ED-26) ở tầng API trên BE THẬT (Django :8000, SQLite tạm đã nạp qa9/seed.py).
 #   QA_DB=<sqlite> API=http://127.0.0.1:8000 python3 e2e/qa_ed_batch9_api.py
 # Phiếu giao dựng bằng fixture (id 1..9 theo seed.py): 1 RACE(giao1,10kg) 2 FAILED(giao1, lô A 5kg + lô B 4kg) 3 OTHER(giao2)
 # 4 RESTOCK(giao1,6kg) 5 WRITEOFF(giao1,6kg) 6 STALE(giao1,3kg) 7 READY 8 COMPLETED 9 CLOSED(lô B 3kg).
@@ -272,7 +272,7 @@ ok("S6 phiếu vẫn còn trong DB", db("select count(*) from inventory_returnto
 before = on_hand(A_PK); led_before = len(ledger(A_PK))
 s, b, _ = call("loc", "POST", f"inventory/returns/{rid_writeoff}/approve/", {"decision": "WRITE_OFF"})
 led = ledger(A_PK)
-ok("S6 loc duyệt Huỷ bỏ, ghi lỗ -> 200, WRITE_OFF", s == 200 and b["decision"] == "WRITE_OFF" and b["status"] == "APPROVED", (s, b))
+ok("S6 loc duyệt Huỷ hàng, ghi lỗ -> 200, WRITE_OFF", s == 200 and b["decision"] == "WRITE_OFF" and b["status"] == "APPROVED", (s, b))
 ok("S6 tồn lô KHÔNG tăng khi huỷ bỏ", abs(on_hand(A_PK) - before) < 1e-6, (before, on_hand(A_PK)))
 ok("S6 sổ có dòng WRITE_OFF ghi lỗ 2 kg (qty_change 0, tham chiếu ghi kg lỗ)", len(led) == led_before + 1 and led[-1][0] == "WRITE_OFF" and "2" in led[-1][3], led[-1:])
 al = db("select action, actor_id, changes from accounts_auditlog where action like '%returntostock%' or action like '%return%' order by id")

@@ -8,7 +8,7 @@ export type CustomerListItem = {
   name: string;
   phone: string;
   order_count: number;
-  /** Tổng trên đơn không huỷ, đã trừ phiếu hoàn REFUNDED. */
+  /** Tổng trên đơn không huỷ, đã trừ phiếu hoàn tiền REFUNDED. */
   total_spent: string;
   cancelled_count: number;
   /** ISO; null = chưa có đơn nào. */
@@ -25,7 +25,7 @@ export type CustomerOrderRow = {
   created_at: string;
 };
 
-/** Phiếu hoàn của khách: KHÔNG có lý do (BE không trả). */
+/** Phiếu hoàn tiền của khách: KHÔNG có lý do (BE không trả). */
 export type CustomerRefundRow = {
   id: number;
   order_code: string;
@@ -42,7 +42,7 @@ export type CustomerDetail = CustomerListItem & {
   first_order_at: string | null;
   /** 50 đơn mới nhất. */
   orders: CustomerOrderRow[];
-  /** 50 phiếu hoàn mới nhất. */
+  /** 50 phiếu hoàn tiền mới nhất. */
   refunds: CustomerRefundRow[];
 };
 

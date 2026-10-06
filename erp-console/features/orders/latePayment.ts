@@ -84,7 +84,7 @@ export function existingPaymentIdOf(err: unknown): number | null {
   return Number.isInteger(id) && id > 0 ? id : null;
 }
 
-/** Khoản có nhãn nghi trùng (BR-TT-15 / BR-TT-18) → lập phiếu hoàn phải tick xác nhận. */
+/** Khoản có nhãn nghi trùng (BR-TT-15 / BR-TT-18) → lập phiếu hoàn tiền phải tick xác nhận. */
 export function hasDuplicateWarning(p: { duplicate_warning?: string | null }): boolean {
   return typeof p.duplicate_warning === "string" && p.duplicate_warning.trim() !== "";
 }

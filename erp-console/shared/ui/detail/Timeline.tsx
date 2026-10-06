@@ -13,7 +13,7 @@ export type TimelineEntry = {
   label: string;
   /** Tên người/hệ thống làm. */
   actor?: string;
-  /** Có thì nhãn việc là liên kết sang chứng từ (vd phiếu hoàn). Màn chỉ đặt khi người xem có quyền mở chứng từ đó. */
+  /** Có thì nhãn việc là liên kết sang chứng từ (vd phiếu hoàn tiền). Màn chỉ đặt khi người xem có quyền mở chứng từ đó. */
   href?: string;
   /** Việc do AI làm: ẩn khi giao diện AI tắt (W39). Dòng dựng từ tên người làm "AI của …" cũng bị coi là việc của AI. */
   ai?: boolean;

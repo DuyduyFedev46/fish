@@ -40,7 +40,7 @@ with sync_playwright() as p:
     txt = rows(page).all_inner_texts()
     ok("S12-AC1: mỗi dòng có loại lệch + số tiền (đ) + mã GD",
        all("đ" in t and "FT" in t for t in txt) and any("Thiếu tiền" in t for t in txt) and any("Không khớp đơn" in t for t in txt)
-       and any("Chuyển thừa" in t for t in txt) and any("Về sau khi đơn tự huỷ" in t for t in txt), str(txt[:2]))
+       and any("Chuyển thừa" in t for t in txt) and any("Về sau khi đơn đã huỷ" in t for t in txt), str(txt[:2]))
     ok("BR-PQ-15: JSON hàng chờ không có field giá vốn", "unit_cost" not in str(j) and "landed" not in str(j))
     # lọc loại lệch
     clear_log(page)

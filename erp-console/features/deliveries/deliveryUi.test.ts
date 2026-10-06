@@ -23,7 +23,7 @@ describe("deliveryUi: thanh trạng thái và việc tiếp theo", () => {
   });
 
   it("READY chưa gán người giao thì việc tiếp theo là giao phiếu; đã gán thì là nhận hàng", () => {
-    expect(nextStepText({ status: "READY", assigned_to: null, failed_attempts: 0 })).toMatch(/Giao phiếu/);
+    expect(nextStepText({ status: "READY", assigned_to: null, failed_attempts: 0 })).toMatch(/Chọn người giao/);
     expect(nextStepText({ status: "READY", assigned_to: 4, failed_attempts: 0 })).toMatch(/nhận hàng/);
     expect(nextStepText({ status: "COMPLETED", assigned_to: 4, failed_attempts: 0 })).toBeNull();
     expect(nextStepText({ status: "FAILED", assigned_to: 4, failed_attempts: 2 })).toMatch(/quyết định/);

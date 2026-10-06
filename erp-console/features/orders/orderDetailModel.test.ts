@@ -205,7 +205,7 @@ describe("dòng thời gian", () => {
   it("khoản tiền và phiếu hoàn: chỉ lấy tên người xử lý khi là chuỗi", () => {
     expect(paymentTimeline({ received_at: "2026-10-01T01:00:00Z", resolved_at: "2026-10-01T02:00:00Z", resolved_by: 5 }).every((e) => !e.actor)).toBe(true);
     const r = refundTimeline({ created_at: "2026-10-01T01:00:00Z", confirmed_at: "2026-10-01T02:00:00Z", created_by: "loc", confirmed_by: null });
-    expect(r.map((e) => e.label)).toEqual(["Xác nhận đã hoàn tiền", "Lập phiếu hoàn"]);
+    expect(r.map((e) => e.label)).toEqual(["Xác nhận đã hoàn tiền", "Lập phiếu hoàn tiền"]);
     expect(r[1].actor).toBe("loc");
   });
 });

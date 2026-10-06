@@ -3,7 +3,7 @@
 // Danh sách đơn hàng (ED-09, tab 1 của "Đơn & tiền"): khung ListPage + bảng DataTable, bấm dòng → /orders/detail/?id=.
 // Cột: Mã đơn · Khách hàng · Trạng thái · Giao hàng · Lý do · Tổng tiền · Thời gian. Đơn tự huỷ hiện chip "Đã huỷ" kèm
 // lý do "Hết giờ giữ chỗ". Bộ lọc/từ khoá chỉ nằm trong state (không URL, không localStorage). `?order=<id>&open=refund`
-// (link cũ từ màn gọi xác nhận) → chuyển sang trang chi tiết, mở sẵn hộp "Lập phiếu hoàn".
+// (link cũ từ màn gọi xác nhận) → chuyển sang trang chi tiết, mở sẵn hộp "Lập phiếu hoàn tiền".
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";

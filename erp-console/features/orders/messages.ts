@@ -1,10 +1,11 @@
 // Câu FE tự sinh của module orders (ED-09…ED-12). Lỗi nghiệp vụ của BE KHÔNG nằm ở đây: UI hiện nguyên văn `detail` BE trả.
 // Quy ước: tiền luôn qua `vnd()` ("540.000 đ", UI-RULES §1.6) — KHÔNG dùng `vnd_display` của BE (có ký hiệu ₫).
-// Từ cấm trên giao diện (UI-RULES §3): TTL, NV, SĐT, NCC, STK. Tên thao tác chuẩn: "Xác nhận đã nhận tiền", "Lập phiếu hoàn",
+// Từ cấm trên giao diện (UI-RULES §3): TTL, NV, SĐT, NCC, STK. Tên thao tác chuẩn: "Xác nhận đã nhận tiền", "Lập phiếu hoàn tiền",
 // "Xác nhận đã hoàn tiền", "Huỷ đơn".
 
 import { vnd } from "@/shared/lib/format";
 import { MONEY_FRACTION_MESSAGE } from "@/shared/lib/moneyInput";
+import { ENUMS } from "@/shared/lib/enums";
 
 export const ORDERS_MSG = {
   /** Đơn vị tiền ở ô nhập, lấy từ vnd() để không gõ tay ký hiệu. */
@@ -13,7 +14,7 @@ export const ORDERS_MSG = {
   tabsLabel: "Đơn & tiền",
   tabOrders: "Đơn hàng",
   tabQueue: "Hàng chờ thanh toán",
-  tabRefunds: "Phiếu hoàn",
+  tabRefunds: "Phiếu hoàn tiền",
 
   // ---- Danh sách đơn ----
   ordersTitle: "Đơn hàng",
@@ -52,7 +53,7 @@ export const ORDERS_MSG = {
   fieldRefund: "Hoàn tiền",
   fieldCancelNote: "Ghi chú huỷ",
   countPayments: (n: number) => `${n} giao dịch`,
-  countRefunds: (n: number) => `${n} phiếu hoàn`,
+  countRefunds: (n: number) => `${n} phiếu hoàn tiền`,
   totalSum: "Tổng cộng",
   fieldCustomer: "Khách hàng",
   fieldPhone: "Số điện thoại",
@@ -84,16 +85,16 @@ export const ORDERS_MSG = {
   allocEmpty: "Chưa phân bổ lô",
   allocEmptyHint: "Đơn được phân bổ lô khi đã thanh toán.",
   paymentsTitle: "Thanh toán",
-  paymentsCaption: "Giao dịch thanh toán của đơn",
-  paymentsEmpty: "Chưa có giao dịch nào",
+  paymentsCaption: "Khoản tiền về của đơn",
+  paymentsEmpty: "Chưa có khoản tiền về nào",
   colTxn: "Mã giao dịch",
   colAmount: "Số tiền",
   colMatch: "Loại khoản tiền",
   colReceivedAt: "Nhận lúc",
   colSource: "Nguồn",
   refundsTitle: "Hoàn tiền",
-  refundsCaption: "Phiếu hoàn của đơn",
-  refundsEmpty: "Đơn chưa có phiếu hoàn",
+  refundsCaption: "Phiếu hoàn tiền của đơn",
+  refundsEmpty: "Đơn chưa có phiếu hoàn tiền",
   colRefundAmount: "Số tiền hoàn",
   colRefundRef: "Mã giao dịch hoàn",
   timelineDerived: "Dòng thời gian",
@@ -139,17 +140,17 @@ export const ORDERS_MSG = {
   cancelNoteLabel: "Ghi chú",
   cancelNoteMissing: "Chọn \"Khác\" thì phải nhập ghi chú nêu rõ lý do.",
   cancelNext: "Tiếp tục",
-  cancelAlertRestored: "Hàng về lại đúng lô gốc. Đơn đã thanh toán nên sau đó cần lập phiếu hoàn.",
-  cancelAlertFailedDelivery: "Phiếu giao đã Giao thất bại: tồn kho giữ nguyên tới khi duyệt hàng hoàn. Đơn đã thanh toán nên sau đó cần lập phiếu hoàn.",
+  cancelAlertRestored: "Hàng về lại đúng lô gốc. Đơn đã thanh toán nên sau đó cần lập phiếu hoàn tiền.",
+  cancelAlertFailedDelivery: "Phiếu giao đã Giao thất bại: tồn kho giữ nguyên tới khi duyệt hàng hoàn. Đơn đã thanh toán nên sau đó cần lập phiếu hoàn tiền.",
   rowReason: "Lý do",
   cancelSubmit: "Huỷ đơn",
   cancelling: "Đang huỷ đơn…",
   cancelResult: (code: string) => `Đã huỷ đơn ${code}.`,
-  cancelSuggestRefund: (amount: string) => `Lập phiếu hoàn ${vnd(amount)}`,
-  cancelSuggestText: (amount: string) => `Đơn đã thanh toán. Lập phiếu hoàn ${vnd(amount)} để trả tiền cho khách.`,
+  cancelSuggestRefund: (amount: string) => `Lập phiếu hoàn tiền ${vnd(amount)}`,
+  cancelSuggestText: (amount: string) => `Đơn đã thanh toán. Lập phiếu hoàn tiền ${vnd(amount)} để trả tiền cho khách.`,
 
-  // ---- F2c: Lập phiếu hoàn ----
-  refundTitle: "Lập phiếu hoàn",
+  // ---- F2c: Lập phiếu hoàn tiền ----
+  refundTitle: "Lập phiếu hoàn tiền",
   rowSourcePayment: "Khoản tiền",
   rowRefundable: "Còn hoàn được",
   refundAmountLabel: "Số tiền hoàn",
@@ -164,11 +165,11 @@ export const ORDERS_MSG = {
     OVERPAID: "Khách chuyển thừa",
   } as Record<string, string>,
   refundAlert: "Tiền chưa rời tài khoản: bạn chuyển khoản trả khách rồi xác nhận phiếu kèm mã giao dịch.",
-  refundSubmit: (amount: string) => `Lập phiếu hoàn ${vnd(amount)}`,
-  refundSubmitNoAmount: "Lập phiếu hoàn",
+  refundSubmit: (amount: string) => `Lập phiếu hoàn tiền ${vnd(amount)}`,
+  refundSubmitNoAmount: "Lập phiếu hoàn tiền",
   refunding: "Đang lập phiếu…",
-  resultRefund: (amount: string) => `Đã lập phiếu hoàn ${vnd(amount)}. Trạng thái Chờ hoàn.`,
-  resultRefundDup: (amount: string) => `Phiếu hoàn ${vnd(amount)} đã được lập trước đó. Không tạo phiếu thứ hai.`,
+  resultRefund: (amount: string) => `Đã lập phiếu hoàn tiền ${vnd(amount)}. Trạng thái Chờ hoàn.`,
+  resultRefundDup: (amount: string) => `Phiếu hoàn tiền ${vnd(amount)} đã được lập trước đó. Không tạo phiếu thứ hai.`,
 
   // ---- Danh sách hàng chờ thanh toán ----
   queueTitle: "Hàng chờ thanh toán",
@@ -210,10 +211,10 @@ export const ORDERS_MSG = {
   fieldOrderMissing: "Còn thiếu",
   fieldOrderOver: "Thừa",
   openOrder: "Xem đơn",
-  orderNotFound: "Không tìm thấy đơn của phiếu hoàn này. Có thể bạn không có quyền xem đơn.",
-  noOrderHint: "Tiền này không khớp đơn nào. Tìm đơn khách định trả để gắn vào, hoặc lập phiếu hoàn.",
-  paymentRefundsTitle: "Phiếu hoàn của khoản này",
-  paymentRefundsCaption: "Phiếu hoàn của khoản tiền",
+  orderNotFound: "Không tìm thấy đơn của phiếu hoàn tiền này. Có thể bạn không có quyền xem đơn.",
+  noOrderHint: "Tiền này không khớp đơn nào. Tìm đơn khách định trả để gắn vào, hoặc lập phiếu hoàn tiền.",
+  paymentRefundsTitle: "Phiếu hoàn tiền của khoản này",
+  paymentRefundsCaption: "Phiếu hoàn tiền của khoản tiền",
 
   // ---- F2d: Gắn khoản tiền vào đơn ----
   attachTitle: "Gắn khoản tiền vào đơn",
@@ -245,38 +246,38 @@ export const ORDERS_MSG = {
   resultConfirmed: (code: string, status: string, closed: number) =>
     `Đã xác nhận đơn ${code}. Đơn hiện: ${status}.${closed > 1 ? ` Đã đóng ${closed} khoản chuyển thiếu của đơn.` : ""}`,
 
-  // ---- Danh sách phiếu hoàn ----
-  refundsListTitle: "Phiếu hoàn",
+  // ---- Danh sách phiếu hoàn tiền ----
+  refundsListTitle: "Phiếu hoàn tiền",
   refundsHeadCount: (total: number) => `${total} phiếu`,
-  refundsSearchLabel: "Tìm phiếu hoàn",
-  refundsNoun: "phiếu hoàn",
+  refundsSearchLabel: "Tìm phiếu hoàn tiền",
+  refundsNoun: "phiếu hoàn tiền",
   refundsFilterStatus: "Lọc theo trạng thái",
   refundsFilterMonth: "Lọc theo tháng",
-  refundsEmptyTitle: "Chưa có phiếu hoàn nào chờ chuyển",
-  refundsEmptyHint: "Phiếu hoàn mới lập hoặc vừa báo thất bại sẽ hiện ở đây.",
-  refundsEmptyMonthTitle: "Tháng này chưa có phiếu hoàn",
+  refundsEmptyTitle: "Chưa có phiếu hoàn tiền nào chờ chuyển",
+  refundsEmptyHint: "Phiếu hoàn tiền mới lập hoặc vừa báo thất bại sẽ hiện ở đây.",
+  refundsEmptyMonthTitle: "Tháng này chưa có phiếu hoàn tiền",
   refundsEmptyMonthHint: "Chọn tháng khác hoặc bỏ lọc tháng để xem mọi phiếu.",
   refundsShown: (n: number, total: number) => `Đang hiện ${n} / ${total} phiếu`,
   // Câu tổng theo tháng: nêu từng trạng thái đang cộng (Chờ hoàn / Đã hoàn); phiếu Thất bại không tính.
   refundsMonthSummary: (monthLabel: string, parts: { status: "PENDING" | "REFUNDED"; count: number; total: string }[], failedCount: number) => {
-    const name = (st: "PENDING" | "REFUNDED") => (st === "PENDING" ? "Chờ hoàn" : "Đã hoàn");
+    const name = (st: "PENDING" | "REFUNDED") => ENUMS.refundStatus[st].label;
     const body =
       parts.length === 0
-        ? "không có phiếu Chờ hoàn hay Đã hoàn"
+        ? `không có phiếu ${ENUMS.refundStatus.PENDING.label} hay ${ENUMS.refundStatus.REFUNDED.label}`
         : parts.map((p) => `${p.count} phiếu ${name(p.status)}, tổng tiền ${vnd(p.total)}`).join(" · ");
-    const tail = failedCount > 0 ? ` (không tính ${failedCount} phiếu Thất bại)` : parts.length > 1 ? "" : " (không tính phiếu Thất bại)";
+    const tail = failedCount > 0 ? ` (không tính ${failedCount} phiếu ${ENUMS.refundStatus.FAILED.label})` : parts.length > 1 ? "" : ` (không tính phiếu ${ENUMS.refundStatus.FAILED.label})`;
     return `${monthLabel}: ${body}${tail}`;
   },
   refundsLoadMore: "Tải thêm phiếu",
-  colRefundId: "Phiếu hoàn",
+  colRefundId: "Phiếu hoàn tiền",
   colRefundOrder: "Đơn",
   colRefundCreatedAt: "Lập lúc",
   noInvoice: "Không có hoá đơn",
 
-  // ---- Chi tiết phiếu hoàn ----
-  backToRefunds: "Phiếu hoàn",
-  refundNoun: "phiếu hoàn",
-  refundIdTitle: (id: number) => `Phiếu hoàn #${id}`,
+  // ---- Chi tiết phiếu hoàn tiền ----
+  backToRefunds: "Phiếu hoàn tiền",
+  refundNoun: "phiếu hoàn tiền",
+  refundIdTitle: (id: number) => `Phiếu hoàn tiền #${id}`,
   fieldRefundAmount: "Số tiền hoàn",
   fieldRefundReason: "Lý do hoàn",
   fieldRefundOrder: "Đơn liên quan",
@@ -288,7 +289,7 @@ export const ORDERS_MSG = {
   fieldRefundCustomer: "Khách hàng",
   fieldRefundPhone: "Số điện thoại",
   fieldRefundMethod: "Hình thức hoàn",
-  tlRefundCreated: "Lập phiếu hoàn",
+  tlRefundCreated: "Lập phiếu hoàn tiền",
   tlRefundConfirmed: "Xác nhận đã hoàn tiền",
   tlRefundFailed: "Báo chuyển thất bại",
   tlPaymentReceived: "Nhận khoản tiền",
@@ -346,12 +347,12 @@ export const ORDERS_MSG = {
   dupBadge: "Nghi trùng",
   dupRefundAck: "Tôi đã đối chiếu sao kê",
   dupRefundBox: "Khoản này đang bị nghi trùng với một khoản khác. Đối chiếu sao kê, tránh hoàn hai lần.",
-  dupRefundNeedAck: "Tick xác nhận đã đối chiếu sao kê rồi mới lập phiếu hoàn.",
+  dupRefundNeedAck: "Tick xác nhận đã đối chiếu sao kê rồi mới lập phiếu hoàn tiền.",
 
   // ---- Chung ----
   conflictNounOrder: "đơn",
   conflictNounPayment: "khoản tiền",
-  conflictNounRefund: "phiếu hoàn",
+  conflictNounRefund: "phiếu hoàn tiền",
   forbidden: "Bạn không có quyền xem danh sách này.",
   back: "Quay lại",
 } as const;

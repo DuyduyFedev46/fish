@@ -129,7 +129,7 @@ export const BE_ERRORS = {
   TT_ACTION_INVALID: {
     status: 400,
     code: "BR-TT-09",
-    detail: "Cách xử lý không hợp lệ: ATTACH_TO_ORDER hoặc CONFIRM_ORDER (hoàn tiền thì tạo phiếu hoàn).",
+    detail: "Cách xử lý không hợp lệ: ATTACH_TO_ORDER hoặc CONFIRM_ORDER (hoàn tiền thì tạo phiếu hoàn tiền).",
   },
   TT_ORDER_REQUIRED: { status: 400, code: "BR-TT-09", detail: "Thiếu hoặc sai order_id." },
   TT_ORDER_NOT_FOUND: { status: 400, code: "BR-TT-09", detail: "Không tìm thấy đơn để gắn." },
@@ -137,7 +137,7 @@ export const BE_ERRORS = {
   TT_ORDER_NOT_BOOKED: { status: 400, code: "BR-TT-09", detail: "Đơn không ở trạng thái Giữ chỗ (đã thanh toán hoặc đang xử lý)." },
   TT_CONFIRM_NO_ORDER: { status: 400, code: "BR-TT-09", detail: "Giao dịch chưa gắn đơn — gắn đơn trước (ATTACH_TO_ORDER)." },
   TT_CONFIRM_ONLY_UNDERPAID: { status: 400, code: "BR-TT-09", detail: "Chỉ xác nhận đơn từ giao dịch thiếu tiền." },
-  TT_CONFIRM_HAS_REFUND: { status: 400, code: "BR-TT-09", detail: "Giao dịch đang có phiếu hoàn — không dùng để xác nhận đơn." },
+  TT_CONFIRM_HAS_REFUND: { status: 400, code: "BR-TT-09", detail: "Giao dịch đang có phiếu hoàn tiền — không dùng để xác nhận đơn." },
   // ---- S13 POST /api/sales/refunds/create/ (BE L8, nhánh payment_transaction — `create_refund_for_payment`) ----
   HT_OVER_REFUNDABLE: { status: 400, code: "BR-HT-04", detail: "Vượt số tiền còn được hoàn: tối đa {max}." },
   /** S15 nhánh sales_invoice (`create_invoice_refund`, câu viết lại ở BE L9 để khớp đúng chữ story). */
@@ -146,11 +146,11 @@ export const BE_ERRORS = {
   HT_AMOUNT_MIN: { status: 400, code: "BR-HT-04", detail: "Số tiền hoàn tối thiểu 1 ₫." },
   HT_ONE_SOURCE: { status: 400, code: "BR-HT-01", detail: "Chỉ gửi một trong hai: sales_invoice hoặc payment_transaction." },
   HT_NO_SOURCE: { status: 400, code: "BR-HT-01", detail: "Thiếu sales_invoice hoặc payment_transaction." },
-  HT_TXN_MATCHED: { status: 400, code: "BR-HT-01", detail: "Giao dịch đã khớp hoá đơn — lập phiếu hoàn từ hoá đơn." },
+  HT_TXN_MATCHED: { status: 400, code: "BR-HT-01", detail: "Giao dịch đã khớp hoá đơn — lập phiếu hoàn tiền từ hoá đơn." },
   HT_TXN_NOT_FOUND: { status: 400, code: "BR-HT-01", detail: "Giao dịch không tồn tại." },
   HT_REQUEST_ID_INVALID: { status: 400, code: "BR-HT-01", detail: "request_id phải là UUID." },
-  HT_REQUEST_ID_USED: { status: 400, code: "BR-HT-01", detail: "request_id đã dùng cho phiếu hoàn khác." },
-  HT_TXN_RESOLVED: { status: 400, code: "BR-TT-09", detail: "Giao dịch đã được xử lý, không lập phiếu hoàn." },
+  HT_REQUEST_ID_USED: { status: 400, code: "BR-HT-01", detail: "request_id đã dùng cho phiếu hoàn tiền khác." },
+  HT_TXN_RESOLVED: { status: 400, code: "BR-TT-09", detail: "Giao dịch đã được xử lý, không lập phiếu hoàn tiền." },
   // ---- #15 POST /api/sales/payments/record-late/ (BE, 03-dev-notes.md "#15 ghi tiền về muộn (BE)"; BR-TT-18) ----
   // Mã lỗi BR-TT-18: thân kèm khoá ô (bank_txn_id | amount | received_at) trùng `detail`; truyền qua tham số `extra` của beError.
   LATE_TXN_MISSING: { status: 400, code: "BR-TT-18", detail: "Thiếu mã giao dịch ngân hàng." },
@@ -200,7 +200,7 @@ export const BE_ERRORS = {
   GH_CANCEL_COMPLETED: {
     status: 400,
     code: "BR-GH-05",
-    detail: "Đơn đã giao hoàn tất — chỉ còn cách lập phiếu hoàn.",
+    detail: "Đơn đã giao hoàn tất — chỉ còn cách lập phiếu hoàn tiền.",
   },
   HT_CANCEL_REASON_INVALID: { status: 400, code: "BR-HT-05", detail: "Lý do huỷ không hợp lệ." },
   HT_CANCEL_NOTE_REQUIRED: {

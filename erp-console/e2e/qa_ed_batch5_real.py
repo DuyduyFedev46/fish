@@ -321,7 +321,7 @@ def main():
         page.get_by_role("button", name="Quyết định", exact=True).click()
         d = dialog(page)
         d.wait_for()
-        d.locator("label", has_text="Gia hạn thêm").first.click()
+        d.locator("label", has_text="Gia hạn gọi").first.click()
         d.get_by_label(re.compile("^Lý do")).fill("Khách hẹn gọi chiều")
         from datetime import datetime, timedelta
         from zoneinfo import ZoneInfo
@@ -329,7 +329,7 @@ def main():
         d.get_by_role("button", name=re.compile("Lưu quyết định")).dblclick()
         d.wait_for(state="detached", timeout=15_000)
         page.wait_for_timeout(1000)
-        ok("AC4 (BE thật): Gia hạn thêm -> việc sang Hẹn gọi lại, chỉ 1 lần (bấm đúp)", task(IDS["E2"])["state"] == "CALLBACK", task(IDS["E2"]))
+        ok("AC4 (BE thật): Gia hạn gọi -> việc sang Hẹn gọi lại, chỉ 1 lần (bấm đúp)", task(IDS["E2"])["state"] == "CALLBACK", task(IDS["E2"]))
         # gia hạn quá 24 giờ -> chặn ở BE
         s, body = call("ql1", "POST", f"/api/confirmation/queue/{IDS['E1']}/decide/", {"decision": "EXTEND", "reason": "thử", "until": (datetime.now(ZoneInfo("UTC")) + timedelta(hours=26)).isoformat()})
         ok("AC4 (BE thật): gia hạn > 24 giờ -> 400, việc không đổi", s == 400 and task(IDS["E1"])["state"] == "ESCALATED", (s, body))
@@ -360,12 +360,12 @@ def main():
         page.get_by_role("button", name="Quyết định", exact=True).click()
         d = dialog(page)
         d.wait_for()
-        d.locator("label", has_text="Giao không xác nhận").first.click()
+        d.locator("label", has_text="Bỏ qua gọi xác nhận").first.click()
         d.get_by_label(re.compile("^Lý do")).fill("Khách quen, giao luôn")
         d.get_by_role("button", name=re.compile("Lưu quyết định")).click()
         d.wait_for(state="detached", timeout=15_000)
         page.wait_for_timeout(800)
-        ok("AC4 (BE thật, loc): Giao không xác nhận -> phiếu sang Soạn hàng", sql("select status from delivery_deliverynote where id=?", IDS["E4"])[0][0] == "PREPARING")
+        ok("AC4 (BE thật, loc): Bỏ qua gọi xác nhận -> phiếu sang Soạn hàng", sql("select status from delivery_deliverynote where id=?", IDS["E4"])[0][0] == "PREPARING")
         ctx.close()
 
         # ---------------- 409 STALE_STATE thật: job tự huỷ chạy trong lúc ql1 mở hộp ----------------
@@ -374,7 +374,7 @@ def main():
         page.get_by_role("button", name="Quyết định", exact=True).click()
         d = dialog(page)
         d.wait_for()
-        d.locator("label", has_text="Giao không xác nhận").first.click()
+        d.locator("label", has_text="Bỏ qua gọi xác nhận").first.click()
         d.get_by_label(re.compile("^Lý do")).fill("Giao luôn")
         out = subprocess.run(JOB, shell=True, capture_output=True, text=True).stdout
         ok("409 STALE (BE thật): job tự huỷ đã huỷ đơn trong lúc hộp mở", re.search(r"tự huỷ [1-9]", out) is not None, out[-200:])

@@ -1,7 +1,7 @@
 "use client";
 
 // Trang chi tiết khoản tiền (ED-11): /orders/payments/detail/?id=<pk>. Nút theo `available_actions` của khoản (Quản lý: rỗng,
-// BE vẫn chặn 403): Gắn vào đơn (F2d) · Xác nhận đơn đủ tiền (F2e) · Lập phiếu hoàn (F2c). Nội dung chuyển khoản chỉ hiện khi
+// BE vẫn chặn 403): Gắn vào đơn (F2d) · Xác nhận đơn đủ tiền (F2e) · Lập phiếu hoàn tiền (F2c). Nội dung chuyển khoản chỉ hiện khi
 // BE trả (người có quyền); không bao giờ đưa vào log hay yêu cầu AI. 409 → ConflictBanner, không xử lý lần hai.
 
 import { useMemo, useState } from "react";

@@ -2,7 +2,7 @@
 #   cd erp-console && NEXT_PUBLIC_USE_MOCK=1 npm run build && (cd out && python3 -m http.server 3401 &)
 #   BASE=http://127.0.0.1:3401 SHOTS=<thư mục ảnh> python3 e2e/ed_bonusA_ui.py      # tắt server (đúng cổng của mình) sau khi xong
 # Kiểm các mục còn lại ngoài ed_batch3 (#15), ed_batch6 (#5), ed_batch8 (#6/#20), ed_batch9 (#8 danh sách), ed_batch10 (#22):
-#   #1 hạn mức AI (chỉ Chủ thấy; ok / sắp chạm / hết) · #2 mốc "Tạo phiếu hoàn" có liên kết sang phiếu · #8 Huỷ phiếu hoàn
+#   #1 hạn mức AI (chỉ Chủ thấy; ok / sắp chạm / hết) · #2 mốc "Lập phiếu hoàn tiền" có liên kết sang phiếu · #8 Huỷ phiếu hoàn
 #   (đường thuận, 409, người không đủ quyền không thấy mục) · #11 tìm khách bằng POST, từ khoá không nằm trong URL ·
 #   #14 lỗi chi phí dưới đúng ô · #17 SĐT từ danh sách, không gọi thêm chi tiết · #18 mốc Bắt đầu giao / Giao thất bại ·
 #   #19 "Nhờ người xử lý" trong menu "…" (đơn, lô) · quyền: vai không có quyền không thấy · 360px không cuộn ngang.
@@ -117,8 +117,8 @@ def refund_timeline(browser):
     order = page.evaluate("""() => { for (let id = 101; id <= 140; id++) { try { const j = window.__caveMock.orderJson('loc', id); if (j && j.refunds && j.refunds.length) return id; } catch (e) {} } return null; }""")
     ok("#2 tìm được đơn có phiếu hoàn trong dữ liệu mock", order is not None, str(order))
     go(page, f"/orders/detail/?id={order}")
-    link = page.locator("a", has_text="Tạo phiếu hoàn").first
-    ok("#2 mốc 'Tạo phiếu hoàn' là liên kết", link.count() == 1 and link.is_visible())
+    link = page.locator("a", has_text="Lập phiếu hoàn tiền").first
+    ok("#2 mốc 'Lập phiếu hoàn tiền' là liên kết", link.count() == 1 and link.is_visible())
     href = link.get_attribute("href") or ""
     ok("#2 liên kết trỏ sang phiếu hoàn, chỉ mang ?id=", re.search(r"/orders/refunds/detail/\?id=\d+$", href) is not None, href)
     link.click()

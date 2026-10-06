@@ -264,6 +264,12 @@ export function ConfirmationDetailScreen() {
           <span>{item.guidance}</span>
         </div>
       )}
+      {item.auto_cancel_blocked_label && (
+        <div className={`alert-box warn ${s.guidance}`} role="status">
+          <Icon name="info" />
+          <span>{item.auto_cancel_blocked_label}</span>
+        </div>
+      )}
       {item.confirm_state === "ESCALATED" && decisions.length === 0 && (
         <div className={`alert-box warn ${s.guidance}`} role="status">
           <Icon name="hourglass_top" />
@@ -394,7 +400,7 @@ export function ConfirmationDetailScreen() {
           onClose={() => setModal(null)}
           onStale={refreshAll}
           onDone={() => {
-            toast.success("Đã huỷ xác nhận. Đơn về Chờ xác nhận để gọi lại khách.");
+            toast.success("Đã huỷ xác nhận. Phiếu giao về Chờ gọi xác nhận để gọi lại khách.");
             refreshAll();
           }}
         />
@@ -417,7 +423,7 @@ export function ConfirmationDetailScreen() {
               else refreshAll();
               return;
             }
-            toast.success(decision === "EXTEND" ? "Đã gia hạn. Đơn hẹn gọi lại khách." : "Đã cho giao không cần xác nhận. Đơn chuyển sang Soạn hàng.");
+            toast.success(decision === "EXTEND" ? "Đã gia hạn. Đơn hẹn gọi lại khách." : "Đã cho giao không cần xác nhận. Phiếu giao chuyển sang Đang soạn hàng.");
             refreshAll();
           }}
         />

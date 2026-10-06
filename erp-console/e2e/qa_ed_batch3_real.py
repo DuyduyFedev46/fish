@@ -409,7 +409,7 @@ with sync_playwright() as p:
     pg.goto(FE + "/orders/payments/"); settle(pg)
     expect(pg.locator("main table tbody tr").first).to_be_visible()
     rows = [[c.strip() for c in r.locator("td").all_inner_texts()] for r in pg.locator("main table tbody tr").all()]
-    ok("ED-11-AC1 BE thật: 4 loại lệch có đúng nhãn chip", {r[2] for r in rows} == {"Thiếu tiền", "Về sau khi đơn tự huỷ", "Chuyển thừa", "Không khớp đơn"}, {r[2] for r in rows})
+    ok("ED-11-AC1 BE thật: 4 loại lệch có đúng nhãn chip", {r[2] for r in rows} == {"Thiếu tiền", "Về sau khi đơn đã huỷ", "Chuyển thừa", "Không khớp đơn"}, {r[2] for r in rows})
     ok("ED-11-AC1 BE thật: cột Tình trạng xử lý 'Chờ xử lý'", all(r[3] == "Chờ xử lý" for r in rows), [r[3] for r in rows])
     ok("ED-11 BE thật: Số tiền 'x đ', Nhận lúc dd/mm/yyyy hh:mm", all(re.fullmatch(r"[\d.]+ đ", r[1]) and re.fullmatch(r"\d{2}/\d{2}/\d{4} \d{2}:\d{2}", r[5]) for r in rows), rows[:2])
     shot(pg, "payments")

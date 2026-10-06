@@ -1,7 +1,7 @@
 // API module orders — S10 (danh sách + chi tiết đơn) và S11 (Chủ xác nhận thanh toán tay), contract ở 02-stories.md.
 // Danh sách/chi tiết cần sales.view_salesorder (NV giao chỉ thấy đơn của phiếu mình, ngoài phạm vi → 404, S5).
 // Xác nhận tay cần sales.confirm_payment_manual; nút chỉ hiện khi `available_actions` có "confirm_payment".
-// S12 (hàng chờ thanh toán lệch) + S13 (phiếu hoàn cho khoản không có hoá đơn): chỉ Chủ (sales.confirm_payment_manual;
+// S12 (hàng chờ thanh toán lệch) + S13 (phiếu hoàn tiền cho khoản không có hoá đơn): chỉ Chủ (sales.confirm_payment_manual;
 // S13 thêm sales.create_refund). Nút trên từng khoản theo `available_actions` của khoản đó.
 
 import { apiFetch, type Paginated } from "@/shared/lib/http";
@@ -143,7 +143,7 @@ export function recordLatePayment(input: RecordLatePaymentInput): Promise<Record
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
-// S13 — phiếu hoàn cho khoản tiền không có hoá đơn
+// S13 — phiếu hoàn tiền cho khoản tiền không có hoá đơn
 
 /** POST /api/sales/refunds/create/ {payment_transaction, amount, reason, request_id, acknowledge_duplicate_warning?} → 201 phiếu PENDING (200 + duplicate khi trùng request_id).
  * Khoản có nhãn nghi trùng mà thiếu cờ → 409 PAYMENT_DUPLICATE_WARNING (`detail` = nhãn). */
@@ -156,11 +156,11 @@ export function createRefund(input: CreateRefundInput): Promise<CreateRefundResu
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
-// S16 — phiếu hoàn chờ chuyển: danh sách + xác nhận / báo thất bại / thử lại
+// S16 — phiếu hoàn tiền chờ chuyển: danh sách + xác nhận / báo thất bại / thử lại
 
 const REFUNDS = "/api/sales/refunds/";
 
-/** Chuỗi query phiếu hoàn: `status` (nhiều giá trị), `month=YYYY-MM` (Lô 3 R3), `page`. */
+/** Chuỗi query phiếu hoàn tiền: `status` (nhiều giá trị), `month=YYYY-MM` (Lô 3 R3), `page`. */
 export function refundListQuery(params: RefundListParams, page: number): string {
   const qs = new URLSearchParams();
   if (params.status) qs.set("status", params.status);

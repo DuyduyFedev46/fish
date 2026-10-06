@@ -18,7 +18,7 @@ export const GROUP_LABEL: Record<string, string> = {
 /** Một dòng mô tả việc chính của nhóm — chỉ để Chủ chọn nhóm cho đúng, không phải luật (luật ở BE). */
 export const GROUP_HINT: Record<string, string> = {
   [ROLE.owner]: "Toàn quyền: tiền, giá vốn, lãi lỗ, nhân viên",
-  [ROLE.manager]: "Duyệt vận hành: mở bán lô, huỷ đơn, tạo phiếu hoàn, kiểm kê",
+  [ROLE.manager]: "Duyệt vận hành: mở bán lô, huỷ đơn, tạo phiếu hoàn tiền, kiểm kê",
   [ROLE.warehouseStaff]: "Nhập lô, soạn hàng, kiểm kê",
   [ROLE.deliveryStaff]: "Nhận và giao phiếu được gán",
   [ROLE.customerService]: "Gọi xác nhận đơn, đổi thông tin nhận",

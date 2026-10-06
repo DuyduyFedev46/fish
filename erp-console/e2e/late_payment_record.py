@@ -98,7 +98,7 @@ with sync_playwright() as p:
     ls = page.evaluate("() => JSON.stringify(Object.entries(localStorage))")
     ok("localStorage không chứa mã GD vừa nhập", "FTE2E001" not in ls)
     main = page.locator("main").inner_text()
-    ok("Chi tiết: loại 'Về sau khi đơn tự huỷ', nguồn 'Xác nhận tay', còn mở", "Về sau khi đơn tự huỷ" in main and "Xác nhận tay" in main and order_code in main, main[:400])
+    ok("Chi tiết: loại 'Về sau khi đơn đã huỷ', nguồn 'Xác nhận tay', còn mở", "Về sau khi đơn đã huỷ" in main and "Xác nhận tay" in main and order_code in main, main[:400])
     ok("Dòng thời gian có 'Ghi tay tiền về muộn 350.000 đ (mã GD FTE2E001)'", "Ghi tay tiền về muộn 350.000 đ (mã GD FTE2E001)" in page.locator("main").inner_text())
     ok("Chi tiết khoản ORPHAN: nút chính là Lập phiếu hoàn", page.locator("main header .btn.primary").first.inner_text().strip() == "Lập phiếu hoàn", page.locator("main header .btn.primary").first.inner_text())
     page.screenshot(path=f"{SHOTS}/detail-late-1280.png")

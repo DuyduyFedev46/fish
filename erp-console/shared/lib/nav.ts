@@ -89,7 +89,7 @@ export const PERM = {
   viewSalesOrder: "sales.view_salesorder",
   /** S11/S12: chỉ Chủ — xác nhận tiền tay, xử lý hàng chờ thanh toán lệch (BR-TT-07, BR-TT-09). */
   confirmPaymentManual: "sales.confirm_payment_manual",
-  /** S16: xem danh sách phiếu hoàn (Chủ, Quản lý có — warehouse_staff/delivery_staff không). Nút xác nhận/thất bại/thử lại theo
+  /** S16: xem danh sách phiếu hoàn tiền (Chủ, Quản lý có — warehouse_staff/delivery_staff không). Nút xác nhận/thất bại/thử lại theo
    * `available_actions` của từng phiếu (chỉ Chủ có sales.confirm_refund, S16-AC7). */
   viewRefund: "sales.view_refund",
   /** ED-09/ED-10: huỷ đơn đã thanh toán (Chủ, Quản lý). Nút thật theo `available_actions` của BE; quyền này chỉ để hiện mục "Huỷ đơn" mờ kèm lý do. */
@@ -206,7 +206,7 @@ export const NAV: NavItem[] = [
   },
   {
     key: "payments",
-    summary: "Khoản tiền về lệch: thiếu, thừa, về sau khi đơn tự huỷ, không khớp đơn.",
+    summary: "Khoản tiền về lệch: thiếu, thừa, về sau khi đơn đã huỷ, không khớp đơn.",
     plannedIn: "S12, S13",
     href: "/orders/payments/",
     label: "Hàng chờ thanh toán",
@@ -220,11 +220,11 @@ export const NAV: NavItem[] = [
   },
   {
     key: "refunds",
-    summary: "Phiếu hoàn đang chờ Chủ chuyển khoản: xác nhận, báo thất bại, thử lại.",
+    summary: "Phiếu hoàn tiền đang chờ Chủ chuyển khoản: xác nhận, báo thất bại, thử lại.",
     plannedIn: "S16",
     href: "/orders/refunds/",
-    label: "Phiếu hoàn chờ chuyển",
-    short: "Phiếu hoàn",
+    label: "Hoàn tiền chờ chuyển",
+    short: "Hoàn tiền",
     icon: "currency_exchange",
     section: "Bán hàng",
     parent: "orders",
@@ -345,8 +345,8 @@ export const NAV: NavItem[] = [
     summary: "Hàng khách trả về, chờ duyệt nhập lại kho hoặc huỷ.",
     plannedIn: "Lô 9",
     href: "/returns/",
-    label: "Hàng hoàn về kho",
-    short: "Hoàn kho",
+    label: "Hàng hoàn",
+    short: "Hàng hoàn",
     icon: "assignment_return",
     section: "Hàng hoá & kho",
     visible: (me) => has(me, PERM.viewReturn),

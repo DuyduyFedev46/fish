@@ -1,6 +1,7 @@
 // Hàm thuần của màn Gọi xác nhận (không React, để vitest). Không ghi tên, số điện thoại, địa chỉ ra log, URL hay máy.
 // Số điện thoại hiện đúng chuỗi BE trả (đủ số khi trong phạm vi, `phone_masked` khi ngoài phạm vi): FE không tự cắt hay ghép số.
 import type { PathStep } from "@/shared/ui/detail/StatusPath";
+import { ENUMS } from "@/shared/lib/enums";
 import { dateTime, vnd } from "@/shared/lib/format";
 import type { CallResult, ConfirmationQueueDetail, ConfirmationQueueItem } from "./types";
 import { CALL_RESULT_OPTIONS } from "./types";
@@ -81,9 +82,9 @@ export function extendError(iso: string, now: Date = new Date()): string | null 
 
 // ---- Thanh trạng thái (board W1c2): Chờ gọi > Cần quyết định > Hoàn tất, khớp với chip của việc gọi ----
 export const PATH_STEPS: PathStep[] = [
-  { key: "WAITING", label: "Chờ gọi" },
-  { key: "DECIDE", label: "Cần quyết định" },
-  { key: "DONE", label: "Hoàn tất" },
+  { key: "WAITING", label: ENUMS.confirmTaskState.PENDING.label },
+  { key: "DECIDE", label: ENUMS.confirmTaskState.ESCALATED.label },
+  { key: "DONE", label: ENUMS.confirmTaskState.DONE.label },
 ];
 
 type PathItem = Pick<ConfirmationQueueItem, "note_status" | "confirm_state">;
@@ -204,7 +205,7 @@ export function loadedOnlyNote(loaded: number): string {
 /** Câu toast sau khi ghi một cuộc gọi, theo kết quả BE trả. */
 export function callToast(result: CallResult, res: { confirm_state: string | null; attempts: number; duplicate: boolean }, maxAttempts: number, callbackAt?: string | null): string {
   if (res.duplicate) return "Cuộc gọi này đã được ghi trước đó.";
-  if (result === "CONFIRMED") return "Đã xác nhận. Đơn chuyển sang Soạn hàng.";
+  if (result === "CONFIRMED") return "Đã xác nhận. Phiếu giao chuyển sang Đang soạn hàng.";
   if (result === "NOTIFIED") return "Đã ghi báo hoàn tiền cho khách.";
   if (result === "CALLBACK") return callbackAt ? `Đã hẹn gọi lại lúc ${dateTime(callbackAt)}.` : "Đã hẹn gọi lại.";
   if (res.confirm_state === "ESCALATED") return "Đã ghi cuộc gọi. Đơn chuyển cho Chủ hoặc Quản lý quyết định.";
@@ -250,8 +251,6 @@ export const RECIPIENT_FIELD_OF: Record<string, keyof RecipientDraft> = { recipi
 
 // ---- F2k: quyết định đơn chưa xác nhận ----
 export const DECIDE_REASON_MAX = 200;
-export const CANCEL_REASON_CODES: Array<{ value: "UNREACHABLE" | "CUSTOMER_CHANGED_MIND" | "OTHER"; label: string }> = [
-  { value: "UNREACHABLE", label: "Không liên lạc được khách" },
-  { value: "CUSTOMER_CHANGED_MIND", label: "Khách đổi ý" },
-  { value: "OTHER", label: "Lý do khác" },
-];
+export const CANCEL_REASON_CODES: Array<{ value: "UNREACHABLE" | "CUSTOMER_CHANGED_MIND" | "OTHER"; label: string }> = (
+  ["UNREACHABLE", "CUSTOMER_CHANGED_MIND", "OTHER"] as const
+).map((value) => ({ value, label: ENUMS.cancelReason[value].label }));

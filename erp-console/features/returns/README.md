@@ -1,6 +1,6 @@
-# Hàng hoàn về kho (ED-26)
+# Hàng hoàn (ED-26)
 
-Hàng giao thất bại mang về kho: nhân viên giao hoặc nhân viên kho nhập số kg, Chủ hoặc Quản lý duyệt "Tái nhập vào lô" hoặc "Huỷ bỏ, ghi lỗ". Màn danh sách `/returns/`, màn chi tiết `/returns/detail/?id=`, hộp "Nhập hàng hoàn về kho", hộp "Duyệt hàng hoàn" và hộp "Huỷ phiếu hàng hoàn" (Lô bổ sung A #8).
+Hàng giao thất bại mang về kho: nhân viên giao hoặc nhân viên kho nhập số kg, Chủ hoặc Quản lý duyệt "Tái nhập vào lô" hoặc "Huỷ hàng, ghi lỗ". Màn danh sách `/returns/`, màn chi tiết `/returns/detail/?id=`, hộp "Nhập hàng hoàn về kho", hộp "Duyệt hàng hoàn" và hộp "Huỷ phiếu hàng hoàn" (Lô bổ sung A #8).
 
 | File | Việc của file |
 |---|---|

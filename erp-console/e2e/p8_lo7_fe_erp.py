@@ -172,7 +172,7 @@ def confirmation_case(browser, tag, w, h):
     modal = page.get_by_role("dialog")
     modal.wait_for(timeout=10_000)
     page.wait_for_timeout(400)
-    modal.locator("label", has_text="Giao không xác nhận").first.click()
+    modal.locator("label", has_text="Bỏ qua gọi xác nhận").first.click()
     modal.get_by_label("Lý do", exact=False).or_(modal.get_by_label("Ghi chú", exact=False)).first.fill("Khách quen giao nhiều lần")
     submit = modal.get_by_role("button", name="Lưu quyết định")
     submit.click()

@@ -139,13 +139,13 @@ MONEY_RE = re.compile(r"^\d{1,3}(\.\d{3})* đ$")
 ORDER_CODE_RE = re.compile(r"^SO\d{6}-[0-9A-F]{6}$")
 ORDER_CODE_IN = re.compile(r"SO\d{6}-[0-9A-F]{6}")
 # UI-RULES §3.2 + §3.4: chữ cấm / tên cũ (kiểm trên văn bản nhìn thấy của mọi màn Lô 3)
-FORBIDDEN = [r"\bTTL\b", r"\bFEFO\b", r"hạch toán", r"\bNCC\b", r"\bNV\b", r"\bSĐT\b", r"\bSTK\b", r"Tổng hoàn", r"Tạo phiếu hoàn",
+FORBIDDEN = [r"\bTTL\b", r"\bFEFO\b", r"hạch toán", r"\bNCC\b", r"\bNV\b", r"\bSĐT\b", r"\bSTK\b", r"Tổng hoàn", r"Lập phiếu hoàn tiền",
              r"Báo hoàn tiền", r"Xác nhận thanh toán", r"Xác nhận tiền về", r"Xác nhận đã chuyển", r"\bBR-[A-Z]", r"Đồng ý thực thi",
              r"Cấu hình", r"Hoàn tác"]
 PII = re.compile(r"0901234567|0912345678|0945222333|0977111222|0868554561|Lê Lợi|Lý Thường Kiệt|Chị Hoa|Anh Khoa|Anh Minh|Cô Lan|Chị Thảo|Bác Tư|Chị Ngọc Ánh")
 ORDER_CHIPS = {"Giữ chỗ", "Đã thanh toán", "Đang xử lý", "Hoàn tất", "Đã huỷ"}
 DELIVERY_CHIPS = {"Chờ xác nhận", "Soạn hàng", "Chờ lấy hàng", "Đang giao", "Hoàn tất", "Giao thất bại", "Đã huỷ theo đơn", "—"}
-MATCH_CHIPS = {"Khớp", "Thiếu tiền", "Về sau khi đơn tự huỷ", "Không khớp đơn", "Chuyển thừa"}
+MATCH_CHIPS = {"Khớp", "Thiếu tiền", "Về sau khi đơn đã huỷ", "Không khớp đơn", "Chuyển thừa"}
 RES_CHIPS = {"Chờ xử lý", "Đã xử lý"}
 REFUND_CHIPS = {"Chờ hoàn", "Đã hoàn", "Thất bại"}
 
@@ -266,7 +266,7 @@ with sync_playwright() as p:
         expect(pg.locator("main table tbody tr").first).to_be_visible()
         ok("ED-11-AC1 cột", heads(pg) == ["Mã giao dịch", "Số tiền", "Loại khoản tiền", "Tình trạng xử lý", "Đơn", "Nhận lúc"], heads(pg))
         rows = table_rows(pg)
-        ok("ED-11-AC1 chip loại khoản ∈ nhãn FE ngắn", all(r[2] in MATCH_CHIPS for r in rows) and {r[2] for r in rows} >= {"Thiếu tiền", "Không khớp đơn", "Chuyển thừa", "Về sau khi đơn tự huỷ"},
+        ok("ED-11-AC1 chip loại khoản ∈ nhãn FE ngắn", all(r[2] in MATCH_CHIPS for r in rows) and {r[2] for r in rows} >= {"Thiếu tiền", "Không khớp đơn", "Chuyển thừa", "Về sau khi đơn đã huỷ"},
            {r[2] for r in rows})
         ok("ED-11-AC1 'Tình trạng xử lý' là cột riêng, chip Chờ xử lý/Đã xử lý", all(r[3] in RES_CHIPS for r in rows), {r[3] for r in rows})
         ok("ED-11 cột Đơn: mã đơn hoặc 'Chưa gắn đơn'", all(ORDER_CODE_RE.match(r[4]) or r[4] == "Chưa gắn đơn" for r in rows), [r[4] for r in rows])

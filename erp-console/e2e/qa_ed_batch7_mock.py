@@ -361,7 +361,7 @@ def check_actions(browser):
     ok("Sau huỷ: không còn mục ghi nào mở được (Trả/Huỷ/Chốt đều mờ kèm lý do)", all(" · " in i for i in items if re.match(r"Trả|Huỷ|Chốt", i)), str(items))
     page.keyboard.press("Escape")
     led = page.locator("table.lt").first.inner_text()
-    ok("ED-24-AC2: Nhập xuất của lô có dòng 'Ghi lỗ, huỷ hàng' (Tồn sau 0)", "Ghi lỗ, huỷ hàng" in led and re.search(r"-3 kg\s+0 kg", re.sub(r"[ \t]+", " ", led)) is not None, led[:300])
+    ok("ED-24-AC2: Nhập xuất của lô có dòng 'Huỷ hàng, ghi lỗ' (Tồn sau 0)", "Huỷ hàng, ghi lỗ" in led and re.search(r"-3 kg\s+0 kg", re.sub(r"[ \t]+", " ", led)) is not None, led[:300])
     shot(page, "q7-loc-after-cancel", full=True)
 
     page.locator("a", has_text="Kho & lô").first.click()
@@ -402,7 +402,7 @@ def check_actions(browser):
     ok("ED-29-AC1: dòng mới nhất của sổ là 'Trả nhà cung cấp' lô L0908-CT00, -2,5 kg, Tồn sau 4 kg", first[1] == "Trả nhà cung cấp" and first[2] == "L0908-CT00" and first[4].startswith("-2,5") and first[5].startswith("4"), str(first))
     ok("ED-29-AC1: dòng có người làm (tên) không phải rỗng", first[7] != "", str(first))
     second = [c.strip() for c in lt.locator("tbody tr").nth(1).locator("td").all_inner_texts()]
-    ok("ED-29-AC1: dòng 'Ghi lỗ, huỷ hàng' của L0910-TS00 nằm ngay sau, Tồn sau 0 kg", second[1] == "Ghi lỗ, huỷ hàng" and second[2] == "L0910-TS00" and second[5].startswith("0"), str(second))
+    ok("ED-29-AC1: dòng 'Huỷ hàng, ghi lỗ' của L0910-TS00 nằm ngay sau, Tồn sau 0 kg", second[1] == "Huỷ hàng, ghi lỗ" and second[2] == "L0910-TS00" and second[5].startswith("0"), str(second))
     finish(ctx, page)
 
     # ---- Chủ: F1i chốt lô: bấm đúp + sau chốt khoá
@@ -508,7 +508,7 @@ def check_ledger(browser):
         ts = [r[0] for r in rows]
         ok("ED-29-AC1: sổ xếp mới nhất trước", ts == sorted(ts, key=lambda x: (x[6:10], x[3:5], x[0:2], x[11:]), reverse=True))
         types = {r[1] for r in rows}
-        ok("ED-29-AC1/G3: Loại dùng đúng nhãn enum-map (WRITE_OFF → 'Ghi lỗ, huỷ hàng'), không 'Hạch toán'", types <= {"Nhập lô", "Bán ra", "Hàng hoàn tái nhập", "Điều chỉnh kiểm kê", "Ghi lỗ, huỷ hàng", "Hoàn kho do huỷ đơn", "Trả nhà cung cấp"}, str(types))
+        ok("ED-29-AC1/G3: Loại dùng đúng nhãn enum-map (WRITE_OFF → 'Huỷ hàng, ghi lỗ'), không 'Hạch toán'", types <= {"Nhập lô", "Bán ra", "Hàng hoàn tái nhập", "Điều chỉnh kiểm kê", "Huỷ hàng, ghi lỗ", "Hoàn kho do huỷ đơn", "Trả nhà cung cấp"}, str(types))
         links = page.locator("table.lt tbody td a").count()
         ok("ED-29: có link chứng từ tới lô (reference kind=batch) hoặc chữ thường", links >= 0)
         shot(page, "q7-loc-ledger-full", full=True)

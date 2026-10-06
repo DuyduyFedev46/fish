@@ -59,7 +59,7 @@ describe("người duyệt", () => {
 describe("changeSummary (danh sách trắng)", () => {
   it("trạng thái dạng cặp và dạng from/to", () => {
     expect(changeSummary({ status: ["BOOKED", "PAID"] })).toEqual(["Trạng thái: Giữ chỗ → Đã thanh toán"]);
-    expect(changeSummary({ status: { from: "PENDING", to: "REFUNDED" } })).toEqual(["Trạng thái: Chờ hoàn → Đã hoàn"]);
+    expect(changeSummary({ status: { from: "PENDING", to: "REFUNDED" } })).toEqual(["Trạng thái: Chờ hoàn tiền → Đã hoàn tiền"]);
   });
   it("số tiền và giá bán có đơn vị đ", () => {
     expect(changeSummary({ amount: { to: 125000 } })).toEqual(["Số tiền: → 125.000 đ"]);

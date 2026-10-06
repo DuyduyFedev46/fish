@@ -2,7 +2,7 @@
 
 // Trang chi tiết khách hàng (ED-14 / W5b): /customers/detail/?id=<pk>. Khung DetailPage: header (tên · "Sửa thông tin" · "…"),
 // KHÔNG có thanh trạng thái (khách không có vòng đời) và KHÔNG có khối Trợ lý AI (`aiSlot` để trống; dữ liệu cá nhân không đưa cho AI).
-// Cột trái: Liên hệ (Tên, Số điện thoại, Địa chỉ, Ghi chú sửa tại chỗ) · Mua hàng (4 số tự tính, khoá) · bảng Đơn hàng · bảng Phiếu hoàn.
+// Cột trái: Liên hệ (Tên, Số điện thoại, Địa chỉ, Ghi chú sửa tại chỗ) · Mua hàng (4 số tự tính, khoá) · bảng Đơn hàng · bảng Phiếu hoàn tiền.
 // Cột phải: Dòng thời gian (guidance `customer`). URL chỉ có id; không ghi tên/SĐT/địa chỉ vào storage, log hay tiêu đề tab.
 
 import { useMemo, useState } from "react";

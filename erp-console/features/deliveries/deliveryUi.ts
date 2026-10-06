@@ -5,17 +5,17 @@ import { ENUMS } from "@/shared/lib/enums";
 import type { DeliveryFailureReason, DeliveryNoteItem } from "./types";
 
 export const PATH_STEPS: PathStep[] = [
-  { key: "CONFIRMING", label: "Chờ xác nhận" },
-  { key: "PREPARING", label: "Soạn hàng" },
-  { key: "READY", label: "Chờ lấy hàng" },
-  { key: "DELIVERING", label: "Đang giao" },
-  { key: "COMPLETED", label: "Hoàn tất" },
+  { key: "CONFIRMING", label: ENUMS.deliveryStatus.CONFIRMING.label },
+  { key: "PREPARING", label: ENUMS.deliveryStatus.PREPARING.label },
+  { key: "READY", label: ENUMS.deliveryStatus.READY.label },
+  { key: "DELIVERING", label: ENUMS.deliveryStatus.DELIVERING.label },
+  { key: "COMPLETED", label: ENUMS.deliveryStatus.COMPLETED.label },
 ];
 
 /** Thanh trạng thái: FAILED hỏng sau bước Đang giao; CANCELLED là kết thúc xấu không có bước đã qua. */
 export function pathOf(note: Pick<DeliveryNoteItem, "status">): { current: string; badEnd: { label: string; after?: string } | null } {
-  if (note.status === "FAILED") return { current: "DELIVERING", badEnd: { label: "Giao thất bại", after: "DELIVERING" } };
-  if (note.status === "CANCELLED") return { current: "CANCELLED", badEnd: { label: "Đã huỷ theo đơn" } };
+  if (note.status === "FAILED") return { current: "DELIVERING", badEnd: { label: ENUMS.deliveryStatus.FAILED.label, after: "DELIVERING" } };
+  if (note.status === "CANCELLED") return { current: "CANCELLED", badEnd: { label: ENUMS.deliveryStatus.CANCELLED.label } };
   return { current: note.status, badEnd: null };
 }
 
@@ -27,7 +27,7 @@ export function nextStepText(note: Pick<DeliveryNoteItem, "status" | "assigned_t
     case "PREPARING":
       return "In tem, đóng gói, rồi bấm Đã đóng gói";
     case "READY":
-      return note.assigned_to ? "Người giao nhận hàng đi giao" : "Giao phiếu cho người giao";
+      return note.assigned_to ? "Người giao nhận hàng đi giao" : "Chọn người giao";
     case "DELIVERING":
       return "Giao xong hoặc báo giao thất bại";
     case "FAILED":

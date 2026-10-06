@@ -1,7 +1,7 @@
 "use client";
 
 // Form dài / nhiều dòng = TRANG RIÊNG (UI-RULES §6.1): tiêu đề + alert đầu form + nội dung + thanh nút dính đáy
-// (cao `--action-bar-h`), nút canh PHẢI: [phụ] [chính] (board F1k), nhãn nói rõ việc ("Lập phiếu hoàn 380.000 đ").
+// (cao `--action-bar-h`), nút canh PHẢI: [phụ] [chính] (board F1k), nhãn nói rõ việc ("Lập phiếu hoàn tiền 380.000 đ").
 // Gửi lỗi (`failed`) → nút chính đổi thành "Thử lại" (UI-RULES §6.6); đang gửi → nút khoá + chữ "Đang gửi…".
 // Việc phá huỷ (huỷ đơn, gỡ bài) → `danger`: nút chính đỏ. Thanh nút dính trong vùng cuộn của khung app nên không che menu.
 

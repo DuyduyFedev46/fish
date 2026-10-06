@@ -1,4 +1,4 @@
-/* Kiểu riêng của module Hàng hoàn về kho (ED-26). Chỉ token trong DESIGN.md — không màu cứng. Bảng, lưới thông tin, thanh trạng thái,
+/* Kiểu riêng của module Hàng hoàn (ED-26). Chỉ token trong DESIGN.md — không màu cứng. Bảng, lưới thông tin, thanh trạng thái,
    dòng thời gian dùng component chung (shared/ui); file này chỉ có khung form trong hộp thoại, danh sách chọn và khối phụ. */
 
 /* Khung form trong hộp thoại: các ô cách đều nhau. */
