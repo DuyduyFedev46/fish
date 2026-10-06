@@ -200,3 +200,9 @@ Hồ sơ: `doc/features/2026-09-26-sepay-cong-thanh-toan/`.
 - **AuditLog cũ** có chữ tự do: **ẩn lúc hiển thị** (Nhật ký chỉ trả ghi chú khớp mẫu cố định, còn lại "Có ghi chú"). Không sửa dữ liệu gốc.
 - **Tắt AI thì Nhật ký ẩn các dòng do AI làm** (lọc ở BE theo cờ AI).
 - **Huỷ phiếu hàng hoàn đã duyệt:** để sau production. Phiếu đã duyệt không xoá được; duyệt nhầm thì sửa bằng phiếu kiểm kê.
+
+## 2026-10-06 (tối) — Dọn chữ AI, đơn hoàn tất, đặt tên chứng từ — [DUY CHỐT]
+- **Dọn chữ AI + nhãn lệch khách thấy:** làm ngay một lô (luồng NHANH, có QA): gom về một cờ AI (BE báo FE), ẩn quyền/nhãn/cột AI theo cờ, sửa Shop hiện mã thô `PREPARING` và "Tự huỷ (quá TTL)", gom nhãn trạng thái về một nguồn. Nguồn: `doc/thuat-ngu-va-trang-thai.md` mục 2.10 và 3.
+- **W37 (đơn giao xong vẫn "Đang xử lý"):** chạy luồng ĐẦY ĐỦ (BA → PO → Tech Lead) trước khi code.
+- **Một tên cho mỗi chứng từ:** PO đề xuất bảng tên trong `doc/thuat-ngu-va-trang-thai.md`, Duy duyệt một lần rồi áp dụng.
+- **Shop:** mặt hàng hết hàng hiện nút "Liên hệ" thay "Hết hàng" (luồng NHANH).
