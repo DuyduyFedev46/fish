@@ -7,7 +7,7 @@ API nội bộ — hàng giao thất bại về kho (P-08, R9). Tầng 2: approv
 - `POST …/{id}/cancel/` (body rỗng): huỷ phiếu còn Chờ duyệt (#8). Quyền: `approve_returntostock` / `change_returntostock`, hoặc
   người tạo phiếu (có quyền tạo) huỷ phiếu của chính mình. Phiếu đã duyệt hoặc đã huỷ → 409 STALE_STATE.
 - `POST …/{id}/delete/` (body rỗng): XOÁ MỀM phiếu Chờ duyệt hoặc Đã huỷ (Duy quyết 03/10 #8). Chỉ Chủ/superuser, kiểm trước
-  phạm vi dòng (người khác 403). Phiếu Đã duyệt → 400 `RETURN_DELETE_NOT_ALLOWED`. Trả 200 `{"status": "deleted", "id"}`; phiếu biến
+  phạm vi dòng (người khác 403). Phiếu Đã duyệt → 400 `RETURN_DELETE_NOT_ALLOWED`; phiếu vừa bị xoá bởi request song song → 409 STALE_STATE. Trả 200 `{"status": "deleted", "id"}`; phiếu biến
   khỏi danh sách/chi tiết (404), AuditLog vẫn giữ.
 - `PATCH …/{id}/`: chỉ đổi `note` khi còn Chờ duyệt. Không có HTTP DELETE (BR-PQ-10).
 Phạm vi dòng: `scope.scope_returns_for` (người giao chỉ thấy phiếu của phiếu giao gán cho mình, ngoài ra 404).
@@ -75,6 +75,14 @@ class ReturnToStockViewSet(NoStoreMixin, DocumentViewSet):
             )
         return super().update(request, *args, **kwargs)
 
+    @staticmethod
+    def _lock_or_stale(pk):
+        """Khoá dòng; phiếu vừa bị request khác xoá mềm (race) → 409 STALE_STATE thay vì 500."""
+        try:
+            return ReturnToStock.objects.select_for_update().get(pk=pk)
+        except ReturnToStock.DoesNotExist:
+            raise ConflictError("Phiếu hàng hoàn đã bị xoá, hãy tải lại.", code="STALE_STATE") from None
+
     @action(detail=True, methods=["post"], required_perms=("inventory.approve_returntostock",))
     def approve(self, request, pk=None):
         """Duyệt phiếu hàng hoàn và nhập lại kho. Body `{"decision": "RESTOCK"|"WRITE_OFF"}` (BR-HV-02)."""
@@ -85,7 +93,7 @@ class ReturnToStockViewSet(NoStoreMixin, DocumentViewSet):
         if decision not in APPROVE_DECISIONS:
             raise BusinessError("Phải chọn Tái nhập hoặc Huỷ bỏ trước khi duyệt (BR-HV-02).", code="RETURN_DECISION_REQUIRED")
         with transaction.atomic():
-            rt = ReturnToStock.objects.select_for_update().get(pk=scoped.pk)
+            rt = self._lock_or_stale(scoped.pk)
             if rt.status != ReturnToStock.Status.DRAFT:
                 raise ConflictError("Phiếu hàng hoàn đã được duyệt, hãy tải lại.", code="STALE_STATE")
             rt.decision = decision
@@ -105,7 +113,7 @@ class ReturnToStockViewSet(NoStoreMixin, DocumentViewSet):
         ):
             raise PermissionDenied("Chỉ người có quyền duyệt hoặc người tạo phiếu mới huỷ được phiếu hàng hoàn.")
         with transaction.atomic():
-            rt = ReturnToStock.objects.select_for_update().get(pk=scoped.pk)
+            rt = self._lock_or_stale(scoped.pk)
             if rt.status != ReturnToStock.Status.DRAFT:
                 raise ConflictError("Phiếu hàng hoàn đã được xử lý, hãy tải lại.", code="STALE_STATE")
             rt.status = ReturnToStock.Status.CANCELLED

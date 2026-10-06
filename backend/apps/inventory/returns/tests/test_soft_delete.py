@@ -54,7 +54,7 @@ class SoftDeleteReturnTests(ReturnsApiBase):
         self.assertEqual(resp.status_code, 400, resp.content)
         body = resp.json()
         self.assertEqual(body["code"], DELETE_CODE)
-        self.assertEqual(body["detail"], "Phiếu đã cộng vào tồn kho. Huỷ phiếu trước rồi mới xoá được.")
+        self.assertEqual(body["detail"], "Phiếu hàng hoàn đã duyệt (đã nhập lại kho hoặc ghi lỗ) không xoá được (BR-PQ-10).")
         self.assertIsNone(ReturnToStock.all_objects.get(pk=self.rt.pk).deleted_at)
 
     # --- phân quyền ---
@@ -143,3 +143,80 @@ class SoftDeleteReturnTests(ReturnsApiBase):
     def test_d8_list_rows_carry_available_actions(self):
         row = client_for(self.owner).get(URL).json()["results"][0]
         self.assertIn("delete", row["available_actions"])
+
+
+class SoftDeleteReviewTests(ReturnsApiBase):
+    """Review TL-D8-M1, L1, L2 (BR-PQ-10, BR-LO-04). Dữ liệu giả."""
+
+    def setUp(self):
+        super().setUp()
+        self.rt = self.make_return(self.note, "4", self.courier, NOTE_WITH_PHONE)
+        self.url = f"{URL}{self.rt.pk}/delete/"
+
+    def delete(self):
+        return client_for(self.owner).post(self.url, {}, format="json")
+
+    # M1: câu lỗi không dẫn vào ngõ cụt
+    def test_d8_m1_approved_message_has_no_dead_end(self):
+        client_for(self.manager).post(f"{URL}{self.rt.pk}/approve/", {"decision": "WRITE_OFF"}, format="json")
+        resp = self.delete()
+        self.assertEqual(resp.status_code, 400)
+        self.assertEqual(
+            resp.json()["detail"],
+            "Phiếu hàng hoàn đã duyệt (đã nhập lại kho hoặc ghi lỗ) không xoá được (BR-PQ-10).",
+        )
+
+    # L1: race, request đến sau thấy phiếu đã bị xoá
+    def test_d8_l1_service_on_already_deleted_return_is_409_not_500(self):
+        from apps.common.exceptions import ConflictError
+        from apps.inventory.returns import services
+        stale = ReturnToStock.objects.get(pk=self.rt.pk)
+        self.assertEqual(self.delete().status_code, 200)
+        with self.assertRaises(ConflictError) as ctx:
+            services.delete_return(return_to_stock=stale, actor=self.owner)
+        self.assertEqual(ctx.exception.code, "STALE_STATE")
+
+    def _stale_post(self, action_name, user, payload=None):
+        """Giả lập race: get_object trả bản cũ trong khi phiếu đã bị xoá mềm."""
+        from unittest import mock
+        from apps.inventory.returns.api import ReturnToStockViewSet
+        stale = ReturnToStock.objects.get(pk=self.rt.pk)
+        self.assertEqual(self.delete().status_code, 200)
+        with mock.patch.object(ReturnToStockViewSet, "get_object", return_value=stale):
+            return client_for(user).post(f"{URL}{self.rt.pk}/{action_name}/", payload or {}, format="json")
+
+    def _assert_stale_409(self, name, payload):
+        resp = self._stale_post(name, self.owner, payload)
+        self.assertEqual(resp.status_code, 409, resp.content)
+        self.assertEqual(resp.json()["code"], "STALE_STATE")
+
+    def test_d8_l1_stale_approve_is_409(self):
+        self._assert_stale_409("approve", {"decision": "RESTOCK"})
+
+    def test_d8_l1_stale_cancel_is_409(self):
+        self._assert_stale_409("cancel", {})
+
+    def test_d8_l1_stale_delete_is_409(self):
+        self._assert_stale_409("delete", {})
+
+    # L2: hành vi sau xoá
+    def test_d8_l2_approve_cancel_patch_after_delete_are_404(self):
+        self.assertEqual(self.delete().status_code, 200)
+        c = client_for(self.owner)
+        self.assertEqual(c.post(f"{URL}{self.rt.pk}/approve/", {"decision": "RESTOCK"}, format="json").status_code, 404)
+        self.assertEqual(c.post(f"{URL}{self.rt.pk}/cancel/", {}, format="json").status_code, 404)
+        self.assertEqual(c.patch(f"{URL}{self.rt.pk}/", {"note": "x"}, format="json").status_code, 404)
+
+    def test_d8_l2_delete_draft_lifts_close_batch_blocks(self):
+        from apps.ai.execution.safety import check_ai_close_batch_conditions
+        from apps.inventory.batches.services import check_close_batch
+        marker = "phiếu hàng hoàn đang chờ duyệt"
+        self.batch.refresh_from_db()
+        self.assertTrue(any(marker in m.text for m in check_close_batch(self.batch)))
+        ok, info = check_ai_close_batch_conditions(self.batch)
+        self.assertFalse(ok)
+        self.assertEqual(self.delete().status_code, 200)
+        self.batch.refresh_from_db()
+        self.assertFalse(any(marker in m.text for m in check_close_batch(self.batch)))
+        ok, info = check_ai_close_batch_conditions(self.batch)
+        self.assertNotIn(marker, (info or {}).get("text", ""))

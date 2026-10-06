@@ -5,7 +5,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from apps.common.audit import record_audit
-from apps.common.exceptions import BusinessError
+from apps.common.exceptions import BusinessError, ConflictError
 from apps.inventory.models import ReturnToStock, StockLedgerEntry
 from apps.inventory.stock import services as stock
 
@@ -55,7 +55,7 @@ DELETE_NOT_ALLOWED_CODE = "RETURN_DELETE_NOT_ALLOWED"
 
 
 def can_delete_return(rt) -> bool:
-    """Phiếu còn xoá được: Chờ duyệt hoặc Đã huỷ. Phiếu Đã duyệt đã cộng vào tồn kho nên không xoá (phải huỷ trước)."""
+    """Phiếu còn xoá được: Chờ duyệt hoặc Đã huỷ. Phiếu Đã duyệt đã nhập kho hoặc ghi lỗ nên không xoá (không có đường đảo)."""
     return rt.status in DELETABLE_STATUSES
 
 
@@ -65,10 +65,14 @@ def delete_return(*, return_to_stock, actor):
     Xoá MỀM phiếu hàng hoàn (Duy quyết 03/10 #8): ghi `deleted_at`/`deleted_by`, dòng và AuditLog vẫn giữ (BR-PQ-10).
     Quyền (chỉ Chủ/superuser) do API kiểm. Không đụng tồn kho. AuditLog không chép ghi chú hay dữ liệu khách (bất biến 9).
     """
-    rt = ReturnToStock.objects.select_for_update().get(pk=return_to_stock.pk)
+    try:
+        rt = ReturnToStock.objects.select_for_update().get(pk=return_to_stock.pk)
+    except ReturnToStock.DoesNotExist:  # request khác vừa xoá mềm xong (race)
+        raise ConflictError("Phiếu hàng hoàn đã bị xoá, hãy tải lại.", code="STALE_STATE") from None
     if not can_delete_return(rt):
         raise BusinessError(
-            "Phiếu đã cộng vào tồn kho. Huỷ phiếu trước rồi mới xoá được.", code=DELETE_NOT_ALLOWED_CODE,
+            "Phiếu hàng hoàn đã duyệt (đã nhập lại kho hoặc ghi lỗ) không xoá được (BR-PQ-10).",
+            code=DELETE_NOT_ALLOWED_CODE,
         )
     old_status = rt.status
     rt.deleted_at = timezone.now()
