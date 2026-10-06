@@ -108,3 +108,89 @@ Nhánh `feat/w37-l1-fe` đã merge `feat/w37-l1-be` (chỉ thêm mục QA BE ở
 - `git merge feat/w37-l1-be`; `npm run build` (mock=1) → 3 kịch bản e2e ở trên.
 - Seed ORM 6 đơn + runserver 8766 (CORS 127.0.0.1:3202); `NEXT_PUBLIC_USE_MOCK=0 NEXT_PUBLIC_API_BASE=http://127.0.0.1:8766 npm run build` exit 0; script Playwright (scratchpad) 30/30 PASS; kiểm lưu trữ trình duyệt.
 - Dọn: dừng server, gỡ `out/`, symlink `node_modules`, `.env`, `staticfiles`, DB tạm.
+
+## QA L2 + L4 BE (08/10)
+
+### Kết luận: APPROVED — S3, S4, S5 và `refund_summary` chạy thật đúng AC; không lệch số báo cáo, không rò giá vốn hay dữ liệu cá nhân
+### Tổng: 144 ca · ✅ 142 · ❌ 0 · ⏸ 2 (xem cuối mục "Ngoại lệ")
+
+Cách chạy: nhánh `feat/w37-l2-l4-be`, `runserver` cổng 8791 trên SQLite tạm (`DATABASE_URL`), `DJANGO_DEBUG=1`. Dữ liệu giả (SĐT 0900000xxx, "Khách Giả n"),
+5 tài khoản (owner, manager, warehouse_staff, hai delivery_staff). Dựng đơn kiểu cũ bằng sửa DB trực tiếp: đơn `PROCESSING` mà phiếu `COMPLETED`.
+Lệnh chạy bằng `manage.py` thật (tiến trình con), API gọi qua HTTP bằng token. Đã tắt server theo PID, gỡ symlink `.env`/`staticfiles`, xoá DB tạm.
+
+### Theo AC
+| Mã AC | Kết quả | Bằng chứng (chạy thật) |
+|---|---|---|
+| S3-AC1 | ✅ | 4 đơn đủ điều kiện (X, X2 và hai đơn kẹt trong lô thử S4) chuyển `COMPLETED`; Y (phiếu FAILED), Z (huỷ), W (`PAID` + phiếu xong), M (P1 xong, P2 đang giao) giữ nguyên. So `id,status` toàn bảng trước/sau: chỉ đúng 4 đơn đổi |
+| S3-AC2 | ✅ | Mỗi đơn có 1 dòng audit `backfill: W37`: `actor` rỗng, `actor_kind=system`, `changes` = `{status:{PROCESSING→COMPLETED}, delivery_note, delivery_note_id, backfill}`, `note` rỗng. Quét tên/SĐT/địa chỉ/khoá tiền (`cost`, `rate`, `amount`): 0 |
+| S3-AC3 | ✅ | Chạy lần hai: "Đã chuyển 0 đơn", số audit không đổi; `--dry-run` sau đó "Sẽ chuyển 0 đơn" |
+| S3-AC4 | ✅ | `--dry-run` in danh sách mã đơn (4 mã), "Chưa ghi gì"; so DB (đơn + số audit) trước/sau: không đổi; output không có SĐT/tên/địa chỉ/số tiền |
+| S3-AC5 | ✅ | Hoá đơn của X lùi 40 ngày (kỳ 08). Lãi lỗ kỳ 07..10 (API), lãi lỗ mọi lô (API), `revenue_today`, số dòng và id lớn nhất của hoá đơn/chứng từ đảo/phiếu hoàn/sổ kho: **trùng khớp** trước/sau, cả lượt 1 và lượt 2 (lượt 2 có thêm 3 đơn đã hoàn tiền REFUNDED/FAILED) |
+| S3-AC6 | ✅ | Đơn M (P1 `COMPLETED`, P2 `DELIVERING`) giữ `PROCESSING` |
+| S3-AC7 | ✅ | Giả lập lỗi ở đơn thứ hai trong shell (mock `complete_order_if_delivered` ném lỗi): đơn đầu đã chuyển, đơn lỗi rollback (không audit), lệnh ném `CommandError` "Lỗi ở đơn <mã>… chạy lại để làm nốt"; chạy lại chuyển nốt đúng 2 đơn còn lại. ⏸ phần "exit khác 0" ở mức tiến trình (xem cuối) |
+| S3-AC8 | ✅ | Quét resolver Django: 512 URL, không route nào chứa `backfill`. Owner GET/POST 5 đường dẫn đoán (`orders/backfill/`, `backfill-completed-orders/`, …) và `orders/{id}/complete/` đều 404/405; ẩn danh 401/404 |
+| S4-AC1 | ✅ | Lô chỉ có đơn `COMPLETED`: owner chốt 200, audit `close_batch` |
+| S4-AC2 | ✅ | Lô có đơn `PROCESSING` + phiếu FAILED: 400 `BR-LO-04` "Còn 1 đơn đang mở…", cả trước lẫn sau khi chạy S3 |
+| S4-AC3 | ✅ | Lô có đơn kẹt (phiếu xong, đơn `PROCESSING`): chốt trước S3 → 400 `BR-LO-04`; chạy S3; chốt lại → 200, lô `CLOSED` |
+| S4-AC4 | ✅ | Manager, kho, giao → 403 (lô không đổi); ẩn danh 401 |
+| S4-AC5 | ✅ | Manager và kho xem lô (chi tiết + danh sách): không có `purchase_rate`, `landed_unit_cost`, `unit_cost`, lãi lỗ. Owner (đối chứng) thấy |
+| S5-AC1 | ✅ | Đơn `COMPLETED`, đã thu 540.000: manager lập 200.000 → 201 `PENDING`, đơn giữ `COMPLETED` |
+| S5-AC2 | ✅ | Owner xác nhận → `REFUNDED`, đơn giữ `COMPLETED`. Kỳ 07, 08, 09 **không đổi**; kỳ 10 đổi (`refunds` 0 → 200.000, `refund_count` 0 → 1, lợi nhuận −200.000). Không thêm chứng từ đảo, không thêm bút toán kho |
+| S5-AC3 | ✅ | Hoàn toàn phần 540.000 (lập + xác nhận): đơn vẫn `COMPLETED` |
+| S5-AC4 | ✅ | Đã hoàn 400.000/540.000, lập thêm 200.000 → 400 `BR-HT-04`, không tạo phiếu |
+| S5-AC5 | ✅ | Owner và manager huỷ đơn `COMPLETED` → 400 `BR-GH-05`; không chứng từ đảo mới |
+| S5-AC6 | ✅ | Kho, giao lập phiếu hoàn → 403, 0 phiếu tạo; ẩn danh 401 |
+| S5-AC7 | ✅ | Manager, kho xác nhận hoàn → 403 |
+| S5-AC8 | ✅ | Đơn `COMPLETED` còn hoàn được: manager có `create_refund`, không có `cancel`; kho không có `create_refund`; còn hoàn = 0 (đã hoàn hết, kể cả đang chờ): không có `create_refund` và không có `cancel` |
+| S7 `refund_summary` | ✅ | Xem bảng dưới |
+
+### `refund_summary` (GET `/api/sales/orders/{id}/`)
+| Tổ hợp | Kết quả |
+|---|---|
+| Không phiếu (đơn `COMPLETED`, `PROCESSING`, `BOOKED` chưa có hoá đơn) | `{"refunded_amount":"0","pending_amount":"0"}`, cả hai là chuỗi |
+| Chỉ `PENDING` 200.000 | `refunded "0"`, `pending "200000"` |
+| `REFUNDED` 200.000 | `refunded "200000"`, `pending "0"` |
+| Chỉ `FAILED` 150.000 | `"0"`/`"0"`; phiếu vẫn nằm trong `refunds[]`; manager vẫn có `create_refund` để lập lại |
+| Hỗn hợp REFUNDED 200.000 + PENDING 100.000 + FAILED 50.000 | `refunded "200000"`, `pending "100000"` (FAILED bỏ) |
+| Hoàn toàn phần | `refunded "540000"`, `pending "0"` |
+| Khoá | luôn đúng 2 khoá tiền, mọi vai (owner, manager, kho, giao); không có trong danh sách đơn (chỉ ở chi tiết) |
+
+### Ngoại lệ & biên (ngoài đường thuận)
+- Dữ liệu đã có giao dịch: 3 đơn kiểu cũ đã có phiếu hoàn (REFUNDED một phần, REFUNDED toàn phần, có phiếu FAILED) → chuyển bù xong số lãi lỗ kỳ/lô và `refund_summary` y nguyên.
+- Màn hình cũ / trạng thái đã đổi: chốt lại lô đã `CLOSED` → 400 `BR-LO-05`, không 5xx; chạy S3 lần hai → 0 đơn.
+- Job chạy 2 lần: S3-AC3. Lỗi giữa chừng rồi chạy lại: S3-AC7.
+- Bấm đúp lập hoàn (cùng `request_id`): lần 1 201, lần 2 200 `duplicate`, cùng một phiếu; `pending` chỉ cộng 1 lần.
+- Hai tình huống đa phiếu: M ở S3-AC6; hoàn FAILED rồi lập lại.
+- ⏸ (1) Mã thoát tiến trình khác 0 khi lỗi: kiểm qua `CommandError` (Django chuyển thành exit 1), chưa kiểm bằng lỗi thật ở tiến trình con. (2) Hai lần chạy lệnh đồng thời: chưa thử (mỗi đơn một giao dịch + khoá dòng theo thiết kế; SQLite không đua tin cậy).
+- Ghi chú về kiểm thử: lần đầu 8 kiểm của tôi báo FAIL do tôi đặt sai kỳ vọng (không phải lỗi sản phẩm): lô thử cũng có 2 đơn kẹt nên lệnh chuyển 4 chứ không phải 2; audit của đường giao xong (S1) có sẵn từ lúc dựng dữ liệu; đơn M cũng là ứng viên (lọc thô) nên đơn thứ hai không phải đơn "lỗi" như dự tính. Đã sửa kỳ vọng và kiểm lại, đều khớp hành vi đặc tả.
+
+### Phân quyền
+| Hành động | owner | manager | warehouse_staff | delivery_staff | Chưa đăng nhập |
+|---|---|---|---|---|---|
+| Chốt lô | 200 | 403 | 403 | 403 | 401 |
+| Lập phiếu hoàn | 201 | 201 | 403 | 403 | 401 |
+| Xác nhận hoàn | 200 | 403 | 403 | (không thử) | — |
+| Huỷ đơn `COMPLETED` | 400 BR-GH-05 | 400 BR-GH-05 | — | — | — |
+| Xem chi tiết đơn | 200 | 200 | 200 | 200 (đơn mình), 404 (đơn người khác) | 401 |
+| Chuyển bù qua HTTP | không có route | không có route | không có route | không có route | 401/404 |
+
+### Rò giá vốn
+Chi tiết đơn (manager, kho, giao) không có `purchase_rate`, `landed_unit_cost`, `unit_cost`, lãi lỗ; owner có `unit_cost` ở `allocations` (đối chứng, đúng thiết kế). Chi tiết và danh sách lô cho manager, kho: sạch.
+Khoá mới: `refund_summary` chỉ gồm tổng tiền hoàn (không phải giá vốn, không tính ngược được giá vốn); audit chuyển bù chỉ có mã phiếu giao, không có tiền/kg.
+
+### Rò dữ liệu cá nhân
+- Output lệnh (dry-run, chạy thật, lỗi): chỉ mã đơn; quét SĐT/tên/địa chỉ: 0.
+- Audit chuyển bù (4 dòng ở lượt 1, 11 sau tất cả lượt): 0 dữ liệu cá nhân.
+- `refund_summary` chỉ 2 khoá tiền. NV giao với đơn quá cửa sổ (completed_at lùi 40 ngày): `customer` = `{name,phone,address: null}`, `customer_hidden_reason: "expired"`, `refund_summary` vẫn có; quét cả phản hồi: không tên/SĐT/địa chỉ. Trong cửa sổ NV giao thấy khách như cũ (đúng thiết kế); NV giao không được gán → 404.
+- Log `runserver` cả phiên: 0 dòng chứa SĐT/tên/địa chỉ giả.
+
+### Hồi quy
+`manage.py test apps.sales.orders apps.sales.refunds apps.inventory.batches.tests.test_close_after_completion apps.sales.orders.tests.test_backfill_completed_orders`: 304 test OK. (Điều phối viên đã chạy toàn bộ 3182 test OK.)
+
+### Lỗi
+Không có lỗi chặn.
+
+### Lệnh đã chạy
+- `migrate` + seed qua `manage.py shell` (SQLite tạm), `runserver 8791 --noreload`.
+- Các kịch bản HTTP + `manage.py backfill_completed_orders [--dry-run]` bằng `urllib`/`subprocess` (script trong scratchpad).
+- `manage.py test` (4 module trên): `Ran 304 tests ... OK`.
