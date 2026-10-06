@@ -69,13 +69,13 @@ class L7LabelTests(OrderApiBase):
         body = client_for(self.ql).get(f"/api/sales/orders/{order.pk}/").json()
         pay = body["payments"][0]
         self.assertEqual(pay["match_status"], "MATCHED")
-        self.assertEqual(pay["match_status_label"], "Khớp — đã xác nhận")
+        self.assertEqual(pay["match_status_label"], "Khớp đơn")
         self.assertEqual(pay["source"], "WEBHOOK")
-        self.assertEqual(pay["source_label"], "Webhook SePay")
+        self.assertEqual(pay["source_label"], "Ngân hàng báo")
         self.assertEqual(body["delivery"]["status"], "CONFIRMING")
-        self.assertEqual(body["delivery"]["status_label"], "Chờ xác nhận")
+        self.assertEqual(body["delivery"]["status_label"], "Chờ gọi xác nhận")
         self.assertEqual(body["refunds"][0]["status"], "PENDING")
-        self.assertEqual(body["refunds"][0]["status_label"], "Chờ hoàn")
+        self.assertEqual(body["refunds"][0]["status_label"], "Chờ hoàn tiền")
 
     def test_l7_nhan_giao_dich_thieu_tien(self):
         order = self._order()
@@ -83,7 +83,7 @@ class L7LabelTests(OrderApiBase):
             order=order, bank_txn_id="FTLOW", amount=Decimal("300000"), received_at=timezone.now(),
         )
         pay = client_for(self.chu).get(f"/api/sales/orders/{order.pk}/").json()["payments"][0]
-        self.assertEqual(pay["match_status_label"], "Thiếu tiền — chờ Chủ")
+        self.assertEqual(pay["match_status_label"], "Chuyển thiếu")
 
 
 class L7TimelineTests(OrderApiBase):

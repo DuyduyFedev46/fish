@@ -123,7 +123,7 @@ class DataScopesDescribeTests(TestCase):
         """D3/D5 là quyền Tầng 1 ngoài registry: chữ là 'Nhóm không có quyền xem ...', Chủ không bật được ở đây."""
         _, rows = self.rows(roles.CUSTOMER_SERVICE)
         self.assertEqual(rows["deliveries"]["inactive_reason"], "Nhóm không có quyền xem phiếu giao")
-        self.assertEqual(rows["returns"]["inactive_reason"], "Nhóm không có quyền xem hàng hoàn về kho")
+        self.assertEqual(rows["returns"]["inactive_reason"], "Nhóm không có quyền xem hàng hoàn")
 
     def test_pv02_ac7_confirmation_inactive_for_group_without_confirm_calls(self):
         _, rows = self.rows(roles.DELIVERY_STAFF)

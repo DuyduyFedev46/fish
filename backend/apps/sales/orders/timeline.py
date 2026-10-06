@@ -162,7 +162,7 @@ def build_timeline(order):
     for n in notes:
         events.append(TimelineEvent(
             n.created_at, "delivery_created",
-            f"Tạo phiếu giao {n.code} (Soạn hàng)", SYSTEM,
+            f"Tạo phiếu giao {n.code} (Đang soạn hàng)", SYSTEM,
             doc="delivery", actor_kind="system",
         ))
 
@@ -176,7 +176,7 @@ def build_timeline(order):
             events.append(TimelineEvent(
                 r.created_at, "refund_created",
                 # Bất biến 9: KHÔNG ghép `Refund.reason` (chữ tự do, có thể chứa SĐT/tên). Lý do xem ở phiếu hoàn.
-                f"Tạo phiếu hoàn {format_vnd_ui(r.amount)}",
+                f"Lập phiếu hoàn tiền {format_vnd_ui(r.amount)}",
                 actor_display(r.created_by),
                 doc="refund", doc_id=r.pk,
                 actor_kind="user" if r.created_by else "system",
@@ -184,7 +184,7 @@ def build_timeline(order):
             if r.confirmed_at is not None:
                 events.append(TimelineEvent(
                     r.confirmed_at, "refund_confirmed",
-                    f"Đã hoàn {format_vnd_ui(r.amount)} (mã GD {r.bank_txn_ref})",
+                    f"Đã hoàn tiền {format_vnd_ui(r.amount)} (mã GD {r.bank_txn_ref})",
                     actor_display(r.confirmed_by),
                     doc="refund",
                     actor_kind="user" if r.confirmed_by else "system",
@@ -194,7 +194,7 @@ def build_timeline(order):
         for cn in invoice.credit_notes.all():
             events.append(TimelineEvent(
                 cn.issued_at, "credit_note_issued",
-                f"Lập chứng từ đảo doanh thu {cn.code} ({format_vnd_ui(cn.amount)})",
+                f"Lập phiếu trừ doanh thu {cn.code} ({format_vnd_ui(cn.amount)})",
                 actor_display(cn.created_by),
                 doc="invoice",
                 actor_kind="user" if cn.created_by else "system",
@@ -226,7 +226,7 @@ def _audit_event(a, notes_by_id, returns_by_id, refunds_by_id, merged_note_ids=f
         if a.action == "cancel_unpaid_expired":
             return TimelineEvent(
                 a.created_at, "auto_cancelled",
-                "Tự huỷ vì quá hạn giữ chỗ, đã nhả hàng giữ", who,
+                "Hết giờ giữ chỗ, đã nhả hàng giữ", who,
                 doc="order", actor_kind=kind_actor, ai_level=ai_lvl, ai_config_version=ai_cfg,
             )
         if a.action == "cancel_paid_order":
@@ -292,7 +292,7 @@ def _audit_event(a, notes_by_id, returns_by_id, refunds_by_id, merged_note_ids=f
         if a.action == "cancel_returntostock":
             return TimelineEvent(
                 a.created_at, "return_cancelled",
-                f"Huỷ phiếu hàng về kho {kg_str(rt.qty)} kg", who,
+                f"Huỷ phiếu hàng hoàn {kg_str(rt.qty)} kg", who,
                 doc="return", actor_kind=kind_actor, ai_level=ai_lvl, ai_config_version=ai_cfg,
             )
         if a.action == "approve_returntostock":
@@ -303,7 +303,7 @@ def _audit_event(a, notes_by_id, returns_by_id, refunds_by_id, merged_note_ids=f
                 decision_label = decision or ""
             return TimelineEvent(
                 a.created_at, "return_approved",
-                f"Duyệt hàng về kho: {decision_label}", who,
+                f"Duyệt hàng hoàn: {decision_label}", who,
                 doc="return", actor_kind=kind_actor, ai_level=ai_lvl, ai_config_version=ai_cfg,
             )
         return None
@@ -313,7 +313,7 @@ def _audit_event(a, notes_by_id, returns_by_id, refunds_by_id, merged_note_ids=f
             return None
         if a.action == "mark_refund_failed":
             # Quyết định 03/10 #3: không chép lý do tự gõ; lý do xem ở chính phiếu hoàn.
-            label = f"Phiếu hoàn {format_vnd_ui(r.amount)} chuyển thất bại"
+            label = f"Phiếu hoàn tiền {format_vnd_ui(r.amount)} chuyển thất bại"
             return TimelineEvent(
                 a.created_at, "refund_failed", label, who,
                 doc="refund", actor_kind=kind_actor, ai_level=ai_lvl, ai_config_version=ai_cfg,
@@ -321,7 +321,7 @@ def _audit_event(a, notes_by_id, returns_by_id, refunds_by_id, merged_note_ids=f
         if a.action == "retry_refund":
             return TimelineEvent(
                 a.created_at, "refund_retry",
-                f"Thử chuyển lại phiếu hoàn {format_vnd_ui(r.amount)}", who,
+                f"Thử hoàn tiền lại {format_vnd_ui(r.amount)}", who,
                 doc="refund", actor_kind=kind_actor, ai_level=ai_lvl, ai_config_version=ai_cfg,
             )
         return None

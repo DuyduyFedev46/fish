@@ -16,9 +16,9 @@ REASONS: dict[str, str] = {
     "BR-GH-07": "Không thể huỷ đơn khi hàng đang giao hoặc đã hoàn tất",
     # Hoàn tiền
     "BR-HT-03": "Cần mã giao dịch chuyển khoản trước khi xác nhận hoàn tiền",
-    "BR-HT-04": "Chỉ tạo phiếu hoàn khi hoá đơn còn khoản có thể hoàn",
+    "BR-HT-04": "Chỉ lập phiếu hoàn tiền khi hoá đơn còn khoản có thể hoàn",
     "BR-HT-07": "Chỉ Chủ vựa mới có quyền xác nhận hoàn tiền",
-    "BR-HT-08": "Phiếu hoàn đã được xử lý hoặc không còn ở trạng thái chờ",
+    "BR-HT-08": "Phiếu hoàn tiền đã được xử lý hoặc không còn ở trạng thái chờ",
     # Quản lý kho & Lô
     "BR-LO-02": "Lô hết hạn sẽ tự động chuyển sang trạng thái Quá hạn",
     "BR-LO-03": "Chỉ huỷ được lô khi đã ở trạng thái Quá hạn",

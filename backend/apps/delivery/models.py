@@ -15,11 +15,11 @@ from django.db import models
 
 class DeliveryNote(models.Model):
     class Status(models.TextChoices):
-        CONFIRMING = "CONFIRMING", "Chờ xác nhận"
-        PREPARING = "PREPARING", "Soạn hàng"
+        CONFIRMING = "CONFIRMING", "Chờ gọi xác nhận"
+        PREPARING = "PREPARING", "Đang soạn hàng"
         READY = "READY", "Chờ lấy hàng"
         DELIVERING = "DELIVERING", "Đang giao"
-        COMPLETED = "COMPLETED", "Hoàn tất"      # điểm không quay lui (BR-GH-05)
+        COMPLETED = "COMPLETED", "Đã giao"      # điểm không quay lui (BR-GH-05)
         FAILED = "FAILED", "Giao thất bại"       # trạng thái tạm (BR-GH-04)
         CANCELLED = "CANCELLED", "Đã huỷ theo đơn"  # S14: đơn bị huỷ (BR-GH-07), không quay lui
 
@@ -71,16 +71,16 @@ class DeliveryNote(models.Model):
     recipient_phone = models.CharField("SĐT người nhận", max_length=20, blank=True, default="")
 
     class Meta:
-        verbose_name = "Phiếu giao hàng"
-        verbose_name_plural = "Phiếu giao hàng"
+        verbose_name = "Phiếu giao"
+        verbose_name_plural = "Phiếu giao"
         ordering = ["-created_at", "-id"]
         permissions = [
             ("confirm_with_customer", "Gọi xác nhận đơn"),
             ("change_recipient", "Đổi thông tin nhận hàng"),
             ("decide_unconfirmed", "Quyết định đơn không liên lạc được"),
-            ("pack_deliverynote", "Đóng gói phiếu giao"),
+            ("pack_deliverynote", "Soạn hàng"),
             ("print_label", "In / huỷ tem giao"),
-            ("assign_deliverynote", "Giao phiếu cho người giao"),
+            ("assign_deliverynote", "Chọn người giao"),
         ]
 
     def __str__(self):
@@ -95,13 +95,13 @@ class ConfirmationTask(models.Model):
         CALLBACK = "CALLBACK", "Hẹn gọi lại"
         ESCALATED = "ESCALATED", "Cần quyết định"
         REFUND_CALL = "REFUND_CALL", "Gọi báo hoàn tiền"
-        DONE = "DONE", "Hoàn tất"
+        DONE = "DONE", "Đã xong"
 
     class EscalationReason(models.TextChoices):
         UNREACHABLE = "UNREACHABLE", "Không nghe máy"
-        WRONG_NUMBER = "WRONG_NUMBER", "Sai số"
-        WANT_CANCEL = "WANT_CANCEL", "Khách muốn huỷ"
-        WANT_CHANGE = "WANT_CHANGE", "Khách muốn đổi"
+        WRONG_NUMBER = "WRONG_NUMBER", "Sai số điện thoại"
+        WANT_CANCEL = "WANT_CANCEL", "Khách muốn huỷ đơn"
+        WANT_CHANGE = "WANT_CHANGE", "Khách muốn đổi món"
 
     note = models.OneToOneField(
         DeliveryNote, on_delete=models.PROTECT, related_name="confirmation",
@@ -136,8 +136,8 @@ class ConfirmationTask(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        verbose_name = "Mục chờ gọi CSKH"
-        verbose_name_plural = "Mục chờ gọi CSKH"
+        verbose_name = "Việc gọi xác nhận"
+        verbose_name_plural = "Việc gọi xác nhận"
         default_permissions = ()
         indexes = [
             models.Index(fields=["state", "escalated_at"]),
@@ -152,12 +152,12 @@ class CustomerCall(models.Model):
 
     class Result(models.TextChoices):
         CONFIRMED = "CONFIRMED", "Đã xác nhận"
-        CONFIRMED_CHANGED = "CONFIRMED_CHANGED", "Xác nhận có đổi thông tin"
+        CONFIRMED_CHANGED = "CONFIRMED_CHANGED", "Đã xác nhận, có đổi thông tin"
         UNREACHABLE = "UNREACHABLE", "Không nghe máy"
-        WRONG_NUMBER = "WRONG_NUMBER", "Sai số"
+        WRONG_NUMBER = "WRONG_NUMBER", "Sai số điện thoại"
         CALLBACK = "CALLBACK", "Hẹn gọi lại"
-        WANT_CHANGE = "WANT_CHANGE", "Khách muốn đổi món/số lượng"
-        WANT_CANCEL = "WANT_CANCEL", "Khách muốn huỷ"
+        WANT_CHANGE = "WANT_CHANGE", "Khách muốn đổi món"
+        WANT_CANCEL = "WANT_CANCEL", "Khách muốn huỷ đơn"
         NOTIFIED = "NOTIFIED", "Đã báo hoàn tiền"
 
     note = models.ForeignKey(

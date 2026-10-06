@@ -260,7 +260,7 @@ class S10DetailTests(OrderApiBase):
         })
         self.assertEqual(body["refunds"], [{
             "id": Refund.objects.get().pk, "amount": "540000", "status": "PENDING",
-            "status_label": "Chờ hoàn", "bank_txn_ref": "",  # L7: thêm nhãn
+            "status_label": "Chờ hoàn tiền", "bank_txn_ref": "",  # L7: thêm nhãn
         }])
         self.assertIn("available_actions", body)
 

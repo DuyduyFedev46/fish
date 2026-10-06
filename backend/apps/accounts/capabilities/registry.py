@@ -56,14 +56,14 @@ CAPABILITIES = (
     ),
     Capability("confirm_payment", "Xác nhận đã nhận tiền", SECTION_SALES, ("sales.confirm_payment_manual",), True),
     Capability("cancel_paid", "Huỷ đơn đã thanh toán", SECTION_SALES, ("sales.cancel_paid_order",)),
-    Capability("create_refund", "Lập phiếu hoàn", SECTION_SALES, ("sales.create_refund",)),
+    Capability("create_refund", "Lập phiếu hoàn tiền", SECTION_SALES, ("sales.create_refund",)),
     Capability("confirm_refund", "Xác nhận đã hoàn tiền", SECTION_SALES, ("sales.confirm_refund",), True),
     Capability(
         "pack_print", "Soạn hàng, in tem", SECTION_SALES,
         ("delivery.pack_deliverynote", "delivery.print_label"),
         requires=("deliver",),
     ),
-    Capability("assign_delivery", "Giao phiếu cho người giao", SECTION_SALES, ("delivery.assign_deliverynote",)),
+    Capability("assign_delivery", "Chọn người giao", SECTION_SALES, ("delivery.assign_deliverynote",)),
     Capability("deliver", "Giao hàng, báo kết quả giao", SECTION_SALES, ("delivery.change_deliverynote",)),
     # Hàng hoá & kho
     Capability(
@@ -78,8 +78,8 @@ CAPABILITIES = (
         ("inventory.add_stockreconciliation", "inventory.change_stockreconciliation"),
     ),
     Capability("approve_count", "Duyệt kiểm kê", SECTION_STOCK, ("inventory.approve_stockreconciliation",)),
-    Capability("create_return", "Ghi hàng hoàn về kho", SECTION_STOCK, ("inventory.add_returntostock",)),
-    Capability("approve_return", "Duyệt hàng hoàn về kho", SECTION_STOCK, ("inventory.approve_returntostock",)),
+    Capability("create_return", "Ghi hàng hoàn", SECTION_STOCK, ("inventory.add_returntostock",)),
+    Capability("approve_return", "Duyệt hàng hoàn", SECTION_STOCK, ("inventory.approve_returntostock",)),
     Capability(
         "set_price", "Sửa giá bán", SECTION_STOCK,
         (

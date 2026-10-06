@@ -16,7 +16,7 @@ class StockLedgerEntry(models.Model):
         SALE = "SALE", "Bán ra"
         RETURN_RESTOCK = "RETURN_RESTOCK", "Hàng hoàn tái nhập"
         RECONCILE = "RECONCILE", "Điều chỉnh kiểm kê"
-        WRITE_OFF = "WRITE_OFF", "Hạch toán lỗ / huỷ"
+        WRITE_OFF = "WRITE_OFF", "Huỷ hàng, ghi lỗ"
         CANCEL_RESTORE = "CANCEL_RESTORE", "Hoàn kho do huỷ đơn"
         SUPPLIER_RETURN = "SUPPLIER_RETURN", "Trả nhà cung cấp"  # P8 Lô 5, BR-MH-08
 
@@ -62,8 +62,8 @@ class StockEntry(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        verbose_name = "Phiếu điều chỉnh kho"
-        verbose_name_plural = "Phiếu điều chỉnh kho"
+        verbose_name = "Phiếu điều chỉnh tồn"
+        verbose_name_plural = "Phiếu điều chỉnh tồn"
         ordering = ["-created_at", "-id"]
 
     def __str__(self):

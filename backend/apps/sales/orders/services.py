@@ -311,15 +311,15 @@ def cancel_unpaid_expired(*, now=None):
 # S14 (BR-GH-07): lý do huỷ đơn đã thanh toán. OTHER bắt buộc `note` đi kèm (kiểm ở API).
 CANCEL_REASON_LABELS = {
     "CUSTOMER_CHANGED_MIND": "Khách đổi ý",
-    "DAMAGED_WHEN_PACKING": "Hư hỏng khi soạn hàng",
-    "GIVE_UP_AFTER_FAILED": "Bỏ giao sau khi thất bại",
+    "DAMAGED_WHEN_PACKING": "Hàng hư lúc soạn hàng",
+    "GIVE_UP_AFTER_FAILED": "Giao thất bại, không giao lại",
     "UNREACHABLE": "Không liên lạc được khách",
-    "OTHER": "Khác",
+    "OTHER": "Lý do khác",
 }
 CANCEL_REASON_CODES = set(CANCEL_REASON_LABELS)
 
 SYSTEM_CANCEL_REASON_CODES = {
-    "UNREACHABLE_AUTO": "Hệ thống tự huỷ — không liên lạc được",
+    "UNREACHABLE_AUTO": "Hệ thống tự huỷ: không liên lạc được khách",
 }
 ALL_CANCEL_REASON_CODES = set(CANCEL_REASON_LABELS) | set(SYSTEM_CANCEL_REASON_CODES)
 
@@ -338,7 +338,7 @@ def _cancel_audit_note(reason_code, cancel_note):
     """Nhật ký chỉ ghi nhãn lý do + "có ghi chú"; chữ gốc ở `SalesOrder.cancel_note` (bất biến 9)."""
     if not reason_code:
         return ""
-    text = f"Lý do: {CANCEL_REASON_LABELS.get(reason_code, 'Không rõ')}"
+    text = f"Huỷ đơn: {CANCEL_REASON_LABELS.get(reason_code, 'Không rõ')}"
     marker = note_marker(cancel_note)
     return f"{text} · {marker}" if marker else text
 
@@ -371,7 +371,7 @@ def cancel_paid_order(*, order, actor, reason="", reason_code="", cancel_note=""
         if o.status == SalesOrder.Status.COMPLETED:
             # W37 S2: đơn đã Hoàn tất (giao xong thắng cuộc đua) — không quay lui, chỉ còn phiếu hoàn.
             raise BusinessError(
-                "Đơn đã giao hoàn tất — chỉ còn cách lập phiếu hoàn.", code="BR-GH-05",
+                "Đơn đã giao hoàn tất — chỉ còn cách lập phiếu hoàn tiền.", code="BR-GH-05",
             )
         if o.status not in (SalesOrder.Status.PAID, SalesOrder.Status.PROCESSING):
             raise BusinessError("Chỉ huỷ được đơn đã thanh toán / đang xử lý (P-07).")
@@ -393,7 +393,7 @@ def cancel_paid_order(*, order, actor, reason="", reason_code="", cancel_note=""
                 )
             if note.status == DeliveryNote.Status.COMPLETED:
                 raise BusinessError(
-                    "Đơn đã giao hoàn tất — chỉ còn cách lập phiếu hoàn.", code="BR-GH-05",
+                    "Đơn đã giao hoàn tất — chỉ còn cách lập phiếu hoàn tiền.", code="BR-GH-05",
                 )
 
         stock_restored = note is None or note.status in _STOCK_STILL_IN_WAREHOUSE

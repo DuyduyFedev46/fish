@@ -45,7 +45,7 @@ GROUP_LABELS = {
 CAPABILITY_LABELS = {
     "inventory.publish_batch": "Mở bán lô",
     "sales.cancel_paid_order": "Huỷ đơn đã thanh toán",
-    "sales.create_refund": "Lập phiếu hoàn",
+    "sales.create_refund": "Lập phiếu hoàn tiền",
     "inventory.approve_returntostock": "Duyệt hàng hoàn",
     "inventory.approve_stockreconciliation": "Duyệt kiểm kê",
     "inventory.close_batch": "Chốt lô",
@@ -66,13 +66,13 @@ CAPABILITY_LABELS = {
     "delivery.confirm_with_customer": "Gọi xác nhận đơn",
     "delivery.change_recipient": "Đổi thông tin nhận hàng",
     "delivery.decide_unconfirmed": "Quyết định đơn không liên lạc được",
-    "delivery.pack_deliverynote": "Đóng gói phiếu giao",
+    "delivery.pack_deliverynote": "Soạn hàng",
     "delivery.print_label": "In / huỷ tem giao",
     # CMS (2026-09-28-cms-viet-bai): Quyền Tầng 2 đăng/gỡ/trả về nháp bài viết và trang
-    "content.publish_entry": "Đăng bài viết và trang",
+    "content.publish_entry": "Đăng bài lên Shop",
     # GL-05 (2026-09-28-khung-go-live): chu + quan_ly.
     "sales.view_privacy_consent": "Xem bằng chứng đồng ý xử lý dữ liệu của đơn",
-    "delivery.assign_deliverynote": "Giao hoặc đổi người giao của phiếu giao",
+    "delivery.assign_deliverynote": "Chọn người giao",
     # B2 (ERP theo design, Lô 6): chu + quan_ly. Khác `sales.view_customer` (Tầng 1, phạm vi dòng của NV giao).
     "sales.view_customer_list": "Xem khách hàng",
     # PV-07 (2026-10-02-pham-vi-du-lieu-cau-hinh): việc V2, cấp cho 5 nhóm (Q-4).

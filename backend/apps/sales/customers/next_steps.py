@@ -15,7 +15,7 @@ from apps.sales.models import Customer
 ACTION_LABELS = {
     "update_customer": "Cập nhật hồ sơ khách",
     "customer_anonymize": "Ẩn danh hoá hồ sơ khách",
-    "admin_edit": "Chỉnh sửa trong trang quản trị",
+    "admin_edit": "Sửa trong trang quản trị kỹ thuật",
 }
 
 

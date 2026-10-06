@@ -30,7 +30,7 @@ def build_refund_timeline(refund: Refund) -> list[TimelineEvent]:
         TimelineEvent(
             at=refund.created_at,
             kind="refund_created",
-            label=f"Tạo phiếu hoàn {format_vnd_ui(refund.amount)}",
+            label=f"Lập phiếu hoàn tiền {format_vnd_ui(refund.amount)}",
             actor_display=actor_display(refund.created_by),
             doc="refund",
             actor_kind="user" if refund.created_by else "system",
@@ -79,7 +79,7 @@ def build_refund_timeline(refund: Refund) -> list[TimelineEvent]:
                 TimelineEvent(
                     at=a.created_at,
                     kind="refund_retried",
-                    label="Thử lại hoàn tiền",
+                    label="Thử hoàn tiền lại",
                     actor_display=who,
                     doc="refund",
                     actor_kind=kind_actor,
@@ -95,7 +95,7 @@ def build_refund_timeline(refund: Refund) -> list[TimelineEvent]:
             TimelineEvent(
                 at=refund.confirmed_at,
                 kind="refund_confirmed",
-                label=f"Đã hoàn {format_vnd_ui(refund.amount)}{ref_text}",
+                label=f"Đã hoàn tiền {format_vnd_ui(refund.amount)}{ref_text}",
                 actor_display=actor_display(refund.confirmed_by),
                 doc="refund",
                 actor_kind="user" if refund.confirmed_by else "system",

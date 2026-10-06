@@ -75,7 +75,7 @@ class OrderReasonTests(R3Base):
         )
         raw = self._get(self.owner).content.decode()
         self.assertNotIn("0900000999", raw)
-        self.assertEqual(self._row(self.owner, order)["reason"], {"code": "OTHER", "label": "Khác"})
+        self.assertEqual(self._row(self.owner, order)["reason"], {"code": "OTHER", "label": "Lý do khác"})
 
     def test_ed09_ac1_unknown_reason_code_is_not_echoed(self):
         """L2: mã lạ (kể cả chữ tự do lọt vào DB) không bao giờ ra API; chỉ nhãn chung."""
@@ -97,7 +97,7 @@ class OrderReasonTests(R3Base):
         )
         reason = self._row(self.owner, order)["reason"]
         self.assertEqual(reason["code"], "UNREACHABLE_AUTO")
-        self.assertEqual(reason["label"], "Hệ thống tự huỷ — không liên lạc được")
+        self.assertEqual(reason["label"], "Hệ thống tự huỷ: không liên lạc được khách")
 
     def test_ed11_ac1_open_underpaid_payment_shows_underpaid(self):
         order = self._order(phone=PHONE_A)

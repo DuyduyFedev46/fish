@@ -81,7 +81,7 @@ class S12QueueListTests(S12Base):
         self.assertEqual(row["bank_txn_id"], "FTUNDER")
         self.assertEqual(row["amount"], "300000")
         self.assertEqual(row["match_status"], "UNDERPAID")
-        self.assertEqual(row["match_status_label"], "Thiếu tiền — chờ Chủ")
+        self.assertEqual(row["match_status_label"], "Chuyển thiếu")
         self.assertEqual(row["resolution_status"], "OPEN")
         self.assertEqual(row["order"], {
             "id": self.order.pk, "code": self.order.code, "status": "AUTO_CANCELLED",

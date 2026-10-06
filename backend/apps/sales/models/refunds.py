@@ -23,12 +23,12 @@ class Refund(models.Model):
 
     class Method(models.TextChoices):
         MANUAL_TRANSFER = "MANUAL_TRANSFER", "Chuyển khoản tay"  # V1
-        GATEWAY = "GATEWAY", "Qua cổng (chưa hiện thực)"        # chỗ chừa sẵn
+        GATEWAY = "GATEWAY", "Qua cổng SePay"        # chỗ chừa sẵn
 
     class Status(models.TextChoices):
-        PENDING = "PENDING", "Chờ hoàn"
-        REFUNDED = "REFUNDED", "Đã hoàn"
-        FAILED = "FAILED", "Thất bại"
+        PENDING = "PENDING", "Chờ hoàn tiền"
+        REFUNDED = "REFUNDED", "Đã hoàn tiền"
+        FAILED = "FAILED", "Hoàn thất bại"
 
     sales_invoice = models.ForeignKey(
         SalesInvoice, on_delete=models.PROTECT, related_name="refunds", verbose_name="Hoá đơn",
@@ -36,7 +36,7 @@ class Refund(models.Model):
     )
     payment_transaction = models.ForeignKey(
         PaymentTransaction, on_delete=models.PROTECT, related_name="refunds",
-        verbose_name="Giao dịch thanh toán (không hoá đơn)", null=True, blank=True,
+        verbose_name="Khoản tiền về (không hoá đơn)", null=True, blank=True,
     )
     # Q12 (S13/S15): khoá chống tạo trùng do FE sinh khi mở form, gửi lại y nguyên khi thử lại.
     request_id = models.UUIDField("Mã yêu cầu (chống trùng)", null=True, blank=True, unique=True)
