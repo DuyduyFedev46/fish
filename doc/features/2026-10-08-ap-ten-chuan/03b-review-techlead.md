@@ -40,3 +40,28 @@
 
 ### Pha B còn nợ (không thuộc lần review này)
 B9 `sales/orders/timeline.py` và test B-timeline, chờ W37 L3 BE gộp.
+
+## Review BE Pha B (08/10)
+
+> Tech Lead · `feat/ten-chuan-be` @ `fdf79e5`, sau merge main `07e8d15` (đã có W37 L3) · soát bằng `git show fdf79e5` (12 file).
+
+**Kết luận: APPROVED.**
+
+### Lệnh đã tự chạy
+- `manage.py test apps.common.tests.test_standard_names apps.sales.orders apps.accounts.audit`: chỉ 1 lỗi,
+  `test_p8_lo7_privacy_gl03.ConsentEvidenceTests.test_f5b_gl03_ac10_admin_post_khong_doi_2_field_consent`, báo
+  `ValueError: Missing staticfiles manifest entry for 'admin/css/base.css'`. Đây là lỗi **môi trường của worktree** (chưa có `.env`,
+  chưa `collectstatic`): chạy đúng test đó ở checkout chính thì OK. Lỗi không liên quan tới lô. Lượt chạy toàn bộ của dev là 3261 OK.
+- `makemigrations --check --dry-run`: No changes detected. Pha B không thêm migration.
+
+### Theo từng điểm
+| Điểm | Kết quả |
+|---|---|
+| B9 `sales/orders/timeline.py` | Đạt. Đủ P4 ("Duyệt hàng hoàn: …"), P5 ("Huỷ phiếu hàng hoàn"), P6 ("Lập phiếu trừ doanh thu"), P7 ("Lập phiếu hoàn tiền", "Thử hoàn tiền lại"), C3 ("Phiếu hoàn tiền … chuyển thất bại", "Đã hoàn tiền …"), T2 ("Hết giờ giữ chỗ, đã nhả hàng giữ"), T25 ("(Đang soạn hàng)"). Logic gộp mốc giao của W37 L3 (`merged_note_ids`, dòng chuyển bù) và bộ lọc dòng AI giữ nguyên. Chỉ đổi chuỗi f-string, không ghép thêm dữ liệu, nên bất biến 9 không đổi |
+| Low 1 | Đạt. Note mới "Huỷ đơn: <nhãn>" (`sales/orders/services.py:341`) hết lặp chữ. `_cancel_note_ok` thử cả hai tiền tố "Huỷ đơn" và "Lý do", với cả nhãn mới lẫn nhãn cũ. Không còn code nào khác (BE hay FE) phân tích tiền tố "Lý do:" của note này |
+| Low 2 | Đạt. Note mới "Hoàn tiền theo phiếu hoàn tiền #N". Regex `phiếu hoàn( tiền)? #\d+` vẫn `fullmatch`, nên chữ tự do theo sau bị che. Có test cho trường hợp có SĐT |
+| Test mới | `OrderTimelineWordingTests` chạy đường thật qua API: giao thất bại, mang hàng về, duyệt huỷ hàng, phiếu hoàn tiền thất bại rồi thử lại, huỷ đơn đã trả tiền kèm phiếu trừ doanh thu, đơn hết giờ giữ chỗ. Có danh sách chữ cấm và assert dương cho từng nhãn mới. SĐT trong test là số giả |
+| Test cũ (5 file) | Chỉ đổi chuỗi mong đợi |
+| Giá vốn / dữ liệu cá nhân / quyền | Không đổi field, serializer hay quyền |
+
+Không còn việc BE nào của lô.
