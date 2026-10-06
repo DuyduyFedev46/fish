@@ -3678,3 +3678,99 @@ Ghi nhận (không phải lỗi mới): `warehouse_staff` xem chi tiết đơn t
 - Toàn bộ backend: điều phối viên đã chạy 3022 test OK (không chạy lại).
 - `makemigrations --check --dry-run`: No changes detected. `python3 scripts/check_naming.py`: OK, không vi phạm mới.
 - Migration `delivery/0010` và `sales/0014` áp dụng sạch trên DB mới (`migrate`).
+
+## QA #15 BE (08/10) — Ghi tiền về muộn, `POST /api/sales/payments/record-late/` (BR-TT-18) · lần 1 · 2026-10-08
+
+### Kết luận: APPROVED — 16/16 AC phía BE có bằng chứng chạy thật qua HTTP; không có lỗi chặn. Hai ghi nhận mức Low (L1, L2), một giới hạn môi trường (E1).
+Phạm vi: chỉ BE (HEAD 7a4b2a7). AC phía FE của LP-AC14 (biểu tượng cảnh báo, khung vàng, ô tick ở hộp hoàn) và LP-AC15 (ẩn nút) thuộc lô FE, chưa kiểm ở đây (⏸).
+
+### Tổng: 70 ca · ✅ 69 · ❌ 0 · ⏸ 1 (đua đồng thời trên Postgres)
+(Chưa tính 3075 test tự động; đếm là các ca QA tự bắn HTTP.)
+
+### Cách chạy
+- `runserver 8765 --noreload`, `DJANGO_DEBUG=1`, SQLite tạm `DATABASE_URL=sqlite:///<scratchpad>/qa.sqlite3`, `INTERNAL_SERVICE_TOKEN` giả. `.env` symlink từ backend gốc, `staticfiles` dựng bằng `collectstatic` trong worktree; đã gỡ cả hai và xoá DB, tắt server.
+- Seed giả: 5 user (`owner1`, `manager1`, `wh1`, `dl1`, `cs1`) kèm token, 1 lô tôm, các đơn BOOKED / PAID / CANCELLED / AUTO_CANCELLED, SĐT dạng `09000004xx`, tên "Khach Gia". Script bắn HTTP bằng urllib (trong scratchpad).
+
+### Theo AC
+| AC | Kết quả | Bằng chứng |
+|---|---|---|
+| LP-AC1 đơn Tự huỷ | ✅ | `FT1004` nhập `" ft 1004 "` + mã đơn viết thường → 201, `source=MANUAL`, `ORPHAN`, `OPEN`, gắn đơn, `environment=""`. Đơn sau ghi: status/invoice/lines/allocations y nguyên (so JSON trước/sau), không có hoá đơn; 1 audit `record_late_payment` gắn giao dịch, không có audit nào trên đơn |
+| LP-AC2 đơn Đã huỷ | ✅ | `FT1005` → 201 `ORPHAN`, đơn vẫn CANCELLED |
+| LP-AC3 không gắn đơn | ✅ | `FT1006`, `FT1007` (bỏ trống / `null`) → 201 `UNMATCHED`, `order=null`. Job `process_exact_payment_matches` chạy 2 lần (bật cờ AI, công tắc Chủ): 13 dòng MANUAL UNMATCHED OPEN không bị đụng, không `AiAction` nào trỏ tới chúng, chỉ 7 dòng WEBHOOK được đẩy lên Chủ, lần 2 idempotent (`escalated 0, skipped 7`) |
+| LP-AC4 gửi lại | ✅ | Gửi lại `FT1004`, `FT1006` đúng dữ liệu → 200 `duplicate:true`, cùng id; tổng dòng không đổi, audit không thêm. Gửi lại dòng đã hoàn (`FTPRIOR1`) → 200 |
+| LP-AC5 trùng mã GD | ✅ | Cùng mã khác tiền / khác đơn / không đơn → 400 `BR-TT-03` kèm `existing_payment_id`, khoá `bank_txn_id`; không dòng mới |
+| LP-AC6 số tiền | ✅ | `0`, `-1`, `abc`, `""`, thiếu, `0.004`, `0.5` (tối thiểu 1đ), `1000000000000` → 400 `BR-TT-18` khoá `amount`. `100.005` làm tròn `100.01` (BR-TT-08, ROUND_HALF_UP, 0,01đ) |
+| LP-AC7 mã GD | ✅ | thiếu, rỗng, `FT 12é`, `AB CD!`, `ft@123`, 101 ký tự → 400 `BR-TT-18` khoá `bank_txn_id`; `FT-9/9._` → 201 |
+| LP-AC8 giờ nhận | ✅ | thiếu, rỗng, `hôm qua`, `2026-13-45`, +1 giờ → 400 `BR-TT-18` khoá `received_at`; +4 phút → 201 (dung sai 5 phút) |
+| LP-AC9 đơn không có | ✅ | `SO-NOPE` → 400 `LATE_PAYMENT_ORDER_NOT_FOUND`, khoá `order_code`, không dòng mới |
+| LP-AC10 trạng thái khác | ✅ | BOOKED → 400 `LATE_PAYMENT_ORDER_BOOKED` kèm `order_id`; PAID → 400 `LATE_PAYMENT_ORDER_PAID`; đơn vừa attach thành PROCESSING → 400 `PAID`. Đơn không đổi |
+| LP-AC11 nghi trùng | ✅ | webhook UNMATCHED rồi ghi tay không đơn → 409 `LATE_PAYMENT_POSSIBLE_DUPLICATE` kèm `similar_payment_id/_bank_txn_id/_received_at`; gửi lại `acknowledge_possible_duplicate:true` → 201, dòng mới có nhãn `Nghi trùng khoản ghi tay…`. Xem thêm 4 ca chéo ở mục Ngoại lệ |
+| LP-AC12 webhook về sau | ✅ | Cùng mã (webhook và IPN) → không thêm dòng (đếm 16 → 16), trả `matched:false` + `match_status` dòng cũ. Khác mã cùng tiền → có nhãn (4 ca chéo) |
+| LP-AC13 chặn hoàn trùng | ✅ | Dòng có nhãn: thiếu cờ → 409 `PAYMENT_DUPLICATE_WARNING` (thân = nhãn); cờ `"true"` kiểu chuỗi → vẫn 409 (chỉ nhận boolean `true`); manager có cờ → 403; `true` → 201; gửi lại cùng `request_id` → 200 cùng phiếu. Audit `create_refund` có `acknowledged_duplicate_warning: true`. Dòng không nhãn tạo phiếu không cần cờ |
+| LP-AC14 hiện cảnh báo | ✅ BE / ⏸ FE | `GET /api/guidance/payment/{id}/` có `warnings[GW-03]` đọc từ `duplicate_warning`. Phần giao diện chưa kiểm (lô FE) |
+| LP-AC15 quyền | ✅ BE / ⏸ nút FE | Bảng ở dưới |
+| LP-AC16 không chữ tự do | ✅ | Gửi `note`, `source:WEBHOOK`, `match_status:MATCHED`, `sales_order`, `raw_payload`, `description` kèm chuỗi giả `GHI-CHU-TU-DO-XYZ gọi 0900000321` → bị bỏ qua: `source=MANUAL`, `ORPHAN`. Chuỗi không xuất hiện ở response, audit, guidance, timeline đơn, log server, và quét SQL `raw_payload`/`resolution_note`/`changes`/`note` = 0 dòng. Timeline đơn: "Nhận 90.909 đ · Xác nhận tay · Đến sau khi đơn đã huỷ…" actor `owner1`; timeline giao dịch có `payment_recorded_late` actor `owner1` |
+
+### Ngoại lệ & biên
+| Ca | Kết quả | Bằng chứng |
+|---|---|---|
+| TL15-H1 A: MANUAL ORPHAN(X) rồi webhook ORPHAN(X) cùng tiền | ✅ | `FTWA1` có nhãn |
+| TL15-H1 B: MANUAL ORPHAN(X) rồi webhook không đơn (UNMATCHED) | ✅ | `FTWB1` có nhãn |
+| TL15-H1 C: MANUAL UNMATCHED rồi webhook ORPHAN(X) | ✅ | `FTWC1` có nhãn |
+| TL15-H1 D: MANUAL UNMATCHED rồi webhook UNMATCHED | ✅ | `FTWD1` có nhãn |
+| Chiều ngược E/F/F'/G: webhook trước, ghi tay sau (UNMATCHED→không đơn; ORPHAN→cùng đơn; ORPHAN→không đơn; UNMATCHED→có đơn) | ✅ | cả 4 trả 409 |
+| Không gắn nhãn thừa: khác tiền (56001 vs 56000), có đơn và không đơn | ✅ | nhãn rỗng |
+| Ngoài cửa sổ 72h: webhook mới vs ghi tay 6 ngày trước (UNMATCHED và ORPHAN); ghi tay mới vs webhook 6 ngày trước; khác tiền 58001 | ✅ | nhãn rỗng / 201 không 409 |
+| Không sửa số kỳ cũ (hoá đơn 28/09, ghi muộn `received_at` 28/09 cả UNMATCHED và ORPHAN, rồi tạo và xác nhận phiếu hoàn của khoản đó) | ✅ | `GET /api/reports/period/` tháng 9 và tháng 10 so JSON trước/sau: y hệt (doanh thu 540.000, giá vốn 360.000, lãi 180.000; tháng 10 toàn 0). Phiếu hoàn khoản không gắn hoá đơn không vào lãi lỗ (S13-AC5) |
+| Màn hình cũ: ghi lại khoản đã gắn đơn (`FTATT1`) → 400 BR-TT-03; resolve lần hai → 400 BR-TT-09; hoàn khoản đã RESOLVED → 400 BR-TT-09 | ✅ | t8 |
+| R3 không "hồi sinh" đơn huỷ: resolve ORPHAN `CONFIRM_ORDER` → 400 BR-TT-05; `ATTACH_TO_ORDER` cho ORPHAN → 400 BR-TT-09; ORPHAN chỉ có `available_actions:["refund"]` | ✅ | |
+| Gắn khoản MANUAL UNMATCHED vào đơn BOOKED qua S12 | ✅ | đơn → PROCESSING, có hoá đơn, giao dịch RESOLVED/ATTACHED |
+| `acknowledge_possible_duplicate`: `abc`/`null` → 400 (DRF); `"false"` → coi là false; `"yes"` ok | ✅ | |
+| Bấm đúp / đua 8 luồng cùng mã GD cùng dữ liệu | ✅ | `[201, 200×6, 409]`, DB đúng 1 dòng `FTCONC1`, không 500. Xem L1 |
+| Đua 8 luồng cùng mã GD khác tiền (SQLite) | ⏸ | 1×201, 3×400 `BR-TT-03`, 4×500 `database is locked` — lỗi khoá ghi của SQLite, không phải logic. DB đúng 1 dòng `FTCONC2`. Nhánh `IntegrityError`→400 đã có test đơn vị (`test_concurrent_integrity_error_returns_400`, xanh). Cần chạy lại trên Postgres khi có staging. Xem E1 |
+| Tiền lẻ / số lớn / đơn vị | ✅ | xem LP-AC6 |
+
+### Phân quyền (POST record-late, mã đúng / số dòng)
+| Vai | Kết quả |
+|---|---|
+| Chưa đăng nhập | 401, không ghi |
+| `manager` | 403 `Thiếu quyền: sales.confirm_payment_manual`, không ghi |
+| `warehouse_staff` | 403, không ghi |
+| `delivery_staff` | 403, không ghi |
+| `customer_service` | 403, không ghi |
+| `owner` | 201 |
+Thêm: `GET /api/sales/payments/` cũng 403 với 4 vai trên và 401 khi chưa đăng nhập; `GET record-late` → 405 (401 khi chưa đăng nhập); `POST /internal/…/sepay-webhook/` thiếu token → 401. Tạo phiếu hoàn từ khoản có nhãn bởi `manager` → 403.
+
+### Rò giá vốn
+Response `payment`, 409/400, guidance, audit `record_late_payment` / `create_refund`: không có `unit_cost`, `landed_unit_cost`, `purchase_rate`, `cogs`, `profit`, `rate` (quét chuỗi JSON). Audit `changes` chỉ gồm `bank_txn_id, amount, match_status, source, order, received_at, acknowledged_duplicate`; số tiền khách trả, không ngược ra giá vốn. Ghi chú ngoài phạm vi: `GET /api/sales/orders/{id}/` trả `allocations[].unit_cost` cho `owner`; đây là hành vi sẵn có theo quyền `view_costprice`, không do #15 đổi.
+
+### Rò dữ liệu cá nhân
+- Response, audit, guidance, timeline: không có `raw_payload`, tên, SĐT, địa chỉ; `order` chỉ có `id, code, status, total_amount, paid_total`.
+- Log server (toàn bộ phiên chạy): 0 dòng chứa SĐT, tên giả, địa chỉ giả hay chuỗi tự do.
+- DB: 23 dòng MANUAL đều có `raw_payload='{}'`; không có chuỗi tự do ở `resolution_note` / `AuditLog.changes` / `note`.
+- Mã GD chỉ nhận `A-Z 0-9 . _ - /` nên không thành chỗ gõ tên hay SĐT.
+- Dữ liệu seed hoàn toàn giả, không dán dữ liệu thật vào report.
+
+### Chứng từ / AuditLog
+Mọi lần 201 sinh đúng 1 audit `record_late_payment` (17 dòng cho 17 lần tạo, gửi lại 200 và các lần 400/409 không sinh audit); không có endpoint sửa/xoá dòng ghi muộn; không thấy `delete()` trong diff.
+
+### Hồi quy
+- `manage.py test` toàn bộ: **Ran 3075 tests, OK** (khớp báo cáo dev).
+- `adapter`: `pytest -q` → 68 passed.
+- `makemigrations --check --dry-run`: No changes detected.
+- Hàng chờ thanh toán S12, S11 xác nhận trên đơn, S13 phiếu hoàn, báo cáo kỳ (BR-BC), job tự khớp: các ca HTTP ở trên vẫn đúng.
+- Lần chạy đầu `apps.sales apps.ai` có 5 ERROR `Missing staticfiles manifest entry 'admin/css/base.css'` (worktree chưa có `collectstatic`, các test admin HTML). Sau `collectstatic` toàn bộ xanh; không liên quan #15.
+- `python3 scripts/check_naming.py` exit 1, do file frontend `ContactButton.tsx` và `SiteLegalFooter.tsx` (chuỗi `thong-tin-nguoi-ban`); hai file này không nằm trong diff #15 (diff chỉ chạm backend + doc). Ghi nhận cho điều phối viên, không chặn #15.
+
+### Lỗi
+Không có lỗi chặn.
+- **L1 · Low · LP-AC4.** Hai request cùng mã GD cùng dữ liệu đến sát nhau: request thua cuộc có thể nhận 409 `LATE_PAYMENT_POSSIBLE_DUPLICATE` (khoản giống chính là dòng vừa tạo, `similar_bank_txn_id` bằng mã vừa gửi) thay vì 200 `duplicate:true`. Tái hiện: 8 luồng POST cùng body → `[201, 200×6, 409]`. Không ghi trùng, không 500; client bấm lại sẽ nhận 200. Có thể để nguyên.
+- **L2 · Low · LP-AC4.** Gửi lại mã GD của khoản đã được gắn đơn (RESOLVED/ATTACHED, nay MATCHED) trả 400 `BR-TT-03` chứ không phải 200; khoản đã hoàn nhưng còn `UNMATCHED` thì trả 200. Khác nhau nhưng nhất quán với điều kiện "dòng cũ là MANUAL ORPHAN/UNMATCHED" của AC4, ghi nhận để FE biết.
+- **E1 · môi trường.** SQLite báo `database is locked` khi 8 luồng ghi đồng thời nên ca đua khác tiền chưa chứng minh được trên DB thật. Đề nghị chạy lại trên staging (Postgres).
+
+### Lệnh đã chạy (tóm tắt)
+- `DJANGO_DEBUG=1 .venv/bin/python manage.py test` (backend toàn bộ) → `Ran 3075 tests … OK`
+- `adapter/.venv/bin/python -m pytest -q` → `68 passed`
+- `manage.py makemigrations --check --dry-run` → `No changes detected`
+- `python3 scripts/check_naming.py` → exit 1 (file frontend ngoài diff, xem trên)
+- Kịch bản HTTP trong scratchpad: `t1`–`t8` (record-late, nghi trùng 4 ca chéo, hoàn có nhãn, kỳ cũ, quyền, rò dữ liệu, đua), `job.py` (job tự khớp), `seed*.py`.
