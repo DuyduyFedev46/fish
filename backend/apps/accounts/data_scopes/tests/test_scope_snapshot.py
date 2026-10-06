@@ -34,6 +34,11 @@ REQUIRED_ENDPOINTS = (
     "directory.list", "directory.detail", "directory.search", "customers.list", "customers.detail",
     "guidance.order", "guidance.delivery", "guidance.return", "guidance.customer", "guidance.receipt",
     "dashboard.summary", "ai.orders_list", "ai.orders_detail",
+    "actions.confirmation_claim", "actions.confirmation_call", "actions.confirmation_unconfirm",
+    "actions.confirmation_recipient", "actions.returns_create", "actions.returns_cancel", "actions.returns_update",
+    "actions.receipts_update", "actions.receipts_submit", "actions.receipts_cancel",
+    "actions.deliveries_assign", "actions.deliveries_status", "actions.deliveries_label",
+    "actions.deliveries_label_print", "actions.deliveries_label_void",
 )
 
 
@@ -158,6 +163,25 @@ class ScopeSnapshotTests(TestCase):
         self.assertNotIn("Khách Giả", text)
         self.assertNotIn("Đường Giả", text)
         self.assertFalse(PHONE_LIKE.findall(text), "Tệp mốc có chuỗi giống SĐT")
+
+    def test_pv01_actions_are_rolled_back_and_recorded(self):
+        """M1: hành động ghi không để lại dấu vết (savepoint rollback) và mốc ghi được mã của cả dòng trong lẫn ngoài phạm vi."""
+        from apps.delivery.models import CustomerCall, LabelPrint
+        from apps.inventory.models import ReturnToStock
+        from apps.purchasing.models import PurchaseReceipt
+
+        counts = (CustomerCall.objects.count(), LabelPrint.objects.count(), ReturnToStock.objects.count(),
+                  PurchaseReceipt.objects.filter(status="CANCELLED").count())
+        facts = self.collector.collect(users={"owner", "courier"}, only={
+            "actions.confirmation_call", "actions.returns_create", "actions.receipts_cancel",
+            "actions.deliveries_label_print"})
+        after = (CustomerCall.objects.count(), LabelPrint.objects.count(), ReturnToStock.objects.count(),
+                 PurchaseReceipt.objects.filter(status="CANCELLED").count())
+        self.assertEqual(counts, after)
+        owner_returns = set(facts["owner"]["actions.returns_create"])
+        self.assertTrue(any(f.startswith("status:no_note=") for f in owner_returns))
+        self.assertTrue(any(f.startswith("status:note_of_order_assigned_other=") for f in owner_returns))
+        self.assertFalse([f for f in owner_returns if "EXC" in f])
 
     def test_pv01_snapshot_is_deterministic(self):
         """Hai lần thu liên tiếp cho cùng kết quả (mốc không dao động theo pk hay giờ máy)."""

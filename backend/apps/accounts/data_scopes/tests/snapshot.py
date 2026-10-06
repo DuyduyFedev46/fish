@@ -16,6 +16,7 @@ import re
 from collections import namedtuple
 
 from django.core.cache import cache
+from django.db import transaction
 from rest_framework.test import APIClient
 
 # Ô dữ liệu khách. `name`/`note` chỉ tính ở endpoint khách (khác tên nhân viên, tên hàng).
@@ -189,6 +190,48 @@ class Collector:
             "guidance.customer": lambda: self.guidance_facts(user_label, "customer", "customers"),
             "guidance.receipt": lambda: self.guidance_facts(user_label, "receipt", "receipts"),
             "dashboard.summary": lambda: self.dashboard_facts(user_label),
+            "actions.confirmation_claim": lambda: self.action_facts(
+                user_label, "notes", lambda o: ("post", f"/api/confirmation/queue/{o.pk}/claim/", {})),
+            "actions.confirmation_call": lambda: self.action_facts(
+                user_label, "notes",
+                lambda o: ("post", f"/api/confirmation/queue/{o.pk}/calls/", {"result": "UNREACHABLE", "note": "x"})),
+            "actions.confirmation_unconfirm": lambda: self.action_facts(
+                user_label, "notes",
+                lambda o: ("post", f"/api/confirmation/queue/{o.pk}/unconfirm/", {"reason": "x"})),
+            "actions.confirmation_recipient": lambda: self.action_facts(
+                user_label, "notes",
+                lambda o: ("post", f"/api/confirmation/queue/{o.pk}/recipient/", {
+                    "recipient_name": "Người nhận giả", "recipient_phone": "0900000888",
+                    "delivery_address": "Số 88 Đường Giả"})),
+            "actions.returns_create": lambda: self.action_facts(
+                user_label, "notes",
+                lambda o: ("post", "/api/inventory/returns/",
+                           {"delivery_note": o.pk, "batch": scene.batch.pk, "qty": "0.500"}),
+                extra_subjects=[("no_note", ("post", "/api/inventory/returns/",
+                                             {"batch": scene.batch.pk, "qty": "0.500"}))]),
+            "actions.returns_cancel": lambda: self.action_facts(
+                user_label, "returns", lambda o: ("post", f"/api/inventory/returns/{o.pk}/cancel/", {})),
+            "actions.returns_update": lambda: self.action_facts(
+                user_label, "returns", lambda o: ("patch", f"/api/inventory/returns/{o.pk}/", {"note": "x"})),
+            "actions.receipts_update": lambda: self.action_facts(
+                user_label, "receipts", lambda o: ("patch", f"/api/purchasing/receipts/{o.pk}/", {"note": "x"})),
+            "actions.receipts_submit": lambda: self.action_facts(
+                user_label, "receipts", lambda o: ("post", f"/api/purchasing/receipts/{o.pk}/submit/", {})),
+            "actions.receipts_cancel": lambda: self.action_facts(
+                user_label, "receipts", lambda o: ("post", f"/api/purchasing/receipts/{o.pk}/cancel/", {})),
+            "actions.deliveries_assign": lambda: self.action_facts(
+                user_label, "notes",
+                lambda o: ("post", f"/api/delivery/notes/{o.pk}/assign/",
+                           {"assigned_to": scene.users["courier_other"].pk})),
+            "actions.deliveries_status": lambda: self.action_facts(
+                user_label, "notes",
+                lambda o: ("post", f"/api/delivery/notes/{o.pk}/status/", {"to_status": "READY"})),
+            "actions.deliveries_label": lambda: self.action_facts(
+                user_label, "notes", lambda o: ("get", f"/api/delivery/notes/{o.pk}/label/", None)),
+            "actions.deliveries_label_print": lambda: self.action_facts(
+                user_label, "notes", lambda o: ("post", f"/api/delivery/notes/{o.pk}/label/print/", {})),
+            "actions.deliveries_label_void": lambda: self.action_facts(
+                user_label, "notes", lambda o: ("post", f"/api/delivery/notes/{o.pk}/label/void/", {})),
             "ai.orders_list": lambda: self.ai_list_facts(user_label, "sales.salesorder.list", "orders"),
             "ai.deliveries_list": lambda: self.ai_list_facts(user_label, "delivery.deliverynote.list", "notes"),
             "ai.orders_detail": lambda: self.ai_detail_facts(user_label, "sales.salesorder.retrieve", "orders"),
@@ -198,6 +241,36 @@ class Collector:
             for name, fn in calls.items()
             if only is None or name in only
         }
+
+
+    # --- đường hành động (M1 review 06/10) ------------------------------------
+
+    def _act(self, user_label, method, url, body=None):
+        """Gọi một hành động GHI rồi rollback (savepoint) để dữ liệu không đổi. Trả mã HTTP, hoặc 'EXC' nếu view ném lỗi."""
+        cache.clear()
+        client = self.clients[user_label]
+        try:
+            with transaction.atomic():
+                if method == "get":
+                    response = client.get(url)
+                elif method == "patch":
+                    response = client.patch(url, body or {}, format="json")
+                else:
+                    response = client.post(url, body or {}, format="json")
+                transaction.set_rollback(True)
+        except Exception as exc:  # noqa: BLE001 - ghi tên lỗi, không ghi nội dung
+            return f"EXC:{type(exc).__name__}"
+        return response.status_code
+
+    def action_facts(self, user_label, kind, build, *, extra_subjects=()):
+        """`build(obj) -> (method, url, body)`; mỗi dòng mẫu một sự kiện `status:<nhãn>=<mã>`."""
+        facts = set()
+        for label, obj in getattr(self.scene, kind).items():
+            method, url, body = build(obj)
+            facts.add(f"status:{label}={self._act(user_label, method, url, body)}")
+        for label, (method, url, body) in extra_subjects:
+            facts.add(f"status:{label}={self._act(user_label, method, url, body)}")
+        return facts
 
     def search_facts(self, user_label, query):
         """POST /api/confirmation/search/ — kết quả theo phiếu giao, ghi nhãn từ mã đơn."""
@@ -226,6 +299,7 @@ class Collector:
         for key in ("pending_orders", "booked_soon"):
             facts.add(f"extra:kpis.{key}={kpis.get(key)}")
         facts.add(f"extra:kpis.revenue_today_present={'revenue_today' in kpis}")
+        facts.add(f"extra:kpis.revenue_today={kpis.get('revenue_today')}")  # doanh thu, không phải giá vốn hay dữ liệu cá nhân
         return facts
 
     def ai_list_facts(self, user_label, command_id, kind):

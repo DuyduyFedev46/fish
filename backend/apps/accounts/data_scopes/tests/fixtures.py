@@ -50,8 +50,8 @@ ORDER_SPECS = (
     {"label": "order_booked_unpaid", "status": "BOOKED", "invoice": False},
     {"label": "order_confirming_pending", "note": "CONFIRMING", "task": "PENDING"},
     {"label": "order_confirming_escalated", "note": "CONFIRMING", "task": "ESCALATED"},
-    {"label": "order_assigned_courier", "note": "DELIVERING", "task": "DONE", "courier": "courier"},
-    {"label": "order_assigned_other", "note": "DELIVERING", "task": "DONE", "courier": "courier_other"},
+    {"label": "order_assigned_courier", "note": "DELIVERING", "task": "DONE", "courier": "courier", "issued": NOW},
+    {"label": "order_assigned_other", "note": "DELIVERING", "task": "DONE", "courier": "courier_other", "issued": NOW},
     {"label": "order_assigned_warehouse_courier", "note": "DELIVERING", "task": "DONE", "courier": "warehouse_courier"},
     {"label": "order_assigned_direct", "note": "DELIVERING", "task": "DONE", "courier": "direct_permissions"},
     {"label": "order_failed_courier", "note": "FAILED", "task": "DONE", "courier": "courier"},
@@ -96,6 +96,7 @@ class Scene:
         self.notes = {}
         self.customers = {}
         self.returns = {}
+        self.batch = None
         self.receipts = {}
         self.refunds = {}
         self.codes = {}  # mã đơn -> nhãn
@@ -158,7 +159,7 @@ def build_orders(scene):
 
 def _build_invoice_and_note(scene, spec, label, order, customer, index):
     invoice = SalesInvoice.objects.create(
-        code=f"INV-PV-{index:02d}", sales_order=order, customer=customer, issued_at=utc(2026, 10, 1, 1, 0),
+        code=f"INV-PV-{index:02d}", sales_order=order, customer=customer, issued_at=spec.get("issued", utc(2026, 10, 1, 1, 0)),
         amount=Decimal("100000"), status=SalesInvoice.Status.ISSUED,
     )  # signal tạo phiếu giao CONFIRMING + mục chờ gọi PENDING
     note = invoice.delivery_notes.get()
@@ -198,6 +199,7 @@ def build_extras(scene):
         qty=Decimal("50"), purchase_rate=Decimal("80000"), batch_id="PV01-261005-AAAAA",
     )
 
+    scene.batch = batch
     owner, warehouse_user = scene.users["owner"], scene.users["warehouse_staff"]
     for label, note_label in (
         ("return_courier", "note_of_order_assigned_courier"),
