@@ -6,7 +6,9 @@ import json
 from io import StringIO
 
 from django.core.management import call_command
+from django.utils import timezone
 
+from apps.common.audit import record_audit
 from apps.common.tests.fixtures import client_for
 from apps.delivery.models import DeliveryNote
 from apps.delivery.tests.test_order_completion import ADDRESS, NAME, PHONE, CompletionBase
@@ -34,10 +36,9 @@ class CompletedTimelineTests(CompletionBase):
     def test_s7_ac7_backfill_keeps_old_delivered_label_and_adds_system_event(self):
         order, note = self._processing()
         # Dữ liệu cũ: phiếu giao xong qua đường cũ (đơn chưa chuyển), rồi chạy chuyển bù.
-        self._complete(self.courier, note)
-        from apps.accounts.models import AuditLog
-        AuditLog.objects.filter(action="complete_order", object_id=str(order.pk)).delete()  # naming: allow - dựng dữ liệu cũ
-        SalesOrder.objects.filter(pk=order.pk).update(status=SalesOrder.Status.PROCESSING)
+        DeliveryNote.objects.filter(pk=note.pk).update(status=S.COMPLETED, completed_at=timezone.now())
+        record_audit("delivery_advance_status", actor=self.courier, obj=note,
+                     changes={"status": {"from": S.DELIVERING, "to": S.COMPLETED}})
         call_command("backfill_completed_orders", stdout=StringIO(), stderr=StringIO())
         order.refresh_from_db()
         self.assertEqual(order.status, SalesOrder.Status.COMPLETED)

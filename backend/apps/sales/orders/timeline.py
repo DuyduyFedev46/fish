@@ -84,6 +84,11 @@ def _cancel_reason_label(changes, note):
     return "Lý do khác" if note else ""
 
 
+def _is_backfill(audit):
+    """Dòng `complete_order` do lệnh chuyển bù (S3) ghi."""
+    return (audit.changes or {}).get("backfill") == BACKFILL_MARKER
+
+
 def _audits(order, notes, returns, refunds):
     cond = Q(model_name=ORDER_MODEL, object_id=str(order.pk))
     # #15 (BR-TT-18): khoản ghi tay tiền về muộn không có audit trên đơn; lấy NGƯỜI ghi từ audit trên giao dịch.
@@ -119,7 +124,7 @@ def build_timeline(order):
         str((a.changes or {}).get("delivery_note_id"))
         for a in audits
         if a.model_name == ORDER_MODEL and a.action == COMPLETE_ORDER_ACTION
-        and not (a.changes or {}).get("backfill")
+        and not _is_backfill(a)
     }
 
     manual_actor = {
@@ -234,7 +239,7 @@ def _audit_event(a, notes_by_id, returns_by_id, refunds_by_id, merged_note_ids=f
                 doc="order", actor_kind=kind_actor, ai_level=ai_lvl, ai_config_version=ai_cfg,
             )
         if a.action == COMPLETE_ORDER_ACTION:
-            if changes.get("backfill") != BACKFILL_MARKER:
+            if not _is_backfill(a):
                 return None  # đã gộp vào mốc "Đã giao — đơn hoàn tất"
             return TimelineEvent(
                 a.created_at, "order_completed", "Hệ thống chuyển đơn sang Hoàn tất (chuyển bù)", SYSTEM,
