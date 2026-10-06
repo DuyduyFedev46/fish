@@ -2646,3 +2646,9 @@ Test cũ phải đổi vì contract đổi có chủ ý (không nới assert): `
 `manage.py test`: 3286 test, OK (skipped=2); trước lô 3228. `makemigrations --check --dry-run`: No changes. `check_naming.py`: OK, không phát sinh mới. Không file `migrations/` nào đổi.
 
 **Nợ / lưu ý:** (1) `/api/reports/*` đổi sang chuỗi nên FE `reports` cần giữ chuẩn hoá chuỗi (đã có); `inventory/types.ts:101` khai chuỗi cho `/reports/batch/` nay đúng. (2) Route chi tiết có khoá UUID trả 500 với id sai kiểu (ví dụ `…/999999999/`), có từ trước, chưa sửa; test A1 thử thêm UUID rỗng để không bỏ sót. (3) `feat/pham-vi-du-lieu` cần rebase: xung đột chỉ ở khối "Đơn gần đây" của `dashboard_api.py` (giữ queryset của PV + `prefetch_related` và thân dict mới của 17a).
+
+### Lô 17a — sửa sau review techlead (08/10)
+- **M1:** khoá kết thúc bằng `unit_cost` (vd `landed_unit_cost`) trả chuỗi 4 chữ số (`"85333.3333"`); tiền 2, kg 3. Rà các khoá của `/reports/*`: chỉ `landed_unit_cost` là 4 chữ số trong DB; các khoá còn lại là tiền (2) hoặc kg (3).
+- **M2:** `date_from`/`date_to` chỉ nhận `YYYY-MM-DD` (regex), năm 2000–2100; `9999-12-31`, `0001-01-01`, `20261007`, `2026-W41-1` đều 400 `INVALID_FILTER`, không còn 500.
+- **L1:** `PAID_AT_IN_FUTURE` cho lệch tối đa 5 phút, setting `PURCHASE_INVOICE_PAID_AT_TOLERANCE_MINUTES` (env cùng tên, mặc định 5).
+- Kiểm: 3290 test OK (skipped=2), `makemigrations --check` sạch, `check_naming` OK.

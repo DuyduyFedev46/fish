@@ -40,14 +40,23 @@ def _actor_filter(request):
         raise BusinessError("Tham số actor phải là mã người dùng (số nguyên dương).", code=INVALID_FILTER) from None
 
 
+DATE_FORMAT = re.compile(r"^\d{4}-\d{2}-\d{2}$", re.ASCII)
+MIN_YEAR, MAX_YEAR = 2000, 2100
+
+
 def _date_filter(request, name):
     raw = (request.query_params.get(name) or "").strip()
     if not raw:
         return None
-    try:
-        return datetime.date.fromisoformat(raw)
-    except ValueError:
-        raise BusinessError(f"Tham số {name} phải có dạng YYYY-MM-DD.", code=INVALID_FILTER) from None
+    # `fromisoformat` của Python 3.11 nhận cả "20261007" và "2026-W41-1": chỉ cho đúng YYYY-MM-DD, năm 2000–2100.
+    if DATE_FORMAT.match(raw):
+        try:
+            day = datetime.date.fromisoformat(raw)
+        except ValueError:
+            day = None
+        if day is not None and MIN_YEAR <= day.year <= MAX_YEAR:
+            return day
+    raise BusinessError(f"Tham số {name} phải có dạng YYYY-MM-DD, năm từ {MIN_YEAR} đến {MAX_YEAR}.", code=INVALID_FILTER)
 
 
 def _start_of_day(day):

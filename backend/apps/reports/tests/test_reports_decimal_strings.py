@@ -17,6 +17,10 @@ QTY_KEYS = {"qty_received", "qty_sold", "reversed_qty", "shrinkage_qty", "damage
 
 
 class StringifyDecimalsUnitTests(TestCase):
+    def test_m1_unit_cost_suffix_uses_four_places(self):
+        out = stringify_decimals({"landed_unit_cost": Decimal("85333.33335"), "unit_cost": Decimal("1")})
+        self.assertEqual(out, {"landed_unit_cost": "85333.3334", "unit_cost": "1.0000"})
+
     def test_money_two_places_qty_three_places_ints_and_bools_kept(self):
         out = stringify_decimals({
             "revenue": Decimal("1000000"), "qty_sold": Decimal("12.5"), "supplier_return_qty": Decimal("1"),
@@ -43,7 +47,7 @@ class ReportsDecimalStringApiTests(TestCase):
             if isinstance(value, Decimal):
                 self.assertIsInstance(body[key], str, key)
                 self.assertEqual(Decimal(body[key]), value, key)
-                places = 3 if key in QTY_KEYS else 2
+                places = 4 if key.endswith("unit_cost") else 3 if key in QTY_KEYS else 2
                 self.assertEqual(len(body[key].split(".")[1]), places, key)
             else:
                 self.assertEqual(body[key], value, key)
@@ -54,6 +58,17 @@ class ReportsDecimalStringApiTests(TestCase):
         self.assertEqual(set(body), set(expected))  # không thêm/bớt khoá
         self.assert_matches_service(body, expected)
         self.assertIs(body["provisional"], True)
+
+    def test_m1_unit_cost_keeps_four_decimal_places(self):
+        from apps.inventory.models import Batch
+        Batch.objects.filter(pk=self.batch.pk).update(landed_unit_cost=Decimal("85333.3333"))
+        self.batch.refresh_from_db()
+        for body in (
+            self.client.get(f"/api/reports/batch/{self.batch.batch_id}/").json(),
+            self.client.get("/api/reports/batches/").json()["results"][0],
+        ):
+            self.assertEqual(body["landed_unit_cost"], "85333.3333")
+            self.assertEqual(Decimal(body["landed_unit_cost"]), self.batch.landed_unit_cost)
 
     def test_batches_list_rows_are_strings(self):
         body = self.client.get("/api/reports/batches/").json()

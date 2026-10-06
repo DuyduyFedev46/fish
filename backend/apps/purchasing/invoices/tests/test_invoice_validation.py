@@ -67,8 +67,10 @@ class InvoiceCreateRulesTests(InvoiceValidationBase):
         self.assert_rejected(self.post(self.paid_payload(paid_at=None)), "PAID_AT_REQUIRED")
 
     def test_a5_paid_at_one_minute_in_future_is_rejected_past_is_accepted(self):
-        future = (timezone.now() + datetime.timedelta(minutes=1)).isoformat()
+        future = (timezone.now() + datetime.timedelta(minutes=6)).isoformat()
         self.assert_rejected(self.post(self.paid_payload(paid_at=future)), "PAID_AT_IN_FUTURE")
+        skew = (timezone.now() + datetime.timedelta(minutes=1)).isoformat()  # L1: chịu lệch đồng hồ tới 5 phút
+        self.assertEqual(self.post(self.paid_payload(paid_at=skew)).status_code, 201)
         past = (timezone.now() - datetime.timedelta(minutes=1)).isoformat()
         self.assertEqual(self.post(self.paid_payload(paid_at=past)).status_code, 201)
 
@@ -121,7 +123,7 @@ class InvoicePatchRulesTests(InvoiceValidationBase):
 
     def test_a5_patch_paid_at_in_future_is_rejected(self):
         invoice = self.make_invoice()
-        future = (timezone.now() + datetime.timedelta(minutes=1)).isoformat()
+        future = (timezone.now() + datetime.timedelta(minutes=6)).isoformat()
         self.assert_rejected(self.patch(invoice, {"paid_at": future}), "PAID_AT_IN_FUTURE")
 
     def test_a5_patch_to_receipt_of_other_supplier_is_rejected(self):

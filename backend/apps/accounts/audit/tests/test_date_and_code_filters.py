@@ -71,6 +71,16 @@ class AuditDateAndCodeFilterTests(TestCase):
             self.assertEqual(response.status_code, 400, params)
             self.assertEqual(response.json()["code"], "INVALID_FILTER", params)
 
+    def test_m2_extreme_or_loose_dates_are_400_not_500(self):
+        for name in ("date_from", "date_to"):
+            for raw in ("9999-12-31", "0001-01-01", "1999-12-31", "2101-01-01", "20261007", "2026-W41-1", "２０２６-10-07"):
+                response = self.client.get(URL, {name: raw})
+                self.assertEqual(response.status_code, 400, (name, raw))
+                self.assertEqual(response.json()["code"], "INVALID_FILTER", (name, raw))
+
+    def test_m2_boundary_years_2000_and_2100_are_accepted(self):
+        self.assertEqual(self.client.get(URL, {"date_from": "2000-01-01", "date_to": "2100-12-31"}).status_code, 200)
+
     def test_tl15_audit_q_matches_object_repr_and_proposal_ref_case_insensitive(self):
         by_repr = self.make_row(at(5, 9, 0), repr_="B-261005-01")
         by_ref = self.make_row(at(5, 9, 1), proposal_ref="AI-PROP-77")

@@ -5,6 +5,9 @@ D-3 (Duy chốt, 02b §6 Q3): Quản lý THẤY `amount`. Người xem được 
 (owner, manager); vai khác bị chặn ở Tầng 1 (403) nên serializer không ẩn field nào. `amount` vì thế không nằm trong
 `COST_KEYS`.
 """
+import datetime
+
+from django.conf import settings
 from django.utils import timezone
 from rest_framework import serializers
 
@@ -74,7 +77,8 @@ class PurchaseInvoiceSerializer(serializers.ModelSerializer):
                 raise BusinessError(
                     "Hoá đơn chưa trả tiền thì không có thời điểm trả.", code="PAID_AT_WHEN_UNPAID"
                 )
-            if paid_at is not None and paid_at > timezone.now():
+            tolerance = datetime.timedelta(minutes=getattr(settings, "PURCHASE_INVOICE_PAID_AT_TOLERANCE_MINUTES", 5))
+            if paid_at is not None and paid_at > timezone.now() + tolerance:  # chịu lệch đồng hồ máy khách
                 raise BusinessError("Thời điểm trả tiền không được ở tương lai.", code="PAID_AT_IN_FUTURE")
         return attrs
 
