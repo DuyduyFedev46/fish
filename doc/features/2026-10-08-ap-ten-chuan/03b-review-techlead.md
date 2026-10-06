@@ -105,3 +105,35 @@ B9 `sales/orders/timeline.py` và test B-timeline, chờ W37 L3 BE gộp.
 | Giá vốn / dữ liệu cá nhân / quyền | Không đổi field, serializer hay quyền |
 
 Không còn việc BE nào của lô.
+
+## Review FE Pha B (08/10)
+
+> Tech Lead · `feat/ten-chuan-fe` @ `fe7642d` (21 file), xét cùng HEAD `b572525` (đã gộp BE Pha A và B).
+
+**Kết luận: APPROVED.** M1 và M2 của review Pha A đã đóng. Có một việc tồn ở **BE** (B-P7 dưới đây), không chặn FE. Tech Lead đề xuất sửa
+trước khi gộp main.
+
+### Lệnh đã tự chạy
+- `npx vitest run features/audit features/confirmation features/orders shared/lib`: 34 file, 463 test xanh. Worktree sạch.
+- Đối chiếu khoá của `AUDIT_ACTION_LABELS` (90 mã) với chuỗi `action` trong BE (không tính tests và migrations). Chỉ còn 4 mã AI
+  (`execute_command`, `propose`, `confirm_proposal`, `reject_proposal`) không thấy ở dạng chuỗi cố định. Đây là phần AI, ngoài lô (02b mục 0).
+
+### Theo từng điểm
+| Điểm | Kết quả |
+|---|---|
+| M1 `escalationHint` | Đóng. Chữ nằm ở `confirmation/messages.ts`, hàm thuần trong `confirmationUi.ts`. Dòng `alert-box warn role="status"` ở `ConfirmationDetailScreen.tsx` chỉ hiện khi WANT_CHANGE. Vitest có cả nhánh có gợi ý và nhánh `null` |
+| M2 / W11 `statusLabel` | Đóng. `STATUS_TABLE_BY_MODEL` tra theo `model_name`, khớp `obj._meta.label` mà BE ghi (`common/audit.py:156`; mọi chỗ khác cũng lọc theo `_meta.label`). Model lạ thì không in. `AuditLogScreen` truyền `row.model_name`. Test có đủ FAILED (phiếu giao / phiếu hoàn tiền), COMPLETED (phiếu giao / đơn), DRAFT (hàng hoàn / lô) và model lạ. Mock Nhật ký đổi `model_name` sang dạng `app.Model` thật, nên e2e mock phản ánh đúng BE |
+| F9 nhãn Nhật ký | Đạt. Có P1–P9, P11, T2, T67–T76 (gồm `item_image_remove`). `enums.standardNames.test.ts` khoá từng dòng theo mã. Trạng thái nhân viên lấy từ `ENUMS.staffStatus` |
+| W34 | Đạt. Bỏ `confirm_payment`, `auto_cancel` và `confirm_proposal` khỏi ô lọc. Không còn nhãn chết ngoài phần AI |
+| "Lập phiếu hoàn tiền" thống nhất | Đạt ở ERP (`orderDetailModel.ts`) và ở nhãn BE do lô đã sửa (registry, `CAPABILITY_LABELS`, next_steps, timeline). Còn sót ở `features/permissions/mock.ts:37` (nhánh F1, đã biết) và `features/ai/report/mock.ts:54` (phần AI). Thanh bước phiếu hoàn tiền và dòng tổng hoàn lấy từ `ENUMS.refundStatus` |
+| F13 Shop | Đạt. `frontend/lib/mock.ts` dùng "Chờ thanh toán" (T1) và "Đang chờ hoàn tiền" (T21), khớp `shop_labels.py`/`customer_notices.py` của BE |
+| `PHASE_B_FILES`, `PENDING_ROUTES` | Đạt. Đã bỏ `PHASE_B_FILES`. `PENDING_ROUTES` chỉ còn hai route `/permissions/` (F1). e2e thêm cột Nhật ký (không "Thao tác khác", không "Người dùng", đối chứng dương "Đang giao → Giao thất bại") và quét Shop 8 đơn |
+
+### Việc tồn
+- **B-P7 (BE, Thấp, nên sửa trước khi gộp):** `backend/apps/sales/models/refunds.py:86` `Meta.permissions` vẫn là `("create_refund", "Tạo phiếu hoàn tiền")`,
+  lệch P7 "Lập phiếu hoàn tiền". Chỉ Django Admin thấy chữ này. Lỗi gốc là 02b mục 2 sót P7 trong danh sách quyền phải đổi, Tech Lead nhận.
+  Cách sửa: đổi `Meta.permissions`, `makemigrations sales` (thêm 0018, chỉ `AlterModelOptions`), thêm `accounts/0018_rename_create_refund_label`
+  theo đúng mẫu 0017 (idempotent, có chiều ngược), và thêm dòng P7 vào `PERMISSION_NAMES`/`OLD_PERMISSION_NAMES` của `test_standard_names.py`.
+- **QA cần chạy bước Shop của e2e:** `shop_sweep` chỉ chạy khi có `SHOP_BASE`, thiếu thì báo SKIP chứ không đỏ. QA phải đặt `SHOP_BASE` và có dòng
+  `[Shop …]` PASS trong báo cáo. Lần chạy trên BE thật (staging local, dữ liệu giả) vẫn là TODO của QA.
+- F1 gộp xong thì gỡ `features/permissions/` khỏi `SKIP_PREFIXES` và gỡ hai route khỏi `PENDING_ROUTES`.
