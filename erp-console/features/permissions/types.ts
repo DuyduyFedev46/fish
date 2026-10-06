@@ -31,6 +31,10 @@ export type GroupSummary = {
   last_changed_at: string | null;
   last_changed_by: string | null;
   capabilities: Record<string, CapabilityState>;
+  /** PV-10: phiên bản cấu hình của nhóm (chuỗi). Gửi lại khi lưu để BE phát hiện người khác vừa sửa (409). */
+  version: string;
+  /** Giá trị phạm vi đã lưu của 6 đối tượng sửa được (orders, deliveries, confirmation, returns, receipts, customers). */
+  data_scope_values: Record<string, string>;
 };
 
 /** Thành viên ở chi tiết nhóm (gồm cả người đã nghỉ). */
@@ -44,16 +48,62 @@ export type GroupMember = {
   added_at: string | null;
 };
 
-/** Phạm vi dữ liệu (chỉ đọc): chuỗi hiển thị do BE dựng. */
+/** Chuỗi phạm vi cũ do BE dựng (BE giữ tới Lô 6, FE không dùng nữa; thay bằng `data_scopes`). */
 export type GroupScopes = { orders: string; deliveries: string; customers: string };
+
+/** Một lựa chọn của ô phạm vi; `rank` càng lớn càng rộng. */
+export type ScopeOption = { value: string; label: string; rank: number };
+
+/** Một dòng của khối "Phạm vi dữ liệu" (8 dòng D1..D8 theo thứ tự `orders, invoices, deliveries, confirmation, returns, receipts, customers, audit_log`). */
+export type DataScopeRow = {
+  key: string;
+  label: string;
+  value: string;
+  /** false: chỉ đọc (Hoá đơn bán theo Đơn hàng, Nhật ký, hoặc nhóm Chủ). */
+  editable: boolean;
+  /** Đối tượng có tên/SĐT/địa chỉ khách: mở rộng phải xác nhận. */
+  customer_data: boolean;
+  /** Mã việc ở registry mà tắt thì ô mờ; `null` khi gốc là quyền ngoài registry (hoặc việc chưa có tới Lô 3). */
+  gate_capability: string | null;
+  /** Khác null: ô mờ, chữ này giải thích. */
+  inactive_reason: string | null;
+  note: string | null;
+  options: ScopeOption[];
+};
 
 /** GET /api/staff/groups/<code>/ (cũng là thân trả về của PUT …/capabilities/). */
 export type GroupDetail = Omit<GroupSummary, "members"> & {
   members: GroupMember[];
   registry: RegistryItem[];
-  scopes: GroupScopes;
+  scopes?: GroupScopes;
+  data_scopes: DataScopeRow[];
   timeline: GuidanceTimelineEntry[];
 };
 
 /** PUT /api/staff/groups/<code>/capabilities/ — khoá = key việc, giá trị = bật (true) / tắt (false). */
 export type CapabilityChanges = Record<string, boolean>;
+
+/** Thay đổi phạm vi: khoá = mã đối tượng, giá trị = mã giá trị mới. */
+export type ScopeChanges = Record<string, string>;
+
+/** Thân PUT …/capabilities/ (PV-08, PV-10): `version` bắt buộc; `capabilities` và `scopes` chỉ gồm khoá đã đổi. */
+export type GroupSaveBody = {
+  version: string;
+  capabilities?: CapabilityChanges;
+  scopes?: ScopeChanges;
+  confirm_customer_data_widening?: true;
+};
+
+/** Thân POST …/permissions-preview/ (PV-09): như PUT, không cần `version`/xác nhận. */
+export type GroupPreviewBody = { capabilities?: CapabilityChanges; scopes?: ScopeChanges };
+
+/** Kết quả xem trước (PV-09, PV-10 phía BE). Chỉ có tên NHÂN VIÊN, không có dữ liệu khách. */
+export type ScopePreview = {
+  widens_customer_data: boolean;
+  widened: { key: string; from: string; to: string }[];
+  affected_members: { id: number; display_name: string }[];
+  affected_count: number;
+  message: string;
+  already_wider_elsewhere: { id: number; display_name: string; via_group: string; key: string }[];
+  narrowed: { key: string; from: string; to: string; rows_losing_access: number }[];
+};

@@ -71,13 +71,36 @@
 .taskState { display: inline-flex; align-items: center; gap: var(--space-1-5); color: var(--ink-2); font-size: var(--text-sm); }
 .stateOn { color: var(--good); }
 
-/* ---- Trang nhóm: phạm vi dữ liệu (cột phải) ---- */
-.scopes { display: flex; flex-direction: column; gap: var(--space-2); margin: 0; }
-.scopeRow { display: grid; grid-template-columns: 7.5rem minmax(0, 1fr); gap: var(--space-2); align-items: baseline; padding: var(--space-2) 0; border-bottom: 1px solid var(--border); }
-.scopeRow:last-child { border-bottom: 0; }
-.scopeRow dt { color: var(--ink-3); font-size: var(--text-sm); }
-.scopeRow dd { margin: 0; color: var(--ink); font-size: var(--text-sm); line-height: var(--leading-snug); }
-.scopeAll { display: inline-flex; align-items: center; gap: var(--space-1-5); font-weight: var(--weight-semibold); color: var(--warn); }
+/* ---- Trang nhóm: phạm vi dữ liệu (8 dòng, ô chọn) ---- */
+.scopeList { list-style: none; margin: 0; padding: 0; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--surface); box-shadow: var(--shadow-xs); overflow: hidden; }
+.scopeItem { display: grid; grid-template-columns: minmax(0, 14rem) minmax(0, 1fr); column-gap: var(--space-4); row-gap: var(--space-1); align-items: center; padding: var(--space-2-5) var(--space-3); border-bottom: 1px solid var(--border); }
+.scopeItem:last-child { border-bottom: 0; }
+.scopeHead { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1-5); min-width: 0; }
+.scopeLabel { font-weight: var(--weight-medium); color: var(--ink); line-height: var(--leading-snug); }
+.scopeTag { font-size: var(--text-2xs); }
+.scopeSelect { width: 100%; min-width: 0; height: var(--control-h); padding: 0 var(--space-3); font: inherit; font-size: var(--control-text); color: var(--ink); background: var(--surface); border: 1px solid var(--border-input); border-radius: var(--radius-md); box-shadow: var(--shadow-xs); }
+.scopeSelect:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+.scopeSelect:disabled { opacity: .6; cursor: not-allowed; background: var(--surface-2); }
+.scopeValue { display: flex; align-items: center; gap: var(--space-1-5); margin: 0; min-height: var(--control-h); color: var(--ink); font-size: var(--text-sm); line-height: var(--leading-snug); }
+.scopeMuted { color: var(--ink-3); }
+.scopeNote { grid-column: 2; margin: 0; display: flex; align-items: flex-start; gap: var(--space-1-5); color: var(--ink-3); font-size: var(--text-xs); line-height: var(--leading-snug); }
+.scopeNoteInactive { color: var(--ink-2); }
+.scopeItem[data-inactive="true"] .scopeLabel { color: var(--ink-2); }
+
+/* ---- Thanh bản nháp (Lưu / Huỷ thay đổi): dính đáy vùng cuộn, chỉ hiện khi có thay đổi chưa lưu ---- */
+.saveBar { position: sticky; bottom: var(--space-2); z-index: var(--z-sticky); display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-2) var(--space-4); padding: var(--space-2) var(--space-3); border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--surface); box-shadow: var(--shadow-sm); }
+.saveBarText { display: flex; flex-direction: column; gap: var(--space-0-5); min-width: 0; flex: 1 1 14rem; }
+.saveBarCount { font-weight: var(--weight-medium); color: var(--ink); font-size: var(--text-sm); }
+.saveBarError { display: flex; align-items: flex-start; gap: var(--space-1-5); color: var(--crit); font-size: var(--text-xs); line-height: var(--leading-snug); }
+.saveBarActions { display: flex; gap: var(--space-2); flex: 0 0 auto; }
+.taskRow[data-unsaved="true"] { background: var(--surface-2); }
+
+/* ---- Hộp xác nhận lưu ---- */
+.widenBox { display: flex; align-items: flex-start; gap: var(--space-2); padding: var(--space-3); border-radius: var(--radius-md); background: var(--warn-soft); color: var(--ink); }
+.widenBox > :global(.mi) { color: var(--warn); flex: none; }
+.widenText { min-width: 0; }
+.nameList { margin: var(--space-1) 0 var(--space-2); padding-left: var(--space-4); color: var(--ink-2); font-size: var(--text-base); }
+.noteList { margin: 0; padding-left: var(--space-4); color: var(--ink-2); font-size: var(--text-sm); line-height: var(--leading-normal); }
 .rail { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }
 
 /* ---- Thành viên ---- */
@@ -102,5 +125,8 @@
 
 @media (max-width: 639px) {
   .matrix th.taskCol, .matrix th.task, .matrix td.task { min-width: 168px; max-width: 200px; }
-  .scopeRow { grid-template-columns: 1fr; gap: var(--space-0-5); }
+  .scopeItem { grid-template-columns: 1fr; }
+  .scopeNote { grid-column: 1; }
+  .saveBarActions { width: 100%; }
+  .saveBarActions > :global(.btn) { flex: 1 1 0; }
 }

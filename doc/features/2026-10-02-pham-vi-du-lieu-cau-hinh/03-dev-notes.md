@@ -93,3 +93,49 @@ Thứ tự đã làm: M1+L1 (commit riêng, sinh lại mốc trên HEAD chưa s�
 - **L4 (Lô 5):** dòng D7 lưu `all` mà nhóm thiếu `view_customer_list` phải có `note`, ví dụ "Bật Xem khách hàng để thấy tất cả khách" (giá trị hiệu lực là `assigned_deliveries`).
 - **L2 phần Lô 5:** bước "trước" của `rows_losing_access` gọi `resolve_data_scopes(member, overrides={})` (`{}` khác `None` nên không bị nhớ). Test Lô 3+ đổi cấu hình dùng `User.objects.get(pk=…)` mới.
 - Lô 3/4 không được thêm `APPROVED_DIFFS` cho `direct_permissions` khi Duy chưa trả lời D-3.
+
+## Lô F1 FE (PV-11, PV-09 phần FE, PV-10 phần FE) — fe-dev, nhánh `feat/pham-vi-fe` (tách từ main `9509453`)
+
+Chưa push, chưa merge. Chỉ sửa `erp-console/features/permissions/**` và `erp-console/e2e/ed_batch14_permissions.py` (+ mục này).
+
+### Làm gì
+| Việc | Chỗ |
+|---|---|
+| Khối "Phạm vi dữ liệu" 8 dòng (D1..D8) ở W3i: ô chọn đúng `options`, D2 "Theo Đơn hàng", D8 chỉ đọc; nhóm Chủ khoá + "Chủ luôn thấy tất cả"; nhãn CSKH đã đúng (hết chữ "Trong phạm vi gọi", L3) | `components/GroupDetailScreen.tsx` (`ScopeRowEditor`), `mockScopes.ts` |
+| Ô mờ khi có `inactive_reason`, giá trị cũ vẫn hiện; bật việc gốc trong bản nháp thì hết mờ; `gate_capability: null` chỉ dựa vào `inactive_reason` | `permissionsModel.ts::isScopeInactive` |
+| W3i thành **bản nháp** + thanh "Lưu thay đổi / Huỷ thay đổi" (một PUT, chỉ khoá đã đổi, kèm `version`); `beforeunload` khi còn nháp. W3h giữ bật/tắt ngay (D-4) | `useGroupDraft.ts`, `permissionsModel.ts` (`Draft`, `toggleInDraft`, `setScopeInDraft`, `cleanDraft`, `saveBodyOf`) |
+| PV-09: lưu → POST xem trước → hộp "Cho thêm người xem dữ liệu khách?" (câu `message`, tên nhân viên, "Người đã nghỉ thì khoá tài khoản", dòng kiêm nhiệm, "Huỷ" / "Tôi hiểu, lưu"); thu hẹp có `rows_losing_access` thì ghi chú, không chữ cảnh báo khách; 400 `CUSTOMER_DATA_WIDENING_UNCONFIRMED` mở hộp bằng `impact`, giữ lựa chọn | `components/ConfirmSaveModal.tsx`, `saveErrors.ts` |
+| PV-10: mọi PUT gửi `version`; 409 → "Nhóm này vừa được người khác đổi. Tải lại để xem bản mới." + nút "Tải lại" (xoá nháp, lấy bản server), không tự gửi lại; W3h: 409 → báo + tải lại danh sách; "Hoàn tác" dùng `version` mới | `useGroupDraft.ts`, `useCapabilityToggle.ts` |
+| PO-Q1: bật "Xem khách hàng" khi Khách hàng = Không xem → nháp (và W3h) tự đặt Khách hàng = Tất cả; chọn Không xem khi việc đang bật thì khoá nút Lưu + báo cạnh nút | `toggleInDraft`, `draftProblem`, `useCapabilityToggle.bodyOf` |
+| **Superuser ngoài nhóm Chủ được ghi** (Duy chốt 06/10): hết chặn ở W3h, W3i, thêm/bỏ thành viên nhóm Chủ | `permissionsModel.ts::isGroupWriter` |
+| Bỏ chip "Được gán" hằng số (`ASSIGNED_ONLY`); chip và chip "Tất cả khách" lấy từ `data_scope_values` BE | `isAssignedOnly`, `showsAllCustomers` |
+
+Hàm API mới (`api.ts`): `saveGroupChanges(code, {version, capabilities?, scopes?, confirm_customer_data_widening?})` (thay `setGroupCapabilities`), `previewGroupChanges(code, {capabilities?, scopes?})`. Kiểu mới ở `types.ts`: `DataScopeRow`, `ScopeOption`, `GroupSaveBody`, `GroupPreviewBody`, `ScopePreview`; `GroupSummary`/`GroupDetail` thêm `version`, `data_scope_values`, `data_scopes`; `scopes` cũ để tuỳ chọn và FE không dùng.
+
+GET dùng đúng contract thật của Lô 2 (`version`, `data_scope_values`, `data_scopes`). PUT mới và preview chạy ở bản mock cho tới Lô 5.
+
+### Mock giữ luật BE (`mock.ts` + phần thuần `mockScopes.ts`)
+Thứ tự kiểm 02b §2.3 (403 → 404 → GROUP_LOCKED → INPUT_NOT_ALLOWED → INVALID_INPUT → SCOPE_* → BR-PQ-32 → **409 CAS `version`** → CAPABILITY_REQUIRES → **PO-Q1** → **400 CUSTOMER_DATA_WIDENING_UNCONFIRMED kèm `impact`**). Không đổi gì thì 200 và không tăng `version`. Kho tạm `sessionStorage` (khoá việc, mã đối tượng, mã giá trị, số phiên bản, tên đăng nhập người sửa; không dữ liệu khách). Công cụ thử: `window.__caveMock.bumpGroupVersion("manager")` giả lập người khác vừa lưu. Danh mục D1..D8 và mặc định theo nhóm chép từ `catalog.py` và migration `0015`. Số "dòng mất quyền xem" của xem trước là số GIẢ cố định (3 phiếu nhập, 2 loại khác).
+
+### Chỗ lệch contract / cần techlead và điều phối viên biết
+1. **`/api/auth/me/` không trả `is_superuser`** (Me ở `features/auth` ngoài danh sách được sửa). `isGroupWriter` dùng `me.is_superuser === true` nếu có, không thì suy ra từ việc có đủ 5 quyền chỉ-Chủ (`confirm_payment_manual`, `confirm_refund`, `manage_staff`, `manage_ai_policy`, `close_batch`), vì superuser có mọi permission. Sai thì BE vẫn 403 và UI hiện nguyên văn. Đề nghị Lô 7 (PV-14, `accounts/auth/services.py`) thêm `is_superuser` vào `/me/`.
+2. **Superuser KHÔNG thuộc nhóm nào** bị `AuthGate` đưa về `/no-role/` (mock `admin`), nên không vào được `/permissions/`. Thuộc `features/auth`, ngoài phạm vi. Superuser kèm nhóm (mock `sa1` = Quản lý + superuser) thì vào và ghi được; e2e kiểm bằng `sa1`.
+3. **Mock cũ sai một chỗ**: `view_customers` mặc định tắt ở Quản lý, trong khi migration `sales/0013` cấp `view_customer_list` cho `manager` (D7 seed = `all`). Đã sửa mock cho Quản lý bật.
+4. **Hành vi theo 02b §2.5, có thể làm Duy bất ngờ**: bật lại một việc cổng (Xem đơn, Gọi xác nhận, Xem khách hàng) trên nhóm đang lưu phạm vi rộng (Q-7 giữ giá trị khi tắt) là MỞ RỘNG dữ liệu khách, nên cả ở W3h cũng hiện hộp "Tôi hiểu, lưu". Mock làm đúng như vậy; BE Lô 5 phải trả đúng cùng quy tắc.
+5. `data_scopes[].options` của nhóm Chủ vẫn có (BE `_options`) dù `editable: false`; FE chỉ đọc nhãn.
+6. Khi bật "Xem khách hàng" ở W3h với D7 = `none`, FE gửi `scopes.customers = "all"`; BE Lô 5 phải chấp nhận khoá này cùng yêu cầu việc (đúng 02b §2.3 bước 10).
+7. `ConfirmOffModal` (hỏi khi tắt việc phá luồng) chỉ còn dùng ở W3h; ở W3i câu hậu quả nằm trong hộp xác nhận lúc Lưu.
+
+### Việc còn nợ
+- Nối BE thật cho PUT/preview ở Lô 5 (không deploy FE này trước Lô 5; M2: Lô 4 và 5 lên cùng lượt).
+- `scopes` cũ và kiểu `GroupScopes` bỏ hẳn ở Lô 6.
+- PV-13, PV-14 FE (Lô 7) chưa làm. Chuyển trang trong app khi còn nháp chưa bị chặn (chỉ `beforeunload` khi đóng tab/tải lại); chấp nhận được, ghi để QA cân nhắc.
+
+### Kiểm chứng (chạy trong lượt làm, trong worktree; `node_modules` là symlink, đã gỡ trước khi commit)
+- `./node_modules/.bin/tsc --noEmit`: sạch.
+- `vitest run`: **86 file, 1021 test PASS** (thêm test model/bản nháp trong `permissionsModel.test.ts` và test luật mock trong `mock.test.ts`).
+- `NEXT_PUBLIC_USE_MOCK=0 npm run build` + `check-no-mock.mjs` (XANH, 28 file mock, 43 chuỗi) + `check-ai-chunks.mjs` (XANH, 48 màn + 2 layout).
+- `NEXT_PUBLIC_USE_MOCK=1 npm run build` + `e2e/ed_batch14_permissions.py`: **154/154 PASS** (gồm: superuser sửa được; Quản lý `ql9`, `ql1`, `kho1`, `giao1`, `cs2` không sửa/không vào; 409 ở W3i và W3h; bản nháp không gọi API cho tới Lưu; Esc/Huỷ không PUT; PO-Q1; ô mờ; 360px không cuộn ngang, vùng bấm ≥ 44px; không dữ liệu cá nhân ở storage/URL; không lỗi console).
+- `python3 scripts/check_naming.py`: OK, không phát sinh mới.
+- Ảnh (thư mục `shots/` bị `.gitignore`, không commit): `shots/f1-desktop-1280-{w3i-scopes,w3i-draft,widen-dialog,conflict,superuser}.png`, `shots/f1-mobile-360-{w3i-draft,w3i-full,widen-dialog}.png`.
+- Dọn: đã xoá `out/` và `.next/`, tắt server 3101.
