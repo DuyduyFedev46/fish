@@ -3008,3 +3008,82 @@ Tôi đã soát diff của `git show 90f66cd`, gồm `returns/api.py`, `returns/
 - **Câu hỏi cho Duy (từ M1):** phiếu hàng hoàn đã duyệt có cần đường đảo không? Nếu cần thì đó là tính năng BR-HV mới, không thuộc lô này.
 
 ### Kết luận #3/#8 BE sau re-review: **APPROVED**
+
+## Review sửa AuditLog.note (06/10)
+
+Phạm vi: TL-D3-L4 / TL15-L5, nhánh `fix/auditlog-note`, commit ebf67e7, `git diff b847087..HEAD` (10 file). Đối chiếu mục "Sửa AuditLog.note chữ tự do (06/10)" trong `03-dev-notes.md` và bất biến 9 (`caveve-domain`).
+
+**Lệnh techlead đã tự chạy trong worktree** (`DJANGO_DEBUG=1`, symlink tạm `backend/.env` và `backend/staticfiles`, đã gỡ sau khi chạy):
+- `manage.py test --parallel 4`: 2891 test, OK.
+- `makemigrations --check --dry-run`: No changes detected.
+- `python3 scripts/check_naming.py`: OK, không phát sinh vi phạm mới.
+- Dùng script `ast` (để ngoài repo) liệt kê toàn bộ 98 lời gọi `record_audit(` trong `backend/apps`, gồm cả đối số `note=` và `changes=`. Grep `AuditLog.objects.create|AuditLog(|bulk_create|get_model(...AuditLog)`: chỉ có `common/audit.py:153` tạo dòng. Ngoài ra chỉ có migration 0007, là backfill cũ.
+- Thăm dò `_is_raw` của test quét bằng `manage.py shell`: `str(reason)`, `reason.strip()`, `data["note"]`, `request.data.get("note")`, `f"{x.note[:50]}"` và biến đổi tên đều trả False, tức là lọt qua test (xem L1).
+
+### Kết quả theo hạng mục soát
+
+| Hạng mục | Kết quả |
+|---|---|
+| 9 điểm sửa trong diff | Đạt về mặt rò dữ liệu. Không còn chữ tự do ở `attach_payment`, hai nhánh `resolve_payment`, `mark_refund_failed`, `cancel_paid_order`, ba action của confirmation và `reject_*`. |
+| Các `record_audit` còn lại (rà từng dòng) | Đạt. Các `note` còn lại đều là câu cố định, mã hoặc số: AI (`ai/actions`, `ai/execution/pipeline.py`, `run_due_ai_actions.py`), accounts, inventory, `receipts` (tên NCC, không phải khách). `changes.reason` ở `content/entries/services.py:708,851` đã kiểm theo `RETURN_REASONS`/`UNPUBLISH_REASONS` (dòng 683, 824). `delivery/labels/services.py:146` dùng enum `LabelPrint.Reason`. `delivery/services.py:224` dùng mã `failure_reason`, còn `failure_note` không vào audit. `recipient_changed` chỉ ghi tên field. `update_customer` dùng `_CustomerAuditRef` và chỉ ghi tên field. |
+| `object_repr` | Đạt cho mọi lời gọi hiện có. `Customer.__str__` có tên và SĐT (`sales/models/customers.py:23`), nhưng đường duy nhất ghi audit cho Customer đã bọc `_CustomerAuditRef`. `__str__` của SalesOrder, DeliveryNote, PaymentTransaction và Refund chỉ có mã, số tiền và trạng thái. |
+| `purchasing/costs/services.py:83` | **be-dev đúng, techlead nhầm.** Dòng đó là `PurchaseCost.objects.create(note=note)`, tức chứng từ gốc. File này không import `record_audit`. Audit của luồng này nằm ở `recompute_landed_cost` (`inventory/batches/services.py:456`) và chỉ có `landed_unit_cost`. |
+| Allowlist 2 file của test quét | Nội dung hợp lý: `content/entries` dùng mã đã kiểm, `auto_confirm.py:71-174` dùng câu do hệ thống sinh. Cách miễn thì quá rộng (xem L1). |
+| Migration, giá vốn, phân quyền | Không đổi schema, không đụng serializer hay quyền. |
+
+### Ý nghĩa nghiệp vụ của nhãn "Có ghi chú (xem trên chứng từ gốc)"
+
+Người xem Nhật ký là Chủ và Quản lý (`accounts.view_auditlog`, `accounts/audit/api.py:37-42`). Nhãn chỉ đúng khi chữ gốc thật sự nằm trên một chứng từ mà hai vai này mở được:
+- `resolve_payment` (ATTACH/CONFIRM): chữ gốc nằm ở `PaymentTransaction.resolution_note` (`payments/services.py:628`). Serializer có trả field này (`payments/serializers.py:113`), quyền xem dùng mẫu `paymenttransaction: r`. **Đúng.**
+- `mark_refund_failed`: chữ gốc nằm ở `Refund.failure_reason`, `RefundSerializer` có trả. **Đúng.**
+- `resolve_payment` do hoàn tiền: nhãn mới là "Hoàn tiền theo phiếu hoàn #id" và `changes.refund_id` vẫn còn. **Đúng.**
+- `delivery_unconfirmed`, `delivery_confirm_skipped`, `delivery_extended`, ghi chú huỷ đơn OTHER, và `attach_payment` khi gắn chưa đủ tiền: **sai, chữ bị mất hẳn** (xem M1).
+
+### Lỗi
+
+**Critical:** không có. **High:** không có.
+
+**TL-AN-M1 · Medium · mất thông tin kiểm toán, nhãn chỉ tới chứng từ không có chữ.** Ở các điểm dưới đây, AuditLog là nơi **duy nhất** từng lưu chữ người dùng gõ. Sau bản sửa, chữ đó không còn được lưu ở đâu, trong khi Nhật ký lại ghi "xem trên chứng từ gốc". Câu trong `03-dev-notes.md` ("Chữ gốc vẫn nằm trên chứng từ") sai với các điểm này.
+- `backend/apps/delivery/confirmation/services.py:576`: `delivery_confirm_skipped`. Lý do là **bắt buộc** (dòng 557-558), vì Quản lý cho giao mà không xác nhận được với khách. Đây đúng là loại lý do kiểm toán cần giữ. `DeliveryNote` và `ConfirmationTask` không có field nào lưu lý do này.
+- `backend/apps/delivery/confirmation/services.py:611`: `delivery_extended` (lý do gia hạn), cùng tình trạng.
+- `backend/apps/delivery/confirmation/services.py:390`: `delivery_unconfirmed` (lý do CSKH huỷ xác nhận), cùng tình trạng.
+- `backend/apps/sales/orders/services.py:402`, cùng với `sales/orders/api.py:180-185` và `delivery/confirmation/services.py:628`: khi chọn OTHER, API **bắt buộc** nhập ghi chú, nhưng sau đó ghi chú bị bỏ đi. Nhật ký chỉ còn "Lý do: Khác". `CreditNote` chỉ lưu `reason_code`.
+- `backend/apps/sales/payments/services.py:574`: `attach_payment` khi gắn chưa đủ tiền. `note` không được lưu vào `resolution_note`, vì chỉ nhánh `_issue_and_close` lưu (dòng 628), nên ghi chú cũng mất.
+
+Ba lý do của confirmation đã bị chặn SĐT và số tài khoản (`has_long_digit_run`, tối đa 200 ký tự, BR-GH-19). Ghi chú huỷ đơn và `resolve_payment` thì chưa qua bộ lọc này.
+
+Cách sửa: **cần Duy chọn (câu hỏi 4 bên dưới)**, sau đó be-dev sửa trong cùng nhánh. Phần không cần quyết định thì làm ngay: (i) `attach_payment` nhánh chưa đủ tiền lưu `note` vào `p.resolution_note`, không cần migration; (ii) sửa câu trong `03-dev-notes.md`; (iii) với điểm nào không có chỗ lưu thì không được dùng nhãn "xem trên chứng từ gốc". Tạm thời dùng nhãn trung tính "Có ghi chú" cho tới khi Duy quyết.
+
+**TL-AN-M2 · Medium · `backend/apps/common/admin.py:46-65` (có từ trước, ngoài diff, nhưng nằm trong phạm vi "mọi cách tạo AuditLog").** Khi superuser sửa field bị khoá trong Django Admin, `_guarded_changes` chép nguyên giá trị `{"from", "to"}` vào `AuditLog.changes`. Danh sách khoá có `PaymentTransaction.raw_payload` (payload IPN có tên người chuyển) và `resolution_note` (`sales/admin.py:88-92`), cùng `Refund.failure_reason` và `bank_txn_ref` (`sales/admin.py:107-110`). Các giá trị này sẽ hiện ở Nhật ký cho Quản lý. Đường này chỉ superuser dùng và hiếm khi xảy ra, nhưng là đường trực tiếp đưa dữ liệu cá nhân khách vào audit, và test quét không bắt được (`changes=changes`). Cách sửa: thêm vào mixin `text_fields`/`pii_fields`, hoặc mặc định coi mọi `TextField`/`JSONField` là nhạy cảm. Với các field đó chỉ ghi `{"changed": true}`. Kèm một test Admin: superuser sửa `raw_payload` có tên giả thì AuditLog không chứa tên đó.
+
+**TL-AN-L1 · Low · `backend/apps/common/tests/test_auditlog_note_no_free_text.py:164-206`.** Test quét tĩnh là chốt chặn dò lỗi chứ chưa phải bảo đảm, và dễ bị lách:
+- `_is_raw` không đi vào `Call`/`Subscript`, nên `str(reason)`, `reason.strip()`, `data["note"]`, `request.data.get("note")` và `f"{x.note[:50]}"` đều lọt (đã thăm dò). Đổi tên biến cũng lọt.
+- Với `changes`, test chỉ xét dict literal và hai khoá `reason`/`note`. Không xét `changes=changes` (biến), cũng không xét khoá khác như `failure_note` hay `text`.
+- Allowlist miễn **cả file**, nên một lời gọi chữ tự do mới thêm vào `content/entries/services.py` hay `auto_confirm.py` sẽ không bị bắt.
+- Không có kiểm tra rằng `AuditLog.objects.create` chỉ xuất hiện ở `common/audit.py`.
+
+Đề xuất: duyệt đệ quy toàn bộ cây con (`ast.walk(kw.value)`). Có `Name`/`Attribute` thuộc `RAW_NAMES` thì báo, trừ khi nằm trong lời gọi `note_marker(...)`. Áp cách này cho mọi giá trị trong dict `changes`. Allowlist đổi sang từng cặp `(file, action)` hoặc comment `# audit: system-text` trên dòng. Thêm test grep `AuditLog.objects.create` ngoài `common/audit.py` và `migrations/`. Không cần làm cho test hoàn hảo, vì test chạy thật theo từng điểm mới là lớp chặn chính.
+
+**TL-AN-L2 · Low · `reject_ai_action` (`backend/apps/ai/actions/services.py:169-176`) mới chỉ có test tĩnh.** Nên thêm test chạy thật, và việc này rẻ: mở rộng `apps/ai/actions/tests/test_actions_api.py:175` (`test_dw11_ac4_reject_action`, đã gọi reject thật) để gửi `reason_code` chứa tên giả, rồi assert `log.note == f"Từ chối đề xuất AI {id}"`, `log.changes == {"has_reason_code": True}` và tên giả không có trong `note`/`changes`. Về nghiệp vụ, hiện FE không gửi `reason_code` (`erp-console/features/ai/actions/api.ts:92` mặc định `""`, `AiDocBlock.tsx:137`), nên việc bỏ giá trị không làm mất gì. Nếu sau này cần lý do từ chối thì phải kiểm theo danh sách mã cố định và lưu mã, không lưu chuỗi tự do.
+
+**TL-AN-L3 · Low · `test_refunded_payment_note_is_fixed_label`.** Test này dùng `bank_txn_ref=f"REF{FAKE_PHONE}"` nhưng chỉ assert tên giả không có, không assert `FAKE_PHONE`, vì SĐT giả vẫn nằm trong `changes.bank_txn_ref` (đúng hành vi hiện tại, xem câu hỏi 3). Nên ghi một comment nói rõ điều này để người sau không hiểu nhầm là test đã chặn SĐT.
+
+### Đề xuất cho 4 câu hỏi (điều phối viên hỏi Duy)
+
+1. **AuditLog cũ còn chữ tự do.** Khuyên chọn **(a) ẩn lúc đọc**, nhưng không dựa theo ngày: với các action bị ảnh hưởng (`attach_payment`, `resolve_payment`, `mark_refund_failed`, `cancel_paid_order`, `delivery_unconfirmed`, `delivery_confirm_skipped`, `delivery_extended`, `reject_*`), serializer Nhật ký chỉ trả `note` khi note khớp các mẫu cố định (`NOTE_PRESENT_LABEL`, `Lý do: <nhãn>`, `Hoàn tiền theo phiếu hoàn #…`, `Từ chối đề xuất AI …`). Không khớp thì trả nhãn trung tính. Cách này không cần cấu hình ngày deploy, không đụng DB, đảo ngược được, và giữ đúng bất biến 4 (AuditLog append-only). Phương án (b), lệnh ẩn danh hoá chạy một lần, là **sửa dòng của bảng append-only**. Chỉ nên dùng khi có yêu cầu xoá dữ liệu cụ thể của một khách theo Luật BVDLCN, và khi đó đi theo quy trình quyền của chủ thể dữ liệu (ẩn danh hoá có ghi vết, Duy duyệt từng lần, chạy staging trước). Lưu ý: Django Admin của AuditLog vẫn thấy chữ cũ, nhưng chỉ superuser vào được, chấp nhận được.
+2. **`staff_create`/`staff_update` ghi tên và SĐT nhân viên vào `changes`** (`accounts/staff/services.py:174-180` và khoảng dòng 205). Đây là dữ liệu cá nhân của nhân viên, không phải khách, nên không thuộc bất biến 9. Người xem Nhật ký (Chủ, Quản lý) cũng là người quản lý nhân viên. Vẫn khuyên **thu tối thiểu**: ghi `{"fields": [...]}` giống `update_customer`, giữ `username` và `groups`. Mức Low, làm ở lô accounts kế tiếp, không chặn bản sửa này.
+3. **`changes.bank_txn_ref`.** Khuyên **giữ**, vì đây là mã giao dịch cần để đối soát hoàn tiền, và chính phiếu hoàn cũng hiện mã này (`refunds/serializers.py:28`, timeline `orders/serializers.py:199`). Nhưng field này hiện là chuỗi tự do do Chủ gõ (`refunds/api.py:114`), nên nên **kiểm định dạng lúc nhập**, ví dụ chỉ nhận `[A-Za-z0-9._-]`, dài 1–64, không có khoảng trắng. Như vậy không gõ được tên người vào. Không dùng `has_long_digit_run`, vì mã ngân hàng vốn là chuỗi số dài. Mức Low, lô sau.
+4. **(Mới, từ M1) Lý do bỏ qua xác nhận, gia hạn, huỷ xác nhận và ghi chú huỷ đơn OTHER nên lưu ở đâu?**
+   - (a) **Khuyên chọn:** lưu trên chứng từ, bằng field mới `ConfirmationTask.decision_note` (CharField 200) cho ba action confirmation, và một field ghi chú huỷ trên `CreditNote` hoặc `SalesOrder` (CharField 200, chạy `has_long_digit_run` như BR-GH-19). Cách này cần migration nhỏ và lý do theo bất biến 8. Chữ nằm trên chứng từ có phân quyền, còn Nhật ký giữ nhãn "Có ghi chú (xem trên chứng từ gốc)", lúc đó mới đúng.
+   - (b) Giữ chữ trong `AuditLog.note` cho ba action confirmation, vì chữ đã bị lọc SĐT và số tài khoản, và người xem cũng là người ra quyết định. Cách này không cần schema, nhưng vẫn để tên khách có thể nằm trong Nhật ký.
+   - (c) Đổi sang chọn mã lý do từ danh sách cố định, kèm nhãn. Cần BA/PO và FE.
+
+### Kết luận: **CHANGES REQUESTED**
+
+Phần chặn rò dữ liệu của 9 điểm sửa là đúng: test chạy thật đủ, suite xanh 2891, không có migration. Lý do chưa duyệt là M1: bản sửa làm mất hẳn lý do kiểm toán bắt buộc (bỏ qua xác nhận, ghi chú huỷ OTHER) mà Nhật ký lại chỉ người xem tới một chứng từ không có chữ đó. Việc cần làm trước khi merge:
+- (i) `attach_payment` nhánh chưa đủ tiền lưu `resolution_note`.
+- (ii) Điểm nào chưa có chỗ lưu thì dùng nhãn trung tính.
+- (iii) Sửa câu trong dev-notes.
+- (iv) M2 (Admin) và L2 (test reject chạy thật), vì cả hai nhỏ và đúng chủ đề.
+
+L1 và L3 nên làm cùng lượt này. Phương án cuối cho các điểm trong M1 làm sau khi Duy trả lời câu hỏi 4. Câu hỏi 1–3 không chặn merge.
