@@ -601,7 +601,7 @@ sinh bước "AI soạn nháp …" và dòng AI. Đề xuất: BE ẩn mọi nh�
 
 ## 4. Đề xuất tên chuẩn (PO, chờ Duy duyệt)
 
-> PO · 06/10/2026 · Trạng thái: **CHỜ DUYỆT** · Theo quyết định Duy 06/10 (tối) "Một tên cho mỗi chứng từ" (`doc/decisions.md`).
+> PO · 06/10/2026 · Trạng thái: **ĐÃ DUYỆT (Duy 07/10, "ok hết" Q-1..Q-5 theo đề xuất)** · Theo quyết định Duy 06/10 (tối) "Một tên cho mỗi chứng từ" (`doc/decisions.md`).
 > Nguồn: mục 1 và 2.10 ở trên, `doc/URD.md` (§5–6), `doc/business-process-spec.md` (P-05…P-08), `doc/ops/go-live-phap-ly.md`.
 
 **Nguyên tắc chọn tên**

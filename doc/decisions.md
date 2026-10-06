@@ -206,3 +206,7 @@ Hồ sơ: `doc/features/2026-09-26-sepay-cong-thanh-toan/`.
 - **W37 (đơn giao xong vẫn "Đang xử lý"):** chạy luồng ĐẦY ĐỦ (BA → PO → Tech Lead) trước khi code.
 - **Một tên cho mỗi chứng từ:** PO đề xuất bảng tên trong `doc/thuat-ngu-va-trang-thai.md`, Duy duyệt một lần rồi áp dụng.
 - **Shop:** mặt hàng hết hàng hiện nút "Liên hệ" thay "Hết hàng" (luồng NHANH).
+
+## 2026-10-07 — W37 đơn hoàn tất, tên chuẩn — [DUY CHỐT]
+- **W37:** NV giao bấm giao xong phiếu cuối thì đơn tự "Hoàn tất" (không nút tay). Bỏ dùng `PAID`. Chuyển bù đơn cũ một lần (staging trước, production khi Duy duyệt). Dòng thời gian gộp "Đã giao" + "Đơn hoàn tất". Chi tiết đơn có "Đã hoàn x đ · Chờ hoàn y đ". BA được ghi BR-BH-18..21, BR-BC-06 và sơ đồ §7.2 mới vào spec. Story: `doc/features/2026-10-06-don-hoan-tat/02-stories.md`.
+- **Tên chuẩn:** duyệt toàn bộ mục 4 `doc/thuat-ngu-va-trang-thai.md`: "Phiếu trừ doanh thu", chip riêng "Hết giờ giữ chỗ", menu "Hàng hoàn", phiếu giao xong "Đã giao", trang `terms` = "Điều kiện giao dịch chung".
