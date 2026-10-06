@@ -59,3 +59,19 @@ Ghi nhận không chặn:
 - Playwright (Python, trong scratchpad): quét E1 thật (5 vai x 44 route x 3 cấu hình), Shop tra đơn thật, ghi chú huỷ đơn, quyết định CSKH, đặt hàng Shop, throttle tra đơn.
 - `tsc --noEmit`, `check-ai-chunks.mjs`, `ed_batch1_shell`, `ed_batch3_orders`, `ed_batch13_catalog`, `note_br_gh_19`.
 - Đã dọn: dừng server, gỡ symlink `node_modules`, `.env`, `staticfiles`, xoá `out/` và DB tạm.
+
+### QA lại sau 4216e84 (08/10)
+
+**Kết luận: APPROVED — B1 đã sửa, ma trận W39 trên BE thật không còn chữ AI. Không còn lỗi chặn.**
+Tổng: 4 ca · ✅ 4 · ❌ 0 · ⏸ 0 (chỉ chạy lại phần liên quan; các mục còn lại của lần trước giữ nguyên kết quả).
+
+Dựng lại BE thật (SQLite tạm, `AI_ENABLED` 0/1) và hai bản build ERP mock=0 (cờ FE tắt, bật), cùng seed như lần trước. `tsc --noEmit` exit 0.
+
+| Ca | Kết quả | Bằng chứng |
+|---|---|---|
+| W39: BE `AI_ENABLED=1`, FE build tắt, 5 vai × 44 route (220 lượt) | ✅ | 0 lượt có `/\bAI\b/` hoặc "Trợ lý" (text, `aria-label`, `title`, `placeholder`, `alt`, `option`); 0 request `/api/ai/`. Các chỗ đã báo sạch: chi tiết đơn, lô, kiểm kê, mặt hàng, `/account/`, `/permissions/`, `/permissions/detail/`. Dữ liệu BE vẫn có `ai_policy` (BE bật) nhưng FE không hiển thị |
+| Không ẩn quá tay ở W39 | ✅ | Chi tiết đơn (360px): "AI của" = 0 nhưng dòng thời gian của người vẫn còn; không cuộn ngang |
+| BE tắt + FE tắt | ✅ | 220 lượt, 0 chữ AI, 0 request `/api/ai/`, `/api/staff/groups/*` không có `ai_policy`, `/me` `ai_features_enabled=false` |
+| Đối chứng BE bật + FE bật | ✅ | 90/220 lượt có chữ AI, 74 request `/api/ai/`; chi tiết đơn có "AI của" = 2 |
+
+Ghi chú: `check-ai-chunks.mjs` không chạy lại được vì `.next` bị bản build gần nhất (cờ bật) ghi đè; điều phối viên đã báo XANH ở bản tắt. Server chỉ tắt theo PID của QA; đã gỡ symlink, `out/`, DB tạm.
