@@ -302,3 +302,87 @@ Code sản phẩm đạt. Tôi không thấy rò dữ liệu cá nhân hay giá 
    (c) mất tên khách trên đơn, hoá đơn, phiếu hoàn khi chưa được cấp V2 (Lô 3). Hàng chờ gọi giữ như cũ. Kèm số người đếm được trên production.
 2. V2 phủ cả phiếu giao. Tắt V2 cho NV giao thì họ mất địa chỉ giao. Tem vẫn theo "In tem", hàng chờ gọi theo "Gọi xác nhận đơn". Đề nghị
    đổi nhãn V2 thành "Xem thông tin khách trên đơn, hoá đơn, phiếu giao".
+
+## Review Lô 4 M1 + Lô 5 + C1 (08/10)
+
+> Tech Lead · 2026-10-08 · `f4eec0b..5fd4032`: `090e6ef` (M1), `5457c2d` (Lô 5: PV-08, PV-09 BE, PV-10 BE, `/me` `is_superuser`, L1,
+> L4), `5fd4032` (C1: phiếu hoàn tiền và dashboard theo D1/D2).
+
+### Kết luận: **APPROVED-chờ-Duy**
+
+Code đạt: không rò giá vốn, không rò dữ liệu cá nhân. CAS, xác nhận mở rộng, AuditLog và xem trước đúng 02b §2.3–§2.5. M1 của review
+Lô 4 đã làm đúng. Lý do "chờ Duy": `PENDING_DUY_DIFFS` vẫn còn mục (D-3), nên theo luật đã đặt thì **chưa merge main**. Không cần review
+lại code khi Duy trả lời, chỉ cần soát lại lần chuyển `PENDING_DUY_DIFFS` sang `APPROVED_DIFFS`.
+
+### Kiểm chứng đã chạy trong lượt review (HEAD `5fd4032`)
+
+- `manage.py test apps.accounts apps.reports apps.sales.refunds apps.delivery` với `DJANGO_DEBUG=1` và symlink `staticfiles` tạm (đã gỡ):
+  **1078 test, OK (skipped=3)**. Điều phối viên đang chạy lại toàn bộ.
+- `makemigrations --check --dry-run`: `No changes detected`.
+
+### M1 (`090e6ef`): đạt
+
+Mốc `direct_permissions` đã trả về hành vi cũ. `PENDING_DUY_DIFFS` tách khỏi `APPROVED_DIFFS`, mỗi mục ghi "CHỜ Duy D-3". Test khẳng định ba
+điều: mọi mục thuộc `direct_permissions`; mọi mục là thu hẹp; một dòng thấy **thêm**, hay một lệch ở tài khoản khác, thì **không** được miễn.
+Docstring của test mốc ghi luật "không merge main khi còn mục".
+
+### Sáu câu hỏi
+
+| # | Điểm | Quyết định |
+|---|---|---|
+| 1 | PUT dùng `scopes`, không dùng `data_scope_values` | **Đúng 02b §2.3, duyệt.** `data_scope_values` là khoá của GET (trạng thái đầy đủ), còn `scopes` là phần thay đổi gửi lên. Phiếu giao việc ghi nhầm, sẽ sửa trong 02c. |
+| 2 | PO-Q1 chỉ kiểm khi request đụng `view_customers` hoặc `scopes.customers` | **Duyệt.** Trạng thái "Xem khách hàng bật, D7 = `none`" không thể sinh ra qua PUT mới, vì mọi lần đụng tới đều bị kiểm. Trạng thái này chỉ có ở dữ liệu cũ, mà seed 0015 đã đặt D7 = `all` cho nhóm đang có `view_customer_list`. Nếu kiểm ở mọi lần lưu thì dữ liệu lệch sẵn sẽ chặn cả những lần lưu không liên quan. Tôi chọn hành vi BE. **Mock F1 phải sửa theo BE** ở Lô 6 FE. Chỉ khác ở ca dữ liệu lệch sẵn nên không ảnh hưởng vận hành. |
+| 3 | `widened[]` có D2 và V2, mock F1 chưa có | **Duyệt BE, đúng 02b §2.5.** Lô 6 FE phải: (a) chịu được `key` ngoài `SCOPE_BY_KEY`, gồm `invoices` và `view_order_customer_info`; (b) lấy nhãn V2 theo chữ mới sau khi Duy chốt; (c) thêm 2 ca này vào mock và vitest. Đây là điều kiện nghiệm thu Lô 6, ghi vào 02c. |
+| 4 | Hai mục `+` ở dashboard trong `PENDING_DUY_DIFFS` | **Chấp nhận.** Đây thật sự là thu hẹp, nhìn bề ngoài mới giống "thấy thêm": (a) `+ extra:kpis.X=<số mới>` luôn đi cùng `- extra:kpis.X=<số cũ>`, vì một con số đổi giá trị luôn hiện thành cặp `-`/`+`; (b) `visible:order_assigned_direct` là đơn **đã** nằm trong D1 của chính người này (mốc `orders.list` có sẵn). Đơn này chỉ lọt vào nhóm 8 đơn gần nhất vì các đơn khác bị lọc đi, không có dữ liệu mới nào. **L-a (Low):** glob `extra:kpis.*` rộng quá, một KPI **tăng** cũng lọt. Khi chuyển sang `APPROVED_DIFFS` sau D-3, ghi đúng giá trị (`extra:kpis.pending_orders=1`, `extra:kpis.revenue_today=0`…) thay cho `*`. |
+| 5 | Phiếu hoàn không gắn đơn bị ẩn khi D1 khác `all` | **Duyệt.** Phiếu không gắn đơn thì không thuộc phạm vi nào ngoài `all`, nên ẩn là hướng an toàn. Mặc định Chủ, Quản lý ở `all` nên thấy như hôm nay. Có test `test_c1_refund_without_order_is_hidden_when_d1_is_narrow`. |
+| 6 | Sửa test cũ | **Duyệt cả nhóm.** `put_caps` chỉ thêm `version` lấy từ GET, không nới kiểm. `test_api_read` và `test_api_write` gửi thêm `scopes.customers` và `confirm_…` đúng bước 10, 11; riêng ca bật lại `view_customers` cho Quản lý còn khẳng định **trước** rằng thiếu xác nhận thì nhận 400 `CUSTOMER_DATA_WIDENING_UNCONFIRMED`, tức là chặt hơn cũ. Hai test khoá `/me` chỉ thêm `is_superuser`. Test GROUP_LOCKED thêm `version`. |
+
+### Soát thêm
+
+- **CAS và 409.** `GroupAccessConfig` được `select_for_update().get_or_create` trong `transaction.atomic`, rồi so `str(row_version)` với
+  `version`. Lệch thì trả `ConflictError` 409 `GROUP_CHANGED`. `row_version` chỉ tăng một lần bằng `F() + 1`, và chỉ khi có thay đổi thật.
+  Lưu không đổi gì thì không tăng, không ghi AuditLog. Thứ tự kiểm khớp 02b: lỗi đầu vào trước 409, 409 trước `requires`, PO-Q1 và mở rộng.
+  Có test version không phải số (409, không 500), test nhóm thiếu dòng cấu hình, và test đua thật trên Postgres (skip trên SQLite). **Test
+  đua phải chạy trên staging hoặc CI trước khi deploy.**
+- **Xác nhận mở rộng và AuditLog.**
+  - BE chặn được kể cả khi FE bỏ qua. `impact` nằm trong body lỗi 400.
+  - Cờ `customer_data_widening_confirmed` ghi ở dòng AuditLog phạm vi nếu có đổi phạm vi, không thì ở dòng AuditLog việc.
+  - `changes` chỉ có mã (test AC9).
+  - AuditLog lỗi thì rollback toàn bộ (AC6).
+  - Dòng thời gian, `capability_change_label` và `scope_change_label` bỏ qua khoá không phải mã.
+  - Mở rộng tính theo **rank hiệu lực** (luật H1). Bốn ca `MockParityTests`, cộng ca 3b (tắt là thu hẹp) và ca 5 (câu nhiều đối tượng),
+    khớp luật mock F1.
+- **Xem trước.**
+  - Chỉ Chủ hoặc superuser gọi được, test AC7 phủ cả Quản lý.
+  - Kiểm giống PUT (`test_pv09_preview_validates_like_put`), không ghi gì.
+  - `rows_losing_access` gọi `resolve_data_scopes(member, overrides={})`, đúng L2(a), nên không ghi vào bộ nhớ tạm.
+  - Đếm gộp không trùng và bỏ dòng đã kết thúc.
+- **Dữ liệu cá nhân và giá vốn trong `impact`/preview.** Chỉ có mã, nhãn cố định, `id` và tên hiển thị **nhân viên**. Không tên, SĐT hay địa
+  chỉ khách, không số tiền (test AC9). Thân yêu cầu không bị log.
+- **`revenue_today` theo D2.**
+  - Với `all`, `scope_invoices_for` trả nguyên queryset, nên tổng hoá đơn không đổi.
+  - `SalesCreditNote.sales_invoice` là FK **không null**, nên `sales_invoice__in=<mọi hoá đơn>` vẫn trừ đủ mọi phiếu đảo như cũ.
+  - Với phạm vi hẹp, phiếu đảo hôm nay chỉ trừ khi thuộc hoá đơn trong phạm vi, kể cả hoá đơn phát hành hôm trước. Đây đúng là phần doanh
+    thu bị đảo của tập hoá đơn người đó thấy.
+  - `annotate(pii_visible=Exists(...))` không nhân dòng, vì lọc dùng `sales_order_id__in`.
+  - Tiền là `Decimal` qua `Coalesce(..., DecimalField())`.
+  - Mốc cho thấy Chủ, Quản lý, NV kho giữ `revenue_today=200000.0`.
+  - Có test `test_c1_revenue_subtracts_only_credit_notes_in_scope`.
+  - Đúng.
+- **Ngân sách truy vấn.** L1 đã có `assertNumQueries`, tối đa +3 cho danh sách phiếu giao, hàng chờ gọi, phiếu nhập, hàng hoàn và khách.
+  Preview thì không có ngân sách: số truy vấn bằng khoảng (số thành viên × số đối tượng đổi) + 5 nhóm. Chấp nhận được với quy mô vựa (L-b).
+
+### Mục mức thấp (không chặn)
+
+| # | Vấn đề | Xử lý |
+|---|---|---|
+| L-a | `PENDING_DUY_DIFFS` có `+ extra:kpis.*` (glob rộng) | Khi chuyển sang `APPROVED_DIFFS` sau D-3, ghi đúng giá trị số |
+| L-b | Preview chưa có ngân sách truy vấn; `rows_losing_access` không phản ánh việc đổi **việc** trong cùng yêu cầu, vì resolver đọc quyền thật trong DB | Ghi nhận. Số dòng chỉ là thông tin cho Chủ. Nếu vựa lớn lên thì thêm ngân sách |
+| L-c | `_held_after` dùng biểu thức điều kiện cho lệnh có tác dụng phụ (`after.update(...) if wanted else after.difference_update(...)`) | Đổi sang `if/else` khi có dịp sửa file này |
+
+### Điều kiện còn mở
+
+- **D-3 (Duy):** khi trả lời, chuyển `PENDING_DUY_DIFFS` sang `APPROVED_DIFFS` (L-a), hoặc sửa code theo lựa chọn của Duy. Sau đó mới merge main.
+- **Deploy:** BE (Lô 4 và Lô 5) lên cùng lượt với ERP gửi `version` (R11, M2). Chạy test đua Postgres. Chạy lệnh đếm D-2 và D-3 (thêm người
+  kiêm NV kho + CSKH, xem L2 Lô 4).
+- **Lô 6 FE:** mock theo PO-Q1 của BE; chịu được `widened[].key` là `invoices` hoặc `view_order_customer_info`; nhãn V2 theo chữ Duy chốt.
