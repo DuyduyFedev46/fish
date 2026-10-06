@@ -3087,3 +3087,75 @@ Phần chặn rò dữ liệu của 9 điểm sửa là đúng: test chạy th�
 - (iv) M2 (Admin) và L2 (test reject chạy thật), vì cả hai nhỏ và đúng chủ đề.
 
 L1 và L3 nên làm cùng lượt này. Phương án cuối cho các điểm trong M1 làm sau khi Duy trả lời câu hỏi 4. Câu hỏi 1–3 không chặn merge.
+
+### Re-review sau quyết định Duy (06/10)
+
+Phạm vi: `git diff 76e6086...HEAD`, gồm 40044a2 (sửa theo review), d5e4371 (`safe_note`, ẩn dòng AI), 6a00e4f (`decision_note`, `cancel_note` + migration), a3a439c và 2 merge main. Đối chiếu `doc/decisions.md` mục "2026-10-06 (chiều)".
+
+**Lệnh techlead đã tự chạy** (`DJANGO_DEBUG=1`, symlink tạm `.env`/`staticfiles`, đã gỡ, worktree sạch):
+- `manage.py test --parallel 4`: 3017 test, OK.
+- `makemigrations --check --dry-run`: No changes detected.
+- `check_naming.py`: không phát sinh vi phạm mới.
+- `sqlmigrate delivery 0010 --backwards` ra `DROP COLUMN "decision_note"`. `sqlmigrate sales 0014 --backwards` ra `DROP COLUMN "cancel_note"`.
+- Một test thăm dò tạm thời (đã xoá, không có trong diff) cho kết quả:
+  - (1) `SalesOrderDetailSerializer` với đơn có `pii_visible=False` trả `customer` toàn `None`, nhưng `cancel_note` vẫn ra nguyên văn `"Nguyễn Văn Giả, ngõ 5 Lê Lợi"` (dữ liệu giả).
+  - (2) `scrub_data({"cancel_note","decision_note","note"})` chỉ bỏ `note` và **giữ** `cancel_note`, `decision_note`.
+  - (3) `record_audit("create_and_submit_receipt", actor=<Chủ>)` trong `set_ai_audit_scope(action_ref="P-9")` cho ra `actor_kind="user"`, `proposal_ref="P-9"`. Khi `AI_ENABLED=False`, dòng này bị `exclude_ai_rows` ẩn.
+
+#### Các mục lần trước
+
+| Mục | Trạng thái |
+|---|---|
+| TL-AN-M1 (mất lý do bắt buộc) | **Đóng.** Lý do lưu ở `ConfirmationTask.decision_note` (`delivery/confirmation/services.py:383,570,603`) và `SalesOrder.cancel_note` (`sales/orders/services.py:405`). `attach_payment` nhánh chưa đủ tiền lưu `resolution_note` (`payments/services.py:573-574`). Nhãn "xem trên chứng từ gốc" nay đúng với mọi điểm. Phát sinh lỗi mới về cách lộ field, xem RR-H1 và RR-M1. |
+| TL-AN-M2 (Admin chép giá trị) | **Đóng.** `common/admin.py` coi `TextField`/`JSONField` (có `raw_payload`) và `free_text_fields` là chữ tự do, chỉ ghi `{"changed": true}`. Có test Admin. |
+| TL-AN-L1 (test quét dễ lách) | **Đóng.** Test duyệt đệ quy, bỏ qua `note_marker`, xét mọi khoá trong `changes`, allowlist theo cặp (file, action) kèm test cặp còn tồn tại. Có test các cách lách đã nêu và test chặn `AuditLog.objects.create`. Allowlist thêm `staff_create`, chấp nhận được trong lúc chờ câu hỏi 2. |
+| TL-AN-L2 (reject chạy thật) | **Đóng.** `ai/actions/tests/test_actions_api.py:186,202-205`. |
+| TL-AN-L3 (comment `bank_txn_ref`) | **Đóng.** `test_auditlog_note_no_free_text.py:142`. |
+
+#### Soát các điểm điều phối viên nêu
+
+| Điểm | Kết quả |
+|---|---|
+| Migration `delivery/0010`, `sales/0014` | **Đạt.** Chỉ có `AddField` CharField(200, blank, default ""). Trên Postgres 11+ thêm cột default hằng chỉ đổi metadata, không ghi lại bảng. Chạy lùi được (DROP COLUMN). Rollback sẽ mất chữ ghi chú đã lưu, nên cần ghi chú khi deploy. |
+| Field mới chỉ lộ cho người có quyền | **`decision_note` đạt:** chỉ có ở chi tiết hàng chờ, `""` khi `in_scope=false` (`delivery/confirmation/serializers.py:237`), không có ở danh sách, có test. **`cancel_note` không đạt** (RR-M1). |
+| Không vào API công khai | **Đạt.** `shop_api` không dùng hai serializer này (grep). |
+| Không vào AI | **Không đạt** (RR-H1). |
+| BR-GH-19 chặn SĐT trong ghi chú huỷ | **BE đạt.** `sales/orders/services.py:361-365` kiểm trước transaction, trả 400 mã `BR-GH-19`, có test. Lưu ý thêm: giới hạn mới 200 ký tự cũng là hành vi mới. **FE phải biết:** `erp-console/features/orders/components/CancelOrderModal.tsx:78` đang để `maxLength={500}`, phải hạ xuống 200, và phải hiện `detail` của lỗi `BR-GH-19` dưới ô ghi chú. Hai lỗi này có thể xảy ra từ cả màn huỷ đơn lẫn màn quyết định CSKH CANCEL. |
+| `safe_note` có lọt chữ tự do không | **Đạt.** Mẫu cố định đều neo đầu và cuối. `cancel_paid_order` chỉ nhận đúng nhãn trong `CANCEL_REASON_LABELS`, có thể ghép nhãn "Có ghi chú". Note cũ dạng `"Lý do: Khác — <chữ>"` và `"Phiếu hoàn #… · mã GD hoàn …"` đều ra "Có ghi chú". `reject_*` chỉ nhận `Từ chối đề xuất AI <[\w-]+>`, mà note cũ luôn có `". Lý do: …"` nên bị ẩn. Action ngoài danh sách vẫn trả nguyên văn, đúng vì lần rà trước đã xác nhận các action đó chỉ ghi câu hệ thống. Có một điểm nhỏ (RR-L2). |
+| Lọc dòng AI: `count`, phân trang, `?actor_kind=ai` | **Kỹ thuật đạt.** Lọc trên queryset trước `paginate_queryset` (`accounts/audit/api.py:51`), nên `count` và các trang khớp nhau. Khi tắt AI, `?actor_kind=ai` trả 0, có test. **Phạm vi lọc thì sai** (RR-M2). |
+
+#### Lỗi
+
+**Critical:** không có.
+
+**RR-H1 · High · `backend/apps/ai/policy/rules.py:112-119` (`SCRUB_FREE_TEXT_KEYS`), cùng `sales/orders/serializers.py:113` và `delivery/confirmation/serializers.py:237`.** Hai field chữ tự do mới không nằm trong danh sách lọc của AI. Viewset đơn hàng khai báo cho AI đọc (`sales/orders/api.py:73`, `AiMeta(keywords=("tra đơn",))`), nên khi AI đọc chi tiết đơn, `cancel_note` sẽ đi nguyên văn vào ngữ cảnh AI. Thăm dò (2) cho thấy scrub giữ lại field này. Ghi chú này có thể chứa tên hoặc địa chỉ khách: chỉ dãy số dài bị chặn, còn "ngõ 5 Lê Lợi" vẫn qua. Ghi chú cũng là kênh prompt injection, đúng lý do `note`/`reason` đã nằm trong danh sách. Câu trong `03-dev-notes.md` "không vào AI" là sai. Cách sửa: thêm `cancel_note` và `decision_note` vào `SCRUB_FREE_TEXT_KEYS`. Nên thêm cả vào `SCRUB_PII_KEYS` để field bị bỏ ở mọi đường scrub, không chỉ đường AI đọc. Test: `scrub_data` bỏ cả hai khoá, và một test AI đọc chi tiết đơn đã huỷ thì JSON trả về không có `cancel_note`. Nên thêm một test bảo vệ chung: mọi CharField/TextField tên `*_note`/`*_reason` của model nghiệp vụ phải nằm trong danh sách scrub, để field mới sau này không lọt lại.
+
+**RR-M1 · Medium · `backend/apps/sales/orders/serializers.py:113`.** `cancel_note` trả nguyên văn kể cả khi `pii_hidden(order)`, tức là NV giao có đơn đã quá cửa sổ, hoặc CSKH ngoài phạm vi (Tầng 3, SR-PII-02). Trong khi `get_customer` đã che tên, SĐT và địa chỉ của cùng đơn (thăm dò 1). Như vậy chưa nhất quán với `decision_note`, vốn đã chặn theo `in_scope`. Cách sửa: chuyển thành `SerializerMethodField` trả `""` khi `pii_hidden(order)`. Test: NV giao nhìn đơn ngoài cửa sổ thì `cancel_note == ""`. Chủ và Quản lý vẫn thấy.
+
+**RR-M2 · Medium · `backend/apps/accounts/audit/serializers.py:62` (`exclude_ai_rows`).** Quyết định của Duy là "ẩn các dòng **do AI làm**". Bộ lọc hiện tại ẩn cả những dòng **do người làm**:
+- (a) `confirm_*`/`reject_*`: Chủ hoặc Quản lý duyệt hay từ chối đề xuất, `actor_kind="user"`, có `proposal_ref`.
+- (b) **Dòng nghiệp vụ thật** do người duyệt thực thi, vì `confirm_ai_action` chạy lệnh trong `set_ai_audit_scope(action_ref=…)` (`ai/actions/services.py:101-114`) và `record_audit` tự gắn `proposal_ref` (`common/audit.py`). Ví dụ phiếu nhập được nộp hay lô được chốt sau khi người bấm duyệt. Thăm dò (3) xác nhận dòng này bị ẩn.
+- (c) `ai_config_update`, `ai_config_kill`, `ai_policy_update`: Chủ đổi cấu hình hoặc bấm công tắc tắt AI.
+
+Hậu quả: tắt AI làm biến mất khỏi Nhật ký những thay đổi chứng từ thật và hành động của Chủ. Như vậy là trái mục đích kiểm toán của BR-PQ-04/05. Cách sửa đề xuất: chỉ loại `actor_kind="ai"`, cộng với dòng Hệ thống thuộc vòng đời đề xuất AI (`actor_kind="system"` và có `proposal_ref`, ví dụ `escalate_overdue_*`, `fail_*`). Giữ mọi dòng `actor_kind="user"` và dòng `ai_*` do Chủ làm. Phải sửa test `test_note_redaction_and_ai_hide.py:71` (hiện đang khoá việc ẩn `ai_policy_update`) và thêm ca: dòng người có `proposal_ref` vẫn hiện khi AI tắt. Nếu Duy thật sự muốn ẩn cả dòng duyệt/từ chối và dòng cấu hình AI, thì điều phối viên hỏi lại một câu. Nhưng dòng nghiệp vụ ở (b) thì không được ẩn trong mọi trường hợp.
+
+**RR-L1 · Low · `backend/apps/delivery/confirmation/services.py:383,570,603`.** `decision_note` chỉ có một ô, nên mỗi quyết định ghi đè lý do trước. Ví dụ: gia hạn với lý do A, sau đó giao không xác nhận với lý do B, thì A mất. `unconfirm` không có lý do cũng xoá trắng lý do cũ. Dòng Nhật ký cũ vẫn ghi "xem trên chứng từ gốc", nhưng chứng từ lúc đó chỉ còn lý do mới nhất. Lý do bắt buộc (bỏ qua xác nhận) là quyết định cuối cùng nên vẫn còn, vì vậy chấp nhận cho lô này. Nếu cần đủ lịch sử thì phải chuyển sang bảng lịch sử quyết định, là việc của lô sau. Tối thiểu nên: `unconfirm` không ghi đè khi `clean_reason` rỗng, và ghi rõ hành vi này trong dev-notes.
+
+**RR-L2 · Low · `backend/apps/accounts/audit/serializers.py:21-22,29`.** Regex dùng `re.match` với `$`, mà `$` khớp được trước ký tự `\n` cuối chuỗi. Các mẫu hiện tại không có chỗ cho chữ tự do nên không lọt gì. Nên đổi sang `fullmatch` để chặt. Ngoài ra mẫu "Hoàn tiền theo phiếu hoàn" khai cho `attach_payment` nhưng action này không bao giờ ghi câu đó, nên bỏ đi cho gọn.
+
+**RR-L3 · Low · `backend/apps/sales/orders/services.py:346` và `sales/orders/api.py:184-185`.** Tham số `reason` của `cancel_paid_order` không còn được dùng trong thân hàm (code chết), nhưng API vẫn ghép chuỗi `"nhãn — ghi chú"` để truyền vào, và hai nơi gọi trong confirmation cũng vậy. Nên bỏ tham số này và các chỗ ghép chuỗi, hoặc ghi docstring rằng nó chỉ để tương thích.
+
+#### Việc cho FE (điều phối viên chuyển)
+- `CancelOrderModal.tsx:78`: đổi `maxLength` thành 200, hiện lỗi 400 `BR-GH-19` ("Không ghi SĐT hay số tài khoản vào ghi chú huỷ." / "Ghi chú huỷ tối đa 200 ký tự.") dưới ô ghi chú, không đóng modal. Màn quyết định CSKH CANCEL cũng có thể nhận lỗi này. Màn này đã giới hạn 200 và chặn SĐT từ trước.
+- Hiển thị `cancel_note` ở chi tiết đơn và `decision_note` ở chi tiết hàng chờ khi chuỗi không rỗng, bám theo contract trong `03-dev-notes.md` (sau khi sửa RR-M1, `cancel_note` có thể là `""` với người ngoài phạm vi).
+- Nhật ký: khi AI tắt, bộ lọc `actor_kind=ai` trả rỗng. Nên ẩn lựa chọn này theo cờ AI, như Lô 15 FE đã làm.
+
+### Kết luận re-review: **CHANGES REQUESTED**
+
+M1, M2 và L1–L3 của lần trước đã đóng. Suite xanh 3017 test, migration an toàn và chạy lùi được. Các việc phải sửa trước khi merge:
+- **RR-H1:** thêm `cancel_note`/`decision_note` vào danh sách scrub của AI, kèm test.
+- **RR-M1:** che `cancel_note` khi `pii_hidden`.
+- **RR-M2:** không ẩn dòng do người làm, ít nhất là dòng nghiệp vụ có `proposal_ref`, kèm sửa test.
+- Sửa câu "không vào AI" trong `03-dev-notes.md`.
+
+RR-L1 (phần `unconfirm` không xoá trắng), RR-L2 và RR-L3 nên làm cùng lượt. Sau khi sửa, gửi lại techlead re-review phần chênh.
