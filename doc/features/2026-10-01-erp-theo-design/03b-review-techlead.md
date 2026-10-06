@@ -3159,3 +3159,33 @@ M1, M2 và L1–L3 của lần trước đã đóng. Suite xanh 3017 test, migra
 - Sửa câu "không vào AI" trong `03-dev-notes.md`.
 
 RR-L1 (phần `unconfirm` không xoá trắng), RR-L2 và RR-L3 nên làm cùng lượt. Sau khi sửa, gửi lại techlead re-review phần chênh.
+
+### Re-review sau 3411a13
+
+Phạm vi: `git show 3411a13`, gồm 9 file. Đây là phần sửa RR-H1, RR-M1, RR-M2, RR-L1–L3.
+
+**Lệnh techlead đã tự chạy** (`DJANGO_DEBUG=1`, symlink tạm `.env`/`staticfiles`, đã gỡ, worktree sạch):
+- `manage.py test --parallel 4`: 3022 test, OK.
+- `makemigrations --check --dry-run`: No changes detected.
+- `check_naming.py`: OK, không phát sinh vi phạm mới.
+
+Ghi nhận sự cố: lần chạy đầu của techlead đụng một phiên khác cũng đang tạo symlink `staticfiles` trong worktree. Lệnh `ln` của techlead vì vậy tạo ra một link vòng `backend/staticfiles/staticfiles` trong repo chính. Thư mục này bị gitignore, không ảnh hưởng tới git. Techlead đã gỡ link đó rồi chạy lại suite sạch như trên.
+
+| Mục | Kết quả |
+|---|---|
+| RR-H1 (scrub AI) | **Đóng.** `cancel_note`, `decision_note` có trong cả `SCRUB_PII_KEYS` lẫn `SCRUB_FREE_TEXT_KEYS` (`ai/policy/rules.py:109-110,121-123`). Vì nằm trong PII keys nên field bị bỏ ở mọi đường `scrub_data`: AI đọc (`pipeline.py:222`), kết quả thực thi (`pipeline.py:621`), args đề xuất (`ai/actions/serializers.py:65`). `note_text` (ghi chú cuộc gọi CSKH) là lỗ hổng cũ cùng loại, nay cũng đã được lọc. Test `AiScrubCoversFreeTextFieldsTests` quét mọi CharField/TextField không có choices, tên có `note/reason/memo/comment/description`. Allowlist 7 field: tôi đã soát từng field, đều là nội dung công khai hoặc mã cố định, có ghi lý do. Test quét theo tên field của model, không theo khoá JSON của serializer. Nếu serializer đổi tên khoá (ví dụ trả `failure_note` dưới tên `note`) thì test không bắt được. Hiện tại không có trường hợp nào lọt, và đây là chốt chặn hợp lý. |
+| RR-M1 (`cancel_note` theo `pii_hidden`) | **Đóng.** `sales/orders/serializers.py:225-227` dùng `SerializerMethodField`, cùng luật với `customer`. Có test cho cả hai nhánh. |
+| RR-M2 (phạm vi ẩn dòng AI) | **Đóng.** `accounts/audit/serializers.py` hiện chỉ loại `actor_kind="ai"` và dòng `system` có `proposal_ref`. Lọc vẫn chạy trên queryset trước khi phân trang, nên `count` và các trang vẫn khớp nhau. Test khoá cả hai phía: ẩn `propose_*`, `execute_*` (AI), `escalate_overdue_*` (Hệ thống), và giữ `confirm_*`, `reject_*`, dòng nghiệp vụ có `proposal_ref`, `ai_config_update`, `ai_config_kill`, `ai_policy_update`. Khớp đúng câu "dòng do AI làm" của Duy. |
+| RR-L1 (`decision_note`) | **Đóng ở mức đã thống nhất.** Lý do rỗng không còn ghi đè lý do cũ. Có test cho `unconfirm`. Phần chỉ giữ lý do mới nhất đã ghi trong dev-notes, để lô sau. |
+| RR-L2 (`fullmatch`) | **Đóng.** Hai regex đều dùng `fullmatch`. Có test đuôi `\n` + tên giả. Đã bỏ mẫu thừa của `attach_payment`. |
+| RR-L3 (`reason` chết) | **Chấp nhận.** API và `decide` không còn ghép hay truyền `reason`. Tham số vẫn còn trong chữ ký hàm, docstring ghi rõ lý do. Nơi gọi duy nhất còn truyền là auto-cancel (`delivery/confirmation/services.py`), với câu do hệ thống sinh, và giá trị đó không được ghi vào đâu. Không có rủi ro. Dọn hẳn khi có đợt sửa test của `cancel_paid_order`. |
+| Dev-notes | Câu "không vào AI" đã sửa thành "bị scrub khỏi dữ liệu AI đọc". Contract `cancel_note` đã ghi rõ trả `""` khi `pii_hidden`, kèm nhắc khi rollback migration. |
+
+**Việc FE (không đổi so với lần trước):**
+- `CancelOrderModal.tsx:78` đổi `maxLength` thành 200, và hiện lỗi `BR-GH-19` dưới ô ghi chú.
+- Hiển thị `cancel_note` và `decision_note` khi chuỗi không rỗng.
+- Ẩn lựa chọn lọc `actor_kind=ai` theo cờ AI.
+
+**Critical/High/Medium:** không còn.
+
+### Kết luận re-review sau 3411a13: **APPROVED**
