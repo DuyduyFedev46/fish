@@ -92,3 +92,12 @@ class MatrixAiFlagTests(TestCase):
         self._seed_events()
         rows = list(AuditLog.objects.filter(action="change_group_capabilities").order_by("id"))
         self.assertEqual(services.capability_change_label(rows[1]), "Tắt việc Mở bán lô")
+
+    @override_settings(AI_ENABLED=False)
+    def test_off_guidance_group_drops_ai_only_event_without_zero_count_label(self):
+        """N1: sự kiện chỉ có khoá AI không hiện "Đổi quyền của nhóm (0 việc)" ở guidance của nhóm."""
+        group = self._seed_events()
+        timeline = self.client.get(f"/api/guidance/group/{group.pk}/").json()["timeline"]
+        labels = [e["label"] for e in timeline if e["kind"] == "change_group_capabilities"]
+        self.assertEqual(labels, ["Tắt việc Mở bán lô"])
+        self.assertNotIn("0 việc", str(timeline))

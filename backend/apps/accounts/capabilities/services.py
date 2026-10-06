@@ -262,12 +262,21 @@ def describe_group(code) -> dict:
 
 def capability_change_label(row) -> str:
     """Nhãn một dòng AuditLog `change_group_capabilities` (dùng cho provider guidance `group`)."""
-    changes = {k: v for k, v in (row.changes or {}).items() if k in registry.visible_keys(row.changes or {})}
+    raw = row.changes or {}
+    visible = set(registry.visible_keys(raw))  # tính một lần
+    changes = {k: v for k, v in raw.items() if k in visible}
     if len(changes) == 1:
         (key, change), = changes.items()
         capability = registry.BY_KEY.get(key)
         return f"{STATE_LABEL_VERB.get((change or {}).get('to'), 'Đổi')} việc {capability.label if capability else 'một việc'}"
     return f"Đổi quyền của nhóm ({len(changes)} việc)"
+
+
+def has_visible_capability_change(row) -> bool:
+    """False khi dòng `change_group_capabilities` chỉ chứa việc đang ẩn (AI tắt): bỏ khỏi guidance."""
+    if row.action != ACTION_CHANGE_CAPABILITIES:
+        return True
+    return bool(registry.visible_keys(row.changes or {}))
 
 
 # --- ghi ---------------------------------------------------------------------------

@@ -29,15 +29,16 @@ class MeAiFlagTests(TestCase):
 
     @override_settings(AI_ENABLED=True)
     def test_emergency_off_switch_does_not_flip_flag(self):
-        from apps.ai.status import services as status_services
+        """Chủ tắt khẩn (global_mode=off thật trong DB): cờ giao diện vẫn theo env, để còn màn bật lại."""
+        from apps.ai.models.policy import AiPolicyVersion
+        from apps.ai.status.services import is_ai_enabled
 
-        orig = status_services.is_ai_enabled
-        status_services.is_ai_enabled = lambda: False  # Chủ tắt khẩn: cờ giao diện vẫn theo env
-        try:
-            body = client_for(self.owner).get(URL).json()
-        finally:
-            status_services.is_ai_enabled = orig
+        AiPolicyVersion.objects.create(
+            version=999, global_mode=AiPolicyVersion.GlobalMode.OFF, created_by=self.owner)
+        self.assertFalse(is_ai_enabled())  # công tắc tắt khẩn đang có hiệu lực
+        body = client_for(self.owner).get(URL).json()
         self.assertIs(body["ai_features_enabled"], True)
+        self.assertIn("ai.manage_ai_policy", [c["code"] for c in body["capabilities"]])
 
     def test_anonymous_gets_401(self):
         self.assertEqual(APIClient().get(URL).status_code, 401)

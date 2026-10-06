@@ -106,6 +106,7 @@ def make_audit_timeline_provider(
     no_store: bool = False,
     exclude_actions: frozenset[str] = frozenset(),
     object_scope_fn: Optional[Callable[[Any, Any], bool]] = None,
+    row_filter: Optional[Callable[[Any], bool]] = None,
 ):
     """
     model         : model của đối tượng; AuditLog đọc theo `model._meta.label` + pk.
@@ -114,6 +115,7 @@ def make_audit_timeline_provider(
     doc_type      : khoá loại trong URL, ghi vào `doc.type` và `timeline[].doc`.
     code_fn       : `obj -> mã hiển thị` (PR-12, KK-3…). Không dùng tên/SĐT khách.
     action_labels : `AuditLog.action -> nhãn` (chuỗi hoặc hàm nhận dòng AuditLog).
+    row_filter    : tuỳ chọn, `dòng AuditLog -> bool`; False thì bỏ dòng (lọc SAU truy vấn, nên chỉ dùng khi hiếm gặp).
     created_label : nếu có, thêm dòng "tạo" theo `obj.created_at`.
     creator_attr  : tên field FK tới User của người tạo (nếu có).
     no_store      : True với đối tượng gắn dữ liệu khách → response gắn `Cache-Control: no-store`.
@@ -169,6 +171,8 @@ def make_audit_timeline_provider(
             .order_by("-created_at", "-id")[: limit + 1]  # lấy dư 1 dòng để biết có bị cắt không
         )
         rows = list(newest_first)
+        if row_filter is not None:  # bỏ dòng không còn gì để hiện (vd đổi quyền chỉ có việc AI khi AI tắt)
+            rows = [r for r in rows if row_filter(r)]
         truncated = len(rows) > limit
         rows = list(reversed(rows[:limit]))  # đảo lại: cũ → mới
         events.extend(_audit_event(r, doc_type=doc_type, action_labels=action_labels) for r in rows)
