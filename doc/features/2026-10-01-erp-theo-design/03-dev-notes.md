@@ -2552,3 +2552,16 @@ Lỗi `{"detail","code",...extra}`; khoá extra trùng tên ô:
 **Không chữ tự do / PII:** không có ô ghi chú, `raw_payload={}`; `AuditLog record_late_payment` chỉ `bank_txn_id, amount, match_status, source, order(mã), received_at, acknowledged_duplicate`, không `note`. Timeline giao dịch có sự kiện `payment_recorded_late` ("Ghi tay tiền về muộn 350.000 đ (mã GD …)"); timeline đơn lấy người làm từ audit trên giao dịch. Tách `record_unmatched_payment` từ `internal_api` (hành vi webhook giữ nguyên).
 
 **Giả định/nợ:** (1) khi ghi tay có ack mà không có khoản giống thì KHÔNG gắn nhãn (chỉ gắn khi thật sự có khoản giống). (2) Số @action ở `test_discipline` trên nhánh này là 31→32 (không phải 29→30 như 02d, vì main đã thêm lệnh khác). (3) `RecordLatePaymentInput` đặt ở `late_serializers.py` thay vì `serializers.py` để tránh xung đột với agent Lô 3. (4) Chưa có "đóng vì trùng" (Q3). (5) `check_naming.py` đang đỏ sẵn trên main do 2 file FE (`ContactButton.tsx`, `SiteLegalFooter.tsx`, từ `nguoi`) — không thuộc việc này; file BE của lô sạch.
+
+## #8 FE — nút Xoá phiếu hoàn (07/10)
+
+Nhánh `feat/xoa-phieu-hoan-fe`. Chỉ sửa `erp-console/features/returns/**` và `erp-console/e2e/delete_return.py`.
+- `types.ts`: `ReturnItem.available_actions?: string[]`. `api.ts`: `deleteReturn(id)` (POST `/delete/`). `returnsModel.ts`: `canDelete(r)` chỉ đọc `available_actions` (FE không tự đoán Chủ/trạng thái). `messages.ts`: nhóm chữ xoá.
+- `ReturnDetailScreen.tsx`: mục "Xoá phiếu hoàn" (danger) trong menu "…", mở `ConfirmModal`; phiếu Chờ duyệt có câu TL-D8-L3 "Số kg trên phiếu này sẽ không được nhập lại kho."; xong `toast.success` rồi `router.push("/returns/")`. 400/409 do `ConfirmModal` lo (alert đỏ + "Thử lại"; 409 là ConflictBanner có "Tải lại").
+- `mock.ts`: `available_actions` theo người xem + trạng thái, `POST /delete/` theo contract (Chủ mới xoá, 403 kiểm trước phạm vi; Chờ duyệt/Đã huỷ → 200 rồi 404; Đã duyệt → 400 `RETURN_DELETE_NOT_ALLOWED`); công cụ thử `window.__caveMock.returnsStaleDelete(id)` cho 409.
+- **Lệch nhỏ:** yêu cầu "hiện nguyên detail", nhưng lớp `apiFetch` (chung, ngoài phạm vi) bỏ mã quy tắc "(BR-…)" khỏi câu hiện cho người dùng theo UI-RULES, nên 400 hiện "Phiếu hàng hoàn đã duyệt (đã nhập lại kho hoặc ghi lỗ) không xoá được." (thiếu "(BR-PQ-10)"). Giữ như vậy.
+- Mock không phân biệt superuser `admin` (Me không có `is_superuser`), chỉ nhóm `owner` có `delete`; BE thật tính cả superuser qua `available_actions`.
+- Kiểm (07/10): `tsc --noEmit` sạch; vitest toàn bộ 1018 test xanh (thêm 3 test + `canDelete`); build mock=0 sạch + `check-no-mock` XANH + `check-ai-chunks` XANH; build mock=1 + `e2e/delete_return.py` 18/18 PASS (Chủ xoá Nháp, Đã huỷ có nút, Đã duyệt không nút, Quản lý không thấy, 400, 409, 360px). `check_naming.py` exit 1 cả trên main chưa sửa (vi phạm có sẵn ở `frontend/`, không có file returns).
+- Ảnh: `doc/features/2026-10-01-erp-theo-design/shots/xoa-phieu-hoan/` (1280 và 360).
+- Nợ: chưa có e2e trên BE thật; chưa duyệt UI bởi QA.
+

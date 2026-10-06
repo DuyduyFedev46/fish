@@ -1,10 +1,10 @@
 # Hàng hoàn về kho (ED-26)
 
-Hàng giao thất bại mang về kho: nhân viên giao hoặc nhân viên kho nhập số kg, Chủ hoặc Quản lý duyệt "Tái nhập vào lô" hoặc "Huỷ bỏ, ghi lỗ". Màn danh sách `/returns/`, màn chi tiết `/returns/detail/?id=`, hộp "Nhập hàng hoàn về kho", hộp "Duyệt hàng hoàn" và hộp "Huỷ phiếu hoàn" (Lô bổ sung A #8).
+Hàng giao thất bại mang về kho: nhân viên giao hoặc nhân viên kho nhập số kg, Chủ hoặc Quản lý duyệt "Tái nhập vào lô" hoặc "Huỷ bỏ, ghi lỗ". Màn danh sách `/returns/`, màn chi tiết `/returns/detail/?id=`, hộp "Nhập hàng hoàn về kho", hộp "Duyệt hàng hoàn" và hộp "Huỷ phiếu hàng hoàn" (Lô bổ sung A #8).
 
 | File | Việc của file |
 |---|---|
-| `types.ts` | Kiểu dữ liệu theo contract BE (`/api/inventory/returns/`): phiếu hoàn, tham số lọc, gói tạo phiếu, số liệu kèm lỗi vượt số kg. |
+| `types.ts` | Kiểu dữ liệu theo contract BE (`/api/inventory/returns/`): phiếu hàng hoàn, tham số lọc, gói tạo phiếu, số liệu kèm lỗi vượt số kg. |
 | `api.ts` | `listReturns`, `getReturn`, `createReturn`, `approveReturn`, `cancelReturn`, `getReturnTimeline`, cộng các hàm phụ cho hộp nhập: `listReturnableNotes` (trả `{notes, truncated}`), `getNoteLines`. Có nhánh mock khi `NEXT_PUBLIC_USE_MOCK=1`. |
 | `returnsModel.ts` | Phần thuần: giờ ngoài kho lạnh, chuẩn hoá số kg, chặn số điện thoại trong ghi chú, ánh xạ lỗi BE sang câu tiếng Việt (không mã quy tắc), quyền hiện nút, gộp lô của phiếu giao. |
 | `messages.ts` | Câu chữ tiếng Việt do FE tự sinh. |
@@ -22,6 +22,7 @@ Hàng giao thất bại mang về kho: nhân viên giao hoặc nhân viên kho n
 - Xem: `inventory.view_returntostock` (Chủ, Quản lý, NV kho, NV giao). NV giao chỉ thấy phiếu của phiếu giao gán cho mình, phiếu khác báo "Không tìm thấy". CSKH thuần không có quyền.
 - Nhập: `inventory.add_returntostock` (Chủ, Quản lý, NV kho, NV giao; Quản lý được cấp thêm theo #21).
 - Duyệt: `inventory.approve_returntostock` (Chủ, Quản lý), chỉ khi phiếu còn Chờ duyệt.
+- Xoá phiếu (#8, BR-PQ-10): `POST /api/inventory/returns/{id}/delete/`, xoá mềm, chỉ Chủ, chỉ phiếu Chờ duyệt hoặc Đã huỷ. Nút "Xoá phiếu hàng hoàn" (menu "…") hiện khi `available_actions` của BE có `delete` (`canDelete`). Hộp xác nhận dùng `ConfirmModal`; phiếu Chờ duyệt có thêm câu "Số kg trên phiếu này sẽ không được nhập lại kho.". Xong về danh sách kèm toast. 400 `RETURN_DELETE_NOT_ALLOWED`, 409 `STALE_STATE` (banner Tải lại).
 - Huỷ phiếu (#8): phiếu còn Chờ duyệt; BE đòi trước `inventory.add_returntostock` (cổng chung, TLA-FE-L4: Chủ tắt "Ghi hàng hoàn về kho" của nhóm ở màn Phân quyền thì nhóm đó không còn mục Huỷ), rồi người có quyền duyệt hoặc sửa huỷ được mọi phiếu, người tạo phiếu huỷ phiếu của mình. BE không trả cờ `can_cancel`, nên `canCancel` ở `returnsModel.ts` tính theo quyền và `created_by`; BE vẫn là chỗ chặn cuối (403, 409). Số kg của phiếu đã huỷ không còn tính vào số đã hoàn của phiếu giao.
 
 ## Dữ liệu cá nhân

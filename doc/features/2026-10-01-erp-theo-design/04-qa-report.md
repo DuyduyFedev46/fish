@@ -3774,3 +3774,58 @@ Không có lỗi chặn.
 - `manage.py makemigrations --check --dry-run` → `No changes detected`
 - `python3 scripts/check_naming.py` → exit 1 (file frontend ngoài diff, xem trên)
 - Kịch bản HTTP trong scratchpad: `t1`–`t8` (record-late, nghi trùng 4 ca chéo, hoàn có nhãn, kỳ cũ, quyền, rò dữ liệu, đua), `job.py` (job tự khớp), `seed*.py`.
+
+## QA #8 FE (08/10)
+
+Nhánh `feat/xoa-phieu-hoan-fe` (HEAD bf56cbf). Dữ liệu giả toàn bộ. Ảnh: `shots/xoa-phieu-hoan-qa/` (thư mục shots bị .gitignore, ảnh chỉ nằm máy QA).
+
+### Kết luận: REJECTED — 1 lỗi Medium (B1): đua hai tab, tab B thấy câu tiếng Anh thô của Django trong hộp xoá
+### Tổng: 18 mock (đạt hết) + 16 BE thật (15 đạt, 1 lỗi B1) + bonusA 35/38 (3 đỏ cũ, y hệt trên main)
+
+### Lệnh đã chạy
+- Mock=1: `npm run build` sạch; `e2e/delete_return.py` **18/18 PASS**.
+- `e2e/ed_bonusA_ui.py` trên nhánh: 35/38. 3 ca đỏ: `ai_budget`, #19 đơn "Nhờ người xử lý", #19 lô. **Trên main (worktree tạm, build mock=1) đỏ y hệt 3 ca, 35/38** → không phải do #8.
+- BE thật: `manage.py runserver 8000` từ `backend/` (main, có BE #8), SQLite tạm qua `DATABASE_URL`, seed giả (loc/ql1/kho1/giao1; 7 phiếu: 5 Chờ duyệt, 1 Đã huỷ, 1 Đã duyệt), build mock=0 với `NEXT_PUBLIC_API_BASE=http://127.0.0.1:8000`, Playwright trên `:3110`.
+
+### Theo yêu cầu
+| Ca | Kết quả | Bằng chứng |
+|---|---|---|
+| Chủ xoá phiếu Chờ duyệt: hộp có "Số kg trên phiếu này sẽ không được nhập lại kho.", toast "Đã xoá phiếu hàng hoàn.", về danh sách, phiếu biến mất | ✅ | BE thật; `dialog-1280.png`, `after-delete-1280.png` |
+| Sau xoá, chi tiết phiếu: API trả 404, màn hình "Không tìm thấy trang này" | ✅ | BE thật |
+| Chủ xoá phiếu Đã huỷ (hộp không có câu nhập kho) | ✅ | BE thật |
+| Phiếu Đã duyệt không có nút | ✅ | BE thật, menu "…" không có mục Xoá |
+| Quản lý, NV kho không thấy nút (phiếu Chờ duyệt) | ✅ | BE thật, ql1 và kho1 |
+| Đua hai tab: tab B bị 404, có thông báo gọn | ❌ | B1: 404 hiện "No ReturnToStock matches the given query." (`race-tabB-1280.png`) |
+| 360px / 1280px, không lỗi console | ✅ | không cuộn ngang, nút Xoá cao ≥44px, console chỉ có dòng "Failed to load resource 400/404" chủ đích |
+| Ngoài đường thuận 1: màn hình cũ, máy khác đã duyệt trước, rồi bấm xoá | ✅ | 400 hiện "Phiếu hàng hoàn đã duyệt ... không xoá được.", không lộ mã BR, hộp còn mở (`stale-approved-1280.png`) |
+| Ngoài đường thuận 2: bấm đúp "Xoá" | ✅ | đúng 1 POST, trả 200 |
+| Ngoài đường thuận 3: xoá phiếu đã xoá (API) | ✅ | 404, không 500 |
+| Phân quyền API trực tiếp: ql1, kho1, giao1 POST delete → 403 | ✅ | test client |
+| Bất biến: xoá mềm (`deleted_at`, `deleted_by` có giá trị, dòng còn trong DB), AuditLog `delete_returntostock` có `changes={"status","deleted"}`, không có SĐT/tên/giá vốn; sổ kho không phát sinh bút toán mới | ✅ | sqlite |
+| Rò dữ liệu cá nhân: localStorage/sessionStorage/URL không có SĐT, tên; log BE không có SĐT/tên | ✅ | quét regex |
+
+### Lỗi
+#### B1 — Đua hai tab, tab B hiện câu tiếng Anh thô và nút "Thử lại" vô ích · Medium · yêu cầu "tab B 409/404 có thông báo gọn"
+Bước tái hiện: BE thật. Chủ mở chi tiết phiếu Chờ duyệt ở tab A và tab B, mở hộp xoá ở cả hai. Tab A bấm "Xoá phiếu hàng hoàn" (thành công, về danh sách). Tab B bấm "Xoá phiếu hàng hoàn".
+Mong đợi: thông báo tiếng Việt gọn, ví dụ "Phiếu này đã bị xoá hoặc không còn", gợi ý quay về danh sách; không mời thử lại.
+Thực tế: BE trả 404 `{"detail":"No ReturnToStock matches the given query."}` (kiểm bằng curl, cả khi id không tồn tại). FE hiện nguyên câu này trong alert đỏ, tên model `ReturnToStock` lộ ra người dùng; nút chính đổi thành "Thử lại" (thử lại sẽ 404 mãi). Không có ConflictBanner/"Tải lại" vì BE trả 404 chứ không 409 ở ca này. Mock không bắt được lỗi vì mock trả câu tiếng Việt. Ảnh: `race-tabB-1280.png`.
+Ảnh hưởng: UX sai ở đúng ca đua mà #8 phải chịu; câu tiếng Anh lộ tên model nội bộ. Không rò giá vốn hay dữ liệu cá nhân.
+Gợi ý giao lại: FE (`ConfirmModal` hoặc xử lý trong `ReturnDetailScreen`): với 404 ở hành động xoá thì hiện câu tiếng Việt cố định ("Phiếu này đã bị xoá hoặc không còn tồn tại."), nút chính thành "Về danh sách", không "Thử lại". Hoặc lớp `apiFetch` map 404 → câu tiếng Việt cho mọi màn. Nếu muốn BE sửa thì `detail` 404 chung toàn dự án, ngoài phạm vi #8.
+
+### Dọn dẹp
+Đã tắt runserver 8000, http.server 3108/3109/3110; xoá SQLite tạm, `out/`, symlink `node_modules`, worktree tạm main.
+
+### QA lại sau 5096889 (08/10)
+
+**Kết luận: APPROVED** — B1 đã sửa, kiểm lại trên BE thật và mock; không còn lỗi chặn.
+
+BE thật (runserver từ main, SQLite tạm, seed giả, build mock=0), Playwright 10/10:
+| Ca | Kết quả |
+|---|---|
+| Đua hai tab: tab B bấm xoá phiếu tab A đã xoá → BE 404, hộp hiện "Phiếu này đã bị xoá hoặc không còn tồn tại.", không còn "ReturnToStock"/câu tiếng Anh, không có "Thử lại", có "Đóng" và "Về danh sách"; bấm "Về danh sách" về `/returns/` | ✅ |
+| Id không tồn tại: mở chi tiết `?id=9999` ra trang "Không tìm thấy trang này", không có câu thô; đường xoá trả cùng 404 như ca đua (id 99 trả 404 ở lượt trước) | ✅ |
+| Hồi quy: xoá Nháp (có câu "không được nhập lại kho", toast, phiếu biến mất), xoá Đã huỷ, phiếu Đã duyệt không có nút | ✅ |
+| Console không lỗi (trừ dòng 4xx chủ đích) | ✅ |
+
+Mock=1: build sạch, `e2e/delete_return.py` **21/21 PASS** (gồm ca 404 mới).
+Dọn: tắt runserver và http.server, xoá SQLite tạm, `out/`, symlink `node_modules`.

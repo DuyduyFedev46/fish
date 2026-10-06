@@ -93,7 +93,7 @@ export function canApprove(permissions: readonly string[] | undefined, r: Pick<R
 }
 
 /**
- * "Huỷ phiếu hoàn": phiếu còn Chờ duyệt, người xem qua được cổng chung của BE (`add_returntostock`, TLA-FE-L4) rồi có quyền duyệt
+ * "Huỷ phiếu hàng hoàn": phiếu còn Chờ duyệt, người xem qua được cổng chung của BE (`add_returntostock`, TLA-FE-L4) rồi có quyền duyệt
  * hoặc sửa phiếu, hoặc là người tạo phiếu. Cổng chung quan trọng từ Lô 14: Chủ có thể tắt "Ghi hàng hoàn về kho" của một nhóm
  * còn quyền duyệt, khi đó BE trả 403 nên FE phải ẩn mục.
  * Đây là luật BE (#8); FE chỉ ẩn mục để khỏi bấm vô ích, BE vẫn là lớp chặn thật (403).
@@ -104,6 +104,11 @@ export function canCancel(me: { id: number; permissions: readonly string[] } | n
   if (!perms.includes(PERM_ADD_RETURN)) return false;
   if (perms.includes(PERM_APPROVE_RETURN) || perms.includes(PERM_CHANGE_RETURN)) return true;
   return r.created_by !== null && r.created_by === me.id;
+}
+
+/** Nút "Xoá phiếu hàng hoàn": chỉ khi BE báo `delete` trong `available_actions` (BE quyết theo Chủ + trạng thái, FE không tự đoán). */
+export function canDelete(r: Pick<ReturnItem, "available_actions">): boolean {
+  return !!r.available_actions?.includes("delete");
 }
 
 export function canCreate(permissions: readonly string[] | undefined): boolean {
