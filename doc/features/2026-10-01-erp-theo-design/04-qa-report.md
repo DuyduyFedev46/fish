@@ -3829,3 +3829,58 @@ BE thật (runserver từ main, SQLite tạm, seed giả, build mock=0), Playwri
 
 Mock=1: build sạch, `e2e/delete_return.py` **21/21 PASS** (gồm ca 404 mới).
 Dọn: tắt runserver và http.server, xoá SQLite tạm, `out/`, symlink `node_modules`.
+
+## QA #15 FE (08/10) — Ghi tiền về muộn (BR-TT-18, LP-AC1…16 phần FE)
+
+**Kết luận: APPROVED** — 4 ca ở 02d §7 và ca chéo TL15-H1 đều xanh trên BE thật; không có lỗi chặn.
+**Tổng: 241 ca script mock (32+66+143) + 56 kiểm tra trên BE thật · ❌ 0 · ⏸ 1 (ca "nhãn xuất hiện sau khi màn đã tải" chỉ có ở mock, xem mục Lỗi)**.
+
+Cách chạy: nhánh `feat/tien-ve-muon-fe` đã `git merge main` (BE #15, xung đột chỉ ở 03-dev-notes và 03b-review-techlead, giữ cả hai mục). Runserver từ chính worktree, SQLite tạm, `seed_demo` (dữ liệu giả) + 4 user giả `loc`/`ql1`/`kho1`/`giao1`; console build `NEXT_PUBLIC_USE_MOCK=0` trỏ `127.0.0.1:8000`, phục vụ tĩnh :3102; trình duyệt Chromium đặt múi giờ UTC để kiểm GMT+7. Không dùng symlink `staticfiles`/`.env` (DEBUG=1 bằng biến môi trường, không cần).
+
+### Mock (build `USE_MOCK=1`)
+| Script | Kết quả |
+|---|---|
+| `e2e/late_payment_record.py` | 32/32 PASS |
+| `e2e/s12_s13_queue.py` (hồi quy) | 66/66 PASS |
+| `e2e/ed_batch3_orders.py` (hồi quy) | 143/143 PASS |
+
+### BE thật — 4 ca 02d §7
+| Ca | Kết quả | Bằng chứng |
+|---|---|---|
+| 1. Đơn Tự huỷ DH-2609-114: nhập mã ` ft 2610 0700001 ` (có dấu cách, chữ thường), 1.400.000, mã đơn viết thường → 201, chi tiết hiện `FT26100700001`, loại "Về sau khi đơn tự huỷ", dòng thời gian "Ghi tay tiền về muộn 1.400.000 đ (mã GD …)". Lập phiếu hoàn (không có ô tick vì không có nhãn) → xác nhận hoàn → khoản RESOLVED/REFUNDED; đơn vẫn AUTO_CANCELLED | ✅ | API: `resolution=REFUNDED`, order `AUTO_CANCELLED`; ảnh `c1-detail-1280`, `c1-refund`, `c1-resolved` |
+| 2. Không gắn đơn 705.000 → UNMATCHED ("Không khớp đơn", nút chính "Gắn vào đơn") → gắn vào DH-2609-119 BOOKED → đơn PROCESSING, khoản MATCHED/RESOLVED | ✅ | API sau thao tác; ảnh `c2-attach-picked` |
+| 3. IPN cùng mã GD (cả dạng `ft 26100700001`) → `matched:false`, không thêm dòng. IPN mã khác `SEPAY-ID-778899`, cùng tiền, cùng đơn → dòng mới ORPHAN có `duplicate_warning`; hàng chờ có dấu cảnh báo, chi tiết có khung vàng; hộp hoàn: chưa tick thì nút khoá và không gửi POST, tick xong → 201 | ✅ | ảnh `c3-queue-6`, `c3-detail-6`, `c3-refund-6` |
+| 4. `ql1`, `kho1` không thấy nút (UI thật); API `record-late` → 401 chưa đăng nhập, 403 cho `ql1`/`kho1`/`giao1`, không ghi dòng nào | ✅ | `c7-ql1`, `c7-kho1` |
+
+### Ca chéo TL15-H1 (cả hai chiều)
+| Ca | Kết quả |
+|---|---|
+| Chủ ghi tay KHÔNG gắn đơn (FT26100700003, 2.520.000) → IPN mã đơn Tự huỷ DH-2609-116, mã GD khác, cùng tiền → dòng IPN có nhãn "Nghi trùng…", hàng chờ và chi tiết hiện nhãn; API tạo hoàn không kèm cờ → 409 `PAYMENT_DUPLICATE_WARNING`; UI phải tick mới lập được (nút khoá, không gửi POST, tick → 201) | ✅ |
+| Chiều ngược: IPN ORPHAN 777.000 có trước, Chủ ghi tay không đơn cùng tiền → 409, hộp vàng nêu `SEPAY-ID-990011`, nút ghi khoá tới khi tick "Tôi đã kiểm, đây không phải trùng", tick → 201, dòng mới có nhãn | ✅ (`c5-409`, `c5-detail-flag`) |
+| Audit `create_refund` khi vượt nhãn ghi `acknowledged_duplicate_warning: true` (TL15-M1) | ✅ |
+
+### Ngoài đường thuận (≥ 2, đã làm nhiều hơn)
+- Bấm đúp nút Ghi: đúng 1 POST, 1 dòng trong DB. ✅
+- Gửi lại đúng y (LP-AC4): 201 rồi 200 `duplicate:true`, cùng id, không audit thứ hai. ✅
+- Màn cũ / trạng thái đã đổi: tab B mở sẵn chi tiết khoản, tab A gắn vào đơn xong, tab B tìm lại thì không còn đơn BOOKED; gọi `resolve` lần hai trả 400 `BR-TT-09` "Giao dịch đã được xử lý, không xử lý lại." (tiếng Việt, không 500). ✅
+- Dữ liệu đã có giao dịch: mã GD trùng khoản khác → thông báo + link "Mở giao dịch đã có" (#4). Đơn PAID → lỗi tại ô Mã đơn (hướng dẫn để trống mã đơn). Đơn BOOKED → lỗi + link "Mở đơn", không tạo dòng. Mã đơn không có → 400. ✅
+- Biên: số tiền 0, âm, 0.004, "abc" (chặn tại ô, không gửi); mã GD có dấu/tên; giờ tương lai; cùng mã khác tiền → 400. ✅
+- Cờ tắt/ không quyền: xem ca 4.
+
+### Giờ GMT+7
+Trình duyệt đặt UTC: ô giờ mặc định = giờ VN hiện tại (lệch < 3 phút); nhập 01:xx VN → body gửi đi bằng UTC lùi 7 giờ; API trả `+07:00`; chi tiết và dòng thời gian hiện đúng "07/10/2026 02:11". ✅
+
+### Rò dữ liệu
+- Giá vốn: phản hồi `record-late` và payment không có `unit_cost`/`landed_unit_cost`/`cogs`/`raw_payload`. ✅
+- Dữ liệu cá nhân: gửi kèm `note: "GHI-CHU-TU-DO-XYZ gọi 0900000321"` → 201, chuỗi không có trong phản hồi, `raw_payload` mọi dòng ({} hoặc `{"demo":true}`), `AuditLog.note/changes`. AuditLog `record_late_payment` chỉ có mã GD, số tiền, trạng thái, mã đơn, giờ, cờ ack (không tên/SĐT/địa chỉ; không tính ngược được giá vốn). `runserver.log` không có SĐT, tên khách hay chuỗi ghi chú. localStorage/sessionStorage/cookie và URL không có SĐT, tên, mã GD, số tiền. Console không lỗi đỏ (trừ dòng 4xx chủ đích). Ô ghi chú không có trên form. Ghi chú: chi tiết phiếu hoàn (màn có sẵn từ #8, không thuộc lô này) vẫn hiện tên và SĐT khách cho Chủ, đúng quyền. ✅
+
+### Giao diện
+1280px và 360px: hàng chờ, hộp 409, chi tiết không cuộn ngang; nút ≥ 44px. Ở 360px phần chân hộp dính đè một phần ô tick khi chưa cuộn, cuộn được và dùng được (Low, không chặn). Ảnh nằm trong scratchpad của phiên (dữ liệu giả); bộ ảnh của dev ở `shots/tien-ve-muon-fe/`.
+
+### Lỗi
+Không có lỗi chặn.
+- N1 · Low: 360px, hộp 409 ghi muộn, ô tick bị chân hộp che một phần khi chưa cuộn.
+- Chưa kiểm được trên BE thật: ca "nhãn xuất hiện sau khi màn đã tải" (FE mở lại hộp hoàn khi nhận 409). Lý do: BE chỉ gắn nhãn lúc tạo dòng nên không có cách gây ra ca này trên dữ liệu thật; mock 32/32 phủ ca này.
+
+### Dọn dẹp
+Tắt runserver 8000 và http.server 3101/3102 của phiên QA, xoá SQLite tạm, `out/`, symlink `node_modules`. (Còn một `http.server 3101 --bind` không phải của phiên này, không đụng.)

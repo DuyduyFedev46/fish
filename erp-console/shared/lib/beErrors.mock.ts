@@ -151,6 +151,43 @@ export const BE_ERRORS = {
   HT_REQUEST_ID_INVALID: { status: 400, code: "BR-HT-01", detail: "request_id phải là UUID." },
   HT_REQUEST_ID_USED: { status: 400, code: "BR-HT-01", detail: "request_id đã dùng cho phiếu hoàn khác." },
   HT_TXN_RESOLVED: { status: 400, code: "BR-TT-09", detail: "Giao dịch đã được xử lý, không lập phiếu hoàn." },
+  // ---- #15 POST /api/sales/payments/record-late/ (BE, 03-dev-notes.md "#15 ghi tiền về muộn (BE)"; BR-TT-18) ----
+  // Mã lỗi BR-TT-18: thân kèm khoá ô (bank_txn_id | amount | received_at) trùng `detail`; truyền qua tham số `extra` của beError.
+  LATE_TXN_MISSING: { status: 400, code: "BR-TT-18", detail: "Thiếu mã giao dịch ngân hàng." },
+  LATE_TXN_TOO_LONG: { status: 400, code: "BR-TT-18", detail: "Mã giao dịch ngân hàng dài quá 100 ký tự." },
+  LATE_TXN_CHARS: { status: 400, code: "BR-TT-18", detail: "Mã giao dịch chỉ gồm chữ không dấu, số và các ký tự . _ - /" },
+  LATE_AMOUNT_INVALID: { status: 400, code: "BR-TT-18", detail: "Số tiền phải là số lớn hơn 0." },
+  LATE_AMOUNT_MIN: { status: 400, code: "BR-TT-18", detail: "Số tiền tối thiểu 1 ₫." },
+  LATE_AMOUNT_TOO_LARGE: { status: 400, code: "BR-TT-18", detail: "Số tiền quá lớn (tối đa 999.999.999.999,99 ₫)." },
+  LATE_AT_INVALID: { status: 400, code: "BR-TT-18", detail: "Thiếu hoặc sai giờ nhận tiền (ISO 8601)." },
+  LATE_AT_FUTURE: { status: 400, code: "BR-TT-18", detail: "Giờ nhận tiền không được ở tương lai." },
+  LATE_TXN_EXISTS: { status: 400, code: "BR-TT-03", detail: "Mã giao dịch này đã có trong hệ thống (giao dịch #{id}), không ghi lại." },
+  LATE_ORDER_NOT_FOUND: {
+    status: 400,
+    code: "LATE_PAYMENT_ORDER_NOT_FOUND",
+    detail: "Không tìm thấy đơn mang mã này. Kiểm tra lại mã đơn, hoặc để trống nếu chưa biết khách chuyển cho đơn nào.",
+  },
+  LATE_ORDER_BOOKED: {
+    status: 400,
+    code: "LATE_PAYMENT_ORDER_BOOKED",
+    detail: "Đơn còn đang giữ chỗ. Xác nhận tiền ngay trên đơn (nút Xác nhận đã nhận tiền).",
+  },
+  LATE_ORDER_PAID: {
+    status: 400,
+    code: "LATE_PAYMENT_ORDER_PAID",
+    detail: "Đơn đã thanh toán. Nếu khách chuyển thêm, để trống mã đơn để ghi khoản không gắn đơn rồi hoàn.",
+  },
+  LATE_POSSIBLE_DUPLICATE: {
+    status: 409,
+    code: "LATE_PAYMENT_POSSIBLE_DUPLICATE",
+    detail: "Có khoản giống (cùng số tiền). Đối chiếu sao kê: nếu là khoản khác thì xác nhận để ghi tiếp.",
+  },
+  // ---- POST /api/sales/refunds/create/ — khoản có nhãn nghi trùng mà thiếu acknowledge_duplicate_warning: `detail` = chính nhãn ----
+  PAYMENT_DUPLICATE_WARNING: {
+    status: 409,
+    code: "PAYMENT_DUPLICATE_WARNING",
+    detail: "Nghi trùng khoản ghi tay tiền về muộn, đối chiếu sao kê trước khi hoàn",
+  },
   // ---- S10 GET /api/sales/orders/ — tham số lọc sai ----
   INVALID_FILTER: { status: 400, code: "INVALID_FILTER", detail: "Tham số {param} phải là ngày dạng YYYY-MM-DD." },
 
@@ -247,10 +284,12 @@ export function beDetail(key: BeErrorKey, params?: Record<string, string | numbe
 }
 
 /** Response mock đúng hình BE: `{detail}` (lỗi DRF) hoặc `{code, detail}` (lỗi nghiệp vụ). */
-export function beError(key: BeErrorKey, params?: Record<string, string | number>): MockResponse {
+export function beError(key: BeErrorKey, params?: Record<string, string | number>, extra?: Record<string, unknown>): MockResponse {
   const e: Entry = BE_ERRORS[key];
   const detail = fill(e.detail, params);
-  return { status: e.status, body: e.code ? { code: e.code, detail } : { detail } };
+  // `extra` = khoá phụ BE trải ngang hàng với detail/code (vd khoá ô lỗi `bank_txn_id`, `order_id`); `"$detail"` = lấy chính câu `detail`.
+  const more = Object.fromEntries(Object.entries(extra ?? {}).map(([k, v]) => [k, v === "$detail" ? detail : v]));
+  return { status: e.status, body: e.code ? { code: e.code, detail, ...more } : { detail, ...more } };
 }
 
 if (process.env.NEXT_PUBLIC_USE_MOCK === "1" && typeof window !== "undefined") {

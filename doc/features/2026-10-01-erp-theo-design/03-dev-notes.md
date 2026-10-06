@@ -2515,6 +2515,34 @@ Làm trong `erp-console/`, theo board `ERP-D1`, `W3f`, `W4b/c/d/e/f/g/h`, `F3g`.
 - RR-L3: API và luồng `decide` không còn ghép/truyền `reason`. Tham số `reason` của `cancel_paid_order` giữ lại chỉ để test và nơi gọi cũ không vỡ (ghi trong docstring).
 - Nhắc triển khai: rollback migration `delivery/0010` và `sales/0014` sẽ mất chữ ghi chú đã lưu.
 
+
+## #15 FE — Ghi tiền về muộn (BR-TT-18, LP-AC1…16 phần FE)
+Thiết kế: `02d-tien-ve-muon.md` (§3 contract, §7 phần FE). Contract thật lấy từ dev-notes "#15 ghi tiền về muộn (BE)" ở nhánh `feat/tien-ve-muon` (commit `d51a89d`). Chỉ sửa trong `erp-console/`. **Điều kiện C1 của techlead: FE này phải đi cùng BE** (nếu BE lên mà FE chưa lên thì lập phiếu hoàn khoản có nhãn nghi trùng nhận 409 mà màn không có ô tick để gửi lại).
+
+**Đã làm (`erp-console/features/orders/`):**
+- `components/RecordLatePaymentModal.tsx` (mới, dựng trên `ActionModal` + `Field` + `useSubmit`): ô Mã giao dịch · Số tiền · Giờ nhận theo sao kê (`datetime-local`, mặc định giờ VN hiện tại, báo tại ô khi ở tương lai) · Mã đơn (tuỳ chọn). **Không có ô ghi chú.** Chặn tại ô trước khi gửi (mã GD: rỗng / >100 ký tự / ký tự ngoài `A-Z 0-9 . _ - /` sau khi bỏ khoảng trắng và in hoa). Lỗi 400 của BE hiện dưới đúng ô theo khoá (`bank_txn_id`, `amount`, `received_at`, `order_code`) và không lặp lại thành alert đỏ. `LATE_PAYMENT_ORDER_BOOKED` → lỗi dưới ô + link "Mở đơn" (`order_id`). `BR-TT-03` → link "Mở giao dịch đã có" (`existing_payment_id`). **409 `LATE_PAYMENT_POSSIBLE_DUPLICATE`** → hộp vàng nêu mã GD và giờ khoản giống + link xem, ô tick "Tôi đã kiểm, đây không phải trùng"; nút ghi khoá tới khi tick; gửi lại kèm `acknowledge_possible_duplicate: true`. Đổi số tiền / giờ / mã đơn thì bỏ hộp vàng và ô tick. Thành công → toast, chuyển sang `/orders/payments/detail/?id=`; 200 `duplicate:true` → toast cảnh báo "đã ghi trước đó" rồi cũng chuyển sang chi tiết.
+- `components/PaymentQueueScreen.tsx`: nút chính "Ghi tiền về muộn" (`actions` của `ListPage`) chỉ hiện khi `me.permissions` có `sales.confirm_payment_manual`; dấu cảnh báo cạnh chip loại khoản khi `duplicate_warning` khác rỗng (có chữ cho trình đọc màn hình, `title` = nhãn).
+- `components/PaymentDetailScreen.tsx`: khung vàng `duplicate_warning`; truyền nhãn vào hộp hoàn. Dòng thời gian khoản: `paymentTimeline` (orderDetailModel.ts) nhận khoản `MANUAL` + `ORPHAN`/`UNMATCHED` là sự kiện `payment_recorded_late`, nhãn "Ghi tay tiền về muộn {tiền} (mã GD …)".
+- `components/RefundModal.tsx`: khoản có nhãn → hộp vàng + ô tick "Tôi đã đối chiếu sao kê", nút chính khoá tới khi tick, gửi `acknowledge_duplicate_warning: true` (chỉ nhánh `payment_transaction`). **Nếu BE trả 409 `PAYMENT_DUPLICATE_WARNING`** (nhãn xuất hiện sau khi màn đã tải) thì mở lại đúng hộp này, hiện nhãn của BE (`detail`), không báo lỗi đỏ.
+- `latePayment.ts` (mới, hàm thuần) + `latePayment.test.ts` (19 test vitest, gồm mock theo contract); `api.ts` (`recordLatePayment`, ghi chú cờ ở `createRefund`); `types.ts` (`RecordLatePaymentInput/Result`, `SimilarPayment`, `duplicate_warning?`, `acknowledge_duplicate_warning?`, kind `payment_recorded_late`); `messages.ts`; `orders.module.css` (`dupFlag`, `dupBox`).
+- Mock: `mock.ts` nhánh `POST /api/sales/payments/record-late/` theo đúng luật §1/§3 và mã lỗi của BE (403 mọi vai thiếu quyền, 400 theo khoá ô, 409 + `similar_*`, 200 `duplicate`, gắn nhãn khi ack có khoản giống, bỏ qua `note`); `refunds/create` mock trả 409 `PAYMENT_DUPLICATE_WARNING` khi thiếu cờ; công cụ thử `__caveMock.flagDuplicate(id)`. `shared/lib/beErrors.mock.ts`: thêm mã lỗi mới và tham số `extra` cho `beError` (khoá phụ như `bank_txn_id`, `order_id`; `"$detail"` = chính câu `detail`). Đây là **ngoại lệ nhỏ ngoài `features/orders`** vì mock lỗi BE dùng chung nằm ở `shared/lib`.
+
+**Kiểm (chạy thật, lượt này):**
+- `tsc --noEmit` sạch; `vitest run` 91 file / 1050 test xanh (có 19 test mới).
+- Build `NEXT_PUBLIC_USE_MOCK=0`: `check-no-mock` XANH, `check-ai-chunks` XANH (50 mục).
+- Build `NEXT_PUBLIC_USE_MOCK=1`: `e2e/late_payment_record.py` **32/32 PASS** (ghi muộn thành công vào ORPHAN; lỗi theo khoá + link Mở đơn; 409 có tick; hoàn có nhãn phải tick; 409 `PAYMENT_DUPLICATE_WARNING` mở lại hộp; `ql1` và `kho1` không thấy nút; không dữ liệu form trong URL/localStorage; 360 px không cuộn ngang, nút ≥ 44 px). Hồi quy `s12_s13_queue.py` 66/66, `ed_batch3_orders.py` 143/143.
+- `python3 scripts/check_naming.py`: không vi phạm mới ở `erp-console/`; còn đỏ sẵn 2 file Shop `frontend/components/ContactButton.tsx`, `frontend/features/site/components/SiteLegalFooter.tsx` (từ `nguoi`, không thuộc việc này, đã ghi ở mục BE).
+- Sau khi đổi chữ gợi ý ô Mã đơn (rút ngắn cho 360 px) chỉ chạy lại tsc + vitest + build `MOCK=0` + hai script check; không chạy lại e2e vì không ca nào đọc chữ này.
+- Ảnh chụp: `doc/features/2026-10-01-erp-theo-design/shots/tien-ve-muon-fe/` (`queue-1280`, `queue-360`, `form-error-1280`, `detail-late-1280`, `similar-409-1280`, `similar-409-360`, `similar-ticked-360`, `refund-tick-1280`).
+
+**Chỗ lệch contract / giả định:**
+1. 02d §7 ghi `PaymentQueueItem.duplicate_warning`; BE có trả. FE đọc `payment.duplicate_warning` ở hàng chờ và chi tiết, khớp.
+2. **Giờ ở dòng thời gian khoản** là giờ nhận theo sao kê (`received_at`), không phải giờ bấm ghi: serializer `PaymentTransactionSerializer` không trả `created_at`, và FE chưa gọi guidance cho dòng thời gian này (BE đã có sự kiện `payment_recorded_late` kèm người làm ở `build_payment_timeline`, FE chỉ hiện được nếu khối hướng dẫn gọi nó). Màn chi tiết khoản hiện không có tên người ghi. Nợ nhỏ: nếu muốn, BE thêm `recorded_at`/`recorded_by` vào serializer.
+3. Hộp hoàn chỉ nhận nhãn nghi trùng cho nhánh `payment_transaction`; nhánh `sales_invoice` giữ nguyên như contract.
+4. Tick "Tôi đã đối chiếu sao kê" (hoàn) và "Tôi đã kiểm, đây không phải trùng" (ghi) dùng đúng chữ trong 02d §2 (LP-AC14) và đề bài; không lưu trạng thái tick vào đâu cả.
+
+**Việc còn nợ:** không lỗ hổng nào ở FE. QA #15 nên chạy cùng BE thật (02d §7 ca 1–4) vì e2e ở đây chỉ chạy trên mock.
+
 ## #15 ghi tiền về muộn (BE)
 Thiết kế: `02d-tien-ve-muon.md` (BR-TT-18, LP-AC1…16). Mặc định Q1–Q3 như trong 02d: không ghi gắn đơn đã thanh toán; bắt tick khi hoàn khoản có nhãn; chưa có "đóng vì trùng".
 
@@ -2564,4 +2592,5 @@ Nhánh `feat/xoa-phieu-hoan-fe`. Chỉ sửa `erp-console/features/returns/**` v
 - Kiểm (07/10): `tsc --noEmit` sạch; vitest toàn bộ 1018 test xanh (thêm 3 test + `canDelete`); build mock=0 sạch + `check-no-mock` XANH + `check-ai-chunks` XANH; build mock=1 + `e2e/delete_return.py` 18/18 PASS (Chủ xoá Nháp, Đã huỷ có nút, Đã duyệt không nút, Quản lý không thấy, 400, 409, 360px). `check_naming.py` exit 1 cả trên main chưa sửa (vi phạm có sẵn ở `frontend/`, không có file returns).
 - Ảnh: `doc/features/2026-10-01-erp-theo-design/shots/xoa-phieu-hoan/` (1280 và 360).
 - Nợ: chưa có e2e trên BE thật; chưa duyệt UI bởi QA.
+
 

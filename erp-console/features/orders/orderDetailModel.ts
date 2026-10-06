@@ -210,10 +210,19 @@ export function orderTimeline(
   return out.sort(byNewest);
 }
 
+/** Khoản do "Ghi tiền về muộn" tạo ra: nguồn MANUAL mà loại là ORPHAN / UNMATCHED (xác nhận tay trên đơn thì luôn MATCHED / UNDERPAID, BE chặn đơn Tự huỷ). */
+export function isLateEntry(p: Partial<Pick<PaymentQueueItem, "source" | "match_status">>): boolean {
+  return p.source === "MANUAL" && (p.match_status === "ORPHAN" || p.match_status === "UNMATCHED");
+}
+
 /** Dòng thời gian của khoản tiền, ghép từ mốc nhận và mốc xử lý (BE chưa có timeline riêng cho khoản tiền). */
-export function paymentTimeline(p: Pick<PaymentQueueItem, "received_at" | "resolved_at" | "resolved_by">): TimelineEntry[] {
+export function paymentTimeline(
+  p: Pick<PaymentQueueItem, "received_at" | "resolved_at" | "resolved_by"> & Partial<Pick<PaymentQueueItem, "source" | "match_status" | "amount" | "bank_txn_id">>,
+): TimelineEntry[] {
   const out: TimelineEntry[] = [];
-  if (p.received_at) out.push({ at: p.received_at, label: M.tlPaymentReceived });
+  // #15: khoản ghi tay ở hàng chờ (MANUAL + Về sau khi đơn huỷ / Không khớp đơn) là "Ghi tay tiền về muộn" (kind payment_recorded_late
+  // ở BE). Nhãn chuẩn, chỉ có tiền và mã GD — không chữ tự do. Mốc hiện là giờ nhận theo sao kê (serializer chưa trả giờ ghi).
+  if (p.received_at) out.push({ at: p.received_at, label: isLateEntry(p) ? M.tlRecordedLate(p.amount ?? "0", p.bank_txn_id ?? "") : M.tlPaymentReceived });
   if (p.resolved_at) out.push({ at: p.resolved_at, label: M.tlPaymentResolved, actor: typeof p.resolved_by === "string" ? p.resolved_by : undefined });
   return out.sort(byNewest);
 }

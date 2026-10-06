@@ -3254,6 +3254,41 @@ Ghi nhận sự cố: lần chạy đầu của techlead đụng một phiên kh
 
 ---
 
+
+## Review #15 FE (08/10)
+
+Phạm vi: `git diff 151b56e..HEAD` (commit 8e56749, 15 file, chỉ trong `erp-console/` và dev-notes). Đối chiếu `02d-tien-ve-muon.md` §3, §7 và contract BE thật (main 4b7554e, sau đính chính TL15-H1). Theo yêu cầu, techlead không build. Số liệu tsc, vitest, build, `check-no-mock` và e2e lấy theo dev-notes. Techlead chỉ chạy `check_naming.py`: không có vi phạm mới (còn 2 file `frontend/` đỏ sẵn trên main).
+
+| Mục | Kết quả |
+|---|---|
+| Quyền | **Đạt.** Nút "Ghi tiền về muộn" chỉ hiện khi `me.permissions` có `PERM.confirmPaymentManual`. Màn hàng chờ vốn đã đòi quyền này. BE vẫn chặn 403. |
+| Giờ GMT+7 | **Đạt.** Mặc định của ô là `nowForInput` = `todayInVietnam` + `timeHM`, cả hai theo giờ VN. Khi gửi, ô được đổi bằng `vnInputToIso` (+07:00 → ISO UTC). FE kiểm giờ tương lai với độ lệch 5 phút như BE. Giờ của khoản giống hiện bằng `dateTime` (giờ VN). |
+| Lỗi theo khoá | **Đạt.** FE chặn trước ba ô mã GD, số tiền và giờ. Lỗi 400 của BE hiện dưới đúng ô nhờ `fieldErrorsOf` đọc các khoá `bank_txn_id`, `amount`, `received_at`, `order_code`, và không lặp lại thành alert đỏ. `order_id` và `existing_payment_id` là số nên `fieldErrorsOf` bỏ qua, FE đọc riêng để dựng link "Mở đơn" và "Mở giao dịch đã có". |
+| 409 nghi trùng khi ghi | **Đạt.** `similarOf` chỉ nhận mã `LATE_PAYMENT_POSSIBLE_DUPLICATE`. Hộp vàng nêu mã GD và giờ, có link xem khoản giống. Nút chính bị khoá tới khi tick, rồi gửi `acknowledge_possible_duplicate: true`. Đổi số tiền, giờ hoặc mã đơn thì bỏ tick và hộp vàng: đúng, vì khoản giống phụ thuộc đúng ba ô này. |
+| C1: `RefundModal` | **Đạt.** Với nhánh `payment_transaction`, khi có nhãn và đã tick thì gửi `acknowledge_duplicate_warning: true`. Nút chính khoá tới khi tick. Nếu BE trả 409 `PAYMENT_DUPLICATE_WARNING` (nhãn xuất hiện sau khi màn đã tải) thì hộp tick mở lại với nhãn của BE và không báo lỗi đỏ. Lần gửi lại giữ nguyên `request_id`. An toàn, vì lần 409 ở BE đã rollback nên không có phiếu nào mang `request_id` đó. Nhánh `sales_invoice` (`OrderDetailScreen`) không đổi, đúng contract. |
+| Nhãn nghi trùng | **Đạt.** Ở hàng chờ có icon cảnh báo cạnh chip, kèm `title` là nhãn và chữ `sr-only` cho trình đọc màn hình. Ở chi tiết có `FormAlert kind="warn"`. Không hiện mã BR. |
+| Dòng thời gian | **Chấp nhận, ghi nợ.** `paymentTimeline` đổi nhãn mốc nhận thành "Ghi tay tiền về muộn {tiền} (mã GD …)" khi khoản là `MANUAL` + `ORPHAN`/`UNMATCHED`. Nhãn chuẩn, không chữ tự do. Có hai giới hạn (TL15F-L1). |
+| Mock đúng contract | **Đạt.** Mock có đủ các ca: 403 (chặn ở đầu `mockPaymentsApi`), 400 theo khoá ô với đúng câu của BE, `LATE_PAYMENT_ORDER_*`, `BR-TT-03` kèm `existing_payment_id`, 200 `duplicate`, 409 kèm `similar_*`. Luật khoản giống chép theo **bản đính chính TL15-H1**: có đơn thì xét giao dịch của đơn hoặc UNMATCHED không đơn trong 72 giờ; không đơn thì xét UNMATCHED không đơn hoặc ORPHAN trong 72 giờ. Có ack và có khoản giống thì gắn nhãn. Phiếu hoàn nhận 409 với `detail` là nhãn, và thứ tự kiểm khớp BE. |
+| Mock không lọt build thật | **Đạt.** `recordLatePayment` dùng `mock: process.env.NEXT_PUBLIC_USE_MOCK === "1" ? mockPaymentsApi : undefined`, giống các hàm cùng file. `flagDuplicate` nằm trong khối `if (NEXT_PUBLIC_USE_MOCK === "1" …)`. `beErrors.mock.ts` chỉ được import từ file mock; `shared/lib/messages.ts` chỉ nhắc tới nó trong comment. Dev-notes ghi build mock=0 cùng `check-no-mock` đều XANH. |
+| Sửa `shared/lib/beErrors.mock.ts` | **Chấp nhận** (ngoại lệ nhỏ ngoài `features/orders`, đã ghi trong dev-notes). Tham số `extra` là tuỳ chọn, nên mọi nơi gọi cũ không đổi hành vi. `"$detail"` thay bằng chính câu lỗi. Các câu mới chép đúng thông điệp BE ở `payments/services.py`. |
+| Dữ liệu cá nhân, URL, storage | **Đạt.** Form chỉ có 4 ô, không có ô ghi chú. Không dùng `localStorage`/`sessionStorage` và không có query string chứa giá trị form (`?id=` chỉ là id giao dịch hay id đơn). Không có `console.*`. Thân lỗi 409 chỉ có id, mã GD và giờ. |
+| UI-RULES, tên chuẩn | **Đạt.** Chữ đời thường, không có mã luật. Nút chính nói rõ việc và số tiền ("Ghi nhận 350.000 đ"). Nút ≥ 44 px, 360 px không cuộn ngang (theo e2e). Định danh tiếng Anh. "Phiếu hoàn" ở đây đúng nghĩa hoàn **tiền**. |
+
+### Lỗi (không có Critical, High hay Medium)
+
+**TL15F-L1 · Low · nợ BE+FE, dòng thời gian khoản ghi muộn (`orderDetailModel.ts:221-227`).** (a) Mốc hiện giờ nhận theo sao kê, không phải giờ bấm ghi, và không có tên người ghi, vì `PaymentTransactionSerializer` chưa trả `created_at`/người ghi. Trong khi đó BE đã có sự kiện `payment_recorded_late` kèm người làm ở `build_payment_timeline`. (b) Nhãn được suy ra từ `MANUAL` + `ORPHAN`/`UNMATCHED`, nên các dòng cũ trước 02/10 (xác nhận tay trên đơn Tự huỷ ra `MANUAL ORPHAN`) cũng hiện "Ghi tay tiền về muộn". Hướng xử lý cho lô sau: FE lấy timeline từ guidance `payment`, hoặc BE thêm `recorded_at`/`recorded_by` vào serializer. Không chặn lô.
+
+**TL15F-L2 · Low · `messages.ts`.** `dupRefundNeedAck` không có chỗ nào dùng, nên bỏ. `RefundModal.tsx` còn một dòng trống thừa sau `useSubmit` (khoảng dòng 77). Sửa khi tiện.
+
+**TL15F-L3 · Low · ghi nhận.** Trong `RecordLatePaymentModal`, nếu đã tick ack rồi lần gửi sau nhận một lỗi 400 khác thì hộp vàng biến mất, nhưng `ack` vẫn là `true`. Lần gửi kế tiếp mang theo ack mà người dùng không thấy hộp. Chấp nhận được: ack chỉ còn khi số tiền, giờ và mã đơn không đổi, tức khoản giống vẫn là khoản đã được xem. Nếu muốn chặt hơn thì `setAck(false)` khi `similarOf(err)` là null.
+
+### Điều kiện
+
+- **C1 đã thoả về mặt FE.** BE #15 (main 4b7554e) và FE #15 phải **deploy cùng một đợt**.
+- QA #15 phải chạy E2E trên **BE thật**, đủ 4 ca ở 02d §7, cộng ca chéo loại TL15-H1: ghi không gắn đơn, rồi bắn IPN có mã đơn Tự huỷ với mã GD khác, kiểm nhãn và ô tick khi hoàn. Hiện e2e của dev mới chạy trên mock.
+
+### Kết luận Review #15 FE (08/10): **APPROVED**
+
 ## Review #15 BE (08/10)
 
 Phạm vi: `git diff main...feat/tien-ve-muon` (commit fdba607, 17 file). Đối chiếu `02d-tien-ve-muon.md` (LP-AC1…16, §3–§7) và dev-notes "#15 ghi tiền về muộn (BE)".
@@ -3384,3 +3419,4 @@ Phạm vi: `git show b97fe68`, 8 file, chỉ đổi chữ, comment, selector e2e
 Việc của QA: chạy lại `npm ci`, `tsc --noEmit`, `vitest`, build mock=0 kèm `check-no-mock`, rồi build mock=1 và chạy `e2e/delete_return.py` cùng `e2e/ed_bonusA_ui.py`, vì selector đã đổi.
 
 ### Kết luận re-review sau b97fe68: **APPROVED**
+
