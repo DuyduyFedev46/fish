@@ -145,6 +145,14 @@ class StandardPagination(PageNumberPagination):
     page_size = 20
 
 
+class SearchBodyPagination(StandardPagination):
+    """Cùng 20 dòng/trang, nhưng số trang lấy từ body JSON (`page`) thay vì query string.
+    Dùng cho các `POST .../search/` (từ khoá cá nhân không được nằm trong URL, bất biến 9)."""
+
+    def get_page_number(self, request, paginator):
+        return request.data.get("page", 1) if hasattr(request.data, "get") else 1
+
+
 class BusinessValidationError(APIException):
     status_code = status.HTTP_400_BAD_REQUEST
     default_detail = "Vi phạm quy tắc nghiệp vụ."

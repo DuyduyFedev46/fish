@@ -81,6 +81,10 @@ class CustomerDataScopeBase(TestCase):
     def get(self, user, url):
         return client_for(user).get(url)
 
+    def search_orders(self, user, q):
+        """NEW-1: tìm đơn theo SĐT/tên đi bằng POST search/ (GET `q` chỉ còn khớp mã)."""
+        return client_for(user).post("/api/sales/orders/search/", {"q": q}, format="json")
+
 
 class MatrixTests(CustomerDataScopeBase):
     """Ma trận Group x 3 endpoint (danh sách + chi tiết), có đếm 200 > 0 để test không rỗng."""
@@ -316,17 +320,18 @@ class CourierWindowTests(CustomerDataScopeBase):
 
     def test_sr_pii_02_ac2_search_by_phone_cannot_find_expired_order(self):
         self._expire(8)
-        resp = self.get(self.courier, f"/api/sales/orders/?q={PII['A']['phone']}")
+        resp = self.search_orders(self.courier, PII["A"]["phone"])
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(resp.json()["count"], 0)
-        resp = self.get(self.courier, f"/api/sales/orders/?q={PII['A']['name'][:12]}")
+        resp = self.search_orders(self.courier, PII["A"]["name"][:12])
         self.assertEqual(resp.json()["count"], 0)
         # Tìm theo mã đơn vẫn chạy (không phải dữ liệu khách).
+        self.assertEqual(self.search_orders(self.courier, "SO-PII-A").json()["count"], 1)
         self.assertEqual(self.get(self.courier, "/api/sales/orders/?q=SO-PII-A").json()["count"], 1)
 
     def test_sr_pii_02_ac3_search_by_phone_works_for_recent_order(self):
         self._expire(2)
-        resp = self.get(self.courier, f"/api/sales/orders/?q={PII['A']['phone']}")
+        resp = self.search_orders(self.courier, PII["A"]["phone"])
         self.assertEqual(resp.json()["count"], 1)
 
     def test_sr_pii_02_ac1_setting_changes_window(self):
