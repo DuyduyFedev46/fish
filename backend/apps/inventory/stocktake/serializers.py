@@ -8,6 +8,7 @@ from decimal import Decimal
 
 from rest_framework import serializers
 
+from apps.common.ai_visibility import ai_features_enabled
 from apps.common.exceptions import BusinessError
 from apps.common.params import parse_positive_id
 from apps.inventory.models import StockReconciliation
@@ -173,6 +174,8 @@ class StockReconciliationSerializer(serializers.ModelSerializer):
         if kind is None:  # phiếu cũ chưa có dòng nhật ký (hoặc đối tượng chưa qua queries)
             return staff_name(obj.created_by)
         if kind == "ai":
+            if not ai_features_enabled():  # dữ liệu lệch: AI tắt thì không lộ chữ AI
+                return SYSTEM_NAME
             return f"AI của {obj.last_ai_actor_display_name or obj.last_ai_actor_username or SYSTEM_NAME}"
         if kind == "system" or obj.last_actor_username is None:
             return SYSTEM_NAME

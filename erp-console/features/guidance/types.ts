@@ -42,6 +42,8 @@ export type GuidanceTimelineEntry = {
   label: string;
   doc: string;
   actor: GuidanceTimelineActor;
+  /** Dòng Hệ thống chạy theo đề xuất của AI (BR-AI-*): ẩn khi giao diện AI tắt. Thiếu = không có. */
+  proposal_ref?: string | null;
 };
 
 export type GuidanceRelatedDoc = {

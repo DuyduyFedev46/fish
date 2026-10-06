@@ -6,7 +6,6 @@ import { ListPage } from "@/shared/ui/list/ListPage";
 import { DataTable } from "@/shared/ui/list/DataTable";
 import { FilterBar } from "@/shared/ui/list/FilterBar";
 import { Tabs, useTabParam } from "@/shared/ui/Tabs";
-import { AiBar } from "@/shared/ui/AiBar";
 import { Chip } from "@/shared/ui/Chip";
 import { ENUMS } from "@/shared/lib/enums";
 import { ToastProvider, useToast } from "@/shared/ui/overlay/Toast";
@@ -51,7 +50,7 @@ function Demo() {
           <FilterBar query={q} onQuery={setQ} placeholder="Tìm mã đơn" searchLabel="Tìm đơn" summary={`Đang hiện ${filtered?.length ?? 0} / 4 đơn`}
             selects={[{ key: "s", label: "Trạng thái", value: status, onChange: setStatus, options: [{ value: "", label: "Mọi trạng thái" }, { value: "BOOKED", label: "Giữ chỗ" }, { value: "PAID", label: "Đã thanh toán" }] }]} />
         }
-        aiBar={<AiBar count={MODE === "rows" || MODE === "loading" || MODE === "stale" ? 2 : 0} href="/ai/actions/">2 đơn quá hạn giữ chỗ</AiBar>}
+        aiBar={null}
         footer={<button className="btn">Tải thêm</button>}
       >
         <DataTable

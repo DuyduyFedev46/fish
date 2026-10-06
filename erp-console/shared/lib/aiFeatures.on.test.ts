@@ -12,7 +12,7 @@ vi.mock("next/link", () => ({ default: () => null }));
 const getAiStatus = vi.hoisted(() => vi.fn(() => new Promise(() => {})));
 vi.mock("@/features/ai/api", () => ({ getAiStatus }));
 
-vi.mock("@/features/auth/components/AuthProvider", () => ({ useAuth: () => ({ me: null }) }));
+vi.mock("@/features/auth/components/AuthProvider", () => ({ useAuth: () => ({ me: { ai_features_enabled: true } }) }));
 import { AI_FEATURES_ENABLED } from "@/shared/lib/features";
 import { menuItems, visibleNav, PERM, type Viewer } from "@/shared/lib/nav";
 import { ROLE } from "@/shared/lib/roles";
@@ -23,7 +23,7 @@ import { escalatableStep } from "@/features/guidance/escalation";
 import GuidanceEscalate from "@/features/guidance/components/GuidanceEscalate";
 import { AiFeatureGuard } from "@/shared/ui/states/AiFeatureGuard";
 
-const OWNER: Viewer = { groups: [ROLE.owner], can_view_profit: true, permissions: Object.values(PERM), home: "dashboard" };
+const OWNER: Viewer = { groups: [ROLE.owner], can_view_profit: true, permissions: Object.values(PERM), home: "dashboard", ai_features_enabled: true };
 
 beforeEach(() => {
   getAiStatus.mockClear();
@@ -51,7 +51,7 @@ describe("cờ AI bật", () => {
 
   it("SR-HIDE-AI-02: cờ bật → 'Nhờ người xử lý' hiện như cũ", () => {
     const step = { key: "confirm_payment", label: "X", actor: "user", allowed: false, who: ["Chủ"], missing: [], deadline: null, why: null, command: null, ai: null } as never;
-    expect(escalatableStep({ next_steps: [step] })).not.toBeNull();
+    expect(escalatableStep({ next_steps: [step] }, { ai_features_enabled: true })).not.toBeNull();
     const html = renderToStaticMarkup(createElement(GuidanceEscalate, { step, docType: "sales.salesorder", docId: 1, noticeHost: null }));
     expect(html).toContain("Nhờ");
   });

@@ -11,7 +11,7 @@ from django.contrib.auth.models import Group
 from apps.common.guidance.api import register_guidance
 from apps.common.guidance.audit_timeline import make_audit_timeline_provider
 
-from .services import ACTION_CHANGE_CAPABILITIES, capability_change_label
+from .services import ACTION_CHANGE_CAPABILITIES, capability_change_label, has_visible_capability_change
 
 register_guidance(
     "group",
@@ -21,5 +21,6 @@ register_guidance(
         doc_type="group",
         code_fn=lambda group: group.name,
         action_labels={ACTION_CHANGE_CAPABILITIES: capability_change_label},
+        row_filter=has_visible_capability_change,
     ),
 )

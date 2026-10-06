@@ -1,4 +1,4 @@
-// Khung thử (QA) vẽ ListPage/DataTable/FilterBar/Tabs/AiBar/Chip/Toast/ErrorScreen/NotFoundScreen với dữ liệu giả.
+// Khung thử (QA) vẽ ListPage/DataTable/FilterBar/Tabs/Chip/Toast/ErrorScreen/NotFoundScreen với dữ liệu giả.
 // Build:  cd erp-console && node_modules/.bin/vite build --config e2e/qa_harness_ed_batch1/vite.config.mjs
 // Phục vụ: (cd e2e/qa_harness_ed_batch1/dist && python3 -m http.server 3102)   rồi   python3 e2e/qa_ed_batch1_template.py
 // Không thuộc sản phẩm: chỉ dùng cho QA; dist/ không commit.

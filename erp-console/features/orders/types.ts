@@ -152,6 +152,8 @@ export type OrderDetail = {
   available_actions: OrderAction[];
   /** GL-05: bằng chứng đồng ý chính sách bảo mật (chỉ trả khi có sales.view_privacy_consent). null khi đơn cũ. */
   privacy_consent?: PrivacyConsentInfo | null;
+  /** Ghi chú huỷ đơn (BR-GH-19: đã bị chặn SĐT/số TK). BE trả "" khi không có hoặc khi che dữ liệu cá nhân. Thiếu (BE cũ) = không hiện. */
+  cancel_note?: string;
 };
 
 export type PrivacyConsentInfo = {

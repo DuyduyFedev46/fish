@@ -162,6 +162,8 @@ type Order = {
   /** Mã lý do huỷ (BE `reasons.py`): nguồn của cột "Lý do" ở danh sách. */
   cancelReasonCode?: string;
   cancelledAt?: string;
+  /** Ghi chú huỷ đã qua kiểm BR-GH-19; `detail()` trả ra `cancel_note` (che theo `piiHidden`). */
+  cancelNote?: string;
   cancelStockRestored?: boolean;
   /** Phiếu giao đã Giao thất bại trước khi bị huỷ (GIVE_UP_AFTER_FAILED) — giữ lại vì `delivery.status` bị ghi đè thành CANCELLED. */
   cancelFromFailedDelivery?: boolean;
@@ -544,6 +546,8 @@ function timelineOf(o: Order): OrderTimelineEntry[] {
       actor_display: p.source === "MANUAL" ? p.actor || SYSTEM : SYSTEM,
     });
   });
+  // W39: dòng do AI làm (BE bật AI mới trả; giao diện tắt thì FE phải ẩn).
+  out.push({ at: at(o.created_at, 1), kind: "ai_proposal_confirmed", label: "Duyệt đề xuất của trợ lý", actor_display: "AI của owner1" });
   if (o.invoice) out.push({ at: o.invoice.issued_at, kind: "invoice_issued", label: `Xuất hoá đơn ${o.invoice.code}`, actor_display: SYSTEM });
   const d = o.delivery;
   if (d && o.invoice) {
@@ -710,6 +714,7 @@ function detail(me: Me, o: Order): OrderDetail {
     created_at: o.created_at,
     reserved_until: o.reserved_until,
     customer: piiHidden(me, o) ? { name: null, phone: null, address: null } : { ...o.customer },
+    cancel_note: piiHidden(me, o) ? "" : o.cancelNote ?? "",
     lines: o.lines.map((l, idx) => ({
       no: idx + 1,
       item_code: l.item_code,
@@ -919,6 +924,11 @@ function cancel(o: Order, body: unknown): MockResponse {
   const b = (body && typeof body === "object" ? body : {}) as Record<string, unknown>;
   const reasonCode = typeof b.reason_code === "string" ? b.reason_code : "";
   const note = typeof b.note === "string" ? b.note.trim() : "";
+  // BR-GH-19: ghi chú ≤ 200 ký tự, không chứa chuỗi ≥ 9 chữ số (SĐT, số tài khoản).
+  if (note.length > 200) return { status: 400, body: { code: "BR-GH-19", detail: "Ghi chú không quá 200 ký tự." } };
+  if (/\d{9,}/.test(note.replace(/[\s.\-_/]/g, ""))) {
+    return { status: 400, body: { code: "BR-GH-19", detail: "Không ghi SĐT hay số tài khoản vào ghi chú." } };
+  }
   if (!CANCEL_REASON_CODES.has(reasonCode)) return beError("HT_CANCEL_REASON_INVALID");
   if (reasonCode === "OTHER" && !note) return beError("HT_CANCEL_NOTE_REQUIRED");
   if (!((o.status === "PAID" || o.status === "PROCESSING") && o.invoice)) return beError("HT_CANCEL_INVALID_STATUS");
@@ -933,6 +943,7 @@ function cancel(o: Order, body: unknown): MockResponse {
   o.cancelReasonCode = reasonCode;
   o.cancelReasonLabel = CANCEL_REASON_LABEL[reasonCode] + (note ? ` — ${note}` : "");
   o.cancelledAt = isoVN(Date.now());
+  o.cancelNote = note;
   o.cancelStockRestored = restored;
   const total = orderTotal(o);
   save(store);

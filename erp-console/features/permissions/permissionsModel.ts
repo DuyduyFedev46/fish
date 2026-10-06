@@ -11,6 +11,12 @@ export const SECTION_ORDER = ["Bán hàng", "Hàng hoá & kho", "Kế toán", "W
 export type Section = { name: string; items: RegistryItem[] };
 
 /** Gom registry theo khu, giữ thứ tự việc BE trả; khu theo `SECTION_ORDER`. */
+/** Việc thuộc phần AI: ẩn khỏi ma trận khi giao diện AI tắt (W39). BE đã ẩn khi `AI_ENABLED` tắt; đây là lớp phòng khi BE bật mà giao diện tắt. */
+export const AI_CAPABILITY_KEYS: readonly string[] = ["ai_policy"];
+export function visibleRegistry(registry: RegistryItem[], aiOn: boolean): RegistryItem[] {
+  return aiOn ? registry : registry.filter((r) => !AI_CAPABILITY_KEYS.includes(r.key));
+}
+
 export function sectionsOf(registry: RegistryItem[]): Section[] {
   const byName = new Map<string, RegistryItem[]>();
   for (const item of registry) {

@@ -11,6 +11,7 @@ import { ModalAlert } from "./ModalAlert";
 import { SummaryBlock } from "@/shared/ui/form/SummaryBlock";
 import { primaryLabel } from "@/shared/ui/form/useSubmit";
 import { Modal } from "@/shared/ui/overlay/Modal";
+import { ApiError } from "@/shared/lib/http";
 import { decideConfirmation } from "../api";
 import { CANCEL_REASON_CODES, DECIDE_REASON_MAX, decisionsOf, extendError, noteError } from "../confirmationUi";
 import type { ConfirmationDecision, DecideResponse } from "../types";
@@ -47,17 +48,27 @@ export function DecideModal({ noteId, orderCode, escalationLabel, attempts, deci
   const sub = useGuardedSubmit(
     async () => {
       const d = decision as ConfirmationDecision;
-      const res = await decideConfirmation(
-        noteId,
-        d === "DELIVER_WITHOUT_CONFIRM"
-          ? { decision: d, reason: reason.trim() }
-          : d === "EXTEND"
-            ? { decision: d, until: untilIso, reason: reason.trim() }
-            : { decision: d, reason_code: cancelCode, note: reason.trim() },
-      );
-      return { d, res };
+      try {
+        const res = await decideConfirmation(
+          noteId,
+          d === "DELIVER_WITHOUT_CONFIRM"
+            ? { decision: d, reason: reason.trim() }
+            : d === "EXTEND"
+              ? { decision: d, until: untilIso, reason: reason.trim() }
+              : { decision: d, reason_code: cancelCode, note: reason.trim() },
+        );
+        return { d, res };
+      } catch (err) {
+        // BR-GH-19: BE từ chối lý do có SĐT/số TK hoặc quá dài → câu lỗi hiện dưới ô lý do, hộp vẫn mở, giữ chữ đã gõ.
+        if (err instanceof ApiError && err.status === 400 && err.code === "BR-GH-19") {
+          setErrors({ reason: err.message });
+          setConfirmingCancel(false);
+          return null;
+        }
+        throw err;
+      }
     },
-    { onSuccess: ({ d, res }) => onDone(d, res) },
+    { onSuccess: (r) => r && onDone(r.d, r.res) },
   );
 
   const requireReason = decision === "DELIVER_WITHOUT_CONFIRM" || decision === "EXTEND";

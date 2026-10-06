@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { getSiteInfo } from "../features/site/api";
 
-export const SELLER_SECTION_ID = "thong-tin-nguoi-ban";
+export const SELLER_SECTION_ID = "seller-info";
 
 /**
  * Nút "Liên hệ" dùng chung (thẻ mặt hàng, trang chi tiết, thẻ trong bài viết) khi hết hàng.

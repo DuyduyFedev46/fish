@@ -28,6 +28,9 @@ export const QUEUE_TYPE_FILTERS: { value: string; label: string }[] = [
 ];
 
 /** Lý do huỷ đơn (F2b). OTHER bắt buộc ghi chú (S14-AC6). */
+/** BR-GH-19: ghi chú huỷ tối đa 200 ký tự (BE chặn thêm chuỗi số dài như SĐT/số tài khoản). */
+export const CANCEL_NOTE_MAX = 200;
+
 export const CANCEL_REASONS: { value: string; label: string }[] = [
   { value: "CUSTOMER_CHANGED_MIND", label: "Khách đổi ý" },
   { value: "DAMAGED_WHEN_PACKING", label: "Hư khi đóng hàng" },

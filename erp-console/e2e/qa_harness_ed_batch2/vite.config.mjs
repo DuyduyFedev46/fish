@@ -23,6 +23,7 @@ export default {
       { find: "next/navigation", replacement: path.join(b1, "navigation.ts") },
       { find: "next/dynamic", replacement: path.join(here, "stubs/dynamic.tsx") },
       { find: /^\.\/AiAssistantPanel$/, replacement: path.join(here, "stubs/AiAssistantPanel.tsx") },
+      { find: "@/features/auth/components/AuthProvider", replacement: path.join(here, "stubs/AuthProvider.tsx") },
       { find: /^@\//, replacement: app + "/" },
       { find: "react/jsx-runtime", replacement: nm("react/jsx-runtime.js") },
       { find: /^react-dom\/client$/, replacement: nm("react-dom/client.js") },

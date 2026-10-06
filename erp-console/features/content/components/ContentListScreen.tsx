@@ -7,6 +7,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/features/auth/components/AuthProvider";
+import { aiVisible } from "@/shared/lib/features";
 import { ENUMS } from "@/shared/lib/enums";
 import { dateTime } from "@/shared/lib/format";
 import { ApiError, loadErrorText } from "@/shared/lib/http";
@@ -57,6 +58,7 @@ function roleLabel(role: string): string {
 
 export function ContentListScreen() {
   const { me } = useAuth();
+  const aiOn = aiVisible(me); // W39: AI tắt thì bỏ cột "AI" và ghi chú "AI soạn nháp"
   const [tab, selectTab] = useTabParam(STATUS_TAB_KEYS, "all");
   const [kind, setKind] = useState("");
   const [category, setCategory] = useState(0);
@@ -113,13 +115,13 @@ export function ContentListScreen() {
       },
     },
     { key: "status", header: M.colStatus, render: (r) => <Chip table={ENUMS.entryStatus} value={r.status} /> },
-    { key: "ai", header: M.colAi, hideBelow: 1100, render: (r) => (r.source === "ai" ? <Chip table={ENUMS.entrySource} value="ai" /> : <span className="muted">—</span>) },
+    ...(aiOn ? [{ key: "ai", header: M.colAi, hideBelow: 1100 as const, render: (r: ContentEntryListItem) => (r.source === "ai" ? <Chip table={ENUMS.entrySource} value="ai" /> : <span className="muted">—</span>) }] : []),
     {
       key: "note",
       header: M.colNote,
       hideBelow: 1100,
       render: (r) => {
-        const note = entryNote(r);
+        const note = entryNote(r, aiOn);
         return note || <span className="muted">—</span>;
       },
     },

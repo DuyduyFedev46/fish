@@ -19,6 +19,7 @@ import { useToast } from "@/shared/ui/overlay/Toast";
 import { Loading } from "@/shared/ui/StateBox";
 import { forgetSignedIn, readSignedIn } from "../signedInAt";
 import { useAuth } from "./AuthProvider";
+import { aiVisible } from "@/shared/lib/features";
 import { ChangePasswordForm } from "./ChangePasswordForm";
 import s from "./account.module.css";
 
@@ -43,6 +44,8 @@ export function AccountScreen() {
   useEffect(() => setSignedIn(readSignedIn()), []);
 
   if (!me) return <Loading />;
+  // W39: giao diện AI tắt thì không liệt kê việc `ai.*` (BE bật AI vẫn trả mã này).
+  const visibleCaps = (me.capabilities ?? []).filter((c) => aiVisible(me) || !c.code.startsWith("ai."));
 
   const name = me.display_name || me.username || "?";
   const groups = me.group_labels?.length
@@ -119,9 +122,9 @@ export function AccountScreen() {
         <div className={s.group}>
           {me.capabilities === undefined ? (
             <p className={s.empty}>Máy chủ chưa trả danh sách này (cần bản backend có S47).</p>
-          ) : me.capabilities.length ? (
+          ) : visibleCaps.length ? (
             <ul className={`cap-list ${s.caps}`}>
-              {me.capabilities.map((c) => (
+              {visibleCaps.map((c) => (
                 <li key={c.code}>
                   <Icon name="check_circle" />
                   {c.label}

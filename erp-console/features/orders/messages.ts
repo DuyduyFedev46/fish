@@ -50,6 +50,7 @@ export const ORDERS_MSG = {
   groupDelivery: "Giao hàng",
   fieldMatched: "Giao dịch khớp",
   fieldRefund: "Hoàn tiền",
+  fieldCancelNote: "Ghi chú huỷ",
   countPayments: (n: number) => `${n} giao dịch`,
   countRefunds: (n: number) => `${n} phiếu hoàn`,
   totalSum: "Tổng cộng",

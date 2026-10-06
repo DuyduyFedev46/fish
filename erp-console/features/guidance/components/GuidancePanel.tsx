@@ -18,7 +18,9 @@ import { Icon } from "@/shared/ui/Icon";
 import { getGuidance } from "../api";
 import type { GuidanceData, GuidanceNextStep, GuidanceTimelineEntry } from "../types";
 import GuidanceEscalate from "./GuidanceEscalate";
-import { AI_FEATURES_ENABLED } from "@/shared/lib/features";
+import { isAiTimelineEntry } from "../detailAdapters";
+import { aiVisible } from "@/shared/lib/features";
+import { useAuth } from "@/features/auth/components/AuthProvider";
 import { useAiEnabledAndConsented } from "@/features/ai/gate-state";
 import s from "./guidance.module.css";
 
@@ -41,7 +43,8 @@ export function GuidancePanel({ docType, docId, onAction, onDataLoaded, refreshS
   const [error, setError] = useState<string | null>(null);
 
   // "Tóm tắt" (model local): "AI bật và đã đồng ý" đọc từ gate-state — không tự gọi /api/ai/status/. KHÔNG dùng cho "Để AI làm".
-  const aiOn = useAiEnabledAndConsented() && AI_FEATURES_ENABLED;
+  const { me } = useAuth();
+  const aiOn = useAiEnabledAndConsented() && aiVisible(me);
   // Chỗ đặt kết quả của phần AI (portal) — giữ bố cục cũ dù nút do component nạp động vẽ.
   const [summaryHost, setSummaryHost] = useState<HTMLDivElement | null>(null);
 
@@ -159,10 +162,12 @@ function StepItem({
   onAction?: (key: string) => void;
   disabled?: boolean;
 }) {
+  const { me } = useAuth();
+  const aiShown = aiVisible(me);
   const isSystem = step.actor === "system";
   const canAct = step.allowed && onAction && !isSystem;
   // F6-2 / DW-14-AC3, AC8: nút "Để AI làm" theo `step.ai` (server đã lọc quyền/cờ AI) + mức C + có lệnh.
-  const showAiButton = AI_FEATURES_ENABLED && Boolean(step.ai && step.ai.level === "C" && step.command);
+  const showAiButton = aiShown && Boolean(step.ai && step.ai.level === "C" && step.command);
   // Nơi phần AI (nạp động) đặt thông báo kết quả — ngay dưới đầu bước.
   const [noticeHost, setNoticeHost] = useState<HTMLDivElement | null>(null);
 
@@ -177,7 +182,7 @@ function StepItem({
           {isSystem ? <Icon name="schedule" /> : <Icon name="play_arrow" />}
           <span>{step.label}</span>
           {isSystem && <span className={s.badgeSystem}>Hệ thống</span>}
-          {AI_FEATURES_ENABLED && step.ai && (
+          {aiShown && step.ai && (
             <span className={s.badgeAi}>AI {step.ai.level ? `(${step.ai.level})` : ""}</span>
           )}
         </div>
@@ -233,7 +238,9 @@ function StepItem({
 }
 
 /** Component hiển thị timeline từ guidance có hỗ trợ tag doc và hiển thị AI actor (L-4). */
-export function GuidanceTimelineView({ entries }: { entries: GuidanceTimelineEntry[] }) {
+export function GuidanceTimelineView({ entries: allEntries }: { entries: GuidanceTimelineEntry[] }) {
+  const { me } = useAuth();
+  const entries = aiVisible(me) ? allEntries : (allEntries ?? []).filter((e) => !isAiTimelineEntry(e));
   if (!entries || entries.length === 0) {
     return <p className={s.nil}>Chưa có lịch sử sự kiện.</p>;
   }
@@ -257,7 +264,6 @@ export function GuidanceTimelineView({ entries }: { entries: GuidanceTimelineEnt
                 {e.actor?.display && (
                   <span>
                     {" · "}
-                    {isAi ? <span className={s.badgeAi}>AI</span> : null}{" "}
                     {e.actor.display}
                     {isAi && e.actor.level ? ` (Mức ${e.actor.level})` : null}
                   </span>

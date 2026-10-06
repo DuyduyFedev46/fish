@@ -13,6 +13,7 @@ from rest_framework.authtoken.models import Token
 
 from apps.accounts import roles
 from apps.accounts.models import StaffProfile
+from apps.common.ai_visibility import ai_features_enabled
 from apps.common.api import VIEW_COSTPRICE_PERM
 from apps.common.audit import record_audit
 from apps.common.exceptions import BusinessError
@@ -103,6 +104,7 @@ def describe_user(user) -> dict:
     """JSON của `GET /api/auth/me/` cho user đã đăng nhập (contract S6)."""
     groups = sorted_groups(user.groups.values_list("name", flat=True))
     permissions = user.get_all_permissions()
+    ai_on = ai_features_enabled()
     profile = getattr(user, "staff_profile", None)  # RelatedObjectDoesNotExist là AttributeError
     return {
         "id": user.pk,
@@ -121,8 +123,10 @@ def describe_user(user) -> dict:
         "capabilities": [
             {"code": code, "label": label}
             for code, label in CAPABILITY_LABELS.items()
-            if code in permissions
+            if code in permissions and (ai_on or not code.startswith("ai."))
         ],
+        # Lô dọn chữ AI (W39): cờ môi trường, FE chỉ hiện phần AI khi cờ này bật.
+        "ai_features_enabled": ai_on,
         # S48 (BR-PQ-19): cờ hiệu lực — superuser luôn False.
         "must_change_password": must_change_password(user),
     }

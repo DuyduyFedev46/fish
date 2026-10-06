@@ -1,6 +1,8 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+vi.mock("@/features/auth/components/AuthProvider", () => ({ useAuth: () => ({ me: { ai_features_enabled: true } }) }));
 import { StatusPath } from "./StatusPath";
 import { Timeline } from "./Timeline";
 import { CONFLICT_FIELD_MESSAGE, validateDraft } from "./InfoField";
@@ -33,7 +35,7 @@ describe("Timeline", () => {
   it("không in mã BR, có nhãn AI, ghi rõ khi bị cắt", () => {
     const html = renderToStaticMarkup(
       createElement(Timeline, {
-        entries: [{ at: "2026-10-01T03:00:00Z", label: "Xác nhận nhập kho", actor: "AI của Lộc", byAi: true }],
+        entries: [{ at: "2026-10-01T03:00:00Z", label: "Xác nhận nhập kho", actor: "AI của Lộc" }],
         truncated: true,
       })
     );

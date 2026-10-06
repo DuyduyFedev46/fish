@@ -12,6 +12,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from apps.accounts.models import AuditLog
+from apps.common.ai_visibility import exclude_ai_audit_rows
 from apps.common.audit import record_audit
 from apps.common.exceptions import BusinessError, ConflictError
 from apps.inventory.models import Batch, StockLedgerEntry, StockReconciliation, StockReconciliationLine
@@ -107,7 +108,9 @@ def staff_name(user):
 def _last_editor_name(reconciliation):
     """Người thao tác gần nhất trên phiếu (từ AuditLog); chưa có dòng nhật ký thì lấy người tạo."""
     row = (
-        AuditLog.objects.filter(model_name=StockReconciliation._meta.label, object_id=str(reconciliation.pk))
+        exclude_ai_audit_rows(
+            AuditLog.objects.filter(model_name=StockReconciliation._meta.label, object_id=str(reconciliation.pk))
+        )
         .select_related("actor__staff_profile", "ai_actor__staff_profile")
         .order_by("-created_at", "-id").first()
     )

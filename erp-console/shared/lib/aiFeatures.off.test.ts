@@ -3,7 +3,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@/shared/lib/features", () => ({ AI_FEATURES_ENABLED: false }));
+vi.mock("@/shared/lib/features", () => ({ AI_FEATURES_ENABLED: false, aiVisible: () => false }));
 // Chạy effect ngay lúc render để bắt được lệnh gọi mạng (renderToStaticMarkup mặc định không chạy effect).
 vi.mock("react", async () => {
   const actual = await vi.importActual<typeof import("react")>("react");
@@ -74,7 +74,7 @@ describe("cờ AI tắt", () => {
 
   it("SR-HIDE-AI-02: không còn điểm vào 'Nhờ người xử lý'", () => {
     const step = { key: "confirm_payment", label: "X", actor: "user", allowed: false, who: ["Chủ"], missing: [], deadline: null, why: null, command: null, ai: null } as never;
-    expect(escalatableStep({ next_steps: [step] })).toBeNull();
+    expect(escalatableStep({ next_steps: [step] }, { ai_features_enabled: true })).toBeNull();
     const html = renderToStaticMarkup(createElement(GuidanceEscalate, { step, docType: "sales.salesorder", docId: 1, noticeHost: null }));
     expect(html).toBe("");
   });

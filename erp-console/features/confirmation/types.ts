@@ -72,6 +72,8 @@ export type ConfirmationQueueDetail = ConfirmationQueueItem & {
   guidance?: string | null;
   /** CS-18: kịch bản gọi hợp với đơn này (chỉ kịch bản đang bật, chỉ khi người xem có quyền xem kịch bản; không thì rỗng hoặc thiếu). */
   scripts?: QueueScript[];
+  /** Lý do quyết định của Chủ/Quản lý (BR-GH-19). BE trả "" khi chưa có hoặc phiếu ngoài phạm vi. Thiếu (BE cũ) = không hiện. */
+  decision_note?: string;
 };
 
 export type ConfirmationQueueResponse = {

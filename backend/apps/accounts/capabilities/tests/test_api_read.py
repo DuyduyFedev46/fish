@@ -1,5 +1,5 @@
 """B4 · ED-39-AC1 — GET /api/staff/groups/ và /api/staff/groups/{code}/ (chỉ Chủ đọc được)."""
-from django.test import TestCase
+from django.test import TestCase, override_settings
 
 from apps.accounts import roles
 from apps.accounts.capabilities import registry
@@ -15,6 +15,7 @@ MEMBER_LIST_KEYS = {"id", "display_name"}
 MEMBER_DETAIL_KEYS = {"id", "display_name", "username", "other_groups", "is_active", "added_at"}
 
 
+@override_settings(AI_ENABLED=True)  # các ca này kiểm ma trận ĐỦ việc; nhánh tắt ở test_ai_hidden
 class GroupReadTests(TestCase):
     def setUp(self):
         self.owner = make_staff("owner1", roles.OWNER, display_name="Chủ Thử")

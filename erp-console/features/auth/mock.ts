@@ -256,6 +256,7 @@ const CAPABILITIES: [string, string][] = [
   ["inventory.view_costprice", "Xem giá vốn"],
   ["reports.view_profitreport", "Xem báo cáo lãi lỗ"],
   ["reports.view_dashboard", "Xem Tổng quan"],
+  ["ai.manage_ai_policy", "Quản lý chính sách AI"],
 ];
 
 const GROUP_ORDER: readonly string[] = GROUP_CODES;
@@ -293,7 +294,19 @@ function buildMe(u: MockUser): Me {
     capabilities: CAPABILITIES.filter(([code]) => perms.includes(code)).map(([code, label]) => ({ code, label })),
     // S48:
     must_change_password: mustChange(u),
+    // W39: mặc định true để bản mock chỉ phụ thuộc cờ build như trước. QA giả lập "BE tắt AI" bằng
+    // `sessionStorage.setItem("caveve_mock_be_ai", "off")` rồi tải lại (cờ cấu hình, không phải dữ liệu cá nhân).
+    ai_features_enabled: mockBackendAiEnabled(),
   };
+}
+
+/** W39: giả lập `settings.AI_ENABLED` của BE. Chỉ mock; bản thật đọc từ `/api/auth/me/`. */
+function mockBackendAiEnabled(): boolean {
+  try {
+    return typeof window === "undefined" || window.sessionStorage.getItem("caveve_mock_be_ai") !== "off";
+  } catch {
+    return true;
+  }
 }
 
 /** S48: superuser không bị ép đổi mật khẩu (S48-AC6). */
