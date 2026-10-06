@@ -194,3 +194,77 @@ Không có lỗi chặn.
 - `migrate` + seed qua `manage.py shell` (SQLite tạm), `runserver 8791 --noreload`.
 - Các kịch bản HTTP + `manage.py backfill_completed_orders [--dry-run]` bằng `urllib`/`subprocess` (script trong scratchpad).
 - `manage.py test` (4 module trên): `Ran 304 tests ... OK`.
+
+---
+
+## QA L3 (08/10) — S7 chi tiết đơn và dòng thời gian, S8 Shop tra đơn (BE + FE, bản build thật)
+### Kết luận: APPROVED — S7 và S8 chạy đúng trên runserver thật; mock không lọt vào bản build thật; không lỗi chặn
+### Tổng: 97 ca · ✅ 96 · ❌ 0 · ⏸ 1 (xem dưới) · 1 ghi nhận Low (S6-AC1 lời văn "mặc định")
+Dữ liệu 100% giả (SĐT 0900005xxx, "Khách Giả QA"). Môi trường: runserver `127.0.0.1:8792` (worktree này, `DJANGO_DEBUG=1`, SQLite tạm), ERP và Shop build `NEXT_PUBLIC_USE_MOCK=0` trỏ vào runserver, Playwright headless. Đơn dựng bằng service thật: A (id 7) hoàn tất qua giao xong, có phiếu hoàn REFUNDED 200.000 + PENDING 100.000; A2 (id 8) hoàn tất, chỉ PENDING 50.000; B (id 9) kẹt kiểu cũ, không có audit giao; D (id 13) kẹt kiểu cũ, có audit giao cũ; C (id 10) PROCESSING với phiếu FAILED.
+
+### Theo yêu cầu
+| Việc | Kết quả | Bằng chứng |
+|---|---|---|
+| 1. ERP chi tiết đơn Hoàn tất (S7-AC1, AC4, AC5, AC6) | ✅ | Chip "Hoàn tất"; thanh 5 bước (Giữ chỗ, Chờ gọi xác nhận, Soạn hàng, Đang giao, Hoàn tất) bốn bước đầu có dấu tick, bước cuối sáng đặc, không có "Đã thanh toán"; dòng "Đã hoàn 200.000 đ · Chờ hoàn 100.000 đ" đúng; nút chính "Lập phiếu hoàn tiền"; menu "…" không có "Huỷ đơn"; đúng 1 mốc "Đã giao — đơn hoàn tất (GH-INV261007-2A18FF-36C8F)", không còn "Giao hàng thành công". Ảnh `l3_erp_detail_completed_1280.png`, `_360.png` |
+| 1b. Phần bằng 0 bị bỏ (S7-AC5 biên) | ✅ | A2 chỉ có PENDING: dòng "Chờ hoàn 50.000 đ", không có "Đã hoàn". `l3_erp_detail_pending_only.png` |
+| 2. Chuyển bù (S7-AC7, S3) | ✅ | `backfill_completed_orders --dry-run` in 1 đơn, chưa ghi. Chạy thật: "Đã chuyển 1 đơn" (BF568A). Đơn D có audit giao cũ: mốc "Giao hàng thành công (GH-…)" giữ nguyên và thêm "Hệ thống chuyển đơn sang Hoàn tất (chuyển bù)" (Hệ thống); không lẫn "Đã giao — đơn hoàn tất". Đơn B không có audit cũ: chỉ có mốc chuyển bù, đúng 1. Chạy lần 2: "Đã chuyển 0 đơn", mốc không nhân đôi. `l3_erp_detail_backfilled_1280.png` |
+| 3. Shop tra đơn (S8-AC1..AC6) | ✅ | Thật: A → 200 `status_label "Hoàn tất"`, `delivery {COMPLETED, "Đã giao"}`; C → "Đang xử lý" / "Giao chưa thành công, vựa sẽ liên hệ lại"; đúng bộ khoá như đơn khác. UI 390/360/1280px: badge "Hoàn tất", dòng "Đã giao", không mã thô (COMPLETED/PROCESSING/...), không cuộn ngang. Sai 4 số: 404 `Không tìm thấy đơn…`, UI hiện "Không tìm thấy đơn hàng phù hợp", không badge. Quá ngưỡng: tra 40 lần sai liên tiếp → từ lần 2 trả 429 (`throttled`), kể cả với 4 số đúng. Thiếu `phone_last4` → 400. `l3_shop_completed_390.png` |
+| 4. Nhật ký | ✅ | Trang Nhật ký hiện "Đơn hoàn tất", không lộ `complete_order` thô. `l3_erp_audit_1280.png` |
+| 5. Bản build thật sạch mock | ✅ | `grep -rlE "cave_erp_mock\|Anh Ph\|Anh Lâm\|Anh Kh" erp-console/out` rỗng (exit 1). Shop `out/` quét `cave_erp_mock\|DH-DEMO0`: rỗng. Màn ERP trên bản thật nhận đơn từ API (mã đơn thật SO2610…), không còn dữ liệu seed mock |
+| 6. Mock=1 | ✅ | ERP `order_completion_detail` 16/16; `order_completion_erp` 6/6; `ed_batch3_orders` 143/143; `ed_batch4_delivery` 70/70. Shop `order_lookup_completed` 4/4; `order_lookup_no_raw_codes` 19/19 |
+| 7. 360px, 1280px, ngoài đường thuận | ✅ | Chi tiết đơn Hoàn tất và đơn chuyển bù 360px không cuộn ngang; Shop 360/390/1280 không cuộn ngang. Ngoài đường thuận: dữ liệu cũ kẹt (B, D), chạy job 2 lần, phần tiền bằng 0, đơn PROCESSING có phiếu FAILED, tra sai 4 số, vượt giới hạn tần suất, phân quyền |
+
+### Theo AC
+| Mã AC | Kết quả | Bằng chứng |
+|---|---|---|
+| S7-AC1 | ✅ | Playwright, ảnh |
+| S7-AC2 | ✅ | Đơn C: chip "Đang xử lý", không nút "Lập phiếu hoàn tiền", bước không tới Hoàn tất |
+| S7-AC3 | ✅ | vitest ERP 95 file, 1070 test xanh (gồm bảng `orderStepKey`) |
+| S7-AC4 | ✅ | Manager (có `create_refund`) thấy nút; menu "…" không có "Huỷ đơn" |
+| S7-AC5 | ✅ | Hỗn hợp, chỉ PENDING |
+| S7-AC6 | ✅ | Đúng 1 mốc, kèm mã phiếu |
+| S7-AC7 | ✅ | Đơn B, D |
+| S7-AC8 | ✅ | `qa_kho` mở đơn Hoàn tất: không nút hoàn tiền; API `available_actions` rỗng |
+| S7-AC9 | ✅ | `GET /api/sales/orders/7/` khoá `timeline` với 4 vai: không SĐT, tên, địa chỉ; không `complete_order`, `delivery_note_id`, `changes` |
+| S7-AC10 | ✅ | Manager/kho/giao: không `unit_cost`, `purchase_rate`, `landed_unit_cost`, lãi lỗ; cột giá vốn trên màn hiện "(cột giới hạn quyền xem)" |
+| S8-AC1..AC6 | ✅ | Xem hàng 3 |
+| S8-AC7 | ✅ | Ẩn danh `GET /api/sales/orders/7/` → 401; ẩn danh `POST /api/delivery/notes/1/status/` → 401/403 |
+| S6 (hồi quy trên bản thật) | ✅ | Lọc "Chưa xong" loại cả 4 đơn Hoàn tất, giữ đơn C; lọc "Hoàn tất" ra 4 đơn, chip "Hoàn tất" mỗi dòng; không có "Đã thanh toán" trong lựa chọn; đơn `PAID` cũ do seed vẫn hiện chip "Đã thanh toán" (S6-AC4). S6-AC7: `qa_giao` mở `/orders/detail/` nhận "Bạn không có quyền xem mục này" |
+
+### Phân quyền (đơn Hoàn tất)
+| Hành động | owner | manager | warehouse_staff | delivery_staff | Chưa đăng nhập |
+|---|---|---|---|---|---|
+| Xem chi tiết đơn (API) | 200 | 200 | 200 | 200 (đơn mình giao) | 401 |
+| Xem chi tiết trên màn ERP | có | có | có | không (màn "Không có quyền", dùng "Việc giao của tôi") | — |
+| `available_actions` có `create_refund` | có | có | không | không | — |
+| Nút "Lập phiếu hoàn tiền" | có | có | không | không | — |
+| Đổi trạng thái phiếu giao | — | — | — | — | 401/403 |
+
+### Rò giá vốn
+Chi tiết đơn Hoàn tất (4 vai): sạch với manager, kho, giao. `refund_summary` chỉ 2 khoá tiền hoàn. Audit `complete_order`: `changes` chỉ có `status {from,to}`, `delivery_note` (mã phiếu), `delivery_note_id`, và `backfill: "W37"` với đơn chuyển bù; `note` rỗng. Không có tiền hay kg nên không tính ngược ra giá vốn được; không tên/SĐT/địa chỉ.
+
+### Rò dữ liệu cá nhân
+- Shop tra đơn: phản hồi không có tên, SĐT, địa chỉ, người giao; bộ khoá không đổi so với đơn chưa Hoàn tất (`order_code, status, status_label, total_amount, lines, delivery, booked_expires_at, cancel_notice`). Có giới hạn tần suất (429).
+- URL, `localStorage`, `sessionStorage` (Shop và ERP) không chứa SĐT, tên, địa chỉ. ERP chỉ giữ `cave_erp_token`, `cave_erp_last_user`, `cave_erp_signed_in_at`.
+- Log runserver cả phiên (312 dòng): 0 dòng chứa SĐT/tên/địa chỉ giả. Output `backfill_completed_orders` (dry-run, thật, lần 2): chỉ mã đơn.
+- Console: ERP không lỗi (bỏ qua nhiễu "Failed to fetch RSC payload" của máy chủ tĩnh `http.server`). Shop chỉ có dòng "Failed to load resource 404" của trình duyệt khi cố ý tra sai 4 số.
+- Ảnh chụp dùng dữ liệu giả; thư mục `shots/` bị `.gitignore` nên ảnh không vào repo.
+
+### Hồi quy
+`manage.py test apps.sales.orders apps.delivery apps.sales.refunds`: 689 test OK (2 skipped). ERP: `tsc --noEmit` exit 0; `npm test` 1070 test xanh. Điều phối viên đã chạy BE toàn bộ 3228 OK và build mock=0.
+
+### Ghi nhận (không chặn)
+- **N1 (Low, S6-AC1, lời văn):** ô lọc trạng thái trên `/orders/` mở ra với "Mọi trạng thái" (10 đơn gồm đơn Hoàn tất), không phải "Chưa xong" như S6-AC1 ghi "bộ lọc mặc định". Chọn "Chưa xong" thì kết quả đúng. Mã chưa đổi từ L1 (QA L1 FE đã duyệt theo nghĩa "có lựa chọn"). Đề nghị PO chốt: sửa lời văn AC hoặc đổi mặc định.
+- **N2 (dữ liệu seed, không phải lỗi L3):** đơn `DH-2609-115` do `seed_demo` có chip "Hoàn tất" nhưng giao hàng "Chờ xác nhận". Là dữ liệu mẫu cũ, không sinh từ luật hoàn tất.
+- ⏸ Không kiểm: hai lần chạy `backfill_completed_orders` đồng thời (SQLite không đua tin cậy; giữ nguyên ghi chú của QA L2).
+
+### Lỗi
+Không có lỗi chặn.
+
+### Lệnh đã chạy
+- `manage.py migrate`, `seed_demo`, `manage.py shell` (dựng đơn A, A2, B, C, D bằng service thật), `runserver 127.0.0.1:8792`.
+- `NEXT_PUBLIC_API_BASE=http://127.0.0.1:8792 NEXT_PUBLIC_USE_MOCK=0 npm run build` ở `erp-console` và `frontend`: exit 0; grep sạch mock.
+- Playwright (script trong scratchpad): ERP 3 lượt (owner, manager, kho, giao; 1280 và 360px), Shop 3 độ rộng; `urllib` cho API 4 vai.
+- `NEXT_PUBLIC_USE_MOCK=1 npm run build` cả hai; 6 kịch bản e2e mock như hàng 6.
+- `manage.py test apps.sales.orders apps.delivery apps.sales.refunds` (689 OK); `tsc --noEmit`; `npm test`.
+- Đã dọn: tắt server theo PID, xoá `out/`, `.next`, `db.sqlite3`, symlink `.env`, `staticfiles`, `node_modules`.

@@ -10,6 +10,7 @@ import {
   ORDER_STEPS,
   orderPath,
   orderStepKey,
+  refundSummaryLine,
   orderTimeline,
   timelineDocHref,
   paymentActionPlan,
@@ -58,8 +59,9 @@ describe("orderActionPlan (ED-09-AC3/AC4)", () => {
     expect(p.primary).toBeNull();
     expect(p.menu.find((m) => m.key === "cancel")?.blockedReason).toBe(BLOCKED_CANCEL_DELIVERING);
   });
-  it("COMPLETED: nút chính Lập phiếu hoàn", () => {
-    expect(plan("COMPLETED", ["create_refund"]).primary?.label).toBe("Lập phiếu hoàn");
+  it("COMPLETED: nút chính Lập phiếu hoàn tiền (S7-AC4), mục … không có Huỷ đơn", () => {
+    expect(plan("COMPLETED", ["create_refund"]).primary?.label).toBe("Lập phiếu hoàn tiền");
+    expect(plan("COMPLETED", ["create_refund"]).menu.map((m) => m.key)).not.toContain("cancel");
   });
   it("AUTO_CANCELLED: không còn Xác nhận đã nhận tiền (#15), không có mục Huỷ đơn mờ", () => {
     const p = plan("AUTO_CANCELLED", ["confirm_payment"]);
@@ -223,5 +225,15 @@ describe("confirmPaymentToast", () => {
   });
   it("chuyển thừa ghi thêm số thừa", () => {
     expect(confirmPaymentToast({ result: "PAID", duplicate: false, order_status: "PAID", overpaid_amount: "10000" }, "X").message).toContain("10.000");
+  });
+});
+
+describe("refundSummaryLine (W37 S7-AC5)", () => {
+  it("đủ hai phần, bỏ phần bằng 0, bỏ cả dòng khi 0/0 hoặc thiếu khoá", () => {
+    expect(refundSummaryLine({ refunded_amount: "200000", pending_amount: "100000" })).toBe("Đã hoàn 200.000 đ · Chờ hoàn 100.000 đ");
+    expect(refundSummaryLine({ refunded_amount: "200000", pending_amount: "0" })).toBe("Đã hoàn 200.000 đ");
+    expect(refundSummaryLine({ refunded_amount: "0", pending_amount: "100000" })).toBe("Chờ hoàn 100.000 đ");
+    expect(refundSummaryLine({ refunded_amount: "0", pending_amount: "0" })).toBeNull();
+    expect(refundSummaryLine(undefined)).toBeNull();
   });
 });

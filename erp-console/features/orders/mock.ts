@@ -62,6 +62,7 @@ import { MOCK_UNAUTHORIZED, mockRequireUser, mockUsers, mockPermsOf } from "@/fe
 import type { Me } from "@/features/auth/types";
 import { money as formatMoney } from "@/shared/lib/format";
 import { isDeliveryFinished } from "@/shared/lib/orderCompletion";
+import { drainDeliveryOutcomes, publishOrderCancelled } from "@/shared/lib/orderLink.mock";
 import type {
   ConfirmPaymentResult,
   OrderAllocation,
@@ -93,6 +94,8 @@ const PERM_VIEW_REFUND = "sales.view_refund";
 const PERM_VIEW_CUSTOMER = "sales.view_customer_list";
 const PERM_CONFIRM_REFUND = "sales.confirm_refund";
 const REFUND_MODE_KEY = "cave_erp_mock_refunds_mode";
+/** "completion" = bộ 7 đơn mẫu của S6-AC1 (1 giữ chỗ · 2 đang xử lý · 3 hoàn tất · 1 huỷ). Đặt rồi xoá khoá kho mock để gieo lại. */
+const DATASET_KEY = "cave_erp_mock_orders_dataset";
 
 /** Giao dịch trong kho mock: field nội bộ (người xác nhận tay, xử lý hàng chờ, nội dung CK) — BE chỉ trả một phần. */
 type Pay = OrderPayment & {
@@ -178,6 +181,8 @@ type Store = {
   unmatched: Pay[];
   /** S13: phiếu hoàn gắn giao dịch (không hoá đơn). */
   txnRefunds: MockRefund[];
+  /** Đã áp ít nhất một kết quả giao hàng từ mock Giao hàng (kho nối `orderLink.mock.ts`). */
+  linked?: boolean;
 };
 
 const ORDER_LABEL: Record<OrderStatus, string> = {
@@ -217,17 +222,20 @@ const CUSTOMERS: [string, string, string][] = [
 ];
 
 // Kịch bản trạng thái theo thứ tự đơn MỚI → CŨ (45 đơn). Phần tử: [trạng thái, phút trước, ghi chú kịch bản]
-type Plan = [OrderStatus, number, string?];
+// Phần tử đầu: trạng thái đơn, hoặc "DELIVERY" = đơn đã có phiếu giao — khi đó trạng thái đơn KHÔNG khai ở đây mà suy từ trạng thái
+// phiếu theo luật dùng chung BR-BH-18 (`isDeliveryFinished`), phiếu do ghi chú kịch bản quyết định (S6-AC8, không gán cứng).
+type PlanKind = OrderStatus | "DELIVERY";
+type Plan = [PlanKind, number, string?];
 const PLAN: Plan[] = [
   ["BOOKED", 10, "hoa"], // id 101 — DH mẫu của contract
   ["BOOKED", 27, "soon"], // còn ~3 phút giữ chỗ
   ["AUTO_CANCELLED", 55],
-  ["PROCESSING", 80, "giao1"],
+  ["DELIVERY", 80, "preparing"],
   ["PAID", 95],
   ["BOOKED", 18, "under"],
-  ["PROCESSING", 150, "giao2"],
-  ["PROCESSING", 200, "failed"],
-  ["COMPLETED", 260],
+  ["DELIVERY", 150, "delivering"],
+  ["DELIVERY", 200, "failed"],
+  ["DELIVERY", 260],
   ["CANCELLED", 320, "refund-pending"],
 ];
 
@@ -235,9 +243,21 @@ const PLAN: Plan[] = [
 // đơn 143 gán cho giao1 (id 4, chỉ delivery_staff), đơn 142 gán cho cs2 (id 12, customer_service + delivery_staff).
 // Đặt vào chỗ hai đơn cũ COMPLETED (42, 41) để tổng số đơn (45) và các id khác không đổi.
 const OLD_COURIER_PLANS: Record<number, Plan> = {
-  42: ["COMPLETED", 10 * 24 * 60, "old-giao1"],
-  41: ["COMPLETED", 11 * 24 * 60, "old-cs2"],
+  42: ["DELIVERY", 10 * 24 * 60, "old-giao1"],
+  41: ["DELIVERY", 11 * 24 * 60, "old-cs2"],
 };
+/** Bộ đơn mẫu S6-AC1 (mới → cũ). Hai đơn Hoàn tất đầu có phiếu giao đã xong; đơn `refunded` có phiếu hoàn Đã hoàn 200.000 + Chờ hoàn 100.000 (S7-AC5). */
+const PLAN_COMPLETION: Plan[] = [
+  ["BOOKED", 10, "sample"],
+  ["DELIVERY", 80, "delivering"], // phiếu Đang giao
+  ["DELIVERY", 140, "failed"], // phiếu Giao thất bại
+  ["DELIVERY", 200, "refunded"],
+  ["DELIVERY", 260],
+  ["DELIVERY", 320],
+  ["CANCELLED", 400],
+];
+/** Trạng thái phiếu giao theo ghi chú kịch bản; không ghi chú nào khớp thì phiếu đã giao xong. */
+const DELIVERY_BY_TAG: Record<string, string> = { preparing: "PREPARING", delivering: "DELIVERING", failed: "FAILED" };
 const OLD_COURIER_BY_TAG: Record<string, number> = { "old-giao1": 4, "old-cs2": 12 };
 /** Số ngày NV giao còn xem được dữ liệu khách của phiếu đã kết thúc (BE `DELIVERY_PII_RECENT_DAYS`, mặc định 7). */
 const PII_RECENT_DAYS = 7;
@@ -299,21 +319,29 @@ function seed(): Store {
   let delId = 20;
   let refId = 3;
   const txns: Record<string, Txn> = {};
-  for (let i = 0; i < 45; i++) {
-    const plan: Plan =
-      PLAN[i] ||
+  const sample = dataset() === "completion";
+  const count = sample ? PLAN_COMPLETION.length : 45;
+  for (let i = 0; i < count; i++) {
+    const plan: Plan = sample
+      ? PLAN_COMPLETION[i]
+      : PLAN[i] ||
       (() => {
         // Đơn cũ hơn: rải 1–20 ngày trước, chủ yếu hoàn tất, xen huỷ / tự huỷ.
-        const st: OrderStatus = i % 9 === 0 ? "AUTO_CANCELLED" : i % 11 === 0 ? "CANCELLED" : "COMPLETED";
+        const st: PlanKind = i % 9 === 0 ? "AUTO_CANCELLED" : i % 11 === 0 ? "CANCELLED" : "DELIVERY";
         return [st, 360 + (i - PLAN.length) * 610 + (i % 5) * 37];
       })();
-    const [status, minutesAgo, tag] = OLD_COURIER_PLANS[i] ?? plan;
+    const [kind, minutesAgo, tag] = (!sample && OLD_COURIER_PLANS[i]) || plan;
+    // Trạng thái phiếu quyết định trạng thái đơn (BR-BH-18), không gán cứng.
+    const deliveryStatus = kind === "DELIVERY" ? DELIVERY_BY_TAG[tag ?? ""] ?? "COMPLETED" : null;
+    const status: OrderStatus = deliveryStatus ? (isDeliveryFinished([deliveryStatus]) ? "COMPLETED" : "PROCESSING") : (kind as OrderStatus);
     const id = 101 + i;
     const createdMs = now - minutesAgo * 60_000;
     const created = isoVN(createdMs);
     const cust = tag === "hoa" ? CUSTOMERS[0] : CUSTOMERS[1 + (i % (CUSTOMERS.length - 1))];
     const lines: Line[] =
-      tag === "hoa"
+      tag === "refunded"
+        ? [{ item_code: "TOM-SU-1", item_name: "Tôm sú loại 1", qty: 2, price: 270000, discount: 0, batches: [["TOM-SU-1-260920-AB12C", 2, 180000]] }]
+        : tag === "hoa"
         ? [{ item_code: "TOM-SU-1", item_name: "Tôm sú loại 1", qty: 2, price: 270000, discount: 0, batches: [["TOM-SU-1-260920-AB12C", 2, 180000]] }]
         : makeLines(i);
     const o: Order = {
@@ -339,9 +367,9 @@ function seed(): Store {
       // Đơn Đã thanh toán cũng có hoá đơn (BR-TT: hoá đơn phát hành ngay khi đủ tiền) để có thể huỷ / hoàn theo ED-09-AC3.
       o.invoice = { id: ++invId, code: `INV${yymmdd(created)}-${hex(invId * 7, 6)}`, issued_at: isoVN(createdMs + 6 * 60_000 + 20_000) };
     }
-    if (status === "PROCESSING" || status === "COMPLETED") {
-      const assigned = tag && OLD_COURIER_BY_TAG[tag] ? OLD_COURIER_BY_TAG[tag] : tag === "giao1" ? 4 : tag === "giao2" ? 7 : tag === "failed" ? 4 : status === "COMPLETED" ? [4, 7, 3][i % 3] : null;
-      const dStatus = status === "COMPLETED" ? "COMPLETED" : tag === "giao2" ? "DELIVERING" : tag === "failed" ? "FAILED" : "PREPARING";
+    if (deliveryStatus) {
+      const assigned = tag && OLD_COURIER_BY_TAG[tag] ? OLD_COURIER_BY_TAG[tag] : tag === "preparing" ? 4 : tag === "delivering" ? 7 : tag === "failed" ? 4 : status === "COMPLETED" ? [4, 7, 3][i % 3] : null;
+      const dStatus = deliveryStatus;
       o.delivery = {
         id: ++delId,
         code: `GH-${o.invoice!.code}-${hex(delId * 13, 5)}`,
@@ -350,9 +378,26 @@ function seed(): Store {
         failed_attempts: tag === "failed" ? 1 : 0,
         ...(dStatus === "COMPLETED" ? { completed_at: isoVN(createdMs + 3 * 3600_000) } : {}),
       };
-      // S6-AC8: đơn Hoàn tất sinh theo luật dùng chung (BR-BH-18), không gán cứng.
-      o.status = isDeliveryFinished([dStatus]) ? "COMPLETED" : "PROCESSING";
       if (tag === "failed") o.needs_attention = true;
+    }
+    if (tag === "refunded") {
+      // S7-AC5: đơn Hoàn tất đã có hai phiếu hoàn — Đã hoàn 200.000 và Chờ hoàn 100.000. Chip đơn vẫn là Hoàn tất (BR-BH-20).
+      for (const [amount, done] of [[200000, true], [100000, false]] as const) {
+        o.refunds.push({
+          id: ++refId,
+          amount: money(amount),
+          status: done ? "REFUNDED" : "PENDING",
+          bank_txn_ref: done ? `HT26267${pad(refId, 4)}` : "",
+          is_partial: true,
+          reason: "Khách trả bớt hàng",
+          request_id: `seed-order-refund-${refId}`,
+          created_by: 1,
+          confirmed_by: done ? 1 : null,
+          created_at: isoVN(createdMs + 5 * 3600_000),
+          confirmed_at: done ? isoVN(createdMs + 6 * 3600_000) : null,
+          failure_reason: "",
+        });
+      }
     }
     if (status === "CANCELLED") {
       const pending = tag === "refund-pending";
@@ -453,6 +498,14 @@ function seed(): Store {
   return { seededAt: now, orders, txns, seq: 60, unmatched, txnRefunds };
 }
 
+function dataset(): "default" | "completion" {
+  try {
+    return typeof window !== "undefined" && window.localStorage.getItem(DATASET_KEY) === "completion" ? "completion" : "default";
+  } catch {
+    return "default";
+  }
+}
+
 function ss(): Storage | null {
   try {
     return typeof window === "undefined" ? null : window.sessionStorage;
@@ -462,7 +515,33 @@ function ss(): Storage | null {
 }
 
 let memory: Store | null = null;
+
+/**
+ * S6-AC8: áp kết quả giao hàng từ mock Giao hàng (kho nối `shared/lib/orderLink.mock.ts`) vào đơn cùng `id`. Trạng thái đơn lấy
+ * từ kết quả đó (BR-BH-18, đã xét mọi phiếu cùng đơn ở bên Giao hàng); đơn chưa có phiếu hoặc đã huỷ thì bỏ qua.
+ */
+function applyDeliveryOutcomes(store: Store): boolean {
+  let changed = false;
+  for (const x of drainDeliveryOutcomes()) {
+    const o = store.orders.find((n) => n.id === x.orderId);
+    if (!o?.delivery || (o.status !== "PROCESSING" && o.status !== "COMPLETED") || x.deliveryStatus === "CANCELLED") continue;
+    if (x.deliveryStatus === "FAILED" && o.delivery.status !== "FAILED") o.delivery.failed_attempts += 1;
+    if (x.deliveryStatus === "COMPLETED" && o.delivery.status !== "COMPLETED") o.delivery.completed_at = isoVN(Date.now());
+    o.delivery.status = x.deliveryStatus;
+    o.status = x.orderStatus === "COMPLETED" ? "COMPLETED" : "PROCESSING";
+    store.linked = true;
+    changed = true;
+  }
+  return changed;
+}
+
 function load(): Store {
+  const store = loadSeeded();
+  if (applyDeliveryOutcomes(store)) save(store);
+  return store;
+}
+
+function loadSeeded(): Store {
   if (memory && Date.now() - memory.seededAt < RESEED_MS) return memory;
   const raw = ss()?.getItem(STORE_KEY);
   if (raw) {
@@ -947,6 +1026,7 @@ function cancel(o: Order, body: unknown): MockResponse {
   o.cancelStockRestored = restored;
   const total = orderTotal(o);
   save(store);
+  publishOrderCancelled(o.id);
   return {
     status: 200,
     body: {
@@ -1775,5 +1855,30 @@ if (process.env.NEXT_PUBLIC_USE_MOCK === "1" && typeof window !== "undefined") {
       const me = { id: u.id, username: u.username, display_name: u.username, groups: u.groups, permissions: mockPermsOf(u) } as unknown as Me;
       return confirm(me, o, body);
     },
+  };
+}
+
+/**
+ * Lát cắt cho Tổng quan mock (S6-AC5/AC6): số đơn chưa xong (BOOKED + PAID + PROCESSING) và 8 đơn mới nhất, tính từ chính kho đơn
+ * này để khớp với bộ lọc "Chưa xong". Chỉ trả khi kho đơn đang dùng bộ mẫu `completion` hoặc đã nhận kết quả từ mock Giao hàng;
+ * ngoài hai trường hợp đó Tổng quan giữ seed riêng của nó (các e2e cũ bám seed đó).
+ */
+export function mockOrdersOverviewSlice(): {
+  pending: number;
+  recent: { code: string; amount: number; status: OrderStatus; status_label: string; expires_at: string | null }[];
+} | null {
+  if (mode() === "empty") return null;
+  const store = load();
+  if (dataset() !== "completion" && !store.linked) return null;
+  const sorted = [...store.orders].sort((a, b) => (a.created_at < b.created_at ? 1 : a.created_at > b.created_at ? -1 : b.id - a.id));
+  return {
+    pending: store.orders.filter((o) => o.status === "BOOKED" || o.status === "PAID" || o.status === "PROCESSING").length,
+    recent: sorted.slice(0, 8).map((o) => ({
+      code: o.code,
+      amount: orderTotal(o),
+      status: o.status,
+      status_label: ORDER_LABEL[o.status],
+      expires_at: o.status === "BOOKED" ? o.reserved_until : null,
+    })),
   };
 }
