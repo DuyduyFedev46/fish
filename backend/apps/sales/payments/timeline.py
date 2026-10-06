@@ -7,6 +7,7 @@ Bất biến:
 - Sửa L-4: actor AI hiện "AI của <tên>" kèm mức, không hiện "Hệ thống".
 """
 from apps.accounts.models import AuditLog
+from apps.common.ai_visibility import exclude_ai_audit_rows
 from apps.sales.models import PaymentTransaction
 from apps.sales.orders.timeline import TimelineEvent, actor_display
 from apps.common.formatting import format_vnd_ui
@@ -36,7 +37,7 @@ def build_payment_timeline(payment: PaymentTransaction) -> list[TimelineEvent]:
 
     # 2. Sự kiện từ AuditLog
     audits = (
-        AuditLog.objects.filter(model_name=PAYMENT_MODEL, object_id=str(payment.pk))
+        exclude_ai_audit_rows(AuditLog.objects.filter(model_name=PAYMENT_MODEL, object_id=str(payment.pk)))
         .select_related("actor__staff_profile", "ai_actor__staff_profile")
         .order_by("created_at", "id")
     )

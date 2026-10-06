@@ -23,6 +23,7 @@ from datetime import datetime
 from django.db.models import Q
 
 from apps.accounts.models import AuditLog
+from apps.common.ai_visibility import exclude_ai_audit_rows
 from apps.delivery.models import DeliveryNote
 from apps.inventory.models import ReturnToStock
 from apps.sales.models import Refund, SalesOrder
@@ -89,7 +90,7 @@ def _audits(order, notes, returns, refunds):
     if refunds:
         cond |= Q(model_name=REFUND_MODEL, object_id__in=[str(r.pk) for r in refunds])
     return list(
-        AuditLog.objects.filter(cond)
+        exclude_ai_audit_rows(AuditLog.objects.filter(cond))
         .select_related("actor__staff_profile", "ai_actor__staff_profile")
         .order_by("created_at", "id")
     )

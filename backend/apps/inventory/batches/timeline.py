@@ -11,6 +11,7 @@ from datetime import datetime
 from typing import Any, Optional
 
 from apps.accounts.models import AuditLog
+from apps.common.ai_visibility import exclude_ai_audit_rows
 from apps.common.cost_keys import can_view_cost
 from apps.inventory.models import Batch, StockLedgerEntry
 from apps.sales.orders.timeline import TimelineEvent, actor_display
@@ -80,7 +81,7 @@ def build_batch_timeline(batch: Batch, viewer: Optional[Any] = None) -> list[Tim
 
     # 3. Sự kiện từ AuditLog
     audits = (
-        AuditLog.objects.filter(model_name=BATCH_MODEL, object_id=str(batch.pk))
+        exclude_ai_audit_rows(AuditLog.objects.filter(model_name=BATCH_MODEL, object_id=str(batch.pk)))
         .select_related("actor__staff_profile", "ai_actor__staff_profile")
         .order_by("created_at", "id")
     )

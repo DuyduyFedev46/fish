@@ -1,6 +1,6 @@
 """B4 · ED-39-AC2..AC5 — PUT /api/staff/groups/{code}/capabilities/ và chặn leo quyền (BR-PQ-32)."""
 from django.contrib.auth.models import Group, Permission
-from django.test import TestCase
+from django.test import TestCase, override_settings
 
 from apps.accounts import roles
 from apps.accounts.capabilities import registry
@@ -129,6 +129,7 @@ class SetCapabilitiesTests(TestCase):
         self.assertIsNone(rows[roles.WAREHOUSE_STAFF]["last_changed_by"])
 
 
+@override_settings(AI_ENABLED=True)  # các ca này kiểm ma trận ĐỦ việc; nhánh tắt ở test_ai_hidden
 class PrivilegeEscalationTests(TestCase):
     def setUp(self):
         self.owner = make_staff("owner1", roles.OWNER)

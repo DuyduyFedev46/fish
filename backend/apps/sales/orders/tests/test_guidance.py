@@ -205,6 +205,7 @@ class GuidanceOrderTest(OrderApiBase):
         self.assertIn("refund", related_types)
 
     # --- DW-03-AC4 (L-4) -----------------------------------------------------
+    @override_settings(AI_ENABLED=True)  # AI tắt thì dòng AI bị ẩn (lô dọn chữ AI)
     def test_dw03_ac4_ai_actor_timeline_l4(self):
         """AuditLog có actor_kind=ai -> hiện 'AI của <tên>' kèm mức, không hiện 'Hệ thống'; config_version tuân thủ quyền."""
         order = self._create_order()

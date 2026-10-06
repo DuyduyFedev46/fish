@@ -23,6 +23,7 @@ from django.conf import settings
 from django.http import Http404
 from rest_framework.exceptions import PermissionDenied
 
+from apps.common.ai_visibility import exclude_ai_audit_rows
 from apps.common.guidance.timeline import format_guidance_timeline
 
 SYSTEM = "Hệ thống"
@@ -162,7 +163,7 @@ def make_audit_timeline_provider(
 
         limit = timeline_max_rows()
         newest_first = (
-            AuditLog.objects.filter(model_name=model._meta.label, object_id=str(obj.pk))
+            exclude_ai_audit_rows(AuditLog.objects.filter(model_name=model._meta.label, object_id=str(obj.pk)))  # lọc trước khi cắt limit
             .exclude(action__in=exclude_actions)
             .select_related("actor__staff_profile", "ai_actor__staff_profile")
             .order_by("-created_at", "-id")[: limit + 1]  # lấy dư 1 dòng để biết có bị cắt không

@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from datetime import datetime
 
 from apps.accounts.models import AuditLog
+from apps.common.ai_visibility import exclude_ai_audit_rows
 from apps.sales.models import Refund
 from apps.sales.orders.timeline import TimelineEvent, actor_display
 from apps.common.formatting import format_vnd_ui
@@ -38,7 +39,7 @@ def build_refund_timeline(refund: Refund) -> list[TimelineEvent]:
 
     # 2. Sự kiện từ AuditLog
     audits = (
-        AuditLog.objects.filter(model_name=REFUND_MODEL, object_id=str(refund.pk))
+        exclude_ai_audit_rows(AuditLog.objects.filter(model_name=REFUND_MODEL, object_id=str(refund.pk)))
         .select_related("actor__staff_profile", "ai_actor__staff_profile")
         .order_by("created_at", "id")
     )

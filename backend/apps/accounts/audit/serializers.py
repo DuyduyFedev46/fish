@@ -8,9 +8,7 @@ Lọc bỏ các khoá giá vốn trong `changes` nếu user không có quyền x
 """
 import re
 
-from django.conf import settings
-from django.db.models import Q
-
+from apps.common.ai_visibility import exclude_ai_audit_rows
 from apps.common.audit import NOTE_PRESENT_LABEL, NOTE_PRESENT_NEUTRAL_LABEL
 from apps.common.cost_keys import redact_cost
 
@@ -55,16 +53,7 @@ def safe_note(action, note):
     return NOTE_PRESENT_NEUTRAL_LABEL
 
 
-def exclude_ai_rows(qs):
-    """
-    Khi AI tắt (`AI_ENABLED=False`) ẩn các dòng DO AI làm: `actor_kind="ai"` và dòng Hệ thống thuộc vòng đời
-    đề xuất AI (`actor_kind="system"` có `proposal_ref`). GIỮ dòng do người làm: duyệt/từ chối đề xuất,
-    dòng nghiệp vụ do người duyệt thực thi (tự gắn `proposal_ref`), và `ai_config_*`/`ai_policy_*` do Chủ đổi
-    (kiểm toán BR-PQ-04/05).
-    """
-    if getattr(settings, "AI_ENABLED", False):
-        return qs
-    return qs.exclude(Q(actor_kind="ai") | (Q(actor_kind="system") & ~Q(proposal_ref="")))
+exclude_ai_rows = exclude_ai_audit_rows  # giữ tên cũ (TL-D3-L4); thân hàm ở apps/common/ai_visibility
 
 
 def audit_item(row, *, can_view_cost: bool = True) -> dict:
