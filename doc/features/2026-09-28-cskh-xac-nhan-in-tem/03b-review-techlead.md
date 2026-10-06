@@ -126,3 +126,39 @@ phiếu được giao cho chính họ. Vì vậy FE phải chặn trang `/print/
 1. `be-dev` sửa M1, L1, L2 (L3, L4 nên làm cùng), thêm test như cột "Cách sửa".
 2. Điều phối viên chạy lại toàn bộ suite có symlink `staticfiles`, `makemigrations --check`, `check_naming.py`.
 3. Techlead review lại phần diff sửa. Nếu đạt thì đổi kết luận thành APPROVED.
+
+## Re-review sau 09672be (06/10)
+
+- **Phạm vi:** `git show 09672be`, gồm 8 file code/test và 3 file doc. Soát từng mục M1, L1–L4, N1, N2 của bản review trên.
+
+### Kết luận: **APPROVED**
+
+Tất cả lỗi đã sửa đúng cách đề ra, có test đi kèm. Không phát sinh lỗi mới về dữ liệu cá nhân, giá vốn, phân quyền hay migration.
+
+### Lệnh kiểm chứng techlead tự chạy (worktree `cskh-lo5`, `DJANGO_DEBUG=1`, symlink tạm `backend/staticfiles`, đã gỡ sau khi chạy)
+
+| Lệnh | Kết quả |
+|---|---|
+| `manage.py makemigrations --check --dry-run` | No changes detected |
+| `manage.py test` (toàn bộ) | **Ran 2887, OK** (thêm 4 test so với `ccb0f10`) |
+| `python3 scripts/check_naming.py` | OK, không phát sinh vi phạm mới |
+
+### Soát từng mục
+
+| # | Kết quả | Căn cứ |
+|---|---|---|
+| M1 | Đạt | `apps/ai/policy/rules.py:20` thêm `"/api/delivery/notes/lookup/"` vào `FORBIDDEN_PREFIXES`, có comment lý do. Snapshot đã gỡ dòng `delivery.deliverynote.lookup`. Test `test_cs17_lookup_label_forbidden_for_ai` (`test_discovery.py`) kiểm cả `is_url_forbidden` lẫn registry. `test_discipline.py` vẫn đếm 30 action. |
+| L1 | Đạt | `delivery/api.py:216-221` kiểm `print_label` rồi đến `view_deliverynote` (403), sau đó gọi `lookup_label(..., queryset=self.get_queryset())`. Như vậy lookup đi qua phạm vi Tầng 3 giống action `label`. Test `test_cs17_l1_out_of_scope_note_404_and_needs_view_perm` kiểm 3 trường hợp: NV giao có thêm `print_label` tra phiếu không phải của mình (404), tra phiếu được giao cho mình (200), có `print_label` nhưng thiếu `view_deliverynote` (403). |
+| L2 | Đạt | `_body_dict` (`scripts_api.py:29-35`) nhận JSON object hoặc QueryDict. Mảng hay chuỗi trả 400 `INVALID_INPUT`. Body rỗng hoặc `null` được coi là `{}`, rồi service trả 400 vì thiếu dữ liệu. Test `test_cs18_l2_non_object_body_400` cover cả POST lẫn PATCH. |
+| L3 | Đạt | `create` nằm trong `transaction.atomic()` lồng (savepoint) bên trong service atomic. Khi gặp `IntegrityError`, savepoint rollback rồi ném `BusinessError` 400, nên giao dịch ngoài không bị hỏng và không ghi AuditLog. Test giả lập `IntegrityError` bằng mock. |
+| L4 | Đạt | `lookup_label` và `LABEL_CODE_RE` đã chuyển sang `delivery/labels/services.py:207-236`. `call_scripts.py` không còn import `re`/`LabelPrint`, không để lại code chết. Phần trả về giữ nguyên 5 khoá, không có dữ liệu cá nhân hay giá. |
+| N1 | Đạt | `order.lines.exclude(bundle_snapshot={}).exists()` đúng, vì `SalesOrderLine.bundle_snapshot` là `JSONField(default=dict)` không null, và hàng thường được ghi `{}` (`sales/orders/services.py:241`). |
+| N2 | Đạt | Đã bỏ `setUp` rỗng. |
+
+Phần doc: 02b §4.6 đã thêm dòng RETURNING. `03-dev-notes.md` §6 và §8 ghi đúng những gì đã sửa. Contract FE không đổi, chỉ thêm
+400 `INVALID_INPUT` khi body không phải object.
+
+### Còn mở (không chặn, chuyển lô FE)
+
+- CS-16-AC4: trang `/print/pick-sheet/` phải chặn theo quyền `delivery.print_label` hoặc `pack_deliverynote` (xem ghi chú lô FE ở trên).
+- Trường hợp biên RETURNING khi khách mới đặt hai đơn gần nhau: giữ như hiện tại trừ khi Duy muốn siết.
