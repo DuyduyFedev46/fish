@@ -101,22 +101,4 @@ STATE_ON = "on"
 STATE_OFF = "off"
 STATE_PARTIAL = "partial"
 
-# Phạm vi dữ liệu (Tầng 3, W3i) — CHỈ ĐỌC. `orders`, `deliveries`: bảng cố định theo `scope_orders_for`,
-# `DeliveryNoteViewSet.get_queryset` (theo nhóm, không đổi khi bật/tắt việc); đổi code Tầng 3 thì sửa bảng này.
-# `customers`: TÍNH ĐỘNG (M2, bất biến 9) — nhóm có `sales.view_customer_list` thì xem được MỌI khách ("Tất cả khách",
-# `can_view_customer_directory` không có phạm vi dòng); nếu không, lấy giá trị bảng này: NV giao chỉ thấy khách của
-# phiếu được gán, nhóm khác "Không xem".
-CUSTOMER_DIRECTORY_PERM = "sales.view_customer_list"
-SCOPE_ALL = "Tất cả"
-SCOPE_ALL_CUSTOMERS = "Tất cả khách"
-SCOPE_ASSIGNED = "Được gán"
-SCOPE_CALL_RANGE = "Trong phạm vi gọi"
-SCOPE_NONE = "Không xem"
-
-GROUP_SCOPES = {
-    roles.OWNER: {"orders": SCOPE_ALL, "deliveries": SCOPE_ALL, "customers": SCOPE_NONE},
-    roles.MANAGER: {"orders": SCOPE_ALL, "deliveries": SCOPE_ALL, "customers": SCOPE_NONE},
-    roles.WAREHOUSE_STAFF: {"orders": SCOPE_ALL, "deliveries": SCOPE_ALL, "customers": SCOPE_NONE},
-    roles.DELIVERY_STAFF: {"orders": SCOPE_ASSIGNED, "deliveries": SCOPE_ASSIGNED, "customers": SCOPE_ASSIGNED},
-    roles.CUSTOMER_SERVICE: {"orders": SCOPE_CALL_RANGE, "deliveries": SCOPE_CALL_RANGE, "customers": SCOPE_NONE},
-}
+# Phạm vi dữ liệu (Tầng 3) KHÔNG còn ở đây: xem `apps/accounts/data_scopes/catalog.py` (PV-02, thay bảng phạm vi cố định cũ).
