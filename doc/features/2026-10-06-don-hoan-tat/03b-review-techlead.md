@@ -263,3 +263,29 @@ Build trong bản sao ở thư mục scratchpad (`rsync` mã nguồn, mượn `n
   "Lập phiếu hoàn". Để lô áp tên chuẩn thống nhất một nhãn.
 - **L2** `features/overview/mock.ts` import `@/features/orders/mock` (mock gọi chéo, có tiền lệ). Sau khi sửa M1, kiểm cùng lúc
   rằng chuỗi seed của orders mock vẫn không có trong `out/`.
+
+### Re-review sau f79f622 (08/10)
+
+**Kết luận: APPROVED.** M1 đã đóng. Kết luận của toàn mục "Review L3 FE" nay là APPROVED, còn 2 điểm Low đã ghi ở trên (không chặn).
+
+**Soát `git show f79f622`:**
+- `features/deliveries/mock.ts`: seed chuyển thành `buildSeed()`, dựng lười qua `mockDeliveryNotes()`. Không còn code nào chạy ở
+  cấp module. Mọi chỗ đọc `MOCK_DELIVERY_NOTES` đã đổi sang `mockDeliveryNotes()` và cùng trỏ một mảng, nên các thao tác vẫn đổi
+  tại chỗ như cũ.
+- `features/deliveries/api.ts`: bỏ import tĩnh. `mockApi()` chỉ `require("./mock")` khi `NEXT_PUBLIC_USE_MOCK === "1"`, và chỉ
+  được gọi trong nhánh `isMock`. Bản build thật bỏ được cả nhánh này. Hàm, route và contract không đổi.
+- `scripts/check-no-mock.mjs`: quét thêm `*.mock.ts`, thêm 4 loại chuỗi seed (khoá `cave_erp_mock_*`, tên người giả, SĐT giả 10
+  số, mã mẫu viết hoa có số, trừ `BR-`). Số chuỗi tăng từ 43 lên 232.
+- Test chỉ đổi cách lấy kho (`mockDeliveryNotes()`), không nới assert nào. Ca "còn phiếu khác" đã có `try/finally` (đóng Low L5 của L1).
+- Comment ở `deliveries/mock.ts` đã sửa cho đúng.
+
+**Lệnh Tech Lead tự chạy** (bản sao trong scratchpad lấy bằng `git archive f79f622`, mượn `node_modules` của checkout chính):
+- `NEXT_PUBLIC_USE_MOCK=0 npm run build`: xanh.
+- `grep -rlE "cave_erp_mock|Anh Ph|Anh Lâm|Anh L\xe2m|Anh Kh|TOM-SU-1|DH-260928|0900000" out`: **rỗng**.
+- `check-no-mock.mjs` trên bản build mới: XANH (30 file mock, 232 chuỗi, 254 file build).
+- Chạy `check-no-mock.mjs` **mới** trên bản build **cũ** của eef6e1b: **ĐỎ**, bắt đúng 2 chỗ lọt là "Anh Khoa" (tên giả của
+  deliveries mock) và `cave_erp_mock_order_link`. Gate nay có tác dụng thật.
+- Không chạy lại vitest hay e2e. Dùng số fe-dev báo (vitest 1070, e2e xanh). Điều phối viên nên chạy lại vitest trên nhánh trước
+  khi commit gộp.
+
+Ghi chú: `features/returns/mock.ts` import `deliveries/mock`. Đây là mock gọi mock nên vô hại, và bản build mới đã sạch.
