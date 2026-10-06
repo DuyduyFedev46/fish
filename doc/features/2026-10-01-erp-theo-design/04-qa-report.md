@@ -3288,3 +3288,80 @@ AuditLog `changes`/`note` và dòng thời gian nhóm sau khi đổi ma trận �
 - BE thật (Django 8641, ERP 3641): `s41_s47_real` (bản sao đổi bộ chọn) 40/40; script QA `q14_ui.py` 23/23, `q14_ui2_e.py` 37/37, `q14_ui2_fg.py` 13/13, `q14_ui3.py` 20/20; `q14_api.py` 67/68, `q14_api2.py` 40/40. Script nằm ở scratchpad.
 - `manage.py test apps.accounts apps.inventory.returns` 418 OK.
 - Ảnh: `doc/features/2026-10-01-erp-theo-design/shots/lo14/lo14-real-*.png` (cạnh các bảng design `board-W3e/W3g/W3h/W3i/F3a–F3f`). Chỉ dừng tiến trình ở cổng 8641, 3641, 3643. Không sửa mã sản phẩm, không commit.
+
+## QA rà soát nhóm C/D/E (06/10)
+
+Bản kiểm: HEAD 35ad90e (đã gộp main). Build `NEXT_PUBLIC_USE_MOCK=1`, cờ AI mặc định tắt, phục vụ tĩnh cổng 3201 (đã tắt, `out/` đã xoá). Dữ liệu là mock giả. Ảnh nằm ở `shots/cde-qa/` (thư mục bị .gitignore, chỉ có trong worktree): `board-*.png` cạnh `app-*-1280.png` / `app-*-360.png`, ca ngoài đường thuận `app-edge-*`, hồi quy A/B `ab-*`.
+
+### Kết luận: REJECTED — 1 lỗi Medium (B1, chỉ ở màn hẹp khi bàn phím mở). Mọi lệch nhóm C/D/E ở desktop đã sửa đúng board; không lỗi Critical/High.
+Tổng: 41 ca · ✅ 36 · ❌ 1 (Medium) · ⏸ 4 · ghi nhận Thấp 4. Nếu Duy coi mobile ERP chưa duyệt (UI-RULES) nên B1 không chặn thì có thể chuyển thành APPROVED kèm nợ B1.
+
+### Lệnh đã chạy (lượt này)
+| Lệnh | Kết quả |
+|---|---|
+| `NEXT_PUBLIC_USE_MOCK=1 npm run build` | xanh |
+| `e2e/ed_batch4_delivery.py` (dev chưa chạy) | **70/70** |
+| `e2e/s48_password.py` | **41/41** (nút mắt 44px đạt) |
+| `e2e/ed_batch5_confirmation.py` | 126/127, đỏ: `ai_block` (giao diện AI, cờ tắt) |
+| `e2e/ed_batch7_inventory.py` | 113/114, đỏ: "AI bật: khối Trợ lý" (cờ tắt) |
+| `ed_batch3_orders` 143/143 · `ed_batch6_customers` 79/79 · `ed_batch10_purchasing` 115/115 · `ed_batch13_catalog` 128/128 · `ed_batch14_permissions` 101/101 | xanh |
+| `ed_batch1_shell` 54/56 | 2 đỏ là menu AI (ED-01 menu loc, menu avatar thiếu "AI của tôi"), do cờ AI tắt |
+| `ed_batch2_patterns` 46 đạt, dừng ở `ai_block` | ⏸ phần sau `ai_block` chưa chạy trên bản cờ tắt |
+Đỏ AI là đã biết (SR-HIDE-AI-01/02), không tính lỗi. Console: 0 lỗi ở mọi phiên chụp.
+
+### Chấm từng lệch nhóm C/D/E trong 04b (bằng ảnh chạy thật cạnh board)
+| Lệch (04b) | Kết quả | Bằng chứng |
+|---|---|---|
+| C: không có thẻ chia khối | ✅ đã sửa | `app-F1k-catalog-new-1280`, `app-F1m-rule-new-1280`, `app-F1a-purchasing-new-1280`, `app-F1f-stocktake-new-1280` đều có thẻ đầu 44px ("Thông tin", "Phiếu nhập", "Mặt hàng"…) |
+| C: ô nhập 46px thay 36px | ✅ | đo trong trình duyệt: 36px ở 1280, 44px ở 360 (đúng `--control-h`) |
+| C: checkbox/select thay switch/radio | ✅ | switch ở "Quản lý theo lô / Có hạn dùng / Đang bán / Đang bật", radio ở "Áp dụng cho", "Kiểu giảm", "Loại" (F1b). Vẫn là input native, đúng ghi chú dev |
+| C: thanh hành động không dính đáy | ✅ (1280, 360 cao 780) | thanh nút nằm sát đáy, trên thanh điều hướng ở 360. Xem B1 cho viewport thấp |
+| C: F1d Nhập lô (wizard) | ⏸ chưa sửa có chủ ý | luồng một form dài, board chia bước. Dev ghi "chỉ ghi nhận". Cần PO quyết, không phải lỗi |
+| D: popup rộng ~520px, board 560/640 | ✅ | đo: F1b 520, F1o/F1l/F2a/F3h 560, F3a 640, F3m 480; board F1b cũng 520 |
+| D: căn giữa dọc, board neo trên | ✅ | `y=111.8` ở mọi popup 1280; ở 360 trượt từ đáy (bottom sheet) |
+| D: ô nhập 46px | ✅ | F2a: 36/36 ở 1280, 44/44 ở 360 |
+| D: khối tóm tắt nền xám, board thẻ viền | ✅ | `app-F2a-1280` (khối Đơn / Tổng đơn là thẻ có viền); chân hộp nền canvas |
+| D: select/checkbox thay radio/switch | ✅ | `app-F1b-1280` (radio Loại, switch Đang hợp tác) |
+| D: F3a "thiếu ô mật khẩu mới" | ✅ báo nhầm, đồng ý với dev | ô "Mật khẩu tạm" + "Nhập lại mật khẩu tạm" có trong `app-F3a` (nhưng xem L3 dưới) |
+| D: F1l ngày và giờ xếp dọc | ✅ ở 1280 (cùng hàng "Áp dụng từ / đến"); 360 xếp dọc theo thiết kế hẹp | `app-F1l-1280`, `app-F1l-360` |
+| E: nền #F3F4F6, thẻ đổ bóng, padding lớn | ✅ | `app-W4f-login-1280` nền sáng, thẻ chỉ viền, so `board-W4f` |
+| E: W4h nút Đăng xuất full width | ✅ | `app-W4h-no-role-1280` nút nhỏ canh phải như board |
+| E: W4g Đặt mật khẩu | ✅ | `app-W4g-set-password-loi-1280` cùng khung với board W4g |
+
+### Ca ngoài đường thuận
+| Ca | Kết quả | Bằng chứng |
+|---|---|---|
+| Validate rỗng (Thêm mặt hàng) | ✅ | 3 ô đỏ + chữ "Nhập mã hàng." v.v. (`app-edge-F1k-validate-1280`). Tiêu điểm vẫn ở nút Lưu, không nhảy tới ô lỗi đầu tiên (L1) |
+| Lỗi máy chủ (mã hàng trùng) | ✅ | biểu ngữ "Dữ liệu gửi lên chưa hợp lệ." + chữ ở ô mã; nút đổi "Thử lại"; không đè nút Lưu (đo hộp: không chồng lấn) |
+| Validate rỗng trong popup (Thêm nhà cung cấp) | ✅ | popup còn mở, ô Tên đỏ + "Nhập tên nhà cung cấp." |
+| Esc đóng popup | ✅ 12/12 | 6 popup × 2 cỡ màn đều `dialog` về 0, kể cả sau khi đã gõ chữ; tiêu điểm trả về nút mở |
+| Tab bị nhốt trong popup | ✅ | 14 lần Tab, tiêu điểm luôn trong `[role=dialog]` |
+| Bấm nền đóng popup | ✅ | đóng cả khi đã gõ dở, không hỏi lại (L2) |
+| Đăng nhập sai mật khẩu | ✅ | hộp đỏ "Sai tài khoản/mật khẩu hoặc tài khoản đã ngừng hoạt động.", ô tài khoản giữ chữ, không đổi URL, ở 1280 và 360 |
+| Đăng nhập để trống | ✅ | "Nhập tên tài khoản của bạn." |
+| Đặt mật khẩu: nhập lại thiếu | ✅ | "Nhập lại mật khẩu mới để kiểm tra." + checklist đổi màu |
+| Tài khoản chưa nhóm (admin) | ✅ | vào `/no-role/` |
+| **Bàn phím mở: viewport 360x420** | ❌ B1 | xem dưới |
+| Cuộn ngang ở 360 | ✅ | 9 màn form/danh sách/chi tiết: không màn nào cuộn ngang trang |
+| Dữ liệu cá nhân ở storage/URL | ✅ (qua e2e) | ed_batch4_delivery, ed_batch14 có ca "không có dữ liệu cá nhân trong localStorage/URL", đạt |
+
+### Hồi quy nhóm A/B (globals.css gộp)
+✅ Danh sách Đơn, Khách hàng, Kho & lô, Mua hàng, Nhân sự và chi tiết Đơn, Khách hàng, Lô, Nhân sự ở 1280 và 360: đầu thẻ 44px, bảng cuộn trong thẻ, thẻ "Thông tin đơn" chia THANH TOÁN / GIAO HÀNG, StatusPath, dòng thời gian không vỡ; 0 cuộn ngang, 0 lỗi console (`ab-list-*`, `ab-detail-*`). Cộng e2e batch3/6/10/13/14 xanh. Lệch có sẵn: StatusPath ở 360 xuống dòng giữa chữ (nhóm B đã ghi).
+
+### Lỗi
+#### B1 — Ô nhập bị thanh nút dính đáy che khi viewport thấp (bàn phím mở) · Medium · AC nhóm C
+Bước tái hiện: mock build, đăng nhập `loc`, viewport 360x420 (mô phỏng bàn phím điện thoại mở), mở `/catalog/new/` (cũng `/catalog/rules/new/`, `/purchasing/new/`), bấm Tab qua các ô hoặc focus ô "Mô tả" rồi gõ.
+Mong đợi: ô đang gõ nằm trên thanh nút.
+Thực tế: ô "Mô tả" ở y 327–394, thanh nút bắt đầu y 295, thanh điều hướng đáy tiếp ngay dưới → ô bị che hoàn toàn, người dùng gõ mà không thấy (`app-edge-F1k-keyboard-focus-hidden-360x420.png`). Ở viewport 780 không xảy ra. Bằng chứng tự động: `/catalog/new/` 3 ô, `/catalog/rules/new/` 7 lần Tab, `/purchasing/new/` 5 lần Tab có đáy ô lớn hơn đỉnh thanh nút. Gợi ý (cho FE): `scroll-padding-bottom` ≥ chiều cao thanh nút + thanh điều hướng cho vùng cuộn của `FormPage`, hoặc `scrollIntoView({block:"center"})` khi focus. Chưa đối chiếu với trước khi sửa nhóm C nên chưa biết có phải hồi quy.
+Ảnh hưởng: nhập liệu trên điện thoại khó dùng. Phạm vi ERP mobile chưa được duyệt theo UI-RULES nên có thể hạ ưu tiên.
+
+### Ghi nhận Thấp (không chặn)
+- L1: sau khi bấm Lưu mà form báo lỗi, tiêu điểm không nhảy tới ô lỗi đầu tiên (a11y). Cũng sau đăng nhập sai tiêu điểm về `body`.
+- L2: Esc hoặc bấm nền đóng popup khi đã gõ dở không hỏi lại, mất chữ đã nhập.
+- L3: F3a vẫn khác board ở đoạn dẫn "Chữ, số và @ . + - _" phía trên, nhãn "NHÓM QUYỀN" HOA nhỏ; thẻ chọn nhóm nhiều dòng mô tả hơn board (board là hộp kiểm một dòng). Bản 1280 có nội dung dài, cuộn trong popup (chân nút vẫn thấy).
+- L4: biểu ngữ lỗi ở FormPage rộng toàn trang (1256px) trong khi thẻ form 960px (`app-edge-F1k-duplicate-1280`). Placeholder "vd: tam.kho" của board W4f không có trong app. F1a: app dùng thẻ từng mặt hàng, board dùng bảng một dòng kèm hàng "Tổng" (luồng khác như F1d).
+
+### Chưa kiểm (⏸)
+- F1c, F1e, F1g–F1i, F1n, F1o(chụp popup nhưng chưa so từng chi tiết), F2b–F2g, F2i–F2o, F3b–F3f, F3m–F3l: chỉ chụp F1b, F1k, F1l, F1m, F1a, F1c(trang), F1f, F2a, F3a, F3h, F3m, F1o ở app. Phần còn lại cùng component `Modal`/`Field` nên dự đoán đúng, nhưng chưa có ảnh nên ghi ⏸.
+- `ed_batch2_patterns` sau `ai_block`; các bản `*_real` (cần BE thật); đổi mật khẩu của W4e (ngăn kéo).
+- Không đối chiếu hành vi trước/sau khi sửa nhóm C cho B1.
