@@ -100,7 +100,7 @@ class CskhL1Tests(TestCase):
     # =========================================================================
 
     def test_cs01_ac1_group_cskh_permissions_and_idempotent_migration(self):
-        """CS-01-AC1: Group cskh có đủ 4 quyền; các group khác có quyền tương ứng."""
+        """CS-01-AC1: Group cskh có đủ 5 quyền (4 + view_callscript); các group khác có quyền tương ứng."""
         cskh_group = Group.objects.get(name=roles.CUSTOMER_SERVICE)
         perm_codes = set(cskh_group.permissions.values_list("codename", flat=True))
         expected_cskh = {
@@ -108,6 +108,7 @@ class CskhL1Tests(TestCase):
             "view_salesorderline",
             "confirm_with_customer",
             "change_recipient",
+            "view_callscript",  # Lô 5 (CS-18): CSKH chỉ đọc kịch bản gọi, cấp bởi delivery/0009
         }
         self.assertEqual(perm_codes, expected_cskh)
 

@@ -19,7 +19,7 @@
 .pick {
   display: flex; align-items: center; gap: var(--space-3);
   min-height: var(--tap); padding: var(--space-2-5) var(--space-3);
-  border: 1px solid var(--border-input); border-radius: var(--radius-md);
+  border: 1px solid var(--border); border-radius: var(--radius-md);
   background: var(--surface); cursor: pointer;
   transition: border-color var(--dur-fast) ease, background-color var(--dur-fast) ease;
 }
@@ -27,7 +27,10 @@
 .pickOn { border-color: var(--accent); background: var(--accent-soft); }
 .pickDanger.pickOn { border-color: var(--crit); background: var(--crit-soft); }
 .pick:focus-within { box-shadow: 0 0 0 1px var(--focus), 0 0 0 4px var(--accent-soft); }
-.pickInput { width: 18px; height: 18px; margin: 0; flex: none; accent-color: var(--accent); }
+/* Nút radio vẽ như board F2h: 16px, viền 1.5px; chọn = viền dày 5px màu nhấn. Vẫn là <input type=radio> thật. */
+.pickInput { appearance: none; -webkit-appearance: none; width: 16px; height: 16px; margin: 0; flex: none; box-sizing: border-box; border: 1.5px solid var(--border-input); border-radius: 8px; background: var(--surface); }
+.pickInput:checked { border: 5px solid var(--accent); }
+.pickDanger .pickInput:checked { border-color: var(--crit); }
 .pickBody { display: flex; flex-direction: column; gap: var(--space-0-5); min-width: 0; flex: 1; }
 .pickName { font-weight: var(--weight-semibold); color: var(--ink); overflow-wrap: anywhere; }
 .form { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }

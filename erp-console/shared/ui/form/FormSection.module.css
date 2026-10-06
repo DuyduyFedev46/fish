@@ -1,0 +1,11 @@
+/* Thẻ chia khối của trang form — chỉ dùng token. Số đo theo board F1k: bo 10px, lề 20px, khoảng giữa 18px. */
+.section { display: flex; flex-direction: column; gap: 18px; min-width: 0; padding: var(--space-4); background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); }
+.head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
+.title { margin: 0; font-size: var(--text-base); font-weight: var(--weight-semibold); color: var(--ink); }
+.grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-4); }
+.span { grid-column: 1 / -1; min-width: 0; }
+@media (min-width: 640px) {
+  .section { padding: var(--space-5); }
+  .cols2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .cols3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}

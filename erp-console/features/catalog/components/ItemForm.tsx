@@ -10,9 +10,11 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { useRef, useState } from "react";
 import { useAuth } from "@/features/auth/components/AuthProvider";
+import { Switch } from "@/shared/ui/form/Choice";
 import { Field } from "@/shared/ui/form/Field";
 import { FormAlert } from "@/shared/ui/form/FormAlert";
 import { FormPage } from "@/shared/ui/form/FormPage";
+import { FormGrid, FormSection } from "@/shared/ui/form/FormSection";
 import { useSubmit } from "@/shared/ui/form/useSubmit";
 import { Icon } from "@/shared/ui/Icon";
 import { useToast } from "@/shared/ui/overlay/Toast";
@@ -153,98 +155,79 @@ function ItemFormBody({ type }: { type: "SIMPLE" | "BUNDLE" }) {
       primaryDisabled={optionsFailed || loadingOptions}
       secondary={{ label: M.cancel, onClick: () => router.push("/catalog/") }}
     >
-      <div className={s.formBody}>
-        <div className={s.formGroup}>
-          <h3 className={s.formHead}>{M.itemSectionInfo}</h3>
-          <div className={s.formRow}>
-            <Field label={M.fieldItemCode} required name="code" value={draft.code} onChange={set("code")} maxLength={ITEM_LIMITS.code} error={errs.code ?? sub.fieldErrors.code} disabled={locked} autoFocus />
-            <Field label={M.fieldItemName} required name="name" value={draft.name} onChange={set("name")} maxLength={ITEM_LIMITS.name} error={errs.name ?? sub.fieldErrors.name} disabled={locked} />
-          </div>
-          <div className={s.formRow}>
-            <Field
-              as="select"
-              label={M.fieldItemGroup}
-              required
-              name="item_group"
-              value={draft.itemGroup}
-              onChange={set("itemGroup")}
-              options={[{ value: "", label: groups.status === "loading" ? M.loadingMore : M.groupPlaceholder }, ...groups.rows.map((g) => ({ value: String(g.id), label: g.name }))]}
-              error={errs.itemGroup ?? sub.fieldErrors.item_group}
-              disabled={locked}
-            />
-            <Field label={M.fieldItemShelfLife} type="number" unit="ngày" required name="shelf_life_in_days" value={draft.shelfLife} onChange={set("shelfLife")} error={errs.shelfLife ?? sub.fieldErrors.shelf_life_in_days} disabled={locked} />
-          </div>
-          <Field as="textarea" label={M.fieldItemDescription} name="description" value={draft.description} onChange={set("description")} rows={3} maxLength={ITEM_LIMITS.description} counter error={errs.description ?? sub.fieldErrors.description} disabled={locked} />
+      <FormSection title={M.itemSectionInfo}>
+        <FormGrid>
+          <Field label={M.fieldItemCode} required name="code" value={draft.code} onChange={set("code")} maxLength={ITEM_LIMITS.code} error={errs.code ?? sub.fieldErrors.code} disabled={locked} autoFocus />
+          <Field label={M.fieldItemName} required name="name" value={draft.name} onChange={set("name")} maxLength={ITEM_LIMITS.name} error={errs.name ?? sub.fieldErrors.name} disabled={locked} />
+          <Field
+            as="select"
+            label={M.fieldItemGroup}
+            required
+            name="item_group"
+            value={draft.itemGroup}
+            onChange={set("itemGroup")}
+            options={[{ value: "", label: groups.status === "loading" ? M.loadingMore : M.groupPlaceholder }, ...groups.rows.map((g) => ({ value: String(g.id), label: g.name }))]}
+            error={errs.itemGroup ?? sub.fieldErrors.item_group}
+            disabled={locked}
+          />
+          <Field label={M.fieldItemShelfLife} type="number" unit="ngày" required name="shelf_life_in_days" value={draft.shelfLife} onChange={set("shelfLife")} error={errs.shelfLife ?? sub.fieldErrors.shelf_life_in_days} disabled={locked} />
+        </FormGrid>
+        <FormGrid cols={3}>
           {!isBundle && (
             <>
-              <label className="check-row">
-                <input type="checkbox" checked={draft.hasBatch} onChange={(e) => set("hasBatch")(e.target.checked)} disabled={locked} />
-                <span>
-                  <b>{M.fieldItemBatch}</b>
-                </span>
-              </label>
-              <label className="check-row">
-                <input type="checkbox" checked={draft.hasExpiry} onChange={(e) => set("hasExpiry")(e.target.checked)} disabled={locked} />
-                <span>
-                  <b>{M.fieldItemExpiry}</b>
-                </span>
-              </label>
+              <Switch label={M.fieldItemBatch} checked={draft.hasBatch} onChange={set("hasBatch")} disabled={locked} />
+              <Switch label={M.fieldItemExpiry} checked={draft.hasExpiry} onChange={set("hasExpiry")} disabled={locked} />
             </>
           )}
-          <label className="check-row">
-            <input type="checkbox" checked={draft.isActive} onChange={(e) => set("isActive")(e.target.checked)} disabled={locked} />
-            <span>
-              <b>{M.fieldItemActive}</b>
-            </span>
-          </label>
-        </div>
+          <Switch label={M.fieldItemActive} checked={draft.isActive} onChange={set("isActive")} disabled={locked} />
+        </FormGrid>
+        <Field as="textarea" label={M.fieldItemDescription} name="description" value={draft.description} onChange={set("description")} rows={2} maxLength={ITEM_LIMITS.description} counter error={errs.description ?? sub.fieldErrors.description} disabled={locked} />
+      </FormSection>
 
-        {isBundle && (
-          <div className={s.formGroup}>
-            <h3 className={s.formHead}>{M.sectionBundleLines}</h3>
-            {errs.lines && (
-              <p className="field-err" role="alert">
-                <Icon name="error" />
-                {errs.lines}
-              </p>
-            )}
-            <ul className={s.lines}>
-              {draft.lines.map((line, idx) => {
-                const saved = savedLines.includes(line.key);
-                const le = lineError(line.key);
-                return (
-                  <li key={line.key} className={s.line}>
-                    <Field
-                      as="select"
-                      label={M.fieldLineComponent}
-                      required
-                      name={`component-${idx}`}
-                      value={line.component}
-                      onChange={(v) => setLine(line.key, { component: v })}
-                      options={[{ value: "", label: items.status === "loading" ? M.loadingMore : M.linePlaceholder }, ...components.map((i) => ({ value: String(i.id), label: i.name }))]}
-                      error={le?.component}
-                      disabled={saved}
-                    />
-                    <Field label={M.fieldLineQty} type="number" unit="kg" required name={`qty-${idx}`} value={line.qty} onChange={(v) => setLine(line.key, { qty: v })} error={le?.qty} disabled={saved} />
-                    {!saved && draft.lines.length > 1 && (
-                      <button type="button" className={`btn ${s.lineRemove}`} onClick={() => removeLine(line.key)} aria-label={`${M.removeLine} ${idx + 1}`}>
-                        <Icon name="close" />
-                        <span className="sr-only">{M.removeLine}</span>
-                      </button>
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
-            <div>
-              <button type="button" className="btn" onClick={addLine} disabled={sub.submitting}>
-                <Icon name="add" />
-                <span>{M.addLine}</span>
-              </button>
-            </div>
+      {isBundle && (
+        <FormSection title={M.sectionBundleLines}>
+          {errs.lines && (
+            <p className="field-err" role="alert">
+              <Icon name="error" />
+              {errs.lines}
+            </p>
+          )}
+          <ul className={s.lines}>
+            {draft.lines.map((line, idx) => {
+              const saved = savedLines.includes(line.key);
+              const le = lineError(line.key);
+              return (
+                <li key={line.key} className={s.line}>
+                  <Field
+                    as="select"
+                    label={M.fieldLineComponent}
+                    required
+                    name={`component-${idx}`}
+                    value={line.component}
+                    onChange={(v) => setLine(line.key, { component: v })}
+                    options={[{ value: "", label: items.status === "loading" ? M.loadingMore : M.linePlaceholder }, ...components.map((i) => ({ value: String(i.id), label: i.name }))]}
+                    error={le?.component}
+                    disabled={saved}
+                  />
+                  <Field label={M.fieldLineQty} type="number" unit="kg" required name={`qty-${idx}`} value={line.qty} onChange={(v) => setLine(line.key, { qty: v })} error={le?.qty} disabled={saved} />
+                  {!saved && draft.lines.length > 1 && (
+                    <button type="button" className={`btn ${s.lineRemove}`} onClick={() => removeLine(line.key)} aria-label={`${M.removeLine} ${idx + 1}`}>
+                      <Icon name="close" />
+                      <span className="sr-only">{M.removeLine}</span>
+                    </button>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+          <div>
+            <button type="button" className="btn" onClick={addLine} disabled={sub.submitting}>
+              <Icon name="add" />
+              <span>{M.addLine}</span>
+            </button>
           </div>
-        )}
-      </div>
+        </FormSection>
+      )}
     </FormPage>
   );
 }

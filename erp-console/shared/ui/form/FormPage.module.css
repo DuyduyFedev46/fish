@@ -1,29 +1,37 @@
-/* Trang form dài. Thanh nút dính đáy vùng cuộn của khung app (.content), cao --action-bar-h; bù lề để phủ hết bề ngang. */
-.page { display: flex; flex-direction: column; gap: var(--space-4); max-width: 720px; }
-.head { display: flex; flex-direction: column; gap: var(--space-1); }
-.back { display: inline-flex; align-items: center; gap: var(--space-1); align-self: flex-start; min-height: var(--tap); color: var(--ink-2); font-size: var(--text-sm); text-decoration: none; }
-.back :global(.mi) { font-size: 18px; }
+/* Trang form dài (board F1a/F1d/F1f/F1k/F1m). Nội dung (.body) rộng tối đa 960px gồm các thẻ FormSection; tiêu đề 22px.
+   Thanh nút dính ĐÁY vùng cuộn của khung app (.content), cao --action-bar-h, nút canh phải; trang ngắn thì thanh vẫn nằm sát đáy
+   (.page cao tối thiểu bằng vùng cuộn tính theo 100dvh trừ thanh trên/dưới và lề, vì .content không có chiều cao xác định để dùng 100%, thanh đẩy xuống bằng margin-top:auto). Bù lề âm để thanh phủ hết bề ngang. */
+.page { display: flex; flex-direction: column; gap: var(--space-4); min-height: calc(100dvh - var(--topbar-h) - var(--bottom-nav-h) - var(--content-pt) - var(--space-6)); }
+@media (min-width: 768px) { .page { min-height: calc(100dvh - var(--topbar-h) - var(--content-pt) - var(--space-6)); } }
+.head { display: flex; flex-direction: column; gap: var(--space-2); }
+.back { display: inline-flex; align-items: center; gap: var(--space-1); align-self: flex-start; min-height: var(--tap); color: var(--ink-3); font-size: var(--text-sm); text-decoration: none; }
+.back :global(.mi) { font-size: 16px; }
+.back:hover { color: var(--ink); }
 .back:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: var(--radius-xs); }
-.title { margin: 0; font-size: var(--text-xl); font-weight: var(--weight-semibold); letter-spacing: var(--tracking-tight); color: var(--ink); }
-.body { display: flex; flex-direction: column; gap: var(--space-4); }
+.title { margin: 0; font-size: var(--text-title); font-weight: var(--weight-semibold); letter-spacing: var(--tracking-tight); color: var(--ink); }
+.body { display: flex; flex-direction: column; gap: var(--space-4); width: 100%; max-width: 960px; min-width: 0; }
 .bar {
   position: sticky;
   bottom: calc(-1 * var(--space-6));
   z-index: var(--z-sticky);
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: var(--space-2);
   min-height: var(--action-bar-h);
-  margin: var(--space-2) calc(-1 * var(--space-4)) calc(-1 * var(--space-6));
+  margin: auto calc(-1 * var(--space-4)) calc(-1 * var(--space-6));
   padding: var(--space-2) var(--space-4);
   background: var(--surface);
   border-top: 1px solid var(--border);
 }
-.spacer { flex: 1; }
+.bar > :global(.btn) { height: var(--control-h); min-height: 0; font-size: var(--text-sm); font-weight: var(--weight-medium); }
+.bar > :global(.btn:not(.primary):not(.danger)) { border-color: var(--border); box-shadow: none; }
 @media (min-width: 768px) {
   .bar { margin-inline: calc(-1 * var(--space-6)); padding-inline: var(--space-6); }
 }
 @media (max-width: 479px) {
-  .bar :global(.btn) { flex: 1 1 0; }
-  .spacer { display: none; }
+  .bar > :global(.btn) { flex: 1 1 0; }
 }
+
+/* Phím Tab / focus: trình duyệt cuộn ô vào vùng nhìn, chừa chỗ cho thanh nút dính đáy. */
+.page :is(input, select, textarea) { scroll-margin-bottom: calc(var(--action-bar-h) + var(--space-6)); }

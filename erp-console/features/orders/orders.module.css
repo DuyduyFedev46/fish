@@ -3,7 +3,7 @@
    khung xương trang chi tiết, khối phụ trên trang chi tiết. */
 
 /* Khung form trong hộp thoại (F2a–F2g): các ô cách đều nhau. */
-.form { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; }
+.form { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }
 
 /* Danh sách chọn đơn trong "Gắn khoản tiền vào đơn" (F2d). */
 .pickList { display: flex; flex-direction: column; gap: var(--space-1); margin: 0; padding: 0; border: 0; min-width: 0; max-height: 280px; overflow-y: auto; }

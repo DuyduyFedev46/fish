@@ -17,6 +17,7 @@ FORBIDDEN_PREFIXES = (
     "/api/cskh/",  # giữ vĩnh viễn: tên cũ của hàng đợi gọi xác nhận (phòng thủ nhiều lớp)
     "/api/confirmation/",  # hàng đợi gọi xác nhận đơn: tên, SĐT, địa chỉ khách (P8b Lô 3, R1)
     "/api/dashboard/attention/",
+    "/api/delivery/notes/lookup/",  # tra mã tem (CS-17): thuộc nghiệp vụ tem, cấm như …/label/
     "/api/sales/customer-directory/",  # danh bạ khách: tên, SĐT, địa chỉ, ghi chú (B2, bất biến 9)
     "/api/sales/customers/",  # endpoint khách cũ (S5/CS-01): cùng dữ liệu cá nhân
 )

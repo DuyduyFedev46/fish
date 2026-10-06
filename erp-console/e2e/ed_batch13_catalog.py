@@ -359,7 +359,7 @@ def run_owner(browser, errors):
     page.get_by_role("button", name="Tạo ưu đãi", exact=True).first.click()
     ok("Tạo ưu đãi: để trống → 'Nhập tên ưu đãi.'", page.get_by_text("Nhập tên ưu đãi.").count() >= 1 and "/rules/new" in page.url)
     page.get_by_label(re.compile("^Tên ưu đãi")).fill("Đơn từ 300.000 giảm 10%")
-    page.get_by_label(re.compile("^Áp dụng cho")).select_option(label="Theo đơn, tổng từ M đồng")
+    page.get_by_role("radio", name="Theo đơn, tổng từ M đồng").check()
     page.get_by_label(re.compile("^Đơn từ")).fill("300000")
     page.get_by_label(re.compile("^Mức giảm")).fill("150")
     page.get_by_role("button", name="Tạo ưu đãi", exact=True).first.click()

@@ -5,6 +5,8 @@ Tuân thủ:
 - Bất biến 9: SĐT trên tem chỉ ở dạng che (mask_phone), mã barcode chỉ chứa mã phiếu và lần in
 - Bất biến BR-GH-09 (chưa xác nhận không in tem), BR-GH-07 (đơn huỷ không in tem), BR-GH-16 (tem cũ không còn hiệu lực)
 """
+import re
+
 from django.db import transaction
 from django.utils import timezone
 
@@ -13,6 +15,8 @@ from apps.common.exceptions import BusinessError
 from apps.common.pii import mask_phone
 from apps.delivery.models import DeliveryNote, LabelPrint
 from apps.sales.models.invoices import SalesInvoiceLineBatch
+
+LABEL_CODE_RE = re.compile(r"^GH-[A-Z0-9-]{3,40}\.\d{1,3}$")
 
 
 def get_label_data(note: DeliveryNote, print_no: int | None = None) -> dict:
@@ -200,3 +204,33 @@ def void_label(note: DeliveryNote, user, print_no: int) -> dict:
             "already": False,
         }
 
+
+def lookup_label(code: str, *, queryset=None) -> dict:
+    """
+    Tra mã tem (CS-17, BR-GH-16, BR-GH-07). Chỉ trả mã phiếu, trạng thái và số lần in: không tên, SĐT, địa chỉ, giá.
+    `queryset`: phạm vi dòng Tầng 3 của người gọi (None = mọi phiếu).
+    """
+    code = (code or "").strip()
+    if not LABEL_CODE_RE.match(code):
+        raise BusinessError("Mã tem không đúng định dạng.", code="INVALID_INPUT")
+    note_code, print_part = code.rsplit(".", 1)
+    print_no = int(print_part)
+    note = (queryset if queryset is not None else DeliveryNote.objects).filter(code=note_code).first()
+    prints = list(LabelPrint.objects.filter(note=note).order_by("print_no")) if note else []
+    if not note or print_no not in {p.print_no for p in prints}:
+        raise BusinessError("Không tìm thấy phiếu.", code="NOT_FOUND", status_code=404)
+
+    if note.status == DeliveryNote.Status.CANCELLED:
+        valid_print_no = None
+        warning = "BR-GH-07"
+    else:
+        valid = [p.print_no for p in prints if p.superseded_at is None and p.voided_at is None]
+        valid_print_no = max(valid) if valid else None
+        warning = None if valid_print_no == print_no else "BR-GH-16"
+    return {
+        "note_id": note.pk,
+        "status": note.status,
+        "print_no": print_no,
+        "valid_print_no": valid_print_no,
+        "warning": warning,
+    }
