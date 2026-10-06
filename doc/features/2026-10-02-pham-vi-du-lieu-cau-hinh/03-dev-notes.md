@@ -77,3 +77,19 @@ Test mốc Lô 1 (`test_scope_snapshot`, 9 test) xanh nguyên sau Lô 2 mà khô
 - `makemigrations --check --dry-run`: `No changes detected`.
 - `migrate` từ DB SQLite trống, lùi `accounts 0013`, tiến lại: OK (xem trên).
 - `python3 scripts/check_naming.py`: OK, không phát sinh vi phạm mới.
+
+## Vòng sửa theo review techlead (06/10, `03b-review-techlead.md`)
+
+Thứ tự đã làm: M1+L1 (commit riêng, sinh lại mốc trên HEAD chưa sửa resolver) → H1 → L2.
+
+- **M1 + L1 (commit `adc9ba9`):** mốc phủ thêm 15 nhóm hành động: claim, ghi cuộc gọi, huỷ gọi, đổi người nhận (gọi xác nhận); tạo, sửa, huỷ hàng hoàn; sửa, gửi, huỷ phiếu nhập; assign, set_status, xem tem, in tem, huỷ tem (phiếu giao). Mỗi hành động chạy với mọi dòng mẫu (trong và ngoài phạm vi) cho mọi tài khoản, bọc `transaction.atomic()` rồi `set_rollback(True)`, ghi `status:<nhãn>=<mã>`. Có test chứng minh dữ liệu không đổi sau khi thu. Dashboard ghi thêm `extra:kpis.revenue_today=<giá trị>`; fixture cho 2 hoá đơn phát hành đúng ngày cố định để số này khác 0 (200000).
+  Lưu ý: `returns_create` của Chủ và NV kho luôn 400 (validate phiếu giao, không phải lỗi quyền), nên nhánh "tạo thành công" không có trong mốc; nhánh phạm vi (200/400 so với 404 theo phiếu giao) vẫn phủ qua NV giao.
+- **H1:** `catalog.ScopeObject` thêm `full_perm` và `capped_value` (D7: `sales.view_customer_list`, `assigned_deliveries`). Resolver: nhóm đủ điều kiện nhưng thiếu `full_perm` thì đóng góp tối đa `capped_value`. Sửa test sai cũ (Quản lý mất `view_customer_list` nay nhận `assigned_deliveries`), thêm 6 test: G lưu `all` thiếu quyền, G có lại quyền, G lưu `none`, K+G mượn `all` (kết quả `assigned_deliveries`, nhóm gốc G), nhóm không có quyền nào, Quản lý. Mốc PV-01 giữ xanh, không sinh lại sau H1.
+- **L2:** `resolver.forget(user)`; gọi trong `staff/services.py` ở `create_staff` và `set_groups` (xoá cả đối tượng của người gọi lẫn bản nạp lại). Có 3 test. `staff/services.py` nằm ngoài danh sách file của 02b Lô 2 nhưng là nơi đổi nhóm duy nhất.
+
+### Nợ chuyển lô
+- **M2 (Lô 4, Lô 5, 02c):** (a) Lô 4 và Lô 5 lên production CÙNG lượt, không deploy Lô 4 riêng (PUT B4 chưa ghi D7 tới Lô 5). (b) Lệnh đếm D-2 in riêng cờ "manager có `sales.view_customer_list`"; nếu không có thì hỏi Duy trước khi migrate (seed D7 = `none`, Quản lý mất API khách cũ từ Lô 4).
+- **L3 (Lô F1):** mock FE `erp-console/features/permissions/mock.ts` còn chữ "Trong phạm vi gọi"; sửa theo BE ("Được gán hoặc trong phạm vi gọi xác nhận", "Được gán"). FE xử lý `gate_capability: null` bằng `inactive_reason`.
+- **L4 (Lô 5):** dòng D7 lưu `all` mà nhóm thiếu `view_customer_list` phải có `note`, ví dụ "Bật Xem khách hàng để thấy tất cả khách" (giá trị hiệu lực là `assigned_deliveries`).
+- **L2 phần Lô 5:** bước "trước" của `rows_losing_access` gọi `resolve_data_scopes(member, overrides={})` (`{}` khác `None` nên không bị nhớ). Test Lô 3+ đổi cấu hình dùng `User.objects.get(pk=…)` mới.
+- Lô 3/4 không được thêm `APPROVED_DIFFS` cho `direct_permissions` khi Duy chưa trả lời D-3.

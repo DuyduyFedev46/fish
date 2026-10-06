@@ -7,6 +7,8 @@ Luật:
    (quyền của chính *nhóm*, không phải quyền gán trực tiếp). Lấy giá trị `rank` lớn nhất. Lý do: chặn rò chéo nhóm. Người
    K+G, Chủ tắt "Xem đơn" của K nhưng D1 của K vẫn lưu "Tất cả" (Q-7): nếu không lọc theo nhóm đủ điều kiện, người này thấy
    mọi đơn nhờ quyền xem đơn của G cộng phạm vi "Tất cả" của K.
+   Riêng D7: nhóm có `sales.view_customer_list` đóng góp giá trị đã lưu; nhóm chỉ có `sales.view_customer` đóng góp tối đa
+   `assigned_deliveries` (H1, review 06/10), để tắt "Xem khách hàng" đóng được "Tất cả khách" dù D7 còn lưu `all`.
 3. Không nhóm đủ điều kiện (kể cả người không nhóm, quyền gán trực tiếp), hoặc nhóm thiếu dòng cấu hình, hoặc giá trị lưu
    không còn là lựa chọn hợp lệ: giá trị `rank = 0` (hẹp nhất).
 4. D2 `invoices` lấy giá trị D1 `orders` CỦA CHÍNH nhóm có quyền xem hoá đơn. D8 `audit_log` là `all` khi có nhóm đủ điều kiện.
@@ -83,6 +85,11 @@ def _resolve_object(obj, groups, held, stored):
             value = catalog.valid_or_narrowest(source, stored[group_id].get(source.key))
         else:
             value = catalog.valid_or_narrowest(obj, stored[group_id].get(obj.key))
+            if obj.full_perm and obj.full_perm not in held[group_id]:
+                # H1: quyền Tầng 1 `view_customer` luôn có ở nhóm giao, không phải việc Chủ tắt được; không cho giá trị lưu
+                # (còn giữ theo Q-7) nâng phạm vi vượt `capped_value` khi nhóm đã mất việc "Xem khách hàng".
+                if catalog.rank_of(obj, value) > catalog.rank_of(obj, obj.capped_value):
+                    value = obj.capped_value
         rank = catalog.rank_of(obj, value)
         if best is None or rank > best[0]:  # lớn hơn hẳn mới thay: hoà thì giữ nhóm đứng trước theo thứ tự vai
             best = (rank, Resolved(value, name))
@@ -115,3 +122,10 @@ def resolve_data_scopes(user, *, overrides=None) -> dict:
 def resolve_data_scope(user, key) -> str:
     """Giá trị phạm vi của `user` cho đối tượng `key` (KeyError nếu `key` không có trong catalog)."""
     return resolve_data_scopes(user)[key].value
+
+
+def forget(user):
+    """Xoá bộ nhớ phân giải trên đối tượng `user` (L2, review 06/10). Gọi sau khi đổi nhóm của user trong cùng request,
+    để lần phân giải kế tiếp trên CHÍNH đối tượng đó không dùng giá trị cũ."""
+    if hasattr(user, CACHE_ATTR):
+        delattr(user, CACHE_ATTR)

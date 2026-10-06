@@ -138,10 +138,45 @@ class ResolverTests(TestCase):
         self.assertEqual(resolver.resolve_data_scope(make_user("pv_a1", roles.MANAGER), "audit_log"), "all")
         self.assertEqual(resolver.resolve_data_scope(make_user("pv_a2", roles.WAREHOUSE_STAFF), "audit_log"), "none")
 
-    def test_pv02_customers_follow_stored_value_when_group_eligible(self):
-        revoke(roles.MANAGER, "sales.view_customer_list")  # vẫn còn view_customer (Tầng 1) nên còn đủ điều kiện
+    def test_pv02_h1_customers_all_needs_view_customer_list_of_the_same_group(self):
+        """H1 (review 06/10): Quản lý mất `view_customer_list` (còn `view_customer` Tầng 1) -> tối đa `assigned_deliveries`."""
+        revoke(roles.MANAGER, "sales.view_customer_list")
         user = make_user("pv_mgr_c", roles.MANAGER)
+        result = resolver.resolve_data_scopes(user)["customers"]
+        self.assertEqual((result.value, result.via_group), ("assigned_deliveries", roles.MANAGER))
+
+    def test_pv02_h1_delivery_staff_stored_all_without_list_permission_stays_assigned(self):
+        """Chủ bật rồi tắt "Xem khách hàng" cho G, D7 vẫn lưu `all` (Q-7): G không được thấy mọi khách."""
+        set_scope(roles.DELIVERY_STAFF, "customers", "all")
+        user = make_user("pv_g_all", roles.DELIVERY_STAFF)
+        self.assertEqual(resolver.resolve_data_scope(user, "customers"), "assigned_deliveries")
+
+    def test_pv02_h1_delivery_staff_gets_all_when_list_permission_is_back(self):
+        set_scope(roles.DELIVERY_STAFF, "customers", "all")
+        grant(roles.DELIVERY_STAFF, "sales.view_customer_list")
+        user = make_user("pv_g_all2", roles.DELIVERY_STAFF)
         self.assertEqual(resolver.resolve_data_scope(user, "customers"), "all")
+
+    def test_pv02_h1_delivery_staff_stored_none_stays_none_even_with_list_permission_off(self):
+        """`min(giá trị lưu, assigned_deliveries)`: lưu `none` thì vẫn `none`."""
+        set_scope(roles.DELIVERY_STAFF, "customers", "none")
+        user = make_user("pv_g_none", roles.DELIVERY_STAFF)
+        self.assertEqual(resolver.resolve_data_scope(user, "customers"), "none")
+
+    def test_pv02_h1_k_plus_g_cannot_borrow_all_from_group_without_list_permission(self):
+        """K có list nhưng D7 = none; G không có list nhưng D7 = all: kết quả `assigned_deliveries`, không phải `all`."""
+        grant(roles.WAREHOUSE_STAFF, "sales.view_customer_list")
+        set_scope(roles.WAREHOUSE_STAFF, "customers", "none")
+        set_scope(roles.DELIVERY_STAFF, "customers", "all")
+        user = make_user("pv_k_g_c", roles.WAREHOUSE_STAFF, roles.DELIVERY_STAFF)
+        result = resolver.resolve_data_scopes(user)["customers"]
+        self.assertEqual((result.value, result.via_group), ("assigned_deliveries", roles.DELIVERY_STAFF))
+
+    def test_pv02_h1_group_with_neither_customer_permission_is_not_eligible(self):
+        set_scope(roles.WAREHOUSE_STAFF, "customers", "all")
+        user = make_user("pv_k_c", roles.WAREHOUSE_STAFF)
+        result = resolver.resolve_data_scopes(user)["customers"]
+        self.assertEqual((result.value, result.via_group), ("none", None))
 
     def test_pv02_unknown_key_raises_keyerror(self):
         with self.assertRaises(KeyError):
@@ -188,3 +223,28 @@ class ResolverTests(TestCase):
         user = make_user("pv_tie", roles.DELIVERY_STAFF, roles.CUSTOMER_SERVICE, roles.MANAGER)
         result = resolver.resolve_data_scopes(user)["receipts"]  # cả ba đều `all`
         self.assertEqual(result.via_group, roles.MANAGER)
+
+
+class ForgetTests(TestCase):
+    """L2 (review 06/10): đổi nhóm của user trong cùng request thì bộ nhớ phân giải phải bỏ được."""
+
+    def test_pv02_l2_forget_clears_remembered_scopes(self):
+        user = make_user("pv_forget", roles.DELIVERY_STAFF)
+        self.assertEqual(resolver.resolve_data_scope(user, "orders"), "assigned_deliveries")
+        user.groups.add(Group.objects.get(name=roles.MANAGER))
+        self.assertEqual(resolver.resolve_data_scope(user, "orders"), "assigned_deliveries")  # còn nhớ bản cũ
+        resolver.forget(user)
+        self.assertEqual(resolver.resolve_data_scope(user, "orders"), "all")
+
+    def test_pv02_l2_forget_without_cache_is_harmless(self):
+        resolver.forget(make_user("pv_forget2", roles.MANAGER))
+
+    def test_pv02_l2_set_groups_service_forgets_cache_of_same_user_object(self):
+        from apps.accounts.staff import services as staff_services
+        from apps.accounts.staff.tests.helpers import staff_user
+
+        owner = staff_user("pv_owner_l2", roles.OWNER)
+        target = staff_user("pv_target_l2", roles.DELIVERY_STAFF)
+        self.assertEqual(resolver.resolve_data_scope(target, "orders"), "assigned_deliveries")
+        staff_services.set_groups(actor=owner, user=target, groups=[roles.MANAGER])
+        self.assertEqual(resolver.resolve_data_scope(target, "orders"), "all")

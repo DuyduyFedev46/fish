@@ -39,6 +39,9 @@ class ScopeObject:
     defaults: dict = field(default_factory=dict)
     read_only: bool = False
     derived_from: str | None = None
+    # H1 (review 06/10): nhóm đủ điều kiện nhưng thiếu `full_perm` chỉ đóng góp tối đa `capped_value` (min theo rank).
+    full_perm: str | None = None
+    capped_value: str | None = None
 
 
 def _defaults(manager, warehouse_staff, delivery_staff, customer_service):
@@ -117,6 +120,7 @@ CUSTOMERS = ScopeObject(
     ),
     gate_perms=("sales.view_customer_list", "sales.view_customer"),
     gate_capability="view_customers", gate_label="khách hàng",
+    full_perm="sales.view_customer_list", capped_value="assigned_deliveries",
     # Quản lý đang có `view_customer_list` lúc migrate -> all; NV giao đi qua phiếu giao; còn lại không xem.
     defaults=_defaults("all", "none", "assigned_deliveries", "none"),
 )

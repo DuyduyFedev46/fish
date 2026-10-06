@@ -18,6 +18,7 @@ from rest_framework.authtoken.models import Token
 
 from apps.accounts import roles
 from apps.accounts.auth.services import ROLE_ORDER, sorted_groups
+from apps.accounts.data_scopes import resolver as data_scope_resolver
 from apps.accounts.models import StaffProfile
 from apps.common.audit import record_audit
 from apps.common.exceptions import BusinessError
@@ -167,6 +168,7 @@ def create_staff(*, actor, username, password, phone, display_name="", groups=()
     except IntegrityError:
         raise BusinessError(USERNAME_TAKEN, code=INPUT_CODE) from None
     user.groups.set(group_objs)
+    data_scope_resolver.forget(user)  # L2: nhóm đổi trong cùng request
     # BR-PQ-19: mật khẩu do Chủ đặt là mật khẩu tạm → người đó phải tự đổi lần đầu.
     StaffProfile.objects.create(
         user=user, phone=phone, display_name=display_name, must_change_password=True
@@ -214,6 +216,7 @@ def update_profile(*, actor, user, **fields):
 @transaction.atomic
 def set_groups(*, actor, user, groups):
     """Thay toàn bộ tập nhóm (PUT). Trả (groups, added, removed) theo thứ tự vai."""
+    caller_user = user  # đối tượng của người gọi: `_lock_target_and_owners` trả bản nạp mới nên phải quên cả hai (L2)
     _locked, user = _lock_target_and_owners(user)
     if user.pk == actor.pk:
         raise BusinessError("Không thể tự đổi nhóm của chính mình.", code=SELF_CODE)
@@ -230,6 +233,8 @@ def set_groups(*, actor, user, groups):
             raise BusinessError("Phải còn ít nhất một Chủ đang làm.", code=LAST_OWNER_CODE)
     if added or removed:
         user.groups.set(group_objs)
+        data_scope_resolver.forget(user)  # L2: nhóm đổi trong cùng request
+        data_scope_resolver.forget(caller_user)
         record_audit(
             "staff_groups_change", actor=actor, obj=user,
             changes={"groups": {"from": before, "to": after}},
