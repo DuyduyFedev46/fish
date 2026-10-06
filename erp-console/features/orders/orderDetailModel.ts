@@ -3,6 +3,7 @@
 // này chỉ quyết định nút nào là nút chính và mục nào hiện mờ kèm lý do (bảng 1 và 2 của ERP-D2c).
 
 import { ENUMS, enumOf } from "@/shared/lib/enums";
+import { vnd } from "@/shared/lib/format";
 import type { PathStep } from "@/shared/ui/detail/StatusPath";
 import type { TimelineEntry } from "@/shared/ui/detail/Timeline";
 import { ORDERS_MSG as M } from "./messages";
@@ -54,6 +55,18 @@ export function orderStepKey(o: PathInput): string {
   return "BOOKED";
 }
 
+/**
+ * W37 S7-AC5: dòng dưới chip "Đã hoàn {x} · Chờ hoàn {y}". Phần bằng 0 bỏ; cả hai bằng 0 (hoặc BE cũ chưa trả
+ * `refund_summary`) thì không có dòng. Chip vẫn là Hoàn tất: phiếu hoàn không đổi trạng thái đơn (BR-BH-20).
+ */
+export function refundSummaryLine(summary: { refunded_amount: string; pending_amount: string } | null | undefined): string | null {
+  if (!summary) return null;
+  const parts: string[] = [];
+  if (Number(summary.refunded_amount) > 0) parts.push(`Đã hoàn ${vnd(summary.refunded_amount)}`);
+  if (Number(summary.pending_amount) > 0) parts.push(`Chờ hoàn ${vnd(summary.pending_amount)}`);
+  return parts.length ? parts.join(" · ") : null;
+}
+
 export function isCancelledStatus(status: string): boolean {
   return status === "CANCELLED" || status === "AUTO_CANCELLED";
 }
@@ -90,7 +103,7 @@ export function orderActionPlan(i: PlanInput): ActionPlan {
   if (has("confirm_payment")) primary = { key: "confirm_payment", label: "Xác nhận đã nhận tiền" };
   else if (has("cancel")) primary = { key: "cancel", label: "Huỷ đơn", danger: true };
   else if (has("create_refund") && isCancelledStatus(i.status)) primary = { key: "create_refund", label: "Lập phiếu hoàn" };
-  else if (has("create_refund") && i.status === "COMPLETED") primary = { key: "create_refund", label: "Lập phiếu hoàn" };
+  else if (has("create_refund") && i.status === "COMPLETED") primary = { key: "create_refund", label: "Lập phiếu hoàn tiền" };
 
   if (has("create_refund") && primary?.key !== "create_refund") menu.push({ key: "create_refund", label: "Lập phiếu hoàn" });
 

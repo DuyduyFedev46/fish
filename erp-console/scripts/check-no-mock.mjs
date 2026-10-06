@@ -29,6 +29,8 @@ function walk(dir, pred, acc = []) {
 
 const mockFiles = [
   ...walk(root, (n) => /^mock[^/]*\.ts$/.test(n)),
+  // File dữ liệu/kho dùng chung chỉ có ở mock (`dashboardSummary.mock.ts`, `orderLink.mock.ts`, `beErrors.mock.ts`…).
+  ...walk(root, (n) => /\.mock\.ts$/.test(n)),
   // Component giả lập cổng thanh toán (chỉ dùng ở mock) — lấy nhãn hiển thị đặc trưng.
   ...walk(root, (n) => /^Mock.*\.tsx$/.test(n)),
 ];
@@ -45,6 +47,12 @@ const add = (s, why, file) => {
 for (const file of mockFiles) {
   const src = readFileSync(file, "utf8");
   for (const m of src.matchAll(/["'`](cangcaloc_[a-z0-9_]+)["'`]/g)) add(m[1], "khoá storage mock", file);
+  // Khoá storage của mock ERP (`cave_erp_mock_orders`, `cave_erp_mock_order_link`…).
+  for (const m of src.matchAll(/["'`](cave_erp_mock_[a-z0-9_]+)["'`]/g)) add(m[1], "khoá storage mock ERP", file);
+  // Tên người giả ("Anh Phúc", "Chị Hoa", "Bác Tư"), SĐT giả dạng 10 số và mã mặt hàng mẫu viết hoa-gạch nối có số ("TOM-SU-1").
+  for (const m of src.matchAll(/["'](?:Anh|Chị|Cô|Bác|Chú|Ông|Bà) [^"'\n]{2,30}["']/g)) add(m[0].slice(1, -1), "tên người giả", file);
+  for (const m of src.matchAll(/["'](0[35789]\d{8})["']/g)) add(m[1], "SĐT giả", file);
+  for (const m of src.matchAll(/["']((?!BR-)[A-Z]{2,}(?:-[A-Z0-9]+)*-\d[A-Z0-9-]*)["']/g)) add(m[1], "mã mẫu viết hoa", file);
   for (const m of src.matchAll(/\b(DH-DEMO\w*)/g)) add(m[1], "mã đơn demo", file);
   for (const m of src.matchAll(/item_code:\s*["']([A-Z0-9-]{4,})["']/g)) add(m[1], "mã mặt hàng mẫu", file);
   for (const m of src.matchAll(/["'](0900000\d*)["']/g)) add(m[1], "SĐT giả", file);

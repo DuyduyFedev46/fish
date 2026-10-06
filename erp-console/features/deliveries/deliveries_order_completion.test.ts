@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { MOCK_DELIVERY_NOTES, mockPostDeliveryNoteStatus } from "./mock";
+import { mockDeliveryNotes, mockPostDeliveryNoteStatus } from "./mock";
 import { completeToast, isOrderCancelledError, orderCancelledMessage, ORDER_CANCELLED_TEXT } from "./deliveryUi";
 import { ApiError } from "@/shared/lib/http";
 
@@ -16,14 +16,14 @@ describe("mock status: order_status (S1)", () => {
   });
 
   it("còn phiếu khác của cùng đơn chưa xong → order_status PROCESSING", () => {
-    const a = MOCK_DELIVERY_NOTES.find((n) => n.id === 36)!;
+    const a = mockDeliveryNotes().find((n) => n.id === 36)!;
     const extra = { ...a, id: 990, code: "GH-TEST-0990", status: "DELIVERING" as const, order: a.order };
-    MOCK_DELIVERY_NOTES.push(extra);
+    mockDeliveryNotes().push(extra);
     try {
       const res = post(36, { to_status: "COMPLETED", from_status: "DELIVERING" });
       expect((res.body as Body).order_status).toBe("PROCESSING");
     } finally {
-      MOCK_DELIVERY_NOTES.splice(MOCK_DELIVERY_NOTES.indexOf(extra), 1);
+      mockDeliveryNotes().splice(mockDeliveryNotes().indexOf(extra), 1);
     }
   });
 

@@ -1,15 +1,12 @@
 import { apiFetch } from "@/shared/lib/http";
-import {
-  mockGetDeliverers,
-  mockLookupDeliveryTag,
-  mockGetDeliveryLabel,
-  mockGetDeliveryNoteDetail,
-  mockListDeliveryNotes,
-  mockPostDeliveryAssign,
-  mockPostDeliveryLabelPrint,
-  mockPostDeliveryLabelVoid,
-  mockPostDeliveryNoteStatus,
-} from "./mock";
+
+/**
+ * Mock nạp bằng `require` sau điều kiện biên dịch `NEXT_PUBLIC_USE_MOCK === "1"`: bản build thật bỏ nhánh này nên không còn
+ * module mock (seed, tên giả, khoá storage) trong bundle. `import` tĩnh giữ lại phần khai báo cấp module của mock (W37 L3 FE, review M1).
+ */
+function mockApi(): typeof import("./mock") {
+  return (process.env.NEXT_PUBLIC_USE_MOCK === "1" ? require("./mock") : undefined) as typeof import("./mock");
+}
 import type {
   AssignDeliveryResponse,
   Deliverer,
@@ -46,7 +43,7 @@ export async function fetchDeliveryNotes(
 
   return apiFetch<DeliveryListResponse>(url, {
     signal,
-    mock: isMock ? mockListDeliveryNotes : undefined,
+    mock: isMock ? mockApi().mockListDeliveryNotes : undefined,
   });
 }
 
@@ -57,7 +54,7 @@ export async function fetchDeliveryNoteDetail(
   const isMock = process.env.NEXT_PUBLIC_USE_MOCK === "1";
   return apiFetch<DeliveryNoteDetail>(`/api/delivery/notes/${id}/`, {
     signal,
-    mock: isMock ? mockGetDeliveryNoteDetail : undefined,
+    mock: isMock ? mockApi().mockGetDeliveryNoteDetail : undefined,
   });
 }
 
@@ -78,7 +75,7 @@ export async function packDeliveryNote(
       from_status: fromStatus,
     },
     signal,
-    mock: isMock ? mockPostDeliveryNoteStatus : undefined,
+    mock: isMock ? mockApi().mockPostDeliveryNoteStatus : undefined,
   });
 }
 
@@ -91,7 +88,7 @@ export async function fetchDeliveryLabel(
   const qs = printNo ? `?print_no=${printNo}` : "";
   return apiFetch<LabelData>(`/api/delivery/notes/${id}/label/${qs}`, {
     signal,
-    mock: isMock ? (req) => mockGetDeliveryLabel(req, id, printNo) : undefined,
+    mock: isMock ? (req) => mockApi().mockGetDeliveryLabel(req, id, printNo) : undefined,
   });
 }
 
@@ -111,7 +108,7 @@ export async function printDeliveryLabel(
     method: "POST",
     body: reason ? { request_id: reqId, reason } : { request_id: reqId },
     signal,
-    mock: isMock ? (req) => mockPostDeliveryLabelPrint(req, id) : undefined,
+    mock: isMock ? (req) => mockApi().mockPostDeliveryLabelPrint(req, id) : undefined,
   });
 }
 
@@ -125,7 +122,7 @@ export async function voidDeliveryLabel(
     method: "POST",
     body: { print_no: printNo },
     signal,
-    mock: isMock ? (req) => mockPostDeliveryLabelVoid(req, id) : undefined,
+    mock: isMock ? (req) => mockApi().mockPostDeliveryLabelVoid(req, id) : undefined,
   });
 }
 
@@ -145,7 +142,7 @@ async function postStatus(id: number, body: Record<string, unknown>, signal?: Ab
     method: "POST",
     body,
     signal,
-    mock: isMock ? mockPostDeliveryNoteStatus : undefined,
+    mock: isMock ? mockApi().mockPostDeliveryNoteStatus : undefined,
   });
 }
 
@@ -176,7 +173,7 @@ export function reportDeliveryFailure(
 /** B6: người giao đang làm kèm số phiếu đang giao / chờ lấy (cần quyền giao người). Mảng thường, không phân trang. */
 export async function fetchDeliverers(signal?: AbortSignal): Promise<Deliverer[]> {
   const isMock = process.env.NEXT_PUBLIC_USE_MOCK === "1";
-  return apiFetch<Deliverer[]>("/api/delivery/deliverers/", { signal, mock: isMock ? mockGetDeliverers : undefined });
+  return apiFetch<Deliverer[]>("/api/delivery/deliverers/", { signal, mock: isMock ? mockApi().mockGetDeliverers : undefined });
 }
 
 /**
@@ -193,7 +190,7 @@ export async function assignDeliveryNote(
     method: "POST",
     body: { assigned_to: input.assignedTo, expected_assigned_to: input.expectedAssignedTo },
     signal,
-    mock: isMock ? mockPostDeliveryAssign : undefined,
+    mock: isMock ? mockApi().mockPostDeliveryAssign : undefined,
   });
 }
 
@@ -204,6 +201,6 @@ export async function assignDeliveryNote(
 export async function lookupDeliveryTag(code: string, signal?: AbortSignal): Promise<TagLookup> {
   return apiFetch<TagLookup>(`/api/delivery/notes/lookup/?code=${encodeURIComponent(code)}`, {
     signal,
-    mock: process.env.NEXT_PUBLIC_USE_MOCK === "1" ? mockLookupDeliveryTag : undefined,
+    mock: process.env.NEXT_PUBLIC_USE_MOCK === "1" ? mockApi().mockLookupDeliveryTag : undefined,
   });
 }
