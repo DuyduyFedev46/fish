@@ -19,6 +19,7 @@ from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 
 from django.conf import settings
 from django.db import IntegrityError, transaction
+from django.db.models import Q
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 
@@ -399,20 +400,32 @@ def _late_order(order_code):
     return order
 
 
+def _in_window(received_at):
+    """Q: giờ nhận trong cửa sổ nghi trùng quanh `received_at` (BR-TT-18, TL15-H1)."""
+    window = _late_duplicate_window()
+    return Q(received_at__gte=received_at - window, received_at__lte=received_at + window)
+
+
 def find_similar_payment(*, order, amount, received_at, exclude_pk=None):
     """
-    BR-TT-18: khoản đã có mà khoản ghi tay mới có thể trùng. Với đơn X: giao dịch bất kỳ của X cùng số tiền
-    (bỏ dòng tách thừa `-THUA`). Không đơn: dòng UNMATCHED không gắn đơn, cùng số tiền, giờ nhận trong cửa sổ.
+    BR-TT-18 (đính chính 08/10, TL15-H1): khoản đã có mà khoản ghi tay mới có thể trùng, KHÔNG phụ thuộc bên kia
+    có gắn đơn hay không. Cùng số tiền và:
+    - có đơn X: giao dịch bất kỳ của X (bỏ dòng tách thừa `-THUA`), hoặc UNMATCHED không đơn trong cửa sổ giờ;
+    - không đơn: UNMATCHED không đơn, hoặc ORPHAN của đơn bất kỳ, đều trong cửa sổ giờ.
     """
+    status = PaymentTransaction.MatchStatus
+    unmatched = Q(sales_order__isnull=True, match_status=status.UNMATCHED) & _in_window(received_at)
     if order is not None:
-        candidates = order.payments.filter(amount=amount).order_by("received_at", "pk")
-        return next((p for p in candidates if "split_from" not in (p.raw_payload or {}) and p.pk != exclude_pk), None)
-    window = _late_duplicate_window()
+        candidates = order.payments.filter(amount=amount).exclude(pk=exclude_pk).order_by("received_at", "pk")
+        own = next((p for p in candidates if "split_from" not in (p.raw_payload or {})), None)
+        if own is not None:
+            return own
+        cond = unmatched
+    else:
+        cond = unmatched | (Q(match_status=status.ORPHAN) & _in_window(received_at))
     return (
-        PaymentTransaction.objects.filter(
-            sales_order__isnull=True, match_status=PaymentTransaction.MatchStatus.UNMATCHED, amount=amount,
-            received_at__gte=received_at - window, received_at__lte=received_at + window,
-        ).exclude(pk=exclude_pk).order_by("received_at", "pk").first()
+        PaymentTransaction.objects.filter(cond, amount=amount).exclude(pk=exclude_pk)
+        .order_by("received_at", "pk").first()
     )
 
 
@@ -420,28 +433,28 @@ def flag_possible_duplicate(payment, order):
     """
     BR-TT-15 + BR-TT-18: gắn nhãn nghi trùng cho giao dịch mới của webhook/IPN (không phải ghi tay).
     - OVERPAID mà đơn có khoản MANUAL MATCHED cùng số tiền  -> DUPLICATE_MANUAL_WARNING (BR-TT-15).
-    - ORPHAN mà đơn có khoản MANUAL ORPHAN cùng số tiền      -> DUPLICATE_LATE_MANUAL_WARNING.
-    - UNMATCHED mà có khoản MANUAL UNMATCHED không đơn, cùng số tiền, trong cửa sổ giờ -> như trên.
-    Trả nhãn đã gắn, hoặc "". Gọi trong transaction của người ghi.
+    - ORPHAN: có khoản MANUAL ORPHAN cùng đơn, hoặc MANUAL UNMATCHED không đơn trong cửa sổ giờ, cùng số tiền.
+    - UNMATCHED: có khoản MANUAL UNMATCHED không đơn, hoặc MANUAL ORPHAN của đơn bất kỳ, trong cửa sổ giờ.
+    Hai chiều khớp với `find_similar_payment` (TL15-H1). Trả nhãn đã gắn, hoặc "". Gọi trong transaction của người ghi.
     """
     if payment.source == PaymentTransaction.Source.MANUAL:
         return ""
     status = PaymentTransaction.MatchStatus
     manual = PaymentTransaction.objects.filter(source=PaymentTransaction.Source.MANUAL, amount=payment.amount)
     manual = manual.exclude(pk=payment.pk)
+    in_window = _in_window(payment.received_at)
+    manual_unmatched = Q(sales_order__isnull=True, match_status=status.UNMATCHED) & in_window
     warning = ""
     if payment.match_status == status.OVERPAID and order is not None:
         if manual.filter(sales_order=order, match_status=status.MATCHED).exists():
             warning = DUPLICATE_MANUAL_WARNING
     elif payment.match_status == status.ORPHAN and order is not None:
-        if manual.filter(sales_order=order, match_status=status.ORPHAN).exists():
+        cond = Q(sales_order=order, match_status=status.ORPHAN) | manual_unmatched
+        if manual.filter(cond).exists():
             warning = DUPLICATE_LATE_MANUAL_WARNING
     elif payment.match_status == status.UNMATCHED:
-        window = _late_duplicate_window()
-        if manual.filter(
-            sales_order__isnull=True, match_status=status.UNMATCHED,
-            received_at__gte=payment.received_at - window, received_at__lte=payment.received_at + window,
-        ).exists():
+        cond = manual_unmatched | (Q(match_status=status.ORPHAN) & in_window)
+        if manual.filter(cond).exists():
             warning = DUPLICATE_LATE_MANUAL_WARNING
     if warning:
         payment.duplicate_warning = warning

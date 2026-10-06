@@ -384,6 +384,9 @@ class LateRefundGuardTests(LateBase):
         resp = self._refund(pay, acknowledge_duplicate_warning=True)
         self.assertEqual(resp.status_code, 201, resp.content)
         self.assertEqual(Refund.objects.count(), 1)
+        audit = AuditLog.objects.get(action="create_refund")  # TL15-M1
+        self.assertIs(audit.changes["acknowledged_duplicate_warning"], True)
+        self.assertNotIn(payment_services.DUPLICATE_LATE_MANUAL_WARNING, json.dumps(audit.changes, ensure_ascii=False))
 
     def test_lp_ac13_legacy_overpaid_label_also_blocked(self):
         pay = PaymentTransaction.objects.create(
@@ -400,6 +403,7 @@ class LateRefundGuardTests(LateBase):
         self.assertEqual(self.post().status_code, 201)
         pay = PaymentTransaction.objects.get()
         self.assertEqual(self._refund(pay).status_code, 201)
+        self.assertNotIn("acknowledged_duplicate_warning", AuditLog.objects.get(action="create_refund").changes)
 
     def test_lp_ac14_guidance_gw03_reads_duplicate_warning(self):
         self.webhook("FT-OTHER-1", "350000", order_code=self.dead.code)
@@ -498,3 +502,69 @@ class LatePrivacyAndCostTests(LateBase):
     def test_no_order_audit_changes_order_is_none(self):
         self.post(order_code="")
         self.assertIsNone(AuditLog.objects.get(action="record_late_payment").changes["order"])
+
+
+class LateCrossTypeDuplicateTests(LateBase):
+    """TL15-H1: nghi trùng không phụ thuộc bên kia có gắn đơn hay không (cả hai chiều, trong cửa sổ giờ)."""
+
+    def _flag(self, txn):
+        return PaymentTransaction.objects.get(bank_txn_id=txn).duplicate_warning
+
+    def test_manual_unmatched_then_ipn_orphan_is_flagged(self):
+        self.assertEqual(self.post(order_code="", received_at=timezone.now().isoformat()).status_code, 201)
+        self.webhook("SEPAY-ID-1", "350000", order_code=self.dead.code, url=IPN_URL)
+        late = PaymentTransaction.objects.get(bank_txn_id="SEPAY-ID-1")
+        self.assertEqual(late.match_status, PaymentTransaction.MatchStatus.ORPHAN)
+        self.assertEqual(late.duplicate_warning, payment_services.DUPLICATE_LATE_MANUAL_WARNING)
+
+    def test_manual_unmatched_then_ipn_orphan_other_amount_or_outside_window_not_flagged(self):
+        self.assertEqual(self.post(order_code="", received_at=timezone.now().isoformat()).status_code, 201)
+        self.webhook("SEPAY-ID-2", "360000", order_code=self.dead.code, url=IPN_URL)
+        self.assertEqual(self._flag("SEPAY-ID-2"), "")
+        PaymentTransaction.objects.filter(bank_txn_id="FT26100300001").update(
+            received_at=timezone.now() - timedelta(hours=200))
+        self.webhook("SEPAY-ID-3", "350000", order_code=self.dead.code, url=IPN_URL)
+        self.assertEqual(self._flag("SEPAY-ID-3"), "")
+
+    def test_ipn_orphan_then_manual_unmatched_returns_409(self):
+        self.webhook("SEPAY-ID-4", "350000", order_code=self.dead.code, url=IPN_URL)
+        resp = self.post(order_code="")
+        self.assertEqual(resp.status_code, 409, resp.content)
+        self.assertEqual(resp.json()["code"], "LATE_PAYMENT_POSSIBLE_DUPLICATE")
+        self.assertEqual(resp.json()["similar_bank_txn_id"], "SEPAY-ID-4")
+        self.assertEqual(PaymentTransaction.objects.count(), 1)
+
+    def test_ipn_orphan_then_manual_unmatched_other_amount_or_outside_window_ok(self):
+        self.webhook("SEPAY-ID-5", "350000", order_code=self.dead.code, url=IPN_URL)
+        self.assertEqual(self.post(order_code="", amount="360000").status_code, 201)
+        with override_settings(LATE_PAYMENT_DUPLICATE_WINDOW_HOURS=1):
+            resp = self.post(order_code="", bank_txn_id="FT-FAR",
+                             received_at=(timezone.now() - timedelta(hours=10)).isoformat())
+        self.assertEqual(resp.status_code, 201, resp.content)
+
+    def test_webhook_unmatched_then_manual_with_cancelled_order_returns_409(self):
+        self.webhook("FT-WH-U", "350000")
+        resp = self.post()  # gắn đơn Tự huỷ
+        self.assertEqual(resp.status_code, 409, resp.content)
+        self.assertEqual(resp.json()["similar_bank_txn_id"], "FT-WH-U")
+        self.assertEqual(PaymentTransaction.objects.count(), 1)
+
+    def test_webhook_unmatched_then_manual_with_order_other_amount_ok(self):
+        self.webhook("FT-WH-U2", "111000")
+        self.assertEqual(self.post().status_code, 201)
+
+    def test_manual_orphan_then_webhook_unmatched_is_flagged(self):
+        self.assertEqual(self.post(received_at=timezone.now().isoformat()).status_code, 201)
+        self.webhook("FT-WH-U3", "350000")  # webhook không mã đơn: UNMATCHED
+        late = PaymentTransaction.objects.get(bank_txn_id="FT-WH-U3")
+        self.assertEqual(late.match_status, PaymentTransaction.MatchStatus.UNMATCHED)
+        self.assertEqual(late.duplicate_warning, payment_services.DUPLICATE_LATE_MANUAL_WARNING)
+
+    def test_manual_orphan_then_webhook_unmatched_other_amount_or_outside_window_not_flagged(self):
+        self.assertEqual(self.post(received_at=timezone.now().isoformat()).status_code, 201)
+        self.webhook("FT-WH-U4", "360000")
+        self.assertEqual(self._flag("FT-WH-U4"), "")
+        PaymentTransaction.objects.filter(bank_txn_id="FT26100300001").update(
+            received_at=timezone.now() - timedelta(hours=200))
+        self.webhook("FT-WH-U5", "350000")
+        self.assertEqual(self._flag("FT-WH-U5"), "")

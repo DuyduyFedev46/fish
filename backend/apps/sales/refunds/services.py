@@ -135,7 +135,9 @@ def create_refund_for_payment(*, payment, amount, reason, actor, is_partial=None
         record_audit(
             "create_refund", actor=actor, obj=refund,
             changes={"amount": {"to": amount}, "payment_transaction": p.bank_txn_id,
-                     "match_status": p.match_status},
+                     "match_status": p.match_status,
+                     # TL15-M1: Chủ đã xác nhận vượt nhãn nghi trùng; chỉ cờ, không chép nhãn.
+                     **({"acknowledged_duplicate_warning": True} if p.duplicate_warning else {})},
         )
     return refund, False
 
