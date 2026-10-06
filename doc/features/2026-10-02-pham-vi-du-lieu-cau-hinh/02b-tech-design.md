@@ -51,6 +51,10 @@ Mọi đường đọc (list, detail, tổng, timeline, Tiếp theo, Nhờ, AI d
 4. `gate_perms`: D1 `sales.view_salesorder` · D2 `sales.view_salesinvoice` (giá trị lấy từ D1 **của nhóm đó**) ·
    D3 `delivery.view_deliverynote` · D4 `delivery.confirm_with_customer` · D5 `inventory.view_returntostock` ·
    D6 `purchasing.view_purchasereceipt`, `purchasing.add_purchasereceipt` · D7 `sales.view_customer_list`, `sales.view_customer`.
+   **Sửa 06/10 (review Lô 2, H1):** với D7, nhóm có `sales.view_customer_list` đóng góp giá trị đã lưu. Nhóm chỉ có
+   `sales.view_customer` (Tầng 1, ngoài registry, Chủ không tắt được) đóng góp tối đa `assigned_deliveries`, tức
+   `min(giá trị lưu, assigned_deliveries)`. Lý do: tắt "Xem khách hàng" phải đóng "Tất cả khách" dù D7 vẫn lưu `all` (Q-7),
+   nếu không thì nhóm G (luôn có `view_customer`) sẽ thấy mọi khách.
 5. Không cache qua request. Nhớ trong `user._data_scope_cache` (cùng cách Django nhớ `_perm_cache`); mỗi request
    TokenAuthentication nạp user mới, nên đổi phạm vi có hiệu lực từ request kế tiếp (BR-PQ-36). Test đổi cấu hình rồi gọi
    lại bằng `force_authenticate` phải nạp lại user (như với permission). `overrides` (cho xem trước) thì không nhớ.
@@ -230,6 +234,8 @@ class GroupDataScope(models.Model):         # nhóm × đối tượng → giá 
         default_permissions = ()             # chỉ sửa qua service, không qua Admin/ma trận
 ```
 
+`GroupAccessConfig` cũng có `default_permissions = ()` (duyệt lệch 1, review 06/10).
+
 CASCADE vì đây là cấu hình, không phải chứng từ (bất biến 3 chỉ áp FK tới User và chứng từ); Group không bị xoá trong hệ thống.
 Không lưu dòng cho `owner` (luôn rộng nhất). D2, D8 không lưu (suy ra). Chỉ mục: ràng buộc duy nhất `(group_id, object_key)` đủ cho
 resolver.
@@ -289,7 +295,7 @@ Chung mọi lô FE: **không đụng** `erp-console/shared/ui/**` (đợt sửa 
 | Lô | Story | Ai | File được sửa |
 |---|---|---|---|
 | 1 | PV-01 | BE | **chỉ thêm** `backend/apps/accounts/data_scopes/__init__.py`, `data_scopes/tests/**` (fixture, test, tệp mốc). Không sửa code sản phẩm. Commit riêng trước Lô 2 |
-| 2 | PV-02 | BE | `accounts/models.py`, `accounts/migrations/0014,0015`, `accounts/data_scopes/{catalog,resolver,services}.py`, `accounts/capabilities/{registry,services}.py` (bỏ dùng `GROUP_SCOPES`, thêm `version`, `data_scopes`, `data_scope_values`), tests |
+| 2 | PV-02 | BE | `accounts/models.py`, `accounts/migrations/0014,0015`, `accounts/data_scopes/{catalog,resolver,services}.py`, `accounts/capabilities/{registry,services}.py`, `accounts/staff/services.py` (gọi `resolver.forget`, duyệt 06/10) (bỏ dùng `GROUP_SCOPES`, thêm `version`, `data_scopes`, `data_scope_values`), tests |
 | F1 | PV-11, PV-09 FE, PV-10 FE (mock) | FE ∥ Lô 2–5 | `erp-console/features/permissions/**`, `erp-console/e2e/ed_batch14_permissions.py` |
 | 3 | PV-03, PV-07 | BE | `accounts/capabilities/registry.py` (V1, V2), `accounts/auth/services.py` (nhãn V2), `sales/models/orders.py`, `sales/migrations/0014,0015`, `sales/orders/{scope,api,serializers}.py`, `sales/payments/{invoice_list,serializers,api}.py`, `sales/refunds/{api,serializers}.py`, `sales/customers/permissions.py`, `delivery/pii_scope.py`, `reports/dashboard_api.py`, tests |
 | 4 | PV-04, PV-05, PV-06 | BE | `delivery/scope.py` (mới), `delivery/{api,next_steps}.py`, `delivery/confirmation/{scope,api,serializers}.py`, `inventory/returns/{scope,api,serializers}.py`, `sales/customers/{scope.py mới,api,directory_api,next_steps}.py`, `sales/orders/api.py` (lọc `?customer=`), `purchasing/receipts/{scope.py mới,api,services,next_steps}.py`, tests |
@@ -320,4 +326,4 @@ quan `row_version` cho mọi lần lưu của nhóm."
 
 ## 9. Review
 
-(để trống)
+- 06/10 Lô 1–2 BE: CHANGES REQUESTED (H1 luật D7), sau d50d082 **APPROVED**. Chi tiết ở `03b-review-techlead.md`.

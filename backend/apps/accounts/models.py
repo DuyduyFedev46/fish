@@ -155,3 +155,45 @@ class DemoRecord(models.Model):
 
     def __str__(self):
         return f"demo {self.content_type.model}#{self.object_id}"
+
+
+class GroupAccessConfig(models.Model):
+    """
+    Một dòng cho mỗi nhóm quyền: khoá lạc quan cho MỌI lần lưu của nhóm (việc lẫn phạm vi), PV-02, 02b §3.
+
+    `row_version` tăng 1 mỗi lần lưu có thay đổi thật; client gửi lại giá trị đã đọc, lệch thì 409 (Lô 5).
+    Lý do thêm bảng (bất biến 8): `auth.Group` không có chỗ lưu số phiên bản; Duy chốt 02/10 (#9, #12, #13).
+    CASCADE vì đây là cấu hình, không phải chứng từ (bất biến 3 chỉ áp FK tới User và chứng từ).
+    """
+
+    group = models.OneToOneField("auth.Group", on_delete=models.CASCADE, related_name="access_config")
+    row_version = models.PositiveIntegerField(default=1)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        default_permissions = ()  # chỉ sửa qua service (Lô 5), không qua Admin hay ma trận Tầng 1
+
+    def __str__(self):
+        return f"cấu hình {self.group.name} v{self.row_version}"
+
+
+class GroupDataScope(models.Model):
+    """
+    Phạm vi dữ liệu (Tầng 3) của nhóm × đối tượng, PV-02. `object_key` là khoá ở `data_scopes/catalog.py`
+    (orders, deliveries, confirmation, returns, receipts, customers); `value` là một lựa chọn trong catalog.
+    Không lưu dòng cho nhóm `owner` (luôn rộng nhất) và cho đối tượng suy ra (invoices, audit_log).
+    """
+
+    group = models.ForeignKey("auth.Group", on_delete=models.CASCADE, related_name="data_scopes")
+    object_key = models.CharField(max_length=32)
+    value = models.CharField(max_length=40)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        default_permissions = ()
+        constraints = [
+            models.UniqueConstraint(fields=["group", "object_key"], name="uniq_group_data_scope"),
+        ]
+
+    def __str__(self):
+        return f"{self.group.name}/{self.object_key}={self.value}"

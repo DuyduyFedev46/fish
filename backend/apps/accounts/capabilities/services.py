@@ -18,6 +18,7 @@ from django.utils import timezone
 
 from apps.accounts import roles
 from apps.accounts.auth.services import GROUP_LABELS, sorted_groups
+from apps.accounts.data_scopes import services as scope_services
 from apps.accounts.models import AuditLog
 from apps.accounts.staff.services import StaffPermissionError, actor_is_owner
 from apps.common.audit import record_audit
@@ -103,7 +104,7 @@ def _last_changes(group_ids):
     return latest
 
 
-def _summary(group, held, members, last_row) -> dict:
+def _summary(group, held, members, last_row, *, version, stored) -> dict:
     return {
         "id": group.pk,
         "code": group.name,
@@ -114,13 +115,21 @@ def _summary(group, held, members, last_row) -> dict:
         "last_changed_at": _local_iso(last_row.created_at) if last_row else None,
         "last_changed_by": display_name(last_row.actor) if last_row else None,
         "capabilities": capability_states(held),
+        # PV-02: khoá lạc quan của cả nhóm (việc lẫn phạm vi) và giá trị 6 phạm vi sửa được (W3h gửi kèm D7, PO-Q1).
+        "version": scope_services.version_string(version),
+        "data_scope_values": scope_services.data_scope_values(group, stored),
     }
 
 
 def list_groups() -> list:
     groups = _role_groups()
-    last = _last_changes([g.pk for g in groups])
-    return [_summary(g, _held(g), _active_members(g), last.get(g.pk)) for g in groups]
+    ids = [g.pk for g in groups]
+    last = _last_changes(ids)
+    stored, versions = scope_services.load_stored(ids), scope_services.load_versions(ids)
+    return [
+        _summary(g, _held(g), _active_members(g), last.get(g.pk), version=versions[g.pk], stored=stored[g.pk])
+        for g in groups
+    ]
 
 
 def get_group_or_404(code):
@@ -227,20 +236,14 @@ def group_timeline(group) -> list:
     return events
 
 
-def group_scopes(code, held) -> dict:
-    """Phạm vi dữ liệu chỉ đọc. `customers` theo quyền thực tế của nhóm (M2), phần còn lại theo bảng cố định."""
-    scopes = dict(registry.GROUP_SCOPES.get(code, {}))
-    if registry.CUSTOMER_DIRECTORY_PERM in held:
-        scopes["customers"] = registry.SCOPE_ALL_CUSTOMERS
-    return scopes
-
-
 def describe_group(code) -> dict:
     group = get_group_or_404(code)
     held = _held(group)
     members = _active_members(group)
     last = _last_changes([group.pk]).get(group.pk)
-    body = _summary(group, held, members, last)
+    stored = scope_services.load_stored([group.pk])[group.pk]
+    version = scope_services.load_versions([group.pk])[group.pk]
+    body = _summary(group, held, members, last, version=version, stored=stored)
     body.update({
         "members": _members_detail(group),
         "registry": [
@@ -248,7 +251,8 @@ def describe_group(code) -> dict:
              "requires": list(c.requires)}
             for c in registry.CAPABILITIES
         ],
-        "scopes": group_scopes(group.name, held),
+        "data_scopes": scope_services.describe_data_scopes(group, held, stored),
+        "scopes": scope_services.legacy_scopes(group, held, stored),
         "timeline": group_timeline(group),
     })
     return body

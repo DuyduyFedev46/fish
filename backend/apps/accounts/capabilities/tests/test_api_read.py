@@ -9,8 +9,8 @@ from apps.common.tests.fixtures import client_for, make_user
 from .base import ALL_CODES, LIST_URL, detail_url, make_staff, put_url, token_client
 
 LIST_KEYS = {"id", "code", "label", "member_count", "members", "can_view_cost",
-             "last_changed_at", "last_changed_by", "capabilities"}
-DETAIL_EXTRA = {"registry", "scopes", "timeline"}
+             "last_changed_at", "last_changed_by", "capabilities", "version", "data_scope_values"}  # PV-02 thêm 2 khoá
+DETAIL_EXTRA = {"registry", "scopes", "timeline", "data_scopes"}
 MEMBER_LIST_KEYS = {"id", "display_name"}
 MEMBER_DETAIL_KEYS = {"id", "display_name", "username", "other_groups", "is_active", "added_at"}
 
