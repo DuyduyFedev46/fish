@@ -14,3 +14,5 @@ Cả hai tiền tố route vẫn nằm trong `FORBIDDEN_PREFIXES` của AI (gi�
 **S14 (Lô L9, sales/orders):** thêm trạng thái `CANCELLED` ("Đã huỷ theo đơn") — không tới qua `advance_status`/`set_status`
 mà do `apps.sales.orders.services.cancel_paid_order` gán thẳng khi huỷ đơn đã thanh toán (BR-GH-07). Không quay lui, giống
 COMPLETED. Lọc `?status=PREPARING,READY,...` giúp phiếu CANCELLED tự vắng mặt khỏi danh sách hoạt động mặc định.
+
+**W37 (BR-BH-18, BR-GH-24):** `advance_status` và `mark_failed` chạy trong một `atomic`, khoá `SalesOrder` rồi mới `DeliveryNote`, đọc lại sau khoá (xem `apps/sales/orders/completion.py`). Phiếu hoặc đơn đã huỷ thì giao/báo thất bại trả 400 `BR-GH-24`. Giao xong phiếu cuối thì đơn tự Hoàn tất; `POST …/status/` trả thêm `order_status` ở mọi nhánh.

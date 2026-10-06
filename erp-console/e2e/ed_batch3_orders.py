@@ -218,8 +218,8 @@ with sync_playwright() as p:
     ok("ED-09-AC5: đồng hồ chạy (giây đổi)", True)
     ok("ED-09-AC5: 'Tự huỷ lúc' là trường riêng", re.search(r"\d{2}/\d{2}/\d{4}", field(page, "Tự huỷ lúc").inner_text()) is not None, field(page, "Tự huỷ lúc").inner_text())
     path = [t.strip() for t in page.locator("ol li").all_inner_texts()][:5]
-    ok("ED-09-AC4: StatusPath Giữ chỗ → Đã thanh toán → Soạn hàng → Đang giao → Hoàn tất",
-       [re.sub(r"^check\s*", "", t) for t in path] == ["Giữ chỗ", "Đã thanh toán", "Soạn hàng", "Đang giao", "Hoàn tất"], str(path))
+    ok("ED-09-AC4 (W37 S7): StatusPath Giữ chỗ → Chờ gọi xác nhận → Soạn hàng → Đang giao → Hoàn tất",
+       [re.sub(r"^check\s*", "", t) for t in path] == ["Giữ chỗ", "Chờ gọi xác nhận", "Soạn hàng", "Đang giao", "Hoàn tất"], str(path))
     ok("ED-09: chưa có 'Tiếp theo: Huỷ đơn' (guidance của trạng thái khác bị bỏ)", "Tiếp theo: Huỷ đơn" not in page.locator("main").inner_text())
     ok("ED-09: không có nút 'Hoàn tác' ở đâu trong trang", page.get_by_text("Hoàn tác").count() == 0)
     ok("ED-09-AC7 (Chủ): có cột Giá vốn/kg ở phân bổ lô", page.get_by_text(re.compile("Giá vốn")).count() >= 1 or "unit_cost" in str(page.evaluate("() => window.__caveMock.orderJson('loc', 101)")))

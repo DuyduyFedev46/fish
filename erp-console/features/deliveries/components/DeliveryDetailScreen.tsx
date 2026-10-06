@@ -34,7 +34,7 @@ import { ErrorScreen } from "@/shared/ui/states/ErrorScreen";
 import { NoPermission } from "@/shared/ui/states/NoPermission";
 import { NotFoundScreen } from "@/shared/ui/states/NotFoundScreen";
 import { fetchDeliveryNoteDetail, packDeliveryNote, printDeliveryLabel, startDelivery, voidDeliveryLabel } from "../api";
-import { canAssign, doneSteps, hasAction, idFromSearch, nextStepText, pathOf, PATH_STEPS, telHref } from "../deliveryUi";
+import { canAssign, completeToast, doneSteps, isOrderCancelledError, hasAction, idFromSearch, nextStepText, pathOf, PATH_STEPS, telHref } from "../deliveryUi";
 import { PICK_SHEET_HREF, canOpenPickSheet } from "../pickSheet";
 import type { DeliveryNoteDetail, LabelPrintReason } from "../types";
 import { AssignCourierModal } from "./AssignCourierModal";
@@ -126,6 +126,7 @@ export function DeliveryDetailScreen() {
       return;
     }
     setActionError(err instanceof Error && err.message ? err.message : fallback);
+    if (isOrderCancelledError(err)) reloadKeepModal(); // BR-GH-24: tải lại để thấy phiếu đã huỷ
   };
 
   const run = async (key: string, task: () => Promise<void>, fallback: string) => {
@@ -447,6 +448,7 @@ export function DeliveryDetailScreen() {
         <ReportFailureModal
           note={note}
           onClose={() => setModal(null)}
+          onReload={refreshAll}
           onReported={(res) => {
             toast.success(res.needs_decision ? "Đã báo giao thất bại. Phiếu này đã hỏng 2 lần, chờ Chủ hoặc Quản lý quyết định." : "Đã báo giao thất bại.");
             refreshAll();
@@ -458,8 +460,8 @@ export function DeliveryDetailScreen() {
           note={note}
           onClose={() => setModal(null)}
           onConflict={refreshAll}
-          onDone={() => {
-            toast.success("Đã giao xong. Phiếu chuyển sang Hoàn tất.");
+          onDone={(res) => {
+            toast.success(completeToast(res.order_status, "Đã giao xong. Phiếu chuyển sang Hoàn tất."));
             refreshAll();
           }}
         />

@@ -132,7 +132,12 @@ export async function voidDeliveryLabel(
 
 
 /** Trả về phiếu theo bản danh sách (không có dòng hàng, SĐT): màn tải lại chi tiết sau khi đổi trạng thái. */
-export type DeliveryStatusResponse = DeliveryNoteItem & { already?: boolean; needs_decision?: boolean };
+export type DeliveryStatusResponse = DeliveryNoteItem & {
+  already?: boolean;
+  needs_decision?: boolean;
+  /** W37 S1: trạng thái đơn đọc mới sau lần chuyển này (`COMPLETED` khi phiếu cuối vừa xong). Thiếu = BE bản cũ. */
+  order_status?: string | null;
+};
 
 async function postStatus(id: number, body: Record<string, unknown>, signal?: AbortSignal): Promise<DeliveryStatusResponse> {
   const isMock = process.env.NEXT_PUBLIC_USE_MOCK === "1";

@@ -107,7 +107,8 @@ export type TimelineKind =
   | "cancelled"
   | "refund_created"
   | "refund_confirmed"
-  | "credit_note_issued";
+  | "credit_note_issued"
+  | "order_completed";
 
 /** Một mốc trên dòng thời gian (BE L7 bổ sung: ghép chứng từ + AuditLog, `at` tăng dần). `actor_display` "Hệ thống" khi actor=None. */
 export type OrderTimelineEntry = {
@@ -143,6 +144,8 @@ export type OrderDetail = {
   payments: OrderPayment[];
   delivery: OrderDelivery | null;
   refunds: OrderRefund[];
+  /** W37 S5: tiền đã hoàn (REFUNDED) và đang chờ hoàn (PENDING). Phiếu FAILED không tính. Chuỗi Decimal. */
+  refund_summary?: { refunded_amount: string; pending_amount: string };
   /** Có ở BE L7 bổ sung. Thiếu (BE cũ) → FE ghép tạm từ các mốc giờ sẵn có. */
   timeline?: OrderTimelineEntry[];
   available_actions: OrderAction[];

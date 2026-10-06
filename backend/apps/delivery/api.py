@@ -23,6 +23,7 @@ from apps.common.api import (
 
 from apps.common.exceptions import BusinessError
 from apps.common.params import parse_positive_id
+from apps.sales.orders import completion
 
 from . import services
 from .models import DeliveryNote
@@ -201,6 +202,7 @@ class DeliveryNoteViewSet(NoStoreMixin, DocumentViewSet):
 
         data = self.get_serializer(note).data
         data["already"] = already
+        data["order_status"] = completion.current_order_status(note)  # W37: đọc mới từ DB, mọi nhánh
         if needs_decision is not None:
             data["needs_decision"] = needs_decision
         return Response(data)

@@ -2,6 +2,7 @@ import { mockRequireUser } from "@/features/auth/mock";
 import type { MockRequest } from "@/shared/lib/http";
 import { PERM } from "@/shared/lib/nav";
 import { hasLimitedCourierScope } from "@/shared/lib/personalData";
+import { isDeliveryFinished } from "@/shared/lib/orderCompletion";
 import { hasLongDigitRun } from "./deliveryUi";
 import type {
   Deliverer,
@@ -765,6 +766,16 @@ const NEXT_FROM: Record<string, string[]> = {
   FAILED: ["DELIVERING"],
 };
 
+/**
+ * W37 S1: trạng thái đơn sau lần chuyển này, theo luật dùng chung BR-BH-18 (`isDeliveryFinished`). Mọi phiếu cùng đơn được xét.
+ * Kho phiếu mock này không nối với kho đơn mock (features/orders/mock): hai kho dùng mã đơn khác nhau, và import chéo làm bản build
+ * thật giữ lại seed mock (check-no-mock đỏ).
+ */
+function orderStatusAfter(item: DeliveryNoteDetail, statuses: string[]): string | null {
+  if (!item.order?.code) return null;
+  return item.status === "CANCELLED" ? "CANCELLED" : isDeliveryFinished(statuses) ? "COMPLETED" : "PROCESSING";
+}
+
 /** `POST /api/delivery/notes/{id}/status/` — đóng gói, nhận hàng đi giao, hoàn tất, báo thất bại (B5). */
 export function mockPostDeliveryNoteStatus(req: MockRequest | { url?: string; body?: unknown; token?: string | null }): { status: number; body: unknown } {
   const id = noteIdOf(pathOf(req), "status/") ?? 31;
@@ -773,6 +784,13 @@ export function mockPostDeliveryNoteStatus(req: MockRequest | { url?: string; bo
   const item = MOCK_DELIVERY_NOTES.find((n) => n.id === id);
   if (!item || !inCourierScope(me, item)) return { status: 404, body: { detail: "Không tìm thấy phiếu giao hàng" } };
   const to = body.to_status;
+  // Trạng thái mọi phiếu cùng đơn (đặt trong hàm này, không tách hàm riêng: tách ra thì bản build thật giữ lại seed mock).
+  const siblingStatuses = (n: DeliveryNoteDetail) => MOCK_DELIVERY_NOTES.filter((x) => x.order?.code === n.order?.code).map((x) => x.status as string);
+
+  // BR-GH-24: phiếu hoặc đơn đã huỷ → không nhận hàng đi giao, không giao xong, không báo thất bại. 400 kèm `code` (02b §2.3).
+  if ((to === "DELIVERING" || to === "COMPLETED" || to === "FAILED") && item.status === "CANCELLED") {
+    return { status: 400, body: { detail: "Đơn đã huỷ — mang hàng về kho.", code: "BR-GH-24", current_status: item.status } };
+  }
 
   if (to === "FAILED") {
     if (item.status !== "DELIVERING") {
@@ -786,13 +804,13 @@ export function mockPostDeliveryNoteStatus(req: MockRequest | { url?: string; bo
     item.failure_reason = body.failure_reason;
     item.failure_note = (body.failure_note ?? "").trim();
     item.failed_at = new Date().toISOString();
-    return { status: 200, body: { ...viewFor(me, item), already: false, needs_decision: item.failed_attempts >= 2 } };
+    return { status: 200, body: { ...viewFor(me, item), already: false, needs_decision: item.failed_attempts >= 2, order_status: orderStatusAfter(item, siblingStatuses(item)) } };
   }
 
   if (to === "READY" && (item.status === "PREPARING" || item.status === "READY" || item.status === "CONFIRMING" || item.status === "CANCELLED")) {
     try {
       const res = mockPackDeliveryNote(id, body.from_status);
-      return { status: 200, body: { ...viewFor(me, res.note), already: res.already } };
+      return { status: 200, body: { ...viewFor(me, res.note), already: res.already, order_status: orderStatusAfter(res.note, siblingStatuses(res.note)) } };
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Lỗi";
       return { status: 400, body: { detail: msg, code: msg.split(":")[0] } };
@@ -800,7 +818,7 @@ export function mockPostDeliveryNoteStatus(req: MockRequest | { url?: string; bo
   }
 
   if (to && STATUS_LABELS[to]) {
-    if (item.status === to) return { status: 200, body: { ...viewFor(me, item), already: true } };
+    if (item.status === to) return { status: 200, body: { ...viewFor(me, item), already: true, order_status: orderStatusAfter(item, siblingStatuses(item)) } };
     if (!(NEXT_FROM[to] ?? []).includes(item.status)) {
       return failure(409, "STALE_STATE", `Phiếu đang ở ${item.status_label}, tải lại để xem.`);
     }
@@ -808,7 +826,7 @@ export function mockPostDeliveryNoteStatus(req: MockRequest | { url?: string; bo
     item.status_label = STATUS_LABELS[to];
     if (to === "COMPLETED") item.completed_at = new Date().toISOString();
     if (to === "DELIVERING") item.delivery_started_at = new Date().toISOString();
-    return { status: 200, body: { ...viewFor(me, item), already: false } };
+    return { status: 200, body: { ...viewFor(me, item), already: false, order_status: orderStatusAfter(item, siblingStatuses(item)) } };
   }
   return failure(400, "DELIVERY_STATUS_INVALID", "Trạng thái không hợp lệ.");
 }

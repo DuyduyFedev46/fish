@@ -19,7 +19,7 @@ import { ErrorBox } from "@/shared/ui/StateBox";
 import { isConflictError } from "@/shared/ui/form/useSubmit";
 import { useToast } from "@/shared/ui/overlay/Toast";
 import { fetchDeliveryNotes, startDelivery } from "../api";
-import { MINE_GROUPS, groupMine, hasAction, lineNames, telHref, type MineGroupKey } from "../deliveryUi";
+import { MINE_GROUPS, completeToast, groupMine, isOrderCancelledError, orderCancelledMessage, hasAction, lineNames, telHref, type MineGroupKey } from "../deliveryUi";
 import type { DeliveryNoteItem } from "../types";
 import { ConfirmCompleteModal } from "./ConfirmCompleteModal";
 import { ReportFailureModal } from "./ReportFailureModal";
@@ -178,6 +178,9 @@ export function MyDeliveriesScreen() {
       if (isConflictError(err)) {
         toast.warn("Phiếu vừa đổi trạng thái. Đã tải lại danh sách.");
         reloadAll();
+      } else if (isOrderCancelledError(err)) {
+        setError(note.id, orderCancelledMessage(err));
+        reloadAll();
       } else {
         setError(note.id, err instanceof Error && err.message ? err.message : "Chưa chuyển sang Đang giao được. Bấm lại để thử lại.");
       }
@@ -283,6 +286,10 @@ export function MyDeliveriesScreen() {
         <ReportFailureModal
           note={failFor}
           onClose={() => setFailFor(null)}
+          onReload={() => {
+            setFailFor(null);
+            reloadAll();
+          }}
           onReported={(res) => {
             setFailFor(null);
             toast.success(res.needs_decision ? "Đã báo giao thất bại. Phiếu đã hỏng 2 lần, chờ Chủ hoặc Quản lý quyết định." : "Đã báo giao thất bại.");
@@ -309,9 +316,9 @@ export function MyDeliveriesScreen() {
             setCompleteFor(null);
             reloadAll();
           }}
-          onDone={() => {
+          onDone={(res) => {
             setCompleteFor(null);
-            toast.success("Đã giao xong.");
+            toast.success(completeToast(res.order_status, "Đã giao xong."));
             reloadAll();
           }}
         />

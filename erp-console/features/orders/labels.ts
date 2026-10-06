@@ -4,7 +4,6 @@ export const STATUS_FILTERS: { value: string; label: string }[] = [
   { value: "", label: "Mọi trạng thái" },
   { value: "BOOKED,PAID,PROCESSING", label: "Chưa xong" },
   { value: "BOOKED", label: "Giữ chỗ" },
-  { value: "PAID", label: "Đã thanh toán" },
   { value: "PROCESSING", label: "Đang xử lý" },
   { value: "COMPLETED", label: "Hoàn tất" },
   { value: "CANCELLED,AUTO_CANCELLED", label: "Đã huỷ" },
