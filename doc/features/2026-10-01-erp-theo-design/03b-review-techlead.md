@@ -2934,3 +2934,50 @@ M1 và L1 đạt. Không còn lỗi Critical, High hay Medium. QA cần chạy `
 
 ### Kết luận Lô 15 — FE: **CHANGES REQUESTED**
 Đạt các mục giá vốn, dữ liệu cá nhân, phân quyền, hiệu năng AI và icon. Cần sửa **M1** (tổng việc AI cộng trùng) và **M2** (đổi mật khẩu phải là hộp thoại theo F3g/ED-06-AC3). L1 và L2 sửa cùng lượt. L3 và L5 chuyển lô BE. L4 và hai nợ contract (`id` trong dashboard, lọc ngày/`q` ở audit-logs) ghi vào Lô 17. Sau khi sửa thì chạy lại vitest, `ed_batch15_overview_ai_account.py` và `s48_password.py`.
+
+---
+
+## Review #3/#8 BE (06/10)
+
+Phạm vi là `git diff main...HEAD` trên nhánh `wip/duy-quyet-03-10` (21 file, commit 1ec71cd và 195862a), đối chiếu quyết định #3/#8 ở `00-can-duy-quyet.md` (commit 465b70c) và mục "Duy quyết 03/10" trong `03-dev-notes.md`.
+
+**Lệnh techlead đã tự chạy trong worktree:**
+- `manage.py test --parallel 4`: 2873 test, OK.
+- `makemigrations --check --dry-run`: No changes detected.
+- `sqlmigrate inventory 0009 --backwards`: chạy lùi được (DROP COLUMN `deleted_at`, `deleted_by_id`).
+- `python3 scripts/check_naming.py`: OK, không phát sinh vi phạm mới.
+- Một test thăm dò tạm thời (đã xoá, không để lại trong diff) cho thấy:
+  - Sau khi xoá mềm, gọi approve, cancel hay PATCH đều trả 404.
+  - Danh sách lọc `?status=DRAFT,CANCELLED` không còn phiếu đã xoá.
+  - AuditLog ghi `changes={"status": "DRAFT", "deleted": true}`, `note=""`, `object_repr="RT-1 · <mã lô> · 4.000kg"`.
+  - Xoá phiếu đã duyệt WRITE_OFF trả 400 với câu "Phiếu đã cộng vào tồn kho. Huỷ phiếu trước rồi mới xoá được.", nhưng gọi cancel phiếu đó lại trả 409 STALE_STATE (xem M1).
+
+### Kết quả theo hạng mục soát
+
+| Hạng mục | Kết quả |
+|---|---|
+| Không xoá chứng từ | Đạt. Chỉ ghi `deleted_at`/`deleted_by` (`services.py:73-75`), dòng vẫn còn trong `all_objects`. HTTP DELETE trả 405 (theo `DocumentViewSet`). Admin chặn xoá cứng, kể cả với superuser (`admin.py:98-100`), và không còn action `delete_selected`. |
+| Tồn kho và giá vốn | Đạt. Chỉ xoá được phiếu DRAFT/CANCELLED. Model chỉ cho chuyển DRAFT→CANCELLED (`api.py:108-110`), không có đường APPROVED→CANCELLED, nên phiếu Đã huỷ chưa bao giờ đụng tồn. Lúc xoá không ghi `StockLedgerEntry` (test `test_d8_delete_does_not_touch_stock`). Báo cáo hàng hỏng (`reports/services.py:87`) chỉ tính phiếu APPROVED, nên xoá mềm không làm đổi số. |
+| Loại dòng đã xoá | Đạt. `ActiveReturnManager` là manager mặc định nên quan hệ ngược `note.returns`/`batch.returns`, API, `returned_qty_by_batch`, timeline đơn, guidance, chặn chốt lô (`batches/services.py:215`) và AI safety (`ai/execution/safety.py:123`) đều tự loại phiếu đã xoá. |
+| Phân quyền | Đạt. `actor_is_owner` (Chủ hoặc superuser) được kiểm trước `get_object`, nên người giao ngoài phạm vi nhận 403, không lộ phiếu có tồn tại hay không. Quản lý, NV kho, NV giao, CSKH và user không có nhóm nhận 403; chưa đăng nhập nhận 401; xoá lần 2 nhận 404. AI bị chặn bằng `/delete` trong `FORBIDDEN_SUFFIXES`. |
+| AuditLog | Đạt. Chỉ có `{"status", "deleted"}` và actor. Không có ghi chú, SĐT hay tên. `object_repr` chỉ gồm mã phiếu, mã lô và số kg. |
+| Timeline (#3) | Đạt ở cả 4 file timeline trong diff. Huỷ đơn chỉ hiện nhãn mã chuẩn (OTHER và audit cũ có note không mã đều hiện "Lý do khác"). Báo hoàn thất bại, tạo phiếu hoàn và `resolve_payment` không còn ghép `note`/`reason`. Đã rà thêm `common/guidance/timeline.py` và `audit_timeline.py`: hai file này vốn không đưa `note` ra. Tiền trong timeline dùng `format_vnd_ui` ("đ"). Shop vẫn giữ "₫". |
+| Giá vốn | Đạt. `available_actions` chỉ chứa `approve`/`cancel`/`delete`. Serializer phiếu hoàn liệt kê field tường minh và không có field giá vốn. Batch timeline vẫn ẩn số với người không có quyền xem giá vốn. |
+| Migration | Đạt. `0009` chỉ AddField nullable, FK `PROTECT`, chạy lùi được. Lưu ý: nếu rollback sau khi đã có phiếu bị xoá mềm thì các phiếu đó sẽ hiện lại, vì cột bị drop. |
+
+### Lỗi
+
+**Critical:** không có. **High:** không có.
+
+**TL-D8-M1 · Medium · `backend/apps/inventory/returns/services.py:70-72`.** Câu báo lỗi khi xoá phiếu đã duyệt chỉ người dùng làm một việc hệ thống không cho làm. Câu hiện tại là "Phiếu đã cộng vào tồn kho. Huỷ phiếu trước rồi mới xoá được." Nhưng cancel chỉ nhận phiếu DRAFT (`api.py:108-109`), nên phiếu APPROVED gọi cancel sẽ nhận 409 STALE_STATE (thăm dò ở trên). Ngoài ra, với phiếu WRITE_OFF thì câu "đã cộng vào tồn kho" là sai: phiếu này ghi lỗ, không cộng tồn. Câu này nằm trong contract đã báo FE và có test khoá cứng (`test_soft_delete.py:55`). Đề xuất đổi thành câu không dẫn vào ngõ cụt và có mã BR, ví dụ "Phiếu hàng hoàn đã duyệt (đã nhập lại kho hoặc ghi lỗ) không xoá được (BR-PQ-10).", rồi sửa assert và dòng contract trong `03-dev-notes.md`. Gốc của lỗi này nằm ở câu quyết định #8: "phiếu đã cộng tồn phải huỷ trước" giả định có đường huỷ phiếu đã duyệt, nhưng hệ thống không có đường đó, và nếu làm thì phải đảo tồn và giá vốn. **Câu hỏi cho điều phối viên hỏi Duy:** phiếu hàng hoàn đã duyệt có cần một đường đảo hay không? Nếu cần thì đó là tính năng mới (BR-HV), không làm trong lô này. Nếu không cần thì chỉ sửa câu chữ như trên.
+
+**TL-D8-L1 · Low · `backend/apps/inventory/returns/services.py:68`, `api.py:88`, `api.py:108`.** Có race. Hai request cùng qua được `get_object`, ví dụ xoá ∥ xoá, xoá ∥ duyệt, hoặc xoá ∥ huỷ. Bên đến sau chờ khoá. Trên Postgres, sau khi có khoá, điều kiện `deleted_at IS NULL` của manager được xét lại, nên `.get()` ném `DoesNotExist` và request trả 500 thay vì 404/409. Dữ liệu không sai. Đề xuất bắt `ReturnToStock.DoesNotExist` và đổi thành `ConflictError(code="STALE_STATE")` hoặc 404.
+
+**TL-D8-L2 · Low · test thiếu.** Chưa có test cho hai hành vi đổi theo: xoá phiếu DRAFT thì gỡ chặn chốt lô (`batches/services.py:215`) và gỡ chặn ở AI safety (`ai/execution/safety.py:123`). Cũng chưa có test cho việc approve/cancel/PATCH sau khi xoá trả 404. Thăm dò cho thấy hành vi đều đúng, chỉ cần khoá lại bằng test.
+
+**TL-D8-L3 · Low · ghi nhận nghiệp vụ, không phải lỗi code.** Xoá phiếu Chờ duyệt (hàng đã thực về kho nhưng chưa duyệt) thì số kg đó không vào tồn, cũng không ghi lỗ, và `returned_qty_by_batch` được nhả ra. Việc này đúng quyết định #8 (cho xoá phiếu Nháp). FE nên có hộp xác nhận nói rõ "số kg này sẽ không được nhập lại kho".
+
+**TL-D3-L4 · Low · ngoài lô, nhắc lại TL15-FE-L5.** #3 đã sạch ở timeline. Nhưng `AuditLog.note` vẫn chứa chữ tự do: ghi chú huỷ đơn (`orders/api.py:184-187` ghép `label — note_text`), lý do báo hoàn thất bại và `resolve_payment`. Màn Nhật ký vẫn in nguyên cột này. Lô BE sau cần xử lý như đã ghi ở TL15-FE-L5.
+
+### Kết luận #3/#8 BE: **CHANGES REQUESTED**
+Chỉ cần sửa **M1** (câu báo lỗi, assert test và dòng contract trong 03-dev-notes) rồi hỏi Duy câu hỏi đi kèm. Các bất biến đều đạt: không xoá cứng, không lệch tồn hay giá vốn, chỉ Chủ/superuser xoá được, AuditLog không có dữ liệu cá nhân, timeline không có chữ tự do, migration chạy lùi được. Nên sửa L1 và L2 trong cùng lượt. L3 chuyển cho FE (hộp xác nhận). L4 để lô BE sau. Sửa xong M1 thì techlead chỉ cần soát lại diff của M1, không phải review lại toàn bộ.
