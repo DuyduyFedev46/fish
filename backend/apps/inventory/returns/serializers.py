@@ -11,7 +11,9 @@ from rest_framework import serializers
 
 from apps.common.params import parse_positive_id
 from apps.delivery.models import DeliveryNote
+from apps.accounts.staff.services import actor_is_owner
 from apps.inventory.models import Batch, ReturnToStock
+from apps.inventory.returns.services import can_delete_return
 from apps.inventory.stock.serializers import user_display_name
 
 from apps.common.pii import has_long_digit_run
@@ -71,6 +73,7 @@ class ReturnToStockSerializer(serializers.ModelSerializer):
     status_label = serializers.CharField(source="get_status_display", read_only=True)
     created_by_name = serializers.SerializerMethodField()
     approved_by_name = serializers.SerializerMethodField()
+    available_actions = serializers.SerializerMethodField()
 
     class Meta:
         model = ReturnToStock
@@ -78,7 +81,7 @@ class ReturnToStockSerializer(serializers.ModelSerializer):
             "id", "code", "delivery_note", "delivery_note_code", "order_code", "batch", "batch_code", "item_name",
             "qty", "left_warehouse_at", "returned_at", "outside_minutes", "decision", "decision_label",
             "status", "status_label", "created_by", "created_by_name", "approved_by", "approved_by_name",
-            "created_at", "note",
+            "created_at", "note", "available_actions",
         ]
         read_only_fields = [
             "left_warehouse_at", "returned_at", "decision", "status", "created_by", "approved_by", "created_at",
@@ -108,3 +111,27 @@ class ReturnToStockSerializer(serializers.ModelSerializer):
 
     def get_approved_by_name(self, obj):
         return user_display_name(obj.approved_by)
+
+    def get_available_actions(self, obj):
+        """Thao tác `user` làm được trên phiếu ở trạng thái hiện tại: `approve`, `cancel`, `delete` (xoá mềm, chỉ Chủ).
+        Kết quả "chủ" tính một lần mỗi request (danh sách 20 dòng không thêm truy vấn)."""
+        request = self.context.get("request")
+        user = getattr(request, "user", None)
+        if user is None or not user.is_authenticated:
+            return []
+        actions = []
+        if obj.status == ReturnToStock.Status.DRAFT:
+            if user.has_perm("inventory.approve_returntostock"):
+                actions.append("approve")
+            is_creator = obj.created_by_id == user.pk and user.has_perm("inventory.add_returntostock")
+            if is_creator or user.has_perm("inventory.approve_returntostock") or user.has_perm("inventory.change_returntostock"):
+                actions.append("cancel")
+        if can_delete_return(obj) and self._is_owner(user):
+            actions.append("delete")
+        return actions
+
+    def _is_owner(self, user):
+        cached = self.context.get("_is_owner")
+        if cached is None:
+            cached = self.context["_is_owner"] = actor_is_owner(user)
+        return cached

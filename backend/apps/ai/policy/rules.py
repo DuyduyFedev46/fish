@@ -29,6 +29,8 @@ FORBIDDEN_SUFFIXES = (
     "/label",
     "/label/print",
     "/label/void",
+    "/delete/",  # xoá mềm chứng từ (phiếu hàng hoàn, Duy quyết 03/10 #8): chỉ Chủ bấm tay, AI không bao giờ
+    "/delete",
 )
 
 # Phương thức HTTP cấm hẳn (Bất biến 3, H4)

@@ -8,6 +8,14 @@ from django.db import models
 from .batches import Batch
 
 
+class ActiveReturnManager(models.Manager):
+    """Manager mặc định: loại phiếu đã xoá mềm (Duy quyết 03/10 #8). Quan hệ ngược (`note.returns`, `batch.returns`),
+    API, báo cáo, dòng thời gian đều đi qua manager này nên phiếu đã xoá biến khỏi mọi nơi. `all_objects` thấy cả phiếu đã xoá."""
+
+    def get_queryset(self):
+        return super().get_queryset().filter(deleted_at__isnull=True)
+
+
 class ReturnToStock(models.Model):
     """
     Hàng giao thất bại quay về kho (P-08). Nhân viên tạo phiếu, KHÔNG tự nhập lại
@@ -53,6 +61,15 @@ class ReturnToStock(models.Model):
     )
     note = models.TextField("Ghi chú", blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    # Xoá mềm (Duy quyết 03/10 #8): chỉ Chủ/superuser, chỉ phiếu Chờ duyệt hoặc Đã huỷ. Dòng và AuditLog vẫn giữ (BR-PQ-10).
+    deleted_at = models.DateTimeField("Xoá lúc", null=True, blank=True)
+    deleted_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, blank=True,
+        related_name="returns_deleted", verbose_name="Người xoá",
+    )
+
+    objects = ActiveReturnManager()
+    all_objects = models.Manager()
 
     class Meta:
         verbose_name = "Hàng hoàn về kho"
