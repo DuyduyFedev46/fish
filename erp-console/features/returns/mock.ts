@@ -168,7 +168,8 @@ const STALE_DELETE = new Set<number>();
 function deleteResponse(me: Me, id: number): MockResponse {
   if (!me.groups.includes(ROLE.owner)) return err(403, "FORBIDDEN", "Chỉ Chủ mới xoá được phiếu hàng hoàn.");
   const r = db().find((x) => x.id === id);
-  if (!r || !inScope(me, r)) return NOT_FOUND;
+  // BE xoá-mềm trả 404 mặc định của DRF (tiếng Anh) khi phiếu đã bị xoá: giữ nguyên để FE phải tự đổi sang câu tiếng Việt.
+  if (!r || !inScope(me, r)) return err(404, "NOT_FOUND", "No ReturnToStock matches the given query.");
   if (STALE_DELETE.has(id)) return err(409, "STALE_STATE", "Phiếu hàng hoàn vừa được người khác xử lý, hãy tải lại.");
   if (r.status === "APPROVED") return err(400, "RETURN_DELETE_NOT_ALLOWED", "Phiếu hàng hoàn đã duyệt (đã nhập lại kho hoặc ghi lỗ) không xoá được (BR-PQ-10).");
   DB = db().filter((x) => x.id !== id);
@@ -391,6 +392,10 @@ if (process.env.NEXT_PUBLIC_USE_MOCK === "1" && typeof window !== "undefined") {
     returnsAddHidden: (noteId: number, qty: number) => {
       HIDDEN_RETURNED[noteId] = (HIDDEN_RETURNED[noteId] ?? 0) + qty;
       return `Phiếu giao ${noteId}: máy khác đã hoàn thêm ${qty} kg (mock)`;
+    },
+    returnsMarkDeleted: (id: number) => {
+      DB = db().filter((x) => x.id !== id);
+      return `RT-${id} đã bị xoá từ máy khác (mock)`;
     },
     returnsStaleDelete: (id: number) => {
       STALE_DELETE.add(id);

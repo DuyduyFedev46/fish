@@ -72,6 +72,9 @@ export const RETURNS_MSG = {
   /** TL-D8-L3: phiếu Nháp xoá đi thì số kg không về kho; nói rõ để người xoá không tưởng là đã nhập lại. */
   deleteDraftNote: "Số kg trên phiếu này sẽ không được nhập lại kho.",
   deleted: "Đã xoá phiếu hàng hoàn.",
+  /** 404 khi xoá: phiếu đã bị xoá ở máy khác. Câu cố định, không hiện `detail` thô của BE. */
+  deleteGone: "Phiếu này đã bị xoá hoặc không còn tồn tại.",
+  deleteGoneConfirm: "Về danh sách",
 
   // ---- F2n Duyệt ----
   approveTitle: "Duyệt hàng hoàn",

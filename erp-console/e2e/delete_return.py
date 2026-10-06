@@ -113,6 +113,20 @@ def owner(browser):
     ok("Chủ: 400 hiện câu của BE (không kèm mã BR)", BE_400 in dlg.inner_text() and "BR-" not in dlg.inner_text(), dlg.inner_text()[:300])
     ok("Chủ: nút chính đổi 'Thử lại'", dlg.get_by_role("button", name=re.compile("Thử lại")).count() == 1)
 
+    # 404: tab khác xoá trước -> câu tiếng Việt cố định, nút "Về danh sách", không "Thử lại", không câu tiếng Anh thô
+    go(page, "/returns/detail/?id=2")
+    dlg = open_delete(page)
+    page.evaluate("() => window.__caveMock.returnsMarkDeleted(2)")
+    dlg.get_by_role("button", name="Xoá phiếu hàng hoàn").click()
+    dlg.get_by_test_id("delete-gone").wait_for()
+    txt = dlg.inner_text()
+    ok("Chủ: 404 hiện câu tiếng Việt cố định", "Phiếu này đã bị xoá hoặc không còn tồn tại." in txt and "ReturnToStock" not in txt and "No " not in txt, txt[:300])
+    ok("Chủ: 404 không có nút Thử lại, có Về danh sách", dlg.get_by_role("button", name=re.compile("Thử lại")).count() == 0 and dlg.get_by_role("button", name="Về danh sách").count() == 1)
+    page.screenshot(path=f"{SHOTS}/delete-404-1280.png")
+    dlg.get_by_role("button", name="Về danh sách").click()
+    page.wait_for_url(re.compile(r"/returns/?$"))
+    ok("Chủ: 404 bấm Về danh sách -> /returns/", re.search(r"/returns/?$", page.url) is not None, page.url)
+
     # 409
     go(page, "/returns/detail/?id=2")
     dlg = open_delete(page)

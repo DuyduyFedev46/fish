@@ -11,7 +11,7 @@ import { useState, type ReactNode } from "react";
 import { useAuth } from "@/features/auth/components/AuthProvider";
 import { ENUMS } from "@/shared/lib/enums";
 import { dateTime, kg } from "@/shared/lib/format";
-import { loadErrorText } from "@/shared/lib/http";
+import { ApiError, loadErrorText } from "@/shared/lib/http";
 import { canView, homePath } from "@/shared/lib/nav";
 import { Chip } from "@/shared/ui/Chip";
 import { DetailHeader } from "@/shared/ui/detail/DetailHeader";
@@ -80,6 +80,7 @@ function ReturnDetailBody({ item: r, detail, renderAi }: { item: ReturnItem; det
   const [modal, setModal] = useState<{ decision: ApproveDecision } | null>(null);
   const [cancelling, setCancelling] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [deleteGone, setDeleteGone] = useState(false);
   const [version, setVersion] = useState(0);
   const timeline = useReturnTimeline(r.id, version);
 
@@ -97,7 +98,7 @@ function ReturnDetailBody({ item: r, detail, renderAi }: { item: ReturnItem; det
 
   const more: MoreMenuItem[] = [];
   if (canCancel(me, r)) more.push({ key: "cancel", label: M.cancelMenu, danger: true, onSelect: () => setCancelling(true) });
-  if (canDelete(r)) more.push({ key: "delete", label: M.deleteMenu, danger: true, onSelect: () => setDeleting(true) });
+  if (canDelete(r)) more.push({ key: "delete", label: M.deleteMenu, danger: true, onSelect: () => { setDeleteGone(false); setDeleting(true); } });
 
   const primary = mayApprove ? (
     <>
@@ -234,13 +235,35 @@ function ReturnDetailBody({ item: r, detail, renderAi }: { item: ReturnItem; det
           <p>{M.cancelBody(r.code)}</p>
         </ConfirmModal>
       )}
-      {deleting && (
+      {deleting && deleteGone && (
+        <ConfirmModal
+          title={M.deleteTitle}
+          confirmLabel={M.deleteGoneConfirm}
+          noun="phiếu"
+          run={async () => undefined}
+          onDone={() => router.push("/returns/")}
+          onClose={() => router.push("/returns/")}
+          backLabel="Đóng"
+        >
+          <p className="alert-box err" role="alert" data-testid="delete-gone">
+            {M.deleteGone}
+          </p>
+        </ConfirmModal>
+      )}
+      {deleting && !deleteGone && (
         <ConfirmModal
           title={M.deleteTitle}
           confirmLabel={M.deleteConfirm}
           danger
           noun="phiếu"
-          run={() => deleteReturn(r.id)}
+          run={async () => {
+            try {
+              return await deleteReturn(r.id);
+            } catch (e) {
+              if (e instanceof ApiError && e.status === 404) setDeleteGone(true);
+              throw e;
+            }
+          }}
           onDone={() => {
             toast.success(M.deleted);
             router.push("/returns/");
