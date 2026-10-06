@@ -21,7 +21,12 @@ const FORBIDDEN: Array<string | RegExp> = [
   "Trả lô về nhà cung cấp", "Giao không xác nhận", "Gia hạn thêm", "Gia hạn giao", "Bỏ qua bước", "Cần gọi ngay",
   "Xác nhận thanh toán thủ công", "Giao phiếu cho người giao", "Gán phiếu giao", "Đóng gói phiếu giao", "Điều khoản mua hàng",
   "Đổi trả hoàn tiền", "Combo dạng gói", "Khách muốn đổi món –",
+  // QA B2: nhãn trạng thái phiếu hoàn tiền / phiếu giao viết cụt trong toast, hộp thoại, messages.ts.
+  /Đã hoàn(?! tiền| tất| thành| tác)/, /Chờ hoàn(?! tiền)/, "Phiếu chuyển sang Hoàn tất", "Phiếu chuyển sang Thất bại", "Đơn về Chờ xác nhận",
 ];
+
+/** Lỗi thay chữ hàng loạt (QA B3): quét cả comment, vì câu vô nghĩa trong comment cũng dễ lan sang chuỗi hiển thị. */
+const TYPO_PATTERNS: RegExp[] = [/hoàn tiền tất/i, /hoàn tiềnt/i, /tiền tiền/i, /hoàn tiền thành(?! phố)/i];
 
 function walk(dir: string, out: string[] = []): string[] {
   for (const name of readdirSync(dir)) {
@@ -46,6 +51,16 @@ describe("không còn chữ cũ của nhóm A trong mã nguồn ERP (02b 3.2)", 
 
   it("quét được nhiều file", () => {
     expect(files.length).toBeGreaterThan(100);
+  });
+
+  it("không có lỗi thay chữ hàng loạt (hoàn tiền tất, tiền tiền...)", () => {
+    const hits: string[] = [];
+    for (const f of files) {
+      readFileSync(path.join(ROOT, f), "utf8").split("\n").forEach((line, i) => {
+        for (const re of TYPO_PATTERNS) if (re.test(line)) hits.push(`${f}:${i + 1} «${String(re)}»`);
+      });
+    }
+    expect(hits).toEqual([]);
   });
 
   it("không file nào chứa chữ cấm", () => {

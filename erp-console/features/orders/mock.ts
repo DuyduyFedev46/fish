@@ -680,7 +680,7 @@ function timelineOf(o: Order): OrderTimelineEntry[] {
       doc: { type: "refund", id: r.id }, // BE Lô bổ sung A #2: mốc có chứng từ riêng
     });
     if (r.status === "REFUNDED") {
-      out.push({ at: r.confirmed_at || r.created_at || o.created_at, kind: "refund_confirmed", label: `Đã hoàn ${beVnd(r.amount)} (mã GD ${r.bank_txn_ref})`, actor_display: "Lộc" });
+      out.push({ at: r.confirmed_at || r.created_at || o.created_at, kind: "refund_confirmed", label: `Đã hoàn tiền ${beVnd(r.amount)} (mã GD ${r.bank_txn_ref})`, actor_display: "Lộc" });
     }
   });
   // Sắp tăng dần theo giờ, giữ thứ tự chèn (= thứ tự nghiệp vụ) khi cùng giờ.

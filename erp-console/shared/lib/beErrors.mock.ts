@@ -223,7 +223,7 @@ export const BE_ERRORS = {
   HT_MARK_FAILED_WRONG_STATUS: {
     status: 400,
     code: "BR-HT-09",
-    detail: "Chỉ báo thất bại được khi phiếu đang Chờ hoàn.",
+    detail: "Chỉ báo thất bại được khi phiếu đang Chờ hoàn tiền.",
   },
   HT_RETRY_WRONG_STATUS: { status: 400, code: "BR-HT-09", detail: "Chỉ thử lại được khi phiếu đang Thất bại." },
 

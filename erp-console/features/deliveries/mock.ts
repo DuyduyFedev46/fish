@@ -230,7 +230,7 @@ function buildSeed(): DeliveryNoteDetail[] {
       },
     ],
   },
-  // SR-PII-02: hai phiếu hoàn tiền tất của giao1 (id 4). Phiếu 40 kết thúc 10 ngày trước → giao1 thấy tên/địa chỉ/ghi chú = null;
+  // SR-PII-02: hai phiếu giao đã giao xong của giao1 (id 4). Phiếu 40 kết thúc 10 ngày trước → giao1 thấy tên/địa chỉ/ghi chú = null;
   // phiếu 41 kết thúc hôm qua → giao1 vẫn thấy đủ. Vai khác thấy đủ cả hai.
   {
     id: 40,

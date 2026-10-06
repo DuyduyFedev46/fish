@@ -168,7 +168,7 @@ export const ORDERS_MSG = {
   refundSubmit: (amount: string) => `Lập phiếu hoàn tiền ${vnd(amount)}`,
   refundSubmitNoAmount: "Lập phiếu hoàn tiền",
   refunding: "Đang lập phiếu…",
-  resultRefund: (amount: string) => `Đã lập phiếu hoàn tiền ${vnd(amount)}. Trạng thái Chờ hoàn.`,
+  resultRefund: (amount: string) => `Đã lập phiếu hoàn tiền ${vnd(amount)}. Trạng thái Chờ hoàn tiền.`,
   resultRefundDup: (amount: string) => `Phiếu hoàn tiền ${vnd(amount)} đã được lập trước đó. Không tạo phiếu thứ hai.`,
 
   // ---- Danh sách hàng chờ thanh toán ----
@@ -258,7 +258,7 @@ export const ORDERS_MSG = {
   refundsEmptyMonthTitle: "Tháng này chưa có phiếu hoàn tiền",
   refundsEmptyMonthHint: "Chọn tháng khác hoặc bỏ lọc tháng để xem mọi phiếu.",
   refundsShown: (n: number, total: number) => `Đang hiện ${n} / ${total} phiếu`,
-  // Câu tổng theo tháng: nêu từng trạng thái đang cộng (Chờ hoàn / Đã hoàn); phiếu Thất bại không tính.
+  // Câu tổng theo tháng: nêu từng trạng thái đang cộng (Chờ hoàn tiền / Đã hoàn tiền); phiếu Hoàn thất bại không tính.
   refundsMonthSummary: (monthLabel: string, parts: { status: "PENDING" | "REFUNDED"; count: number; total: string }[], failedCount: number) => {
     const name = (st: "PENDING" | "REFUNDED") => ENUMS.refundStatus[st].label;
     const body =
@@ -300,18 +300,18 @@ export const ORDERS_MSG = {
   refundConfirmTxnLabel: "Mã giao dịch chuyển khoản hoàn",
   refundConfirmTxnPlaceholder: "Mã HT… bạn vừa chuyển",
   refundConfirmTxnMissing: "Nhập mã giao dịch chuyển khoản hoàn để đối chiếu sao kê.",
-  refundConfirmAlert: "Phiếu chuyển sang Đã hoàn. Không đổi lại được bằng nút này.",
+  refundConfirmAlert: "Phiếu chuyển sang Đã hoàn tiền. Không đổi lại được bằng nút này.",
   refundConfirmSubmit: (amount: string) => `Xác nhận đã hoàn ${vnd(amount)}`,
-  resultRefundConfirmed: "Đã xác nhận chuyển khoản hoàn. Phiếu chuyển sang Đã hoàn.",
+  resultRefundConfirmed: "Đã xác nhận chuyển khoản hoàn tiền. Phiếu chuyển sang Đã hoàn tiền.",
   markFailedTitle: "Báo chuyển thất bại",
   markFailedReasonLabel: "Lý do thất bại",
-  markFailedAlert: "Phiếu chuyển sang Thất bại. Bấm \"Chuyển lại\" khi đã có thông tin đúng.",
+  markFailedAlert: "Phiếu chuyển sang Hoàn thất bại. Bấm \"Chuyển lại\" khi đã có thông tin đúng.",
   markFailedSubmit: "Báo chuyển thất bại",
-  resultRefundFailed: "Đã ghi nhận chuyển thất bại. Phiếu chuyển sang Thất bại.",
+  resultRefundFailed: "Đã ghi nhận chuyển thất bại. Phiếu chuyển sang Hoàn thất bại.",
   retryTitle: "Chuyển lại",
-  retryAlert: "Phiếu quay lại Chờ hoàn. Chuyển khoản trả khách rồi xác nhận phiếu kèm mã giao dịch.",
+  retryAlert: "Phiếu quay lại Chờ hoàn tiền. Chuyển khoản trả khách rồi xác nhận phiếu kèm mã giao dịch.",
   retrySubmit: (amount: string) => `Chuyển lại ${vnd(amount)}`,
-  resultRetry: "Phiếu quay lại Chờ hoàn.",
+  resultRetry: "Phiếu quay lại Chờ hoàn tiền.",
   rowRefundOrder: "Đơn",
   rowRefundAmount: "Số tiền hoàn",
   rowSourceTxn: "Mã giao dịch tiền vào",
