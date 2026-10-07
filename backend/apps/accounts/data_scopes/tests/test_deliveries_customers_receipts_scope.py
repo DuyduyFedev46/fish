@@ -174,21 +174,20 @@ class DeliveryNoteScopeTests(SceneApiBase):
 
     # --- Lỗ dữ liệu cá nhân QA W37 N2: body của POST .../status/ -----------------------------------------------------
 
-    def test_w37_n2_status_response_hides_customer_data_when_v2_is_off(self):
-        """V2 tắt cho NV kho thì phản hồi đổi trạng thái cũng không có tên và địa chỉ khách (cùng luật với danh sách, chi tiết)."""
+    def test_w37_n2_status_response_keeps_customer_data_when_v2_is_off(self):
+        """Duy 08/10 câu 7: V2 không áp cho phiếu giao. Thu V2 của NV kho thì phản hồi đổi trạng thái và chi tiết vẫn có
+        tên, SĐT, địa chỉ khách (cùng một luật cho danh sách, chi tiết, phản hồi)."""
         revoke(roles.WAREHOUSE_STAFF, "sales.view_order_customer_info")
         note = self.note("note_of_order_assigned_warehouse_courier")
         response = self.post("warehouse_staff", f"/api/delivery/notes/{note.pk}/status/", {"to_status": "COMPLETED"})
         self.assertEqual(response.status_code, 200)
-        self.assertIsNone(response.json()["customer_name"])
-        self.assertIsNone(response.json()["address"])
+        self.assertTrue(response.json()["customer_name"])
+        self.assertTrue(response.json()["address"])
         self.assertEqual(response.json()["order_status"], "COMPLETED")  # khoá W37 được giữ
-        self.assertNotIn("Khách Giả", response.content.decode())
-        self.assertNotIn("Đường Giả", response.content.decode())
         detail = self.get("warehouse_staff", f"/api/delivery/notes/{note.pk}/").json()
-        self.assertIsNone(detail["customer_name"])
-        self.assertIsNone(detail["phone"])
-        self.assertIsNone(detail["address"])
+        self.assertTrue(detail["customer_name"])
+        self.assertTrue(detail["phone"])
+        self.assertTrue(detail["address"])
 
     def test_w37_n2_status_response_matches_detail_rule_when_v2_is_on(self):
         note = self.note("note_of_order_assigned_warehouse_courier")
@@ -204,14 +203,30 @@ class DeliveryNoteScopeTests(SceneApiBase):
         self.assertEqual(response.status_code, 200)
         self.assertTrue(response.json()["customer_name"])
 
-    def test_w37_n2_courier_list_hides_customer_data_without_v2(self):
+    def test_w37_n2_courier_list_keeps_customer_data_without_v2(self):
+        """Duy 08/10 câu 7: NV giao bị thu V2 vẫn thấy đủ tên, SĐT, địa chỉ trên phiếu của mình (còn trong cửa sổ)."""
         revoke(roles.DELIVERY_STAFF, "sales.view_order_customer_info")
         rows = self.get("courier", "/api/delivery/notes/", assigned_to="me").json()["results"]
         self.assertTrue(rows)
         for row in rows:
-            self.assertIsNone(row["customer_name"])
-            self.assertIsNone(row["address"])
-            self.assertIsNone(row["phone"])
+            if row["customer_name"] is None:  # phiếu đã quá cửa sổ SR-PII-02 vẫn che (luật còn lại)
+                continue
+            self.assertTrue(row["address"])
+            if row["status"] in ("DELIVERING", "FAILED"):  # `phone` của dòng danh sách chỉ có khi đang giao hoặc giao thất bại
+                self.assertTrue(row["phone"])
+        self.assertTrue(any(row["customer_name"] for row in rows))
+
+    def test_w37_n2_status_response_hides_customer_data_when_note_is_past_pii_window(self):
+        """SR-PII-02 vẫn đúng cho phản hồi `status/`: phiếu quá cửa sổ thì tên và địa chỉ là null (luật còn lại sau câu 7).
+        Giả lập quá cửa sổ ở serializer vì phiếu đã quá cửa sổ thì NV giao không mở được (D3), nên chỉ phản hồi mới thấy luật."""
+        note = self.note("note_of_order_assigned_courier")
+        with mock.patch("apps.delivery.serializers.is_note_pii_expired", return_value=True):
+            response = self.post("courier", f"/api/delivery/notes/{note.pk}/status/", {"to_status": "COMPLETED"})
+        self.assertEqual(response.status_code, 200)
+        self.assertIsNone(response.json()["customer_name"])
+        self.assertIsNone(response.json()["address"])
+        self.assertNotIn("Khách Giả", response.content.decode())
+        self.assertNotIn("Đường Giả", response.content.decode())
 
 
 # --- PV-05: gọi xác nhận (D4) và khách hàng (D7) ----------------------------------------------------------------------

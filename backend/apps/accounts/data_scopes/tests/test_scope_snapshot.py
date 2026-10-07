@@ -10,8 +10,8 @@ Cố ý đổi hành vi thì sinh lại mốc rồi đọc diff trước khi com
     UPDATE_SCOPE_SNAPSHOT=1 python manage.py test apps.accounts.data_scopes.tests.test_scope_snapshot
 
 Lô 4 (PV-04..06): tài khoản `direct_permissions` (người không nhóm) bị thu hẹp ở phiếu nhập (D6) và khách (D7), 02b §7 D-3.
-Mốc vẫn ghi hành vi cũ; các lệch đó nằm ở `PENDING_DUY_DIFFS` (CHỜ Duy D-3), không phải `APPROVED_DIFFS`. Không merge main
-khi `PENDING_DUY_DIFFS` còn mục.
+Duy duyệt 08/10 D-3 (cùng câu 9 cho người kiêm NV kho + CSKH): các lệch thu hẹp đó nằm ở `APPROVED_DIFFS`, `PENDING_DUY_DIFFS` rỗng.
+Mốc vẫn ghi hành vi cũ (không sinh lại); bộ thu dùng `force_authenticate` nên bỏ qua cổng `AUTH_NO_ROLE`, chỉ ghi lớp phạm vi.
 """
 import json
 import os
@@ -134,33 +134,36 @@ class ScopeSnapshotTests(TestCase):
         self.assertEqual(diffs, [Diff("manager", "orders.list", "-", "visible:order_assigned_other")])
 
     def test_pv01_ac3_only_one_approved_exception(self):
-        """PV-01-AC3: ngoại lệ duy nhất là Q-4 (danh sách hoá đơn, ô tên khách) cho thành viên nhóm NV kho: `warehouse_staff`
+        """PV-01-AC3: ngoại lệ "thấy thêm" duy nhất là Q-4 (danh sách hoá đơn, ô tên khách) cho thành viên nhóm NV kho: `warehouse_staff`
         và người kiêm nhiệm kho + giao `warehouse_courier` (cùng nhóm NV kho, cùng V2). Ghi rõ duyệt 02/10 Q-4.
-        Không có ngoại lệ nào cho `direct_permissions` (R9, D-3)."""
+        Các mục còn lại của `APPROVED_DIFFS` là D-3 (Duy duyệt 08/10), chỉ thu hẹp và chỉ của hai tài khoản D-3."""
         self.assertEqual(
-            APPROVED_DIFFS,
+            APPROVED_DIFFS[:2],
             (
                 ("warehouse_staff", "invoices.list", "+", "pii:*:customer_name"),
                 ("warehouse_courier", "invoices.list", "+", "pii:*:customer_name"),
             ),
         )
-        self.assertFalse([diff for diff in APPROVED_DIFFS if diff[0] == "direct_permissions"])
+        self.assertEqual({diff[0] for diff in APPROVED_DIFFS[2:]}, {"direct_permissions", "warehouse_service"})
         source = (Path(__file__).with_name("snapshot.py")).read_text(encoding="utf-8")
         self.assertIn("Duy duyệt 02/10 Q-4", source)
+        self.assertIn("Duy duyệt 08/10 D-3", source)
+        self.assertIn("Duy duyệt 08/10 D-3 (câu 9)", source)
 
-    def test_pv01_pending_duy_diffs_are_direct_permissions_and_narrowing_only(self):
-        """M1 (review Lô 4): mục CHỜ Duy D-3 chỉ của `direct_permissions` và chỉ thu hẹp (dòng biến mất hoặc 200 thành 404)."""
-        from .snapshot import PENDING_DUY_DIFFS, PENDING_DUY_USERS
+    def test_pv01_d3_approved_diffs_are_narrowing_only(self):
+        """D-3 (Duy duyệt 08/10): các mục của `direct_permissions` và `warehouse_service` chỉ thu hẹp (dòng biến mất hoặc
+        200 thành 404); không còn mục CHỜ Duy."""
+        from .snapshot import D3_USERS, PENDING_DUY_DIFFS
 
-        self.assertTrue(PENDING_DUY_DIFFS)
-        for user, _endpoint, sign, glob in PENDING_DUY_DIFFS:
-            self.assertIn(user, PENDING_DUY_USERS)  # direct_permissions (R9) và warehouse_service (O1, K+C)
+        self.assertEqual(PENDING_DUY_DIFFS, ())
+        d3 = [d for d in APPROVED_DIFFS if d[0] in D3_USERS]
+        self.assertTrue(d3)
+        for user, endpoint, sign, glob in d3:
             narrowing = sign == "-" or (sign == "+" and glob in (
                 "status:*=404", "extra:kpis.*", "visible:order_assigned_direct"))  # hai mục sau chỉ ở dashboard.summary
             self.assertTrue(narrowing, (sign, glob))
             if glob != "status:*=404" and sign == "+":
-                self.assertEqual((user, _endpoint), ("direct_permissions", "dashboard.summary"))
-        self.assertFalse([d for d in APPROVED_DIFFS if d[0] in PENDING_DUY_USERS])
+                self.assertEqual((user, endpoint), ("direct_permissions", "dashboard.summary"))
         # Một dòng thấy THÊM của direct_permissions không được miễn.
         self.assertFalse(is_approved(Diff("direct_permissions", "receipts.list", "+", "visible:receipt_manager_today")))
         self.assertFalse(is_approved(Diff("direct_permissions", "orders.list", "-", "visible:order_assigned_direct")))

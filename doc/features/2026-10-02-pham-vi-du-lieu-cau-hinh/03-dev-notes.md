@@ -334,3 +334,46 @@ Quyền gán trực tiếp không tính. Kiểm theo DB mỗi request nên gỡ 
 - Không đụng `features/permissions/**`, backend/, frontend/.
 - Nợ/ghi chú: ed_batch15_overview_ai_account cần build bật AI (chờ `[data-attention=ai_proposals]`); ở build tắt AI nó dừng ở ca này, không liên quan lô. Tên hiển thị người mock "CSKH Thử"/"CSKH Khác" và từ khoá tìm AI "cskh" giữ nguyên (không phải nhãn vai).
 - Sửa theo review (R1–R3, N1): R1 thêm `ai_config_kill` vào `AI_ONLY_ACTIONS` (auditModel.ts) + vitest; R2 nhãn nhóm lệnh AI mock = "Chăm sóc khách hàng"; R3 câu 404 mock gọi xác nhận = nguyên văn BE "Không tìm thấy mục chờ gọi trong phạm vi của bạn."; N1 `onlyDelivery` thêm `!me.is_superuser &&` + 1 ca vitest (nav.test.ts). Kiểm: tsc sạch, vitest 1235/1235, build MOCK=0 + check-no-mock + check-ai-chunks XANH.
+
+## Lô PV-QĐ (08/10) — be-dev, nhánh `feat/pham-vi-du-lieu`
+
+Theo `02c-quyet-dinh-08-10.md` mục G.2 (B.4, C.1–C.2, D, C1). Không đụng `erp-console/`, `accounts/auth/authentication.py`, migration.
+
+**1. Gộp main (commit `4ef5aa8`, main `f3a543f`).** Giải xung đột:
+- `auth/services.py`, `auth/tests/test_s6_me.py`, `test_s47_me_labels.py`: lấy phía main (tập khoá `ai_features_enabled` + `is_superuser`).
+- `capabilities/services.py`: giữ CAS/`version`, `_parse_body`, `_scope_events`, `scope_change_label` của nhánh; thêm `registry.visible_keys` / `visible_capabilities`
+  của main (bỏ cờ `customer_data_widening_confirmed` rồi mới lọc việc AI; PUT việc AI khi AI tắt vẫn 400 `INPUT_NOT_ALLOWED`).
+- `capabilities/next_steps.py`: nhãn `scope_change_label` của nhánh + `row_filter=has_visible_capability_change` của main.
+- `capabilities/tests/test_ai_hidden.py` (không xung đột nhưng hỏng sau gộp): PUT thiếu `version` nên 400; đổi sang `put_caps` (tự lấy version).
+- `reports/dashboard_api.py`: giữ D1 (`orders_in_scope`), "Đơn gần đây" lấy từ `orders_in_scope` kèm `select_related/prefetch_related` của 17a.
+- `sales/orders/api.py`: giữ lọc `?customer=` theo D7 và `POST search/` (17b) của main. Mở rộng nhỏ: `search/` cũng áp D7 cho `customer` trong body
+  (`_customer_filter_outside_scope(request, params)`), để `?customer=` và body cùng một luật (PV-05-AC6).
+- 3 file doc hồ sơ: giữ cả hai phía.
+- Migration: nhánh không có migration nào so với main; `sales/0019` (main) giữ nguyên số; `makemigrations --check` sạch.
+
+**2. Mốc PV-01 (D-3, câu 9).** `snapshot.py`: `PENDING_DUY_DIFFS = ()`; mục `direct_permissions` (D6, D7, `refunds.*`, `dashboard.summary` kèm hai mục `+`)
+chuyển sang `APPROVED_DIFFS` ghi "Duy duyệt 08/10 D-3"; mục `warehouse_service` (8 cặp `confirmation.*`, `actions.confirmation_*`) ghi
+"Duy duyệt 08/10 D-3 (câu 9)". `PENDING_DUY_USERS` đổi tên `D3_USERS`. Không sinh lại `scope_snapshot_baseline.json`: bộ thu dùng `force_authenticate`
+nên bỏ qua cổng `AUTH_NO_ROLE` (người không nhóm bị 403 toàn bộ ở thực tế), mốc vẫn ghi hành vi lớp phạm vi và các lệch nằm ở danh sách được duyệt;
+đây là lớp phòng thủ thứ hai phía sau cổng. `test_scope_snapshot.py`: sửa docstring, `test_pv01_ac3_only_one_approved_exception` (hai mục đầu = Q-4, phần còn lại
+chỉ của hai tài khoản D-3, có "Duy duyệt 08/10 D-3" trong nguồn), `test_pv01_pending_duy_diffs_...` thành `test_pv01_d3_approved_diffs_are_narrowing_only` (kèm `PENDING_DUY_DIFFS == ()`).
+Các khẳng định "một dòng `+` lạ của direct_permissions không được miễn" giữ nguyên.
+
+**3. Câu 7 (V2 không áp cho phiếu giao).** `delivery/serializers.py`: xoá luật "không có V2 thì ẩn" và import `can_view_order_customer_info`;
+`_customer_data_hidden` còn một luật (`pii_restricted` và phiếu quá cửa sổ SR-PII-02). Test (TDD, đỏ rồi xanh):
+`test_w37_n2_status_response_keeps_customer_data_when_v2_is_off` (lật), `test_w37_n2_courier_list_keeps_customer_data_without_v2` (lật),
+mới `test_w37_n2_status_response_hides_customer_data_when_note_is_past_pii_window` (cửa sổ, giả lập `is_note_pii_expired` ở serializer vì phiếu quá cửa sổ thì NV giao
+không mở được theo D3). Tem `/label/` giữ nguyên (che SĐT, chờ Duy Q1). PV-01 xanh, không lệch `deliveries.*`.
+
+**4. C1.** Đã code ở `5fd4032` (có trong HEAD): `refunds/api.py` đi qua `scope_refunds_for`, `dashboard_api.py` qua `scope_orders_for` (D1). Sau gộp vẫn giữ cả hai lời gọi,
+test PV-05/dashboard xanh. Trạng thái chờ đã gỡ (`PENDING_DUY_DIFFS` rỗng); `02b` R9 và D-3 ghi "Duy chốt 08/10".
+
+**Nợ / ghi chú.** (a) Việc vận hành trước deploy production: đếm tài khoản `is_active`, không superuser, không nhóm (chỉ in username), báo Duy xếp nhóm trước khi deploy.
+(b) Test cổng thật `test_no_role_gate.py` đã có từ main; PV-12 (Lô 6) nên quét bằng token thật.
+
+**Kiểm chứng PV-QĐ (08/10, chạy tuần tự `--parallel 1`).**
+- SQLite: `Ran 3526 tests in 289s — OK (skipped=3)`.
+- PostgreSQL 16 (DB `cangca_pvqd`, main chưa có sửa Postgres): `Ran 3523 — FAILED (failures=13, errors=55)`. Toàn bộ nằm trong nhóm lỗi đã biết của nhánh `fix/postgres-compat`:
+  28 `FOR UPDATE cannot be applied to the nullable side of an outer join` (huỷ phiếu nhập, publish lô, claim xác nhận, hoàn tác AI trả 502 vì dispatch bắt lỗi này, và mốc PV-01 lệch `actions.confirmation_claim=EXC:NotSupportedError`),
+  23 `seed_qa` guard (22 lỗi + `test_password_env_is_required`), 3 race `django_content_type` unique, `test_qa_lo4_tien` (2), `supplier_crud` (1 sắp xếp), `shop_labels` (varchar 12), cost overflow (1), `completion_race_postgres` (2, cùng nhóm FOR UPDATE/race). Không có ca đỏ ngoài danh sách.
+- `makemigrations --check --dry-run`: No changes detected. `python3 scripts/check_naming.py`: OK, không phát sinh mới.

@@ -264,7 +264,7 @@ Phụ thuộc: `0015_seed…` cần `accounts/0013_rename_groups_to_english`, `s
 | R6 | Leo quyền ghi phạm vi | Cao | `actor_is_owner` trước mọi kiểm; preview cùng luật | PV-08-AC7, PV-09-AC8 |
 | R7 | Ghi đè đồng thời | Trung bình | `select_for_update` + so `row_version` trong transaction | PV-10-AC1..5 (AC5 luồng thật chỉ chạy trên Postgres: `skipUnless(connection.vendor == "postgresql")`; SQLite chạy bản tuần tự) |
 | R8 | Hiệu năng | Thấp | ≤ 3 truy vấn phân giải / request, nhớ trên user; hàng chờ gọi phân giải 1 lần / request | `assertNumQueries` danh sách đơn: tăng tối đa +3 so với số gốc (be-dev ghi số vào 03-dev-notes) |
-| R9 | Người không nhóm có quyền gán trực tiếp đổi hành vi (D6 hẹp lại, D7 thành `none`; **D4 giữ `none`**, không lên rank 0 vì như vậy là mở thêm dữ liệu khách; sửa 08/10, review Lô 4) | Trung bình | PV-02-AC4 đã duyệt; kiểm đếm trên production trước deploy | điểm dừng D-3 |
+| R9 | Người không nhóm có quyền gán trực tiếp đổi hành vi (D6 hẹp lại, D7 thành `none`; **D4 giữ `none`**, không lên rank 0 vì như vậy là mở thêm dữ liệu khách; sửa 08/10, review Lô 4) | Trung bình | PV-02-AC4 đã duyệt; kiểm đếm trên production trước deploy | Duy chốt 08/10 (D-3): chặn hẳn ở cổng xác thực `AUTH_NO_ROLE`; phạm vi thu hẹp là lớp phòng thủ thứ hai, `PENDING_DUY_DIFFS` rỗng |
 | R10 | Sai lệch ma trận production so với migration (Chủ đã đổi việc qua B4) | Trung bình | data migration đọc quyền **thực tế** cho D7; V2 bật cố định theo Q-4 | điểm dừng D-2 |
 | R11 | FE cũ gửi PUT không `version` sau khi BE lên | Thấp | triển khai BE và ERP cùng lượt | ghi ở 02c |
 
@@ -312,7 +312,7 @@ mock vẫn là `sessionStorage` (chỉ chế độ mock, không có dữ liệu 
 |---|---|---|---|
 | D-1 | 🔴 | N1 (QA Lô 12): sau phát hành NV kho **vẫn** thấy tên/SĐT/địa chỉ trên đơn vì V2 bật mặc định (Q-4). Đóng N1 theo hướng "Chủ tự tắt V2 cho NV kho khi muốn"? V2 có bao gồm **địa chỉ** trên chi tiết đơn không? | Đóng N1 theo cấu hình, không đổi mặc định. V2 gồm tên, SĐT, địa chỉ trên đơn, hoá đơn, phiếu hoàn tiền |
 | D-2 | 🟡 | Trước khi migrate production: điều phối viên chạy lệnh đếm (không dữ liệu cá nhân) quyền hiện tại của 5 nhóm để biết Chủ đã đổi gì qua B4 | Bắt buộc, ghi số vào 03-dev-notes |
-| D-3 | 🟡 | Người dùng không nhóm có quyền gán trực tiếp: đếm trên production. Nếu > 0 thì hành vi của họ đổi (D6 hẹp lại, D7 `none`, D4 rank 0) | Đếm trước deploy; > 0 thì hỏi Duy từng người |
+| D-3 | 🟡 | Người dùng không nhóm có quyền gán trực tiếp: đếm trên production. Nếu > 0 thì hành vi của họ đổi (D6 hẹp lại, D7 `none`, D4 rank 0) | Duy chốt 08/10: chặn hẳn ở cổng xác thực (`AUTH_NO_ROLE`). Đếm trước deploy; > 0 thì báo Duy danh sách để xếp nhóm trước khi deploy |
 | D-4 | 🟡 | W3i chuyển từ "bật là lưu ngay" sang bản nháp + nút "Lưu thay đổi" (W3h giữ bật ngay) | Đồng ý (story PV-11 đã ngầm đòi) |
 | D-5 | 🟢 | Thêm phạm vi cho phiếu hoàn tiền và dashboard (cửa phụ, không đổi mặc định) | Làm, không cần hỏi trừ khi Duy phản đối |
 
