@@ -33,8 +33,8 @@ export function parseCodeRef(raw: string): CodeRef | null {
   if (refund) return { kind: "id", code, href: `/orders/refunds/detail/?id=${Number(refund[1])}` };
   if (/^SO\d{6}-[A-Z0-9]{4,8}$/.test(code)) return { kind: "order", code };
   if (/^GH-[A-Z0-9][A-Z0-9-]{2,}$/.test(code)) return { kind: "note", code };
-  // Mã lô: các đoạn chữ-số nối bằng "-", có ít nhất một chữ số (vd CA-THU-260928-VT01, LO-0912, L0914-CT01).
-  if (/^(?=.*\d)[A-Z0-9]{1,12}(?:-[A-Z0-9]{1,12})+$/.test(code)) return { kind: "batch", code };
+  // Mã lô: các đoạn chữ-số nối bằng "-", có ít nhất một chữ số và một chữ cái (vd CA-THU-260928-VT01, LO-0912, L0914-CT01).
+  if (/^(?=.*\d)(?=.*[A-Z])[A-Z0-9]{1,12}(?:-[A-Z0-9]{1,12})+$/.test(code)) return { kind: "batch", code };
   return null;
 }
 

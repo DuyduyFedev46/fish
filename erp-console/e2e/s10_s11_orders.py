@@ -93,10 +93,10 @@ with sync_playwright() as p:
     ok("S11: đơn Giữ chỗ + Chủ → available_actions có confirm_payment", "confirm_payment" in j["available_actions"], str(j["available_actions"]))
     j108 = page.evaluate("() => window.__caveMock.orderJson('loc', 108)")
     ok("L7 (mock theo BE): có match_status_label, source_label, delivery.status_label",
-       j108["payments"][0].get("match_status_label") == "Khớp — đã xác nhận" and j108["payments"][0].get("source_label") == "Webhook SePay"
+       j108["payments"][0].get("match_status_label") == "Khớp đơn" and j108["payments"][0].get("source_label") == "Ngân hàng báo"
        and j108["delivery"].get("status_label") == "Giao thất bại", str(j108["payments"][0]))
     open_order(page, 108)
-    ok("L7: chi tiết hiện nhãn BE 'Webhook SePay' ở thanh toán", "Webhook SePay" in page.locator("main").inner_text())
+    ok("L7: chi tiết hiện nhãn BE 'Ngân hàng báo' ở thanh toán", "Ngân hàng báo" in page.locator("main").inner_text())
     ok("L7: timeline có 'Giao thất bại' kèm người giao (Anh Phúc)", "Giao thất bại" in page.locator("main").inner_text() and "Anh Phúc" in page.locator("main").inner_text())
 
     # B13 (số tiền): gọi thẳng luật mock → 400 BR-TT-08, không ghi giao dịch

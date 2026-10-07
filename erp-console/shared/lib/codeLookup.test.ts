@@ -14,7 +14,7 @@ describe("parseCodeRef: nhận dạng mẫu mã", () => {
     expect(parseCodeRef("#41")).toMatchObject({ href: "/orders/refunds/detail/?id=41" });
   });
   it("tên, SĐT, từ thường, chuỗi có khoảng trắng hoặc dấu → null (không gọi API)", () => {
-    for (const v of ["", "0912345678", "0912 345 678", "Nguyễn Văn An", "ca thu", "An", "hoa", "tom-su", "An-Binh", "Chị Hạnh", "x".repeat(41), "09-1234-5678-90"]) {
+    for (const v of ["", "0912345678", "0912 345 678", "Nguyễn Văn An", "ca thu", "An", "hoa", "tom-su", "An-Binh", "Chị Hạnh", "x".repeat(41), "09-1234-5678-90", "091-234-56", "12-34"]) {
       expect(parseCodeRef(v), v).toBeNull();
     }
   });
