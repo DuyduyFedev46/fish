@@ -69,7 +69,7 @@ export type CustomerCall = {
 export type ConfirmationQueueRow = ConfirmationQueueItem & { id: number };
 
 export type ConfirmationQueueDetail = ConfirmationQueueItem & {
-  /** Mã phiếu giao ("Phiếu giao" ở chi tiết). BE (02b R1) chưa trả trường này: thiếu thì hiện "—" (lệch hợp đồng, ghi ở 03-dev-notes). */
+  /** Mã phiếu giao ("Phiếu giao" ở chi tiết). Từ Lô 17b-BE (L5-code) danh sách và chi tiết đều trả, không null; BE cũ thiếu thì hiện "—". */
   note_code?: string | null;
   calls: CustomerCall[];
   available_actions: string[];

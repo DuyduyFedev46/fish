@@ -207,6 +207,10 @@ export const CATALOG_MSG = {
   minAmountRequired: "Nhập giá trị đơn tối thiểu.",
   discountRequired: "Nhập mức giảm.",
   discountPositive: "Mức giảm phải lớn hơn 0. Hãy nhập lại mức giảm.",
+  amountTooBig: "Số tiền quá lớn. Nhập số nhỏ hơn 1.000 tỷ đồng.",
+  qtyTooPrecise: "Tối đa 3 chữ số sau dấu phẩy. Hãy nhập lại số kg.",
+  qtyTooBig: "Số kg quá lớn. Hãy nhập lại số kg.",
+  percentTooPrecise: "Tối đa 2 chữ số sau dấu phẩy. Hãy nhập lại phần trăm.",
   discountPercentMax: "Phần trăm giảm không được lớn hơn 100. Hãy nhập lại từ 0 đến 100.",
 
   // ---- nhóm hàng ----

@@ -20,7 +20,7 @@ expect.set_options(timeout=10_000)
 SMALL_TAPS_JS = """() => [...document.querySelectorAll('button, a, input, select')].filter(e => {
     const r = e.getBoundingClientRect(); const s = getComputedStyle(e);
     return r.width > 0 && r.height > 0 && s.visibility !== 'hidden' && r.x >= 0 && r.x < 360 && r.y < innerHeight
-      && !e.classList.contains('sr-only') && !e.classList.contains('lt-link') && !e.matches('input[type=checkbox]') && (r.height < 44 || (!['INPUT', 'SELECT'].includes(e.tagName) && r.width < 44));
+      && !e.classList.contains('sr-only') && !e.matches('input[type=checkbox]') && (r.height < 44 || (!['INPUT', 'SELECT'].includes(e.tagName) && r.width < 44));
   }).map(e => (e.getAttribute('aria-label') || e.innerText || e.tagName).trim().slice(0,30) + ' ' + Math.round(e.getBoundingClientRect().width) + 'x' + Math.round(e.getBoundingClientRect().height))"""
 
 NO_PERM = "không có quyền"
@@ -425,7 +425,31 @@ def run_mobile(browser, errors):
         small = page.evaluate(SMALL_TAPS_JS)
         ok(f"360px {name}: nút / liên kết / ô nhập đủ 44px", not small, str(small[:6]))
         page.screenshot(path=f"{SHOTS}/{shot}", full_page=True)
+    # Lô 17b G6: Hoá đơn bán ở 360px: mã không xuống dòng/cắt, hoá đơn Đã huỷ gạch ngang, ô tìm chặn chuỗi giống SĐT
+    page.goto(BASE + "/accounting/sales-invoices/")
+    page.wait_for_load_state("networkidle")
+    settle(page)
+    wrap = page.evaluate("() => [...document.querySelectorAll('main tbody tr td.mono a, main tbody tr td.mono span')].filter(e => e.children.length === 0 && (() => { const r = document.createRange(); r.selectNodeContents(e); return new Set([...r.getClientRects()].map(x => Math.round(x.top))).size > 1; })()).map(e => e.textContent)")
+    ok("360px Hoá đơn bán: mã hoá đơn / mã đơn không xuống dòng (văn bản một dòng)", not wrap, str(wrap[:3]))
+    cut = page.evaluate("() => [...document.querySelectorAll('main tbody tr td a')].filter(a => a.scrollWidth > a.clientWidth + 1).map(a => a.textContent)")
+    ok("360px Hoá đơn bán: cột Đơn không cắt mã đơn", not cut, str(cut[:3]))
+    page.get_by_label("Trạng thái hoá đơn").select_option(label="Đã huỷ")
+    page.wait_for_load_state("networkidle")
+    settle(page)
+    struck = page.evaluate("() => [...document.querySelectorAll('main tbody tr td .cancelled, main tbody tr td [class*=cancelled]')].map(e => getComputedStyle(e).textDecorationLine)")
+    ok("360px Hoá đơn bán: dòng Đã huỷ gạch ngang", bool(struck) and all("line-through" in s for s in struck) or page.locator("main tbody tr").count() == 0, str(struck[:3]))
+    page.get_by_label("Trạng thái hoá đơn").select_option("")
+    box = page.get_by_role("searchbox", name="Tìm hoá đơn bán")
+    page.evaluate("() => window.__caveMock && window.__caveMock.clearLog && window.__caveMock.clearLog()")
+    box.fill("0912345678")
+    page.wait_for_timeout(700)
+    ok("360px Hoá đơn bán: gõ SĐT → báo 'chỉ tìm theo mã', không gửi request có SĐT", page.get_by_test_id("invoice-search-blocked").is_visible() and not any("0912345678" in x for x in page.evaluate("() => window.__caveMock.log.slice()")), "")
+    ok("Hoá đơn bán: SĐT gõ vào ô tìm không nằm trong URL/storage", "0912345678" not in page.url and "0912345678" not in storage_dump(page))
+    box.fill("")
     # Hộp Thêm hoá đơn trên điện thoại
+    page.goto(BASE + "/accounting/purchase-invoices/")
+    page.wait_for_load_state("networkidle")
+    settle(page)
     page.get_by_test_id("add-invoice").click()
     page.get_by_role("dialog").wait_for()
     settle(page)

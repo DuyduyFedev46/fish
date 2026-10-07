@@ -54,6 +54,17 @@ export function FormPage({ title, back, alert, onSubmit, primaryText, submitting
   useEffect(() => {
     if (failed && !submitting) focusFirstInvalid(formRef.current);
   }, [failed, submitting]);
+  // Xung đột phiên bản (409): banner "Tải lại" nằm đầu form, người dùng đang ở cuối trang dài nên không thấy gì xảy ra sau khi bấm Lưu.
+  // Banner vừa xuất hiện → cuộn vào khung nhìn và đưa focus vào đó (trình đọc màn hình cũng đọc ngay). Chỉ làm một lần cho mỗi lần xuất hiện.
+  const bannerShown = useRef(false);
+  useEffect(() => {
+    const banner = formRef.current?.querySelector<HTMLElement>("[data-conflict-banner]") ?? null;
+    if (banner && !bannerShown.current) {
+      banner.scrollIntoView({ block: "center" });
+      banner.focus({ preventScroll: true });
+    }
+    bannerShown.current = !!banner;
+  });
   return (
     <form
       ref={formRef}

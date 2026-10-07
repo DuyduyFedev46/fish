@@ -10,7 +10,7 @@ import { ApiError } from "@/shared/lib/http";
 import { dateTimeFull } from "@/shared/lib/format";
 import { ErrorBox, Loading } from "@/shared/ui/StateBox";
 import { Icon } from "@/shared/ui/Icon";
-import { SideSheet } from "@/shared/ui/SideSheet";
+import { Modal } from "@/shared/ui/overlay/Modal";
 import { getEntryVersion } from "../api";
 import { isSafeHref } from "../editor/safeHref";
 import type { Block, ContentEntryVersionDetail, InlineNode } from "../types";
@@ -86,7 +86,7 @@ function BlockView({ block }: { block: Block }) {
   }
 }
 
-export default function PolicyVersionSheet({ entryId, versionNo, onClose }: Props) {
+export default function PolicyVersionModal({ entryId, versionNo, onClose }: Props) {
   const [detail, setDetail] = useState<ContentEntryVersionDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
@@ -121,9 +121,8 @@ export default function PolicyVersionSheet({ entryId, versionNo, onClose }: Prop
   const retry = useCallback(() => setReload((n) => n + 1), []);
 
   return (
-    <SideSheet title={notFound ? `Phiên bản ${versionNo}` : `Phiên bản ${versionNo} (khách đã đồng ý)`} onClose={onClose}>
-      {(close) => (
-        <div className={s.wrap} data-policy-version-sheet>
+    <Modal size="lg" title={notFound ? `Phiên bản ${versionNo}` : `Phiên bản ${versionNo} (khách đã đồng ý)`} onClose={onClose}>
+        <div className={s.wrap} data-policy-version-modal>
           {loading ? (
             <Loading label={`Đang tải phiên bản ${versionNo}…`} />
           ) : notFound ? (
@@ -133,7 +132,7 @@ export default function PolicyVersionSheet({ entryId, versionNo, onClose }: Prop
               </span>
               <p className="state-title">Không tìm thấy phiên bản {versionNo}</p>
               <p className={s.hint}>Phiên bản này không có trong lịch sử của bài. Hãy quay về bài để xem các phiên bản đã đăng.</p>
-              <button type="button" className="btn primary" onClick={close}>
+              <button type="button" className="btn primary" onClick={onClose}>
                 Về bài
               </button>
             </div>
@@ -166,14 +165,13 @@ export default function PolicyVersionSheet({ entryId, versionNo, onClose }: Prop
                 )}
               </div>
               <div className={s.actions}>
-                <button type="button" className="btn" onClick={close}>
+                <button type="button" className="btn" onClick={onClose}>
                   Về bài
                 </button>
               </div>
             </>
           ) : null}
         </div>
-      )}
-    </SideSheet>
+    </Modal>
   );
 }

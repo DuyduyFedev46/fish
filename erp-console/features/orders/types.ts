@@ -31,7 +31,7 @@ export type OrderListParams = {
   /** YYYY-MM-DD (ngày theo giờ Việt Nam). Rỗng = không giới hạn. */
   date_from: string;
   date_to: string;
-  /** Mã đơn hoặc SĐT, khớp một phần. */
+  /** Mã đơn, SĐT hoặc tên, khớp một phần. Đi bằng POST search/ (không vào URL). */
   q: string;
   /** Lô 3 R3: lọc theo khách (id) — BE trả 403 khi người xem không có quyền xem khách. Chỉ id, không bao giờ là SĐT/tên. */
   customer?: string;

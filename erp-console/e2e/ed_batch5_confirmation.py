@@ -353,7 +353,7 @@ def decisions(browser):
         ok(f"AC4 {user}: lần bấm đầu chỉ hỏi lại, chưa huỷ", dialog(page).is_visible() and "Xác nhận huỷ đơn" in dlg.inner_text() and "/orders/" not in page.url)
         if user == "loc":
             dlg.locator("button.danger").click()
-            page.wait_for_url(re.compile(r"/orders/\?order=\d+&open=refund"), timeout=10_000)
+            page.wait_for_url(re.compile(r"/orders/detail/\?id=\d+&open=refund"), timeout=10_000)
             ok("AC4 loc: huỷ xong chuyển sang hoàn tiền của đơn", True, page.url)
         else:
             # ql1: quay lại, chọn Bỏ qua gọi xác nhận

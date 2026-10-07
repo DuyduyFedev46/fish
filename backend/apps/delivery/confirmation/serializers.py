@@ -167,6 +167,7 @@ class ConfirmationQueueItemSerializer(serializers.ModelSerializer):
 
         data = {
             "note_id": note.pk,
+            "note_code": note.code,  # L5-code: mã phiếu giao (không phải dữ liệu cá nhân)
             "order_id": order.pk if order else None,
             "order_code": order.code if order else "",
             "note_status": note.status,

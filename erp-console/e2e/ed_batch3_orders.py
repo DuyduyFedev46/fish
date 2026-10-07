@@ -175,9 +175,12 @@ with sync_playwright() as p:
     ok("ED-09: lọc Giữ chỗ gửi ?status=BOOKED", any("status=BOOKED" in x for x in log(page)), str(log(page)))
     page.get_by_label("Lọc theo trạng thái").select_option(label="Mọi trạng thái")
     idle(page)
+    clear_log(page)
     page.get_by_role("searchbox", name="Tìm đơn hàng").fill("0901234")
-    page.wait_for_function("() => window.__caveMock.log.some(x => x.includes('q=0901234'))")
+    # Lô 17b NEW-1: từ khoá đi bằng POST search/, không nằm trong URL của request nào.
+    page.wait_for_function("() => window.__caveMock.log.some(x => x.includes('POST /api/sales/orders/search/'))")
     idle(page)
+    ok("NEW-1: tìm theo SĐT gửi POST /api/sales/orders/search/, URL không chứa SĐT", not any("0901234" in x for x in log(page)) and any("POST /api/sales/orders/search/" in x for x in log(page)), str(log(page)))
     ok("ED-09: tìm theo SĐT một phần → 1 đơn của Chị Hoa", rows.count() == 1 and "Chị Hoa" in rows.first.inner_text(), str(rows.count()))
     page.get_by_role("searchbox", name="Tìm đơn hàng").fill("")
     idle(page)

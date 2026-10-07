@@ -130,3 +130,12 @@
     min-width: var(--tap);
   }
 }
+
+/* Hoá đơn bán (Lô 17b G6): mã không xuống dòng, không bị cắt; dòng Đã huỷ gạch ngang + xám. */
+.noWrap {
+  white-space: nowrap;
+}
+.cancelled {
+  text-decoration: line-through;
+  color: var(--ink-3);
+}

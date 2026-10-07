@@ -9,6 +9,8 @@ import {
   itemInputOf,
   lineInputOf,
   moneyDigits,
+  parseAmount,
+  parseQtyKg,
   parseDecimal,
   parseItemId,
   parseItemTypeParam,
@@ -290,5 +292,33 @@ describe("mock theo contract BE R14", () => {
   });
   it("không có token thì 401", () => {
     expect(mockCatalogApi({ method: "GET", path: ITEMS, token: null }).status).toBe(401);
+  });
+});
+
+describe("Lô 17b G5: số không bị cắt hay làm tròn ngầm", () => {
+  it("parseAmount: 12 chữ số vừa, 13 chữ số báo tooBig, chữ báo invalid", () => {
+    expect(parseAmount("999.999.999.999")).toEqual({ kind: "ok", digits: "999999999999" });
+    expect(parseAmount("1.000.000.000.000")).toEqual({ kind: "tooBig" });
+    expect(parseAmount("12a")).toEqual({ kind: "invalid" });
+    expect(parseAmount(" ")).toEqual({ kind: "empty" });
+  });
+  it("parseQtyKg: 3 số lẻ vừa, 4 số lẻ báo tooPrecise, quá 9 chữ số nguyên báo tooBig", () => {
+    expect(parseQtyKg("0,001")).toMatchObject({ kind: "ok", text: "0.001" });
+    expect(parseQtyKg("0,0005")).toEqual({ kind: "tooPrecise" });
+    expect(parseQtyKg("1234567890")).toEqual({ kind: "tooBig" });
+  });
+  it("định mức combo 4 số lẻ bị báo lỗi, không làm tròn thành 0,001", () => {
+    const d = { ...emptyItemDraft("BUNDLE"), itemType: "BUNDLE" as const, code: "C", name: "C", itemGroup: "1", shelfLife: "3", lines: [{ key: 1, component: "2", qty: "0,0004" }] };
+    expect(validateItem(d).line[1]?.qty).toMatch(/3 chữ số/);
+  });
+  it("kg tối thiểu 4 số lẻ và phần trăm 3 số lẻ bị báo lỗi; tiền quá lớn bị báo lỗi", () => {
+    expect(validateRule({ ...emptyRuleDraft(), name: "A", item: "3", minQty: "5,1234", discountValue: "10" }).minQty).toMatch(/3 chữ số/);
+    expect(validateRule({ ...emptyRuleDraft(), name: "A", item: "3", minQty: "5", discountValue: "7,555" }).discountValue).toMatch(/2 chữ số/);
+    const big = validateRule({ ...emptyRuleDraft(), name: "B", applyOn: "ORDER", minAmount: "1.000.000.000.000", discountType: "AMOUNT", discountValue: "5.000" });
+    expect(big.minAmount).toMatch(/quá lớn/);
+  });
+  it("gửi BE giữ nguyên chữ số, đệm đủ số lẻ", () => {
+    expect(ruleInputOf({ ...emptyRuleDraft(), name: "A", item: "3", minQty: "5,25", discountValue: "7,5" })).toMatchObject({ min_qty: "5.250", discount_value: "7.50" });
+    expect(ruleInputOf({ ...emptyRuleDraft(), name: "B", applyOn: "ORDER", minAmount: "999.999.999.999", discountType: "AMOUNT", discountValue: "5.000" })).toMatchObject({ min_amount: "999999999999.00", discount_value: "5000.00" });
   });
 });

@@ -27,7 +27,7 @@ const NO_PERMISSION: Failure = {
 export function PickSheetScreen() {
   const search = useSearchParams();
   const router = useRouter();
-  const { status, me } = useAuth();
+  const { status, me, error: authError, refreshMe } = useAuth();
   const noteId = idFromSearch(search.get("note"));
 
   const [sheet, setSheet] = useState<PickSheetData | null>(null);
@@ -85,6 +85,25 @@ export function PickSheetScreen() {
           <Icon name={failure.kind === "error" ? "error" : "warning"} />
           <span>{failure.text}</span>
         </div>
+        <button type="button" className="btn" onClick={() => window.close()}>
+          Đóng cửa sổ
+        </button>
+      </div>
+    );
+  }
+
+  // Lô 17b G8: không tải được hồ sơ người dùng (status "error") thì báo lỗi kèm Thử lại, không đứng "Đang nạp…" mãi.
+  if (status === "error") {
+    return (
+      <div className={s.state}>
+        <h1 className={s.stateTitle}>Chưa tải được thông tin tài khoản</h1>
+        <div className="alert-box err" role="alert">
+          <Icon name="error" />
+          <span>{authError || "Kiểm tra mạng rồi bấm Thử lại."}</span>
+        </div>
+        <button type="button" className="btn primary" onClick={() => void refreshMe()}>
+          Thử lại
+        </button>
         <button type="button" className="btn" onClick={() => window.close()}>
           Đóng cửa sổ
         </button>

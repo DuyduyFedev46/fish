@@ -3508,3 +3508,102 @@ Lưu ý cho QA và các lô sau:
 - QA chạy `/api/reports/*` bằng tài khoản `kho1` và `ql1` (phải 403), và kiểm ngày biên của `audit-logs` trên BE thật.
 - Sau khi gộp, nhắc nhánh `feat/pham-vi-du-lieu` rebase, vì có xung đột ở `dashboard_api.py`.
 - 17b-FE2 (G3) phải sửa mock hoá đơn mua cho khớp luật `paid_at`.
+
+## Review Lô 17b-BE (08/10)
+
+Phạm vi: `git diff 2c00222..HEAD`, commit ea1c9fe trên `feat/lo17b-be`, gồm 21 file. Đối chiếu `02e-lo17.md` mục 3.1 (B1–B4, B5 = NEW-1)
+và dev-notes mục "Lô 17b-BE + NEW-1".
+
+**Lệnh techlead tự chạy** (worktree `lo17b-be`, `DJANGO_DEBUG=1`, symlink tạm `staticfiles`, đã gỡ, worktree sạch):
+- `manage.py test apps.sales apps.accounts apps.ai apps.common apps.delivery apps.inventory`: 2704 test, OK (skipped=2).
+- `makemigrations --check --dry-run`: No changes detected.
+- `check_naming.py`: OK, không có vi phạm mới.
+
+### Soát theo yêu cầu
+
+| Mục | Kết quả |
+|---|---|
+| `POST /api/sales/orders/search/`: phạm vi | **Đạt.** `get_queryset` dùng chung với `list` (`scope_orders_for` theo D1). Test NV giao chỉ thấy đơn của phiếu mình. Quyền: `required_perms=("sales.view_salesorder",)`, có test 403 và 401. Lọc `customer` vẫn kiểm `can_filter_orders_by_customer` trước khi đọc tham số khác |
+| V2 và cửa sổ dữ liệu cá nhân | **Đạt.** `allow_customer_search=can_view_order_customer_info(user)`, `restrict_customer_search` khi phạm vi khác `all`, nên tìm theo SĐT/tên chỉ khớp đơn có `pii_visible=True` (SR-PII-02). Như vậy POST không mở thêm được dòng nào mà GET cũ không thấy. Có test `test_new1_post_keeps_scope_rules_for_phone_search` |
+| `next`/`previous` | **Đạt.** Từ khoá nằm trong body. Link chỉ dựng từ URL `/search/` cộng `page`. Có test link không chứa từ khoá |
+| `no-store` | **Đạt.** `NoStoreMixin` của viewset phủ cả action mới. Có test |
+| Câu lỗi không lặp giá trị | **Đạt.** `SEARCH_USE_POST` dùng câu cố định. Các câu của `InvalidFilter` chỉ nêu **tên** tham số, không nêu giá trị. Có test ở cả GET (9 chữ số, giống tên) lẫn POST |
+| GET `?q=` | **Đạt.** `allow_customer_search=False`, nên GET chỉ còn khớp mã đơn. Đây là chốt chặn thật: dù heuristic có lọt thì GET cũng không trả được dữ liệu khách theo tên hay SĐT |
+| Heuristic, ca `hoa` lọt | **Chấp nhận, ghi nhận Low.** Một từ ASCII không dấu, không khoảng trắng (như `hoa`), hoặc dãy 4–8 chữ số, vẫn đi qua GET và vào access log, nhưng chỉ khớp mã đơn, không thành công cụ dò khách. Heuristic chỉ giảm số từ khoá cá nhân lọt vào URL, không thể bắt hết. Việc thật nằm ở FE (17b-FE2): ô tìm đơn **luôn** gửi POST, GET `q` chỉ dùng cho ⌘K với chuỗi đúng mẫu mã |
+| Thêm vào `FORBIDDEN_PREFIXES` của AI, `@action` 32 → 33 | **Duyệt, dù nằm ngoài danh sách file.** Route mới trả tên/SĐT khách. Nếu không cấm thì AI có thêm một đường dò dữ liệu cá nhân, ngược với cách đã làm cho `customer-directory`. Đếm `@action` trong `test_discipline.py` là hệ quả tất yếu. Không đổi gì khác trong `apps/ai/**` |
+| `SearchBodyPagination` chuyển sang `common/api.py` | **Duyệt.** Chuyển nguyên văn, giờ có hai nơi dùng (danh bạ khách, tìm đơn). Bỏ được bản chép, đúng chỗ của tiện ích dùng chung |
+| B1 | **Đạt.** `delete` thêm điều kiện `add_returntostock`, khớp `soft_delete`. Có test Chủ bị tắt quyền |
+| B2 | **Đạt.** GET `customer-directory/?q=` trả 400 `SEARCH_USE_POST`. Các ca GET `q` cũ chuyển sang POST, không nới assert. Danh sách không có `q` giữ nguyên |
+| B3 | **Đạt.** `note_code` là mã phiếu giao, không phải dữ liệu cá nhân. Nằm cùng khối với `note_id`, nên phạm vi CSKH không đổi. Có test |
+| B4 `LATE_PAYMENT_MAX_AGE_DAYS` | **Đạt.** Setting đọc từ env, mặc định 400, có `max(..., 1)` chặn giá trị 0 hoặc âm. Chuỗi chỉ có ngày bị chặn **trước** `parse_datetime` (regex bắt buộc có giờ). Tham số `datetime` truyền thẳng (từ đường gọi nội bộ) không qua regex nhưng có `tzinfo`, nên đúng. Có test chỉ ngày, 401 ngày, hôm qua |
+| Giá vốn, dữ liệu cá nhân | **Đạt.** Kết quả search dùng `SalesOrderListSerializer` như danh sách: không có giá vốn, che khách theo `pii_hidden`. Có test không có giá vốn. Không có log mới |
+
+### Điều kiện phát hành
+
+**C1 · NEW-1 phải deploy cùng FE.** FE hiện tại (`erp-console/features/orders/api.ts:42`) vẫn gửi `GET ?q=`. Sau lô này, Chủ hay Quản lý gõ
+tên hoặc SĐT ở ô tìm đơn sẽ nhận 400 "Tìm theo SĐT/tên dùng ô tìm kiếm." cho tới khi 17b-FE2 chuyển sang `POST search/`. Merge vào main
+được, nhưng **không deploy BE này lên staging hay production khi chưa có FE đi cùng**. Danh bạ khách không bị ảnh hưởng, vì FE đã dùng POST
+từ Lô bổ sung A.
+
+### Ghi nhận Low (không chặn)
+
+- **L1:** heuristic GET như trên. 17b-FE2 phải đặt luật ở FE: ô tìm đơn luôn đi POST.
+- **L2:** `_filters_from_body` cho `customer`/`batch` là `int` nhưng `status` dạng số thì từ chối. Hành vi đúng, chỉ là cần nhớ khi viết mock
+  FE: body gửi `status` là chuỗi hoặc mảng chuỗi.
+
+### Kết luận Review Lô 17b-BE (08/10): **APPROVED**
+
+Không có lỗi Critical, High hay Medium. Có điều kiện phát hành **C1**. Hai việc ngoài danh sách file (AI `FORBIDDEN_PREFIXES`,
+`SearchBodyPagination`) được duyệt.
+
+## Review Lô 17b-FE (08/10)
+
+Phạm vi: `git diff 2c00222..818fc8b`, gồm FE1 c0b0344, FE2 03744ca (có NEW-1 phía FE), FE3 2388b86 và dev-notes 818fc8b. Đối chiếu
+`02e-lo17.md` mục 3.2–3.4 và contract BE 17a, 17b-BE. Theo yêu cầu, techlead không build. Số liệu tsc, vitest, build, `check-no-mock` và
+e2e lấy theo dev-notes. Techlead đọc code.
+
+### Soát theo yêu cầu
+
+| Mục | Kết quả |
+|---|---|
+| NEW-1: ô tìm đơn luôn POST | **Đạt.** `listOrders` (`features/orders/api.ts`) gửi `POST /api/sales/orders/search/` mỗi khi có từ khoá, kể cả khi gõ mã. `orderListQuery` không còn `q`, nên URL GET không bao giờ mang từ khoá. Dùng chung cho màn Đơn, hộp Gắn đơn và mở đơn từ phiếu hoàn tiền. Thân gửi `status` dạng mảng chuỗi, `page` chỉ khi lớn hơn 1, khớp L2 của 17b-BE |
+| URL và storage | **Đạt.** Bộ lọc và từ khoá chỉ nằm trong state (`OrdersScreen.tsx:5`). `router.replace` chỉ dùng cho redirect `?order=&open=refund` cũ. e2e mới `orders_search_post.py` kiểm URL và storage không có SĐT đã gõ |
+| Mock đúng contract BE | **Đạt.** Mock POST `search/`: `q` không phải chuỗi hoặc `status` là số thì 400 `INVALID_FILTER`; trang vượt thì 404; `next` không chứa `q`. Mock GET `?q=` có 9 số liền, khoảng trắng hoặc ký tự ngoài ASCII thì 400 `SEARCH_USE_POST`, giống heuristic BE. Mock danh bạ khách GET `q` cũng trả 400 (G10) |
+| ⌘K (H1): chỉ gọi API khi đúng mẫu mã | **Đạt.** `parseCodeRef` loại chuỗi có khoảng trắng, ký tự ngoài ASCII, dãy từ 9 chữ số, và chuỗi chỉ gồm số và dấu nối có từ 9 chữ số trở lên. API chỉ được gọi khi **bấm Enter hoặc chọn dòng** "Mở chứng từ", không gọi khi đang gõ. Có `AbortController` khi gõ tiếp. Không có kết quả thì hiện "Không tìm thấy chứng từ khớp với <mã>". Đơn tra bằng `GET ?q=` rồi so khớp đúng mã. Phiếu giao dùng `?code=` (A9, có phạm vi). Lô dùng endpoint chi tiết. Xem thêm L1 |
+| `import()` động, không gieo mock vào bản thật | **Đạt.** `features/lookup/codeFinder.ts` nạp ba module api bằng `import()` động. Cờ mock trong từng api là `process.env.NEXT_PUBLIC_USE_MOCK === "1" ? … : undefined`, nên bản mock=0 bị cắt khỏi bundle. Dev-notes: `check-no-mock` xanh, và `grep cave_erp_mock out` rỗng. `shared/` không import module: Provider đặt ở tầng app (`ConsoleCodeFinder`), đúng quy tắc module |
+| G1–G10 dùng contract 17a đúng | **Đạt.** G1 đọc `id`/`reason` (khi thiếu `id` thì quay về danh sách lọc). G2 gửi `date_from`/`date_to`/`q` lên BE, luật ô tìm giống A3, 400 hiện dưới ô. G3 có 5 mã lỗi A5 kèm vị trí ô, và mock nay **không** tự điền `paid_at` (đã đóng điều tôi dặn ở 17a). G4 gửi `expected_updated_at`, 409 thì có nút "Tải lại". G7 đếm theo `count` và tải mới mỗi lần mở. G10 có `note_code` thật |
+| `ed_batch9` đã sửa ngày mock | **Đạt.** Phiếu "tháng này" kẹp không lùi qua đầu tháng. RT-4 cố định cách đầu tháng 36 giờ. Dev báo 145/145 (trước lô 133/139). Việc đổi SĐT thử trong kịch bản để khỏi trùng SĐT giả của kho mock là hợp lý |
+| e2e loại kho `cave_erp_mock_*` khỏi phép kiểm dữ liệu cá nhân | **Chấp nhận, kèm điều kiện cho QA.** Các khoá này là dữ liệu GIẢ do mock gieo (đơn, khách, tài khoản mẫu), và chỉ tồn tại ở bản mock (`check-no-mock` chặn ở bản thật). Không loại thì mọi phép kiểm "storage không có SĐT" sẽ đỏ vì SĐT giả của seed. Điều kiện: ở lượt **BE thật** (`REAL_API`) của `orders_search_post.py` và `ed_batch17_command_search.py`, QA kiểm **toàn bộ** storage, không lọc tiền tố, và phải sạch. Lọc theo tiền tố chỉ được dùng ở bản mock |
+| Giá vốn, dữ liệu cá nhân | **Đạt.** Không có khoá giá vốn mới. G1 không hiện giá trị tồn khi người xem thiếu quyền (dữ liệu do BE quyết). Không có `console.log` mới. Ô tìm Nhật ký (G2) và ô tìm hoá đơn bán (G6) chặn chuỗi giống SĐT trước khi gửi |
+| UI-RULES | **Đạt.** G9 bỏ dòng gợi ý xám (§6.2). F3: `.tab` và `.lt-link` đủ 44px, hover không còn đổi nền ở nút `aria-disabled`. F5 sửa bậc tiêu đề. G6 có ca 360px. Chữ mới không có "BR-", không có mã thô |
+
+### Các lệch dev đã ghi: chấp nhận
+
+- **G3** làm ở `features/accounting`: đúng, vì 02e ghi sai thư mục. Lỗi khác nhà cung cấp hiện ở đầu hộp khi hộp mở từ một phiếu cố định là hợp lý.
+- **F4:** `SkeletonBody` đã đúng từ trước; thêm test khoá là đủ.
+- **F1:** `DESIGN.md` nằm ở gốc repo, không phải `erp-console/`. Dọn 4 chỗ còn nói "cột phải" là đúng tinh thần.
+- **F2** mới chuyển 1 hộp: chấp nhận. Sáu hộp còn lại có luồng "Tải lại" hoặc khoá nút theo mã lỗi mà `ConfirmModal` chưa hỗ trợ; nếu ép chuyển thì sẽ đổi hành vi. Ghi nợ: mở rộng `ConfirmModal` (nút phụ theo `errorText`) rồi chuyển nốt.
+- **`#n` ở ⌘K** mở phiếu hoàn tiền: chấp nhận mặc định này. Nếu Duy muốn nghĩa khác thì chỉ sửa một dòng.
+
+### Ghi nhận Low (không chặn)
+
+- **L1 · `shared/lib/codeLookup.ts`, mẫu mã lô.** Mẫu `^(?=.*\d)[A-Z0-9]{1,12}(?:-[A-Z0-9]{1,12})+$` khớp cả chuỗi chỉ có số và dấu nối dưới
+  9 chữ số, ví dụ `091-234-56`. Một đoạn SĐT gõ dở như vậy sẽ thành `GET /api/inventory/batches/091-234-56/` và vào access log. Không lộ
+  dữ liệu (chỉ trả lô hoặc 404), nhưng đi ngược tinh thần "không gửi chuỗi giống SĐT". Đề xuất: mã lô phải có **ít nhất một chữ cái**
+  (`(?=.*[A-Z])`). Mọi mã lô thật trong dev-notes (`CA-THU-260928-VT01`, `LO-0912`, `L0914-CT01`) đều có chữ. Thêm ca vào `codeLookup.test.ts`.
+- **L2 · nợ đã ghi, đồng ý:** `matchesLocal` ở `auditModel.ts` không còn dùng; G4 mới chặn `beforeunload`, chưa chặn link trong app; G8 chưa
+  có test tự động (QA ép `/api/auth/me/` lỗi để kiểm).
+- **L3 · hồi quy:** `qa_ed_batch3_orders` (64 ca) và `s10_s11_orders` (2 ca) đỏ từ trước lô, do kịch bản dùng chữ trước lô tên chuẩn. Theo
+  02e mục 6.3, đợt chỉ coi là xong khi e2e không còn ca đỏ, nên hai file này phải được viết lại hoặc xoá có lý do trước lượt hồi quy cuối.
+  Không chặn lô này.
+
+### Điều kiện phát hành
+
+- **C1 (nhắc lại từ 17b-BE):** BE 17b và FE 17b phải deploy cùng một đợt. Nhánh này đã merge BE 17b (98ea948), nên khi gộp vào main hai phía đi cùng nhau.
+- QA chạy e2e BE thật mà dev chưa chạy được: `ed_batch12_real`, `ed_batch8_stocktake_real`, `qa_ed_batch10_real`, `s41_s47_real`, cùng
+  `orders_search_post.py` và `ed_batch17_command_search.py` ở chế độ `REAL_API`. Ở hai file sau phải có ca `giao1` gõ mã phiếu của `giao2`
+  (ED-07-AC3) và phép kiểm storage không lọc (xem trên).
+
+### Kết luận Review Lô 17b-FE (08/10): **APPROVED**
+
+Không có lỗi Critical, High hay Medium. L1 nên sửa trong lượt QA nếu tiện, vì chỉ cần một regex và một test. L2, L3 ghi nợ.

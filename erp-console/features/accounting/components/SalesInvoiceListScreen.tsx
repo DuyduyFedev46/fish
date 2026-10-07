@@ -3,7 +3,7 @@
 // Hoá đơn bán (W5f, ED-33). CHỈ ĐỌC: hoá đơn do hệ thống phát hành khi đơn đủ tiền (BR-PQ-11), không có nút tạo.
 // Quyền xem = sales.view_salesinvoice (Chủ, Quản lý, Nhân viên kho; vai khác vào thẳng URL thì ra "Không có quyền").
 // Cột Giá vốn và Lãi gộp (và dòng lãi gộp ở chân) chỉ có khi người xem có quyền xem giá vốn; tên khách chỉ có khi có quyền xem khách hàng
-// (không có thì ẩn cả cột, BE trả null). Tìm theo mã hoá đơn hoặc mã đơn, lọc trạng thái và khoảng ngày xuất ở BE.
+// (không có thì ẩn cả cột, BE trả null). Tìm theo mã hoá đơn hoặc mã đơn (chuỗi giống SĐT không gửi đi: invoiceSearch.ts), lọc trạng thái và khoảng ngày xuất ở BE.
 // Chân bảng: tổng số tiền của toàn bộ kết quả đã lọc (không chỉ trang đang hiện), do BE tính.
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -21,6 +21,7 @@ import { FilterBar } from "@/shared/ui/list/FilterBar";
 import { ListPage } from "@/shared/ui/list/ListPage";
 import { NoPermission } from "@/shared/ui/states/NoPermission";
 import { fetchSalesInvoices } from "../api";
+import { INVOICE_SEARCH_PII_MESSAGE, invoiceSearchTerm } from "../invoiceSearch";
 import type { SalesInvoiceListParams, SalesInvoiceRow, SalesInvoiceTotals } from "../types";
 import s from "../accounting.module.css";
 
@@ -38,6 +39,11 @@ function useDebounced<T>(value: T, ms: number): T {
   return v;
 }
 
+/** Hoá đơn Đã huỷ: chữ gạch ngang, xám (không tính vào tổng). */
+function cancelledText(r: SalesInvoiceRow, text: string) {
+  return <span className={`${s.noWrap}${r.status === "CANCELLED" ? ` ${s.cancelled}` : ""}`}>{text}</span>;
+}
+
 export function SalesInvoiceListScreen() {
   const { me } = useAuth();
   const [query, setQuery] = useState("");
@@ -46,7 +52,9 @@ export function SalesInvoiceListScreen() {
   const [to, setTo] = useState("");
   const [totalsBox, setTotalsBox] = useState<{ key: string; totals: SalesInvoiceTotals } | null>(null);
 
-  const debounced = useDebounced(query, 300).trim();
+  const typed = useDebounced(query, 300);
+  const search = invoiceSearchTerm(typed);
+  const debounced = search.term;
   const badRange = !!from && !!to && from > to;
   const params: SalesInvoiceListParams = useMemo(
     () => ({ q: debounced, status, date_from: badRange ? "" : from, date_to: badRange ? "" : to }),
@@ -79,24 +87,24 @@ export function SalesInvoiceListScreen() {
   };
 
   const columns: Column<SalesInvoiceRow>[] = [
-    { key: "code", header: "Mã hoá đơn", mono: true, width: "112px", render: (r) => r.code },
+    { key: "code", header: "Mã hoá đơn", mono: true, width: "112px", render: (r) => cancelledText(r, r.code) },
     {
       key: "order",
       header: "Đơn",
       mono: true,
-      width: "96px",
+      width: "152px",
       render: (r) =>
         canOpenOrder ? (
-          <Link href={`/orders/detail/?id=${r.sales_order}`} className={s.codeLink}>
+          <Link href={`/orders/detail/?id=${r.sales_order}`} className={`${s.codeLink} ${s.noWrap}${r.status === "CANCELLED" ? ` ${s.cancelled}` : ""}`}>
             {r.order_code}
           </Link>
         ) : (
-          r.order_code
+          cancelledText(r, r.order_code)
         ),
     },
     ...(showCustomer ? [{ key: "customer", header: "Khách hàng", hideBelow: 800 as const, render: (r: SalesInvoiceRow) => r.customer_name || <span className="muted">—</span> }] : []),
     { key: "issued", header: "Ngày xuất", tabular: true, width: "140px", render: (r) => dateTime(r.issued_at) },
-    { key: "amount", header: "Số tiền", num: true, render: (r) => vnd(r.amount) },
+    { key: "amount", header: "Số tiền", num: true, render: (r) => cancelledText(r, vnd(r.amount)) },
     { key: "cogs", header: "Giá vốn", num: true, locked: true, hideBelow: 800, render: (r) => (r.cogs === undefined ? "—" : vnd(r.cogs)) },
     { key: "profit", header: "Lãi gộp", num: true, locked: true, hideBelow: 720, render: (r) => (r.gross_profit === undefined ? "—" : vnd(r.gross_profit)) },
     { key: "status", header: "Trạng thái", render: (r) => <Chip table={ENUMS.salesInvoiceStatus} value={r.status} /> },
@@ -124,6 +132,11 @@ export function SalesInvoiceListScreen() {
               </button>
             )}
           </FilterBar>
+          {search.blocked && (
+            <p className={s.fieldNote} role="alert" data-testid="invoice-search-blocked">
+              {INVOICE_SEARCH_PII_MESSAGE}
+            </p>
+          )}
           {badRange && (
             <p className={s.fieldNote} role="alert">
               Ngày bắt đầu đang sau ngày kết thúc. Chọn lại khoảng ngày.

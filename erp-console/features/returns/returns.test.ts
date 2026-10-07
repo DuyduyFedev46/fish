@@ -389,11 +389,11 @@ describe("xoá phiếu hàng hoàn (#8, BR-PQ-10)", () => {
     expect(refused.body).toMatchObject({ code: "RETURN_DELETE_NOT_ALLOWED", detail: "Phiếu hàng hoàn đã duyệt (đã nhập lại kho hoặc ghi lỗ) không xoá được (BR-PQ-10)." });
     call("loc", "POST", `${BASE}${made.id}/delete/`);
   });
-  it("mock: xoá phiếu đã bị xoá từ máy khác → 404 câu tiếng Anh của BE (FE phải tự đổi câu)", () => {
+  it("mock: xoá phiếu đã bị xoá từ máy khác → 404 câu chuẩn \"Không tìm thấy.\" từ Lô 17a", () => {
     const made = make();
     call("loc", "POST", `${BASE}${made.id}/delete/`);
     const gone = call("loc", "POST", `${BASE}${made.id}/delete/`);
     expect(gone.status).toBe(404);
-    expect(gone.body).toMatchObject({ detail: "No ReturnToStock matches the given query." });
+    expect(gone.body).toMatchObject({ detail: "Không tìm thấy." });
   });
 });

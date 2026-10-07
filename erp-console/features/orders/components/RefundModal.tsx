@@ -75,7 +75,6 @@ export function RefundModal({ target, refundableMax, reasonDefault, duplicateWar
     { onSuccess: onDone },
   );
 
-
   const submit = () => {
     const e: { amount?: string; reason?: string } = {};
     if (check.problem) e.amount = AMOUNT_MSG[check.problem];

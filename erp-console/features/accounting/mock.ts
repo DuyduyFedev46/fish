@@ -7,7 +7,7 @@ import type { MockRequest, MockResponse } from "@/shared/lib/http";
 import { todayInVietnam } from "@/shared/lib/format";
 import { MOCK_UNAUTHORIZED, mockRequireUser } from "@/features/auth/mock";
 import type { Me } from "@/features/auth/types";
-import { beDetail } from "@/shared/lib/beErrors.mock";
+import { beDetail, beError } from "@/shared/lib/beErrors.mock";
 import type { PurchaseCostAllocation, PurchaseCostInput, PurchaseCostRow, PurchaseInvoiceInput, PurchaseInvoiceRow, SalesInvoiceRow, SalesInvoiceTotals } from "./types";
 
 const DAY = 86_400_000;
@@ -196,6 +196,14 @@ export function mockInvoiceList(req: MockRequest): MockResponse {
 
 const required = "Trường này là bắt buộc.";
 
+/** Nhà cung cấp của một phiếu nhập: do mock Mua hàng đăng ký (accounting không import ngược để khỏi vòng). */
+let receiptSupplierOf: (receiptId: number) => number | null = () => null;
+export function setReceiptSupplierLookup(fn: (receiptId: number) => number | null): void {
+  receiptSupplierOf = fn;
+}
+/** Lệch đồng hồ máy khách mà BE chịu được (`PURCHASE_INVOICE_PAID_AT_TOLERANCE_MINUTES`, mặc định 5). */
+const PAID_AT_TOLERANCE_MS = 5 * 60_000;
+
 /** POST /api/purchasing/invoices/. */
 export function mockInvoiceCreate(req: MockRequest): MockResponse {
   const me = mockRequireUser(req);
@@ -208,14 +216,24 @@ export function mockInvoiceCreate(req: MockRequest): MockResponse {
   if (body.amount === undefined || body.amount === null || body.amount === "") bad.amount = [required];
   else if (!/^\d+(\.\d{1,2})?$/.test(String(body.amount))) bad.amount = ["Nhập một số hợp lệ, không âm."];
   if (Object.keys(bad).length > 0) return { status: 400, body: bad };
+  // Lô 17a (A5): luật nghiệp vụ trên giá trị đã gộp, đúng thứ tự BE (số tiền, nhà cung cấp, thời điểm trả).
+  if (Number(body.amount) <= 0) return beError("AMOUNT_NOT_POSITIVE");
+  if (body.receipt != null) {
+    const owner = receiptSupplierOf(body.receipt);
+    if (owner !== null && owner !== body.supplier) return beError("INVOICE_SUPPLIER_MISMATCH");
+  }
+  const isPaid = body.is_paid !== false; // mặc định như model BE: đã trả
+  if (isPaid && !body.paid_at) return beError("PAID_AT_REQUIRED");
+  if (!isPaid && body.paid_at) return beError("PAID_AT_WHEN_UNPAID");
+  if (body.paid_at && Date.parse(body.paid_at) > Date.now() + PAID_AT_TOLERANCE_MS) return beError("PAID_AT_IN_FUTURE");
   const row = invoiceRow({
     id: nextInvoiceId++,
     supplier: body.supplier as number,
     receipt: body.receipt ?? null,
     amount: String(body.amount).replace(/\.\d+$/, ""),
     invoice_date: body.invoice_date as string,
-    is_paid: body.is_paid !== false,
-    paid_at: body.is_paid !== false ? body.paid_at ?? new Date().toISOString() : null,
+    is_paid: isPaid,
+    paid_at: isPaid ? (body.paid_at as string) : null,
   });
   allInvoices().unshift(row);
   return { status: 201, body: row };

@@ -19,6 +19,7 @@ FORBIDDEN_PREFIXES = (
     "/api/dashboard/attention/",
     "/api/delivery/notes/lookup/",  # tra mã tem (CS-17): thuộc nghiệp vụ tem, cấm như …/label/
     "/api/sales/customer-directory/",  # danh bạ khách: tên, SĐT, địa chỉ, ghi chú (B2, bất biến 9)
+    "/api/sales/orders/search/",  # tìm đơn theo SĐT/tên khách bằng POST (NEW-1, bất biến 9): AI không dò dữ liệu cá nhân
     "/api/sales/customers/",  # endpoint khách cũ (S5/CS-01): cùng dữ liệu cá nhân
 )
 

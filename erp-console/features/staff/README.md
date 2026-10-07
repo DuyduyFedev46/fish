@@ -1,7 +1,7 @@
 # features/staff — Nhân sự
 
 Story: **ED-37** (danh sách, hồ sơ, thêm nhân viên, tạo tài khoản Chủ), **ED-38** (sửa hồ sơ, đổi nhóm, đặt lại mật khẩu,
-cho nghỉ / làm lại), nền là S41, S42, S48 của BE L5/L6b. Lô 14 (ERP theo design) thay bản SideSheet cũ.
+cho nghỉ / làm lại), nền là S41, S42, S48 của BE L5/L6b. Lô 14 (ERP theo design) thay bản tấm bên cũ.
 
 Route: `/staff/` (danh sách) và `/staff/detail/?id=<số>` (hồ sơ). Cả hai bọc `<ViewGuard view="staff">`: cần
 `accounts.manage_staff`, người khác thấy "Bạn không có quyền xem mục này" và **không** có request nào tới `/api/staff`.

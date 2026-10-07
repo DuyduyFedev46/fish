@@ -337,6 +337,7 @@ LATE_ENTRY_ORDER_STATUSES = (SalesOrder.Status.CANCELLED, SalesOrder.Status.AUTO
 DUPLICATE_LATE_MANUAL_WARNING = "Nghi trùng khoản ghi tay tiền về muộn, đối chiếu sao kê trước khi hoàn"
 BANK_TXN_ID_PATTERN = r"^[A-Z0-9._/-]+$"
 LATE_RECEIVED_AT_TOLERANCE = timedelta(minutes=5)
+_LATE_HAS_TIME = re.compile(r"\d[T ]\d{1,2}:\d{2}")  # `YYYY-MM-DDThh:mm…` hoặc `YYYY-MM-DD hh:mm…`
 LATE_NOT_FOUND_CODE = "LATE_PAYMENT_ORDER_NOT_FOUND"
 LATE_BOOKED_CODE = "LATE_PAYMENT_ORDER_BOOKED"
 LATE_PAID_CODE = "LATE_PAYMENT_ORDER_PAID"
@@ -367,16 +368,21 @@ def _validate_late_input(bank_txn_id, amount, received_at):
     except ValueError as exc:
         raise _late_error("amount", str(exc)) from None
     if isinstance(received_at, str):
+        received_at = received_at.strip()
         try:
-            received_at = parse_datetime(received_at.strip())
+            # TL15-L2: bắt buộc có phần giờ. Chỉ có ngày thì `parse_datetime` ngầm thành 00:00, nên chặn trước.
+            received_at = parse_datetime(received_at) if _LATE_HAS_TIME.search(received_at) else None
         except ValueError:
             received_at = None
     if received_at is None or not hasattr(received_at, "tzinfo"):
-        raise _late_error("received_at", "Thiếu hoặc sai giờ nhận tiền (ISO 8601).")
+        raise _late_error("received_at", "Thiếu hoặc sai giờ nhận tiền (ISO 8601, gồm cả ngày và giờ).")
     if timezone.is_naive(received_at):
         received_at = timezone.make_aware(received_at)
     if received_at > timezone.now() + LATE_RECEIVED_AT_TOLERANCE:
         raise _late_error("received_at", "Giờ nhận tiền không được ở tương lai.")
+    max_age_days = max(int(getattr(settings, "LATE_PAYMENT_MAX_AGE_DAYS", 400)), 1)
+    if received_at < timezone.now() - timedelta(days=max_age_days):
+        raise _late_error("received_at", f"Giờ nhận tiền cũ quá {max_age_days} ngày, hãy kiểm tra lại năm.")
     return txn, value, received_at
 
 

@@ -139,15 +139,17 @@ MONEY_RE = re.compile(r"^\d{1,3}(\.\d{3})* đ$")
 ORDER_CODE_RE = re.compile(r"^SO\d{6}-[0-9A-F]{6}$")
 ORDER_CODE_IN = re.compile(r"SO\d{6}-[0-9A-F]{6}")
 # UI-RULES §3.2 + §3.4: chữ cấm / tên cũ (kiểm trên văn bản nhìn thấy của mọi màn Lô 3)
+# Giao diện AI chỉ có khi build bật NEXT_PUBLIC_AI_FEATURES=1; chạy kịch bản với AI_FEATURES=1 cho build đó.
+AI_ON = os.environ.get("AI_FEATURES") == "1"
 FORBIDDEN = [r"\bTTL\b", r"\bFEFO\b", r"hạch toán", r"\bNCC\b", r"\bNV\b", r"\bSĐT\b", r"\bSTK\b", r"Tổng hoàn", r"Lập phiếu hoàn tiền",
              r"Báo hoàn tiền", r"Xác nhận thanh toán", r"Xác nhận tiền về", r"Xác nhận đã chuyển", r"\bBR-[A-Z]", r"Đồng ý thực thi",
              r"Cấu hình", r"Hoàn tác"]
 PII = re.compile(r"0901234567|0912345678|0945222333|0977111222|0868554561|Lê Lợi|Lý Thường Kiệt|Chị Hoa|Anh Khoa|Anh Minh|Cô Lan|Chị Thảo|Bác Tư|Chị Ngọc Ánh")
-ORDER_CHIPS = {"Giữ chỗ", "Đã thanh toán", "Đang xử lý", "Hoàn tất", "Đã huỷ"}
-DELIVERY_CHIPS = {"Chờ xác nhận", "Soạn hàng", "Chờ lấy hàng", "Đang giao", "Hoàn tất", "Giao thất bại", "Đã huỷ theo đơn", "—"}
-MATCH_CHIPS = {"Khớp", "Thiếu tiền", "Về sau khi đơn đã huỷ", "Không khớp đơn", "Chuyển thừa"}
+ORDER_CHIPS = {"Giữ chỗ", "Đã thanh toán", "Đang xử lý", "Hoàn tất", "Đã huỷ", "Hết giờ giữ chỗ"}  # tên chuẩn: AUTO_CANCELLED có chip riêng
+DELIVERY_CHIPS = {"Chờ gọi xác nhận", "Đang soạn hàng", "Chờ lấy hàng", "Đang giao", "Đã giao", "Giao thất bại", "Đã huỷ theo đơn", "—"}
+MATCH_CHIPS = {"Khớp đơn", "Chuyển thiếu", "Về sau khi đơn đã huỷ", "Không khớp đơn", "Chuyển thừa"}
 RES_CHIPS = {"Chờ xử lý", "Đã xử lý"}
-REFUND_CHIPS = {"Chờ hoàn", "Đã hoàn", "Thất bại"}
+REFUND_CHIPS = {"Chờ hoàn tiền", "Đã hoàn tiền", "Hoàn thất bại"}
 
 
 def table_rows(pg):
@@ -178,7 +180,7 @@ with sync_playwright() as p:
         ctx, pg = new_page(browser, "loc")
         go(pg, "/orders/")
         expect(pg.locator("main table tbody tr").first).to_be_visible()
-        ok("L1 ba tab theo thứ tự", [t.strip() for t in pg.get_by_role("tab").all_inner_texts()] == ["Đơn hàng", "Hàng chờ thanh toán", "Phiếu hoàn"],
+        ok("L1 ba tab theo thứ tự", [t.strip() for t in pg.get_by_role("tab").all_inner_texts()] == ["Đơn hàng", "Hàng chờ thanh toán", "Phiếu hoàn tiền"],
            pg.get_by_role("tab").all_inner_texts())
         ok("L1 tab Đơn hàng đang chọn (aria-selected)", pg.get_by_role("tab", name="Đơn hàng").get_attribute("aria-selected") == "true")
         ok("ED-09-AC1 7 cột đúng thứ tự", heads(pg) == ["Mã đơn", "Khách hàng", "Trạng thái", "Giao hàng", "Lý do", "Tổng tiền", "Thời gian"], heads(pg))
@@ -192,7 +194,7 @@ with sync_playwright() as p:
         ok("L1 Thời gian dd/mm/yyyy hh:mm", all(DATE_RE.match(r[6]) for r in rows), [r[6] for r in rows if not DATE_RE.match(r[6])])
         ok("L1 không 'hôm nay / hôm qua / phút trước' trong bảng", re.search(r"hôm nay|hôm qua|phút trước|giờ trước", " ".join(" ".join(r) for r in rows), re.I) is None)
         auto = [r for r in rows if r[4] == "Hết giờ giữ chỗ"]
-        ok("ED-09-AC1 đơn tự huỷ: chip 'Đã huỷ' + Lý do 'Hết giờ giữ chỗ' (ô riêng)", len(auto) >= 1 and all(r[2] == "Đã huỷ" for r in auto), auto)
+        ok("ED-09-AC1 đơn tự huỷ: chip 'Hết giờ giữ chỗ' + Lý do 'Hết giờ giữ chỗ' (ô riêng)", len(auto) >= 1 and all(r[2] == "Hết giờ giữ chỗ" for r in auto), auto)
         ok("L1 Lý do là ô riêng: chip Giao hàng không kèm lý do", all(" · " not in r[3] and " · " not in r[2] for r in rows))
         ok("L1 Khách hàng chỉ tên, không SĐT/địa chỉ trong ô", all(not re.search(r"\d{9,}", r[1]) for r in rows))
         ok("L1 chữ cấm/tên cũ không có trong màn", forbidden_hits(visible_text(pg)) == [], forbidden_hits(visible_text(pg)))
@@ -207,12 +209,13 @@ with sync_playwright() as p:
         pg.get_by_label("Lọc theo trạng thái").select_option(label="Đã huỷ")
         idle(pg)
         r3 = table_rows(pg)
-        ok("L1 lọc 'Đã huỷ' gồm cả đơn tự huỷ (lý do Hết giờ giữ chỗ)", len(r3) >= 2 and all(r[2] == "Đã huỷ" for r in r3) and any(r[4] == "Hết giờ giữ chỗ" for r in r3), r3[:3])
+        ok("L1 lọc 'Đã huỷ' gồm cả đơn tự huỷ (chip 'Hết giờ giữ chỗ', lý do Hết giờ giữ chỗ)", len(r3) >= 2 and all(r[2] in ("Đã huỷ", "Hết giờ giữ chỗ") for r in r3) and any(r[4] == "Hết giờ giữ chỗ" for r in r3), r3[:3])
         pg.get_by_label("Lọc theo trạng thái").select_option(label="Mọi trạng thái")
         idle(pg)
         # tìm không thấy
+        pg.evaluate("() => window.__caveMock.clearLog()")
         pg.get_by_role("searchbox", name="Tìm đơn hàng").fill("zzqq")
-        pg.wait_for_function("() => window.__caveMock.log.some(x => x.includes('q=zzqq'))")
+        pg.wait_for_function("() => window.__caveMock.log.some(x => x.includes('POST /api/sales/orders/search/'))")
         idle(pg)
         txt = pg.locator("main").inner_text()
         ok("L1 tìm không thấy: 'Không tìm thấy … khớp với zzqq' + 'Xoá tìm kiếm'", "zzqq" in txt and "Không tìm thấy" in txt and pg.locator("button.btn", has_text="Xoá tìm kiếm").count() == 1, txt[-300:])
@@ -266,7 +269,7 @@ with sync_playwright() as p:
         expect(pg.locator("main table tbody tr").first).to_be_visible()
         ok("ED-11-AC1 cột", heads(pg) == ["Mã giao dịch", "Số tiền", "Loại khoản tiền", "Tình trạng xử lý", "Đơn", "Nhận lúc"], heads(pg))
         rows = table_rows(pg)
-        ok("ED-11-AC1 chip loại khoản ∈ nhãn FE ngắn", all(r[2] in MATCH_CHIPS for r in rows) and {r[2] for r in rows} >= {"Thiếu tiền", "Không khớp đơn", "Chuyển thừa", "Về sau khi đơn đã huỷ"},
+        ok("ED-11-AC1 chip loại khoản ∈ nhãn FE ngắn", all(r[2] in MATCH_CHIPS for r in rows) and {r[2] for r in rows} >= {"Chuyển thiếu", "Không khớp đơn", "Chuyển thừa", "Về sau khi đơn đã huỷ"},
            {r[2] for r in rows})
         ok("ED-11-AC1 'Tình trạng xử lý' là cột riêng, chip Chờ xử lý/Đã xử lý", all(r[3] in RES_CHIPS for r in rows), {r[3] for r in rows})
         ok("ED-11 cột Đơn: mã đơn hoặc 'Chưa gắn đơn'", all(ORDER_CODE_RE.match(r[4]) or r[4] == "Chưa gắn đơn" for r in rows), [r[4] for r in rows])
@@ -305,7 +308,7 @@ with sync_playwright() as p:
         h = heads(pg)
         ok("ED-12-AC1 cột có 'Số tiền hoàn', không 'Tổng hoàn'", "Số tiền hoàn" in h and "Tổng hoàn" not in " ".join(h), h)
         rows = table_rows(pg)
-        ok("ED-12-AC1 chip ∈ Chờ hoàn · Đã hoàn · Thất bại", all(any(c in " ".join(r) for c in REFUND_CHIPS) for r in rows) and
+        ok("ED-12-AC1 chip ∈ Chờ hoàn tiền · Đã hoàn tiền · Hoàn thất bại", all(any(c in " ".join(r) for c in REFUND_CHIPS) for r in rows) and
            all(any(r[i] in REFUND_CHIPS for i in range(len(r))) for r in rows), rows)
         ok("ED-12 phiếu chưa có hoá đơn hiện '#id' hoặc 'Không có hoá đơn' (không rỗng)", all(any(x for x in r[:2]) for r in rows), rows)
         ok("ED-12 số tiền 'x đ', ngày dd/mm/yyyy hh:mm", all(any(MONEY_RE.match(c) for c in r) and any(DATE_RE.match(c) for c in r) for r in rows), rows)
@@ -316,7 +319,7 @@ with sync_playwright() as p:
         ctx, pg = new_page(browser, "loc")
         pg.evaluate("() => window.__caveMock.refunds('empty')")
         go(pg, "/orders/refunds/")
-        ok("ED-12-AC1 trống: 'Chưa có phiếu hoàn nào chờ chuyển'", "Chưa có phiếu hoàn nào chờ chuyển" in pg.locator("main").inner_text(), pg.locator("main").inner_text()[-200:])
+        ok("ED-12-AC1 trống: 'Chưa có phiếu hoàn tiền nào chờ chuyển'", "Chưa có phiếu hoàn tiền nào chờ chuyển" in pg.locator("main").inner_text(), pg.locator("main").inner_text()[-200:])
         shot(pg, "refunds-empty-1280")
         pg.evaluate("() => window.__caveMock.refunds('fail')")
         go(pg, "/orders/refunds/")
@@ -330,23 +333,25 @@ with sync_playwright() as p:
         ctx, pg = new_page(browser, "loc")
         pg.evaluate("() => { window.__caveMock.ai('on'); window.__caveMock.aiConsent(true); }")
         # (oid, chip, current-step, bad-end?)
-        cases = [(101, "Giữ chỗ", "Giữ chỗ", False), (105, "Đã thanh toán", "Đã thanh toán", False), (104, "Đang xử lý", "Soạn hàng", False),
-                 (107, "Đang xử lý", "Đang giao", False), (109, "Hoàn tất", "Hoàn tất", False), (103, "Đã huỷ", "Giữ chỗ", True), (112, "Đã huỷ", None, True)]
+        cases = [(101, "Giữ chỗ", "Giữ chỗ", False), (105, "Đã thanh toán", "Chờ gọi xác nhận", False), (104, "Đang xử lý", "Soạn hàng", False),
+                 (107, "Đang xử lý", "Đang giao", False), (109, "Hoàn tất", "Hoàn tất", False), (103, "Hết giờ giữ chỗ", "Giữ chỗ", True), (112, "Đã huỷ", None, True)]
+        STEP_NAMES = ["Giữ chỗ", "Chờ gọi xác nhận", "Soạn hàng", "Đang giao", "Hoàn tất"]
         for oid, chip, cur, bad in cases:
             open_detail(pg, "order", oid)
             pg.wait_for_timeout(300)
             steps = [(li.get_attribute("data-state"), re.sub(r"^check\s*", "", li.inner_text().strip())) for li in pg.locator("main ol li[data-state]").all()]
-            labels = [s[1] for s in steps if s[0] != "bad" and s[1] in ("Giữ chỗ", "Đã thanh toán", "Soạn hàng", "Đang giao", "Hoàn tất")]
+            labels = [s[1] for s in steps if s[0] != "bad" and s[1] in STEP_NAMES]
             ok(f"ED-09-AC2 đơn {oid}: 5 bước đúng thứ tự{' + bước đỏ Đã huỷ' if bad else ''}",
-               labels[:5] == ["Giữ chỗ", "Đã thanh toán", "Soạn hàng", "Đang giao", "Hoàn tất"] and (pg.locator("main ol li[data-state=bad]").count() == (1 if bad else 0)), steps)
+               labels[:5] == STEP_NAMES and (pg.locator("main ol li[data-state=bad]").count() == (1 if bad else 0)), steps)
             if cur and not bad:
-                now = [s[1] for s in steps if s[0] == "current"]
+                now = [re.sub(r"^check\s*", "", s[1]) for s in steps if s[0] == "current"]
                 ok(f"ED-09-AC2 đơn {oid}: bước hiện tại = {cur}", now == [cur], steps)
-                passed = [s[1] for s in steps if s[0] == "done"]
-                order = ["Giữ chỗ", "Đã thanh toán", "Soạn hàng", "Đang giao", "Hoàn tất"]
+                passed = [s[1] for s in steps if s[0] == "done"]  # đã bỏ chữ "check" của icon
+                order = STEP_NAMES
                 ok(f"ED-09-AC2 đơn {oid}: mọi bước trước {cur} là đã qua", passed == order[: order.index(cur)], passed)
             if bad:
                 ok(f"ED-09-AC2 đơn {oid}: bước đỏ 'Đã huỷ'", "Đã huỷ" in pg.locator("main ol li[data-state=bad]").inner_text())
+            pg.wait_for_function("() => document.querySelector('main header') && document.querySelector('main header').innerText.length > 20")
             hdr = pg.locator("main header").first.inner_text()
             ok(f"D2b đơn {oid}: header có mã đơn mono + chip '{chip}'", ORDER_CODE_IN.search(hdr) is not None and chip in hdr, hdr)
             ok(f"D2b đơn {oid}: có 'Tiếp theo' (trái) và 'Đã làm' hoặc 'Không còn việc'", ("Tiếp theo:" in pg.locator("main").inner_text() or "Không còn việc nào cần làm" in pg.locator("main").inner_text()))
@@ -367,8 +372,12 @@ with sync_playwright() as p:
         ok("D2b 'Tổng tiền' có 'đ'", MONEY_RE.match(info.get("Tổng tiền", "")) is not None, info.get("Tổng tiền"))
         # Dòng thời gian
         tl = pg.locator("main").inner_text()
-        ok("D2b có khối 'Trợ lý AI' (AI bật) và 'Dòng thời gian'", "Trợ lý AI".lower() in tl.lower() and "Dòng thời gian".lower() in tl.lower())
-        ok("D2b khối AI có ô chat + nút gửi", pg.get_by_placeholder(re.compile("Hỏi AI")).count() == 1)
+        ok("D2b có 'Dòng thời gian'", "Dòng thời gian".lower() in tl.lower())
+        if AI_ON:
+            ok("D2b có khối 'Trợ lý AI' (build bật AI)", "trợ lý" in tl.lower() and pg.locator("[data-ai-block]").count() == 1)
+            ok("D2b khối AI có ô hỏi", pg.get_by_label("Hỏi AI về chứng từ này").count() == 1)
+        else:
+            ok("D2b build tắt AI: không có khối Trợ lý AI", pg.locator("[data-ai-block]").count() == 0 and "trợ lý ai" not in tl.lower())
         shot(pg, "detail-booked-1440")
         # dòng thời gian: mỗi dòng bắt đầu bằng ngày giờ, mới nhất trước
         open_detail(pg, "order", 107)
@@ -400,8 +409,8 @@ with sync_playwright() as p:
             105: ("Đã thanh toán", ["Huỷ đơn"], [("Lập phiếu hoàn", False, None), ("Sao chép mã đơn", False, None), ("Xem nhật ký của đơn", False, None)]),
             104: ("Soạn hàng", ["Huỷ đơn"], [("Lập phiếu hoàn", False, None), ("Sao chép mã đơn", False, None), ("Xem nhật ký của đơn", False, None)]),
             107: ("Đang giao", [], [("Huỷ đơn", True, DELIV), ("Lập phiếu hoàn", False, None), ("Sao chép mã đơn", False, None), ("Xem nhật ký của đơn", False, None)]),
-            109: ("Hoàn tất", ["Lập phiếu hoàn"], [("Sao chép mã đơn", False, None), ("Xem nhật ký của đơn", False, None)]),
-            103: ("Đã huỷ (tự huỷ)", ["Xác nhận đã nhận tiền"], [("Sao chép mã đơn", False, None), ("Xem nhật ký của đơn", False, None)]),
+            109: ("Hoàn tất", ["Lập phiếu hoàn tiền"], [("Sao chép mã đơn", False, None), ("Xem nhật ký của đơn", False, None)]),
+            103: ("Hết giờ giữ chỗ", [], [("Sao chép mã đơn", False, None), ("Xem nhật ký của đơn", False, None)]),
             112: ("Đã huỷ", [], [("Sao chép mã đơn", False, None), ("Xem nhật ký của đơn", False, None)]),
         }
         ctx, pg = new_page(browser, "loc")
@@ -410,6 +419,8 @@ with sync_playwright() as p:
             ok(f"D2c Chủ · {name} ({oid}) → nút chính {want_btn or 'không có'}", header_buttons(pg) == want_btn, header_buttons(pg))
             m, items = menu_of(pg)
             got = [(re.sub(r"\s+", " ", t), dis) for t, dis in items]
+            # "Nhờ người xử lý" chỉ hiện khi đơn kẹt ở một bước quá lâu (phụ thuộc đồng hồ, không phải bảng thao tác cố định): bỏ qua.
+            got = [g for g in got if not g[0].startswith("Nhờ người xử lý")]
             for lbl, dis, why in want_menu:
                 hit = [g for g in got if g[0].startswith(lbl)]
                 good = len(hit) == 1 and hit[0][1] == dis and (why is None or why in hit[0][0])
@@ -434,7 +445,7 @@ with sync_playwright() as p:
         open_detail(pg, "order", 105)
         ok("ED-10-AC2 Quản lý · Đã thanh toán: có 'Huỷ đơn' (đỏ)", header_buttons(pg) == ["Huỷ đơn"], header_buttons(pg))
         open_detail(pg, "order", 109)
-        ok("D2c Quản lý · Hoàn tất: 'Lập phiếu hoàn'", header_buttons(pg) == ["Lập phiếu hoàn"], header_buttons(pg))
+        ok("D2c Quản lý · Hoàn tất: 'Lập phiếu hoàn tiền'", header_buttons(pg) == ["Lập phiếu hoàn tiền"], header_buttons(pg))
         ctx.close()
         # NV kho + CSKH: không Huỷ đơn / Lập phiếu hoàn (ED-10-AC6)
         for u in ("kho1", "cs2"):
@@ -464,8 +475,8 @@ with sync_playwright() as p:
     @section("6. Phân quyền 3 tab × 5 vai + URL trực tiếp")
     def _():
         who = {
-            "loc": (["Đơn hàng", "Hàng chờ thanh toán", "Phiếu hoàn"], True, True, True),
-            "ql1": (["Đơn hàng", "Phiếu hoàn"], True, False, True),
+            "loc": (["Đơn hàng", "Hàng chờ thanh toán", "Phiếu hoàn tiền"], True, True, True),
+            "ql1": (["Đơn hàng", "Phiếu hoàn tiền"], True, False, True),
             "kho1": ([], True, False, False),
             "giao1": ([], False, False, False),
             "cs2": ([], True, False, False),
@@ -520,7 +531,7 @@ with sync_playwright() as p:
         pg.get_by_role("button", name="Huỷ đơn").first.click()
         d = dlg_of(pg, "Huỷ đơn")
         ok("F2b tóm tắt: Đơn + Tổng đơn", ORDER_CODE_IN.search(d.inner_text()) and "Tổng đơn" in d.inner_text(), d.inner_text()[:160])
-        ok("F2b lý do chọn từ danh sách chuẩn", all(x in d.inner_text() for x in ("Khách đổi ý", "Hư khi đóng hàng", "Bỏ sau khi giao thất bại", "Khác")))
+        ok("F2b lý do chọn từ danh sách chuẩn", all(x in d.inner_text() for x in ("Khách đổi ý", "Hàng hư lúc soạn hàng", "Giao thất bại, không giao lại", "Lý do khác")))
         ok("F2b nút phụ 'Đóng' + nút chính 'Tiếp tục' (bước xác nhận hậu quả sau đó)", d.get_by_role("button", name="Tiếp tục").count() == 1)
         shot(pg, "F2b-cancel-step1")
         d.get_by_role("button", name="Tiếp tục").click()
@@ -542,7 +553,7 @@ with sync_playwright() as p:
         d = dlg_of(pg, "Lập phiếu hoàn")
         ok("F2c tóm tắt: Đơn · Tổng đơn · Còn hoàn được", all(x in d.inner_text() for x in ("Tổng đơn", "Còn hoàn được")), d.inner_text()[:240])
         ok("F2c khối tóm tắt: mỗi dòng xuất hiện đúng một lần (không lặp 'Còn hoàn được')", d.inner_text().count("Còn hoàn được") == 1, d.inner_text().count("Còn hoàn được"))
-        ok("F2c nút chính ghi số tiền 'Lập phiếu hoàn 1.190.000 đ'", re.search(r"Lập phiếu hoàn [\d.]+ đ", d.locator("button[type=submit]").inner_text()) is not None, d.locator("button").all_inner_texts())
+        ok("F2c nút chính ghi số tiền 'Lập phiếu hoàn tiền 1.190.000 đ'", re.search(r"Lập phiếu hoàn tiền [\d.]+ đ", d.locator("button[type=submit]").inner_text()) is not None, d.locator("button").all_inner_texts())
         ok("F2c có alert vàng 'Tiền chưa rời tài khoản…'", "Tiền chưa rời tài khoản" in d.inner_text())
         shot(pg, "F2c-create-refund")
         # số tiền vượt → lỗi 'Nhập tối đa' + khoá nút chính (ED-10-AC3)
@@ -638,7 +649,7 @@ with sync_playwright() as p:
         ok("F2f xong: chip 'Đã hoàn', hết nút xác nhận", "Đã hoàn" in pg.locator("main header").first.inner_text() and "Xác nhận đã hoàn tiền" not in pg.locator("main header").first.inner_text(), pg.locator("main header").first.inner_text())
         # --- F2g Báo chuyển thất bại: dùng phiếu mới từ đơn 105 → lập qua mock rồi mở
         open_detail(pg, "refund", 31)
-        ok("F2g phiếu Thất bại: nút chính 'Chuyển lại', chip 'Thất bại', lý do thất bại là trường riêng", header_buttons(pg)[:1] == ["Chuyển lại"] and "Thất bại" in pg.locator("main header").first.inner_text() and "Sai số tài khoản" in pg.locator("main").inner_text(), header_buttons(pg))
+        ok("F2g phiếu Thất bại: nút chính 'Chuyển lại', chip 'Hoàn thất bại', lý do thất bại là trường riêng", header_buttons(pg)[:1] == ["Chuyển lại"] and "Hoàn thất bại" in pg.locator("main header").first.inner_text() and "Sai số tài khoản" in pg.locator("main").inner_text(), header_buttons(pg))
         ok("F2g phiếu thất bại không bị xoá (vẫn xem được)", "#31" in pg.locator("main header h2").inner_text())
         ctx.close()
         ctx, pg = new_page(browser, "loc")
@@ -770,9 +781,9 @@ with sync_playwright() as p:
         pg.wait_for_timeout(600)
         pg.clock.run_for(2000)
         head = pg.locator("main header").first.inner_text()
-        ok("ED-09-AC5 hết giờ: chip đổi thành 'Đã huỷ' mà KHÔNG tải lại trang", "Đã huỷ" in head and "Giữ chỗ" not in head, head.replace("\n", " | "))
+        ok("ED-09-AC5 hết giờ: chip đổi thành 'Hết giờ giữ chỗ' mà KHÔNG tải lại trang", "Hết giờ giữ chỗ" in head and "Giữ chỗ |" not in head, head.replace("\n", " | "))
         ok("ED-09-AC5 hết giờ: StatusPath có bước đỏ 'Đã huỷ'", pg.locator("main ol li[data-state=bad]").count() == 1)
-        ok("ED-09-AC5/D2c hết giờ: 'Xác nhận đã nhận tiền' vẫn có (tiền về muộn)", "Xác nhận đã nhận tiền" in " ".join(header_buttons(pg)), header_buttons(pg))
+        ok("ED-09-AC5/D2c hết giờ: không còn 'Xác nhận đã nhận tiền' (BE chặn đơn tự huỷ; tiền về muộn ghi ở hàng chờ)", "Xác nhận đã nhận tiền" not in " ".join(header_buttons(pg)), header_buttons(pg))
         shot(pg, "hold-expired-live")
         ctx.close()
 

@@ -39,7 +39,8 @@ export function orderListQuery(params: OrderListParams, page: number): string {
   if (params.status) qs.set("status", params.status);
   if (params.date_from) qs.set("date_from", params.date_from);
   if (params.date_to) qs.set("date_to", params.date_to);
-  if (params.q.trim()) qs.set("q", params.q.trim());
+  // Lô 17b NEW-1: KHÔNG đưa `q` vào URL. Từ khoá có thể là SĐT/tên khách nên đi bằng POST search/ (xem searchOrders); `GET ?q=` chỉ dành cho
+  // tra theo mã đơn ở ⌘K (shared/lib/codeLookup.ts).
   if (params.customer) qs.set("customer", params.customer);
   if (params.batch) qs.set("batch", params.batch);
   if (page > 1) qs.set("page", String(page));
@@ -47,12 +48,29 @@ export function orderListQuery(params: OrderListParams, page: number): string {
   return s ? `?${s}` : "";
 }
 
-/** GET /api/sales/orders/?status=&date_from=&date_to=&q=&page= — 20 dòng/trang. */
+/** Thân POST /api/sales/orders/search/ (contract Lô 17b-BE): `status` là mảng chuỗi (không gửi số), `page` chỉ khi > 1. Bỏ khoá rỗng. */
+export function orderSearchBody(params: OrderListParams, page: number): Record<string, unknown> {
+  const body: Record<string, unknown> = { q: params.q.trim() };
+  const statuses = params.status.split(",").map((s) => s.trim()).filter(Boolean);
+  if (statuses.length) body.status = statuses;
+  if (params.date_from) body.date_from = params.date_from;
+  if (params.date_to) body.date_to = params.date_to;
+  if (params.customer) body.customer = params.customer;
+  if (params.batch) body.batch = params.batch;
+  if (page > 1) body.page = page;
+  return body;
+}
+
+/**
+ * Danh sách đơn, 20 dòng/trang. Có từ khoá → POST /api/sales/orders/search/ (từ khoá, kể cả khi gõ mã đơn, KHÔNG vào URL/access log, bất biến 9);
+ * không có → GET /api/sales/orders/?status=&date_from=&date_to=&customer=&batch=&page=. Cùng một dạng kết quả phân trang.
+ */
 export function listOrders(params: OrderListParams, page = 1, signal?: AbortSignal): Promise<Paginated<OrderListItem>> {
-  return apiFetch<Paginated<OrderListItem>>(BASE + orderListQuery(params, page), {
-    signal,
-    mock: process.env.NEXT_PUBLIC_USE_MOCK === "1" ? mockOrdersApi : undefined,
-  });
+  const mock = process.env.NEXT_PUBLIC_USE_MOCK === "1" ? mockOrdersApi : undefined;
+  if (params.q.trim()) {
+    return apiFetch<Paginated<OrderListItem>>(`${BASE}search/`, { method: "POST", body: orderSearchBody(params, page), signal, mock });
+  }
+  return apiFetch<Paginated<OrderListItem>>(BASE + orderListQuery(params, page), { signal, mock });
 }
 
 /** GET /api/sales/orders/{id}/ */
@@ -211,4 +229,17 @@ export function retryRefund(id: number): Promise<RetryRefundResult> {
     body: {},
     mock: process.env.NEXT_PUBLIC_USE_MOCK === "1" ? mockRefundQueueApi : undefined,
   });
+}
+
+/**
+ * ⌘K (Lô 17b H1): id đơn khớp ĐÚNG mã, hoặc null. Dùng `GET ?q=<mã>` (chỉ mã đơn, không SĐT/tên; BE trả 400 SEARCH_USE_POST với chuỗi lạ),
+ * nên chỉ gọi với chuỗi đã đúng mẫu mã đơn (shared/lib/codeLookup.ts).
+ */
+export async function findOrderIdByCode(code: string, signal?: AbortSignal): Promise<number | null> {
+  const qs = new URLSearchParams({ q: code });
+  const page = await apiFetch<Paginated<OrderListItem>>(`${BASE}?${qs.toString()}`, {
+    signal,
+    mock: process.env.NEXT_PUBLIC_USE_MOCK === "1" ? mockOrdersApi : undefined,
+  });
+  return page.results.find((o) => o.code.toLowerCase() === code.toLowerCase())?.id ?? null;
 }

@@ -87,6 +87,6 @@ describe("CS-17: mock lookup theo contract BE", () => {
   it("phản hồi không có tên, SĐT, địa chỉ, mã đơn, giá", () => {
     const res = lookup("loc", "GH-HD-0046-REPR.1");
     const text = JSON.stringify(res.body);
-    expect(text).not.toMatch(/Khách|Đường|DH-|phone|address|customer|price|cost/i);
+    expect(text).not.toMatch(/Khách|Đường|SO\d{6}|phone|address|customer|price|cost/i);
   });
 });

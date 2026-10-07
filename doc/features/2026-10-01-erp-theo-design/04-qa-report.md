@@ -3957,3 +3957,131 @@ Không có lỗi chặn. Ghi nhận (Low, không chặn, đã có trong dev-note
 - `runserver 8731 --noreload` (PID 1674, đã tắt), các script HTTP trong scratchpad: `a1.py`, `a2*.py`, `a3.py`, `a4*.py`, `a5.py`, `a67.py`, quét PII.
 - `manage.py test` (lần chạy `--parallel` bị lỗi pickle của Django, chạy lại tuần tự): OK 3290.
 - Dọn dẹp: server đã tắt theo PID, symlink `staticfiles` đã xoá, `db.sqlite3` của worktree đưa về 0 byte như ban đầu, `git status` sạch trước khi ghi report.
+
+## QA Lô 17b (08/10) — BE (NEW-1, 4 việc §3.1) + FE (FE1, FE2, FE3, ⌘K) · lần 1 · 2026-10-08
+
+### Kết luận: REJECTED — B1 (Medium): trên màn Kiểm kê, tab sau bị 409 thì ô "Tải lại" nằm ngoài khung nhìn ở 360px, và cả ở 1280px khi form dài, nên bấm Lưu nháp mà màn hình không phản hồi gì nhìn thấy được
+Dữ liệu không bị đè (đã kiểm ở DB). Lỗi nhỏ, sửa trong `FormPage` hoặc `StocktakeForm`. Phần còn lại của lô (NEW-1, ⌘K, contract 17a/17b trên màn thật) đạt.
+
+### Tổng: 7 nhóm kiểm · khoảng 330 ca chạy thật trên BE thật · ✅ ~315 · ❌ 1 lỗi chặn (B1) · ⏸ 3 mục
+Con số ✅ gồm các script có sẵn và script QA trong scratchpad. Chia nhỏ ở các bảng bên dưới. Ba mục ⏸: xem "Chưa kiểm".
+
+### Cách dựng (không ghi vào `backend/` của worktree)
+`runserver 127.0.0.1:8621 --noreload` từ worktree, SQLite tạm, `DJANGO_DEBUG=1`, CORS cho 3521, throttle đăng nhập nâng lên chỉ ở máy thử. Seed: `migrate`, `bootstrap_masterdata`, `seed_demo`, cộng người dùng giả `loc/ql1/kho1/giao1/giao2/cs2/kho2`, 5 đơn mới (SĐT, tên khách giả), 4 đơn đã thanh toán, phiếu giao gán `giao1` (id 4, đang giao) và `giao2` (id 5, 6, đang soạn), một phiếu hàng hoàn RT-1, hai phiếu nhập PR-1/PR-2. ERP build `NEXT_PUBLIC_USE_MOCK=0 NEXT_PUBLIC_API_BASE=http://127.0.0.1:8621` (xoá `.next`, `out` trước), phục vụ `python3 -m http.server 3521`. Access log runserver ghi vào file để đối chiếu. Tắt server theo PID, xoá DB tạm, `out/`, `.next`, 3 symlink; `git status` sạch trước khi ghi report.
+
+### Theo hạng mục của phiếu giao việc
+| Hạng mục | Kết quả | Bằng chứng |
+|---|---|---|
+| NEW-1 · ô tìm danh sách đơn gửi `POST search/` | ✅ | `orders_search_post.py` (REAL_API) 12/12; script QA `qa_new1.py` 50/50: gõ SĐT, tên, mã, "0912"; mọi request tới orders là `POST /api/sales/orders/search/`, thân POST mang từ khoá, URL request và URL trang sạch |
+| NEW-1 · URL, history, localStorage, sessionStorage, cookie, console | ✅ | `qa_new1.py` gộp `localStorage` + `sessionStorage` + `document.cookie` + `ctx.cookies()` + lịch sử điều hướng (CDP `Page.getNavigationHistory`) **không lọc tiền tố**: không chứa `0912345678`, `Nguyen Van Qa`, `nguyen%20van`, `091-234-56`, `0912`, `Nguyen`; console không chứa từ khoá |
+| NEW-1 · access log runserver | ✅ | Chạy lại `qa_new1.py` với mốc dòng log: 140 dòng log phát sinh, 0 dòng có SĐT hay tên (chỉ khớp `LO-0912` là mã lô). Các dòng `?q=0912345678` trong log toàn phiên là do chính script thử API của QA gọi `GET` có chủ đích |
+| NEW-1 · phạm vi theo vai | ✅ | `POST search/` với SĐT: `loc`, `ql1`, `kho1`, `kho2` thấy 1 đơn; `giao1` thấy đúng 1 đơn của phiếu mình; `giao2` và `cs2` 0 đơn (đơn không thuộc phạm vi); chưa đăng nhập 401; `GET search/` 405; ngày sai 400 `INVALID_FILTER`; user chỉ có `view_salesorder` (không có `view_order_customer_info`) tìm SĐT và tên đều ra 0 dòng (không dùng làm "máy dò" khách); header `Cache-Control: no-store` |
+| NEW-1 · `GET ?q=` có SĐT | ✅ | 400 `{"code":"SEARCH_USE_POST"}` với SĐT 10 số, 9 số, tên có khoảng trắng; câu lỗi không lặp lại từ khoá. `GET ?q=<mã đơn>` vẫn 200 |
+| ⌘K · gõ mã đơn, mã phiếu giao, mã lô | ✅ | `ed_batch17_command_search.py` (REAL_API) 21/21 và `qa_new1.py`: `SO261007-D8A9C1` mở `/orders/detail/?id=7`, `GH-INV261007-07E028-BDFB7` mở `/deliveries/detail/?id=4`, `LO-0912` mở `/inventory/detail/?id=<lô>`, gõ chữ thường cũng mở |
+| ⌘K · gõ SĐT, `091-234-56`, tên | ✅ | 0 request tới bất kỳ `/api/` nào trong suốt lúc gõ, không dòng "Mở chứng từ", không "Không tìm thấy" (không tra mã); storage/cookie/history sạch |
+| ⌘K · `giao1` gõ mã phiếu của `giao2` (ED-07-AC3) | ✅ | `giao1` gõ `GH-INV261007-F428B2-E8D5D`, `GH-INV261007-5B301A-0C478` (phiếu của `giao2`) và `SO261007-DAB72C` → "Không tìm thấy chứng từ khớp với …", không mở trang chi tiết; gõ mã phiếu của chính mình thì mở được |
+| 4 e2e BE thật | xem bảng dưới | |
+| Contract 17a/17b trên màn thật | xem bảng dưới | |
+| 360px và 1280px | ✅ | Mỗi màn dưới đây chạy cả hai cỡ, không cuộn ngang |
+
+### 4 e2e BE thật
+| File | Kết quả | Ghi chú |
+|---|---|---|
+| `s41_s47_real` | ✅ 40/40 | |
+| `ed_batch12_real` | 14/16 | 2 ca đỏ là **kịch bản lỗi thời**: nó khẳng định `/reports/period/` và `/batches/` trả tiền dạng **number**, còn Lô 17a A4 cố ý đổi sang **chuỗi** (đã thấy `"revenue":"2755000.00"`). Màn Báo cáo vẫn hiện đúng tiền (xem bảng dưới). Cần sửa kịch bản. Số "430.000 đ" của kịch bản đúng với DB chỉ có `seed_demo` |
+| `ed_batch8_stocktake_real` | ⏸ 15 ca đạt rồi dừng ở bước 4 | Bước 4 chờ nút "Thao tác khác" ở một phiếu **Nháp** (không có mục nào nên menu không render). `StocktakeDetailScreen.tsx` và `MoreMenu.tsx` **không đổi** từ 2c00222, nên lỗi thời từ trước lô này. Cũng cần mật khẩu `demo1234` chứ không phải `Songbien2026`. Phần hai tab 409 do QA tự viết (bảng dưới) |
+| `qa_ed_batch10_real` | 86 đạt rồi lỗi; 130 đạt khi vá | Kịch bản gõ **một dòng không có giá mua** rồi kỳ vọng POST `rate '0.00'`; form chặn từ phía FE ("Nhập giá mua lớn hơn 0.", `ReceiveBatchesForm` và `receiveValidation` không đổi từ 2c00222) nên không có POST nào và các pha sau dây chuyền đỏ. Ngoài ra `ph_draft_submit` cứng đường dẫn `/Users/dangthiduyen/Downloads/loc-wt-c/backend` và biến `PY`. Chạy bản vá tạm trong scratchpad (dòng thứ ba có giá 60.000; đường dẫn và `PY` đúng máy): 130 PASS, 5 ca đỏ chỉ vì số tiền lệch theo bản vá (1.920.000 đ thay vì 1.665.000 đ), và `ph_draft_submit` 10/10. Không có ca nào đỏ vì sản phẩm. Phần rò: `D-3` ql1 thấy số tiền hoá đơn, giá mồi 77777/66666/55555 không lộ ở Quản lý/NV kho/giao hàng/CSKH; không SĐT khách trong phản hồi |
+
+Ghi nhận: SĐT 0900009901… mà script quét thấy ở lần chạy đầu là SĐT hồ sơ nhân viên do QA gieo, không phải khách; xoá đi thì hết cảnh báo.
+
+### Contract 17a/17b trên màn thật
+| Mục | Kết quả | Bằng chứng |
+|---|---|---|
+| Tổng quan bấm dòng mở đúng chi tiết | ✅ 42/42 | 8 dòng đơn (cả `DH-2609-114` Hết giờ giữ chỗ, đơn đã từng có giao dịch), 7 dòng lô, 1 dòng cảnh báo lô: URL `?id=` khớp `id` trong API và mã hiện trên trang. Có cột "Lý do" ("Hết giờ giữ chỗ" ở đơn tự huỷ). 1280 và 360 |
+| Nhật ký lọc ngày và mã | ✅ 26/26 | DB có 4 dòng, hai dòng lùi ngày (03/10, 20/09): từ 05/10 → 2/2; đến 04/10 → 2/2; biên 03/10–03/10 → 1/1 (giờ VN); mã `RT-1` → 1/1, `rt-1` cũng khớp, mã lạ → 0; mã + khoảng ngày không chứa → 0; từ lớn hơn đến → "Ngày bắt đầu phải trước hoặc bằng ngày kết thúc." (ảnh `c3-audit-range-360.png`); gõ SĐT/tên vào ô mã → không request nào mang chúng. Request có `date_from`, `date_to`, `q` |
+| Báo cáo hiện đúng tiền | ✅ | API: `revenue "2755000.00"`, `cogs "2003000.00"`, `profit "752000.00"`; màn hiện `2.755.000 đ`, `2.003.000 đ`, `752.000 đ`; bảng lô `LO-0922` Tổng chi phí `7.840.000 đ` khớp `purchase_cost`; không `NaN`/`undefined`. Chủ thấy tiền, Quản lý không (ed_batch12_real) |
+| Hoá đơn mua hiện lỗi đúng chỗ | ✅ (một phần ⏸) | `PAID_AT_IN_FUTURE`: BE 400, câu lỗi tiếng Việt hiện **dưới ô "Trả lúc"**, không lộ mã, sửa ô thì câu biến mất (1280, 360). API trực tiếp trả đúng 4 mã mới: `INVOICE_SUPPLIER_MISMATCH`, `AMOUNT_NOT_POSITIVE`, `PAID_AT_REQUIRED`, `PAID_AT_WHEN_UNPAID`. ⏸ `INVOICE_SUPPLIER_MISMATCH` không tái hiện được qua giao diện thật vì form tự bỏ phiếu khi đổi nhà cung cấp (nên đúng ý), chỉ có vitest `invoiceErrors.test.ts` và API |
+| Kiểm kê hai tab: tab sau nhận 409 | ❌ B1 | Chức năng đúng (xem dưới) nhưng thông báo không nhìn thấy trong một số cỡ màn |
+| Hàng chờ gọi có mã phiếu | ✅ | Chi tiết `/confirmation/detail/?id=7` hiện `GH-INV261007-17B840-EF6B2` ở cả `loc` và `cs2`, 1280 và 360. Danh sách không có cột mã phiếu, đúng thiết kế (cột là Mã đơn, Khách, SĐT…); 4 ca của QA đỏ vì kỳ vọng sai của chính QA, không tính |
+| Ghi tiền về muộn thiếu giờ bị chặn | ✅ | UI: bỏ trống giờ → chặn tại ô, 0 request; năm 2006 → BE 400, câu lỗi dưới ô giờ, không lộ `BR-TT-18`; tương lai → chặn; hợp lệ → 201; thân gửi chỉ `bank_txn_id`, `amount`, `received_at` (có giờ). API: chỉ ngày → 400 `BR-TT-18`, quá 400 ngày → 400 `BR-TT-18`. Ca ngoài đường thuận: gửi lần hai cùng 250.000 đ ở 360px → 409 "Có khoản giống đã ghi" kèm ô tick (đúng thiết kế, không ghi trùng) |
+| Nút xoá phiếu hàng hoàn ẩn khi thiếu quyền | ✅ | Chủ đủ quyền: menu có "Huỷ phiếu hàng hoàn" và "Xoá phiếu hàng hoàn". Gỡ `inventory.add_returntostock` khỏi Group `owner` (DB tạm, đã trả lại): `available_actions` còn `['approve','cancel']`, không có nút xoá, `POST delete/` trả 403, phiếu vẫn nguyên. NV kho (`kho1`) cũng không có nút (luật "Chỉ Chủ"), `POST delete/` 403 |
+
+### B1 chi tiết (kiểm kê hai tab)
+Chức năng: `kho1` mở cùng một phiếu nháp ở hai ngữ cảnh. Tab A lưu số đếm 11 trước; tab B (màn cũ) sửa số và ghi chú rồi Lưu nháp → DB giữ nguyên số của A, ghi chú của B **không** ghi; bấm lưu lần nữa khi chưa tải vẫn không đè; bấm "Tải lại" thì ô hiện số của A và banner mất; sửa tiếp rồi lưu được; hai tab chỉ sửa ghi chú: A thắng, B nhận 409. 18/18 ở 1280 và 360.
+
+### Lỗi
+#### B1 — Banner "Phiếu vừa được … sửa. Tải lại để xem bản mới" nằm ngoài khung nhìn khi form kiểm kê đã cuộn xuống · Medium · AC contract 17a A7 / 17b G4
+Bước tái hiện: đăng nhập `kho1` ở hai ngữ cảnh. Ngữ cảnh A: `/stocktake/new/`, chọn Kho chính, nhập số đếm, Lưu nháp, ở lại trang sửa. Ngữ cảnh B: mở `/stocktake/edit/?id=<id>`. Ở A sửa một số rồi Lưu nháp. Ở B (viewport 360×740, hoặc 1280×700 với 9 lô) sửa một số ở dòng dưới cùng rồi bấm "Lưu nháp" trên thanh đáy.
+Mong đợi: người dùng nhìn thấy cảnh báo xung đột và nút "Tải lại", hoặc trang tự cuộn/di chuyển focus tới cảnh báo.
+Thực tế: banner có trong DOM (`[data-conflict-banner]`) nhưng cuộn trong vùng nội dung nên `getBoundingClientRect().top = -306` (360×740, 1 lô) và `-584` (1280×700, 9 lô). Không toast, nhãn nút không đổi, không focus nên người dùng tưởng nút không ăn. Ảnh: `shots/c6b-conflict-viewport-360.png` (trong scratchpad, đã dọn). Ở 1280×900 với 1 lô thì banner nằm trong khung (top 171).
+Ảnh hưởng: dữ liệu an toàn (không bị đè), nhưng nhân viên kho dùng điện thoại không biết vì sao lưu không được. `FormPage.tsx` chỉ có `revealField` cho ô đang focus và `focusFirstInvalid` cho `aria-invalid`; không có cơ chế cuộn tới `alert`.
+Đề xuất: khi `conflict` xuất hiện thì `scrollIntoView({block:"center"})` hoặc focus vào `[data-conflict-banner]` (nên làm ở `FormPage` để các form khác dùng chung `ConflictBanner` cũng hưởng).
+
+#### Ghi nhận (Low, không chặn)
+- L-1: ba kịch bản BE thật lỗi thời nêu ở bảng trên (`ed_batch12_real` khẳng định number thay vì chuỗi; `ed_batch8_stocktake_real` bước 4; `qa_ed_batch10_real` dòng không giá, đường dẫn cứng, biến `PY`) nên không chạy xanh nếu để nguyên. Phần sản phẩm tương ứng đều đạt khi chạy đúng cách. Cần giao FE sửa kịch bản ở lô dọn e2e.
+- L-2: `GET /api/sales/orders/?q=0912-345-678` (SĐT có gạch ngang) và `?q=09123456` (8 số) trả 200, không bị chặn `SEARCH_USE_POST`; chỉ khớp mã nên không lộ gì, nhưng nếu có client gõ SĐT kiểu đó thì nó vào access log. FE hiện không gửi như vậy. Dev đã ghi nợ "từ ASCII ngắn" ở 17b-BE; nên nới luật thành "có từ 7 chữ số, kể cả có dấu `-`".
+- L-3: `GET /api/confirmation/queue/` thiếu quyền trả "Bạn không có quyền truy cập hàng chờ CSKH." (viết tắt CSKH, trái tên chuẩn "Gọi xác nhận"); FE không hiện câu này (hiện "Bạn không có quyền xem mục này").
+- L-4: `POST /api/sales/orders/search/` không có giới hạn tần suất (cần đăng nhập và quyền, `GET ?q=` cũ cũng không có); chưa trong yêu cầu 02e nên chỉ ghi.
+- L-5: `/orders/detail/?id=7` bị prefetch RSC trên `python3 -m http.server` ("Failed to fetch RSC payload", đã nằm trong danh sách loại trừ của các kịch bản có sẵn), không phải lỗi sản phẩm.
+
+### Phân quyền (đã kiểm trên BE thật)
+| Hành động | owner | manager | warehouse_staff | delivery_staff | customer_service | chưa đăng nhập |
+|---|---|---|---|---|---|---|
+| `POST orders/search/` | thấy đơn (SĐT, tên) | thấy | thấy (cùng luật `view_order_customer_info` có sẵn) | chỉ đơn của phiếu mình (`giao1` 1, `giao2` 0) | theo phạm vi dữ liệu (0 ở seed) | 401 |
+| `GET orders/?q=<SĐT/tên>` | 400 | 400 | 400 | 400 | 400 | 401 |
+| ⌘K mã phiếu giao của người khác | mở | mở | không áp dụng | "Không tìm thấy" | không áp dụng | không áp dụng |
+| Xoá phiếu hàng hoàn | có nút | không | không (403) | không | không | không |
+| Xem hàng chờ gọi / mã phiếu | có | có | (không thử) | 403 | có | 401 |
+| Báo cáo lãi lỗ | có | không có menu, vào thẳng "không có quyền" | không | không | không | không |
+
+### Rò giá vốn
+`ed_batch12_real`: Quản lý không có Báo cáo lãi lỗ, không cột Giá vốn/Lãi gộp ở Hoá đơn bán. `qa_ed_batch10_real` (bản vá): giá mồi 77777/66666/55555 không lộ ở ql1, kho1, giao1, cs2; các khoá `purchase_rate`, `landed_unit_cost`, `unit_cost`, `profit`… không có trong phản hồi người thiếu quyền. Lô 17b không thêm khoá mới vào `AuditLog` hay API trả tiền (diff BE: không đụng `AuditLog`, `logger`, `print`).
+
+### Rò dữ liệu cá nhân
+Đạt. Từ khoá SĐT/tên không vào URL, lịch sử, storage, cookie, console, access log (xem NEW-1). ⌘K không gửi SĐT/tên đi đâu. Thân `record-late` chỉ 3 khoá, không ghi chú. Câu lỗi 400/403 của `search/` không chứa từ khoá đã gửi. Dữ liệu chụp và seed đều giả (tên "Nguyen Van Qa", SĐT 09123xxxxx, địa chỉ "Duong Gia"). Lưu ý: dữ liệu `seed_demo` có tên khách giả sẵn (Chị Hồng…); đã dùng đúng như repo có.
+
+### Hồi quy
+- `manage.py test apps.sales apps.delivery apps.inventory apps.accounts apps.ai apps.common`: Ran 2704 tests, OK (skipped=2), 126 giây. (Điều phối viên đã chạy toàn bộ: 3355 OK.)
+- `makemigrations --check --dry-run`: No changes detected.
+- `check_naming.py`: OK, không phát sinh vi phạm mới.
+- `tsc --noEmit`: exit 0. `vitest run`: 103 file, 1229 test đạt.
+- Build `MOCK=0` trỏ vào runserver: exit 0.
+- Không chạy `npm ci` sạch (theo yêu cầu dùng symlink `node_modules` từ repo chính) nên mục "npm ci không `--legacy-peer-deps`" **chưa kiểm** (⏸).
+- `adapter/`: không đổi trong lô, không chạy.
+- Phần ED còn lại (`ed_batch12_real` các phần Báo cáo/Hoá đơn bán; `s41_s47_real` Nhân sự, đổi mật khẩu) chạy được trên BE thật, xem trên.
+
+### Chưa kiểm (⏸)
+1. `npm ci` sạch (dùng symlink `node_modules`).
+2. `INVOICE_SUPPLIER_MISMATCH` qua giao diện (form không cho tới được tình huống này; có vitest và API).
+3. ⌘K và danh sách đơn cho `cs2` và `delivery_staff` ngoài phạm vi dữ liệu theo cấu hình riêng (BE đã có test `test_order_search_post.py`, `test_confirmation_note_code.py`).
+
+### Lệnh đã chạy
+- `manage.py migrate`, `bootstrap_masterdata`, `seed_demo`, `shell` (seed người dùng, đơn, phiếu) trên SQLite tạm; `runserver 127.0.0.1:8621 --noreload` (PID ghi vào file, đã tắt), `python3 -m http.server 3521` (đã tắt).
+- `npm run build` với `NEXT_PUBLIC_USE_MOCK=0 NEXT_PUBLIC_API_BASE=http://127.0.0.1:8621`: exit 0.
+- `orders_search_post.py` 12/12; `ed_batch17_command_search.py` 21/21; `s41_s47_real` 40/40; `ed_batch12_real` 14/16; `ed_batch8_stocktake_real` 15 rồi dừng; `qa_ed_batch10_real` 86 (nguyên bản) và 130 + 10 (bản vá tạm, đã xoá).
+- Script QA (scratchpad, đã dọn khi tắt môi trường): `qa_new1` 50/50, tổng quan 42/42, nhật ký 26/26, báo cáo, hoá đơn mua 12/12, kiểm kê hai tab 18/18 (+ đo B1), hàng chờ gọi, tiền về muộn 15/16 (1 ca là 409 trùng đúng thiết kế), phiếu hàng hoàn 12/12 và 4/4 (gỡ quyền).
+- `manage.py test` 6 app: 2704 OK; `makemigrations --check`; `check_naming.py`; `tsc --noEmit`; `vitest run`.
+- Dọn: kill theo PID, `rm` DB tạm, `out/`, `.next`, 3 symlink; `git status` sạch.
+
+### QA lại sau d524c3e (08/10) — kiểm lại B1 và các sửa kèm trên BE thật (HEAD c8f656b)
+
+#### Kết luận: APPROVED — B1 đã sửa, các việc kèm đạt trên BE thật, không phát sinh lỗi mới
+Tổng: ✅ B1 (2 cỡ màn) · ✅ 2 form dùng `FormPage` có 409 · ✅ GET `q` · ✅ câu 403 · ✅ 3 e2e BE thật chạy lại.
+
+Dựng lại như lần 1 (runserver 8621 + `http.server` 3521, build `MOCK=0` mới sau merge, SQLite tạm), tắt theo PID, dọn DB, `out/`, `.next`, symlink; `git status` sạch.
+
+| Mục | Kết quả | Bằng chứng |
+|---|---|---|
+| B1 Kiểm kê hai tab, 360×740, form 7 lô, cuộn xuống ô cuối | ✅ | Tab B (cũ) bấm Lưu nháp → `[data-conflict-banner]` top 167,5 / bottom 242 trong khung 740 và **có focus** (`document.activeElement` nằm trong banner). DB: số của A giữ nguyên, lô cuối của B không ghi. Bấm lưu lần hai: banner còn, không đè. "Tải lại" → banner mất, số của A hiện. Không cuộn ngang. Ảnh `c10-conflict-360.png` (scratchpad, đã dọn) |
+| B1 cùng ca ở 1280×700 | ✅ | top 171,5 / bottom 231,5 trong khung 700, có focus; các bước còn lại như trên (trước sửa: top −584) |
+| Form khác dùng `FormPage` có 409 | ✅ | Màn bài viết, hộp "Thiết lập bài viết" (`EntryEditScreen` → `FormPage alert`): `ql1` sửa bài qua API (200), `loc` ở bản cũ sửa tóm tắt rồi lưu → 409, banner top 171,5 (360) và 175,5 (1280), trong khung, có focus. Ghi chú: ở chế độ **soạn bài** (không qua `FormPage`) banner hiện cùng trang, ở 1280×900 trong khung (top 309,5) nhưng không có focus; đó là luồng khác, không thuộc sửa B1 và không phải lỗi mới |
+| `GET orders/?q=0912-345-678`, `09123456`, `0912.345.678` | ✅ | cả ba 400 `SEARCH_USE_POST`, câu lỗi không lặp từ khoá; các mã (`LO-0912`, `12-34`, mã đơn, mã phiếu giao) vẫn 200 |
+| 403 `/api/confirmation/queue/` | ✅ | `giao1` và `kho1`: "Bạn không có quyền truy cập hàng chờ Gọi xác nhận." (không có "CSKH"); chi tiết `giao1`: "Bạn không có quyền xem chi tiết đơn Gọi xác nhận."; chưa đăng nhập 401; `loc` 200 |
+| `ed_batch12_real` | ✅ 16/16 | DB chỉ `seed_demo` + người dùng |
+| `ed_batch8_stocktake_real` | ✅ 21/21 | `PASSWORD=Songbien2026` |
+| `qa_ed_batch10_real` | ✅ 143/143 | `QA_PASSWORD=Songbien2026`, `BACKEND_PY` đúng máy; không cần bản vá tạm nữa |
+| Hồi quy NEW-1 và ⌘K sau sửa BE | ✅ | `orders_search_post` 12/12, `ed_batch17_command_search` 21/21 trên BE thật (đọc mã từ màn nên không phụ thuộc seed) |
+
+Ghi chú: bộ kiểm riêng `qa_new1` của QA đỏ 5/47 chỉ vì cứng mã đơn và mã phiếu của lần seed trước (mã sinh ngẫu nhiên mỗi lần dựng DB); phần tương ứng đã được `ed_batch17` đọc mã thật phủ.
+
+Lỗi còn lại: không có. L-1 (3 kịch bản lỗi thời), L-2 (GET `q` có gạch và 8 số) và L-3 (chữ CSKH) của lần 1 đã đóng. L-4 (không giới hạn tần suất `search/`) và L-5 (nhiễu prefetch RSC của `http.server`) vẫn là ghi nhận, không chặn. Mục ⏸ `npm ci` sạch vẫn chưa kiểm (dùng symlink `node_modules`).

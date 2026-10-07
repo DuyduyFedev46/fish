@@ -83,7 +83,7 @@ import type { ContentCategory, ContentEntryDetail, ContentImage, ContentKind, Co
 import ImageUploader from "../editor/ImageUploader";
 import { ChecklistModal, HistoryModal, ReasonModal, WarningsModal } from "./EntryDialogs";
 import { EntrySettings } from "./EntrySettings";
-import PolicyVersionSheet from "./PolicyVersionSheet";
+import PolicyVersionModal from "./PolicyVersionModal";
 import s from "../content.module.css";
 
 // Trình soạn thảo nặng (Tiptap): chỉ tải khi mở màn soạn bài (BR-AI-17: không làm chậm các màn khác).
@@ -1054,7 +1054,7 @@ export function EntryEditScreen() {
 
       {/* SR-19: xem đúng phiên bản chính sách khách đã đồng ý, chỉ đọc, không khôi phục. */}
       {viewVersion !== null && entryId !== null && (
-        <PolicyVersionSheet
+        <PolicyVersionModal
           entryId={entryId}
           versionNo={viewVersion}
           onClose={() => {

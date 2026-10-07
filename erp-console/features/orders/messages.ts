@@ -347,7 +347,6 @@ export const ORDERS_MSG = {
   dupBadge: "Nghi trùng",
   dupRefundAck: "Tôi đã đối chiếu sao kê",
   dupRefundBox: "Khoản này đang bị nghi trùng với một khoản khác. Đối chiếu sao kê, tránh hoàn hai lần.",
-  dupRefundNeedAck: "Tick xác nhận đã đối chiếu sao kê rồi mới lập phiếu hoàn tiền.",
 
   // ---- Chung ----
   conflictNounOrder: "đơn",

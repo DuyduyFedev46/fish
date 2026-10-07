@@ -2,12 +2,13 @@
 
 // Màn Nhật ký hoạt động (ED-41 / W3f): /audit-logs/. Khung ListPage: nhóm nút Tất cả/Người/AI/Hệ thống · ô tìm mã chứng từ ·
 // chọn thao tác · (Chủ) chọn người · khoảng ngày · bảng 8 cột · "Tải thêm". Chỉ xem: không sửa, không xoá (BR-PQ-06).
-// Lọc loại người / thao tác / người làm chạy phía BE (`?actor_kind=&action=&actor=`); tìm mã và khoảng ngày lọc phía máy
-// trong các dòng đã tải (BE chưa có) — màn nói rõ điều này. "Người duyệt" suy từ dòng duyệt cùng mã đề xuất (BE chưa có trường).
+// Mọi bộ lọc chạy phía BE: loại người / thao tác / người làm (`?actor_kind=&action=&actor=`) và, từ Lô 17a, khoảng ngày + mã chứng từ
+// (`?date_from=&date_to=&q=`), nên "Đang hiện n / tổng" đúng cả khi chưa tải hết. Ô tìm chỉ nhận mã (không SĐT, tên): kiểm ở máy theo
+// luật của BE, gõ xong chờ 350ms mới gửi. "Người duyệt" suy từ dòng duyệt cùng mã đề xuất (BE chưa có trường).
 // Dữ liệu cá nhân: cột "Thay đổi" chỉ in khoá trong danh sách trắng (auditModel.changeSummary), không bao giờ in JSON thô;
 // tên đăng nhập chỉ ở bộ nhớ trang (không URL, không storage, không log). Giá vốn: BE đã bỏ khoá giá vốn khỏi `changes` khi thiếu quyền.
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/features/auth/components/AuthProvider";
 import { useStaffList } from "@/features/staff/useStaffData";
 import { dateTime } from "@/shared/lib/format";
@@ -21,7 +22,8 @@ import { FilterBar, type FilterSelect } from "@/shared/ui/list/FilterBar";
 import { ListPage } from "@/shared/ui/list/ListPage";
 import { NoPermission } from "@/shared/ui/states/NoPermission";
 import { getAuditLogs } from "../api";
-import { AI_ONLY_ACTIONS, AUDIT_ACTION_LABELS, AUDIT_FILTER_ACTIONS, KIND_OPTIONS, actionLabel, actorInitial, actorName, approverOf, buildApproverMap, changeSummary, matchesLocal } from "../auditModel";
+import { AI_ONLY_ACTIONS, AUDIT_ACTION_LABELS, AUDIT_FILTER_ACTIONS, KIND_OPTIONS, actionLabel, actorInitial, actorName, approverOf, buildApproverMap, changeSummary } from "../auditModel";
+import { auditRangeError, checkAuditQuery } from "../auditQuery";
 import { AUDIT_MSG as M } from "../messages";
 import type { AuditLogParams, AuditLogRow } from "../types";
 import s from "../audit.module.css";
@@ -76,20 +78,42 @@ export function AuditLogScreen() {
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
 
-  const params = useMemo<AuditLogParams>(() => ({ actor_kind: kind, action, actor: actor ? Number(actor) : undefined }), [kind, action, actor]);
+  // Từ khoá gõ dở không gửi ngay: chờ 350ms. Từ khoá sai luật (SĐT, chữ có dấu…) không bao giờ rời máy.
+  const [qSent, setQSent] = useState("");
+  const qCheck = checkAuditQuery(q);
+  const qWanted = qCheck.ok ? qCheck.q : "";
+  useEffect(() => {
+    const t = setTimeout(() => setQSent(qWanted), 350);
+    return () => clearTimeout(t);
+  }, [qWanted]);
+  const rangeError = auditRangeError(from, to);
+
+  const params = useMemo<AuditLogParams>(
+    () => ({
+      actor_kind: kind,
+      action,
+      actor: actor ? Number(actor) : undefined,
+      date_from: rangeError ? undefined : from || undefined,
+      date_to: rangeError ? undefined : to || undefined,
+      q: qSent || undefined,
+    }),
+    [kind, action, actor, from, to, rangeError, qSent],
+  );
   const list = usePagedList<AuditLogRow, AuditLogParams>((p, page) => getAuditLogs(p, page), params, !!me);
 
   const approvers = useMemo(() => buildApproverMap(list.rows ?? []), [list.rows]);
   // W39: AI tắt thì không hiện dòng do AI làm hay đề xuất của AI, kể cả khi BE chưa lọc (BE bật nhưng giao diện tắt).
   const shown = useMemo(
-    () => (list.rows ? list.rows.filter((r) => (aiOn || (r.actor_kind !== "ai" && !r.proposal_ref)) && matchesLocal(r, { query: q, from, to })) : null),
-    [list.rows, q, from, to, aiOn],
+    () => (list.rows ? list.rows.filter((r) => aiOn || (r.actor_kind !== "ai" && !r.proposal_ref)) : null),
+    [list.rows, aiOn],
   );
 
   if (list.error instanceof ApiError && list.error.status === 403 && !list.rows) return <NoPermission />;
 
-  const localActive = !!(q.trim() || from || to);
-  const serverActive = !!(kind || action || actor);
+  // 400 của BE về bộ lọc (vd INVALID_FILTER): câu của BE hiện dưới ô tìm, không lặp lại từ khoá; bảng không hiện "lỗi tải".
+  const filterRejected = list.error instanceof ApiError && list.error.status === 400;
+  const filterMessage = (qCheck.ok ? null : qCheck.message) ?? rangeError ?? (filterRejected ? (list.error instanceof Error && list.error.message ? list.error.message : M.filterError) : null);
+  const filterActive = !!(kind || action || actor || qSent || from || to);
 
   const selects: FilterSelect[] = [
     {
@@ -133,12 +157,7 @@ export function AuditLogScreen() {
     ...(aiOn ? [{ key: "proposal", header: M.colProposal, mono: true, hideBelow: 1100 as const, width: "88px", render: (r: AuditLogRow) => r.proposal_ref || <span className="muted">{M.noValue}</span> }] : []),
   ];
 
-  const summary =
-    shown && list.rows
-      ? localActive
-        ? M.shownLoaded(shown.length, list.rows.length, list.count)
-        : M.shown(shown.length, list.count)
-      : undefined;
+  const summary = shown && list.rows ? M.shown(shown.length, list.count) : undefined;
 
   const refreshFailed = list.rows !== undefined && list.error != null && !list.loading;
   const clearAll = () => {
@@ -183,6 +202,11 @@ export function AuditLogScreen() {
             dateRange={{ from, to, onFrom: setFrom, onTo: setTo }}
             summary={summary}
           />
+          {filterMessage && (
+            <p className="field-err" role="alert" data-testid="audit-filter-error">
+              {filterMessage}
+            </p>
+          )}
         </>
       }
       footer={
@@ -196,7 +220,7 @@ export function AuditLogScreen() {
               {list.moreLoading ? M.loadingMore : M.loadMore}
             </button>
           ) : null}
-          <p className={s.note}>{localActive ? `${M.localNote} ${M.readOnly}` : M.readOnly}</p>
+          <p className={s.note}>{M.readOnly}</p>
         </div>
       }
       onRetry={() => void list.reload()}
@@ -204,17 +228,17 @@ export function AuditLogScreen() {
       <DataTable
         caption={M.caption}
         columns={columns}
-        rows={shown}
+        rows={filterRejected && !shown ? [] : shown}
         rowKey={(r) => r.id}
         dense
         loading={list.loading && list.rows === undefined}
-        error={list.rows === undefined && list.error != null ? loadErrorText(list.error) : null}
+        error={list.rows === undefined && list.error != null && !filterRejected ? loadErrorText(list.error) : null}
         onRetry={() => void list.reload()}
-        query={q.trim()}
+        query={qSent}
         onClearQuery={() => setQ("")}
         noun={M.noun}
         empty={
-          serverActive || localActive
+          filterActive
             ? {
                 icon: "filter_alt_off",
                 title: M.emptyFiltered,

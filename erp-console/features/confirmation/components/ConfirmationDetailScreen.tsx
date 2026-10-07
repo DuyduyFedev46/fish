@@ -425,7 +425,7 @@ export function ConfirmationDetailScreen() {
             if (decision === "CANCEL") {
               toast.success("Đã huỷ đơn. Chuyển sang hoàn tiền cho khách.");
               setModal(null);
-              if (res.order_id) router.push(`/orders/?order=${res.order_id}&open=refund`);
+              if (res.order_id) router.push(`/orders/detail/?id=${res.order_id}&open=refund`);
               else refreshAll();
               return;
             }

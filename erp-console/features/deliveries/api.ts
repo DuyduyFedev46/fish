@@ -27,6 +27,8 @@ export async function fetchDeliveryNotes(
     completed_from?: string;
     /** `me` = chỉ phiếu gán cho mình (Việc giao của tôi); số = id người giao (chỉ vai đủ phạm vi). */
     assigned_to?: string;
+    /** Lô 17a (A9): khớp ĐÚNG mã phiếu (không phân biệt hoa thường), có phạm vi như danh sách. Dùng cho ⌘K. */
+    code?: string;
     page?: number;
   },
   signal?: AbortSignal
@@ -36,6 +38,7 @@ export async function fetchDeliveryNotes(
   if (params.status) query.set("status", params.status);
   if (params.completed_from) query.set("completed_from", params.completed_from);
   if (params.assigned_to) query.set("assigned_to", params.assigned_to);
+  if (params.code) query.set("code", params.code);
   if (params.page) query.set("page", String(params.page));
 
   const qs = query.toString();
@@ -203,4 +206,10 @@ export async function lookupDeliveryTag(code: string, signal?: AbortSignal): Pro
     signal,
     mock: process.env.NEXT_PUBLIC_USE_MOCK === "1" ? mockApi().mockLookupDeliveryTag : undefined,
   });
+}
+
+/** ⌘K (Lô 17b H1): id phiếu giao khớp đúng mã, hoặc null (không có / ngoài phạm vi: NV giao tra mã của người khác nhận `count` 0). */
+export async function findDeliveryNoteIdByCode(code: string, signal?: AbortSignal): Promise<number | null> {
+  const page = await fetchDeliveryNotes({ code }, signal);
+  return page.results.find((n) => n.code.toLowerCase() === code.toLowerCase())?.id ?? null;
 }

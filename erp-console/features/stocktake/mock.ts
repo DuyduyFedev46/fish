@@ -357,6 +357,15 @@ export function mockStocktakeApi(req: MockRequest): MockResponse {
     if (rec.status !== "DRAFT") return fail(400, "Phiếu kiểm kê đã gửi duyệt hoặc đã duyệt, không sửa dòng được (BR-PQ-10). Muốn sửa, hãy trả phiếu về nháp.", "RECON_NOT_DRAFT");
     const body = bodyOf(req);
     if ("lines" in body) return fail(400, "Dòng số đếm sửa qua POST …/lines/, không sửa qua phiếu.", "RECON_USE_LINES_ENDPOINT");
+    // Lô 17a (A7): `expected_updated_at` tuỳ chọn; có thì sai dạng → 400, lệch → 409 STALE_STATE, không có thì giữ hành vi cũ.
+    if ("expected_updated_at" in body && body.expected_updated_at != null) {
+      if (typeof body.expected_updated_at !== "string" || Number.isNaN(Date.parse(body.expected_updated_at))) {
+        return fail(400, "expected_updated_at không hợp lệ.", "EXPECTED_UPDATED_AT_INVALID");
+      }
+      if (Date.parse(body.expected_updated_at) !== Date.parse(rec.updated_at)) {
+        return fail(409, "Phiếu vừa được người khác cập nhật, tải lại để xem.", "STALE_STATE", { updated_at: rec.updated_at, updated_by_name: rec.last_actor });
+      }
+    }
     if (typeof body.count_date === "string") rec.count_date = body.count_date;
     if (typeof body.note === "string") rec.note = body.note;
     bump(rec, me.display_name);

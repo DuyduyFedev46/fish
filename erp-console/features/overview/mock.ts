@@ -17,21 +17,11 @@ export function mockOverview(req: MockRequest): MockResponse {
     can_view_dashboard: me.permissions.includes("reports.view_dashboard"),
   });
   if (res.status !== 200) return res;
-  const body = withShopOrderCodes(res.body) as { kpis?: Record<string, unknown>; recent_orders?: unknown[] };
+  const body = res.body as { kpis?: Record<string, unknown>; recent_orders?: unknown[] };
   // S6-AC5/AC6: khi kho đơn mock đã có bộ mẫu hoặc đã nhận kết quả giao hàng, số đơn chưa xong và danh sách đơn gần đây lấy từ đó.
   const slice = mockOrdersOverviewSlice();
   if (!slice || !body.kpis) return { ...res, body };
   return { ...res, body: { ...body, kpis: { ...body.kpis, pending_orders: slice.pending }, recent_orders: slice.recent } };
-}
-
-/**
- * Seed chung (shared/lib/dashboardSummary.mock.ts) còn mã đơn kiểu cũ "DH-240924-011"; BE thật trả "SO260930-753F06" (ED-08-AC2).
- * Đổi tiền tố ngay tại mock của màn này để thử đúng dạng mã thật mà không phải sửa seed dùng chung.
- */
-function withShopOrderCodes(body: unknown): unknown {
-  const b = body as { recent_orders?: { code: string }[] };
-  if (!Array.isArray(b?.recent_orders)) return body;
-  return { ...b, recent_orders: b.recent_orders.map((o) => ({ ...o, code: o.code.replace(/^DH-/, "SO") })) };
 }
 
 export function mockAttention(req: MockRequest): MockResponse {
