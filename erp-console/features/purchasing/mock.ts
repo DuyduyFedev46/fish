@@ -3,7 +3,7 @@ import { todayInVietnam } from "@/shared/lib/format";
 import { MOCK_UNAUTHORIZED, mockRequireUser } from "@/features/auth/mock";
 import type { Me } from "@/features/auth/types";
 import type { GuidanceData } from "@/features/guidance/types";
-import { mockCostsOfBatches, mockInvoicesOfReceipt } from "@/features/accounting/mock";
+import { mockCostsOfBatches, mockInvoicesOfReceipt, setReceiptSupplierLookup } from "@/features/accounting/mock";
 import type {
   CancelPurchaseReceiptResponse,
   PurchaseReceiptSummary,
@@ -531,3 +531,6 @@ export function mockCancelPurchaseReceipt(req: MockRequest): {
     },
   };
 }
+
+// Hoá đơn mua kiểm "phiếu thuộc nhà cung cấp khác" (Lô 17a A5): mock Hoá đơn hỏi kho phiếu của mock này.
+setReceiptSupplierLookup((id) => store().find((r) => r.id === id)?.supplier ?? null);

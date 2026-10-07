@@ -68,7 +68,7 @@ def capability_state(capability, held) -> str:
 
 
 def capability_states(held) -> dict:
-    return {c.key: capability_state(c, held) for c in registry.CAPABILITIES}
+    return {c.key: capability_state(c, held) for c in registry.visible_capabilities()}
 
 
 def display_name(user) -> str:
@@ -203,9 +203,10 @@ def _capability_events(group):
                                     object_id=str(group.pk))
             .select_related("actor__staff_profile").order_by("-created_at", "-id")[:TIMELINE_MAX_EVENTS])
     for row in rows:
-        for key, change in (row.changes or {}).items():
-            if key not in registry.BY_KEY:  # bỏ cờ `customer_data_widening_confirmed` (02b §2.3)
-                continue
+        changes = row.changes or {}
+        # bỏ cờ `customer_data_widening_confirmed` (02b §2.3) rồi bỏ việc AI khi AI tắt (main)
+        for key in registry.visible_keys(k for k in changes if k in registry.BY_KEY):
+            change = changes[key]
             capability = registry.BY_KEY[key]
             verb = STATE_LABEL_VERB.get((change or {}).get("to"), "Đổi")
             yield _event(row, f"{verb} việc {capability.label}", group.name)
@@ -269,7 +270,7 @@ def describe_group(code) -> dict:
         "registry": [
             {"key": c.key, "label": c.label, "section": c.section, "owner_only": c.owner_only,
              "requires": list(c.requires)}
-            for c in registry.CAPABILITIES
+            for c in registry.visible_capabilities()
         ],
         "data_scopes": scope_services.describe_data_scopes(group, held, stored),
         "scopes": scope_services.legacy_scopes(group, held, stored),
@@ -280,7 +281,9 @@ def describe_group(code) -> dict:
 
 def capability_change_label(row) -> str:
     """Nhãn một dòng AuditLog `change_group_capabilities` (dùng cho provider guidance `group`)."""
-    changes = {key: change for key, change in (row.changes or {}).items() if key in registry.BY_KEY}
+    raw = {key: change for key, change in (row.changes or {}).items() if key in registry.BY_KEY}
+    visible = set(registry.visible_keys(raw))  # tính một lần
+    changes = {k: v for k, v in raw.items() if k in visible}
     if len(changes) == 1:
         (key, change), = changes.items()
         capability = registry.BY_KEY.get(key)
@@ -296,6 +299,13 @@ def scope_change_label(row) -> str:
     return f"Đổi phạm vi dữ liệu của nhóm ({len(keys)} đối tượng)"
 
 
+def has_visible_capability_change(row) -> bool:
+    """False khi dòng `change_group_capabilities` chỉ chứa việc đang ẩn (AI tắt): bỏ khỏi guidance."""
+    if row.action != ACTION_CHANGE_CAPABILITIES:
+        return True
+    return bool(registry.visible_keys(row.changes or {}))
+
+
 # --- ghi ---------------------------------------------------------------------------
 
 
@@ -309,7 +319,8 @@ def _parse_body(data):
     scopes = data.get("scopes", {})
     if not isinstance(capabilities, dict) or not isinstance(scopes, dict):
         raise BusinessError("Việc và phạm vi phải gửi dạng danh sách khoá và giá trị.", code=INVALID_INPUT_CODE)
-    if set(capabilities) - set(registry.BY_KEY):
+    visible = {c.key for c in registry.visible_capabilities()}
+    if set(capabilities) - visible:  # visible ⊆ BY_KEY; việc AI ẩn khi AI tắt (main)
         raise BusinessError("Có việc không nằm trong danh sách phân quyền.", code=INPUT_CODE)
     version = data.get("version")
     if "version" in data and (not isinstance(version, str) or not version):

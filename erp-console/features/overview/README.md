@@ -13,7 +13,7 @@ Màn đầu của Chủ/Quản lý/NV kho. Dải 5 số liệu (Doanh thu, Đơn
 - Cột "Còn giữ chỗ" đếm ngược mm:ss riêng, không gộp vào Lý do. Đơn Giữ chỗ quá mốc đổi sang "Đã huỷ" ngay tại máy (ED-09-AC5).
 - Dòng "đề xuất AI chờ duyệt" (`AiProposalsRow`) chỉ hiện khi có quyền `ai-actions`, AI đang bật và có ≥1 đề xuất; lỗi hay AI tắt thì ẩn (không tải runtime AI).
 - Hàng đơn/lô **không bấm được** vì dashboard chỉ trả mã, không có id số (xem 03-dev-notes Lô 15). Dòng cận hạn mở danh sách lô lọc "Cận hạn".
-- Mock: `mock.ts` → seed chung `shared/lib/dashboardSummary.mock.ts` (mã đơn đổi sang `SO…` ở đây). Thử lỗi 500 / rỗng:
+- Mock: `mock.ts` → seed chung `shared/lib/dashboardSummary.mock.ts` (mã đơn dạng `SO…`). Thử lỗi 500 / rỗng:
   `window.__caveMock.dashboard("fail" | "empty")`.
 
 | File | Làm gì |

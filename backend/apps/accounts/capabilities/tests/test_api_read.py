@@ -1,5 +1,5 @@
 """B4 · ED-39-AC1 — GET /api/staff/groups/ và /api/staff/groups/{code}/ (chỉ Chủ đọc được)."""
-from django.test import TestCase
+from django.test import TestCase, override_settings
 
 from apps.accounts import roles
 from apps.accounts.capabilities import registry
@@ -15,6 +15,7 @@ MEMBER_LIST_KEYS = {"id", "display_name"}
 MEMBER_DETAIL_KEYS = {"id", "display_name", "username", "other_groups", "is_active", "added_at"}
 
 
+@override_settings(AI_ENABLED=True)  # các ca này kiểm ma trận ĐỦ việc; nhánh tắt ở test_ai_hidden
 class GroupReadTests(TestCase):
     def setUp(self):
         self.owner = make_staff("owner1", roles.OWNER, display_name="Chủ Thử")
@@ -30,7 +31,7 @@ class GroupReadTests(TestCase):
         body = response.json()
         self.assertEqual([g["code"] for g in body], ALL_CODES)
         self.assertEqual([g["label"] for g in body],
-                         ["Chủ", "Quản lý", "Nhân viên kho", "Nhân viên giao", "CSKH"])
+                         ["Chủ", "Quản lý", "Nhân viên kho", "Nhân viên giao", "Nhân viên gọi xác nhận"])
         for row in body:
             self.assertEqual(set(row), LIST_KEYS)
             self.assertEqual(set(row["capabilities"]), {c.key for c in registry.CAPABILITIES})

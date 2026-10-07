@@ -109,13 +109,14 @@ export type OrderLine = { status: string; reason: string | null; holdUntil: stri
 
 /**
  * Trạng thái hiệu lực của đơn ở máy (đơn Giữ chỗ quá mốc → Đã huỷ ngay, ED-09-AC5), cột Lý do và mốc đếm ngược.
- * Lý do chỉ có khi đơn tự huỷ vì hết giờ (summary không trả lý do khác); đếm ngược nằm ở CỘT RIÊNG (ED-08-AC2).
+ * Đếm ngược nằm ở CỘT RIÊNG (ED-08-AC2).
  */
-export function orderLine(status: string, expiresAt: string | null, now: number): OrderLine {
+export function orderLine(status: string, expiresAt: string | null, now: number, serverReason?: { label: string } | null): OrderLine {
   const effective = effectiveOrderStatus(status, expiresAt, now);
   return {
     status: effective,
-    reason: effective === "AUTO_CANCELLED" ? "Hết giờ giữ chỗ" : null,
+    // Lô 17b (G1): lý do lấy từ BE (`reason.label`, Lô 17a); riêng đơn Giữ chỗ vừa quá mốc ở máy thì BE chưa kịp huỷ nên FE tự ghi.
+    reason: effective === "AUTO_CANCELLED" ? (serverReason?.label ?? "Hết giờ giữ chỗ") : (serverReason?.label ?? null),
     holdUntil: effective === "BOOKED" ? expiresAt : null,
   };
 }

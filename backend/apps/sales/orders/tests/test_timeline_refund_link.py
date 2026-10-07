@@ -29,7 +29,7 @@ class TimelineRefundLinkTests(OrderApiBase):
         rows = [e for e in self._timeline() if e["kind"] == "refund_created"]
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0]["doc"], {"type": "refund", "id": self.refund.pk})
-        self.assertTrue(rows[0]["label"].startswith("Tạo phiếu hoàn"))
+        self.assertTrue(rows[0]["label"].startswith("Lập phiếu hoàn tiền"))
         self.assertNotIn("Hàng nhỏ hơn đặt", rows[0]["label"])  # không chữ tự do
 
     def test_link_target_opens_for_the_same_viewer(self):

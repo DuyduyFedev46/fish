@@ -14,9 +14,11 @@ import time
 
 from playwright.sync_api import expect, sync_playwright
 
-from qa_ed_batch1_common import (BASE, EXPECTED_MENU, SHOTS, fulfil_404, login, nav_labels, ok, relevant_errors, summary)
+from qa_ed_batch1_common import (BASE, EXPECTED_MENU, SHOTS, core_nav_labels, fulfil_404, login, nav_labels, ok, relevant_errors, summary)
 
 HARNESS = os.environ.get("HARNESS", "http://127.0.0.1:3102")
+# Dòng đơn trong bảng /orders/ (DataTable: dòng bấm được có class lt-click). Class cũ .order-open đã bỏ từ Lô 3.
+ORDER_ROW = "#main tbody tr.lt-click"
 ASOF_RE = re.compile(r"Dữ liệu lúc (\d{2})/(\d{2})/(\d{4}) (\d{2}):(\d{2})")
 
 
@@ -58,7 +60,7 @@ with sync_playwright() as p:
     # ===================== B1: mất mạng trên màn thật (/orders/ và các màn danh sách khác) =====================
     ctx, page = new_page(browser, "loc")
     page.goto(BASE + "/orders/")
-    page.wait_for_selector(".order-open")
+    page.wait_for_selector(ORDER_ROW)
     banner = page.locator(".offline-banner")
     ok("B1 trước khi mất mạng: không có dải, nội dung rõ nét", banner.count() == 0 and opacity_of_content(page) == 1)
     go_offline(ctx, page)
@@ -86,7 +88,7 @@ with sync_playwright() as p:
     btn = banner.get_by_role("button", name="Thử lại")
     btn.dblclick()
     btn.click()
-    ok("B1 bấm Thử lại nhiều lần liên tiếp: danh sách còn, không lỗi console", page.locator(".order-open").count() > 0 and not relevant_errors(page.errs), page.errs)
+    ok("B1 bấm Thử lại nhiều lần liên tiếp: danh sách còn, không lỗi console", page.locator(ORDER_ROW).count() > 0 and not relevant_errors(page.errs), page.errs)
     # mất mạng -> có mạng -> mất mạng lặp 4 lần
     flips_ok = True
     for i in range(4):
@@ -109,7 +111,7 @@ with sync_playwright() as p:
     page.screenshot(path=f"{SHOTS}/r2-offline-overview-1440.png")
     # quay lại màn danh sách khi vẫn mất mạng: đăng ký lại
     page.locator("#rail-left .nav a", has_text="Đơn & tiền").click()
-    page.wait_for_selector(".order-open")
+    page.wait_for_selector(ORDER_ROW)
     ok("B1 vẫn mất mạng, quay lại /orders/: đủ 'Dữ liệu lúc' + Thử lại", ASOF_RE.search(banner.inner_text()) is not None and banner.get_by_role("button", name="Thử lại").count() == 1, banner.inner_text())
     go_online(ctx, page)
     expect(banner).to_have_count(0)
@@ -204,7 +206,7 @@ with sync_playwright() as p:
     # ===================== B6: Esc đóng ⌘K trả focus =====================
     ctx, page = new_page(browser, "loc")
     page.goto(BASE + "/orders/")
-    page.wait_for_selector(".order-open")
+    page.wait_for_selector(ORDER_ROW)
     dlg = page.get_by_role("dialog", name="Tìm màn hình")
     opener = page.locator("button.search-trigger")
     fo = lambda: page.evaluate("() => { const a=document.activeElement; return a ? (a.tagName + '.' + (a.className||'')) : 'null'; }")
@@ -254,10 +256,10 @@ with sync_playwright() as p:
     # ===================== Hồi quy: menu theo 5 vai =====================
     for user, expected in EXPECTED_MENU.items():
         ctx, page = new_page(browser, user)
-        labels = nav_labels(page)
+        labels = core_nav_labels(page)
         ok(f"Hồi quy menu [{user}] đúng danh sách mong đợi của vai ({len(expected)} mục)", labels == expected, labels)
         if user == "giao1":
-            ok("Hồi quy menu [giao1] chỉ 'Việc giao của tôi', vào / về /my-deliveries/", labels == ["Việc giao của tôi"] and "/my-deliveries/" in page.url, page.url)
+            ok("Hồi quy menu [giao1] đúng menu của vai ('Việc giao của tôi', 'Hàng hoàn'), vào / về /my-deliveries/", labels == EXPECTED_MENU["giao1"] and "/my-deliveries/" in page.url, page.url)
         ctx.close()
 
     # ===================== Harness: B3, B4, B5, H1, H2, toast =====================

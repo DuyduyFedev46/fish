@@ -1,6 +1,6 @@
 "use client";
 
-// Xác nhận "Đã giao xong": phiếu hoàn tất không quay lại được, nên hỏi lại một lần để khỏi bấm nhầm trên điện thoại.
+// Xác nhận "Đã giao xong": phiếu giao đã giao xong thì không quay lại được, nên hỏi lại một lần để khỏi bấm nhầm trên điện thoại.
 import { useState } from "react";
 import { FormAlert } from "@/shared/ui/form/FormAlert";
 import { primaryLabel, useSubmit } from "@/shared/ui/form/useSubmit";
@@ -68,7 +68,7 @@ export function ConfirmCompleteModal({ note, onClose, onDone, onConflict }: Prop
           { label: "Khách hàng", value: <PersonalText value={note.customer_name} whenEmpty="—" /> },
         ]}
       />
-      <p>Đã giao tận tay khách? Phiếu hoàn tất rồi thì không sửa lại được.</p>
+      <p>Đã giao tận tay khách? Phiếu giao đã giao xong thì không sửa lại được.</p>
     </Modal>
   );
 }

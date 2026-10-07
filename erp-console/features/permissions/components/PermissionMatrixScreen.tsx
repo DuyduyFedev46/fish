@@ -9,6 +9,7 @@
 import Link from "next/link";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/features/auth/components/AuthProvider";
+import { aiVisible } from "@/shared/lib/features";
 import { dateTime } from "@/shared/lib/format";
 import { loadErrorText } from "@/shared/lib/http";
 import { ROLE } from "@/shared/lib/roles";
@@ -30,6 +31,7 @@ import {
   matchesTask,
   sectionsOf,
 } from "../permissionsModel";
+import { visibleRegistry } from "../permissionsModel";
 import { cellKey, useCapabilityToggle, type ToggleGroup } from "../useCapabilityToggle";
 import { useGroupDetail, useGroupList } from "../useGroupData";
 import type { GroupDetail, GroupSummary, RegistryItem } from "../types";
@@ -64,7 +66,8 @@ export function PermissionMatrixScreen() {
     [replaceList],
   );
 
-  const registry = useMemo(() => reg.data?.registry ?? [], [reg.data]);
+  const aiOn = aiVisible(me);
+  const registry = useMemo(() => visibleRegistry(reg.data?.registry ?? [], aiOn), [reg.data, aiOn]);
   const toggler = useCapabilityToggle({ registry, onSaved });
   const sections = useMemo(() => sectionsOf(registry), [registry]);
 

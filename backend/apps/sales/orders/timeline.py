@@ -5,7 +5,8 @@ Nguồn:
 - Chứng từ: chứng từ đảo doanh thu (`SalesCreditNote.issued_at`, BR-HT-10), đặt đơn (`SalesOrder.created_at`), giao dịch tiền (`PaymentTransaction.received_at`),
   hoá đơn (`SalesInvoice.issued_at`), tạo phiếu giao (`DeliveryNote.created_at`), phiếu hoàn
   (`Refund.created_at` / `confirmed_at`, người tạo / người xác nhận).
-- AuditLog (BR-PQ-04/05): `cancel_unpaid_expired`, `cancel_paid_order` (đơn);
+- AuditLog (BR-PQ-04/05): `cancel_unpaid_expired`, `cancel_paid_order` (đơn); `complete_order` (W37 S7: gộp vào mốc giao,
+  riêng dòng chuyển bù `backfill` thành mốc `order_completed`);
   `delivery_advance_status`, `delivery_mark_failed` (phiếu giao);
   `return_to_warehouse`, `approve_returntostock`, `cancel_returntostock` (hàng hoàn về kho, P-08);
   `confirm_payment_manual` chỉ dùng để lấy NGƯỜI xác nhận tay, không thành dòng riêng.
@@ -23,9 +24,11 @@ from datetime import datetime
 from django.db.models import Q
 
 from apps.accounts.models import AuditLog
+from apps.common.ai_visibility import exclude_ai_audit_rows
 from apps.delivery.models import DeliveryNote
 from apps.inventory.models import ReturnToStock
-from apps.sales.models import Refund, SalesOrder
+from apps.sales.orders.completion import BACKFILL_MARKER, COMPLETE_ORDER_ACTION
+from apps.sales.models import PaymentTransaction, Refund, SalesOrder
 from apps.sales.utils import kg_str
 from apps.common.formatting import format_vnd_ui
 
@@ -35,6 +38,7 @@ ORDER_MODEL = SalesOrder._meta.label
 NOTE_MODEL = DeliveryNote._meta.label
 RETURN_MODEL = ReturnToStock._meta.label
 REFUND_MODEL = Refund._meta.label
+PAYMENT_MODEL = PaymentTransaction._meta.label
 
 
 @dataclass(frozen=True)
@@ -80,8 +84,17 @@ def _cancel_reason_label(changes, note):
     return "Lý do khác" if note else ""
 
 
+def _is_backfill(audit):
+    """Dòng `complete_order` do lệnh chuyển bù (S3) ghi."""
+    return (audit.changes or {}).get("backfill") == BACKFILL_MARKER
+
+
 def _audits(order, notes, returns, refunds):
     cond = Q(model_name=ORDER_MODEL, object_id=str(order.pk))
+    # #15 (BR-TT-18): khoản ghi tay tiền về muộn không có audit trên đơn; lấy NGƯỜI ghi từ audit trên giao dịch.
+    late_ids = [str(p.pk) for p in order.payments.all() if p.source == p.Source.MANUAL]
+    if late_ids:
+        cond |= Q(model_name=PAYMENT_MODEL, object_id__in=late_ids, action="record_late_payment")
     if notes:
         cond |= Q(model_name=NOTE_MODEL, object_id__in=[str(n.pk) for n in notes])
     if returns:
@@ -89,7 +102,7 @@ def _audits(order, notes, returns, refunds):
     if refunds:
         cond |= Q(model_name=REFUND_MODEL, object_id__in=[str(r.pk) for r in refunds])
     return list(
-        AuditLog.objects.filter(cond)
+        exclude_ai_audit_rows(AuditLog.objects.filter(cond))
         .select_related("actor__staff_profile", "ai_actor__staff_profile")
         .order_by("created_at", "id")
     )
@@ -106,11 +119,19 @@ def build_timeline(order):
     refunds = sorted(invoice.refunds.all(), key=lambda r: r.pk) if invoice is not None else []
     refunds_by_id = {str(r.pk): r for r in refunds}
     audits = _audits(order, notes, returns, refunds)
+    # W37 S7 (BR-BH-18): phiếu làm đơn Hoàn tất qua đường giao xong (không phải chuyển bù) gộp vào mốc giao.
+    merged_note_ids = {
+        str((a.changes or {}).get("delivery_note_id"))
+        for a in audits
+        if a.model_name == ORDER_MODEL and a.action == COMPLETE_ORDER_ACTION
+        and not _is_backfill(a)
+    }
 
     manual_actor = {
         (a.changes or {}).get("bank_txn_id"): a.actor
         for a in audits
-        if a.model_name == ORDER_MODEL and a.action == "confirm_payment_manual"
+        if (a.model_name == ORDER_MODEL and a.action == "confirm_payment_manual")
+        or (a.model_name == PAYMENT_MODEL and a.action == "record_late_payment")
     }
 
     events = [
@@ -141,12 +162,12 @@ def build_timeline(order):
     for n in notes:
         events.append(TimelineEvent(
             n.created_at, "delivery_created",
-            f"Tạo phiếu giao {n.code} (Soạn hàng)", SYSTEM,
+            f"Tạo phiếu giao {n.code} (Đang soạn hàng)", SYSTEM,
             doc="delivery", actor_kind="system",
         ))
 
     for a in audits:
-        event = _audit_event(a, notes_by_id, returns_by_id, refunds_by_id)
+        event = _audit_event(a, notes_by_id, returns_by_id, refunds_by_id, merged_note_ids)
         if event is not None:
             events.append(event)
 
@@ -155,7 +176,7 @@ def build_timeline(order):
             events.append(TimelineEvent(
                 r.created_at, "refund_created",
                 # Bất biến 9: KHÔNG ghép `Refund.reason` (chữ tự do, có thể chứa SĐT/tên). Lý do xem ở phiếu hoàn.
-                f"Tạo phiếu hoàn {format_vnd_ui(r.amount)}",
+                f"Lập phiếu hoàn tiền {format_vnd_ui(r.amount)}",
                 actor_display(r.created_by),
                 doc="refund", doc_id=r.pk,
                 actor_kind="user" if r.created_by else "system",
@@ -163,7 +184,7 @@ def build_timeline(order):
             if r.confirmed_at is not None:
                 events.append(TimelineEvent(
                     r.confirmed_at, "refund_confirmed",
-                    f"Đã hoàn {format_vnd_ui(r.amount)} (mã GD {r.bank_txn_ref})",
+                    f"Đã hoàn tiền {format_vnd_ui(r.amount)} (mã GD {r.bank_txn_ref})",
                     actor_display(r.confirmed_by),
                     doc="refund",
                     actor_kind="user" if r.confirmed_by else "system",
@@ -173,7 +194,7 @@ def build_timeline(order):
         for cn in invoice.credit_notes.all():
             events.append(TimelineEvent(
                 cn.issued_at, "credit_note_issued",
-                f"Lập chứng từ đảo doanh thu {cn.code} ({format_vnd_ui(cn.amount)})",
+                f"Lập phiếu trừ doanh thu {cn.code} ({format_vnd_ui(cn.amount)})",
                 actor_display(cn.created_by),
                 doc="invoice",
                 actor_kind="user" if cn.created_by else "system",
@@ -183,7 +204,7 @@ def build_timeline(order):
     return sorted(events, key=lambda e: e.at)
 
 
-def _audit_event(a, notes_by_id, returns_by_id, refunds_by_id):
+def _audit_event(a, notes_by_id, returns_by_id, refunds_by_id, merged_note_ids=frozenset()):
     if a.actor_kind == AuditLog.ActorKind.AI:
         who = f"AI của {actor_display(a.ai_actor)}"
         kind_actor = "ai"
@@ -205,7 +226,7 @@ def _audit_event(a, notes_by_id, returns_by_id, refunds_by_id):
         if a.action == "cancel_unpaid_expired":
             return TimelineEvent(
                 a.created_at, "auto_cancelled",
-                "Tự huỷ vì quá hạn giữ chỗ, đã nhả hàng giữ", who,
+                "Hết giờ giữ chỗ, đã nhả hàng giữ", who,
                 doc="order", actor_kind=kind_actor, ai_level=ai_lvl, ai_config_version=ai_cfg,
             )
         if a.action == "cancel_paid_order":
@@ -217,6 +238,13 @@ def _audit_event(a, notes_by_id, returns_by_id, refunds_by_id):
                 a.created_at, "cancelled", f"{label}{reason}", who,
                 doc="order", actor_kind=kind_actor, ai_level=ai_lvl, ai_config_version=ai_cfg,
             )
+        if a.action == COMPLETE_ORDER_ACTION:
+            if not _is_backfill(a):
+                return None  # đã gộp vào mốc "Đã giao — đơn hoàn tất"
+            return TimelineEvent(
+                a.created_at, "order_completed", "Hệ thống chuyển đơn sang Hoàn tất (chuyển bù)", SYSTEM,
+                doc="order", actor_kind="system",
+            )
         return None
     if a.model_name == NOTE_MODEL:
         note = notes_by_id.get(a.object_id)
@@ -225,8 +253,12 @@ def _audit_event(a, notes_by_id, returns_by_id, refunds_by_id):
             status = changes.get("status") or {}
             to = status.get("to")
             if to == DeliveryNote.Status.COMPLETED:
+                label = (
+                    f"Đã giao — đơn hoàn tất ({code})" if a.object_id in merged_note_ids
+                    else f"Giao hàng thành công ({code})"
+                )
                 return TimelineEvent(
-                    a.created_at, "delivered", f"Giao hàng thành công ({code})", who,
+                    a.created_at, "delivered", label, who,
                     doc="delivery", actor_kind=kind_actor, ai_level=ai_lvl, ai_config_version=ai_cfg,
                 )
             return TimelineEvent(
@@ -260,7 +292,7 @@ def _audit_event(a, notes_by_id, returns_by_id, refunds_by_id):
         if a.action == "cancel_returntostock":
             return TimelineEvent(
                 a.created_at, "return_cancelled",
-                f"Huỷ phiếu hàng về kho {kg_str(rt.qty)} kg", who,
+                f"Huỷ phiếu hàng hoàn {kg_str(rt.qty)} kg", who,
                 doc="return", actor_kind=kind_actor, ai_level=ai_lvl, ai_config_version=ai_cfg,
             )
         if a.action == "approve_returntostock":
@@ -271,7 +303,7 @@ def _audit_event(a, notes_by_id, returns_by_id, refunds_by_id):
                 decision_label = decision or ""
             return TimelineEvent(
                 a.created_at, "return_approved",
-                f"Duyệt hàng về kho: {decision_label}", who,
+                f"Duyệt hàng hoàn: {decision_label}", who,
                 doc="return", actor_kind=kind_actor, ai_level=ai_lvl, ai_config_version=ai_cfg,
             )
         return None
@@ -281,7 +313,7 @@ def _audit_event(a, notes_by_id, returns_by_id, refunds_by_id):
             return None
         if a.action == "mark_refund_failed":
             # Quyết định 03/10 #3: không chép lý do tự gõ; lý do xem ở chính phiếu hoàn.
-            label = f"Phiếu hoàn {format_vnd_ui(r.amount)} chuyển thất bại"
+            label = f"Phiếu hoàn tiền {format_vnd_ui(r.amount)} chuyển thất bại"
             return TimelineEvent(
                 a.created_at, "refund_failed", label, who,
                 doc="refund", actor_kind=kind_actor, ai_level=ai_lvl, ai_config_version=ai_cfg,
@@ -289,7 +321,7 @@ def _audit_event(a, notes_by_id, returns_by_id, refunds_by_id):
         if a.action == "retry_refund":
             return TimelineEvent(
                 a.created_at, "refund_retry",
-                f"Thử chuyển lại phiếu hoàn {format_vnd_ui(r.amount)}", who,
+                f"Thử hoàn tiền lại {format_vnd_ui(r.amount)}", who,
                 doc="refund", actor_kind=kind_actor, ai_level=ai_lvl, ai_config_version=ai_cfg,
             )
         return None

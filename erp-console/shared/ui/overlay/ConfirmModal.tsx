@@ -1,6 +1,6 @@
 "use client";
 
-// Hộp xác nhận một việc không quay lại được (UI-RULES §6.4): nói rõ việc + hậu quả, nút chính ghi đúng việc ("Huỷ phiếu hoàn",
+// Hộp xác nhận một việc không quay lại được (UI-RULES §6.4): nói rõ việc + hậu quả, nút chính ghi đúng việc ("Huỷ phiếu hoàn tiền",
 // không phải "Đồng ý"), nút phụ "Quay lại". Gửi lỗi → alert đỏ đầu hộp (câu của BE qua `errorText`), nút chính đổi "Thử lại";
 // xung đột phiên bản → ConflictBanner kèm "Tải lại". Dùng chung cho các việc một bước (huỷ phiếu, trả về nháp, nhờ người xử lý…).
 

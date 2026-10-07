@@ -179,8 +179,9 @@ class Collector:
         calls = {
             "orders.list": lambda: self.list_facts(user_label, "/api/sales/orders/", "orders"),
             "orders.search_phone": lambda: self.list_facts(
-                user_label, f"/api/sales/orders/?q={order_phone_prefix}", "orders"),
-            "orders.search_name": lambda: self.list_facts(user_label, "/api/sales/orders/?q=Giả", "orders"),
+                user_label, "/api/sales/orders/search/", "orders", method="post", body={"q": order_phone_prefix}),
+            "orders.search_name": lambda: self.list_facts(
+                user_label, "/api/sales/orders/search/", "orders", method="post", body={"q": "Giả"}),
             "orders.filter_customer": lambda: self.list_facts(
                 user_label, f"/api/sales/orders/?customer={courier_customer}", "orders"),
             "orders.detail": lambda: self.detail_facts(user_label, lambda o: f"/api/sales/orders/{o.pk}/", "orders"),

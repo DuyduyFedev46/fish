@@ -19,6 +19,7 @@ Permission nằm ngoài registry (quyền xem hàng loạt, quyền Tầng 1 kh�
 from dataclasses import dataclass
 
 from apps.accounts import roles
+from apps.common.ai_visibility import ai_features_enabled
 
 SECTION_SALES = "Bán hàng"
 SECTION_STOCK = "Hàng hoá & kho"
@@ -46,7 +47,7 @@ CAPABILITIES = (
     ),
     Capability("view_customers", "Xem khách hàng", SECTION_SALES, ("sales.view_customer_list",)),
     Capability(
-        "view_order_customer_info", "Xem thông tin khách trên đơn & hoá đơn", SECTION_SALES,
+        "view_order_customer_info", "Xem thông tin khách trên đơn, hoá đơn, phiếu hoàn tiền", SECTION_SALES,
         ("sales.view_order_customer_info",),
     ),
     Capability(
@@ -55,14 +56,14 @@ CAPABILITIES = (
     ),
     Capability("confirm_payment", "Xác nhận đã nhận tiền", SECTION_SALES, ("sales.confirm_payment_manual",), True),
     Capability("cancel_paid", "Huỷ đơn đã thanh toán", SECTION_SALES, ("sales.cancel_paid_order",)),
-    Capability("create_refund", "Lập phiếu hoàn", SECTION_SALES, ("sales.create_refund",)),
+    Capability("create_refund", "Lập phiếu hoàn tiền", SECTION_SALES, ("sales.create_refund",)),
     Capability("confirm_refund", "Xác nhận đã hoàn tiền", SECTION_SALES, ("sales.confirm_refund",), True),
     Capability(
         "pack_print", "Soạn hàng, in tem", SECTION_SALES,
         ("delivery.pack_deliverynote", "delivery.print_label"),
         requires=("deliver",),
     ),
-    Capability("assign_delivery", "Giao phiếu cho người giao", SECTION_SALES, ("delivery.assign_deliverynote",)),
+    Capability("assign_delivery", "Chọn người giao", SECTION_SALES, ("delivery.assign_deliverynote",)),
     Capability("deliver", "Giao hàng, báo kết quả giao", SECTION_SALES, ("delivery.change_deliverynote",)),
     # Hàng hoá & kho
     Capability(
@@ -77,8 +78,8 @@ CAPABILITIES = (
         ("inventory.add_stockreconciliation", "inventory.change_stockreconciliation"),
     ),
     Capability("approve_count", "Duyệt kiểm kê", SECTION_STOCK, ("inventory.approve_stockreconciliation",)),
-    Capability("create_return", "Ghi hàng hoàn về kho", SECTION_STOCK, ("inventory.add_returntostock",)),
-    Capability("approve_return", "Duyệt hàng hoàn về kho", SECTION_STOCK, ("inventory.approve_returntostock",)),
+    Capability("create_return", "Ghi hàng hoàn", SECTION_STOCK, ("inventory.add_returntostock",)),
+    Capability("approve_return", "Duyệt hàng hoàn", SECTION_STOCK, ("inventory.approve_returntostock",)),
     Capability(
         "set_price", "Sửa giá bán", SECTION_STOCK,
         (
@@ -100,6 +101,24 @@ CAPABILITIES = (
 )
 
 BY_KEY = {c.key: c for c in CAPABILITIES}
+
+# Việc thuộc về AI: ẩn khỏi ma trận khi AI tắt (lô dọn chữ AI, W39). `CAPABILITIES`/`BY_KEY` giữ nguyên để test
+# "perms rời nhau" và `_check_requires` không đổi; chỉ chỗ HIỂN THỊ/NHẬN INPUT dùng `visible_capabilities()`.
+AI_CAPABILITY_KEYS = frozenset({"ai_policy"})
+
+
+def visible_capabilities():
+    """Các việc hiện trong ma trận: bỏ việc AI khi `AI_ENABLED` tắt."""
+    if ai_features_enabled():
+        return CAPABILITIES
+    return tuple(c for c in CAPABILITIES if c.key not in AI_CAPABILITY_KEYS)
+
+
+def visible_keys(keys):
+    """Giữ khoá hiển thị được (dùng cho dòng nhật ký đổi quyền cũ)."""
+    if ai_features_enabled():
+        return list(keys)
+    return [k for k in keys if k not in AI_CAPABILITY_KEYS]
 
 # Nhóm Chủ luôn đủ quyền, không sửa qua ma trận (GROUP_LOCKED).
 LOCKED_GROUP = roles.OWNER

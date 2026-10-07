@@ -3,6 +3,7 @@
 // này chỉ quyết định nút nào là nút chính và mục nào hiện mờ kèm lý do (bảng 1 và 2 của ERP-D2c).
 
 import { ENUMS, enumOf } from "@/shared/lib/enums";
+import { vnd } from "@/shared/lib/format";
 import type { PathStep } from "@/shared/ui/detail/StatusPath";
 import type { TimelineEntry } from "@/shared/ui/detail/Timeline";
 import { ORDERS_MSG as M } from "./messages";
@@ -54,6 +55,18 @@ export function orderStepKey(o: PathInput): string {
   return "BOOKED";
 }
 
+/**
+ * W37 S7-AC5: dòng dưới chip "Đã hoàn {x} · Chờ hoàn {y}". Phần bằng 0 bỏ; cả hai bằng 0 (hoặc BE cũ chưa trả
+ * `refund_summary`) thì không có dòng. Chip vẫn là Hoàn tất: phiếu hoàn không đổi trạng thái đơn (BR-BH-20).
+ */
+export function refundSummaryLine(summary: { refunded_amount: string; pending_amount: string } | null | undefined): string | null {
+  if (!summary) return null;
+  const parts: string[] = [];
+  if (Number(summary.refunded_amount) > 0) parts.push(`${ENUMS.refundStatus.REFUNDED.label} ${vnd(summary.refunded_amount)}`);
+  if (Number(summary.pending_amount) > 0) parts.push(`${ENUMS.refundStatus.PENDING.label} ${vnd(summary.pending_amount)}`);
+  return parts.length ? parts.join(" · ") : null;
+}
+
 export function isCancelledStatus(status: string): boolean {
   return status === "CANCELLED" || status === "AUTO_CANCELLED";
 }
@@ -89,10 +102,10 @@ export function orderActionPlan(i: PlanInput): ActionPlan {
 
   if (has("confirm_payment")) primary = { key: "confirm_payment", label: "Xác nhận đã nhận tiền" };
   else if (has("cancel")) primary = { key: "cancel", label: "Huỷ đơn", danger: true };
-  else if (has("create_refund") && isCancelledStatus(i.status)) primary = { key: "create_refund", label: "Lập phiếu hoàn" };
-  else if (has("create_refund") && i.status === "COMPLETED") primary = { key: "create_refund", label: "Lập phiếu hoàn" };
+  else if (has("create_refund") && isCancelledStatus(i.status)) primary = { key: "create_refund", label: "Lập phiếu hoàn tiền" };
+  else if (has("create_refund") && i.status === "COMPLETED") primary = { key: "create_refund", label: "Lập phiếu hoàn tiền" };
 
-  if (has("create_refund") && primary?.key !== "create_refund") menu.push({ key: "create_refund", label: "Lập phiếu hoàn" });
+  if (has("create_refund") && primary?.key !== "create_refund") menu.push({ key: "create_refund", label: "Lập phiếu hoàn tiền" });
 
   if (!has("cancel") && i.canCancel) {
     if (i.status === "BOOKED") menu.push({ key: "cancel", label: "Huỷ đơn", danger: true, blockedReason: BLOCKED_CANCEL_BOOKED });
@@ -148,7 +161,7 @@ export const PAYMENT_STEPS: PathStep[] = [
 const PAYMENT_LABEL: Record<string, string> = {
   attach_to_order: "Gắn vào đơn",
   confirm_order: "Xác nhận đơn đủ tiền",
-  refund: "Lập phiếu hoàn",
+  refund: "Lập phiếu hoàn tiền",
 };
 
 /** Khoản tiền: thao tác đầu tiên BE cho phép là nút chính, còn lại vào "…". */
@@ -162,12 +175,12 @@ export function paymentActionPlan(actions: readonly PaymentAction[]): ActionPlan
 // Phiếu hoàn
 
 export const REFUND_STEPS: PathStep[] = [
-  { key: "PENDING", label: "Chờ hoàn" },
-  { key: "REFUNDED", label: "Đã hoàn" },
+  { key: "PENDING", label: ENUMS.refundStatus.PENDING.label },
+  { key: "REFUNDED", label: ENUMS.refundStatus.REFUNDED.label },
 ];
 
 export function refundPath(status: string): { current: string; badEnd: { label: string; after: string } | null } {
-  if (status === "FAILED") return { current: "PENDING", badEnd: { label: "Thất bại", after: "PENDING" } };
+  if (status === "FAILED") return { current: "PENDING", badEnd: { label: ENUMS.refundStatus.FAILED.label, after: "PENDING" } };
   return { current: status === "REFUNDED" ? "REFUNDED" : "PENDING", badEnd: null };
 }
 
@@ -210,10 +223,19 @@ export function orderTimeline(
   return out.sort(byNewest);
 }
 
+/** Khoản do "Ghi tiền về muộn" tạo ra: nguồn MANUAL mà loại là ORPHAN / UNMATCHED (xác nhận tay trên đơn thì luôn MATCHED / UNDERPAID, BE chặn đơn Tự huỷ). */
+export function isLateEntry(p: Partial<Pick<PaymentQueueItem, "source" | "match_status">>): boolean {
+  return p.source === "MANUAL" && (p.match_status === "ORPHAN" || p.match_status === "UNMATCHED");
+}
+
 /** Dòng thời gian của khoản tiền, ghép từ mốc nhận và mốc xử lý (BE chưa có timeline riêng cho khoản tiền). */
-export function paymentTimeline(p: Pick<PaymentQueueItem, "received_at" | "resolved_at" | "resolved_by">): TimelineEntry[] {
+export function paymentTimeline(
+  p: Pick<PaymentQueueItem, "received_at" | "resolved_at" | "resolved_by"> & Partial<Pick<PaymentQueueItem, "source" | "match_status" | "amount" | "bank_txn_id">>,
+): TimelineEntry[] {
   const out: TimelineEntry[] = [];
-  if (p.received_at) out.push({ at: p.received_at, label: M.tlPaymentReceived });
+  // #15: khoản ghi tay ở hàng chờ (MANUAL + Về sau khi đơn huỷ / Không khớp đơn) là "Ghi tay tiền về muộn" (kind payment_recorded_late
+  // ở BE). Nhãn chuẩn, chỉ có tiền và mã GD — không chữ tự do. Mốc hiện là giờ nhận theo sao kê (serializer chưa trả giờ ghi).
+  if (p.received_at) out.push({ at: p.received_at, label: isLateEntry(p) ? M.tlRecordedLate(p.amount ?? "0", p.bank_txn_id ?? "") : M.tlPaymentReceived });
   if (p.resolved_at) out.push({ at: p.resolved_at, label: M.tlPaymentResolved, actor: typeof p.resolved_by === "string" ? p.resolved_by : undefined });
   return out.sort(byNewest);
 }

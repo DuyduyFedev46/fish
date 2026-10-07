@@ -5,6 +5,7 @@ from django.db.models import CharField, Exists, OuterRef, Prefetch, Subquery
 from django.db.models.functions import Cast
 
 from apps.accounts.models import AuditLog
+from apps.common.ai_visibility import exclude_ai_audit_rows
 from apps.inventory.models import StockReconciliation, StockReconciliationLine
 from apps.inventory.stock.filters import parse_choice_list_param, parse_date_param, parse_id_param
 
@@ -20,7 +21,7 @@ def reconciliation_queryset(user):
     Phiếu kèm: người tạo/duyệt (select_related), dòng + lô + kho + mặt hàng (prefetch), và các cột suy ra:
     `last_*` (người thao tác gần nhất theo AuditLog).
     """
-    latest = _audit_of_reconciliation().order_by("-created_at", "-id")
+    latest = exclude_ai_audit_rows(_audit_of_reconciliation()).order_by("-created_at", "-id")
     lines = StockReconciliationLine.objects.select_related("batch__warehouse", "batch__item").order_by("id")
     qs = (
         StockReconciliation.objects

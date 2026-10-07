@@ -20,7 +20,7 @@ import { FormAlert } from "@/shared/ui/form/FormAlert";
 import { FormPage } from "@/shared/ui/form/FormPage";
 import { FormSection } from "@/shared/ui/form/FormSection";
 import { SummaryBlock } from "@/shared/ui/form/SummaryBlock";
-import { useSubmit } from "@/shared/ui/form/useSubmit";
+import { isConflictError, useSubmit } from "@/shared/ui/form/useSubmit";
 import { useToast } from "@/shared/ui/overlay/Toast";
 import { ConflictBanner } from "@/shared/ui/states/ConflictBanner";
 import { ErrorScreen } from "@/shared/ui/states/ErrorScreen";
@@ -35,6 +35,7 @@ import {
   detailHref,
   diffTone,
   editHref,
+  formFingerprint,
   hasAction,
   idFromSearch,
   lineErrorOf,
@@ -119,6 +120,10 @@ export function StocktakeForm({ mode }: { mode: "new" | "edit" }) {
   const savedHeader = useRef<{ date: string; note: string } | null>(null);
   const seq = useRef(0);
   const batchSeq = useRef(0);
+  // Cảnh báo rời trang (Lô 17b G4): `baseline` = dấu vân tay của bản đã lưu (hoặc ban đầu); khác bản đang gõ thì còn sửa chưa lưu.
+  const baseline = useRef<string | null>(null);
+  const leaving = useRef(false);
+  const lastSent = useRef<string | null>(null);
 
   // ---- tải phiếu khi sửa
   const applyDetail = useCallback((d: StocktakeDetail) => {
@@ -129,6 +134,7 @@ export function StocktakeForm({ mode }: { mode: "new" | "edit" }) {
     recId.current = d.id;
     updatedAt.current = d.updated_at;
     savedHeader.current = { date: d.count_date, note: d.note };
+    baseline.current = formFingerprint({ countDate: d.count_date, note: d.note, rows: rowsOfDetail(d) });
   }, []);
 
   const loadDetail = useCallback(async () => {
@@ -198,6 +204,19 @@ export function StocktakeForm({ mode }: { mode: "new" | "edit" }) {
   };
 
   // ---- kiểm tra
+  const fingerprintNow = formFingerprint({ countDate, note, rows });
+  if (baseline.current === null && load === "ready" && mode === "new") baseline.current = fingerprintNow;
+  const unsaved = baseline.current !== null && baseline.current !== fingerprintNow;
+  useEffect(() => {
+    if (!unsaved) return;
+    const guard = (e: BeforeUnloadEvent) => {
+      if (leaving.current) return;
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", guard);
+    return () => window.removeEventListener("beforeunload", guard);
+  }, [unsaved]);
   const check = useMemo(() => checkRows(rows, attempt === "send"), [rows, attempt]);
   const sum = useMemo(() => summarize(rows), [rows]);
   const dateMissing = attempt !== null && !countDate;
@@ -219,6 +238,7 @@ export function StocktakeForm({ mode }: { mode: "new" | "edit" }) {
 
   const persist = async (): Promise<StocktakeDetail> => {
     setServerRow(null);
+    lastSent.current = formFingerprint({ countDate, note, rows });
     const lines = toLineInputs(rows);
     const sent = rows.map((r, i) => (parseCount(r.counted).kind === "ok" ? i : -1)).filter((i) => i >= 0);
     const header = { date: countDate, note: note.trim() };
@@ -244,18 +264,21 @@ export function StocktakeForm({ mode }: { mode: "new" | "edit" }) {
     const before = savedHeader.current;
     if (!before || (before.date === header.date && before.note === header.note)) return saved;
     try {
-      const patched = await updateStocktakeHeader(recId.current, { count_date: header.date, note: header.note });
+      // Lô 17a (A7): gửi mốc phiên bản vừa nhận (sau khi lưu dòng) để PATCH không đè người khác vừa sửa ngày/ghi chú.
+      const patched = await updateStocktakeHeader(recId.current, { count_date: header.date, note: header.note }, updatedAt.current);
       updatedAt.current = patched.updated_at;
       savedHeader.current = { date: patched.count_date, note: patched.note };
       return patched;
     } catch (err) {
       refreshSnapshots(saved);
+      if (isConflictError(err)) throw err; // 409: hộp "Phiếu đã đổi, tải lại" (ConflictBanner), không nói "đã lưu" khi ngày/ghi chú chưa lưu
       throw new ApiError("Đã lưu số đếm nhưng chưa lưu được ngày hoặc ghi chú. Bấm lưu lại để thử lần nữa.", err instanceof ApiError ? err.status : 0);
     }
   };
 
   const afterSave = (res: StocktakeDetail, kind: "draft" | "send") => {
     if (kind === "send") {
+      leaving.current = true;
       toast.success("Đã gửi duyệt. Phiếu chờ Chủ hoặc Quản lý duyệt.");
       router.push(detailHref(res.id));
       return;
@@ -263,6 +286,7 @@ export function StocktakeForm({ mode }: { mode: "new" | "edit" }) {
     recId.current = res.id;
     updatedAt.current = res.updated_at;
     savedHeader.current = { date: res.count_date, note: res.note };
+    if (lastSent.current !== null) baseline.current = lastSent.current;
     setDetail(res);
     refreshSnapshots(res);
     // Dòng chưa có số không lên BE (BE chỉ lưu dòng đã đếm) nhưng vẫn nằm trên màn, kể cả lý do đã gõ: nói rõ để người dùng biết.

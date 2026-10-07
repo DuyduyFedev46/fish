@@ -172,7 +172,7 @@ def confirmation_case(browser, tag, w, h):
     modal = page.get_by_role("dialog")
     modal.wait_for(timeout=10_000)
     page.wait_for_timeout(400)
-    modal.locator("label", has_text="Giao không xác nhận").first.click()
+    modal.locator("label", has_text="Bỏ qua gọi xác nhận").first.click()
     modal.get_by_label("Lý do", exact=False).or_(modal.get_by_label("Ghi chú", exact=False)).first.fill("Khách quen giao nhiều lần")
     submit = modal.get_by_role("button", name="Lưu quyết định")
     submit.click()
@@ -206,18 +206,18 @@ def timeline_case(browser, tag, w, h):
         page.wait_for_url(re.compile(r"/orders/detail/\?id=\d+"))
         page.locator("main header h2").wait_for()
         page.wait_for_timeout(500)
-        if page.locator("[data-timeline-row]", has_text="Lập chứng từ đảo doanh thu").count() >= 1:
+        if page.locator("[data-timeline-row]", has_text="Lập phiếu trừ doanh thu").count() >= 1:
             found = True
             break
-    ok(f"L1[{tag}] có đơn Đã huỷ kèm chứng từ đảo trong dòng thời gian", found)
-    ev = page.locator("[data-timeline-row]", has_text="Lập chứng từ đảo doanh thu")
-    ok(f"L1[{tag}] timeline có đúng 1 mốc chứng từ đảo", ev.count() == 1, str(ev.count()))
+    ok(f"L1[{tag}] có đơn Đã huỷ kèm phiếu trừ doanh thu trong dòng thời gian", found)
+    ev = page.locator("[data-timeline-row]", has_text="Lập phiếu trừ doanh thu")
+    ok(f"L1[{tag}] timeline có đúng 1 mốc phiếu trừ doanh thu", ev.count() == 1, str(ev.count()))
     txt = re.sub(r"\s+", " ", ev.first.inner_text()) if ev.count() else ""
-    ok(f"L1[{tag}] nhãn 'Lập chứng từ đảo doanh thu DC-… (x ₫)' đúng định dạng VNĐ", re.search(r"Lập chứng từ đảo doanh thu DC-INV\d+-[0-9A-Fa-f]+ \(\d{1,3}(\.\d{3})* [đ₫]\)", txt) is not None, txt)
+    ok(f"L1[{tag}] nhãn 'Lập phiếu trừ doanh thu DC-… (x ₫)' đúng định dạng VNĐ", re.search(r"Lập phiếu trừ doanh thu DC-INV\d+-[0-9A-Fa-f]+ \(\d{1,3}(\.\d{3})* [đ₫]\)", txt) is not None, txt)
     labels = page.locator("[data-timeline-row]").evaluate_all("els => els.map(e => e.innerText)")
     idx_cancel = next((i for i, t in enumerate(labels) if "Huỷ đơn" in t), -1)
-    idx_credit = next((i for i, t in enumerate(labels) if "Lập chứng từ đảo doanh thu" in t), -1)
-    ok(f"L1[{tag}] thứ tự: huỷ đơn trước, chứng từ đảo sau", 0 <= idx_cancel < idx_credit, str(labels))
+    idx_credit = next((i for i, t in enumerate(labels) if "Lập phiếu trừ doanh thu" in t), -1)
+    ok(f"L1[{tag}] thứ tự: huỷ đơn trước, phiếu trừ doanh thu sau", 0 <= idx_cancel < idx_credit, str(labels))
     if ev.count():
         ev.first.scroll_into_view_if_needed()
     ok(f"L1[{tag}] không cuộn ngang", no_hscroll(page))

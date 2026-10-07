@@ -31,16 +31,25 @@ export type DashboardKpis = {
 
 /** 8 đơn mới nhất (created_at giảm dần). KHÔNG có tên khách / SĐT (SR-17, bất biến 9: dashboard không lộ dữ liệu cá nhân). */
 export type RecentOrder = {
+  /** Lô 17a (A2): id đơn để mở `/orders/detail/?id=`. */
+  id: number;
   code: string;
   amount: number;
   status: OrderStatus;
   status_label: string;
   /** Mốc hết giữ chỗ (ISO) — chỉ có ý nghĩa khi BOOKED. */
   expires_at: string | null;
+  /**
+   * Lô 17a (A2): lý do của đơn, cùng shape cột Lý do của `/orders/` (`reasons.py`). Chỉ là NHÃN cố định, không bao giờ chữ tự do
+   * (không có ghi chú huỷ, SĐT). `null` với đơn thường; thiếu khoá = BE cũ.
+   */
+  reason?: { code: string; label: string } | null;
 };
 
 /** Tối đa 20 lô đang hoạt động (DRAFT/SELLING/NEAR_EXPIRY). Màn hiện theo thứ tự xuất FEFO (`fefoOrder`). */
 export type DashboardBatch = {
+  /** Lô 17a (A2): pk lô để mở `/inventory/detail/?id=`. */
+  id: number;
   batch_id: string;
   item: string;
   warehouse: string;
@@ -58,6 +67,8 @@ export type DashboardBatch = {
 
 /** Tối đa 6 lô cận hạn, hạn gần nhất trước. */
 export type ExpiryAlert = {
+  /** Lô 17a (A2): pk lô. */
+  id: number;
   batch_id: string;
   item: string;
   expiry_date: string;

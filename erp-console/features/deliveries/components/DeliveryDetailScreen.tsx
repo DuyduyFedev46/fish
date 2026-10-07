@@ -461,7 +461,7 @@ export function DeliveryDetailScreen() {
           onClose={() => setModal(null)}
           onConflict={refreshAll}
           onDone={(res) => {
-            toast.success(completeToast(res.order_status, "Đã giao xong. Phiếu chuyển sang Hoàn tất."));
+            toast.success(completeToast(res.order_status, "Đã giao xong. Phiếu chuyển sang Đã giao."));
             refreshAll();
           }}
         />

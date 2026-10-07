@@ -28,7 +28,7 @@ Sửa giá cho phép, nhưng giá nằm trong đơn đã đặt KHÔNG đổi. G
 - `catalogModel.ts`: hàm thuần (kiểm form, đổi nháp thành thân gửi, chữ hiển thị). Có test ở `catalog.test.ts`.
 - `messages.ts`: toàn bộ chữ tiếng Việt của màn.
 - `useCatalogList.ts`, `useCatalogOptions.ts`, `useItemDetail.ts`, `useItemTimeline.ts`: tải danh sách phân trang, danh sách chọn (đọc hết các trang), một mặt hàng, dòng thời gian.
-- `components/`: `CatalogScreen` (khung bốn tab), `ItemListTab`, `PriceListTab`, `PricingRuleList`, `ItemGroupList`, `ItemDetailScreen`, `ItemForm`, `PricingRuleForm`, `SetPriceModal`, `ItemGroupModal`, `ImageUploadSheet`, `ItemThumb`.
+- `components/`: `CatalogScreen` (khung bốn tab), `ItemListTab`, `PriceListTab`, `PricingRuleList`, `ItemGroupList`, `ItemDetailScreen`, `ItemForm`, `PricingRuleForm`, `SetPriceModal`, `ItemGroupModal`, `ImageUploadModal`, `ItemThumb`.
 
 ## Chuyện cần nhớ
 

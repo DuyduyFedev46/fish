@@ -1,5 +1,5 @@
 """
-Cloud Run Job / Cron: Quét các mốc thời gian CSKH (02b §5.1, CS-07, CS-08).
+Cloud Run Job / Cron: Quét các mốc thời gian Gọi xác nhận (02b §5.1, CS-07, CS-08).
 - Bước 1: PENDING quá W phút -> ESCALATED
 - Bước 2: ESCALATED quá D phút -> Tự huỷ (nếu CONFIRMATION_AUTO_CANCEL_ENABLED=1)
 """
@@ -10,7 +10,7 @@ from apps.delivery.confirmation import services as confirmation_services
 
 
 class Command(BaseCommand):
-    help = "Quét các mốc thời gian CSKH: chuyển Quản lý khi hết cửa sổ và tự huỷ khi Quản lý không xử lý."
+    help = "Quét các mốc thời gian Gọi xác nhận: chuyển Quản lý khi hết cửa sổ và tự huỷ khi Quản lý không xử lý."
 
     def handle(self, *args, **options):
         now = timezone.now()

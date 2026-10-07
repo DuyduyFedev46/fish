@@ -57,7 +57,9 @@ def new_page(browser, user, w=1280, h=860, errors=None, **ctx_args):
     errors = errors if errors is not None else []
     ctx = browser.new_context(viewport={"width": w, "height": h}, reduced_motion="reduce", **ctx_args)
     page = ctx.new_page()
-    page.on("console", lambda m: m.type == "error" and "Failed to fetch RSC payload" not in m.text and "HTTP" not in m.text and errors.append(m.text))
+    # Lô 17b (E2E-1): nghe MỌI loại console (log, info, warn, error), không chỉ error: dữ liệu cá nhân in ra bằng console.log cũng phải bắt được.
+    # Lỗi tải RSC / HTTP của mạng thật không tính; còn lại bất kỳ dòng nào cũng vào `errors` để ca "không rò dữ liệu" kiểm.
+    page.on("console", lambda m: "Failed to fetch RSC payload" not in m.text and "HTTP" not in m.text and errors.append(f"{m.type}: {m.text}"))
     page.on("pageerror", lambda e: errors.append(str(e)))
     login(page, user)
     return ctx, page, errors
@@ -373,7 +375,8 @@ with sync_playwright() as pw:
             page.screenshot(path=f"{SHOTS}/lookup-empty-1280.png")
         ctx.close()
 
-    ok("console: không lỗi, không log dữ liệu khách", not errors and not any(p in " ".join(errors) for p in PII_STRINGS), str(errors[:3]))
+    hard = [e for e in errors if not re.match(r"(log|info|warning|warn|debug|trace|dir): ", e)]  # error + pageerror là lỗi; các loại còn lại chỉ bị soi PII
+    ok("console: không lỗi, không log dữ liệu khách (nghe mọi loại console)", not hard and not any(p in " ".join(errors) for p in PII_STRINGS), str(errors[:3]))
     browser.close()
 
 failed = [r for r in results if not r[1]]

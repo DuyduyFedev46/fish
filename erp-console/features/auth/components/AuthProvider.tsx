@@ -23,8 +23,8 @@ import { ApiError, setForbiddenHandler, setUnauthorizedHandler } from "@/shared/
 import { getToken, setToken } from "@/shared/lib/token";
 import { clearAllDrafts, purgeForeignDrafts } from "@/shared/lib/drafts";
 import { changePassword as apiChangePassword, getMe, login as apiLogin, logoutRemote } from "../api";
-import { getLastUserId, setLastUserId } from "../session";
-import { MUST_CHANGE_PASSWORD_CODE, type Me } from "../types";
+import { endSession, getLastUserId, setLastUserId } from "../session";
+import { MUST_CHANGE_PASSWORD_CODE, NO_ROLE_CODE, type Me } from "../types";
 import { MSG, errorText } from "@/shared/lib/messages";
 
 export type AuthStatus = "loading" | "anon" | "ready" | "error";
@@ -119,7 +119,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     setUnauthorizedHandler(() => {
       if (loggingOut.current) return;
-      setToken(null);
+      endSession();
       setMe(null);
       setStatus("anon");
       setNotice(MSG.sessionExpired);
@@ -132,6 +132,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (code === MUST_CHANGE_PASSWORD_CODE) {
         forcedChange.current = true;
         setMe((m) => (m ? { ...m, must_change_password: true } : m));
+        void loadMe(false);
+        return;
+      }
+      if (code === NO_ROLE_CODE) {
+        // D-3: BE chặn hẳn người không nhóm. Ghi nhận ngay (ConsoleGate đưa về /no-role/), rồi tải lại `me` cho khớp.
+        setMe((m) => (m && m.home !== "no-role" ? { ...m, home: "no-role" } : m));
         void loadMe(false);
         return;
       }
@@ -170,7 +176,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       data = await getMe();
     } catch (err) {
-      setToken(null);
+      endSession();
       throw err;
     }
     // Người khác đăng nhập trên cùng máy → xoá nháp của người trước.
@@ -196,7 +202,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = useCallback(async () => {
     loggingOut.current = true;
     await logoutRemote(); // S46: BE xoá token (mọi máy của người này); lỗi mạng thì bỏ qua
-    setToken(null);
+    endSession();
     clearAllDrafts(); // S46-AC1 + SR-07: xoá nháp trên máy, gồm nháp Nhập lô (sessionStorage) và khoá cũ cave_draft_nhap_lo
     setLastUserId(null);
     setMe(null);

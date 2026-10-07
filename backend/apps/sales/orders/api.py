@@ -8,8 +8,12 @@ và `GET /api/sales/orders/{id}/` (chi tiết + `available_actions`).
 S11: `POST /api/sales/orders/{id}/confirm-payment` (chạy chung service với webhook SePay).
 ERP theo design Lô 3 (R3, 02b §3.8): mỗi dòng danh sách có `reason`; thêm lọc `customer=<id>` (đòi quyền xem
 khách hàng, 403 nếu thiếu; khách ngoài phạm vi D7 của người gọi thì danh sách rỗng, PV-05-AC6) và `batch=<pk>` (đơn có phân bổ từ lô). Sai định dạng → 400 `INVALID_FILTER`.
+NEW-1 (Lô 17b-BE, bất biến 9): tìm theo SĐT/tên khách đi bằng `POST /api/sales/orders/search/` (body `{q, status?,
+date_from?, date_to?, customer?, batch?, page?}`, cùng phạm vi, shape và phân trang như danh sách) để từ khoá không
+vào access log. `GET ?q=` chỉ còn khớp mã đơn; `q` có dãy từ 8 chữ số, SĐT có gạch/chấm hoặc giống tên người → 400 `SEARCH_USE_POST`.
 """
 import datetime
+import re
 
 from django.db.models import Exists, OuterRef, Q, Subquery
 from rest_framework import viewsets
@@ -21,6 +25,7 @@ from apps.ai.declare import AiDeclarable, AiMeta
 from apps.common.api import (
     BusinessModelPermissions,
     NoStoreMixin,
+    SearchBodyPagination,
     StandardPagination,
     require_perm,
 )
@@ -40,6 +45,12 @@ from .scope import ALL, can_filter_orders_by_customer, orders_scope_value, scope
 from .serializers import SalesOrderDetailSerializer, SalesOrderListSerializer
 
 INVALID_FILTER = "INVALID_FILTER"
+SEARCH_USE_POST = "SEARCH_USE_POST"
+SEARCH_USE_POST_MESSAGE = "Tìm theo SĐT/tên dùng ô tìm kiếm."  # không lặp lại giá trị `q` (bất biến 9)
+_PHONE_LIKE = re.compile(r"\d{8,}")
+_PHONE_GROUPS = re.compile(r"\d{2,}(?:[-.]\d{2,}){2,}")  # 0912-345-678, 091.234.5678
+_DIGITS_AND_SEPARATORS = re.compile(r"[\d.\-]+")
+SEARCH_BODY_KEYS = ("q", "status", "date_from", "date_to", "customer", "batch")
 # Giao dịch lệch CÒN MỞ trong hàng chờ Chủ (BR-TT-04/05/10, S12 BR-TT-09: đã xử lý thì bỏ)
 # hoặc phiếu giao thất bại (BR-GH-04) → cần chú ý.
 
@@ -63,6 +74,38 @@ def _parse_positive_int(raw, name):
         raise InvalidFilter(f"Tham số {name} phải là số nguyên dương.")
 
 
+def looks_like_personal_search(q):
+    """`q` của GET chỉ được là mã đơn. Bị từ chối: dãy từ 8 chữ số, SĐT có gạch/chấm (0912-345-678, 0912.345678),
+    hoặc có khoảng trắng / chữ ngoài ASCII (tên người). Mã đơn `SO261007-4F2A1C` chỉ có một gạch nên không dính."""
+    if _PHONE_LIKE.search(q) or _PHONE_GROUPS.search(q):
+        return True
+    if _DIGITS_AND_SEPARATORS.fullmatch(q) and sum(ch.isdigit() for ch in q) >= 8:
+        return True
+    return any(ch.isspace() or ord(ch) > 127 for ch in q)
+
+
+def _filters_from_body(data):
+    """Body của `POST search/` -> dict chuỗi giống query string để dùng chung `_filters`. Sai kiểu → InvalidFilter."""
+    if not hasattr(data, "get"):
+        raise InvalidFilter("Nội dung tìm kiếm không hợp lệ.")
+    page = data.get("page", 1)
+    if isinstance(page, bool) or not isinstance(page, int) or page < 1:
+        raise InvalidFilter("Tham số page phải là số nguyên dương.")
+    params = {}
+    for key in SEARCH_BODY_KEYS:
+        value = data.get(key)
+        if value is None:
+            continue
+        if key == "status" and isinstance(value, list) and all(isinstance(v, str) for v in value):
+            value = ",".join(value)
+        if isinstance(value, bool) or not isinstance(value, (str, int)) or (isinstance(value, int) and key not in ("customer", "batch")):
+            raise InvalidFilter(f"Tham số {key} không hợp lệ.")
+        if key == "q" and len(str(value)) > 200:
+            raise InvalidFilter("Từ khoá tìm kiếm quá dài.")
+        params[key] = str(value)
+    return params
+
+
 def _customer_ids_by_name(q):
     """L7: tên khách chứa `q`, không dấu + không phân biệt hoa thường (chạy giống nhau trên
     SQLite/Postgres, không cần extension `unaccent`). Quét tên khách ở Python — đủ cho quy mô
@@ -79,11 +122,11 @@ class SalesOrderViewSet(NoStoreMixin, AiDeclarable, viewsets.ReadOnlyModelViewSe
     custom_perm_actions = ("cancel", "confirm_payment")
 
     def get_serializer_class(self):
-        return SalesOrderListSerializer if self.action == "list" else SalesOrderDetailSerializer
+        return SalesOrderListSerializer if self.action in ("list", "search") else SalesOrderDetailSerializer
 
     def get_queryset(self):
         qs = super().get_queryset()
-        if self.action == "list":
+        if self.action in ("list", "search"):
             latest_note = DeliveryNote.objects.filter(
                 sales_invoice__sales_order=OuterRef("pk")
             ).order_by("-id")
@@ -119,15 +162,21 @@ class SalesOrderViewSet(NoStoreMixin, AiDeclarable, viewsets.ReadOnlyModelViewSe
             qs = annotate_order_pii_visible(user, qs, value=value)
         return qs
 
-    def list(self, request, *args, **kwargs):
-        if request.query_params.get("customer", "").strip() and not can_filter_orders_by_customer(request.user):
+    def _check_customer_filter_perm(self, params):
+        if str(params.get("customer", "")).strip() and not can_filter_orders_by_customer(self.request.user):
             # R3: lọc theo khách là xem dữ liệu khách, kiểm quyền TRƯỚC khi đọc tham số khác.
             raise PermissionDenied("Thiếu quyền xem khách hàng.")
+
+    def list(self, request, *args, **kwargs):
+        self._check_customer_filter_perm(request.query_params)
+        q = request.query_params.get("q", "").strip()
+        if q and looks_like_personal_search(q):
+            return Response({"detail": SEARCH_USE_POST_MESSAGE, "code": SEARCH_USE_POST}, status=400)
         try:
             self.queryset_filters = self._filters(
                 request.query_params,
                 restrict_customer_search=orders_scope_value(request.user) != ALL,
-                allow_customer_search=can_view_order_customer_info(request.user),
+                allow_customer_search=False,  # NEW-1: GET `q` chỉ khớp mã đơn
             )
             self.customer_outside_scope = self._customer_filter_outside_scope(request)
         except InvalidFilter as exc:
@@ -135,18 +184,37 @@ class SalesOrderViewSet(NoStoreMixin, AiDeclarable, viewsets.ReadOnlyModelViewSe
         return super().list(request, *args, **kwargs)
 
     @staticmethod
-    def _customer_filter_outside_scope(request) -> bool:
+    def _customer_filter_outside_scope(request, params=None) -> bool:
         """PV-05-AC6 (S-7): `?customer=<id>` mà khách nằm ngoài phạm vi D7 của người gọi thì danh sách rỗng, không lộ
         đơn nào của khách đó. Phạm vi D7 `all` thì không cần kiểm."""
-        raw = request.query_params.get("customer", "").strip()
+        raw = (request.query_params if params is None else params).get("customer", "").strip()
         if not raw or sees_all_customers(request.user):
             return False
         customer_id = _parse_positive_int(raw, "customer")
         return not scope_customers_for(request.user, Customer.objects.filter(pk=customer_id)).exists()
 
+    @action(detail=False, methods=["post"], url_path="search", required_perms=("sales.view_salesorder",))
+    def search(self, request):
+        """POST /api/sales/orders/search/ — như danh sách nhưng từ khoá (SĐT/tên khách) nằm trong body, không vào URL/log."""
+        try:
+            params = _filters_from_body(request.data)
+            self._check_customer_filter_perm(params)
+            self.queryset_filters = self._filters(
+                params,
+                restrict_customer_search=orders_scope_value(request.user) != ALL,
+                allow_customer_search=can_view_order_customer_info(request.user),
+            )
+            self.customer_outside_scope = self._customer_filter_outside_scope(request, params)  # D7 (PV-05-AC6)
+        except InvalidFilter as exc:
+            return Response({"detail": str(exc), "code": INVALID_FILTER}, status=400)
+        queryset = self.filter_queryset(self.get_queryset())
+        paginator = SearchBodyPagination()
+        page = paginator.paginate_queryset(queryset, request, view=self)
+        return paginator.get_paginated_response(self.get_serializer(page, many=True).data)
+
     def filter_queryset(self, queryset):
         queryset = super().filter_queryset(queryset)
-        if self.action == "list":
+        if self.action in ("list", "search"):
             queryset = queryset.filter(self.queryset_filters)
             if getattr(self, "customer_outside_scope", False):
                 queryset = queryset.none()

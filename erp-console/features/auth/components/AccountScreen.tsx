@@ -10,15 +10,16 @@
 import Link from "next/link";
 import { useEffect, useId, useState } from "react";
 import { dateTime } from "@/shared/lib/format";
-import { groupLabel } from "@/shared/lib/groups";
+import { groupLabel, SUPERUSER_LABEL } from "@/shared/lib/groups";
 import { AI_SETTINGS_HREF, canView, visibleNav } from "@/shared/lib/nav";
 import { MSG } from "@/shared/lib/messages";
 import { Icon } from "@/shared/ui/Icon";
 import { Modal } from "@/shared/ui/overlay/Modal";
 import { useToast } from "@/shared/ui/overlay/Toast";
 import { Loading } from "@/shared/ui/StateBox";
-import { forgetSignedIn, readSignedIn } from "../signedInAt";
+import { readSignedIn } from "../signedInAt";
 import { useAuth } from "./AuthProvider";
+import { aiVisible } from "@/shared/lib/features";
 import { ChangePasswordForm } from "./ChangePasswordForm";
 import s from "./account.module.css";
 
@@ -43,11 +44,15 @@ export function AccountScreen() {
   useEffect(() => setSignedIn(readSignedIn()), []);
 
   if (!me) return <Loading />;
+  // W39: giao diện AI tắt thì không liệt kê việc `ai.*` (BE bật AI vẫn trả mã này).
+  const visibleCaps = (me.capabilities ?? []).filter((c) => aiVisible(me) || !c.code.startsWith("ai."));
 
   const name = me.display_name || me.username || "?";
-  const groups = me.group_labels?.length
+  const groupList = me.group_labels?.length
     ? me.group_labels
     : me.groups.map((g) => ({ code: g, label: groupLabel(g) }));
+  // Duy 08/10 câu 1: superuser không nhóm vào ERP như Chủ → một dòng thay cho danh sách nhóm rỗng.
+  const groups = groupList.length === 0 && me.is_superuser ? [{ code: "superuser", label: `${SUPERUSER_LABEL} (toàn quyền)` }] : groupList;
   const menu = visibleNav(me);
   const aiSettings = canView(me, "ai-settings");
 
@@ -63,7 +68,6 @@ export function AccountScreen() {
 
   const doLogout = async () => {
     setBusy("logout");
-    forgetSignedIn();
     await logout();
   };
 
@@ -119,9 +123,9 @@ export function AccountScreen() {
         <div className={s.group}>
           {me.capabilities === undefined ? (
             <p className={s.empty}>Máy chủ chưa trả danh sách này (cần bản backend có S47).</p>
-          ) : me.capabilities.length ? (
+          ) : visibleCaps.length ? (
             <ul className={`cap-list ${s.caps}`}>
-              {me.capabilities.map((c) => (
+              {visibleCaps.map((c) => (
                 <li key={c.code}>
                   <Icon name="check_circle" />
                   {c.label}

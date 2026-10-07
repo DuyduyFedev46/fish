@@ -39,6 +39,7 @@ export const MOCK_CONFIRMATION_ITEMS: ConfirmationQueueDetail[] = [
     escalated_at: null,
     decide_deadline: null,
     auto_cancel_blocked: null,
+    auto_cancel_blocked_label: null,
     claimed_by: null,
     claimed_until: null,
     lines_summary: "Tôm sú loại 1 2,000 kg · Mực lá Phan Thiết 1,000 kg",
@@ -91,6 +92,7 @@ export const MOCK_CONFIRMATION_ITEMS: ConfirmationQueueDetail[] = [
     escalated_at: null,
     decide_deadline: null,
     auto_cancel_blocked: null,
+    auto_cancel_blocked_label: null,
     claimed_by: null,
     claimed_until: null,
     lines_summary: "Cá thu Côn Đảo 1,500 kg",
@@ -134,6 +136,7 @@ export const MOCK_CONFIRMATION_ITEMS: ConfirmationQueueDetail[] = [
     escalated_at: null,
     decide_deadline: null,
     auto_cancel_blocked: null,
+    auto_cancel_blocked_label: null,
     claimed_by: null,
     claimed_until: null,
     lines_summary: "Cua Cà Mau Y4 2,500 kg",
@@ -186,6 +189,7 @@ export const MOCK_CONFIRMATION_ITEMS: ConfirmationQueueDetail[] = [
     escalated_at: "2026-09-28T09:25:00+07:00",
     decide_deadline: "2026-09-28T09:55:00+07:00",
     auto_cancel_blocked: null,
+    auto_cancel_blocked_label: null,
     claimed_by: null,
     claimed_until: null,
     lines_summary: "Tôm sú loại 1 2,000 kg",
@@ -229,6 +233,7 @@ export const MOCK_CONFIRMATION_ITEMS: ConfirmationQueueDetail[] = [
     escalated_at: "2026-09-28T08:00:00+07:00",
     decide_deadline: null,
     auto_cancel_blocked: null,
+    auto_cancel_blocked_label: null,
     claimed_by: null,
     claimed_until: null,
     lines_summary: "Mực lá Phan Thiết 1,000 kg",
@@ -247,7 +252,7 @@ export const MOCK_CONFIRMATION_ITEMS: ConfirmationQueueDetail[] = [
       id: 5,
       amount: "280000",
       status: "PENDING",
-      status_label: "Chờ hoàn",
+      status_label: "Chờ hoàn tiền",
       deadline: "2026-10-28",
       refunded_at: null,
     },
@@ -278,6 +283,7 @@ export const MOCK_CONFIRMATION_ITEMS: ConfirmationQueueDetail[] = [
     escalated_at: null,
     decide_deadline: null,
     auto_cancel_blocked: null,
+    auto_cancel_blocked_label: null,
     claimed_by: null,
     claimed_until: null,
     lines_summary: "Cá thu 2,000 kg",
@@ -322,6 +328,7 @@ export const MOCK_CONFIRMATION_ITEMS: ConfirmationQueueDetail[] = [
     escalated_at: null,
     decide_deadline: null,
     auto_cancel_blocked: null,
+    auto_cancel_blocked_label: null,
     claimed_by: null,
     claimed_until: null,
     lines_summary: "Ghẹ xanh 1,000 kg",
@@ -356,6 +363,7 @@ export const MOCK_CONFIRMATION_ITEMS: ConfirmationQueueDetail[] = [
     escalated_at: null,
     decide_deadline: null,
     auto_cancel_blocked: null,
+    auto_cancel_blocked_label: null,
     claimed_by: { id: 99, display_name: "Chị Lan" },
     claimed_until: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
     lines_summary: "Tôm thẻ 1,500 kg",
@@ -471,9 +479,14 @@ export function getMockConfirmationQueue(params?: { state?: string; page?: numbe
       const { calls: _calls, available_actions: _actions, ...row } = viewFor(item, me);
       void _calls;
       void _actions;
-      return row;
+      return { ...row, note_code: noteCodeOf(row.order_code) };
     }) as ConfirmationQueueItem[],
   };
+}
+
+/** Lô 17b-BE (L5-code): danh sách và chi tiết đều có `note_code` (mã phiếu giao của đơn), không bao giờ null. */
+function noteCodeOf(orderCode: string): string {
+  return `GH-${orderCode.replace(/^SO/, "")}`;
 }
 
 export function mockGetConfirmationQueue(req: any): { status: number; body: ConfirmationQueueResponse } {
@@ -514,12 +527,12 @@ export function mockGetConfirmationDetail(
   if (!item || !item.in_scope) {
     return {
       status: 404,
-      body: { detail: "Không tìm thấy phiếu trong phạm vi CSKH." },
+      body: { detail: "Không tìm thấy mục chờ gọi trong phạm vi của bạn." },
     };
   }
   return {
     status: 200,
-    body: { ...item, note_code: `GH-${item.order_code.replace(/^SO/, "")}`, available_actions: actionsFor(item, me), scripts: scriptsForQueueItem(item, me) },
+    body: { ...item, decision_note: item.in_scope ? item.decision_note ?? "" : "", note_code: noteCodeOf(item.order_code), available_actions: actionsFor(item, me), scripts: scriptsForQueueItem(item, me) },
   };
 }
 
@@ -735,7 +748,7 @@ export function mockRecordConfirmationCall(
   if (payload.result === "WANT_CHANGE" || payload.result === "WANT_CANCEL") {
     item.confirm_state = "ESCALATED";
     item.escalation_reason = payload.result;
-    item.escalation_label = payload.result === "WANT_CHANGE" ? "Khách muốn đổi món" : "Khách muốn huỷ";
+    item.escalation_label = payload.result === "WANT_CHANGE" ? "Khách muốn đổi món" : "Khách muốn huỷ đơn";
     return {
       status: 201,
       body: {
@@ -849,7 +862,7 @@ export function mockSearchCustomers(
         results.push({
           note_id: item.note_id,
           order_code: item.order_code,
-          status_label: item.note_status === "CONFIRMING" ? "Chờ xác nhận" : "Soạn hàng",
+          status_label: item.note_status === "CONFIRMING" ? "Chờ gọi xác nhận" : "Đang soạn hàng",
           in_scope: true,
           customer_name: item.customer_name ?? undefined,
           phone: item.phone ?? undefined,
@@ -896,6 +909,14 @@ export function mockDecideConfirmation(
       } as any,
     };
   }
+
+  // BR-GH-19: lý do / ghi chú quyết định không quá 200 ký tự và không chứa chuỗi ≥ 9 chữ số (SĐT, số tài khoản).
+  const decisionText = (payload.decision === "CANCEL" ? payload.note : payload.reason)?.trim() ?? "";
+  if (decisionText.length > 200) return { status: 400, body: { code: "BR-GH-19", detail: "Ghi chú không quá 200 ký tự." } };
+  if (/\d{9,}/.test(decisionText.replace(/[\s.\-_/]/g, ""))) {
+    return { status: 400, body: { code: "BR-GH-19", detail: "Không ghi SĐT hay số tài khoản vào ghi chú." } };
+  }
+  item.decision_note = decisionText;
 
   if (payload.decision === "DELIVER_WITHOUT_CONFIRM") {
     if (!payload.reason?.trim()) {

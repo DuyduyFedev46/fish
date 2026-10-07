@@ -5,7 +5,7 @@ Ca gốc: `POST /api/delivery/notes/{id}/status/` khai `required_perms=("deliver
 SAU ĐÓ mới kiểm `pack_deliverynote` khi chuyển READY. Tắt `deliver` thì người có `pack_print` vẫn thấy "bật" nhưng bị 403.
 """
 from django.contrib.auth.models import Group, Permission
-from django.test import TestCase
+from django.test import TestCase, override_settings
 
 from apps.accounts import roles
 from apps.accounts.capabilities import registry, services
@@ -17,6 +17,7 @@ from .base import group_perms, make_staff, put_url, token_client, put_caps
 DEPENDENCY_CODE = "CAPABILITY_REQUIRES"
 
 
+@override_settings(AI_ENABLED=True)  # các ca này kiểm ma trận ĐỦ việc; nhánh tắt ở test_ai_hidden
 class RegistryRequiresTests(TestCase):
     def test_pack_print_requires_deliver(self):
         self.assertEqual(registry.BY_KEY["pack_print"].requires, ("deliver",))

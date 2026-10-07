@@ -48,13 +48,20 @@ export async function fetchStaffActivity(id: number, signal?: AbortSignal): Prom
 }
 
 type DeliveringPage = {
+  count?: number;
   results: { id: number; code: string; status_label: string; delivery_started_at?: string | null }[];
 };
 
 /** GET /api/delivery/notes/?assigned_to={id}&status=DELIVERING — phiếu người này đang giao (cần quyền xem phiếu giao). Bỏ hết trường về khách. */
 export async function fetchStaffDelivering(id: number, signal?: AbortSignal): Promise<StaffDelivering[]> {
+  return (await fetchStaffDeliveringCount(id, signal)).notes;
+}
+
+/** Như trên nhưng kèm `count` của API (tổng số phiếu Đang giao, không chỉ trang đầu 20 dòng): hộp "Cho nghỉ" đếm theo số này (Lô 17b G7). */
+export async function fetchStaffDeliveringCount(id: number, signal?: AbortSignal): Promise<{ notes: StaffDelivering[]; count: number }> {
   const page = await apiFetch<DeliveringPage>(`/api/delivery/notes/?assigned_to=${id}&status=DELIVERING`, { signal, mock: relatedMock() });
-  return page.results.map((n) => ({ id: n.id, code: n.code, status_label: n.status_label, started_at: n.delivery_started_at ?? null }));
+  const notes = page.results.map((n) => ({ id: n.id, code: n.code, status_label: n.status_label, started_at: n.delivery_started_at ?? null }));
+  return { notes, count: typeof page.count === "number" ? page.count : notes.length };
 }
 
 /** GET /api/staff/?is_active=true|false (bỏ trống = tất cả; BE sắp theo username). Không phân trang. */

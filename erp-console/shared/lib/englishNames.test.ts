@@ -19,7 +19,7 @@ describe("giá trị hằng khớp BE Lô 4a", () => {
   it("thứ tự và nhãn nhóm đi theo tên mới", () => {
     expect([...GROUP_CODES]).toEqual(["owner", "manager", "warehouse_staff", "delivery_staff", "customer_service"]);
     expect(GROUP_LABEL["warehouse_staff"]).toBe("Nhân viên kho");
-    expect(GROUP_LABEL["customer_service"]).toBe("CSKH");
+    expect(GROUP_LABEL["customer_service"]).toBe("Nhân viên gọi xác nhận"); // Duy 08/10 câu 13: bỏ chữ CSKH trên giao diện
   });
 
   it("me.home của người vào hàng đợi gọi xác nhận là confirmation-queue", () => {

@@ -13,7 +13,7 @@ API danh bạ khách cho ERP — Lô 6 / B2 (ED-13, BR-PQ-31, bất biến 9).
   `total_spent` là doanh thu của khách (không phải giá vốn) và không dính lãi lỗ.
 - Không có `AiDeclarable`, và `/api/sales/customer-directory/` nằm trong `FORBIDDEN_PREFIXES` của chính sách AI.
 - `POST .../search/` (Lô bổ sung A #11, Duy chốt 02/10): body `{q, ordering?, page?}`, cùng quyền, cùng shape với danh sách,
-  vì từ khoá tìm (tên/SĐT khách) không được nằm trong URL/log truy cập. `GET ?q=` giữ để tương thích; FE sẽ chuyển sang POST.
+  vì từ khoá tìm (tên/SĐT khách) không được nằm trong URL/log truy cập. `GET ?q=` đã bỏ (Lô 17b-BE, TLA-L3): có `q` thì 400 `SEARCH_USE_POST`, câu lỗi không lặp lại `q`.
   `next`/`previous` trong kết quả chỉ để biết còn trang hay không; muốn sang trang khác thì gửi lại POST với `page`.
 - Response gắn `Cache-Control: no-store` (chứa tên, SĐT, địa chỉ).
 - `PATCH` nhận `name`, `phone`, `default_address`, `note`. `phone` chuẩn hoá bằng `normalize_phone`, trùng khách khác thì
@@ -27,7 +27,7 @@ from rest_framework import serializers, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from apps.common.api import BusinessModelPermissions, NoStoreMixin, StandardPagination
+from apps.common.api import BusinessModelPermissions, NoStoreMixin, SearchBodyPagination, StandardPagination
 from apps.common.exceptions import BusinessError
 from apps.sales.models import Customer, Refund, SalesInvoice, SalesOrder
 from apps.sales.utils import fold_text
@@ -38,6 +38,8 @@ from .scope import scope_customers_for, sees_all_customers
 from .serializers import DirectoryDetailSerializer, DirectoryListSerializer, DirectoryUpdateSerializer
 
 CANCELLED_STATUSES = (SalesOrder.Status.CANCELLED, SalesOrder.Status.AUTO_CANCELLED)
+SEARCH_USE_POST = "SEARCH_USE_POST"
+SEARCH_USE_POST_MESSAGE = "Tìm khách dùng ô tìm trên màn Khách hàng."
 MIN_PHONE_DIGITS = 4  # tìm theo SĐT cần ít nhất 4 chữ số (không dò danh bạ bằng "0", "09")
 
 # Khoá `ordering` được phép -> biểu thức sắp xếp. Mặc định: đơn gần nhất mới trước, khách chưa mua xếp cuối.
@@ -103,13 +105,6 @@ def _name_matches(query):
     return [pk for pk, name in Customer.objects.values_list("pk", "name") if needle in fold_text(name)]
 
 
-class SearchBodyPagination(StandardPagination):
-    """Cùng 20 dòng/trang, nhưng số trang lấy từ body JSON (`page`) thay vì query string."""
-
-    def get_page_number(self, request, paginator):
-        return request.data.get("page", 1) if hasattr(request.data, "get") else 1
-
-
 class SearchBodySerializer(serializers.Serializer):
     q = serializers.CharField(max_length=200, allow_blank=True, required=False, default="")
     ordering = serializers.CharField(max_length=40, allow_blank=True, required=False, default="")
@@ -143,13 +138,11 @@ class CustomerDirectoryViewSet(NoStoreMixin, viewsets.GenericViewSet):
         qs = annotate_purchase_stats(scope_customers_for(self.request.user, Customer.objects.all()))
         if self.action != "list":
             return qs
-        return self.search_queryset(
-            qs, self.request.query_params.get("q", ""), self.request.query_params.get("ordering", ""),
-        )
+        return self.search_queryset(qs, "", self.request.query_params.get("ordering", ""))
 
     @staticmethod
     def search_queryset(qs, query, ordering_key):
-        """Lọc theo `q` (tên không dấu hoặc SĐT ≥ 4 số) và sắp xếp; dùng chung cho GET `?q=` và POST `search/`."""
+        """Lọc theo `q` (tên không dấu hoặc SĐT ≥ 4 số) và sắp xếp; GET (không `q`) và POST `search/` dùng chung."""
         query = (query or "").strip()
         if query:
             cond = Q(pk__in=_name_matches(query))
@@ -161,6 +154,9 @@ class CustomerDirectoryViewSet(NoStoreMixin, viewsets.GenericViewSet):
         return qs.order_by(ordering, "-id")
 
     def list(self, request, *args, **kwargs):
+        if request.query_params.get("q", "").strip():
+            # Từ khoá tên/SĐT không được nằm trong URL (bất biến 9). Không lặp lại giá trị `q`.
+            raise BusinessError(SEARCH_USE_POST_MESSAGE, code=SEARCH_USE_POST)
         page = self.paginate_queryset(self.get_queryset())
         return self.get_paginated_response(self.get_serializer(page, many=True).data)
 

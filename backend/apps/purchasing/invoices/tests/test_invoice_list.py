@@ -14,6 +14,7 @@ from django.contrib.auth.models import User
 from django.db import connection
 from django.test import TestCase
 from django.test.utils import CaptureQueriesContext
+from django.utils import timezone
 
 from apps.accounts import roles
 from apps.catalog.models import Item, ItemGroup
@@ -235,7 +236,9 @@ class InvoiceWriteUnchangedTests(InvoiceListBase):
 
     def test_r11_owner_patch_and_delete_405(self):
         invoice = self.make_invoice(is_paid=False)
-        resp = client_for(self.owner).patch(f"{URL}{invoice.pk}/", {"is_paid": True}, format="json")
+        # Lô 17a (TL12-paid): đánh dấu đã trả thì phải kèm thời điểm trả.
+        paid_at = (timezone.now() - datetime.timedelta(hours=1)).isoformat()
+        resp = client_for(self.owner).patch(f"{URL}{invoice.pk}/", {"is_paid": True, "paid_at": paid_at}, format="json")
         self.assertEqual(resp.status_code, 200, resp.content)
         self.assertEqual(resp.json()["is_paid_label"], "Đã trả tiền")
         self.assertEqual(client_for(self.owner).delete(f"{URL}{invoice.pk}/").status_code, 405)

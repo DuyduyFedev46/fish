@@ -117,6 +117,14 @@ def overview_owner(browser):
     ok("loc: không tên/SĐT khách", not PHONE_RE.search(text), "")
     heads = [h.strip() for h in page.locator(".lt-card:has(h2:text-is('Đơn hàng gần đây')) thead th").all_inner_texts()]
     ok("loc: bảng Đơn hàng gần đây có cột Lý do riêng ở 1280px (ED-08-AC2)", heads == ["Mã đơn", "Giá trị", "Trạng thái", "Lý do", "Còn giữ chỗ"], str(heads))
+    # Lô 17b G1: dòng đơn / lô / cận hạn mở chi tiết bằng id của contract 17a (A2)
+    order_href = page.locator(".lt-card:has(h2:text-is('Đơn hàng gần đây')) tbody tr").first.locator("a.lt-link").get_attribute("href") or ""
+    ok("loc: dòng đơn gần đây mở /orders/detail/?id=<số>", re.fullmatch(r"/orders/detail/\?id=\d+", order_href) is not None, order_href)
+    lot_href = page.locator(".lt-card:has(h2:text-is('Tồn kho theo lô')) tbody tr").first.locator("a.lt-link").get_attribute("href") or ""
+    ok("loc: dòng lô mở /inventory/detail/?id=<số>", re.fullmatch(r"/inventory/detail/\?id=\d+", lot_href) is not None, lot_href)
+    near_hrefs = [a.get_attribute("href") for a in page.locator("[data-attention=near_expiry_batch] a").all()]
+    ok("loc: dòng lô cận hạn mở thẳng chi tiết lô theo id", bool(near_hrefs) and all(re.fullmatch(r"/inventory/detail/\?id=\d+", h or "") for h in near_hrefs), near_hrefs)
+    ok("loc: ô Lý do hiện nhãn của BE cho đơn đã huỷ (Khách đổi ý / Hết giờ giữ chỗ)", bool(re.search(r"Khách đổi ý|Hết giờ giữ chỗ", text)), "")
     ok("loc: khối Cần chú ý có dòng lô quá hạn bấm sang kho lọc EXPIRED",
        page.locator("[data-attention=expired_batches_open] a").get_attribute("href") == "/inventory/?status=EXPIRED")
     ai_row = page.locator("[data-attention=ai_proposals]")
@@ -235,16 +243,35 @@ def audit(browser):
     page.get_by_role("group", name="Lọc theo loại người làm").get_by_role("button", name="Tất cả", exact=True).click()
     settle(page)
     # tìm không ra → trạng thái rỗng có lối thoát
-    page.get_by_role("searchbox", name="Tìm trong nhật ký đã tải").fill("zzzz-khong-co-ma-nay")
+    page.get_by_role("searchbox", name="Tìm theo mã chứng từ").fill("zzzz-khong-co-ma-nay")
     expect(page.get_by_text(re.compile("Không tìm thấy dòng nhật ký khớp với"))).to_be_visible()
     ok("loc: tìm không ra → báo rỗng nêu từ khoá, không bảng trống trơn", True)
-    page.get_by_role("searchbox", name="Tìm trong nhật ký đã tải").fill("")
+    page.get_by_role("searchbox", name="Tìm theo mã chứng từ").fill("")
     # khoảng ngày ở tương lai xa → rỗng; xoá đi → có lại
     page.locator('input[aria-label="Từ ngày"]').fill("2030-01-01")
     expect(page.get_by_text("Không có dòng nào khớp bộ lọc")).to_be_visible()
     ok("loc: khoảng ngày không có dòng nào → báo rỗng theo bộ lọc", True)
     page.locator('input[aria-label="Từ ngày"]').fill("")
     expect(page.locator("main tbody tr").first).to_be_visible()
+    # Lô 17b (G2): tìm mã và khoảng ngày chạy ở BE (mock theo contract 17a A3)
+    box = page.get_by_role("searchbox", name="Tìm theo mã chứng từ")
+    box.fill("SO-20260927-038")
+    expect(page.locator("main tbody tr")).to_have_count(1)
+    expect(page.get_by_text("Đang hiện 1 / 1 dòng")).to_be_visible()
+    ok("loc: tìm mã đúng → BE lọc, 'Đang hiện 1 / 1' (tổng đúng, không chỉ dòng đã tải)", True)
+    box.fill("0912345678")
+    expect(page.get_by_test_id("audit-filter-error")).to_have_text("Chỉ tìm theo mã chứng từ.")
+    ok("loc: gõ dãy giống SĐT → báo dưới ô, câu không lặp lại chuỗi đã gõ", "0912345678" not in page.get_by_test_id("audit-filter-error").inner_text())
+    ok("loc: SĐT gõ vào ô tìm không nằm trong URL / storage", "0912345678" not in page.url and "0912345678" not in storage_dump(page))
+    box.fill("")
+    page.locator('input[aria-label="Từ ngày"]').fill("2026-09-26")
+    page.locator('input[aria-label="Đến ngày"]').fill("2026-09-26")
+    expect(page.locator("main tbody tr").first).to_be_visible()
+    n_day = page.locator("main tbody tr").count()
+    ok("loc: lọc đúng một ngày (26/09) ra ít dòng hơn tổng, tổng 'Đang hiện' do BE tính", 0 < n_day < first and "Đang hiện" in page.locator(".fb-summary").inner_text(), f"{n_day}/{first}")
+    page.locator('input[aria-label="Từ ngày"]').fill("")
+    page.locator('input[aria-label="Đến ngày"]').fill("")
+    expect(page.locator("main tbody tr")).to_have_count(first)  # BE lọc lại, quay về trang 1 của danh sách đầy đủ
     # Tải thêm
     more = page.get_by_role("button", name="Tải thêm")
     if more.count():
@@ -607,12 +634,12 @@ def login_screens(browser):
     page.screenshot(path=f"{SHOTS}/lo15-login-360.png")
     ctx.close()
 
-    # admin (chưa phân quyền) → màn "Tài khoản chưa được phân quyền"
-    ctx, page, errors = new_page(browser, "admin", w=360, h=780, wait_nav=False)
+    # nogroup1 (không nhóm, không superuser) → màn "Bạn không có quyền vào hệ thống vận hành"
+    ctx, page, errors = new_page(browser, "nogroup1", w=360, h=780, wait_nav=False)
     page.wait_for_url(re.compile(r"/no-role/"))
-    expect(page.get_by_role("heading", name="Tài khoản chưa được phân quyền")).to_be_visible()
-    ok("admin: màn chưa phân quyền có tên tài khoản + 'Nhờ Chủ vựa cấp quyền'", "Nhờ Chủ vựa cấp quyền" in page.locator("main").inner_text() and "admin" in page.locator("main").inner_text())
-    ok("admin 360px: không cuộn ngang, không icon rỗng", no_hscroll(page) and missing_icons(page) == [], str(missing_icons(page)))
+    expect(page.get_by_role("heading", name="Bạn không có quyền vào hệ thống vận hành")).to_be_visible()
+    ok("nogroup1: màn không có quyền có tên tài khoản + 'Nhờ Chủ vựa xếp nhóm'", "Nhờ Chủ vựa xếp nhóm" in page.locator("main").inner_text() and "nogroup1" in page.locator("main").inner_text())
+    ok("nogroup1 360px: không cuộn ngang, không icon rỗng", no_hscroll(page) and missing_icons(page) == [], str(missing_icons(page)))
     page.screenshot(path=f"{SHOTS}/lo15-no-role-360.png")
     ctx.close()
 

@@ -22,12 +22,6 @@ from .scope import scope_delivery_notes_for
 
 NOT_FOUND_MESSAGE = "Không tìm thấy phiếu giao."
 MAX_NOTE_LENGTH = 500
-# Nhãn riêng theo thiết kế (02b R9): không đổi `choices` của model (sẽ sinh migration).
-DECISION_LABELS = {
-    ReturnToStock.Decision.PENDING: "Chờ quyết định",
-    ReturnToStock.Decision.RESTOCK: "Tái nhập",
-    ReturnToStock.Decision.WRITE_OFF: "Huỷ bỏ, ghi lỗ",
-}
 
 
 class _IdField(serializers.PrimaryKeyRelatedField):
@@ -104,7 +98,7 @@ class ReturnToStockSerializer(serializers.ModelSerializer):
         return max(0, int((obj.returned_at - obj.left_warehouse_at).total_seconds() // 60))
 
     def get_decision_label(self, obj):
-        return DECISION_LABELS.get(obj.decision, obj.get_decision_display())
+        return obj.get_decision_display()  # nhãn một nguồn từ `choices` (T45)
 
     def get_created_by_name(self, obj):
         return user_display_name(obj.created_by)
@@ -126,7 +120,8 @@ class ReturnToStockSerializer(serializers.ModelSerializer):
             is_creator = obj.created_by_id == user.pk and user.has_perm("inventory.add_returntostock")
             if is_creator or user.has_perm("inventory.approve_returntostock") or user.has_perm("inventory.change_returntostock"):
                 actions.append("cancel")
-        if can_delete_return(obj) and self._is_owner(user):
+        # TL8F-L3: khớp API (`soft_delete` đòi `add_returntostock`), để FE không hiện nút rồi nhận 403.
+        if can_delete_return(obj) and self._is_owner(user) and user.has_perm("inventory.add_returntostock"):
             actions.append("delete")
         return actions
 

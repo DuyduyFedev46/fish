@@ -154,14 +154,14 @@ with sync_playwright() as p:
     ctx, page = new_page(browser, "loc", errors=errors)
     go(page, "/orders/")
     tabs = [t.strip() for t in page.get_by_role("tab").all_inner_texts()]
-    ok("ED-09: 3 tab Đơn hàng · Hàng chờ thanh toán · Phiếu hoàn", tabs == ["Đơn hàng", "Hàng chờ thanh toán", "Phiếu hoàn"], str(tabs))
+    ok("ED-09: 3 tab Đơn hàng · Hàng chờ thanh toán · Phiếu hoàn tiền", tabs == ["Đơn hàng", "Hàng chờ thanh toán", "Phiếu hoàn tiền"], str(tabs))
     heads = [h.strip() for h in page.locator("thead th").all_inner_texts()]
     ok("ED-09-AC1: cột Mã đơn · Khách hàng · Trạng thái · Giao hàng · Lý do · Tổng tiền · Thời gian",
        heads == ["Mã đơn", "Khách hàng", "Trạng thái", "Giao hàng", "Lý do", "Tổng tiền", "Thời gian"], str(heads))
     rows = page.locator("tbody tr")
     ok("ED-09: 20 dòng/trang, 'Đang hiện 20 / 45 đơn'", rows.count() == 20 and page.get_by_text("Đang hiện 20 / 45 đơn").count() == 1, str(rows.count()))
     cancelled = rows.nth(3).inner_text()
-    ok("ED-09-AC2: đơn tự huỷ hiện chip 'Đã huỷ' + lý do 'Hết giờ giữ chỗ'", "Đã huỷ" in cancelled and "Hết giờ giữ chỗ" in cancelled, cancelled)
+    ok("ED-09-AC2: đơn tự huỷ hiện chip 'Hết giờ giữ chỗ' (T2, Q-2) + cột lý do cùng chữ", "Hết giờ giữ chỗ" in cancelled, cancelled)
     ok("ED-09: đơn thiếu tiền có lý do 'Chuyển thiếu tiền'", "Chuyển thiếu tiền" in rows.nth(1).inner_text())
     ok("ED-09: SĐT/ địa chỉ không nằm trong danh sách (chỉ tên khách)", "0901234567" not in rows.nth(0).inner_text())
     page.get_by_role("button", name=re.compile("Tải thêm")).first.click()
@@ -175,9 +175,12 @@ with sync_playwright() as p:
     ok("ED-09: lọc Giữ chỗ gửi ?status=BOOKED", any("status=BOOKED" in x for x in log(page)), str(log(page)))
     page.get_by_label("Lọc theo trạng thái").select_option(label="Mọi trạng thái")
     idle(page)
+    clear_log(page)
     page.get_by_role("searchbox", name="Tìm đơn hàng").fill("0901234")
-    page.wait_for_function("() => window.__caveMock.log.some(x => x.includes('q=0901234'))")
+    # Lô 17b NEW-1: từ khoá đi bằng POST search/, không nằm trong URL của request nào.
+    page.wait_for_function("() => window.__caveMock.log.some(x => x.includes('POST /api/sales/orders/search/'))")
     idle(page)
+    ok("NEW-1: tìm theo SĐT gửi POST /api/sales/orders/search/, URL không chứa SĐT", not any("0901234" in x for x in log(page)) and any("POST /api/sales/orders/search/" in x for x in log(page)), str(log(page)))
     ok("ED-09: tìm theo SĐT một phần → 1 đơn của Chị Hoa", rows.count() == 1 and "Chị Hoa" in rows.first.inner_text(), str(rows.count()))
     page.get_by_role("searchbox", name="Tìm đơn hàng").fill("")
     idle(page)
@@ -186,7 +189,7 @@ with sync_playwright() as p:
     # chuyển tab = chuyển trang
     page.get_by_role("tab", name="Hàng chờ thanh toán").click()
     page.wait_for_url("**/orders/payments/")
-    page.get_by_role("tab", name="Phiếu hoàn").click()
+    page.get_by_role("tab", name="Phiếu hoàn tiền").click()
     page.wait_for_url("**/orders/refunds/")
     page.get_by_role("tab", name="Đơn hàng").click()
     page.wait_for_url("**/orders/")
@@ -239,11 +242,11 @@ with sync_playwright() as p:
     # ======================================================= Bảng trạng thái → nút (Chủ)
     ctx, page = new_page(browser, "loc", errors=errors)
     table = [
-        (103, [], "Đã huỷ"),   # tự huỷ: không còn nút nào (#15)
+        (103, [], "Hết giờ giữ chỗ"),   # tự huỷ: không còn nút nào (#15)
         (104, ["Huỷ đơn"], "Đang xử lý"),             # Soạn hàng
         (105, ["Huỷ đơn"], "Đã thanh toán"),
         (107, [], "Đang xử lý"),                       # Đang giao: không nút
-        (109, ["Lập phiếu hoàn"], "Hoàn tất"),
+        (109, ["Lập phiếu hoàn tiền"], "Hoàn tất"),  # W37 S7-AC4
     ]
     for oid, want, chip in table:
         open_order(page, oid)
@@ -339,7 +342,7 @@ with sync_playwright() as p:
     expect(page.locator(".toast-item").last).to_contain_text(be(page, "ORDER_AUTO_CANCELLED"))
     idle(page)
     ok("Lô bổ sung A #15: ORDER_AUTO_CANCELLED -> hộp đóng, toast vàng nêu lý do, chỉ gửi 1 POST", page.get_by_role("dialog").count() == 0 and page.locator(".toast-item.warn").count() >= 1 and len(posts(page)) == 1, str(posts(page)))
-    expect(page.locator("main header")).to_contain_text("Đã huỷ")
+    expect(page.locator("main header")).to_contain_text("Hết giờ giữ chỗ")
     ok("Lô bổ sung A #15: sau khi tải lại đơn thành Đã huỷ, hết nút Xác nhận", page.get_by_role("button", name="Xác nhận đã nhận tiền").count() == 0 and header_buttons(page) == [], str(header_buttons(page)))
     # thành công trên 101: chip đổi, timeline có dòng mới, toast
     open_order(page, 101)
@@ -368,13 +371,13 @@ with sync_playwright() as p:
     dlg = dialog(page, "Huỷ đơn")
     sel = dlg.get_by_label("Lý do huỷ")
     opts = [o.strip() for o in sel.locator("option").all_inner_texts()]
-    ok("ED-10-AC2: lý do huỷ Khách đổi ý · Hư khi đóng hàng · Bỏ sau khi giao thất bại · Khác",
-       opts[1:] == ["Khách đổi ý", "Hư khi đóng hàng", "Bỏ sau khi giao thất bại", "Khác"], str(opts))
+    ok("ED-10-AC2: lý do huỷ Khách đổi ý · Hàng hư lúc soạn hàng · Giao thất bại, không giao lại · Lý do khác",
+       opts[1:] == ["Khách đổi ý", "Hàng hư lúc soạn hàng", "Giao thất bại, không giao lại", "Lý do khác"], str(opts))
     clear_log(page)
     submit_btn(dlg).click()
     expect(dlg.get_by_text("Chọn một lý do huỷ")).to_be_visible()
     ok("ED-10-AC2: chưa chọn lý do → báo tại ô, không POST", posts(page) == [])
-    sel.select_option(label="Khác")
+    sel.select_option(label="Lý do khác")
     submit_btn(dlg).click()
     expect(dlg.get_by_text("phải nhập ghi chú")).to_be_visible()
     ok("ED-10-AC2: chọn 'Khác' phải có ghi chú", True)
@@ -404,7 +407,7 @@ with sync_playwright() as p:
     page.screenshot(path=f"{SHOTS}/ed3-refund-over-1280-light.png")
     amt.fill(maxv.replace(".", ""))
     ok("ED-10-AC3: về đúng mức → mở khoá", submit_btn(dlg).is_enabled())
-    ok("ED-10: nút ghi số tiền 'Lập phiếu hoàn <số> đ'", submit_btn(dlg).inner_text().strip() == f"Lập phiếu hoàn {maxv} đ", submit_btn(dlg).inner_text())
+    ok("ED-10: nút ghi số tiền 'Lập phiếu hoàn tiền <số> đ'", submit_btn(dlg).inner_text().strip() == f"Lập phiếu hoàn tiền {maxv} đ", submit_btn(dlg).inner_text())
     clear_log(page)
     submit_btn(dlg).click()
     expect(page.locator(".toast-item.success").last).to_contain_text("Đã lập phiếu hoàn")
@@ -438,7 +441,7 @@ with sync_playwright() as p:
     ok("ED-11: Quản lý mở /orders/payments/ → 403 màn chặn, không có Gắn / Xác nhận đơn", page.get_by_role("button", name=re.compile("Gắn vào đơn|Xác nhận đơn")).count() == 0)
     go(page, "/orders/refunds/")
     tabs = [t.strip() for t in page.get_by_role("tab").all_inner_texts()]
-    ok("ED-11: Quản lý chỉ thấy tab Đơn hàng · Phiếu hoàn (không có Hàng chờ thanh toán)", tabs == ["Đơn hàng", "Phiếu hoàn"], str(tabs))
+    ok("ED-11: Quản lý chỉ thấy tab Đơn hàng · Phiếu hoàn (không có Hàng chờ thanh toán)", tabs == ["Đơn hàng", "Phiếu hoàn tiền"], str(tabs))
     page.locator("tbody tr", has_text="Chờ hoàn").first.click()
     page.wait_for_url(re.compile(r"/orders/refunds/detail/\?id=\d+$"))
     expect(page.locator("main header h2")).to_be_visible()
@@ -521,7 +524,7 @@ with sync_playwright() as p:
     page.goto(BASE + "/orders/detail/?id=102")
     expect(page.locator("main header h2")).to_be_visible()
     ok("ED-09-AC5: trước hạn chip 'Giữ chỗ'", "Giữ chỗ" in header_text(page))
-    expect(page.locator("main header")).to_contain_text("Đã huỷ", timeout=8000)
+    expect(page.locator("main header")).to_contain_text("Hết giờ giữ chỗ", timeout=8000)
     ok("ED-09-AC5: hết giờ → chip đổi 'Đã huỷ' không tải lại trang", True)
     ctx.close()
 
@@ -532,8 +535,8 @@ with sync_playwright() as p:
     ok("ED-11-AC1: cột Mã giao dịch · Số tiền · Loại khoản tiền · Tình trạng xử lý · Đơn · Nhận lúc",
        heads == ["Mã giao dịch", "Số tiền", "Loại khoản tiền", "Tình trạng xử lý", "Đơn", "Nhận lúc"], str(heads))
     body = page.locator("tbody").inner_text()
-    ok("ED-11-AC1: nhãn loại khoản Thiếu tiền · Chuyển thừa · Về sau khi đơn tự huỷ · Không khớp đơn",
-       all(x in body for x in ["Thiếu tiền", "Chuyển thừa", "Về sau khi đơn tự huỷ", "Không khớp đơn"]))
+    ok("ED-11-AC1: nhãn loại khoản Chuyển thiếu · Chuyển thừa · Về sau khi đơn đã huỷ · Không khớp đơn",
+       all(x in body for x in ["Chuyển thiếu", "Chuyển thừa", "Về sau khi đơn đã huỷ", "Không khớp đơn"]))
     ok("ED-11-AC1: 'Tình trạng xử lý' là cột riêng (Chờ xử lý)", "Chờ xử lý" in body)
     ok("ED-11: không hiện nội dung chuyển khoản trong danh sách", "Nội dung" not in body)
     page.screenshot(path=f"{SHOTS}/ed3-payments-1280-light.png")
@@ -577,7 +580,7 @@ with sync_playwright() as p:
     page.wait_for_url(re.compile(r"/orders/payments/detail/\?id=\d+$"))
     expect(page.locator("main header h2")).to_be_visible()
     idle(page)
-    ok("ED-11: khoản chuyển thừa → nút chính 'Lập phiếu hoàn'", header_buttons(page) and header_buttons(page)[0] == "Lập phiếu hoàn", str(header_buttons(page)))
+    ok("ED-11: khoản chuyển thừa → nút chính 'Lập phiếu hoàn'", header_buttons(page) and header_buttons(page)[0] == "Lập phiếu hoàn tiền", str(header_buttons(page)))
     page.get_by_role("button", name="Lập phiếu hoàn").first.click()
     dlg = dialog(page, "Lập phiếu hoàn")
     ok("ED-11: hộp hoàn mặc định lý do theo loại khoản", dlg.get_by_label("Lý do hoàn").input_value() != "")
@@ -596,11 +599,11 @@ with sync_playwright() as p:
     heads = [h.strip() for h in page.locator("thead th").all_inner_texts()]
     ok("ED-12-AC1: cột 'Số tiền hoàn' (không 'Tổng hoàn')", "Số tiền hoàn" in heads and "Tổng hoàn" not in heads, str(heads))
     body = page.locator("tbody").inner_text()
-    ok("ED-12: chip Chờ hoàn + Thất bại ở mặc định 'Chờ chuyển'", "Chờ hoàn" in body and "Thất bại" in body)
+    ok("ED-12: chip Chờ hoàn + Thất bại ở mặc định 'Chờ chuyển'", "Chờ hoàn tiền" in body and "Hoàn thất bại" in body)
     page.evaluate("() => window.__caveMock.refunds('empty')")
     page.goto(BASE + "/orders/refunds/")
-    expect(page.get_by_text("Chưa có phiếu hoàn nào chờ chuyển")).to_be_visible()
-    ok("ED-12: chưa có phiếu hoàn → 'Chưa có phiếu hoàn nào chờ chuyển'", True)
+    expect(page.get_by_text("Chưa có phiếu hoàn tiền nào chờ chuyển")).to_be_visible()
+    ok("ED-12: chưa có phiếu hoàn → 'Chưa có phiếu hoàn tiền nào chờ chuyển'", True)
     page.evaluate("() => window.__caveMock.refunds('fail')")
     page.goto(BASE + "/orders/refunds/")
     expect(page.get_by_text("Không tải được dữ liệu").first).to_be_visible()
@@ -643,9 +646,9 @@ with sync_playwright() as p:
     ok("ED-12-AC3: hộp báo thất bại có ô 'Lý do thất bại' (BE cho phép để trống, FE chỉ nhắc)", dlg.get_by_label("Lý do thất bại").count() == 1)
     dlg.get_by_label("Lý do thất bại").fill("Sai số tài khoản")
     submit_btn(dlg).click()
-    expect(page.locator("main header")).to_contain_text("Thất bại")
+    expect(page.locator("main header")).to_contain_text("Hoàn thất bại")
     idle(page)
-    ok("ED-12-AC3: F2g → chip 'Thất bại', lý do là trường riêng", field(page, "Lý do thất bại").inner_text().strip() == "Sai số tài khoản", field(page, "Lý do thất bại").inner_text())
+    ok("ED-12-AC3: F2g → chip Hoàn thất bại, lý do là trường riêng", field(page, "Lý do thất bại").inner_text().strip() == "Sai số tài khoản", field(page, "Lý do thất bại").inner_text())
     ok("ED-12: SĐT khách hiện đủ ở phiếu hoàn có đơn (không che)", re.search(r"0\d{9}", page.locator("main").inner_text()) is not None or "—" in field(page, "Số điện thoại").inner_text())
     page.screenshot(path=f"{SHOTS}/ed3-refund-failed-1280-light.png")
     # Chuyển lại

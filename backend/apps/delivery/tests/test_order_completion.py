@@ -3,10 +3,12 @@ W37 L1 (S1, S2): giao xong phiếu cuối thì đơn Hoàn tất; huỷ và giao
 BR-BH-18, BR-GH-05, BR-GH-24, BR-PQ-04/05/11. Dữ liệu giả (SĐT 0900000xxx).
 Đua thật (hai luồng) nằm ở test_completion_race_postgres.py; ở đây là 5 ca tất định chạy trên mọi engine.
 """
+import datetime
 import json
 from unittest import mock
 
 from django.db.models.query import QuerySet
+from django.utils import timezone
 
 from apps.accounts import roles
 from apps.accounts.models import AuditLog
@@ -102,8 +104,6 @@ class OrderCompletesOnDeliveryTests(CompletionBase):
     def test_s1_ac3_no_documents_or_financial_numbers_change(self):
         order, note = self._processing()
         # Dựng hai kỳ: hoá đơn lùi về tháng trước.
-        import datetime
-        from django.utils import timezone
         order.invoice.issued_at = timezone.now() - datetime.timedelta(days=40)
         order.invoice.save(update_fields=["issued_at"])
         other = self._paid_order(phone="0900000124", txn="FT2626712399")
@@ -239,7 +239,7 @@ class OrderCompletesOnDeliveryTests(CompletionBase):
         self.assertIn(resp.status_code, (401, 403))
 
     def test_order_status_present_on_every_branch(self):
-        order, note = self._processing(to=S.READY)
+        _order, note = self._processing(to=S.READY)
         # READY -> DELIVERING
         resp = client_for(self.courier).post(status_url(note), {"to_status": "DELIVERING", "from_status": "READY"}, format="json")
         self.assertEqual(resp.status_code, 200, resp.content)
@@ -252,7 +252,7 @@ class OrderCompletesOnDeliveryTests(CompletionBase):
         resp = client_for(self.courier).post(status_url(note), {"to_status": "FAILED", "failure_reason": "NOT_MET"}, format="json")
         self.assertEqual(resp.json()["order_status"], "PROCESSING")
         # READY ở bước đóng gói (chủ có quyền pack)
-        order2, note2 = self._processing_to_ready_by_owner()
+        self._processing_to_ready_by_owner()
         self.assertIn("order_status", self._pack_response.json())
         self.assertEqual(self._pack_response.json()["order_status"], "PROCESSING")
 
@@ -272,7 +272,7 @@ class OrderCompletesOnDeliveryTests(CompletionBase):
         self.assertEqual(resp.json()["order_status"], SalesOrder.objects.get(pk=order.pk).status)
 
     def test_response_keys_have_no_personal_data(self):
-        order, note = self._processing()
+        _order, note = self._processing()
         body = self._complete(self.courier, note).json()
         self.assertEqual(body["order_status"], "COMPLETED")
         blob = json.dumps(body, ensure_ascii=False)

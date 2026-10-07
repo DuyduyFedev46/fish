@@ -15,6 +15,7 @@
 import os
 import re
 
+from e2e_support import finish
 from playwright.sync_api import expect, sync_playwright
 
 BASE = os.environ.get("BASE", "http://127.0.0.1:3101")
@@ -484,7 +485,7 @@ with sync_playwright() as p:
     page.wait_for_url("**/account/")
     caps = [c.split("\n")[-1].strip() for c in page.locator(".cap-list li").all_inner_texts()]
     ok("S47-AC1 Quản lý: 5 việc §1.5 + Xem Tổng quan (BE L6)",
-       caps == ["Mở bán lô", "Huỷ đơn đã thanh toán", "Tạo phiếu hoàn", "Duyệt hàng hoàn", "Duyệt kiểm kê", "Xem Tổng quan"], str(caps))
+       caps == ["Mở bán lô", "Huỷ đơn đã thanh toán", "Lập phiếu hoàn tiền", "Duyệt hàng hoàn", "Duyệt kiểm kê", "Xem Tổng quan"], str(caps))
     ok("S47-AC1 nhóm 'Quản lý', tên, SĐT", page.locator(".who-card .group-tag").all_inner_texts() == ["Quản lý"]
        and page.locator(".who-card a[href='tel:0909000111']").count() == 1)
     yn = page.locator(".perm-yn").inner_text()
@@ -641,3 +642,4 @@ passed = sum(1 for _, c, _ in results if c)
 for n, c, e in results:
     print(("PASS " if c else "FAIL ") + n + ("" if c else "  -> " + e))
 print(f"{passed}/{len(results)} PASS")
+finish(results)

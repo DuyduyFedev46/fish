@@ -1,14 +1,18 @@
 "use client";
 
-// Ô tìm ⌘K / Ctrl+K (🟡 T5): ở Lô 1 chỉ NHẢY TỚI MỤC MENU theo tên. Không tìm khách, không gọi API, không ghi
-// từ khoá đi đâu (không localStorage, URL, log). Lô 17 thêm nhảy theo mã chứng từ khớp đúng.
+// Ô tìm ⌘K / Ctrl+K (🟡 T5): nhảy tới MỤC MENU theo tên. Không tìm khách, không ghi từ khoá đi đâu (không localStorage, URL, log).
+// Lô 17b (ED-07): gõ đúng MẪU MÃ chứng từ (SO…, GH-…, mã lô, PR-n, KK-n, RT-n, #n) thì thêm dòng "Mở <mã>" và Enter sẽ tra bằng endpoint có
+// phạm vi rồi mở trang chi tiết. Chuỗi không đúng mẫu mã giữ hành vi cũ và KHÔNG gọi API (chống dò tên/SĐT, 02b T5).
 // Hai dạng: ô gõ trên topbar (≥768 px) và nút kính lúp (điện thoại) — cùng mở một bảng kết quả.
 
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { Icon } from "../Icon";
 import type { NavItem } from "@/shared/lib/nav";
+import { CODE_NOT_FOUND, parseCodeRef, resolveCodeRef } from "@/shared/lib/codeLookup";
 import { fold } from "@/shared/lib/search";
+import { loadErrorText } from "@/shared/lib/http";
+import { useCodeFinder } from "./CodeFinderContext";
 
 type Props = {
   items: NavItem[];
@@ -24,6 +28,11 @@ export function CommandSearch({ items, open, onOpenChange }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const openerRef = useRef<HTMLElement | null>(null);
   const listId = useId();
+  const finder = useCodeFinder();
+  const codeRef = useMemo(() => (finder ? parseCodeRef(query) : null), [finder, query]);
+  // Kết quả tra mã: "đang tìm" · "không có" · "lỗi" (kèm câu của BE). Chỉ gắn với mã đang gõ; gõ tiếp thì bỏ.
+  const [lookup, setLookup] = useState<{ state: "busy" | "none" | "error"; text?: string } | null>(null);
+  const lookupAbort = useRef<AbortController | null>(null);
 
   const results = useMemo(() => {
     const q = fold(query);
@@ -41,7 +50,12 @@ export function CommandSearch({ items, open, onOpenChange }: Props) {
     }
   }, [open]);
 
-  useEffect(() => setActive(0), [query]);
+  useEffect(() => {
+    setActive(0);
+    setLookup(null);
+    lookupAbort.current?.abort();
+  }, [query]);
+  useEffect(() => () => lookupAbort.current?.abort(), []);
 
   // Đóng bằng Esc / bấm nền: trả focus về nút đã mở (hoặc nút tìm đang hiện nếu mở bằng phím tắt), không để rơi về body.
   const dismiss = useCallback(() => {
@@ -70,6 +84,28 @@ export function CommandSearch({ items, open, onOpenChange }: Props) {
 
   if (!open) return null;
 
+  const openCode = async () => {
+    if (!codeRef || !finder || lookup?.state === "busy") return;
+    lookupAbort.current?.abort();
+    const ac = new AbortController();
+    lookupAbort.current = ac;
+    setLookup({ state: "busy" });
+    try {
+      const r = await resolveCodeRef(codeRef, finder, ac.signal);
+      if (ac.signal.aborted) return;
+      if (r.status === "found") {
+        onOpenChange(false);
+        router.push(r.href);
+      } else setLookup({ state: "none", text: CODE_NOT_FOUND(r.code) });
+    } catch (err) {
+      if (ac.signal.aborted) return;
+      setLookup({ state: "error", text: loadErrorText(err) });
+    }
+  };
+
+  const offset = codeRef ? 1 : 0; // dòng "Mở <mã>" nằm trước các mục menu
+  const total = results.length + offset;
+
   const go = (item: NavItem | undefined) => {
     if (!item) return;
     onOpenChange(false);
@@ -79,13 +115,15 @@ export function CommandSearch({ items, open, onOpenChange }: Props) {
   const onKey = (e: React.KeyboardEvent) => {
     if (e.key === "ArrowDown") {
       e.preventDefault();
-      setActive((a) => (results.length ? (a + 1) % results.length : 0));
+      setActive((a) => (total ? (a + 1) % total : 0));
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
-      setActive((a) => (results.length ? (a - 1 + results.length) % results.length : 0));
+      setActive((a) => (total ? (a - 1 + total) % total : 0));
     } else if (e.key === "Enter") {
       e.preventDefault();
-      go(results[active]);
+      // Có mã đúng mẫu: Enter mở chứng từ, trừ khi người dùng đã chọn xuống một mục menu khớp tên.
+      if (codeRef && active === 0) void openCode();
+      else go(results[active - offset]);
     }
   };
 
@@ -101,19 +139,41 @@ export function CommandSearch({ items, open, onOpenChange }: Props) {
             name="cmd"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Tìm màn hình…"
+            placeholder="Tìm màn hình hoặc mã chứng từ…"
             aria-label="Tìm màn hình"
             role="combobox"
             aria-expanded="true"
             aria-controls={listId}
-            aria-activedescendant={results[active] ? `${listId}-${results[active].key}` : undefined}
+            aria-activedescendant={codeRef && active === 0 ? `${listId}-code` : results[active - offset] ? `${listId}-${results[active - offset].key}` : undefined}
             autoComplete="off"
             enterKeyHint="go"
           />
         </label>
         <ul id={listId} className="cmd-list" role="listbox" aria-label="Màn hình">
-          {results.length === 0 && <li className="cmd-empty">Không có màn nào khớp.</li>}
-          {results.map((i, idx) => (
+          {codeRef && (
+            <li
+              id={`${listId}-code`}
+              role="option"
+              aria-selected={active === 0}
+              className={active === 0 ? "on" : undefined}
+              data-cmd-code
+              onMouseEnter={() => setActive(0)}
+              onClick={() => void openCode()}
+            >
+              <Icon name={lookup?.state === "busy" ? "progress_activity" : "search"} className={lookup?.state === "busy" ? "spin" : undefined} />
+              <span>{codeRef.code}</span>
+              <small>{lookup?.state === "busy" ? "Đang tìm…" : "Mở chứng từ"}</small>
+            </li>
+          )}
+          {lookup && lookup.state !== "busy" && (
+            <li className="cmd-empty" role="status" data-cmd-code-result={lookup.state}>
+              {lookup.text}
+            </li>
+          )}
+          {results.length === 0 && !codeRef && <li className="cmd-empty">Không có màn nào khớp.</li>}
+          {results.map((i, idx0) => {
+            const idx = idx0 + offset;
+            return (
             <li
               key={i.key}
               id={`${listId}-${i.key}`}
@@ -127,7 +187,8 @@ export function CommandSearch({ items, open, onOpenChange }: Props) {
               <span>{i.label}</span>
               {i.section && <small>{i.section}</small>}
             </li>
-          ))}
+            );
+          })}
         </ul>
       </div>
     </div>

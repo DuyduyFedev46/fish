@@ -160,21 +160,27 @@ class OrderListScopeTests(ScopeSceneBase):
         self.assertEqual(APIClient().get("/api/sales/orders/").status_code, 401)
         self.assertEqual(APIClient().get("/api/sales/invoices/").status_code, 401)
 
+    def search(self, label, q):
+        """NEW-1: tìm theo SĐT/tên khách đi bằng POST search/ (GET `q` chỉ còn khớp mã đơn)."""
+        client = APIClient()
+        client.force_authenticate(self.user(label))
+        return client.post("/api/sales/orders/search/", {"q": q}, format="json")
+
     def test_pv03_search_by_customer_phone_respects_scope_and_v2(self):
-        """R2: tìm `?q=` theo SĐT chỉ khớp đơn người gọi được xem khách; thiếu V2 thì không dò được SĐT."""
+        """R2: tìm theo SĐT chỉ khớp đơn người gọi được xem khách; thiếu V2 thì không dò được SĐT."""
         other = self.order("order_assigned_other")
         phone = other.phone
-        self.assertEqual(self.get("warehouse_staff", "/api/sales/orders/", q=phone).data["count"], 1)
+        self.assertEqual(self.search("warehouse_staff", phone).data["count"], 1)
         revoke(roles.WAREHOUSE_STAFF, V2_PERM)
-        self.assertEqual(self.get("warehouse_staff", "/api/sales/orders/", q=phone).data["count"], 0)
-        self.assertEqual(self.get("warehouse_staff", "/api/sales/orders/", q=other.code).data["count"], 1)
+        self.assertEqual(self.search("warehouse_staff", phone).data["count"], 0)
+        self.assertEqual(self.search("warehouse_staff", other.code).data["count"], 1)
 
     def test_pv03_search_by_customer_name_blocked_without_v2(self):
         other = self.order("order_assigned_other")
         name = other.customer.name
-        self.assertEqual(self.get("warehouse_staff", "/api/sales/orders/", q=name).data["count"], 1)
+        self.assertEqual(self.search("warehouse_staff", name).data["count"], 1)
         revoke(roles.WAREHOUSE_STAFF, V2_PERM)
-        self.assertEqual(self.get("warehouse_staff", "/api/sales/orders/", q=name).data["count"], 0)
+        self.assertEqual(self.search("warehouse_staff", name).data["count"], 0)
 
     def test_pv03_default_scope_for_union_user_is_widest(self):
         """Người K+G: K có D1 = all nên thấy mọi đơn (khớp hành vi hôm nay)."""
@@ -340,7 +346,7 @@ class CustomerInfoCapabilityRegistryTests(TestCase):
         self.assertFalse(v2.owner_only)
         others = {p for c in registry.CAPABILITIES if c.key not in (V1, V2) for p in c.perms}
         self.assertFalse(others & set(v1.perms + v2.perms))
-        self.assertEqual(v2.label, "Xem thông tin khách trên đơn & hoá đơn")
+        self.assertEqual(v2.label, "Xem thông tin khách trên đơn, hoá đơn, phiếu hoàn tiền")
 
     def test_pv07_ac1_matrix_after_migration(self):
         expected_v1 = {roles.OWNER: "on", roles.MANAGER: "on", roles.WAREHOUSE_STAFF: "on",

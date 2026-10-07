@@ -9,6 +9,7 @@ import {
   canApprove,
   canCancel,
   canCreate,
+  canDelete,
   createErrorOf,
   currentMonth,
   doneSteps,
@@ -92,7 +93,7 @@ describe("returnsModel — hiển thị", () => {
     expect(nextStepText({ status: "DRAFT", outside_minutes: 135, batch_code: "B1" })).toContain("2 giờ 15 phút");
     expect(nextStepText({ status: "APPROVED", outside_minutes: 10, batch_code: "B1" })).toBeNull();
     expect(doneSteps({ status: "DRAFT", decision: "PENDING" })).toHaveLength(2);
-    expect(doneSteps({ status: "APPROVED", decision: "WRITE_OFF" }).at(-1)).toBe("Huỷ bỏ, ghi lỗ");
+    expect(doneSteps({ status: "APPROVED", decision: "WRITE_OFF" }).at(-1)).toBe("Huỷ hàng, ghi lỗ");
     expect(doneSteps({ status: "APPROVED", decision: "RESTOCK" }).at(-1)).toBe("Tái nhập vào lô");
   });
 });
@@ -270,7 +271,7 @@ describe("mock hàng hoàn (theo contract BE Lô 9)", () => {
   });
 });
 
-describe("Huỷ phiếu hoàn (Lô bổ sung A #8)", () => {
+describe("Huỷ phiếu hàng hoàn (Lô bổ sung A #8)", () => {
   const me = (id: number, permissions: string[]) => ({ id, permissions });
   const row = (status: ReturnItem["status"], created_by: number | null) => ({ status, created_by });
 
@@ -348,5 +349,51 @@ describe("mock chi tiết phiếu giao có batch_pk và returned_qty (contract B
     expect(detail(38).lines[0].returned_qty).toBe("0.500");
     call("kho1", "POST", BASE, { delivery_note: 38, batch: 204, qty: "0.2" });
     expect(detail(38).lines[0].returned_qty).toBe("0.700");
+  });
+});
+
+describe("xoá phiếu hàng hoàn (#8, BR-PQ-10)", () => {
+  const make = (qty = "0.1") => {
+    return call("kho1", "POST", BASE, { delivery_note: 34, batch: 202, qty }).body as ReturnItem;
+  };
+
+  it("canDelete chỉ theo available_actions của BE", () => {
+    expect(canDelete({ available_actions: ["approve", "cancel", "delete"] })).toBe(true);
+    expect(canDelete({ available_actions: ["approve", "cancel"] })).toBe(false);
+    expect(canDelete({ available_actions: [] })).toBe(false);
+    expect(canDelete({})).toBe(false);
+  });
+  it("mock: chỉ Chủ có khoá delete; phiếu đã duyệt thì không ai có", () => {
+    const made = make();
+    expect((call("loc", "GET", `${BASE}${made.id}/`).body as ReturnItem).available_actions).toContain("delete");
+    expect((call("ql1", "GET", `${BASE}${made.id}/`).body as ReturnItem).available_actions).not.toContain("delete");
+    expect((call("loc", "GET", `${BASE}3/`).body as ReturnItem).available_actions).not.toContain("delete");
+    const list = call("loc", "GET", BASE).body as Page;
+    expect(list.results.find((r) => r.id === 6)?.available_actions).toContain("delete");
+    call("loc", "POST", `${BASE}${made.id}/delete/`);
+  });
+  it("mock: Chủ xoá Nháp → 200 rồi 404; khỏi danh sách", () => {
+    const made = make();
+    const done = call("loc", "POST", `${BASE}${made.id}/delete/`);
+    expect(done.status).toBe(200);
+    expect(done.body).toEqual({ status: "deleted", id: made.id });
+    expect(call("loc", "GET", `${BASE}${made.id}/`).status).toBe(404);
+    expect(call("loc", "POST", `${BASE}${made.id}/delete/`).status).toBe(404);
+    expect((call("loc", "GET", BASE).body as Page).results.some((r) => r.id === made.id)).toBe(false);
+  });
+  it("mock: Quản lý 403; phiếu đã duyệt 400 RETURN_DELETE_NOT_ALLOWED đúng câu BE", () => {
+    const made = make();
+    expect(call("ql1", "POST", `${BASE}${made.id}/delete/`).status).toBe(403);
+    const refused = call("loc", "POST", `${BASE}3/delete/`);
+    expect(refused.status).toBe(400);
+    expect(refused.body).toMatchObject({ code: "RETURN_DELETE_NOT_ALLOWED", detail: "Phiếu hàng hoàn đã duyệt (đã nhập lại kho hoặc ghi lỗ) không xoá được (BR-PQ-10)." });
+    call("loc", "POST", `${BASE}${made.id}/delete/`);
+  });
+  it("mock: xoá phiếu đã bị xoá từ máy khác → 404 câu chuẩn \"Không tìm thấy.\" từ Lô 17a", () => {
+    const made = make();
+    call("loc", "POST", `${BASE}${made.id}/delete/`);
+    const gone = call("loc", "POST", `${BASE}${made.id}/delete/`);
+    expect(gone.status).toBe(404);
+    expect(gone.body).toMatchObject({ detail: "Không tìm thấy." });
   });
 });

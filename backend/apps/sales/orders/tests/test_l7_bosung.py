@@ -1,7 +1,7 @@
 """
 Lô L7 — bổ sung BE sau khi FE khớp contract S10 (03-dev-notes "Chỗ lệch contract").
 
-1. `?q=` tìm thêm theo tên khách (không phân biệt hoa thường, không dấu) — vẫn giữ mã đơn/SĐT,
+1. `POST search/` (trước là `?q=`, NEW-1) tìm thêm theo tên khách (không phân biệt hoa thường, không dấu) — vẫn giữ mã đơn/SĐT,
    phạm vi NV giao (S5, BR-PQ-12) giữ nguyên.
 2. Chi tiết đơn: nhãn tiếng Việt (`*_label`) cạnh mã trạng thái phiếu giao/giao dịch/phiếu hoàn.
 3. Chi tiết đơn: `timeline` [{at, kind, label, actor_display}] tăng dần theo thời gian, ghép từ
@@ -28,7 +28,8 @@ TIMELINE_KEYS = {"at", "kind", "label", "actor_display"}
 
 class L7SearchByNameTests(OrderApiBase):
     def _ids(self, user, q):
-        resp = client_for(user).get("/api/sales/orders/", {"q": q})
+        # NEW-1: tìm theo tên/SĐT đi bằng POST search/ (từ khoá không vào URL).
+        resp = client_for(user).post("/api/sales/orders/search/", {"q": q}, format="json")
         self.assertEqual(resp.status_code, 200, resp.content)
         return sorted(r["id"] for r in resp.json()["results"])
 
@@ -59,7 +60,8 @@ class L7SearchByNameTests(OrderApiBase):
 
     def test_l7_tim_ten_khong_co_quyen_403(self):
         self._order()
-        self.assertEqual(client_for(self.nobody).get("/api/sales/orders/?q=hoa").status_code, 403)
+        res = client_for(self.nobody).post("/api/sales/orders/search/", {"q": "hoa"}, format="json")
+        self.assertEqual(res.status_code, 403)
 
 
 class L7LabelTests(OrderApiBase):
@@ -69,13 +71,13 @@ class L7LabelTests(OrderApiBase):
         body = client_for(self.ql).get(f"/api/sales/orders/{order.pk}/").json()
         pay = body["payments"][0]
         self.assertEqual(pay["match_status"], "MATCHED")
-        self.assertEqual(pay["match_status_label"], "Khớp — đã xác nhận")
+        self.assertEqual(pay["match_status_label"], "Khớp đơn")
         self.assertEqual(pay["source"], "WEBHOOK")
-        self.assertEqual(pay["source_label"], "Webhook SePay")
+        self.assertEqual(pay["source_label"], "Ngân hàng báo")
         self.assertEqual(body["delivery"]["status"], "CONFIRMING")
-        self.assertEqual(body["delivery"]["status_label"], "Chờ xác nhận")
+        self.assertEqual(body["delivery"]["status_label"], "Chờ gọi xác nhận")
         self.assertEqual(body["refunds"][0]["status"], "PENDING")
-        self.assertEqual(body["refunds"][0]["status_label"], "Chờ hoàn")
+        self.assertEqual(body["refunds"][0]["status_label"], "Chờ hoàn tiền")
 
     def test_l7_nhan_giao_dich_thieu_tien(self):
         order = self._order()
@@ -83,7 +85,7 @@ class L7LabelTests(OrderApiBase):
             order=order, bank_txn_id="FTLOW", amount=Decimal("300000"), received_at=timezone.now(),
         )
         pay = client_for(self.chu).get(f"/api/sales/orders/{order.pk}/").json()["payments"][0]
-        self.assertEqual(pay["match_status_label"], "Thiếu tiền — chờ Chủ")
+        self.assertEqual(pay["match_status_label"], "Chuyển thiếu")
 
 
 class L7TimelineTests(OrderApiBase):

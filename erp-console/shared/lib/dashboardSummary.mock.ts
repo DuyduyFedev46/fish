@@ -38,7 +38,7 @@ const ORDER_LABEL: Record<OrderStatus, string> = {
   PROCESSING: "Đang xử lý",
   COMPLETED: "Hoàn tất",
   CANCELLED: "Đã huỷ",
-  AUTO_CANCELLED: "Tự huỷ (quá TTL)",
+  AUTO_CANCELLED: "Hết giờ giữ chỗ",
 };
 const BATCH_LABEL: Record<BatchStatus, string> = {
   DRAFT: "Nháp",
@@ -82,17 +82,17 @@ const BATCHES: SeedBatch[] = [
 // [code, total, status, phút trước, hạn giữ chỗ còn (phút) | null] — không có tên khách / SĐT (SR-17)
 type SeedOrder = [string, number, OrderStatus, number, number | null];
 const ORDERS: SeedOrder[] = [
-  ["DH-240924-011", 1_092_000, "BOOKED", 22, 6],
-  ["DH-240924-010", 546_000, "BOOKED", 9, 21],
-  ["DH-240924-009", 4_860_000, "PAID", 48, null],
-  ["DH-240924-008", 780_000, "PROCESSING", 95, null],
-  ["DH-240924-007", 1_415_000, "COMPLETED", 180, null],
-  ["DH-240924-006", 312_000, "AUTO_CANCELLED", 240, null],
-  ["DH-240924-005", 2_236_000, "PROCESSING", 300, null],
-  ["DH-240924-004", 928_000, "CANCELLED", 420, null],
-  ["DH-240923-018", 1_640_000, "COMPLETED", 1_200, null],
-  ["DH-240923-017", 6_210_000, "PAID", 1_300, null],
-  ["DH-240923-016", 459_000, "COMPLETED", 1_420, null],
+  ["SO240924-A00011", 1_092_000, "BOOKED", 22, 6],
+  ["SO240924-A00010", 546_000, "BOOKED", 9, 21],
+  ["SO240924-A00009", 4_860_000, "PAID", 48, null],
+  ["SO240924-A00008", 780_000, "PROCESSING", 95, null],
+  ["SO240924-A00007", 1_415_000, "COMPLETED", 180, null],
+  ["SO240924-A00006", 312_000, "AUTO_CANCELLED", 240, null],
+  ["SO240924-A00005", 2_236_000, "PROCESSING", 300, null],
+  ["SO240924-A00004", 928_000, "CANCELLED", 420, null],
+  ["SO240923-A00018", 1_640_000, "COMPLETED", 1_200, null],
+  ["SO240923-A00017", 6_210_000, "PAID", 1_300, null],
+  ["SO240923-A00016", 459_000, "COMPLETED", 1_420, null],
 ];
 
 // [batch_id, type, qty_change, reference, phút trước]
@@ -101,7 +101,7 @@ const LEDGER: SeedLedger[] = [
   ["L0923-SO01", "RECEIPT", 14.2, "PN-240924-02", 35],
   ["L0919-CN01", "SALE", -3.5, "HD-240924-009", 47],
   ["L0917-CB01", "SALE", -2.25, "HD-240924-008", 94],
-  ["L0918-GX01", "CANCEL_RESTORE", 1.2, "DH-240924-004", 110],
+  ["L0918-GX01", "CANCEL_RESTORE", 1.2, "SO240924-A00004", 110],
   ["L0914-CT01", "RECONCILE", -0.4, "KK-240924-01", 150],
   ["L0901-CB00", "WRITE_OFF", -1.1, "LO-HUY-0901", 200],
   ["L0921-CT02", "SALE", -5, "HD-240924-005", 298],
@@ -170,6 +170,7 @@ export function buildDashboardSummaryMock(
     .slice(0, 20)
     .map((b) => {
       const row: DashboardBatch = {
+        id: b.id,
         batch_id: b.batch_id,
         item: b.item,
         warehouse: b.warehouse,
@@ -198,11 +199,13 @@ export function buildDashboardSummaryMock(
     .sort((a, b) => b.created.getTime() - a.created.getTime() || b.id - a.id)
     .slice(0, 8)
     .map((o) => ({
+      id: o.id,
       code: o.code,
       amount: o.total,
       status: o.status,
       status_label: ORDER_LABEL[o.status],
       expires_at: o.expires ? o.expires.toISOString() : null,
+      reason: o.status === "AUTO_CANCELLED" ? { code: "AUTO_CANCELLED", label: "Hết giờ giữ chỗ" } : o.status === "CANCELLED" ? { code: "CUSTOMER_CHANGED_MIND", label: "Khách đổi ý" } : null,
     }));
 
   const activity: LedgerActivity[] = (empty ? [] : LEDGER)
@@ -239,6 +242,7 @@ export function buildDashboardSummaryMock(
       .sort((a, b) => a.expiry.getTime() - b.expiry.getTime())
       .slice(0, 6)
       .map((b) => ({
+        id: b.id,
         batch_id: b.batch_id,
         item: b.item,
         expiry_date: localIsoDate(b.expiry),

@@ -4,10 +4,10 @@ from apps.common.guidance.api import register_guidance
 from apps.common.guidance.audit_timeline import make_audit_timeline_provider
 
 ACTION_LABELS = {
-    "item_image_upload": "Thêm ảnh mặt hàng",
+    "item_image_add": "Thêm ảnh mặt hàng",
     "item_image_replace": "Thay ảnh mặt hàng",
     "item_image_remove": "Gỡ ảnh mặt hàng",
-    "admin_edit": "Chỉnh sửa trong trang quản trị",
+    "admin_edit": "Sửa trong trang quản trị kỹ thuật",
 }
 
 register_guidance(

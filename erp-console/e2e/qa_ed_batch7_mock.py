@@ -25,6 +25,7 @@ COST_NUMBERS = ["175.000", "182.000", "229.500", "236.500", "305.000", "312.000"
 BANNED = ["Ngừng bán lô", "Tạo phiếu điều chỉnh", "Thêm điều chỉnh", "HSD", "NCC", "FEFO", "TTL", "SĐT", "hạch toán", "BR-", "Tạo phiếu kiểm kê"]
 console_errors = []
 CUR = [""]
+CUR_TITLE = [None]  # màn đang chờ sau go(): lots() đợi đúng tiêu đề này
 
 
 def soft(page, path):
@@ -33,7 +34,8 @@ def soft(page, path):
 
 def settle(page):
     page.wait_for_function("() => window.__caveMock && window.__caveMock.pending() === 0", timeout=10_000)
-    page.wait_for_timeout(150)
+    # Chờ React vẽ xong sau khi mock hết việc: hai khung hình liên tiếp (điều kiện, không ngủ cố định).
+    page.evaluate("() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))")
 
 
 def session(browser, user, w=1440, h=1000, mobile=False):
@@ -42,6 +44,7 @@ def session(browser, user, w=1440, h=1000, mobile=False):
         opts.update(device_scale_factor=2, is_mobile=True, has_touch=True)
     ctx = browser.new_context(**opts)
     page = ctx.new_page()
+    CUR_TITLE[0] = None
     page._qa_closing = False
     page.on("console", lambda m: console_errors.append(f"[{CUR[0]} {user}@{w}] {m.type}: {m.text}") if m.type in ("error", "warning") and not page._qa_closing else None)
     page.on("pageerror", lambda e: console_errors.append(f"[{user}@{w}] pageerror: {e}"))
@@ -55,7 +58,6 @@ def session(browser, user, w=1440, h=1000, mobile=False):
 
 def finish(ctx, page):
     try:
-        page.wait_for_timeout(600)
         page._qa_closing = False
         page.wait_for_load_state("networkidle", timeout=5000)  # đợi prefetch của Next xong rồi mới đóng, tránh lỗi giả "Failed to fetch RSC"
     except Exception:
@@ -64,8 +66,24 @@ def finish(ctx, page):
     ctx.close()
 
 
+def title_is(page, title):
+    """Chờ tiêu đề màn ở topbar đúng là `title` (màn cũ đã gỡ). Tránh bắt nhầm bảng của màn trước (vd bảng đơn ở Tổng quan)."""
+    page.wait_for_function("(t) => { const h = document.querySelector('header.topbar h1'); return !!h && h.innerText.trim() === t; }", arg=title, timeout=10_000)
+
+
+def ready(page, route):
+    """Màn của `route` đã vẽ xong (không phải màn trước): theo loại màn Kho & lô / chi tiết lô / Sổ nhập xuất."""
+    if "/inventory/detail/" in route:
+        page.wait_for_selector("[data-testid=qty-available]", timeout=10_000)
+    else:
+        title_is(page, "Sổ nhập xuất" if "/ledger/" in route else "Kho & lô")
+        page.wait_for_function("() => !document.querySelector('[data-testid=qty-available]') && !!document.querySelector('#main table.lt tbody tr:not(.lt-skel)')", timeout=10_000)
+    settle(page)
+
+
 def go(page, label):
     """Bấm menu (điều hướng mềm). Trên điện thoại menu nằm trong ngăn kéo: dùng pushState."""
+    CUR_TITLE[0] = label
     link = page.locator(".nav a", has_text=label).first
     if link.is_visible():
         link.click()
@@ -74,13 +92,18 @@ def go(page, label):
 
 
 def lots(page):
-    t = page.locator("table.lt").first
+    if CUR_TITLE[0]:
+        title_is(page, CUR_TITLE[0])
+    # Không phải màn Tổng quan (có thẻ số liệu) và không phải trang chi tiết lô: chỉ bảng của màn danh sách.
+    page.wait_for_function("() => !document.querySelector('[data-kpi]') && !document.querySelector('[data-testid=qty-available]')", timeout=10_000)
+    t = page.locator("#main table.lt").first
     expect(t.locator("tbody tr").first).to_be_visible()
     expect(t.locator("tr.lt-skel")).to_have_count(0)
     return t
 
 
 def open_lot(page, code):
+    CUR_TITLE[0] = None  # sang trang chi tiết: lots() lần sau (quay về danh sách) không đòi tiêu đề của màn trước
     lots(page).locator("tbody tr", has_text=code).first.locator("a").first.click()
     page.wait_for_selector("[data-testid=qty-available]")
     settle(page)
@@ -135,7 +158,7 @@ def check_roles(browser):
             page.evaluate("() => window.__caveMock.clearLog()")
             soft(page, route)
             if allowed:
-                page.wait_for_function("() => !!document.querySelector('table.lt, [data-testid=qty-available]')", timeout=10_000)
+                ready(page, route)
                 ok(f"[{user}] {route}: xem được, không màn 'không có quyền'", "Bạn không có quyền xem mục này" not in body(page))
             else:
                 page.wait_for_function("() => document.body.innerText.includes('Bạn không có quyền xem mục này')", timeout=10_000)
@@ -264,11 +287,11 @@ def check_list_and_detail(browser):
     ok("ED-23-AC3: mục mờ thật sự bị vô hiệu (aria-disabled/disabled)", dis.get_attribute("aria-disabled") == "true" or dis.is_disabled())
     page.evaluate("() => window.__caveMock.clearLog()")
     dis.click(force=True)
-    page.wait_for_timeout(300)
+    settle(page)
     ok("ED-23-AC3: bấm mục mờ không mở hộp, không gọi API ghi", page.get_by_role("dialog").count() == 0 and not [c for c in page.evaluate("() => window.__caveMock.log") if c.startswith("POST")])
     page.keyboard.press("Escape")
     page.get_by_role("button", name="Thao tác khác").click()
-    page.wait_for_timeout(200)
+    expect(page.get_by_role("menuitem").first).to_be_visible()
     shot(page, "q7-loc-detail-L0914-menu")
     page.keyboard.press("Escape")
     txt = body(page)
@@ -361,7 +384,7 @@ def check_actions(browser):
     ok("Sau huỷ: không còn mục ghi nào mở được (Trả/Huỷ/Chốt đều mờ kèm lý do)", all(" · " in i for i in items if re.match(r"Trả|Huỷ|Chốt", i)), str(items))
     page.keyboard.press("Escape")
     led = page.locator("table.lt").first.inner_text()
-    ok("ED-24-AC2: Nhập xuất của lô có dòng 'Ghi lỗ, huỷ hàng' (Tồn sau 0)", "Ghi lỗ, huỷ hàng" in led and re.search(r"-3 kg\s+0 kg", re.sub(r"[ \t]+", " ", led)) is not None, led[:300])
+    ok("ED-24-AC2: Nhập xuất của lô có dòng 'Huỷ hàng, ghi lỗ' (Tồn sau 0)", "Huỷ hàng, ghi lỗ" in led and re.search(r"-3 kg\s+0 kg", re.sub(r"[ \t]+", " ", led)) is not None, led[:300])
     shot(page, "q7-loc-after-cancel", full=True)
 
     page.locator("a", has_text="Kho & lô").first.click()
@@ -377,7 +400,7 @@ def check_actions(browser):
         d.get_by_label("Số kg đã trả").fill(bad)
         page.evaluate("() => window.__caveMock.clearLog()")
         d.get_by_role("button", name="Ghi nhận đã trả").click()
-        page.wait_for_timeout(200)
+        settle(page)
         ok(f"F1g biên: số kg '{bad}' bị chặn, hộp còn mở, không gọi API", d.is_visible() and not calls(page, "return-to-supplier"), d.inner_text()[-120:])
     d.get_by_label("Số kg đã trả").fill("2,5")
     money = d.get_by_label("Tiền nhà cung cấp hoàn")
@@ -402,7 +425,7 @@ def check_actions(browser):
     ok("ED-29-AC1: dòng mới nhất của sổ là 'Trả nhà cung cấp' lô L0908-CT00, -2,5 kg, Tồn sau 4 kg", first[1] == "Trả nhà cung cấp" and first[2] == "L0908-CT00" and first[4].startswith("-2,5") and first[5].startswith("4"), str(first))
     ok("ED-29-AC1: dòng có người làm (tên) không phải rỗng", first[7] != "", str(first))
     second = [c.strip() for c in lt.locator("tbody tr").nth(1).locator("td").all_inner_texts()]
-    ok("ED-29-AC1: dòng 'Ghi lỗ, huỷ hàng' của L0910-TS00 nằm ngay sau, Tồn sau 0 kg", second[1] == "Ghi lỗ, huỷ hàng" and second[2] == "L0910-TS00" and second[5].startswith("0"), str(second))
+    ok("ED-29-AC1: dòng 'Huỷ hàng, ghi lỗ' của L0910-TS00 nằm ngay sau, Tồn sau 0 kg", second[1] == "Huỷ hàng, ghi lỗ" and second[2] == "L0910-TS00" and second[5].startswith("0"), str(second))
     finish(ctx, page)
 
     # ---- Chủ: F1i chốt lô: bấm đúp + sau chốt khoá
@@ -443,14 +466,15 @@ def check_actions(browser):
     ok("ED-24-AC3: lô Hết hàng chưa đủ điều kiện: 'Chốt lô' mờ kèm lý do tiếng Việt", len(ch) == 1 and " · " in ch[0] and "BR-" not in ch[0], str(items))
     page.evaluate("() => window.__caveMock.clearLog()")
     page.get_by_role("menuitem", name=re.compile("^Chốt lô")).click(force=True)
-    page.wait_for_timeout(250)
+    settle(page)
     ok("ED-24-AC3: bấm mục mờ không mở hộp, không gọi API", page.get_by_role("dialog").count() == 0 and not [c for c in page.evaluate("() => window.__caveMock.log") if c.startswith("POST")])
     finish(ctx, page)
 
 
 # ============================================================ 6. Sổ nhập xuất (ED-29)
 def ledger_table(page):
-    page.wait_for_selector("table.lt thead th:has-text('Mặt hàng')")
+    title_is(page, "Sổ nhập xuất")
+    page.wait_for_selector("#main table.lt thead th:has-text('Mặt hàng')")
     return lots(page)
 
 
@@ -508,7 +532,7 @@ def check_ledger(browser):
         ts = [r[0] for r in rows]
         ok("ED-29-AC1: sổ xếp mới nhất trước", ts == sorted(ts, key=lambda x: (x[6:10], x[3:5], x[0:2], x[11:]), reverse=True))
         types = {r[1] for r in rows}
-        ok("ED-29-AC1/G3: Loại dùng đúng nhãn enum-map (WRITE_OFF → 'Ghi lỗ, huỷ hàng'), không 'Hạch toán'", types <= {"Nhập lô", "Bán ra", "Hàng hoàn tái nhập", "Điều chỉnh kiểm kê", "Ghi lỗ, huỷ hàng", "Hoàn kho do huỷ đơn", "Trả nhà cung cấp"}, str(types))
+        ok("ED-29-AC1/G3: Loại dùng đúng nhãn enum-map (WRITE_OFF → 'Huỷ hàng, ghi lỗ'), không 'Hạch toán'", types <= {"Nhập lô", "Bán ra", "Hàng hoàn tái nhập", "Điều chỉnh kiểm kê", "Huỷ hàng, ghi lỗ", "Hoàn kho do huỷ đơn", "Trả nhà cung cấp"}, str(types))
         links = page.locator("table.lt tbody td a").count()
         ok("ED-29: có link chứng từ tới lô (reference kind=batch) hoặc chữ thường", links >= 0)
         shot(page, "q7-loc-ledger-full", full=True)
@@ -638,8 +662,7 @@ def check_mobile(browser):
         ctx, page = session(browser, user, w=360, h=740, mobile=True)
         for route in ["/inventory/", "/inventory/?tab=adjustments", "/inventory/?tab=warehouses", "/inventory/detail/?id=901", "/inventory/detail/?id=903", "/ledger/"]:
             soft(page, route)
-            page.wait_for_function("() => !!document.querySelector('table.lt tbody tr:not(.lt-skel), [data-testid=qty-available]')", timeout=10_000)
-            settle(page)
+            ready(page, route)
             page.evaluate("() => document.fonts.ready")
             ok(f"[{user}@360] {route}: không cuộn ngang", hscroll_ok(page), page.evaluate("[document.documentElement.scrollWidth, document.documentElement.clientWidth]"))
             small = page.evaluate(SMALL_JS)
@@ -676,7 +699,7 @@ def check_off_path_and_storage(browser):
     for q in ["?id=abc", "?id=", "", "?id=0", "?id=99999", "?id=1e3", "?id=%3Cscript%3E", "?id=901&id=902"]:
         page.evaluate("() => window.__caveMock.clearLog()")
         soft(page, "/inventory/detail/" + q)
-        page.wait_for_timeout(700)
+        page.wait_for_function("(q) => location.search === q", arg=q.split("#")[0] if q.startswith("?") else "", timeout=10_000)
         settle(page)
         t = body(page)
         ok(f"Đường sai /inventory/detail/{q}: 'Không tìm thấy', không vỡ trang, không script chạy", ("Không tìm thấy" in t or "L0908" in t) and "<script" not in page.locator("main").inner_html().lower(), t[:80])
@@ -687,7 +710,7 @@ def check_off_path_and_storage(browser):
     items = menu_items(page)
     ok("Lô Quá hạn còn giữ chỗ: Trả/Huỷ bị khoá nêu lý do giữ chỗ", any(i.startswith("Huỷ phần tồn") and "giữ chỗ" in i for i in items) and any(i.startswith("Trả nhà cung cấp") and "giữ chỗ" in i for i in items), str(items))
     page.keyboard.press("Escape")
-    ls = page.evaluate("() => JSON.stringify([Object.entries(localStorage).filter(e => e[0] !== 'cave_erp_mock_users'), Object.entries(sessionStorage)])")  # cave_erp_mock_users = tài khoản NV giả của mock, không có ở bản thật
+    ls = page.evaluate("() => JSON.stringify([Object.entries(localStorage), Object.entries(sessionStorage)].map(a => a.filter(e => !e[0].startsWith('cave_erp_mock_'))))")  # cave_erp_mock_* (người dùng, đơn mẫu có SĐT giả) chỉ có ở mock, bản thật không có
     ok("G10: localStorage/sessionStorage không có SĐT, tên khách, địa chỉ", not PHONE.search(ls) and not re.search(r"địa chỉ|Nguyễn|Trần|Lê ", ls), ls[:200])
     ok("G10: URL chỉ có ?id= / ?tab= số/enum", re.search(r"[?&](phone|name|address|customer)", page.url) is None, page.url)
     finish(ctx, page)
@@ -707,8 +730,9 @@ def check_click_console(browser):
             page.wait_for_load_state("networkidle")
             for lab in ("Kho & lô", "Sổ nhập xuất", "Kho & lô", "Sổ nhập xuất"):
                 page.locator(".nav a", has_text=lab).first.click()
-                page.wait_for_function("() => !!document.querySelector('table.lt')", timeout=10_000)
-            page.wait_for_timeout(300)
+                title_is(page, lab)
+                page.wait_for_function("() => !!document.querySelector('#main table.lt')", timeout=10_000)
+            settle(page)
             ok(f"[{user}] bấm menu Kho & lô <-> Sổ nhập xuất 4 lần liền: console sạch (kể cả prefetch)", not errs, str(errs[:2]))
             ctx.close()
 

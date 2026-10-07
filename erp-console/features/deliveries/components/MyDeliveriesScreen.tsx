@@ -5,7 +5,7 @@
 // "Gọi khách" hiện đủ số và mở `tel:`. Lô bổ sung A #17: số lấy thẳng từ `phone` trong danh sách `assigned_to=me` (không gọi thêm chi tiết từng phiếu);
 // số chỉ nằm trong bộ nhớ trang: không ghi localStorage, URL, log.
 // F2l "Báo giao thất bại" là hộp riêng. Lô 9: thẻ Giao thất bại có nút "Mang hàng về kho" mở hộp F2m (CreateReturnModal) với phiếu giao điền sẵn;
-// nút chỉ mở hộp, việc ghi phiếu hoàn do hộp đó làm (BE chặn nếu phiếu không còn Đang giao/Giao thất bại).
+// nút chỉ mở hộp, việc ghi phiếu hoàn tiền do hộp đó làm (BE chặn nếu phiếu không còn Đang giao/Giao thất bại).
 import { useMemo, useState } from "react";
 import { ENUMS } from "@/shared/lib/enums";
 import { kg, todayInVietnam } from "@/shared/lib/format";

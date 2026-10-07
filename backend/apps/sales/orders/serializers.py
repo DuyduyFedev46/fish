@@ -8,11 +8,13 @@ L7 bổ sung (chỉ thêm key): `*_label` cạnh mã trạng thái lồng, `time
 Tiền/kg là chuỗi thập phân (bất biến #7). `allocations[].unit_cost` là GIÁ VỐN — không có
 key với người thiếu `inventory.view_costprice` (BR-PQ-15, CostFieldSerializerMixin).
 """
+from decimal import Decimal
+
 from rest_framework import serializers
 
 from apps.common.api import CostFieldSerializerMixin
 from apps.sales.customers.permissions import customer_hidden_reason
-from apps.sales.models import SalesOrder
+from apps.sales.models import Refund, SalesOrder
 from apps.sales.utils import kg_str, money_str
 
 from . import services
@@ -113,6 +115,7 @@ class SalesOrderDetailSerializer(serializers.ModelSerializer):
     available_actions = serializers.SerializerMethodField()
     timeline = serializers.SerializerMethodField()
     privacy_consent = serializers.SerializerMethodField()
+    refund_summary = serializers.SerializerMethodField()
     cancel_note = serializers.SerializerMethodField()
     customer_hidden_reason = serializers.SerializerMethodField()
 
@@ -121,7 +124,7 @@ class SalesOrderDetailSerializer(serializers.ModelSerializer):
         fields = [
             "id", "code", "status", "status_label", "total_amount", "created_at",
             "reserved_until", "customer", "customer_hidden_reason", "lines", "allocations", "invoice", "payments",
-            "delivery", "refunds", "available_actions", "timeline", "privacy_consent",
+            "delivery", "refunds", "refund_summary", "available_actions", "timeline", "privacy_consent",
             "cancel_note",
         ]
         read_only_fields = fields
@@ -215,6 +218,19 @@ class SalesOrderDetailSerializer(serializers.ModelSerializer):
              "status_label": r.get_status_display(), "bank_txn_ref": r.bank_txn_ref}
             for r in sorted(invoice.refunds.all(), key=lambda r: r.pk)
         ]
+
+    def get_refund_summary(self, order):
+        """W37 S5/S7 (BR-BH-20): tổng phiếu REFUNDED và PENDING, phiếu FAILED không tính. Chỉ tiền, không dữ liệu khách.
+        Tính từ `invoice.refunds` đã prefetch nên không thêm query."""
+        totals = {Refund.Status.REFUNDED: Decimal("0"), Refund.Status.PENDING: Decimal("0")}
+        invoice = self._invoice(order)
+        for refund in (invoice.refunds.all() if invoice is not None else ()):
+            if refund.status in totals:
+                totals[refund.status] += refund.amount
+        return {
+            "refunded_amount": money_str(totals[Refund.Status.REFUNDED]),
+            "pending_amount": money_str(totals[Refund.Status.PENDING]),
+        }
 
     def get_available_actions(self, order):
         request = self.context.get("request")

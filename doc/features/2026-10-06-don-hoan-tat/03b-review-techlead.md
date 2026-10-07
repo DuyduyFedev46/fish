@@ -115,3 +115,177 @@ Mock `STALE_STATE` của `status/` trả 409, còn BE trả 400 (02b §2.3). Vô
 ### Gộp nhánh
 `03-dev-notes.md` và `03b-review-techlead.md` đều được tạo mới trên cả `feat/w37-l1-be` lẫn `feat/w37-l1-fe`, nên gộp sẽ xung
 đột cả file. Cách xử lý: giữ cả hai mục (L1 BE trước, L1 FE sau), không ghi đè mục nào.
+
+## Review L2 + L4 BE (08/10)
+
+**Phạm vi:** nhánh `feat/w37-l2-l4-be`, hai commit `b2f5042` (L4, S3) và `3678db9` (L2, S4 + S5 + `refund_summary`), diff
+`ebe7006..HEAD` gồm 8 file. Đối chiếu với `02b-tech-design.md` §1.5, §1.7, §2.5, §4 và §6 (L2, L4).
+
+**Kết luận: APPROVED.** Không có lỗi Critical, High hay Medium. Có 3 điểm Low, không chặn QA.
+
+### Lệnh Tech Lead tự chạy trong worktree
+- 5 file test của W37 (`test_backfill_completed_orders`, `test_order_detail_completed`, `test_refund_completed_order`,
+  `test_close_after_completion`, `delivery/tests/test_order_completion`): **OK**.
+- `manage.py test apps.sales apps.inventory apps.delivery apps.reports` (DJANGO_DEBUG=1): chạy 1664 test, `errors=12`, `skipped=2`.
+  Cả 12 lỗi là test trang admin, lỗi thiếu manifest staticfiles vì worktree không có `backend/staticfiles/`. Lỗi này cùng loại
+  với lỗi đã ghi ở review L1 BE và không do code. Không có FAIL nào.
+- `makemigrations --check --dry-run`: No changes detected.
+- `check_naming.py`: exit 1. Nguyên nhân là 2 file FE đã có sẵn trên main. Không có dòng nào thuộc `backend/`.
+
+### Soát theo yêu cầu
+
+| Mục | Kết quả | Chứng cứ |
+|---|---|---|
+| `refund_summary` chỉ là số tiền | Đạt | `serializers.py`, `get_refund_summary` trả đúng hai khoá `refunded_amount` và `pending_amount`, giá trị qua `money_str`. Test kiểm tập khoá và không có SĐT/tên |
+| Phiếu FAILED không tính | Đạt | Chỉ cộng `REFUNDED` và `PENDING`. Test có đủ ba loại phiếu và trường hợp đơn không có hoá đơn (`"0"/"0"`) |
+| Không thêm query | Đạt | Dùng `invoice.refunds.all()` đã prefetch (`orders/api.py`). `test_no_extra_queries_for_refund_summary` so số query khi có 1 phiếu và khi có 3 phiếu, kết quả bằng nhau |
+| Không đụng phần che dữ liệu của Lô 3 | Đạt | `customer_hidden_reason`, `get_customer` và `pii_hidden` không đổi. Khoá mới chỉ được chèn vào `Meta.fields`. NV giao bị giới hạn phạm vi vẫn thấy `refund_summary`. Đây là tiền, không phải dữ liệu cá nhân, và cùng mức với danh sách `refunds` đã lộ sẵn cho người đó |
+| S3, mỗi đơn một giao dịch có khoá | Đạt | `with transaction.atomic()` → `select_for_update().get(pk=…)` → `complete_order_if_delivered(backfill=True)`. Luật xét lại trong khoá, dùng chung với S1. Lệnh chỉ khoá đơn; mọi đường đổi phiếu đều khoá đơn trước (L1), nên lệnh tuần tự với giao xong và huỷ |
+| S3, idempotent | Đạt | `backfill_candidates` chỉ lấy đơn `PROCESSING`. Chạy lần hai in "Đã chuyển 0 đơn", số AuditLog không tăng (S3-AC3) |
+| S3, AuditLog Hệ thống không có dữ liệu cá nhân | Đạt | `changes` gồm `status`, `delivery_note`, `delivery_note_id`, `backfill: "W37"`. `actor=None`, `actor_kind=system`. Phiếu gây ra là phiếu `COMPLETED` có `completed_at` mới nhất (có test). Output của lệnh (cả `--dry-run`) và câu lỗi chỉ có mã đơn và tên lớp exception, không in nội dung exception |
+| S3, `--dry-run` tính ngoài khoá | Đạt | `_dry_run` đọc không khoá, chỉ dùng `is_delivery_finished`, không ghi DB, không AuditLog (S3-AC4). Kết quả dry-run có thể lệch với lúc chạy thật nếu giữa hai lần có thao tác. Như vậy là đúng ý: dry-run chỉ để ước lượng |
+| S3, exit code | Đạt | Lỗi ở một đơn → đơn đó rollback → `CommandError` (exit 1), in số đơn đã chuyển. Chạy lại thì làm nốt (S3-AC7: đơn 1 xong, đơn 2 và 3 còn `PROCESSING`, lần sau chuyển 2). Lỗi ở AuditLog cũng rollback đơn đó |
+| S3, không có route HTTP | Đạt | Test duyệt toàn bộ `get_resolver().url_patterns`, không có đường nào chứa `backfill`. Đoán URL thì nhận 404/405 |
+| S3, `financial_snapshot` hai kỳ không đổi | Đạt | `test_s3_ac5_r1_…`: hoá đơn lùi 40 ngày, có chứng từ đảo ở kỳ hiện tại. Snapshot trước và sau bằng nhau, tính cả `period_pnl` qua service lẫn API, `batch_pnl` và 5 bảng chứng từ |
+| S5, hoàn tiền đơn Hoàn tất | Đạt | AC1–AC7 đủ. AC2 so `financial_snapshot`: kỳ cũ không đổi số, chỉ kỳ của `confirmed_at` đổi. Đơn giữ `COMPLETED` cả khi hoàn toàn phần (AC3). Có các ca chặn: BR-HT-04, BR-GH-05, phân quyền |
+| S4, chốt lô | Đạt | `inventory/batches/services.py` không bị sửa, đúng 02b §1.5. Test khoá `OPEN_ORDER_STATUSES` không đổi. AC2: đơn `PROCESSING` có phiếu `FAILED` vẫn chặn, đúng câu thông báo. AC3: chạy lệnh S3 rồi chốt được. AC4: các vai thiếu quyền nhận 403 và 401, không có AuditLog. AC5: Quản lý và NV kho không thấy `purchase_rate`, `landed_unit_cost` hay giá thử 99999 |
+| Không rò giá vốn | Đạt | `refund_summary` không chứa giá vốn. Thêm test S7-AC10 (duyệt đệ quy, không có khoá giá vốn với `manager` và `warehouse_staff`) |
+| Marker `naming: allow` | **Duyệt** cả 4 dòng | Các dòng gán bí danh hoặc lặp qua thuộc tính fixture cũ (`self.chu`, `self.quan_ly`, `self.nv_kho`, `self.nv_giao` của `test_l1_close_batch`; `self.kho` của `OrderApiBase`). Có ghi lý do. Cùng tiền lệ đã duyệt ở L1. Đổi tên fixture dùng chung nằm ngoài phạm vi |
+
+### Điểm Low (không chặn)
+- **L1** `backfill_completed_orders.py`, `_dry_run`: mỗi đơn chạy một query đọc trạng thái phiếu (N+1). Không đáng kể với dữ liệu
+  hiện có. Nếu sau này nhiều đơn thì gom một query `values_list("sales_invoice__sales_order_id", "status")`.
+- **L2** `test_close_after_completion.py`: `setUp` gọi thẳng `l1.CloseBatchS04Tests.setUp(self)` và mượn method của lớp khác.
+  Cách này chạy được nhưng phụ thuộc vào nội bộ file test L1 cũ. Khi có dịp thì rút về fixture dùng chung.
+- **L3** Lệnh in danh sách mã đơn đã chuyển. Đúng S3-AC4, nhưng khi chạy production thì **không chép output vào doc hay commit**
+  (repo công khai). Nhắc lại trong bước chạy production của `03-dev-notes.md`.
+
+## Review L3 BE (08/10)
+
+**Phạm vi:** commit `af05872` trên nhánh `feat/w37-l3-be`, diff `c0e5522..HEAD`. Gồm `timeline.py`, hai file test mới và
+dev-notes. `shop_api.py` không bị sửa. Đối chiếu với 02b §1.6, §2.5 (timeline), §2.6 (Shop) và §4 (R4).
+
+**Kết luận: APPROVED.** Không có lỗi Critical, High hay Medium. Có 3 điểm Low, không chặn QA.
+
+### Lệnh Tech Lead tự chạy trong worktree
+- `manage.py test apps.sales.orders apps.delivery` (DJANGO_DEBUG=1): chạy 636 test, `errors=1`, `skipped=2`. Lỗi duy nhất là
+  `test_f5b_gl03_ac10_admin_…`, do thiếu manifest staticfiles vì worktree không có `backend/staticfiles/`. Lỗi này có từ trước và
+  thuộc môi trường, không do code.
+- `apps.common.tests.test_ai_visibility`: OK.
+- `makemigrations --check --dry-run`: sạch.
+- `check_naming.py`: **OK (exit 0)**, không phát sinh vi phạm mới.
+
+### Soát theo yêu cầu
+
+| Mục | Kết quả | Chứng cứ |
+|---|---|---|
+| Logic gộp mốc | Đạt | `merged_note_ids` lấy từ AuditLog `complete_order` không có `backfill`, khoá theo `delivery_note_id`. Mốc `delivery_advance_status → COMPLETED` của phiếu thuộc tập này có nhãn "Đã giao — đơn hoàn tất (mã)", kind `delivered`, người làm là NV giao. Phiếu khác giữ "Giao hàng thành công (mã)". Dòng `complete_order` thường trả `None` (đã gộp). Dòng có `backfill == "W37"` thành mốc `order_completed` "Hệ thống chuyển đơn sang Hoàn tất (chuyển bù)", người làm là Hệ thống. Khớp 02b §1.6, S7-AC6 và AC7 |
+| Không dữ liệu cá nhân hay `changes` thô | Đạt | Nhãn tự dựng, chỉ ghép mã phiếu. `test_s7_ac9` kiểm JSON timeline không có SĐT, tên, địa chỉ, và cũng không có chuỗi `complete_order`, `delivery_note_id` hay `changes` |
+| Lọc dòng AI của lô dọn chữ vẫn giữ | Đạt | `_audits` vẫn bọc `exclude_ai_audit_rows(...)`, diff không đụng hàm này. `complete_order` là dòng Hệ thống, không có `proposal_ref`, nên không bị lọc. Test `test_ai_visibility` xanh |
+| Shop đủ 7 dòng | Đạt | `TABLE` khớp đúng 02b §2.6. Dòng CANCELLED đã theo T30 "Đã huỷ" như chốt T2. Assert cả `status_label` lẫn `delivery.status_label`, và nhãn ≠ mã thô. `shop_api.py` không sửa vì bảng nhãn của lô dọn chữ đã đủ, đúng điều kiện ở 02b §6 L3 |
+| Shop 404/429 | Đạt | Sai 4 số cuối trả 404, thân phản hồi không có "Hoàn tất", "COMPLETED" hay "Đã giao" (S8-AC4). Có test throttle theo IP và test throttle theo mã đơn đổi IP, đều ra 429 (S8-AC5). Tập khoá phản hồi bằng đúng tập khoá của đơn đang xử lý (S8-AC3). Khách không đăng nhập không đổi được trạng thái (AC7) |
+| Giá vốn, phân quyền | Đạt | Không đụng serializer hay route. Timeline không có số tiền mới |
+
+### Điểm Low (không chặn)
+- **L1** `timeline.py`: hai điều kiện "có phải chuyển bù" không cùng một dạng. Tập gộp xét `not changes.get("backfill")`, còn
+  nhánh hiện mốc xét `changes.get("backfill") != BACKFILL_MARKER`. Nếu sau này có giá trị `backfill` khác "W37", dòng đó sẽ
+  không được gộp mà cũng không hiện. Nên dùng chung một hàm `_is_backfill(changes)`.
+- **L2** `test_timeline_completed.py`, `test_s7_ac7`: test dựng dữ liệu cũ bằng cách **xoá dòng AuditLog** (`.delete()`) của bảng
+  append-only. Trong test thì vô hại, nhưng là mẫu xấu dễ bị chép lại. Nên dựng như `BackfillBase._legacy` (đặt thẳng trạng
+  thái phiếu và đơn), không xoá AuditLog.
+- **L3** Cùng dòng đó có marker `# naming: allow - dựng dữ liệu cũ`, nhưng dòng không có định danh tiếng Việt nào, nên marker
+  thừa và gây nhiễu cho lần soát marker sau. Bỏ marker (hoặc bỏ cả dòng nếu sửa theo L2).
+
+Ghi chú hành vi, không phải lỗi: khi AI tắt mà phiếu được AI bấm giao xong thì dòng giao bị lọc. Đơn khi đó vẫn có chip Hoàn tất,
+nhưng timeline không có mốc gộp. Lệnh AI đang tắt toàn hệ thống và chưa có lệnh AI nào giao phiếu, nên chưa phải xử lý.
+
+## Review L3 FE (08/10)
+
+**Phạm vi:** commit `eef6e1b` trên `feat/w37-l3-fe` (diff `c0e5522..eef6e1b`, 17 file ở `erp-console/`, `frontend/`, `doc/`). Nhánh
+đã merge L3 BE (HEAD `37146dc`). Đối chiếu với 02b §2.5, §2.6, §6 (L3) và các Low của review L1 FE.
+
+**Kết luận: CHANGES REQUESTED.** Có một lỗi Medium (M1, mock lọt vào bản build thật). Không có lỗi Critical hay High. Mọi mục
+nghiệp vụ còn lại đều đạt; sửa M1 xong thì Tech Lead chỉ soát lại phần M1.
+
+### Lệnh Tech Lead tự chạy
+Build trong bản sao ở thư mục scratchpad (`rsync` mã nguồn, mượn `node_modules` của checkout chính). Worktree **không** bị sửa.
+- `NEXT_PUBLIC_USE_MOCK=0 npm run build` của `eef6e1b`: build xanh. `check-no-mock` báo XANH (27 file mock, 43 chuỗi seed).
+- Tìm thẳng trong `out/`: `grep -rl "cave_erp_mock_order_link" out` → **có**, ở `out/_next/static/chunks/23-9edda6ada01b774d.js`.
+  Chunk này được nạp ở `/my-deliveries/`, `/print/label/`, `/print/pick-sheet/`.
+- So với gốc `c0e5522`: build cùng lệnh, chuỗi `cave_erp_mock` **không có** trong `out/`. Tức là L3 làm phát sinh thêm.
+- `tsc`, `vitest` và build Shop không chạy lại. Dùng số điều phối viên đã chạy trên nhánh đã merge: tsc sạch, vitest 1070,
+  `check-ai-chunks` xanh, Shop build xanh.
+
+### M1 (Medium): kho nối `orderLink.mock.ts` lọt vào bản build thật, và `check-no-mock` không bắt được
+- **Chứng cứ:** trong chunk ở trên có `let T="cave_erp_mock_order_link";function v(){…sessionStorage…}let p={outcomes:[],cancelled:[]}`.
+  Ngay sau đó là các lời gọi ở cấp module của `features/deliveries/mock.ts` (`E(10,8),E(10,8)…`, bảng tên người giao giả,
+  bảng lý do thất bại).
+- **Nguyên nhân gốc:** `features/deliveries/mock.ts` đã bị giữ lại trong bản build thật **từ trước L3**. Ở `c0e5522`, chunk
+  `8984-*.js` đã chứa `{4:"Anh Phúc",7:"Anh Lâm",14:"Anh Khoa"}`. Module này có code chạy ở cấp module (gọi `Date.now()` để
+  dựng seed) nên bundler không bỏ được. L3 thêm `import … from "@/shared/lib/orderLink.mock"` vào đúng module đó, nên kho nối
+  bị kéo theo.
+- **Vì sao gate không bắt:** `scripts/check-no-mock.mjs` chỉ quét file khớp `/^mock[^/]*\.ts$/` và `/^Mock.*\.tsx$/`. Hai file
+  `orderLink.mock.ts` và `dashboardSummary.mock.ts` không khớp mẫu, và bảng tên giả của deliveries mock cũng không nằm trong
+  danh sách chuỗi seed. Câu trong dev-notes và comment ở `deliveries/mock.ts` ("file nối chỉ có ở mock nên bản build thật
+  không giữ seed") vì vậy **sai**.
+- **Mức độ:** không có dữ liệu cá nhân thật hay giá vốn. Phần lọt là code chết và dữ liệu giả. Tuy vậy, L1 đã đặt "mock không
+  lọt vào bản build thật" làm tiêu chí đạt, và gate đang báo xanh giả.
+- **Yêu cầu sửa (trong L3 FE):**
+  1. `check-no-mock.mjs` quét thêm `*.mock.ts` (mẫu `/\.mock\.ts$/`). Có thể thêm chuỗi đặc trưng tự rút từ khoá `KEY`. Sau
+     bước này gate phải **đỏ** trên `eef6e1b`.
+  2. Bỏ phần cấp module của `features/deliveries/mock.ts` khỏi bản build thật. Cách gợi ý: dựng seed lười trong một hàm
+     (`MOCK_DELIVERY_NOTES` thành getter hoặc khởi tạo khi gọi lần đầu), không gọi hàm ở cấp module. Hoặc chuyển phần gọi
+     `publishDeliveryOutcome` và `isOrderCancelledInMock` vào nhánh `if (process.env.NEXT_PUBLIC_USE_MOCK === "1")`.
+  3. Kiểm lại: build mock=0, rồi `grep -rl "cave_erp_mock_order_link\|Anh Ph" erp-console/out` phải rỗng và `check-no-mock`
+     xanh. Đầu ra lệnh grep ghi vào dev-notes.
+  4. Sửa comment ở `deliveries/mock.ts:772-773` và câu tương ứng trong dev-notes cho đúng sự thật.
+
+  Nếu bước 2 phình ra ngoài phạm vi W37, điều phối viên có thể tách bảng tên giả (lỗi có từ trước) thành nợ riêng. Khi đó L3
+  vẫn phải làm bước 1 và bảo đảm `orderLink.mock.ts` không còn trong `out/`.
+
+### Các mục còn lại: đạt
+
+| Mục | Kết quả | Chứng cứ |
+|---|---|---|
+| `refundSummaryLine` | Đạt | Hàm thuần trong `orderDetailModel.ts`. Bỏ phần bằng 0. Cả hai bằng 0 hoặc thiếu khoá (BE cũ) thì không vẽ dòng. Số tiền format bằng `vnd`. Màn chỉ vẽ `<p data-testid="order-refund-summary">` dưới chip, chip vẫn là Hoàn tất (S7-AC5). Có test |
+| Nút "Lập phiếu hoàn tiền" | Đạt | Đơn `COMPLETED` có `create_refund` thì nút chính là "Lập phiếu hoàn tiền" (S7-AC4). Không có mục Huỷ vì BE không trả `cancel`. Quyền vẫn theo `available_actions` (S7-AC8) |
+| `complete_order` trong `auditModel` | Đạt | `complete_order: "Đơn hoàn tất"` |
+| Bộ đơn mẫu S6-AC1 | Đạt | `PLAN_COMPLETION` có 7 đơn: 1 giữ chỗ, 2 đang xử lý (đang giao, giao thất bại), 3 hoàn tất (một đơn có REFUNDED 200.000 và PENDING 100.000), 1 huỷ. Bật bằng khoá mock `cave_erp_mock_orders_dataset` |
+| Low #2 của L1 (gán cứng) | Đã xử lý | Kế hoạch khai `"DELIVERY"` cùng thẻ phiếu. Trạng thái đơn suy từ trạng thái phiếu qua `isDeliveryFinished`, không còn suy ngược từ đơn |
+| Low #3 của L1 (đơn huỷ, phiếu cũ chưa huỷ) | Đã xử lý | `isOrderCancelledInMock(order.id)` chặn BR-GH-24 như BE §1.2. Mock Đơn gọi `publishOrderCancelled` khi huỷ. Phần này dính M1 vì đi qua kho nối |
+| Kho nối mock: chức năng | Đạt | Mock Giao hàng gửi kết quả, mock Đơn đọc ở lần tải sau (S6-AC8). Tổng quan mock lấy `pending_orders` và đơn gần đây từ kho đơn khi dùng bộ mẫu hoặc đã có kết quả nối. Không có dữ liệu khách trong hộp (chỉ id đơn và mã trạng thái) |
+| Shop mock theo §2.6 | Đạt | `PAID_ORDER_LABELS`: CONFIRMING thì "Đã thanh toán – chờ vựa gọi xác nhận"; READY, DELIVERING, FAILED thì "Đang xử lý"; COMPLETED thì "Hoàn tất" và phiếu "Đã giao" (S8-AC6). Hết chuỗi lạc "Đã thanh toán, đang soạn hàng" cho READY, DELIVERING, FAILED. Có e2e `frontend/e2e/order_lookup_completed.py` |
+| Sửa kỳ vọng `ed_batch3_orders` | Duyệt | Đơn 109 (`COMPLETED`) đổi kỳ vọng nút từ "Lập phiếu hoàn" sang "Lập phiếu hoàn tiền", đúng S7-AC4. Không nới kỳ vọng nào khác |
+| Không đụng vùng cấm | Đạt | Không sửa `shared/ui/**`, `enums.ts`, `features/permissions/**`. `OrderDetailScreen.tsx` được sửa đúng như 02b §6 L3 cho phép |
+
+### Low (không chặn)
+- **L1** Cùng một thao tác có hai nhãn. Nút chính của đơn `COMPLETED` là "Lập phiếu hoàn tiền", còn mục "…" và đơn đã huỷ vẫn là
+  "Lập phiếu hoàn". Để lô áp tên chuẩn thống nhất một nhãn.
+- **L2** `features/overview/mock.ts` import `@/features/orders/mock` (mock gọi chéo, có tiền lệ). Sau khi sửa M1, kiểm cùng lúc
+  rằng chuỗi seed của orders mock vẫn không có trong `out/`.
+
+### Re-review sau f79f622 (08/10)
+
+**Kết luận: APPROVED.** M1 đã đóng. Kết luận của toàn mục "Review L3 FE" nay là APPROVED, còn 2 điểm Low đã ghi ở trên (không chặn).
+
+**Soát `git show f79f622`:**
+- `features/deliveries/mock.ts`: seed chuyển thành `buildSeed()`, dựng lười qua `mockDeliveryNotes()`. Không còn code nào chạy ở
+  cấp module. Mọi chỗ đọc `MOCK_DELIVERY_NOTES` đã đổi sang `mockDeliveryNotes()` và cùng trỏ một mảng, nên các thao tác vẫn đổi
+  tại chỗ như cũ.
+- `features/deliveries/api.ts`: bỏ import tĩnh. `mockApi()` chỉ `require("./mock")` khi `NEXT_PUBLIC_USE_MOCK === "1"`, và chỉ
+  được gọi trong nhánh `isMock`. Bản build thật bỏ được cả nhánh này. Hàm, route và contract không đổi.
+- `scripts/check-no-mock.mjs`: quét thêm `*.mock.ts`, thêm 4 loại chuỗi seed (khoá `cave_erp_mock_*`, tên người giả, SĐT giả 10
+  số, mã mẫu viết hoa có số, trừ `BR-`). Số chuỗi tăng từ 43 lên 232.
+- Test chỉ đổi cách lấy kho (`mockDeliveryNotes()`), không nới assert nào. Ca "còn phiếu khác" đã có `try/finally` (đóng Low L5 của L1).
+- Comment ở `deliveries/mock.ts` đã sửa cho đúng.
+
+**Lệnh Tech Lead tự chạy** (bản sao trong scratchpad lấy bằng `git archive f79f622`, mượn `node_modules` của checkout chính):
+- `NEXT_PUBLIC_USE_MOCK=0 npm run build`: xanh.
+- `grep -rlE "cave_erp_mock|Anh Ph|Anh Lâm|Anh L\xe2m|Anh Kh|TOM-SU-1|DH-260928|0900000" out`: **rỗng**.
+- `check-no-mock.mjs` trên bản build mới: XANH (30 file mock, 232 chuỗi, 254 file build).
+- Chạy `check-no-mock.mjs` **mới** trên bản build **cũ** của eef6e1b: **ĐỎ**, bắt đúng 2 chỗ lọt là "Anh Khoa" (tên giả của
+  deliveries mock) và `cave_erp_mock_order_link`. Gate nay có tác dụng thật.
+- Không chạy lại vitest hay e2e. Dùng số fe-dev báo (vitest 1070, e2e xanh). Điều phối viên nên chạy lại vitest trên nhánh trước
+  khi commit gộp.
+
+Ghi chú: `features/returns/mock.ts` import `deliveries/mock`. Đây là mock gọi mock nên vô hại, và bản build mới đã sạch.

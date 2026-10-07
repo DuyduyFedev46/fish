@@ -2,7 +2,7 @@
 //   GET  /api/inventory/reconciliations/?status=&warehouse=&page=   danh sách (phân trang DRF)
 //   GET  /api/inventory/reconciliations/<id>/                       chi tiết (kèm `lines`, `available_actions`, `approve_blocked_reason`)
 //   POST /api/inventory/reconciliations/                            lập phiếu {count_date, note, lines?}
-//   PATCH /api/inventory/reconciliations/<id>/                      sửa ngày / ghi chú
+//   PATCH /api/inventory/reconciliations/<id>/                      sửa ngày / ghi chú {…, expected_updated_at} (409 STALE_STATE khi lệch, Lô 17a)
 //   POST /api/inventory/reconciliations/<id>/lines/                 thay TOÀN BỘ dòng {expected_updated_at, lines} (409 STALE_STATE khi lệch)
 //   POST /api/inventory/reconciliations/<id>/submit/                gửi duyệt (Nháp → Chờ duyệt; phiếu rỗng 400 RECON_EMPTY)
 //   POST /api/inventory/reconciliations/<id>/return-to-draft/       trả về nháp (Chờ duyệt → Nháp)
@@ -55,11 +55,14 @@ export function createStocktake(input: StocktakeCreateInput): Promise<StocktakeD
   });
 }
 
-/** Sửa ngày kiểm kê / ghi chú của phiếu chờ duyệt. Dòng số đếm KHÔNG sửa ở đây (BE trả 400 RECON_USE_LINES_ENDPOINT). */
-export function updateStocktakeHeader(id: number, changes: { count_date?: string; note?: string }): Promise<StocktakeDetail> {
+/**
+ * Sửa ngày kiểm kê / ghi chú của phiếu nháp. Dòng số đếm KHÔNG sửa ở đây (BE trả 400 RECON_USE_LINES_ENDPOINT).
+ * `expectedUpdatedAt` (Lô 17a A7): `updated_at` đang giữ; lệch → 409 STALE_STATE, người sửa trước không bị đè âm thầm.
+ */
+export function updateStocktakeHeader(id: number, changes: { count_date?: string; note?: string }, expectedUpdatedAt?: string): Promise<StocktakeDetail> {
   return apiFetch<StocktakeDetail>(`${BASE}${id}/`, {
     method: "PATCH",
-    body: changes,
+    body: expectedUpdatedAt ? { ...changes, expected_updated_at: expectedUpdatedAt } : changes,
     mock: process.env.NEXT_PUBLIC_USE_MOCK === "1" ? mockStocktakeApi : undefined,
   });
 }

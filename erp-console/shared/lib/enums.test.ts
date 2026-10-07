@@ -18,8 +18,8 @@ describe("enumOf", () => {
     expect(EMPTY_ENUM.label).toBe("—");
   });
 
-  it("AUTO_CANCELLED hiện là Đã huỷ (lý do ở cột riêng)", () => {
-    expect(enumLabel(ENUMS.salesOrderStatus, "AUTO_CANCELLED")).toBe("Đã huỷ");
+  it("AUTO_CANCELLED có chip riêng Hết giờ giữ chỗ (T2, Q-2); CANCELLED vẫn là Đã huỷ", () => {
+    expect(enumLabel(ENUMS.salesOrderStatus, "AUTO_CANCELLED")).toBe("Hết giờ giữ chỗ");
     expect(enumLabel(ENUMS.salesOrderStatus, "CANCELLED")).toBe("Đã huỷ");
   });
 
@@ -30,9 +30,9 @@ describe("enumOf", () => {
     expect(enumLabel(ENUMS.returnToStockStatus, "CANCELLED")).toBe("Đã huỷ");
   });
 
-  it("hai nhãn WRITE_OFF khác nhau theo ngữ cảnh", () => {
-    expect(enumLabel(ENUMS.stockMovementType, "WRITE_OFF")).toBe("Ghi lỗ, huỷ hàng");
-    expect(enumLabel(ENUMS.returnToStockDecision, "WRITE_OFF")).toBe("Huỷ bỏ, ghi lỗ");
+  it("WRITE_OFF dùng một nhãn ở sổ kho và phiếu hàng hoàn (T44, T45)", () => {
+    expect(enumLabel(ENUMS.stockMovementType, "WRITE_OFF")).toBe("Huỷ hàng, ghi lỗ");
+    expect(enumLabel(ENUMS.returnToStockDecision, "WRITE_OFF")).toBe("Huỷ hàng, ghi lỗ");
   });
 
   it("bảng boolean tra bằng true/false", () => {

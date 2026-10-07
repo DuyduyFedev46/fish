@@ -364,7 +364,7 @@ def unconfirm(task_id: int, user, *, reason: str = "") -> tuple[DeliveryNote, Co
 
         if note.status != DeliveryNote.Status.PREPARING or task.state != ConfirmationTask.State.DONE:
             raise ConflictError(
-                "Phiếu không ở trạng thái Soạn hàng để huỷ xác nhận.",
+                "Phiếu không ở trạng thái Đang soạn hàng để huỷ xác nhận.",
                 code="STALE_STATE",
                 extra={"current_status": note.status, "confirm_state": task.state},
             )
@@ -427,7 +427,7 @@ def change_recipient(
 
         if note.status not in (DeliveryNote.Status.CONFIRMING, DeliveryNote.Status.PREPARING):
             raise ConflictError(
-                "Chỉ đổi thông tin nhận khi đơn ở Chờ xác nhận hoặc Soạn hàng.",
+                "Chỉ đổi thông tin nhận khi đơn ở Chờ gọi xác nhận hoặc Đang soạn hàng.",
                 code="STALE_STATE",
                 extra={"current_status": note.status},
             )

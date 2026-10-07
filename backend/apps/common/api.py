@@ -7,7 +7,10 @@ cho bất kỳ ai gọi được endpoint. `CostFieldSerializerMixin` loại fie
 serializer khi user KHÔNG có `inventory.view_costprice` — kiểm bằng test gọi API
 bằng token nhân viên (BR-PQ-13).
 """
+import re
 from math import ceil
+
+from django.http import Http404
 
 from rest_framework import mixins, status, viewsets
 from rest_framework.exceptions import (
@@ -15,6 +18,7 @@ from rest_framework.exceptions import (
     AuthenticationFailed,
     MethodNotAllowed,
     NotAuthenticated,
+    NotFound,
     PermissionDenied,
     Throttled,
 )
@@ -119,6 +123,14 @@ class StandardPagination(PageNumberPagination):
     page_size = 20
 
 
+class SearchBodyPagination(StandardPagination):
+    """Cùng 20 dòng/trang, nhưng số trang lấy từ body JSON (`page`) thay vì query string.
+    Dùng cho các `POST .../search/` (từ khoá cá nhân không được nằm trong URL, bất biến 9)."""
+
+    def get_page_number(self, request, paginator):
+        return request.data.get("page", 1) if hasattr(request.data, "get") else 1
+
+
 class BusinessValidationError(APIException):
     status_code = status.HTTP_400_BAD_REQUEST
     default_detail = "Vi phạm quy tắc nghiệp vụ."
@@ -128,6 +140,16 @@ class BusinessValidationError(APIException):
 # S6: một thông điệp 401 cho mọi trường hợp (chưa đăng nhập, token hỏng/đã thu, tài khoản đã
 # nghỉ) — không tiết lộ lý do; bản dịch vi của DRF thiếu nên đặt tường minh.
 UNAUTHORIZED_DETAIL = "Thông tin xác thực không hợp lệ."
+
+# N-404 (Lô 17a): câu mặc định của Django khi `get_object_or_404` không thấy dòng ("No <Model> matches the given
+# query.") lộ tên model và là tiếng Anh → đổi thành câu chung. Câu tiếng Việt riêng của view giữ nguyên.
+NOT_FOUND_DETAIL = "Không tìm thấy."
+_DEFAULT_DJANGO_404 = re.compile(r"^No \w+ matches the given query\.$")
+
+
+def _is_default_404_message(exc: Http404) -> bool:
+    message = str(exc.args[0]) if exc.args else ""
+    return not message or bool(_DEFAULT_DJANGO_404.match(message))
 
 
 def exception_handler(exc, context):
@@ -158,6 +180,8 @@ def exception_handler(exc, context):
                         status=exc.status_code)
     if isinstance(exc, (NotAuthenticated, AuthenticationFailed)):
         exc.detail = UNAUTHORIZED_DETAIL
+    if isinstance(exc, Http404) and _is_default_404_message(exc):
+        exc = NotFound(NOT_FOUND_DETAIL)
     return drf_exception_handler(exc, context)
 
 

@@ -45,7 +45,7 @@ class TimelineReturnCancelTests(OrderApiBase):
         created, cancelled = rows[-2], rows[-1]
         self.assertNotIn("chờ duyệt", created["label"])
         self.assertIn("2.000 kg", created["label"])
-        self.assertEqual(cancelled["label"], "Huỷ phiếu hàng về kho 2.000 kg")
+        self.assertEqual(cancelled["label"], "Huỷ phiếu hàng hoàn 2.000 kg")
         self.assertEqual(cancelled["actor_display"], "tl_manager")
 
     def test_tla_l1_pending_return_still_says_pending(self):

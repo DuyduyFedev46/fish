@@ -1,10 +1,11 @@
-// API module Hàng hoàn về kho (ED-26) — contract BE Lô 9 (R9): backend/apps/inventory/returns/api.py.
+// API module Hàng hoàn (ED-26) — contract BE Lô 9 (R9): backend/apps/inventory/returns/api.py.
 //   GET  /api/inventory/returns/?status=&month=&page=   (20 dòng/trang; người giao chỉ thấy phiếu của phiếu giao gán cho mình)
 //   GET  /api/inventory/returns/{id}/                    (phiếu người khác của người giao → 404)
 //   POST /api/inventory/returns/                         {delivery_note, batch, qty, note?}  (batch = id lô, KHÔNG phải mã lô)
 //   POST /api/inventory/returns/{id}/approve/            {decision: RESTOCK | WRITE_OFF}      (cần inventory.approve_returntostock; đã duyệt → 409 STALE_STATE)
 //   POST /api/inventory/returns/{id}/cancel/            body rỗng: huỷ phiếu còn Chờ duyệt (Lô bổ sung A #8). Quyền: người duyệt/người sửa, hoặc người tạo
 //                                                        phiếu huỷ phiếu của mình; đã duyệt/đã huỷ → 409 STALE_STATE
+//   POST /api/inventory/returns/{id}/delete/            body rỗng: xoá mềm phiếu Nháp/Đã huỷ, chỉ Chủ (#8); 200 {status:"deleted"}, 400 RETURN_DELETE_NOT_ALLOWED, 409 STALE_STATE
 //   GET  /api/guidance/return/{id}/                      chỉ dùng `timeline`
 // Hộp F2m lấy phiếu giao và dòng hàng qua hàm công khai của module Giao hàng (fetchDeliveryNotes / fetchDeliveryNoteDetail),
 // không đọc ruột module đó. Mọi dữ liệu nhập (ghi chú) chỉ đi trong thân request, không vào URL, storage hay log.
@@ -47,6 +48,11 @@ export function approveReturn(id: number, decision: ApproveDecision): Promise<Re
 /** Huỷ phiếu hàng hoàn còn Chờ duyệt. Phiếu đã xử lý → 409 STALE_STATE ("hãy tải lại"). */
 export function cancelReturn(id: number): Promise<ReturnItem> {
   return apiFetch<ReturnItem>(`${BASE}${id}/cancel/`, { method: "POST", body: {}, mock: MOCK });
+}
+
+/** Xoá phiếu hàng hoàn (xoá mềm, #8): chỉ Chủ, chỉ phiếu Nháp hoặc Đã huỷ. Đã duyệt → 400 RETURN_DELETE_NOT_ALLOWED; vừa bị xoá/đổi → 409 STALE_STATE; xoá rồi → 404. */
+export function deleteReturn(id: number): Promise<{ status: "deleted"; id: number }> {
+  return apiFetch<{ status: "deleted"; id: number }>(`${BASE}${id}/delete/`, { method: "POST", body: {}, mock: MOCK });
 }
 
 /** Dòng thời gian của phiếu (guidance `return`, chỉ timeline). */

@@ -2514,3 +2514,338 @@ Làm trong `erp-console/`, theo board `ERP-D1`, `W3f`, `W4b/c/d/e/f/g/h`, `F3g`.
 - RR-L2: `safe_note` dùng `fullmatch`; bỏ mẫu "Hoàn tiền theo phiếu hoàn" thừa của `attach_payment`.
 - RR-L3: API và luồng `decide` không còn ghép/truyền `reason`. Tham số `reason` của `cancel_paid_order` giữ lại chỉ để test và nơi gọi cũ không vỡ (ghi trong docstring).
 - Nhắc triển khai: rollback migration `delivery/0010` và `sales/0014` sẽ mất chữ ghi chú đã lưu.
+
+
+## #15 FE — Ghi tiền về muộn (BR-TT-18, LP-AC1…16 phần FE)
+Thiết kế: `02d-tien-ve-muon.md` (§3 contract, §7 phần FE). Contract thật lấy từ dev-notes "#15 ghi tiền về muộn (BE)" ở nhánh `feat/tien-ve-muon` (commit `d51a89d`). Chỉ sửa trong `erp-console/`. **Điều kiện C1 của techlead: FE này phải đi cùng BE** (nếu BE lên mà FE chưa lên thì lập phiếu hoàn khoản có nhãn nghi trùng nhận 409 mà màn không có ô tick để gửi lại).
+
+**Đã làm (`erp-console/features/orders/`):**
+- `components/RecordLatePaymentModal.tsx` (mới, dựng trên `ActionModal` + `Field` + `useSubmit`): ô Mã giao dịch · Số tiền · Giờ nhận theo sao kê (`datetime-local`, mặc định giờ VN hiện tại, báo tại ô khi ở tương lai) · Mã đơn (tuỳ chọn). **Không có ô ghi chú.** Chặn tại ô trước khi gửi (mã GD: rỗng / >100 ký tự / ký tự ngoài `A-Z 0-9 . _ - /` sau khi bỏ khoảng trắng và in hoa). Lỗi 400 của BE hiện dưới đúng ô theo khoá (`bank_txn_id`, `amount`, `received_at`, `order_code`) và không lặp lại thành alert đỏ. `LATE_PAYMENT_ORDER_BOOKED` → lỗi dưới ô + link "Mở đơn" (`order_id`). `BR-TT-03` → link "Mở giao dịch đã có" (`existing_payment_id`). **409 `LATE_PAYMENT_POSSIBLE_DUPLICATE`** → hộp vàng nêu mã GD và giờ khoản giống + link xem, ô tick "Tôi đã kiểm, đây không phải trùng"; nút ghi khoá tới khi tick; gửi lại kèm `acknowledge_possible_duplicate: true`. Đổi số tiền / giờ / mã đơn thì bỏ hộp vàng và ô tick. Thành công → toast, chuyển sang `/orders/payments/detail/?id=`; 200 `duplicate:true` → toast cảnh báo "đã ghi trước đó" rồi cũng chuyển sang chi tiết.
+- `components/PaymentQueueScreen.tsx`: nút chính "Ghi tiền về muộn" (`actions` của `ListPage`) chỉ hiện khi `me.permissions` có `sales.confirm_payment_manual`; dấu cảnh báo cạnh chip loại khoản khi `duplicate_warning` khác rỗng (có chữ cho trình đọc màn hình, `title` = nhãn).
+- `components/PaymentDetailScreen.tsx`: khung vàng `duplicate_warning`; truyền nhãn vào hộp hoàn. Dòng thời gian khoản: `paymentTimeline` (orderDetailModel.ts) nhận khoản `MANUAL` + `ORPHAN`/`UNMATCHED` là sự kiện `payment_recorded_late`, nhãn "Ghi tay tiền về muộn {tiền} (mã GD …)".
+- `components/RefundModal.tsx`: khoản có nhãn → hộp vàng + ô tick "Tôi đã đối chiếu sao kê", nút chính khoá tới khi tick, gửi `acknowledge_duplicate_warning: true` (chỉ nhánh `payment_transaction`). **Nếu BE trả 409 `PAYMENT_DUPLICATE_WARNING`** (nhãn xuất hiện sau khi màn đã tải) thì mở lại đúng hộp này, hiện nhãn của BE (`detail`), không báo lỗi đỏ.
+- `latePayment.ts` (mới, hàm thuần) + `latePayment.test.ts` (19 test vitest, gồm mock theo contract); `api.ts` (`recordLatePayment`, ghi chú cờ ở `createRefund`); `types.ts` (`RecordLatePaymentInput/Result`, `SimilarPayment`, `duplicate_warning?`, `acknowledge_duplicate_warning?`, kind `payment_recorded_late`); `messages.ts`; `orders.module.css` (`dupFlag`, `dupBox`).
+- Mock: `mock.ts` nhánh `POST /api/sales/payments/record-late/` theo đúng luật §1/§3 và mã lỗi của BE (403 mọi vai thiếu quyền, 400 theo khoá ô, 409 + `similar_*`, 200 `duplicate`, gắn nhãn khi ack có khoản giống, bỏ qua `note`); `refunds/create` mock trả 409 `PAYMENT_DUPLICATE_WARNING` khi thiếu cờ; công cụ thử `__caveMock.flagDuplicate(id)`. `shared/lib/beErrors.mock.ts`: thêm mã lỗi mới và tham số `extra` cho `beError` (khoá phụ như `bank_txn_id`, `order_id`; `"$detail"` = chính câu `detail`). Đây là **ngoại lệ nhỏ ngoài `features/orders`** vì mock lỗi BE dùng chung nằm ở `shared/lib`.
+
+**Kiểm (chạy thật, lượt này):**
+- `tsc --noEmit` sạch; `vitest run` 91 file / 1050 test xanh (có 19 test mới).
+- Build `NEXT_PUBLIC_USE_MOCK=0`: `check-no-mock` XANH, `check-ai-chunks` XANH (50 mục).
+- Build `NEXT_PUBLIC_USE_MOCK=1`: `e2e/late_payment_record.py` **32/32 PASS** (ghi muộn thành công vào ORPHAN; lỗi theo khoá + link Mở đơn; 409 có tick; hoàn có nhãn phải tick; 409 `PAYMENT_DUPLICATE_WARNING` mở lại hộp; `ql1` và `kho1` không thấy nút; không dữ liệu form trong URL/localStorage; 360 px không cuộn ngang, nút ≥ 44 px). Hồi quy `s12_s13_queue.py` 66/66, `ed_batch3_orders.py` 143/143.
+- `python3 scripts/check_naming.py`: không vi phạm mới ở `erp-console/`; còn đỏ sẵn 2 file Shop `frontend/components/ContactButton.tsx`, `frontend/features/site/components/SiteLegalFooter.tsx` (từ `nguoi`, không thuộc việc này, đã ghi ở mục BE).
+- Sau khi đổi chữ gợi ý ô Mã đơn (rút ngắn cho 360 px) chỉ chạy lại tsc + vitest + build `MOCK=0` + hai script check; không chạy lại e2e vì không ca nào đọc chữ này.
+- Ảnh chụp: `doc/features/2026-10-01-erp-theo-design/shots/tien-ve-muon-fe/` (`queue-1280`, `queue-360`, `form-error-1280`, `detail-late-1280`, `similar-409-1280`, `similar-409-360`, `similar-ticked-360`, `refund-tick-1280`).
+
+**Chỗ lệch contract / giả định:**
+1. 02d §7 ghi `PaymentQueueItem.duplicate_warning`; BE có trả. FE đọc `payment.duplicate_warning` ở hàng chờ và chi tiết, khớp.
+2. **Giờ ở dòng thời gian khoản** là giờ nhận theo sao kê (`received_at`), không phải giờ bấm ghi: serializer `PaymentTransactionSerializer` không trả `created_at`, và FE chưa gọi guidance cho dòng thời gian này (BE đã có sự kiện `payment_recorded_late` kèm người làm ở `build_payment_timeline`, FE chỉ hiện được nếu khối hướng dẫn gọi nó). Màn chi tiết khoản hiện không có tên người ghi. Nợ nhỏ: nếu muốn, BE thêm `recorded_at`/`recorded_by` vào serializer.
+3. Hộp hoàn chỉ nhận nhãn nghi trùng cho nhánh `payment_transaction`; nhánh `sales_invoice` giữ nguyên như contract.
+4. Tick "Tôi đã đối chiếu sao kê" (hoàn) và "Tôi đã kiểm, đây không phải trùng" (ghi) dùng đúng chữ trong 02d §2 (LP-AC14) và đề bài; không lưu trạng thái tick vào đâu cả.
+
+**Việc còn nợ:** không lỗ hổng nào ở FE. QA #15 nên chạy cùng BE thật (02d §7 ca 1–4) vì e2e ở đây chỉ chạy trên mock.
+
+## #15 ghi tiền về muộn (BE)
+Thiết kế: `02d-tien-ve-muon.md` (BR-TT-18, LP-AC1…16). Mặc định Q1–Q3 như trong 02d: không ghi gắn đơn đã thanh toán; bắt tick khi hoàn khoản có nhãn; chưa có "đóng vì trùng".
+
+**File sửa (backend):** `apps/sales/payments/{services,api,internal_api,next_steps,auto_confirm,timeline,README}`, file mới `payments/late_serializers.py` (input, tách file để tránh xung đột với lô phạm vi dữ liệu), `apps/sales/orders/timeline.py`, `apps/sales/refunds/{services,api}.py`, `config/settings.py` (`LATE_PAYMENT_DUPLICATE_WINDOW_HOURS`=72), snapshot lệnh AI + `test_discipline` (31→32 @action) + `test_discovery` (red zone 6→7: `record_late` có `confirm_payment_manual`). Test mới: `payments/tests/test_late_payment_entry.py` (45 test).
+**Migration:** không có (`makemigrations --check --dry-run` = No changes detected).
+
+**Endpoint** `POST /api/sales/payments/record-late/` (quyền `sales.confirm_payment_manual`; không đăng nhập 401, thiếu quyền 403; AI chỉ đề xuất, `max_level=C`).
+Request:
+```json
+{"bank_txn_id": "FT26100300001", "amount": "350000", "received_at": "2026-10-03T10:29:00+07:00",
+ "order_code": "SO-261003-AB12", "acknowledge_possible_duplicate": false}
+```
+`order_code` bỏ/`""`/`null` = không gắn đơn (UNMATCHED). Khoá lạ (`note`, `source`, `match_status`, `sales_order`) bị bỏ qua.
+Response 201 (dòng mới) hoặc 200 (`duplicate: true`, gửi lại đúng khoản):
+```json
+{"duplicate": false, "payment": {"id": 412, "bank_txn_id": "FT26100300001", "amount": "350000",
+ "match_status": "ORPHAN", "source": "MANUAL", "environment": "", "duplicate_warning": "",
+ "order": {"id": 88, "code": "SO-261003-AB12", "status": "AUTO_CANCELLED"}, "resolution_status": "OPEN",
+ "refundable_amount": "350000", "available_actions": ["refund"]}}
+```
+(`payment` là nguyên `PaymentTransactionSerializer`, không có `raw_payload`, không giá vốn, không tên/SĐT.)
+Lỗi `{"detail","code",...extra}`; khoá extra trùng tên ô:
+| HTTP | code | extra |
+|---|---|---|
+| 400 | `BR-TT-18` (mã GD, tiền, giờ sai) | `bank_txn_id` / `amount` / `received_at` |
+| 400 | `BR-TT-03` (trùng mã GD, kể cả đồng thời) | `bank_txn_id`, `existing_payment_id` |
+| 400 | `LATE_PAYMENT_ORDER_NOT_FOUND` | `order_code` |
+| 400 | `LATE_PAYMENT_ORDER_BOOKED` | `order_code`, `order_id` |
+| 400 | `LATE_PAYMENT_ORDER_PAID` | `order_code` |
+| 409 | `LATE_PAYMENT_POSSIBLE_DUPLICATE` | `similar_payment_id`, `similar_bank_txn_id`, `similar_received_at` |
+
+**Đổi contract nhỏ `POST /api/sales/refunds/create/`** (nhánh `payment_transaction`): khoá tuỳ chọn `acknowledge_duplicate_warning: true`. Giao dịch có `duplicate_warning` mà thiếu cờ → 409 `PAYMENT_DUPLICATE_WARNING`, `detail` = chính nhãn. Áp cho cả nhãn BR-TT-15 cũ.
+
+**Rule cài (BR-TT-18):** ORPHAN/UNMATCHED `MANUAL` OPEN, không đổi đơn/kho/hoá đơn; mã GD `[A-Z0-9._/-]` ≤100 sau chuẩn hoá; `validate_amount` (làm tròn đồng); giờ nhận không muộn quá now+5 phút; nghi trùng hai chiều (ghi tay sau webhook → 409 + tick; webhook sau ghi tay → `flag_possible_duplicate` gắn `DUPLICATE_LATE_MANUAL_WARNING`, job tự khớp đẩy lên Chủ); job tự khớp bỏ qua `MANUAL`; GW-03 đọc `duplicate_warning` (sửa lỗi cũ đọc `resolution_note`).
+**Không chữ tự do / PII:** không có ô ghi chú, `raw_payload={}`; `AuditLog record_late_payment` chỉ `bank_txn_id, amount, match_status, source, order(mã), received_at, acknowledged_duplicate`, không `note`. Timeline giao dịch có sự kiện `payment_recorded_late` ("Ghi tay tiền về muộn 350.000 đ (mã GD …)"); timeline đơn lấy người làm từ audit trên giao dịch. Tách `record_unmatched_payment` từ `internal_api` (hành vi webhook giữ nguyên).
+
+**Giả định/nợ:** (1) khi ghi tay có ack mà không có khoản giống thì KHÔNG gắn nhãn (chỉ gắn khi thật sự có khoản giống). (2) Số @action ở `test_discipline` trên nhánh này là 31→32 (không phải 29→30 như 02d, vì main đã thêm lệnh khác). (3) `RecordLatePaymentInput` đặt ở `late_serializers.py` thay vì `serializers.py` để tránh xung đột với agent Lô 3. (4) Chưa có "đóng vì trùng" (Q3). (5) `check_naming.py` đang đỏ sẵn trên main do 2 file FE (`ContactButton.tsx`, `SiteLegalFooter.tsx`, từ `nguoi`) — không thuộc việc này; file BE của lô sạch.
+
+## #8 FE — nút Xoá phiếu hoàn (07/10)
+
+Nhánh `feat/xoa-phieu-hoan-fe`. Chỉ sửa `erp-console/features/returns/**` và `erp-console/e2e/delete_return.py`.
+- `types.ts`: `ReturnItem.available_actions?: string[]`. `api.ts`: `deleteReturn(id)` (POST `/delete/`). `returnsModel.ts`: `canDelete(r)` chỉ đọc `available_actions` (FE không tự đoán Chủ/trạng thái). `messages.ts`: nhóm chữ xoá.
+- `ReturnDetailScreen.tsx`: mục "Xoá phiếu hoàn" (danger) trong menu "…", mở `ConfirmModal`; phiếu Chờ duyệt có câu TL-D8-L3 "Số kg trên phiếu này sẽ không được nhập lại kho."; xong `toast.success` rồi `router.push("/returns/")`. 400/409 do `ConfirmModal` lo (alert đỏ + "Thử lại"; 409 là ConflictBanner có "Tải lại").
+- `mock.ts`: `available_actions` theo người xem + trạng thái, `POST /delete/` theo contract (Chủ mới xoá, 403 kiểm trước phạm vi; Chờ duyệt/Đã huỷ → 200 rồi 404; Đã duyệt → 400 `RETURN_DELETE_NOT_ALLOWED`); công cụ thử `window.__caveMock.returnsStaleDelete(id)` cho 409.
+- **Lệch nhỏ:** yêu cầu "hiện nguyên detail", nhưng lớp `apiFetch` (chung, ngoài phạm vi) bỏ mã quy tắc "(BR-…)" khỏi câu hiện cho người dùng theo UI-RULES, nên 400 hiện "Phiếu hàng hoàn đã duyệt (đã nhập lại kho hoặc ghi lỗ) không xoá được." (thiếu "(BR-PQ-10)"). Giữ như vậy.
+- Mock không phân biệt superuser `admin` (Me không có `is_superuser`), chỉ nhóm `owner` có `delete`; BE thật tính cả superuser qua `available_actions`.
+- Kiểm (07/10): `tsc --noEmit` sạch; vitest toàn bộ 1018 test xanh (thêm 3 test + `canDelete`); build mock=0 sạch + `check-no-mock` XANH + `check-ai-chunks` XANH; build mock=1 + `e2e/delete_return.py` 18/18 PASS (Chủ xoá Nháp, Đã huỷ có nút, Đã duyệt không nút, Quản lý không thấy, 400, 409, 360px). `check_naming.py` exit 1 cả trên main chưa sửa (vi phạm có sẵn ở `frontend/`, không có file returns).
+- Ảnh: `doc/features/2026-10-01-erp-theo-design/shots/xoa-phieu-hoan/` (1280 và 360).
+- Nợ: chưa có e2e trên BE thật; chưa duyệt UI bởi QA.
+
+
+
+## Lô 17a — BE (07/10)
+
+Nhánh `feat/lo17a-be` (tách từ db1cebd). Không migration, không đổi quyền, không đụng file của lô tên chuẩn. Chín việc A1–A9 của `02e-lo17.md` mục 2.
+
+### Contract mới cho FE
+
+| Việc | Endpoint | Thay đổi |
+|---|---|---|
+| A1 | mọi endpoint chi tiết | 404 không có câu riêng trả `{"detail": "Không tìm thấy."}` (không còn "No X matches the given query.", không tên model). Câu 404 tiếng Việt riêng của view giữ nguyên |
+| A2 | `GET /api/dashboard/summary/` | `recent_orders[]` thêm `id` và `reason`; `batches[]`, `alerts[]` thêm `id` (pk lô) |
+| A3 | `GET /api/audit-logs/` | `?date_from=YYYY-MM-DD&date_to=YYYY-MM-DD&q=` |
+| A4 | `GET /api/reports/batch/<mã>/`, `/reports/batches/`, `/reports/period/` | mọi tiền và kg là chuỗi |
+| A5 | `POST/PATCH /api/purchasing/invoices/` | 5 mã lỗi 400 mới |
+| A7 | `PATCH /api/inventory/reconciliations/<id>/` | `expected_updated_at` tuỳ chọn, lệch → 409 |
+| A9 | `GET /api/delivery/notes/?code=` | khớp đúng mã phiếu |
+
+```json
+// A2 recent_orders[] (khoá reason cùng shape cột Lý do của /orders/; reason là null với đơn thường)
+{"id": 812, "code": "SO261007-4F2A1C", "amount": 450000.0, "status": "CANCELLED", "status_label": "Đã huỷ",
+ "expires_at": null, "reason": {"code": "CUSTOMER_CHANGED_MIND", "label": "Khách đổi ý"}}
+// batches[] thêm "id": 57 ; alerts[] thêm "id": 57
+```
+`reason` chỉ là nhãn cố định từ `sales/orders/reasons.py`, không bao giờ `cancel_note`. 8 đơn gần đây được prefetch nên số truy vấn không tăng theo số đơn. (`amount` ở `recent_orders[]` và các KPI dashboard vẫn là number như cũ, ngoài phạm vi A4.)
+
+**A3.** Ngày theo giờ VN, gồm cả hai ngày. Sai định dạng hoặc `date_from > date_to` → 400 `INVALID_FILTER`. `q`: 2–40 ký tự `[0-9A-Za-z#._-]`, khớp `object_repr` hoặc `proposal_ref` (không phân biệt hoa thường). Có dãy từ 9 chữ số trở lên → 400 `INVALID_FILTER` "Chỉ tìm theo mã chứng từ."; ký tự lạ hoặc sai độ dài → 400 `INVALID_FILTER`. Câu lỗi không lặp lại `q`. Lọc trước phân trang, nên `count` đúng; dòng AI vẫn ẩn khi AI tắt. FE có thể bỏ `localNote`.
+
+**A4.** Tiền `"1000000.00"` (2 số lẻ), kg `"50.000"` (3 số lẻ, khoá `qty_*` hoặc `*_qty`), `ROUND_HALF_UP`. `int` (`year`, `month`, `invoice_count`, `refund_count`) và `provisional` giữ nguyên. Không thêm hay bớt khoá. Code: `apps/reports/decimal_strings.py`; `services.batch_pnl/period_pnl` vẫn trả Decimal. Nhóm test cũ đọc `/api/reports/*` (financial_snapshot, refunds, credit_notes…) vẫn xanh không cần sửa vì chúng so qua `Decimal(...)` hoặc service.
+
+**A5.** Mã lỗi 400 (`{"detail","code"}`, câu tiếng Việt, không mã BR):
+`AMOUNT_NOT_POSITIVE` ("Số tiền hoá đơn phải lớn hơn 0."), `INVOICE_SUPPLIER_MISMATCH` (phiếu nhập của NCC khác), `PAID_AT_REQUIRED`, `PAID_AT_IN_FUTURE`, `PAID_AT_WHEN_UNPAID`. Kiểm trên giá trị đã gộp; PATCH không gửi `is_paid`/`paid_at` thì bỏ qua luật `paid_at`, không gửi `amount` thì bỏ qua luật số tiền, không gửi `receipt`/`supplier` thì bỏ qua luật NCC. `amount` âm cũng trả `AMOUNT_NOT_POSITIVE` (serializer khai `amount` tường minh, không kế thừa `MinValueValidator`). Payload FE hiện tại (`PurchaseInvoiceForm.tsx`): `paid_at` là `null` khi chưa trả, khớp luật; không lệch.
+**Khác với 02e:** câu lỗi không kèm mã BR (theo chỉ đạo của điều phối viên). `POST` không gửi `is_paid` mặc định là đã trả (mặc định model) nên thiếu `paid_at` sẽ bị `PAID_AT_REQUIRED`.
+
+**A6.** Hai nhãn mới ở `stocktake/next_steps.py`. Quan sát (không sửa, ngoài phạm vi): dòng audit `create_stockreconciliation` vẫn rơi về "Có thay đổi" ở dòng thời gian, đứng cạnh dòng "Nhập số kiểm kê" tổng hợp.
+
+**A7.** `expected_updated_at` có thì sai định dạng → 400 `EXPECTED_UPDATED_AT_INVALID`, lệch → 409 `STALE_STATE` (kèm `updated_at`, `updated_by_name`, như `…/lines/`); không có thì giữ hành vi cũ. Phiếu được khoá `select_for_update` rồi mới so. Bắt buộc hoá ở lô sau.
+
+**A8.** `lock_order_of_note -> SalesOrder | None`; `test_order_completion.py` đưa import lên đầu file, bỏ 3 biến thừa (`order`, `order2`, `note2`). Không đổi hành vi.
+
+**A9.** `?code=` dùng `code__iexact` trên `get_queryset()` đã có phạm vi: NV giao tra mã của người khác nhận `count: 0`, JSON giống hệt mã không tồn tại.
+
+### File đã sửa (ngoài file test mới)
+`common/api.py` (chỉ `exception_handler` + hằng), `reports/dashboard_api.py`, `reports/api.py`, `reports/decimal_strings.py` (mới), `accounts/audit/api.py` + `README.md`, `purchasing/invoices/serializers.py` + `README.md`, `inventory/stocktake/{next_steps,api,services}.py`, `sales/orders/completion.py`, `delivery/api.py` (chỉ `filter_queryset`).
+
+Test mới: `common/tests/test_not_found_message.py`, `reports/tests/{test_dashboard_ids_reason,test_reports_decimal_strings}.py`, `accounts/audit/tests/test_date_and_code_filters.py`, `purchasing/invoices/tests/test_invoice_validation.py`, `inventory/stocktake/tests/test_update_stale.py`, `delivery/tests/test_list_code_filter.py`; mở rộng `stocktake/tests/test_timeline_labels.py`.
+
+Test cũ phải đổi vì contract đổi có chủ ý (không nới assert): `RECENT_KEYS` thêm `id`, `reason` (`reports/tests/test_p8_lo5_pnl_dashboard.py`, `inventory/batches/tests/test_p8_lo5_qa_edges.py`); ở `test_p8_lo5_qa_edges` còn bỏ khoá `id` trước khi dò chuỗi PII giả vì `id` tự tăng có thể chứa "0456"/"0789" tình cờ (flaky khi chạy cả bộ). Ba chỗ gửi hoá đơn đã trả không có `paid_at` giờ gửi `is_paid: false` hoặc `paid_at`: `purchasing/invoices/tests/test_invoice_list.py`, `purchasing/receipts/tests/test_cancelled_receipt_guards.py`, `common/tests/test_s4_actor_fields.py`.
+
+### Kiểm (07/10)
+`manage.py test`: 3286 test, OK (skipped=2); trước lô 3228. `makemigrations --check --dry-run`: No changes. `check_naming.py`: OK, không phát sinh mới. Không file `migrations/` nào đổi.
+
+**Nợ / lưu ý:** (1) `/api/reports/*` đổi sang chuỗi nên FE `reports` cần giữ chuẩn hoá chuỗi (đã có); `inventory/types.ts:101` khai chuỗi cho `/reports/batch/` nay đúng. (2) Route chi tiết có khoá UUID trả 500 với id sai kiểu (ví dụ `…/999999999/`), có từ trước, chưa sửa; test A1 thử thêm UUID rỗng để không bỏ sót. (3) `feat/pham-vi-du-lieu` cần rebase: xung đột chỉ ở khối "Đơn gần đây" của `dashboard_api.py` (giữ queryset của PV + `prefetch_related` và thân dict mới của 17a).
+
+### Lô 17a — sửa sau review techlead (08/10)
+- **M1:** khoá kết thúc bằng `unit_cost` (vd `landed_unit_cost`) trả chuỗi 4 chữ số (`"85333.3333"`); tiền 2, kg 3. Rà các khoá của `/reports/*`: chỉ `landed_unit_cost` là 4 chữ số trong DB; các khoá còn lại là tiền (2) hoặc kg (3).
+- **M2:** `date_from`/`date_to` chỉ nhận `YYYY-MM-DD` (regex), năm 2000–2100; `9999-12-31`, `0001-01-01`, `20261007`, `2026-W41-1` đều 400 `INVALID_FILTER`, không còn 500.
+- **L1:** `PAID_AT_IN_FUTURE` cho lệch tối đa 5 phút, setting `PURCHASE_INVOICE_PAID_AT_TOLERANCE_MINUTES` (env cùng tên, mặc định 5).
+- Kiểm: 3290 test OK (skipped=2), `makemigrations --check` sạch, `check_naming` OK.
+
+## Lô 17b-FE (08/10)
+
+Nhánh `feat/lo17b-fe` (tách từ 2c00222). Ba commit: FE1 (§3.2 F1–F7), FE2 (§3.3 G1–G10 + NEW-1 phía FE), FE3 (§3.4 H1–H2). Không đụng `features/permissions/**`, `features/ai/**`, `frontend/`, `backend/`.
+
+### FE1 — khung, dùng chung, dọn
+| Việc | Đã làm |
+|---|---|
+| F1 | Xoá `Placeholder`, `EmptyRow`, `ThemeToggle`, `SideSheet`, `Sheet` (grep xác nhận không còn chỗ dùng; sửa chú thích `themeScript.ts`, `tokens.css`). `PolicyVersionSheet` thành `PolicyVersionModal` dùng `overlay/Modal` (thuộc tính e2e đổi `data-policy-version-sheet` thành `data-policy-version-modal`). `ImageUploadSheet` thành `ImageUploadModal`. `overlay.module.css` bỏ phần `.side`. `DESIGN.md` (ở gốc repo, không phải `erp-console/DESIGN.md`) bỏ mọi chỗ còn tả "cột phải"; README ERP cập nhật. |
+| F2 | Hộp xác nhận tự dựng, đã chuyển: `suppliers/ConfirmActiveModal` sang `ConfirmModal`. **Chưa chuyển, có lý do:** `purchasing/ReceiptActionModals` (Ghi nhận / Huỷ phiếu), `inventory/{PublishBatch,CancelExpired,CloseBatch}Modal`, `deliveries/ConfirmCompleteModal`: mỗi hộp có luồng "số liệu cũ thì mời Tải lại tồn/phiếu" hoặc khoá nút theo mã lỗi (`useActionSubmit`, `isOrderCancelledError`) mà `ConfirmModal` chưa có; chuyển sẽ đổi hành vi. `staff/ActiveModal`, `content/CategoriesScreen`, `stocktake`, `ai/policy` đã dùng `ConfirmModal` sẵn. Việc còn nợ: mở rộng `ConfirmModal` (nút phụ "Tải lại" theo `errorText`) rồi chuyển nốt. |
+| F3 | `globals.css`: `.tab` có `min-width: var(--tap)` + padding ngang, `gap` tab 8px; hover `.btn` loại `[aria-disabled="true"]` (4 chỗ); `.lt-link` thành `display:flex; min-height: var(--tap)`. e2e `ed_batch11/12/13/16` bỏ loại trừ `.lt-link` (và `.tab` ở `ed_batch16`). |
+| F4 | `SkeletonBody` của `DataTable` **đã** gắn đúng class ẩn cột (`lt-hb-*`) và bỏ cột `locked` như bảng thật từ trước (khoảng trống chỉ là mô tả nợ cũ). Thêm 2 test khoá hành vi (vitest, `DataTable.test.ts`). |
+| F5 | `Section` có `headingLevel?: 2 \| 3` (mặc định 3); Tổng quan truyền 2. Test ở `detail.test.ts`. |
+| F6 | `features/auth/session.ts` thêm `endSession()` (xoá token + mốc giờ đăng nhập). `AuthProvider` dùng nó ở cả ba chỗ xoá token (đăng xuất, 401, đăng nhập lỗi giữa chừng); bỏ `forgetSignedIn()` riêng ở `AccountScreen`. Test `session.test.ts` (gồm kiểm không còn `setToken(null)` trần). |
+| F7 | Mock: mã `DH-…` thành `SO…` ở `dashboardSummary.mock`, `deliveries/mock`, `returns/mock` (bỏ `withShopOrderCodes`); hàng hoàn: phiếu "tháng này" kẹp không lùi qua đầu tháng, RT-4 cố định cách đầu tháng 36 giờ (không phụ thuộc hôm nay); mock báo cáo trả chuỗi (như 17a); mọi 404 mock là "Không tìm thấy." Sửa e2e theo mã mới. |
+
+**Ghi chú e2e (`ed_batch9_returns` 145/145):** ca "SĐT không nằm trong storage" đỏ do số `0912345678` của kịch bản trùng SĐT giả của kho mock đơn hàng (sessionStorage `cave_erp_mock_orders`); đổi số thử sang `0987000123`.
+
+### FE2 — sửa theo module, dùng contract 17a/17b-BE
+| Việc | Đã làm |
+|---|---|
+| G1 | Tổng quan: kiểu `RecentOrder.id/reason`, `DashboardBatch.id`, `ExpiryAlert.id`; dòng đơn mở `/orders/detail/?id=`, dòng lô mở `/inventory/detail/?id=`, dòng cận hạn mở thẳng chi tiết lô (thiếu `id` = BE cũ thì về danh sách lọc). Cột Lý do lấy `reason.label` (`orderLine(…, reason)`); đơn Giữ chỗ vừa quá mốc ở máy vẫn tự ghi "Hết giờ giữ chỗ". Mock summary + mock Đơn trả `id`, `reason`. |
+| G2 | Nhật ký: `date_from`, `date_to`, `q` đi lên BE (`api.ts`), bỏ lọc ở máy và `localNote`/`shownLoaded`. Ô tìm chỉ nhận mã (`auditQuery.ts`, giống luật BE: 2–40 ký tự, không dãy 9 số; chờ 350ms; sai luật thì không gửi). 400 của BE (INVALID_FILTER) hiện dưới ô tìm, bảng không hiện "lỗi tải". `matchesLocal` trong `auditModel.ts` còn export nhưng không còn nơi dùng (không đụng file đó theo phạm vi; xoá ở lô sau). Mock theo A3. |
+| G3 | Hoá đơn mua nằm ở `features/accounting` (không phải `purchasing` như 02e): 5 mã lỗi A5 hiện dưới đúng ô (`invoiceErrors.ts`: amount, receipt, paid_at); `PAID_AT_WHEN_UNPAID` và lỗi khác nhà cung cấp khi hộp mở từ một phiếu thì hiện alert đầu hộp. Mock kiểm đúng thứ tự BE, `beErrors.mock.ts` thêm 5 mã. Menu "Nhập chi phí mua" thành "Nhập chi phí phụ"; e2e `qa_ed_batch10_real`, `ed_batch10_purchasing` đổi theo. |
+| G4 | Kiểm kê: PATCH gửi `expected_updated_at` (mốc sau khi lưu dòng); 409 hiện `ConflictBanner` "Tải lại" (không còn câu "Đã lưu số đếm nhưng…"). Cảnh báo rời trang (`beforeunload`) khi còn sửa chưa lưu (`formFingerprint`: ngày, ghi chú, dòng có số/lý do; dòng chỉ nạp từ kho không tính; gửi duyệt xong thì tắt). Chỉ `beforeunload`, chưa chặn bấm link trong app (như `content/EntryEditScreen`). |
+| G5 | `parseAmount` (tiền, tối đa 12 chữ số, báo `tooBig`), `parseQtyKg` (tối đa 3 số lẻ, 9 số nguyên). Định mức combo, kg tối thiểu, phần trăm (2 số lẻ) báo lỗi thay vì làm tròn ngầm; gửi BE bằng chuỗi, không qua `Number`/`toFixed`. |
+| G6 | Hoá đơn bán: `invoiceSearch.ts` chặn chuỗi giống SĐT (không gửi, báo dưới ô); mã đơn không xuống dòng, cột Đơn rộng 152px, hoá đơn Đã huỷ gạch ngang (trên mã, đơn, số tiền). |
+| G7 | "Cho nghỉ": hộp tải phiếu Đang giao MỚI mỗi lần mở và đếm theo `count` của API (`fetchStaffDeliveringCount`, `deliveringBlock(notes, count)`); khoá nút "Đang kiểm tra…" trong lúc tải. |
+| G8 | `PickSheetScreen` và `/print/label`: `status === "error"` hiện màn lỗi + "Thử lại" (`refreshMe`) + "Đóng cửa sổ". Chưa có test tự động (cần AuthProvider giả; sẽ nhờ QA ép `/api/auth/me/` lỗi). |
+| G9 | Huỷ đơn từ Gọi xác nhận đi thẳng `/orders/detail/?id=&open=refund`. `ReprintLabelModal` bỏ dòng gợi ý xám (thay bằng `SummaryBlock`), `AssignCourierModal` dòng "đã giao cho người này" thành `FormAlert` cảnh báo. |
+| G10 | Bỏ `dupRefundNeedAck` và dòng trống ở `RefundModal`; mock danh bạ khách: GET `?q=` không rỗng → 400 `SEARCH_USE_POST` (test chuyển sang POST `search/`); mock hàng chờ gọi xác nhận trả `note_code` cả ở danh sách. |
+| L12-a | Xong cùng G3. |
+
+**NEW-1 (tìm đơn bằng POST):** `listOrders` có từ khoá thì `POST /api/sales/orders/search/` (luôn POST kể cả khi gõ mã đơn, theo techlead); không có từ khoá thì GET như cũ. `orderListQuery` không còn `q`. Thân `{q, status: mảng chuỗi, date_from, date_to, customer, batch, page>1}`. Dùng cho màn Đơn, hộp Gắn đơn, mở đơn từ phiếu hoàn tiền. Mock: POST `search/` (q không phải chuỗi / status là số → 400 INVALID_FILTER, `page` vượt → 404, `next` không chứa `q`), GET `?q=` chỉ khớp mã và trả 400 `SEARCH_USE_POST` với chuỗi có 9 số liền, khoảng trắng hoặc ký tự ngoài ASCII. Cũng khớp 17b-BE B4: mock `record-late` đòi có giờ, quá 400 ngày thì 400 (`BR-TT-18`). e2e cũ chờ dòng log `q=…` đã đổi sang chờ `POST /api/sales/orders/search/`.
+
+### FE3 — ED-07 và dọn e2e
+- **H1** `shared/lib/codeLookup.ts` (+test): mẫu mã `SO…`, `GH-…`, mã lô, `PR-n`, `KK-n`, `RT-n`, `#n` (hàng chờ hoàn tiền, mở `/orders/refunds/detail/?id=`; `#n` của hoá đơn mua không có trang chi tiết nên không dùng). Chuỗi không đúng mẫu (tên, SĐT, từ thường, dãy 9 số) thì `null`, giữ nhảy menu và **không gọi API**. `CommandSearch`: dòng "Mở chứng từ" đứng đầu, Enter tra bằng `GET orders/?q=`, `GET delivery/notes/?code=`, `GET inventory/batches/<mã>/`; không có thì "Không tìm thấy chứng từ khớp với <mã>"; lỗi hiện câu của BE. Nối qua `features/lookup` (+ `ConsoleCodeFinder`, nạp module bằng `import()` động: nạp tĩnh làm mọi trang gieo kho mock đơn vào sessionStorage). Mock phiếu giao hỗ trợ `?code=` sau lọc phạm vi.
+- **H2** Xoá `e2e/s8_views.py`; `confirmation_scripts_tag_lookup` nghe mọi loại console rồi soi PII; `ed_batch3_fixes` bỏ qua 2 ca `aiOrderProposal` khi build tắt AI (in `SKIP`); `ed_batch1_shell` biết cờ `AI_FEATURES=1` (mặc định tắt AI nên không đòi mục "Chính sách AI", "Báo cáo AI", "AI của tôi"). e2e mới `ed_batch17_command_search.py` và `orders_search_post.py` chạy cả mock lẫn BE thật.
+
+### Kiểm (08/10), cây `feat/lo17b-fe` sau 3 commit (c0b0344, 03744ca, 2388b86)
+- `tsc --noEmit` sạch; `vitest` 103 file / 1229 test xanh (trước lô 98 file / 1142); mỗi commit kiểm riêng bằng checkout tạm: FE1 1188 test, FE2 1225 test, đều xanh.
+- Build `NEXT_PUBLIC_USE_MOCK=0`: sạch; `check-no-mock` XANH; `check-ai-chunks` XANH; `grep -rlE "cave_erp_mock|Anh Ph" out` rỗng.
+- `python3 scripts/check_naming.py`: OK, không phát sinh mới. Hex lẻ trong component: chỉ còn `features/guidance/*.css` có từ trước (ngoài lô).
+- e2e trên bản mock (build tắt AI, port 3141), số ca đạt / tổng:
+
+| File | Kết quả |
+|---|---|
+| `ed_batch9_returns` | 145/145 (trước lô 133/139: 6 đỏ) |
+| `ed_batch3_orders` | 144/144 |
+| `ed_batch12_accounting` | 100/100 (thêm 5 ca 360px G6) |
+| `ed_batch8_stocktake` | 125/125 |
+| `ed_batch10_purchasing` | 115/115 |
+| `ed_batch13_catalog` | 128/128 (trước lô 127/129) |
+| `ed_batch11_suppliers` | 103/103 (trước lô 101/105) |
+| `ed_batch16_content` | 121/121 |
+| `ed_batch4_delivery` | 70/70 |
+| `ed_batch1_shell` | 56/56 (trước lô 54/56) |
+| `s41_s47_staff`, `confirmation_scripts_tag_lookup` | 74/74, 92/92 |
+| `s12_s13_queue` | 66/66 |
+| `standard_names_all_routes` | 11/11 (Shop bỏ qua: chưa đặt `SHOP_BASE`) |
+| `ed_batch17_command_search` (mới) | 21/21 |
+| `orders_search_post` (mới) | 11/11 |
+
+- e2e cần build bật AI (`NEXT_PUBLIC_USE_MOCK=1 NEXT_PUBLIC_AI_FEATURES=1`, chạy `AI_FEATURES=1`): `ed_batch15_overview_ai_account` 203/203 (thêm 4 ca G1 và 4 ca G2), `ed_batch3_fixes` 103/103, `ed_batch5_confirmation` 129/129, `p8_lo6_fe_sr19_sr20` 54/54, `ed_batch1_shell` 56/56.
+- Đỏ có từ trước lô, đã đối chiếu bằng build 2c00222: `s10_s11_orders` 2 ca L7 (nhãn BE), `qa_ed_batch3_orders` 64 ca (kịch bản cũ còn tên trước lô tên chuẩn, ví dụ "Đơn hàng", "Hàng chờ thanh toán"). Không sửa vì ngoài phạm vi; nên viết lại hoặc xoá ở lô dọn e2e sau.
+- **Chưa chạy được:** các e2e BE thật (`ed_batch12_real`, `ed_batch8_stocktake_real`, `qa_ed_batch10_real`, `s41_s47_real`) và hai kịch bản mới ở chế độ BE thật (`REAL_API`): máy điều phối dựng BE khi QA. Chỉ kiểm mock.
+
+### Chỗ lệch contract / điều cần báo
+1. 02e §3.3 G3 ghi `features/purchasing/**` nhưng hoá đơn mua nằm ở `features/accounting`; làm ở đó. Hộp "Thêm hoá đơn mua" mở từ một phiếu thì lỗi `INVOICE_SUPPLIER_MISMATCH` không có ô để gắn nên hiện ở đầu hộp.
+2. 02e §3.2 F4: `SkeletonBody` đã đúng từ trước (xem bảng FE1), chỉ thêm test khoá.
+3. 02e §3.2 F1: `DESIGN.md` nằm ở gốc repo, không có `erp-console/DESIGN.md`; chỗ tả 3 cột ở dòng 254–256 đã là 2 cột, nhưng còn 4 chỗ khác nhắc "cột phải", đã bỏ.
+4. `#n` ở ⌘K mở phiếu hoàn tiền (`/orders/refunds/detail/?id=`): hoá đơn mua cũng có mã `#id` nhưng không có trang chi tiết, nên chọn phiếu hoàn tiền (mã `#id` ở hàng chờ hoàn tiền). Nếu Duy muốn nghĩa khác thì đổi một dòng ở `shared/lib/codeLookup.ts`.
+5. Mẫu mã lô ở ⌘K khá rộng (các đoạn chữ-số nối `-` có ít nhất một chữ số) vì mã lô thật có nhiều dạng (`CA-THU-260928-VT01`, `LO-0912`, `L0914-CT01`). Chuỗi như `An-Binh` (không có chữ số) không khớp; chuỗi như `Anh-2` sẽ gọi `GET batches/ANH-2/` (chỉ trả lô hoặc 404, không lộ khách).
+6. Nợ: (a) F2 còn 6 hộp xác nhận chưa chuyển `ConfirmModal`; (b) `matchesLocal` ở `auditModel.ts` không còn dùng; (c) G4 chỉ có cảnh báo `beforeunload`, chưa chặn bấm link trong app; (d) G8 chưa có test tự động; (e) `GET orders/?q=` ở ⌘K một từ ASCII ngắn vẫn qua cửa BE (nợ đã ghi ở 17b-BE) nhưng ⌘K chỉ gửi chuỗi đúng mẫu `SO…` nên không bị ảnh hưởng.
+7. Ảnh chụp (mock, dữ liệu giả; thư mục `shots/` bị `.gitignore` nên KHÔNG nằm trong commit, chỉ có trong worktree `.claude/worktrees/lo17b-fe`): `doc/features/2026-10-01-erp-theo-design/shots/lo17b-fe/` gồm `ed17-cmd-order-1280/360`, `ed17-cmd-notfound-1280`, `ed17-cmd-giao1-notfound-1280`, `orders-search-post-1280`, `ed12-14-m-hoa-don-ban` (360px).
+
+## Lô 17b-BE + NEW-1 — BE (07/10)
+
+Nhánh `feat/lo17b-be` (tách từ main 2c00222). Không migration, không đổi quyền Group.
+
+### NEW-1 — tìm đơn theo SĐT/tên không đi qua URL (bất biến 9)
+**`POST /api/sales/orders/search/`** — cùng quyền Tầng 1 (`sales.view_salesorder`), cùng phạm vi dòng (Tầng 3: NV giao chỉ đơn của phiếu mình, SR-PII-02, PV-07), cùng shape và 20 dòng/trang như `GET /api/sales/orders/`. Header `Cache-Control: no-store`.
+
+Body (mọi khoá tuỳ chọn):
+```json
+{"q": "0900000123", "status": "BOOKED,PAID", "date_from": "2026-10-01", "date_to": "2026-10-07", "customer": 12, "batch": 5, "page": 2}
+```
+- `status` nhận chuỗi cách dấu phẩy hoặc mảng chuỗi `["BOOKED","PAID"]`. `customer`, `batch` nhận số nguyên hoặc chuỗi số. `q` tối đa 200 ký tự.
+- `q` khớp mã đơn (chứa), SĐT (chứa), tên khách (không dấu, không phân biệt hoa thường). Không có quyền xem khách (V2) thì chỉ khớp mã; đơn quá cửa sổ PII thì SĐT/tên không khớp (giữ luật cũ).
+- `page` lấy từ body (số nguyên dương). Sai kiểu hoặc ngày sai định dạng → 400 `{"detail", "code": "INVALID_FILTER"}`. Page vượt số trang → 404 (như directory). `customer` mà thiếu quyền xem khách → 403.
+- Kết quả: `{count, next, previous, results[]}`; `next`/`previous` chỉ để biết còn trang (URL không chứa từ khoá), muốn sang trang khác thì gửi lại POST với `page`. Mỗi dòng đúng shape danh sách (có `reason`, `customer_hidden_reason`).
+- GET `search/` → 405. Chưa đăng nhập 401, thiếu quyền 403 (câu lỗi không chứa SĐT/tên/mã đã gửi).
+- AI: `/api/sales/orders/search/` thêm vào `FORBIDDEN_PREFIXES` (`apps/ai/policy/rules.py`) để registry không sinh lệnh AI dò dữ liệu cá nhân; `test_discipline` đếm @action 32 → 33.
+
+**`GET /api/sales/orders/?q=`** chỉ còn khớp mã đơn (không còn khớp SĐT/tên). `q` có dãy từ 9 chữ số trở lên, hoặc có khoảng trắng, hoặc có ký tự ngoài ASCII (giống tên người) → 400:
+```json
+{"detail": "Tìm theo SĐT/tên dùng ô tìm kiếm.", "code": "SEARCH_USE_POST"}
+```
+Câu lỗi không lặp lại `q`. Quyền (403) và `customer` kiểm trước luật `q`. `q` một từ ASCII không dấu ngắn (vd `hoa`) vẫn qua cửa 400 vì không phân biệt được với đoạn mã, nhưng chỉ khớp mã đơn nên không lộ gì. Hoá đơn bán `/api/sales/invoices/?q=` KHÔNG đổi (ngoài phạm vi; FE G6 tự chặn dãy 9 số).
+
+Test mới `sales/orders/tests/test_order_search_post.py` (17 ca). Test cũ chuyển sang POST (không nới assert): `orders/tests/{test_l7_bosung,test_s10_api}.py`, `accounts/data_scopes/tests/{test_orders_invoices_scope,snapshot}.py` (baseline snapshot không đổi, nên POST cho đúng kết quả như GET cũ), `common/tests/test_customer_data_scope.py`. `SearchBodyPagination` chuyển từ `directory_api.py` sang `common/api.py` dùng chung.
+
+### Bốn việc §3.1
+- **B1 TL8F-L3** `returns/serializers.py`: `available_actions` chỉ có `delete` khi còn `inventory.add_returntostock`. Test `test_soft_delete.py::test_tl8f_l3_*`: Chủ bị gỡ quyền thì không có `delete` (chi tiết và danh sách) và POST `delete/` là 403.
+- **B2 TLA-L3** `customer-directory/`: `GET ?q=` (không rỗng) → 400 `{"detail": "Tìm khách dùng ô tìm trên màn Khách hàng.", "code": "SEARCH_USE_POST"}`, không lặp `q`; thiếu quyền vẫn 403 trước. `get_queryset` bỏ `q`; GET không `q` giữ nguyên. Ca GET `q` cũ ở `test_directory_api.py` thay bằng ca 400; `test_directory_search_post.py` đổi ca "GET q còn chạy" thành 400, ca "cùng shape" so với GET không `q`.
+- **B3 L5-code** `delivery/confirmation/serializers.py`: thêm `note_code` (mã phiếu giao, luôn có vì task luôn gắn phiếu; không phải dữ liệu cá nhân nên có cả ở dòng danh sách ngoài phạm vi, nơi tên/SĐT/địa chỉ vẫn `null`). CSKH ngoài phạm vi vẫn 404, câu lỗi không chứa mã. Test `delivery/tests/test_confirmation_note_code.py`. Lưu ý: 02e ghi "`null` nếu chưa có" nhưng phiếu luôn có mã nên không có ca `null`.
+- **B4 TL15-L2** `payments/services.py::_validate_late_input` (`POST /api/sales/payments/record-late/`): `received_at` dạng chuỗi bắt buộc có phần giờ (`YYYY-MM-DDThh:mm…` hoặc cách bằng dấu cách); chỉ có ngày → 400 `BR-TT-18` khoá `received_at` ("…gồm cả ngày và giờ"). Cũ hơn `settings.LATE_PAYMENT_MAX_AGE_DAYS` (env cùng tên, mặc định 400) → 400 `BR-TT-18` khoá `received_at`. Giờ không múi vẫn coi theo giờ máy chủ như cũ. Thêm hằng vào `config/settings.py`.
+
+### Kiểm (07/10), tuần tự không `--parallel`, DJANGO_DEBUG=1
+`manage.py test`: Ran 3355 tests, OK (skipped=2). `makemigrations --check --dry-run`: No changes detected. `check_naming.py`: OK, không phát sinh mới.
+
+**Việc FE cần làm (17b-FE2):** màn Đơn hàng gửi `POST /api/sales/orders/search/` khi có ô tìm; ô tìm theo mã (⌘K H1) dùng `GET ?q=` chỉ với chuỗi giống mã; xử lý 400 `SEARCH_USE_POST`. Mock danh bạ khách bỏ nhánh GET `q` (G10).
+**Nợ:** `q` GET một từ ASCII không dấu ngắn không bị chặn (xem trên). `invoices/?q=` vẫn nhận `q` tự do (không tìm SĐT/tên nên không lộ dữ liệu cá nhân, đã có test `test_invoice_list`).
+
+### Lô 17b-FE — sửa theo review techlead (08/10, L1 và L3)
+- **L1** `shared/lib/codeLookup.ts`: mẫu mã lô đòi có cả chữ số lẫn chữ cái (`(?=.*\d)(?=.*[A-Z])`), nên `091-234-56` và `12-34` không gọi API. Thêm hai chuỗi này vào ca "null" của `codeLookup.test.ts`.
+- **L3** `e2e/qa_ed_batch3_orders.py` viết lại theo tên chuẩn, không xoá (không trùng `ed_batch3_orders`: file này có ~320 ca về danh sách, chi tiết, bảng thao tác × vai, hộp huỷ/hoàn mà `ed_batch3_orders` chỉ phủ một phần). Sửa: tab "Phiếu hoàn tiền"; chip "Hết giờ giữ chỗ" (đơn tự huỷ), "Đang soạn hàng", "Chờ gọi xác nhận", "Đã giao", "Chuyển thiếu", "Khớp đơn", "Chờ hoàn tiền / Đã hoàn tiền / Hoàn thất bại"; thanh trạng thái đơn 5 bước "Giữ chỗ, Chờ gọi xác nhận, Soạn hàng, Đang giao, Hoàn tất" (đơn Đã thanh toán đứng ở "Chờ gọi xác nhận"); nút "Lập phiếu hoàn tiền"; câu rỗng "Chưa có phiếu hoàn tiền nào chờ chuyển"; danh sách lý do huỷ theo `enums.ts`. Đơn tự huỷ không còn nút "Xác nhận đã nhận tiền" (BE chặn, tiền về muộn ghi ở hàng chờ). Khối Trợ lý AI chỉ kiểm khi chạy với `AI_FEATURES=1` (build bật AI); build tắt AI thì kiểm không có khối. Mục "Nhờ người xử lý" trong menu "…" bị bỏ qua khi so bảng thao tác vì nó phụ thuộc đơn kẹt bao lâu (đồng hồ).
+- `e2e/s10_s11_orders.py`: nhãn L7 đổi thành "Khớp đơn" và "Ngân hàng báo".
+- Kết quả: `qa_ed_batch3_orders` 318/318 (build tắt AI) và 319/319 (build bật AI, `AI_FEATURES=1`); `s10_s11_orders` 42/42 ở cả hai build. tsc sạch, vitest 1229, build mock=0 sạch, `check-no-mock` XANH, grep `cave_erp_mock|Anh Ph` rỗng.
+
+### Lô 17b-FE — sửa theo QA (08/10, B1 và dọn e2e BE thật)
+- **B1** `shared/ui/form/FormPage.tsx` (dùng chung cho mọi form trang riêng): khi `[data-conflict-banner]` vừa xuất hiện (409), cuộn banner vào giữa khung nhìn và đặt focus vào nó; `ConflictBanner` có `tabIndex={-1}` để nhận focus. Chỉ làm một lần cho mỗi lần xuất hiện. e2e mới trong `ed_batch8_stocktake.py` (`conflict_in_view`): 360×740 và 1280×700, cuộn xuống cuối, đổi phiếu ở nơi khác, bấm Lưu nháp: banner nằm trọn trong khung nhìn và focus ở trong banner. `ed_batch8_stocktake` 129/129 (mock).
+- **e2e BE thật** (dựng runserver SQLite tạm, `migrate`, `bootstrap_masterdata`, `seed_demo`, tạo `loc/ql1/kho1/giao1/cs1/cs2`, tắt giới hạn đăng nhập bằng `THROTTLE_LOGIN_IP/USER`; build `MOCK=0 NEXT_PUBLIC_API_BASE`):
+  - `ed_batch12_real`: phép so `/reports/*` đổi sang chuỗi 2 số lẻ. 16/16.
+  - `ed_batch8_stocktake_real`: phiếu Nháp không có menu "Thao tác khác" và không có Duyệt; thay ca "duyệt bị chặn" (đã bỏ từ Lô bổ sung A #6/#20) bằng kiểm Nháp có "Sửa số đếm", "Gửi duyệt", rồi Gửi duyệt và để Chủ duyệt; mật khẩu lấy từ `PASSWORD`. 21/21.
+  - `qa_ed_batch10_real`: bỏ đường dẫn `loc-wt-c` và biến `PY` (mặc định `backend/.venv/bin/python` của repo, đổi bằng `BACKEND_PY`, `BACKEND_DIR`, mật khẩu chung `QA_PASSWORD`); mọi dòng nhập đều có giá mua (giá mua bắt buộc: dòng thứ ba 4,25 kg × 70.000, tổng tiền mua đổi 1.665.000 thành 1.962.500). 143/143.
+- tsc sạch, vitest 1229, build mock=0 sạch, `check-no-mock` XANH, grep `cave_erp_mock|Anh Ph` rỗng.
+
+### Lô 17b-BE — sửa sau QA (2 Low)
+- `confirmation/api.py`: 4 câu 403 đổi "CSKH" thành "Gọi xác nhận" (`truy cập hàng chờ Gọi xác nhận`, `xem chi tiết đơn …`, `nhận xử lý đơn …`, `tìm kiếm đơn …`); cả help của 2 management command. Còn "CSKH" ở nhãn vai (`accounts/auth/services.py:39`, `ai/settings/services.py:101`), verbose_name trong migration cũ và comment: không đổi (nhãn vai thuộc quyết định tên chuẩn riêng).
+- `GET orders/?q=`: chặn thêm dãy từ 8 chữ số, SĐT có gạch/chấm (`0912-345-678`, `091.234.5678`, `0912.345678`) → 400 `SEARCH_USE_POST`. Mã đơn một gạch (`SO261007-123456`) vẫn qua.
+
+
+## seed_qa — dữ liệu giả dùng chung cho e2e BE thật (BE, 08/10, lô dọn e2e)
+
+**Chọn lệnh riêng `seed_qa`** (không mở rộng `seed_demo --qa`): `seed_demo` được chạy trên production và có sổ `DemoRecord`; trộn QA vào sẽ đưa dữ liệu giả vào luồng production và làm `seed_demo --remove` kéo theo dữ liệu QA. Không có migration, không đổi model, không đổi API.
+
+- File: `backend/apps/accounts/management/commands/seed_qa.py` (lệnh), `backend/apps/accounts/qa_fixture/{build,reset,guard}.py`, test `qa_fixture/tests/test_seed_qa.py` (25 ca). Doc: `backend/README.md` mục "Dữ liệu giả cho e2e", `apps/accounts/README.md`.
+- Dùng: `QA_PASSWORD=... manage.py seed_qa [--manifest tệp.json] [--allow-non-local]`, `manage.py seed_qa --reset`. Bảng mã → id: in ra màn hình và ghi `/tmp/seed_qa_ids.json` (JSON, khoá `users/customers/items/batches/orders/invoices/delivery_notes/payments/refunds/returns/receipts/stocktakes/call_scripts`; đơn, phiếu giao, lô kèm `status`; phiếu giao kèm `assigned_to`).
+- Đi đúng đường nghiệp vụ khi được: `batches.reserve`, `payments.confirm_payment/confirm_payment_manual/resolve_payment`, `orders.cancel_paid_order`, `refunds.*`, `call_scripts.create_script` (nên có hoá đơn, phân bổ lô, bút toán SALE/CANCEL_RESTORE, phiếu đảo doanh thu, AuditLog thật). Trạng thái phiếu giao, việc gọi xác nhận, hàng hoàn, phiếu nhập, kiểm kê đặt thẳng bằng ORM.
+- Phủ: 11 tài khoản `qa_…` (5 vai, K+G, K+C, không nhóm, superuser; mật khẩu từ `QA_PASSWORD`); đơn `QA-SO-01…17` đủ 6 trạng thái; phiếu giao đủ 7 trạng thái (FAILED giao2; CANCELLED giao1 và giao2); hoàn tiền PENDING/REFUNDED/FAILED; hàng hoàn DRAFT/APPROVED/CANCELLED; phiếu nhập 3 trạng thái; kiểm kê DRAFT + SUBMITTED; lô 8 trạng thái (cận hạn, quá hạn 6,5 kg); tiền về MATCHED/UNDERPAID/ORPHAN/UNMATCHED/OVERPAID/MANUAL, nhãn nghi trùng trên ORPHAN/UNMATCHED/OVERPAID; việc gọi PENDING/CALLBACK/ESCALATED/REFUND_CALL/DONE; 4 kịch bản gọi; AuditLog đủ `user/system/ai`.
+- Bất biến 9: SĐT `09000000nn`, tên "Khách QA Giả nn", địa chỉ "QA-Địa chỉ giả…"; không in SĐT/địa chỉ/mật khẩu ra màn hình hay tệp JSON; AuditLog không chứa SĐT (test).
+- Cổng chặn (`guard.py`): cần `DEBUG` bật và (SQLite hoặc DB/host có `staging`). DB giống production (PostgreSQL tên `postgres`, hoặc tên/host có `prod` mà không có `staging`) luôn bị từ chối, kể cả khi có `--allow-non-local`. Cờ đó chỉ nới DEBUG tắt / Postgres dev. `--reset` cũng qua cổng.
+- Idempotent (test: chạy hai lần cùng số bản ghi và cùng bảng mã → id); `--reset` xoá theo tiền tố, giữ bản ghi còn bị dữ liệu khác tham chiếu (test: dữ liệu không QA còn nguyên, AuditLog QA bị xoá).
+- Nợ: (1) hạn giữ chỗ `QA-SO-01/02/13` tính từ lúc seed (25, 3, 20 phút), job `cancel_expired_orders` sẽ huỷ sau đó, kịch bản cần đơn BOOKED thì seed ngay trước khi chạy; (2) ngày/giờ trong dữ liệu là thời điểm seed, chỉ mã cố định; không có đồng hồ đóng băng (kịch bản `qa_lo8_real` cần riêng); (3) kịch bản e2e chưa được viết lại để đọc `/tmp/seed_qa_ids.json` (phần FE/QA); (4) chưa chạy trên staging thật, chỉ SQLite.
+
+### seed_qa — sửa theo review techlead (08/10)
+- **M1** `qa_fixture/reset.py`: khách chỉ xoá khi SĐT thuộc đúng 20 SĐT giả và tên bắt đầu "Khách QA Giả"; AuditLog chỉ xoá dòng gắn đối tượng QA (model + id, tính trước khi xoá) hoặc note `QA-audit-`, không xoá theo người làm; Refund chỉ xoá khi gắn hoá đơn hoặc khoản tiền về mã `QA-`; user `qa_…` còn bị dữ liệu ngoài QA tham chiếu thì giữ, `is_active=False`, báo `User:<tên>` trong `kept`. Test mới: khách `0900000050`, Nhật ký của `qa_owner` trên mặt hàng ngoài QA, phiếu hoàn do `qa_owner` lập trên đơn ngoài QA đều còn nguyên, `qa_owner` nằm trong `kept`.
+- **L1** `guard.py`: `SEPAY_ENV=PRODUCTION` luôn bị từ chối, không cờ nào mở (có test).
+- **L2** `QA-LO-07/08` thêm bút toán bù (SALE / WRITE_OFF, `reference` có `QA-`); hàng hoàn APPROVED đi qua `returns.apply_return` (có RETURN_RESTOCK, cộng tồn). Test "tổng sổ = tồn" cho mọi lô QA.
+- **L3** README: không commit tệp bảng mã.
+
+## Lô dọn e2e (FE/e2e, 08/10)
+
+Nhánh `chore/e2e-cleanup`. Chỉ đổi kịch bản e2e và tài liệu, không đổi code sản phẩm.
+
+- **Hạ tầng chung:** `erp-console/e2e/e2e_support.py` (`finish(results)` thoát mã khác 0 khi có ca đỏ; `page_404_body(base)` đọc trang 404 qua HTTP thay vì `out/404.html`), `e2e_seed_qa.py` (đọc bảng mã → id của `manage.py seed_qa`, mật khẩu từ `QA_PASSWORD`, không mặc định).
+- **Viết lại 18 kịch bản lỗi thời** theo hành vi hiện tại (tên chuẩn 07/10, menu 'Hàng hoàn', ⌘K theo mã chứng từ, DataTable, giá mua bắt buộc, quyền nhập hàng hoàn của Quản lý, chuỗi thập phân của Lô 17a), cách nhận diện nhãn AI theo `AI_FEATURES`/`AI_BUILD`.
+- **Chuyển sang seed_qa:** `ed_batch3_real`, `qa_ed_batch11_api`, `p8_lo5_qa_real_backend`, `standard_names_all_routes` (chế độ `REAL=1`); thêm `ed_batch5_confirmation_real`, `ed_batch6_customers_real` thay phần tích hợp UI ↔ BE của kịch bản QA một lần.
+- **Xoá 14 kịch bản QA một lần** cứng fixture/đường dẫn của phiên QA cũ, phần đáng giữ đã có ở kịch bản seed_qa hoặc test BE: `qa_ed_batch10_second_pass`, `qa_ed_batch11_real`, `qa_ed_batch3_real`, `qa_ed_batch6_api`, `qa_ed_batch6_real`, `qa_ed_batch7_real`, `qa_ed_batch8_real`, `qa_ed_batch8_real_followup`, `qa_ed_batch8_real_round2`, `qa_ed_batch9_api`, `qa_ed_batch9_real`, `qa_ed_batch9_real_closed`, `qa_lo7_real_expired`, `qa_lo8_real`.
+- **Còn ⏸ có ghi chú đầu file:** `qa_ed_batch3_real_ai` (cần BE bật AI, nợ lô AI), `qa_ed_batch5_real` (cần mở rộng seed_qa: 6 việc Chờ gọi, 5 Cần quyết định, job tự huỷ). 4 kịch bản CMS `ra_soat_cms*` vẫn cần bài mẫu CMS.
+
+### Kiểm chứng (điều phối viên tự chạy, 08/10)
+Mỗi kịch bản giới hạn 300 s. Mock: build `NEXT_PUBLIC_USE_MOCK=1`, AI tắt và AI bật (`NEXT_PUBLIC_AI_FEATURES=1`), harness vite `qa_harness_ed_batch1` cổng 3102. BE thật: SQLite tạm, `migrate` + `bootstrap_masterdata`, `seed_qa` lại DB mới trước mỗi kịch bản, ERP build `NEXT_PUBLIC_USE_MOCK=0`.
+
+| Kịch bản | Mock AI tắt | Mock AI bật | BE thật |
+|---|---|---|---|
+| `ed_batch14_permissions` | 101/101 | 101/101 | |
+| `ed_batch1_shell` | 56/56 | 56/56 | |
+| `ed_shell_fixes` (+ harness) | 21/21 | | |
+| `p8_lo5_fe_lo_qua_han` | 75/75 | 75/75 | |
+| `p8_lo7_fe_erp` | 83/83 | 83/83 | |
+| `qa_ed_batch1_roles` | 48/48 | 48/48 | |
+| `qa_ed_batch1_round2` (+ harness) | 99/99 | | |
+| `qa_ed_batch1_shell` | 97/97 | 99/99 | |
+| `qa_ed_batch4_round2` | 72/72 | 72/72 | |
+| `qa_ed_batch5_round2` | xanh (rc 0) | xanh (rc 0) | |
+| `qa_ed_batch5_ui` | xanh (rc 0) | xanh (rc 0) | |
+| `qa_ed_batch7_mock` | 336/336 (lần đầu 335/336, ca 'đường sai id kép' chụp lúc chưa render xong; chạy lại xanh) | 336/336 | |
+| `qa_ed_batch9_ui` | xanh (rc 0) | xanh (rc 0) | |
+| `s14_s16_cancel_refund` | 41/41 | 41/41 | |
+| `s7_shell` | 24/24 | 24/24 | |
+| `sr07_receive_batches_draft` | 20/20 | 20/20 | |
+| `ed_batch3_real` | | | 25/25 |
+| `qa_ed_batch11_api` | | | 153/153 |
+| `ed_batch5_confirmation_real` | | | 27/27 |
+| `ed_batch6_customers_real` | | | 32/32 |
+| `p8_lo5_qa_real_backend` | | | 12/12 |
+| `standard_names_all_routes` | | | 10/10 |
+
+Sửa lúc tự kiểm: `ed_batch1_shell.py` gọi `page_404_body` nhưng thiếu import (commit 8e17ec5), đã thêm.
+Nợ: `qa_ed_batch7_mock` ca 'đường sai id kép' có thể chập chờn (chờ theo nội dung thay vì `table.lt` nên làm ở lần sửa sau).
+
+### Sửa theo review techlead (08/10, 4 lỗi Low)
+- L1 `p8_lo5_qa_real_backend.py`: bỏ if/else, khẳng định đúng một kết quả theo seed ('Chốt lô' mờ, lý do nhắc kiểm kê). Nợ: thêm vào seed_qa một lô Quá hạn đã kiểm kê APPROVED để có lại ca chốt lô thành công.
+- L2 Nợ a11y (Low, sản phẩm): nút đóng toast `.toast-close` cao 32px (< 44px) ở `shared/ui/globals.css`; `qa_ed_batch4_round2` tạm loại nút này khỏi ca kích thước chạm.
+- L3, L4 `e2e_support.py`: sửa docstring tên cũ `e2e_exit`, bỏ tham số `label` không dùng.

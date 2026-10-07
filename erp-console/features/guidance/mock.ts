@@ -6,6 +6,15 @@ import { mockExpiredBatchGuidance } from "@/features/inventory/mock";
 import { aiEnabled as mockAiEnabled } from "@/features/ai/mock";
 import type { GuidanceData } from "./types";
 
+/** W39: một dòng do AI làm trong mọi dòng thời gian mock, để e2e bắt được ca "BE bật, giao diện AI tắt". */
+const AI_TIMELINE_ENTRY = {
+  at: new Date(Date.now() - 25 * 60 * 1000).toISOString(),
+  kind: "ai_proposal_confirmed",
+  label: "Duyệt đề xuất của trợ lý",
+  doc: "",
+  actor: { kind: "ai" as const, display: "AI của owner1" },
+};
+
 // F6-1: bước người dùng chưa được phép (viewer thiếu quyền) để màn hiện nút "Nhờ" (DW-23). Chỉ dùng cho mock/e2e.
 function ownerOnlyStep(key: string, label: string, br: string, text: string) {
   return {
@@ -104,7 +113,7 @@ export function mockGuidanceApi(req: MockRequest): MockResponse {
             },
             {
               key: "create_refund",
-              label: "Tạo phiếu hoàn",
+              label: "Lập phiếu hoàn tiền",
               actor: "user",
               allowed: true,
               who: ["Quản lý", "Chủ"],
@@ -112,7 +121,7 @@ export function mockGuidanceApi(req: MockRequest): MockResponse {
               deadline: null,
               why: {
                 br: "BR-HT-04",
-                text: "Chỉ tạo phiếu hoàn khi hoá đơn còn khoản có thể hoàn",
+                text: "Chỉ tạo phiếu hoàn tiền khi hoá đơn còn khoản có thể hoàn",
               },
               command: "sales.refund.create",
               // F6-2: giống server (resolve_step_ai) — cờ AI toàn cục tắt thì `ai: null`; bật thì mức C, KHÔNG xét đồng ý model.
@@ -122,6 +131,7 @@ export function mockGuidanceApi(req: MockRequest): MockResponse {
           ],
       warnings: [],
       timeline: [
+        AI_TIMELINE_ENTRY,
         {
           at: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
           kind: "order_placed",
@@ -149,7 +159,7 @@ export function mockGuidanceApi(req: MockRequest): MockResponse {
               {
                 at: new Date(Date.now() - 19 * 60 * 1000).toISOString(),
                 kind: "delivery_created",
-                label: `Tạo phiếu giao DN-${docId} (Soạn hàng)`,
+                label: `Tạo phiếu giao DN-${docId} (Đang soạn hàng)`,
                 doc: "delivery",
                 actor: { kind: "system" as const, display: "Hệ thống" },
               },
@@ -172,7 +182,7 @@ export function mockGuidanceApi(req: MockRequest): MockResponse {
         id: docId,
         code: `REF-${docId}`,
         status: "PENDING",
-        status_label: "Chờ hoàn",
+        status_label: "Chờ hoàn tiền",
       },
       next_steps: [
         {
@@ -200,24 +210,25 @@ export function mockGuidanceApi(req: MockRequest): MockResponse {
           deadline: null,
           why: {
             br: "BR-HT-08",
-            text: "Phiếu hoàn đã được xử lý hoặc không còn ở trạng thái chờ",
+            text: "Phiếu hoàn tiền đã được xử lý hoặc không còn ở trạng thái chờ",
           },
           command: "sales.refund.mark_failed",
           ai: null,
         },
-        ownerOnlyStep("cancel_refund", "Huỷ phiếu hoàn", "BR-HT-05", "Phiếu hoàn đã có yêu cầu chuyển tiền, chỉ Chủ được huỷ."),
+        ownerOnlyStep("cancel_refund", "Huỷ phiếu hoàn tiền", "BR-HT-05", "Phiếu hoàn tiền đã có yêu cầu chuyển tiền, chỉ Chủ được huỷ."),
       ],
       warnings: [
         {
           code: "GW-02",
-          text: "Phiếu hoàn gần hạn 30 ngày (BR-AI-33)",
+          text: "Phiếu hoàn tiền gần hạn 30 ngày (BR-AI-33)",
         },
       ],
       timeline: [
+        AI_TIMELINE_ENTRY,
         {
           at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
           kind: "refund_created",
-          label: "Tạo phiếu hoàn 50.000 ₫",
+          label: "Lập phiếu hoàn tiền 50.000 ₫",
           doc: "refund",
           actor: { kind: "user" as const, display: "Quản lý A" },
         },
@@ -250,14 +261,14 @@ export function mockGuidanceApi(req: MockRequest): MockResponse {
           deadline: null,
           why: {
             br: "BR-TT-09",
-            text: "Giao dịch thanh toán cần được xử lý theo hàng chờ lệch",
+            text: "Khoản tiền về cần được xử lý theo hàng chờ lệch",
           },
           command: "sales.paymenttransaction.resolve",
           ai: null,
         },
         {
           key: "refund",
-          label: "Tạo phiếu hoàn",
+          label: "Lập phiếu hoàn tiền",
           actor: "user",
           allowed: true,
           who: ["Chủ"],
@@ -274,6 +285,7 @@ export function mockGuidanceApi(req: MockRequest): MockResponse {
       ],
       warnings: [],
       timeline: [
+        AI_TIMELINE_ENTRY,
         {
           at: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
           kind: "payment_received",
@@ -343,6 +355,7 @@ export function mockGuidanceApi(req: MockRequest): MockResponse {
         },
       ],
       timeline: [
+        AI_TIMELINE_ENTRY,
         {
           at: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
           kind: "batch_created",
@@ -374,6 +387,7 @@ export function mockGuidanceApi(req: MockRequest): MockResponse {
       next_steps: [],
       warnings: [],
       timeline: [
+        AI_TIMELINE_ENTRY,
         { at: "2026-09-28T01:05:00Z", kind: "create", label: "Hệ thống tạo phiếu giao", doc: "", actor: { kind: "system", display: "Hệ thống" } },
         { at: "2026-09-28T01:40:00Z", kind: "confirm", label: "Xác nhận đơn với khách", doc: "", actor: { kind: "user", display: "Chị Hạnh" } },
         { at: "2026-09-28T02:10:00Z", kind: "label", label: "In tem giao", doc: "", actor: { kind: "user", display: "Anh Tín" } },

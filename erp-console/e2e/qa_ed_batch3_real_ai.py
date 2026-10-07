@@ -1,3 +1,5 @@
+# CHỜ seed_qa và lô AI (lô dọn e2e 08/10): kịch bản kiểm khối Trợ lý AI ở 3 trang chi tiết, cứng mã đơn `SO261002-B00003` của fixture QA cũ và cần
+# chạy hai lần (AI_ENABLED=0 và 1). Thuộc nợ của lô AI; chưa chuyển sang seed_qa (seed_qa không bật AI), không nằm trong lượt chạy xanh.
 # QA Lô 3 FE lần 2 trên BE THẬT (Django runserver + SQLite tạm đã nạp seed_demo và dữ liệu giả của QA), khối Trợ lý AI ở 3 trang chi tiết.
 #   AI_EXPECT=off  → BE chạy AI_ENABLED=0 (mặc định): 3 danh sách 0 request /api/ai/*, 3 trang chi tiết tối đa 1 request status, không khối.
 #   AI_EXPECT=on   → BE chạy AI_ENABLED=1: khối hiện ở 3 trang, GET /api/ai/actions/?target_model=…&target_id=… trả 200 (không 400), không cảnh báo,
@@ -11,6 +13,7 @@ import time
 import urllib.error
 import urllib.request
 
+from e2e_support import finish
 from playwright.sync_api import expect, sync_playwright
 
 FE = os.environ.get("FE", "http://127.0.0.1:3102")
@@ -206,3 +209,4 @@ print(f"\n{passed}/{len(R)} PASS", flush=True)
 for n, c, e in R:
     if not c:
         print("FAIL", n, "->", str(e)[:300])
+finish(R)

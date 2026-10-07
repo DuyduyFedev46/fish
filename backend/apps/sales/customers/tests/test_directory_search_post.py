@@ -1,7 +1,8 @@
 """
 Lô bổ sung A #11 (Duy chốt 02/10): `POST /api/sales/customer-directory/search/` body `{q, ordering?, page?}`.
 
-Cùng quyền và `no-store` với GET, cùng shape với danh sách; từ khoá không nằm trong URL. GET `?q=` vẫn chạy.
+Cùng quyền và `no-store` với GET, cùng shape với danh sách; từ khoá không nằm trong URL. GET `?q=` đã bỏ (17b-BE, TLA-L3)
+và trả 400 `SEARCH_USE_POST`.
 Toàn bộ dữ liệu là giả.
 """
 from apps.common.tests.fixtures import client_for, make_user
@@ -29,8 +30,8 @@ class DirectorySearchPostTests(DirectoryBase):
 
     def test_same_shape_and_rows_as_get(self):
         self.seed_history()
-        got = self.get("owner", q="khach thu").json()
-        posted = self.post({"q": "khach thu"}).json()
+        got = self.get("owner").json()
+        posted = self.post({}).json()
         self.assertEqual(set(posted), {"count", "next", "previous", "results"})
         self.assertEqual(posted["results"], got["results"])
         self.assertEqual(posted["count"], got["count"])
@@ -78,8 +79,11 @@ class DirectorySearchPostTests(DirectoryBase):
         self.assertIn("no-store", res.headers["Cache-Control"])
         self.assertNotIn("khach", str(res.json()["next"] or ""))
 
-    def test_get_with_q_still_works(self):
-        self.assertEqual(self.get("owner", q="khach thu").json()["count"], 1)
+    def test_tla_l3_get_with_q_is_400_search_use_post(self):
+        res = self.get("owner", q="khach thu")
+        self.assertEqual(res.status_code, 400)
+        self.assertEqual(res.json()["code"], "SEARCH_USE_POST")
+        self.assertNotIn("khach thu", res.content.decode())
 
     def test_other_methods_on_search_and_create_on_list_stay_405(self):
         self.assertEqual(self.clients["owner"].get(SEARCH_URL).status_code, 405)

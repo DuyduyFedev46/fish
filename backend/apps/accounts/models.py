@@ -20,7 +20,7 @@ class StaffProfile(models.Model):
 
     class Status(models.TextChoices):
         ACTIVE = "ACTIVE", "Đang làm"
-        INACTIVE = "INACTIVE", "Nghỉ"
+        INACTIVE = "INACTIVE", "Đã nghỉ"
 
     user = models.OneToOneField(
         settings.AUTH_USER_MODEL,
@@ -67,7 +67,7 @@ class AuditLog(models.Model):
     """
 
     class ActorKind(models.TextChoices):
-        USER = "user", "Người dùng"
+        USER = "user", "Người"
         SYSTEM = "system", "Hệ thống"
         AI = "ai", "AI (thay người dùng)"
 

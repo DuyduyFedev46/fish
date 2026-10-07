@@ -23,6 +23,7 @@ from apps.ai.declare import AiMeta
 from apps.inventory.batches.services import FEFO_ORDER, SELLABLE_STATUSES, sellable_batches
 from apps.inventory.models import Batch, StockLedgerEntry
 from apps.sales.models import SalesCreditNote, SalesInvoice, SalesOrder
+from apps.sales.orders.reasons import order_reason
 from apps.sales.orders.scope import scope_orders_for
 from apps.sales.payments.invoice_list import scope_invoices_for
 
@@ -85,13 +86,22 @@ class DashboardSummaryView(APIView):
 
         # ---- Đơn gần đây ----
         # SR-17 (bất biến 9): KHÔNG trả tên/SĐT khách — dashboard xem bởi nhiều nhóm, mở đơn ở màn Đơn hàng.
-        orders = orders_in_scope.order_by("-created_at", "-id")[:8]
+        # Lô 17a (TL15-dash): `id` để FE mở dòng; `reason` là NHÃN cố định (cùng shape cột Lý do của `/orders/`),
+        # không bao giờ chữ tự do như ghi chú huỷ. Prefetch để không phát sinh truy vấn theo từng đơn.
+        # PV-QĐ: lấy từ `orders_in_scope` (phạm vi D1/D2 của nhánh), không đọc SalesOrder.objects trần.
+        orders = (
+            orders_in_scope.select_related("invoice")
+            .prefetch_related("payments", "invoice__credit_notes", "invoice__delivery_notes")
+            .order_by("-created_at", "-id")[:8]
+        )
         recent_orders = [{
+            "id": o.pk,
             "code": o.code,
             "amount": _money(o.total_amount),
             "status": o.status,
             "status_label": o.get_status_display(),
             "expires_at": o.booked_expires_at.isoformat() if o.booked_expires_at else None,
+            "reason": order_reason(o),
         } for o in orders]
 
         # ---- Tồn theo lô: theo thứ tự xuất FEFO (BR-BH-05, cùng khoá với sellable_batches) ----
@@ -103,6 +113,7 @@ class DashboardSummaryView(APIView):
         for b in batches:
             near = b.status in SELLABLE_STATUSES and today <= b.expiry_date <= near_cutoff
             row = {
+                "id": b.pk,
                 "batch_id": b.batch_id,
                 "item": b.item.name,
                 "warehouse": b.warehouse.name,
@@ -121,6 +132,7 @@ class DashboardSummaryView(APIView):
 
         # ---- Cảnh báo cận hạn ----
         alerts = [{
+            "id": b.pk,
             "batch_id": b.batch_id,
             "item": b.item.name,
             "expiry_date": b.expiry_date.isoformat(),

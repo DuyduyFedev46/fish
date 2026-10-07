@@ -1,6 +1,6 @@
 "use client";
 
-// Trang chi tiết phiếu hoàn (ED-12): /orders/refunds/detail/?id=<pk>. Chủ: "Xác nhận đã hoàn tiền" (F2f) hoặc "Chuyển lại" khi
+// Trang chi tiết phiếu hoàn tiền (ED-12): /orders/refunds/detail/?id=<pk>. Chủ: "Xác nhận đã hoàn tiền" (F2f) hoặc "Chuyển lại" khi
 // Thất bại; "Báo chuyển thất bại" (F2g) nằm trong "…". Quản lý xem được nhưng `available_actions` rỗng → không có nút (BE 403
 // nếu gọi). Phiếu Thất bại hiện "Lý do thất bại" thành một trường riêng. SĐT hiện đủ; BE trả sẵn `order_code` nhưng không trả
 // id đơn nên link "Xem đơn" tra id theo mã đơn (đúng mã, không ghi vào URL).
@@ -35,7 +35,7 @@ import { useIdParam } from "../useIdParam";
 import { ConfirmRefundModal, MarkRefundFailedModal, RetryRefundModal } from "./RefundActionModals";
 
 type Props = {
-  /** Trang ghép khối Trợ lý AI vào đây (feature không import features/ai). `onApplied` = tải lại phiếu hoàn sau khi AI áp dụng đề xuất. */
+  /** Trang ghép khối Trợ lý AI vào đây (feature không import features/ai). `onApplied` = tải lại phiếu hoàn tiền sau khi AI áp dụng đề xuất. */
   renderAi?: (target: { id: number }, onApplied: () => void) => React.ReactNode;
 };
 

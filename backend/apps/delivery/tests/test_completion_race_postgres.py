@@ -1,7 +1,7 @@
 """
 W37 S2-AC1 / S2-AC5: đua thật Huỷ đơn ∥ Giao xong, hai luồng, hai kết nối.
 Chỉ chạy trên PostgreSQL (trên SQLite `select_for_update` không có tác dụng). Máy dev không có Postgres nên test này
-bị `skip`; điều phối viên chốt T1 (b) ngày 07/10: chứng minh bằng test tất định + test thứ tự khoá, test này viết sẵn.
+bị `skip`. 08/10 (Duy duyệt chống race condition): đã chạy xanh trên PostgreSQL 16 cục bộ (cụm tạm, không phải staging/production).
 Chạy: DATABASE_URL=postgres://… manage.py test apps.delivery.tests.test_completion_race_postgres
 (Django tạo DB `test_*` trên server, vì vậy KHÔNG trỏ vào staging hay production.)
 """
@@ -9,7 +9,7 @@ import threading
 import time
 from unittest import skipUnless
 
-from django.db import close_old_connections, connection
+from django.db import connection
 from django.test import TransactionTestCase
 
 from apps.common.exceptions import BusinessError
@@ -63,7 +63,7 @@ class CancelVersusCompleteRaceTests(TransactionTestCase):
             except Exception as exc:  # noqa: BLE001 - deadlock hay lỗi bất ngờ đều là thất bại
                 errors.append(exc)
             finally:
-                close_old_connections()
+                connection.close()  # đóng hẳn kết nối của luồng phụ, nếu không Django không xoá được DB test
 
         def deliver():
             try:
@@ -79,7 +79,7 @@ class CancelVersusCompleteRaceTests(TransactionTestCase):
             except Exception as exc:  # noqa: BLE001
                 errors.append(exc)
             finally:
-                close_old_connections()
+                connection.close()  # đóng hẳn kết nối của luồng phụ, nếu không Django không xoá được DB test
 
         threads = [threading.Thread(target=cancel), threading.Thread(target=deliver)]
         for thread in threads:

@@ -93,6 +93,7 @@ class RefundViewSet(NoStoreMixin, AiDeclarable, viewsets.ReadOnlyModelViewSet):
                 payment=payment, amount=amount, reason=reason, actor=request.user,
                 is_partial=None if is_partial is None else bool(is_partial),
                 request_id=request_id,
+                acknowledge_duplicate_warning=data.get("acknowledge_duplicate_warning") is True,
             )
         else:
             invoice = _get_or_400(SalesInvoice, data.get("sales_invoice"), "Hoá đơn")

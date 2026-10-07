@@ -91,7 +91,7 @@ class ReturnToStockViewSet(NoStoreMixin, DocumentViewSet):
         data = request.data if hasattr(request.data, "get") else {}
         decision = data.get("decision")
         if decision not in APPROVE_DECISIONS:
-            raise BusinessError("Phải chọn Tái nhập hoặc Huỷ bỏ trước khi duyệt (BR-HV-02).", code="RETURN_DECISION_REQUIRED")
+            raise BusinessError("Phải chọn Tái nhập hoặc Huỷ hàng, ghi lỗ trước khi duyệt (BR-HV-02).", code="RETURN_DECISION_REQUIRED")
         with transaction.atomic():
             rt = self._lock_or_stale(scoped.pk)
             if rt.status != ReturnToStock.Status.DRAFT:

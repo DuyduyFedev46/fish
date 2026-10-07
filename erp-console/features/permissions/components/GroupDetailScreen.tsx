@@ -10,6 +10,7 @@ import { useCallback, useMemo, useState } from "react";
 import { useAuth } from "@/features/auth/components/AuthProvider";
 import { toTimelineEntries } from "@/features/guidance/detailAdapters";
 import { PERM, homePath } from "@/shared/lib/nav";
+import { aiVisible } from "@/shared/lib/features";
 import { dateTime } from "@/shared/lib/format";
 import { groupLabel } from "@/shared/lib/groups";
 import { loadErrorText } from "@/shared/lib/http";
@@ -36,6 +37,7 @@ import {
   isAssignedOnly,
   parseGroupCode,
   sectionsOf,
+  visibleRegistry,
 } from "../permissionsModel";
 import { cellKey, useCapabilityToggle, type ToggleGroup } from "../useCapabilityToggle";
 import { useGroupCode, useGroupDetail, type Loaded } from "../useGroupData";
@@ -88,8 +90,10 @@ function GroupDetailBody({ group: g, detail }: { group: GroupDetail; detail: Loa
 
   const replace = detail.replace;
   const onSaved = useCallback((next: GroupDetail) => replace(next), [replace]);
-  const toggler = useCapabilityToggle({ registry: g.registry, onSaved });
-  const sections = useMemo(() => sectionsOf(g.registry), [g.registry]);
+  const aiOn = aiVisible(me);
+  const registry = useMemo(() => visibleRegistry(g.registry, aiOn), [g.registry, aiOn]);
+  const toggler = useCapabilityToggle({ registry, onSaved });
+  const sections = useMemo(() => sectionsOf(registry), [registry]);
   const label = g.label || groupLabel(g.code);
   const toggleGroup: ToggleGroup = { code: g.code, label, states: g.capabilities, memberCount: g.member_count };
 
