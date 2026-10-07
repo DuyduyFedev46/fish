@@ -37,6 +37,7 @@ class CancelVersusCompleteRaceTests(TransactionTestCase):
 
         ContentType.objects.all().delete()
         super()._fixture_setup()
+        ContentType.objects.clear_cache()
 
     def setUp(self):
         OrderApiBase.setUp(self)

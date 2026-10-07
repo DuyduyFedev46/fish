@@ -204,7 +204,7 @@ def cancel_receipt(*, receipt, actor):
 
         lines = list(receipt.lines.select_for_update(of=("self",)).select_related("batch"))
         batch_ids = [line.batch_id for line in lines if line.batch_id]
-        batches = list(Batch.objects.select_for_update().filter(id__in=batch_ids))
+        batches = list(Batch.objects.select_for_update().filter(id__in=batch_ids).order_by("pk"))
 
         for batch in batches:
             if batch.cost_allocations.exists():
