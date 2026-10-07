@@ -124,12 +124,17 @@ class OrderGetSearchRestrictedTests(SearchBase):
         return client_for(user or self.manager).get(LIST_URL, {"q": q})
 
     def test_new1_get_q_with_nine_digits_is_400_without_echo(self):
-        for q in ("0901234567", "SO0901234567", "090123456"):
+        for q in ("0901234567", "SO0901234567", "090123456", "09123456", "0912-345-678", "091.234.5678", "0912.345678", "0912-345678"):
             res = self.get(q)
             self.assertEqual(res.status_code, 400, q)
             self.assertEqual(res.json()["code"], "SEARCH_USE_POST")
             self.assertIn("ô tìm kiếm", res.json()["detail"])
             self.assertNotIn(q, res.content.decode())
+
+    def test_new1_get_q_seven_digits_and_order_code_with_one_hyphen_still_ok(self):
+        order = self._order()
+        for q in ("0912345", order.code, "SO261007-123456", "SO-T003"):
+            self.assertEqual(self.get(q).status_code, 200, q)
 
     def test_new1_get_q_that_looks_like_a_name_is_400_without_echo(self):
         for q in ("Chị Hoa", "nguyen van a", "Đạt", "Nguyễn"):

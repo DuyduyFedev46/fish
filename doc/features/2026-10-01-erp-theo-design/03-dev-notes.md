@@ -2779,3 +2779,7 @@ Test mới `sales/orders/tests/test_order_search_post.py` (17 ca). Test cũ chuy
   - `ed_batch8_stocktake_real`: phiếu Nháp không có menu "Thao tác khác" và không có Duyệt; thay ca "duyệt bị chặn" (đã bỏ từ Lô bổ sung A #6/#20) bằng kiểm Nháp có "Sửa số đếm", "Gửi duyệt", rồi Gửi duyệt và để Chủ duyệt; mật khẩu lấy từ `PASSWORD`. 21/21.
   - `qa_ed_batch10_real`: bỏ đường dẫn `loc-wt-c` và biến `PY` (mặc định `backend/.venv/bin/python` của repo, đổi bằng `BACKEND_PY`, `BACKEND_DIR`, mật khẩu chung `QA_PASSWORD`); mọi dòng nhập đều có giá mua (giá mua bắt buộc: dòng thứ ba 4,25 kg × 70.000, tổng tiền mua đổi 1.665.000 thành 1.962.500). 143/143.
 - tsc sạch, vitest 1229, build mock=0 sạch, `check-no-mock` XANH, grep `cave_erp_mock|Anh Ph` rỗng.
+
+### Lô 17b-BE — sửa sau QA (2 Low)
+- `confirmation/api.py`: 4 câu 403 đổi "CSKH" thành "Gọi xác nhận" (`truy cập hàng chờ Gọi xác nhận`, `xem chi tiết đơn …`, `nhận xử lý đơn …`, `tìm kiếm đơn …`); cả help của 2 management command. Còn "CSKH" ở nhãn vai (`accounts/auth/services.py:39`, `ai/settings/services.py:101`), verbose_name trong migration cũ và comment: không đổi (nhãn vai thuộc quyết định tên chuẩn riêng).
+- `GET orders/?q=`: chặn thêm dãy từ 8 chữ số, SĐT có gạch/chấm (`0912-345-678`, `091.234.5678`, `0912.345678`) → 400 `SEARCH_USE_POST`. Mã đơn một gạch (`SO261007-123456`) vẫn qua.
