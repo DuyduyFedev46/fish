@@ -4,6 +4,9 @@
 
 from playwright.sync_api import sync_playwright, expect
 
+from e2e_support import finish
+from qa_ed_batch1_common import AI_NAV_LABELS, EXPECTED_MENU
+
 import os
 BASE = os.environ.get("BASE", "http://127.0.0.1:3101")
 SHOTS = os.environ.get("SHOTS", "/tmp")
@@ -52,7 +55,10 @@ with sync_playwright() as p:
     # (Hàng chờ thanh toán, Phiếu hoàn, Chuyên mục) là tab trong màn cha, "Việc AI"/"AI của tôi" không còn dòng ở menu trái.
     # Mock chưa có quyền mới nên mục chưa làm (Khách hàng, Nhà cung cấp…) chưa hiện. Chi tiết 4 vai: e2e/ed_batch1_shell.py.
     # Lô 7: thêm "Sổ nhập xuất"; sửa sau Techlead L1: mock cấp Chủ đủ quyền như BE thật nên thấy thêm Gọi xác nhận, Chính sách AI, Báo cáo AI.
-    expected = ["Tổng quan", "Đơn & tiền", "Gọi xác nhận", "Giao hàng", "Mua hàng", "Kho & lô", "Kiểm kê", "Sổ nhập xuất", "Danh mục & giá", "Báo cáo lãi lỗ", "Nội dung", "Nhân sự", "Nhật ký hoạt động", "Chính sách AI", "Báo cáo AI"]
+    # Menu mong đợi lấy từ MỘT nguồn chung (qa_ed_batch1_common.EXPECTED_MENU, cập nhật 08/10: có Hàng hoàn, Phân quyền); mục AI chỉ có
+    # khi build bật AI nên bỏ ra trước khi so.
+    labels = [l for l in labels if l not in AI_NAV_LABELS]
+    expected = EXPECTED_MENU["loc"]
     ok("AC1 menu Chủ", labels == expected, str(labels))
     ok("AC7 1280: 2 cột (menu trái hiện, không còn cột phải)", page.locator("#rail-left").is_visible() and page.locator("#rail-right").count() == 0)
     ok("AC7 1280: không có menu đáy", not page.locator(".bottom-nav").is_visible())
@@ -89,7 +95,7 @@ with sync_playwright() as p:
     # AC2: giao1
     page.wait_for_load_state("networkidle")
     labels = [l.split("\n")[-1].strip() for l in nav_labels(page)]
-    ok("AC2 menu giao1 chỉ 'Việc giao của tôi'", labels == ["Việc giao của tôi"], str(labels))
+    ok("AC2 menu giao1 đúng việc của vai: 'Việc giao của tôi' và 'Hàng hoàn' (Mang hàng về kho, Lô 9)", labels == EXPECTED_MENU["giao1"], str(labels))
 
     # AC3: giao1 gõ /reports
     page.goto(BASE + "/reports")
@@ -154,3 +160,4 @@ ok("Không lỗi console (trừ font/401 cố ý)", not relevant, str(relevant[:
 for n, c, e in results:
     print(("PASS " if c else "FAIL ") + n + ("" if c else "  -> " + e))
 print("all errors:", errors[:6])
+finish(results)

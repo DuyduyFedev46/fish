@@ -10,11 +10,12 @@ import sys
 
 from playwright.sync_api import sync_playwright
 
-from qa_ed_batch1_common import (BASE, FULL_ORDER, SECTION_OF, SECTION_ORDER, SHOTS, fonts_ready, is_subsequence, login,
+from qa_ed_batch1_common import (BASE, EXPECTED_MENU, FULL_ORDER, SECTION_OF, SECTION_ORDER, SHOTS, fonts_ready, is_subsequence, login,
                                  nav_heads, nav_labels, ok, relevant_errors, summary)
 
 ROUTES = ["/overview/", "/orders/", "/orders/payments/", "/orders/refunds/", "/confirmation/", "/deliveries/",
           "/my-deliveries/", "/purchasing/", "/inventory/", "/stocktake/", "/ledger/", "/catalog/", "/reports/", "/content/",
+          "/customers/", "/suppliers/", "/returns/", "/accounting/sales-invoices/", "/accounting/purchase-invoices/", "/permissions/",
           "/content/categories/", "/staff/", "/audit-logs/", "/ai/policy/", "/ai/report/", "/ai/settings/",
           "/ai/actions/", "/account/"]
 USERS = ["loc", "ql1", "kho1", "giao1", "cs2"]
@@ -97,14 +98,18 @@ with sync_playwright() as p:
 
     # ---------- khẳng định theo story ----------
     m = matrix
-    ok("ED-01-AC5 giao1: menu chỉ có 'Việc giao của tôi'", menu_of["giao1"] == ["Việc giao của tôi"], str(menu_of["giao1"]))
+    # Mục AI chỉ có khi build bật AI (NEXT_PUBLIC_AI_FEATURES=1). Build tắt AI: các đường dẫn /ai/* trả "Không tìm thấy trang này".
+    ai_on = "Chính sách AI" in menu_of["loc"]
+    AI_ROUTES = {"/ai/policy/", "/ai/report/", "/ai/settings/", "/ai/actions/"}
+    denied = "noperm" if ai_on else "notfound"
+    ok("ED-01-AC5 giao1: menu đúng việc của vai ('Việc giao của tôi', 'Hàng hoàn' để Mang hàng về kho)", menu_of["giao1"] == EXPECTED_MENU["giao1"], str(menu_of["giao1"]))
     ok("ED-01-AC5 giao1: Đơn & tiền, Giao hàng, Tổng quan, báo cáo, nhân sự... đều không có quyền khi vào thẳng URL",
-       all(m["giao1"][r] == "noperm" for r in ["/overview/", "/orders/", "/orders/payments/", "/orders/refunds/", "/deliveries/",
+       all(m["giao1"][r] == (denied if r in AI_ROUTES else "noperm") for r in ["/overview/", "/orders/", "/orders/payments/", "/orders/refunds/", "/deliveries/",
                                               "/purchasing/", "/inventory/", "/stocktake/", "/ledger/", "/catalog/", "/reports/", "/content/",
                                               "/staff/", "/audit-logs/", "/ai/report/", "/confirmation/"]),
        {r: m["giao1"][r] for r in ROUTES})
     # Có sẵn từ gốc (màn AI chưa chuyển, thuộc lô 15): /ai/policy/ không bọc ViewGuard nên vai nào cũng thấy khung màn.
-    ok("[CÓ SẴN TỪ GỐC, ngoài lô 1] G9 /ai/policy/ chặn người không phải chủ", m["ql1"]["/ai/policy/"] == "noperm" and m["giao1"]["/ai/policy/"] == "noperm",
+    ok("G9 /ai/policy/ chặn người không phải chủ (build tắt AI: không có trang)", m["ql1"]["/ai/policy/"] == denied and m["giao1"]["/ai/policy/"] == denied,
        {u: m[u]["/ai/policy/"] for u in USERS})
     ok("ED-01-AC5 giao1 mở 'Việc giao của tôi' và 'Tài khoản của tôi' được", m["giao1"]["/my-deliveries/"] == "ok" and m["giao1"]["/account/"] == "ok",
        {r: m["giao1"][r] for r in ["/my-deliveries/", "/account/"]})
@@ -116,9 +121,11 @@ with sync_playwright() as p:
        (m["kho1"]["/audit-logs/"], m["ql1"]["/audit-logs/"]))
     ok("G9 ql1/kho1 không vào được hàng chờ thanh toán (chỉ chủ)", m["ql1"]["/orders/payments/"] == "noperm" and m["kho1"]["/orders/payments/"] == "noperm")
     # đồng bộ menu và bảo vệ màn: mục menu hiện thì vào được, khớp 1-1
-    label_route = {"Tổng quan": "/overview/", "Đơn & tiền": "/orders/", "Gọi xác nhận": "/confirmation/", "Giao hàng": "/deliveries/",
-                   "Việc giao của tôi": "/my-deliveries/", "Mua hàng": "/purchasing/", "Kho & lô": "/inventory/", "Kiểm kê": "/stocktake/", "Sổ nhập xuất": "/ledger/", "Chính sách AI": "/ai/policy/", "Báo cáo AI": "/ai/report/",
-                   "Danh mục & giá": "/catalog/", "Báo cáo lãi lỗ": "/reports/", "Nội dung": "/content/", "Nhân sự": "/staff/",
+    label_route = {"Tổng quan": "/overview/", "Đơn & tiền": "/orders/", "Khách hàng": "/customers/", "Gọi xác nhận": "/confirmation/", "Giao hàng": "/deliveries/",
+                   "Việc giao của tôi": "/my-deliveries/", "Mua hàng": "/purchasing/", "Nhà cung cấp": "/suppliers/", "Kho & lô": "/inventory/",
+                   "Hàng hoàn": "/returns/", "Kiểm kê": "/stocktake/", "Sổ nhập xuất": "/ledger/", "Chính sách AI": "/ai/policy/", "Báo cáo AI": "/ai/report/",
+                   "Danh mục & giá": "/catalog/", "Báo cáo lãi lỗ": "/reports/", "Hoá đơn bán": "/accounting/sales-invoices/",
+                   "Hoá đơn mua & chi phí": "/accounting/purchase-invoices/", "Nội dung": "/content/", "Nhân sự": "/staff/", "Phân quyền": "/permissions/",
                    "Nhật ký hoạt động": "/audit-logs/"}
     mismatch = []
     for user in USERS:
@@ -128,8 +135,9 @@ with sync_playwright() as p:
             if (route in shown) != allowed:
                 mismatch.append(f"{user} {route}: menu={route in shown} màn={m[user][route]}")
     ok("G9 menu và chặn URL khớp nhau cho cả 5 vai (mục menu hiện <=> vào được màn)", not mismatch, mismatch)
-    ok("Không màn nào báo lỗi hay 404 với vai bất kỳ", all(v not in ("error", "notfound") for r in m.values() for v in r.values()),
-       [(u, p_, v) for u, r in m.items() for p_, v in r.items() if v in ("error", "notfound")])
+    ok("Không màn nào báo lỗi hay 404 với vai bất kỳ (trừ /ai/* ở build tắt AI)",
+       all(v not in ("error", "notfound") for r in m.values() for p_, v in r.items() if ai_on or p_ not in AI_ROUTES),
+       [(u, p_, v) for u, r in m.items() for p_, v in r.items() if v in ("error", "notfound") and (ai_on or p_ not in AI_ROUTES)])
 
     # ---------- ca ngoài đường thuận ----------
     # 1) CSKH thuần (không kèm nhóm giao): đổi nhóm bằng patchUser
@@ -174,8 +182,8 @@ with sync_playwright() as p:
     page.reload()
     page.wait_for_selector("#rail-left .nav a", state="attached")
     labels = nav_labels(page)
-    ok("ED-01-AC6 cấp thêm quyền: mục AI hiện ra, vẫn đúng thứ tự §2.1", "Chính sách AI" in labels and "Báo cáo AI" in labels and "Nhân sự" in labels
-       and is_subsequence(labels, FULL_ORDER), str(labels))
+    ok("ED-01-AC6 cấp thêm quyền: mục Nhân sự hiện ra (và mục AI nếu build bật AI), vẫn đúng thứ tự §2.1",
+       ("Chính sách AI" in labels and "Báo cáo AI" in labels or not ai_on) and "Nhân sự" in labels and is_subsequence(labels, FULL_ORDER), str(labels))
     page.screenshot(path=f"{SHOTS}/roles-ql1-extra-perms.png")
     page.evaluate("() => window.__caveMock.resetUsers()")
     ctx.close()

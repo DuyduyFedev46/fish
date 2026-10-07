@@ -8,9 +8,10 @@ Dữ liệu chỉ là dữ liệu giả của mock. Không dùng wait_for_timeou
 import os
 import pathlib
 
+from e2e_support import page_404_body
+
 BASE = os.environ.get("BASE", "http://127.0.0.1:3101")
 SHOTS = os.environ.get("SHOTS", "/tmp/qa_ed_batch1")
-OUT_404 = pathlib.Path(__file__).resolve().parent.parent / "out" / "404.html"
 BOARDS = "file:///Users/dangthiduyen/Downloads/loc/doc/design/erp/screens/"
 pathlib.Path(SHOTS).mkdir(parents=True, exist_ok=True)
 
@@ -37,16 +38,21 @@ FULL_ORDER = [
     "Nội dung",
     "Nhân sự", "Phân quyền", "Nhật ký hoạt động", "Chính sách AI", "Báo cáo AI",
 ]
-# Menu mong đợi của từng vai trên mock (theo quyền mock cấp). Các kịch bản so với danh sách này thay vì đếm số mục cứng:
-# thêm một màn mới (vd Sổ nhập xuất ở Lô 7) hay cấp thêm quyền cho Chủ chỉ phải sửa MỘT chỗ này.
+# Menu mong đợi của từng vai trên mock (theo quyền mock cấp, KHÔNG gồm mục AI: các mục AI chỉ hiện khi build bật
+# NEXT_PUBLIC_AI_FEATURES=1, xem AI_NAV_LABELS và core_nav_labels). Các kịch bản so với danh sách này thay vì đếm số mục cứng:
+# thêm một màn mới hay cấp thêm quyền chỉ phải sửa MỘT chỗ này. Cập nhật 08/10 (lô dọn e2e): thêm "Hàng hoàn" (Lô 9: Chủ,
+# Quản lý, NV kho, giao1 đều có quyền xem hàng hoàn), "Phân quyền" của Chủ (Lô 14), cs1/cs2.
 EXPECTED_MENU = {
-    "loc": ["Tổng quan", "Đơn & tiền", "Khách hàng", "Gọi xác nhận", "Giao hàng", "Mua hàng", "Nhà cung cấp", "Kho & lô", "Kiểm kê", "Sổ nhập xuất", "Danh mục & giá",
-            "Báo cáo lãi lỗ", "Hoá đơn bán", "Hoá đơn mua & chi phí", "Nội dung", "Nhân sự", "Nhật ký hoạt động", "Chính sách AI", "Báo cáo AI"],
-    "ql1": ["Tổng quan", "Đơn & tiền", "Khách hàng", "Gọi xác nhận", "Giao hàng", "Mua hàng", "Nhà cung cấp", "Kho & lô", "Kiểm kê", "Sổ nhập xuất", "Danh mục & giá",
-            "Hoá đơn bán", "Hoá đơn mua & chi phí", "Nội dung", "Nhật ký hoạt động"],
-    "kho1": ["Tổng quan", "Đơn & tiền", "Giao hàng", "Việc giao của tôi", "Mua hàng", "Nhà cung cấp", "Kho & lô", "Kiểm kê", "Sổ nhập xuất", "Danh mục & giá", "Hoá đơn bán"],
-    "giao1": ["Việc giao của tôi"],
+    "loc": ["Tổng quan", "Đơn & tiền", "Khách hàng", "Gọi xác nhận", "Giao hàng", "Mua hàng", "Nhà cung cấp", "Kho & lô", "Hàng hoàn", "Kiểm kê", "Sổ nhập xuất",
+            "Danh mục & giá", "Báo cáo lãi lỗ", "Hoá đơn bán", "Hoá đơn mua & chi phí", "Nội dung", "Nhân sự", "Phân quyền", "Nhật ký hoạt động"],
+    "ql1": ["Tổng quan", "Đơn & tiền", "Khách hàng", "Gọi xác nhận", "Giao hàng", "Mua hàng", "Nhà cung cấp", "Kho & lô", "Hàng hoàn", "Kiểm kê", "Sổ nhập xuất",
+            "Danh mục & giá", "Hoá đơn bán", "Hoá đơn mua & chi phí", "Nội dung", "Nhật ký hoạt động"],
+    "kho1": ["Tổng quan", "Đơn & tiền", "Giao hàng", "Việc giao của tôi", "Mua hàng", "Nhà cung cấp", "Kho & lô", "Hàng hoàn", "Kiểm kê", "Sổ nhập xuất",
+             "Danh mục & giá", "Hoá đơn bán"],
+    "giao1": ["Việc giao của tôi", "Hàng hoàn"],
 }
+# Mục menu chỉ có khi build bật AI.
+AI_NAV_LABELS = {"Chính sách AI", "Báo cáo AI", "AI của tôi", "Việc AI"}
 SECTION_ORDER = ["Bán hàng", "Hàng hoá & kho", "Kế toán", "Website", "Quản trị"]
 SECTION_OF = {
     **{k: "" for k in ["Tổng quan"]},
@@ -78,6 +84,11 @@ def nav_labels(page):
     return [t.split("\n")[-1].strip() for t in page.locator("#rail-left .nav a").all_inner_texts()]
 
 
+def core_nav_labels(page):
+    """Nhãn menu trái bỏ các mục AI (có hay không tuỳ cờ build), để so với EXPECTED_MENU."""
+    return [t for t in nav_labels(page) if t not in AI_NAV_LABELS]
+
+
 def nav_heads(page):
     return [t.strip() for t in page.locator("#rail-left .nav-h").all_inner_texts()]
 
@@ -92,5 +103,5 @@ def relevant_errors(errors):
 
 
 def fulfil_404(page, path_glob):
-    body = OUT_404.read_text(encoding="utf-8")
+    body = page_404_body(BASE)
     page.route(path_glob, lambda route: route.fulfill(status=404, content_type="text/html; charset=utf-8", body=body))

@@ -636,7 +636,7 @@ def conflicts_and_stale(browser):
     page.wait_for_timeout(900)
     txt = page.inner_text("main")
     ok("màn cũ (đơn đã sang Soạn hàng): lưu cuộc gọi không làm vỡ trang, không 'undefined/NaN', không lỗi console", "undefined" not in txt and "NaN" not in txt and not errors, str(errors[:2]))
-    ok("màn cũ: sau lưu, trang tự nạp lại và hiện trạng thái Soạn hàng", "Soạn hàng" in txt and dialog(page).count() == 0)
+    ok("màn cũ: sau lưu, trang tự nạp lại và hiện trạng thái Đang soạn hàng", "Đang soạn hàng" in txt and dialog(page).count() == 0)
     # nạp lại màn chi tiết đơn đã sang Soạn hàng (back rồi forward để mock giữ trạng thái)
     page.go_back(); page.wait_for_timeout(600); settle(page)
     page.go_forward(); page.wait_for_timeout(800); settle(page)

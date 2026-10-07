@@ -13,10 +13,14 @@ import re
 
 from playwright.sync_api import expect, sync_playwright
 
+from e2e_support import finish, page_404_body
+
 BASE = os.environ.get("BASE", "http://127.0.0.1:3101")
 HARNESS = os.environ.get("HARNESS", "http://127.0.0.1:3102")
 SHOTS = os.environ.get("SHOTS", "/tmp")
-OUT_404 = pathlib.Path(__file__).resolve().parent.parent / "out" / "404.html"
+
+# Dòng đơn trong bảng /orders/ (DataTable: dòng bấm được có class lt-click). Class cũ .order-open đã bỏ từ Lô 3.
+ORDER_ROW = "#main tbody tr.lt-click"
 results = []
 
 
@@ -86,7 +90,7 @@ with sync_playwright() as p:
     page = ctx.new_page()
     login(page, "loc")
     page.goto(BASE + "/orders/")
-    page.wait_for_selector(".order-open", state="attached")
+    page.wait_for_selector(ORDER_ROW, state="attached")
     # Đếm ngược chạy từng giây (M2): đọc chữ "còn mm:ss" hai lần, phải khác nhau trong ~vài giây.
     # Mock lưu ngày tại giờ VN: đơn BOOKED còn hạn thì mới có đếm; nếu mock không có đơn còn hạn thì bỏ qua ca này có ghi chú.
     cd = page.locator("span", has_text=re.compile(r"^.*còn \d\d:\d\d$")).first
@@ -118,7 +122,7 @@ with sync_playwright() as p:
     page.evaluate("() => window.dispatchEvent(new Event('offline'))")
     expect(banner).to_be_visible()
     banner.get_by_role("button", name="Thử lại").click()
-    expect(page.locator(".order-open").first).to_be_visible()
+    expect(page.locator(ORDER_ROW).first).to_be_visible()
     ok("ED-03-AC4 bấm Thử lại: danh sách vẫn còn, trang không vỡ", True)
     ctx.set_offline(False)
     page.evaluate("() => window.dispatchEvent(new Event('online'))")
@@ -144,7 +148,7 @@ with sync_playwright() as p:
         ctx = browser.new_context(viewport={"width": 1280, "height": 800}, reduced_motion="reduce")
         page = ctx.new_page()
         login(page, user)
-        body = OUT_404.read_text(encoding="utf-8")
+        body = page_404_body(BASE)
         page.route("**/khong-co-man-nay/**", lambda route: route.fulfill(status=404, content_type="text/html; charset=utf-8", body=body))
         page.goto(BASE + "/khong-co-man-nay/")
         link = page.get_by_role("link", name=label)
@@ -160,4 +164,4 @@ with sync_playwright() as p:
 for n, c, e in results:
     print(("PASS " if c else "FAIL ") + n + ("" if c else "  -> " + e))
 print(f"{sum(1 for _, c, _ in results if c)}/{len(results)} PASS")
-raise SystemExit(0 if all(c for _, c, _ in results) else 1)
+finish(results)
