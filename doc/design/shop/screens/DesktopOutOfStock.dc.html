@@ -19,28 +19,6 @@ a{color:#1A5BC0}a:hover{color:#1A57B5}
 a,button{transition:transform 120ms cubic-bezier(.23,1,.32,1),background-color 150ms ease-out,border-color 150ms ease-out,color 150ms ease-out,box-shadow 150ms ease-out}
 a:active,button:active{transform:scale(.97)}
 a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid #1F66D1;outline-offset:2px}
-.hd{background:#1F66D1;color:#FFFFFF}
-.hd a:focus-visible,.hd button:focus-visible,.ft a:focus-visible{outline-color:#FFFFFF}
-.hd-a{height:44px;padding:0 12px;border-radius:22px;display:flex;align-items:center;gap:8px;color:#FFFFFF;text-decoration:none;font-size:14px;font-weight:500;white-space:nowrap}
-.hd-a:hover{color:#FFFFFF;background:#1A57B5}
-.badge{min-width:20px;height:20px;padding:0 6px;box-sizing:border-box;border-radius:10px;background:#FFFFFF;color:#1A5BC0;font-size:12px;font-weight:600;display:inline-flex;align-items:center;justify-content:center}
-.srch{flex:1 1 360px;display:flex;align-items:center;height:48px;border-radius:24px;background:#FFFFFF;padding:0 4px 0 18px;gap:10px;box-sizing:border-box}
-.srch input{flex:1;min-width:0;height:44px;border:0;outline:none;background:transparent;font:inherit;font-size:15px;color:#17171C}
-.srch input::placeholder{color:#686874}
-.srch:focus-within{box-shadow:0 0 0 3px rgba(255,255,255,0.5)}
-.srch button{height:40px;padding:0 22px;border:0;border-radius:20px;background:#0E3A73;color:#FFFFFF;font:inherit;font-weight:600;cursor:pointer}
-.srch button:hover{background:#0A2C59}
-.srch button:focus-visible{outline-color:#1F66D1}
-.mn{background:#FFFFFF;border-bottom:1px solid #E4E4E9}
-.mn ul{list-style:none;display:flex;flex-wrap:wrap;gap:4px}
-.mn a{height:48px;padding:0 14px;display:flex;align-items:center;color:#17171C;text-decoration:none;font-weight:500;box-shadow:inset 0 -2px 0 transparent}
-.mn a:hover{color:#1A5BC0;background:#EBF2FE}
-.mn a[aria-current="page"]{color:#1A5BC0;font-weight:600;box-shadow:inset 0 -2px 0 #1F66D1}
-.ft{background:#0E3A73;color:#D6E4FA;font-size:14px}
-.ft a{color:#D6E4FA;text-decoration:none}
-.ft a:hover{color:#FFFFFF;text-decoration:underline}
-.ft h2{margin:0 0 14px;font-size:15px;font-weight:600;color:#FFFFFF}
-.ft ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}
 .btn{height:52px;padding:0 24px;border-radius:26px;display:inline-flex;align-items:center;justify-content:center;gap:8px;font:inherit;font-size:15px;font-weight:600;text-decoration:none;cursor:pointer;box-sizing:border-box}
 .btn-p{background:#1F66D1;color:#FFFFFF;border:1px solid #1F66D1}
 .btn-p:hover{background:#1A57B5;border-color:#1A57B5;color:#FFFFFF}
@@ -50,53 +28,58 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible{ou
 .crumb{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:13px;color:#686874}
 .crumb a{color:#4E4E58;text-decoration:none}
 .crumb a:hover{color:#1A5BC0;text-decoration:underline}
+.top a.tl{color:#FFFFFF;text-decoration:none;font-size:13px;font-weight:500;display:flex;align-items:center;gap:6px;height:44px;padding:0 10px;border-radius:8px;white-space:nowrap}
+.top a.tl:hover{color:#FFFFFF;background:rgba(255,255,255,0.12)}
+.top a.tl[aria-current="page"]{background:rgba(255,255,255,0.14);font-weight:600}
+.top a:focus-visible,.top button:focus-visible,.ft a:focus-visible{outline-color:#FFFFFF}
+.menu a{height:48px;padding:0 14px;display:flex;align-items:center;color:#17171C;text-decoration:none;font-weight:500;font-size:14px;box-shadow:inset 0 -2px 0 transparent}
+.menu a:hover{color:#1A5BC0}
+.menu a[aria-current="page"]{color:#1A5BC0;font-weight:600;box-shadow:inset 0 -2px 0 #1F66D1}
+.ft h3{margin:0 0 10px;font-size:14px;font-weight:600;color:#FFFFFF}
+.ft ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.ft li a{display:flex;align-items:center;min-height:32px;color:#D6E4FA;text-decoration:none;font-size:14px}
+.ft li a:hover{color:#FFFFFF;text-decoration:underline}
 @media (prefers-reduced-motion:reduce){a:active,button:active{transform:none}}
 </style>
 </helmet>
-<div style="min-height: 1100px; display: flex; flex-direction: column; background: #F4F4F6; color: #17171C; font-family: Inter, system-ui, sans-serif; font-size: 14px; line-height: 1.5">
+<div style="min-height: 1530px; display: flex; flex-direction: column; background: #F4F4F6; color: #17171C; font-family: Inter, system-ui, sans-serif; font-size: 14px; line-height: 1.5">
 
   <header>
-    <div class="hd">
-      <div class="wrap" style="min-height: 76px; padding-top: 14px; padding-bottom: 14px; display: flex; flex-wrap: wrap; align-items: center; gap: 12px 28px">
+    <div class="top" style="background: #1F66D1">
+      <div class="wrap" style="min-height: 40px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0 16px; border-bottom: 1px solid rgba(255,255,255,0.14); font-size: 13px; color: #D6E4FA">
+        <span>Hải sản cấp đông theo lô · mua từ 1 kg · giao tận nhà</span>
+        <span style="display: flex; gap: 4px">
+          <a class="tl" href="DesktopPolicy.dc.html#cach-mua" style="height: 32px">Cách mua hàng</a>
+          <a class="tl" href="Landing.dc.html" style="height: 32px">Về Cá Về</a>
+        </span>
+      </div>
+      <div class="wrap" style="padding-top: 14px; padding-bottom: 14px; display: flex; flex-wrap: wrap; align-items: center; gap: 12px 24px">
         <a href="DesktopHome.dc.html" aria-label="Cá Về — trang chủ" style="flex: none; display: flex; align-items: center; gap: 10px; color: #FFFFFF; text-decoration: none">
-          <span aria-hidden="true" style="width: 40px; height: 40px; border-radius: 9px; border: 1.5px dashed rgba(255,255,255,0.75); font-size: 10px; font-weight: 600; display: flex; align-items: center; justify-content: center">LOGO</span>
-          <span style="display: flex; flex-direction: column; line-height: 1.15">
-            <span style="font-size: 20px; font-weight: 600; letter-spacing: -0.01em">Cá Về</span>
-            <span style="font-size: 12px; font-weight: 500; color: #D6E4FA">Từ cảng về bếp nhà bạn</span>
-          </span>
+          <span aria-hidden="true" style="width: 40px; height: 40px; border-radius: 9px; border: 1.5px dashed rgba(255,255,255,0.7); font-size: 9px; font-weight: 600; display: flex; align-items: center; justify-content: center">LOGO</span>
+          <span style="display: flex; flex-direction: column; line-height: 1.15"><span style="font-size: 22px; font-weight: 600; letter-spacing: -0.015em">Cá Về</span><span style="font-size: 12px; color: #D6E4FA">Từ cảng về bếp nhà bạn</span></span>
         </a>
-        <form role="search" action="DesktopCategory.dc.html" class="srch">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#686874" stroke-width="1.8" stroke-linecap="round" aria-hidden="true" style="flex: none"><circle cx="11" cy="11" r="6.5"></circle><path d="M20 20l-4.2-4.2"></path></svg>
-          <label for="q" class="sr">Tìm sản phẩm</label>
-          <input id="q" type="search" name="q" placeholder="Tìm cá thu, mực ống, tôm sú, combo lẩu…" autocomplete="off">
-          <button type="submit">Tìm</button>
+        <form role="search" action="DesktopCategory.dc.html" style="flex: 1 1 320px; margin: 0; display: flex; height: 48px; background: #FFFFFF; border-radius: 24px; padding: 4px 4px 4px 20px; box-sizing: border-box; align-items: center; gap: 8px">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#686874" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"></circle><path d="M20 20l-4.2-4.2"></path></svg>
+          <input type="search" name="q" aria-label="Tìm sản phẩm" placeholder="Tìm cá, tôm, mực, combo…" style="flex: 1; min-width: 0; border: 0; outline: none; font: inherit; font-size: 15px">
+          <button type="submit" style="height: 40px; padding: 0 20px; border: 0; border-radius: 20px; background: #0E3A73; color: #FFFFFF; font: inherit; font-weight: 600; cursor: pointer">Tìm</button>
         </form>
-        <div style="flex: none; display: flex; align-items: center; gap: 4px">
-          <a href="tel:[hotline]" class="hd-a">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2"></path></svg>
-            Hotline [hotline]
-          </a>
-          <a href="DesktopLookup.dc.html" class="hd-a">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3h8l3 3v15H5V3h3zM9 10h6M9 14h6M9 18h3"></path></svg>
-            Tra cứu đơn
-          </a>
-          <a href="DesktopCart.dc.html" class="hd-a" aria-label="Giỏ hàng, 1 món">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 4h2l2.4 10.2a1.5 1.5 0 0 0 1.5 1.1h8.6a1.5 1.5 0 0 0 1.5-1.1L21 8H6.2"></path><circle cx="9.5" cy="19.5" r="1.3"></circle><circle cx="17" cy="19.5" r="1.3"></circle></svg>
-            Giỏ hàng <span class="badge num">1</span>
-          </a>
-        </div>
+        <nav aria-label="Tài khoản và giỏ" style="flex: none; display: flex; align-items: center; gap: 4px">
+          <a class="tl" href="tel:[hotline]"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2"></path></svg><span style="display: flex; flex-direction: column; line-height: 1.2"><span style="font-size: 11px; color: #D6E4FA">Hotline</span><span style="font-weight: 600">[hotline]</span></span></a>
+          <a class="tl" href="DesktopLookup.dc.html"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3h8l3 3v15H5V3h3zM9 10h6M9 14h6M9 18h3"></path></svg>Tra cứu đơn</a>
+          <a class="tl" href="DesktopCart.dc.html" aria-label="Giỏ hàng, 1 món" style="background: rgba(255,255,255,0.14); padding: 0 14px"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 4h2l2.4 10.2a1.5 1.5 0 0 0 1.5 1.1h8.6a1.5 1.5 0 0 0 1.5-1.1L21 8H6.2"></path><circle cx="9.5" cy="19.5" r="1.3"></circle><circle cx="17" cy="19.5" r="1.3"></circle></svg>Giỏ hàng<span style="min-width: 20px; height: 20px; padding: 0 6px; box-sizing: border-box; border-radius: 10px; background: #FFFFFF; color: #1A5BC0; font-size: 12px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; font-variant-numeric: tabular-nums">1</span></a>
+        </nav>
       </div>
     </div>
-    <nav class="mn" aria-label="Danh mục sản phẩm">
-      <ul class="wrap">
-        <li><a href="DesktopCategory.dc.html" aria-current="page">Cá</a></li>
-        <li><a href="DesktopCategory.dc.html">Tôm</a></li>
-        <li><a href="DesktopCategory.dc.html">Mực</a></li>
-        <li><a href="DesktopCategory.dc.html">Cua ghẹ</a></li>
-        <li><a href="DesktopCategory.dc.html">Combo</a></li>
-        <li><a href="DesktopKitchenList.dc.html">Góc bếp</a></li>
-        <li><a href="Landing.dc.html">Về Cá Về</a></li>
-      </ul>
+    <nav class="menu" aria-label="Danh mục sản phẩm" style="background: #FFFFFF; border-bottom: 1px solid #E4E4E9">
+      <div class="wrap" style="padding: 0 10px; display: flex; flex-wrap: wrap; align-items: center">
+        <a href="DesktopCategory.dc.html" aria-current="page">Cá</a>
+        <a href="DesktopCategory.dc.html">Tôm</a>
+        <a href="DesktopCategory.dc.html">Mực</a>
+        <a href="DesktopCategory.dc.html">Cua ghẹ</a>
+        <a href="DesktopCategory.dc.html">Combo</a>
+        <a href="DesktopKitchenList.dc.html">Góc bếp</a>
+        <a href="Landing.dc.html" style="margin-left: auto">Về Cá Về</a>
+      </div>
     </nav>
   </header>
 
@@ -173,65 +156,51 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible{ou
     </div>
   </main>
 
-  <footer class="ft">
-    <div class="wrap" style="padding-top: 40px; padding-bottom: 32px; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 32px">
-      <div id="lien-he">
-        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px">
-          <span aria-hidden="true" style="width: 36px; height: 36px; border-radius: 8px; border: 1.5px dashed rgba(214,228,250,0.7); color: #FFFFFF; font-size: 9px; font-weight: 600; display: flex; align-items: center; justify-content: center">LOGO</span>
-          <h2 style="margin: 0">Cá Về</h2>
-        </div>
-        <p style="margin: 0 0 14px; line-height: 1.55">Hải sản cấp đông mua theo lô tại cảng, bán theo kg, giao tận nhà.</p>
+  <footer class="ft" style="background: #0E3A73; color: #D6E4FA">
+    <div class="wrap" style="padding-top: 40px; padding-bottom: 28px; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 32px">
+      <div style="display: flex; flex-direction: column; gap: 10px">
+        <a href="DesktopHome.dc.html" aria-label="Cá Về — trang chủ" style="display: flex; align-items: center; gap: 10px; color: #FFFFFF; text-decoration: none; font-size: 20px; font-weight: 600">
+          <span aria-hidden="true" style="width: 36px; height: 36px; border-radius: 8px; border: 1.5px dashed rgba(255,255,255,0.7); font-size: 9px; display: flex; align-items: center; justify-content: center">LOGO</span>Cá Về</a>
+        <p style="margin: 0">Hải sản cấp đông theo lô, giá tính theo kg, giao tận nhà.</p>
         <ul>
-          <li><a href="tel:[hotline]">Hotline [hotline]</a></li>
-          <li><a href="https://zalo.me/[số]">Zalo [số Zalo]</a></li>
-          <li><a href="mailto:[email]">Email [email]</a></li>
+          <li><a href="tel:[hotline]">Hotline: [hotline]</a></li>
+          <li><a href="https://zalo.me/[số]" target="_blank" rel="noopener">Zalo: [số Zalo]</a></li>
+          <li><a href="mailto:[email]">Email: [email]</a></li>
         </ul>
       </div>
-      <div>
-        <h2>Mua hàng</h2>
-        <ul>
-          <li><a href="DesktopCategory.dc.html">Hàng đang có</a></li>
-          <li><a href="DesktopCategory.dc.html">Combo</a></li>
-          <li><a href="DesktopPolicy.dc.html#cach-mua">Cách mua hàng</a></li>
-          <li><a href="DesktopLookup.dc.html">Tra cứu đơn</a></li>
-        </ul>
-      </div>
-      <div>
-        <h2>Chính sách</h2>
-        <ul>
-          <li><a href="DesktopPolicy.dc.html">Chính sách đổi trả</a></li>
-          <li><a href="DesktopPolicy.dc.html">Chính sách giao hàng</a></li>
-          <li><a href="#chinh-sach-thanh-toan">Chính sách thanh toán</a></li>
-          <li><a href="#chinh-sach-quyen-rieng-tu">Chính sách quyền riêng tư</a></li>
-          <li><a href="#chinh-sach-dieu-khoan">Điều khoản sử dụng</a></li>
-        </ul>
-      </div>
-      <div>
-        <h2>Về chúng tôi</h2>
-        <ul>
-          <li><a href="Landing.dc.html">Giới thiệu</a></li>
-          <li><a href="DesktopKitchenList.dc.html">Góc bếp</a></li>
-          <li><a href="DesktopContact.dc.html">Liên hệ</a></li>
-        </ul>
-      </div>
+      <nav aria-labelledby="f-mua"><h3 id="f-mua">Mua hàng</h3><ul>
+        <li><a href="DesktopCategory.dc.html">Hàng đang có</a></li>
+        <li><a href="DesktopCategory.dc.html">Combo nấu nhanh</a></li>
+        <li><a href="DesktopPolicy.dc.html#cach-mua">Cách mua hàng</a></li>
+        <li><a href="DesktopLookup.dc.html">Tra cứu đơn</a></li>
+      </ul></nav>
+      <nav aria-labelledby="f-cs"><h3 id="f-cs">Chính sách</h3><ul>
+        <li><a href="DesktopPolicy.dc.html">Chính sách đổi trả và hoàn tiền</a></li>
+        <li><a href="DesktopPolicy.dc.html">Chính sách giao hàng</a></li>
+        <li><a href="DesktopPolicy.dc.html">Chính sách thanh toán</a></li>
+        <li><a href="DesktopPolicy.dc.html">Chính sách quyền riêng tư</a></li>
+        <li><a href="DesktopPolicy.dc.html">Điều khoản sử dụng</a></li>
+        <li><a href="DesktopPolicy.dc.html">Cơ chế giải quyết khiếu nại</a></li>
+      </ul></nav>
+      <nav aria-labelledby="f-ve"><h3 id="f-ve">Về Cá Về</h3><ul>
+        <li><a href="Landing.dc.html">Giới thiệu</a></li>
+        <li><a href="DesktopKitchenList.dc.html">Góc bếp</a></li>
+        <li><a href="DesktopContact.dc.html">Liên hệ</a></li>
+      </ul></nav>
     </div>
-    <div style="border-top: 1px solid rgba(214,228,250,0.18)">
-      <div class="wrap" style="padding-top: 20px; padding-bottom: 24px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px 32px; font-size: 13px">
-        <div style="display: flex; flex-direction: column; gap: 4px">
-          <span>[Tên doanh nghiệp] · MST [mã số thuế] · Địa chỉ [địa chỉ kinh doanh]</span>
-          <span>Giấy CN ĐKKD số [số] do [nơi cấp] cấp ngày [ngày]</span>
-          <span>© 2026 Cá Về</span>
+    <div style="border-top: 1px solid rgba(255,255,255,0.14)">
+      <div class="wrap" style="padding-top: 18px; padding-bottom: 24px; display: flex; flex-wrap: wrap; gap: 16px 24px; align-items: center; justify-content: space-between; font-size: 12px">
+        <div style="display: flex; flex-direction: column; gap: 2px">
+          <span>[Tên doanh nghiệp] · MST [mã số thuế] · Địa chỉ: [địa chỉ kinh doanh]</span>
+          <span>GCN ĐKKD số [số] do [nơi cấp] cấp ngày [ngày] · © 2026 Cá Về</span>
         </div>
-        <div style="display: flex; align-items: center; gap: 10px; height: 48px; padding: 0 14px; border: 1.5px dashed rgba(214,228,250,0.55); border-radius: 8px">
-          <span aria-hidden="true" style="width: 32px; height: 32px; border-radius: 16px; border: 1.5px dashed rgba(214,228,250,0.7); font-size: 8px; font-weight: 600; display: flex; align-items: center; justify-content: center">BCT</span>
-          <span style="font-weight: 500; color: #FFFFFF">Đã thông báo Bộ Công Thương</span>
-        </div>
+        <a href="#bo-cong-thuong" target="_blank" rel="noopener" style="flex: none; width: 132px; height: 48px; border: 1.5px dashed rgba(255,255,255,0.6); border-radius: 6px; color: #FFFFFF; font-size: 10px; font-weight: 600; text-decoration: none; display: flex; align-items: center; justify-content: center; text-align: center">Logo "Đã thông báo Bộ Công Thương"</a>
       </div>
     </div>
   </footer>
 </div>
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":1100}}'>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":1530}}'>
 class Component extends DCLogic {
   renderVals() { return {}; }
 }

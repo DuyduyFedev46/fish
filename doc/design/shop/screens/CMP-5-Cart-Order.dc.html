@@ -104,8 +104,8 @@ button:focus-visible,a:focus-visible{outline:2px solid #1F66D1;outline-offset:2p
             <div style="display: flex; justify-content: space-between; gap: 8px; align-items: flex-start"><span style="font-weight: 500; line-height: 1.3; color: #4E4E58">Cá bớp cắt lát</span><span class="bdg" style="height: 22px; padding: 0 6px; background: #EBEBEF; color: #4E4E58">Hết hàng</span></div>
             <span style="font-size: 12px; font-weight: 500; color: #4E4E58">Món này vừa hết. Không tính vào tổng.</span>
             <div style="display: flex; gap: 8px">
-              <a class="cto" href="tel:[hotline]" style="flex: 1; padding: 0 8px; font-size: 13px"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#17171C" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2"></path></svg>Liên hệ chúng tôi</a>
-              <button class="cto" style="flex: none; font: inherit; font-size: 13px; font-weight: 600; color: #C0312B; cursor: pointer">Bỏ khỏi giỏ</button>
+              <a class="cto" href="tel:[hotline]" aria-label="Liên hệ Cá Về hỏi hàng Cá bớp cắt lát" style="flex: 1 1 0; min-width: 0; padding: 0 8px; font-size: 13px; white-space: nowrap"><svg style="flex: none" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#17171C" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2"></path></svg>Liên hệ</a>
+              <button class="cto" aria-label="Bỏ Cá bớp cắt lát khỏi giỏ" style="flex: 1 1 0; min-width: 0; padding: 0 8px; white-space: nowrap; font: inherit; font-size: 13px; font-weight: 600; color: #C0312B; cursor: pointer">Bỏ khỏi giỏ</button>
             </div>
           </div>
         </div>
@@ -146,9 +146,9 @@ button:focus-visible,a:focus-visible{outline:2px solid #1F66D1;outline-offset:2p
         <tr><td>Chữ</td><td>Tên 14/500/1.3 · đơn giá 12/500 <code>ink-3</code> · thành tiền 14/600 tabular.</td><td>Tên 15/500 (link về trang chi tiết) · đơn giá 14 <code>ink-2</code> · thành tiền 14/600, căn phải.</td></tr>
         <tr><td>Số lượng</td><td colspan="2">QtyStepper biến thể giỏ (viền, cao 40). Ở 1 kg nút trừ thành thùng rác <code>crit</code>, bấm mở B2-RemoveConfirm. Nút bỏ riêng: icon 18 <code>ink-3</code>, vùng chạm 36 (điện thoại) / 40 (máy tính).</td></tr>
         <tr><td>Giá đổi</td><td>Viền trái 3px <code>warn #A85A07</code>. Giá cũ <code>&lt;del&gt;</code> <code>ink-3</code>, giá mới 12/600, nhãn "Giá đã cập nhật".</td><td>Cả hàng nền <code>warn-soft #FDF3E3</code>, nhãn nền trắng chữ <code>warn</code>. Thành tiền theo giá mới.</td></tr>
-        <tr><td>Đã hết</td><td colspan="2">Ảnh <code>opacity: .55</code>, tên <code>ink-2</code>, nhãn "Hết hàng" nền <code>surface-3 #EBEBEF</code>. Không có stepper, không có thành tiền. Hai hành động: "Liên hệ chúng tôi" (<code>tel:</code>, viền <code>border-strong</code>) và "Bỏ khỏi giỏ" (chữ <code>crit #C0312B</code>). Không ghi số kg còn lại. Nút đặt hàng bị chặn tới khi bỏ món.</td></tr>
+        <tr><td>Đã hết</td><td colspan="2">Ảnh <code>opacity: .55</code>, tên <code>ink-2</code>, nhãn "Hết hàng" nền <code>surface-3 #EBEBEF</code>. Không có stepper, không có thành tiền. Hai hành động: "Liên hệ" ở điện thoại / "Liên hệ chúng tôi" ở máy tính (<code>tel:</code>, viền <code>border-strong</code>, aria-label "Liên hệ Cá Về hỏi hàng …") và "Bỏ khỏi giỏ" (chữ <code>crit #C0312B</code>, mở popup B2). Điện thoại: hai nút chia đôi hàng (<code>flex: 1 1 0; min-width: 0; white-space: nowrap</code>). Không ghi số kg còn lại. Nút đặt hàng bị chặn tới khi bỏ món.</td></tr>
         <tr><td>Bo góc · bóng</td><td>Danh sách nền trắng liền khối (B3 dùng thẻ bo 10). Không bóng.</td><td>Bảng bo 12, viền <code>border #E4E4E9</code>. Không bóng.</td></tr>
-        <tr><td>Chuyển động</td><td colspan="2">Bỏ món: hàng thu chiều cao + mờ 200ms <code>cubic-bezier(.23,1,.32,1)</code>, toast "Đã bỏ … · Hoàn tác" 3s. Reduced-motion: biến mất ngay.</td></tr>
+        <tr><td>Chuyển động</td><td colspan="2">Bỏ món luôn qua popup xác nhận B2-RemoveConfirm (máy tính: DesktopRemoveConfirm), không bỏ ngay, không có Hoàn tác. Sau khi xác nhận: hàng thu chiều cao + mờ 200ms <code>cubic-bezier(.23,1,.32,1)</code>, toast "Đã bỏ … khỏi giỏ" 3s. Reduced-motion: biến mất ngay.</td></tr>
         <tr><td>A11y</td><td colspan="2">Danh sách là <code>&lt;ul&gt;</code> (điện thoại) / <code>role="table"</code> có hàng đầu (máy tính). Thay đổi giá đọc qua <code>role="status"</code> ở đầu giỏ: "2 món đã đổi giá".</td></tr>
       </tbody>
     </table>
@@ -418,14 +418,14 @@ button:focus-visible,a:focus-visible{outline:2px solid #1F66D1;outline-offset:2p
   <section class="sec" aria-labelledby="c-pay">
     <div>
       <h2 id="c-pay" class="cname">PaymentMethod</h2>
-      <p class="cdesc">Thẻ chọn phương thức thanh toán. Hiện chỉ có chuyển khoản VietQR qua cổng SePay, luôn ở trạng thái đang chọn.</p>
+      <p class="cdesc">Thẻ chọn phương thức thanh toán. Hiện chỉ có chuyển khoản VietQR qua cổng thanh toán, luôn ở trạng thái đang chọn.</p>
     </div>
     <div class="row">
       <div class="cell">
         <span class="cap">Đang chọn</span>
         <div role="radio" aria-checked="true" tabindex="0" style="width: 358px; box-sizing: border-box; display: flex; gap: 12px; align-items: center; padding: 12px; border: 2px solid #1F66D1; border-radius: 10px; background: #EBF2FE">
           <span style="flex: none; width: 40px; height: 40px; border-radius: 8px; background: #FFFFFF; display: flex; align-items: center; justify-content: center"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1A5BC0" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h2v2h-2zM18 18h2v2h-2zM18 14h2M14 18v2"></path></svg></span>
-          <span style="flex: 1; display: flex; flex-direction: column"><span style="font-weight: 600">Chuyển khoản qua VietQR</span><span style="font-size: 12px; font-weight: 500; color: #4E4E58">Qua cổng SePay · quét bằng app ngân hàng bất kỳ, xác nhận tự động</span></span>
+          <span style="flex: 1; display: flex; flex-direction: column"><span style="font-weight: 600">Chuyển khoản qua VietQR</span><span style="font-size: 12px; font-weight: 500; color: #4E4E58">Quét mã QR bằng app ngân hàng bất kỳ, xác nhận tự động</span></span>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1A5BC0" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"></path></svg>
         </div>
       </div>
@@ -433,7 +433,7 @@ button:focus-visible,a:focus-visible{outline:2px solid #1F66D1;outline-offset:2p
         <span class="cap">Focus</span>
         <div style="width: 358px; box-sizing: border-box; display: flex; gap: 12px; align-items: center; padding: 12px; border: 2px solid #1F66D1; border-radius: 10px; background: #EBF2FE; outline: 2px solid #1F66D1; outline-offset: 2px">
           <span style="flex: none; width: 40px; height: 40px; border-radius: 8px; background: #FFFFFF; display: flex; align-items: center; justify-content: center"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1A5BC0" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h2v2h-2zM18 18h2v2h-2zM18 14h2M14 18v2"></path></svg></span>
-          <span style="flex: 1; display: flex; flex-direction: column"><span style="font-weight: 600">Chuyển khoản qua VietQR</span><span style="font-size: 12px; font-weight: 500; color: #4E4E58">Qua cổng SePay</span></span>
+          <span style="flex: 1; display: flex; flex-direction: column"><span style="font-weight: 600">Chuyển khoản qua VietQR</span><span style="font-size: 12px; font-weight: 500; color: #4E4E58">Quét mã QR bằng app ngân hàng</span></span>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1A5BC0" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"></path></svg>
         </div>
       </div>
@@ -446,7 +446,7 @@ button:focus-visible,a:focus-visible{outline:2px solid #1F66D1;outline-offset:2p
             <tr><td>Chữ</td><td>Tên 14/600 <code>ink</code>, mô tả 12/500 <code>ink-2</code>.</td></tr>
             <tr><td>Bo · bóng</td><td>Bo 10, không bóng.</td></tr>
             <tr><td>A11y</td><td>Nhóm <code>role="radiogroup"</code>, thẻ <code>role="radio" aria-checked</code>. Một phương thức thì vẫn hiện để khách biết cách trả tiền.</td></tr>
-            <tr><td>CTA đi kèm</td><td>"Thanh toán qua cổng SePay", pill 48, icon khoá. Mở trang SePay cùng tab.</td></tr>
+            <tr><td>CTA đi kèm</td><td>"Thanh toán", pill 48, icon khoá. Mở trang thanh toán cùng tab.</td></tr>
           </tbody>
         </table>
       </div>
@@ -565,7 +565,7 @@ button:focus-visible,a:focus-visible{outline:2px solid #1F66D1;outline-offset:2p
       <thead><tr><th style="width: 22%">Trạng thái</th><th style="width: 22%">Tông</th><th>Nền · chữ · ý nghĩa</th></tr></thead>
       <tbody>
         <tr><td>Chờ thanh toán</td><td>warn</td><td><code>warn-soft #FDF3E3</code> · <code>warn #A85A07</code>. Khách cần làm gì đó (trả tiền trước khi hết giờ giữ).</td></tr>
-        <tr><td>Đang chờ xác nhận tiền</td><td>neutral</td><td><code>surface-3 #EBEBEF</code> · <code>ink-2 #4E4E58</code>. Đã chuyển, chờ SePay báo về. Khách không cần làm gì.</td></tr>
+        <tr><td>Đang chờ xác nhận tiền</td><td>neutral</td><td><code>surface-3 #EBEBEF</code> · <code>ink-2 #4E4E58</code>. Đã chuyển, chờ ngân hàng báo về. Khách không cần làm gì.</td></tr>
         <tr><td>Chờ cửa hàng xác nhận</td><td>neutral</td><td>Như trên. Đơn đã trả tiền, chờ Cá Về gọi xác nhận và báo phí giao.</td></tr>
         <tr><td>Đang chuẩn bị · Đang giao</td><td>accent</td><td><code>accent-soft #EBF2FE</code> · <code>accent-text #1A5BC0</code>. Đơn đang chạy bình thường.</td></tr>
         <tr><td>Đã giao</td><td>good</td><td><code>good-soft #E9F7EE</code> · <code>good #157F3D</code>.</td></tr>
@@ -664,7 +664,7 @@ button:focus-visible,a:focus-visible{outline:2px solid #1F66D1;outline-offset:2p
         <tr><td>Chữ</td><td>Tiêu đề 14/600, thân 13/400.</td><td>14, tiêu đề 600 cùng dòng.</td></tr>
         <tr><td>Bo · bóng</td><td colspan="2">Bo 12. Không bóng.</td></tr>
         <tr><td>Chuyển động</td><td colspan="2">Vào: <code>opacity 0→1</code> + <code>translateY(-8px)→0</code> 200ms <code>cubic-bezier(.23,1,.32,1)</code>. Đóng: mờ 150ms rồi thu chiều cao. Reduced-motion: chỉ fade.</td></tr>
-        <tr><td>Khi nào hiện</td><td colspan="2">Chỉ khi quay về từ SePay với kết quả thành công và server đã xác nhận. Đóng xong không hiện lại khi tải lại trang..</td></tr>
+        <tr><td>Khi nào hiện</td><td colspan="2">Chỉ khi quay về từ cổng thanh toán với kết quả thành công và server đã xác nhận. Đóng xong không hiện lại khi tải lại trang..</td></tr>
         <tr><td>A11y</td><td colspan="2"><code>role="status"</code> để đọc một lần. Nút đóng có nhãn "Đóng thông báo"; đóng xong đưa focus về tiêu đề trang.</td></tr>
       </tbody>
     </table>
@@ -672,7 +672,7 @@ button:focus-visible,a:focus-visible{outline:2px solid #1F66D1;outline-offset:2p
   </section>
 </div>
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":7500}}'>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":8890}}'>
 class Component extends DCLogic {
   renderVals() {
     return {};

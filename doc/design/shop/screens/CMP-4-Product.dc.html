@@ -488,7 +488,7 @@ button:focus-visible,a:focus-visible{outline:2px solid #1F66D1;outline-offset:2p
         <tr><td>Bo góc</td><td colspan="3">8. Không bóng.</td></tr>
         <tr><td>Disabled</td><td colspan="3">Icon <code>border-strong #D4D4DB</code>, nền <code>surface-2 #F4F4F6</code>, <code>cursor: not-allowed</code>, giữ trong thứ tự tab với <code>aria-disabled</code> khi cần giải thích.</td></tr>
         <tr><td>Chuyển động</td><td colspan="3">Nhấn: <code>scale(.97)</code> 120ms <code>cubic-bezier(.23,1,.32,1)</code>. Đổi số: không animate số. Màu 150ms ease-out.</td></tr>
-        <tr><td>Quy tắc</td><td colspan="3">Theo kg: <code>min = 1</code>, <code>step = 0.5</code>, <code>unit = "kg"</code>, hiển thị dấu phẩy thập phân <code>1,5 kg</code>. Combo: <code>min = 1</code>, <code>step = 1</code>, <code>unit = "combo"</code>. Ở mức min, nút trừ: thẻ → thùng rác, bấm bỏ ngay (có toast Hoàn tác) · giỏ → mở popup B2 · chi tiết → disabled. Gửi số thập phân dạng chuỗi <code>"1.5"</code> lên API.</td></tr>
+        <tr><td>Quy tắc</td><td colspan="3">Theo kg: <code>min = 1</code>, <code>step = 0.5</code>, <code>unit = "kg"</code>, hiển thị dấu phẩy thập phân <code>1,5 kg</code>. Combo: <code>min = 1</code>, <code>step = 1</code>, <code>unit = "combo"</code>. Ở mức min, nút trừ: thẻ và giỏ → thùng rác, bấm luôn mở popup xác nhận B2 (máy tính: DesktopRemoveConfirm), không bỏ ngay, không có Hoàn tác · chi tiết → disabled. Gửi số thập phân dạng chuỗi <code>"1.5"</code> lên API.</td></tr>
         <tr><td>A11y</td><td colspan="3">Bọc <code>role="group"</code> + <code>aria-label="Số lượng Mực ống làm sạch"</code>. Nút: "Bớt 0,5 kg …", "Thêm 0,5 kg …", ở min: "Bỏ … khỏi giỏ". Số hiện tại đọc qua <code>aria-live="polite"</code>. Vùng chạm tối thiểu 40.</td></tr>
       </tbody>
     </table>
@@ -527,7 +527,7 @@ button:focus-visible,a:focus-visible{outline:2px solid #1F66D1;outline-offset:2p
         <tr><td>Nhãn nút</td><td>"Thêm 1 kg" cho món theo kg, "Thêm 1 combo" cho combo. Không dùng "Mua ngay" trên thẻ.</td></tr>
         <tr><td>Kích thước · màu</td><td>Cao 44, rộng 100%, bo 8, viền 1px + chữ <code>accent #1F66D1</code> trên nền <code>surface #FFFFFF</code>. Sang stepper: nền <code>accent #1F66D1</code>, chữ trắng.</td></tr>
         <tr><td>Chuyển động</td><td>Stepper vào: <code>opacity 0→1</code> + <code>scale(.96)→1</code>, <code>180ms cubic-bezier(.23,1,.32,1)</code>. Nút nhấn <code>scale(.97)</code> 120ms. Ngược lại (bỏ món) thay ngay, không animate. Reduced-motion: chỉ đổi, không scale.</td></tr>
-        <tr><td>Lạc quan · lỗi</td><td>Cập nhật giao diện ngay, gọi API sau. Lỗi mạng hoặc hết hàng: trả về trạng thái trước, toast lỗi (A4). Không hiện số kg còn lại.</td></tr>
+        <tr><td>Lạc quan · lỗi</td><td>Giỏ lưu ở trình duyệt nên cập nhật giao diện ngay, không gọi API khi thêm giỏ. Giá và tình trạng hàng được kiểm lại khi mở giỏ (B3) và khi đặt hàng (C3). Không hiện số kg còn lại.</td></tr>
         <tr><td>Chi tiết sản phẩm</td><td>Thanh mua đáy dùng hai nút "Thêm vào giỏ" (viền) và "Chọn mua" (đặc), pill 48, theo số kg đang chọn ở QtyStepper chi tiết.</td></tr>
       </tbody>
     </table>
@@ -642,7 +642,7 @@ button:focus-visible,a:focus-visible{outline:2px solid #1F66D1;outline-offset:2p
   </section>
 </div>
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":5900}}'>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":7420}}'>
 class Component extends DCLogic {
   renderVals() {
     return {};

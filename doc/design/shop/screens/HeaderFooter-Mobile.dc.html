@@ -14,10 +14,12 @@
 body{margin:0}
 a{color:#1A5BC0}a:hover{color:#1A57B5}
 .num{font-variant-numeric:tabular-nums}
-.spec{width:100%;border-collapse:collapse;font-size:12px}
+.spec{width:100%;min-width:0;table-layout:fixed;border-collapse:collapse;font-size:12px}
+.spec th:nth-child(1){width:30%}
+.spec th:nth-child(2){width:33%}
 .spec th{text-align:left;font-weight:600;color:#4E4E58;padding:6px 8px;border-bottom:1px solid #D4D4DB;background:#F4F4F6}
 .spec td{padding:6px 8px;border-bottom:1px solid #E4E4E9;vertical-align:top;color:#17171C}
-.spec code{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11px;color:#0E3A73;background:#EBF2FE;padding:1px 4px;border-radius:4px;white-space:nowrap}
+.spec code{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11px;color:#0E3A73;background:#EBF2FE;padding:1px 4px;border-radius:4px;white-space:normal;overflow-wrap:anywhere}
 .phone{width:390px;flex:none;background:#FFFFFF;border:1px solid #D4D4DB;border-radius:12px;overflow:hidden}
 .lab{font-size:12px;font-weight:600;color:#686874;text-transform:uppercase;letter-spacing:.04em}
 .ft summary{list-style:none;cursor:pointer;height:48px;display:flex;align-items:center;justify-content:space-between;color:#FFFFFF;font-weight:600;border-bottom:1px solid rgba(255,255,255,0.14)}
@@ -170,7 +172,7 @@ a{color:#1A5BC0}a:hover{color:#1A57B5}
           </details>
           <details>
             <summary>Chính sách <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg></summary>
-            <ul><li><a href="P1-Policy.dc.html">Chính sách đổi trả</a></li><li><a href="P1-Policy.dc.html">Chính sách giao hàng</a></li><li><a href="P1-Policy.dc.html">Chính sách thanh toán</a></li><li><a href="P1-Policy.dc.html">Chính sách quyền riêng tư</a></li><li><a href="P1-Policy.dc.html">Điều khoản sử dụng</a></li></ul>
+            <ul><li><a href="P1-Policy.dc.html">Chính sách đổi trả và hoàn tiền</a></li><li><a href="P1-Policy.dc.html">Chính sách giao hàng</a></li><li><a href="P1-Policy.dc.html">Chính sách thanh toán</a></li><li><a href="P1-Policy.dc.html">Chính sách quyền riêng tư</a></li><li><a href="P1-Policy.dc.html">Điều khoản sử dụng</a></li><li><a href="P1-Policy.dc.html">Cơ chế giải quyết khiếu nại</a></li></ul>
           </details>
           <details>
             <summary>Về Cá Về <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg></summary>
@@ -199,11 +201,12 @@ a{color:#1A5BC0}a:hover{color:#1A57B5}
         <tr><td>Cách mua hàng</td><td><code>/trang/cach-mua-hang</code></td><td>Trang tĩnh: chọn kg → đặt → VietQR → giao.</td></tr>
         <tr><td>Tra cứu đơn</td><td><code>/shop/orders</code></td><td></td></tr>
         <tr><td colspan="3" style="font-weight: 600; background: #FBFBFC">Nhóm "Chính sách" (thu gọn, danh sách đầy đủ)</td></tr>
-        <tr><td>Chính sách đổi trả</td><td><code>/trang/doi-tra</code></td><td rowspan="5">Bắt buộc với website TMĐT bán hàng. Nội dung chờ <code>legal-vn</code> duyệt (doc/ops/go-live-phap-ly.md).</td></tr>
+        <tr><td>Chính sách đổi trả và hoàn tiền</td><td><code>/trang/doi-tra</code></td><td rowspan="6">Bắt buộc với website TMĐT bán hàng (go-live pháp lý mục 2, 3, 9). Chữ "hoàn tiền" chỉ dùng ở tên trang này. Nội dung chờ <code>legal-vn</code> duyệt (doc/ops/go-live-phap-ly.md).</td></tr>
         <tr><td>Chính sách giao hàng</td><td><code>/trang/giao-hang</code></td></tr>
         <tr><td>Chính sách thanh toán</td><td><code>/trang/thanh-toan</code></td></tr>
         <tr><td>Chính sách quyền riêng tư</td><td><code>/trang/quyen-rieng-tu</code></td></tr>
         <tr><td>Điều khoản sử dụng</td><td><code>/trang/dieu-khoan</code></td></tr>
+        <tr><td>Cơ chế giải quyết khiếu nại</td><td><code>/trang/khieu-nai</code></td></tr>
         <tr><td colspan="3" style="font-weight: 600; background: #FBFBFC">Nhóm "Về Cá Về"</td></tr>
         <tr><td>Giới thiệu</td><td><code>/gioi-thieu</code></td><td>Landing page thương hiệu.</td></tr>
         <tr><td>Góc bếp</td><td><code>/bai-viet</code></td><td>Đã có route <code>frontend/app/bai-viet</code>.</td></tr>
@@ -217,7 +220,7 @@ a{color:#1A5BC0}a:hover{color:#1A57B5}
   </section>
 </div>
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":880,"height":2600}}'>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":880,"height":3000}}'>
 class Component extends DCLogic {
   renderVals() {
     return {};

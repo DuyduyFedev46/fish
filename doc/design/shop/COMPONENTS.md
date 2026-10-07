@@ -129,6 +129,9 @@ export type Money = string;                          // chuỗi Decimal, ví d�
 
 ## Bảng tổng hợp: Component → Lô → file code
 
+> Thêm 07/10: **48. VoucherField** → lô 3b → `components/cart/VoucherField.tsx` (xem cuối file).
+
+
 Lô theo `PLAN.md`. "Mới" là file chưa có. ⚠ = file mới **chưa nằm trong cột "Được sửa"** của lô trong `PLAN.md`/`DOI-CHIEU-CODE.md` §5; điều phối viên cần bổ sung vào phiếu 02c trước khi giao.
 
 | # | Component | Lô | File code |
@@ -263,7 +266,7 @@ Câu đã mở sẵn trong `PLAN.md` (Q2, Q4, Q6, Q7, Q8, Q9, bước 0,5 kg) v�
 
 | `variant` | Khi nào | Ví dụ trên màn |
 |---|---|---|
-| `primary` | hành động chính, **một nút mỗi vùng** | "Đặt hàng", "Thanh toán qua cổng SePay", "Chọn mua", "Thử lại" |
+| `primary` | hành động chính, **một nút mỗi vùng** | "Đặt hàng", "Thanh toán", "Chọn mua", "Thử lại" |
 | `outline` | hành động phụ cùng cấp với nút chính | "Thêm vào giỏ", "Thêm 1 kg", "Tra cứu đơn", "Gọi Cá Về" |
 | `secondary` | lựa chọn trung tính, huỷ bước | "Giữ lại", "Liên hệ chúng tôi", "Quay lại giỏ hàng", "Rời trang" |
 | `ghost` | lối thoát nhẹ | "Để sau", "Nhập tay" |
@@ -1198,7 +1201,7 @@ interface CartLineProps {
 | mặc định | như token |
 | hover / nhấn / focus | theo Button |
 | disabled | `payment` khi đơn hết hạn (D4): CTA disabled `--surface-3` |
-| đang tải | CTA "Đặt hàng" → "Đang đặt…" + Spinner; "Thanh toán qua cổng SePay" → `loadingText` `[copy]` |
+| đang tải | CTA "Đặt hàng" → "Đang đặt…" + Spinner; "Thanh toán" → `loadingText` `[copy]` |
 | lỗi | lỗi gửi: Dialog C4 (giữ dữ liệu); hết hàng: Sheet C3 |
 | chọn | không áp dụng |
 
@@ -1220,7 +1223,7 @@ interface CartSummaryProps {
 ```
 
 9. **Truy cập.** `aside` có `aria-labelledby` tiêu đề. Tổng đổi (khi sửa giỏ) đọc qua vùng live của trang, không đặt `aria-live` trên cả khối. CTA `type="submit" form="checkout-form"` khi nằm ngoài form.
-10. **Câu chữ.** "Tạm tính", "Phí giao", "Báo khi xác nhận đơn", "Tổng tiền hàng", "Tiếp tục: nhập thông tin nhận hàng" (điện thoại), "Tiếp tục" (máy tính), "Tóm tắt đơn", "Đơn hàng (3 món)", "3 món · tổng tiền hàng", "Đặt hàng", "Cần thanh toán", "Thanh toán qua cổng SePay", "Thanh toán lại", "Huỷ đơn" (chờ Q9). Câu phí giao chờ `legal-vn` (Q6).
+10. **Câu chữ.** "Tạm tính", "Phí giao", "Báo khi xác nhận đơn", "Tổng tiền hàng", "Tiếp tục: nhập thông tin nhận hàng" (điện thoại), "Tiếp tục" (máy tính), "Tóm tắt đơn", "Đơn hàng (3 món)", "3 món · tổng tiền hàng", "Đặt hàng", "Cần thanh toán", "Thanh toán", "Thanh toán lại", "Huỷ đơn" (chờ Q9). Câu phí giao chờ `legal-vn` (Q6).
 11. **Không được.** Hiện phí giao bằng số hoặc "Miễn phí". Tự tính tổng thanh toán ở FE. Hai CTA chính. Che nội dung trang (thiếu `padding-bottom`).
 12. **Code.** Mới `components/cart/CartSummary.tsx` ⚠.
 
@@ -1361,13 +1364,13 @@ interface HoldCountdownProps {
 
 ## 25. PaymentMethod
 
-1. **Công dụng.** Hiện phương thức thanh toán duy nhất: chuyển khoản VietQR qua SePay. **Dùng ở:** `Payment`, `DesktopPayment`.
+1. **Công dụng.** Hiện phương thức thanh toán duy nhất: chuyển khoản Chuyển khoản ngân hàng. **Dùng ở:** `Payment`, `DesktopPayment`.
 2. **Giải phẫu.** (a) tiêu đề "Phương thức thanh toán" · (b) thẻ: ô icon QR · tên · mô tả · dấu tích.
 3. **Biến thể.** Một biến thể, chỉ đọc.
 4. **Kích thước và khoảng cách.** Khối đệm 16, bo 12, gap 12. Thẻ đệm 12, gap 12, bo 10. Ô icon 40 bo 8, icon 22. Dấu tích 20.
 5. **Token.** Thẻ: viền 2px `--accent`, nền `--accent-soft`. Ô icon nền `--surface`, icon `--accent-text`. Tên 14/600 `--ink`. Mô tả `caption` `--ink-2`. Dấu tích `--accent-text`.
 6. **Trạng thái.** Luôn "đã chọn". hover / nhấn / focus / disabled / đang tải / lỗi: không áp dụng (không bấm được).
-7. **Hành vi.** Không có lựa chọn khác nên **không** render radio. Nút "Thanh toán qua cổng SePay" nằm ở CartSummary `payment`; bấm thì gọi `POST /api/shop/orders/<code>/checkout/` rồi chuyển sang SePay; lỗi gọi API → Banner `crit` `[copy]` trên nút, giữ đồng hồ.
+7. **Hành vi.** Không có lựa chọn khác nên **không** render radio. Nút "Thanh toán" nằm ở CartSummary `payment`; bấm thì gọi `POST /api/shop/orders/<code>/checkout/` rồi chuyển sang SePay; lỗi gọi API → Banner `crit` `[copy]` trên nút, giữ đồng hồ.
 8. **Props.**
 
 ```ts
@@ -1410,7 +1413,7 @@ interface TimelineStep {
   key: 'placed' | 'paid' | 'preparing' | 'shipping' | 'delivered' | 'awaiting_bank';
   label: string;
   state: 'done' | 'current' | 'upcoming' | 'failed';
-  detail?: string;          // "Kho đóng thùng giữ lạnh", "VietQR qua SePay", "chưa giao được"
+  detail?: string;          // "Kho đóng thùng giữ lạnh", "Chuyển khoản ngân hàng", "chưa giao được"
   time?: string;            // đã định dạng giờ Việt Nam
 }
 interface OrderTimelineProps {
@@ -1421,7 +1424,7 @@ interface OrderTimelineProps {
 ```
 
 9. **Truy cập.** `<ol aria-label="Tiến trình đơn">`, bước hiện tại `aria-current="step"`. Mỗi bước có chữ ẩn trạng thái: "(đã xong)", "(đang làm)", "(chưa tới)", "(chưa giao được)". Màu không phải nguồn tin duy nhất.
-10. **Câu chữ.** "Đã đặt", "Đã thanh toán", "Đang chuẩn bị hàng" (máy tính "Đang chuẩn bị"), "Đang giao", "Đã giao", "Kho đóng thùng giữ lạnh", "VietQR qua SePay", "chưa giao được", "Đơn đã tạo, giữ hàng", "Đã nhận tiền qua SePay". `payment`: "Đặt đơn", "Chờ ngân hàng", "Thanh toán xong", "Tự kiểm tra lại sau mỗi 5 giây", "Đã chờ 0:04".
+10. **Câu chữ.** "Đã đặt", "Đã thanh toán", "Đang chuẩn bị hàng" (máy tính "Đang chuẩn bị"), "Đang giao", "Đã giao", "Kho đóng thùng giữ lạnh", "Chuyển khoản ngân hàng", "chưa giao được", "Đơn đã tạo, giữ hàng", "Đã nhận tiền". `payment`: "Đặt đơn", "Chờ ngân hàng", "Thanh toán xong", "Tự kiểm tra lại sau mỗi 5 giây", "Đã chờ 0:04".
 11. **Không được.** Hiện người nhận, shipper, SĐT. Dùng đỏ cho giao thất bại. Bịa mốc giờ.
 12. **Code.** Mới `features/checkout/components/OrderTimeline.tsx`.
 
@@ -2267,3 +2270,35 @@ Khung chung (ShopHeader, ShopFooter, BottomNav, LogoSlot, Toast) không ghi lạ
 - **Baseline:** không gradient, không glow, z-index theo thang cố định, `100dvh`, safe-area cho thanh dính đáy. Mục "MUST Tailwind/`cn`" của `baseline-ui` không áp dụng vì Shop không dùng Tailwind (theo `HUONG-DAN-CODE.md` §7: không thêm thư viện).
 - **Nghiệp vụ:** giá theo kg / combo, tối thiểu 1 kg bước 0,5, combo bước 1, dưới tối thiểu mở Dialog; tồn chỉ `in/low/out`, không prop nhận số kg; hết hàng "Liên hệ chúng tôi"; không ngày nhập, mã lô, giá vốn; địa chỉ một ô + Maps nạp khi bấm, không lưu toạ độ; không hoá đơn điện tử; không chữ "hoàn tiền"; trang đơn không hiện người nhận; mã đơn `SO…`; badge giỏ là số món.
 - **Dữ liệu mẫu:** chỉ dùng tên giả "Nguyễn Văn A", "09xx xxx xxx", ô `[…]` của file màn; không có dữ liệu thật.
+
+
+---
+
+## 48. VoucherField (mã giảm giá, chốt 07/10)
+
+1. **Công dụng**: nhập và áp một mã giảm giá cho đơn. **Dùng ở**: `Cart`, `B5-VoucherSheet`, `B6-VoucherApplied`, `B7-VoucherError`, `B8-VoucherInvalidAtOrder`, `DesktopCart`, `DesktopVoucher`; dòng giảm giá ở `Payment`, `Success`, `DesktopPayment`. Bảng hình: `screens/CMP-3-Inputs.dc.html` (section cuối).
+2. **Giải phẫu**: (điện thoại) dòng "Mã giảm giá · Nhập mã ›" trong tóm tắt giỏ → BottomSheet gồm tiêu đề, ô nhập, nút "Áp dụng", câu "Mỗi đơn dùng 1 mã.", dòng lỗi. (Máy tính) nhãn + ô nhập + nút "Áp dụng" ngay trong CartSummary. Sau khi áp: chip mã (good-soft) + nút bỏ mã + dòng "Giảm giá −…".
+3. **Biến thể**: `trigger-row` (điện thoại), `sheet` (điện thoại), `inline` (máy tính), `applied` (chip).
+4. **Kích thước**: ô nhập 44, chữ 16, bo 8; nút "Áp dụng" rộng cố định 104 (điện thoại, primary) / nút viền md 44 (máy tính, để không tranh với "Tiếp tục"); chip cao 32, bo 999; nút X trong chip vùng chạm 44.
+5. **Token**: ô `border-input`, focus `focus` + ring `accent-soft`; lỗi `crit` + `crit-soft`; chip `good-soft`/`good`; dòng giảm giá chữ `good`; thông tin "ưu đãi lợi hơn" `ink-2` + icon i (không dùng crit).
+6. **Trạng thái**: trống (nút tắt) · đang gõ (chữ tự in hoa, bỏ khoảng trắng; nút bật) · đang kiểm (spinner trong nút, `aria-busy`, ô khoá) · đã áp (chip + dòng giảm + tổng mới, toast "Đã áp mã …") · lỗi (viền crit, `aria-invalid`, dòng lỗi dưới ô) · ưu đãi đang áp lợi hơn (thông tin, không phải lỗi) · hết hiệu lực lúc đặt (Dialog B8).
+7. **Hành vi**: mỗi đơn tối đa 1 mã; áp mã mới thay mã cũ. Không cộng dồn với ưu đãi tự động (PricingRule), hệ thống lấy cái lợi hơn (mặc định, chờ Duy xác nhận). Kiểm mã qua API (BE-11), không tự tính ở FE. Enter trong ô = bấm "Áp dụng". Gõ lại sau lỗi thì ẩn lỗi. Bỏ mã → quay về trạng thái trống, tổng cũ. Mã lưu cùng giỏ (máy khách); khi đặt hàng gửi `voucher_code`, server kiểm lại.
+8. **Props**:
+```ts
+type VoucherError = 'INVALID' | 'EXPIRED' | 'MIN_ORDER' | 'USED_UP' | 'BETTER_PROMO' | 'NETWORK';
+interface VoucherFieldProps {
+  variant: 'trigger-row' | 'sheet' | 'inline';
+  appliedCode?: string;            // có thì hiện chip
+  discountAmount?: number;         // đồng
+  checking?: boolean;
+  error?: VoucherError;
+  minOrderAmount?: number;         // cho câu MIN_ORDER
+  onApply: (code: string) => void;
+  onRemove: () => void;
+  onOpenSheet?: () => void;        // trigger-row
+}
+```
+9. **Truy cập**: label "Mã giảm giá" gắn ô; lỗi `role="alert"` + `aria-describedby`; áp hoặc bỏ mã báo qua `aria-live="polite"`; nút X `aria-label="Bỏ mã CAVE10"`; sheet theo luật BottomSheet (giữ tiêu điểm, Esc).
+10. **Câu chữ**: "Mã giảm giá" · "Nhập mã" · "Áp dụng" · "Mỗi đơn dùng 1 mã." · "Đã áp mã {MÃ}" · "Giảm giá −{tiền}" · "Bỏ mã". Lỗi: "Mã không đúng hoặc đã hết hạn." · "Đơn cần từ {tiền} để dùng mã này." · "Mã đã hết lượt dùng." · "Ưu đãi đang áp đã có lợi hơn mã này." · "Chưa kiểm được mã. Thử lại." · Dialog: "Mã {MÃ} không còn dùng được" / "Đơn sẽ tính theo giá chưa giảm." / "Đặt hàng không dùng mã" · "Quay lại giỏ".
+11. **Không được**: tự tính số tiền giảm ở FE; cộng dồn nhiều mã; đặt hàng với giá khác giá khách đã thấy mà không hỏi (B8); hiện mã riêng của khách khác; ghi mã vào log kèm số điện thoại.
+12. **Code**: mới `frontend/components/cart/VoucherField.tsx`; sửa `components/cart/CartSummary.tsx`, `features/checkout/*` (gửi `voucher_code`); `lib/api.ts` (`checkVoucher`). Lô **3b** trong `PLAN.md`.

@@ -259,6 +259,7 @@ test lỗi nghiệp vụ.
 | BE-7 | `site-info` thêm `zalo`, `return_report_hours` (E3 "[số] giờ"), có thể thêm `search_chips` | `seller.zalo`, `policies.return_report_hours`, `search_chips:[…]` từ settings/env | — | Low |
 | BE-8 | Tiền tố mã đơn `CV` (nếu Duy chốt) | `gen_code("CV", SalesOrder)` | — | Low |
 | BE-9 | (Tuỳ chọn) báo giá giỏ: giá hiện hành, mức tồn, ưu đãi, tổng; không giữ chỗ | `POST /api/shop/cart/quote/` `{items}` → `{lines:[{item_code,price,stock_level,amount}],discount_total,total}`. Dùng lại bước 1–2 của `create_order` | — | Low (B3 làm được bằng FE) |
+| BE-11 | **Mã giảm giá (mới, chốt 07/10)**: model `Voucher` (mã, kiểu AMOUNT/PERCENT, giá trị, trần giảm, đơn tối thiểu, hiệu lực từ–đến, tổng lượt, đang bật), ghi nhận dùng mã trên đơn (đơn ↔ mã ↔ số tiền giảm, đóng băng lúc tạo đơn như BR-BH-08), API kiểm mã công khai có throttle, ERP để Lộc tạo/tắt mã, AuditLog. Quy tắc với PricingRule: không cộng dồn, lấy lợi hơn | `POST /api/shop/vouchers/check/` `{code, items}` → `{valid, discount_amount, reason_code: INVALID\|EXPIRED\|MIN_ORDER\|USED_UP\|BETTER_PROMO, min_amount?}`; `POST /api/shop/orders/` nhận `voucher_code`; lỗi `VOUCHER_INVALID` khi đặt | `Voucher`, `SalesOrder.voucher` (+ số tiền giảm) | High (lật quyết định cũ, cần BR mới) |
 | BE-10 | Dọn câu lỗi giữ chỗ lộ mã lô (`inventory/batches/services.py:128`) khi trả về Shop | gộp vào BE-3 | — | Low |
 
 Gợi ý tìm kiếm (A9) và "giá cũ" (B3) **không cần BE**. Catalog chỉ vài chục món, FE tải một lần rồi lọc bỏ dấu tại chỗ. Giá cũ nằm sẵn trong giỏ `localStorage`.

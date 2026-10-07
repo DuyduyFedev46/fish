@@ -51,12 +51,22 @@ a{color:#1A5BC0}
 .sg{display:flex;align-items:center;gap:12px;min-height:60px;padding:8px 16px;box-sizing:border-box}
 .th{flex:none;width:44px;height:44px;border-radius:8px;background:#F4F4F6;display:flex;align-items:center;justify-content:center}
 .rc{height:40px;padding:0 14px;box-sizing:border-box;border-radius:20px;border:1px solid #D4D4DB;background:#FFFFFF;color:#17171C;font-size:13px;font-weight:500;display:inline-flex;align-items:center;gap:6px}
+.vrow{display:flex;gap:8px}
+.vcode{font-weight:500;letter-spacing:.04em}
+.vb{flex:none;width:104px;height:44px;box-sizing:border-box;border-radius:8px;background:#1F66D1;color:#FFFFFF;font-weight:600;display:flex;align-items:center;justify-content:center}
+.vb.dis{background:#EBEBEF;color:#686874}
+.vb.sec{width:auto;padding:0 16px;background:#FFFFFF;border:1px solid #1F66D1;color:#1A5BC0}
+.vb.sec.dis{background:#F4F4F6;border-color:#E4E4E9;color:#686874}
+.chipv{height:32px;padding:0 5px 0 10px;box-sizing:border-box;border-radius:999px;background:#E9F7EE;border:1px solid #BFE5CC;color:#157F3D;font-size:13px;font-weight:600;letter-spacing:.04em;display:inline-flex;align-items:center;gap:6px}
+.spin{animation:spin 800ms linear infinite;transform-origin:center}
+@keyframes spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.spin{animation-duration:1.6s}}
 </style>
 </helmet>
 <div style="width: 1280px; box-sizing: border-box; padding: 40px; background: #FBFBFC; color: #17171C; font-family: Inter, system-ui, sans-serif; font-size: 14px; line-height: 1.5; display: flex; flex-direction: column; gap: 28px">
   <div style="display: flex; flex-direction: column; gap: 4px">
     <h1 style="margin: 0; font-size: 24px; font-weight: 600; letter-spacing: -0.015em">Component · Ô nhập và tìm kiếm</h1>
-    <p style="margin: 0; color: #4E4E58">TextField, AddressField, Checkbox, SearchBox, FormErrorSummary. Mọi input chữ 16px để iOS không tự phóng to. Trạng thái vẽ tĩnh. Các ô dưới vẽ ở bề rộng điện thoại (358 = 390 trừ lề 16); máy tính khác chỗ nào thì vẽ thêm.</p>
+    <p style="margin: 0; color: #4E4E58">TextField, AddressField, Checkbox, SearchBox, FormErrorSummary, VoucherField. Mọi input chữ 16px để iOS không tự phóng to. Trạng thái vẽ tĩnh. Các ô dưới vẽ ở bề rộng điện thoại (358 = 390 trừ lề 16); máy tính khác chỗ nào thì vẽ thêm.</p>
   </div>
 
   <section class="sec" aria-labelledby="c-tf">
@@ -341,8 +351,84 @@ a{color:#1A5BC0}
       <p class="use"><strong>Dùng ở:</strong> <code>C2-Invalid.dc.html</code> <code>DesktopInvalid.dc.html</code></p>
     </section>
   </div>
+
+  <section class="sec" aria-labelledby="c-vf">
+    <div style="display: flex; flex-direction: column; gap: 4px">
+      <h2 id="c-vf" class="cname">VoucherField</h2>
+      <p class="desc">Ô nhập mã giảm giá ở giỏ hàng. Mỗi đơn tối đa 1 mã. Không cộng dồn với ưu đãi tự động: lấy cái có lợi hơn cho khách.</p>
+    </div>
+
+    <span class="cap">Biến thể</span>
+    <div style="display: grid; grid-template-columns: 358px 358px 300px; gap: 28px; align-items: start">
+      <div class="st"><span class="na">Điện thoại · dòng mở sheet (CartSummary)</span>
+        <div style="padding: 12px 16px; border: 1px solid #E4E4E9; border-radius: 10px; display: flex; flex-direction: column; gap: 8px">
+          <div style="display: flex; justify-content: space-between; align-items: center; height: 24px; color: #4E4E58"><span>Mã giảm giá</span><span style="display: flex; align-items: center; gap: 2px; color: #1A5BC0; font-weight: 600">Nhập mã<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#1A5BC0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg></span></div>
+        </div>
+        <span class="hint">Bấm cả dòng (vùng chạm 44) mở sheet B5.</span>
+      </div>
+      <div class="st"><span class="na">Điện thoại · trong sheet</span>
+        <div class="f">
+          <div class="vrow"><span class="in" style="flex: 1"><span class="ph">Nhập mã</span></span><span class="vb dis">Áp dụng</span></div>
+          <span class="hint">Mỗi đơn dùng 1 mã.</span>
+        </div>
+      </div>
+      <div class="st"><span class="na">Máy tính · ô inline trong hộp tóm tắt</span>
+        <div class="f"><span class="lb">Mã giảm giá</span>
+          <div class="vrow"><span class="in" style="flex: 1"><span class="ph">Nhập mã</span></span><span class="vb sec dis">Áp dụng</span></div>
+          <span class="hint">Mỗi đơn dùng 1 mã.</span>
+        </div>
+      </div>
+    </div>
+
+    <span class="cap">Trạng thái · vẽ ở bản sheet điện thoại; máy tính giống hệt, chỉ đổi nút sang kiểu viền</span>
+    <div class="g3">
+      <div class="st"><span class="na">Trống · nút disabled</span>
+        <div class="f"><div class="vrow"><span class="in foc" style="flex: 1"><span class="caret" style="margin-left: 0"></span><span class="ph">Nhập mã</span></span><span class="vb dis" aria-disabled="true">Áp dụng</span></div><span class="hint">Mỗi đơn dùng 1 mã.</span></div>
+      </div>
+      <div class="st"><span class="na">Đang gõ · nút bật</span>
+        <div class="f"><div class="vrow"><span class="in foc vcode" style="flex: 1">CAVE10<span class="caret" style="margin-left: 1px"></span></span><span class="vb">Áp dụng</span></div><span class="hint">Mỗi đơn dùng 1 mã.</span></div>
+      </div>
+      <div class="st"><span class="na">Đang kiểm · aria-busy="true"</span>
+        <div class="f"><div class="vrow"><span class="in off vcode" style="flex: 1">CAVE10</span><span class="vb" aria-busy="true" style="opacity: 0.85"><svg class="spin" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="rgba(255,255,255,0.35)" stroke-width="3"></circle><path d="M21 12a9 9 0 0 0-9-9" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round"></path></svg></span></div><span class="hint">Mỗi đơn dùng 1 mã.</span></div>
+      </div>
+      <div class="st"><span class="na">Đã áp · chip + Bỏ mã</span>
+        <div style="display: flex; flex-direction: column; gap: 8px; padding: 12px 16px; border: 1px solid #E4E4E9; border-radius: 10px">
+          <div style="display: flex; justify-content: space-between; align-items: center; color: #4E4E58"><span>Mã giảm giá</span>
+            <span class="chipv"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#157F3D" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12V4h8l10 10-8 8z"></path><circle cx="7.5" cy="8.5" r="1.2"></circle></svg>CAVE10<span aria-label="Bỏ mã CAVE10" style="width: 22px; height: 22px; border-radius: 11px; background: #FFFFFF; display: flex; align-items: center; justify-content: center"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#157F3D" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg></span></span>
+          </div>
+          <div style="display: flex; justify-content: space-between; color: #157F3D; font-weight: 500"><span>Giảm giá</span><span class="num">−86.700đ</span></div>
+        </div>
+        <span class="hint">Máy tính: chip không có X, thêm nút chữ "Bỏ mã" 36 bên phải.</span>
+      </div>
+      <div class="st"><span class="na">Lỗi · aria-invalid="true"</span>
+        <div class="f"><div class="vrow"><span class="in bad vcode" aria-invalid="true" style="flex: 1">CAVE01</span><span class="vb">Áp dụng</span></div>
+          <span class="err"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#C0312B" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7.5v5.5M12 16.5h.01"></path></svg>Mã không đúng hoặc đã hết hạn.</span></div>
+      </div>
+      <div class="st"><span class="na">Ưu đãi đang áp có lợi hơn · không viền đỏ</span>
+        <div class="f"><div class="vrow"><span class="in vcode" style="flex: 1">CAVE10</span><span class="vb">Áp dụng</span></div>
+          <span class="err" style="color: #4E4E58"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4E4E58" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 11v5M12 7.5h.01"></path></svg>Ưu đãi đang áp đã có lợi hơn mã này.</span></div>
+      </div>
+    </div>
+
+    <table class="spec">
+      <thead><tr><th style="width: 18%">Thuộc tính</th><th>Giá trị</th></tr></thead>
+      <tbody>
+        <tr><td>Ô</td><td>Như TextField: cao <code>44</code> · bo <code>8</code> · viền <code>border-input #8C8C98</code> · chữ <code>16/500</code> chữ hoa, giãn <code>.04em</code> · placeholder "Nhập mã" 16/400. Nhãn ẩn trong sheet (tiêu đề sheet đã nói), hiện <code>label 13/500</code> trên máy tính.</td></tr>
+        <tr><td>Nút Áp dụng</td><td>Sheet điện thoại: rộng cố định <code>104</code> × <code>44</code>, bo 8, nền <code>accent</code>. Máy tính: kiểu viền <code>accent</code>, nền trắng, hover <code>accent-soft</code> (nút chính của hộp là "Tiếp tục"). Ô trống → <code>disabled</code>, nền <code>surface-3 #EBEBEF</code>, chữ <code>ink-3</code>.</td></tr>
+        <tr><td>Đang kiểm</td><td>Ô <code>readonly</code> nền <code>surface-2</code>. Nút giữ bề rộng, spinner 18 trắng 800ms, <code>aria-busy="true"</code>, chữ ẩn cho trình đọc "Đang kiểm mã".</td></tr>
+        <tr><td>Đã áp</td><td>Ô thay bằng chip: cao 32, bo 999, nền <code>good-soft #E9F7EE</code>, viền <code>good-border #BFE5CC</code>, chữ <code>13/600 good</code>, icon thẻ 14. Bỏ mã: điện thoại là X 22 trong chip, vùng chạm <code>44</code>, <code>aria-label="Bỏ mã CAVE10"</code>; máy tính là nút chữ "Bỏ mã" 36. Dòng "Giảm giá −[số tiền]" <code>good</code> 14/500, dấu trừ U+2212. Toast "Đã áp mã [MÃ]" 3s (điện thoại).</td></tr>
+        <tr><td>Lỗi</td><td>Viền 1.5 <code>crit</code> + dòng lỗi <code>caption 12/500 crit</code> thay chỗ câu "Mỗi đơn dùng 1 mã.". Gõ lại thì ẩn lỗi. Riêng "Ưu đãi đang áp đã có lợi hơn mã này." là thông tin: chữ <code>ink-2</code>, icon i, ô không viền đỏ.</td></tr>
+        <tr><td>Câu lỗi</td><td>Sai hoặc hết hạn: "Mã không đúng hoặc đã hết hạn." · Chưa đủ điều kiện: "Đơn cần từ [số tiền] để dùng mã này." · Hết lượt: "Mã đã hết lượt dùng." · Kém lợi hơn: "Ưu đãi đang áp đã có lợi hơn mã này." · Mạng: "Chưa kiểm được mã. Thử lại."</td></tr>
+        <tr><td>Kết hợp ưu đãi</td><td>Mặc định không cộng dồn với ưu đãi tự động; hệ thống chọn cái có lợi hơn. Chưa chốt, chờ Duy. Lúc đặt hàng mà mã vừa hết hạn hoặc hết lượt → dialog B8.</td></tr>
+        <tr><td>Thuộc tính HTML</td><td><code>type="text" autocapitalize="characters" autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="done" maxlength="20"</code>. Bỏ khoảng trắng, đổi chữ hoa khi gõ.</td></tr>
+        <tr><td>A11y</td><td>Lỗi: <code>aria-invalid="true"</code> + <code>aria-describedby</code> trỏ dòng lỗi (bình thường trỏ câu "Mỗi đơn dùng 1 mã."), dòng lỗi <code>role="alert"</code>. Áp xong: vùng <code>role="status" aria-live="polite"</code> đọc "Đã áp mã CAVE10. Giảm 86.700đ."; bỏ mã đọc "Đã bỏ mã CAVE10" và focus về dòng Nhập mã.</td></tr>
+        <tr><td>Chuyển động</td><td>Viền và ring 150ms <code>ease-out</code>. Sheet vào 260ms <code>cubic-bezier(.32,.72,0,1)</code>. Đổi số tổng không animate. Reduced-motion: bỏ trượt sheet, spinner chậm 1.6s.</td></tr>
+      </tbody>
+    </table>
+    <p class="use"><strong>Dùng ở:</strong> <code>Cart.dc.html</code> <code>B5-VoucherSheet.dc.html</code> <code>B6-VoucherApplied.dc.html</code> <code>B7-VoucherError.dc.html</code> <code>DesktopCart.dc.html</code> <code>DesktopVoucher.dc.html</code> · dòng giảm giá ở <code>B8-VoucherInvalidAtOrder.dc.html</code> <code>Payment.dc.html</code> <code>Success.dc.html</code> <code>DesktopPayment.dc.html</code></p>
+  </section>
 </div>
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":4800}}'>class Component extends DCLogic { renderVals(){ return {}; } }</script>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":5940}}'>class Component extends DCLogic { renderVals(){ return {}; } }</script>
 </body>
 </html>

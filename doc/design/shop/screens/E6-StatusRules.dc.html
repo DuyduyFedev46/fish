@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<title>Trạng thái đơn quyết định màn hiển thị</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#1A5BC0}a:hover{color:#1A57B5}
+.num{font-variant-numeric:tabular-nums}
+.lab{font-size:12px;font-weight:600;color:#686874;text-transform:uppercase;letter-spacing:.04em}
+.mx{width:100%;border-collapse:separate;border-spacing:0;font-size:13px;background:#FFFFFF;border:1px solid #E4E4E9;border-radius:12px;overflow:hidden}
+.mx th{text-align:left;font-weight:600;color:#4E4E58;padding:10px 12px;background:#F4F4F6;border-bottom:1px solid #D4D4DB;vertical-align:bottom}
+.mx th code{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:12px;color:#0E3A73}
+.mx td{padding:10px 12px;border-bottom:1px solid #E4E4E9;vertical-align:top;color:#17171C}
+.mx tr:last-child td{border-bottom:0}
+.mx td+td,.mx th+th{border-left:1px solid #E4E4E9}
+.st{display:flex;flex-direction:column;gap:2px}
+.st b{font-weight:600}
+.st code{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11px;color:#686874}
+.sc{display:flex;flex-direction:column;gap:4px;align-items:flex-start}
+.tag{font-size:12px;font-weight:600;padding:2px 8px;border-radius:6px;white-space:nowrap}
+.t-d{background:#EBF2FE;color:#1A5BC0}
+.t-e{background:#E9F7EE;color:#157F3D}
+.t-x{background:#EBEBEF;color:#4E4E58}
+.t-w{background:#FDF3E3;color:#A85A07}
+.f{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11px;color:#4E4E58}
+.nt{font-size:12px;color:#686874}
+.spec{width:100%;border-collapse:collapse;font-size:13px;background:#FFFFFF;border:1px solid #E4E4E9}
+.spec th{text-align:left;font-weight:600;color:#4E4E58;padding:8px 12px;border-bottom:1px solid #D4D4DB;background:#F4F4F6}
+.spec td{padding:8px 12px;border-bottom:1px solid #E4E4E9;vertical-align:top;color:#17171C}
+</style>
+</helmet>
+<div style="width: 1280px; box-sizing: border-box; padding: 40px; background: #FBFBFC; color: #17171C; font-family: Inter, system-ui, sans-serif; font-size: 14px; line-height: 1.5; display: flex; flex-direction: column; gap: 32px">
+
+  <div style="display: flex; flex-direction: column; gap: 4px">
+    <span class="lab">E6 · Bảng đặc tả</span>
+    <h1 style="margin: 0; font-size: 24px; font-weight: 600; letter-spacing: -0.015em">Trạng thái đơn quyết định màn hiển thị</h1>
+    <p style="margin: 0; color: #4E4E58">Áp cho <code class="f">/shop/orders/?code=…</code> và trang thanh toán. FE tải đơn trước, rồi chọn màn theo bảng.</p>
+  </div>
+
+  <div role="note" style="padding: 16px 20px; border-radius: 12px; background: #0E3A73; color: #FFFFFF; display: flex; align-items: center; gap: 14px">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 3v6c0 4.5-3 7.8-7 9-4-1.2-7-4.5-7-9V6z"></path><path d="M9 12l2 2 4-4"></path></svg>
+    <span style="font-size: 17px; font-weight: 600">Trạng thái đơn thật luôn thắng tham số <code style="font-family: 'JetBrains Mono', monospace; font-size: 15px; color: #D6E4FA">result</code>.</span>
+  </div>
+
+  <section aria-labelledby="h-mx" style="display: flex; flex-direction: column; gap: 10px">
+    <h2 id="h-mx" style="margin: 0; font-size: 17px; font-weight: 600">Trạng thái đơn × tham số <code class="f" style="font-size: 14px">result</code> → màn</h2>
+    <table class="mx">
+      <thead>
+        <tr>
+          <th style="width: 20%">Trạng thái đơn</th>
+          <th style="width: 20%"><code>result=success</code></th>
+          <th style="width: 20%"><code>result=cancel</code></th>
+          <th style="width: 20%"><code>result=error</code></th>
+          <th style="width: 20%">Không có <code>result</code></th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="st"><b>Chờ thanh toán, còn giờ</b><code>BOOKED</code></span></td>
+          <td><span class="sc"><span class="tag t-d">D3 · Chờ ngân hàng</span><span class="f">D3-PayPending</span></span></td>
+          <td><span class="sc"><span class="tag t-d">D2 · Chưa thành công</span><span class="f">D2-PayCancelled</span></span></td>
+          <td><span class="sc"><span class="tag t-d">D2 · Chưa thành công</span><span class="f">D2-PayCancelled</span></span></td>
+          <td><span class="sc"><span class="tag t-d">D1 · Thanh toán</span><span class="f">Payment</span></span></td>
+        </tr>
+        <tr>
+          <td><span class="st"><b>Chờ thanh toán, hết giờ</b><code>BOOKED, quá giờ giữ</code></span></td>
+          <td colspan="4"><span class="sc"><span class="tag t-x">D4 · Hết giờ giữ hàng</span><span class="f">D4-Expired</span><span class="nt">Dạng trang, không phải popup. Có nút "Đặt lại".</span></span></td>
+        </tr>
+        <tr>
+          <td><span class="st"><b>Đã thanh toán</b><code>PAID</code></span></td>
+          <td><span class="sc"><span class="tag t-e">E1 · Trang đơn</span><span class="f">Success</span><span class="nt">Banner "Thanh toán thành công"</span></span></td>
+          <td colspan="3"><span class="sc"><span class="tag t-e">E1 · Trang đơn</span><span class="f">Success</span><span class="nt">Banner "Đơn đã thanh toán". Không nút thanh toán.</span></span></td>
+        </tr>
+        <tr>
+          <td><span class="st"><b>Đang chuẩn bị</b><code>PROCESSING</code></span></td>
+          <td colspan="3"><span class="sc"><span class="tag t-e">E1 · Trang đơn</span><span class="f">Success</span><span class="nt">Banner "Đơn đã thanh toán"</span></span></td>
+          <td><span class="sc"><span class="tag t-e">E1 · Trang đơn</span><span class="f">Success</span></span></td>
+        </tr>
+        <tr>
+          <td><span class="st"><b>Đang giao</b></span></td>
+          <td colspan="3"><span class="sc"><span class="tag t-e">E1 · bước "Đang giao"</span><span class="f">Success</span><span class="nt">Banner "Đơn đã thanh toán"</span></span></td>
+          <td><span class="sc"><span class="tag t-e">E1 · bước "Đang giao"</span><span class="f">Success</span><span class="nt">Giao lỗi: E4 · <span class="f">E4-DeliveryFailed</span></span></span></td>
+        </tr>
+        <tr>
+          <td><span class="st"><b>Đã giao</b><code>COMPLETED</code></span></td>
+          <td colspan="4"><span class="sc"><span class="tag t-e">E3 · Đã giao</span><span class="f">E3-Delivered</span></span></td>
+        </tr>
+        <tr>
+          <td><span class="st"><b>Đã huỷ</b><code>CANCELLED</code></span></td>
+          <td colspan="4"><span class="sc"><span class="tag t-x">E2 · Đã huỷ</span><span class="f">E2-Cancelled</span><span class="nt">Lý do lấy từ bảng nhãn công khai.</span></span></td>
+        </tr>
+        <tr>
+          <td><span class="st"><b>Tự huỷ do hết giờ</b><code>AUTO_CANCELLED</code></span></td>
+          <td colspan="4"><span class="sc"><span class="tag t-x">D4 · Hết giờ giữ hàng</span><span class="f">D4-Expired</span><span class="nt">Dạng trang. Kể cả khi <code class="f">result=success</code>: tiền về sau xử lý theo E-03.</span></span></td>
+        </tr>
+        <tr>
+          <td><span class="st"><b>Chuyển thiếu tiền</b></span></td>
+          <td colspan="4"><span class="sc"><span class="tag t-w">D5 · Chuyển thiếu</span><span class="f">D5-Underpaid</span></span></td>
+        </tr>
+        <tr>
+          <td><span class="st"><b>Huỷ một phần</b><span class="nt">Còn món giao</span></span></td>
+          <td colspan="4"><span class="sc"><span class="tag t-w">E5 · Bỏ bớt món</span><span class="f">E5-PartialCancel</span><span class="nt">Badge theo trạng thái giao. Món bị bỏ gạch ngang, có tổng mới.</span></span></td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section aria-labelledby="h-ca" style="display: flex; flex-direction: column; gap: 10px">
+    <h2 id="h-ca" style="margin: 0; font-size: 17px; font-weight: 600">Các ca đặc biệt</h2>
+    <table class="spec">
+      <thead><tr><th style="width: 30%">Ca</th><th style="width: 28%">Màn hiện</th><th>Ghi chú</th></tr></thead>
+      <tbody>
+        <tr><td>Mở lại link thanh toán cũ khi đơn đã trả</td><td><span class="tag t-e">E1 · Trang đơn</span></td><td>Banner "Đơn đã thanh toán". Không QR, không đồng hồ.</td></tr>
+        <tr><td>Link thanh toán hết hạn</td><td><span class="tag t-x">D4 · Hết giờ giữ hàng</span></td><td>Dạng trang.</td></tr>
+        <tr><td>F5 giữa chừng</td><td>Giữ nguyên màn theo trạng thái</td><td>Tải lại đơn rồi tra bảng trên. Không dựa vào <code class="f">result</code> cũ trên URL.</td></tr>
+        <tr><td>Tắt trình duyệt rồi quay lại</td><td>Giỏ vẫn còn</td><td>Giỏ lưu trong máy (chỉ mã hàng + số lượng).</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section aria-labelledby="h-gio" style="display: flex; flex-direction: column; gap: 10px">
+    <h2 id="h-gio" style="margin: 0; font-size: 17px; font-weight: 600">Giỏ hàng</h2>
+    <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px">
+      <div style="background: #FFFFFF; border: 1px solid #E4E4E9; border-radius: 12px; padding: 16px 20px; display: flex; flex-direction: column; gap: 4px">
+        <span class="lab">Xoá giỏ</span>
+        <span style="font-weight: 600">Xoá sau khi tạo đơn thành công.</span>
+        <span class="nt">Tạo đơn lỗi (mạng, hết hàng, 409, 429) thì giữ giỏ.</span>
+      </div>
+      <div style="background: #FFFFFF; border: 1px solid #E4E4E9; border-radius: 12px; padding: 16px 20px; display: flex; flex-direction: column; gap: 4px">
+        <span class="lab">Đặt lại từ D4</span>
+        <span style="font-weight: 600">Dựng lại giỏ từ món trong đơn.</span>
+        <span class="nt">Giá và tình trạng hàng lấy mới. Món hết thì báo như B3.</span>
+      </div>
+    </div>
+  </section>
+
+  <section aria-labelledby="h-bn" style="display: flex; flex-direction: column; gap: 10px">
+    <h2 id="h-bn" style="margin: 0; font-size: 17px; font-weight: 600">Banner trên E1</h2>
+    <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px">
+      <div role="img" aria-label="Banner Thanh toán thành công" style="padding: 14px; border-radius: 12px; background: #E9F7EE; display: flex; gap: 12px; align-items: flex-start">
+        <span style="flex: none; width: 36px; height: 36px; border-radius: 18px; background: #157F3D; display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"></path></svg></span>
+        <span style="display: flex; flex-direction: column"><span style="font-weight: 600; color: #157F3D">Thanh toán thành công</span><span style="font-size: 13px">Cá Về sẽ gọi xác nhận trước khi giao.</span></span>
+      </div>
+      <div role="img" aria-label="Banner Đơn đã thanh toán" style="padding: 14px; border-radius: 12px; background: #EBF2FE; display: flex; gap: 12px; align-items: flex-start">
+        <span style="flex: none; width: 36px; height: 36px; border-radius: 18px; background: #1F66D1; display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8"></circle><path d="M12 8v4M12 15.5h.01"></path></svg></span>
+        <span style="display: flex; flex-direction: column"><span style="font-weight: 600; color: #1A5BC0">Đơn đã thanh toán</span><span style="font-size: 13px">Không cần thanh toán lại.</span></span>
+      </div>
+    </div>
+  </section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":1706}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

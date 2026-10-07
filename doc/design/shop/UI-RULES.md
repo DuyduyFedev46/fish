@@ -20,9 +20,21 @@
    Script Google Maps chỉ nạp khi khách bấm "Bản đồ". Không lưu toạ độ.
 3. **Phí giao** không có trong hệ thống. Chỉ ghi "Phí giao: Báo khi xác nhận đơn".
 4. **Giữ hàng 30 phút** bắt đầu khi bấm "Đặt hàng" (không phải khi thêm vào giỏ). Màn thanh toán có đồng hồ đếm ngược, dưới 5 phút thì chuyển màu hổ phách.
-5. Thanh toán duy nhất là **chuyển khoản VietQR qua cổng SePay**. Thanh toán xong thì vào thẳng **trang đơn hàng** (cũng là trang tra cứu), trên cùng có banner "Thanh toán thành công".
-6. **Không hiện chữ "hoàn tiền"** trên Shop. Đơn huỷ sau khi khách đã trả tiền ghi "Cá Về sẽ gọi cho bạn" kèm hotline.
+5. Thanh toán duy nhất là **chuyển khoản ngân hàng quét mã QR (VietQR)**. **Không hiện tên nhà cung cấp cổng thanh toán** trên giao diện khách (nút ghi "Thanh toán", phương thức ghi "Chuyển khoản ngân hàng (quét mã QR)"). Tên cổng chỉ nằm trong code và tài liệu kỹ thuật. Thanh toán xong thì vào thẳng **trang đơn hàng** (cũng là trang tra cứu), trên cùng có banner "Thanh toán thành công".
+6. **Không hiện chữ "hoàn tiền"** trên Shop, **trừ tên trang "Chính sách đổi trả và hoàn tiền"** (bắt buộc công khai theo checklist go-live). Đơn huỷ sau khi khách đã trả tiền ghi "Cá Về sẽ gọi cho bạn" kèm hotline.
 7. Mã đơn hiển thị đúng định dạng code (`SO…`), font mono hoặc `tabular-nums`.
+
+## 2b. Mã giảm giá (chốt 07/10)
+1. Ô "Mã giảm giá" nằm ở **tóm tắt giỏ hàng**: điện thoại là dòng "Nhập mã" mở bottom sheet, máy tính là ô nhập + nút "Áp dụng" ngay trong hộp tóm tắt.
+2. Mỗi đơn **tối đa 1 mã**. Áp xong hiện chip mã + nút "Bỏ mã", dòng "Giảm giá −…" màu good, tổng mới.
+3. Lỗi nói rõ lý do và cách sửa, nằm dưới ô: mã sai/hết hạn, chưa đủ điều kiện ("Đơn cần từ … để dùng mã này."), hết lượt, ưu đãi đang áp lợi hơn, lỗi mạng.
+4. Mã hết hiệu lực ngay lúc đặt → dialog báo, cho đặt tiếp không dùng mã. Không bao giờ tự đặt với giá khác giá khách đã thấy mà không hỏi.
+5. Tóm tắt ở thanh toán và trang đơn có dòng "Mã giảm giá (MÃ) −…".
+6. Không cộng dồn với ưu đãi tự động (mặc định, chờ Duy xác nhận); hệ thống lấy cái lợi hơn.
+
+## 2c. Trạng thái đơn quyết định màn hiển thị
+Trạng thái đơn thật (lấy từ server) **luôn thắng** tham số `result` trên URL. Bảng đầy đủ: `screens/E6-StatusRules.dc.html`.
+Ví dụ: mở lại link thanh toán cũ khi đơn đã trả → trang đơn có banner "Đơn đã thanh toán"; link hết giờ → D4; tải lại trang giữa chừng → giữ đúng màn theo trạng thái. Giỏ chỉ xoá sau khi tạo đơn thành công.
 
 ## 3. Dữ liệu cá nhân (bất biến 9)
 1. Trang đơn hàng và trang tra cứu là **công khai**: **không hiện tên, số điện thoại, địa chỉ người nhận**.
@@ -47,7 +59,7 @@
 5. **Thanh điều hướng đáy** (điện thoại) gồm Trang chủ · Danh mục · Giỏ hàng · Đơn hàng. Chỉ hiện ở Trang chủ, Danh mục, Góc bếp.
 6. **Footer đầy đủ** (F1) gồm:
    - gọi và Zalo;
-   - nhóm Mua hàng, nhóm Chính sách (5 link), nhóm Về Cá Về;
+   - nhóm Mua hàng, nhóm Chính sách (6 link, có "Chính sách đổi trả và hoàn tiền" và "Cơ chế giải quyết khiếu nại"), nhóm Về Cá Về;
    - dải pháp lý (tên doanh nghiệp, MST, địa chỉ, giấy chứng nhận ĐKKD, logo Bộ Công Thương).
    Điện thoại hiện dạng nhóm thu gọn. Giỏ, Đặt hàng, Thanh toán dùng **footer rút gọn** (F2).
 

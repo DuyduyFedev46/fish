@@ -15,6 +15,7 @@
   - **Q8** Ô "Lô mới về" bỏ, hay định nghĩa là lô mở bán trong N ngày?
   - **Q9** Giữ nút "Huỷ đơn" ở màn thanh toán chưa thành công (cần BE-6 và BR mới), hay bỏ?
   - Bước tăng sau 1 kg có đúng là 0,5 kg?
+  - **Voucher**: mã có cộng dồn với ưu đãi tự động không (mặc định: không, lấy lợi hơn)? Ai tạo mã (Lộc trong ERP)? Mã công khai hay mã riêng từng khách (riêng từng khách = dữ liệu cá nhân)?
 - Đã chốt trong thiết kế: Q1 bỏ khối "Giao tới"; Q3 không nêu số kg còn lại; Q5 giữ mã đơn `SO…`.
 
 ## Lô
@@ -24,6 +25,7 @@
 | ☐ | 1 | **Khung chung**: token (thêm `brand-deep` vào `DESIGN.md`) vào `globals.css`, Inter qua `next/font`, `CartProvider` lên root, `ShopHeader` H1–H4, `BottomNav`, `ShopFooter` F1/F2, `Sheet`/`Dialog`/`Toast`/`EmptyState`/`Skeleton`, `/gioi-thieu/` (chuyển landing), `/` trang chủ A1 dựng bằng catalog hiện có, 404 | FE | `frontend/app/layout.tsx`, `app/page.tsx`, **mới** `app/gioi-thieu/`, `app/shop/layout.tsx`, `app/globals.css`, `app/not-found.tsx`, `components/*` (header, footer, mới: BottomNav, ui/*), `features/site/components/SiteLegalFooter.tsx`, `DESIGN.md` (chỉ thêm token), `frontend/e2e/*` liên quan | `lib/api.ts`, `lib/types.ts`, `features/checkout/*`, `backend/` | — |
 | ☐ | 2 | BE-1 (`stock_level`, `unit`, `min_qty`, `qty_step`, slug nhóm), BE-3 (kiểm số lượng, lỗi hết hàng có cấu trúc), BE-10 ∥ FE: danh mục A2, A4–A9, chi tiết A3, A7, A10, giỏ B1–B4 (`/shop/cart/`), `QtyStepper`, `StockBadge`, badge số món | BE ∥ FE | Xem `DOI-CHIEU-CODE.md` §5 lô 2 | migration cũ, `payments/*`, `features/checkout/*` | — |
 | ☐ | 3 | BE-4 (`lines`, `lookup_token`, `client_request_id`), BE-5 (tra đơn POST), BE-6 (nếu Q9 giữ) ∥ FE đặt hàng C1–C5: một ô địa chỉ, `MapPicker` (Maps nạp khi bấm), khối tóm tắt lỗi, popup hết hàng, chống bấm đúp | BE ∥ FE | Xem §5 lô 3 | `payments/checkout.py`, `adapter/` | — |
+| ☐ | 3b | **Mã giảm giá**: BE-11 (model, kiểm mã, áp vào đơn, ERP tạo mã) ∥ FE B5–B8, DesktopVoucher, `VoucherField`, dòng giảm giá ở thanh toán/đơn. Cần quyết định mới ở lô 0 | BE ∥ FE (+ ERP) | BE: app mới hoặc `catalog/pricing/*` + migration, `sales/orders/*`; FE: `app/shop/cart/*`, `components/cart/*`, `features/checkout/*`; ERP: màn mã giảm giá | `PricingRule` hiện có (chỉ đọc) | — |
 | ☐ | 4 | Trang đơn = trang tra cứu: D1–D6, E1–E4, F1–F2 trên `/shop/orders/`, banner thành công, `OrderTimeline`, dựng lại giỏ từ `lines`, popup "Rời trang?", **không hiện người nhận** | FE | `app/shop/orders/*`, `features/checkout/components/OrderPaymentPanel.tsx`, `PaymentPanel.tsx` | `backend/` | — |
 | ☐ | 5 | Trang phụ: chính sách (F3), liên hệ (F4), cách mua (F5), Góc bếp G1, G2; BE-7 `site-info` (Zalo, số giờ báo lỗi) | BE nhỏ ∥ FE | `app/trang/*`, `app/bai-viet/*`, `features/site/*`, `features/content/*`, nơi dựng `site-info` | `content/models` | — |
 | ☐ | 6 | ERP: màn nhập field mặt hàng mới (mô tả, quy cách, bảo quản, nguồn hàng), slug nhóm, chip tìm kiếm | BE nhỏ ∥ FE ERP | `erp-console/features/items/*` và API ERP mặt hàng | Shop | — |
