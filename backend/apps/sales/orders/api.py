@@ -10,7 +10,7 @@ ERP theo design Lô 3 (R3, 02b §3.8): mỗi dòng danh sách có `reason`; thê
 khách hàng, 403 nếu thiếu) và `batch=<pk>` (đơn có phân bổ từ lô). Sai định dạng → 400 `INVALID_FILTER`.
 NEW-1 (Lô 17b-BE, bất biến 9): tìm theo SĐT/tên khách đi bằng `POST /api/sales/orders/search/` (body `{q, status?,
 date_from?, date_to?, customer?, batch?, page?}`, cùng phạm vi, shape và phân trang như danh sách) để từ khoá không
-vào access log. `GET ?q=` chỉ còn khớp mã đơn; `q` có dãy từ 9 chữ số hoặc giống tên người → 400 `SEARCH_USE_POST`.
+vào access log. `GET ?q=` chỉ còn khớp mã đơn; `q` có dãy từ 8 chữ số, SĐT có gạch/chấm hoặc giống tên người → 400 `SEARCH_USE_POST`.
 """
 import datetime
 import re
@@ -46,7 +46,9 @@ from .serializers import SalesOrderDetailSerializer, SalesOrderListSerializer
 INVALID_FILTER = "INVALID_FILTER"
 SEARCH_USE_POST = "SEARCH_USE_POST"
 SEARCH_USE_POST_MESSAGE = "Tìm theo SĐT/tên dùng ô tìm kiếm."  # không lặp lại giá trị `q` (bất biến 9)
-_PHONE_LIKE = re.compile(r"\d{9,}")
+_PHONE_LIKE = re.compile(r"\d{8,}")
+_PHONE_GROUPS = re.compile(r"\d{2,}(?:[-.]\d{2,}){2,}")  # 0912-345-678, 091.234.5678
+_DIGITS_AND_SEPARATORS = re.compile(r"[\d.\-]+")
 SEARCH_BODY_KEYS = ("q", "status", "date_from", "date_to", "customer", "batch")
 # Giao dịch lệch CÒN MỞ trong hàng chờ Chủ (BR-TT-04/05/10, S12 BR-TT-09: đã xử lý thì bỏ)
 # hoặc phiếu giao thất bại (BR-GH-04) → cần chú ý.
@@ -72,8 +74,13 @@ def _parse_positive_int(raw, name):
 
 
 def looks_like_personal_search(q):
-    """`q` của GET chỉ được là mã đơn: dãy từ 9 chữ số (SĐT) hoặc có khoảng trắng / chữ ngoài ASCII (tên người) bị từ chối."""
-    return bool(_PHONE_LIKE.search(q)) or any(ch.isspace() or ord(ch) > 127 for ch in q)
+    """`q` của GET chỉ được là mã đơn. Bị từ chối: dãy từ 8 chữ số, SĐT có gạch/chấm (0912-345-678, 0912.345678),
+    hoặc có khoảng trắng / chữ ngoài ASCII (tên người). Mã đơn `SO261007-4F2A1C` chỉ có một gạch nên không dính."""
+    if _PHONE_LIKE.search(q) or _PHONE_GROUPS.search(q):
+        return True
+    if _DIGITS_AND_SEPARATORS.fullmatch(q) and sum(ch.isdigit() for ch in q) >= 8:
+        return True
+    return any(ch.isspace() or ord(ch) > 127 for ch in q)
 
 
 def _filters_from_body(data):

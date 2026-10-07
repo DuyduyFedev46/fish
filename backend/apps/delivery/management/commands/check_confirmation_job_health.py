@@ -1,5 +1,5 @@
 """
-Giám sát sức khoẻ job xử lý thời hạn CSKH (02b §5.2).
+Giám sát sức khoẻ job xử lý thời hạn Gọi xác nhận (02b §5.2).
 Exit code 1 nếu phát hiện:
 1. Task PENDING quá first_unreachable_at + W + 10' mà chưa chuyển ESCALATED
 2. (Khi CONFIRMATION_AUTO_CANCEL_ENABLED=1) Task ESCALATED quá escalated_at + D + 10' mà chưa tự huỷ
@@ -17,7 +17,7 @@ logger = logging.getLogger("cangca.delivery.confirmation")
 
 
 class Command(BaseCommand):
-    help = "Kiểm tra sức khoẻ của job xử lý thời hạn CSKH (exit 1 nếu job có dấu hiệu chết)."
+    help = "Kiểm tra sức khoẻ của job xử lý thời hạn Gọi xác nhận (exit 1 nếu job có dấu hiệu chết)."
 
     def add_arguments(self, parser):
         parser.add_argument("--grace-minutes", type=int, default=10, help="Số phút trễ cho phép (mặc định 10).")

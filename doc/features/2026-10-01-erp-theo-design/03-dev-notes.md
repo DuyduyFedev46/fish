@@ -2690,3 +2690,7 @@ Test mới `sales/orders/tests/test_order_search_post.py` (17 ca). Test cũ chuy
 
 **Việc FE cần làm (17b-FE2):** màn Đơn hàng gửi `POST /api/sales/orders/search/` khi có ô tìm; ô tìm theo mã (⌘K H1) dùng `GET ?q=` chỉ với chuỗi giống mã; xử lý 400 `SEARCH_USE_POST`. Mock danh bạ khách bỏ nhánh GET `q` (G10).
 **Nợ:** `q` GET một từ ASCII không dấu ngắn không bị chặn (xem trên). `invoices/?q=` vẫn nhận `q` tự do (không tìm SĐT/tên nên không lộ dữ liệu cá nhân, đã có test `test_invoice_list`).
+
+### Lô 17b-BE — sửa sau QA (2 Low)
+- `confirmation/api.py`: 4 câu 403 đổi "CSKH" thành "Gọi xác nhận" (`truy cập hàng chờ Gọi xác nhận`, `xem chi tiết đơn …`, `nhận xử lý đơn …`, `tìm kiếm đơn …`); cả help của 2 management command. Còn "CSKH" ở nhãn vai (`accounts/auth/services.py:39`, `ai/settings/services.py:101`), verbose_name trong migration cũ và comment: không đổi (nhãn vai thuộc quyết định tên chuẩn riêng).
+- `GET orders/?q=`: chặn thêm dãy từ 8 chữ số, SĐT có gạch/chấm (`0912-345-678`, `091.234.5678`, `0912.345678`) → 400 `SEARCH_USE_POST`. Mã đơn một gạch (`SO261007-123456`) vẫn qua.
