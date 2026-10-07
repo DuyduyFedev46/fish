@@ -10,7 +10,7 @@ import threading
 from unittest import mock, skipUnless
 
 from django.contrib.auth.models import Group, User
-from django.db import close_old_connections, connection
+from django.db import connection
 from django.test import TransactionTestCase
 from rest_framework.test import APIClient
 
@@ -84,7 +84,7 @@ class ConcurrentSaveRaceTests(TransactionTestCase):
                 put_url(roles.WAREHOUSE_STAFF), {"version": version, "scopes": {"receipts": value}}, format="json")
             results[index] = response.status_code
         finally:
-            close_old_connections()
+            connection.close()
 
     def test_pv10_ac5_two_parallel_saves_one_wins(self):
         client = APIClient()

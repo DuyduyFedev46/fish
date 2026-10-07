@@ -375,5 +375,5 @@ test PV-05/dashboard xanh. Trạng thái chờ đã gỡ (`PENDING_DUY_DIFFS` r�
 - SQLite: `Ran 3526 tests in 289s — OK (skipped=3)`.
 - PostgreSQL 16 (DB `cangca_pvqd`, main chưa có sửa Postgres): `Ran 3523 — FAILED (failures=13, errors=55)`. Toàn bộ nằm trong nhóm lỗi đã biết của nhánh `fix/postgres-compat`:
   28 `FOR UPDATE cannot be applied to the nullable side of an outer join` (huỷ phiếu nhập, publish lô, claim xác nhận, hoàn tác AI trả 502 vì dispatch bắt lỗi này, và mốc PV-01 lệch `actions.confirmation_claim=EXC:NotSupportedError`),
-  23 `seed_qa` guard (22 lỗi + `test_password_env_is_required`), 3 race `django_content_type` unique, `test_qa_lo4_tien` (2), `supplier_crud` (1 sắp xếp), `shop_labels` (varchar 12), cost overflow (1), `completion_race_postgres` (2, cùng nhóm FOR UPDATE/race). Không có ca đỏ ngoài danh sách.
+  23 `seed_qa` guard (22 lỗi + `test_password_env_is_required`), 1 race `django_content_type` unique (`test_pv10_ac5`, sửa khi gộp `fix/postgres-compat`, M1), `test_qa_lo4_tien` (2), `supplier_crud` (1 sắp xếp), `shop_labels` (varchar 12), cost overflow (1), `completion_race` admin.logentry (2, đã sửa ở `fix/postgres-compat`). Không có ca đỏ ngoài danh sách.
 - `makemigrations --check --dry-run`: No changes detected. `python3 scripts/check_naming.py`: OK, không phát sinh mới.

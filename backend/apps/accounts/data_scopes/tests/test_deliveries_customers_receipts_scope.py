@@ -368,6 +368,27 @@ class CustomerScopeTests(SceneApiBase):
         again = self.get("manager", "/api/sales/orders/", customer=str(outside.pk))
         self.assertEqual(again.data["count"], 1)
 
+    def _post_search(self, label, body):
+        client = APIClient()
+        client.force_authenticate(self.user(label))
+        return client.post("/api/sales/orders/search/", body, format="json")
+
+    def test_pv05_ac6_search_body_customer_outside_d7_is_empty_for_int_and_string(self):
+        outside = self.scene.customers["customer_of_order_assigned_other"]
+        set_scope(roles.MANAGER, "customers", "assigned_deliveries")
+        for value in (outside.pk, str(outside.pk)):
+            response = self._post_search("manager", {"customer": value})
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.json()["count"], 0)
+        set_scope(roles.MANAGER, "customers", "all")
+        for value in (outside.pk, str(outside.pk)):
+            self.assertEqual(self._post_search("manager", {"customer": value}).json()["count"], 1)
+
+    def test_pv05_ac6_search_body_customer_invalid_value_is_400(self):
+        for value in ("abc", -1, 0, True, ["1"]):
+            response = self._post_search("manager", {"customer": value})
+            self.assertEqual(response.status_code, 400, value)
+
     def test_pv05_ac6_order_filter_by_customer_inside_d7_returns_rows(self):
         own = self.scene.customers["customer_of_order_assigned_courier"]
         response = self.get("courier", "/api/sales/orders/", customer=str(own.pk))

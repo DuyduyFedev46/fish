@@ -8,7 +8,6 @@ from rest_framework import serializers
 
 from .models import DeliveryNote, LabelPrint
 from . import services
-
 from .pii_scope import is_note_pii_expired
 
 
