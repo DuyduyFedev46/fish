@@ -4085,3 +4085,202 @@ Dựng lại như lần 1 (runserver 8621 + `http.server` 3521, build `MOCK=0` m
 Ghi chú: bộ kiểm riêng `qa_new1` của QA đỏ 5/47 chỉ vì cứng mã đơn và mã phiếu của lần seed trước (mã sinh ngẫu nhiên mỗi lần dựng DB); phần tương ứng đã được `ed_batch17` đọc mã thật phủ.
 
 Lỗi còn lại: không có. L-1 (3 kịch bản lỗi thời), L-2 (GET `q` có gạch và 8 số) và L-3 (chữ CSKH) của lần 1 đã đóng. L-4 (không giới hạn tần suất `search/`) và L-5 (nhiễu prefetch RSC của `http.server`) vẫn là ghi nhận, không chặn. Mục ⏸ `npm ci` sạch vẫn chưa kiểm (dùng symlink `node_modules`).
+
+
+---
+
+## Hồi quy toàn bộ (08/10)
+
+Phần e2e của hồi quy `02e-lo17.md` mục 6.2 và 6.3. Chạy trên `main` **697ced4** (nhánh `qa/regression-08-10`). Mục 6.1 do điều phối viên chạy (BE 3357 OK, adapter 68, ERP vitest 1229, build, check) và không chạy lại ở đây. Không sửa code sản phẩm.
+
+### Kết luận: CHƯA đạt 6.3 điều 2 theo chữ ("E2E không có ca đỏ"); KHÔNG tìm thấy lỗi sản phẩm mới
+
+- Không có lỗi sản phẩm mới ở mức Critical, High hay Medium. Mọi ca đỏ đã được soi nguyên nhân và rơi vào: kịch bản lỗi thời, cần build bật AI (ngoài phạm vi), nhiễu `http.server`, hoặc cần fixture riêng mà kịch bản QA một lần đòi.
+- Điều kiện chưa đạt: 17 file kịch bản lỗi thời còn đỏ, 18 file e2e BE thật cần fixture riêng của lúc viết và 4 file CMS ⏸ (chưa kiểm). Với 22 file ⏸ này, kết luận "không có lỗi sản phẩm" chỉ dựa vào phần ca đã chạy và các e2e dev/QA cùng chủ đề đã xanh, không phải bằng chính file đó.
+- Đề xuất: một lô dọn e2e (viết lại hoặc xoá 17 file lỗi thời; dựng fixture dùng chung hoặc xoá 18 file QA một lần) rồi chạy lại. Hoặc Duy duyệt ngoại lệ có ghi nhận.
+
+### Số liệu
+
+- ERP (`erp-console/e2e`): 103 tệp `.py`, 3 là mô-đun/mẫu dùng chung (`orders_common`, `qa_ed_batch1_common`, `qa_ed_batch1_template`), 100 kịch bản chạy được. 116 lượt chạy (tệp × chế độ): **6694 ca đạt, 152 ca đỏ** (ca đỏ gồm cả phần dừng giữa chừng do lỗi kịch bản, nên số ca của file dừng sớm là cận dưới).
+- Phân loại 100 kịch bản: **56 xanh hoàn toàn** (48 xanh ở chế độ thường + 8 xanh khi bật AI); **17 lỗi thời** (S); **1 đã biết** (K); **1 nhiễu môi trường** (E); **3 còn đỏ vì AI** (ngoài phạm vi); **18 ⏸ cần fixture riêng** (F); **4 ⏸ chưa dựng** (CMS).
+- Shop (`frontend/e2e`): 13 tệp. 8 chạy, **493 ca đạt, 0 đỏ**. 5 ⏸ (xem bảng Shop).
+
+### Cách chạy (để lặp lại)
+
+- Build `erp-console` ba bản: `NEXT_PUBLIC_USE_MOCK=1` (tắt AI), `NEXT_PUBLIC_USE_MOCK=1 NEXT_PUBLIC_AI_FEATURES=1` (bật AI), `NEXT_PUBLIC_USE_MOCK=0 NEXT_PUBLIC_API_BASE=http://127.0.0.1:8621`. Mỗi bản build một lần, copy ra scratchpad, dựng `http.server` tĩnh (3141 mock, 3142 mock bật AI, 3521 BE thật). Build `frontend` ba bản (mock, API giả `localhost:8199`, API `127.0.0.1:8621`), dựng cổng 3220–3227.
+- BE thật: `runserver 127.0.0.1:8621 --noreload`, `DJANGO_DEBUG=1`, SQLite tạm **copy mới từ DB gốc cho từng kịch bản**, `AI_ENABLED=0`, `THROTTLE_LOGIN_IP/USER=off`. DB gốc: `migrate`, `bootstrap_masterdata`, `seed_demo`, thêm người dùng giả `loc/ql1/kho1/giao1/giao2/cs1/cs2/quanly1`, 7 phiếu giao đủ trạng thái, 3 phiếu nhập, mã đơn đổi sang dạng `SO261007-nnnnnn`. Fixture bổ sung theo kịch bản (nhà cung cấp `QA …`, phiếu ESCALATED + cuộc gọi của cs1 cho `sr09`, giá trị mật khẩu) dựng bằng `manage.py shell`/SQL trước khi bật BE.
+- Mỗi lần chỉ một kịch bản, nền, ghi log ra tệp, giới hạn 600–900 giây. Tắt máy chủ theo PID của mình. **Mã thoát của nhiều kịch bản không phản ánh đúng (in FAIL mà thoát 0)**, nên kết quả lấy từ nội dung log.
+
+### Bảng theo từng file e2e (ERP)
+
+Nhãn: ✅ xanh · ✅ khi bật AI · ❌ kịch bản lỗi thời (S) · ❌ đã biết (K) · ❌ nhiễu môi trường (E) · ❌ AI (ngoài phạm vi) · ⏸ cần fixture riêng (F) · ⏸ chưa dựng. "BE thật" là SQLite tạm, AI tắt.
+
+| File (`erp-console/e2e/`) | Chế độ và đạt/tổng | Nhãn | Ghi chú nguyên nhân |
+|---|---|---|---|
+| `a2_catalog_real.py` | BE thật 6/6 | ✅ |  |
+| `ai_text_hidden_all_routes.py` | mock tắt AI 24/24 · mock bật AI 14/14 · BE thật 24/24 | ✅ | |
+| `confirmation_route.py` | mock tắt AI 8/8 | ✅ |  |
+| `confirmation_scripts_tag_lookup.py` | mock tắt AI 92/92 | ✅ |  |
+| `delete_return.py` | mock tắt AI 21/21 | ✅ |  |
+| `ed_batch10_purchasing.py` | mock tắt AI 115/115 | ✅ |  |
+| `ed_batch11_real.py` | BE thật 21/21 | ✅ |  |
+| `ed_batch11_suppliers.py` | mock tắt AI 103/103 | ✅ |  |
+| `ed_batch12_accounting.py` | mock tắt AI 100/100 | ✅ |  |
+| `ed_batch12_real.py` | BE thật 16/16 | ✅ |  |
+| `ed_batch13_catalog.py` | mock tắt AI 128/128 | ✅ |  |
+| `ed_batch14_permissions.py` | mock tắt AI 99/101 · mock bật AI 99/101 | ❌ kịch bản lỗi thời | 2 ca: (1) kịch bản đọc hộp 'Cho nghỉ' của giao1 trước khi xong bước 'Đang kiểm tra phiếu đang giao' (chờ 2,5 s thì đạt, đã đo); (2) kiểm sessionStorage không lọc khoá giả `cave_erp_mock_orders` (SĐT giả của mock, bản thật không có khoá này) |
+| `ed_batch15_overview_ai_account.py` | mock tắt AI 11/11 · mock bật AI 203/203 | ✅ khi bật AI | Build tắt AI: dừng ở ca đầu cần khối AI. Build bật AI: 203/203 |
+| `ed_batch16_content.py` | mock tắt AI 121/121 | ✅ |  |
+| `ed_batch16_real.py` | BE thật 25/25 | ✅ |  |
+| `ed_batch17_command_search.py` | mock tắt AI 21/21 · BE thật 21/21 | ✅ |  |
+| `ed_batch1_shell.py` | mock tắt AI 56/56 · mock bật AI 56/56 | ✅ |  |
+| `ed_batch2_patterns.py` | mock tắt AI 43/47 · mock bật AI 75/75 | ✅ khi bật AI | Build tắt AI 43/47 (4 ca về khối AI). Bật AI 75/75 |
+| `ed_batch3_fixes.py` | mock tắt AI 77/94 · mock bật AI 103/103 | ✅ khi bật AI | Build tắt AI 77/94 (17 ca khối AI). Bật AI 103/103 |
+| `ed_batch3_orders.py` | mock tắt AI 144/144 | ✅ |  |
+| `ed_batch3_real.py` | BE thật 17/19 | ❌ kịch bản lỗi thời | 2 ca: chip 'Đang xử lý'/'Đã huỷ' nay là 'Đang soạn hàng'/'Hết giờ giữ chỗ'; tab 'Phiếu hoàn' nay là 'Phiếu hoàn tiền' (tên chuẩn) |
+| `ed_batch4_delivery.py` | mock tắt AI 70/70 | ✅ |  |
+| `ed_batch5_confirmation.py` | mock tắt AI 126/127 · mock bật AI 129/129 | ✅ khi bật AI | Tắt AI 126/127 (ai_block). Bật AI 129/129 |
+| `ed_batch6_customers.py` | mock tắt AI 79/79 | ✅ |  |
+| `ed_batch7_inventory.py` | mock tắt AI 113/114 · mock bật AI 114/114 | ✅ khi bật AI | Tắt AI 113/114 (ca 'AI bật'). Bật AI 114/114 |
+| `ed_batch7_real.py` | BE thật 8/9 | ❌ nhiễu môi trường | 1 ca console bắt 'Failed to fetch RSC payload' của `http.server` tĩnh (đã biết, ghi từ QA Lô 7/SR-07); 8 ca còn lại đạt |
+| `ed_batch8_stocktake.py` | mock tắt AI 129/129 | ✅ |  |
+| `ed_batch8_stocktake_real.py` | BE thật 21/21 | ✅ |  |
+| `ed_batch9_real.py` | BE thật 30/30 | ✅ |  |
+| `ed_batch9_returns.py` | mock tắt AI 145/145 | ✅ |  |
+| `ed_bonusA_ui.py` | mock tắt AI 35/38 · mock bật AI 49/49 | ✅ khi bật AI | Tắt AI 35/38 (ai_budget, #19 'Nhờ người xử lý'). Bật AI 49/49 |
+| `ed_form_keyboard_focus.py` | mock tắt AI 4/4 | ✅ |  |
+| `ed_shell_fixes.py` | mock tắt AI 0/0 | ❌ kịch bản lỗi thời | Dừng ở `.order-open` (class đã bỏ từ Lô 3, bảng đơn là DataTable); phần harness Back/tab chưa chạy tới cuối |
+| `l7_1_open_redirect.py` | mock tắt AI 16/16 | ✅ |  |
+| `late_payment_record.py` | mock tắt AI 32/32 | ✅ |  |
+| `note_br_gh_19.py` | mock tắt AI 10/10 | ✅ |  |
+| `order_completion_detail.py` | mock tắt AI 16/16 | ✅ |  |
+| `order_completion_erp.py` | mock tắt AI 6/6 | ✅ |  |
+| `orders_search_post.py` | mock tắt AI 11/11 · BE thật 10/10 | ✅ |  |
+| `p8_lo5_fe_lo_qua_han.py` | mock tắt AI 1/2 | ❌ kịch bản lỗi thời | SR-17-AC3 đòi đúng 3 cột; bảng 'Đơn hàng gần đây' nay 5 cột (không có cột Khách); ô `input[type=search]` đã đổi |
+| `p8_lo5_qa_real_backend.py` | BE thật 0/0 | ⏸ cần fixture riêng | Cần lô EXPIRED còn 6,5 kg của fixture riêng |
+| `p8_lo6_fe_sr19_sr20.py` | mock tắt AI 45/49 · mock bật AI 54/54 | ✅ khi bật AI | Tắt AI 45/49 (khối AI). Bật AI 54/54 |
+| `p8_lo7_fe_erp.py` | mock tắt AI 75/83 | ❌ kịch bản lỗi thời | 8 ca L1: nhãn 'Lập chứng từ đảo doanh thu' nay là 'Lập phiếu trừ doanh thu' (log hiện nhãn mới, đúng thứ tự) |
+| `p8_lo8_fe_erp_tz.py` | mock tắt AI 83/83 | ✅ |  |
+| `qa_ed_batch10_mock.py` | mock tắt AI 33/33 | ✅ |  |
+| `qa_ed_batch10_real.py` | BE thật 143/143 | ✅ |  |
+| `qa_ed_batch10_second_pass.py` | mock tắt AI 0/0 | ⏸ cần fixture riêng | Cần BE thật (ở đây chạy nhầm bản mock: Connection refused); chưa dựng lại fixture của Lô 10 vòng 2 |
+| `qa_ed_batch11_api.py` | BE thật 157/158 | ❌ kịch bản lỗi thời | 1 ca S2: kịch bản gọi `submit_receipt` hai lần; BE nay chặn lần hai bằng RECEIPT_NOT_DRAFT (commit bb0137c, QA Lô 10 B1) |
+| `qa_ed_batch11_mock_infofield.py` | mock tắt AI 29/29 | ✅ |  |
+| `qa_ed_batch11_real.py` | BE thật 87/91 | ⏸ cần fixture riêng | 87/91 rồi dừng: DB tự dựng chưa đủ dữ liệu riêng của kịch bản (dòng Nháp 99.999.900 đ) và chọn NCC ở form nhập lô nay là nhóm radio, không phải `<select>` |
+| `qa_ed_batch1_roles.py` | mock tắt AI 32/35 | ❌ kịch bản lỗi thời | giao1 nay có menu 'Hàng hoàn' (Lô 9); EXPECTED_MENU thiếu mục này; `/ai/policy/` ẩn vì build tắt AI |
+| `qa_ed_batch1_round2.py` | mock tắt AI 0/0 · harness 0/0 | ❌ kịch bản lỗi thời | `.order-open` không còn (Lô 3); chạy cả mock và harness đều dừng ở đó |
+| `qa_ed_batch1_shell.py` | mock tắt AI 11/14 · mock bật AI 66/78 | ❌ kịch bản lỗi thời | Tắt AI 11/14, bật AI 66/78 rồi dừng: EXPECTED_MENU thiếu 'Hàng hoàn'; ⌘K nay mở theo mã chứng từ (ED-07); tab '/orders/' đổi tên; ca 'Bất biến 9' do React tự ghi lỗi ra console (đã biết, ghi trong `app/(console)/error.tsx`); 8 ca 'localStorage rác' đỏ vì cùng EXPECTED_MENU (đã đo tay: width 240, không collapsed, 19 mục) |
+| `qa_ed_batch2_followup.py` | mock tắt AI 1/7 · harness 60/63 | ❌ AI (ngoài phạm vi) | Mock 1/7 (cổng 3101 cứng ở phần B, nên đã chạy lại với MOCK_BASE). Harness 60/63, 3 ca đỏ đều là `[data-proposal]`/`[data-ai-block]` (harness không bật AI) |
+| `qa_ed_batch2_harness.py` | harness 52/53 | ❌ AI (ngoài phạm vi) | 52/53, ca đỏ duy nhất `h_ai` cần `[data-ai-block]` (harness không bật cờ AI) |
+| `qa_ed_batch2_patterns.py` | mock tắt AI 66/67 · mock bật AI 79/79 | ✅ khi bật AI | Tắt AI 66/67. Bật AI 79/79 |
+| `qa_ed_batch3_followup.py` | mock tắt AI 79/82 · mock bật AI 95/97 | ❌ AI (ngoài phạm vi) | Tắt AI 79/82, bật AI 95/97: nhóm 2 và 2b (khối AI đề xuất) timeout click |
+| `qa_ed_batch3_money.py` | mock tắt AI 231/231 | ✅ |  |
+| `qa_ed_batch3_orders.py` | mock tắt AI 318/318 · mock bật AI 319/319 | ✅ |  |
+| `qa_ed_batch3_real.py` | BE thật 47/54 | ⏸ cần fixture riêng | Cứng mã đơn `SO261002-B00003` và dữ liệu đơn đang giao của fixture cũ (KeyError 'status') |
+| `qa_ed_batch3_real_ai.py` | BE thật 1/1 | ⏸ cần fixture riêng | Cứng mã đơn `SO261002-B00003` (StopIteration) |
+| `qa_ed_batch4_ac.py` | mock tắt AI 17/17 | ✅ |  |
+| `qa_ed_batch4_round2.py` | mock tắt AI 26/27 | ❌ kịch bản lỗi thời | Tab 'Soạn hàng' nay là 'Đang soạn hàng' |
+| `qa_ed_batch4_ui.py` | mock tắt AI 48/50 | ❌ đã biết | 2 ca: 'Bắt đầu giao' (nợ 8b, ghi ngay trong tên ca) và 'sắp có' cho Mang hàng về kho (đã làm ở Lô 9) |
+| `qa_ed_batch5_real.py` | BE thật 0/0 | ⏸ cần fixture riêng | Cần biến QA_JOB, QA_IDS (lệnh job và id của fixture riêng) |
+| `qa_ed_batch5_round2.py` | mock tắt AI 151/153 | ❌ kịch bản lỗi thời | B5: bước hiện tại nay là 'Đã xong' (không phải 'Hoàn tất') |
+| `qa_ed_batch5_ui.py` | mock tắt AI 250/251 | ❌ kịch bản lỗi thời | 'Soạn hàng' nay là 'Đang soạn hàng' (so chuỗi có hoa chữ S) |
+| `qa_ed_batch6_api.py` | BE thật 31/32 | ⏸ cần fixture riêng | Cần dữ liệu khách `Khách Thử A…`; còn gọi `GET customer-directory/?q=<SĐT>` (BE nay 400 SEARCH_USE_POST) |
+| `qa_ed_batch6_real.py` | BE thật 43/44 | ⏸ cần fixture riêng | Cần dữ liệu khách `Khách Thử A` (0900000101) |
+| `qa_ed_batch7_mock.py` | mock tắt AI 310/321 | ❌ kịch bản lỗi thời | 11 ca: kịch bản chờ `table.lt` nên chụp nhầm trang Tổng quan (nay có bảng đơn, giá trị đơn 312.000 trùng số mồi) thay vì trang Kho; đã đo tay trang Kho/chi tiết lô của kho1, ql1: không số mồi, không giá vốn; khoá mock trong sessionStorage |
+| `qa_ed_batch7_real.py` | BE thật 0/0 | ⏸ cần fixture riêng | Cần tệp token và DB của phiên QA cũ (đường dẫn scratchpad cứng) |
+| `qa_ed_batch8_real.py` | BE thật 23/24 | ⏸ cần fixture riêng | Fixture kiểm kê riêng (mgr1/mgr2/store1/store2 và phiếu đếm sẵn); chạy với DB tự dựng 23/24 rồi dừng |
+| `qa_ed_batch8_real_followup.py` | BE thật 5/5 | ⏸ cần fixture riêng | Như trên, dừng sau 5 ca |
+| `qa_ed_batch8_real_round2.py` | BE thật 16/17 | ⏸ cần fixture riêng | Như trên, 16/17 rồi dừng (ca K8 đọc nhầm menu) |
+| `qa_ed_batch9_api.py` | BE thật 52/83 | ⏸ cần fixture riêng | Cần fixture phiếu giao id 1..9 của `qa9/seed.py` |
+| `qa_ed_batch9_real.py` | BE thật 3/5 | ⏸ cần fixture riêng | Cần lô `CA01` của fixture riêng |
+| `qa_ed_batch9_real_closed.py` | BE thật 0/0 | ⏸ cần fixture riêng | Cần lô `TOM01` của fixture riêng |
+| `qa_ed_batch9_ui.py` | mock tắt AI 95/97 | ❌ kịch bản lỗi thời | ql1 nay có nút 'Nhập hàng hoàn' (Lô bổ sung A 02/10, manager có add_returntostock); kiểm storage không lọc khoá mock |
+| `qa_lo7_login_next.py` | mock tắt AI 34/34 | ✅ |  |
+| `qa_lo7_real_expired.py` | BE thật 0/0 | ⏸ cần fixture riêng | Cổng 3219/8118 và lô EXPIRED có giá mua 777001 cứng |
+| `qa_lo8_real.py` | BE thật 0/0 | ⏸ cần fixture riêng | Cần QA_ORDER, QA_CS_ORDERS (đơn dựng bằng đồng hồ Django đóng băng) |
+| `ra_soat_cms03_ac13_mobile.py` | không chạy | ⏸ chưa dựng | Cần Django :8104 + ERP :3204 + bài mẫu CMS; chưa dựng |
+| `ra_soat_cms04_autosave.py` | không chạy | ⏸ chưa dựng | Như trên |
+| `ra_soat_cms05_upload_mobile.py` | không chạy | ⏸ chưa dựng | Như trên |
+| `ra_soat_cms11_ac3_restore_confirm.py` | không chạy | ⏸ chưa dựng | Như trên |
+| `ra_soat_cs02_cs05_mobile_360.py` | mock tắt AI 11/11 | ✅ |  |
+| `ra_soat_cs11_ac6_label_pdf.py` | mock tắt AI 5/5 | ✅ |  |
+| `ra_soat_x_ac4_storage.py` | mock tắt AI 33/33 | ✅ |  |
+| `s10_s11_orders.py` | mock tắt AI 42/42 | ✅ |  |
+| `s12_s13_queue.py` | mock tắt AI 66/66 | ✅ |  |
+| `s14_s16_cancel_refund.py` | mock tắt AI 0/0 | ❌ kịch bản lỗi thời | Dừng ở chọn lý do huỷ 'Khác' (nhãn nay là 'Lý do khác') |
+| `s41_s47_real.py` | BE thật 40/40 | ✅ |  |
+| `s41_s47_staff.py` | mock tắt AI 74/74 | ✅ |  |
+| `s48_password.py` | mock tắt AI 41/41 | ✅ |  |
+| `s7_shell.py` | mock tắt AI 22/24 | ❌ kịch bản lỗi thời | Danh sách menu của Chủ và giao1 thiếu các mục mới ('Hàng hoàn' và các mục sau Lô 9) |
+| `sr07_qa_edges.py` | mock tắt AI 23/23 | ✅ |  |
+| `sr07_receive_batches_draft.py` | mock tắt AI 18/18 | ❌ kịch bản lỗi thời | Bước 5 gửi phiếu khi giá mua rỗng; giá mua nay bắt buộc (17b: 'giá mua bắt buộc') |
+| `sr09_ac4_real_backend.py` | BE thật 11/11 | ✅ |  |
+| `sr09_ac4_stale_state.py` | mock tắt AI 24/24 | ✅ |  |
+| `standard_names_all_routes.py` | mock tắt AI 11/11 · BE thật 9/11 | ⏸ cần fixture riêng | BE thật 9/11: seed thiếu phiếu hoàn tiền và nhật ký phiếu giao thất bại để quét hai chip. Bản mock 11/11 |
+
+### Shop (`frontend/e2e/`)
+
+| File | Chế độ | Đạt | Nhãn |
+|---|---|---|---|
+| `order_lookup_completed.py` | mock | 4/4 | ✅ |
+| `order_lookup_no_raw_codes.py` | mock | 19/19 | ✅ |
+| `qa-lo7-shop-xss.py` | mock | 52/52 | ✅ |
+| `qa-lo8-shop-format.py` | mock + build thật, API giả `localhost:8199` | 54/54 | ✅ |
+| `qa-lo6-sr21-shop.py` | build thật, API giả `localhost:8199` | 279/279 | ✅ |
+| `qa-lo7-shop-links.py` | build thật, API giả | 16/16 | ✅ |
+| `qa-lo7-shop-real.py` | build thật, API giả | 23/23 | ✅ |
+| `ra-soat-a2-golive.py` | build thật, API giả | 46/46 | ✅ |
+| `qa-lo8-shop-django.py` | BE thật | chưa chạy | ⏸ cần `QA_ORDER_PAID/REFUNDED/PENDING` (đơn dựng bằng đồng hồ Django đóng băng) |
+| `qa_sepay_checkout.py` | BE thật + adapter | chưa chạy | ⏸ cần adapter :8199 với secret, hàng `QA-ROUND` và máy chủ tĩnh riêng cổng 3410 |
+| `ra_soat_cms06_item_card.py`, `ra_soat_cms13_public.py`, `ra_soat_cms14_landing.py` | BE thật :8104 | chưa chạy | ⏸ cổng 3104/8104 cứng, cần bài mẫu CMS |
+
+Phạm vi "AI tắt": các ca bỏ qua có in lý do (`standard_names_all_routes`: "SKIP Shop: chưa đặt SHOP_BASE" ở bản ERP; script Shop của nó không chạy trong đợt này).
+
+### Đối chiếu 6.3
+
+| Điều | Kết quả | Bằng chứng |
+|---|---|---|
+| 1. Mọi lệnh 6.1 xanh, ghi số thật | ✅ (điều phối viên) | Không chạy lại ở đây. Số e2e xem phần trên |
+| 2. E2E không có ca đỏ (trừ ca bỏ qua có lý do khi AI tắt) | ❌ chưa đạt theo chữ | 17 kịch bản lỗi thời, 1 đã biết, 1 nhiễu môi trường, 3 AI, 22 ⏸. Không ca nào là lỗi sản phẩm |
+| 3. Ca ngoài đường thuận cho 17a/17b | ✅ | `ed_batch17_command_search` 21/21 trên **mock và BE thật** (mã đúng mẫu mà không có, giao1 gõ mã phiếu của người khác, gõ tên/SĐT không gọi API tra chứng từ, chữ thường). `orders_search_post` 11/11 mock, 10/10 BE thật (tìm không ra, `q` không vào URL/storage, không có GET danh sách mang `q`). `ed_batch8_stocktake` 129/129 mock (banner 409 trong khung nhìn, có focus, hai cỡ màn). `ed_batch12_real` 16/16 (so số báo cáo 2 chữ số lẻ). `sr09_ac4_real_backend` 11/11 (màn cũ sau khi job tự huỷ: 409 STALE_STATE, bấm Tải lại). `qa_ed_batch10_real` 143/143 (giá mua bắt buộc) |
+| 4. Không rò giá vốn, không rò dữ liệu cá nhân ở lượt BE thật | ✅ | Xem hai bảng dưới |
+| 5. techlead review, qa-tester APPROVED | ngoài phạm vi phần này | |
+| 6. ☑ Lô 17 ở 02c | chưa | chờ điều 2 |
+
+**Rò giá vốn (BE thật, người dùng `kho1`, `giao1`, `cs1`, `ql1`, `loc`, token thật, AI tắt):**
+
+| Endpoint | `kho1` | `giao1` | `cs1` | `ql1` | `loc` |
+|---|---|---|---|---|---|
+| `GET /api/reports/batches/`, `/reports/batch/<mã>/`, `/reports/period/` | 403 | 403 | 403 | 403 | 200 (có `landed_unit_cost`, `profit`) · `period` 400 thiếu tham số |
+| `GET /api/dashboard/summary/` | 200 không khoá giá vốn | 403 | 403 | 200 không khoá giá vốn | 200 (có `unit_cost`) |
+| `GET /api/audit-logs/` | 403 | 403 | 403 | 200 | 200 |
+| `GET /api/inventory/batches/` | 200 không `purchase_rate`, `landed_unit_cost` | 403 | 403 | 200 không khoá giá vốn | 200 có |
+| `GET /api/sales/invoices/`, `/purchasing/receipts/` | 200 không `gross_profit`, `unit_cost`, `rate` | 403 | 403 | 200 không khoá giá vốn | 200 có |
+
+Trang Kho và chi tiết lô của `kho1`, `ql1` ở bản mock: không chứa số giá mua/giá vốn của mock; từ "giá vốn" chỉ có ở tiêu đề mục "Số lượng & giá vốn", không có giá trị (đã đo tay; xem `qa_ed_batch7_mock`).
+
+**Rò dữ liệu cá nhân (BE thật):**
+
+| Kiểm | Kết quả |
+|---|---|
+| Log `runserver` của mọi lượt (khoảng 4600 dòng) chứa tên, SĐT, địa chỉ của khách giả (13 giá trị lấy từ DB) | ✅ 0 dòng |
+| URL request chứa SĐT/từ khoá tìm đơn | ✅ không (`orders_search_post` BE thật: 0 GET `q=` mang từ khoá, `search/` là POST; `GET orders/?q=0903338472` → 400 `SEARCH_USE_POST`) |
+| Console, URL, storage ở BE thật | ✅ `ed_batch17_command_search` (storage/URL không chứa từ khoá), `sr09_ac4_real_backend` (console/URL/storage không SĐT/tên/địa chỉ) đạt |
+| Quan sát (Low, không phải lỗi sản phẩm) | Hai dòng log có SĐT: (1) `GET customer-directory/?q=<SĐT>` 403 do **chính kịch bản** `qa_ed_batch6_real` gửi (kịch bản cũ, FE không gửi); (2) `GET purchasing/suppliers/?q=<SĐT nhà cung cấp>` do `qa_ed_batch11_real` tìm theo SĐT đối tác. SĐT nhà cung cấp không thuộc dữ liệu cá nhân của khách (bất biến 9), nhưng vẫn nằm trong URL |
+
+### Lỗi sản phẩm
+
+Không có. Không tạo B-mục.
+
+### Điểm cần Duy/điều phối viên quyết
+
+1. Dọn e2e: viết lại hoặc xoá 17 file lỗi thời (danh sách ở bảng, nhãn "kịch bản lỗi thời"). Đề xuất gom nhận diện bằng `data-testid` thay vì chữ hiển thị để khỏi gãy mỗi lần đổi tên chuẩn.
+2. 18 file e2e BE thật cần fixture riêng: dựng một lệnh `seed_qa` dùng chung (hoặc xoá bớt file trùng với `ed_batch*_real`), nếu không điều 2 của 6.3 không bao giờ xanh trên máy sạch.
+3. Ca AI còn đỏ (`qa_ed_batch2_followup`, `qa_ed_batch2_harness`, `qa_ed_batch3_followup`) ngoài phạm vi theo yêu cầu, ghi nhận để lô AI xử lý.
+
+### Lệnh đã chạy (tóm tắt)
+
+- `NEXT_PUBLIC_USE_MOCK=1 npm run build` (3 biến thể) và `NEXT_PUBLIC_USE_MOCK=0 NEXT_PUBLIC_API_BASE=… npm run build` ở `erp-console` và `frontend`: exit 0, mỗi bản một lần.
+- Từng file: `python3 -u erp-console/e2e/<file>.py` (hoặc `frontend/e2e/<file>.py`) với `BASE`/`REAL_API`/`QA_*` tương ứng, `AI_FEATURES=1` cho bản bật AI, nền, log riêng.
+- Probe tay (Playwright/`urllib`) để xác minh nguyên nhân: hộp "Cho nghỉ" của giao1, 8 giá trị `cave_ui_sidebar` rác, trang Kho/chi tiết lô của kho1 và ql1, hộp "Huỷ đơn", ma trận endpoint giá vốn ở BE thật, quét log BE tìm dữ liệu cá nhân.
+- Dọn: kill theo PID (13 tiến trình), xoá DB tạm, `out/` của hai app, `.next`, bản build harness vite (ở scratchpad), 3 symlink (`backend/.env`, `backend/staticfiles`, `erp-console/out`); `git status` sạch trước khi ghi report này.
