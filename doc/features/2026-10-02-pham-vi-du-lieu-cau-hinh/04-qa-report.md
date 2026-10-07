@@ -156,7 +156,7 @@ Không có lỗi chặn.
 **Kết luận: APPROVED** — chạy thật trên BE (SQLite tạm, `seed_qa`) + ERP build thật và mock; không có lỗi chặn.
 Nhánh `feat/qd-0810` HEAD `49392a3`. Quyết định: câu 1 (superuser như Chủ), câu 2 (tắt AI ẩn dòng cài đặt/chính sách AI), câu 6 (D-3, cổng BE `AUTH_NO_ROLE`), câu 13 (nhãn "Nhân viên gọi xác nhận"). Dữ liệu chỉ là dữ liệu giả `seed_qa`.
 
-**Tổng: 148 ca · ✅ 148 · ❌ 0 · ⏸ 0** (sau khi loại 7 lần "FAIL" do lỗi kịch bản QA của chính tôi, ghi ở "Ghi chú kịch bản").
+**Tổng: 107 ca kiểm tay chạy thật (api 27, api2 7, ui 50, probe route 9, nhật ký 10, AI bật 4) + 149 ca e2e hồi quy + 173 test BE tập trung · ❌ 0 · ⏸ 0** (các "FAIL" ở lượt đầu đều là lỗi kịch bản của QA, đã kiểm lại đúng, xem "Ghi chú kịch bản").
 
 ### Bảng ca
 | Nhóm | Ca | Kết quả | Bằng chứng |
