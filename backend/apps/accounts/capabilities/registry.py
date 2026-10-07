@@ -47,7 +47,7 @@ CAPABILITIES = (
     ),
     Capability("view_customers", "Xem khách hàng", SECTION_SALES, ("sales.view_customer_list",)),
     Capability(
-        "view_order_customer_info", "Xem thông tin khách trên đơn & hoá đơn", SECTION_SALES,
+        "view_order_customer_info", "Xem thông tin khách trên đơn, hoá đơn, phiếu hoàn tiền", SECTION_SALES,
         ("sales.view_order_customer_info",),
     ),
     Capability(

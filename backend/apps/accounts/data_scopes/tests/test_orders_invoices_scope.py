@@ -346,7 +346,7 @@ class CustomerInfoCapabilityRegistryTests(TestCase):
         self.assertFalse(v2.owner_only)
         others = {p for c in registry.CAPABILITIES if c.key not in (V1, V2) for p in c.perms}
         self.assertFalse(others & set(v1.perms + v2.perms))
-        self.assertEqual(v2.label, "Xem thông tin khách trên đơn & hoá đơn")
+        self.assertEqual(v2.label, "Xem thông tin khách trên đơn, hoá đơn, phiếu hoàn tiền")
 
     def test_pv07_ac1_matrix_after_migration(self):
         expected_v1 = {roles.OWNER: "on", roles.MANAGER: "on", roles.WAREHOUSE_STAFF: "on",

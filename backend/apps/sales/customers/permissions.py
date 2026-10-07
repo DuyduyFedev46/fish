@@ -18,7 +18,7 @@ def can_view_customer_directory(user) -> bool:
     return bool(user and user.is_authenticated and user.has_perm(VIEW_CUSTOMER_LIST_PERM))
 
 
-# PV-07 (BR-PQ-38): việc V2 "Xem thông tin khách trên đơn & hoá đơn". Khác `view_customer_list` ở trên: V2 chỉ điều khiển
+# PV-07 (BR-PQ-38): việc V2 "Xem thông tin khách trên đơn, hoá đơn, phiếu hoàn tiền". Khác `view_customer_list` ở trên: V2 chỉ điều khiển
 # ô tên, SĐT, địa chỉ trên đơn, hoá đơn bán, phiếu hoàn tiền; danh bạ khách và phiếu giao có luật riêng (D7, D3 + cửa sổ).
 VIEW_ORDER_CUSTOMER_INFO_PERM = "sales.view_order_customer_info"
 

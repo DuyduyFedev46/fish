@@ -257,6 +257,11 @@ class SeedQaCoverageTests(SeedQaBase):
         self.assertTrue(User.objects.get(username="qa_superuser").is_superuser)
         self.assertEqual(len(groups), len(USERS))
 
+    def test_no_group_user_has_direct_permissions_for_d3_gate_check(self):
+        # D-3 (Duy 08/10): e2e BE thật cần ca "có quyền gán trực tiếp vẫn bị chặn".
+        perms = set(User.objects.get(username="qa_nogroup").user_permissions.values_list("codename", flat=True))
+        self.assertEqual(perms, {"view_salesorder", "view_refund"})
+
     def test_password_comes_from_env_for_every_user(self):
         for user in User.objects.all():
             self.assertTrue(user.check_password(PASSWORD), user.username)

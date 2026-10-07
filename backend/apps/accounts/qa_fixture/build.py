@@ -18,7 +18,7 @@ from decimal import Decimal
 from uuid import NAMESPACE_URL, uuid5
 
 from django.contrib.auth import get_user_model
-from django.contrib.auth.models import Group
+from django.contrib.auth.models import Group, Permission
 from django.db import transaction
 from django.utils import timezone
 
@@ -73,6 +73,9 @@ USERS = [
     ("qa_nogroup", [], False, "QA Không nhóm (giả)"),
     ("qa_superuser", [], True, "QA Superuser (giả)"),
 ]
+
+# D-3 (Duy 08/10): người không nhóm được gán sẵn quyền trực tiếp để e2e bắt ca "có quyền vẫn bị chặn".
+DIRECT_PERMS = {"qa_nogroup": [("sales", "view_salesorder"), ("sales", "view_refund")]}
 
 # code, tên, giá bán, giá vốn/kg (số giả)
 ITEMS = [
@@ -172,6 +175,12 @@ class QaSeed:
             user.set_password(self.password)
             user.save()
             user.groups.set(Group.objects.filter(name__in=group_names))
+            user.user_permissions.set(
+                Permission.objects.filter(
+                    content_type__app_label=app_label, codename=codename,
+                ).first()
+                for app_label, codename in DIRECT_PERMS.get(username, [])
+            )
             profile, _ = StaffProfile.objects.get_or_create(
                 user=user,
                 defaults={"phone": f"0900000{900 + len(self.users):03d}"[:10], "display_name": display},
