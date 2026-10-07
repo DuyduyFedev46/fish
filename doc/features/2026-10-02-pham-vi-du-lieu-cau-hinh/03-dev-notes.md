@@ -171,3 +171,13 @@ Thứ tự đã làm: M1+L1 (commit riêng, sinh lại mốc trên HEAD chưa s�
 - **L4 (Lô 5):** dòng D7 lưu `all` mà nhóm thiếu `view_customer_list` phải có `note`, ví dụ "Bật Xem khách hàng để thấy tất cả khách" (giá trị hiệu lực là `assigned_deliveries`).
 - **L2 phần Lô 5:** bước "trước" của `rows_losing_access` gọi `resolve_data_scopes(member, overrides={})` (`{}` khác `None` nên không bị nhớ). Test Lô 3+ đổi cấu hình dùng `User.objects.get(pk=…)` mới.
 - Lô 3/4 không được thêm `APPROVED_DIFFS` cho `direct_permissions` khi Duy chưa trả lời D-3.
+
+## Lô QĐ-08/10 FE (erp-console, Duy duyệt 08/10: câu 1, D-3, câu 13)
+
+- Superuser không nhóm vào ERP như Chủ: `Me.is_superuser`, `Viewer.is_superuser` (nav.ts, logic menu không đổi), `SUPERUSER_LABEL = "Quản trị hệ thống"` ở `shared/lib/groups.ts`; `roleText` (ConsoleGate) và AccountScreen ("Quản trị hệ thống (toàn quyền)") hiện nhãn này khi không có nhóm mà là superuser.
+- D-3: `NO_ROLE_CODE = "AUTH_NO_ROLE"` (`features/auth/types.ts`). AuthProvider: 403 mã này đặt `me.home = "no-role"` rồi tải lại `me`, ConsoleGate đưa về `/no-role/` (không đi nhánh 403 chung vì nhánh đó chỉ tải lại `me` và có thể không chuyển trang). `/no-role/` đổi chữ thành "Bạn không có quyền vào hệ thống vận hành".
+- Mock: `admin` thành `home: "dashboard"` + `is_superuser`; thêm `nogroup1` (id 13, không nhóm, có quyền gán lẻ) và cổng mock trả 403 `AUTH_NO_ROLE` (thêm vào `beErrors.mock.ts`) cho mọi API trừ me/logout/change-password/token, đứng sau kiểm mật khẩu tạm. LoginScreen gợi ý tài khoản mock đổi theo.
+- Nhãn `customer_service` thành "Nhân viên gọi xác nhận" (`GROUP_LABEL`, nhãn nhóm lệnh AI ở `ai/settings/mock.ts`, một câu 404 mock). Mã nhóm giữ. Nhãn V2 mới do BE trả, FE không chép.
+- e2e đổi `admin` thành `nogroup1` cho ca không nhóm: s7_shell (thêm ca admin vào /overview/, menu có Phân quyền, không có Việc giao của tôi), qa_ed_batch1_roles, ed_batch15_overview_ai_account, s48_password (đích chờ của admin là /overview/). Vitest: `englishNames.test.ts` đổi nhãn; mới `features/auth/superuser.test.ts`.
+- Không đụng `features/permissions/**`, backend/, frontend/.
+- Nợ/ghi chú: ed_batch15_overview_ai_account cần build bật AI (chờ `[data-attention=ai_proposals]`); ở build tắt AI nó dừng ở ca này, không liên quan lô. Tên hiển thị người mock "CSKH Thử"/"CSKH Khác" và từ khoá tìm AI "cskh" giữ nguyên (không phải nhãn vai).

@@ -14,6 +14,8 @@ export type Viewer = {
   home: "dashboard" | "my-deliveries" | typeof HOME_CONFIRMATION_QUEUE | "no-role";
   /** S48: còn dùng mật khẩu tạm → chỉ được mở màn "Đặt mật khẩu mới". */
   must_change_password?: boolean;
+  /** Duy 08/10 câu 1: superuser không nhóm vẫn vào ERP (BE trả home = dashboard); menu lọc theo quyền như mọi người. */
+  is_superuser?: boolean;
   /** W39: BE báo cờ AI. Cùng cờ build quyết định có hiện mục AI hay không (`aiVisible`). */
   ai_features_enabled?: boolean;
 };
