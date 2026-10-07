@@ -161,3 +161,37 @@ Các chỗ còn lại là `Model.objects.select_for_update().get/filter(...)` kh
 - PostgreSQL 16, DB riêng `cangca_b12`, toàn suite: `Ran 3409 tests in 282.515s — OK` (không skip).
 - SQLite tuần tự, toàn suite: `Ran 3409 tests in 196.660s — OK (skipped=6)` (6 ca đua chỉ chạy trên Postgres).
 - `makemigrations --check --dry-run`: No changes detected. `check_naming.py`: OK, không vi phạm mới.
+
+## Review techlead B1/B2 (08/10)
+
+**Kết luận: REVIEW PASS — APPROVED** (commit `ba3b213`). Không có lỗi chặn; 4 ghi chú Low, sửa khi tiện.
+
+### (1) B2 `record_purchase_cost` ∥ `cancel_receipt` (BR-MH-07, giá vốn)
+- **Huỷ vào trước, chi phí chờ khoá lô.** `FOR UPDATE` trả bản lô mới nhất; truy vấn `PurchaseReceipt(status=CANCELLED, lines__batch_id__in=…)` là câu lệnh mới nên có snapshot mới (READ COMMITTED) và thấy phiếu CANCELLED → 400 `BATCH_CANCELLED`. Đúng.
+- **Cửa sổ huỷ đã khoá phiếu+dòng nhưng chưa tới lô, chi phí khoá lô trước.** Chi phí đọc phiếu thấy SUBMITTED (huỷ chưa commit), ghi allocation, commit, nhả lô. Huỷ lấy được khoá lô, `batch.cost_allocations.exists()` là câu mới nên thấy allocation → 400 BR-MH-07, rollback toàn bộ. Kết quả hợp lệ (chi phí vào lô thật của phiếu còn hiệu lực).
+- **Deadlock khi chi phí phân bổ nhiều lô thuộc nhiều phiếu.** Chi phí chỉ giữ khoá lô (cộng FOR KEY SHARE lên lô đã giữ khi insert allocation, `recompute_landed_cost` chỉ save lô đã khoá), không bao giờ chờ phiếu hay dòng. Huỷ chờ phiếu/dòng (chi phí không giữ) và lô. Cả hai khoá lô bằng một câu `ORDER BY pk` (LockRows nằm trên Sort nên khoá theo thứ tự pk). Các lệnh huỷ khác nhau khoá tập lô rời nhau. Không có chu trình chờ.
+- Hành vi giữ nguyên: lô không có `source_line` vẫn nhận chi phí; lô CANCELLED do quá hạn (BR-LO-03) vẫn nhận chi phí đến muộn (E-14, BR-GV-02) vì chỉ xét trạng thái phiếu.
+
+### (2) B1 `claim_task`
+- Câu khoá chỉ còn bảng `ConfirmationTask`; `note` và `User` người giữ đọc bằng truy vấn mới sau khoá → luôn thấy bản đã commit. `note` không khoá, giống trước (`of=self`), nên không hồi quy.
+- 409 `CLAIMED` chỉ chứa `get_full_name()`/`username` của **nhân viên** và `claimed_until`. Không có tên, SĐT hay địa chỉ khách. Không log. Đạt bất biến 9.
+
+### (3) Bốn chỗ sửa thêm
+- `escalate_expired_windows` (doc ghi nhầm tên `escalate_unreachable`): vẫn khoá phiếu → task; dùng `note_obj` đã khoá thay `task.note`, đúng hơn bản cũ.
+- `submit_receipt`: phiếu → dòng (thêm `order_by("pk")`); `line.item` đọc lazy (thêm N truy vấn nhỏ, chấp nhận được).
+- `cancel_receipt`: phiếu → dòng → lô không đổi; chỉ dùng `line.batch_id`.
+- `_mark_failed`: `skip_locked` trên một dòng `AiAction`, `owner` đọc lazy; `.first()` thêm ORDER BY pk, vô hại.
+- Không còn chỗ nào `select_for_update` kèm `select_related` trong `backend/apps` (đã grep cả chuỗi nhiều dòng).
+
+### (4) Test đua — techlead tự chạy (DB riêng `cangca_tlb12`, đã xoá)
+- Code cũ `a69f380` + test mới: `test_b1_waiter…` đỏ 15/15, `test_b1_two_claims…` đỏ 15/15, `test_b2_cost_waiting_on_lock…` đỏ 15/15. Vậy test chờ khoá bắt được lỗi một cách xác định, không pass ngẫu nhiên.
+- Code mới `ba3b213`: 3 lần liên tiếp `Ran 4 tests … OK`. SQLite: `OK (skipped=4)`.
+
+### Ghi chú Low (không chặn)
+- **L1.** `test_cost_cancel_race_postgres.py:96` có `outcomes_seen` được gán nhưng không bao giờ assert, là code chết. Nên assert `len(outcomes_seen) == 2` (đo được: cả hai cặp đều xuất hiện trong mọi lần chạy) hoặc xoá biến.
+- **L2.** `test_b2_cancel_and_cost_at_once_never_both_succeed` **xanh trên code cũ** (`a69f380`, đã chạy): lệch 0–50 ms không tạo ra ca chờ khoá. Lỗi B2 thật chỉ được `test_b2_cost_waiting_on_lock…` bắt. Ghi chú này để tránh hiểu nhầm là test đó canh B2. Cần giữ nó làm test bất biến "không bao giờ cả hai thành công".
+- **L3.** Khi xoá `_is_cancelled_batch` (`costs/services.py`), đã mất lý do vì sao không xét `batch.status` (lô huỷ do quá hạn vẫn nhận chi phí muộn, E-14, BR-GV-02). Nên thêm lại một dòng comment cạnh `cancelled_batch_ids` để người sau không “sửa” thành kiểm `batch.status`.
+- **L4.** Các test chờ khoá dựa vào `time.sleep(0.4)`. Hiện đỏ 15/15 trên code cũ nên đủ dùng; nếu CI chậm có thể thay bằng vòng chờ `pg_stat_activity.wait_event_type = 'Lock'`.
+
+### Skill
+Đã thêm quy tắc "khoá dòng không kèm join; quan hệ dùng để quyết định thì đọc lại sau khoá; test đua có ca chờ khoá" vào `.claude/skills/django-drf-patterns/SKILL.md`, mục Service.
