@@ -210,3 +210,15 @@ Hồ sơ: `doc/features/2026-09-26-sepay-cong-thanh-toan/`.
 ## 2026-10-07 — W37 đơn hoàn tất, tên chuẩn — [DUY CHỐT]
 - **W37:** NV giao bấm giao xong phiếu cuối thì đơn tự "Hoàn tất" (không nút tay). Bỏ dùng `PAID`. Chuyển bù đơn cũ một lần (staging trước, production khi Duy duyệt). Dòng thời gian gộp "Đã giao" + "Đơn hoàn tất". Chi tiết đơn có "Đã hoàn x đ · Chờ hoàn y đ". BA được ghi BR-BH-18..21, BR-BC-06 và sơ đồ §7.2 mới vào spec. Story: `doc/features/2026-10-06-don-hoan-tat/02-stories.md`.
 - **Tên chuẩn:** duyệt toàn bộ mục 4 `doc/thuat-ngu-va-trang-thai.md`: "Phiếu trừ doanh thu", chip riêng "Hết giờ giữ chỗ", menu "Hàng hoàn", phiếu giao xong "Đã giao", trang `terms` = "Điều kiện giao dịch chung".
+
+## 2026-10-08 — Trả lời 13 câu chờ Duy (06-cho-duy-08-10.md) — [DUY CHỐT]
+- **Superuser không thuộc nhóm** vào được ERP với quyền cao nhất như Chủ (lật S6-AC4, S47-AC5).
+- **Tắt AI thì ẩn hết dòng AI** trong Nhật ký, gồm cả dòng Chủ đổi cài đặt/chính sách AI (`ai_config_*`, `ai_policy_*`).
+- **Không** chặn SĐT trong lý do/ghi chú phiếu hoàn tiền (câu 3). **Không** che tên/SĐT nhân viên ở nhật ký `staff_create` (câu 4).
+- **Chống race condition Huỷ ∥ Giao xong (W37 T1):** làm, chạy test đua trên PostgreSQL thật.
+- **D-3: người không thuộc nhóm nào** (kể cả có quyền gán trực tiếp) **không được vào ERP**, báo lỗi không có quyền. Trừ superuser (ý trên). Phạm vi Lô 4–7 và F1 FE được làm tiếp.
+- **Phiếu giao luôn có đủ tên, SĐT, địa chỉ người nhận** cho người xem được phiếu đó (NV giao cần để giao), bản in cũng đầy đủ. V2 "xem thông tin khách" **không** áp cho phiếu giao, chỉ áp cho đơn, hoá đơn, phiếu hoàn tiền.
+- **Người kiêm NV kho + CSKH** ở Gọi xác nhận: theo đề xuất của điều phối viên (Duy giao đề xuất): áp phạm vi như nhóm, thấy việc đang chờ gọi và việc mình đã gọi trong N ngày; Chủ muốn họ thấy hết thì nới phạm vi Gọi xác nhận của nhóm ở màn Phân quyền.
+- **BR-TT-18** (#15 ghi tiền về muộn) ghi vào spec gốc §P-05. **NEW-1** (tìm đơn bằng POST) giữ như đã làm.
+- **Đợt 2 rà soát giao diện (17c):** chưa làm, ưu tiên staging chạy ổn trước.
+- **Nhãn vai "CSKH"** đổi thành tên dễ hiểu ("Nhân viên gọi xác nhận"); mã nhóm `customer_service` giữ nguyên.
