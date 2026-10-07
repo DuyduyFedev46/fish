@@ -57,7 +57,7 @@ class ShopLookupLabelTests(OrderApiBase):
     def test_unknown_delivery_status_never_returns_raw_code(self):
         order = self._paid_order(phone=PHONE)
         note = order.invoice.delivery_notes.first()
-        DeliveryNote.objects.filter(pk=note.pk).update(status="FUTURE_STATUS")
+        DeliveryNote.objects.filter(pk=note.pk).update(status="FUTURE")
         body = self._lookup(order).json()
         self.assertEqual(body["delivery"]["status_label"], UNKNOWN_STATUS_LABEL)
         self.assertEqual(UNKNOWN_STATUS_LABEL, "Đang cập nhật")
