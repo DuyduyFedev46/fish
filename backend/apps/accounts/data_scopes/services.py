@@ -1,7 +1,7 @@
 """
 Mô tả phạm vi dữ liệu của nhóm cho màn Phân quyền (W3i/W3h), PV-02, 02b §2.1–§2.2.
 
-Lô 2: ĐỌC (`data_scopes` 8 dòng, `data_scope_values` 6 đối tượng sửa được, chuỗi `scopes` cũ).
+Lô 2: ĐỌC (`data_scopes` 8 dòng, `data_scope_values` 6 đối tượng sửa được; chuỗi `scopes` cũ đã bỏ ở Lô 6).
 Lô 5 (PV-08..PV-10): kiểm giá trị (`parse_scope_changes`), tầm với và mở rộng dữ liệu khách (`reach`, `widened_objects`, 02b §2.5),
 xem trước (`preview_group_changes`, 02b §2.4), áp (`apply_scope_changes`). Việc đổi nhóm có khoá lạc quan, AuditLog và gọi các hàm này
 nằm ở `capabilities/services.py`.
@@ -20,19 +20,6 @@ from .resolver import resolve_data_scopes
 OWNER_NOTE = "Chủ luôn thấy tất cả"
 INVOICES_NOTE = "Theo Đơn hàng"
 DEFAULT_VERSION = 1
-
-# Chuỗi `scopes` cũ (FE tới Lô 6): giữ nguyên nhãn đang dùng, dựng từ cấu hình thay vì bảng cố định.
-LEGACY_ORDERS = {
-    "all": "Tất cả",
-    "assigned_deliveries": "Được gán",
-    "assigned_or_confirmation": "Được gán hoặc trong phạm vi gọi xác nhận",
-}
-LEGACY_DELIVERIES = {"all": "Tất cả", "assigned": "Được gán"}
-LEGACY_ALL_CUSTOMERS = "Tất cả khách"
-LEGACY_ASSIGNED = "Được gán"
-LEGACY_NONE = "Không xem"
-CUSTOMER_LIST_PERM = "sales.view_customer_list"
-CUSTOMER_PERM = "sales.view_customer"
 
 
 def load_stored(group_ids) -> dict:
@@ -133,25 +120,6 @@ def _row(group, obj, held, stored):
 def describe_data_scopes(group, held, stored) -> list:
     """8 dòng D1..D8 của nhóm (02b §2.2). `held` = tập permission `app.codename` của nhóm; `stored` = cấu hình đã lưu."""
     return [_row(group, obj, held, stored) for obj in catalog.OBJECTS]
-
-
-def legacy_scopes(group, held, stored) -> dict:
-    """Chuỗi `scopes` cũ ({orders, deliveries, customers}) dựng từ cấu hình đã lưu; bỏ ở Lô 6 cùng lúc FE đổi kiểu.
-
-    `customers` vẫn theo quyền thực tế (M2, bất biến 9): nhóm có `sales.view_customer_list` -> "Tất cả khách"; không thì
-    "Được gán" chỉ khi cấu hình là `assigned_deliveries` và nhóm có `sales.view_customer`, còn lại "Không xem"."""
-    values = data_scope_values(group, stored)
-    if CUSTOMER_LIST_PERM in held or _is_owner(group):
-        customers = LEGACY_ALL_CUSTOMERS
-    elif values["customers"] == "assigned_deliveries" and CUSTOMER_PERM in held:
-        customers = LEGACY_ASSIGNED
-    else:
-        customers = LEGACY_NONE
-    return {
-        "orders": LEGACY_ORDERS[values["orders"]],
-        "deliveries": LEGACY_DELIVERIES[values["deliveries"]],
-        "customers": customers,
-    }
 
 
 # --- Lô 5: kiểm, mở rộng dữ liệu khách, xem trước, áp (PV-08, PV-09; 02b §2.3–§2.5) --------------------------------

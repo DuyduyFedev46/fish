@@ -28,7 +28,6 @@ from rest_framework.response import Response
 from rest_framework.views import exception_handler as drf_exception_handler
 
 from .exceptions import BusinessError
-from apps.accounts import roles
 from apps.ai.declare import AiDeclarable
 
 VIEW_COSTPRICE_PERM = "inventory.view_costprice"
