@@ -1,6 +1,6 @@
 /* Giao diện console theo DESIGN.md (gốc repo): tinh gọn kiểu Linear/Notion, một màu nhấn xanh biển.
    CHỈ dùng token trong ./tokens.css (nạp trước file này ở app/layout.tsx) — không viết mã màu/px rời cho màu, bóng.
-   Mobile-first: mặc định cho 360px, mở rộng ở 768px (menu trái cố định) và 1024px (3 cột). */
+   Mobile-first: mặc định cho 360px, mở rộng ở 768px (menu trái cố định) và 1024px (khung 2 cột). */
 
 /* ---------- Nền tảng ---------- */
 *,*::before,*::after{box-sizing:border-box}
@@ -37,8 +37,8 @@ input,textarea{caret-color:var(--accent)}
 .btn.primary{background:var(--accent);border-color:transparent;color:var(--on-accent);box-shadow:none}
 .btn:disabled,.btn[aria-disabled="true"]{opacity:.55;cursor:not-allowed;box-shadow:none}
 @media (hover:hover) and (pointer:fine){
-  .btn:hover:not(:disabled){background:var(--surface-2)}
-  .btn.primary:hover:not(:disabled){background:var(--accent-hover)}
+  .btn:hover:not(:disabled):not([aria-disabled="true"]){background:var(--surface-2)}
+  .btn.primary:hover:not(:disabled):not([aria-disabled="true"]){background:var(--accent-hover)}
 }
 .iconbtn{width:var(--tap);height:var(--tap);border-radius:var(--radius-md);border:0;background:transparent;color:var(--ink-2);display:grid;place-items:center;position:relative;flex:none;padding:0;transition:background-color var(--dur-fast) ease,color var(--dur-fast) ease,transform var(--dur-fast) var(--ease-out)}
 .iconbtn .mi{font-size:20px}
@@ -456,9 +456,9 @@ table.data tbody tr.empty-row td{white-space:normal;border-bottom:1px solid var(
 .seg button[aria-pressed="true"]{background:var(--surface);color:var(--ink);box-shadow:var(--shadow-xs)}
 .inline-link{border:0;background:none;padding:0 var(--space-1);color:var(--accent-text);font-weight:var(--weight-semibold);text-decoration:underline;text-underline-offset:.2em;min-height:var(--tap);display:inline-flex;align-items:center;font-size:inherit}
 .btn.danger{color:var(--crit);border-color:var(--crit)}
-@media (hover:hover) and (pointer:fine){.btn.danger:hover:not(:disabled){background:var(--crit-soft)}}
+@media (hover:hover) and (pointer:fine){.btn.danger:hover:not(:disabled):not([aria-disabled="true"]){background:var(--crit-soft)}}
 .btn.danger.solid{background:var(--crit);color:var(--on-crit);border-color:transparent}
-@media (hover:hover) and (pointer:fine){.btn.danger.solid:hover:not(:disabled){background:var(--crit-hover)}}
+@media (hover:hover) and (pointer:fine){.btn.danger.solid:hover:not(:disabled):not([aria-disabled="true"]){background:var(--crit-hover)}}
 .help{font-size:var(--text-sm);color:var(--ink-3);margin:0;line-height:var(--leading-normal)}
 .field .help{font-size:var(--text-xs)}
 .help a{display:inline-block;padding:var(--space-3) var(--space-0-5);margin:calc(-1 * var(--space-3)) 0;font-weight:var(--weight-semibold)}
@@ -543,9 +543,9 @@ table.data tbody tr.empty-row td{white-space:normal;border-bottom:1px solid var(
    ====================================================================================================== */
 
 /* Tab dưới topbar */
-.tabs{display:flex;gap:var(--space-5);border-bottom:1px solid var(--border);overflow-x:auto;scrollbar-width:none}
+.tabs{display:flex;gap:var(--space-2);border-bottom:1px solid var(--border);overflow-x:auto;scrollbar-width:none}
 .tabs::-webkit-scrollbar{display:none}
-.tab{display:inline-flex;align-items:center;gap:var(--space-1-5);min-height:var(--tap);padding:0;border:0;border-bottom:2px solid transparent;margin-bottom:-1px;background:transparent;font:inherit;font-size:var(--text-sm);font-weight:var(--weight-regular);color:var(--ink-2);white-space:nowrap;transition:color var(--dur-fast) ease,border-color var(--dur-fast) ease}
+.tab{display:inline-flex;align-items:center;gap:var(--space-1-5);min-height:var(--tap);min-width:var(--tap);justify-content:center;padding:0 var(--space-2);border:0;border-bottom:2px solid transparent;margin-bottom:-1px;background:transparent;font:inherit;font-size:var(--text-sm);font-weight:var(--weight-regular);color:var(--ink-2);white-space:nowrap;transition:color var(--dur-fast) ease,border-color var(--dur-fast) ease}
 .tab[aria-selected="true"]{border-bottom-color:var(--accent);color:var(--ink);font-weight:var(--weight-semibold)}
 .tab:focus-visible{outline-offset:-2px;border-radius:var(--radius-xs)}
 .tab-count{font-size:var(--text-2xs);font-weight:var(--weight-semibold);padding:1px var(--space-1-5);border-radius:var(--radius-full);background:var(--warn-soft);color:var(--warn);font-variant-numeric:tabular-nums}
@@ -626,7 +626,7 @@ table.lt.lt-dense th:last-child,table.lt.lt-dense td:last-child{padding-right:va
 table.lt .r{text-align:right}
 table.lt .num{font-variant-numeric:tabular-nums}
 table.lt .mono,table.lt td.mono{font-family:var(--font-mono);font-size:var(--text-xs);color:var(--ink-2)}
-table.lt .lt-link{display:inline-block;color:inherit;text-decoration:none}
+table.lt .lt-link{display:flex;align-items:center;min-height:var(--tap);color:inherit;text-decoration:none}
 table.lt .lt-link:focus-visible{outline-offset:2px;border-radius:var(--radius-xs)}
 table.lt tr.lt-click{cursor:pointer}
 @media (hover:hover) and (pointer:fine){table.lt tr.lt-click:hover td{background:var(--surface-2)}}

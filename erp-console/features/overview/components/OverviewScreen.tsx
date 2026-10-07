@@ -100,6 +100,7 @@ function Body({ data }: { data: OverviewData }) {
       <div className={s.cols}>
         <Section
           title="Cần chú ý"
+          headingLevel={2}
           count={data.kpis.near_expiry ? `${data.kpis.near_expiry} lô cận hạn` : undefined}
           flush
         >

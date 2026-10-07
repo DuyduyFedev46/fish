@@ -1,6 +1,6 @@
 /* Token thiết kế Cá Về — bản chạy thật của DESIGN.md (gốc repo). Đổi giá trị ở DESIGN.md trước rồi chép sang đây.
    Đây là file DUY NHẤT trong erp-console được chứa mã màu; mọi CSS/component khác chỉ dùng var(--…).
-   Sáng/tối: theo máy (prefers-color-scheme) hoặc ép bằng <html data-theme="light|dark"> (ThemeToggle). */
+   Sáng/tối: theo máy (prefers-color-scheme) hoặc ép bằng <html data-theme="light|dark"> (themeScript.ts). */
 
 :root{
   /* ---- Màu: light ---- */

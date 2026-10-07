@@ -1,5 +1,5 @@
 // Kiểu dữ liệu Báo cáo lãi lỗ (ED-32). Trong app mọi số tiền/kg là chuỗi thập phân ("1650000.5"); cộng trừ qua ./decimal.ts.
-// Lưu ý: BE thật trả các field này của /reports/period/ và /reports/batches/ dạng JSON number; ./api.ts chuẩn hoá về chuỗi.
+// Từ Lô 17a BE trả các field này của /reports/period/ và /reports/batches/ dạng chuỗi; ./api.ts vẫn chuẩn hoá thêm cho BE cũ (number).
 // Chỉ Chủ (reports.view_profitreport) gọi được; vai khác nhận 403.
 
 /** GET /api/reports/period/?year=&month= */

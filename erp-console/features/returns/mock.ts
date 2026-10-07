@@ -57,7 +57,7 @@ function mode(): Mode {
 const has = (me: Me | null, perm: string) => !!me && me.permissions.includes(perm);
 const err = (status: number, code: string, detail: string, extra: Record<string, unknown> = {}): MockResponse => ({ status, body: { detail, code, ...extra } });
 const FORBIDDEN = err(403, "FORBIDDEN", "Bạn không có quyền xem hàng hoàn về kho.");
-const NOT_FOUND = err(404, "NOT_FOUND", "Không tìm thấy phiếu hàng hoàn.");
+const NOT_FOUND = err(404, "NOT_FOUND", "Không tìm thấy.");
 
 /** Id lô giả theo mã lô (khớp `lines[].batch_id` của phiếu giao mock). */
 const BATCH_PK: Record<string, number> = {
@@ -79,17 +79,29 @@ const BATCH_CODE: Record<number, { code: string; item: string }> = {
 type NoteFact = { code: string; order: string; courierId: number; batch: number; delivered: number };
 /** Phiếu giao mock còn đi giao hoặc giao thất bại (id → dữ kiện). courierId khớp `assigned_to` của module Giao hàng. */
 const NOTES: Record<number, NoteFact> = {
-  33: { code: "GH-HD-0033-DELI", order: "DH-260928-0003", courierId: 14, batch: 201, delivered: 1 },
-  34: { code: "GH-HD-0034-FAIL", order: "DH-260928-0004", courierId: 14, batch: 202, delivered: 2 },
-  36: { code: "GH-HD-0036-DELI", order: "DH-260928-0006", courierId: 4, batch: 203, delivered: 2 },
-  38: { code: "GH-HD-0038-FAIL", order: "DH-260928-0008", courierId: 4, batch: 204, delivered: 1 },
-  39: { code: "GH-HD-0039-DELI", order: "DH-260928-0009", courierId: 7, batch: 201, delivered: 1.2 },
+  33: { code: "GH-HD-0033-DELI", order: "SO260928-A00003", courierId: 14, batch: 201, delivered: 1 },
+  34: { code: "GH-HD-0034-FAIL", order: "SO260928-A00004", courierId: 14, batch: 202, delivered: 2 },
+  36: { code: "GH-HD-0036-DELI", order: "SO260928-A00006", courierId: 4, batch: 203, delivered: 2 },
+  38: { code: "GH-HD-0038-FAIL", order: "SO260928-A00008", courierId: 4, batch: 204, delivered: 1 },
+  39: { code: "GH-HD-0039-DELI", order: "SO260928-A00009", courierId: 7, batch: 201, delivered: 1.2 },
 };
 
 const COURIER_NAME: Record<number, string> = { 4: "Anh Phúc", 7: "Anh Lâm", 14: "Anh Khoa" };
 
+/** 00:00 ngày mùng 1 của THÁNG HIỆN TẠI theo giờ Việt Nam (UTC+7), tính ra ms UTC. */
+function monthStartMs(): number {
+  const vn = new Date(Date.now() + 7 * 3600_000);
+  return Date.UTC(vn.getUTCFullYear(), vn.getUTCMonth(), 1) - 7 * 3600_000;
+}
+
+/**
+ * Mốc tạo phiếu mock. `minutesAgo > 0` = cách đây chừng đó phút nhưng KHÔNG lùi qua đầu tháng hiện tại (để ca "mặc định tháng hiện tại"
+ * không đổi kết quả vào những ngày đầu tháng). `minutesAgo < 0` = phiếu của THÁNG TRƯỚC: lùi `-minutesAgo` phút tính từ đầu tháng
+ * hiện tại, không phụ thuộc hôm nay là ngày nào.
+ */
 function monthAgoIso(minutesAgo: number): string {
-  return new Date(Date.now() - minutesAgo * 60_000).toISOString();
+  if (minutesAgo < 0) return new Date(monthStartMs() + minutesAgo * 60_000).toISOString();
+  return new Date(Math.max(Date.now() - minutesAgo * 60_000, monthStartMs())).toISOString();
 }
 
 function make(
@@ -146,7 +158,7 @@ function db(): ReturnItem[] {
       make(1, 38, "0.500", { status: "DRAFT", decision: "PENDING", outside: 135, createdMinutesAgo: 90, by: 4, note: "Khách không nghe máy" }),
       make(2, 39, "0.700", { status: "DRAFT", decision: "PENDING", outside: 55, createdMinutesAgo: 200, by: 7, note: "Khách từ chối nhận" }),
       make(3, 33, "1.000", { status: "APPROVED", decision: "RESTOCK", outside: 70, createdMinutesAgo: 1500, by: 14, note: "Sai địa chỉ, giao lại", approvedBy: "Chị Hạnh" }),
-      make(4, 34, "0.800", { status: "APPROVED", decision: "WRITE_OFF", outside: 245, createdMinutesAgo: 2900, by: 14, note: "Xe hỏng giữa đường", approvedBy: "Chị Hạnh" }),
+      make(4, 34, "0.800", { status: "APPROVED", decision: "WRITE_OFF", outside: 245, createdMinutesAgo: -2160, by: 14, note: "Xe hỏng giữa đường", approvedBy: "Chị Hạnh" }),
       make(5, 36, "0.300", { status: "DRAFT", decision: "PENDING", outside: 40, createdMinutesAgo: 30, by: 4 }),
       make(6, 36, "0.200", { status: "CANCELLED", decision: "PENDING", outside: 45, createdMinutesAgo: 600, by: 4, note: "Nhập nhầm lô" }),
     ];
@@ -169,8 +181,8 @@ const STALE_DELETE = new Set<number>();
 function deleteResponse(me: Me, id: number): MockResponse {
   if (!me.groups.includes(ROLE.owner)) return err(403, "FORBIDDEN", "Chỉ Chủ mới xoá được phiếu hàng hoàn.");
   const r = db().find((x) => x.id === id);
-  // BE xoá-mềm trả 404 mặc định của DRF (tiếng Anh) khi phiếu đã bị xoá: giữ nguyên để FE phải tự đổi sang câu tiếng Việt.
-  if (!r || !inScope(me, r)) return err(404, "NOT_FOUND", "No ReturnToStock matches the given query.");
+  // Từ Lô 17a BE trả 404 tiếng Việt chuẩn "Không tìm thấy." (không lộ tên model).
+  if (!r || !inScope(me, r)) return err(404, "NOT_FOUND", "Không tìm thấy.");
   if (STALE_DELETE.has(id)) return err(409, "STALE_STATE", "Phiếu hàng hoàn vừa được người khác xử lý, hãy tải lại.");
   if (r.status === "APPROVED") return err(400, "RETURN_DELETE_NOT_ALLOWED", "Phiếu hàng hoàn đã duyệt (đã nhập lại kho hoặc ghi lỗ) không xoá được (BR-PQ-10).");
   DB = db().filter((x) => x.id !== id);

@@ -17,7 +17,7 @@ import { Icon } from "@/shared/ui/Icon";
 import { Modal } from "@/shared/ui/overlay/Modal";
 import { useToast } from "@/shared/ui/overlay/Toast";
 import { Loading } from "@/shared/ui/StateBox";
-import { forgetSignedIn, readSignedIn } from "../signedInAt";
+import { readSignedIn } from "../signedInAt";
 import { useAuth } from "./AuthProvider";
 import { aiVisible } from "@/shared/lib/features";
 import { ChangePasswordForm } from "./ChangePasswordForm";
@@ -66,7 +66,6 @@ export function AccountScreen() {
 
   const doLogout = async () => {
     setBusy("logout");
-    forgetSignedIn();
     await logout();
   };
 

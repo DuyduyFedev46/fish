@@ -28,7 +28,7 @@ type Props = {
   onConflictReload: () => void;
 };
 
-export function ImageUploadSheet({ item, onClose, onUploaded, onConflictReload }: Props) {
+export function ImageUploadModal({ item, onClose, onUploaded, onConflictReload }: Props) {
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [altText, setAltText] = useState("");

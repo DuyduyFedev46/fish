@@ -97,7 +97,7 @@ def run3(br):
     ok("B4: mỗi thẻ có đúng một dòng 'Đã thanh toán, không thu thêm'", pay == len(codes) >= 3, f"{pay} dòng / {len(codes)} thẻ")
     for lab in ("Người nhận", "Đơn", "Địa chỉ", "Số kg", "Hàng"):
         ok(f"B4: nhãn '{lab}' xuất hiện ở cả 3 thẻ", len(re.findall(rf"(?m)^{lab}$", body)) >= 3, str(len(re.findall(rf"(?m)^{lab}$", body))))
-    ok("B4: mã đơn DH-… trên thẻ", len(re.findall(r"DH-\d{6}-\d{4}", body)) >= 3)
+    ok("B4: mã đơn SO… trên thẻ", len(re.findall(r"SO\d{6}-[A-Z0-9]{6}", body)) >= 3)
     ok("B4: trường Hàng không kèm kg, kg không lặp (không 'kg · ')", not re.search(r"kg\s*·", body) and not re.search(r"\d\.\d{3}\s*kg", body), re.findall(r".{0,20}kg.{0,12}", body)[:4].__str__())
     ok("B5: thẻ Giao thất bại có 'Lý do' và 'Lần thất bại' là hai nhãn riêng", len(re.findall(r"(?m)^Lý do$", body)) >= 1 and len(re.findall(r"(?m)^Lần thất bại$", body)) >= 1)
     ok("B5: không còn chữ 'sắp có' / 'Mang hàng về kho'", "sắp có" not in body and "Mang hàng về kho" not in body)

@@ -175,7 +175,7 @@ def run_columns_and_format(b):
     links = p.locator("main a[href]").evaluate_all("els => els.map(e => e.innerText.trim() + ' -> ' + e.getAttribute('href'))")
     print("INFO liên kết ở chi tiết:", links)
     ok("Chi tiết: Phiếu giao là liên kết bấm được (UI-RULES: đối tượng liên quan là link)", any(re.search(r"GH-HD", l) for l in links), links)
-    ok("Chi tiết: Đơn là liên kết bấm được", any(re.search(r"DH-2609", l) for l in links), links)
+    ok("Chi tiết: Đơn là liên kết bấm được", any(re.search(r"SO2609", l) for l in links), links)
     skip("Chi tiết: Lô là liên kết bấm được", "chờ Lô 7 (Kho & lô) vào main; dev ghi nợ, QA không tính lỗi")
     p.screenshot(path=f"{SHOTS}/impl-detail-ql1-1440.png")
     ok("Chi tiết: không có tiền / giá vốn", not re.search(r"₫|VND|[Gg]iá vốn|landed", p.locator("main").inner_text()))

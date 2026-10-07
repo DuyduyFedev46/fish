@@ -1,5 +1,5 @@
 // Script nhỏ chạy trong <head> trước khi vẽ, để không nháy sai màu sáng/tối.
-// Tách khỏi ThemeToggle.tsx ("use client") vì app/layout.tsx là server component.
+// Tách khỏi component client vì app/layout.tsx là server component.
 // Key giống bản HTML cũ (legacy/index.html) để giữ lựa chọn người dùng đã có.
 // Màu thanh trình duyệt (<meta name="theme-color">) đọc từ token CSS --canvas (tokens.css), không viết cứng mã màu:
 // đồng bộ khi tải trang, khi máy đổi sáng/tối và khi bấm nút đổi giao diện (window.__caveSyncThemeColor).

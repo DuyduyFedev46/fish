@@ -101,3 +101,29 @@ describe("DataTable: trạng thái", () => {
     expect(out).toContain("lt-click");
   });
 });
+
+describe("DataTable: khung xương ẩn cột như bảng thật (17b F4)", () => {
+  const cols: Column<Row>[] = [
+    { key: "code", header: "Mã đơn", render: (r) => r.code },
+    { key: "total", header: "Tổng tiền", num: true, hideBelow: 720, render: (r) => r.total },
+    { key: "cost", header: "Giá vốn", num: true, locked: true, hideBelow: 980, render: (r) => r.cost },
+  ];
+  const tdClasses = (out: string, rowClass: string) => {
+    const row = out.split("<tr").find((s) => s.includes(rowClass)) ?? "";
+    return [...row.matchAll(/<td[^>]*?class="([^"]*)"/g)].map((m) => m[1]);
+  };
+
+  it("ô khung xương mang đúng class ẩn cột (lt-hb-*) như ô dữ liệu", () => {
+    const skel = tdClasses(html({ columns: cols, rows: null, loading: true }), "lt-skel");
+    const real = tdClasses(html({ columns: cols, rowHref: (r: Row) => `/x/${r.id}/` }), "lt-click");
+    expect(skel.some((c) => c.includes("lt-hb-720"))).toBe(true);
+    expect(skel.some((c) => c.includes("lt-hb-980"))).toBe(true);
+    expect(skel.map((c) => c.match(/lt-hb-\d+/)?.[0] ?? "")).toEqual(real.map((c) => c.match(/lt-hb-\d+/)?.[0] ?? ""));
+  });
+
+  it("không quyền giá vốn: khung xương cũng bỏ cột khoá (cùng số ô với bảng thật)", () => {
+    const out = html({ columns: cols, rows: null, loading: true, canViewCost: false });
+    const skelRow = out.split("<tr").find((s) => s.includes("lt-skel")) ?? "";
+    expect((skelRow.match(/<td/g) ?? []).length).toBe(2);
+  });
+});

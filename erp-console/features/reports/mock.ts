@@ -1,5 +1,5 @@
 // Mock Báo cáo lãi lỗ (ED-32) — chỉ dùng khi NEXT_PUBLIC_USE_MOCK=1. Dữ liệu bịa, không có thông tin khách.
-// Response trả tiền/kg dạng number như BE thật (xem asWire); api.ts chuẩn hoá về chuỗi.
+// Response trả tiền/kg dạng CHUỖI thập phân như BE thật từ Lô 17a (TL12-num); api.ts vẫn nhận cả number cho BE cũ.
 // Quyền như BE: cả hai endpoint chỉ cho reports.view_profitreport (Chủ), vai khác nhận 403.
 // Số liệu kỳ khớp công thức của BE: revenue/cogs ĐÃ trừ phần đảo, profit = revenue − cogs − refunds; kỳ cách đây quá 3 tháng thì trống.
 // Danh sách lô: 24 lô (hơn một trang 20 dòng) phát sinh ở tháng này và tháng trước, vài lô lỗ, vài lô tạm tính.
@@ -129,14 +129,6 @@ function batchRows(): Seeded[] {
   });
 }
 
-/**
- * BE thật trả tiền và kg của hai endpoint báo cáo là JSON number (DRF đổi Decimal thành float), không phải chuỗi.
- * Mock đổi mọi giá trị chuỗi dạng số sang number ở ranh giới response để e2e chạy đúng shape thật (TL12-FE-H1).
- */
-function asWire<T extends object>(row: T): Record<string, unknown> {
-  return Object.fromEntries(Object.entries(row).map(([k, v]) => [k, typeof v === "string" && /^-?\d+(\.\d+)?$/.test(v) ? Number(v) : v]));
-}
-
 let cache: Seeded[] | null = null;
 const rows = () => (cache ??= batchRows());
 
@@ -149,7 +141,7 @@ export function mockPeriodReport(req: MockRequest): MockResponse {
   const year = Number(q.get("year"));
   const month = Number(q.get("month"));
   if (!Number.isInteger(year) || !Number.isInteger(month) || month < 1 || month > 12) return bad("Cần tham số year & month.");
-  return { status: 200, body: asWire(periodOf(year, month)) };
+  return { status: 200, body: periodOf(year, month) };
 }
 
 export function mockBatchReport(req: MockRequest): MockResponse {
@@ -182,7 +174,7 @@ export function mockBatchReport(req: MockRequest): MockResponse {
       results: list.slice(start, start + PAGE_SIZE).map((r) => {
         // BE không trả khoá số `id` (FE tự gán).
         const { id: _id, ...wire } = r.row;
-        return asWire(wire);
+        return wire;
       }),
     },
   };

@@ -30,7 +30,7 @@ erp-console/
                           S14 huỷ đơn đã thanh toán, S15 phiếu hoàn từ đơn có hoá đơn, S16 phiếu hoàn chờ chuyển
                           (/orders/refunds/, menu con — xác nhận/thất bại/thử lại)
     confirmation/         CS-05 gọi xác nhận đơn: hàng chờ, gọi, hẹn gọi lại, xử lý (route /confirmation/; đường dẫn cũ /cskh/ đã gỡ ở P8b Lô 5, nay là 404 tĩnh; API /api/confirmation/)
-    inventory/            S8 Kho & lô + tab "Hoạt động" (sổ kho) của cột phải — S25 mở rộng
+    inventory/            S8 Kho & lô + sổ kho (S25 mở rộng)
                           (mỗi module: api.ts mock.ts types.ts components/ README.md)
   shared/                 dùng chung, KHÔNG phụ thuộc features/
     lib/                  http.ts (apiFetch + Token + mock), token.ts, nav.ts (menu ↔ quyền, hằng PERM),
@@ -43,11 +43,11 @@ erp-console/
                           search.ts (tìm phía máy, bỏ dấu), status.ts (màu/icon trạng thái đơn, lô),
                           passwordRules.ts (gợi ý quy tắc mật khẩu hiện trước khi gửi — BE vẫn kiểm thật)
     ui/                   PasswordInput (Ô MẬT KHẨU DÙNG CHUNG cho mọi form: nút mắt ≥44px, gợi ý quy tắc, lỗi "không khớp"),
-                          Shell (3 cột), Icon, Sheet (hộp thoại/tấm trượt đáy), StateBox (tải/lỗi/rỗng), ResourceView (3 trạng thái
-                          cho useResource), Toolbar (ô tìm + Làm mới), EmptyRow, Placeholder,
-                          ThemeToggle, themeScript.ts, NotFoundScreen, Skeleton, Figure,
-                          SideSheet + Toast + overlay.module.css (tấm bên có chuyển động ra, thông báo nổi — UI5 đưa lên dùng chung),
-                          useDrawerFocus.ts (ngăn kéo menu/cột phải: focus vào trong, giữ Tab, trả focus khi đóng),
+                          Shell (2 cột: menu trái + nội dung), Icon, StateBox (tải/lỗi/rỗng), ResourceView (3 trạng thái
+                          cho useResource), Toolbar (ô tìm + Làm mới),
+                          themeScript.ts, NotFoundScreen, Skeleton, Figure,
+                          Toast + overlay.module.css (thông báo nổi); hộp thoại dùng `overlay/Modal`, `overlay/ConfirmModal`,
+                          useDrawerFocus.ts (ngăn kéo menu: focus vào trong, giữ Tab, trả focus khi đóng),
                           tokens.css (TOKEN THIẾT KẾ theo DESIGN.md ở gốc repo — file DUY NHẤT được chứa mã màu),
                           globals.css (style chung, chỉ dùng var(--…))
   e2e/                    kịch bản Playwright (Python): trên bản build mock s7_shell.py, s8_views.py, s41_s47_staff.py,
@@ -74,9 +74,8 @@ erp-console/
   "Hai mật khẩu không khớp" và KHÔNG gọi API. Mật khẩu không bao giờ nằm trong nháp (`useDraft`) hay localStorage.
 
 **Thêm một module:** tạo `features/<x>/{api.ts,mock.ts,types.ts,components/<X>Screen.tsx,README.md}`,
-rồi trong `app/(console)/<x>/page.tsx` thay `<Placeholder view="..." />` bằng màn của module (giữ `<ViewGuard>`). Mẫu: `features/overview/`.
+rồi trong `app/(console)/<x>/page.tsx` dùng màn của module (giữ `<ViewGuard>`). Mẫu: `features/overview/`.
 Dữ liệu đọc dùng chung nhiều màn → `useResource(key, loader)` (`shared/lib/useResource.ts`), vẽ trạng thái bằng `<ResourceView>`.
-Nội dung cột phải (Hoạt động, Trợ lý) ghép ở `app/(console)/layout.tsx` (tầng app được import mọi module).
 
 ## File cấu hình ở gốc
 

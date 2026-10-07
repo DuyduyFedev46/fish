@@ -82,17 +82,17 @@ const BATCHES: SeedBatch[] = [
 // [code, total, status, phút trước, hạn giữ chỗ còn (phút) | null] — không có tên khách / SĐT (SR-17)
 type SeedOrder = [string, number, OrderStatus, number, number | null];
 const ORDERS: SeedOrder[] = [
-  ["DH-240924-011", 1_092_000, "BOOKED", 22, 6],
-  ["DH-240924-010", 546_000, "BOOKED", 9, 21],
-  ["DH-240924-009", 4_860_000, "PAID", 48, null],
-  ["DH-240924-008", 780_000, "PROCESSING", 95, null],
-  ["DH-240924-007", 1_415_000, "COMPLETED", 180, null],
-  ["DH-240924-006", 312_000, "AUTO_CANCELLED", 240, null],
-  ["DH-240924-005", 2_236_000, "PROCESSING", 300, null],
-  ["DH-240924-004", 928_000, "CANCELLED", 420, null],
-  ["DH-240923-018", 1_640_000, "COMPLETED", 1_200, null],
-  ["DH-240923-017", 6_210_000, "PAID", 1_300, null],
-  ["DH-240923-016", 459_000, "COMPLETED", 1_420, null],
+  ["SO240924-A00011", 1_092_000, "BOOKED", 22, 6],
+  ["SO240924-A00010", 546_000, "BOOKED", 9, 21],
+  ["SO240924-A00009", 4_860_000, "PAID", 48, null],
+  ["SO240924-A00008", 780_000, "PROCESSING", 95, null],
+  ["SO240924-A00007", 1_415_000, "COMPLETED", 180, null],
+  ["SO240924-A00006", 312_000, "AUTO_CANCELLED", 240, null],
+  ["SO240924-A00005", 2_236_000, "PROCESSING", 300, null],
+  ["SO240924-A00004", 928_000, "CANCELLED", 420, null],
+  ["SO240923-A00018", 1_640_000, "COMPLETED", 1_200, null],
+  ["SO240923-A00017", 6_210_000, "PAID", 1_300, null],
+  ["SO240923-A00016", 459_000, "COMPLETED", 1_420, null],
 ];
 
 // [batch_id, type, qty_change, reference, phút trước]
@@ -101,7 +101,7 @@ const LEDGER: SeedLedger[] = [
   ["L0923-SO01", "RECEIPT", 14.2, "PN-240924-02", 35],
   ["L0919-CN01", "SALE", -3.5, "HD-240924-009", 47],
   ["L0917-CB01", "SALE", -2.25, "HD-240924-008", 94],
-  ["L0918-GX01", "CANCEL_RESTORE", 1.2, "DH-240924-004", 110],
+  ["L0918-GX01", "CANCEL_RESTORE", 1.2, "SO240924-A00004", 110],
   ["L0914-CT01", "RECONCILE", -0.4, "KK-240924-01", 150],
   ["L0901-CB00", "WRITE_OFF", -1.1, "LO-HUY-0901", 200],
   ["L0921-CT02", "SALE", -5, "HD-240924-005", 298],
