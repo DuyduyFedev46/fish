@@ -8,15 +8,25 @@ Chạy trên bản build MOCK (dữ liệu giả). Mỗi lần chỉ giữ một
 Vai: loc (Chủ) và ql1 (Quản lý). Nguồn chữ: doc/thuat-ngu-va-trang-thai.md mục 4.
 Shop (tuỳ chọn): đặt SHOP_BASE=http://127.0.0.1:3220 (bản build mock của frontend/) để quét thêm /shop/orders/: BOOKED, AUTO_CANCELLED,
 có hoàn tiền, đủ trạng thái phiếu giao, cấm mã thô.
-TODO: chạy lần hai trên BE thật (staging local, dữ liệu giả) khi có.
+Chế độ BE THẬT (08/10, lô dọn e2e): đặt REAL=1 để chạy trên build NEXT_PUBLIC_USE_MOCK=0 với dữ liệu giả của `manage.py seed_qa`
+(xem e2e_seed_qa.py: BASE, SEED_QA_IDS, QA_PASSWORD). Vai qa_owner và qa_manager; id chi tiết lấy từ bảng mã -> id (không cứng id);
+seed_qa có đủ phiếu hoàn tiền Chờ/Đã hoàn/Thất bại và phiếu giao đủ trạng thái (gồm FAILED) để quét hai nhóm chip. Route chỉ có ở mock
+(`/content/edit/?id=44`: bài viết mẫu) bị bỏ. Phần Shop không chạy ở chế độ này.
 """
 import os
+import json
 import re
 import sys
+import urllib.request
 
 from playwright.sync_api import sync_playwright
 
-BASE = os.environ.get("BASE", "http://127.0.0.1:3219")
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from e2e_seed_qa import API, ids as seed_ids, password as seed_password  # noqa: E402
+from e2e_support import finish  # noqa: E402
+
+REAL = os.environ.get("REAL") == "1"
+BASE = os.environ.get("BASE", "http://127.0.0.1:3521" if REAL else "http://127.0.0.1:3219")
 ROUTES = [
     "/overview/", "/orders/", "/orders/payments/", "/orders/refunds/", "/orders/detail/?id=1", "/orders/payments/detail/?id=1",
     "/orders/refunds/detail/?id=1", "/customers/", "/customers/detail/?id=1", "/confirmation/", "/confirmation/detail/?id=31",
@@ -60,6 +70,35 @@ PENDING_ROUTES = {"/permissions/", "/permissions/detail/?group=manager&code=mana
 results = []
 
 
+def real_url_map():
+    """Route chuẩn (khoá của CHIP_BANNED) -> đường dẫn thật với id lấy từ seed_qa. Mock dùng id cứng của dữ liệu mẫu nên không cần."""
+    m = seed_ids()
+    refunds = m["refunds"]
+    pick = lambda d, status: next(v["id"] for v in d.values() if v["status"] == status)  # noqa: E731
+    mapping = {
+        "/orders/detail/?id=1": f"/orders/detail/?id={m['orders']['QA-SO-05']['id']}",
+        "/orders/payments/detail/?id=1": f"/orders/payments/detail/?id={m['payments']['QA-TXN-13-SHORT']['id']}",
+        "/orders/refunds/detail/?id=1": f"/orders/refunds/detail/?id={pick(refunds, 'FAILED')}",
+        "/customers/detail/?id=1": f"/customers/detail/?id={next(iter(m['customers'].values()))}",
+        "/confirmation/detail/?id=31": f"/confirmation/detail/?id={m['delivery_notes']['QA-GH-04']['id']}",
+        "/deliveries/detail/?id=1": f"/deliveries/detail/?id={m['delivery_notes']['QA-GH-09']['id']}",  # phiếu giao Giao thất bại
+        "/purchasing/detail/?id=1": f"/purchasing/detail/?id={next(iter(m['receipts'].values()))}",
+        "/suppliers/detail/?id=1": "/suppliers/detail/?id=1",
+        "/inventory/detail/?id=1": f"/inventory/detail/?id={m['batches']['QA-LO-03']['id']}",
+        "/returns/detail/?id=1": f"/returns/detail/?id={next(iter(m['returns'].values()))}",
+        "/stocktake/detail/?id=1": f"/stocktake/detail/?id={next(iter(m['stocktakes'].values()))}",
+        "/catalog/detail/?id=1": f"/catalog/detail/?id={next(iter(m['items'].values()))}",
+        "/staff/detail/?id=1": f"/staff/detail/?id={m['users']['qa_owner']}",
+    }
+    return mapping
+
+
+URL_OF = real_url_map() if REAL else {}
+SKIP_REAL = {"/content/edit/?id=44"}  # bài viết mẫu chỉ có ở mock
+USERS = {"loc": "qa_owner", "ql1": "qa_manager"} if REAL else {"loc": "loc", "ql1": "ql1"}
+USERS_LIST = list(USERS)
+
+
 def ok(name, cond, extra=""):
     results.append((name, bool(cond), extra))
     print(("PASS " if cond else "FAIL ") + name + ("" if cond else "  -> " + str(extra)[:300]), flush=True)
@@ -67,8 +106,8 @@ def ok(name, cond, extra=""):
 
 def login(page, user):
     page.goto(BASE + "/login/")
-    page.fill("#u", user)
-    page.fill("#p", "demo1234")
+    page.fill("#u", USERS[user])
+    page.fill("#p", seed_password() if REAL else "demo1234")
     page.get_by_role("button", name="Đăng nhập").click()
     page.wait_for_function("() => !window.location.href.includes('/login/')", timeout=10_000)
     page.wait_for_load_state("networkidle")
@@ -86,6 +125,17 @@ def visible_text(page):
     )
 
 
+def seed_only_unlabelled_rows(page):
+    """Số dòng Nhật ký có mã thao tác mà seed_qa tự đặt và ERP không có nhãn (đếm qua API bằng token của phiên đang đăng nhập)."""
+    token = page.evaluate("() => localStorage.getItem('cave_erp_token')")
+    n = 0
+    for action in ("create_user", "cancel_expired_orders"):
+        req = urllib.request.Request(f"{API}/api/audit-logs/?action={action}", headers={"Authorization": "Token " + token})
+        with urllib.request.urlopen(req, timeout=20) as r:
+            n += json.load(r)["count"]
+    return n
+
+
 def chips(page):
     return [t.strip() for t in page.locator(".stat-chip").all_inner_texts()]
 
@@ -96,9 +146,12 @@ def sweep(browser, user):
     login(page, user)
     found, chip_hits, shown = {}, {}, {}
     for route in ROUTES:
-        page.goto(BASE + route)
+        if REAL and route in SKIP_REAL:
+            continue
+        page.goto(BASE + URL_OF.get(route, route))
         page.wait_for_load_state("networkidle")
-        page.wait_for_timeout(250)
+        # Chờ màn vẽ xong (hết khung xương/đang tải), thay cho ngủ cố định.
+        page.wait_for_function("() => !!document.querySelector('#main') && !document.querySelector('#main .lt-skel, #main [aria-busy=true]')", timeout=15_000)
         text = visible_text(page)
         hits = [w for w in GROUP_A if w in text]
         hits += [r for r in GROUP_A_REGEX if re.search(r, text, re.I if "phiếu" in r else 0)]
@@ -113,7 +166,7 @@ def sweep(browser, user):
     found = {r: w for r, w in found.items() if r not in PENDING_ROUTES}
     if pending:
         print(f"WARN [{user}] còn chữ cũ ở route chờ Pha B/F1: {pending}", flush=True)
-    ok(f"[{user}] nhóm A: 0 chữ cấm ở {len(ROUTES) - len(PENDING_ROUTES)} route (trừ route chờ Pha B/F1)", not found, found)
+    ok(f"[{user}] nhóm A: 0 chữ cấm ở {len(ROUTES) - len(PENDING_ROUTES) - (len(SKIP_REAL) if REAL else 0)} route (trừ route chờ Pha B/F1)", not found, found)
     ok(f"[{user}] nhóm B: 0 chip mang chữ cũ", not chip_hits, chip_hits)
     if user == "loc":
         all_chips = {c for cs in shown.values() for c in cs}
@@ -131,10 +184,19 @@ def sweep(browser, user):
         # Nhật ký (T67-T76, W11, T49): cột Thao tác không còn "Thao tác khác", cột Người không còn "Người dùng".
         page.goto(BASE + "/audit-logs/")
         page.wait_for_load_state("networkidle")
+        page.wait_for_function("() => !document.querySelector('#main .lt-skel, #main [aria-busy=true]') && document.querySelectorAll('#main tbody tr').length > 0")
         cells = page.locator("tbody td").all_inner_texts()
-        ok(f"[{user}] Nhật ký: không có ô 'Thao tác khác' hay 'Người dùng'", not any(c.strip() in ("Thao tác khác", "Người dùng") for c in cells), [c for c in cells if c.strip() in ("Thao tác khác", "Người dùng")][:3])
+        unknown_cells = [c for c in cells if c.strip() == "Thao tác khác"]
+        # Chế độ BE thật: seed_qa ghi hai mã thao tác mà sản phẩm không bao giờ ghi (create_user, cancel_expired_orders; mã thật là
+        # staff_create... và order_auto_cancelled) nên ERP in "Thao tác khác" cho đúng bấy nhiêu dòng. Cho phép đúng số dòng đó (đếm qua API), không hơn.
+        allowed_unknown = seed_only_unlabelled_rows(page) if REAL else 0
+        ok(f"[{user}] Nhật ký: không có ô 'Thao tác khác' (trừ {allowed_unknown} dòng mã lạ do seed_qa) hay 'Người dùng'",
+           len(unknown_cells) <= allowed_unknown and not any(c.strip() == "Người dùng" for c in cells), [c for c in cells if c.strip() in ("Thao tác khác", "Người dùng")][:3])
         body = page.inner_text("main")
-        ok(f"[{user}] Nhật ký: phiếu giao FAILED dịch là 'Giao thất bại' (W11), tem dùng 'In tem giao'", "Đang giao → Giao thất bại" in body and "In tem giao" in body, body[:200])
+        if REAL:
+            print("SKIP Nhật ký 'Đang giao → Giao thất bại' / 'In tem giao': seed_qa chưa ghi nhật ký phiếu giao thất bại và in tem (đề nghị bổ sung vào seed_qa)", flush=True)
+        else:
+            ok(f"[{user}] Nhật ký: phiếu giao FAILED dịch là 'Giao thất bại' (W11), tem dùng 'In tem giao'", "Đang giao → Giao thất bại" in body and "In tem giao" in body, body[:200])
     ctx.close()
 
 
@@ -166,10 +228,11 @@ def shop_sweep(browser):
 
 with sync_playwright() as p:
     browser = p.chromium.launch()
-    for user in ("loc", "ql1"):
+    for user in USERS_LIST:
         sweep(browser, user)
-    shop_sweep(browser)
+    if REAL:
+        print("SKIP Shop: chế độ BE thật chỉ quét ERP", flush=True)
+    else:
+        shop_sweep(browser)
     browser.close()
-passed = sum(1 for _, c, _ in results if c)
-print(f"== {passed}/{len(results)} PASS")
-sys.exit(0 if passed == len(results) else 1)
+finish(results)

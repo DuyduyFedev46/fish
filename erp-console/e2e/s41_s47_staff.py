@@ -15,6 +15,7 @@
 import os
 import re
 
+from e2e_support import finish
 from playwright.sync_api import expect, sync_playwright
 
 BASE = os.environ.get("BASE", "http://127.0.0.1:3101")
@@ -641,3 +642,4 @@ passed = sum(1 for _, c, _ in results if c)
 for n, c, e in results:
     print(("PASS " if c else "FAIL ") + n + ("" if c else "  -> " + e))
 print(f"{passed}/{len(results)} PASS")
+finish(results)

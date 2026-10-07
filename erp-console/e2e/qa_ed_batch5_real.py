@@ -1,3 +1,6 @@
+# CHỜ seed_qa (lô dọn e2e 08/10): kịch bản này cần dữ liệu mà `manage.py seed_qa` chưa có: 6 việc Chờ gọi riêng (P1..P6), 5 việc Cần quyết định
+# (E1..E5), một việc Gọi báo hoàn tiền NGOÀI phạm vi của cs2 (OUT_*), một phiếu để job tự huỷ chạy lúc hộp đang mở (STALE) và một phiếu để
+# cs1 giữ (CLAIM). Chưa chạy được trên seed_qa, không nằm trong lượt chạy xanh. Phần tích hợp UI <-> BE thật đã có ở ed_batch5_confirmation_real.py.
 # QA độc lập, ERP theo design, Lô 5 FE (Gọi xác nhận) trên BACKEND THẬT: Django + SQLite tạm, ERP build NEXT_PUBLIC_USE_MOCK=0.
 # Dữ liệu 100% giả (seed_demo + đơn "Khách Thử ..."). Không bao giờ trỏ vào DB thật.
 # Biến: QA_ERP (vd http://127.0.0.1:3202), QA_API (http://127.0.0.1:8120), QA_DB (đường dẫn SQLite tạm), QA_SHOTS,
