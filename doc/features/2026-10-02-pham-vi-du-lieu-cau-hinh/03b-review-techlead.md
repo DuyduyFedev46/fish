@@ -525,3 +525,90 @@ Xem hẹp diff `ff0c57a` (7 file). Đã chạy `npx vitest run shared/lib/nav.te
 | # | Mức | Chỗ | Ghi nhận | Cách sửa |
 |---|---|---|---|---|
 | L1 | Low (không chặn) | `erp-console/shared/lib/nav.test.ts:32` | Test dùng `toBeGreaterThanOrEqual`. Nếu sau này superuser mất một mục của Chủ nhưng lại có thêm một mục khác, test vẫn xanh | Khẳng định chính xác: `expect(menuItems(su).map(i => i.key)).toEqual([...menuItems(OWNER).map(i => i.key)` chèn `"my-deliveries"` đúng vị trí trong NAV`])`. Cách đơn giản hơn: tập key của su bằng tập key của OWNER cộng `"my-deliveries"`. Làm ở lô kế tiếp có đụng `nav.test.ts` |
+
+## Lô PV-QĐ (08/10)
+
+Review diff `main...HEAD` của nhánh `feat/pham-vi-du-lieu` (merge `4ef5aa8` gộp main `f3a543f`, rồi `d11fa2b`), đối chiếu
+`02c-quyet-dinh-08-10.md` §B.4, §C.1–C.2, §D, §G.2. Không chạy cả suite (điều phối viên chạy). Đã tự chạy:
+- SQLite: `test_no_role_gate`, `test_scope_snapshot`, `test_deliveries_customers_receipts_scope`, `test_refunds_dashboard_scope`: Ran 94, OK.
+- `makemigrations --check --dry-run`: No changes detected. `python3 scripts/check_naming.py`: OK, không phát sinh mới.
+- Một test thăm dò tạm (đã xoá, không commit) cho `POST /api/sales/orders/search/` với `customer` trong body: kết quả ở mục 1.
+- PostgreSQL 16 cục bộ (DB riêng `cangca_tlreview*`), chạy lẻ `ConcurrentSaveRaceTests`: kết quả ở mục 6.
+
+**Kết luận: APPROVED.** Không có lỗi Critical hay High. Có 1 Medium (M1) phải làm khi gộp `fix/postgres-compat`, trước khi báo suite
+Postgres xanh. M1 không chặn việc merge lô này vào main. Thêm 3 Low.
+
+### 1. Giải xung đột merge — đạt
+- **`capabilities/services.py`**: giữ CAS. `set_group_capabilities` khoá `GroupAccessConfig`, so `version` và trả 409 `GROUP_CHANGED`,
+  rồi tăng `row_version` đúng một lần. Giữ `_parse_body`, `_scope_events`, `scope_change_label` của nhánh. Thêm đủ phần của main:
+  `_parse_body` lọc theo `registry.visible_capabilities()` nên PUT việc AI khi AI tắt vẫn 400 `INPUT_NOT_ALLOWED`;
+  `_capability_events` và `capability_change_label` bỏ cờ `customer_data_widening_confirmed` (lọc `BY_KEY`) trước khi gọi `visible_keys`;
+  `has_visible_capability_change` còn nguyên. `next_steps.py` có cả `scope_change_label` và `row_filter` của main. `test_ai_hidden.py`
+  đổi sang `put_caps` (vì PUT bắt buộc có `version`) và giữ nguyên mọi khẳng định.
+- **`reports/dashboard_api.py`**: KPI và "Đơn gần đây" đi qua `orders_in_scope` (D1), doanh thu đi qua `invoices_in_scope` (D2), phiếu đảo
+  chỉ tính phần của hoá đơn trong phạm vi. Giữ `id`, `reason`, `select_related`/`prefetch_related` của 17a. Không trả tên hay SĐT (SR-17).
+- **`sales/orders/api.py`**: `POST search/` đi qua `get_queryset`, nên dùng `scope_orders_for` bản D1 của nhánh và `annotate_order_pii_visible`.
+  Tìm theo tên/SĐT vẫn cần V2 (`allow_customer_search=can_view_order_customer_info`). `GET ?q=` vẫn chỉ khớp mã đơn và vẫn trả
+  `SEARCH_USE_POST`. Phần thêm ngoài 02c, `_customer_filter_outside_scope(request, params)` cho body: **đúng, chấp nhận**. Không có nó thì
+  body `customer` là đường vòng của PV-05-AC6 (dò đơn của khách ngoài D7 khi D1 = `all`). `_filters_from_body` đã đổi mọi giá trị sang `str`,
+  nên `.strip()` an toàn. Thăm dò bằng test tạm: Quản lý có D7 `assigned_deliveries` gửi `customer` (số nguyên hoặc chuỗi) của khách
+  ngoài phạm vi thì nhận 200 `count=0`; gửi `"abc"` hoặc `-1` thì 400; khi D7 là `all` thì `count=1`. Không lọt dữ liệu cá nhân hay phạm vi.
+  Thiếu test hồi quy cho nhánh này (L1).
+- **Không mất hành vi của main.** `accounts/auth/authentication.py` (cổng `AUTH_NO_ROLE`) và `auth/tests/test_no_role_gate.py` không có
+  trong diff. Endpoint mới của nhánh (`permissions-preview`) không khai `allow_without_group` và không phải `AllowAny`, nên vẫn đi qua cổng.
+  Search POST 17b, `SEARCH_USE_POST`, giữ khoá `order_status` của W37 (test N2 còn khẳng định), nhãn V2/CSKH của main, AuditLog: không bị đụng.
+  `common/api.py` bỏ `has_full_delivery_scope` và `sees_customer_directory`: grep không còn chỗ gọi (chỉ còn test khẳng định các tên này đã bị bỏ).
+
+### 2. Mốc PV-01 — đạt
+`snapshot.py` tách thành `_Q4_DIFFS`, `_D3_DIRECT_DIFFS` (comment "Duy duyệt 08/10 D-3") và `_D3_COMBINED_DIFFS`
+(comment "Duy duyệt 08/10 D-3 (câu 9)"). `PENDING_DUY_DIFFS = ()`, đổi `D3_USERS`, không sinh lại baseline. Test vẫn chặn: hai mục đầu là Q-4,
+các mục D-3 chỉ thu hẹp, và một dòng `+` lạ của `direct_permissions` vẫn không được miễn. **Lập luận về `force_authenticate`: chấp nhận.**
+Cổng chặn nằm ở lớp xác thực, và `force_authenticate` bỏ qua lớp này (docstring `authentication.py` ghi rõ). Vì vậy mốc chỉ đo lớp phạm vi,
+tức lớp phòng thủ thứ hai. Cổng thật đã có test dùng token thật trên main (`test_no_role_gate.py`).
+
+### 3. Câu 7 — đạt
+`delivery/serializers.py`: `_customer_data_hidden` chỉ còn luật `pii_restricted` và quá cửa sổ SR-PII-02, đã bỏ import V2. Logic giờ giống
+hệt main, chỉ khác docstring. Ai được D3 cho xem phiếu thì thấy đủ tên, SĐT, địa chỉ khi phiếu còn trong cửa sổ. Tem `/label/` không đổi
+(vẫn che SĐT, chờ Duy trả lời Q1). Hai test N2 lật đúng, chi tiết phiếu khẳng định có `phone`. Có thêm ca cửa sổ trên phản hồi `status/`.
+Ca này giả lập `is_note_pii_expired` ở serializer, chấp nhận vì phiếu quá cửa sổ của NV giao không mở được bằng đường nào khác.
+`sales/customers/permissions.py` không đổi, đúng §C.2.
+
+### 4. C1 — đạt
+`refunds/api.py` có `get_queryset` gọi `scope_refunds_for` (D1, gắn `pii_visible`). Dashboard đã nói ở mục 1. Mặc định `all` cho Chủ,
+Quản lý, NV kho nên số liệu của họ không đổi. `test_refunds_dashboard_scope` xanh.
+
+### 5. Giá vốn, dữ liệu cá nhân, migration — đạt
+Không serializer nào thêm field giá vốn. Dashboard vẫn gắn `landed_unit_cost` theo `view_costprice` như cũ. Không có log hay AuditLog mới
+chép dữ liệu cá nhân. Thông điệp `SEARCH_USE_POST` không lặp lại `q`. Nhánh không thêm migration (`0014`/`0015` của phạm vi đã ở main,
+`sales/0019` của main giữ nguyên số), `makemigrations --check` sạch.
+
+### 6. Log PostgreSQL (`pvqd_pg.log`, Ran 3523, failures=13, errors=55)
+Đã phân loại cả 68 ca:
+- **Nhóm 1 (`FOR UPDATE ... nullable side of an outer join`)**: huỷ phiếu nhập (gồm 2 ca mới của nhánh, `ReceiptScopeTests.test_pv06_*`),
+  publish lô, claim việc gọi xác nhận.
+- **Nhóm 2 (AI trả 502)**: `QaF10UndoRealWhenAiOffTests` (6) và `test_dw19_level_b` (2). Đây là hệ quả của nhóm 1.
+- **Nhóm 6a, `test_pv01_ac1`**: đã đọc cả 71 dòng lệch. Mọi dòng `+` đều là `actions.confirmation_claim` hoặc `actions.receipts_cancel`
+  với giá trị `EXC:NotSupportedError`, đi cặp với dòng `-` của mã trạng thái cũ. Phần lệch `confirmation_claim` thuộc nhóm 1, không phải
+  lỗi phạm vi.
+- **Các nhóm còn lại** đều có trong `doc/ops/postgres-compat-08-10.md` của `fix/postgres-compat`: `seed_qa`, `test_qa_lo4_tien`,
+  `supplier_crud`, `shop_labels`, cost overflow, và `completion_race_postgres` (2 ca lỗi `admin.logentry`).
+- `git merge-tree HEAD fix/postgres-compat`: không xung đột. Thay đổi `can_cancel_receipt` của nhánh không đụng dòng `select_for_update`
+  mà bản sửa Postgres sửa.
+- **Ngoại lệ: `test_pv10_ac5` (lỗi `content_type` unique) có cùng nguyên nhân với nhóm 7b, nhưng bản sửa ở `fix/postgres-compat` không phủ ca này.**
+  Bản sửa 7b chỉ thêm `_fixture_setup` vào riêng lớp `CancelVersusCompleteRaceTests`. Chạy lẻ trên Postgres thì `ConcurrentSaveRaceTests` qua
+  (Ran 1, OK). Chạy chung suite, sau một `TransactionTestCase` đã flush, thì lớp này đỏ. Xem M1.
+- Ghi chú `03-dev-notes.md` có hai chỗ sai: "3 race `django_content_type` unique" thực ra là 1 ca `content_type` (pv10) cộng 2 ca `admin.logentry`
+  (completion race), và pv10 không tự hết khi gộp bản sửa.
+
+### Lỗi
+
+| # | Mức | Chỗ | Lỗi | Cách sửa |
+|---|---|---|---|---|
+| M1 | Medium (không chặn merge lô này; phải xong trước khi báo suite Postgres xanh sau khi gộp `fix/postgres-compat`) | `backend/apps/accounts/data_scopes/tests/test_query_budget_and_race.py:70-73` | `ConcurrentSaveRaceTests` (`serialized_rollback = True`) thiếu bản sửa 7b. Chạy chung suite thì lỗi `IntegrityError django_content_type_app_label_model_..._uniq` khi nạp bản serialize. Chạy lẻ thì qua | Thêm đúng `_fixture_setup` như `apps/delivery/tests/test_completion_race_postgres.py` của `fix/postgres-compat` (xoá ContentType tạo lại, gọi `super()._fixture_setup()`, rồi `ContentType.objects.clear_cache()`). Nên tách thành một mixin chung trong `apps/common/tests/` để hai lớp đua dùng chung. Làm ngay trong commit gộp `fix/postgres-compat`, rồi chạy lại cả suite trên Postgres |
+| L1 | Low | `backend/apps/accounts/data_scopes/tests/test_deliveries_customers_receipts_scope.py` (đặt cạnh `:361`) | `POST search/` với `customer` trong body ngoài D7 chưa có test hồi quy. Hành vi hiện tại đúng (đã thăm dò ở mục 1) | Thêm `test_pv05_ac6_search_body_customer_outside_d7_is_empty`: D7 `assigned_deliveries` cho Quản lý, gửi body `{"customer": <pk>}` dạng số nguyên và dạng chuỗi thì `count == 0`; D7 `all` thì `count == 1` |
+| L2 | Low | `test_query_budget_and_race.py:87` | `close_old_connections()` không đóng kết nối của luồng phụ (chưa "cũ"). Postgres báo `database "test_..." is being accessed by other users` khi xoá DB test (đã thấy khi chạy lẻ) | Dùng `connection.close()` trong `finally`, như `test_completion_race_postgres.py:66,82` |
+| L3 | Low (nit) | `backend/apps/delivery/serializers.py:11` | Dòng trống thừa giữa hai import tương đối, sót lại sau khi xoá import V2. Khiến diff so với main không rỗng | Xoá dòng trống. Sau đó `delivery/serializers.py` chỉ còn khác main ở docstring |
+
+### Việc trước khi merge vào main / deploy
+- Sửa doc `03-dev-notes.md` (phân loại pv10 như mục 6) cùng lúc với M1, hoặc ghi M1 thành nợ ghi tên trong `05-tiep-tuc.md`.
+- Nhắc lại §B.4.5: trước khi deploy production, đếm tài khoản `is_active`, không superuser, không nhóm (chỉ in username) và báo Duy.
