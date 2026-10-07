@@ -96,7 +96,11 @@ class SupplierFilterTests(ReceiptsApiBase):
         return [row["name"] for row in resp.json()["results"]]
 
     def test_supplier_list_is_sorted_by_name_and_unfiltered_by_default(self):
-        self.assertEqual(self.names(""), sorted(["Đầu mối A", "Vựa B", "Công ty Biển Xanh", "Ghe Cũ"]))
+        # Thứ tự do collation của DB quyết định (Postgres xếp "Đ" cạnh "D" theo tiếng Việt, SQLite xếp theo mã ký tự),
+        # nên chỉ so tập tên và thứ tự các tên có chữ cái đầu giống nhau ở mọi collation.
+        names = self.names("")
+        self.assertEqual(sorted(names), sorted(["Đầu mối A", "Vựa B", "Công ty Biển Xanh", "Ghe Cũ"]))
+        self.assertEqual([n for n in names if n != "Đầu mối A"], ["Công ty Biển Xanh", "Ghe Cũ", "Vựa B"])
 
     def test_supplier_filter_is_active(self):
         self.assertEqual(self.names("?is_active=false"), ["Ghe Cũ"])

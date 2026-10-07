@@ -40,6 +40,14 @@ class AuditLogMigrationTests(TransactionTestCase):
         executor.migrate(self.migrate_to)
         self.new_apps = executor.loader.project_state(self.migrate_to).apps
 
+    def tearDown(self):
+        # Trả DB test về bản mới nhất: test này lùi `accounts` rồi chỉ tiến tới 0007, các app phụ thuộc (ai, delivery,
+        # sales, inventory) còn ở trạng thái đã gỡ, làm hỏng mọi TransactionTestCase chạy sau nó (lộ khi chạy chung suite).
+        executor = MigrationExecutor(connection)
+        executor.loader.build_graph()
+        executor.migrate(executor.loader.graph.leaf_nodes())
+        super().tearDown()
+
     def test_s03_ac1_backfill_actor_kind_khong_mat_du_lieu_cu(self):
         AuditLog = self.new_apps.get_model("accounts", "AuditLog")
         rows = {r.action: r for r in AuditLog.objects.all()}

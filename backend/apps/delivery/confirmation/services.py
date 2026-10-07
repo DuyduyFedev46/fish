@@ -67,7 +67,7 @@ def claim_task(task_id: int, user, *, now=None) -> ConfirmationTask:
     now = now or timezone.now()
     with transaction.atomic():
         # Khoá dòng ConfirmationTask
-        task = ConfirmationTask.objects.select_for_update().select_related("note", "claimed_by").get(pk=task_id)
+        task = ConfirmationTask.objects.select_for_update(of=("self",)).select_related("note", "claimed_by").get(pk=task_id)
 
         if task.note.status == DeliveryNote.Status.CANCELLED and task.state != ConfirmationTask.State.REFUND_CALL:
             raise BusinessError("Đơn đã huỷ.", code="BR-GH-07")
