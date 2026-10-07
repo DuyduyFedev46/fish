@@ -139,7 +139,7 @@ export const AUDIT_FILTER_ACTIONS: readonly string[] = [
 ];
 
 /** Thao tác chỉ có nghĩa khi AI bật: ẩn khỏi ô lọc khi cờ AI tắt (SR-HIDE-AI-01). */
-export const AI_ONLY_ACTIONS: readonly string[] = ["ai_config_update", "ai_policy_update", "confirm_proposal"];
+export const AI_ONLY_ACTIONS: readonly string[] = ["ai_config_update", "ai_policy_update", "ai_config_kill", "confirm_proposal"];
 
 /** Tên người làm để hiện: dòng AI bỏ tiền tố "ai:" (nhãn AI vẽ riêng), dòng Hệ thống → "Hệ thống". */
 export function actorName(row: Pick<AuditLogRow, "actor_kind" | "actor_display">): string {

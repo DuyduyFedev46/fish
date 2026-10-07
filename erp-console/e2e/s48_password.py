@@ -288,9 +288,9 @@ with sync_playwright() as p:
     # superuser không bị ép
     page.evaluate("() => window.__caveMock.patchUser('admin', {must_change_password: true})")
     login(page, "admin")
-    page.wait_for_url("**/no-role/")
+    page.wait_for_url("**/overview/")
     ok("S48-AC6 superuser admin không bị ép (me.must_change_password=false)", True)
-    page.get_by_role("button", name="Đăng xuất").click()
+    logout(page)
     page.wait_for_url("**/login/")
     ctx.close()
 

@@ -1,7 +1,7 @@
 """QA độc lập đợt 1: menu và chặn truy cập theo vai (ED-01-AC1/AC5/AC6, ED-03-AC8, G9, UI-RULES §2.1, §8.1).
 
 Vai mock: loc (chủ), ql1 (quản lý), kho1 (kho + giao), giao1 (chỉ giao), cs2 (gọi xác nhận + giao),
-cùng hai ca ngoài đường thuận: CSKH thuần (patchUser) và tài khoản không nhóm (admin).
+cùng hai ca ngoài đường thuận: CSKH thuần (patchUser) và tài khoản không nhóm (nogroup1).
 In ra bảng vai x đường dẫn để dán vào báo cáo.
 """
 
@@ -191,7 +191,7 @@ with sync_playwright() as p:
     # 3) tài khoản không nhóm và mật khẩu tạm
     ctx = browser.new_context(viewport={"width": 1440, "height": 900}, reduced_motion="reduce")
     page = ctx.new_page()
-    login(page, "admin", wait_nav=False)
+    login(page, "nogroup1", wait_nav=False)
     page.wait_for_url("**/no-role/")
     ok("Tài khoản không nhóm: về màn 'chưa được phân quyền', không có sidebar", page.locator("#rail-left").count() == 0)
     page.goto(BASE + "/orders/")

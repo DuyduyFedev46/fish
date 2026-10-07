@@ -103,17 +103,26 @@ with sync_playwright() as p:
     log = page.evaluate("() => window.__caveMock.log.slice()")
     ok("AC3 không gọi API báo cáo", all("report" not in x for x in log) and log == ["GET /api/auth/me/"], str(log))
 
-    # AC5: admin (không Group)
+    # AC5 (D-3, Duy 08/10): nogroup1 = không Group, không superuser
     page.locator(".avatar-btn").click()  # đăng xuất nằm trong menu avatar
     page.get_by_role("menuitem", name="Đăng xuất").click()
     page.wait_for_url("**/login/")
-    login(page, "admin")
+    login(page, "nogroup1")
     page.wait_for_url("**/no-role/")
-    expect(page.get_by_text("Tài khoản chưa được phân quyền")).to_be_visible()
+    expect(page.get_by_role("heading", name="Bạn không có quyền vào hệ thống vận hành")).to_be_visible()
     ok("AC5 không có menu", page.locator(".nav").count() == 0 and page.locator("#rail-right").count() == 0)
     ok("AC5 gõ /overview vẫn bị đưa về no-role", True)
     page.goto(BASE + "/overview/")
     page.wait_for_url("**/no-role/")
+    # Duy 08/10 câu 1: admin (superuser, không Group) vào thẳng Tổng quan như Chủ
+    page.get_by_role("button", name="Đăng xuất").click()
+    page.wait_for_url("**/login/")
+    login(page, "admin")
+    page.wait_for_url("**/overview/")
+    expect(page.locator(".nav a").first).to_be_visible()
+    labels = nav_labels(page)
+    ok("superuser không nhóm: vào /overview/, menu có Phân quyền, không có Việc giao của tôi",
+       any(l.endswith("Phân quyền") for l in labels) and not any(l.endswith("Việc giao của tôi") for l in labels), str(labels))
     ctx.close()
 
     # ---------- Mobile 360x640 ----------

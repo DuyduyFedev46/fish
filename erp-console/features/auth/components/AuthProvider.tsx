@@ -24,7 +24,7 @@ import { getToken, setToken } from "@/shared/lib/token";
 import { clearAllDrafts, purgeForeignDrafts } from "@/shared/lib/drafts";
 import { changePassword as apiChangePassword, getMe, login as apiLogin, logoutRemote } from "../api";
 import { endSession, getLastUserId, setLastUserId } from "../session";
-import { MUST_CHANGE_PASSWORD_CODE, type Me } from "../types";
+import { MUST_CHANGE_PASSWORD_CODE, NO_ROLE_CODE, type Me } from "../types";
 import { MSG, errorText } from "@/shared/lib/messages";
 
 export type AuthStatus = "loading" | "anon" | "ready" | "error";
@@ -132,6 +132,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (code === MUST_CHANGE_PASSWORD_CODE) {
         forcedChange.current = true;
         setMe((m) => (m ? { ...m, must_change_password: true } : m));
+        void loadMe(false);
+        return;
+      }
+      if (code === NO_ROLE_CODE) {
+        // D-3: BE chặn hẳn người không nhóm. Ghi nhận ngay (ConsoleGate đưa về /no-role/), rồi tải lại `me` cho khớp.
+        setMe((m) => (m && m.home !== "no-role" ? { ...m, home: "no-role" } : m));
         void loadMe(false);
         return;
       }

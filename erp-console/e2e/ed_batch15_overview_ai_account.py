@@ -634,12 +634,12 @@ def login_screens(browser):
     page.screenshot(path=f"{SHOTS}/lo15-login-360.png")
     ctx.close()
 
-    # admin (chưa phân quyền) → màn "Tài khoản chưa được phân quyền"
-    ctx, page, errors = new_page(browser, "admin", w=360, h=780, wait_nav=False)
+    # nogroup1 (không nhóm, không superuser) → màn "Bạn không có quyền vào hệ thống vận hành"
+    ctx, page, errors = new_page(browser, "nogroup1", w=360, h=780, wait_nav=False)
     page.wait_for_url(re.compile(r"/no-role/"))
-    expect(page.get_by_role("heading", name="Tài khoản chưa được phân quyền")).to_be_visible()
-    ok("admin: màn chưa phân quyền có tên tài khoản + 'Nhờ Chủ vựa cấp quyền'", "Nhờ Chủ vựa cấp quyền" in page.locator("main").inner_text() and "admin" in page.locator("main").inner_text())
-    ok("admin 360px: không cuộn ngang, không icon rỗng", no_hscroll(page) and missing_icons(page) == [], str(missing_icons(page)))
+    expect(page.get_by_role("heading", name="Bạn không có quyền vào hệ thống vận hành")).to_be_visible()
+    ok("nogroup1: màn không có quyền có tên tài khoản + 'Nhờ Chủ vựa xếp nhóm'", "Nhờ Chủ vựa xếp nhóm" in page.locator("main").inner_text() and "nogroup1" in page.locator("main").inner_text())
+    ok("nogroup1 360px: không cuộn ngang, không icon rỗng", no_hscroll(page) and missing_icons(page) == [], str(missing_icons(page)))
     page.screenshot(path=f"{SHOTS}/lo15-no-role-360.png")
     ctx.close()
 

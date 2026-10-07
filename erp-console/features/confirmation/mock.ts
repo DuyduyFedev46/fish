@@ -527,7 +527,7 @@ export function mockGetConfirmationDetail(
   if (!item || !item.in_scope) {
     return {
       status: 404,
-      body: { detail: "Không tìm thấy phiếu trong phạm vi CSKH." },
+      body: { detail: "Không tìm thấy mục chờ gọi trong phạm vi của bạn." },
     };
   }
   return {

@@ -140,7 +140,7 @@ function LoginForm() {
         {MOCK && (
           <div className="mock-hint">
             <b>Chế độ mock.</b> Tài khoản: <code>loc</code> (Chủ), <code>ql1</code>, <code>kho1</code>,{" "}
-            <code>giao1</code>, <code>admin</code> (chưa phân quyền), <code>nghi1</code> (đã nghỉ), <code>kho5</code> (phải đặt
+            <code>giao1</code>, <code>admin</code> (quản trị hệ thống), <code>nogroup1</code> (chưa xếp nhóm), <code>nghi1</code> (đã nghỉ), <code>kho5</code> (phải đặt
             mật khẩu mới). Mật khẩu{" "}
             <code>demo1234</code>.
           </div>
