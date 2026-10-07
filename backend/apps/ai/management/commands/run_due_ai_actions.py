@@ -282,8 +282,7 @@ def _mark_failed(action_pk, exc):
     """
     with transaction.atomic():
         locked = (
-            AiAction.objects.select_related("owner")
-            .select_for_update(skip_locked=True, of=("self",))
+            AiAction.objects.select_for_update(skip_locked=True)
             .filter(pk=action_pk, status=AiAction.Status.SCHEDULED)
             .first()
         )

@@ -14,8 +14,17 @@ class AuditLogMigrationTests(TransactionTestCase):
     migrate_from = [("accounts", "0006_grant_change_item_image")]
     migrate_to = [("accounts", "0007_auditlog_ai_actor")]
 
+    def _restore_leaf(self):
+        # Trả DB test về bản mới nhất: test này lùi `accounts` rồi chỉ tiến tới 0007, các app phụ thuộc (ai, delivery,
+        # sales, inventory) còn ở trạng thái đã gỡ, làm hỏng mọi TransactionTestCase chạy sau nó (lộ khi chạy chung suite).
+        executor = MigrationExecutor(connection)
+        executor.loader.build_graph()
+        executor.migrate(executor.loader.graph.leaf_nodes())
+
     def setUp(self):
         super().setUp()
+        # Đăng ký ngay đầu setUp: nếu setUp lỗi giữa chừng (tearDown không chạy) vẫn trả migration về leaf.
+        self.addCleanup(self._restore_leaf)
         executor = MigrationExecutor(connection)
         # Các app khác giữ bản mới nhất; riêng accounts lùi về trạng thái TRƯỚC khi có 3 field mới
         # để tạo dữ liệu "kiểu cũ". Loại cả `ai` (P8b Lô 4: `ai/0003` phụ thuộc `accounts/0013`, nếu để
