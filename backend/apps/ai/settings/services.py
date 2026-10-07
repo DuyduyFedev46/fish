@@ -98,7 +98,7 @@ def get_user_config_data(user) -> dict:
     group_definitions = [
         (command_groups.PURCHASING, "Thu mua"),
         (command_groups.SALES, "Bán hàng"),
-        (command_groups.CUSTOMER_SERVICE, "CSKH"),
+        (command_groups.CUSTOMER_SERVICE, "Chăm sóc khách hàng"),
     ]
 
     registry = get_registry()

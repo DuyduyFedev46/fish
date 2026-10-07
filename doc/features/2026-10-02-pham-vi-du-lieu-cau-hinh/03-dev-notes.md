@@ -171,3 +171,53 @@ Thứ tự đã làm: M1+L1 (commit riêng, sinh lại mốc trên HEAD chưa s�
 - **L4 (Lô 5):** dòng D7 lưu `all` mà nhóm thiếu `view_customer_list` phải có `note`, ví dụ "Bật Xem khách hàng để thấy tất cả khách" (giá trị hiệu lực là `assigned_deliveries`).
 - **L2 phần Lô 5:** bước "trước" của `rows_losing_access` gọi `resolve_data_scopes(member, overrides={})` (`{}` khác `None` nên không bị nhớ). Test Lô 3+ đổi cấu hình dùng `User.objects.get(pk=…)` mới.
 - Lô 3/4 không được thêm `APPROVED_DIFFS` cho `direct_permissions` khi Duy chưa trả lời D-3.
+
+## Lô QĐ-08/10 BE (be-dev, 08/10, nhánh `feat/qd-0810-be`)
+
+Theo `02c-quyet-dinh-08-10.md` mục A, B, C.4, E, F. Quy tắc: BR-PQ-19/38, D-3 (Duy 08/10).
+
+### File đã sửa (đều trong `backend/`)
+- Cổng D-3: `apps/accounts/auth/authentication.py` (mixin đổi tên `_EnforceAccessMixin`; thêm `NoRole`, `has_erp_access`), `apps/accounts/auth/api.py` (4 view thêm `allow_without_group = True`).
+- `me`/home: `apps/accounts/auth/services.py` (`home_for(user, groups)` (sau sửa L1), khoá `is_superuser`, `GROUP_LABELS`, nhãn V2).
+- Nhãn V2 "Xem thông tin khách trên đơn, hoá đơn, phiếu hoàn tiền": `capabilities/registry.py`, `sales/models/orders.py`, `sales/customers/permissions.py` (comment), migration `sales/migrations/0019_alter_salesorder_view_order_customer_info_label.py` (chỉ `AlterModelOptions`).
+- Câu 2: `apps/common/ai_visibility.py` (`AI_ADMIN_ACTION_PREFIXES`).
+- Câu 13: nhãn vai "Nhân viên gọi xác nhận" (`GROUP_LABELS`), nhóm lệnh AI "Chăm sóc khách hàng" (`ai/settings/services.py`).
+- Seed: `accounts/qa_fixture/build.py` (`qa_nogroup` có quyền trực tiếp `sales.view_salesorder`, `sales.view_refund`, idempotent).
+
+### Contract cho FE
+`GET /api/auth/me/` thêm `"is_superuser": bool`. Superuser (kể cả không nhóm, hoặc chỉ `delivery_staff`) có `home: "dashboard"`; `groups`, `group_labels` vẫn là nhóm thật (có thể `[]`). Người không nhóm, không superuser: `home: "no-role"`, `me` vẫn 200.
+
+Cổng D-3: người không nhóm và không superuser gọi bất kỳ API ERP nào (trừ `/api/auth/token/`, `me`, `logout`, `change-password` và view `AllowAny`) nhận:
+```json
+HTTP 403 {"detail": "Tài khoản của bạn chưa thuộc nhóm nào nên không có quyền vào hệ thống vận hành. Nhờ Chủ vựa xếp nhóm.", "code": "AUTH_NO_ROLE"}
+```
+Quyền gán trực tiếp không tính. Kiểm theo DB mỗi request nên gỡ nhóm có hiệu lực ngay (không cache, khác 02c "cache trên user", vì token client dùng lại đối tượng user khác nhau mỗi request nên cache vô ích). Thứ tự: `AUTH_MUST_CHANGE_PASSWORD` kiểm trước, rồi `AUTH_NO_ROLE`.
+
+### Test lật / đổi
+- `test_s6_me.py`: `test_s6_ac4_superuser_without_group_goes_to_dashboard` (lật S6-AC4), thêm ca superuser chỉ `delivery_staff`, ca `is_superuser False`; tập khoá thêm `is_superuser`.
+- `test_s47_me_labels.py`: `test_s47_ac5_superuser_without_group_has_dashboard_and_all_capabilities` (lật S47-AC5); nhãn V2; tập khoá.
+- Mới `auth/tests/test_no_role_gate.py` (9 test): token thật quét mọi route DRF dưới `/api/` (view không miễn đều 403 `AUTH_NO_ROLE` dù có quyền trực tiếp), thân 403 chỉ `{detail, code}` không có SĐT giả, được chừa login/me/logout/đổi mật khẩu, view AllowAny không bị cổng, mọi nhóm qua cổng, superuser qua, gỡ nhóm có hiệu lực ngay, 401 khi chưa đăng nhập.
+- `test_note_redaction_and_ai_hide.py`, `common/tests/test_ai_visibility.py`: ẩn `ai_config_*`, `ai_policy_*`, `downgrade_*` khi tắt AI, hiện lại khi bật, lọc `?action=ai_config_update` trả 0, giữ dòng nghiệp vụ có `proposal_ref` do người duyệt.
+- `test_standard_names.py` (nhãn vai không còn viết tắt cũ), `capabilities/tests/test_api_read.py`, `delivery/tests/test_confirmation_role_scope.py`, `data_scopes/tests/test_orders_invoices_scope.py` (nhãn), `qa_fixture/tests/test_seed_qa.py` (quyền trực tiếp qa_nogroup).
+- Không test cũ nào dùng token thật với user không nhóm bị vỡ.
+
+### Ghi chú
+- `seed_qa` guard từ chối DB không phải SQLite nên 21 test `qa_fixture` không chạy được trên PostgreSQL cục bộ (có từ trước, không do lô này); chúng xanh trên SQLite.
+- Sinh migration `sales/0019` đúng số kế tiếp trên main (0018 là cuối).
+- Không đụng `delivery/serializers.py`, `features/permissions/**`, ngoài `backend/`.
+
+### Sửa theo review (L1–L4)
+- L1: `home_for(user, groups)` dùng `has_erp_access` (cùng luật với cổng D-3); kết quả `home` không đổi.
+- L2: `test_no_role_gate.py` thêm 3 ca: phiên (Session) bị 403 `AUTH_NO_ROLE`; người không nhóm có mật khẩu tạm nhận `AUTH_MUST_CHANGE_PASSWORD` trước; POST huỷ đơn bị 403 và đơn giữ trạng thái `PROCESSING`.
+- L3: test `test_no_api_view_overrides_get_permissions` khẳng định không view nào dưới `/api/` override `get_permissions` (vì `_is_public_view` chỉ đọc `permission_classes` cấp class).
+- L4: `qa_fixture/build.py` dùng `Permission.objects.get(...)`, thiếu quyền thì lỗi to thay vì bỏ qua im lặng.
+## Lô QĐ-08/10 FE (erp-console, Duy duyệt 08/10: câu 1, D-3, câu 13)
+
+- Superuser không nhóm vào ERP như Chủ: `Me.is_superuser`, `Viewer.is_superuser` (nav.ts, logic menu không đổi), `SUPERUSER_LABEL = "Quản trị hệ thống"` ở `shared/lib/groups.ts`; `roleText` (ConsoleGate) và AccountScreen ("Quản trị hệ thống (toàn quyền)") hiện nhãn này khi không có nhóm mà là superuser.
+- D-3: `NO_ROLE_CODE = "AUTH_NO_ROLE"` (`features/auth/types.ts`). AuthProvider: 403 mã này đặt `me.home = "no-role"` rồi tải lại `me`, ConsoleGate đưa về `/no-role/` (không đi nhánh 403 chung vì nhánh đó chỉ tải lại `me` và có thể không chuyển trang). `/no-role/` đổi chữ thành "Bạn không có quyền vào hệ thống vận hành".
+- Mock: `admin` thành `home: "dashboard"` + `is_superuser`; thêm `nogroup1` (id 13, không nhóm, có quyền gán lẻ) và cổng mock trả 403 `AUTH_NO_ROLE` (thêm vào `beErrors.mock.ts`) cho mọi API trừ me/logout/change-password/token, đứng sau kiểm mật khẩu tạm. LoginScreen gợi ý tài khoản mock đổi theo.
+- Nhãn `customer_service` thành "Nhân viên gọi xác nhận" (`GROUP_LABEL`, nhãn nhóm lệnh AI ở `ai/settings/mock.ts`, một câu 404 mock). Mã nhóm giữ. Nhãn V2 mới do BE trả, FE không chép.
+- e2e đổi `admin` thành `nogroup1` cho ca không nhóm: s7_shell (thêm ca admin vào /overview/, menu có Phân quyền, không có Việc giao của tôi), qa_ed_batch1_roles, ed_batch15_overview_ai_account, s48_password (đích chờ của admin là /overview/). Vitest: `englishNames.test.ts` đổi nhãn; mới `features/auth/superuser.test.ts`.
+- Không đụng `features/permissions/**`, backend/, frontend/.
+- Nợ/ghi chú: ed_batch15_overview_ai_account cần build bật AI (chờ `[data-attention=ai_proposals]`); ở build tắt AI nó dừng ở ca này, không liên quan lô. Tên hiển thị người mock "CSKH Thử"/"CSKH Khác" và từ khoá tìm AI "cskh" giữ nguyên (không phải nhãn vai).
+- Sửa theo review (R1–R3, N1): R1 thêm `ai_config_kill` vào `AI_ONLY_ACTIONS` (auditModel.ts) + vitest; R2 nhãn nhóm lệnh AI mock = "Chăm sóc khách hàng"; R3 câu 404 mock gọi xác nhận = nguyên văn BE "Không tìm thấy mục chờ gọi trong phạm vi của bạn."; N1 `onlyDelivery` thêm `!me.is_superuser &&` + 1 ca vitest (nav.test.ts). Kiểm: tsc sạch, vitest 1235/1235, build MOCK=0 + check-no-mock + check-ai-chunks XANH.

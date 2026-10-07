@@ -90,7 +90,7 @@ class S47MeLabelsTests(TestCase):
         # PV-07: V2 cấp cho cả 5 nhóm (Q-4), nên NV giao có đúng một việc Tầng 2 này.
         self.assertEqual(
             body["capabilities"],
-            [{"code": "sales.view_order_customer_info", "label": "Xem thông tin khách trên đơn & hoá đơn"}],
+            [{"code": "sales.view_order_customer_info", "label": "Xem thông tin khách trên đơn, hoá đơn, phiếu hoàn tiền"}],
         )
 
     def test_s47_capabilities_la_tap_con_cua_permissions(self):
@@ -154,16 +154,19 @@ class S47MeLabelsTests(TestCase):
         self.assertIs(body["can_view_cost"], True)
 
     # --- AC5 ------------------------------------------------------------------------
-    def test_s47_ac5_superuser_khong_group_van_no_role(self):
+    def test_s47_ac5_superuser_without_group_has_dashboard_and_all_capabilities(self):
+        # Duy 08/10 câu 1 (lật S47-AC5 cũ): vào ERP như Chủ, nhóm vẫn là nhóm thật (rỗng).
         admin = User.objects.create_superuser("admin", password="x")
         body = client_for(admin).get(URL).json()
         self.assertEqual(body["group_labels"], [])
-        self.assertEqual(body["home"], "no-role")
+        self.assertEqual(body["home"], "dashboard")
+        self.assertIs(body["is_superuser"], True)
+        self.assertIn("inventory.view_costprice", codes(body))
 
     # --- contract: chỉ THÊM key -------------------------------------------------------
     def test_s47_giu_key_s6_them_group_labels_capabilities(self):
         body = client_for(make_user("loc", roles.OWNER)).get(URL).json()
-        self.assertEqual(set(body), S6_KEYS | {"group_labels", "capabilities", "must_change_password", "ai_features_enabled"})  # + S48
+        self.assertEqual(set(body), S6_KEYS | {"group_labels", "capabilities", "must_change_password", "ai_features_enabled", "is_superuser"})  # + S48
 
     def test_s47_chua_dang_nhap_401(self):
         self.assertEqual(APIClient().get(URL).status_code, 401)

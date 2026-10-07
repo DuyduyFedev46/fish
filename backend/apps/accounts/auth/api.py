@@ -28,6 +28,7 @@ class LoginTokenView(ObtainAuthToken):
     từ chối), thêm ghi `User.last_login` để cột "Đăng nhập gần nhất" ở /api/staff/ có dữ liệu."""
 
     allow_must_change_password = True  # BR-PQ-19: đăng nhập bằng mật khẩu tạm vẫn được
+    allow_without_group = True  # D-3: người không nhóm vẫn đăng nhập được
     throttle_classes = [LoginIpThrottle, LoginUserThrottle]
 
     def post(self, request, *args, **kwargs):
@@ -44,6 +45,7 @@ class MeView(APIView):
 
     permission_classes = [IsAuthenticated]
     allow_must_change_password = True  # BR-PQ-19: miễn chặn
+    allow_without_group = True  # D-3: miễn cổng không nhóm
 
     def get(self, request):
         return Response(services.describe_user(request.user))
@@ -58,6 +60,7 @@ class LogoutView(APIView):
 
     permission_classes = [IsAuthenticated]
     allow_must_change_password = True  # BR-PQ-19: miễn chặn
+    allow_without_group = True  # D-3: miễn cổng không nhóm
 
     def post(self, request):
         services.logout(user=request.user)
@@ -71,6 +74,7 @@ class ChangePasswordView(APIView):
 
     permission_classes = [IsAuthenticated]
     allow_must_change_password = True  # BR-PQ-19: miễn chặn
+    allow_without_group = True  # D-3: miễn cổng không nhóm
 
     def post(self, request):
         data = request.data if hasattr(request.data, "keys") else {}

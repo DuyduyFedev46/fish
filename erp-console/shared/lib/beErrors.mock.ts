@@ -70,6 +70,13 @@ export const BE_ERRORS = {
     detail: "Bạn cần đặt mật khẩu mới trước khi dùng hệ thống (BR-PQ-19).",
   },
 
+  // ---- D-3 (Duy 08/10): không nhóm và không superuser → mọi API ERP bị chặn trừ auth/token, auth/me, auth/logout, auth/change-password ----
+  AUTH_NO_ROLE: {
+    status: 403,
+    code: "AUTH_NO_ROLE",
+    detail: "Tài khoản của bạn chưa thuộc nhóm nào nên không có quyền vào hệ thống vận hành. Nhờ Chủ vựa xếp nhóm.",
+  },
+
   // ---- S11 POST /api/sales/orders/{id}/confirm-payment (contract THỰC TẾ BE L7, 03-dev-notes.md "Lô L7 — S10, S11 (BE)") ----
   TT_TXN_REQUIRED: { status: 400, code: "BR-TT-08", detail: "Thiếu mã giao dịch ngân hàng." },
   TT_AMOUNT_INVALID: { status: 400, code: "BR-TT-08", detail: "Số tiền phải là số lớn hơn 0." },

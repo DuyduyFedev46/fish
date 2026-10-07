@@ -186,6 +186,12 @@ class ChoiceLabelTests(TestCase):
                     with self.subTest(enum=enum.__qualname__, label=str(choice_label), word=word):
                         self.assertNotIn(word, str(choice_label))
 
+    def test_qd0810_role_labels_have_no_old_abbreviation(self):
+        from apps.accounts.auth.services import GROUP_LABELS
+        for code, label in GROUP_LABELS.items():
+            with self.subTest(code=code):
+                self.assertNotIn("CSKH", label)
+
     def test_bt1_cancel_reason_labels(self):
         labels = order_services.CANCEL_REASON_LABELS
         self.assertEqual(labels["CUSTOMER_CHANGED_MIND"], "Khách đổi ý")  # T14

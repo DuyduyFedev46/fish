@@ -31,7 +31,7 @@ class GroupReadTests(TestCase):
         body = response.json()
         self.assertEqual([g["code"] for g in body], ALL_CODES)
         self.assertEqual([g["label"] for g in body],
-                         ["Chủ", "Quản lý", "Nhân viên kho", "Nhân viên giao", "CSKH"])
+                         ["Chủ", "Quản lý", "Nhân viên kho", "Nhân viên giao", "Nhân viên gọi xác nhận"])
         for row in body:
             self.assertEqual(set(row), LIST_KEYS)
             self.assertEqual(set(row["capabilities"]), {c.key for c in registry.CAPABILITIES})

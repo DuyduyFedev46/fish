@@ -132,7 +132,7 @@ class CskhL1Tests(TestCase):
         self.assertEqual(data["home"], "confirmation-queue")
         self.assertFalse(data["can_view_cost"])
         self.assertFalse(data["can_view_profit"])
-        self.assertEqual(data["group_labels"], [{"code": roles.CUSTOMER_SERVICE, "label": "CSKH"}])
+        self.assertEqual(data["group_labels"], [{"code": roles.CUSTOMER_SERVICE, "label": "Nhân viên gọi xác nhận"}])
         cap_codes = [c["code"] for c in data["capabilities"]]
         self.assertIn("delivery.confirm_with_customer", cap_codes)
         self.assertIn("delivery.change_recipient", cap_codes)

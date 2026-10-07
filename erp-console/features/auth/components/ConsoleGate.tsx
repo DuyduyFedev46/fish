@@ -7,7 +7,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { Shell } from "@/shared/ui/shell/Shell";
 import { Icon } from "@/shared/ui/Icon";
 import { ErrorBox, Loading } from "@/shared/ui/StateBox";
-import { groupLabel } from "@/shared/lib/groups";
+import { SUPERUSER_LABEL, groupLabel } from "@/shared/lib/groups";
 import { ACCOUNT_HREF, SET_PASSWORD_HREF } from "@/shared/lib/nav";
 import type { Me } from "../types";
 import { useAuth } from "./AuthProvider";
@@ -16,6 +16,7 @@ import { MSG } from "@/shared/lib/messages";
 /** Nhãn nhóm: ưu tiên `group_labels` BE trả (S47), không có thì dịch mã. */
 export function roleText(me: Me): string {
   if (me.group_labels?.length) return me.group_labels.map((g) => g.label).join(" · ");
+  if (me.groups.length === 0 && me.is_superuser) return SUPERUSER_LABEL;
   return me.groups.map(groupLabel).join(" · ");
 }
 

@@ -18,7 +18,7 @@ from apps.common.api import VIEW_COSTPRICE_PERM
 from apps.common.audit import record_audit
 from apps.common.exceptions import BusinessError
 
-from .authentication import must_change_password
+from .authentication import has_erp_access, must_change_password
 
 VIEW_PROFITREPORT_PERM = "reports.view_profitreport"
 
@@ -36,7 +36,7 @@ GROUP_LABELS = {
     roles.MANAGER: "Quản lý",
     roles.WAREHOUSE_STAFF: "Nhân viên kho",
     roles.DELIVERY_STAFF: "Nhân viên giao",
-    roles.CUSTOMER_SERVICE: "CSKH",
+    roles.CUSTOMER_SERVICE: "Nhân viên gọi xác nhận",
 }
 
 # S47: quyền Tầng 2 = bảng spec §1.5 + mọi `Meta.permissions` tuỳ biến. Thứ tự dict = thứ tự
@@ -76,7 +76,7 @@ CAPABILITY_LABELS = {
     # B2 (ERP theo design, Lô 6): chu + quan_ly. Khác `sales.view_customer` (Tầng 1, phạm vi dòng của NV giao).
     "sales.view_customer_list": "Xem khách hàng",
     # PV-07 (2026-10-02-pham-vi-du-lieu-cau-hinh): việc V2, cấp cho 5 nhóm (Q-4).
-    "sales.view_order_customer_info": "Xem thông tin khách trên đơn & hoá đơn",
+    "sales.view_order_customer_info": "Xem thông tin khách trên đơn, hoá đơn, phiếu hoàn tiền",
 }
 
 AUTH_OLD_PASSWORD = "AUTH_OLD_PASSWORD"
@@ -89,10 +89,14 @@ def sorted_groups(names):
     return sorted(names, key=lambda n: (rank.get(n, len(ROLE_ORDER)), n))
 
 
-def home_for(groups) -> str:
-    """Trang mặc định: không Group → no-role; chỉ delivery_staff → my-deliveries; chỉ customer_service → confirmation-queue; còn lại → dashboard."""
-    if not groups:
+def home_for(user, groups) -> str:
+    """Trang mặc định: không có quyền vào ERP (cùng luật `has_erp_access` với cổng D-3) → no-role;
+    superuser → dashboard (Duy 08/10 câu 1); chỉ delivery_staff → my-deliveries; chỉ customer_service →
+    confirmation-queue; còn lại → dashboard."""
+    if not has_erp_access(user):
         return HOME_NO_ROLE
+    if user.is_superuser:
+        return HOME_DASHBOARD
     if set(groups) == {roles.DELIVERY_STAFF}:
         return HOME_MY_DELIVERIES
     if set(groups) == {roles.CUSTOMER_SERVICE}:
@@ -117,7 +121,7 @@ def describe_user(user) -> dict:
         "permissions": sorted(permissions),
         "can_view_cost": user.has_perm(VIEW_COSTPRICE_PERM),
         "can_view_profit": user.has_perm(VIEW_PROFITREPORT_PERM),
-        "home": home_for(groups),
+        "home": home_for(user, groups),
         # S47 — chỉ THÊM key, không đổi key S6.
         "group_labels": [{"code": g, "label": GROUP_LABELS.get(g, g)} for g in groups],
         "capabilities": [
@@ -129,6 +133,8 @@ def describe_user(user) -> dict:
         "ai_features_enabled": ai_on,
         # S48 (BR-PQ-19): cờ hiệu lực — superuser luôn False.
         "must_change_password": must_change_password(user),
+        # PV-14 (review 07/10) + Duy 08/10 câu 1: FE phân biệt superuser không nhóm.
+        "is_superuser": bool(user.is_superuser),
     }
 
 

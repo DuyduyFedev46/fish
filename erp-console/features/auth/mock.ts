@@ -11,7 +11,8 @@
 //   giao2 = delivery_staff             → còn 2 phiếu Đang giao → Chủ cho nghỉ bị BR-GH-08 (S42-AC4)
 //   ql9   = manager + quyền lẻ accounts.manage_staff (không thuộc owner) → thử BR-PQ-17 403 (S41-AC6, S42-AC7)
 //   sa1   = superuser + manager → thử BR-PQ-18 (bỏ nhóm Chủ của loc — Chủ cuối cùng, S41-AC7)
-//   admin = superuser, không Group → home "no-role" (S6-AC4, S47-AC5)
+//   admin = superuser, không Group → home "dashboard", is_superuser (Duy 08/10 câu 1: vào ERP như Chủ; lật S6-AC4, S47-AC5)
+//   nogroup1 = không Group, không superuser → home "no-role"; mọi API ERP 403 AUTH_NO_ROLE (D-3, Duy 08/10)
 //   nghi1 = is_active=False     → đăng nhập 400 (S7-AC4)
 //   kho5  = warehouse_staff, còn mật khẩu tạm (must_change_password) → chỉ mở được màn "Đặt mật khẩu mới" (S48-AC1)
 //
@@ -207,6 +208,8 @@ function seed(): MockUser[] {
     u(10, "kho5", "Chị Sáu", "0909000888", [ROLE.warehouseStaff], { must_change_password: true }),
     u(11, "cs1", "Chị Cúc", "0909000999", [ROLE.customerService], { last_login: "2026-09-28T08:00:00+07:00" }),
     u(12, "cs2", "Chị Đào", "0909001000", [ROLE.customerService, ROLE.deliveryStaff], { last_login: "2026-10-01T08:00:00+07:00" }),
+    // D-3: không nhóm, không superuser, có quyền gán lẻ → vẫn bị chặn (quyền gán trực tiếp không tính).
+    u(13, "nogroup1", "Tài khoản chưa xếp nhóm", "", [], { extra_perms: ["sales.view_salesorder", "sales.view_refund"] }),
   ];
 }
 
@@ -278,7 +281,7 @@ function buildMe(u: MockUser): Me {
   const perms = mockPermsOf(u);
   const groups = sortGroups(u.groups);
   const home: Me["home"] =
-    groups.length === 0 ? "no-role" : groups.length === 1 && groups[0] === ROLE.deliveryStaff ? "my-deliveries" : "dashboard";
+    u.is_superuser ? "dashboard" : groups.length === 0 ? "no-role" : groups.length === 1 && groups[0] === ROLE.deliveryStaff ? "my-deliveries" : "dashboard";
   return {
     id: u.id,
     username: u.username,
@@ -294,6 +297,7 @@ function buildMe(u: MockUser): Me {
     capabilities: CAPABILITIES.filter(([code]) => perms.includes(code)).map(([code, label]) => ({ code, label })),
     // S48:
     must_change_password: mustChange(u),
+    is_superuser: u.is_superuser,
     // W39: mặc định true để bản mock chỉ phụ thuộc cờ build như trước. QA giả lập "BE tắt AI" bằng
     // `sessionStorage.setItem("caveve_mock_be_ai", "off")` rồi tải lại (cờ cấu hình, không phải dữ liệu cá nhân).
     ai_features_enabled: mockBackendAiEnabled(),
@@ -385,7 +389,10 @@ if (process.env.NEXT_PUBLIC_USE_MOCK === "1") {
   setMockGate((req) => {
     if (MUST_CHANGE_ALLOWED.some((p) => req.path.startsWith(p))) return null;
     const u = userFromToken(req.token);
-    return u && mustChange(u) ? beError("AUTH_MUST_CHANGE_PASSWORD") : null;
+    if (!u) return null;
+    if (mustChange(u)) return beError("AUTH_MUST_CHANGE_PASSWORD");
+    // D-3: sau kiểm mật khẩu tạm; chỉ chặn đường ERP (mock chưa có đường công khai trong gate này).
+    return !u.is_superuser && u.groups.length === 0 ? beError("AUTH_NO_ROLE") : null;
   });
 }
 
