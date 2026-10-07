@@ -106,6 +106,40 @@ Ranh giới Chủ ↔ Quản lý: Quản lý được uỷ *mọi thứ làm kh�
 - Field nhạy cảm (`Batch.purchase_rate`, `Batch.landed_unit_cost`,
   `PurchaseReceiptLine.rate`, `*LineBatch.unit_cost`): chỉ `view_costprice`.
 
+## Dữ liệu giả cho e2e — `manage.py seed_qa`
+
+Bộ dữ liệu giả CỐ ĐỊNH, TẤT ĐỊNH để các e2e chạy trên backend thật khỏi cứng mã/id của phiên QA cũ.
+Lệnh **riêng**, không phải `seed_demo --qa`: `seed_demo` được phép chạy trên production và có sổ `DemoRecord`
+(`seed_demo --remove` gỡ theo sổ), trộn QA vào đó sẽ đưa dữ liệu giả vào luồng production và làm `--remove` kéo
+theo dữ liệu QA. Code ở `apps/accounts/qa_fixture/` (`build.py` dữ liệu, `reset.py`, `guard.py` cổng chặn).
+
+```bash
+cd backend
+export DJANGO_DEBUG=1 DATABASE_URL=sqlite:////tmp/e2e.sqlite3     # DB tạm, KHÔNG dùng DB thật
+.venv/bin/python manage.py migrate && .venv/bin/python manage.py bootstrap_masterdata
+QA_PASSWORD='mật-khẩu-tự-chọn' .venv/bin/python manage.py seed_qa  # dựng (idempotent) + in bảng mã → id
+.venv/bin/python manage.py seed_qa --reset                         # xoá đúng bản ghi QA
+```
+
+- **Bảng mã → id** in ra màn hình và ghi `/tmp/seed_qa_ids.json` (đổi bằng `--manifest`): khoá `users`, `customers`,
+  `items`, `batches`, `orders`, `invoices`, `delivery_notes`, `payments`, `refunds`, `returns`, `receipts`,
+  `stocktakes`, `call_scripts`. Kịch bản e2e đọc tệp này thay vì cứng id.
+- **Mật khẩu** các tài khoản `qa_…` lấy từ env `QA_PASSWORD` (bắt buộc, không mặc định, không in ra).
+- **Tài khoản:** `qa_owner`, `qa_manager`, `qa_warehouse`, `qa_courier1`, `qa_courier2`, `qa_cs1`, `qa_cs2`,
+  tổ hợp `qa_warehouse_courier` (K+G), `qa_warehouse_cs` (K+C), `qa_nogroup` (không nhóm), `qa_superuser`.
+- **Đơn** `QA-SO-01…17` đủ trạng thái (giữ chỗ, tự huỷ, đã thanh toán, đang xử lý, hoàn tất, huỷ có `cancel_note`,
+  hoàn tất sau chuyển bù, chuyển thiếu); **phiếu giao** `QA-GH-nn` đủ trạng thái (gồm FAILED giao2 và CANCELLED giao1/giao2);
+  phiếu hoàn tiền PENDING/REFUNDED/FAILED; hàng hoàn Nháp/Đã duyệt/Đã huỷ; phiếu nhập Nháp/Ghi nhận/Huỷ;
+  kiểm kê Nháp + Chờ duyệt; lô `QA-LO-01…08` (đang bán, cận hạn, quá hạn 6,5 kg, nháp, đã chốt, hết hàng, đã huỷ);
+  khoản tiền về ORPHAN/UNMATCHED/OVERPAID/MANUAL có nhãn nghi trùng; kịch bản gọi; Nhật ký đủ người/hệ thống/AI.
+- **Dữ liệu cá nhân hoàn toàn giả:** SĐT `09000000nn`, tên "Khách QA Giả nn", địa chỉ "QA-Địa chỉ giả…".
+- **Cổng chặn:** chỉ chạy khi `DJANGO_DEBUG=1` VÀ (SQLite hoặc tên DB/host có `staging`). DB giống production
+  (PostgreSQL tên `postgres`, hoặc tên/host có `prod` không có `staging`) bị từ chối, **không cờ nào mở được**.
+  `--allow-non-local` chỉ nới điều kiện DEBUG/loại DB (vd Postgres dev trên máy).
+- **Idempotent:** chạy lại không nhân đôi. `--reset` xoá theo tiền tố `QA-`/`qa_` và SĐT `09000000nn`; bản ghi còn
+  bị dữ liệu khác tham chiếu thì giữ lại và báo. Ngoại lệ có chủ đích của BR-PQ-10/06, chỉ cho dữ liệu QA.
+- Hạn giữ chỗ của `QA-SO-01/02/13` tính từ lúc seed (25, 3, 20 phút): đừng chạy `cancel_expired_orders` giữa chừng.
+
 ## Tham số cấu hình (không hard-code) — `.env` / `settings.py`
 
 `BATCH_DEFAULT_SHELF_LIFE_DAYS` (90), `BATCH_NEAR_EXPIRY_DAYS` (14),

@@ -11,6 +11,7 @@ nguồn ở `capabilities/registry.py`, audit `change_group_capabilities`, guida
 Migration `0003`: gán `reports.view_dashboard` cho owner/manager/warehouse_staff (S6).
 Command: `bootstrap_masterdata` (Kho chính + bảng giá Bán lẻ), `seed_demo` (dữ liệu demo):
 `seed_demo` thêm (idempotent) · `seed_demo --remove [--dry-run] [--adopt-legacy]` gỡ CHỈ dữ liệu demo.
+`seed_qa` (+ `qa_fixture/`): dữ liệu giả cố định cho e2e, cổng chặn production, `--reset` theo tiền tố `QA-`; xem `backend/README.md`.
 `demo/`: sổ đánh dấu `DemoRecord` (migration `0005`) + `services.track_demo_creations` /
 `remove_demo` (D1 — ngoại lệ có chủ đích của BR-PQ-10, chỉ cho bản ghi demo).
 Tập giữ lại tính theo bao đóng (QA lần 2 · B2): demo là "một phần" của bản ghi đang giữ (mọi FK ngoài `REFERENCE_FIELDS`) cũng giữ — chứng từ giữ cả cụm hoặc gỡ cả cụm.
