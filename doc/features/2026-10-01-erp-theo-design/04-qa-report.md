@@ -4284,3 +4284,62 @@ Không có. Không tạo B-mục.
 - Từng file: `python3 -u erp-console/e2e/<file>.py` (hoặc `frontend/e2e/<file>.py`) với `BASE`/`REAL_API`/`QA_*` tương ứng, `AI_FEATURES=1` cho bản bật AI, nền, log riêng.
 - Probe tay (Playwright/`urllib`) để xác minh nguyên nhân: hộp "Cho nghỉ" của giao1, 8 giá trị `cave_ui_sidebar` rác, trang Kho/chi tiết lô của kho1 và ql1, hộp "Huỷ đơn", ma trận endpoint giá vốn ở BE thật, quét log BE tìm dữ liệu cá nhân.
 - Dọn: kill theo PID (13 tiến trình), xoá DB tạm, `out/` của hai app, `.next`, bản build harness vite (ở scratchpad), 3 symlink (`backend/.env`, `backend/staticfiles`, `erp-console/out`); `git status` sạch trước khi ghi report này.
+
+---
+
+## QA lô dọn e2e (08/10)
+
+Nhánh `chore/e2e-cleanup`, HEAD `8f1f43a`. Lô chỉ đổi kịch bản e2e (`erp-console/e2e/`) và tài liệu, không đổi code sản phẩm. QA tự chạy lại, cổng riêng (3611/3612/3631/3102/8621), mỗi kịch bản giới hạn 300 s, bản build có sẵn của điều phối viên.
+
+### Kết luận: APPROVED
+Mọi kịch bản chạy lại đều xanh, số khớp bảng điều phối viên. Kịch bản đỏ thật khi sản phẩm sai. Không có SĐT/tên/địa chỉ thật, không mật khẩu thật cứng.
+
+### Tổng: 20 lượt chạy kịch bản + 3 ca ngoài đường thuận + 2 ca quét/cài đặt · ✅ tất cả · ❌ 0 · ⏸ 0
+
+### 1. Chạy lại (QA tự chạy)
+| Kịch bản | Môi trường | Kết quả QA | Bảng điều phối viên | Khớp |
+|---|---|---|---|---|
+| `qa_ed_batch1_shell` | mock AI tắt | 97/97, rc 0 | 97/97 | ✅ |
+| `qa_ed_batch1_shell` | mock AI bật | 99/99, rc 0 | 99/99 | ✅ |
+| `ed_batch14_permissions` | AI tắt | 101/101, rc 0 | 101/101 | ✅ |
+| `ed_batch14_permissions` | AI bật | 101/101, rc 0 | 101/101 | ✅ |
+| `qa_ed_batch7_mock` | AI tắt | 336/336, rc 0 (lần này không chập chờn) | 336/336 | ✅ |
+| `qa_ed_batch7_mock` | AI bật | 336/336, rc 0 | 336/336 | ✅ |
+| `s14_s16_cancel_refund` | AI tắt | 41/41, rc 0 | 41/41 | ✅ |
+| `s14_s16_cancel_refund` | AI bật | 41/41, rc 0 | 41/41 | ✅ |
+| `ed_shell_fixes` (+ harness 3102) | AI tắt | 21/21, rc 0 | 21/21 | ✅ |
+| `qa_ed_batch1_round2` (+ harness 3102) | AI tắt | 99/99, rc 0 | 99/99 | ✅ |
+| `ed_batch6_customers_real` | BE thật + seed_qa mới | 32/32, rc 0 | 32/32 | ✅ |
+| `qa_ed_batch11_api` | BE thật + seed_qa mới | 153/153, rc 0 | 153/153 | ✅ |
+| `p8_lo5_qa_real_backend` | BE thật + seed_qa mới | 12/12, rc 0 | 12/12 | ✅ |
+
+Ghi chú: `s14_s16` có 1 dòng chứa chữ "FAIL" nhưng là tên trạng thái trong ca `PASS S16: danh sách gồm cả PENDING và FAILED`, không phải ca đỏ. BE thật: SQLite tạm, `migrate` + `bootstrap_masterdata`, `seed_qa` DB mới trước từng kịch bản, ERP build `NEXT_PUBLIC_USE_MOCK=0`.
+
+### 2. Ca ngoài đường thuận
+| Ca | Cách làm | Kết quả |
+|---|---|---|
+| Kịch bản đỏ khi sản phẩm sai | Sao chép `out_off` vào scratchpad, đổi nhãn menu `Hàng hoàn` thành `Hàng trả` trong 26 chunk JS (chuỗi được minify thành `H\xe0ng ho\xe0n`), không đụng repo. Chạy `qa_ed_batch1_shell` trên bản đó | rc 1, `== 88/97 PASS`, 9 dòng `FAIL` (vd ED-01-AC2). Trên bản đúng cùng kịch bản: 97/97, rc 0. `finish()` thoát khác 0 đúng |
+| Thiếu `QA_PASSWORD` | Chạy 3 kịch bản seed_qa không có env | `ed_batch6_customers_real` và `p8_lo5_qa_real_backend`: in "Thiếu env QA_PASSWORD (…)" rc 1. `qa_ed_batch11_api` đòi `QA_DB` trước (KeyError nếu thiếu), có `QA_DB` mà thiếu mật khẩu thì in cùng thông báo; không `QA_DB` rc 1 |
+| Seed lại DB mới trước mỗi kịch bản | Mỗi kịch bản BE thật dùng bản copy `tpl.sqlite3` + `seed_qa` mới | Không phụ thuộc trạng thái kịch bản trước, cả 3 xanh |
+
+### 3. Bất biến 9 (dữ liệu cá nhân, mật khẩu)
+Quét 30 file `.py` e2e thêm/sửa trong lô + phần `+` của diff doc:
+- SĐT trong kịch bản đều là giá trị giả rõ ràng: `09000000nn`, `0909…`, `0911222333`, `0912345678`, `tel:0909000111`. Tên/địa chỉ giả: "Khách Thử", "Người Nhận Giả", "12 Đường Giả". Doc ghi rõ dữ liệu giả ("Khách QA Giả nn", "QA-Địa chỉ"). Không có số/tên/địa chỉ thật. ✅
+- Kịch bản BE thật dùng `password()` đọc `QA_PASSWORD`, không mặc định, không cứng. Chỉ còn `pw="demo1234"` làm mặc định hàm `login` của kịch bản mock (mật khẩu demo của mock, 12 file, đã có sẵn ở main; lô này thêm 1). Không phải mật khẩu thật. Ghi nhận **Low** (thông tin): nên đổi sang đọc env nếu sau này mock kiểm mật khẩu thật. ✅
+- Các ca PII trong kịch bản (URL/localStorage/DOM không chứa số đủ) vẫn xanh trong mock chạy lại.
+
+### 4. npm ci sạch
+Bản copy `erp-console` (không có `node_modules`) ở scratchpad: `npm ci` (không `--legacy-peer-deps`) rc 0, 189 packages, 9,9 s; `./node_modules/.bin/tsc --noEmit` rc 0. Lô không đổi code sản phẩm nên `npm run build` không chạy lại (dùng bản build có sẵn của điều phối viên). ✅
+
+### Rò giá vốn / phân quyền / hồi quy
+Lô không đổi sản phẩm. Kịch bản phân quyền `ed_batch14_permissions` (101 ca) và `qa_ed_batch1_shell` (menu theo vai, PII storage) xanh ở cả AI tắt/bật; `qa_ed_batch11_api` (153 ca, API trên BE thật) xanh.
+
+### Lỗi
+Không có lỗi chặn. Ghi nhận (không chặn):
+- L-QA1 (Low): `pw="demo1234"` mặc định ở 12 hàm `login` mock.
+- L-QA2 (Low): `qa_ed_batch11_api` KeyError `QA_DB` khi thiếu env (không có thông báo thân thiện như `QA_PASSWORD`).
+- Nợ đã biết (đã ghi ở dev notes): `qa_ed_batch3_real_ai`, `qa_ed_batch5_real` còn ⏸; 4 kịch bản CMS cần bài mẫu; `.toast-close` 32px < 44px (a11y sản phẩm).
+- Thư mục `backend/staticfiles` và `erp-console/node_modules` hiện là untracked trong worktree (không thuộc commit này).
+
+### Lệnh đã chạy
+`mock.sh` (3 http.server + 10 lượt kịch bản mock), `real.sh` (migrate, bootstrap_masterdata, seed_qa, runserver 8621, 3 kịch bản), kịch bản trên bản build sai, 3 kịch bản không `QA_PASSWORD`, `npm ci` + `tsc --noEmit` ở bản copy, grep PII/mật khẩu. Đã tắt toàn bộ http.server/runserver của QA.

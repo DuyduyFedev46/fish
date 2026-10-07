@@ -10,9 +10,10 @@ import pathlib
 
 from playwright.sync_api import expect, sync_playwright
 
+from e2e_support import page_404_body
+
 BASE = os.environ.get("BASE", "http://127.0.0.1:3101")
 SHOTS = os.environ.get("SHOTS", "/tmp")
-OUT_404 = pathlib.Path(__file__).resolve().parent.parent / "out" / "404.html"
 results = []
 # Lô 17b (E2E-1): giao diện AI chỉ có khi build bật NEXT_PUBLIC_AI_FEATURES=1. Chạy với AI_FEATURES=1 nếu build có AI; mặc định build tắt AI.
 AI_ON = os.environ.get("AI_FEATURES") == "1"
@@ -68,7 +69,7 @@ def fonts_ready(page):
 
 
 def fulfil_404(page, path_glob):
-    body = OUT_404.read_text(encoding="utf-8")
+    body = page_404_body(BASE)
     page.route(path_glob, lambda route: route.fulfill(status=404, content_type="text/html; charset=utf-8", body=body))
 
 

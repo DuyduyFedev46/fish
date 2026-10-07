@@ -2803,3 +2803,49 @@ Test mới `sales/orders/tests/test_order_search_post.py` (17 ca). Test cũ chuy
 - **L1** `guard.py`: `SEPAY_ENV=PRODUCTION` luôn bị từ chối, không cờ nào mở (có test).
 - **L2** `QA-LO-07/08` thêm bút toán bù (SALE / WRITE_OFF, `reference` có `QA-`); hàng hoàn APPROVED đi qua `returns.apply_return` (có RETURN_RESTOCK, cộng tồn). Test "tổng sổ = tồn" cho mọi lô QA.
 - **L3** README: không commit tệp bảng mã.
+
+## Lô dọn e2e (FE/e2e, 08/10)
+
+Nhánh `chore/e2e-cleanup`. Chỉ đổi kịch bản e2e và tài liệu, không đổi code sản phẩm.
+
+- **Hạ tầng chung:** `erp-console/e2e/e2e_support.py` (`finish(results)` thoát mã khác 0 khi có ca đỏ; `page_404_body(base)` đọc trang 404 qua HTTP thay vì `out/404.html`), `e2e_seed_qa.py` (đọc bảng mã → id của `manage.py seed_qa`, mật khẩu từ `QA_PASSWORD`, không mặc định).
+- **Viết lại 18 kịch bản lỗi thời** theo hành vi hiện tại (tên chuẩn 07/10, menu 'Hàng hoàn', ⌘K theo mã chứng từ, DataTable, giá mua bắt buộc, quyền nhập hàng hoàn của Quản lý, chuỗi thập phân của Lô 17a), cách nhận diện nhãn AI theo `AI_FEATURES`/`AI_BUILD`.
+- **Chuyển sang seed_qa:** `ed_batch3_real`, `qa_ed_batch11_api`, `p8_lo5_qa_real_backend`, `standard_names_all_routes` (chế độ `REAL=1`); thêm `ed_batch5_confirmation_real`, `ed_batch6_customers_real` thay phần tích hợp UI ↔ BE của kịch bản QA một lần.
+- **Xoá 14 kịch bản QA một lần** cứng fixture/đường dẫn của phiên QA cũ, phần đáng giữ đã có ở kịch bản seed_qa hoặc test BE: `qa_ed_batch10_second_pass`, `qa_ed_batch11_real`, `qa_ed_batch3_real`, `qa_ed_batch6_api`, `qa_ed_batch6_real`, `qa_ed_batch7_real`, `qa_ed_batch8_real`, `qa_ed_batch8_real_followup`, `qa_ed_batch8_real_round2`, `qa_ed_batch9_api`, `qa_ed_batch9_real`, `qa_ed_batch9_real_closed`, `qa_lo7_real_expired`, `qa_lo8_real`.
+- **Còn ⏸ có ghi chú đầu file:** `qa_ed_batch3_real_ai` (cần BE bật AI, nợ lô AI), `qa_ed_batch5_real` (cần mở rộng seed_qa: 6 việc Chờ gọi, 5 Cần quyết định, job tự huỷ). 4 kịch bản CMS `ra_soat_cms*` vẫn cần bài mẫu CMS.
+
+### Kiểm chứng (điều phối viên tự chạy, 08/10)
+Mỗi kịch bản giới hạn 300 s. Mock: build `NEXT_PUBLIC_USE_MOCK=1`, AI tắt và AI bật (`NEXT_PUBLIC_AI_FEATURES=1`), harness vite `qa_harness_ed_batch1` cổng 3102. BE thật: SQLite tạm, `migrate` + `bootstrap_masterdata`, `seed_qa` lại DB mới trước mỗi kịch bản, ERP build `NEXT_PUBLIC_USE_MOCK=0`.
+
+| Kịch bản | Mock AI tắt | Mock AI bật | BE thật |
+|---|---|---|---|
+| `ed_batch14_permissions` | 101/101 | 101/101 | |
+| `ed_batch1_shell` | 56/56 | 56/56 | |
+| `ed_shell_fixes` (+ harness) | 21/21 | | |
+| `p8_lo5_fe_lo_qua_han` | 75/75 | 75/75 | |
+| `p8_lo7_fe_erp` | 83/83 | 83/83 | |
+| `qa_ed_batch1_roles` | 48/48 | 48/48 | |
+| `qa_ed_batch1_round2` (+ harness) | 99/99 | | |
+| `qa_ed_batch1_shell` | 97/97 | 99/99 | |
+| `qa_ed_batch4_round2` | 72/72 | 72/72 | |
+| `qa_ed_batch5_round2` | xanh (rc 0) | xanh (rc 0) | |
+| `qa_ed_batch5_ui` | xanh (rc 0) | xanh (rc 0) | |
+| `qa_ed_batch7_mock` | 336/336 (lần đầu 335/336, ca 'đường sai id kép' chụp lúc chưa render xong; chạy lại xanh) | 336/336 | |
+| `qa_ed_batch9_ui` | xanh (rc 0) | xanh (rc 0) | |
+| `s14_s16_cancel_refund` | 41/41 | 41/41 | |
+| `s7_shell` | 24/24 | 24/24 | |
+| `sr07_receive_batches_draft` | 20/20 | 20/20 | |
+| `ed_batch3_real` | | | 25/25 |
+| `qa_ed_batch11_api` | | | 153/153 |
+| `ed_batch5_confirmation_real` | | | 27/27 |
+| `ed_batch6_customers_real` | | | 32/32 |
+| `p8_lo5_qa_real_backend` | | | 12/12 |
+| `standard_names_all_routes` | | | 10/10 |
+
+Sửa lúc tự kiểm: `ed_batch1_shell.py` gọi `page_404_body` nhưng thiếu import (commit 8e17ec5), đã thêm.
+Nợ: `qa_ed_batch7_mock` ca 'đường sai id kép' có thể chập chờn (chờ theo nội dung thay vì `table.lt` nên làm ở lần sửa sau).
+
+### Sửa theo review techlead (08/10, 4 lỗi Low)
+- L1 `p8_lo5_qa_real_backend.py`: bỏ if/else, khẳng định đúng một kết quả theo seed ('Chốt lô' mờ, lý do nhắc kiểm kê). Nợ: thêm vào seed_qa một lô Quá hạn đã kiểm kê APPROVED để có lại ca chốt lô thành công.
+- L2 Nợ a11y (Low, sản phẩm): nút đóng toast `.toast-close` cao 32px (< 44px) ở `shared/ui/globals.css`; `qa_ed_batch4_round2` tạm loại nút này khỏi ca kích thước chạm.
+- L3, L4 `e2e_support.py`: sửa docstring tên cũ `e2e_exit`, bỏ tham số `label` không dùng.

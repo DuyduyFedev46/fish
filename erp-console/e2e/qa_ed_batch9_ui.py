@@ -99,8 +99,8 @@ def dlg(page):
 
 
 def run_roles(b):
-    exp = {  # user: (thấy menu, nút Nhập, nút duyệt ở phiếu Chờ duyệt)
-        "loc": (True, True, True), "ql1": (True, False, True), "kho1": (True, True, False),
+    exp = {  # user: (thấy menu, nút Nhập, nút duyệt ở phiếu Chờ duyệt). ql1 có nút Nhập hàng hoàn từ Lô bổ sung A (02/10): manager có add_returntostock
+        "loc": (True, True, True), "ql1": (True, True, True), "kho1": (True, True, False),
         "giao1": (True, True, False), "giao2": (True, True, False), "cs2": (True, True, False), "cs1": (False, False, False),
     }
     for u, (menu, add, appr) in exp.items():
@@ -258,7 +258,7 @@ def run_create_edges(b):
             ok(f"PII ghi chú {text!r}: {'bị chặn' if should_block else 'không bị chặn'}", True)
         if dlg(p).count() == 0:
             break
-    ok("PII: không lọt vào URL/storage (trừ danh sách người dùng mock và token)", "0912" not in p.url and "0912" not in p.evaluate("() => JSON.stringify(Object.entries(localStorage).filter(([k]) => !k.includes('mock_users') && !k.includes('token')).concat(Object.entries(sessionStorage)))"))
+    ok("PII: không lọt vào URL/storage (trừ khoá giả cave_erp_mock_* của mock và token)", "0912" not in p.url and "0912" not in p.evaluate("() => JSON.stringify(Object.entries(localStorage).filter(([k]) => !k.includes('mock_users') && !k.includes('token') && !k.startsWith('cave_erp_mock_')).concat(Object.entries(sessionStorage).filter(([k]) => !k.startsWith('cave_erp_mock_'))))"))
     ctx.close()
 
     # bấm đúp "Gửi duyệt": chỉ 1 phiếu
@@ -375,8 +375,8 @@ def run_privacy(b):
         txt = p.locator("main").inner_text()
         ok(f"PII {path}: không SĐT, không địa chỉ khách, không tên khách", not re.search(r"0\d{9}|\+84", txt) and not re.search(r"Nguyễn|Trần|Lê Văn|Phạm", txt), txt[:200])
         dump = p.evaluate("() => JSON.stringify([Object.entries(localStorage), Object.entries(sessionStorage), document.cookie])")
-        dump2 = p.evaluate("() => JSON.stringify(Object.entries(localStorage).filter(([k]) => !k.includes('mock_users') && !k.includes('token')).concat(Object.entries(sessionStorage), [document.cookie]))")
-        ok(f"PII {path}: storage (trừ danh sách người dùng mock) không chứa ghi chú/tên/SĐT", not re.search(r"Khách|Sai địa chỉ|Xe hỏng|0\d{9}", dump2), dump2[:300])
+        dump2 = p.evaluate("() => JSON.stringify(Object.entries(localStorage).filter(([k]) => !k.includes('mock_users') && !k.includes('token') && !k.startsWith('cave_erp_mock_')).concat(Object.entries(sessionStorage).filter(([k]) => !k.startsWith('cave_erp_mock_')), [document.cookie]))")
+        ok(f"PII {path}: storage (trừ khoá giả cave_erp_mock_* của mock) không chứa ghi chú/tên/SĐT", not re.search(r"Khách|Sai địa chỉ|Xe hỏng|0\d{9}", dump2), dump2[:300])
         ok(f"PII {path}: URL không chứa chữ tự do", re.fullmatch(r"[^?]*(\?id=\d+)?", p.url.replace(BASE, "")) is not None, p.url)
     ok("không console error/warning", p.__errors == [], p.__errors)
     ctx.close()

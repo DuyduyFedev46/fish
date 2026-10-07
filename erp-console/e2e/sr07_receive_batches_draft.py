@@ -165,6 +165,8 @@ with sync_playwright() as p:
     # 5) Gửi thành công -> nháp xoá; nhập phiếu tiếp -> key mới
     page.locator("select[name='item-0']").select_option(index=1)
     page.locator("input[name='qty-0']").first.fill("5")
+    # Giá mua bắt buộc (17b): phải điền mới gửi được. Giá này chỉ có ở ô nhập, không vào storage (đã kiểm ở trên).
+    page.locator("input[name='rate-0']").first.fill("45000")
     page.get_by_role("button", name="Ghi nhận phiếu nhập").click()
     page.wait_for_selector("text=Ghi nhận phiếu nhập thành công", timeout=10_000)
     page.wait_for_timeout(300)
