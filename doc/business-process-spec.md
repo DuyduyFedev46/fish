@@ -357,6 +357,7 @@ Trạng thái `PAID` (Đã thanh toán) giữ trong DB nhưng không dùng ở V
 | BR-TT-05 | **Tiền về sau khi đơn đã tự huỷ** → không tự khôi phục đơn (hàng có thể đã bán cho người khác). Đẩy vào hàng chờ Chủ → thường dẫn tới hoàn tiền (P-07). |
 | BR-TT-06 | Ghi nhận doanh thu tại thời điểm **xác nhận thanh toán** (tiền đã về tài khoản thật), không phải lúc giao xong *(PA)*. |
 | BR-TT-07 | Xác nhận thanh toán thủ công (`confirm_payment_manual`) **chỉ Chủ** — thao tác này đòi đối chiếu sao kê, mà sao kê chỉ Lộc truy cập được. Uỷ quyền chỗ này là mở đường ghi doanh thu khống. |
+| BR-TT-18 | **Tiền về muộn mà webhook/IPN không báo** (E-05; đơn đã huỷ/tự huỷ hoặc chưa rõ đơn): Chủ (hoặc người có `confirm_payment_manual`) **ghi tay** khoản tiền ở Hàng chờ thanh toán. Hệ thống tạo giao dịch `MANUAL` đang Chờ xử lý: `ORPHAN` nếu gắn đơn Đã huỷ/Tự huỷ, `UNMATCHED` nếu không gắn đơn. **Không đổi đơn, kho, hoá đơn**; bước sau đi qua hàng chờ (gắn đơn / phiếu hoàn, P-07). Không ghi gắn đơn đang giữ chỗ (dùng xác nhận trên đơn, BR-TT-07) hoặc đã thanh toán (để trống mã đơn rồi hoàn); mã đơn sai thì báo lỗi, không tự đổi thành `UNMATCHED`. Chỉ nhập mã GD, số tiền, giờ nhận (có cả ngày và giờ, không ở tương lai, không cũ quá `LATE_PAYMENT_MAX_AGE_DAYS`), mã đơn; **không có ô ghi chú**. Mã GD chống trùng (BR-TT-03). Khoản cùng số tiền trong cửa sổ `LATE_PAYMENT_DUPLICATE_WINDOW_HOURS` bị coi là nghi trùng, xét **hai chiều**: ghi tay sau khoản đã có thì phải xác nhận mới ghi, khoản webhook/IPN về sau khoản ghi tay thì bị gắn nhãn. Phiếu hoàn trên giao dịch có nhãn nghi trùng phải xác nhận "đã đối chiếu sao kê" (áp cả nhãn BR-TT-15). Job tự khớp bỏ qua khoản ghi tay *(D, 03/10; ghi vào spec 08/10)*. |
 
 ---
 
@@ -493,7 +494,7 @@ Cả hai báo cáo nằm sau `view_profitreport` — mặc định chỉ Chủ (
 | E-02 | Tiền về thiếu | Không tự xác nhận, hàng chờ Chủ | BR-TT-04 |
 | E-03 | Tiền về sau khi đơn đã huỷ | Hàng chờ Chủ → thường dẫn tới hoàn tiền | BR-TT-05 |
 | E-04 | Webhook gửi trùng | Chống trùng bằng mã giao dịch ngân hàng | BR-TT-03 |
-| E-05 | Webhook không tới (SePay lỗi) | Màn hình xác nhận thanh toán thủ công, **chỉ Chủ** | BR-TT-07 |
+| E-05 | Webhook không tới (SePay lỗi) | Đơn còn giữ chỗ: màn hình xác nhận thanh toán thủ công, **chỉ Chủ**. Đơn đã huỷ/tự huỷ hoặc chưa rõ đơn: Chủ ghi tay tiền về muộn ở Hàng chờ thanh toán | BR-TT-07, BR-TT-18 |
 | E-06 | Hai khách tranh lô cuối | Người tạo đơn trước thắng | BR-BH-02 |
 | E-07 | Soạn hàng phát hiện hàng hỏng | Huỷ toàn/một phần + phiếu hoàn | P-07 |
 | E-08 | Giao 2 lần không gặp khách | Hệ thống nhắc Quản lý/Chủ quyết định | BR-GH-04 |
