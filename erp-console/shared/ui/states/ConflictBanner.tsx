@@ -29,7 +29,7 @@ function capitalize(s: string): string {
 
 export function ConflictBanner({ noun = "bản ghi", updatedByName, updatedAt, onReload, reloading = false }: Props) {
   return (
-    <div className="alert-box warn" role="status" data-conflict-banner>
+    <div className="alert-box warn" role="status" data-conflict-banner tabIndex={-1}>
       <Icon name="sync_problem" />
       <span>{conflictMessage(noun, updatedByName, updatedAt)}</span>
       <button type="button" className="btn" onClick={onReload} disabled={reloading}>

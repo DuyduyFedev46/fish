@@ -350,7 +350,27 @@ def approve_errors(browser):
     ctx.close()
 
 
-# ---------------------------------------------------------------- 409
+# ---------------------------------------------------------------- 409 nhìn thấy được (QA 17b B1)
+def conflict_in_view(browser):
+    """Cuộn xuống cuối, bấm Lưu nháp khi phiếu đã đổi ở nơi khác: banner xung đột phải nằm trong khung nhìn và giữ focus."""
+    for w, h in ((360, 740), (1280, 700)):
+        ctx, page, errors = new_page(browser, "kho1", w=w, h=h)
+        go(page, "/stocktake/edit/?id=16")
+        count(page, 202, "19,9")
+        # đưa nút Lưu nháp ở cuối trang vào tầm bấm; trang dài thì cuộn hẳn xuống đáy
+        page.evaluate("() => { const m = document.querySelector('main'); [m, document.scrollingElement, document.querySelector('[data-scroll]')].forEach(e => e && (e.scrollTop = e.scrollHeight)); window.scrollTo(0, document.body.scrollHeight); }")
+        page.evaluate("() => window.__caveMock.stocktakeEditByOther(16, {batch: 101, counted: 4})")
+        page.get_by_role("button", name="Lưu nháp").click()
+        banner = page.locator("[data-conflict-banner]")
+        banner.wait_for()
+        page.wait_for_timeout(400)
+        box = banner.bounding_box()
+        in_view = box is not None and box["y"] >= 0 and box["y"] + box["height"] <= h
+        ok(f"B1 {w}px: banner xung đột nằm trong khung nhìn sau khi bấm Lưu nháp từ cuối trang", in_view, str(box))
+        ok(f"B1 {w}px: focus nằm trong banner", page.evaluate("() => !!document.activeElement && !!document.activeElement.closest('[data-conflict-banner]')"))
+        ctx.close()
+
+
 def conflicts(browser):
     # B2 (TL8-F3): Tải lại nhận bản mới của máy chủ, bỏ phần đang gõ, nói trước là sẽ bỏ
     ctx, page, errors = new_page(browser, "kho1")
@@ -475,7 +495,7 @@ def mobile(browser):
 
 with sync_playwright() as p:
     browser = p.chromium.launch(headless=True)
-    for fn in (role_access, list_screen, create_flow, detail_and_approval, approve_errors, conflicts, stale_submit, form_edges, mobile):
+    for fn in (role_access, list_screen, create_flow, detail_and_approval, approve_errors, conflicts, conflict_in_view, stale_submit, form_edges, mobile):
         try:
             fn(browser)
         except Exception as exc:  # một nhóm lỗi không làm mất kết quả các nhóm khác

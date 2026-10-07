@@ -1,5 +1,7 @@
 # QA độc lập Lô 10 FE (Mua hàng + phiếu nhập, ED-20) trên BE THẬT (Django SQLite tạm) với bản build MOCK=0.
 #   REAL_BASE=http://127.0.0.1:3302 REAL_API=http://127.0.0.1:8130 SHOTS=<doc/features/.../shots/lot10> python3 -u e2e/qa_ed_batch10_real.py
+# Dựng BE: SQLite tạm, `migrate`, `bootstrap_masterdata`, `seed_demo`, tạo loc/ql1/kho1/giao1/cs2 (cs2 thêm nhóm giao hàng), runserver với THROTTLE_LOGIN_IP=1000/min THROTTLE_LOGIN_USER=1000/hour
+# (kịch bản đăng nhập rất nhiều lần). Biến: BACKEND_PY (Python của BE, mặc định backend/.venv/bin/python), BACKEND_DIR, QA_PASSWORD (mật khẩu chung nếu khác demo1234).
 # Tài khoản: loc (Chủ) / ql1 / kho1 / giao1 / cs2. Chỉ dữ liệu giả. Tiền gửi đọc từ THÂN request thật của trình duyệt.
 import json
 import os
@@ -15,6 +17,7 @@ BASE = os.environ.get("REAL_BASE", "http://127.0.0.1:3302")
 API = os.environ.get("REAL_API", "http://127.0.0.1:8130")
 SHOTS = os.environ.get("SHOTS", "/tmp")
 PWS = {"loc": "Songbien2026"}
+DEFAULT_PW = os.environ.get("QA_PASSWORD", "demo1234")  # mật khẩu của các tài khoản còn lại (QA_PASSWORD=Songbien2026 nếu dùng chung một mật khẩu)
 os.makedirs(SHOTS, exist_ok=True)
 expect.set_options(timeout=10_000)
 results = []
@@ -45,7 +48,7 @@ _tok = {}
 
 def token(u):
     if u not in _tok:
-        r = urllib.request.Request(API + "/api/auth/token/", data=json.dumps({"username": u, "password": PWS.get(u, "demo1234")}).encode(), headers={"Content-Type": "application/json"})
+        r = urllib.request.Request(API + "/api/auth/token/", data=json.dumps({"username": u, "password": PWS.get(u, DEFAULT_PW)}).encode(), headers={"Content-Type": "application/json"})
         _tok[u] = json.load(urllib.request.urlopen(r))["token"]
     return _tok[u]
 
@@ -105,7 +108,7 @@ class Sess:
         p.goto(BASE + "/login/")
         p.wait_for_load_state("networkidle")
         p.fill("#u", user)
-        p.fill("#p", PWS.get(user, "demo1234"))
+        p.fill("#p", PWS.get(user, DEFAULT_PW))
         p.get_by_role("button", name="Đăng nhập").click()
         p.wait_for_function("() => !window.location.href.includes('/login/')", timeout=15_000)
         p.wait_for_load_state("networkidle")
@@ -294,7 +297,7 @@ def ph_warehouse_receive(browser):
     shot(s, "f1a-sau-f5-nhap")
     pg.locator("input[name=rate-0]").fill("80000")
     pg.locator("input[name=rate-1]").fill("95000")
-    pg.locator("input[name=rate-2]").fill("")  # dòng không giá
+    pg.locator("input[name=rate-2]").fill("70000")  # giá mua giờ là bắt buộc: dòng nào cũng phải có giá
     # Ca lỗi mạng + Thử lại giữ giá trị và cùng idempotency key
     state = {"n": 0}
 
@@ -326,7 +329,7 @@ def ph_warehouse_receive(browser):
     STATE["receive_body"] = b
     lines = b["lines"]
     print("   THÂN request thật:", json.dumps(b, ensure_ascii=False))
-    ok("F1a: tiền gửi ĐÚNG ĐỒNG: rate '80000' / '95000' / '0.00' (dòng không giá)", [l["rate"] for l in lines] == ["80000", "95000", "0.00"], [l["rate"] for l in lines])
+    ok("F1a: tiền gửi ĐÚNG ĐỒNG: rate '80000' / '95000' / '70000'", [l["rate"] for l in lines] == ["80000", "95000", "70000"], [l["rate"] for l in lines])
     ok("F1a: khối lượng gửi '12.5' / '7' / '4.25'", [l["qty"] for l in lines] == ["12.5", "7", "4.25"], [l["qty"] for l in lines])
     ok("F1a: gửi supplier=2, đúng 3 dòng, đúng item_code", b["supplier"] == 2 and [l["item_code"] for l in lines] == ["MUC-ONG", "CA-THU", "TOM-SU-1"], b)
     n1 = receipt_count()
@@ -371,15 +374,15 @@ def ph_loc_invoice_cost(browser):
     ok("loc: danh sách có cột Tiền mua và Hoá đơn", any(h.startswith("Tiền mua") for h in heads) and "Hoá đơn mua" in heads, heads)
     row = pg.locator("table tbody tr", has_text=f"PR-{rid}").first
     rt = squash(row.inner_text())
-    # 12.5*80000 + 7*95000 + 0 = 1.665.000
-    ok("loc: dòng phiếu mới có Tiền mua đúng 1.665.000 đ (12,5×80.000 + 7×95.000)", "1.665.000" in rt, rt)
+    # 12.5*80000 + 7*95000 + 4.25*70000 = 1.962.500
+    ok("loc: dòng phiếu mới có Tiền mua đúng 1.962.500 đ (12,5×80.000 + 7×95.000 + 4,25×70.000)", "1.962.500" in rt, rt)
     shot(s, "w2a-loc-danh-sach")
     row.locator("a").first.click()
     pg.wait_for_url(re.compile(r"/purchasing/detail/\?id="))
     pg.wait_for_load_state("networkidle")
     pg.wait_for_timeout(500)
     d = s.main()
-    ok("loc: chi tiết có Tiền mua 1.665.000 đ", "1.665.000 đ" in d, d[:300])
+    ok("loc: chi tiết có Tiền mua 1.962.500 đ", "1.962.500 đ" in d, d[:300])
     ok("loc: chi tiết có Dòng nhập (3 dòng) + Hoá đơn mua + Chi phí phụ", "Dòng nhập" in d and "Hoá đơn mua" in d and "Chi phí phụ" in d, d[:200])
     shot(s, "w2b-loc-truoc")
     # đọc landed_unit_cost trước khi thêm chi phí
@@ -392,7 +395,7 @@ def ph_loc_invoice_cost(browser):
     dlg = pg.get_by_role("dialog")
     dlg.wait_for()
     amt = dlg.locator("input[name=amount]")
-    ok("F1c: số tiền gợi ý từ tiền mua của phiếu 1.665.000", amt.input_value() == "1.665.000", amt.input_value())
+    ok("F1c: số tiền gợi ý từ tiền mua của phiếu 1.962.500", amt.input_value() == "1.962.500", amt.input_value())
     paste(pg, amt, "1.650.000")
     ok("F1c: dán '1.650.000' -> ô hiện 1.650.000", amt.input_value() == "1.650.000", amt.input_value())
     amt.press("End")
@@ -632,8 +635,14 @@ def ph_draft_submit(browser):
         "PurchaseReceiptLine.objects.create(receipt=r,item=Item.objects.get(code='BACH-TUOC'),qty='6',rate='120000')\n"
         "print('DRAFTID',r.id)\n"
     )
-    wt = "/Users/dangthiduyen/Downloads/loc-wt-c/backend"
+    # Thư mục BE và Python: mặc định là `backend/` của chính repo này và `.venv` trong đó; đổi bằng BACKEND_DIR / BACKEND_PY (cùng DB với REAL_API:
+    # đặt thêm DJANGO_* / DATABASE_URL như khi chạy runserver).
+    wt = os.environ.get("BACKEND_DIR") or os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "backend"))
     env = dict(os.environ)
+    env.setdefault("DJANGO_DEBUG", "1")  # ORM chạy ngoài runserver: cần DEBUG (dev) hoặc DJANGO_SECRET_KEY như BE đang chạy
+    env["PY"] = os.environ.get("BACKEND_PY") or os.path.join(wt, ".venv", "bin", "python")
+    if not os.path.exists(env["PY"]):
+        env["PY"] = sys.executable
     out = subprocess.run([env["PY"], "manage.py", "shell", "-c", script], cwd=wt, env=env, capture_output=True, text=True)
     m = re.search(r"DRAFTID (\d+)", out.stdout)
     ok("(chuẩn bị) tạo phiếu Nháp bằng ORM", bool(m), out.stderr[-300:] + out.stdout[-200:])
@@ -818,7 +827,7 @@ def ph_leak_manager_warehouse(browser):
             dom.append(pg.locator("body").inner_text())
         blob = "\n".join(dom)
         raws = "\n".join(t for (_, _, t) in s.resp)
-        leaks_dom = [b for b in BAIT + ["1.665.000", "1.000.001", "600.001", "400.000"] if b in blob]
+        leaks_dom = [b for b in BAIT + ["1.962.500", "1.665.000", "1.000.001", "600.001", "400.000"] if b in blob]
         ok(f"{user}: DOM các trang Mua hàng không chứa số mồi / tiền mua / chi phí ({user})", not leaks_dom, leaks_dom)
         leaks_keys = [k for k in COST_KEYS if f'"{k}"' in raws]
         ok(f"{user}: mọi phản hồi API khi duyệt không có khoá giá vốn", not leaks_keys, leaks_keys)
