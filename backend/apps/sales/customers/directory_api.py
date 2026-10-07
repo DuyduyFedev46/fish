@@ -5,8 +5,10 @@ API danh bạ khách cho ERP — Lô 6 / B2 (ED-13, BR-PQ-31, bất biến 9).
 `GET|PATCH /api/sales/customer-directory/{id}/`.
 
 - Quyền: Tầng 2 `sales.view_customer_list` (owner + manager, Chủ bật/tắt được); `PATCH` thêm `sales.change_customer`.
-  Không có phạm vi dòng: quyền này = xem mọi khách. NV kho, NV giao, CSKH nhận 403 (kể cả khi có `view_customer`
-  Tầng 1). NV giao vẫn xem khách của phiếu mình ở endpoint cũ `/api/sales/customers/` (không đổi).
+  NV kho, NV giao, CSKH nhận 403 khi chưa được bật việc "Xem khách hàng" (kể cả khi có `view_customer` Tầng 1).
+- Phạm vi dòng (PV-05): D7 của nhóm (`scope.scope_customers_for`), CÙNG hàm với endpoint cũ `/api/sales/customers/` nên hai API
+  trả cùng một tập khách. `all`: mọi khách, đủ field. `assigned_deliveries`: khách của phiếu gán cho mình còn trong cửa sổ
+  SR-PII-02, và không có `note`, `default_address` (chỉ field cần để giao, bất biến 9). `none`: rỗng. Ngoài phạm vi: 404.
 - Số liệu (đơn, tổng mua, đơn huỷ, đơn đầu/cuối) tính bằng `annotate` Subquery trong một câu SQL, không N+1.
   `total_spent` là doanh thu của khách (không phải giá vốn) và không dính lãi lỗ.
 - Không có `AiDeclarable`, và `/api/sales/customer-directory/` nằm trong `FORBIDDEN_PREFIXES` của chính sách AI.
@@ -32,6 +34,7 @@ from apps.sales.utils import fold_text
 
 from . import services
 from .permissions import CHANGE_CUSTOMER_PERM, VIEW_CUSTOMER_LIST_PERM
+from .scope import scope_customers_for, sees_all_customers
 from .serializers import DirectoryDetailSerializer, DirectoryListSerializer, DirectoryUpdateSerializer
 
 CANCELLED_STATUSES = (SalesOrder.Status.CANCELLED, SalesOrder.Status.AUTO_CANCELLED)
@@ -126,8 +129,13 @@ class CustomerDirectoryViewSet(NoStoreMixin, viewsets.GenericViewSet):
     def get_serializer_class(self):
         return DirectoryListSerializer if self.action == "list" else DirectoryDetailSerializer
 
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context["full_customer_data"] = sees_all_customers(self.request.user)  # D7 `all` mới có địa chỉ mặc định, ghi chú
+        return context
+
     def get_queryset(self):
-        qs = annotate_purchase_stats(Customer.objects.all())
+        qs = annotate_purchase_stats(scope_customers_for(self.request.user, Customer.objects.all()))
         if self.action != "list":
             return qs
         return self.search_queryset(qs, "", self.request.query_params.get("ordering", ""))
@@ -158,11 +166,12 @@ class CustomerDirectoryViewSet(NoStoreMixin, viewsets.GenericViewSet):
         body = SearchBodySerializer(data=request.data if hasattr(request.data, "get") else {})
         body.is_valid(raise_exception=True)
         queryset = self.search_queryset(
-            annotate_purchase_stats(Customer.objects.all()), body.validated_data["q"], body.validated_data["ordering"],
+            annotate_purchase_stats(scope_customers_for(request.user, Customer.objects.all())),
+            body.validated_data["q"], body.validated_data["ordering"],
         )
         paginator = SearchBodyPagination()
         page = paginator.paginate_queryset(queryset, request, view=self)
-        return paginator.get_paginated_response(DirectoryListSerializer(page, many=True).data)
+        return paginator.get_paginated_response(DirectoryListSerializer(page, many=True, context=self.get_serializer_context()).data)
 
     def retrieve(self, request, *args, **kwargs):
         return Response(self.get_serializer(self.get_object()).data)

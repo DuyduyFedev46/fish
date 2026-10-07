@@ -111,28 +111,6 @@ class CostFieldSerializerMixin:
         return ret
 
 
-# Nhóm thấy mọi đơn / khách / phiếu giao. Ai chỉ thuộc nv_giao bị giới hạn theo phiếu
-# giao gán cho mình (Tầng 3 dòng, spec §1.6). Kiêm nhiệm = hợp quyền (BR-PQ-09).
-FULL_SCOPE_GROUPS = frozenset({roles.OWNER, roles.MANAGER, roles.WAREHOUSE_STAFF})
-
-
-def has_full_delivery_scope(user) -> bool:
-    return bool(
-        user.is_superuser or user.groups.filter(name__in=FULL_SCOPE_GROUPS).exists()
-    )
-
-
-# Chỉ Chủ, Quản lý (và superuser) thấy toàn bộ danh bạ khách. NV kho không dùng full scope giao hàng
-# để vòng qua: quyền xem khách của người kiêm nhiệm đến từ nv_giao (SR-PII-01).
-CUSTOMER_DIRECTORY_GROUPS = frozenset({roles.OWNER, roles.MANAGER})
-
-
-def sees_customer_directory(user) -> bool:
-    return bool(
-        user.is_superuser or user.groups.filter(name__in=CUSTOMER_DIRECTORY_GROUPS).exists()
-    )
-
-
 def require_perm(user, perm: str):
     """Chặn ở tầng service-call trong view cho custom action (Tầng 2)."""
     if not (user and user.has_perm(perm)):

@@ -2,11 +2,13 @@
 
 // Chi tiết một nhóm quyền (ED-40 / W3i): /permissions/detail/?group=<mã>. Khung DetailPage: header (tên nhóm · số người · "Thêm người vào nhóm"),
 // cột trái: "Thông tin nhóm" (khoá: nhóm do hệ thống tạo) · "Thành viên" (bảng, bấm → hồ sơ nhân viên, "Bỏ khỏi nhóm") · "Việc được làm"
-// (công tắc theo khu, nhóm Chủ chỉ xem). Cột phải: "Phạm vi dữ liệu" (chỉ đọc, BE dựng chuỗi) và "Lịch sử thay đổi".
-// Việc "Xem khách hàng" đang bật ghi rõ "Tất cả khách" + cảnh báo (quyết định #13, bất biến 9). Chủ mới bật/tắt được; mọi lỗi hiện nguyên văn BE.
+// (công tắc theo khu, nhóm Chủ chỉ xem) · "Phạm vi dữ liệu" (8 dòng, ô chọn theo `data_scopes` của BE). Cột phải: "Lịch sử thay đổi".
+// PV-11: việc và phạm vi là BẢN NHÁP trong bộ nhớ; thanh "Lưu thay đổi / Huỷ thay đổi" gửi MỘT PUT có `version` (PV-10), sau bước xem trước
+// và hộp xác nhận khi mở rộng dữ liệu khách (PV-09). Chủ HOẶC superuser mới sửa được; mọi lỗi hiện nguyên văn BE.
+// Việc "Xem khách hàng" đang bật ghi rõ "Tất cả khách" + cảnh báo (quyết định #13, bất biến 9).
 // Mã nhóm trong URL là mã hệ thống (không có tên người). Không ghi storage/log.
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useId, useMemo, useState } from "react";
 import { useAuth } from "@/features/auth/components/AuthProvider";
 import { toTimelineEntries } from "@/features/guidance/detailAdapters";
 import { PERM, homePath } from "@/shared/lib/nav";
@@ -33,17 +35,23 @@ import { PERM_MSG as M } from "../messages";
 import {
   ALL_CUSTOMERS_LABEL,
   CUSTOMERS_KEY,
+  applyChanges,
   cellMode,
+  effectiveValues,
   isAssignedOnly,
+  isGroupWriter,
+  isScopeInactive,
   parseGroupCode,
+  scopeValueLabel,
   sectionsOf,
+  showsAllCustomers,
   visibleRegistry,
 } from "../permissionsModel";
-import { cellKey, useCapabilityToggle, type ToggleGroup } from "../useCapabilityToggle";
+import { useGroupDraft } from "../useGroupDraft";
 import { useGroupCode, useGroupDetail, type Loaded } from "../useGroupData";
-import type { GroupDetail, GroupMember, RegistryItem } from "../types";
+import type { CapabilityState, DataScopeRow, GroupDetail, GroupMember, RegistryItem } from "../types";
 import { AddMemberModal } from "./AddMemberModal";
-import { ConfirmOffModal } from "./ConfirmOffModal";
+import { ConfirmSaveModal } from "./ConfirmSaveModal";
 import { PermSwitch } from "./PermSwitch";
 import { RemoveMemberModal } from "./RemoveMemberModal";
 import s from "../permissions.module.css";
@@ -83,19 +91,24 @@ function GroupDetailBody({ group: g, detail }: { group: GroupDetail; detail: Loa
   const toast = useToast();
   const [modal, setModal] = useState<"add" | { remove: GroupMember } | null>(null);
   const isOwnerGroup = g.code === ROLE.owner;
-  // Chỉ nhóm Chủ ghi được việc của nhóm (BE chặn thật); thêm/bỏ người cần manage_staff, riêng nhóm Chủ cũng chỉ Chủ.
-  const viewerIsOwner = !!me?.groups.includes(ROLE.owner);
-  const canEditTasks = viewerIsOwner && !isOwnerGroup;
-  const canManageMembers = !!me?.permissions.includes(PERM.manageStaff) && (!isOwnerGroup || viewerIsOwner);
+  // Chủ HOẶC superuser ghi được (BE chặn thật, Duy chốt 06/10); thêm/bỏ người cần manage_staff, riêng nhóm Chủ cũng chỉ người ghi được.
+  const viewerIsWriter = isGroupWriter(me);
+  const canEdit = viewerIsWriter && !isOwnerGroup;
+  const canManageMembers = !!me?.permissions.includes(PERM.manageStaff) && (!isOwnerGroup || viewerIsWriter);
 
   const replace = detail.replace;
+  const reload = detail.reload;
   const onSaved = useCallback((next: GroupDetail) => replace(next), [replace]);
   const aiOn = aiVisible(me);
   const registry = useMemo(() => visibleRegistry(g.registry, aiOn), [g.registry, aiOn]);
-  const toggler = useCapabilityToggle({ registry, onSaved });
+  const drafting = useGroupDraft({ group: g, onSaved, reload });
+  const { draft } = drafting;
+  const states = useMemo(() => applyChanges(g.capabilities, draft.capabilities), [g.capabilities, draft.capabilities]);
+  const values = useMemo(() => effectiveValues(g.data_scope_values, draft), [g.data_scope_values, draft]);
   const sections = useMemo(() => sectionsOf(registry), [registry]);
   const label = g.label || groupLabel(g.code);
-  const toggleGroup: ToggleGroup = { code: g.code, label, states: g.capabilities, memberCount: g.member_count };
+  const labelOf = useCallback((key: string) => g.registry.find((r) => r.key === key)?.label ?? key, [g.registry]);
+  const objectLabel = useCallback((key: string) => g.data_scopes.find((r) => r.key === key)?.label ?? key, [g.data_scopes]);
 
   const afterMembers = (message: string) => {
     toast.success(message);
@@ -179,12 +192,13 @@ function GroupDetailBody({ group: g, detail }: { group: GroupDetail; detail: Loa
               </button>
             </div>
           )}
-          {toggler.error && (
-            <div className="alert-box err" role="alert">
-              <Icon name="error" />
-              <span>{toggler.error}</span>
-              <button type="button" className="btn" onClick={toggler.clearError}>
-                {M.dismiss}
+          {drafting.conflict && (
+            <div className="alert-box warn" role="alert" data-testid="group-conflict">
+              <Icon name="sync_problem" />
+              <span>{M.conflictText}</span>
+              <button type="button" className="btn" onClick={() => void drafting.reloadAfterConflict()} disabled={drafting.reloading}>
+                {drafting.reloading ? <Icon name="progress_activity" className="spin" /> : <Icon name="refresh" />}
+                <span>{drafting.reloading ? M.conflictReloading : M.conflictReload}</span>
               </button>
             </div>
           )}
@@ -194,7 +208,7 @@ function GroupDetailBody({ group: g, detail }: { group: GroupDetail; detail: Loa
               <span>{M.ownerLockedBanner}</span>
             </p>
           ) : (
-            !viewerIsOwner && (
+            !viewerIsWriter && (
               <p className={s.note} role="note">
                 <Icon name="lock" />
                 <span>{M.readOnlyBanner}</span>
@@ -205,14 +219,6 @@ function GroupDetailBody({ group: g, detail }: { group: GroupDetail; detail: Loa
       }
       timeline={
         <div className={s.rail}>
-          <Section title={M.scopesTitle} aria-label={M.scopesTitle}>
-            <p className={s.sectionHint}>{M.scopesIntro}</p>
-            <dl className={s.scopes}>
-              <ScopeRow term={M.scopeOrders} value={g.scopes.orders} />
-              <ScopeRow term={M.scopeDeliveries} value={g.scopes.deliveries} />
-              <ScopeRow term={M.scopeCustomers} value={g.scopes.customers} highlight={g.scopes.customers.includes(ALL_CUSTOMERS_LABEL)} />
-            </dl>
-          </Section>
           <div id="group-timeline" tabIndex={-1}>
             <Timeline entries={toTimelineEntries(g.timeline)} title={M.timelineTitle} />
           </div>
@@ -240,7 +246,7 @@ function GroupDetailBody({ group: g, detail }: { group: GroupDetail; detail: Loa
       </Section>
 
       <Section title={M.tasksTitle} aria-label={M.tasksTitle}>
-        <p className={s.sectionHint}>{M.tasksIntro}</p>
+        <p className={s.sectionHint}>{canEdit ? M.tasksIntroDraft : M.tasksIntro}</p>
         <div className={s.tasks}>
           {sections.map((sec) => (
             <div key={sec.name} className={s.taskGroup}>
@@ -251,10 +257,13 @@ function GroupDetailBody({ group: g, detail }: { group: GroupDetail; detail: Loa
                     key={item.key}
                     item={item}
                     group={g}
-                    labelOf={toggler.labelOf}
-                    canEdit={canEditTasks}
-                    busy={toggler.busyCells.includes(cellKey(g.code, item.key))}
-                    onToggle={() => toggler.toggle(toggleGroup, item.key)}
+                    state={states[item.key]}
+                    scopeValues={values}
+                    unsaved={item.key in draft.capabilities}
+                    labelOf={labelOf}
+                    canEdit={canEdit}
+                    disabled={drafting.saving}
+                    onToggle={() => drafting.toggleCap(item.key)}
                   />
                 ))}
               </ul>
@@ -263,8 +272,70 @@ function GroupDetailBody({ group: g, detail }: { group: GroupDetail; detail: Loa
         </div>
       </Section>
 
-      {toggler.pendingOff && (
-        <ConfirmOffModal pending={toggler.pendingOff} onConfirm={toggler.confirmOff} onClose={toggler.cancelOff} labelOf={toggler.labelOf} />
+      <Section title={M.scopesTitle} aria-label={M.scopesTitle}>
+        <p className={s.sectionHint}>{canEdit ? M.scopesIntro : M.scopesIntroReadOnly}</p>
+        <ul className={s.scopeList} data-testid="scope-list">
+          {g.data_scopes.map((row) => (
+            <ScopeRowEditor
+              key={row.key}
+              row={row}
+              value={values[row.key] ?? row.value}
+              inactive={isScopeInactive(row, states, draft)}
+              unsaved={row.key in draft.scopes}
+              canEdit={canEdit}
+              disabled={drafting.saving}
+              onChange={(v) => drafting.setScope(row.key, v)}
+            />
+          ))}
+        </ul>
+      </Section>
+
+      {canEdit && drafting.size > 0 && (
+        <div className={s.saveBar} role="region" aria-label={M.draftBarLabel} data-testid="draft-bar">
+          <div className={s.saveBarText}>
+            <span className={s.saveBarCount}>{M.draftCount(drafting.size)}</span>
+            {(drafting.problem || drafting.saveError) && (
+              <span className={s.saveBarError} role="alert">
+                <Icon name="error" />
+                <span>{drafting.problem ?? drafting.saveError}</span>
+              </span>
+            )}
+          </div>
+          <div className={s.saveBarActions}>
+            <button type="button" className="btn" onClick={drafting.discard} disabled={drafting.saving}>
+              {M.draftDiscard}
+            </button>
+            <button
+              type="button"
+              className="btn primary"
+              onClick={() => void drafting.save()}
+              disabled={drafting.saving || drafting.conflict || !!drafting.problem}
+              aria-busy={drafting.saving || undefined}
+            >
+              {drafting.saving ? (
+                <>
+                  <Icon name="progress_activity" className="spin" />
+                  <span>{M.draftSaving}</span>
+                </>
+              ) : drafting.failed ? (
+                M.draftRetry
+              ) : (
+                M.draftSave
+              )}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {drafting.confirm && (
+        <ConfirmSaveModal
+          groupLabelText={label}
+          preview={drafting.confirm.preview}
+          breaking={drafting.confirm.breaking}
+          objectLabel={objectLabel}
+          run={drafting.confirmSave}
+          onClose={drafting.cancelConfirm}
+        />
       )}
       {modal === "add" && (
         <AddMemberModal
@@ -287,43 +358,105 @@ function GroupDetailBody({ group: g, detail }: { group: GroupDetail; detail: Loa
   );
 }
 
-function ScopeRow({ term, value, highlight = false }: { term: string; value: string; highlight?: boolean }) {
+/** Một dòng phạm vi: ô chọn (Chủ sửa được), hoặc chữ chỉ đọc. Ô mờ khi `inactive`: giá trị cũ vẫn hiện kèm lý do (PV-11-AC2). */
+function ScopeRowEditor({
+  row,
+  value,
+  inactive,
+  unsaved,
+  canEdit,
+  disabled,
+  onChange,
+}: {
+  row: DataScopeRow;
+  value: string;
+  inactive: boolean;
+  unsaved: boolean;
+  canEdit: boolean;
+  disabled: boolean;
+  onChange: (value: string) => void;
+}) {
+  const uid = useId();
+  const selectId = `${uid}-scope`;
+  const noteId = `${uid}-note`;
+  const editable = canEdit && row.editable && row.options.length > 0;
+  const valueText = scopeValueLabel(row, value);
+  // Dòng chỉ đọc có ghi chú trùng giá trị (vd "Theo Đơn hàng") thì chỉ hiện một lần.
+  const note = inactive ? row.inactive_reason : !editable && row.note === valueText ? null : row.note;
+  const wide = row.customer_data && row.options.length > 0 && row.options[row.options.length - 1].value === value;
   return (
-    <div className={s.scopeRow}>
-      <dt>{term}</dt>
-      <dd>
-        {highlight ? (
-          <span className={s.scopeAll}>
-            <Icon name="warning" />
-            {value}
+    <li className={s.scopeItem} data-scope={row.key} data-inactive={inactive || undefined}>
+      <div className={s.scopeHead}>
+        <label className={s.scopeLabel} htmlFor={editable ? selectId : undefined}>
+          {row.label}
+        </label>
+        {row.customer_data && (
+          <span className={`tag ${s.scopeTag}`} title={M.scopeCustomerData}>
+            {M.scopeCustomerData}
           </span>
-        ) : (
-          value
         )}
-      </dd>
-    </div>
+        {unsaved && <span className={`tag ${s.tagWarn}`}>{M.unsaved}</span>}
+      </div>
+      {editable ? (
+        <select
+          id={selectId}
+          className={s.scopeSelect}
+          value={value}
+          disabled={inactive || disabled}
+          aria-describedby={note ? noteId : undefined}
+          aria-label={M.scopeSelectLabel(row.label)}
+          onChange={(e) => onChange(e.target.value)}
+        >
+          {row.options.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+        </select>
+      ) : (
+        <p className={`${s.scopeValue} ${inactive ? s.scopeMuted : ""}`}>
+          {wide && !inactive && <Icon name="warning" />}
+          <span>{valueText}</span>
+        </p>
+      )}
+      {note && (
+        <p id={noteId} className={`${s.scopeNote} ${inactive ? s.scopeNoteInactive : ""}`}>
+          {inactive && <Icon name="info" />}
+          <span>{note}</span>
+        </p>
+      )}
+    </li>
   );
 }
 
 function TaskRow({
   item,
   group,
+  state,
+  scopeValues,
+  unsaved,
   labelOf,
   canEdit,
-  busy,
+  disabled,
   onToggle,
 }: {
   item: RegistryItem;
   group: GroupDetail;
+  /** Trạng thái đã cộng bản nháp. */
+  state: CapabilityState | undefined;
+  /** Phạm vi đã cộng bản nháp (chip "Được gán" lấy từ BE, không còn hằng số FE). */
+  scopeValues: Record<string, string>;
+  unsaved: boolean;
   labelOf: (key: string) => string;
   canEdit: boolean;
-  busy: boolean;
+  disabled: boolean;
   onToggle: () => void;
 }) {
-  const mode = cellMode(item, group.code, group.capabilities[item.key]);
+  const mode = cellMode(item, group.code, state);
   const isCustomers = item.key === CUSTOMERS_KEY;
   const on = mode === "on" || mode === "owner";
-  const assigned = (mode === "on" || mode === "partial") && isAssignedOnly(group.code, item.key);
+  const allCustomers = isCustomers && showsAllCustomers(scopeValues, on);
+  const assigned = (mode === "on" || mode === "partial") && isAssignedOnly(scopeValues, item.key);
 
   let control: React.ReactNode;
   if (mode === "owner") {
@@ -341,18 +474,18 @@ function TaskRow({
       </span>
     );
   } else if (canEdit) {
-    control = <PermSwitch state={mode === "on" ? "on" : mode === "partial" ? "partial" : "off"} label={`${item.label} — ${group.label}`} busy={busy} onToggle={onToggle} title={mode === "partial" ? M.cellPartial : undefined} />;
+    control = <PermSwitch state={mode === "on" ? "on" : mode === "partial" ? "partial" : "off"} label={`${item.label} — ${group.label}`} disabled={disabled} onToggle={onToggle} title={mode === "partial" ? M.cellPartial : undefined} />;
   } else {
     control = (
       <span className={`${s.taskState} ${on ? s.stateOn : ""}`}>
         <Icon name={on ? "check_circle" : mode === "partial" ? "indeterminate_check_box" : "remove"} />
-        <span>{on ? M.cellOn : mode === "partial" ? "Một phần" : M.cellOff}</span>
+        <span>{on ? M.cellOn : mode === "partial" ? M.cellPartialShort : M.cellOff}</span>
       </span>
     );
   }
 
   return (
-    <li className={s.taskRow}>
+    <li className={s.taskRow} data-unsaved={unsaved || undefined}>
       <div className={s.taskText}>
         <span className={s.taskLabel}>
           {item.label}
@@ -361,16 +494,17 @@ function TaskRow({
               {M.ownerOnlyBadge}
             </span>
           )}
-          {isCustomers && on && <span className={`tag ${s.tagWarn}`}>{ALL_CUSTOMERS_LABEL}</span>}
+          {allCustomers && <span className={`tag ${s.tagWarn}`}>{ALL_CUSTOMERS_LABEL}</span>}
           {assigned && (
             <span className="tag" title={M.assignedOnlyHint}>
               {M.assignedOnly}
             </span>
           )}
+          {unsaved && <span className={`tag ${s.tagWarn}`}>{M.unsaved}</span>}
         </span>
         {item.requires.length > 0 && <span className={s.taskSub}>{M.requiresNote(item.requires.map(labelOf).join(", "))}</span>}
         {isCustomers && !on && <span className={s.taskSub}>{M.allCustomersHint}</span>}
-        {isCustomers && on && (
+        {allCustomers && (
           <span className={s.taskWarn} role="note">
             <Icon name="warning" />
             <span>{M.customersWarning}</span>

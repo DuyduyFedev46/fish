@@ -5,7 +5,7 @@ from django.test import TestCase
 from apps.accounts import roles
 from apps.common.tests.fixtures import client_for, make_user
 
-from .base import detail_url, make_staff, put_url
+from .base import detail_url, make_staff, put_url, put_caps
 
 
 class GroupTimelineTests(TestCase):
@@ -16,9 +16,7 @@ class GroupTimelineTests(TestCase):
         self.client = client_for(self.owner)
 
     def change(self, code, changes):
-        self.assertEqual(
-            self.client.put(put_url(code), {"capabilities": changes}, format="json").status_code, 200
-        )
+        self.assertEqual(put_caps(self.client, code, changes).status_code, 200)
 
     def timeline(self, code=roles.MANAGER):
         return self.client.get(detail_url(code)).json()["timeline"]
@@ -76,7 +74,7 @@ class GroupGuidanceProviderTests(TestCase):
         return f"/api/guidance/group/{pk or self.group.pk}/"
 
     def test_r2_group_guidance_returns_timeline_only(self):
-        self.client.put(put_url(roles.MANAGER), {"capabilities": {"publish_batch": False}}, format="json")
+        put_caps(self.client, roles.MANAGER, {"publish_batch": False})
         response = self.client.get(self.url())
         self.assertEqual(response.status_code, 200)
         body = response.json()

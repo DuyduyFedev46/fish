@@ -7,7 +7,7 @@ from apps.accounts.models import AuditLog
 from apps.common.audit import record_audit
 from apps.common.tests.fixtures import client_for
 
-from .base import LIST_URL, detail_url, group_perms, make_staff, put_url
+from .base import LIST_URL, detail_url, group_perms, make_staff, put_caps, put_url
 
 NON_AI_KEYS = {c.key for c in registry.CAPABILITIES} - registry.AI_CAPABILITY_KEYS
 
@@ -36,7 +36,7 @@ class MatrixAiFlagTests(TestCase):
     @override_settings(AI_ENABLED=False)
     def test_off_put_ai_policy_is_400_and_data_unchanged(self):
         before = group_perms(roles.MANAGER)
-        response = self.client.put(put_url(roles.MANAGER), {"capabilities": {"ai_policy": False}}, format="json")
+        response = put_caps(self.client, roles.MANAGER, {"ai_policy": False})
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.json()["code"], "INPUT_NOT_ALLOWED")
         self.assertEqual(group_perms(roles.MANAGER), before)
@@ -44,12 +44,12 @@ class MatrixAiFlagTests(TestCase):
 
     @override_settings(AI_ENABLED=False)
     def test_off_put_other_keys_still_works(self):
-        response = self.client.put(put_url(roles.MANAGER), {"capabilities": {"publish_batch": False}}, format="json")
+        response = put_caps(self.client, roles.MANAGER, {"publish_batch": False})
         self.assertEqual(response.status_code, 200)
 
     @override_settings(AI_ENABLED=True)
     def test_on_put_ai_policy_off_still_accepted(self):
-        response = self.client.put(put_url(roles.MANAGER), {"capabilities": {"ai_policy": False}}, format="json")
+        response = put_caps(self.client, roles.MANAGER, {"ai_policy": False})
         self.assertEqual(response.status_code, 200)
 
     @override_settings(AI_ENABLED=False)

@@ -12,7 +12,7 @@ from rest_framework import serializers
 
 from apps.common.formatting import format_local_date
 from apps.common.pii import mask_phone
-from apps.delivery.confirmation.scope import note_in_customer_service_scope
+from apps.delivery.confirmation.scope import note_in_confirmation_scope
 from apps.delivery.models import ConfirmationTask, CustomerCall, DeliveryNote
 from apps.sales.models.invoices import SalesInvoiceLineBatch
 
@@ -98,7 +98,8 @@ class ConfirmationQueueItemSerializer(serializers.ModelSerializer):
         order = getattr(invoice, "sales_order", None) if invoice else None
         customer = getattr(order, "customer", None) if order else None
 
-        in_scope = note_in_customer_service_scope(user, note, now=now)
+        # D4 do view tính một lần cho cả trang (context `scope_value`); thiếu thì phân giải (nhớ trên user, không thêm truy vấn).
+        in_scope = note_in_confirmation_scope(user, note, now=now, value=self.context.get("scope_value"))
 
         # Trạng thái hiển thị
         confirm_state = None if obj.state == ConfirmationTask.State.DONE else obj.state

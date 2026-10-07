@@ -176,7 +176,8 @@ Khi mở rộng chỉ do bật V2 (không đổi phạm vi), cờ nằm trong `c
 
 ### 2.4 POST `/api/staff/groups/<code>/permissions-preview/`
 
-Thân như PUT, không cần `version`/`confirm_…`; kiểm 1–7, 9, 10 như PUT; không ghi gì. Trả như story:
+Thân như PUT, không cần `version`/`confirm_…` (**chốt 07/10:** có gửi thì bỏ qua, khoá lạ khác vẫn `INPUT_NOT_ALLOWED`);
+kiểm 1–7, 9, 10 như PUT; không ghi gì. Trả như story:
 `widens_customer_data`, `widened[]`, `affected_members[]` (nhân viên đang hoạt động của nhóm, chỉ `id`, `display_name`),
 `affected_count`, `message`, `already_wider_elsewhere[]`, `narrowed[]` với `rows_losing_access`.
 
@@ -191,6 +192,10 @@ Với mỗi đối tượng có dữ liệu khách D1, D2, D3, D4, D5, D7, gọi
 (rank tăng **hoặc** cổng vừa mở với rank > 0). Cổng: D1 `view_orders`, D2 `view_sales_invoices` (rank theo D1), D4
 `confirm_calls`, D7 `view_customers`; D3/D5 cổng Tầng 1 ngoài registry (luôn như đang có). Cộng: bật V2. Lý do: Q-7 giữ giá trị
 khi tắt việc, nên bật lại việc trên nhóm đang lưu "Tất cả" mở dữ liệu khách mà story chưa tính.
+**Sửa 07/10 (review F1, M1):** rank dùng để so là rank **hiệu lực** sau luật §1.3, gồm trần D7: nhóm thiếu
+`sales.view_customer_list` mà có `sales.view_customer` (Quản lý, NV giao) thì cổng D7 vẫn mở với rank `min(lưu, assigned_deliveries)`.
+Ví dụ: NV giao lưu D7 = `all`, bật "Xem khách hàng" là **mở rộng** (1 → 2). Đổi D7 từ `assigned_deliveries` sang `all` khi việc còn
+tắt **không** là mở rộng. PUT có `confirm_customer_data_widening: true` mà không có mở rộng: nhận, không ghi cờ vào AuditLog.
 
 ### 2.6 FE: W3i chuyển sang bản nháp, W3h giữ bật/tắt ngay
 
@@ -264,7 +269,7 @@ Phụ thuộc: `0015_seed…` cần `accounts/0013_rename_groups_to_english`, `s
 | R6 | Leo quyền ghi phạm vi | Cao | `actor_is_owner` trước mọi kiểm; preview cùng luật | PV-08-AC7, PV-09-AC8 |
 | R7 | Ghi đè đồng thời | Trung bình | `select_for_update` + so `row_version` trong transaction | PV-10-AC1..5 (AC5 luồng thật chỉ chạy trên Postgres: `skipUnless(connection.vendor == "postgresql")`; SQLite chạy bản tuần tự) |
 | R8 | Hiệu năng | Thấp | ≤ 3 truy vấn phân giải / request, nhớ trên user; hàng chờ gọi phân giải 1 lần / request | `assertNumQueries` danh sách đơn: tăng tối đa +3 so với số gốc (be-dev ghi số vào 03-dev-notes) |
-| R9 | Người không nhóm có quyền gán trực tiếp đổi hành vi (D6 hẹp lại, D7 thành `none`, D4 từ "không gì" thành rank 0) | Trung bình | PV-02-AC4 đã duyệt; kiểm đếm trên production trước deploy | điểm dừng D-3 |
+| R9 | Người không nhóm có quyền gán trực tiếp đổi hành vi (D6 hẹp lại, D7 thành `none`; **D4 giữ `none`**, không lên rank 0 vì như vậy là mở thêm dữ liệu khách; sửa 08/10, review Lô 4) | Trung bình | PV-02-AC4 đã duyệt; kiểm đếm trên production trước deploy | Duy chốt 08/10 (D-3): chặn hẳn ở cổng xác thực `AUTH_NO_ROLE`; phạm vi thu hẹp là lớp phòng thủ thứ hai, `PENDING_DUY_DIFFS` rỗng |
 | R10 | Sai lệch ma trận production so với migration (Chủ đã đổi việc qua B4) | Trung bình | data migration đọc quyền **thực tế** cho D7; V2 bật cố định theo Q-4 | điểm dừng D-2 |
 | R11 | FE cũ gửi PUT không `version` sau khi BE lên | Thấp | triển khai BE và ERP cùng lượt | ghi ở 02c |
 
@@ -312,7 +317,7 @@ mock vẫn là `sessionStorage` (chỉ chế độ mock, không có dữ liệu 
 |---|---|---|---|
 | D-1 | 🔴 | N1 (QA Lô 12): sau phát hành NV kho **vẫn** thấy tên/SĐT/địa chỉ trên đơn vì V2 bật mặc định (Q-4). Đóng N1 theo hướng "Chủ tự tắt V2 cho NV kho khi muốn"? V2 có bao gồm **địa chỉ** trên chi tiết đơn không? | Đóng N1 theo cấu hình, không đổi mặc định. V2 gồm tên, SĐT, địa chỉ trên đơn, hoá đơn, phiếu hoàn tiền |
 | D-2 | 🟡 | Trước khi migrate production: điều phối viên chạy lệnh đếm (không dữ liệu cá nhân) quyền hiện tại của 5 nhóm để biết Chủ đã đổi gì qua B4 | Bắt buộc, ghi số vào 03-dev-notes |
-| D-3 | 🟡 | Người dùng không nhóm có quyền gán trực tiếp: đếm trên production. Nếu > 0 thì hành vi của họ đổi (D6 hẹp lại, D7 `none`, D4 rank 0) | Đếm trước deploy; > 0 thì hỏi Duy từng người |
+| D-3 | 🟡 | Người dùng không nhóm có quyền gán trực tiếp: đếm trên production. Nếu > 0 thì hành vi của họ đổi (D6 hẹp lại, D7 `none`, D4 rank 0) | Duy chốt 08/10: chặn hẳn ở cổng xác thực (`AUTH_NO_ROLE`). Đếm trước deploy; > 0 thì báo Duy danh sách để xếp nhóm trước khi deploy |
 | D-4 | 🟡 | W3i chuyển từ "bật là lưu ngay" sang bản nháp + nút "Lưu thay đổi" (W3h giữ bật ngay) | Đồng ý (story PV-11 đã ngầm đòi) |
 | D-5 | 🟢 | Thêm phạm vi cho phiếu hoàn tiền và dashboard (cửa phụ, không đổi mặc định) | Làm, không cần hỏi trừ khi Duy phản đối |
 
@@ -327,4 +332,7 @@ quan `row_version` cho mọi lần lưu của nhóm."
 ## 9. Review
 
 - 06/10 Lô 1–2 BE: CHANGES REQUESTED (H1 luật D7), sau d50d082 **APPROVED**. Chi tiết ở `03b-review-techlead.md`.
+- 07/10 Lô F1 FE (dd84536): **CHANGES REQUESTED** (M1 mock D7, M2 Hoàn tác mở rộng, M3 chặn chuyển trang). Chi tiết ở 03b. Sau a1b5b31 **APPROVED** (còn L10 cho Lô 6; giữ nhánh tới Lô 5 BE).
 - 07/10 Lô 3 BE (`30bbc87`): **APPROVED**, kèm điều kiện C1 (D1 cho phiếu hoàn tiền và dashboard phải vào trước hoặc cùng Lô 5, chờ D-3) và C2. Lô 3 sửa thêm `ai/policy/rules.py`; migration sales là 0015/0016.
+- 08/10 Lô 4 BE (`d861021`): **APPROVED-chờ-Duy**. M1 (tệp mốc dùng `PENDING_DUY_DIFFS` thay cho sinh lại mốc) và D-3 phải xong trước merge main. Lô 4 xoá sớm 4 hàm của `common/api.py`. V2 áp cho phiếu giao.
+- 08/10 Lô 4 M1 + Lô 5 + C1 (`5fd4032`): **APPROVED-chờ-Duy**. Code đạt; chưa merge main khi `PENDING_DUY_DIFFS` còn mục (D-3). PO-Q1 chỉ kiểm khi yêu cầu đụng `view_customers`/`scopes.customers` (mock F1 theo BE).

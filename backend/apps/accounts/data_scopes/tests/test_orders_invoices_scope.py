@@ -367,7 +367,7 @@ class CustomerInfoCapabilityRegistryTests(TestCase):
         owner = make_user("pv07_owner2", roles.OWNER)
         client = APIClient()
         client.force_authenticate(owner)
-        response = client.put(f"/api/staff/groups/{roles.OWNER}/capabilities/", {"capabilities": {V2: True}},
+        response = client.put(f"/api/staff/groups/{roles.OWNER}/capabilities/", {"version": "1", "capabilities": {V2: True}},
                               format="json")
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.data["code"], "GROUP_LOCKED")

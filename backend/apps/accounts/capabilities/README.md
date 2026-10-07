@@ -6,8 +6,8 @@ migration mới (dùng `auth.Group` / `Permission`). Quy tắc BR-PQ-32 (đề x
 | File | Làm gì |
 |---|---|
 | `registry.py` | Nguồn duy nhất: danh sách việc (`key`, nhãn, khu, `perms`, `owner_only`, `requires`) + bảng phạm vi dữ liệu theo nhóm (cột `customers` tính theo quyền thực tế). |
-| `services.py` | `list_groups`, `describe_group` (đọc) và `set_group_capabilities` (ghi, chống leo quyền, ghi `AuditLog`). |
-| `api.py` | `GET /api/staff/groups/`, `GET /api/staff/groups/{code}/`, `PUT /api/staff/groups/{code}/capabilities/`. |
+| `services.py` | `list_groups`, `describe_group` (đọc); `set_group_capabilities` (ghi việc + phạm vi, khoá lạc quan `version`, xác nhận mở rộng dữ liệu khách, chống leo quyền, ghi `AuditLog`) và `preview_group` (xem trước, không ghi). |
+| `api.py` | `GET /api/staff/groups/`, `GET /api/staff/groups/{code}/`, `PUT /api/staff/groups/{code}/capabilities/` (thân `{version, capabilities?, scopes?, confirm_customer_data_widening?}`), `POST /api/staff/groups/{code}/permissions-preview/`. |
 | `next_steps.py` | Provider guidance `group` (dòng thời gian của nhóm) cho `GET /api/guidance/group/{pk}/`. |
 | `tests/` | Registry (codename tồn tại, các việc rời nhau), đọc, ghi, leo quyền, dòng thời gian, quyền của nhóm Nhân viên giao. |
 

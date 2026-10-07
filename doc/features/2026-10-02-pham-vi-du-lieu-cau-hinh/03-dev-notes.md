@@ -150,6 +150,71 @@ Test `QueryBudgetTests`: danh sách đơn (NV giao) và danh sách hoá đơn (N
 - `sales/orders/api.py` vẫn kiểm `?customer=` bằng `can_view_customer_directory` (403) và chưa lọc theo D7: thuộc Lô 4 (PV-05-AC6).
 - `naming`: `scripts/check_naming.py` đang báo 2 file FE mới từ main (`frontend/components/ContactButton.tsx`, `frontend/features/site/components/SiteLegalFooter.tsx`, chữ `nguoi` trong khoá `thong-tin-nguoi-ban`), không phải file của Lô này.
 
+## Lô 4 — PV-04, PV-05, PV-06 (phiếu giao, hàng hoàn, gọi xác nhận, khách, phiếu nhập đọc phạm vi cấu hình)
+
+> be-dev · 2026-10-07 · nhánh `feat/pham-vi-du-lieu` (đã merge main `151b56e`, có W37 L1).
+
+### File đã sửa / thêm
+- **Mới:** `delivery/scope.py` (D3: `deliveries_scope_value`, `scope_deliveries_for`, `deliveries_window_applies`), `sales/customers/scope.py` (D7: `customers_scope_value`,
+  `sees_all_customers`, `scope_customers_for`), `purchasing/receipts/scope.py` (D6: `receipts_scope_value`, `scope_q`, `scope_receipts_for`, `cancel_scope_q`, `vietnam_day_bounds`).
+- **Đổi:** `delivery/{api,next_steps,serializers}.py`, `delivery/confirmation/{scope,api,serializers}.py` (`note_in_customer_service_scope` đổi tên `note_in_confirmation_scope`, thêm
+  `confirmation_scope_value`; bỏ `is_customer_service`), `inventory/returns/scope.py` (D5), `sales/customers/{api,directory_api,next_steps,serializers}.py`, `sales/orders/api.py` (lọc `?customer=`),
+  `purchasing/receipts/{api,services,next_steps}.py` (tách `can_cancel_receipt`, `can_cancel_any_receipt`, không đổi hành vi huỷ).
+- **Ngoài danh sách file của 02b Lô 4:** `common/api.py` xoá `FULL_SCOPE_GROUPS`, `has_full_delivery_scope`, `CUSTOMER_DIRECTORY_GROUPS`, `sees_customer_directory`. Lý do: PV-05-AC8 đòi grep không còn các tên này
+  và sau Lô 4 không còn nơi dùng (kiểm bằng grep), nên xoá luôn thay vì để tới Lô 6. Phần "dọn" còn lại của Lô 6 (bỏ `scopes` cũ, test quét PV-12) không đổi.
+- **Test mới:** `accounts/data_scopes/tests/test_deliveries_customers_receipts_scope.py` (55 test, dùng lại fixture PV-01). **Test cũ sửa (hợp đồng đổi có chủ ý):** `test_scope_snapshot.py` (mock AC2 đổi sang
+  `apps.delivery.scope.resolve_data_scope`), `sales/customers/tests/test_directory_api.py` và `test_directory_permission.py` (hai test "người chỉ có quyền thêm" nay đặt quyền và D7 = all ở
+  nhóm NV kho, vì người không nhóm có D7 = none), `delivery/tests/test_timeline_customer_service.py` (chỉ docstring), `scope_snapshot_baseline.json` (xem Lệch 2).
+
+### Hành vi
+- **D3 phiếu giao:** `scope_deliveries_for` dùng cho list, detail, `assigned_to=me`, đổi trạng thái, giao người, tem, tra tem, dòng thời gian `delivery`. `assigned` → `assigned_to=user`; `all` → mọi phiếu.
+  `pii_restricted` (cửa sổ SR-PII-02) bật khi D3 khác `all`, nghĩa là nhóm ở `all` không bị cửa sổ (PV-04-AC5). Lọc `assigned_to=<người khác>` vẫn 403 khi D3 khác `all`. Phiếu `CANCELLED` gán cho NV giao
+  vẫn nằm trong queryset nên nhận 400 `BR-GH-24` (W37 S2-AC2, có test). Khoá `order_status` của `POST .../status/` giữ nguyên.
+- **D5 hàng hoàn:** `scope_returns_for`, `scope_delivery_notes_for` (ô chọn phiếu giao ở form tạo) đọc D5, độc lập với D3.
+- **D4 gọi xác nhận:** `note_in_confirmation_scope(user, note, now=, value=)`. `all_pending` → True; `pending_or_called_recently` → điều kiện cũ; view tính D4 một lần, đưa vào context serializer (`scope_value`).
+  `customer_service_note_q` giữ nguyên nghĩa "điều kiện hẹp của D4" cho nhánh `assigned_or_confirmation` của D1.
+- **D7 khách:** `scope_customers_for` cho `/customers/` (cũ), danh bạ mới (list, retrieve, `search`, `PATCH`), dòng thời gian khách và lọc đơn `?customer=`. `all` → mọi khách; `assigned_deliveries` → khách của đơn có phiếu
+  thoả `courier_visible_note_q` (dùng `pk__in`, không `distinct`, để giữ annotate của danh bạ); `none` → rỗng. `?customer=<id>` ngoài D7 → danh sách đơn rỗng (200), cổng 403 theo `view_customer_list` giữ trước.
+  API cũ trả `CustomerSerializer` khi D7 = `all`, ngược lại `CourierCustomerSerializer`. Danh bạ mới: khi D7 khác `all` bỏ `note`, `default_address` (xem Lệch 4).
+- **D6 phiếu nhập:** `scope_receipts_for` cho list, detail, sửa (PATCH), `submit`, dòng thời gian `receipt` (thêm `scope_fn`). `created_by_me_today` dùng `timezone.localtime`, mốc 00:00 giờ VN hôm nay tới 00:00 ngày mai, so với
+  `created_at` UTC. Test ngày giờ cố định: 10:00 06/10, 23:55 05/10, qua nửa đêm 23:59 → 00:01 (nháp mở trước nửa đêm gửi sau nửa đêm: 404, nháp không đổi, Quản lý vẫn sửa được).
+  **Huỷ phiếu:** action `cancel` dùng `cancel_scope_q` = phiếu trong D6 hoặc phiếu qua luật huỷ cũ (người tạo, hoặc Quản lý/Chủ). Phiếu ngoài cả hai → 404; trong D6 mà không phải người tạo/Quản lý → 403 như hôm nay.
+  Lưu ý khi viết: `Q() | Q(x)` bỏ mất vế rỗng; `cancel_scope_q` xử lý riêng trường hợp D6 = `all` (đã có test PV-06-AC6).
+- **Lỗ dữ liệu cá nhân QA W37 N2:** phản hồi `POST /api/delivery/notes/{id}/status/` (và `assign`, danh sách, chi tiết) dùng cùng `DeliveryNoteSerializer._customer_data_hidden`: ẩn tên, địa chỉ, SĐT, `note`,
+  `recipient_*`, `failure_note` (giá trị `null`, giữ khoá) khi (1) người gọi KHÔNG có V2 `sales.view_order_customer_info`, hoặc không có người gọi, hoặc (2) D3 khác `all` và phiếu quá cửa sổ. Trước đây chỉ có (2).
+  Mặc định không đổi gì: Chủ, Quản lý, NV kho, NV giao, CSKH đều có V2 từ migration `sales/0016`. Chủ tắt V2 cho một nhóm thì phiếu giao cũng hết tên, địa chỉ (xem Lệch 3).
+
+### Rule BR đã cài
+BR-PQ-33/35 (phiếu giao, hàng hoàn, gọi xác nhận, khách, phiếu nhập đọc cấu hình, một hàm cho mọi đường), BR-PQ-34 (cổng Tầng 1/2 đứng trước, có test 403 khi `all` nhưng thiếu quyền), BR-PQ-36 (đổi cấu hình hiệu lực ở request kế),
+BR-PQ-10 (huỷ phiếu nhập giữ luật cũ), BR-GH-06/18/24, SR-PII-02 (cửa sổ chỉ khi D3 khác `all`), S-7 (404 không lộ), bất biến 1 (test không khoá giá vốn ở phiếu giao, hàng hoàn, phiếu nhập),
+bất biến 9 (test không tên/SĐT/địa chỉ giả khi che, danh bạ hẹp không có `note`/`default_address`, phiếu giao khi V2 tắt).
+
+### Lệch so với 02b / yêu cầu (cần techlead biết)
+1. **`common/api.py` xoá bốn tên cũ ngay ở Lô 4** (ngoài danh sách file). Lý do ở trên (PV-05-AC8).
+2. **Người không nhóm (quyền gán trực tiếp), R9/D-3: hành vi ĐỔI, đã sinh lại mốc cho đúng tài khoản `direct_permissions`, KHÔNG thêm `APPROVED_DIFFS`.** Phần 02b §7 D-3 đã tiên liệu ("D6 hẹp lại, D7 none, D4 rank 0").
+   Mốc `scope_snapshot_baseline.json`: chỉ đổi dòng của `direct_permissions` ở `receipts.list/detail`, `directory.list/detail/search`, `customers.list/detail`, `guidance.receipt`, `guidance.customer`; các tài khoản khác và hai mục Q-4 giữ y nguyên (so với HEAD bằng script).
+   - D6: người không nhóm chỉ còn thấy phiếu nhập do mình tạo trong ngày (trước: mọi phiếu). Test `UngroupedUserTests.test_ungrouped_receipts_scope_is_created_by_me_today`.
+   - D7: người không nhóm có D7 = `none`: danh bạ mới rỗng, `/customers/` rỗng (trước: danh bạ thấy mọi khách nếu có `view_customer_list`; `/customers/` thấy khách của phiếu gán cho mình).
+   - **D4 là chỗ tôi KHÔNG theo chữ 02b:** 02b ghi "D4 rank 0" (người không nhóm vào phạm vi `pending_or_called_recently`), nhưng đó là MỞ THÊM dữ liệu khách (phiếu đang chờ gọi) cho người chưa từng được cấp phạm vi. Tôi giữ hành vi cũ:
+     `confirmation_scope_value` trả giá trị nội bộ `none` (không mục nào trong phạm vi) cho người không có nhóm đủ điều kiện và không phải superuser. Mốc `confirmation.*` của họ không đổi. Nếu Duy muốn theo chữ 02b thì bỏ nhánh đó (1 chỗ) và sinh lại mốc.
+   - Việc cần làm trước khi migrate production (D-2/D-3, điều phối viên): đếm số người không nhóm có `view_purchasereceipt` hoặc `view_customer_list` hay `view_customer` trực tiếp; họ sẽ mất phạm vi như trên cho tới khi được xếp vào nhóm.
+3. **V2 áp cho phiếu giao (đóng N2).** 02b/D-1 chỉ nêu V2 cho đơn, hoá đơn, phiếu hoàn tiền. Tôi mở rộng sang tên/SĐT/địa chỉ trên phiếu giao vì nếu không, Chủ tắt V2 cho NV kho vẫn lộ khách qua `/delivery/notes/` và qua phản hồi đổi trạng thái.
+   Hệ quả: nếu Chủ tắt V2 cho NV giao thì họ không còn thấy địa chỉ giao trên phiếu. Đó là lựa chọn của Chủ; mặc định V2 bật cho cả 5 nhóm nên không đổi gì. Cần techlead xác nhận hướng này; nếu không muốn thì gỡ dòng V2 trong `_customer_data_hidden`
+   (phản hồi đổi trạng thái vẫn cùng luật với chi tiết).
+4. **Danh bạ mới ẩn `note`, `default_address` khi D7 khác `all`** (02b không nói). Hôm nay nhóm khác Chủ/Quản lý nhận 403 nên không có hợp đồng cũ để giữ; ẩn theo cùng nguyên tắc `CourierCustomerSerializer` (bất biến 9). Mặc định Quản lý (`all`) không đổi.
+5. **`has_full_delivery_scope` còn trong mock của test AC2** đã thay bằng `apps.delivery.scope.resolve_data_scope`; test quét PV-12 sau này không bị vướng.
+
+### Kiểm chứng Lô 4 (chạy trong lượt làm)
+- Trước khi sửa: 28 trong 51 test mới đỏ (đúng lý do: 404/403 sai, tên cũ còn).
+- `manage.py test` toàn bộ (DJANGO_DEBUG=1): **3148 test, OK, skipped=2** (hai test đua Postgres). Mốc PV-01 (10 test) xanh sau khi sinh lại dòng `direct_permissions`.
+- `makemigrations --check --dry-run`: `No changes detected` (không có migration trong Lô này). `check_naming.py`: chỉ báo hai file FE có sẵn từ main (`ContactButton.tsx`, `SiteLegalFooter.tsx`), không có file của Lô 4.
+
+### Việc còn nợ / chuyển lô
+- C1 (Lô 5): phạm vi D1 cho `refunds/api.py::get_queryset` và dashboard vẫn chưa làm (chờ D-3, như review Lô 3). Lô 4 không đụng.
+- Lô 5: ô D7 phải có `note` cho nhóm lưu `all` mà thiếu `view_customer_list` (L4); PUT B4 phải ghi D7 khi bật "Xem khách hàng" (PO-Q1). Lô 4 và Lô 5 lên production CÙNG lượt (M2).
+- Lô 6: `GET /api/staff/groups/` vẫn còn khoá `scopes` cũ; test quét PV-12 nên thêm `is_customer_service`, `has_full_delivery_scope` (đã sạch từ Lô 4).
+- FE (Lô 7): ô khách trên phiếu giao nay có thể `null` vì V2 tắt, ngoài `null` do quá cửa sổ; chưa có `customer_hidden_reason` ở phiếu giao (không thêm khoá mới).
+
 ## Kiểm chứng (chạy trong lượt làm)
 - `manage.py test` toàn bộ trước Lô 1: 2850 test (suy ra 2859 − 9). Sau Lô 1: **2859 test, OK**. Sau Lô 2: **2918 test, OK** (0 failure, 0 error).
 - `makemigrations --check --dry-run`: `No changes detected`.
@@ -172,6 +237,107 @@ Thứ tự đã làm: M1+L1 (commit riêng, sinh lại mốc trên HEAD chưa s�
 - **L2 phần Lô 5:** bước "trước" của `rows_losing_access` gọi `resolve_data_scopes(member, overrides={})` (`{}` khác `None` nên không bị nhớ). Test Lô 3+ đổi cấu hình dùng `User.objects.get(pk=…)` mới.
 - Lô 3/4 không được thêm `APPROVED_DIFFS` cho `direct_permissions` khi Duy chưa trả lời D-3.
 
+## Lô 4 M1 + Lô 5 — PV-08, PV-09 (BE), PV-10 (BE), C1, L1, L4, `/me`
+
+> be-dev · 2026-10-08 · nhánh `feat/pham-vi-du-lieu`, sau review techlead Lô 4 (`f4eec0b`). Commit: M1 `090e6ef`, Lô 5 `5457c2d`, C1 (commit sau).
+
+### M1 (review Lô 4, chỉ tệp test)
+`scope_snapshot_baseline.json`: dòng `direct_permissions` về như `151b56e`. `snapshot.py` thêm `PENDING_DUY_DIFFS` (mỗi mục chú thích "CHỜ Duy D-3"), `is_approved` chấp nhận `APPROVED_DIFFS + PENDING_DUY_DIFFS`.
+Test: mọi mục thuộc `direct_permissions` và chỉ thu hẹp; `APPROVED_DIFFS` vẫn không có `direct_permissions`. Lô 5 (C1) thêm vào danh sách này `refunds.*` và `dashboard.summary` (xem dưới). **Không merge main khi `PENDING_DUY_DIFFS` còn mục.**
+
+### File đã sửa / thêm (Lô 5)
+- `accounts/capabilities/{services,api,next_steps}.py`, `accounts/data_scopes/services.py`, `config/api_urls.py` (route preview), `accounts/auth/services.py` (`is_superuser`), `inventory/returns/scope.py` (tham số `value` cho xem trước).
+- C1: **mới** `sales/refunds/scope.py`; sửa `sales/refunds/api.py` (`get_queryset`), `reports/dashboard_api.py`.
+- Test mới: `data_scopes/tests/test_group_save_scopes.py` (46), `test_refunds_dashboard_scope.py` (12), `test_query_budget_and_race.py` (3 + 1 đua Postgres, bỏ qua trên SQLite).
+- Test cũ sửa (hợp đồng đổi có chủ ý): mọi lệnh PUT của `capabilities/tests/*` gửi `version` qua helper `put_caps` (`base.py`); `test_api_read`, `test_api_write` (bật Xem khách hàng khi D7 = none phải gửi kèm `scopes.customers`, bật lại việc trên nhóm lưu `all` phải xác nhận, theo 02b §2.3 bước 10, 11); hai test khoá khoá `/me` thêm `is_superuser`.
+
+### Endpoint (đúng 02b §2.3–§2.5, không đổi hợp đồng)
+- `PUT /api/staff/groups/<code>/capabilities/` thân `{"version": "41", "capabilities"?: {...}, "scopes"?: {"receipts": "created_by_me_today"}, "confirm_customer_data_widening"?: true}`. Thứ tự kiểm 1 đến 12 như bảng 02b. 200 trả body như GET chi tiết; không có thay đổi thật thì không AuditLog và không tăng `version`.
+  - 409 `GROUP_CHANGED` "Nhóm này vừa được người khác đổi. Tải lại để xem bản mới." (khoá dòng `GroupAccessConfig`, `row_version` tăng đúng 1 lần cho cả việc lẫn phạm vi).
+  - 400 `CUSTOMER_DATA_WIDENING_UNCONFIRMED` kèm `impact` (cùng nội dung xem trước): `{"impact": {...}, "detail": "...", "code": "..."}`.
+  - AuditLog `change_group_data_scopes`: `changes = {"receipts": {"from": "all", "to": "created_by_me_today"}}` (+ `"customer_data_widening_confirmed": true`). Cờ nằm ở dòng phạm vi nếu có đổi phạm vi, không thì ở dòng việc; dòng thời gian và `capability_change_label` bỏ qua khoá không phải mã việc.
+- `POST /api/staff/groups/<code>/permissions-preview/` thân như PUT không cần `version` và `confirm…`. Trả `{"widens_customer_data", "widened": [{"key","from","to"}], "affected_members": [{"id","display_name"}], "affected_count", "message", "already_wider_elsewhere": [{"id","display_name","via_group","key"}], "narrowed": [{"key","from","to","rows_losing_access"}]}`.
+  `widened[].from/to` là giá trị ĐÃ LƯU (L11, ca cổng vừa mở cho `from == to`). `rows_losing_access` đếm dòng chưa kết thúc (đơn BOOKED/PAID/PROCESSING, phiếu giao chưa xong, hàng hoàn Nháp, phiếu nhập Nháp, việc gọi đang mở), gộp không trùng qua các thành viên; khách = 0.
+- `GET …/<code>/`: `timeline` có sự kiện `kind: "change_group_data_scopes"` (một sự kiện mỗi đối tượng, nhãn dựng từ mã); `last_changed_at/by` tính cả AuditLog phạm vi; dòng `customers` có `note: "Bật Xem khách hàng để thấy tất cả khách"` khi lưu `all` mà nhóm thiếu `view_customer_list` (L4).
+- `GET /api/auth/me/`: thêm `is_superuser` (bool).
+
+### Rule BR đã cài
+BR-PQ-36 (hiệu lực ở request kế, PV-08-AC10; cả yêu cầu hợp lệ hoặc không đổi gì, PV-08-AC6 AuditLog lỗi thì rollback), R1 (BE chặn thiếu xác nhận), R6 (chỉ Chủ ghi và xem trước), Q-8 (CAS), Q-9 (thu hẹp không cần xác nhận, có số dòng), S-8, bất biến 9 (AuditLog và xem trước chỉ có mã, tên nhân viên; test không chuỗi giả của khách).
+
+### Mock F1: 4 ca đối chiếu (`MockParityTests`)
+(1) NV giao đổi D7 `assigned_deliveries` → `all` khi việc tắt: không mở rộng, không thu hẹp. (2) NV giao lưu `all` rồi bật việc: mở rộng, `widened` `{"customers","all","all"}`. (3) Quản lý tắt rồi bật lại khi D7 = `all`: mở rộng. (4) NV kho bật việc kèm `scopes.customers = "all"`: mở rộng `{"none","all"}`; không kèm D7 thì 400 `SCOPE_VALUE_INVALID` (PO-Q1).
+Rank hiệu lực D7 bị chặn trần `assigned_deliveries` khi nhóm thiếu `view_customer_list` (cùng luật H1 của resolver).
+
+### Lệch so với 02b / yêu cầu (cần techlead biết)
+1. **PUT nhận `scopes`, không phải `data_scope_values`.** Yêu cầu giao việc ghi "PUT nhận … `data_scope_values`"; 02b §2.3 và mock F1 gửi `scopes`, còn `data_scope_values` là khoá của GET. Tôi theo 02b.
+2. **PO-Q1 (bước 10) chỉ kiểm khi yêu cầu có đụng `view_customers` hoặc `scopes.customers`.** Mock kiểm mọi lần lưu; làm vậy sẽ chặn nhầm một lần lưu không liên quan khi nhóm có sẵn trạng thái lệch (Xem khách hàng bật, D7 = none, dữ liệu cũ). Hai bên khác nhau chỉ ở ca dữ liệu lệch sẵn.
+3. **Mở rộng tính cả D2 (hoá đơn) và V2** theo 02b §2.5, mock F1 chưa có. `widened[]` có thể chứa `{"key": "invoices", ...}` (from/to = giá trị D1) và `{"key": "view_order_customer_info", "from": "off", "to": "on"}`; FE tra nhãn đối tượng theo `key` nên cần chịu khoá không có trong `SCOPE_BY_KEY` (V2) khi Lô 6 nối BE thật.
+4. **C1: người không nhóm (`direct_permissions`) co lại ở `refunds.*` và `dashboard.summary`** (D1 = hẹp nhất): 15 → 1 đơn chờ, doanh thu 200000 → 0, mất 10 dòng ở dashboard, phiếu hoàn 200 → 404. Đưa vào `PENDING_DUY_DIFFS`; hai mục `+` ở dashboard (`extra:kpis.*`, `visible:order_assigned_direct`) là con số mới nhỏ hơn và đơn của chính họ lọt vào cửa sổ 8 đơn gần nhất, không ai thấy thêm đơn. Test M1 cho phép đúng hai mục đó và chỉ ở `dashboard.summary`.
+5. Phiếu hoàn không gắn đơn nào (giao dịch lệch chưa khớp đơn) bị ẩn khi D1 khác `all`; với `all` thấy như hôm nay.
+6. `legacy_scopes` (chuỗi `scopes` cũ) không đổi; hai test cũ phải gửi kèm `scopes.customers` cho khớp PO-Q1.
+
+### Kiểm chứng (chạy trong lượt làm)
+Kết quả cuối ghi trong báo cáo bàn giao (số test toàn bộ, `makemigrations --check`, `check_naming.py`).
+
+### Việc còn nợ / chuyển lô
+- Superuser không nhóm về `dashboard` (`home_for`): KHÔNG làm, vẫn chờ Duy.
+- Lô 6: bỏ khoá `scopes` cũ; FE nối BE thật cần chịu `widened[].key` ngoài `SCOPE_BY_KEY`; nhãn V2 chờ Duy chốt chữ.
+- Người phạm vi hẹp vẫn `PATCH` được `note`/`default_address` của khách ngoài tầm đọc (ghi chú techlead Lô 4 điểm 4): cần cả `view_customer_list` lẫn `change_customer`; chưa chặn.
+- Đua thật PV-10-AC5 chỉ chạy trên Postgres (bỏ qua trên SQLite); cần chạy ở CI hoặc staging.
+
+## Lô F1 FE (PV-11, PV-09 phần FE, PV-10 phần FE) — fe-dev, nhánh `feat/pham-vi-fe` (tách từ main `9509453`)
+
+Chưa push, chưa merge. Chỉ sửa `erp-console/features/permissions/**` và `erp-console/e2e/ed_batch14_permissions.py` (+ mục này).
+
+### Làm gì
+| Việc | Chỗ |
+|---|---|
+| Khối "Phạm vi dữ liệu" 8 dòng (D1..D8) ở W3i: ô chọn đúng `options`, D2 "Theo Đơn hàng", D8 chỉ đọc; nhóm Chủ khoá + "Chủ luôn thấy tất cả"; nhãn CSKH đã đúng (hết chữ "Trong phạm vi gọi", L3) | `components/GroupDetailScreen.tsx` (`ScopeRowEditor`), `mockScopes.ts` |
+| Ô mờ khi có `inactive_reason`, giá trị cũ vẫn hiện; bật việc gốc trong bản nháp thì hết mờ; `gate_capability: null` chỉ dựa vào `inactive_reason` | `permissionsModel.ts::isScopeInactive` |
+| W3i thành **bản nháp** + thanh "Lưu thay đổi / Huỷ thay đổi" (một PUT, chỉ khoá đã đổi, kèm `version`); `beforeunload` khi còn nháp. W3h giữ bật/tắt ngay (D-4) | `useGroupDraft.ts`, `permissionsModel.ts` (`Draft`, `toggleInDraft`, `setScopeInDraft`, `cleanDraft`, `saveBodyOf`) |
+| PV-09: lưu → POST xem trước → hộp "Cho thêm người xem dữ liệu khách?" (câu `message`, tên nhân viên, "Người đã nghỉ thì khoá tài khoản", dòng kiêm nhiệm, "Huỷ" / "Tôi hiểu, lưu"); thu hẹp có `rows_losing_access` thì ghi chú, không chữ cảnh báo khách; 400 `CUSTOMER_DATA_WIDENING_UNCONFIRMED` mở hộp bằng `impact`, giữ lựa chọn | `components/ConfirmSaveModal.tsx`, `saveErrors.ts` |
+| PV-10: mọi PUT gửi `version`; 409 → "Nhóm này vừa được người khác đổi. Tải lại để xem bản mới." + nút "Tải lại" (xoá nháp, lấy bản server), không tự gửi lại; W3h: 409 → báo + tải lại danh sách; "Hoàn tác" dùng `version` mới | `useGroupDraft.ts`, `useCapabilityToggle.ts` |
+| PO-Q1: bật "Xem khách hàng" khi Khách hàng = Không xem → nháp (và W3h) tự đặt Khách hàng = Tất cả; chọn Không xem khi việc đang bật thì khoá nút Lưu + báo cạnh nút | `toggleInDraft`, `draftProblem`, `useCapabilityToggle.bodyOf` |
+| **Superuser ngoài nhóm Chủ được ghi** (Duy chốt 06/10): hết chặn ở W3h, W3i, thêm/bỏ thành viên nhóm Chủ | `permissionsModel.ts::isGroupWriter` |
+| Bỏ chip "Được gán" hằng số (`ASSIGNED_ONLY`); chip và chip "Tất cả khách" lấy từ `data_scope_values` BE | `isAssignedOnly`, `showsAllCustomers` |
+
+Hàm API mới (`api.ts`): `saveGroupChanges(code, {version, capabilities?, scopes?, confirm_customer_data_widening?})` (thay `setGroupCapabilities`), `previewGroupChanges(code, {capabilities?, scopes?})`. Kiểu mới ở `types.ts`: `DataScopeRow`, `ScopeOption`, `GroupSaveBody`, `GroupPreviewBody`, `ScopePreview`; `GroupSummary`/`GroupDetail` thêm `version`, `data_scope_values`, `data_scopes`; `scopes` cũ để tuỳ chọn và FE không dùng.
+
+GET dùng đúng contract thật của Lô 2 (`version`, `data_scope_values`, `data_scopes`). PUT mới và preview chạy ở bản mock cho tới Lô 5.
+
+### Mock giữ luật BE (`mock.ts` + phần thuần `mockScopes.ts`)
+Thứ tự kiểm 02b §2.3 (403 → 404 → GROUP_LOCKED → INPUT_NOT_ALLOWED → INVALID_INPUT → SCOPE_* → BR-PQ-32 → **409 CAS `version`** → CAPABILITY_REQUIRES → **PO-Q1** → **400 CUSTOMER_DATA_WIDENING_UNCONFIRMED kèm `impact`**). Không đổi gì thì 200 và không tăng `version`. Kho tạm `sessionStorage` (khoá việc, mã đối tượng, mã giá trị, số phiên bản, tên đăng nhập người sửa; không dữ liệu khách). Công cụ thử: `window.__caveMock.bumpGroupVersion("manager")` giả lập người khác vừa lưu. Danh mục D1..D8 và mặc định theo nhóm chép từ `catalog.py` và migration `0015`. Số "dòng mất quyền xem" của xem trước là số GIẢ cố định (3 phiếu nhập, 2 loại khác).
+
+### Chỗ lệch contract / cần techlead và điều phối viên biết
+1. **`/api/auth/me/` không trả `is_superuser`** (Me ở `features/auth` ngoài danh sách được sửa). `isGroupWriter` dùng `me.is_superuser === true` nếu có, không thì suy ra từ việc có đủ 5 quyền chỉ-Chủ (`confirm_payment_manual`, `confirm_refund`, `manage_staff`, `manage_ai_policy`, `close_batch`), vì superuser có mọi permission. Sai thì BE vẫn 403 và UI hiện nguyên văn. Đề nghị Lô 7 (PV-14, `accounts/auth/services.py`) thêm `is_superuser` vào `/me/`.
+2. **Superuser KHÔNG thuộc nhóm nào** bị `AuthGate` đưa về `/no-role/` (mock `admin`), nên không vào được `/permissions/`. Thuộc `features/auth`, ngoài phạm vi. Superuser kèm nhóm (mock `sa1` = Quản lý + superuser) thì vào và ghi được; e2e kiểm bằng `sa1`.
+3. **Mock cũ sai một chỗ**: `view_customers` mặc định tắt ở Quản lý, trong khi migration `sales/0013` cấp `view_customer_list` cho `manager` (D7 seed = `all`). Đã sửa mock cho Quản lý bật.
+4. **Hành vi theo 02b §2.5, có thể làm Duy bất ngờ**: bật lại một việc cổng (Xem đơn, Gọi xác nhận, Xem khách hàng) trên nhóm đang lưu phạm vi rộng (Q-7 giữ giá trị khi tắt) là MỞ RỘNG dữ liệu khách, nên cả ở W3h cũng hiện hộp "Tôi hiểu, lưu". Mock làm đúng như vậy; BE Lô 5 phải trả đúng cùng quy tắc.
+5. `data_scopes[].options` của nhóm Chủ vẫn có (BE `_options`) dù `editable: false`; FE chỉ đọc nhãn.
+6. Khi bật "Xem khách hàng" ở W3h với D7 = `none`, FE gửi `scopes.customers = "all"`; BE Lô 5 phải chấp nhận khoá này cùng yêu cầu việc (đúng 02b §2.3 bước 10).
+7. `ConfirmOffModal` (hỏi khi tắt việc phá luồng) chỉ còn dùng ở W3h; ở W3i câu hậu quả nằm trong hộp xác nhận lúc Lưu.
+
+### Việc còn nợ
+- Nối BE thật cho PUT/preview ở Lô 5 (không deploy FE này trước Lô 5; M2: Lô 4 và 5 lên cùng lượt).
+- `scopes` cũ và kiểu `GroupScopes` bỏ hẳn ở Lô 6.
+- PV-13, PV-14 FE (Lô 7) chưa làm. Chuyển trang trong app khi còn nháp chưa bị chặn (chỉ `beforeunload` khi đóng tab/tải lại); chấp nhận được, ghi để QA cân nhắc.
+
+### Kiểm chứng (chạy trong lượt làm, trong worktree; `node_modules` là symlink, đã gỡ trước khi commit)
+- `./node_modules/.bin/tsc --noEmit`: sạch.
+- `vitest run`: **86 file, 1021 test PASS** (thêm test model/bản nháp trong `permissionsModel.test.ts` và test luật mock trong `mock.test.ts`).
+- `NEXT_PUBLIC_USE_MOCK=0 npm run build` + `check-no-mock.mjs` (XANH, 28 file mock, 43 chuỗi) + `check-ai-chunks.mjs` (XANH, 48 màn + 2 layout).
+- `NEXT_PUBLIC_USE_MOCK=1 npm run build` + `e2e/ed_batch14_permissions.py`: **154/154 PASS** (gồm: superuser sửa được; Quản lý `ql9`, `ql1`, `kho1`, `giao1`, `cs2` không sửa/không vào; 409 ở W3i và W3h; bản nháp không gọi API cho tới Lưu; Esc/Huỷ không PUT; PO-Q1; ô mờ; 360px không cuộn ngang, vùng bấm ≥ 44px; không dữ liệu cá nhân ở storage/URL; không lỗi console).
+- `python3 scripts/check_naming.py`: OK, không phát sinh mới.
+- Ảnh (thư mục `shots/` bị `.gitignore`, không commit): `shots/f1-desktop-1280-{w3i-scopes,w3i-draft,widen-dialog,conflict,superuser}.png`, `shots/f1-mobile-360-{w3i-draft,w3i-full,widen-dialog}.png`.
+- Dọn: đã xoá `out/` và `.next/`, tắt server 3101.
+
+### Vòng sửa theo review techlead F1 (07/10)
+- **M1:** mock D7 theo rank hiệu lực (`effectiveRank`, trần `assigned_deliveries` khi "Xem khách hàng" tắt); Quản lý và NV giao luôn đủ điều kiện D7 (không mờ). Test: NV giao đổi D7 sang `all` khi việc tắt không đòi xác nhận; NV giao lưu `all` rồi bật việc đòi xác nhận; Quản lý tắt rồi bật lại đòi xác nhận.
+- **M2:** "Hoàn tác" ở W3h đi cùng đường `send` (mở rộng thì mở hộp cảnh báo); ca PO-Q1 hoàn tác kèm `scopes.customers = "none"`. e2e: tắt Xem đơn của Quản lý, Hoàn tác, hộp cảnh báo, "Tôi hiểu, lưu".
+- **M3:** link nội bộ khi còn nháp: bắt click pha capture, `confirm(M.draftLeave)`, rồi `router.push`. Nút Back của trình duyệt (`popstate`) CHƯA chặn (QA biết). e2e có ca huỷ ở lại và đồng ý sang trang.
+- **L1, L2:** mock preview nhận `version`/`confirm` (bỏ qua); người không phải Chủ gọi PUT/POST nhóm lạ nhận 403 trước 404. **L3:** `version` đổi khi đang có nháp (sau thêm/bỏ thành viên) → báo xung đột "Tải lại". **L4:** chuỗi "Chưa lưu", "Một phần" vào `messages.ts`, bỏ `scopeReadOnlyHint`. **L5:** bỏ ca đếm khống. L6 để UI review; L7..L9 ghi cho Lô 3/5.
+- Superuser không nhóm (`/no-role/`): không làm, chờ Duy.
+- Kiểm: tsc sạch; vitest 86 file, 1026 test PASS; build mock=0 + check-no-mock + check-ai-chunks XANH; build mock=1 + `ed_batch14_permissions.py` 157/157 PASS. Đã xoá `out/`, gỡ symlink, tắt server.
 ## Lô QĐ-08/10 BE (be-dev, 08/10, nhánh `feat/qd-0810-be`)
 
 Theo `02c-quyet-dinh-08-10.md` mục A, B, C.4, E, F. Quy tắc: BR-PQ-19/38, D-3 (Duy 08/10).
@@ -221,3 +387,79 @@ Quyền gán trực tiếp không tính. Kiểm theo DB mỗi request nên gỡ 
 - Không đụng `features/permissions/**`, backend/, frontend/.
 - Nợ/ghi chú: ed_batch15_overview_ai_account cần build bật AI (chờ `[data-attention=ai_proposals]`); ở build tắt AI nó dừng ở ca này, không liên quan lô. Tên hiển thị người mock "CSKH Thử"/"CSKH Khác" và từ khoá tìm AI "cskh" giữ nguyên (không phải nhãn vai).
 - Sửa theo review (R1–R3, N1): R1 thêm `ai_config_kill` vào `AI_ONLY_ACTIONS` (auditModel.ts) + vitest; R2 nhãn nhóm lệnh AI mock = "Chăm sóc khách hàng"; R3 câu 404 mock gọi xác nhận = nguyên văn BE "Không tìm thấy mục chờ gọi trong phạm vi của bạn."; N1 `onlyDelivery` thêm `!me.is_superuser &&` + 1 ca vitest (nav.test.ts). Kiểm: tsc sạch, vitest 1235/1235, build MOCK=0 + check-no-mock + check-ai-chunks XANH.
+
+## Lô PV-QĐ (08/10) — be-dev, nhánh `feat/pham-vi-du-lieu`
+
+Theo `02c-quyet-dinh-08-10.md` mục G.2 (B.4, C.1–C.2, D, C1). Không đụng `erp-console/`, `accounts/auth/authentication.py`, migration.
+
+**1. Gộp main (commit `4ef5aa8`, main `f3a543f`).** Giải xung đột:
+- `auth/services.py`, `auth/tests/test_s6_me.py`, `test_s47_me_labels.py`: lấy phía main (tập khoá `ai_features_enabled` + `is_superuser`).
+- `capabilities/services.py`: giữ CAS/`version`, `_parse_body`, `_scope_events`, `scope_change_label` của nhánh; thêm `registry.visible_keys` / `visible_capabilities`
+  của main (bỏ cờ `customer_data_widening_confirmed` rồi mới lọc việc AI; PUT việc AI khi AI tắt vẫn 400 `INPUT_NOT_ALLOWED`).
+- `capabilities/next_steps.py`: nhãn `scope_change_label` của nhánh + `row_filter=has_visible_capability_change` của main.
+- `capabilities/tests/test_ai_hidden.py` (không xung đột nhưng hỏng sau gộp): PUT thiếu `version` nên 400; đổi sang `put_caps` (tự lấy version).
+- `reports/dashboard_api.py`: giữ D1 (`orders_in_scope`), "Đơn gần đây" lấy từ `orders_in_scope` kèm `select_related/prefetch_related` của 17a.
+- `sales/orders/api.py`: giữ lọc `?customer=` theo D7 và `POST search/` (17b) của main. Mở rộng nhỏ: `search/` cũng áp D7 cho `customer` trong body
+  (`_customer_filter_outside_scope(request, params)`), để `?customer=` và body cùng một luật (PV-05-AC6).
+- 3 file doc hồ sơ: giữ cả hai phía.
+- Migration: nhánh không có migration nào so với main; `sales/0019` (main) giữ nguyên số; `makemigrations --check` sạch.
+
+**2. Mốc PV-01 (D-3, câu 9).** `snapshot.py`: `PENDING_DUY_DIFFS = ()`; mục `direct_permissions` (D6, D7, `refunds.*`, `dashboard.summary` kèm hai mục `+`)
+chuyển sang `APPROVED_DIFFS` ghi "Duy duyệt 08/10 D-3"; mục `warehouse_service` (8 cặp `confirmation.*`, `actions.confirmation_*`) ghi
+"Duy duyệt 08/10 D-3 (câu 9)". `PENDING_DUY_USERS` đổi tên `D3_USERS`. Không sinh lại `scope_snapshot_baseline.json`: bộ thu dùng `force_authenticate`
+nên bỏ qua cổng `AUTH_NO_ROLE` (người không nhóm bị 403 toàn bộ ở thực tế), mốc vẫn ghi hành vi lớp phạm vi và các lệch nằm ở danh sách được duyệt;
+đây là lớp phòng thủ thứ hai phía sau cổng. `test_scope_snapshot.py`: sửa docstring, `test_pv01_ac3_only_one_approved_exception` (hai mục đầu = Q-4, phần còn lại
+chỉ của hai tài khoản D-3, có "Duy duyệt 08/10 D-3" trong nguồn), `test_pv01_pending_duy_diffs_...` thành `test_pv01_d3_approved_diffs_are_narrowing_only` (kèm `PENDING_DUY_DIFFS == ()`).
+Các khẳng định "một dòng `+` lạ của direct_permissions không được miễn" giữ nguyên.
+
+**3. Câu 7 (V2 không áp cho phiếu giao).** `delivery/serializers.py`: xoá luật "không có V2 thì ẩn" và import `can_view_order_customer_info`;
+`_customer_data_hidden` còn một luật (`pii_restricted` và phiếu quá cửa sổ SR-PII-02). Test (TDD, đỏ rồi xanh):
+`test_w37_n2_status_response_keeps_customer_data_when_v2_is_off` (lật), `test_w37_n2_courier_list_keeps_customer_data_without_v2` (lật),
+mới `test_w37_n2_status_response_hides_customer_data_when_note_is_past_pii_window` (cửa sổ, giả lập `is_note_pii_expired` ở serializer vì phiếu quá cửa sổ thì NV giao
+không mở được theo D3). Tem `/label/` giữ nguyên (che SĐT, chờ Duy Q1). PV-01 xanh, không lệch `deliveries.*`.
+
+**4. C1.** Đã code ở `5fd4032` (có trong HEAD): `refunds/api.py` đi qua `scope_refunds_for`, `dashboard_api.py` qua `scope_orders_for` (D1). Sau gộp vẫn giữ cả hai lời gọi,
+test PV-05/dashboard xanh. Trạng thái chờ đã gỡ (`PENDING_DUY_DIFFS` rỗng); `02b` R9 và D-3 ghi "Duy chốt 08/10".
+
+**Nợ / ghi chú.** (a) Việc vận hành trước deploy production: đếm tài khoản `is_active`, không superuser, không nhóm (chỉ in username), báo Duy xếp nhóm trước khi deploy.
+(b) Test cổng thật `test_no_role_gate.py` đã có từ main; PV-12 (Lô 6) nên quét bằng token thật.
+
+**Kiểm chứng PV-QĐ (08/10, chạy tuần tự `--parallel 1`).**
+- SQLite: `Ran 3526 tests in 289s — OK (skipped=3)`.
+- PostgreSQL 16 (DB `cangca_pvqd`, main chưa có sửa Postgres): `Ran 3523 — FAILED (failures=13, errors=55)`. Toàn bộ nằm trong nhóm lỗi đã biết của nhánh `fix/postgres-compat`:
+  28 `FOR UPDATE cannot be applied to the nullable side of an outer join` (huỷ phiếu nhập, publish lô, claim xác nhận, hoàn tác AI trả 502 vì dispatch bắt lỗi này, và mốc PV-01 lệch `actions.confirmation_claim=EXC:NotSupportedError`),
+  23 `seed_qa` guard (22 lỗi + `test_password_env_is_required`), 1 race `django_content_type` unique (`test_pv10_ac5`, sửa khi gộp `fix/postgres-compat`, M1), `test_qa_lo4_tien` (2), `supplier_crud` (1 sắp xếp), `shop_labels` (varchar 12), cost overflow (1), `completion_race` admin.logentry (2, đã sửa ở `fix/postgres-compat`). Không có ca đỏ ngoài danh sách.
+- `makemigrations --check --dry-run`: No changes detected. `python3 scripts/check_naming.py`: OK, không phát sinh mới.
+
+## Gộp main sau sửa Postgres + M1 (08/10)
+
+- `git merge main` (cfc039b) vào nhánh `feat/pham-vi-du-lieu`: không xung đột. Git tự gộp `purchasing/receipts/services.py`;
+  `delivery/confirmation/services.py` và `purchasing/costs/services.py` nhánh này không đụng nên giữ bản của main.
+- Rà `select_for_update` kèm `select_related` trong code không phải test: không còn câu nào (chỉ còn một comment giải thích
+  quy tắc ở `delivery/confirmation/services.py`). Code phạm vi dữ liệu của nhánh không có câu vi phạm quy tắc.
+- M1 (review techlead Lô PV-QĐ): thêm `apps/common/tests/postgres_race.py` với `PostgresRaceFixtureMixin` (xoá ContentType
+  trước `super()._fixture_setup()`, rồi `ContentType.objects.clear_cache()`, kèm `serialized_rollback = True`). Áp cho
+  `CancelVersusCompleteRaceTests`, `ClaimRaceTests`, `CostVersusCancelReceiptRaceTests`, `ConcurrentSaveRaceTests`
+  (test_pv10_ac5). Xoá bản `_fixture_setup` chép tay ở ba file.
+- Kiểm chứng: PostgreSQL 16 (DB riêng) `Ran 3532 tests ... OK`, không ca đỏ, không skip; SQLite tuần tự
+  `Ran 3532 tests ... OK (skipped=7)`; `makemigrations --check --dry-run` No changes detected; `check_naming.py` OK.
+## F1 gộp main (08/10) — fe-dev, nhánh `feat/pham-vi-fe`
+
+Theo `02c-quyet-dinh-08-10.md` mục G.2 (F1 FE). Merge commit `4bb92ec`, commit sửa ngay sau. Chỉ sửa `erp-console/features/permissions/**`, một e2e, và hồ sơ này. Không đụng `backend/`, `frontend/`.
+
+**Xung đột đã giải (5):**
+- `GroupDetailScreen.tsx`: giữ `useGroupDraft` (bản nháp, một PUT có `version`) của F1, thêm `aiVisible` + `visibleRegistry` của main (mục lệnh AI ẩn khi tắt AI; `sections` lấy từ registry đã lọc). Bỏ `useCapabilityToggle` ở màn này vì F1 đã thay bằng bản nháp.
+- `PermissionMatrixScreen.tsx`: giữ `onConflict` (409 `GROUP_CHANGED` → tải lại danh sách + registry) và `objectLabel` của F1, registry qua `visibleRegistry(…, aiVisible(me))` của main.
+- `02b-tech-design.md`, `03-dev-notes.md`, `03b-review-techlead.md`: giữ cả hai phía (chỉ bỏ dấu xung đột).
+- `isGroupWriter` giữ nguyên ý (Chủ HOẶC superuser ghi được, quyết định 06/10 + câu 1 ngày 08/10).
+
+**Sửa ngoài giải xung đột (tối thiểu):**
+1. `permissionsModel.ts`: bỏ nhánh đoán `OWNER_ONLY_PERMS`; `isGroupWriter` chỉ đọc nhóm Chủ hoặc cờ `is_superuser` (BE đã trả ở `/api/auth/me/`). Test vitest đổi: ca "đoán qua đủ quyền chỉ-Chủ" thành "không đoán, thiếu cờ thì chỉ nhóm Chủ ghi được". README `features/permissions` sửa theo.
+2. Nhãn mock cho khớp BE (`standard_names`): `create_refund` "Lập phiếu hoàn tiền", `assign_delivery` "Chọn người giao", `create_return` "Ghi hàng hoàn", `approve_return` "Duyệt hàng hoàn", phạm vi `returns` "Hàng hoàn" (`mock.ts`, `mockScopes.ts`). Nhờ đó chữ cũ ở /permissions/ hết, nên bỏ TODO F1 và `PENDING_ROUTES` trong `e2e/standard_names_all_routes.py` (còn tập rỗng). `ed_batch14_permissions.py` đổi "Ghi hàng hoàn về kho" thành "Ghi hàng hoàn".
+
+**Không làm / nợ cho Lô 6 (nối BE thật):**
+- Câu 7 (phiếu giao không còn theo V2): màn Phân quyền không có chữ nào nói phiếu giao đi theo V2 (`grep V2` rỗng); khối phạm vi "Phiếu giao" là phạm vi D riêng, giữ nguyên.
+- Mock registry (`permissions/mock.ts`) vẫn chưa có hai việc `view_sales_invoices` và `view_order_customer_info` (nhãn mới "Xem thông tin khách trên đơn, hoá đơn, phiếu hoàn tiền") mà BE đã trả. Thêm vào mock kéo theo đổi số việc, luật H1 và nhiều test, nên để Lô 6 bỏ mock/nối BE thật. Khi nối, nhãn lấy từ BE, FE không chép.
+- `useGroupDraft` vẫn nhận `group.registry` gốc (kể cả mục AI khi tắt AI) để tính cảnh báo phá luồng; không ảnh hưởng hiển thị.
+
+**Kiểm chứng:** xem số ở báo cáo cuối lượt (tsc, vitest, build thật, check-no-mock, check-ai-chunks, e2e mock AI tắt và bật).

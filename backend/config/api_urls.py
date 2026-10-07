@@ -12,7 +12,9 @@ from rest_framework.routers import DefaultRouter
 
 from apps.accounts.audit.api import AuditLogListView
 from apps.accounts.auth.api import ChangePasswordView, LoginTokenView, LogoutView, MeView
-from apps.accounts.capabilities.api import GroupCapabilitiesView, GroupDetailView, GroupListView
+from apps.accounts.capabilities.api import (
+    GroupCapabilitiesView, GroupDetailView, GroupListView, GroupPermissionsPreviewView,
+)
 from apps.accounts.staff.api import StaffViewSet
 from apps.ai.actions.api import AiActionViewSet
 from apps.ai.execution.pipeline import AiCommandCallView
@@ -126,6 +128,7 @@ urlpatterns = [
     # Ma trận phân quyền (B4): khai trước include(router.urls) để StaffViewSet không bắt pk="groups".
     path("staff/groups/", GroupListView.as_view(), name="staff-groups"),
     path("staff/groups/<str:code>/capabilities/", GroupCapabilitiesView.as_view(), name="staff-group-capabilities"),
+    path("staff/groups/<str:code>/permissions-preview/", GroupPermissionsPreviewView.as_view(), name="staff-group-permissions-preview"),
     path("staff/groups/<str:code>/", GroupDetailView.as_view(), name="staff-group-detail"),
     # Danh sách người giao kèm số phiếu đang giữ (BR-GH-23).
     path("delivery/deliverers/", DeliverersView.as_view(), name="delivery-deliverers"),

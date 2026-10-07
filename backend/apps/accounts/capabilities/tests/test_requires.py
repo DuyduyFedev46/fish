@@ -12,7 +12,7 @@ from apps.accounts.capabilities import registry, services
 from apps.accounts.models import AuditLog
 from apps.common.tests.fixtures import client_for, make_user
 
-from .base import group_perms, make_staff, put_url, token_client
+from .base import group_perms, make_staff, put_url, token_client, put_caps
 
 DEPENDENCY_CODE = "CAPABILITY_REQUIRES"
 
@@ -85,7 +85,7 @@ class RequiresWriteTests(TestCase):
         self.client = client_for(self.owner)
 
     def put(self, code, changes):
-        return self.client.put(put_url(code), {"capabilities": changes}, format="json")
+        return put_caps(self.client, code, changes)
 
     def assert_rejected(self, response, snapshot):
         self.assertEqual(response.status_code, 400)
@@ -165,8 +165,7 @@ class RequiresWriteTests(TestCase):
 
     def test_m1_non_owner_still_gets_403_before_dependency_check(self):
         manager = make_staff("manager1", roles.MANAGER)
-        response = token_client(manager).put(
-            put_url(roles.WAREHOUSE_STAFF), {"capabilities": {"deliver": False}}, format="json")
+        response = put_caps(token_client(manager), roles.WAREHOUSE_STAFF, {"deliver": False})
         self.assertEqual(response.status_code, 403)
 
     def test_m1_reproduction_warehouse_staff_cannot_pack_when_only_deliver_is_turned_off_directly(self):

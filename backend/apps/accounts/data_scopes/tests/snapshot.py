@@ -31,13 +31,55 @@ STAFF_SEGMENTS = frozenset({"assigned_to", "claimed_by", "created_by", "approved
 
 Diff = namedtuple("Diff", "user endpoint sign fact")
 
-# Ngoại lệ DUY NHẤT được lệch (PV-01-AC3): nhóm NV kho thấy tên khách trên danh sách hoá đơn bán sau khi có việc V2.
-# Duy duyệt 02/10 Q-4 (V2 mặc định bật cho NV kho). Mọi lệch khác -> test đỏ.
-APPROVED_DIFFS = (
+# Ngoại lệ được lệch (PV-01-AC3). Mọi lệch khác -> test đỏ.
+# 1) Q-4: nhóm NV kho thấy tên khách trên danh sách hoá đơn bán sau khi có việc V2. Duy duyệt 02/10 Q-4 (V2 mặc định bật cho NV kho).
+_Q4_DIFFS = (
     ("warehouse_staff", "invoices.list", "+", "pii:*:customer_name"),  # Duy duyệt 02/10 Q-4
     # Người kiêm nhiệm NV kho + NV giao: có V2 qua nhóm NV kho nên cùng một ngoại lệ Q-4 (D2 của họ = all, như NV kho).
     ("warehouse_courier", "invoices.list", "+", "pii:*:customer_name"),  # Duy duyệt 02/10 Q-4 (thành viên NV kho)
 )
+
+# 2) D-3 (Duy duyệt 08/10, câu 6): người không nhóm (`direct_permissions`, quyền gán trực tiếp) bị THU HẸP ở phiếu nhập (D6), khách (D7),
+# phiếu hoàn tiền và bảng điều hành (D1). Từ 08/10 cổng `AUTH_NO_ROLE` (Lô QĐ, ở lớp xác thực) còn chặn họ 403 ở mọi API ERP; tệp mốc
+# dùng `force_authenticate` nên vẫn ghi hành vi lớp phạm vi (lớp phòng thủ thứ hai, phía sau cổng) và các lệch này vẫn nằm ở đây.
+# Chỉ được thu hẹp: dòng biến mất (`-`) hoặc 200 thành 404 (`+ status:*=404`). Không sinh lại `scope_snapshot_baseline.json`.
+_D3_ENDPOINTS = (
+    "receipts.list", "receipts.detail", "guidance.receipt",
+    "directory.list", "directory.detail", "directory.search", "customers.list", "customers.detail", "guidance.customer",
+    "refunds.list", "refunds.detail",  # C1 (Lô 5): D1 cho phiếu hoàn tiền
+    "dashboard.summary",  # C1 (Lô 5): D1 cho bảng điều hành
+)
+_D3_DIRECT_DIFFS = tuple(
+    entry
+    for endpoint in _D3_ENDPOINTS
+    for entry in (
+        ("direct_permissions", endpoint, "-", "*"),  # Duy duyệt 08/10 D-3
+        ("direct_permissions", endpoint, "+", "status:*=404"),  # Duy duyệt 08/10 D-3
+    )
+) + (
+    # Bảng điều hành của người không nhóm (D1 = assigned_deliveries): số đếm co lại (`+ extra:kpis.*` là con số MỚI nhỏ hơn, đi cùng
+    # dòng `-` của số cũ) và đơn của chính họ lọt vào cửa sổ 8 đơn gần nhất khi các đơn khác ra khỏi phạm vi. Không ai thấy thêm đơn.
+    ("direct_permissions", "dashboard.summary", "+", "extra:kpis.*"),  # Duy duyệt 08/10 D-3
+    ("direct_permissions", "dashboard.summary", "+", "visible:order_assigned_direct"),  # Duy duyệt 08/10 D-3
+)
+# 3) Câu 9 (Duy duyệt 08/10 D-3): người kiêm NV kho + CSKH. Trước PV-05 `has_full_delivery_scope` (NV kho) cho họ thấy mọi phiếu chờ gọi;
+# nay chỉ nhóm CSKH đủ điều kiện D4 (NV kho không có `confirm_with_customer`) nên còn `pending_or_called_recently`. Chấp nhận thu hẹp;
+# Chủ muốn họ thấy hết thì nới D4 của nhóm CSKH (`all_pending`) ở màn Phân quyền.
+_D3_COMBINED_DIFFS = tuple(
+    entry
+    for endpoint in (
+        "confirmation.detail", "confirmation.queue_done", "confirmation.search_called", "confirmation.search_phone",
+        "actions.confirmation_call", "actions.confirmation_claim", "actions.confirmation_recipient",
+        "actions.confirmation_unconfirm",
+    )
+    for entry in (
+        ("warehouse_service", endpoint, "-", "*"),  # Duy duyệt 08/10 D-3 (câu 9)
+        ("warehouse_service", endpoint, "+", "status:*=404"),  # Duy duyệt 08/10 D-3 (câu 9)
+    )
+)
+D3_USERS = ("direct_permissions", "warehouse_service")
+APPROVED_DIFFS = _Q4_DIFFS + _D3_DIRECT_DIFFS + _D3_COMBINED_DIFFS
+PENDING_DUY_DIFFS = ()  # không còn mục chờ Duy; giữ tên để `is_approved` không đổi chữ ký
 
 
 def pii_paths(node, *, customer_endpoint=False, path=()):
@@ -370,7 +412,7 @@ def diff_snapshots(expected, actual, *, users=None):
 def is_approved(diff):
     return any(
         diff.user == user and diff.endpoint == endpoint and diff.sign == sign and fnmatch.fnmatchcase(diff.fact, glob)
-        for user, endpoint, sign, glob in APPROVED_DIFFS
+        for user, endpoint, sign, glob in APPROVED_DIFFS + PENDING_DUY_DIFFS
     )
 
 

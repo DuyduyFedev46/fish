@@ -14,6 +14,7 @@ from django.db import connection, transaction
 from django.test import TransactionTestCase
 from django.utils import timezone
 
+from apps.common.tests.postgres_race import PostgresRaceFixtureMixin
 from apps.accounts import roles
 from apps.common.exceptions import ConflictError
 from apps.common.tests.fixtures import make_confirming_note, make_user
@@ -25,16 +26,7 @@ ROUNDS = 15
 
 
 @skipUnless(connection.vendor == "postgresql", "Cần PostgreSQL: select_for_update không có tác dụng trên SQLite.")
-class ClaimRaceTests(TransactionTestCase):
-    serialized_rollback = True
-
-    def _fixture_setup(self):
-        from django.contrib.contenttypes.models import ContentType
-
-        ContentType.objects.all().delete()
-        super()._fixture_setup()
-        ContentType.objects.clear_cache()
-
+class ClaimRaceTests(PostgresRaceFixtureMixin, TransactionTestCase):
     def setUp(self):
         self.cs1 = make_user("race_cs1", roles.CUSTOMER_SERVICE)
         self.cs2 = make_user("race_cs2", roles.CUSTOMER_SERVICE)

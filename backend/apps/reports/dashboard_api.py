@@ -5,6 +5,9 @@ Trả về dữ liệu THẬT từ DB trong một lần gọi: KPI, đơn gần 
 cảnh báo cận hạn và dòng hoạt động. Chỉ cho người có quyền `reports.view_dashboard` (S6).
 Giá vốn (landed_unit_cost) là field nhạy cảm — chỉ đính kèm khi user có quyền
 `inventory.view_costprice` (chủ vựa / Tầng 1-2).
+C1 (PV-03 hoãn, 02b §1.5): số đơn, đơn gần đây, đơn giữ chỗ sắp hết hạn theo D1 của người gọi (`scope_orders_for`); doanh thu
+hôm nay theo D2 (`scope_invoices_for`), phiếu đảo chỉ trừ phần của hoá đơn trong phạm vi. Phạm vi `all` (Chủ, Quản lý, NV kho)
+không đổi số liệu nào.
 """
 from datetime import timedelta
 
@@ -21,6 +24,8 @@ from apps.inventory.batches.services import FEFO_ORDER, SELLABLE_STATUSES, sella
 from apps.inventory.models import Batch, StockLedgerEntry
 from apps.sales.models import SalesCreditNote, SalesInvoice, SalesOrder
 from apps.sales.orders.reasons import order_reason
+from apps.sales.orders.scope import scope_orders_for
+from apps.sales.payments.invoice_list import scope_invoices_for
 
 PENDING = [SalesOrder.Status.BOOKED, SalesOrder.Status.PAID, SalesOrder.Status.PROCESSING]
 ACTIVE_BATCH = [Batch.Status.SELLING, Batch.Status.NEAR_EXPIRY, Batch.Status.DRAFT]
@@ -57,15 +62,18 @@ class DashboardSummaryView(APIView):
         can_cost = user.has_perm("inventory.view_costprice")
 
         # ---- KPI ----
-        revenue_today = SalesInvoice.objects.filter(
+        orders_in_scope = scope_orders_for(user, SalesOrder.objects.all())  # D1 (C1)
+        invoices_in_scope = scope_invoices_for(user, SalesInvoice.objects.all())  # D2 (C1)
+        revenue_today = invoices_in_scope.filter(
             status=SalesInvoice.Status.ISSUED, issued_at__date=today
         ).aggregate(s=Coalesce(Sum("amount"), 0, output_field=DecimalField()))["s"]
-        # BR-HT-10: trừ chứng từ đảo doanh thu lập hôm nay (đơn đã thanh toán bị huỷ).
-        revenue_today -= SalesCreditNote.objects.filter(issued_at__date=today).aggregate(
-            s=Coalesce(Sum("amount"), 0, output_field=DecimalField()))["s"]
+        # BR-HT-10: trừ chứng từ đảo doanh thu lập hôm nay (đơn đã thanh toán bị huỷ), chỉ của hoá đơn trong phạm vi.
+        revenue_today -= SalesCreditNote.objects.filter(
+            issued_at__date=today, sales_invoice__in=invoices_in_scope.values("pk"),
+        ).aggregate(s=Coalesce(Sum("amount"), 0, output_field=DecimalField()))["s"]
 
-        pending_count = SalesOrder.objects.filter(status__in=PENDING).count()
-        booked_soon = SalesOrder.objects.filter(
+        pending_count = orders_in_scope.filter(status__in=PENDING).count()
+        booked_soon = orders_in_scope.filter(
             status=SalesOrder.Status.BOOKED, booked_expires_at__isnull=False,
             booked_expires_at__lte=now + timedelta(minutes=10),
         ).count()
@@ -80,8 +88,9 @@ class DashboardSummaryView(APIView):
         # SR-17 (bất biến 9): KHÔNG trả tên/SĐT khách — dashboard xem bởi nhiều nhóm, mở đơn ở màn Đơn hàng.
         # Lô 17a (TL15-dash): `id` để FE mở dòng; `reason` là NHÃN cố định (cùng shape cột Lý do của `/orders/`),
         # không bao giờ chữ tự do như ghi chú huỷ. Prefetch để không phát sinh truy vấn theo từng đơn.
+        # PV-QĐ: lấy từ `orders_in_scope` (phạm vi D1/D2 của nhánh), không đọc SalesOrder.objects trần.
         orders = (
-            SalesOrder.objects.select_related("invoice")
+            orders_in_scope.select_related("invoice")
             .prefetch_related("payments", "invoice__credit_notes", "invoice__delivery_notes")
             .order_by("-created_at", "-id")[:8]
         )

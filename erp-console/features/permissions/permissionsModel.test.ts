@@ -9,13 +9,25 @@ import {
   matchesTask,
   isAssignedOnly,
   isToggleable,
+  showsAllCustomers,
+  isGroupWriter,
+  EMPTY_DRAFT,
+  cleanDraft,
+  draftProblem,
+  draftSize,
+  isScopeInactive,
+  saveBodyOf,
+  scopeValueLabel,
+  setScopeInDraft,
+  toggleInDraft,
+  breakingWarnings,
   labelOfGroup,
   parseGroupCode,
   planToggle,
   sectionsOf,
   toggleMessage,
 } from "./permissionsModel";
-import type { CapabilityState, RegistryItem } from "./types";
+import type { CapabilityState, DataScopeRow, RegistryItem } from "./types";
 
 const item = (key: string, section: string, extra: Partial<RegistryItem> = {}): RegistryItem => ({
   key,
@@ -170,11 +182,23 @@ describe("tìm việc trong ma trận", () => {
 });
 
 describe("hằng và tiện ích", () => {
-  it("nhóm giao chỉ làm trên phiếu được gán", () => {
-    expect(isAssignedOnly("delivery_staff", "deliver")).toBe(true);
-    expect(isAssignedOnly("delivery_staff", "view_orders")).toBe(true);
-    expect(isAssignedOnly("delivery_staff", "view_customers")).toBe(false);
-    expect(isAssignedOnly("manager", "deliver")).toBe(false);
+  it("chip Được gán lấy từ phạm vi BE trả, không còn hằng số theo nhóm (PV-11)", () => {
+    const courierScope = { orders: "assigned_deliveries", deliveries: "assigned", customers: "assigned_deliveries" };
+    const managerScope = { orders: "all", deliveries: "all", customers: "all" };
+    expect(isAssignedOnly(courierScope, "deliver")).toBe(true);
+    expect(isAssignedOnly(courierScope, "view_orders")).toBe(true);
+    expect(isAssignedOnly(managerScope, "deliver")).toBe(false);
+    expect(isAssignedOnly(managerScope, "view_orders")).toBe(false);
+    // Chủ đổi Đơn hàng của nhóm Quản lý sang "gán cho tôi" thì chip hiện theo, không cần sửa FE.
+    expect(isAssignedOnly({ ...managerScope, orders: "assigned_or_confirmation" }, "view_orders")).toBe(true);
+    expect(isAssignedOnly(undefined, "view_orders")).toBe(false);
+    expect(isAssignedOnly(courierScope, "pack_print")).toBe(false);
+  });
+  it("showsAllCustomers: chỉ khi việc bật và phạm vi Khách hàng = Tất cả", () => {
+    expect(showsAllCustomers({ customers: "all" }, true)).toBe(true);
+    expect(showsAllCustomers({ customers: "assigned_deliveries" }, true)).toBe(false);
+    expect(showsAllCustomers({ customers: "all" }, false)).toBe(false);
+    expect(showsAllCustomers(undefined, true)).toBe(true);
   });
   it("khoá và nhãn xem khách", () => {
     expect(CUSTOMERS_KEY).toBe("view_customers");
@@ -191,5 +215,110 @@ describe("hằng và tiện ích", () => {
     expect(parseGroupCode("?group=Nguyen%20Van%20A")).toBeNull();
     expect(parseGroupCode("?group=../x")).toBeNull();
     expect(parseGroupCode("?group=" + "a".repeat(60))).toBeNull();
+  });
+});
+
+describe("isGroupWriter (Duy chốt 06/10: superuser ngoài nhóm Chủ được ghi)", () => {
+  it("Chủ ghi được", () => {
+    expect(isGroupWriter({ groups: ["owner"], permissions: [] })).toBe(true);
+  });
+  it("superuser ghi được dù không thuộc nhóm Chủ (cờ is_superuser)", () => {
+    expect(isGroupWriter({ groups: [], permissions: [], is_superuser: true })).toBe(true);
+    expect(isGroupWriter({ groups: ["manager"], permissions: [], is_superuser: true })).toBe(true);
+  });
+  it("không đoán superuser qua danh sách quyền: thiếu cờ is_superuser thì chỉ nhóm Chủ ghi được", () => {
+    const many = ["sales.confirm_payment_manual", "sales.confirm_refund", "accounts.manage_staff", "ai.manage_ai_policy", "inventory.close_batch"];
+    expect(isGroupWriter({ groups: [], permissions: many })).toBe(false);
+  });
+  it("người chỉ có manage_staff (Quản lý + quyền lẻ) vẫn chỉ xem", () => {
+    expect(isGroupWriter({ groups: ["manager"], permissions: ["accounts.manage_staff"] })).toBe(false);
+    expect(isGroupWriter({ groups: ["manager"], permissions: [], is_superuser: false })).toBe(false);
+    expect(isGroupWriter(null)).toBe(false);
+  });
+});
+
+describe("bản nháp W3i (PV-11)", () => {
+  const reg: RegistryItem[] = [item("view_orders", "Bán hàng"), item("view_customers", "Bán hàng"), item("deliver", "Bán hàng"), item("pack_print", "Bán hàng", { requires: ["deliver"] })];
+  const states: Record<string, CapabilityState> = { view_orders: "off", view_customers: "off", deliver: "on", pack_print: "on" };
+  const values = { orders: "all", customers: "none", receipts: "all" };
+
+  it("bấm việc → vào bản nháp, bấm lại → hết thay đổi", () => {
+    const a = toggleInDraft(reg, states, values, EMPTY_DRAFT, "view_orders");
+    expect(a?.draft.capabilities).toEqual({ view_orders: true });
+    const b = toggleInDraft(reg, states, values, a!.draft, "view_orders");
+    expect(draftSize(b!.draft)).toBe(0);
+  });
+  it("việc có requires đi cùng cặp trong bản nháp", () => {
+    const a = toggleInDraft(reg, states, values, EMPTY_DRAFT, "deliver");
+    expect(a?.draft.capabilities).toEqual({ deliver: false, pack_print: false });
+  });
+  it("PO-Q1: bật Xem khách hàng khi Khách hàng = Không xem thì bản nháp tự đặt Tất cả", () => {
+    const a = toggleInDraft(reg, states, values, EMPTY_DRAFT, "view_customers")!;
+    expect(a.draft).toEqual({ capabilities: { view_customers: true }, scopes: { customers: "all" } });
+    expect(draftProblem("manager", states, values, a.draft)).toBeNull();
+    // bật rồi tắt lại: phạm vi tự đặt cũng bỏ
+    const b = toggleInDraft(reg, states, values, a.draft, "view_customers")!;
+    expect(draftSize(b.draft)).toBe(0);
+  });
+  it("PO-Q1 không ghi đè khi Chủ đã chọn phạm vi khách khác Không xem", () => {
+    const withValue = { ...values, customers: "assigned_deliveries" };
+    const a = toggleInDraft(reg, states, withValue, EMPTY_DRAFT, "view_customers")!;
+    expect(a.draft.scopes).toEqual({});
+  });
+  it("draftProblem: bật Xem khách hàng mà Khách hàng = Không xem bị chặn ở FE (BE cũng chặn)", () => {
+    const d = setScopeInDraft({ ...states, view_customers: "on" }, { ...values, customers: "all" }, EMPTY_DRAFT, "customers", "none");
+    expect(draftProblem("manager", { ...states, view_customers: "on" }, { ...values, customers: "all" }, d)).toContain("khác Không xem");
+    expect(draftProblem("owner", states, values, d)).toBeNull();
+  });
+  it("cleanDraft bỏ khoá trùng giá trị đang lưu", () => {
+    expect(cleanDraft({ capabilities: { view_orders: false, deliver: false }, scopes: { orders: "all", receipts: "created_by_me" } }, states, values)).toEqual({
+      capabilities: { deliver: false },
+      scopes: { receipts: "created_by_me" },
+    });
+  });
+  it("saveBodyOf: một PUT, chỉ khoá đã đổi, luôn có version (PV-10-AC8)", () => {
+    const d = { capabilities: { view_orders: true }, scopes: { orders: "all" } };
+    expect(saveBodyOf("41", d, false)).toEqual({ version: "41", capabilities: { view_orders: true }, scopes: { orders: "all" } });
+    expect(saveBodyOf("41", { capabilities: {}, scopes: { orders: "all" } }, true)).toEqual({ version: "41", scopes: { orders: "all" }, confirm_customer_data_widening: true });
+  });
+  it("breakingWarnings chỉ nêu việc đang bật mà bản nháp tắt", () => {
+    const out = breakingWarnings([item("view_orders", "Bán hàng")], { view_orders: "on" }, { capabilities: { view_orders: false }, scopes: {} }, 2);
+    expect(out).toHaveLength(1);
+    expect(out[0].text).toContain("Hiện có 2 người");
+    expect(breakingWarnings([item("view_orders", "Bán hàng")], { view_orders: "off" }, { capabilities: { view_orders: false }, scopes: {} }, 2)).toEqual([]);
+  });
+});
+
+describe("ô phạm vi mờ (PV-11-AC2, AC3)", () => {
+  const row = (extra: Partial<DataScopeRow>): DataScopeRow => ({
+    key: "orders",
+    label: "Đơn hàng",
+    value: "all",
+    editable: true,
+    customer_data: true,
+    gate_capability: "view_orders",
+    inactive_reason: 'Không xem — bật việc "Xem đơn" trước',
+    note: null,
+    options: [{ value: "all", label: "Tất cả đơn", rank: 2 }],
+    ...extra,
+  });
+  it("mờ khi BE báo inactive_reason và việc gốc chưa bật", () => {
+    expect(isScopeInactive(row({}), { view_orders: "off" }, EMPTY_DRAFT)).toBe(true);
+  });
+  it("hết mờ ngay khi bật việc gốc trong bản nháp, chưa cần lưu", () => {
+    expect(isScopeInactive(row({}), { view_orders: "off" }, { capabilities: { view_orders: true }, scopes: {} })).toBe(false);
+  });
+  it("gate_capability null: chỉ dựa vào inactive_reason, không có gì để bỏ mờ", () => {
+    const r = row({ gate_capability: null, inactive_reason: "Nhóm không có quyền xem phiếu giao" });
+    expect(isScopeInactive(r, { view_orders: "on" }, { capabilities: { view_orders: true }, scopes: {} })).toBe(true);
+  });
+  it("inactive_reason null thì không mờ", () => {
+    expect(isScopeInactive(row({ inactive_reason: null }), { view_orders: "off" }, EMPTY_DRAFT)).toBe(false);
+  });
+  it("scopeValueLabel: nhãn lựa chọn, 'Theo Đơn hàng', 'Tất cả', 'Không xem'", () => {
+    expect(scopeValueLabel(row({}), "all")).toBe("Tất cả đơn");
+    expect(scopeValueLabel(row({ options: [] }), "follows_orders")).toBe("Theo Đơn hàng");
+    expect(scopeValueLabel(row({ options: [] }), "all")).toBe("Tất cả");
+    expect(scopeValueLabel(row({ options: [] }), "none")).toBe("Không xem");
   });
 });

@@ -36,11 +36,16 @@ class GroupCapabilitiesView(APIView):
     http_method_names = ["put", "options"]
 
     def put(self, request, code):
+        """PUT …/capabilities/ (02b §2.3): `{version, capabilities?, scopes?, confirm_customer_data_widening?}`. Không log thân yêu cầu."""
         data = request.data if hasattr(request.data, "keys") else {}
-        unknown = sorted(set(data.keys()) - {"capabilities"})
-        if unknown:
-            raise BusinessError("Có trường không được phép.", code=services.INPUT_CODE)
-        body = services.set_group_capabilities(
-            group_code=code, changes=data.get("capabilities"), actor=request.user
-        )
-        return Response(body)
+        return Response(services.set_group_capabilities(group_code=code, data=dict(data), actor=request.user))
+
+
+class GroupPermissionsPreviewView(APIView):
+    permission_classes = [CanManageStaff]
+    http_method_names = ["post", "options"]
+
+    def post(self, request, code):
+        """POST …/permissions-preview/ (02b §2.4, PV-09): xem trước tác động, không ghi gì."""
+        data = request.data if hasattr(request.data, "keys") else {}
+        return Response(services.preview_group(group_code=code, data=dict(data), actor=request.user))

@@ -7,7 +7,7 @@ from apps.accounts.capabilities import registry
 from apps.accounts.models import AuditLog
 from apps.common.tests.fixtures import client_for, make_user
 
-from .base import detail_url, group_perms, make_staff, put_url, token_client
+from .base import detail_url, group_perms, make_staff, put_url, token_client, put_caps
 
 ACTION = "change_group_capabilities"
 
@@ -24,7 +24,7 @@ class SetCapabilitiesTests(TestCase):
         self.client = client_for(self.owner)
 
     def put(self, code, changes, client=None):
-        return (client or self.client).put(put_url(code), {"capabilities": changes}, format="json")
+        return put_caps(client or self.client, code, changes)
 
     def test_ed39_owner_turns_capability_on_and_gets_detail_body(self):
         self.assertNotIn("inventory.approve_returntostock", group_perms(roles.WAREHOUSE_STAFF))
@@ -51,7 +51,9 @@ class SetCapabilitiesTests(TestCase):
         self.assertNotIn(
             "sales.view_customer_list", manager_client.get("/api/auth/me/").json()["permissions"]
         )
-        self.put(roles.MANAGER, {"view_customers": True})
+        # Q-7: D7 vẫn lưu `all`, nên bật lại việc là mở rộng dữ liệu khách và phải xác nhận (02b §2.5).
+        self.assertEqual(self.put(roles.MANAGER, {"view_customers": True}).json()["code"], "CUSTOMER_DATA_WIDENING_UNCONFIRMED")
+        put_caps(self.client, roles.MANAGER, {"view_customers": True}, confirm_customer_data_widening=True)
         self.assertEqual(manager_client.get(directory).status_code, 200)
 
     def test_ed39_ac2_member_gains_permission_immediately(self):
@@ -140,7 +142,7 @@ class PrivilegeEscalationTests(TestCase):
         return {code: group_perms(code) for code in roles.ALL_ROLES}
 
     def put(self, code, changes, client=None):
-        return (client or self.client).put(put_url(code), {"capabilities": changes}, format="json")
+        return put_caps(client or self.client, code, changes)
 
     def assert_nothing_changed(self, before):
         self.assertEqual(self.snapshot(), before)

@@ -70,18 +70,49 @@ export const PERM_MSG = {
   removeMember: "Bỏ khỏi nhóm",
   removeMemberFor: (who: string) => `Bỏ ${who} khỏi nhóm`,
   tasksTitle: "Việc được làm",
-  tasksIntro: "Bật hoặc tắt từng việc cho cả nhóm. Việc có nhãn “Chỉ Chủ” không cấp được cho nhóm này.",
+  tasksIntro: "Việc nhóm này được làm. Việc có nhãn “Chỉ Chủ” không cấp được cho nhóm này.",
   toggleLabel: (task: string) => `${task}`,
   customersWarning: "Bật việc này: mọi người trong nhóm xem được danh sách khách hàng đầy đủ (tên, số điện thoại, địa chỉ). Chỉ bật cho nhóm thật sự cần.",
   requiresNote: (need: string) => `Cần bật cả “${need}”.`,
   scopesTitle: "Phạm vi dữ liệu",
-  scopesIntro: "Chỉ đọc. Nhóm này nhìn thấy dữ liệu nào.",
-  scopeOrders: "Đơn hàng",
-  scopeDeliveries: "Phiếu giao",
-  scopeCustomers: "Khách hàng",
+  scopesIntro: "Nhóm này nhìn thấy dòng dữ liệu nào. Đổi xong bấm “Lưu thay đổi” để áp cho cả nhóm.",
+  scopesIntroReadOnly: "Chỉ xem. Chỉ Chủ mới đổi được phạm vi dữ liệu của nhóm.",
+  scopeCustomerData: "Có dữ liệu khách",
+  scopeSelectLabel: (object: string) => `Phạm vi ${object}`,
+  tasksIntroDraft: "Bật hoặc tắt từng việc cho cả nhóm, rồi bấm “Lưu thay đổi”. Việc có nhãn “Chỉ Chủ” không cấp được cho nhóm này.",
   timelineTitle: "Lịch sử thay đổi",
   timelineEmpty: "Chưa có thay đổi nào.",
   groupNotFoundHint: "Nhóm này không tồn tại hoặc đã bị gỡ.",
+
+  // ---- Bản nháp W3i (PV-11) ----
+  unsaved: "Chưa lưu",
+  cellPartialShort: "Một phần",
+  draftCount: (n: number) => (n === 1 ? "Có 1 thay đổi chưa lưu" : `Có ${n} thay đổi chưa lưu`),
+  draftSave: "Lưu thay đổi",
+  draftSaving: "Đang lưu…",
+  draftRetry: "Thử lại",
+  draftDiscard: "Huỷ thay đổi",
+  draftSaved: "Đã lưu thay đổi.",
+  draftBarLabel: "Thay đổi chưa lưu",
+  draftLeave: "Bạn có thay đổi chưa lưu. Rời trang sẽ mất chúng.",
+  previewFailedNote: "Chưa xem trước được ai bị ảnh hưởng. Máy chủ vẫn kiểm trước khi lưu.",
+  conflictText: "Nhóm này vừa được người khác đổi. Tải lại để xem bản mới.",
+  conflictReload: "Tải lại",
+  conflictReloading: "Đang tải lại…",
+
+  // ---- Hộp xác nhận lưu (PV-09) ----
+  widenTitle: "Cho thêm người xem dữ liệu khách?",
+  widenOk: "Tôi hiểu, lưu",
+  widenBusy: "Đang lưu…",
+  saveConfirmTitle: "Lưu thay đổi cho nhóm?",
+  confirmGroup: (group: string) => `Nhóm: ${group}.`,
+  saveConfirmOk: "Lưu thay đổi",
+  confirmCancel: "Huỷ",
+  widenWho: "Những người sẽ thấy thêm:",
+  widenHint: "Người đã nghỉ thì khoá tài khoản.",
+  widenObjects: (objects: string) => `Phạm vi mở rộng: ${objects}.`,
+  alreadyWider: (name: string, object: string, group: string) => `${name} vẫn thấy nhiều hơn ở “${object}” nhờ nhóm ${group}.`,
+  narrowedRows: (n: number, noun: string) => `${n} ${noun} đang làm dở sẽ không còn hiện với nhóm này. Quản lý và Chủ vẫn thấy.`,
 
   // ---- Bật/tắt ----
   saving: "Đang lưu…",
@@ -115,3 +146,13 @@ export const PERM_MSG = {
   added: (who: string, group: string) => `Đã thêm ${who} vào nhóm ${group}.`,
   removed: (who: string, group: string) => `Đã bỏ ${who} khỏi nhóm ${group}.`,
 } as const;
+
+/** Danh từ của dòng "đang làm dở" khi thu hẹp phạm vi (khoá = mã đối tượng phạm vi). */
+export const SCOPE_NOUN: Record<string, string> = {
+  orders: "đơn",
+  deliveries: "phiếu giao",
+  confirmation: "việc gọi xác nhận",
+  returns: "phiếu hàng hoàn",
+  receipts: "phiếu nhập",
+  customers: "khách",
+};
