@@ -8,7 +8,7 @@ Phiên chính là **điều phối viên**: nó giao việc cho `fe-dev` / `be-d
 ## Prompt 0: khởi động (dán đầu tiên ở mỗi phiên mới)
 ```
 Mình là Duy. Việc của phiên này là code giao diện Shop mới theo thiết kế trong doc/design/shop/.
-Trước khi làm gì, đọc theo thứ tự: CLAUDE.md, doc/design/shop/README.md, UI-RULES.md, HUONG-DAN-CODE.md,
+Trước khi làm gì, đọc theo thứ tự: CLAUDE.md, doc/design/shop/README.md, UI-RULES.md, COMPONENTS.md, HUONG-DAN-CODE.md,
 PLAN.md, DOI-CHIEU-CODE.md. Sau đó báo mình 5 dòng: lô nào đang ☐ tiếp theo, điều kiện đầu vào của lô đó đã đủ chưa,
 và còn câu nào trong PLAN.md cần mình trả lời. Chưa sửa code.
 ```
@@ -30,7 +30,7 @@ Chạy lô 1 trong doc/design/shop/PLAN.md theo quy trình lô của CLAUDE.md.
   DesktopHome.dc.html, Landing.dc.html, A0-Loading.dc.html, A4-Toast.dc.html, B2-RemoveConfirm.dc.html (mẫu Dialog),
   C3-SoldOut.dc.html (mẫu Sheet).
 - Giao fe-dev, kèm danh sách file được sửa và không được đụng đúng như dòng lô 1.
-- Dựng các component dùng chung ở HUONG-DAN-CODE.md §3: ShopHeader 4 biến thể, BottomNav, ShopFooter 2 biến thể,
+- Dựng các component dùng chung đúng đặc tả COMPONENTS.md (props, trạng thái, token, a11y) và bảng hình screens/CMP-1…CMP-7: ShopHeader 4 biến thể, BottomNav, ShopFooter 2 biến thể,
   Sheet/Dialog, Toast, EmptyState, ErrorState, Skeleton. Chuyển CartProvider lên root. Chuyển landing sang /gioi-thieu/.
   Dựng trang chủ / bằng catalog hiện có.
 - Chạy lệnh kiểm chứng ở HUONG-DAN-CODE.md §6. qa-tester chụp 360 px và 1280 px, so với từng file thiết kế ở trên.

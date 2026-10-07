@@ -159,7 +159,7 @@ khoản này. Rủi ro pháp lý: website TMĐT phải công bố đủ chi phí
   còn đòi **chính sách quyền riêng tư nêu rõ** và checklist go-live mục 6b. → **Cần ghi quyết định** + legal-vn sửa chính sách quyền riêng tư trước go-live.
 - Chỉ nạp script Maps khi khách bấm "Bản đồ" (`next/dynamic` / tạo thẻ script lúc mở popup), không nạp ở mọi trang. **Không lưu toạ độ** (thêm field cá nhân
   mới cần lý do + Duy duyệt). Chỉ chuỗi địa chỉ cuối cùng vào `delivery_address`.
-- Kỹ thuật: biến `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` (truyền lúc build như các `NEXT_PUBLIC_*` khác); khoá giới hạn HTTP referrer (`cangca-loc.web.app`,
+- Kỹ thuật: biến `NEXT_PUBLIC_GOOGLE_MAPS_KEY` (truyền lúc build như các `NEXT_PUBLIC_*` khác); khoá giới hạn HTTP referrer (`cangca-loc.web.app`,
   domain staging, domain thật) + giới hạn API (Maps JavaScript, Places, Geocoding); bật billing và hạn mức; dùng session token của Places để giảm phí;
   `componentRestrictions: {country: "vn"}`, `language: "vi"`; giữ chữ "Google" theo điều khoản Places.
 - CSP: `frontend/firebase.json` **chưa có** header CSP nên hôm nay không chặn. Nếu thêm CSP (nên làm trước go-live) phải mở `script-src` / `connect-src` /

@@ -176,6 +176,15 @@
       "x": 4080,
       "y": 10320
     },
+    "DesktopCartChanged.dc.html": {
+      "expand": "fill",
+      "h": 900,
+      "is_interactive": true,
+      "title": "Ngoại lệ · Giỏ đổi giá / món hết",
+      "w": 1280,
+      "x": 13600,
+      "y": 13560
+    },
     "DesktopCategory.dc.html": {
       "expand": "fill",
       "h": 1100,
@@ -193,6 +202,24 @@
       "w": 1280,
       "x": 5440,
       "y": 10320
+    },
+    "DesktopComboDetail.dc.html": {
+      "expand": "fill",
+      "h": 1100,
+      "is_interactive": true,
+      "title": "Happy · Chi tiết combo",
+      "w": 1280,
+      "x": 12240,
+      "y": 13560
+    },
+    "DesktopContact.dc.html": {
+      "expand": "fill",
+      "h": 900,
+      "is_interactive": true,
+      "title": "Trang liên hệ",
+      "w": 1280,
+      "x": 2720,
+      "y": 15080
     },
     "DesktopHome.dc.html": {
       "expand": "fill",
@@ -212,6 +239,24 @@
       "x": 2720,
       "y": 13560
     },
+    "DesktopKitchenArticle.dc.html": {
+      "expand": "fill",
+      "h": 1500,
+      "is_interactive": true,
+      "title": "Góc bếp · bài viết",
+      "w": 1280,
+      "x": 5440,
+      "y": 15080
+    },
+    "DesktopKitchenList.dc.html": {
+      "expand": "fill",
+      "h": 1200,
+      "is_interactive": true,
+      "title": "Góc bếp · danh sách",
+      "w": 1280,
+      "x": 4080,
+      "y": 15080
+    },
     "DesktopLeavePayment.dc.html": {
       "h": 800,
       "is_interactive": true,
@@ -219,6 +264,15 @@
       "w": 1280,
       "x": 9520,
       "y": 12340
+    },
+    "DesktopLoading.dc.html": {
+      "expand": "fill",
+      "h": 1100,
+      "is_interactive": true,
+      "title": "Trạng thái · Đang tải",
+      "w": 1280,
+      "x": 9520,
+      "y": 13560
     },
     "DesktopLookup.dc.html": {
       "expand": "fill",
@@ -267,6 +321,24 @@
       "x": 0,
       "y": 13560
     },
+    "DesktopOffline.dc.html": {
+      "expand": "fill",
+      "h": 900,
+      "is_interactive": true,
+      "title": "Lỗi · Mất mạng",
+      "w": 1280,
+      "x": 10880,
+      "y": 13560
+    },
+    "DesktopOrderStates.dc.html": {
+      "expand": "fill",
+      "h": 1400,
+      "is_interactive": true,
+      "title": "Đơn hàng · Đã giao / Giao không thành công / Bị huỷ",
+      "w": 1280,
+      "x": 0,
+      "y": 15080
+    },
     "DesktopOutOfStock.dc.html": {
       "expand": "fill",
       "h": 1100,
@@ -303,6 +375,15 @@
       "x": 6800,
       "y": 10320
     },
+    "DesktopPolicy.dc.html": {
+      "expand": "fill",
+      "h": 1300,
+      "is_interactive": true,
+      "title": "Trang chính sách + cách mua hàng",
+      "w": 1280,
+      "x": 1360,
+      "y": 15080
+    },
     "DesktopProduct.dc.html": {
       "expand": "fill",
       "h": 1100,
@@ -337,6 +418,24 @@
       "x": 8160,
       "y": 10320
     },
+    "DesktopToast.dc.html": {
+      "expand": "fill",
+      "h": 900,
+      "is_interactive": true,
+      "title": "[Toast] Đã thêm vào giỏ + giỏ mini",
+      "w": 1280,
+      "x": 8160,
+      "y": 13560
+    },
+    "DesktopUnderpaid.dc.html": {
+      "expand": "fill",
+      "h": 900,
+      "is_interactive": true,
+      "title": "Ngoại lệ · Chuyển thiếu tiền (E-02)",
+      "w": 1280,
+      "x": 14960,
+      "y": 13560
+    },
     "E2-Cancelled.dc.html": {
       "h": 844,
       "title": "E2 · Ngoại lệ · Đơn bị huỷ → Cá Về gọi lại (E-03, E-07)",
@@ -370,6 +469,22 @@
       "title": "F2 · Lỗi · Không tìm thấy đơn",
       "w": 390,
       "x": 470,
+      "y": 8208
+    },
+    "G1-KitchenList.dc.html": {
+      "h": 1240,
+      "is_interactive": true,
+      "title": "F6 · Góc bếp · danh sách",
+      "w": 390,
+      "x": 2350,
+      "y": 8208
+    },
+    "G2-KitchenArticle.dc.html": {
+      "h": 1600,
+      "is_interactive": true,
+      "title": "F7 · Góc bếp · bài viết",
+      "w": 390,
+      "x": 2820,
       "y": 8208
     },
     "HeaderFooter-Desktop.dc.html": {
@@ -456,120 +571,54 @@
       "x": 0,
       "y": 6548
     },
-    "G1-KitchenList.dc.html": {
-      "x": 2350,
-      "y": 8208,
-      "w": 390,
-      "h": 1240,
-      "title": "F6 · Góc bếp · danh sách",
-      "is_interactive": true
-    },
-    "G2-KitchenArticle.dc.html": {
-      "x": 2820,
-      "y": 8208,
-      "w": 390,
-      "h": 1600,
-      "title": "F7 · Góc bếp · bài viết",
-      "is_interactive": true
-    },
-    "DesktopToast.dc.html": {
-      "x": 8160,
-      "y": 13560,
-      "w": 1280,
-      "h": 900,
-      "title": "[Toast] Đã thêm vào giỏ + giỏ mini",
-      "is_interactive": true,
-      "expand": "fill"
-    },
-    "DesktopLoading.dc.html": {
-      "x": 9520,
-      "y": 13560,
-      "w": 1280,
-      "h": 1100,
-      "title": "Trạng thái · Đang tải",
-      "is_interactive": true,
-      "expand": "fill"
-    },
-    "DesktopOffline.dc.html": {
-      "x": 10880,
-      "y": 13560,
-      "w": 1280,
-      "h": 900,
-      "title": "Lỗi · Mất mạng",
-      "is_interactive": true,
-      "expand": "fill"
-    },
-    "DesktopComboDetail.dc.html": {
-      "x": 12240,
-      "y": 13560,
-      "w": 1280,
-      "h": 1100,
-      "title": "Happy · Chi tiết combo",
-      "is_interactive": true,
-      "expand": "fill"
-    },
-    "DesktopCartChanged.dc.html": {
-      "x": 13600,
-      "y": 13560,
-      "w": 1280,
-      "h": 900,
-      "title": "Ngoại lệ · Giỏ đổi giá / món hết",
-      "is_interactive": true,
-      "expand": "fill"
-    },
-    "DesktopUnderpaid.dc.html": {
-      "x": 14960,
-      "y": 13560,
-      "w": 1280,
-      "h": 900,
-      "title": "Ngoại lệ · Chuyển thiếu tiền (E-02)",
-      "is_interactive": true,
-      "expand": "fill"
-    },
-    "DesktopOrderStates.dc.html": {
+    "CMP-1-Tokens.dc.html": {
       "x": 0,
-      "y": 15080,
+      "y": 23220,
       "w": 1280,
-      "h": 1400,
-      "title": "Đơn hàng · Đã giao / Giao không thành công / Bị huỷ",
-      "is_interactive": true,
-      "expand": "fill"
+      "h": 4800,
+      "title": "Component · 1 · Token (màu, chữ, khoảng cách, bo góc, bóng, chuyển động, icon)"
     },
-    "DesktopPolicy.dc.html": {
+    "CMP-2-Buttons.dc.html": {
       "x": 1360,
-      "y": 15080,
+      "y": 23220,
       "w": 1280,
-      "h": 1300,
-      "title": "Trang chính sách + cách mua hàng",
-      "is_interactive": true,
-      "expand": "fill"
+      "h": 4600,
+      "title": "Component · 2 · Nút, chip, link, công tắc"
     },
-    "DesktopContact.dc.html": {
+    "CMP-3-Inputs.dc.html": {
       "x": 2720,
-      "y": 15080,
+      "y": 23220,
       "w": 1280,
-      "h": 900,
-      "title": "Trang liên hệ",
-      "is_interactive": true,
-      "expand": "fill"
+      "h": 4800,
+      "title": "Component · 3 · Ô nhập, địa chỉ, tìm kiếm, tóm tắt lỗi"
     },
-    "DesktopKitchenList.dc.html": {
+    "CMP-4-Product.dc.html": {
       "x": 4080,
-      "y": 15080,
+      "y": 23220,
       "w": 1280,
-      "h": 1200,
-      "title": "Góc bếp · danh sách",
-      "is_interactive": true,
-      "expand": "fill"
+      "h": 5900,
+      "title": "Component · 4 · Thẻ sản phẩm, nhãn tồn, giá, bộ tăng giảm"
     },
-    "DesktopKitchenArticle.dc.html": {
+    "CMP-5-Cart-Order.dc.html": {
       "x": 5440,
-      "y": 15080,
+      "y": 23220,
       "w": 1280,
-      "h": 1500,
-      "title": "Góc bếp · bài viết",
-      "is_interactive": true,
-      "expand": "fill"
+      "h": 7500,
+      "title": "Component · 5 · Giỏ, thanh toán, đơn hàng"
+    },
+    "CMP-6-Navigation.dc.html": {
+      "x": 6800,
+      "y": 23220,
+      "w": 1280,
+      "h": 9890,
+      "title": "Component · 6 · Header, điều hướng, footer"
+    },
+    "CMP-7-Overlay-Feedback.dc.html": {
+      "x": 8160,
+      "y": 23220,
+      "w": 1280,
+      "h": 11770,
+      "title": "Component · 7 · Popup, toast, banner, trạng thái"
     }
   },
   "createdOnFiles": {
@@ -605,6 +654,14 @@
       "x": 0,
       "y": 13300
     },
+    "dRow4": {
+      "kind": "title1",
+      "maxW": 6720,
+      "text": "MÁY TÍNH · Đơn hàng & trang phụ",
+      "w": 240,
+      "x": 0,
+      "y": 14820
+    },
     "flow": {
       "kind": "title1",
       "maxW": 4620,
@@ -623,7 +680,7 @@
     },
     "legend": {
       "fill": "blue",
-      "text": "Cách đọc canvas\n\nMỗi hàng là một luồng. Ô đầu hàng là happy case, các ô kế bên là lỗi và ngoại lệ của bước đó.\n\nTên có [Popup] = trên app hiện dạng popup / bottom sheet / toast đè lên màn.\n\nMã E-0x khớp bảng ngoại lệ trong business-process-spec.md.\n\nPhần MÁY TÍNH (cuộn xuống): cùng luồng ở khổ 1280px. Ca lỗi giống bản điện thoại; popup trên máy tính là hộp thoại giữa màn.\n\nCuộn tiếp: Header & Footer (đặc tả từng link), rồi Landing page.",
+      "text": "Cách đọc canvas\n\nMỗi hàng là một luồng. Ô đầu hàng là happy case, các ô kế bên là lỗi và ngoại lệ của bước đó.\n\nTên có [Popup] = trên app hiện dạng popup / bottom sheet / toast đè lên màn.\n\nMã E-0x khớp bảng ngoại lệ trong business-process-spec.md.\n\nPhần MÁY TÍNH (cuộn xuống): cùng luồng ở khổ 1280px. Ca lỗi giống bản điện thoại; popup trên máy tính là hộp thoại giữa màn.\n\nCuộn tiếp: Header & Footer (đặc tả từng link), rồi Landing page.\n\nCuối canvas: 7 bảng COMPONENT (token, nút, ô nhập, thẻ sản phẩm, giỏ & đơn, điều hướng, popup & trạng thái).",
       "w": 300,
       "x": 4800,
       "y": 0
@@ -676,12 +733,12 @@
       "x": 0,
       "y": 19760
     },
-    "dRow4": {
+    "cmp": {
       "kind": "title1",
-      "maxW": 6720,
-      "text": "MÁY TÍNH · Đơn hàng & trang phụ",
+      "maxW": 9440,
+      "text": "COMPONENT · đặc tả biến thể, trạng thái, thông số",
       "x": 0,
-      "y": 14820
+      "y": 22960
     }
   },
   "order": [
@@ -756,7 +813,14 @@
     "DesktopKitchenArticle.dc.html",
     "Landing.dc.html",
     "HeaderFooter-Mobile.dc.html",
-    "HeaderFooter-Desktop.dc.html"
+    "HeaderFooter-Desktop.dc.html",
+    "CMP-1-Tokens.dc.html",
+    "CMP-2-Buttons.dc.html",
+    "CMP-3-Inputs.dc.html",
+    "CMP-4-Product.dc.html",
+    "CMP-5-Cart-Order.dc.html",
+    "CMP-6-Navigation.dc.html",
+    "CMP-7-Overlay-Feedback.dc.html"
   ],
   "pages": [],
   "title": "Cá Về — Bảng hàng prototype"

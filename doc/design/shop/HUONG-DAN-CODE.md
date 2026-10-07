@@ -5,7 +5,7 @@
 
 ## 0. Đọc trước (theo thứ tự)
 1. `CLAUDE.md` và skill `caveve-domain`, nhất là bất biến 9 (dữ liệu cá nhân) và luật không rò giá vốn.
-2. `doc/design/shop/UI-RULES.md`: luật bắt buộc của Shop.
+2. `doc/design/shop/UI-RULES.md`: luật bắt buộc của Shop. Rồi `COMPONENTS.md`: đặc tả từng component.
 3. `doc/design/shop/DOI-CHIEU-CODE.md`: bảng màn → route → API → khoảng trống, kèm việc BE và các câu hỏi còn mở.
 4. `DESIGN.md` (token), skill `nextjs-shop-patterns` (static export, `lib/api.ts` + mock), skill `caveve-ui`.
 5. Màn thiết kế của lô đang làm, trong `doc/design/shop/screens/`. Mở bằng trình duyệt hoặc xem trên canvas: https://claude.ai/artifact/SPSQLR5rMEtuBFreYbK96J
@@ -43,6 +43,9 @@ Không dùng route động `[x]`, dùng query string thay thế.
 | Góc bếp | `/bai-viet/` | `app/bai-viet/*` |
 
 ## 3. Component dùng chung (lô 1 dựng, các lô sau dùng lại)
+
+> **Đặc tả đầy đủ từng component nằm ở `COMPONENTS.md`** (props TypeScript, trạng thái, token, a11y, câu chữ, file code) và bảng hình `screens/CMP-*.dc.html`. Khi `COMPONENTS.md` khác bảng dưới hay khác file màn, theo `COMPONENTS.md` (mục "Chỗ đã chuẩn hoá so với file màn").
+
 | Component | Vai trò | Thiết kế mẫu |
 |---|---|---|
 | `ShopHeader` (`variant`: `home` \| `sticky` \| `sub` \| `checkout`) | Header H1–H4, máy tính 2 tầng hoặc rút gọn | `HeaderFooter-*.dc.html` |

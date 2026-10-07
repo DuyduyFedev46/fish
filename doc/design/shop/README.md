@@ -3,7 +3,7 @@
 - **Canvas gốc** (xem trực quan, bấm thử được): https://claude.ai/artifact/SPSQLR5rMEtuBFreYbK96J
 - `screens/*.dc.html`: HTML tĩnh, style inline. Mở bằng trình duyệt để xem. Icon và font cần mạng. Thẻ `<sc-if>`, `<sc-for>`, `{{…}}` và khối `<script type="text/x-dc">` là cú pháp của canvas, khi code thì thay bằng state React. Dev đọc cấu trúc, khoảng cách, màu và chữ từ HTML.
 - `canvas.json`: vị trí và tên từng màn trên canvas.
-- **Luật bắt buộc: `UI-RULES.md`.** Cách code: `HUONG-DAN-CODE.md`. Chia lô: `PLAN.md`. Prompt dán cho Claude Code: `PROMPT.md`.
+- **Luật bắt buộc: `UI-RULES.md`.** Đặc tả từng component (47 cái: giải phẫu, biến thể, trạng thái, props, a11y): **`COMPONENTS.md`**, kèm 7 bảng hình `screens/CMP-*.dc.html`. Cách code: `HUONG-DAN-CODE.md`. Chia lô: `PLAN.md`. Prompt dán cho Claude Code: `PROMPT.md`.
 - Đối chiếu thiết kế với code và backend hiện tại: `DOI-CHIEU-CODE.md` (Tech Lead, 06/10).
 - Dữ liệu trên thiết kế là **dữ liệu giả**. Ô có ngoặc vuông `[…]` là chỗ chờ số liệu thật. Ô "LOGO" chờ file Duy upload.
 
@@ -24,7 +24,7 @@
 8. Thanh toán xong thì vào thẳng **trang đơn hàng, cũng là trang tra cứu đơn**. Không có màn "thành công" riêng.
 9. Trang đơn hàng công khai **không hiện người nhận** (tên, số điện thoại, địa chỉ), theo bất biến 9. Mã đơn giữ dạng `SO…` như code.
 
-## Danh mục màn (72 artboard)
+## Danh mục màn (72 màn + 7 bảng component)
 
 ### Điện thoại · A Chọn hàng
 
@@ -137,3 +137,15 @@
 | `screens/Landing.dc.html` | Landing page — giới thiệu thương hiệu | 1280×2700 co giãn |
 | `screens/HeaderFooter-Mobile.dc.html` | Header & footer · điện thoại (đặc tả từng link) | 880×2600 |
 | `screens/HeaderFooter-Desktop.dc.html` | Header & footer · máy tính (đặc tả từng link) | 1280×2600 |
+
+### Bảng component (đặc tả hình: biến thể × trạng thái × thông số)
+
+| File | Nội dung |
+|---|---|
+| `screens/CMP-1-Tokens.dc.html` | Component · 1 · Token (màu, chữ, khoảng cách, bo góc, bóng, chuyển động, icon) |
+| `screens/CMP-2-Buttons.dc.html` | Component · 2 · Nút, chip, link, công tắc |
+| `screens/CMP-3-Inputs.dc.html` | Component · 3 · Ô nhập, địa chỉ, tìm kiếm, tóm tắt lỗi |
+| `screens/CMP-4-Product.dc.html` | Component · 4 · Thẻ sản phẩm, nhãn tồn, giá, bộ tăng giảm |
+| `screens/CMP-5-Cart-Order.dc.html` | Component · 5 · Giỏ, thanh toán, đơn hàng |
+| `screens/CMP-6-Navigation.dc.html` | Component · 6 · Header, điều hướng, footer |
+| `screens/CMP-7-Overlay-Feedback.dc.html` | Component · 7 · Popup, toast, banner, trạng thái |

@@ -31,6 +31,8 @@
 
 Thứ tự: 0 → (1 ∥ BE của 2) → FE của 2 → 3 → 4 → 5 → 6 → 7.
 
+> Danh sách file mới theo `COMPONENTS.md` (bảng "Component → Lô → file code", các dòng ⚠) được tính vào cột "Được sửa" của lô tương ứng, nhất là lô 1 (`components/ui/*`) và lô 2 (`components/catalog/*`, `components/cart/*`, `SearchSuggest`).
+
 ## Mỗi lô: điều kiện xong
 - Lệnh kiểm chứng ở `HUONG-DAN-CODE.md` §6 chạy sạch. Điều phối viên tự chạy lại và dán output vào `03-dev-notes.md`.
 - Ảnh chụp 360 px và 1280 px của **mọi màn trong lô**, cả ca lỗi, đặt cạnh file thiết kế.
