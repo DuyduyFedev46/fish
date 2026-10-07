@@ -272,3 +272,22 @@ BE thật trên `feat/qd-0810-be` (`auth/authentication.py:41-52`, `auth/api.py`
 | N3 | Ghi nhận | `shared/ui/shell/AvatarMenu.tsx:111` | Nhãn vai dài ("Nhân viên gọi xác nhận · Nhân viên giao") đã có ellipsis (`globals.css:130`) nhưng thiếu `title` theo §F | Làm khi có lô đụng `shared/ui/shell`. Không chặn lô này |
 
 R1–R3 sửa xong là đạt. Không cần review lại toàn bộ, techlead chỉ xem 3 dòng. N1 nên sửa cùng lượt.
+
+### Re-review sau ff0c57a (08/10)
+
+Xem hẹp diff `ff0c57a` (7 file). Đã chạy `npx vitest run shared/lib/nav.test.ts features/audit/auditModel.test.ts`: 2 file, xanh.
+
+**Kết luận: APPROVED** (R1–R3 và N1 đã sửa đúng; còn 1 Low ghi nhận, không chặn lô).
+
+- **R1 đạt.** `auditModel.ts:142` đã thêm `"ai_config_kill"` vào `AI_ONLY_ACTIONS`. Có vitest khẳng định.
+- **R2 đạt.** `ai/settings/mock.ts:29` đổi thành "Chăm sóc khách hàng", khớp BE.
+- **R3 đạt.** `confirmation/mock.ts:530` chép nguyên văn câu BE `delivery/confirmation/api.py:128` ("Không tìm thấy mục chờ gọi trong phạm vi của bạn.").
+- **N1 đạt.** `nav.ts:176`: `onlyDelivery` thêm điều kiện `!me.is_superuser`, nên superuser chỉ thuộc `delivery_staff` thấy menu như Chủ.
+  - Đã chạy thử để so menu: Chủ có 19 mục, superuser chỉ thuộc `delivery_staff` có 20 mục. Superuser không thiếu mục nào của Chủ. Mục dư duy nhất là
+    `my-deliveries` ("Việc giao của tôi"), do `nav.ts:307` hiện mục này theo `inGroup(deliveryStaff)`.
+  - Mục dư này **đúng ý**. Superuser đó thật sự thuộc nhóm NV giao, nên có thể được gán làm `courier` trên phiếu, và cần màn xem phiếu của mình.
+    Superuser không nhóm thì không có mục này, giống mục 2 của lần review trước.
+
+| # | Mức | Chỗ | Ghi nhận | Cách sửa |
+|---|---|---|---|---|
+| L1 | Low (không chặn) | `erp-console/shared/lib/nav.test.ts:32` | Test dùng `toBeGreaterThanOrEqual`. Nếu sau này superuser mất một mục của Chủ nhưng lại có thêm một mục khác, test vẫn xanh | Khẳng định chính xác: `expect(menuItems(su).map(i => i.key)).toEqual([...menuItems(OWNER).map(i => i.key)` chèn `"my-deliveries"` đúng vị trí trong NAV`])`. Cách đơn giản hơn: tập key của su bằng tập key của OWNER cộng `"my-deliveries"`. Làm ở lô kế tiếp có đụng `nav.test.ts` |
