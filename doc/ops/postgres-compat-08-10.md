@@ -195,3 +195,26 @@ Các chỗ còn lại là `Model.objects.select_for_update().get/filter(...)` kh
 
 ### Skill
 Đã thêm quy tắc "khoá dòng không kèm join; quan hệ dùng để quyết định thì đọc lại sau khoá; test đua có ca chờ khoá" vào `.claude/skills/django-drf-patterns/SKILL.md`, mục Service.
+
+## QA vòng 2 (08/10)
+
+**Kết luận: APPROVED.** B1 và B2 đã sửa, kiểm trên BE thật chạy PostgreSQL 16 (DB riêng `cangca_qapg2_staging`, `seed_qa --allow-non-local`, dữ liệu giả; DB đã xoá, server đã tắt). Nhánh `qa/postgres-compat` HEAD eb3d517. Không sửa code. Suite đầy đủ không chạy lại theo yêu cầu (điều phối viên đã chạy: Postgres 3409 OK, SQLite 3409 OK skipped=6).
+
+**Tổng: 36 ca · ✅ 35 · ❌ 0 · ⏸ 1**
+
+| # | Ca | Kết quả | Bằng chứng (`scratchpad/qapg2/`) |
+|---|---|---|---|
+| 1 | B1 hai người (qa_cs1 ∥ qa_cs2) claim cùng một việc, Barrier, 24 vòng (reset claim bằng SQL giữa vòng) | ✅ | `claim_race.out`: 24/24 đúng `{200:1, 409:1}`, không 500 |
+| 2 | B1 sáu luồng (cs1, cs2, owner, manager, cs1, cs2) cùng một việc, 18 vòng | ✅ | 10 vòng `{200:1, 409:5}`, 8 vòng `{200:2, 409:4}`; 200 thứ hai luôn là chính người đang giữ gọi lại (idempotent). Mọi vòng đúng một người giữ, không 500, không `AttributeError` |
+| 3 | Thân 409 không có dữ liệu khách | ✅ | Mọi 409 chỉ có khoá `detail`, `code=CLAIMED`, `claimed_until`; `detail` chỉ có username nhân viên và giờ; không số dài, không mã đơn/phiếu |
+| 4 | B2 huỷ phiếu ∥ chi phí, chi phí chậm 0–120 ms (kịch bản vòng 1), 48 vòng | ✅ | `race.out`: `(200,400)` ×48, không `(200,201)` |
+| 5 | B2 đảo thứ tự (huỷ chậm 0–120 ms), 48 vòng | ✅ | `race_swap.out`: `(400,201)` ×48 |
+| 6 | B2 lệch giờ hai phía 0–30 ms, 48 vòng (kết quả trộn cả hai chiều) | ✅ | `race_both.out`: `(400,201)` ×29, `(200,400)` ×19, không `(200,201)` |
+| 7 | DB sau 144 vòng: không có `PurchaseCostAllocation` trỏ lô của phiếu CANCELLED | ✅ | 0 dòng (truy vấn nối allocation → lô → dòng phiếu → phiếu `CANCELLED`); truy vấn có hiệu lực: cùng nối cho 78 allocation ở phiếu SUBMITTED, 90 phiếu CANCELLED |
+| 8 | Không deadlock, không 500/502 | ✅ | `race*.out`: danh sách 500/502 rỗng; `server.log`: 0 `deadlock`, 0 `" 500 `/`" 502 `, 0 `Traceback`, 0 `AttributeError` (693 POST) |
+| 9 | Huỷ phiếu ∥ huỷ phiếu cùng phiếu (6 vòng × 3 lần chạy) | ✅ | luôn `(200,400)` |
+| 10–31 | Hồi quy `scen.py` (28 bước): receive-batches rồi huỷ; huỷ phiếu có lô đang bán 400 BR-MH-07; chi phí quá lớn 400 `COST_LANDED_OVERFLOW` (0 bản ghi mới); chi phí thường 201; Quản lý thêm chi phí 403; claim thường 200, người khác 409, giữ lại 200, chưa đăng nhập 401, Chủ khi cs1 giữ 409; AI `receive_batches` đề xuất + xác nhận; AI `cancel` phiếu → CANCELLED; AI undo lần 2 trả 400 không 500 | ✅ 22 | `scen.out`. Có 5 bước "404" chỉ vì `scen.py` gắn cứng id phiếu #4/#5 của DB vòng 1; không phải lỗi sản phẩm, đã chạy lại bằng `reg.py` (ca 32–36) |
+| 32–36 | Hồi quy phiếu Nháp: tạo, huỷ (200), huỷ lại (400 BR-MH-07); tạo, ghi nhận (200), ghi nhận lại (400 màn hình cũ), huỷ phiếu đã ghi nhận (200) | ✅ 5 | `reg.py` |
+| — | AI undo của `receive_batches` | ⏸ | Giống vòng 1: lệnh mức C, sau xác nhận là CONFIRMED nên undo 400 `AI_CANNOT_UNDO` đúng thiết kế; không bật mức B mà không đổi cấu hình AI. Đường `cancel_receipt` qua AI đã kiểm bằng lệnh `cancel` |
+
+Lưu ý: ca 4 và 5 mỗi bên chỉ một chiều thắng ổn định theo độ lệch; chiều còn lại và cả hai chiều trộn được phủ ở ca 6, cộng 2 test chờ khoá của techlead (đỏ trên code cũ). Không có lỗi mới.
