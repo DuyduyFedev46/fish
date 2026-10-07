@@ -10,6 +10,8 @@ import pathlib
 
 from playwright.sync_api import expect, sync_playwright
 
+from e2e_support import page_404_body
+
 BASE = os.environ.get("BASE", "http://127.0.0.1:3101")
 SHOTS = os.environ.get("SHOTS", "/tmp")
 results = []
