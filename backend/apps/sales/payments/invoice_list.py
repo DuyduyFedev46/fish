@@ -8,7 +8,7 @@ from decimal import Decimal
 from django.db.models import DecimalField, Exists, F, OuterRef, Q, Subquery, Sum, Value
 from django.db.models.functions import Coalesce
 
-from apps.common.api import has_full_delivery_scope
+from apps.accounts.data_scopes.resolver import resolve_data_scope
 from apps.common.exceptions import BusinessError
 from apps.delivery.pii_scope import annotate_order_pii_visible
 from apps.inventory.stock.filters import INVALID_FILTER, date_range_q, parse_choice_list_param, parse_date_param
@@ -34,12 +34,15 @@ def with_cogs(queryset):
 def scope_invoices_for(user, queryset):
     """Phạm vi dòng (Tầng 3) theo đơn của hoá đơn: dùng chung `scope_orders_for` để không lệch với danh sách đơn.
 
-    Vai full scope (Chủ, Quản lý, NV kho) thấy hết. Người khác chỉ thấy hoá đơn của đơn trong phạm vi, và
-    `pii_visible` quyết định có hiện tên khách hay không (SR-PII-02)."""
-    if has_full_delivery_scope(user):
+    PV-03: giá trị lấy từ D2 (= D1 của chính nhóm có quyền xem hoá đơn, BR-PQ-37), không phụ thuộc nhóm đó có bật
+    `view_orders` hay không (Q-7). `all` thì thấy hết. Còn lại chỉ thấy hoá đơn của đơn trong phạm vi, và `pii_visible`
+    quyết định có hiện tên khách hay không (SR-PII-02)."""
+    value = resolve_data_scope(user, "invoices")
+    if value == "all":
         return queryset
-    in_scope = scope_orders_for(user, SalesOrder.objects.all()).values("pk")
-    visible = annotate_order_pii_visible(user, SalesOrder.objects.filter(pk=OuterRef("sales_order_id")))
+    in_scope = scope_orders_for(user, SalesOrder.objects.all(), value=value).values("pk")
+    visible = annotate_order_pii_visible(
+        user, SalesOrder.objects.filter(pk=OuterRef("sales_order_id")), value=value)
     return queryset.filter(sales_order_id__in=in_scope).annotate(
         pii_visible=Exists(visible.filter(pii_visible=True))
     )

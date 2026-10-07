@@ -42,6 +42,8 @@ DIRECT_PERMISSIONS = (
     "delivery.view_deliverynote", "delivery.confirm_with_customer",
     "inventory.view_returntostock", "purchasing.view_purchasereceipt",
     "reports.view_dashboard",
+    # PV-07: V2 cấp cho 5 nhóm qua migration; người không nhóm phải được cấp tay mới thấy tên khách trên đơn (R9, D-3).
+    "sales.view_order_customer_info",
 )
 
 # Một đơn = một khách riêng. `note`: trạng thái phiếu giao sau khi chỉnh; `task`: tình trạng gọi; `courier`: nhãn người giao;

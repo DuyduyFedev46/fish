@@ -37,7 +37,7 @@ describe("monthBreakdown (ED-12, TL-M2)", () => {
 describe("câu tổng theo tháng nói rõ đang cộng gì", () => {
   it("chỉ Chờ hoàn: nêu trạng thái và ghi chú không tính phiếu lỗi", () => {
     const text = ORDERS_MSG.refundsMonthSummary("Tháng 10/2026", [{ status: "PENDING", count: 3, total: "1200000" }], 0);
-    expect(text).toBe("Tháng 10/2026: 3 phiếu Chờ hoàn, tổng tiền 1.200.000 đ (không tính phiếu Thất bại)");
+    expect(text).toBe("Tháng 10/2026: 3 phiếu Chờ hoàn tiền, tổng tiền 1.200.000 đ (không tính phiếu Hoàn thất bại)");
   });
   it("hai trạng thái: tách từng số, đếm phiếu Thất bại bị bỏ", () => {
     const text = ORDERS_MSG.refundsMonthSummary(
@@ -48,9 +48,9 @@ describe("câu tổng theo tháng nói rõ đang cộng gì", () => {
       ],
       2
     );
-    expect(text).toBe("Tháng 10/2026: 1 phiếu Chờ hoàn, tổng tiền 100.000 đ · 2 phiếu Đã hoàn, tổng tiền 380.000 đ (không tính 2 phiếu Thất bại)");
+    expect(text).toBe("Tháng 10/2026: 1 phiếu Chờ hoàn tiền, tổng tiền 100.000 đ · 2 phiếu Đã hoàn tiền, tổng tiền 380.000 đ (không tính 2 phiếu Hoàn thất bại)");
   });
   it("không có phiếu nào", () => {
-    expect(ORDERS_MSG.refundsMonthSummary("Tháng 10/2026", [], 0)).toContain("không có phiếu Chờ hoàn hay Đã hoàn");
+    expect(ORDERS_MSG.refundsMonthSummary("Tháng 10/2026", [], 0)).toContain("không có phiếu Chờ hoàn tiền hay Đã hoàn tiền");
   });
 });

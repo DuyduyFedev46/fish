@@ -17,7 +17,7 @@ ACTION_LABELS = {
     "staff_reactivate": "Mở lại tài khoản",
     "staff_password_reset": "Đặt lại mật khẩu",
     "password_change_self": "Tự đổi mật khẩu",
-    "admin_edit": "Chỉnh sửa trong trang quản trị",
+    "admin_edit": "Sửa trong trang quản trị kỹ thuật",
 }
 
 register_guidance(

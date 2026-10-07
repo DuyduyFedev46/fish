@@ -2,6 +2,8 @@
 // Lỗi nghiệp vụ của BE (định dạng ảnh, giá đã có đơn dùng, chồng lấn ngày…) KHÔNG ở đây: UI hiện nguyên văn `detail`
 // BE trả (đã bỏ mã quy tắc) — xem shared/lib/messages.ts `errorText()`.
 
+import { ENUMS } from "@/shared/lib/enums";
+
 export const CATALOG_MSG = {
   // ---- khung màn ----
   screenTitle: "Danh mục & giá",
@@ -155,7 +157,7 @@ export const CATALOG_MSG = {
   filterRuleActiveAll: "Mọi trạng thái",
   filterApplyOn: "Áp dụng cho",
   filterApplyOnAll: "Mọi loại ưu đãi",
-  optRuleOn: "Đang bật",
+  optRuleOn: ENUMS.pricingRuleActive.true.label,
   optRuleOff: "Đã tắt",
   ruleShown: (shown: number, total: number) => `Đang hiện ${shown} / ${total} ưu đãi`,
   rulesTitle: "Ưu đãi",
@@ -197,7 +199,7 @@ export const CATALOG_MSG = {
   fieldDiscountValue: "Mức giảm",
   fieldRuleFrom: "Từ ngày",
   fieldRuleUpto: "Đến ngày",
-  fieldRuleActive: "Đang bật",
+  fieldRuleActive: ENUMS.pricingRuleActive.true.label,
   ruleNameRequired: "Nhập tên ưu đãi.",
   ruleItemRequired: "Chọn mặt hàng được giảm.",
   minQtyRequired: "Nhập số kg tối thiểu.",
@@ -205,6 +207,10 @@ export const CATALOG_MSG = {
   minAmountRequired: "Nhập giá trị đơn tối thiểu.",
   discountRequired: "Nhập mức giảm.",
   discountPositive: "Mức giảm phải lớn hơn 0. Hãy nhập lại mức giảm.",
+  amountTooBig: "Số tiền quá lớn. Nhập số nhỏ hơn 1.000 tỷ đồng.",
+  qtyTooPrecise: "Tối đa 3 chữ số sau dấu phẩy. Hãy nhập lại số kg.",
+  qtyTooBig: "Số kg quá lớn. Hãy nhập lại số kg.",
+  percentTooPrecise: "Tối đa 2 chữ số sau dấu phẩy. Hãy nhập lại phần trăm.",
   discountPercentMax: "Phần trăm giảm không được lớn hơn 100. Hãy nhập lại từ 0 đến 100.",
 
   // ---- nhóm hàng ----

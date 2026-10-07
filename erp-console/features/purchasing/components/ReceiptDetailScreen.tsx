@@ -113,7 +113,7 @@ function Loaded({ id, me, renderAi }: { id: number; me: Me; renderAi?: RenderAi 
 
   const more: MoreMenuItem[] = [];
   if (ability.addCost && submitted) {
-    more.push({ key: "cost", label: "Nhập chi phí mua", onSelect: () => router.push(`/purchasing/costs/new/?receipt=${row.id}`) });
+    more.push({ key: "cost", label: "Nhập chi phí phụ", onSelect: () => router.push(`/purchasing/costs/new/?receipt=${row.id}`) });
   }
   if (canCancelReceipt(me, row)) {
     more.push({ key: "cancel", label: "Huỷ phiếu", danger: true, blockedReason: cancelBlockReason(row), onSelect: () => setModal("cancel") });

@@ -4,10 +4,13 @@
 // Bấm một dòng → /confirmation/detail/?id=<số> (URL chỉ mang id). Số điện thoại hiện đúng chuỗi BE trả: đủ số khi dòng trong phạm vi,
 // `phone_masked` khi ngoài phạm vi (dòng đó không mở được). Tìm kiếm chạy trên các dòng đã tải, không gửi từ khoá đi đâu;
 // tra theo số điện thoại hoặc mã đơn trên toàn hệ thống dùng hộp "Tìm khách gọi lại" (POST).
+import Link from "next/link";
 import { useMemo, useState } from "react";
+import { useAuth } from "@/features/auth/components/AuthProvider";
 import { ENUMS } from "@/shared/lib/enums";
 import { dateTime, kg, vnd } from "@/shared/lib/format";
 import { loadErrorText, type Paginated } from "@/shared/lib/http";
+import { canView } from "@/shared/lib/nav";
 import { usePagedList } from "@/shared/lib/usePagedList";
 import { Chip } from "@/shared/ui/Chip";
 import { Icon } from "@/shared/ui/Icon";
@@ -44,6 +47,7 @@ async function loadRows(p: Params, page: number): Promise<Paginated<Confirmation
 }
 
 export function ConfirmationQueueView() {
+  const { me } = useAuth();
   const [tab, setTab] = useTabParam(TAB_KEYS, DEFAULT_TAB);
   const [query, setQuery] = useState("");
   const [searching, setSearching] = useState(false);
@@ -120,10 +124,18 @@ export function ConfirmationQueueView() {
       asOf={list.asOf}
       onRetry={() => void list.reload()}
       actions={
-        <button type="button" className="btn" onClick={() => setSearching(true)}>
-          <Icon name="search" />
-          <span>Tìm khách gọi lại</span>
-        </button>
+        <>
+          {me && canView(me, "call-scripts") && (
+            <Link href="/confirmation/scripts/" className="btn">
+              <Icon name="chat" />
+              <span>Kịch bản gọi</span>
+            </Link>
+          )}
+          <button type="button" className="btn" onClick={() => setSearching(true)}>
+            <Icon name="search" />
+            <span>Tìm khách gọi lại</span>
+          </button>
+        </>
       }
       tabs={
         <Tabs

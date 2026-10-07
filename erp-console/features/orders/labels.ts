@@ -1,13 +1,15 @@
 // Lựa chọn lọc của các danh sách Đơn & tiền. Nhãn trạng thái KHÔNG viết ở đây: dùng ENUMS (shared/lib/enums.ts).
 
+import { ENUMS } from "@/shared/lib/enums";
+
 export const STATUS_FILTERS: { value: string; label: string }[] = [
   { value: "", label: "Mọi trạng thái" },
   { value: "BOOKED,PAID,PROCESSING", label: "Chưa xong" },
-  { value: "BOOKED", label: "Giữ chỗ" },
-  { value: "PAID", label: "Đã thanh toán" },
-  { value: "PROCESSING", label: "Đang xử lý" },
-  { value: "COMPLETED", label: "Hoàn tất" },
-  { value: "CANCELLED,AUTO_CANCELLED", label: "Đã huỷ" },
+  { value: "BOOKED", label: ENUMS.salesOrderStatus.BOOKED.label },
+  { value: "PROCESSING", label: ENUMS.salesOrderStatus.PROCESSING.label },
+  { value: "COMPLETED", label: ENUMS.salesOrderStatus.COMPLETED.label },
+  // Nhóm gộp CANCELLED và AUTO_CANCELLED (Q-2): nhãn nhóm là "Đã huỷ", chip từng đơn vẫn tách theo ENUMS.
+  { value: "CANCELLED,AUTO_CANCELLED", label: ENUMS.salesOrderStatus.CANCELLED.label },
 ];
 
 export type DatePreset = "all" | "today" | "7d" | "30d" | "custom";
@@ -22,16 +24,15 @@ export const DATE_FILTERS: { value: DatePreset; label: string }[] = [
 /** Lọc loại khoản tiền ở hàng chờ — giá trị gửi thẳng lên `?match_status=`. */
 export const QUEUE_TYPE_FILTERS: { value: string; label: string }[] = [
   { value: "", label: "Mọi loại khoản tiền" },
-  { value: "UNDERPAID", label: "Thiếu tiền" },
-  { value: "UNMATCHED", label: "Không khớp đơn" },
-  { value: "ORPHAN", label: "Về sau khi đơn tự huỷ" },
-  { value: "OVERPAID", label: "Chuyển thừa" },
+  ...(["UNDERPAID", "UNMATCHED", "ORPHAN", "OVERPAID"] as const).map((value) => ({ value: value as string, label: ENUMS.paymentMatchStatus[value].label })),
 ];
 
 /** Lý do huỷ đơn (F2b). OTHER bắt buộc ghi chú (S14-AC6). */
-export const CANCEL_REASONS: { value: string; label: string }[] = [
-  { value: "CUSTOMER_CHANGED_MIND", label: "Khách đổi ý" },
-  { value: "DAMAGED_WHEN_PACKING", label: "Hư khi đóng hàng" },
-  { value: "GIVE_UP_AFTER_FAILED", label: "Bỏ sau khi giao thất bại" },
-  { value: "OTHER", label: "Khác" },
-];
+/** BR-GH-19: ghi chú huỷ tối đa 200 ký tự (BE chặn thêm chuỗi số dài như SĐT/số tài khoản). */
+export const CANCEL_NOTE_MAX = 200;
+
+/** Ô chọn lý do huỷ tay: 4 mã người dùng được chọn, nhãn lấy từ ENUMS (UNREACHABLE và UNREACHABLE_AUTO do luồng gọi xác nhận / hệ thống). */
+export const CANCEL_REASONS: { value: string; label: string }[] = (["CUSTOMER_CHANGED_MIND", "DAMAGED_WHEN_PACKING", "GIVE_UP_AFTER_FAILED", "OTHER"] as const).map((value) => ({
+  value: value as string,
+  label: ENUMS.cancelReason[value].label,
+}));

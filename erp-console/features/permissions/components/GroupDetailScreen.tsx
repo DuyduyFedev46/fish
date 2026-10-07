@@ -12,6 +12,7 @@ import { useCallback, useId, useMemo, useState } from "react";
 import { useAuth } from "@/features/auth/components/AuthProvider";
 import { toTimelineEntries } from "@/features/guidance/detailAdapters";
 import { PERM, homePath } from "@/shared/lib/nav";
+import { aiVisible } from "@/shared/lib/features";
 import { dateTime } from "@/shared/lib/format";
 import { groupLabel } from "@/shared/lib/groups";
 import { loadErrorText } from "@/shared/lib/http";
@@ -44,6 +45,7 @@ import {
   scopeValueLabel,
   sectionsOf,
   showsAllCustomers,
+  visibleRegistry,
 } from "../permissionsModel";
 import { useGroupDraft } from "../useGroupDraft";
 import { useGroupCode, useGroupDetail, type Loaded } from "../useGroupData";
@@ -97,11 +99,13 @@ function GroupDetailBody({ group: g, detail }: { group: GroupDetail; detail: Loa
   const replace = detail.replace;
   const reload = detail.reload;
   const onSaved = useCallback((next: GroupDetail) => replace(next), [replace]);
+  const aiOn = aiVisible(me);
+  const registry = useMemo(() => visibleRegistry(g.registry, aiOn), [g.registry, aiOn]);
   const drafting = useGroupDraft({ group: g, onSaved, reload });
   const { draft } = drafting;
   const states = useMemo(() => applyChanges(g.capabilities, draft.capabilities), [g.capabilities, draft.capabilities]);
   const values = useMemo(() => effectiveValues(g.data_scope_values, draft), [g.data_scope_values, draft]);
-  const sections = useMemo(() => sectionsOf(g.registry), [g.registry]);
+  const sections = useMemo(() => sectionsOf(registry), [registry]);
   const label = g.label || groupLabel(g.code);
   const labelOf = useCallback((key: string) => g.registry.find((r) => r.key === key)?.label ?? key, [g.registry]);
   const objectLabel = useCallback((key: string) => g.data_scopes.find((r) => r.key === key)?.label ?? key, [g.data_scopes]);

@@ -200,7 +200,7 @@ def run_owner(browser, errors):
     ok("Chủ: có Dòng thời gian", page.locator("#receipt-timeline").count() >= 1 or "DÒNG THỜI GIAN" in page.locator("main").inner_text().upper())
     ok("Chủ: có nút Thêm hoá đơn (phiếu chưa có hoá đơn)", page.get_by_role("button", name="Thêm hoá đơn").count() >= 1)
     items = menu_items(page)
-    ok("Chủ: menu … có Nhập chi phí mua, Huỷ phiếu", any(i.startswith("Nhập chi phí mua") for i in items) and any(i.startswith("Huỷ phiếu") for i in items), str(items))
+    ok("Chủ: menu … có Nhập chi phí phụ, Huỷ phiếu", any(i.startswith("Nhập chi phí phụ") for i in items) and any(i.startswith("Huỷ phiếu") for i in items), str(items))
     page.screenshot(path=f"{SHOTS}/ed10-2-chu-chi-tiet-pr101.png", full_page=True)
 
     # F1c Thêm hoá đơn: tiền đúng từng đồng; tên phiếu gắn sẵn
@@ -235,7 +235,7 @@ def run_owner(browser, errors):
     ok("F1c: lưu xong không có alert lỗi", alert_text(page) == "", alert_text(page))
 
     # F1d Nhập chi phí (phiếu 1 lô): AC4
-    pick_menu(page, "Nhập chi phí mua")
+    pick_menu(page, "Nhập chi phí phụ")
     page.wait_for_url(re.compile(r"/purchasing/costs/new/\?receipt=101"))
     page.locator("input[name=amount]").wait_for()
     settle(page)
@@ -427,7 +427,7 @@ def run_receive_form(browser, errors):
     ok("F1a: phiếu vừa tạo có 3 dòng nhập", page.locator("table tbody tr").count() >= 3)
 
     # F1d cho phiếu 3 lô: chia theo kg, tổng khớp đúng đồng
-    pick_menu(page, "Nhập chi phí mua")
+    pick_menu(page, "Nhập chi phí phụ")
     page.wait_for_url(re.compile(r"/purchasing/costs/new/\?receipt=\d+"))
     page.locator("input[name=amount]").wait_for()
     settle(page)
@@ -638,7 +638,7 @@ def run_real(browser):
     ok("Thật F1c: body hoá đơn amount đúng '1000000', receipt khớp phiếu", str(ib.get("amount")) == "1000000" and str(ib.get("receipt")) == rid, json.dumps(ib))
     ok("Thật F1c: hoá đơn mới hiện 1.000.000 đ trong phiếu", "1.000.000 đ" in page.locator("[data-testid=receipt-invoices]").inner_text())
     # F1d
-    pick_menu(page, "Nhập chi phí mua")
+    pick_menu(page, "Nhập chi phí phụ")
     page.wait_for_url(re.compile(r"/purchasing/costs/new/\?receipt=\d+"))
     page.locator("input[name=amount]").wait_for()
     page.wait_for_timeout(500)

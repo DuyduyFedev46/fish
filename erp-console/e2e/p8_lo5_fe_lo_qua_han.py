@@ -89,17 +89,17 @@ def run_chu(browser, tag, viewport, errors):
     orders = page.locator(".lt-card:has(h2:text-is('Đơn hàng gần đây'))")
     orders.locator("tbody tr").first.wait_for()
     heads = [h.strip() for h in orders.locator("thead th").all_inner_texts()]
-    ok(f"[{tag}] SR-17-AC3 bảng đơn: không có cột 'Khách' (cột: {heads})", "Khách" not in heads and len(heads) == 3)
+    ok(f"[{tag}] SR-17-AC3 bảng đơn (nay 5 cột, ED-08): không có cột 'Khách' (cột: {heads})", "Khách" not in heads and heads == ["Mã đơn", "Giá trị", "Trạng thái", "Lý do", "Còn giữ chỗ"])
     body_text = page.locator("body").inner_text()
     html = page.content()
     leaked = [n for n in OLD_CUSTOMERS if n in body_text or n in html]
     ok(f"[{tag}] SR-17-AC3 DOM không có tên khách mock", not leaked, str(leaked))
-    ok(f"[{tag}] SR-17-AC3 placeholder tìm kiếm không nhắc 'khách'", "khách" not in (page.locator("input[type=search]").first.get_attribute("placeholder") or "").lower())
+    ok(f"[{tag}] SR-17-AC3 placeholder tìm kiếm không nhắc 'khách'", "khách" not in " ".join((e.get_attribute("placeholder") or "") + " " + (e.get_attribute("aria-label") or "") for e in page.locator("input, .search-trigger").all()).lower())
 
     # ---- SR-15-AC4: thẻ Cần chú ý ----
     card = page.locator("[data-attention=expired_batches_open]")
     card.wait_for(timeout=10_000)
-    ok(f"[{tag}] SR-15-AC4 Chủ thấy thẻ 'Lô quá hạn còn tồn: 3'", "Lô quá hạn còn tồn: 3" in card.inner_text(), card.inner_text().replace("\n", " | "))
+    ok(f"[{tag}] SR-15-AC4 Chủ thấy thẻ '3 lô quá hạn còn tồn' (nhãn thẻ ED-08)", "3 lô quá hạn còn tồn" in card.inner_text(), card.inner_text().replace("\n", " | "))
     ok(f"[{tag}] SR-17 không cuộn ngang", no_hscroll(page))
     page.screenshot(path=f"{SHOTS}/lo5-{tag}-1-tong-quan-chu-the-can-chu-y.png")
 

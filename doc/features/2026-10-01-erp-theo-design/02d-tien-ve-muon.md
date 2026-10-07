@@ -212,6 +212,8 @@ Phía webhook: thay khối BR-TT-15 tại `services.py:300-310` bằng helper `f
 
 View `record_late` chỉ parse input bằng `RecordLatePaymentInput` (các `CharField` lỏng, để service trả lỗi thống nhất, theo mẫu `ReturnToSupplierInput`), gọi service, rồi trả `{"duplicate", "payment"}` với status 201 hoặc 200. View không chứa nghiệp vụ.
 
+**Đính chính 08/10 (TL15-H1).** "Khoản giống" không phụ thuộc bên kia có gắn đơn hay không: cùng số tiền và (với ca không có đơn chung) `received_at` trong `LATE_PAYMENT_DUPLICATE_WINDOW_HOURS`, cả hai chiều. `find_similar_payment`: có đơn X thì lấy giao dịch của X hoặc UNMATCHED không đơn trong cửa sổ; không đơn thì lấy UNMATCHED không đơn hoặc ORPHAN của đơn bất kỳ trong cửa sổ. `flag_possible_duplicate`: ORPHAN so với MANUAL ORPHAN cùng đơn hoặc MANUAL UNMATCHED không đơn; UNMATCHED so với MANUAL UNMATCHED hoặc MANUAL ORPHAN của đơn bất kỳ. Audit `create_refund` ghi `acknowledged_duplicate_warning: true` khi Chủ vượt nhãn (TL15-M1).
+
 ## 6. Rủi ro và cơ chế chặn
 
 | # | Rủi ro | Cơ chế chặn | Test bắt lỗi |

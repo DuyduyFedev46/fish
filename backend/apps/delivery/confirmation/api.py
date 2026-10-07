@@ -63,7 +63,7 @@ class ConfirmationQueueViewSet(NoStoreMixin, viewsets.GenericViewSet):
         try:
             note_id = int(lookup_val)
         except (ValueError, TypeError):
-            raise Http404("Mục chờ gọi không hợp lệ.")
+            raise Http404("Việc gọi xác nhận không hợp lệ.")
 
         task = self.get_queryset().filter(note_id=note_id).first()
         if not task:
@@ -77,7 +77,7 @@ class ConfirmationQueueViewSet(NoStoreMixin, viewsets.GenericViewSet):
         - Nếu có ?state=: lọc theo state chỉ định.
         """
         if not request.user.has_perm("delivery.confirm_with_customer"):
-            raise PermissionDenied("Bạn không có quyền truy cập hàng chờ CSKH.")
+            raise PermissionDenied("Bạn không có quyền truy cập hàng chờ Gọi xác nhận.")
 
         now = timezone.now()
         state = request.query_params.get("state")
@@ -118,7 +118,7 @@ class ConfirmationQueueViewSet(NoStoreMixin, viewsets.GenericViewSet):
         Chi tiết mục chờ gọi. Nếu CSKH ngoài phạm vi thì trả 404 (02b §3.2).
         """
         if not request.user.has_perm("delivery.confirm_with_customer"):
-            raise PermissionDenied("Bạn không có quyền xem chi tiết đơn CSKH.")
+            raise PermissionDenied("Bạn không có quyền xem chi tiết đơn Gọi xác nhận.")
 
         task = self.get_object()
         now = timezone.now()
@@ -138,7 +138,7 @@ class ConfirmationQueueViewSet(NoStoreMixin, viewsets.GenericViewSet):
         CSKH nhận đơn để xử lý gọi (khoá mềm).
         """
         if not request.user.has_perm("delivery.confirm_with_customer"):
-            raise PermissionDenied("Bạn không có quyền nhận xử lý đơn CSKH.")
+            raise PermissionDenied("Bạn không có quyền nhận xử lý đơn Gọi xác nhận.")
 
         task = self.get_object()
         now = timezone.now()
@@ -328,7 +328,7 @@ class CustomerSearchView(NoStoreMixin, APIView):
 
     def post(self, request, *args, **kwargs):
         if not request.user.has_perm("delivery.confirm_with_customer"):
-            raise PermissionDenied("Bạn không có quyền tìm kiếm đơn CSKH.")
+            raise PermissionDenied("Bạn không có quyền tìm kiếm đơn Gọi xác nhận.")
 
         raw_q = (request.data.get("q") if request.data else "") or ""
         raw_q = str(raw_q).strip()

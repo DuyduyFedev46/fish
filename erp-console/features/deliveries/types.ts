@@ -1,3 +1,5 @@
+import { ENUMS } from "@/shared/lib/enums";
+
 export type DeliveryStatus =
   | "CONFIRMING"
   | "PREPARING"
@@ -109,12 +111,12 @@ export type DeliveryStatusGroup =
   | "COMPLETED";
 
 export const STATUS_GROUP_TABS: Array<{ key: DeliveryStatusGroup; label: string }> = [
-  { key: "CONFIRMING", label: "Chờ xác nhận" },
-  { key: "PREPARING", label: "Soạn hàng" },
-  { key: "READY", label: "Chờ lấy" },
-  { key: "DELIVERING", label: "Đang giao" },
-  { key: "FAILED", label: "Giao thất bại" },
-  { key: "COMPLETED", label: "Hoàn tất (hôm nay)" },
+  { key: "CONFIRMING", label: ENUMS.deliveryStatus.CONFIRMING.label },
+  { key: "PREPARING", label: ENUMS.deliveryStatus.PREPARING.label },
+  { key: "READY", label: ENUMS.deliveryStatus.READY.label },
+  { key: "DELIVERING", label: ENUMS.deliveryStatus.DELIVERING.label },
+  { key: "FAILED", label: ENUMS.deliveryStatus.FAILED.label },
+  { key: "COMPLETED", label: `${ENUMS.deliveryStatus.COMPLETED.label} (hôm nay)` },
 ];
 
 export type LabelData = {
@@ -147,3 +149,30 @@ export type VoidLabelResponse = {
   already: boolean;
 };
 
+
+/**
+ * CS-17 `GET /api/delivery/notes/lookup/?code=`: kết quả tra mã tem. KHÔNG có tên, SĐT, địa chỉ, mã đơn hay giá.
+ * `warning`: "BR-GH-16" = tem cũ hoặc đã huỷ tem (`valid_print_no` = lần tem còn hiệu lực), "BR-GH-07" = phiếu đã huỷ.
+ */
+export type TagLookup = {
+  note_id: number;
+  status: DeliveryStatus;
+  print_no: number;
+  valid_print_no: number | null;
+  warning: "BR-GH-16" | "BR-GH-07" | null;
+};
+
+/** CS-16: dòng của phiếu soạn nội bộ. Chỉ 4 trường này được giữ lại từ chi tiết phiếu giao (không tên, SĐT, địa chỉ, giá). */
+export type PickSheetLine = {
+  item_name: string;
+  batch_id: string;
+  expiry_date: string;
+  qty_kg: string;
+};
+
+export type PickSheetData = {
+  note_code: string;
+  status: DeliveryStatus;
+  total_kg: string;
+  lines: PickSheetLine[];
+};

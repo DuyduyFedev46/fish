@@ -7,6 +7,7 @@ chi tiết (404), số đã hoàn, dòng thời gian đơn, guidance, báo cáo.
 """
 from django.contrib.auth.models import User
 
+from apps.accounts import roles
 from apps.accounts.models import AuditLog
 from apps.common.tests.fixtures import client_for
 from apps.inventory.models import ReturnToStock, StockLedgerEntry
@@ -143,6 +144,20 @@ class SoftDeleteReturnTests(ReturnsApiBase):
     def test_d8_list_rows_carry_available_actions(self):
         row = client_for(self.owner).get(URL).json()["results"][0]
         self.assertIn("delete", row["available_actions"])
+
+    def test_tl8f_l3_owner_without_add_returntostock_has_no_delete_action_and_post_is_403(self):
+        """TL8F-L3: Chủ bị tắt "Ghi hàng hoàn" thì `available_actions` không còn `delete` và POST `delete/` là 403."""
+        from django.contrib.auth.models import Group, Permission
+
+        perm = Permission.objects.get(content_type__app_label="inventory", codename="add_returntostock")
+        Group.objects.get(name=roles.OWNER).permissions.remove(perm)
+        owner = User.objects.get(pk=self.owner.pk)  # bỏ cache quyền
+        detail = client_for(owner).get(f"{URL}{self.rt.pk}/").json()
+        self.assertNotIn("delete", detail["available_actions"])
+        row = [r for r in client_for(owner).get(URL).json()["results"] if r["id"] == self.rt.pk][0]
+        self.assertNotIn("delete", row["available_actions"])
+        self.assertEqual(self.delete(owner).status_code, 403)
+        self.assertIsNone(ReturnToStock.all_objects.get(pk=self.rt.pk).deleted_at)
 
 
 class SoftDeleteReviewTests(ReturnsApiBase):

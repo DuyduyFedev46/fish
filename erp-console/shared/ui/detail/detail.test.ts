@@ -1,8 +1,11 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+vi.mock("@/features/auth/components/AuthProvider", () => ({ useAuth: () => ({ me: { ai_features_enabled: true } }) }));
 import { StatusPath } from "./StatusPath";
 import { Timeline } from "./Timeline";
+import { Section } from "./Section";
 import { CONFLICT_FIELD_MESSAGE, validateDraft } from "./InfoField";
 import { AiBlockFrame, type AiProposalView } from "./AiBlockFrame";
 
@@ -33,7 +36,7 @@ describe("Timeline", () => {
   it("không in mã BR, có nhãn AI, ghi rõ khi bị cắt", () => {
     const html = renderToStaticMarkup(
       createElement(Timeline, {
-        entries: [{ at: "2026-10-01T03:00:00Z", label: "Xác nhận nhập kho", actor: "AI của Lộc", byAi: true }],
+        entries: [{ at: "2026-10-01T03:00:00Z", label: "Xác nhận nhập kho", actor: "AI của Lộc" }],
         truncated: true,
       })
     );
@@ -128,5 +131,14 @@ describe("AiBlockFrame: giữ khung hỏi nhanh trong lúc trợ lý nạp (B6, 
     const html = render({ chat, starter });
     expect(html).not.toContain("data-ai-starter");
     expect(html).toContain("Đang mở trợ lý");
+  });
+});
+
+describe("Section: bậc tiêu đề (17b F5)", () => {
+  it("mặc định h3; headingLevel=2 vẽ h2", () => {
+    expect(renderToStaticMarkup(createElement(Section, { title: "Khối" }, "x"))).toMatch(/<h3[^>]*>Khối/);
+    const h2 = renderToStaticMarkup(createElement(Section, { title: "Khối", headingLevel: 2 }, "x"));
+    expect(h2).toMatch(/<h2[^>]*>Khối/);
+    expect(h2).not.toContain("<h3");
   });
 });

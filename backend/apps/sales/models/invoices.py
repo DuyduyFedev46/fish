@@ -37,7 +37,7 @@ class SalesInvoice(models.Model):
         ordering = ["-issued_at", "-id"]
         default_permissions = ("view", "change")  # BR-PQ-11: không add/delete
         permissions = [
-            ("confirm_payment_manual", "Xác nhận thanh toán thủ công"),
+            ("confirm_payment_manual", "Xác nhận đã nhận tiền"),
         ]
 
     def __str__(self):

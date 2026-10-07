@@ -99,14 +99,14 @@ def dlg(page):
 
 
 def run_roles(b):
-    exp = {  # user: (thấy menu, nút Nhập, nút duyệt ở phiếu Chờ duyệt)
-        "loc": (True, True, True), "ql1": (True, False, True), "kho1": (True, True, False),
+    exp = {  # user: (thấy menu, nút Nhập, nút duyệt ở phiếu Chờ duyệt). ql1 có nút Nhập hàng hoàn từ Lô bổ sung A (02/10): manager có add_returntostock
+        "loc": (True, True, True), "ql1": (True, True, True), "kho1": (True, True, False),
         "giao1": (True, True, False), "giao2": (True, True, False), "cs2": (True, True, False), "cs1": (False, False, False),
     }
     for u, (menu, add, appr) in exp.items():
         ctx, p = newp(b, u)
         navs = [t.strip() for t in p.locator(".nav a").all_inner_texts()]
-        ok(f"R {u}: menu Hàng hoàn về kho {'có' if menu else 'không'}", any("Hàng hoàn về kho" in t for t in navs) == menu, navs)
+        ok(f"R {u}: menu Hàng hoàn {'có' if menu else 'không'}", any("Hàng hoàn" in t for t in navs) == menu, navs)
         go(p, "/returns/")
         if not menu:
             ok(f"R {u}: URL trực tiếp -> Không có quyền, không lộ dữ liệu", p.get_by_role("heading", name="Không có quyền").count() >= 1 and "RT-" not in p.inner_text("main"))
@@ -115,7 +115,7 @@ def run_roles(b):
             ok(f"R {u}: nút Nhập hàng hoàn {'có' if add else 'không có'}", (p.get_by_role("button", name="Nhập hàng hoàn").count() == 1) == add)
             rows = p.locator("main table tbody tr").count()
             go(p, "/returns/detail/?id=1" if u not in ("giao2", "cs2") else "/returns/detail/?id=5")
-            has_buttons = p.get_by_role("button", name="Tái nhập vào lô").count() + p.get_by_role("button", name="Huỷ bỏ, ghi lỗ").count()
+            has_buttons = p.get_by_role("button", name="Tái nhập vào lô").count() + p.get_by_role("button", name="Huỷ hàng, ghi lỗ").count()
             if u in ("giao2", "cs2"):
                 ok(f"R {u}: phiếu của người khác -> Không tìm thấy", p.get_by_role("heading", name="Không tìm thấy").count() >= 1 and has_buttons == 0)
                 mine = [c.strip() for c in p.locator("main table tbody tr td:first-child").all_inner_texts()] if False else None
@@ -175,7 +175,7 @@ def run_columns_and_format(b):
     links = p.locator("main a[href]").evaluate_all("els => els.map(e => e.innerText.trim() + ' -> ' + e.getAttribute('href'))")
     print("INFO liên kết ở chi tiết:", links)
     ok("Chi tiết: Phiếu giao là liên kết bấm được (UI-RULES: đối tượng liên quan là link)", any(re.search(r"GH-HD", l) for l in links), links)
-    ok("Chi tiết: Đơn là liên kết bấm được", any(re.search(r"DH-2609", l) for l in links), links)
+    ok("Chi tiết: Đơn là liên kết bấm được", any(re.search(r"SO2609", l) for l in links), links)
     skip("Chi tiết: Lô là liên kết bấm được", "chờ Lô 7 (Kho & lô) vào main; dev ghi nợ, QA không tính lỗi")
     p.screenshot(path=f"{SHOTS}/impl-detail-ql1-1440.png")
     ok("Chi tiết: không có tiền / giá vốn", not re.search(r"₫|VND|[Gg]iá vốn|landed", p.locator("main").inner_text()))
@@ -258,7 +258,7 @@ def run_create_edges(b):
             ok(f"PII ghi chú {text!r}: {'bị chặn' if should_block else 'không bị chặn'}", True)
         if dlg(p).count() == 0:
             break
-    ok("PII: không lọt vào URL/storage (trừ danh sách người dùng mock và token)", "0912" not in p.url and "0912" not in p.evaluate("() => JSON.stringify(Object.entries(localStorage).filter(([k]) => !k.includes('mock_users') && !k.includes('token')).concat(Object.entries(sessionStorage)))"))
+    ok("PII: không lọt vào URL/storage (trừ khoá giả cave_erp_mock_* của mock và token)", "0912" not in p.url and "0912" not in p.evaluate("() => JSON.stringify(Object.entries(localStorage).filter(([k]) => !k.includes('mock_users') && !k.includes('token') && !k.startsWith('cave_erp_mock_')).concat(Object.entries(sessionStorage).filter(([k]) => !k.startsWith('cave_erp_mock_'))))"))
     ctx.close()
 
     # bấm đúp "Gửi duyệt": chỉ 1 phiếu
@@ -319,7 +319,7 @@ def run_approve_edges(b):
     ctx, p = newp(b, "loc")
     go(p, "/returns/detail/?id=5")
     p.evaluate("() => window.__caveMock.returnsMarkApproved(5)")
-    p.get_by_role("button", name="Huỷ bỏ, ghi lỗ").click()
+    p.get_by_role("button", name="Huỷ hàng, ghi lỗ").click()
     d = dlg(p)
     d.get_by_role("button", name="Duyệt", exact=True).click()
     p.wait_for_function("() => document.querySelector('[role=dialog]') && document.querySelector('[role=dialog]').innerText.includes('Tải lại')")
@@ -375,8 +375,8 @@ def run_privacy(b):
         txt = p.locator("main").inner_text()
         ok(f"PII {path}: không SĐT, không địa chỉ khách, không tên khách", not re.search(r"0\d{9}|\+84", txt) and not re.search(r"Nguyễn|Trần|Lê Văn|Phạm", txt), txt[:200])
         dump = p.evaluate("() => JSON.stringify([Object.entries(localStorage), Object.entries(sessionStorage), document.cookie])")
-        dump2 = p.evaluate("() => JSON.stringify(Object.entries(localStorage).filter(([k]) => !k.includes('mock_users') && !k.includes('token')).concat(Object.entries(sessionStorage), [document.cookie]))")
-        ok(f"PII {path}: storage (trừ danh sách người dùng mock) không chứa ghi chú/tên/SĐT", not re.search(r"Khách|Sai địa chỉ|Xe hỏng|0\d{9}", dump2), dump2[:300])
+        dump2 = p.evaluate("() => JSON.stringify(Object.entries(localStorage).filter(([k]) => !k.includes('mock_users') && !k.includes('token') && !k.startsWith('cave_erp_mock_')).concat(Object.entries(sessionStorage).filter(([k]) => !k.startsWith('cave_erp_mock_')), [document.cookie]))")
+        ok(f"PII {path}: storage (trừ khoá giả cave_erp_mock_* của mock) không chứa ghi chú/tên/SĐT", not re.search(r"Khách|Sai địa chỉ|Xe hỏng|0\d{9}", dump2), dump2[:300])
         ok(f"PII {path}: URL không chứa chữ tự do", re.fullmatch(r"[^?]*(\?id=\d+)?", p.url.replace(BASE, "")) is not None, p.url)
     ok("không console error/warning", p.__errors == [], p.__errors)
     ctx.close()

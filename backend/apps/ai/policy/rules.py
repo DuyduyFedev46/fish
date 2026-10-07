@@ -19,6 +19,7 @@ FORBIDDEN_PREFIXES = (
     "/api/dashboard/attention/",
     "/api/delivery/notes/lookup/",  # tra mã tem (CS-17): thuộc nghiệp vụ tem, cấm như …/label/
     "/api/sales/customer-directory/",  # danh bạ khách: tên, SĐT, địa chỉ, ghi chú (B2, bất biến 9)
+    "/api/sales/orders/search/",  # tìm đơn theo SĐT/tên khách bằng POST (NEW-1, bất biến 9): AI không dò dữ liệu cá nhân
     "/api/sales/customers/",  # endpoint khách cũ (S5/CS-01): cùng dữ liệu cá nhân
 )
 
@@ -83,6 +84,8 @@ FORCE_C_PERMS = frozenset({
 
 # Lọc đầu ra: Khoá PII khách (H2, bất biến 9 — loại bỏ đệ quy kể cả với Chủ)
 SCRUB_PII_KEYS = frozenset({
+    # PV-07: cờ "ô khách bị che" (null | expired | not_permitted) đi kèm tên/SĐT; AI không cần, bỏ để kết quả AI không đổi.
+    "customer_hidden_reason",
     "phone",
     "customer_phone",
     "customer_name",
@@ -106,6 +109,8 @@ SCRUB_PII_KEYS = frozenset({
     "phone_masked",
     "customer_address",
     "default_address",  # địa chỉ giao mặc định của khách (B2)
+    "cancel_note",  # ghi chú huỷ đơn (TL-D3-L4): có thể chứa tên/địa chỉ khách
+    "decision_note",  # lý do bỏ qua xác nhận/gia hạn/huỷ xác nhận
 })
 
 # Lọc đầu ra: Chữ tự do (H10 — tránh Prompt Injection)
@@ -116,6 +121,9 @@ SCRUB_FREE_TEXT_KEYS = frozenset({
     "failure_reason",
     "failure_note",
     "comment",
+    "cancel_note",
+    "decision_note",
+    "note_text",  # ghi chú cuộc gọi CSKH (CustomerCall)
 })
 
 # Lọc đầu ra: Khoá giá vốn khi thiếu view_costprice (bất biến 1, H3)

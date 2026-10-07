@@ -1,6 +1,6 @@
 "use client";
 
-// Phiếu hoàn (ED-12, tab 3 của "Đơn & tiền"). Chip Chờ hoàn · Đã hoàn · Thất bại; cột "Số tiền hoàn". Mặc định hiện phiếu
+// Phiếu hoàn tiền (ED-12, tab 3 của "Đơn & tiền"). Chip Chờ hoàn · Đã hoàn · Thất bại; cột "Số tiền hoàn". Mặc định hiện phiếu
 // còn phải chuyển (Chờ hoàn + Thất bại); lọc theo tháng (`month=YYYY-MM`) thì có thêm câu tổng tiền của tháng đó theo từng trạng thái (Chờ hoàn, Đã hoàn; không tính Thất bại).
 // Quản lý xem được danh sách, không có nút xử lý (BE trả `available_actions` rỗng). Bấm dòng → /orders/refunds/detail/?id=.
 
@@ -24,17 +24,17 @@ import { OrdersSectionTabs } from "./OrdersSectionTabs";
 import s from "../orders.module.css";
 
 const STATUS_OPTIONS = [
-  { value: "PENDING,FAILED", label: "Chờ chuyển (Chờ hoàn, Thất bại)" },
-  { value: "PENDING", label: "Chờ hoàn" },
-  { value: "FAILED", label: "Thất bại" },
-  { value: "REFUNDED", label: "Đã hoàn" },
+  { value: "PENDING,FAILED", label: `Chờ chuyển (${ENUMS.refundStatus.PENDING.label}, ${ENUMS.refundStatus.FAILED.label})` },
+  { value: "PENDING", label: ENUMS.refundStatus.PENDING.label },
+  { value: "FAILED", label: ENUMS.refundStatus.FAILED.label },
+  { value: "REFUNDED", label: ENUMS.refundStatus.REFUNDED.label },
   { value: "", label: "Mọi trạng thái" },
 ];
 
 export type MonthPart = { status: "PENDING" | "REFUNDED"; count: number; total: string };
 
 /**
- * Cộng tiền phiếu hoàn theo TỪNG trạng thái (Chờ hoàn, Đã hoàn) để câu tổng nói rõ đang cộng những phiếu nào theo bộ lọc.
+ * Cộng tiền phiếu hoàn tiền theo TỪNG trạng thái (Chờ hoàn, Đã hoàn) để câu tổng nói rõ đang cộng những phiếu nào theo bộ lọc.
  * Phiếu Thất bại không tính (tiền chưa rời túi), chỉ đếm riêng để câu chữ nhắc. Số tiền là chuỗi, cộng bằng số nguyên đồng.
  */
 export function monthBreakdown(rows: readonly RefundQueueItem[]): { parts: MonthPart[]; failedCount: number } {

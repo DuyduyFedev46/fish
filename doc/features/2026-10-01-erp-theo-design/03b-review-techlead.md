@@ -3070,3 +3070,642 @@ Tôi đã soát diff của `git show 90f66cd`, gồm `returns/api.py`, `returns/
 - **Câu hỏi cho Duy (từ M1):** phiếu hàng hoàn đã duyệt có cần đường đảo không? Nếu cần thì đó là tính năng BR-HV mới, không thuộc lô này.
 
 ### Kết luận #3/#8 BE sau re-review: **APPROVED**
+
+## Review sửa AuditLog.note (06/10)
+
+Phạm vi: TL-D3-L4 / TL15-L5, nhánh `fix/auditlog-note`, commit ebf67e7, `git diff b847087..HEAD` (10 file). Đối chiếu mục "Sửa AuditLog.note chữ tự do (06/10)" trong `03-dev-notes.md` và bất biến 9 (`caveve-domain`).
+
+**Lệnh techlead đã tự chạy trong worktree** (`DJANGO_DEBUG=1`, symlink tạm `backend/.env` và `backend/staticfiles`, đã gỡ sau khi chạy):
+- `manage.py test --parallel 4`: 2891 test, OK.
+- `makemigrations --check --dry-run`: No changes detected.
+- `python3 scripts/check_naming.py`: OK, không phát sinh vi phạm mới.
+- Dùng script `ast` (để ngoài repo) liệt kê toàn bộ 98 lời gọi `record_audit(` trong `backend/apps`, gồm cả đối số `note=` và `changes=`. Grep `AuditLog.objects.create|AuditLog(|bulk_create|get_model(...AuditLog)`: chỉ có `common/audit.py:153` tạo dòng. Ngoài ra chỉ có migration 0007, là backfill cũ.
+- Thăm dò `_is_raw` của test quét bằng `manage.py shell`: `str(reason)`, `reason.strip()`, `data["note"]`, `request.data.get("note")`, `f"{x.note[:50]}"` và biến đổi tên đều trả False, tức là lọt qua test (xem L1).
+
+### Kết quả theo hạng mục soát
+
+| Hạng mục | Kết quả |
+|---|---|
+| 9 điểm sửa trong diff | Đạt về mặt rò dữ liệu. Không còn chữ tự do ở `attach_payment`, hai nhánh `resolve_payment`, `mark_refund_failed`, `cancel_paid_order`, ba action của confirmation và `reject_*`. |
+| Các `record_audit` còn lại (rà từng dòng) | Đạt. Các `note` còn lại đều là câu cố định, mã hoặc số: AI (`ai/actions`, `ai/execution/pipeline.py`, `run_due_ai_actions.py`), accounts, inventory, `receipts` (tên NCC, không phải khách). `changes.reason` ở `content/entries/services.py:708,851` đã kiểm theo `RETURN_REASONS`/`UNPUBLISH_REASONS` (dòng 683, 824). `delivery/labels/services.py:146` dùng enum `LabelPrint.Reason`. `delivery/services.py:224` dùng mã `failure_reason`, còn `failure_note` không vào audit. `recipient_changed` chỉ ghi tên field. `update_customer` dùng `_CustomerAuditRef` và chỉ ghi tên field. |
+| `object_repr` | Đạt cho mọi lời gọi hiện có. `Customer.__str__` có tên và SĐT (`sales/models/customers.py:23`), nhưng đường duy nhất ghi audit cho Customer đã bọc `_CustomerAuditRef`. `__str__` của SalesOrder, DeliveryNote, PaymentTransaction và Refund chỉ có mã, số tiền và trạng thái. |
+| `purchasing/costs/services.py:83` | **be-dev đúng, techlead nhầm.** Dòng đó là `PurchaseCost.objects.create(note=note)`, tức chứng từ gốc. File này không import `record_audit`. Audit của luồng này nằm ở `recompute_landed_cost` (`inventory/batches/services.py:456`) và chỉ có `landed_unit_cost`. |
+| Allowlist 2 file của test quét | Nội dung hợp lý: `content/entries` dùng mã đã kiểm, `auto_confirm.py:71-174` dùng câu do hệ thống sinh. Cách miễn thì quá rộng (xem L1). |
+| Migration, giá vốn, phân quyền | Không đổi schema, không đụng serializer hay quyền. |
+
+### Ý nghĩa nghiệp vụ của nhãn "Có ghi chú (xem trên chứng từ gốc)"
+
+Người xem Nhật ký là Chủ và Quản lý (`accounts.view_auditlog`, `accounts/audit/api.py:37-42`). Nhãn chỉ đúng khi chữ gốc thật sự nằm trên một chứng từ mà hai vai này mở được:
+- `resolve_payment` (ATTACH/CONFIRM): chữ gốc nằm ở `PaymentTransaction.resolution_note` (`payments/services.py:628`). Serializer có trả field này (`payments/serializers.py:113`), quyền xem dùng mẫu `paymenttransaction: r`. **Đúng.**
+- `mark_refund_failed`: chữ gốc nằm ở `Refund.failure_reason`, `RefundSerializer` có trả. **Đúng.**
+- `resolve_payment` do hoàn tiền: nhãn mới là "Hoàn tiền theo phiếu hoàn #id" và `changes.refund_id` vẫn còn. **Đúng.**
+- `delivery_unconfirmed`, `delivery_confirm_skipped`, `delivery_extended`, ghi chú huỷ đơn OTHER, và `attach_payment` khi gắn chưa đủ tiền: **sai, chữ bị mất hẳn** (xem M1).
+
+### Lỗi
+
+**Critical:** không có. **High:** không có.
+
+**TL-AN-M1 · Medium · mất thông tin kiểm toán, nhãn chỉ tới chứng từ không có chữ.** Ở các điểm dưới đây, AuditLog là nơi **duy nhất** từng lưu chữ người dùng gõ. Sau bản sửa, chữ đó không còn được lưu ở đâu, trong khi Nhật ký lại ghi "xem trên chứng từ gốc". Câu trong `03-dev-notes.md` ("Chữ gốc vẫn nằm trên chứng từ") sai với các điểm này.
+- `backend/apps/delivery/confirmation/services.py:576`: `delivery_confirm_skipped`. Lý do là **bắt buộc** (dòng 557-558), vì Quản lý cho giao mà không xác nhận được với khách. Đây đúng là loại lý do kiểm toán cần giữ. `DeliveryNote` và `ConfirmationTask` không có field nào lưu lý do này.
+- `backend/apps/delivery/confirmation/services.py:611`: `delivery_extended` (lý do gia hạn), cùng tình trạng.
+- `backend/apps/delivery/confirmation/services.py:390`: `delivery_unconfirmed` (lý do CSKH huỷ xác nhận), cùng tình trạng.
+- `backend/apps/sales/orders/services.py:402`, cùng với `sales/orders/api.py:180-185` và `delivery/confirmation/services.py:628`: khi chọn OTHER, API **bắt buộc** nhập ghi chú, nhưng sau đó ghi chú bị bỏ đi. Nhật ký chỉ còn "Lý do: Khác". `CreditNote` chỉ lưu `reason_code`.
+- `backend/apps/sales/payments/services.py:574`: `attach_payment` khi gắn chưa đủ tiền. `note` không được lưu vào `resolution_note`, vì chỉ nhánh `_issue_and_close` lưu (dòng 628), nên ghi chú cũng mất.
+
+Ba lý do của confirmation đã bị chặn SĐT và số tài khoản (`has_long_digit_run`, tối đa 200 ký tự, BR-GH-19). Ghi chú huỷ đơn và `resolve_payment` thì chưa qua bộ lọc này.
+
+Cách sửa: **cần Duy chọn (câu hỏi 4 bên dưới)**, sau đó be-dev sửa trong cùng nhánh. Phần không cần quyết định thì làm ngay: (i) `attach_payment` nhánh chưa đủ tiền lưu `note` vào `p.resolution_note`, không cần migration; (ii) sửa câu trong `03-dev-notes.md`; (iii) với điểm nào không có chỗ lưu thì không được dùng nhãn "xem trên chứng từ gốc". Tạm thời dùng nhãn trung tính "Có ghi chú" cho tới khi Duy quyết.
+
+**TL-AN-M2 · Medium · `backend/apps/common/admin.py:46-65` (có từ trước, ngoài diff, nhưng nằm trong phạm vi "mọi cách tạo AuditLog").** Khi superuser sửa field bị khoá trong Django Admin, `_guarded_changes` chép nguyên giá trị `{"from", "to"}` vào `AuditLog.changes`. Danh sách khoá có `PaymentTransaction.raw_payload` (payload IPN có tên người chuyển) và `resolution_note` (`sales/admin.py:88-92`), cùng `Refund.failure_reason` và `bank_txn_ref` (`sales/admin.py:107-110`). Các giá trị này sẽ hiện ở Nhật ký cho Quản lý. Đường này chỉ superuser dùng và hiếm khi xảy ra, nhưng là đường trực tiếp đưa dữ liệu cá nhân khách vào audit, và test quét không bắt được (`changes=changes`). Cách sửa: thêm vào mixin `text_fields`/`pii_fields`, hoặc mặc định coi mọi `TextField`/`JSONField` là nhạy cảm. Với các field đó chỉ ghi `{"changed": true}`. Kèm một test Admin: superuser sửa `raw_payload` có tên giả thì AuditLog không chứa tên đó.
+
+**TL-AN-L1 · Low · `backend/apps/common/tests/test_auditlog_note_no_free_text.py:164-206`.** Test quét tĩnh là chốt chặn dò lỗi chứ chưa phải bảo đảm, và dễ bị lách:
+- `_is_raw` không đi vào `Call`/`Subscript`, nên `str(reason)`, `reason.strip()`, `data["note"]`, `request.data.get("note")` và `f"{x.note[:50]}"` đều lọt (đã thăm dò). Đổi tên biến cũng lọt.
+- Với `changes`, test chỉ xét dict literal và hai khoá `reason`/`note`. Không xét `changes=changes` (biến), cũng không xét khoá khác như `failure_note` hay `text`.
+- Allowlist miễn **cả file**, nên một lời gọi chữ tự do mới thêm vào `content/entries/services.py` hay `auto_confirm.py` sẽ không bị bắt.
+- Không có kiểm tra rằng `AuditLog.objects.create` chỉ xuất hiện ở `common/audit.py`.
+
+Đề xuất: duyệt đệ quy toàn bộ cây con (`ast.walk(kw.value)`). Có `Name`/`Attribute` thuộc `RAW_NAMES` thì báo, trừ khi nằm trong lời gọi `note_marker(...)`. Áp cách này cho mọi giá trị trong dict `changes`. Allowlist đổi sang từng cặp `(file, action)` hoặc comment `# audit: system-text` trên dòng. Thêm test grep `AuditLog.objects.create` ngoài `common/audit.py` và `migrations/`. Không cần làm cho test hoàn hảo, vì test chạy thật theo từng điểm mới là lớp chặn chính.
+
+**TL-AN-L2 · Low · `reject_ai_action` (`backend/apps/ai/actions/services.py:169-176`) mới chỉ có test tĩnh.** Nên thêm test chạy thật, và việc này rẻ: mở rộng `apps/ai/actions/tests/test_actions_api.py:175` (`test_dw11_ac4_reject_action`, đã gọi reject thật) để gửi `reason_code` chứa tên giả, rồi assert `log.note == f"Từ chối đề xuất AI {id}"`, `log.changes == {"has_reason_code": True}` và tên giả không có trong `note`/`changes`. Về nghiệp vụ, hiện FE không gửi `reason_code` (`erp-console/features/ai/actions/api.ts:92` mặc định `""`, `AiDocBlock.tsx:137`), nên việc bỏ giá trị không làm mất gì. Nếu sau này cần lý do từ chối thì phải kiểm theo danh sách mã cố định và lưu mã, không lưu chuỗi tự do.
+
+**TL-AN-L3 · Low · `test_refunded_payment_note_is_fixed_label`.** Test này dùng `bank_txn_ref=f"REF{FAKE_PHONE}"` nhưng chỉ assert tên giả không có, không assert `FAKE_PHONE`, vì SĐT giả vẫn nằm trong `changes.bank_txn_ref` (đúng hành vi hiện tại, xem câu hỏi 3). Nên ghi một comment nói rõ điều này để người sau không hiểu nhầm là test đã chặn SĐT.
+
+### Đề xuất cho 4 câu hỏi (điều phối viên hỏi Duy)
+
+1. **AuditLog cũ còn chữ tự do.** Khuyên chọn **(a) ẩn lúc đọc**, nhưng không dựa theo ngày: với các action bị ảnh hưởng (`attach_payment`, `resolve_payment`, `mark_refund_failed`, `cancel_paid_order`, `delivery_unconfirmed`, `delivery_confirm_skipped`, `delivery_extended`, `reject_*`), serializer Nhật ký chỉ trả `note` khi note khớp các mẫu cố định (`NOTE_PRESENT_LABEL`, `Lý do: <nhãn>`, `Hoàn tiền theo phiếu hoàn #…`, `Từ chối đề xuất AI …`). Không khớp thì trả nhãn trung tính. Cách này không cần cấu hình ngày deploy, không đụng DB, đảo ngược được, và giữ đúng bất biến 4 (AuditLog append-only). Phương án (b), lệnh ẩn danh hoá chạy một lần, là **sửa dòng của bảng append-only**. Chỉ nên dùng khi có yêu cầu xoá dữ liệu cụ thể của một khách theo Luật BVDLCN, và khi đó đi theo quy trình quyền của chủ thể dữ liệu (ẩn danh hoá có ghi vết, Duy duyệt từng lần, chạy staging trước). Lưu ý: Django Admin của AuditLog vẫn thấy chữ cũ, nhưng chỉ superuser vào được, chấp nhận được.
+2. **`staff_create`/`staff_update` ghi tên và SĐT nhân viên vào `changes`** (`accounts/staff/services.py:174-180` và khoảng dòng 205). Đây là dữ liệu cá nhân của nhân viên, không phải khách, nên không thuộc bất biến 9. Người xem Nhật ký (Chủ, Quản lý) cũng là người quản lý nhân viên. Vẫn khuyên **thu tối thiểu**: ghi `{"fields": [...]}` giống `update_customer`, giữ `username` và `groups`. Mức Low, làm ở lô accounts kế tiếp, không chặn bản sửa này.
+3. **`changes.bank_txn_ref`.** Khuyên **giữ**, vì đây là mã giao dịch cần để đối soát hoàn tiền, và chính phiếu hoàn cũng hiện mã này (`refunds/serializers.py:28`, timeline `orders/serializers.py:199`). Nhưng field này hiện là chuỗi tự do do Chủ gõ (`refunds/api.py:114`), nên nên **kiểm định dạng lúc nhập**, ví dụ chỉ nhận `[A-Za-z0-9._-]`, dài 1–64, không có khoảng trắng. Như vậy không gõ được tên người vào. Không dùng `has_long_digit_run`, vì mã ngân hàng vốn là chuỗi số dài. Mức Low, lô sau.
+4. **(Mới, từ M1) Lý do bỏ qua xác nhận, gia hạn, huỷ xác nhận và ghi chú huỷ đơn OTHER nên lưu ở đâu?**
+   - (a) **Khuyên chọn:** lưu trên chứng từ, bằng field mới `ConfirmationTask.decision_note` (CharField 200) cho ba action confirmation, và một field ghi chú huỷ trên `CreditNote` hoặc `SalesOrder` (CharField 200, chạy `has_long_digit_run` như BR-GH-19). Cách này cần migration nhỏ và lý do theo bất biến 8. Chữ nằm trên chứng từ có phân quyền, còn Nhật ký giữ nhãn "Có ghi chú (xem trên chứng từ gốc)", lúc đó mới đúng.
+   - (b) Giữ chữ trong `AuditLog.note` cho ba action confirmation, vì chữ đã bị lọc SĐT và số tài khoản, và người xem cũng là người ra quyết định. Cách này không cần schema, nhưng vẫn để tên khách có thể nằm trong Nhật ký.
+   - (c) Đổi sang chọn mã lý do từ danh sách cố định, kèm nhãn. Cần BA/PO và FE.
+
+### Kết luận: **CHANGES REQUESTED**
+
+Phần chặn rò dữ liệu của 9 điểm sửa là đúng: test chạy thật đủ, suite xanh 2891, không có migration. Lý do chưa duyệt là M1: bản sửa làm mất hẳn lý do kiểm toán bắt buộc (bỏ qua xác nhận, ghi chú huỷ OTHER) mà Nhật ký lại chỉ người xem tới một chứng từ không có chữ đó. Việc cần làm trước khi merge:
+- (i) `attach_payment` nhánh chưa đủ tiền lưu `resolution_note`.
+- (ii) Điểm nào chưa có chỗ lưu thì dùng nhãn trung tính.
+- (iii) Sửa câu trong dev-notes.
+- (iv) M2 (Admin) và L2 (test reject chạy thật), vì cả hai nhỏ và đúng chủ đề.
+
+L1 và L3 nên làm cùng lượt này. Phương án cuối cho các điểm trong M1 làm sau khi Duy trả lời câu hỏi 4. Câu hỏi 1–3 không chặn merge.
+
+### Re-review sau quyết định Duy (06/10)
+
+Phạm vi: `git diff 76e6086...HEAD`, gồm 40044a2 (sửa theo review), d5e4371 (`safe_note`, ẩn dòng AI), 6a00e4f (`decision_note`, `cancel_note` + migration), a3a439c và 2 merge main. Đối chiếu `doc/decisions.md` mục "2026-10-06 (chiều)".
+
+**Lệnh techlead đã tự chạy** (`DJANGO_DEBUG=1`, symlink tạm `.env`/`staticfiles`, đã gỡ, worktree sạch):
+- `manage.py test --parallel 4`: 3017 test, OK.
+- `makemigrations --check --dry-run`: No changes detected.
+- `check_naming.py`: không phát sinh vi phạm mới.
+- `sqlmigrate delivery 0010 --backwards` ra `DROP COLUMN "decision_note"`. `sqlmigrate sales 0014 --backwards` ra `DROP COLUMN "cancel_note"`.
+- Một test thăm dò tạm thời (đã xoá, không có trong diff) cho kết quả:
+  - (1) `SalesOrderDetailSerializer` với đơn có `pii_visible=False` trả `customer` toàn `None`, nhưng `cancel_note` vẫn ra nguyên văn `"Nguyễn Văn Giả, ngõ 5 Lê Lợi"` (dữ liệu giả).
+  - (2) `scrub_data({"cancel_note","decision_note","note"})` chỉ bỏ `note` và **giữ** `cancel_note`, `decision_note`.
+  - (3) `record_audit("create_and_submit_receipt", actor=<Chủ>)` trong `set_ai_audit_scope(action_ref="P-9")` cho ra `actor_kind="user"`, `proposal_ref="P-9"`. Khi `AI_ENABLED=False`, dòng này bị `exclude_ai_rows` ẩn.
+
+#### Các mục lần trước
+
+| Mục | Trạng thái |
+|---|---|
+| TL-AN-M1 (mất lý do bắt buộc) | **Đóng.** Lý do lưu ở `ConfirmationTask.decision_note` (`delivery/confirmation/services.py:383,570,603`) và `SalesOrder.cancel_note` (`sales/orders/services.py:405`). `attach_payment` nhánh chưa đủ tiền lưu `resolution_note` (`payments/services.py:573-574`). Nhãn "xem trên chứng từ gốc" nay đúng với mọi điểm. Phát sinh lỗi mới về cách lộ field, xem RR-H1 và RR-M1. |
+| TL-AN-M2 (Admin chép giá trị) | **Đóng.** `common/admin.py` coi `TextField`/`JSONField` (có `raw_payload`) và `free_text_fields` là chữ tự do, chỉ ghi `{"changed": true}`. Có test Admin. |
+| TL-AN-L1 (test quét dễ lách) | **Đóng.** Test duyệt đệ quy, bỏ qua `note_marker`, xét mọi khoá trong `changes`, allowlist theo cặp (file, action) kèm test cặp còn tồn tại. Có test các cách lách đã nêu và test chặn `AuditLog.objects.create`. Allowlist thêm `staff_create`, chấp nhận được trong lúc chờ câu hỏi 2. |
+| TL-AN-L2 (reject chạy thật) | **Đóng.** `ai/actions/tests/test_actions_api.py:186,202-205`. |
+| TL-AN-L3 (comment `bank_txn_ref`) | **Đóng.** `test_auditlog_note_no_free_text.py:142`. |
+
+#### Soát các điểm điều phối viên nêu
+
+| Điểm | Kết quả |
+|---|---|
+| Migration `delivery/0010`, `sales/0014` | **Đạt.** Chỉ có `AddField` CharField(200, blank, default ""). Trên Postgres 11+ thêm cột default hằng chỉ đổi metadata, không ghi lại bảng. Chạy lùi được (DROP COLUMN). Rollback sẽ mất chữ ghi chú đã lưu, nên cần ghi chú khi deploy. |
+| Field mới chỉ lộ cho người có quyền | **`decision_note` đạt:** chỉ có ở chi tiết hàng chờ, `""` khi `in_scope=false` (`delivery/confirmation/serializers.py:237`), không có ở danh sách, có test. **`cancel_note` không đạt** (RR-M1). |
+| Không vào API công khai | **Đạt.** `shop_api` không dùng hai serializer này (grep). |
+| Không vào AI | **Không đạt** (RR-H1). |
+| BR-GH-19 chặn SĐT trong ghi chú huỷ | **BE đạt.** `sales/orders/services.py:361-365` kiểm trước transaction, trả 400 mã `BR-GH-19`, có test. Lưu ý thêm: giới hạn mới 200 ký tự cũng là hành vi mới. **FE phải biết:** `erp-console/features/orders/components/CancelOrderModal.tsx:78` đang để `maxLength={500}`, phải hạ xuống 200, và phải hiện `detail` của lỗi `BR-GH-19` dưới ô ghi chú. Hai lỗi này có thể xảy ra từ cả màn huỷ đơn lẫn màn quyết định CSKH CANCEL. |
+| `safe_note` có lọt chữ tự do không | **Đạt.** Mẫu cố định đều neo đầu và cuối. `cancel_paid_order` chỉ nhận đúng nhãn trong `CANCEL_REASON_LABELS`, có thể ghép nhãn "Có ghi chú". Note cũ dạng `"Lý do: Khác — <chữ>"` và `"Phiếu hoàn #… · mã GD hoàn …"` đều ra "Có ghi chú". `reject_*` chỉ nhận `Từ chối đề xuất AI <[\w-]+>`, mà note cũ luôn có `". Lý do: …"` nên bị ẩn. Action ngoài danh sách vẫn trả nguyên văn, đúng vì lần rà trước đã xác nhận các action đó chỉ ghi câu hệ thống. Có một điểm nhỏ (RR-L2). |
+| Lọc dòng AI: `count`, phân trang, `?actor_kind=ai` | **Kỹ thuật đạt.** Lọc trên queryset trước `paginate_queryset` (`accounts/audit/api.py:51`), nên `count` và các trang khớp nhau. Khi tắt AI, `?actor_kind=ai` trả 0, có test. **Phạm vi lọc thì sai** (RR-M2). |
+
+#### Lỗi
+
+**Critical:** không có.
+
+**RR-H1 · High · `backend/apps/ai/policy/rules.py:112-119` (`SCRUB_FREE_TEXT_KEYS`), cùng `sales/orders/serializers.py:113` và `delivery/confirmation/serializers.py:237`.** Hai field chữ tự do mới không nằm trong danh sách lọc của AI. Viewset đơn hàng khai báo cho AI đọc (`sales/orders/api.py:73`, `AiMeta(keywords=("tra đơn",))`), nên khi AI đọc chi tiết đơn, `cancel_note` sẽ đi nguyên văn vào ngữ cảnh AI. Thăm dò (2) cho thấy scrub giữ lại field này. Ghi chú này có thể chứa tên hoặc địa chỉ khách: chỉ dãy số dài bị chặn, còn "ngõ 5 Lê Lợi" vẫn qua. Ghi chú cũng là kênh prompt injection, đúng lý do `note`/`reason` đã nằm trong danh sách. Câu trong `03-dev-notes.md` "không vào AI" là sai. Cách sửa: thêm `cancel_note` và `decision_note` vào `SCRUB_FREE_TEXT_KEYS`. Nên thêm cả vào `SCRUB_PII_KEYS` để field bị bỏ ở mọi đường scrub, không chỉ đường AI đọc. Test: `scrub_data` bỏ cả hai khoá, và một test AI đọc chi tiết đơn đã huỷ thì JSON trả về không có `cancel_note`. Nên thêm một test bảo vệ chung: mọi CharField/TextField tên `*_note`/`*_reason` của model nghiệp vụ phải nằm trong danh sách scrub, để field mới sau này không lọt lại.
+
+**RR-M1 · Medium · `backend/apps/sales/orders/serializers.py:113`.** `cancel_note` trả nguyên văn kể cả khi `pii_hidden(order)`, tức là NV giao có đơn đã quá cửa sổ, hoặc CSKH ngoài phạm vi (Tầng 3, SR-PII-02). Trong khi `get_customer` đã che tên, SĐT và địa chỉ của cùng đơn (thăm dò 1). Như vậy chưa nhất quán với `decision_note`, vốn đã chặn theo `in_scope`. Cách sửa: chuyển thành `SerializerMethodField` trả `""` khi `pii_hidden(order)`. Test: NV giao nhìn đơn ngoài cửa sổ thì `cancel_note == ""`. Chủ và Quản lý vẫn thấy.
+
+**RR-M2 · Medium · `backend/apps/accounts/audit/serializers.py:62` (`exclude_ai_rows`).** Quyết định của Duy là "ẩn các dòng **do AI làm**". Bộ lọc hiện tại ẩn cả những dòng **do người làm**:
+- (a) `confirm_*`/`reject_*`: Chủ hoặc Quản lý duyệt hay từ chối đề xuất, `actor_kind="user"`, có `proposal_ref`.
+- (b) **Dòng nghiệp vụ thật** do người duyệt thực thi, vì `confirm_ai_action` chạy lệnh trong `set_ai_audit_scope(action_ref=…)` (`ai/actions/services.py:101-114`) và `record_audit` tự gắn `proposal_ref` (`common/audit.py`). Ví dụ phiếu nhập được nộp hay lô được chốt sau khi người bấm duyệt. Thăm dò (3) xác nhận dòng này bị ẩn.
+- (c) `ai_config_update`, `ai_config_kill`, `ai_policy_update`: Chủ đổi cấu hình hoặc bấm công tắc tắt AI.
+
+Hậu quả: tắt AI làm biến mất khỏi Nhật ký những thay đổi chứng từ thật và hành động của Chủ. Như vậy là trái mục đích kiểm toán của BR-PQ-04/05. Cách sửa đề xuất: chỉ loại `actor_kind="ai"`, cộng với dòng Hệ thống thuộc vòng đời đề xuất AI (`actor_kind="system"` và có `proposal_ref`, ví dụ `escalate_overdue_*`, `fail_*`). Giữ mọi dòng `actor_kind="user"` và dòng `ai_*` do Chủ làm. Phải sửa test `test_note_redaction_and_ai_hide.py:71` (hiện đang khoá việc ẩn `ai_policy_update`) và thêm ca: dòng người có `proposal_ref` vẫn hiện khi AI tắt. Nếu Duy thật sự muốn ẩn cả dòng duyệt/từ chối và dòng cấu hình AI, thì điều phối viên hỏi lại một câu. Nhưng dòng nghiệp vụ ở (b) thì không được ẩn trong mọi trường hợp.
+
+**RR-L1 · Low · `backend/apps/delivery/confirmation/services.py:383,570,603`.** `decision_note` chỉ có một ô, nên mỗi quyết định ghi đè lý do trước. Ví dụ: gia hạn với lý do A, sau đó giao không xác nhận với lý do B, thì A mất. `unconfirm` không có lý do cũng xoá trắng lý do cũ. Dòng Nhật ký cũ vẫn ghi "xem trên chứng từ gốc", nhưng chứng từ lúc đó chỉ còn lý do mới nhất. Lý do bắt buộc (bỏ qua xác nhận) là quyết định cuối cùng nên vẫn còn, vì vậy chấp nhận cho lô này. Nếu cần đủ lịch sử thì phải chuyển sang bảng lịch sử quyết định, là việc của lô sau. Tối thiểu nên: `unconfirm` không ghi đè khi `clean_reason` rỗng, và ghi rõ hành vi này trong dev-notes.
+
+**RR-L2 · Low · `backend/apps/accounts/audit/serializers.py:21-22,29`.** Regex dùng `re.match` với `$`, mà `$` khớp được trước ký tự `\n` cuối chuỗi. Các mẫu hiện tại không có chỗ cho chữ tự do nên không lọt gì. Nên đổi sang `fullmatch` để chặt. Ngoài ra mẫu "Hoàn tiền theo phiếu hoàn" khai cho `attach_payment` nhưng action này không bao giờ ghi câu đó, nên bỏ đi cho gọn.
+
+**RR-L3 · Low · `backend/apps/sales/orders/services.py:346` và `sales/orders/api.py:184-185`.** Tham số `reason` của `cancel_paid_order` không còn được dùng trong thân hàm (code chết), nhưng API vẫn ghép chuỗi `"nhãn — ghi chú"` để truyền vào, và hai nơi gọi trong confirmation cũng vậy. Nên bỏ tham số này và các chỗ ghép chuỗi, hoặc ghi docstring rằng nó chỉ để tương thích.
+
+#### Việc cho FE (điều phối viên chuyển)
+- `CancelOrderModal.tsx:78`: đổi `maxLength` thành 200, hiện lỗi 400 `BR-GH-19` ("Không ghi SĐT hay số tài khoản vào ghi chú huỷ." / "Ghi chú huỷ tối đa 200 ký tự.") dưới ô ghi chú, không đóng modal. Màn quyết định CSKH CANCEL cũng có thể nhận lỗi này. Màn này đã giới hạn 200 và chặn SĐT từ trước.
+- Hiển thị `cancel_note` ở chi tiết đơn và `decision_note` ở chi tiết hàng chờ khi chuỗi không rỗng, bám theo contract trong `03-dev-notes.md` (sau khi sửa RR-M1, `cancel_note` có thể là `""` với người ngoài phạm vi).
+- Nhật ký: khi AI tắt, bộ lọc `actor_kind=ai` trả rỗng. Nên ẩn lựa chọn này theo cờ AI, như Lô 15 FE đã làm.
+
+### Kết luận re-review: **CHANGES REQUESTED**
+
+M1, M2 và L1–L3 của lần trước đã đóng. Suite xanh 3017 test, migration an toàn và chạy lùi được. Các việc phải sửa trước khi merge:
+- **RR-H1:** thêm `cancel_note`/`decision_note` vào danh sách scrub của AI, kèm test.
+- **RR-M1:** che `cancel_note` khi `pii_hidden`.
+- **RR-M2:** không ẩn dòng do người làm, ít nhất là dòng nghiệp vụ có `proposal_ref`, kèm sửa test.
+- Sửa câu "không vào AI" trong `03-dev-notes.md`.
+
+RR-L1 (phần `unconfirm` không xoá trắng), RR-L2 và RR-L3 nên làm cùng lượt. Sau khi sửa, gửi lại techlead re-review phần chênh.
+
+### Re-review sau 3411a13
+
+Phạm vi: `git show 3411a13`, gồm 9 file. Đây là phần sửa RR-H1, RR-M1, RR-M2, RR-L1–L3.
+
+**Lệnh techlead đã tự chạy** (`DJANGO_DEBUG=1`, symlink tạm `.env`/`staticfiles`, đã gỡ, worktree sạch):
+- `manage.py test --parallel 4`: 3022 test, OK.
+- `makemigrations --check --dry-run`: No changes detected.
+- `check_naming.py`: OK, không phát sinh vi phạm mới.
+
+Ghi nhận sự cố: lần chạy đầu của techlead đụng một phiên khác cũng đang tạo symlink `staticfiles` trong worktree. Lệnh `ln` của techlead vì vậy tạo ra một link vòng `backend/staticfiles/staticfiles` trong repo chính. Thư mục này bị gitignore, không ảnh hưởng tới git. Techlead đã gỡ link đó rồi chạy lại suite sạch như trên.
+
+| Mục | Kết quả |
+|---|---|
+| RR-H1 (scrub AI) | **Đóng.** `cancel_note`, `decision_note` có trong cả `SCRUB_PII_KEYS` lẫn `SCRUB_FREE_TEXT_KEYS` (`ai/policy/rules.py:109-110,121-123`). Vì nằm trong PII keys nên field bị bỏ ở mọi đường `scrub_data`: AI đọc (`pipeline.py:222`), kết quả thực thi (`pipeline.py:621`), args đề xuất (`ai/actions/serializers.py:65`). `note_text` (ghi chú cuộc gọi CSKH) là lỗ hổng cũ cùng loại, nay cũng đã được lọc. Test `AiScrubCoversFreeTextFieldsTests` quét mọi CharField/TextField không có choices, tên có `note/reason/memo/comment/description`. Allowlist 7 field: tôi đã soát từng field, đều là nội dung công khai hoặc mã cố định, có ghi lý do. Test quét theo tên field của model, không theo khoá JSON của serializer. Nếu serializer đổi tên khoá (ví dụ trả `failure_note` dưới tên `note`) thì test không bắt được. Hiện tại không có trường hợp nào lọt, và đây là chốt chặn hợp lý. |
+| RR-M1 (`cancel_note` theo `pii_hidden`) | **Đóng.** `sales/orders/serializers.py:225-227` dùng `SerializerMethodField`, cùng luật với `customer`. Có test cho cả hai nhánh. |
+| RR-M2 (phạm vi ẩn dòng AI) | **Đóng.** `accounts/audit/serializers.py` hiện chỉ loại `actor_kind="ai"` và dòng `system` có `proposal_ref`. Lọc vẫn chạy trên queryset trước khi phân trang, nên `count` và các trang vẫn khớp nhau. Test khoá cả hai phía: ẩn `propose_*`, `execute_*` (AI), `escalate_overdue_*` (Hệ thống), và giữ `confirm_*`, `reject_*`, dòng nghiệp vụ có `proposal_ref`, `ai_config_update`, `ai_config_kill`, `ai_policy_update`. Khớp đúng câu "dòng do AI làm" của Duy. |
+| RR-L1 (`decision_note`) | **Đóng ở mức đã thống nhất.** Lý do rỗng không còn ghi đè lý do cũ. Có test cho `unconfirm`. Phần chỉ giữ lý do mới nhất đã ghi trong dev-notes, để lô sau. |
+| RR-L2 (`fullmatch`) | **Đóng.** Hai regex đều dùng `fullmatch`. Có test đuôi `\n` + tên giả. Đã bỏ mẫu thừa của `attach_payment`. |
+| RR-L3 (`reason` chết) | **Chấp nhận.** API và `decide` không còn ghép hay truyền `reason`. Tham số vẫn còn trong chữ ký hàm, docstring ghi rõ lý do. Nơi gọi duy nhất còn truyền là auto-cancel (`delivery/confirmation/services.py`), với câu do hệ thống sinh, và giá trị đó không được ghi vào đâu. Không có rủi ro. Dọn hẳn khi có đợt sửa test của `cancel_paid_order`. |
+| Dev-notes | Câu "không vào AI" đã sửa thành "bị scrub khỏi dữ liệu AI đọc". Contract `cancel_note` đã ghi rõ trả `""` khi `pii_hidden`, kèm nhắc khi rollback migration. |
+
+**Việc FE (không đổi so với lần trước):**
+- `CancelOrderModal.tsx:78` đổi `maxLength` thành 200, và hiện lỗi `BR-GH-19` dưới ô ghi chú.
+- Hiển thị `cancel_note` và `decision_note` khi chuỗi không rỗng.
+- Ẩn lựa chọn lọc `actor_kind=ai` theo cờ AI.
+
+**Critical/High/Medium:** không còn.
+
+### Kết luận re-review sau 3411a13: **APPROVED**
+
+---
+
+
+## Review #15 FE (08/10)
+
+Phạm vi: `git diff 151b56e..HEAD` (commit 8e56749, 15 file, chỉ trong `erp-console/` và dev-notes). Đối chiếu `02d-tien-ve-muon.md` §3, §7 và contract BE thật (main 4b7554e, sau đính chính TL15-H1). Theo yêu cầu, techlead không build. Số liệu tsc, vitest, build, `check-no-mock` và e2e lấy theo dev-notes. Techlead chỉ chạy `check_naming.py`: không có vi phạm mới (còn 2 file `frontend/` đỏ sẵn trên main).
+
+| Mục | Kết quả |
+|---|---|
+| Quyền | **Đạt.** Nút "Ghi tiền về muộn" chỉ hiện khi `me.permissions` có `PERM.confirmPaymentManual`. Màn hàng chờ vốn đã đòi quyền này. BE vẫn chặn 403. |
+| Giờ GMT+7 | **Đạt.** Mặc định của ô là `nowForInput` = `todayInVietnam` + `timeHM`, cả hai theo giờ VN. Khi gửi, ô được đổi bằng `vnInputToIso` (+07:00 → ISO UTC). FE kiểm giờ tương lai với độ lệch 5 phút như BE. Giờ của khoản giống hiện bằng `dateTime` (giờ VN). |
+| Lỗi theo khoá | **Đạt.** FE chặn trước ba ô mã GD, số tiền và giờ. Lỗi 400 của BE hiện dưới đúng ô nhờ `fieldErrorsOf` đọc các khoá `bank_txn_id`, `amount`, `received_at`, `order_code`, và không lặp lại thành alert đỏ. `order_id` và `existing_payment_id` là số nên `fieldErrorsOf` bỏ qua, FE đọc riêng để dựng link "Mở đơn" và "Mở giao dịch đã có". |
+| 409 nghi trùng khi ghi | **Đạt.** `similarOf` chỉ nhận mã `LATE_PAYMENT_POSSIBLE_DUPLICATE`. Hộp vàng nêu mã GD và giờ, có link xem khoản giống. Nút chính bị khoá tới khi tick, rồi gửi `acknowledge_possible_duplicate: true`. Đổi số tiền, giờ hoặc mã đơn thì bỏ tick và hộp vàng: đúng, vì khoản giống phụ thuộc đúng ba ô này. |
+| C1: `RefundModal` | **Đạt.** Với nhánh `payment_transaction`, khi có nhãn và đã tick thì gửi `acknowledge_duplicate_warning: true`. Nút chính khoá tới khi tick. Nếu BE trả 409 `PAYMENT_DUPLICATE_WARNING` (nhãn xuất hiện sau khi màn đã tải) thì hộp tick mở lại với nhãn của BE và không báo lỗi đỏ. Lần gửi lại giữ nguyên `request_id`. An toàn, vì lần 409 ở BE đã rollback nên không có phiếu nào mang `request_id` đó. Nhánh `sales_invoice` (`OrderDetailScreen`) không đổi, đúng contract. |
+| Nhãn nghi trùng | **Đạt.** Ở hàng chờ có icon cảnh báo cạnh chip, kèm `title` là nhãn và chữ `sr-only` cho trình đọc màn hình. Ở chi tiết có `FormAlert kind="warn"`. Không hiện mã BR. |
+| Dòng thời gian | **Chấp nhận, ghi nợ.** `paymentTimeline` đổi nhãn mốc nhận thành "Ghi tay tiền về muộn {tiền} (mã GD …)" khi khoản là `MANUAL` + `ORPHAN`/`UNMATCHED`. Nhãn chuẩn, không chữ tự do. Có hai giới hạn (TL15F-L1). |
+| Mock đúng contract | **Đạt.** Mock có đủ các ca: 403 (chặn ở đầu `mockPaymentsApi`), 400 theo khoá ô với đúng câu của BE, `LATE_PAYMENT_ORDER_*`, `BR-TT-03` kèm `existing_payment_id`, 200 `duplicate`, 409 kèm `similar_*`. Luật khoản giống chép theo **bản đính chính TL15-H1**: có đơn thì xét giao dịch của đơn hoặc UNMATCHED không đơn trong 72 giờ; không đơn thì xét UNMATCHED không đơn hoặc ORPHAN trong 72 giờ. Có ack và có khoản giống thì gắn nhãn. Phiếu hoàn nhận 409 với `detail` là nhãn, và thứ tự kiểm khớp BE. |
+| Mock không lọt build thật | **Đạt.** `recordLatePayment` dùng `mock: process.env.NEXT_PUBLIC_USE_MOCK === "1" ? mockPaymentsApi : undefined`, giống các hàm cùng file. `flagDuplicate` nằm trong khối `if (NEXT_PUBLIC_USE_MOCK === "1" …)`. `beErrors.mock.ts` chỉ được import từ file mock; `shared/lib/messages.ts` chỉ nhắc tới nó trong comment. Dev-notes ghi build mock=0 cùng `check-no-mock` đều XANH. |
+| Sửa `shared/lib/beErrors.mock.ts` | **Chấp nhận** (ngoại lệ nhỏ ngoài `features/orders`, đã ghi trong dev-notes). Tham số `extra` là tuỳ chọn, nên mọi nơi gọi cũ không đổi hành vi. `"$detail"` thay bằng chính câu lỗi. Các câu mới chép đúng thông điệp BE ở `payments/services.py`. |
+| Dữ liệu cá nhân, URL, storage | **Đạt.** Form chỉ có 4 ô, không có ô ghi chú. Không dùng `localStorage`/`sessionStorage` và không có query string chứa giá trị form (`?id=` chỉ là id giao dịch hay id đơn). Không có `console.*`. Thân lỗi 409 chỉ có id, mã GD và giờ. |
+| UI-RULES, tên chuẩn | **Đạt.** Chữ đời thường, không có mã luật. Nút chính nói rõ việc và số tiền ("Ghi nhận 350.000 đ"). Nút ≥ 44 px, 360 px không cuộn ngang (theo e2e). Định danh tiếng Anh. "Phiếu hoàn" ở đây đúng nghĩa hoàn **tiền**. |
+
+### Lỗi (không có Critical, High hay Medium)
+
+**TL15F-L1 · Low · nợ BE+FE, dòng thời gian khoản ghi muộn (`orderDetailModel.ts:221-227`).** (a) Mốc hiện giờ nhận theo sao kê, không phải giờ bấm ghi, và không có tên người ghi, vì `PaymentTransactionSerializer` chưa trả `created_at`/người ghi. Trong khi đó BE đã có sự kiện `payment_recorded_late` kèm người làm ở `build_payment_timeline`. (b) Nhãn được suy ra từ `MANUAL` + `ORPHAN`/`UNMATCHED`, nên các dòng cũ trước 02/10 (xác nhận tay trên đơn Tự huỷ ra `MANUAL ORPHAN`) cũng hiện "Ghi tay tiền về muộn". Hướng xử lý cho lô sau: FE lấy timeline từ guidance `payment`, hoặc BE thêm `recorded_at`/`recorded_by` vào serializer. Không chặn lô.
+
+**TL15F-L2 · Low · `messages.ts`.** `dupRefundNeedAck` không có chỗ nào dùng, nên bỏ. `RefundModal.tsx` còn một dòng trống thừa sau `useSubmit` (khoảng dòng 77). Sửa khi tiện.
+
+**TL15F-L3 · Low · ghi nhận.** Trong `RecordLatePaymentModal`, nếu đã tick ack rồi lần gửi sau nhận một lỗi 400 khác thì hộp vàng biến mất, nhưng `ack` vẫn là `true`. Lần gửi kế tiếp mang theo ack mà người dùng không thấy hộp. Chấp nhận được: ack chỉ còn khi số tiền, giờ và mã đơn không đổi, tức khoản giống vẫn là khoản đã được xem. Nếu muốn chặt hơn thì `setAck(false)` khi `similarOf(err)` là null.
+
+### Điều kiện
+
+- **C1 đã thoả về mặt FE.** BE #15 (main 4b7554e) và FE #15 phải **deploy cùng một đợt**.
+- QA #15 phải chạy E2E trên **BE thật**, đủ 4 ca ở 02d §7, cộng ca chéo loại TL15-H1: ghi không gắn đơn, rồi bắn IPN có mã đơn Tự huỷ với mã GD khác, kiểm nhãn và ô tick khi hoàn. Hiện e2e của dev mới chạy trên mock.
+
+### Kết luận Review #15 FE (08/10): **APPROVED**
+
+## Review #15 BE (08/10)
+
+Phạm vi: `git diff main...feat/tien-ve-muon` (commit fdba607, 17 file). Đối chiếu `02d-tien-ve-muon.md` (LP-AC1…16, §3–§7) và dev-notes "#15 ghi tiền về muộn (BE)".
+
+**Lệnh techlead tự chạy (08/10).** Chạy trên cây đã merge thử `main` (5116d99, có Phạm vi Lô 3) với nhánh. Dùng `git merge-tree`, không xung đột. Worktree tạm nằm ở scratchpad và đã gỡ.
+- `makemigrations --check --dry-run`: No changes detected.
+- `manage.py test apps.sales apps.ai apps.accounts` (`DJANGO_DEBUG=1`): 1421 test, 1411 OK. 10 ERROR đều là test HTML trang admin, lỗi `Missing staticfiles manifest entry`. Đây là lỗi môi trường tạm (chưa `collectstatic`), không phải lỗi code.
+- `check_naming.py`: không có vi phạm mới. Chỉ còn 2 file `frontend/` đã đỏ sẵn trên main.
+
+### Kết quả theo mục được giao
+
+| Mục | Kết quả |
+|---|---|
+| Tiền, làm tròn đồng | **Đạt.** Đi qua `validate_amount` (Decimal, ROUND_HALF_UP 0,01, tối thiểu 1 đ, trần cột). Có test `350000.004 → 350000.00` và 6 giá trị sai. Không dùng float. |
+| Không sửa số kỳ cũ | **Đạt.** `received_at` cho lùi ngày tuỳ ý, nhưng (a) báo cáo không đọc `PaymentTransaction.received_at`; (b) `ORPHAN`/`UNMATCHED` không vào `_countable_payments`; (c) gắn dòng `UNMATCHED` vào đơn (S12) thì xuất hoá đơn với `issued_at=now` (`services.py:841`), không theo giờ ghi muộn; (d) phiếu hoàn ghi sổ lúc xác nhận. Nên ghi muộn không đổi số của kỳ đã qua. |
+| Nghi trùng hai chiều | **Đạt theo 02d, nhưng 02d có lỗ.** Ghi tay sau webhook trả 409 kèm tick. Webhook sau ghi tay thì gắn nhãn. Hai chiều chỉ hoạt động khi **cùng loại**: ORPHAN↔ORPHAN cùng đơn, hoặc UNMATCHED↔UNMATCHED. Ca chéo loại không bị bắt, xem **TL15-H1**. |
+| Job tự khớp bỏ qua MANUAL | **Đạt.** `auto_confirm.py:51` thêm `.exclude(source=MANUAL)`. Có test qua job thật và qua query. |
+| Quyền `confirm_payment_manual` | **Đạt.** Có `required_perms` ở action và `check_permissions` → `require_perm` ở viewset. Có test 401, test 403 cho 4 Group (không ghi dòng nào, không ghi audit), và test user chỉ có perm thì được ghi. Người gọi không có tham số nào để tự đặt `source`, `match_status`, `sales_order` hay `environment` (có test). |
+| `raw_payload`, AuditLog, dữ liệu cá nhân | **Đạt.** Cả hai nhánh đều có `raw_payload={}`. `record_late_payment` chỉ ghi 7 khoá (mã GD, tiền, loại, nguồn, mã đơn, giờ, cờ ack), không có `note`. Có test khoá `note` chứa SĐT giả và kiểm rằng nó không nằm trong model, audit, hai timeline hay response. Response không có `raw_payload`, giá vốn, tên hay SĐT. Có test `assertNoLogs`. Mã GD chỉ nhận ký tự `[A-Z0-9._/-]`. |
+| AI `record_late` | **Giữ, không cấm.** Lệnh nằm trong `RED_ZONE_PERMS` (`confirm_payment_manual`). `effective_level` tính trần theo `spec.max_level`, kể cả khi Chủ mở vùng đỏ (`policy/effective.py:150`), nên trần thực tế là **C**: AI chỉ điền đề xuất, Chủ bấm xác nhận. Mức này giống `sales.salesorder.confirm_payment` và `resolve`. Cấm hẳn AI không thêm an toàn, vì mọi số trên phiếu Chủ vẫn phải tự đối chiếu với sao kê. Còn một điểm nhỏ ở **TL15-L1**. |
+| Đổi contract refund | **Đúng 02d, có điều kiện triển khai** (**TL15-C1**). FE hiện tại (main) không gửi `acknowledge_duplicate_warning`. 409 `PAYMENT_DUPLICATE_WARNING` không thuộc `CONFLICT_CODES` và không có `updated_at`, nên `ConfirmModal`/`useSubmit` hiện nó như lỗi thường, alert đỏ kèm câu nhãn. Không vỡ màn hình. Tuy vậy **Chủ sẽ không lập được phiếu hoàn** cho mọi giao dịch có nhãn, gồm cả dòng `OVERPAID` BR-TT-15 đã có trên production, cho tới khi FE #15 có ô tick. Lối gọi AI `create_refund` cũng không gửi được cờ này. Đây là hành vi đúng (AI không vượt được cảnh báo). |
+| Sửa GW-03 | **Đạt.** `next_steps.py:151` đọc `payment.duplicate_warning`, áp cho mọi loại khoản. Import `DUPLICATE_MANUAL_WARNING` không còn dùng đã được bỏ. Có test. |
+| Va chạm Phạm vi Lô 3 | **Không va chạm.** Ở `sales/payments/api.py`, main chỉ sửa docstring `SalesInvoiceViewSet`, còn nhánh thêm action vào `PaymentTransactionViewSet`. `merge-tree` sạch. `PaymentTransactionSerializer` không bị Lô 3 đổi. Bộ test sales/ai/accounts trên cây merge vẫn xanh (trừ lỗi môi trường đã nêu). |
+| Đúng thiết kế khác | Có `late_serializers.py` tách riêng và đếm 31→32 `@action` (giả định 2, 3 của dev). **Chấp nhận** cả hai. Giả định 1 (ack mà không có khoản giống thì không gắn nhãn) cũng **chấp nhận**. |
+
+### Lỗi
+
+**TL15-H1 · High · lỗ thiết kế 02d §5 (lỗi của techlead, không phải của dev). Nghi trùng không bắt ca chéo loại, nên có thể hoàn hai lần.**
+- `services.py:402-416` `find_similar_payment`: khi không có đơn, hàm chỉ tìm `UNMATCHED` không gắn đơn. Khi có đơn, hàm chỉ tìm giao dịch của chính đơn đó.
+- `services.py:436-446` `flag_possible_duplicate`: nhánh `ORPHAN` chỉ so với `MANUAL ORPHAN` cùng đơn. Nhánh `UNMATCHED` chỉ so với `MANUAL UNMATCHED` không đơn.
+- Tái hiện (ca thật, hay gặp nhất). Đơn SO-A tự huỷ. Chủ thấy 350.000 đ trên sao kê nhưng không chắc của đơn nào, nên ghi muộn **không gắn đơn** (`UNMATCHED`, mã FT…01). Sau đó IPN của cổng về trễ. IPN luôn mang mã đơn, và vì không có FT nên lùi về id SePay (02d R2). Kết quả là dòng `ORPHAN` gắn SO-A với mã GD khác, **không có nhãn**. Cả hai dòng đều OPEN và có `refund` trong `available_actions`, không có tick nào chặn → hoàn hai lần 350.000 đ.
+- Chiều ngược lại cũng lọt. Webhook/IPN đã tạo `ORPHAN` trên SO-A, sau đó Chủ ghi muộn **không gắn đơn** cùng số tiền với mã khác. `find_similar_payment(order=None)` không thấy, nên không trả 409.
+- Sửa: coi "khoản giống" là **cùng số tiền và `received_at` trong cửa sổ `LATE_PAYMENT_DUPLICATE_WINDOW_HOURS`**, không phụ thuộc bên kia có gắn đơn hay không, với các ca sau:
+  - `find_similar_payment(order=None)`: thêm `Q(match_status=ORPHAN)` (đơn bất kỳ) bên cạnh `UNMATCHED` không đơn.
+  - `find_similar_payment(order=X)`: giữ nhánh "giao dịch của X", thêm `UNMATCHED` không đơn trong cửa sổ.
+  - `flag_possible_duplicate` nhánh `ORPHAN`: thêm `MANUAL UNMATCHED` không đơn trong cửa sổ.
+  - `flag_possible_duplicate` nhánh `UNMATCHED`: thêm `MANUAL ORPHAN` (đơn bất kỳ) trong cửa sổ.
+- Test bắt buộc (4 ca): ghi tay không đơn rồi IPN ORPHAN thì dòng IPN có nhãn; IPN ORPHAN rồi ghi tay không đơn thì 409; webhook UNMATCHED rồi ghi tay gắn đơn huỷ thì 409; ghi tay gắn đơn huỷ rồi webhook UNMATCHED thì có nhãn. Mỗi ca thêm một ca ngoài cửa sổ hoặc khác tiền để chứng minh không gắn nhãn thừa.
+- Techlead nhận đây là phần đính chính 02d §5 và R2. Điều phối viên ghi một dòng "đính chính 08/10" vào 02d khi sửa.
+
+**TL15-M1 · Medium · `refunds/services.py:135-139`. Quyết định vượt cảnh báo không để lại dấu vết.** Chủ gửi `acknowledge_duplicate_warning=true` thì phiếu hoàn được tạo, nhưng audit `create_refund` không ghi việc Chủ đã xác nhận qua nhãn nghi trùng. Đây là thao tác làm tiền rời túi, đi ngược một cảnh báo của hệ thống, nên phải truy được ai đã bấm (BR-PQ-04/05). Sửa: khi `p.duplicate_warning` khác rỗng thì thêm `"acknowledged_duplicate_warning": True` vào `changes`, chỉ là cờ, không chép nhãn. Thêm test assert khoá này trong `test_lp_ac13_refund_blocked_without_ack_then_ok_with_ack`.
+
+**TL15-L1 · Low · AI và `acknowledge_possible_duplicate`.** `RecordLatePaymentInput` khai cờ này nên AI có thể đề xuất sẵn `true`, và Chủ bấm xác nhận mà không thấy hộp 409. Nên bỏ cờ khỏi tham số AI được điền, hoặc để pipeline luôn ép `false` với lệnh này. Không chặn lô này, đưa vào nợ AI.
+
+**TL15-L2 · Low · `services.py:368-376`.** `parse_datetime("2026-10-03")` (Python 3.11 `fromisoformat`) nhận chuỗi chỉ có ngày thành 00:00. Ngoài ra không có cận dưới cho giờ nhận, nên gõ nhầm năm 2006 vẫn ghi được. Cả hai đều không đổi số kỳ cũ (xem bảng trên), nhưng làm lệch thứ tự timeline và cửa sổ nghi trùng. Nên đòi có phần giờ và chặn cũ hơn khoảng 400 ngày. Không chặn lô này.
+
+**TL15-L3 · Low · ghi nhận.** Kiểm nghi trùng chạy ngoài khoá, nên hai lần ghi đồng thời **khác** mã GD mà cùng tiền vẫn qua cả hai, không có nhãn. Ca này phải do hai người cùng bấm trong vài trăm ms, khó xảy ra với một Chủ. Chấp nhận.
+
+### Điều kiện (không phải lỗi code)
+
+- **TL15-C1. Phát hành đồng bộ.** Không deploy BE #15 lên staging hay production khi FE #15 (ô tick trong `RefundModal`, nhãn ở hàng chờ và chi tiết) chưa đi cùng đợt. Nếu không, Chủ bị khoá hoàn tiền với mọi giao dịch có nhãn. Merge vào main được, vì merge không phải deploy. Trước khi deploy production, nên đếm số dòng `duplicate_warning <> ''` và `resolution_status='OPEN'` (chỉ đếm, không đọc dữ liệu) để biết bao nhiêu dòng cũ sẽ đòi tick.
+- **TL15-C2. Ghi BR-TT-18 vào spec khi nghiệm thu.** `doc/business-process-spec.md` §P-05 hiện chỉ có tới BR-TT-07 (BR-TT-08…17 còn nằm ở hồ sơ tính năng, nợ cũ). BR-TT-17 đã dùng ở hồ sơ SePay, nên số 18 không trùng. Đề xuất thêm ngay dưới BR-TT-07:
+  > | BR-TT-18 | **Tiền về muộn mà webhook/IPN không báo** (E-05, đơn đã huỷ/tự huỷ hoặc chưa rõ đơn): Chủ (hoặc người có `confirm_payment_manual`) ghi tay ở Hàng chờ thanh toán. Hệ thống tạo giao dịch `MANUAL` đang Chờ xử lý: `ORPHAN` nếu gắn đơn đã huỷ, `UNMATCHED` nếu không gắn đơn. **Không đổi đơn, kho, hoá đơn**; bước sau đi qua hàng chờ (gắn đơn / phiếu hoàn). Không ghi gắn đơn đang giữ chỗ hoặc đã thanh toán. Không có ô ghi chú. Mã GD chống trùng (BR-TT-03). Khoản cùng số tiền trong cửa sổ `LATE_PAYMENT_DUPLICATE_WINDOW_HOURS` bị gắn nhãn nghi trùng; phiếu hoàn trên giao dịch có nhãn phải xác nhận "đã đối chiếu sao kê" (áp cả nhãn BR-TT-15) *(D, 03/10; Q1–Q3 theo mặc định 02d)*. |
+
+  Sửa thêm dòng E-05 ở §13 thành `BR-TT-07, BR-TT-18`.
+
+### Kết luận Review #15 BE (08/10): **CHANGES REQUESTED**
+
+Phải sửa trước khi merge: **TL15-H1** (4 nhánh + 4 test) và **TL15-M1** (1 khoá audit + 1 assert). L1–L3 đưa vào nợ. C1, C2 là điều kiện cho điều phối viên. Sau khi sửa, techlead re-review chỉ phần diff mới và chạy lại `apps.sales.payments` cùng `apps.sales.refunds`.
+
+### Re-review sau d51a89d
+
+Phạm vi: `git show d51a89d`, 4 file (`payments/services.py`, `refunds/services.py`, test, đính chính 02d §5).
+
+**Lệnh techlead đã tự chạy** (`DJANGO_DEBUG=1`, worktree `tien-ve-muon`, không tạo file nào trong worktree):
+- `manage.py test apps.sales.payments apps.sales.refunds apps.sales.orders apps.ai.registry`: 569 test, 568 OK. Còn 1 ERROR là `test_f5b_gl03_ac10_admin_post…`, lỗi HTML trang admin `Missing staticfiles manifest`. Đây là lỗi môi trường, đã gặp ở lần review trước, không liên quan code.
+- `makemigrations --check --dry-run`: No changes detected.
+- `check_naming.py`: không có vi phạm mới.
+
+| Mục | Kết quả |
+|---|---|
+| TL15-H1, chiều ghi tay (`find_similar_payment`, `services.py:409-429`) | **Đóng.** Có hai trường hợp:<br>- **Có đơn X:** lấy giao dịch của chính X trước. Không cửa sổ, giữ như cũ, vẫn bỏ dòng `-THUA`. Không có thì lấy `UNMATCHED` không đơn, cùng tiền, trong cửa sổ.<br>- **Không đơn:** lấy `UNMATCHED` không đơn hoặc `ORPHAN` của đơn bất kỳ, cả hai đều cùng tiền và trong cửa sổ.<br>`ORPHAN` ở đây không lọc theo nguồn, đúng ý: Chủ ghi sau webhook hoặc IPN. |
+| TL15-H1, chiều webhook (`flag_possible_duplicate`, `services.py:432-461`) | **Đóng.** Chỉ so với dòng `MANUAL`, loại chính nó, cùng tiền:<br>- **`ORPHAN`:** so với `MANUAL ORPHAN` cùng đơn (không cửa sổ), hoặc `MANUAL UNMATCHED` không đơn trong cửa sổ.<br>- **`UNMATCHED`:** so với `MANUAL UNMATCHED` không đơn, hoặc `MANUAL ORPHAN` đơn bất kỳ, cả hai trong cửa sổ.<br>Nhánh `OVERPAID` của BR-TT-15 không đổi. Hai hàm đối xứng nhau. |
+| Cửa sổ giờ | **Đúng.** `_in_window` tạo đoạn đóng hai phía `[t − W, t + W]`, với `W = max(LATE_PAYMENT_DUPLICATE_WINDOW_HOURS, 0)` đọc mỗi lần gọi. `override_settings` có hiệu lực, có test với W=1. Cửa sổ áp lên mọi ca chéo loại. Ca cùng đơn không có cửa sổ, đúng như 02d (cùng đơn đã là dấu hiệu mạnh). |
+| Không gắn nhãn thừa | **Đạt.** Có 4 test âm: khác tiền, ngoài cửa sổ (200 giờ so với W=72; 10 giờ so với W=1), cho cả hai chiều ghi tay→IPN và IPN→ghi tay. Dòng không phải `MANUAL` không bao giờ là căn cứ để gắn nhãn cho dòng webhook. Vì vậy hai webhook cùng tiền, không liên quan nhau, vẫn không bị gắn nhãn (giữ hành vi cũ). Phía ghi tay, phạm vi rộng hơn (`ORPHAN` đơn bất kỳ trong 72 giờ) có thể làm số lần hiện 409 tăng lên khi trùng số tiền phổ biến. Cái giá chỉ là Chủ tick một lần. Chấp nhận, vì đây là lớp chặn hoàn hai lần. |
+| TL15-M1 | **Đóng.** `refunds/services.py:138-140` chỉ thêm cờ `acknowledged_duplicate_warning: True` khi giao dịch có nhãn, không chép nội dung nhãn. Có test cả nhánh có cờ (kèm assert nhãn không nằm trong `changes`) và nhánh không nhãn (không có khoá). |
+| Đính chính 02d §5 | **Đạt.** Nội dung khớp code. |
+| Thiếu sót nhỏ (không chặn) | Chưa có test âm "ngoài cửa sổ" cho chiều webhook `UNMATCHED` → ghi tay gắn đơn huỷ. Chiều này dùng chung `_in_window` với các ca đã có test, nên rủi ro thấp. Nên bổ sung khi lần sau có người sửa file test này. |
+
+L1–L3 giữ nguyên là nợ. Điều kiện **C1** (deploy BE #15 cùng đợt với FE #15) và **C2** (ghi BR-TT-18 vào spec khi nghiệm thu) vẫn còn hiệu lực.
+
+### Kết luận re-review sau d51a89d: **APPROVED** (kèm điều kiện C1, C2)
+
+## Review #8 FE (08/10)
+
+Phạm vi: `git diff main...feat/xoa-phieu-hoan-fe` (commit 273cda0, 10 file trong `erp-console/features/returns/**`, `erp-console/e2e/delete_return.py`, dev-notes). Đối chiếu contract BE trên main (`backend/apps/inventory/returns/api.py:9-11,127-138`, `serializers.py:115-130`, `services.py:53-92`) và TL-D8-L3. Theo yêu cầu, techlead không build. Số liệu tsc/vitest/build/e2e lấy theo dev-notes và để QA chạy lại. Techlead chỉ chạy `check_naming.py`: không có vi phạm mới, chỉ còn 2 file `frontend/` đã đỏ sẵn trên main.
+
+| Mục | Kết quả |
+|---|---|
+| Đúng contract BE | **Đạt.** `POST /api/inventory/returns/{id}/delete/` gửi body rỗng và nhận 200 `{status:"deleted", id}`. `canDelete` chỉ đọc `available_actions` của BE (`returnsModel.ts:110`), không tự đoán Chủ hay trạng thái, đúng như BE (Chủ/superuser, phiếu `DRAFT`/`CANCELLED`). Khai `available_actions?` optional là phòng thủ hợp lý: BE luôn trả khoá này, nếu thiếu thì coi như không có nút. |
+| Hộp xác nhận có câu TL-D8-L3 | **Đạt.** `messages.ts:72` có câu "Số kg trên phiếu này sẽ không được nhập lại kho.", chỉ hiện khi phiếu `DRAFT` (`ReturnDetailScreen.tsx:256`). Phiếu Đã huỷ không có câu này, đúng vì kg của phiếu đó đã không còn tính. |
+| 400 / 409 | **Đạt.** Dùng `ConfirmModal` có sẵn. 400 `RETURN_DELETE_NOT_ALLOWED` hiện alert đỏ, nút đổi thành "Thử lại". 409 `STALE_STATE` hiện `ConflictBanner` với nút "Tải lại" → `refresh()`. Nếu phiếu đã bị xoá thì sau khi tải lại ra `NotFoundScreen`. |
+| Lệch: `apiFetch` bỏ "(BR-…)" | **Chấp nhận.** UI-RULES §1 mục 1 cấm hiện mã luật trên màn. Câu "hiện nguyên `detail`" ở TL-D8 nghĩa là không thay bằng câu chung chung, không bắt hiện mã BR. |
+| Không `console` | **Đạt.** Không có `console.*` trong `features/returns`. Trong e2e chỉ có bộ nghe `console.error` để kiểm lỗi. Không đưa dữ liệu vào URL hay storage. |
+| Mock không lọt build thật | **Đạt theo pattern có sẵn.** `MOCK = process.env.NEXT_PUBLIC_USE_MOCK === "1" ? mockReturnsApi : undefined` (`api.ts:21`). Công cụ thử `returnsStaleDelete` nằm trong khối `if (process.env.NEXT_PUBLIC_USE_MOCK === "1" && …)`, giống các module khác. `check-no-mock.mjs` tự lấy chuỗi seed từ `mock*.ts`. Dev-notes ghi build mock=0 cùng `check-no-mock` và `check-ai-chunks` đều XANH. QA phải chạy lại trên `npm ci` sạch. |
+| Lệch: mock chỉ cho `owner` | **Chấp nhận.** Chỉ ảnh hưởng chế độ mock. BE thật tính cả superuser qua `available_actions`, và FE không tự đoán. |
+| Không giá vốn, không dữ liệu cá nhân | **Đạt.** Màn không có tiền. Response xoá chỉ có `status`, `id`. |
+
+### Lỗi
+
+**TL8F-M1 · Medium · `features/returns/messages.ts:68-74` (và 60-65 cũ). Sai tên chuẩn, trùng nghĩa với phiếu hoàn TIỀN.** UI-RULES (bảng từ ngữ, dòng 49) dùng "phiếu hoàn" cho **hoàn tiền** ("Lập phiếu hoàn", "Tạo phiếu hoàn"). Màn hàng chờ thanh toán và chi tiết đơn đều có "phiếu hoàn" theo nghĩa đó. Ở màn này, nút đỏ "Xoá phiếu hoàn" và toast "Đã xoá phiếu hoàn." dễ khiến Chủ tưởng đang xoá phiếu hoàn tiền, trong khi đây là thao tác không khôi phục được. Tiêu đề, danh sách và toast tạo của chính module đã dùng "phiếu hàng hoàn".
+- Sửa `deleteMenu`, `deleteTitle`, `deleteConfirm` thành "Xoá phiếu hàng hoàn", và `deleted` thành "Đã xoá phiếu hàng hoàn.". Câu `deleteBody` dùng "Xoá phiếu hàng hoàn {code} …".
+- Cùng lần, sửa cụm `cancel*` (60-65, cùng story #8) cho thống nhất: "Huỷ phiếu hàng hoàn", "Đã huỷ phiếu hàng hoàn.".
+- Cập nhật `features/returns/README.md` (dòng mới), selector/nhãn trong `e2e/delete_return.py` (dòng 70, 83, 87, 91, 98, 111, 120) và test vitest nếu có so chuỗi.
+
+**TL8F-L1 · Low · `ReturnDetailScreen.tsx:7`.** Comment đầu file vẫn ghi "Phiếu đã huỷ: … hết mọi nút". Thực tế Chủ còn mục "Xoá phiếu hàng hoàn" trong menu "…". Sửa comment cho khớp.
+
+**TL8F-L2 · Low · nhỏ.** Dòng trống thừa trước `if (canDelete(r))` (dòng 100). `useRouter()` nên khai cùng nhóm với `useAuth`/`useToast`, không chen giữa các `useState`. Sửa cùng lần với M1 nếu tiện.
+
+**TL8F-L3 · Low · ghi nhận cho BE (không thuộc lô FE).** `soft_delete` đòi `required_perms=("inventory.add_returntostock",)` (`api.py:129`), nhưng `available_actions` trả `delete` chỉ theo "là Chủ" mà không xét perm này. Nếu Chủ tắt "Ghi hàng hoàn về kho" của nhóm `owner` ở màn Phân quyền, FE vẫn hiện nút và bấm vào thì nhận 403. Hiếm gặp, BE vẫn chặn đúng. Ghi nợ BE: `get_available_actions` thêm điều kiện `has_perm("inventory.add_returntostock")`.
+
+### Kết luận Review #8 FE (08/10): **CHANGES REQUESTED**
+
+Lý do duy nhất là **TL8F-M1** (đổi chữ hiển thị và selector e2e, không đổi logic). Sửa xong thì chạy lại `tsc --noEmit`, `vitest` và `e2e/delete_return.py` (mock). Techlead chỉ cần soát diff chữ, không cần review lại toàn bộ. L1, L2 sửa cùng lần nếu tiện. L3 chuyển BE.
+
+### Re-review sau b97fe68
+
+Phạm vi: `git show b97fe68`, 8 file, chỉ đổi chữ, comment, selector e2e và thứ tự hook. Logic không đổi. Theo yêu cầu, techlead không build và không chạy e2e. `check_naming.py`: không có vi phạm mới.
+
+| Mục | Kết quả |
+|---|---|
+| TL8F-M1 | **Đóng.** `messages.ts` đổi đủ 4 khoá `cancel*` và 4 khoá `delete*` sang "phiếu hàng hoàn". README, docstring `api.ts`/`returnsModel.ts` và tên `describe` trong vitest cũng đã đổi. `cancelBody`/`deleteBody` vẫn viết "Huỷ/Xoá phiếu {code}": có mã RT-… nên không nhầm được với phiếu hoàn tiền, chấp nhận. Grep toàn `erp-console`: chuỗi cũ không còn ở nhãn hàng hoàn nào. Ba chỗ còn "phiếu hoàn" đều là hoàn **tiền** hoặc comment chung, đúng nghĩa: `guidance/mock.ts:208` (`cancel_refund`), comment ví dụ ở `ConfirmModal.tsx:3`, và comment đầu `e2e/ed_bonusA_ui.py:5`. |
+| Selector e2e | **Đạt.** `delete_return.py` và `ed_bonusA_ui.py` dùng nhãn mới. Có sửa đúng một hệ quả của #8: sau khi Chủ huỷ RT-1, menu "…" vẫn còn mục "Xoá phiếu hàng hoàn". Assert cũ "không còn nút Thao tác khác" nay thành "không còn mục Huỷ, có mục Xoá". Ca RT-6 của `giao1` vẫn kỳ vọng không có menu, đúng vì `giao1` không phải Chủ. |
+| TL8F-L1 | **Đóng.** Comment đầu `ReturnDetailScreen.tsx` nay nói rõ Chủ còn mục Xoá trên phiếu đã huỷ. |
+| TL8F-L2 | **Đóng.** `useRouter()` chuyển lên cùng nhóm với `useAuth`/`useToast`, bỏ dòng trống thừa. |
+| TL8F-L3 | Vẫn là nợ BE (`available_actions` chưa xét `add_returntostock`), không thuộc lô FE. |
+
+Việc của QA: chạy lại `npm ci`, `tsc --noEmit`, `vitest`, build mock=0 kèm `check-no-mock`, rồi build mock=1 và chạy `e2e/delete_return.py` cùng `e2e/ed_bonusA_ui.py`, vì selector đã đổi.
+
+### Kết luận re-review sau b97fe68: **APPROVED**
+
+
+## Review Lô 17a (08/10)
+
+Phạm vi: `git diff db1cebd..HEAD`, commit 14107a3 trên `feat/lo17a-be`, gồm 28 file. Đối chiếu `02e-lo17.md` mục 2 và dev-notes mục "Lô 17a".
+
+**Lệnh techlead tự chạy** (worktree `lo17a`, `DJANGO_DEBUG=1`, venv của checkout chính):
+- `makemigrations --check --dry-run`: No changes detected.
+- `manage.py test apps.common apps.reports apps.accounts.audit apps.purchasing apps.inventory apps.delivery apps.sales`: 2215 test, 28 lỗi.
+  Cả 28 lỗi đều là `Missing staticfiles manifest entry` (test HTML Django Admin), do môi trường. Tôi gắn symlink tạm `staticfiles`
+  rồi chạy lại 7 module đó cùng `apps.accounts`, `apps.ai`: 19 + 891 test OK. Symlink đã gỡ, worktree sạch.
+- `python3 scripts/check_naming.py`: OK, không có vi phạm mới.
+- Một test tạm, chạy xong đã xoá, để tái hiện M1 và M2 ở dưới.
+
+### Soát theo yêu cầu
+
+| Mục | Kết quả |
+|---|---|
+| A1 404 | **Đạt.** Chỉ thay `Http404` có câu mặc định của Django hoặc câu rỗng. Câu tiếng Việt riêng giữ nguyên (`reports/batch` "Không tìm thấy lô.", guidance). Test quét mọi route chi tiết của `router.registry` (ít nhất 15 route), kiểm không có `matches the given query`, không có tên model, không lặp id. Tôi chạy thử `orders`, `batches` (id số và mã chữ), `purchasing/invoices`: đều 404 `{"detail":"Không tìm thấy."}` |
+| A2 `reason`, prefetch | **Đạt.** Dùng `order_reason` (nhãn cố định). Test ghi `cancel_note` có SĐT giả, assert không lộ. Có `select_related("invoice")` và prefetch 3 quan hệ. Có test số truy vấn không tăng theo số đơn. NV kho không có `unit_cost`/`inventory_value`, NV giao 403 |
+| A3 lọc trước phân trang, `q`, dòng AI | **Đạt một phần, xem M2.** Bộ lọc nằm trên cùng queryset với `exclude_ai_rows` và trước `paginate_queryset`, nên `count` khớp. Câu lỗi `q` không lặp giá trị (có test). Có test AI tắt vẫn ẩn dòng AI. Biên giờ VN có test |
+| A4 chuỗi, làm tròn | **Chưa đạt, xem M1.** `ROUND_HALF_UP`. Tiền 2 chữ số, kg 3 chữ số, `int` giữ number. Không thêm hay bớt khoá, nên quyền `view_profitreport` không đổi |
+| A5 dữ liệu cũ | **Đạt.** `validate()` chạy trên giá trị đã gộp. PATCH không gửi `is_paid`/`paid_at` thì bỏ qua luật `paid_at` (có test với dòng cũ `is_paid=True, paid_at=NULL`). Khai `amount` tường minh để trả mã `AMOUNT_NOT_POSITIVE` |
+| A5 POST mặc định `is_paid` | **Không làm vỡ FE hiện tại.** `PurchaseInvoiceForm.tsx:97-98` luôn gửi `is_paid` tường minh. Khi đã trả, form gửi `paid_at` (bắt buộc ở client, mặc định là giờ hiện tại). Khi chưa trả, form gửi `null`. Lệnh AI `purchasing.purchaseinvoice.create` có thể bị 400 nếu không điền `paid_at`, nhưng AI đang tắt, đó là hành vi đúng. Mock FE (`accounting/mock.ts:217-218`) còn tự điền `paid_at`, nên khác BE: sửa ở 17b-FE2 (G3) |
+| A6 | **Đạt.** Hai nhãn hằng, có test |
+| A7 khoá rồi mới so | **Đạt.** `update_reconciliation` gọi `_lock` (`select_for_update`), rồi `_require_draft`, rồi `_require_fresh`. `save` có `updated_at` trong `update_fields`, nên lần PATCH sau thấy mốc mới. `_require_fresh` dùng chung với `replace_lines`, không chép code |
+| A8 | **Đạt.** Không đổi hành vi |
+| A9 phạm vi | **Đạt.** Lọc `code__iexact` trong `filter_queryset`, chạy trên `get_queryset()` đã có phạm vi. Test: NV giao tra mã phiếu của người khác thì `count` 0, không khớp một phần, 403 và 401 |
+| Giá vốn, dữ liệu cá nhân | **Đạt.** Không có khoá mới nào chứa giá vốn. `reason` chỉ là nhãn. `q` của Nhật ký chặn dãy chữ số giống SĐT. Không có log mới |
+
+### Các lệch dev đã ghi
+
+- **A5 câu lỗi không kèm mã BR:** chấp nhận. Lô tên chuẩn cấm chữ `BR-` trên giao diện (nhóm A, 3.3), còn mã BR đã nằm ở docstring. 02e ghi "kèm BR" là sai, tôi chịu phần đó.
+- **POST mặc định `is_paid=true` mà thiếu `paid_at` thì bị chặn:** chấp nhận, vì đúng nghĩa của luật. FE thật không vỡ (xem bảng).
+- **3 file test ngoài danh sách 2.3** (`common/tests/test_s4_actor_fields.py`, `purchasing/invoices/tests/test_invoice_list.py`,
+  `purchasing/receipts/tests/test_cancelled_receipt_guards.py`): chấp nhận. Cả ba đang tạo hoá đơn nhờ luật cũ lỏng. Sửa bằng cách gửi
+  `is_paid: false` hoặc kèm `paid_at` hợp lệ, không nới assert nào. Cả ba không thuộc lô tên chuẩn.
+- **`test_p8_lo5_qa_edges` bỏ khoá `id` trước khi dò chuỗi PII:** chấp nhận. `id` là số tự tăng nên có thể tình cờ chứa "0456". Test vẫn
+  khoá tập khoá bằng `set(row) == RECENT_KEYS`, nên không thể lén thêm khoá chứa dữ liệu cá nhân. Hàm chỉ bỏ đúng khoá tên `id`.
+
+### Lỗi
+
+**M1 · Medium · `backend/apps/reports/decimal_strings.py:19-21`. Giá vốn/kg bị làm tròn mất 2 chữ số.**
+`Batch.landed_unit_cost` có `decimal_places=4` (`inventory/models/batches.py:56`). Hàm làm tròn mọi khoá không phải kg về 0.01, nên
+`/api/reports/batch/<mã>/` và `/reports/batches/` trả `"85333.33"` cho giá trị `85333.3333` (tôi đã tái hiện). Trước lô này, float vẫn còn
+đủ 4 chữ số. Số này hiện ở `CloseBatchModal` khi chốt lô, nên lệch với DB và với chỗ khác in giá vốn.
+**Sửa:** khoá `landed_unit_cost` (nên viết tổng quát là khoá kết thúc bằng `_unit_cost`) dùng 0.0001. Thêm ca `85333.3333` vào
+`test_reports_decimal_strings.py`, và assert `Decimal(res["landed_unit_cost"]) == batch.landed_unit_cost`.
+
+**M2 · Medium · `backend/apps/accounts/audit/api.py:43-56,106-107`. Ngày biên làm API trả 500.**
+`GET /api/audit-logs/?date_to=9999-12-31` ném `OverflowError: date value out of range` ở `date_to + timedelta(days=1)`, thành 500 (tôi đã
+tái hiện). `date_from=0001-01-01` cũng có nguy cơ tương tự khi đổi sang UTC. Ngoài ra, `date.fromisoformat` của Python 3.11 nhận cả
+`20261007` và `2026-W41-1`, rộng hơn contract `YYYY-MM-DD`.
+**Sửa:** kiểm bằng regex `^\d{4}-\d{2}-\d{2}$` trước khi parse, giới hạn năm trong khoảng hợp lý (ví dụ 2000–2100), và bắt `OverflowError`.
+Mọi trường hợp đó trả 400 `INVALID_FILTER`. Thêm test cho `9999-12-31`, `0001-01-01`, `20261007`.
+
+**L1 · Low · `purchasing/invoices/serializers.py` (`PAID_AT_IN_FUTURE`).** So thẳng với `timezone.now()`, không có độ lệch cho phép. Form
+lấy "bây giờ" theo đồng hồ máy khách, cắt tới phút, nên chỉ máy có đồng hồ chạy nhanh hơn khoảng một phút mới bị chặn nhầm. Không chặn lô.
+Nếu QA gặp thì cho lệch tối đa 5 phút, đặt bằng một setting.
+
+### Kết luận Review Lô 17a (08/10): **CHANGES REQUESTED**
+
+Phải sửa M1 và M2, mỗi lỗi kèm test tái hiện như trên. L1 tuỳ chọn. Sửa xong, techlead chỉ soát diff mới và chạy lại `apps.reports` và
+`apps.accounts.audit`.
+
+### Re-review sau a31b8c7
+
+Phạm vi: `git show a31b8c7`, gồm 8 file. Soát M1, M2, L1.
+
+**Lệnh techlead tự chạy** (symlink tạm `staticfiles`, đã gỡ, worktree sạch):
+- `manage.py test apps.reports apps.accounts.audit apps.purchasing.invoices`: 199 test OK.
+- `makemigrations --check --dry-run`: No changes detected.
+- `check_naming.py`: OK, không có vi phạm mới.
+- Con số 3290 OK của toàn bộ suite là do be-dev báo. Tôi không chạy lại toàn bộ.
+
+| Mục | Kết quả |
+|---|---|
+| M1 | **Đóng.** Khoá kết thúc bằng `unit_cost` làm tròn 4 chữ số, đúng `decimal_places=4` của `Batch.landed_unit_cost`. Test qua API thật (`/reports/batch/`, `/reports/batches/`): `85333.3333` ra đúng `"85333.3333"` và bằng giá trị DB. Có thêm test đơn vị cho nửa lẻ (`85333.33335` thành `85333.3334`). Tiền và kg không đổi |
+| M2 | **Đóng.** Kiểm regex `^\d{4}-\d{2}-\d{2}$` (`re.ASCII`, nên chữ số toàn khổ bị loại) trước khi parse. Năm phải trong 2000–2100. Ngày không hợp lệ như `2026-02-30` cũng ra 400. Test cả hai tham số với `9999-12-31`, `0001-01-01`, `1999-12-31`, `2101-01-01`, `20261007`, `2026-W41-1`, chữ số toàn khổ: đều 400 `INVALID_FILTER`. Biên 2000 và 2100 thì 200. Vì `date_to` tối đa là 2100-12-31 nên `+1 ngày` không thể tràn |
+| L1 | **Đóng.** `PURCHASE_INVOICE_PAID_AT_TOLERANCE_MINUTES` đọc từ env, mặc định 5 (bất biến 7). Test: lệch 1 phút thì 201, lệch 6 phút thì 400 |
+
+Không có code chết hay code lặp, và không đụng file nào của lô tên chuẩn. Giá vốn và dữ liệu cá nhân không đổi so với lần review trước.
+
+### Kết luận re-review Lô 17a sau a31b8c7: **APPROVED**
+
+Lưu ý cho QA và các lô sau:
+- QA chạy `/api/reports/*` bằng tài khoản `kho1` và `ql1` (phải 403), và kiểm ngày biên của `audit-logs` trên BE thật.
+- Sau khi gộp, nhắc nhánh `feat/pham-vi-du-lieu` rebase, vì có xung đột ở `dashboard_api.py`.
+- 17b-FE2 (G3) phải sửa mock hoá đơn mua cho khớp luật `paid_at`.
+
+## Review Lô 17b-BE (08/10)
+
+Phạm vi: `git diff 2c00222..HEAD`, commit ea1c9fe trên `feat/lo17b-be`, gồm 21 file. Đối chiếu `02e-lo17.md` mục 3.1 (B1–B4, B5 = NEW-1)
+và dev-notes mục "Lô 17b-BE + NEW-1".
+
+**Lệnh techlead tự chạy** (worktree `lo17b-be`, `DJANGO_DEBUG=1`, symlink tạm `staticfiles`, đã gỡ, worktree sạch):
+- `manage.py test apps.sales apps.accounts apps.ai apps.common apps.delivery apps.inventory`: 2704 test, OK (skipped=2).
+- `makemigrations --check --dry-run`: No changes detected.
+- `check_naming.py`: OK, không có vi phạm mới.
+
+### Soát theo yêu cầu
+
+| Mục | Kết quả |
+|---|---|
+| `POST /api/sales/orders/search/`: phạm vi | **Đạt.** `get_queryset` dùng chung với `list` (`scope_orders_for` theo D1). Test NV giao chỉ thấy đơn của phiếu mình. Quyền: `required_perms=("sales.view_salesorder",)`, có test 403 và 401. Lọc `customer` vẫn kiểm `can_filter_orders_by_customer` trước khi đọc tham số khác |
+| V2 và cửa sổ dữ liệu cá nhân | **Đạt.** `allow_customer_search=can_view_order_customer_info(user)`, `restrict_customer_search` khi phạm vi khác `all`, nên tìm theo SĐT/tên chỉ khớp đơn có `pii_visible=True` (SR-PII-02). Như vậy POST không mở thêm được dòng nào mà GET cũ không thấy. Có test `test_new1_post_keeps_scope_rules_for_phone_search` |
+| `next`/`previous` | **Đạt.** Từ khoá nằm trong body. Link chỉ dựng từ URL `/search/` cộng `page`. Có test link không chứa từ khoá |
+| `no-store` | **Đạt.** `NoStoreMixin` của viewset phủ cả action mới. Có test |
+| Câu lỗi không lặp giá trị | **Đạt.** `SEARCH_USE_POST` dùng câu cố định. Các câu của `InvalidFilter` chỉ nêu **tên** tham số, không nêu giá trị. Có test ở cả GET (9 chữ số, giống tên) lẫn POST |
+| GET `?q=` | **Đạt.** `allow_customer_search=False`, nên GET chỉ còn khớp mã đơn. Đây là chốt chặn thật: dù heuristic có lọt thì GET cũng không trả được dữ liệu khách theo tên hay SĐT |
+| Heuristic, ca `hoa` lọt | **Chấp nhận, ghi nhận Low.** Một từ ASCII không dấu, không khoảng trắng (như `hoa`), hoặc dãy 4–8 chữ số, vẫn đi qua GET và vào access log, nhưng chỉ khớp mã đơn, không thành công cụ dò khách. Heuristic chỉ giảm số từ khoá cá nhân lọt vào URL, không thể bắt hết. Việc thật nằm ở FE (17b-FE2): ô tìm đơn **luôn** gửi POST, GET `q` chỉ dùng cho ⌘K với chuỗi đúng mẫu mã |
+| Thêm vào `FORBIDDEN_PREFIXES` của AI, `@action` 32 → 33 | **Duyệt, dù nằm ngoài danh sách file.** Route mới trả tên/SĐT khách. Nếu không cấm thì AI có thêm một đường dò dữ liệu cá nhân, ngược với cách đã làm cho `customer-directory`. Đếm `@action` trong `test_discipline.py` là hệ quả tất yếu. Không đổi gì khác trong `apps/ai/**` |
+| `SearchBodyPagination` chuyển sang `common/api.py` | **Duyệt.** Chuyển nguyên văn, giờ có hai nơi dùng (danh bạ khách, tìm đơn). Bỏ được bản chép, đúng chỗ của tiện ích dùng chung |
+| B1 | **Đạt.** `delete` thêm điều kiện `add_returntostock`, khớp `soft_delete`. Có test Chủ bị tắt quyền |
+| B2 | **Đạt.** GET `customer-directory/?q=` trả 400 `SEARCH_USE_POST`. Các ca GET `q` cũ chuyển sang POST, không nới assert. Danh sách không có `q` giữ nguyên |
+| B3 | **Đạt.** `note_code` là mã phiếu giao, không phải dữ liệu cá nhân. Nằm cùng khối với `note_id`, nên phạm vi CSKH không đổi. Có test |
+| B4 `LATE_PAYMENT_MAX_AGE_DAYS` | **Đạt.** Setting đọc từ env, mặc định 400, có `max(..., 1)` chặn giá trị 0 hoặc âm. Chuỗi chỉ có ngày bị chặn **trước** `parse_datetime` (regex bắt buộc có giờ). Tham số `datetime` truyền thẳng (từ đường gọi nội bộ) không qua regex nhưng có `tzinfo`, nên đúng. Có test chỉ ngày, 401 ngày, hôm qua |
+| Giá vốn, dữ liệu cá nhân | **Đạt.** Kết quả search dùng `SalesOrderListSerializer` như danh sách: không có giá vốn, che khách theo `pii_hidden`. Có test không có giá vốn. Không có log mới |
+
+### Điều kiện phát hành
+
+**C1 · NEW-1 phải deploy cùng FE.** FE hiện tại (`erp-console/features/orders/api.ts:42`) vẫn gửi `GET ?q=`. Sau lô này, Chủ hay Quản lý gõ
+tên hoặc SĐT ở ô tìm đơn sẽ nhận 400 "Tìm theo SĐT/tên dùng ô tìm kiếm." cho tới khi 17b-FE2 chuyển sang `POST search/`. Merge vào main
+được, nhưng **không deploy BE này lên staging hay production khi chưa có FE đi cùng**. Danh bạ khách không bị ảnh hưởng, vì FE đã dùng POST
+từ Lô bổ sung A.
+
+### Ghi nhận Low (không chặn)
+
+- **L1:** heuristic GET như trên. 17b-FE2 phải đặt luật ở FE: ô tìm đơn luôn đi POST.
+- **L2:** `_filters_from_body` cho `customer`/`batch` là `int` nhưng `status` dạng số thì từ chối. Hành vi đúng, chỉ là cần nhớ khi viết mock
+  FE: body gửi `status` là chuỗi hoặc mảng chuỗi.
+
+### Kết luận Review Lô 17b-BE (08/10): **APPROVED**
+
+Không có lỗi Critical, High hay Medium. Có điều kiện phát hành **C1**. Hai việc ngoài danh sách file (AI `FORBIDDEN_PREFIXES`,
+`SearchBodyPagination`) được duyệt.
+
+## Review Lô 17b-FE (08/10)
+
+Phạm vi: `git diff 2c00222..818fc8b`, gồm FE1 c0b0344, FE2 03744ca (có NEW-1 phía FE), FE3 2388b86 và dev-notes 818fc8b. Đối chiếu
+`02e-lo17.md` mục 3.2–3.4 và contract BE 17a, 17b-BE. Theo yêu cầu, techlead không build. Số liệu tsc, vitest, build, `check-no-mock` và
+e2e lấy theo dev-notes. Techlead đọc code.
+
+### Soát theo yêu cầu
+
+| Mục | Kết quả |
+|---|---|
+| NEW-1: ô tìm đơn luôn POST | **Đạt.** `listOrders` (`features/orders/api.ts`) gửi `POST /api/sales/orders/search/` mỗi khi có từ khoá, kể cả khi gõ mã. `orderListQuery` không còn `q`, nên URL GET không bao giờ mang từ khoá. Dùng chung cho màn Đơn, hộp Gắn đơn và mở đơn từ phiếu hoàn tiền. Thân gửi `status` dạng mảng chuỗi, `page` chỉ khi lớn hơn 1, khớp L2 của 17b-BE |
+| URL và storage | **Đạt.** Bộ lọc và từ khoá chỉ nằm trong state (`OrdersScreen.tsx:5`). `router.replace` chỉ dùng cho redirect `?order=&open=refund` cũ. e2e mới `orders_search_post.py` kiểm URL và storage không có SĐT đã gõ |
+| Mock đúng contract BE | **Đạt.** Mock POST `search/`: `q` không phải chuỗi hoặc `status` là số thì 400 `INVALID_FILTER`; trang vượt thì 404; `next` không chứa `q`. Mock GET `?q=` có 9 số liền, khoảng trắng hoặc ký tự ngoài ASCII thì 400 `SEARCH_USE_POST`, giống heuristic BE. Mock danh bạ khách GET `q` cũng trả 400 (G10) |
+| ⌘K (H1): chỉ gọi API khi đúng mẫu mã | **Đạt.** `parseCodeRef` loại chuỗi có khoảng trắng, ký tự ngoài ASCII, dãy từ 9 chữ số, và chuỗi chỉ gồm số và dấu nối có từ 9 chữ số trở lên. API chỉ được gọi khi **bấm Enter hoặc chọn dòng** "Mở chứng từ", không gọi khi đang gõ. Có `AbortController` khi gõ tiếp. Không có kết quả thì hiện "Không tìm thấy chứng từ khớp với <mã>". Đơn tra bằng `GET ?q=` rồi so khớp đúng mã. Phiếu giao dùng `?code=` (A9, có phạm vi). Lô dùng endpoint chi tiết. Xem thêm L1 |
+| `import()` động, không gieo mock vào bản thật | **Đạt.** `features/lookup/codeFinder.ts` nạp ba module api bằng `import()` động. Cờ mock trong từng api là `process.env.NEXT_PUBLIC_USE_MOCK === "1" ? … : undefined`, nên bản mock=0 bị cắt khỏi bundle. Dev-notes: `check-no-mock` xanh, và `grep cave_erp_mock out` rỗng. `shared/` không import module: Provider đặt ở tầng app (`ConsoleCodeFinder`), đúng quy tắc module |
+| G1–G10 dùng contract 17a đúng | **Đạt.** G1 đọc `id`/`reason` (khi thiếu `id` thì quay về danh sách lọc). G2 gửi `date_from`/`date_to`/`q` lên BE, luật ô tìm giống A3, 400 hiện dưới ô. G3 có 5 mã lỗi A5 kèm vị trí ô, và mock nay **không** tự điền `paid_at` (đã đóng điều tôi dặn ở 17a). G4 gửi `expected_updated_at`, 409 thì có nút "Tải lại". G7 đếm theo `count` và tải mới mỗi lần mở. G10 có `note_code` thật |
+| `ed_batch9` đã sửa ngày mock | **Đạt.** Phiếu "tháng này" kẹp không lùi qua đầu tháng. RT-4 cố định cách đầu tháng 36 giờ. Dev báo 145/145 (trước lô 133/139). Việc đổi SĐT thử trong kịch bản để khỏi trùng SĐT giả của kho mock là hợp lý |
+| e2e loại kho `cave_erp_mock_*` khỏi phép kiểm dữ liệu cá nhân | **Chấp nhận, kèm điều kiện cho QA.** Các khoá này là dữ liệu GIẢ do mock gieo (đơn, khách, tài khoản mẫu), và chỉ tồn tại ở bản mock (`check-no-mock` chặn ở bản thật). Không loại thì mọi phép kiểm "storage không có SĐT" sẽ đỏ vì SĐT giả của seed. Điều kiện: ở lượt **BE thật** (`REAL_API`) của `orders_search_post.py` và `ed_batch17_command_search.py`, QA kiểm **toàn bộ** storage, không lọc tiền tố, và phải sạch. Lọc theo tiền tố chỉ được dùng ở bản mock |
+| Giá vốn, dữ liệu cá nhân | **Đạt.** Không có khoá giá vốn mới. G1 không hiện giá trị tồn khi người xem thiếu quyền (dữ liệu do BE quyết). Không có `console.log` mới. Ô tìm Nhật ký (G2) và ô tìm hoá đơn bán (G6) chặn chuỗi giống SĐT trước khi gửi |
+| UI-RULES | **Đạt.** G9 bỏ dòng gợi ý xám (§6.2). F3: `.tab` và `.lt-link` đủ 44px, hover không còn đổi nền ở nút `aria-disabled`. F5 sửa bậc tiêu đề. G6 có ca 360px. Chữ mới không có "BR-", không có mã thô |
+
+### Các lệch dev đã ghi: chấp nhận
+
+- **G3** làm ở `features/accounting`: đúng, vì 02e ghi sai thư mục. Lỗi khác nhà cung cấp hiện ở đầu hộp khi hộp mở từ một phiếu cố định là hợp lý.
+- **F4:** `SkeletonBody` đã đúng từ trước; thêm test khoá là đủ.
+- **F1:** `DESIGN.md` nằm ở gốc repo, không phải `erp-console/`. Dọn 4 chỗ còn nói "cột phải" là đúng tinh thần.
+- **F2** mới chuyển 1 hộp: chấp nhận. Sáu hộp còn lại có luồng "Tải lại" hoặc khoá nút theo mã lỗi mà `ConfirmModal` chưa hỗ trợ; nếu ép chuyển thì sẽ đổi hành vi. Ghi nợ: mở rộng `ConfirmModal` (nút phụ theo `errorText`) rồi chuyển nốt.
+- **`#n` ở ⌘K** mở phiếu hoàn tiền: chấp nhận mặc định này. Nếu Duy muốn nghĩa khác thì chỉ sửa một dòng.
+
+### Ghi nhận Low (không chặn)
+
+- **L1 · `shared/lib/codeLookup.ts`, mẫu mã lô.** Mẫu `^(?=.*\d)[A-Z0-9]{1,12}(?:-[A-Z0-9]{1,12})+$` khớp cả chuỗi chỉ có số và dấu nối dưới
+  9 chữ số, ví dụ `091-234-56`. Một đoạn SĐT gõ dở như vậy sẽ thành `GET /api/inventory/batches/091-234-56/` và vào access log. Không lộ
+  dữ liệu (chỉ trả lô hoặc 404), nhưng đi ngược tinh thần "không gửi chuỗi giống SĐT". Đề xuất: mã lô phải có **ít nhất một chữ cái**
+  (`(?=.*[A-Z])`). Mọi mã lô thật trong dev-notes (`CA-THU-260928-VT01`, `LO-0912`, `L0914-CT01`) đều có chữ. Thêm ca vào `codeLookup.test.ts`.
+- **L2 · nợ đã ghi, đồng ý:** `matchesLocal` ở `auditModel.ts` không còn dùng; G4 mới chặn `beforeunload`, chưa chặn link trong app; G8 chưa
+  có test tự động (QA ép `/api/auth/me/` lỗi để kiểm).
+- **L3 · hồi quy:** `qa_ed_batch3_orders` (64 ca) và `s10_s11_orders` (2 ca) đỏ từ trước lô, do kịch bản dùng chữ trước lô tên chuẩn. Theo
+  02e mục 6.3, đợt chỉ coi là xong khi e2e không còn ca đỏ, nên hai file này phải được viết lại hoặc xoá có lý do trước lượt hồi quy cuối.
+  Không chặn lô này.
+
+### Điều kiện phát hành
+
+- **C1 (nhắc lại từ 17b-BE):** BE 17b và FE 17b phải deploy cùng một đợt. Nhánh này đã merge BE 17b (98ea948), nên khi gộp vào main hai phía đi cùng nhau.
+- QA chạy e2e BE thật mà dev chưa chạy được: `ed_batch12_real`, `ed_batch8_stocktake_real`, `qa_ed_batch10_real`, `s41_s47_real`, cùng
+  `orders_search_post.py` và `ed_batch17_command_search.py` ở chế độ `REAL_API`. Ở hai file sau phải có ca `giao1` gõ mã phiếu của `giao2`
+  (ED-07-AC3) và phép kiểm storage không lọc (xem trên).
+
+### Kết luận Review Lô 17b-FE (08/10): **APPROVED**
+
+Không có lỗi Critical, High hay Medium. L1 nên sửa trong lượt QA nếu tiện, vì chỉ cần một regex và một test. L2, L3 ghi nợ.
+
+## Review seed_qa (08/10)
+
+Phạm vi: `git diff d3c04d2..HEAD`, commit 5b27bdd trên `chore/seed-qa`, gồm 10 file. Đối chiếu dev-notes mục "seed_qa".
+
+**Lệnh techlead tự chạy** (worktree `seed-qa`, `DJANGO_DEBUG=1`):
+- `manage.py test apps.accounts.qa_fixture`: 25 test OK.
+- `makemigrations --check --dry-run`: No changes detected.
+- `check_naming.py`: OK, không có vi phạm mới.
+- Một test thăm dò tạm (đã xoá, worktree sạch) để tái hiện M1.
+
+### Soát theo yêu cầu
+
+| Mục | Kết quả |
+|---|---|
+| Cổng chặn production (`guard.py`) | **Đạt.** DB PostgreSQL tên `postgres` (đúng tên DB production trên Supabase, `doc/ops/moi-truong.md:15`) luôn bị chặn, không cờ nào mở được. So sánh sau `lower()`. Tên hoặc host có `prod` mà không có `staging` cũng bị chặn. Staging là `cangca_staging`, nên không thể nhầm hai DB vì cùng host Supabase. Tôi không tìm được đường chạy lên DB production: muốn vào DB `postgres` thì tên DB phải là `postgres`, và tên đó bị chặn cứng. Xem thêm L1 |
+| `--allow-non-local` | **Đạt.** Chỉ nới điều kiện "DEBUG bật + SQLite/staging". Không nới được chữ ký production. Có test lặp cả hai cách gọi (có và không có cờ) trên ba chữ ký production |
+| `--reset` qua cổng | **Đạt.** `guard.check_allowed` chạy đầu `handle`, trước nhánh `--reset`. Có test `test_reset_is_also_guarded` |
+| `--reset` chỉ xoá dữ liệu QA | **Chưa đạt, xem M1** |
+| Dữ liệu cá nhân giả, `QA_PASSWORD` | **Đạt.** SĐT `09000000nn`, tên "Khách QA Giả nn", địa chỉ ghi rõ là giả. `QA_PASSWORD` không có mặc định, thiếu thì `CommandError` và chưa tạo gì. JSON chỉ có `"password_env": "QA_PASSWORD"`, không có mật khẩu (có test). Output không in SĐT, mật khẩu hay địa chỉ. AuditLog không chép SĐT hay địa chỉ (có test) |
+| Dựng chứng từ bằng service thật | **Đạt phần chứng từ tiền.** Giữ chỗ (`batches.reserve`), thanh toán (`confirm_payment`, sinh hoá đơn, phân bổ lô, bút toán SALE, phiếu giao), huỷ đơn (`cancel_paid_order`, sinh chứng từ đảo), phiếu hoàn tiền (`create_refund`, `confirm_refund`, `mark_refund_failed`), ghi tay (`confirm_payment_manual`, `record_unmatched_payment`) đều qua service. `unit_cost` của phân bổ lô lấy từ lô đã giữ chỗ. Giá vốn là số giả, không đổi luật tính. Lô, hàng hoàn, phiếu nhập, kiểm kê được tạo thẳng: xem L2 |
+| Lọt vào registry lệnh AI | **Không lọt.** Đây là management command, không có view hay route, không có `AiMeta`. `grep qa_fixture\|seed_qa apps/ai` rỗng |
+| Test đủ chặt | **Chưa đủ ở reset (M1).** Phần cổng, mật khẩu, tính tất định, độ phủ trạng thái thì tốt |
+
+### Lỗi
+
+**M1 · Medium · `backend/apps/accounts/qa_fixture/reset.py:33-60`. `--reset` xoá cả dữ liệu không phải QA.**
+Tôi đã tái hiện bằng test tạm: seed, tạo khách `0900000050` không có đơn, và một dòng AuditLog do `qa_owner` làm trên một mặt hàng không
+phải QA, rồi `--reset`. Kết quả: **cả hai bị xoá** (`CUSTOMER_KEPT False`, `AUDIT_KEPT False`). Có ba chỗ khớp quá rộng:
+1. `Customer.phone__startswith="09000000"` khớp mọi khách `0900000000…0900000099`, không chỉ 20 khách QA. Khách khác không có đơn thì bị
+   xoá, vì PROTECT chỉ giữ được khách đang có đơn.
+2. `AuditLog` lọc theo `actor_id__in=<qa users>` / `ai_actor_id`: xoá **mọi** dòng nhật ký do tài khoản `qa_…` làm, kể cả trên đối tượng
+   không phải QA. Khi e2e chạy trên staging, `qa_owner` sửa phân quyền của Group thật hay sửa mặt hàng thật, rồi reset xoá luôn vết đó
+   (BR-PQ-06, AuditLog chỉ được ghi thêm).
+3. `Refund.created_by_id__in=<qa users>`: xoá phiếu hoàn tiền do `qa_owner` lập trên đơn không phải QA (chứng từ không xoá, BR-PQ-10).
+
+Test `test_reset_removes_only_qa_records` không bắt được, vì khách "thật" của test có SĐT `0900000500`, không thuộc tiền tố `09000000`.
+Ngoài ra `AuditLog.count() == 0` trong test chỉ đúng vì không có dòng nào khác.
+
+**Sửa:**
+- Khách: chỉ xoá khi `phone` thuộc **đúng tập** `fake_phone(1..20)` **và** `name` bắt đầu bằng "Khách QA Giả".
+- AuditLog: chỉ xoá dòng gắn với đối tượng QA, tức (`model_name`, `object_id`) nằm trong tập id QA đã thu (đơn, hoá đơn, phiếu giao, lô,
+  mặt hàng, phiếu hoàn tiền QA, user QA…), hoặc `note` bắt đầu bằng `QA-audit-`. Không xoá theo `actor`.
+- Refund: chỉ xoá phiếu có hoá đơn mã `QA-` (hoặc `reason` có tiền tố).
+- User QA còn bị nhật ký hay chứng từ ngoài QA tham chiếu (PROTECT) thì **giữ lại**. Báo trong `kept` và đặt `is_active=False`, không xoá lan.
+
+**Test bắt buộc:** thêm vào `test_reset_removes_only_qa_records`:
+- khách `0900000050` không có đơn;
+- dòng AuditLog do `qa_owner` làm trên mặt hàng không phải QA;
+- phiếu hoàn tiền do `qa_owner` lập trên đơn không phải QA (nếu dựng được gọn).
+
+Assert cả ba còn nguyên sau `--reset`, và `qa_owner` nằm trong `kept`.
+
+### Ghi nhận Low (không chặn)
+
+- **L1 · `guard.py`, phòng thủ thêm.** Production hiện chỉ nhận ra bằng tên DB. Nên chặn thêm khi `settings.SEPAY_ENV == "PRODUCTION"`, vì
+  production chạy SePay live còn staging chạy sandbox. Một dòng code, không nới được bằng cờ, có test.
+- **L2 · tồn kho tạo thẳng không khớp sổ.** `QA-LO-07` (nhập 30, tồn 0, SOLD_OUT) và `QA-LO-08` (nhập 10, tồn 0, CANCELLED) chỉ có bút toán
+  RECEIPT, nên tổng sổ nhập xuất khác tồn. Hàng hoàn `QA-RETURN-APPROVED` (RESTOCK) được tạo thẳng ở trạng thái APPROVED, không có bút toán
+  RETURN, cũng không cộng tồn. Không đụng giá vốn, nhưng e2e Sổ nhập xuất và kiểm kê trên dữ liệu QA sẽ thấy số lệch. Nên thêm bút toán
+  bù (SALE hoặc WRITE_OFF với `reference` có `QA-`), hoặc duyệt hàng hoàn qua `apply_return`. Kèm test "tổng sổ = tồn" cho mọi lô QA.
+- **L3 · manifest mặc định `/tmp/seed_qa_ids.json`.** Tệp chỉ chứa id, mã và SĐT giả nên chấp nhận được. Ghi chú trong README rằng file này
+  không được commit.
+
+### Kết luận Review seed_qa (08/10): **CHANGES REQUESTED**
+
+Phải sửa **M1** (reset khớp quá rộng, đã tái hiện) kèm test như trên. L1, L2 nên làm cùng lượt, vì đều nhỏ. Cổng chặn production,
+`--allow-non-local`, phần mật khẩu và dữ liệu cá nhân giả, và chuyện không lọt registry AI đều đạt. Sau khi sửa, techlead chỉ soát diff mới
+và chạy lại `apps.accounts.qa_fixture`.
+
+### Re-review sau d75655f
+
+Phạm vi: `git show d75655f`, gồm 6 file. Soát M1, L1, L2, L3.
+
+**Lệnh techlead tự chạy** (`DJANGO_DEBUG=1`):
+- `manage.py test apps.accounts.qa_fixture`: 29 test OK.
+- `makemigrations --check --dry-run`: No changes detected.
+- `check_naming.py`: OK, không có vi phạm mới.
+- Chạy lại test thăm dò M1 (tạm, đã xoá), có mở rộng thêm ca. Kết quả:
+  - Khách `0900000050` không phải QA: **còn**.
+  - Khách `0900000099` tên "Khách QA Giả lạ" (đúng tiền tố tên, SĐT ngoài tập 20 số): **còn**.
+  - Dòng AuditLog do `qa_owner` làm trên mặt hàng không phải QA: **còn**.
+  - `qa_owner` được giữ lại với `is_active=False`, và là user `qa_` duy nhất còn lại.
+  - Không còn đơn `QA-` nào.
+  - `SEPAY_ENV=PRODUCTION` kèm `--reset --allow-non-local`: bị chặn.
+
+| Mục | Kết quả |
+|---|---|
+| M1 khách | **Đóng.** Phải đúng một trong 20 SĐT giả **và** tên bắt đầu bằng "Khách QA Giả" |
+| M1 AuditLog | **Đóng.** Chỉ xoá dòng gắn đúng cặp (`model_name`, `object_id`) của đối tượng QA, hoặc có note `QA-audit-`. Bộ lọc được tính **trước** khi xoá, nên không mất id để khớp. Không còn xoá theo người làm |
+| M1 Refund | **Đóng.** Chỉ xoá phiếu gắn hoá đơn `QA-` hoặc khoản tiền về `QA-`. Không xét người lập |
+| M1 user QA bị tham chiếu | **Đóng.** Xoá user trong savepoint, kèm hồ sơ nhân viên. Bị PROTECT thì hoàn tác, đặt `is_active=False` và báo trong `kept`. Có test |
+| L1 | **Đóng.** `SEPAY_ENV=PRODUCTION` bị chặn **trước** mọi kiểm khác, không cờ nào mở được. Áp cho cả `--reset` |
+| L2 | **Đóng.** Lô dựng sẵn có tồn thấp hơn số nhập được thêm bút toán bù (`WRITE_OFF` cho lô huỷ, `SALE` cho lô bán hết, `reference` có `QA-`). Hàng hoàn APPROVED đi qua `return_services.apply_return`, nên có bút toán và cộng tồn thật. Có test "tổng sổ = tồn" cho mọi lô QA. Bút toán `SALE` bù không có dòng phân bổ đơn: chấp nhận cho dữ liệu giả, không đổi giá vốn lô |
+| L3 | **Đóng.** README ghi không commit file manifest |
+
+Ghi chú vận hành: worktree có symlink `backend/staticfiles` chưa track (tạo lúc 16:58, trước lượt soát này; không phải của techlead). Đã có
+trong gitignore của checkout chính hay chưa thì cần xem; gỡ trước khi merge, và không `git add` nó.
+
+### Kết luận re-review seed_qa sau d75655f: **APPROVED**
+
+Không còn lỗi Critical, High hay Medium. Cổng chặn production nay có hai lớp: tên DB và `SEPAY_ENV`. `--reset` chỉ đụng đúng bản ghi QA.

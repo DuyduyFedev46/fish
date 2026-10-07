@@ -85,19 +85,23 @@ class StockReconciliationViewSet(DocumentViewSet):
         return self._detail(rec.pk, http_status.HTTP_201_CREATED)
 
     def update(self, request, *args, **kwargs):
-        """Sửa ghi chú hoặc ngày kiểm kê của phiếu đang chờ duyệt. Dòng số đếm sửa qua `…/lines/`."""
+        """Sửa ghi chú hoặc ngày kiểm kê của phiếu nháp. Dòng số đếm sửa qua `…/lines/`. Body có thể kèm `expected_updated_at`."""
         self.reject_protected_fields(request.data)
         if "lines" in request.data:
             raise BusinessError(
                 "Dòng số đếm sửa qua POST …/lines/, không sửa qua phiếu.", code="RECON_USE_LINES_ENDPOINT",
             )
         rec = self.get_object()
+        # L8-PATCH (Lô 17a): `expected_updated_at` tuỳ chọn; có thì lệch → 409 STALE_STATE, không có thì giữ hành vi cũ.
+        raw_expected = request.data.get("expected_updated_at") if hasattr(request.data, "get") else None
+        expected = _parse_expected_updated_at(raw_expected) if raw_expected is not None else None
         serializer = StockReconciliationSerializer(
             rec, data=request.data, partial=kwargs.get("partial", False), context=self.get_serializer_context()
         )
         serializer.is_valid(raise_exception=True)
         services.update_reconciliation(
-            reconciliation=rec, changes=dict(serializer.validated_data), actor=request.user
+            reconciliation=rec, changes=dict(serializer.validated_data), actor=request.user,
+            expected_updated_at=expected,
         )
         return self._detail(rec.pk)
 

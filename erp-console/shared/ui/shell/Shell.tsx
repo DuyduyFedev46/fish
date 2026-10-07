@@ -13,7 +13,7 @@ import { useDrawerFocus } from "../useDrawerFocus";
 import { Sidebar } from "./Sidebar";
 import { Topbar } from "./Topbar";
 import { CommandSearch } from "./CommandSearch";
-import { AI_FEATURES_ENABLED } from "@/shared/lib/features";
+import { aiVisible } from "@/shared/lib/features";
 import { OfflineBanner, useOffline } from "../states/OfflineBanner";
 import {
   ACCOUNT_HREF,
@@ -88,7 +88,9 @@ export function Shell({ viewer, userName, roleText, onLogout, accountHref, child
   const items = menuItems(viewer);
   // Mục đang chọn tính trên cả mục không có dòng menu (payments, content-categories…) để mục cha sáng.
   const current = navMatch(pathname, visibleNav(viewer));
-  const titleItem = navMatch(pathname);
+  const rawTitleItem = navMatch(pathname);
+  // W39: AI tắt thì tiêu đề trang /ai/* cũng không được nhắc tên mục AI (trang chỉ hiện "Không tìm thấy trang này").
+  const titleItem = rawTitleItem?.key.startsWith("ai-") && !aiVisible(viewer) ? undefined : rawTitleItem;
   // Menu đáy chỉ có mục chính.
   const topItems = items.filter((i) => !i.parent);
 
@@ -124,7 +126,7 @@ export function Shell({ viewer, userName, roleText, onLogout, accountHref, child
   const bottomItems = overflow ? topItems.slice(0, 4) : topItems;
   const showBottom = topItems.length >= 2;
 
-  const aiSettingsHref = AI_FEATURES_ENABLED && canView(viewer, "ai-settings") ? AI_SETTINGS_HREF : undefined;
+  const aiSettingsHref = aiVisible(viewer) && canView(viewer, "ai-settings") ? AI_SETTINGS_HREF : undefined;
   const bottomActive = (i: NavItem) => !!current && (current.key === i.key || current.parent === i.key);
 
   return (

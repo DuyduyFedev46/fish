@@ -64,7 +64,11 @@ def new_page(browser, user, w=1280, h=860, errors=None, touch=False):
 
 
 def storage_dump(page):
-    return page.evaluate("() => JSON.stringify([Object.entries(localStorage).filter(e => e[0] !== 'cave_erp_token' && !e[0].startsWith('cave_erp_mock_')), Object.entries(sessionStorage)])")
+    # Khoá giả của mock (cave_erp_mock_*: người dùng, đơn, SĐT giả của dữ liệu mẫu) nằm ở cả local và session; bản thật không có.
+    return page.evaluate("""() => {
+        const real = (e) => e[0] !== 'cave_erp_token' && !e[0].startsWith('cave_erp_mock_');
+        return JSON.stringify([Object.entries(localStorage).filter(real), Object.entries(sessionStorage).filter(real)]);
+    }""")
 
 
 def nav_labels(page):
@@ -351,6 +355,9 @@ def owner(browser):
     page.get_by_role("menuitem", name="Cho nghỉ").click()
     dlg = dialog(page)
     expect(dlg.get_by_role("button", name="Cho nghỉ")).to_be_visible()
+    # Chờ hết bước "Đang kiểm tra phiếu đang giao…" (cờ data-delivering-checking) rồi mới đọc hộp.
+    expect(dlg.locator("[data-delivering-checking]")).to_have_count(0)
+    expect(dlg.get_by_role("button", name="Cho nghỉ")).to_be_enabled()
     ok("giao1 không có phiếu đang giao: hộp không chặn, nút xác nhận bấm được, vẫn nêu hậu quả",
        dlg.locator("[data-delivering-block]").count() == 0 and dlg.get_by_role("button", name="Cho nghỉ").is_enabled()
        and "đăng xuất khỏi mọi máy" in dlg.inner_text())

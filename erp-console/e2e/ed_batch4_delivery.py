@@ -71,7 +71,7 @@ def courier_scope(browser):
     ok("giao1: có đủ nhóm Đang giao / Chờ lấy hàng / Giao thất bại", all(t in body for t in ("Đang giao", "Chờ lấy hàng", "Giao thất bại")))
     # ED-19-AC1: nhãn trường, mã đơn, dòng đã thanh toán, mỗi trường một giá trị
     ok("giao1: thẻ có nhãn Người nhận · Đơn · Địa chỉ · Số kg · Hàng", all(re.search(rf"^{l}$", body, re.M) for l in ("Người nhận", "Đơn", "Địa chỉ", "Số kg", "Hàng")))
-    ok("giao1: thẻ có mã đơn DH-...", re.search(r"DH-\d{6}-\d{4}", body) is not None)
+    ok("giao1: thẻ có mã đơn SO…", re.search(r"SO\d{6}-[A-Z0-9]{6}", body) is not None)
     ok("giao1: thẻ có dòng 'Đã thanh toán, không thu thêm'", body.count("Đã thanh toán, không thu thêm") >= 3)
     ok("giao1: kg dạng 'n,n kg' và mỗi thẻ chỉ một giá trị kg", re.search(r"\d+,\d+ kg", body) is not None and not re.search(r"\d\.\d{3}\s*kg", body))
     first_card = page.locator("[data-group='DELIVERING'] li").first.inner_text()

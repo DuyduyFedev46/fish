@@ -5,7 +5,7 @@ và SR-17 (dashboard `recent_orders` không có dữ liệu cá nhân). Dữ li�
 - SR-16-AC4: batch_pnl có supplier_return_qty, supplier_refund_amount; total_cost = mua + phân bổ − tiền NCC hoàn.
 - SR-16-AC4b: landed_unit_cost KHÔNG đổi khi NCC hoàn tiền; period_pnl không đổi.
 - F11: WRITE_OFF của huỷ phiếu nhập không tính vào expired_qty.
-- SR-17: recent_orders có đúng {code, amount, status, status_label, expires_at}.
+- SR-17: recent_orders có đúng {id, code, amount, status, status_label, expires_at, reason} (không tên, SĐT).
 """
 import json
 import uuid
@@ -24,7 +24,7 @@ from apps.sales.orders.tests.test_s10_api import OrderApiBase, find_keys
 from apps.accounts import roles
 
 DASH_URL = "/api/dashboard/summary/"
-RECENT_KEYS = {"code", "amount", "status", "status_label", "expires_at"}
+RECENT_KEYS = {"id", "code", "amount", "status", "status_label", "expires_at", "reason"}  # Lô 17a (TL15-dash)
 
 
 class Lo5PnlTests(OrderApiBase):

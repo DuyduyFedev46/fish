@@ -82,10 +82,12 @@ const MAX_CODES_SHOWN = 5;
  * `notes` null (khối không tải được hoặc người xem thiếu quyền xem phiếu) → null: giữ hành vi cũ, để BE quyết khi bấm xác nhận.
  * Chỉ dùng số phiếu và mã phiếu, không có dữ liệu khách.
  */
-export function deliveringBlock(notes: Pick<StaffDelivering, "code">[] | null): string | null {
-  if (!notes || notes.length === 0) return null;
+export function deliveringBlock(notes: Pick<StaffDelivering, "code">[] | null, count?: number): string | null {
+  // `count` (Lô 17b G7) = tổng của API; thiếu thì đếm theo danh sách. Danh sách chỉ là trang đầu nên không dùng độ dài của nó làm tổng.
+  const total = Math.max(count ?? 0, notes?.length ?? 0);
+  if (!notes || total === 0) return null;
   const shown = notes.slice(0, MAX_CODES_SHOWN).map((n) => n.code).join(", ");
-  return M.deactivateDelivering(notes.length, shown, notes.length - MAX_CODES_SHOWN);
+  return M.deactivateDelivering(total, shown, total - Math.min(notes.length, MAX_CODES_SHOWN));
 }
 
 const ACTION_VERB: Record<string, string> = {

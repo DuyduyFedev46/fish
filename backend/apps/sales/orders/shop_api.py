@@ -24,6 +24,7 @@ from apps.common.throttling import (
 from apps.sales.models import SalesOrder
 
 from . import services
+from .shop_labels import shop_delivery_status_label, shop_order_status_label
 
 LOOKUP_NOT_FOUND = "Không tìm thấy đơn với mã và số điện thoại này."
 LOOKUP_BAD_LAST4 = "Vui lòng nhập đúng 4 số cuối số điện thoại."
@@ -82,18 +83,14 @@ class ShopOrderLookupView(APIView):
             return Response({"detail": LOOKUP_NOT_FOUND}, status=404)
 
         delivery = None
-        status_label = order.get_status_display()
+        status_label = shop_order_status_label(order)
         invoice = getattr(order, "invoice", None)
         if invoice is not None:
             dn = invoice.delivery_notes.first()
             if dn is not None:
-                deliv_label = dn.get_status_display()
-                if dn.status == "CONFIRMING":
-                    deliv_label = "Chờ vựa gọi xác nhận"
-                    if order.status == SalesOrder.Status.PROCESSING:
-                        status_label = "Đã thanh toán – chờ vựa gọi xác nhận"
-                elif dn.status == "CANCELLED" and order.status == SalesOrder.Status.CANCELLED:
-                    deliv_label = "Đã huỷ theo đơn"
+                deliv_label = shop_delivery_status_label(dn.status)
+                if dn.status == "CONFIRMING" and order.status == SalesOrder.Status.PROCESSING:
+                    status_label = "Đã thanh toán – chờ vựa gọi xác nhận"
                 delivery = {"status": dn.status, "status_label": deliv_label}
 
         booked_expires_at = None

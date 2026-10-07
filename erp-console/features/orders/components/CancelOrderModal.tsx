@@ -1,7 +1,7 @@
 "use client";
 
 // F2b — "Huỷ đơn" (ED-10-AC2): hai bước. Bước 1 chọn lý do (+ ghi chú, bắt buộc khi chọn "Khác"); bước 2 nêu hậu quả rồi
-// mới có nút đỏ "Huỷ đơn". Sau khi huỷ, màn gợi ý "Lập phiếu hoàn" (đơn đã thanh toán).
+// mới có nút đỏ "Huỷ đơn". Sau khi huỷ, màn gợi ý "Lập phiếu hoàn tiền" (đơn đã thanh toán).
 
 import { useState } from "react";
 import { vnd } from "@/shared/lib/format";
@@ -9,11 +9,14 @@ import { Field } from "@/shared/ui/form/Field";
 import { FormAlert } from "@/shared/ui/form/FormAlert";
 import { SummaryBlock } from "@/shared/ui/form/SummaryBlock";
 import { useSubmit, type SubmitConflict } from "@/shared/ui/form/useSubmit";
+import { ApiError } from "@/shared/lib/http";
 import { cancelOrder } from "../api";
-import { CANCEL_REASONS } from "../labels";
+import { CANCEL_NOTE_MAX, CANCEL_REASONS } from "../labels";
 import { ORDERS_MSG as M } from "../messages";
 import type { CancelOrderResult, CancelReasonCode } from "../types";
 import { ActionModal } from "./ActionModal";
+
+const NOTE_RULE_CODE = "BR-GH-19";
 
 type Props = {
   order: { id: number; code: string; total_amount: string; delivery_status: string | null };
@@ -27,7 +30,22 @@ export function CancelOrderModal({ order, onClose, onDone, onConflict }: Props) 
   const [reason, setReason] = useState("");
   const [note, setNote] = useState("");
   const [errs, setErrs] = useState<{ reason?: string; note?: string }>({});
-  const sub = useSubmit(() => cancelOrder(order.id, { reason_code: reason as CancelReasonCode, note: note.trim() }), { onSuccess: onDone });
+  // BR-GH-19: BE từ chối ghi chú có SĐT/số TK hoặc quá dài → câu lỗi hiện dưới ô ghi chú, quay về form, giữ nguyên chữ đã gõ.
+  const sub = useSubmit(
+    async (): Promise<CancelOrderResult | null> => {
+      try {
+        return await cancelOrder(order.id, { reason_code: reason as CancelReasonCode, note: note.trim() });
+      } catch (err) {
+        if (err instanceof ApiError && err.status === 400 && err.code === NOTE_RULE_CODE) {
+          setErrs({ note: err.message });
+          setStep("form");
+          return null;
+        }
+        throw err;
+      }
+    },
+    { onSuccess: (r) => r && onDone(r) },
+  );
   const reasonLabel = CANCEL_REASONS.find((r) => r.value === reason)?.label ?? "";
 
   const next = () => {
@@ -75,7 +93,8 @@ export function CancelOrderModal({ order, onClose, onDone, onConflict }: Props) 
             setNote(v);
             if (errs.note) setErrs((e) => ({ ...e, note: undefined }));
           }}
-          maxLength={500}
+          maxLength={CANCEL_NOTE_MAX}
+          counter
           error={errs.note ?? sub.fieldErrors.note}
         />
       </ActionModal>

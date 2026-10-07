@@ -23,6 +23,7 @@ from apps.common.api import (
 
 from apps.common.exceptions import BusinessError
 from apps.common.params import parse_positive_id
+from apps.sales.orders import completion
 
 from . import services
 from .models import DeliveryNote
@@ -99,6 +100,12 @@ class DeliveryNoteViewSet(NoStoreMixin, DocumentViewSet):
             order_id = _positive_int_param(self.request.query_params.get("order"), "order")
             if order_id is not None:
                 queryset = queryset.filter(sales_invoice__sales_order_id=order_id)
+
+            # ED-07-BE (Lô 17a): `code` khớp ĐÚNG mã phiếu (không phân biệt hoa thường), trên queryset đã có phạm vi:
+            # người giao tra mã phiếu của người khác nhận `count: 0`, giống mã không tồn tại.
+            code = (self.request.query_params.get("code") or "").strip()
+            if code:
+                queryset = queryset.filter(code__iexact=code)
 
             # CS-02: completed_from YYYY-MM-DD
             completed_from = self.request.query_params.get("completed_from")
@@ -201,6 +208,7 @@ class DeliveryNoteViewSet(NoStoreMixin, DocumentViewSet):
 
         data = self.get_serializer(note).data
         data["already"] = already
+        data["order_status"] = completion.current_order_status(note)  # W37: đọc mới từ DB, mọi nhánh
         if needs_decision is not None:
             data["needs_decision"] = needs_decision
         return Response(data)

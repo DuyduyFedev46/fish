@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { actionLabel, actorInitial, actorName, approverOf, buildApproverMap, changeSummary, matchesLocal, UNKNOWN_ACTION } from "./auditModel";
+import { AI_ONLY_ACTIONS, AUDIT_FILTER_ACTIONS, actionLabel, actorInitial, actorName, approverOf, buildApproverMap, changeSummary, matchesLocal, UNKNOWN_ACTION } from "./auditModel";
 import type { AuditLogRow } from "./types";
 
 const row = (over: Partial<AuditLogRow>): AuditLogRow => ({
@@ -56,10 +56,29 @@ describe("người duyệt", () => {
   });
 });
 
+describe("changeSummary: W11 dịch trạng thái theo model_name (T23, T29, T47)", () => {
+  it("FAILED của phiếu giao là Giao thất bại, của phiếu hoàn tiền là Hoàn thất bại", () => {
+    expect(changeSummary({ status: ["DELIVERING", "FAILED"] }, "delivery.DeliveryNote")).toEqual(["Trạng thái: Đang giao → Giao thất bại"]);
+    expect(changeSummary({ status: ["PENDING", "FAILED"] }, "sales.Refund")).toEqual(["Trạng thái: Chờ hoàn tiền → Hoàn thất bại"]);
+  });
+  it("DRAFT của phiếu hàng hoàn là Chờ duyệt, của lô là Nháp", () => {
+    expect(changeSummary({ status: ["DRAFT", "APPROVED"] }, "inventory.ReturnToStock")).toEqual(["Trạng thái: Chờ duyệt → Đã duyệt"]);
+    expect(changeSummary({ status: ["DRAFT", "SELLING"] }, "inventory.Batch")).toEqual(["Trạng thái: Nháp → Đang bán"]);
+  });
+  it("COMPLETED của phiếu giao là Đã giao, của đơn là Hoàn tất", () => {
+    expect(changeSummary({ status: ["DELIVERING", "COMPLETED"] }, "delivery.DeliveryNote")).toEqual(["Trạng thái: Đang giao → Đã giao"]);
+    expect(changeSummary({ status: ["PROCESSING", "COMPLETED"] }, "sales.SalesOrder")).toEqual(["Trạng thái: Đang xử lý → Hoàn tất"]);
+  });
+  it("model lạ hoặc thiếu: không đoán, không in trạng thái", () => {
+    expect(changeSummary({ status: ["BOOKED", "PAID"] })).toEqual([]);
+    expect(changeSummary({ status: ["BOOKED", "PAID"] }, "x.Unknown")).toEqual([]);
+  });
+});
+
 describe("changeSummary (danh sách trắng)", () => {
   it("trạng thái dạng cặp và dạng from/to", () => {
-    expect(changeSummary({ status: ["BOOKED", "PAID"] })).toEqual(["Trạng thái: Giữ chỗ → Đã thanh toán"]);
-    expect(changeSummary({ status: { from: "PENDING", to: "REFUNDED" } })).toEqual(["Trạng thái: Chờ hoàn → Đã hoàn"]);
+    expect(changeSummary({ status: ["BOOKED", "PAID"] }, "sales.SalesOrder")).toEqual(["Trạng thái: Giữ chỗ → Đã thanh toán"]);
+    expect(changeSummary({ status: { from: "PENDING", to: "REFUNDED" } }, "sales.Refund")).toEqual(["Trạng thái: Chờ hoàn tiền → Đã hoàn tiền"]);
   });
   it("số tiền và giá bán có đơn vị đ", () => {
     expect(changeSummary({ amount: { to: 125000 } })).toEqual(["Số tiền: → 125.000 đ"]);
@@ -103,5 +122,12 @@ describe("matchesLocal", () => {
     expect(matchesLocal(r, { query: "", from: "2026-09-27", to: "2026-09-27" })).toBe(true);
     expect(matchesLocal(r, { query: "", from: "2026-09-28", to: "" })).toBe(false);
     expect(matchesLocal(r, { query: "", from: "", to: "2026-09-26" })).toBe(false);
+  });
+});
+
+describe("AI_ONLY_ACTIONS (R1)", () => {
+  it("gồm cả ai_config_kill để tắt AI thì ô lọc không còn Tắt trợ lý AI", () => {
+    expect(AI_ONLY_ACTIONS).toContain("ai_config_kill");
+    expect(AUDIT_FILTER_ACTIONS.filter((a) => !AI_ONLY_ACTIONS.includes(a))).not.toContain("ai_config_kill");
   });
 });

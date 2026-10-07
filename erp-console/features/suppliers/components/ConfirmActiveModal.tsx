@@ -2,11 +2,9 @@
 
 // Hộp hỏi lại trước khi đổi trạng thái hợp tác (ED-22): "Ngừng hợp tác" là việc phá huỷ nhẹ nên nút đỏ và nêu hậu quả; "Bật lại hợp tác"
 // là nút chính thường. Cả hai là một PATCH `is_active` (BE không cho xoá nhà cung cấp). Lỗi → giữ hộp mở, nút chính đổi "Thử lại".
+// Dùng `shared/ui/overlay/ConfirmModal` (Lô 17b CLN-2).
 
-import { primaryLabel, useSubmit } from "@/shared/ui/form/useSubmit";
-import { FormAlert } from "@/shared/ui/form/FormAlert";
-import { Icon } from "@/shared/ui/Icon";
-import { Modal } from "@/shared/ui/overlay/Modal";
+import { ConfirmModal } from "@/shared/ui/overlay/ConfirmModal";
 import { setSupplierActive } from "../api";
 import { SUPPLIERS_MSG as M } from "../messages";
 import { saveErrorMessage } from "../suppliersModel";
@@ -22,50 +20,20 @@ type Props = {
 };
 
 export function ConfirmActiveModal({ supplier, deactivating, onClose, onDone }: Props) {
-  const sub = useSubmit(
-    async () => {
-      try {
-        return await setSupplierActive(supplier.id, !deactivating);
-      } catch (err) {
-        throw new Error(saveErrorMessage(err));
-      }
-    },
-    { onSuccess: onDone },
-  );
-  const title = deactivating ? M.confirmDeactivateTitle : M.confirmReactivateTitle;
-  const ok = deactivating ? M.confirmDeactivateOk : M.confirmReactivateOk;
   return (
-    <Modal
-      title={title}
-      size="sm"
+    <ConfirmModal
+      title={deactivating ? M.confirmDeactivateTitle : M.confirmReactivateTitle}
+      confirmLabel={deactivating ? M.confirmDeactivateOk : M.confirmReactivateOk}
+      busyLabel={M.confirmBusy}
+      backLabel={M.cancel}
+      danger={deactivating}
+      run={() => setSupplierActive(supplier.id, !deactivating)}
+      errorText={saveErrorMessage}
+      onDone={onDone}
       onClose={onClose}
-      busy={sub.submitting}
-      footer={
-        <>
-          <button type="button" className="btn" onClick={onClose} disabled={sub.submitting}>
-            {M.cancel}
-          </button>
-          <button
-            type="button"
-            className={`btn ${deactivating ? "danger solid" : "primary"}`}
-            onClick={() => void sub.submit()}
-            disabled={sub.submitting}
-            aria-busy={sub.submitting || undefined}
-          >
-            {sub.submitting ? (
-              <>
-                <Icon name="progress_activity" className="spin" />
-                <span>{M.confirmBusy}</span>
-              </>
-            ) : (
-              primaryLabel(ok, sub.failed)
-            )}
-          </button>
-        </>
-      }
+      noun="nhà cung cấp"
     >
-      {sub.error && <FormAlert>{sub.error}</FormAlert>}
       <p className={s.confirmBody}>{deactivating ? M.confirmDeactivateBody : M.confirmReactivateBody}</p>
-    </Modal>
+    </ConfirmModal>
   );
 }

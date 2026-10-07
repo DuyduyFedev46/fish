@@ -4,6 +4,7 @@ import React from "react";
 import Link from "next/link";
 import { formatVnd } from "@/lib/format";
 import type { CatalogItem } from "@/lib/types";
+import ContactButton from "@/components/ContactButton";
 import s from "./ItemCard.module.css";
 
 interface ItemCardProps {
@@ -20,7 +21,6 @@ interface ItemCardProps {
 export default function ItemCard({ itemCode, postSlug, item, loading }: ItemCardProps) {
   const campaign = postSlug ? encodeURIComponent(postSlug) : "";
   const shopItemUrl = `/shop/item/?code=${encodeURIComponent(itemCode)}&utm_source=caveve_web&utm_medium=bai_viet&utm_campaign=${campaign}`;
-  const shopCatalogUrl = `/shop/?utm_source=caveve_web&utm_medium=bai_viet&utm_campaign=${campaign}`;
 
   if (loading) {
     return (
@@ -31,18 +31,16 @@ export default function ItemCard({ itemCode, postSlug, item, loading }: ItemCard
   }
 
   // Trường hợp mặt hàng ẩn, hết hàng hoặc API lỗi (CMS-06-AC5)
-  // (API lỗi cũng rơi vào đây: không có `item` -> "Tạm hết hàng").
+  // (API lỗi cũng rơi vào đây: không có `item` -> "Tạm hết · liên hệ để đặt").
   if (!item || Number(item.sellable_qty) <= 0) {
     return (
       <div className={`${s.cardWrapper} ${s.unavailable}`}>
         <div className={s.itemInfo}>
           <span className={s.tag}>Hải sản Cá Về</span>
           <h4 className={s.name}>Mặt hàng #{itemCode}</h4>
-          <span className={s.statusBadge}>Tạm hết hàng</span>
+          <span className={s.statusBadge}>Tạm hết · liên hệ để đặt</span>
         </div>
-        <Link href={shopCatalogUrl} className={s.btnSecondary}>
-          Xem cửa hàng
-        </Link>
+        <ContactButton className={s.btnSecondary} />
       </div>
     );
   }

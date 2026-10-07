@@ -27,6 +27,7 @@ URL = "/api/sales/invoices/"
 ROW_KEYS = {
     "id", "code", "sales_order", "order_code", "customer_name", "issued_at", "amount", "status",
     "status_label",
+    "customer_hidden_reason",  # PV-07 (02b §2.7)
 }
 COST_ROW_KEYS = {"cogs", "gross_profit"}
 COGS_SENTINEL = "4242"  # tổng giá vốn của hoá đơn mẫu: 10 kg × 424,2 → 4242 (số lạ để quét rò)
@@ -264,27 +265,37 @@ class InvoiceListCustomerDataTests(InvoiceListBase):
             with self.subTest(user=user.username):
                 self.assertEqual(self.get(user)["Cache-Control"], "no-store")
 
-    def test_r13_pii_customer_name_only_for_customer_directory_permission(self):
-        """M1: `customer_name` chỉ khi có `sales.view_customer_list` (owner, manager); NV kho thấy dòng nhưng tên = null."""
+    def test_r13_pii_customer_name_only_for_order_customer_info_permission(self):
+        """PV-07 (thay M1): `customer_name` chỉ khi có V2 `sales.view_order_customer_info`. Mặc định cả owner, manager và
+        NV kho đều có (ngoại lệ đã duyệt Q-4: trước đây NV kho thấy tên = null). Gỡ V2 khỏi nhóm NV kho thì tên = null."""
+        from django.contrib.auth.models import Group, Permission
+
         self.make_invoice()
-        for user in (self.owner, self.manager):
+        for user in (self.owner, self.manager, self.warehouse_staff):
             with self.subTest(user=user.username):
                 row = self.get(user).json()["results"][0]
                 self.assertEqual(row["customer_name"], FAKE_NAME)
-        response = self.get(self.warehouse_staff)
+        Group.objects.get(name=roles.WAREHOUSE_STAFF).permissions.remove(
+            Permission.objects.get(content_type__app_label="sales", codename="view_order_customer_info"))
+        response = self.get(User.objects.get(pk=self.warehouse_staff.pk))
         self.assertEqual(response.status_code, 200)
         body = response.json()
         self.assertEqual(body["count"], 1)
         self.assertIn("customer_name", body["results"][0])
         self.assertIsNone(body["results"][0]["customer_name"])
+        self.assertEqual(body["results"][0]["customer_hidden_reason"], "not_permitted")
         self.assertEqual(body["results"][0]["code"], "HD-T001")  # các cột còn lại vẫn có
         self.assertNotIn(FAKE_NAME, response.content.decode())
 
-    def test_r13_pii_customer_name_follows_permission_not_group(self):
-        """Quyền gán trực tiếp quyết định: bật `view_customer_list` cho NV kho thì thấy tên, và ngược lại."""
+    def test_r13_pii_customer_view_list_permission_alone_does_not_show_name(self):
+        """Quyền "Xem khách hàng" (danh bạ) không còn mở tên trên hoá đơn: chỉ V2 mới mở (BR-PQ-38)."""
         self.make_invoice()
         user = make_user("u_wh_names", roles.WAREHOUSE_STAFF, perms=("sales.view_customer_list",))
-        self.assertEqual(self.get(user).json()["results"][0]["customer_name"], FAKE_NAME)
+        from django.contrib.auth.models import Group, Permission
+
+        Group.objects.get(name=roles.WAREHOUSE_STAFF).permissions.remove(
+            Permission.objects.get(content_type__app_label="sales", codename="view_order_customer_info"))
+        self.assertIsNone(self.get(User.objects.get(pk=user.pk)).json()["results"][0]["customer_name"])
 
     def test_r13_pii_detail_no_store(self):
         invoice = self.make_invoice()

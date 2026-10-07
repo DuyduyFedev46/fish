@@ -13,11 +13,12 @@ from rest_framework.authtoken.models import Token
 
 from apps.accounts import roles
 from apps.accounts.models import StaffProfile
+from apps.common.ai_visibility import ai_features_enabled
 from apps.common.api import VIEW_COSTPRICE_PERM
 from apps.common.audit import record_audit
 from apps.common.exceptions import BusinessError
 
-from .authentication import must_change_password
+from .authentication import has_erp_access, must_change_password
 
 VIEW_PROFITREPORT_PERM = "reports.view_profitreport"
 
@@ -35,7 +36,7 @@ GROUP_LABELS = {
     roles.MANAGER: "Quản lý",
     roles.WAREHOUSE_STAFF: "Nhân viên kho",
     roles.DELIVERY_STAFF: "Nhân viên giao",
-    roles.CUSTOMER_SERVICE: "CSKH",
+    roles.CUSTOMER_SERVICE: "Nhân viên gọi xác nhận",
 }
 
 # S47: quyền Tầng 2 = bảng spec §1.5 + mọi `Meta.permissions` tuỳ biến. Thứ tự dict = thứ tự
@@ -44,7 +45,7 @@ GROUP_LABELS = {
 CAPABILITY_LABELS = {
     "inventory.publish_batch": "Mở bán lô",
     "sales.cancel_paid_order": "Huỷ đơn đã thanh toán",
-    "sales.create_refund": "Lập phiếu hoàn",
+    "sales.create_refund": "Lập phiếu hoàn tiền",
     "inventory.approve_returntostock": "Duyệt hàng hoàn",
     "inventory.approve_stockreconciliation": "Duyệt kiểm kê",
     "inventory.close_batch": "Chốt lô",
@@ -65,15 +66,17 @@ CAPABILITY_LABELS = {
     "delivery.confirm_with_customer": "Gọi xác nhận đơn",
     "delivery.change_recipient": "Đổi thông tin nhận hàng",
     "delivery.decide_unconfirmed": "Quyết định đơn không liên lạc được",
-    "delivery.pack_deliverynote": "Đóng gói phiếu giao",
+    "delivery.pack_deliverynote": "Soạn hàng",
     "delivery.print_label": "In / huỷ tem giao",
     # CMS (2026-09-28-cms-viet-bai): Quyền Tầng 2 đăng/gỡ/trả về nháp bài viết và trang
-    "content.publish_entry": "Đăng bài viết và trang",
+    "content.publish_entry": "Đăng bài lên Shop",
     # GL-05 (2026-09-28-khung-go-live): chu + quan_ly.
     "sales.view_privacy_consent": "Xem bằng chứng đồng ý xử lý dữ liệu của đơn",
-    "delivery.assign_deliverynote": "Giao hoặc đổi người giao của phiếu giao",
+    "delivery.assign_deliverynote": "Chọn người giao",
     # B2 (ERP theo design, Lô 6): chu + quan_ly. Khác `sales.view_customer` (Tầng 1, phạm vi dòng của NV giao).
     "sales.view_customer_list": "Xem khách hàng",
+    # PV-07 (2026-10-02-pham-vi-du-lieu-cau-hinh): việc V2, cấp cho 5 nhóm (Q-4).
+    "sales.view_order_customer_info": "Xem thông tin khách trên đơn, hoá đơn, phiếu hoàn tiền",
 }
 
 AUTH_OLD_PASSWORD = "AUTH_OLD_PASSWORD"
@@ -86,10 +89,14 @@ def sorted_groups(names):
     return sorted(names, key=lambda n: (rank.get(n, len(ROLE_ORDER)), n))
 
 
-def home_for(groups) -> str:
-    """Trang mặc định: không Group → no-role; chỉ delivery_staff → my-deliveries; chỉ customer_service → confirmation-queue; còn lại → dashboard."""
-    if not groups:
+def home_for(user, groups) -> str:
+    """Trang mặc định: không có quyền vào ERP (cùng luật `has_erp_access` với cổng D-3) → no-role;
+    superuser → dashboard (Duy 08/10 câu 1); chỉ delivery_staff → my-deliveries; chỉ customer_service →
+    confirmation-queue; còn lại → dashboard."""
+    if not has_erp_access(user):
         return HOME_NO_ROLE
+    if user.is_superuser:
+        return HOME_DASHBOARD
     if set(groups) == {roles.DELIVERY_STAFF}:
         return HOME_MY_DELIVERIES
     if set(groups) == {roles.CUSTOMER_SERVICE}:
@@ -101,6 +108,7 @@ def describe_user(user) -> dict:
     """JSON của `GET /api/auth/me/` cho user đã đăng nhập (contract S6)."""
     groups = sorted_groups(user.groups.values_list("name", flat=True))
     permissions = user.get_all_permissions()
+    ai_on = ai_features_enabled()
     profile = getattr(user, "staff_profile", None)  # RelatedObjectDoesNotExist là AttributeError
     return {
         "id": user.pk,
@@ -113,16 +121,20 @@ def describe_user(user) -> dict:
         "permissions": sorted(permissions),
         "can_view_cost": user.has_perm(VIEW_COSTPRICE_PERM),
         "can_view_profit": user.has_perm(VIEW_PROFITREPORT_PERM),
-        "home": home_for(groups),
+        "home": home_for(user, groups),
         # S47 — chỉ THÊM key, không đổi key S6.
         "group_labels": [{"code": g, "label": GROUP_LABELS.get(g, g)} for g in groups],
         "capabilities": [
             {"code": code, "label": label}
             for code, label in CAPABILITY_LABELS.items()
-            if code in permissions
+            if code in permissions and (ai_on or not code.startswith("ai."))
         ],
+        # Lô dọn chữ AI (W39): cờ môi trường, FE chỉ hiện phần AI khi cờ này bật.
+        "ai_features_enabled": ai_on,
         # S48 (BR-PQ-19): cờ hiệu lực — superuser luôn False.
         "must_change_password": must_change_password(user),
+        # PV-14 (review 07/10) + Duy 08/10 câu 1: FE phân biệt superuser không nhóm.
+        "is_superuser": bool(user.is_superuser),
     }
 
 

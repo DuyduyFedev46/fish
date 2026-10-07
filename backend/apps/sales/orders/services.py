@@ -20,8 +20,9 @@ from django.db.models import Q
 from django.utils import timezone
 
 from apps.catalog.models import Item, ItemPrice, PricingRule
-from apps.common.audit import record_audit
+from apps.common.audit import note_marker, record_audit
 from apps.common.exceptions import BusinessError
+from apps.common.pii import has_long_digit_run
 from apps.delivery.models import DeliveryNote
 from apps.inventory.batches import services as batches
 from apps.inventory.models import Batch, StockLedgerEntry
@@ -310,15 +311,15 @@ def cancel_unpaid_expired(*, now=None):
 # S14 (BR-GH-07): lý do huỷ đơn đã thanh toán. OTHER bắt buộc `note` đi kèm (kiểm ở API).
 CANCEL_REASON_LABELS = {
     "CUSTOMER_CHANGED_MIND": "Khách đổi ý",
-    "DAMAGED_WHEN_PACKING": "Hư hỏng khi soạn hàng",
-    "GIVE_UP_AFTER_FAILED": "Bỏ giao sau khi thất bại",
+    "DAMAGED_WHEN_PACKING": "Hàng hư lúc soạn hàng",
+    "GIVE_UP_AFTER_FAILED": "Giao thất bại, không giao lại",
     "UNREACHABLE": "Không liên lạc được khách",
-    "OTHER": "Khác",
+    "OTHER": "Lý do khác",
 }
 CANCEL_REASON_CODES = set(CANCEL_REASON_LABELS)
 
 SYSTEM_CANCEL_REASON_CODES = {
-    "UNREACHABLE_AUTO": "Hệ thống tự huỷ — không liên lạc được",
+    "UNREACHABLE_AUTO": "Hệ thống tự huỷ: không liên lạc được khách",
 }
 ALL_CANCEL_REASON_CODES = set(CANCEL_REASON_LABELS) | set(SYSTEM_CANCEL_REASON_CODES)
 
@@ -330,7 +331,19 @@ _STOCK_STILL_IN_WAREHOUSE = (
 )
 
 
-def cancel_paid_order(*, order, actor, reason="", reason_code=""):
+CANCEL_NOTE_MAX = 200
+
+
+def _cancel_audit_note(reason_code, cancel_note):
+    """Nhật ký chỉ ghi nhãn lý do + "có ghi chú"; chữ gốc ở `SalesOrder.cancel_note` (bất biến 9)."""
+    if not reason_code:
+        return ""
+    text = f"Huỷ đơn: {CANCEL_REASON_LABELS.get(reason_code, 'Không rõ')}"
+    marker = note_marker(cancel_note)
+    return f"{text} · {marker}" if marker else text
+
+
+def cancel_paid_order(*, order, actor, reason="", reason_code="", cancel_note=""):
     """
     Huỷ đơn đã thanh toán (BR-HT-05, BR-GH-07): chặn khi phiếu giao đang Đang giao
     (BR-GH-07) hoặc đã Hoàn tất (BR-GH-05, không quay lui — chỉ còn cách lập phiếu hoàn).
@@ -344,9 +357,22 @@ def cancel_paid_order(*, order, actor, reason="", reason_code=""):
     Doanh thu đảo bằng chứng từ đảo (BR-HT-10) lập NGAY tại thời điểm huỷ, trong cùng
     transaction (lỗi thì cả lần huỷ rollback); hoá đơn gốc giữ nguyên ISSUED (BR-HT-06).
     Phiếu hoàn chỉ là dòng tiền, không đảo doanh thu. Trả dict {"order", "stock_restored", "delivery_note"}.
+
+    Tham số `reason` không còn được dùng (chữ lý do nay là `cancel_note`, lưu ở đơn); giữ lại chỉ để
+    các nơi gọi cũ (chủ yếu test) không vỡ. Luồng sản phẩm không truyền nữa.
     """
+    cancel_note = (cancel_note or "").strip()
+    if len(cancel_note) > CANCEL_NOTE_MAX:
+        raise BusinessError(f"Ghi chú huỷ tối đa {CANCEL_NOTE_MAX} ký tự.", code="BR-GH-19")
+    if has_long_digit_run(cancel_note):
+        raise BusinessError("Không ghi SĐT hay số tài khoản vào ghi chú huỷ.", code="BR-GH-19")
     with transaction.atomic():
         o = SalesOrder.objects.select_for_update().get(pk=order.pk)
+        if o.status == SalesOrder.Status.COMPLETED:
+            # W37 S2: đơn đã Hoàn tất (giao xong thắng cuộc đua) — không quay lui, chỉ còn phiếu hoàn.
+            raise BusinessError(
+                "Đơn đã giao hoàn tất — chỉ còn cách lập phiếu hoàn tiền.", code="BR-GH-05",
+            )
         if o.status not in (SalesOrder.Status.PAID, SalesOrder.Status.PROCESSING):
             raise BusinessError("Chỉ huỷ được đơn đã thanh toán / đang xử lý (P-07).")
         invoice = getattr(o, "invoice", None)
@@ -367,7 +393,7 @@ def cancel_paid_order(*, order, actor, reason="", reason_code=""):
                 )
             if note.status == DeliveryNote.Status.COMPLETED:
                 raise BusinessError(
-                    "Đơn đã giao hoàn tất — chỉ còn cách lập phiếu hoàn.", code="BR-GH-05",
+                    "Đơn đã giao hoàn tất — chỉ còn cách lập phiếu hoàn tiền.", code="BR-GH-05",
                 )
 
         stock_restored = note is None or note.status in _STOCK_STILL_IN_WAREHOUSE
@@ -384,7 +410,8 @@ def cancel_paid_order(*, order, actor, reason="", reason_code=""):
 
         old_status = o.status
         o.status = SalesOrder.Status.CANCELLED
-        o.save(update_fields=["status"])
+        o.cancel_note = cancel_note
+        o.save(update_fields=["status", "cancel_note"])
 
         if note is not None:
             note.status = DeliveryNote.Status.CANCELLED
@@ -399,7 +426,7 @@ def cancel_paid_order(*, order, actor, reason="", reason_code=""):
                 "stock_restored": stock_restored,
                 "reason_code": reason_code,
             },
-            note=reason,
+            note=_cancel_audit_note(reason_code, cancel_note),
         )
         credit_note_services.issue_cancel_credit_note(
             invoice=invoice, actor=actor, reason_code=reason_code,

@@ -25,7 +25,7 @@ class ReturnToStock(models.Model):
     class Decision(models.TextChoices):
         PENDING = "PENDING", "Chờ quyết định"
         RESTOCK = "RESTOCK", "Tái nhập"
-        WRITE_OFF = "WRITE_OFF", "Huỷ bỏ (hạch toán lỗ)"
+        WRITE_OFF = "WRITE_OFF", "Huỷ hàng, ghi lỗ"
 
     class Status(models.TextChoices):
         DRAFT = "DRAFT", "Chờ duyệt"
@@ -72,10 +72,10 @@ class ReturnToStock(models.Model):
     all_objects = models.Manager()
 
     class Meta:
-        verbose_name = "Hàng hoàn về kho"
-        verbose_name_plural = "Hàng hoàn về kho"
+        verbose_name = "Hàng hoàn"
+        verbose_name_plural = "Hàng hoàn"
         ordering = ["-created_at", "-id"]
-        permissions = [("approve_returntostock", "Duyệt hàng hoàn về kho")]
+        permissions = [("approve_returntostock", "Duyệt hàng hoàn")]
 
     def __str__(self):
         return f"RT-{self.pk} · {self.batch.batch_id} · {self.qty}kg"

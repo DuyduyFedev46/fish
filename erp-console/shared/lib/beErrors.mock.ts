@@ -70,6 +70,13 @@ export const BE_ERRORS = {
     detail: "Bạn cần đặt mật khẩu mới trước khi dùng hệ thống (BR-PQ-19).",
   },
 
+  // ---- D-3 (Duy 08/10): không nhóm và không superuser → mọi API ERP bị chặn trừ auth/token, auth/me, auth/logout, auth/change-password ----
+  AUTH_NO_ROLE: {
+    status: 403,
+    code: "AUTH_NO_ROLE",
+    detail: "Tài khoản của bạn chưa thuộc nhóm nào nên không có quyền vào hệ thống vận hành. Nhờ Chủ vựa xếp nhóm.",
+  },
+
   // ---- S11 POST /api/sales/orders/{id}/confirm-payment (contract THỰC TẾ BE L7, 03-dev-notes.md "Lô L7 — S10, S11 (BE)") ----
   TT_TXN_REQUIRED: { status: 400, code: "BR-TT-08", detail: "Thiếu mã giao dịch ngân hàng." },
   TT_AMOUNT_INVALID: { status: 400, code: "BR-TT-08", detail: "Số tiền phải là số lớn hơn 0." },
@@ -107,6 +114,18 @@ export const BE_ERRORS = {
     code: "COST_LANDED_OVERFLOW",
     detail: "Chi phí quá lớn: giá vốn mỗi kg của lô vượt giới hạn cho phép. Kiểm tra lại số tiền.",
   },
+  // ---- Lô 17b-BE (NEW-1): tìm đơn theo SĐT/tên chỉ qua POST search/ ----
+  SEARCH_USE_POST: { status: 400, code: "SEARCH_USE_POST", detail: "Tìm theo SĐT/tên dùng ô tìm kiếm." },
+  // ---- Lô 17a (A5): hoá đơn mua, 5 mã lỗi 400 `{detail, code}`; câu tiếng Việt, không mã BR ----
+  AMOUNT_NOT_POSITIVE: { status: 400, code: "AMOUNT_NOT_POSITIVE", detail: "Số tiền hoá đơn phải lớn hơn 0." },
+  INVOICE_SUPPLIER_MISMATCH: {
+    status: 400,
+    code: "INVOICE_SUPPLIER_MISMATCH",
+    detail: "Phiếu nhập thuộc nhà cung cấp khác, không gắn vào hoá đơn của nhà cung cấp này được.",
+  },
+  PAID_AT_REQUIRED: { status: 400, code: "PAID_AT_REQUIRED", detail: "Hoá đơn đã trả tiền thì phải có thời điểm trả." },
+  PAID_AT_WHEN_UNPAID: { status: 400, code: "PAID_AT_WHEN_UNPAID", detail: "Hoá đơn chưa trả tiền thì không có thời điểm trả." },
+  PAID_AT_IN_FUTURE: { status: 400, code: "PAID_AT_IN_FUTURE", detail: "Thời điểm trả tiền không được ở tương lai." },
   /** #10 sửa giá đã áp vào đơn. */
   PRICE_USED_BY_ORDERS: {
     status: 400,
@@ -129,7 +148,7 @@ export const BE_ERRORS = {
   TT_ACTION_INVALID: {
     status: 400,
     code: "BR-TT-09",
-    detail: "Cách xử lý không hợp lệ: ATTACH_TO_ORDER hoặc CONFIRM_ORDER (hoàn tiền thì tạo phiếu hoàn).",
+    detail: "Cách xử lý không hợp lệ: ATTACH_TO_ORDER hoặc CONFIRM_ORDER (hoàn tiền thì tạo phiếu hoàn tiền).",
   },
   TT_ORDER_REQUIRED: { status: 400, code: "BR-TT-09", detail: "Thiếu hoặc sai order_id." },
   TT_ORDER_NOT_FOUND: { status: 400, code: "BR-TT-09", detail: "Không tìm thấy đơn để gắn." },
@@ -137,7 +156,7 @@ export const BE_ERRORS = {
   TT_ORDER_NOT_BOOKED: { status: 400, code: "BR-TT-09", detail: "Đơn không ở trạng thái Giữ chỗ (đã thanh toán hoặc đang xử lý)." },
   TT_CONFIRM_NO_ORDER: { status: 400, code: "BR-TT-09", detail: "Giao dịch chưa gắn đơn — gắn đơn trước (ATTACH_TO_ORDER)." },
   TT_CONFIRM_ONLY_UNDERPAID: { status: 400, code: "BR-TT-09", detail: "Chỉ xác nhận đơn từ giao dịch thiếu tiền." },
-  TT_CONFIRM_HAS_REFUND: { status: 400, code: "BR-TT-09", detail: "Giao dịch đang có phiếu hoàn — không dùng để xác nhận đơn." },
+  TT_CONFIRM_HAS_REFUND: { status: 400, code: "BR-TT-09", detail: "Giao dịch đang có phiếu hoàn tiền — không dùng để xác nhận đơn." },
   // ---- S13 POST /api/sales/refunds/create/ (BE L8, nhánh payment_transaction — `create_refund_for_payment`) ----
   HT_OVER_REFUNDABLE: { status: 400, code: "BR-HT-04", detail: "Vượt số tiền còn được hoàn: tối đa {max}." },
   /** S15 nhánh sales_invoice (`create_invoice_refund`, câu viết lại ở BE L9 để khớp đúng chữ story). */
@@ -146,11 +165,50 @@ export const BE_ERRORS = {
   HT_AMOUNT_MIN: { status: 400, code: "BR-HT-04", detail: "Số tiền hoàn tối thiểu 1 ₫." },
   HT_ONE_SOURCE: { status: 400, code: "BR-HT-01", detail: "Chỉ gửi một trong hai: sales_invoice hoặc payment_transaction." },
   HT_NO_SOURCE: { status: 400, code: "BR-HT-01", detail: "Thiếu sales_invoice hoặc payment_transaction." },
-  HT_TXN_MATCHED: { status: 400, code: "BR-HT-01", detail: "Giao dịch đã khớp hoá đơn — lập phiếu hoàn từ hoá đơn." },
+  HT_TXN_MATCHED: { status: 400, code: "BR-HT-01", detail: "Giao dịch đã khớp hoá đơn — lập phiếu hoàn tiền từ hoá đơn." },
   HT_TXN_NOT_FOUND: { status: 400, code: "BR-HT-01", detail: "Giao dịch không tồn tại." },
   HT_REQUEST_ID_INVALID: { status: 400, code: "BR-HT-01", detail: "request_id phải là UUID." },
-  HT_REQUEST_ID_USED: { status: 400, code: "BR-HT-01", detail: "request_id đã dùng cho phiếu hoàn khác." },
-  HT_TXN_RESOLVED: { status: 400, code: "BR-TT-09", detail: "Giao dịch đã được xử lý, không lập phiếu hoàn." },
+  HT_REQUEST_ID_USED: { status: 400, code: "BR-HT-01", detail: "request_id đã dùng cho phiếu hoàn tiền khác." },
+  HT_TXN_RESOLVED: { status: 400, code: "BR-TT-09", detail: "Giao dịch đã được xử lý, không lập phiếu hoàn tiền." },
+  // ---- #15 POST /api/sales/payments/record-late/ (BE, 03-dev-notes.md "#15 ghi tiền về muộn (BE)"; BR-TT-18) ----
+  // Mã lỗi BR-TT-18: thân kèm khoá ô (bank_txn_id | amount | received_at) trùng `detail`; truyền qua tham số `extra` của beError.
+  LATE_TXN_MISSING: { status: 400, code: "BR-TT-18", detail: "Thiếu mã giao dịch ngân hàng." },
+  LATE_TXN_TOO_LONG: { status: 400, code: "BR-TT-18", detail: "Mã giao dịch ngân hàng dài quá 100 ký tự." },
+  LATE_TXN_CHARS: { status: 400, code: "BR-TT-18", detail: "Mã giao dịch chỉ gồm chữ không dấu, số và các ký tự . _ - /" },
+  LATE_AMOUNT_INVALID: { status: 400, code: "BR-TT-18", detail: "Số tiền phải là số lớn hơn 0." },
+  LATE_AMOUNT_MIN: { status: 400, code: "BR-TT-18", detail: "Số tiền tối thiểu 1 ₫." },
+  LATE_AMOUNT_TOO_LARGE: { status: 400, code: "BR-TT-18", detail: "Số tiền quá lớn (tối đa 999.999.999.999,99 ₫)." },
+  LATE_AT_INVALID: { status: 400, code: "BR-TT-18", detail: "Thiếu hoặc sai giờ nhận tiền (ISO 8601, gồm cả ngày và giờ)." },
+  /** Lô 17b-BE (TL15-L2): cũ hơn LATE_PAYMENT_MAX_AGE_DAYS (mặc định 400 ngày). */
+  LATE_AT_TOO_OLD: { status: 400, code: "BR-TT-18", detail: "Giờ nhận tiền cũ quá {days} ngày, hãy kiểm tra lại năm." },
+  LATE_AT_FUTURE: { status: 400, code: "BR-TT-18", detail: "Giờ nhận tiền không được ở tương lai." },
+  LATE_TXN_EXISTS: { status: 400, code: "BR-TT-03", detail: "Mã giao dịch này đã có trong hệ thống (giao dịch #{id}), không ghi lại." },
+  LATE_ORDER_NOT_FOUND: {
+    status: 400,
+    code: "LATE_PAYMENT_ORDER_NOT_FOUND",
+    detail: "Không tìm thấy đơn mang mã này. Kiểm tra lại mã đơn, hoặc để trống nếu chưa biết khách chuyển cho đơn nào.",
+  },
+  LATE_ORDER_BOOKED: {
+    status: 400,
+    code: "LATE_PAYMENT_ORDER_BOOKED",
+    detail: "Đơn còn đang giữ chỗ. Xác nhận tiền ngay trên đơn (nút Xác nhận đã nhận tiền).",
+  },
+  LATE_ORDER_PAID: {
+    status: 400,
+    code: "LATE_PAYMENT_ORDER_PAID",
+    detail: "Đơn đã thanh toán. Nếu khách chuyển thêm, để trống mã đơn để ghi khoản không gắn đơn rồi hoàn.",
+  },
+  LATE_POSSIBLE_DUPLICATE: {
+    status: 409,
+    code: "LATE_PAYMENT_POSSIBLE_DUPLICATE",
+    detail: "Có khoản giống (cùng số tiền). Đối chiếu sao kê: nếu là khoản khác thì xác nhận để ghi tiếp.",
+  },
+  // ---- POST /api/sales/refunds/create/ — khoản có nhãn nghi trùng mà thiếu acknowledge_duplicate_warning: `detail` = chính nhãn ----
+  PAYMENT_DUPLICATE_WARNING: {
+    status: 409,
+    code: "PAYMENT_DUPLICATE_WARNING",
+    detail: "Nghi trùng khoản ghi tay tiền về muộn, đối chiếu sao kê trước khi hoàn",
+  },
   // ---- S10 GET /api/sales/orders/ — tham số lọc sai ----
   INVALID_FILTER: { status: 400, code: "INVALID_FILTER", detail: "Tham số {param} phải là ngày dạng YYYY-MM-DD." },
 
@@ -163,7 +221,7 @@ export const BE_ERRORS = {
   GH_CANCEL_COMPLETED: {
     status: 400,
     code: "BR-GH-05",
-    detail: "Đơn đã giao hoàn tất — chỉ còn cách lập phiếu hoàn.",
+    detail: "Đơn đã giao hoàn tất — chỉ còn cách lập phiếu hoàn tiền.",
   },
   HT_CANCEL_REASON_INVALID: { status: 400, code: "BR-HT-05", detail: "Lý do huỷ không hợp lệ." },
   HT_CANCEL_NOTE_REQUIRED: {
@@ -186,7 +244,7 @@ export const BE_ERRORS = {
   HT_MARK_FAILED_WRONG_STATUS: {
     status: 400,
     code: "BR-HT-09",
-    detail: "Chỉ báo thất bại được khi phiếu đang Chờ hoàn.",
+    detail: "Chỉ báo thất bại được khi phiếu đang Chờ hoàn tiền.",
   },
   HT_RETRY_WRONG_STATUS: { status: 400, code: "BR-HT-09", detail: "Chỉ thử lại được khi phiếu đang Thất bại." },
 
@@ -247,10 +305,12 @@ export function beDetail(key: BeErrorKey, params?: Record<string, string | numbe
 }
 
 /** Response mock đúng hình BE: `{detail}` (lỗi DRF) hoặc `{code, detail}` (lỗi nghiệp vụ). */
-export function beError(key: BeErrorKey, params?: Record<string, string | number>): MockResponse {
+export function beError(key: BeErrorKey, params?: Record<string, string | number>, extra?: Record<string, unknown>): MockResponse {
   const e: Entry = BE_ERRORS[key];
   const detail = fill(e.detail, params);
-  return { status: e.status, body: e.code ? { code: e.code, detail } : { detail } };
+  // `extra` = khoá phụ BE trải ngang hàng với detail/code (vd khoá ô lỗi `bank_txn_id`, `order_id`); `"$detail"` = lấy chính câu `detail`.
+  const more = Object.fromEntries(Object.entries(extra ?? {}).map(([k, v]) => [k, v === "$detail" ? detail : v]));
+  return { status: e.status, body: e.code ? { code: e.code, detail, ...more } : { detail, ...more } };
 }
 
 if (process.env.NEXT_PUBLIC_USE_MOCK === "1" && typeof window !== "undefined") {

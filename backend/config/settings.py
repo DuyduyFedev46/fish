@@ -223,6 +223,8 @@ CAVEVE_THROTTLE_RATES = {k: None for k in _DEFAULT_THROTTLE_RATES} if TESTING el
 # Nguồn: business-process-spec.md (BR-MH-02, BR-LO-06, BR-BH-03, BR-GH-04, BR-HV-03).
 BATCH_DEFAULT_SHELF_LIFE_DAYS = int(os.getenv("BATCH_DEFAULT_SHELF_LIFE_DAYS", "365"))
 BATCH_NEAR_EXPIRY_DAYS = int(os.getenv("BATCH_NEAR_EXPIRY_DAYS", "14"))
+# L1 (Lô 17a): hoá đơn mua cho `paid_at` lệch tối đa N phút về tương lai (đồng hồ máy khách chạy nhanh).
+PURCHASE_INVOICE_PAID_AT_TOLERANCE_MINUTES = int(os.getenv("PURCHASE_INVOICE_PAID_AT_TOLERANCE_MINUTES", "5"))
 SALES_ORDER_TTL_MINUTES = int(os.getenv("SALES_ORDER_TTL_MINUTES", "30"))
 DELIVERY_MAX_FAILED_ATTEMPTS = int(os.getenv("DELIVERY_MAX_FAILED_ATTEMPTS", "2"))
 COLD_CHAIN_MAX_HOURS = int(os.getenv("COLD_CHAIN_MAX_HOURS", "6"))
@@ -236,6 +238,10 @@ INTERNAL_SERVICE_TOKEN = os.getenv("INTERNAL_SERVICE_TOKEN", "")
 # Secret thật nằm ở GCP Secret Manager (cangca-sepay-sandbox-*) — KHÔNG có giá trị mặc định
 # ở đây, rỗng thì P1 từ chối ký (an toàn hơn ký nhầm bằng chuỗi rỗng).
 SEPAY_ENV = os.getenv("SEPAY_ENV", "SANDBOX").strip().upper()  # SANDBOX | PRODUCTION
+# BR-TT-18 (#15): cửa sổ (giờ) để coi hai khoản không gắn đơn cùng số tiền là nghi trùng khi ghi tiền về muộn.
+LATE_PAYMENT_DUPLICATE_WINDOW_HOURS = int(os.getenv("LATE_PAYMENT_DUPLICATE_WINDOW_HOURS", "72"))
+# TL15-L2: ghi tiền về muộn không nhận giờ nhận cũ hơn số ngày này (gõ nhầm năm). Env `LATE_PAYMENT_MAX_AGE_DAYS`.
+LATE_PAYMENT_MAX_AGE_DAYS = int(os.getenv("LATE_PAYMENT_MAX_AGE_DAYS", "400"))
 SEPAY_MERCHANT_ID = os.getenv("SEPAY_MERCHANT_ID", "")
 SEPAY_SECRET_KEY = os.getenv("SEPAY_SECRET_KEY", "")
 SEPAY_CHECKOUT_URL_SANDBOX = os.getenv(

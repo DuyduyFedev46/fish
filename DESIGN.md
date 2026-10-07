@@ -194,7 +194,7 @@ Chiến lược **Restrained**: 90% là xám trung tính (hơi lạnh), 1 màu n
 | Token | Light | Dark | Dùng cho |
 |---|---|---|---|
 | `canvas` | #FBFBFC | #111113 | nền vùng nội dung giữa |
-| `sidebar` | #F4F4F6 | #151518 | cột menu trái, cột phải, nền màn đăng nhập |
+| `sidebar` | #F4F4F6 | #151518 | cột menu trái, nền màn đăng nhập |
 | `surface` | #FFFFFF | #1A1A1E | bảng, panel, ô nhập, hộp thoại |
 | `surface-2` | #F4F4F6 | #222227 | hover, nền phụ |
 | `surface-3` | #EBEBEF | #2B2B31 | đang nhấn, chip trung tính |
@@ -268,7 +268,7 @@ Phẳng là mặc định: panel và bảng chỉ có viền 1 px `border`, khô
 |---|---|
 | `--shadow-xs` | nút phụ, ô nhập (gần như không thấy, tạo độ nổi 1 px) |
 | `--shadow-sm` | thẻ đăng nhập trên desktop |
-| `--shadow-md` | ngăn kéo menu/cột phải trên điện thoại |
+| `--shadow-md` | ngăn kéo menu trên điện thoại |
 | `--shadow-lg` | hộp thoại, tấm trượt đáy |
 
 Dark mode dùng bóng đen đậm hơn và dựa vào bậc sáng của bề mặt (`canvas` < `sidebar` < `surface` < `surface-2`) để tạo chiều sâu.
@@ -358,10 +358,7 @@ Ngoại lệ có chủ đích: trang cài đặt (Tài khoản của tôi) dùng
 - **Menu trái**: nền `sidebar`, nhóm có nhãn chữ hoa 11 px `ink-3`; mục cao 36 px (44 px trên điện thoại), icon 18 px `ink-3`.
   Đang chọn: nền `accent-soft`, chữ + icon `accent-text`. Chân menu: avatar + tên (mở "Tài khoản của tôi") + nút đăng xuất.
 - **Menu đáy** (điện thoại): 60 px + safe-area; mục đang chọn có icon đặc, chữ `accent-text` và viên nền `accent-soft` sau icon.
-- **Cột phải** (Ghi chú · Trợ lý · Hoạt động): tab **chỉ chữ** (không xuống dòng ở 360 px), gạch chân 2 px `accent`;
-  phím ← → Home End chuyển tab (một tab trong thứ tự Tab). Trợ lý chưa nối: khung "sắp có" (icon, tiêu đề + nhãn
-  `Sắp có` nền `accent-soft`, một câu, ví dụ câu hỏi dạng chữ trơn — không đóng khung để khỏi trông như nút).
-- **Ngăn kéo** (menu trái < 768 px, cột phải < 1024 px): mở thì focus vào trong (mục đang chọn), giữ Tab trong ngăn kéo,
+- **Ngăn kéo** (menu trái < 768 px): mở thì focus vào trong (mục đang chọn), giữ Tab trong ngăn kéo,
   Esc/bấm nền/nút "Đóng menu" để đóng, đóng thì focus về nút đã mở (`shared/ui/useDrawerFocus`).
 
 ### Sổ kho (`.feed-day > ol.feed > li.fev`)
@@ -372,8 +369,8 @@ Không tô đỏ việc bán hàng bình thường; chỉ "hạch toán lỗ / h
 
 ### Empty / Loading / Error
 
-- **Một kiểu cho rỗng / lỗi / 403** (bảng, cả màn, cột phải, Nhân sự): icon 22 px trong ô vuông 40 px bo `lg` nền `surface-2`
-  (`surface-3` trong cột phải), tiêu đề 15/600 `ink`, một câu 13 `ink-2` (≤ 46ch), một hành động. Lỗi: ô icon `crit-soft`, câu lỗi
+- **Một kiểu cho rỗng / lỗi / 403** (bảng, cả màn, Nhân sự): icon 22 px trong ô vuông 40 px bo `lg` nền `surface-2`,
+  tiêu đề 15/600 `ink`, một câu 13 `ink-2` (≤ 46ch), một hành động. Lỗi: ô icon `crit-soft`, câu lỗi
   làm tiêu đề, nút "Thử lại".
 - Nút gửi **không tắt vì thiếu ô**: bấm thì báo ngay dưới ô trống (`aria-invalid`, câu nói cách sửa) và đưa focus vào ô đó.
   Chỉ tắt khi đang gửi (kèm "Đang …").

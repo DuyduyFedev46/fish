@@ -12,6 +12,11 @@ import type {
   ChangeRecipientResponse,
   DecidePayload,
   DecideResponse,
+  CallScript,
+  CallScriptCreatePayload,
+  CallScriptsResponse,
+  CallScriptUpdatePayload,
+  CallScriptSituation,
 } from "./types";
 import {
   mockClaimConfirmationTask,
@@ -23,6 +28,7 @@ import {
   mockChangeRecipient,
   mockDecideConfirmation,
 } from "./mock";
+import { mockCreateCallScript, mockListCallScripts, mockUpdateCallScript } from "./mockScripts";
 
 export async function fetchConfirmationQueue(
   params?: {
@@ -167,4 +173,32 @@ export async function decideConfirmation(
 /** 409 `STALE_STATE` (SR-09): màn hình đã cũ — đơn/phiếu đổi trạng thái sau khi mở (vd job tự huỷ đã chạy). */
 export function isStaleStateError(err: unknown): err is ApiError {
   return err instanceof ApiError && err.status === 409 && err.code === "STALE_STATE";
+}
+
+// ---- CS-18: kịch bản gọi soạn sẵn (Chủ soạn; Quản lý và CSKH chỉ đọc). Không có đường xoá: tắt bằng `is_active`. ----
+
+export async function fetchCallScripts(signal?: AbortSignal): Promise<CallScript[]> {
+  const res = await apiFetch<CallScriptsResponse>("/api/confirmation/scripts/", {
+    signal,
+    mock: process.env.NEXT_PUBLIC_USE_MOCK === "1" ? mockListCallScripts : undefined,
+  });
+  return res.results;
+}
+
+export async function createCallScript(payload: CallScriptCreatePayload, signal?: AbortSignal): Promise<CallScript> {
+  return apiFetch<CallScript>("/api/confirmation/scripts/", {
+    method: "POST",
+    body: payload,
+    signal,
+    mock: process.env.NEXT_PUBLIC_USE_MOCK === "1" ? mockCreateCallScript : undefined,
+  });
+}
+
+export async function updateCallScript(situation: CallScriptSituation, payload: CallScriptUpdatePayload, signal?: AbortSignal): Promise<CallScript> {
+  return apiFetch<CallScript>(`/api/confirmation/scripts/${situation}/`, {
+    method: "PATCH",
+    body: payload,
+    signal,
+    mock: process.env.NEXT_PUBLIC_USE_MOCK === "1" ? mockUpdateCallScript : undefined,
+  });
 }

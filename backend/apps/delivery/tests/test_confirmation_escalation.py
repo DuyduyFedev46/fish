@@ -200,7 +200,7 @@ class TestCS07EscalationAndDecide(ConfirmationL3BaseTestCase):
         audit = AuditLog.objects.filter(action="delivery_confirm_skipped").first()
         self.assertIsNotNone(audit)
         self.assertEqual(audit.actor, self.ql)
-        self.assertEqual(audit.note, "Khách quen, địa chỉ đã giao 2 lần")
+        self.assertEqual(audit.note, "Có ghi chú (xem trên chứng từ gốc)")  # TL-D3-L4: chữ gốc ở ConfirmationTask.decision_note
 
     def test_cs07_ac9_decide_extend(self):
         """Quản lý chọn EXTEND tới +3 giờ -> confirm_state=CALLBACK, attempts=0."""
@@ -524,7 +524,7 @@ class TestCS09RefundCalls(ConfirmationL3BaseTestCase):
         self.assertEqual(item["customer_name"], "Khách Thử A")
         self.assertIsNotNone(item.get("refund"))
         self.assertEqual(item["refund"]["amount"], str(int(order.total_amount)))
-        self.assertEqual(item["refund"]["status_label"], "Chờ hoàn")
+        self.assertEqual(item["refund"]["status_label"], "Chờ hoàn tiền")
 
     def test_cs09_ac2_record_notified(self):
         """cs1 ghi NOTIFIED -> task DONE (confirm_state=None), bản ghi gọi + AuditLog."""
@@ -589,7 +589,7 @@ class TestCS09RefundCalls(ConfirmationL3BaseTestCase):
         self.assertEqual(resp.status_code, 200)
         results = resp.json()["results"]
         self.assertEqual(results[0]["refund"]["status"], "REFUNDED")
-        self.assertEqual(results[0]["refund"]["status_label"], "Đã hoàn")
+        self.assertEqual(results[0]["refund"]["status_label"], "Đã hoàn tiền")
 
     def test_cs09_ac6_cs1_cannot_confirm_refund(self):
         """cs1 gọi confirm_refund -> 403."""
@@ -671,7 +671,7 @@ class TestCS10ShopNotices(ConfirmationL3BaseTestCase):
         self.assertEqual(notice["reason_code"], "UNREACHABLE_AUTO")
         self.assertIn("3 lần trong 30 phút", notice["message"])
         self.assertEqual(notice["refund"]["amount"], str(int(order.total_amount)))
-        self.assertEqual(notice["refund"]["status_label"], "Đang chờ hoàn")
+        self.assertEqual(notice["refund"]["status_label"], "Đang chờ hoàn tiền")
 
     @override_settings(CONFIRMATION_AUTO_CANCEL_ENABLED=True)
     def test_cs10_ac4_order_lookup_refunded(self):
@@ -690,7 +690,7 @@ class TestCS10ShopNotices(ConfirmationL3BaseTestCase):
         client = client_for(None)
         resp = client.get(f"/api/shop/orders/{order.code}/?phone_last4=0123")
         data = resp.json()
-        self.assertEqual(data["cancel_notice"]["refund"]["status_label"], "Đã hoàn")
+        self.assertEqual(data["cancel_notice"]["refund"]["status_label"], "Đã hoàn tiền")
         self.assertIsNotNone(data["cancel_notice"]["refund"]["refunded_at"])
 
     def test_cs10_ac5_order_lookup_manual_cancelled(self):

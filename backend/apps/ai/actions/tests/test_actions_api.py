@@ -183,7 +183,7 @@ class AiActionApiTestCase(TestCase):
 
         res_rej = self.client_kho.post(
             f"/api/ai/actions/{action_id}/reject/",
-            {"reason_code": "NOT_NEEDED"},
+            {"reason_code": "NOT_NEEDED Nguyễn Văn Giả 0900000321"},  # TL-AN-L2: chữ tự do không vào Nhật ký
             format="json",
         )
         self.assertEqual(res_rej.status_code, 200)
@@ -199,6 +199,10 @@ class AiActionApiTestCase(TestCase):
             proposal_ref=str(action.id),
         ).first()
         self.assertIsNotNone(log)
+        self.assertEqual(log.note, f"Từ chối đề xuất AI {action.id}")
+        self.assertEqual(log.changes, {"has_reason_code": True})
+        self.assertNotIn("Nguyễn Văn Giả", f"{log.note}{log.changes}")
+        self.assertNotIn("0900000321", f"{log.note}{log.changes}")
 
     def test_dw11_ac5_permission_denied_on_confirm(self):
         """DW-11-AC5: Người duyệt thiếu quyền -> 403 BR-AI-04. scope=all chỉ người có manage_ai_policy xem được."""

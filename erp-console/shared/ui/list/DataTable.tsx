@@ -59,7 +59,7 @@ type Props<T> = {
   /** Từ khoá đang tìm: có từ khoá mà không có dòng → trạng thái "không thấy". */
   query?: string;
   onClearQuery?: () => void;
-  /** "đơn hàng", "phiếu hoàn"… — dùng cho câu "Không tìm thấy <noun> khớp với …". */
+  /** "đơn hàng", "phiếu hoàn tiền"… — dùng cho câu "Không tìm thấy <noun> khớp với …". */
   noun: string;
   empty: EmptyState;
   /** Người xem có quyền xem giá vốn (`view_costprice`) không. Cột `locked` chỉ hiện khi true (02b §4). */

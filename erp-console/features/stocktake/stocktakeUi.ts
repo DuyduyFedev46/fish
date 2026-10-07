@@ -225,3 +225,16 @@ export function doneSteps(d: StocktakeDetail): string[] {
   if (d.status === "APPROVED") out.push("Đã điều chỉnh tồn");
   return out;
 }
+
+// ---------------------------------------------------------------- chưa lưu (Lô 17b G4)
+/**
+ * Dấu vân tay những gì người dùng ĐÃ GÕ vào form: ngày, ghi chú, và các dòng có số đếm hoặc lý do. Dòng chỉ nạp từ kho (chưa gõ gì)
+ * không tính, nên mở form rồi chọn kho chưa phải "sửa chưa lưu". So sánh hai dấu vân tay để biết có đáng cảnh báo khi rời trang.
+ */
+export function formFingerprint(f: { countDate: string; note: string; rows: Pick<FormRow, "batch" | "counted" | "reason">[] }): string {
+  return JSON.stringify([
+    f.countDate,
+    f.note.trim(),
+    f.rows.filter((r) => r.counted.trim() || r.reason.trim()).map((r) => [r.batch, r.counted.trim(), r.reason.trim()]),
+  ]);
+}

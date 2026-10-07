@@ -5,8 +5,8 @@ import { toDecimalString } from "./decimal";
 import { mockBatchReport, mockPeriodReport } from "./mock";
 import type { BatchReportParams, BatchReportRow, PeriodReport } from "./types";
 
-// BE trả tiền và kg của hai endpoint báo cáo dạng JSON number (DRF đổi Decimal thành float). Cả app giữ chúng dạng
-// chuỗi thập phân (cộng trừ bằng BigInt), nên chuẩn hoá ngay ở đây; nhận cả number lẫn string.
+// Từ Lô 17a BE trả tiền và kg của hai endpoint báo cáo dạng chuỗi thập phân. Trước đó là JSON number (DRF đổi Decimal thành float).
+// Cả app giữ chúng dạng chuỗi (cộng trừ bằng BigInt), nên vẫn chuẩn hoá ở đây; nhận cả number lẫn string.
 const PERIOD_DECIMAL_FIELDS = ["revenue", "cogs", "credit_notes", "cogs_reversed", "refunds", "profit"] as const;
 const BATCH_DECIMAL_FIELDS = [
   "qty_received", "qty_sold", "landed_unit_cost", "revenue", "reversed_qty", "reversed_revenue", "purchase_cost", "allocated_cost",

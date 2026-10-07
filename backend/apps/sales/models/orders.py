@@ -16,7 +16,7 @@ class SalesOrder(models.Model):
         PROCESSING = "PROCESSING", "Đang xử lý"  # đã trừ kho + ghi doanh thu
         COMPLETED = "COMPLETED", "Hoàn tất"
         CANCELLED = "CANCELLED", "Đã huỷ"        # cancel_paid_order (P-07)
-        AUTO_CANCELLED = "AUTO_CANCELLED", "Tự huỷ (quá TTL)"
+        AUTO_CANCELLED = "AUTO_CANCELLED", "Hết giờ giữ chỗ"
 
     code = models.CharField("Mã đơn", max_length=32, unique=True)
     customer = models.ForeignKey(
@@ -43,6 +43,9 @@ class SalesOrder(models.Model):
     checkout_attempts = models.PositiveIntegerField(
         "Số lần lập tham số thanh toán cổng", default=0,
     )
+    # Ghi chú khi huỷ đơn đã thanh toán với lý do OTHER (bắt buộc ở API). Chữ nằm ở chứng từ,
+    # không chép vào AuditLog (bất biến 9, TL-AN-M1). Lọc SĐT/số tài khoản theo BR-GH-19.
+    cancel_note = models.CharField("Ghi chú huỷ đơn", max_length=200, blank=True, default="")
     # KHÔNG có trường phí giao hàng (BR-BH-10 — outscope hoàn toàn).
 
     # Khung go-live pháp lý (GL-03, BR-BH-17, bất biến 9)
@@ -71,6 +74,8 @@ class SalesOrder(models.Model):
         permissions = [
             ("cancel_paid_order", "Huỷ đơn đã thanh toán"),
             ("view_privacy_consent", "Xem bằng chứng đồng ý xử lý dữ liệu của đơn"),
+            # PV-07 (BR-PQ-38): tên, SĐT, địa chỉ khách trên đơn, hoá đơn, phiếu hoàn tiền. Khác `view_customer_list`.
+            ("view_order_customer_info", "Xem thông tin khách trên đơn, hoá đơn, phiếu hoàn tiền"),
         ]
 
     def __str__(self):

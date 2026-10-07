@@ -36,7 +36,7 @@ import { useItemPriceHistory } from "../useCatalogList";
 import { usePriceListOptions } from "../useCatalogOptions";
 import { useItemDetail, useItemId, type ItemDetailState } from "../useItemDetail";
 import { useItemTimeline } from "../useItemTimeline";
-import { ImageUploadSheet } from "./ImageUploadSheet";
+import { ImageUploadModal } from "./ImageUploadModal";
 import { ItemThumb } from "./ItemThumb";
 import { SetPriceModal } from "./SetPriceModal";
 import s from "../catalog.module.css";
@@ -295,7 +295,7 @@ function ItemDetailBody({ item, detail, renderAi }: { item: CatalogItem; detail:
         />
       )}
       {modal === "image" && (
-        <ImageUploadSheet
+        <ImageUploadModal
           item={item}
           onClose={() => setModal(null)}
           onUploaded={(it) => {

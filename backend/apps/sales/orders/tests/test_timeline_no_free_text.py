@@ -48,7 +48,7 @@ class TimelineLabelsNoFreeTextTests(OrderApiBase):
 
     def _scenario(self, code="OTHER"):
         order = self._paid_order()
-        self.assertEqual(self._cancel(order, code, FREE).status_code, 200)
+        self.assertEqual(self._cancel(order, code, MARK).status_code, 200)  # ghi chú huỷ chặn SĐT (BR-GH-19)
         refund, _ = refund_services.create_invoice_refund(
             invoice=order.invoice, amount=Decimal("100000"), is_partial=True, reason=FREE, actor=self.manager,
         )
@@ -67,8 +67,8 @@ class TimelineLabelsNoFreeTextTests(OrderApiBase):
         for label in self._all_labels(order, refund):
             self.assertNotIn(MARK, label)
             self.assertNotIn(FAKE_PHONE, label)
-        raw = client_for(self.owner).get(f"/api/sales/orders/{order.pk}/").content.decode()
-        self.assertNotIn(MARK, raw.split('"timeline"')[1])
+        body = client_for(self.owner).get(f"/api/sales/orders/{order.pk}/").json()
+        self.assertNotIn(MARK, str(body["timeline"]))  # chữ ghi chú huỷ chỉ ở `cancel_note`, không vào timeline
 
     def test_d3_no_label_contains_dong_sign(self):
         order, refund = self._scenario()
@@ -95,22 +95,22 @@ class TimelineLabelsNoFreeTextTests(OrderApiBase):
         rows = client_for(self.owner).get(f"/api/sales/orders/{order.pk}/").json()["timeline"]
         cancelled = next(r for r in rows if r["kind"] == "cancelled")
         self.assertEqual(
-            cancelled["label"], "Huỷ đơn, hoàn hàng về lô gốc — lý do: Hư hỏng khi soạn hàng",
+            cancelled["label"], "Huỷ đơn, hoàn hàng về lô gốc — lý do: Hàng hư lúc soạn hàng",
         )
 
     def test_d3_refund_failed_line_has_no_reason(self):
         order, refund = self._scenario()
         rows = client_for(self.owner).get(f"/api/sales/orders/{order.pk}/").json()["timeline"]
         failed = next(r for r in rows if r["kind"] == "refund_failed")
-        self.assertEqual(failed["label"], "Phiếu hoàn 100.000 đ chuyển thất bại")
+        self.assertEqual(failed["label"], "Phiếu hoàn tiền 100.000 đ chuyển thất bại")
         own = [e.label for e in build_refund_timeline(refund)]
-        self.assertIn("Tạo phiếu hoàn 100.000 đ", own)
+        self.assertIn("Lập phiếu hoàn tiền 100.000 đ", own)
         self.assertIn("Báo thất bại", own)
 
     def test_d3_payment_resolution_uses_label_not_code_or_note(self):
         order, _ = self._scenario()
         labels = [e.label for e in build_payment_timeline(order.payments.first())]
-        self.assertIn("Xử lý giao dịch (Xác nhận đơn (khách đã bù))", labels)
+        self.assertIn("Xử lý khoản tiền về (Đã xác nhận đơn)", labels)
 
     def test_d3_format_vnd_ui(self):
         self.assertEqual(format_vnd_ui(Decimal("280000")), "280.000 đ")

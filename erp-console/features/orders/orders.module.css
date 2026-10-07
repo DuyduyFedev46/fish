@@ -28,3 +28,11 @@
 .summaryLine b { color: var(--ink); }
 .suggest { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
 .mono { font-family: var(--font-mono); }
+
+/* #15 — dấu "Nghi trùng" cạnh chip loại khoản ở hàng chờ (nhãn cho trình đọc màn hình nằm trong .sr-only). */
+.dupFlag { display: inline-flex; align-items: center; margin-left: var(--space-1); color: var(--warn); vertical-align: middle; }
+.dupFlag :global(.mi) { font-size: 18px; }
+/* Hộp "Nghi trùng" ở chi tiết khoản và hộp lập phiếu hoàn: một cột, ô tick nằm dưới lời nhắc. */
+.dupBox { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-2); }
+.dupBox > :global(.alert-box) { margin-bottom: 0; align-self: stretch; }
+.dupBox > :global(.check-row) { align-self: stretch; }

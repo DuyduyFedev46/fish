@@ -35,6 +35,8 @@ Diff = namedtuple("Diff", "user endpoint sign fact")
 # Duy duyệt 02/10 Q-4 (V2 mặc định bật cho NV kho). Mọi lệch khác -> test đỏ.
 APPROVED_DIFFS = (
     ("warehouse_staff", "invoices.list", "+", "pii:*:customer_name"),  # Duy duyệt 02/10 Q-4
+    # Người kiêm nhiệm NV kho + NV giao: có V2 qua nhóm NV kho nên cùng một ngoại lệ Q-4 (D2 của họ = all, như NV kho).
+    ("warehouse_courier", "invoices.list", "+", "pii:*:customer_name"),  # Duy duyệt 02/10 Q-4 (thành viên NV kho)
 )
 
 
@@ -139,8 +141,9 @@ class Collector:
         calls = {
             "orders.list": lambda: self.list_facts(user_label, "/api/sales/orders/", "orders"),
             "orders.search_phone": lambda: self.list_facts(
-                user_label, f"/api/sales/orders/?q={order_phone_prefix}", "orders"),
-            "orders.search_name": lambda: self.list_facts(user_label, "/api/sales/orders/?q=Giả", "orders"),
+                user_label, "/api/sales/orders/search/", "orders", method="post", body={"q": order_phone_prefix}),
+            "orders.search_name": lambda: self.list_facts(
+                user_label, "/api/sales/orders/search/", "orders", method="post", body={"q": "Giả"}),
             "orders.filter_customer": lambda: self.list_facts(
                 user_label, f"/api/sales/orders/?customer={courier_customer}", "orders"),
             "orders.detail": lambda: self.detail_facts(user_label, lambda o: f"/api/sales/orders/{o.pk}/", "orders"),

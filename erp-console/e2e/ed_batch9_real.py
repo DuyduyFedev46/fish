@@ -1,4 +1,4 @@
-# Smoke trên BE THẬT (Lô 9 Hàng hoàn về kho): cần BE chạy ở :8000 (DB SQLite tạm, có người dùng loc/ql1/kho1/giao1/giao2 mật khẩu Songbien2026
+# Smoke trên BE THẬT (Lô 9 Hàng hoàn): cần BE chạy ở :8000 (DB SQLite tạm, có người dùng loc/ql1/kho1/giao1/giao2 mật khẩu Songbien2026
 # và hai phiếu giao ĐANG GIAO, mỗi phiếu 10 kg của một lô), console build NEXT_PUBLIC_USE_MOCK=0 phục vụ ở :3102,
 # BE bật CORS_ALLOWED_ORIGINS=http://127.0.0.1:3102. Mỗi lần chạy tạo phiếu hàng hoàn, nên chạy lại cần nạp lại DB.
 import os
@@ -126,7 +126,7 @@ with sync_playwright() as p:
     a.wait_for_function("() => !document.querySelector('[role=dialog]')")
     a.wait_for_function("() => document.body.innerText.includes('Đã duyệt. Hàng đã nhập lại vào lô.')")
     ok("BE thật ql1: duyệt Tái nhập -> toast, chip Đã duyệt", "Đã duyệt" in a.inner_text("main"), a.inner_text("main")[:200])
-    b2.get_by_role("button", name="Huỷ bỏ, ghi lỗ").click()
+    b2.get_by_role("button", name="Huỷ hàng, ghi lỗ").click()
     d2 = b2.get_by_role("dialog")
     d2.get_by_role("button", name="Duyệt", exact=True).click()
     b2.wait_for_function("() => document.querySelector('[role=dialog]') && document.querySelector('[role=dialog]').innerText.includes('Tải lại')")
@@ -135,22 +135,22 @@ with sync_playwright() as p:
     d2.get_by_role("button", name="Tải lại").first.click()
     b2.wait_for_function("() => !document.querySelector('[role=dialog]')")
     b2.wait_for_timeout(800)
-    ok("BE thật ql1: Tải lại -> phiếu Đã duyệt, hết nút", b2.get_by_role("button", name="Huỷ bỏ, ghi lỗ").count() == 0 and "Đã duyệt" in b2.inner_text("main"))
+    ok("BE thật ql1: Tải lại -> phiếu Đã duyệt, hết nút", b2.get_by_role("button", name="Huỷ hàng, ghi lỗ").count() == 0 and "Đã duyệt" in b2.inner_text("main"))
     ok("BE thật ql1: dòng thời gian có bước duyệt", "Duyệt" in b2.inner_text("main"), b2.inner_text("main")[-300:])
     ok("BE thật ql1: không console.error", errs == [], str(errs))
     ctx.close()
 
-    # 4. loc: Huỷ bỏ, ghi lỗ RT-2
+    # 4. loc: Huỷ hàng, ghi lỗ RT-2
     ctx, page, errs = session(b, "loc")
     go(page, "/returns/detail/?id=2")
-    page.get_by_role("button", name="Huỷ bỏ, ghi lỗ").click()
+    page.get_by_role("button", name="Huỷ hàng, ghi lỗ").click()
     page.get_by_role("dialog").get_by_role("button", name="Duyệt", exact=True).click()
-    page.wait_for_function("() => document.body.innerText.includes('Đã duyệt. Hàng đã huỷ bỏ, ghi lỗ.')")
+    page.wait_for_function("() => document.body.innerText.includes('Đã duyệt. Hàng đã huỷ hàng, ghi lỗ.')")
     ok("BE thật loc: duyệt Huỷ bỏ -> toast", True)
     go(page, "/returns/")
     ok("BE thật loc: thấy RT-1, RT-2 (Đã duyệt) và RT-3", sorted(rows(page)) == ["RT-1", "RT-2", "RT-3"], str(rows(page)))
     body = page.inner_text("main")
-    ok("BE thật loc: có Tái nhập và Huỷ bỏ, ghi lỗ ở cột Quyết định", "Tái nhập" in body and "Huỷ bỏ, ghi lỗ" in body, body[-400:])
+    ok("BE thật loc: có Tái nhập và Huỷ hàng, ghi lỗ ở cột Quyết định", "Tái nhập" in body and "Huỷ hàng, ghi lỗ" in body, body[-400:])
     page.screenshot(path=f"{SHOTS}/real-list.png")
     # QA Lô 9 B3: liên kết Phiếu giao / Đơn ở chi tiết (id đơn lấy từ phiếu giao của BE thật), Lô vẫn là chữ thường
     go(page, "/returns/detail/?id=1")

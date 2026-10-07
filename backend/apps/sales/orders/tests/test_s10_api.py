@@ -26,6 +26,7 @@ LIST_KEYS = {
     "id", "code", "status", "status_label", "customer_name", "customer_phone",
     "total_amount", "created_at", "reserved_until", "delivery_status", "needs_attention",
     "reason",  # R3 (ERP theo design Lô 3)
+    "customer_hidden_reason",  # PV-07 (02b §2.7): null | "expired" | "not_permitted"
 }
 
 
@@ -136,7 +137,7 @@ class S10ListTests(OrderApiBase):
     def test_s10_ac2_tim_theo_sdt_mot_phan(self):
         target = self._order(phone="0901234567")
         self._order(phone="0987654321", name="Anh Ba")
-        resp = client_for(self.kho).get("/api/sales/orders/?q=0901234")
+        resp = client_for(self.kho).post("/api/sales/orders/search/", {"q": "0901234"}, format="json")
         self.assertEqual([r["id"] for r in resp.json()["results"]], [target.pk])
 
     def test_s10_ac2_tim_theo_ma_don_mot_phan(self):
@@ -259,7 +260,7 @@ class S10DetailTests(OrderApiBase):
         })
         self.assertEqual(body["refunds"], [{
             "id": Refund.objects.get().pk, "amount": "540000", "status": "PENDING",
-            "status_label": "Chờ hoàn", "bank_txn_ref": "",  # L7: thêm nhãn
+            "status_label": "Chờ hoàn tiền", "bank_txn_ref": "",  # L7: thêm nhãn
         }])
         self.assertIn("available_actions", body)
 

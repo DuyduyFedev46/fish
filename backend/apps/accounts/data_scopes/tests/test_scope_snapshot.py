@@ -130,10 +130,17 @@ class ScopeSnapshotTests(TestCase):
         self.assertEqual(diffs, [Diff("manager", "orders.list", "-", "visible:order_assigned_other")])
 
     def test_pv01_ac3_only_one_approved_exception(self):
-        """PV-01-AC3: danh sách ngoại lệ chỉ một mục (NV kho, danh sách hoá đơn, ô tên khách), ghi rõ duyệt 02/10 Q-4."""
+        """PV-01-AC3: ngoại lệ duy nhất là Q-4 (danh sách hoá đơn, ô tên khách) cho thành viên nhóm NV kho: `warehouse_staff`
+        và người kiêm nhiệm kho + giao `warehouse_courier` (cùng nhóm NV kho, cùng V2). Ghi rõ duyệt 02/10 Q-4.
+        Không có ngoại lệ nào cho `direct_permissions` (R9, D-3)."""
         self.assertEqual(
-            APPROVED_DIFFS, (("warehouse_staff", "invoices.list", "+", "pii:*:customer_name"),),
+            APPROVED_DIFFS,
+            (
+                ("warehouse_staff", "invoices.list", "+", "pii:*:customer_name"),
+                ("warehouse_courier", "invoices.list", "+", "pii:*:customer_name"),
+            ),
         )
+        self.assertFalse([diff for diff in APPROVED_DIFFS if diff[0] == "direct_permissions"])
         source = (Path(__file__).with_name("snapshot.py")).read_text(encoding="utf-8")
         self.assertIn("Duy duyệt 02/10 Q-4", source)
 

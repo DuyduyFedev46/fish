@@ -2,7 +2,7 @@
 #   cd erp-console && NEXT_PUBLIC_USE_MOCK=1 npm run build && (cd out && python3 -m http.server 3401 &)
 #   BASE=http://127.0.0.1:3401 SHOTS=<thư mục ảnh> python3 e2e/ed_bonusA_ui.py      # tắt server (đúng cổng của mình) sau khi xong
 # Kiểm các mục còn lại ngoài ed_batch3 (#15), ed_batch6 (#5), ed_batch8 (#6/#20), ed_batch9 (#8 danh sách), ed_batch10 (#22):
-#   #1 hạn mức AI (chỉ Chủ thấy; ok / sắp chạm / hết) · #2 mốc "Tạo phiếu hoàn" có liên kết sang phiếu · #8 Huỷ phiếu hoàn
+#   #1 hạn mức AI (chỉ Chủ thấy; ok / sắp chạm / hết) · #2 mốc "Lập phiếu hoàn tiền" có liên kết sang phiếu · #8 Huỷ phiếu hoàn
 #   (đường thuận, 409, người không đủ quyền không thấy mục) · #11 tìm khách bằng POST, từ khoá không nằm trong URL ·
 #   #14 lỗi chi phí dưới đúng ô · #17 SĐT từ danh sách, không gọi thêm chi tiết · #18 mốc Bắt đầu giao / Giao thất bại ·
 #   #19 "Nhờ người xử lý" trong menu "…" (đơn, lô) · quyền: vai không có quyền không thấy · 360px không cuộn ngang.
@@ -117,8 +117,8 @@ def refund_timeline(browser):
     order = page.evaluate("""() => { for (let id = 101; id <= 140; id++) { try { const j = window.__caveMock.orderJson('loc', id); if (j && j.refunds && j.refunds.length) return id; } catch (e) {} } return null; }""")
     ok("#2 tìm được đơn có phiếu hoàn trong dữ liệu mock", order is not None, str(order))
     go(page, f"/orders/detail/?id={order}")
-    link = page.locator("a", has_text="Tạo phiếu hoàn").first
-    ok("#2 mốc 'Tạo phiếu hoàn' là liên kết", link.count() == 1 and link.is_visible())
+    link = page.locator("a", has_text="Lập phiếu hoàn tiền").first
+    ok("#2 mốc 'Lập phiếu hoàn tiền' là liên kết", link.count() == 1 and link.is_visible())
     href = link.get_attribute("href") or ""
     ok("#2 liên kết trỏ sang phiếu hoàn, chỉ mang ?id=", re.search(r"/orders/refunds/detail/\?id=\d+$", href) is not None, href)
     link.click()
@@ -132,30 +132,32 @@ def refund_timeline(browser):
     ctx.close()
 
 
-# ---------------------------------------------------------------- #8 Huỷ phiếu hoàn
+# ---------------------------------------------------------------- #8 Huỷ phiếu hàng hoàn
 def return_cancel(browser):
     # đường thuận: Chủ huỷ RT-1 (Chờ duyệt)
     ctx, page, errors = new_page(browser, "loc")
     go(page, "/returns/detail/?id=1")
     m = menu(page)
-    ok("#8 RT-1 Chờ duyệt: Chủ có mục Huỷ phiếu hoàn trong '…'", m.get_by_role("menuitem", name="Huỷ phiếu hoàn").count() == 1)
-    m.get_by_role("menuitem", name="Huỷ phiếu hoàn").click()
+    ok("#8 RT-1 Chờ duyệt: Chủ có mục Huỷ phiếu hàng hoàn trong '…'", m.get_by_role("menuitem", name="Huỷ phiếu hàng hoàn").count() == 1)
+    m.get_by_role("menuitem", name="Huỷ phiếu hàng hoàn").click()
     dlg = page.get_by_role("dialog")
     ok("#8 hộp xác nhận nói không khôi phục lại được", "không khôi phục lại được" in dlg.inner_text(), dlg.inner_text())
     page.evaluate("() => window.__caveMock.clearLog()")
-    dlg.get_by_role("button", name="Huỷ phiếu hoàn").click()
+    dlg.get_by_role("button", name="Huỷ phiếu hàng hoàn").click()
     page.get_by_text("Đã huỷ phiếu", exact=False).first.wait_for()
     settle(page)
     ok("#8 huỷ xong: chip Đã huỷ, gọi đúng 1 POST cancel", "Đã huỷ" in page.inner_text("main") and len([x for x in log(page) if "POST" in x and "cancel" in x]) == 1, str([x for x in log(page) if x.startswith("POST")]))
-    ok("#8 huỷ xong: hết nút Tái nhập / Huỷ bỏ và mục Huỷ phiếu hoàn", page.get_by_role("button", name="Tái nhập vào lô").count() == 0 and page.get_by_role("button", name="Thao tác khác").count() == 0)
+    page.get_by_role("button", name="Thao tác khác").click()  # Chủ còn mục Xoá (#8), nên menu vẫn có
+    ok("#8 huỷ xong: hết nút Tái nhập / Huỷ bỏ và mục Huỷ phiếu hàng hoàn", page.get_by_role("button", name="Tái nhập vào lô").count() == 0 and page.get_by_role("menuitem", name="Huỷ phiếu hàng hoàn").count() == 0 and page.get_by_role("menuitem", name="Xoá phiếu hàng hoàn").count() == 1)
+    page.keyboard.press("Escape")
     ctx.close()
     # 409: phiếu được duyệt từ máy khác trong lúc mở hộp
     ctx, page, errors = new_page(browser, "ql1")
     go(page, "/returns/detail/?id=2")
     page.evaluate("() => window.__caveMock.returnsMarkApproved(2)")
-    menu(page).get_by_role("menuitem", name="Huỷ phiếu hoàn").click()
+    menu(page).get_by_role("menuitem", name="Huỷ phiếu hàng hoàn").click()
     dlg = page.get_by_role("dialog")
-    dlg.get_by_role("button", name="Huỷ phiếu hoàn").click()
+    dlg.get_by_role("button", name="Huỷ phiếu hàng hoàn").click()
     dlg.locator("[data-conflict-banner]").wait_for()
     ok("#8 409: hộp hiện banner xung đột, có nút Tải lại, hộp không tự đóng", dlg.is_visible() and dlg.get_by_role("button", name="Tải lại").count() == 1, " ".join(dlg.inner_text().split())[:200])
     dlg.get_by_role("button", name="Tải lại").click()
@@ -167,12 +169,12 @@ def return_cancel(browser):
     ctx, page, errors = new_page(browser, "kho1")
     go(page, "/returns/detail/?id=1")
     has_menu = page.get_by_role("button", name="Thao tác khác").count() == 1
-    ok("#8 kho1 (không phải người tạo, không quyền duyệt): không có mục Huỷ phiếu hoàn", (not has_menu) or menu(page).get_by_role("menuitem", name="Huỷ phiếu hoàn").count() == 0)
+    ok("#8 kho1 (không phải người tạo, không quyền duyệt): không có mục Huỷ phiếu hàng hoàn", (not has_menu) or menu(page).get_by_role("menuitem", name="Huỷ phiếu hàng hoàn").count() == 0)
     ctx.close()
     # giao1: người tạo RT-1 huỷ được phiếu của mình; phiếu đã huỷ (RT-6) không còn mục Huỷ
     ctx, page, errors = new_page(browser, "giao1")
     go(page, "/returns/detail/?id=1")
-    ok("#8 giao1 (người tạo RT-1): có mục Huỷ phiếu hoàn", menu(page).get_by_role("menuitem", name="Huỷ phiếu hoàn").count() == 1)
+    ok("#8 giao1 (người tạo RT-1): có mục Huỷ phiếu hàng hoàn", menu(page).get_by_role("menuitem", name="Huỷ phiếu hàng hoàn").count() == 1)
     page.keyboard.press("Escape")
     go(page, "/returns/detail/?id=6")
     ok("#8 RT-6 đã huỷ: chip Đã huỷ, không có mục Huỷ", "Đã huỷ" in page.inner_text("main") and page.get_by_role("button", name="Thao tác khác").count() == 0)
@@ -313,8 +315,8 @@ def mobile(browser):
     ctx, page, errors = new_page(browser, "ql1", 360, 740)
     go(page, "/returns/detail/?id=2")
     ok("360px chi tiết phiếu hoàn: không cuộn ngang", no_hscroll(page))
-    menu(page).get_by_role("menuitem", name="Huỷ phiếu hoàn").click()
-    ok("360px hộp Huỷ phiếu hoàn: không cuộn ngang, nút cao >= 44px", no_hscroll(page) and page.get_by_role("dialog").get_by_role("button", name="Huỷ phiếu hoàn").bounding_box()["height"] >= 43.5)
+    menu(page).get_by_role("menuitem", name="Huỷ phiếu hàng hoàn").click()
+    ok("360px hộp Huỷ phiếu hàng hoàn: không cuộn ngang, nút cao >= 44px", no_hscroll(page) and page.get_by_role("dialog").get_by_role("button", name="Huỷ phiếu hàng hoàn").bounding_box()["height"] >= 43.5)
     page.screenshot(path=os.path.join(SHOTS, "bonusA_return_cancel_360.png"))
     page.keyboard.press("Escape")
     go(page, "/stocktake/detail/?id=14")

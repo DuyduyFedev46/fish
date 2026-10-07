@@ -3,17 +3,16 @@
 ## Kế hoạch chạy hết phần còn lại, không tính AI (06/10/2026)
 Duy chốt 06/10 (ghi ở `doc/decisions.md`): D-1 giữ V2 bật, Chủ tự tắt · superuser được ghi phân quyền (FE mở) · #14 để sau production · **làm** CSKH lô 5.
 
-| Đợt | Việc | Ở đâu | Trạng thái |
+| Đợt | Việc | Ở đâu | Trạng thái (07/10) |
 |---|---|---|---|
-| 1 | #3/#8 BE hoàn tất | worktree `duy-quyet` (nhánh `wip/duy-quyet-03-10`) | đang chạy |
-| 1 | Rà soát C/D/E hoàn tất | worktree `agent-adb46da0acecd2601` | đang chạy |
-| 1 | Lô 15 hoàn tất (tuân cờ ẩn AI) | worktree `agent-adeaae51549099388` | đang chạy |
-| 1 | Phạm vi dữ liệu Lô 1–2 BE | worktree `pham-vi` (nhánh `feat/pham-vi-du-lieu`) | đang chạy |
-| 1 | CSKH lô 5 BE | worktree `cskh-lo5` (nhánh `feat/cskh-lo5`) | đang chạy |
-| 2 | Gộp C/D/E, Lô 15, #3/#8 vào main → kiểm chứng đủ → techlead → QA → push | main | chờ |
-| 2 | #8 FE nút "Xoá phiếu" · CSKH lô 5 FE · Phạm vi Lô F1 FE (mock) | — | chờ |
-| 3 | Phạm vi Lô 3–7 · #15 Ghi tiền về muộn (sau #3/#8) | — | chờ |
-| 4 | Lô 17 (nợ + hồi quy, gồm FE mở phân quyền cho superuser) · đợt 2 rà soát giao diện | — | chờ |
+| 1 | #3/#8 BE, C/D/E, Lô 15, CSKH Lô 5 (BE+FE), Phạm vi Lô 1–2, AuditLog.note, Shop "Liên hệ" | main | ☑ đã push |
+| 2 | Phạm vi Lô F1 FE (giữ nhánh tới Lô 5 BE) | worktree `pham-vi-fe` (`feat/pham-vi-fe`) | xong, techlead đang review — KHÔNG merge trước Lô 5 |
+| 2 | Phạm vi Lô 3 BE | worktree `pham-vi` (`feat/pham-vi-du-lieu`) | đang code |
+| 2 | Lô dọn chữ AI (02b `doc/features/2026-10-07-don-chu-ai/`) | worktree `don-ai-be` ∥ `don-ai-fe` | đang code |
+| 2 | W37 đơn hoàn tất (story ĐÃ DUYỆT) | `doc/features/2026-10-06-don-hoan-tat/` | techlead viết 02b |
+| 3 | Lô áp tên chuẩn (mục 4 `doc/thuat-ngu-va-trang-thai.md`, ĐÃ DUYỆT) | — | chờ sau lô dọn AI |
+| 3 | Phạm vi Lô 4–7 · #15 Ghi tiền về muộn · FE #8 nút Xoá phiếu hoàn | — | chờ |
+| 4 | Lô 17 (nợ + hồi quy) · đợt 2 rà soát giao diện | — | chờ |
 | 5 | Deploy staging (chỉ khi Duy bảo) | — | chờ |
 
 

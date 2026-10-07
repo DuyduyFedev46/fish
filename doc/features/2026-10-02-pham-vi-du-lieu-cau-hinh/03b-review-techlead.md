@@ -348,3 +348,213 @@ Số kiểm chứng lấy từ báo cáo của fe-dev: vitest 1026 PASS, `ed_bat
   để giữ khớp với mock.
 - Vẫn còn: L6 (chờ UI review quyết), L7–L9 (Lô 3/5), câu hỏi superuser không nhóm (điểm dừng 🟡 hỏi Duy), quy tắc deploy theo
   phương án A ở mục trên (không gộp main hay deploy F1 trước Lô 5 BE).
+## Review Lô 3 BE (07/10)
+
+> Tech Lead · 2026-10-07 · commit `30bbc87` (PV-03, PV-07) trên `feat/pham-vi-du-lieu`, diff `7110254..30bbc87`. Nhánh đã
+> merge main `7110254`.
+
+### Kết luận: **APPROVED**, kèm 2 điều kiện cho lô sau (C1, C2)
+
+Đơn và hoá đơn đã đọc phạm vi từ cấu hình qua một hàm duy nhất, V1 và V2 đã vào registry. Tôi không thấy chỗ rò dữ liệu cá
+nhân hay giá vốn. Ngoài phạm vi trả 404. Số truy vấn trong ngân sách.
+
+### Kiểm chứng đã chạy trong lượt review (HEAD `30bbc87`)
+
+- Toàn bộ `manage.py test` (`DJANGO_DEBUG=1`, symlink `backend/staticfiles` tạm, đã gỡ): **OK**. Điều phối viên đếm được 3057 test.
+- `makemigrations --check --dry-run`: `No changes detected`.
+- `git merge-tree` giữa `feat/w37-l1-be` và `30bbc87`: merge sạch. Nhánh W37 L1 chưa có commit, phần sửa còn nằm trong worktree
+  `w37-be` nên tôi soát tay (xem mục W37).
+
+### Sáu câu hỏi của điều phối viên
+
+| # | Việc | Quyết định |
+|---|---|---|
+| 1 | Hoãn D1 cho phiếu hoàn tiền và dashboard | **Duyệt hoãn, nhưng có hạn (C1).** Hoãn an toàn tới Lô 5: trước Lô 5 không có đường nào ghi được D1 (PUT phạm vi là việc của Lô 5; `GroupDataScope` không đăng ký Admin và không có permission), nên D1 của mọi nhóm vẫn là mặc định. Nhóm có `view_refund`/`view_dashboard` lúc này đều đang `all`, nên hành vi không đổi. Khi Lô 5 cho Chủ thu hẹp D1, phiếu hoàn và dashboard **phải** theo D1. Nếu không, Quản lý bị thu hẹp vẫn thấy mọi phiếu hoàn kèm tên/SĐT khách. Vì vậy **Lô 5 không được duyệt nếu thiếu phần này**. Để làm được thì cần Duy trả lời D-3. Điều phối viên nên hỏi Duy ngay, không đợi tới Lô 5. Không chấp nhận code lửng, và be-dev đã gỡ sạch (đúng). |
+| 2 | `APPROVED_DIFFS` thêm `warehouse_courier invoices.list` | **Duyệt.** Người kiêm nhiệm có V2 và D2 = `all` nhờ nhóm NV kho, nên đây là cùng một ngoại lệ Q-4 chứ không phải ngoại lệ mới. Test AC3 khoá đúng hai mục và không có mục nào cho `direct_permissions`. |
+| 3 | `ai/policy/rules.py` thêm `customer_hidden_reason` vào `SCRUB_PII_KEYS` | **Duyệt.** Bản thân cờ này không phải dữ liệu cá nhân. Bỏ nó khỏi đầu ra AI để kết quả AI không đổi: không bị cắt mất dòng ở `AI_RESULT_MAX_CHARS`, mốc `ai.orders_list` giữ nguyên. Sửa này chỉ thu hẹp đầu ra, không mở thêm gì. Nên ghi một dòng vào 02b §6 Lô 3. |
+| 4 | Phiếu hoàn tiền khi bị che trả `null` thay vì `""` | **Duyệt.** Khớp 02b §2.7 ("ô khách vẫn `null`") và cùng cách với đơn, hoá đơn. Khi phiếu không có đơn mà không bị che thì vẫn trả `""` như cũ. FE Lô 7 phải chịu được `null` ở hai ô này. Mock F1 cũng phải có ca `null`. |
+| 5 | Sửa 5 test cũ | **Duyệt cả 5.** Mỗi test đổi vì hợp đồng đổi có chủ ý: thêm khoá (`test_s10_api`, `test_invoice_list`); V2 thay `view_customer_list` làm cổng tên trên hoá đơn, kèm ngoại lệ Q-4 (`test_invoice_list`); V2 cấp cho 5 nhóm (`test_s47_me_labels`, `test_confirmation_role_scope`); serializer không có người gọi thì mặc định che, hướng an toàn (`test_auditlog_note_no_free_text`). Không test nào bị nới để che lỗi. Test M1 cũ được viết lại thành test V2, vẫn kiểm `customer_name` null và không có chuỗi tên giả trong body. |
+| 6 | V2 = `sales.view_order_customer_info`; migration `sales/0015`, `0016`; người không nhóm mất V2 (R9) | **Duyệt.** Đánh số 0015/0016 đúng vì main đã có `0014_salesorder_cancel_note`. `0015` là AlterModelOptions tự sinh. `0016` theo mẫu `sales/0013`, cấp cho 5 nhóm, lùi bằng cách gỡ khỏi 5 nhóm. V2 không `owner_only`, perms tách khỏi V1 và khỏi `view_customer_list`. Khoá việc `view_order_customer_info` lấy theo tên permission, chấp nhận. **Về R9:** fixture PV-01 cấp V2 trực tiếp cho `direct_permissions`, nên mốc **không** bắt được việc người không nhóm mất tên khách. Chấp nhận, vì mốc dùng để chứng minh không đổi hành vi với cấu hình thật, và chỗ đổi này đã được ghi rõ. Nhưng câu hỏi D-3 gửi Duy phải nêu thẳng: "người không nhóm sẽ mất tên/SĐT/địa chỉ trên đơn, hoá đơn, phiếu hoàn cho tới khi được cấp V2 trực tiếp" (C2). |
+
+### Soát thêm
+
+- **Dữ liệu cá nhân.** Ô khách trên đơn (danh sách: `customer_name`, `customer_phone`; chi tiết: `customer{name,phone,address}`),
+  danh sách hoá đơn (`customer_name`) và phiếu hoàn (`customer_name`, `customer_phone`) đều đi qua **một** hàm
+  `customer_hidden_reason`. Thiếu V2 thì che, rồi mới xét quá cửa sổ. Chi tiết đơn không còn nhánh nào khác chứa dữ liệu khách:
+  `delivery` chỉ có người giao (nhân viên); `payments` chỉ mã giao dịch và số tiền; `refunds` lồng không có tên; `invoice` chỉ
+  mã. Chi tiết hoá đơn (`SalesInvoiceSerializer`) chỉ có `customer` dạng id, có test `test_pv07_invoice_detail_has_no_personal_data_keys`.
+  Tìm `?q=` khi thiếu V2 chỉ khớp mã đơn, nên không dò được SĐT hay tên (có 2 test). Tra đơn công khai Shop không đổi (có test).
+  Serializer không có `request` thì mặc định che.
+- **`cancel_note`.** Bị che theo V2 lẫn cửa sổ (`orders/serializers.py`, `get_cancel_note`), trả `""` như luật cũ, có test
+  `test_pv07_cancel_note_stays_empty_when_customer_hidden`. Đạt.
+- **Giá vốn.** Không đụng `CostFieldSerializerMixin` hay `sensitive_fields`. Test `test_pv03_ac8_no_cost_fields_for_user_without_view_cost`
+  kiểm với NV kho và NV giao. Đạt.
+- **404 ngoài phạm vi.** `get_queryset` lọc theo D1, nên chi tiết, hành động `get_object` và AI đều trả 404. Có test AC4 và AC5. Cổng
+  Tầng 1 vẫn đứng trước: tắt `view_orders` thì 403 dù D1 = `all` (test AC7). Đạt.
+- **Số truy vấn.** Phân giải nhớ trên user, nên danh sách đơn (NV giao) và danh sách hoá đơn (NV kho) chỉ tăng tối đa 3 truy vấn
+  (`QueryBudgetTests`). `customer_hidden_reason` gọi `has_perm` cho từng dòng nhưng dùng `_perm_cache`, không thêm truy vấn. Đạt R8.
+- **Rò chéo nhóm.** `test_pv03_cross_group_leak_is_closed` có; D2 theo D1 của nhóm có quyền xem hoá đơn (Q-7, test PV-07-AC6). Đạt.
+- **Code chết.** Đường đơn và hoá đơn không còn `has_full_delivery_scope` hay `is_customer_service`; `pii_hidden` đã bỏ, không còn
+  chỗ gọi. Hàm cũ trong `common/api.py` bỏ ở Lô 6 theo kế hoạch.
+
+### Va chạm với W37
+
+- **W37 L1** (worktree `w37-be`, chưa commit): sửa `delivery/api.py`, `delivery/services.py`, `sales/orders/services.py`, `completion.py`
+  mới và test `cancel_paid_order`. **Không trùng file** với Lô 3, và không dùng hàm Lô 3 đã đổi chữ ký (`scope_orders_for`,
+  `annotate_order_pii_visible`) hay đã bỏ (`pii_hidden`). Lô 3 merge vào main trước hay sau W37 L1 đều được. **Lô 4** thì sẽ sửa đúng
+  `delivery/api.py` (`get_serializer_context`, `get_queryset`, lọc `assigned_to`), cùng file W37 L1 đang sửa. Đề nghị: bắt đầu Lô 4 sau
+  khi W37 L1 đã vào main, rồi `git merge main` trước khi code.
+- **W37 L2** (`refund_summary` trong `sales/orders/serializers.py`): trùng file với Lô 3. Merge sau thì sửa phần xung đột bằng tay; khu
+  vực gần `get_refunds` và `get_cancel_note`. **Luật cho W37 L2:** nếu `refund_summary` có bất kỳ ô nào là dữ liệu khách (tên, SĐT, ghi
+  chú tự do) thì phải che bằng `hidden_reason(self, order)` như `customer` và `cancel_note`. Tốt nhất là chỉ trả số tiền và trạng thái.
+  Techlead sẽ soát điểm này khi review W37 L2.
+
+### Điều kiện chuyển lô
+
+- **C1 (chặn duyệt Lô 5):** phạm vi D1 cho `sales/refunds/api.py::get_queryset` và cho `reports/dashboard_api.py` (`recent_orders`,
+  `pending_orders`, `booked_soon` qua `scope_orders_for`; `revenue_today` qua `scope_invoices_for`) phải vào trước hoặc cùng Lô 5. Lệch
+  mốc của `direct_permissions` chỉ được ghi vào `APPROVED_DIFFS` sau khi Duy trả lời D-3, kèm "Duy duyệt <ngày> D-3".
+- **C2 (D-3, trước deploy production):** lệnh đếm người không nhóm có quyền gán trực tiếp phải liệt kê thêm ai đang có
+  `sales.view_salesorder`/`view_salesinvoice`/`view_refund`. Câu hỏi gửi Duy nêu rõ họ sẽ mất tên khách cho tới khi được cấp V2.
+- Ghi 02b §6 Lô 3: thêm `ai/policy/rules.py` (điểm 3) vào danh sách file đã sửa; số migration sales là 0015/0016.
+- Chưa tự chạy migrate lùi `sales 0016 → 0014` trên DB thật. Hàm `revoke` là bản chép mẫu `sales/0013` đã chạy trên production. QA
+  nên chạy tiến/lùi trên SQLite tạm khi nghiệm thu.
+
+## Lô QĐ-08/10 BE (08/10)
+
+Techlead review `git diff main...HEAD` nhánh `feat/qd-0810-be` (`b802baf`), đối chiếu `02c-quyet-dinh-08-10.md` §A, B.2, B.4.2, C.4, E, F.
+Kết luận: **REVIEW PASS (APPROVED)**. Không có lỗi Critical, High hay Medium. Có 4 mục Low, không chặn merge.
+
+### Kiểm chứng đã chạy (lệnh lẻ, < 1 phút)
+- `manage.py test apps.accounts.auth.tests.test_no_role_gate` + 3 test thăm dò tạm (đã xoá, không commit): session auth bị chặn
+  `AUTH_NO_ROLE`; không nhóm + mật khẩu tạm trả `AUTH_MUST_CHANGE_PASSWORD` trước; `POST /api/sales/orders/1/cancel/` bị 403
+  `AUTH_NO_ROLE`; `GET /api/shop/catalog/` kèm token người không nhóm vẫn 200; `POST /api/internal/payments/sepay-ipn/` kèm token
+  đó không bị cổng. Kết quả `Ran 12 tests ... OK`.
+- `makemigrations --check --dry-run`: No changes detected. `python3 scripts/check_naming.py`: OK, không phát sinh mới.
+
+### 1. Cổng D-3 `AUTH_NO_ROLE` (`backend/apps/accounts/auth/authentication.py:56-81`)
+- **Phủ route.** Cổng ở lớp xác thực mặc định, nên mọi view DRF dùng token hay session đều qua. Đã grep: không view nào tự khai
+  `authentication_classes`, không có `get_permissions()` override hay `@action(permission_classes=...)`, không có `@api_view`. Route
+  ngoài DRF chỉ có `admin/` (Django admin, chỉ superuser, không đổi) và `api-auth/` (form đăng nhập browsable). Test quét mọi route
+  DRF dưới `/api/` (hơn 40 đường bị chặn) bắt được view mới quên miễn.
+- **Miễn đúng.** Shop (`catalog`, `orders`, `checkout`), `public/*`, `site-info` đều `[AllowAny]`. Internal SePay webhook/IPN là
+  `[AllowAny]` cộng `X-Internal-Token`. Adapter không gửi `Authorization`, nên lớp xác thực trả `None` và cổng không chạy. Login,
+  me, logout, change-password có `allow_without_group = True`. `ObtainAuthToken` có `permission_classes = ()` nên không lọt vào
+  nhánh "public", nhưng đã có cờ miễn.
+- **Thứ tự.** `MustChangePassword` (`:76`) đứng trước `NoRole` (`:79`), đúng §B.4.2.
+- **Thân 403.** Chỉ `{"detail", "code"}` qua `render_code` của `apps/common/api.py:199`. Câu chữ cố định, không có username hay
+  dữ liệu khách. Có test.
+- **Bỏ cache (lệch 02c).** Chấp nhận. `authenticate` chạy một lần mỗi request trên đối tượng user mới, nên cache trên user không
+  tiết kiệm được gì. Chi phí là một `EXISTS` trên `auth_user_groups` (có index `user_id`) cho mỗi request của người không phải
+  superuser. Lợi ích: gỡ nhóm có hiệu lực ngay (có test).
+- **Hướng sai an toàn.** Nếu sau này có view tự trả quyền khác nhau theo action qua `get_permissions()`, `_is_public_view` chỉ đọc
+  thuộc tính lớp. Khai `IsAuthenticated` mà trả `AllowAny` thì hỏng theo hướng đóng (an toàn). Ngược lại, lớp `AllowAny` mà trả quyền
+  chặt hơn thì chỉ hở D-3 cho đúng view đó. Hiện không có view nào như vậy. Xem L3.
+
+### 2. Superuser không nhóm (`auth/services.py:92-101`, `:123`, `:135-136`)
+- Không mở rộng quyền. Superuser vốn có `has_perm` mọi quyền và trước lô đã gọi API được. Lô chỉ đổi `home` sang `dashboard`, thêm
+  khoá `is_superuser` và cho qua cổng D-3. `groups`/`group_labels` vẫn là nhóm thật, không bịa `owner`, nên luật "còn ít nhất một Chủ"
+  không đổi. Superuser chỉ thuộc `delivery_staff` cũng về `dashboard` (có test).
+- Contract `me` chỉ thêm khoá, đúng §A.2. Vị trí và comment khớp nhánh phạm vi, nên khi gộp chỉ cần giữ một dòng.
+
+### 3. Migration `sales/0019_alter_salesorder_view_order_customer_info_label.py`
+- Chỉ có `AlterModelOptions` (đổi nhãn quyền), phụ thuộc `0018`, đúng số kế tiếp trên main. `feat/pham-vi-du-lieu` và
+  `feat/pham-vi-fe` không có `sales/0019`, nên không trùng số. Không đụng schema. Nhãn `Permission.name` trên DB cập nhật qua
+  `post_migrate`, như mẫu `0018`.
+
+### 4. Ẩn dòng AI (`backend/apps/common/ai_visibility.py:12, 28-32`)
+- Chỉ lọc khi `AI_ENABLED` tắt; khi bật thì trả nguyên queryset (có test cả hai chiều). Chỉ ẩn khi đọc, không xoá `AuditLog`.
+- Vẫn giữ dòng nghiệp vụ do người duyệt thực thi có `proposal_ref` (có test). Lọc `?action=ai_config_update` khi tắt trả 0 (có test).
+- `startswith` trên `action`: đã grep, không có action nghiệp vụ nào bắt đầu bằng `ai_config_`, `ai_policy_` hay `downgrade_`.
+
+### 5. Seed QA `qa_nogroup` (`backend/apps/accounts/qa_fixture/build.py:77-78, 178-183`)
+- Hợp lý. Hai quyền xem gán trực tiếp giúp e2e chạy BE thật bắt được ca "có quyền vẫn bị chặn". Dữ liệu giả, không có giá vốn hay
+  dữ liệu cá nhân thật. `set(...)` chạy cho mọi user QA nên seed vẫn idempotent: user khác bị đặt lại về rỗng, đúng ý seed.
+
+### 6. Giá vốn, dữ liệu cá nhân, contract
+- Không serializer nào đổi field, không log mới. Khoá mới `is_superuser` chỉ trả về chính người đăng nhập.
+- Nhãn V2 đổi đủ 3 chỗ, khớp 02c §C.4. Nhãn vai và nhóm lệnh AI đổi khớp bảng §F. Không đụng `delivery/serializers.py`,
+  `features/permissions/**`, hay file ngoài `backend/`.
+- Lệch 02c chỉ có hai chỗ, cả hai chấp nhận: bỏ cache (lý do ở mục 1) và L1 bên dưới.
+
+### Lỗi mức Low (không chặn, nên làm ở lô sau hoặc khi gộp nhánh phạm vi)
+- **L1** `backend/apps/accounts/auth/services.py:92-98`. `home_for` tự viết `if is_superuser` / `if not groups` thay vì dùng
+  `has_erp_access` như §A.2. Hiện tương đương. Cách sửa: `if not has_erp_access(user): return HOME_NO_ROLE` (đổi chữ ký sang nhận
+  `user`), để luật cổng và luật `home` không trôi khỏi nhau.
+- **L2** `backend/apps/accounts/auth/tests/test_no_role_gate.py`. Thiếu 3 ca §B.4.2 yêu cầu: session auth bị chặn; không nhóm + mật
+  khẩu tạm thì ra `AUTH_MUST_CHANGE_PASSWORD`; một `POST` hành động bị 403 và dữ liệu không đổi. Techlead đã thăm dò, cả 3 ca đều đúng.
+  Cách sửa: thêm 3 test đó vào file này, nhất là ca thứ tự cờ, vì FE dựa vào nó để đưa người dùng sang màn đặt mật khẩu.
+- **L3** `backend/apps/accounts/auth/authentication.py:64-66`. `_is_public_view` chỉ đọc `permission_classes` của lớp. Cách sửa
+  (phòng xa): thêm một test khẳng định không view nào dưới `/api/` override `get_permissions`, hoặc ghi rõ giới hạn này trong docstring.
+- **L4** `backend/apps/accounts/qa_fixture/build.py:178-183`. `.first()` trả `None` nếu codename sai, và `set([None])` sẽ ném lỗi khó
+  đọc. Cách sửa: dùng `Permission.objects.get(...)` để lỗi nêu rõ quyền nào thiếu.
+
+### Việc vận hành (nhắc lại C2 và §B.4.5)
+Trước khi deploy production, điều phối viên đếm tài khoản `is_active`, không superuser, không nhóm (chỉ in username). Ngay sau khi
+deploy, những người này mất quyền vào ERP.
+---
+
+## Lô QĐ-08/10 FE (08/10)
+
+Nhánh `feat/qd-0810-fe` `52a2585`, diff `main...HEAD` (19 file). Thiết kế `02c-quyet-dinh-08-10.md` §A.3, §B.3, §E, §F. Đối chiếu contract
+BE thật trên `feat/qd-0810-be` (`auth/authentication.py:41-52`, `auth/api.py` 4 view `allow_without_group`, `auth/services.py:92,136`).
+Đã chạy `python3 scripts/check_naming.py`: OK, không phát sinh mới. Không build (điều phối viên chạy tsc/vitest/build).
+
+**Kết luận: CHANGES REQUESTED** (1 Medium, 2 Low phải sửa trong lô; còn lại ghi nhận).
+
+### Đã soát, đạt
+
+1. **Nhánh 403 `AUTH_NO_ROLE` trong `AuthProvider.tsx:138-143` (lệch §B.3): chấp nhận, 02c §B.3 coi như được thay bằng bản này.**
+   Nhánh chung không sai hẳn (lần 403 đầu vẫn tải lại `me` → `home=no-role` → ConsoleGate chuyển trang), nhưng nó bỏ qua request đã nằm
+   trong `stableForbidden` 60 giây, và hiện thêm thông báo "quyền vừa đổi". Nhánh riêng thì luôn chuyển trang, nên tốt hơn.
+   - Không có vòng lặp: BE miễn cổng cho `me` (200), và `loadMe` đã bỏ qua 403. Request đang bay có thể gọi `me` thêm vài lần, nhưng số
+     lần có giới hạn. Khi `home=no-role`, ConsoleGate chỉ vẽ Loading và gỡ Shell, nên không còn màn nào gọi API. `NoRoleScreen` không gọi API.
+   - Có thể nháy trang trong ca đua: Chủ vừa gán lại nhóm. FE đặt lạc quan `home=no-role`, rồi `me` trả `dashboard`, và `NoRoleScreen:19`
+     đưa về `homePath`. Màn tự trở lại đúng, chấp nhận được.
+   - Không xung đột với mật khẩu tạm. BE và mock đều kiểm `AUTH_MUST_CHANGE_PASSWORD` trước (`mock.ts:393`). ConsoleGate `:41-42` và
+     NoRoleScreen `:19` đều ưu tiên `must_change_password`. Nhánh NO_ROLE không đụng cờ `forcedChange`.
+2. **Superuser không nhóm.** `nav.ts` không đổi logic. `my-deliveries` vẫn dùng `inGroup(deliveryStaff)`, nên superuser không thấy mục này.
+   `hasLimitedCourierScope` trả false với superuser không nhóm, khớp `resolver.py`. `receiptView.ts:60` đạt nhờ quyền `deletePurchaseReceipt`.
+   `AiAssistantPanel:274` đi theo quyền. `roleText` và AccountScreen chỉ hiện nhãn "Quản trị hệ thống" khi không có nhóm, nên không che nhóm
+   thật. Vitest `superuser.test.ts` có phủ. Màn Phân quyền vẫn ở chế độ chỉ đọc với superuser không thuộc `owner`
+   (`PermissionMatrixScreen.tsx:49`) cho tới khi F1 vào main. Đây là việc của F1, lô này không được đụng `permissions/**`.
+3. **Mock.** Đường miễn cổng (token, me, logout, change-password) và câu `detail` (`beErrors.mock.ts:74-78`) khớp nguyên văn BE
+   `NO_ROLE_DETAIL`. `setMockGate` nằm trong `if (NEXT_PUBLIC_USE_MOCK === "1")`. `beErrors.mock.ts` và `mock.ts` đã có trong danh sách quét
+   của `check-no-mock.mjs`. `nogroup1` dùng SĐT rỗng và tên chung, không có dữ liệu cá nhân.
+4. **E2E.** Bốn file đổi `admin` thành `nogroup1` cho ca không nhóm, đúng ý. Ca `admin` mới vào `/overview/` và có kiểm menu. `s48`
+   không nới lỏng: vẫn kiểm superuser không bị ép đổi mật khẩu, chỉ đổi trang đích. Các helper `nav_labels` và `logout` đều có sẵn.
+5. **Phạm vi.** Không đụng `features/permissions/**`, `backend/` hay `frontend/`. Không thêm log, console, localStorage hay URL chứa dữ liệu
+   cá nhân. Không có field giá vốn. Có 3 file nằm ngoài danh sách §G.1 (`AuthProvider.tsx`, `LoginScreen.tsx` chỉ là gợi ý mock,
+   `beErrors.mock.ts`) và 1 file test mới. Đều hợp lý, chấp nhận.
+
+### Lỗi
+
+| # | Mức | Chỗ | Lỗi | Cách sửa |
+|---|---|---|---|---|
+| R1 | Medium | `erp-console/features/audit/auditModel.ts:142` | Thiếu hạng mục §E của lô. `AI_ONLY_ACTIONS` chưa có `"ai_config_kill"`, nên khi tắt AI thì ô lọc Nhật ký vẫn còn "Tắt trợ lý AI" | Thêm `"ai_config_kill"` vào mảng. Thêm một khẳng định vitest nếu đã có test cho `AI_ONLY_ACTIONS` |
+| R2 | Low | `erp-console/features/ai/settings/mock.ts:29` | Nhãn nhóm **lệnh AI** đang là "Gọi xác nhận". §F yêu cầu "Chăm sóc khách hàng", khớp BE `ai/settings/services.py:101` | Đổi thành `"Chăm sóc khách hàng"` |
+| R3 | Low | `erp-console/features/confirmation/mock.ts:530` | §F yêu cầu chép đúng câu 404 BE. Mock: "Không tìm thấy phiếu trong phạm vi gọi xác nhận của bạn." BE `delivery/confirmation/api.py:128`: "Không tìm thấy mục chờ gọi trong phạm vi của bạn." | Chép nguyên văn câu BE |
+| N1 | Low (ghi nhận, nên sửa) | `erp-console/shared/lib/nav.ts:176` `onlyDelivery` | Superuser chỉ thuộc `delivery_staff`: BE trả `home=dashboard` (§A.2). FE vẫn coi là "chỉ giao" và ẩn Đơn, Phiếu giao, Hoá đơn, Nhật ký, AI, nên không "như Chủ" | `onlyDelivery = (me) => !me.is_superuser && me.groups.length > 0 && ...`. Thêm 1 ca vitest. File thuộc danh sách được sửa |
+| N2 | Ghi chú QA | `AuthProvider.tsx:138` | Nhánh mới chưa có test nào chạy qua. Các e2e chỉ đăng nhập sẵn bằng `nogroup1`, vì vậy đi đường `me.home` | QA thêm hai ca. Ca 1: đăng nhập `kho1`, gọi `__caveMock.patchUser('kho1',{groups:[]})`, mở `/orders/`, kết quả phải về `/no-role/`, và log mock không có chuỗi `GET /api/auth/me/` lặp vô hạn. Ca 2: `nogroup1` + `must_change_password`, kết quả phải về `/set-password/` |
+| N3 | Ghi nhận | `shared/ui/shell/AvatarMenu.tsx:111` | Nhãn vai dài ("Nhân viên gọi xác nhận · Nhân viên giao") đã có ellipsis (`globals.css:130`) nhưng thiếu `title` theo §F | Làm khi có lô đụng `shared/ui/shell`. Không chặn lô này |
+
+R1–R3 sửa xong là đạt. Không cần review lại toàn bộ, techlead chỉ xem 3 dòng. N1 nên sửa cùng lượt.
+
+### Re-review sau ff0c57a (08/10)
+
+Xem hẹp diff `ff0c57a` (7 file). Đã chạy `npx vitest run shared/lib/nav.test.ts features/audit/auditModel.test.ts`: 2 file, xanh.
+
+**Kết luận: APPROVED** (R1–R3 và N1 đã sửa đúng; còn 1 Low ghi nhận, không chặn lô).
+
+- **R1 đạt.** `auditModel.ts:142` đã thêm `"ai_config_kill"` vào `AI_ONLY_ACTIONS`. Có vitest khẳng định.
+- **R2 đạt.** `ai/settings/mock.ts:29` đổi thành "Chăm sóc khách hàng", khớp BE.
+- **R3 đạt.** `confirmation/mock.ts:530` chép nguyên văn câu BE `delivery/confirmation/api.py:128` ("Không tìm thấy mục chờ gọi trong phạm vi của bạn.").
+- **N1 đạt.** `nav.ts:176`: `onlyDelivery` thêm điều kiện `!me.is_superuser`, nên superuser chỉ thuộc `delivery_staff` thấy menu như Chủ.
+  - Đã chạy thử để so menu: Chủ có 19 mục, superuser chỉ thuộc `delivery_staff` có 20 mục. Superuser không thiếu mục nào của Chủ. Mục dư duy nhất là
+    `my-deliveries` ("Việc giao của tôi"), do `nav.ts:307` hiện mục này theo `inGroup(deliveryStaff)`.
+  - Mục dư này **đúng ý**. Superuser đó thật sự thuộc nhóm NV giao, nên có thể được gán làm `courier` trên phiếu, và cần màn xem phiếu của mình.
+    Superuser không nhóm thì không có mục này, giống mục 2 của lần review trước.
+
+| # | Mức | Chỗ | Ghi nhận | Cách sửa |
+|---|---|---|---|---|
+| L1 | Low (không chặn) | `erp-console/shared/lib/nav.test.ts:32` | Test dùng `toBeGreaterThanOrEqual`. Nếu sau này superuser mất một mục của Chủ nhưng lại có thêm một mục khác, test vẫn xanh | Khẳng định chính xác: `expect(menuItems(su).map(i => i.key)).toEqual([...menuItems(OWNER).map(i => i.key)` chèn `"my-deliveries"` đúng vị trí trong NAV`])`. Cách đơn giản hơn: tập key của su bằng tập key của OWNER cộng `"my-deliveries"`. Làm ở lô kế tiếp có đụng `nav.test.ts` |

@@ -5,7 +5,7 @@
 // "Gọi khách" hiện đủ số và mở `tel:`. Lô bổ sung A #17: số lấy thẳng từ `phone` trong danh sách `assigned_to=me` (không gọi thêm chi tiết từng phiếu);
 // số chỉ nằm trong bộ nhớ trang: không ghi localStorage, URL, log.
 // F2l "Báo giao thất bại" là hộp riêng. Lô 9: thẻ Giao thất bại có nút "Mang hàng về kho" mở hộp F2m (CreateReturnModal) với phiếu giao điền sẵn;
-// nút chỉ mở hộp, việc ghi phiếu hoàn do hộp đó làm (BE chặn nếu phiếu không còn Đang giao/Giao thất bại).
+// nút chỉ mở hộp, việc ghi phiếu hoàn tiền do hộp đó làm (BE chặn nếu phiếu không còn Đang giao/Giao thất bại).
 import { useMemo, useState } from "react";
 import { ENUMS } from "@/shared/lib/enums";
 import { kg, todayInVietnam } from "@/shared/lib/format";
@@ -19,7 +19,7 @@ import { ErrorBox } from "@/shared/ui/StateBox";
 import { isConflictError } from "@/shared/ui/form/useSubmit";
 import { useToast } from "@/shared/ui/overlay/Toast";
 import { fetchDeliveryNotes, startDelivery } from "../api";
-import { MINE_GROUPS, groupMine, hasAction, lineNames, telHref, type MineGroupKey } from "../deliveryUi";
+import { MINE_GROUPS, completeToast, groupMine, isOrderCancelledError, orderCancelledMessage, hasAction, lineNames, telHref, type MineGroupKey } from "../deliveryUi";
 import type { DeliveryNoteItem } from "../types";
 import { ConfirmCompleteModal } from "./ConfirmCompleteModal";
 import { ReportFailureModal } from "./ReportFailureModal";
@@ -178,6 +178,9 @@ export function MyDeliveriesScreen() {
       if (isConflictError(err)) {
         toast.warn("Phiếu vừa đổi trạng thái. Đã tải lại danh sách.");
         reloadAll();
+      } else if (isOrderCancelledError(err)) {
+        setError(note.id, orderCancelledMessage(err));
+        reloadAll();
       } else {
         setError(note.id, err instanceof Error && err.message ? err.message : "Chưa chuyển sang Đang giao được. Bấm lại để thử lại.");
       }
@@ -283,6 +286,10 @@ export function MyDeliveriesScreen() {
         <ReportFailureModal
           note={failFor}
           onClose={() => setFailFor(null)}
+          onReload={() => {
+            setFailFor(null);
+            reloadAll();
+          }}
           onReported={(res) => {
             setFailFor(null);
             toast.success(res.needs_decision ? "Đã báo giao thất bại. Phiếu đã hỏng 2 lần, chờ Chủ hoặc Quản lý quyết định." : "Đã báo giao thất bại.");
@@ -309,9 +316,9 @@ export function MyDeliveriesScreen() {
             setCompleteFor(null);
             reloadAll();
           }}
-          onDone={() => {
+          onDone={(res) => {
             setCompleteFor(null);
-            toast.success("Đã giao xong.");
+            toast.success(completeToast(res.order_status, "Đã giao xong."));
             reloadAll();
           }}
         />

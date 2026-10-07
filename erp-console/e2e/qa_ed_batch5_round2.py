@@ -171,7 +171,7 @@ def status_path(browser):
         page.screenshot(path=os.path.join(SHOTS, f"r2-detail-{code[-4:]}-ql1-1280.png"))
     ok("B5 console sạch", not errors, str(errors[:2]))
     ctx.close()
-    # sau khi xác nhận xong -> Hoàn tất; phiếu bị huỷ -> nhánh huỷ
+    # sau khi xác nhận xong -> Đã xong; phiếu bị huỷ -> nhánh huỷ
     ctx, page, errors = q.new_page(browser, "ql1")
     q.open_detail_from_queue(page, "SO260928-B27C30")
     page.get_by_role("button", name="Ghi kết quả gọi").click()
@@ -182,7 +182,7 @@ def status_path(browser):
     d.wait_for(state="detached")
     q.settle(page)
     sp = page.evaluate("() => [...document.querySelectorAll('[aria-current]')].map(n => n.innerText.trim())")
-    ok("B5 sau 'Đã xác nhận': bước hiện tại 'Hoàn tất'", any("Hoàn tất" in s for s in sp), str(sp))
+    ok("B5 sau 'Đã xác nhận': bước hiện tại 'Đã xong'", any("Đã xong" in s for s in sp), str(sp))
     ctx.close()
     ctx, page, errors = q.new_page(browser, "ql1")
     q.open_detail_from_queue(page, "SO260928-E83D36")
@@ -190,7 +190,7 @@ def status_path(browser):
     page.go_back(); page.go_forward()
     page.wait_for_load_state("networkidle"); q.settle(page)
     sp = page.evaluate("() => [...document.querySelectorAll('[aria-current]')].map(n => n.innerText.trim())")
-    ok("B5 phiếu đã sang Soạn hàng (màn cũ tải lại): bước 'Hoàn tất', không còn nút Ghi kết quả", any("Hoàn tất" in x for x in sp) and page.get_by_role("button", name="Ghi kết quả gọi").count() == 0, f"{sp}")
+    ok("B5 phiếu đã sang Soạn hàng (màn cũ tải lại): bước 'Đã xong', không còn nút Ghi kết quả", any("Đã xong" in x for x in sp) and page.get_by_role("button", name="Ghi kết quả gọi").count() == 0, f"{sp}")
     ctx.close()
 
 

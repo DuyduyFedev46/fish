@@ -4,9 +4,12 @@
 // Bấm một dòng → /deliveries/detail/?id=<số> (URL chỉ mang id). Tìm kiếm chạy trên các dòng đã tải, không gửi từ khoá đi đâu.
 // Cột người nhận dùng PersonalText (null = đã ẩn theo thời hạn). Không có giá vốn trong màn này.
 import { useMemo, useState } from "react";
+import Link from "next/link";
+import { useAuth } from "@/features/auth/components/AuthProvider";
 import { ENUMS, deliveryLabelText } from "@/shared/lib/enums";
 import { kg, todayInVietnam } from "@/shared/lib/format";
 import { loadErrorText } from "@/shared/lib/http";
+import { canView } from "@/shared/lib/nav";
 import { usePagedList } from "@/shared/lib/usePagedList";
 import { Chip } from "@/shared/ui/Chip";
 import { Icon } from "@/shared/ui/Icon";
@@ -35,6 +38,7 @@ function matches(row: DeliveryNoteItem, q: string): boolean {
 }
 
 export function DeliveriesView() {
+  const { me } = useAuth();
   const [tab, setTab] = useTabParam(TAB_KEYS, DEFAULT_TAB);
   const [query, setQuery] = useState("");
   const [label, setLabel] = useState(LABEL_ALL);
@@ -92,6 +96,15 @@ export function DeliveriesView() {
       id="deliveries-panel"
       asOf={list.asOf}
       onRetry={() => void list.reload()}
+      actions={
+        // CS-17: màn quét/gõ mã tem. Chỉ người có quyền in tem (BE `lookup`) thấy nút.
+        me && canView(me, "delivery-lookup") ? (
+          <Link href="/deliveries/lookup/" className="btn">
+            <Icon name="search" />
+            <span>Quét mã tem</span>
+          </Link>
+        ) : undefined
+      }
       tabs={
         <Tabs
           label="Nhóm phiếu giao theo trạng thái"

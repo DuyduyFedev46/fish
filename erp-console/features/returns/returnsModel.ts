@@ -2,6 +2,7 @@
 import type { PathStep } from "@/shared/ui/detail/StatusPath";
 import { ApiError } from "@/shared/lib/http";
 import { todayInVietnam } from "@/shared/lib/format";
+import { ENUMS } from "@/shared/lib/enums";
 import { RETURNS_MSG as M } from "./messages";
 import type { BatchChoice, QtyExceedsExtras, ReturnItem, ReturnableLine } from "./types";
 
@@ -13,8 +14,8 @@ export const NOTE_MAX = 500;
 const QTY_DECIMALS = 3;
 
 export const PATH_STEPS: PathStep[] = [
-  { key: "DRAFT", label: "Chờ duyệt" },
-  { key: "APPROVED", label: "Đã duyệt" },
+  { key: "DRAFT", label: ENUMS.returnToStockStatus.DRAFT.label },
+  { key: "APPROVED", label: ENUMS.returnToStockStatus.APPROVED.label },
 ];
 
 // ---- Đọc id từ URL ----
@@ -77,13 +78,13 @@ export function pendingCount(rows: readonly Pick<ReturnItem, "status">[]): numbe
 export function nextStepText(r: Pick<ReturnItem, "status" | "outside_minutes" | "batch_code">): string | null {
   if (r.status !== "DRAFT") return null;
   const outside = r.outside_minutes === null ? "" : `Hàng ở ngoài kho lạnh ${outsideText(r.outside_minutes)}. `;
-  return `${outside}Chọn tái nhập vào lô ${r.batch_code} hoặc huỷ bỏ, ghi lỗ.`;
+  return `${outside}Chọn tái nhập vào lô ${r.batch_code} hoặc huỷ hàng, ghi lỗ.`;
 }
 
 export function doneSteps(r: Pick<ReturnItem, "status" | "decision">): string[] {
   const out = ["Ghi số kg", "Ghi giờ về kho"];
   if (r.status === "CANCELLED") out.push("Huỷ phiếu");
-  if (r.status === "APPROVED") out.push(r.decision === "WRITE_OFF" ? "Huỷ bỏ, ghi lỗ" : "Tái nhập vào lô");
+  if (r.status === "APPROVED") out.push(r.decision === "WRITE_OFF" ? ENUMS.returnToStockDecision.WRITE_OFF.label : "Tái nhập vào lô");
   return out;
 }
 
@@ -93,7 +94,7 @@ export function canApprove(permissions: readonly string[] | undefined, r: Pick<R
 }
 
 /**
- * "Huỷ phiếu hoàn": phiếu còn Chờ duyệt, người xem qua được cổng chung của BE (`add_returntostock`, TLA-FE-L4) rồi có quyền duyệt
+ * "Huỷ phiếu hàng hoàn": phiếu còn Chờ duyệt, người xem qua được cổng chung của BE (`add_returntostock`, TLA-FE-L4) rồi có quyền duyệt
  * hoặc sửa phiếu, hoặc là người tạo phiếu. Cổng chung quan trọng từ Lô 14: Chủ có thể tắt "Ghi hàng hoàn về kho" của một nhóm
  * còn quyền duyệt, khi đó BE trả 403 nên FE phải ẩn mục.
  * Đây là luật BE (#8); FE chỉ ẩn mục để khỏi bấm vô ích, BE vẫn là lớp chặn thật (403).
@@ -104,6 +105,11 @@ export function canCancel(me: { id: number; permissions: readonly string[] } | n
   if (!perms.includes(PERM_ADD_RETURN)) return false;
   if (perms.includes(PERM_APPROVE_RETURN) || perms.includes(PERM_CHANGE_RETURN)) return true;
   return r.created_by !== null && r.created_by === me.id;
+}
+
+/** Nút "Xoá phiếu hàng hoàn": chỉ khi BE báo `delete` trong `available_actions` (BE quyết theo Chủ + trạng thái, FE không tự đoán). */
+export function canDelete(r: Pick<ReturnItem, "available_actions">): boolean {
+  return !!r.available_actions?.includes("delete");
 }
 
 export function canCreate(permissions: readonly string[] | undefined): boolean {

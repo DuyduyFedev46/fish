@@ -16,9 +16,9 @@ class ProfitReport(models.Model):
         default_permissions = ()
         # Django vẫn tạo Permission cho model managed=False qua post_migrate.
         permissions = [
-            ("view_profitreport", "Xem báo cáo giá vốn / lãi lỗ"),
+            ("view_profitreport", "Xem báo cáo lãi lỗ"),
             # S6: mục "Tổng quan" của console + `/api/dashboard/summary/` (chu, quan_ly, nv_kho).
-            ("view_dashboard", "Xem Tổng quan vận hành"),
+            ("view_dashboard", "Xem Tổng quan"),
         ]
         verbose_name = "Báo cáo lãi lỗ"
         verbose_name_plural = "Báo cáo lãi lỗ"

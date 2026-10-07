@@ -15,7 +15,7 @@ import s from "@/features/deliveries/label.module.css";
 function LabelPrintContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const { status, me } = useAuth();
+  const { status, me, error: authError, refreshMe } = useAuth();
 
   const noteParam = searchParams.get("note");
   const printNoParam = searchParams.get("print_no");
@@ -81,6 +81,26 @@ function LabelPrintContent() {
       return () => clearTimeout(timer);
     }
   }, [labelData, qrSvg, error]);
+
+  // Lô 17b G8: hồ sơ người dùng không tải được → màn lỗi có Thử lại (trước đây đứng "Đang nạp…" mãi).
+  if (status === "error") {
+    return (
+      <div className={s.labelState}>
+        <div className="alert-box err" role="alert">
+          <Icon name="error" />
+          <span>
+            <b>Chưa tải được thông tin tài khoản.</b> {authError || "Kiểm tra mạng rồi bấm Thử lại."}
+          </span>
+        </div>
+        <button type="button" className="btn primary" onClick={() => void refreshMe()}>
+          Thử lại
+        </button>
+        <button type="button" className="btn" onClick={() => window.close()}>
+          Đóng cửa sổ
+        </button>
+      </div>
+    );
+  }
 
   if (loading || status === "loading") {
     return (

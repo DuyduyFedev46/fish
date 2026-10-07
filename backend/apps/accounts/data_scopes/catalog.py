@@ -90,12 +90,12 @@ CONFIRMATION = ScopeObject(
 )
 
 RETURNS = ScopeObject(
-    key="returns", label="Hàng hoàn về kho", customer_data=True,
+    key="returns", label="Hàng hoàn", customer_data=True,
     options=(
         ScopeOption("assigned_deliveries", "Phiếu của phiếu giao gán cho tôi", 0),
         ScopeOption("all", "Tất cả phiếu", 1),
     ),
-    gate_perms=("inventory.view_returntostock",), gate_capability=None, gate_label="hàng hoàn về kho",
+    gate_perms=("inventory.view_returntostock",), gate_capability=None, gate_label="hàng hoàn",
     defaults=_defaults("all", "all", "assigned_deliveries", "assigned_deliveries"),
 )
 

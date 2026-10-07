@@ -9,6 +9,7 @@ import re
 
 import os
 
+from e2e_support import finish
 from playwright.sync_api import expect, sync_playwright
 
 BASE = os.environ.get("BASE", "http://127.0.0.1:3101")
@@ -287,9 +288,9 @@ with sync_playwright() as p:
     # superuser không bị ép
     page.evaluate("() => window.__caveMock.patchUser('admin', {must_change_password: true})")
     login(page, "admin")
-    page.wait_for_url("**/no-role/")
+    page.wait_for_url("**/overview/")
     ok("S48-AC6 superuser admin không bị ép (me.must_change_password=false)", True)
-    page.get_by_role("button", name="Đăng xuất").click()
+    logout(page)
     page.wait_for_url("**/login/")
     ctx.close()
 
@@ -328,3 +329,4 @@ passed = sum(1 for _, c, _ in results if c)
 for n, c, e in results:
     print(("PASS " if c else "FAIL ") + n + ("" if c else "  -> " + e))
 print(f"{passed}/{len(results)} PASS")
+finish(results)

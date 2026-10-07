@@ -53,8 +53,8 @@ class RegistryTests(TestCase):
         self.assertEqual(set(catalog.DEFAULT_GROUPS), set(roles.ALL_ROLES) - {roles.OWNER})
 
     def test_tier2_permission_labels_use_one_name_per_action(self):
-        # 02b §0c: một việc một tên ("Lập phiếu hoàn", "Xác nhận đã nhận tiền").
-        self.assertEqual(CAPABILITY_LABELS["sales.create_refund"], "Lập phiếu hoàn")
+        # 02b §0c: một việc một tên ("Lập phiếu hoàn tiền", "Xác nhận đã nhận tiền"; P7, P1).
+        self.assertEqual(CAPABILITY_LABELS["sales.create_refund"], "Lập phiếu hoàn tiền")
         self.assertEqual(CAPABILITY_LABELS["sales.confirm_payment_manual"], "Xác nhận đã nhận tiền")
         labels = {c.key: c.label for c in registry.CAPABILITIES}
         self.assertEqual(labels["create_refund"], CAPABILITY_LABELS["sales.create_refund"])
@@ -62,13 +62,13 @@ class RegistryTests(TestCase):
 
 
 class CreateReturnCapabilityTests(TestCase):
-    """TLA-L2 (Lô 14): ô "Ghi hàng hoàn về kho" để Chủ cấp/gỡ quyền tạo phiếu hàng hoàn cho từng nhóm."""
+    """TLA-L2 (Lô 14): ô "Ghi hàng hoàn" để Chủ cấp/gỡ quyền tạo phiếu hàng hoàn cho từng nhóm."""
 
     def test_create_return_capability_maps_to_add_returntostock(self):
         capability = registry.BY_KEY["create_return"]
         self.assertEqual(capability.perms, ("inventory.add_returntostock",))
         self.assertEqual(capability.section, registry.SECTION_STOCK)
-        self.assertEqual(capability.label, "Ghi hàng hoàn về kho")
+        self.assertEqual(capability.label, "Ghi hàng hoàn")
         self.assertFalse(capability.owner_only)
         self.assertEqual(capability.requires, ())
 

@@ -265,7 +265,7 @@ function PeriodBlock({
         />
         <Stat label="Số hoá đơn" value={String(period.invoice_count)} />
         <Stat label="Hoàn tiền trong kỳ" locked value={vnd(period.refunds)} />
-        <Stat label="Phiếu hoàn đã chuyển" value={String(period.refund_count)} />
+        <Stat label="Phiếu hoàn tiền đã chuyển" value={String(period.refund_count)} />
       </dl>
 
       <section className={s.card} aria-label="Cấu thành lãi">

@@ -18,8 +18,9 @@ import { attentionRows, expiryLine } from "../view";
 import { AiProposalsRow } from "./AiProposalsRow";
 import s from "../overview.module.css";
 
-// Dashboard chỉ trả mã lô (chuỗi), trang chi tiết lô cần id số → dòng cận hạn mở danh sách lô lọc "Cận hạn".
+// Lô 17a (A2): `alerts[].id` là pk lô → dòng cận hạn mở thẳng trang chi tiết lô. Thiếu `id` (BE cũ) thì về danh sách lọc "Cận hạn".
 const NEAR_EXPIRY_HREF = "/inventory/?status=NEAR_EXPIRY";
+const alertHref = (a: ExpiryAlert) => (typeof a.id === "number" ? `/inventory/detail/?id=${a.id}` : NEAR_EXPIRY_HREF);
 
 function ExpiryRows({ alerts }: { alerts: ExpiryAlert[] }) {
   return (
@@ -28,7 +29,7 @@ function ExpiryRows({ alerts }: { alerts: ExpiryAlert[] }) {
         const crit = a.days_left <= 1;
         return (
           <li key={a.batch_id} data-attention="near_expiry_batch">
-            <Link href={NEAR_EXPIRY_HREF} className={`${s.row}${crit ? ` ${s.rowCrit}` : ""}`}>
+            <Link href={alertHref(a)} className={`${s.row}${crit ? ` ${s.rowCrit}` : ""}`}>
               <Icon name={crit ? "error" : "schedule"} className={s.rowIc} />
               <span className={s.code}>{a.batch_id}</span>
               <span className={s.rowMain}>{a.item}</span>

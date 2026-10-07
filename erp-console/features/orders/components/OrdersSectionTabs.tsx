@@ -1,6 +1,6 @@
 "use client";
 
-// Ba tab của "Đơn & tiền": Đơn hàng · Hàng chờ thanh toán · Phiếu hoàn (ED-09). Mỗi tab là một trang riêng (menu trái cũng
+// Ba tab của "Đơn & tiền": Đơn hàng · Hàng chờ thanh toán · Phiếu hoàn tiền (ED-09). Mỗi tab là một trang riêng (menu trái cũng
 // có mục con) nên đổi tab = chuyển trang. Tab chỉ hiện khi người xem mở được màn đó; chỉ còn "Đơn hàng" thì ẩn cả thanh.
 
 import { useRouter } from "next/navigation";

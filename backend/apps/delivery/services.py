@@ -25,7 +25,8 @@ from apps.common.exceptions import BusinessError, ConflictError
 from apps.common.params import MAX_ID
 from apps.common.pii import has_long_digit_run
 from apps.inventory.models import ReturnToStock
-from apps.sales.models import SalesInvoice
+from apps.sales.models import SalesInvoice, SalesOrder
+from apps.sales.orders import completion
 
 from .models import DeliveryNote
 
@@ -87,48 +88,81 @@ def create_delivery_note(*, invoice, assigned_to=None, note="", status=None):
     return dn
 
 
+# BR-GH-24: thông báo khi đơn (hoặc phiếu) đã huỷ mà vẫn có người bấm giao / báo thất bại.
+# Một chỗ duy nhất để hồ sơ "huỷ đơn đang giao" dùng lại.
+ORDER_CANCELLED_MESSAGE = "Đơn đã huỷ — mang hàng về kho."
+ORDER_CANCELLED_CODE = "BR-GH-24"
+_ORDER_CANCELLED_STATUSES = (SalesOrder.Status.CANCELLED, SalesOrder.Status.AUTO_CANCELLED)
+
+
+def _lock_order_then_note(note):
+    """
+    Khoá `SalesOrder` rồi mới `DeliveryNote` (một thứ tự duy nhất, 02b §1.3), đọc lại trạng thái sau khoá.
+    Trả đơn đã khoá (None nếu phiếu không có đơn).
+    """
+    order = completion.lock_order_of_note(note)
+    _lock_note(note)
+    return order
+
+
+def _raise_if_cancelled(note, order):
+    """BR-GH-24: phiếu hoặc đơn đã huỷ thì không giao, không báo thất bại. Xét cả đơn để chặn phiếu cũ chưa bị huỷ theo."""
+    if note.status == Status.CANCELLED or (order is not None and order.status in _ORDER_CANCELLED_STATUSES):
+        raise BusinessError(
+            ORDER_CANCELLED_MESSAGE, code=ORDER_CANCELLED_CODE, extra={"current_status": note.status},
+        )
+
+
 def advance_status(*, note, to_status, actor, from_status=None):
     """
     Chuyển trạng thái phiếu giao đúng theo state machine P-06.
     Hỗ trợ from_status để kiểm tra stale state hoặc idempotency (already: True).
     Trả về (note, already: bool).
+
+    W37 (S1, S2): toàn thân trong một `atomic`. Khoá đơn rồi phiếu, đọc lại sau khoá (BR-GH-24). Giao xong phiếu
+    cuối thì đơn PROCESSING tự sang COMPLETED (BR-BH-18, `completion.complete_order_if_delivered`), cùng giao dịch
+    với phiếu và AuditLog; lỗi ở đâu thì rollback cả phiếu lẫn đơn.
     """
     if to_status not in Status.values:
         raise BusinessError(f"Trạng thái '{to_status}' không hợp lệ.")
 
-    current = note.status
-    if current == Status.CONFIRMING:
-        raise BusinessError("Chưa xác nhận với khách, chưa soạn được.", code="BR-GH-11")
+    with transaction.atomic():
+        order = _lock_order_then_note(note)
+        current = note.status
+        if current == Status.CONFIRMING:
+            raise BusinessError("Chưa xác nhận với khách, chưa soạn được.", code="BR-GH-11")
 
-    if current == Status.CANCELLED:
-        raise BusinessError("Đơn đã huỷ, không soạn.", code="BR-GH-07")
+        if to_status in (Status.DELIVERING, Status.COMPLETED):
+            _raise_if_cancelled(note, order)
 
-    if from_status is not None:
-        if current == to_status:
-            return note, True
-        if current != from_status:
+        if current == Status.CANCELLED:
+            raise BusinessError("Đơn đã huỷ, không soạn.", code="BR-GH-07")
+
+        if from_status is not None:
+            if current == to_status:
+                return note, True
+            if current != from_status:
+                raise BusinessError(
+                    f"Phiếu đang ở {note.get_status_display()}, tải lại để xem.",
+                    code="STALE_STATE",
+                    extra={"current_status": current},
+                )
+
+        if current == Status.COMPLETED:
+            raise BusinessError("Phiếu giao đã giao xong — không quay lui được (BR-GH-05).", code="BR-GH-05")
+
+        allowed = ALLOWED_TRANSITIONS.get(current, set())
+        if to_status not in allowed:
+            current_label = note.get_status_display()
+            try:
+                to_label = Status(to_status).label
+            except ValueError:
+                to_label = to_status
             raise BusinessError(
-                f"Phiếu đang ở {note.get_status_display()}, tải lại để xem.",
-                code="STALE_STATE",
-                extra={"current_status": current},
+                f"Không chuyển được từ {current_label} sang {to_label}.",
+                code="BR-GH-05",
             )
 
-    if current == Status.COMPLETED:
-        raise BusinessError("Phiếu giao đã Hoàn tất — không quay lui được (BR-GH-05).", code="BR-GH-05")
-
-    allowed = ALLOWED_TRANSITIONS.get(current, set())
-    if to_status not in allowed:
-        current_label = note.get_status_display()
-        try:
-            to_label = Status(to_status).label
-        except ValueError:
-            to_label = to_status
-        raise BusinessError(
-            f"Không chuyển được từ {current_label} sang {to_label}.",
-            code="BR-GH-05",
-        )
-
-    with transaction.atomic():
         note.status = to_status
         update_fields = ["status"]
         if to_status == Status.COMPLETED:
@@ -139,10 +173,12 @@ def advance_status(*, note, to_status, actor, from_status=None):
             update_fields.append("delivery_started_at")
         note.save(update_fields=update_fields)
 
-    record_audit(
-        "delivery_advance_status", actor=actor, obj=note,
-        changes={"status": {"from": current, "to": to_status}},
-    )
+        record_audit(
+            "delivery_advance_status", actor=actor, obj=note,
+            changes={"status": {"from": current, "to": to_status}},
+        )
+        if to_status == Status.COMPLETED:
+            completion.complete_order_if_delivered(order=order, trigger_note=note)
     return note, False
 
 
@@ -204,7 +240,8 @@ def mark_failed(*, note, actor, reason=None, reason_note=""):
     threshold = getattr(settings, "DELIVERY_MAX_FAILED_ATTEMPTS", 2)
 
     with transaction.atomic():
-        _lock_note(note)  # đọc lại trạng thái trong khoá, tránh hai lần báo cùng lúc
+        order = _lock_order_then_note(note)  # đơn rồi phiếu, đọc lại trong khoá (BR-GH-24, tránh hai lần báo cùng lúc)
+        _raise_if_cancelled(note, order)
         if note.status != Status.DELIVERING:
             raise BusinessError("Chỉ đánh dấu giao thất bại khi phiếu đang ở trạng thái Đang giao.")
         note.status = Status.FAILED

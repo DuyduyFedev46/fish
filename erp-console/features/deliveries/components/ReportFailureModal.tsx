@@ -14,7 +14,7 @@ import { SummaryBlock } from "@/shared/ui/form/SummaryBlock";
 import { PersonalText } from "@/shared/ui/PersonalText";
 import { Modal } from "@/shared/ui/overlay/Modal";
 import { reportDeliveryFailure, type DeliveryStatusResponse } from "../api";
-import { FAILURE_NOTE_MAX, FAILURE_REASON_KEYS, failureFieldOfCode, validateFailureInput } from "../deliveryUi";
+import { FAILURE_NOTE_MAX, FAILURE_REASON_KEYS, failureFieldOfCode, isOrderCancelledError, orderCancelledMessage, validateFailureInput } from "../deliveryUi";
 import type { DeliveryFailureReason, DeliveryNoteItem } from "../types";
 import s from "../deliveries.module.css";
 
@@ -22,9 +22,12 @@ type Props = {
   note: Pick<DeliveryNoteItem, "id" | "code" | "order" | "customer_name">;
   onClose: () => void;
   onReported: (res: DeliveryStatusResponse) => void;
+  /** BR-GH-24: đơn đã huỷ. Màn cha đóng hộp và tải lại phiếu. */
+  onReload: () => void;
 };
 
-export function ReportFailureModal({ note, onClose, onReported }: Props) {
+export function ReportFailureModal({ note, onClose, onReported, onReload }: Props) {
+  const [cancelledText, setCancelledText] = useState<string | null>(null);
   const [reason, setReason] = useState<DeliveryFailureReason | "">("");
   const [text, setText] = useState("");
   const [fieldError, setFieldError] = useState<{ field: "reason" | "note"; message: string } | null>(null);
@@ -36,7 +39,8 @@ export function ReportFailureModal({ note, onClose, onReported }: Props) {
       try {
         return await reportDeliveryFailure(note.id, { reason: reason as DeliveryFailureReason, note: text });
       } catch (err) {
-        if (err instanceof ApiError) {
+        if (isOrderCancelledError(err)) setCancelledText(orderCancelledMessage(err));
+        else if (err instanceof ApiError) {
           const field = failureFieldOfCode(err.code);
           if (field) {
             setFieldError({ field, message: err.message });
@@ -59,7 +63,7 @@ export function ReportFailureModal({ note, onClose, onReported }: Props) {
   };
 
   // Lỗi theo ô đã hiện dưới ô: không lặp thêm ở alert đầu hộp.
-  const showAlert = Boolean(sub.error) && !fieldError;
+  const showAlert = Boolean(sub.error) && !fieldError && !cancelledText;
   const noteRequired = reason === "OTHER";
 
   return (
@@ -72,12 +76,19 @@ export function ReportFailureModal({ note, onClose, onReported }: Props) {
           <button type="button" className="btn" onClick={onClose} disabled={sub.submitting}>
             Quay lại
           </button>
-          <button type="button" className="btn danger" onClick={trySubmit} disabled={sub.submitting}>
-            {sub.submitting ? "Đang gửi…" : primaryLabel("Báo giao thất bại", sub.failed)}
-          </button>
+          {cancelledText ? (
+            <button type="button" className="btn primary" onClick={onReload}>
+              Tải lại
+            </button>
+          ) : (
+            <button type="button" className="btn danger" onClick={trySubmit} disabled={sub.submitting}>
+              {sub.submitting ? "Đang gửi…" : primaryLabel("Báo giao thất bại", sub.failed)}
+            </button>
+          )}
         </>
       }
     >
+      {cancelledText && <FormAlert>{cancelledText}</FormAlert>}
       {showAlert && <FormAlert>{sub.error}</FormAlert>}
       <SummaryBlock
         label="Phiếu giao cần báo thất bại"

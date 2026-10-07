@@ -109,6 +109,7 @@ class CskhL1Tests(TestCase):
             "confirm_with_customer",
             "change_recipient",
             "view_callscript",  # Lô 5 (CS-18): CSKH chỉ đọc kịch bản gọi, cấp bởi delivery/0009
+            "view_order_customer_info",  # PV-07 (Q-4): việc V2 cấp cho cả 5 nhóm, cấp bởi sales/0016
         }
         self.assertEqual(perm_codes, expected_cskh)
 
@@ -131,7 +132,7 @@ class CskhL1Tests(TestCase):
         self.assertEqual(data["home"], "confirmation-queue")
         self.assertFalse(data["can_view_cost"])
         self.assertFalse(data["can_view_profit"])
-        self.assertEqual(data["group_labels"], [{"code": roles.CUSTOMER_SERVICE, "label": "CSKH"}])
+        self.assertEqual(data["group_labels"], [{"code": roles.CUSTOMER_SERVICE, "label": "Nhân viên gọi xác nhận"}])
         cap_codes = [c["code"] for c in data["capabilities"]]
         self.assertIn("delivery.confirm_with_customer", cap_codes)
         self.assertIn("delivery.change_recipient", cap_codes)
