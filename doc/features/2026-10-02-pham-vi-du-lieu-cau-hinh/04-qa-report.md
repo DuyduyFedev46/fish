@@ -148,3 +148,82 @@ Không có lỗi chặn.
 - Máy chủ: `runserver 8801 --noreload` (main), `runserver 8802 --noreload` (nhánh), `AI_ENABLED=1`.
 - Hồi quy: `reg.py` 585 lời gọi trên mỗi máy chủ, `cmp.py` so thân JSON. Kịch bản: `scen.py` (64 ca), `scen2.py` (12 ca), `audit.py`. Chủ đổi quyền bằng `PUT /api/staff/groups/<code>/capabilities/` (đường thật), D1 bằng `GroupDataScope` qua shell.
 - `manage.py test --parallel 4` toàn bộ: `Ran 3057 tests … OK`. `manage.py test apps.accounts.data_scopes`: `Ran 112 tests … OK`.
+
+---
+
+## QA Lô QĐ-08/10 (08/10)
+
+**Kết luận: APPROVED** — chạy thật trên BE (SQLite tạm, `seed_qa`) + ERP build thật và mock; không có lỗi chặn.
+Nhánh `feat/qd-0810` HEAD `49392a3`. Quyết định: câu 1 (superuser như Chủ), câu 2 (tắt AI ẩn dòng cài đặt/chính sách AI), câu 6 (D-3, cổng BE `AUTH_NO_ROLE`), câu 13 (nhãn "Nhân viên gọi xác nhận"). Dữ liệu chỉ là dữ liệu giả `seed_qa`.
+
+**Tổng: 148 ca · ✅ 148 · ❌ 0 · ⏸ 0** (sau khi loại 7 lần "FAIL" do lỗi kịch bản QA của chính tôi, ghi ở "Ghi chú kịch bản").
+
+### Bảng ca
+| Nhóm | Ca | Kết quả | Bằng chứng |
+|---|---|---|---|
+| API D-3: `qa_nogroup` (có 2 quyền gán trực tiếp) GET 18 API ERP (đơn, hoá đơn, phiếu hoàn, khách, thanh toán, phiếu giao, dashboard, kho, mua, staff, nhóm, hàng chờ, báo cáo, nhật ký, sổ kho) | 18 | ✅ toàn bộ 403 `AUTH_NO_ROLE` | `qaqd/api.py` |
+| POST/DELETE/PATCH của `qa_nogroup` (huỷ đơn, xác nhận thanh toán, tạo phiếu hoàn, tạo phiếu giao, tạo khách, tìm xác nhận, xoá đơn, sửa hàng) | 9 | ✅ đều 403; trạng thái mọi đơn trước/sau giống hệt (ngoài đường thuận: dữ liệu không đổi) | `api.py`, `api2.py` |
+| Thân 403 chỉ `{detail, code}`, không username/tên/SĐT | 1 | ✅ | `api.py` |
+| `qa_nogroup`: me 200 (`home=no-role`, `groups=[]`, `is_superuser=false`), logout 204, đổi mật khẩu tới được logic (sai mật khẩu cũ → 400 `AUTH_OLD_PASSWORD`, không phải AUTH_NO_ROLE) | 4 | ✅ | `api.py` |
+| Công khai không đổi: Shop catalog (có và không có token `qa_nogroup`), site-info, content public | 4 | ✅ 200 | `api.py` |
+| Chưa đăng nhập gọi đơn → 401, không lộ mã `AUTH_NO_ROLE` | 1 | ✅ | `api.py` |
+| Superuser không nhóm: me `is_superuser=true`, `home=dashboard`, `groups=[]`; GET dashboard, đơn, hoá đơn, phiếu hoàn, nhóm, lô, nhật ký | 8 | ✅ 200 | `api.py` |
+| Mỗi vai (Chủ, Quản lý, NV kho, NV giao, NV gọi xác nhận): me 200, không dính `AUTH_NO_ROLE`, `is_superuser=false`; nhãn vai đúng; `home` đúng | 5 | ✅ (NV giao, NV gọi xác nhận 403 dashboard như cũ) | `api.py` |
+| UI 1280 + 360: `qa_nogroup` đăng nhập → `/no-role/` "Bạn không có quyền vào hệ thống vận hành", nêu username, không chữ "CSKH"; gõ thẳng `/orders/ /overview/ /customers/ /deliveries/ /returns/ /ledger/ /confirmation/ /audit-logs/ /staff/ /reports/ /purchasing/ /inventory/` → về `/no-role/` | 2×(2+12) | ✅ | `ui.py`, ảnh `nogroup-1280.png`, `nogroup-360.png` |
+| UI: localStorage và console của `qa_nogroup` không có SĐT/tên | 4 | ✅ | `ui.py` |
+| UI: `qa_superuser` → `/overview/`, menu có "Phân quyền" (mục Quản trị), không có "Việc giao của tôi", nhãn "Quản trị hệ thống" trong menu tài khoản và trang Tài khoản, vào được `/orders/ /permissions/ /account/` | 2×~6 | ✅ | `ui.py`, `probe2.py`, ảnh `superuser-*.png` |
+| Ca N2 (1280): `qa_warehouse` đang đăng nhập, gỡ hết nhóm bằng shell Django, mở `/orders/` → `/no-role/`; số request `me` sau khi gỡ = 1 (không lặp) | 3 | ✅ | `ui.py`, ảnh `n2-1280.png` |
+| N2b: đang ở `/inventory/`, gỡ nhóm, bấm liên kết `/orders` → `/no-role/`; `me` = 1 | 2 | ✅ | `ui.py` |
+| Người không nhóm có `must_change_password` → `/set-password/` trước; gõ `/orders/` vẫn ở `/set-password/` | 2 | ✅ | `ui.py`, ảnh `mustchange-1280.png` |
+| Nhãn: `qa_cs1` (Tài khoản) hiện "Nhân viên gọi xác nhận"; Chủ ở Nhân viên, Phân quyền, Tài khoản không còn chữ "CSKH" (1280 và 360) | 2×~6 | ✅ | `ui.py` |
+| Câu 2, AI tắt (mặc định): 4 dòng giả `ai_config_update`, `ai_config_kill`, `ai_policy_update`, `downgrade_cancel_order` không có ở danh sách và lọc `?action=` (đều 0); dòng nghiệp vụ có `proposal_ref` do người duyệt và dòng thường vẫn hiện; trang Nhật ký không chữ AI cài đặt/chính sách, ô lọc không có "Tắt trợ lý AI" | 12 | ✅ | `audit.py`, ảnh `audit-ai-off.png` |
+| Câu 2, ngoài đường thuận: bật `AI_ENABLED=1` (cùng DB) → count 30, 4 dòng hiện lại đủ (không bị xoá, bất biến 4) | 4 | ✅ | script inline |
+| Migration `makemigrations --check --dry-run` | 1 | ✅ "No changes detected" | |
+| BE test tập trung `apps.accounts.auth`, `common.tests.test_ai_visibility`, `accounts.audit` | 173 | ✅ OK | |
+| `check_naming.py` | 1 | ✅ không phát sinh mới | |
+
+### Hồi quy (chạy thật)
+| Kịch bản | Môi trường | Kết quả |
+|---|---|---|
+| `s7_shell` | build mock (AI tắt) | ✅ 25/25 |
+| `qa_ed_batch1_roles` | mock | ✅ 48/48 |
+| `s48_password` | mock | ✅ 41/41 |
+| `ed_batch3_real` | BE thật + seed_qa (DB mới) | ✅ 25/25 |
+| `standard_names_all_routes` (REAL=1) | BE thật | ✅ 10/10 |
+
+### `npm ci` sạch
+Bản copy `erp-console` (không node_modules) trong scratchpad: `npm ci` rc=0 (không `--legacy-peer-deps`), `tsc --noEmit` rc=0. Build ERP thật (`NEXT_PUBLIC_USE_MOCK=0`) và build mock đều thành công.
+
+### Phân quyền (bảng Group × hành động)
+| Danh tính | ERP API | `me` | Shop/public |
+|---|---|---|---|
+| Không nhóm (có quyền trực tiếp) | 403 `AUTH_NO_ROLE` mọi đường đọc/ghi | 200 | 200 |
+| Superuser không nhóm | 200 | 200, `home=dashboard` | 200 |
+| Chủ, Quản lý, NV kho | 200 | 200 | 200 |
+| NV giao, NV gọi xác nhận | như trước (dashboard 403 theo quyền cũ) | 200 | 200 |
+| Chưa đăng nhập | 401 | 401 | 200 |
+
+### Rò giá vốn / dữ liệu cá nhân
+- Thân 403 `AUTH_NO_ROLE` chỉ có `detail`, `code`: không username, không tên/SĐT, không giá vốn.
+- Log server của các phiên chạy (`server.log`, `server_ed_batch3_real.log`): 0 dòng chứa SĐT/tên giả; không có Traceback liên quan.
+- localStorage và console của người không nhóm không có SĐT/tên. Ảnh chụp chỉ dữ liệu giả `seed_qa`.
+- Không có khoá mới trong AuditLog/API ngoài `is_superuser` (bool) và `code`; không tính ngược được giá vốn.
+
+### Lỗi
+Không có lỗi chặn.
+
+### Quan sát (không chặn)
+- **O1 (Low, có từ trước, không do lô này):** owner `POST /api/delivery/notes/` thân `{}` → 500 `IntegrityError ... sales_invoice_id NOT NULL`. Nên trả 400 thay 500. Nhánh này không đụng `delivery`.
+- **O2 (Low):** đăng nhập có giới hạn tần suất (429) khi chạy nhiều phiên liên tiếp; đúng thiết kế, chỉ cần giãn script.
+- **O3:** `/accounting/` không có trang gốc (404 tĩnh), chỉ `sales-invoices`, `purchase-invoices`; không liên quan lô.
+- **Vận hành trước deploy production (nhắc từ 02c §B.4 bước 5):** đếm tài khoản `is_active`, không superuser, không nhóm; họ mất quyền vào ERP ngay sau deploy.
+
+### Ghi chú kịch bản (lỗi của QA, không phải của sản phẩm)
+Bảy dòng FAIL ở lượt chạy đầu của `ui.py` là do tôi: `/refunds/` không phải route ERP (404 tĩnh); nhãn "Quản trị hệ thống" nằm trong menu tài khoản chứ không ở thân trang `/overview/` (đã kiểm lại bằng cách mở menu, đạt ở 1280 và 360); "Nhân viên gọi xác nhận" không hiện ở thân trang `/` của `qa_cs1` (đã kiểm ở `/account/`, đạt). Một ca POST trả 404 vì tôi gõ sai đường dẫn hành động; kiểm lại bằng đường dẫn thật đều 403. Lượt chạy sau thay các route đúng, đều đạt.
+
+### Lệnh đã chạy
+- `setup.sh`: build ERP thật + mock, `migrate`, `bootstrap_masterdata`, `seed_qa --manifest` → `SETUP_DONE`.
+- `runserver 127.0.0.1:8641`, `http.server` 3641 (thật) và 3642 (mock); API `api.py` 26/27 đầu tiên (1 ca do tôi gõ sai đường dẫn, sau đó 7/7 đường thật đều 403), `ui.py` (45/50 rồi 5 ca lỗi kịch bản đã sửa bằng `probe*.py`), `audit.py`.
+- `regress.sh`: 5 kịch bản e2e hồi quy, tất cả rc=0, 0 dòng FAIL.
+- `npm ci` + `tsc --noEmit` trong bản copy sạch: rc=0, rc=0.
+- Đã tắt mọi server (8641, 8642, 3641, 3642).
