@@ -4062,3 +4062,26 @@ Thực tế: banner có trong DOM (`[data-conflict-banner]`) nhưng cuộn trong
 - Script QA (scratchpad, đã dọn khi tắt môi trường): `qa_new1` 50/50, tổng quan 42/42, nhật ký 26/26, báo cáo, hoá đơn mua 12/12, kiểm kê hai tab 18/18 (+ đo B1), hàng chờ gọi, tiền về muộn 15/16 (1 ca là 409 trùng đúng thiết kế), phiếu hàng hoàn 12/12 và 4/4 (gỡ quyền).
 - `manage.py test` 6 app: 2704 OK; `makemigrations --check`; `check_naming.py`; `tsc --noEmit`; `vitest run`.
 - Dọn: kill theo PID, `rm` DB tạm, `out/`, `.next`, 3 symlink; `git status` sạch.
+
+### QA lại sau d524c3e (08/10) — kiểm lại B1 và các sửa kèm trên BE thật (HEAD c8f656b)
+
+#### Kết luận: APPROVED — B1 đã sửa, các việc kèm đạt trên BE thật, không phát sinh lỗi mới
+Tổng: ✅ B1 (2 cỡ màn) · ✅ 2 form dùng `FormPage` có 409 · ✅ GET `q` · ✅ câu 403 · ✅ 3 e2e BE thật chạy lại.
+
+Dựng lại như lần 1 (runserver 8621 + `http.server` 3521, build `MOCK=0` mới sau merge, SQLite tạm), tắt theo PID, dọn DB, `out/`, `.next`, symlink; `git status` sạch.
+
+| Mục | Kết quả | Bằng chứng |
+|---|---|---|
+| B1 Kiểm kê hai tab, 360×740, form 7 lô, cuộn xuống ô cuối | ✅ | Tab B (cũ) bấm Lưu nháp → `[data-conflict-banner]` top 167,5 / bottom 242 trong khung 740 và **có focus** (`document.activeElement` nằm trong banner). DB: số của A giữ nguyên, lô cuối của B không ghi. Bấm lưu lần hai: banner còn, không đè. "Tải lại" → banner mất, số của A hiện. Không cuộn ngang. Ảnh `c10-conflict-360.png` (scratchpad, đã dọn) |
+| B1 cùng ca ở 1280×700 | ✅ | top 171,5 / bottom 231,5 trong khung 700, có focus; các bước còn lại như trên (trước sửa: top −584) |
+| Form khác dùng `FormPage` có 409 | ✅ | Màn bài viết, hộp "Thiết lập bài viết" (`EntryEditScreen` → `FormPage alert`): `ql1` sửa bài qua API (200), `loc` ở bản cũ sửa tóm tắt rồi lưu → 409, banner top 171,5 (360) và 175,5 (1280), trong khung, có focus. Ghi chú: ở chế độ **soạn bài** (không qua `FormPage`) banner hiện cùng trang, ở 1280×900 trong khung (top 309,5) nhưng không có focus; đó là luồng khác, không thuộc sửa B1 và không phải lỗi mới |
+| `GET orders/?q=0912-345-678`, `09123456`, `0912.345.678` | ✅ | cả ba 400 `SEARCH_USE_POST`, câu lỗi không lặp từ khoá; các mã (`LO-0912`, `12-34`, mã đơn, mã phiếu giao) vẫn 200 |
+| 403 `/api/confirmation/queue/` | ✅ | `giao1` và `kho1`: "Bạn không có quyền truy cập hàng chờ Gọi xác nhận." (không có "CSKH"); chi tiết `giao1`: "Bạn không có quyền xem chi tiết đơn Gọi xác nhận."; chưa đăng nhập 401; `loc` 200 |
+| `ed_batch12_real` | ✅ 16/16 | DB chỉ `seed_demo` + người dùng |
+| `ed_batch8_stocktake_real` | ✅ 21/21 | `PASSWORD=Songbien2026` |
+| `qa_ed_batch10_real` | ✅ 143/143 | `QA_PASSWORD=Songbien2026`, `BACKEND_PY` đúng máy; không cần bản vá tạm nữa |
+| Hồi quy NEW-1 và ⌘K sau sửa BE | ✅ | `orders_search_post` 12/12, `ed_batch17_command_search` 21/21 trên BE thật (đọc mã từ màn nên không phụ thuộc seed) |
+
+Ghi chú: bộ kiểm riêng `qa_new1` của QA đỏ 5/47 chỉ vì cứng mã đơn và mã phiếu của lần seed trước (mã sinh ngẫu nhiên mỗi lần dựng DB); phần tương ứng đã được `ed_batch17` đọc mã thật phủ.
+
+Lỗi còn lại: không có. L-1 (3 kịch bản lỗi thời), L-2 (GET `q` có gạch và 8 số) và L-3 (chữ CSKH) của lần 1 đã đóng. L-4 (không giới hạn tần suất `search/`) và L-5 (nhiễu prefetch RSC của `http.server`) vẫn là ghi nhận, không chặn. Mục ⏸ `npm ci` sạch vẫn chưa kiểm (dùng symlink `node_modules`).
