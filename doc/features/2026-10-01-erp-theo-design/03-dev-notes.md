@@ -2844,3 +2844,8 @@ Mỗi kịch bản giới hạn 300 s. Mock: build `NEXT_PUBLIC_USE_MOCK=1`, AI 
 
 Sửa lúc tự kiểm: `ed_batch1_shell.py` gọi `page_404_body` nhưng thiếu import (commit 8e17ec5), đã thêm.
 Nợ: `qa_ed_batch7_mock` ca 'đường sai id kép' có thể chập chờn (chờ theo nội dung thay vì `table.lt` nên làm ở lần sửa sau).
+
+### Sửa theo review techlead (08/10, 4 lỗi Low)
+- L1 `p8_lo5_qa_real_backend.py`: bỏ if/else, khẳng định đúng một kết quả theo seed ('Chốt lô' mờ, lý do nhắc kiểm kê). Nợ: thêm vào seed_qa một lô Quá hạn đã kiểm kê APPROVED để có lại ca chốt lô thành công.
+- L2 Nợ a11y (Low, sản phẩm): nút đóng toast `.toast-close` cao 32px (< 44px) ở `shared/ui/globals.css`; `qa_ed_batch4_round2` tạm loại nút này khỏi ca kích thước chạm.
+- L3, L4 `e2e_support.py`: sửa docstring tên cũ `e2e_exit`, bỏ tham số `label` không dùng.

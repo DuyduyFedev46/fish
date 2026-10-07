@@ -7,7 +7,7 @@
    Không đọc `out/404.html` trên đĩa: nếu build ở đĩa khác bản đang phục vụ thì mã băm các tệp JS lệch và trang trắng.
 
 Lý do có tệp này: nhiều kịch bản cũ in FAIL mà vẫn thoát 0 (hồi quy 08/10), nên chạy trong CI hay shell không biết đỏ.
-Kịch bản chạy bằng `python3 e2e/<tên>.py` nên `import e2e_exit` tìm thấy tệp này cùng thư mục.
+Kịch bản chạy bằng `python3 e2e/<tên>.py` nên `from e2e_support import finish` tìm thấy tệp này cùng thư mục.
 """
 
 import sys
@@ -20,7 +20,7 @@ def _passed(entry):
     return bool(entry)
 
 
-def finish(results, label="ca"):
+def finish(results):
     total = len(results)
     failed = [r for r in results if not _passed(r)]
     print(f"{total - len(failed)}/{total} PASS", flush=True)

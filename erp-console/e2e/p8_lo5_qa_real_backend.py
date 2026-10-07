@@ -93,19 +93,11 @@ def run(browser, tag, viewport):
     ok(f"[{tag}] Chủ: trả hết + bấm đúp -> đúng 1 POST thêm ({n1 - n0}), tồn 0", n1 - n0 == 1 and qty(page).startswith("0"))
     items = menu_items(page)
     ok(f"[{tag}] Chủ: hết tồn -> không còn mục Trả / Huỷ phần tồn mở được", not [i for i in items if re.match(r"Trả|Huỷ", i) and " · " not in i], str(items))
-    close_open = [i for i in items if i == "Chốt lô"]
-    if close_open:
-        pick(page, "Chốt lô")
-        cd = page.get_by_role("dialog", name="Chốt lô")
-        cd.wait_for()
-        cd.get_by_role("button", name="Chốt lô").click()
-        cd.wait_for(state="detached")
-        page.wait_for_function("() => document.querySelector('main').innerText.includes('Đã chốt')")
-        ok(f"[{tag}] Chủ: chốt lô thật thành công (200)", [r for r in resp if "/close/" in r[1]][-1][2] == 200)
-    else:
-        # Chưa chốt được vì thiếu điều kiện khác (vd chưa có hoá đơn mua): phải khoá kèm lý do tiếng Việt, không lỗi
-        why = [i for i in items if i.startswith("Chốt lô")]
-        ok(f"[{tag}] Chủ: hết tồn nhưng chưa chốt được thì 'Chốt lô' mờ kèm lý do", len(why) == 1 and " · " in why[0] and "BR-" not in why[0], str(items))
+    # seed_qa: QA-LO-03 chưa có kiểm kê APPROVED (BR-KK-05) nên hết tồn vẫn chưa chốt được. Khẳng định đúng một kết quả:
+    # 'Chốt lô' mờ kèm lý do tiếng Việt nhắc kiểm kê, không mã BR-. Ca chốt lô thành công cần lô Quá hạn có kiểm kê APPROVED (chưa có trong seed_qa).
+    why = [i for i in items if i.startswith("Chốt lô")]
+    ok(f"[{tag}] Chủ: hết tồn nhưng chưa kiểm kê thì 'Chốt lô' mờ kèm lý do kiểm kê",
+       "Chốt lô" not in items and len(why) == 1 and " · " in why[0] and "kiểm kê" in why[0].lower() and "BR-" not in why[0], str(items))
     page.keyboard.press("Escape")
     page.screenshot(path=f"{SHOTS}/real-{tag}-3-chu-sau-tra-het.png")
     body = page.locator("body").inner_text() + page.content()
