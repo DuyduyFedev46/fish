@@ -724,6 +724,8 @@ export function mockListDeliveryNotes(req: MockRequest | { url?: string; token?:
   }
   const base = getMockDeliveryNotes({ status, completed_from: completedFrom });
   let rows = base.results.filter((n) => inCourierScope(me, n));
+  const codeParam = (q.get("code") || "").trim().toLowerCase();
+  if (codeParam) rows = rows.filter((n) => n.code.toLowerCase() === codeParam); // Lô 17a A9: khớp đúng mã, sau khi lọc theo phạm vi
   if (assignedTo === "me") rows = rows.filter((n) => me && n.assigned_to === me.id);
   else if (assignedTo) rows = rows.filter((n) => n.assigned_to === Number(assignedTo));
   if (completedFrom) rows = rows.filter((n) => n.status !== "COMPLETED" || (n.completed_at ?? "").slice(0, 10) >= completedFrom);

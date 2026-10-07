@@ -14,6 +14,9 @@ BASE = os.environ.get("BASE", "http://127.0.0.1:3101")
 SHOTS = os.environ.get("SHOTS", "/tmp")
 OUT_404 = pathlib.Path(__file__).resolve().parent.parent / "out" / "404.html"
 results = []
+# Lô 17b (E2E-1): giao diện AI chỉ có khi build bật NEXT_PUBLIC_AI_FEATURES=1. Chạy với AI_FEATURES=1 nếu build có AI; mặc định build tắt AI.
+AI_ON = os.environ.get("AI_FEATURES") == "1"
+AI_LABELS = {"Chính sách AI", "Báo cáo AI", "AI của tôi"}
 
 # UI-RULES §2.1: thứ tự đầy đủ của menu trái (mục có thể ẩn theo quyền nhưng không đổi thứ tự).
 FULL_ORDER = [
@@ -81,7 +84,8 @@ with sync_playwright() as p:
         login(page, user)
         labels = nav_labels(page)
         heads = [t.strip() for t in page.locator(".nav-h").all_inner_texts()]
-        ok(f"ED-01 menu {user} đúng danh sách", labels == labels_expected, str(labels))
+        want = [l for l in labels_expected if AI_ON or l not in AI_LABELS]
+        ok(f"ED-01 menu {user} đúng danh sách", labels == want, str(labels))
         ok(f"ED-01 menu {user} theo thứ tự UI-RULES §2.1", is_subsequence(labels, FULL_ORDER), str(labels))
         ok(f"ED-01 menu {user} chỉ hiện nhóm có mục", heads == sections_expected and is_subsequence(heads, SECTIONS), str(heads))
         ok(f"ED-01 {user} không còn cột phải", page.locator("#rail-right").count() == 0)
@@ -123,7 +127,8 @@ with sync_playwright() as p:
     ok("ED-01 đăng xuất không nằm rời ngoài menu avatar", page.get_by_role("button", name="Đăng xuất").count() == 0)
     page.locator(".avatar-btn").click()
     items = [t.split("\n")[-1].strip() for t in page.locator("[role=menuitem]").all_inner_texts()]
-    ok("ED-01 menu avatar đúng 3 mục", items == ["Tài khoản của tôi", "AI của tôi", "Đăng xuất"], str(items))
+    avatar_want = [x for x in ["Tài khoản của tôi", "AI của tôi", "Đăng xuất"] if AI_ON or x not in AI_LABELS]
+    ok(f"ED-01 menu avatar đúng {len(avatar_want)} mục", items == avatar_want, str(items))
     ok("ED-01 menu avatar không có 'Làm mới'", page.get_by_text("Làm mới").count() == 0)
     page.screenshot(path=f"{SHOTS}/ed-lo1-desktop-1280-avatar.png")
     page.keyboard.press("Escape")

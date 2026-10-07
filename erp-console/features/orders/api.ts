@@ -230,3 +230,16 @@ export function retryRefund(id: number): Promise<RetryRefundResult> {
     mock: process.env.NEXT_PUBLIC_USE_MOCK === "1" ? mockRefundQueueApi : undefined,
   });
 }
+
+/**
+ * ⌘K (Lô 17b H1): id đơn khớp ĐÚNG mã, hoặc null. Dùng `GET ?q=<mã>` (chỉ mã đơn, không SĐT/tên; BE trả 400 SEARCH_USE_POST với chuỗi lạ),
+ * nên chỉ gọi với chuỗi đã đúng mẫu mã đơn (shared/lib/codeLookup.ts).
+ */
+export async function findOrderIdByCode(code: string, signal?: AbortSignal): Promise<number | null> {
+  const qs = new URLSearchParams({ q: code });
+  const page = await apiFetch<Paginated<OrderListItem>>(`${BASE}?${qs.toString()}`, {
+    signal,
+    mock: process.env.NEXT_PUBLIC_USE_MOCK === "1" ? mockOrdersApi : undefined,
+  });
+  return page.results.find((o) => o.code.toLowerCase() === code.toLowerCase())?.id ?? null;
+}
