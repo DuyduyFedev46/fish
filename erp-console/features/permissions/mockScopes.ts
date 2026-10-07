@@ -86,11 +86,11 @@ export const SCOPE_OBJECTS: ScopeObjectDef[] = [
   },
   {
     key: "returns",
-    label: "Hàng hoàn về kho",
+    label: "Hàng hoàn",
     customer_data: true,
     options: [opt("assigned_deliveries", "Phiếu của phiếu giao gán cho tôi", 0), opt("all", "Tất cả phiếu", 1)],
     gate_capability: null,
-    gate_label: "hàng hoàn về kho",
+    gate_label: "hàng hoàn",
     defaults: dflt("all", "all", "assigned_deliveries", "assigned_deliveries"),
     read_only: false,
     phrase: "của mọi phiếu hàng hoàn",

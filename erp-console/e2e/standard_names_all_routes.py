@@ -65,8 +65,8 @@ CHIP_BANNED = {
     "/catalog/": {"Đang bật"},
     "/content/": {"Bảo mật"},
 }
-# TODO F1: Phân quyền còn chữ cũ vì features/permissions/mock.ts thuộc nhánh F1. Chỉ in cảnh báo, không đỏ; bỏ khỏi danh sách khi F1 gộp.
-PENDING_ROUTES = {"/permissions/", "/permissions/detail/?group=manager&code=manager"}
+# Route còn chữ cũ nhưng chờ một nhánh khác gộp: chỉ in cảnh báo, không đỏ. Hiện không còn route nào (F1 đã gộp, mock phân quyền dùng nhãn chuẩn).
+PENDING_ROUTES: set[str] = set()
 results = []
 
 

@@ -62,19 +62,10 @@ export function showsAllCustomers(values: Record<string, string> | undefined, on
   return values?.customers === undefined ? true : values.customers === "all";
 }
 
-/** Người được ghi phân quyền (BE: Chủ HOẶC superuser; Duy chốt 06/10: FE mở cho superuser, không chặn chặt hơn BE). */
-const OWNER_ONLY_PERMS = [
-  "sales.confirm_payment_manual",
-  "sales.confirm_refund",
-  "accounts.manage_staff",
-  "ai.manage_ai_policy",
-  "inventory.close_batch",
-];
+/** Người được ghi phân quyền (BE: Chủ HOẶC superuser; Duy chốt 06/10 + 08/10 câu 1: FE mở cho superuser, `/api/auth/me/` trả `is_superuser`). */
 export function isGroupWriter(me: { groups: string[]; permissions: string[]; is_superuser?: boolean } | null | undefined): boolean {
   if (!me) return false;
-  if (me.groups.includes(ROLE.owner) || me.is_superuser === true) return true;
-  // `/api/auth/me/` chưa trả `is_superuser`: superuser có MỌI permission nên có đủ các quyền chỉ-Chủ. Nếu sai, BE vẫn trả 403 và UI hiện nguyên văn.
-  return OWNER_ONLY_PERMS.every((p) => me.permissions.includes(p));
+  return me.groups.includes(ROLE.owner) || me.is_superuser === true;
 }
 
 /** Việc "Xem khách hàng": bật = nhóm xem được MỌI khách (quyết định #13, bất biến 9) → ô phải ghi rõ "Tất cả khách". */

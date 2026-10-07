@@ -274,3 +274,24 @@ Quyền gán trực tiếp không tính. Kiểm theo DB mỗi request nên gỡ 
 - Không đụng `features/permissions/**`, backend/, frontend/.
 - Nợ/ghi chú: ed_batch15_overview_ai_account cần build bật AI (chờ `[data-attention=ai_proposals]`); ở build tắt AI nó dừng ở ca này, không liên quan lô. Tên hiển thị người mock "CSKH Thử"/"CSKH Khác" và từ khoá tìm AI "cskh" giữ nguyên (không phải nhãn vai).
 - Sửa theo review (R1–R3, N1): R1 thêm `ai_config_kill` vào `AI_ONLY_ACTIONS` (auditModel.ts) + vitest; R2 nhãn nhóm lệnh AI mock = "Chăm sóc khách hàng"; R3 câu 404 mock gọi xác nhận = nguyên văn BE "Không tìm thấy mục chờ gọi trong phạm vi của bạn."; N1 `onlyDelivery` thêm `!me.is_superuser &&` + 1 ca vitest (nav.test.ts). Kiểm: tsc sạch, vitest 1235/1235, build MOCK=0 + check-no-mock + check-ai-chunks XANH.
+
+## F1 gộp main (08/10) — fe-dev, nhánh `feat/pham-vi-fe`
+
+Theo `02c-quyet-dinh-08-10.md` mục G.2 (F1 FE). Merge commit `4bb92ec`, commit sửa ngay sau. Chỉ sửa `erp-console/features/permissions/**`, một e2e, và hồ sơ này. Không đụng `backend/`, `frontend/`.
+
+**Xung đột đã giải (5):**
+- `GroupDetailScreen.tsx`: giữ `useGroupDraft` (bản nháp, một PUT có `version`) của F1, thêm `aiVisible` + `visibleRegistry` của main (mục lệnh AI ẩn khi tắt AI; `sections` lấy từ registry đã lọc). Bỏ `useCapabilityToggle` ở màn này vì F1 đã thay bằng bản nháp.
+- `PermissionMatrixScreen.tsx`: giữ `onConflict` (409 `GROUP_CHANGED` → tải lại danh sách + registry) và `objectLabel` của F1, registry qua `visibleRegistry(…, aiVisible(me))` của main.
+- `02b-tech-design.md`, `03-dev-notes.md`, `03b-review-techlead.md`: giữ cả hai phía (chỉ bỏ dấu xung đột).
+- `isGroupWriter` giữ nguyên ý (Chủ HOẶC superuser ghi được, quyết định 06/10 + câu 1 ngày 08/10).
+
+**Sửa ngoài giải xung đột (tối thiểu):**
+1. `permissionsModel.ts`: bỏ nhánh đoán `OWNER_ONLY_PERMS`; `isGroupWriter` chỉ đọc nhóm Chủ hoặc cờ `is_superuser` (BE đã trả ở `/api/auth/me/`). Test vitest đổi: ca "đoán qua đủ quyền chỉ-Chủ" thành "không đoán, thiếu cờ thì chỉ nhóm Chủ ghi được". README `features/permissions` sửa theo.
+2. Nhãn mock cho khớp BE (`standard_names`): `create_refund` "Lập phiếu hoàn tiền", `assign_delivery` "Chọn người giao", `create_return` "Ghi hàng hoàn", `approve_return` "Duyệt hàng hoàn", phạm vi `returns` "Hàng hoàn" (`mock.ts`, `mockScopes.ts`). Nhờ đó chữ cũ ở /permissions/ hết, nên bỏ TODO F1 và `PENDING_ROUTES` trong `e2e/standard_names_all_routes.py` (còn tập rỗng). `ed_batch14_permissions.py` đổi "Ghi hàng hoàn về kho" thành "Ghi hàng hoàn".
+
+**Không làm / nợ cho Lô 6 (nối BE thật):**
+- Câu 7 (phiếu giao không còn theo V2): màn Phân quyền không có chữ nào nói phiếu giao đi theo V2 (`grep V2` rỗng); khối phạm vi "Phiếu giao" là phạm vi D riêng, giữ nguyên.
+- Mock registry (`permissions/mock.ts`) vẫn chưa có hai việc `view_sales_invoices` và `view_order_customer_info` (nhãn mới "Xem thông tin khách trên đơn, hoá đơn, phiếu hoàn tiền") mà BE đã trả. Thêm vào mock kéo theo đổi số việc, luật H1 và nhiều test, nên để Lô 6 bỏ mock/nối BE thật. Khi nối, nhãn lấy từ BE, FE không chép.
+- `useGroupDraft` vẫn nhận `group.registry` gốc (kể cả mục AI khi tắt AI) để tính cảnh báo phá luồng; không ảnh hưởng hiển thị.
+
+**Kiểm chứng:** xem số ở báo cáo cuối lượt (tsc, vitest, build thật, check-no-mock, check-ai-chunks, e2e mock AI tắt và bật).

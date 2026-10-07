@@ -5,8 +5,8 @@ quyền do admin cấu hình được; Chủ có thể bật "Xem khách hàng" 
 
 Route: `/permissions/` (ma trận) và `/permissions/detail/?group=<mã nhóm>` (một nhóm). Bọc `<ViewGuard view="permissions">`
 (cần `accounts.manage_staff`). Mọi người có quyền xem đều xem được; **Chủ hoặc superuser** thấy công tắc và ô chọn bấm được
-(`isGroupWriter`; Duy chốt 06/10: FE mở cho superuser ngoài nhóm Chủ như BE). `/api/auth/me/` chưa trả `is_superuser`, nên
-hàm nhận ra superuser qua việc có đủ quyền chỉ-Chủ; khi BE thêm cờ thì dùng cờ.
+(`isGroupWriter`; Duy chốt 06/10: FE mở cho superuser ngoài nhóm Chủ như BE). `/api/auth/me/` trả `is_superuser` (Lô QĐ-08/10)
+nên hàm đọc thẳng cờ này, không còn đoán qua danh sách quyền.
 
 **Phạm vi dữ liệu cấu hình (PV-09, PV-10, PV-11, Lô F1):** W3i có khối "Phạm vi dữ liệu" 8 dòng (D1..D8 theo `data_scopes` của BE).
 Việc và phạm vi là **bản nháp** trong bộ nhớ (`useGroupDraft`, `Draft` ở `permissionsModel`); thanh "Lưu thay đổi / Huỷ thay đổi"

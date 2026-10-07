@@ -219,7 +219,6 @@ describe("hằng và tiện ích", () => {
 });
 
 describe("isGroupWriter (Duy chốt 06/10: superuser ngoài nhóm Chủ được ghi)", () => {
-  const OWNER_ONLY = ["sales.confirm_payment_manual", "sales.confirm_refund", "accounts.manage_staff", "ai.manage_ai_policy", "inventory.close_batch"];
   it("Chủ ghi được", () => {
     expect(isGroupWriter({ groups: ["owner"], permissions: [] })).toBe(true);
   });
@@ -227,12 +226,12 @@ describe("isGroupWriter (Duy chốt 06/10: superuser ngoài nhóm Chủ được
     expect(isGroupWriter({ groups: [], permissions: [], is_superuser: true })).toBe(true);
     expect(isGroupWriter({ groups: ["manager"], permissions: [], is_superuser: true })).toBe(true);
   });
-  it("me chưa có cờ: superuser nhận ra qua đủ quyền chỉ-Chủ", () => {
-    expect(isGroupWriter({ groups: [], permissions: [...OWNER_ONLY, "reports.view_dashboard"] })).toBe(true);
+  it("không đoán superuser qua danh sách quyền: thiếu cờ is_superuser thì chỉ nhóm Chủ ghi được", () => {
+    const many = ["sales.confirm_payment_manual", "sales.confirm_refund", "accounts.manage_staff", "ai.manage_ai_policy", "inventory.close_batch"];
+    expect(isGroupWriter({ groups: [], permissions: many })).toBe(false);
   });
   it("người chỉ có manage_staff (Quản lý + quyền lẻ) vẫn chỉ xem", () => {
     expect(isGroupWriter({ groups: ["manager"], permissions: ["accounts.manage_staff"] })).toBe(false);
-    expect(isGroupWriter({ groups: ["manager"], permissions: OWNER_ONLY.slice(0, 4) })).toBe(false);
     expect(isGroupWriter({ groups: ["manager"], permissions: [], is_superuser: false })).toBe(false);
     expect(isGroupWriter(null)).toBe(false);
   });

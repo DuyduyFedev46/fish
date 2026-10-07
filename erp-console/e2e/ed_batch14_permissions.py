@@ -130,7 +130,7 @@ def owner(browser):
     heads = [h.strip().lower() for h in page.locator("table thead th").all_text_contents()]
     ok("ma trận: có cột Quản lý và Nhân viên giao, cột 'Chỉ Chủ'", "quản lý" in heads and "nhân viên giao" in heads and "chỉ chủ" in heads, str(heads))
     rows_text = page.locator("main table").nth(1).inner_text()
-    ok("ma trận: có việc Xem khách hàng, Ghi hàng hoàn về kho", "Xem khách hàng" in rows_text and "Ghi hàng hoàn về kho" in rows_text)
+    ok("ma trận: có việc Xem khách hàng, Ghi hàng hoàn", "Xem khách hàng" in rows_text and "Ghi hàng hoàn" in rows_text)
     ok("danh sách nhóm: 5 nhóm, bấm được", page.locator("main table").first.locator("tr.lt-click").count() == 5, str(page.locator("main table").first.locator("tr.lt-click").count()))
     ok("giá vốn không hiện ở cột nhóm trừ cờ Có/Không", "Xem giá vốn" in page.locator("main table").first.inner_text())
     page.screenshot(path=f"{SHOTS}/lo14-desktop-1280-matrix.png", full_page=True)
@@ -208,7 +208,7 @@ def owner(browser):
 
     # Việc 'Chỉ Chủ' ở nhóm khác: ô khoá, không phải công tắc
     ok("việc Chỉ Chủ ở nhóm khác: không có công tắc", switch(page, "Xem giá vốn", "Quản lý").count() == 0)
-    ok("việc Ghi hàng hoàn về kho: có công tắc cho Nhân viên kho", switch(page, "Ghi hàng hoàn về kho", "Nhân viên kho").count() == 1)
+    ok("việc Ghi hàng hoàn: có công tắc cho Nhân viên kho", switch(page, "Ghi hàng hoàn", "Nhân viên kho").count() == 1)
 
     # ---------- Trang nhóm ----------
     page.get_by_role("link", name="Mở nhóm Quản lý").click()
