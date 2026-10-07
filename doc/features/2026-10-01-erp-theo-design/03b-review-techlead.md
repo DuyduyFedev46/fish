@@ -3676,3 +3676,36 @@ Assert cả ba còn nguyên sau `--reset`, và `qa_owner` nằm trong `kept`.
 Phải sửa **M1** (reset khớp quá rộng, đã tái hiện) kèm test như trên. L1, L2 nên làm cùng lượt, vì đều nhỏ. Cổng chặn production,
 `--allow-non-local`, phần mật khẩu và dữ liệu cá nhân giả, và chuyện không lọt registry AI đều đạt. Sau khi sửa, techlead chỉ soát diff mới
 và chạy lại `apps.accounts.qa_fixture`.
+
+### Re-review sau d75655f
+
+Phạm vi: `git show d75655f`, gồm 6 file. Soát M1, L1, L2, L3.
+
+**Lệnh techlead tự chạy** (`DJANGO_DEBUG=1`):
+- `manage.py test apps.accounts.qa_fixture`: 29 test OK.
+- `makemigrations --check --dry-run`: No changes detected.
+- `check_naming.py`: OK, không có vi phạm mới.
+- Chạy lại test thăm dò M1 (tạm, đã xoá), có mở rộng thêm ca. Kết quả:
+  - Khách `0900000050` không phải QA: **còn**.
+  - Khách `0900000099` tên "Khách QA Giả lạ" (đúng tiền tố tên, SĐT ngoài tập 20 số): **còn**.
+  - Dòng AuditLog do `qa_owner` làm trên mặt hàng không phải QA: **còn**.
+  - `qa_owner` được giữ lại với `is_active=False`, và là user `qa_` duy nhất còn lại.
+  - Không còn đơn `QA-` nào.
+  - `SEPAY_ENV=PRODUCTION` kèm `--reset --allow-non-local`: bị chặn.
+
+| Mục | Kết quả |
+|---|---|
+| M1 khách | **Đóng.** Phải đúng một trong 20 SĐT giả **và** tên bắt đầu bằng "Khách QA Giả" |
+| M1 AuditLog | **Đóng.** Chỉ xoá dòng gắn đúng cặp (`model_name`, `object_id`) của đối tượng QA, hoặc có note `QA-audit-`. Bộ lọc được tính **trước** khi xoá, nên không mất id để khớp. Không còn xoá theo người làm |
+| M1 Refund | **Đóng.** Chỉ xoá phiếu gắn hoá đơn `QA-` hoặc khoản tiền về `QA-`. Không xét người lập |
+| M1 user QA bị tham chiếu | **Đóng.** Xoá user trong savepoint, kèm hồ sơ nhân viên. Bị PROTECT thì hoàn tác, đặt `is_active=False` và báo trong `kept`. Có test |
+| L1 | **Đóng.** `SEPAY_ENV=PRODUCTION` bị chặn **trước** mọi kiểm khác, không cờ nào mở được. Áp cho cả `--reset` |
+| L2 | **Đóng.** Lô dựng sẵn có tồn thấp hơn số nhập được thêm bút toán bù (`WRITE_OFF` cho lô huỷ, `SALE` cho lô bán hết, `reference` có `QA-`). Hàng hoàn APPROVED đi qua `return_services.apply_return`, nên có bút toán và cộng tồn thật. Có test "tổng sổ = tồn" cho mọi lô QA. Bút toán `SALE` bù không có dòng phân bổ đơn: chấp nhận cho dữ liệu giả, không đổi giá vốn lô |
+| L3 | **Đóng.** README ghi không commit file manifest |
+
+Ghi chú vận hành: worktree có symlink `backend/staticfiles` chưa track (tạo lúc 16:58, trước lượt soát này; không phải của techlead). Đã có
+trong gitignore của checkout chính hay chưa thì cần xem; gỡ trước khi merge, và không `git add` nó.
+
+### Kết luận re-review seed_qa sau d75655f: **APPROVED**
+
+Không còn lỗi Critical, High hay Medium. Cổng chặn production nay có hai lớp: tên DB và `SEPAY_ENV`. `--reset` chỉ đụng đúng bản ghi QA.
