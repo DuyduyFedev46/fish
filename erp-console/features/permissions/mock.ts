@@ -33,10 +33,12 @@ const S_ACC = "Kế toán";
 const S_WEB = "Website";
 const S_ADMIN = "Quản trị";
 
-/** Chép registry BE (26 việc). `groups` = nhóm đang bật việc theo mặc định (việc Chỉ Chủ chỉ có nhóm Chủ). */
+/** Chép registry BE (28 việc, thứ tự và nhãn đúng từng chữ như `backend/apps/accounts/capabilities/registry.py`). `groups` = nhóm đang bật việc theo mặc định (việc Chỉ Chủ chỉ có nhóm Chủ). */
 const REGISTRY: { item: RegistryItem; groups: string[] }[] = [
   { item: { key: "view_orders", label: "Xem đơn", section: S_SALES, owner_only: false, requires: [] }, groups: ["manager", "warehouse_staff", "delivery_staff", "customer_service"] },
+  { item: { key: "view_sales_invoices", label: "Xem hoá đơn bán", section: S_SALES, owner_only: false, requires: [] }, groups: ["manager", "warehouse_staff"] },
   { item: { key: "view_customers", label: "Xem khách hàng", section: S_SALES, owner_only: false, requires: [] }, groups: ["manager"] },
+  { item: { key: "view_order_customer_info", label: "Xem thông tin khách trên đơn, hoá đơn, phiếu hoàn tiền", section: S_SALES, owner_only: false, requires: [] }, groups: ["manager", "warehouse_staff", "delivery_staff", "customer_service"] },
   { item: { key: "confirm_calls", label: "Gọi xác nhận đơn", section: S_SALES, owner_only: false, requires: [] }, groups: ["manager", "customer_service"] },
   { item: { key: "confirm_payment", label: "Xác nhận đã nhận tiền", section: S_SALES, owner_only: true, requires: [] }, groups: [] },
   { item: { key: "cancel_paid", label: "Huỷ đơn đã thanh toán", section: S_SALES, owner_only: false, requires: [] }, groups: ["manager"] },

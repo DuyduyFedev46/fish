@@ -463,3 +463,24 @@ Theo `02c-quyet-dinh-08-10.md` mục G.2 (F1 FE). Merge commit `4bb92ec`, commit
 - `useGroupDraft` vẫn nhận `group.registry` gốc (kể cả mục AI khi tắt AI) để tính cảnh báo phá luồng; không ảnh hưởng hiển thị.
 
 **Kiểm chứng:** xem số ở báo cáo cuối lượt (tsc, vitest, build thật, check-no-mock, check-ai-chunks, e2e mock AI tắt và bật).
+
+## Lô 6 FE (08/10) — fe-dev, nhánh `feat/pv6-fe` (từ main `db13e13`)
+
+Theo `02c-quyet-dinh-08-10.md` §G.3 và điều kiện đóng F1 ở `03b-review-techlead.md` ("F1 gộp main"). Chỉ sửa `erp-console/features/permissions/**`, một e2e, và hồ sơ này. Không đụng `backend/`, `frontend/`.
+
+**Đã làm:**
+1. **Nối BE thật, bỏ kiểu cũ.** Xoá `GroupScopes` và field `scopes?` của `GroupDetail` (`types.ts`); không còn chỗ nào dùng. `api.ts` bỏ câu "BE chưa có endpoint, đừng deploy trước Lô 5" (BE đã có `PUT …/capabilities/` mới và `POST …/permissions-preview/` từ Lô 5). README module sửa theo. Màn chỉ đọc `registry`, `data_scopes`, `data_scope_values`, `version` do BE trả.
+2. **Điều kiện đóng F1: mock có đủ 2 việc.** `mock.ts` thêm `view_sales_invoices` ("Xem hoá đơn bán", mặc định bật cho Quản lý, NV kho) và `view_order_customer_info` ("Xem thông tin khách trên đơn, hoá đơn, phiếu hoàn tiền", mặc định bật cho 4 nhóm, theo migration `sales/0016`). Đối chiếu tự động với `backend/apps/accounts/capabilities/registry.py`: 28 việc, thứ tự và nhãn trùng từng chữ.
+3. **Luật H1 / mở rộng dữ liệu khách kéo theo (mock khớp `data_scopes/services.py::widened_objects`).** Dòng `invoices` có `gate_capability: "view_sales_invoices"` (bỏ danh sách cứng `HAS_INVOICE_VIEW`; `isEligible` tự đọc việc). `buildPreview` thêm hai ca: bật V1 cho nhóm chưa có → `widened` có `invoices` (rank theo D1); bật V2 → `widened` có `view_order_customer_info` (`from: "off", to: "on"`) với câu "… trên đơn, hoá đơn và phiếu giao". `GroupDetailScreen.objectLabel` tra thêm nhãn việc ở registry gốc để hộp xác nhận không hiện khoá thô `view_order_customer_info`.
+4. **L1:** `e2e/ed_batch14_permissions.py` thêm `"hoàn về kho" not in rows_text.lower()` (bắt cả "Ghi hàng hoàn về kho") và một ca mới kiểm hai việc mới có trong ma trận.
+5. **L2:** comment ở `GroupDetailScreen.labelOf` nói rõ cố ý đọc registry gốc, đừng "đồng bộ" thành bản đã lọc AI.
+6. **L-A (QA: bảng Thành viên cắt cột "Thao tác" ở 1280px).** Tái hiện: khung bảng ở 1280px chỉ rộng 646px (nhánh hai cột), người thuộc 3 nhóm hoặc tên dài làm bảng rộng 781px, nút "Bỏ khỏi nhóm" nằm ngoài vùng cuộn (nút lệch phải 1030 so với mép thẻ 911). Với dữ liệu mẫu ngắn thì vừa khung nên chưa thấy. Sửa: bảng vẫn cuộn ngang trong khung riêng (không cuộn cả trang), riêng cột cuối được ghim bên phải (`.memberTable` trong `permissions.module.css`, chỉ khi `canManageMembers`), nên nút luôn thấy và bấm được ở 1280 và 360. Sau sửa: nút lệch phải 894 < mép thẻ 910 (1280) và 326 < 342 (360), trang không cuộn ngang. Không đổi `DataTable` dùng chung.
+7. **Test vitest mới** (`mock.test.ts`, 5 ca): 28 việc và nhãn; mặc định V1/V2; dòng Hoá đơn bán mờ kèm tên việc; bật V1 → cần xác nhận, `widened` = `invoices`; tắt rồi bật V2 → `widened` = V2.
+
+**Ảnh (scratchpad, không commit):** `…/scratchpad/pv6fe/before-members-{1280,360}.png`, `after-members-{1280,360}.png` (bảng Thành viên với dữ liệu giả lập 3 nhóm khác + tên dài), `before-1280.png`, `before-wh-1280.png` (trang nhóm nguyên trạng).
+
+**Còn nợ / lưu ý:**
+- Chạy e2e `ed_batch14` trên BE thật (để thấy 2 công tắc mới do BE trả) cần BE + dữ liệu chạy; lô này chỉ kiểm bằng mock, QA nên chạy lượt thật.
+- Mock `gate_capability: "view_sales_invoices"` khiến dòng Hoá đơn bán mờ khi tắt V1 (khớp BE). Phiên đăng nhập mock không đổi quyền theo việc đã bật/tắt (ghi chú cũ của `mock.ts`).
+
+**Kiểm chứng Lô 6 FE:** `tsc --noEmit` sạch; `vitest` 105 file / 1285 test PASS; build thật (`USE_MOCK=0`) sạch, `check-no-mock` XANH (32 file mock, 208 chuỗi seed, 258 file), `check-ai-chunks` XANH (48 màn + 2 layout), grep `cave_erp_mock` trong `out/` rỗng; e2e mock `ed_batch14_permissions` 158/158 PASS (AI tắt và bật), `standard_names_all_routes` 11/11 PASS (AI tắt và bật); `check_naming.py` OK.

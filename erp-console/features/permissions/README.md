@@ -21,8 +21,9 @@ gửi MỘT PUT có `version`. W3h (ma trận) vẫn bật/tắt ngay nhưng cũ
 | `saveGroupChanges(code, {version, capabilities?, scopes?, confirm_customer_data_widening?})` | `PUT /api/staff/groups/<code>/capabilities/` → chi tiết nhóm mới (có `version` mới). 409 `GROUP_CHANGED`; 400 `CUSTOMER_DATA_WIDENING_UNCONFIRMED` kèm `impact` |
 | `previewGroupChanges(code, {capabilities?, scopes?})` | `POST /api/staff/groups/<code>/permissions-preview/` → ai bị ảnh hưởng, không ghi gì (BE Lô 5) |
 
-GET đã có `version`, `data_scope_values` (danh sách) và `data_scopes` 8 dòng (chi tiết) từ Lô 2. PUT mới và preview chỉ chạy ở bản mock
-cho tới Lô 5 BE: **không deploy FE này trước Lô 5**.
+GET có `version`, `data_scope_values` (danh sách) và `data_scopes` 8 dòng (chi tiết). PUT mới và preview đã có ở BE thật từ Lô 5;
+bản mock (`mock.ts`, `mockScopes.ts`) mô phỏng đúng contract đó, registry mock đủ 28 việc, nhãn đúng từng chữ như BE
+(`backend/apps/accounts/capabilities/registry.py`). Kiểu `GroupScopes` cũ đã bỏ ở Lô 6; màn chỉ đọc `data_scopes`.
 
 Thêm / bỏ thành viên đi qua `PUT /api/staff/{id}/groups/` của module `staff` (một chỗ duy nhất đổi nhóm của một người).
 

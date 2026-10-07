@@ -107,6 +107,11 @@
 .memberHead { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-2); }
 .memberName { font-weight: var(--weight-medium); color: var(--ink); }
 .memberUser { color: var(--ink-3); font-size: var(--text-xs); font-family: var(--font-mono); }
+/* Bảng Thành viên (L-A, QA 08/10): người thuộc nhiều nhóm khác hoặc tên dài làm bảng rộng hơn khung 646px ở 1280px, nên cột "Thao tác" bị cuộn khuất.
+   Bảng vẫn cuộn ngang trong khung riêng (không cuộn cả trang), riêng cột cuối được ghim bên phải để nút "Bỏ khỏi nhóm" luôn thấy và bấm được. */
+.memberTable :global(table.lt) :global(th):last-child,
+.memberTable :global(table.lt) :global(td):last-child { position: sticky; right: 0; z-index: 1; box-shadow: -1px 0 0 var(--border); }
+.memberTable :global(table.lt) :global(td):last-child { background: var(--surface); }
 .tags { display: inline-flex; flex-wrap: wrap; gap: var(--space-1); }
 
 /* ---- Hộp thoại ---- */
