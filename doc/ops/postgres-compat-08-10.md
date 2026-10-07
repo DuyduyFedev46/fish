@@ -82,3 +82,40 @@ chỉ Chủ (`add_purchasecost`). Test `test_n3_landed_cost_over_ten_integer_dig
 - L3 (có sẵn từ trước, không phải hồi quy) `purchasing/receipts/services.py:207`: khoá lô không có `order_by("pk")`, trong khi
   `record_purchase_cost` khoá theo pk. Thêm `.order_by("pk")` để hai luồng khoá cùng nhóm lô theo một thứ tự.
 - Doc: bảng nhóm 1 nên ghi rằng `submit_receipt` không lỗi mà chỉ bỏ khoá kèm Item.
+
+## QA (08/10)
+
+**Kết luận: REJECTED.** Bản sửa đúng cho các đường từng lỗi 500 (huỷ/ghi nhận phiếu nhập, claim thường, chi phí quá lớn, lệnh AI huỷ phiếu), suite xanh trên cả hai DB. Nhưng QA tìm ra 2 lỗi đồng thời chỉ lộ trên PostgreSQL, cùng một gốc (xem dưới). Nhánh `qa/postgres-compat` HEAD 6673ae4 (main f3a543f + fix de8ff5b). Dữ liệu giả `seed_qa`; DB tạm (`cangca_qapg*`) đã xoá, server đã tắt.
+
+**Tổng: 34 ca · ✅ 30 · ❌ 3 · ⏸ 1**
+
+| # | Ca | Kết quả | Bằng chứng |
+|---|---|---|---|
+| 1 | Suite PostgreSQL 16 (DB `cangca_qapg`), tuần tự | ✅ | `Ran 3405 tests in 464.8s — OK` (không skip) |
+| 2 | Suite SQLite tuần tự, nhánh gộp | ✅ | `Ran 3405 tests in 336.5s — OK (skipped=2)` (2 ca đua chỉ chạy trên Postgres) |
+| 3–30 | API thật trên BE chạy Postgres, bản sửa (28 bước, `scen.py`): huỷ phiếu Nháp (200) và huỷ lại (400 BR-MH-07); ghi nhận phiếu Nháp (200) và ghi nhận lại (400); huỷ phiếu đã ghi nhận lô Nháp (200); `receive-batches` rồi huỷ (201/200); huỷ phiếu có lô đang bán (400 BR-MH-07); chi phí quá lớn (400 `COST_LANDED_OVERFLOW`, 0 bản ghi mới); chi phí thường (201); Quản lý thêm chi phí (403); cs1 claim (200), cs2 claim khi cs1 giữ (409 CLAIMED), cs1 claim lại (200), chưa đăng nhập (401), Chủ claim khi cs1 giữ (409); AI `receive_batches` (đề xuất, xác nhận 200); AI `cancel` phiếu #6 (đề xuất, xác nhận 200, phiếu thành CANCELLED); AI undo lần 2 (400, không 500) | ✅ 25 / ❌ 2 / ⏸ 1 | `scratchpad/qapg/scen_fix.out`. Hai ❌ là claim đồng thời (B1). ⏸: AI undo của lệnh `receive_batches` vì ở cấu hình này lệnh là mức C, sau xác nhận trạng thái CONFIRMED nên undo trả 400 `AI_CANNOT_UNDO` đúng thiết kế; undo chỉ có ở mức B, không bật được mức B cho Chủ mà không đổi cấu hình AI. Đường `cancel_receipt` qua AI đã được kiểm bằng lệnh `cancel` trực tiếp (xanh) |
+| 31 | Chứng minh bản sửa có tác dụng: cùng kịch bản trên `main` f3a543f (worktree tạm) | ✅ | `scen_main.out`: 14 đường trả lỗi: huỷ phiếu (5 lần, 500), chi phí quá lớn (500), claim (6 lần, 500), AI xác nhận huỷ phiếu (502 `AI_DISPATCH_FAILED`); ghi nhận phiếu vẫn 200 (khớp review techlead) |
+| 32 | Race: huỷ phiếu ∥ thêm chi phí cùng lô, 36 vòng (Postgres, có lệch giờ ngẫu nhiên 0–120 ms) | ✅ không deadlock, không 500/502 | `race.py`; log server không có `deadlock` |
+| 33 | Race: huỷ phiếu ∥ huỷ phiếu cùng phiếu, 12 vòng | ✅ | luôn (200, 400) |
+| 34 | Race: huỷ phiếu ∥ thêm chi phí, kết quả nhất quán | ❌ | B2 |
+
+### B1 — claim đồng thời: 500 `AttributeError` (High, chặn)
+
+Bước tái hiện: Postgres, hai tài khoản `qa_cs1` và `qa_cs2` cùng lúc `POST /api/confirmation/queue/<note_id>/claim/` cho một việc chưa ai nhận (hai luồng, Barrier). Lặp: lần 1 `[200, 500]`; 6 luồng trên 1 việc `{200: 3, 409: 1, 500: 2}`.
+Mong đợi: một 200, còn lại 409 `CLAIMED` (đây là đúng ca "hai người claim cùng lúc → 409" của yêu cầu).
+Thực tế: người đến sau chờ khoá, thức dậy thì `task.claimed_by` là `None` dù `claimed_by_id` đã có, dòng `claimer_name = task.claimed_by.get_full_name()` (`delivery/confirmation/services.py:81`) ném `AttributeError` → 500.
+Gốc: `select_for_update(of=("self",)).select_related("note", "claimed_by")`. Với `FOR UPDATE OF` bảng chính, Postgres khi tái kiểm tra dòng sau khi chờ khoá (READ COMMITTED) không nạp lại phía bị nối ngoài (LEFT JOIN `claimed_by`), nên nhận về NULL. Dữ liệu không hỏng (chỉ một người giữ), nhưng người dùng thấy lỗi thay vì "đang được X xử lý". Trước bản sửa, `main` luôn 500, nên đây là lỗi còn sót, không phải hồi quy.
+Gợi ý sửa: bỏ `claimed_by` khỏi `select_related` của câu khoá, tra người đang giữ bằng `User.objects.get(pk=task.claimed_by_id)` sau khi đã khoá (hoặc `select_related("note")` rồi đọc `claimed_by` lazy). Thêm test hai luồng trên Postgres (`TransactionTestCase`, bỏ qua khi SQLite) cho `claim_task`.
+
+### B2 — thêm chi phí ∥ huỷ phiếu: chi phí lọt vào lô của phiếu đã huỷ (High, chặn; vi phạm BR-MH-07)
+
+Bước tái hiện: `receive-batches` 5 kg → hai luồng cùng lúc `POST /api/purchasing/receipts/<id>/cancel/` và `POST /api/purchasing/costs/` (chi phí 50000, phân bổ vào lô vừa tạo), luồng chi phí chậm hơn ngẫu nhiên 0–120 ms. 36 vòng cho kết quả (huỷ, chi phí): `(200, 400)` ×21, `(400, 201)` ×13, **`(200, 201)` ×2**.
+Mong đợi: không bao giờ cả hai cùng thành công (hoặc 400 `BATCH_CANCELLED` cho chi phí, hoặc 400 BR-MH-07 cho huỷ phiếu).
+Thực tế: hai vòng cả hai cùng 200/201. Truy vấn DB sau đó: 2 `PurchaseCostAllocation` (id 16, 17) trỏ vào lô `CANCELLED` của phiếu `CANCELLED`.
+Gốc (nhiều khả năng cùng cơ chế B1): `record_purchase_cost` khoá lô bằng `select_for_update(of=("self",)).select_related("source_line__receipt")`; người đến sau chờ khoá lô, khi thức dậy phía nối (`source_line.receipt`, nối ngoài vì `source_line` là quan hệ ngược nullable) không được nạp lại nên `_is_cancelled_batch` vẫn thấy phiếu cũ → không chặn. Đoạn này có sẵn từ trước và trên main không bao giờ chạy tới (`cancel_receipt` luôn 500 trên Postgres), nay bản sửa nhóm 1 làm nó lộ ra.
+Ảnh hưởng: chi phí mua gắn vào lô của chứng từ đã huỷ (số tiền bị tính vào lô 0 kg, sai giá vốn/lãi lỗ kỳ đó; vi phạm "huỷ bằng trạng thái, không đổi chứng từ đã huỷ"). Cửa sổ hẹp, chỉ Chủ thêm được chi phí.
+Gợi ý sửa: sau khi khoá, nạp lại trạng thái phiếu bằng truy vấn riêng (`PurchaseReceipt.objects.filter(lines__batch_id__in=...)`) hoặc `refresh_from_db` lô rồi đọc `source_line.receipt` lazy, thay cho `select_related` qua quan hệ nullable; và khoá phiếu (`select_for_update` theo thứ tự phiếu → lô, giống `cancel_receipt`). Thêm test đua trên Postgres.
+
+### Ghi nhận khác
+- Rà `select_for_update(of=("self",))` kèm `select_related` tới quan hệ nullable: `claim_task` (B1) và `record_purchase_cost` (B2) bị; `cancel_receipt` chỉ dùng `line.batch_id` nên an toàn; `submit_receipt` nối trong (`item` NOT NULL), không thấy lỗi qua `submit` đúng 2 lần liên tiếp và test suite. Nên đưa việc "không tin dữ liệu join phía không khoá sau khi chờ khoá" vào hướng dẫn `django-drf-patterns`.
+- Dữ liệu cá nhân: lệnh AI và API trên đây không trả/ghi tên, SĐT, địa chỉ (chỉ `display_name` của tài khoản `qa_*`); phản hồi lỗi không chứa giá vốn.
