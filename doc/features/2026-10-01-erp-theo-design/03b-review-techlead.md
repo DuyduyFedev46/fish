@@ -3607,3 +3607,72 @@ e2e lấy theo dev-notes. Techlead đọc code.
 ### Kết luận Review Lô 17b-FE (08/10): **APPROVED**
 
 Không có lỗi Critical, High hay Medium. L1 nên sửa trong lượt QA nếu tiện, vì chỉ cần một regex và một test. L2, L3 ghi nợ.
+
+## Review seed_qa (08/10)
+
+Phạm vi: `git diff d3c04d2..HEAD`, commit 5b27bdd trên `chore/seed-qa`, gồm 10 file. Đối chiếu dev-notes mục "seed_qa".
+
+**Lệnh techlead tự chạy** (worktree `seed-qa`, `DJANGO_DEBUG=1`):
+- `manage.py test apps.accounts.qa_fixture`: 25 test OK.
+- `makemigrations --check --dry-run`: No changes detected.
+- `check_naming.py`: OK, không có vi phạm mới.
+- Một test thăm dò tạm (đã xoá, worktree sạch) để tái hiện M1.
+
+### Soát theo yêu cầu
+
+| Mục | Kết quả |
+|---|---|
+| Cổng chặn production (`guard.py`) | **Đạt.** DB PostgreSQL tên `postgres` (đúng tên DB production trên Supabase, `doc/ops/moi-truong.md:15`) luôn bị chặn, không cờ nào mở được. So sánh sau `lower()`. Tên hoặc host có `prod` mà không có `staging` cũng bị chặn. Staging là `cangca_staging`, nên không thể nhầm hai DB vì cùng host Supabase. Tôi không tìm được đường chạy lên DB production: muốn vào DB `postgres` thì tên DB phải là `postgres`, và tên đó bị chặn cứng. Xem thêm L1 |
+| `--allow-non-local` | **Đạt.** Chỉ nới điều kiện "DEBUG bật + SQLite/staging". Không nới được chữ ký production. Có test lặp cả hai cách gọi (có và không có cờ) trên ba chữ ký production |
+| `--reset` qua cổng | **Đạt.** `guard.check_allowed` chạy đầu `handle`, trước nhánh `--reset`. Có test `test_reset_is_also_guarded` |
+| `--reset` chỉ xoá dữ liệu QA | **Chưa đạt, xem M1** |
+| Dữ liệu cá nhân giả, `QA_PASSWORD` | **Đạt.** SĐT `09000000nn`, tên "Khách QA Giả nn", địa chỉ ghi rõ là giả. `QA_PASSWORD` không có mặc định, thiếu thì `CommandError` và chưa tạo gì. JSON chỉ có `"password_env": "QA_PASSWORD"`, không có mật khẩu (có test). Output không in SĐT, mật khẩu hay địa chỉ. AuditLog không chép SĐT hay địa chỉ (có test) |
+| Dựng chứng từ bằng service thật | **Đạt phần chứng từ tiền.** Giữ chỗ (`batches.reserve`), thanh toán (`confirm_payment`, sinh hoá đơn, phân bổ lô, bút toán SALE, phiếu giao), huỷ đơn (`cancel_paid_order`, sinh chứng từ đảo), phiếu hoàn tiền (`create_refund`, `confirm_refund`, `mark_refund_failed`), ghi tay (`confirm_payment_manual`, `record_unmatched_payment`) đều qua service. `unit_cost` của phân bổ lô lấy từ lô đã giữ chỗ. Giá vốn là số giả, không đổi luật tính. Lô, hàng hoàn, phiếu nhập, kiểm kê được tạo thẳng: xem L2 |
+| Lọt vào registry lệnh AI | **Không lọt.** Đây là management command, không có view hay route, không có `AiMeta`. `grep qa_fixture\|seed_qa apps/ai` rỗng |
+| Test đủ chặt | **Chưa đủ ở reset (M1).** Phần cổng, mật khẩu, tính tất định, độ phủ trạng thái thì tốt |
+
+### Lỗi
+
+**M1 · Medium · `backend/apps/accounts/qa_fixture/reset.py:33-60`. `--reset` xoá cả dữ liệu không phải QA.**
+Tôi đã tái hiện bằng test tạm: seed, tạo khách `0900000050` không có đơn, và một dòng AuditLog do `qa_owner` làm trên một mặt hàng không
+phải QA, rồi `--reset`. Kết quả: **cả hai bị xoá** (`CUSTOMER_KEPT False`, `AUDIT_KEPT False`). Có ba chỗ khớp quá rộng:
+1. `Customer.phone__startswith="09000000"` khớp mọi khách `0900000000…0900000099`, không chỉ 20 khách QA. Khách khác không có đơn thì bị
+   xoá, vì PROTECT chỉ giữ được khách đang có đơn.
+2. `AuditLog` lọc theo `actor_id__in=<qa users>` / `ai_actor_id`: xoá **mọi** dòng nhật ký do tài khoản `qa_…` làm, kể cả trên đối tượng
+   không phải QA. Khi e2e chạy trên staging, `qa_owner` sửa phân quyền của Group thật hay sửa mặt hàng thật, rồi reset xoá luôn vết đó
+   (BR-PQ-06, AuditLog chỉ được ghi thêm).
+3. `Refund.created_by_id__in=<qa users>`: xoá phiếu hoàn tiền do `qa_owner` lập trên đơn không phải QA (chứng từ không xoá, BR-PQ-10).
+
+Test `test_reset_removes_only_qa_records` không bắt được, vì khách "thật" của test có SĐT `0900000500`, không thuộc tiền tố `09000000`.
+Ngoài ra `AuditLog.count() == 0` trong test chỉ đúng vì không có dòng nào khác.
+
+**Sửa:**
+- Khách: chỉ xoá khi `phone` thuộc **đúng tập** `fake_phone(1..20)` **và** `name` bắt đầu bằng "Khách QA Giả".
+- AuditLog: chỉ xoá dòng gắn với đối tượng QA, tức (`model_name`, `object_id`) nằm trong tập id QA đã thu (đơn, hoá đơn, phiếu giao, lô,
+  mặt hàng, phiếu hoàn tiền QA, user QA…), hoặc `note` bắt đầu bằng `QA-audit-`. Không xoá theo `actor`.
+- Refund: chỉ xoá phiếu có hoá đơn mã `QA-` (hoặc `reason` có tiền tố).
+- User QA còn bị nhật ký hay chứng từ ngoài QA tham chiếu (PROTECT) thì **giữ lại**. Báo trong `kept` và đặt `is_active=False`, không xoá lan.
+
+**Test bắt buộc:** thêm vào `test_reset_removes_only_qa_records`:
+- khách `0900000050` không có đơn;
+- dòng AuditLog do `qa_owner` làm trên mặt hàng không phải QA;
+- phiếu hoàn tiền do `qa_owner` lập trên đơn không phải QA (nếu dựng được gọn).
+
+Assert cả ba còn nguyên sau `--reset`, và `qa_owner` nằm trong `kept`.
+
+### Ghi nhận Low (không chặn)
+
+- **L1 · `guard.py`, phòng thủ thêm.** Production hiện chỉ nhận ra bằng tên DB. Nên chặn thêm khi `settings.SEPAY_ENV == "PRODUCTION"`, vì
+  production chạy SePay live còn staging chạy sandbox. Một dòng code, không nới được bằng cờ, có test.
+- **L2 · tồn kho tạo thẳng không khớp sổ.** `QA-LO-07` (nhập 30, tồn 0, SOLD_OUT) và `QA-LO-08` (nhập 10, tồn 0, CANCELLED) chỉ có bút toán
+  RECEIPT, nên tổng sổ nhập xuất khác tồn. Hàng hoàn `QA-RETURN-APPROVED` (RESTOCK) được tạo thẳng ở trạng thái APPROVED, không có bút toán
+  RETURN, cũng không cộng tồn. Không đụng giá vốn, nhưng e2e Sổ nhập xuất và kiểm kê trên dữ liệu QA sẽ thấy số lệch. Nên thêm bút toán
+  bù (SALE hoặc WRITE_OFF với `reference` có `QA-`), hoặc duyệt hàng hoàn qua `apply_return`. Kèm test "tổng sổ = tồn" cho mọi lô QA.
+- **L3 · manifest mặc định `/tmp/seed_qa_ids.json`.** Tệp chỉ chứa id, mã và SĐT giả nên chấp nhận được. Ghi chú trong README rằng file này
+  không được commit.
+
+### Kết luận Review seed_qa (08/10): **CHANGES REQUESTED**
+
+Phải sửa **M1** (reset khớp quá rộng, đã tái hiện) kèm test như trên. L1, L2 nên làm cùng lượt, vì đều nhỏ. Cổng chặn production,
+`--allow-non-local`, phần mật khẩu và dữ liệu cá nhân giả, và chuyện không lọt registry AI đều đạt. Sau khi sửa, techlead chỉ soát diff mới
+và chạy lại `apps.accounts.qa_fixture`.
