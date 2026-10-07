@@ -224,3 +224,76 @@ nhân hay giá vốn. Ngoài phạm vi trả 404. Số truy vấn trong ngân s�
 - Ghi 02b §6 Lô 3: thêm `ai/policy/rules.py` (điểm 3) vào danh sách file đã sửa; số migration sales là 0015/0016.
 - Chưa tự chạy migrate lùi `sales 0016 → 0014` trên DB thật. Hàm `revoke` là bản chép mẫu `sales/0013` đã chạy trên production. QA
   nên chạy tiến/lùi trên SQLite tạm khi nghiệm thu.
+
+## Lô QĐ-08/10 BE (08/10)
+
+Techlead review `git diff main...HEAD` nhánh `feat/qd-0810-be` (`b802baf`), đối chiếu `02c-quyet-dinh-08-10.md` §A, B.2, B.4.2, C.4, E, F.
+Kết luận: **REVIEW PASS (APPROVED)**. Không có lỗi Critical, High hay Medium. Có 4 mục Low, không chặn merge.
+
+### Kiểm chứng đã chạy (lệnh lẻ, < 1 phút)
+- `manage.py test apps.accounts.auth.tests.test_no_role_gate` + 3 test thăm dò tạm (đã xoá, không commit): session auth bị chặn
+  `AUTH_NO_ROLE`; không nhóm + mật khẩu tạm trả `AUTH_MUST_CHANGE_PASSWORD` trước; `POST /api/sales/orders/1/cancel/` bị 403
+  `AUTH_NO_ROLE`; `GET /api/shop/catalog/` kèm token người không nhóm vẫn 200; `POST /api/internal/payments/sepay-ipn/` kèm token
+  đó không bị cổng. Kết quả `Ran 12 tests ... OK`.
+- `makemigrations --check --dry-run`: No changes detected. `python3 scripts/check_naming.py`: OK, không phát sinh mới.
+
+### 1. Cổng D-3 `AUTH_NO_ROLE` (`backend/apps/accounts/auth/authentication.py:56-81`)
+- **Phủ route.** Cổng ở lớp xác thực mặc định, nên mọi view DRF dùng token hay session đều qua. Đã grep: không view nào tự khai
+  `authentication_classes`, không có `get_permissions()` override hay `@action(permission_classes=...)`, không có `@api_view`. Route
+  ngoài DRF chỉ có `admin/` (Django admin, chỉ superuser, không đổi) và `api-auth/` (form đăng nhập browsable). Test quét mọi route
+  DRF dưới `/api/` (hơn 40 đường bị chặn) bắt được view mới quên miễn.
+- **Miễn đúng.** Shop (`catalog`, `orders`, `checkout`), `public/*`, `site-info` đều `[AllowAny]`. Internal SePay webhook/IPN là
+  `[AllowAny]` cộng `X-Internal-Token`. Adapter không gửi `Authorization`, nên lớp xác thực trả `None` và cổng không chạy. Login,
+  me, logout, change-password có `allow_without_group = True`. `ObtainAuthToken` có `permission_classes = ()` nên không lọt vào
+  nhánh "public", nhưng đã có cờ miễn.
+- **Thứ tự.** `MustChangePassword` (`:76`) đứng trước `NoRole` (`:79`), đúng §B.4.2.
+- **Thân 403.** Chỉ `{"detail", "code"}` qua `render_code` của `apps/common/api.py:199`. Câu chữ cố định, không có username hay
+  dữ liệu khách. Có test.
+- **Bỏ cache (lệch 02c).** Chấp nhận. `authenticate` chạy một lần mỗi request trên đối tượng user mới, nên cache trên user không
+  tiết kiệm được gì. Chi phí là một `EXISTS` trên `auth_user_groups` (có index `user_id`) cho mỗi request của người không phải
+  superuser. Lợi ích: gỡ nhóm có hiệu lực ngay (có test).
+- **Hướng sai an toàn.** Nếu sau này có view tự trả quyền khác nhau theo action qua `get_permissions()`, `_is_public_view` chỉ đọc
+  thuộc tính lớp. Khai `IsAuthenticated` mà trả `AllowAny` thì hỏng theo hướng đóng (an toàn). Ngược lại, lớp `AllowAny` mà trả quyền
+  chặt hơn thì chỉ hở D-3 cho đúng view đó. Hiện không có view nào như vậy. Xem L3.
+
+### 2. Superuser không nhóm (`auth/services.py:92-101`, `:123`, `:135-136`)
+- Không mở rộng quyền. Superuser vốn có `has_perm` mọi quyền và trước lô đã gọi API được. Lô chỉ đổi `home` sang `dashboard`, thêm
+  khoá `is_superuser` và cho qua cổng D-3. `groups`/`group_labels` vẫn là nhóm thật, không bịa `owner`, nên luật "còn ít nhất một Chủ"
+  không đổi. Superuser chỉ thuộc `delivery_staff` cũng về `dashboard` (có test).
+- Contract `me` chỉ thêm khoá, đúng §A.2. Vị trí và comment khớp nhánh phạm vi, nên khi gộp chỉ cần giữ một dòng.
+
+### 3. Migration `sales/0019_alter_salesorder_view_order_customer_info_label.py`
+- Chỉ có `AlterModelOptions` (đổi nhãn quyền), phụ thuộc `0018`, đúng số kế tiếp trên main. `feat/pham-vi-du-lieu` và
+  `feat/pham-vi-fe` không có `sales/0019`, nên không trùng số. Không đụng schema. Nhãn `Permission.name` trên DB cập nhật qua
+  `post_migrate`, như mẫu `0018`.
+
+### 4. Ẩn dòng AI (`backend/apps/common/ai_visibility.py:12, 28-32`)
+- Chỉ lọc khi `AI_ENABLED` tắt; khi bật thì trả nguyên queryset (có test cả hai chiều). Chỉ ẩn khi đọc, không xoá `AuditLog`.
+- Vẫn giữ dòng nghiệp vụ do người duyệt thực thi có `proposal_ref` (có test). Lọc `?action=ai_config_update` khi tắt trả 0 (có test).
+- `startswith` trên `action`: đã grep, không có action nghiệp vụ nào bắt đầu bằng `ai_config_`, `ai_policy_` hay `downgrade_`.
+
+### 5. Seed QA `qa_nogroup` (`backend/apps/accounts/qa_fixture/build.py:77-78, 178-183`)
+- Hợp lý. Hai quyền xem gán trực tiếp giúp e2e chạy BE thật bắt được ca "có quyền vẫn bị chặn". Dữ liệu giả, không có giá vốn hay
+  dữ liệu cá nhân thật. `set(...)` chạy cho mọi user QA nên seed vẫn idempotent: user khác bị đặt lại về rỗng, đúng ý seed.
+
+### 6. Giá vốn, dữ liệu cá nhân, contract
+- Không serializer nào đổi field, không log mới. Khoá mới `is_superuser` chỉ trả về chính người đăng nhập.
+- Nhãn V2 đổi đủ 3 chỗ, khớp 02c §C.4. Nhãn vai và nhóm lệnh AI đổi khớp bảng §F. Không đụng `delivery/serializers.py`,
+  `features/permissions/**`, hay file ngoài `backend/`.
+- Lệch 02c chỉ có hai chỗ, cả hai chấp nhận: bỏ cache (lý do ở mục 1) và L1 bên dưới.
+
+### Lỗi mức Low (không chặn, nên làm ở lô sau hoặc khi gộp nhánh phạm vi)
+- **L1** `backend/apps/accounts/auth/services.py:92-98`. `home_for` tự viết `if is_superuser` / `if not groups` thay vì dùng
+  `has_erp_access` như §A.2. Hiện tương đương. Cách sửa: `if not has_erp_access(user): return HOME_NO_ROLE` (đổi chữ ký sang nhận
+  `user`), để luật cổng và luật `home` không trôi khỏi nhau.
+- **L2** `backend/apps/accounts/auth/tests/test_no_role_gate.py`. Thiếu 3 ca §B.4.2 yêu cầu: session auth bị chặn; không nhóm + mật
+  khẩu tạm thì ra `AUTH_MUST_CHANGE_PASSWORD`; một `POST` hành động bị 403 và dữ liệu không đổi. Techlead đã thăm dò, cả 3 ca đều đúng.
+  Cách sửa: thêm 3 test đó vào file này, nhất là ca thứ tự cờ, vì FE dựa vào nó để đưa người dùng sang màn đặt mật khẩu.
+- **L3** `backend/apps/accounts/auth/authentication.py:64-66`. `_is_public_view` chỉ đọc `permission_classes` của lớp. Cách sửa
+  (phòng xa): thêm một test khẳng định không view nào dưới `/api/` override `get_permissions`, hoặc ghi rõ giới hạn này trong docstring.
+- **L4** `backend/apps/accounts/qa_fixture/build.py:178-183`. `.first()` trả `None` nếu codename sai, và `set([None])` sẽ ném lỗi khó
+  đọc. Cách sửa: dùng `Permission.objects.get(...)` để lỗi nêu rõ quyền nào thiếu.
+
+### Việc vận hành (nhắc lại C2 và §B.4.5)
+Trước khi deploy production, điều phối viên đếm tài khoản `is_active`, không superuser, không nhóm (chỉ in username). Ngay sau khi
+deploy, những người này mất quyền vào ERP.
