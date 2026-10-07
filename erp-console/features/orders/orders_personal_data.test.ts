@@ -55,7 +55,7 @@ describe("Orders mock: dữ liệu khách của NV giao theo thời hạn 7 ngà
 
   it("tìm theo SĐT/tên không khớp đơn đã ẩn (chống dò)", () => {
     const phone = (get("loc", `/api/sales/orders/${OLD_ID}/`).body as OrderDetail).customer.phone;
-    const res = get("giao1", `/api/sales/orders/?q=${phone}`);
+    const res = mockOrdersApi({ method: "POST", path: "/api/sales/orders/search/", body: { q: phone }, token: tokenFor("giao1") });
     const rows = (res.body as { results: OrderListItem[] }).results;
     expect(rows.some((r) => r.id === OLD_ID)).toBe(false);
   });

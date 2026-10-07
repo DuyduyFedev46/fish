@@ -8,10 +8,9 @@ export const AUDIT_MSG = {
   allActions: "Mọi thao tác",
   actorSelectLabel: "Lọc theo người làm",
   allActors: "Mọi người",
-  searchLabel: "Tìm trong nhật ký đã tải",
+  searchLabel: "Tìm theo mã chứng từ",
   searchPlaceholder: "Tìm mã chứng từ…",
   shown: (n: number, total: number) => `Đang hiện ${n} / ${total} dòng`,
-  shownLoaded: (n: number, loaded: number, total: number) => `Đang hiện ${n} / ${loaded} dòng đã tải (tổng ${total})`,
 
   colTime: "Giờ",
   colActor: "Người làm",
@@ -34,6 +33,6 @@ export const AUDIT_MSG = {
   loadingMore: "Đang tải…",
   loadMoreFailed: "Không tải thêm được. Thử lại.",
   retry: "Thử lại",
-  localNote: "Tìm mã và khoảng ngày chỉ lọc trong các dòng đã tải. Bấm “Tải thêm” để xem các dòng cũ hơn.",
+  filterError: "Bộ lọc chưa dùng được. Sửa lại rồi thử.",
   readOnly: "Nhật ký chỉ để xem: không sửa, không xoá.",
 } as const;

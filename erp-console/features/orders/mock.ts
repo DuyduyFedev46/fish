@@ -3,7 +3,8 @@
 // thêm status_label/total_amount/created_at/reserved_until ở chi tiết; và "Lô L7 — bổ sung (BE)": `q` khớp cả tên khách (bỏ dấu),
 // `*_label` của giao dịch/phiếu giao/phiếu hoàn tiền, `timeline [{at, kind, label, actor_display}]` tăng dần. Đổi ở BE thì chép lại ở đây.
 //
-//   GET  /api/sales/orders/?status=A,B&date_from=YYYY-MM-DD&date_to=YYYY-MM-DD&q=&page=   (20 dòng/trang)
+//   GET  /api/sales/orders/?status=A,B&date_from=YYYY-MM-DD&date_to=YYYY-MM-DD&q=&page=   (20 dòng/trang; `q` CHỈ khớp mã đơn, Lô 17b-BE)
+//   POST /api/sales/orders/search/  {q?, status? (chuỗi "A,B" hoặc mảng chuỗi), date_from?, date_to?, customer?, batch?, page?}   (cùng dạng kết quả; tìm cả SĐT/tên)
 //   GET  /api/sales/orders/{id}/
 //   POST /api/sales/orders/{id}/confirm-payment[/]   {bank_txn_id, amount?}
 //
@@ -859,7 +860,39 @@ function parsePath(path: string): { id: number | null; action: string | null; qu
   return { id: m && m[1] ? Number(m[1]) : null, action: m && m[2] ? m[2] : null, query: new URLSearchParams(q) };
 }
 
-function listResponse(me: Me, query: URLSearchParams): MockResponse {
+/** Chuỗi GET `?q=` chỉ được là đoạn mã: có dãy từ 9 chữ số, khoảng trắng hoặc ký tự ngoài ASCII (giống tên người) → 400 SEARCH_USE_POST (BE Lô 17b). */
+function getSearchRejected(q: string): boolean {
+  return /\d{9,}/.test(q) || /\s/.test(q) || /[^\x00-\x7F]/.test(q);
+}
+
+/** POST search/: đổi thân JSON sang cùng bộ tham số của listResponse. Sai kiểu (q không phải chuỗi, status là số…) → 400 INVALID_FILTER. */
+function searchQueryOf(body: unknown): { query: URLSearchParams } | { error: MockResponse } {
+  const b = (body && typeof body === "object" && !Array.isArray(body) ? body : {}) as Record<string, unknown>;
+  const bad = (param: string) => ({ error: beError("INVALID_FILTER", { param }) });
+  const qs = new URLSearchParams();
+  if (b.q !== undefined && b.q !== null) {
+    if (typeof b.q !== "string") return bad("q");
+    qs.set("q", b.q);
+  }
+  if (b.status !== undefined && b.status !== null) {
+    const list = Array.isArray(b.status) ? b.status : [b.status];
+    if (!list.every((s) => typeof s === "string")) return bad("status");
+    qs.set("status", (list as string[]).join(","));
+  }
+  for (const key of ["date_from", "date_to", "customer", "batch"] as const) {
+    const v = b[key];
+    if (v === undefined || v === null || v === "") continue;
+    if (typeof v !== "string") return bad(key);
+    qs.set(key, v);
+  }
+  if (b.page !== undefined && b.page !== null) {
+    if (!Number.isInteger(b.page) || (b.page as number) < 1) return bad("page");
+    qs.set("page", String(b.page));
+  }
+  return { query: qs };
+}
+
+function listResponse(me: Me, query: URLSearchParams, opts: { search?: boolean } = {}): MockResponse {
   const statuses = (query.get("status") || "").split(",").map((s) => s.trim()).filter(Boolean);
   const from = query.get("date_from") || "";
   const to = query.get("date_to") || "";
@@ -885,18 +918,19 @@ function listResponse(me: Me, query: URLSearchParams): MockResponse {
     .filter((o) => !customer || customerIdOf(o) === Number(customer))
     // Mock không có pk lô: `batch=<n>` khớp lô thứ n của bảng ITEMS (đủ để thử bộ lọc).
     .filter((o) => !batch || o.lines.some((l) => l.batches.some(([code]) => code === ITEMS[(Number(batch) - 1) % ITEMS.length]?.[3])))
-    // Đơn đã ẩn dữ liệu khách chỉ tìm được theo mã đơn (BE chống dò SĐT/tên).
+    // Đơn đã ẩn dữ liệu khách chỉ tìm được theo mã đơn (BE chống dò SĐT/tên). GET `?q=` (không phải search) chỉ khớp MÃ đơn.
     .filter(
       (o) =>
         !q ||
         o.code.toLowerCase().includes(q) ||
-        (!piiHidden(me, o) && (o.customer.phone.includes(q) || fold(o.customer.name).includes(fold(q)))),
+        (opts.search && !piiHidden(me, o) && (o.customer.phone.includes(q) || fold(o.customer.name).includes(fold(q)))),
     )
     .sort((a, b) => (a.created_at < b.created_at ? 1 : a.created_at > b.created_at ? -1 : b.id - a.id));
   const pages = Math.max(1, Math.ceil(hit.length / PAGE_SIZE));
   if (page > pages) return { status: 404, body: { detail: "Trang không hợp lệ." } };
   const link = (n: number) => {
     const qs = new URLSearchParams(query);
+    qs.delete("q"); // `next` không chứa từ khoá (BE: gửi lại POST với `page`)
     qs.set("page", String(n));
     return `http://localhost:8000/api/sales/orders/?${qs.toString()}`;
   };
@@ -1063,9 +1097,17 @@ export function mockOrdersApi(req: MockRequest): MockResponse {
   if (action === "confirm-payment" && req.method === "POST" && !has(me, PERM_CONFIRM)) return beError("DRF_FORBIDDEN");
   // S14: thiếu sales.cancel_paid_order → 403 TRƯỚC khi tra đơn, cùng cách với confirm-payment.
   if (action === "cancel" && req.method === "POST" && !has(me, PERM_CANCEL)) return beError("DRF_FORBIDDEN");
+  if (req.path.split("?")[0] === "/api/sales/orders/search/") {
+    if (req.method !== "POST") return beError("METHOD_NOT_ALLOWED", { method: req.method });
+    if (mode() === "fail") return { status: 500, body: null };
+    const parsed = searchQueryOf(req.body);
+    if ("error" in parsed) return parsed.error;
+    return listResponse(me, parsed.query, { search: true });
+  }
   if (id === null) {
     if (req.method !== "GET") return beError("METHOD_NOT_ALLOWED", { method: req.method });
     if (mode() === "fail") return { status: 500, body: null };
+    if (getSearchRejected((query.get("q") || "").trim())) return beError("SEARCH_USE_POST");
     return listResponse(me, query);
   }
   const store = load();
@@ -1330,6 +1372,9 @@ function lateAmount(raw: unknown): { value: number } | { err: MockResponse } {
   return { value: v };
 }
 
+/** Như `settings.LATE_PAYMENT_MAX_AGE_DAYS` của BE (mặc định 400). */
+const LATE_MAX_AGE_DAYS = 400;
+
 function recordLate(me: Me, body: unknown): MockResponse {
   const b = (body && typeof body === "object" ? body : {}) as Record<string, unknown>; // khoá lạ (note, source…) bị bỏ qua
   const txn = String(b.bank_txn_id ?? "").replace(/\s+/g, "").toUpperCase();
@@ -1338,9 +1383,12 @@ function recordLate(me: Me, body: unknown): MockResponse {
   if (!/^[A-Z0-9._/-]+$/.test(txn)) return beError("LATE_TXN_CHARS", undefined, { bank_txn_id: "$detail" });
   const amt = lateAmount(b.amount);
   if ("err" in amt) return amt.err;
-  const at = typeof b.received_at === "string" ? new Date(b.received_at.trim()) : null;
+  // Lô 17b-BE (TL15-L2): bắt buộc có phần giờ (chỉ có ngày thì BE từ chối, không ngầm thành 00:00) và không cũ quá 400 ngày.
+  const rawAt = typeof b.received_at === "string" ? b.received_at.trim() : "";
+  const at = /[T ]\d{1,2}:\d{2}/.test(rawAt) ? new Date(rawAt) : null;
   if (!at || Number.isNaN(at.getTime())) return beError("LATE_AT_INVALID", undefined, { received_at: "$detail" });
   if (at.getTime() > Date.now() + 5 * 60_000) return beError("LATE_AT_FUTURE", undefined, { received_at: "$detail" });
+  if (at.getTime() < Date.now() - LATE_MAX_AGE_DAYS * 86_400_000) return beError("LATE_AT_TOO_OLD", { days: LATE_MAX_AGE_DAYS }, { received_at: "$detail" });
 
   const store = load();
   const code = typeof b.order_code === "string" ? b.order_code.trim() : "";
@@ -1866,7 +1914,7 @@ if (process.env.NEXT_PUBLIC_USE_MOCK === "1" && typeof window !== "undefined") {
  */
 export function mockOrdersOverviewSlice(): {
   pending: number;
-  recent: { code: string; amount: number; status: OrderStatus; status_label: string; expires_at: string | null }[];
+  recent: { id: number; code: string; amount: number; status: OrderStatus; status_label: string; expires_at: string | null; reason: { code: string; label: string } | null }[];
 } | null {
   if (mode() === "empty") return null;
   const store = load();
@@ -1875,11 +1923,13 @@ export function mockOrdersOverviewSlice(): {
   return {
     pending: store.orders.filter((o) => o.status === "BOOKED" || o.status === "PAID" || o.status === "PROCESSING").length,
     recent: sorted.slice(0, 8).map((o) => ({
+      id: o.id,
       code: o.code,
       amount: orderTotal(o),
       status: o.status,
       status_label: ORDER_LABEL[o.status],
       expires_at: o.status === "BOOKED" ? o.reserved_until : null,
+      reason: reasonOf(o),
     })),
   };
 }

@@ -107,6 +107,18 @@ export const BE_ERRORS = {
     code: "COST_LANDED_OVERFLOW",
     detail: "Chi phí quá lớn: giá vốn mỗi kg của lô vượt giới hạn cho phép. Kiểm tra lại số tiền.",
   },
+  // ---- Lô 17b-BE (NEW-1): tìm đơn theo SĐT/tên chỉ qua POST search/ ----
+  SEARCH_USE_POST: { status: 400, code: "SEARCH_USE_POST", detail: "Tìm theo SĐT/tên dùng ô tìm kiếm." },
+  // ---- Lô 17a (A5): hoá đơn mua, 5 mã lỗi 400 `{detail, code}`; câu tiếng Việt, không mã BR ----
+  AMOUNT_NOT_POSITIVE: { status: 400, code: "AMOUNT_NOT_POSITIVE", detail: "Số tiền hoá đơn phải lớn hơn 0." },
+  INVOICE_SUPPLIER_MISMATCH: {
+    status: 400,
+    code: "INVOICE_SUPPLIER_MISMATCH",
+    detail: "Phiếu nhập thuộc nhà cung cấp khác, không gắn vào hoá đơn của nhà cung cấp này được.",
+  },
+  PAID_AT_REQUIRED: { status: 400, code: "PAID_AT_REQUIRED", detail: "Hoá đơn đã trả tiền thì phải có thời điểm trả." },
+  PAID_AT_WHEN_UNPAID: { status: 400, code: "PAID_AT_WHEN_UNPAID", detail: "Hoá đơn chưa trả tiền thì không có thời điểm trả." },
+  PAID_AT_IN_FUTURE: { status: 400, code: "PAID_AT_IN_FUTURE", detail: "Thời điểm trả tiền không được ở tương lai." },
   /** #10 sửa giá đã áp vào đơn. */
   PRICE_USED_BY_ORDERS: {
     status: 400,
@@ -159,7 +171,9 @@ export const BE_ERRORS = {
   LATE_AMOUNT_INVALID: { status: 400, code: "BR-TT-18", detail: "Số tiền phải là số lớn hơn 0." },
   LATE_AMOUNT_MIN: { status: 400, code: "BR-TT-18", detail: "Số tiền tối thiểu 1 ₫." },
   LATE_AMOUNT_TOO_LARGE: { status: 400, code: "BR-TT-18", detail: "Số tiền quá lớn (tối đa 999.999.999.999,99 ₫)." },
-  LATE_AT_INVALID: { status: 400, code: "BR-TT-18", detail: "Thiếu hoặc sai giờ nhận tiền (ISO 8601)." },
+  LATE_AT_INVALID: { status: 400, code: "BR-TT-18", detail: "Thiếu hoặc sai giờ nhận tiền (ISO 8601, gồm cả ngày và giờ)." },
+  /** Lô 17b-BE (TL15-L2): cũ hơn LATE_PAYMENT_MAX_AGE_DAYS (mặc định 400 ngày). */
+  LATE_AT_TOO_OLD: { status: 400, code: "BR-TT-18", detail: "Giờ nhận tiền cũ quá {days} ngày, hãy kiểm tra lại năm." },
   LATE_AT_FUTURE: { status: 400, code: "BR-TT-18", detail: "Giờ nhận tiền không được ở tương lai." },
   LATE_TXN_EXISTS: { status: 400, code: "BR-TT-03", detail: "Mã giao dịch này đã có trong hệ thống (giao dịch #{id}), không ghi lại." },
   LATE_ORDER_NOT_FOUND: {

@@ -167,9 +167,9 @@ export function AssignCourierModal({ note, onClose, onAssigned, onReload }: Prop
         </fieldset>
       )}
       {sameAsCurrent && (
-        <p id={`${groupId}-same`} className="muted" role="status">
+        <FormAlert kind="warn" id={`${groupId}-same`}>
           Phiếu đã giao cho người này. Chọn người khác để đổi.
-        </p>
+        </FormAlert>
       )}
     </Modal>
   );

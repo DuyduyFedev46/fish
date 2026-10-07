@@ -350,7 +350,7 @@ def main():
         page.wait_for_timeout(2500)
         t3 = task(IDS["E3"])
         ok("AC4 (BE thật): xác nhận huỷ -> việc kết thúc (DONE; REFUND_CALL chỉ do job tự huỷ), phiếu bị huỷ", t3["state"] == "DONE" and sql("select status from delivery_deliverynote where id=?", IDS["E3"])[0][0] == "CANCELLED", t3)
-        ok("AC4 (BE thật): sau huỷ chuyển sang màn Đơn hàng để lập phiếu hoàn (URL có ?order & open=refund)", "/orders" in page.url and "open=refund" in page.url, page.url)
+        ok("AC4 (BE thật): sau huỷ chuyển sang màn Đơn hàng để lập phiếu hoàn (URL /orders/detail/?id=…&open=refund)", "/orders/detail/?id=" in page.url and "open=refund" in page.url, page.url)
         ok("AC4 (BE thật): URL sau huỷ không chứa dữ liệu khách", not pii_in(page.url))
         page.screenshot(path=os.path.join(SHOTS, "qa5-real-after-cancel-ql1-1280.png"))
         ctx.close()

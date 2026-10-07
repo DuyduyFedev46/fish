@@ -27,7 +27,7 @@ TOMORROW_VN = (TODAY + timedelta(days=1)).strftime("%d/%m/%Y")
 SMALL_TAPS_JS = """() => [...document.querySelectorAll('button, a, input, select')].filter(e => {
     const r = e.getBoundingClientRect(); const s = getComputedStyle(e);
     return r.width > 0 && r.height > 0 && s.visibility !== 'hidden' && r.x >= 0 && r.x < 360 && r.y < innerHeight
-      && !e.classList.contains('sr-only') && !e.classList.contains('lt-link') && !e.matches('input[type=checkbox]') && (r.height < 44 || (!['INPUT', 'SELECT'].includes(e.tagName) && r.width < 44));
+      && !e.classList.contains('sr-only') && !e.matches('input[type=checkbox]') && (r.height < 44 || (!['INPUT', 'SELECT'].includes(e.tagName) && r.width < 44));
   }).map(e => (e.getAttribute('aria-label') || e.innerText || e.tagName).trim().slice(0,30) + ' ' + Math.round(e.getBoundingClientRect().width) + 'x' + Math.round(e.getBoundingClientRect().height))"""
 
 PHONE = re.compile(r"\b0\d{9}\b")
@@ -123,8 +123,8 @@ def pick_more(page, label):
 
 
 def storage_dump(page):
-    # Bỏ kho tài khoản mock của module đăng nhập (số điện thoại giả của nhân viên mẫu, có từ trước Lô 13, không thuộc Danh mục).
-    return page.evaluate("() => JSON.stringify([Object.entries(localStorage).filter(([k]) => k !== 'cave_erp_mock_users'), Object.entries(sessionStorage), location.href])")
+    # Bỏ mọi kho mock `cave_erp_mock_*` (tài khoản mẫu, đơn/khách GIẢ gieo sẵn khi Tổng quan tải): không thuộc Danh mục.
+    return page.evaluate("() => JSON.stringify([Object.entries(localStorage).filter(([k]) => !k.startsWith('cave_erp_mock_')), Object.entries(sessionStorage).filter(([k]) => !k.startsWith('cave_erp_mock_')), location.href])")
 
 
 def personal_clean(page, extra=()):

@@ -479,9 +479,14 @@ export function getMockConfirmationQueue(params?: { state?: string; page?: numbe
       const { calls: _calls, available_actions: _actions, ...row } = viewFor(item, me);
       void _calls;
       void _actions;
-      return row;
+      return { ...row, note_code: noteCodeOf(row.order_code) };
     }) as ConfirmationQueueItem[],
   };
+}
+
+/** Lô 17b-BE (L5-code): danh sách và chi tiết đều có `note_code` (mã phiếu giao của đơn), không bao giờ null. */
+function noteCodeOf(orderCode: string): string {
+  return `GH-${orderCode.replace(/^SO/, "")}`;
 }
 
 export function mockGetConfirmationQueue(req: any): { status: number; body: ConfirmationQueueResponse } {
@@ -527,7 +532,7 @@ export function mockGetConfirmationDetail(
   }
   return {
     status: 200,
-    body: { ...item, decision_note: item.in_scope ? item.decision_note ?? "" : "", note_code: `GH-${item.order_code.replace(/^SO/, "")}`, available_actions: actionsFor(item, me), scripts: scriptsForQueueItem(item, me) },
+    body: { ...item, decision_note: item.in_scope ? item.decision_note ?? "" : "", note_code: noteCodeOf(item.order_code), available_actions: actionsFor(item, me), scripts: scriptsForQueueItem(item, me) },
   };
 }
 

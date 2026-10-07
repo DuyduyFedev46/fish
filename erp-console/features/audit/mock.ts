@@ -1,11 +1,12 @@
 // Mock module audit — CHỈ dùng khi NEXT_PUBLIC_USE_MOCK=1 (bản build thật loại bỏ file này).
-//   GET /api/audit-logs/?page=&actor_kind=&action=&actor=   (S03; quyền accounts.view_auditlog = Chủ + Quản lý)
+//   GET /api/audit-logs/?page=&actor_kind=&action=&actor=&date_from=&date_to=&q=   (S03; Lô 17a thêm ngày + q; quyền accounts.view_auditlog = Chủ + Quản lý)
 // Đúng contract BE: `actor_display` = TÊN ĐĂNG NHẬP (dòng AI: "ai:<tên đăng nhập>", dòng hệ thống: "system"),
 // `ai_actor` = mã số người dùng, `changes` bỏ khoá giá vốn khi người xem không có `view_costprice`.
 // Dữ liệu GIẢ: chỉ mã chứng từ / mã đề xuất, KHÔNG có tên/SĐT/địa chỉ khách (bất biến 9).
 
 import type { MockRequest, MockResponse } from "@/shared/lib/http";
 import { MOCK_UNAUTHORIZED, mockRequireUser, mockUsers } from "@/features/auth/mock";
+import { dateKeyInVietnam } from "@/shared/lib/format";
 import type { AuditLogRow } from "./types";
 
 const VIEW_PERM = "accounts.view_auditlog";
@@ -102,10 +103,25 @@ export function mockAuditLogs(req: MockRequest): MockResponse {
     }
     actorId = Number(actorRaw);
   }
+  // Lô 17a (A3): ngày theo giờ VN, gồm cả hai đầu; `q` 2–40 ký tự [0-9A-Za-z#._-], không có dãy 9 chữ số; câu lỗi không lặp lại q.
+  const invalid = (detail: string): MockResponse => ({ status: 400, body: { detail, code: "INVALID_FILTER" } });
+  const dayOk = (v: string) => /^\d{4}-\d{2}-\d{2}$/.test(v) && Number(v.slice(0, 4)) >= 2000 && Number(v.slice(0, 4)) <= 2100 && !Number.isNaN(Date.parse(v));
+  const from = (p.get("date_from") || "").trim();
+  const to = (p.get("date_to") || "").trim();
+  if ((from && !dayOk(from)) || (to && !dayOk(to))) return invalid("Ngày phải có dạng YYYY-MM-DD.");
+  if (from && to && from > to) return invalid("Ngày bắt đầu phải trước hoặc bằng ngày kết thúc.");
+  const q = (p.get("q") || "").trim();
+  if (p.has("q") && q) {
+    if (/\d{9,}/.test(q)) return invalid("Chỉ tìm theo mã chứng từ.");
+    if (q.length < 2 || q.length > 40 || !/^[0-9A-Za-z#._-]+$/.test(q)) return invalid("Mã tìm phải dài 2–40 ký tự, chỉ gồm chữ không dấu, số và # . _ -");
+  }
   const actorName = actorId === null ? null : mockUsers().find((u) => u.id === actorId)?.username ?? "";
   let rows = buildRows(me.permissions.includes(COST_PERM));
   if (kind) rows = rows.filter((r) => r.actor_kind === kind);
   if (action) rows = rows.filter((r) => r.action === action);
+  if (from) rows = rows.filter((r) => dateKeyInVietnam(r.created_at) >= from);
+  if (to) rows = rows.filter((r) => dateKeyInVietnam(r.created_at) <= to);
+  if (q) rows = rows.filter((r) => `${r.object_repr ?? ""} ${r.proposal_ref ?? ""}`.toLowerCase().includes(q.toLowerCase()));
   // Như BE: ?actor= chỉ lấy dòng do chính người đó làm (không gồm dòng AI thay mặt, không gồm dòng Hệ thống).
   if (actorName !== null) rows = rows.filter((r) => r.actor_kind === "user" && r.actor_display === actorName);
   const page = Math.max(1, Number(p.get("page") || "1") || 1);

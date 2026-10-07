@@ -211,8 +211,9 @@ with sync_playwright() as p:
         pg.get_by_label("Lọc theo trạng thái").select_option(label="Mọi trạng thái")
         idle(pg)
         # tìm không thấy
+        pg.evaluate("() => window.__caveMock.clearLog()")
         pg.get_by_role("searchbox", name="Tìm đơn hàng").fill("zzqq")
-        pg.wait_for_function("() => window.__caveMock.log.some(x => x.includes('q=zzqq'))")
+        pg.wait_for_function("() => window.__caveMock.log.some(x => x.includes('POST /api/sales/orders/search/'))")
         idle(pg)
         txt = pg.locator("main").inner_text()
         ok("L1 tìm không thấy: 'Không tìm thấy … khớp với zzqq' + 'Xoá tìm kiếm'", "zzqq" in txt and "Không tìm thấy" in txt and pg.locator("button.btn", has_text="Xoá tìm kiếm").count() == 1, txt[-300:])

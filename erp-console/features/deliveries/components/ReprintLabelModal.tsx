@@ -3,16 +3,15 @@
 // In lại tem: hỏi lý do (hỏng/mất tem, hay đổi thông tin nhận) trước khi in. Tem cũ vẫn phải xé và xác nhận huỷ (CS-14).
 import { useId, useState } from "react";
 import { ENUMS } from "@/shared/lib/enums";
+import { SummaryBlock } from "@/shared/ui/form/SummaryBlock";
 import { Modal } from "@/shared/ui/overlay/Modal";
 import type { LabelPrintReason } from "../types";
 import s from "../deliveries.module.css";
 
 type Props = { code: string; onClose: () => void; onConfirm: (reason: LabelPrintReason) => void };
 
-const OPTIONS: Array<{ value: LabelPrintReason; hint: string }> = [
-  { value: "REPRINT", hint: "Tem cũ bị hỏng, mất hoặc in mờ." },
-  { value: "ADDRESS_CHANGED", hint: "Khách đổi người nhận hoặc địa chỉ, tem cũ hết hiệu lực." },
-];
+// Lô 17b (UI-RULES §6.2): không dòng gợi ý xám; tên lý do (enums.ts) đã tự nói rõ.
+const OPTIONS: Array<{ value: LabelPrintReason }> = [{ value: "REPRINT" }, { value: "ADDRESS_CHANGED" }];
 
 export function ReprintLabelModal({ code, onClose, onConfirm }: Props) {
   const [reason, setReason] = useState<LabelPrintReason>("REPRINT");
@@ -33,9 +32,7 @@ export function ReprintLabelModal({ code, onClose, onConfirm }: Props) {
         </>
       }
     >
-      <p className="muted">
-        Phiếu <span className="num">{code}</span>
-      </p>
+      <SummaryBlock label="Phiếu in lại tem" rows={[{ label: "Phiếu giao", value: code, mono: true }]} />
       <fieldset className={s.pickList}>
         <legend className={s.pickLegend}>Vì sao in lại?</legend>
         {OPTIONS.map((o) => (
@@ -43,7 +40,6 @@ export function ReprintLabelModal({ code, onClose, onConfirm }: Props) {
             <input className={s.pickInput} type="radio" name={`${name}-reason`} checked={reason === o.value} onChange={() => setReason(o.value)} />
             <span className={s.pickBody}>
               <span className={s.pickName}>{ENUMS.deliveryLabelReason[o.value].label}</span>
-              <span className={s.pickMeta}>{o.hint}</span>
             </span>
           </label>
         ))}

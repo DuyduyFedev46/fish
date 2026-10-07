@@ -189,3 +189,17 @@ describe("mock record-late (BR-TT-18)", () => {
     expect(refund({ acknowledge_duplicate_warning: true }).status).toBe(201);
   });
 });
+
+describe("mock record-late: giờ nhận tiền (Lô 17b-BE, TL15-L2)", () => {
+  const rec = (received_at: string) =>
+    mockPaymentsApi({ method: "POST", path: "/api/sales/payments/record-late/", body: { bank_txn_id: `FTX${Math.round(Math.random() * 1e9)}`, amount: "412345", received_at }, token: `mock-token-loc-${Date.now() + 60_000}` });
+  it("chỉ có ngày → 400 BR-TT-18 khoá received_at; quá 400 ngày → 400; hôm qua → 200", () => {
+    const dateOnly = rec("2026-10-03");
+    expect(dateOnly.status).toBe(400);
+    expect(dateOnly.body).toMatchObject({ code: "BR-TT-18", received_at: expect.stringContaining("gồm cả ngày và giờ") });
+    const old = rec(new Date(Date.now() - 401 * 86_400_000).toISOString());
+    expect(old.status).toBe(400);
+    expect(old.body).toMatchObject({ code: "BR-TT-18", received_at: expect.stringContaining("cũ quá 400 ngày") });
+    expect(rec(new Date(Date.now() - 86_400_000).toISOString()).status).toBe(201);
+  });
+});

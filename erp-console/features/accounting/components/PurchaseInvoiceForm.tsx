@@ -17,6 +17,7 @@ import { SummaryBlock } from "@/shared/ui/form/SummaryBlock";
 import { primaryLabel, useSubmit } from "@/shared/ui/form/useSubmit";
 import { Modal } from "@/shared/ui/overlay/Modal";
 import { createPurchaseInvoice } from "../api";
+import { invoiceFieldError, type InvoiceFieldError } from "../invoiceErrors";
 import { CURRENCY_UNIT, moneyBody, moneyMessage, suggestedAmount } from "../money";
 import type { PurchaseInvoiceRow } from "../types";
 import { ReceiptSelect } from "./ReceiptSelect";
@@ -56,9 +57,13 @@ export function PurchaseInvoiceForm({ receipt, onClose, onDone }: Props) {
   // Nhà cung cấp của phiếu đang chọn (ô chọn phiếu) và số tiền hiện tại có phải số gợi ý từ phiếu không (người gõ thì không phải).
   const [receiptSupplier, setReceiptSupplier] = useState("");
   const [amountSuggested, setAmountSuggested] = useState(false);
+  // Lô 17b (G3): lỗi nghiệp vụ của BE (5 mã Lô 17a) đặt dưới đúng ô; sửa ô đó thì câu biến mất.
+  const [serverField, setServerField] = useState<InvoiceFieldError | null>(null);
+  const clearServer = (field: InvoiceFieldError["field"]) => setServerField((cur) => (cur && cur.field === field ? null : cur));
 
   // Đổi nhà cung cấp khác với nhà cung cấp của phiếu đang chọn: bỏ phiếu (và số gợi ý của nó), tránh gắn phiếu của nhà cung cấp khác (TL12-FE-M1).
   const changeSupplier = (value: string) => {
+    clearServer("receipt");
     setSupplier(value);
     if (receiptId && receiptSupplier && receiptSupplier !== value) {
       setReceiptId(NO_RECEIPT);
@@ -70,6 +75,7 @@ export function PurchaseInvoiceForm({ receipt, onClose, onDone }: Props) {
     }
   };
   const typeAmount = (value: string) => {
+    clearServer("amount");
     setAmount(value);
     setAmountSuggested(false);
   };
@@ -88,15 +94,22 @@ export function PurchaseInvoiceForm({ receipt, onClose, onDone }: Props) {
   if (paid && !vnInputToIso(paidAt)) local.paid_at = "Chọn giờ trả tiền.";
 
   const sub = useSubmit(
-    () =>
-      createPurchaseInvoice({
-        supplier: Number(supplier),
-        receipt: receiptId ? Number(receiptId) : null,
-        amount: moneyBody(amount),
-        invoice_date: date,
-        is_paid: paid,
-        paid_at: paid ? vnInputToIso(paidAt) : null,
-      }),
+    async () => {
+      setServerField(null);
+      try {
+        return await createPurchaseInvoice({
+          supplier: Number(supplier),
+          receipt: receiptId ? Number(receiptId) : null,
+          amount: moneyBody(amount),
+          invoice_date: date,
+          is_paid: paid,
+          paid_at: paid ? vnInputToIso(paidAt) : null,
+        });
+      } catch (e) {
+        setServerField(invoiceFieldError(e, !receipt));
+        throw e;
+      }
+    },
     { onSuccess: onDone },
   );
 
@@ -105,7 +118,7 @@ export function PurchaseInvoiceForm({ receipt, onClose, onDone }: Props) {
     if (Object.keys(local).length > 0) return;
     void sub.submit();
   };
-  const err = (key: string) => (touched ? local[key] : undefined) ?? sub.fieldErrors[key];
+  const err = (key: string) => (touched ? local[key] : undefined) ?? (serverField?.field === key ? serverField.message : undefined) ?? sub.fieldErrors[key];
   const loadFailed = !receipt && Boolean(suppliers.error) && !suppliers.data;
 
   return (
@@ -124,7 +137,7 @@ export function PurchaseInvoiceForm({ receipt, onClose, onDone }: Props) {
         </>
       }
     >
-      {sub.error && (
+      {sub.error && !serverField && (
         <div data-testid="dialog-error">
           <FormAlert>{sub.error}</FormAlert>
         </div>
@@ -151,6 +164,7 @@ export function PurchaseInvoiceForm({ receipt, onClose, onDone }: Props) {
             emptyLabel="Không gắn phiếu nhập"
             error={err("receipt")}
             onChange={(value, row) => {
+              clearServer("receipt");
               setReceiptId(value);
               if (!row) {
                 // Bỏ phiếu: số tiền đang là số gợi ý của phiếu đó thì bỏ theo.
@@ -176,14 +190,21 @@ export function PurchaseInvoiceForm({ receipt, onClose, onDone }: Props) {
       <Field label="Số tiền hoá đơn" name="amount" type="money" required unit={CURRENCY_UNIT} value={amount} onChange={typeAmount} error={err("amount")} />
       <Field label="Ngày hoá đơn" name="invoice_date" type="date" required value={date} onChange={setDate} error={err("invoice_date")} />
       <label className="check-row">
-        <input type="checkbox" name="is_paid" checked={paid} onChange={(e) => setPaid(e.target.checked)} />
+        <input type="checkbox" name="is_paid" checked={paid} onChange={(e) => {
+            clearServer("paid_at");
+            setPaid(e.target.checked);
+          }} />
         <span>
           <b>Đã trả tiền</b>
         </span>
       </label>
       {paid && (
         <div className={s.paidAt} data-testid="paid-at">
-          <Field label="Trả lúc" name="paid_at" type="datetime-local" required value={paidAt} onChange={setPaidAt} error={err("paid_at")} />
+          <Field label="Trả lúc" name="paid_at" type="datetime-local" required value={paidAt} onChange={(v) => {
+              clearServer("paid_at");
+              setPaidAt(v);
+            }}
+            error={err("paid_at")} />
         </div>
       )}
     </Modal>

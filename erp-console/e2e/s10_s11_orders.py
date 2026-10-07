@@ -77,7 +77,7 @@ with sync_playwright() as p:
     clear_log(page)
     box = page.get_by_role("searchbox", name="Tìm đơn hàng")
     box.fill("chi hoa")
-    page.wait_for_function("() => window.__caveMock.log.some(x => x.includes('q=chi'))")
+    page.wait_for_function("() => window.__caveMock.log.some(x => x.includes('POST /api/sales/orders/search/'))")
     idle(page)
     ok("L7: tìm tên không dấu 'chi hoa' → đơn của Chị Hoa", rows(page).count() >= 1 and "Chị Hoa" in rows(page).first.inner_text(), str(rows(page).count()))
     box.fill("")

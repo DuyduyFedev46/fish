@@ -26,4 +26,10 @@ export type AuditLogParams = {
   action?: string;
   /** Mã người dùng (`?actor=`): chỉ các dòng do chính người đó làm (không gồm dòng AI/hệ thống). */
   actor?: number;
+  /** Lô 17a (A3): `?date_from=YYYY-MM-DD` (giờ VN, gồm cả ngày đó). */
+  date_from?: string;
+  /** `?date_to=YYYY-MM-DD` (gồm cả ngày đó). */
+  date_to?: string;
+  /** `?q=` mã chứng từ hoặc mã đề xuất (2–40 ký tự, không dãy 9 chữ số). Đã qua `checkAuditQuery`. */
+  q?: string;
 };

@@ -17,7 +17,7 @@ Mô-đun này tự chứa cả API, kiểu và mock (Lô 15 đã chuyển khỏi
 
 ## Chỗ BE chưa có (FE xử lý tạm, ghi ở 03-dev-notes Lô 15)
 
-- Chưa lọc theo ngày ở BE → khoảng ngày và ô tìm mã lọc phía máy trên các dòng đã tải.
+- Khoảng ngày và ô tìm mã: từ Lô 17a BE lọc (`?date_from=&date_to=&q=`), FE gửi lên, không còn lọc trên dòng đã tải. Ô tìm chỉ nhận mã (`auditQuery.ts`, giống luật BE); 400 hiện dưới ô.
 - Chưa có người duyệt → lấy từ dòng `confirm_*`/`approve_*` cùng `proposal_ref`, không có thì "—".
 - Dòng chưa có id người làm → hiện tên đăng nhập; `?actor=` chỉ trả dòng của chính người đó.
 - `/api/staff/` chỉ Chủ gọi được → Quản lý không thấy danh sách "Mọi người" (ô lọc người làm ẩn).

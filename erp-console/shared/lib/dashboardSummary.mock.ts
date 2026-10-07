@@ -170,6 +170,7 @@ export function buildDashboardSummaryMock(
     .slice(0, 20)
     .map((b) => {
       const row: DashboardBatch = {
+        id: b.id,
         batch_id: b.batch_id,
         item: b.item,
         warehouse: b.warehouse,
@@ -198,11 +199,13 @@ export function buildDashboardSummaryMock(
     .sort((a, b) => b.created.getTime() - a.created.getTime() || b.id - a.id)
     .slice(0, 8)
     .map((o) => ({
+      id: o.id,
       code: o.code,
       amount: o.total,
       status: o.status,
       status_label: ORDER_LABEL[o.status],
       expires_at: o.expires ? o.expires.toISOString() : null,
+      reason: o.status === "AUTO_CANCELLED" ? { code: "AUTO_CANCELLED", label: "Hết giờ giữ chỗ" } : o.status === "CANCELLED" ? { code: "CUSTOMER_CHANGED_MIND", label: "Khách đổi ý" } : null,
     }));
 
   const activity: LedgerActivity[] = (empty ? [] : LEDGER)
@@ -239,6 +242,7 @@ export function buildDashboardSummaryMock(
       .sort((a, b) => a.expiry.getTime() - b.expiry.getTime())
       .slice(0, 6)
       .map((b) => ({
+        id: b.id,
         batch_id: b.batch_id,
         item: b.item,
         expiry_date: localIsoDate(b.expiry),

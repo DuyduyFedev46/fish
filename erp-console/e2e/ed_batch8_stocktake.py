@@ -148,7 +148,7 @@ def list_screen(browser):
     page.get_by_label("Lọc theo kho").select_option(label="Kho mát chợ Vũng Tàu")
     page.wait_for_load_state("networkidle")
     settle(page)
-    ok("lọc kho Vũng Tàu: KK-16 và KK-15", sorted(t.split("\t")[0] for t in page.locator("table.lt tbody tr").all_inner_texts()) == ["KK-15", "KK-16"], str(page.locator("table.lt tbody tr").all_inner_texts()))
+    ok("lọc kho Vũng Tàu: KK-16 và KK-15", sorted(t.split("\t")[0].strip() for t in page.locator("table.lt tbody tr").all_inner_texts()) == ["KK-15", "KK-16"], str(page.locator("table.lt tbody tr").all_inner_texts()))
     page.get_by_label("Lọc theo kho").select_option("")
     page.wait_for_load_state("networkidle")
     settle(page)
@@ -242,7 +242,7 @@ def create_flow(browser):
     ok("không có lỗi console", not errors, str(errors[:2]))
     # KHÔNG tạo hai phiếu
     go(page, "/stocktake/")
-    codes = [t.split("\t")[0] for t in page.locator("table.lt tbody tr").all_inner_texts()]
+    codes = [t.split("\t")[0].strip() for t in page.locator("table.lt tbody tr").all_inner_texts()]
     ok("danh sách có đúng một phiếu mới KK-18 (không nhân đôi khi bấm đúp)", codes.count("KK-18") == 1 and "KK-19" not in codes, str(codes))
     # đổi người: ql1 duyệt
     before = {b: stock(page, b) for b in (101, 102, 103, 104, 105)}

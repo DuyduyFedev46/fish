@@ -272,7 +272,9 @@ export function mockCustomersApi(req: MockRequest): MockResponse {
   if (id === null) {
     if (req.method !== "GET") return { status: 405, body: { detail: `Phương thức "${req.method}" không được chấp nhận.` } };
     if (mode() === "fail") return { status: 500, body: null };
-    return listResponse({ q: query.get("q") || "", ordering: query.get("ordering") || "", page: Math.max(1, Number(query.get("page") || "1") || 1) });
+    // Lô 17b-BE (TLA-L3): tìm khách chỉ qua POST search/ (từ khoá là SĐT/tên, không được vào URL). GET có `q` không rỗng → 400 SEARCH_USE_POST, không lặp lại `q`.
+    if ((query.get("q") || "").trim()) return { status: 400, body: { detail: "Tìm khách dùng ô tìm trên màn Khách hàng.", code: "SEARCH_USE_POST" } };
+    return listResponse({ q: "", ordering: query.get("ordering") || "", page: Math.max(1, Number(query.get("page") || "1") || 1) });
   }
   if (req.method === "POST") return { status: 405, body: { detail: `Phương thức "${req.method}" không được chấp nhận.` } };
   const p = load().find((x) => x.id === id);

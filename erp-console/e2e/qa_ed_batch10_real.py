@@ -366,7 +366,7 @@ def ph_loc_invoice_cost(browser):
     s.go("/purchasing/")
     pg.locator("table tbody tr").first.wait_for()
     tabs = [squash(t) for t in pg.get_by_role("tab").all_inner_texts()]
-    ok("loc: 3 tab Phiếu nhập / Hoá đơn mua / Chi phí mua", tabs == ["Phiếu nhập", "Hoá đơn mua", "Chi phí mua"], tabs)
+    ok("loc: 3 tab Phiếu nhập / Hoá đơn mua / Chi phí phụ", tabs == ["Phiếu nhập", "Hoá đơn mua", "Chi phí phụ"], tabs)
     heads = [squash(h) for h in pg.locator("table thead th").all_inner_texts()]
     ok("loc: danh sách có cột Tiền mua và Hoá đơn", any(h.startswith("Tiền mua") for h in heads) and "Hoá đơn mua" in heads, heads)
     row = pg.locator("table tbody tr", has_text=f"PR-{rid}").first
@@ -511,7 +511,7 @@ def ph_loc_invoice_cost(browser):
     s.go("/purchasing/?tab=costs")
     pg.locator("table tbody tr").first.wait_for()
     t = s.main()
-    ok("loc: tab Chi phí mua hiện 1.000.001 đ", "1.000.001 đ" in t, t[:200])
+    ok("loc: tab Chi phí phụ hiện 1.000.001 đ", "1.000.001 đ" in t, t[:200])
     shot(s, "tab-chi-phi-loc")
     # cột Hoá đơn của danh sách đã cập nhật
     s.go("/purchasing/")
@@ -741,7 +741,7 @@ def ph_roles(browser):
         t = s.main()
         if user == "ql1":
             tabs = [squash(x) for x in pg.get_by_role("tab").all_inner_texts()]
-            ok("ql1: 2 tab Phiếu nhập + Hoá đơn mua, KHÔNG có Chi phí mua", tabs == expect_tabs, tabs)
+            ok("ql1: 2 tab Phiếu nhập + Hoá đơn mua, KHÔNG có Chi phí phụ", tabs == expect_tabs, tabs)
             heads = [squash(h) for h in pg.locator("table thead th").all_inner_texts()]
             ok("ql1: danh sách không có cột Tiền mua nhưng có Hoá đơn", not any(h.startswith("Tiền mua") for h in heads) and "Hoá đơn mua" in heads, heads)
             s.go("/purchasing/?tab=invoices")
@@ -751,7 +751,7 @@ def ph_roles(browser):
             shot(s, "tab-hoa-don-ql1")
             s.go("/purchasing/?tab=costs")
             pg.wait_for_timeout(400)
-            ok("ql1: ?tab=costs rơi về tab Phiếu nhập (không thấy chi phí)", "1.000.001" not in s.main() and "Chi phí mua" not in [squash(x) for x in pg.get_by_role("tab").all_inner_texts()], s.main()[:200])
+            ok("ql1: ?tab=costs rơi về tab Phiếu nhập (không thấy chi phí)", "1.000.001" not in s.main() and "Chi phí phụ" not in [squash(x) for x in pg.get_by_role("tab").all_inner_texts()], s.main()[:200])
             s.go(f"/purchasing/detail/?id={rid}")
             pg.wait_for_timeout(500)
             d = s.main()
@@ -774,7 +774,7 @@ def ph_roles(browser):
             has_access = pg.locator("table tbody tr").count() > 0
             st, _, _ = call("GET", "/api/purchasing/receipts/", user)
             note(f"{user}: /purchasing/ -> API receipts {st}; menu {'có' if has_access else 'không có'} bảng; trang: {t[:100]}")
-            ok(f"{user}: không thấy Tiền mua / Hoá đơn / Chi phí / giá", all(x not in t for x in ("Tiền mua", "Hoá đơn mua", "Chi phí mua", "1.650.000", "80.000")), t[:200])
+            ok(f"{user}: không thấy Tiền mua / Hoá đơn / Chi phí / giá", all(x not in t for x in ("Tiền mua", "Hoá đơn mua", "Chi phí phụ", "1.650.000", "80.000")), t[:200])
             ok(f"{user}: API receipts không rò khoá giá vốn", True if st in (403, 401) else all(f'"{k}"' not in call("GET", "/api/purchasing/receipts/", user)[2] for k in COST_KEYS))
             shot(s, f"w2a-{user}")
             st1, _, _ = call("POST", "/api/purchasing/invoices/", user, {"supplier": 2, "amount": "100.00", "invoice_date": "2026-10-02"})
