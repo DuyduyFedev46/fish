@@ -29,6 +29,7 @@ from apps.common.audit import record_audit
 from apps.delivery.confirmation import call_scripts
 from apps.delivery.models import CallScript, ConfirmationTask, CustomerCall, DeliveryNote
 from apps.inventory.batches import services as batch_services
+from apps.inventory.returns import services as return_services
 from apps.inventory.models import (
     Batch,
     ReturnToStock,
@@ -55,6 +56,7 @@ PREFIX = "QA-"
 USER_PREFIX = "qa_"
 PHONE_PREFIX = "09000000"
 CALL_SCRIPT_PREFIX = "[QA] "
+CUSTOMER_NAME_PREFIX = "Khách QA Giả"
 SECTION_GROUP_NAME = "Hải sản"
 
 # username, các Group, là superuser, tên hiển thị. Tổ hợp: K+G (kho + giao), K+C (kho + gọi xác nhận).
@@ -206,7 +208,7 @@ class QaSeed:
         for n in range(1, 21):
             self.customers[n], _ = Customer.objects.get_or_create(
                 phone=fake_phone(n),
-                defaults=dict(name=f"Khách QA Giả {n:02d}", default_address=FAKE_ADDRESS.format(n=n)),
+                defaults=dict(name=f"{CUSTOMER_NAME_PREFIX} {n:02d}", default_address=FAKE_ADDRESS.format(n=n)),
             )
 
     def _batches(self):
@@ -227,6 +229,16 @@ class QaSeed:
                     batch=batch, movement_type=StockLedgerEntry.MovementType.RECEIPT,
                     qty_change=Decimal(qty_in), reference=f"Nhập lô {batch_id}",
                 )
+                # Lô tạo sẵn ở tồn thấp hơn số nhập: bút toán bù để tổng sổ = tồn (sổ nhập xuất, kiểm kê).
+                gap = Decimal(qty_stock) - Decimal(qty_in)
+                if gap:
+                    StockLedgerEntry.objects.create(
+                        batch=batch, qty_change=gap,
+                        movement_type=(StockLedgerEntry.MovementType.WRITE_OFF
+                                       if status == Batch.Status.CANCELLED
+                                       else StockLedgerEntry.MovementType.SALE),
+                        reference="QA-bút toán bù cho lô dựng sẵn",
+                    )
                 if status == Batch.Status.CLOSED:
                     Batch.objects.filter(pk=batch.pk).update(
                         closed_at=self.now, closed_by=self.users["qa_owner"])
@@ -486,11 +498,16 @@ class QaSeed:
                 self.returns[text] = ReturnToStock.all_objects.get(note=text)
                 continue
             approved = status == ReturnToStock.Status.APPROVED
-            self.returns[text] = ReturnToStock.all_objects.create(
+            rt = ReturnToStock.all_objects.create(
                 delivery_note=note, batch=self.batches["QA-LO-01"], qty=Decimal("1.000"),
                 left_warehouse_at=self.now - timedelta(hours=3), returned_at=self.now - timedelta(hours=1),
-                decision=decision, status=status, created_by=self.users["qa_courier2"],
-                approved_by=self.users["qa_manager"] if approved else None, note=text)
+                decision=decision,
+                status=ReturnToStock.Status.DRAFT if approved else status,
+                created_by=self.users["qa_courier2"], note=text)
+            if approved:  # đi qua service để có bút toán RETURN_RESTOCK và cộng tồn
+                return_services.apply_return(return_to_stock=rt, approver=self.users["qa_manager"])
+                rt.refresh_from_db()
+            self.returns[text] = rt
 
     def _receipts(self):
         specs = [

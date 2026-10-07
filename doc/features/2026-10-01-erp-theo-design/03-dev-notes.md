@@ -2797,3 +2797,9 @@ Test mới `sales/orders/tests/test_order_search_post.py` (17 ca). Test cũ chuy
 - Cổng chặn (`guard.py`): cần `DEBUG` bật và (SQLite hoặc DB/host có `staging`). DB giống production (PostgreSQL tên `postgres`, hoặc tên/host có `prod` mà không có `staging`) luôn bị từ chối, kể cả khi có `--allow-non-local`. Cờ đó chỉ nới DEBUG tắt / Postgres dev. `--reset` cũng qua cổng.
 - Idempotent (test: chạy hai lần cùng số bản ghi và cùng bảng mã → id); `--reset` xoá theo tiền tố, giữ bản ghi còn bị dữ liệu khác tham chiếu (test: dữ liệu không QA còn nguyên, AuditLog QA bị xoá).
 - Nợ: (1) hạn giữ chỗ `QA-SO-01/02/13` tính từ lúc seed (25, 3, 20 phút), job `cancel_expired_orders` sẽ huỷ sau đó, kịch bản cần đơn BOOKED thì seed ngay trước khi chạy; (2) ngày/giờ trong dữ liệu là thời điểm seed, chỉ mã cố định; không có đồng hồ đóng băng (kịch bản `qa_lo8_real` cần riêng); (3) kịch bản e2e chưa được viết lại để đọc `/tmp/seed_qa_ids.json` (phần FE/QA); (4) chưa chạy trên staging thật, chỉ SQLite.
+
+### seed_qa — sửa theo review techlead (08/10)
+- **M1** `qa_fixture/reset.py`: khách chỉ xoá khi SĐT thuộc đúng 20 SĐT giả và tên bắt đầu "Khách QA Giả"; AuditLog chỉ xoá dòng gắn đối tượng QA (model + id, tính trước khi xoá) hoặc note `QA-audit-`, không xoá theo người làm; Refund chỉ xoá khi gắn hoá đơn hoặc khoản tiền về mã `QA-`; user `qa_…` còn bị dữ liệu ngoài QA tham chiếu thì giữ, `is_active=False`, báo `User:<tên>` trong `kept`. Test mới: khách `0900000050`, Nhật ký của `qa_owner` trên mặt hàng ngoài QA, phiếu hoàn do `qa_owner` lập trên đơn ngoài QA đều còn nguyên, `qa_owner` nằm trong `kept`.
+- **L1** `guard.py`: `SEPAY_ENV=PRODUCTION` luôn bị từ chối, không cờ nào mở (có test).
+- **L2** `QA-LO-07/08` thêm bút toán bù (SALE / WRITE_OFF, `reference` có `QA-`); hàng hoàn APPROVED đi qua `returns.apply_return` (có RETURN_RESTOCK, cộng tồn). Test "tổng sổ = tồn" cho mọi lô QA.
+- **L3** README: không commit tệp bảng mã.

@@ -22,9 +22,12 @@ from apps.accounts.qa_fixture import guard
 from apps.accounts.qa_fixture.build import USERS
 from apps.catalog.models import Item, ItemGroup
 from apps.delivery.models import CallScript, ConfirmationTask, DeliveryNote
-from apps.inventory.models import Batch, ReturnToStock, StockReconciliation, Warehouse
+from apps.common.audit import record_audit
+from apps.inventory.models import Batch, ReturnToStock, StockLedgerEntry, StockReconciliation, Warehouse
 from apps.purchasing.models import PurchaseReceipt
-from apps.sales.models import Customer, PaymentTransaction, Refund, SalesOrder
+from django.db.models import Sum
+
+from apps.sales.models import Customer, PaymentTransaction, Refund, SalesInvoice, SalesOrder
 
 PASSWORD = "Qa-Test-Pass-1"
 User = get_user_model()
@@ -116,6 +119,14 @@ class SeedQaGuardTests(SeedQaBase):
                     self.assertIn("production", str(ctx.exception))
         self.assertEqual(SalesOrder.objects.count(), 0)
 
+    def test_sepay_production_is_always_refused_even_with_flag(self):
+        for flags in ((), ("--allow-non-local",)):
+            with override_settings(DEBUG=True, SEPAY_ENV="PRODUCTION"):
+                with self.assertRaises(CommandError) as ctx:
+                    call_command("seed_qa", *flags, "--manifest", str(self.manifest_path), stdout=StringIO())
+            self.assertIn("SEPAY_ENV", str(ctx.exception))
+        self.assertEqual(SalesOrder.objects.count(), 0)
+
     def test_staging_database_is_allowed_with_debug_on(self):
         with self._facts("cangca_staging", "db.supabase.co"):
             self.run_seed()
@@ -170,21 +181,54 @@ class SeedQaNoRealDataTests(SeedQaBase):
     def test_reset_removes_only_qa_records(self):
         real_group = ItemGroup.objects.create(name="Nhóm thật thử")
         real_item = Item.objects.create(code="CA-THAT", name="Cá thật thử", item_group=real_group)
-        real_customer = Customer.objects.create(phone="0900000500", name="Khách thử khác")
+        # Khách có SĐT cùng tiền tố 09000000 nhưng không thuộc 20 khách QA (M1.1).
+        real_customer = Customer.objects.create(phone="0900000050", name="Khách thử khác")
         real_user = User.objects.create_user("kho_thu", password="x")
         real_warehouse = Warehouse.objects.create(name="Kho thật thử")
         self.run_seed()
         self.assertTrue(self.manifest_path.exists())
-        self.run_seed("--reset")
+        qa_owner = User.objects.get(username="qa_owner")
+        # M1.2: Nhật ký do qa_owner làm trên mặt hàng KHÔNG phải QA.
+        real_log = record_audit("update_item", actor=qa_owner, obj=real_item, changes={"name": "x"})
+        # M1.3: phiếu hoàn tiền do qa_owner lập trên đơn KHÔNG phải QA.
+        real_order = SalesOrder.objects.create(
+            code="SO-THAT-1", customer=real_customer, status=SalesOrder.Status.PROCESSING,
+            delivery_address="Địa chỉ thử", phone=real_customer.phone, total_amount=1000)
+        real_invoice = SalesInvoice.objects.create(
+            code="HD-THAT-1", sales_order=real_order, customer=real_customer,
+            issued_at=real_order.created_at, amount=1000)
+        real_refund = Refund.objects.create(sales_invoice=real_invoice, amount=1000, created_by=qa_owner,
+                                            reason="thật")
+        output = self.run_seed("--reset")
         self.assertFalse(self.manifest_path.exists())
-        self.assertEqual(SalesOrder.objects.count(), 0)
-        self.assertEqual(DeliveryNote.objects.count(), 0)
+        self.assertEqual(SalesOrder.objects.filter(code__startswith="QA-").count(), 0)
+        self.assertEqual(DeliveryNote.objects.filter(code__startswith="QA-").count(), 0)
         self.assertEqual(Batch.objects.count(), 0)
-        self.assertEqual(AuditLog.objects.count(), 0)
-        self.assertEqual(User.objects.filter(username__startswith="qa_").count(), 0)
+        self.assertEqual(Customer.objects.filter(name__startswith="Khách QA Giả").count(), 0)
         self.assertEqual(Item.objects.filter(code__startswith="QA-").count(), 0)
-        for obj in (real_item, real_customer, real_user, real_warehouse):
+        self.assertFalse(AuditLog.objects.filter(note__startswith="QA-audit-").exists())
+        self.assertFalse(AuditLog.objects.filter(object_repr__startswith="QA-").exists())
+        for obj in (real_item, real_customer, real_user, real_warehouse, real_log, real_order,
+                    real_invoice, real_refund):
             self.assertTrue(type(obj).objects.filter(pk=obj.pk).exists(), obj)
+        # qa_owner còn bị dữ liệu ngoài QA tham chiếu: giữ, vô hiệu hoá, báo trong kết quả.
+        qa_owner.refresh_from_db()
+        self.assertFalse(qa_owner.is_active)
+        self.assertIn("qa_owner", output)
+        # Các tài khoản qa_ khác không bị tham chiếu thì đã xoá.
+        self.assertEqual(set(User.objects.filter(username__startswith="qa_").values_list("username", flat=True)),
+                         {"qa_owner"})
+
+    def test_reset_result_reports_kept_users(self):
+        from apps.accounts.qa_fixture.reset import reset_qa
+        self.run_seed()
+        item = Item.objects.get(code="QA-CA")
+        Item.objects.create(code="CA-THAT2", name="x", item_group=item.item_group)
+        owner = User.objects.get(username="qa_owner")
+        record_audit("update_item", actor=owner, obj=Item.objects.get(code="CA-THAT2"))
+        with override_settings(DEBUG=True):
+            result = reset_qa()
+        self.assertIn("User:qa_owner", result["kept"])
 
     def test_seed_after_reset_restores_the_same_codes(self):
         self.run_seed()
@@ -277,3 +321,13 @@ class SeedQaCoverageTests(SeedQaBase):
         for batch in Batch.objects.all():
             self.assertGreaterEqual(batch.qty_available, batch.qty_reserved)
             self.assertGreaterEqual(batch.qty_reserved, 0)
+
+    def test_ledger_sum_equals_stock_for_every_qa_batch(self):
+        for batch in Batch.objects.all():
+            total = StockLedgerEntry.objects.filter(batch=batch).aggregate(t=Sum("qty_change"))["t"] or 0
+            self.assertEqual(total, batch.qty_available, batch.batch_id)
+
+    def test_approved_return_went_through_service_and_restocked(self):
+        entry = StockLedgerEntry.objects.filter(
+            movement_type=StockLedgerEntry.MovementType.RETURN_RESTOCK, batch__batch_id="QA-LO-01")
+        self.assertEqual(entry.count(), 1)

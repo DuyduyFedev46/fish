@@ -124,6 +124,7 @@ QA_PASSWORD='mật-khẩu-tự-chọn' .venv/bin/python manage.py seed_qa  # d�
 - **Bảng mã → id** in ra màn hình và ghi `/tmp/seed_qa_ids.json` (đổi bằng `--manifest`): khoá `users`, `customers`,
   `items`, `batches`, `orders`, `invoices`, `delivery_notes`, `payments`, `refunds`, `returns`, `receipts`,
   `stocktakes`, `call_scripts`. Kịch bản e2e đọc tệp này thay vì cứng id.
+- **Không commit** tệp bảng mã (`/tmp/seed_qa_ids.json`) và đừng đặt `--manifest` vào trong repo: tuy chỉ chứa id, mã và SĐT giả, nó là đầu ra của một lần chạy.
 - **Mật khẩu** các tài khoản `qa_…` lấy từ env `QA_PASSWORD` (bắt buộc, không mặc định, không in ra).
 - **Tài khoản:** `qa_owner`, `qa_manager`, `qa_warehouse`, `qa_courier1`, `qa_courier2`, `qa_cs1`, `qa_cs2`,
   tổ hợp `qa_warehouse_courier` (K+G), `qa_warehouse_cs` (K+C), `qa_nogroup` (không nhóm), `qa_superuser`.
@@ -133,11 +134,10 @@ QA_PASSWORD='mật-khẩu-tự-chọn' .venv/bin/python manage.py seed_qa  # d�
   kiểm kê Nháp + Chờ duyệt; lô `QA-LO-01…08` (đang bán, cận hạn, quá hạn 6,5 kg, nháp, đã chốt, hết hàng, đã huỷ);
   khoản tiền về ORPHAN/UNMATCHED/OVERPAID/MANUAL có nhãn nghi trùng; kịch bản gọi; Nhật ký đủ người/hệ thống/AI.
 - **Dữ liệu cá nhân hoàn toàn giả:** SĐT `09000000nn`, tên "Khách QA Giả nn", địa chỉ "QA-Địa chỉ giả…".
-- **Cổng chặn:** chỉ chạy khi `DJANGO_DEBUG=1` VÀ (SQLite hoặc tên DB/host có `staging`). DB giống production
+- **Cổng chặn:** `SEPAY_ENV=PRODUCTION` luôn bị từ chối. Chỉ chạy khi `DJANGO_DEBUG=1` VÀ (SQLite hoặc tên DB/host có `staging`). DB giống production
   (PostgreSQL tên `postgres`, hoặc tên/host có `prod` không có `staging`) bị từ chối, **không cờ nào mở được**.
   `--allow-non-local` chỉ nới điều kiện DEBUG/loại DB (vd Postgres dev trên máy).
-- **Idempotent:** chạy lại không nhân đôi. `--reset` xoá theo tiền tố `QA-`/`qa_` và SĐT `09000000nn`; bản ghi còn
-  bị dữ liệu khác tham chiếu thì giữ lại và báo. Ngoại lệ có chủ đích của BR-PQ-10/06, chỉ cho dữ liệu QA.
+- **Idempotent:** chạy lại không nhân đôi. `--reset` chỉ xoá đối tượng mang mã `QA-`, đúng 20 khách giả (đủ SĐT và tên "Khách QA Giả") và Nhật ký gắn với đối tượng QA; không xoá theo người làm. Tài khoản `qa_…` còn bị dữ liệu ngoài QA tham chiếu thì giữ lại, vô hiệu hoá (`is_active=False`) và báo trong `kept`. Ngoại lệ có chủ đích của BR-PQ-10/06, chỉ cho dữ liệu QA.
 - Hạn giữ chỗ của `QA-SO-01/02/13` tính từ lúc seed (25, 3, 20 phút): đừng chạy `cancel_expired_orders` giữa chừng.
 
 ## Tham số cấu hình (không hard-code) — `.env` / `settings.py`
