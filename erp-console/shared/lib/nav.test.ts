@@ -29,7 +29,9 @@ const WAREHOUSE = viewer({
 describe("superuser chỉ thuộc delivery_staff (N1)", () => {
   it("thấy menu như Chủ, không bị thu gọn như nhân viên giao", () => {
     const su = viewer({ ...OWNER, groups: [ROLE.deliveryStaff], is_superuser: true });
-    expect(menuItems(su).length).toBeGreaterThanOrEqual(menuItems(OWNER).length);
+    // Đúng bằng menu của Chủ, cộng "Việc giao của tôi" vì superuser này thật sự thuộc nhóm NV giao.
+    const keys = (me: Viewer) => menuItems(me).map((n) => n.key).sort();
+    expect(keys(su)).toEqual([...keys(OWNER), "my-deliveries"].sort());
     expect(menuItems(su).length).toBeGreaterThan(menuItems(DELIVERY).length);
   });
 });
