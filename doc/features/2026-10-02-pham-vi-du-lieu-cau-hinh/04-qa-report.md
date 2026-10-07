@@ -368,3 +368,84 @@ Bảy dòng FAIL ở lượt chạy đầu của `ui.py` là do tôi: `/refunds/
 - `regress.sh`: 5 kịch bản e2e hồi quy, tất cả rc=0, 0 dòng FAIL.
 - `npm ci` + `tsc --noEmit` trong bản copy sạch: rc=0, rc=0.
 - Đã tắt mọi server (8641, 8642, 3641, 3642).
+
+## QA cụm Phạm vi (08/10)
+
+> qa-tester · worktree `.claude/worktrees/pv-cum`, nhánh `feat/pham-vi-cum`, HEAD `d3df9fb` (main `cfc039b` + `feat/pham-vi-du-lieu` + `feat/pham-vi-fe`). Lần đầu tổ hợp BE + FE. Mọi dữ liệu là dữ liệu giả của `seed_qa` ("Khách QA Giả nn", SĐT `09000000nn`). Không sửa code. Chạy trên BE thật (SQLite tạm, `DJANGO_DEBUG=1`, cổng 8631) + ERP build `NEXT_PUBLIC_USE_MOCK=0` (cổng 3531) bằng Playwright thật. Đã tắt mọi server (8631, 3531, 3601, 3602) và gỡ build tạm.
+
+### Kết luận: APPROVED — 0 lỗi chặn. Không rò giá vốn, không rò dữ liệu khách, phạm vi và V2 có hiệu lực đúng ở API lẫn giao diện thật, 409 và cảnh báo mở rộng chạy đúng ở trình duyệt.
+### Tổng: ≈ 160 ca thủ công (API + trình duyệt) + 392 lời khẳng định e2e hồi quy + 3532 test BE + 1280 test FE + 4 test Postgres · ✅ tất cả · ❌ 0 · ⏸ 2 (xem cuối mục)
+(Có 14 dòng "FAIL" lúc chạy kịch bản là **lỗi kịch bản của QA**, đã đo lại đúng và tính ✅: 10 dòng do tôi gán phiếu giao cho Quản lý, mà BE đúng khi trả 400 `DELIVERY_ASSIGNEE_INVALID` vì Quản lý không thuộc nhóm NV giao, và truyền `customer` là dict thay vì id; 2 dòng "console sạch" là nhiễu `Failed to fetch RSC payload` của `python -m http.server` (các e2e của dự án đều lọc dòng này); 2 dòng đếm cứng 4 phiếu của courier1 trong khi tôi đã gán thêm phiếu thứ 5, hành vi vẫn đúng; 1 dòng `rate` ở hoá đơn là **giá bán**, không phải giá vốn; 1 ca đua SQLite `database is locked`, kiểm lại trên Postgres.)
+
+### Theo AC (bằng chứng chạy thật)
+| Mã AC | Kết quả | Bằng chứng |
+|---|---|---|
+| PV-11 (W3i khối Phạm vi) | ✅ | Chủ (superuser không nhóm) mở `/permissions/detail/?group=manager` trên BE thật: 8 dòng D1..D8 đúng thứ tự, Hoá đơn "Theo Đơn hàng" không ô chọn, 6 ô chọn, registry thật có việc "Xem thông tin khách trên đơn, hoá đơn, phiếu hoàn tiền". Ảnh `u1-manager-before.png`, `u1-manager-after.png` |
+| PV-09 (cảnh báo mở rộng) | ✅ | Thu hẹp D1 Quản lý: POST preview rồi hộp xác nhận không có chữ cảnh báo dữ liệu khách, đúng 1 PUT. Mở rộng D1 NV giao → `all`: hộp "Cho thêm người xem dữ liệu khách?", "3 người … sẽ thấy tên, SĐT, địa chỉ khách", 3 tên nhân viên giả, Huỷ không gửi PUT (`u1-widen-dialog.png`). API: PUT thiếu xác nhận → 400 `CUSTOMER_DATA_WIDENING_UNCONFIRMED` kèm `impact`; bật lại V2 không xác nhận → 400; có xác nhận → 200 |
+| PV-10 (hai người cùng lưu) | ✅ | Hai tab cùng nhóm Nhân viên kho: tab A lưu 200, tab B nhận 409 `GROUP_CHANGED`, banner "Nhóm này vừa được người khác đổi. Tải lại để xem bản mới." + nút Tải lại, đúng 1 PUT (không tự gửi lại), BE giữ giá trị của tab A, Tải lại cho giá trị server (`u1-conflict.png`). Đua thật 2 luồng song song: Postgres `test_pv10_ac5_two_parallel_saves_one_wins` OK (không skip); SQLite cho `[200, 500]` do khoá DB, đúng như ghi từ QA Lô 4+5 |
+| PV-08 (quyền sửa, AuditLog) | ✅ | PUT và preview: Quản lý, NV kho, NV giao, CSKH, K+G, K+C đều 403; chưa đăng nhập 401; nhóm `owner` 400 `GROUP_LOCKED`; superuser không nhóm 200; version sai 409; giá trị sai 400 `SCOPE_VALUE_INVALID`; `invoices` 400 `SCOPE_READ_ONLY`; trường lạ 400; body rỗng 400. Màn Quản lý và NV kho: không ô chọn, không nút Lưu, console sạch (`u1-qa_manager-readonly.png`). Nhóm Chủ: không ô chọn, "Chủ luôn thấy tất cả" ×8 (`u1-owner-locked.png`) |
+| PV-03 (đơn, hoá đơn) | ✅ | Quản lý D1 `assigned_deliveries` (Chủ lưu từ màn): đơn, hoá đơn, phiếu hoàn = 0 dòng (Chủ thấy 17/12/3); chi tiết đơn/hoá đơn/phiếu hoàn ngoài phạm vi 404. D1 `assigned_or_confirmation`: tập hẹp (4 đơn rồi 2 đơn sau khi tôi gọi xong việc, đúng luật), hoá đơn theo đơn, chi tiết trong 200 và ngoài 404. Đổi về `all`: request kế (cùng token) thấy đủ 17 |
+| C1 (dashboard theo phạm vi) | ✅ | Quản lý thu hẹp: `pending_orders` 0 (Chủ 11), `recent_orders` rỗng, `revenue_today` 0 (Chủ > 0). D1 `assigned_or_confirmation`: `pending_orders` 4 < 11, mọi đơn gần đây nằm trong tập hẹp. Màn Tổng quan mở được, không lỗi |
+| PV-05 (tìm đơn, khách D7) | ✅ | `POST /sales/orders/search/` với Quản lý thu hẹp: `q` mã đơn, SĐT, tên, `customer`, `status` đều 0 kết quả; Chủ cùng `q` có kết quả. D1 hẹp: `q` đúng tập hẹp; `customer` ngoài D1 → 0; **`customer` ngoài D7 dù đơn trong D1 → 0**, trong D7 → 1; danh bạ khách 0 và chi tiết khách ngoài D7 404; trả D7 `all` → 1 |
+| PV-07 (V2) | ✅ | Tắt V2 của Quản lý: danh sách đơn 17 dòng, hoá đơn 12, phiếu hoàn 3, chi tiết đơn/hoá đơn/phiếu hoàn: **0 chuỗi tên/SĐT/địa chỉ giả**, `customer_hidden_reason`. Tìm theo SĐT hoặc tên khi V2 tắt: 0 (không dò được); tìm mã đơn vẫn chạy. Tắt V2 của NV giao: đơn có dòng nhưng ẩn khách; ảnh `u2-orders-v2off.png`, `u2-detail-v2off.png`. Bật lại: có xác nhận mới qua (400 nếu thiếu), request kế thấy tên |
+| Câu 7 (phiếu giao luôn đủ) | ✅ | V2 tắt: Quản lý và NV giao vẫn thấy tên + SĐT + địa chỉ ở danh sách và chi tiết phiếu giao; màn Giao hàng ở trình duyệt vẫn có "Khách QA Giả" (`u2-delivery-v2off.png`) |
+| Tem `/label/` | ✅ | `recipient_phone_masked: "09xx xxx 006"`, không có SĐT đầy đủ, kể cả khi V2 tắt (Duy chưa đổi, đúng). Câu hỏi Q1 vẫn mở |
+| Câu 4 (NV giao) | ✅ | courier1: phiếu và đơn chỉ của mình, chi tiết có tên/SĐT/địa chỉ; courier2 mở phiếu của courier1 → 404, mở phiếu mình 200. Giao diện "Việc giao của tôi": thấy tên khách, không thấy phiếu QA-GH-09/11/12 của courier2 (`u2-courier.png`) |
+| Câu 9 (kiêm K+C) | ✅ | `qa_warehouse_cs`: hàng chờ thấy các việc đang chờ; `?state=DONE`: chỉ việc **mình gọi** (QA-GH-16) có tên/SĐT, 8 việc người khác đã xong chỉ còn `phone_masked` (tên, SĐT `null`); chi tiết việc người khác xong 404, việc mình gọi 200, việc đang chờ người khác gọi lại 200. `qa_cs1` thấy PII đúng việc mình gọi, `qa_cs2` (không gọi gì) 404 và không PII. Chủ, Quản lý thấy tất cả |
+| D-3 (người không nhóm) | ✅ | `qa_nogroup` (có quyền gán trực tiếp xem đơn, xem hoàn tiền): `/sales/orders/`, `/staff/groups/`, `/dashboard/summary/`, `/delivery/notes/`, `/confirmation/queue/`, `/customer-directory/`, `/inventory/batches/`, `/catalog/items/`, `POST orders/search/` đều 403 `AUTH_NO_ROLE`; `/auth/me/` 200 với `home: "no-role"`, 2 quyền. Đổi mật khẩu vẫn tới được logic (400 mật khẩu cũ sai, không phải 403). Superuser không nhóm: `home: "dashboard"`, `is_superuser: true`, 181 quyền, vào được toàn bộ ERP và màn Phân quyền |
+| PV-12 (sàn cứng) | ✅ | Giá vốn: Quản lý, NV kho, NV giao, CSKH, K+G, K+C không có khoá `purchase_rate`, `landed_unit_cost`, `unit_cost`, `cogs`, `gross_profit`, `inventory_value` ở 12 endpoint (đơn, hoá đơn, phiếu hoàn, phiếu giao, hàng hoàn, dashboard, attention, hàng chờ, nhóm, me). `rate` ở dòng hoá đơn là giá bán (100000), Chủ mới có `unit_cost`/`cogs`/`gross_profit` |
+
+### Ngoại lệ & biên
+| Ca | Kết quả |
+|---|---|
+| Màn cũ (trạng thái đã đổi): tab B lưu với `version` cũ | ✅ 409 + banner, không ghi đè |
+| Bấm lưu đồng thời 2 PUT cùng version (Postgres) | ✅ 1 thắng, 1 thua (test đua Postgres OK) |
+| Preview không ghi gì | ✅ `version`, phạm vi, số dòng AuditLog trước/sau bằng nhau; preview chỉ có tên nhân viên giả |
+| Dữ liệu đã từng bán/đã giao: đơn đã xong, đã huỷ, phiếu hoàn đã hoàn | ✅ vẫn nằm đúng phạm vi D1 (chi tiết 404 ngoài phạm vi) |
+| Cờ bật/tắt: V2 tắt rồi bật, AI tắt và bật ở e2e mock | ✅ hiệu lực ngay ở request kế (cùng token) |
+| Thu hẹp chủ động rồi mở lại phải có xác nhận | ✅ `CUSTOMER_DATA_WIDENING_UNCONFIRMED` |
+| Mở thẳng URL đơn ngoài phạm vi trên giao diện | ✅ không lộ tên/SĐT (`u2-out-of-scope.png`) |
+| Việc đã gọi xong trong cửa sổ N ngày so với ngoài cửa sổ | ✅ (đã phủ ở QA Lô 4+5, test BE xanh) |
+
+### Phân quyền (Group × hành động)
+| Hành động | Chủ | Quản lý | NV kho | NV giao | CSKH | K+G | K+C | Không nhóm | Superuser | Chưa đăng nhập |
+|---|---|---|---|---|---|---|---|---|---|---|
+| PUT `/staff/groups/<code>/capabilities/` | 200 | 403 | 403 | 403 | 403 | 403 | 403 | 403 (`AUTH_NO_ROLE`) | 200 | 401 |
+| POST `…/permissions-preview/` | 200 | 403 | 403 | 403 | 403 | 403 | 403 | 403 | 200 | 401 |
+| Màn Phân quyền | sửa được | chỉ xem | chỉ xem | không menu | không menu | không menu | không menu | `/no-role/` | sửa được | `/login/` |
+| Đọc đơn | tất cả | theo D1 | theo D1 | gán cho mình | theo D1 | tất cả (rộng nhất) | tất cả | 403 | tất cả | 401 |
+
+### Rò giá vốn: không (xem dòng PV-12). Rò dữ liệu cá nhân: không
+- API công khai: không đụng trong cụm này; suite BE (3532) có các test ẩn danh Shop xanh.
+- AuditLog: 17 dòng `change_group_*` (`changes` chỉ mã đối tượng, giá trị, cờ `customer_data_widening_confirmed`); quét chuỗi giả khách: 0; quét khoá giá vốn (`rate`, `landed`, `unit_cost`, `purchase_`, `cogs`, `profit`): 0. Không tính ngược ra giá vốn được từ khoá nào.
+- Log server (`runserver`, 5 phiên): 0 chuỗi tên/SĐT/địa chỉ giả; 0 `Traceback` ngoài `database is locked` của ca đua SQLite.
+- Trình duyệt: `localStorage`/`sessionStorage` (trừ `cave_erp_token`) và URL không chứa SĐT hay tên giả ở mọi phiên (ui1, ui2) và ở `ed_batch6_customers_real`; console sạch (trừ nhiễu RSC của máy chủ tĩnh).
+- Nhóm không cần thì không thấy dữ liệu khách: NV kho/NV giao/CSKH vào `/customers/` thấy "Không có quyền", không gọi `customer-directory`.
+
+### Hồi quy
+| Kịch bản | Kết quả |
+|---|---|
+| `manage.py test` toàn bộ trên nhánh gộp, SQLite, tuần tự | `Ran 3532 tests in 183.188s · OK (skipped=7)` |
+| `apps.accounts.data_scopes.tests.test_query_budget_and_race` trên Postgres 16 | `Ran 4 tests · OK` (đua PV-10-AC5 chạy thật, không skip) |
+| `tsc --noEmit` (erp-console) | rc=0 |
+| `vitest run` | 105 file, **1280 passed** |
+| `next build` ×3 (thật `USE_MOCK=0`, mock, mock + `AI_FEATURES=1`) | cả ba thành công |
+| e2e `ed_batch14_permissions` mock AI tắt / AI bật | **157/157** / **157/157 PASS** |
+| e2e `standard_names_all_routes` mock | 11/11 PASS |
+| e2e BE thật (seed lại DB mỗi kịch bản): `ed_batch3_real`, `ed_batch6_customers_real`, `standard_names_all_routes REAL=1` | 25/25, 32/32, 10/10 PASS (rc=0, 0 FAIL) |
+
+### Lỗi
+Không có lỗi chặn. Ghi nhận mức Low (không chặn):
+- **L-A (Low, chưa đối chiếu với main):** trang nhóm ở 1280px, bảng "Thành viên" bị cắt cột "Thao tác" ở mép phải (nút "Bỏ khỏi nhóm" hiện "Bỏ khỏi n…", `u1-conflict.png`, `u1-widen-dialog.png`). F1 không sửa bảng này (`git diff main..HEAD` không có thay đổi về bảng thành viên), nhiều khả năng đã có từ trước.
+- **L-B (Low, vận hành):** trước deploy production nhắc lại 02c §B.4: đếm tài khoản `is_active`, không superuser, không nhóm; họ mất quyền vào ERP ngay (D-3).
+
+### Chưa kiểm (⏸)
+1. `npm ci` sạch (không `--legacy-peer-deps`): `node_modules` của worktree là symlink theo chỉ dẫn, nên tôi không chạy lại `npm ci`; `tsc`, `vitest` và ba lần `next build` đều xanh trên bộ cài sẵn.
+2. Suite Postgres toàn bộ (3532): chỉ điều phối viên chạy; tôi chỉ chạy lại module đua trên Postgres (xanh).
+
+### Lệnh đã chạy (rút gọn)
+- Nền: `manage.py test --noinput` (SQLite) → `Ran 3532 … OK (skipped=7)`; `tsc --noEmit` rc=0; `vitest run` 1280 passed.
+- `up.sh` (build ERP thật), `be.sh` (migrate, `bootstrap_masterdata`, `seed_qa`), `srv.sh` (runserver 8631, `THROTTLE_LOGIN_*` nới bằng biến môi trường, không sửa code; đã xác nhận bản mặc định trả 429 khi đăng nhập quá nhanh).
+- Kịch bản tạm (scratchpad `qapv/`): `ui1.py`, `ui1c.py`, `ui2.py` (Playwright thật), `p2.py`, `p2b.py`, `p3.py`, kịch bản đua và quét giá vốn (HTTP thật).
+- `mockbuild.sh` + `reg.sh`: 6 e2e hồi quy, tổng kết `reg/summary.txt`: 6 dòng rc=0, 0 FAIL.
+- Đã tắt server 8631, 3531, 3601, 3602.
