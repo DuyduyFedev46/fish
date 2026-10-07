@@ -44,7 +44,7 @@ def submit_receipt(*, receipt, actor):
     batches = []
     with transaction.atomic():
         locked = lock_draft_receipt(receipt)
-        lines = list(locked.lines.select_for_update(of=("self",)).select_related("item"))
+        lines = list(locked.lines.select_for_update().order_by("pk"))
         for line in lines:
             if line.batch_id is not None:
                 # dòng đã có lô (dữ liệu cũ) -> giữ nguyên, không sinh lô trùng
@@ -202,7 +202,7 @@ def cancel_receipt(*, receipt, actor):
         if receipt.invoices.exists():
             raise BusinessError("Không thể huỷ phiếu nhập đã gắn hoá đơn mua.", code="BR-MH-07")
 
-        lines = list(receipt.lines.select_for_update(of=("self",)).select_related("batch"))
+        lines = list(receipt.lines.select_for_update().order_by("pk"))
         batch_ids = [line.batch_id for line in lines if line.batch_id]
         batches = list(Batch.objects.select_for_update().filter(id__in=batch_ids).order_by("pk"))
 

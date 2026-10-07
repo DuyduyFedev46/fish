@@ -51,16 +51,26 @@ def record_purchase_cost(*, cost_type, amount, allocation_method, incurred_date,
     with transaction.atomic():
         resolved = [_resolve_allocation(a) for a in allocations]
 
-        # Khoá các lô đích rồi kiểm trạng thái trong khoá, để huỷ phiếu song song không lọt qua.
+        # Khoá các lô đích (order_by pk, cùng thứ tự với cancel_receipt) rồi kiểm trạng thái phiếu trong khoá,
+        # để huỷ phiếu song song không lọt qua. KHÔNG select_related qua quan hệ ngược/nullable trong câu khoá:
+        # với FOR UPDATE OF bảng chính, Postgres không nạp lại phía nối ngoài sau khi chờ khoá (B2, QA 08/10).
+        # Trạng thái phiếu đọc bằng truy vấn mới SAU khoá và không khoá phiếu: không đảo thứ tự khoá phiếu -> lô
+        # của cancel_receipt nên không deadlock; cancel_receipt vẫn tự chặn nếu chi phí vào trước (kiểm
+        # cost_allocations sau khi khoá lô).
         locked = {
-            b.pk: b for b in Batch.objects.select_for_update(of=("self",)).select_related("source_line__receipt")
+            b.pk: b for b in Batch.objects.select_for_update(of=("self",))
             .filter(pk__in=[batch.pk for batch, _ in resolved]).order_by("pk")
         }
         resolved = [(locked[batch.pk], amt) for batch, amt in resolved]
+        cancelled_batch_ids = set(
+            PurchaseReceipt.objects.filter(
+                status=PurchaseReceipt.Status.CANCELLED, lines__batch_id__in=list(locked)
+            ).values_list("lines__batch_id", flat=True)
+        )
 
         # BR-MH-07: không phân bổ chi phí vào lô của phiếu nhập đã huỷ (đổi giá vốn chứng từ đã huỷ)
         for batch, _ in resolved:
-            if _is_cancelled_batch(batch):
+            if batch.pk in cancelled_batch_ids:
                 raise BusinessError(
                     f"Lô {batch.batch_id} thuộc phiếu nhập đã huỷ, không thêm chi phí được (BR-MH-07).",
                     code="BATCH_CANCELLED",
@@ -98,15 +108,6 @@ def record_purchase_cost(*, cost_type, amount, allocation_method, incurred_date,
             raise BusinessError(message, code="COST_LANDED_OVERFLOW", extra={"allocations": [message]})
 
     return cost
-
-
-def _is_cancelled_batch(batch):
-    """
-    Lô sinh từ phiếu nhập đã huỷ (BR-MH-07). Không xét `batch.status`: lô bị huỷ vì quá hạn
-    (`cancel_expired_batch`, BR-LO-03) là lô thật, chưa chốt, vẫn nhận chi phí đến muộn (E-14, BR-GV-02).
-    """
-    line = getattr(batch, "source_line", None)
-    return line is not None and line.receipt.status == PurchaseReceipt.Status.CANCELLED
 
 
 def _resolve_allocation(entry):

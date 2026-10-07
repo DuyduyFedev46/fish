@@ -9,6 +9,7 @@ from datetime import timedelta
 import logging
 import uuid
 from django.conf import settings
+from django.contrib.auth.models import User
 from django.db import transaction
 from django.utils import timezone
 
@@ -66,10 +67,12 @@ def claim_task(task_id: int, user, *, now=None) -> ConfirmationTask:
     """
     now = now or timezone.now()
     with transaction.atomic():
-        # Khoá dòng ConfirmationTask
-        task = ConfirmationTask.objects.select_for_update(of=("self",)).select_related("note", "claimed_by").get(pk=task_id)
+        # Khoá dòng ConfirmationTask. Không select_related trong câu khoá: sau khi chờ khoá, Postgres không nạp lại
+        # phía nối (claimed_by nối ngoài thành None), nên quan hệ đọc SAU khoá bằng truy vấn mới (B1, QA 08/10).
+        task = ConfirmationTask.objects.select_for_update(of=("self",)).get(pk=task_id)
+        note = DeliveryNote.objects.get(pk=task.note_id)
 
-        if task.note.status == DeliveryNote.Status.CANCELLED and task.state != ConfirmationTask.State.REFUND_CALL:
+        if note.status == DeliveryNote.Status.CANCELLED and task.state != ConfirmationTask.State.REFUND_CALL:
             raise BusinessError("Đơn đã huỷ.", code="BR-GH-07")
 
         if task.state == ConfirmationTask.State.DONE:
@@ -78,7 +81,8 @@ def claim_task(task_id: int, user, *, now=None) -> ConfirmationTask:
         # Kiểm tra người khác đang claim còn hạn
         if task.claimed_by_id and task.claimed_by_id != user.pk:
             if task.claimed_until and task.claimed_until > now:
-                claimer_name = task.claimed_by.get_full_name() or task.claimed_by.username
+                claimer = User.objects.get(pk=task.claimed_by_id)
+                claimer_name = claimer.get_full_name() or claimer.username
                 time_str = format_local_time(task.claimed_until)
                 raise ConflictError(
                     f"Đơn đang được {claimer_name} xử lý tới {time_str}.",
@@ -164,7 +168,8 @@ def record_call(
         # Kiểm tra claim của người khác
         if task.claimed_by_id and task.claimed_by_id != user.pk:
             if task.claimed_until and task.claimed_until > now:
-                claimer_name = task.claimed_by.get_full_name() or task.claimed_by.username
+                claimer = User.objects.get(pk=task.claimed_by_id)
+                claimer_name = claimer.get_full_name() or claimer.username
                 time_str = format_local_time(task.claimed_until)
                 raise ConflictError(
                     f"Đơn đang được {claimer_name} xử lý tới {time_str}.",
@@ -674,10 +679,10 @@ def escalate_expired_windows(*, now=None) -> int:
             with transaction.atomic():
                 # P8 F08: thứ tự khoá đơn -> phiếu -> task (02b CSKH §1.5): khoá phiếu trước, rồi task.
                 note_obj = DeliveryNote.objects.select_for_update().get(pk=note_id)
-                task = ConfirmationTask.objects.select_for_update(of=("self",)).select_related("note").get(pk=task_id)
+                task = ConfirmationTask.objects.select_for_update().get(pk=task_id)
                 if (
                     task.state != ConfirmationTask.State.PENDING
-                    or task.note.status != DeliveryNote.Status.CONFIRMING
+                    or note_obj.status != DeliveryNote.Status.CONFIRMING
                     or not task.first_unreachable_at
                     or task.first_unreachable_at > cutoff
                 ):

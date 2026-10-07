@@ -119,3 +119,45 @@ Gợi ý sửa: sau khi khoá, nạp lại trạng thái phiếu bằng truy v�
 ### Ghi nhận khác
 - Rà `select_for_update(of=("self",))` kèm `select_related` tới quan hệ nullable: `claim_task` (B1) và `record_purchase_cost` (B2) bị; `cancel_receipt` chỉ dùng `line.batch_id` nên an toàn; `submit_receipt` nối trong (`item` NOT NULL), không thấy lỗi qua `submit` đúng 2 lần liên tiếp và test suite. Nên đưa việc "không tin dữ liệu join phía không khoá sau khi chờ khoá" vào hướng dẫn `django-drf-patterns`.
 - Dữ liệu cá nhân: lệnh AI và API trên đây không trả/ghi tên, SĐT, địa chỉ (chỉ `display_name` của tài khoản `qa_*`); phản hồi lỗi không chứa giá vốn.
+
+## Sửa theo QA (B1, B2)
+
+Đã sửa 2 lỗi High của QA 08/10. Cùng một gốc: `select_for_update(of=("self",))` kèm `select_related` sang bảng khác. Khi phải chờ khoá, Postgres (READ COMMITTED) chỉ đọc lại dòng của bảng đã khoá. Phía nối không được nạp lại: nối ngoài cho giá trị NULL, nối trong giữ bản cũ.
+
+**Quy tắc mới.** Trong câu có `select_for_update`, không `select_related` qua quan hệ ngược hoặc nullable. Quan hệ cần để quyết định thì đọc bằng truy vấn mới SAU khi đã khoá. Quan hệ cần ổn định thì khoá nó riêng trước, theo thứ tự khoá chung.
+
+### B1 — `claim_task` (`delivery/confirmation/services.py`)
+- Chứng minh gốc: test đua xác định (người giữ chưa commit, người thứ hai chờ khoá) đỏ 15/15 vòng với `AttributeError`. Test hai luồng cùng lúc đỏ 15/15 vòng (`['ERROR AttributeError', 'ok']`).
+- Sửa: câu khoá chỉ còn `select_for_update(of=("self",))`. `note` và người đang giữ (`User`) đọc bằng truy vấn mới sau khoá. Luôn một 200, người còn lại 409 `CLAIMED` có tên người giữ.
+
+### B2 — `record_purchase_cost` (`purchasing/costs/services.py`), BR-MH-07
+- Chứng minh gốc: test đua xác định (huỷ phiếu giữ khoá, chi phí chờ) đỏ 15/15 vòng, chi phí được ghi vào lô của phiếu đã huỷ. Giữ nguyên code mới nhưng đặt lại `select_related("source_line__receipt")` thì vẫn đỏ 15/15. Bỏ `select_related` thì xanh. Vậy gốc là join, không phải thứ tự khoá.
+- Sửa: khoá lô (`order_by("pk")`, không select_related), rồi hỏi trạng thái phiếu bằng truy vấn mới `PurchaseReceipt.filter(status=CANCELLED, lines__batch_id__in=…)`. Bỏ hàm `_is_cancelled_batch`.
+- Vì sao chọn cách này mà không khoá phiếu trước: `cancel_receipt` khoá phiếu rồi dòng rồi lô. Chi phí chỉ khoá lô và không khoá phiếu, nên không bao giờ giữ lô rồi chờ phiếu, không có chu trình chờ, không deadlock. Hai thứ tự đều đúng.
+  - Huỷ vào trước: chi phí chờ khoá lô, thức dậy thấy phiếu CANCELLED, trả 400 `BATCH_CANCELLED`.
+  - Chi phí vào trước: huỷ chờ khoá lô, thức dậy thấy `cost_allocations`, trả 400 BR-MH-07 (kiểm sẵn trong `cancel_receipt`).
+  - Khoá phiếu trong đường chi phí thì phải thêm một bước khoá nữa mà không được gì thêm, nên bỏ.
+
+### Rà toàn bộ `backend/apps`
+Mọi `select_for_update(` (khoảng 75 chỗ) đã được rà. Chỗ có `of=` hoặc `select_related` kèm khoá:
+
+| Vị trí | Xử lý |
+|---|---|
+| `confirmation.claim_task` | Sửa (B1) |
+| `costs.record_purchase_cost` | Sửa (B2) |
+| `confirmation.escalate_unreachable` (khoảng dòng 677, `select_related("note")`) | Sửa: bỏ select_related, dùng `note_obj` đã khoá |
+| `receipts.submit_receipt` (`select_related("item")`) | Sửa: bỏ select_related, thêm `order_by("pk")` |
+| `receipts.cancel_receipt` (`select_related("batch")`, quan hệ nullable; chỉ dùng `batch_id`) | Sửa: bỏ select_related, thêm `order_by("pk")` |
+| `run_due_ai_actions._mark_failed` (`select_related("owner")`) | Sửa: bỏ select_related (owner đọc lazy) |
+
+Các chỗ còn lại là `Model.objects.select_for_update().get/filter(...)` không join, hoặc `skip_locked` không join: giữ nguyên. Thứ tự khoá không đổi ở chỗ nào, nên không có rủi ro deadlock mới.
+
+### Test mới (PostgreSQL, bỏ qua trên SQLite)
+- `backend/apps/delivery/tests/test_claim_race_postgres.py`: 2 test, mỗi test 15 vòng.
+- `backend/apps/purchasing/costs/tests/test_cost_cancel_race_postgres.py`: 2 test, 15 vòng và 30 vòng (lệch giờ 0 đến 50 ms). Cặp kết quả chỉ được là (huỷ ok, chi phí `BATCH_CANCELLED`) hoặc (huỷ `BR-MH-07`, chi phí ok); không có chi phí nào trỏ vào lô của phiếu đã huỷ.
+- Trước khi sửa: 45 subtest đỏ (B1 30, B2 15). Sau khi sửa: xanh.
+
+### Kết quả kiểm chứng (08/10, sau sửa)
+- PostgreSQL 16, DB riêng `cangca_b12`, toàn suite: `Ran 3409 tests in 282.515s — OK` (không skip).
+- SQLite tuần tự, toàn suite: `Ran 3409 tests in 196.660s — OK (skipped=6)` (6 ca đua chỉ chạy trên Postgres).
+- `makemigrations --check --dry-run`: No changes detected. `check_naming.py`: OK, không vi phạm mới.
