@@ -5,7 +5,7 @@
 
 import { apiFetch } from "@/shared/lib/http";
 import { mockPermissionsApi } from "./mock";
-import type { CapabilityChanges, GroupDetail, GroupSummary } from "./types";
+import type { GroupDetail, GroupPreviewBody, GroupSaveBody, GroupSummary, ScopePreview } from "./types";
 
 const BASE = "/api/staff/groups/";
 const mock = () => (process.env.NEXT_PUBLIC_USE_MOCK === "1" ? mockPermissionsApi : undefined);
@@ -21,13 +21,20 @@ export function getGroup(code: string, signal?: AbortSignal): Promise<GroupDetai
 }
 
 /**
- * PUT /api/staff/groups/<code>/capabilities/ — bật/tắt một hay nhiều việc, trả chi tiết nhóm mới.
+ * PUT /api/staff/groups/<code>/capabilities/ — lưu việc và/hoặc phạm vi của nhóm trong MỘT lần, trả chi tiết nhóm mới (có `version` mới).
+ * `version` lấy từ lần GET gần nhất (PV-10): người khác vừa đổi nhóm → 409 GROUP_CHANGED. Mở rộng dữ liệu khách mà thiếu
+ * `confirm_customer_data_widening: true` → 400 CUSTOMER_DATA_WIDENING_UNCONFIRMED kèm `impact` (PV-09).
  * Việc có `requires` đổi cùng yêu cầu với việc gốc (nếu không BE trả 400 CAPABILITY_REQUIRES). Tất cả hoặc không gì cả.
+ * Chỉ Chủ hoặc superuser ghi được (BE trả 403 với người khác, kể cả có manage_staff).
  */
-export function setGroupCapabilities(code: string, changes: CapabilityChanges): Promise<GroupDetail> {
-  return apiFetch<GroupDetail>(`${BASE}${encodeURIComponent(code)}/capabilities/`, {
-    method: "PUT",
-    body: { capabilities: changes },
-    mock: mock(),
-  });
+export function saveGroupChanges(code: string, body: GroupSaveBody): Promise<GroupDetail> {
+  return apiFetch<GroupDetail>(`${BASE}${encodeURIComponent(code)}/capabilities/`, { method: "PUT", body, mock: mock() });
+}
+
+/**
+ * POST /api/staff/groups/<code>/permissions-preview/ — xem trước ai bị ảnh hưởng, KHÔNG ghi gì (PV-09, PV-10 phía BE).
+ * Lô F1: BE chưa có endpoint này và PUT mới (version, scopes) tới Lô 5, nên hai hàm chỉ chạy được ở bản mock; KHÔNG deploy FE này trước Lô 5.
+ */
+export function previewGroupChanges(code: string, body: GroupPreviewBody): Promise<ScopePreview> {
+  return apiFetch<ScopePreview>(`${BASE}${encodeURIComponent(code)}/permissions-preview/`, { method: "POST", body, mock: mock() });
 }

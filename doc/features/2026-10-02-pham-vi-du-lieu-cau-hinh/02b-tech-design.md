@@ -176,7 +176,8 @@ Khi mở rộng chỉ do bật V2 (không đổi phạm vi), cờ nằm trong `c
 
 ### 2.4 POST `/api/staff/groups/<code>/permissions-preview/`
 
-Thân như PUT, không cần `version`/`confirm_…`; kiểm 1–7, 9, 10 như PUT; không ghi gì. Trả như story:
+Thân như PUT, không cần `version`/`confirm_…` (**chốt 07/10:** có gửi thì bỏ qua, khoá lạ khác vẫn `INPUT_NOT_ALLOWED`);
+kiểm 1–7, 9, 10 như PUT; không ghi gì. Trả như story:
 `widens_customer_data`, `widened[]`, `affected_members[]` (nhân viên đang hoạt động của nhóm, chỉ `id`, `display_name`),
 `affected_count`, `message`, `already_wider_elsewhere[]`, `narrowed[]` với `rows_losing_access`.
 
@@ -191,6 +192,10 @@ Với mỗi đối tượng có dữ liệu khách D1, D2, D3, D4, D5, D7, gọi
 (rank tăng **hoặc** cổng vừa mở với rank > 0). Cổng: D1 `view_orders`, D2 `view_sales_invoices` (rank theo D1), D4
 `confirm_calls`, D7 `view_customers`; D3/D5 cổng Tầng 1 ngoài registry (luôn như đang có). Cộng: bật V2. Lý do: Q-7 giữ giá trị
 khi tắt việc, nên bật lại việc trên nhóm đang lưu "Tất cả" mở dữ liệu khách mà story chưa tính.
+**Sửa 07/10 (review F1, M1):** rank dùng để so là rank **hiệu lực** sau luật §1.3, gồm trần D7: nhóm thiếu
+`sales.view_customer_list` mà có `sales.view_customer` (Quản lý, NV giao) thì cổng D7 vẫn mở với rank `min(lưu, assigned_deliveries)`.
+Ví dụ: NV giao lưu D7 = `all`, bật "Xem khách hàng" là **mở rộng** (1 → 2). Đổi D7 từ `assigned_deliveries` sang `all` khi việc còn
+tắt **không** là mở rộng. PUT có `confirm_customer_data_widening: true` mà không có mở rộng: nhận, không ghi cờ vào AuditLog.
 
 ### 2.6 FE: W3i chuyển sang bản nháp, W3h giữ bật/tắt ngay
 
@@ -327,6 +332,7 @@ quan `row_version` cho mọi lần lưu của nhóm."
 ## 9. Review
 
 - 06/10 Lô 1–2 BE: CHANGES REQUESTED (H1 luật D7), sau d50d082 **APPROVED**. Chi tiết ở `03b-review-techlead.md`.
+- 07/10 Lô F1 FE (dd84536): **CHANGES REQUESTED** (M1 mock D7, M2 Hoàn tác mở rộng, M3 chặn chuyển trang). Chi tiết ở 03b. Sau a1b5b31 **APPROVED** (còn L10 cho Lô 6; giữ nhánh tới Lô 5 BE).
 - 07/10 Lô 3 BE (`30bbc87`): **APPROVED**, kèm điều kiện C1 (D1 cho phiếu hoàn tiền và dashboard phải vào trước hoặc cùng Lô 5, chờ D-3) và C2. Lô 3 sửa thêm `ai/policy/rules.py`; migration sales là 0015/0016.
 - 08/10 Lô 4 BE (`d861021`): **APPROVED-chờ-Duy**. M1 (tệp mốc dùng `PENDING_DUY_DIFFS` thay cho sinh lại mốc) và D-3 phải xong trước merge main. Lô 4 xoá sớm 4 hàm của `common/api.py`. V2 áp cho phiếu giao.
 - 08/10 Lô 4 M1 + Lô 5 + C1 (`5fd4032`): **APPROVED-chờ-Duy**. Code đạt; chưa merge main khi `PENDING_DUY_DIFFS` còn mục (D-3). PO-Q1 chỉ kiểm khi yêu cầu đụng `view_customers`/`scopes.customers` (mock F1 theo BE).
