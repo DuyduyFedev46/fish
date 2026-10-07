@@ -226,6 +226,38 @@ class LateRejectTests(LateBase):
         self.assertEqual(resp.status_code, 400)
         self.assertFalse(PaymentTransaction.objects.exists())
 
+    def test_tl15_l2_date_only_received_at_is_400_with_time_hint(self):
+        """TL15-L2: chỉ có ngày (thành 00:00 ngầm) bị từ chối, bắt buộc có phần giờ."""
+        for bad in ("2026-10-06", " 2026-10-06 ", timezone.localdate().isoformat()):
+            with self.subTest(received_at=bad):
+                resp = self.post(received_at=bad)
+                self.assertEqual(resp.status_code, 400, resp.content)
+                self.assertEqual(resp.json()["code"], "BR-TT-18")
+                self.assertIn("received_at", resp.json())
+        self.assertFalse(PaymentTransaction.objects.exists())
+
+    def test_tl15_l2_older_than_max_age_is_400_but_yesterday_is_ok(self):
+        """TL15-L2: cũ hơn LATE_PAYMENT_MAX_AGE_DAYS (mặc định 400) thì 400; hôm qua thì 201; đúng ngưỡng vẫn nhận."""
+        resp = self.post(received_at=(timezone.now() - timedelta(days=401)).isoformat())
+        self.assertEqual(resp.status_code, 400, resp.content)
+        self.assertEqual(resp.json()["code"], "BR-TT-18")
+        self.assertIn("received_at", resp.json())
+        self.assertFalse(PaymentTransaction.objects.exists())
+        resp = self.post(received_at=(timezone.now() - timedelta(days=399)).isoformat())
+        self.assertEqual(resp.status_code, 201, resp.content)
+        PaymentTransaction.objects.all().delete()
+        resp = self.post(received_at=(timezone.now() - timedelta(days=1)).isoformat(), bank_txn_id="FT26100300002")
+        self.assertEqual(resp.status_code, 201, resp.content)
+
+    @override_settings(LATE_PAYMENT_MAX_AGE_DAYS=10)
+    def test_tl15_l2_max_age_is_a_setting(self):
+        self.assertEqual(self.post(received_at=(timezone.now() - timedelta(days=11)).isoformat()).status_code, 400)
+        self.assertEqual(self.post(received_at=(timezone.now() - timedelta(days=9)).isoformat()).status_code, 201)
+
+    def test_tl15_l2_naive_datetime_with_time_still_accepted(self):
+        naive = timezone.localtime(timezone.now() - timedelta(hours=3)).replace(tzinfo=None).isoformat(timespec="seconds")
+        self.assertEqual(self.post(received_at=naive).status_code, 201)
+
     def test_lp_ac8_within_five_minutes_future_accepted(self):
         resp = self.post(received_at=(timezone.now() + timedelta(minutes=3)).isoformat())
         self.assertEqual(resp.status_code, 201, resp.content)

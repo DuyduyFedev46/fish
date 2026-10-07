@@ -3508,3 +3508,50 @@ Lưu ý cho QA và các lô sau:
 - QA chạy `/api/reports/*` bằng tài khoản `kho1` và `ql1` (phải 403), và kiểm ngày biên của `audit-logs` trên BE thật.
 - Sau khi gộp, nhắc nhánh `feat/pham-vi-du-lieu` rebase, vì có xung đột ở `dashboard_api.py`.
 - 17b-FE2 (G3) phải sửa mock hoá đơn mua cho khớp luật `paid_at`.
+
+## Review Lô 17b-BE (08/10)
+
+Phạm vi: `git diff 2c00222..HEAD`, commit ea1c9fe trên `feat/lo17b-be`, gồm 21 file. Đối chiếu `02e-lo17.md` mục 3.1 (B1–B4, B5 = NEW-1)
+và dev-notes mục "Lô 17b-BE + NEW-1".
+
+**Lệnh techlead tự chạy** (worktree `lo17b-be`, `DJANGO_DEBUG=1`, symlink tạm `staticfiles`, đã gỡ, worktree sạch):
+- `manage.py test apps.sales apps.accounts apps.ai apps.common apps.delivery apps.inventory`: 2704 test, OK (skipped=2).
+- `makemigrations --check --dry-run`: No changes detected.
+- `check_naming.py`: OK, không có vi phạm mới.
+
+### Soát theo yêu cầu
+
+| Mục | Kết quả |
+|---|---|
+| `POST /api/sales/orders/search/`: phạm vi | **Đạt.** `get_queryset` dùng chung với `list` (`scope_orders_for` theo D1). Test NV giao chỉ thấy đơn của phiếu mình. Quyền: `required_perms=("sales.view_salesorder",)`, có test 403 và 401. Lọc `customer` vẫn kiểm `can_filter_orders_by_customer` trước khi đọc tham số khác |
+| V2 và cửa sổ dữ liệu cá nhân | **Đạt.** `allow_customer_search=can_view_order_customer_info(user)`, `restrict_customer_search` khi phạm vi khác `all`, nên tìm theo SĐT/tên chỉ khớp đơn có `pii_visible=True` (SR-PII-02). Như vậy POST không mở thêm được dòng nào mà GET cũ không thấy. Có test `test_new1_post_keeps_scope_rules_for_phone_search` |
+| `next`/`previous` | **Đạt.** Từ khoá nằm trong body. Link chỉ dựng từ URL `/search/` cộng `page`. Có test link không chứa từ khoá |
+| `no-store` | **Đạt.** `NoStoreMixin` của viewset phủ cả action mới. Có test |
+| Câu lỗi không lặp giá trị | **Đạt.** `SEARCH_USE_POST` dùng câu cố định. Các câu của `InvalidFilter` chỉ nêu **tên** tham số, không nêu giá trị. Có test ở cả GET (9 chữ số, giống tên) lẫn POST |
+| GET `?q=` | **Đạt.** `allow_customer_search=False`, nên GET chỉ còn khớp mã đơn. Đây là chốt chặn thật: dù heuristic có lọt thì GET cũng không trả được dữ liệu khách theo tên hay SĐT |
+| Heuristic, ca `hoa` lọt | **Chấp nhận, ghi nhận Low.** Một từ ASCII không dấu, không khoảng trắng (như `hoa`), hoặc dãy 4–8 chữ số, vẫn đi qua GET và vào access log, nhưng chỉ khớp mã đơn, không thành công cụ dò khách. Heuristic chỉ giảm số từ khoá cá nhân lọt vào URL, không thể bắt hết. Việc thật nằm ở FE (17b-FE2): ô tìm đơn **luôn** gửi POST, GET `q` chỉ dùng cho ⌘K với chuỗi đúng mẫu mã |
+| Thêm vào `FORBIDDEN_PREFIXES` của AI, `@action` 32 → 33 | **Duyệt, dù nằm ngoài danh sách file.** Route mới trả tên/SĐT khách. Nếu không cấm thì AI có thêm một đường dò dữ liệu cá nhân, ngược với cách đã làm cho `customer-directory`. Đếm `@action` trong `test_discipline.py` là hệ quả tất yếu. Không đổi gì khác trong `apps/ai/**` |
+| `SearchBodyPagination` chuyển sang `common/api.py` | **Duyệt.** Chuyển nguyên văn, giờ có hai nơi dùng (danh bạ khách, tìm đơn). Bỏ được bản chép, đúng chỗ của tiện ích dùng chung |
+| B1 | **Đạt.** `delete` thêm điều kiện `add_returntostock`, khớp `soft_delete`. Có test Chủ bị tắt quyền |
+| B2 | **Đạt.** GET `customer-directory/?q=` trả 400 `SEARCH_USE_POST`. Các ca GET `q` cũ chuyển sang POST, không nới assert. Danh sách không có `q` giữ nguyên |
+| B3 | **Đạt.** `note_code` là mã phiếu giao, không phải dữ liệu cá nhân. Nằm cùng khối với `note_id`, nên phạm vi CSKH không đổi. Có test |
+| B4 `LATE_PAYMENT_MAX_AGE_DAYS` | **Đạt.** Setting đọc từ env, mặc định 400, có `max(..., 1)` chặn giá trị 0 hoặc âm. Chuỗi chỉ có ngày bị chặn **trước** `parse_datetime` (regex bắt buộc có giờ). Tham số `datetime` truyền thẳng (từ đường gọi nội bộ) không qua regex nhưng có `tzinfo`, nên đúng. Có test chỉ ngày, 401 ngày, hôm qua |
+| Giá vốn, dữ liệu cá nhân | **Đạt.** Kết quả search dùng `SalesOrderListSerializer` như danh sách: không có giá vốn, che khách theo `pii_hidden`. Có test không có giá vốn. Không có log mới |
+
+### Điều kiện phát hành
+
+**C1 · NEW-1 phải deploy cùng FE.** FE hiện tại (`erp-console/features/orders/api.ts:42`) vẫn gửi `GET ?q=`. Sau lô này, Chủ hay Quản lý gõ
+tên hoặc SĐT ở ô tìm đơn sẽ nhận 400 "Tìm theo SĐT/tên dùng ô tìm kiếm." cho tới khi 17b-FE2 chuyển sang `POST search/`. Merge vào main
+được, nhưng **không deploy BE này lên staging hay production khi chưa có FE đi cùng**. Danh bạ khách không bị ảnh hưởng, vì FE đã dùng POST
+từ Lô bổ sung A.
+
+### Ghi nhận Low (không chặn)
+
+- **L1:** heuristic GET như trên. 17b-FE2 phải đặt luật ở FE: ô tìm đơn luôn đi POST.
+- **L2:** `_filters_from_body` cho `customer`/`batch` là `int` nhưng `status` dạng số thì từ chối. Hành vi đúng, chỉ là cần nhớ khi viết mock
+  FE: body gửi `status` là chuỗi hoặc mảng chuỗi.
+
+### Kết luận Review Lô 17b-BE (08/10): **APPROVED**
+
+Không có lỗi Critical, High hay Medium. Có điều kiện phát hành **C1**. Hai việc ngoài danh sách file (AI `FORBIDDEN_PREFIXES`,
+`SearchBodyPagination`) được duyệt.

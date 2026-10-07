@@ -120,7 +120,8 @@ class ReturnToStockSerializer(serializers.ModelSerializer):
             is_creator = obj.created_by_id == user.pk and user.has_perm("inventory.add_returntostock")
             if is_creator or user.has_perm("inventory.approve_returntostock") or user.has_perm("inventory.change_returntostock"):
                 actions.append("cancel")
-        if can_delete_return(obj) and self._is_owner(user):
+        # TL8F-L3: khớp API (`soft_delete` đòi `add_returntostock`), để FE không hiện nút rồi nhận 403.
+        if can_delete_return(obj) and self._is_owner(user) and user.has_perm("inventory.add_returntostock"):
             actions.append("delete")
         return actions
 

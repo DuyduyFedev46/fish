@@ -2727,3 +2727,41 @@ Nhánh `feat/lo17b-fe` (tách từ 2c00222). Ba commit: FE1 (§3.2 F1–F7), FE2
 5. Mẫu mã lô ở ⌘K khá rộng (các đoạn chữ-số nối `-` có ít nhất một chữ số) vì mã lô thật có nhiều dạng (`CA-THU-260928-VT01`, `LO-0912`, `L0914-CT01`). Chuỗi như `An-Binh` (không có chữ số) không khớp; chuỗi như `Anh-2` sẽ gọi `GET batches/ANH-2/` (chỉ trả lô hoặc 404, không lộ khách).
 6. Nợ: (a) F2 còn 6 hộp xác nhận chưa chuyển `ConfirmModal`; (b) `matchesLocal` ở `auditModel.ts` không còn dùng; (c) G4 chỉ có cảnh báo `beforeunload`, chưa chặn bấm link trong app; (d) G8 chưa có test tự động; (e) `GET orders/?q=` ở ⌘K một từ ASCII ngắn vẫn qua cửa BE (nợ đã ghi ở 17b-BE) nhưng ⌘K chỉ gửi chuỗi đúng mẫu `SO…` nên không bị ảnh hưởng.
 7. Ảnh chụp (mock, dữ liệu giả; thư mục `shots/` bị `.gitignore` nên KHÔNG nằm trong commit, chỉ có trong worktree `.claude/worktrees/lo17b-fe`): `doc/features/2026-10-01-erp-theo-design/shots/lo17b-fe/` gồm `ed17-cmd-order-1280/360`, `ed17-cmd-notfound-1280`, `ed17-cmd-giao1-notfound-1280`, `orders-search-post-1280`, `ed12-14-m-hoa-don-ban` (360px).
+
+## Lô 17b-BE + NEW-1 — BE (07/10)
+
+Nhánh `feat/lo17b-be` (tách từ main 2c00222). Không migration, không đổi quyền Group.
+
+### NEW-1 — tìm đơn theo SĐT/tên không đi qua URL (bất biến 9)
+**`POST /api/sales/orders/search/`** — cùng quyền Tầng 1 (`sales.view_salesorder`), cùng phạm vi dòng (Tầng 3: NV giao chỉ đơn của phiếu mình, SR-PII-02, PV-07), cùng shape và 20 dòng/trang như `GET /api/sales/orders/`. Header `Cache-Control: no-store`.
+
+Body (mọi khoá tuỳ chọn):
+```json
+{"q": "0900000123", "status": "BOOKED,PAID", "date_from": "2026-10-01", "date_to": "2026-10-07", "customer": 12, "batch": 5, "page": 2}
+```
+- `status` nhận chuỗi cách dấu phẩy hoặc mảng chuỗi `["BOOKED","PAID"]`. `customer`, `batch` nhận số nguyên hoặc chuỗi số. `q` tối đa 200 ký tự.
+- `q` khớp mã đơn (chứa), SĐT (chứa), tên khách (không dấu, không phân biệt hoa thường). Không có quyền xem khách (V2) thì chỉ khớp mã; đơn quá cửa sổ PII thì SĐT/tên không khớp (giữ luật cũ).
+- `page` lấy từ body (số nguyên dương). Sai kiểu hoặc ngày sai định dạng → 400 `{"detail", "code": "INVALID_FILTER"}`. Page vượt số trang → 404 (như directory). `customer` mà thiếu quyền xem khách → 403.
+- Kết quả: `{count, next, previous, results[]}`; `next`/`previous` chỉ để biết còn trang (URL không chứa từ khoá), muốn sang trang khác thì gửi lại POST với `page`. Mỗi dòng đúng shape danh sách (có `reason`, `customer_hidden_reason`).
+- GET `search/` → 405. Chưa đăng nhập 401, thiếu quyền 403 (câu lỗi không chứa SĐT/tên/mã đã gửi).
+- AI: `/api/sales/orders/search/` thêm vào `FORBIDDEN_PREFIXES` (`apps/ai/policy/rules.py`) để registry không sinh lệnh AI dò dữ liệu cá nhân; `test_discipline` đếm @action 32 → 33.
+
+**`GET /api/sales/orders/?q=`** chỉ còn khớp mã đơn (không còn khớp SĐT/tên). `q` có dãy từ 9 chữ số trở lên, hoặc có khoảng trắng, hoặc có ký tự ngoài ASCII (giống tên người) → 400:
+```json
+{"detail": "Tìm theo SĐT/tên dùng ô tìm kiếm.", "code": "SEARCH_USE_POST"}
+```
+Câu lỗi không lặp lại `q`. Quyền (403) và `customer` kiểm trước luật `q`. `q` một từ ASCII không dấu ngắn (vd `hoa`) vẫn qua cửa 400 vì không phân biệt được với đoạn mã, nhưng chỉ khớp mã đơn nên không lộ gì. Hoá đơn bán `/api/sales/invoices/?q=` KHÔNG đổi (ngoài phạm vi; FE G6 tự chặn dãy 9 số).
+
+Test mới `sales/orders/tests/test_order_search_post.py` (17 ca). Test cũ chuyển sang POST (không nới assert): `orders/tests/{test_l7_bosung,test_s10_api}.py`, `accounts/data_scopes/tests/{test_orders_invoices_scope,snapshot}.py` (baseline snapshot không đổi, nên POST cho đúng kết quả như GET cũ), `common/tests/test_customer_data_scope.py`. `SearchBodyPagination` chuyển từ `directory_api.py` sang `common/api.py` dùng chung.
+
+### Bốn việc §3.1
+- **B1 TL8F-L3** `returns/serializers.py`: `available_actions` chỉ có `delete` khi còn `inventory.add_returntostock`. Test `test_soft_delete.py::test_tl8f_l3_*`: Chủ bị gỡ quyền thì không có `delete` (chi tiết và danh sách) và POST `delete/` là 403.
+- **B2 TLA-L3** `customer-directory/`: `GET ?q=` (không rỗng) → 400 `{"detail": "Tìm khách dùng ô tìm trên màn Khách hàng.", "code": "SEARCH_USE_POST"}`, không lặp `q`; thiếu quyền vẫn 403 trước. `get_queryset` bỏ `q`; GET không `q` giữ nguyên. Ca GET `q` cũ ở `test_directory_api.py` thay bằng ca 400; `test_directory_search_post.py` đổi ca "GET q còn chạy" thành 400, ca "cùng shape" so với GET không `q`.
+- **B3 L5-code** `delivery/confirmation/serializers.py`: thêm `note_code` (mã phiếu giao, luôn có vì task luôn gắn phiếu; không phải dữ liệu cá nhân nên có cả ở dòng danh sách ngoài phạm vi, nơi tên/SĐT/địa chỉ vẫn `null`). CSKH ngoài phạm vi vẫn 404, câu lỗi không chứa mã. Test `delivery/tests/test_confirmation_note_code.py`. Lưu ý: 02e ghi "`null` nếu chưa có" nhưng phiếu luôn có mã nên không có ca `null`.
+- **B4 TL15-L2** `payments/services.py::_validate_late_input` (`POST /api/sales/payments/record-late/`): `received_at` dạng chuỗi bắt buộc có phần giờ (`YYYY-MM-DDThh:mm…` hoặc cách bằng dấu cách); chỉ có ngày → 400 `BR-TT-18` khoá `received_at` ("…gồm cả ngày và giờ"). Cũ hơn `settings.LATE_PAYMENT_MAX_AGE_DAYS` (env cùng tên, mặc định 400) → 400 `BR-TT-18` khoá `received_at`. Giờ không múi vẫn coi theo giờ máy chủ như cũ. Thêm hằng vào `config/settings.py`.
+
+### Kiểm (07/10), tuần tự không `--parallel`, DJANGO_DEBUG=1
+`manage.py test`: Ran 3355 tests, OK (skipped=2). `makemigrations --check --dry-run`: No changes detected. `check_naming.py`: OK, không phát sinh mới.
+
+**Việc FE cần làm (17b-FE2):** màn Đơn hàng gửi `POST /api/sales/orders/search/` khi có ô tìm; ô tìm theo mã (⌘K H1) dùng `GET ?q=` chỉ với chuỗi giống mã; xử lý 400 `SEARCH_USE_POST`. Mock danh bạ khách bỏ nhánh GET `q` (G10).
+**Nợ:** `q` GET một từ ASCII không dấu ngắn không bị chặn (xem trên). `invoices/?q=` vẫn nhận `q` tự do (không tìm SĐT/tên nên không lộ dữ liệu cá nhân, đã có test `test_invoice_list`).
