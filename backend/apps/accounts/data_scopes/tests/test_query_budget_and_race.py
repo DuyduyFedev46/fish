@@ -14,6 +14,7 @@ from django.db import connection
 from django.test import TransactionTestCase
 from rest_framework.test import APIClient
 
+from apps.common.tests.postgres_race import PostgresRaceFixtureMixin
 from apps.accounts import roles
 from apps.accounts.capabilities.tests.base import detail_url, put_url
 from apps.accounts.data_scopes import resolver
@@ -67,10 +68,8 @@ class ListQueryBudgetTests(ScopeSceneBase):
 
 
 @skipUnless(connection.vendor == "postgresql", "Cần PostgreSQL: select_for_update không có tác dụng trên SQLite.")
-class ConcurrentSaveRaceTests(TransactionTestCase):
+class ConcurrentSaveRaceTests(PostgresRaceFixtureMixin, TransactionTestCase):
     """PV-10-AC5: hai PUT cùng `version` chạy song song, đúng một 200 và một 409."""
-
-    serialized_rollback = True
 
     def setUp(self):
         self.owner = User.objects.create_user("race_owner", password="x")

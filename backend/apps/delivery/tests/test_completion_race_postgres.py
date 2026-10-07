@@ -12,6 +12,7 @@ from unittest import skipUnless
 from django.db import connection
 from django.test import TransactionTestCase
 
+from apps.common.tests.postgres_race import PostgresRaceFixtureMixin
 from apps.common.exceptions import BusinessError
 from apps.common.tests.fixtures import confirm_note_for_test
 from apps.delivery import services
@@ -26,19 +27,7 @@ JOIN_TIMEOUT_SECONDS = 5
 
 
 @skipUnless(connection.vendor == "postgresql", "Cần PostgreSQL: select_for_update không có tác dụng trên SQLite.")
-class CancelVersusCompleteRaceTests(TransactionTestCase):
-    serialized_rollback = True  # giữ Group seed bởi migration sau mỗi test
-
-    def _fixture_setup(self):
-        # Khi chạy chung suite, một TransactionTestCase khác (không serialized_rollback) đã flush rồi `post_migrate` tạo lại
-        # ContentType/Permission với id mới; nạp lại bản serialize sẽ đụng khoá duy nhất (admin, logentry). Xoá bản tạo lại
-        # trước (kéo theo Permission), để bản serialize nạp về đúng id gốc.
-        from django.contrib.contenttypes.models import ContentType
-
-        ContentType.objects.all().delete()
-        super()._fixture_setup()
-        ContentType.objects.clear_cache()
-
+class CancelVersusCompleteRaceTests(PostgresRaceFixtureMixin, TransactionTestCase):
     def setUp(self):
         OrderApiBase.setUp(self)
         self.courier, self.manager = self.giao, self.ql  # naming: allow - thuộc tính fixture cũ của OrderApiBase

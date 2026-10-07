@@ -13,6 +13,7 @@ from unittest import skipUnless
 from django.db import connection, transaction
 from django.test import TransactionTestCase
 
+from apps.common.tests.postgres_race import PostgresRaceFixtureMixin
 from apps.accounts import roles
 from apps.catalog.models import Item, ItemGroup
 from apps.common.exceptions import BusinessError
@@ -27,16 +28,7 @@ ROUNDS = 15
 
 
 @skipUnless(connection.vendor == "postgresql", "Cần PostgreSQL: select_for_update không có tác dụng trên SQLite.")
-class CostVersusCancelReceiptRaceTests(TransactionTestCase):
-    serialized_rollback = True
-
-    def _fixture_setup(self):
-        from django.contrib.contenttypes.models import ContentType
-
-        ContentType.objects.all().delete()
-        super()._fixture_setup()
-        ContentType.objects.clear_cache()
-
+class CostVersusCancelReceiptRaceTests(PostgresRaceFixtureMixin, TransactionTestCase):
     def setUp(self):
         self.owner = make_user("race_owner", roles.OWNER)
         group = ItemGroup.objects.create(name="Cá")

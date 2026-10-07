@@ -377,3 +377,16 @@ test PV-05/dashboard xanh. Trạng thái chờ đã gỡ (`PENDING_DUY_DIFFS` r�
   28 `FOR UPDATE cannot be applied to the nullable side of an outer join` (huỷ phiếu nhập, publish lô, claim xác nhận, hoàn tác AI trả 502 vì dispatch bắt lỗi này, và mốc PV-01 lệch `actions.confirmation_claim=EXC:NotSupportedError`),
   23 `seed_qa` guard (22 lỗi + `test_password_env_is_required`), 1 race `django_content_type` unique (`test_pv10_ac5`, sửa khi gộp `fix/postgres-compat`, M1), `test_qa_lo4_tien` (2), `supplier_crud` (1 sắp xếp), `shop_labels` (varchar 12), cost overflow (1), `completion_race` admin.logentry (2, đã sửa ở `fix/postgres-compat`). Không có ca đỏ ngoài danh sách.
 - `makemigrations --check --dry-run`: No changes detected. `python3 scripts/check_naming.py`: OK, không phát sinh mới.
+
+## Gộp main sau sửa Postgres + M1 (08/10)
+
+- `git merge main` (cfc039b) vào nhánh `feat/pham-vi-du-lieu`: không xung đột. Git tự gộp `purchasing/receipts/services.py`;
+  `delivery/confirmation/services.py` và `purchasing/costs/services.py` nhánh này không đụng nên giữ bản của main.
+- Rà `select_for_update` kèm `select_related` trong code không phải test: không còn câu nào (chỉ còn một comment giải thích
+  quy tắc ở `delivery/confirmation/services.py`). Code phạm vi dữ liệu của nhánh không có câu vi phạm quy tắc.
+- M1 (review techlead Lô PV-QĐ): thêm `apps/common/tests/postgres_race.py` với `PostgresRaceFixtureMixin` (xoá ContentType
+  trước `super()._fixture_setup()`, rồi `ContentType.objects.clear_cache()`, kèm `serialized_rollback = True`). Áp cho
+  `CancelVersusCompleteRaceTests`, `ClaimRaceTests`, `CostVersusCancelReceiptRaceTests`, `ConcurrentSaveRaceTests`
+  (test_pv10_ac5). Xoá bản `_fixture_setup` chép tay ở ba file.
+- Kiểm chứng: PostgreSQL 16 (DB riêng) `Ran 3532 tests ... OK`, không ca đỏ, không skip; SQLite tuần tự
+  `Ran 3532 tests ... OK (skipped=7)`; `makemigrations --check --dry-run` No changes detected; `check_naming.py` OK.
