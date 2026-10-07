@@ -16,7 +16,10 @@ from rest_framework.permissions import AllowAny
 from rest_framework.test import APIClient
 
 from apps.accounts import roles
-from apps.common.tests.fixtures import make_user
+from apps.accounts.auth.authentication import MUST_CHANGE_PASSWORD_CODE, _is_public_view
+from apps.accounts.models import StaffProfile
+from apps.common.tests.fixtures import make_order_with_note, make_user
+from apps.sales.models import SalesOrder
 
 CODE = "AUTH_NO_ROLE"
 ME = "/api/auth/me/"
@@ -140,3 +143,37 @@ class NoRoleGateTests(TestCase):
 
     def test_unauthenticated_is_still_401(self):
         self.assertEqual(APIClient().get("/api/sales/orders/").status_code, 401)
+
+    def test_session_auth_no_role_user_gets_403_auth_no_role(self):
+        client = APIClient()
+        client.force_login(self.no_role)  # phiên (Session), không phải token
+        resp = client.get("/api/sales/orders/")
+        self.assertEqual((resp.status_code, resp.json().get("code")), (403, CODE))
+
+    def test_no_role_user_with_temp_password_gets_must_change_password_first(self):
+        StaffProfile.objects.update_or_create(user=self.no_role, defaults={"must_change_password": True})
+        resp = self.client_no_role.get("/api/sales/orders/")
+        self.assertEqual((resp.status_code, resp.json().get("code")), (403, MUST_CHANGE_PASSWORD_CODE))
+
+    def test_no_role_user_cannot_post_cancel_and_order_is_unchanged(self):
+        order, _customer, _note = make_order_with_note("DH-NOROLE", FAKE_PHONE)
+        self.no_role.user_permissions.add(Permission.objects.get(codename="cancel_paid_order"))
+        resp = self.client_no_role.post(
+            f"/api/sales/orders/{order.pk}/cancel/", {"reason_code": "OTHER", "note": "x"}, format="json"
+        )
+        self.assertEqual((resp.status_code, resp.json().get("code")), (403, CODE))
+        order.refresh_from_db()
+        self.assertEqual(order.status, SalesOrder.Status.PROCESSING)
+
+
+class NoViewOverridesGetPermissionsTests(TestCase):
+    def test_no_api_view_overrides_get_permissions(self):
+        """`_is_public_view` chỉ đọc `permission_classes` ở cấp class. View nào override `get_permissions`
+        có thể mở công khai mà cổng không thấy → cấm; cần thì sửa `_is_public_view` cùng lúc."""
+        from rest_framework.views import APIView
+
+        offenders = sorted(
+            {path for path, cls in iter_routes() if cls.get_permissions is not APIView.get_permissions}
+        )
+        self.assertEqual(offenders, [])
+        self.assertTrue(_is_public_view(type("V", (), {"permission_classes": [AllowAny]})))

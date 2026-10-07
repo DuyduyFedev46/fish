@@ -178,7 +178,7 @@ Theo `02c-quyet-dinh-08-10.md` mục A, B, C.4, E, F. Quy tắc: BR-PQ-19/38, D-
 
 ### File đã sửa (đều trong `backend/`)
 - Cổng D-3: `apps/accounts/auth/authentication.py` (mixin đổi tên `_EnforceAccessMixin`; thêm `NoRole`, `has_erp_access`), `apps/accounts/auth/api.py` (4 view thêm `allow_without_group = True`).
-- `me`/home: `apps/accounts/auth/services.py` (`home_for(groups, *, is_superuser=False)`, khoá `is_superuser`, `GROUP_LABELS`, nhãn V2).
+- `me`/home: `apps/accounts/auth/services.py` (`home_for(user, groups)` (sau sửa L1), khoá `is_superuser`, `GROUP_LABELS`, nhãn V2).
 - Nhãn V2 "Xem thông tin khách trên đơn, hoá đơn, phiếu hoàn tiền": `capabilities/registry.py`, `sales/models/orders.py`, `sales/customers/permissions.py` (comment), migration `sales/migrations/0019_alter_salesorder_view_order_customer_info_label.py` (chỉ `AlterModelOptions`).
 - Câu 2: `apps/common/ai_visibility.py` (`AI_ADMIN_ACTION_PREFIXES`).
 - Câu 13: nhãn vai "Nhân viên gọi xác nhận" (`GROUP_LABELS`), nhóm lệnh AI "Chăm sóc khách hàng" (`ai/settings/services.py`).
@@ -205,3 +205,9 @@ Quyền gán trực tiếp không tính. Kiểm theo DB mỗi request nên gỡ 
 - `seed_qa` guard từ chối DB không phải SQLite nên 21 test `qa_fixture` không chạy được trên PostgreSQL cục bộ (có từ trước, không do lô này); chúng xanh trên SQLite.
 - Sinh migration `sales/0019` đúng số kế tiếp trên main (0018 là cuối).
 - Không đụng `delivery/serializers.py`, `features/permissions/**`, ngoài `backend/`.
+
+### Sửa theo review (L1–L4)
+- L1: `home_for(user, groups)` dùng `has_erp_access` (cùng luật với cổng D-3); kết quả `home` không đổi.
+- L2: `test_no_role_gate.py` thêm 3 ca: phiên (Session) bị 403 `AUTH_NO_ROLE`; người không nhóm có mật khẩu tạm nhận `AUTH_MUST_CHANGE_PASSWORD` trước; POST huỷ đơn bị 403 và đơn giữ trạng thái `PROCESSING`.
+- L3: test `test_no_api_view_overrides_get_permissions` khẳng định không view nào dưới `/api/` override `get_permissions` (vì `_is_public_view` chỉ đọc `permission_classes` cấp class).
+- L4: `qa_fixture/build.py` dùng `Permission.objects.get(...)`, thiếu quyền thì lỗi to thay vì bỏ qua im lặng.

@@ -176,9 +176,9 @@ class QaSeed:
             user.save()
             user.groups.set(Group.objects.filter(name__in=group_names))
             user.user_permissions.set(
-                Permission.objects.filter(
+                Permission.objects.get(
                     content_type__app_label=app_label, codename=codename,
-                ).first()
+                )
                 for app_label, codename in DIRECT_PERMS.get(username, [])
             )
             profile, _ = StaffProfile.objects.get_or_create(

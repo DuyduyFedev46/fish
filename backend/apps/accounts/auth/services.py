@@ -18,7 +18,7 @@ from apps.common.api import VIEW_COSTPRICE_PERM
 from apps.common.audit import record_audit
 from apps.common.exceptions import BusinessError
 
-from .authentication import must_change_password
+from .authentication import has_erp_access, must_change_password
 
 VIEW_PROFITREPORT_PERM = "reports.view_profitreport"
 
@@ -89,13 +89,14 @@ def sorted_groups(names):
     return sorted(names, key=lambda n: (rank.get(n, len(ROLE_ORDER)), n))
 
 
-def home_for(groups, *, is_superuser=False) -> str:
-    """Trang mặc định: superuser → dashboard (Duy 08/10 câu 1); không Group → no-role; chỉ delivery_staff →
-    my-deliveries; chỉ customer_service → confirmation-queue; còn lại → dashboard."""
-    if is_superuser:
-        return HOME_DASHBOARD
-    if not groups:
+def home_for(user, groups) -> str:
+    """Trang mặc định: không có quyền vào ERP (cùng luật `has_erp_access` với cổng D-3) → no-role;
+    superuser → dashboard (Duy 08/10 câu 1); chỉ delivery_staff → my-deliveries; chỉ customer_service →
+    confirmation-queue; còn lại → dashboard."""
+    if not has_erp_access(user):
         return HOME_NO_ROLE
+    if user.is_superuser:
+        return HOME_DASHBOARD
     if set(groups) == {roles.DELIVERY_STAFF}:
         return HOME_MY_DELIVERIES
     if set(groups) == {roles.CUSTOMER_SERVICE}:
@@ -120,7 +121,7 @@ def describe_user(user) -> dict:
         "permissions": sorted(permissions),
         "can_view_cost": user.has_perm(VIEW_COSTPRICE_PERM),
         "can_view_profit": user.has_perm(VIEW_PROFITREPORT_PERM),
-        "home": home_for(groups, is_superuser=user.is_superuser),
+        "home": home_for(user, groups),
         # S47 — chỉ THÊM key, không đổi key S6.
         "group_labels": [{"code": g, "label": GROUP_LABELS.get(g, g)} for g in groups],
         "capabilities": [
