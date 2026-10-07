@@ -41,6 +41,19 @@ class SeedQaBase(TestCase):
         env = mock.patch.dict(os.environ, {"QA_PASSWORD": PASSWORD})
         env.start()
         self.addCleanup(env.stop)
+        # DB test trên PostgreSQL tên `test_*` (không chứa 'staging') sẽ bị cổng chặn từ chối. Trong test, coi DB
+        # test là DB staging; cổng ở code sản phẩm không đổi. Test cổng tự patch `database_facts` riêng (ghi đè lên đây).
+        real_facts = guard.database_facts
+
+        def facts_for_test_database():
+            facts = real_facts()
+            if not facts["is_sqlite"] and facts["name"].startswith("test_"):
+                facts["name"] += "_staging"
+            return facts
+
+        facts_patch = mock.patch.object(guard, "database_facts", side_effect=facts_for_test_database)
+        facts_patch.start()
+        self.addCleanup(facts_patch.stop)
 
     def run_seed(self, *args):
         out = StringIO()
