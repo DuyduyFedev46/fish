@@ -173,7 +173,7 @@ export const PERM = {
 const has = (me: Me, perm: string) => me.permissions.includes(perm);
 const inGroup = (me: Me, ...groups: string[]) => me.groups.some((g) => groups.includes(g));
 /** Chỉ thuộc delivery_staff (không kèm Group nào khác). */
-export const onlyDelivery = (me: Me) => me.groups.length > 0 && me.groups.every((g) => g === ROLE.deliveryStaff);
+export const onlyDelivery = (me: Me) => !me.is_superuser && me.groups.length > 0 && me.groups.every((g) => g === ROLE.deliveryStaff);
 
 /**
  * Thứ tự trong bảng = thứ tự ở menu trái (UI-RULES §2.1). Mỗi lô chỉ THÊM dòng/bỏ cờ `soon`, không đổi thứ tự nhóm.

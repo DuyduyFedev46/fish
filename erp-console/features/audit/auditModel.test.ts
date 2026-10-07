@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { actionLabel, actorInitial, actorName, approverOf, buildApproverMap, changeSummary, matchesLocal, UNKNOWN_ACTION } from "./auditModel";
+import { AI_ONLY_ACTIONS, AUDIT_FILTER_ACTIONS, actionLabel, actorInitial, actorName, approverOf, buildApproverMap, changeSummary, matchesLocal, UNKNOWN_ACTION } from "./auditModel";
 import type { AuditLogRow } from "./types";
 
 const row = (over: Partial<AuditLogRow>): AuditLogRow => ({
@@ -122,5 +122,12 @@ describe("matchesLocal", () => {
     expect(matchesLocal(r, { query: "", from: "2026-09-27", to: "2026-09-27" })).toBe(true);
     expect(matchesLocal(r, { query: "", from: "2026-09-28", to: "" })).toBe(false);
     expect(matchesLocal(r, { query: "", from: "", to: "2026-09-26" })).toBe(false);
+  });
+});
+
+describe("AI_ONLY_ACTIONS (R1)", () => {
+  it("gồm cả ai_config_kill để tắt AI thì ô lọc không còn Tắt trợ lý AI", () => {
+    expect(AI_ONLY_ACTIONS).toContain("ai_config_kill");
+    expect(AUDIT_FILTER_ACTIONS.filter((a) => !AI_ONLY_ACTIONS.includes(a))).not.toContain("ai_config_kill");
   });
 });

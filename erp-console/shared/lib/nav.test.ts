@@ -26,6 +26,14 @@ const WAREHOUSE = viewer({
   permissions: [PERM.viewDashboard, PERM.viewBatch, PERM.viewPurchaseReceipt, PERM.viewStockReconciliation, PERM.viewItem],
 });
 
+describe("superuser chỉ thuộc delivery_staff (N1)", () => {
+  it("thấy menu như Chủ, không bị thu gọn như nhân viên giao", () => {
+    const su = viewer({ ...OWNER, groups: [ROLE.deliveryStaff], is_superuser: true });
+    expect(menuItems(su).length).toBeGreaterThanOrEqual(menuItems(OWNER).length);
+    expect(menuItems(su).length).toBeGreaterThan(menuItems(DELIVERY).length);
+  });
+});
+
 describe("bảng NAV", () => {
   it("nhóm theo đúng thứ tự UI-RULES §2.1, không xen kẽ", () => {
     const seen: string[] = [];

@@ -26,7 +26,7 @@ const SPECS: MockSpec[] = [
 const GROUP_LABELS: Array<[AiCommandGroup, string]> = [
   [COMMAND_GROUP.purchasing, "Thu mua"],
   [COMMAND_GROUP.sales, "Bán hàng"],
-  [COMMAND_GROUP.customerService, "Gọi xác nhận"],
+  [COMMAND_GROUP.customerService, "Chăm sóc khách hàng"],
 ];
 
 const WRITE_CHOICES: AiCommandLevel[] = ["OFF", "C", "B"];
