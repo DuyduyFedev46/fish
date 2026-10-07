@@ -558,3 +558,47 @@ Xem hẹp diff `ff0c57a` (7 file). Đã chạy `npx vitest run shared/lib/nav.te
 | # | Mức | Chỗ | Ghi nhận | Cách sửa |
 |---|---|---|---|---|
 | L1 | Low (không chặn) | `erp-console/shared/lib/nav.test.ts:32` | Test dùng `toBeGreaterThanOrEqual`. Nếu sau này superuser mất một mục của Chủ nhưng lại có thêm một mục khác, test vẫn xanh | Khẳng định chính xác: `expect(menuItems(su).map(i => i.key)).toEqual([...menuItems(OWNER).map(i => i.key)` chèn `"my-deliveries"` đúng vị trí trong NAV`])`. Cách đơn giản hơn: tập key của su bằng tập key của OWNER cộng `"my-deliveries"`. Làm ở lô kế tiếp có đụng `nav.test.ts` |
+
+## F1 gộp main (08/10)
+
+Review hẹp merge `4bb92ec` (main `f3a543f` vào `feat/pham-vi-fe`) và commit sửa `2b49ed6`. Đọc diff, so registry BE ở nhánh `feat/pham-vi-du-lieu`.
+Không build/tsc/vitest (điều phối viên chạy).
+
+**Kết luận: APPROVED** (không có lỗi chặn; 2 Low ghi nhận, 1 nợ Lô 6).
+
+1. **Giải xung đột 2 màn: không mất hành vi.**
+   - Phía main chỉ đổi ở `features/permissions/` đúng 3 chỗ (diff merge-base..`f3a543f`): `aiVisible` + `visibleRegistry` ở `GroupDetailScreen`,
+     ở `PermissionMatrixScreen`, và hàm `visibleRegistry` trong `permissionsModel.ts` (kèm `visibleRegistry.test.ts`). Cả ba còn nguyên sau merge.
+     `sections` ở cả hai màn lấy từ registry đã lọc, nên mục `ai_policy` vẫn ẩn khi tắt AI.
+   - Phía F1 còn đủ: `useGroupDraft` (bản nháp, một PUT có `version`), banner 409 `group-conflict` + `reloadAfterConflict`, `ScopeRowEditor` 8 dòng,
+     thanh lưu, `ConfirmSaveModal` có `objectLabel`; ma trận giữ `onConflict` → tải lại danh sách và registry, `pendingWiden`, `asToggleGroup` có `version`/`scopeValues`.
+   - So `f3a543f..2b49ed6` trên `erp-console/`: chỉ khác ở `features/permissions/**` và 2 e2e, nên merge không làm rơi thay đổi nào khác của main.
+   - Lô QĐ superuser: main để ma trận `canEdit = nhóm Chủ`, với lý do "superuser sẽ bị 403". Lý do này **sai so với BE**: `_gate_group` gọi
+     `actor_is_owner` = `is_superuser or is_owner` (`staff/services.py:53`). Merge dùng `isGroupWriter(me)`, đúng quyết định 06/10 và câu 1 ngày 08/10.
+     `ConsoleGate`, `AccountScreen`, `nav` (nhãn và menu superuser của main) không bị đụng.
+2. **`isGroupWriter` khớp BE.** Hàm trả true khi `groups` có `owner` **hoặc** `is_superuser === true`. BE chặn ghi ở `_gate_group` cũng theo đúng hai điều kiện đó (403 `StaffPermissionError`).
+   `/api/auth/me/` trả `is_superuser` (`auth/services.py:137`) và `features/auth/types.ts:35` có field này. Bỏ nhánh đoán theo danh sách quyền là đúng, vì nhánh đó
+   có thể mở công tắc cho người có quyền lẻ mà BE sẽ chặn. Có test cho ca "đủ 5 quyền chỉ-Chủ nhưng không có cờ thì false". Người thuộc nhóm Chủ vẫn
+   bị chặn sửa nhóm Chủ (`canEdit = writer && !isOwnerGroup`), khớp `GROUP_LOCKED`.
+3. **Nhãn mock khớp BE.** So tự động 29 việc ở `capabilities/registry.py` với `permissions/mock.ts`: 27 việc trùng từng chữ (gồm `create_refund` "Lập phiếu hoàn tiền",
+   `assign_delivery` "Chọn người giao", `create_return` "Ghi hàng hoàn", `approve_return` "Duyệt hàng hoàn"). Mock chỉ thiếu 2 việc (xem mục 4).
+   8 đối tượng `mockScopes.ts` khớp `data_scopes/catalog.py` cả `label` lẫn `gate_label` (`returns` là "Hàng hoàn"/"hàng hoàn").
+   `grep` trong `features/permissions` không còn "hoàn về kho" hay "Giao phiếu cho người giao".
+4. **Nợ Lô 6: chấp nhận cho merge.**
+   - Khi chạy BE thật, màn vẽ registry, nhãn và phạm vi theo dữ liệu BE trả. Không có chỗ nào hard-code số việc.
+   - `view_sales_invoices` và `view_order_customer_info` đi qua các nhánh chung: `sectionsOf` gom theo `section`, công tắc theo `cellMode`,
+     `requires` lấy từ registry. Cảnh báo mở rộng dữ liệu khách do BE quyết, qua `preview.widens_customer_data` và lỗi PUT `wideningImpactOf`.
+     FE không tự quyết nên không bỏ sót việc mới. Dòng `invoices` có `gate_capability` thật thì `isScopeInactive` tự đọc.
+   - Mock để `gate_capability: null` cho `invoices`. Ở mock điều này nhất quán, vì mock không có việc đó.
+   - `useGroupDraft` nhận `group.registry` gốc, có mục AI. Ảnh hưởng chỉ ở `breakingWarnings`/`toggleInDraft`, và chỉ chạy khi người dùng bật/tắt việc. Việc AI ẩn thì không bấm được.
+     `ai_policy` ở BE có `requires=()` nên không sinh cảnh báo phụ thuộc. Hiển thị không sai.
+   - Lô 6 **phải** làm 2 việc: thêm 2 việc vào mock (hoặc bỏ mock), và chạy e2e `ed_batch14` trên BE thật để thấy 2 công tắc mới. Nợ này phải có trong 02c Lô 6.
+     Nếu chưa làm thì không đóng F1.
+5. **E2E không nới lỏng.**
+   - `PENDING_ROUTES` thành tập rỗng nên 2 route `/permissions/...` quay lại bị quét nhóm A. Đây là siết thêm.
+   - `ed_batch14`: hàm `switch()` dùng `exact=True` nên đổi sang "Ghi hàng hoàn" vẫn là khớp đúng tên. Hướng kiểm không đổi.
+
+| # | Mức | Chỗ | Ghi nhận | Cách sửa |
+|---|---|---|---|---|
+| L1 | Low (không chặn) | `erp-console/e2e/ed_batch14_permissions.py:133` | Kiểm `"Ghi hàng hoàn" in rows_text` là so chuỗi con, nên nhãn cũ "Ghi hàng hoàn về kho" cũng lọt. Nhóm A ở `standard_names_all_routes.py:44` so phân biệt hoa thường với "Hàng hoàn về kho", nên cũng không bắt được "Ghi **h**àng hoàn về kho". Hiện chỉ ca `switch(..., exact=True)` ở dòng 211 chặn nhãn cũ | Thêm `and "hoàn về kho" not in rows_text`, hoặc thêm "hàng hoàn về kho" (chữ thường) vào `GROUP_A`. Làm ở Lô 6 |
+| L2 | Low (ghi nhận) | `erp-console/features/permissions/components/GroupDetailScreen.tsx` `labelOf` | `labelOf` đọc `g.registry` gốc, khác `sections` đọc registry đã lọc. Làm vậy là đúng, vì nhãn `requires` của việc hiện vẫn cần tra được. Ghi lại để tránh ai "sửa đồng bộ" thành bản đã lọc | Không cần sửa |
