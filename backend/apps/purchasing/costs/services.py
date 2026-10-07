@@ -69,6 +69,8 @@ def record_purchase_cost(*, cost_type, amount, allocation_method, incurred_date,
         )
 
         # BR-MH-07: không phân bổ chi phí vào lô của phiếu nhập đã huỷ (đổi giá vốn chứng từ đã huỷ)
+        # Chỉ xét trạng thái phiếu, không xét `batch.status`: lô huỷ vì quá hạn (`cancel_expired_batch`, BR-LO-03) là lô thật,
+        # chưa chốt, vẫn nhận chi phí đến muộn (E-14, BR-GV-02). Trạng thái phiếu đọc bằng truy vấn mới SAU khi khoá lô.
         for batch, _ in resolved:
             if batch.pk in cancelled_batch_ids:
                 raise BusinessError(

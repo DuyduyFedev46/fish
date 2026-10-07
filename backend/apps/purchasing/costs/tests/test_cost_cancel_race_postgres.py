@@ -93,7 +93,6 @@ class CostVersusCancelReceiptRaceTests(TransactionTestCase):
                 self._assert_no_cost_on_cancelled(receipt, batch)
 
     def test_b2_cancel_and_cost_at_once_never_both_succeed(self):
-        outcomes_seen = set()
         for i in range(ROUNDS * 2):
             with self.subTest(i=i):
                 receipt, batch = self._receipt()
@@ -132,6 +131,5 @@ class CostVersusCancelReceiptRaceTests(TransactionTestCase):
                     t.join(JOIN_TIMEOUT_SECONDS)
                     self.assertFalse(t.is_alive(), "treo quá thời hạn (nghi deadlock)")
                 pair = (result["cancel"], result["cost"])
-                outcomes_seen.add(pair)
                 self.assertIn(pair, {("ok", "BATCH_CANCELLED"), ("BR-MH-07", "ok")}, pair)
                 self._assert_no_cost_on_cancelled(receipt, batch)
