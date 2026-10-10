@@ -222,3 +222,8 @@ Hồ sơ: `doc/features/2026-09-26-sepay-cong-thanh-toan/`.
 - **BR-TT-18** (#15 ghi tiền về muộn) ghi vào spec gốc §P-05. **NEW-1** (tìm đơn bằng POST) giữ như đã làm.
 - **Đợt 2 rà soát giao diện (17c):** chưa làm, ưu tiên staging chạy ổn trước.
 - **Nhãn vai "CSKH"** đổi thành tên dễ hiểu ("Nhân viên gọi xác nhận"); mã nhóm `customer_service` giữ nguyên.
+
+## 2026-10-10 — Nhắc lại câu chờ Duy, chốt chỗ chạy test PostgreSQL — [DUY CHỐT]
+- Giữ quyết định 08/10: câu 3 không chặn, câu 4 không che, BR-TT-18 ghi vào spec gốc, đổi nhãn vai "CSKH".
+- **Test PostgreSQL (câu 5):** không chạy trên PostgreSQL cài ở máy. Chạy trên cloud, với DB test riêng, không trỏ vào staging hay production.
+- **Production chưa lên.** Còn nhiều việc. Xong đợt này thì tách nhánh để làm Shop.
