@@ -59,7 +59,7 @@
 import { ENUMS } from "@/shared/lib/enums";
 import type { MockRequest, MockResponse, Paginated } from "@/shared/lib/http";
 import { beError } from "@/shared/lib/beErrors.mock";
-import { hasLimitedCourierScope } from "@/shared/lib/personalData";
+import { hasLimitedCourierScope, type CustomerHiddenReason } from "@/shared/lib/personalData";
 import { MOCK_UNAUTHORIZED, mockRequireUser, mockUsers, mockPermsOf } from "@/features/auth/mock";
 import type { Me } from "@/features/auth/types";
 import { money as formatMoney } from "@/shared/lib/format";
@@ -708,6 +708,15 @@ function piiHidden(me: Me, o: Order): boolean {
   return endedDay < cutoffDay;
 }
 
+/**
+ * §2.7 `customer_hidden_reason` như BE (`sales/customers/permissions.py`): không có V2 → "not_permitted" (đứng trước);
+ * NV giao quá cửa sổ SR-PII-02 → "expired"; còn lại null.
+ */
+function hiddenReason(me: Me, o: Order): CustomerHiddenReason | null {
+  if (!has(me, "sales.view_order_customer_info")) return "not_permitted";
+  return piiHidden(me, o) ? "expired" : null;
+}
+
 /** Phiếu giao còn ở trạng thái huỷ được (Soạn hàng/Chờ lấy/Giao thất bại) — BE `_cancellable_delivery_status`. */
 function cancellableDeliveryStatus(d: Delivery | null): boolean {
   return !d || d.status === "PREPARING" || d.status === "READY" || d.status === "FAILED";
@@ -756,7 +765,8 @@ function customerIdOf(o: Order): number {
 }
 
 function listItem(me: Me, o: Order): OrderListItem {
-  const hidden = piiHidden(me, o);
+  const reason = hiddenReason(me, o);
+  const hidden = reason !== null;
   return {
     id: o.id,
     code: o.code,
@@ -764,6 +774,7 @@ function listItem(me: Me, o: Order): OrderListItem {
     status_label: ORDER_LABEL[o.status],
     customer_name: hidden ? null : o.customer.name,
     customer_phone: hidden ? null : o.customer.phone,
+    customer_hidden_reason: reason,
     total_amount: money(orderTotal(o)),
     created_at: o.created_at,
     reserved_until: o.reserved_until,
@@ -794,8 +805,9 @@ function detail(me: Me, o: Order): OrderDetail {
     total_amount: money(orderTotal(o)),
     created_at: o.created_at,
     reserved_until: o.reserved_until,
-    customer: piiHidden(me, o) ? { name: null, phone: null, address: null } : { ...o.customer },
-    cancel_note: piiHidden(me, o) ? "" : o.cancelNote ?? "",
+    customer: hiddenReason(me, o) ? { name: null, phone: null, address: null } : { ...o.customer },
+    customer_hidden_reason: hiddenReason(me, o),
+    cancel_note: hiddenReason(me, o) ? "" : o.cancelNote ?? "",
     lines: o.lines.map((l, idx) => ({
       no: idx + 1,
       item_code: l.item_code,
@@ -923,7 +935,7 @@ function listResponse(me: Me, query: URLSearchParams, opts: { search?: boolean }
       (o) =>
         !q ||
         o.code.toLowerCase().includes(q) ||
-        (opts.search && !piiHidden(me, o) && (o.customer.phone.includes(q) || fold(o.customer.name).includes(fold(q)))),
+        (opts.search && !hiddenReason(me, o) && (o.customer.phone.includes(q) || fold(o.customer.name).includes(fold(q)))),
     )
     .sort((a, b) => (a.created_at < b.created_at ? 1 : a.created_at > b.created_at ? -1 : b.id - a.id));
   const pages = Math.max(1, Math.ceil(hit.length / PAGE_SIZE));
@@ -1632,6 +1644,15 @@ function refundQueueActions(me: Me, status: string): string[] {
   return [];
 }
 
+/** Tên/SĐT khách của phiếu hoàn tiền: `null` kèm lý do khi bị che (V2 hoặc quá cửa sổ); không có đơn thì bỏ khoá. */
+function refundCustomer(me: Me, o: Order | null): Pick<RefundQueueItem, "customer_name" | "customer_phone" | "customer_hidden_reason"> {
+  if (!o) return { customer_name: undefined, customer_phone: undefined };
+  const reason = hiddenReason(me, o);
+  return reason
+    ? { customer_name: null, customer_phone: null, customer_hidden_reason: reason }
+    : { customer_name: o.customer.name, customer_phone: o.customer.phone, customer_hidden_reason: null };
+}
+
 function refundQueueItem(me: Me, store: Store, e: RefundEntry): RefundQueueItem {
   const actionsFor = refundQueueActions(me, e.r.status);
   if (e.kind === "payment") {
@@ -1640,8 +1661,7 @@ function refundQueueItem(me: Me, store: Store, e: RefundEntry): RefundQueueItem 
     return {
       ...paymentRefundShape(e.r),
       order_code: o ? o.code : null,
-      customer_name: o ? o.customer.name : undefined,
-      customer_phone: o ? o.customer.phone : undefined,
+      ...refundCustomer(me, o),
       source_bank_txn_id: entry?.p.bank_txn_id,
       failure_reason: e.r.failure_reason,
       available_actions: actionsFor,
@@ -1652,8 +1672,7 @@ function refundQueueItem(me: Me, store: Store, e: RefundEntry): RefundQueueItem 
   return {
     ...invoiceRefundShape(o, r, r.is_partial),
     order_code: o.code,
-    customer_name: o.customer.name,
-    customer_phone: o.customer.phone,
+    ...refundCustomer(me, o),
     source_bank_txn_id: source,
     failure_reason: r.failure_reason,
     available_actions: actionsFor,

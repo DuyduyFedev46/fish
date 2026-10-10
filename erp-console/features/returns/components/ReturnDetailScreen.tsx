@@ -25,6 +25,7 @@ import { Icon } from "@/shared/ui/Icon";
 import { PersonalText } from "@/shared/ui/PersonalText";
 import { ConfirmModal } from "@/shared/ui/overlay/ConfirmModal";
 import { useToast } from "@/shared/ui/overlay/Toast";
+import { ScopeLostInApp } from "@/features/auth/components/AppStates";
 import { ErrorScreen } from "@/shared/ui/states/ErrorScreen";
 import { NoPermission } from "@/shared/ui/states/NoPermission";
 import { NotFoundScreen } from "@/shared/ui/states/NotFoundScreen";
@@ -67,6 +68,7 @@ export function ReturnDetailScreen({ renderAi }: Props) {
   if (id === undefined) return <DetailSkeleton />;
   if (id === null) return <NotFoundScreen homeHref={home} />;
   if (detail.status === "forbidden") return <NoPermission homeHref={home} />;
+  if (detail.status === "scope_lost") return <ScopeLostInApp listHref="/returns/" />;
   if (detail.status === "notfound") return <NotFoundScreen homeHref={home} />;
   if (detail.status === "error") return <ErrorScreen homeHref={home} onRetry={() => void detail.reload()} />;
   if (detail.status === "loading" || !detail.data) return <DetailSkeleton />;

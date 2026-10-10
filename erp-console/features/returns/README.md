@@ -8,7 +8,7 @@ Hàng giao thất bại mang về kho: nhân viên giao hoặc nhân viên kho n
 | `api.ts` | `listReturns`, `getReturn`, `createReturn`, `approveReturn`, `cancelReturn`, `getReturnTimeline`, cộng các hàm phụ cho hộp nhập: `listReturnableNotes` (trả `{notes, truncated}`), `getNoteLines`. Có nhánh mock khi `NEXT_PUBLIC_USE_MOCK=1`. |
 | `returnsModel.ts` | Phần thuần: giờ ngoài kho lạnh, chuẩn hoá số kg, chặn số điện thoại trong ghi chú, ánh xạ lỗi BE sang câu tiếng Việt (không mã quy tắc), quyền hiện nút, gộp lô của phiếu giao. |
 | `messages.ts` | Câu chữ tiếng Việt do FE tự sinh. |
-| `useReturnList.ts`, `useReturnDetail.ts`, `useReturnTimeline.ts` | Tải danh sách (lọc trạng thái, tháng, "Tải thêm"), tải chi tiết theo `?id=`, tải dòng thời gian từ `/api/guidance/return/<id>/`. |
+| `useReturnList.ts`, `useReturnDetail.ts`, `useReturnTimeline.ts` | Tải danh sách (lọc trạng thái, tháng, "Tải thêm"), tải chi tiết theo `?id=` (tải lại 404 sau khi đã xem → `scope_lost`, PV-13), tải dòng thời gian từ `/api/guidance/return/<id>/`. |
 | `components/ReturnListScreen.tsx` | Màn danh sách. |
 | `components/ReturnDetailScreen.tsx` | Màn chi tiết: thanh trạng thái, thông tin, dòng thời gian, khối Trợ lý AI, hai nút duyệt (theo quyền). |
 | `components/CreateReturnModal.tsx` | Hộp F2m. Cũng được mở từ nút "Mang hàng về kho" ở Việc giao của tôi, kèm phiếu giao điền sẵn. |

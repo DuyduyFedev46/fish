@@ -49,7 +49,7 @@ export function PaymentDetailScreen({ renderAi }: Props) {
   const id = useIdParam();
   const detail = useDetail<PaymentQueueItem>(id, getPayment);
   return (
-    <DetailGate id={id} detail={detail} noun={M.paymentNoun}>
+    <DetailGate id={id} detail={detail} noun={M.paymentNoun} listHref="/orders/payments/">
       {(p) => <PaymentDetailBody payment={p} detail={detail} renderAi={renderAi} />}
     </DetailGate>
   );

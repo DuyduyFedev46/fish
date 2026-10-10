@@ -1,5 +1,7 @@
 // Kiểu dữ liệu hoá đơn mua (R11) và chi phí phụ (R12). Lô 10 dùng ở Mua hàng; Lô 12 dùng lại ở "Hoá đơn mua & chi phí".
 
+import type { CustomerHiddenReason } from "@/shared/lib/personalData";
+
 /** GET /api/purchasing/invoices/. `amount` hiện cho người có view_purchaseinvoice (Chủ, Quản lý; quyết định D-3). */
 export type PurchaseInvoiceRow = {
   id: number;
@@ -101,6 +103,8 @@ export type SalesInvoiceRow = {
   sales_order: number;
   order_code: string;
   customer_name: string | null;
+  /** §2.7 — lý do `customer_name` là null: "expired" | "not_permitted". */
+  customer_hidden_reason?: CustomerHiddenReason | null;
   issued_at: string;
   amount: string;
   /** ISSUED | CANCELLED. */

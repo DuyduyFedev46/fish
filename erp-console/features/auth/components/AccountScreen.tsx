@@ -17,6 +17,7 @@ import { Icon } from "@/shared/ui/Icon";
 import { Modal } from "@/shared/ui/overlay/Modal";
 import { useToast } from "@/shared/ui/overlay/Toast";
 import { Loading } from "@/shared/ui/StateBox";
+import { DATA_SCOPE_MSG, dataScopeView } from "../dataScopeView";
 import { readSignedIn } from "../signedInAt";
 import { useAuth } from "./AuthProvider";
 import { aiVisible } from "@/shared/lib/features";
@@ -53,6 +54,7 @@ export function AccountScreen() {
     : me.groups.map((g) => ({ code: g, label: groupLabel(g) }));
   // Duy 08/10 câu 1: superuser không nhóm vào ERP như Chủ → một dòng thay cho danh sách nhóm rỗng.
   const groups = groupList.length === 0 && me.is_superuser ? [{ code: "superuser", label: `${SUPERUSER_LABEL} (toàn quyền)` }] : groupList;
+  const scopes = dataScopeView(me);
   const menu = visibleNav(me);
   const aiSettings = canView(me, "ai-settings");
 
@@ -151,6 +153,38 @@ export function AccountScreen() {
               </dd>
             </div>
           </dl>
+        </div>
+      </section>
+
+      <section className={s.section} aria-labelledby="acc-scope" data-testid="data-scopes">
+        <div className={s.sectionHead}>
+          <h2 id="acc-scope">{DATA_SCOPE_MSG.title}</h2>
+          <p>{DATA_SCOPE_MSG.intro}</p>
+        </div>
+        <div className={s.group}>
+          {scopes.state === "missing" ? (
+            <p className={s.empty}>{DATA_SCOPE_MSG.missing}</p>
+          ) : (
+            <>
+              {scopes.superuser && (
+                <p className={s.scopeAll} data-testid="data-scope-superuser">
+                  <Icon name="shield_person" />
+                  {DATA_SCOPE_MSG.superuser}
+                </p>
+              )}
+              <dl className={s.scopes}>
+                {scopes.lines.map((l) => (
+                  <div key={l.key} className={`${s.scopeRow}${l.muted ? ` ${s.scopeNone}` : ""}`} data-scope={l.key}>
+                    <dt>{l.label}</dt>
+                    <dd>
+                      <span className={s.scopeValue}>{l.valueLabel}</span>
+                      {l.note && <span className={s.scopeNote}>{l.note}</span>}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            </>
+          )}
         </div>
       </section>
 

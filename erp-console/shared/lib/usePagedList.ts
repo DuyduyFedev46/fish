@@ -90,9 +90,15 @@ export function usePagedList<T extends { id: number }, P>(
       });
     } catch (err) {
       if (id !== seq.current) return;
+      // PV-13-AC3: phạm vi vừa hẹp lại nên trang kế không còn (DRF trả 404) → tải lại trang 1, giữ dòng cũ tới khi có kết quả.
+      if (err instanceof ApiError && err.status === 404) {
+        setState((s) => ({ ...s, moreLoading: false }));
+        void loadFirst(true);
+        return;
+      }
       setState((s) => ({ ...s, moreLoading: false, moreError: err }));
     }
-  }, []);
+  }, [loadFirst]);
 
   const patch = useCallback((id: number, change: Partial<T>) => {
     setState((s) => (s.rows ? { ...s, rows: s.rows.map((o) => (o.id === id ? { ...o, ...change } : o)) } : s));
