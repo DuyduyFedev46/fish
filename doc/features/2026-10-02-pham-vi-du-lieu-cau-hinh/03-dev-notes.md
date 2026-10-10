@@ -505,3 +505,26 @@ Theo `02c-quyet-dinh-08-10.md` §G.3 và điều kiện đóng F1 ở `03b-revie
 - Mock `gate_capability: "view_sales_invoices"` khiến dòng Hoá đơn bán mờ khi tắt V1 (khớp BE). Phiên đăng nhập mock không đổi quyền theo việc đã bật/tắt (ghi chú cũ của `mock.ts`).
 
 **Kiểm chứng Lô 6 FE:** `tsc --noEmit` sạch; `vitest` 105 file / 1285 test PASS; build thật (`USE_MOCK=0`) sạch, `check-no-mock` XANH (32 file mock, 208 chuỗi seed, 258 file), `check-ai-chunks` XANH (48 màn + 2 layout), grep `cave_erp_mock` trong `out/` rỗng; e2e mock `ed_batch14_permissions` 158/158 PASS (AI tắt và bật), `standard_names_all_routes` 11/11 PASS (AI tắt và bật); `check_naming.py` OK.
+
+## Lô 6 BE — sửa review techlead (10/10)
+
+Chỉ sửa `backend/apps/accounts/data_scopes/tests/test_release_gate.py`. Không đụng code sản phẩm, migration, FE.
+
+- **M1 (AC6)**: PUT nay gửi kèm thay đổi hợp lệ `scopes: {receipts: created_by_me}` cộng khoá số ngày ở thân: kỳ vọng 400 `INPUT_NOT_ALLOWED`.
+  Thêm biến thể khoá số ngày nằm trong `scopes`: kỳ vọng 400 `SCOPE_OBJECT_UNKNOWN`. Sau vòng lặp assert `version` nhóm không tăng,
+  `GroupDataScope` không đổi, `AuditLog` không thêm dòng, hai setting `*_PII_RECENT_DAYS` không đổi.
+  **Chứng minh bắt được lỗi**: tạm cho `capabilities.services.BODY_KEYS` nhận 6 khoá số ngày, chạy riêng test AC6 thì ĐỎ
+  (`200 != 400` ở `delivery_pii_recent_days`, `409 != 400` ở các khoá còn lại). Đã hoàn lại bằng `git checkout`, cây sạch.
+- **M2 (AC3)**: `COST_KEYS = apps.common.cost_keys.COST_KEYS | {"costs"}`. Chạy lại vẫn XANH: không có rò giá vốn thật.
+- **L1**: AC3 quét thêm `/api/guidance/receipt|order/<id>/`, `/api/delivery/notes/lookup/?code=<mã>.1`; test mới
+  `test_pv12_ac3_s1_ai_detail_and_reports_batches_do_not_leak_cost` quét AI chi tiết đơn/phiếu giao (bật AI bằng `override_settings`),
+  tem lookup (tạo `LabelPrint` giả), và assert `reports/batches/` `!= 200` cho 4 nhóm không có `view_profitreport`.
+- **L2**: `SWEEP["orders"]` thêm `invoices.list` và `invoices.detail`; tập đơn của hoá đơn (bỏ tiền tố `invoice_of_`) phải bằng
+  tập đơn theo D1 giao với đơn đã có hoá đơn, ở mọi giá trị D1. Xanh.
+- **L3**: `SourceGrepTests.GROUP_NAME_EXCEPTIONS` khai ngoại lệ `can_cancel_any_receipt` (quyền hành động, PV-06-AC5/6, 02b dòng 98).
+  Test mới quét `services.py` của mọi module có `scope.py`, chỉ cho so tên nhóm trong hàm ngoại lệ. Phát hiện thêm 2 chỗ cùng bản chất
+  hành động ở `delivery/services.py` (`list_deliverers`, `assign_deliverer`: chọn người được gán phiếu, BR-GH-23) nên khai kèm.
+  Test cũng đỏ nếu ngoại lệ đã khai mà không còn dùng. Backlog (techlead): story BR-PQ-33 đưa việc huỷ phiếu nhập thành việc trong ma trận.
+- **N1**: import `load_baseline` lên đầu file. **N2**: AC7 gọi DELETE/PUT/PATCH trên `/api/audit-logs/` (route thật), kỳ vọng 403/405
+  (hiện trạng thực tế 405 cho người xem được, 403 cho người không đủ quyền); bỏ route `/<pk>/` không tồn tại.
+- Nợ: không phát sinh mới. Nợ chuyển tiếp của techlead (e2e `ed_batch14` trên BE thật) vẫn thuộc QA.
