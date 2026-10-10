@@ -524,3 +524,102 @@ Tái hiện: `qa_owner` → /permissions/detail/?group=delivery_staff ở 1280px
 - Dọn: tắt runserver/http.server, xoá bản sao `out/` trong scratchpad. Ảnh còn ở `scratchpad/pv6qa/shots/`.
 - Không chạy lại: suite BE 3551, tsc, vitest 1285, check-no-mock/ai-chunks (điều phối viên đã chạy).
 - Lưu ý: `erp-console/e2e/permissions_real_backend.py` là file mới chưa commit (QA được phép thêm e2e); `03b-review-techlead.md` đang có thay đổi chưa commit không phải của QA.
+
+---
+
+# Lô 7 + kiểm lại Lô 6 — QA (10/10)
+HEAD `ad31d5d` (nhánh `feat/pv7-cum`). Chạy **BE thật + ERP build USE_MOCK=0**, dữ liệu giả `seed_qa`. Không sửa code sản phẩm, không commit.
+
+## Kết luận: REJECTED — 1 lỗi Medium chặn (B1): nhật ký ERP hiện "Thao tác khác" cho mọi dòng `change_group_data_scopes`, làm đỏ hồi quy `standard_names_all_routes` trên BE thật
+Toàn bộ ca của Lô 7 (PV-13, PV-14, §2.7) và Lô 6 (B1 đã sửa) đều xanh. Lỗi chặn nằm ngoài file Lô 7 (nhãn thiếu từ lô ghi phạm vi), sửa một dòng. L1 của Lô 6 vẫn còn (Low, không chặn).
+
+## Tổng: 353 ca · ✅ 351 · ❌ 1 · ⏸ 1
+| Bộ chạy | Kết quả |
+|---|---|
+| `erp-console/e2e/data_scope_real_backend.py` (mới, BE thật, 17 nhóm ca) | **247/247 PASS** (một lần chạy liền) |
+| `erp-console/e2e/permissions_real_backend.py` (Lô 6, chạy lại) | **33/33 PASS** (B1 xanh) |
+| `REAL=1 e2e/standard_names_all_routes.py` | 9/10 — FAIL = B1 mới (dưới) |
+| Script API `scratchpad/api_pv14.py` (token thật, 9 tài khoản, đối chiếu cấu hình nhóm) | 57/57 PASS |
+| API bổ sung (409 version cũ, 400 chưa xác nhận mở rộng, 403 Quản lý PUT, 401 chưa đăng nhập, quét khoá giá vốn 5 vai) | 5/5 PASS |
+| ⏸ | `data_scope_loss_account.py` chế độ MOCK không chạy lại (việc giao chỉ yêu cầu BE thật; điều phối viên đã chạy vitest) |
+
+Dựng: `migrate` + `bootstrap_masterdata` + `seed_qa` trên SQLite tạm; lùi `created_at` của `QA-RECEIPT-DRAFT` 1 ngày và `completed_at` của `QA-GH-08` 10 ngày (chỉ DB tạm); `CORS_ALLOWED_ORIGINS` + nới `THROTTLE_LOGIN_*` cho BE tạm (giới hạn đăng nhập hoạt động: gặp 429 "quá nhanh" khi chạy dồn). Trình duyệt: Chromium headless, 1280 và 360.
+
+## Theo AC / ca §6.1.6 (BE thật; không PASS bằng đọc code)
+| Ca / AC | Kết quả | Bằng chứng |
+|---|---|---|
+| 1 PV-13-AC1 phiếu nhập, người không phải người tạo (`qa_warehouse_courier`, Chủ đặt `receipts=created_by_me`) | ✅ | `receipt_not_creator`: "Ghi nhận phiếu" → BE 404 thật → hộp có "Tải lại" → màn "Bạn không còn quyền xem mục này." + liên kết "Về danh sách" → `/purchasing/`; KHÔNG có câu "Phiếu tạo từ hôm trước". Ảnh `shots/scope-lost-phi-u-nh-p-kh-ng-ph-i-ng-i-t-o-created-b.png` |
+| 2 PV-13-AC2 người tạo, phiếu hôm qua (`qa_warehouse`, `created_by_me_today`) | ✅ | `receipt_earlier_day`: có thêm "Phiếu tạo từ hôm trước. Nhờ Quản lý xử lý tiếp." Ảnh `shots/scope-lost-phi-u-nh-p-ng-i-t-o-phi-u-h-m-qua-create.png` |
+| 3 AC1 trên thao tác ghi (I3: 2 bước) | ✅ | cùng hai ca trên: sau "Ghi nhận phiếu" bị 404, trang không trắng, không toast lỗi đỏ, hộp hiện "Tải lại"; bấm mới sang màn mất quyền (đúng I3) |
+| 4 AC1+AC5 đơn (Quản lý, `orders=assigned_deliveries`) | ✅ | `order`: đối chứng trước thu hẹp thấy tên/SĐT/địa chỉ giả trong DOM và cây fiber; sau mất quyền: DOM, props/state (283 nút fiber), console, localStorage/sessionStorage/URL/cookie đều không còn `Khách QA Giả`, `09000000NN`, `QA-Địa chỉ giả` |
+| 5 phiếu giao, khách, gọi xác nhận, hàng hoàn, phiếu hoàn tiền | ✅ | `delivery`, `customer`, `confirmation`, `return`, `refund`: cùng bộ kiểm như ca 4, bấm "Về danh sách" đúng đường quay lại. Chú thích: `return` — API hàng hoàn không có dữ liệu khách nên chỉ kiểm không lộ; `refund` — xem O2 (cách gây tải lại) |
+| 6 mở lần đầu ngoài phạm vi | ✅ | `first_open`: `qa_courier1` mở phiếu giao của `qa_courier2` và `qa_cs1` mở `QA-SO-01` → "Không tìm thấy trang này", không dùng câu mất quyền, không lộ dữ liệu khách |
+| 7 PV-13-AC4 tải lại bị 500 | ✅ | `http_500`: chặn GET chi tiết trả 500 → giữ màn đơn, nút "Thử lại", không vào scope_lost. Ảnh `shots/ac4-500.png` |
+| 8 PV-13-AC3 danh sách + "Tải thêm" | ✅ | `list_refresh`: thu hẹp rồi bấm "Thử lại" của dải mất mạng → danh sách ngắn lại, không hộp lỗi. `load_more`: "Tải thêm" gặp 404 thật của `?page=2` → gọi lại trang 1 đúng 1 lần, không lặp (kiểm thêm 1,5 giây). Chỉ sửa trường `next` của trang 1 để hiện nút (seed không đủ 2 trang) |
+| 9 PV-14-AC4 `qa_courier1` | ✅ | `account`: 8 dòng, Đơn hàng "Đơn có phiếu giao gán cho tôi / theo nhóm Nhân viên giao", Hoá đơn bán "Không xem", không nút/ô nhập/liên kết, 360 và 1280 không cuộn ngang. Ảnh `shots/pv14-qa_courier1-1280.png`, `-360.png` |
+| 10 PV-14-AC1 `qa_warehouse_courier` | ✅ | Đơn "Tất cả đơn / theo nhóm Nhân viên kho"; Khách hàng "Khách của phiếu giao gán cho tôi / theo nhóm Nhân viên giao". Ảnh `shots/pv14-qa_warehouse_courier-360.png` |
+| 11 `qa_superuser` | ✅ | dòng "Toàn bộ (quản trị hệ thống)", mọi dòng rộng nhất, không chữ phụ |
+| 12 PV-14-AC2/AC5 API | ✅ | `qa_nogroup`: `/me` 200, 8 dòng `none`, `via_group` null, `value_label` "Không xem"; 8 API ERP đều 403 `AUTH_NO_ROLE`; UI đưa tới `/no-role/`. `qa_courier1` GET `/api/staff/groups/manager/` → 403 |
+| 13 BR-PQ-36 | ✅ | `account_refresh`: Chủ đổi D6 → `/me` kế tiếp thấy ngay (API); UI "Tải lại quyền" đổi dòng Phiếu nhập sang "Do tôi tạo trong ngày" |
+| 14 §2.7 | ✅ | `hidden_v2`: tắt V2 của kho → danh sách đơn, chi tiết đơn (≥ 3 chỗ "Đã ẩn (không có quyền xem thông tin khách)"), hoá đơn bán KHÔNG có cột Khách; Quản lý tắt V2 → chi tiết phiếu hoàn tiền ghi lý do, không lộ khách; bật lại có xác nhận (400 `CUSTOMER_DATA_WIDENING_UNCONFIRMED` khi thiếu cờ) → hiện lại tên. Ảnh `shots/v2-off-*.png` |
+| 15 hồi quy câu 7 + cửa sổ | ✅ | NV kho bị tắt V2 vẫn thấy đủ tên, SĐT, địa chỉ trên phiếu giao (`shots/v2-off-delivery-note.png`); phiếu `QA-GH-08` của `qa_courier1` quá cửa sổ → "Đã ẩn (quá 7 ngày)" và không lộ khách ở "Việc giao của tôi" |
+
+## Ngoại lệ & biên
+- Dữ liệu đã có giao dịch: các ca chạy trên đơn đã thanh toán/đang soạn, phiếu hoàn tiền Chờ chuyển, phiếu giao đủ trạng thái của `seed_qa`.
+- Màn cũ/trạng thái đã đổi: toàn bộ PV-13 là "mở rồi mới đổi quyền", kể cả thao tác ghi tới BE sau khi mất quyền (BE trả 404 thật).
+- Hai người cùng lúc: PUT nhóm với `version` cũ → 409; Chủ đổi cấu hình giữa chừng (mọi ca PV-13) → request kế tiếp thấy ngay.
+- Cờ bật/tắt: V2 tắt/bật cho kho và Quản lý; `confirm_customer_data_widening` thiếu → 400.
+- Mọi khoá mới trả qua API (`data_scopes`: `key,label,value,value_label,via_group`): không có giá vốn, không có tên/SĐT/địa chỉ khách, không tính ngược được giá vốn. AuditLog `change_group_data_scopes` có `changes = {đối tượng: {from,to}}`, không tiền, không dữ liệu khách.
+
+## Phân quyền (từ `api_pv14.py`, token thật)
+| Người dùng | `/me` data_scopes | API ERP |
+|---|---|---|
+| owner | 8 dòng rộng nhất, `via_group` "owner" | đủ |
+| manager / warehouse / courier1 / cs1 / K+G / K+C | khớp `data_scope_values` của nhóm (từng đối tượng đủ điều kiện), đối tượng không đủ điều kiện = `none` | theo nhóm |
+| nogroup (quyền gán riêng) | 8 dòng `none`, `via_group` null | 403 `AUTH_NO_ROLE` (8/8) |
+| superuser | rộng nhất, `via_group` null | đủ |
+| chưa đăng nhập | 401 | 401 |
+| PUT cấu hình nhóm | chỉ Chủ (Quản lý 403, 409 khi `version` cũ) | |
+
+## Rò giá vốn
+Không phát hiện. Quét khoá `purchase_rate|landed_unit_cost|unit_cost|rate|profit*` trên 14 endpoint cho manager, warehouse, courier1, cs1: không có (ngoại lệ duy nhất `rate` ở `catalog/items/current_price.rate` là giá BÁN, không phải giá vốn). Chủ vẫn thấy như cũ.
+
+## Rò dữ liệu cá nhân
+Không phát hiện. Sau mất quyền: DOM, cây fiber hiện tại, console, localStorage/sessionStorage/URL/cookie sạch ở cả 7 màn; mở lần đầu ngoài phạm vi không lộ; `/me` không chứa tên/SĐT khách; log BE (`qa-be.log`): 0 Traceback, 0 SĐT/tên khách giả, 0 query `q=`. Ảnh chỉ có dữ liệu giả.
+
+## Lô 6 kiểm lại
+- **B1 (nhãn V2 ở hộp mở rộng của ma trận): ✅ đã sửa.** `permissions_real_backend.py` 33/33: ở `/permissions/` bật V2 cột Nhân viên giao → hộp "Cho thêm người xem dữ liệu khách?" ghi "Xem thông tin khách trên đơn, hoá đơn, phiếu hoàn tiền", không có `view_`; BE không đổi khi Esc, version tăng khi xác nhận.
+- **L1 (bảng Thành viên): ❌ vẫn còn (Low, ghi nhận).** Đo trên BE thật, `qa_owner` → `/permissions/detail/?group=warehouse_staff`: ở **1280** khung bảng rộng 644px, nội dung 749px, tiêu đề cột "Trạng thái" bị cột ghim "Thao tác" che **102/102px (100%)**, nên chữ "Đang làm" chỉ thấy sau khi cuộn ngang trong khung (ảnh `shots6/members-1280.png`, `members-scrolled-1280.png`). Ở **360** cột "Tên đăng nhập" bị cắt ("Tên", "qa_…"), "Trạng thái" nằm ngoài khung (ảnh `shots6/members-360.png`). Nút "Bỏ khỏi nhóm" thấy và bấm được, trang không cuộn ngang. Bản sửa chỉ thu hẹp cột ghim nên che ít hơn chứ chưa hết, và dev-notes đã ghi chưa tái hiện được ở mock. Gợi ý: cho Trạng thái nằm trước cột Tên đăng nhập hoặc gộp "Trạng thái" vào ô Tên; hoặc bỏ ghim ở 1280.
+
+## Hồi quy
+- `standard_names_all_routes` BE thật (AI tắt): 9/10, FAIL do B1 dưới (hai dòng "mã lạ" của seed_qa được phép; dòng thứ ba là `change_group_data_scopes`).
+- `permissions_real_backend.py` 33/33, console không lỗi (đã lọc nhiễu tải trước RSC của máy chủ tĩnh Python); `data_scope_real_backend.py` kiểm console không lỗi ở khối Tài khoản (7 vai × 2 cỡ).
+- Log BE: 0 Traceback. `python3 scripts/check_naming.py`: OK (script mới không phát sinh vi phạm).
+
+## Lỗi
+
+### B1 — Nhật ký ERP hiện "Thao tác khác" cho `change_group_data_scopes` · Medium (chặn) · PV-08 / Tầng 2 (BR-PQ-04/05), hiển thị Nhật ký
+- File: `erp-console/features/audit/auditModel.ts:91` (bảng nhãn có `change_group_capabilities: "Đổi phân quyền nhóm"` nhưng KHÔNG có `change_group_data_scopes`, hằng `UNKNOWN_ACTION` ở dòng 113). BE ghi action tại `backend/apps/accounts/capabilities/services.py:35`.
+- Tái hiện: (1) `qa_owner` PUT `/api/staff/groups/warehouse_staff/capabilities/` `{"version":…,"scopes":{"receipts":"created_by_me_today"}}` → 200. (2) Đăng nhập ERP bằng `qa_owner` → Nhật ký hoạt động (`/audit-logs/`).
+- Mong đợi: dòng ghi nhãn tiếng Việt (vd "Đổi phạm vi dữ liệu nhóm"), như `change_group_capabilities`.
+- Thực tế: cột Thao tác ghi "Thao tác khác" cho cả 40 dòng phạm vi trong DB QA; `standard_names_all_routes.py` (REAL=1) đỏ: "Nhật ký: không có ô 'Thao tác khác' (trừ 2 dòng mã lạ do seed_qa)… -> ['Thao tác khác','Thao tác khác','Thao tác khác']".
+- Ảnh hưởng: Chủ không đọc được ai đổi phạm vi dữ liệu khách của nhóm nào trong Nhật ký (nhật ký có ghi, nhưng hiển thị không dùng được); hồi quy chuẩn tên đỏ ngay khi dùng tính năng. Không rò dữ liệu.
+- Gợi ý: thêm một dòng nhãn vào `auditModel.ts` (và nếu cần mô tả `changes` `{đối tượng: {from,to}}` ra chữ), kèm test; `features/audit/**` nằm ngoài danh sách file của Lô 7 nên cần giao cho FE như việc riêng.
+
+### L1 — Bảng Thành viên vẫn che cột "Trạng thái" ở 1280 · Low (ghi nhận, không chặn) · Lô 6 FE
+Xem mục "Lô 6 kiểm lại".
+
+## Quan sát (không chặn)
+- **O1:** `qa_courier1` bị cổng chặn cả màn Đơn ("Bạn không có quyền xem mục này", kể cả đơn của chính mình), nên ca 14 "`qa_courier1` mở đơn quá cửa sổ" được kiểm trên phiếu giao (`/deliveries/detail/`) và "Việc giao của tôi". Đúng thiết kế, ghi để 02b không hiểu nhầm.
+- **O2:** màn **Phiếu hoàn tiền** không có thao tác ghi nào cho người không phải Chủ (xác nhận/đánh dấu hỏng chỉ Chủ, BR-PQ-32) và Chủ không thu hẹp được (S-5), nên **không có nút nào gây "tải lại"** cho người có thể mất quyền. QA gọi đúng hàm `reload` của `useDetail` lấy từ cây fiber (`FIBER_RELOAD` trong script) rồi để GET thật, 404 thật, chuyển trạng thái và vẽ màn chạy bằng mã sản phẩm: xanh. Đường PV-13 ở màn này vì vậy là phòng thủ, chưa có đường người dùng thật chạm tới.
+- **O3:** các ca `customer`/`return`/`delivery`/`confirmation`/`order` gây "tải lại" bằng cách trả giả MỘT thao tác ghi (409 hoặc 200) qua `page.route`; mọi GET đọc chi tiết đi tới BE thật. Phiếu nhập dùng 404 thật của thao tác ghi.
+- **O4:** máy chủ tĩnh `python3 -m http.server` đứt kết nối khi trình duyệt tải trước nhiều RSC (2 lần chạy đầu trắng trang, không phải lỗi sản phẩm); QA đổi sang `ThreadingHTTPServer` có hàng đợi lớn, kịch bản chạy ổn định sau đó.
+
+## Lệnh đã chạy
+- BE tạm: `DJANGO_DEBUG=1 DATABASE_URL=sqlite:///…/e2e.sqlite3 CORS_ALLOWED_ORIGINS=… THROTTLE_LOGIN_*=… manage.py migrate | bootstrap_masterdata | seed_qa | runserver 8731 --noreload`.
+- `NEXT_PUBLIC_USE_MOCK=0 NEXT_PUBLIC_API_BASE=http://127.0.0.1:8731 npm run build` (erp-console): exit 0.
+- `python3 e2e/data_scope_real_backend.py`: 247/247 PASS. `python3 e2e/permissions_real_backend.py`: 33/33 PASS. `REAL=1 python3 e2e/standard_names_all_routes.py`: 9/10 (B1). `python3 scratchpad/api_pv14.py`: 57/57 PASS.
+- `python3 scripts/check_naming.py`: OK.
+- Không chạy lại (điều phối viên đã chạy): suite BE 3566, tsc, vitest 1325, check-no-mock, check-ai-chunks.
+- File mới chưa commit: `erp-console/e2e/data_scope_real_backend.py` (không chứa mật khẩu; `QA_PASSWORD` và `SEED_QA_IDS` lấy từ env). Cấu hình nhóm đã trả về mặc định sau mỗi ca (đối chiếu cuối phiên bằng API).
+- Dọn: tắt runserver 8731 và máy chủ tĩnh 3731; xoá DB SQLite tạm, mật khẩu và bảng mã trong scratchpad (giữ ảnh `scratchpad/shots`, `shots6`). `erp-console/out/` trong worktree hiện là bản build trỏ `127.0.0.1:8731` (đã gitignore), không có bản sao `out/` ở scratchpad.
