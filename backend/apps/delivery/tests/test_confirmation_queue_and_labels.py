@@ -417,7 +417,7 @@ class CS11LabelPrintTests(ConfirmationL2BaseTestCase):
         self.assertEqual(data["order_code"], "DH-LBL-01")
         self.assertEqual(data["print_no"], 1)
         self.assertEqual(data["barcode_value"], f"{note.code}.1")
-        self.assertEqual(data["recipient_phone_masked"], "09xx xxx 666")
+        self.assertEqual(data["recipient_phone_masked"], "xxxxxx6666")
         self.assertEqual(data["paid_text"], "ĐÃ THANH TOÁN – không thu thêm")
         self.assertEqual(data["total_kg"], "2.000")
 
@@ -489,3 +489,18 @@ class CS11LabelPrintTests(ConfirmationL2BaseTestCase):
         giao_client = client_for(self.giao)
         self.assertEqual(giao_client.get(f"/api/delivery/notes/{note.pk}/label/").status_code, 403)
         self.assertEqual(giao_client.post(f"/api/delivery/notes/{note.pk}/label/print/").status_code, 403)
+
+
+class Tem01LabelLast4Tests(ConfirmationL2BaseTestCase):
+    def test_tem01_ac1_ac2_label_only_last4_digits(self):
+        """TEM-01 AC1/AC2/AC6: tem qua API thật chỉ chứa 4 số cuối, không chữ số nào khác."""
+        import re
+        label_client = client_for(make_user("label_warehouse", roles.WAREHOUSE_STAFF))
+        for i, raw in enumerate(("0901234567", "+84 901 234 567", "84901234567", "090.123.4567")):
+            _, _, note, _ = self._create_paid_order(f"DH-T4-{i}", raw, qty="1")
+            confirm_note_for_test(note)
+            resp = label_client.get(f"/api/delivery/notes/{note.pk}/label/")
+            self.assertEqual(resp.status_code, 200)
+            masked = resp.json()["recipient_phone_masked"]
+            self.assertEqual(masked, "xxxxxx4567")
+            self.assertEqual(re.sub(r"\D", "", masked), "4567")

@@ -34,6 +34,17 @@ def mask_phone(phone: str) -> str:
     return f"{prefix}xx xxx {suffix}"
 
 
+def mask_phone_last4(phone: str) -> str:
+    """
+    Che SĐT trên tem in (TEM-01): chỉ giữ 4 số cuối -> 'xxxxxx4567'.
+    Chuẩn hoá trước; rỗng hoặc dưới 4 chữ số -> '***'. Không thay `mask_phone` (AC4).
+    """
+    norm = normalize_phone(phone)
+    if len(norm) < 4:
+        return "***"
+    return f"xxxxxx{norm[-4:]}"
+
+
 def has_long_digit_run(text: str, min_len: int = 9) -> bool:
     """
     Kiểm tra xem chuỗi có chứa dãy chữ số dài (>= min_len chữ số) hay không,

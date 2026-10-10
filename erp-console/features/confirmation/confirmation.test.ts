@@ -201,7 +201,7 @@ describe("CSKH Feature Tests (CS-04, CS-05, CS-06, CS-11)", () => {
       const res = mockGetDeliveryLabel({}, 31);
       expect(res.status).toBe(200);
       if ("recipient_phone_masked" in res.body) {
-        expect(res.body.recipient_phone_masked).toBe("09xx xxx 123");
+        expect(res.body.recipient_phone_masked).toBe("xxxxxx4567");
         expect(res.body.recipient_phone_masked).not.toBe("0900000123");
       }
     });

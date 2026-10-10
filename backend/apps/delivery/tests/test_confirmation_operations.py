@@ -246,7 +246,7 @@ class TestCS12ChangeRecipient(ConfirmationL4BaseTestCase):
         self.assertEqual(resp.status_code, 200)
         data = resp.json()
         self.assertEqual(data["recipient_name"], "Cô Ba Nhận Giúp")
-        self.assertEqual(data["recipient_phone_masked"], "09xx xxx 344")
+        self.assertEqual(data["recipient_phone_masked"], "xxxxxx3344")
 
     def test_cs12_ac9_permissions(self):
         """kho1, giao1 gọi POST recipient -> 403."""
