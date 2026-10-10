@@ -528,3 +528,16 @@ Chỉ sửa `backend/apps/accounts/data_scopes/tests/test_release_gate.py`. Khô
 - **N1**: import `load_baseline` lên đầu file. **N2**: AC7 gọi DELETE/PUT/PATCH trên `/api/audit-logs/` (route thật), kỳ vọng 403/405
   (hiện trạng thực tế 405 cho người xem được, 403 cho người không đủ quyền); bỏ route `/<pk>/` không tồn tại.
 - Nợ: không phát sinh mới. Nợ chuyển tiếp của techlead (e2e `ed_batch14` trên BE thật) vẫn thuộc QA.
+
+## Lô 6 FE — sửa QA (10/10)
+
+- **B1 (Medium)**: hộp "Cho thêm người xem dữ liệu khách?" ở ma trận hiện khoá thô `view_order_customer_info`. Nguyên nhân: `objectLabel` của
+  `PermissionMatrixScreen` chỉ tra `data_scopes`. Sửa: một hàm chung `features/permissions/objectLabel.ts` (`objectLabelOf`) tra `data_scopes` trước,
+  rồi registry GỐC (chưa lọc AI, theo L2 ở `GroupDetailScreen`), không thấy thì "một phạm vi dữ liệu"; không bao giờ trả khoá thô. Dùng cho cả ma trận và
+  trang nhóm. Test: `objectLabel.test.ts` (V2, `invoices`, khoá lạ); ca ma trận trong `e2e/ed_batch14_permissions.py` (tắt rồi bật V2 cột Nhân viên giao,
+  hộp phải có nhãn tiếng Việt và không có `view_`). **Chứng minh bắt được lỗi**: dựng lại với `PermissionMatrixScreen` cũ thì ca mới ĐỎ (158/159), trả bản sửa thì XANH.
+  Mock đã có sẵn `widened` cho V2 (`mockScopes.ts`), không cần sửa.
+- **L1 (Low)**: bảng Thành viên, cột ghim "Thao tác": tiêu đề đục (`--surface-2`), ô sát lề + `width:1%`/`nowrap` để che ít cột nhất, viền và bóng
+  về bên trái bằng `--border-strong` (không hex rời). Ảnh trước/sau ở 1280 và 360 trong scratchpad (`l1-before-*`, `l1-after-*`). Ở mock 1280 bảng vừa khung
+  nên chưa tái hiện được cảnh bị che (QA gặp với dữ liệu thật); ở 360 đã thấy cột ghim tách rõ.
+- Không đổi `shared/ui/**`, BE.
