@@ -212,14 +212,18 @@ class TestCS12ChangeRecipient(ConfirmationL4BaseTestCase):
         self.assertEqual(resp2.json()["code"], "INVALID_INPUT")
 
     def test_cs12_ac6_shop_lookup_with_original_phone(self):
-        """Sau khi đổi người nhận hộ, khách tra đơn bằng 4 số cuối SĐT cũ -> vẫn tra được 200."""
+        """Sau khi đổi người nhận hộ, khách tra đơn bằng SĐT đặt hàng cũ -> vẫn tra được 200."""
         order, note, task = self._create_order_with_confirmation(phone="0900000123")
         confirmation_services.change_recipient(
             task.pk, self.cs1, recipient_name="Người Hộ", recipient_phone="0988888999"
         )
-        client = client_for(None)
-        resp = client.get(f"/api/shop/orders/{order.code}/?phone_last4=0123")
+        resp = client_for(None).post(
+            "/api/shop/orders/lookup/", {"order_code": order.code, "phone": "0900000123"}, format="json"
+        )
         self.assertEqual(resp.status_code, 200)
+        # người nhận hộ không bao giờ lộ ở trang đơn công khai
+        for leak in ("Người Hộ", "0988888999"):
+            self.assertNotIn(leak, resp.content.decode())
 
     def test_cs12_ac7_no_old_address_in_audit_or_logs(self):
         """Tìm chuỗi địa chỉ cũ trong AuditLog -> không có (thu tối thiểu)."""

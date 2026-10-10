@@ -1,38 +1,12 @@
 "use client";
 
 import { Suspense } from "react";
-import { useSearchParams } from "next/navigation";
-import OrderLookup from "./OrderLookup";
-import ShopFrame from "../../../components/ShopFrame";
+import OrderScreen, { OrderFallback } from "@/features/checkout/components/OrderScreen";
 
-function OrderLookupInner() {
-  const searchParams = useSearchParams();
-  const initialCode = searchParams.get("code") || "";
-  // BE (success_url/cancel_url/error_url, story P1) dùng `?result=success|cancel|error`.
-  const resultParam = searchParams.get("result");
-  const paymentReturn =
-    resultParam === "success" || resultParam === "cancel" || resultParam === "error"
-      ? resultParam
-      : null;
+export default function OrdersPage() {
   return (
-    <>
-      <h1 className="page-title">Tra cứu đơn hàng</h1>
-      <p className="page-subtitle">
-        Nhập mã đơn hàng và 4 số cuối số điện thoại đã dùng khi đặt hàng.
-      </p>
-      <OrderLookup initialCode={initialCode} paymentReturn={paymentReturn} />
-    </>
-  );
-}
-
-export default function OrderLookupPage() {
-  return (
-    <ShopFrame header="sub" title="Tra cứu đơn hàng" footer="full" bottomNav>
-      <div className="shop-main">
-        <Suspense fallback={<p className="empty-state">Đang tải…</p>}>
-          <OrderLookupInner />
-        </Suspense>
-      </div>
-    </ShopFrame>
+    <Suspense fallback={<OrderFallback />}>
+      <OrderScreen />
+    </Suspense>
   );
 }

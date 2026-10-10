@@ -2,7 +2,7 @@
 Dịch vụ in tem giao hàng 100x150 mm (2026-09-28-cskh-xac-nhan-in-tem, CS-11).
 Tuân thủ:
 - Bất biến 1: Tuyệt đối không trả về hay lưu giá vốn, tiền, đơn giá
-- Bất biến 9: SĐT trên tem chỉ ở dạng che (mask_phone_last4, chỉ 4 số cuối), mã barcode chỉ chứa mã phiếu và lần in
+- Bất biến 9: SĐT trên tem chỉ ở dạng che (mask_phone_tail, chỉ 4 số cuối), mã barcode chỉ chứa mã phiếu và lần in
 - Bất biến BR-GH-09 (chưa xác nhận không in tem), BR-GH-07 (đơn huỷ không in tem), BR-GH-16 (tem cũ không còn hiệu lực)
 """
 import re
@@ -12,7 +12,7 @@ from django.utils import timezone
 
 from apps.common.audit import record_audit
 from apps.common.exceptions import BusinessError
-from apps.common.pii import mask_phone_last4
+from apps.common.pii import mask_phone_tail
 from apps.delivery.models import DeliveryNote, LabelPrint
 from apps.sales.models.invoices import SalesInvoiceLineBatch
 
@@ -65,7 +65,7 @@ def get_label_data(note: DeliveryNote, print_no: int | None = None) -> dict:
     # Tên và SĐT người nhận
     recipient_name = note.recipient_name or (customer.name if customer else "")
     raw_phone = note.recipient_phone or (order.phone if order else (customer.phone if customer else ""))
-    recipient_phone_masked = mask_phone_last4(raw_phone)
+    recipient_phone_masked = mask_phone_tail(raw_phone)
     address = order.delivery_address if order else ""
 
     # Tính HSD sớm nhất và tổng kg từ allocations

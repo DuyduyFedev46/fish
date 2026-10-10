@@ -67,6 +67,31 @@
   font-weight: 600;
 }
 
+.lines {
+  display: none;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.line {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--border);
+  color: var(--ink-2);
+  font-size: 14px;
+}
+
+.lineName {
+  min-width: 0;
+}
+
+.lineQty {
+  color: var(--ink-3);
+}
+
 .onlyDesktop {
   display: none;
 }
@@ -97,6 +122,10 @@
 
   .rows {
     gap: var(--space-3);
+  }
+
+  .lines {
+    display: block;
   }
 
   .onlyMobile {

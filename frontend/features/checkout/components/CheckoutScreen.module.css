@@ -1,0 +1,150 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+
+.head {
+  display: flex;
+  flex-direction: column;
+}
+
+.title {
+  margin: 0;
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.layout {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+}
+
+.formCol {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding-top: var(--space-2);
+  background: var(--surface-2);
+}
+
+.summaryCol {
+  display: contents;
+}
+
+.block {
+  padding: 0 var(--space-4);
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding-bottom: var(--space-4);
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  background: var(--surface);
+}
+
+.sectionTitle {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+}
+
+.paused {
+  flex: 1;
+  padding: var(--space-4) 0 var(--space-8);
+}
+
+.pausedNote {
+  margin: 0;
+  color: var(--ink-2);
+  font-size: 14px;
+}
+
+@media (min-width: 768px) {
+  .page {
+    width: 100%;
+    max-width: var(--container-max);
+    margin: 0 auto;
+    padding: var(--space-6) var(--space-6) var(--space-12);
+  }
+
+  .head {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-4);
+    margin-bottom: var(--space-5);
+  }
+
+  .title {
+    position: static;
+    width: auto;
+    height: auto;
+    margin: 0;
+    overflow: visible;
+    clip: auto;
+    white-space: normal;
+    font-size: 24px;
+    font-weight: 600;
+    letter-spacing: -0.015em;
+  }
+
+  .layout {
+    flex-direction: row;
+    align-items: flex-start;
+    gap: var(--space-6);
+  }
+
+  .formCol {
+    min-width: 0;
+    padding-top: 0;
+    background: transparent;
+  }
+
+  .block {
+    padding: 0;
+  }
+
+  .form {
+    gap: var(--space-4);
+    padding-bottom: 0;
+  }
+
+  .section {
+    padding: var(--space-5) var(--space-6);
+    border-radius: var(--radius-card);
+  }
+
+  .summaryCol {
+    display: block;
+    flex: 0 0 340px;
+    align-self: stretch;
+  }
+
+  .paused {
+    max-width: 480px;
+    margin: 0 auto;
+  }
+}

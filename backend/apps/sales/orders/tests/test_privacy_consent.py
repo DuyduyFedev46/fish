@@ -120,7 +120,8 @@ class PrivacyConsentTests(TestCase):
             resp = self.client.post("/api/shop/orders/", p, format="json")
             self.assertEqual(resp.status_code, 400, f"Expected 400 for payload {p}, got {resp.status_code}")
             data = resp.json()
-            self.assertEqual(data["code"], "BR-BH-17")
+            self.assertEqual(data["code"], "VALIDATION")
+            self.assertIn("consent", data["fields"])
 
             self.assertEqual(SalesOrder.objects.count(), orders_before)
             self.assertEqual(SalesOrderLine.objects.count(), lines_before)
@@ -183,7 +184,7 @@ class PrivacyConsentTests(TestCase):
         resp = self.client.post("/api/shop/orders/", self._payload(), format="json")
         self.assertEqual(resp.status_code, 503, resp.content)
         data = resp.json()
-        self.assertEqual(data["code"], "BR-BH-17")
+        self.assertEqual(data["code"], "SHOP_CLOSED")
         self.assertIn("Shop tạm chưa nhận đơn.", data["detail"])
         self.assertEqual(SalesOrder.objects.count(), orders_before)
 
@@ -252,7 +253,9 @@ class PrivacyConsentTests(TestCase):
         self.assertEqual(resp_create.status_code, 201)
         code = resp_create.json()["order_code"]
 
-        resp_lookup = self.client.get(f"/api/shop/orders/{code}/?phone_last4=5678")
+        resp_lookup = self.client.post(
+            "/api/shop/orders/lookup/", {"order_code": code, "phone": "0912345678"}, format="json"
+        )
         self.assertEqual(resp_lookup.status_code, 200)
         data = resp_lookup.json()
 

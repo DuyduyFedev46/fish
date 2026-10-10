@@ -1,0 +1,103 @@
+.box {
+  --tone: var(--accent-text);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: var(--space-5) var(--space-4);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  text-align: center;
+}
+
+.warn {
+  --tone: var(--warn);
+}
+
+.crit {
+  --tone: var(--crit);
+}
+
+.code {
+  margin: 0;
+  color: var(--ink-2);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.codeValue {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.lead {
+  margin: 0;
+  color: var(--ink-2);
+  font-size: 13px;
+}
+
+.time {
+  color: var(--tone);
+  font-size: 40px;
+  font-weight: 600;
+  line-height: 1.15;
+  letter-spacing: -0.015em;
+  transition: color var(--dur-color) ease-out;
+}
+
+.track {
+  width: 100%;
+  height: 4px;
+  overflow: hidden;
+  border-radius: var(--radius-full);
+  background: var(--surface-3);
+}
+
+.bar {
+  width: 100%;
+  height: 4px;
+  border-radius: var(--radius-full);
+  background: var(--tone);
+  transform-origin: left center;
+  transition:
+    transform 1s linear,
+    background-color var(--dur-color) ease-out;
+}
+
+@media (min-width: 768px) {
+  .box {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    grid-template-areas:
+      "code time"
+      "lead time"
+      "track track";
+    align-items: center;
+    gap: 4px var(--space-8);
+    padding: var(--space-6);
+    text-align: left;
+  }
+
+  .code {
+    grid-area: code;
+  }
+
+  .lead {
+    grid-area: lead;
+  }
+
+  .time {
+    grid-area: time;
+  }
+
+  .track {
+    grid-area: track;
+    margin-top: var(--space-3);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bar {
+    transition: background-color var(--dur-color) ease-out;
+  }
+}

@@ -1,0 +1,103 @@
+.box {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+}
+
+.title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.line {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  font-size: 14px;
+}
+
+.name {
+  min-width: 0;
+}
+
+.qty {
+  color: var(--ink-3);
+}
+
+.amount {
+  flex: none;
+}
+
+.summary .line,
+.summary .name {
+  color: var(--ink-2);
+}
+
+.cancelled .line,
+.cancelled .name,
+.cancelled .amount {
+  color: var(--ink-3);
+}
+
+.discount {
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--border);
+  color: var(--good);
+  font-weight: 500;
+}
+
+.total {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin: var(--space-1) 0 0;
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--border);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.total dd {
+  margin: 0;
+}
+
+.note {
+  margin: 0;
+  color: var(--ink-2);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+@media (min-width: 768px) {
+  .box {
+    padding: var(--space-5) var(--space-6);
+  }
+
+  .line {
+    padding: var(--space-3) 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .list {
+    gap: 0;
+  }
+
+  .discount {
+    border-top: 0;
+  }
+}

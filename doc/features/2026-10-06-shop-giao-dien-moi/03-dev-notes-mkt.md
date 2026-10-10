@@ -310,3 +310,85 @@ Không build frontend (fe-dev đang build).
   - `app/not-found.tsx`: bỏ `robots` trong `metadata` vì Next.js tự chèn `noindex` cho trang 404 → còn một thẻ.
 
 Kiểm chứng (11/10): `cd frontend && npx tsc --noEmit` → exit 0 · `python3 scripts/check_naming.py` → OK. Không build (theo phân công).
+
+## Lô 5b (5b-MKT): SHOP-5-04, SHOP-5-05
+
+```mermaid
+flowchart LR
+  K(["Khách"]) --> P["/pages/?slug="]
+  P -->|"lien-he"| C["Thẻ Gọi, Zalo, Email, Địa chỉ, Giờ làm (ẩn thẻ thiếu dữ liệu)"]
+  P -->|"cach-mua-hang"| H["5 bước có số + hỏi đáp thu gọn"]
+  P -->|"6 trang chính sách"| R["Mục lục + danh sách Các chính sách"]
+  K --> B["/blog/"]
+  B --> L["Chip chuyên mục, thẻ bài"]
+  L --> V["Bài + Món dùng trong bài (Thêm 1 kg) + Bài liên quan"]
+```
+
+> `mkt-brand` · 11/10/2026 · nhánh `shop/lo-34-checkout-orders` (gốc lô `8f5fb63`) · Trạng thái: **CHỜ REVIEW** (techlead + QA). Không commit, không build.
+
+### File đổi
+| File | Việc |
+|---|---|
+| `frontend/app/pages/page.tsx`, `app/blog/page.tsx` | viết lại thành route mỏng (Suspense + `PageScreen` / `KitchenScreen`) |
+| `features/content/components/PageScreen.tsx` + css | mới: `/pages/?slug=`; ShopFrame `sub`; tải trang, footer-links (PolicyNav), site-info (chỉ Liên hệ); 3 trạng thái lỗi |
+| `features/content/components/ContactView.tsx` + css | mới: F4. Không form. Thẻ từ site-info (`pickHotline(seller.phone, confirmation_policy.hotline)`, `seller.zalo`, `seller.email`, `seller.address`, `seller.working_hours`); giờ làm trống thì lấy mục "Giờ làm việc" của CMS; chuỗi có `[…]` coi như chưa có → ẩn thẻ |
+| `features/content/components/HowToBuyView.tsx` + css | mới: F5. Danh sách số mà mục mở đầu bằng chữ đậm → thẻ bước có số; H3 + đoạn → `<details>` (câu đầu mở sẵn); nút "Xem hàng đang có". Máy tính: bước thành lưới thẻ |
+| `features/site/components/PolicyNav.tsx` + css | mới: COMPONENTS #36, biến thể `toc` / `list` / `aside`, `aria-current="page"`, khung xương khi đang tải, danh sách từ footer-links |
+| `features/content/headings.ts` | mới: `id` cho H2 (`muc-<chữ bỏ dấu>`, trùng thì `-2`) + mục lục, dùng chung cho thân bài và PolicyNav |
+| `features/content/components/ArticleBody.tsx` + css | viết lại: biến thể `policy` / `article`, H2 có id + `scroll-margin-top`, không vẽ `item_card`; link ngoài vẫn `rel="nofollow noopener noreferrer"` + chữ ẩn "(mở tab mới)" |
+| `features/content/components/ArticleItems.tsx` + css | mới, thay ItemCard: "Món dùng trong bài" = ProductCard `row` (href có UTM `caveve_web/bai_viet/<slug>`) + AddToCart `card` + `useCartActions` (toast "Xem giỏ", MiniCart máy tính, hộp thoại bỏ món); nạp catalog 1 lần; món không còn trong catalog → ẩn; catalog lỗi → ẩn khối |
+| `features/content/components/KitchenScreen.tsx`, `KitchenListView.tsx`, `KitchenArticleView.tsx` + css | mới: G1/G2. Danh sách: ShopFrame `sticky` + BottomNav, chip là link `?category=` có `aria-current`, phân trang `?page=` (bỏ tham số `trang` cũ), rỗng/lỗi/tải. Bài: ShopFrame `sub`, breadcrumb (máy tính), ảnh bìa, nhãn chuyên mục, "Cá Về · ngày", cột phải dính (máy tính) "Món dùng trong bài" + "Bài liên quan" (cùng chuyên mục, tối đa 3) |
+| `features/content/components/ContentState.tsx` + css | mới: khung xương + 404/410/lỗi mạng theo 06-marketing C7 |
+| `features/content/slugs.ts`, `policySummary.ts`, `pageMeta.ts` (thêm `setPageDescription`), `README.md` | mới/thêm |
+| `features/content/mock.ts` | viết lại từ `shop_content/*.json` (qua `content_markup.py`): 10 trang, 5 bài, 3 chuyên mục; bỏ bài mẫu cũ có "tươi sống", "hút chân không", ảnh Unsplash; giữ bài XSS `xss-mau`, `bai-da-go` (410), alias `chinh-sach-bao-mat` |
+| xoá | `app/pages/pages.module.css`, `app/blog/blog.module.css`, `features/content/components/ItemCard.*`, `LatestPosts.*` (không ai dùng) |
+| `frontend/e2e/content_item_card.py` | theo khối mới (giá đọc theo `li`, ngưng bán → không còn thẻ, thêm chế độ `add`) |
+| `frontend/e2e/content_public_pages.py` | thêm kiểm 5-04 AC1–AC4, 5-05 AC1 (mục lục, aria-current, Liên hệ không form/không `[`, Cách mua 5 bước + `<details>` + số, title không lặp) |
+
+Không đụng: `lib/*`, `components/*` (chỉ dùng), `features/{checkout,catalog,cart,home}/**` (chỉ import `toCardItem`, `groupIconOf`, `useCartActions`), `backend/`.
+
+### Chữ giao diện (mkt-brand chốt, nguồn 06-marketing C7, B7, 02a §5-05)
+| Màn | Vị trí | Câu chữ | Trạng thái |
+|---|---|---|---|
+| `/blog/` | H1 + câu dưới | "Góc bếp" · "Mẹo rã đông và cách nấu hải sản cấp đông." | ĐÃ ĐỐI CHIẾU (06-mkt B7 G1) |
+| `/blog/` | title / description | "Góc bếp \| Cá Về" · "Góc bếp Cá Về: mẹo rã đông và cách nấu hải sản cấp đông tại nhà." | ĐÃ ĐỐI CHIẾU (hàng cấp đông) |
+| `/blog/?category=` rỗng | EmptyState | "Chưa có bài ở mục này." + "Xem tất cả bài" | 02a `[copy]` |
+| `/blog/` không bài | EmptyState | "Góc bếp chưa có bài." + "Xem hàng đang có" | mới |
+| bài 404 / 410 / lỗi | | "Không tìm thấy bài này" · "Bài có thể đã đổi hoặc chưa đăng." · "Xem bài khác ở Góc bếp" + "Về trang chủ" / "Bài này không còn trên web" · "Cá Về đã gỡ bài này. Bạn xem các bài khác ở Góc bếp." · "Xem Góc bếp" / "Chưa tải được bài" · "Kiểm tra mạng rồi thử lại." · "Thử lại" | C7 |
+| trang 404 / 410 / lỗi | | "Không tìm thấy trang này" · "Trang có thể đã đổi hoặc chưa đăng." · "Về trang chủ" + "Xem hàng đang có" / "Trang này không còn trên web" · "Cá Về đã gỡ trang này." / "Chưa tải được trang" · "Kiểm tra mạng rồi thử lại." | C7 (chỉnh từ "bài" sang "trang" cho trang chính sách: nút "Xem bài khác ở Góc bếp" không hợp trang chính sách) |
+| Chính sách | | "Cập nhật lần cuối {ngày}" (từ `effective_from`), "Mục lục", "Các chính sách", "Chính sách", "Đang xem", "Cách mua hàng" | COMPONENTS #36 mục 10 |
+| Liên hệ | nhãn thẻ / nút (máy tính) | "Hotline" "Gọi ngay" · "Zalo" "Nhắn Zalo" · "Email" "Gửi email" · "Địa chỉ kinh doanh" · "Giờ làm việc" | màn DesktopContact |
+| Bài | | "Món dùng trong bài", "Bài liên quan", "Cá Về · {ngày}" | màn G2 |
+
+Không câu nào hứa phí giao, thời gian giao, "tươi sống". "hoàn tiền" chỉ có trong tên trang "Chính sách đổi trả và hoàn tiền" (AC6; nội dung CMS dẫn link bằng tên trang).
+
+### Lệch / việc cho người khác
+1. **SHOP-5-04 AC5 (dòng "Giao hàng:", "Đổi trả:" ở trang chi tiết món)** nằm ở `features/catalog/components/ItemDetailScreen.tsx` (file fe-dev). Đã làm sẵn
+   `getPolicySummaries()` ở `features/content/policySummary.ts` (lấy `excerpt` trang `giao-hang`, `doi-tra`; thiếu/lỗi → `null` để ẩn dòng, có cache).
+   **fe-dev gắn** khi rảnh tay (lô 3+4 hoặc 5c). Seed `giao-hang` hiện chưa có `excerpt` → dòng sẽ ẩn tới khi Lộc điền tóm tắt (S6 06-marketing, CHỜ PHÁP LÝ).
+2. Màn DesktopPolicy vẽ khối "Cách mua hàng" ngay dưới bài chính sách. Em để Cách mua là trang riêng `/pages/?slug=cach-mua-hang` (02b §3.7.4, P3) và đặt link
+   "Cách mua hàng" dưới đường kẻ của cột "Chính sách" (đang xem thì có `aria-current`), không tải hai trang trên một màn.
+3. Khối `item_card` trong **trang** CMS (không phải bài) không vẽ ở `/pages/` (chỉ `/about/` và `/blog/` vẽ thẻ). Trang chính sách không cần thẻ hàng.
+4. Số 1 kg / 0,5 kg / 30 phút ở Cách mua lấy từ settings **lúc nạp** (`{min_qty_kg}`, `{qty_step_kg}`, `{hold_minutes}` trong lệnh `load_shop_content`), FE không viết cứng.
+   Đổi settings sau khi đã nạp thì cần nạp lại (`--overwrite`) hoặc sửa ở màn Nội dung ERP.
+5. Liên hệ: giờ làm việc ưu tiên `SELLER_WORKING_HOURS` (site-info, lô 5a); trống thì lấy mục "Giờ làm việc" trong CMS `lien-he`; ô `[giờ mở] – [giờ đóng]` chưa điền → ẩn thẻ.
+   Staging hiện chưa có số thật (L14 hoi-loc) nên trang Liên hệ chỉ còn câu mở đầu cho tới khi điền `SHOP_HOTLINE`/`SELLER_*`.
+6. **Chưa chụp 360/1280** (không build để khỏi đè `out/` của fe-dev). QA chụp ở lô 7 bằng build mock riêng: `/pages/?slug=doi-tra`, `?slug=lien-he`, `?slug=cach-mua-hang`,
+   `?slug=khong-co`, `/blog/`, `/blog/?category=ra-dong`, `/blog/?category=mon-chien`, `/blog/?slug=ca-thu-hap-gung-hanh` (có món hết `CUA-HOANG-DE` → "Liên hệ chúng tôi",
+   món ngưng bán `MON-DA-NGUNG` → ẩn), `/blog/?slug=bai-da-go` (410), bấm "Thêm 1 kg" trong bài (toast + bộ tăng giảm + MiniCart máy tính).
+7. e2e cũ còn bám UI cũ `qa-lo6-sr21-shop.py`, `qa-lo7-shop-real.py`, `qa-lo8-shop-format.py` (bài `chinh-sach-bao-mat`, "Xem giá & đặt") — đã ghi nợ lô 7 (qa-tester).
+
+### Kiểm chứng (11/10, chạy trong lượt này)
+```
+$ cd frontend && npx tsc --noEmit
+  5 lỗi, KHÔNG lỗi nào ở features/content, features/site, app/pages, app/blog. Cả 5 ở file fe-dev đang làm lô 3+4:
+  app/shop/orders/page.tsx (./OrderLookup đã xoá), features/checkout/components/CheckoutScreen.tsx (ConfirmationPolicyNotice, PaymentPanel, ../storage đã xoá; qty number/string).
+$ G7: grep -nE "#[0-9A-Fa-f]{6}" trên mọi file lô 5b (app/{pages,blog}/page.tsx, features/content/**, features/site/components/PolicyNav.*) -> 0 dòng
+$ grep "transition: all" trên file lô 5b -> 0 dòng
+$ node scripts/test-safe-href.mjs -> test-safe-href: 40/40 đạt, 0 sai
+$ headings.ts (node --experimental-strip-types): "1. Điều kiện đổi","Đổi","Đổi" -> muc-dieu-kien-doi, muc-doi, muc-doi-2
+$ python3 scripts/check_naming.py -> exit 1, chỉ backend/apps/sales/orders/tests/test_shop_lookup.py ('chu', file be-dev lô 3+4); file lô 5b sạch
+  (slugs.ts:5 `"giao-hang"` có marker `naming: allow - slug trang CMS là dữ liệu` — cần techlead duyệt).
+$ e2e content_public_pages.py, content_item_card.py: chỉ kiểm cú pháp (ast.parse OK); chưa chạy (cần BE :8104 + Shop :3104 + nạp nội dung).
+```
+Không build frontend, không chạy test backend (lô 5b không đụng `backend/`).

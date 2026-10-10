@@ -78,7 +78,7 @@ function useGoBack(backHref: string) {
 
 /** Ô tìm của header kèm gợi ý khi gõ (SHOP-2-04). Header được phép đọc catalog (cache sẵn). */
 function HeaderSearch({ placeholder }: { placeholder: string }) {
-  const search = useSearchSuggest();
+  const search = useSearchSuggest({ lazy: true });
   return <SearchBox variant="brand" placeholder={placeholder} {...search} />;
 }
 

@@ -34,6 +34,13 @@ from apps.sales.refunds import services as refund_services
 from apps.accounts import roles
 
 
+def shop_lookup(order, phone="0900000123"):
+    """Tra đơn công khai bằng POST mã + SĐT đầy đủ (SHOP-3-02); GET 4 số cuối đã gỡ."""
+    return client_for(None).post(
+        "/api/shop/orders/lookup/", {"order_code": order.code, "phone": phone}, format="json"
+    )
+
+
 class ConfirmationL3BaseTestCase(TestCase):
     def setUp(self):
         self.wh = Warehouse.objects.create(name="Kho chính")
@@ -639,18 +646,18 @@ class TestCS10ShopNotices(ConfirmationL3BaseTestCase):
     def test_cs10_ac2_order_lookup_confirming(self):
         """Đơn CONFIRMING -> Shop tra đơn thấy status_label Chờ vựa gọi xác nhận."""
         order, note, task = self._create_order_with_confirmation(phone="0900000123")
-        client = client_for(None)
-        resp = client.get(f"/api/shop/orders/{order.code}/?phone_last4=0123")
+        resp = shop_lookup(order)
         self.assertEqual(resp.status_code, 200)
         data = resp.json()
+        self.assertEqual(data["state"], "preparing")
         self.assertEqual(data["status_label"], "Đã thanh toán – chờ vựa gọi xác nhận")
-        self.assertEqual(data["delivery"]["status"], "CONFIRMING")
-        self.assertEqual(data["delivery"]["status_label"], "Chờ vựa gọi xác nhận")
+        self.assertEqual(data["delivery"]["step"], "preparing")
+        self.assertEqual(data["delivery"]["step_label"], "Chờ vựa gọi xác nhận")
         self.assertIsNone(data["cancel_notice"])
 
     @override_settings(CONFIRMATION_AUTO_CANCEL_ENABLED=True)
     def test_cs10_ac3_order_lookup_auto_cancelled(self):
-        """Đơn tự huỷ -> Shop tra đơn có cancel_notice đủ 4 phần."""
+        """Đơn tự huỷ -> Shop tra đơn có cancel_notice theo BR-HT-12 (không hứa hạn hoàn)."""
         t0 = timezone.now().replace(hour=9, minute=25, second=0, microsecond=0)
         order, note, task = self._create_order_with_confirmation(phone="0900000123")
         task.state = ConfirmationTask.State.ESCALATED
@@ -660,22 +667,24 @@ class TestCS10ShopNotices(ConfirmationL3BaseTestCase):
 
         confirmation_services.auto_cancel_overdue(now=t0 + timedelta(minutes=31))
 
-        client = client_for(None)
-        resp = client.get(f"/api/shop/orders/{order.code}/?phone_last4=0123")
+        resp = shop_lookup(order)
         self.assertEqual(resp.status_code, 200)
         data = resp.json()
         self.assertEqual(data["status"], "CANCELLED")
+        self.assertEqual(data["state"], "cancelled")
         self.assertIsNotNone(data["cancel_notice"])
 
         notice = data["cancel_notice"]
+        self.assertEqual(notice["scope"], "full")
         self.assertEqual(notice["reason_code"], "UNREACHABLE_AUTO")
-        self.assertIn("3 lần trong 30 phút", notice["message"])
-        self.assertEqual(notice["refund"]["amount"], str(int(order.total_amount)))
-        self.assertEqual(notice["refund"]["status_label"], "Đang chờ hoàn tiền")
+        self.assertEqual(notice["reason_label"], "Không liên lạc được để xác nhận đơn")
+        self.assertEqual(notice["cancelled_amount"], str(int(order.total_amount)))
+        self.assertNotIn("refund", notice)
+        self.assertNotIn("hoàn", notice["message"])
 
     @override_settings(CONFIRMATION_AUTO_CANCEL_ENABLED=True)
     def test_cs10_ac4_order_lookup_refunded(self):
-        """Chủ xác nhận hoàn -> status_label Đã hoàn."""
+        """Chủ xác nhận hoàn -> Shop vẫn KHÔNG lộ tiến độ hoàn tiền (BR-HT-12)."""
         t0 = timezone.now().replace(hour=9, minute=25, second=0, microsecond=0)
         order, note, task = self._create_order_with_confirmation(phone="0900000123")
         task.state = ConfirmationTask.State.ESCALATED
@@ -687,30 +696,29 @@ class TestCS10ShopNotices(ConfirmationL3BaseTestCase):
         task.refresh_from_db()
         refund_services.confirm_refund(refund=task.refund, bank_txn_ref="TX123", actor=self.chu)
 
-        client = client_for(None)
-        resp = client.get(f"/api/shop/orders/{order.code}/?phone_last4=0123")
-        data = resp.json()
-        self.assertEqual(data["cancel_notice"]["refund"]["status_label"], "Đã hoàn tiền")
-        self.assertIsNotNone(data["cancel_notice"]["refund"]["refunded_at"])
+        data = shop_lookup(order).json()
+        notice = data["cancel_notice"]
+        self.assertEqual(notice["reason_code"], "UNREACHABLE_AUTO")
+        self.assertNotIn("refund", notice)
+        raw = str(data)
+        for leak in ("Đã hoàn tiền", "refunded_at", "TX123", "REFUNDED"):
+            self.assertNotIn(leak, raw)
 
     def test_cs10_ac5_order_lookup_manual_cancelled(self):
         """Đơn do Quản lý huỷ tay -> không hiện câu không liên lạc được."""
         order, note, task = self._create_order_with_confirmation(phone="0900000123")
         order_services.cancel_paid_order(order=order, actor=self.ql, reason="Khách đổi ý")
 
-        client = client_for(None)
-        resp = client.get(f"/api/shop/orders/{order.code}/?phone_last4=0123")
-        data = resp.json()
+        data = shop_lookup(order).json()
         self.assertIsNotNone(data["cancel_notice"])
-        self.assertIsNone(data["cancel_notice"]["reason_code"])
+        self.assertEqual(data["cancel_notice"]["reason_code"], "OTHER")  # không chọn mã lý do -> câu chung
+        self.assertEqual(data["cancel_notice"]["reason_label"], "Cá Về đã huỷ đơn này")
         self.assertNotIn("không liên lạc được", data["cancel_notice"]["message"])
 
     def test_cs10_ac6_no_pii_in_lookup(self):
         """Tra đơn AllowAny không có key tên, SĐT, địa chỉ, người nhận hộ, ghi chú gọi (Bất biến 9)."""
         order, note, task = self._create_order_with_confirmation(phone="0900000123", name="Khách Bí Mật")
-        client = client_for(None)
-        resp = client.get(f"/api/shop/orders/{order.code}/?phone_last4=0123")
-        data = resp.json()
+        data = shop_lookup(order).json()
 
         def _assert_no_pii(val):
             if isinstance(val, dict):
@@ -727,18 +735,16 @@ class TestCS10ShopNotices(ConfirmationL3BaseTestCase):
         _assert_no_pii(data)
 
     def test_cs10_ac7_wrong_phone_404(self):
-        """Sai 4 số cuối SĐT -> 404."""
+        """Sai SĐT -> 404."""
         order, note, task = self._create_order_with_confirmation(phone="0900000123")
-        client = client_for(None)
-        resp = client.get(f"/api/shop/orders/{order.code}/?phone_last4=9999")
+        resp = shop_lookup(order, phone="0900009999")
         self.assertEqual(resp.status_code, 404)
+        self.assertEqual(shop_lookup(order, phone="9999").status_code, 404)  # 4 số cuối không còn đủ
 
     def test_cs10_ac8_no_cost_keys(self):
         """Tra đơn không chứa bất kỳ khoá giá vốn nào (Bất biến 1)."""
         order, note, task = self._create_order_with_confirmation(phone="0900000123")
-        client = client_for(None)
-        resp = client.get(f"/api/shop/orders/{order.code}/?phone_last4=0123")
-        data = resp.json()
+        data = shop_lookup(order).json()
 
         def _assert_no_cost(val):
             if isinstance(val, dict):

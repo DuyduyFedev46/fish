@@ -469,6 +469,7 @@ Route đặt **trước** mọi route `shop/orders/<str:order_code>/…` trong `
 | `completed` | `COMPLETED` | Đã giao |
 
 `delivery.step`: `CONFIRMING|PREPARING|READY` → `preparing`; `DELIVERING` → `delivering`; `COMPLETED` → `delivered`; `FAILED` → `failed`; `CANCELLED`/không phiếu → `delivery: null`. `step_label` lấy bảng `SHOP_DELIVERY_STATUS_LABELS` sẵn có.
+**Bổ sung (techlead chốt 11/10, review lô 3+4, làm ở lô 3b):** khối `delivery` có thêm `awaiting_confirmation: bool`, `true` khi và chỉ khi phiếu giao mới nhất đang `CONFIRMING`. FE dùng cờ này để hiện khối giờ gọi xác nhận, không dò chữ trong `step_label`. Ví dụ: `"delivery": {"step": "preparing", "step_label": "Chờ vựa gọi xác nhận", "awaiting_confirmation": true}`.
 
 #### 3.4.3 `cancel_notice` (BR-HT-12) — viết lại `customer_notices.py`
 ```json
@@ -896,6 +897,7 @@ sequenceDiagram
 
 ## 11. Review
 (Để trống — techlead ghi REVIEW PASS / REVIEW FAIL theo từng lô.)
+- Lô 3+4 + 5b (11/10): **REVIEW PASS** (APPROVED), chi tiết ở `03b-review-lo34.md`. Còn M1 đến M3 và L1, L2 làm ở lô 3b, L3 và L4 làm ở lô 5c. Cổng `grep phone_last4` ở §7.1 không tính `apps/ai/policy/rules.py` (danh sách chặn khoá cá nhân của AI, giữ lại), test AI và các test chỉ dùng chuỗi này để khẳng định khoá không xuất hiện.
 
 ## 12. Việc ghi nợ phát sinh khi làm (điều phối)
 - (lô 1) `erp-console/features/audit/auditModel.ts`: thêm nhãn action `content_load` = "Nạp nội dung soạn sẵn" — fe-dev làm ở lô 2b-ERP.
@@ -909,3 +911,6 @@ sequenceDiagram
 - (review lô 2) Cảnh báo cụm khẳng định cấm trong `apps/content/body/scan.py` (§3.7.5) dời sang lô 5c — mkt-brand.
 - (QA lô 2) e2e cũ `qa-lo6-sr21-shop.py`, `qa-lo7-shop-real.py`, `qa-lo8-shop-format.py`, `content_item_card.py` còn bám UI cũ (footer cũ, nút thẻ bài, "0 request catalog") — viết lại ở lô 7 (qa-tester).
 - (QA lô 2) Ô tìm có gợi ý nạp catalog ở mọi trang — techlead xem lại (nạp khi focus ô tìm, hoặc cache) ở lô 3+4.
+- (review lô 3+4) Lô 3b: M1 cờ `delivery.awaiting_confirmation` (be-dev `shop_state.delivery_block` + test; fe-dev `lib/types.ts`, `lib/mock.ts`, `OrderView.tsx:55`); M2 test đua `client_request_id` ca "người thứ hai chờ khoá" + chạy Postgres cloud; M3 đơn tự huỷ mà mọi giao dịch nghi trùng ra `late_payment=true` + câu "trả lại 0đ" (`customer_notices.py:82`, `shop_state.py:34`); L1/L2 log mã đơn từ body, `_now()`/`_body` thừa.
+- (review lô 3+4) Lô 5c: L3 `policySummary` cache cả khi lỗi mạng (mkt-brand); L4 `minQty: 1` viết cứng ở C3 (fe-dev).
+- (QA lô 3+4) D3 "Đã chờ" tạm lưu mốc bắt đầu chờ ở sessionStorage `shop_pending_since_v1` theo mã đơn; lô 3b be-dev thêm mốc server (vd `payment_pending_since`) vào lookup, fe-dev đọc thay sessionStorage.

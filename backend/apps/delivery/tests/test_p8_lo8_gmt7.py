@@ -32,16 +32,18 @@ class Lo8CskhFormatTests(l3.ConfirmationL3BaseTestCase):
         order.refresh_from_db()
         return order, note, task
 
-    @override_settings(CONFIRMATION_AUTO_CANCEL_ENABLED=True, REFUND_DEADLINE_DAYS=30)
+    @override_settings(CONFIRMATION_AUTO_CANCEL_ENABLED=True, SHOP_CANCEL_CALLBACK_WITHIN="1 ngày làm việc")
     def test_sr25_ac1_cancel_notice_message_tien_vnd_dau_cham(self):
-        """Câu báo khách tự huỷ: `Số tiền 300.000 ₫ sẽ được hoàn`; JSON refund.amount vẫn là chuỗi thô."""
+        """Câu báo khách tự huỷ (BR-HT-12): `trả lại 300.000đ`; JSON `cancelled_amount` vẫn là chuỗi thô."""
         order, _note, _task = self._auto_cancelled()
-        resp = client_for(None).get(f"/api/shop/orders/{order.code}/?phone_last4=0123")
+        resp = client_for(None).post(
+            "/api/shop/orders/lookup/", {"order_code": order.code, "phone": "0900000123"}, format="json"
+        )
         self.assertEqual(resp.status_code, 200)
         notice = resp.json()["cancel_notice"]
-        self.assertIn("Số tiền 300.000 ₫ sẽ được hoàn", notice["message"])
+        self.assertIn("để trả lại 300.000đ.", notice["message"])
         self.assertNotIn("300000đ", notice["message"])
-        self.assertEqual(notice["refund"]["amount"], "300000")  # contract khoá, không đổi
+        self.assertEqual(notice["cancelled_amount"], "300000")  # contract khoá, không đổi
 
     @override_settings(CONFIRMATION_AUTO_CANCEL_ENABLED=True, REFUND_DEADLINE_DAYS=30)
     def test_sr25_ac2_cskh_queue_refund_deadline_theo_ngay_vn(self):
@@ -54,11 +56,17 @@ class Lo8CskhFormatTests(l3.ConfirmationL3BaseTestCase):
         self.assertEqual(item["refund"]["deadline"], "2026-10-31")
 
     @override_settings(CONFIRMATION_AUTO_CANCEL_ENABLED=True, REFUND_DEADLINE_DAYS=30)
-    def test_sr25_ac2_shop_cancel_notice_deadline_theo_ngay_vn(self):
+    def test_sr25_ac2_shop_cancel_notice_has_no_refund_deadline(self):
+        """Shop không còn hạn hoàn (BR-HT-12): hạn là câu "trong <thời hạn>" đọc từ settings, không có ngày."""
         order, note, task = self._auto_cancelled()
         Refund.objects.filter(pk=task.refund.pk).update(created_at=LATE_UTC)
-        resp = client_for(None).get(f"/api/shop/orders/{order.code}/?phone_last4=0123")
-        self.assertEqual(resp.json()["cancel_notice"]["refund"]["deadline"], "2026-10-31")
+        resp = client_for(None).post(
+            "/api/shop/orders/lookup/", {"order_code": order.code, "phone": "0900000123"}, format="json"
+        )
+        notice = resp.json()["cancel_notice"]
+        self.assertNotIn("refund", notice)
+        self.assertNotIn("deadline", notice)
+        self.assertNotIn("2026-10-31", resp.content.decode())
 
     def test_sr25_ac2_claim_conflict_gio_vn_con_iso_giu_nguyen(self):
         """Thông điệp `tới 00:30` theo giờ VN; `extra.claimed_until` ISO còn nguyên offset UTC."""

@@ -367,7 +367,7 @@ SHOP_MAX_ORDER_LINES = int(os.getenv("SHOP_MAX_ORDER_LINES", "30"))
 SHOP_LOOKUP_TOKEN_DAYS = int(os.getenv("SHOP_LOOKUP_TOKEN_DAYS", "30"))
 SHOP_PAYMENT_PENDING_MINUTES = int(os.getenv("SHOP_PAYMENT_PENDING_MINUTES", "5"))
 SHOP_CANCEL_CALLBACK_WITHIN = os.getenv("SHOP_CANCEL_CALLBACK_WITHIN", "1 ngày làm việc")
-SHOP_CANCEL_POLICY_URL = os.getenv("SHOP_CANCEL_POLICY_URL", "/trang/?slug=doi-tra#xu-ly-tien")  # naming: allow - URL công khai tiếng Việt đã chốt ở 02b §2.3
+SHOP_CANCEL_POLICY_URL = os.getenv("SHOP_CANCEL_POLICY_URL", "/pages/?slug=doi-tra#xu-ly-tien")  # naming: allow - slug CMS tiếng Việt là dữ liệu (02b §2.3)
 SHOP_RETURN_REPORT_HOURS = os.getenv("SHOP_RETURN_REPORT_HOURS", "")  # rỗng -> API trả null (E3)
 # Mã giảm giá (BR-DM-21) — lô 3b dùng.
 VOUCHER_MAX_PERCENT = Decimal(os.getenv("VOUCHER_MAX_PERCENT", "50"))

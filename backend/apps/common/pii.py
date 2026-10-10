@@ -34,7 +34,7 @@ def mask_phone(phone: str) -> str:
     return f"{prefix}xx xxx {suffix}"
 
 
-def mask_phone_last4(phone: str) -> str:
+def mask_phone_tail(phone: str) -> str:
     """
     Che SĐT trên tem in (TEM-01): chỉ giữ 4 số cuối -> 'xxxxxx4567'.
     Chuẩn hoá trước; rỗng hoặc dưới 4 chữ số -> '***'. Không thay `mask_phone` (AC4).

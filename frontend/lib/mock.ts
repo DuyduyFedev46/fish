@@ -8,13 +8,20 @@ import {
   type CatalogItem,
   type CatalogItemDetail,
   type CatalogResponse,
+  type CancelNotice,
   type CreateOrderPayload,
+  type CreateOrderResponse,
+  type InvalidQtyLine,
   type ItemImage,
-  type OrderCancelNotice,
+  type OrderDelivery,
+  type OrderDiscount,
+  type OrderLookupInput,
+  type OrderLookupResult,
+  type OrderState,
+  type OutOfStockLine,
   type PaymentCheckoutSession,
+  type SaleUnit,
   type StockLevel,
-  type WireCreateOrderResponse,
-  type WireOrderStatus,
 } from "./types";
 import { todayInVietnam } from "./format";
 
@@ -219,243 +226,282 @@ const MOCK_CATALOG: MockSeedItem[] = [
   },
 ];
 
-// Kho đơn hàng cho mock — lưu vào localStorage (không phải Map thuần trong bộ nhớ), vì
-// luồng thanh toán SePay (P4) đưa khách sang một "trang khác" (giả lập bằng điều hướng
-// trình duyệt thật, `window.location.href`) rồi quay về: mỗi lần điều hướng như vậy nạp
-// lại toàn bộ JS, một Map trong bộ nhớ sẽ mất trắng. localStorage sống qua việc đó.
-type MockOrderLine = { item_code: string; name: string; qty: number; amount: number };
+// Kho đơn cho mock (02b §1.6) — lưu vào localStorage vì luồng cổng thanh toán đưa khách sang một "trang khác"
+// (giả lập bằng điều hướng trình duyệt thật) rồi quay về, mỗi lần như vậy nạp lại toàn bộ JS.
+// SĐT KHÔNG được lưu ở đâu: chỉ lưu băm (`phone_key`), để ngay cả dữ liệu giả cũng không nằm nguyên văn trong storage.
+// Đơn mẫu `SO000000-MOCK…` được dựng lại theo giờ hiện tại mỗi lần đọc, chỉ phần đã bị thay đổi (vd. vừa trả tiền) mới được lưu.
+type MockOrderLine = { item_code: string; name: string; unit: SaleUnit; qty: number; amount: number };
 
-type MockOrderRecord = {
+type MockOrder = {
   order_code: string;
-  phone: string;
-  total_amount: number;
+  phone_key: string;
+  request_id: string | null;
   lines: MockOrderLine[];
-  is_paid: boolean;
-  is_expired: boolean;
-  booked_expires_at: string | null;
-  // Thời điểm (epoch ms) mô phỏng "IPN đến" — chỉ mock dùng, để giả lập độ trễ xác nhận
-  // thanh toán mà vẫn sống sót qua một lượt điều hướng thật (xem mockMarkPaymentPending).
-  pay_confirmed_at: number | null;
-  status_label: string;
-  /** Mã trạng thái phiếu giao (CONFIRMING…CANCELLED); null = chưa có phiếu giao (đơn chưa thanh toán). */
+  total: number;
+  placed_at: number;
+  hold_until: number;
+  /** Thời điểm (epoch ms) mô phỏng "tiền về" — chỉ mock dùng, vẫn sống sót qua điều hướng thật. */
+  pay_confirm_at: number | null;
+  paid_at: number | null;
+  delivered_at: number | null;
+  status: "BOOKED" | "PROCESSING" | "COMPLETED" | "CANCELLED" | "AUTO_CANCELLED";
+  /** Trạng thái phiếu giao (CONFIRMING…FAILED); null = chưa có phiếu. */
   delivery_code: string | null;
-  cancel_notice?: OrderCancelNotice | null;
+  cancel: { scope: "full" | "partial"; reason_code: string; amount: number } | null;
+  late_payment: boolean;
+  /** Số lần mở cổng thanh toán còn phải báo lỗi (ca D1 lỗi mở cổng). */
+  checkout_fails: number;
 };
 
-const ORDERS_STORAGE_KEY = "cangcaloc_mock_orders_v3";
+const ORDERS_STORAGE_KEY = "cangcaloc_mock_orders_v4";
+const MOCK_HOLD_MINUTES = 30;
+const MOCK_PAYMENT_PENDING_MINUTES = 5;
+const MOCK_HOTLINE = "0900000000";
+const MIN = 60 * 1000;
 
-// Nhãn Shop của phiếu giao (T24–T30, chưa duyệt, dùng tạm) — khớp bảng BE ở 02b-tech-design.md mục 2.4.
-// Khách không bao giờ thấy mã thô; mã lạ → "Đang cập nhật".
-const DELIVERY_LABELS: Record<string, string> = {
-  CONFIRMING: "Chờ vựa gọi xác nhận",
-  PREPARING: "Đang soạn hàng",
-  READY: "Đã soạn xong, chờ giao",
-  DELIVERING: "Đang giao",
-  COMPLETED: "Đã giao",
-  FAILED: "Giao chưa thành công, vựa sẽ liên hệ lại",
-  CANCELLED: "Đã huỷ",
-};
-// Nhãn đơn của khách theo bảng 02b §2.6 (W37 S8, mục 4 thuật ngữ đã duyệt): đơn đã trả tiền chỉ có ba nhãn, ứng với phiếu giao.
-// Đơn Hoàn tất (phiếu Đã giao) hiện "Hoàn tất"; chưa giao xong hiện "Đang xử lý"; phiếu còn chờ gọi xác nhận có câu riêng.
-const PAID_ORDER_LABELS = {
-  confirming: "Đã thanh toán – chờ vựa gọi xác nhận",
-  processing: "Đang xử lý",
-  completed: "Hoàn tất",
-} as const;
-const deliveryLabelOf = (code: string): string => DELIVERY_LABELS[code] ?? "Đang cập nhật";
-
-function nowIso(minutesFromNow: number): string {
-  return new Date(Date.now() + minutesFromNow * 60 * 1000).toISOString();
-}
-
-function seedDemoOrders(): Map<string, MockOrderRecord> {
-  const orders = new Map<string, MockOrderRecord>();
-  // Đơn mẫu 1: đã thanh toán — test tra cứu ngay (mã DH-DEMO001, 4 số cuối SĐT 6789).
-  orders.set("DH-DEMO001", {
-    order_code: "DH-DEMO001",
-    phone: "0909006789",
-    total_amount: 285000,
-    lines: [
-      { item_code: "CA-BASA-PHILE", name: "Cá basa phi lê", qty: 2, amount: 130000 },
-      { item_code: "TOM-SU-TUOI", name: "Tôm sú tươi", qty: 0.5, amount: 110000 },
-    ],
-    is_paid: true,
-    is_expired: false,
-    booked_expires_at: null,
-    pay_confirmed_at: null,
-    status_label: "Đã thanh toán, đang soạn hàng",
-    delivery_code: "PREPARING",
-  });
-  // Đơn mẫu 2: đang giữ chỗ, còn hạn — test màn "chưa thanh toán, còn mm:ss" + thanh toán lại
-  // (mã DH-DEMO002, 4 số cuối SĐT 1234).
-  orders.set("DH-DEMO002", {
-    order_code: "DH-DEMO002",
-    phone: "0912341234",
-    total_amount: 180000,
-    lines: [{ item_code: "MUC-ONG", name: "Mực ống", qty: 1, amount: 180000 }],
-    is_paid: false,
-    is_expired: false,
-    booked_expires_at: nowIso(12),
-    pay_confirmed_at: null,
-    status_label: "Chờ thanh toán",
-    delivery_code: null,
-  });
-  // Đơn mẫu 3: đã hết hạn giữ chỗ — test màn "hết hạn, mời đặt lại" (mã DH-DEMO003, SĐT 4321).
-  orders.set("DH-DEMO003", {
-    order_code: "DH-DEMO003",
-    phone: "0909994321",
-    total_amount: 90000,
-    lines: [{ item_code: "NGHEU-TRANG", name: "Nghêu trắng", qty: 2, amount: 90000 }],
-    is_paid: false,
-    is_expired: true,
-    booked_expires_at: null,
-    pay_confirmed_at: null,
-    status_label: "Đã huỷ vì quá giờ thanh toán",
-    delivery_code: "CANCELLED",
-  });
-  // Đơn mẫu 4: CS-10 tự huỷ do không liên lạc được kèm hoàn tiền (mã DH-DEMO004, SĐT 5678).
-  orders.set("DH-DEMO004", {
-    order_code: "DH-DEMO004",
-    phone: "0901235678",
-    total_amount: 540000,
-    lines: [{ item_code: "TOM-SU-TUOI", name: "Tôm sú tươi", qty: 2, amount: 540000 }],
-    is_paid: false,
-    is_expired: false,
-    booked_expires_at: null,
-    pay_confirmed_at: null,
-    status_label: "Đã huỷ",
-    delivery_code: "CANCELLED",
-    cancel_notice: {
-      reason_code: "UNREACHABLE_AUTO",
-      // # CHỜ legal-vn: câu thông báo tự huỷ do không liên lạc được
-      message:
-        "Cá Về đã gọi số điện thoại đặt hàng 3 lần trong 30 phút nhưng không liên lạc được, nên đơn được huỷ tự động để hoàn tiền cho quý khách.",
-      refund: {
-        amount: "540000",
-        status_label: "Đang chờ hoàn tiền",
-        deadline: "2026-10-28",
-        refunded_at: null,
-      },
-      contact: "1900 6868",
-    },
-  });
-  // Đơn mẫu 5–9: một đơn cho mỗi trạng thái phiếu giao còn lại (E2: Shop tra đơn không lộ mã thô).
-  const extra: Array<[string, string, string, string]> = [
-    ["DH-DEMO005", "0909005001", "CONFIRMING", PAID_ORDER_LABELS.confirming],
-    ["DH-DEMO006", "0909005002", "READY", PAID_ORDER_LABELS.processing],
-    ["DH-DEMO007", "0909005003", "DELIVERING", PAID_ORDER_LABELS.processing],
-    // W37 S8-AC6: đơn Hoàn tất — badge "Hoàn tất", dòng phiếu "Đã giao" (status COMPLETED suy từ phiếu ở toWireOrderStatus).
-    ["DH-DEMO008", "0909005004", "COMPLETED", PAID_ORDER_LABELS.completed],
-    ["DH-DEMO009", "0909005005", "FAILED", PAID_ORDER_LABELS.processing],
-  ];
-  for (const [order_code, phone, delivery_code, status_label] of extra) {
-    orders.set(order_code, {
-      order_code,
-      phone,
-      total_amount: 120000,
-      lines: [{ item_code: "MUC-ONG", name: "Mực ống", qty: 0.5, amount: 120000 }],
-      is_paid: true,
-      is_expired: false,
-      booked_expires_at: null,
-      pay_confirmed_at: null,
-      status_label,
-      delivery_code,
-    });
+/** Băm FNV-1a 32 bit: đủ để so khớp SĐT trong mock mà không lưu số thật. */
+function phoneKey(phone: string): string {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < phone.length; i++) {
+    h ^= phone.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
   }
-  return orders;
+  return (h >>> 0).toString(16);
 }
 
-function loadOrders(): Map<string, MockOrderRecord> {
-  if (typeof window === "undefined") return seedDemoOrders();
+/** "+84 900 000 001" | "0900000001" -> "0900000001". */
+function normalizePhone(raw: string): string {
+  const digits = raw.replace(/[\s.\-()]/g, "");
+  return digits.startsWith("+84") ? `0${digits.slice(3)}` : digits.startsWith("84") && digits.length === 11 ? `0${digits.slice(2)}` : digits;
+}
+
+const MOCK_SEED_PHONE_KEY = phoneKey("0900000001");
+
+function seedLines(): MockOrderLine[] {
+  return [
+    { item_code: "MUC-ONG", name: "Mực ống", unit: "kg", qty: 1.5, amount: 270000 },
+    { item_code: "COMBO-HAISAN-GD", name: "Combo hải sản gia đình", unit: "combo", qty: 1, amount: 450000 },
+  ];
+}
+
+const SEED_SUBTOTAL = 720000;
+
+function seedOrder(code: string, now: number, over: Partial<MockOrder>): MockOrder {
+  return {
+    order_code: code,
+    phone_key: MOCK_SEED_PHONE_KEY,
+    request_id: null,
+    lines: seedLines(),
+    total: SEED_SUBTOTAL,
+    placed_at: now - 20 * MIN,
+    hold_until: now + 10 * MIN,
+    pay_confirm_at: null,
+    paid_at: null,
+    delivered_at: null,
+    status: "BOOKED",
+    delivery_code: null,
+    cancel: null,
+    late_payment: false,
+    checkout_fails: 0,
+    ...over,
+  };
+}
+
+/** 12 đơn mẫu, mỗi `state` (bảng E6) một đơn; tra bằng SĐT giả 0900000001. */
+function seedOrders(now: number): MockOrder[] {
+  const paid = { status: "PROCESSING" as const, paid_at: now - 15 * MIN, hold_until: now + 10 * MIN };
+  return [
+    seedOrder("SO000000-MOCKA1", now, { placed_at: now - 6 * MIN, hold_until: now + 24 * MIN }),
+    seedOrder("SO000000-MOCKA2", now, { placed_at: now - 31 * MIN, hold_until: now - 1 * MIN }),
+    seedOrder("SO000000-MOCKA3", now, { status: "AUTO_CANCELLED", placed_at: now - 2 * 60 * MIN, hold_until: now - 90 * MIN }),
+    seedOrder("SO000000-MOCKA4", now, {
+      ...paid,
+      status: "CANCELLED",
+      delivery_code: "CANCELLED",
+      cancel: { scope: "full", reason_code: "DAMAGED_WHEN_PACKING", amount: SEED_SUBTOTAL },
+    }),
+    seedOrder("SO000000-MOCKA5", now, {
+      ...paid,
+      status: "CANCELLED",
+      delivery_code: "CANCELLED",
+      cancel: { scope: "full", reason_code: "UNREACHABLE_AUTO", amount: SEED_SUBTOTAL },
+    }),
+    seedOrder("SO000000-MOCKA6", now, {
+      status: "AUTO_CANCELLED",
+      placed_at: now - 3 * 60 * MIN,
+      hold_until: now - 150 * MIN,
+      late_payment: true,
+      cancel: { scope: "full", reason_code: "PAID_AFTER_EXPIRY", amount: SEED_SUBTOTAL },
+    }),
+    seedOrder("SO000000-MOCKA7", now, { ...paid, delivery_code: "CONFIRMING" }),
+    seedOrder("SO000000-MOCKA8", now, { ...paid, delivery_code: "READY" }),
+    seedOrder("SO000000-MOCKA9", now, { ...paid, delivery_code: "DELIVERING" }),
+    seedOrder("SO000000-MOCKB1", now, { ...paid, delivery_code: "FAILED" }),
+    seedOrder("SO000000-MOCKB2", now, {
+      ...paid,
+      status: "COMPLETED",
+      delivery_code: "COMPLETED",
+      delivered_at: now - 2 * 60 * MIN,
+    }),
+    seedOrder("SO000000-MOCKB3", now, {
+      ...paid,
+      delivery_code: "PREPARING",
+      cancel: { scope: "partial", reason_code: "PARTIAL", amount: 270000 },
+    }),
+    // Đơn còn hạn nhưng mở cổng thanh toán lỗi lần đầu (câu "Chưa mở được trang thanh toán. Thử lại.").
+    seedOrder("SO000000-MOCKB4", now, { placed_at: now - 4 * MIN, hold_until: now + 26 * MIN, checkout_fails: 1 }),
+  ];
+}
+
+function readStoredOrders(): MockOrder[] {
+  if (typeof window === "undefined") return [];
   try {
     const raw = window.localStorage.getItem(ORDERS_STORAGE_KEY);
-    if (!raw) {
-      const seeded = seedDemoOrders();
-      saveOrders(seeded);
-      return seeded;
-    }
-    const entries: [string, MockOrderRecord][] = JSON.parse(raw);
-    return new Map(entries);
+    return raw ? (JSON.parse(raw) as MockOrder[]) : [];
   } catch {
-    return seedDemoOrders();
+    return [];
   }
 }
 
-function saveOrders(orders: Map<string, MockOrderRecord>): void {
+function writeStoredOrders(orders: MockOrder[]): void {
   if (typeof window === "undefined") return;
   try {
-    window.localStorage.setItem(
-      ORDERS_STORAGE_KEY,
-      JSON.stringify(Array.from(orders.entries()))
-    );
+    window.localStorage.setItem(ORDERS_STORAGE_KEY, JSON.stringify(orders));
   } catch {
-    // localStorage không khả dụng — mock vẫn chạy được trong phiên hiện tại, chỉ không
-    // sống sót qua điều hướng thật.
+    // localStorage không khả dụng — mock vẫn chạy trong phiên hiện tại, chỉ không sống sót qua điều hướng thật.
   }
 }
 
-// Xử lý "tới hạn" một cách lười: mỗi lần đọc một đơn, kiểm xem TTL đã qua chưa, hoặc
-// "IPN giả lập" đã tới giờ chưa, rồi cập nhật đúng như job nền thật sẽ làm.
-function resolveMockOrder(record: MockOrderRecord): { record: MockOrderRecord; changed: boolean } {
-  const now = Date.now();
+/** Đơn đã lưu đè lên đơn mẫu cùng mã; đơn mẫu chưa bị đụng tới thì dựng lại theo giờ hiện tại. */
+function allOrders(now: number): MockOrder[] {
+  const stored = readStoredOrders();
+  const storedCodes = new Set(stored.map((o) => o.order_code));
+  return [...seedOrders(now).filter((o) => !storedCodes.has(o.order_code)), ...stored];
+}
+
+function saveOrder(order: MockOrder): void {
+  const stored = readStoredOrders().filter((o) => o.order_code !== order.order_code);
+  stored.push(order);
+  writeStoredOrders(stored.slice(-30));
+}
+
+/** Xử lý "tới hạn" một cách lười, đúng như job nền thật: tiền về giả lập, hết giờ giữ hàng. Trả `true` nếu đổi. */
+function settleOrder(o: MockOrder, now: number): boolean {
   let changed = false;
-
-  if (!record.is_paid && record.pay_confirmed_at != null && now >= record.pay_confirmed_at) {
-    record.is_paid = true;
-    record.is_expired = false;
-    record.pay_confirmed_at = null;
-    record.booked_expires_at = null;
-    record.status_label = "Đã thanh toán, đang soạn hàng";
-    record.delivery_code = "PREPARING";
+  if (o.status === "BOOKED" && o.pay_confirm_at != null && now >= o.pay_confirm_at) {
+    o.status = "PROCESSING";
+    o.paid_at = o.pay_confirm_at;
+    o.pay_confirm_at = null;
+    o.delivery_code = "CONFIRMING";
     changed = true;
   }
-
-  if (
-    !record.is_paid &&
-    !record.is_expired &&
-    record.booked_expires_at &&
-    now >= new Date(record.booked_expires_at).getTime()
-  ) {
-    record.is_expired = true;
-    record.booked_expires_at = null;
-    record.pay_confirmed_at = null;
-    record.status_label = "Đã huỷ vì quá giờ thanh toán";
-    record.delivery_code = "CANCELLED";
-    changed = true;
-  }
-
-  return { record, changed };
+  return changed;
 }
 
-// Trả đúng KIỂU TRÊN DÂY (số dạng chuỗi, không có is_paid/is_expired) — giống hệt cấu trúc
-// `ShopOrderLookupView` thật trả, để `lib/api.ts` dùng chung một hàm map cho cả mock lẫn
-// API thật. Khác BE thật ở 2 chỗ (có ghi chú rõ): mock trả thêm `name` mỗi dòng và
-// `booked_expires_at` — BE thật hôm nay chưa có 2 field này ở tra đơn (xem lib/types.ts).
-function toWireOrderStatus(record: MockOrderRecord): WireOrderStatus {
-  const fulfilment =
-    (record.delivery_code === "CANCELLED" && !record.is_expired)
-      ? "CANCELLED"
-      : record.is_paid
-      ? "CONFIRMING"
-      : record.is_expired
-      ? "CANCELLED"
-      : "BOOKED";
+type MockState = OrderState;
 
+function stateOf(o: MockOrder, now: number): MockState {
+  if (o.status === "BOOKED") return now < o.hold_until ? "awaiting_payment" : "hold_expired";
+  if (o.status === "AUTO_CANCELLED") return o.late_payment ? "cancelled" : "expired";
+  if (o.status === "CANCELLED") return "cancelled";
+  if (o.status === "COMPLETED") return "completed";
+  if (o.delivery_code === "DELIVERING") return "delivering";
+  if (o.delivery_code === "FAILED") return "delivery_failed";
+  return "preparing";
+}
+
+const STATUS_LABELS: Record<string, string> = {
+  awaiting_payment: "Chờ thanh toán",
+  hold_expired: "Chờ thanh toán",
+  expired: "Đã huỷ vì quá giờ thanh toán",
+  cancelled: "Đã huỷ",
+  delivering: "Đang giao",
+  delivery_failed: "Giao không thành công",
+  completed: "Đã giao",
+};
+
+const CANCEL_LABELS: Record<string, string> = {
+  DAMAGED_WHEN_PACKING: "Hàng không đạt khi soạn",
+  UNREACHABLE_AUTO: "Không liên lạc được để xác nhận đơn",
+  PAID_AFTER_EXPIRY: "Hết giờ giữ hàng, tiền về sau",
+  PARTIAL: "Một phần đơn không giao được",
+};
+
+function deliveryOf(code: string | null): OrderDelivery | null {
+  switch (code) {
+    case "CONFIRMING":
+      return { step: "preparing", step_label: "Chờ vựa gọi xác nhận" };
+    case "PREPARING":
+      return { step: "preparing", step_label: "Đang soạn hàng" };
+    case "READY":
+      return { step: "preparing", step_label: "Đã soạn xong, chờ giao" };
+    case "DELIVERING":
+      return { step: "delivering", step_label: "Đang giao" };
+    case "COMPLETED":
+      return { step: "delivered", step_label: "Đã giao" };
+    case "FAILED":
+      return { step: "failed", step_label: "Giao chưa thành công, vựa sẽ liên hệ lại" };
+    default:
+      return null;
+  }
+}
+
+function vndText(amount: number): string {
+  return `${Math.round(amount).toLocaleString("vi-VN")}đ`;
+}
+
+function mockLookupToken(orderCode: string): string {
+  return `mock-token.${typeof window !== "undefined" ? window.btoa(orderCode) : orderCode}`;
+}
+
+function toWireLookup(o: MockOrder, now: number): OrderLookupResult {
+  const state = stateOf(o, now);
+  const delivery = deliveryOf(o.delivery_code);
+  const noDiscount: OrderDiscount = { source: null, code: null, amount: "0" };
+  let cancel_notice: CancelNotice | null = null;
+  if (o.cancel) {
+    cancel_notice = {
+      scope: o.cancel.scope,
+      reason_code: o.cancel.reason_code,
+      reason_label: CANCEL_LABELS[o.cancel.reason_code] ?? "Cá Về đã huỷ đơn này",
+      cancelled_amount: String(o.cancel.amount),
+      message: `Cá Về sẽ gọi vào số điện thoại đặt hàng trong 1 ngày làm việc để trả lại ${vndText(o.cancel.amount)}.`,
+      hotline: MOCK_HOTLINE,
+      policy_url: "/pages/?slug=doi-tra#xu-ly-tien",
+    };
+  }
+  const label =
+    state === "preparing"
+      ? o.delivery_code === "CONFIRMING"
+        ? "Đã thanh toán – chờ vựa gọi xác nhận"
+        : "Đang chuẩn bị hàng"
+      : STATUS_LABELS[state];
   return {
-    order_code: record.order_code,
-    status: record.is_paid ? (record.delivery_code === "COMPLETED" ? "COMPLETED" : "PROCESSING") : record.is_expired ? "AUTO_CANCELLED" : record.cancel_notice ? "CANCELLED" : "BOOKED",
-    status_label: record.status_label,
-    fulfilment,
-    total_amount: String(record.total_amount),
-    lines: record.lines.map((l) => ({
+    order_code: o.order_code,
+    status: o.status,
+    state,
+    status_label: label,
+    placed_at: new Date(o.placed_at).toISOString(),
+    paid_at: o.paid_at ? new Date(o.paid_at).toISOString() : null,
+    delivered_at: o.delivered_at ? new Date(o.delivered_at).toISOString() : null,
+    booked_expires_at: o.status === "BOOKED" ? new Date(o.hold_until).toISOString() : null,
+    server_now: new Date(now).toISOString(),
+    hold_minutes: MOCK_HOLD_MINUTES,
+    payment_pending_minutes: MOCK_PAYMENT_PENDING_MINUTES,
+    delivery: state === "cancelled" || state === "expired" || state === "hold_expired" || state === "awaiting_payment" ? null : delivery,
+    lines: o.lines.map((l) => ({
       item_code: l.item_code,
       name: l.name,
+      unit: l.unit,
       qty: String(l.qty),
       amount: String(l.amount),
     })),
-    delivery: record.delivery_code ? { status: record.delivery_code, status_label: deliveryLabelOf(record.delivery_code) } : null,
-    cancel_notice: record.cancel_notice ?? null,
-    ...(record.booked_expires_at ? { booked_expires_at: record.booked_expires_at } : {}),
+    subtotal: String(o.lines.reduce((sum, l) => sum + l.amount, 0)),
+    discount: noDiscount,
+    total_amount: String(o.total),
+    cancel_notice,
+    late_payment: o.late_payment,
+    lookup_token: mockLookupToken(o.order_code),
   };
 }
 
@@ -486,130 +532,192 @@ export async function mockGetCatalogItem(itemCode: string): Promise<CatalogItemD
 }
 
 function genOrderCode(): string {
-  // Ngày theo giờ VN (SR-25 AC4), không theo múi giờ máy.
+  // Dạng SO + ngày theo giờ VN (YYMMDD) + 6 ký tự (02b §3.3), không theo múi giờ máy.
   const [y, m, d] = todayInVietnam().split("-");
-  const rand = Math.floor(1000 + Math.random() * 9000);
-  return `DH-${y.slice(2)}${m}${d}-${rand}`;
+  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let tail = "";
+  for (let i = 0; i < 6; i++) tail += alphabet[Math.floor(Math.random() * alphabet.length)];
+  return `SO${y.slice(2)}${m}${d}-${tail}`;
 }
 
-export async function mockCreateOrder(
-  payload: CreateOrderPayload
-): Promise<WireCreateOrderResponse> {
-  // Giả lập cho QA kiểm thử các case đặc biệt (GL-03)
-  if (payload.customer?.name === "MOCK_409") {
-    throw new ApiError("Chính sách vừa cập nhật, vui lòng xem và đồng ý lại.", 409, "POLICY_CHANGED", {
-      current: { version: 4, version_id: 930, slug: "chinh-sach-bao-mat" },
-    });
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function toWireCreate(o: MockOrder, now: number): CreateOrderResponse {
+  const lookup = toWireLookup(o, now);
+  return {
+    order_code: o.order_code,
+    status: o.status,
+    subtotal: lookup.subtotal,
+    discount: lookup.discount,
+    total_amount: lookup.total_amount,
+    booked_expires_at: new Date(o.hold_until).toISOString(),
+    server_now: lookup.server_now,
+    hold_minutes: MOCK_HOLD_MINUTES,
+    lines: lookup.lines,
+    lookup_token: lookup.lookup_token,
+  };
+}
+
+/**
+ * Tạo đơn giả (02b §3.3). Ca cố định cho QA: tên chứa `#timeout` (ghi đơn rồi ném lỗi mạng; gửi lại cùng
+ * `client_request_id` trả đơn cũ), `#throttle` (429), `#policy` (409), `#closed` (503 Shop tạm ngưng).
+ */
+export async function mockCreateOrder(payload: CreateOrderPayload): Promise<CreateOrderResponse> {
+  const name = payload.customer?.name ?? "";
+  if (name.includes("#closed")) {
+    throw new ApiError("Shop tạm chưa nhận đơn.", 503, "SHOP_CLOSED");
   }
-  if (payload.customer?.name === "MOCK_503") {
-    throw new ApiError("Shop tạm chưa nhận đơn.", 503, "BR-BH-17");
+  const fields: Record<string, string> = {};
+  const phone = normalizePhone(payload.customer?.phone ?? "");
+  if (!UUID_RE.test(payload.client_request_id ?? "")) fields.client_request_id = "Mã yêu cầu không hợp lệ.";
+  if (!name.trim() || name.length > 100) fields.name = "Nhập họ tên người nhận";
+  if (!/^0\d{9}$/.test(phone)) fields.phone = "Số điện thoại cần 10 chữ số, bắt đầu bằng 0";
+  if (!payload.delivery_address?.trim() || payload.delivery_address.length > 500) {
+    fields.delivery_address = "Nhập địa chỉ giao hàng hoặc chọn trên bản đồ";
   }
+  if (!payload.items?.length) fields.items = "Giỏ hàng đang trống";
   if (payload.privacy_consent && payload.privacy_consent.accepted !== true) {
-    throw new ApiError("Vui lòng đồng ý chính sách xử lý dữ liệu cá nhân.", 400, "BR-BH-17");
+    fields.consent = "Đánh dấu đồng ý ở trên để đặt hàng.";
+  }
+  if (Object.keys(fields).length > 0) {
+    throw new ApiError("Thông tin đặt hàng chưa hợp lệ.", 400, "VALIDATION", { code: "VALIDATION", fields });
   }
 
+  const now = Date.now();
+  const existing = allOrders(now).find((o) => o.request_id === payload.client_request_id);
+  if (existing) return delay(toWireCreate(existing, now));
+
+  if (name.includes("#policy")) {
+    throw new ApiError("Chính sách vừa cập nhật, vui lòng xem và đồng ý lại.", 409, "POLICY_CHANGED", {
+      current: { version: 4, version_id: 930, slug: "quyen-rieng-tu" },
+    });
+  }
+  if (name.includes("#throttle")) {
+    throw new ApiError("Bạn thao tác quá nhanh. Vui lòng thử lại sau 60 giây.", 429, "throttled");
+  }
+
+  // Số lượng sai bước (BR-BH-22): liệt kê mọi dòng sai.
+  const invalid: InvalidQtyLine[] = [];
+  for (const line of payload.items) {
+    const item = MOCK_CATALOG.find((i) => i.item_code === line.item_code);
+    if (!item) continue;
+    const isBundle = item.item_type === "BUNDLE";
+    const q = Math.round(Number(line.qty) * 1000);
+    const step = isBundle ? 1000 : 500;
+    if (!Number.isFinite(q) || q < 1000 || q % step !== 0) {
+      invalid.push({ item_code: item.item_code, min_qty: "1", qty_step: isBundle ? "1" : "0.5" });
+    }
+  }
+  if (invalid.length > 0) {
+    throw new ApiError("Số lượng không hợp lệ.", 400, "INVALID_QTY", { code: "INVALID_QTY", lines: invalid });
+  }
+
+  // Hết hàng (BR-BH-24): chỉ trả `out` hoặc `short`, không có số kg.
+  const short: OutOfStockLine[] = [];
   let total = 0;
   const lines: MockOrderLine[] = [];
   for (const line of payload.items) {
     const item = MOCK_CATALOG.find((i) => i.item_code === line.item_code);
-    if (!item) {
-      throw new Error(`Mặt hàng không tồn tại: ${line.item_code}`);
+    const qty = Number(line.qty);
+    if (!item || item.mock_stock < 1) {
+      short.push({ item_code: line.item_code, stock_level: "out" });
+      continue;
     }
-    if (line.qty > item.mock_stock) {
-      throw new Error(`Mặt hàng "${item.name}" không đủ tồn kho khả dụng`);
+    if (qty > item.mock_stock) {
+      short.push({ item_code: item.item_code, stock_level: "short" });
+      continue;
     }
-    // Làm tròn nguyên đồng (BR-BH-15, story P5) để số gửi cổng khớp số trên hoá đơn.
-    const lineAmount = Math.round(item.price * line.qty);
-    total += lineAmount;
+    const amount = Math.round(item.price * qty);
+    total += amount;
     lines.push({
       item_code: item.item_code,
       name: item.name,
-      qty: line.qty,
-      amount: lineAmount,
+      unit: item.item_type === "BUNDLE" ? "combo" : "kg",
+      qty,
+      amount,
     });
   }
+  if (short.length > 0) {
+    throw new ApiError("Một số món vừa hết hàng.", 400, "OUT_OF_STOCK", { code: "OUT_OF_STOCK", lines: short });
+  }
 
-  const order_code = genOrderCode();
-  const booked_expires_at = nowIso(30);
-
-  const orders = loadOrders();
-  orders.set(order_code, {
-    order_code,
-    phone: payload.phone,
-    total_amount: total,
+  const order: MockOrder = {
+    order_code: genOrderCode(),
+    phone_key: phoneKey(phone),
+    request_id: payload.client_request_id,
     lines,
-    is_paid: false,
-    is_expired: false,
-    booked_expires_at,
-    pay_confirmed_at: null,
-    status_label: "Chờ thanh toán",
+    total,
+    placed_at: now,
+    hold_until: now + MOCK_HOLD_MINUTES * MIN,
+    pay_confirm_at: null,
+    paid_at: null,
+    delivered_at: null,
+    status: "BOOKED",
     delivery_code: null,
-  });
-  saveOrders(orders);
+    cancel: null,
+    late_payment: false,
+    checkout_fails: 0,
+  };
+  saveOrder(order);
 
-  return delay({
-    order_code,
-    total_amount: String(total),
-    booked_expires_at,
-  });
+  // Mất phản hồi sau khi máy chủ đã ghi đơn (C4): lần gửi lại cùng mã yêu cầu sẽ trả đơn này.
+  if (name.includes("#timeout")) throw new TypeError("Failed to fetch");
+  return delay(toWireCreate(order, now));
 }
 
-export async function mockGetOrderStatus(
-  orderCode: string,
-  phoneLast4: string
-): Promise<WireOrderStatus | null> {
-  const orders = loadOrders();
-  const record = orders.get(orderCode);
+/** Tra đơn giả (02b §3.4). `null` = 404 một câu chung. Token `mock-expired…` -> 401 TOKEN_EXPIRED. */
+export async function mockLookupOrder(input: OrderLookupInput): Promise<OrderLookupResult | null> {
+  const now = Date.now();
+  const code = (input.order_code ?? "").trim().toUpperCase();
+  if (input.token) {
+    if (input.token.startsWith("mock-expired")) {
+      throw new ApiError("Phiên xem đơn đã hết hạn. Nhập số điện thoại để xem lại.", 401, "TOKEN_EXPIRED");
+    }
+    if (input.token !== mockLookupToken(code)) return delay(null);
+  } else if (!input.phone) {
+    throw new ApiError("Thông tin tra đơn chưa hợp lệ.", 400, "VALIDATION");
+  }
+  const record = allOrders(now).find((o) => o.order_code === code);
   if (!record) return delay(null);
-  if (!record.phone.endsWith(phoneLast4)) return delay(null);
-
-  const { record: resolved, changed } = resolveMockOrder(record);
-  if (changed) {
-    orders.set(orderCode, resolved);
-    saveOrders(orders);
-  }
-  return delay(toWireOrderStatus(resolved));
+  if (!input.token && phoneKey(normalizePhone(input.phone ?? "")) !== record.phone_key) return delay(null);
+  if (settleOrder(record, now)) saveOrder(record);
+  return delay(toWireLookup(record, now));
 }
 
-// Lập bộ tham số thanh toán cổng — giả lập BR-TT-01/13/14/17 (story P1). Hình dạng
-// `fields` (mảng có thứ tự) khớp SDK SePay thật theo ghi chú điều phối 2026-09-26: merchant,
-// operation, payment_method, order_amount, currency, order_invoice_number, order_description,
-// success_url, error_url, cancel_url, signature. Mock KHÔNG dùng URL trong `fields` để điều
-// hướng thật (static export không có route nhận POST) — xem `goToMockGateway` ở
-// features/checkout/gateway.ts, dùng riêng cho nhánh mock.
-export async function mockStartCheckoutSession(
-  orderCode: string
-): Promise<PaymentCheckoutSession> {
-  const orders = loadOrders();
-  const record = orders.get(orderCode);
-  if (!record) {
-    throw new ApiError("Không tìm thấy đơn.", 404);
+// Lập bộ tham số cổng thanh toán (BR-TT-01/13/14/17). Hình dạng `fields` (mảng có thứ tự) khớp SDK cổng
+// thật. Mock KHÔNG dùng URL trong `fields` để điều hướng (static export không có route nhận POST) — xem
+// `goToMockGateway` ở features/checkout/gateway.ts.
+export async function mockStartCheckoutSession(orderCode: string): Promise<PaymentCheckoutSession> {
+  const now = Date.now();
+  const record = allOrders(now).find((o) => o.order_code === orderCode);
+  if (!record) throw new ApiError("Không tìm thấy đơn.", 404, "ORDER_NOT_FOUND");
+  if (record.checkout_fails > 0) {
+    record.checkout_fails -= 1;
+    saveOrder(record);
+    throw new ApiError("Chưa mở được trang thanh toán. Thử lại.", 400, "CHECKOUT_UNAVAILABLE", {
+      code: "CHECKOUT_UNAVAILABLE",
+      reason: "MOCK",
+    });
   }
-
-  const { record: resolved, changed } = resolveMockOrder(record);
-  if (changed) {
-    orders.set(orderCode, resolved);
-    saveOrders(orders);
-  }
-
-  if (resolved.is_paid) {
-    throw new ApiError("Đơn đã thanh toán.", 400);
-  }
-  if (resolved.is_expired || !resolved.booked_expires_at) {
-    throw new ApiError("Đơn đã hết hạn giữ hàng, vui lòng đặt lại.", 400);
+  if (settleOrder(record, now)) saveOrder(record);
+  if (stateOf(record, now) !== "awaiting_payment") {
+    throw new ApiError("Chưa mở được trang thanh toán. Thử lại.", 400, "CHECKOUT_UNAVAILABLE", {
+      code: "CHECKOUT_UNAVAILABLE",
+      reason: "NOT_PAYABLE",
+    });
   }
 
   const origin = typeof window !== "undefined" ? window.location.origin : "";
   const returnBase = `${origin}/shop/orders?code=${encodeURIComponent(orderCode)}`;
 
   return delay({
-    checkout_url: "https://pay-sandbox.sepay.vn/v1/checkout/init",
+    checkout_url: "https://pay-sandbox.example.invalid/v1/checkout/init",
     environment: "SANDBOX",
     fields: [
       { name: "merchant", value: "MOCK_MERCHANT" },
       { name: "operation", value: "pay" },
       { name: "payment_method", value: "BANK_TRANSFER" },
-      { name: "order_amount", value: String(resolved.total_amount) },
+      { name: "order_amount", value: String(record.total) },
       { name: "currency", value: "VND" },
       { name: "order_invoice_number", value: orderCode },
       { name: "order_description", value: `Thanh toan don hang ${orderCode}` },
@@ -621,13 +729,12 @@ export async function mockStartCheckoutSession(
   });
 }
 
-// Chỉ mock dùng: giả lập "IPN sẽ đến sau `delayMs`". Ghi thẳng vào localStorage (không
-// dùng setTimeout) để sống sót qua việc điều hướng thật sang trang "cổng" rồi quay về.
-export function mockMarkPaymentPending(orderCode: string, delayMs: number): void {
-  const orders = loadOrders();
-  const record = orders.get(orderCode);
+// Chỉ mock dùng: giả lập "tiền sẽ về sau `delayMs`" (`null` = không bao giờ về, để thử màn chờ quá 5 phút).
+// Ghi thẳng vào localStorage (không dùng setTimeout) để sống sót qua việc điều hướng thật sang trang "cổng" rồi quay về.
+export function mockMarkPaymentPending(orderCode: string, delayMs: number | null): void {
+  const now = Date.now();
+  const record = allOrders(now).find((o) => o.order_code === orderCode);
   if (!record) return;
-  record.pay_confirmed_at = Date.now() + delayMs;
-  orders.set(orderCode, record);
-  saveOrders(orders);
+  record.pay_confirm_at = delayMs === null ? null : now + delayMs;
+  saveOrder(record);
 }

@@ -1,0 +1,121 @@
+/* Trang CMS /pages/ (P1-Policy, DesktopPolicy, P3-HowToBuy). Chỉ token trong app/globals.css. */
+.page {
+  padding: var(--space-3) 0 var(--space-6);
+}
+
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  max-width: var(--container-max);
+  margin: 0 auto;
+  padding: 0 var(--space-4);
+}
+
+.columns {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.aside {
+  display: none;
+}
+
+.main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.article {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: 0 calc(-1 * var(--space-4));
+  padding: var(--space-4);
+  background: var(--surface);
+}
+
+.head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.title {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: -0.015em;
+}
+
+.updated {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ink-3);
+}
+
+.listBelow {
+  margin: 0 calc(-1 * var(--space-4));
+}
+
+@media (min-width: 768px) {
+  .page {
+    padding: var(--space-4) 0 var(--space-12);
+  }
+
+  .container {
+    gap: var(--space-5);
+    padding: 0 var(--space-6);
+  }
+
+  .article,
+  .listBelow {
+    margin: 0;
+    border-radius: var(--radius-card);
+  }
+
+  .article {
+    gap: var(--space-5);
+    padding: 28px var(--space-8);
+  }
+
+  .listBelow {
+    overflow: hidden;
+  }
+
+  .title {
+    font-size: 24px;
+  }
+
+  .updated {
+    font-size: 13px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .columns {
+    flex-direction: row;
+    align-items: flex-start;
+    gap: var(--space-6);
+  }
+
+  .aside {
+    position: sticky;
+    top: var(--space-6);
+    display: block;
+    flex: 0 0 260px;
+  }
+
+  .main {
+    flex: 1 1 600px;
+    gap: var(--space-5);
+  }
+
+  .listBelow {
+    display: none;
+  }
+}

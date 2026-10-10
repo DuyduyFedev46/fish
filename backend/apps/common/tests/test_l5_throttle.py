@@ -51,12 +51,13 @@ class ThrottleL5Tests(TestCase):
 
     @override_settings(CAVEVE_THROTTLE_RATES={"shop_lookup_ip": "5/min"})
     def test_s03_ac1_shop_lookup_ip_throttle(self):
-        url = f"/api/shop/orders/{self.order.code}/?phone_last4=3344"
+        url = "/api/shop/orders/lookup/"
+        body = {"order_code": self.order.code, "phone": "0911223344"}
         for i in range(5):
-            resp = self.client.get(url, REMOTE_ADDR="192.168.1.100")
+            resp = self.client.post(url, body, format="json", REMOTE_ADDR="192.168.1.100")
             self.assertEqual(resp.status_code, 200, f"Request {i+1} failed")
 
-        resp_throttled = self.client.get(url, REMOTE_ADDR="192.168.1.100")
+        resp_throttled = self.client.post(url, body, format="json", REMOTE_ADDR="192.168.1.100")
         self.assertEqual(resp_throttled.status_code, 429)
         self.assertEqual(resp_throttled.json()["code"], "throttled")
         self.assertIn("Bạn thao tác quá nhanh", resp_throttled.json()["detail"])
@@ -64,14 +65,15 @@ class ThrottleL5Tests(TestCase):
 
     @override_settings(CAVEVE_THROTTLE_RATES={"shop_lookup_order": "3/hour"})
     def test_s03_ac1_shop_lookup_order_throttle_across_ips(self):
-        url = f"/api/shop/orders/{self.order.code}/?phone_last4=3344"
+        url = "/api/shop/orders/lookup/"
+        body = {"order_code": self.order.code, "phone": "0911223344"}
         # 3 IP khác nhau cùng tra một mã đơn
         for i in range(1, 4):
-            resp = self.client.get(url, REMOTE_ADDR=f"10.0.0.{i}")
+            resp = self.client.post(url, body, format="json", REMOTE_ADDR=f"10.0.0.{i}")
             self.assertEqual(resp.status_code, 200)
 
         # Lần 4 từ IP thứ 4 bị chặn do chạm ngưỡng mã đơn
-        resp4 = self.client.get(url, REMOTE_ADDR="10.0.0.4")
+        resp4 = self.client.post(url, body, format="json", REMOTE_ADDR="10.0.0.4")
         self.assertEqual(resp4.status_code, 429)
         self.assertEqual(resp4.json()["code"], "throttled")
 
@@ -131,9 +133,10 @@ class ThrottleL5Tests(TestCase):
         "shop_lookup_order": "",
     })
     def test_s03_ac3_tat_scope_khi_muc_la_none_hoac_rong(self):
-        url = f"/api/shop/orders/{self.order.code}/?phone_last4=3344"
+        url = "/api/shop/orders/lookup/"
+        body = {"order_code": self.order.code, "phone": "0911223344"}
         for _ in range(10):
-            resp = self.client.get(url, REMOTE_ADDR="192.168.4.1")
+            resp = self.client.post(url, body, format="json", REMOTE_ADDR="192.168.4.1")
             self.assertEqual(resp.status_code, 200)
 
     def test_s03_ac5_backoffice_khong_bi_throttle(self):
@@ -146,17 +149,18 @@ class ThrottleL5Tests(TestCase):
 
     @override_settings(CAVEVE_THROTTLE_RATES={"shop_lookup_ip": "2/min"})
     def test_s03_ac6_num_proxies_dem_chung_ip_cuoi_xff(self):
-        url = f"/api/shop/orders/{self.order.code}/?phone_last4=3344"
+        url = "/api/shop/orders/lookup/"
+        body = {"order_code": self.order.code, "phone": "0911223344"}
         # Client giả mạo XFF ở đầu nhưng IP thật ở cuối là 9.9.9.9
         headers1 = {"HTTP_X_FORWARDED_FOR": "1.1.1.1, 9.9.9.9"}
         headers2 = {"HTTP_X_FORWARDED_FOR": "2.2.2.2, 9.9.9.9"}
         headers3 = {"HTTP_X_FORWARDED_FOR": "3.3.3.3, 9.9.9.9"}
 
-        resp1 = self.client.get(url, **headers1)
+        resp1 = self.client.post(url, body, format="json", **headers1)
         self.assertEqual(resp1.status_code, 200)
-        resp2 = self.client.get(url, **headers2)
+        resp2 = self.client.post(url, body, format="json", **headers2)
         self.assertEqual(resp2.status_code, 200)
 
         # Lần 3 bị throttle vì cùng IP cuối 9.9.9.9
-        resp3 = self.client.get(url, **headers3)
+        resp3 = self.client.post(url, body, format="json", **headers3)
         self.assertEqual(resp3.status_code, 429)

@@ -23,9 +23,14 @@ from config.settings import privacy_consent_required
 User = get_user_model()
 
 PUBLIC_LOOKUP_KEYS = {
-    "order_code", "status", "status_label", "total_amount",
-    "lines", "delivery", "booked_expires_at", "cancel_notice",
+    "order_code", "status", "state", "status_label", "placed_at", "paid_at", "delivered_at", "booked_expires_at",
+    "server_now", "hold_minutes", "payment_pending_minutes", "delivery", "lines", "subtotal", "discount",
+    "total_amount", "cancel_notice", "late_payment", "lookup_token",
 }
+
+
+def _lookup(code, phone="0912345678"):
+    return APIClient().post("/api/shop/orders/lookup/", {"order_code": code, "phone": phone}, format="json")
 
 
 class PrivacyConsentFlagFunctionTests(TestCase):
@@ -74,14 +79,14 @@ class ConsentEvidenceTests(TestCase):
     def test_f5c_gl03_ac9_tra_don_co_dong_y_dung_tap_khoa_cong_khai(self):
         order, code = self._create_order_with_consent()
         self.assertIsNotNone(order.privacy_consent_at)  # chắc chắn là đơn CÓ đồng ý
-        res = APIClient().get(f"/api/shop/orders/{code}/?phone_last4=5678")
+        res = _lookup(code)
         self.assertEqual(res.status_code, 200, res.content)
         self.assertEqual(set(res.json().keys()), PUBLIC_LOOKUP_KEYS)
 
     @override_settings(PRIVACY_CONSENT_REQUIRED=True)
     def test_f5c_gl03_ac9_tra_don_khong_chua_gia_tri_ca_nhan_hay_consent(self):
         _, code = self._create_order_with_consent()
-        body = APIClient().get(f"/api/shop/orders/{code}/?phone_last4=5678").content.decode()
+        body = _lookup(code).content.decode()
         for forbidden in ("Anh A", "0912345678", "123 Bến Cảng", "privacy", "consent", "policy_version"):
             self.assertNotIn(forbidden, body)
 

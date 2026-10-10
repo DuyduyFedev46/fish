@@ -1,0 +1,224 @@
+.body {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.searchWrap {
+  position: relative;
+  flex: none;
+  padding: var(--space-3) var(--space-4) var(--space-2);
+}
+
+.search {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: var(--h-input);
+  padding: 0 var(--space-1) 0 var(--space-3);
+  border: 1px solid var(--border-input);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  color: var(--ink-3);
+  transition:
+    border-color var(--dur-color) ease-out,
+    box-shadow var(--dur-color) ease-out;
+}
+
+.search:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font-size: 16px;
+  outline: none;
+}
+
+.input::-webkit-search-cancel-button {
+  display: none;
+}
+
+.clear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  margin-right: -1px;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--ink-3);
+  cursor: pointer;
+}
+
+.notice {
+  margin: var(--space-2) 0 0;
+  color: var(--ink-2);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.list {
+  position: absolute;
+  top: calc(var(--space-3) + var(--h-input) + var(--space-1));
+  left: var(--space-4);
+  right: var(--space-4);
+  z-index: var(--z-popover);
+  max-height: 260px;
+  margin: 0;
+  padding: var(--space-1) 0;
+  overflow-y: auto;
+  list-style: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-pop);
+}
+
+.list[hidden] {
+  display: none;
+}
+
+.option {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-height: 48px;
+  padding: 10px var(--space-3);
+  color: var(--ink-3);
+  cursor: pointer;
+}
+
+.optionActive {
+  background: var(--accent-soft);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .option:hover {
+    background: var(--surface-2);
+  }
+}
+
+.optionText {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.optionMain {
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.optionSub {
+  color: var(--ink-2);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.mapArea {
+  position: relative;
+  flex: 1;
+  min-height: 220px;
+  background: var(--surface-3);
+}
+
+.map {
+  position: absolute;
+  inset: 0;
+}
+
+.loading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface-3);
+  color: var(--accent-text);
+}
+
+.pin {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  color: var(--accent);
+  transform: translate(-50%, -100%);
+  pointer-events: none;
+}
+
+.pinLabel {
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  background: var(--ink);
+  color: var(--on-accent);
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.footer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.chosen {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin: 0;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.45;
+}
+
+.chosen svg {
+  flex: none;
+  margin-top: 1px;
+  color: var(--accent-text);
+}
+
+.chosenEmpty {
+  color: var(--ink-2);
+  font-weight: 400;
+}
+
+.actions {
+  display: flex;
+  gap: var(--space-3);
+}
+
+.manual {
+  display: none;
+  flex: 1;
+}
+
+@media (min-width: 768px) {
+  .manual {
+    display: block;
+  }
+
+  .actions {
+    flex-direction: row-reverse;
+  }
+
+  .actions > :first-child {
+    flex: 1;
+  }
+}

@@ -8,6 +8,14 @@ Chạy thật (không mock): backend Django tại :8104 (BE thật), frontend Sh
 QA tự tạo qua API với dữ liệu giả (tiêu đề "Bai kiem tra XSS lop 2 (du lieu gia)"), không phải
 dữ liệu thật của vựa.
 
+Cập nhật lô 5b (SHOP-5-04, SHOP-5-05, mkt-brand): thêm kiểm trang CMS mới (cần đã chạy
+`manage.py load_shop_content --author <chủ> --publish` trên DB test):
+- 5-04 AC1: /pages/?slug=doi-tra có Breadcrumb, mục lục link neo tới H2 có id, "Các chính sách" có aria-current.
+- 5-04 AC2: /pages/?slug=lien-he KHÔNG có <form>, ô nhập; thẻ chưa có dữ liệu thì ẩn (không còn chữ "[").
+- 5-04 AC3: /pages/?slug=cach-mua-hang có 5 bước có số và hỏi đáp <details>.
+- 5-04 AC4 / 5-05 AC4: slug không có -> "Không tìm thấy …", bài đã gỡ -> "… không còn trên web".
+- 5-05 AC1: /blog/?category=<chuyên mục đầu> chip có aria-current, thanh đáy hiện; title không lặp "| Cá Về".
+
 Dùng: .venv/bin/python frontend/e2e/content_public_pages.py
 (cần backend chạy ở :8104 và frontend Shop chạy ở :3104 trỏ NEXT_PUBLIC_API_BASE=http://localhost:8104)
 """
@@ -128,6 +136,75 @@ def main() -> int:
         if "Không tìm thấy bài" not in content2 and "Chưa tải được bài" not in content2:
             failures.append("AC7/AC4: slug không tồn tại không hiện thông báo lỗi phù hợp")
         page2.screenshot(path="/tmp/ra_soat_cms13_ac7_notfound.png", full_page=True)
+
+        # --- SHOP-5-04 AC1: trang chính sách có mục lục + PolicyNav ---
+        pp = browser.new_page(viewport={"width": 390, "height": 844})
+        pp.goto(f"{BASE}/pages/?slug=doi-tra")
+        pp.wait_for_selector("h1", timeout=10000)
+        pp.wait_for_load_state("networkidle")
+        toc_links = pp.eval_on_selector_all('nav a[href^="#muc-"]', "els => els.map(e => e.getAttribute('href'))")
+        if len(toc_links) < 2:
+            failures.append(f"5-04 AC1: mục lục thiếu link neo (có {toc_links})")
+        for href in toc_links:
+            if pp.locator(f"h2{href}").count() != 1:
+                failures.append(f"5-04 AC1: link mục lục {href} không trỏ tới đúng một H2")
+        if pp.locator('nav a[aria-current="page"][href*="slug=doi-tra"]').count() < 1:
+            failures.append("5-04 AC1: khối 'Các chính sách' không đánh dấu trang đang xem (aria-current)")
+        if pp.locator('nav[aria-label="Đường dẫn"]').count() < 1:
+            failures.append("5-04 AC1: thiếu Breadcrumb")
+        if pp.title().count("Cá Về") != 1:
+            failures.append(f"5-04: title lặp thương hiệu: {pp.title()!r}")
+        pp.screenshot(path="/tmp/shop_5_04_policy_390.png", full_page=True)
+
+        # --- SHOP-5-04 AC2: Liên hệ không có form, không còn ô giữ chỗ ---
+        pp.goto(f"{BASE}/pages/?slug=lien-he")
+        pp.wait_for_selector("h1", timeout=10000)
+        pp.wait_for_load_state("networkidle")
+        if pp.locator("main form, main input, main textarea").count() != 0:
+            failures.append("5-04 AC2: trang Liên hệ có form/ô nhập (UI-RULES §3.3 cấm)")
+        main_text = pp.locator("main").inner_text()
+        if "[" in main_text:
+            failures.append("5-04 AC2: trang Liên hệ còn ô giữ chỗ '[…]' (thẻ thiếu dữ liệu phải ẩn)")
+        pp.screenshot(path="/tmp/shop_5_04_contact_390.png", full_page=True)
+
+        # --- SHOP-5-04 AC3: Cách mua 5 bước + hỏi đáp <details> ---
+        pp.goto(f"{BASE}/pages/?slug=cach-mua-hang")
+        pp.wait_for_selector("h1", timeout=10000)
+        pp.wait_for_load_state("networkidle")
+        steps = pp.locator("main ol > li").count()
+        if steps < 5:
+            failures.append(f"5-04 AC3: Cách mua không đủ 5 bước (thấy {steps})")
+        if pp.locator("main details").count() < 1:
+            failures.append("5-04 AC3: hỏi đáp không thu gọn bằng <details>")
+        body3 = pp.locator("main").inner_text()
+        for must in ("1 kg", "0,5 kg", "30 phút"):
+            if must not in body3:
+                failures.append(f"5-04 AC3: thiếu số '{must}' (lấy từ settings lúc nạp)")
+        pp.screenshot(path="/tmp/shop_5_04_howtobuy_390.png", full_page=True)
+
+        # --- SHOP-5-04 AC4: slug không có ---
+        pp.goto(f"{BASE}/pages/?slug=khong-co-trang-nay")
+        pp.wait_for_load_state("networkidle")
+        if "Không tìm thấy trang này" not in pp.inner_text("body"):
+            failures.append("5-04 AC4: slug không có không hiện 'Không tìm thấy trang này'")
+
+        # --- SHOP-5-05 AC1: danh sách Góc bếp lọc chuyên mục ---
+        pp.goto(f"{BASE}/blog/")
+        pp.wait_for_selector("h1", timeout=10000)
+        pp.wait_for_load_state("networkidle")
+        if pp.title().count("Cá Về") != 1:
+            failures.append(f"5-05: title /blog/ lặp thương hiệu: {pp.title()!r}")
+        cat_links = pp.eval_on_selector_all('nav[aria-label="Chuyên mục"] a[href*="category="]', "els => els.map(e => e.getAttribute('href'))")
+        if cat_links:
+            pp.goto(f"{BASE}{cat_links[0]}")
+            pp.wait_for_load_state("networkidle")
+            if pp.locator('nav[aria-label="Chuyên mục"] a[aria-current="page"]').count() != 1:
+                failures.append("5-05 AC1: chip chuyên mục đang chọn không có aria-current")
+            if pp.locator('nav[aria-label="Điều hướng chính"]').count() < 1:
+                failures.append("5-05 AC1: thanh điều hướng đáy không hiện ở danh sách Góc bếp")
+        else:
+            failures.append("5-05 AC1: không có chip chuyên mục (đã nạp nội dung chưa?)")
+        pp.screenshot(path="/tmp/shop_5_05_list_390.png", full_page=True)
         browser.close()
 
     if failures:

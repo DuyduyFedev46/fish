@@ -48,6 +48,11 @@ class SalesOrder(models.Model):
     cancel_note = models.CharField("Ghi chú huỷ đơn", max_length=200, blank=True, default="")
     # KHÔNG có trường phí giao hàng (BR-BH-10 — outscope hoàn toàn).
 
+    # BR-BH-27 (SHOP-3-01): khoá chống tạo trùng do Shop sinh khi mở trang thanh toán; gửi lại cùng mã thì trả đơn cũ.
+    client_request_id = models.UUIDField(
+        "Mã yêu cầu tạo đơn (chống trùng)", null=True, blank=True, unique=True, editable=False,
+    )
+
     # Khung go-live pháp lý (GL-03, BR-BH-17, bất biến 9)
     privacy_consent_at = models.DateTimeField(
         "Đồng ý xử lý dữ liệu lúc",

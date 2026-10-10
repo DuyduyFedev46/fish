@@ -311,8 +311,11 @@ class QALeakTests(QAItem2Base):
         for url in self._urls(o1, o2, o3):
             self.assertEqual(client_for(None).get(url).status_code, 401, url)
         # Shop công khai (tra đơn cần mã + SĐT): đơn đã huỷ có chứng từ, response không có chứng từ/giá vốn/PII đầy đủ
-        resp = client_for(None).get(f"/api/shop/orders/{o1.code}/", {"phone": SENTINEL_PHONE})
-        text = json.dumps(resp.json(), ensure_ascii=False) if resp.status_code == 200 else ""
+        resp = client_for(None).post(
+            "/api/shop/orders/lookup/", {"order_code": o1.code, "phone": o1.phone}, format="json"
+        )
+        self.assertEqual(resp.status_code, 200)
+        text = json.dumps(resp.json(), ensure_ascii=False)
         for bad in ("unit_cost", COST_SENTINEL, "credit_note", "DC-", "SalesCreditNote", SENTINEL_NAME, SENTINEL_ADDRESS):
             self.assertNotIn(bad, text, bad)
         if resp.status_code == 200:

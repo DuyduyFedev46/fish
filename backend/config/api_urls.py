@@ -138,7 +138,8 @@ urlpatterns = [
     path("shop/catalog/", ShopCatalogView.as_view()),
     path("shop/catalog/<str:item_code>/", ShopItemDetailView.as_view()),
     path("shop/orders/", ShopOrderCreateView.as_view()),
-    path("shop/orders/<str:order_code>/", ShopOrderLookupView.as_view()),
+    # Tra đơn bằng POST (SHOP-3-02): đặt TRƯỚC mọi route shop/orders/<mã>/…; GET 4 số cuối đã gỡ (không còn route).
+    path("shop/orders/lookup/", ShopOrderLookupView.as_view()),
     # P1: lập tham số thanh toán cổng SePay cho đơn Giữ chỗ (lần đầu hoặc thanh toán lại).
     path("shop/orders/<str:order_code>/checkout/", ShopOrderCheckoutView.as_view()),
     # Đăng nhập token cho dashboard SPA

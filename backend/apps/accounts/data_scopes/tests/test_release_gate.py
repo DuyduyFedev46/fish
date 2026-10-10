@@ -376,9 +376,8 @@ class HardFloorTests(ReleaseGateBase):
 
     def test_pv12_ac4_s2_public_apis_never_return_name_phone_address(self):
         order = self.scene.orders["order_assigned_courier"]
-        last4 = order.phone[-4:]
         client = APIClient()
-        bodies = [client.get(f"/api/shop/orders/{order.code}/?phone_last4={last4}"),
+        bodies = [client.post("/api/shop/orders/lookup/", {"order_code": order.code, "phone": order.phone}, format="json"),
                   client.get("/api/shop/catalog/"), client.get("/api/public/site-info/")]
         self.assertEqual(bodies[0].status_code, 200)
         for response in bodies:
@@ -388,9 +387,11 @@ class HardFloorTests(ReleaseGateBase):
                 self.assertNotIn(fake, text)
         self.assertTrue(set(bodies[0].json()) .isdisjoint({"phone", "customer", "delivery_address", "name", "address"}))
 
-    def test_pv12_ac4_s2_wrong_last4_leaks_nothing(self):
+    def test_pv12_ac4_s2_wrong_phone_leaks_nothing(self):
         order = self.scene.orders["order_assigned_courier"]
-        response = APIClient().get(f"/api/shop/orders/{order.code}/?phone_last4=0000")
+        response = APIClient().post(
+            "/api/shop/orders/lookup/", {"order_code": order.code, "phone": "0900000000"}, format="json"
+        )
         self.assertEqual(response.status_code, 404)
         for fake in fixtures.FAKE_STRINGS:
             self.assertNotIn(fake, response.content.decode())

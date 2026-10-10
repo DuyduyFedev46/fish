@@ -20,6 +20,7 @@ import Skeleton from "@/components/ui/Skeleton";
 import { CART_HREF } from "@/components/shopLinks";
 import { formatQty } from "@/lib/quantity";
 import { useCartActions } from "@/features/cart/useCartActions";
+import { getPolicySummaries, type PolicySummaries } from "@/features/content/policySummary";
 import { toCardItem } from "../cardItem";
 import { groupIconOf } from "../groupIcon";
 import s from "./ItemDetailScreen.module.css";
@@ -31,6 +32,7 @@ export default function ItemDetailScreen() {
   const [item, setItem] = useState<CatalogItemDetail | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "missing" | "error">("loading");
   const [retrying, setRetrying] = useState(false);
+  const [policies, setPolicies] = useState<PolicySummaries | null>(null);
   const { hotline, zaloUrl } = useHotline();
   const actions = useCartActions();
   const { cart } = actions;
@@ -47,6 +49,15 @@ export default function ItemDetailScreen() {
       })
       .catch(() => setState("error"));
   }, [code]);
+
+  // Tóm tắt chính sách (SHOP-5-04 AC5): dòng chưa có tóm tắt thì ẩn.
+  useEffect(() => {
+    let active = true;
+    getPolicySummaries().then((p) => active && setPolicies(p));
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     setState("loading");
@@ -112,6 +123,10 @@ export default function ItemDetailScreen() {
       { label: "Nguồn hàng", value: item.origin },
       { label: "Đơn vị bán", value: item.unit === "kg" ? "Kg" : "Combo" },
     ].filter((r) => r.value.trim() !== "");
+    const policyRows = [
+      { label: "Giao hàng", line: policies?.shipping ?? null },
+      { label: "Đổi trả", line: policies?.returns ?? null },
+    ].filter((r) => r.line !== null);
     body = (
       <div className={s.layout}>
         <div className={s.media}>
@@ -193,6 +208,14 @@ export default function ItemDetailScreen() {
                 <div key={r.label} className={s.dlRow}>
                   <dt>{r.label}</dt>
                   <dd>{r.value}</dd>
+                </div>
+              ))}
+              {policyRows.map((r) => (
+                <div key={r.label} className={s.dlRow}>
+                  <dt>{r.label}</dt>
+                  <dd>
+                    <a href={r.line!.href}>{r.line!.text}</a>
+                  </dd>
                 </div>
               ))}
             </dl>

@@ -329,7 +329,9 @@ class OrderCustomerInfoTests(ScopeSceneBase):
     def test_pv07_public_lookup_never_returns_personal_data(self):
         """AC9: V2 bật cho mọi nhóm; tra đơn công khai vẫn không có tên, SĐT, địa chỉ đầy đủ."""
         order = self.order("order_booked_unpaid")
-        response = APIClient().get(f"/api/shop/orders/{order.code}/", {"phone_last4": order.phone[-4:]})
+        response = APIClient().post(
+            "/api/shop/orders/lookup/", {"order_code": order.code, "phone": order.phone}, format="json"
+        )
         self.assertEqual(response.status_code, 200)
         text = response.content.decode()
         for fake in fixtures.FAKE_STRINGS:

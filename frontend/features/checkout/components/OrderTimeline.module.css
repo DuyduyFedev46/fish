@@ -1,0 +1,214 @@
+.list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.step {
+  display: flex;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.rail {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  align-items: center;
+  width: 12px;
+}
+
+.dot {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 12px;
+  height: 12px;
+  margin-top: 4px;
+  border-radius: 50%;
+  background: var(--border-strong);
+  color: var(--on-accent);
+}
+
+.dot svg {
+  display: none;
+}
+
+.line {
+  flex: 1;
+  width: 2px;
+  min-height: 18px;
+  background: var(--border);
+}
+
+.text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding-bottom: var(--space-2);
+}
+
+.label {
+  color: var(--ink-3);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.detail {
+  color: var(--ink-3);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.done .dot {
+  background: var(--good);
+}
+.done .line {
+  background: var(--good);
+}
+.done .label {
+  color: var(--ink);
+}
+
+.current .dot {
+  background: transparent;
+  border: 3px solid var(--accent);
+}
+.current .label {
+  color: var(--accent-text);
+  font-weight: 600;
+}
+
+.failed .dot {
+  width: 16px;
+  height: 16px;
+  margin: 2px 0 0 -2px;
+  background: var(--warn);
+  font-size: 11px;
+  font-weight: 600;
+}
+.failed .label {
+  color: var(--warn);
+  font-weight: 600;
+}
+.failed .detail {
+  color: var(--warn);
+}
+
+/* Đường nối sau bước hiện tại và bước lỗi vẫn là đường chưa tới */
+.bang {
+  line-height: 1;
+}
+
+@media (min-width: 768px) {
+  .list {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+
+  .step {
+    flex-direction: column;
+    gap: 10px;
+    padding-right: var(--space-2);
+  }
+
+  .rail {
+    flex-direction: row;
+    align-items: center;
+    width: 100%;
+  }
+
+  .dot {
+    width: 24px;
+    height: 24px;
+    margin-top: 0;
+  }
+
+  .dot svg {
+    display: block;
+  }
+
+  .line {
+    flex: 1;
+    width: auto;
+    min-height: 0;
+    height: 2px;
+  }
+
+  .failed .dot {
+    width: 24px;
+    height: 24px;
+    margin: 0;
+  }
+
+  .current .dot {
+    background: var(--accent-soft);
+  }
+
+  .text {
+    padding-bottom: 0;
+  }
+}
+
+/* Màn chờ tiền: 3 vạch ngang */
+.payment {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pStep {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.pBar {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--surface-3);
+}
+
+.pLabel {
+  color: var(--ink-3);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.p_done .pBar {
+  background: var(--accent);
+}
+.p_done .pLabel {
+  color: var(--ink-2);
+}
+
+.p_current .pBar {
+  background: var(--accent);
+  animation: pulse 1.4s ease-in-out infinite;
+}
+.p_current .pLabel {
+  color: var(--accent-text);
+  font-weight: 600;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .p_current .pBar {
+    animation: none;
+  }
+}

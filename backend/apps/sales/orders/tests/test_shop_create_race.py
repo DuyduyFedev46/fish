@@ -114,3 +114,60 @@ class ShopCreateRaceTests(PostgresRaceFixtureMixin, TransactionTestCase):
                 self.assertEqual(result["outcome"], "OUT_OF_STOCK")
                 self.assertFalse(SalesOrder.objects.filter(phone=f"09000{500 + i:05d}").exists())
                 Batch.objects.filter(pk=batch.pk).update(status=Batch.Status.CLOSED)
+
+
+@skipUnless(connection.vendor == "postgresql", "Cần PostgreSQL: unique index chặn hai request song song.")
+class ShopCreateSameRequestIdRaceTests(PostgresRaceFixtureMixin, TransactionTestCase):
+    """SHOP-3-01 AC2 (BR-BH-27): hai request song song cùng `client_request_id` -> đúng 1 đơn, 1 bộ giữ chỗ."""
+
+    def setUp(self):
+        today = timezone.localdate()
+        group = ItemGroup.objects.create(name="Race")
+        self.item = Item.objects.create(code="RACE", name="Cá thử", item_group=group)
+        price_list = PriceList.objects.create(name="Bán lẻ", is_default=True)
+        ItemPrice.objects.create(
+            price_list=price_list, item=self.item, rate=Decimal("100000"),
+            valid_from=today - datetime.timedelta(days=1),
+        )
+        batch = batch_services.create_batch(
+            item=self.item, supplier=Supplier.objects.create(name="Đầu mối giả"),
+            warehouse=Warehouse.objects.create(name="Kho"), received_date=today, qty=Decimal("10"),
+            purchase_rate=Decimal("80000"),
+        )
+        batch_services.publish_batch(batch=batch, actor=None)
+        self.batch = batch
+
+    def test_parallel_same_request_id_one_order(self):
+        import uuid
+
+        for i in range(ROUNDS):
+            with self.subTest(i=i):
+                request_id = uuid.uuid4()
+                barrier = threading.Barrier(2)
+                outcomes = []
+
+                def place():
+                    try:
+                        barrier.wait(JOIN_TIMEOUT_SECONDS)
+                        order, created = services.place_order(
+                            client_request_id=request_id, customer_phone="0900000001", customer_name="Khách giả",
+                            delivery_address="1 Đường Thử", phone="0900000001",
+                            lines=[{"item_code": "RACE", "qty": Decimal("1")}],
+                        )
+                        outcomes.append((order.code, created))
+                    except Exception as exc:  # noqa: BLE001
+                        outcomes.append(f"ERROR {type(exc).__name__}")
+                    finally:
+                        connection.close()
+
+                threads = [threading.Thread(target=place) for _ in (1, 2)]
+                for t in threads:
+                    t.start()
+                for t in threads:
+                    t.join(JOIN_TIMEOUT_SECONDS)
+                    self.assertFalse(t.is_alive(), "treo quá thời hạn (nghi deadlock)")
+                self.assertEqual(len({o[0] for o in outcomes if isinstance(o, tuple)}), 1, outcomes)
+                self.assertEqual(sorted(o[1] for o in outcomes), [False, True], outcomes)
+                self.assertEqual(SalesOrder.objects.filter(client_request_id=request_id).count(), 1)
+        self.batch.refresh_from_db()
+        self.assertEqual(self.batch.qty_reserved, Decimal(ROUNDS))  # mỗi vòng giữ đúng 1 kg

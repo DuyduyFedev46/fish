@@ -73,16 +73,22 @@ export default function ShopFrame({
     getFooterLinks()
       .then((v) => active && setFooterLinks(Array.isArray(v) ? v : []))
       .catch(() => {});
-    getCatalog()
-      .then((c) => {
-        if (!active) return;
-        setGroups(c.groups.map((g) => ({ slug: g.slug, label: g.name, href: groupHref(g.slug) })));
-      })
-      .catch(() => {})
-      .finally(() => active && setGroupsLoading(false));
+    // Menu nhóm chỉ có ở header máy tính đầy đủ; header rút gọn (giỏ, đặt hàng, thanh toán) không cần catalog.
+    if ((desktopHeader ?? (header === "checkout" ? "compact" : "full")) === "compact") {
+      setGroupsLoading(false);
+    } else {
+      getCatalog()
+        .then((c) => {
+          if (!active) return;
+          setGroups(c.groups.map((g) => ({ slug: g.slug, label: g.name, href: groupHref(g.slug) })));
+        })
+        .catch(() => {})
+        .finally(() => active && setGroupsLoading(false));
+    }
     return () => {
       active = false;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Báo cho Toast biết có thanh đáy để nổi phía trên nó.

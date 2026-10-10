@@ -1,0 +1,21 @@
+.wrap {
+  padding: var(--space-6) 0 var(--space-10);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+.skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  max-width: 720px;
+  padding: var(--space-4);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+}

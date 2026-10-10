@@ -1,0 +1,152 @@
+/* PolicyNav (COMPONENTS #36 mục 4–6). Chỉ token trong app/globals.css. */
+
+/* toc: mục lục trong trang */
+.toc {
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-lg);
+  background: var(--surface-2);
+}
+
+.tocTitle {
+  margin: 0;
+  padding-top: var(--space-1);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-3);
+}
+
+.tocList {
+  margin: 0;
+  padding: 0 0 0 18px;
+  color: var(--accent-text);
+}
+
+.tocLink {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 44px;
+  color: var(--accent-text);
+  text-decoration: none;
+}
+
+/* list: "Các chính sách" cuối trang (điện thoại) */
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-3) var(--space-4);
+  background: var(--surface);
+}
+
+.listTitle {
+  margin: 0 0 var(--space-1);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.listItems {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.listRow {
+  border-bottom: 1px solid var(--border);
+}
+
+.listRow:last-child {
+  border-bottom: 0;
+}
+
+.listLink {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-height: 44px;
+  color: var(--accent-text);
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.listCurrent {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.viewing {
+  flex: none;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ink-3);
+}
+
+.arrow {
+  display: inline-flex;
+  flex: none;
+  color: var(--ink-3);
+}
+
+/* aside: cột trái dính (máy tính) */
+.aside {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--space-4) var(--space-3);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+}
+
+.asideTitle {
+  margin: 0 0 var(--space-2);
+  padding: 0 var(--space-3);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.asideList,
+.asideExtra {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.asideExtra {
+  margin-top: var(--space-2);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--border);
+}
+
+.asideItem {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-md);
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 500;
+  text-decoration: none;
+  transition: background-color var(--dur-color) var(--ease-out);
+}
+
+.asideItem[aria-current="page"] {
+  background: var(--accent-soft);
+  color: var(--accent-text);
+  font-weight: 600;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .tocLink:hover,
+  .listLink:hover {
+    text-decoration: underline;
+  }
+
+  .asideItem:not([aria-current="page"]):hover {
+    background: var(--surface-2);
+  }
+}

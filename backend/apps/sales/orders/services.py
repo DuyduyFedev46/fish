@@ -15,7 +15,7 @@ BusinessError. actor=None nghĩa là Hệ thống.
 from decimal import Decimal
 
 from django.conf import settings
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.db.models import Q
 from django.utils import timezone
 
@@ -240,6 +240,7 @@ def create_order(
     phone,
     lines,
     privacy_consent=None,
+    client_request_id=None,
 ):
     """
     Tạo đơn ở trạng thái BOOKED — do Hệ thống tạo (BR-PQ-11). TẤT CẢ trong 1 transaction:
@@ -248,7 +249,10 @@ def create_order(
     lines: list[{"item_code": str, "qty": Decimal}]. `qty` của combo là SỐ COMBO (nguyên), của món thường là kg.
 
     Lỗi Shop có cấu trúc (02b §3.3, đều xảy ra trước khi ghi DB hoặc giữ chỗ, rollback cả đơn):
-    `InvalidQtyError` (BR-BH-22) rồi `OutOfStockError` (BR-BH-24).
+    `InvalidQtyError` (BR-BH-22), `PolicyChanged` (BR-BH-17) rồi `OutOfStockError` (BR-BH-24).
+
+    `client_request_id` (BR-BH-27): ghi vào đơn; unique ở DB. Hai request cùng mã: request sau bị chặn ở unique index
+    và nhận `IntegrityError` — `place_order` bắt NGOÀI `atomic` này và trả đơn đã có.
     """
     if not delivery_address:
         raise BusinessError("Địa chỉ giao bắt buộc (BR-BH-09).")
@@ -287,6 +291,7 @@ def create_order(
             + timezone.timedelta(minutes=settings.SALES_ORDER_TTL_MINUTES),
             privacy_consent_at=timezone.now() if policy_version else None,
             privacy_policy_version=policy_version,
+            client_request_id=client_request_id,
         )
 
         # Bước 1: dựng dữ liệu dòng + giá (đóng băng), chưa áp ưu đãi.
@@ -361,6 +366,30 @@ def create_order(
         order.save(update_fields=["total_amount"])
 
     return order
+
+
+def find_by_client_request_id(client_request_id):
+    if client_request_id is None:
+        return None
+    return SalesOrder.objects.filter(client_request_id=client_request_id).first()
+
+
+def place_order(*, client_request_id=None, **kwargs):
+    """
+    Tạo đơn Shop chống trùng (BR-BH-27). Trả `(order, created)`; `created=False` khi `client_request_id` đã có đơn
+    (kể cả hai request song song: request thua đua nhận `IntegrityError` ngoài transaction rồi đọc đơn đã commit).
+    Gửi lại KHÔNG giữ chỗ hay lượt thêm. Request đầu rollback (hết hàng...) thì request sau chạy bình thường.
+    """
+    existing = find_by_client_request_id(client_request_id)
+    if existing is not None:
+        return existing, False
+    try:
+        return create_order(client_request_id=client_request_id, **kwargs), True
+    except IntegrityError:
+        existing = find_by_client_request_id(client_request_id)
+        if existing is None:
+            raise
+        return existing, False
 
 
 # --- P-05: job TTL nhả giữ chỗ ----------------------------------------------

@@ -32,3 +32,12 @@ export function setPageMeta({ title, noindex }: { title: string; noindex: boolea
     existing.filter((el) => el.hasAttribute(OWNED_ATTR)).forEach((el) => el.remove());
   }
 }
+
+/** Đặt `<meta name="description">` theo nội dung CMS (chuỗi rỗng thì giữ mô tả mặc định của layout). */
+export function setPageDescription(text: string | null | undefined): void {
+  if (typeof document === "undefined") return;
+  const value = (text ?? "").trim();
+  if (!value) return;
+  const meta = document.head.querySelector('meta[name="description"]');
+  if (meta) meta.setAttribute("content", value);
+}

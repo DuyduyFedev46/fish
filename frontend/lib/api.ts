@@ -1,4 +1,4 @@
-// API client cho Shop API công khai (xem doc/BUILD-PLAN.md — "Shop API (công khai)").
+// API client cho Shop API công khai (contract: doc/features/2026-10-06-shop-giao-dien-moi/02b-tech-design.md §3).
 // Khi NEXT_PUBLIC_USE_MOCK=1, mọi hàm trả dữ liệu mock (lib/mock.ts) thay vì gọi mạng —
 // cho phép /shop chạy được ngay cả khi backend Django chưa lên.
 
@@ -8,10 +8,9 @@ import {
   type CatalogResponse,
   type CreateOrderPayload,
   type CreateOrderResponse,
-  type OrderStatus,
+  type OrderLookupInput,
+  type OrderLookupResult,
   type PaymentCheckoutSession,
-  type WireCreateOrderResponse,
-  type WireOrderStatus,
 } from "./types";
 // KHÔNG import tĩnh "./mock": bản build thật (USE_MOCK != "1") phải không mang seed mock.
 // Mỗi nhánh mock dưới đây dùng điều kiện literal `process.env.NEXT_PUBLIC_USE_MOCK === "1"`
@@ -110,74 +109,40 @@ export async function getCatalogItem(itemCode: string): Promise<CatalogItemDetai
   }
 }
 
-// Trạng thái coi là "đã thanh toán" cho mục đích hiển thị (BR-TT-12). PAID là trạng thái cũ
-// ít dùng (lõi hiện đi thẳng BOOKED -> PROCESSING khi IPN khớp, theo P3) — vẫn liệt vào đây
-// phòng khi có nơi khác set PAID.
-const PAID_STATUSES = new Set(["PAID", "PROCESSING", "COMPLETED"]);
-
-function mapOrderStatus(wire: WireOrderStatus): OrderStatus {
-  return {
-    order_code: wire.order_code,
-    status: wire.status,
-    status_label: wire.status_label,
-    fulfilment: wire.fulfilment ?? (wire.delivery ? wire.delivery.status : undefined),
-    total_amount: Number(wire.total_amount),
-    lines: wire.lines.map((l) => ({
-      item_code: l.item_code,
-      name: l.name || l.item_code,
-      qty: Number(l.qty),
-      line_total: Number(l.amount),
-    })),
-    is_paid: PAID_STATUSES.has(wire.status),
-    is_expired: wire.status === "AUTO_CANCELLED",
-    ...(wire.booked_expires_at ? { booked_expires_at: wire.booked_expires_at } : {}),
-    delivery: wire.delivery
-      ? { status: wire.delivery.status, status_label: wire.delivery.status_label }
-      : undefined,
-    cancel_notice: wire.cancel_notice ?? null,
-  };
-}
-
 // `getSiteInfo` nằm ở features/site/api.ts (một nguồn duy nhất, SR-23 F10).
 
-function mapCreateOrderResponse(wire: WireCreateOrderResponse): CreateOrderResponse {
-  return {
-    order_code: wire.order_code,
-    total_amount: Number(wire.total_amount),
-    booked_expires_at: wire.booked_expires_at,
-  };
-}
-
-export async function createOrder(
-  payload: CreateOrderPayload
-): Promise<CreateOrderResponse> {
+/**
+ * Tạo đơn (02b §3.3). Gửi lại cùng `client_request_id` thì máy chủ trả đơn đã có (HTTP 200), không giữ chỗ thêm.
+ * Lỗi nghiệp vụ là `ApiError` có `code` (OUT_OF_STOCK, INVALID_QTY, VALIDATION, POLICY_CHANGED, SHOP_CLOSED,
+ * VOUCHER_INVALID, throttled); lỗi mạng là lỗi không phải ApiError (fetch ném TypeError).
+ * Không log `payload` (có tên, SĐT, địa chỉ khách).
+ */
+export async function createOrder(payload: CreateOrderPayload): Promise<CreateOrderResponse> {
   if (process.env.NEXT_PUBLIC_USE_MOCK === "1") {
     const m = await import("./mock");
-    return mapCreateOrderResponse(await m.mockCreateOrder(payload));
+    return m.mockCreateOrder(payload);
   }
-  const wire = await apiFetch<WireCreateOrderResponse>("/api/shop/orders/", {
+  return apiFetch<CreateOrderResponse>("/api/shop/orders/", {
     method: "POST",
     body: JSON.stringify(payload),
   });
-  return mapCreateOrderResponse(wire);
 }
 
-export async function getOrderStatus(
-  orderCode: string,
-  phoneLast4: string
-): Promise<OrderStatus | null> {
+/**
+ * Tra đơn bằng POST (02b §3.4): mã đơn + SĐT đầy đủ, hoặc mã đơn + mã tra đơn. SĐT chỉ nằm trong thân yêu cầu,
+ * không bao giờ trên URL. 404 (sai mã, sai SĐT, token của đơn khác) -> `null`, một câu chung, không chỉ ra ô sai.
+ * 401 `TOKEN_EXPIRED` và 429 để nguyên `ApiError` cho màn xử lý.
+ */
+export async function lookupOrder(input: OrderLookupInput): Promise<OrderLookupResult | null> {
   if (process.env.NEXT_PUBLIC_USE_MOCK === "1") {
     const m = await import("./mock");
-    const wire = await m.mockGetOrderStatus(orderCode, phoneLast4);
-    return wire ? mapOrderStatus(wire) : null;
+    return m.mockLookupOrder(input);
   }
   try {
-    const wire = await apiFetch<WireOrderStatus>(
-      `/api/shop/orders/${encodeURIComponent(orderCode)}/?phone_last4=${encodeURIComponent(
-        phoneLast4
-      )}`
-    );
-    return mapOrderStatus(wire);
+    return await apiFetch<OrderLookupResult>("/api/shop/orders/lookup/", {
+      method: "POST",
+      body: JSON.stringify(input.token ? { order_code: input.order_code, token: input.token } : input),
+    });
   } catch (err) {
     if (err instanceof ApiError && err.status === 404) return null;
     throw err;
