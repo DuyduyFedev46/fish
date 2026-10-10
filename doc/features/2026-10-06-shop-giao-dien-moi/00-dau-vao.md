@@ -18,7 +18,7 @@ flowchart TD
 
 ## Nguồn thiết kế (đã duyệt)
 `doc/design/shop/`: README (11 chốt), UI-RULES, SO-CHUAN, COMPONENTS (48 component), HUONG-DAN-CODE, PLAN (lô 0–7, 3b),
-DOI-CHIEU-CODE (BE-1…BE-11, L-xx), AUDIT-DO-DU (§8 câu mở), RENDER-AUDIT. Màn: `screens/*.dc.html`. Canvas: https://claude.ai/artifact/SPSQLR5rMEtuBFreYbK96J
+DOI-CHIEU-CODE (BE-1…BE-11, L-xx), AUDIT-DO-DU (§8 câu mở), RENDER-AUDIT (hai file này nay ở `doc/archive/design-shop/`). Màn: `screens/*.dc.html`. Canvas: https://claude.ai/artifact/SPSQLR5rMEtuBFreYbK96J
 
 ## Đã chốt (ghi `doc/decisions.md` mục 2026-10-10 tối)
 Xem decisions. Tóm tắt: làm lại từ đầu; `/` = trang chủ Shop, landing → `/gioi-thieu/` dựng mới; tối thiểu 1 kg, combo nguyên; tồn 3 mức;

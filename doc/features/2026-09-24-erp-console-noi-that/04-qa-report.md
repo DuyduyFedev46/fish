@@ -1,5 +1,7 @@
 # QA — ERP console "nối thật", mốc deploy 1 (S1–S9, S41, S42, S46, S47) · lần 1 · 2026-09-24
 
+> **Kết luận hiện hành (rà 11/10): APPROVED.** File gồm nhiều lần QA nối tiếp; các lần REJECTED (dòng ~198, ~1018) đã được lần sau sửa và APPROVED. Lần cuối trong file (S14/S15/S16, dòng ~1408) là APPROVED.
+
 ## Kết luận: APPROVED (kèm 1 ghi nhận Low) — mọi AC chính và ngoại lệ đạt trên backend thật; không rò giá vốn, không vượt quyền, không xoá được chứng từ. Còn 1 việc dọn dẹp (`legacy/` chưa xoá, S8-AC6), không chặn deploy.
 
 ## Tổng: 114 ca · ✅ 111 · ❌ 1 (Low, không chặn) · ⏸ 2

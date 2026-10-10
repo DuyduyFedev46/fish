@@ -1,6 +1,6 @@
 # 05 — Pháp lý cho Shop làm lại (lô 0)
 > `legal-vn` · kiểm chứng 2026-10-10 · nhánh `shop/lo-0-quyet-dinh`
-> Đầu vào: `00-dau-vao.md`, `doc/decisions.md` mục 2026-10-10 (tối), `doc/design/shop/UI-RULES.md`, `AUDIT-DO-DU.md` §4 và §8 (câu 28, 33, 38, 39, 41),
+> Đầu vào: `00-dau-vao.md`, `doc/decisions.md` mục 2026-10-10 (tối), `doc/design/shop/UI-RULES.md`, `AUDIT-DO-DU.md` (nay ở `doc/archive/design-shop/`) §4 và §8 (câu 28, 33, 38, 39, 41),
 > `doc/ops/go-live-phap-ly.md`, các màn Checkout, C1b-MapPicker, E2-Cancelled, P1-Policy, HeaderFooter-Mobile/Desktop.
 >
 > Đây là tài liệu tham khảo nội bộ, **không phải tư vấn pháp lý**. Nhiều điểm dưới đây dựa trên nguồn thứ cấp (luatvietnam, EY, KPMG, PwC,

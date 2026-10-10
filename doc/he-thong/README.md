@@ -1,6 +1,6 @@
 # Tài liệu hệ thống Cá Về
 
-> Cập nhật 02/10/2026, theo code `main` `bf62b81`.
+> Cập nhật 11/10/2026 (rà tài liệu legacy, `doc/ops/ra-soat-tai-lieu-legacy-2026-10-11.md`).
 > Bộ này mô tả hệ thống **đang chạy trong code**. Khi tài liệu cũ và code lệch nhau thì code đúng, và bộ này viết theo code.
 
 ## Đọc gì trước
@@ -31,14 +31,16 @@
 | `doc/URD.md` | Yêu cầu người dùng |
 | `doc/business-process-spec.md` | Quy trình P-01 đến P-10, business rule `BR-*`, ngoại lệ, câu hỏi mở |
 | `doc/decisions.md` | Quyết định đã chốt. Không tự lật |
-| `doc/ke-hoach-tong.md` | Thứ tự các phase P1 đến P9 và trạng thái |
+| `doc/ke-hoach-tong.md` | Thứ tự các phase P1 đến P9 (bảng dừng ở 01/10; đợt sau đó xem hồ sơ trong `doc/features/`) |
+| `doc/thuat-ngu-va-trang-thai.md` | Tên chuẩn chứng từ, trạng thái, nhãn (Duy duyệt 07/10) |
+| `doc/design/shop/`, `doc/design/erp/` | Thiết kế Shop (làm lại 10/10) và ERP: luật giao diện, component, màn |
 | `doc/ops/moi-truong.md` | URL, secret (tên, không có giá trị), lệnh deploy, nhật ký deploy |
 | `doc/ops/go-live-phap-ly.md` | Checklist pháp lý trước khi mở bán thật |
 | `doc/features/<ngày>-<slug>/` | Hồ sơ từng tính năng (phân tích, story, thiết kế kỹ thuật, ghi chú dev, báo cáo QA) |
 | `.claude/skills/caveve-domain/SKILL.md` | Bản đồ nghiệp vụ và bất biến ngắn gọn cho agent |
 | `DESIGN.md`, `PRODUCT.md` (gốc repo) | Hệ thiết kế giao diện, bối cảnh người dùng |
 
-`doc/BUILD-PLAN.md` và `doc/doctype-mapping.md` là tài liệu giai đoạn đầu. Nhiều chỗ đã cũ, chỉ đọc để hiểu lịch sử.
+`doc/archive/` chứa tài liệu giai đoạn đầu đã lưu trữ (`BUILD-PLAN.md`, `doctype-mapping.md`…). Nhiều chỗ đã cũ, chỉ đọc để hiểu lịch sử, không dùng làm contract.
 
 ## Giữ bộ này không cũ
 

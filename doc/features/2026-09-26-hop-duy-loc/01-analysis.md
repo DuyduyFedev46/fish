@@ -1,5 +1,6 @@
 # Họp Duy – Lộc 2026-09-26: quy mô đơn, thanh toán 100%, khách thân quen, in đơn tự động, vùng giao miền Nam — Phân tích nghiệp vụ
-> BA · 2026-09-26 · Trạng thái: **CHỜ DUYỆT**
+> BA · 2026-09-26 · Trạng thái: **CHỜ DUYỆT** (một phần đã được trả lời)
+> **Rà 11/10:** vùng giao đã chốt là **Phan Thiết**, đơn vị giao Ahamove hoặc GHN **chưa chốt** (`doc/decisions.md` mục 2026-10-11, S-08). Các ý "miền Nam, 12 tỉnh dưới 300 km" và "NV nội bộ giao" trong BR-BH-12/13, BR-GH-01/02 dưới đây không còn là hướng hiện hành. Phần còn lại (quy mô đơn, khách thân quen, in đơn tự động) chưa có quyết định mới.
 
 ```mermaid
 flowchart TD

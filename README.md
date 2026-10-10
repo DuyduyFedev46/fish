@@ -1,7 +1,7 @@
 # Cá Về: hệ thống mua, bán, quản lý kho cho vựa hải sản
 
 Phần mềm cho một vựa hải sản đông lạnh bán lẻ cho khách cá nhân (B2C). Vựa mua cá theo **lô** tại cảng, bán online theo kg,
-khách trả bằng **VietQR qua cổng SePay**, nhân viên của vựa giao tận nhà. Hệ thống theo dõi **giá vốn và lãi lỗ theo từng lô**.
+khách trả bằng **VietQR qua cổng SePay**, giao tận nhà ở Phan Thiết (đơn vị giao Ahamove hoặc GHN, chưa chốt; quyết định 11/10). Hệ thống theo dõi **giá vốn và lãi lỗ theo từng lô**.
 Lộc là chủ vựa, Duy là PO. Chuỗi `cangca` trong tên hạ tầng là tên cũ, thương hiệu hiển thị là "Cá Về".
 
 **Tài liệu hệ thống đầy đủ: [`doc/he-thong/`](doc/he-thong/README.md)** (kiến trúc, nghiệp vụ, backend, ERP, Shop, quy trình đội, thuật ngữ).
@@ -31,9 +31,9 @@ Quyết định kiến trúc đã chốt: `doc/decisions.md`. Chi tiết: [`doc/
 |---|---|
 | `backend/` | Django + DRF: các app `accounts`, `catalog`, `purchasing`, `inventory`, `sales`, `delivery`, `reports`, `content`, `ai`, `common`. Xem `backend/README.md` |
 | `erp-console/` | ERP nội bộ cho Chủ và nhân viên (Next.js, chia `features/<module>` và `shared/`). Xem `erp-console/README.md` |
-| `frontend/` | Trang giới thiệu, Shop, bài viết, trang chính sách cho khách (Next.js). Xem `frontend/features/checkout/README.md` |
+| `frontend/` | Shop cho khách (Next.js): trang chủ `/`, danh mục, giỏ, đặt đơn, tra đơn, giới thiệu `/about/`, bài viết `/blog/`, trang CMS `/pages/?slug=`. Xem `frontend/README.md` |
 | `adapter/` | FastAPI nhận IPN SePay. Xem `adapter/README.md` |
-| `doc/` | Tài liệu: `he-thong/` (bộ tài liệu hệ thống), `URD.md`, `business-process-spec.md` (quy trình và luật `BR-*`), `decisions.md`, `ke-hoach-tong.md`, `ops/` (môi trường, pháp lý), `features/` (hồ sơ từng tính năng), `design/erp/` (thiết kế ERP mới) |
+| `doc/` | Tài liệu: `he-thong/` (bộ tài liệu hệ thống), `URD.md`, `business-process-spec.md` (quy trình và luật `BR-*`), `decisions.md`, `ke-hoach-tong.md` (bảng phase tới 01/10), `ops/` (môi trường, pháp lý), `features/` (hồ sơ từng tính năng), `design/erp/` (thiết kế ERP), `design/shop/` (thiết kế Shop làm lại: 86 màn, `UI-RULES.md`, `COMPONENTS.md`), `archive/` (tài liệu cũ đã lưu trữ) |
 | `scripts/` | `check_naming.py` kiểm định danh tiếng Anh trong code |
 | `DESIGN.md` | Hệ thiết kế dùng chung (màu sáng/tối, chữ, khoảng cách, bo góc, bóng, chuyển động). Token chạy thật của ERP: `erp-console/shared/ui/tokens.css` |
 | `PRODUCT.md` | Bối cảnh sản phẩm và người dùng cho thiết kế giao diện (mục "(suy luận)" chờ Duy xác nhận) |
@@ -106,19 +106,21 @@ E2E (Playwright, Python) nằm ở `erp-console/e2e/` và `frontend/e2e/`. Đầ
 ## Tiến độ
 
 Đã xong và có trên staging: nhập lô, giá vốn, bán hàng trên Shop, thanh toán cổng SePay, gọi xác nhận đơn, giao hàng, in tem,
-huỷ đơn và hoàn tiền, chứng từ đảo doanh thu, CMS và trang chính sách, lớp lệnh AI, đổi định danh sang tiếng Anh (P1 đến P8b).
+huỷ đơn và hoàn tiền, phiếu trừ doanh thu, CMS và trang chính sách, lớp lệnh AI, đổi định danh sang tiếng Anh (P1 đến P8b).
+
+ERP làm lại theo bộ thiết kế mới (`doc/features/2026-10-01-erp-theo-design/`) đã xong và lên staging.
 
 Đang làm và tiếp theo:
-- ERP làm lại theo bộ thiết kế mới: `doc/features/2026-10-01-erp-theo-design/`.
-- Màn ERP Kiểm kê, Báo cáo lãi lỗ, Việc giao của tôi còn là màn chờ (backend đã có API).
-- P9: AI chạy model trên máy người dùng.
+- **Shop làm lại từ đầu** theo `doc/design/shop/` (quyết định 10/10). Hồ sơ: `doc/features/2026-10-06-shop-giao-dien-moi/`,
+  bảng lô ở `02b-tech-design.md` §7.1. Mỗi lô làm trên nhánh `shop/lo-<n>-…`, QA đạt mới gộp `main`. Lô 0 và lô 1 đã gộp `main`.
+- Production chưa lên. AI đang tắt cứng (05/10), P9 tạm hoãn.
 
-Bảng phase và trạng thái: `doc/ke-hoach-tong.md`.
+Bảng phase P1–P9 (dừng ở 01/10): `doc/ke-hoach-tong.md`. Theo dõi tính năng: Jira Product Discovery, project FISH.
 
 ## Quy ước
 
 - Định danh trong code là tiếng Anh chuẩn. Giao diện, comment, tài liệu là tiếng Việt.
 - Không rò giá vốn, không rò dữ liệu cá nhân của khách, không xoá chứng từ.
 - Tiền VNĐ dùng `Decimal`. DB lưu giờ UTC, hiển thị giờ Việt Nam.
-- Xong một lô đã QA đạt thì commit tiếng Việt có mã lô/story và `git push origin main`.
+- Xong một lô đã QA đạt thì commit theo pathspec (không `git add -A`), message tiếng Việt có mã lô/story; lô làm trên nhánh riêng thì gộp `main` rồi `git push origin main`.
 - Quy trình đội: [`doc/he-thong/quy-trinh-doi.md`](doc/he-thong/quy-trinh-doi.md) và `CLAUDE.md`.

@@ -1,6 +1,6 @@
 # Shop làm lại từ đầu (thiết kế 06/10): product brief
-> PM · 2026-10-10 · Trạng thái: **CHỜ DUYỆT** · Nhánh `shop/lo-0-quyet-dinh`
-> Đầu vào: `00-dau-vao.md`, `doc/decisions.md` mục 2026-10-10 (tối), `doc/design/shop/` (README, PLAN, DOI-CHIEU-CODE, AUDIT-DO-DU, UI-RULES),
+> PM · 2026-10-10 · Trạng thái: **ĐÃ DUYỆT** (Duy 10–11/10, `doc/decisions.md` mục 2026-10-10 tối và 2026-10-11) · Nhánh `shop/lo-0-quyet-dinh`
+> Đầu vào: `00-dau-vao.md`, `doc/decisions.md` mục 2026-10-10 (tối), `doc/design/shop/` (README, PLAN, DOI-CHIEU-CODE, AUDIT-DO-DU (nay ở `doc/archive/design-shop/`), UI-RULES),
 > code `frontend/`, `backend/apps/catalog/items/shop_api.py`, `backend/apps/sales/orders/shop_api.py`, `backend/apps/sales/{models,payments}/`.
 
 ```mermaid

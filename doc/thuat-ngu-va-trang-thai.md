@@ -2,6 +2,8 @@
 
 Ngày 06/10/2026. Đọc code trên `main` tại commit `deb3441` ("Merge Lô 15 FE (ED-06, ED-08, ED-41, ED-42)…").
 Người viết: Tech Lead. File này chỉ mô tả hiện trạng, không đổi quyết định nào trong `doc/decisions.md`.
+> Ghi chú 11/10/2026: mục 4 (tên chuẩn) đã được Duy duyệt 07/10 và đã áp vào code (`enums.ts`, choices BE). Bảng mục 1 đã sửa theo tên chuẩn;
+> các mục khảo sát lệch (W*, mục 2–3) giữ nguyên làm lịch sử ngày 06/10. Mã giảm giá (Voucher) có từ quyết định 10/10.
 Nguồn: `backend/apps/**/models*`, `erp-console/shared/lib/enums.ts` (bảng nhãn FE duy nhất), `erp-console/features/**`,
 `frontend/`, `doc/design/erp/enum-map.md` (bản 01/10, nay đã cũ một phần), glossary `doc/features/2026-09-30-dat-ten-tieng-anh/` (02c §1, 01 §2).
 
@@ -39,10 +41,11 @@ Quy ước đặt tên (P8b, Duy chốt 01/10): định danh trong code là ti�
 | Khách hàng | `Customer` (`phone`, `name`) | dữ liệu cá nhân, bất biến 9 |
 | Hoá đơn bán | `SalesInvoice`, dòng `SalesInvoiceLine` | `INV<yymmdd>-…` |
 | Phân bổ lô đã bán | `SalesInvoiceLineBatch.unit_cost` | giá vốn, append-only |
-| Chứng từ đảo doanh thu ⚠ | `SalesCreditNote` (`DC-<mã hoá đơn>`), `kind=CANCEL_ORDER` | ba tên khác nhau, xem ⚠W29 |
+| Phiếu trừ doanh thu | `SalesCreditNote` (`DC-<mã hoá đơn>`), `kind=CANCEL_ORDER` | tên chuẩn Duy duyệt 07/10 (C2, Q-1); tên cũ "Chứng từ đảo doanh thu", xem W29 |
 | Mã lý do huỷ | `SalesCreditNote.reason_code`, bảng `CANCEL_REASON_LABELS` (`sales/orders/services.py:311`) | |
 | Bảng giá / giá niêm yết | `PriceList` / `ItemPrice` | |
-| Ưu đãi | `PricingRule` | không phải "mã giảm giá" |
+| Ưu đãi | `PricingRule` | khác "mã giảm giá" |
+| Mã giảm giá | Voucher (model, API Shop và màn ERP thêm ở Shop lô 3b, `doc/features/2026-10-06-shop-giao-dien-moi/02b-tech-design.md` §3.8–3.9, §4) | Duy chốt CÓ ngày 10/10, lật ý "không mã giảm giá" của 2026-09-10; 1 mã/đơn, không cộng dồn |
 | Bằng chứng đồng ý xử lý dữ liệu | quyền `view_privacy_consent`, `sales/orders/consent.py` | |
 
 ### 1.3 Thanh toán / Hoàn tiền (`sales/payments/`, `sales/refunds/`, `adapter/`)
@@ -119,7 +122,7 @@ Quy ước đặt tên (P8b, Duy chốt 01/10): định danh trong code là ti�
 | Quản lý | `manager` | Quản lý |
 | NV kho | `warehouse_staff` | Nhân viên kho |
 | NV giao | `delivery_staff` | Nhân viên giao |
-| CSKH | `customer_service` | CSKH |
+| Nhân viên gọi xác nhận | `customer_service` | Nhân viên gọi xác nhận (nhãn cũ "CSKH", đổi 08/10) |
 | Hồ sơ nhân viên | `StaffProfile` (`status`, `must_change_password`) | |
 | Việc (ô ma trận phân quyền) | `Capability` ở `accounts/capabilities/registry.py` | |
 | Phạm vi dữ liệu (Tầng 3) | `GroupDataScope` (`object_key`, `value`), `accounts/data_scopes/catalog.py` | |

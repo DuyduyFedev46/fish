@@ -13,7 +13,11 @@ ship-mate (wshobson/agents). Playwright Python đã cài sẵn trên máy.
 ```
 Story chỉ đụng FE, API đã có mock?  → chạy FE mock:  NEXT_PUBLIC_USE_MOCK=1 npm run dev (:3000)
 Story đụng cả BE                     → chạy thật:     Django :8000 (SQLite dev) + FE trỏ NEXT_PUBLIC_API_BASE=http://localhost:8000
+Story đụng ERP console               → cd erp-console && npm run dev (:3100), đăng nhập bằng user demo theo từng Group
+Cần soi component Shop riêng lẻ       → build/dev với NEXT_PUBLIC_UI_PREVIEW=1 rồi mở /ui-preview/ (bản thường phải 404)
 ```
+Route Shop mới: `/` trang chủ (HomeScreen) · `/shop/` danh mục · `/shop/item/?code=` · `/shop/cart/` · `/shop/checkout/` ·
+`/shop/orders/` (trang đơn = trang tra cứu) · `/about/` · `/pages/?slug=` · `/blog/`. Màn mẫu để so ảnh: `doc/design/shop/screens/`.
 
 Bật server nền, đợi cổng mở, chạy script, **luôn tắt server khi xong**:
 ```bash
@@ -36,7 +40,7 @@ with sync_playwright() as p:
     page = browser.new_page(viewport={"width": 390, "height": 844})   # mobile-first
     errors = []
     page.on("console", lambda m: m.type == "error" and errors.append(m.text))
-    page.goto("http://localhost:3000/shop/")
+    page.goto("http://localhost:3000/")              # trang chủ Shop; danh mục ở /shop/
     page.wait_for_load_state("networkidle")          # BẮT BUỘC trước khi soi DOM
     page.screenshot(path="shot-01-catalog.png", full_page=True)
     page.get_by_role("button", name="Thêm vào giỏ").first.click()
@@ -55,7 +59,10 @@ with sync_playwright() as p:
 - Màn hình 390px (mobile) và 1280px.
 - Trạng thái rỗng / lỗi mạng (tắt backend) / đang tải.
 - Bấm đúp nút đặt hàng → chỉ tạo 1 đơn.
-- Không có giá vốn, lãi lỗ, hay dữ liệu nội bộ nào trong HTML Shop (`page.content()`).
+- Không có giá vốn, lãi lỗ, số kg tồn hay dữ liệu nội bộ nào trong HTML Shop (`page.content()`).
+- **Dữ liệu cá nhân** (bất biến 9): sau khi đặt đơn/tra đơn, kiểm `page.url`, `localStorage`/`sessionStorage`
+  (`page.evaluate`) và log console **không** chứa tên, SĐT, địa chỉ; trang đơn công khai không hiện người nhận.
+  Chỉ dùng dữ liệu giả (`Nguyễn Văn A`, `0900000001`).
 - Console không có lỗi đỏ.
 
 ## Đặt tên (P8b, Duy chốt 01/10)
@@ -75,9 +82,8 @@ Không đưa mã lô giao việc (`lo7`, `l8`, `p8_lo5`) vào tên; mã lô/stor
 | Giờ Việt Nam | `VN_TIME_ZONE`, `todayInVietnam()`, `today_in_vietnam()` | `VN_TZ`, `todayVn`, `vn_today` |
 | Bản rà soát QA / bổ sung | `review_*` / `extra`, `followup` | `ra_soat_*` / `bosung` |
 
-Giữ nguyên (không đổi): migration đã chạy, `AuditLog.action` đã ghi, dòng phiên bản cấu hình AI cũ, URL công khai Shop
-`/bai-viet/` `/trang/` `?chuyen-muc=`, dữ liệu demo (username `kho1`, `chu_vua`..., slug, mã hàng), keyword AI có dấu, chuỗi `cangca`.
-Bảng đầy đủ: `doc/features/2026-09-30-dat-ten-tieng-anh/02c-giao-viec.md` mục 1.
+Giữ nguyên (không đổi): migration đã chạy, `AuditLog.action` đã ghi, dòng phiên bản cấu hình AI cũ, dữ liệu demo (username `kho1`, `chu_vua`..., slug, mã hàng), keyword AI có dấu, chuỗi `cangca`.
+Bảng đầy đủ: `doc/features/2026-09-30-dat-ten-tieng-anh/02c-giao-viec.md` mục 1. Bảng gốc ở skill `caveve-domain`; sửa ở đó trước. URL Shop đã đổi sang tiếng Anh 11/10 (`/about/`, `/pages/?slug=`, `/blog/?category=`).
 
 **Kiểm bằng máy** (Python 3 stdlib, chạy từ gốc repo, dưới 10 giây, không cần venv):
 `python3 scripts/check_naming.py`. Exit 1 khi file MỚI có định danh tiếng Việt, hoặc số vi phạm của một file TĂNG so với

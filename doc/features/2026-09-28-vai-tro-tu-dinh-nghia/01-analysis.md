@@ -1,6 +1,6 @@
 # Vai trò tự định nghĩa (Chủ tự tạo vai bằng ma trận CRUD, một người kiêm nhiều vai) — Phân tích nghiệp vụ
 > BA · 2026-09-28 (sửa cùng ngày theo chỉnh của Duy: bỏ danh mục "quyền tính năng", chuyển sang ma trận CRUD) ·
-> Trạng thái: **CHỜ DUYỆT**
+> Trạng thái: **TẠM HOÃN** (rà 11/10: `doc/ke-hoach-tong.md` ghi "để sau"; mã BR-PQ-20…30 giữ chỗ cho hồ sơ này)
 >
 > **Đụng quyết định đã chốt.** decisions.md 2026-09-10 "Phân quyền 3 tầng…" mục 2 chốt **bốn Group cố định**,
 > và spec §13 E-17 ghi "gán nhiều Group, **không tạo role mới**". Yêu cầu này lật một phần mục đó: cơ chế 3 tầng,

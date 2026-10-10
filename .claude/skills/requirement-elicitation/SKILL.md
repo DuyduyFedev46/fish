@@ -25,12 +25,14 @@ Nguồn tham khảo: BMAD `bmad-agent-analyst` + `bmad-advanced-elicitation`
 1. **Tóm lại yêu cầu bằng một câu** theo mẫu: *[Tác nhân] cần [việc] để [giá trị]*.
 2. **Định vị trong spec**: quy trình P-0x nào, BR nào liên quan, quyết định nào ràng buộc.
 3. **Hỏi dồn 5 góc** (tự trả lời từ tài liệu trước; chỉ hỏi Duy điều tài liệu không có):
-   - *Ai*: tác nhân nào (Khách / Chủ / Quản lý / NV kho / NV giao / Hệ thống)? Group nào có quyền?
+   - *Ai*: tác nhân nào (Khách / Chủ / Quản lý / NV kho / NV giao / Nhân viên gọi xác nhận (`customer_service`) / Hệ thống)?
+     Group nào có quyền?
    - *Khi nào*: sự kiện kích hoạt, trạng thái trước/sau (state machine đơn, vòng đời lô).
    - *Tiền*: có làm đổi giá vốn, lãi lỗ, tiền rời túi không? → thuộc quyền Chủ.
    - *Hàng*: có trừ/cộng tồn, ảnh hưởng FEFO (thứ tự xuất theo hạn), giữ chỗ, hạn dùng, chuỗi lạnh không?
    - *Sai thì sao*: huỷ, hoàn tiền, giao thất bại, trùng thao tác, mạng rớt, TTL hết.
-4. **Kiểm tra rủi ro Cá Về** (skill `caveve-domain`): rò giá vốn? xoá chứng từ? thiếu AuditLog?
+4. **Kiểm tra rủi ro Cá Về** (skill `caveve-domain`): rò giá vốn? rò dữ liệu cá nhân của khách (bất biến 9: thu field
+   mới, API công khai, log, gửi bên thứ ba)? xoá chứng từ? thiếu AuditLog?
 5. **Viết use case** cho mỗi luồng: tiền điều kiện → luồng chính (đánh số) → luồng thay thế
    → ngoại lệ → hậu điều kiện.
 6. **Phân loại câu hỏi mở**: 🔴 chặn (không trả lời thì không làm được) / 🟡 có mặc định
@@ -38,8 +40,18 @@ Nguồn tham khảo: BMAD `bmad-agent-analyst` + `bmad-advanced-elicitation`
 
 ## Mẫu đầu ra — `doc/features/<ngày>-<slug>/01-analysis.md`
 
-```md
+````md
 # <Tên tính năng> — Phân tích nghiệp vụ
+
+```mermaid
+flowchart TD
+  A["Khách hoặc nhân viên làm bước đầu"] --> B{"Điều kiện chính?"}
+  B -- "được" --> C["Luồng chính"]
+  B -- "không" --> D["Ngoại lệ, báo cách sửa"]
+  C --> E{"Duy duyệt?"}
+```
+(Sơ đồ luồng nghiệp vụ ngay dưới tiêu đề, nhãn tiếng Việt đời thường, điểm quyết định là hình thoi — luật 11/10.)
+
 > BA · <ngày> · Trạng thái: NHÁP / CHỜ DUYỆT / ĐÃ DUYỆT
 
 ## 1. Yêu cầu gốc
@@ -65,13 +77,13 @@ Nguồn tham khảo: BMAD `bmad-agent-analyst` + `bmad-advanced-elicitation`
 Model/field bị ảnh hưởng (không thiết kế chi tiết), API/màn hình liên quan, bên thứ 3.
 
 ## 8. Rủi ro Cá Về
-Giá vốn · phân quyền · chứng từ/AuditLog · FEFO/tồn · tiền
+Giá vốn · dữ liệu cá nhân (bất biến 9) · phân quyền · chứng từ/AuditLog · FEFO/tồn · tiền
 
 ## 9. Ngoài phạm vi
 
 ## 10. Câu hỏi mở
 | # | Mức | Câu hỏi | Mặc định PA đề xuất |
-```
+````
 
 Bản phân tích đạt khi: mọi luồng có ngoại lệ, mọi rule có nhãn nguồn, không còn câu hỏi 🔴
 chưa được Duy trả lời trước khi chuyển sang PO.

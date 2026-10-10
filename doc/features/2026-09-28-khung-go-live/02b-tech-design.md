@@ -4,6 +4,7 @@
 > Phụ thuộc: hồ sơ `2026-09-28-cms-viet-bai` (`02b` §4.6, §8.6 — trang có `page_role`, `EntryVersion`, `footer-links`,
 > `/trang/?slug=`, `BusinessError.extra`). Code tham chiếu nhánh `wip/autosave` commit `cc47542`.
 > Người hiện thực: Gemini CLI / Antigravity theo `AGENTS.md`; giao việc ở `02c-giao-viec.md`.
+> **Ghi chú rà 11/10 (lịch sử):** `SiteLegalFooter` gắn ở `app/layout.tsx` mô tả dưới đây đã xoá ở Shop lô 1. Footer pháp lý nay là `ShopFooter` (khối F1/F2) theo `doc/features/2026-10-06-shop-giao-dien-moi/02b-tech-design.md`. URL `/trang/?slug=` nay là `/pages/?slug=` (quyết định 11/10).
 
 ```mermaid
 flowchart TD

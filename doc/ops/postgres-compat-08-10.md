@@ -3,6 +3,8 @@
 Production và staging chạy PostgreSQL 16 (Supabase), nhưng test xưa nay chạy SQLite nên một số lỗi lọt. Ngày 08/10 chạy
 cả suite trên PostgreSQL 16 cục bộ: Ran 3384, failures=13, errors=51 (main d0854a7). Sau khi sửa: xem mục "Số test".
 
+> **Từ 10/10:** test PostgreSQL **không chạy ở máy cục bộ nữa**, mà chạy trên cloud với DB test riêng, không trỏ vào staging hay production (`doc/decisions.md` mục 2026-10-10). Phần dưới là nhật ký sự cố 08/10, giữ nguyên.
+
 ## Nguyên nhân và cách sửa
 
 | Nhóm | Nguyên nhân | Cách sửa |

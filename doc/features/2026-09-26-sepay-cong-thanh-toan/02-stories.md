@@ -1,5 +1,6 @@
-# Cổng thanh toán SePay: user stories (bản nháp)
-> BA (nháp cho PO) · 2026-09-26 · Nguồn: `01-analysis.md` (CHỜ DUYỆT). Trạng thái: **ĐÃ DUYỆT** (2026-09-26, Duy)
+# Cổng thanh toán SePay: user stories
+> BA (nháp cho PO) · 2026-09-26 · Nguồn: `01-analysis.md` (CHỜ DUYỆT). Trạng thái: **XONG** (duyệt 2026-09-26, QA APPROVED ở `04-qa-report.md`)
+> **Rà 11/10:** phần FE Shop (màn thanh toán thành công riêng, tra đơn bằng 4 số cuối SĐT) đã bị thay theo quyết định 2026-10-10 tối: thanh toán xong vào thẳng trang đơn hàng, tra đơn bằng POST với SĐT đầy đủ hoặc mã tra đơn (hồ sơ `2026-10-06-shop-giao-dien-moi`).
 > Duy đã chốt 2026-09-26:
 > - V1 **chỉ VietQR qua Cổng SePay**, không thẻ/NAPAS;
 > - **chỉ IPN**: webhook ngân hàng `/webhook/sepay` giữ code nhưng tắt;

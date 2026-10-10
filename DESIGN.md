@@ -1,6 +1,6 @@
 ---
 name: Cá Về
-description: Design system dùng chung cho ERP console, Shop và app. Tinh gọn kiểu Linear/Notion, một màu nhấn xanh biển.
+description: Design system (token) dùng chung cho ERP console, Shop và app. Một màu nhấn xanh biển. Shop theo bố cục bán lẻ ở doc/design/shop, ERP theo doc/design/erp/UI-RULES.md.
 colors:
   # Light
   canvas: "#FBFBFC"
@@ -185,13 +185,15 @@ Bối cảnh sản phẩm và người dùng: `PRODUCT.md`. Cách chọn skill U
 
 ## Overview
 
-Công cụ làm việc, không phải trang quảng cáo. Hướng **Linear/Notion tinh gọn** (Duy chốt 2026-09-24): nền xám trung tính
+Token trong file này dùng chung. Hướng bố cục theo bề mặt: **Shop** theo bố cục bán lẻ kiểu Long Châu, chỉ bản sáng
+(`doc/design/shop/UI-RULES.md`, Duy chốt 10/10); **ERP** là công cụ làm việc tinh gọn (`doc/design/erp/UI-RULES.md`). Phần dưới
+mô tả ERP: nền xám trung tính
 rất nhạt, bề mặt trắng, viền mảnh 1 px, một màu nhấn **xanh biển** cho hành động chính và trạng thái đang chọn.
 Thứ bậc tạo bằng cỡ chữ, độ đậm và ba mức xám của chữ (`ink`, `ink-2`, `ink-3`), không bằng khung dày hay bóng nặng.
 Con số (tiền, kg) là nhân vật chính: chữ số cùng độ rộng (`tabular-nums`), căn phải trong bảng.
 
 Người dùng chuẩn đo là NV kho/NV giao cầm điện thoại ngoài trời: vùng bấm ≥ 44 px, tương phản AA ở cả light và dark,
-thao tác chính nằm dưới ngón cái (menu đáy, nút chính ở cuối form). Dark mode là chế độ ngang hàng, chọn theo máy hoặc
+thao tác chính nằm dưới ngón cái (menu đáy, nút chính ở cuối form). Ở ERP, dark mode là chế độ ngang hàng (Shop chỉ có bản sáng), chọn theo máy hoặc
 bằng nút đổi giao diện (lưu `localStorage["cave_theme"]`).
 
 ## Colors

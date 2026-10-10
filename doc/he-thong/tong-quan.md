@@ -1,6 +1,6 @@
 # Tổng quan hệ thống
 
-> Cập nhật 02/10/2026, theo code `main` `bf62b81`.
+> Cập nhật 11/10/2026 (rà tài liệu legacy).
 
 ```mermaid
 flowchart LR
@@ -33,8 +33,8 @@ Ngoài ra có CMS viết bài và trang chính sách cho Shop, và lớp **AI Na
 | Thư mục | Là gì | Ai dùng | Công nghệ | Chạy ở đâu |
 |---|---|---|---|---|
 | `backend/` | **Lõi duy nhất**: dữ liệu, nghiệp vụ, API, Django Admin | ERP, Shop, adapter gọi vào | Django 5 + Django REST Framework, PostgreSQL | Cloud Run `cangca-api` / `cangca-api-staging` |
-| `erp-console/` | ERP nội bộ (console vận hành) | Chủ, Quản lý, NV kho, NV giao, CSKH | Next.js 14, xuất tĩnh | Firebase Hosting site `cangca-erp` / `cangca-erp-staging` |
-| `frontend/` | Shop và trang giới thiệu cho khách | Khách (không đăng nhập) | Next.js 14, xuất tĩnh | Firebase Hosting site `cangca-loc` / `cangca-loc-staging` |
+| `erp-console/` | ERP nội bộ (console vận hành) | Chủ, Quản lý, NV kho, NV giao, NV gọi xác nhận | Next.js 14, xuất tĩnh | Firebase Hosting site `cangca-erp` / `cangca-erp-staging` |
+| `frontend/` | Shop cho khách: trang chủ `/`, danh mục, giỏ, đặt đơn, tra đơn, giới thiệu `/about/`, bài viết `/blog/`, trang CMS `/pages/` (đang làm lại theo lô, xem `frontend.md`) | Khách (không đăng nhập) | Next.js 14, xuất tĩnh | Firebase Hosting site `cangca-loc` / `cangca-loc-staging` |
 | `adapter/` | Lớp mỏng nhận IPN thanh toán từ SePay rồi chuyển vào Django | SePay gọi vào | FastAPI, không đụng DB | Cloud Run `cangca-adapter` / `cangca-adapter-staging` |
 
 Chuỗi `cangca` trong tên hạ tầng là tên cũ, không phải thương hiệu. Thương hiệu hiển thị là "Cá Về".
@@ -70,7 +70,7 @@ Nguyên tắc kiến trúc (decisions.md 2026-09-09, 2026-09-10):
 - **Django là 100% lõi.** Mọi luật nghiệp vụ nằm ở `backend/apps/<app>/<module>/services.py`. View API chỉ kiểm quyền, gọi service, trả JSON.
 - **Adapter chỉ chuyển tiếp.** Bên thứ ba không nối thẳng vào lõi. Adapter xác thực, đổi dạng dữ liệu, gọi API nội bộ. Chống trùng giao dịch do Django lo.
 - **Shop và ERP là web tĩnh.** Không có server Next.js khi chạy. Mọi dữ liệu lấy qua API lúc chạy trên trình duyệt, nên URL API phải truyền vào **lúc build**.
-- **Không xây trên Frappe/ERPNext.** Chỉ mượn cách đặt tên chứng từ (`doc/doctype-mapping.md`).
+- **Không xây trên Frappe/ERPNext.** Chỉ mượn cách đặt tên chứng từ (`doc/archive/doctype-mapping.md`, đã lưu trữ).
 
 ## Môi trường
 

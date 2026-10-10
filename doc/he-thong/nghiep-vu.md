@@ -1,6 +1,6 @@
 # Nghiệp vụ: luồng chính và bất biến
 
-> Cập nhật 02/10/2026, theo code `main` `bf62b81`.
+> Cập nhật 11/10/2026 (rà tài liệu legacy). Phần Shop đang làm lại theo lô, xem `frontend.md`.
 > File này là **bản đồ**. Luật chi tiết nằm ở `doc/business-process-spec.md` (mã `BR-*`), quyết định ở `doc/decisions.md`,
 > bất biến tóm tắt cho agent ở `.claude/skills/caveve-domain/SKILL.md`. Khi các file đó và file này khác nhau thì các file đó đúng.
 
@@ -10,7 +10,7 @@ flowchart TD
   B --> C["Mở bán lô"]
   C --> D["Khách đặt, giữ hàng 30 phút"]
   D --> E{"Trả tiền kịp?"}
-  E -- "không" --> F["Tự huỷ, nhả hàng"]
+  E -- "không" --> F["Hết giờ giữ chỗ, nhả hàng"]
   E -- "có" --> G["Gọi khách xác nhận đơn"]
   G --> H["Soạn hàng, in tem, đi giao"]
   H --> I{"Giao được?"}
@@ -49,14 +49,14 @@ flowchart TD
   A2[2. Chi phí phụ<br/>PurchaseCost, chỉ Chủ] -->|phân bổ vào giá vốn lô| B
   B -->|3. publish_batch| C[Lô SELLING<br/>hiện trên Shop]
   C --> D[4. Khách đặt trên Shop<br/>SalesOrder BOOKED<br/>giữ chỗ theo lô FEFO, TTL 30']
-  D -->|quá TTL| D1[AUTO_CANCELLED<br/>nhả giữ chỗ]
-  D -->|5. checkout -> SePay -> IPN -> adapter| E[PAID -> PROCESSING<br/>SalesInvoice ISSUED, trừ kho<br/>ghi doanh thu]
-  E --> F[6. DeliveryNote CONFIRMING<br/>ConfirmationTask: CSKH gọi khách]
+  D -->|quá TTL| D1[AUTO_CANCELLED Hết giờ giữ chỗ<br/>nhả giữ chỗ]
+  D -->|5. checkout -> SePay -> IPN -> adapter| E[PROCESSING<br/>SalesInvoice ISSUED, trừ kho<br/>ghi doanh thu]
+  E --> F[6. DeliveryNote CONFIRMING<br/>ConfirmationTask: NV gọi xác nhận gọi khách]
   F -->|đã xác nhận| G[PREPARING -> in tem -> READY]
   G --> H[DELIVERING]
-  H -->|khách nhận| I[COMPLETED<br/>đơn COMPLETED]
+  H -->|khách nhận| I[COMPLETED Đã giao<br/>đơn tự Hoàn tất]
   H -->|không gặp| J[FAILED -> giao lại<br/>hoặc ReturnToStock chờ duyệt]
-  E -->|7. huỷ đơn đã trả tiền| K[CANCELLED + chứng từ đảo doanh thu<br/>+ phiếu hoàn PENDING]
+  E -->|7. huỷ đơn đã trả tiền| K[CANCELLED + phiếu trừ doanh thu<br/>+ phiếu hoàn PENDING]
   K -->|Chủ xác nhận + mã GD| L[Refund REFUNDED]
   C --> M[8. Kiểm kê theo lô<br/>người khác duyệt]
   C -->|hết hàng / quá hạn| N[SOLD_OUT / NEAR_EXPIRY / EXPIRED]
@@ -94,25 +94,27 @@ Lô quá hạn có thể **trả nhà cung cấp** một phần hoặc toàn b�
   Combo giữ chỗ đủ mọi thành phần, thiếu một là không tạo đơn (BR-BH-07). Giá và công thức combo đóng băng lúc tạo đơn (BR-BH-08).
 - Giữ chỗ có hạn `SALES_ORDER_TTL_MINUTES` (30 phút). Job `cancel_expired_orders` chuyển đơn quá hạn sang `AUTO_CANCELLED` và nhả hàng (BR-BH-03, 04).
 - Nếu bật `PRIVACY_CONSENT_REQUIRED` mà chưa đăng trang chính sách bảo mật thì Shop từ chối tạo đơn (503, BR-BH-17).
-- Tra đơn: `GET /api/shop/orders/{mã}/?phone_last4=` (mã đơn và 4 số cuối SĐT, có giới hạn tần suất).
+- Tra đơn: hiện còn `GET /api/shop/orders/{mã}/?phone_last4=` (mã đơn và 4 số cuối SĐT, có giới hạn tần suất). Quyết định 10/10:
+  Shop lô 3+4 gỡ đường GET này, thay bằng `POST /api/shop/orders/lookup/` (mã đơn + SĐT đầy đủ, hoặc mã tra đơn tạm); trang đơn
+  công khai không hiện người nhận.
 
 ### 4. Thanh toán SePay / VietQR (P-05 §7.4)
 1. Shop gọi `POST /api/shop/orders/{mã}/checkout/`. Backend lập và ký sẵn tham số, trả `checkout_url` và mảng `fields` có thứ tự.
 2. Trình duyệt submit form POST sang trang thanh toán SePay. Khách quét VietQR. V1 chỉ VietQR, trả 100%, không cọc (decisions 2026-09-26).
 3. SePay gửi IPN `ORDER_PAID` tới adapter `/ipn/sepay`. Adapter kiểm `X-Secret-Key`, đổi dạng, gọi `POST /api/internal/payments/sepay-ipn/` của Django.
-4. Django ghi `PaymentTransaction`, chống trùng theo mã giao dịch ngân hàng (BR-TT-03). Khớp đủ thì đơn `PAID`, xuất `SalesInvoice`, trừ kho thật đúng các lô đã giữ (không chọn lại, BR-BH-11), đơn sang `PROCESSING`, ghi doanh thu (BR-TT-06).
+4. Django ghi `PaymentTransaction`, chống trùng theo mã giao dịch ngân hàng (BR-TT-03). Khớp đủ thì xuất `SalesInvoice`, trừ kho thật đúng các lô đã giữ (không chọn lại, BR-BH-11), đơn sang thẳng `PROCESSING`, ghi doanh thu (BR-TT-06). Trạng thái `PAID` không còn dùng từ 07/10 (W37), chỉ giữ trong choices cho dữ liệu cũ.
 5. Khách quay về trang `success_url` **không** có nghĩa là đã trả tiền. Chỉ IPN mới xác nhận.
 
 Tiền lệch không tự xác nhận mà vào **hàng chờ Chủ** (`PaymentTransaction.match_status`):
-`UNDERPAID` (thiếu), `ORPHAN` (tới sau khi đơn đã tự huỷ), `UNMATCHED` (không khớp đơn), `OVERPAID` (chuyển thừa).
+`UNDERPAID` (thiếu), `ORPHAN` (tới sau khi đơn đã huỷ hoặc hết giờ giữ chỗ), `UNMATCHED` (không khớp đơn), `OVERPAID` (chuyển thừa).
 Chủ xử lý bằng `POST /api/sales/payments/{id}/resolve` (gắn đơn, xác nhận, hoặc hoàn tiền). Chủ cũng có thể xác nhận tay một đơn sau khi đối chiếu sao kê
 (`POST /api/sales/orders/{id}/confirm-payment`, quyền `confirm_payment_manual`, BR-TT-07).
 
 Route webhook biến động số dư cũ `/webhook/sepay` vẫn còn code nhưng **tắt mặc định**.
 
-### 5. Gọi xác nhận đơn (CSKH)
+### 5. Gọi xác nhận đơn
 - Hoá đơn được xuất thì `delivery/signals.py` tự tạo **phiếu giao** (`DeliveryNote`) ở trạng thái `CONFIRMING` và một việc gọi (`ConfirmationTask`).
-- Nhân viên CSKH (nhóm `customer_service`) nhận việc trong hàng chờ `/api/confirmation/queue/`, gọi khách, ghi kết quả (`CustomerCall`):
+- Nhân viên gọi xác nhận (nhóm `customer_service`, nhãn vai đổi 08/10) nhận việc trong hàng chờ `/api/confirmation/queue/`, gọi khách, ghi kết quả (`CustomerCall`):
   đã xác nhận, xác nhận có đổi thông tin, không nghe máy, sai số, hẹn gọi lại, muốn đổi, muốn huỷ.
 - Gọi không được quá số lần cho phép trong cửa sổ thời gian thì chuyển Quản lý quyết định (`ESCALATED`). Có thể bật tự huỷ sau hạn (`CONFIRMATION_AUTO_CANCEL_ENABLED`, mặc định tắt, chỉ bật sau khi pháp lý duyệt).
 - Phiếu còn `CONFIRMING` thì chưa soạn được (BR-GH-11). Job `process_confirmation_deadlines` xử lý nhắc, chuyển cấp, tự huỷ.
@@ -122,7 +124,7 @@ Trạng thái phiếu giao (`DeliveryNote.Status`):
 `CONFIRMING` → `PREPARING` (soạn) → `READY` (đóng gói xong, cần quyền `pack_deliverynote`) → `DELIVERING` → `COMPLETED`.
 Từ `DELIVERING` có thể sang `FAILED`, rồi giao lại (`DELIVERING`). `COMPLETED` và `CANCELLED` không quay lui (BR-GH-05, BR-GH-07).
 - In tem giao: `GET/POST /api/delivery/notes/{id}/label/`, `label/print/`, `label/void/` (quyền `print_label`). Mỗi lần in ghi `LabelPrint`.
-- Phiếu giao hoàn tất thì đơn sang `COMPLETED`.
+- Phiếu giao cuối cùng sang `COMPLETED` (nhãn "Đã giao") thì đơn tự sang `COMPLETED` ("Hoàn tất"), không có nút tay (W37, 07/10).
 - Giao thất bại quá `DELIVERY_MAX_FAILED_ATTEMPTS` lần (mặc định 2) thì hệ thống báo cần quyết định (BR-GH-04).
 - NV giao chỉ thấy phiếu được gán cho mình (BR-GH-06, BR-PQ-12) và chỉ thấy dữ liệu khách của phiếu đã kết thúc trong `DELIVERY_PII_RECENT_DAYS` ngày.
 
@@ -131,11 +133,11 @@ NV giao tạo phiếu hàng hoàn (`ReturnToStock`) về **đúng lô gốc**. Q
 **tái nhập** (cộng lại lô gốc) hoặc **huỷ bỏ** (hạch toán hàng hỏng vào lô gốc). Lô đã chốt không nhận hàng hoàn (BR-HV-04).
 
 ### 8. Huỷ đơn và hoàn tiền (P-07)
-- Đơn chưa trả tiền: tự huỷ khi quá TTL.
+- Đơn chưa trả tiền: hết giờ giữ chỗ thì hệ thống huỷ (`AUTO_CANCELLED`, nhãn "Hết giờ giữ chỗ").
 - Đơn đã trả tiền: `POST /api/sales/orders/{id}/cancel/` với `reason_code` (quyền `cancel_paid_order`, Chủ và Quản lý).
   Bị chặn khi phiếu giao đang `DELIVERING` (BR-GH-07) hoặc `COMPLETED` (BR-GH-05).
   Hoàn kho về lô gốc **chỉ khi hàng còn ở kho** (soạn hàng, chờ lấy). Phiếu giao thất bại thì đi luồng P-08, không cộng kho hai lần.
-- Huỷ đơn đã trả tiền thì hệ thống lập **chứng từ đảo doanh thu** (`SalesCreditNote`, BR-HT-10) ngay trong giao dịch huỷ.
+- Huỷ đơn đã trả tiền thì hệ thống lập **phiếu trừ doanh thu** (`SalesCreditNote`, BR-HT-10; tên chuẩn 07/10) ngay trong giao dịch huỷ.
   Doanh thu và giá vốn đảo vào **kỳ phát sinh huỷ**, không sửa kỳ cũ (BR-HT-06). Hoá đơn gốc giữ nguyên.
 - **Phiếu hoàn tiền** (`Refund`): Chủ hoặc Quản lý tạo (`create_refund`), trạng thái `PENDING`.
   Chỉ Chủ xác nhận đã chuyển (`confirm_refund`), bắt buộc nhập mã giao dịch (BR-HT-03). Có `mark-failed` và `retry`.
@@ -168,7 +170,7 @@ Chi tiết và ví dụ ở `.claude/skills/caveve-domain/SKILL.md` mục "Bất
 | 6 | **FEFO**: lô hạn sớm nhất ra trước, cùng hạn thì lô nhập trước, rồi lô tạo trước. Lô chốt một lần lúc tạo đơn. Giữ chỗ có TTL, job huỷ phải idempotent | `inventory/batches/services.py` (`sellable_batches`), `sales/orders/tasks.py` |
 | 7 | Tiền dùng `Decimal`. Tham số nghiệp vụ đọc từ `settings`/env, không viết cứng | `config/settings.py` |
 | 8 | Thêm model/field phải có lý do trong hồ sơ tính năng và có migration đi kèm | |
-| 9 | **Không rò dữ liệu cá nhân của khách** (tên, SĐT, địa chỉ). API công khai không trả đủ, chỉ che bớt. Không ghi vào log. Không đưa dữ liệu thật vào test, doc, commit. NV giao, CSKH chỉ thấy khách cần cho việc của mình. Không gửi cho bên thứ ba khi Duy chưa duyệt | `delivery/confirmation/scope.py`, `FORBIDDEN_PREFIXES` của AI, checklist `doc/ops/go-live-phap-ly.md` |
+| 9 | **Không rò dữ liệu cá nhân của khách** (tên, SĐT, địa chỉ). API công khai không trả tên, SĐT, địa chỉ; trang đơn công khai không hiện người nhận (10/10). Không ghi vào log. Không đưa dữ liệu thật vào test, doc, commit. NV giao, NV gọi xác nhận chỉ thấy khách cần cho việc của mình. Không gửi cho bên thứ ba khi Duy chưa duyệt | `delivery/confirmation/scope.py`, `FORBIDDEN_PREFIXES` của AI, checklist `doc/ops/go-live-phap-ly.md` |
 
 Ranh giới Chủ và Quản lý (spec §1.5): Quản lý được uỷ **việc làm khách phải chờ** (mở bán lô, duyệt kiểm kê, duyệt hàng hoàn, huỷ đơn đã trả, tạo phiếu hoàn).
 Chủ giữ **việc làm tiền rời túi hoặc đổi con số lời lỗ** (chốt lô, chi phí mua, xác nhận hoàn tiền, xác nhận thanh toán tay, xem giá vốn, xem lãi lỗ, quản lý nhân viên).

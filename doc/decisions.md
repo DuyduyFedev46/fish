@@ -92,10 +92,10 @@ Format: bối cảnh – lựa chọn – lý do – hệ quả (5 dòng/quyết
 
 - **Bối cảnh**: "Trả thẳng có combo" nằm trong brief gốc của Lộc từ đầu nhưng **vắng mặt hoàn toàn** ở cả 4 tài liệu (URD, doctype-mapping, ecosystem-l1, decisions) cho tới 10/09. Duy chốt hướng: "làm flex có thể setup được thay vì fix cứng scheme".
 - **Lựa chọn**: Hỗ trợ 3 dạng combo bằng **2 cơ chế**, cả hai cấu hình được trong Django Admin, không cần sửa code khi thêm combo mới:
-  1. **Combo dạng gói (BUNDLE)** — `Item.item_type = BUNDLE` + bảng `BundleLine` (mặt hàng thành phần, định mức kg). Bán như 1 SKU với giá niêm yết riêng; khi chốt đơn thì nổ ra thành phần và trừ kho theo FIFO từng thành phần. Giá vốn combo = tổng giá vốn thành phần thực xuất.
+  1. **Combo dạng gói (BUNDLE)** — `Item.item_type = BUNDLE` + bảng `BundleLine` (mặt hàng thành phần, định mức kg). Bán như 1 SKU với giá niêm yết riêng; khi chốt đơn thì nổ ra thành phần và trừ kho theo FIFO từng thành phần *(đã thay FIFO bằng FEFO — xem mục 2026-09-26)*. Giá vốn combo = tổng giá vốn thành phần thực xuất.
   2. **Combo đóng gói sẵn** — không cần cơ chế mới: đó chỉ là `Item` thường (`item_type = SIMPLE`) có lô riêng, cân đóng sẵn lúc nhập.
   3. **Combo dạng ưu đãi (`PricingRule`)** — điều kiện 1 tầng (mua ≥ N kg mặt hàng X, hoặc đơn ≥ M đồng) → giảm số tiền hoặc %. Kho vẫn trừ từng mặt hàng riêng.
-- **Lý do**: "Flex" được diễn giải là *cấu hình được trong Admin*, KHÔNG phải *rule engine tổng quát*. Ranh giới cố ý: PricingRule chỉ 1 tầng điều kiện, **không lồng nhau, không cộng dồn nhiều ưu đãi** (chọn rule có lợi nhất cho khách), không ngân sách khuyến mãi, không mã giảm giá. Rule engine tổng quát (DSL điều kiện, thứ tự ưu tiên, stacking) là thứ giết dự án do 1 người maintain — chi phí test tổ hợp tăng theo cấp số nhân.
+- **Lý do**: "Flex" được diễn giải là *cấu hình được trong Admin*, KHÔNG phải *rule engine tổng quát*. Ranh giới cố ý: PricingRule chỉ 1 tầng điều kiện, **không lồng nhau, không cộng dồn nhiều ưu đãi** (chọn rule có lợi nhất cho khách), không ngân sách khuyến mãi, không mã giảm giá *(đã lật phần mã giảm giá: xem mục 2026-10-10 (tối) "Mã giảm giá: CÓ")*. Rule engine tổng quát (DSL điều kiện, thứ tự ưu tiên, stacking) là thứ giết dự án do 1 người maintain — chi phí test tổ hợp tăng theo cấp số nhân.
 - **Hệ quả**: Tồn khả dụng của BUNDLE là giá trị **tính ra**, không lưu: `min(floor(tồn khả dụng thành phần i / định mức i))`. Giữ chỗ 1 combo = giữ chỗ đồng thời tất cả thành phần; thiếu 1 thành phần thì không bán được combo. Báo cáo lãi lỗ theo lô vẫn đúng vì trừ kho ở mức thành phần.
 - **Cái đắt nếu sửa sau**: Thấp nếu cần luật phức tạp hơn — thêm field vào PricingRule, hoặc thay riêng module ưu đãi (leaf node, không ai phụ thuộc). CAO nếu bây giờ xây DSL rồi bỏ. Cũng cao nếu chọn "combo = SKU độc lập" duy nhất rồi sau muốn tách thành phần — mất toàn bộ lịch sử giá vốn thành phần, không dựng lại được.
 
@@ -143,21 +143,21 @@ Những điểm dưới đây chưa từng được Lộc hoặc Duy phát biể
 
 - Hệ thống mua hàng – bán hàng – quản lý kho cho vựa cảng cá của Lộc (bạn của Duy). **Đây là dự án tương lai — Lộc chưa vận hành thực tế**, nên mọi chi tiết hành vi vận hành cụ thể đều là giả định thiết kế, cần kiểm chứng khi vận hành thật. Timeline tự đặt 6 tháng, Duy làm gần một mình + AI hỗ trợ.
 - Trọng tâm: mua hàng, bán hàng, chi phí hàng hoá (giá vốn/lãi lỗ). Bán theo kg, niêm yết giá, trả thẳng có combo.
-- Hàng hoá: đông lạnh, nguồn theo mùa, hạn dùng nội bộ 3 tháng/lô, quản lý kho theo lô.
+- Hàng hoá: đông lạnh, nguồn theo mùa, hạn dùng nội bộ 3 tháng/lô, quản lý kho theo lô. *(đã thay: hạn mặc định 365 ngày, xuất FEFO — xem mục 2026-09-26 "Hạn dùng mặc định hàng đông lạnh 12 tháng" và "Xuất kho FEFO")*
 - **Combo: 3 dạng (gói có công thức / đóng gói sẵn / ưu đãi 1 tầng), cấu hình trong Admin, không có rule engine tổng quát.**
 - **Giá vốn lô = giá mua + chi phí phụ phân bổ (landed cost). Báo cáo lãi lỗ theo lô là nguồn sự thật.**
-- **Phân quyền: 3 tầng (CRUD model / custom action perm / phạm vi dòng-cột), 4 Group cộng dồn (`owner`, `manager`, `warehouse_staff`, `delivery_staff`), `StaffProfile` OneToOne với `User`, `AuditLog` cho mọi hành động duyệt-chốt-huỷ-xác nhận.** (mã đổi sang tiếng Anh ngày 2026-10-01, P8b; nội dung quyết định giữ nguyên)
-- Landing (SEO) và Shop (giỏ hàng + thanh toán) tách nhau. **Social chỉ đăng tay, không tích hợp API** — chỉ dẫn link vào Shop.
+- **Phân quyền: 3 tầng (CRUD model / custom action perm / phạm vi dòng-cột), 4 Group cộng dồn (`owner`, `manager`, `warehouse_staff`, `delivery_staff`) *(đã thay: nay 5 nhóm, thêm `customer_service` = "Nhân viên gọi xác nhận" — xem mục 2026-10-08)*, `StaffProfile` OneToOne với `User`, `AuditLog` cho mọi hành động duyệt-chốt-huỷ-xác nhận.** (mã đổi sang tiếng Anh ngày 2026-10-01, P8b; nội dung quyết định giữ nguyên)
+- Landing (SEO) và Shop (giỏ hàng + thanh toán) tách nhau. *(đã thay: `/` là trang chủ Shop, landing ở `/about/` — xem mục 2026-10-10 (tối) và 2026-10-11 "Đổi URL Shop sang tiếng Anh")* **Social chỉ đăng tay, không tích hợp API** — chỉ dẫn link vào Shop.
 - **Khách hàng: chỉ cá nhân, B2C thuần** (đã chốt cuối). Guest checkout, gộp theo SĐT, không có tài khoản hệ thống.
-- **100% đơn giao tận nhà, nhân viên nội bộ giao** (đã chốt cuối). Không quản lý chi phí xe cộ/điều phối phức tạp.
-- **Phí giao hàng: outscope hoàn toàn**, Lộc tự quản lý ngoài hệ thống.
-- Thanh toán: VietQR qua SePay (chọn tạm), webhook tự xác nhận qua FastAPI adapter, khớp TTL giữ chỗ 30 phút. **Hoàn tiền: SePay không có API hoàn tiền — hệ thống ghi sổ, Lộc chuyển khoản tay.**
+- **100% đơn giao tận nhà, nhân viên nội bộ giao** (đã chốt cuối). *(đã thay một phần: khu vực Phan Thiết, hướng Ahamove hoặc GHN, chưa chốt hãng — xem mục 2026-10-11 S-08)* Không quản lý chi phí xe cộ/điều phối phức tạp.
+- **Phí giao hàng: outscope hoàn toàn**, Lộc tự quản lý ngoài hệ thống. *(bổ sung: khách trả một lần qua QR, hiện chưa có phí ship — xem mục 2026-10-10 (tối) "Phí giao")*
+- Thanh toán: VietQR qua SePay (chọn tạm) *(đã chốt: Cổng thanh toán SePay — xem mục 2026-09-26)*, webhook tự xác nhận qua FastAPI adapter, khớp TTL giữ chỗ 30 phút. **Hoàn tiền: SePay không có API hoàn tiền — hệ thống ghi sổ, Lộc chuyển khoản tay.**
 - Luồng bán hàng: Customer (địa chỉ giao hàng) → Sales Order (booked, TTL 30') → xác nhận qua webhook (SePay → FastAPI → Django) → Sales Invoice (trừ kho thật + thu tiền) → Delivery Note (soạn hàng → chờ lấy → đang giao → hoàn tất). Nhánh ngoại lệ: huỷ / hoàn tiền / hàng hoàn về kho — xem `business-process-spec.md`.
 - Luồng mua hàng: Supplier → Purchase Receipt (trực tiếp tại cảng, không qua PO, sinh Batch) → Purchase Invoice (tách riêng) → Purchase Cost (chi phí phụ, phân bổ vào giá vốn lô) → Chốt lô.
 - **Hướng kiến trúc (đã chốt)**: học mô hình doctype ERPNext làm tài liệu tham chiếu, build mới hoàn toàn bằng Django. Quy mô 1 điểm bán duy nhất.
 - **Backend stack (ĐÃ CHỐT)**: Django 100% lõi; FastAPI CHỈ adapter mỏng cho bên thứ 3. Frontend Next.js. DB PostgreSQL.
 - Nguyên tắc thiết kế xuyên suốt: hạn chế tối đa nhập liệu thủ công; ưu tiên đơn giản/dễ 1 mình maintain; ưu tiên công cụ có sẵn (Django Admin/auth) hơn tự build; bên thứ 3 luôn qua adapter; **chưa có dữ liệu vận hành thật → ưu tiên giả định đơn giản nhất, dễ mở rộng sau**.
-- **Level 2 (doctype)**: `doctype-mapping.md` — ⚠ ĐÃ LỖI THỜI, cần viết lại. **URD v4**: `URD.md`. **Level 3 (nghiệp vụ chi tiết) v2: `business-process-spec.md`.**
+- **Level 2 (doctype)**: `doctype-mapping.md` — ⚠ ĐÃ LỖI THỜI, cần viết lại. *(đã lưu trữ: `doc/archive/doctype-mapping.md`)* **URD v4**: `URD.md`. **Level 3 (nghiệp vụ chi tiết) v2: `business-process-spec.md`.**
 - **Câu hỏi mở còn lại**: (1) mục tiêu nghiệp vụ suy luận ở URD 2.2, (2) service token FastAPI ↔ Django, (3) điều kiện/phí SePay, (4) giả định "số kg đặt = số kg thực giao", (5) combo thực tế bán dạng nào, (6) mua tại cảng có gối đầu không, (7) ngưỡng thời gian ngoài chuỗi lạnh, (8) **vựa có bao nhiêu người và có ai để Lộc uỷ quyền duyệt khi vắng mặt không**.
 
 ## 2026-09-26 — Xuất kho FEFO (hết hạn trước xuất trước) thay FIFO — [DUY CHỐT]

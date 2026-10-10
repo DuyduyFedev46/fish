@@ -1,5 +1,5 @@
 # Lưu cài đặt AI và CMS trên backend thật (luồng NHANH)
-> Điều phối · 2026-10-01 · Trạng thái: **SẴN SÀNG CODE** · Nguồn: QA P8b Lô 4b (`doc/features/2026-09-30-dat-ten-tieng-anh/04-qa-report.md` mục Lô 4b, B1–B3). Lỗi có từ trước P8b; mock che mất.
+> Điều phối · 2026-10-01 · Trạng thái: **XONG** (QA lần 2 APPROVED, `04-qa-report.md`) · Nguồn: QA P8b Lô 4b (`doc/features/2026-09-30-dat-ten-tieng-anh/04-qa-report.md` mục Lô 4b, B1–B3). Lỗi có từ trước P8b; mock che mất.
 
 ```mermaid
 flowchart TD

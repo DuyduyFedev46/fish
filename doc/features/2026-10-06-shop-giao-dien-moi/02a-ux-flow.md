@@ -34,7 +34,7 @@ flowchart TD
   D4 -.->|"Đặt lại đơn này"| B1
 ```
 
-> `ux-designer` · 2026-10-11 · Nhánh `shop/lo-0-quyet-dinh` · **Trạng thái: CHỜ DUYỆT**
+> `ux-designer` · 2026-10-11 · Nhánh `shop/lo-0-quyet-dinh` · **Trạng thái: ĐÃ DUYỆT** (Duy 11/10, cùng story ở điểm dừng 2)
 > Đầu vào: `02-stories.md` (ĐÃ DUYỆT 11/10), `01-analysis.md` §6, §6.1, §13, `05-phap-ly.md` §1.2, §2, §3.1, `06-marketing.md` C2.3, C5, C7,
 > `doc/decisions.md` mục 2026-10-10 (tối) và 2026-10-11, `doc/ops/hoi-loc.md` (câu tạm L1–L12), `doc/design/shop/` (README, UI-RULES, SO-CHUAN, COMPONENTS).
 > Duy giao điều phối chạy qua đêm, không để câu hỏi treo: chỗ phải quyết đã chọn theo UI-RULES/COMPONENTS và ghi **UX chốt**. Lệch 02b thì 02b thắng.

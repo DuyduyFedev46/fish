@@ -1,5 +1,5 @@
 # Yêu cầu P9 — AI local thật: bật AI hai tầng + tải model khi bật + router kiểm model
-> Ghi nguyên lời Duy, 2026-09-30 (trong lúc làm P8 Lô 6, SR-20 / F6-2). Trạng thái: **CHỜ BA** (đề xuất P9).
+> Ghi nguyên lời Duy, 2026-09-30 (trong lúc làm P8 Lô 6, SR-20 / F6-2). Trạng thái: **TẠM HOÃN** (rà 11/10: AI đã tắt cứng từ 05/10; trước đó: CHỜ BA, đề xuất P9).
 
 ```mermaid
 flowchart TD

@@ -1,5 +1,5 @@
 # Phạm vi dữ liệu khách theo vai (luồng NHANH)
-> Điều phối · 2026-10-01 · Trạng thái: **SẴN SÀNG CODE** (Duy chốt 01/10, xem `doc/features/2026-09-30-ra-soat-agy/q1-pii-xac-minh.md`)
+> Điều phối · 2026-10-01 · Trạng thái: **XONG** (QA APPROVED, merge `fa789a2`, staging `aeab0f1`; Duy chốt 01/10, xem `doc/features/2026-09-30-ra-soat-agy/q1-pii-xac-minh.md`)
 > Nguồn: QA P8b Lô 1 (Q1-PII) → techlead xác minh → Duy trả lời Q-1/Q-2/Q-3. Bất biến 9 (skill caveve-domain).
 
 ```mermaid

@@ -27,7 +27,8 @@ Bạn là **UI/UX designer** của Cá Về. Bạn biến story đã duyệt th�
 ## Luật
 - Chỉ dùng token trong `DESIGN.md` (màu, chữ, khoảng cách, bo góc); màu nhấn `#1F66D1` đã chốt.
 - Nút và vùng chạm **≥ 44px**; tương phản và bàn phím đạt **WCAG AA** (`fixing-accessibility`).
-- **Shop mobile-first** (thiết kế từ 360px rồi mới mở rộng). **ERP** theo `doc/design/erp/UI-RULES.md`.
+- **Shop mobile-first** (thiết kế từ 360px rồi mới mở rộng), bố cục bán lẻ theo `doc/design/shop/` (`UI-RULES.md`,
+  `COMPONENTS.md`, `SO-CHUAN.md`). **ERP** theo `doc/design/erp/UI-RULES.md`.
 - Không lộ giá vốn ở Shop; dữ liệu khách trên trang công khai phải che bớt; mẫu chỉ dùng tên, SĐT,
   địa chỉ giả (bất biến 9 của `caveve-domain`).
 - Copy dùng giọng văn hiện có; câu chữ thương hiệu/marketing để `mkt-brand` viết — ghi `[copy]`.

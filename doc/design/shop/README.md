@@ -1,10 +1,22 @@
 # Thiết kế Shop Cá Về (bản thiết kế 06/10/2026, Duy chốt 10/10/2026)
 
+```mermaid
+flowchart TD
+  A["Thiết kế màn trên canvas"] --> B["Luật giao diện và đặc tả component"]
+  B --> C{"Duy duyệt thiết kế?"}
+  C -- "duyệt 10/10" --> D["Tech Lead chia lô ở 02b"]
+  D --> E["Dev dựng theo màn mẫu"]
+  E --> F["QA so ảnh chụp với màn mẫu"]
+  F --> G{"Lệch thiết kế?"}
+  G -- "có" --> E
+  G -- "không" --> H["Gộp main, lên staging"]
+```
+
 - **Canvas gốc** (xem trực quan, bấm thử được): https://claude.ai/artifact/SPSQLR5rMEtuBFreYbK96J
 - `screens/*.dc.html`: HTML tĩnh, style inline. Mở bằng trình duyệt để xem. Icon và font cần mạng. Thẻ `<sc-if>`, `<sc-for>`, `{{…}}` và khối `<script type="text/x-dc">` là cú pháp của canvas, khi code thì thay bằng state React. Dev đọc cấu trúc, khoảng cách, màu và chữ từ HTML.
 - `canvas.json`: vị trí và tên từng màn trên canvas.
 - **Luật bắt buộc: `UI-RULES.md`.** Đặc tả từng component (47 cái: giải phẫu, biến thể, trạng thái, props, a11y): **`COMPONENTS.md`**, kèm 7 bảng hình `screens/CMP-*.dc.html`. Cách code: `HUONG-DAN-CODE.md`. Chia lô: `PLAN.md`. Prompt dán cho Claude Code: `PROMPT.md`.
-- Số chuẩn (token, chiều cao, bo góc, bóng, chuyển động): `SO-CHUAN.md`. Báo cáo soát độ đủ: `AUDIT-DO-DU.md`. Báo cáo dựng và chụp từng màn (lỗi hiển thị đã sửa, chiều cao): `RENDER-AUDIT.md`.
+- Số chuẩn (token, chiều cao, bo góc, bóng, chuyển động): `SO-CHUAN.md`. Báo cáo soát độ đủ: `doc/archive/design-shop/AUDIT-DO-DU.md` (đã lưu trữ 11/10, câu mở đã trả lời 10–11/10). Báo cáo dựng và chụp từng màn (lỗi hiển thị đã sửa, chiều cao): `doc/archive/design-shop/RENDER-AUDIT.md` (đã lưu trữ).
 - Đối chiếu thiết kế với code và backend hiện tại: `DOI-CHIEU-CODE.md` (Tech Lead, 06/10).
 - Dữ liệu trên thiết kế là **dữ liệu giả**. Ô có ngoặc vuông `[…]` là chỗ chờ số liệu thật. Ô "LOGO" chờ file Duy upload.
 

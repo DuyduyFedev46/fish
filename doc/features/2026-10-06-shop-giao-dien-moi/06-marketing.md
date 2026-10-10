@@ -1,6 +1,6 @@
 # 06 · Marketing: kiểm kê nội dung thiết kế Shop và nội dung soạn sẵn để nạp CMS
 
-> `mkt-brand` · 10/10/2026 · Nhánh `shop/lo-0-quyet-dinh` · **Trạng thái: CHỜ DUYỆT** (Duy duyệt cùng story, theo D11 trong `00-dau-vao.md`)
+> `mkt-brand` · 10/10/2026 · Nhánh `shop/lo-0-quyet-dinh` · **Trạng thái: ĐÃ DUYỆT** (Duy duyệt cùng story 11/10, theo D11 trong `00-dau-vao.md`)
 > Nguồn: `doc/decisions.md:235-254` (chốt 10/10 tối), `doc/design/shop/UI-RULES.md` §6, `doc/design/shop/screens/*.dc.html`,
 > `doc/business-process-spec.md`, hướng dẫn CMS `doc/ops/cms-cho-mkt.md` (viết cùng đợt, các mục "§" trong cột nguồn trỏ về file đó).
 > Phần pháp lý (đổi trả, quyền riêng tư, khiếu nại, điều kiện giao dịch) ở đây **chỉ là khung**. `legal-vn` đang viết `05-phap-ly.md`. Khi hai bên khác nhau thì theo `05-phap-ly.md`.

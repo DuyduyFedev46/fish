@@ -70,7 +70,7 @@ Bản v1 mô tả quyền bằng **động từ nghiệp vụ** ("được soạ
 
 Ba tầng phải cùng tồn tại. Chỉ làm tầng 1 thì nhân viên giao hàng thấy toàn bộ đơn của cả kho và đọc được giá vốn từng lô.
 
-## 1.3 Bốn nhóm quyền — cộng dồn, không phải bậc thang
+## 1.3 Năm nhóm quyền — cộng dồn, không phải bậc thang
 
 | Group | Ai | Ghi chú |
 |---|---|---|
@@ -78,8 +78,9 @@ Ba tầng phải cùng tồn tại. Chỉ làm tầng 1 thì nhân viên giao h�
 | `manager` | Người Lộc uỷ quyền khi vắng mặt | Duyệt vận hành, **không** đụng tiền và giá vốn |
 | `warehouse_staff` | Nhập lô, soạn hàng, kiểm kê | |
 | `delivery_staff` | Giao hàng | Chỉ thấy đơn được gán cho mình |
+| `customer_service` | Nhân viên gọi xác nhận | Gọi xác nhận đơn, in tem. Thêm 2026-10-01 (migration `accounts` 0011, đổi tên ở 0013), nhãn đổi 2026-10-08 (D) |
 
-**Cộng dồn, không xếp bậc (PA)**: một người ở vựa nhỏ vừa nhập kho vừa đi giao — gán cả `warehouse_staff` lẫn `delivery_staff`, không cần role thứ năm. Quản lý thường là `manager` + `warehouse_staff`. Thiết kế theo Group cộng dồn nên **thêm người kiêm nhiệm không phải sửa code**; thiết kế theo bậc thang thì phải.
+**Cộng dồn, không xếp bậc (PA)**: một người ở vựa nhỏ vừa nhập kho vừa đi giao — gán cả `warehouse_staff` lẫn `delivery_staff`, không cần thêm nhóm. Quản lý thường là `manager` + `warehouse_staff`. Thiết kế theo Group cộng dồn nên **thêm người kiêm nhiệm không phải sửa code**; thiết kế theo bậc thang thì phải.
 
 ## 1.4 Tầng 1 — Ma trận CRUD theo model
 
@@ -256,7 +257,7 @@ Phân quyền mà không có log thì chỉ chặn được nhầm lẫn, không
 ## 4.1 Luồng
 Mua trực tiếp tại cảng, **không có đơn đặt hàng trước** (L). NV kho/Chủ ghi nhận ngay:
 
-`Chọn nhà cung cấp → nhập từng mặt hàng + số kg + đơn giá mua → hệ thống sinh Lô (Batch) → tự tính hạn dùng = ngày nhập + 90 ngày → lô ở trạng thái Nháp`
+`Chọn nhà cung cấp → nhập từng mặt hàng + số kg + đơn giá mua → hệ thống sinh Lô (Batch) → tự tính hạn dùng = ngày nhập + 365 ngày *(sửa 2026-09-26, (D): trước là 90 ngày; tham số `BATCH_DEFAULT_SHELF_LIFE_DAYS`)* → lô ở trạng thái Nháp`
 
 ## 4.2 Business rules
 | Mã | Luật |
@@ -428,7 +429,7 @@ stateDiagram-v2
 
 | Mã | Luật |
 |---|---|
-| BR-GH-01 | Người giao là **nhân viên nội bộ**, FK trỏ `User` (D). `StaffProfile` cung cấp số điện thoại để khách/Lộc liên hệ. |
+| BR-GH-01 | Người giao là **nhân viên nội bộ**, FK trỏ `User` (D). `StaffProfile` cung cấp số điện thoại để khách/Lộc liên hệ. *(Lưu ý 2026-10-11: khu vực giao Phan Thiết, hướng hãng ngoài Ahamove hoặc GHN, chưa chốt. Khi chốt hãng sẽ sửa luật này — xem decisions.md mục 2026-10-11 S-08.)* |
 | BR-GH-02 | Không có định tuyến, tối ưu lộ trình, chi phí xe cộ (L). |
 | BR-GH-03 | Số kg cân khi soạn = số kg khách đặt. **Giả định V1 (PA), chưa kiểm chứng** — không có field "số kg thực xuất". |
 | BR-GH-04 | "Giao thất bại" là **trạng thái tạm**, đếm số lần thử. Sau 2 lần thất bại hệ thống nhắc Quản lý/Chủ quyết định *(PA — ngưỡng cấu hình được)*. |
@@ -563,7 +564,7 @@ Cả hai báo cáo nằm sau `view_profitreport` — mặc định chỉ Chủ (
 
 # 14. Ảnh hưởng lên data model (đầu vào cho Level 4)
 
-Thực thể **mới** so với `doctype-mapping.md`:
+Thực thể **mới** so với `archive/doctype-mapping.md`:
 
 | Thực thể | Vì sao |
 |---|---|
@@ -580,7 +581,7 @@ Trường **mới** đáng chú ý: `Item.item_type`, `Batch.status`, `Batch.lan
 
 **Custom permissions cần khai trong `Meta.permissions`**: `publish_batch`, `close_batch`, `approve_stockreconciliation`, `approve_returntostock`, `cancel_paid_order`, `create_refund`, `confirm_refund`, `confirm_payment_manual`, `view_costprice`, `view_profitreport`, `manage_staff`.
 
-**Fixture khởi tạo**: 4 Group (`owner`, `manager`, `warehouse_staff`, `delivery_staff`) với permission gán sẵn theo mục 1.4 và 1.5 — phải là data migration, không phải bấm tay trong Admin, nếu không thì môi trường dev/staging/prod lệch nhau.
+**Fixture khởi tạo**: 5 Group (`owner`, `manager`, `warehouse_staff`, `delivery_staff`, `customer_service`) với permission gán sẵn theo mục 1.4 và 1.5 — phải là data migration, không phải bấm tay trong Admin, nếu không thì môi trường dev/staging/prod lệch nhau.
 
 ---
 
@@ -604,7 +605,7 @@ Trường **mới** đáng chú ý: `Item.item_type`, `Batch.status`, `Batch.lan
 9. `doctype-mapping.md` đã lỗi thời (còn ghi "bỏ Sales Order", "bỏ Delivery Note") và chưa có 8 thực thể mới ở mục 14. **Phải viết lại trước khi dịch sang Django models.**
 
 ---
-*Tài liệu liên quan: `URD.md` (Level 0 — yêu cầu), `ecosystem-l1.md` (Level 1 — hệ sinh thái), `doctype-mapping.md` (Level 2 — ⚠ lỗi thời), `decisions.md` (nhật ký quyết định).*
+*Tài liệu liên quan: `URD.md` (Level 0 — yêu cầu), `ecosystem-l1.md` (Level 1 — hệ sinh thái), `archive/doctype-mapping.md` (Level 2 — ⚠ lỗi thời, đã lưu trữ), `decisions.md` (nhật ký quyết định).*
 
 **Nhật ký thay đổi**
 - 08/10/2026 — W37 S9 (Duy duyệt 07/10): thay sơ đồ §7.2 (bỏ `DaThanhToan`, Hoàn tất do Hệ thống chuyển khi phiếu cuối giao xong); thêm BR-BH-18..21 (§7.2), BR-BC-06 (§12.2), BR-GH-24 phần "không ghi đè" (§8). Hồ sơ: `doc/features/2026-10-06-don-hoan-tat/`.

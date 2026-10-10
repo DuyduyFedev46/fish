@@ -1,5 +1,5 @@
 # Giao việc — P8 Sửa lỗi review P1–P7
-> Claude (Tech Lead) · 2026-09-30 · Trạng thái: **SẴN SÀNG CODE (Duy 30/09)**
+> Claude (Tech Lead) · 2026-09-30 · Trạng thái: **XONG — mọi lô ☑, QA APPROVED (`04-qa-report.md`); trước đó: SẴN SÀNG CODE (Duy 30/09)**
 > Người hiện thực: Gemini CLI / Antigravity theo `AGENTS.md`, lệnh `/lam-tinh-nang 2026-09-30-sua-loi-review`.
 > Nhánh làm việc: `main` (không dùng `wip/autosave`).
 

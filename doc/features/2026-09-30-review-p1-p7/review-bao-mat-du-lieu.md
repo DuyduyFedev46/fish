@@ -1,4 +1,5 @@
 # Review bảo mật dữ liệu P1–P7 (giá vốn · dữ liệu cá nhân khách · phân quyền · cờ an toàn)
+> **ĐÃ ĐÓNG — lịch sử (rà 11/10).** Lỗi đã sửa ở P8 (`2026-09-30-sua-loi-review`, XONG). Không dời thư mục vì test trong code còn trỏ tới.
 
 - Người review: Tech Lead (Claude), 2026-09-30. Phạm vi: `main` @ `75e5dd3`, diff từ `85c0b36` (merge P1) tới HEAD.
 - Cách kiểm: đọc code và chạy thử bằng test tạm (đặt ở scratchpad, **không** thêm vào repo; `DJANGO_DEBUG=1`, SQLite, dữ liệu

@@ -23,13 +23,14 @@ sửa code sản phẩm** (không sửa `backend/apps/**` ngoài `tests/`, khôn
    trong `01-analysis.md` → 1 ca; cộng các ca chuẩn:
    - biên: 0, âm, vượt tồn, lô cuối, TTL vừa hết
    - trùng/đồng thời: bấm đúp, 2 đơn tranh 1 lô, webhook gửi 2 lần
-   - **phân quyền**: từng Group `owner`/`manager`/`warehouse_staff`/`delivery_staff` + chưa đăng nhập
+   - **phân quyền**: từng Group `owner`/`manager`/`warehouse_staff`/`delivery_staff`/`customer_service`
+     (Nhân viên gọi xác nhận) + người không thuộc nhóm nào (bị chặn khỏi ERP, trừ superuser) + chưa đăng nhập
    - **rò giá vốn**: JSON API & HTML Shop không chứa field giá vốn với người thiếu quyền
    - **rò dữ liệu cá nhân**:
-     - API công khai và HTML Shop không trả tên, SĐT hay địa chỉ đầy đủ;
+     - API công khai và HTML Shop không trả tên, SĐT hay địa chỉ người nhận (trang đơn công khai không hiện người nhận);
      - Group không cần thì không thấy dữ liệu khách;
      - log, console trình duyệt, `localStorage` và URL không chứa dữ liệu cá nhân;
-     - tra đơn có giới hạn tần suất;
+     - tra đơn dùng POST (mã đơn + SĐT đầy đủ hoặc mã tra đơn) và có giới hạn tần suất;
      - ảnh chụp và report chỉ dùng dữ liệu giả.
    - chứng từ không bị xoá, AuditLog được ghi cho hành động Tầng 2
    - mỗi rủi ro trong `02b-tech-design.md` → 1 ca

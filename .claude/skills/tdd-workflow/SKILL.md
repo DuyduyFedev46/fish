@@ -36,9 +36,10 @@ Ngoại lệ (phải nói rõ với Duy): file cấu hình, migration sinh tự 
 
 | Tuyên bố | Bằng chứng cần có |
 |---|---|
-| Test xanh | Output `manage.py test` / `pytest` của lượt này: 0 failure |
+| Test xanh | Output `manage.py test` / `pytest` của lượt này: phải **thấy dòng `Ran N tests … OK`** (test song song có thể sập im lặng, không có dòng này là chưa xanh); sau khi gộp nhánh chạy lại tuần tự |
 | FE ổn | `npm run build` exit 0 (+ `npx tsc --noEmit`) |
-| Không rò giá vốn | Test API với warehouse_staff/delivery_staff chạy xanh |
+| Không rò giá vốn | Test API với `warehouse_staff`/`delivery_staff`/`customer_service` chạy xanh |
+| Không rò dữ liệu cá nhân | Test API công khai không trả tên/SĐT/địa chỉ; Group không cần thì không thấy dữ liệu khách; không log dữ liệu cá nhân (bất biến 9) |
 | Migration ổn | `makemigrations --check --dry-run` không sinh gì mới |
 | Bug đã sửa | Test tái hiện bug giờ xanh, trước đó đỏ |
 | Subagent làm xong | Tự xem diff/chạy test — không tin báo cáo suông |
@@ -63,9 +64,8 @@ Không đưa mã lô giao việc (`lo7`, `l8`, `p8_lo5`) vào tên; mã lô/stor
 | Giờ Việt Nam | `VN_TIME_ZONE`, `todayInVietnam()`, `today_in_vietnam()` | `VN_TZ`, `todayVn`, `vn_today` |
 | Bản rà soát QA / bổ sung | `review_*` / `extra`, `followup` | `ra_soat_*` / `bosung` |
 
-Giữ nguyên (không đổi): migration đã chạy, `AuditLog.action` đã ghi, dòng phiên bản cấu hình AI cũ, URL công khai Shop
-`/bai-viet/` `/trang/` `?chuyen-muc=`, dữ liệu demo (username `kho1`, `chu_vua`..., slug, mã hàng), keyword AI có dấu, chuỗi `cangca`.
-Bảng đầy đủ: `doc/features/2026-09-30-dat-ten-tieng-anh/02c-giao-viec.md` mục 1.
+Giữ nguyên (không đổi): migration đã chạy, `AuditLog.action` đã ghi, dòng phiên bản cấu hình AI cũ, dữ liệu demo (username `kho1`, `chu_vua`..., slug, mã hàng), keyword AI có dấu, chuỗi `cangca`.
+Bảng đầy đủ: `doc/features/2026-09-30-dat-ten-tieng-anh/02c-giao-viec.md` mục 1. Bảng gốc ở skill `caveve-domain`; sửa ở đó trước. URL Shop đã đổi sang tiếng Anh 11/10 (`/about/`, `/pages/?slug=`, `/blog/?category=`).
 
 **Kiểm bằng máy** (Python 3 stdlib, chạy từ gốc repo, dưới 10 giây, không cần venv):
 `python3 scripts/check_naming.py`. Exit 1 khi file MỚI có định danh tiếng Việt, hoặc số vi phạm của một file TĂNG so với

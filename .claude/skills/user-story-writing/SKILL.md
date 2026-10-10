@@ -19,19 +19,29 @@ Duy nói bỏ qua BA).
   làm), **test được**. Story quá to → chia theo lát dọc (một luồng chạy đủ BE→FE), không
   chia theo tầng ("làm model", "làm API").
 - **Ngôn ngữ đời thường**, tiếng Việt; tác nhân dùng tên vai trò của vựa
-  (Khách, Chủ vựa, Quản lý, NV kho, NV giao), không dùng "user".
+  (Khách, Chủ vựa, Quản lý, NV kho, NV giao, Nhân viên gọi xác nhận), không dùng "user".
 - **AC dạng Given/When/Then**, mỗi AC kiểm được bằng 1 test tự động. Tối thiểu mỗi story có:
   1 luồng chính · 1 ngoại lệ/lỗi · 1 AC phân quyền (ai *không* được làm) · AC giá vốn nếu
   story đụng tới dữ liệu giá vốn/lãi lỗ.
 - Mỗi AC ghi mã BR nó kiểm (nếu có). Gắn mã AC dạng `S2-AC3` để QA truy vết.
 - **Ưu tiên MoSCoW** (Must/Should/Could/Won't) + lý do một dòng.
 - **Definition of Done** chung (không lặp lại trong từng story): test BE xanh, FE build
-  sạch, QA report APPROVED, không rò giá vốn, doc cập nhật nếu đổi rule.
+  sạch, QA report APPROVED, không rò giá vốn, không rò dữ liệu cá nhân của khách (bất biến 9: API công khai,
+  log, localStorage/URL, dữ liệu giả trong test và ảnh), doc cập nhật nếu đổi rule.
 
 ## Mẫu đầu ra — `doc/features/<ngày>-<slug>/02-stories.md`
 
-```md
+````md
 # <Tên tính năng> — User stories
+
+```mermaid
+flowchart TD
+  S1["Story 1: việc khách làm được"] --> S2["Story 2"]
+  S2 --> S3["Story 3"]
+  S3 --> D{"Duy duyệt story?"}
+```
+(Sơ đồ thứ tự story hoặc luồng người dùng ngay dưới tiêu đề, nhãn tiếng Việt đời thường — luật 11/10.)
+
 > PO · <ngày> · Nguồn: 01-analysis.md · Trạng thái: CHỜ DUYỆT / ĐÃ DUYỆT
 
 ## Mục tiêu & thước đo
@@ -49,6 +59,7 @@ Bối cảnh: <conversation ngắn, link UC-x>
 | S1-AC1 | … | … | … | BR-BH-06 |
 | S1-AC2 (lỗi) | … | … | … | |
 | S1-AC3 (quyền) | NV giao đăng nhập | gọi … | nhận 403, không đổi dữ liệu | BR-PQ-… |
+| S1-AC4 (dữ liệu cá nhân) | khách chưa đăng nhập | gọi API công khai … | không có tên, SĐT, địa chỉ người nhận | |
 
 Ghi chú kỹ thuật cho dev (nếu có): API/màn hình dự kiến, không bắt buộc.
 
@@ -56,7 +67,10 @@ Ghi chú kỹ thuật cho dev (nếu có): API/màn hình dự kiến, không b�
 S1 → S2 → …  (lý do)
 
 ## Rủi ro / phụ thuộc
-```
+````
+
+Vai dùng trong story: Khách · Chủ (`owner`) · Quản lý (`manager`) · NV kho (`warehouse_staff`) · NV giao (`delivery_staff`) ·
+Nhân viên gọi xác nhận (`customer_service`, nhãn đổi 08/10) · Hệ thống.
 
 Tự kiểm trước khi giao: mỗi UC trong 01-analysis có ít nhất 1 story phủ; mỗi ngoại lệ có AC;
 không AC nào chứa chữ mơ hồ ("nhanh", "dễ dùng", "hợp lý") mà không có con số.

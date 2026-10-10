@@ -1,78 +1,110 @@
 # Shop cho khách (`frontend/`)
 
-> Cập nhật 02/10/2026, theo code `main` `bf62b81`.
-> Hợp đồng thanh toán chi tiết: `frontend/features/checkout/README.md`. `frontend/README.md` đã cũ ở vài chỗ (xem cuối file).
-
 ```mermaid
 flowchart TD
-  A["Khách xem bảng giá"] --> B["Cho hàng vào giỏ"]
-  B --> C["Điền thông tin, đặt đơn"]
-  C --> D["Hệ thống giữ hàng 30 phút"]
-  D --> E["Bấm thanh toán, sang cổng SePay"]
-  E --> F["Quét mã QR bằng app ngân hàng"]
-  F --> G["Quay về trang tra đơn"]
+  A["Khách vào trang chủ"] --> B["Xem danh mục, tìm món"]
+  B --> C["Cho món vào giỏ"]
+  C --> D["Điền thông tin giao, đặt đơn"]
+  D --> E["Hệ thống giữ hàng 30 phút"]
+  E --> F["Bấm thanh toán, quét mã QR"]
+  F --> G["Về trang đơn hàng"]
   G --> H{"Hệ thống đã nhận tiền?"}
-  H -- "rồi" --> I["Đơn đang xử lý"]
+  H -- "rồi" --> I["Đơn đang soạn, chờ giao"]
   H -- "chưa" --> J["Chờ hoặc thanh toán lại"]
 ```
 
+> Cập nhật 11/10/2026, sau Shop lô 1 (đã gộp `main` ở `a5a5da2`). Shop đang **làm lại từ đầu theo lô** (quyết định 10/10);
+> cập nhật file này cuối mỗi lô Shop. Nguồn chuẩn: `doc/features/2026-10-06-shop-giao-dien-moi/02b-tech-design.md`
+> (§1.1 cây thư mục, §1.4 khung trang, §1.10 component, §1.11 code cũ bị xoá theo lô, §3 contract API, §7.1 bảng lô).
+> Thiết kế: `doc/design/shop/` (`UI-RULES.md`, `COMPONENTS.md`, `SO-CHUAN.md`).
+
 ## Là gì
 
-Trang giới thiệu và Shop cho khách. Khách **không đăng nhập** (guest checkout, gộp theo SĐT). Next.js 14 (App Router),
-**xuất tĩnh** ra `out/`, đưa lên Firebase Hosting (site `cangca-loc`, staging `cangca-loc-staging`). Mọi dữ liệu lấy từ API công khai của Django lúc chạy.
+Shop bán lẻ cho khách, bố cục kiểu nhà thuốc bán lẻ (Long Châu), token màu chung `DESIGN.md` (màu nhấn `#1F66D1`).
+Khách **không đăng nhập** (guest checkout, gộp theo SĐT). Next.js 14 (App Router), **xuất tĩnh** ra `out/`, đưa lên
+Firebase Hosting (site `cangca-loc`, staging `cangca-loc-staging`). Mọi dữ liệu lấy từ API công khai của Django lúc chạy.
 
 ## Trang
 
 | Route | Nội dung | API dùng |
 |---|---|---|
-| `/` | Trang giới thiệu (SEO), bài viết mới | `public/content/entries/` |
-| `/shop/` | Bảng giá theo nhóm, tồn khả dụng | `shop/catalog/` |
-| `/shop/item/?code=<mã hàng>` | Chi tiết mặt hàng hoặc combo | `shop/catalog/{item_code}/` |
-| `/shop/checkout/` | Giỏ hàng, form giao hàng, đặt đơn, nút thanh toán VietQR, đồng hồ giữ chỗ | `shop/orders/`, `shop/orders/{code}/checkout/` |
-| `/shop/orders/?code=...` | Tra đơn bằng mã đơn và 4 số cuối SĐT, thanh toán lại | `shop/orders/{code}/?phone_last4=` |
-| `/bai-viet/` | Danh sách và chi tiết bài viết (`?chuyen-muc=`) | `public/content/...` |
-| `/trang/` | Trang chính sách (bảo mật, điều kiện giao dịch, đổi trả, thông tin người bán) | `public/content/pages/by-role/{role}/` |
+| `/` | Trang chủ Shop (`HomeScreen`) | `shop/catalog/`, `public/content/...` |
+| `/shop/` | Danh mục theo nhóm, tồn hiện 3 mức | `shop/catalog/` |
+| `/shop/item/?code=<mã hàng>` | Chi tiết món hoặc combo | `shop/catalog/{item_code}/` |
+| `/shop/cart/` | Giỏ hàng (✚ lô 2) | `shop/catalog/` (so giá) |
+| `/shop/checkout/` | Form giao hàng, đặt đơn, thanh toán (viết lại ở lô 3+4) | `shop/orders/`, `shop/orders/{code}/checkout/` |
+| `/shop/orders/?code=...` | Trang đơn hàng, cũng là trang tra đơn | hiện `shop/orders/{code}/?phone_last4=`; lô 3+4 đổi sang `POST shop/orders/lookup/` |
+| `/about/` | Trang giới thiệu thương hiệu (nội dung CMS) | `public/content/...` |
+| `/blog/` | Danh sách bài viết (`?category=`) và chi tiết (`?slug=`) | `public/content/...` |
+| `/pages/?slug=...` | Trang CMS: chính sách, liên hệ, cách mua | `public/content/pages/...` |
+| `/ui-preview/` | Bộ sưu tập component, chỉ có khi build với `NEXT_PUBLIC_UI_PREVIEW=1` (production 404) | — |
 
-Chân trang hiện thông tin người bán và liên kết chính sách (`public/site-info/`, `public/content/footer-links/`).
-Route chi tiết dùng query string (`?code=`) thay cho route động vì xuất tĩnh không dựng trước được trang cho mã hàng chưa biết.
-URL công khai `/bai-viet/`, `/trang/`, `?chuyen-muc=` giữ tiếng Việt (ngoại lệ có chủ đích của quy tắc đặt tên).
+Chân trang (`ShopFooter`) hiện thông tin người bán và liên kết chính sách (`public/site-info/`, `public/content/footer-links/`).
+URL và thư mục là tiếng Anh (quyết định 11/10: `/gioi-thieu/` → `/about/`, `/trang/` → `/pages/`, `/bai-viet/` → `/blog/`, không giữ đường cũ).
+Slug nội dung CMS là dữ liệu, giữ tiếng Việt. Route chi tiết dùng query string vì xuất tĩnh không dựng trước được trang cho mã chưa biết.
 
 ## Cấu trúc thư mục
 
 ```
 frontend/
-  app/                    route (page.tsx, layout.tsx), app/shop/layout.tsx bọc CartProvider
-  components/             thành phần cũ dùng chung: CartContext, ShopHeader/Footer, CatalogGrid, AddToCartControl,
-                          CountdownTimer, ItemImageFrame
+  app/                    route; layout.tsx bọc CartProvider + ToastProvider ở root; globals.css (token), legacy.css (xoá lô 5)
+  components/
+    ShopFrame.tsx         khung: header + main + footer + BottomNav theo props, mỗi màn tự bọc
+    ShopHeader, ShopFooter, BottomNav, LogoSlot, CartContext, shopLinks.ts
+    ui/                   component trình bày dùng chung (Button, Chip, Dialog, Sheet, Popover, Toast, Banner, Icon…)
+    catalog/              PriceTag, ImageFrame, CategoryTile, ProductCard, StockBadge
+    search/               SearchBox
+    cart/                 (✚ lô 2)
   features/
-    checkout/             luồng thanh toán cổng SePay: gateway.ts (dựng form POST), storage.ts, PaymentPanel,
-                          OrderPaymentPanel, CheckoutScreen, MockGatewayPanel (cổng giả khi mock)
-    content/              bài viết, thẻ mặt hàng trong bài, ArticleBody, safeHref.ts (chặn link nguy hiểm)
-    site/                 thông tin người bán, chân trang pháp lý, thông báo gọi xác nhận đơn
-  lib/                    api.ts (MỌI gọi Shop API đi qua đây), mock.ts, types.ts, format.ts (tiền, kg, giờ VN)
-  scripts/                check-no-mock.mjs, test-format.mjs, test-safe-href.mjs
+    home/                 HomeScreen, content.ts (xoá lô 5)
+    catalog/              groupIcon.ts; lô 2 thêm CatalogScreen, ItemDetailScreen
+    checkout/             luồng thanh toán cổng SePay: gateway.ts, MockGatewayPanel; phần còn lại viết lại ở lô 3+4
+    content/              bài viết, ArticleBody, safeHref.ts (chặn link nguy hiểm) — mkt-brand
+    site/                 thông tin người bán, thông báo gọi xác nhận — mkt-brand
+    ui-preview/           PreviewGallery + dữ liệu giả
+  lib/                    api.ts (MỌI gọi Shop API đi qua đây), mock.ts, types.ts, format.ts, quantity.ts, phone.ts
+  scripts/                check-no-mock.mjs, test-format.mjs, test-quantity.mjs, test-phone.mjs, test-safe-href.mjs
   e2e/                    kịch bản Playwright (Python)
-  next.config.mjs         output: "export", trailingSlash
+  next.config.mjs         output: "export", trailingSlash, pageExtensions theo cờ UI preview
   firebase.json / firebase.staging.json   Hosting production / staging (staging có header noindex)
 ```
 
-Code mới đặt trong `features/<module>/`. `components/` và `lib/` là phần có từ đầu, giữ nguyên quy ước "mọi gọi API qua `lib/api.ts`".
+Component trong `components/ui|catalog|cart|search` chỉ **trình bày** (props vào, callback ra, không gọi API, không đọc storage).
+Chỉ `*Screen.tsx`, `ShopHeader`, `ShopFooter` được gọi `lib/api.ts` hoặc `features/site/api.ts`.
+
+Code cũ còn tồn tại, sẽ xoá theo 02b §1.11: `CatalogGrid`, `AddToCartControl`, `ContactButton` (lô 2); `CountdownTimer`,
+`app/shop/orders/OrderLookup.tsx`, `features/checkout/storage.ts`, `PaymentPanel`, `OrderPaymentPanel`, `ConfirmCallNotice` (lô 3+4).
+Đã xoá ở lô 1: landing cũ ở `app/page.tsx`, `components/ItemImageFrame.tsx`, `features/site/components/SiteLegalFooter.*`.
+
+## Danh mục
+
+`GET /api/shop/catalog/` trả `{groups, items}`. Mỗi món có `stock_level` (`in` / `low` / `out`), Shop hiện ba mức
+Còn hàng / Sắp hết / Hết, không hiện số kg, ngày nhập hay mã lô (quyết định 10/10). Hết hàng thì nút "Liên hệ chúng tôi".
+Bán theo kg, tối thiểu 1 kg, bước 0,5 kg; combo tính theo combo, số nguyên.
 
 ## Thanh toán
 
 1. Đặt đơn: `POST /api/shop/orders/` trả mã đơn và `booked_expires_at` (hạn giữ chỗ).
-2. Bấm "Thanh toán bằng VietQR": `POST /api/shop/orders/{code}/checkout/` trả `checkout_url` và mảng `fields` có thứ tự.
-   `features/checkout/gateway.ts` dựng `<form method="POST">` với đúng thứ tự field rồi submit sang SePay. FE **không** tính tiền, không ký, không đổi field.
-3. SePay đưa khách về `/shop/orders/?code=...&result=success|cancel|error`. Trang tra đơn hiện trạng thái thật từ API.
-   Về trang `success` chưa có nghĩa đã trả tiền; chỉ IPN qua adapter mới xác nhận.
+2. Bấm thanh toán: `POST /api/shop/orders/{code}/checkout/` trả `checkout_url` và mảng `fields` có thứ tự.
+   `features/checkout/gateway.ts` dựng `<form method="POST">` đúng thứ tự field rồi submit sang cổng. FE **không** tính tiền, không ký, không đổi field.
+3. Cổng đưa khách về `/shop/orders/?code=...&result=success|cancel|error`. Trang đơn hàng hiện trạng thái thật từ API.
+   Về trang `success` chưa có nghĩa đã trả tiền; chỉ IPN qua adapter mới xác nhận. Không có màn "thành công" riêng.
 
-Dữ liệu cá nhân: giỏ hàng trong `localStorage` chỉ giữ mã hàng, tên hàng, giá và số kg, không có dữ liệu khách. `sessionStorage` nhớ tạm mã đơn và 4 số cuối SĐT để khách vừa quay về từ cổng không phải gõ lại.
-Không lưu tên, SĐT đầy đủ, địa chỉ vào storage hay URL.
+Giao diện khách chỉ ghi "Chuyển khoản ngân hàng (quét mã QR)", không ghi tên nhà cung cấp cổng. Hiện chưa có phí ship;
+khách trả một lần qua QR.
+
+## Dữ liệu cá nhân (bất biến 9)
+
+- Giỏ hàng trong `localStorage` chỉ giữ mã hàng, tên hàng, đơn vị, giá và số lượng.
+- Trang đơn hàng công khai **không hiện người nhận** (tên, SĐT, địa chỉ).
+- Tra đơn hiện còn GET với 4 số cuối SĐT; lô 3+4 gỡ đường này, thay bằng POST với mã đơn + SĐT đầy đủ, hoặc mã tra đơn tạm
+  lưu ở `sessionStorage` (02b §1.7, §3.4).
+- Không lưu tên, SĐT đầy đủ, địa chỉ vào storage hay URL; không `console.log` dữ liệu form.
 
 ## Mock
 
-`NEXT_PUBLIC_USE_MOCK=1` thì `lib/mock.ts` (và `features/*/mock.ts`) trả dữ liệu giả, không cần backend. Có cổng SePay giả
-(`MockGatewayPanel`, bật khi URL có `?mock_gateway=1`) để đi hết luồng thanh toán. Mã đơn mẫu để tra thử nằm trong `lib/mock.ts`.
+`NEXT_PUBLIC_USE_MOCK=1` thì `lib/mock.ts` (và `features/*/mock.ts`) trả dữ liệu giả đúng JSON của 02b §3, không cần backend.
+Có cổng thanh toán giả (`MockGatewayPanel`, bật khi URL có `?mock_gateway=1`). Dữ liệu mock chỉ dùng tên/SĐT giả.
 
 `.env.example` để `NEXT_PUBLIC_USE_MOCK=1`, nên `.env.local` chép từ đó sẽ bật mock khi chạy máy mình.
 
@@ -83,8 +115,9 @@ cd frontend
 npm ci
 NEXT_PUBLIC_USE_MOCK=1 npm run dev                       # mock -> http://localhost:3000
 NEXT_PUBLIC_USE_MOCK=0 NEXT_PUBLIC_API_BASE=http://localhost:8000 npm run dev   # nối Django máy mình
-npm run build                                            # build tĩnh ra out/, phải sạch
-node scripts/test-format.mjs && node scripts/test-safe-href.mjs   # kiểm hàm định dạng, chặn link
+NEXT_PUBLIC_USE_MOCK=0 npm run build                     # build tĩnh ra out/, phải sạch
+test ! -e out/ui-preview/index.html                      # bản build thường không có /ui-preview/
+node scripts/test-format.mjs && node scripts/test-quantity.mjs && node scripts/test-safe-href.mjs
 ```
 
 **Build để deploy** (chỉ khi Duy yêu cầu): luôn truyền biến **trực tiếp** trên dòng lệnh, vì `frontend/.env.local` (mock) đè lên `.env.production`.
@@ -99,13 +132,6 @@ URL API từng môi trường và lệnh production: `doc/ops/moi-truong.md`.
 
 ## E2E
 
-Kịch bản Playwright (Python) ở `frontend/e2e/`, ví dụ `qa_sepay_checkout.py` (luồng thanh toán mock), `qa-lo8-shop-django.py` (với backend thật),
-`ra_soat_cms13_public.py` (bài viết công khai). Đọc đầu mỗi file để biết cần build mock hay backend thật.
-
-## `frontend/README.md` đã cũ ở đâu (tại `bf62b81`)
-
-- Ghi route `/shop/[itemCode]`. Thực tế là `/shop/item/?code=`.
-- Ghi "VietQR là payload tĩnh giả lập từ backend". Đã thay bằng cổng SePay (`features/checkout/`).
-- Không nhắc `features/`, `/bai-viet/`, `/trang/`, `scripts/check-no-mock.mjs`.
-- Ghi build bằng `npm run build && npm run start`. Shop là web tĩnh, deploy bằng Firebase, không dùng `next start`.
-- `features/checkout/README.md` ghi tra đơn "CHƯA trả `booked_expires_at`". Backend nay đã trả trường này khi đơn còn `BOOKED`.
+Kịch bản Playwright (Python) ở `frontend/e2e/`, ví dụ `qa_sepay_checkout.py` (luồng thanh toán mock), `qa-lo8-shop-django.py`
+(với backend thật), `about_page.py` (trang giới thiệu), `content_public_pages.py` (bài viết và trang CMS công khai).
+Đọc đầu mỗi file để biết cần build mock hay backend thật.

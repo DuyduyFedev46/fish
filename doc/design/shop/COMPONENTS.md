@@ -1,11 +1,10 @@
 # Đặc tả component Shop Cá Về
 
-> `ux-designer` · 2026-10-07 · Trạng thái: **CHỜ DUYỆT**.
+> `ux-designer` · 2026-10-07 · Trạng thái: **ĐÃ DUYỆT** (decisions 2026-10-10 (tối) lấy file này làm chuẩn).
 > Tài liệu cho `fe-dev` code giao diện Shop (`frontend/`) đúng thiết kế, và cho `qa-tester` có sẵn ca để kiểm.
 > Nguồn: `screens/*.dc.html` (hình, chữ, trạng thái), `UI-RULES.md` (luật), `HUONG-DAN-CODE.md` (cách code),
 > `PLAN.md` (lô), `DOI-CHIEU-CODE.md` (contract, khoảng trống), `DESIGN.md` gốc repo (token), số chuẩn `SO-CHUAN.md`.
-> Bảng component trực quan trên canvas: **CMP-1-Tokens … CMP-7-Overlay-Feedback** (thư mục `screens/`; lúc viết tài liệu này
-> các file `CMP-*` chưa có trong worktree, khi có thì đối chiếu thêm).
+> Bảng component trực quan trên canvas: **CMP-1-Tokens … CMP-7-Overlay-Feedback** (thư mục `screens/`, đã có đủ 7 file `CMP-*`).
 > **Số chuẩn thắng màn.** Khi file màn dùng số khác số chuẩn (vd. bo 16 cho hộp thoại máy tính), tài liệu này ghi số chuẩn
 > và liệt kê chỗ lệch ở mục "Chỗ đã chuẩn hoá". Muốn đổi số chuẩn thì hỏi Duy, không tự đổi trong code.
 
