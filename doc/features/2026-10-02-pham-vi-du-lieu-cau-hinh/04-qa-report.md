@@ -623,3 +623,39 @@ Xem mục "Lô 6 kiểm lại".
 - Không chạy lại (điều phối viên đã chạy): suite BE 3566, tsc, vitest 1325, check-no-mock, check-ai-chunks.
 - File mới chưa commit: `erp-console/e2e/data_scope_real_backend.py` (không chứa mật khẩu; `QA_PASSWORD` và `SEED_QA_IDS` lấy từ env). Cấu hình nhóm đã trả về mặc định sau mỗi ca (đối chiếu cuối phiên bằng API).
 - Dọn: tắt runserver 8731 và máy chủ tĩnh 3731; xoá DB SQLite tạm, mật khẩu và bảng mã trong scratchpad (giữ ảnh `scratchpad/shots`, `shots6`). `erp-console/out/` trong worktree hiện là bản build trỏ `127.0.0.1:8731` (đã gitignore), không có bản sao `out/` ở scratchpad.
+
+---
+
+# Vòng 2 — QA (10/10)
+HEAD `fa2b6e2`. BE thật (SQLite tạm + `seed_qa`, dữ liệu giả) + ERP build `USE_MOCK=0` trỏ BE local, Chromium headless 1280 và 360. Không sửa code sản phẩm, không commit.
+
+## Kết luận: APPROVED — B1 đã sửa, hồi quy xanh; L1 hết che cột ở 1280; còn 1 quan sát Low (L2) ở 360 với tên đăng nhập rất dài
+## Tổng: 291 ca · ✅ 291 · ❌ 0 · ⏸ 0 (chưa tính L2 ghi nhận)
+| Bộ chạy | Kết quả |
+|---|---|
+| `data_scope_real_backend.py` | **247/247 PASS** (giữ nguyên) |
+| `permissions_real_backend.py` | **33/33 PASS** (giữ nguyên) |
+| `REAL=1 standard_names_all_routes.py` (AI tắt) | **10/10 PASS** (vòng 1: 9/10), dòng "Nhật ký: không có 'Thao tác khác'" chuyển đỏ → xanh |
+| Script B1 riêng (API + UI) | 7 kiểm đều đạt |
+| Script đo L1 (bounding box, `elementFromPoint`) | 3 nhóm × 2 cỡ, xem dưới |
+
+## B1 (nhãn Nhật ký) — ✅ đã sửa, kiểm trên BE thật
+- API: `qa_owner` PUT `/api/staff/groups/warehouse_staff/capabilities/` `{"scopes":{"receipts":"created_by_me_today"}}` → 200; UI: màn Phân quyền đổi "Phạm vi Phiếu nhập" rồi "Lưu thay đổi" → version tăng.
+- `/audit-logs/` (1280 và 360): 13 dòng "Đổi phạm vi dữ liệu của nhóm", **0 dòng "Thao tác khác"**, không khoá thô (`change_group_data_scopes`, `scopes`, `created_by_me`, `view_*`), không tên/SĐT/địa chỉ khách giả. Ảnh `scratchpad/shots2/r2-audit-1280.png`, `r2-audit-360.png`.
+- API `/api/audit-logs/`: 13 dòng action `change_group_data_scopes`, `changes = {"receipts": {"from": "...", "to": "..."}}`, không tiền, không khoá giá vốn, không dữ liệu khách. Ngoài đường thuận: đổi lần 2 từ UI sau lần 1 từ API (hai nguồn khác nhau, version 13→15), đổi lại về `all` có cờ xác nhận mở rộng. Cấu hình nhóm đã trả về mặc định.
+- Console: 0 lỗi.
+
+## L1 (bảng Thành viên) — ✅ ở 1280; quan sát Low L2 ở 360
+Đo trên BE thật, `qa_owner`, `/permissions/detail/?group=…` cho `warehouse_staff` (thêm 1 thành viên tên dài, tài khoản nghỉ, đủ 4 nhóm khác), `delivery_staff`, `manager`:
+- **1280**: khung 644px, bảng 644px, **không cuộn ngang** (khung và trang). Cột "Nhân viên" [266–752], "Thao tác" [752–910], không chồng nhau, không cột nào bị che. Tên, tên đăng nhập, chip trạng thái ("Đang làm"/"Đã nghỉ") và nhóm khác đều đọc được trong ô Nhân viên (cột "Nhóm khác", "Vào nhóm lúc" ẩn có chủ đích dưới 720px khung, nội dung nhóm khác dời xuống ô tên). Nút "Bỏ khỏi nhóm" nằm trong khung, `elementFromPoint` trúng nút. Ảnh `shots2/r2-members-warehouse_staff-1280.png`.
+- Bấm "Bỏ khỏi nhóm" (cả 1280 và 360) → hộp "Bỏ … khỏi nhóm …?"; **Esc huỷ, hộp đóng, số dòng không đổi (4), BE không đổi**.
+- **360, dữ liệu thường** (`delivery_staff`, `manager`): bảng 324–334px; nút "Bỏ khỏi nhóm" và tên, tên đăng nhập, trạng thái thấy ngay, trang không cuộn ngang (`docScroll` 360=360). Ảnh `shots2/r2-members-delivery_staff-360.png`.
+- **L2 (Low, ghi nhận, không chặn):** ở 360 khi có thành viên có tên đăng nhập dài (mono, không xuống dòng): 22 ký tự → nút lấn 8px ra ngoài khung (vẫn bấm được); **52 ký tự → bảng rộng 535px trong khung 324px, cột "Thao tác" nằm hẳn ngoài khung cho mọi dòng** (phải cuộn ngang trong khung, không có gợi ý cuộn), tên đăng nhập bị cắt. Trang vẫn không cuộn ngang; bấm được qua cuộn trong khung; không cột nào bị che chồng. Tên đăng nhập BE cho tới 150 ký tự (`staff/services.py:145`). Gợi ý: cho tên đăng nhập `overflow-wrap:anywhere`/`word-break` ở ô Nhân viên. Ảnh `shots2/r2-members-warehouse_staff-360.png`.
+
+## Hồi quy / rò dữ liệu
+- Console trình duyệt: 0 lỗi ở mọi ca vòng 2. Log BE (`r2-be.log`, 1506 dòng): 0 Traceback, 0 phản hồi 5xx, 0 SĐT/tên khách giả, 0 query `q=`.
+- Rò giá vốn / dữ liệu cá nhân: không phát hiện (nhật ký, `/audit-logs/` API, DOM đã quét). BE không đổi từ vòng 1.
+- Dữ liệu tạm: user `nguyen.van.a.kho1` chỉ trong DB SQLite tạm đã xoá.
+
+## Dọn dẹp
+Đã tắt runserver 8731 và máy chủ tĩnh 3731, xoá SQLite tạm, mật khẩu, bảng mã, script tạm. Ảnh giữ ở `scratchpad/shots2`. **`erp-console/out/` đã build lại bản staging** (`NEXT_PUBLIC_API_BASE=https://cangca-api-staging-…`, exit 0; không còn chuỗi `127.0.0.1:8731`).
