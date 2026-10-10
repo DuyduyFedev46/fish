@@ -227,3 +227,7 @@ Hồ sơ: `doc/features/2026-09-26-sepay-cong-thanh-toan/`.
 - Giữ quyết định 08/10: câu 3 không chặn, câu 4 không che, BR-TT-18 ghi vào spec gốc, đổi nhãn vai "CSKH".
 - **Test PostgreSQL (câu 5):** không chạy trên PostgreSQL cài ở máy. Chạy trên cloud, với DB test riêng, không trỏ vào staging hay production.
 - **Production chưa lên.** Còn nhiều việc. Xong đợt này thì tách nhánh để làm Shop.
+
+## 2026-10-10 (chiều) — Tem in và việc còn lại — [DUY CHỐT]
+- **Tem in phiếu giao** chỉ hiện **4 số cuối** SĐT người nhận (`xxxxxx4567`). Các chỗ che SĐT khác giữ nguyên. Trả lời Q1 trong `02c-quyet-dinh-08-10.md`.
+- Duy đồng ý các việc còn lại: sửa nợ L2 (bảng Thành viên ở 360), dọn worktree đã gộp.
