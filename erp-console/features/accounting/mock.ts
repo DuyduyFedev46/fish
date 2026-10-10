@@ -323,7 +323,8 @@ let salesMode: SalesMode = "ok";
 
 function salesRows(me: Me): SalesInvoiceRow[] {
   const showCost = me.can_view_cost;
-  const showName = can(me, "sales.view_customer_list");
+  // §2.7: BE trả tên khách theo V2 `sales.view_order_customer_info` (PV-07); không có V2 → null kèm "not_permitted".
+  const showName = can(me, "sales.view_order_customer_info");
   return SALES_SEEDS.map((x) => {
     const issued = new Date(Date.now() - x.ago * DAY - ((x.id * 7) % 11) * 3_600_000);
     const row: SalesInvoiceRow = {
@@ -332,6 +333,7 @@ function salesRows(me: Me): SalesInvoiceRow[] {
       sales_order: x.order,
       order_code: `DH${x.order}`,
       customer_name: showName ? MOCK_CUSTOMERS[x.customer] : null,
+      customer_hidden_reason: showName ? null : "not_permitted",
       issued_at: issued.toISOString(),
       amount: `${x.amount}.00`,
       status: x.cancelled ? "CANCELLED" : "ISSUED",

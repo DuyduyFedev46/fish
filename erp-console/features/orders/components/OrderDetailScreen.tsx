@@ -34,7 +34,6 @@ import type { SubmitConflict } from "@/shared/ui/form/useSubmit";
 import { Icon } from "@/shared/ui/Icon";
 import { DataTable, type Column } from "@/shared/ui/list/DataTable";
 import { useToast } from "@/shared/ui/overlay/Toast";
-import { PersonalText } from "@/shared/ui/PersonalText";
 import { ConflictBanner } from "@/shared/ui/states/ConflictBanner";
 import { getOrder } from "../api";
 import { DetailGate } from "../DetailGate";
@@ -56,6 +55,7 @@ import { useDetail, type DetailState } from "../useDetail";
 import { useIdParam } from "../useIdParam";
 import { holdLeftText, useHoldExpired, useNow } from "../useNow";
 import { CancelOrderModal } from "./CancelOrderModal";
+import { CustomerCell } from "./CustomerCell";
 import { ConfirmPaymentModal } from "./ConfirmPaymentModal";
 import { RefundModal } from "./RefundModal";
 import s from "../orders.module.css";
@@ -73,7 +73,7 @@ export function OrderDetailScreen({ renderAi }: Props) {
   const id = useIdParam();
   const detail = useDetail<OrderDetail>(id, getOrder);
   return (
-    <DetailGate id={id} detail={detail} noun={M.detailNoun}>
+    <DetailGate id={id} detail={detail} noun={M.detailNoun} listHref="/orders/">
       {(order) => <OrderDetailBody order={order} detail={detail} renderAi={renderAi} />}
     </DetailGate>
   );
@@ -321,7 +321,7 @@ function OrderDetailBody({ order: o, detail, renderAi }: { order: OrderDetail; d
                   label={M.fieldCustomer}
                   value={
                     <>
-                      <PersonalText value={o.customer.name} />
+                      <CustomerCell value={o.customer.name} reason={o.customer_hidden_reason} />
                       {customerHref && (
                         <>
                           {" · "}
@@ -342,11 +342,11 @@ function OrderDetailBody({ order: o, detail, renderAi }: { order: OrderDetail; d
                         {o.customer.phone}
                       </a>
                     ) : (
-                      <PersonalText value={o.customer.phone} />
+                      <CustomerCell value={o.customer.phone} reason={o.customer_hidden_reason} />
                     )
                   }
                 />
-                <InfoField label={M.fieldAddress} value={<PersonalText value={o.customer.address} />} />
+                <InfoField label={M.fieldAddress} value={<CustomerCell value={o.customer.address} reason={o.customer_hidden_reason} />} />
                 {o.delivery &&
                   (canOpenDelivery ? (
                     <InfoField label={M.fieldDelivery} kind="link" mono value={o.delivery.code} onOpen={() => setLookupDelivery(true)} />

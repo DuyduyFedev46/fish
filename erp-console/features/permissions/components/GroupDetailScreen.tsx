@@ -8,6 +8,7 @@
 // Việc "Xem khách hàng" đang bật ghi rõ "Tất cả khách" + cảnh báo (quyết định #13, bất biến 9).
 // Mã nhóm trong URL là mã hệ thống (không có tên người). Không ghi storage/log.
 
+import { objectLabelOf } from "../objectLabel";
 import { useCallback, useId, useMemo, useState } from "react";
 import { useAuth } from "@/features/auth/components/AuthProvider";
 import { toTimelineEntries } from "@/features/guidance/detailAdapters";
@@ -107,8 +108,11 @@ function GroupDetailBody({ group: g, detail }: { group: GroupDetail; detail: Loa
   const values = useMemo(() => effectiveValues(g.data_scope_values, draft), [g.data_scope_values, draft]);
   const sections = useMemo(() => sectionsOf(registry), [registry]);
   const label = g.label || groupLabel(g.code);
+  // `labelOf` đọc registry GỐC `g.registry` (không phải bản đã lọc AI ở `registry`) có chủ đích: nhãn trong chip `requires` của một việc vẫn phải tra
+  // được dù việc đó đang bị ẩn. Đừng "đồng bộ" thành bản đã lọc (review techlead F1 gộp main, L2).
   const labelOf = useCallback((key: string) => g.registry.find((r) => r.key === key)?.label ?? key, [g.registry]);
-  const objectLabel = useCallback((key: string) => g.data_scopes.find((r) => r.key === key)?.label ?? key, [g.data_scopes]);
+  // Khoá `widened` có thể là đối tượng phạm vi hoặc việc V2 (`view_order_customer_info`), nên tra thêm nhãn việc ở registry gốc.
+  const objectLabel = useCallback((key: string) => objectLabelOf(key, g.data_scopes, g.registry), [g.data_scopes, g.registry]);
 
   const afterMembers = (message: string) => {
     toast.success(message);
@@ -120,17 +124,30 @@ function GroupDetailBody({ group: g, detail }: { group: GroupDetail; detail: Loa
     () => [
       {
         key: "name",
-        header: M.colName,
+        header: M.colMember,
         render: (m) => (
-          <span>
+          <span className={s.memberCell}>
             <span className={s.memberName}>{m.display_name || m.username}</span>
+            <span className={s.memberMeta}>
+              <span className={s.memberUser}>{m.username}</span>
+              <Chip table={ENUMS.staffStatus} value={m.is_active ? "ACTIVE" : "INACTIVE"} />
+            </span>
+            {m.other_groups.length > 0 && (
+              <span className={`${s.tags} ${s.memberGroupsNarrow}`}>
+                {m.other_groups.map((c) => (
+                  <span key={c} className="tag">
+                    {groupLabel(c)}
+                  </span>
+                ))}
+              </span>
+            )}
           </span>
         ),
       },
-      { key: "user", header: M.colUsername, mono: true, render: (m) => m.username },
       {
         key: "other",
         header: M.colOtherGroups,
+        hideBelow: 720,
         render: (m) =>
           m.other_groups.length === 0 ? (
             <span className="muted">{M.noOtherGroups}</span>
@@ -145,7 +162,6 @@ function GroupDetailBody({ group: g, detail }: { group: GroupDetail; detail: Loa
           ),
       },
       { key: "added", header: M.colAddedAt, num: true, hideBelow: 720, render: (m) => (m.added_at ? dateTime(m.added_at) : <span className="muted">—</span>) },
-      { key: "status", header: M.colStatus, render: (m) => <Chip table={ENUMS.staffStatus} value={m.is_active ? "ACTIVE" : "INACTIVE"} /> },
       ...(canManageMembers
         ? [
             {
@@ -233,16 +249,18 @@ function GroupDetailBody({ group: g, detail }: { group: GroupDetail; detail: Loa
       </InfoGrid>
 
       <Section title={M.membersTitle} count={M.members(g.members.length)} aria-label={M.membersTitle} flush>
-        <DataTable
-          caption={M.membersCaption}
-          columns={memberCols}
-          rows={g.members}
-          rowKey={(m) => m.id}
-          rowHref={(m) => `/staff/detail/?id=${m.id}`}
-          noun={M.memberNoun}
-          empty={{ icon: "group_off", title: M.membersEmpty, hint: canManageMembers ? M.membersEmptyHint : undefined }}
-          canViewCost={false}
-        />
+        <div className={canManageMembers ? s.memberTable : undefined}>
+          <DataTable
+            caption={M.membersCaption}
+            columns={memberCols}
+            rows={g.members}
+            rowKey={(m) => m.id}
+            rowHref={(m) => `/staff/detail/?id=${m.id}`}
+            noun={M.memberNoun}
+            empty={{ icon: "group_off", title: M.membersEmpty, hint: canManageMembers ? M.membersEmptyHint : undefined }}
+            canViewCost={false}
+          />
+        </div>
       </Section>
 
       <Section title={M.tasksTitle} aria-label={M.tasksTitle}>

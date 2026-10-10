@@ -1,9 +1,10 @@
 "use client";
 
 // Cổng trạng thái của trang chi tiết: đang dựng · URL không có id · đang tải (khung xương) · 403 (Không có quyền) ·
-// 404 (Không tìm thấy — cũng là câu cho NV giao mở đơn ngoài phiếu của mình, BR-PQ-12) · lỗi (Thử lại) · có dữ liệu.
+// mất quyền giữa chừng (đã xem, tải lại 404) · 404 (Không tìm thấy — cũng là câu cho NV giao mở đơn ngoài phiếu của mình, BR-PQ-12) · lỗi (Thử lại) · có dữ liệu.
 
 import { useAuth } from "@/features/auth/components/AuthProvider";
+import { ScopeLostInApp } from "@/features/auth/components/AppStates";
 import { homePath } from "@/shared/lib/nav";
 import { NoPermission } from "@/shared/ui/states/NoPermission";
 import { NotFoundScreen } from "@/shared/ui/states/NotFoundScreen";
@@ -16,6 +17,8 @@ type Props<T> = {
   id: number | null | undefined;
   detail: DetailState<T>;
   noun: string;
+  /** PV-13: nút "Về danh sách" của màn mất quyền (đường quay lại của màn). */
+  listHref: string;
   children: (data: T) => React.ReactNode;
 };
 
@@ -34,12 +37,13 @@ export function DetailSkeleton({ noun }: { noun: string }) {
   );
 }
 
-export function DetailGate<T>({ id, detail, noun, children }: Props<T>) {
+export function DetailGate<T>({ id, detail, noun, listHref, children }: Props<T>) {
   const { me } = useAuth();
   const home = me ? homePath(me) : undefined;
   if (id === undefined) return <DetailSkeleton noun={noun} />;
   if (id === null) return <NotFoundScreen homeHref={home} />;
   if (detail.status === "forbidden") return <NoPermission homeHref={home} />;
+  if (detail.status === "scope_lost") return <ScopeLostInApp listHref={listHref} />;
   if (detail.status === "notfound") return <NotFoundScreen homeHref={home} />;
   if (detail.status === "error") return <ErrorScreen homeHref={home} onRetry={() => void detail.reload()} />;
   if (detail.status === "loading" || !detail.data) return <DetailSkeleton noun={noun} />;

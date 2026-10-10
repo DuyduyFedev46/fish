@@ -2,6 +2,8 @@
 // S11 (POST /api/sales/orders/{id}/confirm-payment) trong 02-stories.md. Tiền/kg là CHUỖI thập phân (bất biến #7).
 // Field đánh dấu optional = contract không ghi rõ ở chi tiết; FE chịu được khi BE không trả (xem 03-dev-notes.md, L7 FE).
 
+import type { CustomerHiddenReason } from "@/shared/lib/personalData";
+
 export type OrderStatus = "BOOKED" | "PAID" | "PROCESSING" | "COMPLETED" | "CANCELLED" | "AUTO_CANCELLED";
 
 /** Một dòng của GET /api/sales/orders/ (phân trang DRF, 20 dòng/trang). */
@@ -13,6 +15,8 @@ export type OrderListItem = {
   /** `null` = đã ẩn theo thời hạn (NV giao, phiếu giao kết thúc quá 7 ngày — SR-PII-02); "" = chưa có. */
   customer_name: string | null;
   customer_phone: string | null;
+  /** §2.7 — lý do ô khách là `null`: "expired" (quá cửa sổ) | "not_permitted" (không có V2). null/thiếu = không bị che hoặc không kèm lý do. */
+  customer_hidden_reason?: CustomerHiddenReason | null;
   total_amount: string;
   created_at: string;
   /** Mốc hết giữ chỗ (BR-BH-03) — BE trả; FE chỉ đếm lùi, không tự tính. */
@@ -139,6 +143,8 @@ export type OrderDetail = {
   /** Cả ba trường là `null` khi đã ẩn theo thời hạn (NV giao, phiếu giao kết thúc quá 7 ngày — SR-PII-02). */
   /** `id` là FE đề xuất (BE Lô 3 chưa trả) — có thì mới dựng được liên kết "Mở trang khách". */
   customer: { id?: number; name: string | null; phone: string | null; address: string | null };
+  /** §2.7 — lý do che `customer` (xem OrderListItem). */
+  customer_hidden_reason?: CustomerHiddenReason | null;
   lines: OrderLine[];
   allocations: OrderAllocation[];
   invoice: { id: number; code: string; issued_at: string | null } | null;
@@ -349,8 +355,11 @@ export type RefundQueueItem = {
   request_id?: string | null;
   /** Có khi phiếu gắn `sales_invoice`; null khi gắn thẳng giao dịch không hoá đơn (S13). */
   order_code?: string | null;
-  customer_name?: string;
-  customer_phone?: string;
+  /** `null` khi bị che theo V2 hoặc quá cửa sổ (kèm `customer_hidden_reason`). */
+  customer_name?: string | null;
+  customer_phone?: string | null;
+  /** §2.7 — lý do che tên/SĐT khách (xem OrderListItem). */
+  customer_hidden_reason?: CustomerHiddenReason | null;
   /** Mã GD của khoản tiền VÀO ban đầu (không phải mã GD hoàn) — để Lộc đối chiếu số tài khoản trên sao kê (Q13). */
   source_bank_txn_id?: string;
   /** Lý do lần báo thất bại gần nhất (BR-HT-09); `retry` xoá về "" (giả định dev BE #4). */

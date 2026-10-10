@@ -33,7 +33,7 @@ export function saveGroupChanges(code: string, body: GroupSaveBody): Promise<Gro
 
 /**
  * POST /api/staff/groups/<code>/permissions-preview/ — xem trước ai bị ảnh hưởng, KHÔNG ghi gì (PV-09, PV-10 phía BE).
- * Lô F1: BE chưa có endpoint này và PUT mới (version, scopes) tới Lô 5, nên hai hàm chỉ chạy được ở bản mock; KHÔNG deploy FE này trước Lô 5.
+ * BE đã có endpoint này và PUT mới (version, scopes) từ Lô 5; bản mock mô phỏng đúng contract đó.
  */
 export function previewGroupChanges(code: string, body: GroupPreviewBody): Promise<ScopePreview> {
   return apiFetch<ScopePreview>(`${BASE}${encodeURIComponent(code)}/permissions-preview/`, { method: "POST", body, mock: mock() });

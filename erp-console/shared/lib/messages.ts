@@ -32,6 +32,14 @@ export const MSG = {
   noViewPermissionHint: "Nếu cần dùng mục này, hãy nhờ Chủ vựa cấp quyền cho tài khoản của bạn.",
   /** SR-PII-02: BE trả `null` cho dữ liệu khách của NV giao khi phiếu đã kết thúc quá hạn xem (mặc định 7 ngày). */
   personalDataHidden: "Đã ẩn (quá 7 ngày)",
+  /** §2.7: BE trả `customer_hidden_reason = "not_permitted"` khi người xem không có quyền xem thông tin khách (V2). */
+  personalDataNotPermitted: "Đã ẩn (không có quyền xem thông tin khách)",
+  /** PV-13-AC1: tải lại một mục đã xem mà BE trả 404 (phạm vi vừa thu hẹp). Chỉ khi màn ĐÃ có dữ liệu rồi. */
+  scopeLostTitle: "Bạn không còn quyền xem mục này.",
+  scopeLostHint: "Phạm vi dữ liệu của bạn vừa được thu hẹp. Nếu vẫn cần mục này, nhờ Quản lý hoặc Chủ vựa.",
+  /** PV-13-AC2: phiếu nhập do chính mình tạo từ hôm trước (D6 chỉ còn "do tôi tạo hôm nay"). */
+  scopeLostOwnReceiptEarlierDay: "Phiếu tạo từ hôm trước. Nhờ Quản lý xử lý tiếp.",
+  backToList: "Về danh sách",
   /** UI5: nút gửi không bị tắt khi thiếu ô — bấm thì báo ngay tại ô còn trống (nói cách sửa). */
   needUsername: "Nhập tên tài khoản của bạn.",
   needPassword: "Nhập mật khẩu.",

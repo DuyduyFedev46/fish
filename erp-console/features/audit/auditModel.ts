@@ -89,6 +89,7 @@ export const AUDIT_ACTION_LABELS: Readonly<Record<string, string>> = {
   staff_update: "Sửa hồ sơ nhân viên",
   staff_groups_change: "Đổi nhóm quyền",
   change_group_capabilities: "Đổi phân quyền nhóm",
+  change_group_data_scopes: "Đổi phạm vi dữ liệu của nhóm",
   staff_password_reset: "Đặt lại mật khẩu",
   staff_deactivate: "Cho nghỉ",
   staff_reactivate: "Cho làm lại",

@@ -29,6 +29,7 @@ import { FormAlert } from "@/shared/ui/form/FormAlert";
 import { conflictOf, isConflictError, type SubmitConflict } from "@/shared/ui/form/useSubmit";
 import { useToast } from "@/shared/ui/overlay/Toast";
 import { ConflictBanner } from "@/shared/ui/states/ConflictBanner";
+import { ScopeLostInApp } from "@/features/auth/components/AppStates";
 import { ErrorScreen } from "@/shared/ui/states/ErrorScreen";
 import { NoPermission } from "@/shared/ui/states/NoPermission";
 import { NotFoundScreen } from "@/shared/ui/states/NotFoundScreen";
@@ -42,7 +43,7 @@ import { RecordCallModal } from "./RecordCallModal";
 import { UnconfirmModal } from "./UnconfirmModal";
 import s from "../confirmation.module.css";
 
-type Load = "loading" | "ready" | "error" | "notfound" | "forbidden";
+type Load = "loading" | "ready" | "error" | "notfound" | "forbidden" | "scope_lost";
 type Modals = null | "call" | "callback" | "recipient" | "decide" | "unconfirm";
 type History = { state: "loading" } | { state: "error" } | { state: "forbidden" } | { state: "notfound" } | { state: "ready"; entries: TimelineEntry[]; truncated: boolean };
 
@@ -66,6 +67,18 @@ export function ConfirmationDetailScreen() {
   const seq = useRef(0);
   // Đã có dữ liệu đơn chưa (ref để loadDetail không đọc state cũ): tải lại lỗi thì giữ dữ liệu cũ và báo, không thay bằng màn lỗi.
   const hasDetail = useRef(false);
+
+  // PV-13: đơn vừa ra ngoài phạm vi (đã có dữ liệu mà 404) → xoá hết dữ liệu khách đã tải. Chưa có dữ liệu thì vẫn là "Không tìm thấy".
+  const loseScope = useCallback(() => {
+    if (!hasDetail.current) {
+      setLoad("notfound");
+      return;
+    }
+    setDetail(null);
+    setHistory({ state: "loading" });
+    setModal(null);
+    setLoad("scope_lost");
+  }, []);
 
   const loadHistory = useCallback(() => {
     if (id === null) return;
@@ -95,15 +108,17 @@ export function ConfirmationDetailScreen() {
         setConflict(null);
       } catch (err) {
         if (mine !== seq.current) return;
-        if (err instanceof ApiError && err.status === 404) setLoad("notfound");
-        else if (err instanceof ApiError && err.status === 403) setLoad("forbidden");
+        if (err instanceof ApiError && err.status === 404) {
+          if (initial) setLoad("notfound");
+          else loseScope();
+        } else if (err instanceof ApiError && err.status === 403) setLoad("forbidden");
         else if (!hasDetail.current) setLoad("error");
         else setActionError("Chưa tải lại được đơn. Kiểm tra mạng rồi bấm Tải lại.");
       } finally {
         if (mine === seq.current) setReloading(false);
       }
     },
-    [id],
+    [id, loseScope],
   );
 
   useEffect(() => {
@@ -129,6 +144,7 @@ export function ConfirmationDetailScreen() {
         <div className={s.skelRow} />
       </SkeletonScreen>
     );
+  if (load === "scope_lost") return <ScopeLostInApp listHref={HOME} />;
   if (load === "notfound") return <NotFoundScreen homeHref={HOME} />;
   if (load === "forbidden") return <NoPermission homeHref={HOME} />;
   if (load === "error" || !detail) return <ErrorScreen homeHref={HOME} onRetry={() => void loadDetail(true)} />;
@@ -155,7 +171,7 @@ export function ConfirmationDetailScreen() {
       await claimConfirmationTask(item.note_id);
       next();
     } catch (err) {
-      if (err instanceof ApiError && err.status === 404) setLoad("notfound");
+      if (err instanceof ApiError && err.status === 404) loseScope();
       else if (isConflictError(err)) setConflict(conflictOf(err));
       else {
         setActionError(err instanceof Error && err.message ? err.message : "Chưa giữ được đơn để gọi. Bấm lại để thử lại.");

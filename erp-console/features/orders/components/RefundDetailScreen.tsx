@@ -23,7 +23,6 @@ import { Timeline } from "@/shared/ui/detail/Timeline";
 import type { SubmitConflict } from "@/shared/ui/form/useSubmit";
 import { Icon } from "@/shared/ui/Icon";
 import { useToast } from "@/shared/ui/overlay/Toast";
-import { PersonalText } from "@/shared/ui/PersonalText";
 import { ConflictBanner } from "@/shared/ui/states/ConflictBanner";
 import { getRefund, listOrders } from "../api";
 import { DetailGate } from "../DetailGate";
@@ -32,6 +31,7 @@ import { REFUND_STEPS, refundActionPlan, refundPath, refundTimeline } from "../o
 import type { RefundQueueItem } from "../types";
 import { useDetail, type DetailState } from "../useDetail";
 import { useIdParam } from "../useIdParam";
+import { CustomerCell } from "./CustomerCell";
 import { ConfirmRefundModal, MarkRefundFailedModal, RetryRefundModal } from "./RefundActionModals";
 
 type Props = {
@@ -43,7 +43,7 @@ export function RefundDetailScreen({ renderAi }: Props) {
   const id = useIdParam();
   const detail = useDetail<RefundQueueItem>(id, getRefund);
   return (
-    <DetailGate id={id} detail={detail} noun={M.refundNoun}>
+    <DetailGate id={id} detail={detail} noun={M.refundNoun} listHref="/orders/refunds/">
       {(r) => <RefundDetailBody refund={r} detail={detail} renderAi={renderAi} />}
     </DetailGate>
   );
@@ -156,8 +156,8 @@ function RefundDetailBody({ refund: r, detail, renderAi }: { refund: RefundQueue
             )
           }
         />
-        <InfoField label={M.fieldRefundCustomer} value={<PersonalText value={r.customer_name} />} />
-        <InfoField label={M.fieldRefundPhone} num value={<PersonalText value={r.customer_phone} />} />
+        <InfoField label={M.fieldRefundCustomer} value={<CustomerCell value={r.customer_name} reason={r.customer_hidden_reason} />} />
+        <InfoField label={M.fieldRefundPhone} num value={<CustomerCell value={r.customer_phone} reason={r.customer_hidden_reason} />} />
         <InfoField label={M.fieldRefundSourceTxn} mono value={r.source_bank_txn_id || null} />
         <InfoField label={M.fieldRefundRef} mono value={r.bank_txn_ref || null} />
         {r.method && <InfoField label={M.fieldRefundMethod} value={<Chip table={ENUMS.refundMethod} value={r.method} />} />}

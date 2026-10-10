@@ -1,7 +1,7 @@
 """
 Mô tả phạm vi dữ liệu của nhóm cho màn Phân quyền (W3i/W3h), PV-02, 02b §2.1–§2.2.
 
-Lô 2: ĐỌC (`data_scopes` 8 dòng, `data_scope_values` 6 đối tượng sửa được, chuỗi `scopes` cũ).
+Lô 2: ĐỌC (`data_scopes` 8 dòng, `data_scope_values` 6 đối tượng sửa được; chuỗi `scopes` cũ đã bỏ ở Lô 6).
 Lô 5 (PV-08..PV-10): kiểm giá trị (`parse_scope_changes`), tầm với và mở rộng dữ liệu khách (`reach`, `widened_objects`, 02b §2.5),
 xem trước (`preview_group_changes`, 02b §2.4), áp (`apply_scope_changes`). Việc đổi nhóm có khoá lạc quan, AuditLog và gọi các hàm này
 nằm ở `capabilities/services.py`.
@@ -20,19 +20,6 @@ from .resolver import resolve_data_scopes
 OWNER_NOTE = "Chủ luôn thấy tất cả"
 INVOICES_NOTE = "Theo Đơn hàng"
 DEFAULT_VERSION = 1
-
-# Chuỗi `scopes` cũ (FE tới Lô 6): giữ nguyên nhãn đang dùng, dựng từ cấu hình thay vì bảng cố định.
-LEGACY_ORDERS = {
-    "all": "Tất cả",
-    "assigned_deliveries": "Được gán",
-    "assigned_or_confirmation": "Được gán hoặc trong phạm vi gọi xác nhận",
-}
-LEGACY_DELIVERIES = {"all": "Tất cả", "assigned": "Được gán"}
-LEGACY_ALL_CUSTOMERS = "Tất cả khách"
-LEGACY_ASSIGNED = "Được gán"
-LEGACY_NONE = "Không xem"
-CUSTOMER_LIST_PERM = "sales.view_customer_list"
-CUSTOMER_PERM = "sales.view_customer"
 
 
 def load_stored(group_ids) -> dict:
@@ -135,23 +122,68 @@ def describe_data_scopes(group, held, stored) -> list:
     return [_row(group, obj, held, stored) for obj in catalog.OBJECTS]
 
 
-def legacy_scopes(group, held, stored) -> dict:
-    """Chuỗi `scopes` cũ ({orders, deliveries, customers}) dựng từ cấu hình đã lưu; bỏ ở Lô 6 cùng lúc FE đổi kiểu.
+# --- Lô 7 (PV-14): phạm vi của CHÍNH người đăng nhập, cho `GET /api/auth/me/` (02b §6.1.3) -----------------------------
 
-    `customers` vẫn theo quyền thực tế (M2, bất biến 9): nhóm có `sales.view_customer_list` -> "Tất cả khách"; không thì
-    "Được gán" chỉ khi cấu hình là `assigned_deliveries` và nhóm có `sales.view_customer`, còn lại "Không xem"."""
-    values = data_scope_values(group, stored)
-    if CUSTOMER_LIST_PERM in held or _is_owner(group):
-        customers = LEGACY_ALL_CUSTOMERS
-    elif values["customers"] == "assigned_deliveries" and CUSTOMER_PERM in held:
-        customers = LEGACY_ASSIGNED
-    else:
-        customers = LEGACY_NONE
-    return {
-        "orders": LEGACY_ORDERS[values["orders"]],
-        "deliveries": LEGACY_DELIVERIES[values["deliveries"]],
-        "customers": customers,
-    }
+NO_VIEW = "none"
+NO_VIEW_LABEL = "Không xem"
+AUDIT_ALL_LABEL = "Tất cả"
+# D2 có bảng chữ riêng (nhãn catalog của D1 nói về "đơn", không nói về "hoá đơn").
+INVOICE_VALUE_LABELS = {
+    "all": "Hoá đơn của tất cả đơn",
+    "assigned_deliveries": "Hoá đơn của đơn có phiếu giao gán cho tôi",
+    "assigned_or_confirmation": "Hoá đơn của đơn có phiếu gán cho tôi hoặc trong phạm vi gọi xác nhận",
+}
+
+
+def _value_label(obj, value) -> str:
+    if value == NO_VIEW:
+        return NO_VIEW_LABEL
+    if obj.key == "invoices":
+        return INVOICE_VALUE_LABELS.get(value, value)
+    if obj.key == "audit_log":
+        return AUDIT_ALL_LABEL
+    for option in catalog.ranked_options(obj):
+        if option.value == value:
+            return option.label
+    return value
+
+
+def _own_row(obj, value, via_group) -> dict:
+    if value == NO_VIEW:
+        via_group = None
+    return {"key": obj.key, "label": obj.label, "value": value, "value_label": _value_label(obj, value),
+            "via_group": via_group}
+
+
+def describe_own_data_scopes(user, *, erp_access=None) -> list:
+    """8 dòng D1..D8 cho `user` (02b §6.1.3). Giá trị là đúng giá trị mà hàm phạm vi của từng view đọc:
+    không chép lại luật, chỉ gọi `resolve_data_scopes` và `confirmation_scope_value`.
+
+    Người không vào được ERP (D-3) thấy `none` ở cả 8 dòng, vì mọi API ERP đều trả 403 cho họ. Đối tượng mà người đó không có
+    permission cổng nào (kể cả quyền gán riêng) cũng `none`, khớp 403 ở Tầng 1. Chỉ mã và nhãn cố định, không dữ liệu khách.
+    `erp_access`: kết quả `has_erp_access(user)` nếu nơi gọi đã có, để khỏi hỏi DB lần nữa."""
+    from apps.accounts.auth.authentication import has_erp_access
+
+    if erp_access is None:
+        erp_access = has_erp_access(user)
+    if not erp_access:
+        return [_own_row(obj, NO_VIEW, None) for obj in catalog.OBJECTS]
+    resolved = resolve_data_scopes(user)
+    rows = []
+    for obj in catalog.OBJECTS:
+        via_group = resolved[obj.key].via_group
+        full_access = user.is_superuser or via_group == roles.OWNER
+        if not full_access and not any(user.has_perm(perm) for perm in obj.gate_perms):
+            rows.append(_own_row(obj, NO_VIEW, None))
+        elif obj.key == "confirmation":
+            from apps.delivery.confirmation.scope import confirmation_scope_value
+
+            rows.append(_own_row(obj, confirmation_scope_value(user), via_group))
+        elif obj.key == "audit_log":
+            rows.append(_own_row(obj, "all", via_group))
+        else:
+            rows.append(_own_row(obj, resolved[obj.key].value, via_group))
+    return rows
 
 
 # --- Lô 5: kiểm, mở rộng dữ liệu khách, xem trước, áp (PV-08, PV-09; 02b §2.3–§2.5) --------------------------------

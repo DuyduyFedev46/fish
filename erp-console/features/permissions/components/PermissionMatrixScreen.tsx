@@ -7,6 +7,7 @@
 // (quyết định #13). Registry (danh sách việc) lấy từ chi tiết nhóm Chủ vì danh sách nhóm không kèm registry.
 // Mọi con số lấy từ BE; ô chỉ đổi sau khi BE nhận (không cập nhật lạc quan). Không ghi gì vào storage/URL/log.
 
+import { objectLabelOf } from "../objectLabel";
 import Link from "next/link";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/features/auth/components/AuthProvider";
@@ -88,7 +89,7 @@ export function PermissionMatrixScreen() {
     void reloadRegistry();
   }, [reloadList, reloadRegistry]);
   const toggler = useCapabilityToggle({ registry, onSaved, onConflict });
-  const objectLabel = useCallback((key: string) => reg.data?.data_scopes.find((r) => r.key === key)?.label ?? key, [reg.data]);
+  const objectLabel = useCallback((key: string) => objectLabelOf(key, reg.data?.data_scopes, reg.data?.registry), [reg.data]);
   const sections = useMemo(() => sectionsOf(registry), [registry]);
 
   const reloadAll = () => {

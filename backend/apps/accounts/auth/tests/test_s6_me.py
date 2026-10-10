@@ -52,6 +52,7 @@ class S6MeTests(TestCase):
              "group_labels", "capabilities",  # S47 chỉ thêm 2 key
              "must_change_password",  # S48 thêm 1 key
              "is_superuser",  # Duy 08/10 câu 1
+             "data_scopes",  # PV-14 (Lô 7)
              "ai_features_enabled"},  # lô dọn chữ AI thêm 1 key
         )
 

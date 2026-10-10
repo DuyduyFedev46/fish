@@ -273,7 +273,6 @@ def describe_group(code) -> dict:
             for c in registry.visible_capabilities()
         ],
         "data_scopes": scope_services.describe_data_scopes(group, held, stored),
-        "scopes": scope_services.legacy_scopes(group, held, stored),
         "timeline": group_timeline(group),
     })
     return body
