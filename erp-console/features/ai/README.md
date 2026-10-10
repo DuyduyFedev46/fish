@@ -10,7 +10,7 @@ Module này chỉ đặt logic AI của **erp-console** — không đụng `fron
 | `types.ts` | Kiểu contract Lô 1–2 (S01/S02/S03/S05) |
 | `api.ts` | Gọi HTTP: status, catalog (nhẹ — **không** import runtime). Nhật ký đã chuyển sang `features/audit` (Lô 15) |
 | `settings/` · `policy/` · `report/` | Lô 15: màn "AI của tôi" (`/ai/settings/`), "Chính sách AI" (`/ai/policy/`), "Báo cáo AI" (`/ai/report/`); mỗi thư mục có `api.ts` + `mock.ts` + `view.ts` (logic thuần) + `components/` + `.module.css` |
-| `commands.ts` | Kênh thực thi lệnh (execute/propose/confirm) (nhẹ — **không** import runtime) |
+| `commands/` | Kênh thực thi lệnh (execute/propose/confirm): `index.ts`, `call.ts`, `planner.ts`, `search.ts`, `budget.ts` (nhẹ — **không** import runtime) |
 | `mock.ts` | Mock endpoint Lô 1–2 (status, catalog, execute/propose) — dữ liệu giả |
 | `commandGroups.ts` | Giá trị nhóm lệnh / mức nhạy cảm / id lệnh "Nhập lô" hiện hành (tên tiếng Anh, khớp BE). P8b Lô 5 đã gỡ `legacyIds.ts` (lớp chuẩn hoá tên cũ); id lệnh và khoá `caps`/`overrides` dùng đúng id BE trả |
 | `consent.ts` | Cờ đồng ý tải model (boolean thuần, localStorage — không dữ liệu cá nhân) |
@@ -51,7 +51,7 @@ Module này chỉ đặt logic AI của **erp-console** — không đụng `fron
 
 ## Ranh giới
 
-- `api.ts`, `commands.ts` **không** import `runtime/` `voice/` `chat/`.
+- `api.ts`, `commands/` **không** import `runtime/` `voice/` `chat/`.
 - `shared/` và `features/auth/` **không** import gì từ `features/ai`.
 - Không có barrel `index.ts` — import đường dẫn cụ thể.
 - Mọi `dynamic(() => import(...))` nặng đều đứng sau cánh cổng.
@@ -62,5 +62,5 @@ Module này chỉ đặt logic AI của **erp-console** — không đụng `fron
 - **COOP/COEP (H7)**: chạy wasm threads cần header Cross-Origin — việc deploy/ops, ghi rõ trong dev notes.
 - **python http.server phục vụ file test không hỗ trợ Range** → downloader tự chuyển một lượt streaming.
 - **E2E**: QA thêm kịch bản bật `__caveMock.ai("on")` + `__caveMock.aiConsent(true)`; khung chờ "Trợ lý đang được nối, sắp có" giữ nguyên khi AI tắt (mặc định mock tắt).
-- **S02 UI** (đề xuất → xác nhận trên màn) chưa làm — `commands.ts` sẵn hàm, lô sau ghép.
+- **S02 UI** (đề xuất → xác nhận trên màn) chưa làm — `commands/` sẵn hàm, lô sau ghép.
 - **S03 mock**: `mockAuditLogs` đã chuyển sang `features/audit/mock.ts` (Lô 15).

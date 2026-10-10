@@ -1,6 +1,6 @@
 ---
 name: feature
-description: Điều phối workflow đội dự án Cá Về (BA → PO → Tech Lead → BE ∥ FE → QA → Review → Deploy) bằng các subagent product-manager, ba-analyst, po-owner, ux-designer, techlead, mkt-brand, legal-vn, be-dev, fe-dev, qa-tester. PHẢI dùng mỗi khi Duy nhờ bằng lời thường một việc làm thay đổi sản phẩm — thêm/sửa/bỏ chức năng, "Lộc muốn…", "khách phàn nàn…", sửa lỗi, đổi giao diện, đổi quy tắc nghiệp vụ, viết yêu cầu/story, test thử một luồng, deploy — kể cả khi không nhắc tới workflow hay tên agent. Không dùng cho câu hỏi thuần giải thích/tra cứu.
+description: Điều phối workflow đội dự án Cá Về (BA → PO → Tech Lead → BE ∥ FE → Review → QA → Deploy) bằng các subagent product-manager, ba-analyst, po-owner, ux-designer, techlead, mkt-brand, legal-vn, be-dev, fe-dev, qa-tester. PHẢI dùng mỗi khi Duy nhờ bằng lời thường một việc làm thay đổi sản phẩm — thêm/sửa/bỏ chức năng, "Lộc muốn…", "khách phàn nàn…", sửa lỗi, đổi giao diện, đổi quy tắc nghiệp vụ, viết yêu cầu/story, test thử một luồng, deploy — kể cả khi không nhắc tới workflow hay tên agent. Không dùng cho câu hỏi thuần giải thích/tra cứu.
 argument-hint: "<yêu cầu bằng lời thường>"
 ---
 
@@ -22,12 +22,15 @@ flowchart TD
   UXTL --> DEV["BE và FE làm theo lô nhỏ"]
   AC --> DEV
   DEV --> KC["Điều phối tự chạy lại test, soát giao diện"]
-  KC --> QA{"QA đạt?"}
+  KC --> TLR["Tech Lead review diff"]
+  TLR --> QA{"QA đạt?"}
   QA -- "chưa, tối đa 2 vòng" --> DEV
-  QA -- "đạt" --> GIT["Commit và push"]
-  GIT --> RV["Soát pháp lý, review code, PO nghiệm thu"]
+  QA -- "đạt" --> GIT["Commit theo pathspec trên nhánh lô, gộp main, push"]
+  GIT --> RV["Soát pháp lý, PO nghiệm thu"]
   RV --> D3{"Điểm dừng 3: Duy cho deploy?"}
-  D3 -- "có" --> DEP["Deploy"]
+  D3 -- "có" --> STG["Deploy staging"]
+  STG --> D4{"Duy duyệt staging?"}
+  D4 -- "có" --> PRD["Deploy production"]
 ```
 
 Yêu cầu: **$ARGUMENTS** (nếu trống: lấy từ tin nhắn gần nhất của Duy)
@@ -105,6 +108,10 @@ chỉ dừng hỏi Duy khi techlead nêu câu hỏi kỹ thuật 🔴 cần quy�
   `manage.py test` / `npm run build`, xem diff. Không tin báo cáo suông.
 - Nếu contract BE thực tế lệch story → giao `techlead` chốt (sửa code hay sửa design), rồi
   `fe-dev` chỉnh theo contract thật.
+- Mỗi lô ghi trong phiếu `02c-giao-viec.md` (mẫu `doc/features/_mau-02c-giao-viec.md`) hoặc
+  bảng lô trong 02b (vd đợt Shop: `doc/features/2026-10-06-shop-giao-dien-moi/02b-tech-design.md`
+  §7.1). Lô đụng thương hiệu, nội dung CMS hay trang nội dung → giao `mkt-brand`: vai này làm
+  full stack (soạn copy và tự code lệnh nạp CMS, trang nội dung) theo 02b.
 
 ## 3b. UI review (khi lô có đổi giao diện)
 Giao `fe-dev` một lượt **chỉ để soát và đánh bóng**:
@@ -114,33 +121,45 @@ Giao `fe-dev` một lượt **chỉ để soát và đánh bóng**:
 
 Theo "Cổng chất lượng UI" trong skill `caveve-ui`. Có ảnh trước và sau.
 
+## 3c. Tech Lead — review diff (trước QA, khớp `CLAUDE.md`)
+Giao `techlead` review diff của lô: giá vốn, dữ liệu cá nhân, phân quyền, migration, lệch 02b
+(code review + security review khi đụng thanh toán, webhook). Lỗi xác thực được → giao lại
+`be-dev`/`fe-dev`, rồi điều phối tự chạy lại lệnh kiểm chứng.
+
 ## 4. QA — kiểm thử
 Giao `qa-tester` với danh sách story đã làm.
 - **REJECTED** → giao lỗi chặn về đúng `be-dev`/`fe-dev` → QA lại. Tối đa **2 vòng**; quá
   2 vòng → dừng, báo Duy tình trạng + lỗi còn lại.
 - **APPROVED** → sang bước 5.
 
-## 4b. Commit & push (Duy yêu cầu)
+## 4b. Commit, gộp main & push (Duy yêu cầu)
+Mỗi lô làm trên **một nhánh riêng** (vd đợt Shop: `shop/lo-<n>-<slug>`), tách từ `main`.
 Khi lô đã QA APPROVED:
-1. Tự chạy lại test/build.
-2. `git add -A`, rồi commit với message tiếng Việt có mã story. Cuối message thêm dòng Co-Authored-By.
-3. `git push origin main`.
+1. Tự chạy lại test/build (phải thấy dòng `Ran N tests … OK`, không tin báo cáo).
+2. Commit **theo pathspec**: `git add <các file của lô>` rồi `git commit -- <các file đó>`.
+   **Không dùng `git add -A`/`git add .`** — có thể cuốn file của agent khác đang chạy song
+   song hoặc file không được commit (`*.env` ở gốc repo, repo đang công khai). Message tiếng
+   Việt có mã lô/story, cuối message thêm dòng Co-Authored-By.
+3. Gộp nhánh lô vào `main` (`git checkout main && git merge --no-ff <nhánh>`), chạy lại test
+   tuần tự sau khi gộp, rồi `git push origin main`.
 
 Trước khi push, kiểm `git status` không có `.env`, DB hay bí mật nào.
 
 ## 5. Review & nghiệm thu
 - Nếu lô đụng pháp lý (dữ liệu cá nhân, thanh toán, AI, hợp đồng, go-live) → giao `legal-vn`
   soát trước khi nghiệm thu, memo vào hồ sơ tính năng.
-- Giao `techlead` review diff của lô (code review + security review khi đụng phân quyền,
-  thanh toán, webhook, giá vốn, dữ liệu cá nhân); lỗi xác thực được → giao `be-dev`/`fe-dev` sửa.
+- Review code của `techlead` đã chạy ở bước 3c (trước QA).
 - Giao `po-owner` (chế độ nghiệm thu) đối chiếu `04-qa-report.md` với AC.
 - Rule nghiệp vụ mới/đổi → đề xuất cập nhật `doc/business-process-spec.md` (hỏi Duy trước
   khi sửa spec gốc).
 
 ## 6. Tổng kết & deploy
 ➜ **ĐIỂM DỪNG 3**: báo Duy: story xong · test (số liệu thật) · QA · review · việc còn nợ.
-**Chỉ deploy khi Duy nói rõ** — Cloud Run `cangca-api` / Firebase `cangca-loc`,
-`cangca-erp` (xem memory deploy). Có migration → nhắc chạy migrate trên Cloud SQL.
+**Chỉ deploy khi Duy nói rõ.** Có 2 môi trường (từ 27/09): **staging** (SePay sandbox, DB
+`cangca_staging`) và **production** (SePay live, DB `postgres`), cả hai trên Supabase
+(Cloud SQL đã xoá). Luôn lên **staging trước**, Duy duyệt rồi mới lên production. URL, lệnh
+build, cách chạy migrate cho từng môi trường: `doc/ops/moi-truong.md`. Build frontend truyền
+`NEXT_PUBLIC_*` trực tiếp. Có migration → chạy migrate trên DB của đúng môi trường đang deploy.
 
 ## Luồng nhanh
 Cho bug nhỏ / chỉnh sửa rõ ràng, 1 story:
@@ -148,7 +167,7 @@ Cho bug nhỏ / chỉnh sửa rõ ràng, 1 story:
    cho Duy xem trong 1 tin nhắn — không cần chờ nếu Duy đã nói "cứ làm".
 2. `be-dev` và/hoặc `fe-dev` (TDD, test tái hiện bug trước).
 3. `qa-tester` (chỉ AC + hồi quy app liên quan).
-4. Tổng kết như bước 6.
+4. Commit theo bước 4b, tổng kết như bước 6.
 
 Không cần `techlead` trừ khi sửa đụng kiến trúc/hợp đồng BE↔FE — lúc đó techlead viết
 `02b` ngắn trước khi dev.
@@ -192,4 +211,4 @@ Cách viết idea: **ngắn gọn, dễ hiểu với người không đọc code
 ## Nguyên tắc điều phối
 - Mỗi lượt giao việc: nêu rõ đường dẫn hồ sơ, mã story, phạm vi file được sửa, đầu ra cần trả.
 - Giữ chat ngắn: kết quả chi tiết nằm trong `doc/features/…`, chat chỉ tóm tắt + link file.
-- Commit + push sau mỗi lô đã qua QA (bước 4b). Deploy chỉ làm khi Duy nói rõ.
+- Commit theo pathspec, gộp main và push sau mỗi lô đã qua QA (bước 4b). Deploy chỉ làm khi Duy nói rõ, staging trước.

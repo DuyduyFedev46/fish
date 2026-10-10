@@ -1,4 +1,5 @@
 # Việc cần Duy quyết — gom từ đêm 02/10/2026
+> **ĐỢT ĐÃ ĐÓNG (rà 11/10):** ảnh chụp việc dở của đợt ERP theo design. Các câu chờ đã được Duy trả lời 08/10 và 10/10 (`doc/decisions.md`). Không chạy lại theo file này; đợt đang làm là Shop (`doc/features/2026-10-06-shop-giao-dien-moi/`).
 > Duy dặn 02/10 00:40: "cho auto chạy qua đêm, cái gì cần anh quyết gom lại trưa mai tính sau".
 > Điều phối viên không đứng chờ: lô nào gặp điểm dừng thì ghi vào đây, bỏ qua, làm lô khác.
 

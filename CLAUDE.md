@@ -74,7 +74,7 @@ Từ P8 trở đi **Claude và đội subagent tự code, QA và commit**. Gemin
 3. Điều phối viên **tự chạy lại** lệnh kiểm chứng. Không tin báo cáo của subagent khi chưa chạy.
 4. `techlead` review diff (giá vốn, dữ liệu cá nhân, phân quyền, migration, lệch 02b).
 5. `qa-tester` kiểm theo luật đã siết: không PASS bằng đọc code, có ca ngoài đường thuận, `npm ci` sạch.
-6. REJECTED → giao lại dev, quay về bước 3. APPROVED → commit tiếng Việt có mã lô/story, `git push origin main`,
+6. REJECTED → giao lại dev, quay về bước 3. APPROVED → commit tiếng Việt có mã lô/story **theo pathspec** (không `git add -A`) trên nhánh lô, gộp `main`, `git push origin main`,
    đánh ☑ ở 02c. Gặp điểm dừng trong 02c → hỏi Duy.
 
 `AGENTS.md`/`.agents/`/`.gemini/` giữ nguyên để có thể bật lại AGY. Không cho hai bên cùng làm một phase.
@@ -85,7 +85,7 @@ Skill dùng chung: `.agents/skills/` trỏ về `.claude/skills/`, nên sửa sk
 
 ## Luật chung
 - **Tài liệu quy trình luôn có sơ đồ Mermaid ở đầu** (Duy chốt 11/10): mọi doc mô tả quy trình, luồng nghiệp vụ, luồng màn, luồng làm việc, deploy hay vận hành (spec, 00/01/02/02a/02b/02c, PLAN, runbook `doc/ops/`, `doc/he-thong/`, skill/agent workflow) phải có một khối ` ```mermaid ` ngay dưới tiêu đề, trước phần chữ. Duy đọc luồng từ sơ đồ này nên nhãn viết tiếng Việt đời thường, ngắn, không mã kỹ thuật; điểm Duy duyệt/quyết định vẽ thành hình thoi. Nhãn có dấu câu thì đặt trong ngoặc kép. Sửa quy trình thì sửa sơ đồ cùng lúc.
-- **Git:** mỗi khi xong một tính năng (một lô đã QA APPROVED) thì commit và `git push origin main` lên github.com/DuyduyFedev46/fish. Đây là quy ước Duy đặt ngày 2026-09-25. Repo đang công khai nên không bao giờ commit `.env` hay bí mật.
+- **Git:** mỗi khi xong một tính năng (một lô đã QA APPROVED) thì commit và `git push origin main` lên github.com/DuyduyFedev46/fish. Đây là quy ước Duy đặt ngày 2026-09-25. Mỗi lô làm trên một nhánh riêng (vd `shop/lo-<n>-<slug>`), commit theo pathspec, QA APPROVED mới gộp `main` rồi push. Repo đang công khai nên không bao giờ commit `.env` hay bí mật.
 - **Jira Product Discovery (Duy chốt 2026-10-11):** mỗi tính năng là một idea trong project FISH. Điều phối viên cập nhật trạng thái theo các mốc trong skill `feature` (mục "Cập nhật Jira Product Discovery"), dùng `.claude/scripts/jira_pd.py`; subagent không đụng Jira. Viết idea ngắn gọn, tên `[Hệ thống] - Tên`.
 - Không deploy khi Duy chưa yêu cầu.
 - Không báo "xong"/"test xanh" khi chưa chạy lệnh kiểm chứng trong lượt đó.

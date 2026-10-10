@@ -10,7 +10,7 @@ kênh CHÍNH là IPN Cổng thanh toán (`POST /ipn/sepay`)`.** Route webhook bi
 `SEPAY_BANK_WEBHOOK_ENABLED=true` nếu cần dùng song song (xem BR-TT-15 về chống trùng khi
 bật cả hai kênh).
 
-Xem hợp đồng gốc: `../doc/BUILD-PLAN.md` (Contract B mục "API cho adapter",
+Xem hợp đồng gốc: `../doc/archive/BUILD-PLAN.md` (đã lưu trữ, chỉ là lịch sử; contract hiện hành xem `backend/README.md`) (Contract B mục "API cho adapter",
 Contract C), `../doc/decisions.md` (quyết định 2026-09-09 Django/FastAPI),
 `../doc/ecosystem-l1.md` mục 3 và 6, `../doc/features/2026-09-26-sepay-cong-thanh-toan/`
 (phân tích + story P2 + `03-dev-notes.md` mục "P2 (adapter)").

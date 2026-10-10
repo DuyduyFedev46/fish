@@ -1,5 +1,5 @@
 # AI Native ERP — Phân tích lại dưới lăng kính hiệu năng
-> BA · 2026-09-27 · Trạng thái: **CHỜ DUYỆT**
+> BA · 2026-09-27 · Trạng thái: **TẠM HOÃN** (rà 11/10: AI đã tắt cứng từ 05/10)
 >
 > **Bối cảnh:** Duy chốt khi duyệt story: *"việc tích hợp AI mà đánh đổi performance là KHÔNG ĐÁNG"*
 > (ghi thành BR-AI-17, ADR điểm 10) và yêu cầu đội phân tích lại nghiêm túc dưới góc hiệu năng

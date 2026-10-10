@@ -1,5 +1,7 @@
 # Level 1 — Ecosystem tổng thể (bản có AI Native, cập nhật 2026-09-27)
 
+> Ghi chú 11/10/2026: sửa phần Shop theo quyết định 10/10 (trang chủ Shop ở `/`, giới thiệu ở `/about/`, tra đơn POST) và 11/10 (khu vực giao Phan Thiết). AI đang tắt cứng từ 05/10.
+
 Bản 2026-09-10: cập nhật sau Level 3 (`business-process-spec.md`) — thêm Combo/Ưu đãi, Chi phí mua hàng (landed cost), Hoàn tiền, Hàng hoàn về kho, bước Soạn hàng.
 
 Bản này (có AI Native): thêm ERP console, adapter IPN SePay, 2 môi trường Supabase (staging `cangca_staging` / production `postgres`), và lớp AI Native — runtime on-device **wllama + GGUF** trong trình duyệt ERP + **lớp lệnh nghiệp vụ dùng chung** (Command registry, kênh execute/propose/confirm, context builder lọc theo quyền, AiUsageLedger, AuditLog `ai:<user>`) + **proxy MiMo cloud** ở adapter. Chi tiết: `doc/features/2026-09-27-ai-native-erp/02b-tech-design.md`.
@@ -7,8 +9,8 @@ Bản này (có AI Native): thêm ERP console, adapter IPN SePay, 2 môi trườ
 ```mermaid
 flowchart TB
     subgraph FRONT["Mặt tiền + nội bộ (Next.js static export)"]
-        LANDING["Landing SEO<br/>giới thiệu"]
-        SHOP["Shop<br/>bảng giá + combo + giỏ hàng<br/>guest checkout, gộp theo SĐT"]
+        LANDING["Trang giới thiệu /about/<br/>nội dung CMS, trong Shop"]
+        SHOP["Shop, trang chủ /<br/>danh mục + combo + giỏ hàng<br/>guest checkout, gộp theo SĐT"]
         ERP["ERP Console<br/>đơn/tiền · kho & lô · mua hàng · giao hàng · báo cáo"]
         subgraph AIONDEV["AI on-device — trong trình duyệt ERP (tải khi đồng ý + Wi-Fi)"]
             WLLAMA["Runtime wllama (llama.cpp WASM + WebGPU)<br/>model GGUF (Gemma 3n · 32k) · cache IndexedDB"]
@@ -51,7 +53,7 @@ flowchart TB
     MIMOCLOUD["MiMo-V2.6-Flash (Xiaomi cloud API)<br/>chỉ khi AI_CLOUD_ENABLED=true"]
 
     SOCIAL -->|link thẳng, đăng tay| SHOP
-    LANDING -.giới thiệu, không giao dịch.-> SHOP
+    LANDING -. "giới thiệu, dẫn vào mua" .-> SHOP
     SHOP -->|gọi API DRF trực tiếp| BAN
     ERP -->|gọi API DRF| CMDS
     ERP --> AIONDEV
@@ -87,7 +89,7 @@ flowchart TB
 Django làm toàn bộ lõi: ORM, migration, Admin panel (back-office cho Lộc/nhân viên — ưu tiên dùng Admin có sẵn hơn tự build CRUD), API (DRF) phục vụ Next.js trực tiếp. Item Master + Item Group + Price List (niêm yết, lưu lịch sử giá theo mùa) + cấu hình Combo và Ưu đãi. Batch/lô là đơn vị vận hành chính — kg, hạn dùng theo mặt hàng (mặc định 365 ngày), có giá vốn sau phân bổ chi phí phụ. Sổ cái tính lãi lỗ theo lô.
 
 ## 2. Apps nghiệp vụ (trong Django, tách theo domain)
-**Mua hàng** — Purchase Receipt trực tiếp tại cảng (không qua PO), Purchase Invoice tách riêng, Purchase Cost phân bổ chi phí phụ vào giá vốn lô. **Bán hàng** — Sales Order giữ chỗ 30 phút → Sales Invoice khi xác nhận thanh toán; Refund cho huỷ & hoàn tiền (toàn phần/một phần). **Giao hàng** — Delivery Note gồm bước soạn hàng, gán nhân viên nội bộ, có nhánh giao thất bại → hàng về kho chờ Chủ duyệt. **Kho** — Batch với vòng đời và thao tác chốt lô, Stock Reconciliation kiểm kê định kỳ. Mỗi app độc lập (model/admin/API/migration riêng).
+**Mua hàng** — Purchase Receipt trực tiếp tại cảng (không qua PO), Purchase Invoice tách riêng, Purchase Cost phân bổ chi phí phụ vào giá vốn lô. **Bán hàng** — Sales Order giữ chỗ 30 phút → Sales Invoice khi xác nhận thanh toán; Refund cho huỷ & hoàn tiền (toàn phần/một phần). **Giao hàng** — Delivery Note gồm bước soạn hàng, gán người giao (bản đầu: nhân viên nội bộ; 11/10 mở hướng Ahamove hoặc GHN, chưa chốt), có nhánh giao thất bại → hàng về kho chờ Chủ duyệt. **Kho** — Batch với vòng đời và thao tác chốt lô, Stock Reconciliation kiểm kê định kỳ. Mỗi app độc lập (model/admin/API/migration riêng).
 
 ## 3. Adapter bên thứ 3 — FastAPI
 Lớp mỏng, chỉ tồn tại để cô lập lõi khỏi bên ngoài. Hiện tại: nhận webhook SePay → validate/transform → gọi vào API nội bộ Django. Không đụng DB/ORM trực tiếp. Không bên thứ 3 nào được nối thẳng vào Django — nguyên tắc áp dụng cho mọi tích hợp tương lai, không riêng SePay.
@@ -95,7 +97,7 @@ Lớp mỏng, chỉ tồn tại để cô lập lõi khỏi bên ngoài. Hiện 
 Từ bản có AI Native (2026-09-27) adapter có vai trò thứ hai: **proxy MiMo cloud** (`/ai/*`, Xiaomi là bên thứ 3 thứ hai — cũng bắt buộc qua adapter). Prompt do Django dựng và đã lọc theo quyền (allowlist); adapter chặn lớp cuối trước khi dữ liệu rời máy chủ: loại field ngoài danh sách cho phép → che dữ liệu cá nhân (redaction) → **chặn cứng 422 nếu vẫn còn PII** (không một byte rời adapter), rồi mới gọi MiMo-V2.6-Flash; đo token trả về cho Django ghi sổ mức dùng. Adapter vẫn không đụng DB, không log nội dung prompt; route tắt bằng cấu hình `AI_ROUTE_ENABLED` (mặc định tắt — tiền lệ `SEPAY_BANK_WEBHOOK_ENABLED`).
 
 ## 4. Mặt tiền khách hàng
-Next.js. Landing và Shop tách biệt. Guest checkout, không đăng nhập ở V1 — khách gộp theo số điện thoại, tra đơn bằng mã đơn + 4 số cuối SĐT. **100% đơn hàng giao tận nhà — không có bán tại quầy.**
+Next.js. Từ 10/10 `/` là trang chủ Shop, trang giới thiệu thương hiệu nằm ở `/about/` trong cùng site (thay ý "Landing và Shop tách biệt"). Guest checkout, không đăng nhập ở V1 — khách gộp theo số điện thoại. Tra đơn bằng mã đơn + SĐT đầy đủ hoặc mã tra đơn, gửi qua POST (thay cách cũ 4 số cuối SĐT, đổi ở Shop lô 3+4); trang đơn công khai không hiện người nhận. **100% đơn hàng giao tận nhà — không có bán tại quầy.**
 
 **ERP console** (Next.js static export) là mặt tiền nội bộ của Chủ/nhân viên (đăng nhập token DRF, menu theo quyền). Từ bản có AI Native còn chứa **runtime AI on-device (wllama + GGUF)** chạy ngay trong trình duyệt: model chỉ tải khi người dùng đồng ý và đang Wi-Fi (không bao giờ tự tải qua 4G/5G), cache IndexedDB; voice/ASR xử lý on-device, audio không rời máy. Khách hàng trên Shop không có AI (AI Native chỉ trong ERP nội bộ).
 
@@ -119,4 +121,4 @@ AI **không đổi luồng nghiệp vụ hiện có** — là kênh thao tác th
 4. Xác nhận lại mục tiêu nghiệp vụ suy luận ở `URD.md` mục 2.2.
 5. Cơ chế xác thực nội bộ giữa FastAPI và Django (service token) — để lại lúc build.
 6. Duy xác nhận điều kiện/phí SePay trực tiếp với nhà cung cấp trước khi ký.
-7. **Nợ tài liệu**: `doctype-mapping.md` lỗi thời (còn ghi bỏ Sales Order / Delivery Note) và thiếu 6 thực thể mới — viết lại trước khi dịch sang Django models.
+7. **Nợ tài liệu**: `doctype-mapping.md` (nay ở `doc/archive/doctype-mapping.md`, đã lưu trữ) lỗi thời (còn ghi bỏ Sales Order / Delivery Note) và thiếu 6 thực thể mới — viết lại trước khi dịch sang Django models.

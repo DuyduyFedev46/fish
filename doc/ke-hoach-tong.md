@@ -1,4 +1,5 @@
 # Kế hoạch tổng — đợt 2026-09-28
+> **ĐÓNG BĂNG 01/10/2026** (rà soát legacy 11/10): bảng P1–P9 chỉ là lịch sử. Sau đó có đợt ERP theo design (`doc/features/2026-10-01-erp-theo-design/`, đã đóng) và đợt Shop làm lại (`doc/features/2026-10-06-shop-giao-dien-moi/`, bảng lô ở 02b §7.1). File giữ ở đây vì lệnh `/lam-tiep` của AGY (`.agents/`, `.gemini/`) còn đọc.
 > Điều phối: Claude · Người hiện thực: P1–P7 Gemini CLI / Antigravity; **từ P8 là đội Claude** (Duy chốt 30/09, quy trình ở
 > `CLAUDE.md` mục "Người hiện thực"; AGY tạm dừng) · Duy duyệt từng phase.
 > Scope Duy chốt 28/09: sửa lỗi + AI + CSKH + CMS + khung go-live. **Không** làm đợt này: vai trò tự định nghĩa

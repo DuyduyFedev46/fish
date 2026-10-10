@@ -1,6 +1,6 @@
 # Bảng thuật ngữ
 
-> Cập nhật 02/10/2026, theo code `main` `bf62b81`.
+> Cập nhật 11/10/2026. Tên chuẩn chứng từ và trạng thái (Duy duyệt 07/10): `doc/thuat-ngu-va-trang-thai.md` mục 2–4; khi lệch thì file đó đúng.
 > Quy tắc đặt tên đầy đủ: skill `caveve-domain` mục "Đặt tên" và `doc/features/2026-09-30-dat-ten-tieng-anh/02c-giao-viec.md` mục 1.
 > Kiểm bằng máy: `python3 scripts/check_naming.py`.
 
@@ -12,7 +12,7 @@
 | Quản lý | Group `manager` | |
 | Nhân viên kho (NV kho) | Group `warehouse_staff` | |
 | Nhân viên giao (NV giao) | Group `delivery_staff` | |
-| Chăm sóc khách hàng (CSKH) | Group `customer_service` | Gọi xác nhận đơn |
+| Nhân viên gọi xác nhận | Group `customer_service` | Gọi xác nhận đơn. Nhãn cũ "CSKH" đổi ngày 08/10, mã nhóm giữ nguyên |
 | Người giao trên một phiếu | `courier` / `DeliveryNote.assigned_to` | |
 | Hệ thống | `actor=None`, `actor_kind="system"` | Job, signal |
 | AI | `actor_kind="ai"`, `AiAction` | |
@@ -28,6 +28,7 @@
 | Combo | `Item` có `item_type = BUNDLE` + `BundleLine` (công thức thành phần). Mặt hàng thường là `SIMPLE` |
 | Bảng giá / giá niêm yết | `PriceList` / `ItemPrice` |
 | Ưu đãi | `PricingRule` |
+| Mã giảm giá | Voucher (quyết định 10/10; model và API thêm ở Shop lô 3b, 02b §3.8–3.9, §4). Khác `PricingRule` |
 | Ảnh mặt hàng | `ItemImage` |
 | Nhà cung cấp (NCC) | `Supplier` |
 | Phiếu nhập (mua tại cảng) | `PurchaseReceipt`, `PurchaseReceiptLine` |
@@ -63,7 +64,7 @@
 |---|---|
 | Đơn hàng | `SalesOrder`, `SalesOrderLine` |
 | Giữ chỗ | trạng thái `BOOKED`, TTL `SALES_ORDER_TTL_MINUTES` |
-| Tự huỷ (quá hạn giữ chỗ) | `AUTO_CANCELLED`, job `cancel_expired_orders` |
+| Hết giờ giữ chỗ | `AUTO_CANCELLED`, job `cancel_expired_orders` |
 | Phân bổ lô của dòng đơn | `SalesOrderLineBatch` |
 | Hoá đơn bán | `SalesInvoice`, `SalesInvoiceLine`, `SalesInvoiceLineBatch` |
 | Giao dịch thanh toán | `PaymentTransaction` |
@@ -72,7 +73,7 @@
 | Xác nhận thanh toán tay | `confirm_payment_manual`, action `confirm-payment` |
 | Huỷ đơn đã thanh toán | `cancel_paid_order` |
 | Phiếu hoàn tiền | `Refund` (`PENDING` → `REFUNDED` / `FAILED`) |
-| Chứng từ đảo doanh thu | `SalesCreditNote`, `SalesCreditNoteLine` |
+| Phiếu trừ doanh thu | `SalesCreditNote`, `SalesCreditNoteLine` |
 | Cổng thanh toán | SePay, `checkout`, IPN (`/ipn/sepay` ở adapter) |
 | Mã giao dịch ngân hàng | `bank_txn_id` (mã FT...) |
 | Đồng ý xử lý dữ liệu | `PRIVACY_CONSENT_REQUIRED`, quyền `view_privacy_consent` |
@@ -104,12 +105,12 @@
 | Lệnh AI | `CommandSpec`, `ai/commands/` |
 | Việc AI | `AiAction` |
 | AI của tôi / Chính sách AI | `AiConfigVersion` / `AiPolicyVersion` |
-| Nhóm lệnh AI: thu mua / bán hàng / CSKH | `purchasing` / `sales` / `customer_service` |
+| Nhóm lệnh AI: thu mua / bán hàng / gọi xác nhận | `purchasing` / `sales` / `customer_service` |
 | Mức nhạy cảm: cao / trung bình / thấp | `high` / `medium` / `low` |
 | Giờ Việt Nam | `todayInVietnam()` (TS), `TIME_ZONE = "Asia/Ho_Chi_Minh"` (Django) |
 | Dữ liệu demo | `seed_demo`, `DemoRecord` |
 
 ## Tên giữ nguyên (không đổi sang tiếng Anh)
 
-Migration đã chạy, giá trị `AuditLog.action` đã ghi, phiên bản cấu hình AI cũ, URL công khai Shop `/bai-viet/` `/trang/` `?chuyen-muc=`,
+Migration đã chạy, giá trị `AuditLog.action` đã ghi, phiên bản cấu hình AI cũ, slug nội dung CMS (vd `cach-mua-hang`; URL Shop đã đổi sang tiếng Anh `/about/`, `/blog/`, `/pages/` ngày 11/10),
 dữ liệu demo (username `kho1`, `chu_vua`..., slug, mã hàng), keyword AI có dấu, chuỗi `cangca` trong tên hạ tầng.

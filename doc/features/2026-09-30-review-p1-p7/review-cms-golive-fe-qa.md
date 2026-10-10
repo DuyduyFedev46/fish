@@ -1,4 +1,5 @@
 # Review P1–P7: CMS, khung go-live, chất lượng FE và đối chiếu QA
+> **ĐÃ ĐÓNG — lịch sử (rà 11/10).** Lỗi đã sửa ở P8 (`2026-09-30-sua-loi-review`, XONG). Không dời thư mục vì test trong code còn trỏ tới.
 > Tech Lead (Claude) · 2026-09-30 · `main` @ `75e5dd3` · chỉ đọc code, không sửa code sản phẩm, không commit.
 > Phạm vi gồm hồ sơ `2026-09-28-cms-viet-bai`, `2026-09-28-khung-go-live`, phần FE của `2026-09-28-cskh-xac-nhan-in-tem` và phần FE của `2026-09-28-ai-digital-worker`.
 

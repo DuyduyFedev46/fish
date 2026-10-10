@@ -17,7 +17,8 @@ Nguồn tham khảo: `react-best-practices`, `web-design-guidelines` (vercel-lab
 - ❌ Route động `[code]` cần `generateStaticParams` — thường **tránh**; dùng query string
   (`/shop/item/?code=CA01`) như code hiện có.
 - ✅ Trang cần dữ liệu thật → `"use client"` + `useEffect` gọi `lib/api.ts` lúc chạy.
-- ✅ Trang tĩnh thuần (landing, SEO) → server component, không fetch.
+- ✅ Trang tĩnh thuần (không có nội dung CMS) → server component, không fetch. Trang đọc CMS (`/about/`,
+  `/pages/?slug=`, `/blog/`) là client component gọi API công khai lúc chạy.
 
 ## Cấu trúc thư mục — chia theo MODULE TÍNH NĂNG (Duy yêu cầu 2026-09-24)
 
@@ -30,8 +31,26 @@ README.md            sơ đồ thư mục + giải thích từng file cấu hìn
 ```
 - Module không import vào ruột module khác; dùng chung thì đưa lên `shared/` (hoặc `features/auth`).
 - Không barrel `index.ts`; import bằng alias `@/`.
-- Áp dụng bắt buộc cho `erp-console/`. `frontend/` (Shop) đang theo cấu trúc cũ `components/` + `lib/` —
-  chuyển dần khi có đợt sửa Shop.
+- Áp dụng bắt buộc cho `erp-console/`.
+
+### Shop mới (`frontend/`, đợt `2026-10-06-shop-giao-dien-moi`, 02b §1.1 và §1.10)
+
+```
+app/                 route mỏng: / (HomeScreen) · /about/ · /pages/?slug= · /blog/ (?slug=, ?category=) · /shop/ · /shop/item/?code=
+                     · /shop/cart/ · /shop/checkout/ · /shop/orders/ · /ui-preview/ (chỉ build khi NEXT_PUBLIC_UI_PREVIEW=1)
+components/          ShopFrame (khung: header + main + footer + BottomNav theo props), ShopHeader, ShopFooter, BottomNav,
+                     LogoSlot, CartContext
+components/ui|catalog|cart|search/   component TRÌNH BÀY: props vào, callback ra, không gọi API, không đọc storage
+features/<module>/   home · catalog · cart · checkout · content · site · ui-preview — mỗi màn là components/<X>Screen.tsx
+lib/                 api.ts · types.ts · mock.ts (chỉ fe-dev sửa) · format.ts · quantity.ts · text.ts
+```
+- Mỗi màn tự bọc `ShopFrame` (bảng header/footer/BottomNav theo route ở 02b §1.4). Chỉ `*Screen.tsx` và
+  `ShopHeader`/`ShopFooter` được gọi API. Không barrel, import bằng `@/`.
+- URL tiếng Anh (decisions 11/10): `/about/`, `/pages/?slug=`, `/blog/?category=`. Production chưa chạy nên **không giữ** đường cũ
+  `/gioi-thieu/`, `/trang/`, `/bai-viet/`, `?chuyen-muc=`. Slug nội dung CMS là dữ liệu, giữ tiếng Việt.
+- Catalog `GET /api/shop/catalog/` trả `{groups, items}`; tồn kho chỉ `stock_level` (`in`/`low`/`out`), không có `sellable_qty`.
+- Code Shop cũ bị xoá dần theo lô (02b §1.11): `CatalogGrid`, `AddToCartControl`, `ContactButton` (lô 2), `CountdownTimer`,
+  `OrderLookup`, `features/checkout/storage.ts`, `phone_last4` (lô 3+4). Không viết thêm code dựa vào các file này.
 
 ## Gọi API
 
@@ -50,8 +69,8 @@ README.md            sơ đồ thư mục + giải thích từng file cấu hìn
 - Huỷ cập nhật state khi unmount (`let active = true` … cleanup) như `app/shop/page.tsx`.
 - Giỏ hàng qua `components/CartContext.tsx`; không tạo store thứ hai.
 - Tiền: format bằng `lib/format.ts` (VND, không số lẻ). Khối lượng theo `Kg`.
-- Thời gian giữ chỗ/TTL hiển thị bằng `CountdownTimer` — lấy mốc hết hạn từ backend,
-  không tự tính.
+- Thời gian giữ chỗ/TTL hiển thị bằng đồng hồ đếm ngược (Shop mới: `HoldCountdown` ở lô 3+4, thay `CountdownTimer`) —
+  lấy mốc hết hạn từ backend, không tự tính.
 
 ## Hiệu năng (lọc từ Vercel best practices)
 
@@ -66,7 +85,7 @@ README.md            sơ đồ thư mục + giải thích từng file cấu hìn
 - Mobile-first (khách mua trên điện thoại), vùng bấm ≥ 44px, ô nhập số dùng `inputMode="decimal"`.
 - Nút có trạng thái disabled + loading khi submit; chặn bấm đúp khi đặt đơn.
 - Ảnh có `alt`, form có `label`, tương phản đủ, focus thấy được.
-- Làm giao diện mới/redesign → có thể dùng thêm skill `design-taste-frontend`.
+- Shop: làm đúng `doc/design/shop/` (`UI-RULES.md`, `COMPONENTS.md`), xem skill `caveve-ui`. ERP: `doc/design/erp/UI-RULES.md`.
 
 ## Kiểm tra trước khi báo xong
 
@@ -93,9 +112,8 @@ Không đưa mã lô giao việc (`lo7`, `l8`, `p8_lo5`) vào tên; mã lô/stor
 | Giờ Việt Nam | `VN_TIME_ZONE`, `todayInVietnam()`, `today_in_vietnam()` | `VN_TZ`, `todayVn`, `vn_today` |
 | Bản rà soát QA / bổ sung | `review_*` / `extra`, `followup` | `ra_soat_*` / `bosung` |
 
-Giữ nguyên (không đổi): migration đã chạy, `AuditLog.action` đã ghi, dòng phiên bản cấu hình AI cũ, URL công khai Shop
-`/bai-viet/` `/trang/` `?chuyen-muc=`, dữ liệu demo (username `kho1`, `chu_vua`..., slug, mã hàng), keyword AI có dấu, chuỗi `cangca`.
-Bảng đầy đủ: `doc/features/2026-09-30-dat-ten-tieng-anh/02c-giao-viec.md` mục 1.
+Giữ nguyên (không đổi): migration đã chạy, `AuditLog.action` đã ghi, dòng phiên bản cấu hình AI cũ, dữ liệu demo (username `kho1`, `chu_vua`..., slug, mã hàng), keyword AI có dấu, chuỗi `cangca`.
+Bảng đầy đủ: `doc/features/2026-09-30-dat-ten-tieng-anh/02c-giao-viec.md` mục 1. Bảng gốc ở skill `caveve-domain`; sửa ở đó trước. URL Shop đã đổi sang tiếng Anh 11/10 (`/about/`, `/pages/?slug=`, `/blog/?category=`).
 
 **Kiểm bằng máy** (Python 3 stdlib, chạy từ gốc repo, dưới 10 giây, không cần venv):
 `python3 scripts/check_naming.py`. Exit 1 khi file MỚI có định danh tiếng Việt, hoặc số vi phạm của một file TĂNG so với
@@ -103,5 +121,5 @@ Bảng đầy đủ: `doc/features/2026-09-30-dat-ten-tieng-anh/02c-giao-viec.md
 allowlist ở `scripts/naming_blocklist.txt`. Chạy lệnh này trước khi báo xong mọi việc có sửa code.
 
 Áp dụng cho FE (Shop và ERP): tên file/thư mục component, component, hook, type, khoá JSON đọc từ API, view key, route,
-`data-testid`, khoá `localStorage`/`sessionStorage`, class CSS Module. Ngoại lệ vĩnh viễn: thư mục route `frontend/app/bai-viet/`,
-`frontend/app/trang/` và tham số `chuyen-muc` (URL công khai). Nhãn trên giao diện vẫn tiếng Việt.
+`data-testid`, khoá `localStorage`/`sessionStorage`, class CSS Module. Ngoại lệ cũ (thư mục `bai-viet/`, `trang/`, tham số `chuyen-muc`) đã bỏ: từ
+11/10 route Shop là `about/`, `pages/`, `blog/`, tham số `category` (decisions 11/10). Nhãn trên giao diện vẫn tiếng Việt.

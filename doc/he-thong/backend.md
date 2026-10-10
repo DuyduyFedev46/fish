@@ -1,6 +1,6 @@
 # Backend (Django + DRF)
 
-> Cập nhật 02/10/2026, theo code `main` `bf62b81`.
+> Cập nhật 11/10/2026 (rà tài liệu legacy).
 > Bản đồ module chi tiết hơn: `backend/README.md` và `backend/apps/<app>/README.md`. Khi các README đó lệch code, xem mục "Doc cũ lệch code" cuối file này.
 
 ```mermaid
@@ -72,7 +72,7 @@ Django Admin ở `/admin/`: field trạng thái, tồn, giá vốn khoá chỉ �
 | `manager` | Quản lý | Duyệt vận hành, không đụng tiền và giá vốn |
 | `warehouse_staff` | NV kho | Nhập lô, soạn hàng, kiểm kê |
 | `delivery_staff` | NV giao | Chỉ thấy phiếu giao được gán cho mình |
-| `customer_service` | CSKH | Gọi xác nhận đơn, đổi thông tin nhận hàng |
+| `customer_service` | NV gọi xác nhận (nhãn cũ "CSKH", đổi 08/10) | Gọi xác nhận đơn, đổi thông tin nhận hàng |
 
 Một người có thể ở nhiều nhóm (ví dụ NV kho kiêm giao). Tên nhóm đổi sang tiếng Anh ở P8b (migration `accounts/0013`, giữ id).
 Tên cũ (`chu`, `quan_ly`, `nv_kho`, `nv_giao`, `cskh`) bị từ chối ở đường ghi. Hằng tên nhóm chỉ nằm ở `apps/accounts/roles.py` (BE) và `erp-console/shared/lib/roles.ts` (ERP).
@@ -98,7 +98,7 @@ Quyền Tầng 2 hiện có trong code:
 | `content` | `publish_entry` |
 | `ai` | `manage_ai_policy` |
 
-Gán quyền cho nhóm nào: xem `doc/business-process-spec.md` §1.4, §1.5 và các data migration trong `apps/*/migrations/`. Spec §1.3 vẫn ghi "bốn nhóm"; nhóm thứ năm `customer_service` đến từ hồ sơ `2026-09-28-cskh-xac-nhan-in-tem`.
+Gán quyền cho nhóm nào: xem `doc/business-process-spec.md` §1.4, §1.5 và các data migration trong `apps/*/migrations/`. Nhóm thứ năm `customer_service` đến từ hồ sơ `2026-09-28-cskh-xac-nhan-in-tem`.
 
 ### Đăng nhập
 - ERP gọi `POST /api/auth/token/` lấy Token DRF, gửi kèm header `Authorization: Token ...`.
@@ -145,7 +145,7 @@ Không có model ngôn ngữ nào chạy ở backend. Backend lo **lệnh, quy�
 | `DELIVERY_MAX_FAILED_ATTEMPTS` | 2 | Số lần giao thất bại trước khi cần quyết định |
 | `COLD_CHAIN_MAX_HOURS` | 6 | Ngưỡng ngoài chuỗi lạnh (chờ Lộc cho số thật) |
 | `TTL_JOB_HEALTH_GRACE_MINUTES` | 5 | Ngưỡng báo job TTL chết |
-| `DELIVERY_PII_RECENT_DAYS`, `CONFIRMATION_PII_RECENT_DAYS` | 7 | Số ngày NV giao / CSKH còn thấy dữ liệu khách |
+| `DELIVERY_PII_RECENT_DAYS`, `CONFIRMATION_PII_RECENT_DAYS` | 7 | Số ngày NV giao / NV gọi xác nhận còn thấy dữ liệu khách |
 | `CONFIRMATION_*` | xem `settings.py` | Luật gọi xác nhận (số lần, cửa sổ, khung giờ, tự huỷ) |
 | `REFUND_DEADLINE_DAYS` | 30 | Hạn hoàn tiền |
 | `PRIVACY_CONSENT_REQUIRED` | tắt khi dev/test, bật ở nơi khác | Bắt khách đồng ý chính sách khi đặt đơn |
@@ -182,11 +182,9 @@ python3 scripts/check_naming.py                                     # kiểm đ�
 Khi chạy test, `settings.py` tự đổi băm mật khẩu sang MD5 cho nhanh và tắt throttle. Production vẫn PBKDF2.
 Test viết bằng Django `TestCase`, nằm trong `apps/<app>/<module>/tests/`. Dữ liệu test dùng chung: `apps/common/tests/fixtures.py`, `apps/sales/orders/tests/base.py`.
 
-## Doc cũ lệch code (tại `bf62b81`)
+## Doc cũ lệch code (rà lại 11/10/2026)
 
-- `backend/README.md` ghi `BATCH_DEFAULT_SHELF_LIFE_DAYS (90)`. Code mặc định **365** (đúng decisions 2026-09-26).
-- `backend/README.md` mục "Còn lại" vẫn ghi "VietQR stub `_vietqr_stub`". Đã thay bằng cổng SePay (`sales/payments/checkout.py`) từ P1.
-- `backend/README.md` và `apps/accounts/README.md` ghi "4 Group". Code có **5** (`customer_service`, migration `accounts/0011`, `0013`).
-- `backend/apps/ai/README.md` mô tả module `commands/`, `status.py`, `usage/`, `cloud/`, `alerts/` và route `/api/commands/catalog`, `/api/ai/status`. Code hiện tại không có các module và route đó. Module thật là `registry/`, `execution/`, `actions/`, `policy/`, `settings/`, `report/`.
-- ERP gọi `GET /api/ai/status/` (`erp-console/features/ai/api.ts`) nhưng `config/api_urls.py` không có route này. Theo đọc code (chưa chạy thử), với backend thật request trả 404, ERP coi như AI tắt và không hiện trợ lý. Cần xác nhận và quyết định: thêm route hay đổi ERP sang endpoint khác.
+- `apps/accounts/README.md` ghi "4 Group". Code có **5** (`customer_service` seed ở migration `accounts/0011` với tên cũ `cskh`, đổi tên ở `0013`).
 - `apps/delivery/README.md` ghi state machine bắt đầu từ `PREPARING`. Phiếu giao thật bắt đầu ở `CONFIRMING` (chờ gọi xác nhận).
+- `apps/sales/orders/README.md` còn tả tra đơn `GET …?phone_last4=`; Shop lô 3+4 thay bằng `POST /api/shop/orders/lookup/` và sửa README cùng lô.
+- `backend/README.md` đã sửa ngày 11/10 (5 Group, hạn dùng 365 ngày, job nền Cloud Run Job, bỏ VietQR stub).

@@ -1,5 +1,10 @@
 # features/checkout
 
+> **Sẽ viết lại ở Shop lô 3+4** (`doc/features/2026-10-06-shop-giao-dien-moi/02b-tech-design.md` §1.1, §1.11, §3.4).
+> Lô đó xoá `storage.ts`, `PaymentPanel.tsx`, `OrderPaymentPanel.tsx`, `CheckoutScreen.tsx` bản cũ và mọi chỗ dùng
+> `phone_last4`; tra đơn đổi sang `POST /api/shop/orders/lookup/` (mã đơn + SĐT đầy đủ, hoặc mã tra đơn). Trạng thái
+> `PAID` không còn dùng từ 07/10 (vẫn nằm trong choices; đơn trả tiền xong là `PROCESSING`). Phần dưới mô tả bản hiện có tới hết lô 3+4.
+
 Luồng thanh toán cổng SePay (VietQR) cho Shop — story P4 của
 `doc/features/2026-09-26-sepay-cong-thanh-toan/`.
 
@@ -41,7 +46,7 @@ module tính năng mà không phải refactor toàn bộ `lib/` hiện có.
 - `GET /api/shop/orders/<code>/?phone_last4=...` **CHƯA** trả `booked_expires_at` (chỉ có ở
   response đặt hàng) và **CHƯA** trả `name` mỗi dòng (chỉ `item_code`, `qty`, `amount`).
   `lib/api.ts` (`mapOrderStatus`) tự suy `is_paid`/`is_expired` từ `status` thô
-  (BOOKED/PAID/PROCESSING/COMPLETED/CANCELLED/AUTO_CANCELLED) và hiện tạm mã hàng khi
+  (BOOKED/PROCESSING/COMPLETED/CANCELLED/AUTO_CANCELLED; `PAID` không còn dùng từ 07/10) và hiện tạm mã hàng khi
   thiếu tên. Thiếu `booked_expires_at` thì `OrderPaymentPanel` ẩn đồng hồ đếm ngược thay vì
   suy đoán — nút "Thanh toán lại" vẫn dùng được vì BE tự chặn khi hết hạn.
 - `success_url`/`cancel_url`/`error_url` trỏ về `/shop/orders?code=...&result=success|cancel|error`.
@@ -51,5 +56,4 @@ module tính năng mà không phải refactor toàn bộ `lib/` hiện có.
   khi demo — không dùng `fields` của mock để điều hướng thật (static export không có route
   nhận POST), xem `goToMockGateway`.
 
-Còn nợ (BE cần bổ sung để hết giả lập phần đếm ngược trên trang tra đơn):
-thêm `booked_expires_at` và tên mặt hàng vào `GET /api/shop/orders/<code>/`.
+Ghi chú: backend nay đã trả `booked_expires_at` khi đơn còn `BOOKED`. Đường GET này bị gỡ ở lô 3+4.

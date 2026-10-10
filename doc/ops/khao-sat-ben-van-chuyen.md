@@ -3,6 +3,7 @@
 - **Ngày khảo sát:** 2026-09-28
 - **Người làm:** Claude (research subagent), theo yêu cầu của Duy
 - **Mục đích:** chỉ để biết thị trường có bên nào đáp ứng được không. **Báo cáo này không đề xuất lật quyết định** "100% đơn do nhân viên nội bộ giao" (`doc/decisions.md`, 2026-09-09). Nó chỉ cung cấp dữ liệu.
+- **Cập nhật 11/10:** Duy chốt khu vực giao là **Phan Thiết**, đơn vị giao trước mắt là **Ahamove hoặc GHN, chưa chốt** (`doc/decisions.md` mục 2026-10-11, S-08). Bảng dưới chưa có GHN; bổ sung khi chốt hãng (kèm quyết định riêng và cập nhật chính sách quyền riêng tư).
 - **Phạm vi:** lấy hàng ở kho Phan Thiết, giao nội thành và liên tỉnh trong bán kính dưới 300 km, ưu tiên giao trong ngày. Hàng đông lạnh đóng thùng xốp và đá, mỗi đơn 1–10 kg, vài chục đơn/ngày. Phải có API.
 
 ## 0. Cách làm và mức tin cậy

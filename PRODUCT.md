@@ -28,8 +28,8 @@ Giá vốn và lãi lỗ **theo lô** là nguồn sự thật (landed cost gồm
 
 ## Operating Context
 
-- Ba bề mặt: **ERP console** (`erp-console/`, nội bộ), **Shop + Landing** (`frontend/`, công khai), app di động (sau này).
-- Console có 4 nhóm quyền cộng dồn (Chủ, Quản lý, NV kho, NV giao); menu hiện theo quyền.
+- Ba bề mặt: **ERP console** (`erp-console/`, nội bộ), **Shop** (`frontend/`, công khai: trang chủ Shop ở `/`, giới thiệu thương hiệu ở `/about/`), app di động (sau này).
+- Console có 5 nhóm quyền cộng dồn (Chủ, Quản lý, NV kho, NV giao, Nhân viên gọi xác nhận); menu hiện theo quyền.
 - Tiền VND không số lẻ, khối lượng theo kg; giữ chỗ đơn có thời hạn (TTL).
 - Dự án chưa vận hành thực tế (URD §1.3): nhiều hành vi là giả định thiết kế, sẽ chỉnh khi Lộc vận hành.
 
@@ -43,7 +43,7 @@ Giá vốn và lãi lỗ **theo lô** là nguồn sự thật (landed cost gồm
 ## Brand Commitments
 
 - Tên hiển thị: **"Cá Về"**. "Lộc" là chủ vựa (người), không phải brand. Chuỗi `cangca` chỉ là tên hạ tầng.
-- Hướng giao diện Duy chốt 2026-09-24: **tinh gọn kiểu Linear/Notion**, một màu nhấn xanh biển, dark mode ngang hàng light (chi tiết ở `DESIGN.md`).
+- Hướng giao diện: token chung ở `DESIGN.md`, một màu nhấn xanh biển `#1F66D1`. **Shop** theo bố cục bán lẻ kiểu Long Châu, chỉ bản sáng (`doc/design/shop/`, Duy chốt 10/10). **ERP** tinh gọn, có dark mode ngang hàng light (`doc/design/erp/UI-RULES.md`).
 - Giọng văn: tiếng Việt đời thường, động từ rõ ("Mở bán lô", "Xác nhận đã nhận tiền"); lỗi phải nói cách sửa.
 
 ## Evidence on Hand

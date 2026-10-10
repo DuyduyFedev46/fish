@@ -43,7 +43,7 @@ Quy mô: 1 điểm bán/kho duy nhất. Timeline tự đặt 6 tháng. Duy phát
 ## 2.2 Mục tiêu nghiệp vụ *(suy luận từ bối cảnh — chưa được Lộc/Duy phát biểu trực tiếp, cần xác nhận lại)*
 - Số hoá & chuẩn hoá vận hành mua – bán – kho, giảm sai sót từ ghi chép/tính toán thủ công
 - Có căn cứ số liệu rõ ràng theo từng lô hàng để tính đúng giá vốn và lãi/lỗ (khó làm thủ công khi giá vốn biến động theo mẻ)
-- Mở kênh bán online (landing + shop) tiếp cận khách hàng cá nhân, tách biệt khỏi cách bán truyền thống tại vựa
+- Mở kênh bán online (trang chủ Shop ở `/`, trang giới thiệu thương hiệu ở `/about/` *(sửa 2026-10-10 và 2026-10-11, (D))*) tiếp cận khách hàng cá nhân, tách biệt khỏi cách bán truyền thống tại vựa
 - Kiểm soát được hao hụt hàng tồn kho đông lạnh qua kiểm kê định kỳ
 
 *Đây là phần suy luận của Product Architect dựa trên toàn bộ yêu cầu — không phải Lộc/Duy phát biểu trực tiếp. Anh xác nhận lại hoặc sửa nếu không đúng.*
@@ -66,12 +66,12 @@ Quy mô: 1 điểm bán/kho duy nhất. Timeline tự đặt 6 tháng. Duy phát
 - **Combo — 3 dạng**: gói có công thức thành phần, hàng đóng gói sẵn, ưu đãi giảm giá 1 tầng. Cấu hình được trong Admin, không cần sửa code khi thêm combo mới
 - Mua hàng: ghi nhận nhập kho theo lô, ghi nhận chi phí mua hàng (tách riêng khỏi bước nhập kho)
 - **Chi phí phụ mua hàng (đá, vận chuyển, bốc vác) phân bổ vào giá vốn lô** (landed cost)
-- Kho: quản lý tồn theo lô (số lượng kg, hạn dùng mặc định 90 ngày), vòng đời lô có bước **chốt lô**, kiểm kê định kỳ để đo hao hụt
+- Kho: quản lý tồn theo lô (số lượng kg, hạn dùng mặc định 365 ngày *(sửa 2026-09-26, (D), trước là 90 ngày)*), vòng đời lô có bước **chốt lô**, kiểm kê định kỳ để đo hao hụt
 - Bán hàng: giỏ hàng, đặt hàng, giữ chỗ tạm thời (TTL 30 phút), xác nhận thanh toán tự động qua webhook VietQR
 - **Huỷ đơn & hoàn tiền**: hệ thống ghi sổ (trạng thái đơn, hoàn kho, phiếu hoàn tiền toàn phần/một phần); thao tác chuyển tiền do Lộc làm tay trên app ngân hàng
 - **Hàng giao thất bại quay về kho**: ghi nhận, Chủ duyệt tái nhập hoặc huỷ bỏ
 - Giao hàng: theo dõi trạng thái vận hành từ soạn hàng đến hoàn tất, gán nhân viên phụ trách
-- Shop (bảng giá, giỏ hàng, thanh toán) và trang giới thiệu thương hiệu: `/` là trang chủ Shop; trang giới thiệu thương hiệu ở `/gioi-thieu/` *(sửa 2026-10-10, (D), xem decisions.md; thay "Landing và Shop — 2 mặt tiền tách biệt")*
+- Shop (bảng giá, giỏ hàng, thanh toán) và trang giới thiệu thương hiệu: `/` là trang chủ Shop; trang giới thiệu thương hiệu ở `/about/` *(sửa 2026-10-10, (D), xem decisions.md; thay "Landing và Shop — 2 mặt tiền tách biệt")*
 - **Mã giảm giá công khai, mỗi đơn một mã**; Chủ quản lý mã trong ERP *(mới 2026-10-10, (D), xem decisions.md)*
 - Social: đăng bài thủ công ngoài hệ thống, chỉ dẫn link thẳng vào Shop — không phải 1 module của hệ thống
 - Báo cáo giá vốn/lãi lỗ **theo lô** (nguồn sự thật) và **theo kỳ** (điều hành)
@@ -84,7 +84,7 @@ Quy mô: 1 điểm bán/kho duy nhất. Timeline tự đặt 6 tháng. Duy phát
 - **Rule engine khuyến mãi tổng quát** — không điều kiện lồng nhau, không cộng dồn ưu đãi, không ngân sách khuyến mãi *(sửa 2026-10-10, (D), xem decisions.md: bỏ "không mã giảm giá")*
 - Điều phối/tối ưu tuyến giao hàng, quản lý chi phí xe cộ, app shipper phức tạp
 - **Phí giao hàng**: hoàn toàn ngoài phạm vi hệ thống — Lộc tự thoả thuận và quản lý với khách
-- Giao hàng qua đối tác thứ 3 (Grab/Ahamove) — chỉ dùng nhân viên nội bộ
+- Giao hàng qua đối tác thứ 3 (Grab/Ahamove) — chỉ dùng nhân viên nội bộ *(lưu ý 2026-10-11, (D): khu vực Phan Thiết, đang cân nhắc Ahamove hoặc GHN, chưa chốt — xem decisions.md)*
 - Đa kho, đa điểm bán/chuỗi cửa hàng
 - Bán hàng trực tiếp trên mạng xã hội (social chỉ dẫn link, đăng tay, không tích hợp API)
 - Đối soát/tách bạch số kg cân thực tế khác số kg đặt — xem giả định ở mục 6.4
@@ -123,7 +123,7 @@ Quy mô: 1 điểm bán/kho duy nhất. Timeline tự đặt 6 tháng. Duy phát
 
 ## 6.1 Mua hàng
 - Ghi nhận nhập kho trực tiếp theo lô (không qua bước đặt hàng/PO với nhà cung cấp)
-- Mỗi lô: gắn nhà cung cấp, số lượng kg, ngày nhập, hạn dùng (mặc định 90 ngày)
+- Mỗi lô: gắn nhà cung cấp, số lượng kg, ngày nhập, hạn dùng (mặc định 365 ngày *(sửa 2026-09-26, (D))*)
 - Ghi nhận chi phí mua hàng như một bước tách biệt, gắn với lô đã nhập
 - **Chứng từ chi phí phụ**: loại chi phí, số tiền, phương pháp phân bổ (theo kg hoặc theo giá trị), danh sách lô nhận phân bổ → cập nhật giá vốn lô
 
@@ -174,7 +174,7 @@ Quy mô: 1 điểm bán/kho duy nhất. Timeline tự đặt 6 tháng. Duy phát
 - Nhân viên không được tự nhập lại kho
 
 ## 6.8 Landing & Shop
-- `/` là trang chủ Shop; trang giới thiệu thương hiệu ở `/gioi-thieu/` (tối ưu SEO, không có giao dịch) *(sửa 2026-10-10, (D), xem decisions.md; thay "Landing và Shop tách biệt hoàn toàn")*
+- `/` là trang chủ Shop; trang giới thiệu thương hiệu ở `/about/` (tối ưu SEO, không có giao dịch) *(sửa 2026-10-10, (D), xem decisions.md; thay "Landing và Shop tách biệt hoàn toàn")*
 - Shop: hiển thị bảng giá, giỏ hàng, thanh toán
 - Link từ mạng xã hội trỏ thẳng vào Shop, không qua trang trung gian; social tự đăng bài thủ công, không có tích hợp/API nào giữa hệ thống và các nền tảng social
 
@@ -200,7 +200,7 @@ Quy mô: 1 điểm bán/kho duy nhất. Timeline tự đặt 6 tháng. Duy phát
 - **Frontend**: Next.js
 - **Cơ sở dữ liệu**: PostgreSQL
 - Kiến trúc tham khảo doctype ERPNext làm tài liệu, **build mới hoàn toàn bằng Django — không cài/fork Frappe framework**
-- Cơ chế tự huỷ đơn quá hạn: recurring job định kỳ trong hệ sinh thái Python (Celery Beat, cụ thể chọn khi build)
+- Cơ chế tự huỷ đơn quá hạn: recurring job định kỳ trong hệ sinh thái Python *(đã build: lệnh `cancel_expired_orders` chạy bằng Cloud Run Job + Cloud Scheduler trên hạ tầng; Celery chỉ dùng khi dev — xem `doc/ops/moi-truong.md`)*
 - Cần cơ chế xác thực nội bộ (service token) giữa FastAPI và Django — chi tiết để lúc build
 - **Ràng buộc từ nhà cung cấp thanh toán (đã kiểm chứng)**: SePay theo mô hình tiền vào thẳng tài khoản ngân hàng người bán, không qua ví trung gian; tài liệu API chỉ có webhook/tra cứu/virtual account/IPN, **không có API hoàn tiền hay chuyển tiền đi** → hoàn tiền tự động không khả thi ở V1
 - **Giả định vận hành chưa kiểm chứng**: số kg khách đặt = số kg thực cân khi soạn hàng = số kg trừ kho (xem mục 6.4)
@@ -243,4 +243,4 @@ Quy mô: 1 điểm bán/kho duy nhất. Timeline tự đặt 6 tháng. Duy phát
 8. `doctype-mapping.md` đã lỗi thời (còn ghi "bỏ Sales Order", "bỏ Delivery Note") và chưa có 6 thực thể mới phát sinh từ `business-process-spec.md`. Phải viết lại trước khi dịch sang Django models.
 
 ---
-*Tài liệu tham chiếu liên quan trong project: `business-process-spec.md` (Level 3 — nghiệp vụ chi tiết, state machine, business rules), `decisions.md` (nhật ký quyết định kiến trúc), `doctype-mapping.md` (Level 2 — ⚠ lỗi thời), `ecosystem-l1.md` (sơ đồ tổng thể), artifact "Doctype Cảng Cá Lộc" (sơ đồ Level 2).*
+*Tài liệu tham chiếu liên quan trong project: `business-process-spec.md` (Level 3 — nghiệp vụ chi tiết, state machine, business rules), `decisions.md` (nhật ký quyết định kiến trúc), `archive/doctype-mapping.md` (Level 2 — ⚠ lỗi thời), `ecosystem-l1.md` (sơ đồ tổng thể), artifact "Doctype Cảng Cá Lộc" (sơ đồ Level 2).*

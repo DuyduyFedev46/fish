@@ -74,7 +74,7 @@ frontend/
     legacy.css                   ✚ (1) class cũ còn dùng bởi trang chưa viết lại, biến cũ trỏ về token mới (KHÔNG hex) · ✖ (5)
     page.tsx                     ↻ (1) <HomeScreen/> + metadata (metadata do mkt-brand sửa ở 1-09)
     not-found.tsx                ↻ (1, mkt-brand)
-    gioi-thieu/page.tsx          ✚ (1, mkt-brand)
+    about/page.tsx          ✚ (1, mkt-brand)
     ui-preview/page.preview.tsx  ✚ (1) chỉ build khi NEXT_PUBLIC_UI_PREVIEW=1
     shop/layout.tsx              ↻ (1) chỉ metadata + children (CartProvider đã lên root)
     shop/page.tsx                ↻ (1 bọc ShopFrame) → (2) <CatalogScreen/>
@@ -83,7 +83,7 @@ frontend/
     shop/checkout/page.tsx       ↻ (1 bọc) → (3) <CheckoutScreen/> (viết mới, cùng tên file cũ đã xoá)
     shop/orders/page.tsx         ↻ (1 bọc) → (4) <OrderScreen/>
     shop/orders/OrderLookup.tsx  ✖ (4)
-    trang/page.tsx, bai-viet/page.tsx   ↻ (1 bọc ShopFrame, fe-dev) → (5, mkt-brand) giao diện mới
+    pages/page.tsx, blog/page.tsx   ↻ (1 bọc ShopFrame, fe-dev) → (5, mkt-brand) giao diện mới
   components/
     ShopFrame.tsx                ✚ (1) khung: header + main + footer + BottomNav theo props
     ShopHeader.tsx + .module.css ↻ (1)   ShopFooter.tsx + .module.css ↻ (1)
@@ -146,8 +146,8 @@ Chỉ `*Screen.tsx` và `ShopHeader`/`ShopFooter` (cần site-info/catalog) đư
 | `/shop/cart/` | `sub` (H3, không nút giỏ) → compact | compact | không |
 | `/shop/checkout/`, `/shop/orders/` khi đơn `BOOKED` | `checkout` (H4) → compact | compact | không |
 | `/shop/orders/` các trạng thái khác + F1/F2 | `sub` → full | full | có (tab "Đơn hàng") |
-| `/bai-viet/` danh sách | `sticky` → full | full | có |
-| `/bai-viet/?slug=`, `/trang/`, `/gioi-thieu/`, 404 | `sub` → full | full | không |
+| `/blog/` danh sách | `sticky` → full | full | có |
+| `/blog/?slug=`, `/pages/`, `/about/`, 404 | `sub` → full | full | không |
 
 - H3 nút quay lại: có `history.length > 1` và `document.referrer` cùng origin thì `history.back()`, không thì `backHref` (mặc định `/shop/`).
 - Header/footer đọc `getSiteInfo()` (có cache 5 phút sẵn) và `getFooterLinks()` (features/site). Lỗi thì ẩn khối liên quan, không vỡ bố cục (1-03 AC7, 1-05 AC6).
@@ -187,7 +187,7 @@ Chỉ `*Screen.tsx` và `ShopHeader`/`ShopFooter` (cần site-info/catalog) đư
 | `cangcaloc_order_tokens_v1` | sessionStorage | `{[order_code]: token}` tối đa 5 | 401 thì xoá mục đó |
 | `cangcaloc_last_order_contact_v1` | sessionStorage | — | Khoá cũ (4 số cuối): lô 3 **xoá** khi trang đơn mở |
 
-URL chỉ chứa `code`, `result`, `q`, `group`, `type`, `sort`, `slug`, `chuyen-muc`. Không bao giờ SĐT, tên, địa chỉ, token. Không `console.log` dữ liệu form.
+URL chỉ chứa `code`, `result`, `q`, `group`, `type`, `sort`, `slug`, `category`. Không bao giờ SĐT, tên, địa chỉ, token. Không `console.log` dữ liệu form.
 
 ### 1.8 `/ui-preview/` theo cờ build (Techlead chốt)
 - File `app/ui-preview/page.preview.tsx`; `next.config.mjs`: `pageExtensions: process.env.NEXT_PUBLIC_UI_PREVIEW === "1" ? ["tsx","ts","preview.tsx"] : ["tsx","ts"]`.
@@ -268,12 +268,12 @@ Kiểu dùng chung trong `lib/types.ts`: `StockLevel = "in"|"low"|"out"`, `SaleU
 
 | Lô | Xoá (FE) | Xoá/gỡ (BE) | e2e cũ |
 |---|---|---|---|
-| 1 | landing ở `app/page.tsx`; `ShopHeader`/`ShopFooter` bản cũ (viết lại cùng tên); `features/site/components/SiteLegalFooter.tsx` + `.module.css` + chỗ gắn ở `app/layout.tsx`; `components/ItemImageFrame.tsx`; mọi hex/token cũ trong `globals.css`; `CartProvider` trong `app/shop/layout.tsx`; khoá `sellable_qty`, `unit:"Kg"`, `group` (chuỗi) khỏi `lib/types.ts`, `lib/mock.ts`, `lib/api.ts` | `sellable_qty` khỏi `catalog/items/shop_api.py`; câu lỗi lộ mã lô/số kg ở `inventory/batches/services.py` (`allocate_fefo`, `reserve`) | `ra_soat_cms14_landing.py` (mkt-brand sửa sang `/gioi-thieu/`), phần footer cũ của `ra-soat-a2-golive.py` (fe-dev) |
+| 1 | landing ở `app/page.tsx`; `ShopHeader`/`ShopFooter` bản cũ (viết lại cùng tên); `features/site/components/SiteLegalFooter.tsx` + `.module.css` + chỗ gắn ở `app/layout.tsx`; `components/ItemImageFrame.tsx`; mọi hex/token cũ trong `globals.css`; `CartProvider` trong `app/shop/layout.tsx`; khoá `sellable_qty`, `unit:"Kg"`, `group` (chuỗi) khỏi `lib/types.ts`, `lib/mock.ts`, `lib/api.ts` | `sellable_qty` khỏi `catalog/items/shop_api.py`; câu lỗi lộ mã lô/số kg ở `inventory/batches/services.py` (`allocate_fefo`, `reserve`) | `ra_soat_cms14_landing.py` (mkt-brand sửa sang `/about/`; nay là `about_page.py`), phần footer cũ của `ra-soat-a2-golive.py` (fe-dev) |
 | 2 | `components/CatalogGrid.tsx`, `components/AddToCartControl.tsx`, `components/ContactButton.tsx` (khi `ItemCard` lô 5 chưa xoá thì ItemCard tự dựng nút `tel:`), phần dòng giỏ trong `features/checkout/components/CheckoutScreen.tsx`, dòng phụ đề "tồn kho hiển thị là…" ở `app/shop/page.tsx` | — | e2e đọc "Còn X kg" trong `qa-lo6-sr21-shop.py`, `qa-lo7-shop-*.py`, `qa-lo8-shop-*.py` (sửa hoặc xoá đoạn đó) |
 | 2b | — | — | — |
 | 3+4 | `features/checkout/components/CheckoutScreen.tsx` (bản cũ, viết lại), `PaymentPanel.tsx`, `OrderPaymentPanel.tsx`, `features/checkout/storage.ts`, `app/shop/orders/OrderLookup.tsx`, `components/CountdownTimer.tsx`, `features/site/components/ConfirmationPolicyNotice.*` + `ConfirmCallNotice.tsx` (thay bằng `ConfirmCallBlock`, vì câu cũ có chữ "hoàn đủ tiền"), class giỏ/checkout trong `legacy.css`, `getOrderStatus`, `phone_last4` khắp FE | `ShopOrderLookupView` GET + route `shop/orders/<code>/`, `LOOKUP_BAD_LAST4`, khối `refund{…}` và câu "sẽ được hoàn trong vòng N ngày" trong `customer_notices.py` | `order_lookup_completed.py`, `order_lookup_no_raw_codes.py`, phần tra đơn của `qa_sepay_checkout.py` |
 | 3b | mock tạm `discount` nếu có | — | — |
-| 5 | `app/trang/trang.module.css`, `app/bai-viet/bai-viet.module.css`, `features/content/components/ItemCard.*`, `features/home/content.ts`, `app/legacy.css` | — | `ra_soat_cms13_public.py`, `ra_soat_cms06_item_card.py` sửa theo giao diện mới |
+| 5 | `app/pages/pages.module.css`, `app/blog/blog.module.css`, `features/content/components/ItemCard.*`, `features/home/content.ts`, `app/legacy.css` | — | `ra_soat_cms13_public.py`, `ra_soat_cms06_item_card.py` sửa theo giao diện mới |
 | 7 | — | — | còn sót; `grep -rnE "sellable_qty|phone_last4|OrderLookup|SiteLegalFooter|CatalogGrid|AddToCartControl|CountdownTimer" frontend backend/apps` = 0 ngoài migration/doc |
 
 ---
@@ -312,7 +312,7 @@ Thanh toán: khoá `SalesOrder` → cập nhật `VoucherRedemption` của đơn
 | `SHOP_LOOKUP_TOKEN_DAYS` | `30` | BR-BH-25 (V-02) |
 | `SHOP_PAYMENT_PENDING_MINUTES` | `5` | BR-TT-19 (trả trong tra đơn) |
 | `SHOP_CANCEL_CALLBACK_WITHIN` | `"1 ngày làm việc"` | BR-HT-12 (S-12 câu tạm) |
-| `SHOP_CANCEL_POLICY_URL` | `"/trang/?slug=doi-tra#xu-ly-tien"` | BR-HT-12 |
+| `SHOP_CANCEL_POLICY_URL` | `"/pages/?slug=doi-tra#xu-ly-tien"` | BR-HT-12 |
 | `VOUCHER_MAX_PERCENT` | `Decimal("50")` | BR-DM-21 |
 | `SELLER_ZALO`, `SELLER_WORKING_HOURS`, `SELLER_REG_ISSUED_BY`, `SELLER_REG_ISSUED_ON`, `SELLER_WEBSITE_NOTICE_URL`, `SELLER_WEBSITE_NOTICE_IMAGE` | `""` | BR-ND-18 (mkt-brand đọc ở lô 5) |
 | `SHOP_RETURN_REPORT_HOURS` | `""` (rỗng → `null`) | E3 |
@@ -475,7 +475,7 @@ Route đặt **trước** mọi route `shop/orders/<str:order_code>/…` trong `
 {"scope": "full", "reason_code": "DAMAGED_WHEN_PACKING", "reason_label": "Hàng không đạt khi soạn",
  "cancelled_amount": "278000",
  "message": "Cá Về sẽ gọi vào số điện thoại đặt hàng trong 1 ngày làm việc để trả lại 278.000đ.",
- "hotline": "1900 xxxx", "policy_url": "/trang/?slug=doi-tra#xu-ly-tien"}
+ "hotline": "1900 xxxx", "policy_url": "/pages/?slug=doi-tra#xu-ly-tien"}
 ```
 
 | Khi | `scope` | `reason_code` | `cancelled_amount` |
@@ -513,7 +513,7 @@ Thêm vào `seller`: `zalo`, `working_hours`, `registration_issued_by`, `registr
    - `home-banner`: mỗi slide = 1 khối `heading` cấp 2 (tiêu đề) + 1 `paragraph` (câu phụ) + tuỳ chọn 1 `paragraph` chỉ chứa **một** link nội bộ (nút: chữ link + `href` qua `safeHref`) + tuỳ chọn 1 `image` (ảnh nền). Tối đa 3 slide. `excerpt` của trang = dải chữ đầu trang (rỗng → ẩn).
    - `home-commitments`: một khối `list`; mỗi mục = phần `bold` (tiêu đề cam kết) + phần thường (mô tả). Tối đa 4 mục.
    - FE parse ở `features/home/homeBlocks.ts` (mkt-brand, lô 5); khối sai dạng thì bỏ qua khối đó, không vỡ trang. Lộc sửa ở màn Nội dung ERP như trang thường, đăng là Shop đổi, không build lại.
-3. `/gioi-thieu/`: trang CMS `gioi-thieu` dạng bài đọc (06-marketing C2.3); "khối giá có thẻ hàng" = khối `item_card` sẵn có (render ProductCard `row`, giá thật từ catalog).
+3. `/about/`: trang CMS `gioi-thieu` dạng bài đọc (06-marketing C2.3); "khối giá có thẻ hàng" = khối `item_card` sẵn có (render ProductCard `row`, giá thật từ catalog).
 4. Trang Cách mua hiển thị FAQ: H3 + đoạn trong CMS, FE trình bày `<details>` theo slug `cach-mua-hang` (mkt-brand).
 5. Chặn claim: `scan.py` thêm cảnh báo cho danh sách cụm cấm (`"miễn phí giao"`, `"hút chân không"`, `"cấp đông ngay tại cảng"`, `"Cân đúng"`, `"tươi sống"`) qua setting `CONTENT_BLOCKED_CLAIMS` (mkt-brand đọc bằng `getattr` mặc định danh sách trên; be-dev không cần khai). Hotline (`SHOP_HOTLINE`, `SELLER_PHONE`) tự nằm trong danh sách SĐT được phép (5-01 AC5).
 6. Lệnh nạp `backend/apps/content/management/commands/load_shop_content.py`: `--author <username>` (bắt buộc, người tạo), `--publish` (đăng luôn; chỉ nhận khi `SEPAY_ENV != "PRODUCTION"`), `--overwrite`, `--environment production` (bắt buộc khi `SEPAY_ENV == "PRODUCTION"`, không thì từ chối, exit ≠ 0).
@@ -741,7 +741,7 @@ OrderTimeline 5 bước: Đặt hàng (`placed_at`) → Thanh toán (`paid_at`) 
 |---|---|---|
 | `frontend/lib/api.ts`, `lib/types.ts`, `lib/mock.ts`, `lib/format.ts`, `lib/quantity.ts`, `lib/text.ts` | **fe-dev** | mkt-brand chỉ đọc (`getCatalog`) |
 | `frontend/components/**`, `features/{home,catalog,cart,checkout,ui-preview}/**`, `app/{layout,page,globals,legacy}`, `app/shop/**`, `app/ui-preview/**`, `next.config.mjs`, `DESIGN.md`, `scripts/test-*.mjs` | **fe-dev** | `app/page.tsx` khối `metadata` do mkt-brand sửa **sau** khi fe-dev xong 1-06 |
-| `frontend/features/{site,content}/**`, `app/{trang,bai-viet,gioi-thieu}/**`, `app/not-found.tsx` | **mkt-brand** | ngoại lệ ghi rõ ở lô (fe-dev bọc ShopFrame lô 1; fe-dev sửa kiểu ở `ArticleBody.tsx`/`ItemCard.tsx` lô 1; fe-dev xoá `SiteLegalFooter` lô 1, `ConfirmationPolicyNotice`/`ConfirmCallNotice` lô 3+4) |
+| `frontend/features/{site,content}/**`, `app/{pages,blog,about}/**`, `app/not-found.tsx` | **mkt-brand** | ngoại lệ ghi rõ ở lô (fe-dev bọc ShopFrame lô 1; fe-dev sửa kiểu ở `ArticleBody.tsx`/`ItemCard.tsx` lô 1; fe-dev xoá `SiteLegalFooter` lô 1, `ConfirmationPolicyNotice`/`ConfirmCallNotice` lô 3+4) |
 | `backend/config/settings.py`, `backend/config/api_urls.py` | **be-dev** | mkt-brand không sửa; cần biến/route mới thì báo điều phối |
 | `backend/apps/{catalog,sales,inventory,common,accounts/capabilities,reports}/**` + migration `catalog`, `sales` | **be-dev** | |
 | `backend/apps/content/**` + migration `content` | **mkt-brand** | |
@@ -774,11 +774,13 @@ OrderTimeline 5 bước: Đặt hàng (`placed_at`) → Thanh toán (`paid_at`) 
 
 ### 7.1 Bảng lô
 
+> Cập nhật 11/10: lô 0 ☑ (5f193ba, 3aa6731), lô 1 ☑ (95a2ea9, QA APPROVED, đã merge `main` ở a5a5da2). Lô 2 đang làm trên nhánh `shop/lo-2-catalog-cart`. URL Shop đã đổi sang tiếng Anh (`/about/`, `/pages/?slug=`, `/blog/`, decisions 11/10); đường dẫn trong bảng đã đổi theo.
+
 | ☐ | Lô | Story | Người | Được sửa | Không được đụng | Kiểm chứng thêm | Điểm dừng |
 |---|---|---|---|---|---|---|---|
-| ☐ | **1-FE** | 1-01…1-06 + nhận contract danh mục mới (T1) | fe-dev | `frontend/app/{layout.tsx,page.tsx,globals.css,legacy.css}`, `app/shop/layout.tsx`, bọc ShopFrame ở `app/shop/page.tsx`, `app/shop/item/page.tsx`, `app/shop/checkout/page.tsx`, `app/shop/orders/page.tsx`, `app/bai-viet/page.tsx`, `app/trang/page.tsx`; `app/ui-preview/page.preview.tsx`; `next.config.mjs`; `components/**` (mới §1.10 lô 1, viết lại ShopHeader/ShopFooter/CartContext, ✚ ShopFrame/BottomNav/LogoSlot); `features/home/**`, `features/catalog/groupIcon.ts`, `features/ui-preview/**`; `lib/{api,types,mock,format,quantity}.ts` (phần danh mục + định dạng); sửa kiểu tối thiểu `components/CatalogGrid.tsx`, `app/shop/item/page.tsx`, `features/content/components/{ArticleBody,ItemCard}.tsx` (thay `sellable_qty` bằng `stock_level`, đọc `.items`); xoá `features/site/components/SiteLegalFooter.*`, `components/ItemImageFrame.tsx`; `DESIGN.md` (chỉ thêm); `scripts/test-quantity.mjs`; `e2e/ra-soat-a2-golive.py` (phần footer) | `features/checkout/components/**`, `features/site/{api,types,mock}.ts`, `backend/`, `erp-console/` | `test-quantity`; `test ! -e out/ui-preview/index.html`; build thứ hai có cờ `NEXT_PUBLIC_UI_PREVIEW=1 NEXT_PUBLIC_USE_MOCK=1` thành công | S-18: không hiện "Cân đúng" |
-| ☐ | **1-MKT** (song song) | 1-07, 1-08, 1-09 | mkt-brand | `backend/apps/content/management/**` (lệnh + `shop_content/*.json`), `backend/apps/content/tests/**` (test lệnh), `frontend/app/gioi-thieu/**`, `frontend/app/not-found.tsx`, `frontend/features/site/{types,mock}.ts` (thêm khoá tuỳ chọn §3.6), khối `metadata` của `frontend/app/page.tsx` (**sau** khi 1-06 xong), `frontend/e2e/ra_soat_cms14_landing.py` | `config/*`, migration, `lib/*`, `components/*`, `features/content/components/*` (lô 1 do fe-dev sửa kiểu) | `manage.py test apps.content`; chạy lệnh nạp 2 lần trên DB test (idempotent) | S-18, S-08, S-23 (dữ liệu, dùng câu tạm `doc/ops/hoi-loc.md`) |
-| ☐ | **1-BE** (song song) | 2-01, 2-02 | be-dev | `backend/config/settings.py` (khối biến §2.3 **đủ cả đợt**), `apps/catalog/models/items.py` (slug), migration `catalog/0005–0007`, `apps/catalog/items/{services,shop_api}.py`, `apps/catalog/items/tests/**`, `apps/common/slugs.py`, `apps/sales/orders/{services,shop_api,shop_errors}.py` (chỉ kiểm số lượng + `OUT_OF_STOCK` + phong bì lỗi tạo đơn; contract response tạo đơn **giữ** tới lô 3), `apps/sales/orders/tests/**`, `apps/inventory/batches/services.py` (câu lỗi) | `apps/content/**`, `frontend/`, `erp-console/`, `payments/*` | test chống rò G1/G3, G4, Postgres race (skip nếu SQLite) | — |
+| ☑ | **1-FE** | 1-01…1-06 + nhận contract danh mục mới (T1) | fe-dev | `frontend/app/{layout.tsx,page.tsx,globals.css,legacy.css}`, `app/shop/layout.tsx`, bọc ShopFrame ở `app/shop/page.tsx`, `app/shop/item/page.tsx`, `app/shop/checkout/page.tsx`, `app/shop/orders/page.tsx`, `app/blog/page.tsx`, `app/pages/page.tsx`; `app/ui-preview/page.preview.tsx`; `next.config.mjs`; `components/**` (mới §1.10 lô 1, viết lại ShopHeader/ShopFooter/CartContext, ✚ ShopFrame/BottomNav/LogoSlot); `features/home/**`, `features/catalog/groupIcon.ts`, `features/ui-preview/**`; `lib/{api,types,mock,format,quantity}.ts` (phần danh mục + định dạng); sửa kiểu tối thiểu `components/CatalogGrid.tsx`, `app/shop/item/page.tsx`, `features/content/components/{ArticleBody,ItemCard}.tsx` (thay `sellable_qty` bằng `stock_level`, đọc `.items`); xoá `features/site/components/SiteLegalFooter.*`, `components/ItemImageFrame.tsx`; `DESIGN.md` (chỉ thêm); `scripts/test-quantity.mjs`; `e2e/ra-soat-a2-golive.py` (phần footer) | `features/checkout/components/**`, `features/site/{api,types,mock}.ts`, `backend/`, `erp-console/` | `test-quantity`; `test ! -e out/ui-preview/index.html`; build thứ hai có cờ `NEXT_PUBLIC_UI_PREVIEW=1 NEXT_PUBLIC_USE_MOCK=1` thành công | S-18: không hiện "Cân đúng" |
+| ☑ | **1-MKT** (song song) | 1-07, 1-08, 1-09 | mkt-brand | `backend/apps/content/management/**` (lệnh + `shop_content/*.json`), `backend/apps/content/tests/**` (test lệnh), `frontend/app/about/**`, `frontend/app/not-found.tsx`, `frontend/features/site/{types,mock}.ts` (thêm khoá tuỳ chọn §3.6), khối `metadata` của `frontend/app/page.tsx` (**sau** khi 1-06 xong), `frontend/e2e/ra_soat_cms14_landing.py` | `config/*`, migration, `lib/*`, `components/*`, `features/content/components/*` (lô 1 do fe-dev sửa kiểu) | `manage.py test apps.content`; chạy lệnh nạp 2 lần trên DB test (idempotent) | S-18, S-08, S-23 (dữ liệu, dùng câu tạm `doc/ops/hoi-loc.md`) |
+| ☑ | **1-BE** (song song) | 2-01, 2-02 | be-dev | `backend/config/settings.py` (khối biến §2.3 **đủ cả đợt**), `apps/catalog/models/items.py` (slug), migration `catalog/0005–0007`, `apps/catalog/items/{services,shop_api}.py`, `apps/catalog/items/tests/**`, `apps/common/slugs.py`, `apps/sales/orders/{services,shop_api,shop_errors}.py` (chỉ kiểm số lượng + `OUT_OF_STOCK` + phong bì lỗi tạo đơn; contract response tạo đơn **giữ** tới lô 3), `apps/sales/orders/tests/**`, `apps/inventory/batches/services.py` (câu lỗi) | `apps/content/**`, `frontend/`, `erp-console/`, `payments/*` | test chống rò G1/G3, G4, Postgres race (skip nếu SQLite) | — |
 |  | → commit chung **"Shop lô 1"** sau khi 3 phần cùng QA APPROVED | | | | | | |
 | ☐ | **2-FE** | 2-03, 2-05, 2-06, 2-04 | fe-dev | `app/shop/{page,item/page,cart/page}.tsx`, `features/{catalog,cart}/**`, `components/{catalog,cart,search,ui}/**` (mới lô 2), `components/CartContext.tsx` (`CartEntry`), `lib/{api,types,mock,text}.ts`, phần dòng giỏ của `features/checkout/components/CheckoutScreen.tsx` (chỉ gỡ), xoá `CatalogGrid`, `AddToCartControl`, `ContactButton`; `scripts/test-cart-reconcile.mjs`; e2e lô 2 | `backend/`, `features/{site,content}/**` (trừ `ItemCard` thay nút liên hệ nội tuyến khi xoá ContactButton), `erp-console/` | `test-cart-reconcile` | — |
 | ☐ | **2b-BE** (song song 2-FE) | 2b-01, 2b-02 (BE) | be-dev | `apps/catalog/models/items.py`, migration `catalog/0008`, `apps/catalog/items/{api,serializers,shop_api,public_text}.py`, tests | `frontend/`, `apps/content/**` | 403 từng Group, kiểm chữ BR-DM-25 | — |
@@ -787,7 +789,7 @@ OrderTimeline 5 bước: Đặt hàng (`placed_at`) → Thanh toán (`paid_at`) 
 | ☐ | **2b-ERP** | 2b-01, 2b-02 (ERP) | fe-dev (sau 2-FE) | `erp-console/features/catalog/**` (`ItemForm`, `ItemGroupModal`, `ItemGroupList`, `api.ts`, `types.ts`, `mock.ts`, `messages.ts`, test) | `frontend/`, `backend/` | ERP tsc + test + build | — → commit **"Shop lô 2b"** |
 | ☐ | **3+4-BE** | 3-01, 3-02, 4-05 (BE) | be-dev | `apps/sales/models/orders.py`, migration `sales/0020`, `apps/sales/orders/{services,shop_api,shop_errors,lookup_token,shop_state,shop_labels,customer_notices}.py`, `apps/sales/payments/shop_api.py` (lỗi `ORDER_NOT_FOUND`/`CHECKOUT_UNAVAILABLE` §3.5), `apps/common/throttling.py`, `config/api_urls.py`, tests | `payments/checkout.py`, `adapter/`, `frontend/` | lookup PII, token, throttle, cancel_notice | Mọi đổi trạng thái đơn → dừng (lô này **không** đổi trạng thái) |
 | ☐ | **3+4-FE** (song song) | 3-03, 3-05, 3-04, 4-01, 4-02, 4-03, 4-04, 4-05 (FE) | fe-dev | `app/shop/{checkout,orders}/**`, `features/checkout/**` (viết lại, xoá file §1.11), `components/ui/{TextField,Checkbox,FormErrorSummary}.tsx`, `components/cart/CartSummary.tsx` (biến thể), `lib/{api,types,mock}.ts`, xoá `components/CountdownTimer.tsx`, `features/site/components/{ConfirmationPolicyNotice.*,ConfirmCallNotice.tsx}`; `scripts/test-order-state.mjs`; e2e lô 3+4 | `backend/`, `features/site/{api,types,mock}.ts`, `features/content/**` | `test-order-state`; `grep -rn phone_last4 frontend backend/apps` = 0 (ngoài migration) | **Google Maps key** (làm nhánh không key) |
-| ☐ | **5b-MKT** (song song 3+4) | 5-04, 5-05 | mkt-brand | `app/{trang,bai-viet}/**`, `features/{site,content}/**` (PolicyNav, ItemCard → ProductCard `row` + AddToCart), xoá `trang.module.css`, `bai-viet.module.css`, `ItemCard.*`; e2e `ra_soat_cms13_public.py`, `ra_soat_cms06_item_card.py` | `lib/*`, `components/*` (chỉ dùng), `backend/` trừ `apps/content` | G7 trên file lô | S-12, S-16, S-08 (ô `[…]`) |
+| ☐ | **5b-MKT** (song song 3+4) | 5-04, 5-05 | mkt-brand | `app/{pages,blog}/**`, `features/{site,content}/**` (PolicyNav, ItemCard → ProductCard `row` + AddToCart), xoá `pages.module.css`, `blog.module.css`, `ItemCard.*`; e2e `ra_soat_cms13_public.py`, `ra_soat_cms06_item_card.py` | `lib/*`, `components/*` (chỉ dùng), `backend/` trừ `apps/content` | G7 trên file lô | S-12, S-16, S-08 (ô `[…]`) |
 |  | → commit **"Shop lô 3+4"** một lần (S-09c) (+ 5b nếu đã APPROVED, không thì commit riêng sau) | | | | | | |
 | ☐ | **3b-BE** | 3b-01, 3b-03, 3b-04 | be-dev | `apps/catalog/models/{vouchers,__init__}.py`, `apps/catalog/vouchers/**`, migration `catalog/0009–0010`, `apps/sales/models/{vouchers,__init__}.py`, migration `sales/0021`, `apps/sales/orders/{services,voucher_redemptions,shop_api}.py`, `apps/sales/payments/services.py` (chỉ móc `mark_used` nhánh MATCHED), `apps/accounts/capabilities/registry.py`, `apps/common/throttling.py`, `config/api_urls.py`, tests (+ `apps/reports/tests` test kỳ) | `apps/reports/services.py` (công thức), `PricingRule`, `payments/checkout.py`, `adapter/` | Postgres race 5 luồng; job chạy 2 lần | Đụng công thức lãi lỗ → dừng |
 | ☐ | **3b-FE** (song song) | 3b-02 (ERP), 3b-05, 3b-06 | fe-dev | `erp-console/features/catalog/**` (VoucherList, VoucherForm, VoucherDisableDialog, VoucherRedemptions, api/types/mock/permissions/messages), `erp-console/app/(console)/vouchers/**`, `erp-console/shared/lib/nav.ts` (+test); `frontend/components/cart/VoucherField.tsx`, `features/cart/**`, `features/checkout/**`, `lib/{api,types,mock}.ts` | `backend/`, `features/{site,content}/**` | ERP tsc+test+build; giờ nhập ERP đổi sang ISO +07:00 qua helper sẵn có (`noLocalTime` test) | — → commit **"Shop lô 3b"** |
@@ -796,7 +798,7 @@ OrderTimeline 5 bước: Đặt hàng (`placed_at`) → Thanh toán (`paid_at`) 
 
 ### 7.2 Phiếu lô 1 rút gọn (để giao ngay)
 - **fe-dev:** token + Inter + `legacy.css`; `CartProvider`/`ToastProvider` lên root (badge = số dòng); `components/ui/*` lô 1 + `Icon` + `ShopFrame` + Header H1–H4 + BottomNav + Footer F1/F2; `/ui-preview/` theo cờ; `/` = HomeScreen (catalog **mới** từ `lib/api.ts`, mock khớp §3.1, chữ banner tạm ở `features/home/content.ts` chỉ dòng "ĐÃ ĐỐI CHIẾU"); vá kiểu các file cũ đang đọc `sellable_qty`.
-- **mkt-brand:** `load_shop_content` (staging `--publish`, production nháp, idempotent, chặn claim, không SĐT thật) · `/gioi-thieu/` đọc CMS · 404 + metadata `/`, `/gioi-thieu/` · khoá site-info tuỳ chọn trong `features/site/types.ts` + mock.
+- **mkt-brand:** `load_shop_content` (staging `--publish`, production nháp, idempotent, chặn claim, không SĐT thật) · `/about/` đọc CMS · 404 + metadata `/`, `/about/` · khoá site-info tuỳ chọn trong `features/site/types.ts` + mock.
 - **be-dev:** khối settings §2.3 · slug nhóm (3 migration) · `{groups, items}` + `stock_level`/`unit`/`min_qty`/`qty_step` · kiểm số lượng + `OUT_OF_STOCK` có cấu trúc, không lộ kg/mã lô · test G1/G3/G4.
 - Kiểm chứng: §7.0 (FE, BE, naming). Điểm dừng: không có (S-18 chỉ ẩn câu).
 

@@ -1,5 +1,5 @@
 # Giao việc — P8b Đổi tên định danh sang tiếng Anh
-> Claude (Tech Lead) · 2026-10-01 · Trạng thái: **SẴN SÀNG CODE (Duy 01/10)**
+> Claude (Tech Lead) · 2026-10-01 · Trạng thái: **XONG — mọi lô ☑, QA APPROVED (`04-qa-report.md`); trước đó: SẴN SÀNG CODE (Duy 01/10)**
 > Người hiện thực: **đội Claude** (CLAUDE.md "Người hiện thực: đội Claude"). Điều phối viên giao `be-dev` ∥ `fe-dev`,
 > `techlead` review diff, `qa-tester` kiểm; APPROVED thì commit + `git push origin main`, đánh ☑ ở bảng dưới.
 > Nhánh làm việc: `main`.

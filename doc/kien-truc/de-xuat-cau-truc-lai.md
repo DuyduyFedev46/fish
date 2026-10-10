@@ -1,6 +1,6 @@
 # Đề xuất cấu trúc lại mã nguồn theo HỆ THỐNG
 
-> Tech Lead · 2026-10-10 · Trạng thái: **ĐỀ XUẤT, chờ Duy duyệt** (mục 7 có các câu hỏi).
+> Tech Lead · 2026-10-10 · Trạng thái: **KHÔNG LÀM đợt này, giữ tham khảo** (Duy 10/10: "thôi khỏi cấu trúc đi, cho làm shop", `doc/decisions.md` mục 2026-10-10 tối).
 > Đo trên nhánh `shop/lo-0-quyet-dinh` (`7b165e9`). Tài liệu này chỉ nghiên cứu và đề xuất, chưa di chuyển file nào.
 
 Yêu cầu của Duy: *"cấu trúc lại code cho hợp lý… nhiều hệ thống khác nhau, không gộp chung một folder BE hoặc FE… chia sao để

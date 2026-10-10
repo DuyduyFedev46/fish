@@ -1,6 +1,6 @@
 # Đối chiếu thiết kế Shop mới (prototype 06/10) với code hiện tại
 
-> **Cập nhật 11/10:** một số mục ở đây đã bị thay bởi chốt 10–11/10: bỏ BE-6 (không nút Huỷ đơn), bỏ `search_chips`, mã BR-BH-18/19 thay bằng BR-BH-22…30 và BR-DM-17…25. Khi lệch, theo `PLAN.md`, `doc/business-process-spec.md` và `doc/decisions.md`.
+> **Cập nhật 11/10:** một số mục ở đây đã bị thay bởi chốt 10–11/10: bỏ BE-6 (không nút Huỷ đơn), bỏ `search_chips`, mã BR-BH-18/19 thay bằng BR-BH-22…30 và BR-DM-17…25, **bỏ dải chip "Tìm nhiều"**, **bỏ câu "Phí giao: báo khi xác nhận"** (thay bằng "Đã gồm giao hàng…", BR-BH-30). URL Shop nay là `/about/`, `/pages/?slug=`, `/blog/` (11/10). Bảng lô chuẩn: 02b §7.1 của hồ sơ `2026-10-06-shop-giao-dien-moi`. Khi lệch, theo `PLAN.md`, `doc/business-process-spec.md` và `doc/decisions.md`.
 
 > Tech Lead · 2026-10-06 · CHỈ ĐỌC, không sửa repo.
 

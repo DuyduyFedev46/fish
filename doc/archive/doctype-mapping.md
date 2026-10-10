@@ -1,5 +1,7 @@
 # Level 2 — Mapping Doctype ERPNext → Hệ thống cảng cá Lộc
 
+> **LƯU TRỮ 11/10/2026** — lịch sử, không dùng làm nguồn sự thật. Xem `doc/archive/README.md`.
+
 Nguồn: đọc trực tiếp schema JSON từ repo github.com/frappe/erpnext (branch develop), không suy đoán từ docs tóm tắt.
 
 ## Phát hiện quan trọng — ERPNext đã có sẵn cơ chế đơn giản hoá đúng cho use case này

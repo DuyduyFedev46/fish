@@ -64,7 +64,8 @@ def close_batch(*, batch, actor):
   phía nối giữ bản cũ hoặc thành `None`. Quan hệ dùng để **quyết định** thì đọc bằng truy vấn mới SAU khoá; quan
   hệ phải đứng yên thì khoá riêng theo thứ tự khoá chung (vd phiếu → dòng → lô). Khoá nhiều dòng thì `order_by("pk")`.
   Test đua: `TransactionTestCase` + `skipUnless(connection.vendor == "postgresql")`, có ca người thứ hai **chờ khoá**
-  (giữ khoá trong luồng chính rồi mới commit) — SQLite không bắt được lỗi này.
+  (giữ khoá trong luồng chính rồi mới commit) — SQLite không bắt được lỗi này. Test PostgreSQL chạy **trên cloud với DB
+  test riêng**, không chạy Postgres cài ở máy, không trỏ staging hay production (decisions 10/10).
 
 ## API + phân quyền 3 tầng
 
@@ -108,7 +109,7 @@ Quyền Tầng 2 mới → thêm vào `Meta.permissions` + data migration gán G
 Mỗi endpoint mới cần tối thiểu:
 1. Happy path với Group đúng quyền.
 2. **403** với Group thiếu quyền (và 401 khi chưa đăng nhập) — dữ liệu không đổi.
-3. **Không rò giá vốn**: gọi bằng `warehouse_staff`/`delivery_staff`, assert field nhạy cảm *không có* trong JSON.
+3. **Không rò giá vốn**: gọi bằng `warehouse_staff`/`delivery_staff`/`customer_service`, assert field nhạy cảm *không có* trong JSON.
 4. Lỗi nghiệp vụ → 400 với thông điệp `BusinessError`.
 5. Nếu đụng tồn/tiền: trường hợp biên (0, âm, vượt tồn, lô cuối, hai đơn tranh nhau).
 
@@ -146,9 +147,8 @@ Không đưa mã lô giao việc (`lo7`, `l8`, `p8_lo5`) vào tên; mã lô/stor
 | Giờ Việt Nam | `VN_TIME_ZONE`, `todayInVietnam()`, `today_in_vietnam()` | `VN_TZ`, `todayVn`, `vn_today` |
 | Bản rà soát QA / bổ sung | `review_*` / `extra`, `followup` | `ra_soat_*` / `bosung` |
 
-Giữ nguyên (không đổi): migration đã chạy, `AuditLog.action` đã ghi, dòng phiên bản cấu hình AI cũ, URL công khai Shop
-`/bai-viet/` `/trang/` `?chuyen-muc=`, dữ liệu demo (username `kho1`, `chu_vua`..., slug, mã hàng), keyword AI có dấu, chuỗi `cangca`.
-Bảng đầy đủ: `doc/features/2026-09-30-dat-ten-tieng-anh/02c-giao-viec.md` mục 1.
+Giữ nguyên (không đổi): migration đã chạy, `AuditLog.action` đã ghi, dòng phiên bản cấu hình AI cũ, dữ liệu demo (username `kho1`, `chu_vua`..., slug, mã hàng), keyword AI có dấu, chuỗi `cangca`.
+Bảng đầy đủ: `doc/features/2026-09-30-dat-ten-tieng-anh/02c-giao-viec.md` mục 1. Bảng gốc ở skill `caveve-domain`; sửa ở đó trước. URL Shop đã đổi sang tiếng Anh 11/10 (`/about/`, `/pages/?slug=`, `/blog/?category=`).
 
 **Kiểm bằng máy** (Python 3 stdlib, chạy từ gốc repo, dưới 10 giây, không cần venv):
 `python3 scripts/check_naming.py`. Exit 1 khi file MỚI có định danh tiếng Việt, hoặc số vi phạm của một file TĂNG so với

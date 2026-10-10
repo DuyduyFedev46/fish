@@ -1,5 +1,5 @@
 # Giao việc — AI của tôi: nhân viên số, lệnh tự sinh từ API, hướng dẫn theo chứng từ
-> Claude (Tech Lead) · 2026-09-28 · Trạng thái: **SẴN SÀNG CODE (Duy duyệt 28/09 — chạy toàn bộ kế hoạch)**
+> Claude (Tech Lead) · 2026-09-28 · Trạng thái: **XONG — mọi lô ☑, QA APPROVED (`04-qa-report.md`); trước đó: SẴN SÀNG CODE (Duy duyệt 28/09 — chạy toàn bộ kế hoạch)**
 > Người hiện thực: Gemini CLI / Antigravity theo `AGENTS.md`, lệnh `/lam-tinh-nang 2026-09-28-ai-digital-worker` (`.agents/workflows/lam-tinh-nang.md`).
 > Nhánh làm việc: `main` (chỉ sau khi hồ sơ `2026-09-28-sua-loi-bao-mat` đã merge `wip/autosave` → `main` ở cuối Lô 2 của nó). `git pull --ff-only origin main` trước mỗi lô.
 

@@ -1,4 +1,5 @@
 # Rà soát toàn bộ phần AGY làm (P1–P7) — báo cáo tổng
+> **ĐÃ ĐÓNG — lịch sử (rà 11/10).** Các lỗi đã đưa vào P8 (`2026-09-30-sua-loi-review`, XONG). Kịch bản "landing ở `/`" đã đổi (10/10: `/` là trang chủ Shop, landing ở `/about/`). Không dời thư mục vì test trong code còn trỏ tới.
 > Điều phối (Claude Opus 5.5) · 2026-09-30 · phạm vi commit `5d26d95..75e5dd3`
 > Chi tiết: `A1-code.md` (techlead), `A2-bao-mat-go-live.md`, `A3-ai-digital-worker.md`, `A4-cskh-in-tem.md`, `A5-cms-viet-bai.md` (qa-tester).
 

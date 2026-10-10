@@ -1,7 +1,7 @@
 # Shop làm lại từ đầu theo thiết kế 06/10: phân tích nghiệp vụ
 > BA · 2026-10-10 · Trạng thái: **ĐÃ DUYỆT** 10/10 (Duy: "cho làm shop" → nhóm A §11.1 + V-01…V-12 theo khuyến nghị; nhóm B S-08, S-12, S-14, S-16, S-18, S-19, S-23 còn chờ, không chặn lô 0–1). Không cấu trúc lại thư mục code.
 > Nhánh `shop/lo-0-quyet-dinh`. Đầu vào: `00-dau-vao.md` (D1–D13), `00-product-brief.md` (PM), `05-phap-ly.md` (legal-vn), `06-marketing.md` (mkt-brand),
-> `doc/decisions.md` mục 2026-10-10 (tối), `doc/design/shop/` (README, UI-RULES, DOI-CHIEU-CODE, AUDIT-DO-DU §1 §8, PLAN), `doc/business-process-spec.md`, `doc/URD.md`.
+> `doc/decisions.md` mục 2026-10-10 (tối), `doc/design/shop/` (README, UI-RULES, DOI-CHIEU-CODE, AUDIT-DO-DU §1 §8 (nay ở `doc/archive/design-shop/`), PLAN), `doc/business-process-spec.md`, `doc/URD.md`.
 > Code đã đối chiếu: `catalog/models/items.py`, `catalog/models/pricing.py`, `catalog/items/shop_api.py`, `sales/models/orders.py`, `sales/orders/services.py`,
 > `sales/orders/customer_notices.py`, `content/site/services.py` + `api.py`, `content/models/entries.py`, `accounts/capabilities/registry.py`.
 > Phân tích không phụ thuộc đường dẫn code (đề xuất đổi thư mục ở `doc/kien-truc/de-xuat-cau-truc-lai.md` chưa duyệt).

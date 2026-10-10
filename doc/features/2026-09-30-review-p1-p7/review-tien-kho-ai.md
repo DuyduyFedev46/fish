@@ -1,4 +1,5 @@
 # Review P1–P7: tiền, kho, chứng từ và AI tự làm
+> **ĐÃ ĐÓNG — lịch sử (rà 11/10).** Lỗi đã sửa ở P8 (`2026-09-30-sua-loi-review`, XONG). Không dời thư mục vì test trong code còn trỏ tới.
 
 > Tech Lead (Claude), 2026-09-30. Nhánh `main`, HEAD `75e5dd3`. Chỉ đọc code, không sửa code sản phẩm, không commit.
 > Đối chiếu với: `2026-09-28-sua-loi-bao-mat` (S04, S06, S07), `2026-09-28-cskh-xac-nhan-in-tem` (CS-07, CS-08, CS-09),

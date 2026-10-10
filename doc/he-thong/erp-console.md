@@ -1,6 +1,6 @@
 # ERP console (`erp-console/`)
 
-> Cập nhật 02/10/2026, theo code `main` `bf62b81`.
+> Cập nhật 11/10/2026 (rà tài liệu legacy). Thiết kế ERP: `doc/design/erp/` (`UI-RULES.md`, `screens/`).
 > **Đang chuyển sang bộ thiết kế mới** (màn máy tính theo design): hồ sơ `doc/features/2026-10-01-erp-theo-design/`
 > (17 lô ở `02c-giao-viec.md`, quy tắc giao diện ở `doc/design/erp/UI-RULES.md`). File này mô tả ERP **hiện tại**; sau mỗi lô của hồ sơ đó cần cập nhật lại.
 > Hướng dẫn chi tiết cho dev: `erp-console/README.md`.
@@ -24,7 +24,7 @@ flowchart TD
 
 ## Là gì
 
-Console vận hành nội bộ cho Chủ, Quản lý, NV kho, NV giao, CSKH. Next.js 14 (App Router), **xuất tĩnh** ra `out/`,
+Console vận hành nội bộ cho Chủ, Quản lý, NV kho, NV giao, NV gọi xác nhận. Next.js 14 (App Router), **xuất tĩnh** ra `out/`,
 đưa lên Firebase Hosting (site `cangca-erp`, staging `cangca-erp-staging`). Không có server Next lúc chạy.
 Gọi Django API bằng Token DRF. Duy muốn mọi tính năng có màn ERP, kể cả việc của Chủ (không dồn sang Django Admin).
 
@@ -88,7 +88,7 @@ Module `guidance` vẽ khung "Tiếp theo · Đã làm" ở các màn chi tiết
 - **Trợ lý chạy trên máy** (`runtime/`): kiểm máy, tải model GGUF vào IndexedDB, chạy trong Web Worker. Bản mock dùng engine giả `llmock`. Bản thật chọn
   `wllama`, nhưng thư viện `@wllama/wllama` **chưa cài** và chưa chốt model, nên trợ lý báo lỗi và không chạy (fail-closed). Việc này thuộc P9 (`doc/ke-hoach-tong.md`).
   Cánh cổng `AiAssistantGate` gọi `GET /api/ai/status/` và chỉ nạp phần nặng khi AI bật và người dùng đồng ý.
-  Lưu ý: tại `bf62b81` backend **không có route** `/api/ai/status/` (xem `backend.md` mục "Doc cũ lệch code"), nên với backend thật cánh cổng luôn coi là AI tắt.
+  Backend đã có route `/api/ai/status/` (`config/api_urls.py`). AI đang tắt cứng từ 05/10 nên cánh cổng coi là AI tắt.
 
 ## Mock
 

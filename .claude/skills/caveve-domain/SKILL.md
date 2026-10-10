@@ -15,7 +15,7 @@ Tên sản phẩm hiển thị là **"Cá Về"**. "Lộc" là chủ vựa (ngư
 | `doc/URD.md` | Yêu cầu người dùng (mục 5 = tác nhân, mục 6 = chức năng) |
 | `doc/business-process-spec.md` | Quy trình P-01…P-10 + business rule `BR-*` + §13 ngoại lệ + §15 câu hỏi mở |
 | `doc/decisions.md` | Quyết định đã chốt — **không tự lật** |
-| `doc/BUILD-PLAN.md` | Contract hàm service/API |
+| `backend/README.md` (bản đồ module) + `02b-tech-design.md` của hồ sơ tính năng đang làm | Contract hàm service/API hiện hành (vd đợt Shop: `doc/features/2026-10-06-shop-giao-dien-moi/02b-tech-design.md`). `doc/archive/BUILD-PLAN.md` chỉ là lịch sử Phase 2, **không** dùng làm contract |
 | `doc/features/<ngày>-<slug>/` | Hồ sơ từng tính năng mới (xem skill `feature`) |
 
 **Nhãn nguồn** trong spec: **(L)** Lộc nói trực tiếp → yêu cầu thật, không sửa ·
@@ -40,11 +40,11 @@ Rule mới → đề xuất mã kế tiếp trong nhóm (vd BR-BH-11) và ghi v�
 ```
 frontend/ (Next.js 14, static export → Firebase cangca-loc)   erp-console/ (Next.js 14 static export, chia features/ → Firebase cangca-erp)
         │                                                               │
-        └──────────►  backend/ Django + DRF (Cloud Run cangca-api, Cloud SQL Postgres 16)  ◄── adapter/ FastAPI (webhook SePay, không đụng DB)
+        └──────────►  backend/ Django + DRF (Cloud Run cangca-api[-staging], Postgres trên Supabase)  ◄── adapter/ FastAPI (webhook SePay, không đụng DB)
 ```
 
 - Django là **100% lõi**. FastAPI chỉ là adapter mỏng gọi API nội bộ Django.
-- App theo domain: `accounts catalog purchasing inventory sales delivery reports common`.
+- App theo domain: `accounts catalog purchasing inventory sales delivery reports content ai common`.
 - Mỗi app domain chia module tính năng `apps/<domain>/<tinh_nang>/` (xem `backend/README.md` — bản đồ module). Logic nghiệp vụ ở `<tinh_nang>/services.py`; API ở `api.py` / `shop_api.py` /
   `internal_api.py`; route ở `config/api_urls.py`. View **không** chứa logic nghiệp vụ.
 - Lỗi nghiệp vụ → raise `apps.common.exceptions.BusinessError` (thông điệp tiếng Việt,
@@ -56,8 +56,9 @@ frontend/ (Next.js 14, static export → Firebase cangca-loc)   erp-console/ (Ne
    `PurchaseReceiptLine.rate`, `*LineBatch.unit_cost`, lãi lỗ) chỉ lộ khi user có
    `view_costprice` / `view_profitreport`. Serializer tách theo quyền, **cấm `fields="__all__"`**.
    Có test mẫu: `backend/apps/inventory/batches/tests/test_api.py`.
-2. **Phân quyền 3 tầng** (BR-PQ): Tầng 1 = model perm qua 4 Group cộng dồn `owner`,
-   `manager`, `warehouse_staff`, `delivery_staff` (`BusinessModelPermissions` ở `apps/common/api.py`);
+2. **Phân quyền 3 tầng** (BR-PQ): Tầng 1 = model perm qua 5 Group cộng dồn `owner`,
+   `manager`, `warehouse_staff`, `delivery_staff`, `customer_service` (nhãn "Nhân viên gọi xác nhận";
+   hằng ở `apps/accounts/roles.py`) (`BusinessModelPermissions` ở `apps/common/api.py`);
    Tầng 2 = `Meta.permissions` tuỳ biến (`publish_batch`, `close_batch`,
    `cancel_paid_order`, `create_refund`, `confirm_refund`, `confirm_payment_manual`,
    `view_costprice`, `view_profitreport`, `manage_staff`…); Tầng 3 = scope dòng trong
@@ -77,8 +78,10 @@ frontend/ (Next.js 14, static export → Firebase cangca-loc)   erp-console/ (Ne
    cùng nội dung IPN hay sao kê có tên người chuyển. Mức nghiêm trọng ngang rò giá vốn.
    - **Thu tối thiểu.** Chỉ thu field phục vụ giao hàng hoặc thanh toán. Thêm field cá nhân mới phải ghi lý do
      trong `01-analysis.md` và Duy duyệt.
-   - **API công khai (`AllowAny`) không bao giờ trả tên, SĐT hay địa chỉ đầy đủ.** Nếu cần hiện thì che bớt,
-     ví dụ `09xx xxx 123`. Tra đơn phải có yếu tố xác minh (mã đơn + SĐT) và **giới hạn tần suất**.
+   - **API công khai (`AllowAny`) không trả tên, SĐT hay địa chỉ người nhận.** Trang đơn hàng công khai của Shop
+     **không hiện người nhận** (decisions 10/10). Tra đơn bằng **POST** với mã đơn + SĐT đầy đủ hoặc mã tra đơn
+     tạm (gỡ GET 4 số cuối ở Shop lô 3+4), có **giới hạn tần suất**. Ngoại lệ có chủ ý: tem in phiếu giao trong
+     ERP chỉ hiện 4 số cuối SĐT (decisions 10/10 chiều).
    - **Trong ERP, chỉ lộ cho ai cần** (Tầng 3). `delivery_staff` chỉ thấy khách của phiếu giao được giao cho mình.
      Serializer liệt kê field tường minh, giống quy tắc giá vốn.
    - **Không ghi dữ liệu cá nhân vào log**, gồm `logger`, `print`, Sentry và console FE. Không log nguyên
@@ -96,6 +99,22 @@ frontend/ (Next.js 14, static export → Firebase cangca-loc)   erp-console/ (Ne
    - Quyền của khách (xem, sửa, xoá) xử lý bằng **ẩn danh hoá** trường cá nhân. Chứng từ vẫn giữ (bất biến 3),
      không xoá dòng.
 
+## Luật Shop mới (decisions 10–11/10, đợt `2026-10-06-shop-giao-dien-moi`)
+
+- URL tiếng Anh: `/` trang chủ Shop, `/about/` giới thiệu thương hiệu, `/pages/?slug=` trang CMS, `/blog/` (lọc
+  `?category=`), `/shop/…` giỏ, thanh toán, đơn hàng. Production chưa chạy nên không giữ đường cũ
+  (`/gioi-thieu/`, `/trang/`, `/bai-viet/`). Slug nội dung CMS là dữ liệu, giữ tiếng Việt.
+- **Tồn kho trên Shop chỉ 3 mức** (Còn hàng / Sắp hết / Hết, `stock_level`), không hiện số kg, ngày nhập, mã lô.
+  Hết hàng → nút "Liên hệ chúng tôi". Giá theo kg, tối thiểu 1 kg, bước 0,5 kg; combo theo số nguyên.
+- **Mã giảm giá có** (Voucher): 1 mã/đơn, không cộng dồn, chỉ mã công khai, trần giảm 50% (tham số), tổng sau
+  giảm > 0; quyền `manage_voucher` chỉ Chủ (uỷ được). Lượt mã giữ khi tạo đơn, nhả khi tự huỷ hết giờ.
+- **Khu vực giao: Phan Thiết**; hãng giao Ahamove hoặc GHN chưa chốt. **Chưa có phí ship**: khách trả một lần qua
+  QR, câu chữ "Đã gồm giao hàng…", không ghi "Phí giao: báo khi xác nhận", không hứa "miễn phí giao".
+- Shop không hiện luồng hoàn tiền, không ô hoá đơn điện tử, không ghi tên cổng thanh toán (chỉ "Chuyển khoản
+  ngân hàng (quét mã QR)"). Thanh toán xong vào thẳng trang đơn hàng.
+- Nội dung chữ Lộc cần sửa (chính sách, liên hệ, cách mua, Góc bếp, giới thiệu) nằm ở CMS (`apps.content`), không
+  hard-code. Thiết kế Shop: `doc/design/shop/` (xem skill `caveve-ui`).
+
 ## Lệnh chuẩn
 
 ```bash
@@ -107,8 +126,11 @@ cd frontend && NEXT_PUBLIC_USE_MOCK=1 npm run dev              # FE chạy mock,
 cd erp-console && ./node_modules/.bin/tsc --noEmit && npm run build   # ERP console
 ```
 
-Production (chỉ deploy khi Duy duyệt): GCP project `keolai-63ec1`, region
-`asia-southeast1`; xem `backend/Dockerfile`, `frontend/firebase.json`.
+Môi trường (chỉ deploy khi Duy duyệt): GCP project `keolai-63ec1`, region `asia-southeast1`, DB Postgres trên
+Supabase (Cloud SQL đã xoá). Có 2 môi trường: **staging** (SePay sandbox, DB `cangca_staging`) và **production**
+(SePay live, DB `postgres`). Luôn lên staging trước, Duy duyệt rồi mới production. Job nền (`cancel_expired_orders`…)
+chạy bằng Cloud Run Job + Cloud Scheduler; Celery chỉ dùng khi dev. Chi tiết: `doc/ops/moi-truong.md`.
+Test đua trên PostgreSQL chạy trên cloud với DB test riêng, không trỏ staging hay production (decisions 10/10).
 
 ## Đặt tên (P8b, Duy chốt 01/10)
 
@@ -127,8 +149,7 @@ Không đưa mã lô giao việc (`lo7`, `l8`, `p8_lo5`) vào tên; mã lô/stor
 | Giờ Việt Nam | `VN_TIME_ZONE`, `todayInVietnam()`, `today_in_vietnam()` | `VN_TZ`, `todayVn`, `vn_today` |
 | Bản rà soát QA / bổ sung | `review_*` / `extra`, `followup` | `ra_soat_*` / `bosung` |
 
-Giữ nguyên (không đổi): migration đã chạy, `AuditLog.action` đã ghi, dòng phiên bản cấu hình AI cũ, URL công khai Shop
-`/bai-viet/` `/trang/` `?chuyen-muc=`, dữ liệu demo (username `kho1`, `chu_vua`..., slug, mã hàng), keyword AI có dấu, chuỗi `cangca`.
+Giữ nguyên (không đổi): migration đã chạy, `AuditLog.action` đã ghi, dòng phiên bản cấu hình AI cũ, dữ liệu demo (username `kho1`, `chu_vua`..., slug, mã hàng), keyword AI có dấu, chuỗi `cangca`.
 Bảng đầy đủ: `doc/features/2026-09-30-dat-ten-tieng-anh/02c-giao-viec.md` mục 1.
 
 **Kiểm bằng máy** (Python 3 stdlib, chạy từ gốc repo, dưới 10 giây, không cần venv):

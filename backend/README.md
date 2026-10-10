@@ -13,7 +13,7 @@ cd backend
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env            # BẮT BUỘC: DJANGO_DEBUG=1 cho dev (DEBUG mặc định tắt, thiếu SECRET_KEY sẽ dừng); để trống DATABASE_URL = dùng SQLite
-python manage.py migrate        # tạo bảng + seed 4 Group phân quyền (migration accounts.0002)
+python manage.py migrate        # tạo bảng + seed 5 Group phân quyền (accounts.0002, `customer_service` thêm ở 0011)
 python manage.py bootstrap_masterdata   # tạo Kho chính + bảng giá Bán lẻ
 python manage.py createsuperuser
 python manage.py runserver      # /admin/ và /api/
@@ -68,7 +68,7 @@ Module gọi module khác **qua services** của module đó. Route tập trung 
 | `config/settings.py` | "Bảng công tắc" của cả hệ thống: kết nối DB, danh sách app, bảo mật, ngưỡng nghiệp vụ (TTL, cận hạn…) đọc từ `.env`. |
 | `config/urls.py` | Chia đường dẫn gốc: `/admin/` (trang quản trị), `/api/` (dữ liệu cho web/app). |
 | `config/api_urls.py` | Danh bạ API: mỗi đường dẫn `/api/...` trỏ tới màn xử lý nào trong module nào. |
-| `config/celery.py` | Bật "người làm việc nền" Celery để chạy job định kỳ (vd tự huỷ đơn quá hạn giữ chỗ mỗi phút). |
+| `config/celery.py` | Bật "người làm việc nền" Celery để chạy job định kỳ **khi dev ở máy mình**. Staging/production không có Celery/Redis: job chạy bằng Cloud Run Job + Cloud Scheduler (xem mục Job nền). |
 | `config/asgi.py`, `config/wsgi.py` | Chỗ máy chủ web (gunicorn trên Cloud Run) cắm vào để chạy ứng dụng; gần như không bao giờ sửa. |
 | `Dockerfile` | Công thức đóng gói backend thành 1 "hộp" chạy được trên Cloud Run (cài thư viện, gom file tĩnh, chạy gunicorn). |
 | `.dockerignore` | Danh sách thứ KHÔNG bỏ vào hộp khi đóng gói (môi trường ảo, DB thử, file `.env` bí mật, tài liệu). |
@@ -77,8 +77,9 @@ Module gọi module khác **qua services** của module đó. Route tập trung 
 
 ## Phân quyền 3 tầng (§1)
 
-- **Tầng 1 — CRUD/model**: `auth.Permission` + 4 Group `owner` / `manager` / `warehouse_staff`
-  / `delivery_staff` (cộng dồn). Gán trong data migration `accounts/migrations/0002`.
+- **Tầng 1 — CRUD/model**: `auth.Permission` + 5 Group `owner` / `manager` / `warehouse_staff`
+  / `delivery_staff` / `customer_service` (cộng dồn; nhãn vai "Nhân viên gọi xác nhận"). Gán trong data migration
+  `accounts/migrations/0002`, `customer_service` thêm ở `0011` (tên cũ `cskh`), đổi tên tiếng Anh ở `0013` (`apps/accounts/roles.py`).
 - **Tầng 2 — hành động tuỳ biến** (`Meta.permissions`): `publish_batch`,
   `close_batch`, `approve_stockreconciliation`, `approve_returntostock`,
   `cancel_paid_order`, `create_refund`, `confirm_refund`,
@@ -142,7 +143,7 @@ QA_PASSWORD='mật-khẩu-tự-chọn' .venv/bin/python manage.py seed_qa  # d�
 
 ## Tham số cấu hình (không hard-code) — `.env` / `settings.py`
 
-`BATCH_DEFAULT_SHELF_LIFE_DAYS` (90), `BATCH_NEAR_EXPIRY_DAYS` (14),
+`BATCH_DEFAULT_SHELF_LIFE_DAYS` (365, quyết định 26/09), `BATCH_NEAR_EXPIRY_DAYS` (14),
 `SALES_ORDER_TTL_MINUTES` (30), `DELIVERY_MAX_FAILED_ATTEMPTS` (2),
 `COLD_CHAIN_MAX_HOURS` (6 — câu hỏi mở #3, cần Lộc cho số thật),
 `TTL_JOB_HEALTH_GRACE_MINUTES` (5), `INTERNAL_SERVICE_TOKEN` (adapter → Django).
@@ -152,10 +153,13 @@ Riêng khi chạy `manage.py test`, `settings.py` đổi băm mật khẩu sang 
 
 ## Job nền
 
-- Huỷ đơn quá TTL (BR-BH-03/04): Celery task `apps.sales.tasks.cancel_expired_orders`
-  (code ở `apps/sales/orders/tasks.py`) chạy mỗi phút; fallback cron `manage.py cancel_expired_orders`;
-  giám sát `manage.py check_ttl_job_health` (exit 1 = nghi job chết).
+- Huỷ đơn quá TTL (BR-BH-03/04): trên staging/production chạy `manage.py cancel_expired_orders` bằng
+  **Cloud Run Job + Cloud Scheduler** (lịch thật: `doc/ops/moi-truong.md`); giám sát `manage.py check_ttl_job_health`
+  (exit 1 = nghi job chết). Celery task `apps.sales.tasks.cancel_expired_orders` (code ở `apps/sales/orders/tasks.py`)
+  chỉ dùng khi dev ở máy mình.
 - Trạng thái lô theo hạn (BR-LO-01/02/06): `manage.py update_batch_status` (đề xuất 00:05 giờ VN).
+
+Chỉ khi dev ở máy mình:
 
 ```bash
 celery -A config worker -l info          # worker (cần Redis)
@@ -165,5 +169,5 @@ Không có broker: `CELERY_TASK_ALWAYS_EAGER=1`.
 
 ## Còn lại (hạ tầng/nghiệp vụ)
 
-- Sinh mã VietQR SePay thật (hiện stub `_vietqr_stub` ở `apps/sales/orders/shop_api.py`).
+- Thanh toán đã chạy qua Cổng thanh toán SePay (quyết định 26/09, `apps/sales/payments/`), không còn VietQR giả.
 - Trả lời câu hỏi mở nghiệp vụ trong `../doc/` (ngưỡng chuỗi lạnh, combo thực tế…).

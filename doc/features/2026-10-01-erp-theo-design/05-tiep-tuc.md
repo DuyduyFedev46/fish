@@ -14,6 +14,8 @@ flowchart TD
     J -->|"Đã chốt"| D
 ```
 
+> **ĐỢT ĐÃ ĐÓNG (rà 11/10):** ảnh chụp việc dở của đợt ERP theo design. Các câu chờ đã được Duy trả lời 08/10 và 10/10 (`doc/decisions.md`). Không chạy lại theo file này; đợt đang làm là Shop (`doc/features/2026-10-06-shop-giao-dien-moi/`).
+
 ## Kế hoạch chạy hết phần còn lại, không tính AI (06/10/2026)
 Duy chốt 06/10 (ghi ở `doc/decisions.md`): D-1 giữ V2 bật, Chủ tự tắt · superuser được ghi phân quyền (FE mở) · #14 để sau production · **làm** CSKH lô 5.
 
