@@ -556,3 +556,39 @@ E2E mới: `erp-console/e2e/data_scope_loss_account.py` (mock, 38 ca: khối PV-
 **Kiểm chứng Lô 7 FE (10/10):** `tsc --noEmit` sạch; `vitest` 111 file / 1322 test PASS (Lô 6 FE: 105 file / 1285); `python3 scripts/check_naming.py` OK (không phát sinh mới); build thật (`USE_MOCK=0`, API staging) sạch, `check-no-mock` XANH (32 file mock, 208 chuỗi seed, 257 file), `check-ai-chunks` XANH (48 màn + 2 layout). Build mock (AI tắt) + `data_scope_loss_account.py` 38/38 PASS, `ed_batch14_permissions.py` 158/158 PASS, `standard_names_all_routes.py` 11/11 PASS. Ghi chú: bản build mock chạy e2e được dựng trước khi đổi icon `verified_user` → `shield_person` (chỉ đổi tên icon, đã build thật lại sau đó).
 
 **Lô 7 FE — sửa review L1–L3 (10/10):** L1 `ScopeLostInApp` đặt `role="alert"` trên `div.page-state`, `h2` có `tabIndex={-1}` và nhận focus khi mount; L2 gộp `CustomerCell` vào `features/orders/components/CustomerCell.tsx`; L3 chuyển `fakeReactHooks.ts` sang `shared/lib/testing/`. Kiểm: tsc sạch, vitest 111 file / 1322 test PASS, build thật + check-no-mock + check-ai-chunks XANH.
+
+## Lô 6 BE — sửa review techlead (10/10)
+
+Chỉ sửa `backend/apps/accounts/data_scopes/tests/test_release_gate.py`. Không đụng code sản phẩm, migration, FE.
+
+- **M1 (AC6)**: PUT nay gửi kèm thay đổi hợp lệ `scopes: {receipts: created_by_me}` cộng khoá số ngày ở thân: kỳ vọng 400 `INPUT_NOT_ALLOWED`.
+  Thêm biến thể khoá số ngày nằm trong `scopes`: kỳ vọng 400 `SCOPE_OBJECT_UNKNOWN`. Sau vòng lặp assert `version` nhóm không tăng,
+  `GroupDataScope` không đổi, `AuditLog` không thêm dòng, hai setting `*_PII_RECENT_DAYS` không đổi.
+  **Chứng minh bắt được lỗi**: tạm cho `capabilities.services.BODY_KEYS` nhận 6 khoá số ngày, chạy riêng test AC6 thì ĐỎ
+  (`200 != 400` ở `delivery_pii_recent_days`, `409 != 400` ở các khoá còn lại). Đã hoàn lại bằng `git checkout`, cây sạch.
+- **M2 (AC3)**: `COST_KEYS = apps.common.cost_keys.COST_KEYS | {"costs"}`. Chạy lại vẫn XANH: không có rò giá vốn thật.
+- **L1**: AC3 quét thêm `/api/guidance/receipt|order/<id>/`, `/api/delivery/notes/lookup/?code=<mã>.1`; test mới
+  `test_pv12_ac3_s1_ai_detail_and_reports_batches_do_not_leak_cost` quét AI chi tiết đơn/phiếu giao (bật AI bằng `override_settings`),
+  tem lookup (tạo `LabelPrint` giả), và assert `reports/batches/` `!= 200` cho 4 nhóm không có `view_profitreport`.
+- **L2**: `SWEEP["orders"]` thêm `invoices.list` và `invoices.detail`; tập đơn của hoá đơn (bỏ tiền tố `invoice_of_`) phải bằng
+  tập đơn theo D1 giao với đơn đã có hoá đơn, ở mọi giá trị D1. Xanh.
+- **L3**: `SourceGrepTests.GROUP_NAME_EXCEPTIONS` khai ngoại lệ `can_cancel_any_receipt` (quyền hành động, PV-06-AC5/6, 02b dòng 98).
+  Test mới quét `services.py` của mọi module có `scope.py`, chỉ cho so tên nhóm trong hàm ngoại lệ. Phát hiện thêm 2 chỗ cùng bản chất
+  hành động ở `delivery/services.py` (`list_deliverers`, `assign_deliverer`: chọn người được gán phiếu, BR-GH-23) nên khai kèm.
+  Test cũng đỏ nếu ngoại lệ đã khai mà không còn dùng. Backlog (techlead): story BR-PQ-33 đưa việc huỷ phiếu nhập thành việc trong ma trận.
+- **N1**: import `load_baseline` lên đầu file. **N2**: AC7 gọi DELETE/PUT/PATCH trên `/api/audit-logs/` (route thật), kỳ vọng 403/405
+  (hiện trạng thực tế 405 cho người xem được, 403 cho người không đủ quyền); bỏ route `/<pk>/` không tồn tại.
+- Nợ: không phát sinh mới. Nợ chuyển tiếp của techlead (e2e `ed_batch14` trên BE thật) vẫn thuộc QA.
+
+## Lô 6 FE — sửa QA (10/10)
+
+- **B1 (Medium)**: hộp "Cho thêm người xem dữ liệu khách?" ở ma trận hiện khoá thô `view_order_customer_info`. Nguyên nhân: `objectLabel` của
+  `PermissionMatrixScreen` chỉ tra `data_scopes`. Sửa: một hàm chung `features/permissions/objectLabel.ts` (`objectLabelOf`) tra `data_scopes` trước,
+  rồi registry GỐC (chưa lọc AI, theo L2 ở `GroupDetailScreen`), không thấy thì "một phạm vi dữ liệu"; không bao giờ trả khoá thô. Dùng cho cả ma trận và
+  trang nhóm. Test: `objectLabel.test.ts` (V2, `invoices`, khoá lạ); ca ma trận trong `e2e/ed_batch14_permissions.py` (tắt rồi bật V2 cột Nhân viên giao,
+  hộp phải có nhãn tiếng Việt và không có `view_`). **Chứng minh bắt được lỗi**: dựng lại với `PermissionMatrixScreen` cũ thì ca mới ĐỎ (158/159), trả bản sửa thì XANH.
+  Mock đã có sẵn `widened` cho V2 (`mockScopes.ts`), không cần sửa.
+- **L1 (Low)**: bảng Thành viên, cột ghim "Thao tác": tiêu đề đục (`--surface-2`), ô sát lề + `width:1%`/`nowrap` để che ít cột nhất, viền và bóng
+  về bên trái bằng `--border-strong` (không hex rời). Ảnh trước/sau ở 1280 và 360 trong scratchpad (`l1-before-*`, `l1-after-*`). Ở mock 1280 bảng vừa khung
+  nên chưa tái hiện được cảnh bị che (QA gặp với dữ liệu thật); ở 360 đã thấy cột ghim tách rõ.
+- Không đổi `shared/ui/**`, BE.

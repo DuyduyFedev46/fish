@@ -8,6 +8,7 @@
 // Việc "Xem khách hàng" đang bật ghi rõ "Tất cả khách" + cảnh báo (quyết định #13, bất biến 9).
 // Mã nhóm trong URL là mã hệ thống (không có tên người). Không ghi storage/log.
 
+import { objectLabelOf } from "../objectLabel";
 import { useCallback, useId, useMemo, useState } from "react";
 import { useAuth } from "@/features/auth/components/AuthProvider";
 import { toTimelineEntries } from "@/features/guidance/detailAdapters";
@@ -111,10 +112,7 @@ function GroupDetailBody({ group: g, detail }: { group: GroupDetail; detail: Loa
   // được dù việc đó đang bị ẩn. Đừng "đồng bộ" thành bản đã lọc (review techlead F1 gộp main, L2).
   const labelOf = useCallback((key: string) => g.registry.find((r) => r.key === key)?.label ?? key, [g.registry]);
   // Khoá `widened` có thể là đối tượng phạm vi hoặc việc V2 (`view_order_customer_info`), nên tra thêm nhãn việc ở registry gốc.
-  const objectLabel = useCallback(
-    (key: string) => g.data_scopes.find((r) => r.key === key)?.label ?? g.registry.find((r) => r.key === key)?.label ?? key,
-    [g.data_scopes, g.registry],
-  );
+  const objectLabel = useCallback((key: string) => objectLabelOf(key, g.data_scopes, g.registry), [g.data_scopes, g.registry]);
 
   const afterMembers = (message: string) => {
     toast.success(message);

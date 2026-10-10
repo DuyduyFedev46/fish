@@ -449,3 +449,78 @@ Không có lỗi chặn. Ghi nhận mức Low (không chặn):
 - Kịch bản tạm (scratchpad `qapv/`): `ui1.py`, `ui1c.py`, `ui2.py` (Playwright thật), `p2.py`, `p2b.py`, `p3.py`, kịch bản đua và quét giá vốn (HTTP thật).
 - `mockbuild.sh` + `reg.sh`: 6 e2e hồi quy, tổng kết `reg/summary.txt`: 6 dòng rc=0, 0 FAIL.
 - Đã tắt server 8631, 3531, 3601, 3602.
+
+---
+
+# Lô 6 — QA (10/10)
+Worktree `pv6-cum`, HEAD `faa6678`. Phạm vi: PV-12 (BE cổng phát hành) + Lô 6 FE nối BE thật + nợ đóng F1.
+
+## Kết luận: REJECTED — 1 lỗi Medium chặn (B1): hộp xác nhận mở rộng ở **ma trận** vẫn hiện khoá thô `view_order_customer_info`
+## Tổng: 20 ca · ✅ 19 · ❌ 1 · ⏸ 0 (chưa lặp suite BE/vitest/build vì điều phối viên đã chạy; số của họ không tính ở đây)
+
+## Môi trường
+BE Django runserver 8631 của worktree, `DJANGO_DEBUG=1`, SQLite tạm trong scratchpad (`DATABASE_URL=sqlite:///…/qa.sqlite3`), `migrate` + `seed_qa` (dữ liệu giả `qa_*`). ERP build `NEXT_PUBLIC_USE_MOCK=0 NEXT_PUBLIC_API_BASE=http://127.0.0.1:8631`, phục vụ tĩnh ở 3531. Playwright chromium.
+
+**Về e2e `ed_batch14_permissions.py`:** script này chỉ chạy được trên bản build MOCK (dựa vào `window.__caveMock`, tài khoản `loc/ql1`, mật khẩu demo). KHÔNG chạy được trên BE thật nếu không viết lại. Vì vậy QA thêm kịch bản mới `erp-console/e2e/permissions_real_backend.py` (chưa commit) chạy trên BE thật, phủ các ý nợ F1. Kết quả: **32/33 PASS**, 1 FAIL là B1.
+
+## Theo ca
+| # | Ca | Kq | Bằng chứng |
+|---|---|---|---|
+| 1 | BE thật trả V1 "Xem hoá đơn bán" trong ma trận | ✅ | e2e real, ảnh `shots/real-matrix-1280.png`; GET registry có `view_sales_invoices` |
+| 2 | BE thật trả V2 nhãn đầy đủ "Xem thông tin khách trên đơn, hoá đơn, phiếu hoàn tiền" | ✅ | e2e real; GET registry |
+| 3 | Bật V2 cho nhóm chưa có, **trang nhóm** (bản nháp, Lưu) → hộp mở rộng nhãn tiếng Việt | ✅ | e2e real, `shots/real-group-widen-v2-dialog.png` |
+| 4 | Bật V2 cho nhóm chưa có, **ma trận** → hộp mở rộng nhãn tiếng Việt, không khoá thô | ❌ | B1; `shots/real-widen-v2-dialog.png` hiện "Phạm vi mở rộng: view_order_customer_info." |
+| 5 | Ngoài đường thuận: Esc ở hộp mở rộng → BE không đổi (version giữ nguyên, V2 vẫn off); xác nhận → V2 on, version tăng, AuditLog `customer_data_widening_confirmed` | ✅ | e2e real + đọc AuditLog |
+| 6 | Bật V1 cho nhóm chưa có (customer_service) không lộ khoá thô | ✅ | e2e real, `shots/real-v1-toggle.png` |
+| 7 | API: `GET /api/staff/groups/` và `/<code>/` (5 nhóm) không còn khoá `scopes`; còn `data_scopes` 8 dòng | ✅ | script API; kết quả `scopes False, data_scopes 8` cả 5 nhóm |
+| 8 | API: PUT capabilities kèm khoá số ngày (4 tên) → 400 `INPUT_NOT_ALLOWED`; version không tăng | ✅ | script API (version 1 trước/sau) |
+| 9 | API: PUT kèm scopes hợp lệ + khoá số ngày → 400, version giữ; số ngày trong `scopes` → 400 `SCOPE_OBJECT_UNKNOWN` | ✅ | script API |
+| 10 | Phân quyền API: `qa_manager`, `qa_warehouse` GET/PUT `/api/staff/groups/…` → 403; chưa đăng nhập → 401 | ✅ | script API |
+| 11 | Nhóm khác Chủ không thấy khoá giá vốn qua endpoint nhóm (bị 403, không có body) | ✅ | script API; HTML màn nhóm không chứa `purchase_rate/landed_unit_cost/unit_cost/profit` |
+| 12 | Màn Thành viên 1280: nút "Bỏ khỏi nhóm" thấy, bấm mở hộp xác nhận, trang không cuộn ngang | ✅ | e2e real; `shots/real-members-1280.png`, `real-members-1280-confirm.png` |
+| 13 | Màn Thành viên 360: như trên, nút nằm trong 360px, cao ≥ 40px | ✅ | e2e real; `shots/real-members-360.png` |
+| 14 | Quản lý ở /permissions/: "Bạn không có quyền xem mục này", không công tắc | ✅ | e2e real; `shots/real-manager-denied.png` |
+| 15 | Hồi quy `standard_names_all_routes` BE thật, AI tắt (build mặc định): 40 route, 0 chữ cấm, `loc`/`ql1` | ✅ | `10/10 PASS` (REAL=1) |
+| 16 | Console trình duyệt không lỗi (Chủ, 1280, 360, các màn trên) | ✅ | e2e real |
+| 17 | localStorage/sessionStorage/URL không có SĐT; DOM màn Phân quyền không SĐT | ✅ | e2e real |
+| 18 | Log BE (runserver) không có chuỗi SĐT 0xxxxxxxxx; không Traceback/500 | ✅ | `grep -cE "0[0-9]{9}"` = 0 |
+| 19 | AuditLog `change_group_capabilities` chỉ chứa `{khoá việc: {from,to}}` và cờ xác nhận: không tên/SĐT, không thể tính ngược giá vốn | ✅ | đọc AuditLog bằng shell, quét SĐT = rỗng |
+| 20 | `check_naming.py` | ✅ | "OK, không phát sinh mới" |
+
+## Phân quyền (nhóm × hành động, endpoint `/api/staff/groups/*`)
+| Nhóm | Xem (GET) | Ghi (PUT) | Menu "Phân quyền" |
+|---|---|---|---|
+| owner (`qa_owner`) | 200 | 200 | có |
+| manager (`qa_manager`) | 403 | 403 | không |
+| warehouse_staff (`qa_warehouse`) | 403 | 403 | (suy từ GET 403) |
+| delivery_staff, customer_service | ⏸ không đăng nhập thử riêng (cùng cổng `manage_staff`, BE test PV-12 AC7 phủ) | | |
+| chưa đăng nhập | 401 | — | — |
+
+## Rò giá vốn / dữ liệu cá nhân
+Không phát hiện. Chi tiết ở ca 11, 17, 18, 19. Ảnh chụp chỉ có dữ liệu giả `QA …(giả)`.
+
+## Lỗi
+
+### B1 — Hộp xác nhận mở rộng ở ma trận hiện khoá thô `view_order_customer_info` · Medium (chặn) · PV-09/Lô 6 FE (điều kiện đóng F1)
+- File: `erp-console/features/permissions/components/PermissionMatrixScreen.tsx:91`
+  `const objectLabel = useCallback((key) => reg.data?.data_scopes.find((r) => r.key === key)?.label ?? key, [reg.data]);`
+  Chỉ tra `data_scopes`, không tra `registry`. `GroupDetailScreen.tsx:114` đã sửa (tra thêm `registry`) nhưng ma trận thì chưa.
+- Tái hiện: đăng nhập `qa_owner` → /permissions/ (ma trận) → bật công tắc "Xem thông tin khách trên đơn, hoá đơn, phiếu hoàn tiền" của cột Nhân viên giao (đang tắt) → hộp "Cho thêm người xem dữ liệu khách?".
+- Mong đợi: "Phạm vi mở rộng: Xem thông tin khách trên đơn, hoá đơn, phiếu hoàn tiền." (nhãn BE).
+- Thực tế: "Phạm vi mở rộng: view_order_customer_info." (ảnh `scratchpad/pv6qa/shots/real-widen-v2-dialog.png`). Cùng thao tác ở trang nhóm thì đúng.
+- Ảnh hưởng: chữ kỹ thuật lộ cho Chủ ở đúng hộp cảnh báo dữ liệu khách; yêu cầu tường minh của Lô 6. Mock e2e (158/158) không bắt vì mock đi nhánh khác.
+- Sửa gợi ý: dùng chung một hàm tra nhãn (data_scopes rồi registry) ở cả hai màn; thêm ca vào `ed_batch14_permissions.py` cho ma trận.
+
+### L1 — Bảng Thành viên: cột "Tên đăng nhập"/"Trạng thái" bị che sau cột ghim "Thao tác" · Low (ghi nhận)
+Tái hiện: `qa_owner` → /permissions/detail/?group=delivery_staff ở 1280px (ảnh `real-group-1280.png`: tiêu đề "Trạ…", badge "Đ…" cắt) và ở 360px (`real-members-360.png`). Cuộn ngang trong khung mới thấy đủ; nút "Bỏ khỏi nhóm" thì đúng yêu cầu (thấy, bấm được, trang không cuộn ngang). Gợi ý: thu hẹp cột tên đăng nhập/nhóm khác hoặc cho cột Trạng thái co lại.
+
+## Lệnh đã chạy
+- `manage.py migrate` + `seed_qa` (SQLite tạm): OK. runserver 8631.
+- `NEXT_PUBLIC_USE_MOCK=0 NEXT_PUBLIC_API_BASE=http://127.0.0.1:8631 npm run build` (erp-console): exit 0.
+- `python3 e2e/permissions_real_backend.py` (BE thật): 32/33 PASS, FAIL = B1.
+- `REAL=1 … python3 e2e/standard_names_all_routes.py`: 10/10 PASS.
+- Script API (urllib, token thật): ca 7–11.
+- `python3 scripts/check_naming.py`: OK.
+- Dọn: tắt runserver/http.server, xoá bản sao `out/` trong scratchpad. Ảnh còn ở `scratchpad/pv6qa/shots/`.
+- Không chạy lại: suite BE 3551, tsc, vitest 1285, check-no-mock/ai-chunks (điều phối viên đã chạy).
+- Lưu ý: `erp-console/e2e/permissions_real_backend.py` là file mới chưa commit (QA được phép thêm e2e); `03b-review-techlead.md` đang có thay đổi chưa commit không phải của QA.

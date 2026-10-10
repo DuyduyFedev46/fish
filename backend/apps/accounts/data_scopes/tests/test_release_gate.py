@@ -18,15 +18,17 @@ from unittest import mock
 
 from django.contrib.auth.models import Group, Permission, User
 from django.core.cache import cache
-from django.test import TestCase
+from django.conf import settings
+from django.test import TestCase, override_settings
 from rest_framework.authtoken.models import Token
 from rest_framework.test import APIClient
 
 from apps.accounts import roles
 from apps.accounts.data_scopes import catalog
 from apps.accounts.models import AuditLog, GroupDataScope
+from apps.common.cost_keys import COST_KEYS as CANONICAL_COST_KEYS
 from apps.delivery.confirmation.scope import note_in_confirmation_scope
-from apps.delivery.models import CustomerCall, DeliveryNote
+from apps.delivery.models import CustomerCall, DeliveryNote, LabelPrint
 from apps.delivery.scope import scope_deliveries_for
 from apps.inventory.models import ReturnToStock
 from apps.inventory.returns.scope import scope_returns_for
@@ -38,11 +40,10 @@ from apps.sales.orders.scope import scope_orders_for
 
 from . import fixtures
 from .snapshot import PENDING_DUY_DIFFS, Collector
+from .test_scope_snapshot import load_baseline
 
-COST_KEYS = frozenset({
-    "purchase_rate", "landed_unit_cost", "rate", "unit_cost", "purchase_total", "purchase_amount", "costs",
-    "allocated_amount", "cogs", "gross_profit", "inventory_value", "profit",
-})
+# Nguồn chuẩn của repo (không tự chép tập con, M2 review Lô 6) + khoá `costs` (tổng chi phí mua lồng trong lô).
+COST_KEYS = CANONICAL_COST_KEYS | {"costs"}
 COST_PERMS = ("inventory.view_costprice", "reports.view_profitreport")
 PROBE_GROUP = "pv12_probe"
 BACKEND_APPS = Path(__file__).resolve().parents[3]  # backend/apps
@@ -140,6 +141,7 @@ class SweepEqualityTests(ReleaseGateBase):
         "orders": ("orders", [
             ("orders.list", "visible"), ("orders.search_code", "visible"), ("orders.detail", "ok"),
             ("guidance.order", "ok"), ("ai.orders_detail", "ok"),
+            ("invoices.list", "invoice_orders"), ("invoices.detail", "invoice_orders_ok"),
         ]),
         "deliveries": ("notes", [
             ("deliveries.list", "visible"), ("deliveries.detail", "ok"), ("guidance.delivery", "ok"),
@@ -171,6 +173,9 @@ class SweepEqualityTests(ReleaseGateBase):
     def fresh_user(self):
         return User.objects.get(pk=self.user.pk)
 
+    def invoiced_order_labels(self):
+        return [label[len("invoice_of_"):] for label in self.scene.invoices]
+
     def expected(self, key):
         user = self.fresh_user()
         scene = self.scene
@@ -200,8 +205,18 @@ class SweepEqualityTests(ReleaseGateBase):
                                                   body={"q": "SO-PV"})
             else:
                 facts = facts_of(self.collector, "probe", endpoint)
-            got[endpoint] = visible(facts) if mode == "visible" else status_ok(facts)
+            if mode == "invoice_orders":  # Hoá đơn bán (D2) đi theo D1: dòng hoá đơn gắn với đơn tương ứng
+                got[endpoint] = self.invoice_order_labels(visible(facts))
+            elif mode == "invoice_orders_ok":
+                got[endpoint] = self.invoice_order_labels(status_ok(facts))
+            else:
+                got[endpoint] = visible(facts) if mode == "visible" else status_ok(facts)
         return got
+
+    @staticmethod
+    def invoice_order_labels(invoice_labels):
+        prefix = "invoice_of_"
+        return {label[len(prefix):] for label in invoice_labels}
 
     def test_pv12_ac2_every_endpoint_returns_the_same_rows_as_the_scope_function_for_every_value(self):
         for key in self.SWEEP:
@@ -213,7 +228,11 @@ class SweepEqualityTests(ReleaseGateBase):
                     self.assertEqual(self.fresh_user().groups.count(), 1)
                     expected = self.expected(key)
                     for endpoint, rows in self.sweep(key).items():
-                        self.assertEqual(rows, expected, f"{key}={option.value} @ {endpoint}")
+                        if endpoint.startswith("invoices."):  # chỉ đơn đã có hoá đơn mới có dòng hoá đơn
+                            self.assertEqual(rows, expected & set(self.invoiced_order_labels()),
+                                             f"{key}={option.value} @ {endpoint}")
+                        else:
+                            self.assertEqual(rows, expected, f"{key}={option.value} @ {endpoint}")
 
     def test_pv12_ac2_sweep_is_not_vacuous_widest_differs_from_narrowest(self):
         """Chống quét rỗng: giá trị rộng nhất thấy nhiều dòng hơn giá trị hẹp nhất ở mọi đối tượng quét được."""
@@ -299,6 +318,10 @@ class HardFloorTests(ReleaseGateBase):
         urls += [f"/api/purchasing/receipts/{o.pk}/" for o in scene.receipts.values()]
         urls += [f"/api/inventory/returns/{o.pk}/" for o in scene.returns.values()]
         urls += [f"/api/sales/refunds/{o.pk}/" for o in scene.refunds.values()]
+        # L1 (review Lô 6): các endpoint AC2 đã dùng, quét thêm giá vốn.
+        urls += [f"/api/guidance/receipt/{o.pk}/" for o in scene.receipts.values()]
+        urls += [f"/api/guidance/order/{o.pk}/" for o in scene.orders.values()]
+        urls += [f"/api/delivery/notes/lookup/?code={n.code}.1" for n in scene.notes.values()]
         return urls
 
     def test_pv12_ac3_s1_no_cost_field_in_any_endpoint_for_non_owner_groups_at_widest_scope(self):
@@ -314,6 +337,35 @@ class HardFloorTests(ReleaseGateBase):
                     self.assertEqual(leaked, set())
                 checked += 1
         self.assertGreater(checked, 100)
+
+    def test_pv12_ac3_s1_ai_detail_and_reports_batches_do_not_leak_cost(self):
+        """L1: AI chi tiết đơn/phiếu giao không có khoá giá vốn; `reports/batches/` (lãi lỗ) không mở khi thiếu quyền."""
+        for note in self.scene.notes.values():  # tem để `delivery/notes/lookup/` có dòng thật mà quét
+            LabelPrint.objects.create(note=note, print_no=1, printed_by=self.scene.users["owner"])
+        cache.clear()
+        checked = 0
+        for label, client in self.clients.items():
+            with self.subTest(user=label, url="/api/reports/batches/"):
+                cache.clear()
+                self.assertNotEqual(client.get("/api/reports/batches/").status_code, 200)
+            for command, kind in (("sales.salesorder.retrieve", "orders"), ("delivery.deliverynote.retrieve", "notes")):
+                for obj in getattr(self.scene, kind).values():
+                    cache.clear()
+                    with override_settings(AI_ENABLED=True):
+                        response = client.post(f"/api/ai/commands/{command}/call/",
+                                               {"target_id": str(obj.pk), "args": {}}, format="json")
+                    if response.status_code != 200:
+                        continue
+                    with self.subTest(user=label, command=command, target=obj.pk):
+                        self.assertEqual(self.deep_keys(response.json()) & COST_KEYS, set())
+                    checked += 1
+            for url in (f"/api/delivery/notes/lookup/?code={n.code}.1" for n in self.scene.notes.values()):
+                cache.clear()
+                response = client.get(url)
+                if response.status_code == 200:
+                    self.assertEqual(self.deep_keys(response.json()) & COST_KEYS, set(), url)
+                    checked += 1
+        self.assertGreater(checked, 0)
 
     def test_pv12_ac3_s1_cost_fields_exist_for_owner_so_the_sweep_can_fail(self):
         """Đối chứng: Chủ thấy giá vốn ở chính các endpoint đó (không thì quét ở trên vô nghĩa)."""
@@ -384,8 +436,6 @@ class HardFloorTests(ReleaseGateBase):
             facts = facts_of(collector, "manager", endpoint)
             with self.subTest(endpoint=endpoint):
                 baseline_pii = {f for f in facts if f.startswith("pii:")}
-                from .test_scope_snapshot import load_baseline
-
                 before = {f for f in load_baseline()["manager"][endpoint] if f.startswith("pii:")}
                 self.assertLessEqual(baseline_pii, before)
 
@@ -403,12 +453,28 @@ class HardFloorTests(ReleaseGateBase):
         self.assertTrue(self.pii_values(inside))  # đối chứng: trong cửa sổ vẫn có dữ liệu khách
         owner = token_client(scene.users["owner"])
         version = owner.get(f"/api/staff/groups/{group.name}/").json()["version"]
+        delivery_days, confirmation_days = settings.DELIVERY_PII_RECENT_DAYS, settings.CONFIRMATION_PII_RECENT_DAYS
+        scopes_before = dict(GroupDataScope.objects.filter(group=group).values_list("object_key", "value"))
+        audit_before = AuditLog.objects.count()
+        url = f"/api/staff/groups/{group.name}/capabilities/"
         for key in ("delivery_pii_recent_days", "DELIVERY_PII_RECENT_DAYS", "confirmation_pii_recent_days",
                     "window_days", "pii_window_days", "recent_days"):
-            response = owner.put(f"/api/staff/groups/{group.name}/capabilities/",
-                                 {"version": version, "capabilities": {}, key: 365}, format="json")
-            with self.subTest(key=key):
-                self.assertEqual(response.status_code, 400)
+            # Kèm một thay đổi HỢP LỆ: request chỉ có thể bị từ chối vì khoá lạ (không phải vì thân rỗng).
+            top_level = owner.put(url, {"version": version, "scopes": {"receipts": "created_by_me"}, key: 365},
+                                  format="json")
+            with self.subTest(key=key, where="top_level"):
+                self.assertEqual(top_level.status_code, 400)
+                self.assertEqual(top_level.json()["code"], "INPUT_NOT_ALLOWED")
+            nested = owner.put(url, {"version": version, "scopes": {key: 365}}, format="json")
+            with self.subTest(key=key, where="in_scopes"):
+                self.assertEqual(nested.status_code, 400)
+                self.assertEqual(nested.json()["code"], "SCOPE_OBJECT_UNKNOWN")
+        self.assertEqual(owner.get(f"/api/staff/groups/{group.name}/").json()["version"], version)
+        self.assertEqual(dict(GroupDataScope.objects.filter(group=group).values_list("object_key", "value")),
+                         scopes_before)
+        self.assertEqual(AuditLog.objects.count(), audit_before)
+        self.assertEqual((settings.DELIVERY_PII_RECENT_DAYS, settings.CONFIRMATION_PII_RECENT_DAYS),
+                         (delivery_days, confirmation_days))
         detail = owner.get(f"/api/staff/groups/{group.name}/").content.decode().lower()
         self.assertNotIn("recent_days", detail)
 
@@ -427,18 +493,20 @@ class HardFloorTests(ReleaseGateBase):
                   AuditLog.objects.count())
         clients = dict(self.clients, owner=token_client(scene.users["owner"]),
                        superuser=token_client(scene.users["superuser"]))
-        audit = AuditLog.objects.first() or AuditLog.objects.create(action="seed", actor_kind="system")
+        AuditLog.objects.first() or AuditLog.objects.create(action="seed", actor_kind="system")
         before = before[:3] + (AuditLog.objects.count(),)
         calls = (
             ("delete", f"/api/sales/orders/{order.pk}/"), ("delete", f"/api/sales/invoices/{invoice.pk}/"),
-            ("delete", f"/api/purchasing/receipts/{receipt.pk}/"), ("delete", f"/api/audit-logs/{audit.pk}/"),
-            ("patch", f"/api/audit-logs/{audit.pk}/"), ("post", "/api/sales/orders/"), ("post", "/api/sales/invoices/"),
+            ("delete", f"/api/purchasing/receipts/{receipt.pk}/"), ("delete", "/api/audit-logs/"),
+            ("put", "/api/audit-logs/"), ("patch", "/api/audit-logs/"), ("post", "/api/sales/orders/"), ("post", "/api/sales/invoices/"),
         )
         for label, client in clients.items():
             for method, url in calls:
                 with self.subTest(user=label, method=method, url=url):
                     response = getattr(client, method)(url, {}, format="json") if method != "delete" else client.delete(url)
-                    self.assertIn(response.status_code, (403, 404, 405))
+                    # Route danh sách audit-logs chỉ có GET: DELETE/PUT/PATCH phải 405 (hoặc 403 khi không đủ quyền xem).
+                    expected_codes = (403, 405) if url == "/api/audit-logs/" else (403, 404, 405)
+                    self.assertIn(response.status_code, expected_codes)
         after = (SalesOrder.objects.count(), SalesInvoice.objects.count(), PurchaseReceipt.objects.count(),
                  AuditLog.objects.count())
         self.assertEqual(after, before)
@@ -489,6 +557,47 @@ class SourceGrepTests(TestCase):
             text = path.read_text(encoding="utf-8")
             offenders += [f"{path.relative_to(BACKEND_APPS)}: {name}" for name in self.BANNED if name in text]
         self.assertEqual(offenders, [])
+
+    # Ngoại lệ có chủ đích (L3 review Lô 6): `can_cancel_any_receipt` so tên nhóm owner/manager nhưng là QUYỀN HÀNH ĐỘNG
+    # (huỷ phiếu nhập của người khác, V-DW2, PV-06-AC5/6, 02b §2 dòng 98), không phải phạm vi đọc dòng nên AC8 không áp.
+    # Nợ: đưa thành việc trong ma trận (BR-PQ-33, backlog sau đợt Shop). Chỉ ĐÚNG hàm này được phép; chỗ khác thì đỏ.
+    # Cũng ngoại lệ hành động, phát hiện khi mở rộng quét sang services.py: chọn ai được GÁN phiếu giao (người nhận việc
+    # phải thuộc nhóm `delivery_staff`, BR-GH-23), không quyết ai XEM dòng nào.
+    GROUP_NAME_EXCEPTIONS = {
+        "purchasing/receipts/services.py": ("can_cancel_any_receipt",),
+        "delivery/services.py": ("list_deliverers", "assign_deliverer"),
+    }
+    EXPECTED_EXCEPTIONS_USED = [
+        ("delivery/services.py", "assign_deliverer"), ("delivery/services.py", "list_deliverers"),
+        ("purchasing/receipts/services.py", "can_cancel_any_receipt"),
+    ]
+
+    def test_pv12_ac8_services_read_group_names_only_in_declared_exceptions(self):
+        """Quét `services.py` của mọi module có `scope.py` (module có phạm vi dòng): so tên nhóm chỉ được ở hàm ngoại lệ."""
+        pattern = re.compile(r"roles\.[A-Z_]+|groups__name|groups\.filter\(name")
+        offenders, used, scanned = [], set(), 0
+        for path in self.source_files():
+            if path.name != "services.py" or not (path.parent / "scope.py").exists():
+                continue
+            scanned += 1
+            rel = path.relative_to(BACKEND_APPS).as_posix()
+            allowed, current = self.GROUP_NAME_EXCEPTIONS.get(rel, ()), None
+            for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+                match = re.match(r"(?:async )?def (\w+)\(", line)
+                if match:
+                    current = match.group(1)
+                elif line and not line[0].isspace() and not line.startswith(("#", ")", "@")):
+                    current = None
+                if not pattern.search(line.split("#", 1)[0]):
+                    continue
+                if current in allowed:
+                    used.add((rel, current))
+                elif "roles.ALL_ROLES" not in line:
+                    offenders.append(f"{rel}:{number}")
+        self.assertEqual(sorted(used), self.EXPECTED_EXCEPTIONS_USED,
+                         "ngoại lệ đã khai nhưng không còn dùng: gỡ khỏi danh sách")
+        self.assertGreater(scanned, 3, "quét không thấy module nào: bài kiểm vô nghĩa")
+        self.assertEqual(offenders, [], "services.py so tên nhóm ngoài ngoại lệ đã khai (xem GROUP_NAME_EXCEPTIONS)")
 
     def test_pv12_ac8_scope_modules_never_read_group_names(self):
         """Mọi `scope.py` / `resolver.py` quyết phạm vi bằng cấu hình, không so tên nhóm."""

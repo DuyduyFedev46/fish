@@ -1053,3 +1053,52 @@ fe-dev còn thời gian. Các lỗi này không chặn QA.
 1. QA chạy §6.1.6 trên BE thật. Ca 1, 2, 3, 5 bắt buộc (mock không dựng được). Ca 4 nghe `console` và đọc `innerText`.
 2. L1–L3 nên sửa cùng lô nếu fe-dev còn thời gian. Nếu sửa thì chỉ cần chạy lại vitest, tsc và build, không cần review lại.
    Nếu không sửa thì ghi vào nợ dọn.
+
+## Lô 6 — re-review (10/10)
+
+Phạm vi: commit sửa `faa6678`, gồm `backend/apps/accounts/data_scopes/tests/test_release_gate.py` và 03-dev-notes (mục "Lô 6 BE —
+sửa review techlead"). Commit không đụng code sản phẩm.
+
+**Kết luận: APPROVED.**
+
+### Lệnh tôi tự chạy
+- `manage.py test apps.accounts.data_scopes.tests.test_release_gate` cho kết quả `Ran 20 tests … OK`.
+- Đột biến lại (b) bằng `sitecustomize` để ở scratchpad, nạp qua `PYTHONPATH`, không sửa file nào trong worktree. Đột biến cho
+  `capabilities.services.BODY_KEYS` nhận thêm 6 khoá "số ngày". Kết quả: test AC6 **ĐỎ** với 7 lỗi. Khoá đầu ra `200 != 400`. Năm
+  khoá sau ra `409 != 400`, vì `version` đã tăng sau lần lọt đầu. Assert `version` cuối cũng đỏ (`'2' != '1'`). Như vậy cổng bắt được
+  dù chỉ một khoá lọt ở bất kỳ vị trí nào trong vòng lặp.
+- `python3 scripts/check_naming.py` cho kết quả OK, không có vi phạm mới.
+- Điều phối viên đã chạy toàn suite (`Ran 3551 … OK (skipped=7)`) và `makemigrations` (No changes).
+
+### Đối chiếu từng mục
+| # | Kết quả |
+|---|---|
+| M1 | **Đạt.** Thân PUT có kèm thay đổi hợp lệ `scopes.receipts`. Test assert đúng `code`: `INPUT_NOT_ALLOWED` cho khoá ở mức trên cùng, `SCOPE_OBJECT_UNKNOWN` cho khoá lồng trong `scopes`. Sau vòng lặp, test kiểm `version`, `GroupDataScope`, số `AuditLog` và hai setting `*_PII_RECENT_DAYS` đều không đổi. Đột biến đã xác nhận test hết xanh giả. |
+| M2 | **Đạt.** `COST_KEYS = apps.common.cost_keys.COST_KEYS \| {"costs"}`. Chạy lại vẫn xanh, nghĩa là hiện không có rò giá vốn thật. |
+| L1 | **Đạt.** AC3 đã quét thêm guidance `receipt`/`order` và `delivery/notes/lookup/`. Test mới quét AI chi tiết đơn và phiếu giao, kèm assert `reports/batches/` `!= 200` cho nhóm không phải Chủ. |
+| L2 | **Đạt.** `invoices.list` và `invoices.detail` được so với `expected(orders) ∩ đơn có hoá đơn` ở mọi giá trị D1. |
+| L3 | **Đạt.** Có `GROUP_NAME_EXCEPTIONS`, và test mới quét `services.py` của mọi module có `scope.py`. Test đỏ khi một ngoại lệ đã khai không còn được dùng (`EXPECTED_EXCEPTIONS_USED`), và đỏ khi số module quét được ≤ 3. Như vậy bài kiểm này rộng hơn yêu cầu. |
+| N1, N2 | **Đạt.** `load_baseline` đã đưa lên đầu file. AC7 gọi DELETE/PUT/PATCH trên route thật `/api/audit-logs/`, kỳ vọng 403 hoặc 405. |
+
+### Quyết định: ngoại lệ `list_deliverers`, `assign_deliverer` (`delivery/services.py:275`, `:317`) — **chấp nhận, có chủ đích**
+Hai hàm này đúng bản chất "quyền hành động", không phải lỗ hổng phạm vi đọc. Lý do:
+- Điều kiện tên nhóm `groups__name=roles.DELIVERY_STAFF` lọc **người được gán** (assignee), tức là ai đủ tư cách nhận phiếu theo
+  BR-GH-23. Nó **không** lọc theo nhóm của người gọi, nên không mở hay thu hẹp tập phiếu mà người gọi thấy.
+- Người gọi vẫn đi qua đủ các tầng. `POST notes/<id>/assign/` cần Tầng 2 `delivery.assign_deliverynote`, và lấy phiếu bằng
+  `self.get_object()`, tức là qua `get_queryset` có phạm vi D3. Phản hồi được serialize lại qua `get_queryset()`.
+  `GET /api/delivery/deliverers/` cần `require_perm("delivery.assign_deliverynote")`.
+- Dữ liệu trả về chỉ gồm `id`, `display_name` của nhân viên, và số phiếu DELIVERING/READY dưới dạng số đếm. Không có dữ liệu khách,
+  không có giá vốn, không có SĐT hay tên đăng nhập. Số đếm phiếu trên toàn hệ là thông tin điều phối, có từ T7 và không đổi ở đợt này.
+- Ghi chú (không chặn): "người nhận phiếu phải thuộc nhóm Nhân viên giao" là luật nghiệp vụ gắn với tên nhóm cố định. Nếu sau này Duy
+  muốn nhóm tự tạo cũng được nhận phiếu giao, thì đổi sang một việc kiểu "nhận phiếu giao" trong ma trận. Nên gộp vào cùng story
+  backlog BR-PQ-33 với `can_cancel_any_receipt`.
+
+### Nit (không chặn, để lần sửa sau nếu tiện)
+- `test_release_gate.py`: có hai helper gần trùng nhau, `invoiced_order_labels` (thực thể) và `invoice_order_labels` (static), cùng
+  cắt tiền tố `invoice_of_`. Có thể gộp làm một.
+- `test_pv12_ac3_s1_ai_detail_and_reports_batches_do_not_leak_cost` dùng `checked > 0` gộp chung cho cả AI và lookup. Nếu AI trả
+  non-200 cho mọi người, phần AI sẽ bị bỏ qua mà không ai biết. Nên đếm riêng phần AI và assert > 0.
+
+### Còn mở (không thuộc lô sửa này)
+- Nợ chuyển tiếp **chặn đóng F1**: QA chạy e2e `ed_batch14` trên BE thật.
+- Backlog BR-PQ-33 gồm `can_cancel_any_receipt`, và nếu Duy muốn thì thêm luật nhận phiếu giao.

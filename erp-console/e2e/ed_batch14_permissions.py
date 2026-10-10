@@ -194,6 +194,23 @@ def owner(browser):
     expect(dialog(page)).to_have_count(0)
     expect(sw2).to_have_attribute("aria-checked", "true")
 
+    # B1 (QA Lô 6): hộp cảnh báo ở MA TRẬN phải hiện nhãn tiếng Việt của việc V2, không lộ khoá thô `view_order_customer_info`.
+    sw_v2 = switch(page, "Xem thông tin khách trên đơn, hoá đơn, phiếu hoàn tiền", "Nhân viên giao")
+    expect(sw_v2).to_have_attribute("aria-checked", "true")
+    sw_v2.click()
+    if dialog(page).count():
+        dialog(page).get_by_role("button", name="Tắt việc này").click()
+    expect(sw_v2).to_have_attribute("aria-checked", "false")
+    sw_v2.click()
+    expect(dialog(page).get_by_role("heading", name=re.compile("Cho thêm người xem dữ liệu khách"))).to_be_visible()
+    dlg_text = dialog(page).inner_text()
+    ok("B1 ma trận: bật V2 cột Nhân viên giao → hộp nêu nhãn tiếng Việt, không có khoá thô 'view_'",
+       "Xem thông tin khách trên đơn, hoá đơn, phiếu hoàn tiền" in dlg_text and "view_" not in dlg_text, dlg_text[:300])
+    page.screenshot(path=f"{SHOTS}/lo6-b1-matrix-widen-dialog.png")
+    dialog(page).get_by_role("button", name="Tôi hiểu, lưu").click()
+    expect(dialog(page)).to_have_count(0)
+    expect(sw_v2).to_have_attribute("aria-checked", "true")
+
     # Việc thường: tắt ngay (có thể hoàn tác), tải lại vẫn giữ (mock lưu sessionStorage)
     sw3 = switch(page, "Gọi xác nhận đơn", "Quản lý")
     expect(sw3).to_have_attribute("aria-checked", "true")

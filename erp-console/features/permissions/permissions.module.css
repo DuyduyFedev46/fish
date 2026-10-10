@@ -109,8 +109,11 @@
 .memberUser { color: var(--ink-3); font-size: var(--text-xs); font-family: var(--font-mono); }
 /* Bảng Thành viên (L-A, QA 08/10): người thuộc nhiều nhóm khác hoặc tên dài làm bảng rộng hơn khung 646px ở 1280px, nên cột "Thao tác" bị cuộn khuất.
    Bảng vẫn cuộn ngang trong khung riêng (không cuộn cả trang), riêng cột cuối được ghim bên phải để nút "Bỏ khỏi nhóm" luôn thấy và bấm được. */
+/* L1 (QA Lô 6): cột ghim phải ĐỤC (cả tiêu đề lẫn ô) và có bóng đổ về bên trái, để biết phía dưới còn cột đang trượt; bề rộng chỉ vừa nút
+   (ô sát lề, không xuống dòng) nên che ít cột nhất. Khi bảng chưa cuộn thì bóng không che gì vì cột cuối nằm đúng chỗ của nó. */
 .memberTable :global(table.lt) :global(th):last-child,
-.memberTable :global(table.lt) :global(td):last-child { position: sticky; right: 0; z-index: 1; box-shadow: -1px 0 0 var(--border); }
+.memberTable :global(table.lt) :global(td):last-child { position: sticky; right: 0; z-index: 1; width: 1%; white-space: nowrap; padding-left: var(--space-2); padding-right: var(--space-2); box-shadow: -1px 0 0 var(--border-strong), -6px 0 6px -6px var(--border-strong); }
+.memberTable :global(table.lt) :global(th):last-child { background: var(--surface-2); }
 .memberTable :global(table.lt) :global(td):last-child { background: var(--surface); }
 .tags { display: inline-flex; flex-wrap: wrap; gap: var(--space-1); }
 
