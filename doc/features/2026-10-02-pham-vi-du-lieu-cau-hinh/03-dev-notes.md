@@ -463,3 +463,24 @@ Theo `02c-quyet-dinh-08-10.md` mục G.2 (F1 FE). Merge commit `4bb92ec`, commit
 - `useGroupDraft` vẫn nhận `group.registry` gốc (kể cả mục AI khi tắt AI) để tính cảnh báo phá luồng; không ảnh hưởng hiển thị.
 
 **Kiểm chứng:** xem số ở báo cáo cuối lượt (tsc, vitest, build thật, check-no-mock, check-ai-chunks, e2e mock AI tắt và bật).
+
+## Lô 6 BE (PV-12) — be-dev, nhánh `feat/pv6-be` (từ main `db13e13`)
+
+**File sửa:** `backend/apps/accounts/data_scopes/services.py` (bỏ `legacy_scopes`, `LEGACY_*`, hằng quyền chỉ dùng cho nó),
+`backend/apps/accounts/capabilities/services.py` (`describe_group` không trả `scopes`), `backend/apps/common/api.py` (bỏ `import roles` mồ côi;
+các hàm `FULL_SCOPE_GROUPS`, `has_full_delivery_scope`, `CUSTOMER_DIRECTORY_GROUPS`, `sees_customer_directory` đã gỡ từ Lô 4, grep sạch),
+README `data_scopes`, test cũ `capabilities/tests/test_api_read.py` và `data_scopes/tests/test_api_describe.py` đổi sang `data_scope_values`.
+**File thêm:** `backend/apps/accounts/data_scopes/tests/test_release_gate.py`. Không có migration, không đổi model.
+
+**Contract đổi cho FE (đúng 02b §2.2 "bỏ ở Lô 6"):** `GET /api/staff/groups/<code>/` **không còn khoá `scopes`** (chuỗi nhãn cũ
+`{orders, deliveries, customers}`). FE đọc `data_scopes` (8 dòng) và `data_scope_values`. Thân `PUT …/capabilities/` và
+`POST …/permissions-preview/` **vẫn nhận** khoá `scopes` = `{mã đối tượng: mã giá trị}` (đó là đầu vào mới của Lô 5, không phải `scopes` cũ); phản hồi PUT như GET (không có `scopes`).
+Nơi FE từng dựa vào "customers = Tất cả khách" theo quyền thực: nay dùng dòng `data_scopes[key=customers]` (`value`, `inactive_reason`, `note`; `note` = "Bật Xem khách hàng để thấy tất cả khách" khi bị chặn trần).
+
+**PV-12 (test_release_gate.py, token thật như `test_no_role_gate.py`, nên quét luôn cổng D-3):**
+- AC1: `test_scope_snapshot` giữ nguyên xanh (không sinh lại mốc); thêm test chốt `PENDING_DUY_DIFFS == ()`.
+- AC2: nhóm thăm dò `pv12_probe` có đủ quyền cổng; với D1, D3, D5, D6, D7 và MỌI giá trị, 3–6 endpoint mỗi đối tượng (danh sách, tìm theo mã, chi tiết, "Tiếp theo" qua guidance, AI chi tiết) cho tập dòng bằng nhau và bằng hàm phạm vi (`scope_*_for`). D4: chi tiết bằng `note_in_confirmation_scope`; hàng chờ liệt kê mọi mục theo trạng thái nhưng chỉ mục trong phạm vi mang dữ liệu khách (hiện trạng PV-01, khoá bởi mốc). Danh sách AI có giới hạn dòng nên chỉ kiểm không vượt phạm vi và không rỗng; bảng điều hành kiểm tương tự. Có test chống quét rỗng (rộng nhất thấy nhiều dòng hơn hẹp nhất).
+- AC3 (S-1) 4 nhóm khác Chủ ở phạm vi rộng nhất, không `view_costprice`/`view_profitreport`, hơn 100 lần gọi: không khoá giá vốn; đối chứng Chủ có thấy. AC4 (S-2) tra đơn công khai, catalog, site-info: không chuỗi giả nào của tên/SĐT/địa chỉ. AC5 (S-3) bắt log DEBUG + AuditLog quanh preview, PUT và quét: không chuỗi giả; ngữ cảnh AI không thêm dấu vết dữ liệu khách so với mốc. AC6 (S-4) phiếu/đơn kết thúc 8 ngày: dữ liệu khách rỗng; PUT với 6 tên khoá "số ngày" đều 400. AC7 (S-6) DELETE/PATCH/POST trên đơn, hoá đơn, phiếu nhập, nhật ký, bằng 4 nhóm + Chủ + superuser: 403/404/405, số dòng không đổi. AC8 grep: không còn `FULL_SCOPE_GROUPS`, `has_full_delivery_scope`, `CUSTOMER_DIRECTORY_GROUPS`, `sees_customer_directory`, `is_customer_service`, `GROUP_SCOPES`, `legacy_scopes` trong mã sản phẩm; các `scope.py`/`resolver.py`/`pii_scope.py`/`permissions.py` không so tên nhóm.
+- Không phát hiện chỗ rò mới. Ghi nhận hiện trạng (không đổi, mốc PV-01 giữ): hàng chờ gọi xác nhận `?state=DONE` liệt kê cả mục ngoài phạm vi D4 nhưng không kèm dữ liệu khách của mục đó.
+
+**Nợ / ghi chú:** `can_cancel_any_receipt` (`purchasing/receipts/services.py`) còn so nhóm `owner`/`manager` để quyết huỷ phiếu nhập của người khác. Đó là quyền hành động (không phải phạm vi đọc dòng, ngoài danh sách AC8); để techlead quyết có đưa vào cấu hình không. Tem `/label/` giữ che SĐT (Q1, mặc định), không đụng.
