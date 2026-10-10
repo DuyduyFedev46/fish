@@ -4,6 +4,25 @@
 > File này là **bản đồ**. Luật chi tiết nằm ở `doc/business-process-spec.md` (mã `BR-*`), quyết định ở `doc/decisions.md`,
 > bất biến tóm tắt cho agent ở `.claude/skills/caveve-domain/SKILL.md`. Khi các file đó và file này khác nhau thì các file đó đúng.
 
+```mermaid
+flowchart TD
+  A["Nhập lô tại cảng"] --> B["Cộng chi phí phụ vào giá vốn"]
+  B --> C["Mở bán lô"]
+  C --> D["Khách đặt, giữ hàng 30 phút"]
+  D --> E{"Trả tiền kịp?"}
+  E -- "không" --> F["Tự huỷ, nhả hàng"]
+  E -- "có" --> G["Gọi khách xác nhận đơn"]
+  G --> H["Soạn hàng, in tem, đi giao"]
+  H --> I{"Giao được?"}
+  I -- "được" --> J["Đơn hoàn tất"]
+  I -- "không" --> K["Giao lại hoặc đưa hàng về kho"]
+  G -- "huỷ đơn đã trả" --> L["Phiếu hoàn, Chủ xác nhận chuyển khoản"]
+  C --> M["Kiểm kê theo lô"]
+  C --> N["Hết hàng hoặc quá hạn"]
+  N --> O{"Chủ chốt lô"}
+  O --> P["Báo cáo lãi lỗ"]
+```
+
 ## Danh mục quy trình
 
 | Mã | Quy trình | Tiền tố BR | App / module code |

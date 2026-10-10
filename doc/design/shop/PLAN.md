@@ -8,6 +8,30 @@
 > mỗi lô ghi `03-dev-notes.md`, `04-qa-report.md`, ảnh chụp vào `shots/`).
 > Nhánh: tách từ `design/shop-ui`, mỗi lô một nhánh `shop/lo-<n>-<slug>`. QA APPROVED thì merge về `main` theo quy ước của Duy.
 
+```mermaid
+flowchart TD
+  L0["Lô 0: quyết định, phân tích, story"] --> L1["Lô 1: khung chung"]
+  L0 --> B2["Lô 2 phần BE"]
+  L1 --> F2["Lô 2 phần FE: danh mục, giỏ"]
+  B2 --> F2
+  B2 --> L2b["Lô 2b: thông tin mặt hàng trong ERP"]
+  F2 --> L34["Lô 3 và 4: đặt hàng, trang đơn"]
+  L2b --> L34
+  L34 --> L3b["Lô 3b: mã giảm giá"]
+  L3b --> L5["Lô 5: trang phụ, nội dung"]
+  L5 --> L7["Lô 7: QA toàn luồng"]
+  subgraph MOILO["Mỗi lô làm như sau"]
+    direction LR
+    S1["Dev làm"] --> S2["Điều phối chạy lại kiểm chứng"]
+    S2 --> S3["Tech Lead soát"]
+    S3 --> S4{"QA đạt?"}
+    S4 -- "chưa" --> S1
+    S4 -- "đạt" --> S5["Commit, gộp nhánh"]
+    S5 --> S6["Lên staging (Duy đã cho phép)"]
+    S1 -- "lệch thiết kế, đụng tiền" --> DUNG{"Dừng hỏi Duy"}
+  end
+```
+
 ## Điều kiện đầu vào
 - Duy duyệt bộ màn ở `doc/design/shop/` (canvas: https://claude.ai/artifact/SPSQLR5rMEtuBFreYbK96J).
 - Duy trả lời các câu còn mở (chi tiết ở `DOI-CHIEU-CODE.md` §6):

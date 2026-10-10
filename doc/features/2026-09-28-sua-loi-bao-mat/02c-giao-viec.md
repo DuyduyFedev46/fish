@@ -3,6 +3,20 @@
 > Người hiện thực: Gemini CLI / Antigravity theo `AGENTS.md`, lệnh `/lam-tinh-nang 2026-09-28-sua-loi-bao-mat`.
 > Nhánh làm việc: `wip/autosave` (sau Lô 2 merge vào `main`, từ đó làm trên `main`). **Lô 3 làm trên `main`**, chỉ bắt đầu khi bước merge cuối Lô 2 đã push `main`.
 
+```mermaid
+flowchart TD
+    A["Làm đầu tiên, ghi số test gốc"] --> L1["Lô 1: Nhật ký, tra đơn, giới hạn gọi"]
+    L1 --> Q1{"QA đạt?"}
+    Q1 -->|"Đạt"| L2["Lô 2: Chốt lô, staging ẩn"]
+    L2 --> Q2{"QA đạt?"}
+    Q2 -->|"Đạt"| M["Gộp nhánh làm việc vào nhánh chính"]
+    M --> X{"Xung đột hoặc test đỏ?"}
+    X -->|"Có"| Y{"Dừng, báo Duy"}
+    X -->|"Không"| L3["Lô 3: Sửa công thức lãi lỗ lô"]
+    L3 --> Q3{"QA đạt?"}
+    Q3 -->|"Đạt"| Z["Commit, đánh dấu xong, không deploy"]
+```
+
 ## Điều kiện đầu vào
 - `02-stories.md`: ĐÃ DUYỆT (Duy 28/09, luồng NHANH) · `02b-tech-design.md`: ĐÃ DUYỆT (Duy 28/09)
 - **Làm đầu tiên**, trước mọi hồ sơ khác (Duy chốt 28/09). Không cần migration.

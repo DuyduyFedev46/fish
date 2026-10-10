@@ -3,6 +3,22 @@
 > Dành cho phiên Claude Code (`fe-dev`, `be-dev`, `qa-tester`) làm Shop mới. Đọc hết file này trước khi sửa dòng code nào.
 > Quy trình lô theo `CLAUDE.md`, mục "Người hiện thực: đội Claude". Chia lô xem `PLAN.md`, prompt dán sẵn xem `PROMPT.md`.
 
+```mermaid
+flowchart TD
+  A["Đọc luật chung và luật Shop"] --> B["Mở màn thiết kế của lô"]
+  B --> C["Đổi màu sang biến chung, dữ liệu lấy qua API"]
+  C --> D["Một component cho cả điện thoại và máy tính"]
+  D --> E["Dùng dữ liệu giả đúng hợp đồng nếu BE chưa xong"]
+  E --> F{"Thiết kế lệch code hoặc hợp đồng?"}
+  F -- "lệch" --> G["Ghi lệch thiết kế, dừng lô"]
+  F -- "khớp" --> H["Chạy lệnh kiểm chứng"]
+  H --> I["Soát trợ năng"]
+  I --> J["QA chụp màn 360 và 1280 px, cả ca lỗi"]
+  J --> K{"QA đạt?"}
+  K -- "chưa" --> C
+  K -- "đạt" --> L["Commit, đánh dấu xong lô"]
+```
+
 ## 0. Đọc trước (theo thứ tự)
 1. `CLAUDE.md` và skill `caveve-domain`, nhất là bất biến 9 (dữ liệu cá nhân) và luật không rò giá vốn.
 2. `doc/design/shop/UI-RULES.md`: luật bắt buộc của Shop. Rồi `COMPONENTS.md`: đặc tả từng component.

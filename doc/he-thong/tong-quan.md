@@ -2,6 +2,19 @@
 
 > Cập nhật 02/10/2026, theo code `main` `bf62b81`.
 
+```mermaid
+flowchart LR
+  KH["Khách"] --> SHOP["Shop bán hàng"]
+  NV["Lộc và nhân viên"] --> ERP["ERP quản lý"]
+  SHOP --> LOI["Lõi hệ thống: dữ liệu và luật"]
+  ERP --> LOI
+  KH --> CONG["Cổng thanh toán SePay"]
+  CONG --> CAU["Cầu nối nhận báo tiền"]
+  CAU --> LOI
+  LOI --> DB["Cơ sở dữ liệu và kho ảnh"]
+  JOB["Việc chạy theo lịch"] --> LOI
+```
+
 ## Hệ thống làm gì
 
 **Cá Về** là phần mềm cho một vựa hải sản đông lạnh bán lẻ cho khách cá nhân (B2C). Lộc là chủ vựa, Duy là PO.

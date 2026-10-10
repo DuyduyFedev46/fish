@@ -4,6 +4,23 @@
 > Nguồn: `doc/thuat-ngu-va-trang-thai.md` mục 3 (A1–A17), mục 2.10 (W1, W2, W39), mục 4 (T2, T24–T30, **chưa duyệt**, chỉ dùng tạm cột "Shop").
 > BR liên quan: BR-AI-17 (AI tắt không tải gì), BR-PQ-04/05 (vết kiểm toán), BR-GH-19 (ghi chú không chứa SĐT/số TK), BR-BH-03 (giữ chỗ TTL).
 
+```mermaid
+flowchart TD
+    A{"Duy chốt dọn chữ AI"} --> B{"Cờ AI lúc build bật?"}
+    B -- "Không" --> D["Ẩn mọi chữ và khối AI"]
+    B -- "Có" --> C{"Máy chủ báo AI bật?"}
+    C -- "Không" --> D
+    C -- "Có" --> E["Hiện AI, dọn chữ lặp"]
+    D --> F["Nhật ký, dòng thời gian ẩn dòng AI"]
+    G["Khách tra đơn trên Shop"] --> H["Hiện nhãn trạng thái dễ hiểu"]
+    H --> I["Mã lạ hiện Đang cập nhật"]
+    J["Song song: BE và FE cùng làm"] --> K["QA chạy thử trên máy chủ thật"]
+    F --> K
+    I --> K
+    K --> L["Tech Lead review"]
+    L -.-> M{"Duy: ẩn cả dòng cài đặt AI?"}
+```
+
 ## 0. Hiện trạng đã kiểm trên main
 
 | Việc | Hiện trạng |

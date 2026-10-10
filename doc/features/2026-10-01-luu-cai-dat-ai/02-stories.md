@@ -1,6 +1,18 @@
 # Lưu cài đặt AI và CMS trên backend thật (luồng NHANH)
 > Điều phối · 2026-10-01 · Trạng thái: **SẴN SÀNG CODE** · Nguồn: QA P8b Lô 4b (`doc/features/2026-09-30-dat-ten-tieng-anh/04-qa-report.md` mục Lô 4b, B1–B3). Lỗi có từ trước P8b; mock che mất.
 
+```mermaid
+flowchart TD
+    A["Chủ mở Chính sách AI hoặc AI của tôi"] --> B["Đọc cài đặt hiện có"]
+    B --> C["Hiện đúng giới hạn đã lưu"]
+    C --> D["Đổi một vài lệnh rồi bấm Lưu"]
+    D --> E["Gửi cài đặt lên máy chủ một lần"]
+    E --> F["Giữ nguyên cấu hình nhóm cũ"]
+    F --> G{"Máy chủ nhận?"}
+    G -->|"Có"| H["Lưu đúng, lệnh khác không đổi"]
+    G -->|"Không"| I["Báo lỗi, giữ dữ liệu đang sửa"]
+```
+
 ## SR-AIS-01 — Lưu không bị mã hoá JSON hai lần (B1, High)
 - **AC1.** `PUT /api/ai/policy/` (màn Chính sách AI) và `PUT /api/ai/my-config/` (màn AI của tôi) gửi body là **object JSON**, BE thật trả 200 và lưu đúng phiên bản mới (không còn 400 `Expected a dictionary, but got str`).
 - **AC2.** Rà mọi chỗ gọi `apiFetch`/`http` với `body: JSON.stringify(...)` trong khi lớp http đã tự `JSON.stringify` (đã biết: `features/ai/policy/api.ts:~96`, `features/ai/settings/api.ts:~101,~123`, `features/content/api.ts:~61,~72`) — sửa một kiểu thống nhất; test vitest kiểm body gửi đi là object/chuỗi JSON một lớp.

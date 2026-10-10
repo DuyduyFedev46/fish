@@ -1,6 +1,27 @@
 # Huỷ đơn khi phiếu giao đang "Đang giao" — Phân tích nghiệp vụ
 > BA · 2026-10-01 · Trạng thái: **CHỜ DUYỆT**
 
+```mermaid
+flowchart TD
+    A["Quản lý mở đơn đang giao"] --> B["Bấm Huỷ đơn, chọn lý do"]
+    B --> C{"Người giao vừa báo giao xong?"}
+    C -->|"Có"| D["Chặn huỷ, chỉ còn hoàn tiền"]
+    C -->|"Chưa"| E["Chọn tình trạng hàng"]
+    E --> F["Huỷ đơn, đảo doanh thu, chưa cộng kho"]
+    F --> G["Gợi ý tạo phiếu hoàn tiền"]
+    F --> H{"Hàng đi đâu?"}
+    H -->|"Mang về kho"| I["Ghi hàng về, chờ duyệt"]
+    H -->|"Mất hoặc hỏng"| J["Khai mất, người khác duyệt"]
+    H -->|"Chưa rõ"| K["Treo việc, nhắc sau 24 giờ"]
+    K --> H
+    I --> L{"Người khác duyệt"}
+    L -->|"Tái nhập"| M["Cộng lại đúng lô gốc"]
+    L -->|"Huỷ bỏ"| N["Ghi lỗ hàng hỏng vào lô"]
+    J --> N
+    M --> O["Đóng khoản hàng chờ xử lý"]
+    N --> O
+```
+
 ## 1. Yêu cầu gốc
 > "chỗ đơn đang giao tại sao ko cho phép hủy ? vì có thể là hủy bởi bên thứ 3 nhưng bên mình chưa api đc, thì cũng nên có thao tác cho ngta hủy nhỉ ?"
 

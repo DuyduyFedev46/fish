@@ -1,5 +1,29 @@
 # Cá Về — hướng dẫn cho Claude
 
+```mermaid
+flowchart TD
+  Y["Duy nhờ bằng lời thường"] --> L{"Loại việc?"}
+  L -- "hỏi, tra cứu, vận hành" --> TT["Làm trực tiếp, không qua đội"]
+  L -- "tính năng mới, đổi nghiệp vụ" --> BA["BA phân tích yêu cầu"]
+  L -- "lỗi rõ, chỉnh nhỏ" --> AC["Viết vài tiêu chí ngắn"]
+  BA --> D1{"Duy duyệt phân tích?"}
+  D1 -- "sửa lại" --> BA
+  D1 -- "duyệt" --> PO["PO viết story và tiêu chí nghiệm thu"]
+  PO --> D2{"Duy duyệt story?"}
+  D2 -- "duyệt" --> TL["Tech Lead thiết kế kỹ thuật"]
+  TL --> DEV["Dev BE và FE làm song song"]
+  AC --> DEV
+  DEV --> KC["Điều phối tự chạy lại kiểm chứng"]
+  KC --> RV["Soát code và giao diện"]
+  RV --> QA{"QA kiểm thật, đạt?"}
+  QA -- "chưa đạt" --> DEV
+  QA -- "đạt" --> GIT["Commit và đẩy lên GitHub"]
+  GIT --> D3{"Duy bảo deploy?"}
+  D3 -- "có" --> STG["Lên staging"]
+  STG --> D4{"Duy duyệt lên thật?"}
+  D4 -- "duyệt" --> PRD["Lên production"]
+```
+
 Vựa cá B2C (mua lô tại cảng → bán online → quản lý kho/giá vốn). Người dùng là **Duy**
 (PO), trao đổi bằng tiếng Việt. Nghiệp vụ & bất biến: skill `caveve-domain`.
 
@@ -60,6 +84,7 @@ Skill dùng chung: `.agents/skills/` trỏ về `.claude/skills/`, nên sửa sk
 **Staging** (sandbox SePay, DB `cangca_staging`) và **Production** (SePay live, DB `postgres` trên Supabase). Deploy luôn lên staging trước, Duy duyệt rồi mới lên production. Chi tiết URL, secret và lệnh build nằm ở `doc/ops/moi-truong.md`. Build frontend luôn truyền `NEXT_PUBLIC_*` trực tiếp, vì `.env.local` đè lên `.env.production`.
 
 ## Luật chung
+- **Tài liệu quy trình luôn có sơ đồ Mermaid ở đầu** (Duy chốt 11/10): mọi doc mô tả quy trình, luồng nghiệp vụ, luồng màn, luồng làm việc, deploy hay vận hành (spec, 00/01/02/02a/02b/02c, PLAN, runbook `doc/ops/`, `doc/he-thong/`, skill/agent workflow) phải có một khối ` ```mermaid ` ngay dưới tiêu đề, trước phần chữ. Duy đọc luồng từ sơ đồ này nên nhãn viết tiếng Việt đời thường, ngắn, không mã kỹ thuật; điểm Duy duyệt/quyết định vẽ thành hình thoi. Nhãn có dấu câu thì đặt trong ngoặc kép. Sửa quy trình thì sửa sơ đồ cùng lúc.
 - **Git:** mỗi khi xong một tính năng (một lô đã QA APPROVED) thì commit và `git push origin main` lên github.com/DuyduyFedev46/fish. Đây là quy ước Duy đặt ngày 2026-09-25. Repo đang công khai nên không bao giờ commit `.env` hay bí mật.
 - Không deploy khi Duy chưa yêu cầu.
 - Không báo "xong"/"test xanh" khi chưa chạy lệnh kiểm chứng trong lượt đó.

@@ -3,6 +3,21 @@
 > Story: `02-stories.md` (S01–S05). Không model mới, **không migration**, không đổi contract FE ngoài thông điệp lỗi.
 > Dòng code tham chiếu theo nhánh `wip/autosave` tại commit `9648b07`.
 
+```mermaid
+flowchart TD
+    K["Khách gọi trang công khai"] --> G{"Quá số lần cho phép?"}
+    G -->|"Quá"| G1["Chặn, báo thử lại sau"]
+    G -->|"Chưa"| T["Tra đơn bằng mã và 4 số cuối"]
+    T --> T1["Sai hay không có: cùng một câu trả lời"]
+    T --> T2["Đúng: chỉ trả trạng thái, không dữ liệu khách"]
+    N["Quản lý xem nhật ký"] --> N1["Lọc bỏ mọi số giá vốn"]
+    C["Bấm chốt lô"] --> C1{"Còn đơn mở, hàng giữ, chưa kiểm kê?"}
+    C1 -->|"Còn"| C2["Từ chối chốt"]
+    C1 -->|"Không"| C3["Chốt lô"]
+    B["Báo cáo lãi lỗ lô"] --> B1["Bỏ hoá đơn huỷ, không trừ hao hai lần"]
+    S["Trang staging"] --> S1["Gắn cờ không cho tìm kiếm"]
+```
+
 ## 1. S01 — Lọc khoá giá vốn khỏi nhật ký (L-3)
 
 **Chỗ sửa**

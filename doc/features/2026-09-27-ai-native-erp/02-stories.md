@@ -1,6 +1,21 @@
 # AI Native ERP — User stories
 > PO · 2026-09-27 · Nguồn: 01-analysis.md (ĐÃ DUYỆT, Q1–Q6 đã chốt) · Trạng thái: **ĐÃ DUYỆT (Duy, 27/09)** — chốt kèm: model Gemma 3n 32k (ADR điểm 9); máy chuẩn Android/Windows ≥ 8GB RAM, iPhone tạm chưa hỗ trợ; AI là add-on bật/tắt theo user, giữ 1 bản build (chuẩn "không tải/không chạy"); hiệu năng không đánh đổi (BR-AI-17, ADR điểm 10).
 
+```mermaid
+flowchart TD
+    L1["Lô 1: danh mục lệnh, nhật ký, chạy AI trên máy"] --> L2["Lô 2: kênh đề xuất, công tắc AI, lọc dữ liệu"]
+    L2 --> L3["Lô 3: màn nhập lô, trần chi phí"]
+    L3 --> L4["Lô 4: hỏi đáp chat, nhập bằng giọng"]
+    L4 --> L5["Lô 5: mở AI cloud, gợi ý mã hàng, nút FEFO"]
+    L5 --> L6["Lô 6: cảnh báo, tóm tắt tổng quan"]
+    L6 --> L7["Lô 7: tóm tắt hội thoại dài"]
+    M{"Duy giao máy thật?"} -- "Có" --> S["Thử trên máy thật, chốt model"]
+    S --> L4
+    L1 --> Q{"QA đạt từng lô?"}
+    Q -- "Đạt" --> P["Lưu và đẩy code"]
+    Q -- "Chưa" --> R["Sửa lại rồi kiểm lại"]
+```
+
 ## Mục tiêu & thước đo
 
 **Vì sao làm:** ERP **nói được, gợi ý được, cảnh báo được** — nhập liệu nhanh tại cảng, giảm nút

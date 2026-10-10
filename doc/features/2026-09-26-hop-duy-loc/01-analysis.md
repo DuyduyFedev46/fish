@@ -1,6 +1,22 @@
 # Họp Duy – Lộc 2026-09-26: quy mô đơn, thanh toán 100%, khách thân quen, in đơn tự động, vùng giao miền Nam — Phân tích nghiệp vụ
 > BA · 2026-09-26 · Trạng thái: **CHỜ DUYỆT**
 
+```mermaid
+flowchart TD
+    Z["Chủ bật tắt vùng giao trên ERP"] --> A
+    A["Khách chọn tỉnh, phường xã"] --> B{"Địa chỉ trong vùng giao?"}
+    B -->|"Không"| C["Báo chưa giao tới, không đặt được"]
+    B -->|"Có"| D["Giữ chỗ, hiện mã QR đủ tiền"]
+    D --> E{"Khách trả đủ 100%?"}
+    E -->|"Thiếu hoặc không trả"| F["Chờ Chủ xử lý hoặc tự huỷ"]
+    E -->|"Đủ"| G["Xuất hoá đơn, tạo phiếu giao"]
+    G --> H["Tự tạo lệnh in phiếu"]
+    H --> I["Máy in ở kho in phiếu"]
+    I --> J["Kho soạn, đóng gói, giao"]
+    G --> K["Cộng số đơn, số tiền của khách"]
+    K --> L["Đạt ngưỡng thì gắn nhãn khách thân quen"]
+```
+
 Ký hiệu mức câu hỏi: **ĐỎ** = chặn, không trả lời thì không viết story được · **VÀNG** = có mặc định PA, Duy có thể lật · **XANH** = để sau.
 
 ## 1. Yêu cầu gốc

@@ -2,6 +2,21 @@
 > Duy dặn 02/10 00:40: "cho auto chạy qua đêm, cái gì cần anh quyết gom lại trưa mai tính sau".
 > Điều phối viên không đứng chờ: lô nào gặp điểm dừng thì ghi vào đây, bỏ qua, làm lô khác.
 
+```mermaid
+flowchart TD
+    A["Lô đang làm gặp điểm dừng"] --> B["Ghi việc cần quyết vào đây"]
+    B --> C["Bỏ qua, làm lô khác"]
+    B --> D{"Duy đọc và quyết"}
+    D -->|"Chốt"| E["Ghi việc phải làm"]
+    D -->|"Chưa hiểu"| F["Em giải thích lại"]
+    F --> D
+    E --> G["Giao lô làm theo quyết định"]
+    A --> H["Việc không cần Duy quyết"]
+    H --> I["Tự chốt hoặc chuyển nợ lô sau"]
+    I --> J{"Duy xem lại, muốn lật không"}
+    J -->|"Lật"| E
+```
+
 | # | Lô | Việc cần quyết | Em đề xuất | Đang làm tạm thế nào |
 |---|---|---|---|---|
 | 1 | ngoài lô | ⚠️ (QA Lô 3 xác nhận lại trên BE thật: khối AI không bao giờ hiện dù bật AI, mỗi trang chi tiết có 1 lỗi 404 trong console.) **ERP gọi `GET /api/ai/status/` nhưng backend không có route** (em đã grep `config/api_urls.py`: không có; chỉ mock có). Trên backend thật request trả 404 → cổng AI coi như tắt → Trợ lý AI không bao giờ hiện trên staging/production. | Làm lô NHANH: thêm route `ai/status/` ở backend theo contract S05 (luôn 200, `ai_enabled`…), có test. | Chưa sửa (ngoài phạm vi ERP theo design). Không chặn các lô. |

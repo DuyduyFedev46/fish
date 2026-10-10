@@ -6,6 +6,20 @@ Người soạn: Duy (BA/PO) — tổng hợp cùng Claude (Product Architect)
 Trạng thái: Draft v4 — bổ sung Combo, Huỷ & hoàn tiền, Chi phí phụ vào giá vốn lô; chi tiết nghiệp vụ tách sang business-process-spec.md
 ---
 
+```mermaid
+flowchart TD
+  MUA["Mua tại cảng, nhập kho theo lô"] --> CP["Ghi chi phí phụ vào giá vốn lô"]
+  CP --> KHO["Kho theo lô, hạn sớm xuất trước"]
+  KHO --> SHOP["Khách đặt trên Shop, giữ hàng 30 phút"]
+  SHOP --> QR{"Trả bằng mã QR kịp?"}
+  QR -- "không" --> TUHUY["Tự huỷ, nhả hàng"]
+  QR -- "có" --> GIAO["Nhân viên vựa giao tận nhà"]
+  GIAO --> BC["Báo cáo lãi lỗ theo lô và tháng"]
+  QR -- "huỷ sau khi trả" --> HOAN["Phiếu hoàn tiền, Lộc chuyển khoản"]
+  GIAO -- "giao thất bại" --> VE{"Chủ duyệt: nhập lại hay huỷ bỏ"}
+  KHO -- "kiểm kê định kỳ" --> KK["Ghi hao hụt vào lô"]
+```
+
 # 1. Giới thiệu
 
 ## 1.1 Mục đích tài liệu

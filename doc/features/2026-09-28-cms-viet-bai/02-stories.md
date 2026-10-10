@@ -4,6 +4,23 @@
 > Mã story dùng tiền tố **CMS** để khỏi trùng với hồ sơ khác. Hồ sơ `2026-09-28-khung-go-live` (GL-01…) làm **sau** hồ sơ này
 > và dùng CMS-15 làm nền.
 
+```mermaid
+flowchart TD
+    A["Quyền Nội dung và menu"] --> C["Chuyên mục"]
+    B["Chặn Google trên staging"]
+    C --> D["Soạn và lưu nháp"]
+    D --> E["Ảnh trong bài, ảnh bìa"]
+    E --> F["Đăng bài lần đầu"]
+    F --> G["Cảnh báo SĐT, giá vốn"]
+    G --> H["Khách đọc bài trên web"]
+    H --> X{"Duy xem thử trên staging"}
+    X --> I["Gỡ bài và đăng lại"]
+    I --> J["Sửa bài đã đăng"]
+    J --> K["Trang chính sách cho go-live"]
+    K --> L["Phần nên có: thẻ mặt hàng, danh sách bài"]
+    L --> M["Gửi duyệt, lịch sử phiên bản, tự lưu"]
+```
+
 ## Mục tiêu & thước đo
 Chủ và Quản lý tự soạn, đăng, sửa, gỡ bài và trang trên web công khai mà không nhờ dev sửa code. Bài dẫn khách sang Shop.
 Trang chính sách bắt buộc trước go-live được soạn bằng chính CMS này.

@@ -1,6 +1,18 @@
 # Đầu vào: Shop làm lại từ đầu theo thiết kế 06/10 (lô 0)
 > Điều phối · 2026-10-10 · Nhánh `shop/lo-0-quyet-dinh` (tách từ `design/shop-ui` đã gộp `main` a0c94d4).
 
+```mermaid
+flowchart TD
+  A["Duy: làm lại Shop từ đầu, thêm mã giảm giá"] --> B["Bộ thiết kế đã duyệt"]
+  B --> C["Ghi các chốt vào quyết định"]
+  C --> F["Sửa thiết kế và tài liệu theo chốt"]
+  C --> D["Điều phối đề xuất 13 mặc định"]
+  D --> E{"Duy duyệt mặc định ở điểm dừng 1"}
+  E --> G["BA phân tích, PO viết story"]
+  F --> G
+  G --> H["Ghi số kiểm chứng gốc, bắt đầu lô code"]
+```
+
 ## Yêu cầu nguyên văn của Duy
 "coi như làm lại shop từ đầu đó" · "ok làm lại từ đầu đi, chuẩn chỉ vào" · "erp làm quản lý voucher, tạo voucher".
 

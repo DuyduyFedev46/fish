@@ -6,6 +6,23 @@
 > `doc/features/2026-09-28-cms-viet-bai/01-analysis.md:236-252`. Đây là điểm cần BA chép về spec gốc.
 > Theo quyết định `doc/decisions.md:252` (10/10): mọi nội dung chữ do Lộc sửa được thì để ở CMS, còn chữ giao diện (nút, câu lỗi, tiêu đề màn) để trong code.
 
+```mermaid
+flowchart TD
+  A["Soạn bài trong ERP, lưu nháp"] --> B{"Người soạn có quyền đăng?"}
+  B -- "không" --> C["Gửi duyệt"]
+  C --> D{"Người duyệt đồng ý?"}
+  D -- "chưa, kèm lý do" --> A
+  D -- "đồng ý" --> E["Tick đủ 5 mục tự kiểm"]
+  B -- "có" --> E
+  E --> F{"Hệ thống cảnh báo?"}
+  F -- "có" --> G["Xem lại, sửa hoặc vẫn đăng"]
+  F -- "không" --> H["Đăng lên Shop"]
+  G --> H
+  H --> I["Sửa bài rồi đăng bản sửa"]
+  H --> J["Gỡ bài, chọn lý do"]
+  J --> K["Đăng lại khi cần"]
+```
+
 ---
 
 ## 1. CMS ở đâu, ai được dùng

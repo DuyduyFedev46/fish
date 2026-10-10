@@ -5,6 +5,24 @@
 > `doc/business-process-spec.md`, hướng dẫn CMS `doc/ops/cms-cho-mkt.md` (viết cùng đợt, các mục "§" trong cột nguồn trỏ về file đó).
 > Phần pháp lý (đổi trả, quyền riêng tư, khiếu nại, điều kiện giao dịch) ở đây **chỉ là khung**. `legal-vn` đang viết `05-phap-ly.md`. Khi hai bên khác nhau thì theo `05-phap-ly.md`.
 
+```mermaid
+flowchart TD
+  A["Kiểm kê chữ trên các màn thiết kế"] --> B{"Chữ để ở đâu?"}
+  B -- "chữ giao diện" --> C["Để trong code"]
+  B -- "thông tin mặt hàng" --> D["Nhập trong ERP"]
+  B -- "bài, trang" --> E["Soạn sẵn để nạp CMS"]
+  B -- "CMS chưa chứa được" --> F["Tech Lead chọn nơi lưu"]
+  E --> G{"Câu chính sách?"}
+  G -- "có" --> H["Pháp lý soát"]
+  G -- "không" --> I{"Câu đã có nguồn?"}
+  I -- "chưa" --> J["Duy xác nhận"]
+  I -- "có" --> K["Nạp vào CMS"]
+  H --> K
+  J --> K
+  K --> L["Chờ số liệu và ảnh của Lộc"]
+  L --> M["Đăng lên Shop"]
+```
+
 Quy ước trạng thái từng câu:
 - **ĐÃ ĐỐI CHIẾU**: có nguồn trong decisions hoặc BR.
 - **CHỜ PHÁP LÝ**: câu chữ chính sách, cần `legal-vn` soát trước khi đăng.

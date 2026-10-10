@@ -7,6 +7,26 @@
 > trang tư vấn) vì không đọc được bản gốc (thuvienphapluat trả 403). Chỗ nào chưa đối chiếu văn bản gốc thì ghi **(chưa xác minh bản gốc)**.
 > Các ô ⚠ cần luật sư hoặc kế toán xác nhận trước go-live.
 
+```mermaid
+flowchart TD
+  A["Kiểm luật đang hiệu lực"] --> B["Rà từng câu hỏi pháp lý của Shop"]
+  B --> C["Câu chữ và màn cần làm trong lô"]
+  B --> Q{"Duy quyết các điểm mở"}
+  C --> LO["Làm trong lô 1 đến lô 5"]
+  Q --> D["Chủ thể pháp lý, tên miền"]
+  D --> E["Thông báo website, nhận biểu tượng"]
+  D --> F["Điền số vào 6 trang chính sách"]
+  D --> G["Hồ sơ chuyển dữ liệu ra nước ngoài"]
+  D --> H["Kế toán xác nhận hoá đơn"]
+  F --> F2["Pháp lý soát bản cuối"]
+  E --> I["Luật sư xác nhận ô cảnh báo"]
+  F2 --> I
+  G --> I
+  H --> I
+  LO --> I
+  I --> J{"Đủ điều kiện go-live"}
+```
+
 ## 0. Văn bản áp dụng (đã kiểm ngày 2026-10-10)
 
 | Văn bản | Hiệu lực | Ghi chú |

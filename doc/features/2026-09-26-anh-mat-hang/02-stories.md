@@ -8,6 +8,18 @@
 >
 > Mã story dùng tiền tố **A** (A1…A5) để khỏi trùng với S1…S48 của hồ sơ console.
 
+```mermaid
+flowchart TD
+    A1["Lô 1: tạo nơi lưu ảnh riêng"] --> A2["Chủ tải ảnh trên console"]
+    A1 -.-> A4F["Shop hiện ảnh, làm song song"]
+    A2 --> A4["Shop hiện ảnh thật"]
+    A4F --> A4
+    A4 --> S["Đưa lên staging"]
+    S --> D{"Duy thử ảnh thật, duyệt?"}
+    D -->|"Duyệt"| P["Lên production, Lộc gắn ảnh dần"]
+    P --> L2["Lô 2: gỡ ảnh, ảnh trong giỏ"]
+```
+
 ## Mục tiêu & thước đo
 Khách trả tiền trước qua VietQR mà không nhìn thấy hàng thì khó tin. Hiện tại **không mặt hàng nào có ảnh**,
 vì hệ thống chưa có chỗ lưu ảnh.

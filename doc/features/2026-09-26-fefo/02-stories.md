@@ -1,6 +1,15 @@
 # Xuất kho FEFO: user stories
 > Điều phối viên, 2026-09-26. Nguồn: 01-analysis.md (ĐÃ DUYỆT; Duy chốt Q1 = áp cho toàn bộ mặt hàng, Q2 = V1 chưa cho chọn tay lô). Trạng thái: **ĐÃ DUYỆT** (phạm vi nhỏ, theo luồng gọn; Duy đã duyệt phân tích).
 
+```mermaid
+flowchart LR
+    A["Duy duyệt phân tích"] --> B["Chọn lô theo hạn dùng"]
+    A --> C["Sửa màn hình và tài liệu"]
+    B --> Q["Kiểm thử"]
+    C --> Q
+    Q --> P["Lưu và đẩy code"]
+```
+
 ## F1: Chọn lô theo FEFO · Must · BE
 **Là** Chủ vựa, **tôi muốn** hệ thống luôn xuất lô có hạn dùng sớm nhất trước, **để** hàng đông lạnh không bị quá hạn trong kho.
 

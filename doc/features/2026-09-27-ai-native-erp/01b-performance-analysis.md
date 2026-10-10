@@ -13,6 +13,28 @@
 > `app/(console)/` + `features/auth/` + `shared/`, chưa có `features/ai/`, chưa có dependency AI nào,
 > đang dùng Google Fonts render-blocking trong `app/layout.tsx`, chưa có header COOP/COEP).
 
+```mermaid
+flowchart TD
+    A["Đo tốc độ ERP trước khi thêm AI"] --> B["Làm từng phần AI"]
+    B --> C["QA đo lại tốc độ"]
+    C --> D{"Đạt ngân sách tốc độ?"}
+    D -- "Đạt" --> E["Cho nghiệm thu"]
+    D -- "Không đạt" --> F["Bỏ tóm tắt hội thoại"]
+    F --> G{"Đạt chưa?"}
+    G -- "Chưa" --> H["Hoãn nhập bằng giọng"]
+    H --> I{"Đạt chưa?"}
+    I -- "Chưa" --> J["Hoãn hỏi đáp chat"]
+    J --> K{"Đạt chưa?"}
+    K -- "Chưa" --> L["Đổi sang model nhỏ hơn"]
+    L --> M{"Đạt chưa?"}
+    M -- "Chưa" --> N{"Duy chốt tắt AI trên máy?"}
+    N -- "Đồng ý" --> O["Chỉ giữ AI cloud, ghi quyết định"]
+    G -- "Đạt" --> E
+    I -- "Đạt" --> E
+    K -- "Đạt" --> E
+    M -- "Đạt" --> E
+```
+
 ---
 
 ## 1. Tuyên bố nguyên tắc

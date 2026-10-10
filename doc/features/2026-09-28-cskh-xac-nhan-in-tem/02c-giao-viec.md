@@ -3,6 +3,20 @@
 > Người hiện thực: Gemini CLI / Antigravity theo `AGENTS.md`, lệnh `/lam-tinh-nang 2026-09-28-cskh-xac-nhan-in-tem`.
 > Nhánh làm việc: **`main`** (sau khi hồ sơ `2026-09-28-sua-loi-bao-mat` đã merge `wip/autosave` → `main`).
 
+```mermaid
+flowchart TD
+    A["Xong hồ sơ sửa lỗi bảo mật"] --> B["Kéo code, ghi số test gốc"]
+    B --> L1["Lô 1: Nhóm CSKH, phiếu giao"]
+    L1 --> L2["Lô 2: Gọi, xác nhận, in tem"]
+    L2 --> L3["Lô 3: Tự huỷ, báo khách"]
+    L3 --> L4["Lô 4: Hoàn thiện vận hành"]
+    L4 --> Q{"Duy bảo làm tiếp Lô 5?"}
+    Q -->|"Có"| L5["Lô 5: Phiếu soạn, quét tem, kịch bản"]
+    L1 & L2 & L3 & L4 & L5 -.-> K["Mỗi lô: kiểm chứng, QA đạt, đánh dấu"]
+    K -.-> X{"Lệch thiết kế, đụng tiền hay dữ liệu khách?"}
+    X -->|"Có"| Y{"Dừng, hỏi Duy"}
+```
+
 ## Điều kiện đầu vào
 - `02-stories.md`: ĐÃ DUYỆT (Duy 28/09) · `02b-tech-design.md`: ĐÃ DUYỆT (Duy 28/09 — theo chốt scope).
 - **Phải xong trước:** hồ sơ `2026-09-28-sua-loi-bao-mat` trạng thái XONG (Lô 1 + Lô 2 ☑, đã merge `main`). Hồ sơ này dùng

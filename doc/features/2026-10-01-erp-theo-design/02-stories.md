@@ -2,6 +2,19 @@
 > PO · 01/10/2026 · Nguồn: `01-analysis.md` (ĐÃ DUYỆT) · Luật UI: `doc/design/erp/UI-RULES.md` · Enum: `doc/design/erp/enum-map.md`
 > Trạng thái: **ĐÃ DUYỆT (Duy duyệt 01/10/2026 qua chat: làm hết theo design ERP máy tính)**
 
+```mermaid
+flowchart TD
+    A["Đợt 1: khung và mẫu chung"] --> C["Đợt 2: đơn và tiền"]
+    B["Đợt 1 song song: backend còn thiếu"] --> D
+    C --> D["Đợt 3: khách, gọi xác nhận, giao"]
+    D --> E["Đợt 4: mua hàng và kho"]
+    E --> F["Đợt 5: danh mục, giá, lãi lỗ"]
+    F --> G["Đợt 6: nhân sự, phân quyền"]
+    G --> H["Đợt 7: hoá đơn, nội dung, nhật ký"]
+    H --> I{"Duy trả lời câu tìm nhanh"}
+    I --> J["Đợt 8: tìm nhanh theo mã"]
+```
+
 ## Mục tiêu & thước đo
 Đưa `erp-console/` về đúng bộ thiết kế ERP máy tính đã duyệt, bổ sung backend B1–B6.
 - 105/105 file `doc/design/erp/screens/*.dc.html` có màn tương ứng; QA đối chiếu từng file (bảng "Design" của mỗi story).

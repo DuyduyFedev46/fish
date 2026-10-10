@@ -5,6 +5,28 @@
 > Ký hiệu nhóm: **Chủ** `owner` · **Q** Quản lý `manager` · **K** NV kho `warehouse_staff` · **G** NV giao
 > `delivery_staff` · **C** CSKH `customer_service`.
 
+```mermaid
+flowchart TD
+    A["Chụp ảnh quyền hiện tại làm mốc"] --> B["Lưu phạm vi theo nhóm, mặc định như cũ"]
+    B --> C["Đơn hàng và hoá đơn đọc cấu hình"]
+    C --> D["Phiếu giao, hàng hoàn đọc cấu hình"]
+    D --> E["Gọi xác nhận, khách hàng đọc cấu hình"]
+    E --> F["Phiếu nhập theo phạm vi"]
+    F --> G["Hai việc mới: xem hoá đơn, xem thông tin khách"]
+    B --> H["Chủ lưu phạm vi, ghi nhật ký"]
+    H --> I["Cảnh báo khi mở rộng dữ liệu khách"]
+    H --> J["Hai người cùng lưu: người sau không ghi đè"]
+    B -.-> K["Giao diện: khối Phạm vi dữ liệu sửa được"]
+    G --> L["Cổng phát hành: so ảnh chụp trước và sau"]
+    I --> L
+    J --> L
+    K --> L
+    L --> M{"Ảnh chụp khớp?"}
+    M -- "Lệch" --> N["Dừng, không phát hành"]
+    M -- "Khớp" --> O["Phát hành"]
+    O --> P["Làm sau: báo mất quyền, Quyền của tôi"]
+```
+
 ## Mục tiêu & thước đo
 
 Chủ tự chọn ai thấy dòng dữ liệu nào (đơn, phiếu giao, phiếu nhập, hàng hoàn, gọi xác nhận, khách), và tự bật/tắt việc

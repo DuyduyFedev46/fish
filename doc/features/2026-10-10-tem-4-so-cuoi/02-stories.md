@@ -1,5 +1,19 @@
 # Tem in chỉ hiện 4 số cuối SĐT người nhận — luồng NHANH
 
+```mermaid
+flowchart TD
+    A{"Duy chốt: tem in 4 số cuối"} --> B["Bấm in tem phiếu giao"]
+    B --> C["Chuẩn hoá số điện thoại người nhận"]
+    C --> D{"Đủ 4 chữ số?"}
+    D -- "Không" --> E["In ba dấu sao"]
+    D -- "Có" --> F["In sáu chữ x và 4 số cuối"]
+    F --> G["Dán tem ngoài thùng"]
+    E --> G
+    G -.-> H["NV giao vẫn xem đủ số trong app"]
+    G -.-> I["Các chỗ che số khác giữ nguyên"]
+    J["Kèm: bảng Thành viên xuống dòng tên dài"]
+```
+
 Trạng thái: ĐÃ DUYỆT (Duy, 10/10/2026: "in 4 số cuối thôi"). Trả lời Q1 của `doc/features/2026-10-02-pham-vi-du-lieu-cau-hinh/02c-quyet-dinh-08-10.md`.
 
 Hiện tại tem (`GET /api/delivery/notes/<id>/label/`) in SĐT người nhận dạng `09xx xxx 123` (`mask_phone`: 2 số đầu, 3 số cuối).

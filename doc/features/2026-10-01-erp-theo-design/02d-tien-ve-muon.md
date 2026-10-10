@@ -1,5 +1,23 @@
 # 02d — Ghi tiền về muộn ở Hàng chờ thanh toán (TLA-M3 / #15)
 
+```mermaid
+flowchart TD
+    A["Tiền đã vào tài khoản, hệ thống chưa biết"] --> B["Chủ ghi tay ở Hàng chờ thanh toán"]
+    B --> C{"Có nhập mã đơn?"}
+    C -->|"Để trống"| D["Ghi khoản chưa gắn đơn"]
+    C -->|"Đơn đã huỷ"| E["Ghi khoản tiền của đơn đã huỷ"]
+    C -->|"Đơn còn chờ hoặc đã trả"| F["Từ chối, chỉ đường khác"]
+    C -->|"Sai mã đơn"| G["Báo không thấy đơn"]
+    D --> H{"Nghi trùng khoản đã có?"}
+    E --> H
+    H -->|"Có"| I{"Chủ xác nhận vẫn ghi?"}
+    I -->|"Không"| J["Không ghi gì"]
+    I -->|"Có"| K["Ghi kèm cảnh báo trùng"]
+    H -->|"Không"| L["Ghi khoản chờ xử lý"]
+    K --> M["Xử lý tiếp: gắn đơn hoặc hoàn tiền"]
+    L --> M
+```
+
 Luồng: **NHANH**, có thiết kế trước vì việc này đụng tới tiền. Tech Lead viết ngày 03/10/2026.
 Nguồn: TLA-M3 trong `03b-review-techlead.md` (ca E-05 khi đơn đã Tự huỷ), Duy đồng ý làm ngày 03/10/2026.
 Business rule đề xuất: **BR-TT-18**. Điều phối viên cần ghi rule này vào `doc/business-process-spec.md` §P-05 khi lô được nghiệm thu.

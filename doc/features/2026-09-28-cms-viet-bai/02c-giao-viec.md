@@ -3,6 +3,26 @@
 > Người hiện thực: Gemini CLI / Antigravity theo `AGENTS.md`, lệnh `/lam-tinh-nang 2026-09-28-cms-viet-bai`.
 > Nhánh làm việc: **`main`** (sau khi hồ sơ `2026-09-28-sua-loi-bao-mat` đã merge `wip/autosave` → `main`). Nếu lúc bắt đầu hồ sơ đó **chưa** merge thì làm trên `wip/autosave` và ghi rõ trong `03-dev-notes.md`.
 
+```mermaid
+flowchart TD
+    A{"Hồ sơ sửa lỗi bảo mật đã xong?"}
+    A -->|"Chưa"| B["Dừng, báo Duy"]
+    A -->|"Rồi"| L1["Lô 1: quyền và chuyên mục"]
+    L1 --> L2["Lô 2: soạn nháp và ảnh"]
+    L2 --> L3["Lô 3: đăng bài, cảnh báo, khách đọc"]
+    L3 --> X{"Duy xem staging, quyết deploy"}
+    L3 --> L4["Lô 4: gỡ bài, sửa bài đã đăng"]
+    L4 --> L5["Lô 5: trang chính sách go-live"]
+    L5 --> L6["Lô 6: thẻ mặt hàng, danh sách bài"]
+    L6 --> L7["Lô 7: gửi duyệt, phiên bản, tự lưu"]
+    subgraph moilo["Mỗi lô"]
+        P["Dev làm song song"] --> Q["Chạy lệnh kiểm chứng"]
+        Q --> R{"Kiểm thử đạt?"}
+        R -->|"Không"| P
+        R -->|"Đạt"| S["Commit, đánh dấu xong"]
+    end
+```
+
 ## Điều kiện đầu vào
 - `02-stories.md`: ĐÃ DUYỆT (Duy 28/09 — chốt scope qua câu hỏi) · `02b-tech-design.md`: ĐÃ DUYỆT (Duy 28/09 — theo chốt scope)
 - **Phải xong trước:** hồ sơ `2026-09-28-sua-loi-bao-mat` Lô 1 + Lô 2 + bước merge vào `main` (CMS dùng `apps/common/throttling.py` của S03 và sửa cùng `apps/common/api.py::exception_handler`). Kiểm: `git log --oneline -5 main` có commit merge "sửa lỗi bảo mật"; `ls backend/apps/common/throttling.py` tồn tại. Không có → **dừng, báo Duy**.

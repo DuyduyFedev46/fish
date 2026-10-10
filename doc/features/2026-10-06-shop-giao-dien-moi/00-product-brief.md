@@ -3,6 +3,18 @@
 > Đầu vào: `00-dau-vao.md`, `doc/decisions.md` mục 2026-10-10 (tối), `doc/design/shop/` (README, PLAN, DOI-CHIEU-CODE, AUDIT-DO-DU, UI-RULES),
 > code `frontend/`, `backend/apps/catalog/items/shop_api.py`, `backend/apps/sales/orders/shop_api.py`, `backend/apps/sales/{models,payments}/`.
 
+```mermaid
+flowchart TD
+  A["Lát 1: bán trọn vòng"] --> A1["Xem, tìm, cho vào giỏ"]
+  A1 --> A2["Đặt hàng, trả bằng QR"]
+  A2 --> A3["Trang đơn, tra đơn"]
+  A3 --> A4["Trang chính sách tối thiểu"]
+  A4 --> P{"Đủ điều kiện lên production"}
+  A3 --> Q{"Duy trả lời câu hỏi mã giảm giá"}
+  Q --> B["Lát 2: mã giảm giá"]
+  B --> C["Lát 3: Góc bếp, trang phụ, QA toàn bộ"]
+```
+
 **Khuyến nghị: LÀM**, chia 3 lát. Lát 1 là vòng mua trọn (xem, giỏ, đặt, trả QR, trang đơn) và là điều kiện để Shop lên production.
 Mã giảm giá (3b) làm ngay sau lát 1. Lý do: Shop chưa chạy production nên chưa có khách để mất, còn đây là lần duy nhất được đổi contract API mà không cần giữ đường cũ.
 

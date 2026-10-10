@@ -7,6 +7,28 @@ Trạng thái: Draft v2 — viết lại mục 1 (phân quyền 3 tầng, thêm 
 Vị trí: Level 3, nằm giữa URD.md (cái gì) và data model (Level 4, chưa viết)
 ---
 
+```mermaid
+flowchart TD
+  DM["Lập danh mục, giá, combo"] --> MUA["Mua tại cảng, nhập lô"]
+  MUA --> CP["Cộng chi phí phụ vào giá vốn lô"]
+  CP --> MO["Mở bán lô trên Shop"]
+  MO --> DAT["Khách đặt hàng, giữ hàng 30 phút"]
+  DAT --> TT{"Tiền về đủ?"}
+  TT -- "quá 30 phút" --> TUHUY["Đơn tự huỷ, nhả hàng"]
+  TT -- "đủ" --> XL["Trừ kho, ghi doanh thu"]
+  XL --> SOAN["Soạn hàng và đi giao"]
+  SOAN --> GIAO{"Giao được?"}
+  GIAO -- "khách nhận" --> XONG["Đơn hoàn tất"]
+  GIAO -- "hẹn giao lại" --> SOAN
+  GIAO -- "thôi không giao" --> VE["Hàng về kho, chờ duyệt"]
+  VE --> DUYET{"Quản lý hoặc Chủ: nhập lại hay huỷ?"}
+  XL -- "huỷ sau khi đã trả" --> HUY["Huỷ đơn, lập phiếu hoàn tiền"]
+  HUY --> HOAN["Chủ chuyển khoản trả khách"]
+  MO --> KK["Kiểm kê theo lô, người khác duyệt"]
+  KK --> CHOT{"Chủ chốt lô khi hết hàng hoặc quá hạn"}
+  CHOT --> BC["Báo cáo lãi lỗ theo lô và tháng"]
+```
+
 # 0. Cách đọc tài liệu này
 
 ## 0.1 Nó khác URD ở chỗ nào

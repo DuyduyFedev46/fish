@@ -6,6 +6,29 @@
 > `sales/orders/customer_notices.py`, `content/site/services.py` + `api.py`, `content/models/entries.py`, `accounts/capabilities/registry.py`.
 > Phân tích không phụ thuộc đường dẫn code (đề xuất đổi thư mục ở `doc/kien-truc/de-xuat-cau-truc-lai.md` chưa duyệt).
 
+```mermaid
+flowchart TD
+  A["Khách xem và chọn hàng, từ 1 kg"] --> B["Giỏ hàng, nhập mã giảm giá"]
+  B --> C["Điền tên, số điện thoại, địa chỉ"]
+  C --> D["Tick đồng ý, bấm Đặt hàng"]
+  D --> E{"Còn đủ hàng?"}
+  E -- "hết" --> E1["Báo món hết, không tạo đơn"]
+  E1 --> B
+  E -- "đủ" --> F["Giữ hàng 30 phút, có mã đơn"]
+  F --> G["Thanh toán quét mã QR"]
+  G --> H{"Tiền về?"}
+  H -- "lỗi hoặc huỷ trên cổng" --> G2["Thanh toán lại"]
+  G2 --> G
+  H -- "quá 30 phút" --> H1["Hết giờ, đặt lại đơn"]
+  H -- "chờ quá lâu" --> H2["Cá Về kiểm tra và gọi"]
+  H -- "đủ" --> I["Trang đơn: đang chuẩn bị"]
+  I --> J{"Giao hàng"}
+  J -- "đã giao" --> K["Đơn đã giao"]
+  J -- "không thành công" --> K2["Cá Về gọi hẹn lại"]
+  I -- "đơn bị huỷ" --> K3["Báo huỷ, Cá Về sẽ gọi"]
+  L["Tra đơn bằng mã và số điện thoại"] --> I
+```
+
 Ký hiệu nguồn: **(D)** Duy đã chốt (decisions 10/10 tối hoặc trước) · **(L)** Lộc nói · **(MĐ)** mặc định chờ Duy duyệt ở điểm dừng 1 · **(PA)** giả định thiết kế.
 Mức câu hỏi: 🔴 chặn lô · 🟡 BA đã đặt mặc định, Duy chỉ cần phản đối nếu khác · 🟢 để sau.
 

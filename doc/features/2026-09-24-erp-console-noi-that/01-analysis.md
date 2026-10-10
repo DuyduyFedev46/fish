@@ -1,6 +1,19 @@
 # ERP console "nối thật": từ màn hình chỉ xem sang màn hình thao tác được — Phân tích nghiệp vụ
 > BA · 2026-09-24 · Trạng thái: **ĐÃ DUYỆT** (2026-09-24, Duy)
 
+```mermaid
+flowchart TD
+    A["ERP chỉ xem, sửa tay trong Admin"] --> B["BA phân tích 24 việc, 4 vai"]
+    B --> Q{"Duy chốt: làm cả 3 đợt?"}
+    Q -->|"Có, làm lần lượt"| C["Sửa trước: lô quá hạn vẫn bán"]
+    C --> D["Khoá lỗ hổng sửa trạng thái tay"]
+    D --> E["Đợt 1: đơn, tiền, giao hàng"]
+    E --> F["Đợt 2: kho, mua hàng, kiểm kê, báo cáo"]
+    F --> G["Đợt 3: danh mục, nhân sự, nhật ký"]
+    G --> H["Trợ lý AI chỉ đọc"]
+    H --> I["Admin chỉ còn cấu hình và cứu hộ"]
+```
+
 Ký hiệu mức câu hỏi (mục 10): **ĐỎ** = chặn, chưa trả lời thì không viết story được · **VÀNG** = có mặc định PA, Duy không nói gì thì làm theo mặc định · **XANH** = để sau.
 
 ---

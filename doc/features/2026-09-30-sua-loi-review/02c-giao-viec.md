@@ -3,6 +3,21 @@
 > Người hiện thực: Gemini CLI / Antigravity theo `AGENTS.md`, lệnh `/lam-tinh-nang 2026-09-30-sua-loi-review`.
 > Nhánh làm việc: `main` (không dùng `wip/autosave`).
 
+```mermaid
+flowchart TD
+    A["Kéo code, ghi số test gốc"] --> B["Viết test tái hiện, thấy đỏ"]
+    B --> C["Sửa đến khi xanh"]
+    C --> D["Chạy đủ lệnh kiểm chứng"]
+    D --> E{"QA chạy thật, đạt?"}
+    E -->|"Không"| B
+    E -->|"Đạt"| F["Commit, đánh dấu lô"]
+    F --> G["Lô kế tiếp, từ 1 đến 8"]
+    G --> B
+    D -.-> X{"Lệch thiết kế, đụng tiền?"}
+    X -->|"Có"| Y{"Dừng, hỏi Duy"}
+    F --> Z{"Sau deploy: Duy chạy lập bù chứng từ?"}
+```
+
 ## Điều kiện đầu vào
 - `02-stories.md`: ĐÃ DUYỆT (Duy 30/09) · `02b-tech-design.md`: ĐÃ DUYỆT (Duy 30/09)
 - P7 đã xong (xem `doc/ke-hoach-tong.md`). **Chặn deploy staging tới khi Lô 1–5 xong.**

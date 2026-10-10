@@ -1,5 +1,17 @@
 # Shop: mặt hàng hết hàng hiện nút "Liên hệ" (luồng NHANH, 2026-10-06)
 
+```mermaid
+flowchart TD
+    A["Khách xem mặt hàng"] --> B{"Còn hàng?"}
+    B -- "Còn" --> C["Nút mua như cũ"]
+    B -- "Hết" --> D["Hiện Tạm hết, liên hệ để đặt"]
+    D --> E["Nút Liên hệ bấm được"]
+    E --> F{"Vựa có số điện thoại?"}
+    F -- "Có" --> G["Mở gọi điện"]
+    F -- "Không" --> H["Cuộn tới thông tin người bán"]
+    E -.-> I["Không thêm vào giỏ"]
+```
+
 Yêu cầu của Duy: "nếu mặt hàng bị hết thì button ko hiển thị hết hàng mà là Liên Hệ nhé".
 
 ## AC

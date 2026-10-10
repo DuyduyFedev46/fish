@@ -6,6 +6,22 @@
 > Nguồn: `01-ra-soat-dat-ten.md` (mục 1–3 + "Quyết định Duy 30/09"). Hồ sơ này **không có** `02-stories.md`/`02b` riêng:
 > việc là đổi tên thuần, không đổi nghiệp vụ; contract đổi tên ghi ở §3 dưới đây và thay cho 02b.
 
+```mermaid
+flowchart TD
+    A["Xong đợt trước, ghi số test gốc"] --> Q{"Duy trả lời 3 câu hỏi?"}
+    Q -->|"Đã trả lời"| L0["Lô 0: Chặn tên tiếng Việt mới"]
+    L0 --> L1["Lô 1: Đổi tên nội bộ, gom tên nhóm"]
+    L1 --> L3["Lô 3: Đổi tên giao tiếp, giữ tên cũ tạm"]
+    L3 --> S3["Thử trên staging"]
+    S3 --> L4["Lô 4: Đổi tên 5 nhóm quyền, giữ nguyên quyền"]
+    L4 --> S4["Thử trên staging"]
+    S4 --> L5["Lô 5: Gỡ tên cũ tạm"]
+    B["Lô 2 đổi tên test: bỏ, đổi dần"] -.-> L1
+    L0 & L1 & L3 & L4 & L5 -.-> K["Mỗi lô: kiểm chứng, review, QA, commit"]
+    K -.-> X{"Lệch thiết kế hoặc cần deploy?"}
+    X -->|"Có"| Y{"Dừng, hỏi Duy"}
+```
+
 ## Điều kiện đầu vào
 - P8 xong (Lô 1–8, `807159e`), staging chạy P1–P8 (`api:v6`, `doc/ops/moi-truong.md` "Nhật ký deploy staging").
 - Duy đã chốt Q1–Q4 ngày 30/09 (cuối `01-ra-soat-dat-ten.md`). Phiếu này cần Duy duyệt thêm các câu 🔴 ở §7.

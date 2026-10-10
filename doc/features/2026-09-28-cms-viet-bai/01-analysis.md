@@ -1,6 +1,25 @@
 # CMS viết bài (bài viết + trang nội dung trên web công khai) — Phân tích nghiệp vụ
 > BA · 2026-09-28 · Trạng thái: **ĐÃ DUYỆT** (Duy 28/09, chốt scope qua câu hỏi, xem §13)
 
+```mermaid
+flowchart TD
+    A["Người soạn mở mục Nội dung"] --> B["Viết bài, chèn ảnh, thẻ mặt hàng"]
+    B --> C["Tự lưu nháp, xem trước"]
+    C --> D{"Người soạn có quyền đăng?"}
+    D -->|"Không"| E["Gửi duyệt, chờ Chủ hoặc Quản lý"]
+    E --> F
+    D -->|"Có"| F["Kiểm đủ thông tin, tick tự kiểm"]
+    F --> G{"Máy thấy giống SĐT hoặc giá vốn?"}
+    G -->|"Có"| H["Cảnh báo, người đăng xác nhận lại"]
+    G -->|"Không"| I["Lưu phiên bản, bài lên web"]
+    H --> I
+    I --> J["Khách đọc bài từ Google, Zalo"]
+    J --> K["Bấm Xem giá và đặt sang Shop"]
+    I --> L["Sửa bài, đăng lại thành phiên bản mới"]
+    I --> M["Gỡ khỏi web, ghi lý do"]
+    M --> N["Đăng lại khi cần"]
+```
+
 ## 1. Yêu cầu gốc
 
 > "thêm CMS để viết bài nha"

@@ -3,6 +3,19 @@
 > Cập nhật 02/10/2026, theo code `main` `bf62b81`.
 > Hợp đồng thanh toán chi tiết: `frontend/features/checkout/README.md`. `frontend/README.md` đã cũ ở vài chỗ (xem cuối file).
 
+```mermaid
+flowchart TD
+  A["Khách xem bảng giá"] --> B["Cho hàng vào giỏ"]
+  B --> C["Điền thông tin, đặt đơn"]
+  C --> D["Hệ thống giữ hàng 30 phút"]
+  D --> E["Bấm thanh toán, sang cổng SePay"]
+  E --> F["Quét mã QR bằng app ngân hàng"]
+  F --> G["Quay về trang tra đơn"]
+  G --> H{"Hệ thống đã nhận tiền?"}
+  H -- "rồi" --> I["Đơn đang xử lý"]
+  H -- "chưa" --> J["Chờ hoặc thanh toán lại"]
+```
+
 ## Là gì
 
 Trang giới thiệu và Shop cho khách. Khách **không đăng nhập** (guest checkout, gộp theo SĐT). Next.js 14 (App Router),

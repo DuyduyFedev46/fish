@@ -1,6 +1,17 @@
 # Khung go-live pháp lý trên web — User stories
 > PO · 2026-09-28 · Nguồn: 01-analysis.md (cùng thư mục) · Trạng thái: **ĐÃ DUYỆT (Duy 28/09 — chốt scope qua câu hỏi)**
 
+```mermaid
+flowchart LR
+    A["Chân trang người bán"] --> B["Link trang chính sách"]
+    B --> C["Ô đồng ý ở thanh toán"]
+    C --> D["Báo sẽ gọi xác nhận"]
+    D --> E["Tra bằng chứng đồng ý"]
+    X["CMS xong trang chính sách"] -.-> B
+    X -.-> C
+    Y{"Duy duyệt hồ sơ CSKH?"} -.-> D
+```
+
 > Làm **sau** hồ sơ `2026-09-28-cms-viet-bai`. GL-02, GL-03, GL-05 cần CMS-15 (trang có vai trò và phiên bản có hiệu lực).
 
 ## Mục tiêu & thước đo

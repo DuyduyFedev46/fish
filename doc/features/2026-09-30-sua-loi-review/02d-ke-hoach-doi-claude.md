@@ -3,6 +3,27 @@
 > Phiếu giao việc từng lô P8 vẫn là `02c-giao-viec.md`. File này ghi **ai làm gì, theo thứ tự nào, kiểm ở đâu**,
 > và prompt để Duy dán vào phiên Claude Code mới (cuối file).
 
+```mermaid
+flowchart TD
+    subgraph BA["Bước A: rà lại phần AGY làm"]
+        A1["Tech Lead rà toàn bộ code"]
+        A2["4 QA kiểm lại mọi tiêu chí, chạy thật"]
+        A1 --> A6["Điều phối gộp báo cáo tổng"]
+        A2 --> A6
+        A6 --> A7["Lỗi mới để Duy duyệt thành đợt sau"]
+    end
+    subgraph BB["Bước B: sửa lỗi từng lô"]
+        B1["Kéo code, ghi số gốc"] --> B2["Dev BE và FE làm song song"]
+        B2 --> B3["Điều phối tự chạy lại kiểm chứng"]
+        B3 --> B4["Tech Lead review"]
+        B4 --> B5{"QA đạt?"}
+        B5 -->|"Không"| B2
+        B5 -->|"Đạt"| B6["Commit, đánh dấu lô"]
+    end
+    A7 -.-> B1
+    B6 --> C{"Xong Lô 5: báo Duy mở deploy staging"}
+```
+
 ## Đội
 | Vai | Agent | Model | Việc |
 |---|---|---|---|

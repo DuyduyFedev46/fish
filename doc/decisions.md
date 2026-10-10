@@ -268,3 +268,5 @@ Nguồn: `doc/design/shop/README.md` (chốt 06–07/10) và trả lời của D
 - **S-16 Thời hạn phản hồi khiếu nại: dưới 2 giờ.**
 - **S-12, S-18, S-19, S-23:** Claude dùng câu tạm để làm UAT; danh sách câu hỏi để Duy hỏi Lộc ở `doc/ops/hoi-loc.md`.
 - **Duyệt `02-stories.md` (41 story, điểm dừng 2)** theo khuyến nghị PO — Duy giao tự duyệt và chạy hết các lô đêm 10→11/10, không deploy: lệnh nạp nội dung CMS và `/gioi-thieu/` kéo lên lô 1; trang `/ui-preview/` chỉ bật bằng cờ build (production 404); giỏ có món vừa hết thì chặn "Đặt hàng" tới khi khách bỏ món (techlead được đổi ở 02b).
+- **Deploy staging** các lô Shop đã QA APPROVED và merge `main` (Duy 11/10: "xong thì deploy staging các phần đã xong"). Production chưa.
+- **Mọi tài liệu quy trình có sơ đồ Mermaid ngay dưới tiêu đề**, nhãn tiếng Việt dễ hiểu, để Duy đọc luồng (Duy 11/10). Luật ghi ở `CLAUDE.md`.

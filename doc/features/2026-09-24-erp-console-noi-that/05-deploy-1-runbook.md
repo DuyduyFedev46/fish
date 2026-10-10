@@ -1,6 +1,22 @@
 # Deploy lần 1: ERP console mới + tài khoản & phân quyền
 > Điều phối viên · 2026-09-24 · Trạng thái: **ĐÃ CHẠY 2026-09-25**. Bước 1–7 xong. Ở bước 5, Duy chọn gỡ 51 bản ghi demo cũ rồi seed bộ mẫu mới (6 mặt hàng, 6 lô, 6 đơn, 3 hoá đơn). Còn bước 8, Duy làm.
 
+```mermaid
+flowchart TD
+    A["Sao lưu cơ sở dữ liệu"] --> B["Build bản backend mới"]
+    B --> C["Chạy cập nhật cấu trúc dữ liệu"]
+    C --> D["Đổi backend sang bản mới, kiểm nhanh"]
+    D --> E["Chạy thử gỡ dữ liệu demo"]
+    E --> Q{"Duy quyết: gỡ dữ liệu demo?"}
+    Q -->|"Gỡ"| F["Gỡ demo, đóng lô demo sót"]
+    Q -->|"Giữ"| G["Đặt lịch job hạn lô hằng ngày"]
+    F --> G
+    G --> H["Đưa ERP console mới lên mạng"]
+    H --> I["Duy tạo tài khoản riêng cho Lộc"]
+    I --> J["Duy đổi mật khẩu tài khoản admin"]
+    D -.->|"Có sự cố"| R["Quay về bản cũ"]
+```
+
 Phạm vi: S1–S9, S41, S42, S46, S47, S48, D1, sửa lỗi QA lần 2. QA lần 3 **APPROVED**.
 Backend 369 test xanh (gồm sửa theo code review; QA lần 4 xác nhận trước khi chạy). Shop (`frontend/`) không đổi code nên **không deploy lại**.
 

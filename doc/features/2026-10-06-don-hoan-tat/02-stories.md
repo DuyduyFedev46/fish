@@ -1,6 +1,21 @@
 # Đơn hoàn tất (W37) — User stories
 > PO · 07/10/2026 · Nguồn: `01-analysis.md` (ĐÃ DUYỆT 07/10, gồm mục "Duy trả lời") · Trạng thái: **ĐÃ DUYỆT (07/10)**
 
+```mermaid
+flowchart TD
+    A["Lô 1: chặn huỷ và giao xong cùng lúc"] --> B["Lô 1: giao xong phiếu cuối, đơn Hoàn tất"]
+    A2["Song song: giao diện ERP theo mẫu"] --> E
+    B --> C["Lô 2: chốt được lô"]
+    B --> D["Lô 2: hoàn tiền, đơn giữ Hoàn tất"]
+    C --> E["Lô 3: ERP và Shop hiện đúng Hoàn tất"]
+    D --> E
+    E --> F["Lô 4: chuyển bù đơn cũ trên staging"]
+    F --> G{"Duy duyệt chạy production?"}
+    G -- "Duyệt" --> H["Chuyển bù trên production"]
+    I["Đề xuất sửa sơ đồ trạng thái đơn"] --> J{"Duy duyệt sửa tài liệu?"}
+    J -- "Duyệt" --> K["BA ghi vào tài liệu quy trình"]
+```
+
 ## Mục tiêu & thước đo
 NV giao bấm giao xong thì đơn tự sang **Hoàn tất**. Khi đó khách tra đơn thấy đúng kết cục, ERP "Chưa xong" và Tổng quan chỉ
 đếm việc còn phải làm, và **lô đã bán qua Shop chốt được** (H1, đang chặn nghiệp vụ).

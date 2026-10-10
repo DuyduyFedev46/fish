@@ -3,6 +3,23 @@
 > `01c-phap-ly.md`, `research/01-mcp-per-function.md` (đã bị điều chỉnh M1-sửa thay thế) · Trạng thái:
 > **ĐÃ DUYỆT (Duy 28/09 — chốt scope qua câu hỏi)**.
 
+```mermaid
+flowchart TD
+    A["Sửa lỗi bảo mật làm trước"] --> L1["Lô 1: khối Tiếp theo và Đã làm"]
+    A --> L0["Lô 0: thử nghiệm kỹ thuật"]
+    L0 --> L2["Lô 2: lệnh AI tự sinh từ chức năng"]
+    L1 --> L2
+    L2 --> L3["Lô 3: AI soạn nháp, màn AI của tôi"]
+    L3 --> L4["Lô 4: nhập lô trên ERP"]
+    L4 --> L5["Lô 5: AI tự ghi có hoàn tác"]
+    L5 --> L6["Lô 6: lệnh tiền và chốt lô"]
+    L5 --> S["Chỉ chạy thử ở staging"]
+    L6 --> S
+    S --> D{"Đủ điều kiện pháp lý, Duy cho bật?"}
+    D -->|"Có"| P["Bật trên production"]
+    D -->|"Chưa"| S
+```
+
 ## Chốt scope của Duy (28/09) áp vào file này
 
 | Chốt | Hệ quả trong story |

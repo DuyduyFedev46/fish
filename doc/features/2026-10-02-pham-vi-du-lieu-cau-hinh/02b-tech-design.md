@@ -6,6 +6,23 @@
 > Code đọc trên `main` @ 7137a8d.
 > **10/10:** Lô 7 đã chốt ở §6.1 (phạm vi, contract, file được sửa và không được đụng, test). Lô 1–6 đã xong nên không bổ sung danh sách cho chúng nữa.
 
+```mermaid
+flowchart TD
+    A["Chủ đổi phạm vi trên màn Phân quyền"] --> B["Kiểm tra và chặn lưu trùng"]
+    B --> C["Ghi nhật ký rồi lưu cấu hình"]
+    D["Nhân viên mở danh sách, chi tiết, AI"] --> E["Hàm phạm vi của từng loại dữ liệu"]
+    E --> F["Tính phạm vi rộng nhất theo nhóm"]
+    C -.-> F
+    F --> G{"Nhóm có quyền xem loại này?"}
+    G -- "Không" --> H["Phạm vi hẹp nhất"]
+    G -- "Có" --> I["Lấy phạm vi đã lưu"]
+    H --> J["Chỉ trả dòng trong phạm vi"]
+    I --> J
+    J --> K["Ngoài phạm vi: báo không tìm thấy"]
+    L{"Duy chốt các điểm dừng?"} --> M["Chia 7 lô, làm lần lượt"]
+    M --> N["Cổng phát hành chạy cuối"]
+```
+
 ## 0. Kết luận nhanh
 
 - **7 lô**: Lô 1 PV-01 (mốc ảnh chụp, BE) → Lô 2 PV-02 (BE) ∥ Lô F1 PV-11+PV-09 FE+PV-10 FE (mock) → Lô 3 PV-03+PV-07 →

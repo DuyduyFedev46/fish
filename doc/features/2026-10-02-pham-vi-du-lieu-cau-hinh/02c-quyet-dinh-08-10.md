@@ -6,6 +6,27 @@
 >
 > Câu 3, 4, 10, 11 không phát sinh code. Câu 5 (đua Huỷ ∥ Giao xong) và câu 12 (đợt 2 giao diện) không thuộc file này.
 
+```mermaid
+flowchart TD
+    A{"Duy trả lời câu hỏi 08/10"} --> B["Tech Lead chốt cách làm từng câu"]
+    B --> C["Lô quyết định trên nhánh chính"]
+    C --> C1["Quản trị viên vào ERP như Chủ"]
+    C --> C2["Người không nhóm bị chặn vào ERP"]
+    C --> C3["Đổi nhãn vai và nhãn việc xem khách"]
+    C --> C4["Tắt AI thì ẩn dòng AI trong nhật ký"]
+    C1 --> D["Review, QA, đưa lên nhánh chính"]
+    C2 --> D
+    C3 --> D
+    C4 --> D
+    D --> E["Gộp vào nhánh phạm vi dữ liệu"]
+    E --> F["Phiếu giao luôn đủ thông tin khách"]
+    F --> G["Review, QA, gộp về nhánh chính"]
+    G --> H["Gộp nhánh giao diện phân quyền"]
+    H --> I["Lô 6: cổng phát hành và dọn"]
+    I --> J["Lô 7: báo mất quyền, Quyền của tôi"]
+    G -.-> K{"Duy chốt: tem in đủ SĐT?"}
+```
+
 ## 0. Tóm tắt chốt kỹ thuật
 
 | Câu | Chốt | Nhánh làm |

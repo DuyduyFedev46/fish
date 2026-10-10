@@ -1,9 +1,24 @@
 # Shop làm lại từ đầu theo thiết kế 06/10: user stories
 > PO · 2026-10-11 · Nguồn: `01-analysis.md` (ĐÃ DUYỆT 10/10: nhóm A §11.1 + V-01…V-12) · Trạng thái: **ĐÃ DUYỆT** 11/10 (Duy giao tự duyệt theo khuyến nghị: đồng ý kéo 1-07/1-08 lên lô 1, `/ui-preview/` chỉ bật bằng cờ build, giỏ có món hết thì chặn "Đặt hàng" tới khi khách bỏ món — techlead được đổi ở 02b)
+> **11/10:** `02b-tech-design.md` §9 chỉnh một số AC (lô 1 fe-dev được sửa `lib/*`; 2b-01 chỉ Chủ; 3-02 bỏ `confirmation`, thêm `state`; 4-05 AC3 không tách dòng; 3b-04 AC9 kiểm ở lãi lỗ theo kỳ…). Khi lệch, **02b thắng**.
 > Nhánh `shop/lo-0-quyet-dinh`. Đầu vào thêm: `00-product-brief.md` (lát MVP, đổi lô S-09 đã duyệt), `05-phap-ly.md`, `06-marketing.md`, `doc/decisions.md` mục 2026-10-10 (tối),
 > `doc/design/shop/` (README, UI-RULES, PLAN, COMPONENTS mục "Ánh xạ màn → component", DOI-CHIEU-CODE §4 BE-1…BE-11, HUONG-DAN-CODE §6).
 > Mã BR dùng theo `01-analysis.md` §7.2 (BR-DM-17…25, BR-BH-22…30, BR-TT-19, BR-HT-12, BR-ND-20/21). **Không** dùng BR-BH-18/19 cũ của PLAN.
 > Contract API trong file này là **dự kiến** để FE dựng mock. `techlead` chốt ở `02b-tech-design.md`; lệch thì 02b thắng, PO sửa AC theo.
+
+```mermaid
+flowchart TD
+  L1["Lô 1: khung chung, nạp nội dung"] --> L2["Lô 2: danh mục, chi tiết, giỏ"]
+  B2["Lô 2 phần BE: mức tồn, kiểm số lượng"] --> L2
+  B2 --> L2b["Lô 2b: thông tin mặt hàng trong ERP"]
+  L2 --> L34["Lô 3 và 4: đặt hàng, thanh toán, trang đơn"]
+  L2b --> L34
+  L34 --> M{"Gộp một lần vào nhánh chính"}
+  M --> L3b["Lô 3b: mã giảm giá"]
+  L3b --> L5["Lô 5: trang phụ, nội dung"]
+  L5 --> L7["Lô 7: QA toàn luồng"]
+  M -- "cùng các trang bắt buộc" --> P{"Lát 1 xong: đủ điều kiện production"}
+```
 
 ---
 

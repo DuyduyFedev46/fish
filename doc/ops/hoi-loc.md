@@ -2,6 +2,16 @@
 > Tạo 11/10/2026. Em (Claude) đang dùng **câu tạm** dưới đây để làm UAT trên staging. Anh hỏi Lộc xong thì ghi câu trả lời vào cột cuối, em sửa lại nội dung và code.
 > Nguồn: `doc/features/2026-10-06-shop-giao-dien-moi/01-analysis.md` §11.1 (S-xx), `06-marketing.md`, `05-phap-ly.md`.
 
+```mermaid
+flowchart LR
+  A["Em dùng câu tạm trên staging"] --> B["Anh hỏi Lộc"]
+  B --> C["Anh ghi câu trả lời vào cột cuối"]
+  C --> D["Em sửa nội dung và code"]
+  D --> E{"Câu nhóm pháp lý?"}
+  E -- "có" --> F["Xong trước khi lên production"]
+  E -- "không" --> G["Thử lại trên staging"]
+```
+
 ## Giao hàng
 | # | Câu hỏi | Đang dùng tạm | Lộc trả lời |
 |---|---|---|---|

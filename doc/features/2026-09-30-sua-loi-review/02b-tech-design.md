@@ -3,6 +3,24 @@
 > Story: `02-stories.md` (SR-01…SR-24) · Giao việc: `02c-giao-viec.md` · Nhánh `main`.
 > Nguồn lỗi: `doc/features/2026-09-30-review-p1-p7/*.md`. Số dòng trích theo `main` @ `5372c83`; dev đọc lại trước khi sửa.
 
+```mermaid
+flowchart TD
+    A["Huỷ đơn đã thanh toán"] --> B["Hoàn hàng về kho nếu còn"]
+    A --> C["Lập chứng từ đảo doanh thu"]
+    C --> D["Giữ nguyên hoá đơn gốc"]
+    C --> E["Báo cáo lãi lỗ trừ chứng từ đảo"]
+    F["Đơn huỷ trước đợt sửa"] --> G{"Duy chạy lệnh lập bù?"}
+    G -->|"Chạy"| C
+    H["Lô hết hạn còn tồn"] --> I["Cảnh báo Chủ"]
+    I --> J{"Chủ xác nhận phần tồn"}
+    J -->|"Đã huỷ"| K["Ghi lỗ, huỷ tồn"]
+    J -->|"Đã trả nhà cung cấp"| L["Trừ kg, ghi trả hàng"]
+    K --> N{"Hết tồn?"}
+    L --> N
+    N -->|"Hết"| O["Cho chốt lô"]
+    N -->|"Còn"| I
+```
+
 ## 0. Tóm tắt
 - 7 lô, tuần tự. Lô 1–5 chặn deploy staging. Hai migration duy nhất: `sales` (Lô 4, chứng từ đảo doanh thu) và `inventory` (Lô 5, trả NCC +
   choice sổ kho). Không thêm quyền Tầng 2 mới, không data migration gán Group.

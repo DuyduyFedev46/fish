@@ -6,6 +6,30 @@ argument-hint: "<yêu cầu bằng lời thường>"
 
 # Workflow đội dự án Cá Về
 
+```mermaid
+flowchart TD
+  Y["Duy nhờ bằng lời thường"] --> L{"Chọn luồng, báo Duy một dòng"}
+  L -- "câu hỏi, vận hành" --> TT["Trả lời hoặc làm trực tiếp"]
+  L -- "ý tưởng còn sơ" --> PM["PM viết bản khám phá"]
+  L -- "tính năng mới" --> BA["BA phân tích"]
+  L -- "lỗi rõ, chỉnh nhỏ" --> AC["Tự viết 3 đến 5 tiêu chí"]
+  L -- "chỉ QA, review, pháp lý, deploy" --> RIENG["Giao đúng một vai"]
+  PM --> BA
+  BA --> D1{"Điểm dừng 1: Duy duyệt phân tích"}
+  D1 --> PO["PO viết story"]
+  PO --> D2{"Điểm dừng 2: Duy duyệt story"}
+  D2 --> UXTL["UX vẽ luồng màn, Tech Lead thiết kế"]
+  UXTL --> DEV["BE và FE làm theo lô nhỏ"]
+  AC --> DEV
+  DEV --> KC["Điều phối tự chạy lại test, soát giao diện"]
+  KC --> QA{"QA đạt?"}
+  QA -- "chưa, tối đa 2 vòng" --> DEV
+  QA -- "đạt" --> GIT["Commit và push"]
+  GIT --> RV["Soát pháp lý, review code, PO nghiệm thu"]
+  RV --> D3{"Điểm dừng 3: Duy cho deploy?"}
+  D3 -- "có" --> DEP["Deploy"]
+```
+
 Yêu cầu: **$ARGUMENTS** (nếu trống: lấy từ tin nhắn gần nhất của Duy)
 
 Duy chỉ nói bằng ngôn ngữ tự nhiên, không gõ lệnh. Việc đầu tiên là **nhận diện đúng

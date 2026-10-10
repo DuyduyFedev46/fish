@@ -1,5 +1,21 @@
 # Checklist pháp lý trước khi go-live website bán hàng
 
+```mermaid
+flowchart TD
+  A{"Duy chốt chủ thể pháp lý, mã số thuế, tên miền"} --> B["Thông báo website với Sở Công Thương"]
+  A --> C["Đăng trang chính sách, thông tin người bán"]
+  A --> D["Kế toán xác nhận thuế và hoá đơn"]
+  C --> E["Xin đồng ý dữ liệu, không tick sẵn"]
+  E --> F["Hồ sơ chuyển dữ liệu ra nước ngoài"]
+  F --> G["Có sao lưu để lưu đủ hạn"]
+  B --> H["Luật sư xác nhận các ô cảnh báo"]
+  D --> H
+  G --> H
+  H --> I{"Đủ checklist, Duy duyệt?"}
+  I -- "có" --> J["Bật cổng thanh toán thật, mở bán"]
+  J --> K["Báo cáo năm trước trước 15/02"]
+```
+
 Kiểm chứng ngày 2026-09-27 theo các văn bản đang có hiệu lực:
 - **Luật Thương mại điện tử 2025** (122/2025/QH15), hiệu lực từ 01/7/2026.
 - **NĐ 248/2026/NĐ-CP**, hướng dẫn Luật TMĐT, hiệu lực từ 01/7/2026. NĐ 52/2013 và NĐ 85/2021 không còn là căn cứ chính.

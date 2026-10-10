@@ -6,6 +6,24 @@
 > Scheduler `cangca-ttl-trigger` + `cangca-batch-status-trigger` (production) **tạm dừng**.
 > Bật lại: `gcloud run services update <svc> --region asia-southeast1 --project keolai-63ec1 --ingress all` và `gcloud scheduler jobs resume <job> --location asia-southeast1 --project keolai-63ec1`. Phải bật adapter + TTL trước khi mở thanh toán.
 
+```mermaid
+flowchart TD
+  A["Lô đã QA đạt, đã push"] --> B{"Duy bảo deploy?"}
+  B -- "chưa" --> W["Chờ"]
+  B -- "có" --> C["Đóng gói bản mới một lần"]
+  C --> D{"Có đổi cấu trúc dữ liệu?"}
+  D -- "có" --> E["Cập nhật dữ liệu trên staging trước"]
+  D -- "không" --> F["Đưa bản mới lên staging"]
+  E --> F
+  F --> G["Build Shop, ERP trỏ staging"]
+  G --> H["QA hoặc Duy thử trên staging"]
+  H --> I{"Duy duyệt lên thật?"}
+  I -- "chưa" --> J["Sửa rồi làm lại"]
+  I -- "duyệt" --> K["Cập nhật dữ liệu production"]
+  K --> L["Đưa cùng bản đó lên production"]
+  L --> M["Build Shop, ERP trỏ production"]
+```
+
 | | **Staging (thử)** | **Production (thật)** |
 |---|---|---|
 | Shop | https://cangca-loc-staging.web.app | https://cangca-loc.web.app |

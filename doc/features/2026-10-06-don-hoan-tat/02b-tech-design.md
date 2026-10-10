@@ -2,6 +2,22 @@
 > Tech Lead · 07/10/2026 · Nguồn: `02-stories.md` (S1–S9, ĐÃ DUYỆT 07/10), `01-analysis.md`, `doc/decisions.md` mục 2026-10-07.
 > Đọc code trên `main` (7fa314d, nay 49b9a4e, chỉ thêm doc). Mục 9 (Review) để trống, dùng sau.
 
+```mermaid
+flowchart TD
+    A["NV giao bấm Hoàn tất trên phiếu"] --> B["Khoá đơn rồi khoá phiếu"]
+    B --> C["Đọc lại trạng thái mới nhất"]
+    C --> D{"Đơn đã huỷ hoặc phiếu đã xong?"}
+    D -- "Đơn đã huỷ" --> E["Từ chối, báo mang hàng về kho"]
+    D -- "Phiếu đã xong" --> F["Trả đã hoàn tất, không ghi lại"]
+    D -- "Hợp lệ" --> G["Phiếu sang Hoàn tất, ghi nhật ký"]
+    G --> H{"Mọi phiếu của đơn đã xong?"}
+    H -- "Chưa" --> I["Đơn giữ Đang xử lý"]
+    H -- "Rồi" --> J["Đơn sang Hoàn tất, ghi nhật ký"]
+    G -.-> K["Lỗi bất kỳ: huỷ cả phiếu lẫn đơn"]
+    J --> L["Trả về trạng thái đơn mới"]
+    M["Lệnh chuyển bù đơn cũ"] --> H
+```
+
 ## 0. Kết luận nhanh
 
 - **Không thêm model, field, migration hay quyền.** `SalesOrder.Status.COMPLETED` đã có trong `choices`. AuditLog có thêm

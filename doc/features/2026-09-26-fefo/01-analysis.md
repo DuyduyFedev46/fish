@@ -1,6 +1,20 @@
 # Xuất kho FEFO (hết hạn trước, xuất trước) — Phân tích nghiệp vụ
 > BA · 2026-09-26 · Trạng thái: **ĐÃ DUYỆT** (2026-09-26, Duy)
 
+```mermaid
+flowchart TD
+    A["Khách đặt hàng trên Shop"] --> B["Lọc lô còn bán, chưa quá hạn"]
+    B --> C["Chọn lô hạn dùng sớm nhất"]
+    C --> D{"Lô này đủ hàng?"}
+    D -->|"Thiếu"| E["Lấy tiếp lô hạn kế tiếp"]
+    E --> D
+    D -->|"Đủ"| F["Giữ chỗ trên các lô đã chọn"]
+    F --> G["Xác nhận thanh toán"]
+    G --> H["Trừ kho đúng lô đã giữ"]
+    H --> I["Kho soạn đúng lô"]
+    J["Hàng hoàn hoặc đơn huỷ"] --> K["Trả về lô gốc"]
+```
+
 ## 1. Yêu cầu gốc
 > "có 1 thứ chúng ta làm sai, nếu làm hàng đông lạnh phải là FEFO mới đúng"
 

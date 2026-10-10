@@ -1,5 +1,16 @@
 # Tạm tắt thanh toán live · luồng NHANH · 2026-09-27
 
+```mermaid
+flowchart TD
+    A["Khách mở Shop"] --> B["Banner: website đang thử nghiệm"]
+    B --> C{"Công tắc đặt hàng đang bật?"}
+    C -->|"Tắt, mặc định ở bản thật"| D["Báo tạm chưa nhận đặt hàng"]
+    D --> E["Không tạo đơn, không giữ hàng"]
+    C -->|"Bật, bản thử nghiệm"| F["Đặt hàng, thanh toán thử"]
+    G["Tiền về cho đơn cũ"] --> H["Vẫn ghi nhận bình thường"]
+    I{"Duy yêu cầu deploy?"} -->|"Có"| J["Lên backend trước, Shop sau"]
+```
+
 **Trạng thái:** TẠM HOÃN. Ngày 2026-09-27 Duy bảo khỏi code, Duy tự tắt cổng trên dashboard SePay live. Chưa có code nào được sửa. Khi cần công tắc trong code thì làm tiếp từ file này.
 
 **Bối cảnh:** chưa đủ checklist pháp lý go-live (`doc/ops/go-live-phap-ly.md`) và chưa thông báo website với

@@ -7,6 +7,26 @@
 > 5 nhóm có sẵn. Hồ sơ `2026-09-28-vai-tro-tu-dinh-nghia` (chưa duyệt, mới có 01) đã đề xuất ý tương tự ở BR-PQ-29.
 > Hồ sơ này làm phần đó trước, trên 5 nhóm hiện có, và không phụ thuộc vai tự tạo.
 
+```mermaid
+flowchart TD
+    A["Chủ mở màn Phân quyền"] --> B["Chọn một nhóm nhân viên"]
+    B --> C["Xem phạm vi dữ liệu từng loại"]
+    C --> D["Chọn phạm vi mới cho một loại"]
+    D --> E{"Mở rộng thấy dữ liệu khách?"}
+    E -- "Có" --> F["Hiện cảnh báo số người bị ảnh hưởng"]
+    F --> G{"Chủ xác nhận?"}
+    G -- "Không" --> C
+    G -- "Có" --> H["Bấm Lưu thay đổi"]
+    E -- "Không" --> H
+    H --> I{"Có người khác vừa lưu?"}
+    I -- "Có" --> J["Báo nhóm đã đổi, tải lại"]
+    I -- "Không" --> K["Lưu một lần và ghi nhật ký"]
+    K --> L["Có hiệu lực từ lần bấm kế tiếp"]
+    L --> M["Nhân viên chỉ thấy dòng trong phạm vi"]
+    M --> N["Mở mục ngoài phạm vi: báo không tìm thấy"]
+    L -.-> O["Sàn cứng: giá vốn, dữ liệu khách công khai không đổi"]
+```
+
 ## Câu trả lời của Duy (02/10/2026, qua điều phối viên)
 
 | Câu | Duy chốt | Hệ quả áp vào bản phân tích |

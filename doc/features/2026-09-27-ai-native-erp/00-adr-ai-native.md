@@ -8,6 +8,24 @@
 > Bản gốc do Duy dán ngày 2026-09-27, lưu nguyên văn làm nguồn cho feature
 > `ai-native-erp`. Hồ sơ phân tích: `01-analysis.md`, story: `02-stories.md`.
 
+```mermaid
+flowchart TD
+    A["Người dùng nói hoặc gõ yêu cầu"] --> B{"AI đang bật?"}
+    B -- "Không" --> C["Dùng ERP như bình thường"]
+    B -- "Có" --> D["Chọn nơi xử lý theo nhãn lệnh"]
+    D -- "Việc đơn giản" --> E["AI chạy trên máy"]
+    D -- "Việc nhiều bước" --> F["AI trên cloud"]
+    E --> G["Lớp lệnh nghiệp vụ dùng chung"]
+    F --> G
+    C --> G
+    G --> H["Kiểm quyền người đang đăng nhập"]
+    H --> I{"Lệnh có ghi dữ liệu?"}
+    I -- "Chỉ đọc" --> J["Trả kết quả"]
+    I -- "Có ghi" --> K{"Người dùng xác nhận?"}
+    K -- "Đồng ý" --> L["Ghi dữ liệu và nhật ký"]
+    K -- "Từ chối" --> M["Huỷ đề xuất"]
+```
+
 ---
 
 ## 1. BỐI CẢNH

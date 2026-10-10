@@ -5,6 +5,24 @@
 > Shop, merge vào `main`). Người hiện thực: Gemini/Antigravity theo `02c-giao-viec.md`.
 > Mọi dữ liệu trong JSON mẫu là **giả** (`Khách Thử A`, `0900000123`, `Số 1 Đường Thử`).
 
+```mermaid
+flowchart TD
+    A["Tiền vào: cổng thanh toán hoặc Chủ xác nhận"] --> B["Xuất hoá đơn, trừ kho"]
+    B --> C["Tạo phiếu giao ở Chờ xác nhận"]
+    C --> D["CSKH gọi và ghi kết quả"]
+    D -->|"Xác nhận"| E["Phiếu sang Soạn hàng"]
+    E --> F["In tem từ trình duyệt"]
+    F --> G["Kho đóng gói, chờ lấy"]
+    G --> H["Đang giao"] --> I["Hoàn tất"]
+    D -->|"Không liên lạc được"| J["Chuyển Quản lý"]
+    J --> K{"Quản lý: giao hay huỷ?"}
+    K -->|"Giao"| E
+    K -->|"Huỷ"| L["Huỷ đơn, hoàn kho, lập phiếu hoàn"]
+    M["Việc chạy nền 5 phút một lần"] --> J
+    M -->|"Quá hạn, cờ bật"| L
+    L --> N["Shop báo khách lý do huỷ"]
+```
+
 ## Mục lục
 0. Tóm tắt quyết định · 0b. Mặc định 🟡 đã áp · 0c. Chỗ contract khác bản PO (FE bám bản này)
 1. Kiến trúc & máy trạng thái

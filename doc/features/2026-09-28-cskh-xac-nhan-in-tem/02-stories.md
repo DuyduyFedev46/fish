@@ -2,6 +2,19 @@
 > PO · 2026-09-28 · Nguồn: `01-analysis.md` (ĐÃ DUYỆT, mục "Câu trả lời của Duy") · Tiền đề: S17, S19 của
 > `2026-09-24-erp-console-noi-that/02-stories.md` · Trạng thái: **ĐÃ DUYỆT (Duy 28/09 — chốt scope qua câu hỏi)**
 
+```mermaid
+flowchart TD
+    L1["Lô 1: Nhóm CSKH, bảng phiếu giao"] --> L2["Lô 2: Gọi, xác nhận, in tem, soạn"]
+    L2 --> S1["Lên thử staging"]
+    L2 --> L3["Lô 3: Không liên lạc được, tự huỷ, báo khách"]
+    L3 --> P{"Pháp lý duyệt câu chữ báo khách?"}
+    P -->|"Duyệt"| P2{"Duy cho lên production?"}
+    P2 -->|"Đồng ý"| PR["Lô 2 và 3 lên production cùng nhau"]
+    L3 --> L4["Lô 4: Đổi người nhận, in lại tem, cần chú ý"]
+    L4 --> T{"Duy bảo còn thời gian?"}
+    T -->|"Còn"| L5["Lô 5: Phiếu soạn, quét tem, kịch bản gọi"]
+```
+
 ---
 
 ## Mục tiêu & thước đo

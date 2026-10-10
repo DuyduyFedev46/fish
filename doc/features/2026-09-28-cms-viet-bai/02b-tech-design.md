@@ -4,6 +4,27 @@
 > `02-stories.md` (CMS-01…16, ĐÃ DUYỆT). Code tham chiếu nhánh `wip/autosave` commit `cc47542`.
 > Người hiện thực: Gemini CLI / Antigravity theo `AGENTS.md`; giao việc ở `02c-giao-viec.md`.
 
+```mermaid
+flowchart TD
+    A["Người soạn viết bài trên ERP"] --> B["Máy chủ lọc nội dung an toàn"]
+    B --> C["Lưu bản đang soạn"]
+    C --> D["Bấm Đăng"]
+    D --> E{"Có người khác vừa sửa?"}
+    E -->|"Có"| F["Báo tải lại bài"]
+    E -->|"Không"| G{"Đủ thông tin và đã tick tự kiểm?"}
+    G -->|"Thiếu"| H["Báo mục còn thiếu"]
+    G -->|"Đủ"| I{"Có cảnh báo SĐT, giá vốn?"}
+    I -->|"Có, chưa xác nhận"| J["Hỏi người đăng xác nhận"]
+    J --> D
+    I -->|"Không hoặc đã xác nhận"| K["Chụp phiên bản đã đăng"]
+    K --> L["Ghi nhật ký đăng bài"]
+    K --> M["Khách mở trang bài trên web"]
+    M --> N["Web tải phiên bản đã đăng"]
+    N --> O["Hiện bài, thẻ mặt hàng giá hiện hành"]
+    C --> P["Gỡ bài, ghi lý do"]
+    P --> Q["Web báo bài không còn"]
+```
+
 ## 0. Tóm tắt quyết định
 
 | # | Quyết định | Căn cứ |

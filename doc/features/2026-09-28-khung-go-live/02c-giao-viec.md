@@ -3,6 +3,18 @@
 > Người hiện thực: Gemini CLI / Antigravity theo `AGENTS.md`, lệnh `/lam-tinh-nang 2026-09-28-khung-go-live`.
 > Nhánh làm việc: **`main`** (sau khi hồ sơ `2026-09-28-sua-loi-bao-mat` đã merge vào `main`). Nếu hồ sơ đó **chưa** merge thì làm trên `wip/autosave` và ghi rõ trong `03-dev-notes.md`.
 
+```mermaid
+flowchart TD
+    A["Xong sửa lỗi bảo mật và CMS"] --> B["Kéo code, ghi số test gốc"]
+    B --> L1["Lô 1: Chân trang người bán, link chính sách"]
+    L1 --> L2["Lô 2: Ô đồng ý ở thanh toán"]
+    L2 --> L3["Lô 3: Tra bằng chứng, báo gọi xác nhận"]
+    L1 & L2 & L3 -.-> K["Mỗi lô: kiểm chứng, QA đạt, commit"]
+    K -.-> X{"Lệch thiết kế hoặc test cũ đỏ?"}
+    X -->|"Có"| Y{"Dừng, hỏi Duy"}
+    L3 --> Z{"Duy đăng chính sách rồi mới bật?"}
+```
+
 ## Điều kiện đầu vào
 - `02-stories.md`: ĐÃ DUYỆT (Duy 28/09 — chốt scope qua câu hỏi) · `02b-tech-design.md`: ĐÃ DUYỆT (Duy 28/09 — theo chốt scope)
 - **Phải xong trước:**

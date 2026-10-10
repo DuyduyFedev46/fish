@@ -3,6 +3,27 @@
 > Người hiện thực: Gemini CLI / Antigravity theo `AGENTS.md`, lệnh `/lam-tinh-nang 2026-09-28-ai-digital-worker` (`.agents/workflows/lam-tinh-nang.md`).
 > Nhánh làm việc: `main` (chỉ sau khi hồ sơ `2026-09-28-sua-loi-bao-mat` đã merge `wip/autosave` → `main` ở cuối Lô 2 của nó). `git pull --ff-only origin main` trước mỗi lô.
 
+```mermaid
+flowchart TD
+    A["Hồ sơ sửa lỗi bảo mật xong"] --> B["Lô 1: Tiếp theo và Đã làm"]
+    A --> C["Lô 0: thử nghiệm kỹ thuật"]
+    C --> D{"Thử nghiệm đạt tiêu chí?"}
+    D -->|"Không"| E["Dừng, sửa thiết kế, hỏi Duy"]
+    D -->|"Đạt"| F["Lô 2: lệnh AI tự sinh"]
+    B --> F
+    F --> G["Lô 3: nháp, AI của tôi, tắt khẩn"]
+    G --> H["Lô 4: nhập lô trên ERP"]
+    H --> I["Làm hồ sơ CSKH, CMS, go-live"]
+    I --> J["Lô 5: AI tự ghi có hoàn tác"]
+    J --> K{"Duy xác nhận trước lệnh thanh toán?"}
+    K -->|"Đồng ý"| L["Lô 6: lệnh tiền và chốt lô"]
+    L --> M["Chỉ bật ở staging"]
+    subgraph moilo["Mỗi lô"]
+        N["Dev làm, tự kiểm"] --> O["Kiểm thử đạt"]
+        O --> P["Commit, đẩy lên, đánh dấu xong"]
+    end
+```
+
 ## Điều kiện đầu vào
 - `02-stories.md`: ĐÃ DUYỆT (Duy 28/09, DW-01…DW-27) · `02b-tech-design.md`: ĐÃ DUYỆT (Duy 28/09) · `01-analysis.md`: ĐÃ DUYỆT (28/09) · pháp lý `01c-phap-ly.md`.
 - **Việc phải xong trước:** hồ sơ `doc/features/2026-09-28-sua-loi-bao-mat/` ở trạng thái **XONG** (L-1 chốt lô, L-3 lọc giá vốn nhật ký, L-5 throttle, L-6 tra đơn) và đã push `main`. Kiểm: `git log --oneline origin/main | grep -i "sửa lỗi bảo mật"` có commit merge; `backend/apps/inventory/batches/tests/test_l1_close_batch.py` tồn tại trên `main`. Chưa có → **dừng, báo Duy**.
