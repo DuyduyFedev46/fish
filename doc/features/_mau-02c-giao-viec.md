@@ -3,6 +3,17 @@
 > Người hiện thực: Gemini CLI / Antigravity theo `AGENTS.md`, lệnh `/lam-tinh-nang <slug>`.
 > Nhánh làm việc: `<tên nhánh>`
 
+```mermaid
+flowchart TD
+    A["Duy duyệt story và thiết kế"] --> L1["Lô 1: (việc của lô 1)"]
+    L1 --> K1["Chạy lệnh kiểm chứng"]
+    K1 --> R1{"Kiểm thử đạt?"}
+    R1 -->|"Chưa"| L1
+    R1 -->|"Đạt"| L2["Lô 2: (việc của lô 2)"]
+    L2 --> D{"Điểm dừng: hỏi Duy (nội dung)"}
+    D --> X["Lưu và đẩy code, đánh dấu xong"]
+```
+
 ## Điều kiện đầu vào
 - `02-stories.md`: ĐÃ DUYỆT (ngày …) · `02b-tech-design.md`: ĐÃ DUYỆT (ngày …)
 - Việc phải xong trước (lỗi có sẵn, migration, hồ sơ khác): …

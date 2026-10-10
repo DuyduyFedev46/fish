@@ -1,6 +1,21 @@
 # Cổng thanh toán SePay (VietQR là phương thức chính): phân tích nghiệp vụ
 > BA · 2026-09-26 · Trạng thái: **ĐÃ DUYỆT** (2026-09-26, Duy)
 
+```mermaid
+flowchart TD
+    A["Khách đặt đơn, đơn được giữ chỗ"] --> B["Bấm Thanh toán bằng VietQR"]
+    B --> C["Chuyển sang trang SePay"]
+    C --> D{"Khách chuyển tiền?"}
+    D -->|"Huỷ hoặc lỗi"| E["Còn giữ chỗ, thanh toán lại"]
+    E --> B
+    D -->|"Có"| F["SePay báo tiền về hệ thống"]
+    F --> G{"Đơn còn giữ chỗ, tiền đủ?"}
+    G -->|"Đủ"| H["Xuất hoá đơn, trừ kho, tạo phiếu giao"]
+    G -->|"Thiếu, thừa, đơn đã huỷ"| I["Vào hàng chờ cho Chủ xử lý"]
+    H --> J["Trang tra đơn báo đã thanh toán"]
+    D -->|"Hết giờ giữ chỗ"| K["Đơn tự huỷ, trả hàng về kho"]
+```
+
 ## 1. Yêu cầu gốc
 - "Đã đăng ký SePay … sepay đang hỏi ipn URL" và "anh muốn thanh toán VietQR là PTTT chính". Nguồn: Duy (PO), 2026-09-26, trong phiên này.
 - Duy đã chốt trong phiên: (a) khoá hiện có là **SANDBOX**; (b) làm ngay theo quy trình rồi deploy adapter; (c) Duy tự khai IPN URL trên SePay.

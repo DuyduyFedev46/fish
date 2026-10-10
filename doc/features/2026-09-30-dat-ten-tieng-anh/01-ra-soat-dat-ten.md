@@ -1,5 +1,21 @@
 # Rà soát đặt tên tiếng Anh trong code (2026-09-30)
 
+```mermaid
+flowchart TD
+    A["Quét tên trong toàn bộ code"] --> B["Chia nợ đặt tên theo 3 mức rủi ro"]
+    B --> C{"Duy chốt bảng thuật ngữ và 4 câu hỏi?"}
+    C -->|"Chốt"| L0["Lô 0: Chặn tên tiếng Việt mới"]
+    L0 --> W["Chờ lô đang code dở xong"]
+    W --> L1["Lô 1: Đổi tên nội bộ, gom tên nhóm"]
+    L1 --> L2["Lô 2: Đổi tên test"]
+    L2 --> L3["Lô 3: Đổi tên giao tiếp, giữ tên cũ tạm"]
+    L3 --> Q{"Duy đồng ý đổi tên nhóm quyền?"}
+    Q -->|"Đồng ý"| L4["Lô 4: Đổi tên nhóm trong dữ liệu"]
+    L4 --> S1["Thử trên staging với 5 vai"]
+    S1 --> P{"Duy duyệt lên production?"}
+    Q -->|"Chưa cần"| X["Dừng ở Lô 3"]
+```
+
 Người làm: Tech Lead. Ngày làm: 30/09/2026, lúc P8 Lô 7 đang code dở. Đây là bản chỉ đọc, chưa sửa dòng code nào.
 Yêu cầu của Duy: mọi định danh trong code phải là **tiếng Anh chuẩn, dễ hiểu**, không viết tắt tiếng Việt. Định danh gồm hàm,
 biến, class, module, thư mục, file, test, script, route API, khoá JSON, tên Group, codename quyền, tên bảng và model.

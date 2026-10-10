@@ -28,6 +28,7 @@ import {
   mockOtherEdit,
   mockUseRawBody,
 } from "./mock";
+import { itemsFromShopCatalog } from "./shopCatalog";
 import { bodyToTiptap, tiptapToBody } from "./editor/convert";
 
 describe("CMS-01 & CMS-02 Console Tests", () => {
@@ -452,18 +453,36 @@ describe("CMS-01 & CMS-02 Console Tests", () => {
   });
 
   describe("CMS-06 Console Tests", () => {
-    it("CMS-06-AC1: mockFetchShopCatalog trả danh mục mặt hàng công khai không rò giá vốn", () => {
-      const items = mockFetchShopCatalog();
-      expect(Array.isArray(items)).toBe(true);
+    it("CMS-06-AC1: mockFetchShopCatalog trả {groups, items} đúng 02b §3.1, không rò giá vốn, không số kg tồn", () => {
+      const data = mockFetchShopCatalog();
+      expect(Array.isArray(data)).toBe(false);
+      expect(Array.isArray(data.groups)).toBe(true);
+      const items = itemsFromShopCatalog(data);
       expect(items.length).toBeGreaterThan(0);
-      const forbidden = ["unit_cost", "purchase_rate", "cost", "landed_cost"];
+      const forbidden = ["unit_cost", "purchase_rate", "cost", "landed_cost", "sellable_qty"];
       for (const it of items) {
-        expect(it.item_code).toBeDefined();
-        expect(it.name).toBeDefined();
+        expect(typeof it.item_code).toBe("string");
+        expect(typeof it.name).toBe("string");
+        expect(typeof it.price).toBe("string");
+        expect(["in", "low", "out"]).toContain(it.stock_level);
         for (const f of forbidden) {
           expect(f in it).toBe(false);
         }
       }
+    });
+
+    it("H1 review lô 1: itemsFromShopCatalog đọc .items của {groups, items}", () => {
+      const items = itemsFromShopCatalog({
+        groups: [{ slug: "muc", name: "Mực", item_count: 1 }],
+        items: [{ item_code: "MUC-ONG", name: "Mực ống", item_type: "SIMPLE", unit: "kg", price: "278000", stock_level: "low", group: { slug: "muc", name: "Mực" } }],
+      });
+      expect(items.map((it) => it.item_code)).toEqual(["MUC-ONG"]);
+    });
+
+    it("H1 review lô 1: phản hồi sai hình dạng (mảng cũ, thiếu items, null) -> ném lỗi để hộp chọn hiện lỗi, không vỡ", () => {
+      expect(() => itemsFromShopCatalog([{ item_code: "A", name: "B" }])).toThrow();
+      expect(() => itemsFromShopCatalog({ groups: [] })).toThrow();
+      expect(() => itemsFromShopCatalog(null)).toThrow();
     });
   });
 

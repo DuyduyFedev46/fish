@@ -50,6 +50,11 @@ eq("formatVnd undefined", () => mod.formatVnd(undefined), "—");
 eq("formatVnd chuỗi rỗng", () => mod.formatVnd(""), "—");
 eq("formatVnd chữ rác", () => mod.formatVnd("abc"), "—");
 eq("formatVnd NaN", () => mod.formatVnd(NaN), "—");
+eq("formatPriceVnd chuỗi nguyên đồng", () => mod.formatPriceVnd("278000"), "278.000đ");
+eq("formatPriceVnd số", () => mod.formatPriceVnd(450000), "450.000đ");
+eq("formatPriceVnd triệu", () => mod.formatPriceVnd("1250000"), "1.250.000đ");
+eq("formatPriceVnd rác", () => mod.formatPriceVnd("abc"), "—");
+eq("formatPriceVnd null", () => mod.formatPriceVnd(null), "—");
 eq("formatKg chuỗi", () => mod.formatKg("2.500"), "2,5 kg");
 eq("formatKg rác", () => mod.formatKg("x"), "—");
 
@@ -60,6 +65,8 @@ eq("formatDateTime giữa ngày", () => mod.formatDateTime("2026-09-30T03:05:00Z
 eq("formatDateTime nửa đêm VN không ra 24:", () => mod.formatDateTime("2026-09-30T17:00:00Z"), "01/10 00:00");
 eq("formatDateTime rác", () => mod.formatDateTime("không phải ngày"), "—");
 eq("formatDateTime null", () => mod.formatDateTime(null), "—");
+eq("formatTimeDayVn 07:05Z = 14:05 · 11/10 VN", () => mod.formatTimeDayVn("2026-10-11T07:05:00Z"), "14:05 · 11/10");
+eq("formatTimeDayVn rác", () => mod.formatTimeDayVn("x"), "—");
 eq("formatDate qua ngày mới VN", () => mod.formatDate("2026-12-31T20:00:00Z"), "01/01/2027");
 eq("formatTime", () => mod.formatTime("2026-09-30T17:30:00Z"), "00:30");
 eq("formatDateOnly", () => mod.formatDateOnly("2026-10-28"), "28/10/2026");

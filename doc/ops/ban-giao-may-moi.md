@@ -2,6 +2,20 @@
 > Viết 02/10/2026 sau đợt "ERP theo design" chạy qua đêm. Đọc file này từ trên xuống, làm đúng thứ tự.
 > Mọi thứ cần để dev tiếp **đều ở trên GitHub** (`DuyduyFedev46/fish`, nhánh `main`) — trừ các file bí mật ở §2.
 
+```mermaid
+flowchart TD
+  A["Clone repo từ GitHub"] --> B["Cài backend, ERP, Shop, cầu nối"]
+  B --> C["Tạo tài khoản thử trên máy"]
+  C --> D["Chuyển file bí mật bằng cách an toàn"]
+  D --> E["Chạy máy chủ và ERP để dev"]
+  E --> F["Chạy lệnh kiểm chứng"]
+  F --> G{"Kiểm chứng xanh?"}
+  G -- "chưa" --> E
+  G -- "xanh" --> H["Đọc việc chờ Duy quyết"]
+  H --> I["Làm tiếp lô bằng Claude Code"]
+  I --> J["Commit, push, đánh dấu xong lô"]
+```
+
 ## 0. Trạng thái lúc bàn giao
 - Nhánh duy nhất cần dùng: **`main`** (commit cuối lúc bàn giao: xem `git log -1`). Các nhánh tạm `ed-stream-b/c` đã gộp và xoá; worktree tạm đã gỡ.
 - Tính năng đang làm: **ERP theo design** — hồ sơ ở `doc/features/2026-10-01-erp-theo-design/`.

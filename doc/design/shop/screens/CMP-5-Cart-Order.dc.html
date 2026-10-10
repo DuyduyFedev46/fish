@@ -1,0 +1,683 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<title>Component giỏ và đơn — đặc tả</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#1A5BC0}
+.num{font-variant-numeric:tabular-nums}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.spec{width:100%;border-collapse:collapse;font-size:12px;background:#FFFFFF}
+.spec th{text-align:left;font-weight:600;color:#4E4E58;padding:6px 10px;border-bottom:1px solid #D4D4DB;background:#F4F4F6}
+.spec td{padding:6px 10px;border-bottom:1px solid #E4E4E9;vertical-align:top;color:#17171C}
+.spec code,.mono{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11px;color:#0E3A73;background:#EBF2FE;padding:1px 4px;border-radius:4px;white-space:nowrap}
+.lab{font-size:12px;font-weight:600;color:#686874;text-transform:uppercase;letter-spacing:.04em}
+.sec{background:#FFFFFF;border:1px solid #E4E4E9;border-radius:12px;padding:24px;display:flex;flex-direction:column;gap:20px}
+.cname{margin:0;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:18px;font-weight:500;color:#0E3A73}
+.cdesc{margin:4px 0 0;color:#4E4E58}
+.row{display:flex;flex-wrap:wrap;gap:24px;align-items:flex-start}
+.cell{display:flex;flex-direction:column;gap:8px}
+.cap{font-size:12px;font-weight:600;color:#4E4E58}
+.cap small{display:block;font-weight:500;color:#686874;font-size:11px}
+.stage{background:#F4F4F6;border-radius:10px;padding:16px;display:flex;gap:12px;align-items:flex-start}
+.used{margin:0;font-size:13px;color:#4E4E58}
+.used b{color:#17171C;font-weight:600}
+.th{flex:none;width:68px;height:68px;border-radius:8px;background:#F4F4F6;display:flex;align-items:center;justify-content:center}
+.ob{height:40px;border:1px solid #D4D4DB;border-radius:8px;display:flex;align-items:center;background:#FFFFFF}
+.ob button{width:40px;height:38px;border:0;background:transparent;display:flex;align-items:center;justify-content:center;border-radius:8px;cursor:pointer}
+.ob .q{min-width:60px;text-align:center;font-weight:600;font-size:13px;font-variant-numeric:tabular-nums}
+.ib{flex:none;width:36px;height:36px;border:0;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;border-radius:8px}
+.cta{height:48px;border-radius:24px;background:#1F66D1;color:#FFFFFF;font-weight:600;text-decoration:none;display:flex;align-items:center;justify-content:center;gap:8px}
+.cto{height:44px;border-radius:8px;border:1px solid #D4D4DB;background:#FFFFFF;color:#17171C;font-size:14px;font-weight:600;text-decoration:none;display:flex;align-items:center;justify-content:center;gap:6px;padding:0 14px}
+.sum{display:flex;justify-content:space-between;color:#4E4E58}
+.bdg{height:24px;padding:0 8px;border-radius:6px;font-size:12px;font-weight:500;display:inline-flex;align-items:center;gap:4px;white-space:nowrap}
+.st{display:flex;gap:12px}
+.dot{flex:none;width:24px;height:24px;border-radius:12px;display:flex;align-items:center;justify-content:center;box-sizing:border-box}
+.d-ok{background:#157F3D}
+.d-cur{background:#FFFFFF;border:2px solid #1F66D1}
+.d-cur span{width:10px;height:10px;border-radius:5px;background:#1F66D1}
+.d-todo{background:#FFFFFF;border:2px solid #D4D4DB}
+.d-warn{background:#A85A07}
+.d-crit{background:#C0312B}
+.vl{width:2px;flex:1;min-height:18px;margin:2px 0}
+.tl-l{font-size:14px;font-weight:500;line-height:24px}
+.tl-s{font-size:12px;color:#686874}
+button:focus-visible,a:focus-visible{outline:2px solid #1F66D1;outline-offset:2px}
+.timer-bar{width:100%;height:4px;border-radius:2px;background:#EBEBEF;overflow:hidden}
+</style>
+</helmet>
+<div style="width: 1280px; box-sizing: border-box; padding: 40px; background: #FBFBFC; color: #17171C; font-family: Inter, system-ui, sans-serif; font-size: 14px; line-height: 1.5; display: flex; flex-direction: column; gap: 28px">
+  <div style="display: flex; flex-direction: column; gap: 4px">
+    <span class="lab">CMP-5 · Bảng đặc tả component</span>
+    <h1 style="margin: 0; font-size: 24px; font-weight: 600; letter-spacing: -0.015em">Giỏ hàng, đặt hàng và đơn hàng</h1>
+    <p style="margin: 0; color: #4E4E58; max-width: 880px">Nhóm component từ lúc có món trong giỏ tới khi theo dõi đơn. Số liệu theo <span class="mono">SO-CHUAN.md</span>. Không có dòng "Phí giao"; dưới Tổng ghi "Đã gồm giao hàng. Bạn trả một lần, không trả thêm khi nhận hàng." (BR-BH-30). Mã đơn dạng <span class="mono">SO…</span>. Trang đơn và thanh toán không hiện tên, số điện thoại hay địa chỉ người nhận.</p>
+  </div>
+
+  <section class="sec" aria-labelledby="c-line">
+    <div>
+      <h2 id="c-line" class="cname">CartLine</h2>
+      <p class="cdesc">Một món trong giỏ: ảnh, tên, đơn giá, số lượng, thành tiền, bỏ món. Điện thoại là thẻ dòng, máy tính là hàng bảng.</p>
+    </div>
+    <span class="lab">Điện thoại · 390</span>
+    <div class="row" style="gap: 16px">
+      <div class="cell">
+        <span class="cap">Thường</span>
+        <div style="width: 358px; background: #FFFFFF; border: 1px solid #E4E4E9; border-radius: 10px; padding: 14px 16px; box-sizing: border-box; display: flex; gap: 12px">
+          <span class="th"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#686874" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3c-3 0-5 3-5 7v3h10v-3c0-4-2-7-5-7zM8 13l-1 7M10.5 13l-.5 8M13.5 13l.5 8M16 13l1 7"></path></svg></span>
+          <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px">
+            <div style="display: flex; justify-content: space-between; gap: 8px"><span style="font-weight: 500; line-height: 1.3">Mực ống làm sạch</span><button class="ib" aria-label="Bỏ Mực ống làm sạch khỏi giỏ" style="margin: -8px -8px 0 0"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#686874" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"></path></svg></button></div>
+            <span class="num" style="font-size: 12px; font-weight: 500; color: #686874">278.000đ / kg</span>
+            <div style="display: flex; align-items: center; justify-content: space-between; padding-top: 2px">
+              <div class="ob"><button aria-label="Bớt 0,5 kg"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#17171C" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M5 12h14"></path></svg></button><span class="q">1,5 kg</span><button aria-label="Thêm 0,5 kg"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#17171C" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg></button></div>
+              <span class="num" style="font-weight: 600">417.000đ</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="cell">
+        <span class="cap">Giá đổi</span>
+        <div style="width: 358px; background: #FFFFFF; border: 1px solid #E4E4E9; border-left: 3px solid #A85A07; border-radius: 10px; padding: 14px 16px 14px 14px; box-sizing: border-box; display: flex; gap: 12px">
+          <span class="th"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#686874" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12c2.6-3.6 6-5.5 9.5-5.5 2.7 0 4.7 1.9 6.5 5.5-1.8 3.6-3.8 5.5-6.5 5.5C11 17.5 7.6 15.6 5 12zM5 12L2 8.5M5 12l-3 3.5"></path></svg></span>
+          <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px">
+            <div style="display: flex; justify-content: space-between; gap: 8px"><span style="font-weight: 500; line-height: 1.3">Cá thu cắt khúc</span><button class="ib" aria-label="Bỏ Cá thu cắt khúc khỏi giỏ" style="margin: -8px -8px 0 0"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#686874" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"></path></svg></button></div>
+            <span style="display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap"><del class="num" style="font-size: 12px; font-weight: 500; color: #686874">330.000đ</del><span class="num" style="font-size: 12px; font-weight: 600">345.000đ / kg</span><span class="bdg" style="height: 22px; padding: 0 6px; background: #FDF3E3; color: #A85A07">Giá đã cập nhật</span></span>
+            <div style="display: flex; align-items: center; justify-content: space-between; padding-top: 2px">
+              <div class="ob"><button aria-label="Bỏ món khỏi giỏ" aria-haspopup="dialog"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#C0312B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"></path></svg></button><span class="q">1 kg</span><button aria-label="Thêm 0,5 kg"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#17171C" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg></button></div>
+              <span class="num" style="font-weight: 600">345.000đ</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="cell">
+        <span class="cap">Đã hết</span>
+        <div style="width: 358px; background: #FFFFFF; border: 1px solid #E4E4E9; border-radius: 10px; padding: 14px 16px; box-sizing: border-box; display: flex; gap: 12px">
+          <span class="th" style="opacity: 0.55"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#686874" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12c2.6-3.6 6-5.5 9.5-5.5 2.7 0 4.7 1.9 6.5 5.5-1.8 3.6-3.8 5.5-6.5 5.5C11 17.5 7.6 15.6 5 12zM5 12L2 8.5M5 12l-3 3.5"></path></svg></span>
+          <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px">
+            <div style="display: flex; justify-content: space-between; gap: 8px; align-items: flex-start"><span style="font-weight: 500; line-height: 1.3; color: #4E4E58">Cá bớp cắt lát</span><span class="bdg" style="height: 22px; padding: 0 6px; background: #EBEBEF; color: #4E4E58">Hết hàng</span></div>
+            <span style="font-size: 12px; font-weight: 500; color: #4E4E58">Món này vừa hết. Không tính vào tổng.</span>
+            <div style="display: flex; gap: 8px">
+              <a class="cto" href="tel:[hotline]" aria-label="Liên hệ Cá Về hỏi hàng Cá bớp cắt lát" style="flex: 1 1 0; min-width: 0; padding: 0 8px; font-size: 13px; white-space: nowrap"><svg style="flex: none" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#17171C" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2"></path></svg>Liên hệ</a>
+              <button class="cto" aria-label="Bỏ Cá bớp cắt lát khỏi giỏ" style="flex: 1 1 0; min-width: 0; padding: 0 8px; white-space: nowrap; font: inherit; font-size: 13px; font-weight: 600; color: #C0312B; cursor: pointer">Bỏ khỏi giỏ</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <span class="lab">Máy tính · hàng bảng</span>
+    <div style="border: 1px solid #E4E4E9; border-radius: 12px; overflow: hidden; background: #FFFFFF">
+      <div style="display: grid; grid-template-columns: minmax(0, 1fr) 140px 150px 130px 48px; gap: 16px; align-items: center; padding: 10px 20px; background: #F4F4F6; font-size: 12px; font-weight: 600; color: #4E4E58">
+        <span>Sản phẩm</span><span>Đơn giá</span><span>Số lượng</span><span style="text-align: right">Thành tiền</span><span class="sr">Bỏ</span>
+      </div>
+      <div style="display: grid; grid-template-columns: minmax(0, 1fr) 140px 150px 130px 48px; gap: 16px; align-items: center; padding: 16px 20px; border-top: 1px solid #E4E4E9">
+        <span style="display: flex; gap: 14px; align-items: center"><span class="th" style="width: 72px; height: 72px"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#686874" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3c-3 0-5 3-5 7v3h10v-3c0-4-2-7-5-7zM8 13l-1 7M10.5 13l-.5 8M13.5 13l.5 8M16 13l1 7"></path></svg></span><span style="display: flex; flex-direction: column"><a href="DesktopProduct.dc.html" style="font-size: 15px; font-weight: 500; color: #17171C; text-decoration: none">Mực ống làm sạch</a><span style="font-size: 12px; font-weight: 500; color: #686874">Đã bỏ nội tạng</span></span><span class="lab" style="margin-left: auto; text-transform: none; letter-spacing: 0">Thường</span></span>
+        <span class="num" style="color: #4E4E58">278.000đ / kg</span>
+        <span class="ob" style="justify-self: start"><button aria-label="Bớt 0,5 kg"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#17171C" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M5 12h14"></path></svg></button><span class="q">1,5 kg</span><button aria-label="Thêm 0,5 kg"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#17171C" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg></button></span>
+        <span class="num" style="text-align: right; font-weight: 600">417.000đ</span>
+        <button class="ib" aria-label="Bỏ Mực ống làm sạch khỏi giỏ" style="width: 40px; height: 40px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#686874" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"></path></svg></button>
+      </div>
+      <div style="display: grid; grid-template-columns: minmax(0, 1fr) 140px 150px 130px 48px; gap: 16px; align-items: center; padding: 16px 20px; border-top: 1px solid #E4E4E9; background: #FDF3E3">
+        <span style="display: flex; gap: 14px; align-items: center"><span class="th" style="width: 72px; height: 72px; background: #FFFFFF"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#686874" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12c2.6-3.6 6-5.5 9.5-5.5 2.7 0 4.7 1.9 6.5 5.5-1.8 3.6-3.8 5.5-6.5 5.5C11 17.5 7.6 15.6 5 12zM5 12L2 8.5M5 12l-3 3.5"></path></svg></span><span style="display: flex; flex-direction: column; gap: 2px"><a href="DesktopProduct.dc.html" style="font-size: 15px; font-weight: 500; color: #17171C; text-decoration: none">Cá thu cắt khúc</a><span class="bdg" style="height: 22px; padding: 0 6px; background: #FFFFFF; color: #A85A07; align-self: flex-start">Giá đã cập nhật</span></span><span class="lab" style="margin-left: auto; text-transform: none; letter-spacing: 0">Giá đổi</span></span>
+        <span style="display: flex; flex-direction: column"><del class="num" style="font-size: 12px; color: #686874">330.000đ</del><span class="num" style="font-weight: 600">345.000đ / kg</span></span>
+        <span class="ob" style="justify-self: start"><button aria-label="Bớt 0,5 kg"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#17171C" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M5 12h14"></path></svg></button><span class="q">2 kg</span><button aria-label="Thêm 0,5 kg"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#17171C" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg></button></span>
+        <span class="num" style="text-align: right; font-weight: 600">690.000đ</span>
+        <button class="ib" aria-label="Bỏ Cá thu cắt khúc khỏi giỏ" style="width: 40px; height: 40px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#686874" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"></path></svg></button>
+      </div>
+      <div style="display: grid; grid-template-columns: minmax(0, 1fr) 140px 150px 130px 48px; gap: 16px; align-items: center; padding: 16px 20px; border-top: 1px solid #E4E4E9">
+        <span style="display: flex; gap: 14px; align-items: center"><span class="th" style="width: 72px; height: 72px; opacity: 0.55"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#686874" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12c2.6-3.6 6-5.5 9.5-5.5 2.7 0 4.7 1.9 6.5 5.5-1.8 3.6-3.8 5.5-6.5 5.5C11 17.5 7.6 15.6 5 12zM5 12L2 8.5M5 12l-3 3.5"></path></svg></span><span style="display: flex; flex-direction: column; gap: 2px"><span style="font-size: 15px; font-weight: 500; color: #4E4E58">Cá bớp cắt lát</span><span class="bdg" style="height: 22px; padding: 0 6px; background: #EBEBEF; color: #4E4E58; align-self: flex-start">Hết hàng · không tính vào tổng</span></span><span class="lab" style="margin-left: auto; text-transform: none; letter-spacing: 0">Đã hết</span></span>
+        <span class="num" style="color: #686874">290.000đ / kg</span>
+        <a class="cto" href="tel:[hotline]" style="height: 40px; justify-self: start; font-size: 13px">Liên hệ chúng tôi</a>
+        <span style="text-align: right; color: #686874">—</span>
+        <button class="ib" aria-label="Bỏ Cá bớp cắt lát khỏi giỏ" style="width: 40px; height: 40px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#C0312B" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"></path></svg></button>
+      </div>
+    </div>
+    <table class="spec">
+      <thead><tr><th style="width: 18%">Thuộc tính</th><th style="width: 41%">Điện thoại</th><th>Máy tính</th></tr></thead>
+      <tbody>
+        <tr><td>Bố cục</td><td>Flex ngang: ảnh 68 vuông · cột nội dung. Đệm 14 16, gap 12, phân cách <code>border-bottom</code> 1px.</td><td>Lưới <code>minmax(0,1fr) 140px 150px 130px 48px</code>, gap 16, đệm 16 20. Hàng đầu bảng nền <code>surface-2</code>, chữ 12/600 <code>ink-2</code>.</td></tr>
+        <tr><td>Chữ</td><td>Tên 14/500/1.3 · đơn giá 12/500 <code>ink-3</code> · thành tiền 14/600 tabular.</td><td>Tên 15/500 (link về trang chi tiết) · đơn giá 14 <code>ink-2</code> · thành tiền 14/600, căn phải.</td></tr>
+        <tr><td>Số lượng</td><td colspan="2">QtyStepper biến thể giỏ (viền, cao 40). Ở 1 kg nút trừ thành thùng rác <code>crit</code>, bấm mở B2-RemoveConfirm. Nút bỏ riêng: icon 18 <code>ink-3</code>, vùng chạm 36 (điện thoại) / 40 (máy tính).</td></tr>
+        <tr><td>Giá đổi</td><td>Viền trái 3px <code>warn #A85A07</code>. Giá cũ <code>&lt;del&gt;</code> <code>ink-3</code>, giá mới 12/600, nhãn "Giá đã cập nhật".</td><td>Cả hàng nền <code>warn-soft #FDF3E3</code>, nhãn nền trắng chữ <code>warn</code>. Thành tiền theo giá mới.</td></tr>
+        <tr><td>Đã hết</td><td colspan="2">Ảnh <code>opacity: .55</code>, tên <code>ink-2</code>, nhãn "Hết hàng" nền <code>surface-3 #EBEBEF</code>. Không có stepper, không có thành tiền. Hai hành động: "Liên hệ" ở điện thoại / "Liên hệ chúng tôi" ở máy tính (<code>tel:</code>, viền <code>border-strong</code>, aria-label "Liên hệ Cá Về hỏi hàng …") và "Bỏ khỏi giỏ" (chữ <code>crit #C0312B</code>, mở popup B2). Điện thoại: hai nút chia đôi hàng (<code>flex: 1 1 0; min-width: 0; white-space: nowrap</code>). Không ghi số kg còn lại. Nút đặt hàng bị chặn tới khi bỏ món.</td></tr>
+        <tr><td>Bo góc · bóng</td><td>Danh sách nền trắng liền khối (B3 dùng thẻ bo 10). Không bóng.</td><td>Bảng bo 12, viền <code>border #E4E4E9</code>. Không bóng.</td></tr>
+        <tr><td>Chuyển động</td><td colspan="2">Bỏ món luôn qua popup xác nhận B2-RemoveConfirm (máy tính: DesktopRemoveConfirm), không bỏ ngay, không có Hoàn tác. Sau khi xác nhận: hàng thu chiều cao + mờ 200ms <code>cubic-bezier(.23,1,.32,1)</code>, toast "Đã bỏ … khỏi giỏ" 3s. Reduced-motion: biến mất ngay.</td></tr>
+        <tr><td>A11y</td><td colspan="2">Danh sách là <code>&lt;ul&gt;</code> (điện thoại) / <code>role="table"</code> có hàng đầu (máy tính). Thay đổi giá đọc qua <code>role="status"</code> ở đầu giỏ: "2 món đã đổi giá".</td></tr>
+      </tbody>
+    </table>
+    <p class="used"><b>Dùng ở:</b> Cart.dc.html · B3-CartChanged.dc.html · DesktopCart.dc.html · DesktopCartChanged.dc.html · C3-SoldOut.dc.html · DesktopModalSoldOut.dc.html</p>
+  </section>
+
+  <section class="sec" aria-labelledby="c-sum">
+    <div>
+      <h2 id="c-sum" class="cname">CartSummary</h2>
+      <p class="cdesc">Tóm tắt tiền và nút đi tiếp. Điện thoại dính đáy màn, máy tính là hộp dính ở cột phải.</p>
+    </div>
+    <div class="row">
+      <div class="cell">
+        <span class="cap">Điện thoại · thanh dính đáy<small>rộng 390 · bóng bar</small></span>
+        <div style="width: 390px; height: 250px; position: relative; background: #F4F4F6; border-radius: 10px; overflow: hidden">
+          <div style="position: absolute; left: 0; right: 0; bottom: 0; background: #FFFFFF; box-shadow: 0 -4px 16px rgba(23,23,28,0.08); padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 8px">
+            <div class="sum"><span>Tạm tính · 3 món</span><span class="num">867.000đ</span></div>
+            <div style="display: flex; justify-content: space-between; align-items: baseline; padding-top: 6px; border-top: 1px solid #E4E4E9"><span style="font-weight: 600; padding-top: 6px">Tổng tiền hàng</span><span class="num" style="font-size: 20px; font-weight: 600; color: #1A5BC0; padding-top: 6px">867.000đ</span></div>
+            <p style="margin: 0; font-size: 13px; color: #4E4E58">Đã gồm giao hàng. Bạn trả một lần, không trả thêm khi nhận hàng.</p>
+            <a class="cta" href="Checkout.dc.html" style="margin-top: 4px">Tiếp tục: nhập thông tin nhận hàng</a>
+          </div>
+        </div>
+      </div>
+      <div class="cell">
+        <span class="cap">Máy tính · hộp sticky<small>rộng 360 · top 24</small></span>
+        <div style="width: 360px; box-sizing: border-box; background: #FFFFFF; border: 1px solid #E4E4E9; border-radius: 12px; padding: 20px; display: flex; flex-direction: column; gap: 10px">
+          <h3 style="margin: 0; font-size: 17px; font-weight: 600">Tóm tắt đơn</h3>
+          <div class="sum"><span>Tạm tính · 3 món</span><span class="num">867.000đ</span></div>
+          <div style="display: flex; justify-content: space-between; align-items: baseline; padding-top: 10px; border-top: 1px solid #E4E4E9"><span style="font-weight: 600">Tổng tiền hàng</span><span class="num" style="font-size: 22px; font-weight: 600; color: #1A5BC0">867.000đ</span></div>
+          <p style="margin: 0; font-size: 13px; color: #4E4E58">Đã gồm giao hàng. Bạn trả một lần, không trả thêm khi nhận hàng.</p>
+          <a class="cta" href="DesktopCheckout.dc.html" style="margin-top: 6px">Tiến hành đặt hàng</a>
+          <span style="font-size: 12px; font-weight: 500; color: #686874; text-align: center">Mua tối thiểu 1 kg mỗi món</span>
+        </div>
+      </div>
+      <div class="cell">
+        <span class="cap">Bị chặn · có món đã hết<small>UX chốt 11/10: CTA vẫn bấm được (Q-UX-4); bấm thì hiện lý do, không sang bước sau</small></span>
+        <div style="width: 300px; box-sizing: border-box; background: #FFFFFF; border: 1px solid #E4E4E9; border-radius: 12px; padding: 20px; display: flex; flex-direction: column; gap: 10px">
+          <div style="display: flex; justify-content: space-between; align-items: baseline"><span style="font-weight: 600">Tổng tiền hàng</span><span class="num" style="font-size: 22px; font-weight: 600; color: #1A5BC0">577.000đ</span></div>
+          <span id="why" role="alert" style="font-size: 13px; font-weight: 500; color: #C0312B">Bỏ món đã hết để đặt hàng.</span>
+          <button type="button" aria-describedby="why" style="height: 48px; border-radius: 24px; border: 0; background: #1F66D1; color: #FFFFFF; font: inherit; font-weight: 600">Tiến hành đặt hàng</button>
+        </div>
+      </div>
+    </div>
+    <table class="spec">
+      <thead><tr><th style="width: 18%">Thuộc tính</th><th style="width: 41%">Điện thoại</th><th>Máy tính</th></tr></thead>
+      <tbody>
+        <tr><td>Vị trí</td><td><code>position: fixed; bottom: 0</code>, đệm 14 16 <code>16 + env(safe-area-inset-bottom)</code>. Nội dung cuộn có <code>padding-bottom</code> ≥ chiều cao thanh.</td><td><code>position: sticky; top: 24px</code> trong cột phải 360, cạnh bảng CartLine.</td></tr>
+        <tr><td>Chữ</td><td>Dòng phụ 14 <code>ink-2</code>. "Tổng tiền hàng" 14/600. Tổng 20/600 <code>accent-text #1A5BC0</code>.</td><td>Tiêu đề 17/600. Tổng 22/600 <code>accent-text</code>.</td></tr>
+        <tr><td>Giao hàng</td><td colspan="2">Không có dòng "Phí giao" (BR-BH-30). Ngay dưới Tổng: "Đã gồm giao hàng. Bạn trả một lần, không trả thêm khi nhận hàng." chữ 13 <code>ink-2</code>. Không ghi "miễn phí giao".</td></tr>
+        <tr><td>CTA</td><td>Pill 48, bo 999, nền <code>accent #1F66D1</code>, chữ trắng 14/600.</td><td>Như điện thoại. Hover <code>accent-hover #1A57B5</code> 150ms.</td></tr>
+        <tr><td>Bị chặn</td><td colspan="2">Không tắt nút. Còn món hết mà bấm: hiện lý do trên nút (<code>role="alert"</code>, <code>aria-describedby</code>, chữ <code>crit</code>), dời tiêu điểm tới "Bỏ khỏi giỏ" của món hết đầu tiên.</td></tr>
+        <tr><td>Bóng · bo</td><td>Bóng bar <code>0 -4px 16px rgba(23,23,28,.08)</code>. Không bo.</td><td>Không bóng. Bo 12, viền <code>border</code>.</td></tr>
+        <tr><td>Chuyển động</td><td colspan="2">Đổi số tổng không animate. Thanh đáy vào: <code>translateY(100%)→0</code> 240ms <code>cubic-bezier(.32,.72,0,1)</code>.</td></tr>
+      </tbody>
+    </table>
+    <p class="used"><b>Dùng ở:</b> Cart.dc.html · B3-CartChanged.dc.html · DesktopCart.dc.html · DesktopCartChanged.dc.html</p>
+  </section>
+
+  <section class="sec" aria-labelledby="c-bar">
+    <div>
+      <h2 id="c-bar" class="cname">CartBar</h2>
+      <p class="cdesc">Thanh nhắc giỏ ở trang danh mục điện thoại, hiện khi giỏ có ít nhất 1 món. Bấm cả thanh để mở giỏ.</p>
+    </div>
+    <div class="row">
+      <div class="cell">
+        <span class="cap">Có món · 390</span>
+        <div style="width: 390px; height: 120px; position: relative; background: #FBFBFC; border: 1px solid #E4E4E9; border-radius: 10px; overflow: hidden">
+          <div style="position: absolute; left: 0; right: 0; bottom: 0; background: #FFFFFF; box-shadow: 0 -4px 16px rgba(23,23,28,0.08); padding: 8px 16px 16px">
+            <a href="Cart.dc.html" style="height: 48px; border-radius: 8px; background: #1F66D1; color: #FFFFFF; font-weight: 600; padding: 0 16px; text-decoration: none; display: flex; align-items: center; justify-content: space-between">
+              <span class="num">3 món · 867.000đ</span>
+              <span style="display: flex; align-items: center; gap: 6px">Xem giỏ <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></span>
+            </a>
+          </div>
+        </div>
+      </div>
+      <div class="cell">
+        <span class="cap">Focus<small>outline trắng offset -4 trên nền accent</small></span>
+        <div style="width: 358px; background: #FFFFFF; padding: 8px 0">
+          <a href="Cart.dc.html" style="height: 48px; border-radius: 8px; background: #1F66D1; color: #FFFFFF; font-weight: 600; padding: 0 16px; text-decoration: none; display: flex; align-items: center; justify-content: space-between; outline: 2px solid #FFFFFF; outline-offset: -4px">
+            <span class="num">1 món · 278.000đ</span>
+            <span style="display: flex; align-items: center; gap: 6px">Xem giỏ <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></span>
+          </a>
+        </div>
+      </div>
+      <div class="cell" style="flex: 1; min-width: 300px">
+        <table class="spec">
+          <thead><tr><th style="width: 30%">Thuộc tính</th><th>Giá trị</th></tr></thead>
+          <tbody>
+            <tr><td>Kích thước</td><td>Vỏ trắng đệm 8 16 <code>16 + safe-area</code>. Nút cao 48, bo 8, đệm ngang 16.</td></tr>
+            <tr><td>Chữ · màu</td><td>14/600 trắng trên <code>accent #1F66D1</code>, số tabular. "N món" đếm số dòng, không đếm kg.</td></tr>
+            <tr><td>Bóng</td><td>bar <code>0 -4px 16px rgba(23,23,28,.08)</code>.</td></tr>
+            <tr><td>Chuyển động</td><td>Lần đầu hiện: <code>translateY(100%)→0</code> 240ms <code>cubic-bezier(.32,.72,0,1)</code>. Cập nhật số: không animate. Giỏ về 0: ẩn ngay.</td></tr>
+            <tr><td>A11y</td><td>Là một <code>&lt;a&gt;</code>, tên đọc "Xem giỏ, 3 món, 867.000đ". Không che nội dung: lưới có <code>padding-bottom: 108px</code>.</td></tr>
+            <tr><td>Máy tính</td><td>Không dùng. Thay bằng badge số trên nút Giỏ hàng ở header + MiniCart.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <p class="used"><b>Dùng ở:</b> Main.dc.html · A7-OutOfStock.dc.html</p>
+  </section>
+
+  <section class="sec" aria-labelledby="c-mini">
+    <div>
+      <h2 id="c-mini" class="cname">MiniCart</h2>
+      <p class="cdesc">Popover giỏ trên máy tính, mở khi bấm "Giỏ hàng" ở header hoặc vài giây sau khi thêm món. Xem nhanh, không sửa số lượng.</p>
+    </div>
+    <div class="row">
+      <div class="cell">
+        <span class="cap">Có món<small>neo dưới nút Giỏ hàng · rộng 360</small></span>
+        <div style="width: 420px; height: 470px; position: relative; background: #F4F4F6; border-radius: 10px">
+          <div style="position: absolute; right: 16px; top: 12px; height: 44px; padding: 0 12px; border-radius: 8px; background: #1A57B5; color: #FFFFFF; font-weight: 500; display: flex; align-items: center; gap: 8px">Giỏ hàng <span class="num" style="min-width: 18px; height: 18px; padding: 0 5px; box-sizing: border-box; border-radius: 9px; background: #FFFFFF; color: #1A5BC0; font-size: 11px; font-weight: 600; display: flex; align-items: center; justify-content: center">3</span></div>
+          <span style="position: absolute; right: 52px; top: 58px; width: 12px; height: 12px; background: #FFFFFF; transform: rotate(45deg); border-left: 1px solid #E4E4E9; border-top: 1px solid #E4E4E9"></span>
+          <div role="dialog" aria-label="Giỏ hàng" style="position: absolute; right: 16px; top: 64px; width: 360px; box-sizing: border-box; background: #FFFFFF; border: 1px solid #E4E4E9; border-radius: 12px; box-shadow: 0 12px 32px rgba(23,23,28,0.12); padding: 16px; display: flex; flex-direction: column; gap: 12px">
+            <div style="display: flex; justify-content: space-between; align-items: baseline"><span style="font-size: 15px; font-weight: 600">Giỏ hàng <span class="num" style="font-weight: 500; color: #686874">(3)</span></span><span style="font-size: 12px; font-weight: 500; color: #157F3D">Đã thêm Mực ống làm sạch</span></div>
+            <ul style="list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px">
+              <li style="display: flex; gap: 10px; align-items: center"><span class="th" style="width: 48px; height: 48px"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#686874" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3c-3 0-5 3-5 7v3h10v-3c0-4-2-7-5-7zM8 13l-1 7M10.5 13l-.5 8M13.5 13l.5 8M16 13l1 7"></path></svg></span><span style="flex: 1; min-width: 0; display: flex; flex-direction: column"><span style="font-weight: 500">Mực ống làm sạch</span><span class="num" style="font-size: 12px; color: #686874">1 kg × 278.000đ</span></span><span class="num" style="font-weight: 600">278.000đ</span></li>
+              <li style="display: flex; gap: 10px; align-items: center"><span class="th" style="width: 48px; height: 48px"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#686874" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12c2.6-3.6 6-5.5 9.5-5.5 2.7 0 4.7 1.9 6.5 5.5-1.8 3.6-3.8 5.5-6.5 5.5C11 17.5 7.6 15.6 5 12zM5 12L2 8.5M5 12l-3 3.5"></path></svg></span><span style="flex: 1; min-width: 0; display: flex; flex-direction: column"><span style="font-weight: 500">Cá thu cắt khúc</span><span class="num" style="font-size: 12px; color: #686874">1 kg × 330.000đ</span></span><span class="num" style="font-weight: 600">330.000đ</span></li>
+              <li style="display: flex; gap: 10px; align-items: center"><span class="th" style="width: 48px; height: 48px"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#686874" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8l8-4 8 4v8l-8 4-8-4zM4 8l8 4 8-4M12 12v8"></path></svg></span><span style="flex: 1; min-width: 0; display: flex; flex-direction: column"><span style="font-weight: 500">Combo lẩu hải sản</span><span class="num" style="font-size: 12px; color: #686874">1 combo × 259.000đ</span></span><span class="num" style="font-weight: 600">259.000đ</span></li>
+            </ul>
+            <div style="display: flex; justify-content: space-between; align-items: baseline; padding-top: 10px; border-top: 1px solid #E4E4E9"><span style="font-weight: 600">Tổng tiền hàng</span><span class="num" style="font-size: 17px; font-weight: 600; color: #1A5BC0">867.000đ</span></div>
+            <span style="font-size: 12px; color: #686874">Đã gồm giao hàng.</span>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px">
+              <a class="cto" href="DesktopCart.dc.html">Xem giỏ</a>
+              <a href="DesktopCheckout.dc.html" style="height: 44px; border-radius: 8px; background: #1F66D1; color: #FFFFFF; font-weight: 600; text-decoration: none; display: flex; align-items: center; justify-content: center">Đặt hàng</a>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="cell">
+        <span class="cap">Giỏ trống</span>
+        <div style="width: 360px; box-sizing: border-box; background: #FFFFFF; border: 1px solid #E4E4E9; border-radius: 12px; box-shadow: 0 12px 32px rgba(23,23,28,0.12); padding: 24px 16px; display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#8C8C98" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 4h2l2.4 10.2a1.5 1.5 0 0 0 1.5 1.1h8.6a1.5 1.5 0 0 0 1.5-1.1L21 8H6.2"></path></svg>
+          <span style="font-weight: 600">Giỏ hàng đang trống</span>
+          <a href="DesktopCategory.dc.html" class="cto" style="margin-top: 4px">Xem hàng đang có</a>
+        </div>
+      </div>
+      <div class="cell" style="flex: 1; min-width: 280px">
+        <table class="spec">
+          <thead><tr><th style="width: 32%">Thuộc tính</th><th>Giá trị</th></tr></thead>
+          <tbody>
+            <tr><td>Kích thước</td><td>Rộng 360, đệm 16, gap 12. Tối đa 4 dòng, quá thì cuộn trong (<code>max-height: 280px</code>). Ảnh 48.</td></tr>
+            <tr><td>Màu · bo · bóng</td><td>Nền <code>surface</code>, viền <code>border</code>, bo 12, bóng pop <code>0 12px 32px rgba(23,23,28,.12)</code>.</td></tr>
+            <tr><td>Chữ</td><td>Tiêu đề 15/600. Tên 14/500. Dòng phụ 12 <code>ink-3</code>. Tổng 17/600 <code>accent-text</code>.</td></tr>
+            <tr><td>Mở · đóng</td><td>Bấm nút Giỏ hàng (<code>aria-expanded</code>), Esc, bấm ra ngoài. Sau khi thêm món tự mở 3s rồi đóng nếu chuột không ở trong.</td></tr>
+            <tr><td>Chuyển động</td><td>Vào: <code>opacity 0→1</code> + <code>translateY(-4px)→0</code> + <code>scale(.98)→1</code>, 160ms, <code>transform-origin: top right</code>. Ra 120ms. Reduced-motion: chỉ fade.</td></tr>
+            <tr><td>A11y</td><td><code>role="dialog"</code> không modal, focus vào tiêu đề khi mở bằng bàn phím, trả focus về nút Giỏ khi đóng.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <p class="used"><b>Dùng ở:</b> header máy tính H1 (HeaderFooter-Desktop.dc.html) · DesktopCategory.dc.html · DesktopProduct.dc.html · DesktopHome.dc.html</p>
+  </section>
+
+  <section class="sec" aria-labelledby="c-steps">
+    <div>
+      <h2 id="c-steps" class="cname">CheckoutSteps</h2>
+      <p class="cdesc">Thanh 3 bước Giỏ → Nhận hàng → Thanh toán ở đầu luồng đặt hàng. Mỗi bước có trạng thái xong, hiện tại, chưa.</p>
+    </div>
+    <div class="row">
+      <div class="cell">
+        <span class="cap">Điện thoại · bước 1 hiện tại</span>
+        <ol style="width: 358px; list-style: none; margin: 0; padding: 12px 0; background: #FFFFFF; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; font-size: 12px; font-weight: 500">
+          <li aria-current="step" style="display: flex; flex-direction: column; gap: 6px; color: #1A5BC0"><span style="height: 4px; border-radius: 2px; background: #1F66D1"></span>1. Giỏ hàng</li>
+          <li style="display: flex; flex-direction: column; gap: 6px; color: #686874"><span style="height: 4px; border-radius: 2px; background: #EBEBEF"></span>2. Nhận hàng</li>
+          <li style="display: flex; flex-direction: column; gap: 6px; color: #686874"><span style="height: 4px; border-radius: 2px; background: #EBEBEF"></span>3. Thanh toán</li>
+        </ol>
+        <span class="cap">Điện thoại · bước 2 hiện tại</span>
+        <ol style="width: 358px; list-style: none; margin: 0; padding: 12px 0; background: #FFFFFF; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; font-size: 12px; font-weight: 500">
+          <li style="display: flex; flex-direction: column; gap: 6px; color: #4E4E58"><span style="height: 4px; border-radius: 2px; background: #1F66D1"></span><a href="Cart.dc.html" style="color: #4E4E58; text-decoration: none">1. Giỏ hàng</a></li>
+          <li aria-current="step" style="display: flex; flex-direction: column; gap: 6px; color: #1A5BC0"><span style="height: 4px; border-radius: 2px; background: #1F66D1"></span>2. Nhận hàng</li>
+          <li style="display: flex; flex-direction: column; gap: 6px; color: #686874"><span style="height: 4px; border-radius: 2px; background: #EBEBEF"></span>3. Thanh toán</li>
+        </ol>
+        <span class="cap">Điện thoại · bước 3 hiện tại</span>
+        <ol style="width: 358px; list-style: none; margin: 0; padding: 12px 0; background: #FFFFFF; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; font-size: 12px; font-weight: 500">
+          <li style="display: flex; flex-direction: column; gap: 6px; color: #4E4E58"><span style="height: 4px; border-radius: 2px; background: #1F66D1"></span>1. Giỏ hàng</li>
+          <li style="display: flex; flex-direction: column; gap: 6px; color: #4E4E58"><span style="height: 4px; border-radius: 2px; background: #1F66D1"></span>2. Nhận hàng</li>
+          <li aria-current="step" style="display: flex; flex-direction: column; gap: 6px; color: #1A5BC0"><span style="height: 4px; border-radius: 2px; background: #1F66D1"></span>3. Thanh toán</li>
+        </ol>
+      </div>
+      <div class="cell">
+        <span class="cap">Máy tính · bước 2 hiện tại<small>vòng số 28 + đường nối</small></span>
+        <ol style="width: 600px; list-style: none; margin: 0; padding: 16px 20px; box-sizing: border-box; background: #FFFFFF; border: 1px solid #E4E4E9; border-radius: 12px; display: flex; align-items: center; gap: 12px; font-size: 14px; font-weight: 500">
+          <li style="display: flex; align-items: center; gap: 8px; color: #4E4E58"><span style="width: 28px; height: 28px; border-radius: 14px; background: #157F3D; display: flex; align-items: center; justify-content: center"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"></path></svg></span><a href="DesktopCart.dc.html" style="color: #4E4E58">Giỏ hàng</a><span class="sr">(đã xong)</span></li>
+          <li aria-hidden="true" style="flex: 1; height: 2px; background: #157F3D"></li>
+          <li aria-current="step" style="display: flex; align-items: center; gap: 8px; color: #1A5BC0; font-weight: 600"><span class="num" style="width: 28px; height: 28px; border-radius: 14px; background: #1F66D1; color: #FFFFFF; display: flex; align-items: center; justify-content: center; font-size: 13px">2</span>Nhận hàng</li>
+          <li aria-hidden="true" style="flex: 1; height: 2px; background: #EBEBEF"></li>
+          <li style="display: flex; align-items: center; gap: 8px; color: #686874"><span class="num" style="width: 28px; height: 28px; box-sizing: border-box; border-radius: 14px; border: 2px solid #D4D4DB; display: flex; align-items: center; justify-content: center; font-size: 13px">3</span>Thanh toán</li>
+        </ol>
+        <span class="cap" style="margin-top: 8px">Máy tính · bước 3 hiện tại</span>
+        <ol style="width: 600px; list-style: none; margin: 0; padding: 16px 20px; box-sizing: border-box; background: #FFFFFF; border: 1px solid #E4E4E9; border-radius: 12px; display: flex; align-items: center; gap: 12px; font-size: 14px; font-weight: 500">
+          <li style="display: flex; align-items: center; gap: 8px; color: #4E4E58"><span style="width: 28px; height: 28px; border-radius: 14px; background: #157F3D; display: flex; align-items: center; justify-content: center"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"></path></svg></span>Giỏ hàng</li>
+          <li aria-hidden="true" style="flex: 1; height: 2px; background: #157F3D"></li>
+          <li style="display: flex; align-items: center; gap: 8px; color: #4E4E58"><span style="width: 28px; height: 28px; border-radius: 14px; background: #157F3D; display: flex; align-items: center; justify-content: center"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"></path></svg></span>Nhận hàng</li>
+          <li aria-hidden="true" style="flex: 1; height: 2px; background: #157F3D"></li>
+          <li aria-current="step" style="display: flex; align-items: center; gap: 8px; color: #1A5BC0; font-weight: 600"><span class="num" style="width: 28px; height: 28px; border-radius: 14px; background: #1F66D1; color: #FFFFFF; display: flex; align-items: center; justify-content: center; font-size: 13px">3</span>Thanh toán</li>
+        </ol>
+      </div>
+    </div>
+    <table class="spec">
+      <thead><tr><th style="width: 18%">Trạng thái</th><th style="width: 41%">Điện thoại</th><th>Máy tính</th></tr></thead>
+      <tbody>
+        <tr><td>Xong</td><td>Vạch 4px <code>accent #1F66D1</code>, chữ 12/500 <code>ink-2 #4E4E58</code>. Bước 1, 2 bấm được để quay lại (trừ khi đã tạo đơn).</td><td>Vòng 28 nền <code>good #157F3D</code>, dấu tích trắng. Đường nối 2px <code>good</code>.</td></tr>
+        <tr><td>Hiện tại</td><td>Vạch <code>accent</code>, chữ <code>accent-text #1A5BC0</code>, <code>aria-current="step"</code>.</td><td>Vòng 28 nền <code>accent</code>, số trắng 13/600, nhãn 14/600 <code>accent-text</code>.</td></tr>
+        <tr><td>Chưa</td><td>Vạch <code>surface-3 #EBEBEF</code>, chữ <code>ink-3 #686874</code>.</td><td>Vòng viền 2px <code>border-strong #D4D4DB</code>, số <code>ink-3</code>. Đường nối <code>surface-3</code>.</td></tr>
+        <tr><td>Kích thước</td><td>Lưới 3 cột gap 6, đệm 12 16, nền trắng ngay dưới header.</td><td>Hộp bo 12, đệm 16 20, gap 12, rộng theo cột chính.</td></tr>
+        <tr><td>Khi đã tạo đơn</td><td colspan="2">Ở bước 3 (đơn <code>SO…</code> đã tạo, đang giữ hàng), bước 1 và 2 không còn là link để tránh tạo trùng đơn.</td></tr>
+        <tr><td>A11y</td><td colspan="2"><code>&lt;ol aria-label="Bước đặt hàng"&gt;</code>. Bước xong có chữ ẩn "(đã xong)". Đường nối <code>aria-hidden</code>.</td></tr>
+      </tbody>
+    </table>
+    <p class="used"><b>Dùng ở:</b> Cart.dc.html · Checkout.dc.html · Payment.dc.html · DesktopCart.dc.html · DesktopCheckout.dc.html · DesktopPayment.dc.html</p>
+  </section>
+
+  <section class="sec" aria-labelledby="c-hold">
+    <div>
+      <h2 id="c-hold" class="cname">HoldCountdown</h2>
+      <p class="cdesc">Đếm ngược thời gian Cá Về giữ hàng cho đơn chờ thanh toán. Hết giờ thì hàng được nhả và khách phải đặt lại.</p>
+    </div>
+    <div class="row">
+      <div class="cell">
+        <span class="cap">Bình thường · accent</span>
+        <div style="width: 300px; box-sizing: border-box; background: #FFFFFF; border: 1px solid #E4E4E9; border-radius: 12px; padding: 20px 16px; display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center">
+          <span style="font-size: 13px; color: #4E4E58">Cá Về đang giữ hàng cho bạn trong</span>
+          <span role="timer" aria-live="off" aria-label="Còn 12 phút 34 giây" class="num" style="font-size: 40px; font-weight: 600; letter-spacing: -0.02em; color: #1A5BC0">12:34</span>
+          <div class="timer-bar"><div style="height: 4px; width: 84%; background: #1F66D1"></div></div>
+        </div>
+      </div>
+      <div class="cell">
+        <span class="cap">Dưới 5 phút · warn</span>
+        <div style="width: 300px; box-sizing: border-box; background: #FFFFFF; border: 1px solid #E4E4E9; border-radius: 12px; padding: 20px 16px; display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center">
+          <span style="font-size: 13px; color: #4E4E58">Cá Về đang giữ hàng cho bạn trong</span>
+          <span role="timer" aria-live="off" class="num" style="font-size: 40px; font-weight: 600; letter-spacing: -0.02em; color: #A85A07">04:12</span>
+          <div class="timer-bar"><div style="height: 4px; width: 28%; background: #A85A07"></div></div>
+          <span style="font-size: 12px; font-weight: 500; color: #A85A07">Sắp hết thời gian giữ hàng</span>
+        </div>
+      </div>
+      <div class="cell">
+        <span class="cap">Hết giờ · crit</span>
+        <div style="width: 300px; box-sizing: border-box; background: #FFFFFF; border: 1px solid #E4E4E9; border-radius: 12px; padding: 20px 16px; display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center">
+          <span style="font-size: 13px; color: #4E4E58">Hết thời gian giữ hàng</span>
+          <span role="timer" aria-live="off" class="num" style="font-size: 40px; font-weight: 600; letter-spacing: -0.02em; color: #C0312B">00:00</span>
+          <div class="timer-bar"><div style="height: 4px; width: 0%; background: #C0312B"></div></div>
+          <span style="font-size: 12px; font-weight: 500; color: #C0312B">Đơn SO[mã đơn] đã hết hạn. Mở D4 để đặt lại.</span>
+        </div>
+      </div>
+      <div class="cell">
+        <span class="cap">Máy tính · dạng dòng<small>trong hộp thanh toán</small></span>
+        <div style="width: 300px; box-sizing: border-box; background: #EBF2FE; border-radius: 12px; padding: 12px 16px; display: flex; flex-direction: column; gap: 8px">
+          <div style="display: flex; align-items: center; justify-content: space-between"><span style="font-size: 14px; color: #17171C; display: flex; align-items: center; gap: 6px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#1A5BC0" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>Giữ hàng còn</span><span role="timer" class="num" style="font-size: 22px; font-weight: 600; color: #1A5BC0">12:34</span></div>
+          <div class="timer-bar" style="background: #FFFFFF"><div style="height: 4px; width: 84%; background: #1F66D1"></div></div>
+        </div>
+      </div>
+    </div>
+    <table class="spec">
+      <thead><tr><th style="width: 18%">Thuộc tính</th><th>Giá trị</th></tr></thead>
+      <tbody>
+        <tr><td>Ngưỡng màu</td><td>&gt; 5:00 <code>accent-text #1A5BC0</code> (thanh <code>accent #1F66D1</code>) · ≤ 5:00 <code>warn #A85A07</code> + dòng "Sắp hết thời gian giữ hàng" · 00:00 <code>crit #C0312B</code>, chuyển sang D4-Expired.</td></tr>
+        <tr><td>Chữ</td><td>Số 40/600 <code>letter-spacing: -0.02em</code>, tabular, định dạng <code>mm:ss</code>. Máy tính dạng dòng 22/600. Dòng trên 13 <code>ink-2</code>.</td></tr>
+        <tr><td>Thanh tiến trình</td><td>Cao 4, bo 2, nền <code>surface-3 #EBEBEF</code>. Độ rộng = thời gian còn / tổng thời gian giữ. <code>transition: width 1s linear</code>.</td></tr>
+        <tr><td>Nguồn thời gian</td><td>Tính từ <code>hold_expires_at</code> do server trả, không từ đồng hồ máy khách lúc mở trang. Mỗi lần quay lại tab tính lại.</td></tr>
+        <tr><td>A11y</td><td><code>role="timer"</code>, <code>aria-live="off"</code> để không đọc mỗi giây. Thông báo riêng qua <code>role="status"</code> ở mốc 5 phút và 1 phút, và khi hết giờ.</td></tr>
+        <tr><td>Chuyển động</td><td>Số đổi không animate. Đổi màu 150ms ease-out. Reduced-motion: thanh nhảy theo giây, không trượt.</td></tr>
+      </tbody>
+    </table>
+    <p class="used"><b>Dùng ở:</b> Payment.dc.html · DesktopPayment.dc.html · D3-PayPending.dc.html · D4-Expired.dc.html · DesktopModalExpired.dc.html · D6-LeavePayment.dc.html</p>
+  </section>
+
+  <section class="sec" aria-labelledby="c-pay">
+    <div>
+      <h2 id="c-pay" class="cname">PaymentMethod</h2>
+      <p class="cdesc">Thẻ chọn phương thức thanh toán. Hiện chỉ có chuyển khoản ngân hàng quét mã QR, luôn ở trạng thái đang chọn. Không ghi tên cổng thanh toán (decisions 10/10).</p>
+    </div>
+    <div class="row">
+      <div class="cell">
+        <span class="cap">Đang chọn</span>
+        <div role="radio" aria-checked="true" tabindex="0" style="width: 358px; box-sizing: border-box; display: flex; gap: 12px; align-items: center; padding: 12px; border: 2px solid #1F66D1; border-radius: 10px; background: #EBF2FE">
+          <span style="flex: none; width: 40px; height: 40px; border-radius: 8px; background: #FFFFFF; display: flex; align-items: center; justify-content: center"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1A5BC0" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h2v2h-2zM18 18h2v2h-2zM18 14h2M14 18v2"></path></svg></span>
+          <span style="flex: 1; display: flex; flex-direction: column"><span style="font-weight: 600">Chuyển khoản ngân hàng (quét mã QR)</span><span style="font-size: 12px; font-weight: 500; color: #4E4E58">Quét bằng app ngân hàng. Tiền về đủ là đơn tự xác nhận.</span></span>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1A5BC0" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"></path></svg>
+        </div>
+      </div>
+      <div class="cell">
+        <span class="cap">Focus</span>
+        <div style="width: 358px; box-sizing: border-box; display: flex; gap: 12px; align-items: center; padding: 12px; border: 2px solid #1F66D1; border-radius: 10px; background: #EBF2FE; outline: 2px solid #1F66D1; outline-offset: 2px">
+          <span style="flex: none; width: 40px; height: 40px; border-radius: 8px; background: #FFFFFF; display: flex; align-items: center; justify-content: center"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1A5BC0" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h2v2h-2zM18 18h2v2h-2zM18 14h2M14 18v2"></path></svg></span>
+          <span style="flex: 1; display: flex; flex-direction: column"><span style="font-weight: 600">Chuyển khoản ngân hàng (quét mã QR)</span><span style="font-size: 12px; font-weight: 500; color: #4E4E58">Quét bằng app ngân hàng</span></span>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1A5BC0" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"></path></svg>
+        </div>
+      </div>
+      <div class="cell" style="flex: 1; min-width: 300px">
+        <table class="spec">
+          <thead><tr><th style="width: 30%">Thuộc tính</th><th>Giá trị</th></tr></thead>
+          <tbody>
+            <tr><td>Kích thước</td><td>Đệm 12, gap 12, ô icon 40 bo 8 nền trắng, icon 22.</td></tr>
+            <tr><td>Màu</td><td>Đang chọn: viền 2px <code>accent #1F66D1</code>, nền <code>accent-soft #EBF2FE</code>, tích <code>accent-text #1A5BC0</code>. Chưa chọn (khi có thêm phương thức): viền 1px <code>border-strong #D4D4DB</code>, nền trắng.</td></tr>
+            <tr><td>Chữ</td><td>Tên 14/600 <code>ink</code>, mô tả 12/500 <code>ink-2</code>.</td></tr>
+            <tr><td>Bo · bóng</td><td>Bo 10, không bóng.</td></tr>
+            <tr><td>A11y</td><td>Nhóm <code>role="radiogroup"</code>, thẻ <code>role="radio" aria-checked</code>. Một phương thức thì vẫn hiện để khách biết cách trả tiền.</td></tr>
+            <tr><td>CTA đi kèm</td><td>"Thanh toán", pill 48, icon khoá. Mở trang thanh toán cùng tab.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <p class="used"><b>Dùng ở:</b> Payment.dc.html · DesktopPayment.dc.html</p>
+  </section>
+
+  <section class="sec" aria-labelledby="c-tl">
+    <div>
+      <h2 id="c-tl" class="cname">OrderTimeline</h2>
+      <p class="cdesc">Tiến trình 5 bước của đơn: Đã đặt, Đã thanh toán, Đang chuẩn bị, Đang giao, Đã giao. Điện thoại dọc, máy tính ngang.</p>
+    </div>
+    <span class="lab">Điện thoại · dọc</span>
+    <div class="row" style="gap: 16px">
+      <div class="cell">
+        <span class="cap">Đang chuẩn bị</span>
+        <ol style="width: 260px; list-style: none; margin: 0; padding: 16px; box-sizing: border-box; background: #FFFFFF; border: 1px solid #E4E4E9; border-radius: 12px">
+          <li class="st"><span style="display: flex; flex-direction: column; align-items: center"><span class="dot d-ok"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"></path></svg></span><span class="vl" style="background: #157F3D"></span></span><span style="padding-bottom: 12px"><span class="tl-l">Đã đặt</span><br><span class="tl-s">[giờ] · [ngày]</span></span></li>
+          <li class="st"><span style="display: flex; flex-direction: column; align-items: center"><span class="dot d-ok"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"></path></svg></span><span class="vl" style="background: #157F3D"></span></span><span style="padding-bottom: 12px"><span class="tl-l">Đã thanh toán</span><br><span class="tl-s">[giờ] · [ngày]</span></span></li>
+          <li class="st" aria-current="step"><span style="display: flex; flex-direction: column; align-items: center"><span class="dot d-cur"><span></span></span><span class="vl" style="background: #EBEBEF"></span></span><span style="padding-bottom: 12px"><span class="tl-l" style="font-weight: 600; color: #1A5BC0">Đang chuẩn bị</span><br><span class="tl-s">Cá Về đang soạn hàng</span></span></li>
+          <li class="st"><span style="display: flex; flex-direction: column; align-items: center"><span class="dot d-todo"></span><span class="vl" style="background: #EBEBEF"></span></span><span style="padding-bottom: 12px"><span class="tl-l" style="color: #686874">Đang giao</span></span></li>
+          <li class="st"><span style="display: flex; flex-direction: column; align-items: center"><span class="dot d-todo"></span></span><span><span class="tl-l" style="color: #686874">Đã giao</span></span></li>
+        </ol>
+      </div>
+      <div class="cell">
+        <span class="cap">Đã giao · xanh hết</span>
+        <ol style="width: 260px; list-style: none; margin: 0; padding: 16px; box-sizing: border-box; background: #FFFFFF; border: 1px solid #E4E4E9; border-radius: 12px">
+          <li class="st"><span style="display: flex; flex-direction: column; align-items: center"><span class="dot d-ok"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"></path></svg></span><span class="vl" style="background: #157F3D"></span></span><span style="padding-bottom: 12px"><span class="tl-l">Đã đặt</span><br><span class="tl-s">[giờ] · [ngày]</span></span></li>
+          <li class="st"><span style="display: flex; flex-direction: column; align-items: center"><span class="dot d-ok"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"></path></svg></span><span class="vl" style="background: #157F3D"></span></span><span style="padding-bottom: 12px"><span class="tl-l">Đã thanh toán</span><br><span class="tl-s">[giờ] · [ngày]</span></span></li>
+          <li class="st"><span style="display: flex; flex-direction: column; align-items: center"><span class="dot d-ok"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"></path></svg></span><span class="vl" style="background: #157F3D"></span></span><span style="padding-bottom: 12px"><span class="tl-l">Đang chuẩn bị</span><br><span class="tl-s">[giờ] · [ngày]</span></span></li>
+          <li class="st"><span style="display: flex; flex-direction: column; align-items: center"><span class="dot d-ok"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"></path></svg></span><span class="vl" style="background: #157F3D"></span></span><span style="padding-bottom: 12px"><span class="tl-l">Đang giao</span><br><span class="tl-s">[giờ] · [ngày]</span></span></li>
+          <li class="st" aria-current="step"><span style="display: flex; flex-direction: column; align-items: center"><span class="dot d-ok"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"></path></svg></span></span><span><span class="tl-l" style="font-weight: 600; color: #157F3D">Đã giao</span><br><span class="tl-s">[giờ] · [ngày]</span></span></li>
+        </ol>
+      </div>
+      <div class="cell">
+        <span class="cap">Giao không thành công · bước 4 warn</span>
+        <ol style="width: 260px; list-style: none; margin: 0; padding: 16px; box-sizing: border-box; background: #FFFFFF; border: 1px solid #E4E4E9; border-radius: 12px">
+          <li class="st"><span style="display: flex; flex-direction: column; align-items: center"><span class="dot d-ok"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"></path></svg></span><span class="vl" style="background: #157F3D"></span></span><span style="padding-bottom: 12px"><span class="tl-l">Đã đặt</span></span></li>
+          <li class="st"><span style="display: flex; flex-direction: column; align-items: center"><span class="dot d-ok"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"></path></svg></span><span class="vl" style="background: #157F3D"></span></span><span style="padding-bottom: 12px"><span class="tl-l">Đã thanh toán</span></span></li>
+          <li class="st"><span style="display: flex; flex-direction: column; align-items: center"><span class="dot d-ok"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"></path></svg></span><span class="vl" style="background: #A85A07"></span></span><span style="padding-bottom: 12px"><span class="tl-l">Đang chuẩn bị</span></span></li>
+          <li class="st" aria-current="step"><span style="display: flex; flex-direction: column; align-items: center"><span class="dot d-warn"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" aria-hidden="true"><path d="M12 6v7M12 18h.01"></path></svg></span><span class="vl" style="background: #EBEBEF"></span></span><span style="padding-bottom: 12px"><span class="tl-l" style="font-weight: 600; color: #A85A07">Chưa giao được</span><br><span class="tl-s">Cá Về sẽ gọi hẹn lại giờ giao</span></span></li>
+          <li class="st"><span style="display: flex; flex-direction: column; align-items: center"><span class="dot d-todo"></span></span><span><span class="tl-l" style="color: #686874">Đã giao</span></span></li>
+        </ol>
+      </div>
+      <div class="cell">
+        <span class="cap">Đã huỷ · crit</span>
+        <ol style="width: 260px; list-style: none; margin: 0; padding: 16px; box-sizing: border-box; background: #FFFFFF; border: 1px solid #E4E4E9; border-radius: 12px">
+          <li class="st"><span style="display: flex; flex-direction: column; align-items: center"><span class="dot d-ok"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"></path></svg></span><span class="vl" style="background: #157F3D"></span></span><span style="padding-bottom: 12px"><span class="tl-l">Đã đặt</span></span></li>
+          <li class="st"><span style="display: flex; flex-direction: column; align-items: center"><span class="dot d-ok"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"></path></svg></span><span class="vl" style="background: #C0312B"></span></span><span style="padding-bottom: 12px"><span class="tl-l">Đã thanh toán</span></span></li>
+          <li class="st" aria-current="step"><span style="display: flex; flex-direction: column; align-items: center"><span class="dot d-crit"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" aria-hidden="true"><path d="M7 7l10 10M17 7L7 17"></path></svg></span><span class="vl" style="background: #EBEBEF"></span></span><span style="padding-bottom: 12px"><span class="tl-l" style="font-weight: 600; color: #C0312B">Đã huỷ</span><br><span class="tl-s">Cá Về sẽ gọi cho bạn</span></span></li>
+          <li class="st"><span style="display: flex; flex-direction: column; align-items: center"><span class="dot d-todo" style="opacity: 0.5"></span><span class="vl" style="background: #EBEBEF"></span></span><span style="padding-bottom: 12px"><span class="tl-l" style="color: #8C8C98; text-decoration: line-through">Đang giao</span></span></li>
+          <li class="st"><span style="display: flex; flex-direction: column; align-items: center"><span class="dot d-todo" style="opacity: 0.5"></span></span><span><span class="tl-l" style="color: #8C8C98; text-decoration: line-through">Đã giao</span></span></li>
+        </ol>
+      </div>
+    </div>
+
+    <span class="lab">Máy tính · ngang</span>
+    <div style="display: flex; flex-direction: column; gap: 12px">
+      <div style="background: #FFFFFF; border: 1px solid #E4E4E9; border-radius: 12px; padding: 20px 24px; display: flex; flex-direction: column; gap: 12px">
+        <span class="cap">Đang chuẩn bị</span>
+        <ol style="list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr))">
+          <li><span style="display: flex; align-items: center"><span class="dot d-ok"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"></path></svg></span><span style="flex: 1; height: 2px; background: #157F3D; margin: 0 6px"></span></span><span class="tl-l" style="display: block; padding-top: 6px">Đã đặt</span><span class="tl-s">[giờ] · [ngày]</span></li>
+          <li><span style="display: flex; align-items: center"><span class="dot d-ok"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"></path></svg></span><span style="flex: 1; height: 2px; background: #157F3D; margin: 0 6px"></span></span><span class="tl-l" style="display: block; padding-top: 6px">Đã thanh toán</span><span class="tl-s">[giờ] · [ngày]</span></li>
+          <li aria-current="step"><span style="display: flex; align-items: center"><span class="dot d-cur"><span></span></span><span style="flex: 1; height: 2px; background: #EBEBEF; margin: 0 6px"></span></span><span class="tl-l" style="display: block; padding-top: 6px; font-weight: 600; color: #1A5BC0">Đang chuẩn bị</span><span class="tl-s">Cá Về đang soạn hàng</span></li>
+          <li><span style="display: flex; align-items: center"><span class="dot d-todo"></span><span style="flex: 1; height: 2px; background: #EBEBEF; margin: 0 6px"></span></span><span class="tl-l" style="display: block; padding-top: 6px; color: #686874">Đang giao</span></li>
+          <li><span style="display: flex; align-items: center"><span class="dot d-todo"></span></span><span class="tl-l" style="display: block; padding-top: 6px; color: #686874">Đã giao</span></li>
+        </ol>
+      </div>
+      <div style="background: #FFFFFF; border: 1px solid #E4E4E9; border-radius: 12px; padding: 20px 24px; display: flex; flex-direction: column; gap: 12px">
+        <span class="cap">Giao không thành công</span>
+        <ol style="list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr))">
+          <li><span style="display: flex; align-items: center"><span class="dot d-ok"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"></path></svg></span><span style="flex: 1; height: 2px; background: #157F3D; margin: 0 6px"></span></span><span class="tl-l" style="display: block; padding-top: 6px">Đã đặt</span></li>
+          <li><span style="display: flex; align-items: center"><span class="dot d-ok"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"></path></svg></span><span style="flex: 1; height: 2px; background: #157F3D; margin: 0 6px"></span></span><span class="tl-l" style="display: block; padding-top: 6px">Đã thanh toán</span></li>
+          <li><span style="display: flex; align-items: center"><span class="dot d-ok"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"></path></svg></span><span style="flex: 1; height: 2px; background: #A85A07; margin: 0 6px"></span></span><span class="tl-l" style="display: block; padding-top: 6px">Đang chuẩn bị</span></li>
+          <li aria-current="step"><span style="display: flex; align-items: center"><span class="dot d-warn"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" aria-hidden="true"><path d="M12 6v7M12 18h.01"></path></svg></span><span style="flex: 1; height: 2px; background: #EBEBEF; margin: 0 6px"></span></span><span class="tl-l" style="display: block; padding-top: 6px; font-weight: 600; color: #A85A07">Chưa giao được</span><span class="tl-s">Cá Về sẽ gọi hẹn lại</span></li>
+          <li><span style="display: flex; align-items: center"><span class="dot d-todo"></span></span><span class="tl-l" style="display: block; padding-top: 6px; color: #686874">Đã giao</span></li>
+        </ol>
+      </div>
+    </div>
+    <table class="spec">
+      <thead><tr><th style="width: 18%">Thuộc tính</th><th>Giá trị</th></tr></thead>
+      <tbody>
+        <tr><td>Chấm</td><td>24×24 bo 999. Xong: nền <code>good #157F3D</code> + tích trắng. Hiện tại: viền 2px <code>accent #1F66D1</code>, lõi 10 <code>accent</code>. Chưa: viền 2px <code>border-strong #D4D4DB</code>. Lỗi giao: nền <code>warn #A85A07</code> + "!". Huỷ: nền <code>crit #C0312B</code> + "×".</td></tr>
+        <tr><td>Đường nối</td><td>2px. Giữa hai bước xong: <code>good</code>. Dẫn tới bước lỗi: màu của bước lỗi (<code>warn</code> / <code>crit</code>). Phần chưa tới: <code>surface-3 #EBEBEF</code>.</td></tr>
+        <tr><td>Chữ</td><td>Nhãn 14/500 <code>ink</code>, bước hiện tại 14/600 theo màu trạng thái. Dòng phụ 12 <code>ink-3</code>: giờ, ngày, hoặc câu hướng dẫn. Bước chưa tới <code>ink-3</code>; khi huỷ gạch ngang <code>#8C8C98</code>.</td></tr>
+        <tr><td>Bố cục</td><td>Điện thoại: dọc, gap 12 giữa chấm và chữ, mỗi bước <code>padding-bottom: 12px</code>. Máy tính: lưới 5 cột, đường nối nằm ngang cạnh chấm.</td></tr>
+        <tr><td>Dữ liệu</td><td>Chỉ hiện trạng thái và thời điểm. Không hiện tên, SĐT, địa chỉ người nhận hay tên shipper.</td></tr>
+        <tr><td>A11y</td><td><code>&lt;ol aria-label="Tiến trình đơn"&gt;</code>, bước hiện tại <code>aria-current="step"</code>. Icon có chữ ẩn "(xong)", "(lỗi)".</td></tr>
+        <tr><td>Chuyển động</td><td>Không animate khi tải. Khi trạng thái đổi lúc đang mở trang: chấm đổi màu 150ms.</td></tr>
+      </tbody>
+    </table>
+    <p class="used"><b>Dùng ở:</b> Success.dc.html · E2-Cancelled.dc.html · E3-Delivered.dc.html · E4-DeliveryFailed.dc.html · DesktopSuccess.dc.html · DesktopOrderStates.dc.html · F1-Lookup.dc.html · DesktopLookup.dc.html</p>
+  </section>
+
+  <section class="sec" aria-labelledby="c-osb">
+    <div>
+      <h2 id="c-osb" class="cname">OrderStatusBadge</h2>
+      <p class="cdesc">Nhãn trạng thái đơn ngắn gọn, dùng ở đầu trang đơn và kết quả tra cứu. Mỗi trạng thái có màu và icon riêng.</p>
+    </div>
+    <div class="row" style="gap: 12px">
+      <div class="cell"><span class="cap">pending_payment</span><span class="bdg" style="background: #FDF3E3; color: #A85A07"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#A85A07" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>Chờ thanh toán</span></div>
+      <div class="cell"><span class="cap">payment_verifying</span><span class="bdg" style="background: #EBEBEF; color: #4E4E58"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#4E4E58" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-3-6.7M21 4v4h-4"></path></svg>Đang chờ xác nhận tiền</span></div>
+      <div class="cell"><span class="cap">awaiting_confirm</span><span class="bdg" style="background: #EBEBEF; color: #4E4E58"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#4E4E58" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9l1-5h16l1 5M4 9v11h16V9M9 20v-6h6v6"></path></svg>Chờ cửa hàng xác nhận</span></div>
+      <div class="cell"><span class="cap">preparing</span><span class="bdg" style="background: #EBF2FE; color: #1A5BC0"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#1A5BC0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8l8-4 8 4v8l-8 4-8-4zM4 8l8 4 8-4"></path></svg>Đang chuẩn bị</span></div>
+      <div class="cell"><span class="cap">shipping</span><span class="bdg" style="background: #EBF2FE; color: #1A5BC0"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#1A5BC0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7h11v9H3zM14 10h4l3 3v3h-7"></path></svg>Đang giao</span></div>
+      <div class="cell"><span class="cap">delivered</span><span class="bdg" style="background: #E9F7EE; color: #157F3D"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#157F3D" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"></path></svg>Đã giao</span></div>
+      <div class="cell"><span class="cap">delivery_failed</span><span class="bdg" style="background: #FDF3E3; color: #A85A07"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#A85A07" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 6v7M12 18h.01"></path></svg>Chưa giao được</span></div>
+      <div class="cell"><span class="cap">cancelled</span><span class="bdg" style="background: #FCEDEC; color: #C0312B"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#C0312B" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M7 7l10 10M17 7L7 17"></path></svg>Đã huỷ</span></div>
+    </div>
+    <div class="row" style="gap: 12px; align-items: center">
+      <span class="cap">Cỡ lớn · đầu trang đơn máy tính</span>
+      <span class="bdg" style="height: 32px; padding: 0 12px; border-radius: 999px; font-size: 14px; background: #EBF2FE; color: #1A5BC0"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#1A5BC0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7h11v9H3zM14 10h4l3 3v3h-7"></path></svg>Đang giao</span>
+      <span class="bdg" style="height: 32px; padding: 0 12px; border-radius: 999px; font-size: 14px; background: #E9F7EE; color: #157F3D"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#157F3D" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"></path></svg>Đã giao</span>
+    </div>
+    <table class="spec">
+      <thead><tr><th style="width: 22%">Trạng thái</th><th style="width: 22%">Tông</th><th>Nền · chữ · ý nghĩa</th></tr></thead>
+      <tbody>
+        <tr><td>Chờ thanh toán</td><td>warn</td><td><code>warn-soft #FDF3E3</code> · <code>warn #A85A07</code>. Khách cần làm gì đó (trả tiền trước khi hết giờ giữ).</td></tr>
+        <tr><td>Đang chờ xác nhận tiền</td><td>neutral</td><td><code>surface-3 #EBEBEF</code> · <code>ink-2 #4E4E58</code>. Đã chuyển, chờ ngân hàng báo về. Khách không cần làm gì.</td></tr>
+        <tr><td>Chờ cửa hàng xác nhận</td><td>neutral</td><td>Như trên. Đơn đã trả tiền, chờ Cá Về gọi xác nhận.</td></tr>
+        <tr><td>Đang chuẩn bị · Đang giao</td><td>accent</td><td><code>accent-soft #EBF2FE</code> · <code>accent-text #1A5BC0</code>. Đơn đang chạy bình thường.</td></tr>
+        <tr><td>Đã giao</td><td>good</td><td><code>good-soft #E9F7EE</code> · <code>good #157F3D</code>.</td></tr>
+        <tr><td>Chưa giao được</td><td>warn</td><td><code>warn-soft</code> · <code>warn</code>. Có vấn đề nhưng còn xử lý được.</td></tr>
+        <tr><td>Đã huỷ</td><td>crit</td><td><code>crit-soft #FCEDEC</code> · <code>crit #C0312B</code>. Đơn đã trả tiền mà bị huỷ: chỉ ghi "Cá Về sẽ gọi cho bạn", không hứa hẹn về khoản tiền.</td></tr>
+        <tr><td>Kích thước</td><td colspan="2">Thường: cao 24, đệm 0 8, bo 6, chữ 12/500, icon 12, gap 4. Cỡ lớn: cao 32, đệm 0 12, bo 999, chữ 14/500, icon 14. Không bóng, không chuyển động.</td></tr>
+        <tr><td>A11y</td><td colspan="2">Chữ là nội dung, icon <code>aria-hidden</code>. Tương phản chữ/nền ≥ 4.5:1 cho cả 8 trạng thái.</td></tr>
+      </tbody>
+    </table>
+    <p class="used"><b>Dùng ở:</b> Success.dc.html · E2-Cancelled.dc.html · E3-Delivered.dc.html · E4-DeliveryFailed.dc.html · D3-PayPending.dc.html · F1-Lookup.dc.html · DesktopSuccess.dc.html · DesktopOrderStates.dc.html · DesktopLookup.dc.html · DesktopPayPending.dc.html</p>
+  </section>
+
+  <section class="sec" aria-labelledby="c-ol">
+    <div>
+      <h2 id="c-ol" class="cname">OrderLines</h2>
+      <p class="cdesc">Danh sách món của một đơn đã tạo kèm tổng tiền. Chỉ đọc, không sửa số lượng.</p>
+    </div>
+    <div class="row">
+      <div class="cell">
+        <span class="cap">Điện thoại</span>
+        <section style="width: 358px; box-sizing: border-box; background: #FFFFFF; border: 1px solid #E4E4E9; border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 10px">
+          <div style="display: flex; justify-content: space-between; align-items: baseline"><h3 style="margin: 0; font-size: 15px; font-weight: 600">Món đã đặt</h3><span class="num" style="font-size: 13px; color: #686874">Đơn SO[mã đơn]</span></div>
+          <ul style="list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px">
+            <li style="display: flex; gap: 10px; align-items: center"><span class="th" style="width: 44px; height: 44px"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#686874" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3c-3 0-5 3-5 7v3h10v-3c0-4-2-7-5-7zM8 13l-1 7M10.5 13l-.5 8M13.5 13l.5 8M16 13l1 7"></path></svg></span><span style="flex: 1; display: flex; flex-direction: column"><span style="font-weight: 500">Mực ống làm sạch</span><span class="num" style="font-size: 12px; color: #686874">1,5 kg × 278.000đ</span></span><span class="num" style="font-weight: 600">417.000đ</span></li>
+            <li style="display: flex; gap: 10px; align-items: center"><span class="th" style="width: 44px; height: 44px"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#686874" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12c2.6-3.6 6-5.5 9.5-5.5 2.7 0 4.7 1.9 6.5 5.5-1.8 3.6-3.8 5.5-6.5 5.5C11 17.5 7.6 15.6 5 12zM5 12L2 8.5M5 12l-3 3.5"></path></svg></span><span style="flex: 1; display: flex; flex-direction: column"><span style="font-weight: 500">Cá thu cắt khúc</span><span class="num" style="font-size: 12px; color: #686874">1 kg × 330.000đ</span></span><span class="num" style="font-weight: 600">330.000đ</span></li>
+            <li style="display: flex; gap: 10px; align-items: center"><span class="th" style="width: 44px; height: 44px"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#686874" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8l8-4 8 4v8l-8 4-8-4zM4 8l8 4 8-4M12 12v8"></path></svg></span><span style="flex: 1; display: flex; flex-direction: column"><span style="font-weight: 500">Combo lẩu hải sản</span><span class="num" style="font-size: 12px; color: #686874">1 combo × 259.000đ</span></span><span class="num" style="font-weight: 600">259.000đ</span></li>
+          </ul>
+          <div style="border-top: 1px solid #E4E4E9; padding-top: 10px; display: flex; flex-direction: column; gap: 6px">
+            <div class="sum"><span>Tạm tính</span><span class="num">1.006.000đ</span></div>
+            <div style="display: flex; justify-content: space-between; align-items: baseline"><span style="font-weight: 600">Đã thanh toán</span><span class="num" style="font-size: 17px; font-weight: 600; color: #1A5BC0">1.006.000đ</span></div>
+            <p style="margin: 0; font-size: 13px; color: #4E4E58">Đã gồm giao hàng. Bạn trả một lần, không trả thêm khi nhận hàng.</p>
+          </div>
+        </section>
+      </div>
+      <div class="cell">
+        <span class="cap">Máy tính · bảng</span>
+        <section style="width: 560px; box-sizing: border-box; background: #FFFFFF; border: 1px solid #E4E4E9; border-radius: 12px; padding: 20px 24px; display: flex; flex-direction: column; gap: 12px">
+          <h3 style="margin: 0; font-size: 17px; font-weight: 600">Món đã đặt</h3>
+          <table style="width: 100%; border-collapse: collapse; font-size: 14px">
+            <thead><tr style="font-size: 12px; color: #4E4E58; text-align: left"><th style="font-weight: 600; padding: 6px 0; border-bottom: 1px solid #E4E4E9">Món</th><th style="font-weight: 600; padding: 6px 0; border-bottom: 1px solid #E4E4E9; text-align: right">Số lượng</th><th style="font-weight: 600; padding: 6px 0; border-bottom: 1px solid #E4E4E9; text-align: right">Đơn giá</th><th style="font-weight: 600; padding: 6px 0; border-bottom: 1px solid #E4E4E9; text-align: right">Thành tiền</th></tr></thead>
+            <tbody class="num">
+              <tr><td style="padding: 10px 0; border-bottom: 1px solid #E4E4E9">Mực ống làm sạch</td><td style="text-align: right; border-bottom: 1px solid #E4E4E9">1,5 kg</td><td style="text-align: right; border-bottom: 1px solid #E4E4E9; color: #4E4E58">278.000đ</td><td style="text-align: right; border-bottom: 1px solid #E4E4E9; font-weight: 600">417.000đ</td></tr>
+              <tr><td style="padding: 10px 0; border-bottom: 1px solid #E4E4E9">Cá thu cắt khúc</td><td style="text-align: right; border-bottom: 1px solid #E4E4E9">1 kg</td><td style="text-align: right; border-bottom: 1px solid #E4E4E9; color: #4E4E58">330.000đ</td><td style="text-align: right; border-bottom: 1px solid #E4E4E9; font-weight: 600">330.000đ</td></tr>
+              <tr><td style="padding: 10px 0; border-bottom: 1px solid #E4E4E9">Combo lẩu hải sản</td><td style="text-align: right; border-bottom: 1px solid #E4E4E9">1 combo</td><td style="text-align: right; border-bottom: 1px solid #E4E4E9; color: #4E4E58">259.000đ</td><td style="text-align: right; border-bottom: 1px solid #E4E4E9; font-weight: 600">259.000đ</td></tr>
+            </tbody>
+            <tfoot>
+              <tr><td colspan="3" style="padding: 10px 0 0; font-weight: 600">Tổng tiền hàng</td><td class="num" style="text-align: right; padding-top: 10px; font-size: 20px; font-weight: 600; color: #1A5BC0">1.006.000đ</td></tr>
+              <tr><td colspan="4" style="padding-top: 4px; font-size: 13px; color: #4E4E58">Đã gồm giao hàng. Bạn trả một lần, không trả thêm khi nhận hàng.</td></tr>
+            </tfoot>
+          </table>
+        </section>
+      </div>
+    </div>
+    <table class="spec">
+      <thead><tr><th style="width: 18%">Thuộc tính</th><th>Giá trị</th></tr></thead>
+      <tbody>
+        <tr><td>Dòng</td><td>Điện thoại: ảnh 44 · tên 14/500 · "1,5 kg × 278.000đ" 12 <code>ink-3</code> · thành tiền 14/600 căn phải. Máy tính: bảng 4 cột, số căn phải, tabular.</td></tr>
+        <tr><td>Tổng</td><td>Tạm tính, [Mã giảm giá (MÃ) −…], dòng chốt, rồi câu "Đã gồm giao hàng…" 13 <code>ink-2</code> (không dòng "Phí giao", BR-BH-30). Nhãn chốt theo trạng thái: "Cần thanh toán" (chờ thanh toán), "Đã thanh toán" (đã nhận tiền), "Tổng tiền hàng" (chung). Số chốt 17/600 (điện thoại) / 20/600 (máy tính) <code>accent-text</code>.</td></tr>
+        <tr><td>Khung</td><td>Nền <code>surface</code>, viền <code>border</code>, bo 12, đệm 16 (điện thoại) / 20 24 (máy tính). Không bóng.</td></tr>
+        <tr><td>Dữ liệu</td><td>Giá theo giá lúc đặt (snapshot trên đơn), không lấy giá hiện tại. Không có giá vốn, không có lô, không có ngày nhập. Không hiện người nhận.</td></tr>
+        <tr><td>A11y</td><td>Máy tính dùng <code>&lt;table&gt;</code> thật có <code>&lt;th&gt;</code>. Điện thoại dùng <code>&lt;ul&gt;</code>.</td></tr>
+      </tbody>
+    </table>
+    <p class="used"><b>Dùng ở:</b> Payment.dc.html · Success.dc.html · E2-Cancelled.dc.html · E3-Delivered.dc.html · E4-DeliveryFailed.dc.html · DesktopPayment.dc.html · DesktopSuccess.dc.html · DesktopOrderStates.dc.html</p>
+  </section>
+
+  <section class="sec" aria-labelledby="c-ok">
+    <div>
+      <h2 id="c-ok" class="cname">SuccessBanner</h2>
+      <p class="cdesc">Thông báo thanh toán thành công ở đầu trang đơn khi khách vừa trả tiền xong. Đóng được, không tự ẩn.</p>
+    </div>
+    <div class="row">
+      <div class="cell">
+        <span class="cap">Điện thoại</span>
+        <div role="status" style="width: 358px; box-sizing: border-box; padding: 14px; border-radius: 12px; background: #E9F7EE; display: flex; gap: 12px; align-items: flex-start">
+          <span style="flex: none; width: 36px; height: 36px; border-radius: 18px; background: #157F3D; display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"></path></svg></span>
+          <span style="flex: 1; display: flex; flex-direction: column"><span style="font-weight: 600; color: #157F3D">Thanh toán thành công</span><span style="font-size: 13px; color: #17171C">Cá Về sẽ gọi xác nhận trước khi giao.</span></span>
+          <button class="ib" aria-label="Đóng thông báo" style="margin: -6px -6px 0 0"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#157F3D" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg></button>
+        </div>
+      </div>
+      <div class="cell">
+        <span class="cap">Máy tính · có viền</span>
+        <div role="status" style="width: 640px; box-sizing: border-box; background: #E9F7EE; border: 1px solid #BFE5CC; border-radius: 12px; padding: 10px 8px 10px 16px; display: flex; align-items: center; gap: 12px">
+          <span style="flex: none; width: 32px; height: 32px; border-radius: 16px; background: #157F3D; display: flex; align-items: center; justify-content: center"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"></path></svg></span>
+          <span style="flex: 1"><span style="font-weight: 600; color: #157F3D">Thanh toán thành công.</span> <span style="color: #17171C">Cá Về sẽ gọi xác nhận đơn <span class="num" style="font-weight: 600">SO[mã đơn]</span> trước khi giao.</span></span>
+          <button class="ib" aria-label="Đóng thông báo" style="width: 40px; height: 40px; outline: 2px solid #1F66D1; outline-offset: 2px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#157F3D" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg></button>
+        </div>
+        <span style="font-size: 11px; color: #686874">Nút đóng đang focus</span>
+      </div>
+    </div>
+    <table class="spec">
+      <thead><tr><th style="width: 18%">Thuộc tính</th><th style="width: 41%">Điện thoại</th><th>Máy tính</th></tr></thead>
+      <tbody>
+        <tr><td>Kích thước</td><td>Đệm 14, gap 12, vòng icon 36, nút đóng 36 (lùi -6 vào góc).</td><td>Đệm 10 8 10 16, một dòng, vòng icon 32, nút đóng 40.</td></tr>
+        <tr><td>Màu</td><td colspan="2">Nền <code>good-soft #E9F7EE</code>, tiêu đề + vòng + nút đóng <code>good #157F3D</code>, thân <code>ink #17171C</code>. Máy tính thêm viền <code>#BFE5CC</code> (good pha nhạt, chỉ dùng ở đây).</td></tr>
+        <tr><td>Chữ</td><td>Tiêu đề 14/600, thân 13/400.</td><td>14, tiêu đề 600 cùng dòng.</td></tr>
+        <tr><td>Bo · bóng</td><td colspan="2">Bo 12. Không bóng.</td></tr>
+        <tr><td>Chuyển động</td><td colspan="2">Vào: <code>opacity 0→1</code> + <code>translateY(-8px)→0</code> 200ms <code>cubic-bezier(.23,1,.32,1)</code>. Đóng: mờ 150ms rồi thu chiều cao. Reduced-motion: chỉ fade.</td></tr>
+        <tr><td>Khi nào hiện</td><td colspan="2">Chỉ khi quay về từ cổng thanh toán với kết quả thành công và server đã xác nhận. Đóng xong không hiện lại khi tải lại trang..</td></tr>
+        <tr><td>A11y</td><td colspan="2"><code>role="status"</code> để đọc một lần. Nút đóng có nhãn "Đóng thông báo"; đóng xong đưa focus về tiêu đề trang.</td></tr>
+      </tbody>
+    </table>
+    <p class="used"><b>Dùng ở:</b> Success.dc.html · DesktopSuccess.dc.html</p>
+  </section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":8890}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

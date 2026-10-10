@@ -1,0 +1,65 @@
+.chip {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  height: var(--h-chip);
+  padding: 0 14px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-full);
+  background: var(--surface);
+  color: var(--ink-2);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    transform var(--dur-press) var(--ease-out),
+    background-color var(--dur-color) ease-out,
+    border-color var(--dur-color) ease-out,
+    color var(--dur-color) ease-out;
+}
+
+/* Vùng chạm mở rộng tới 44 px mà không đổi chiều cao hiển thị */
+.chip::before {
+  content: "";
+  position: absolute;
+  inset: -2px 0;
+}
+
+.chip:active {
+  transform: scale(0.97);
+}
+
+.link {
+  height: 44px;
+  padding: 0 18px;
+  color: var(--ink);
+  font-size: 14px;
+}
+.link::before {
+  inset: 0;
+}
+
+.selected {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .chip:not(.selected):hover {
+    background: var(--surface-2);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chip:active {
+    transform: none;
+  }
+}

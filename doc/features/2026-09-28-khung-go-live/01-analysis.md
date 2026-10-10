@@ -1,6 +1,22 @@
 # Khung go-live pháp lý trên web (footer người bán, trang chính sách, đồng ý dữ liệu cá nhân) — Phân tích nghiệp vụ
 > PO (thay BA, bản ngắn) · 2026-09-28 · Nguồn: `doc/ops/go-live-phap-ly.md` · Trạng thái: **ĐÃ DUYỆT** (Duy 28/09, chốt scope qua câu hỏi)
 
+```mermaid
+flowchart TD
+    A["Pháp lý soạn 4 trang chính sách"] --> B{"Duy duyệt nội dung?"}
+    B -->|"Duyệt"| C["Đăng trang bằng CMS"]
+    D["Thông tin người bán đặt trong cấu hình"] --> E["Chân trang hiện thông tin người bán"]
+    C --> F["Chân trang có link chính sách"]
+    G["Khách vào trang thanh toán"] --> H{"Đã có chính sách bảo mật đăng?"}
+    H -->|"Chưa"| I["Shop tạm chưa nhận đơn"]
+    H -->|"Có"| J{"Khách tick đồng ý?"}
+    J -->|"Chưa"| K["Nút đặt hàng bị khoá"]
+    J -->|"Rồi"| L["Tạo đơn, lưu giờ và bản chính sách"]
+    L --> M["Báo khách: vựa sẽ gọi xác nhận"]
+    L --> N["Chủ, Quản lý tra bằng chứng đồng ý"]
+    O["Thủ tục ngoài code của Duy"] --> P{"Duy làm xong mới go-live?"}
+```
+
 ## 1. Yêu cầu gốc và phạm vi Duy chốt (28/09)
 - Làm **sau** hồ sơ `2026-09-28-cms-viet-bai`.
 - **Nội dung** các trang chính sách soạn bằng CMS (loại **Trang**). Code chỉ làm **khung**:

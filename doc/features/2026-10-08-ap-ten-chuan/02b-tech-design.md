@@ -4,6 +4,19 @@
 > mục 2.10 (W1–W41). Duy duyệt mục 4 ngày 07/10 ("ok hết", Q-1..Q-5 theo đề xuất PO). Đọc trên `main` @ `d807a2d`.
 > Quyết định nền: `doc/decisions.md` 06/10 "Một tên cho mỗi chứng từ".
 
+```mermaid
+flowchart TD
+    A{"Duy duyệt bảng tên chuẩn"} --> B["Chỉ đổi chữ hiển thị"]
+    B --> C["Pha A: BE và FE đổi nhãn song song"]
+    C --> D["Bỏ qua phần trùng việc Đơn hoàn tất"]
+    D --> E["Chờ lô Đơn hoàn tất gộp xong"]
+    E --> F["Pha B: đổi nốt dòng thời gian, nhật ký"]
+    F --> G["Kiểm migration không đổi dữ liệu"]
+    G --> H["Chạy test và quét chữ cũ"]
+    H --> I["Chạy thử mọi màn ERP"]
+    I --> J["Gộp sau phạm vi dữ liệu và Đơn hoàn tất"]
+```
+
 ## 0. Phạm vi và bất biến của lô
 
 - **Chỉ đổi chữ hiển thị.** Không đổi giá trị DB (`DB` ở bảng T), không đổi `AuditLog.action`, không đổi khoá JSON, route hay

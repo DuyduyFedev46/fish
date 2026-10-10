@@ -4,12 +4,15 @@
 
 import {
   ApiError,
+  type BundleComponent,
   type CatalogItem,
   type CatalogItemDetail,
+  type CatalogResponse,
   type CreateOrderPayload,
   type ItemImage,
   type OrderCancelNotice,
   type PaymentCheckoutSession,
+  type StockLevel,
   type WireCreateOrderResponse,
   type WireOrderStatus,
 } from "./types";
@@ -29,7 +32,7 @@ function toBase64Utf8(text: string): string {
 }
 
 function mockImage(bg: string, label: string, isIllustration = false): ItemImage {
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="480" height="480"><rect width="480" height="480" fill="${bg}"/><text x="240" y="252" font-size="44" text-anchor="middle" fill="#fff" font-family="sans-serif" font-weight="600">${label}</text></svg>`;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="480" height="480"><rect width="480" height="480" fill="${bg}"/><text x="240" y="252" font-size="44" text-anchor="middle" fill="white" font-family="sans-serif" font-weight="600">${label}</text></svg>`;
   const src = `data:image/svg+xml;base64,${toBase64Utf8(svg)}`;
   return { alt: label, is_illustration: isIllustration, urls: { thumb: src, card: src, detail: src } };
 }
@@ -45,122 +48,160 @@ const BROKEN_IMAGE: ItemImage = {
   },
 };
 
-// Seed dùng số để tính toán; ra ngoài qua `toWireItem` với giá/tồn dạng CHUỖI Decimal giống API thật
-// ("65000.00", "120.000") — để mock bắt được lỗi hiển thị kiểu "260000.00đ" (RA-01).
-type MockCatalogItem = Omit<CatalogItemDetail, "price" | "sellable_qty"> & {
+// Seed giữ lượng bán được (`mock_stock`: kg với món lẻ, số combo với BUNDLE) CHỈ để mock tự tính
+// `stock_level` và kiểm đủ hàng lúc đặt. Ra ngoài mock chỉ còn `stock_level` ("in" | "low" | "out"),
+// đúng contract 02b §3.1: không có số kg tồn.
+type MockSeedItem = {
+  item_code: string;
+  name: string;
+  item_type: "SIMPLE" | "BUNDLE";
+  group: { slug: string; name: string };
   price: number;
-  sellable_qty: number;
+  mock_stock: number;
+  image: ItemImage | null;
+  bundle_components?: BundleComponent[];
 };
 
-function toWireItem<T extends MockCatalogItem>(item: T): Omit<T, "price" | "sellable_qty"> & {
-  price: string;
-  sellable_qty: string;
-} {
-  return { ...item, price: item.price.toFixed(2), sellable_qty: item.sellable_qty.toFixed(3) };
+const MOCK_LOW_STOCK = 3; // khớp mặc định SHOP_LOW_STOCK_KG / SHOP_LOW_STOCK_COMBO ở backend
+const MOCK_MIN_STOCK = 1;
+
+function stockLevelOf(stock: number): StockLevel {
+  if (stock < MOCK_MIN_STOCK) return "out";
+  if (stock < MOCK_LOW_STOCK) return "low";
+  return "in";
 }
 
-const MOCK_CATALOG: MockCatalogItem[] = [
+function toWireItem(seed: MockSeedItem): CatalogItem {
+  const isBundle = seed.item_type === "BUNDLE";
+  return {
+    item_code: seed.item_code,
+    name: seed.name,
+    item_type: seed.item_type,
+    unit: isBundle ? "combo" : "kg",
+    price: String(seed.price),
+    stock_level: stockLevelOf(seed.mock_stock),
+    min_qty: "1",
+    qty_step: isBundle ? "1" : "0.5",
+    group: seed.group,
+    short_note: "",
+    image: seed.image,
+  };
+}
+
+function toWireDetail(seed: MockSeedItem): CatalogItemDetail {
+  return {
+    ...toWireItem(seed),
+    description: "",
+    spec: "",
+    storage: "",
+    origin: "",
+    ...(seed.bundle_components ? { bundle_components: seed.bundle_components } : {}),
+  };
+}
+
+const GROUP_FISH = { slug: "ca", name: "Cá" };
+const GROUP_SHRIMP = { slug: "tom", name: "Tôm" };
+const GROUP_SQUID = { slug: "muc", name: "Mực" };
+const GROUP_CRAB = { slug: "cua-ghe", name: "Cua ghẹ" };
+const GROUP_SHELLFISH = { slug: "oc-ngheu-so", name: "Ốc/Nghêu/Sò" };
+const GROUP_COMBO = { slug: "combo", name: "Combo" };
+
+const MOCK_CATALOG: MockSeedItem[] = [
   {
     item_code: "CA-BASA-PHILE",
     name: "Cá basa phi lê",
-    group: "Cá",
     item_type: "SIMPLE",
-    unit: "Kg",
+    group: GROUP_FISH,
     price: 65000,
-    sellable_qty: 120,
+    mock_stock: 120,
     image: null,
   },
   {
     item_code: "CA-THU-KHUC",
     name: "Cá thu cắt khúc",
-    group: "Cá",
     item_type: "SIMPLE",
-    unit: "Kg",
+    group: GROUP_FISH,
     price: 150000,
-    sellable_qty: 60,
-    image: mockImage("#0a6e8c", "Ca thu"),
+    mock_stock: 60,
+    image: mockImage("rgb(10 110 140)", "Ca thu"),
   },
   {
     item_code: "TOM-SU-TUOI",
     name: "Tôm sú tươi",
-    group: "Tôm",
     item_type: "SIMPLE",
-    unit: "Kg",
+    group: GROUP_SHRIMP,
     price: 220000,
-    sellable_qty: 45,
+    // Sắp hết (dưới ngưỡng 3 kg) và ảnh hỏng: thử cả nhãn "Sắp hết" lẫn khung dự phòng.
+    mock_stock: 2.7,
     image: BROKEN_IMAGE,
   },
   {
     item_code: "MUC-ONG",
     name: "Mực ống",
-    group: "Mực",
     item_type: "SIMPLE",
-    unit: "Kg",
+    group: GROUP_SQUID,
     price: 180000,
-    sellable_qty: 30,
+    mock_stock: 30,
     image: null,
   },
   {
     item_code: "GHEO-BIEN",
     name: "Ghẹ biển",
-    group: "Cua ghẹ",
     item_type: "SIMPLE",
-    unit: "Kg",
+    group: GROUP_CRAB,
     price: 240000,
-    sellable_qty: 20,
+    mock_stock: 20,
     // Q8 (02-stories.md): ảnh minh hoạ khi chưa có ảnh Lộc tự chụp — Shop phải ghi rõ nhãn.
-    image: mockImage("#a85a07", "Ghe bien", true),
+    image: mockImage("rgb(168 90 7)", "Ghe bien", true),
   },
   {
     item_code: "NGHEU-TRANG",
     name: "Nghêu trắng",
-    group: "Ốc/Nghêu/Sò",
     item_type: "SIMPLE",
-    unit: "Kg",
+    group: GROUP_SHELLFISH,
     price: 45000,
-    sellable_qty: 80,
+    mock_stock: 80,
     image: null,
   },
   {
     item_code: "CUA-HOANG-DE",
     name: "Cua hoàng đế",
-    group: "Cua ghẹ",
     item_type: "SIMPLE",
-    unit: "Kg",
+    group: GROUP_CRAB,
     price: 950000,
-    sellable_qty: 0,
+    // Luôn hết hàng: ca cố định cho QA (02b §1.6).
+    mock_stock: 0,
     image: null,
   },
   {
     item_code: "COMBO-HAISAN-GD",
     name: "Combo hải sản gia đình",
-    group: "Combo",
     item_type: "BUNDLE",
-    unit: "Kg",
+    group: GROUP_COMBO,
     price: 450000,
-    sellable_qty: 15,
+    mock_stock: 15,
     // A4-AC8: ảnh của COMBO, không tự lấy ảnh thành phần (dù CA-BASA-PHILE ở trên đang image:null).
-    image: mockImage("#157f3d", "Combo"),
+    image: mockImage("rgb(21 127 61)", "Combo"),
     bundle_components: [
-      { item_code: "CA-BASA-PHILE", name: "Cá basa phi lê", qty_per_bundle: 1 },
-      { item_code: "TOM-SU-TUOI", name: "Tôm sú tươi", qty_per_bundle: 0.5 },
-      { item_code: "MUC-ONG", name: "Mực ống", qty_per_bundle: 0.5 },
+      { item_code: "CA-BASA-PHILE", name: "Cá basa phi lê", qty_per_bundle: "1", unit: "kg" },
+      { item_code: "TOM-SU-TUOI", name: "Tôm sú tươi", qty_per_bundle: "0.5", unit: "kg" },
+      { item_code: "MUC-ONG", name: "Mực ống", qty_per_bundle: "0.5", unit: "kg" },
     ],
   },
   {
     item_code: "COMBO-LAU-HAISAN",
     name: "Combo lẩu hải sản",
-    group: "Combo",
     item_type: "BUNDLE",
-    unit: "Kg",
+    group: GROUP_COMBO,
     price: 380000,
-    sellable_qty: 10,
+    // Combo sắp hết (ráp được 2 bộ, dưới ngưỡng 3).
+    mock_stock: 2,
     // A4-AC8: combo chưa có ảnh riêng -> khung mặc định (không mượn ảnh Tôm sú/Mực ống/Nghêu).
     image: null,
     bundle_components: [
-      { item_code: "TOM-SU-TUOI", name: "Tôm sú tươi", qty_per_bundle: 0.3 },
-      { item_code: "MUC-ONG", name: "Mực ống", qty_per_bundle: 0.3 },
-      { item_code: "NGHEU-TRANG", name: "Nghêu trắng", qty_per_bundle: 0.5 },
+      { item_code: "TOM-SU-TUOI", name: "Tôm sú tươi", qty_per_bundle: "0.3", unit: "kg" },
+      { item_code: "MUC-ONG", name: "Mực ống", qty_per_bundle: "0.3", unit: "kg" },
+      { item_code: "NGHEU-TRANG", name: "Nghêu trắng", qty_per_bundle: "0.5", unit: "kg" },
     ],
   },
 ];
@@ -409,15 +450,26 @@ function delay<T>(value: T, ms = 250): Promise<T> {
   return new Promise((resolve) => setTimeout(() => resolve(value), ms));
 }
 
-export async function mockGetCatalog(): Promise<CatalogItem[]> {
-  return delay(
-    MOCK_CATALOG.map(({ bundle_components: _bc, ...rest }) => toWireItem(rest))
-  );
+export async function mockGetCatalog(): Promise<CatalogResponse> {
+  // Thứ tự `items`: tên nhóm, rồi mã (contract 02b §3.1). `groups` chỉ gồm nhóm có món.
+  const items = [...MOCK_CATALOG]
+    .sort(
+      (x, y) =>
+        x.group.name.localeCompare(y.group.name, "vi") || x.item_code.localeCompare(y.item_code)
+    )
+    .map(toWireItem);
+  const groups = new Map<string, { slug: string; name: string; item_count: number }>();
+  for (const it of items) {
+    const g = groups.get(it.group.slug);
+    if (g) g.item_count += 1;
+    else groups.set(it.group.slug, { ...it.group, item_count: 1 });
+  }
+  return delay({ groups: [...groups.values()], items });
 }
 
 export async function mockGetCatalogItem(itemCode: string): Promise<CatalogItemDetail | null> {
   const found = MOCK_CATALOG.find((i) => i.item_code === itemCode);
-  return delay(found ? toWireItem(found) : null);
+  return delay(found ? toWireDetail(found) : null);
 }
 
 function genOrderCode(): string {
@@ -450,7 +502,7 @@ export async function mockCreateOrder(
     if (!item) {
       throw new Error(`Mặt hàng không tồn tại: ${line.item_code}`);
     }
-    if (line.qty > item.sellable_qty) {
+    if (line.qty > item.mock_stock) {
       throw new Error(`Mặt hàng "${item.name}" không đủ tồn kho khả dụng`);
     }
     // Làm tròn nguyên đồng (BR-BH-15, story P5) để số gửi cổng khớp số trên hoá đơn.

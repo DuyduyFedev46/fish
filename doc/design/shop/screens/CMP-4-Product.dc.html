@@ -1,0 +1,653 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<title>Component sản phẩm — đặc tả</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#1A5BC0}
+.num{font-variant-numeric:tabular-nums}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.spec{width:100%;border-collapse:collapse;font-size:12px;background:#FFFFFF}
+.spec th{text-align:left;font-weight:600;color:#4E4E58;padding:6px 10px;border-bottom:1px solid #D4D4DB;background:#F4F4F6}
+.spec td{padding:6px 10px;border-bottom:1px solid #E4E4E9;vertical-align:top;color:#17171C}
+.spec code,.mono{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11px;color:#0E3A73;background:#EBF2FE;padding:1px 4px;border-radius:4px;white-space:nowrap}
+.lab{font-size:12px;font-weight:600;color:#686874;text-transform:uppercase;letter-spacing:.04em}
+.sec{background:#FFFFFF;border:1px solid #E4E4E9;border-radius:12px;padding:24px;display:flex;flex-direction:column;gap:20px}
+.cname{margin:0;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:18px;font-weight:500;color:#0E3A73}
+.cdesc{margin:4px 0 0;color:#4E4E58}
+.row{display:flex;flex-wrap:wrap;gap:24px;align-items:flex-start}
+.cell{display:flex;flex-direction:column;gap:8px}
+.cap{font-size:12px;font-weight:600;color:#4E4E58}
+.cap small{display:block;font-weight:500;color:#686874;font-size:11px}
+.stage{background:#F4F4F6;border-radius:10px;padding:16px;display:flex;gap:12px;align-items:flex-start}
+.used{margin:0;font-size:13px;color:#4E4E58}
+.used b{color:#17171C;font-weight:600}
+.pc{box-sizing:border-box;background:#FFFFFF;border:1px solid #E4E4E9;border-radius:10px;padding:8px;display:flex;flex-direction:column;gap:4px}
+.pc.dt{border-radius:12px;padding:12px}
+.img{position:relative;width:100%;aspect-ratio:3 / 2;border-radius:8px;background:#F4F4F6;display:flex;align-items:center;justify-content:center;margin-bottom:4px}
+.nm{margin:0;font-size:14px;font-weight:500;line-height:1.3;min-height:36px;color:#17171C;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.dt .nm{font-size:15px;min-height:40px}
+.pr{display:flex;align-items:baseline;gap:4px}
+.pv{font-size:17px;font-weight:600;color:#17171C;font-variant-numeric:tabular-nums}
+.pu{font-size:13px;font-weight:500;color:#4E4E58}
+.nt{font-size:12px;font-weight:500;color:#686874;min-height:18px}
+.act{margin-top:auto;padding-top:6px}
+.add{width:100%;height:44px;border-radius:8px;border:1px solid #1F66D1;background:#FFFFFF;color:#1F66D1;font:inherit;font-weight:600;cursor:pointer;transition:background-color 150ms ease-out,transform 120ms cubic-bezier(.23,1,.32,1)}
+.add:hover{background:#EBF2FE}
+.stp{height:44px;border-radius:8px;background:#1F66D1;display:flex;align-items:center;justify-content:space-between}
+.stp button{width:44px;height:44px;border:0;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;border-radius:8px}
+.stp span{color:#FFFFFF;font-weight:600;font-variant-numeric:tabular-nums}
+.ct{height:44px;border-radius:8px;border:1px solid #D4D4DB;background:#FFFFFF;color:#17171C;font-size:14px;font-weight:600;text-decoration:none;display:flex;align-items:center;justify-content:center;gap:6px}
+.bw{position:absolute;top:6px;right:6px;height:22px;padding:0 6px;border-radius:6px;background:#FDF3E3;color:#A85A07;font-size:12px;font-weight:500;display:flex;align-items:center;gap:3px}
+.bo{position:absolute;top:6px;right:6px;height:22px;padding:0 6px;border-radius:6px;background:#EBEBEF;color:#4E4E58;font-size:12px;font-weight:500;display:flex;align-items:center;gap:3px}
+.bc{position:absolute;top:6px;left:6px;height:22px;padding:0 6px;border-radius:6px;background:#FFFFFF;border:1px solid #E4E4E9;color:#4E4E58;font-size:12px;font-weight:500;display:flex;align-items:center}
+.sk{background:#EBEBEF;border-radius:6px;animation:sk 1.4s ease-in-out infinite}
+@keyframes sk{0%,100%{opacity:1}50%{opacity:.55}}
+.ob{height:44px;border:1px solid #D4D4DB;border-radius:8px;display:flex;align-items:center;background:#FFFFFF}
+.ob button{width:44px;height:42px;border:0;background:transparent;display:flex;align-items:center;justify-content:center;border-radius:8px;cursor:pointer}
+.ob .q{min-width:64px;text-align:center;font-weight:600;font-variant-numeric:tabular-nums}
+.ob.sm{height:40px}
+.ob.sm button{width:40px;height:38px}
+.ob.sm .q{min-width:60px;font-size:13px}
+.chip{height:44px;border-radius:8px;border:1px solid #D4D4DB;background:#FFFFFF;color:#17171C;font:inherit;font-weight:600;display:flex;align-items:center;justify-content:center;font-variant-numeric:tabular-nums}
+.chip[aria-pressed="true"]{border:2px solid #1F66D1;background:#EBF2FE;color:#1A5BC0}
+.arrow{align-self:center;display:flex;flex-direction:column;align-items:center;gap:4px;color:#686874;font-size:11px;font-weight:500;font-family:'JetBrains Mono',ui-monospace,monospace}
+.pin{position:absolute;width:18px;height:18px;border-radius:9px;background:#0E3A73;color:#FFFFFF;font-size:11px;font-weight:600;display:flex;align-items:center;justify-content:center;z-index:1}
+.tile{display:flex;flex-direction:column;align-items:center;gap:6px;padding:4px 0 8px;width:64px;text-decoration:none;color:#17171C;font-size:12px;font-weight:500;border-radius:10px}
+.tile span.ic{width:48px;height:48px;border-radius:14px;background:#EBF2FE;display:flex;align-items:center;justify-content:center}
+button:focus-visible,a:focus-visible{outline:2px solid #1F66D1;outline-offset:2px}
+.stp button:focus-visible{outline:2px solid #FFFFFF;outline-offset:-4px}
+@media (prefers-reduced-motion:reduce){.sk{animation:none}}
+</style>
+</helmet>
+<div style="width: 1280px; box-sizing: border-box; padding: 40px; background: #FBFBFC; color: #17171C; font-family: Inter, system-ui, sans-serif; font-size: 14px; line-height: 1.5; display: flex; flex-direction: column; gap: 28px">
+  <div style="display: flex; flex-direction: column; gap: 4px">
+    <span class="lab">CMP-4 · Bảng đặc tả component</span>
+    <h1 style="margin: 0; font-size: 24px; font-weight: 600; letter-spacing: -0.015em">Sản phẩm: thẻ, giá, tồn kho, chọn số kg</h1>
+    <p style="margin: 0; color: #4E4E58; max-width: 880px">Nhóm component hiển thị và mua một món. Số liệu theo <span class="mono">SO-CHUAN.md</span>. Bán theo kg, tối thiểu 1 kg, bước 0,5 kg. Combo bán theo combo, bước 1. Tồn kho chỉ có ba mức Còn, Sắp hết, Hết và không bao giờ hiện số kg. Không hiện ngày nhập hàng.</p>
+  </div>
+
+  <section class="sec" aria-labelledby="c-card">
+    <div>
+      <h2 id="c-card" class="cname">ProductCard</h2>
+      <p class="cdesc">Thẻ một món trong lưới danh mục, hàng cuộn trang chủ và danh sách combo. Bấm ảnh hoặc tên mở trang chi tiết, nút dưới cùng thêm vào giỏ ngay tại chỗ.</p>
+    </div>
+
+    <span class="lab">Thứ bậc nội dung</span>
+    <div class="row" style="align-items: stretch">
+      <div class="stage" style="position: relative; padding: 24px">
+        <article class="pc" style="width: 173px; position: relative">
+          <span class="pin" style="left: -12px; top: 30px">1</span>
+          <span class="pin" style="left: -12px; top: 128px">2</span>
+          <span class="pin" style="left: -12px; top: 166px">3</span>
+          <span class="pin" style="left: -12px; top: 194px">4</span>
+          <span class="pin" style="left: -12px; top: 232px">5</span>
+          <div class="img"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#686874" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3c-3 0-5 3-5 7v3h10v-3c0-4-2-7-5-7zM8 13l-1 7M10.5 13l-.5 8M13.5 13l.5 8M16 13l1 7"></path></svg></div>
+          <h3 class="nm">Mực ống làm sạch</h3>
+          <div class="pr"><span class="pv">278.000đ</span><span class="pu">/ kg</span></div>
+          <div class="nt">Đã bỏ nội tạng</div>
+          <div class="act"><button class="add">Thêm 1 kg</button></div>
+        </article>
+      </div>
+      <ol style="margin: 0; padding: 0 0 0 20px; display: flex; flex-direction: column; gap: 8px; max-width: 560px; color: #4E4E58">
+        <li><b style="color: #17171C">Ảnh 3:2</b> (<span class="mono">aspect-ratio: 3 / 2</span>, bo 8). Badge tồn kho góc phải trên, tag Combo góc trái trên. Xem <span class="mono">ImageFrame</span>.</li>
+        <li><b style="color: #17171C">Tên</b> tối đa 2 dòng (<span class="mono">-webkit-line-clamp: 2</span>), luôn giữ chỗ 2 dòng (<span class="mono">min-height: 36px</span>) để giá các thẻ cùng hàng thẳng nhau.</li>
+        <li><b style="color: #17171C">Giá + đơn vị</b> trên cùng một đường chân chữ. Xem <span class="mono">PriceTag</span> biến thể thẻ.</li>
+        <li><b style="color: #17171C">Ghi chú</b> một dòng: quy cách, size, thành phần combo. Giữ chỗ 18 px kể cả khi trống.</li>
+        <li><b style="color: #17171C">Hành động</b> <span class="mono">margin-top: auto</span> để nút luôn bám đáy thẻ dù tên ngắn hay dài. Thêm 1 kg, stepper, hoặc Liên hệ chúng tôi.</li>
+      </ol>
+    </div>
+
+    <span class="lab">Biến thể</span>
+    <div class="row">
+      <div class="cell">
+        <span class="cap">Dọc · điện thoại<small>lưới 2 cột · rộng 173 · gap 12</small></span>
+        <div class="stage">
+          <article class="pc" style="width: 173px">
+            <div class="img"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#686874" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12c2.6-3.6 6-5.5 9.5-5.5 2.7 0 4.7 1.9 6.5 5.5-1.8 3.6-3.8 5.5-6.5 5.5C11 17.5 7.6 15.6 5 12zM5 12L2 8.5M5 12l-3 3.5"></path></svg></div>
+            <h3 class="nm">Cá thu cắt khúc</h3>
+            <div class="pr"><span class="pv">330.000đ</span><span class="pu">/ kg</span></div>
+            <div class="nt">Cắt khúc dày 2–3 cm</div>
+            <div class="act"><button class="add">Thêm 1 kg</button></div>
+          </article>
+          <article class="pc" style="width: 173px">
+            <div class="img"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#686874" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12c2.6-3.6 6-5.5 9.5-5.5 2.7 0 4.7 1.9 6.5 5.5-1.8 3.6-3.8 5.5-6.5 5.5C11 17.5 7.6 15.6 5 12zM5 12L2 8.5M5 12l-3 3.5"></path></svg></div>
+            <h3 class="nm">Cá ngừ đại dương phi lê không da</h3>
+            <div class="pr"><span class="pv">330.000đ</span><span class="pu">/ kg</span></div>
+            <div class="nt">Phi lê không da</div>
+            <div class="act"><button class="add">Thêm 1 kg</button></div>
+          </article>
+        </div>
+      </div>
+      <div class="cell">
+        <span class="cap">Dọc · máy tính<small>lưới 4 cột · tối thiểu 196 · gap 16 · đệm 12 · bo 12</small></span>
+        <div class="stage">
+          <article class="pc dt" style="width: 232px">
+            <div class="img"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#686874" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 5c-5 0-9 3.5-9 8 0 3 2 5 5 5h3M9 13H5M18 5c2 0 3 1.2 3 3s-1.6 3-3.5 3M12 18l-2 3M16 18l1 3"></path></svg></div>
+            <h3 class="nm">Tôm sú</h3>
+            <div class="pr"><span class="pv">378.000đ</span><span class="pu">/ kg</span></div>
+            <div class="nt">Size 30–35 con/kg</div>
+            <div class="act"><button class="add">Thêm 1 kg</button></div>
+          </article>
+        </div>
+      </div>
+      <div class="cell">
+        <span class="cap">Ngang · hàng cuộn trang chủ<small>rộng cố định 156 · gap 10 · scroll-snap</small></span>
+        <div class="stage" style="width: 300px; overflow: hidden; box-sizing: border-box">
+          <article class="pc" style="width: 156px; flex: none; border: 0">
+            <div class="img"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#686874" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 13a6 4 0 1 0 12 0a6 4 0 1 0-12 0M5 10L3 6l3 1M19 10l2-4-3 1M7 16l-2 3M17 16l2 3"></path></svg><span class="bw"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#A85A07" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 2h12M6 22h12M7 2c0 6 10 6 10 10S7 16 7 22M17 2c0 3-2 4-5 6"></path></svg>Sắp hết</span></div>
+            <h3 class="nm">Ghẹ xanh</h3>
+            <div class="pr"><span class="pv" style="font-size: 16px">420.000đ</span><span class="pu" style="font-size: 12px">/ kg</span></div>
+            <div class="nt">Size 3–4 con/kg</div>
+            <div class="act"><button class="add">Thêm 1 kg</button></div>
+          </article>
+          <article class="pc" style="width: 156px; flex: none; border: 0">
+            <div class="img"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#686874" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12c2.6-3.6 6-5.5 9.5-5.5 2.7 0 4.7 1.9 6.5 5.5-1.8 3.6-3.8 5.5-6.5 5.5C11 17.5 7.6 15.6 5 12zM5 12L2 8.5M5 12l-3 3.5"></path></svg></div>
+            <h3 class="nm">Cá nục bông</h3>
+            <div class="pr"><span class="pv" style="font-size: 16px">75.000đ</span><span class="pu" style="font-size: 12px">/ kg</span></div>
+            <div class="nt">Nguyên con</div>
+            <div class="act"><button class="add">Thêm 1 kg</button></div>
+          </article>
+        </div>
+      </div>
+      <div class="cell">
+        <span class="cap">Dòng ngang · combo<small>ảnh 72 vuông · cả dòng là link</small></span>
+        <div class="stage" style="width: 358px; box-sizing: border-box; flex-direction: column">
+          <a href="A9-ComboDetail.dc.html" style="width: 100%; box-sizing: border-box; background: #FFFFFF; border-radius: 10px; padding: 10px; display: flex; gap: 12px; align-items: center; text-decoration: none; color: #17171C">
+            <span style="flex: none; width: 72px; height: 72px; border-radius: 8px; background: #F4F4F6; display: flex; align-items: center; justify-content: center"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#686874" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8l8-4 8 4v8l-8 4-8-4zM4 8l8 4 8-4M12 12v8"></path></svg></span>
+            <span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px">
+              <span style="font-weight: 500">Combo lẩu hải sản</span>
+              <span style="font-size: 12px; font-weight: 500; color: #686874">Mực, tôm, cá thu · đủ 3–4 người</span>
+              <span><span class="num" style="font-weight: 600">259.000đ</span><span style="font-size: 12px; font-weight: 500; color: #4E4E58"> / combo</span></span>
+            </span>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#686874" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg>
+          </a>
+          <a href="A9-ComboDetail.dc.html" style="width: 100%; box-sizing: border-box; background: #FFFFFF; border-radius: 10px; padding: 10px; display: flex; gap: 12px; align-items: center; text-decoration: none; color: #17171C">
+            <span style="flex: none; width: 72px; height: 72px; border-radius: 8px; background: #F4F4F6; display: flex; align-items: center; justify-content: center"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#686874" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8l8-4 8 4v8l-8 4-8-4zM4 8l8 4 8-4M12 12v8"></path></svg></span>
+            <span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px">
+              <span style="font-weight: 500">Combo nướng</span>
+              <span style="font-size: 12px; font-weight: 500; color: #686874">Mực, tôm sú, cá bớp</span>
+              <span><span class="num" style="font-weight: 600">319.000đ</span><span style="font-size: 12px; font-weight: 500; color: #4E4E58"> / combo</span></span>
+            </span>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#686874" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg>
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <span class="lab">Trạng thái · điện thoại</span>
+    <div class="row" style="gap: 16px">
+      <div class="cell">
+        <span class="cap">Mặc định</span>
+        <article class="pc" style="width: 173px; height: 286px">
+          <div class="img"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#686874" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3c-3 0-5 3-5 7v3h10v-3c0-4-2-7-5-7zM8 13l-1 7M10.5 13l-.5 8M13.5 13l.5 8M16 13l1 7"></path></svg></div>
+          <h3 class="nm">Mực ống làm sạch</h3>
+          <div class="pr"><span class="pv">278.000đ</span><span class="pu">/ kg</span></div>
+          <div class="nt">Đã bỏ nội tạng</div>
+          <div class="act"><button class="add">Thêm 1 kg</button></div>
+        </article>
+      </div>
+      <div class="cell">
+        <span class="cap">Có trong giỏ · stepper</span>
+        <article class="pc" style="width: 173px; height: 286px">
+          <div class="img"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#686874" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3c-3 0-5 3-5 7v3h10v-3c0-4-2-7-5-7zM8 13l-1 7M10.5 13l-.5 8M13.5 13l.5 8M16 13l1 7"></path></svg></div>
+          <h3 class="nm">Mực ống làm sạch</h3>
+          <div class="pr"><span class="pv">278.000đ</span><span class="pu">/ kg</span></div>
+          <div class="nt">Đã bỏ nội tạng</div>
+          <div class="act"><div class="stp"><button aria-label="Bớt 0,5 kg Mực ống làm sạch"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M5 12h14"></path></svg></button><span>1,5 kg</span><button aria-label="Thêm 0,5 kg Mực ống làm sạch"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg></button></div></div>
+        </article>
+      </div>
+      <div class="cell">
+        <span class="cap">Sắp hết</span>
+        <article class="pc" style="width: 173px; height: 286px">
+          <div class="img"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#686874" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 5c-5 0-9 3.5-9 8 0 3 2 5 5 5h3M9 13H5M18 5c2 0 3 1.2 3 3s-1.6 3-3.5 3M12 18l-2 3M16 18l1 3"></path></svg><span class="bw"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#A85A07" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 2h12M6 22h12M7 2c0 6 10 6 10 10S7 16 7 22M17 2c0 3-2 4-5 6"></path></svg>Sắp hết</span></div>
+          <h3 class="nm">Tôm sú</h3>
+          <div class="pr"><span class="pv">378.000đ</span><span class="pu">/ kg</span></div>
+          <div class="nt">Size 30–35 con/kg</div>
+          <div class="act"><button class="add">Thêm 1 kg</button></div>
+        </article>
+      </div>
+      <div class="cell">
+        <span class="cap">Hết hàng</span>
+        <article class="pc" style="width: 173px; height: 286px">
+          <div class="img"><span style="display: flex; opacity: 0.55"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#686874" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12c2.6-3.6 6-5.5 9.5-5.5 2.7 0 4.7 1.9 6.5 5.5-1.8 3.6-3.8 5.5-6.5 5.5C11 17.5 7.6 15.6 5 12zM5 12L2 8.5M5 12l-3 3.5"></path></svg></span><span class="bo"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#4E4E58" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"></circle><path d="M6 6l12 12"></path></svg>Hết hàng</span></div>
+          <h3 class="nm" style="color: #4E4E58">Cá bớp cắt lát</h3>
+          <div class="pr"><span class="pv" style="color: #4E4E58">290.000đ</span><span class="pu">/ kg</span></div>
+          <div class="nt">Cắt lát</div>
+          <div class="act"><a class="ct" href="tel:[hotline]" aria-label="Liên hệ chúng tôi về Cá bớp cắt lát"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#17171C" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2"></path></svg>Liên hệ chúng tôi</a></div>
+        </article>
+      </div>
+      <div class="cell">
+        <span class="cap">Combo</span>
+        <article class="pc" style="width: 173px; height: 286px">
+          <div class="img"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#686874" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8l8-4 8 4v8l-8 4-8-4zM4 8l8 4 8-4M12 12v8"></path></svg><span class="bc">Combo</span></div>
+          <h3 class="nm">Combo lẩu hải sản</h3>
+          <div class="pr"><span class="pv">259.000đ</span><span class="pu">/ combo</span></div>
+          <div class="nt">Mực, tôm, cá thu</div>
+          <div class="act"><button class="add">Thêm 1 combo</button></div>
+        </article>
+      </div>
+      <div class="cell">
+        <span class="cap">Đang tải · skeleton</span>
+        <article class="pc" style="width: 173px; height: 286px" aria-busy="true">
+          <div class="sk" style="width: 100%; aspect-ratio: 3 / 2; border-radius: 8px; margin-bottom: 4px"></div>
+          <div class="sk" style="height: 14px; width: 90%; margin-top: 2px"></div>
+          <div class="sk" style="height: 14px; width: 60%; margin-bottom: 6px"></div>
+          <div class="sk" style="height: 18px; width: 55%"></div>
+          <div class="sk" style="height: 12px; width: 70%; margin-top: 4px"></div>
+          <div class="act"><div class="sk" style="height: 44px; border-radius: 8px"></div></div>
+        </article>
+      </div>
+    </div>
+
+    <span class="lab">Trạng thái · máy tính</span>
+    <div class="row" style="gap: 16px">
+      <div class="cell">
+        <span class="cap">Mặc định</span>
+        <article class="pc dt" style="width: 232px; height: 330px">
+          <div class="img"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#686874" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3c-3 0-5 3-5 7v3h10v-3c0-4-2-7-5-7zM8 13l-1 7M10.5 13l-.5 8M13.5 13l.5 8M16 13l1 7"></path></svg></div>
+          <h3 class="nm">Mực ống làm sạch</h3>
+          <div class="pr"><span class="pv">278.000đ</span><span class="pu">/ kg</span></div>
+          <div class="nt">Đã bỏ nội tạng</div>
+          <div class="act"><button class="add">Thêm 1 kg</button></div>
+        </article>
+      </div>
+      <div class="cell">
+        <span class="cap">Hover thẻ + hover nút</span>
+        <article class="pc dt" style="width: 232px; height: 330px; border-color: #D4D4DB; box-shadow: 0 6px 20px rgba(23,23,28,0.06)">
+          <div class="img"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#686874" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3c-3 0-5 3-5 7v3h10v-3c0-4-2-7-5-7zM8 13l-1 7M10.5 13l-.5 8M13.5 13l.5 8M16 13l1 7"></path></svg></div>
+          <h3 class="nm"><span style="color: #1A5BC0; text-decoration: underline">Mực ống làm sạch</span></h3>
+          <div class="pr"><span class="pv">278.000đ</span><span class="pu">/ kg</span></div>
+          <div class="nt">Đã bỏ nội tạng</div>
+          <div class="act"><button class="add" style="background: #EBF2FE">Thêm 1 kg</button></div>
+        </article>
+      </div>
+      <div class="cell">
+        <span class="cap">Có trong giỏ</span>
+        <article class="pc dt" style="width: 232px; height: 330px">
+          <div class="img"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#686874" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3c-3 0-5 3-5 7v3h10v-3c0-4-2-7-5-7zM8 13l-1 7M10.5 13l-.5 8M13.5 13l.5 8M16 13l1 7"></path></svg></div>
+          <h3 class="nm">Mực ống làm sạch</h3>
+          <div class="pr"><span class="pv">278.000đ</span><span class="pu">/ kg</span></div>
+          <div class="nt">Đã bỏ nội tạng</div>
+          <div class="act"><div class="stp"><button aria-label="Bớt 0,5 kg"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M5 12h14"></path></svg></button><span>2 kg</span><button aria-label="Thêm 0,5 kg"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg></button></div></div>
+        </article>
+      </div>
+      <div class="cell">
+        <span class="cap">Hết hàng</span>
+        <article class="pc dt" style="width: 232px; height: 330px">
+          <div class="img"><span style="display: flex; opacity: 0.55"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#686874" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12c2.6-3.6 6-5.5 9.5-5.5 2.7 0 4.7 1.9 6.5 5.5-1.8 3.6-3.8 5.5-6.5 5.5C11 17.5 7.6 15.6 5 12zM5 12L2 8.5M5 12l-3 3.5"></path></svg></span><span class="bo"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#4E4E58" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"></circle><path d="M6 6l12 12"></path></svg>Hết hàng</span></div>
+          <h3 class="nm" style="color: #4E4E58">Cá bớp cắt lát</h3>
+          <div class="pr"><span class="pv" style="color: #4E4E58">290.000đ</span><span class="pu">/ kg</span></div>
+          <div class="nt">Cắt lát</div>
+          <div class="act"><a class="ct" href="tel:[hotline]" aria-label="Liên hệ chúng tôi về Cá bớp cắt lát"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#17171C" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2"></path></svg>Liên hệ chúng tôi</a></div>
+        </article>
+      </div>
+    </div>
+
+    <table class="spec">
+      <thead><tr><th style="width: 18%">Thuộc tính</th><th style="width: 41%">Điện thoại</th><th>Máy tính</th></tr></thead>
+      <tbody>
+        <tr><td>Kích thước</td><td>Lưới: <code>repeat(2, minmax(0,1fr))</code>, gap 12, lề 16 → rộng 173 trên khổ 390. Ngang: rộng cố định <code>156px</code>, gap 10, <code>scroll-snap-type: x mandatory</code>, lề hàng 0 16.</td><td>Lưới 4 cột <code>repeat(auto-fill, minmax(196px,1fr))</code>, gap 16, trong vùng nội dung cạnh cột lọc (≈ 232). Trang chủ: 4 cột cố định trong container 1200.</td></tr>
+        <tr><td>Đệm · khoảng cách</td><td>Đệm 8. Gap dọc 4. Ảnh cách tên thêm 4 (<code>margin-bottom: 4px</code>). Hành động <code>padding-top: 6px</code>.</td><td>Đệm 12. Gap dọc 4. Còn lại như điện thoại.</td></tr>
+        <tr><td>Thứ bậc</td><td colspan="2">Ảnh 3:2 → tên 2 dòng → giá + đơn vị → ghi chú → hành động <code>margin-top: auto</code>. Thẻ là <code>display: flex; flex-direction: column</code>, cùng hàng cao bằng nhau.</td></tr>
+        <tr><td>Chữ</td><td>Tên 14/500/1.3, <code>min-height: 36px</code>. Giá 17/600 tabular (thẻ ngang 16/600). Đơn vị 13/500 (ngang 12/500). Ghi chú 12/500. Nút 14/600.</td><td>Tên 15/500/1.3, <code>min-height: 40px</code>. Giá 17/600. Còn lại như điện thoại.</td></tr>
+        <tr><td>Màu</td><td colspan="2">Nền <code>surface #FFFFFF</code>, viền <code>border #E4E4E9</code>, ảnh <code>surface-2 #F4F4F6</code>. Tên và giá <code>ink #17171C</code>, đơn vị <code>ink-2 #4E4E58</code>, ghi chú <code>ink-3 #686874</code>. Nút Thêm: viền + chữ <code>accent #1F66D1</code>. Hết hàng: tên và giá <code>ink-2 #4E4E58</code>, ảnh <code>opacity: .55</code>.</td></tr>
+        <tr><td>Bo góc</td><td>Thẻ 10 · ảnh 8 · nút 8 · badge 6.</td><td>Thẻ 12 · ảnh 8 · nút 8 · badge 6.</td></tr>
+        <tr><td>Bóng · hover</td><td>Không bóng. Không hover (thiết bị chạm). Nhấn nút: <code>scale(.97)</code> 120ms.</td><td>Hover thẻ: viền <code>border-strong #D4D4DB</code> + <code>0 6px 20px rgba(23,23,28,.06)</code>, tên gạch chân <code>accent-text #1A5BC0</code>. Hover nút Thêm: nền <code>accent-soft #EBF2FE</code>. 150ms ease-out.</td></tr>
+        <tr><td>Chuyển động</td><td colspan="2">Thêm → stepper: fade + scale .96→1, 180ms <code>cubic-bezier(.23,1,.32,1)</code>. Skeleton nhấp nháy opacity 1 → .55 → 1, 1.4s. <code>prefers-reduced-motion</code>: bỏ scale, skeleton đứng yên.</td></tr>
+        <tr><td>Sắp xếp</td><td colspan="2">Món hết hàng luôn xuống cuối lưới, không ẩn. Trong nhóm còn hàng sắp theo lựa chọn của khách.</td></tr>
+        <tr><td>A11y</td><td colspan="2"><code>&lt;article aria-label="Tên, giá / kg, mức tồn"&gt;</code>. Tên là <code>&lt;h3&gt;&lt;a&gt;</code>. Nút có nhãn đầy đủ: "Thêm 1 kg Mực ống làm sạch vào giỏ". Đổi số lượng báo qua vùng <code>aria-live="polite"</code> chung của trang.</td></tr>
+        <tr><td>Lệch cần sửa</td><td colspan="2"><code>Home.dc.html</code> hàng cuộn đang vẽ ảnh 1:1, ghi chú trên giá, giá màu accent-text và nút "Chọn mua" pill 40. Chuẩn hoá theo thứ bậc trên: ảnh 3:2, giá <code>ink</code>, nút "Thêm 1 kg" 44.</td></tr>
+      </tbody>
+    </table>
+    <p class="used"><b>Dùng ở:</b> Home.dc.html · Main.dc.html · DesktopHome.dc.html · DesktopCategory.dc.html · DesktopProduct.dc.html (món liên quan) · A7-OutOfStock.dc.html · DesktopOutOfStock.dc.html · A0-Loading.dc.html · DesktopLoading.dc.html · Card-states.dc.html</p>
+  </section>
+
+  <section class="sec" aria-labelledby="c-badge">
+    <div>
+      <h2 id="c-badge" class="cname">StockBadge</h2>
+      <p class="cdesc">Nhãn mức tồn kho đặt trên ảnh. Chỉ hai mức có nhãn, mức Còn không gắn nhãn trên thẻ. Không bao giờ chứa số kg hay số lượng.</p>
+    </div>
+    <div class="row">
+      <div class="cell">
+        <span class="cap">Sắp hết · warn</span>
+        <div class="stage"><span style="position: relative; display: block; width: 96px; height: 22px"><span class="bw" style="top: 0; right: auto; left: 0"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#A85A07" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 2h12M6 22h12M7 2c0 6 10 6 10 10S7 16 7 22M17 2c0 3-2 4-5 6"></path></svg>Sắp hết</span></span></div>
+      </div>
+      <div class="cell">
+        <span class="cap">Hết hàng · neutral</span>
+        <div class="stage"><span style="position: relative; display: block; width: 96px; height: 22px"><span class="bo" style="top: 0; right: auto; left: 0"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#4E4E58" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"></circle><path d="M6 6l12 12"></path></svg>Hết hàng</span></span></div>
+      </div>
+      <div class="cell">
+        <span class="cap">Còn · không có badge trên thẻ</span>
+        <div class="stage" style="color: #686874; font-size: 12px; height: 22px; align-items: center">(trống)</div>
+      </div>
+      <div class="cell">
+        <span class="cap">Vị trí trên ảnh<small>top 6 · right 6 · Combo tag ở top 6 · left 6</small></span>
+        <div class="stage">
+          <div class="img" style="width: 200px; margin: 0; background: #FFFFFF; border: 1px dashed #D4D4DB; box-sizing: border-box">
+            <span class="bc">Combo</span>
+            <span class="bw"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#A85A07" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 2h12M6 22h12M7 2c0 6 10 6 10 10S7 16 7 22M17 2c0 3-2 4-5 6"></path></svg>Sắp hết</span>
+            <span style="font-size: 11px; color: #686874; font-family: 'JetBrains Mono', monospace">ảnh 3:2</span>
+          </div>
+        </div>
+      </div>
+      <div class="cell">
+        <span class="cap">Dòng trạng thái ở trang chi tiết</span>
+        <div class="stage" style="flex-direction: column; gap: 6px; background: #FFFFFF; border: 1px solid #E4E4E9">
+          <span style="font-size: 12px; font-weight: 500; color: #157F3D; display: flex; align-items: center; gap: 4px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#157F3D" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"></path></svg>Còn hàng</span>
+          <span style="font-size: 12px; font-weight: 500; color: #A85A07; display: flex; align-items: center; gap: 4px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#A85A07" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 2h12M6 22h12M7 2c0 6 10 6 10 10S7 16 7 22M17 2c0 3-2 4-5 6"></path></svg>Sắp hết, nên đặt sớm</span>
+          <span style="font-size: 12px; font-weight: 500; color: #4E4E58; display: flex; align-items: center; gap: 4px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4E4E58" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"></circle><path d="M6 6l12 12"></path></svg>Hết hàng</span>
+        </div>
+      </div>
+    </div>
+    <table class="spec">
+      <thead><tr><th style="width: 18%">Thuộc tính</th><th>Giá trị</th></tr></thead>
+      <tbody>
+        <tr><td>Kích thước</td><td>Cao 22, đệm ngang 6, gap icon 3, icon 12. Chữ caption 12/500.</td></tr>
+        <tr><td>Màu</td><td>Sắp hết: nền <code>warn-soft #FDF3E3</code>, chữ + icon <code>warn #A85A07</code>. Hết hàng: nền <code>surface-3 #EBEBEF</code>, chữ + icon <code>ink-2 #4E4E58</code>. Không dùng crit cho hết hàng (không phải lỗi).</td></tr>
+        <tr><td>Bo góc · bóng</td><td>Bo 6. Không bóng.</td></tr>
+        <tr><td>Vị trí</td><td><code>position: absolute; top: 6px; right: 6px</code> trong khung ảnh. Không đè lên tag Combo (góc trái).</td></tr>
+        <tr><td>Dữ liệu</td><td>Nhận đúng 1 trong 3 giá trị API: <code>in_stock</code> · <code>low</code> · <code>out</code>. Component không có prop số lượng. Ngưỡng Sắp hết do backend quyết, không lộ ra Shop.</td></tr>
+        <tr><td>A11y</td><td>Icon <code>aria-hidden</code>, chữ là nội dung thật, mức tồn có trong <code>aria-label</code> của thẻ. Màu không phải tín hiệu duy nhất (có chữ + icon).</td></tr>
+      </tbody>
+    </table>
+    <p class="used"><b>Dùng ở:</b> Main.dc.html · Home.dc.html · DesktopCategory.dc.html · DesktopHome.dc.html · Product.dc.html · DesktopProduct.dc.html · A7-OutOfStock.dc.html · DesktopOutOfStock.dc.html</p>
+  </section>
+
+  <section class="sec" aria-labelledby="c-price">
+    <div>
+      <h2 id="c-price" class="cname">PriceTag</h2>
+      <p class="cdesc">Giá kèm đơn vị bán. Định dạng <span class="mono">278.000đ</span> (dấu chấm phân nghìn, đ liền số), luôn <span class="mono">tabular-nums</span>. Đơn vị là "/ kg" hoặc "/ combo".</p>
+    </div>
+    <div class="row" style="align-items: flex-end">
+      <div class="cell">
+        <span class="cap">Thẻ<small>17/600 ink + 13/500 ink-2</small></span>
+        <div class="stage" style="background: #FFFFFF; border: 1px solid #E4E4E9"><div class="pr"><span class="pv">278.000đ</span><span class="pu">/ kg</span></div></div>
+      </div>
+      <div class="cell">
+        <span class="cap">Chi tiết<small>24/600 accent-text + 14/500 ink-2</small></span>
+        <div class="stage" style="background: #FFFFFF; border: 1px solid #E4E4E9"><div class="pr"><span class="num" style="font-size: 24px; font-weight: 600; color: #1A5BC0; letter-spacing: -0.01em">278.000đ</span><span style="font-size: 14px; font-weight: 500; color: #4E4E58">/ kg</span></div></div>
+      </div>
+      <div class="cell">
+        <span class="cap">Giỏ · giá đã đổi<small>giá cũ gạch ngang · giá mới · nhãn warn</small></span>
+        <div class="stage" style="background: #FFFFFF; border: 1px solid #E4E4E9; flex-direction: column; gap: 4px">
+          <div style="display: flex; align-items: baseline; gap: 6px">
+            <del class="num" style="font-size: 12px; font-weight: 500; color: #686874">278.000đ</del>
+            <span class="num" style="font-size: 13px; font-weight: 600; color: #17171C">295.000đ / kg</span>
+          </div>
+          <span style="height: 22px; padding: 0 6px; border-radius: 6px; background: #FDF3E3; color: #A85A07; font-size: 12px; font-weight: 500; display: inline-flex; align-items: center; gap: 4px; align-self: flex-start"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#A85A07" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7M3 4v4h4"></path></svg>Giá đã cập nhật</span>
+        </div>
+      </div>
+      <div class="cell">
+        <span class="cap">Combo<small>đơn vị "/ combo"</small></span>
+        <div class="stage" style="background: #FFFFFF; border: 1px solid #E4E4E9"><div class="pr"><span class="pv">259.000đ</span><span class="pu">/ combo</span></div></div>
+      </div>
+      <div class="cell">
+        <span class="cap">Hết hàng<small>giá giữ nguyên, đổi sang ink-2</small></span>
+        <div class="stage" style="background: #FFFFFF; border: 1px solid #E4E4E9"><div class="pr"><span class="pv" style="color: #4E4E58">290.000đ</span><span class="pu">/ kg</span></div></div>
+      </div>
+    </div>
+    <table class="spec">
+      <thead><tr><th style="width: 18%">Biến thể</th><th style="width: 30%">Chữ</th><th>Màu · ghi chú</th></tr></thead>
+      <tbody>
+        <tr><td>Thẻ</td><td>Giá 17/600 (thẻ ngang 16/600) · đơn vị 13/500 (ngang 12/500) · gap 4 · căn baseline</td><td>Giá <code>ink #17171C</code>, đơn vị <code>ink-2 #4E4E58</code>.</td></tr>
+        <tr><td>Chi tiết</td><td>Giá 24/600, <code>letter-spacing: -0.01em</code> · đơn vị 14/500</td><td>Giá <code>accent-text #1A5BC0</code>. Dưới giá là dòng trạng thái tồn (xem StockBadge).</td></tr>
+        <tr><td>Giỏ · giá đổi</td><td>Giá cũ 12/500 <code>&lt;del&gt;</code> · giá mới 13/600 · nhãn 12/500 cao 22</td><td>Giá cũ <code>ink-3 #686874</code>. Nhãn "Giá đã cập nhật" nền <code>warn-soft #FDF3E3</code> chữ <code>warn #A85A07</code>. Thành tiền dòng tính theo giá mới. Đọc cho trình đọc màn hình: "Giá cũ 278.000đ, giá mới 295.000đ một kg".</td></tr>
+        <tr><td>Combo</td><td>Như thẻ</td><td>Giá trọn combo, không quy đổi ra kg.</td></tr>
+        <tr><td>Tổng</td><td>Xem <code>CartSummary</code> (CMP-5)</td><td>Tổng tiền dùng 20/600 <code>accent-text</code>.</td></tr>
+      </tbody>
+    </table>
+    <p class="used"><b>Dùng ở:</b> Main.dc.html · Home.dc.html · Product.dc.html · A9-ComboDetail.dc.html · Cart.dc.html · B3-CartChanged.dc.html · DesktopCategory.dc.html · DesktopProduct.dc.html · DesktopCart.dc.html · DesktopCartChanged.dc.html</p>
+  </section>
+
+  <section class="sec" aria-labelledby="c-qty">
+    <div>
+      <h2 id="c-qty" class="cname">QtyStepper</h2>
+      <p class="cdesc">Chọn số lượng theo bước. Món theo kg: tối thiểu 1 kg, bước 0,5 kg. Combo: tối thiểu 1, bước 1. Không có giới hạn trên hiển thị, khi vượt tồn kho backend trả lỗi và hiện thông báo không kèm số.</p>
+    </div>
+    <span class="lab">Biến thể</span>
+    <div class="row" style="align-items: flex-end">
+      <div class="cell">
+        <span class="cap">Trên thẻ<small>nền accent · cao 44 · chữ trắng</small></span>
+        <div class="stage" style="background: #FFFFFF; border: 1px solid #E4E4E9"><div class="stp" style="width: 155px"><button aria-label="Bớt 0,5 kg"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M5 12h14"></path></svg></button><span>1,5 kg</span><button aria-label="Thêm 0,5 kg"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg></button></div></div>
+      </div>
+      <div class="cell">
+        <span class="cap">Trong giỏ<small>viền · cao 40 · nút 40</small></span>
+        <div class="stage" style="background: #FFFFFF; border: 1px solid #E4E4E9"><div class="ob sm"><button aria-label="Bớt 0,5 kg"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#17171C" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M5 12h14"></path></svg></button><span class="q">2 kg</span><button aria-label="Thêm 0,5 kg"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#17171C" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg></button></div></div>
+      </div>
+      <div class="cell">
+        <span class="cap">Chi tiết<small>viền · cao 44 · kèm chọn nhanh</small></span>
+        <div class="stage" style="background: #FFFFFF; border: 1px solid #E4E4E9; flex-direction: column; width: 360px; box-sizing: border-box">
+          <span style="font-size: 15px; font-weight: 600">Chọn số kg</span>
+          <div role="group" aria-label="Chọn nhanh số kg" style="width: 100%; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px">
+            <button class="chip" aria-pressed="false">1 kg</button>
+            <button class="chip" aria-pressed="true">1,5 kg</button>
+            <button class="chip" aria-pressed="false">2 kg</button>
+            <button class="chip" aria-pressed="false">3 kg</button>
+          </div>
+          <div style="width: 100%; display: flex; align-items: center; justify-content: space-between">
+            <span style="font-size: 13px; font-weight: 500; color: #4E4E58">Tối thiểu 1 kg</span>
+            <div class="ob"><button aria-label="Bớt 0,5 kg"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#17171C" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M5 12h14"></path></svg></button><span class="q">1,5 kg</span><button aria-label="Thêm 0,5 kg"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#17171C" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg></button></div>
+          </div>
+        </div>
+      </div>
+      <div class="cell">
+        <span class="cap">Combo<small>bước 1 · đơn vị combo</small></span>
+        <div class="stage" style="background: #FFFFFF; border: 1px solid #E4E4E9"><div class="ob"><button aria-label="Bớt 1 combo"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#17171C" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M5 12h14"></path></svg></button><span class="q" style="min-width: 80px">2 combo</span><button aria-label="Thêm 1 combo"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#17171C" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg></button></div></div>
+      </div>
+    </div>
+
+    <span class="lab">Trạng thái</span>
+    <div class="row" style="align-items: flex-end">
+      <div class="cell">
+        <span class="cap">Mức tối thiểu · trên thẻ<small>nút trừ thành thùng rác, bấm là bỏ món</small></span>
+        <div class="stage" style="background: #FFFFFF; border: 1px solid #E4E4E9"><div class="stp" style="width: 155px"><button aria-label="Bỏ Mực ống làm sạch khỏi giỏ"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"></path></svg></button><span>1 kg</span><button aria-label="Thêm 0,5 kg"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg></button></div></div>
+      </div>
+      <div class="cell">
+        <span class="cap">Mức tối thiểu · trong giỏ<small>nút trừ mở popup bỏ món (B2)</small></span>
+        <div class="stage" style="background: #FFFFFF; border: 1px solid #E4E4E9; flex-direction: column">
+          <div class="ob sm"><button aria-label="Bỏ món khỏi giỏ" aria-haspopup="dialog"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#C0312B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"></path></svg></button><span class="q">1 kg</span><button aria-label="Thêm 0,5 kg"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#17171C" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg></button></div>
+          <span style="font-size: 11px; color: #686874; font-family: 'JetBrains Mono', monospace">→ B2-RemoveConfirm</span>
+        </div>
+      </div>
+      <div class="cell">
+        <span class="cap">Mức tối thiểu · chi tiết<small>nút trừ disabled, không bỏ món</small></span>
+        <div class="stage" style="background: #FFFFFF; border: 1px solid #E4E4E9"><div class="ob"><button disabled aria-label="Bớt 0,5 kg" style="cursor: not-allowed"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#D4D4DB" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M5 12h14"></path></svg></button><span class="q">1 kg</span><button aria-label="Thêm 0,5 kg"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#17171C" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg></button></div></div>
+      </div>
+      <div class="cell">
+        <span class="cap">Focus · trên nền accent<small>outline trắng, offset -4</small></span>
+        <div class="stage" style="background: #FFFFFF; border: 1px solid #E4E4E9"><div class="stp" style="width: 155px"><button aria-label="Bớt 0,5 kg"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M5 12h14"></path></svg></button><span>2 kg</span><button aria-label="Thêm 0,5 kg" style="outline: 2px solid #FFFFFF; outline-offset: -4px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg></button></div></div>
+      </div>
+      <div class="cell">
+        <span class="cap">Focus · có viền<small>outline focus, offset 2</small></span>
+        <div class="stage" style="background: #FFFFFF; border: 1px solid #E4E4E9"><div class="ob"><button aria-label="Bớt 0,5 kg"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#17171C" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M5 12h14"></path></svg></button><span class="q">2 kg</span><button aria-label="Thêm 0,5 kg" style="outline: 2px solid #1F66D1; outline-offset: 2px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#17171C" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg></button></div></div>
+      </div>
+      <div class="cell">
+        <span class="cap">Disabled · hết hàng<small>không hiện, thay bằng Liên hệ</small></span>
+        <div class="stage" style="background: #FFFFFF; border: 1px solid #E4E4E9; flex-direction: column">
+          <div class="ob" style="background: #F4F4F6; border-color: #E4E4E9" aria-disabled="true"><button disabled aria-label="Bớt 0,5 kg" style="cursor: not-allowed"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#D4D4DB" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M5 12h14"></path></svg></button><span class="q" style="color: #686874">1 kg</span><button disabled aria-label="Thêm 0,5 kg" style="cursor: not-allowed"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#D4D4DB" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg></button></div>
+          <span style="font-size: 11px; color: #686874">Chỉ dùng trong giỏ khi món vừa hết, chờ khách bỏ.</span>
+        </div>
+      </div>
+    </div>
+
+    <table class="spec">
+      <thead><tr><th style="width: 18%">Thuộc tính</th><th style="width: 27%">Trên thẻ</th><th style="width: 27%">Trong giỏ</th><th>Chi tiết</th></tr></thead>
+      <tbody>
+        <tr><td>Kích thước</td><td>Cao 44, rộng 100% thẻ. Nút 44×44.</td><td>Cao 40. Nút 40×38. Ô số <code>min-width: 60px</code>.</td><td>Cao 44. Nút 44×42. Ô số <code>min-width: 64px</code>. Chọn nhanh: lưới 4 cột gap 8, ô cao 44.</td></tr>
+        <tr><td>Chữ</td><td>Số 14/600 trắng, tabular.</td><td>Số 13/600 ink.</td><td>Số 14/600 ink. Chọn nhanh 14/600.</td></tr>
+        <tr><td>Màu</td><td>Nền <code>accent #1F66D1</code>, icon <code>#FFFFFF</code>.</td><td>Viền <code>border-strong #D4D4DB</code>, icon <code>ink #17171C</code>. Thùng rác <code>crit #C0312B</code>.</td><td>Như giỏ. Chọn nhanh đang chọn: viền 2px <code>accent #1F66D1</code>, nền <code>accent-soft #EBF2FE</code>, chữ <code>accent-text #1A5BC0</code>.</td></tr>
+        <tr><td>Bo góc</td><td colspan="3">8. Không bóng.</td></tr>
+        <tr><td>Disabled</td><td colspan="3">Icon <code>border-strong #D4D4DB</code>, nền <code>surface-2 #F4F4F6</code>, <code>cursor: not-allowed</code>, giữ trong thứ tự tab với <code>aria-disabled</code> khi cần giải thích.</td></tr>
+        <tr><td>Chuyển động</td><td colspan="3">Nhấn: <code>scale(.97)</code> 120ms <code>cubic-bezier(.23,1,.32,1)</code>. Đổi số: không animate số. Màu 150ms ease-out.</td></tr>
+        <tr><td>Quy tắc</td><td colspan="3">Theo kg: <code>min = 1</code>, <code>step = 0.5</code>, <code>unit = "kg"</code>, hiển thị dấu phẩy thập phân <code>1,5 kg</code>. Combo: <code>min = 1</code>, <code>step = 1</code>, <code>unit = "combo"</code>. Ở mức min, nút trừ: thẻ và giỏ → thùng rác, bấm luôn mở popup xác nhận B2 (máy tính: DesktopRemoveConfirm), không bỏ ngay, không có Hoàn tác · chi tiết → disabled. Gửi số thập phân dạng chuỗi <code>"1.5"</code> lên API.</td></tr>
+        <tr><td>A11y</td><td colspan="3">Bọc <code>role="group"</code> + <code>aria-label="Số lượng Mực ống làm sạch"</code>. Nút: "Bớt 0,5 kg …", "Thêm 0,5 kg …", ở min: "Bỏ … khỏi giỏ". Số hiện tại đọc qua <code>aria-live="polite"</code>. Vùng chạm tối thiểu 40.</td></tr>
+      </tbody>
+    </table>
+    <p class="used"><b>Dùng ở:</b> Main.dc.html · Product.dc.html · A9-ComboDetail.dc.html · Cart.dc.html · B3-CartChanged.dc.html · DesktopCategory.dc.html · DesktopProduct.dc.html · DesktopComboDetail.dc.html · DesktopCart.dc.html</p>
+  </section>
+
+  <section class="sec" aria-labelledby="c-add">
+    <div>
+      <h2 id="c-add" class="cname">AddToCart</h2>
+      <p class="cdesc">Nút thêm trên thẻ biến thành stepper ngay tại chỗ, không rời trang. Lần bấm đầu thêm đúng mức tối thiểu.</p>
+    </div>
+    <div class="stage" style="background: #FFFFFF; border: 1px solid #E4E4E9; padding: 24px; gap: 20px; align-items: center">
+      <div class="cell" style="width: 155px">
+        <span class="cap">1 · chưa có trong giỏ</span>
+        <button class="add">Thêm 1 kg</button>
+      </div>
+      <div class="arrow"><svg width="56" height="16" viewBox="0 0 56 16" fill="none" stroke="#686874" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 8h50M46 3l6 5-6 5"></path></svg>bấm · 180ms</div>
+      <div class="cell" style="width: 155px">
+        <span class="cap">2 · 1 kg (mức min)</span>
+        <div class="stp"><button aria-label="Bỏ khỏi giỏ"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"></path></svg></button><span>1 kg</span><button aria-label="Thêm 0,5 kg"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg></button></div>
+      </div>
+      <div class="arrow"><svg width="56" height="16" viewBox="0 0 56 16" fill="none" stroke="#686874" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 8h50M46 3l6 5-6 5"></path></svg>bấm +</div>
+      <div class="cell" style="width: 155px">
+        <span class="cap">3 · 1,5 kg</span>
+        <div class="stp"><button aria-label="Bớt 0,5 kg"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M5 12h14"></path></svg></button><span>1,5 kg</span><button aria-label="Thêm 0,5 kg"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg></button></div>
+      </div>
+      <div class="arrow"><svg width="56" height="16" viewBox="0 0 56 16" fill="none" stroke="#686874" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 8h50M46 3l6 5-6 5"></path></svg>đồng thời</div>
+      <div class="cell" style="width: 220px">
+        <span class="cap">Phản hồi kèm theo</span>
+        <span style="font-size: 12px; color: #4E4E58">Badge giỏ ở header +1 món (lần đầu). CartBar trượt lên ở trang danh mục điện thoại. Trình đọc màn hình: "Đã thêm 1 kg Mực ống làm sạch vào giỏ".</span>
+      </div>
+    </div>
+    <table class="spec">
+      <thead><tr><th style="width: 18%">Thuộc tính</th><th>Giá trị</th></tr></thead>
+      <tbody>
+        <tr><td>Nhãn nút</td><td>"Thêm 1 kg" cho món theo kg, "Thêm 1 combo" cho combo. Không dùng "Mua ngay" trên thẻ.</td></tr>
+        <tr><td>Kích thước · màu</td><td>Cao 44, rộng 100%, bo 8, viền 1px + chữ <code>accent #1F66D1</code> trên nền <code>surface #FFFFFF</code>. Sang stepper: nền <code>accent #1F66D1</code>, chữ trắng.</td></tr>
+        <tr><td>Chuyển động</td><td>Stepper vào: <code>opacity 0→1</code> + <code>scale(.96)→1</code>, <code>180ms cubic-bezier(.23,1,.32,1)</code>. Nút nhấn <code>scale(.97)</code> 120ms. Ngược lại (bỏ món) thay ngay, không animate. Reduced-motion: chỉ đổi, không scale.</td></tr>
+        <tr><td>Lạc quan · lỗi</td><td>Giỏ lưu ở trình duyệt nên cập nhật giao diện ngay, không gọi API khi thêm giỏ. Giá và tình trạng hàng được kiểm lại khi mở giỏ (B3) và khi đặt hàng (C3). Không hiện số kg còn lại.</td></tr>
+        <tr><td>Chi tiết sản phẩm</td><td>Thanh mua đáy dùng hai nút "Thêm vào giỏ" (viền) và "Chọn mua" (đặc), pill 48, theo số kg đang chọn ở QtyStepper chi tiết.</td></tr>
+      </tbody>
+    </table>
+    <p class="used"><b>Dùng ở:</b> Main.dc.html · Home.dc.html · DesktopCategory.dc.html · DesktopHome.dc.html · Product.dc.html · DesktopProduct.dc.html · A9-ComboDetail.dc.html</p>
+  </section>
+
+  <section class="sec" aria-labelledby="c-img">
+    <div>
+      <h2 id="c-img" class="cname">ImageFrame</h2>
+      <p class="cdesc">Khung ảnh sản phẩm. Khi chưa có ảnh thật dùng khung xám kèm icon theo nhóm. Ảnh thật phủ kín khung, không méo.</p>
+    </div>
+    <span class="lab">Chưa có ảnh · icon theo nhóm</span>
+    <div class="row" style="gap: 16px">
+      <div class="cell"><span class="cap">Cá</span><div class="img" style="width: 150px; margin: 0"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#686874" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12c2.6-3.6 6-5.5 9.5-5.5 2.7 0 4.7 1.9 6.5 5.5-1.8 3.6-3.8 5.5-6.5 5.5C11 17.5 7.6 15.6 5 12zM5 12L2 8.5M5 12l-3 3.5"></path></svg></div></div>
+      <div class="cell"><span class="cap">Tôm</span><div class="img" style="width: 150px; margin: 0"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#686874" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 5c-5 0-9 3.5-9 8 0 3 2 5 5 5h3M9 13H5M18 5c2 0 3 1.2 3 3s-1.6 3-3.5 3M12 18l-2 3M16 18l1 3"></path></svg></div></div>
+      <div class="cell"><span class="cap">Mực</span><div class="img" style="width: 150px; margin: 0"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#686874" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3c-3 0-5 3-5 7v3h10v-3c0-4-2-7-5-7zM8 13l-1 7M10.5 13l-.5 8M13.5 13l.5 8M16 13l1 7"></path></svg></div></div>
+      <div class="cell"><span class="cap">Cua ghẹ</span><div class="img" style="width: 150px; margin: 0"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#686874" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 13a6 4 0 1 0 12 0a6 4 0 1 0-12 0M5 10L3 6l3 1M19 10l2-4-3 1M7 16l-2 3M17 16l2 3"></path></svg></div></div>
+      <div class="cell"><span class="cap">Combo</span><div class="img" style="width: 150px; margin: 0"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#686874" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8l8-4 8 4v8l-8 4-8-4zM4 8l8 4 8-4M12 12v8"></path></svg></div></div>
+    </div>
+    <span class="lab">Trang chi tiết · ảnh lớn + thư viện</span>
+    <div class="row">
+      <div class="cell">
+        <span class="cap">Ảnh minh hoạ<small>nhãn góc trái dưới</small></span>
+        <div style="width: 300px; display: flex; flex-direction: column; gap: 8px">
+          <div class="img" style="margin: 0; border-radius: 10px"><svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="#686874" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3c-3 0-5 3-5 7v3h10v-3c0-4-2-7-5-7zM8 13l-1 7M10.5 13l-.5 8M13.5 13l.5 8M16 13l1 7"></path></svg><span style="position: absolute; left: 10px; bottom: 10px; height: 24px; padding: 0 8px; border-radius: 6px; background: #FFFFFF; border: 1px solid #E4E4E9; color: #4E4E58; font-size: 12px; font-weight: 500; display: flex; align-items: center">Ảnh minh hoạ</span></div>
+          <div role="list" aria-label="Thư viện ảnh" style="display: flex; gap: 8px">
+            <span role="listitem" style="width: 56px; height: 56px; box-sizing: border-box; border-radius: 8px; background: #F4F4F6; border: 2px solid #1F66D1" aria-current="true"></span>
+            <span role="listitem" style="width: 56px; height: 56px; box-sizing: border-box; border-radius: 8px; background: #F4F4F6; border: 1px solid #E4E4E9"></span>
+            <span role="listitem" style="width: 56px; height: 56px; box-sizing: border-box; border-radius: 8px; background: #F4F4F6; border: 1px solid #E4E4E9"></span>
+            <span role="listitem" style="width: 56px; height: 56px; box-sizing: border-box; border-radius: 8px; background: #F4F4F6; border: 1px solid #E4E4E9; outline: 2px solid #1F66D1; outline-offset: 2px"></span>
+          </div>
+          <span style="font-size: 11px; color: #686874">Ô 1 đang chọn · ô 4 đang focus</span>
+        </div>
+      </div>
+      <div class="cell">
+        <span class="cap">Ảnh thật<small>object-fit: cover · không nhãn</small></span>
+        <div style="width: 300px; display: flex; flex-direction: column; gap: 8px">
+          <div style="position: relative; width: 100%; aspect-ratio: 3 / 2; border-radius: 10px; overflow: hidden; background: linear-gradient(135deg, #D6E4FA 0%, #9FB9DE 45%, #5E7FAE 100%)">
+            <span style="position: absolute; inset: 18% 22%; border-radius: 50% 40% 45% 55%; background: rgba(255,255,255,0.35)"></span>
+            <span style="position: absolute; right: 10px; bottom: 10px; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #FFFFFF">img · cover · center</span>
+          </div>
+          <div style="display: flex; gap: 8px">
+            <span style="width: 56px; height: 56px; box-sizing: border-box; border-radius: 8px; background: linear-gradient(135deg, #D6E4FA, #5E7FAE); border: 2px solid #1F66D1"></span>
+            <span style="width: 56px; height: 56px; box-sizing: border-box; border-radius: 8px; background: linear-gradient(135deg, #EBEBEF, #8C8C98); border: 1px solid #E4E4E9"></span>
+            <span style="width: 56px; height: 56px; box-sizing: border-box; border-radius: 8px; background: linear-gradient(135deg, #FDF3E3, #C9A27A); border: 1px solid #E4E4E9"></span>
+          </div>
+        </div>
+      </div>
+      <div class="cell" style="flex: 1; min-width: 320px">
+        <table class="spec">
+          <thead><tr><th style="width: 30%">Thuộc tính</th><th>Giá trị</th></tr></thead>
+          <tbody>
+            <tr><td>Tỉ lệ</td><td><code>aspect-ratio: 3 / 2</code> ở thẻ và trang chi tiết. Dòng combo và dòng giỏ dùng ô vuông 72 / 68.</td></tr>
+            <tr><td>Khung trống</td><td>Nền <code>surface-2 #F4F4F6</code>, icon nét <code>ink-3 #686874</code> 1.4px: 32 (thẻ điện thoại), 40 (thẻ máy tính), 56 (chi tiết).</td></tr>
+            <tr><td>Nhãn</td><td>"Ảnh minh hoạ" chỉ ở trang chi tiết khi chưa có ảnh thật hoặc ảnh không phải của lô đang bán. Cao 24, bo 6, nền trắng, viền <code>border</code>, chữ 12/500 <code>ink-2</code>, cách mép 10.</td></tr>
+            <tr><td>Ảnh thật</td><td><code>object-fit: cover; object-position: center</code>, <code>loading="lazy"</code> trừ ảnh đầu màn, có <code>width/height</code> để không nhảy bố cục. <code>alt</code> = tên món.</td></tr>
+            <tr><td>Bo góc</td><td>Thẻ 8 · chi tiết 10 (máy tính 12) · thư viện 8.</td></tr>
+            <tr><td>Thư viện</td><td>Ô 56×56, gap 8. Đang chọn: viền 2px <code>accent #1F66D1</code>. Khác: viền 1px <code>border #E4E4E9</code>. Máy tính: các ô là <code>&lt;button aria-pressed&gt;</code>, focus outline 2px offset 2.</td></tr>
+            <tr><td>Hết hàng</td><td>Chỉ phần ảnh/icon <code>opacity: .55</code>, badge giữ đậm.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <p class="used"><b>Dùng ở:</b> Main.dc.html · Home.dc.html · Product.dc.html · A9-ComboDetail.dc.html · Cart.dc.html · DesktopCategory.dc.html · DesktopProduct.dc.html · DesktopComboDetail.dc.html · DesktopCart.dc.html</p>
+  </section>
+
+  <section class="sec" aria-labelledby="c-tile">
+    <div>
+      <h2 id="c-tile" class="cname">CategoryTile</h2>
+      <p class="cdesc">Ô lối tắt vào nhóm hàng ở trang chủ. Bấm mở danh mục đã lọc sẵn nhóm đó.</p>
+    </div>
+    <div class="row">
+      <div class="cell">
+        <span class="cap">Hàng 5 ô · điện thoại<small>khung trắng bo 12, đệm 14 8 8</small></span>
+        <div style="width: 358px; box-sizing: border-box; background: #FFFFFF; border: 1px solid #E4E4E9; border-radius: 12px; padding: 14px 8px 8px; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; justify-items: center">
+          <a class="tile" href="Main.dc.html"><span class="ic"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#1A5BC0" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12c2.6-3.6 6-5.5 9.5-5.5 2.7 0 4.7 1.9 6.5 5.5-1.8 3.6-3.8 5.5-6.5 5.5C11 17.5 7.6 15.6 5 12zM5 12L2 8.5M5 12l-3 3.5"></path></svg></span>Cá</a>
+          <a class="tile" href="Main.dc.html"><span class="ic"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#1A5BC0" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 5c-5 0-9 3.5-9 8 0 3 2 5 5 5h3M9 13H5M18 5c2 0 3 1.2 3 3s-1.6 3-3.5 3M12 18l-2 3M16 18l1 3"></path></svg></span>Tôm</a>
+          <a class="tile" href="Main.dc.html"><span class="ic"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#1A5BC0" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3c-3 0-5 3-5 7v3h10v-3c0-4-2-7-5-7zM8 13l-1 7M10.5 13l-.5 8M13.5 13l.5 8M16 13l1 7"></path></svg></span>Mực</a>
+          <a class="tile" href="Main.dc.html"><span class="ic"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#1A5BC0" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 13a6 4 0 1 0 12 0a6 4 0 1 0-12 0M5 10L3 6l3 1M19 10l2-4-3 1M7 16l-2 3M17 16l2 3"></path></svg></span>Cua ghẹ</a>
+          <a class="tile" href="Main.dc.html"><span class="ic"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#1A5BC0" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8l8-4 8 4v8l-8 4-8-4zM4 8l8 4 8-4M12 12v8"></path></svg></span>Combo</a>
+        </div>
+      </div>
+      <div class="cell">
+        <span class="cap">Mặc định</span>
+        <div class="stage" style="background: #FFFFFF; border: 1px solid #E4E4E9"><span class="tile"><span class="ic"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#1A5BC0" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 5c-5 0-9 3.5-9 8 0 3 2 5 5 5h3M9 13H5M18 5c2 0 3 1.2 3 3s-1.6 3-3.5 3M12 18l-2 3M16 18l1 3"></path></svg></span>Tôm</span></div>
+      </div>
+      <div class="cell">
+        <span class="cap">Nhấn / hover<small>ô icon đậm hơn, scale .97</small></span>
+        <div class="stage" style="background: #FFFFFF; border: 1px solid #E4E4E9"><span class="tile" style="transform: scale(0.97)"><span class="ic" style="background: #D6E4FA"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#1A5BC0" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 5c-5 0-9 3.5-9 8 0 3 2 5 5 5h3M9 13H5M18 5c2 0 3 1.2 3 3s-1.6 3-3.5 3M12 18l-2 3M16 18l1 3"></path></svg></span><span style="color: #1A5BC0">Tôm</span></span></div>
+      </div>
+      <div class="cell">
+        <span class="cap">Focus</span>
+        <div class="stage" style="background: #FFFFFF; border: 1px solid #E4E4E9"><span class="tile" style="outline: 2px solid #1F66D1; outline-offset: 2px"><span class="ic"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#1A5BC0" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 5c-5 0-9 3.5-9 8 0 3 2 5 5 5h3M9 13H5M18 5c2 0 3 1.2 3 3s-1.6 3-3.5 3M12 18l-2 3M16 18l1 3"></path></svg></span>Tôm</span></div>
+      </div>
+      <div class="cell">
+        <span class="cap">Máy tính<small>ô 72, icon 32, chữ 14/500</small></span>
+        <div class="stage" style="background: #FFFFFF; border: 1px solid #E4E4E9"><span class="tile" style="width: 104px; gap: 8px; font-size: 14px"><span class="ic" style="width: 72px; height: 72px; border-radius: 16px"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#1A5BC0" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8l8-4 8 4v8l-8 4-8-4zM4 8l8 4 8-4M12 12v8"></path></svg></span>Combo</span></div>
+      </div>
+    </div>
+    <table class="spec">
+      <thead><tr><th style="width: 18%">Thuộc tính</th><th style="width: 41%">Điện thoại</th><th>Máy tính</th></tr></thead>
+      <tbody>
+        <tr><td>Kích thước</td><td>Lưới 5 cột gap 4. Ô icon 48×48. Cả ô là link, cao ≥ 76 (đủ vùng chạm 44).</td><td>Hàng 5 ô trong container 1200, ô icon 72×72, gap 8 với nhãn.</td></tr>
+        <tr><td>Chữ</td><td>Nhãn 12/500 <code>ink #17171C</code>, 1 dòng.</td><td>Nhãn 14/500.</td></tr>
+        <tr><td>Màu</td><td colspan="2">Ô icon <code>accent-soft #EBF2FE</code>, icon nét 1.5px <code>accent-text #1A5BC0</code>. Nhấn/hover: ô <code>on-brand-muted #D6E4FA</code>, nhãn <code>accent-text</code>.</td></tr>
+        <tr><td>Bo góc</td><td>Ô icon 14.</td><td>Ô icon 16.</td></tr>
+        <tr><td>Chuyển động</td><td colspan="2">Nhấn <code>scale(.97)</code> 120ms. Màu 150ms ease-out. Không bóng.</td></tr>
+        <tr><td>Đích</td><td colspan="2"><code>/shop?cat=ca</code> · <code>tom</code> · <code>muc</code> · <code>cua</code> · <code>/shop?type=combo</code>.</td></tr>
+      </tbody>
+    </table>
+    <p class="used"><b>Dùng ở:</b> Home.dc.html · DesktopHome.dc.html</p>
+  </section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":7420}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

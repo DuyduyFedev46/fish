@@ -5,6 +5,23 @@
 > `/trang/?slug=`, `BusinessError.extra`). Code tham chiếu nhánh `wip/autosave` commit `cc47542`.
 > Người hiện thực: Gemini CLI / Antigravity theo `AGENTS.md`; giao việc ở `02c-giao-viec.md`.
 
+```mermaid
+flowchart TD
+    A["Mở trang Shop bất kỳ"] --> B["Tải thông tin người bán từ máy chủ"]
+    A --> C["Tải danh sách link chính sách từ CMS"]
+    B --> D["Hiện chân trang"]
+    C --> D
+    E["Khách mở thanh toán"] --> F["Lấy bản chính sách bảo mật đang hiệu lực"]
+    F --> G["Khách tick đồng ý, gửi đơn kèm số bản"]
+    G --> H{"Máy chủ kiểm đồng ý"}
+    H -->|"Thiếu hoặc không tick"| I["Từ chối, không giữ hàng"]
+    H -->|"Chính sách vừa đổi"| J["Bỏ tick, mời đọc bản mới"]
+    H -->|"Chưa có chính sách"| K["Shop tạm chưa nhận đơn"]
+    H -->|"Hợp lệ"| L["Tạo đơn, lưu giờ máy chủ và số bản"]
+    L --> M["Màn thanh toán báo sẽ gọi xác nhận"]
+    L --> N["ERP: Chủ, Quản lý xem bằng chứng"]
+```
+
 ## 0. Tóm tắt quyết định
 
 | # | Quyết định | Căn cứ |

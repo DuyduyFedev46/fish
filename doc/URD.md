@@ -6,6 +6,20 @@ Người soạn: Duy (BA/PO) — tổng hợp cùng Claude (Product Architect)
 Trạng thái: Draft v4 — bổ sung Combo, Huỷ & hoàn tiền, Chi phí phụ vào giá vốn lô; chi tiết nghiệp vụ tách sang business-process-spec.md
 ---
 
+```mermaid
+flowchart TD
+  MUA["Mua tại cảng, nhập kho theo lô"] --> CP["Ghi chi phí phụ vào giá vốn lô"]
+  CP --> KHO["Kho theo lô, hạn sớm xuất trước"]
+  KHO --> SHOP["Khách đặt trên Shop, giữ hàng 30 phút"]
+  SHOP --> QR{"Trả bằng mã QR kịp?"}
+  QR -- "không" --> TUHUY["Tự huỷ, nhả hàng"]
+  QR -- "có" --> GIAO["Nhân viên vựa giao tận nhà"]
+  GIAO --> BC["Báo cáo lãi lỗ theo lô và tháng"]
+  QR -- "huỷ sau khi trả" --> HOAN["Phiếu hoàn tiền, Lộc chuyển khoản"]
+  GIAO -- "giao thất bại" --> VE{"Chủ duyệt: nhập lại hay huỷ bỏ"}
+  KHO -- "kiểm kê định kỳ" --> KK["Ghi hao hụt vào lô"]
+```
+
 # 1. Giới thiệu
 
 ## 1.1 Mục đích tài liệu
@@ -38,7 +52,7 @@ Quy mô: 1 điểm bán/kho duy nhất. Timeline tự đặt 6 tháng. Duy phát
 
 | Actor | Mô tả |
 |---|---|
-| Khách hàng | Cá nhân đặt hàng qua Shop online, **không có tài khoản** — nhận diện bằng số điện thoại, tra đơn bằng mã đơn + 4 số cuối SĐT. Thanh toán trước qua VietQR, nhận hàng giao tận nhà bởi nhân viên nội bộ |
+| Khách hàng | Cá nhân đặt hàng qua Shop online, **không có tài khoản** — nhận diện bằng số điện thoại, tra đơn bằng mã đơn + số điện thoại đặt hàng *(sửa 2026-10-10, (D), xem decisions.md)*. Thanh toán trước qua VietQR, nhận hàng giao tận nhà bởi nhân viên nội bộ |
 | Chủ vựa (Lộc) | Toàn quyền: danh mục, giá, combo, chi phí mua hàng, chốt lô, huỷ đơn, hoàn tiền, duyệt kiểm kê, duyệt hàng hoàn, xem báo cáo lãi lỗ |
 | Nhân viên vận hành | Nhập lô, soạn hàng, giao hàng, nhập số kiểm kê. **Không** đụng tới giá, chi phí, hoàn tiền, báo cáo. Đăng nhập qua tài khoản nội bộ (Django User) |
 | Hệ thống thanh toán (bên ngoài) | SePay (chọn tạm làm đại diện VietQR aggregator) — xác nhận thanh toán qua webhook, đi qua lớp adapter (FastAPI), không nối thẳng vào lõi hệ thống |
@@ -57,7 +71,8 @@ Quy mô: 1 điểm bán/kho duy nhất. Timeline tự đặt 6 tháng. Duy phát
 - **Huỷ đơn & hoàn tiền**: hệ thống ghi sổ (trạng thái đơn, hoàn kho, phiếu hoàn tiền toàn phần/một phần); thao tác chuyển tiền do Lộc làm tay trên app ngân hàng
 - **Hàng giao thất bại quay về kho**: ghi nhận, Chủ duyệt tái nhập hoặc huỷ bỏ
 - Giao hàng: theo dõi trạng thái vận hành từ soạn hàng đến hoàn tất, gán nhân viên phụ trách
-- Landing (giới thiệu, SEO) và Shop (bảng giá, giỏ hàng, thanh toán) — 2 mặt tiền tách biệt
+- Shop (bảng giá, giỏ hàng, thanh toán) và trang giới thiệu thương hiệu: `/` là trang chủ Shop; trang giới thiệu thương hiệu ở `/gioi-thieu/` *(sửa 2026-10-10, (D), xem decisions.md; thay "Landing và Shop — 2 mặt tiền tách biệt")*
+- **Mã giảm giá công khai, mỗi đơn một mã**; Chủ quản lý mã trong ERP *(mới 2026-10-10, (D), xem decisions.md)*
 - Social: đăng bài thủ công ngoài hệ thống, chỉ dẫn link thẳng vào Shop — không phải 1 module của hệ thống
 - Báo cáo giá vốn/lãi lỗ **theo lô** (nguồn sự thật) và **theo kỳ** (điều hành)
 
@@ -66,7 +81,7 @@ Quy mô: 1 điểm bán/kho duy nhất. Timeline tự đặt 6 tháng. Duy phát
 - **Công nợ nhà cung cấp** — mua tại cảng trả tiền ngay, không gối đầu *(mặc định PA, cần Lộc xác nhận)*
 - **Tài khoản đăng nhập cho khách** — V1 dùng guest checkout, gộp khách theo số điện thoại
 - **Hoàn tiền tự động qua cổng thanh toán** — SePay không có API hoàn tiền/chuyển tiền đi (đã kiểm chứng); hoàn tiền là chuyển khoản tay, hệ thống chỉ ghi sổ
-- **Rule engine khuyến mãi tổng quát** — không điều kiện lồng nhau, không cộng dồn ưu đãi, không mã giảm giá, không ngân sách khuyến mãi
+- **Rule engine khuyến mãi tổng quát** — không điều kiện lồng nhau, không cộng dồn ưu đãi, không ngân sách khuyến mãi *(sửa 2026-10-10, (D), xem decisions.md: bỏ "không mã giảm giá")*
 - Điều phối/tối ưu tuyến giao hàng, quản lý chi phí xe cộ, app shipper phức tạp
 - **Phí giao hàng**: hoàn toàn ngoài phạm vi hệ thống — Lộc tự thoả thuận và quản lý với khách
 - Giao hàng qua đối tác thứ 3 (Grab/Ahamove) — chỉ dùng nhân viên nội bộ
@@ -78,13 +93,13 @@ Quy mô: 1 điểm bán/kho duy nhất. Timeline tự đặt 6 tháng. Duy phát
 # 5. Yêu cầu người dùng theo vai trò
 
 ## 5.1 Khách hàng
-- Xem danh mục mặt hàng, combo và giá niêm yết theo kg trên Shop
-- Thấy đúng tình trạng còn/hết hàng (tồn khả dụng đã trừ phần khách khác đang giữ chỗ)
+- Xem danh mục mặt hàng, combo và giá niêm yết theo kg, combo theo combo trên Shop *(sửa 2026-10-10, (D), xem decisions.md)*
+- Thấy đúng tình trạng còn/hết hàng (tồn khả dụng đã trừ phần khách khác đang giữ chỗ). Shop hiện Còn hàng / Sắp hết / Hết, không hiện số kg *(sửa 2026-10-10, (D), xem decisions.md)*
 - Thêm mặt hàng/combo vào giỏ, đặt hàng (khởi tạo đơn ở trạng thái giữ chỗ)
 - Nhập địa chỉ giao hàng và số điện thoại khi đặt (bắt buộc)
 - Thanh toán qua quét mã VietQR; hệ thống tự động xác nhận khi nhận được tiền
 - Nếu không thanh toán trong 30 phút, đơn tự huỷ và phải đặt lại
-- Tra cứu trạng thái đơn bằng mã đơn + 4 số cuối SĐT: đã xác nhận / soạn hàng / chờ lấy hàng / đang giao / đã giao / đã huỷ
+- Tra cứu trạng thái đơn bằng mã đơn + số điện thoại đặt hàng *(sửa 2026-10-10, (D), xem decisions.md)*: đã xác nhận / soạn hàng / chờ lấy hàng / đang giao / đã giao / đã huỷ
 
 ## 5.2 Chủ vựa (Lộc)
 - Quản lý danh mục mặt hàng, nhóm hàng, bảng giá niêm yết, **cấu hình combo và ưu đãi**
@@ -124,7 +139,7 @@ Quy mô: 1 điểm bán/kho duy nhất. Timeline tự đặt 6 tháng. Duy phát
 - **Combo**: bán như 1 mặt hàng có giá niêm yết riêng; combo dạng gói khi chốt đơn thì nổ ra thành phần và trừ kho theo từng lô thành phần; tồn khả dụng combo tính từ thành phần khan hiếm nhất
 - Đặt hàng qua giỏ hàng tạo đơn ở trạng thái "giữ chỗ" — giữ tạm số lượng trong lô tương ứng, chưa trừ tồn kho chính thức
 - Trạng thái "giữ chỗ" tự động huỷ sau 30 phút nếu không được xác nhận thanh toán, nhả lại số lượng đã giữ
-- Tồn hiển thị trên Shop = tồn sổ − đang giữ chỗ; không cho bán vượt
+- Tồn khả dụng = tồn sổ − đang giữ chỗ; không cho bán vượt. Shop hiện Còn hàng / Sắp hết / Hết, không hiện số kg *(sửa 2026-10-10, (D), xem decisions.md)*
 - Khi thanh toán được xác nhận (qua webhook), đơn chuyển sang trạng thái chính thức, trừ tồn kho thật và ghi nhận doanh thu — dùng **số kg khách đặt** (xem giả định mục 6.4)
 - **Một dòng đơn có thể lấy hàng từ nhiều lô** — hệ thống lưu bảng phân bổ dòng ↔ lô ↔ kg ↔ đơn giá vốn, làm nền cho toàn bộ báo cáo giá vốn
 - **Không có trường/logic phí giao hàng trong đơn** (đã chốt outscope)
@@ -159,8 +174,8 @@ Quy mô: 1 điểm bán/kho duy nhất. Timeline tự đặt 6 tháng. Duy phát
 - Nhân viên không được tự nhập lại kho
 
 ## 6.8 Landing & Shop
-- Landing: trang giới thiệu, tối ưu SEO, không có giao dịch
-- Shop: hiển thị bảng giá, giỏ hàng, thanh toán — tách biệt hoàn toàn khỏi Landing
+- `/` là trang chủ Shop; trang giới thiệu thương hiệu ở `/gioi-thieu/` (tối ưu SEO, không có giao dịch) *(sửa 2026-10-10, (D), xem decisions.md; thay "Landing và Shop tách biệt hoàn toàn")*
+- Shop: hiển thị bảng giá, giỏ hàng, thanh toán
 - Link từ mạng xã hội trỏ thẳng vào Shop, không qua trang trung gian; social tự đăng bài thủ công, không có tích hợp/API nào giữa hệ thống và các nền tảng social
 
 ## 6.9 Báo cáo

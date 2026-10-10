@@ -5,6 +5,19 @@
 > Thiết kế: `02b-tech-design.md` · Giao việc: `02c-giao-viec.md`.
 > **Ký hiệu mã nguồn:** `F01…F13` (hai chữ số) = báo cáo tiền/kho/AI; `F1…F14` (một chữ số) = báo cáo CMS/go-live/FE.
 
+```mermaid
+flowchart TD
+    A{"Duy chốt cách sửa ngày 30/09"} --> L1["Lô 1: Nhật ký, cài đặt sạch, AI chốt lô"]
+    L1 --> L2["Lô 2: Dữ liệu khách và phạm vi"]
+    L2 --> L3["Lô 3: Tiền và kho"]
+    L3 --> L4["Lô 4: Chứng từ đảo doanh thu khi huỷ"]
+    L4 --> L5["Lô 5: Lô quá hạn, bảng tổng quan"]
+    L5 --> M["Mở chặn deploy staging"]
+    M --> L6["Lô 6: Bài viết, giao diện, bù bằng chứng"]
+    L6 --> L7["Lô 7: Lỗi nhỏ còn lại"]
+    L7 --> L8["Lô 8: Tiền VNĐ, giờ Việt Nam"]
+```
+
 ## Quyết định của Duy (30/09) — ghi nguyên văn
 
 - **F04**, nguyên văn: *"đề xuất làm sao cho sổ cái OK á, hủy luôn sợ ko ghi được lịch sử"* → KHÔNG đổi/xoá hoá đơn gốc. Thiết kế

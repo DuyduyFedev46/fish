@@ -109,9 +109,8 @@ def allocate_fefo(*, item, qty):
         if remaining <= ZERO:
             break
     if remaining > ZERO:
-        raise BusinessError(
-            f"Không đủ tồn khả dụng cho {item.code}: thiếu {remaining}kg (BR-BH-02)."
-        )
+        # Không ghi số kg thiếu hay mã lô: câu này có thể đi ra ngoài (BR-BH-24, G1, G3).
+        raise BusinessError(f"Không đủ tồn khả dụng cho {item.code} (BR-BH-02).")
     return result
 
 
@@ -125,7 +124,7 @@ def reserve(*, batch, qty):
     with transaction.atomic():
         b = Batch.objects.select_for_update().get(pk=batch.pk)
         if (b.qty_available - b.qty_reserved) < qty:
-            raise BusinessError(f"Lô {b.batch_id} không còn đủ để giữ chỗ (BR-BH-02).")
+            raise BusinessError("Không đủ tồn khả dụng để giữ chỗ (BR-BH-02).")
         b.qty_reserved += qty
         b.save(update_fields=["qty_reserved"])
     return b

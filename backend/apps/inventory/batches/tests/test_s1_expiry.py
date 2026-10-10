@@ -19,6 +19,7 @@ from apps.inventory.models import Batch, Warehouse
 from apps.purchasing.models import Supplier
 from apps.sales.models import SalesOrder, SalesOrderLineBatch
 from apps.sales.orders import services as order_services
+from apps.sales.orders.shop_errors import OutOfStockError
 from apps.sales.payments import services as payment_services
 
 
@@ -94,7 +95,7 @@ class S1ServiceTests(S1Base):
             received=self.today - datetime.timedelta(days=20),
             expiry=self.today - datetime.timedelta(days=1),
         )
-        with self.assertRaisesMessage(BusinessError, "Không đủ tồn khả dụng"):
+        with self.assertRaises(OutOfStockError):
             self._order("1")
         self.assertEqual(SalesOrder.objects.count(), 0)
         a.refresh_from_db()
@@ -149,11 +150,11 @@ class S1ShopApiTests(S1Base):
 
     def test_s1_ac4_catalog_chi_tinh_ton_lo_con_han(self):
         self._ab()
-        rows = self.client.get("/api/shop/catalog/").json()
+        rows = self.client.get("/api/shop/catalog/").json()["items"]
         row = next(r for r in rows if r["item_code"] == "X")
-        self.assertEqual(Decimal(row["sellable_qty"]), Decimal("5"))
+        self.assertEqual(row["stock_level"], "in")   # 5 kg còn hạn; lô quá hạn không tính (số kg không còn lộ ra Shop)
         detail = self.client.get("/api/shop/catalog/X/").json()
-        self.assertEqual(Decimal(detail["sellable_qty"]), Decimal("5"))
+        self.assertEqual(detail["stock_level"], "in")
         # Shop công khai không lộ giá vốn (bất biến #1)
         for key in ("landed_unit_cost", "purchase_rate", "unit_cost"):
             self.assertNotIn(key, row)
@@ -177,7 +178,8 @@ class S1ShopApiTests(S1Base):
         )
         resp = self._post_order()
         self.assertEqual(resp.status_code, 400, resp.content)
-        self.assertIn("Không đủ tồn khả dụng", resp.json()["detail"])
+        self.assertEqual(resp.json()["code"], "OUT_OF_STOCK")
+        self.assertEqual(resp.json()["lines"], [{"item_code": "X", "stock_level": "out"}])
         self.assertEqual(SalesOrder.objects.count(), 0)
         a.refresh_from_db()
         self.assertEqual(a.qty_reserved, Decimal("0"))

@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<title>C5 · Chưa mở được bản đồ — Cá Về</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#1A5BC0}a:hover{color:#1A57B5}
+a:focus-visible,button:focus-visible{outline:2px solid #1F66D1;outline-offset:2px}
+</style>
+</helmet>
+<!-- C5 chỉ còn ca "bản đồ nạp lỗi" (không có key, script lỗi, mạng chặn Google). Bỏ ca từ chối quyền vị trí (V1 không xin vị trí, BR-BH-29).
+     UX chốt 11/10: không chồng hai modal. Khi nạp lỗi, đóng sheet bản đồ trước rồi mở Dialog này trên nền form Checkout. -->
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; background: #F4F4F6; color: #17171C; font-family: Inter, system-ui, sans-serif; font-size: 14px; line-height: 1.5">
+  <div aria-hidden="true">
+    <div style="height: 56px; background: #FFFFFF; border-bottom: 1px solid #E4E4E9; display: flex; align-items: center; padding: 0 16px; font-size: 17px; font-weight: 600">Thông tin nhận hàng</div>
+    <div style="margin-top: 8px; background: #FFFFFF; padding: 16px; display: flex; flex-direction: column; gap: 8px">
+      <span style="font-size: 15px; font-weight: 600">Địa chỉ giao hàng</span>
+      <div style="height: 64px; border: 1px solid #8C8C98; border-radius: 8px"></div>
+    </div>
+  </div>
+  <div aria-hidden="true" style="position: absolute; inset: 0; background: rgba(23,23,28,0.48)"></div>
+
+  <div role="dialog" aria-modal="true" aria-labelledby="loc-t" aria-describedby="loc-d" style="position: absolute; left: 24px; right: 24px; top: 50%; transform: translateY(-50%); background: #FFFFFF; border-radius: 14px; padding: 24px 20px 16px; display: flex; flex-direction: column; gap: 10px; text-align: center; align-items: center">
+    <span style="width: 52px; height: 52px; border-radius: 26px; background: #FDF3E3; display: flex; align-items: center; justify-content: center">
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#A85A07" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z"></path><path d="M4 4l16 16"></path></svg>
+    </span>
+    <h2 id="loc-t" style="margin: 0; font-size: 17px; font-weight: 600">Chưa mở được bản đồ</h2>
+    <p id="loc-d" style="margin: 0; color: #4E4E58">Bạn gõ địa chỉ vào ô, vẫn đặt hàng bình thường.</p>
+    <div style="align-self: stretch; display: flex; flex-direction: column; gap: 8px; padding-top: 8px">
+      <!-- Một nút. Bấm, Esc hoặc chạm lớp phủ: đóng và đưa tiêu điểm vào ô Địa chỉ giao hàng (không về nút Bản đồ). -->
+      <a href="Checkout.dc.html" autofocus="" style="height: 48px; border-radius: 24px; background: #1F66D1; color: #FFFFFF; font-weight: 600; text-decoration: none; display: flex; align-items: center; justify-content: center">Nhập tay</a>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

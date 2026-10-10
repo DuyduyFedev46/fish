@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<title>Combo lẩu hải sản — Cá Về</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#1A5BC0}a:hover{color:#1A57B5}
+.num{font-variant-numeric:tabular-nums}
+a,button{-webkit-tap-highlight-color:transparent;touch-action:manipulation;transition:transform 120ms cubic-bezier(.23,1,.32,1),background-color 150ms ease-out}
+a:active,button:active:not(:disabled){transform:scale(.97)}
+a:focus-visible,button:focus-visible{outline:2px solid #1F66D1;outline-offset:2px}
+.tb{width:100%;border-collapse:collapse}
+.tb th{text-align:left;font-size:12px;font-weight:600;color:#686874;padding:0 0 6px;border-bottom:1px solid #E4E4E9}
+.tb td{padding:10px 0;border-bottom:1px solid #E4E4E9}
+.tb tr:last-child td{border-bottom:0}
+@media (prefers-reduced-motion:reduce){a:active,button:active:not(:disabled){transform:none}}
+</style>
+</helmet>
+<div style="width: 390px; height: 1040px; position: relative; overflow: hidden; background: #F4F4F6; color: #17171C; font-family: Inter, system-ui, sans-serif; font-size: 14px; line-height: 1.5">
+
+  <header style="height: 56px; background: #FFFFFF; border-bottom: 1px solid #E4E4E9; display: flex; align-items: center; justify-content: space-between; padding: 0 6px">
+    <a href="Main.dc.html" aria-label="Quay lại danh mục" style="width: 44px; height: 44px; display: flex; align-items: center; justify-content: center"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#17171C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"></path></svg></a>
+    <span style="font-size: 15px; font-weight: 600">Chi tiết combo</span>
+    <a href="Cart.dc.html" aria-label="Giỏ hàng, 1 món" style="position: relative; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#17171C" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 4h2l2.4 10.2a1.5 1.5 0 0 0 1.5 1.1h8.6a1.5 1.5 0 0 0 1.5-1.1L21 8H6.2"></path><circle cx="9.5" cy="19.5" r="1.3"></circle><circle cx="17" cy="19.5" r="1.3"></circle></svg><span class="num" style="position: absolute; top: 3px; right: 1px; min-width: 18px; height: 18px; padding: 0 5px; box-sizing: border-box; border-radius: 9px; background: {{brand}}; color: #FFFFFF; font-size: 11px; font-weight: 600; display: flex; align-items: center; justify-content: center">1</span></a>
+  </header>
+
+  <section style="background: #FFFFFF; padding: 12px 16px 16px; display: flex; flex-direction: column; gap: 10px">
+    <div style="position: relative; width: 100%; aspect-ratio: 1 / 1; border-radius: 12px; background: #F4F4F6; display: flex; align-items: center; justify-content: center">
+      <svg width="96" height="96" viewBox="0 0 24 24" fill="none" stroke="#8C8C98" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8l8-4 8 4v8l-8 4-8-4zM4 8l8 4 8-4M12 12v8"></path></svg>
+      <span style="position: absolute; top: 10px; left: 10px; height: 24px; padding: 0 8px; border-radius: 6px; background: #FFFFFF; border: 1px solid #E4E4E9; color: #4E4E58; font-size: 12px; font-weight: 500; display: flex; align-items: center">Combo</span>
+    </div>
+    <h1 style="margin: 4px 0 0; font-size: 20px; font-weight: 600; line-height: 1.3; letter-spacing: -0.01em">Combo lẩu hải sản</h1>
+    <div style="display: flex; align-items: baseline; gap: 4px">
+      <span class="num" style="font-size: 24px; font-weight: 600; color: #1A5BC0">259.000đ</span>
+      <span style="font-size: 14px; font-weight: 500; color: #4E4E58">/ combo</span>
+    </div>
+  </section>
+
+  <section aria-labelledby="h-in" style="margin-top: 8px; background: #FFFFFF; padding: 16px; display: flex; flex-direction: column; gap: 10px">
+    <h2 id="h-in" style="margin: 0; font-size: 15px; font-weight: 600">Trong combo có</h2>
+    <table class="tb" aria-labelledby="h-in">
+      <thead><tr><th scope="col">Món</th><th scope="col" style="text-align: right">Số lượng</th></tr></thead>
+      <tbody>
+        <tr><td>Mực ống làm sạch</td><td class="num" style="text-align: right">[x kg]</td></tr>
+        <tr><td>Tôm sú</td><td class="num" style="text-align: right">[x kg]</td></tr>
+        <tr><td>Cá thu cắt khúc</td><td class="num" style="text-align: right">[x kg]</td></tr>
+      </tbody>
+    </table>
+    <p style="margin: 0; padding: 10px 12px; border-radius: 8px; background: #F4F4F6; color: #4E4E58; display: flex; gap: 8px; align-items: flex-start">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#4E4E58" stroke-width="1.8" stroke-linecap="round" aria-hidden="true" style="flex: none; margin-top: 1px"><circle cx="12" cy="12" r="9"></circle><path d="M12 11v5M12 7.5h.01"></path></svg>
+      Nếu một món trong combo hết, combo tạm ngưng bán.
+    </p>
+  </section>
+
+  <section aria-labelledby="h-qty" style="margin-top: 8px; background: #FFFFFF; padding: 16px; display: flex; flex-direction: column; gap: 12px">
+    <div style="display: flex; align-items: center; justify-content: space-between">
+      <h2 id="h-qty" style="margin: 0; font-size: 15px; font-weight: 600">Số combo</h2>
+      <div role="group" aria-labelledby="h-qty" style="display: flex; align-items: center; border: 1px solid #D4D4DB; border-radius: 8px; height: 44px">
+        <button type="button" onClick="{{dec}}" aria-disabled="{{atMin}}" aria-label="Bớt 1 combo" style="opacity: {{decOpacity}}; width: 44px; height: 42px; border: 0; background: transparent; cursor: pointer; display: flex; align-items: center; justify-content: center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#17171C" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M5 12h14"></path></svg></button>
+        <span class="num" aria-live="polite" style="min-width: 72px; text-align: center; font-weight: 600">{{qtyText}}</span>
+        <button type="button" onClick="{{inc}}" aria-label="Thêm 1 combo" style="width: 44px; height: 42px; border: 0; background: transparent; cursor: pointer; display: flex; align-items: center; justify-content: center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#17171C" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg></button>
+      </div>
+    </div>
+    <div style="display: flex; justify-content: space-between; align-items: baseline; padding-top: 8px; border-top: 1px dashed #E4E4E9">
+      <span style="color: #4E4E58">Tạm tính</span>
+      <span class="num" style="font-size: 17px; font-weight: 600">{{subtotal}}</span>
+    </div>
+  </section>
+
+  <div style="position: absolute; left: 0; right: 0; bottom: 0; background: #FFFFFF; box-shadow: 0 -4px 16px rgba(23,23,28,0.08); padding: 10px 16px 16px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px">
+    <a href="Main.dc.html" style="height: 48px; border-radius: 24px; border: 1px solid {{brand}}; color: {{brand}}; font-weight: 600; text-decoration: none; display: flex; align-items: center; justify-content: center">Thêm vào giỏ</a>
+    <a href="Cart.dc.html" style="height: 48px; border-radius: 24px; background: {{brand}}; color: #FFFFFF; font-weight: 600; text-decoration: none; display: flex; align-items: center; justify-content: center">Chọn mua</a>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"brand":{"editor":"color","default":"#1F66D1","options":["#1F66D1","#0E3A73"]},"$preview":{"width":390,"height":1040}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { qty: 1 };
+  }
+  renderVals() {
+    const brand = this.props.brand ?? '#1F66D1';
+    const q = this.state.qty;
+    const set = (n) => this.setState({ qty: Math.max(1, n) });
+    return {
+      brand,
+      qtyText: q + ' combo',
+      subtotal: (q * 259000).toLocaleString('vi-VN') + 'đ',
+      atMin: q <= 1 ? 'true' : 'false',
+      decOpacity: q <= 1 ? '0.4' : '1',
+      inc: () => set(q + 1),
+      dec: () => set(q - 1)
+    };
+  }
+}
+</script>
+</body>
+</html>

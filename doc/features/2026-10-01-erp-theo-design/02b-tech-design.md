@@ -5,6 +5,22 @@
 > nên lô ở §5 gọi theo màn/đối tượng, điều phối viên tự ghép mã story.
 > Mọi dữ liệu trong JSON mẫu là **giả** (`Khách Thử A`, `0900000123`, `[Địa chỉ giao]`).
 
+```mermaid
+flowchart TD
+    A["Nhân viên mở ERP"] --> B["Menu hiện theo quyền thật"]
+    B --> C["Trang danh sách có thanh AI"]
+    C --> D["Bấm dòng mở trang chi tiết"]
+    D --> E["Thanh trạng thái và dòng thời gian"]
+    D --> F["Khối Trợ lý AI trong trang"]
+    D --> G["Bấm thao tác hoặc mở form"]
+    G --> H["Gửi lên máy chủ"]
+    H --> I{"Có quyền và đúng trạng thái?"}
+    I -->|"Không"| J["Báo lý do ngắn"]
+    I -->|"Bị người khác sửa trước"| K["Báo tải lại bản mới"]
+    I -->|"Có"| L["Lưu và ghi nhật ký"]
+    L --> M["Trả dữ liệu, ẩn giá vốn và thông tin khách"]
+```
+
 ## Mục lục
 0. Tóm tắt quyết định · 0b. Mặc định 🟡 · 0c. Chỗ thiết kế lệch code (code thắng về dữ liệu)
 1. Bản đồ màn

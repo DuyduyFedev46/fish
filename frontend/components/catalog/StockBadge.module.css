@@ -1,0 +1,46 @@
+.badge {
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+}
+
+/* Trên ảnh */
+.overlay {
+  height: 22px;
+  padding: 0 6px;
+  gap: 3px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-weight: 500;
+}
+.overlay.md {
+  height: 26px;
+  padding: 0 10px;
+  gap: 4px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.overlay.low {
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+.overlay.out {
+  background: var(--surface-3);
+  color: var(--ink-2);
+}
+
+/* Dưới giá */
+.inline {
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 500;
+}
+.inline.in {
+  color: var(--good);
+}
+.inline.low {
+  color: var(--warn);
+}
+.inline.out {
+  color: var(--ink-2);
+}

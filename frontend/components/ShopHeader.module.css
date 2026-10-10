@@ -1,0 +1,365 @@
+/* Điện thoại hiện dưới 768 px, máy tính từ 768 px. Một trong hai nhóm bị display:none nên không nằm trong cây truy cập. */
+.desktop {
+  display: none;
+}
+
+/* ---------------- H1: trang chủ điện thoại ---------------- */
+.h1 {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: var(--space-2) var(--space-4) 14px;
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.h1Row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 44px;
+}
+
+.actions {
+  display: flex;
+  gap: var(--space-1);
+}
+
+.sentinel {
+  height: 1px;
+  margin-top: -10px;
+}
+
+/* ---------------- H2 / H3 / H4 ---------------- */
+.bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  height: var(--h-header);
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+
+.stickyBar {
+  position: sticky;
+  top: 0;
+  z-index: var(--z-header);
+  padding: 0 6px 0 var(--space-4);
+}
+
+.fixedBar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: var(--z-header);
+  padding: 0 6px 0 var(--space-4);
+  transform: translateY(-100%);
+  visibility: hidden;
+  transition:
+    transform var(--dur-sheet) var(--ease-drawer),
+    visibility 0s linear var(--dur-sheet);
+}
+
+.fixedBarShown {
+  transform: translateY(0);
+  visibility: visible;
+  transition-delay: 0s;
+}
+
+.barLogo {
+  margin-right: auto;
+}
+
+.sub {
+  justify-content: space-between;
+  padding: 0 6px;
+}
+
+.subTitle {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 15px;
+  font-weight: 600;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.spacer {
+  flex: none;
+  width: 44px;
+}
+
+.checkout {
+  padding: 0 var(--space-3) 0 6px;
+}
+
+.checkoutTitle {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.secure {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--good);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+/* ---------------- Máy tính ---------------- */
+@media (min-width: 768px) {
+  .mobile {
+    display: none;
+  }
+
+  .full {
+    /* Các tầng thành con trực tiếp của khung trang để tầng chính dính độc lập (menu và dải trên cuộn đi). */
+    display: contents;
+  }
+
+  .strip {
+    background: var(--accent);
+    border-bottom: 1px solid var(--accent-hover);
+    color: var(--on-accent);
+    font-size: 13px;
+  }
+
+  .stripInner {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0 var(--space-4);
+    min-height: 40px;
+  }
+
+  .stripLinks {
+    display: flex;
+    gap: var(--space-1);
+  }
+
+  .stripLink {
+    display: inline-flex;
+    align-items: center;
+    height: 32px;
+    padding: 0 10px;
+    border-radius: var(--radius-md);
+    color: var(--on-accent);
+    font-weight: 500;
+    text-decoration: none;
+    transition: background-color var(--dur-color) ease-out;
+  }
+  .stripLink:focus-visible,
+  .mainLink:focus-visible {
+    outline-color: var(--on-accent);
+    outline-offset: -4px;
+  }
+
+  .main {
+    position: sticky;
+    top: 0;
+    z-index: var(--z-header);
+    background: var(--accent);
+    color: var(--on-accent);
+  }
+
+  .mainInner {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px 28px;
+    padding-top: 14px;
+    padding-bottom: 14px;
+  }
+
+  .search {
+    flex: 1 1 320px;
+    min-width: 0;
+  }
+
+  .mainNav {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: var(--space-2);
+  }
+
+  .mainLink {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    height: 44px;
+    padding: 0 var(--space-3);
+    border-radius: var(--radius-full);
+    color: var(--on-accent);
+    font-size: 13px;
+    font-weight: 500;
+    text-decoration: none;
+    white-space: nowrap;
+    transition:
+      transform var(--dur-press) var(--ease-out),
+      background-color var(--dur-color) ease-out;
+  }
+  .mainLink:active {
+    transform: scale(0.97);
+  }
+  .mainLinkCurrent,
+  .cartLink {
+    background: var(--accent-hover);
+  }
+  .mainLinkCurrent {
+    font-weight: 600;
+  }
+  .cartLink {
+    padding: 0 14px;
+  }
+
+  .hotline {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.2;
+  }
+  .hotlineLabel {
+    font-size: 11px;
+    color: var(--on-accent);
+  }
+  .hotlineNumber {
+    font-weight: 600;
+  }
+
+  .inlineBadge {
+    min-width: 20px;
+    height: 20px;
+    padding: 0 6px;
+    border-radius: var(--radius-full);
+    background: var(--surface);
+    color: var(--accent-text);
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 20px;
+    text-align: center;
+    animation: badge-in var(--dur-swap) var(--ease-out);
+  }
+
+  .menu {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .menuInner {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    min-height: 48px;
+  }
+
+  .menuLink {
+    display: inline-flex;
+    align-items: center;
+    height: 48px;
+    padding: 0 14px;
+    color: var(--ink);
+    font-size: 14px;
+    font-weight: 500;
+    text-decoration: none;
+    box-shadow: inset 0 -2px 0 transparent;
+    transition:
+      background-color var(--dur-color) ease-out,
+      color var(--dur-color) ease-out;
+  }
+  .menuLink[aria-current="page"] {
+    color: var(--accent-text);
+    font-weight: 600;
+    box-shadow: inset 0 -2px 0 var(--accent);
+  }
+  .menuEnd {
+    margin-left: auto;
+  }
+  .menuSkeleton {
+    display: inline-flex;
+    gap: var(--space-6);
+    padding: 0 14px;
+  }
+
+  /* Rút gọn: Giỏ, Đặt hàng, Thanh toán */
+  .compact {
+    display: block;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+  }
+  .compactInner {
+    display: flex;
+    align-items: center;
+    gap: var(--space-6);
+    height: 76px;
+  }
+  .compactDivider {
+    width: 1px;
+    height: 28px;
+    background: var(--border);
+  }
+  .safe {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--good);
+    font-size: 15px;
+    font-weight: 600;
+  }
+  .help {
+    margin-left: auto;
+    color: var(--ink);
+    font-size: 14px;
+    text-decoration: none;
+  }
+  .helpNumber {
+    color: var(--accent-text);
+    font-weight: 600;
+  }
+}
+
+@media (min-width: 768px) and (hover: hover) and (pointer: fine) {
+  .stripLink:hover,
+  .mainLink:hover {
+    background: var(--accent-hover);
+  }
+  .menuLink:hover {
+    background: var(--accent-soft);
+    color: var(--accent-text);
+  }
+}
+
+@keyframes badge-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fixedBar {
+    transition: none;
+  }
+  .mainLink:active {
+    transform: none;
+  }
+  .inlineBadge {
+    animation: none;
+  }
+}

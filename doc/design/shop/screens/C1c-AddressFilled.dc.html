@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<title>Địa chỉ đã điền từ bản đồ — Cá Về</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#1A5BC0}a:hover{color:#1A57B5}
+.num{font-variant-numeric:tabular-nums}
+.f{display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:500;color:#4E4E58}
+.f input,.f select{height:44px;box-sizing:border-box;padding:0 12px;border:1px solid #8C8C98;border-radius:8px;background:#FFFFFF;font:inherit;font-size:16px;font-weight:400;color:#17171C}
+.f input.filled,.f select.filled{background:#F5FAF6;border-color:#157F3D}
+a:focus-visible,button:focus-visible{outline:2px solid #1F66D1;outline-offset:2px}
+.flash{animation:fl 900ms ease-out}
+@keyframes fl{from{background:#E9F7EE}to{background:#FFFFFF}}
+@media (prefers-reduced-motion:reduce){.flash{animation:none}}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; background: #F4F4F6; color: #17171C; font-family: Inter, system-ui, sans-serif; font-size: 14px; line-height: 1.5">
+  <header style="height: 56px; background: #FFFFFF; border-bottom: 1px solid #E4E4E9; display: flex; align-items: center; gap: 4px; padding: 0 6px">
+    <a href="Cart.dc.html" aria-label="Quay lại giỏ hàng" style="width: 44px; height: 44px; display: flex; align-items: center; justify-content: center"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#17171C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"></path></svg></a>
+    <h1 style="margin: 0; font-size: 17px; font-weight: 600">Thông tin nhận hàng</h1>
+  </header>
+
+  <div style="display: flex; flex-direction: column; gap: 8px; padding: 8px 0 200px">
+    <section style="background: #FFFFFF; padding: 16px; display: flex; flex-direction: column; gap: 14px">
+      <h2 style="margin: 0; font-size: 15px; font-weight: 600">Người nhận</h2>
+      <label class="f">Họ và tên<input type="text" value="[Họ tên đã nhập]"></label>
+      <label class="f">Số điện thoại<input type="tel" value="09xx xxx xxx"></label>
+    </section>
+
+    <section class="flash" aria-labelledby="h-diachi" style="background: #FFFFFF; padding: 16px; display: flex; flex-direction: column; gap: 8px">
+      <h2 id="h-diachi" style="margin: 0 0 4px; font-size: 15px; font-weight: 600"><label for="f-addr">Địa chỉ giao hàng</label></h2>
+      <div role="status" style="display: flex; gap: 10px; padding: 10px 12px; border-radius: 10px; background: #E9F7EE; color: #157F3D; font-size: 13px; font-weight: 500"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#157F3D" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex: none; margin-top: 1px"><path d="M5 12l5 5 9-10"></path></svg>Đã điền địa chỉ từ bản đồ.</div>
+      <div style="display: flex; align-items: stretch; border: 1px solid #157F3D; border-radius: 8px; overflow: hidden; background: #F5FAF6">
+        <textarea id="f-addr" name="delivery_address" rows="2" autocomplete="street-address" placeholder="Bấm để tìm trên bản đồ, hoặc gõ địa chỉ" required="required" style="flex: 1; min-width: 0; border: 0; padding: 10px 12px; font: inherit; font-size: 16px; line-height: 1.4; resize: none; outline: none; background: transparent; color: #17171C">12 Đường số 5, [Phường / xã], [Tỉnh / thành]</textarea>
+        <a href="C1b-MapPicker.dc.html" aria-label="Tìm và chọn địa chỉ trên bản đồ" style="flex: none; width: 64px; border-left: 1px solid #E4E4E9; background: #EBF2FE; color: #1A5BC0; font-size: 12px; font-weight: 600; text-decoration: none; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1A5BC0" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z"></path><circle cx="12" cy="10" r="2.5"></circle></svg>Bản đồ</a>
+      </div>
+      <span style="font-size: 12px; font-weight: 500; color: #686874">Thêm hẻm, tầng, toà nhà nếu có. Cá Về giao trong khu vực Phan Thiết.</span>
+    </section>
+
+    <section style="background: #FFFFFF; padding: 16px">
+      <label style="display: flex; gap: 12px; align-items: flex-start">
+        <!-- Không tick sẵn (BR-BH-17): điền từ bản đồ không đổi trạng thái ô đồng ý. -->
+        <input type="checkbox" style="flex: none; width: 20px; height: 20px; margin: 2px 0 0; accent-color: #1F66D1">
+        <span style="color: #4E4E58">Tôi đồng ý để Cá Về dùng họ tên, số điện thoại và địa chỉ này để giao và hỗ trợ đơn hàng, theo <a href="P1-Policy.dc.html" target="_blank" rel="noopener">Chính sách quyền riêng tư<span style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap"> (mở tab mới)</span></a>. Dữ liệu được lưu trên máy chủ đặt ở nước ngoài.</span>
+      </label>
+    </section>
+  </div>
+
+  <div style="position: absolute; left: 0; right: 0; bottom: 0; background: #FFFFFF; box-shadow: 0 -4px 16px rgba(23,23,28,0.08); padding: 12px 16px 16px; display: flex; flex-direction: column; gap: 8px">
+    <div style="display: flex; justify-content: space-between; align-items: baseline"><span style="color: #4E4E58">3 món · tổng tiền hàng</span><span class="num" style="font-size: 20px; font-weight: 600; color: #1A5BC0">867.000đ</span></div>
+    <p style="margin: 0; font-size: 13px; color: #4E4E58">Đã gồm giao hàng. Bạn trả một lần, không trả thêm khi nhận hàng.</p>
+    <a href="Payment.dc.html" style="height: 48px; border-radius: 24px; background: #1F66D1; color: #FFFFFF; font-weight: 600; text-decoration: none; display: flex; align-items: center; justify-content: center">Đặt hàng</a>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

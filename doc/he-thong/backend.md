@@ -3,6 +3,17 @@
 > Cập nhật 02/10/2026, theo code `main` `bf62b81`.
 > Bản đồ module chi tiết hơn: `backend/README.md` và `backend/apps/<app>/README.md`. Khi các README đó lệch code, xem mục "Doc cũ lệch code" cuối file này.
 
+```mermaid
+flowchart LR
+  REQ["ERP, Shop hoặc cầu nối gọi vào"] --> AUTH{"Được phép không?"}
+  AUTH -- "không" --> TU["Từ chối"]
+  AUTH -- "được" --> SV["Xử lý nghiệp vụ"]
+  SV --> DB["Lưu dữ liệu, ghi nhật ký"]
+  SV --> AN["Ẩn giá vốn, dữ liệu khách nếu thiếu quyền"]
+  AN --> TRA["Trả kết quả"]
+  JOB["Việc theo lịch: huỷ đơn quá hạn, đổi trạng thái lô"] --> SV
+```
+
 ## Cấu trúc
 
 ```

@@ -1,10 +1,34 @@
 ---
 name: feature
-description: Điều phối workflow đội dự án Cá Về (BA → PO → Tech Lead → BE ∥ FE → QA → Review → Deploy) bằng các subagent ba-analyst, po-owner, techlead, be-dev, fe-dev, qa-tester. PHẢI dùng mỗi khi Duy nhờ bằng lời thường một việc làm thay đổi sản phẩm — thêm/sửa/bỏ chức năng, "Lộc muốn…", "khách phàn nàn…", sửa lỗi, đổi giao diện, đổi quy tắc nghiệp vụ, viết yêu cầu/story, test thử một luồng, deploy — kể cả khi không nhắc tới workflow hay tên agent. Không dùng cho câu hỏi thuần giải thích/tra cứu.
+description: Điều phối workflow đội dự án Cá Về (BA → PO → Tech Lead → BE ∥ FE → QA → Review → Deploy) bằng các subagent product-manager, ba-analyst, po-owner, ux-designer, techlead, mkt-brand, legal-vn, be-dev, fe-dev, qa-tester. PHẢI dùng mỗi khi Duy nhờ bằng lời thường một việc làm thay đổi sản phẩm — thêm/sửa/bỏ chức năng, "Lộc muốn…", "khách phàn nàn…", sửa lỗi, đổi giao diện, đổi quy tắc nghiệp vụ, viết yêu cầu/story, test thử một luồng, deploy — kể cả khi không nhắc tới workflow hay tên agent. Không dùng cho câu hỏi thuần giải thích/tra cứu.
 argument-hint: "<yêu cầu bằng lời thường>"
 ---
 
 # Workflow đội dự án Cá Về
+
+```mermaid
+flowchart TD
+  Y["Duy nhờ bằng lời thường"] --> L{"Chọn luồng, báo Duy một dòng"}
+  L -- "câu hỏi, vận hành" --> TT["Trả lời hoặc làm trực tiếp"]
+  L -- "ý tưởng còn sơ" --> PM["PM viết bản khám phá"]
+  L -- "tính năng mới" --> BA["BA phân tích"]
+  L -- "lỗi rõ, chỉnh nhỏ" --> AC["Tự viết 3 đến 5 tiêu chí"]
+  L -- "chỉ QA, review, pháp lý, deploy" --> RIENG["Giao đúng một vai"]
+  PM --> BA
+  BA --> D1{"Điểm dừng 1: Duy duyệt phân tích"}
+  D1 --> PO["PO viết story"]
+  PO --> D2{"Điểm dừng 2: Duy duyệt story"}
+  D2 --> UXTL["UX vẽ luồng màn, Tech Lead thiết kế"]
+  UXTL --> DEV["BE và FE làm theo lô nhỏ"]
+  AC --> DEV
+  DEV --> KC["Điều phối tự chạy lại test, soát giao diện"]
+  KC --> QA{"QA đạt?"}
+  QA -- "chưa, tối đa 2 vòng" --> DEV
+  QA -- "đạt" --> GIT["Commit và push"]
+  GIT --> RV["Soát pháp lý, review code, PO nghiệm thu"]
+  RV --> D3{"Điểm dừng 3: Duy cho deploy?"}
+  D3 -- "có" --> DEP["Deploy"]
+```
 
 Yêu cầu: **$ARGUMENTS** (nếu trống: lấy từ tin nhắn gần nhất của Duy)
 
@@ -19,6 +43,8 @@ FE): QA sẽ kiểm lại sau khi sửa"* — rồi chạy luôn. Duy nói khác
 | Chức năng mới; đổi quy trình/quy tắc nghiệp vụ (tiền, tồn kho, giá vốn, phân quyền, đơn hàng, hoàn tiền); "Lộc muốn…"; yêu cầu còn mơ hồ hoặc đụng nhiều màn hình | **ĐẦY ĐỦ** | Bước 1 (BA) |
 | Lỗi/sai rõ ràng ("bị lỗi", "không chạy", "hiện sai"); chỉnh nhỏ đã rõ phải làm gì (đổi chữ, màu, bố cục, thêm 1 field hiển thị); không đổi quy tắc nghiệp vụ | **NHANH** | Luồng nhanh |
 | "Phân tích…", "làm rõ yêu cầu…", "viết URD/spec…" | **CHỈ BA** | Bước 1, dừng sau điểm dừng 1 |
+| Ý tưởng/prototype còn sơ, "có nên làm…", "MVP gồm gì…" | **ĐẦY ĐỦ** từ PM | Bước 0b (PM), rồi Bước 1 |
+| "Logo, slogan, câu chữ, landing page…" | **CHỈ MKT** | Giao `mkt-brand`, memo `0X-marketing.md` (câu đổi trả/khuyến mãi qua `legal-vn`) |
 | "Viết story/backlog/tiêu chí nghiệm thu…" | **CHỈ PO** | Bước 2 (chạy BA trước nếu chưa có 01-analysis) |
 | "Test thử / kiểm tra / QA … xem có lỗi không" | **CHỈ QA** | Bước 4, không tự sửa — báo lỗi rồi hỏi có sửa không |
 | "Review code…", "kiểm tra bảo mật…" | **REVIEW** | Bước 5 |
@@ -44,6 +70,11 @@ kết quả, và giữ Duy trong vòng lặp. Ý tưởng lấy từ BMAD-METHOD
 - Tạo slug ngắn không dấu từ yêu cầu; thư mục `doc/features/<YYYY-MM-DD>-<slug>/`.
 - Báo Duy 1 dòng: thư mục hồ sơ + các bước sắp chạy.
 
+## 0b. PM — khám phá (khi tính năng còn ở mức ý tưởng/prototype)
+Giao `product-manager`: ý tưởng/prototype + thư mục hồ sơ → `00-product-brief.md` (vấn đề, chỉ số
+first-party, lát MVP, chỗ trái BR/decisions, dữ liệu backend đã có). Đưa Duy khuyến nghị + câu hỏi 🔴
+trước khi giao BA. Yêu cầu đã rõ thì bỏ bước này.
+
 ## 1. BA — phân tích
 Giao `ba-analyst`: yêu cầu nguyên văn + đường dẫn thư mục hồ sơ.
 ➜ **ĐIỂM DỪNG 1**: đưa Duy tóm tắt + câu hỏi 🔴 (dùng AskUserQuestion nếu câu hỏi có
@@ -54,6 +85,11 @@ Không có câu hỏi 🔴 và Duy đã nói "cứ làm" → đi tiếp, không 
 Giao `po-owner` (chế độ viết story).
 ➜ **ĐIỂM DỪNG 2**: đưa Duy bảng story (mã · tiêu đề · ưu tiên · BE/FE) + thứ tự làm. Duy
 duyệt/cắt bớt → cập nhật `02-stories.md` thành `ĐÃ DUYỆT`.
+
+## 2a. UX — luồng màn hình (khi có đổi giao diện; song song 2b)
+Giao `ux-designer` cùng lượt với `techlead`: `02a-ux-flow.md` (bảng luồng × trạng thái, ghi rõ
+popup/bottom sheet/toast) + link prototype. FE dựng theo 02a. Đụng thương hiệu hoặc copy → giao
+thêm `mkt-brand` viết `0X-marketing.md`.
 
 ## 2b. Tech Lead — thiết kế kỹ thuật
 Giao `techlead`: viết `02b-tech-design.md` (kiến trúc, contract API BE↔FE, model/migration,

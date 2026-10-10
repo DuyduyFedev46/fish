@@ -8,6 +8,26 @@
 > `decisions.md` hay ADR; Duy tự ghi quyết định sau khi đọc file này.
 > Pháp lý: memo `01c-phap-ly.md` cùng thư mục (legal-vn, 2026-09-28).
 
+```mermaid
+flowchart TD
+    A["Người dùng mở màn AI của tôi"] --> B["Chọn mức cho từng lệnh trong quyền"]
+    B --> C{"Lệnh tiền hoặc chốt lô?"}
+    C -->|"Có"| D{"Chủ đã bật công tắc riêng?"}
+    D -->|"Chưa"| E["Lệnh bị khoá, giữ mức nháp"]
+    D -->|"Rồi"| F["Lưu cấu hình, người cấp chịu trách nhiệm"]
+    C -->|"Không"| F
+    F --> G["Người dùng nhờ AI làm việc"]
+    G --> H{"Đủ quyền, dưới ngưỡng, không tắt khẩn?"}
+    H -->|"Không"| I["AI soạn nháp, người bấm xác nhận"]
+    H -->|"Có, mức B"| J["AI tự ghi, cho hoàn tác vài phút"]
+    H -->|"Có, mức A"| K["AI tự ghi, vào báo cáo cuối ngày"]
+    G --> L{"AI thiếu dữ liệu để làm?"}
+    L -->|"Có"| M["Chuyển việc cho chủ AI hoặc người có quyền"]
+    J --> N["Nhật ký ghi người cấp và cấu hình"]
+    K --> N
+    I --> N
+```
+
 ## Câu trả lời của Duy (2026-09-28) — quyết định đã chốt
 
 | # | Câu hỏi (bản trước) | Trả lời nguyên văn của Duy | Hệ quả áp vào bản phân tích |

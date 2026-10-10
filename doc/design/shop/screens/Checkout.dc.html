@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<title>Thông tin nhận hàng — Cá Về</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#1A5BC0}a:hover{color:#1A57B5}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.num{font-variant-numeric:tabular-nums}
+.f{display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:500;color:#4E4E58}
+.f input,.f select{height:44px;box-sizing:border-box;padding:0 12px;border:1px solid #8C8C98;border-radius:8px;background:#FFFFFF;font:inherit;font-size:16px;font-weight:400;color:#17171C;transition:border-color 150ms ease-out,box-shadow 150ms ease-out}
+.f input::placeholder{color:#8C8C98}
+.f input:focus,.f select:focus{outline:none;border-color:#1F66D1;box-shadow:0 0 0 3px #EBF2FE}
+.req{color:#C0312B}
+a,button{-webkit-tap-highlight-color:transparent;touch-action:manipulation;transition:transform 120ms cubic-bezier(.23,1,.32,1)}
+a:active,button:active{transform:scale(.97)}
+a:focus-visible,button:focus-visible{outline:2px solid #1F66D1;outline-offset:2px}
+@media (prefers-reduced-motion:reduce){a:active,button:active{transform:none}}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; background: #F4F4F6; color: #17171C; font-family: Inter, system-ui, sans-serif; font-size: 14px; line-height: 1.5">
+
+  <header style="height: 56px; background: #FFFFFF; border-bottom: 1px solid #E4E4E9; display: flex; align-items: center; gap: 4px; padding: 0 6px">
+    <a href="Cart.dc.html" aria-label="Quay lại giỏ hàng" style="width: 44px; height: 44px; display: flex; align-items: center; justify-content: center">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#17171C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"></path></svg>
+    </a>
+    <h1 style="margin: 0; font-size: 17px; font-weight: 600">Thông tin nhận hàng</h1>
+  </header>
+
+  <ol aria-label="Bước đặt hàng" style="list-style: none; margin: 0; padding: 12px 16px; background: #FFFFFF; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; font-size: 12px; font-weight: 500">
+    <li style="display: flex; flex-direction: column; gap: 6px; color: #4E4E58"><span style="height: 4px; border-radius: 2px; background: {{brand}}"></span>1. Giỏ hàng</li>
+    <li aria-current="step" style="display: flex; flex-direction: column; gap: 6px; color: #1A5BC0"><span style="height: 4px; border-radius: 2px; background: {{brand}}"></span>2. Nhận hàng</li>
+    <li style="display: flex; flex-direction: column; gap: 6px; color: #686874"><span style="height: 4px; border-radius: 2px; background: #EBEBEF"></span>3. Thanh toán</li>
+  </ol>
+
+  <form style="display: flex; flex-direction: column; gap: 8px; padding: 8px 0 200px">
+    <section aria-labelledby="h-nguoi" style="background: #FFFFFF; padding: 16px; display: flex; flex-direction: column; gap: 14px">
+      <h2 id="h-nguoi" style="margin: 0; font-size: 15px; font-weight: 600">Người nhận</h2>
+      <label class="f">Họ và tên
+        <input type="text" name="name" autocomplete="name" placeholder="Nguyễn Văn A" required>
+      </label>
+      <label class="f">Số điện thoại
+        <input type="tel" name="phone" autocomplete="tel" inputmode="tel" placeholder="09xx xxx xxx" required>
+      </label>
+    </section>
+
+    <section aria-labelledby="h-diachi" style="background: #FFFFFF; padding: 16px; display: flex; flex-direction: column; gap: 8px">
+      <h2 id="h-diachi" style="margin: 0 0 4px; font-size: 15px; font-weight: 600"><label for="f-addr">Địa chỉ giao hàng</label></h2>
+      <div style="display: flex; align-items: stretch; border: 1px solid #8C8C98; border-radius: 8px; overflow: hidden; background: #FFFFFF">
+        <textarea id="f-addr" name="delivery_address" rows="2" autocomplete="street-address" placeholder="Bấm để tìm trên bản đồ, hoặc gõ địa chỉ" required="required" style="flex: 1; min-width: 0; border: 0; padding: 10px 12px; font: inherit; font-size: 16px; line-height: 1.4; resize: none; outline: none; background: transparent; color: #17171C"></textarea>
+        <a href="C1b-MapPicker.dc.html" aria-label="Tìm và chọn địa chỉ trên bản đồ" style="flex: none; width: 64px; border-left: 1px solid #E4E4E9; background: #EBF2FE; color: #1A5BC0; font-size: 12px; font-weight: 600; text-decoration: none; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1A5BC0" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z"></path><circle cx="12" cy="10" r="2.5"></circle></svg>Bản đồ</a>
+      </div>
+      <span style="font-size: 12px; font-weight: 500; color: #686874">Thêm hẻm, tầng, toà nhà nếu có. Cá Về giao trong khu vực Phan Thiết.</span>
+    </section>
+
+    <section style="background: #FFFFFF; padding: 16px">
+      <label style="display: flex; gap: 12px; align-items: flex-start; cursor: pointer">
+        <input type="checkbox" checked="{{consent}}" onChange="{{toggleConsent}}" style="flex: none; width: 20px; height: 20px; margin: 2px 0 0; accent-color: #1F66D1">
+        <span style="color: #4E4E58">Tôi đồng ý để Cá Về dùng họ tên, số điện thoại và địa chỉ này để giao và hỗ trợ đơn hàng, theo <a href="P1-Policy.dc.html" target="_blank" rel="noopener">Chính sách quyền riêng tư<span class="sr"> (mở tab mới)</span></a>. Dữ liệu được lưu trên máy chủ đặt ở nước ngoài.</span>
+      </label>
+    </section>
+  </form>
+
+  <div style="position: absolute; left: 0; right: 0; bottom: 0; background: #FFFFFF; box-shadow: 0 -4px 16px rgba(23,23,28,0.08); padding: 12px 16px 16px; display: flex; flex-direction: column; gap: 8px">
+    <div style="display: flex; justify-content: space-between; align-items: baseline">
+      <span style="color: #4E4E58">3 món · tổng tiền hàng</span>
+      <span class="num" style="font-size: 20px; font-weight: 600; color: #1A5BC0">867.000đ</span>
+    </div>
+    <p style="margin: 0; font-size: 13px; color: #4E4E58">Đã gồm giao hàng. Bạn trả một lần, không trả thêm khi nhận hàng.</p>
+    <!-- Q-UX-4: nút luôn bấm được. Chưa tick đồng ý (hoặc thiếu ô) thì bấm sang trạng thái C2 (FormErrorSummary + lỗi dưới ô), không gọi API. -->
+    <a href="{{orderHref}}" style="height: 48px; border-radius: 24px; background: {{brand}}; color: #FFFFFF; font-weight: 600; text-decoration: none; display: flex; align-items: center; justify-content: center">Đặt hàng</a>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"brand":{"editor":"color","default":"#1F66D1","options":["#1F66D1","#0E3A73"]},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { consent: false };
+  }
+  renderVals() {
+    const brand = this.props.brand ?? '#1F66D1';
+    const consent = this.state.consent;
+    return {
+      brand, consent,
+      orderHref: consent ? 'Payment.dc.html' : 'C2-Invalid.dc.html',
+      toggleConsent: () => this.setState({ consent: !consent })
+    };
+  }
+}
+</script>
+</body>
+</html>

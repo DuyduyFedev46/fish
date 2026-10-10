@@ -3,6 +3,30 @@
 > Cập nhật 02/10/2026, theo code `main` `bf62b81`.
 > Nguồn: `CLAUDE.md` ở gốc repo (luật gốc, file này chỉ tóm tắt), skill `.claude/skills/feature/`, các agent ở `.claude/agents/`.
 
+```mermaid
+flowchart TD
+  Y["Duy nhờ bằng lời thường"] --> L{"Loại việc?"}
+  L -- "hỏi, tra cứu, vận hành" --> TT["Làm trực tiếp, không qua đội"]
+  L -- "tính năng mới, đổi nghiệp vụ" --> BA["BA phân tích yêu cầu"]
+  L -- "lỗi rõ, chỉnh nhỏ" --> AC["Viết vài tiêu chí ngắn"]
+  BA --> D1{"Duy duyệt phân tích?"}
+  D1 -- "sửa lại" --> BA
+  D1 -- "duyệt" --> PO["PO viết story và tiêu chí nghiệm thu"]
+  PO --> D2{"Duy duyệt story?"}
+  D2 -- "duyệt" --> TL["Tech Lead thiết kế kỹ thuật"]
+  TL --> DEV["Dev BE và FE làm song song"]
+  AC --> DEV
+  DEV --> KC["Điều phối tự chạy lại kiểm chứng"]
+  KC --> RV["Soát code và giao diện"]
+  RV --> QA{"QA kiểm thật, đạt?"}
+  QA -- "chưa đạt" --> DEV
+  QA -- "đạt" --> GIT["Commit và đẩy lên GitHub"]
+  GIT --> D3{"Duy bảo deploy?"}
+  D3 -- "có" --> STG["Lên staging"]
+  STG --> D4{"Duy duyệt lên thật?"}
+  D4 -- "duyệt" --> PRD["Lên production"]
+```
+
 ## Ai làm gì
 
 Duy là PO, chỉ nhờ bằng lời thường, không phải gõ lệnh. Từ P8 (30/09/2026) **đội Claude** tự code, QA và commit.

@@ -1,6 +1,22 @@
 # ERP console "nối thật" — User stories
 > PO · 2026-09-24 · Nguồn: 01-analysis.md (ĐÃ DUYỆT, quyết định Duy mục 11) · Trạng thái: **ĐÃ DUYỆT** (2026-09-24, Duy — nhận toàn bộ mặc định C1–C9)
 
+```mermaid
+flowchart TD
+    L1["Lô 1–2: bịt lỗi lô quá hạn, khoá sửa tay"] --> L3["Lô 3–4: khung console mới, khoá Admin"]
+    L3 --> L5["Lô 5–6: tài khoản và phân quyền"]
+    L5 --> D1{"Duy duyệt deploy 1"}
+    D1 --> L7["Lô 7–9: xác nhận tiền, huỷ, hoàn tiền"]
+    L7 --> L10["Lô 10–12: điều phối và giao hàng"]
+    L10 --> D2{"Duy duyệt deploy 2"}
+    D2 --> L13["Lô 13–15: vòng đời lô, nhập hàng, chi phí"]
+    L13 --> L16["Lô 16–17: kiểm kê, báo cáo lãi lỗ"]
+    L16 --> D3{"Duy duyệt deploy 3"}
+    D3 --> L18["Lô 18–19: danh mục giá, nhật ký"]
+    L18 --> L20["Lô 20: Trợ lý AI chỉ đọc"]
+    L20 --> D4{"Duy duyệt deploy 4"}
+```
+
 ---
 
 ## Mục tiêu & thước đo

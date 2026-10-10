@@ -2,6 +2,19 @@
 > Điều phối · 2026-10-01 · Trạng thái: **SẴN SÀNG CODE** (Duy chốt 01/10, xem `doc/features/2026-09-30-ra-soat-agy/q1-pii-xac-minh.md`)
 > Nguồn: QA P8b Lô 1 (Q1-PII) → techlead xác minh → Duy trả lời Q-1/Q-2/Q-3. Bất biến 9 (skill caveve-domain).
 
+```mermaid
+flowchart TD
+    A["Nhân viên mở dữ liệu khách"] --> B{"Vai của người xem"}
+    B -->|"Nhân viên kho"| C["Không vào được danh bạ khách"]
+    C --> D["Vẫn thấy đủ tên, số, địa chỉ trên đơn"]
+    B -->|"Nhân viên giao"| E{"Phiếu giao của mình?"}
+    E -->|"Không"| F["Không thấy"]
+    E -->|"Có"| G{"Đã giao xong quá 7 ngày?"}
+    G -->|"Chưa"| H["Thấy thông tin khách để giao"]
+    G -->|"Quá rồi"| I["Ẩn tên, số, địa chỉ; giữ mã và số kg"]
+    B -->|"Chủ, Quản lý"| J["Xem như cũ"]
+```
+
 ## Quyết định của Duy (01/10)
 - Q-1: NV kho **không cần** danh bạ khách.
 - Q-2: NV kho **giữ SĐT đầy đủ** ở màn Đơn hàng / phiếu giao.

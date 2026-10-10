@@ -2,8 +2,17 @@
 
 export type ItemType = "SIMPLE" | "BUNDLE";
 
+/** Mức tồn công khai (BR-BH-23). Chỉ ba mức, không bao giờ là số kg. */
+export type StockLevel = "in" | "low" | "out";
+/** Đơn vị bán: kg cho món lẻ, combo cho BUNDLE. */
+export type SaleUnit = "kg" | "combo";
+/** Tiền là chuỗi số nguyên đồng ("278000"), chỉ đổi sang số ở chỗ cần tính. */
+export type Money = string;
+/** Icon nhóm dùng làm ảnh dự phòng, FE suy từ slug nhóm (features/catalog/groupIcon.ts). */
+export type GroupIcon = "fish" | "shrimp" | "squid" | "crab" | "combo";
+
 // Ảnh mặt hàng (A4, doc/features/2026-09-26-anh-mat-hang/02-stories.md). Chưa có ảnh -> `image: null`,
-// Shop vẽ khung mặc định bằng code (components/ItemImageFrame.tsx) — KHÔNG có field id/người tải/tệp
+// Shop vẽ khung mặc định bằng code (components/catalog/ImageFrame.tsx) — KHÔNG có field id/người tải/tệp
 // gốc (bất biến 1: Shop không lộ dữ liệu nội bộ, chỉ nhận URL công khai).
 export type ItemImageUrls = { thumb: string; card: string; detail: string };
 
@@ -13,26 +22,46 @@ export type ItemImage = {
   urls: ItemImageUrls;
 };
 
+export type CatalogGroup = {
+  slug: string;
+  name: string;
+  /** Số món đang bán trong nhóm (đếm trong `items`), không phải số kg. */
+  item_count: number;
+};
+
+// Khớp 02b-tech-design §3.1 (GET /api/shop/catalog/). Không có khoá nào chứa số kg tồn, giá vốn hay mã lô.
 export type CatalogItem = {
   item_code: string;
   name: string;
-  group: string;
   item_type: ItemType;
-  unit: "Kg";
-  // API thật trả Decimal dạng chuỗi ("260000.00", "50.000"); mock trả số. Hiển thị qua lib/format.ts,
-  // tính toán (giỏ hàng) ép bằng Number ở AddToCartControl.
-  price: string | number;
-  sellable_qty: string | number;
+  unit: SaleUnit;
+  price: Money;
+  stock_level: StockLevel;
+  min_qty: string;
+  qty_step: string;
+  group: { slug: string; name: string };
+  short_note: string;
   image: ItemImage | null;
+};
+
+export type CatalogResponse = {
+  groups: CatalogGroup[];
+  items: CatalogItem[];
 };
 
 export type BundleComponent = {
   item_code: string;
   name: string;
-  qty_per_bundle: number;
+  qty_per_bundle: string;
+  unit: SaleUnit;
 };
 
+// §3.2 GET /api/shop/catalog/<item_code>/
 export type CatalogItemDetail = CatalogItem & {
+  description: string;
+  spec: string;
+  storage: string;
+  origin: string;
   bundle_components?: BundleComponent[];
 };
 

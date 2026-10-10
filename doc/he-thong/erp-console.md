@@ -5,6 +5,23 @@
 > (17 lô ở `02c-giao-viec.md`, quy tắc giao diện ở `doc/design/erp/UI-RULES.md`). File này mô tả ERP **hiện tại**; sau mỗi lô của hồ sơ đó cần cập nhật lại.
 > Hướng dẫn chi tiết cho dev: `erp-console/README.md`.
 
+```mermaid
+flowchart TD
+  A["Nhân viên đăng nhập"] --> B{"Còn mật khẩu tạm?"}
+  B -- "có" --> C["Đổi mật khẩu"]
+  B -- "không" --> D{"Thuộc nhóm nào chưa?"}
+  C --> D
+  D -- "chưa" --> E["Báo chưa có vai trò"]
+  D -- "rồi" --> F["Menu theo quyền"]
+  F --> G["Mở màn việc"]
+  G --> H["Gọi lõi hệ thống"]
+  H --> I{"Kết quả"}
+  I -- "đang tải" --> J["Hiện đang tải"]
+  I -- "lỗi" --> K["Hiện câu lỗi"]
+  I -- "rỗng" --> L["Hiện chưa có dữ liệu"]
+  I -- "có dữ liệu" --> M["Hiện danh sách, thao tác"]
+```
+
 ## Là gì
 
 Console vận hành nội bộ cho Chủ, Quản lý, NV kho, NV giao, CSKH. Next.js 14 (App Router), **xuất tĩnh** ra `out/`,

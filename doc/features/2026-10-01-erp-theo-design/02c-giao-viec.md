@@ -3,6 +3,21 @@
 > Người hiện thực: đội Claude theo `CLAUDE.md`, lệnh `/lam-design-erp`.
 > Nhánh làm việc: `main` (mỗi lô QA APPROVED → commit + `git push origin main` → đánh ☑ ở đây).
 
+```mermaid
+flowchart TD
+    A{"Duy duyệt phân tích, story, thiết kế"} -->|"Duyệt"| B["Lô 1: khung menu và danh sách"]
+    B --> C["Lô 2: mẫu trang chi tiết"]
+    C --> D["Lô 3 đến 7: bán hàng, giao, khách"]
+    D --> E["Lô 8 đến 11: kho, nhập, hoàn hàng"]
+    E --> F["Lô 12 đến 14: kế toán, giá, phân quyền"]
+    F --> G["Lô 15 và 16: tổng quan, soạn bài"]
+    G --> H["Lô bổ sung A theo Duy quyết"]
+    H --> I["Lô 17: dọn nợ và hồi quy"]
+    J["Mỗi lô: code, review, kiểm thử"] --> K{"Kiểm thử đạt?"}
+    K -->|"Đạt"| L["Lưu lên main, đánh dấu xong"]
+    K -->|"Chưa"| J
+```
+
 ## Điều kiện đầu vào
 - `01-analysis.md`: ĐÃ DUYỆT 01/10 · `02-stories.md`: ĐÃ DUYỆT 01/10 · `02b-tech-design.md`: ĐÃ DUYỆT 01/10 (§6 Duy đã trả lời).
 - Đọc trước mỗi lô: `doc/design/erp/UI-RULES.md`, `doc/design/erp/enum-map.md`, board thiết kế của lô trong `doc/design/erp/screens/`.

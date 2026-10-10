@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<title>Góc bếp — điện thoại</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#1A5BC0}a:hover{color:#1A57B5}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.chips::-webkit-scrollbar{display:none}
+a,button{-webkit-tap-highlight-color:transparent;touch-action:manipulation;transition:transform 120ms cubic-bezier(.23,1,.32,1),background-color 150ms ease-out}
+a:active,button:active{transform:scale(.97)}
+a:focus-visible,button:focus-visible{outline:2px solid #1F66D1;outline-offset:2px}
+.ft a:focus-visible{outline-color:#FFFFFF}
+.clamp{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.one{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.post{position:relative}
+.post h2 a::after{content:"";position:absolute;inset:0}
+.post:has(a:focus-visible){outline:2px solid #1F66D1;outline-offset:2px}
+.post h2 a:focus-visible{outline:none}
+.ft summary{list-style:none;cursor:pointer;height:48px;display:flex;align-items:center;justify-content:space-between;color:#FFFFFF;font-weight:600;border-bottom:1px solid rgba(255,255,255,0.14)}
+.ft summary::-webkit-details-marker{display:none}
+.ft ul{list-style:none;margin:0;padding:4px 0 12px;display:flex;flex-direction:column}
+.ft li a{display:flex;align-items:center;min-height:40px;color:#D6E4FA;text-decoration:none;font-size:14px}
+@media (prefers-reduced-motion:reduce){a:active,button:active{transform:none}}
+</style>
+</helmet>
+<div style="width: 390px; height: 1360px; position: relative; overflow: hidden; background: #F4F4F6; color: #17171C; font-family: Inter, system-ui, sans-serif; font-size: 14px; line-height: 1.5">
+  <div style="height: 1296px; overflow-y: auto">
+
+    <header style="position: sticky; top: 0; z-index: 2; height: 56px; box-sizing: border-box; background: #FFFFFF; border-bottom: 1px solid #E4E4E9; display: flex; align-items: center; justify-content: space-between; padding: 0 6px">
+      <a href="Home.dc.html" aria-label="Quay lại" style="width: 44px; height: 44px; display: flex; align-items: center; justify-content: center"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#17171C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"></path></svg></a>
+      <h1 style="margin: 0; font-size: 15px; font-weight: 600">Góc bếp</h1>
+      <a href="Cart.dc.html" aria-label="Giỏ hàng, 3 món" style="width: 44px; height: 44px; display: flex; align-items: center; justify-content: center"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#17171C" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 4h2l2.4 10.2a1.5 1.5 0 0 0 1.5 1.1h8.6a1.5 1.5 0 0 0 1.5-1.1L21 8H6.2"></path><circle cx="9.5" cy="19.5" r="1.3"></circle><circle cx="17" cy="19.5" r="1.3"></circle></svg></a>
+    </header>
+
+    <main style="background: #FFFFFF; padding-bottom: 8px">
+      <nav aria-label="Chuyên mục" class="chips" style="display: flex; gap: 8px; padding: 12px 16px; overflow-x: auto; white-space: nowrap; scrollbar-width: none">
+        <sc-for list="{{chips}}" as="c" hint-placeholder-count="4">
+          <button type="button" onClick="{{c.pick}}" aria-pressed="{{c.on}}" style="{{c.style}}">{{c.label}}</button>
+        </sc-for>
+      </nav>
+
+      <ul style="list-style: none; margin: 0; padding: 0 16px; display: flex; flex-direction: column">
+        <sc-for list="{{posts}}" as="b" hint-placeholder-count="4">
+          <li style="border-top: 1px solid #E4E4E9">
+            <article class="post" style="display: flex; gap: 12px; padding: 12px 0; border-radius: 8px">
+              <span style="flex: none; width: 112px; height: 84px; border-radius: 8px; background: #EBEBEF; display: flex; align-items: center; justify-content: center">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#8C8C98" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 11h16a8 8 0 0 1-16 0zM8 7c0-1 1-1.5 1-2.5M12 7c0-1 1-1.5 1-2.5M16 7c0-1 1-1.5 1-2.5"></path></svg>
+              </span>
+              <span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px">
+                <span style="font-size: 12px; font-weight: 500; color: #1A5BC0">{{b.tag}}</span>
+                <h2 class="clamp" style="margin: 0; font-size: 15px; font-weight: 600; line-height: 1.35"><a href="G2-KitchenArticle.dc.html" style="color: #17171C; text-decoration: none">{{b.title}}</a></h2>
+                <p class="one" style="margin: 0; font-size: 13px; color: #4E4E58">{{b.desc}}</p>
+              </span>
+            </article>
+          </li>
+        </sc-for>
+      </ul>
+      <div aria-live="polite" class="sr">{{liveText}}</div>
+    </main>
+
+    <footer class="ft" style="margin-top: 8px; background: #0E3A73; color: #D6E4FA; padding: 20px 16px; display: flex; flex-direction: column; gap: 4px; font-size: 14px">
+      <a href="Home.dc.html" aria-label="Cá Về — trang chủ" style="display: flex; align-items: center; gap: 8px; color: #FFFFFF; text-decoration: none; font-weight: 600; font-size: 17px; padding-bottom: 6px">
+        <span aria-hidden="true" style="width: 28px; height: 28px; border-radius: 7px; border: 1.5px dashed rgba(255,255,255,0.7); font-size: 8px; display: flex; align-items: center; justify-content: center">LOGO</span>Cá Về</a>
+      <p style="margin: 0 0 8px">Hải sản cấp đông theo lô, giá tính theo kg, giao tận nhà.</p>
+      <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; padding-bottom: 8px">
+        <a href="tel:[hotline]" style="height: 44px; border-radius: 22px; background: #FFFFFF; color: #0E3A73; font-weight: 600; text-decoration: none; display: flex; align-items: center; justify-content: center">Gọi [hotline]</a>
+        <a href="https://zalo.me/[số]" style="height: 44px; border-radius: 22px; border: 1px solid rgba(255,255,255,0.5); color: #FFFFFF; font-weight: 600; text-decoration: none; display: flex; align-items: center; justify-content: center">Nhắn Zalo</a>
+      </div>
+      <details open="open">
+        <summary>Mua hàng <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg></summary>
+        <ul><li><a href="Main.dc.html">Hàng đang có</a></li><li><a href="Main.dc.html">Combo nấu nhanh</a></li><li><a href="P3-HowToBuy.dc.html">Cách mua hàng</a></li><li><a href="F1-Lookup.dc.html">Tra cứu đơn</a></li></ul>
+      </details>
+      <details>
+        <summary>Chính sách <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg></summary>
+        <ul><li><a href="P1-Policy.dc.html">Chính sách đổi trả và hoàn tiền</a></li><li><a href="P1-Policy.dc.html">Chính sách giao hàng</a></li><li><a href="P1-Policy.dc.html">Chính sách thanh toán</a></li><li><a href="P1-Policy.dc.html">Chính sách quyền riêng tư</a></li><li><a href="P1-Policy.dc.html">Điều kiện giao dịch chung</a></li><li><a href="P1-Policy.dc.html">Cơ chế giải quyết khiếu nại</a></li></ul>
+      </details>
+      <details>
+        <summary>Về Cá Về <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg></summary>
+        <ul><li><a href="Landing.dc.html">Giới thiệu</a></li><li><a href="G1-KitchenList.dc.html" aria-current="page">Góc bếp</a></li><li><a href="P2-Contact.dc.html">Liên hệ</a></li></ul>
+      </details>
+      <div style="padding-top: 14px; display: flex; flex-direction: column; gap: 6px; font-size: 12px">
+        <span>[Tên doanh nghiệp] · MST [mã số thuế]</span>
+        <span>Địa chỉ: [địa chỉ kinh doanh]</span>
+        <span>GCN ĐKKD số [số] do [nơi cấp] cấp ngày [ngày]</span>
+        <span>Email: <a href="mailto:[email]" style="color: #FFFFFF">[email]</a></span>
+        <!-- Logo "Đã thông báo website" (D12, BR-ND-18): chỉ render khi site-info có seller.website_notice_url; chưa có link thì ẩn hẳn, không để ô giữ chỗ. -->
+        <span style="color: #A9C4EE">© 2026 Cá Về</span>
+      </div>
+    </footer>
+  </div>
+
+  <nav aria-label="Điều hướng chính" style="position: absolute; left: 0; right: 0; bottom: 0; height: 64px; background: #FFFFFF; border-top: 1px solid #E4E4E9; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr))">
+    <a href="Home.dc.html" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; text-decoration: none; font-size: 12px; font-weight: 500; color: #4E4E58"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#4E4E58" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 11l8-6 8 6v8a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1z"></path></svg>Trang chủ</a>
+    <a href="Main.dc.html" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; text-decoration: none; font-size: 12px; font-weight: 500; color: #4E4E58"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#4E4E58" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z"></path></svg>Danh mục</a>
+    <a href="Cart.dc.html" aria-label="Giỏ hàng, 3 món" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; text-decoration: none; font-size: 12px; font-weight: 500; color: #4E4E58"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#4E4E58" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 4h2l2.4 10.2a1.5 1.5 0 0 0 1.5 1.1h8.6a1.5 1.5 0 0 0 1.5-1.1L21 8H6.2"></path></svg>Giỏ hàng</a>
+    <a href="F1-Lookup.dc.html" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; text-decoration: none; font-size: 12px; font-weight: 500; color: #4E4E58"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#4E4E58" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3h8l3 3v15H5V3h3zM9 10h6M9 14h6"></path></svg>Đơn hàng</a>
+  </nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":1360}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { cat: 'all' };
+  }
+  renderVals() {
+    const cats = [
+      { id: 'all', label: 'Tất cả' }, { id: 'ra-dong', label: 'Rã đông' },
+      { id: 'hap', label: 'Món hấp' }, { id: 'chien', label: 'Món chiên' }
+    ];
+    const all = [
+      { cat: 'ra-dong', tag: 'Rã đông', title: 'Rã đông cá đúng cách để thịt không bở', desc: 'Ngăn mát hay nước lạnh, chọn cách nào cho từng món.' },
+      { cat: 'hap', tag: 'Món hấp', title: 'Mực ống: hấp, chiên hay xào?', desc: 'Mỗi cách nấu hợp với loại mực nào.' },
+      { cat: 'hap', tag: 'Món hấp', title: 'Cá thu hấp gừng hành', desc: 'Món nhẹ cho bữa tối, ít dầu mỡ.' },
+      { cat: 'chien', tag: 'Món chiên', title: 'Cá nục chiên giòn không bắn dầu', desc: 'Thấm khô cá trước khi cho vào chảo.' }
+    ];
+    const cat = this.state.cat;
+    const base = 'flex: none; height: 40px; padding: 0 14px; border-radius: 20px; font: inherit; font-size: 13px; font-weight: 500; cursor: pointer; ';
+    const chips = cats.map((c) => ({
+      label: c.label,
+      on: c.id === cat ? 'true' : 'false',
+      pick: () => this.setState({ cat: c.id }),
+      style: base + (c.id === cat ? 'background: #1F66D1; color: #FFFFFF; border: 1px solid #1F66D1;' : 'background: #FFFFFF; color: #4E4E58; border: 1px solid #D4D4DB;')
+    }));
+    const posts = all.filter((p) => cat === 'all' || p.cat === cat);
+    return { chips, posts, liveText: posts.length + ' bài' };
+  }
+}
+</script>
+</body>
+</html>

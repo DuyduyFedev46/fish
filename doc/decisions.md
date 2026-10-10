@@ -231,3 +231,43 @@ Hồ sơ: `doc/features/2026-09-26-sepay-cong-thanh-toan/`.
 ## 2026-10-10 (chiều) — Tem in và việc còn lại — [DUY CHỐT]
 - **Tem in phiếu giao** chỉ hiện **4 số cuối** SĐT người nhận (`xxxxxx4567`). Các chỗ che SĐT khác giữ nguyên. Trả lời Q1 trong `02c-quyet-dinh-08-10.md`.
 - Duy đồng ý các việc còn lại: sửa nợ L2 (bảng Thành viên ở 360), dọn worktree đã gộp.
+
+## 2026-10-10 (tối) — Shop làm lại từ đầu theo thiết kế 06/10 — [DUY CHỐT]
+Nguồn: `doc/design/shop/README.md` (chốt 06–07/10) và trả lời của Duy ngày 10/10. Hồ sơ: `doc/features/2026-10-06-shop-giao-dien-moi/`.
+- **Shop làm lại từ đầu** theo `doc/design/shop/` (86 màn, `COMPONENTS.md`, `UI-RULES.md`). Component viết mới, code Shop cũ bỏ dần theo lô, không vá. Production chưa chạy Shop nên API Shop được đổi contract, không giữ đường cũ.
+- **Bố cục bán lẻ kiểu Long Châu**, token giữ `DESIGN.md` (một màu nhấn `#1F66D1`, thêm `brand-deep`). Reviewer UI không chấm lệch so với hướng Linear/Notion của `caveve-ui` ở Shop.
+- **`/` là trang chủ Shop; landing thương hiệu chuyển sang `/gioi-thieu/`** (dựng mới theo thiết kế). Thay ý "Landing (SEO) và Shop tách nhau" ở mục Bối cảnh.
+- **Giá theo kg, tối thiểu 1 kg.** Combo tính theo combo, số nguyên (sửa BR-DM-01).
+- **Tồn kho trên Shop chỉ ba mức** Còn hàng / Sắp hết / Hết, không hiện số kg (sửa câu chữ BR-BH-01). Hết hàng thì nút "Liên hệ chúng tôi". Không hiện ngày nhập lô, mã lô.
+- **Shop không có ô hoá đơn điện tử** trên giao diện. Nghĩa vụ lập hoá đơn ở hậu trường (NĐ 254/2026 thay NĐ 123 từ 01/7/2026) chốt cùng kế toán; không được ghi "Cá Về không xuất hoá đơn" (xem `05-phap-ly.md` mục 6).
+- **Shop không hiện luồng hoàn tiền.** Đơn huỷ sau khi đã trả tiền ghi "Cá Về sẽ gọi cho bạn". ERP giữ nguyên Refund (quyết định 2026-09-10 không đổi). Chữ "hoàn tiền" chỉ xuất hiện trong tên trang "Chính sách đổi trả và hoàn tiền".
+- **Địa chỉ giao là một ô**, có nút mở Google Maps để tìm/ghim rồi tự điền. Duy đồng ý gửi địa chỉ cho Google; chính sách quyền riêng tư phải nêu. Không lưu toạ độ. Script Maps chỉ nạp khi khách bấm.
+- **Thanh toán xong vào thẳng trang đơn hàng (cũng là trang tra cứu)**, không có màn "thành công" riêng. Giao diện khách không ghi tên nhà cung cấp cổng thanh toán, chỉ ghi "Chuyển khoản ngân hàng (quét mã QR)".
+- **Trang đơn hàng công khai không hiện người nhận** (tên, SĐT, địa chỉ), theo bất biến 9. Mã đơn giữ dạng `SO…`.
+- **Phí giao:** khách trả **một lần qua QR**, không thu tiền khi nhận. **Hiện chưa có phí ship**; BR-BH-10 giữ nguyên. Shop bỏ dòng "Phí giao: Báo khi xác nhận đơn" và không hứa "miễn phí giao". Khi có phí ship thì phí cộng vào tổng tiền QR, ghi quyết định riêng.
+- **Mã giảm giá: CÓ** (Duy chốt 07/10, xác nhận 10/10). **Lật** ý "không mã giảm giá" ở quyết định 2026-09-10 (combo/PricingRule) và BR-DM-08 phần liên quan. Ô nhập mã ở giỏ, mỗi đơn tối đa 1 mã. **ERP có màn quản lý mã giảm giá** (tạo, tắt, xem lượt dùng). Quy tắc cộng dồn và loại mã: xem hồ sơ, chờ Duy duyệt ở điểm dừng BA.
+- **Không có dải chip "Tìm nhiều"**; Shop chỉ có một ô tìm kiếm.
+- Đuôi lô dưới 1 kg (Q4): Shop không bán phần lẻ; tổng bán được dưới 1 kg thì Shop hiện "Hết hàng"; Lộc bán ngoài hoặc điều chỉnh tồn ở ERP.
+- Trang Liên hệ và Cách mua là trang CMS (`/trang/?slug=…`), Lộc sửa ở màn Nội dung ERP.
+- **Nội dung chữ trong thiết kế nạp vào CMS** (Duy chốt 10/10): trang chính sách, liên hệ, cách mua, bài Góc bếp, nội dung giới thiệu/landing và các khối nội dung khác Lộc cần sửa → lưu ở CMS (`apps.content`), FE đọc qua API công khai, không hard-code. Chữ giao diện (nhãn nút, câu lỗi, tiêu đề màn) vẫn nằm trong code. `mkt-brand` học CMS để soạn và nạp nội dung; chỗ CMS chưa chứa được thì techlead thiết kế ở 02b.
+- **Đội dev giữ 1 `be-dev` + 1 `fe-dev`** (Duy chốt 10/10).
+- **`mkt-brand` là full stack** (Duy chốt 10/10): ngoài soạn nội dung, tự code phần nội dung/CMS (app `content`, lệnh nạp nội dung, trang nội dung Shop, màn Nội dung ERP khi mở rộng). Không đụng tiền, giá vốn, kho, đơn, thanh toán; code vẫn qua techlead review + QA. Đội dev chính vẫn 1 `be-dev` + 1 `fe-dev`.
+- **Nạp nội dung CMS:** trên **staging** lệnh nạp **đăng luôn toàn bộ** (kể cả trang chính sách đang chờ legal-vn, bài Góc bếp dùng ảnh bìa tạm có nhãn "Ảnh minh hoạ"). Production: nạp ở trạng thái Nháp, Duy/Lộc duyệt rồi bấm Đăng ở ERP (mặc định, chờ Duy xác nhận khi lên production). (Duy chốt 10/10)
+- **Không cấu trúc lại thư mục code** đợt này (Duy 10/10: "thôi khỏi cấu trúc đi, cho làm shop"). Đề xuất `doc/kien-truc/de-xuat-cau-truc-lai.md` giữ làm tham khảo, chưa làm.
+- **Duyệt điểm dừng 1 Shop theo khuyến nghị** (`01-analysis.md` §11.1 nhóm A: S-01…S-07, S-09…S-11, S-13, S-15, S-17, S-20…S-22; mặc định V-01…V-12 §11.2):
+  mã giảm giá không cộng dồn, lấy lợi hơn; chỉ mã công khai, giới hạn tổng lượt, 1 mã/đơn; quyền `manage_voucher` chỉ Chủ (uỷ được); bước 0,5 kg;
+  bỏ nút "Huỷ đơn"; tra đơn mã + SĐT đầy đủ (POST) hoặc mã tra đơn tạm, gỡ GET 4 số cuối; bỏ nút "Vị trí của tôi"; đổi lô theo PM (xoá code cũ theo lô,
+  gỡ `sellable_qty` lô 2, `phone_last4` lô 3, merge lô 3+4 cùng lần, BE-2 + ERP mặt hàng lên lô 2b, xoá lô 6); lượt mã giữ khi tạo đơn, nhả khi tự huỷ hết giờ;
+  trần giảm 50% (tham số), mã % có trần tiền, tổng sau giảm > 0; production không chờ mã giảm giá; ghi tên SePay chỉ ở chính sách quyền riêng tư;
+  V1 không tạo nhóm MKT; D7–D13; tên trang `terms` là "Điều kiện giao dịch chung".
+  **Còn chờ** (nhóm B): S-08 khu vực giao, S-12 thời hạn gọi lại/trả tiền, S-14 chủ thể pháp lý + tên miền, S-16 thời hạn khiếu nại, S-18 sơ chế/đóng gói, S-19 giờ rã đông, S-23 cá nục.
+
+## 2026-10-11 — Trả lời nhóm B điểm dừng 1 Shop — [DUY CHỐT]
+- **S-08 Khu vực giao: Phan Thiết.** Đơn vị giao trước mắt là **Ahamove hoặc GHN, chưa chốt**. Lưu ý: khác quyết định cũ "100% đơn giao tận nhà, nhân viên nội bộ giao" — khi chốt hãng ngoài phải ghi quyết định riêng và cập nhật chính sách quyền riêng tư (gửi tên/SĐT/địa chỉ khách cho hãng, bất biến 9). Shop vẫn chưa có phí ship, câu "Đã gồm giao hàng…".
+- **S-14 Chủ thể pháp lý: doanh nghiệp**, thông tin để sau. Làm **UAT trên staging** trước; khối pháp lý/logo thông báo ẩn tới khi có thông tin.
+- **S-16 Thời hạn phản hồi khiếu nại: dưới 2 giờ.**
+- **S-12, S-18, S-19, S-23:** Claude dùng câu tạm để làm UAT; danh sách câu hỏi để Duy hỏi Lộc ở `doc/ops/hoi-loc.md`.
+- **Duyệt `02-stories.md` (41 story, điểm dừng 2)** theo khuyến nghị PO — Duy giao tự duyệt và chạy hết các lô đêm 10→11/10, không deploy: lệnh nạp nội dung CMS và `/gioi-thieu/` kéo lên lô 1; trang `/ui-preview/` chỉ bật bằng cờ build (production 404); giỏ có món vừa hết thì chặn "Đặt hàng" tới khi khách bỏ món (techlead được đổi ở 02b).
+- **Deploy staging** các lô Shop đã QA APPROVED và merge `main` (Duy 11/10: "xong thì deploy staging các phần đã xong"). Production chưa.
+- **Mọi tài liệu quy trình có sơ đồ Mermaid ngay dưới tiêu đề**, nhãn tiếng Việt dễ hiểu, để Duy đọc luồng (Duy 11/10). Luật ghi ở `CLAUDE.md`.
+- **Đổi URL Shop sang tiếng Anh** (Duy chốt 11/10, chọn khuyến nghị): thư mục và URL `/gioi-thieu/` → `/about/`, `/trang/?slug=` → `/pages/?slug=`, `/bai-viet/` → `/blog/`. Production chưa chạy nên không giữ đường cũ. Slug nội dung CMS (vd `cach-mua-hang`) là dữ liệu, giữ tiếng Việt. Nhắc lại luật: tên file, thư mục, hàm, biến, route trong source là tiếng Anh; chỉ comment, chữ hiển thị và tài liệu là tiếng Việt.

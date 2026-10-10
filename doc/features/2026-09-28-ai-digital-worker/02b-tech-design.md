@@ -12,6 +12,26 @@
 > Chưa có `02-stories.md` cho hồ sơ này. Các lô ở §12 là **đề xuất để PO viết story**; khi story có, Tech
 > Lead đối chiếu lại contract.
 
+```mermaid
+flowchart TD
+    A["Người dùng hỏi AI trên ERP"] --> B["Máy tìm tối đa 5 lệnh hợp"]
+    B --> C["AI chọn một lệnh"]
+    C --> D["Tải mẫu dữ liệu của lệnh đó"]
+    D --> E["AI điền thông tin cho lệnh"]
+    E --> F["Gửi lên máy chủ kiểm tra"]
+    F --> G{"AI bật, đủ quyền, dữ liệu đúng?"}
+    G -->|"Không"| H["Từ chối, báo lý do"]
+    G -->|"Có"| I{"Lệnh đọc hay ghi, mức nào?"}
+    I -->|"Đọc"| J["Lấy dữ liệu, ẩn giá vốn và thông tin khách"]
+    I -->|"Mức nháp"| K["Lưu nháp chờ người duyệt"]
+    I -->|"Mức tự ghi"| L["Ghi như người bấm nút, cho hoàn tác"]
+    I -->|"Không làm được"| M["Chuyển việc cho người có quyền"]
+    J --> N["AI diễn đạt kết quả"]
+    K --> O["Ghi nhật ký kèm người cấp"]
+    L --> O
+    M --> O
+```
+
 ## Điều chỉnh của Duy (28/09) — nguyên văn, thắng mọi chỗ khác trong file
 
 > "anh hiểu nhầm biến feature thành mcp rồi, nó sẽ gây context lớn và crash ?? mong muốn của anh là:

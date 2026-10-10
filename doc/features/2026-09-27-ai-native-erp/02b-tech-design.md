@@ -5,6 +5,26 @@
 > Trạng thái: **BẢN THIẾT KẾ** — bám theo story đang CHỜ DUYỆT. PO đổi story → cập nhật mục "Lệch so với story PO"
 > (mục 9) và contract tương ứng. FE mock theo đúng contract trong file này; đổi tên field phải báo Tech Lead/PO.
 
+```mermaid
+flowchart TD
+    A["Nhân viên dùng AI trên ERP"] --> B{"AI đang bật?"}
+    B -- "Không" --> C["Màn AI ẩn, làm tay như cũ"]
+    B -- "Có" --> D{"Lệnh chạy ở đâu?"}
+    D -- "Trên máy" --> E["AI trong trình duyệt hiểu câu"]
+    D -- "Cloud" --> F{"Còn trong trần chi phí?"}
+    F -- "Hết trần" --> G["Báo đã chạm trần tháng"]
+    F -- "Còn" --> H["Máy chủ lọc bỏ dữ liệu khách"]
+    H --> I["Gửi AI cloud qua cổng chặn"]
+    E --> J["Lớp lệnh chung kiểm quyền"]
+    I --> J
+    J --> K{"Lệnh chỉ đọc?"}
+    K -- "Có" --> L["Trả kết quả, ẩn giá vốn"]
+    K -- "Không" --> M["Tạo bản đề xuất"]
+    M --> N{"Người dùng xác nhận?"}
+    N -- "Đồng ý" --> O["Thực thi và ghi nhật ký"]
+    N -- "Không" --> P["Bỏ đề xuất"]
+```
+
 ## Mục lục
 1. [Kiến trúc tổng thể khi có AI Native](#1-kiến-trúc-tổng-thể-khi-có-ai-native)
 2. [Lớp lệnh nghiệp vụ dùng chung](#2-lớp-lệnh-nghiệp-vụ-dùng-chung)

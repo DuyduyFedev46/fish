@@ -1,6 +1,24 @@
 # AI Native ERP — Phân tích nghiệp vụ
 > BA · 2026-09-27 · Trạng thái: **ĐÃ DUYỆT** (Duy trả lời Q1–Q6 ngày 2026-09-27 — xem mục "Câu trả lời của Duy")
 
+```mermaid
+flowchart TD
+    A["Nhân viên mở màn nhập lô"] --> B{"Máy chạy được AI?"}
+    B -- "Không" --> C["Nhập tay như cũ"]
+    B -- "Có" --> D["Bấm ghi âm, đọc thông tin lô"]
+    D --> E["AI trên máy điền sẵn form"]
+    E --> F{"Thiếu thông tin?"}
+    F -- "Có" --> G["AI hỏi lại bằng tiếng Việt"]
+    G --> E
+    F -- "Đủ" --> H["Form hiện nhãn do AI đề xuất"]
+    H --> I["Nhân viên xem, sửa nếu cần"]
+    I --> J{"Nhân viên bấm xác nhận?"}
+    J -- "Không" --> K["Bỏ bản nháp"]
+    J -- "Có" --> L["Hệ thống kiểm quyền và dữ liệu"]
+    L --> M["Tạo phiếu nhập, sinh lô"]
+    M --> N["Ghi nhật ký có dấu AI"]
+```
+
 ## Tóm tắt
 
 **Nhân viên/Chủ vựa** cần ERP **nói được, gợi ý được, cảnh báo được** để **nhập liệu nhanh

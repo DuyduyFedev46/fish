@@ -1,6 +1,26 @@
 # Đơn hoàn tất (W37) — Phân tích nghiệp vụ
 > BA · 2026-10-06 · Trạng thái: **ĐÃ DUYỆT (07/10)**
 
+```mermaid
+flowchart TD
+    A["Khách trả đủ tiền, đơn Đang xử lý"] --> B["NV giao đi giao hàng"]
+    B --> C{"Giao được không?"}
+    C -- "Thất bại" --> D["Phiếu Giao thất bại, đơn giữ Đang xử lý"]
+    D --> E{"Giao lại hay thôi?"}
+    E -- "Giao lại" --> B
+    E -- "Thôi" --> F["Chủ hoặc Quản lý huỷ đơn"]
+    C -- "Được" --> G["NV giao bấm Hoàn tất phiếu"]
+    G --> H{"Đơn đã bị huỷ?"}
+    H -- "Có" --> I["Từ chối, mang hàng về kho"]
+    H -- "Không" --> J{"Mọi phiếu của đơn đã xong?"}
+    J -- "Chưa" --> K["Đơn giữ Đang xử lý"]
+    J -- "Rồi" --> L["Đơn tự sang Hoàn tất"]
+    L --> M["Ghi nhật ký, khách tra thấy Hoàn tất"]
+    L --> N["Lô hết bị chặn chốt"]
+    L --> O["Khiếu nại: vẫn hoàn tiền, đơn giữ Hoàn tất"]
+    P["Đơn cũ đã giao xong: chuyển bù một lần"] --> L
+```
+
 ## 1. Yêu cầu gốc
 > "W37 (đơn giao xong vẫn 'Đang xử lý'): chạy luồng ĐẦY ĐỦ (BA → PO → Tech Lead) trước khi code."
 > — Duy chốt, `decisions.md` 2026-10-06 (tối).

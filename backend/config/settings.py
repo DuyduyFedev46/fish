@@ -7,6 +7,7 @@ Nguyên tắc (theo decisions.md / URD.md):
 - Ngưỡng nghiệp vụ (TTL, cận hạn, chuỗi lạnh...) là tham số cấu hình, không hard-code.
 """
 import sys
+from decimal import Decimal
 from pathlib import Path
 
 import dj_database_url
@@ -211,6 +212,8 @@ _DEFAULT_THROTTLE_RATES = {
     "shop_lookup_order": _rate("THROTTLE_SHOP_LOOKUP_ORDER", "10/hour"),
     "shop_order_create": _rate("THROTTLE_SHOP_ORDER_CREATE", "20/hour"),
     "shop_checkout": _rate("THROTTLE_SHOP_CHECKOUT", "30/hour"),
+    "shop_lookup_token": _rate("THROTTLE_SHOP_LOOKUP_TOKEN", "60/min"),
+    "shop_voucher_check": _rate("THROTTLE_SHOP_VOUCHER_CHECK", "20/min"),
     "login_ip": _rate("THROTTLE_LOGIN_IP", "10/min"),
     "login_user": _rate("THROTTLE_LOGIN_USER", "30/hour"),
     "customer_search": _rate("THROTTLE_CUSTOMER_SEARCH", "30/min"),
@@ -351,6 +354,30 @@ def privacy_consent_required(testing: bool, debug: bool, env) -> bool:
 
 # Cờ bắt buộc đồng ý chính sách bảo mật (mặc định BẬT ngoài dev/test - G1)
 PRIVACY_CONSENT_REQUIRED = privacy_consent_required(TESTING, DEBUG, os.environ)
+
+# --- Shop làm lại 2026-10 (doc/features/2026-10-06-shop-giao-dien-moi/02b §2.3) -----------
+# Khai một lần ở lô 1 cho cả đợt; lô sau chỉ đọc. Tham số nghiệp vụ không hard-code (bất biến 7).
+# Số lượng đặt và mức tồn hiển thị (BR-BH-22, BR-BH-23, V-01).
+SHOP_MIN_QTY_KG = Decimal(os.getenv("SHOP_MIN_QTY_KG", "1"))
+SHOP_QTY_STEP_KG = Decimal(os.getenv("SHOP_QTY_STEP_KG", "0.5"))
+SHOP_LOW_STOCK_KG = Decimal(os.getenv("SHOP_LOW_STOCK_KG", "3"))
+SHOP_LOW_STOCK_COMBO = int(os.getenv("SHOP_LOW_STOCK_COMBO", "3"))
+SHOP_MAX_ORDER_LINES = int(os.getenv("SHOP_MAX_ORDER_LINES", "30"))
+# Tra đơn, thanh toán, huỷ (BR-BH-25, BR-TT-19, BR-HT-12) — lô 3+4 dùng.
+SHOP_LOOKUP_TOKEN_DAYS = int(os.getenv("SHOP_LOOKUP_TOKEN_DAYS", "30"))
+SHOP_PAYMENT_PENDING_MINUTES = int(os.getenv("SHOP_PAYMENT_PENDING_MINUTES", "5"))
+SHOP_CANCEL_CALLBACK_WITHIN = os.getenv("SHOP_CANCEL_CALLBACK_WITHIN", "1 ngày làm việc")
+SHOP_CANCEL_POLICY_URL = os.getenv("SHOP_CANCEL_POLICY_URL", "/trang/?slug=doi-tra#xu-ly-tien")  # naming: allow - URL công khai tiếng Việt đã chốt ở 02b §2.3
+SHOP_RETURN_REPORT_HOURS = os.getenv("SHOP_RETURN_REPORT_HOURS", "")  # rỗng -> API trả null (E3)
+# Mã giảm giá (BR-DM-21) — lô 3b dùng.
+VOUCHER_MAX_PERCENT = Decimal(os.getenv("VOUCHER_MAX_PERCENT", "50"))
+# Thông tin người bán hiển thị ở site-info (BR-ND-18) — mkt-brand đọc ở lô 5.
+SELLER_ZALO = os.getenv("SELLER_ZALO", "")
+SELLER_WORKING_HOURS = os.getenv("SELLER_WORKING_HOURS", "")
+SELLER_REG_ISSUED_BY = os.getenv("SELLER_REG_ISSUED_BY", "")
+SELLER_REG_ISSUED_ON = os.getenv("SELLER_REG_ISSUED_ON", "")
+SELLER_WEBSITE_NOTICE_URL = os.getenv("SELLER_WEBSITE_NOTICE_URL", "")
+SELLER_WEBSITE_NOTICE_IMAGE = os.getenv("SELLER_WEBSITE_NOTICE_IMAGE", "")
 
 # Cờ thông báo xác nhận cuộc gọi (mặc định TẮT tới khi CSKH vận hành - G2)
 SHOP_CONFIRM_CALL_NOTICE = _bool("SHOP_CONFIRM_CALL_NOTICE", "0")

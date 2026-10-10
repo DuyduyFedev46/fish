@@ -1,0 +1,76 @@
+.price {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 var(--space-1);
+  min-width: 0;
+}
+
+.amount {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.unit {
+  font-weight: 500;
+  color: var(--ink-2);
+}
+
+.old {
+  margin-right: 2px;
+  color: var(--ink-3);
+  font-weight: 400;
+}
+
+.arrow {
+  margin: 0 2px;
+  color: var(--ink-3);
+}
+
+.card .amount {
+  font-size: 17px;
+}
+.card .unit {
+  font-size: 13px;
+}
+
+.rail .amount {
+  font-size: 16px;
+}
+.rail .unit {
+  font-size: 12px;
+}
+
+.detail .amount,
+.total .amount {
+  font-size: 24px;
+  line-height: 1.25;
+}
+.detail .unit {
+  font-size: 14px;
+}
+
+.meta .amount,
+.meta .unit {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ink-3);
+}
+
+.line .amount {
+  font-size: 14px;
+}
+
+.accent .amount {
+  color: var(--accent-text);
+}
+
+.muted .amount {
+  color: var(--ink-2);
+}
+
+@media (min-width: 768px) {
+  .detail {
+    gap: 0 6px;
+  }
+}

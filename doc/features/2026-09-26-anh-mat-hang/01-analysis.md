@@ -1,6 +1,19 @@
 # Ảnh mặt hàng trên Shop — Phân tích nghiệp vụ
 > BA · 2026-09-26 · Trạng thái: ĐÃ DUYỆT (2026-09-26, Duy) — gộp vào S38 (Đợt 3)
 
+```mermaid
+flowchart TD
+    A["Chủ hoặc Quản lý chọn ảnh mặt hàng"] --> B{"Ảnh hợp lệ? đúng loại, đủ cỡ"}
+    B -->|"Không"| C["Từ chối, báo lỗi tiếng Việt"]
+    B -->|"Có"| D["Gỡ vị trí GPS, tạo các cỡ ảnh"]
+    D --> E["Nhập mô tả ảnh, mặc định tên hàng"]
+    E --> F["Lưu ảnh, ghi nhật ký"]
+    F --> G["Khách thấy ảnh trên Shop"]
+    F --> H["Nhân viên thấy ảnh trên ERP"]
+    I["Mặt hàng chưa có ảnh"] --> J["Shop hiện ảnh mặc định"]
+    K["Gỡ ảnh"] --> J
+```
+
 ## 1. Yêu cầu gốc
 "hình như mấy cái mặt hàng thiếu hình ảnh rồi, ko có ảnh ko show đc cho KH" (Duy, PO, 2026-09-26).
 

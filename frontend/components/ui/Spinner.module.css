@@ -1,0 +1,27 @@
+.wrap {
+  display: inline-flex;
+}
+
+.spinner {
+  flex: none;
+  animation: spin 850ms linear infinite;
+}
+
+/* Rãnh chỉ hiện ở vòng lớn (D3); trong nút không có rãnh. */
+.track {
+  stroke: var(--border);
+  opacity: 0;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* Vẫn cần dấu hiệu đang chạy, nhưng quay chậm. */
+  .spinner {
+    animation-duration: 2.6s;
+  }
+}

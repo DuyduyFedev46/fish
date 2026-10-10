@@ -9,12 +9,12 @@
   align-items: center;
   gap: 8px;
   font-size: 14px;
-  color: #64748b;
+  color: var(--ink-3);
   margin-bottom: 24px;
 }
 
 .breadcrumb a {
-  color: #0284c7;
+  color: var(--accent-text);
   text-decoration: none;
 }
 
@@ -30,8 +30,8 @@
   display: inline-block;
   font-size: 13px;
   font-weight: 600;
-  color: #0284c7;
-  background-color: #f0f9ff;
+  color: var(--accent-text);
+  background-color: var(--accent-soft);
   padding: 4px 10px;
   border-radius: 9999px;
   text-decoration: none;
@@ -42,7 +42,7 @@
   font-size: 32px;
   font-weight: 800;
   line-height: 1.25;
-  color: #0f172a;
+  color: var(--ink);
   margin: 0 0 16px;
   overflow-wrap: anywhere; /* tiêu đề có chuỗi dài không dấu cách không được đẩy trang cuộn ngang */
 }
@@ -52,20 +52,20 @@
   align-items: center;
   gap: 16px;
   font-size: 14px;
-  color: #64748b;
+  color: var(--ink-3);
   flex-wrap: wrap;
 }
 
 .author {
   font-weight: 600;
-  color: #334155;
+  color: var(--ink-2);
 }
 
 .coverWrapper {
   margin: 24px 0 36px;
   border-radius: 12px;
   overflow: hidden;
-  background-color: #f1f5f9;
+  background-color: var(--surface-2);
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
 }
 
@@ -79,8 +79,8 @@
 .errorBox {
   padding: 48px 16px;
   text-align: center;
-  background-color: #f8fafc;
-  border: 1px solid #e2e8f0;
+  background-color: var(--canvas);
+  border: 1px solid var(--border);
   border-radius: 12px;
   margin: 40px auto;
   max-width: 500px;
@@ -89,13 +89,13 @@
 .errorTitle {
   font-size: 20px;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--ink);
   margin-bottom: 12px;
 }
 
 .errorDesc {
   font-size: 15px;
-  color: #64748b;
+  color: var(--ink-3);
   margin-bottom: 24px;
   line-height: 1.5;
 }
@@ -103,8 +103,8 @@
 .actionBtn {
   min-height: 44px;
   padding: 10px 24px;
-  background-color: #0284c7;
-  color: #ffffff;
+  background-color: var(--accent-text);
+  color: var(--on-accent);
   border: none;
   border-radius: 8px;
   font-size: 15px;
@@ -117,13 +117,13 @@
 }
 
 .actionBtn:hover {
-  background-color: #0369a1;
+  background-color: var(--accent-hover);
 }
 
 .loadingBox {
   padding: 80px 16px;
   text-align: center;
-  color: #64748b;
+  color: var(--ink-3);
   font-size: 16px;
 }
 
@@ -136,10 +136,10 @@
 }
 
 .card {
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--border);
   border-radius: 10px;
   overflow: hidden;
-  background-color: #ffffff;
+  background-color: var(--surface);
   display: flex;
   flex-direction: column;
   transition: transform 0.15s, box-shadow 0.15s;
@@ -154,7 +154,7 @@
 
 .cardImgWrapper {
   height: 180px;
-  background-color: #f1f5f9;
+  background-color: var(--surface-2);
   overflow: hidden;
 }
 
@@ -174,14 +174,14 @@
 .cardTitle {
   font-size: 18px;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--ink);
   margin: 0 0 8px;
   line-height: 1.4;
 }
 
 .cardExcerpt {
   font-size: 14px;
-  color: #64748b;
+  color: var(--ink-3);
   line-height: 1.5;
   margin-bottom: 12px;
   display: -webkit-box;
@@ -192,7 +192,7 @@
 
 .cardDate {
   font-size: 12px;
-  color: #94a3b8;
+  color: var(--border-input);
   margin-top: auto;
 }
 
@@ -217,23 +217,23 @@
   border-radius: 9999px;
   font-size: 14px;
   font-weight: 500;
-  color: #475569;
-  background-color: #f1f5f9;
+  color: var(--ink-2);
+  background-color: var(--surface-2);
   text-decoration: none;
-  transition: all 0.15s;
+  transition: background-color 150ms ease-out, border-color 150ms ease-out, color 150ms ease-out;
 }
 
 .tabItem:hover {
-  background-color: #e2e8f0;
+  background-color: var(--border);
 }
 
 .tabActive {
-  background-color: #0284c7;
-  color: #ffffff;
+  background-color: var(--accent-text);
+  color: var(--on-accent);
 }
 
 .tabActive:hover {
-  background-color: #0369a1;
+  background-color: var(--accent-hover);
 }
 
 .pagination {
@@ -247,10 +247,10 @@
 .pageBtn {
   min-height: 40px;
   padding: 8px 16px;
-  background-color: #ffffff;
-  border: 1px solid #cbd5e1;
+  background-color: var(--surface);
+  border: 1px solid var(--border-strong);
   border-radius: 6px;
-  color: #0f172a;
+  color: var(--ink);
   font-size: 14px;
   font-weight: 500;
   text-decoration: none;
@@ -261,7 +261,7 @@
 }
 
 .pageBtn:hover {
-  background-color: #f8fafc;
+  background-color: var(--canvas);
 }
 
 .pageDisabled {
@@ -272,5 +272,5 @@
 
 .pageInfo {
   font-size: 14px;
-  color: #64748b;
+  color: var(--ink-3);
 }

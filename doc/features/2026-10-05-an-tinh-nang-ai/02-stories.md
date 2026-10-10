@@ -1,6 +1,21 @@
 # Ẩn hết tính năng AI (luồng NHANH)
 > Điều phối · 2026-10-05 · Trạng thái: **ĐÃ DUYỆT** (Duy chọn "Tắt cứng bằng cờ") · Phạm vi: chỉ `erp-console/`. Shop `frontend/` không có AI. Backend không đổi vì `AI_ENABLED` mặc định đã là "0".
 
+```mermaid
+flowchart TD
+    A{"Duy chọn tắt cứng AI bằng cờ"} --> B["Đặt cờ AI ở một chỗ"]
+    B --> C{"Lúc build cờ bằng 1?"}
+    C -- "Có" --> D["Giao diện AI hiện như cũ"]
+    C -- "Không, mặc định" --> E["Ẩn mục AI ở menu, tìm kiếm"]
+    E --> F["Gõ thẳng trang AI: báo không có trang"]
+    F --> G["Ẩn khối Trợ lý AI ở trang chi tiết"]
+    G --> H["Không tải model AI"]
+    H --> I{"Duy: ẩn luôn nút Nhờ"}
+    I --> J["Ẩn mọi chỗ Nhờ người xử lý"]
+    J --> K["Chạy test, kiểm kiểu, build xanh"]
+    D --> K
+```
+
 ## SR-HIDE-AI-01: Cờ build tắt mọi giao diện AI
 Cờ `NEXT_PUBLIC_AI_FEATURES`. Chỉ đúng giá trị `"1"` mới là bật. Vắng cờ hoặc bất kỳ giá trị nào khác đều là **tắt**, và đây là mặc định ở mọi môi trường. Bản mock (`NEXT_PUBLIC_USE_MOCK=1`) cũng tuân theo cờ này.
 

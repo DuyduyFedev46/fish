@@ -1,6 +1,21 @@
 # Yêu cầu P9 — AI local thật: bật AI hai tầng + tải model khi bật + router kiểm model
 > Ghi nguyên lời Duy, 2026-09-30 (trong lúc làm P8 Lô 6, SR-20 / F6-2). Trạng thái: **CHỜ BA** (đề xuất P9).
 
+```mermaid
+flowchart TD
+    A{"Chủ bật AI toàn vựa?"} -- "Chưa" --> B["Ẩn mọi tính năng AI"]
+    A -- "Đã bật" --> C["Nhân viên thấy công tắc AI, mặc định tắt"]
+    C --> D{"Nhân viên bật AI?"}
+    D -- "Không" --> E["Làm việc như bình thường"]
+    D -- "Bật" --> F["Hiện tab Trợ lý và tính năng AI"]
+    F --> G["Bắt đầu tải AI về máy"]
+    G --> H["Nhân viên giao một việc cho AI"]
+    H --> I{"Máy đã có AI tải xong?"}
+    I -- "Có" --> J["Chạy AI ngay trên máy"]
+    I -- "Chưa hoặc đang tải" --> K["Dùng bản trả lời soạn sẵn"]
+    H --> L["Việc đọc ghi dữ liệu chạy ở máy chủ"]
+```
+
 ## Lời Duy (nguyên văn)
 - "anh nhớ thiết kế là tự deligate chứ đâu cần phải chọn nút này nút kia ta"
 - "ý là có 1 tầng nữa tự biết lúc nào dùng AI local lúc nào call server"

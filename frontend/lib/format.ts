@@ -25,6 +25,13 @@ export function formatVnd(value: Nullable): string {
   return `${Math.round(n).toLocaleString("vi-VN")} ₫`;
 }
 
+/** "278000" | 278000 -> "278.000đ" (giá hiển thị ở Shop, UI-RULES §1.1). Giá trị rác -> "—". */
+export function formatPriceVnd(value: Nullable): string {
+  const n = toNumber(value);
+  if (n === null) return "—";
+  return `${Math.round(n).toLocaleString("vi-VN")}đ`;
+}
+
 /** "2.500" | 2.5 -> "2,5 kg" (tối đa 3 số lẻ). */
 export function formatKg(value: Nullable): string {
   const n = toNumber(value);
@@ -89,4 +96,10 @@ export function todayInVietnam(now: Date = new Date()): string {
 /** Năm hiện tại theo giờ VN (dùng cho dòng bản quyền). */
 export function currentYearInVietnam(now: Date = new Date()): number {
   return Number(vnPartsOf(now)!.year);
+}
+
+/** ISO -> "14:05 · 11/10" (giờ VN, dùng cho mốc giờ trên trang đơn). */
+export function formatTimeDayVn(value: string | number | Date | null | undefined): string {
+  const p = vnPartsOf(value);
+  return p ? `${p.hour}:${p.minute} · ${p.day}/${p.month}` : "—";
 }

@@ -1,5 +1,19 @@
 # Tiếp tục sau khi tắt máy (03/10/2026)
 
+```mermaid
+flowchart TD
+    A["Đọc file này trước khi làm"] --> B["Đợt 1: việc đã đẩy lên main"]
+    B --> C["Đợt 2: các nhánh song song đang làm"]
+    C --> D["Đợt 3: tên chuẩn, phạm vi, tiền về muộn"]
+    D --> E["Đợt 4: dọn nợ và rà giao diện"]
+    E --> F["Chạy đủ kiểm chứng trên main"]
+    F --> G{"Duy bảo deploy staging?"}
+    G -->|"Có"| H["Đợt 5: deploy staging"]
+    G -->|"Chưa"| I["Giữ trên main, chờ"]
+    C --> J{"Việc chờ Duy quyết"}
+    J -->|"Đã chốt"| D
+```
+
 ## Kế hoạch chạy hết phần còn lại, không tính AI (06/10/2026)
 Duy chốt 06/10 (ghi ở `doc/decisions.md`): D-1 giữ V2 bật, Chủ tự tắt · superuser được ghi phân quyền (FE mở) · #14 để sau production · **làm** CSKH lô 5.
 

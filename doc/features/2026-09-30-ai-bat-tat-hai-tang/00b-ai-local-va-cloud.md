@@ -1,6 +1,23 @@
 # AI trên máy và AI cloud: làm sao cho đủ thông minh
 > Điều phối · 2026-10-01 · Ghi chú để Duy nghiên cứu trước khi lập kế hoạch P9. Chưa phải quyết định.
 
+```mermaid
+flowchart TD
+    A["Mỗi đêm máy chủ gom số liệu"] --> B["Cloud viết nhận định"]
+    B --> C["Đóng gói kiến thức gửi về máy"]
+    C --> D["Nhân viên hỏi AI trên máy"]
+    D --> E{"Có sẵn trong gói hoặc đã nhớ?"}
+    E -- "Có" --> F["AI trên máy diễn đạt câu trả lời"]
+    E -- "Không chắc" --> G["Lọc bỏ dữ liệu khách, giá vốn"]
+    G --> H["Hỏi AI cloud"]
+    H --> I["Lưu câu trả lời cho lần sau"]
+    I --> F
+    F --> J{"Cần ghi dữ liệu?"}
+    J -- "Có" --> K["Máy chủ kiểm quyền rồi mới ghi"]
+    J -- "Không" --> L["Xong"]
+    M{"Duy chọn hướng A, B hay C?"} --> A
+```
+
 ## 1. Vấn đề
 Máy tham chiếu 8 GB chỉ chạy được model nhỏ (Gemma 3n E2B, khoảng 2 tỉ tham số, ~1,5–2 GB, ngữ cảnh ~2.000 token). Model này:
 - **Không đủ sức suy luận nghiệp vụ**: FEFO, giá vốn, lãi lỗ lô, vì sao đơn bị chặn.

@@ -190,8 +190,10 @@ class F1ShopAndDashboardTests(F1FefoSalesBase):
     def test_f1_ac8_shop_ton_ban_duoc_khong_doi(self):
         resp = client_for(None).get("/api/shop/catalog/")
         self.assertEqual(resp.status_code, 200)
-        row = next(r for r in resp.json() if r["item_code"] == "F1S")
-        self.assertEqual(Decimal(row["sellable_qty"]), Decimal("15"))  # 10 + 7 − 2 giữ chỗ
+        row = next(r for r in resp.json()["items"] if r["item_code"] == "F1S")
+        # 10 + 7 − 2 giữ chỗ = 15 kg bán được -> "in"; Shop không còn trả số kg (BR-BH-01, G1)
+        self.assertEqual(row["stock_level"], "in")
+        self.assertNotIn("sellable_qty", row)
         self.assertEqual(set(row) & COST_KEYS, set())
 
     def test_f1_ac8_tong_quan_ton_theo_lo_sap_theo_thu_tu_xuat(self):

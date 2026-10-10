@@ -1,6 +1,28 @@
 # CSKH gọi xác nhận đơn → tự in tem → kho soạn hàng — Phân tích nghiệp vụ
 > BA · 2026-09-28 · Trạng thái: **ĐÃ DUYỆT** (Duy 28/09 — chốt scope qua câu hỏi; câu trả lời ở mục ngay dưới)
 
+```mermaid
+flowchart TD
+    A["Khách trả tiền xong"] --> B["Đơn vào hàng chờ gọi xác nhận"]
+    B --> C["CSKH gọi khách"]
+    C --> D{"Kết quả cuộc gọi?"}
+    D -->|"Khách xác nhận"| E["Cho in tem tay khổ 100×150"]
+    E --> F["Kho soạn hàng, đóng gói"]
+    F --> G["Giao hàng"]
+    D -->|"Hẹn gọi lại"| C
+    D -->|"Đổi địa chỉ, người nhận"| C
+    D -->|"Muốn huỷ hoặc đổi món"| Q
+    D -->|"Không nghe máy"| H{"Đã gọi 3 lần trong 30 phút?"}
+    H -->|"Chưa"| C
+    H -->|"Rồi"| Q{"Quản lý quyết định trong 30 phút?"}
+    Q -->|"Cho giao"| E
+    Q -->|"Huỷ đơn"| K["Huỷ đơn, hoàn kho"]
+    Q -->|"Quá 30 phút"| K
+    K --> L["Báo khách lý do, lập phiếu hoàn"]
+    L --> M["Nhắc nhân viên gọi báo hoàn tiền"]
+    M --> N["Chủ xác nhận đã chuyển tiền"]
+```
+
 ## Câu trả lời của Duy (2026-09-28)
 *PO ghi lại theo lời Duy do điều phối viên chuyển. Chỗ nào lật mặc định BA thì ghi rõ "LẬT". Mục nào có hiệu lực hơn
 nội dung phía dưới của bản phân tích thì mục này thắng.*

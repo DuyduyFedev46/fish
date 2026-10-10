@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<title>Đơn hàng bỏ bớt món — Cá Về</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#1A5BC0}a:hover{color:#1A57B5}
+.num{font-variant-numeric:tabular-nums}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+a,button{-webkit-tap-highlight-color:transparent;transition:transform 120ms cubic-bezier(.23,1,.32,1)}
+a:active,button:active{transform:scale(.97)}
+a:focus-visible,button:focus-visible{outline:2px solid #1F66D1;outline-offset:2px}
+.drop{animation:dr 280ms cubic-bezier(.23,1,.32,1)}
+@keyframes dr{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){a:active,button:active{transform:none}.drop{animation:none}}
+</style>
+</helmet>
+<div style="width: 390px; height: 1240px; position: relative; overflow: hidden; background: #F4F4F6; color: #17171C; font-family: Inter, system-ui, sans-serif; font-size: 14px; line-height: 1.5">
+
+  <header style="height: 56px; background: #FFFFFF; border-bottom: 1px solid #E4E4E9; display: flex; align-items: center; gap: 4px; padding: 0 6px">
+    <a href="Home.dc.html" aria-label="Về trang chủ" style="width: 44px; height: 44px; display: flex; align-items: center; justify-content: center"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#17171C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"></path></svg></a>
+    <h1 style="margin: 0; font-size: 17px; font-weight: 600">Đơn hàng <span class="num">SO[mã đơn]</span></h1>
+  </header>
+
+  <div class="drop" role="status" style="margin: 12px 16px 0; padding: 14px; border-radius: 12px; background: #FDF3E3; border: 1px solid #F3DDB8; display: flex; gap: 12px; align-items: flex-start">
+    <span aria-hidden="true" style="flex: none; width: 36px; height: 36px; border-radius: 18px; background: #A85A07; display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8v5M12 16.5h.01"></path><circle cx="12" cy="12" r="9"></circle></svg></span>
+    <span style="flex: 1; display: flex; flex-direction: column; gap: 8px">
+      <!-- Lý do: reason_label cố định. Câu: BR-HT-12 bản A (câu tạm D 11/10). Số tiền = cancelled_amount, chỉ phần bị huỷ, không phải tổng đơn. -->
+      <span><span style="font-weight: 600">Một món đã bỏ khỏi đơn: Hàng không đạt khi soạn.</span> Cá Về sẽ gọi vào số điện thoại đặt hàng trong 1 ngày làm việc để trả lại <span class="num" style="font-weight: 600">330.000đ</span> của món này. Cần gấp, bạn gọi <a href="tel:[hotline]" style="font-weight: 600; color: #A85A07">[hotline]</a>.</span>
+      <a href="P1-Policy.dc.html#xu-ly-tien" style="align-self: flex-start; min-height: 44px; display: inline-flex; align-items: center; font-weight: 600; color: #A85A07">Xem cách Cá Về trả lại tiền</a>
+    </span>
+  </div>
+
+  <section aria-labelledby="h-st" style="margin: 12px 16px 0; background: #FFFFFF; border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 12px">
+    <div style="display: flex; justify-content: space-between; align-items: center">
+      <h2 id="h-st" style="margin: 0; font-size: 15px; font-weight: 600">Trạng thái</h2>
+      <span style="font-size: 12px; font-weight: 600; padding: 3px 8px; border-radius: 6px; background: #EBF2FE; color: #1A5BC0">Đang chuẩn bị</span>
+    </div>
+    <ol style="list-style: none; margin: 0; padding: 0">
+      <li style="display: flex; gap: 12px"><span style="display: flex; flex-direction: column; align-items: center"><span style="width: 12px; height: 12px; border-radius: 6px; background: #157F3D; margin-top: 5px"></span><span style="flex: 1; width: 2px; background: #157F3D; min-height: 18px"></span></span><span style="padding-bottom: 8px"><span style="font-weight: 500">Đã đặt</span> <span style="font-size: 12px; color: #686874">· [giờ:phút]</span></span></li>
+      <li style="display: flex; gap: 12px"><span style="display: flex; flex-direction: column; align-items: center"><span style="width: 12px; height: 12px; border-radius: 6px; background: #157F3D; margin-top: 5px"></span><span style="flex: 1; width: 2px; background: #157F3D; min-height: 18px"></span></span><span style="padding-bottom: 8px"><span style="font-weight: 500">Đã thanh toán</span> <span style="font-size: 12px; color: #686874">· Chuyển khoản ngân hàng</span></span></li>
+      <li aria-current="step" style="display: flex; gap: 12px"><span style="display: flex; flex-direction: column; align-items: center"><span style="width: 12px; height: 12px; border-radius: 6px; border: 3px solid #1F66D1; box-sizing: border-box; margin-top: 5px"></span><span style="flex: 1; width: 2px; background: #E4E4E9; min-height: 18px"></span></span><span style="padding-bottom: 8px"><span style="font-weight: 600; color: #1A5BC0">Đang chuẩn bị hàng</span><br><span style="font-size: 12px; color: #686874">Cá Về soạn hàng</span></span></li>
+      <li style="display: flex; gap: 12px"><span style="display: flex; flex-direction: column; align-items: center"><span style="width: 12px; height: 12px; border-radius: 6px; background: #D4D4DB; margin-top: 5px"></span><span style="flex: 1; width: 2px; background: #E4E4E9; min-height: 18px"></span></span><span style="padding-bottom: 8px; color: #686874">Đang giao</span></li>
+      <li style="display: flex; gap: 12px"><span style="display: flex; flex-direction: column; align-items: center"><span style="width: 12px; height: 12px; border-radius: 6px; background: #D4D4DB; margin-top: 5px"></span></span><span style="color: #686874">Đã giao</span></li>
+    </ol>
+  </section>
+
+  <section aria-labelledby="h-mon" style="margin: 8px 16px 0; background: #FFFFFF; border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 10px">
+    <h2 id="h-mon" style="margin: 0; font-size: 15px; font-weight: 600">Món trong đơn</h2>
+    <ul style="list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px">
+      <li style="display: flex; justify-content: space-between; gap: 12px"><span>Mực ống làm sạch · 1 kg</span><span class="num">278.000đ</span></li>
+      <li style="display: flex; justify-content: space-between; gap: 12px; align-items: flex-start">
+        <span style="display: flex; flex-direction: column; gap: 4px; color: #686874">
+          <del style="text-decoration-color: #686874">Cá thu cắt khúc · 1 kg</del>
+          <span style="align-self: flex-start; font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 6px; background: #EBEBEF; color: #4E4E58">Đã bỏ khỏi đơn</span>
+        </span>
+        <del class="num" style="color: #686874; text-decoration-color: #686874">330.000đ</del>
+      </li>
+      <li style="display: flex; justify-content: space-between; gap: 12px"><span>Combo lẩu hải sản · 1 combo</span><span class="num">259.000đ</span></li>
+    </ul>
+    <div style="display: flex; flex-direction: column; gap: 6px; padding-top: 10px; border-top: 1px solid #E4E4E9">
+      <div style="display: flex; justify-content: space-between; color: #4E4E58"><span>Đã thanh toán</span><span class="num">867.000đ</span></div>
+      <div style="display: flex; justify-content: space-between; color: #4E4E58"><span>Món đã bỏ</span><span class="num">−330.000đ</span></div>
+      <div style="display: flex; justify-content: space-between; align-items: baseline; font-weight: 600"><span>Tổng mới</span><span class="num" style="font-size: 18px; color: #1A5BC0">537.000đ</span></div>
+    </div>
+  </section>
+
+  <section aria-labelledby="h-khac" style="margin: 8px 16px 0; background: #FFFFFF; border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 10px">
+    <h2 id="h-khac" style="margin: 0; font-size: 15px; font-weight: 600">Tra đơn khác</h2>
+    <form method="post" style="display: flex; flex-direction: column; gap: 8px">
+      <input type="text" name="code" aria-label="Mã đơn" placeholder="Mã đơn, ví dụ SO…" style="height: 44px; box-sizing: border-box; padding: 0 12px; border: 1px solid #8C8C98; border-radius: 8px; font: inherit; font-size: 16px">
+      <input type="tel" name="phone" aria-label="Số điện thoại đặt hàng" placeholder="Số điện thoại đặt hàng" style="height: 44px; box-sizing: border-box; padding: 0 12px; border: 1px solid #8C8C98; border-radius: 8px; font: inherit; font-size: 16px">
+      <button type="button" style="height: 44px; border-radius: 22px; border: 1px solid #1F66D1; background: #FFFFFF; color: #1F66D1; font: inherit; font-weight: 600; cursor: pointer">Tra cứu</button>
+    </form>
+  </section>
+
+  <div style="position: absolute; left: 0; right: 0; bottom: 0; padding: 12px 16px 16px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; background: #FFFFFF; box-shadow: 0 -4px 16px rgba(23,23,28,0.08)">
+    <a href="tel:[hotline]" style="height: 48px; border-radius: 24px; border: 1px solid #1F66D1; color: #1F66D1; font-weight: 600; text-decoration: none; display: flex; align-items: center; justify-content: center">Gọi Cá Về</a>
+    <a href="Home.dc.html" style="height: 48px; border-radius: 24px; background: #1F66D1; color: #FFFFFF; font-weight: 600; text-decoration: none; display: flex; align-items: center; justify-content: center">Tiếp tục mua</a>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":1240}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

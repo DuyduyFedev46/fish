@@ -1,0 +1,203 @@
+/* <dialog> chỉ là vỏ trong suốt; hộp thật là .box phủ kín vỏ, nên chạm vào ::backdrop mới có target là <dialog>. */
+.dialog {
+  width: calc(100% - 48px);
+  max-width: 440px;
+  max-height: calc(100dvh - 48px);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  overflow: visible;
+}
+
+.dialog::backdrop {
+  background: var(--overlay);
+}
+
+.dialog[open]::backdrop {
+  animation: fade-in var(--dur-toast) var(--ease-out);
+}
+
+.dialog[open] .box {
+  animation: box-in var(--dur-toast) var(--ease-out);
+}
+
+.dialog[data-closing]::backdrop {
+  animation: fade-out 150ms var(--ease-out) forwards;
+}
+
+.dialog[data-closing] .box {
+  animation: box-out 150ms var(--ease-out) forwards;
+}
+
+.box {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  max-height: calc(100dvh - 48px);
+  overflow-y: auto;
+  padding: var(--space-5);
+  border-radius: var(--radius-xl);
+  background: var(--surface);
+  box-shadow: var(--shadow-modal);
+}
+
+.alert {
+  align-items: center;
+  padding: var(--space-6) var(--space-5) var(--space-4);
+  text-align: center;
+}
+
+.text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.title {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+  outline: none;
+  text-wrap: balance;
+}
+
+.description {
+  margin: 0;
+  color: var(--ink-2);
+  font-size: 14px;
+  line-height: 1.5;
+  text-wrap: pretty;
+}
+
+.actions {
+  display: grid;
+  gap: var(--space-2);
+  width: 100%;
+}
+
+/* confirm: hai nút chia đôi, nút giữ lại bên trái, nút phá huỷ bên phải */
+.confirm .actions {
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: var(--space-2);
+}
+
+.alert .actions {
+  margin-top: var(--space-2);
+}
+
+.footnote {
+  margin: 0;
+  color: var(--ink-3);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  border-radius: var(--radius-full);
+}
+.tone_neutral {
+  background: var(--surface-2);
+  color: var(--ink-2);
+}
+.tone_info {
+  background: var(--accent-soft);
+  color: var(--accent-text);
+}
+.tone_warn {
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+.tone_crit {
+  background: var(--crit-soft);
+  color: var(--crit);
+}
+
+/* Nút X chỉ có ở máy tính (UI-RULES §5.2) */
+.closeBtn {
+  display: none;
+}
+
+@media (min-width: 768px) {
+  .dialog {
+    width: 440px;
+    max-width: calc(100% - 32px);
+  }
+  .md {
+    width: 480px;
+  }
+  .box {
+    padding: var(--space-6);
+  }
+  .alert {
+    padding: 28px var(--space-6) var(--space-6);
+  }
+  .closeBtn {
+    position: absolute;
+    top: var(--space-2);
+    right: var(--space-2);
+    display: block;
+  }
+  .confirm .text {
+    padding-right: var(--space-8);
+  }
+  .confirm .actions {
+    gap: var(--space-3);
+    margin-top: var(--space-2);
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes fade-out {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes box-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+}
+@keyframes box-out {
+  to {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+}
+
+/* Giảm chuyển động: bỏ scale, chỉ còn mờ dần */
+@keyframes fade-only {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes fade-only-out {
+  to {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dialog[open] .box {
+    animation-name: fade-only;
+  }
+  .dialog[data-closing] .box {
+    animation-name: fade-only-out;
+  }
+}

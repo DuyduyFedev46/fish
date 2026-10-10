@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<title>Giỏ hàng — Cá Về (máy tính)</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#1A5BC0}a:hover{color:#1A57B5}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.num{font-variant-numeric:tabular-nums}
+.wrap{max-width:1200px;margin:0 auto;padding:0 24px;box-sizing:border-box}
+a,button{transition:transform 120ms cubic-bezier(.23,1,.32,1),background-color 150ms ease-out,border-color 150ms ease-out,color 150ms ease-out}
+a:active,button:active{transform:scale(.97)}
+a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid #1F66D1;outline-offset:2px}
+.steps{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;align-items:center;gap:10px 12px;font-weight:500;color:#686874}
+.steps li{display:flex;align-items:center;gap:10px}
+.steps .bar{width:48px;height:2px;border-radius:1px;background:#D4D4DB}
+.steps .dot{width:28px;height:28px;border-radius:14px;border:1.5px solid #D4D4DB;box-sizing:border-box;background:#FFFFFF;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600}
+.steps .done{color:#17171C}
+.steps .cur{color:#1A5BC0;font-weight:600}
+.steps .done .dot,.steps .cur .dot{background:#1F66D1;border-color:#1F66D1;color:#FFFFFF}
+.steps .done .bar,.steps .cur .bar{background:#1F66D1}
+.btn{height:48px;padding:0 24px;border-radius:24px;display:flex;align-items:center;justify-content:center;gap:8px;font:inherit;font-size:15px;font-weight:600;text-decoration:none;cursor:pointer;box-sizing:border-box}
+.btn-p{background:#1F66D1;color:#FFFFFF;border:1px solid #1F66D1}
+.btn-p:hover{background:#1A57B5;border-color:#1A57B5;color:#FFFFFF}
+.ib{width:40px;height:38px;border:0;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.ib:hover{background:#F4F4F6}
+.del{width:40px;height:40px;border:0;border-radius:20px;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.del:hover{background:#FCEDEC}
+.del:hover svg{stroke:#C0312B}
+.vin{flex:1;min-width:0;height:44px;box-sizing:border-box;padding:0 12px;border:1px solid #8C8C98;border-radius:8px;background:#FFFFFF;font:inherit;font-size:16px;font-weight:500;letter-spacing:.04em;color:#17171C;text-transform:uppercase;transition:border-color 150ms ease-out,box-shadow 150ms ease-out}
+.vin::placeholder{color:#8C8C98;font-weight:400;letter-spacing:0;text-transform:none}
+.vin:focus-visible{outline:none;border-color:#1F66D1;box-shadow:0 0 0 3px #EBF2FE}
+.vbtn{flex:none;height:44px;padding:0 16px;border-radius:8px;font:inherit;font-weight:600;cursor:pointer;border:1px solid #1F66D1;background:#FFFFFF;color:#1A5BC0}
+.vbtn:hover{background:#EBF2FE}
+.vbtn:disabled{cursor:default;border-color:#E4E4E9;background:#F4F4F6;color:#686874}
+th{font-weight:500}
+@media (prefers-reduced-motion:reduce){a:active,button:active{transform:none}}
+</style>
+</helmet>
+<div style="min-height: 800px; display: flex; flex-direction: column; background: #F4F4F6; color: #17171C; font-family: Inter, system-ui, sans-serif; font-size: 14px; line-height: 1.5">
+
+  <header style="background: #FFFFFF; border-bottom: 1px solid #E4E4E9">
+    <div class="wrap" style="min-height: 68px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 24px">
+      <a href="DesktopHome.dc.html" aria-label="Cá Về — trang chủ" style="display: flex; align-items: center; gap: 10px; text-decoration: none; color: #0E3A73">
+        <span aria-hidden="true" style="width: 36px; height: 36px; border-radius: 8px; border: 1.5px dashed #8C8C98; background: #F4F4F6; color: #4E4E58; font-size: 9px; font-weight: 600; display: flex; align-items: center; justify-content: center">LOGO</span>
+        <span style="font-size: 20px; font-weight: 600">Cá Về</span>
+      </a>
+      <span aria-hidden="true" style="width: 1px; height: 28px; background: #E4E4E9"></span>
+      <span style="font-size: 16px; font-weight: 600; display: flex; align-items: center; gap: 6px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#157F3D" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"></rect><path d="M8 11V7a4 4 0 0 1 8 0v4"></path></svg>Đặt hàng an toàn</span>
+      <a href="tel:[hotline]" style="margin-left: auto; color: #17171C; text-decoration: none; font-size: 14px">Cần hỗ trợ? <span style="font-weight: 600; color: #1A5BC0">[hotline]</span></a>
+    </div>
+  </header>
+
+  <main style="flex: 1; padding: 24px 0 48px">
+    <div class="wrap" style="display: flex; flex-direction: column; gap: 20px">
+      <div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 24px">
+        <h1 style="margin: 0; font-size: 24px; font-weight: 600; letter-spacing: -0.01em">Giỏ hàng <span class="num" style="font-size: 16px; font-weight: 500; color: #686874">({{count}} món)</span></h1>
+        <ol aria-label="Bước đặt hàng" class="steps">
+          <li class="cur" aria-current="step"><span class="dot">1</span>Giỏ hàng</li>
+          <li><span class="bar" aria-hidden="true"></span><span class="dot">2</span>Nhận hàng</li>
+          <li><span class="bar" aria-hidden="true"></span><span class="dot">3</span>Thanh toán</li>
+        </ol>
+      </div>
+
+      <sc-if value="{{hasItems}}" hint-placeholder-val="{{ true }}">
+        <div style="display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start">
+          <section aria-label="Món trong giỏ" style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column; gap: 12px">
+            <div style="background: #FFFFFF; border-radius: 16px; padding: 4px 20px; overflow-x: auto">
+              <table style="width: 100%; min-width: 600px; border-collapse: collapse">
+                <thead>
+                  <tr style="font-size: 13px; color: #686874; text-align: left">
+                    <th scope="col" style="padding: 14px 0">Sản phẩm</th>
+                    <th scope="col" style="padding: 14px 12px; text-align: right">Đơn giá</th>
+                    <th scope="col" style="padding: 14px 12px; text-align: center">Số lượng</th>
+                    <th scope="col" style="padding: 14px 12px; text-align: right">Thành tiền</th>
+                    <th scope="col" style="padding: 14px 0; width: 40px"><span class="sr">Xoá</span></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <sc-for list="{{lines}}" as="l" hint-placeholder-count="3">
+                    <tr style="border-top: 1px solid #E4E4E9">
+                      <td style="padding: 16px 0">
+                        <span style="display: flex; align-items: center; gap: 14px">
+                          <span style="flex: none; width: 64px; height: 64px; border-radius: 10px; background: #F4F4F6; display: flex; align-items: center; justify-content: center">
+                            <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#686874" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="{{l.icon}}"></path></svg>
+                          </span>
+                          <span style="display: flex; flex-direction: column; gap: 2px">
+                            <a href="DesktopProduct.dc.html" style="color: #17171C; font-weight: 500; text-decoration: none">{{l.name}}</a>
+                            <span style="font-size: 12px; font-weight: 500; color: #686874">{{l.note}}</span>
+                          </span>
+                        </span>
+                      </td>
+                      <td class="num" style="padding: 16px 12px; text-align: right; color: #4E4E58; white-space: nowrap">{{l.unitPrice}}</td>
+                      <td style="padding: 16px 12px">
+                        <span style="margin: 0 auto; width: max-content; display: flex; align-items: center; border: 1px solid #D4D4DB; border-radius: 10px; height: 40px; overflow: hidden">
+                          <button onClick="{{l.dec}}" aria-label="{{l.decLabel}}" class="ib"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#17171C" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M5 12h14"></path></svg></button>
+                          <span class="num" style="min-width: 72px; text-align: center; font-weight: 600; font-size: 13px">{{l.qtyText}}</span>
+                          <button onClick="{{l.inc}}" aria-label="{{l.incLabel}}" class="ib"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#17171C" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg></button>
+                        </span>
+                      </td>
+                      <td class="num" style="padding: 16px 12px; text-align: right; font-weight: 600; white-space: nowrap">{{l.lineTotal}}</td>
+                      <td style="padding: 16px 0">
+                        <button onClick="{{l.remove}}" aria-label="{{l.removeLabel}}" class="del">
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#686874" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"></path></svg>
+                        </button>
+                      </td>
+                    </tr>
+                  </sc-for>
+                </tbody>
+              </table>
+            </div>
+            <div style="padding: 12px 16px; border-radius: 12px; background: #EBF2FE; color: #1A5BC0; font-size: 13px; font-weight: 500; display: flex; gap: 10px; align-items: flex-start">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1A5BC0" stroke-width="1.8" stroke-linecap="round" aria-hidden="true" style="flex: none; margin-top: 1px"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>
+              <span>Mua tối thiểu 1 kg mỗi món. Hàng được giữ 30 phút sau khi đặt. Khi còn nằm trong giỏ, hàng chưa được giữ.</span>
+            </div>
+            <a href="DesktopCategory.dc.html" style="align-self: flex-start; height: 44px; display: flex; align-items: center; gap: 6px; font-weight: 500; text-decoration: none">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"></path></svg>
+              Mua thêm hàng khác
+            </a>
+            <p role="status" class="sr">{{liveText}}</p>
+          </section>
+
+          <aside aria-labelledby="h-tom" style="flex: 1 1 300px; position: sticky; top: 24px; align-self: flex-start; background: #FFFFFF; border-radius: 16px; padding: 20px; display: flex; flex-direction: column; gap: 12px">
+            <h2 id="h-tom" style="margin: 0; font-size: 17px; font-weight: 600">Tóm tắt đơn</h2>
+            <div style="display: flex; justify-content: space-between; color: #4E4E58"><span>Tạm tính ({{count}} món)</span><span class="num">{{total}}</span></div>
+            <div style="display: flex; flex-direction: column; gap: 6px; padding-top: 4px">
+              <label for="v-code" style="font-size: 13px; font-weight: 500; color: #4E4E58">Mã giảm giá</label>
+              <div style="display: flex; gap: 8px">
+                <input id="v-code" class="vin" type="text" value="{{code}}" onChange="{{type}}" autocapitalize="characters" autocomplete="off" spellcheck="false" maxlength="20" placeholder="Nhập mã" aria-describedby="v-hint">
+                <button type="button" class="vbtn" disabled="{{applyOff}}">Áp dụng</button>
+              </div>
+              <span id="v-hint" style="font-size: 12px; font-weight: 500; color: #686874">Mỗi đơn dùng 1 mã.</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: baseline; border-top: 1px solid #E4E4E9; padding-top: 12px">
+              <span style="font-weight: 600">Tổng tiền hàng</span>
+              <span class="num" style="font-size: 24px; font-weight: 600; color: #1A5BC0; letter-spacing: -0.01em">{{total}}</span>
+            </div>
+            <p style="margin: 0; font-size: 13px; color: #4E4E58">Đã gồm giao hàng. Bạn trả một lần, không trả thêm khi nhận hàng.</p>
+            <a href="DesktopCheckout.dc.html" class="btn btn-p" style="margin-top: 4px">Tiếp tục</a>
+          </aside>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{isEmpty}}" hint-placeholder-val="{{ false }}">
+        <div style="padding: 48px 24px; background: #FFFFFF; border-radius: 16px; display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center">
+          <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#8C8C98" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 4h2l2.4 10.2a1.5 1.5 0 0 0 1.5 1.1h8.6a1.5 1.5 0 0 0 1.5-1.1L21 8H6.2"></path></svg>
+          <span style="font-size: 17px; font-weight: 600">Giỏ hàng đang trống</span>
+          <a href="DesktopCategory.dc.html" class="btn btn-p" style="margin-top: 8px">Xem hàng đang có</a>
+        </div>
+      </sc-if>
+    </div>
+  </main>
+
+  <footer style="background: #FFFFFF; border-top: 1px solid #E4E4E9">
+    <div class="wrap" style="padding-top: 16px; padding-bottom: 16px; display: flex; flex-wrap: wrap; gap: 8px 24px; align-items: center; justify-content: space-between; font-size: 12px; color: #4E4E58">
+      <span>[Tên doanh nghiệp] · MST [mã số thuế] · © 2026 Cá Về</span>
+      <span style="display: flex; flex-wrap: wrap; gap: 4px 16px">
+        <a href="DesktopPolicy.dc.html" target="_blank" rel="noopener">Chính sách đổi trả và hoàn tiền</a>
+        <a href="DesktopPolicy.dc.html" target="_blank" rel="noopener">Chính sách quyền riêng tư</a>
+        <a href="DesktopPolicy.dc.html" target="_blank" rel="noopener">Chính sách thanh toán</a>
+      </span>
+    </div>
+  </footer>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":800}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { qty: { muc: 1, thu: 1, combo: 1 }, live: '', code: '' };
+  }
+  renderVals() {
+    const vnd = (n) => Math.round(n).toLocaleString('vi-VN') + 'đ';
+    const items = [
+      { id: 'muc', name: 'Mực ống làm sạch', note: 'Đã bỏ nội tạng', price: 278000, step: 0.5, unit: 'kg', icon: 'M12 3c-3 0-5 3-5 7v3h10v-3c0-4-2-7-5-7zM8 13l-1 7M10.5 13l-.5 8M13.5 13l.5 8M16 13l1 7' },
+      { id: 'thu', name: 'Cá thu cắt khúc', note: 'Cắt khúc dày 2–3 cm', price: 330000, step: 0.5, unit: 'kg', icon: 'M5 12c2.6-3.6 6-5.5 9.5-5.5 2.7 0 4.7 1.9 6.5 5.5-1.8 3.6-3.8 5.5-6.5 5.5C11 17.5 7.6 15.6 5 12zM5 12L2 8.5M5 12l-3 3.5' },
+      { id: 'combo', name: 'Combo lẩu hải sản', note: 'Mực, tôm, cá thu', price: 259000, step: 1, unit: 'combo', icon: 'M4 8l8-4 8 4v8l-8 4-8-4zM4 8l8 4 8-4M12 12v8' }
+    ];
+    const qty = this.state.qty;
+    const set = (i, n) => {
+      const next = Object.assign({}, this.state.qty);
+      if (n <= 0) delete next[i.id]; else next[i.id] = Math.round(n * 10) / 10;
+      this.setState({ qty: next, live: n > 0 ? 'Đã cập nhật ' + i.name : 'Đã bỏ ' + i.name + ' khỏi giỏ' });
+    };
+    let total = 0;
+    const lines = items.filter((i) => qty[i.id] > 0).map((i) => {
+      const q = qty[i.id];
+      total += q * i.price;
+      const stepText = i.unit === 'kg' ? '0,5 kg ' : '1 combo ';
+      return Object.assign({}, i, {
+        qtyText: i.unit === 'kg' ? q.toLocaleString('vi-VN') + ' kg' : q + ' combo',
+        unitPrice: vnd(i.price) + ' / ' + i.unit,
+        lineTotal: vnd(q * i.price),
+        removeLabel: 'Xoá ' + i.name + ' khỏi giỏ',
+        incLabel: 'Thêm ' + stepText + i.name,
+        decLabel: q - i.step < 1 ? 'Bỏ ' + i.name + ' khỏi giỏ' : 'Bớt ' + stepText + i.name,
+        inc: () => set(i, q + i.step),
+        dec: () => set(i, q - i.step < 1 ? 0 : q - i.step),
+        remove: () => set(i, 0)
+      });
+    });
+    return {
+      lines,
+      count: lines.length,
+      hasItems: lines.length > 0,
+      isEmpty: lines.length === 0,
+      total: vnd(total),
+      liveText: this.state.live,
+      code: this.state.code,
+      applyOff: this.state.code.trim() === '',
+      type: (e) => this.setState({ code: String(e.target.value || '').toUpperCase().replace(/\s+/g, '') })
+    };
+  }
+}
+</script>
+</body>
+</html>

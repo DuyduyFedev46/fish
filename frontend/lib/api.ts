@@ -4,8 +4,8 @@
 
 import {
   ApiError,
-  type CatalogItem,
   type CatalogItemDetail,
+  type CatalogResponse,
   type CreateOrderPayload,
   type CreateOrderResponse,
   type OrderStatus,
@@ -69,12 +69,30 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
   return res.json() as Promise<T>;
 }
 
-export async function getCatalog(): Promise<CatalogItem[]> {
+// Catalog dùng chung cho trang chủ, header (menu nhóm) và các màn sau: giữ 30 giây để một lần
+// xem trang chỉ tốn một request. Lỗi thì bỏ cache để lần "Thử lại" gọi lại thật.
+const CATALOG_TTL_MS = 30 * 1000;
+let catalogCache: { at: number; promise: Promise<CatalogResponse> } | null = null;
+
+async function fetchCatalog(): Promise<CatalogResponse> {
   if (process.env.NEXT_PUBLIC_USE_MOCK === "1") {
     const m = await import("./mock");
     return m.mockGetCatalog();
   }
-  return apiFetch<CatalogItem[]>("/api/shop/catalog/");
+  return apiFetch<CatalogResponse>("/api/shop/catalog/");
+}
+
+export function getCatalog(options?: { fresh?: boolean }): Promise<CatalogResponse> {
+  const now = Date.now();
+  if (!options?.fresh && catalogCache && now - catalogCache.at < CATALOG_TTL_MS) {
+    return catalogCache.promise;
+  }
+  const promise = fetchCatalog();
+  catalogCache = { at: now, promise };
+  promise.catch(() => {
+    if (catalogCache && catalogCache.promise === promise) catalogCache = null;
+  });
+  return promise;
 }
 
 export async function getCatalogItem(itemCode: string): Promise<CatalogItemDetail | null> {

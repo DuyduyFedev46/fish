@@ -7,6 +7,25 @@
 > cộng dồn và ranh giới Chủ ↔ Quản lý được giữ, còn danh sách vai thì không cố định nữa. BA không sửa
 > `decisions.md`. Duy tự ghi quyết định sau khi trả lời các câu 🔴 ở §10.
 
+```mermaid
+flowchart TD
+    A["Chủ mở màn Vai trò"] --> B{"Tạo mới hay nhân bản?"}
+    B -- "Tạo mới" --> C["Đặt tên vai"]
+    B -- "Nhân bản" --> D["Chép ô của vai có sẵn"]
+    D --> C
+    C --> E["Tick bảng Xem, Thêm, Sửa, Duyệt, Huỷ"]
+    E --> F["Xem tóm tắt và cảnh báo"]
+    F --> G{"Chủ bấm lưu?"}
+    G -- "Có" --> H["Lưu vai, ghi nhật ký"]
+    G -- "Không" --> E
+    H --> I["Gán một hoặc nhiều vai cho nhân viên"]
+    I --> J{"Vừa nhập vừa duyệt được?"}
+    J -- "Có" --> K["Cảnh báo: không tự duyệt phiếu mình"]
+    J -- "Không" --> L["Quyền có hiệu lực ngay"]
+    K --> L
+    L --> M["Nhân viên thấy menu theo quyền"]
+```
+
 ## Câu trả lời / chỉnh của Duy
 
 | Ngày | Nguyên văn | Hệ quả áp vào bản phân tích |

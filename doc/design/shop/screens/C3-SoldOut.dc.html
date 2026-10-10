@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<title>Món vừa hết hàng — sheet</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#1A5BC0}
+.num{font-variant-numeric:tabular-nums}
+a,button{-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+a:focus-visible,button:focus-visible{outline:2px solid #1F66D1;outline-offset:2px}
+.sheet{animation:up 260ms cubic-bezier(.32,.72,0,1)}
+@keyframes up{from{transform:translateY(100%)}to{transform:none}}
+@media (prefers-reduced-motion:reduce){.sheet{animation:none}}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; background: #F4F4F6; color: #17171C; font-family: Inter, system-ui, sans-serif; font-size: 14px; line-height: 1.5">
+
+  <div aria-hidden="true">
+    <div style="height: 56px; background: #FFFFFF; border-bottom: 1px solid #E4E4E9; display: flex; align-items: center; gap: 4px; padding: 0 6px">
+      <span style="width: 44px; height: 44px; display: flex; align-items: center; justify-content: center"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#17171C" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"></path></svg></span>
+      <span style="font-size: 17px; font-weight: 600">Thông tin nhận hàng</span>
+    </div>
+    <div style="padding: 12px 16px; background: #FFFFFF; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; font-size: 12px; font-weight: 500">
+      <span style="display: flex; flex-direction: column; gap: 6px; color: #4E4E58"><span style="height: 4px; border-radius: 2px; background: #1F66D1"></span>1. Giỏ hàng</span>
+      <span style="display: flex; flex-direction: column; gap: 6px; color: #1A5BC0"><span style="height: 4px; border-radius: 2px; background: #1F66D1"></span>2. Nhận hàng</span>
+      <span style="display: flex; flex-direction: column; gap: 6px; color: #686874"><span style="height: 4px; border-radius: 2px; background: #EBEBEF"></span>3. Thanh toán</span>
+    </div>
+    <div style="margin-top: 8px; background: #FFFFFF; padding: 16px; display: flex; flex-direction: column; gap: 14px">
+      <span style="font-size: 15px; font-weight: 600">Người nhận</span>
+      <div style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 500; color: #4E4E58">Họ và tên<span style="height: 44px; border: 1px solid #8C8C98; border-radius: 8px; padding: 0 12px; display: flex; align-items: center; font-size: 16px; font-weight: 400; color: #17171C">[Họ tên khách]</span></div>
+      <div style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 500; color: #4E4E58">Số điện thoại<span style="height: 44px; border: 1px solid #8C8C98; border-radius: 8px; padding: 0 12px; display: flex; align-items: center; font-size: 16px; font-weight: 400; color: #17171C">[Số điện thoại]</span></div>
+    </div>
+    <div style="margin-top: 8px; background: #FFFFFF; padding: 16px; display: flex; flex-direction: column; gap: 14px">
+      <span style="font-size: 15px; font-weight: 600">Địa chỉ giao hàng</span>
+      <span style="height: 44px; border: 1px solid #8C8C98; border-radius: 8px; padding: 0 12px; display: flex; align-items: center; font-size: 16px">[Tỉnh / thành 1]</span>
+      <span style="height: 44px; border: 1px solid #8C8C98; border-radius: 8px; padding: 0 12px; display: flex; align-items: center; font-size: 16px">[Phường / xã 1]</span>
+    </div>
+  </div>
+
+  <div aria-hidden="true" style="position: absolute; inset: 0; background: rgba(23,23,28,0.48)"></div>
+
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sh-title" aria-describedby="sh-desc" style="position: absolute; left: 0; right: 0; bottom: 0; background: #FFFFFF; border-radius: 16px 16px 0 0; box-shadow: 0 -8px 32px rgba(23,23,28,0.2); padding: 8px 16px 20px; display: flex; flex-direction: column">
+    <span aria-hidden="true" style="align-self: center; width: 36px; height: 4px; border-radius: 2px; background: #D4D4DB; margin-bottom: 16px"></span>
+
+    <span aria-hidden="true" style="width: 44px; height: 44px; border-radius: 22px; background: #FDF3E3; display: flex; align-items: center; justify-content: center; margin-bottom: 12px">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#A85A07" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5l9.5 16.5h-19zM12 10v4.5M12 17.5h.01"></path></svg>
+    </span>
+    <h2 id="sh-title" tabindex="-1" style="margin: 0; font-size: 18px; font-weight: 600; line-height: 1.35">Một số món vừa hết hàng</h2>
+    <p id="sh-desc" style="margin: 6px 0 0; color: #4E4E58">Có khách vừa đặt trước bạn.</p>
+
+    <ul style="list-style: none; margin: 16px 0 0; padding: 0; border: 1px solid #E4E4E9; border-radius: 12px">
+      <li style="display: flex; align-items: center; gap: 12px; padding: 12px; border-bottom: 1px solid #E4E4E9">
+        <span style="flex: none; width: 44px; height: 44px; border-radius: 8px; background: #F4F4F6; display: flex; align-items: center; justify-content: center">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#686874" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 5c-5 0-9 3.5-9 8 0 3 2 5 5 5h3M9 13H5M18 5c2 0 3 1.2 3 3s-1.6 3-3.5 3M12 18l-2 3M16 18l1 3"></path></svg>
+        </span>
+        <div style="flex: 1; min-width: 0; display: flex; flex-direction: column">
+          <span style="font-weight: 500">Tôm sú</span>
+          <span class="num" style="font-size: 13px; color: #4E4E58">Bạn đặt 2 kg · <span style="color: #A85A07; font-weight: 600; white-space: nowrap">không đủ hàng</span></span>
+        </div>
+        <button type="button" style="flex: none; height: 44px; padding: 0 12px; border-radius: 8px; border: 1px solid #1F66D1; background: #FFFFFF; color: #1A5BC0; font: inherit; font-size: 13px; font-weight: 600">Đổi thành 1 kg</button>
+      </li>
+      <li style="display: flex; align-items: center; gap: 12px; padding: 12px">
+        <span style="flex: none; width: 44px; height: 44px; border-radius: 8px; background: #F4F4F6; display: flex; align-items: center; justify-content: center; opacity: 0.5">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#686874" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 13a6 4 0 1 0 12 0a6 4 0 1 0-12 0M5 10L3 6l3 1M19 10l2-4-3 1M7 16l-2 3M17 16l2 3"></path></svg>
+        </span>
+        <div style="flex: 1; min-width: 0; display: flex; flex-direction: column">
+          <span style="font-weight: 500; color: #4E4E58">Ghẹ xanh</span>
+          <span style="font-size: 13px; color: #4E4E58; font-weight: 600">Đã hết · sẽ bỏ khỏi giỏ</span>
+        </div>
+        <a href="tel:[hotline]" aria-label="Liên hệ Cá Về hỏi hàng Ghẹ xanh" style="flex: none; height: 44px; padding: 0 4px; display: flex; align-items: center; font-size: 13px; font-weight: 600; color: #1A5BC0">Liên hệ chúng tôi</a>
+      </li>
+    </ul>
+
+
+    <button type="button" style="margin-top: 16px; height: 48px; border-radius: 24px; border: 0; background: #1F66D1; color: #FFFFFF; font: inherit; font-weight: 600">Cập nhật giỏ và đặt lại</button>
+    <a href="Cart.dc.html" style="margin-top: 8px; height: 48px; border-radius: 24px; border: 1px solid #D4D4DB; background: #FFFFFF; color: #17171C; font-weight: 600; text-decoration: none; display: flex; align-items: center; justify-content: center">Quay lại giỏ hàng</a>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

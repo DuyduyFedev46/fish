@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<title>Hết thời gian giữ hàng — Cá Về</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#1A5BC0}a:hover{color:#1A57B5}
+.num{font-variant-numeric:tabular-nums}
+a,button{-webkit-tap-highlight-color:transparent;touch-action:manipulation;transition:transform 120ms cubic-bezier(.23,1,.32,1)}
+a:active,button:active{transform:scale(.97)}
+a:focus-visible,button:focus-visible{outline:2px solid #1F66D1;outline-offset:2px}
+.dlg{animation:dlg 240ms cubic-bezier(.23,1,.32,1)}
+@keyframes dlg{from{opacity:0;transform:scale(.96)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){a:active,button:active{transform:none}.dlg{animation:none}}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; position: relative; overflow: hidden; background: #F4F4F6; color: #17171C; font-family: Inter, system-ui, sans-serif; font-size: 14px; line-height: 1.5">
+
+  <div inert="" style="position: absolute; inset: 0">
+    <header style="height: 56px; background: #FFFFFF; border-bottom: 1px solid #E4E4E9; display: flex; align-items: center; padding: 0 16px">
+      <span style="font-size: 17px; font-weight: 600">Thanh toán</span>
+    </header>
+
+    <ol aria-label="Bước đặt hàng" style="list-style: none; margin: 0; padding: 12px 16px; background: #FFFFFF; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; font-size: 12px; font-weight: 500">
+      <li style="display: flex; flex-direction: column; gap: 6px; color: #4E4E58"><span style="height: 4px; border-radius: 2px; background: {{brand}}"></span>1. Giỏ hàng</li>
+      <li style="display: flex; flex-direction: column; gap: 6px; color: #4E4E58"><span style="height: 4px; border-radius: 2px; background: {{brand}}"></span>2. Nhận hàng</li>
+      <li style="display: flex; flex-direction: column; gap: 6px; color: #1A5BC0"><span style="height: 4px; border-radius: 2px; background: {{brand}}"></span>3. Thanh toán</li>
+    </ol>
+
+    <section style="margin: 8px 16px 0; background: #FFFFFF; border-radius: 12px; padding: 20px 16px; display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center">
+      <span style="font-size: 13px; font-weight: 500; color: #4E4E58">Đơn <span class="num" style="color: #17171C; font-weight: 600">SO[mã đơn]</span></span>
+      <span style="font-size: 13px; color: #4E4E58">Thời gian giữ hàng còn lại</span>
+      <span class="num" style="font-size: 40px; font-weight: 600; letter-spacing: -0.02em; color: #C0312B">00:00</span>
+      <div style="width: 100%; height: 4px; border-radius: 2px; background: #EBEBEF"></div>
+    </section>
+
+    <section style="margin: 8px 16px 0; background: #FFFFFF; border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 8px">
+      <span style="font-size: 15px; font-weight: 600">Tóm tắt</span>
+      <div style="display: flex; justify-content: space-between; color: #4E4E58"><span>Mực ống làm sạch · 1 kg</span><span class="num">278.000đ</span></div>
+      <div style="display: flex; justify-content: space-between; color: #4E4E58"><span>Cá thu cắt khúc · 1 kg</span><span class="num">330.000đ</span></div>
+      <div style="display: flex; justify-content: space-between; color: #4E4E58"><span>Combo lẩu hải sản · 1 combo</span><span class="num">259.000đ</span></div>
+    </section>
+
+    <div style="position: absolute; left: 0; right: 0; bottom: 0; background: #FFFFFF; box-shadow: 0 -4px 16px rgba(23,23,28,0.08); padding: 12px 16px 16px; display: flex; flex-direction: column; gap: 8px">
+      <div style="display: flex; justify-content: space-between; align-items: baseline">
+        <span style="font-weight: 600">Cần thanh toán</span>
+        <span class="num" style="font-size: 22px; font-weight: 600; color: #1A5BC0">867.000đ</span>
+      </div>
+      <span style="height: 48px; border-radius: 24px; background: #D4D4DB; color: #FFFFFF; font-weight: 600; display: flex; align-items: center; justify-content: center">Thanh toán</span>
+    </div>
+  </div>
+
+  <div aria-hidden="true" style="position: absolute; inset: 0; background: rgba(23,23,28,0.48)"></div>
+
+  <div style="position: absolute; inset: 0; padding: 0 24px; display: flex; align-items: center">
+  <div class="dlg" role="dialog" aria-modal="true" aria-labelledby="dlg-t" aria-describedby="dlg-d" style="flex: 1; background: #FFFFFF; border-radius: 14px; padding: 24px 20px 20px; box-shadow: 0 24px 64px rgba(23,23,28,0.28); display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center">
+    <span style="width: 56px; height: 56px; border-radius: 28px; background: #FCEDEC; display: flex; align-items: center; justify-content: center">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#C0312B" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="13" r="8"></circle><path d="M12 9v4l2.5 2M9.5 2.5h5M12 2.5V5"></path></svg>
+    </span>
+    <h2 id="dlg-t" style="margin: 0; font-size: 18px; font-weight: 600">Hết thời gian giữ hàng</h2>
+    <p id="dlg-d" style="margin: 0; color: #4E4E58">Đơn <span class="num" style="font-weight: 600; color: #17171C">SO[mã đơn]</span> đã tự huỷ sau 30 phút chưa thanh toán. Hàng đã trả lại kho, bạn chưa bị trừ tiền.</p>
+    <div style="width: 100%; display: flex; flex-direction: column; gap: 8px; margin-top: 8px">
+      <a href="Cart.dc.html" style="height: 48px; border-radius: 24px; background: {{brand}}; color: #FFFFFF; font-weight: 600; text-decoration: none; display: flex; align-items: center; justify-content: center">Đặt lại đơn này</a>
+      <a href="Home.dc.html" style="height: 44px; border-radius: 22px; border: 1px solid #D4D4DB; color: #17171C; font-weight: 600; text-decoration: none; display: flex; align-items: center; justify-content: center">Về trang chủ</a>
+    </div>
+    <p style="margin: 4px 0 0; font-size: 12px; font-weight: 500; color: #686874">Đã chuyển khoản rồi? Liên hệ [hotline], Cá Về sẽ kiểm tra và gọi lại cho bạn.</p>
+  </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"brand":{"editor":"color","default":"#1F66D1","options":["#1F66D1","#0E3A73"]},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return { brand: this.props.brand ?? '#1F66D1' };
+  }
+}
+</script>
+</body>
+</html>

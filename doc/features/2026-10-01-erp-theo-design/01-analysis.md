@@ -1,6 +1,19 @@
 # Phân tích: làm lại giao diện ERP (máy tính) theo bộ thiết kế
 > Claude (điều phối) · 2026-10-01 · Trạng thái: **ĐÃ DUYỆT** (Duy duyệt qua chat 01/10/2026: "ok làm cách 1… em làm hết đi", "chỉ duyệt erp cho máy tính")
 
+```mermaid
+flowchart TD
+    A["Duy và Claude vẽ lại ERP"] --> B{"Duy duyệt bản máy tính"}
+    B -->|"Duyệt"| C["Chép bộ thiết kế vào repo"]
+    C --> D["Rà từng màn với code hiện có"]
+    D --> E{"Màn cần dữ liệu backend chưa có?"}
+    E -->|"Có"| F["Bổ sung backend còn thiếu"]
+    E -->|"Không"| G["Làm lại giao diện theo thiết kế"]
+    F --> G
+    G --> H["Chặn rò giá vốn và dữ liệu khách"]
+    H --> I["ERP máy tính đúng bộ thiết kế"]
+```
+
 ## 1. Bối cảnh
 Ngày 30/09–01/10/2026 Duy và Claude thiết kế lại toàn bộ giao diện ERP trên canvas Design
 (https://claude.ai/code/artifact/ab9d37bb-9aba-449b-a71f-bccf97ca1f26). Bản ERP **máy tính** đã được duyệt và chép vào

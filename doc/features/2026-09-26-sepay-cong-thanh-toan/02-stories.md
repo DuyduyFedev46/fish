@@ -7,6 +7,20 @@
 >
 > Câu ĐỎ còn lại là Q3 (dữ liệu thử/thật) và Q4 (khoá chống trùng, BE tự chốt bằng IPN sandbox). AC có đánh dấu (Qx) viết theo mặc định PA.
 
+```mermaid
+flowchart TD
+    P5["Tổng đơn tròn đồng"] --> P1["Máy chủ lập thông tin thanh toán"]
+    P5 --> P2["Nhận báo tiền từ SePay, ghi giao dịch"]
+    P1 --> P4["Shop chuyển khách sang SePay"]
+    P2 --> P4
+    P4 --> Q["Kiểm thử"]
+    Q --> D{"Duy duyệt deploy thử nghiệm?"}
+    D -->|"Duyệt"| P6["Deploy bản thử, kiểm đường nhận tiền"]
+    P6 --> T["Chạy thử một đơn từ đầu đến cuối"]
+    T --> P8["ERP hiện nguồn tiền, nhãn cảnh báo"]
+    P7["Cập nhật tài liệu, làm song song"]
+```
+
 ## Bảng tóm tắt
 | Story | Tên | Ưu tiên | Bên làm | BR | Phụ thuộc |
 |---|---|---|---|---|---|

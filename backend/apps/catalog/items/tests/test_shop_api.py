@@ -1,4 +1,5 @@
-"""Test Shop API danh mục (guest): có giá niêm yết + tồn khả dụng, KHÔNG rò giá vốn."""
+"""Test Shop API danh mục (guest): giá niêm yết + mức tồn, ảnh; KHÔNG rò giá vốn, số kg tồn.
+Contract `{groups, items}` và mức tồn xem `test_shop_catalog.py` (SHOP-2-01)."""
 import datetime
 from decimal import Decimal
 
@@ -34,15 +35,16 @@ class ShopCatalogAPITests(TestCase):
     def test_shop_catalog_has_price_no_cost(self):
         resp = self.client.get("/api/shop/catalog/")
         self.assertEqual(resp.status_code, 200)
-        row = resp.json()[0]
-        self.assertEqual(row["price"], "100000.00")
-        self.assertEqual(Decimal(row["sellable_qty"]), Decimal("50"))
+        row = resp.json()["items"][0]
+        self.assertEqual(row["price"], "100000")
+        self.assertEqual(row["stock_level"], "in")
+        self.assertNotIn("sellable_qty", row)
         self.assertNotIn("landed_unit_cost", row)
         self.assertNotIn("purchase_rate", row)
 
     def test_a4_ac2_chua_co_anh_tra_image_null(self):
         resp = self.client.get("/api/shop/catalog/")
-        row = resp.json()[0]
+        row = resp.json()["items"][0]
         self.assertIsNone(row["image"])
 
         resp2 = self.client.get(f"/api/shop/catalog/{self.item.code}/")
@@ -56,7 +58,8 @@ class ShopCatalogAPITests(TestCase):
             self.client.get("/api/shop/catalog/"),
             self.client.get(f"/api/shop/catalog/{self.item.code}/"),
         ):
-            row = resp.json()[0] if isinstance(resp.json(), list) else resp.json()
+            body = resp.json()
+            row = body["items"][0] if "items" in body else body
             image = row["image"]
             self.assertEqual(set(image.keys()), {"alt", "is_illustration", "urls"})
             self.assertEqual(set(image["urls"].keys()), {"thumb", "card", "detail"})
@@ -66,7 +69,7 @@ class ShopCatalogAPITests(TestCase):
     def test_a4_ac9_khong_ro_gia_von_lo_hay_ncc_qua_image(self):
         image_services.upload_item_image(item=self.item, file=make_uploaded_image(), actor=None)
         resp = self.client.get("/api/shop/catalog/")
-        row = resp.json()[0]
+        row = resp.json()["items"][0]
         forbidden = {
             "purchase_rate", "landed_unit_cost", "rate", "unit_cost", "supplier",
             "uploaded_by", "id",

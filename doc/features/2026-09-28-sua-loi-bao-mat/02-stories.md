@@ -6,6 +6,24 @@
 > **S06 (L-10) thêm ngày 28/09, Duy duyệt** (trả lời "ok" cho đề xuất sửa công thức lãi lỗ theo lô). Làm ở Lô 3, trên `main` sau khi Lô 2 merge.
 > **S07 (L-11) thêm 28/09, Duy duyệt** (trả lời "ok"): doanh thu lô chỉ tính hoá đơn chưa huỷ. Gộp vào Lô 3.
 
+```mermaid
+flowchart LR
+    subgraph L1["Lô 1"]
+        S1["Nhật ký không lộ giá vốn"]
+        S2["Tra đơn không dò được"]
+        S3["Giới hạn số lần gọi công khai"]
+    end
+    subgraph L2["Lô 2"]
+        S4["Chốt lô đủ điều kiện"]
+        S5["Staging không bị tìm kiếm"]
+    end
+    subgraph L3["Lô 3"]
+        S6["Lãi lỗ không trừ hao hai lần"]
+        S7["Lãi lỗ bỏ hoá đơn đã huỷ"]
+    end
+    L1 --> L2 --> M["Gộp vào nhánh chính"] --> L3
+```
+
 Không có tính năng mới, không đổi schema. Mỗi lỗi một story (S06 sửa công thức nghiệp vụ, không phải lỗi bảo mật, gom vào đây vì cùng đợt sửa lỗi có sẵn). "Group" = 4 Group seed sẵn `chu`, `quan_ly`,
 `nv_kho`, `nv_giao`; "khách" = gọi không đăng nhập. Dữ liệu trong test chỉ dùng số giả (vd SĐT `0900000000`).
 
