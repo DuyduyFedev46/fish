@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { AI_ONLY_ACTIONS, AUDIT_FILTER_ACTIONS, actionLabel, actorInitial, actorName, approverOf, buildApproverMap, changeSummary, matchesLocal, UNKNOWN_ACTION } from "./auditModel";
 import type { AuditLogRow } from "./types";
@@ -129,5 +130,27 @@ describe("AI_ONLY_ACTIONS (R1)", () => {
   it("gồm cả ai_config_kill để tắt AI thì ô lọc không còn Tắt trợ lý AI", () => {
     expect(AI_ONLY_ACTIONS).toContain("ai_config_kill");
     expect(AUDIT_FILTER_ACTIONS.filter((a) => !AI_ONLY_ACTIONS.includes(a))).not.toContain("ai_config_kill");
+  });
+});
+
+describe("nhãn cho mọi action phạm vi/phân quyền mà BE ghi", () => {
+  // Danh sách ghi tay từ backend/apps/accounts/capabilities/services.py (ACTION_*). BE thêm action mới → thêm vào đây và vào bảng nhãn.
+  const BE_CAPABILITY_ACTIONS = ["change_group_capabilities", "change_group_data_scopes", "staff_groups_change"];
+  it.each(BE_CAPABILITY_ACTIONS)("%s có nhãn tiếng Việt", (a) => {
+    expect(actionLabel(a)).not.toBe(UNKNOWN_ACTION);
+  });
+  it("đổi phạm vi dữ liệu nhóm có nhãn rõ nghĩa", () => {
+    expect(actionLabel("change_group_data_scopes")).toBe("Đổi phạm vi dữ liệu của nhóm");
+  });
+  it("khớp hằng ACTION_* trong BE (khi có mã nguồn BE)", () => {
+    let src = "";
+    try {
+      src = readFileSync(new URL("../../../backend/apps/accounts/capabilities/services.py", import.meta.url), "utf8");
+    } catch {
+      return;
+    }
+    const found = [...src.matchAll(/^ACTION_[A-Z_]+ = "([a-z_]+)"/gm)].map((m) => m[1]);
+    expect(found.length).toBeGreaterThan(0);
+    for (const a of found) expect(actionLabel(a)).not.toBe(UNKNOWN_ACTION);
   });
 });

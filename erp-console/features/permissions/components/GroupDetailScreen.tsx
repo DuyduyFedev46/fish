@@ -124,17 +124,30 @@ function GroupDetailBody({ group: g, detail }: { group: GroupDetail; detail: Loa
     () => [
       {
         key: "name",
-        header: M.colName,
+        header: M.colMember,
         render: (m) => (
-          <span>
+          <span className={s.memberCell}>
             <span className={s.memberName}>{m.display_name || m.username}</span>
+            <span className={s.memberMeta}>
+              <span className={s.memberUser}>{m.username}</span>
+              <Chip table={ENUMS.staffStatus} value={m.is_active ? "ACTIVE" : "INACTIVE"} />
+            </span>
+            {m.other_groups.length > 0 && (
+              <span className={`${s.tags} ${s.memberGroupsNarrow}`}>
+                {m.other_groups.map((c) => (
+                  <span key={c} className="tag">
+                    {groupLabel(c)}
+                  </span>
+                ))}
+              </span>
+            )}
           </span>
         ),
       },
-      { key: "user", header: M.colUsername, mono: true, render: (m) => m.username },
       {
         key: "other",
         header: M.colOtherGroups,
+        hideBelow: 720,
         render: (m) =>
           m.other_groups.length === 0 ? (
             <span className="muted">{M.noOtherGroups}</span>
@@ -149,7 +162,6 @@ function GroupDetailBody({ group: g, detail }: { group: GroupDetail; detail: Loa
           ),
       },
       { key: "added", header: M.colAddedAt, num: true, hideBelow: 720, render: (m) => (m.added_at ? dateTime(m.added_at) : <span className="muted">—</span>) },
-      { key: "status", header: M.colStatus, render: (m) => <Chip table={ENUMS.staffStatus} value={m.is_active ? "ACTIVE" : "INACTIVE"} /> },
       ...(canManageMembers
         ? [
             {

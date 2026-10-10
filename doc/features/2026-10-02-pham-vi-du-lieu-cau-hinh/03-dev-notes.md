@@ -592,3 +592,17 @@ Chỉ sửa `backend/apps/accounts/data_scopes/tests/test_release_gate.py`. Khô
   về bên trái bằng `--border-strong` (không hex rời). Ảnh trước/sau ở 1280 và 360 trong scratchpad (`l1-before-*`, `l1-after-*`). Ở mock 1280 bảng vừa khung
   nên chưa tái hiện được cảnh bị che (QA gặp với dữ liệu thật); ở 360 đã thấy cột ghim tách rõ.
 - Không đổi `shared/ui/**`, BE.
+
+## Lô 6+7 — sửa QA (10/10)
+
+- **B1 (Medium)**: bảng nhãn Nhật ký thiếu `change_group_data_scopes`. Đã đọc BE `accounts/capabilities/services.py`: action ghi là
+  `change_group_capabilities`, `change_group_data_scopes`, `staff_groups_change`; `customer_data_widening_confirmed` chỉ là khoá cờ trong body, KHÔNG phải action.
+  Thêm nhãn "Đổi phạm vi dữ liệu của nhóm" vào `features/audit/auditModel.ts`. Test trước (đỏ 3 ca) rồi xanh: `auditModel.test.ts` có danh sách action BE ghi tay
+  và một ca đọc thẳng `ACTION_* = "..."` trong `services.py` (bỏ qua khi không có mã BE) để action mới thiếu nhãn là đỏ. Dòng chi tiết (`changeSummary`) chỉ in khoá đã biết,
+  khoá `scopes` bị bỏ qua nên không lộ khoá thô hay dữ liệu khách.
+- **L1 (Low, lần 2)**: chọn cách THU GỌN, bỏ ghim cột. Cột "Nhân viên" gộp tên + tên đăng nhập + chip trạng thái (xếp dọc); "Nhóm khác" là cột riêng khi khung >= 720px,
+  dưới đó chuyển thành thẻ dưới tên (`hideBelow: 720` + `@container lt-list`); "Thao tác" là cột cuối thường, nút "Bỏ khỏi nhóm" vẫn chữ đầy đủ + aria-label.
+  Đo Playwright (mock, trang `/permissions/detail/?group=warehouse_staff`): 1280 khung 644 = nội dung 644 (không cuộn), tiêu đề Nhân viên 266-752, Thao tác 752-910, không giao nhau;
+  360 khung 324 = nội dung 324, Nhân viên 18-184, Thao tác 184-342, nút 200-326 trong khung. Ảnh sau: scratchpad `members_after_1280.png`, `members_after_360.png`
+  (không chụp ảnh trước vì bản trước đã có trong ghi chú QA). Bỏ chuỗi `colUsername`/`colStatus` không còn dùng.
+- Không đổi `shared/ui/**`, BE.

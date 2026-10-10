@@ -107,15 +107,15 @@
 .memberHead { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-2); }
 .memberName { font-weight: var(--weight-medium); color: var(--ink); }
 .memberUser { color: var(--ink-3); font-size: var(--text-xs); font-family: var(--font-mono); }
-/* Bảng Thành viên (L-A, QA 08/10): người thuộc nhiều nhóm khác hoặc tên dài làm bảng rộng hơn khung 646px ở 1280px, nên cột "Thao tác" bị cuộn khuất.
-   Bảng vẫn cuộn ngang trong khung riêng (không cuộn cả trang), riêng cột cuối được ghim bên phải để nút "Bỏ khỏi nhóm" luôn thấy và bấm được. */
-/* L1 (QA Lô 6): cột ghim phải ĐỤC (cả tiêu đề lẫn ô) và có bóng đổ về bên trái, để biết phía dưới còn cột đang trượt; bề rộng chỉ vừa nút
-   (ô sát lề, không xuống dòng) nên che ít cột nhất. Khi bảng chưa cuộn thì bóng không che gì vì cột cuối nằm đúng chỗ của nó. */
+/* Bảng Thành viên (L1, QA Lô 6+7 lần 2): gộp "Tên đăng nhập" và "Trạng thái" xuống dưới tên để bảng vừa khung 644px ở 1280px, không ghim cột nào
+   (ghim từng che tiêu đề "Trạng thái"). Cột "Thao tác" là cột cuối thường; nếu hẹp quá (360px) khung vẫn cuộn ngang, không cột nào bị che. */
+.memberCell { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; }
+.memberMeta { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-2); }
 .memberTable :global(table.lt) :global(th):last-child,
-.memberTable :global(table.lt) :global(td):last-child { position: sticky; right: 0; z-index: 1; width: 1%; white-space: nowrap; padding-left: var(--space-2); padding-right: var(--space-2); box-shadow: -1px 0 0 var(--border-strong), -6px 0 6px -6px var(--border-strong); }
-.memberTable :global(table.lt) :global(th):last-child { background: var(--surface-2); }
-.memberTable :global(table.lt) :global(td):last-child { background: var(--surface); }
+.memberTable :global(table.lt) :global(td):last-child { width: 1%; white-space: nowrap; }
 .tags { display: inline-flex; flex-wrap: wrap; gap: var(--space-1); }
+.memberGroupsNarrow { display: none; }
+@container lt-list (max-width: 719px) { .memberGroupsNarrow { display: inline-flex; } }
 
 /* ---- Hộp thoại ---- */
 .confirmBody { margin: 0; color: var(--ink-2); font-size: var(--text-base); line-height: var(--leading-normal); }
