@@ -3,6 +3,7 @@
 import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import OrderLookup from "./OrderLookup";
+import ShopFrame from "../../../components/ShopFrame";
 
 function OrderLookupInner() {
   const searchParams = useSearchParams();
@@ -26,8 +27,12 @@ function OrderLookupInner() {
 
 export default function OrderLookupPage() {
   return (
-    <Suspense fallback={<p className="empty-state">Đang tải…</p>}>
-      <OrderLookupInner />
-    </Suspense>
+    <ShopFrame header="sub" title="Tra cứu đơn hàng" footer="full" bottomNav>
+      <div className="shop-main">
+        <Suspense fallback={<p className="empty-state">Đang tải…</p>}>
+          <OrderLookupInner />
+        </Suspense>
+      </div>
+    </ShopFrame>
   );
 }

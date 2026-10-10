@@ -32,7 +32,7 @@ export default function ItemCard({ itemCode, postSlug, item, loading }: ItemCard
 
   // Trường hợp mặt hàng ẩn, hết hàng hoặc API lỗi (CMS-06-AC5)
   // (API lỗi cũng rơi vào đây: không có `item` -> "Tạm hết · liên hệ để đặt").
-  if (!item || Number(item.sellable_qty) <= 0) {
+  if (!item || item.stock_level === "out") {
     return (
       <div className={`${s.cardWrapper} ${s.unavailable}`}>
         <div className={s.itemInfo}>

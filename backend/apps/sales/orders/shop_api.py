@@ -24,11 +24,26 @@ from apps.common.throttling import (
 from apps.sales.models import SalesOrder
 
 from . import services
+from .shop_errors import validation_error
 from .shop_labels import shop_delivery_status_label, shop_order_status_label
 
 LOOKUP_NOT_FOUND = "Không tìm thấy đơn với mã và số điện thoại này."
 LOOKUP_BAD_LAST4 = "Vui lòng nhập đúng 4 số cuối số điện thoại."
 _LAST4 = re.compile(r"\d{4}")
+
+
+def _parse_lines(items):
+    """Parse `items` -> [{item_code, qty: Decimal}]. Sai kiểu/không phải số hữu hạn -> 400 VALIDATION (02b §3.3 #2)."""
+    try:
+        lines = []
+        for it in items:
+            qty = Decimal(str(it["qty"]).strip())
+            if not qty.is_finite():
+                raise InvalidOperation
+            lines.append({"item_code": str(it["item_code"]), "qty": qty})
+        return lines
+    except (KeyError, TypeError, InvalidOperation, AttributeError):
+        raise validation_error(items="Số lượng chưa hợp lệ.") from None
 
 
 class ShopOrderCreateView(APIView):
@@ -38,14 +53,8 @@ class ShopOrderCreateView(APIView):
     def post(self, request):
         d = request.data or {}
         customer = d.get("customer") or {}
-        items = d.get("items") or []
-        try:
-            lines = [
-                {"item_code": it["item_code"], "qty": Decimal(str(it["qty"]))}
-                for it in items
-            ]
-        except (KeyError, TypeError, InvalidOperation):
-            return Response({"detail": "Dữ liệu giỏ hàng không hợp lệ."}, status=400)
+        # Không log `request.data` hay dữ liệu khách ở view này (bất biến 9, SHOP-2-02 AC6).
+        lines = _parse_lines(d.get("items") or [])
 
         order = services.create_order(
             customer_phone=(customer.get("phone") or "").strip(),

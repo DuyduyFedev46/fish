@@ -1,0 +1,20 @@
+{
+  "_note": "Chuyên mục Góc bếp (06-marketing C1). Slug do hệ thống tự sinh từ tên; lệnh khớp theo tên đã bỏ dấu.",
+  "categories": [
+    {
+      "name": "Rã đông",
+      "order": 1,
+      "description": "Cách rã đông từng loại hải sản cấp đông trước khi nấu."
+    },
+    {
+      "name": "Món hấp",
+      "order": 2,
+      "description": "Món hấp đơn giản từ cá, mực, tôm cấp đông."
+    },
+    {
+      "name": "Món chiên",
+      "order": 3,
+      "description": "Món chiên giòn, ít bắn dầu, làm nhanh trong bữa tối."
+    }
+  ]
+}

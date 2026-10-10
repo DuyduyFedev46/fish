@@ -1,0 +1,110 @@
+{
+  "_note": "Bài Góc bếp bản đầu (06-marketing C4). Bài cá nục (C4.5) KHÔNG nạp khi S-23 chưa trả lời. Số giờ rã đông 8–12 là câu tạm (doc/ops/hoi-loc.md L10). @item_card chỉ chèn khi mã hàng có thật, đang bán, có giá.",
+  "posts": [
+    {
+      "slug": "ra-dong-ca-dung-cach",
+      "title": "Rã đông cá đúng cách để thịt không bở",
+      "category": "Rã đông",
+      "excerpt": "Ngăn mát hay nước lạnh, chọn cách nào cho từng món, và vì sao không nên dùng nước nóng.",
+      "seo_title": "Rã đông cá đúng cách để thịt không bở | Cá Về",
+      "seo_description": "Rã đông cá cấp đông trong ngăn mát hoặc nước lạnh để thịt vẫn chắc. Những điều nên tránh khi rã đông cá.",
+      "body": [
+        "Cá cấp đông rã đúng cách thì thịt vẫn chắc. Rã vội bằng nước nóng hay để ngoài lâu thì phần ngoài mềm nhũn trong khi lõi còn đá, nấu lên dễ bở.",
+        "## Vì sao thịt cá bị bở",
+        "Khi cá tan đá quá nhanh hoặc không đều, nước trong thớ thịt chảy ra ngoài. Thịt mất nước nên rời và bở khi nấu.",
+        "## Cách 1: rã đông trong ngăn mát (nên dùng)",
+        "1. Để nguyên túi, đặt cá lên đĩa để hứng nước.",
+        "2. Chuyển xuống ngăn mát tủ lạnh trước khi nấu khoảng 8–12 giờ. Khúc dày cần lâu hơn.",
+        "3. Lấy ra, thấm khô mặt cá bằng khăn giấy rồi mới nấu.",
+        "## Cách 2: khi cần gấp",
+        "- Ngâm **cả túi kín** trong nước lạnh. Không để nước lọt vào túi.",
+        "- Thay nước lạnh khoảng 30 phút một lần.",
+        "- Rã xong thì nấu ngay.",
+        "## Những điều nên tránh",
+        "- Không ngâm nước nóng, không rã đông bằng vòi nước nóng.",
+        "- Không để cá ngoài nhiệt độ phòng nhiều giờ.",
+        "- Cá đã rã đông thì không cấp đông lại.",
+        "@item_card CA-THU"
+      ]
+    },
+    {
+      "slug": "ra-dong-tom",
+      "title": "Rã đông tôm mà vẫn giữ vị ngọt",
+      "category": "Rã đông",
+      "excerpt": "Để nguyên túi, rã trong ngăn mát hoặc nước lạnh, không xả nước trực tiếp lên tôm.",
+      "seo_title": "Rã đông tôm mà vẫn giữ vị ngọt | Cá Về",
+      "seo_description": "Cách rã đông tôm cấp đông trong ngăn mát hoặc nước lạnh để tôm không nhũn và giữ được vị.",
+      "body": [
+        "Tôm nhỏ và mỏng nên tan đá nhanh. Rã đúng cách giúp tôm không bị nhũn và giữ được vị.",
+        "## Rã trong ngăn mát",
+        "1. Để nguyên túi, đặt lên đĩa.",
+        "2. Chuyển xuống ngăn mát tủ lạnh trước khi nấu khoảng 8–12 giờ.",
+        "3. Rã xong, để ráo rồi chế biến.",
+        "## Khi cần gấp",
+        "- Ngâm cả túi kín trong âu nước lạnh, thay nước nếu nước bớt lạnh.",
+        "- Không xả nước trực tiếp lên tôm đã bóc vỏ.",
+        "- Rã xong thì nấu ngay, không cấp đông lại.",
+        "@item_card TOM-SU-1"
+      ]
+    },
+    {
+      "slug": "muc-ong-hap-chien-hay-xao",
+      "title": "Mực ống: hấp, chiên hay xào?",
+      "category": "Món hấp",
+      "excerpt": "Mỗi cách nấu hợp với một kiểu cắt mực. Gợi ý nhanh để chọn món cho bữa tối.",
+      "seo_title": "Mực ống: hấp, chiên hay xào? | Cá Về",
+      "seo_description": "Mực ống cấp đông nấu món gì: hấp gừng hành, chiên giòn hay xào lửa lớn. Cách cắt mực cho từng món.",
+      "body": [
+        "Mực ống đã làm sạch chỉ cần rã đông, rửa lại là nấu được. Cách cắt quyết định món nào hợp hơn.",
+        "## Hấp: để nguyên con hoặc cắt khoanh to",
+        "Hấp cùng gừng và hành trong vài phút là chín. Hấp lâu mực sẽ dai.",
+        "## Chiên: cắt khoanh tròn",
+        "Thấm thật khô, lăn qua bột rồi chiên ngập dầu đến khi vàng. Mực càng khô thì càng ít bắn dầu.",
+        "## Xào: khía vảy rồng, cắt miếng vừa ăn",
+        "Xào lửa lớn, nhanh tay, cho mực vào sau cùng để mực giòn.",
+        "> Mực chín nhanh. Nấu quá lửa là cách dễ nhất làm mực dai.",
+        "@item_card MUC-ONG"
+      ]
+    },
+    {
+      "slug": "ca-thu-hap-gung-hanh",
+      "title": "Cá thu hấp gừng hành",
+      "category": "Món hấp",
+      "excerpt": "Món hấp nhẹ cho bữa tối, không cần dầu chiên, làm trong khoảng nửa giờ.",
+      "seo_title": "Cá thu hấp gừng hành | Cá Về",
+      "seo_description": "Cách làm cá thu hấp gừng hành cho 2–3 người từ cá thu cắt khúc cấp đông: nguyên liệu và 4 bước làm.",
+      "body": [
+        "## Nguyên liệu (2–3 người)",
+        "- 500 g cá thu cắt khúc, đã rã đông",
+        "- 1 nhánh gừng, thái sợi",
+        "- 3 cây hành lá",
+        "- Nước mắm, tiêu, một ít dầu ăn",
+        "## Cách làm",
+        "1. Thấm khô cá, ướp chút nước mắm và tiêu khoảng 10 phút.",
+        "2. Xếp cá vào đĩa, rải gừng lên trên.",
+        "3. Hấp cách thuỷ đến khi thịt cá chuyển màu trắng đục và tách thớ.",
+        "4. Rắc hành lá, rưới một thìa dầu nóng lên trên rồi tắt bếp.",
+        "@item_card CA-THU"
+      ]
+    },
+    {
+      "slug": "ca-thu-chien-sa-ot",
+      "title": "Cá thu chiên sả ớt",
+      "category": "Món chiên",
+      "excerpt": "Ướp sả ớt, chiên vàng hai mặt. Món đậm vị cho bữa cơm nhà.",
+      "seo_title": "Cá thu chiên sả ớt | Cá Về",
+      "seo_description": "Cách làm cá thu chiên sả ớt cho 2–3 người từ cá thu cắt khúc cấp đông: nguyên liệu và 3 bước làm.",
+      "body": [
+        "## Nguyên liệu (2–3 người)",
+        "- 500 g cá thu cắt khúc, đã rã đông",
+        "- 3 cây sả băm nhỏ, 1–2 quả ớt",
+        "- Nước mắm, đường, dầu ăn",
+        "## Cách làm",
+        "1. Thấm khô cá, ướp nước mắm, chút đường và một nửa phần sả khoảng 15 phút.",
+        "2. Chiên cá vàng hai mặt rồi vớt ra.",
+        "3. Phi thơm phần sả còn lại với ớt, cho cá vào đảo nhẹ cho thấm.",
+        "@item_card CA-THU"
+      ]
+    }
+  ]
+}

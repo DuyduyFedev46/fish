@@ -305,10 +305,10 @@ class B2ClosureTests(TestCase):
         self.assert_khong_go_nua_chung(before)
         self.assertTrue(ItemPrice.objects.filter(item=muc).exists(), out)
         resp = self.client.get(CATALOG)
-        codes = {d["item_code"]: d for d in resp.json()}
+        codes = {d["item_code"]: d for d in resp.json()["items"]}
         self.assertIn("MUC-ONG", codes, out)
         self.assertEqual(Decimal(codes["MUC-ONG"]["price"]), Decimal("235000"))
-        self.assertEqual(Decimal(codes["MUC-ONG"]["sellable_qty"]), Decimal("10"))
+        self.assertEqual(codes["MUC-ONG"]["stock_level"], "in")   # 10 kg; Shop không trả số kg (G1)
         order = real_order("MUC-ONG", "2")
         self.assertEqual(order.lines.count(), 1)
         self.assertIn("Giá niêm yết", out)  # báo rõ giá được giữ
@@ -376,7 +376,7 @@ class B2LegacyClosureTests(TestCase):
         self.assert_khong_go_nua_chung(before)
         detail = self.client.get(f"{CATALOG}CA-THU/").json()
         self.assertEqual(Decimal(detail["price"]), Decimal("165000"))
-        self.assertIn("CA-THU", {d["item_code"] for d in self.client.get(CATALOG).json()})
+        self.assertIn("CA-THU", {d["item_code"] for d in self.client.get(CATALOG).json()["items"]})
         real_order("CA-THU", "1")
 
     def test_b2_legacy_don_that_da_thanh_toan_con_du_dong(self):

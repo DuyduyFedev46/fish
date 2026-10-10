@@ -385,8 +385,9 @@ class S3ErrorCodeShopAndInternalTests(TestCase):
             format="json",
         )
         self.assertEqual(resp.status_code, 400, resp.content)
-        self.assertIn("Không đủ tồn khả dụng", resp.json()["detail"])
-        self.assertEqual(resp.json()["code"], "BR-BH-02")
+        # Hết hàng trả lỗi có cấu trúc theo dòng (SHOP-2-02, BR-BH-24), không còn câu chung có mã BR-BH-02.
+        self.assertEqual(resp.json()["code"], "OUT_OF_STOCK")
+        self.assertEqual(resp.json()["lines"], [{"item_code": item.code, "stock_level": "out"}])
 
     def test_s3_ac5_webhook_noi_bo_loi_nghiep_vu_co_code(self):
         from unittest import mock

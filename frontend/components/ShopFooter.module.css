@@ -1,0 +1,245 @@
+/* ---------------- F1 ---------------- */
+.footer {
+  margin-top: var(--space-6);
+  background: var(--brand-deep);
+  color: var(--on-brand-muted);
+  font-size: 14px;
+}
+
+.top {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding-top: var(--space-5);
+  padding-bottom: var(--space-2);
+}
+
+.reserveNav {
+  padding-bottom: calc(var(--h-bottom-nav) + env(safe-area-inset-bottom) + var(--space-4));
+}
+
+.intro {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-1);
+}
+
+.sentence {
+  margin: 0 0 var(--space-2);
+}
+
+.contactButtons {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2);
+  width: 100%;
+  padding-bottom: var(--space-2);
+}
+
+.contactList {
+  display: none;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.group {
+  display: block;
+}
+
+.details {
+  display: block;
+}
+
+.summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: var(--space-12);
+  border-bottom: 1px solid var(--accent-hover);
+  color: var(--on-accent);
+  cursor: pointer;
+  list-style: none;
+}
+.summary::-webkit-details-marker {
+  display: none;
+}
+.summary:focus-visible {
+  outline-color: var(--on-accent);
+  outline-offset: -4px;
+}
+
+.groupTitle {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.chevron {
+  display: inline-flex;
+  transition: transform var(--dur-color) ease-out;
+}
+.chevronOpen {
+  transform: rotate(180deg);
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: var(--space-1) 0 var(--space-3);
+  list-style: none;
+}
+
+/* Dải pháp lý */
+.legalWrap {
+  padding-bottom: var(--space-2);
+}
+
+.legal {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding-top: 14px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.legalLines {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.legalLines a {
+  color: var(--on-accent);
+}
+.copy {
+  color: var(--on-brand-muted);
+}
+
+.notice {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  min-height: 44px;
+  color: var(--on-accent);
+  font-weight: 500;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.notice:focus-visible {
+  outline-color: var(--on-accent);
+}
+.notice img {
+  width: auto;
+  height: 44px;
+}
+
+/* ---------------- F2 ---------------- */
+.compact {
+  margin-top: var(--space-6);
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--ink-2);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.compactInner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-6);
+  padding-top: var(--space-4);
+  padding-bottom: var(--space-4);
+}
+
+.compactLinks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 var(--space-4);
+}
+
+.compactLink {
+  font-size: 12px;
+}
+
+/* ---------------- Máy tính ---------------- */
+@media (min-width: 768px) {
+  .footer {
+    margin-top: var(--space-8);
+  }
+
+  .reserveNav {
+    padding-bottom: 0;
+  }
+
+  .top {
+    display: grid;
+    grid-template-columns: 1.4fr 1fr 1fr 1fr;
+    gap: var(--space-8);
+    padding-top: var(--space-10);
+    padding-bottom: 28px;
+  }
+
+  .sentence {
+    margin: 0;
+  }
+
+  .contactButtons {
+    display: none;
+  }
+
+  .contactList {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .summary {
+    height: auto;
+    margin-bottom: 10px;
+    border-bottom: 0;
+    cursor: default;
+    pointer-events: none;
+  }
+
+  .chevron {
+    display: none;
+  }
+
+  .list {
+    padding: 0;
+  }
+
+  .legalWrap {
+    padding-bottom: 0;
+    border-top: 1px solid var(--accent-hover);
+  }
+
+  .legal {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    padding-top: 18px;
+    padding-bottom: var(--space-6);
+  }
+
+  .compactInner {
+    padding-top: var(--space-4);
+    padding-bottom: var(--space-4);
+  }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .compactLink:hover {
+    color: var(--accent-hover);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chevron {
+    transition: none;
+  }
+}

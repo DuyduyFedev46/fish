@@ -1,10 +1,11 @@
 "use client";
 
-// Bảng giá — client component fetch lúc chạy (static export không SSR).
+// Bảng giá tạm của lô 1 (khung mới bọc ngoài). Lô 2 thay bằng CatalogScreen (lọc, sắp xếp, tìm).
 import { useEffect, useState } from "react";
 import { getCatalog } from "../../lib/api";
 import type { CatalogItem } from "../../lib/types";
 import CatalogGrid from "../../components/CatalogGrid";
+import ShopFrame from "../../components/ShopFrame";
 
 export default function ShopCatalogPage() {
   const [items, setItems] = useState<CatalogItem[]>([]);
@@ -14,7 +15,7 @@ export default function ShopCatalogPage() {
   useEffect(() => {
     let active = true;
     getCatalog()
-      .then((data) => active && setItems(data))
+      .then((data) => active && setItems(data.items))
       .catch(() => active && setLoadError("Không tải được bảng giá lúc này. Vui lòng thử lại sau."))
       .finally(() => active && setLoading(false));
     return () => {
@@ -23,18 +24,17 @@ export default function ShopCatalogPage() {
   }, []);
 
   return (
-    <>
-      <h1 className="page-title">Bảng giá hải sản</h1>
-      <p className="page-subtitle">
-        Bán theo kg, giá niêm yết — tồn kho hiển thị là số lượng còn khả dụng.
-      </p>
-      {loading ? (
-        <p className="empty-state">Đang tải bảng giá…</p>
-      ) : loadError ? (
-        <p className="form-banner-error">{loadError}</p>
-      ) : (
-        <CatalogGrid items={items} />
-      )}
-    </>
+    <ShopFrame header="sticky" footer="full" bottomNav>
+      <div className="shop-main">
+        <h1 className="page-title">Bảng giá hải sản</h1>
+        {loading ? (
+          <p className="empty-state">Đang tải bảng giá…</p>
+        ) : loadError ? (
+          <p className="form-banner-error">{loadError}</p>
+        ) : (
+          <CatalogGrid items={items} />
+        )}
+      </div>
+    </ShopFrame>
   );
 }

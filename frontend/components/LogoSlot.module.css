@@ -1,0 +1,65 @@
+.logo {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 44px;
+  text-decoration: none;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform var(--dur-press) var(--ease-out);
+}
+
+.logo:active {
+  transform: scale(0.97);
+}
+
+.light {
+  color: var(--brand-deep);
+}
+.brand {
+  color: var(--on-accent);
+}
+.brand:focus-visible {
+  outline-color: var(--on-accent);
+}
+
+.mark {
+  flex: none;
+  border-radius: var(--radius-md);
+  object-fit: contain;
+}
+
+.words {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.15;
+}
+
+.name {
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.tagline {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--on-accent);
+}
+
+.size36,
+.size40 {
+  gap: 10px;
+}
+.size36 .name {
+  font-size: 20px;
+}
+.size40 .name {
+  font-size: 24px;
+  letter-spacing: -0.015em;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .logo:active {
+    transform: none;
+  }
+}

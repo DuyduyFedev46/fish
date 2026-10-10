@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { ApiError } from "@/lib/types";
 import { formatDate } from "@/lib/format";
 import { fetchPublicEntry } from "@/features/content/api";
+import ShopFrame from "@/components/ShopFrame";
 import ArticleBody from "@/features/content/components/ArticleBody";
 import type { PublicEntryDetail } from "@/features/content/types";
 import s from "./trang.module.css";
@@ -35,8 +36,10 @@ function TrangContent() {
     fetchPublicEntry(slug)
       .then((data) => {
         setEntry(data);
-        if (data.seo_title || data.title) {
-          document.title = `${data.seo_title || data.title} | Cá Về`;
+        const pageTitle = (data.seo_title || data.title || "").trim();
+        if (pageTitle) {
+          // seo_title trong CMS đã có "— Cá Về" thì không thêm hậu tố lần nữa (QA lô 1 L2: tiêu đề lặp "| Cá Về").
+          document.title = pageTitle.includes("Cá Về") ? pageTitle : `${pageTitle} | Cá Về`;
         }
         if (data.description) {
           const metaDesc = document.querySelector('meta[name="description"]');
@@ -164,16 +167,19 @@ function TrangContent() {
   );
 }
 
+// Khung mới (lô 1) bọc ngoài; giao diện bên trong do lô 5 viết lại.
 export default function TrangPage() {
   return (
-    <Suspense
-      fallback={
-        <div className={s.container}>
-          <div className={s.loadingBox}>Đang tải trang...</div>
-        </div>
-      }
-    >
-      <TrangContent />
-    </Suspense>
+    <ShopFrame header="sub" title="Chính sách" footer="full" bottomNav={false}>
+      <Suspense
+        fallback={
+          <div className={s.container}>
+            <div className={s.loadingBox}>Đang tải trang...</div>
+          </div>
+        }
+      >
+        <TrangContent />
+      </Suspense>
+    </ShopFrame>
   );
 }

@@ -17,7 +17,7 @@ from apps.content.body.slug import fold_text
 PHONE_RE = re.compile(r"(?<!\d)(?:\+?84|0)(?:[\s.\-]?\d){9,10}(?!\d)")
 
 
-def _normalize_phone_digits(candidate: str) -> str:
+def normalize_phone_digits(candidate: str) -> str:
     """Rút gọn chỉ còn chữ số, chuẩn hoá đầu 84 thành 0."""
     digits = re.sub(r"\D", "", candidate)
     if digits.startswith("84") and len(digits) in (11, 12):
@@ -29,7 +29,7 @@ def _mask_phone_in_text(text: str, allowlist: set[str]) -> str:
     """Thay thế các số điện thoại trong chuỗi bằng chuỗi đã che (vd: 09xx xxx 678)."""
     def repl(m: re.Match) -> str:
         raw = m.group(0)
-        digits = _normalize_phone_digits(raw)
+        digits = normalize_phone_digits(raw)
         if digits in allowlist:
             return raw
         if len(digits) >= 5:
@@ -39,12 +39,12 @@ def _mask_phone_in_text(text: str, allowlist: set[str]) -> str:
     return PHONE_RE.sub(repl, text)
 
 
-def _get_phone_allowlist() -> set[str]:
+def get_phone_allowlist() -> set[str]:
     raw = getattr(settings, "CONTENT_PHONE_ALLOWLIST", ()) or ()
     items = raw.split(",") if isinstance(raw, str) else raw
     allowlist = set()
     for item in items:
-        cleaned = _normalize_phone_digits(str(item).strip())
+        cleaned = normalize_phone_digits(str(item).strip())
         if cleaned:
             allowlist.add(cleaned)
     return allowlist
@@ -88,7 +88,7 @@ def _scan_text_for_warnings(
         if phone_counts >= 5:
             break
         raw_match = match.group(0)
-        digits = _normalize_phone_digits(raw_match)
+        digits = normalize_phone_digits(raw_match)
         if digits in allowlist:
             continue
         # Trích snippet và che số trong snippet
@@ -131,7 +131,7 @@ def scan_entry_warnings(entry: Any) -> list[dict[str, Any]]:
     Quét toàn bộ nội dung của entry tìm các nguy cơ bảo mật trước khi publish.
     Trả về danh sách các cảnh báo (CMS-08).
     """
-    allowlist = _get_phone_allowlist()
+    allowlist = get_phone_allowlist()
     cost_keywords = _get_cost_keywords()
     warnings: list[dict[str, Any]] = []
 

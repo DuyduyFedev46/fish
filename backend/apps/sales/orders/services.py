@@ -19,7 +19,9 @@ from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
 
+from apps.catalog.items import services as catalog_stock
 from apps.catalog.models import Item, ItemPrice, PricingRule
+from apps.catalog.pricing.services import effective_price as listed_price
 from apps.common.audit import note_marker, record_audit
 from apps.common.exceptions import BusinessError
 from apps.common.pii import has_long_digit_run
@@ -31,9 +33,11 @@ from apps.sales.credit_notes import services as credit_note_services
 from apps.sales.customers import services as customers
 from apps.sales.models import SalesOrder, SalesOrderLine, SalesOrderLineBatch
 from apps.sales.orders.consent import resolve_privacy_consent
+from apps.sales.orders.shop_errors import LEVEL_OUT, LEVEL_SHORT, InvalidQtyError, OutOfStockError
 from apps.sales.utils import ZERO
 from apps.sales.utils import gen_code as _gen_code
 from apps.sales.utils import money as _q
+from apps.sales.utils import money_str
 from apps.sales.utils import money_vnd as _q_vnd
 from apps.sales.utils import now as _now
 
@@ -164,6 +168,68 @@ def _bundle_components(item, line_qty):
     return components, snapshot
 
 
+# --- SHOP-2-02: kiểm số lượng và tồn trước khi giữ chỗ -----------------------------------
+
+BR_NOT_ENOUGH_STOCK = "BR-BH-02"
+
+
+def _resolve_lines(lines):
+    """[(raw_line, item hoặc None, qty Decimal)] — mã không tồn tại cho item = None (xử lý như hết hàng)."""
+    codes = {raw["item_code"] for raw in lines}
+    items = {it.code: it for it in Item.objects.filter(code__in=codes)}
+    return [(raw, items.get(raw["item_code"]), Decimal(str(raw["qty"]))) for raw in lines]
+
+
+def _check_line_quantities(resolved):
+    """BR-BH-22: liệt kê MỌI dòng sai mức tối thiểu/bước, trước khi ghi DB hay giữ chỗ."""
+    bad = []
+    for raw, item, qty in resolved:
+        if item is not None and not catalog_stock.validate_line_qty(item, qty):
+            min_qty, qty_step = catalog_stock.qty_rule(item)
+            bad.append(
+                {"item_code": item.code, "min_qty": money_str(min_qty), "qty_step": money_str(qty_step)}
+            )
+    if bad:
+        raise InvalidQtyError(bad)
+
+
+def _demand_parts(item, qty):
+    """[(thành phần, kg cần)] của một dòng; None nếu combo chưa có công thức (không bán được)."""
+    if not item.is_bundle:
+        return [(item, qty)]
+    lines = list(item.bundle_lines.select_related("component"))
+    if not lines:
+        return None
+    return [(bl.component, bl.qty_per_bundle * qty) for bl in lines]
+
+
+def _out_of_stock_lines(resolved, today):
+    """
+    BR-BH-24: các dòng không đủ hàng, chỉ gồm mã hàng và mức "out" | "short" (không số kg, không mã lô).
+    Cộng nhu cầu kg THEO THÀNH PHẦN của mọi dòng (SIMPLE = chính nó; BUNDLE = định mức × số combo) rồi so với
+    tồn bán được của thành phần. Món ngưng bán, không giá hiệu lực hoặc không có mã -> "out".
+    """
+    per_line = []        # (item_code, item hoặc None, parts hoặc None)
+    demand = {}          # pk thành phần -> [thành phần, tổng kg cần]
+    for raw, item, qty in resolved:
+        sellable = item is not None and item.is_active and listed_price(item, today) is not None
+        parts = _demand_parts(item, qty) if sellable else None
+        per_line.append((raw["item_code"], item, parts))
+        for component, kg in parts or ():
+            demand.setdefault(component.pk, [component, ZERO])[1] += kg
+    shortage = {
+        pk for pk, (component, kg) in demand.items() if kg > catalog_stock.simple_sellable_qty(component)
+    }
+    result = []
+    for code, item, parts in per_line:
+        if parts is None:
+            result.append({"item_code": code, "stock_level": LEVEL_OUT})
+        elif any(component.pk in shortage for component, _kg in parts):
+            level = LEVEL_OUT if catalog_stock.stock_level(item) == catalog_stock.STOCK_OUT else LEVEL_SHORT
+            result.append({"item_code": code, "stock_level": level})
+    return result
+
+
 # --- P-05: tạo đơn (giữ chỗ) ------------------------------------------------
 
 def create_order(
@@ -179,12 +245,19 @@ def create_order(
     Tạo đơn ở trạng thái BOOKED — do Hệ thống tạo (BR-PQ-11). TẤT CẢ trong 1 transaction:
     thiếu tồn 1 thành phần bất kỳ -> cả đơn fail (BR-BH-02/07).
 
-    lines: list[{"item_code": str, "qty": Decimal}].
+    lines: list[{"item_code": str, "qty": Decimal}]. `qty` của combo là SỐ COMBO (nguyên), của món thường là kg.
+
+    Lỗi Shop có cấu trúc (02b §3.3, đều xảy ra trước khi ghi DB hoặc giữ chỗ, rollback cả đơn):
+    `InvalidQtyError` (BR-BH-22) rồi `OutOfStockError` (BR-BH-24).
     """
     if not delivery_address:
         raise BusinessError("Địa chỉ giao bắt buộc (BR-BH-09).")
     if not lines:
         raise BusinessError("Đơn hàng phải có ít nhất một dòng.")
+
+    # BR-BH-22: kiểm số lượng ở máy chủ, trước giữ chỗ và trước mọi ghi DB.
+    resolved = _resolve_lines(lines)
+    _check_line_quantities(resolved)
 
     # Kiểm tra đồng ý chính sách bảo mật trước khi giữ chỗ hoặc ghi DB (GL-03, BR-BH-17)
     policy_version = resolve_privacy_consent(privacy_consent)
@@ -193,6 +266,11 @@ def create_order(
     now = _now()
 
     with transaction.atomic():
+        # BR-BH-24: kiểm đủ hàng theo thành phần trước khi ghi gì (chưa khoá; `reserve` bên dưới mới là nguồn quyết định).
+        out_of_stock = _out_of_stock_lines(resolved, today)
+        if out_of_stock:
+            raise OutOfStockError(out_of_stock)
+
         # 7.1 — gộp/khởi tạo Customer theo số điện thoại (khoá tự nhiên).
         customer = customers.get_or_create_by_phone(
             phone=customer_phone, name=customer_name, default_address=delivery_address,
@@ -213,11 +291,7 @@ def create_order(
 
         # Bước 1: dựng dữ liệu dòng + giá (đóng băng), chưa áp ưu đãi.
         lines_data = []
-        for raw in lines:
-            item = _get_item(raw["item_code"])
-            qty = Decimal(str(raw["qty"]))
-            if qty <= ZERO:
-                raise BusinessError(f"Số lượng dòng {item.code} phải > 0.")
+        for raw, item, qty in resolved:
             rate = _effective_price(item, today)  # BR-DM-02 (BUNDLE dùng giá độc lập, BR-DM-04)
             gross = _q(qty * rate)
             lines_data.append({"item": item, "qty": qty, "rate": rate, "gross": gross})
@@ -255,17 +329,30 @@ def create_order(
             # BR-BH-07: giữ chỗ ĐỒNG THỜI mọi thành phần. Vì cùng transaction, thiếu 1
             # thành phần -> BusinessError -> rollback toàn bộ đơn.
             for component_item, comp_qty in components:
-                allocation = batches.allocate_fefo(item=component_item, qty=comp_qty)
-                for batch, take in allocation:
-                    batches.reserve(batch=batch, qty=take)  # khoá lô, người sau thua (BR-BH-02)
-                    fresh = Batch.objects.get(pk=batch.pk)
-                    SalesOrderLineBatch.objects.create(
-                        order_line=order_line,
-                        batch=batch,
-                        component_item=component_item,
-                        qty=take,
-                        unit_cost=fresh.landed_unit_cost,  # ảnh chụp giá vốn lúc đặt
+                try:
+                    allocation = batches.allocate_fefo(item=component_item, qty=comp_qty)
+                    for batch, take in allocation:
+                        batches.reserve(batch=batch, qty=take)  # khoá lô, người sau thua (BR-BH-02)
+                        fresh = Batch.objects.get(pk=batch.pk)
+                        SalesOrderLineBatch.objects.create(
+                            order_line=order_line,
+                            batch=batch,
+                            component_item=component_item,
+                            qty=take,
+                            unit_cost=fresh.landed_unit_cost,  # ảnh chụp giá vốn lúc đặt
+                        )
+                except OutOfStockError:
+                    raise
+                except BusinessError as exc:
+                    if exc.code != BR_NOT_ENOUGH_STOCK:
+                        raise
+                    # Thua đua lúc giữ chỗ: ném lỗi theo từng dòng (rollback cả đơn), không lộ lô hay số kg.
+                    level = (
+                        LEVEL_OUT
+                        if catalog_stock.stock_level(item) == catalog_stock.STOCK_OUT
+                        else LEVEL_SHORT
                     )
+                    raise OutOfStockError([{"item_code": item.code, "stock_level": level}]) from None
             total += amount
 
         # BR-BH-15 (Q6): tổng đơn là số NGUYÊN ĐỒNG, half-up — dòng đơn vẫn giữ 2 chữ số
@@ -460,13 +547,6 @@ def _cancellable_delivery_status(invoice):
 
 
 # --- nội bộ -----------------------------------------------------------------
-
-def _get_item(item_code):
-    try:
-        return Item.objects.get(code=item_code)
-    except Item.DoesNotExist:
-        raise BusinessError(f"Không tìm thấy mặt hàng: {item_code}.")
-
 
 def update_delivery_address(order: SalesOrder, address: str) -> None:
     """

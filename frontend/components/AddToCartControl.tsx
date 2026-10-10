@@ -10,7 +10,7 @@ export default function AddToCartControl({ item }: { item: CatalogItem }) {
   const [qty, setQty] = useState(1);
   const [added, setAdded] = useState(false);
 
-  const outOfStock = !(Number(item.sellable_qty) > 0);
+  const outOfStock = item.stock_level === "out";
 
   function handleAdd() {
     if (qty <= 0) return;

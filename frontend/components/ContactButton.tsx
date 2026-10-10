@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { getSiteInfo } from "../features/site/api";
+import { validHotline } from "../lib/phone";
 
 export const SELLER_SECTION_ID = "seller-info";
 
@@ -19,7 +20,8 @@ export default function ContactButton({ className }: { className: string }) {
     let active = true;
     getSiteInfo()
       .then((info) => {
-        const clean = info?.seller?.phone?.replace(/[^\d+]/g, "") || null;
+        const valid = validHotline(info?.seller?.phone);
+        const clean = valid ? valid.replace(/[^\d+]/g, "") : null;
         if (active) setPhone(clean);
       })
       .catch(() => {});

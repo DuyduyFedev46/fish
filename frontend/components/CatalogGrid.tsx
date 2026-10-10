@@ -1,17 +1,20 @@
 "use client";
 
+// Lưới danh mục tạm của lô 1 (đọc catalog mới: stock_level, group.{slug,name}). Lô 2 thay bằng CatalogScreen + ProductCard.
 import Link from "next/link";
 import type { CatalogItem } from "../lib/types";
-import { formatVnd, formatKg } from "../lib/format";
+import { groupIconOf } from "../features/catalog/groupIcon";
 import AddToCartControl from "./AddToCartControl";
-import ItemImageFrame from "./ItemImageFrame";
+import ImageFrame from "./catalog/ImageFrame";
+import PriceTag from "./catalog/PriceTag";
+import StockBadge from "./catalog/StockBadge";
 
 export default function CatalogGrid({ items }: { items: CatalogItem[] }) {
   if (items.length === 0) {
     return <p className="empty-state">Hiện chưa có mặt hàng nào.</p>;
   }
 
-  const groups = Array.from(new Set(items.map((i) => i.group)));
+  const groups = Array.from(new Set(items.map((i) => i.group.name)));
 
   return (
     <div className="catalog">
@@ -20,7 +23,7 @@ export default function CatalogGrid({ items }: { items: CatalogItem[] }) {
           <h2 className="catalog-group-title">{group}</h2>
           <div className="catalog-grid">
             {items
-              .filter((i) => i.group === group)
+              .filter((i) => i.group.name === group)
               .map((item) => (
                 <article key={item.item_code} className="item-card">
                   <Link
@@ -29,7 +32,13 @@ export default function CatalogGrid({ items }: { items: CatalogItem[] }) {
                     aria-hidden="true"
                     tabIndex={-1}
                   >
-                    <ItemImageFrame image={item.image} alt={item.name} groupLabel={item.group} size="card" />
+                    <ImageFrame
+                      image={item.image}
+                      alt=""
+                      group={groupIconOf(item.group.slug, item.item_type)}
+                      ratio="1/1"
+                      dimmed={item.stock_level === "out"}
+                    />
                   </Link>
                   <Link href={`/shop/item?code=${encodeURIComponent(item.item_code)}`} className="item-card-name">
                     {item.name}
@@ -37,19 +46,8 @@ export default function CatalogGrid({ items }: { items: CatalogItem[] }) {
                       <span className="badge badge-combo">Combo</span>
                     )}
                   </Link>
-                  <div className="item-card-price">
-                    {formatVnd(item.price)} <span className="unit">/ kg</span>
-                  </div>
-                  <div
-                    className={
-                      "item-card-stock " +
-                      (Number(item.sellable_qty) > 0 ? "in-stock" : "out-stock")
-                    }
-                  >
-                    {Number(item.sellable_qty) > 0
-                      ? `Còn ${formatKg(item.sellable_qty)}`
-                      : "Tạm hết · liên hệ để đặt"}
-                  </div>
+                  <PriceTag amount={item.price} unit={item.unit} size="card" tone={item.stock_level === "out" ? "muted" : "default"} />
+                  <StockBadge level={item.stock_level} placement="inline" />
                   <AddToCartControl item={item} />
                 </article>
               ))}

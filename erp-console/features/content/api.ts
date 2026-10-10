@@ -1,4 +1,5 @@
 import { apiFetch, apiUpload, type Paginated } from "@/shared/lib/http";
+import { itemsFromShopCatalog, type ShopCatalogItem, type ShopCatalogResponse } from "./shopCatalog";
 import type {
   CategoryCreatePayload,
   CategoryUpdatePayload,
@@ -29,6 +30,7 @@ import {
   mockDeleteEntry,
   mockDiscardChanges,
   mockFetchEntryVersions,
+  mockFetchShopCatalog,
   mockGetEntry,
   mockGetEntryCounts,
   mockGetEntryVersion,
@@ -221,26 +223,15 @@ export async function fetchGoliveStatus(signal?: AbortSignal): Promise<GoliveSta
   });
 }
 
-export interface ShopCatalogItem {
-  item_code: string;
-  name: string;
-  price?: number;
-  sellable_qty?: number;
-}
+export type { ShopCatalogItem } from "./shopCatalog";
 
+/** CMS-06: danh mục Shop công khai `{groups, items}` (02b Shop §3.1); trả mảng món cho hộp chọn thẻ hàng. */
 export async function fetchShopCatalog(): Promise<ShopCatalogItem[]> {
-  return apiFetch<ShopCatalogItem[]>("/api/shop/catalog/", {
+  const data = await apiFetch<ShopCatalogResponse>("/api/shop/catalog/", {
     auth: false,
-    mock: process.env.NEXT_PUBLIC_USE_MOCK === "1" ? () => ({
-      status: 200,
-      body: [
-        { item_code: "CA-THU-1KG", name: "Cá thu Phan Thiết 1kg", price: 250000, sellable_qty: 10 },
-        { item_code: "CA-BOP-1KG", name: "Cá bớp cắt khoanh 1kg", price: 280000, sellable_qty: 5 },
-        { item_code: "TOM-SU-1KG", name: "Tôm sú Cà Mau 1kg", price: 320000, sellable_qty: 8 },
-        { item_code: "MUC-ONG-1KG", name: "Mực ống Phan Thiết 1kg", price: 220000, sellable_qty: 12 },
-      ],
-    }) : undefined,
+    mock: process.env.NEXT_PUBLIC_USE_MOCK === "1" ? () => ({ status: 200, body: mockFetchShopCatalog() }) : undefined,
   });
+  return itemsFromShopCatalog(data);
 }
 
 export async function submitEntry(

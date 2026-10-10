@@ -1,0 +1,154 @@
+.sheet {
+  position: fixed;
+  inset: 24px 0 0 0;
+  width: 100%;
+  max-width: none;
+  height: calc(100dvh - 24px);
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  overflow: visible;
+}
+
+.sheet::backdrop {
+  background: var(--overlay);
+}
+
+.sheet[open]::backdrop {
+  animation: fade-in var(--dur-toast) var(--ease-out);
+}
+
+.sheet[open] .box {
+  animation: sheet-in 260ms var(--ease-drawer);
+}
+
+.sheet[data-closing]::backdrop {
+  animation: fade-out var(--dur-sheet) var(--ease-out) forwards;
+}
+
+.sheet[data-closing] .box {
+  animation: sheet-out var(--dur-sheet) var(--ease-drawer) forwards;
+}
+
+.box {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  border-radius: var(--radius-sheet) var(--radius-sheet) 0 0;
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.head {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-1);
+  height: var(--h-header);
+  padding: 0 6px;
+  border-bottom: 1px solid var(--border);
+}
+
+.close {
+  display: inline-flex;
+}
+
+.title {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+  outline: none;
+}
+
+.body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.footer {
+  flex: none;
+  padding: var(--space-3) var(--space-4) calc(var(--space-4) + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--border);
+}
+
+@media (min-width: 768px) {
+  .sheet {
+    inset: 0;
+    width: min(960px, calc(100vw - 48px));
+    height: min(640px, calc(100dvh - 48px));
+    margin: auto;
+  }
+  .box {
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-modal);
+  }
+  .head {
+    flex-direction: row-reverse;
+    justify-content: space-between;
+    padding: 0 var(--space-2) 0 var(--space-6);
+  }
+  .sheet[open] .box {
+    animation: box-in var(--dur-toast) var(--ease-out);
+  }
+  .sheet[data-closing] .box {
+    animation: box-out 150ms var(--ease-out) forwards;
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes fade-out {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes sheet-in {
+  from {
+    transform: translateY(100%);
+  }
+}
+@keyframes sheet-out {
+  to {
+    transform: translateY(100%);
+  }
+}
+@keyframes box-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+}
+@keyframes box-out {
+  to {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+}
+@keyframes fade-only {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes fade-only-out {
+  to {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sheet[open] .box {
+    animation-name: fade-only;
+  }
+  .sheet[data-closing] .box {
+    animation-name: fade-only-out;
+  }
+}

@@ -10,6 +10,7 @@ import {
   fetchPublicEntries,
   fetchPublicEntry,
 } from "@/features/content/api";
+import ShopFrame from "@/components/ShopFrame";
 import ArticleBody from "@/features/content/components/ArticleBody";
 import type {
   PublicCategory,
@@ -135,7 +136,7 @@ function BaiVietContent() {
             Đường dẫn bài viết không tồn tại hoặc đã bị thay đổi.
           </p>
           <div style={{ display: "flex", gap: "12px", justifyContent: "center" }}>
-            <Link href="/bai-viet" className={s.actionBtn} style={{ backgroundColor: "#64748b" }}>
+            <Link href="/bai-viet" className={s.actionBtn} style={{ backgroundColor: "var(--ink-3)" }}>
               Xem bài viết khác
             </Link>
             <Link href="/shop" className={s.actionBtn}>
@@ -171,7 +172,7 @@ function BaiVietContent() {
     const isUpdated = entry.updated_at && entry.published_at && entry.updated_at !== entry.published_at;
 
     return (
-      <main className={s.container}>
+      <div className={s.container}>
         {/* Breadcrumb */}
         <nav className={s.breadcrumb} aria-label="Đường dẫn">
           <Link href="/">Trang chủ</Link>
@@ -226,7 +227,7 @@ function BaiVietContent() {
 
         {/* Nội dung bài viết sạch, render qua ArticleBody an toàn kèm ItemCard */}
         <ArticleBody body={entry.body} postSlug={entry.slug} />
-      </main>
+      </div>
     );
   }
 
@@ -236,10 +237,10 @@ function BaiVietContent() {
   const hasPrevPage = currentPage > 1;
 
   return (
-    <main className={s.container}>
+    <div className={s.container}>
       <header className={s.header}>
         <h1 className={s.title}>Cẩm nang &amp; Kinh nghiệm từ cảng cá</h1>
-        <p style={{ color: "#64748b", margin: 0 }}>
+        <p style={{ color: "var(--ink-3)", margin: 0 }}>
           Chia sẻ kinh nghiệm chọn hải sản tươi, bí quyết bảo quản và các công thức nấu ăn đậm đà vị biển.
         </p>
       </header>
@@ -268,7 +269,7 @@ function BaiVietContent() {
 
       {/* CMS-14-AC2: Chuyên mục không có bài -> hiện "Chưa có bài" */}
       {list.length === 0 ? (
-        <div style={{ textAlign: "center", padding: "48px 16px", color: "#64748b" }}>
+        <div style={{ textAlign: "center", padding: "48px 16px", color: "var(--ink-3)" }}>
           Chưa có bài
         </div>
       ) : (
@@ -299,7 +300,7 @@ function BaiVietContent() {
                       <span
                         style={{
                           fontSize: "12px",
-                          color: "#0284c7",
+                          color: "var(--accent-text)",
                           fontWeight: 600,
                           marginBottom: "4px",
                         }}
@@ -354,7 +355,23 @@ function BaiVietContent() {
           )}
         </>
       )}
-    </main>
+    </div>
+  );
+}
+
+// Khung mới (lô 1) bọc ngoài; giao diện bên trong do lô 5 viết lại. Danh sách = H2 + thanh đáy, bài chi tiết = H3.
+function BaiVietFrame() {
+  const slug = useSearchParams().get("slug");
+  return (
+    <ShopFrame
+      header={slug ? "sub" : "sticky"}
+      title={slug ? "Góc bếp" : undefined}
+      footer="full"
+      bottomNav={!slug}
+      backHref="/bai-viet/"
+    >
+      <BaiVietContent />
+    </ShopFrame>
   );
 }
 
@@ -362,12 +379,14 @@ export default function BaiVietPage() {
   return (
     <Suspense
       fallback={
-        <div className={s.container}>
-          <div className={s.loadingBox}>Đang tải nội dung...</div>
-        </div>
+        <ShopFrame header="sticky" footer="full" bottomNav>
+          <div className={s.container}>
+            <div className={s.loadingBox}>Đang tải nội dung...</div>
+          </div>
+        </ShopFrame>
       }
     >
-      <BaiVietContent />
+      <BaiVietFrame />
     </Suspense>
   );
 }

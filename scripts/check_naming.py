@@ -74,6 +74,8 @@ EXEMPT_PATH_PREFIXES = (
     # URL công khai Shop (/bai-viet/, /trang/) là chữ khách nhìn thấy, đã nằm trong link/QR phát ra (R13, 02c §1d).
     "frontend/app/bai-viet/",
     "frontend/app/trang/",
+    # /gioi-thieu/ là URL công khai Duy chốt 10/10 (landing thương hiệu chuyển khỏi /).
+    "frontend/app/gioi-thieu/",
 )
 # Chỉ miễn CHUỖI literal (định danh vẫn bị xét), giữ vĩnh viễn: file chứa map id/nhóm AI cũ -> mới cho các phiên bản
 # cấu hình AI đã ghim (append-only, 02c Lô 4). Tên hàm/biến trong file này vẫn phải là tiếng Anh (review Lô 0, R3).

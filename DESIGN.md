@@ -28,6 +28,14 @@ colors:
   crit-hover: "#A82823"
   crit-soft: "#FCEDEC"
   on-crit: "#FFFFFF"
+  # Shop (token bổ sung 07/10/2026, chỉ có bản light; Shop khoá color-scheme: light)
+  brand-deep: "#0E3A73"
+  brand-deep-hover: "#0A2C59"
+  on-brand-muted: "#D6E4FA"
+  crit-border: "#F2C9C6"
+  good-border: "#BFE5CC"
+  overlay: "rgba(23,23,28,0.48)"
+  overlay-light: "rgba(23,23,28,0.24)"
   # Dark (ngang hàng light, không đảo màu máy móc)
   dark-canvas: "#111113"
   dark-sidebar: "#151518"
@@ -103,6 +111,8 @@ rounded:
   lg: "10px"
   xl: "14px"
   full: "999px"
+  card: "12px"
+  sheet: "16px"
 spacing:
   "0.5": "2px"
   "1": "4px"
@@ -115,6 +125,12 @@ spacing:
   "8": "32px"
   "10": "40px"
   "12": "48px"
+shadows:
+  shop-sm: "0 1px 2px rgba(23,23,28,.12)"
+  shop-bar: "0 -4px 16px rgba(23,23,28,.08)"
+  shop-pop: "0 12px 32px rgba(23,23,28,.12)"
+  shop-modal: "0 24px 64px rgba(23,23,28,.28)"
+  shop-card-hover: "0 6px 20px rgba(23,23,28,.06)"
 components:
   button-primary:
     backgroundColor: "{colors.accent}"
@@ -377,6 +393,28 @@ Không tô đỏ việc bán hàng bình thường; chỉ "hạch toán lỗ / h
 - Tải: màn dữ liệu dùng **khung chờ đúng hình** (`shared/ui/Skeleton`: vạch `surface-3` nhịp mờ 1.4s, đứng yên khi giảm chuyển động,
   `role="status"` + chữ ẩn "Đang tải dữ liệu…"); chỗ nhỏ vẫn dùng icon quay + chữ. Lỗi: icon + câu nói cách sửa + nút "Thử lại". Rỗng: icon trong ô vuông `surface-2`,
   tiêu đề, một câu hướng dẫn, một hành động kế tiếp. 403: nói rõ thiếu quyền gì và nhờ ai.
+
+## Shop: token bổ sung (07/10/2026)
+
+Shop (`frontend/`) dùng thêm 14 token dưới đây, khai thành biến CSS ở `frontend/app/globals.css`. Chỉ có bản light.
+Riêng `--shadow-sm` của Shop (`shop-sm`) là bóng 1 lớp của ô đang chọn, khác `--shadow-sm` của ERP.
+
+| Token | Giá trị | Dùng cho |
+|---|---|---|
+| `brand-deep` | #0E3A73 | banner trang chủ, footer F1, nút "Tìm" header máy tính |
+| `brand-deep-hover` | #0A2C59 | hover nút "Tìm", hover nút trên nền `brand-deep` |
+| `on-brand-muted` | #D6E4FA | chữ phụ trên `brand-deep` và trên `ink` (toast) |
+| `crit-border` | #F2C9C6 | viền khối tóm tắt lỗi |
+| `good-border` | #BFE5CC | viền SuccessBanner máy tính |
+| `overlay` | rgba(23,23,28,0.48) | lớp phủ dialog, sheet |
+| `overlay-light` | rgba(23,23,28,0.24) | nền sau gợi ý tìm kiếm điện thoại |
+| `card` (`--radius-card`) | 12px | thẻ máy tính, banner, section |
+| `sheet` (`--radius-sheet`) | 16px | mép trên sheet |
+| `shop-sm` (`--shadow-sm`) | 0 1px 2px rgba(23,23,28,.12) | ô đang chọn của SegmentedControl |
+| `shop-bar` (`--shadow-bar`) | 0 -4px 16px rgba(23,23,28,.08) | thanh dính đáy, BottomNav, BottomSheet |
+| `shop-pop` (`--shadow-pop`) | 0 12px 32px rgba(23,23,28,.12) | dropdown, giỏ mini, toast |
+| `shop-modal` (`--shadow-modal`) | 0 24px 64px rgba(23,23,28,.28) | dialog, hộp thoại lớn |
+| `shop-card-hover` (`--shadow-card-hover`) | 0 6px 20px rgba(23,23,28,.06) | hover thẻ sản phẩm máy tính, kèm viền `border-strong` |
 
 ## Do's and Don'ts
 

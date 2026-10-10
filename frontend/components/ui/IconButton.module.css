@@ -1,0 +1,113 @@
+.btn {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+  text-decoration: none;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    transform var(--dur-press) var(--ease-out),
+    background-color var(--dur-color) ease-out,
+    color var(--dur-color) ease-out;
+}
+
+.btn:active {
+  transform: scale(0.97);
+}
+
+.ghost {
+  color: var(--ink);
+}
+.onBrand {
+  color: var(--on-accent);
+}
+.onBrand:focus-visible {
+  outline-color: var(--on-accent);
+  outline-offset: -4px;
+}
+.close {
+  border-radius: var(--radius-full);
+  color: var(--ink-2);
+}
+.dangerGhost {
+  color: var(--ink-3);
+}
+
+.btn:disabled {
+  color: var(--ink-3);
+  cursor: not-allowed;
+}
+
+.badge {
+  position: absolute;
+  top: 2px;
+  right: 0;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: var(--radius-full);
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 18px;
+  text-align: center;
+  animation: badge-in var(--dur-swap) var(--ease-out);
+}
+
+.badgeSurface {
+  background: var(--surface);
+  color: var(--accent-text);
+}
+
+@keyframes badge-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .ghost:hover,
+  .close:hover {
+    background: var(--surface-2);
+  }
+  .onBrand:hover {
+    background: var(--accent-hover);
+  }
+  .dangerGhost:hover {
+    background: var(--crit-soft);
+    color: var(--crit);
+  }
+}
+
+@media (min-width: 768px) {
+  .badge {
+    min-width: 20px;
+    height: 20px;
+    line-height: 20px;
+    padding: 0 6px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn:active {
+    transform: none;
+  }
+  .badge {
+    animation: none;
+  }
+}

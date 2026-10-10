@@ -29,6 +29,7 @@ flowchart LR
 > `techlead` · 2026-10-11 · Trạng thái: **SẴN SÀNG CODE** (Duy giao điều phối tự chạy hết các lô đêm 11/10, không deploy; mọi điểm mở đã "Techlead chốt", không câu hỏi treo).
 > Nhánh `shop/lo-0-quyet-dinh` (commit gốc `7dfa7aa`). Đầu vào: `02-stories.md` (ĐÃ DUYỆT, 41 story), `01-analysis.md` (ĐÃ DUYỆT), `05-phap-ly.md`, `06-marketing.md`, `00-product-brief.md`,
 > `doc/decisions.md` mục 2026-10-10 (tối) và 2026-10-11, `doc/business-process-spec.md`, `doc/design/shop/` (UI-RULES, SO-CHUAN, COMPONENTS, HUONG-DAN-CODE, PLAN, DOI-CHIEU-CODE), `doc/ops/cms-cho-mkt.md`, `doc/ops/moi-truong.md`.
+> Cập nhật 11/10 (sau `02a-ux-flow.md`): §0 T12, §1.9, §3.4.3, §3.5, §3.8, §6.1, §9 — khớp 02a mục 7, 9. Phần lô 1 (§7) không đổi.
 > Code đã đọc: `frontend/` (app, components, features, lib, scripts, e2e), `backend/apps/{catalog,sales,content,accounts/capabilities,inventory/batches,reports,common}`, `config/api_urls.py`, `config/settings.py`, `erp-console/features/{catalog,content}`, `shared/lib/nav.ts`.
 > **02b thắng `02-stories.md` khi lệch** (dòng 6 của 02-stories). Chỗ lệch AC ghi ở §9 để PO sửa.
 > Không cấu trúc lại thư mục (Duy chốt 10/10): giữ `frontend/`, `backend/`, `erp-console/`; chỉ thêm module trong cấu trúc hiện có.
@@ -50,7 +51,7 @@ flowchart LR
 | T9 | Banner / cam kết trang chủ = **2 trang CMS có đường dẫn cố định** (`home-banner`, `home-commitments`), đọc bằng API trang công khai sẵn có; không model mới, không màn ERP mới | §3.7 |
 | T10 | Mã giảm giá: `Voucher` ở app `catalog`, `VoucherRedemption` ở app `sales` (1-1 với đơn); quyền `catalog.manage_voucher` chỉ cấp `owner`, việc "Quản lý mã giảm giá" uỷ được ở màn Phân quyền | §3.8, §3.9, §4 |
 | T11 | Lãi lỗ theo lô **không đổi công thức** ở đợt này (vẫn tính theo đơn giá gộp như PricingRule hiện nay); giảm của mã đi vào `SalesOrderLine.amount` → hoá đơn → lãi lỗ theo kỳ đúng. Lệch của báo cáo theo lô ghi đề xuất cho Duy (§8) | §5, §9 |
-| T12 | Giỏ có món hết: **chặn "Đặt hàng"** (giữ mặc định PO) + nút "Bỏ các món đã hết" trong banner B3 | §6.1 |
+| T12 | Giỏ có món hết: theo 02a §7.1 — nút chính **không tắt**; bấm khi còn món hết thì báo `role="alert"` "Bỏ món đã hết để đặt hàng." và dời tiêu điểm tới "Bỏ khỏi giỏ" của món hết đầu tiên; không có nút gỡ hàng loạt | §6.1 |
 | T13 | Google Maps: biến `NEXT_PUBLIC_GOOGLE_MAPS_KEY`; không có key thì nút "Bản đồ" vẫn hiện, bấm mở C5; tự nạp script bằng thẻ `<script>` khi bấm, không thêm thư viện | §1.9 |
 | T14 | `/ui-preview/` dùng đuôi trang `page.preview.tsx` + `pageExtensions` theo cờ `NEXT_PUBLIC_UI_PREVIEW=1`; build thường **không có route** (404) | §1.8 |
 | T15 | Khung trang mỗi màn tự bọc bằng `ShopFrame` (header/footer/BottomNav theo props); `app/layout.tsx` chỉ có font + provider | §1.4 |
@@ -197,6 +198,8 @@ URL chỉ chứa `code`, `result`, `q`, `group`, `type`, `sort`, `slug`, `chuyen
 ### 1.9 Google Maps (Techlead chốt)
 - Biến: **`NEXT_PUBLIC_GOOGLE_MAPS_KEY`** (một tên duy nhất). Truyền lúc build như `NEXT_PUBLIC_*` khác; không commit.
 - Nút "Bản đồ" **luôn hiện**. Bấm → mở `FullscreenSheet` (điện thoại) / Dialog (máy tính) ngay, dòng thông báo Google (BR-BH-29) hiện **trước** khi tải script.
+- **Thiếu key (Techlead chốt, 02a §9.1):** `const MAPS_KEY = (process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY ?? "").trim()` đọc **một chỗ** ở `googleMaps.ts`, export `hasMapsKey(): boolean`. Rỗng = thiếu key → bấm "Bản đồ" mở thẳng Dialog C5, không mở sheet, không tạo thẻ script, 0 request tới Google.
+  Hằng `MAPS_LOAD_TIMEOUT_MS = 10000` (10 giây). Lỗi/timeout: đóng sheet **trước** rồi mới mở C5 (không chồng hai modal); xoá thẻ script hỏng; lần bấm sau trong cùng phiên thử nạp lại **một** lần, lần lỗi thứ hai thì mở thẳng C5.
 - `features/checkout/googleMaps.ts`: `loadGoogleMaps(): Promise<GoogleNs>` — không key → reject ngay; có key → chèn **một** thẻ `<script src="https://maps.googleapis.com/maps/api/js?key=…&v=weekly&loading=async&language=vi&region=VN&callback=__caveveMapsReady">`, timeout 10 giây.
   Lỗi/timeout/không key → đóng sheet, mở Dialog C5, đưa tiêu điểm về ô địa chỉ (3-04 AC5). Kiểu `google` khai tối thiểu ở `features/checkout/googleMaps.d.ts` (không thêm `@types/google.maps`).
 - Bên trong: `google.maps.importLibrary("maps"|"places"|"geocoding")`; ô tìm dùng `PlaceAutocompleteElement` (Places API mới, `includedRegionCodes: ["vn"]`); ghim kéo được, kéo xong `Geocoder` đảo ngược ra chuỗi địa chỉ.
@@ -482,12 +485,19 @@ Route đặt **trước** mọi route `shop/orders/<str:order_code>/…` trong `
 | `PROCESSING` có `Refund` `is_partial=True`, trạng thái khác `FAILED` | partial | `PARTIAL` | Σ các phiếu đó |
 | khác (kể cả `COMPLETED` có phiếu hoàn, `expired`) | `cancel_notice: null` | | |
 
+Khớp 02a §9.2–9.3: nhãn `late_payment` = `PAID_AFTER_EXPIRY` "Hết giờ giữ hàng, tiền về sau"; `UNREACHABLE_AUTO` "Không liên lạc được để xác nhận đơn"; ở E5 `cancelled_amount` **là tiền phần bị huỷ** (Σ phiếu hoàn một phần, không phải tổng đơn); thời hạn trong câu đọc từ `SHOP_CANCEL_CALLBACK_WITHIN` (chuỗi, đổi khi Lộc trả lời L6).
 Bảng nhãn công khai **cố định** (`PUBLIC_CANCEL_REASON_LABELS`): `CUSTOMER_CHANGED_MIND` "Huỷ theo yêu cầu của bạn" · `DAMAGED_WHEN_PACKING` "Hàng không đạt khi soạn" · `GIVE_UP_AFTER_FAILED` "Giao không thành công" ·
 `UNREACHABLE`, `UNREACHABLE_AUTO` "Không liên lạc được để xác nhận đơn" · `PAID_AFTER_EXPIRY` "Hết giờ giữ hàng, tiền về sau" · `PARTIAL` "Một phần đơn không giao được" · `OTHER`, rỗng, mã lạ → "Cá Về đã huỷ đơn này".
 `message` = `f"Cá Về sẽ gọi vào số điện thoại đặt hàng trong {SHOP_CANCEL_CALLBACK_WITHIN} để trả lại {vnd}."` (bản A, S-12 tạm), `vnd` dạng `278.000đ`. **Không** khoá `refund`, `deadline`, `refunded_at`, trạng thái phiếu hoàn, `cancel_note`, `Refund.reason`.
 
-### 3.5 `POST /api/shop/orders/<order_code>/checkout/` — giữ nguyên (không đụng `payments/checkout.py`)
-Trả về cổng: `/shop/orders?code=…&result=success|cancel|error` (sẵn có).
+### 3.5 `POST /api/shop/orders/<order_code>/checkout/` — giữ thân thành công, chuẩn hoá lỗi (Techlead chốt, 02a §9.6)
+200 giữ nguyên (`checkout_url`, `fields`, `environment`). Trả về cổng: `/shop/orders?code=…&result=success|cancel|error` (sẵn có). Không đụng `payments/checkout.py`; chỉ sửa view `apps/sales/payments/shop_api.py` (be-dev, lô 3+4):
+```json
+404 {"code": "ORDER_NOT_FOUND", "detail": "Không tìm thấy đơn."}
+400 {"code": "CHECKOUT_UNAVAILABLE", "detail": "Chưa mở được trang thanh toán. Thử lại.", "reason": "<mã BusinessError gốc>"}
+429 {"code": "throttled", …}
+```
+FE: `CHECKOUT_UNAVAILABLE`, 5xx hoặc lỗi mạng → Banner "Chưa mở được trang thanh toán. Thử lại." + gọi lại lookup (đơn có thể đã hết giờ / đã trả, server thắng). `reason` chỉ để log/QA, không hiện cho khách. Không lộ dữ liệu khách.
 
 ### 3.6 `GET /api/public/site-info/` mở rộng (mkt-brand, lô 5; FE lô 1 đọc tuỳ chọn)
 Thêm vào `seller`: `zalo`, `working_hours`, `registration_issued_by`, `registration_issued_on`, `website_notice_url`, `website_notice_image` (chuỗi hoặc `null`; rỗng → `null`). Thêm khối:
@@ -519,15 +529,16 @@ Request: `{"code": "cave 10", "items": [{"item_code": "MUC-ONG", "qty": "2"}]}` 
   "applied": {"source": "voucher", "amount": "50000"},
   "total_after": "506000",
   "terms": {"kind": "PERCENT", "value": "10", "max_discount": "50000", "min_order_amount": "300000",
-            "ends_at": "2026-10-31T16:59:00Z", "customer_terms": "…"}
+            "starts_at": "2026-10-15T01:00:00Z", "ends_at": "2026-10-31T16:59:00Z", "customer_terms": "…"}
 }
 200 {"code": "CAVE10", "valid": false, "reason_code": "MIN_ORDER", "subtotal": "256000", "auto_discount_amount": "0",
-     "discount_amount": "0", "missing_amount": "44000", "applied": {"source": null, "amount": "0"}, "total_after": "256000", "terms": null}
+     "discount_amount": "0", "missing_amount": "44000", "applied": {"source": null, "amount": "0"}, "total_after": "256000", "terms": {…như trên…}}
 200 {"code": null, "valid": null, "reason_code": null, "subtotal": "556000", "auto_discount_amount": "60000",
      "discount_amount": "0", "missing_amount": null, "applied": {"source": "promo", "amount": "60000"}, "total_after": "496000", "terms": null}
 400 VALIDATION (items rỗng, mã hàng không bán, quá số dòng) · 400 INVALID_QTY · 429
 ```
 - `code` vắng → chỉ báo giá giỏ + ưu đãi tự động (V-11, giỏ hiện được "Ưu đãi −x").
+- `terms` (02a §9.5) đủ dựng dòng điều kiện B6: mức (`kind` + `value`; AMOUNT thì `max_discount: null`), trần, đơn tối thiểu (`"0"` = không có → FE ẩn cụm này), hạn (`ends_at`, FE hiện GMT+7), `customer_terms`; câu "Số lượt có hạn" và câu không cộng dồn là chữ cố định ở FE. `terms` có cả khi `valid:false` vì `MIN_ORDER`/`BETTER_PROMO` (để hiện "Đơn cần từ …"); `null` khi `INVALID`/`EXPIRED`/`USED_UP`.
 - Thứ tự lý do: không có mã / chưa tới `starts_at` / đã tắt → `INVALID`; quá `ends_at` → `EXPIRED`; giữ + dùng ≥ tổng lượt → `USED_UP`; `subtotal < min_order_amount` → `MIN_ORDER` (+`missing_amount`); `auto_discount ≥ voucher_discount` → `BETTER_PROMO` (hoà cũng vậy, BR-DM-18).
 - Tính giảm (`evaluate_voucher`, dùng chung với tạo đơn): AMOUNT → `value`; PERCENT → `subtotal × value / 100`, chặn `max_discount`; rồi chặn `subtotal × VOUCHER_MAX_PERCENT / 100`; **làm tròn xuống** nguyên đồng. Tổng sau giảm luôn > 0.
 - Không trả: số lượt còn, danh sách mã, dữ liệu đơn khác, giá vốn, số kg tồn. FE không tự tính giảm; tổng hiển thị = `total_after`.
@@ -676,10 +687,12 @@ Mỗi endpoint mới còn đủ bộ tối thiểu của skill: happy path, 403/
 
 ## 6. Chốt các điểm mở
 
-### 6.1 Giỏ có món hết (B3, AUDIT câu 17) — **Techlead chốt: chặn, không tự loại**
-Đối chiếu màn `B3-CartChanged`: banner hổ phách, dòng món hết gắn nhãn "Hết hàng", giá cũ gạch, món hết không tính vào tổng — màn không vẽ hành vi tự xoá. Chọn chặn vì: không tự xoá thứ khách đã chọn; khách thấy rõ món nào hết; khớp C3 (cũng hỏi khách).
-Hành vi: tổng chỉ tính món còn; bấm "Đặt hàng" khi còn món `out` → không điều hướng, Banner nêu "Bỏ món đã hết để đặt hàng", tiêu điểm vào dòng hết đầu tiên; banner B3 có nút **"Bỏ các món đã hết"** (một chạm). Tải giá lỗi (AC7) → banner "Chưa cập nhật được giá. Thử lại", vẫn cho đặt (máy chủ kiểm lại).
-Giá đổi: giỏ giữ `price` lúc thêm; giỏ tính bằng giá mới; khi khách bấm "Đặt hàng" thì cập nhật `price` trong giỏ thành giá mới (đã thấy).
+### 6.1 Giỏ có món hết (B3, AUDIT câu 17) — **Techlead chốt: theo 02a §7.1** (thay bản trước có nút "Bỏ các món đã hết")
+- Dòng món hết: ảnh mờ, nhãn "Món này đã hết", không tính vào Tạm tính/Tổng, hai nút "Liên hệ" (`tel:`) và "Bỏ khỏi giỏ" (không hỏi lại; `aria-live` "Đã bỏ … khỏi giỏ"). Không có nút gỡ hàng loạt (màn B3 không vẽ; mỗi dòng đã có nút riêng).
+- Nút chính của giỏ **không tắt** (Q-UX-4). Bấm khi còn món hết: không điều hướng; dòng `role="alert"` chữ `crit` ngay trên nút: "Bỏ món đã hết để đặt hàng."; nút có `aria-describedby` tới dòng này; tiêu điểm dời tới "Bỏ khỏi giỏ" của món hết đầu tiên. Bỏ hết món hết → dòng lỗi mất, nút đi tiếp.
+- Vào thẳng `/shop/checkout/` khi giỏ còn món hết (theo lần tải catalog gần nhất) → chuyển về `/shop/cart/`.
+- Nhãn nút theo thiết kế ("Tiếp tục: nhập thông tin nhận hàng" / "Tiếp tục"); QA tìm theo vai trò nút chính, không theo chữ "Đặt hàng".
+- Giá đổi: giỏ giữ `price` lúc thêm, hiện giá cũ gạch + giá mới, tính bằng giá mới; khi bấm nút chính thành công thì ghi `price` mới vào giỏ. Tải giá lỗi (AC7) → banner "Chưa cập nhật được giá. Thử lại", vẫn cho đi tiếp (máy chủ kiểm lại).
 
 ### 6.2 Google Maps — xem §1.9 (Techlead chốt). Không key → C5; form gõ tay vẫn đặt được.
 
@@ -772,7 +785,7 @@ OrderTimeline 5 bước: Đặt hàng (`placed_at`) → Thanh toán (`paid_at`) 
 | ☐ | **5a-MKT** (song song 2) | 5-01, 5-02 | mkt-brand | `apps/content/site/**`, `apps/content/models/entries.py`, migration `content/0004`, `apps/content/entries/services.py` (`GOLIVE_PAGE_ROLES`), `apps/content/body/scan.py`, lệnh nạp (gắn vai trò), `features/site/**`, `erp-console/features/content/**` (hiện vai trò mới) | `config/*`, `lib/*` | `manage.py test apps.content` | S-14 (khối thông báo website để trống) |
 |  | → commit **"Shop lô 2"** (2-FE + 2b-BE + 5a) | | | | | | |
 | ☐ | **2b-ERP** | 2b-01, 2b-02 (ERP) | fe-dev (sau 2-FE) | `erp-console/features/catalog/**` (`ItemForm`, `ItemGroupModal`, `ItemGroupList`, `api.ts`, `types.ts`, `mock.ts`, `messages.ts`, test) | `frontend/`, `backend/` | ERP tsc + test + build | — → commit **"Shop lô 2b"** |
-| ☐ | **3+4-BE** | 3-01, 3-02, 4-05 (BE) | be-dev | `apps/sales/models/orders.py`, migration `sales/0020`, `apps/sales/orders/{services,shop_api,shop_errors,lookup_token,shop_state,shop_labels,customer_notices}.py`, `apps/sales/payments/shop_api.py` (chỉ dòng import hằng 404), `apps/common/throttling.py`, `config/api_urls.py`, tests | `payments/checkout.py`, `adapter/`, `frontend/` | lookup PII, token, throttle, cancel_notice | Mọi đổi trạng thái đơn → dừng (lô này **không** đổi trạng thái) |
+| ☐ | **3+4-BE** | 3-01, 3-02, 4-05 (BE) | be-dev | `apps/sales/models/orders.py`, migration `sales/0020`, `apps/sales/orders/{services,shop_api,shop_errors,lookup_token,shop_state,shop_labels,customer_notices}.py`, `apps/sales/payments/shop_api.py` (lỗi `ORDER_NOT_FOUND`/`CHECKOUT_UNAVAILABLE` §3.5), `apps/common/throttling.py`, `config/api_urls.py`, tests | `payments/checkout.py`, `adapter/`, `frontend/` | lookup PII, token, throttle, cancel_notice | Mọi đổi trạng thái đơn → dừng (lô này **không** đổi trạng thái) |
 | ☐ | **3+4-FE** (song song) | 3-03, 3-05, 3-04, 4-01, 4-02, 4-03, 4-04, 4-05 (FE) | fe-dev | `app/shop/{checkout,orders}/**`, `features/checkout/**` (viết lại, xoá file §1.11), `components/ui/{TextField,Checkbox,FormErrorSummary}.tsx`, `components/cart/CartSummary.tsx` (biến thể), `lib/{api,types,mock}.ts`, xoá `components/CountdownTimer.tsx`, `features/site/components/{ConfirmationPolicyNotice.*,ConfirmCallNotice.tsx}`; `scripts/test-order-state.mjs`; e2e lô 3+4 | `backend/`, `features/site/{api,types,mock}.ts`, `features/content/**` | `test-order-state`; `grep -rn phone_last4 frontend backend/apps` = 0 (ngoài migration) | **Google Maps key** (làm nhánh không key) |
 | ☐ | **5b-MKT** (song song 3+4) | 5-04, 5-05 | mkt-brand | `app/{trang,bai-viet}/**`, `features/{site,content}/**` (PolicyNav, ItemCard → ProductCard `row` + AddToCart), xoá `trang.module.css`, `bai-viet.module.css`, `ItemCard.*`; e2e `ra_soat_cms13_public.py`, `ra_soat_cms06_item_card.py` | `lib/*`, `components/*` (chỉ dùng), `backend/` trừ `apps/content` | G7 trên file lô | S-12, S-16, S-08 (ô `[…]`) |
 |  | → commit **"Shop lô 3+4"** một lần (S-09c) (+ 5b nếu đã APPROVED, không thì commit riêng sau) | | | | | | |
@@ -818,6 +831,10 @@ OrderTimeline 5 bước: Đặt hàng (`placed_at`) → Thanh toán (`paid_at`) 
 | 5-01 contract | chỉ `seller.*` + `policies.return_report_hours` | thêm `policies.min_qty_kg`, `qty_step_kg`, `hold_minutes` |
 | 5-03 | "model hoặc khối" | 2 trang CMS cố định `home-banner`, `home-commitments` (§3.7) |
 | DoD | `03-dev-notes.md` | mỗi người một file `03-dev-notes-{be,fe,mkt}.md` |
+| 1-06 AC1 "dải cam kết 2 mục" | 2 mục | **Theo màn (02a §7.3):** điện thoại 3 ô "Cấp đông theo lô" · "Giao tận nhà" · "Quét mã QR"; máy tính 2 ô; không có "Cân đúng" (S-18). AC đọc thành "không có mục Cân đúng". fe-dev lô 1 làm theo màn, không đổi phạm vi file lô 1 |
+| 3-03 AC2 "Còn 3 chỗ cần sửa" | cố định 3 | **Theo màn:** N đếm động theo số ô lỗi (màn mẫu 4 chỗ gồm ô đồng ý) |
+| 2-06 AC4 | "nút Đặt hàng báo … khi bấm" | nút chính của giỏ (nhãn "Tiếp tục…"), báo `role="alert"` + dời tiêu điểm (§6.1) |
+| 4-02 (D1/D2) | lỗi mở cổng chung | `CHECKOUT_UNAVAILABLE` + câu "Chưa mở được trang thanh toán. Thử lại." (§3.5) |
 
 ---
 
@@ -876,3 +893,13 @@ sequenceDiagram
 
 ## 11. Review
 (Để trống — techlead ghi REVIEW PASS / REVIEW FAIL theo từng lô.)
+
+## 12. Việc ghi nợ phát sinh khi làm (điều phối)
+- (lô 1) `erp-console/features/audit/auditModel.ts`: thêm nhãn action `content_load` = "Nạp nội dung soạn sẵn" — fe-dev làm ở lô 2b-ERP.
+- (lô 1) `scripts/check_naming.py`: miễn `frontend/app/gioi-thieu/` (URL công khai) — điều phối đã thêm.
+- (review lô 1, L5) `scan.py`: đổi `_get_phone_allowlist`, `_normalize_phone_digits` thành hàm công khai — mkt-brand lô 5a (đã giao làm sớm ở lượt sửa lô 1 nếu kịp).
+- (review lô 1, L6) Ảnh bìa tạm tải lên trong `atomic`, đăng lỗi thì tệp sót lại (chỉ staging) — nợ, mkt-brand.
+- (review lô 1, L7) `ShopFrame` `INTRO_TEXT` "mua từ 1 kg" viết cứng → lô 5 đọc `policies.min_qty_kg` — fe-dev.
+- (QA lô 1) Trang 404 theo màn X1-NotFound404: `ShopFrame header="sticky" bottomNav` — thay dòng 404 ở bảng §1.4 (`sub`, không BottomNav). Màn thắng.
+- (QA lô 1) `app/bai-viet/page.tsx:59` ghép "| Cá Về" gây lặp tiêu đề — mkt-brand sửa ở lô 5b.
+- (QA lô 1) Thẻ hết hàng khi chưa có hotline hợp lệ: nút "Liên hệ chúng tôi" dẫn tới trang Liên hệ (CMS) thay vì ẩn — fe-dev ở lô 2 (ProductCard/AddToCart).

@@ -1,0 +1,124 @@
+/* Điện thoại: nổi đáy; có thanh đáy (BottomNav) thì nằm trên nó 12 px. Máy tính: góc phải dưới header. */
+.region {
+  position: fixed;
+  left: var(--space-4);
+  right: var(--space-4);
+  bottom: calc(var(--space-4) + env(safe-area-inset-bottom));
+  z-index: var(--z-toast);
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+
+:global(body[data-bottom-nav]) .region {
+  bottom: calc(var(--h-bottom-nav) + var(--space-3) + env(safe-area-inset-bottom));
+}
+
+.toast {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  max-width: 480px;
+  min-height: 48px;
+  padding: var(--space-1) var(--space-1) var(--space-1) 14px;
+  border-radius: var(--radius-lg);
+  background: var(--ink);
+  color: var(--on-accent);
+  box-shadow: var(--shadow-pop);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.4;
+  pointer-events: auto;
+  animation: toast-in var(--dur-toast) var(--ease-out);
+  transition: opacity 150ms ease-out;
+}
+
+.leaving {
+  opacity: 0;
+}
+
+.tick {
+  display: none;
+  flex: none;
+  width: 24px;
+  height: 24px;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-full);
+  background: var(--good);
+  color: var(--on-accent);
+}
+
+.message {
+  flex: 1;
+  min-width: 0;
+  padding: var(--space-2) 0;
+}
+
+.action {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  height: 44px;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-md);
+  color: var(--on-brand-muted);
+  font-weight: 600;
+  text-decoration: none;
+  transition: transform var(--dur-press) var(--ease-out);
+}
+.action:active {
+  transform: scale(0.97);
+}
+.action:focus-visible {
+  outline-color: var(--on-accent);
+  outline-offset: -4px;
+}
+
+@media (min-width: 768px) {
+  .region {
+    left: auto;
+    right: var(--space-6);
+    top: 88px;
+    bottom: auto;
+    width: 360px;
+  }
+  :global(body[data-bottom-nav]) .region {
+    bottom: auto;
+  }
+  .toast {
+    padding: 10px 10px 10px 14px;
+    border-radius: var(--radius-card);
+    animation-name: toast-in-desktop;
+  }
+  .tick {
+    display: inline-flex;
+  }
+  /* Máy tính không có "Xem giỏ" trong toast (đi kèm MiniCart): ẩn hành động */
+  .action {
+    display: none;
+  }
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+@keyframes toast-in-desktop {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toast {
+    animation: none;
+  }
+  .action:active {
+    transform: none;
+  }
+}

@@ -1,0 +1,83 @@
+.link {
+  cursor: pointer;
+  transition:
+    transform var(--dur-press) var(--ease-out),
+    background-color var(--dur-color) ease-out,
+    color var(--dur-color) ease-out;
+}
+
+.inline {
+  color: var(--accent-text);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.standalone,
+.nav,
+.onBrand {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  text-decoration: none;
+}
+
+.standalone {
+  color: var(--accent-text);
+  font-weight: 500;
+}
+.standalone:active {
+  transform: scale(0.97);
+}
+
+.nav {
+  color: var(--ink-2);
+}
+.nav[aria-current="page"] {
+  color: var(--ink);
+  font-weight: 500;
+}
+
+.onBrand {
+  color: var(--on-brand-muted);
+}
+.onBrand:focus-visible {
+  outline-color: var(--on-accent);
+}
+
+.dangerInline {
+  color: var(--crit);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+@media (min-width: 768px) {
+  .standalone,
+  .nav,
+  .onBrand {
+    min-height: 40px;
+  }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .inline:hover,
+  .standalone:hover {
+    color: var(--accent-hover);
+    text-decoration: underline;
+  }
+  .nav:hover {
+    color: var(--accent-text);
+    text-decoration: underline;
+  }
+  .onBrand:hover {
+    color: var(--on-accent);
+    text-decoration: underline;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .standalone:active {
+    transform: none;
+  }
+}

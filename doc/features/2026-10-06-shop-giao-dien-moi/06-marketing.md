@@ -140,7 +140,7 @@ Toàn bộ trang này là **CMS CHƯA CHỨA** nếu muốn giữ đúng bố c�
 |---|---|---|---|
 | M1 | 5 bước: Chọn món · Vào giỏ · Nhập thông tin · Quét VietQR · Nhận hàng | **CMS page** `cach-mua-hang` (danh sách số) | Bước 5 "Cá Về gọi xác nhận, **báo phí giao** rồi giao" **bắt buộc sửa** |
 | M2 | Hỏi đáp "Tối thiểu bao nhiêu kg?" | CMS page (H3 + đoạn) | "0,5 kg" là mặc định D4, CHỜ DUY |
-| M3 | Hỏi đáp "Phí giao tính thế nào? Cá Về báo phí giao khi gọi xác nhận đơn." | CMS page | **Bắt buộc sửa** |
+| M3 | Hỏi đáp "Phí giao tính thế nào? Cá Về báo phí giao khi gọi xác nhận đơn." | CMS page | **Bắt buộc sửa**. Đã thay bằng "Giao hàng có tốn thêm tiền không?" (QA lô 1 B1: cấm chữ "Phí giao", BR-BH-30) |
 | M4 | Hỏi đáp "Hết giờ giữ hàng thì sao?" | CMS page | ĐÃ ĐỐI CHIẾU (E-01) |
 | M5 | Bố cục thẻ có số và hỏi đáp thu gọn | — | CMS chưa có khối tương ứng. FE trình bày riêng theo slug, hoặc techlead thêm khối |
 
@@ -209,8 +209,8 @@ Liên kết nội bộ dùng route hiện chạy được: `/trang/?slug=…`, `
 ## Câu hỏi thường gặp
 ### Mua ít nhất bao nhiêu?
 Mỗi món từ 1 kg, thêm từng 0,5 kg. Combo mua từ 1 combo.
-### Phí giao tính thế nào?
-Bạn trả một lần khi quét mã QR. Cá Về không thu thêm tiền khi giao hàng.
+### Giao hàng có tốn thêm tiền không?
+Không. Giá đã gồm giao hàng trong khu vực Phan Thiết. Bạn trả một lần khi quét mã QR, không trả thêm khi nhận hàng.
 ### Hết 30 phút mà chưa thanh toán thì sao?
 Đơn tự huỷ và hàng được giữ cho người khác. Bạn đặt lại đơn mới là được.
 ### Đã chuyển khoản mà đơn chưa đổi trạng thái?

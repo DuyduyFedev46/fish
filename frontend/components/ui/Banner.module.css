@@ -1,0 +1,77 @@
+.banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.icon {
+  display: inline-flex;
+  flex: none;
+  padding-top: 1px;
+}
+
+.text {
+  flex: 1;
+  min-width: 0;
+}
+
+.title {
+  margin: 0;
+  font-weight: 600;
+}
+
+.body {
+  color: var(--ink-2);
+}
+
+.action {
+  flex: none;
+}
+
+.info {
+  background: var(--accent-soft);
+  color: var(--accent-text);
+}
+.success {
+  background: var(--good-soft);
+  color: var(--good);
+}
+.warn {
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+.crit {
+  background: var(--crit-soft);
+  color: var(--crit);
+}
+
+.inset {
+  padding: var(--space-3) 14px;
+  border-radius: var(--radius-lg);
+}
+
+.fullBleed {
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--border);
+}
+
+.strip {
+  align-items: center;
+  justify-content: center;
+  min-height: 32px;
+  padding: 0 var(--space-4);
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 500;
+}
+.strip .icon {
+  padding-top: 0;
+}
+
+@media (min-width: 768px) {
+  .inset {
+    border-radius: var(--radius-card);
+  }
+}

@@ -1,3 +1,4 @@
+import type { ShopCatalogResponse } from "./shopCatalog";
 import {
   CategoryCreatePayload,
   CategoryUpdatePayload,
@@ -889,13 +890,24 @@ export function mockGetGoliveStatus(): GoliveStatusResponse {
   return { missing_roles: missing };
 }
 
-export function mockFetchShopCatalog() {
-  return [
-    { item_code: "CA-THU-1KG", name: "Cá thu Phan Thiết 1kg", price: 250000, sellable_qty: 10 },
-    { item_code: "CA-BOP-1KG", name: "Cá bớp cắt khoanh 1kg", price: 280000, sellable_qty: 5 },
-    { item_code: "TOM-SU-1KG", name: "Tôm sú Cà Mau 1kg", price: 320000, sellable_qty: 8 },
-    { item_code: "MUC-ONG-1KG", name: "Mực ống Phan Thiết 1kg", price: 220000, sellable_qty: 12 },
-  ];
+// Đúng hình dạng 02b Shop §3.1 `{groups, items}`: giá là chuỗi, chỉ mức tồn, không số kg tồn (review lô 1, H1).
+export function mockFetchShopCatalog(): ShopCatalogResponse {
+  const fish = { slug: "ca", name: "Cá" };
+  const shrimp = { slug: "tom", name: "Tôm" };
+  const squid = { slug: "muc", name: "Mực" };
+  return {
+    groups: [
+      { ...fish, item_count: 2 },
+      { ...shrimp, item_count: 1 },
+      { ...squid, item_count: 1 },
+    ],
+    items: [
+      { item_code: "CA-THU-1KG", name: "Cá thu Phan Thiết 1kg", item_type: "SIMPLE", unit: "kg", price: "250000", stock_level: "in", group: fish },
+      { item_code: "CA-BOP-1KG", name: "Cá bớp cắt khoanh 1kg", item_type: "SIMPLE", unit: "kg", price: "280000", stock_level: "low", group: fish },
+      { item_code: "TOM-SU-1KG", name: "Tôm sú Cà Mau 1kg", item_type: "SIMPLE", unit: "kg", price: "320000", stock_level: "in", group: shrimp },
+      { item_code: "MUC-ONG-1KG", name: "Mực ống Phan Thiết 1kg", item_type: "SIMPLE", unit: "kg", price: "220000", stock_level: "out", group: squid },
+    ],
+  };
 }
 
 export function mockSubmitEntry(

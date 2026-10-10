@@ -21,6 +21,9 @@ class ItemGroup(models.Model):
         related_name="children",
         verbose_name="Nhóm cha",
     )
+    # SHOP-2-01: đường dẫn lọc `/shop/?group=<slug>`. Bỏ trống thì `save()` tự sinh từ tên (không
+    # đổi khi đổi tên, để link khách đã lưu không chết).
+    slug = models.SlugField("Đường dẫn", max_length=80, unique=True, blank=True)
 
     class Meta:
         verbose_name = "Nhóm hàng"
@@ -29,6 +32,16 @@ class ItemGroup(models.Model):
 
     def __str__(self):
         return self.name
+
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            from apps.common.slugs import slugify_vi, unique_slug
+
+            self.slug = unique_slug(ItemGroup, slugify_vi(self.name), exclude_pk=self.pk)
+            update_fields = kwargs.get("update_fields")
+            if update_fields is not None:
+                kwargs["update_fields"] = {*update_fields, "slug"}
+        super().save(*args, **kwargs)
 
 
 class Item(models.Model):

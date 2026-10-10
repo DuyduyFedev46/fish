@@ -31,29 +31,43 @@ SITE_INFO_OK = {
         "address": "1 Đường Giả, Phường Giả, Tỉnh Giả",
         "phone": "0900000000",
         "email": "lienhe@example.com",
+        "registration_issued_by": "Sở Giả Định",
+        "registration_issued_on": "2026-01-01",
     },
     "seller_complete": True,
     "privacy_consent_required": True,
     "confirm_call_notice": False,
     "confirm_call_hours": "7:00–20:00",
 }
+# 6 trang chính sách theo thứ tự lệnh nạp nội dung (06-marketing B4); tiêu đề lấy từ CMS.
 FOOTER_LINKS_OK = [
-    {"title": "Chính sách bảo mật", "slug": "chinh-sach-bao-mat"},
-    {"title": "Chính sách đổi trả", "slug": "chinh-sach-doi-tra"},
-    {"title": "Chính sách thanh toán", "slug": "chinh-sach-thanh-toan"},
+    {"title": "Chính sách đổi trả và hoàn tiền", "slug": "doi-tra"},
+    {"title": "Chính sách giao hàng", "slug": "giao-hang"},
+    {"title": "Chính sách thanh toán", "slug": "thanh-toan"},
+    {"title": "Chính sách quyền riêng tư", "slug": "quyen-rieng-tu"},
+    {"title": "Điều kiện giao dịch chung", "slug": "dieu-khoan"},
+    {"title": "Cơ chế giải quyết khiếu nại", "slug": "khieu-nai"},
 ]
-CATALOG_OK = [
-    {
-        "item_code": "CA-QA-01",
-        "name": "Cá QA giả định",
-        "group": "ca",
-        "item_type": "SIMPLE",
-        "unit": "Kg",
-        "price": 100000,
-        "sellable_qty": 50,
-        "image": None,
-    }
-]
+POLICY_TITLES = [x["title"] for x in FOOTER_LINKS_OK]
+POLICY_NAV = "footer nav:has(h2:text-is('Chính sách')) a"
+CATALOG_OK = {
+    "groups": [{"slug": "ca", "name": "Cá", "item_count": 1}],
+    "items": [
+        {
+            "item_code": "CA-QA-01",
+            "name": "Cá QA giả định",
+            "item_type": "SIMPLE",
+            "unit": "kg",
+            "price": "100000",
+            "stock_level": "in",
+            "min_qty": "1",
+            "qty_step": "0.5",
+            "group": {"slug": "ca", "name": "Cá"},
+            "short_note": "",
+            "image": None,
+        }
+    ],
+}
 PRIVACY_POLICY_OK = {
     "slug": "chinh-sach-bao-mat",
     "title": "Chính sách bảo mật thông tin",
@@ -109,37 +123,34 @@ def main():
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
 
-        # ---------- GL-01-AC2: footer đủ 7 thông tin trên nhiều trang công khai ----------
-        ctx = browser.new_context()
+        # ---------- GL-01-AC2: footer F1 có dải pháp lý đủ thông tin người bán trên nhiều trang công khai ----------
+        ctx = browser.new_context(viewport={"width": 1280, "height": 900})
         page = ctx.new_page()
         install_common_routes(page)
         for route_path, label in [
-            ("/", "Landing"),
+            ("/", "Trang chủ"),
             ("/shop/", "Shop"),
-            ("/trang/?slug=chinh-sach-bao-mat", "Trang nội dung"),
+            ("/trang/?slug=doi-tra", "Trang nội dung"),
         ]:
             page.goto(f"{BASE}{route_path}")
             page.wait_for_load_state("networkidle")
-            body = page.inner_text("body")
+            foot = page.locator("footer").last.inner_text()
             check(
-                f"GL-01-AC2 [{label}] footer có đủ 7 thông tin người bán",
+                f"GL-01-AC2 [{label}] dải pháp lý có tên, MST, địa chỉ, GCN ĐKKD (nơi cấp, ngày cấp)",
                 all(
-                    s in body
-                    for s in [
+                    x in foot
+                    for x in [
                         "Vựa Thử Nghiệm QA",
-                        "Hộ kinh doanh",
-                        "0000000001",
-                        "0000000002",
+                        "MST 0000000002",
                         "1 Đường Giả",
-                        "0900000000",
-                        "lienhe@example.com",
+                        "GCN ĐKKD số 0000000001 do Sở Giả Định cấp ngày 01/01/2026",
                     ]
                 ),
             )
-            tel = page.locator('a[href="tel:0900000000"]')
-            mailto = page.locator('a[href="mailto:lienhe@example.com"]')
-            check(f"GL-01-AC2 [{label}] SĐT là link tel:", tel.count() >= 1)
-            check(f"GL-01-AC2 [{label}] Email là link mailto:", mailto.count() >= 1)
+            check(f"GL-01-AC2 [{label}] SĐT là link tel:", page.locator('footer a[href="tel:0900000000"]').count() >= 1)
+            check(f"GL-01-AC2 [{label}] Email là link mailto:", page.locator('footer a[href="mailto:lienhe@example.com"]').count() >= 1)
+            check(f"GL-01-AC2 [{label}] chưa có link thông báo website thì không có khối logo", "thông báo website" not in foot)
+            check(f"GL-01-AC2 [{label}] không có chữ chờ kiểu [..] hay 'Đang chờ'", "[" not in foot and "Đang chờ" not in foot)
         page.screenshot(path=f"{SHOT_DIR}/gl01-ac2-shop-footer.png", full_page=True)
         ctx.close()
 
@@ -156,7 +167,7 @@ def main():
         page.goto(f"{BASE}/shop/")
         page.wait_for_load_state("networkidle")
         body = page.inner_text("body")
-        check("GL-01-AC5 khối người bán ẩn khi site-info lỗi", "Thông tin đơn vị bán hàng" not in body)
+        check("GL-01-AC5 khối người bán ẩn khi site-info lỗi", "MST" not in body)
         check("GL-01-AC5 trang không trắng (vẫn còn nội dung Shop)", "Cá QA giả định" in body)
         check(
             "GL-01-AC5 không lộ dữ liệu cá nhân/PII nào trong console lỗi",
@@ -165,27 +176,25 @@ def main():
         page.screenshot(path=f"{SHOT_DIR}/gl01-ac5-site-info-error.png", full_page=True)
         ctx.close()
 
-        # ---------- GL-02-AC1: 3 link footer theo đúng thứ tự ----------
-        ctx = browser.new_context()
+        # ---------- GL-02-AC1: nhóm "Chính sách" của F1 đúng 6 link theo thứ tự CMS ----------
+        ctx = browser.new_context(viewport={"width": 1280, "height": 900})
         page = ctx.new_page()
         install_common_routes(page)
         page.goto(f"{BASE}/shop/")
         page.wait_for_load_state("networkidle")
-        links = page.locator("footer a[href*='/trang/']")
-        titles = [links.nth(i).inner_text() for i in range(links.count())]
-        check(
-            "GL-02-AC1 footer có đúng 3 link theo thứ tự cấu hình",
-            titles == ["Chính sách bảo mật", "Chính sách đổi trả", "Chính sách thanh toán"],
-        )
+        page.locator(POLICY_NAV).first.wait_for()
+        links = page.locator(POLICY_NAV)
+        titles = [links.nth(i).inner_text().strip() for i in range(links.count())]
+        check("GL-02-AC1 footer có đúng 6 link chính sách theo thứ tự CMS", titles == POLICY_TITLES)
+        check("GL-02-AC1 có 'Điều kiện giao dịch chung' và không có 'Điều khoản sử dụng'",
+              "Điều kiện giao dịch chung" in titles and "Điều khoản sử dụng" not in page.locator("footer").last.inner_text())
+        check("GL-02-AC1 có 'Cơ chế giải quyết khiếu nại'", "Cơ chế giải quyết khiếu nại" in titles)
         hrefs = [links.nth(i).get_attribute("href") for i in range(links.count())]
-        check(
-            "GL-02-AC1 link trỏ /trang/?slug=...",
-            all("/trang/" in h and "slug=" in h for h in hrefs),
-        )
+        check("GL-02-AC1 link trỏ /trang/?slug=...", all("/trang/" in h and "slug=" in h for h in hrefs))
         ctx.close()
 
         # ---------- GL-02-AC2/AC3: gỡ 1 trang khỏi footer, tải lại không cần build lại FE ----------
-        ctx = browser.new_context()
+        ctx = browser.new_context(viewport={"width": 1280, "height": 900})
         page = ctx.new_page()
         state = {"links": FOOTER_LINKS_OK}
         page.route("**/api/public/site-info/", lambda r: route_json(r, SITE_INFO_OK))
@@ -193,22 +202,19 @@ def main():
         page.route("**/api/public/content/footer-links/", lambda r: route_json(r, state["links"]))
         page.goto(f"{BASE}/shop/")
         page.wait_for_load_state("networkidle")
-        links = page.locator("footer a[href*='/trang/']")
-        check("GL-02-AC2/AC3 trước khi gỡ: 3 link hiện đủ", links.count() == 3)
+        check("GL-02-AC2/AC3 trước khi gỡ: 6 link hiện đủ", page.locator(POLICY_NAV).count() == 6)
         # Gỡ 1 trang (show_in_footer=False) mô phỏng bằng response mới, KHÔNG build lại FE
-        state["links"] = [FOOTER_LINKS_OK[0], FOOTER_LINKS_OK[2]]
+        state["links"] = [x for x in FOOTER_LINKS_OK if x["slug"] != "giao-hang"]
         page.reload()
         page.wait_for_load_state("networkidle")
-        links = page.locator("footer a[href*='/trang/']")
-        titles = [links.nth(i).inner_text() for i in range(links.count())]
-        check(
-            "GL-02-AC2/AC3 sau khi gỡ: link biến mất, 2 link còn lại giữ nguyên",
-            titles == ["Chính sách bảo mật", "Chính sách thanh toán"],
-        )
+        links = page.locator(POLICY_NAV)
+        titles = [links.nth(i).inner_text().strip() for i in range(links.count())]
+        check("GL-02-AC2/AC3 sau khi gỡ: link biến mất, 5 link còn lại giữ nguyên thứ tự",
+              titles == [t for t in POLICY_TITLES if t != "Chính sách giao hàng"])
         ctx.close()
 
-        # ---------- GL-02-AC4: footer-links lỗi -> ẩn khối link, khối người bán vẫn còn ----------
-        ctx = browser.new_context()
+        # ---------- GL-02-AC4: footer-links lỗi -> ẩn nhóm Chính sách, dải pháp lý vẫn còn ----------
+        ctx = browser.new_context(viewport={"width": 1280, "height": 900})
         page = ctx.new_page()
         page.route("**/api/public/site-info/", lambda r: route_json(r, SITE_INFO_OK))
         page.route("**/api/shop/catalog/", lambda r: route_json(r, CATALOG_OK))
@@ -216,11 +222,23 @@ def main():
         page.goto(f"{BASE}/shop/")
         page.wait_for_load_state("networkidle")
         body = page.inner_text("body")
-        check("GL-02-AC4 khối link ẩn khi footer-links lỗi", "Chính sách bảo mật" not in body)
-        check(
-            "GL-02-AC4 khối người bán KHÔNG bị ảnh hưởng",
-            "Vựa Thử Nghiệm QA" in body,
-        )
+        check("GL-02-AC4 nhóm Chính sách ẩn khi footer-links lỗi", page.locator(POLICY_NAV).count() == 0
+              and "Chính sách đổi trả" not in body)
+        check("GL-02-AC4 dải pháp lý người bán KHÔNG bị ảnh hưởng", "Vựa Thử Nghiệm QA" in body)
+        check("GL-02-AC4 các nhóm khác của footer vẫn hiện", "Mua hàng" in body and "Về Cá Về" in body)
+        ctx.close()
+
+        # ---------- F2: footer rút gọn ở trang đặt hàng, 3 link chính sách mở tab mới ----------
+        ctx = browser.new_context(viewport={"width": 1280, "height": 900})
+        page = ctx.new_page()
+        install_common_routes(page)
+        page.goto(f"{BASE}/shop/checkout/")
+        page.wait_for_load_state("networkidle")
+        f2 = page.locator("footer a[target='_blank']")
+        t2 = [f2.nth(i).inner_text().replace("(mở tab mới)", "").strip() for i in range(f2.count())]
+        check("F2 có đúng 3 link: đổi trả, quyền riêng tư, thanh toán",
+              t2 == ["Chính sách đổi trả và hoàn tiền", "Chính sách quyền riêng tư", "Chính sách thanh toán"])
+        check("F2 link có rel=noopener", all("noopener" in (f2.nth(i).get_attribute("rel") or "") for i in range(f2.count())))
         ctx.close()
 
         # ---------- GL-02-AC5: viewport 375x667, không cuộn ngang, vùng chạm >= 44px ----------
@@ -232,7 +250,9 @@ def main():
         scroll_w = page.evaluate("document.documentElement.scrollWidth")
         client_w = page.evaluate("document.documentElement.clientWidth")
         check(f"GL-02-AC5 không cuộn ngang ở 375px (scrollWidth={scroll_w} clientWidth={client_w})", scroll_w <= client_w + 1)
-        link = page.locator("footer a[href*='/trang/']").first
+        # Điện thoại: nhóm "Chính sách" thu gọn mặc định, mở ra rồi mới đo (SHOP-1-05 AC3).
+        page.locator("footer summary:has(h2:text-is('Chính sách'))").click()
+        link = page.locator(POLICY_NAV).first
         box = link.bounding_box()
         check(f"GL-02-AC5 vùng chạm link >= 44px chiều cao (đo {box['height'] if box else None})", box is not None and box["height"] >= 44)
         page.screenshot(path=f"{SHOT_DIR}/gl02-ac5-mobile-375.png", full_page=True)

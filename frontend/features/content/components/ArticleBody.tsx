@@ -193,11 +193,11 @@ export default function ArticleBody({ body, postSlug }: ArticleBodyProps) {
     let active = true;
     setCatalog({ status: "loading" });
     getCatalog()
-      .then((items) => {
+      .then((catalog) => {
         if (!active) return;
         setCatalog({
           status: "ready",
-          byCode: new Map((items || []).map((it) => [it.item_code, it])),
+          byCode: new Map((catalog.items || []).map((it) => [it.item_code, it])),
         });
       })
       .catch(() => {

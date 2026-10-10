@@ -1,0 +1,165 @@
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-width: 44px;
+  border: 1px solid transparent;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+  text-decoration: none;
+  cursor: pointer;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    transform var(--dur-press) var(--ease-out),
+    background-color var(--dur-color) ease-out,
+    border-color var(--dur-color) ease-out,
+    color var(--dur-color) ease-out;
+}
+
+.label {
+  min-width: 0;
+}
+
+.full {
+  width: 100%;
+}
+
+/* Kích thước */
+.md {
+  height: var(--h-btn-md);
+  padding: 0 var(--space-4);
+}
+.lg {
+  height: var(--h-btn-lg);
+  padding: 0 var(--space-6);
+}
+.sm {
+  /* sm 36 chỉ dùng từ máy tính; điện thoại giữ 44 cho vùng chạm */
+  height: var(--h-btn-md);
+  padding: 0 14px;
+}
+@media (min-width: 768px) {
+  .sm {
+    height: var(--h-btn-sm);
+  }
+}
+
+.rounded {
+  border-radius: var(--radius-md);
+}
+.pill {
+  border-radius: var(--radius-full);
+}
+
+/* Biến thể */
+.primary {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+.outline {
+  background: var(--surface);
+  color: var(--accent-text);
+  border-color: var(--accent);
+}
+.secondary {
+  background: var(--surface);
+  color: var(--ink);
+  border-color: var(--border-strong);
+}
+.ghost {
+  background: transparent;
+  color: var(--ink-2);
+}
+.danger {
+  background: var(--crit);
+  color: var(--on-crit);
+}
+.dangerText {
+  background: var(--surface);
+  color: var(--crit);
+  border-color: var(--border-strong);
+}
+.onBrand {
+  background: var(--surface);
+  color: var(--brand-deep);
+}
+.onBrandOutline {
+  background: transparent;
+  color: var(--on-accent);
+  border-color: var(--on-brand-muted);
+}
+
+/* Nhấn */
+.btn:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+/* Focus: nền accent/brand dùng viền trắng thụt vào trong */
+.primary:focus-visible,
+.danger:focus-visible,
+.onBrandOutline:focus-visible {
+  outline-color: var(--on-accent);
+  outline-offset: -4px;
+}
+
+/* Tắt: chỉ khi đang gửi hoặc đơn hết hạn; luôn có chữ giải thích gần nút */
+.btn:disabled {
+  background: var(--surface-3);
+  color: var(--ink-3);
+  border-color: transparent;
+  cursor: not-allowed;
+}
+/* Đang tải giữ nguyên nền (không giảm opacity) */
+.btn[aria-busy="true"]:disabled {
+  cursor: progress;
+}
+.primary[aria-busy="true"]:disabled {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+.danger[aria-busy="true"]:disabled {
+  background: var(--crit);
+  color: var(--on-crit);
+}
+.outline[aria-busy="true"]:disabled,
+.secondary[aria-busy="true"]:disabled,
+.onBrand[aria-busy="true"]:disabled {
+  background: var(--surface);
+  color: var(--ink-2);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .primary:hover:not(:disabled) {
+    background: var(--accent-hover);
+  }
+  .outline:hover:not(:disabled) {
+    background: var(--accent-soft);
+  }
+  .secondary:hover:not(:disabled),
+  .ghost:hover:not(:disabled) {
+    background: var(--surface-2);
+  }
+  .danger:hover:not(:disabled) {
+    background: var(--crit-hover);
+  }
+  .dangerText:hover:not(:disabled) {
+    background: var(--crit-soft);
+  }
+  .onBrand:hover:not(:disabled) {
+    background: var(--accent-soft);
+  }
+  .onBrandOutline:hover:not(:disabled) {
+    background: var(--brand-deep-hover);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn:active:not(:disabled) {
+    transform: none;
+  }
+}
