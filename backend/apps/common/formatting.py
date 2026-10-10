@@ -6,6 +6,7 @@ Quy ước hiển thị (Duy 30/09, P8 Lô 8 SR-25):
 - Giờ/ngày: luôn `Asia/Ho_Chi_Minh` (GMT+7) qua `timezone.localtime`, không `strftime` trên datetime UTC.
 Dữ liệu lưu DB vẫn UTC; ISO trả qua API giữ nguyên (có offset) — file này CHỈ dành cho chuỗi người đọc.
 """
+import datetime
 from decimal import ROUND_HALF_UP, Decimal
 
 from django.utils import timezone
@@ -37,3 +38,10 @@ def format_local_date(value) -> str:
 def format_local_datetime(value) -> str:
     """Ngày giờ VN dạng `YYYY-MM-DD HH:MM`. `value` phải là datetime có múi giờ."""
     return timezone.localtime(value).strftime("%Y-%m-%d %H:%M")
+
+
+def iso_utc(value) -> str | None:
+    """ISO 8601 UTC có `Z` cho API công khai của Shop: `2026-10-11T03:00:00Z` (02b §3.0). `None` -> `None`."""
+    if value is None:
+        return None
+    return value.astimezone(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")

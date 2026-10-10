@@ -88,7 +88,7 @@
  "backend/apps/delivery/tests/test_p8_lo3_qa_edges.py": 50,
  "backend/apps/delivery/tests/test_p8_lo7_lock_order.py": 4,
  "backend/apps/delivery/tests/test_p8_lo7_qa_edges.py": 27,
- "backend/apps/delivery/tests/test_p8_lo8_gmt7.py": 9,
+ "backend/apps/delivery/tests/test_p8_lo8_gmt7.py": 8,
  "backend/apps/delivery/tests/test_p8_record_call_stale.py": 27,
  "backend/apps/delivery/tests/test_ra_soat_cskh.py": 5,
  "backend/apps/inventory/batches/tests/test_api.py": 14,
@@ -177,9 +177,5 @@
  "frontend/e2e/qa-lo7-shop-real.py": 1,
  "frontend/e2e/qa-lo7-shop-xss.py": 1,
  "frontend/e2e/qa-lo8-shop-django.py": 1,
- "frontend/e2e/qa-lo8-shop-format.py": 1,
- "frontend/e2e/golive_footer_checks.py": 1,
- "frontend/e2e/ra_soat_cms06_item_card.py": 1,
- "frontend/e2e/ra_soat_cms13_public.py": 1,
- "frontend/e2e/ra_soat_cms14_landing.py": 1
+ "frontend/e2e/qa-lo8-shop-format.py": 1
 }

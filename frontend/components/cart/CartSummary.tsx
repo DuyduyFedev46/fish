@@ -4,6 +4,7 @@ import { formatPriceVnd } from "@/lib/format";
 import type { Money } from "@/lib/types";
 import PriceTag from "../catalog/PriceTag";
 import Button from "../ui/Button";
+import Icon, { type IconName } from "../ui/Icon";
 import { cx } from "../ui/cx";
 import s from "./CartSummary.module.css";
 
@@ -19,6 +20,12 @@ export interface CartSummaryProps {
   total: Money;
   /** Dòng giảm giá, số lấy từ máy chủ (mã giảm giá, lô 3b). */
   discount?: { code: string; amount: Money };
+  /** Tiêu đề hộp máy tính. Mặc định "Tóm tắt đơn"; đặt hàng ghi "Đơn hàng (3 món)". */
+  title?: string;
+  /** Nhãn dòng tổng. Mặc định "Tổng tiền hàng"; thanh toán ghi "Cần thanh toán". */
+  totalLabel?: string;
+  /** Danh sách món rút gọn, chỉ hiện từ máy tính (bước đặt hàng và thanh toán). */
+  lines?: { name: string; qtyText: string; amount: Money }[];
   /** Dòng cảnh báo `role="alert"` ngay trên nút (vd. "Bỏ món đã hết để đặt hàng."). */
   notice?: { id: string; text: string };
   cta: {
@@ -31,6 +38,8 @@ export interface CartSummaryProps {
     loadingText?: string;
     disabled?: boolean;
     form?: string;
+    /** Icon đầu nút (vd. ổ khoá ở nút "Thanh toán"). */
+    icon?: IconName;
   };
 }
 
@@ -47,6 +56,9 @@ export default function CartSummary({
   discount,
   notice,
   cta,
+  title = "Tóm tắt đơn",
+  totalLabel = "Tổng tiền hàng",
+  lines,
 }: CartSummaryProps) {
   const someOut = availableCount !== undefined && availableCount < itemCount;
   const subtotalLabel = someOut ? `Tạm tính (${availableCount} món còn hàng)` : "Tạm tính";
@@ -57,14 +69,28 @@ export default function CartSummary({
     loading: cta.loading,
     loadingText: cta.loadingText,
     disabled: cta.disabled,
+    iconStart: cta.icon ? <Icon name={cta.icon} size={18} /> : undefined,
     "aria-describedby": notice?.id,
   };
 
   return (
     <section className={cx(s.summary, s[context])} aria-labelledby="cart-summary-title">
       <h2 id="cart-summary-title" className={s.title}>
-        Tóm tắt đơn
+        {title}
       </h2>
+      {lines && lines.length > 0 ? (
+        <ul className={s.lines} aria-label="Món trong đơn">
+          {lines.map((l) => (
+            <li key={`${l.name}-${l.qtyText}`} className={s.line}>
+              <span className={s.lineName}>
+                {l.name}
+                <span className={s.lineQty}> · {l.qtyText}</span>
+              </span>
+              <span className="num">{formatPriceVnd(l.amount)}</span>
+            </li>
+          ))}
+        </ul>
+      ) : null}
       <dl className={s.rows}>
         {subtotal !== undefined ? (
           <div className={s.row}>
@@ -79,7 +105,7 @@ export default function CartSummary({
           </div>
         ) : null}
         <div className={cx(s.row, s.totalRow)}>
-          <dt>Tổng tiền hàng</dt>
+          <dt>{totalLabel}</dt>
           <dd>
             <PriceTag amount={total} size="total" />
           </dd>

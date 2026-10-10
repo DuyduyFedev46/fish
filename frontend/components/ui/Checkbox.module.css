@@ -1,0 +1,46 @@
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  min-height: 44px;
+  cursor: pointer;
+}
+
+.box {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  margin: 2px 0 0;
+  accent-color: var(--accent);
+}
+
+.box:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.text {
+  min-width: 0;
+  color: var(--ink-2);
+  font-size: 14px;
+  line-height: 1.5;
+  text-wrap: pretty;
+}
+
+.error {
+  margin: 0;
+  color: var(--crit);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.hasError .box {
+  outline: 2px solid var(--crit);
+  outline-offset: 1px;
+}

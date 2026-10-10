@@ -47,15 +47,34 @@ class ShopLookupIpThrottle(SettingsRateThrottle):
     scope = "shop_lookup_ip"
 
 
+def body_dict(request) -> dict:
+    """Thân JSON của request dưới dạng dict; lỗi parse hoặc kiểu lạ -> {} (view sẽ trả 400 sau)."""
+    try:
+        data = request.data
+    except Exception:  # ParseError: để view báo lỗi, throttle không được nổ
+        return {}
+    return data if hasattr(data, "get") else {}
+
+
 class ShopLookupOrderThrottle(SettingsRateThrottle):
+    """Tra đơn bằng SĐT: giới hạn theo mã đơn IN HOA đọc từ BODY (02b §3.11), chặn dò SĐT từ nhiều IP."""
+
     scope = "shop_lookup_order"
 
     def get_cache_key(self, request, view):
-        order_code = view.kwargs.get("order_code") or ""
-        ident = order_code.strip().upper()
+        order_code = body_dict(request).get("order_code") or view.kwargs.get("order_code") or ""
+        ident = str(order_code).strip().upper()
         if not ident:
             return None
+        # Chuỗi tuỳ ý từ body -> băm để khoá cache an toàn và có độ dài cố định.
+        ident = hashlib.sha256(ident.encode("utf-8")).hexdigest()
         return self.cache_format % {"scope": self.scope, "ident": ident}
+
+
+class ShopLookupTokenThrottle(SettingsRateThrottle):
+    """Tra đơn bằng mã tra đơn: 60/phút/IP, tách khỏi hạn 10/giờ theo mã đơn (02b §3.11)."""
+
+    scope = "shop_lookup_token"
 
 
 class ShopOrderCreateThrottle(SettingsRateThrottle):

@@ -1,0 +1,28 @@
+.badge {
+  display: inline-block;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.warn {
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+
+.accent {
+  background: var(--accent-soft);
+  color: var(--accent-text);
+}
+
+.good {
+  background: var(--good-soft);
+  color: var(--good);
+}
+
+.neutral {
+  background: var(--surface-3);
+  color: var(--ink-2);
+}

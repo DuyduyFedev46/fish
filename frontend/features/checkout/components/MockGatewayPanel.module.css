@@ -1,0 +1,40 @@
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  width: 100%;
+  max-width: 480px;
+  margin: var(--space-6) auto;
+  padding: var(--space-5);
+  border: 2px dashed var(--warn);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+}
+
+.tag {
+  align-self: flex-start;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  background: var(--warn-soft);
+  color: var(--warn);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.note {
+  margin: 0;
+  color: var(--ink-2);
+  font-size: 13px;
+}
+
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}

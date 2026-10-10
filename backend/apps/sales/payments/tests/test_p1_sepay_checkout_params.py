@@ -20,6 +20,8 @@ from apps.sales.orders import services as order_services
 from apps.sales.payments import checkout as checkout_services
 from apps.sales.payments import services as payment_services
 
+BOOKING_CODE = checkout_services.BOOKING_CODE
+
 SEPAY_SETTINGS = dict(
     SEPAY_ENV="SANDBOX",
     SEPAY_MERCHANT_ID="MCH-TEST-01",
@@ -204,7 +206,10 @@ class P1AC4RejectInvalidOrderTests(CheckoutParamsBase):
         self.order.save(update_fields=["booked_expires_at"])
         resp = self._checkout()
         self.assertEqual(resp.status_code, 400)
-        self.assertIn("hết hạn", resp.json()["detail"])
+        self.assertEqual(
+            resp.json(),
+            {"code": "CHECKOUT_UNAVAILABLE", "detail": "Chưa mở được trang thanh toán. Thử lại.", "reason": BOOKING_CODE},
+        )
 
     def test_p1_ac4_auto_cancelled_rejected(self):
         self.order.booked_expires_at = timezone.now() - datetime.timedelta(minutes=1)
@@ -212,7 +217,10 @@ class P1AC4RejectInvalidOrderTests(CheckoutParamsBase):
         order_services.cancel_unpaid_expired()
         resp = self._checkout()
         self.assertEqual(resp.status_code, 400)
-        self.assertIn("hết hạn", resp.json()["detail"])
+        self.assertEqual(
+            resp.json(),
+            {"code": "CHECKOUT_UNAVAILABLE", "detail": "Chưa mở được trang thanh toán. Thử lại.", "reason": BOOKING_CODE},
+        )
 
     def test_p1_ac4_already_paid_rejected(self):
         payment_services.confirm_payment(
@@ -221,11 +229,15 @@ class P1AC4RejectInvalidOrderTests(CheckoutParamsBase):
         )
         resp = self._checkout()
         self.assertEqual(resp.status_code, 400)
-        self.assertIn("đã thanh toán", resp.json()["detail"])
+        self.assertEqual(
+            resp.json(),
+            {"code": "CHECKOUT_UNAVAILABLE", "detail": "Chưa mở được trang thanh toán. Thử lại.", "reason": BOOKING_CODE},
+        )
 
     def test_p1_ac4_order_not_found_404(self):
         resp = self._checkout(code="SO-KHONGCO")
         self.assertEqual(resp.status_code, 404)
+        self.assertEqual(resp.json(), {"code": "ORDER_NOT_FOUND", "detail": "Không tìm thấy đơn."})
 
 
 class P1AC5RetryPaymentTests(CheckoutParamsBase):

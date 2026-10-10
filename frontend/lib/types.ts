@@ -1,4 +1,4 @@
-// Kiểu dữ liệu khớp Shop API (công khai) — xem doc/BUILD-PLAN.md, mục "Shop API (công khai)".
+// Kiểu dữ liệu khớp Shop API công khai — contract chuẩn ở doc/features/2026-10-06-shop-giao-dien-moi/02b-tech-design.md §3.
 
 export type ItemType = "SIMPLE" | "BUNDLE";
 
@@ -65,120 +65,119 @@ export type CatalogItemDetail = CatalogItem & {
   bundle_components?: BundleComponent[];
 };
 
+// ---- Đặt hàng, tra đơn, thanh toán (02b §3.3–3.5). Kiểu dây = kiểu dùng: tiền là chuỗi `Money`, giờ là ISO UTC có `Z`. ----
+
 export type CreateOrderItemInput = {
   item_code: string;
-  qty: number;
+  /** Chuỗi tối giản: "1", "1.5"; combo luôn nguyên (BR-BH-22). */
+  qty: string;
 };
 
 export type CreateOrderPayload = {
-  customer: {
-    phone: string;
-    name: string;
-  };
+  /** UUID sinh một lần khi mở form, giữ qua các lần "Thử lại" để không tạo đơn trùng (BR-BH-27). */
+  client_request_id: string;
+  customer: { name: string; phone: string };
   delivery_address: string;
-  phone: string;
   items: CreateOrderItemInput[];
-  privacy_consent?: {
-    accepted: boolean;
-    policy_version_id: number;
-  };
+  privacy_consent?: { accepted: boolean; policy_version_id: number };
+  /** Lô 3b. */
+  voucher_code?: string;
 };
 
-// Cổng thanh toán SePay (VietQR) — xem doc/features/2026-09-26-sepay-cong-thanh-toan.
-// Không còn trường `vietqr` giả (BR-TT-01): Shop không tự vẽ QR, cổng SePay lo việc đó.
+/** Giảm giá của đơn: nguồn là ưu đãi tự động, mã giảm giá, hoặc không có (`code: null`, `amount: "0"`). */
+export type OrderDiscount = {
+  source: "promo" | "voucher" | null;
+  code: string | null;
+  amount: Money;
+};
+
+/** Một dòng đơn. `amount` là thành tiền gộp (số lượng nhân đơn giá), không có tên người nhận. */
+export type OrderLineData = {
+  item_code: string;
+  name: string;
+  unit: SaleUnit;
+  qty: string;
+  amount: Money;
+};
+
 export type CreateOrderResponse = {
   order_code: string;
-  total_amount: number;
-  booked_expires_at: string; // ISO datetime — hạn giữ chỗ (BR-BH-03)
+  status: string;
+  subtotal: Money;
+  discount: OrderDiscount;
+  total_amount: Money;
+  booked_expires_at: string;
+  server_now: string;
+  hold_minutes: number;
+  lines: OrderLineData[];
+  lookup_token: string;
 };
 
-export type OrderLineStatus = {
-  item_code: string;
-  // Tra đơn thật (`ShopOrderLookupView`) CHƯA trả tên mặt hàng, chỉ `item_code` — xem
-  // "còn nợ" trong 03-dev-notes.md. FE hiện tạm mã hàng khi thiếu (lib/api.ts).
-  name: string;
-  qty: number;
-  line_total?: number;
-};
+/** Một dòng lỗi tồn kho: `out` hết hẳn, `short` còn nhưng không đủ số khách đặt. Không có số kg (BR-BH-24). */
+export type OutOfStockLine = { item_code: string; stock_level: "out" | "short" };
+export type InvalidQtyLine = { item_code: string; min_qty: string; qty_step: string };
 
-export type OrderCancelNotice = {
-  reason_code: string | null;
+/** `state` do máy chủ tính (bảng E6, 02b §3.4.2). FE chỉ ánh xạ sang màn (features/checkout/orderState.ts). */
+export type OrderState =
+  | "awaiting_payment"
+  | "hold_expired"
+  | "expired"
+  | "cancelled"
+  | "preparing"
+  | "delivering"
+  | "delivery_failed"
+  | "completed";
+
+/** Thông báo đơn huỷ sau khi đã trả tiền (BR-HT-12). Không có tiến độ phiếu hoàn. */
+export type CancelNotice = {
+  scope: "full" | "partial";
+  reason_code: string;
+  reason_label: string;
+  cancelled_amount: Money;
   message: string;
-  refund: {
-    amount: string;
-    status_label: string;
-    deadline: string;
-    refunded_at: string | null;
-  };
-  contact: string;
+  hotline: string;
+  policy_url: string;
 };
 
-export type OrderStatus = {
+export type OrderDelivery = { step: "preparing" | "delivering" | "delivered" | "failed"; step_label: string };
+
+/** Kết quả tra đơn (`POST /api/shop/orders/lookup/`). Không có tên, SĐT hay địa chỉ người nhận. */
+export type OrderLookupResult = {
   order_code: string;
   status: string;
+  state: OrderState;
   status_label: string;
-  fulfilment?: string;
-  lines: OrderLineStatus[];
-  total_amount: number;
-  // Suy ra từ `status` ở lib/api.ts (BE trả status thô: BOOKED/PAID/PROCESSING/COMPLETED/
-  // CANCELLED/AUTO_CANCELLED — xem apps/sales/models/orders.py). BE chưa có field boolean
-  // riêng, FE tự map để không phải rải chuỗi trạng thái khắp UI.
-  is_paid: boolean;
-  is_expired: boolean;
-  // CHƯA có trong response tra đơn thật hôm nay (chỉ có ở response đặt hàng) — xem "còn nợ"
-  // 03-dev-notes.md. Thiếu thì FE ẩn đồng hồ đếm ngược, không suy đoán.
-  booked_expires_at?: string;
-  delivery?: {
-    status: string;
-    status_label?: string;
-  };
-  cancel_notice?: OrderCancelNotice | null;
+  placed_at: string;
+  paid_at: string | null;
+  delivered_at: string | null;
+  booked_expires_at: string | null;
+  server_now: string;
+  hold_minutes: number;
+  payment_pending_minutes: number;
+  delivery: OrderDelivery | null;
+  lines: OrderLineData[];
+  subtotal: Money;
+  discount: OrderDiscount;
+  total_amount: Money;
+  cancel_notice: CancelNotice | null;
+  late_payment: boolean;
+  lookup_token: string;
 };
 
+/** Tra bằng mã đơn + SĐT đầy đủ, hoặc mã đơn + mã tra đơn (có cả hai thì máy chủ dùng `token`). */
+export type OrderLookupInput = { order_code: string; phone?: string; token?: string };
+
+// Cổng thanh toán (BR-TT-01/13). Shop không tự vẽ QR, cổng lo việc đó. Không hiện tên cổng cho khách.
 // Một field gửi cổng thanh toán, ĐÚNG THỨ TỰ máy chủ trả (chữ ký HMAC phụ thuộc thứ tự —
 // BR-TT-13). FE không được thêm/bớt/sắp lại/đổi tên field trong mảng này.
 export type PaymentGatewayField = { name: string; value: string };
 
-// Bộ tham số lập cổng thanh toán SePay (P1, BE, endpoint `POST
-// /api/shop/orders/<order_code>/checkout/`). FE chỉ dựng `<form method="POST"
-// action={checkout_url}>` với `fields` làm input ẩn, giữ nguyên thứ tự, rồi submit.
+// Bộ tham số lập cổng thanh toán (`POST /api/shop/orders/<order_code>/checkout/`). FE chỉ dựng
+// `<form method="POST" action={checkout_url}>` với `fields` làm input ẩn, giữ nguyên thứ tự, rồi submit.
 export type PaymentCheckoutSession = {
   checkout_url: string;
   fields: PaymentGatewayField[];
   environment?: "SANDBOX" | "PRODUCTION";
-};
-
-// ---- Kiểu "trên dây" (JSON thô Django trả — số dạng chuỗi, không có is_paid/is_expired) ----
-// Khớp `ShopOrderCreateView`/`ShopOrderLookupView` (backend/apps/sales/orders/shop_api.py),
-// đối chiếu theo 03-dev-notes.md mục "P5, P1, P3 (BE)". `lib/api.ts` map sang kiểu FE dùng ở
-// trên; `lib/mock.ts` trả thẳng đúng kiểu này để chỉ có MỘT đường map, dùng chung cho cả
-// mock lẫn API thật (đỡ lệch hai luồng).
-export type WireCreateOrderResponse = {
-  order_code: string;
-  total_amount: string;
-  booked_expires_at: string;
-};
-
-export type WireOrderLine = {
-  item_code: string;
-  qty: string;
-  amount: string;
-  // BE hôm nay CHƯA trả field này ở tra đơn — xem OrderLineStatus ở trên. Mock có trả.
-  name?: string;
-};
-
-export type WireOrderStatus = {
-  order_code: string;
-  status: string; // BOOKED | PAID | PROCESSING | COMPLETED | CANCELLED | AUTO_CANCELLED
-  status_label: string;
-  fulfilment?: string;
-  total_amount: string;
-  lines: WireOrderLine[];
-  delivery: { status: string; status_label?: string } | null;
-  // BE hôm nay CHƯA trả field này ở tra đơn (chỉ có lúc đặt hàng) — xem OrderStatus ở trên.
-  // Mock có trả để luồng đếm ngược chạy đủ.
-  booked_expires_at?: string | null;
-  cancel_notice?: OrderCancelNotice | null;
 };
 
 export class ApiError extends Error {

@@ -14,18 +14,21 @@ from apps.sales.models import SalesOrder
 
 S = DeliveryNote.Status
 O = SalesOrder.Status
-TOP_KEYS = {"order_code", "status", "status_label", "total_amount", "lines", "delivery", "booked_expires_at",
-            "cancel_notice"}
+TOP_KEYS = {
+    "order_code", "status", "state", "status_label", "placed_at", "paid_at", "delivered_at", "booked_expires_at",
+    "server_now", "hold_minutes", "payment_pending_minutes", "delivery", "lines", "subtotal", "discount",
+    "total_amount", "cancel_notice", "late_payment", "lookup_token",
+}
 
-# (order.status, delivery.status, status_label, delivery.status_label): đủ 7 dòng bảng §2.6
+# (order.status, delivery.status, status_label, delivery.step_label hoặc None): bảng 02b §3.4.2
 TABLE = [
     (O.PROCESSING, S.CONFIRMING, "Đã thanh toán – chờ vựa gọi xác nhận", "Chờ vựa gọi xác nhận"),
-    (O.PROCESSING, S.PREPARING, "Đang xử lý", "Đang soạn hàng"),
-    (O.PROCESSING, S.READY, "Đang xử lý", "Đã soạn xong, chờ giao"),
-    (O.PROCESSING, S.DELIVERING, "Đang xử lý", "Đang giao"),
-    (O.PROCESSING, S.FAILED, "Đang xử lý", "Giao chưa thành công, vựa sẽ liên hệ lại"),
-    (O.COMPLETED, S.COMPLETED, "Hoàn tất", "Đã giao"),
-    (O.CANCELLED, S.CANCELLED, "Đã huỷ", "Đã huỷ"),
+    (O.PROCESSING, S.PREPARING, "Đang chuẩn bị hàng", "Đang soạn hàng"),
+    (O.PROCESSING, S.READY, "Đang chuẩn bị hàng", "Đã soạn xong, chờ giao"),
+    (O.PROCESSING, S.DELIVERING, "Đang giao", "Đang giao"),
+    (O.PROCESSING, S.FAILED, "Giao không thành công", "Giao chưa thành công, vựa sẽ liên hệ lại"),
+    (O.COMPLETED, S.COMPLETED, "Đã giao", "Đã giao"),
+    (O.CANCELLED, S.CANCELLED, "Đã huỷ", None),
 ]
 
 
@@ -33,8 +36,8 @@ class ShopLookupCompletedTests(CompletionBase):
     def tearDown(self):
         cache.clear()
 
-    def _lookup(self, order, last4=PHONE[-4:], **extra):
-        return APIClient().get(f"/api/shop/orders/{order.code}/", {"phone_last4": last4}, **extra)
+    def _lookup(self, order, phone=PHONE, **extra):
+        return APIClient().post("/api/shop/orders/lookup/", {"order_code": order.code, "phone": phone}, format="json", **extra)
 
     def _completed(self):
         order, note = self._processing()
@@ -48,8 +51,9 @@ class ShopLookupCompletedTests(CompletionBase):
         self.assertEqual(resp.status_code, 200, resp.content)
         body = resp.json()
         self.assertEqual(body["status"], "COMPLETED")
-        self.assertEqual(body["status_label"], "Hoàn tất")
-        self.assertEqual(body["delivery"], {"status": "COMPLETED", "status_label": "Đã giao"})
+        self.assertEqual(body["state"], "completed")
+        self.assertEqual(body["status_label"], "Đã giao")
+        self.assertEqual(body["delivery"], {"step": "delivered", "step_label": "Đã giao"})
 
     def test_s8_ac2_label_table_all_seven_rows(self):
         order = self._paid_order(phone=PHONE)
@@ -60,7 +64,10 @@ class ShopLookupCompletedTests(CompletionBase):
             body = self._lookup(order).json()
             ctx = f"{order_status}/{note_status}"
             self.assertEqual(body["status_label"], label, ctx)
-            self.assertEqual(body["delivery"]["status_label"], note_label, ctx)
+            if note_label is None:
+                self.assertIsNone(body["delivery"], ctx)
+            else:
+                self.assertEqual(body["delivery"]["step_label"], note_label, ctx)
             self.assertNotEqual(body["status_label"], body["status"], ctx)
 
     def test_s8_ac3_key_set_unchanged_and_no_personal_data(self):
@@ -68,9 +75,9 @@ class ShopLookupCompletedTests(CompletionBase):
         resp = self._lookup(order)
         body = resp.json()
         self.assertEqual(set(body), TOP_KEYS)
-        self.assertEqual(set(body["delivery"]), {"status", "status_label"})
+        self.assertEqual(set(body["delivery"]), {"step", "step_label"})
         raw = json.dumps(body, ensure_ascii=False)
-        for secret in (PHONE, NAME, ADDRESS, "Lê Lợi", "completed_at", "assigned_to", "courier", "giao1"):
+        for secret in (PHONE, NAME, ADDRESS, "Lê Lợi", "assigned_to", "courier", "giao1"):
             self.assertNotIn(secret, raw)
         self.assertNotIn(self.courier.get_username(), raw)
 
@@ -80,10 +87,10 @@ class ShopLookupCompletedTests(CompletionBase):
 
     def test_s8_ac4_wrong_last4_is_404_without_status_leak(self):
         order = self._completed()
-        resp = self._lookup(order, last4="0000")
+        resp = self._lookup(order, phone="0900000999")
         self.assertEqual(resp.status_code, 404)
         raw = resp.content.decode()
-        for leak in ("Hoàn tất", "COMPLETED", "Đã giao"):
+        for leak in ("Hoàn tất", "COMPLETED", "Đã giao", "completed"):
             self.assertNotIn(leak, raw)
 
     @override_settings(CAVEVE_THROTTLE_RATES={"shop_lookup_ip": "3/min"})

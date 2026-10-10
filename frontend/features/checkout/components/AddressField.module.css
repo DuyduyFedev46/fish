@@ -1,0 +1,61 @@
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.mapButton {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  width: 64px;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  border-left: 1px solid var(--border);
+  background: var(--accent-soft);
+  color: var(--accent-text);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    transform var(--dur-press) var(--ease-out),
+    color var(--dur-color) ease-out;
+}
+
+.mapButton:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.mapButton:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: -4px;
+}
+
+.mapButton:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .mapButton:hover:not(:disabled) {
+    color: var(--accent-hover);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mapButton:active:not(:disabled) {
+    transform: none;
+  }
+}
+
+.area {
+  margin: 0;
+  color: var(--ink-3);
+  font-size: 12px;
+  font-weight: 500;
+}

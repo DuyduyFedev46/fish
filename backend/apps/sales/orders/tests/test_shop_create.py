@@ -72,11 +72,10 @@ class ValidQtyTests(ShopCreateBase):
         for qty in ("1", "3"):
             self.assertEqual(self.post([("COMBO-LAU", qty)]).status_code, 201, qty)
 
-    def test_success_response_contract_unchanged_until_story_3_01(self):
+    def test_success_response_total_is_whole_vnd_string(self):
         self._stocked_batch(self._item("MUC-ONG", price="100000"), "50")
         data = self.post([("MUC-ONG", "3")]).json()
-        self.assertEqual(set(data), {"order_code", "total_amount", "booked_expires_at"})
-        self.assertEqual(data["total_amount"], "300000.00")
+        self.assertEqual(data["total_amount"], "300000")  # SHOP-3-01: money_str, không còn ".00"
 
 
 class InvalidQtyTests(ShopCreateBase):
@@ -85,6 +84,7 @@ class InvalidQtyTests(ShopCreateBase):
         self.simple = self._item("MUC-ONG", price="278000")
         self._stocked_batch(self.simple, "50")
         self.combo("COMBO-LAU", [(self.simple, "0.5")])
+        self.combo("COMBO-NUONG", [(self.simple, "0.5")])
 
     def assert_invalid_qty(self, resp, expected_codes):
         self.assertEqual(resp.status_code, 400, resp.content)
@@ -112,10 +112,10 @@ class InvalidQtyTests(ShopCreateBase):
 
     def test_s2_02_ac2_lists_every_bad_line_and_only_bad_lines(self):
         before = self.snapshot()
-        resp = self.post([("MUC-ONG", "0.5"), ("COMBO-LAU", "2"), ("COMBO-LAU", "1.5")])
+        resp = self.post([("MUC-ONG", "0.5"), ("COMBO-LAU", "2"), ("COMBO-NUONG", "1.5")])
         # dòng hợp lệ (combo 2) không bị liệt kê; hai dòng sai theo đúng thứ tự gửi
         self.assertEqual(resp.status_code, 400)
-        self.assertEqual([l["item_code"] for l in resp.json()["lines"]], ["MUC-ONG", "COMBO-LAU"])
+        self.assertEqual([l["item_code"] for l in resp.json()["lines"]], ["MUC-ONG", "COMBO-NUONG"])
         self.assertEqual(self.snapshot(), before)
 
     def test_s2_02_ac5_step_comes_from_settings(self):

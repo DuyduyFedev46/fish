@@ -1,0 +1,196 @@
+/* Cách mua hàng (P3-HowToBuy, DesktopPolicy#cach-mua). Chỉ token trong app/globals.css. */
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-1) 0 var(--space-2);
+}
+
+.title {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: -0.015em;
+}
+
+.lead {
+  margin: 0;
+  color: var(--ink-2);
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  padding: 6px var(--space-4) var(--space-2);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  color: var(--ink-2);
+}
+
+.card > p {
+  margin: var(--space-2) 0;
+}
+
+.cardTitle {
+  margin: 10px 0 2px;
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.steps {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.step {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.step:last-child {
+  border-bottom: 0;
+}
+
+.stepNo {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-full);
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.stepText {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.stepTitle {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.stepDesc {
+  color: var(--ink-2);
+}
+
+.faq {
+  border-bottom: 1px solid var(--border);
+}
+
+.faq:last-child {
+  border-bottom: 0;
+}
+
+.question {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-height: 48px;
+  color: var(--ink);
+  font-weight: 500;
+  list-style: none;
+  cursor: pointer;
+}
+
+.question::-webkit-details-marker {
+  display: none;
+}
+
+.chevron {
+  display: inline-flex;
+  flex: none;
+  color: var(--ink-3);
+  transition: transform var(--dur-swap) var(--ease-out);
+}
+
+.faq[open] .chevron {
+  transform: rotate(180deg);
+}
+
+.answer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: 0 0 var(--space-3);
+  color: var(--ink-2);
+}
+
+.answer p {
+  margin: 0;
+}
+
+.cta {
+  margin-top: var(--space-2);
+}
+
+@media (min-width: 768px) {
+  .wrap {
+    gap: var(--space-4);
+  }
+
+  .card {
+    padding: var(--space-5) var(--space-8) var(--space-4);
+  }
+
+  .cardTitle {
+    margin-top: 0;
+    font-size: 20px;
+    letter-spacing: -0.01em;
+  }
+
+  .title {
+    font-size: 24px;
+  }
+
+  /* Máy tính: 5 bước thành lưới thẻ (DesktopPolicy#cach-mua). */
+  .steps {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: var(--space-3);
+    margin-top: var(--space-3);
+  }
+
+  .step {
+    flex-direction: column;
+    gap: var(--space-2);
+    padding: var(--space-4);
+    border-bottom: 0;
+    border-radius: var(--radius-card);
+    background: var(--surface-2);
+  }
+
+  .stepDesc {
+    font-size: 13px;
+  }
+
+  .cta {
+    align-self: flex-start;
+    min-width: 240px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chevron {
+    transition: none;
+  }
+}

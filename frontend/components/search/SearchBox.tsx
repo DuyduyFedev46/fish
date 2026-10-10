@@ -21,6 +21,8 @@ export interface SearchBoxProps {
   suggestions?: SuggestItem[];
   recentQueries?: string[];
   onQueryChange?: (q: string) => void;
+  /** Gọi khi ô nhận tiêu điểm (nạp catalog trễ cho gợi ý). */
+  onFocusSearch?: () => void;
   onClearRecent?: () => void;
   /** Gọi khi gửi từ khoá (Enter, "Tìm", chọn "Xem tất cả") để container lưu "Tìm gần đây". */
   onRemember?: (q: string) => void;
@@ -41,6 +43,7 @@ export default function SearchBox({
   suggestions = [],
   recentQueries = [],
   onQueryChange,
+  onFocusSearch,
   onClearRecent,
   onRemember,
 }: SearchBoxProps) {
@@ -145,7 +148,10 @@ export default function SearchBox({
             setOpen(true);
             onQueryChange?.(e.target.value);
           }}
-          onFocus={() => setOpen(true)}
+          onFocus={() => {
+            setOpen(true);
+            onFocusSearch?.();
+          }}
           onKeyDown={onKeyDown}
         />
         {value ? (

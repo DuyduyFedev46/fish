@@ -2,7 +2,7 @@
 
 Tạo đơn BOOKED + giữ chỗ theo lô chọn FEFO (BR-BH-02/05/06/07; lô chốt một lần lúc tạo đơn, BR-BH-11), giá & ưu đãi (BR-DM-02/08), đóng băng giá/công thức (BR-BH-08).
 Job huỷ đơn quá TTL idempotent (BR-BH-03/04, `tasks.py`); huỷ đơn đã thanh toán hoàn kho lô gốc (BR-HT-05, quyền `cancel_paid_order`).
-Endpoint: `POST /api/shop/orders/`, `GET /api/shop/orders/{code}/?phone_last4=` (`shop_api.py`); `/api/sales/orders/` (chỉ đọc) + `POST …/{id}/cancel/`.
+Endpoint: `POST /api/shop/orders/` (tạo đơn, chống trùng `client_request_id`), `POST /api/shop/orders/lookup/` (tra đơn bằng mã + SĐT đầy đủ hoặc mã tra đơn; GET 4 số cuối đã gỡ) (`shop_api.py`); `/api/sales/orders/` (chỉ đọc) + `POST …/{id}/cancel/`.
 S10: list lọc `status` (nhiều, dấu phẩy), `date_from`/`date_to` (ngày tạo, giờ VN), `q` (mã đơn/SĐT, khớp một phần), 20 dòng/trang;
 chi tiết có dòng hàng, phân bổ lô (`unit_cost` chỉ với `view_costprice`), hoá đơn, thanh toán, phiếu giao, hoàn tiền, `available_actions`
 (`services.available_actions` — luật + quyền). S11: `POST …/{id}/confirm-payment` (chỉ Chủ) gọi `payments.services.confirm_payment_manual`.
@@ -18,3 +18,10 @@ P5 (BR-BH-15, Q6): `create_order` làm tròn `total_amount` về **SỐ NGUYÊN 
 `utils.money_vnd`) — dòng đơn (`SalesOrderLine.amount`) vẫn 2 chữ số thập phân như trước.
 P1 (BR-TT-01): đặt hàng KHÔNG còn trả `vietqr` (QR giả) — lập tham số thanh toán cổng SePay
 nay ở `payments/checkout.py` + `payments/shop_api.py` (`POST /api/shop/orders/{code}/checkout/`).
+
+Shop lô 3+4 (SHOP-3-01, 3-02, 4-05; BR-BH-25, 26, 27, 29, BR-TT-19, BR-HT-12; 02b §3.3, §3.4): `shop_api.py` kiểm lỗi tạo đơn
+theo thứ tự SHOP_CLOSED, VALIDATION, đơn cũ (200), INVALID_QTY, POLICY_CHANGED, OUT_OF_STOCK; `services.place_order` chống trùng
+(`SalesOrder.client_request_id` unique, `IntegrityError` bắt ngoài `atomic`); `shop_payload.py` dựng khối dòng/tiền dùng chung;
+`lookup_token.py` ký mã tra đơn (chỉ mã đơn + mốc giờ, hạn `SHOP_LOOKUP_TOKEN_DAYS`); `shop_state.py` tính `state` (E6) và
+`delivery.step`; `shop_labels.py` nhãn theo `state`; `customer_notices.py` dựng `cancel_notice` (nhãn lý do cố định, không khoá `refund*`).
+Lô này không đổi trạng thái đơn.

@@ -131,3 +131,29 @@ Người làm: fe-dev. Chưa commit.
 - B2 (G8): `grep -rnE "sellable_qty|CatalogGrid|AddToCartControl" frontend` = 0. Sửa `frontend/README.md`; fixture e2e `qa-lo6-sr21-shop.py`, `qa-lo7-shop-real.py`, `qa-lo8-shop-format.py` sang `{groups, items}` + `stock_level`; ca kiểm "Còn X kg" đổi thành kiểm nhãn "Sắp hết/Hết hàng" và không hiện số kg; `qa-lo8-shop-django.py` đọc `["items"]` + `stock_level`; `content_item_card.py` bỏ tên `CatalogGrid` trong chú thích. Các script e2e chỉ kiểm cú pháp (`py_compile`), chưa chạy lại trên trình duyệt.
 - Low: toast không che thanh mua ở trang chi tiết 360 px (`body[data-buy-bar]`); nhóm không tồn tại hiện "Không tìm thấy nhóm hàng" thay vì "· 0 món"; SĐT trong `?q=` đã chặn ở `SearchBox.go` (sửa sau khi QA chạy). Tiêu đề story 2b-01 "Chủ/Quản lý" là việc của PO (code đúng: chỉ Chủ). L3 (title trang CMS 404, 2 thẻ robots) thuộc mkt-brand; L5/L6 dữ liệu CMS/lô 5.
 - Kiểm: FE `tsc` sạch, build xanh, check-no-mock XANH, 6 test script đạt; ERP `tsc` sạch, 1342 test đạt, build xanh; check_naming không mới.
+
+## Lô 3+4 (FE) — đặt hàng, thanh toán, trang đơn
+
+Story: SHOP-3-03, 3-05, 3-04, 4-01…4-04, 4-05 (FE), SHOP-5-04 AC5 (dòng "Giao hàng:/Đổi trả:" ở chi tiết món, dùng `getPolicySummaries()` của mkt-brand), 02b §12 (ô tìm chỉ nạp catalog khi chạm; header rút gọn không nạp catalog).
+
+Đã làm: `features/checkout/` viết lại (CheckoutScreen, AddressField, AddressMapPicker, SoldOutSheet, OrderScreen, PaymentView, PendingView, ExpiredView, OrderView, LookupForm, HoldCountdown, PaymentMethod, OrderTimeline, OrderStatusBadge, OrderLines, SuccessBanner, CancelNotice, ConfirmCallBlock; requestId, lookupToken, googleMaps(+.d.ts), orderState, formRules, reorder); `components/ui/{TextField,Checkbox,FormErrorSummary}`; `CartSummary` thêm title/totalLabel/lines/icon; `lib/api.ts` (`createOrder`, `lookupOrder`, `startCheckoutSession`), `lib/types.ts`, `lib/mock.ts` (12 đơn mẫu `SO000000-MOCK…`, SĐT giả 0900000001; ca `#timeout #throttle #policy #closed`; mock lưu băm SĐT, không lưu SĐT).
+Đã xoá: CountdownTimer, OrderLookup, storage.ts, PaymentPanel, OrderPaymentPanel, ConfirmationPolicyNotice(+css), ConfirmCallNotice, class checkout trong legacy.css, `getOrderStatus`, kiểu Wire*.
+
+Kiểm (chạy lại trong lượt này): `rm -rf .next && npm ci && tsc --noEmit` sạch; build `USE_MOCK=0` sạch; `check-no-mock` XANH; test-format 33/33, safe-href 40/40, quantity 45/45, phone 17/17, cart-reconcile 20/20, catalog-view 21/21, order-state 78/78. G7 hex = 0 (file lô chạm); `transition: all` = 0; `check_naming` không có lỗi mới ở frontend (lỗi còn lại ở `backend/.../test_shop_lookup.py` của be-dev). `phone_last4`: 0 trong code/README FE; còn trong `frontend/e2e/*.py` (e2e cũ, thuộc lô 7).
+
+Ảnh chụp (mock, 360 và 1280): `doc/features/2026-10-06-shop-giao-dien-moi/shots/lo34/` (checkout, C2, C3, C4, C5, X2, X3, X4, F1, F2, D1, D2, D3, D3 chậm, D4 hộp thoại/trang, D6, E1 có banner, E2, E2 tiền về sau, E3, E4, E5). Ảnh toàn trang có thanh dính/BottomNav hiện giữa trang là do chụp full_page.
+
+Lệch thiết kế / chỗ cần báo:
+- X2: màn mẫu vẽ form khoá; 02a bảng 4 ghi "trang, không form" nên làm không form (EmptyState + Gọi + Xem giỏ).
+- X4/C9: màn mẫu có nút "Đồng ý và đặt hàng"; theo 02a §6.1 dùng "Xem chính sách" · "Đã hiểu".
+- E5: contract không tách dòng huỷ, nên chỉ hiện Banner số tiền phần bị huỷ, danh sách món giữ nguyên.
+- `cancel_notice.message` (BE) không có chữ "bạn đã thanh toán"; FE hiện nguyên văn rồi thêm "Cần gấp, bạn gọi …" và link chính sách.
+- Khối giờ gọi xác nhận (ConfirmCallBlock): contract không có cờ "đang chờ xác nhận"; FE dò `delivery.step_label` chứa "xác nhận". Đề nghị BE thêm cờ riêng.
+- Nhánh bản đồ CÓ key chưa chạy thật (không có key): chỉ kiểm nhánh không key (C5, 0 request Google). `AddressMapPicker` viết theo Places mới (`AutocompleteSuggestion`) + Geocoder; cần Duy/techlead cấp key để kiểm. Có thể kiểm giao diện bằng cách chặn route Maps và trả stub.
+- `app/blog/page.tsx` từng báo lỗi tsc `postSlug` (thuộc mkt-brand); hiện tsc sạch.
+- C6 mã giảm giá (lô 3b) chưa làm; `voucher_code` đã có trong kiểu.
+
+## Sửa sau QA lô 3+4
+- B1: khối "Còn N chỗ cần sửa" chỉ hiện sau khi bấm "Đặt hàng" (`summaryShown`); lỗi khi rời ô chỉ hiện dưới ô nên nút "Bản đồ" không bị đẩy. Kiểm tay (mock, 360 và 1280): chạm ô địa chỉ rồi bấm "Bản đồ" mở C5 ngay lần đầu, không có khối tóm tắt. Ảnh sau: `shots/lo34/B1-after-{360,1280}.png`.
+- B2: F1 mất mạng có nút "Thử lại" trong banner (`LookupForm`).
+- D3 "Đã chờ": mốc bắt đầu chờ lưu sessionStorage `shop_pending_since_v1` theo mã đơn, tải lại không về 0. Lệch: contract tra đơn không có mốc "bắt đầu chờ tiền" (`placed_at` gồm cả thời gian khách đang trả nên sẽ báo "chờ lâu" sai), nên dùng mốc phía trình duyệt; cần mốc server thì BE phải thêm field.

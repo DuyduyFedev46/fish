@@ -61,18 +61,16 @@ frontend/
 Component trong `components/ui|catalog|cart|search` chỉ **trình bày**: props vào, callback ra, không gọi API, không
 đọc storage. Chỉ `*Screen.tsx`, `ShopHeader` và `ShopFooter` được gọi API. Token màu và chữ lấy từ `DESIGN.md` ở gốc repo.
 
-Còn tồn tại nhưng sẽ xoá theo 02b §1.11: `CountdownTimer`, `app/shop/orders/OrderLookup.tsx`, `features/checkout/storage.ts`, `PaymentPanel`,
-`OrderPaymentPanel` (lô 3+4); `legacy.css`, `features/home/content.ts` (lô 5).
+Còn tồn tại nhưng sẽ xoá ở lô 5 (02b §1.11): `legacy.css`, `features/home/content.ts`. Code lô 3+4 cũ (`CountdownTimer`, `OrderLookup`, `storage.ts`, `PaymentPanel`, `OrderPaymentPanel`, khối thông báo xác nhận) đã xoá.
 
 ## API chính
 
 - `GET /api/shop/catalog/` trả `{groups, items}`. Mỗi món có `stock_level` (`in` / `low` / `out`, Shop hiện ba mức
   Còn hàng / Sắp hết / Hết), không có số kg tồn, giá vốn hay mã lô.
 - `GET /api/shop/catalog/<item_code>/`: chi tiết món.
-- `POST /api/shop/orders/`: đặt đơn, trả mã đơn và `booked_expires_at`.
+- `POST /api/shop/orders/`: đặt đơn (kèm `client_request_id`), trả mã đơn, `lines`, `lookup_token`, `booked_expires_at`.
+- `POST /api/shop/orders/lookup/`: tra đơn bằng mã đơn + SĐT đầy đủ, hoặc mã đơn + `lookup_token`; trả `state` để chọn màn.
 - `POST /api/shop/orders/<code>/checkout/`: lập tham số cổng thanh toán (xem `features/checkout/README.md`).
-- Tra đơn: hiện còn `GET /api/shop/orders/<code>/?phone_last4=`; **lô 3+4 đổi sang
-  `POST /api/shop/orders/lookup/`** (mã đơn + SĐT đầy đủ, hoặc mã tra đơn) và gỡ đường GET.
 
 ## Chạy
 
