@@ -24,7 +24,7 @@ FE): QA sẽ kiểm lại sau khi sửa"* — rồi chạy luôn. Duy nói khác
 | "Review code…", "kiểm tra bảo mật…" | **REVIEW** | Bước 5 |
 | "Luật/pháp lý…", "có vi phạm không", "go-live checklist", hỏi về nghĩa vụ nhà nước | **CHỈ PHÁP LÝ** | Giao `legal-vn` (không qua BA/PO), memo `0X-phap-ly.md` |
 | "Deploy / đưa lên / cập nhật bản thật" | **DEPLOY** | Bước 6 — xác nhận lại phạm vi trước khi chạy |
-| Làm tiếp tính năng đang dở ("làm tiếp", "ok duyệt") | **TIẾP TỤC** | Đọc trạng thái trong `doc/features/<gần nhất>/` |
+| Làm tiếp tính năng đang dở ("làm tiếp", "ok duyệt") | **TIẾP TỤC** | Đọc trạng thái trong `doc/features/<gần nhất>/`, đối chiếu idea trên Jira (`jira_pd.py find`) |
 
 Quy tắc khi phân vân:
 - Lỗi nhưng gốc là *quy tắc nghiệp vụ chưa rõ* (vd "tính lãi sai" mà không rõ công thức
@@ -116,6 +116,42 @@ Cho bug nhỏ / chỉnh sửa rõ ràng, 1 story:
 
 Không cần `techlead` trừ khi sửa đụng kiến trúc/hợp đồng BE↔FE — lúc đó techlead viết
 `02b` ngắn trước khi dev.
+
+## Cập nhật Jira Product Discovery (Duy chốt 2026-10-11)
+Mỗi tính năng là một idea trong project **FISH**
+(dtduy46work.atlassian.net). Chỉ **điều phối viên** cập nhật idea, subagent không đụng
+Jira. Dùng `python3 -I .claude/scripts/jira_pd.py`. Token nằm ở `~/.jira-env`, ngoài repo,
+và không bao giờ in ra hay đưa vào commit.
+
+Workflow: `PLAN → DISCOVERY → SHAPE ⇄ REVIEW SHAPE → BUILD → STAGING → DONE`. Từ bước
+nào cũng chuyển được sang `PARKED` (tạm hoãn) hoặc `CANCELLED` (bỏ).
+
+Chỉ chuyển trạng thái **sau khi việc đã xảy ra thật** (file đã ghi, test tự chạy lại đã xanh,
+Duy đã trả lời). Mỗi lần chuyển kèm 1 dòng comment: chuyện vừa xảy ra, bằng chứng (file hoặc
+commit) và ai làm bước kế.
+
+| Lúc | Lệnh |
+|---|---|
+| Duy nhờ việc mới (bước 0) | `find <slug>`. Chưa có thì `create "[Hệ thống] - Tên" --folder <ngày-slug> --labels tinh-nang,agent-…` → PLAN |
+| Giao product-manager hoặc ba-analyst | `move KEY DISCOVERY` |
+| BA xong, cần Duy duyệt (điểm dừng 1) | `move KEY "REVIEW SHAPE" "Cần Duy duyệt BA: …"` |
+| Giao po-owner, ux-designer, techlead | `move KEY SHAPE` |
+| Story và 02b xong, cần Duy duyệt (điểm dừng 2) | `move KEY "REVIEW SHAPE" "Cần Duy duyệt story: …"` |
+| Duy duyệt, giao lô đầu cho be-dev ∥ fe-dev | `move KEY BUILD` |
+| Một lô QA APPROVED nhưng còn lô sau | chỉ `comment KEY "Lô 2/5 APPROVED, commit …"`, không đổi trạng thái |
+| QA APPROVED lô cuối, đã push và deploy staging | `move KEY STAGING "…"` |
+| Lên production | `move KEY DONE "…"` |
+| Duy nói hoãn hoặc bỏ | `move KEY PARKED` / `move KEY CANCELLED` kèm lý do |
+| Luồng NHANH | `create` rồi `move KEY BUILD` ngay, sau đó đi như trên |
+
+Cách viết idea: **ngắn gọn, dễ hiểu với người không đọc code**.
+- Tên dạng `[Hệ thống] - Tên`. Hệ thống gồm Shop, ERP, CMS, Payment, AI, Core, Infra,
+  Marketing; nhiều hệ thống thì nối bằng gạch, ví dụ `[ERP-Payment]`.
+- Mô tả theo khung 6 phần (`jira_pd.py template`). Mỗi ô tối đa 1–3 dòng ngắn, không tên
+  file, không tên model. Ô nào chưa có thông tin thì **để trống**.
+- Ô 18–20 ghi tên agent (`ba-analyst, po-owner, techlead, be-dev, qa-tester`). Ô 19
+  (người quyết định) là "Duy (PO)".
+- Không ghi dữ liệu cá nhân của khách và không ghi giá vốn từng lô.
 
 ## Nguyên tắc điều phối
 - Mỗi lượt giao việc: nêu rõ đường dẫn hồ sơ, mã story, phạm vi file được sửa, đầu ra cần trả.

@@ -56,6 +56,7 @@ Skill dùng chung: `.agents/skills/` trỏ về `.claude/skills/`, nên sửa sk
 
 ## Luật chung
 - **Git:** mỗi khi xong một tính năng (một lô đã QA APPROVED) thì commit và `git push origin main` lên github.com/DuyduyFedev46/fish. Đây là quy ước Duy đặt ngày 2026-09-25. Repo đang công khai nên không bao giờ commit `.env` hay bí mật.
+- **Jira Product Discovery (Duy chốt 2026-10-11):** mỗi tính năng là một idea trong project FISH. Điều phối viên cập nhật trạng thái theo các mốc trong skill `feature` (mục "Cập nhật Jira Product Discovery"), dùng `.claude/scripts/jira_pd.py`; subagent không đụng Jira. Viết idea ngắn gọn, tên `[Hệ thống] - Tên`.
 - Không deploy khi Duy chưa yêu cầu.
 - Không báo "xong"/"test xanh" khi chưa chạy lệnh kiểm chứng trong lượt đó.
 - Không rò giá vốn, không xoá chứng từ, không lật quyết định trong `doc/decisions.md`.
