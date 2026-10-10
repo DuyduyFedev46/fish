@@ -1,5 +1,7 @@
 # Đối chiếu thiết kế Shop mới (prototype 06/10) với code hiện tại
 
+> **Cập nhật 11/10:** một số mục ở đây đã bị thay bởi chốt 10–11/10: bỏ BE-6 (không nút Huỷ đơn), bỏ `search_chips`, mã BR-BH-18/19 thay bằng BR-BH-22…30 và BR-DM-17…25. Khi lệch, theo `PLAN.md`, `doc/business-process-spec.md` và `doc/decisions.md`.
+
 > Tech Lead · 2026-10-06 · CHỈ ĐỌC, không sửa repo.
 
 > **Cập nhật sau đối chiếu (06/10):** thiết kế đã sửa theo 3 câu. **Q1:** đã bỏ khối "Giao tới" trên mọi trang đơn hàng.

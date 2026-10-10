@@ -16,13 +16,22 @@
 
 ## 2. Đơn hàng và thanh toán
 1. Form đặt hàng chỉ gồm **Họ và tên · Số điện thoại · Địa chỉ giao hàng (một ô) · ô đồng ý chính sách quyền riêng tư**. Không có hoá đơn điện tử.
+   **Ô đồng ý không bao giờ tick sẵn** (NĐ 356/2025 cấm đồng ý mặc định; prototype `consent: true` là sai). Câu chữ theo `05-phap-ly.md` §1.2(a), link mở tab mới,
+   lỗi "Đánh dấu đồng ý ở trên để đặt hàng." (BR-BH-17; chốt 10/10)
 2. **Địa chỉ một ô**: một `<textarea>` 2 dòng. Bên phải có nút "Bản đồ" mở Google Maps để tìm, ghim rồi tự điền vào ô. Khách vẫn sửa tay được.
    Script Google Maps chỉ nạp khi khách bấm "Bản đồ". Không lưu toạ độ.
-3. **Phí giao** không có trong hệ thống. Chỉ ghi "Phí giao: Báo khi xác nhận đơn".
+   Popup bản đồ hiện dòng thông báo **ngay khi mở** (trước khi script nạp xong), dưới ô "Tìm địa chỉ": "Bản đồ do Google cung cấp. Chữ bạn gõ và vị trí bạn ghim
+   sẽ được gửi tới Google. Không muốn dùng, bạn đóng lại và gõ địa chỉ trực tiếp." **Không có nút "Vị trí của tôi"** ở V1 (BR-BH-29; chốt 10/10).
+3. **Phí giao** không có trong hệ thống. Không có dòng "Phí giao", không hứa "miễn phí giao". Ngay dưới dòng Tổng ở giỏ, đặt hàng và thanh toán ghi
+   (chữ phụ 13 px): "Đã gồm giao hàng. Bạn trả một lần, không trả thêm khi nhận hàng." (BR-BH-30; chốt 10/10). Khu vực giao và dòng nhắc khu vực ở form đặt hàng:
+   Phan Thiết (D 11/10); ranh giới và đơn ngoài vùng tạm theo `doc/ops/hoi-loc.md` L1–L2.
 4. **Giữ hàng 30 phút** bắt đầu khi bấm "Đặt hàng" (không phải khi thêm vào giỏ). Màn thanh toán có đồng hồ đếm ngược, dưới 5 phút thì chuyển màu hổ phách.
 5. Thanh toán duy nhất là **chuyển khoản ngân hàng quét mã QR (VietQR)**. **Không hiện tên nhà cung cấp cổng thanh toán** trên giao diện khách (nút ghi "Thanh toán", phương thức ghi "Chuyển khoản ngân hàng (quét mã QR)"). Tên cổng chỉ nằm trong code và tài liệu kỹ thuật. Thanh toán xong thì vào thẳng **trang đơn hàng** (cũng là trang tra cứu), trên cùng có banner "Thanh toán thành công".
-6. **Không hiện chữ "hoàn tiền"** trên Shop, **trừ tên trang "Chính sách đổi trả và hoàn tiền"** (bắt buộc công khai theo checklist go-live). Đơn huỷ sau khi khách đã trả tiền ghi "Cá Về sẽ gọi cho bạn" kèm hotline.
+6. **Không hiện chữ "hoàn tiền"** ở trang đơn hàng và các màn đặt hàng, thanh toán, **trừ tên trang "Chính sách đổi trả và hoàn tiền"** (bắt buộc công khai theo checklist go-live). Trang chính sách thì phải nói rõ cách Cá Về trả lại tiền (mục "Xử lý tiền đã chuyển khi đơn huỷ").
+   Đơn huỷ sau khi khách đã trả tiền: nhãn lý do cố định, số tiền phần bị huỷ, câu "Cá Về sẽ gọi vào số điện thoại đặt hàng trong [thời hạn] để …" kèm hotline và link mục chính sách trên;
+   không hiện tiến độ phiếu hoàn (BR-HT-12; bản câu A/B và thời hạn bản A, tạm gọi trong 1 ngày làm việc, trả tiền trong 3 ngày làm việc (D 11/10: câu tạm, hỏi Lộc L6–L7 ở `doc/ops/hoi-loc.md`)).
 7. Mã đơn hiển thị đúng định dạng code (`SO…`), font mono hoặc `tabular-nums`.
+8. Khách **không tự huỷ đơn** trên Shop: màn thanh toán không có nút "Huỷ đơn"; đơn chưa trả tự huỷ khi hết 30 phút (BR-BH-28; chốt 10/10).
 
 ## 2b. Mã giảm giá (chốt 07/10)
 1. Ô "Mã giảm giá" nằm ở **tóm tắt giỏ hàng**: điện thoại là dòng "Nhập mã" mở bottom sheet, máy tính là ô nhập + nút "Áp dụng" ngay trong hộp tóm tắt.
@@ -30,7 +39,8 @@
 3. Lỗi nói rõ lý do và cách sửa, nằm dưới ô: mã sai/hết hạn, chưa đủ điều kiện ("Đơn cần từ … để dùng mã này."), hết lượt, ưu đãi đang áp lợi hơn, lỗi mạng.
 4. Mã hết hiệu lực ngay lúc đặt → dialog báo, cho đặt tiếp không dùng mã. Không bao giờ tự đặt với giá khác giá khách đã thấy mà không hỏi.
 5. Tóm tắt ở thanh toán và trang đơn có dòng "Mã giảm giá (MÃ) −…".
-6. Không cộng dồn với ưu đãi tự động (mặc định, chờ Duy xác nhận); hệ thống lấy cái lợi hơn.
+6. Không cộng dồn với ưu đãi tự động (Duy duyệt 10/10, BR-DM-18); hệ thống lấy cái lợi hơn, hoà thì giữ ưu đãi tự động. Khi mã hợp lệ, giỏ hiện điều kiện của mã
+   (mức giảm, đơn tối thiểu, hạn dùng, "Số lượt có hạn", "Không áp dụng cùng ưu đãi khác; Cá Về tự chọn mức có lợi hơn cho bạn"). Không hiện số lượt còn lại (BR-DM-24).
 
 ## 2c. Trạng thái đơn quyết định màn hiển thị
 Trạng thái đơn thật (lấy từ server) **luôn thắng** tham số `result` trên URL. Bảng đầy đủ: `screens/E6-StatusRules.dc.html`.
@@ -50,24 +60,24 @@ Ví dụ: mở lại link thanh toán cũ khi đơn đã trả → trang đơn c
    Màu và chữ vẫn theo token `DESIGN.md`.
 2. **Mobile-first**: thiết kế ở 390 px, phải chạy ở 360 px mà không cuộn ngang. Bản máy tính 1280 px, nội dung nằm trong container `max-width: 1200px`.
 3. **Header** (đặc tả từng link: `screens/HeaderFooter-*.dc.html`):
-   - H1, header trang chủ: nền thương hiệu, logo, hotline, tra cứu đơn, giỏ có badge, ô tìm, chip tìm nhiều.
+   - H1, header trang chủ: nền thương hiệu, logo, hotline, tra cứu đơn, giỏ có badge, ô tìm. **Không có dải chip "Tìm nhiều"** (chốt 10/10); gợi ý khi gõ vẫn giữ (D13).
    - H2, khi cuộn hoặc ở trang danh mục: nền trắng, cao 56 px.
    - H3, trang con: nút quay lại, tiêu đề, giỏ.
    - H4, các bước đặt hàng: chỉ có nút quay lại và tiêu đề. Không logo, không giỏ, không menu.
    - Máy tính: header 2 tầng (H1); Giỏ, Đặt hàng, Thanh toán dùng header rút gọn.
 4. **Badge giỏ là số món**, không phải tổng kg. Ẩn badge khi giỏ có 0 món.
-5. **Thanh điều hướng đáy** (điện thoại) gồm Trang chủ · Danh mục · Giỏ hàng · Đơn hàng. Chỉ hiện ở Trang chủ, Danh mục, Góc bếp.
+5. **Thanh điều hướng đáy** (điện thoại) gồm Trang chủ · Danh mục · Giỏ hàng · Đơn hàng. Chỉ hiện ở Trang chủ, Danh mục, Góc bếp, Tra cứu đơn (D9, chốt 10/10).
 6. **Footer đầy đủ** (F1) gồm:
    - gọi và Zalo;
-   - nhóm Mua hàng, nhóm Chính sách (6 link, có "Chính sách đổi trả và hoàn tiền" và "Cơ chế giải quyết khiếu nại"), nhóm Về Cá Về;
-   - dải pháp lý (tên doanh nghiệp, MST, địa chỉ, giấy chứng nhận ĐKKD, logo Bộ Công Thương).
+   - nhóm Mua hàng, nhóm Chính sách (6 link, có "Chính sách đổi trả và hoàn tiền", "Cơ chế giải quyết khiếu nại" và trang `terms` tên **"Điều kiện giao dịch chung"**, không ghi "Điều khoản sử dụng"; chốt 07/10, 10/10), nhóm Về Cá Về;
+   - dải pháp lý (tên doanh nghiệp, MST, địa chỉ, giấy chứng nhận ĐKKD, biểu tượng đã thông báo Bộ Công Thương). Biểu tượng **chỉ gắn khi có link xác nhận**; chưa có thì ẩn hẳn khối (D12). Trường người bán nào trống thì ẩn dòng đó, không hiện "Đang chờ" (BR-ND-18).
    Điện thoại hiện dạng nhóm thu gọn. Giỏ, Đặt hàng, Thanh toán dùng **footer rút gọn** (F2).
 
 ## 5. Popup
 1. Điện thoại: **bottom sheet** (có thanh kéo) cho danh sách lựa chọn, **dialog giữa màn** cho xác nhận, **toast** (nền tối, `role="status"`) cho phản hồi nhanh.
 2. Máy tính: mọi popup là **hộp thoại giữa màn** rộng 440–480 px, có nút X. Gợi ý tìm kiếm là dropdown dưới ô tìm.
 3. Popup có `role="dialog" aria-modal="true"`, giữ tiêu điểm bên trong, đóng bằng Esc, trả tiêu điểm về nút đã mở nó. Lớp phủ `rgba(23,23,28,0.48)`.
-4. Việc phá huỷ (bỏ món, huỷ đơn) dùng nút đỏ, có bước xác nhận.
+4. Việc phá huỷ (bỏ món) dùng nút đỏ, có bước xác nhận. Shop không có nút huỷ đơn (BR-BH-28).
 
 ## 6. Câu chữ
 1. **Gọn**: mỗi màn chỉ có tiêu đề, **một câu cần thiết** và nút. Không dòng chú thích nhỏ giải thích, không mã luật, không chữ kỹ thuật.

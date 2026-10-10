@@ -27,7 +27,7 @@ code (xem log, seed dữ liệu, đổi mật khẩu) — làm trực tiếp.
 | BA | `ba-analyst` | requirement-elicitation | `doc/features/<ngày>-<slug>/01-analysis.md` |
 | PO | `po-owner` | user-story-writing | `02-stories.md` (+ nghiệm thu) |
 | UX | `ux-designer` | caveve-ui, impeccable (chỉ đọc), web-design-guidelines, fixing-accessibility, baseline-ui | `02a-ux-flow.md` + link prototype |
-| Marketing/Brand | `mkt-brand` | caveve-domain, caveve-ui | `0X-marketing.md` trong hồ sơ tính năng |
+| Marketing/Brand (full stack, Duy chốt 10/10) | `mkt-brand` | caveve-domain, caveve-ui, django-drf-patterns, nextjs-shop-patterns, tdd-workflow | `0X-marketing.md` + code nội dung/CMS (app `content`, trang nội dung Shop) |
 | Tech Lead | `techlead` | caveve-domain, django-drf-patterns, nextjs-shop-patterns | `02b-tech-design.md` + review code |
 | Pháp lý | `legal-vn` | caveve-domain (+ WebSearch/WebFetch) | `0X-phap-ly.md` trong hồ sơ tính năng hoặc `doc/ops/` |
 | BE | `be-dev` | django-drf-patterns, tdd-workflow | code `backend/` `adapter/` + `03-dev-notes.md` |

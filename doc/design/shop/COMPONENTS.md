@@ -138,7 +138,7 @@ Lô theo `PLAN.md`. "Mới" là file chưa có. ⚠ = file mới **chưa nằm t
 |---|---|---|---|
 | 1 | Button | 1 | mới `components/ui/Button.tsx` |
 | 2 | IconButton | 1 | mới `components/ui/IconButton.tsx` (+ `CartBadge` trong cùng file) |
-| 3 | Chip | 1 (chip header) · 2 (chip lọc) | mới `components/ui/Chip.tsx` |
+| 3 | Chip | 2 (chip lọc, tìm gần đây; chip header "Tìm nhiều" bỏ, chốt 10/10) | mới `components/ui/Chip.tsx` |
 | 4 | SegmentedControl | 2 | mới `components/ui/SegmentedControl.tsx` |
 | 5 | Link | 1 | mới `components/ui/TextLink.tsx` (export `TextLink`, tránh trùng `next/link`) |
 | 6 | Toggle | 2 | mới `components/ui/ToggleButton.tsx` |
@@ -235,7 +235,7 @@ Dev code theo cột "Dùng". Khi QA so ảnh với file màn, các chỗ này **
 
 ## Điểm cần chốt trước khi code
 
-Câu đã mở sẵn trong `PLAN.md` (Q2, Q4, Q6, Q7, Q8, Q9, bước 0,5 kg) vẫn giữ nguyên. Câu mới từ tài liệu này:
+Câu đã mở sẵn trong `PLAN.md` (Q2, Q4, Q6, Q7, Q8, Q9, bước 0,5 kg) **đã được Duy trả lời 10/10** (xem `PLAN.md` mục Điều kiện đầu vào). Câu mới từ tài liệu này:
 
 | Mã | Câu hỏi | Mặc định nếu chưa trả lời |
 |---|---|---|
@@ -243,7 +243,7 @@ Câu đã mở sẵn trong `PLAN.md` (Q2, Q4, Q6, Q7, Q8, Q9, bước 0,5 kg) v�
 | Q-UX-2 | Icon Shop dùng bộ SVG nét như thiết kế, hay Material Symbols như ERP? | SVG như thiết kế, gom ở `Icon.tsx` |
 | Q-UX-3 | Thêm cỡ "số đồng hồ" 40/600 vào `SO-CHUAN.md`? | dùng 40/600 |
 | Q-UX-4 | Nút "Đặt hàng" khi chưa tick đồng ý: màn C1 vẽ nút **tắt** + dòng nhắc; `DESIGN.md` cấm tắt nút vì thiếu ô. | Nút **luôn bấm được**; bấm khi chưa tick thì hiện lỗi ở ô đồng ý và trong FormErrorSummary |
-| Q-UX-5 | BottomNav ở F1/F2 (tra cứu đơn): màn vẽ có, UI-RULES §4.5 không liệt kê. | Theo màn: hiện ở tra cứu đơn (tab "Đơn hàng" đang chọn); cần Duy duyệt để sửa UI-RULES |
+| Q-UX-5 | BottomNav ở F1/F2 (tra cứu đơn): màn vẽ có, UI-RULES §4.5 không liệt kê. | ĐÃ CHỐT (Duy 10/10, D9): hiện ở tra cứu đơn (tab "Đơn hàng" đang chọn); UI-RULES §4.5 đã sửa |
 | Q-UX-6 | Danh mục điện thoại có cả CartBar (A2) và BottomNav (A0). | Có món trong giỏ: CartBar nằm **trên** BottomNav; giỏ trống: chỉ BottomNav |
 | Q-UX-7 | ĐÃ CHỐT (điều phối, 07/10): câu A7 đổi thành "Món này đang hết. Liên hệ để hỏi khi nào có hàng." | — |
 
@@ -251,7 +251,7 @@ Câu đã mở sẵn trong `PLAN.md` (Q2, Q4, Q6, Q7, Q8, Q9, bước 0,5 kg) v�
 - Thời lượng giữ hàng để vẽ thanh tiến độ (`hold_minutes` hoặc `booked_at`) và giờ máy chủ (`server_now`) để đồng hồ không lệch giờ máy khách. Câu "30 phút" trên màn lấy từ field này, không hard-code.
 - Bảng trạng thái đơn hiển thị (enum → nhãn) cho OrderStatusBadge và OrderTimeline; mốc `placed_at`, `paid_at`, `delivered_at` (BE-5).
 - Tên biến môi trường Maps: `HUONG-DAN-CODE.md` ghi `NEXT_PUBLIC_GOOGLE_MAPS_KEY`, `DOI-CHIEU-CODE.md` ghi `NEXT_PUBLIC_GOOGLE_MAPS_KEY`. Chốt một tên ở 02b.
-- `site-info.seller.zalo`, `search_chips`, `return_report_hours` (BE-7); nhóm có `parent_slug` (L-20) cho menu con máy tính.
+- `site-info.seller.zalo`, `return_report_hours` (BE-7; **không** `search_chips`, chốt 10/10); nhóm có `parent_slug` (L-20) cho menu con máy tính.
 - Lỗi hết hàng có cấu trúc `lines[].stock_level: 'out' | 'short'` (BE-3) cho popup C3.
 
 ---
@@ -380,7 +380,7 @@ interface IconButtonProps extends Omit<React.ButtonHTMLAttributes<HTMLButtonElem
 
 ## 3. Chip
 
-1. **Công dụng.** Viên nhỏ để lọc nhóm hàng, gợi ý từ khoá, tìm gần đây. **Dùng ở:** `Main`, `A4-Toast`, `A5-NotFound`, `A6-Offline` (lọc), `Home`/`HeaderFooter-Mobile` (tìm nhiều), `A8-SearchSuggest` (tìm gần đây), `G1-KitchenList` (lọc chuyên mục).
+1. **Công dụng.** Viên nhỏ để lọc nhóm hàng, gợi ý từ khoá, tìm gần đây. **Dùng ở:** `Main`, `A4-Toast`, `A5-NotFound`, `A6-Offline` (lọc), `A8-SearchSuggest` (tìm gần đây), `G1-KitchenList` (lọc chuyên mục). **Bỏ dải chip "Tìm nhiều"** ở `Home`/`HeaderFooter-Mobile` (chốt 10/10): biến thể `on-brand` không dùng ở V1.
 2. **Giải phẫu.** (a) icon đầu tuỳ chọn (đồng hồ ở "tìm gần đây") · (b) nhãn.
 3. **Biến thể.**
 
@@ -388,7 +388,7 @@ interface IconButtonProps extends Omit<React.ButtonHTMLAttributes<HTMLButtonElem
 |---|---|---|
 | `filter` | `<a>` có `aria-current` (đổi URL) hoặc `<button aria-pressed>` (lọc tại chỗ) | hàng nhóm hàng ở danh mục, chuyên mục Góc bếp |
 | `link` | `<a>` | gợi ý nhóm ở trạng thái rỗng, tìm gần đây |
-| `on-brand` | `<a>` | "Tìm nhiều" trên header trang chủ |
+| ~~`on-brand`~~ | `<a>` | ~~"Tìm nhiều" trên header trang chủ~~ — bỏ (chốt 10/10), không code |
 
 4. **Kích thước và khoảng cách.**
 
@@ -414,13 +414,13 @@ on-brand: nền `--accent-hover` #1A57B5, chữ `--on-accent`.
 | chọn | filter bật như token; `aria-current="page"` hoặc `aria-pressed="true"` |
 | disabled / đang tải / lỗi | không áp dụng; khi danh mục đang tải, hàng chip là Skeleton |
 
-7. **Hành vi.** Chip nhóm trên danh mục đổi URL `/shop/?group=<slug>` (combo: `?type=combo`), nên dùng `<a>` + `aria-current="page"` để nút Back hoạt động. Chip "Tìm nhiều" mở `/shop/?q=<từ khoá>`; tối đa 4 chip (đặc tả H1), nguồn `search_chips` (BE-7) hoặc tạm 4 nhóm đầu (L-25). Chip "tìm gần đây" mở `/shop/?q=`.
+7. **Hành vi.** Chip nhóm trên danh mục đổi URL `/shop/?group=<slug>` (combo: `?type=combo`), nên dùng `<a>` + `aria-current="page"` để nút Back hoạt động. Không có chip "Tìm nhiều" và không có `search_chips` (chốt 10/10). Chip "tìm gần đây" mở `/shop/?q=`.
 8. **Props.**
 
 ```ts
 interface ChipProps {
   label: string;
-  variant?: 'filter' | 'link' | 'on-brand';   // 'filter'
+  variant?: 'filter' | 'link';                // 'filter' ('on-brand' bỏ cùng chip "Tìm nhiều", chốt 10/10)
   href?: string;                              // có: <a>
   selected?: boolean;                         // false (filter)
   onClick?: () => void;                       // filter tại chỗ (không href)
@@ -428,9 +428,8 @@ interface ChipProps {
 }
 ```
 
-9. **Truy cập.** Hàng chip bọc `<nav aria-label="Danh mục">` (lọc) hoặc `<nav aria-label="Tìm nhiều">`. Không dùng `tabindex` > 0. Trạng thái chọn có cả màu lẫn thuộc tính ARIA.
-10. **Câu chữ.** "Tất cả", "Cá", "Tôm", "Mực", "Cua ghẹ", "Combo" (tên nhóm lấy từ catalog). Tìm nhiều: "Cá thu", "Mực ống", "Tôm sú", "Combo lẩu" (dữ liệu mẫu).
-11. **Không được.** Chip filter cao < 40 hoặc không có vùng chạm 44. Dùng chip để chạy hành động phá huỷ. Ghi số kg trong chip.
+9. **Truy cập.** Hàng chip lọc bọc `<nav aria-label="Danh mục">`. Không dùng `tabindex` > 0. Trạng thái chọn có cả màu lẫn thuộc tính ARIA.
+10. **Câu chữ.** "Tất cả", "Cá", "Tôm", "Mực", "Cua ghẹ", "Combo" (tên nhóm lấy từ catalog).11. **Không được.** Chip filter cao < 40 hoặc không có vùng chạm 44. Dùng chip để chạy hành động phá huỷ. Ghi số kg trong chip.
 12. **Code.** Mới `frontend/components/ui/Chip.tsx`.
 
 ## 4. SegmentedControl
@@ -595,7 +594,7 @@ interface TextFieldProps {
 1. **Công dụng.** Một ô địa chỉ giao hàng (gõ tay được) cộng nút "Bản đồ" mở Google Maps để tìm, ghim rồi tự điền chuỗi địa chỉ. **Dùng ở:** `Checkout`, `C1b-MapPicker`, `C1c-AddressFilled`, `C2-Invalid`, `C5-LocationDenied`, `DesktopCheckout`, `DesktopMapPicker`.
 2. **Giải phẫu.**
    - AddressField: (a) tiêu đề khối là `<label>` "Địa chỉ giao hàng" · (b) Banner thành công tuỳ chọn · (c) khung chứa textarea 2 dòng + nút "Bản đồ" bên phải · (d) gợi ý "Thêm hẻm, tầng, toà nhà nếu có." hoặc dòng lỗi.
-   - MapPicker (trong FullscreenSheet): (a) thanh đầu: nút đóng X + tiêu đề · (b) ô tìm địa chỉ (combobox) + danh sách gợi ý · (c) vùng bản đồ: ghim giữa có nhãn "Giao tới đây", nút nổi "Vị trí của tôi" · (d) chân: địa chỉ đang chọn + nút "Xác nhận vị trí này".
+   - MapPicker (trong FullscreenSheet): (a) thanh đầu: nút đóng X + tiêu đề · (b) ô tìm địa chỉ (combobox) + danh sách gợi ý · (c) vùng bản đồ: ghim giữa có nhãn "Giao tới đây" (**không** có nút "Vị trí của tôi", chốt 10/10, BR-BH-29) · (b2) dòng thông báo Google ngay dưới ô tìm, hiện ngay khi sheet mở · (d) chân: địa chỉ đang chọn + nút "Xác nhận vị trí này".
 3. **Biến thể.** AddressField: `empty` · `filled-from-map` (C1c) · `error` (C2). MapPicker: điện thoại là FullscreenSheet; máy tính là hộp thoại lớn.
 4. **Kích thước và khoảng cách.**
 
@@ -604,27 +603,28 @@ interface TextFieldProps {
 | Khung ô | textarea 2 dòng (≈64), đệm 10 12; nút Bản đồ rộng 64, cao bằng khung | như điện thoại |
 | MapPicker | sheet cách mép trên 24, mép trên bo 16; đầu 56; ô tìm 44 (đệm 12 16 8); chân đệm 14 16 16 + safe-area | hộp thoại `min(960px, 100vw - 48px)` × `min(640px, 100dvh - 48px)`, bo 14 |
 | Dòng gợi ý địa chỉ | đệm 10 12, icon 18, gap 10 | như điện thoại |
-| "Vị trí của tôi" | cao 44, đệm 0 12, cách góc 12 | như điện thoại |
+| Dòng thông báo Google | chữ `caption` 12–13, đệm 0 16 8, ngay dưới ô tìm | như điện thoại |
 | CTA xác nhận | `lg` 48 pill, rộng đầy | như điện thoại |
 
-5. **Token.** Khung: viền 1px `--border-input`, bo `--radius-md`, nền `--surface`. Nút Bản đồ: nền `--accent-soft`, chữ `caption` 12/600 `--accent-text`, icon 20 `--accent-text`, viền trái 1px `--border`. Đã điền: viền `--good`, nền `--good-soft`, Banner `success`. Danh sách gợi ý: nền `--surface`, viền `--border`, bo `--radius-lg`, bóng `--shadow-pop`; dòng đang chọn nền `--accent-soft`; dòng 1 14/600, dòng 2 `caption` `--ink-2`. Nhãn "Giao tới đây": nền `--ink`, chữ `--on-accent` 12/500, bo `--radius-sm`. Ghim `--accent`. "Vị trí của tôi": nền `--surface`, bóng `--shadow-pop`, bo `--radius-full`, icon `--accent-text`.
+5. **Token.** Khung: viền 1px `--border-input`, bo `--radius-md`, nền `--surface`. Nút Bản đồ: nền `--accent-soft`, chữ `caption` 12/600 `--accent-text`, icon 20 `--accent-text`, viền trái 1px `--border`. Đã điền: viền `--good`, nền `--good-soft`, Banner `success`. Danh sách gợi ý: nền `--surface`, viền `--border`, bo `--radius-lg`, bóng `--shadow-pop`; dòng đang chọn nền `--accent-soft`; dòng 1 14/600, dòng 2 `caption` `--ink-2`. Nhãn "Giao tới đây": nền `--ink`, chữ `--on-accent` 12/500, bo `--radius-sm`. Ghim `--accent`. Dòng thông báo Google: chữ `--ink-2`.
 6. **Trạng thái.**
 
 | Trạng thái | Thay đổi |
 |---|---|
 | mặc định | khung `--border-input` |
 | hover | nút Bản đồ: nền giữ `--accent-soft`, chữ và icon → `--accent-hover`; dòng gợi ý địa chỉ → nền `--surface-2` |
-| nhấn | nút Bản đồ, "Vị trí của tôi", CTA: `scale(.97)` |
+| nhấn | nút Bản đồ, CTA: `scale(.97)` |
 | focus-visible | khung `:focus-within`: viền `--accent` + vòng 3px `--accent-soft`; nút Bản đồ: viền 2px `--focus` |
 | disabled | khi form đang gửi: textarea `readOnly`, nút Bản đồ ẩn tương tác (`disabled`) |
-| đang tải | bấm "Bản đồ": sheet mở ngay, vùng bản đồ là Skeleton + Spinner (chữ ẩn "Đang tải bản đồ") trong lúc nạp script; "Vị trí của tôi" đang lấy toạ độ: Spinner 18 trong nút |
-| lỗi | ô trống khi gửi: viền `--crit` + "Nhập địa chỉ giao hàng hoặc chọn trên bản đồ". Từ chối quyền vị trí hoặc bản đồ nạp lỗi: Dialog C5 |
+| đang tải | bấm "Bản đồ": sheet mở ngay, vùng bản đồ là Skeleton + Spinner (chữ ẩn "Đang tải bản đồ") trong lúc nạp script; dòng thông báo Google đã hiện từ lúc này |
+| lỗi | ô trống khi gửi: viền `--crit` + "Nhập địa chỉ giao hàng hoặc chọn trên bản đồ". Bản đồ nạp lỗi: Dialog C5 |
 | chọn | sau khi xác nhận: biến thể `filled-from-map` (Banner thành công + viền `--good`) cho tới khi khách sửa tay thì về mặc định |
 
 7. **Hành vi.**
    - Script Google Maps **chỉ nạp khi bấm "Bản đồ"** (tạo thẻ `<script>` lúc mở, không nạp ở trang khác). Key qua biến `NEXT_PUBLIC_*` lúc build (tên chờ techlead chốt). Places Autocomplete: `componentRestrictions: { country: 'vn' }`, `language: 'vi'`, dùng session token. Giữ chữ "Google" theo điều khoản.
    - Ô tìm trong sheet: gõ để gợi ý; chọn gợi ý thì ghim bay tới đó. Kéo bản đồ thì ghim đứng giữa, địa chỉ dưới chân cập nhật (đảo toạ độ → chữ).
-   - "Vị trí của tôi" mới xin quyền định vị (không xin khi mở sheet). Bị từ chối → Dialog C5: "Gõ địa chỉ để tìm" (quay lại sheet, focus ô tìm) · "Nhập tay" (đóng sheet, focus textarea). Bản đồ nạp lỗi → cùng Dialog, chỉ còn "Nhập tay".
+   - Dòng thông báo hiện **ngay khi sheet mở**, trước khi script nạp xong: "Bản đồ do Google cung cấp. Chữ bạn gõ và vị trí bạn ghim sẽ được gửi tới Google. Không muốn dùng, bạn đóng lại và gõ địa chỉ trực tiếp." (`05-phap-ly.md` §1.2b, BR-BH-29).
+   - **Không có nút "Vị trí của tôi"**, không gọi Geolocation của trình duyệt (chốt 10/10: vị trí thiết bị là dữ liệu nhạy cảm theo NĐ 356/2025). Bản đồ nạp lỗi → Dialog C5, chỉ còn "Nhập tay".
    - "Xác nhận vị trí này": điền **chuỗi** địa chỉ vào textarea, đóng sheet, focus textarea (con trỏ cuối chuỗi) để khách thêm hẻm/tầng. **Không lưu toạ độ** ở đâu cả (state, storage, request).
    - Đóng X: không đổi giá trị ô.
    - Sheet mở: animation `translateY(100%)→0` 260ms `--ease-drawer`.
@@ -651,8 +651,8 @@ interface AddressMapPickerProps {
 ```
 
 9. **Truy cập.** Nút Bản đồ `aria-label="Tìm và chọn địa chỉ trên bản đồ"`. Sheet `role="dialog" aria-modal="true" aria-labelledby` tiêu đề; mở thì focus ô tìm; đóng trả focus về nút Bản đồ. Ô tìm `role="combobox" aria-expanded aria-controls aria-activedescendant`, danh sách `role="listbox"`, dòng `role="option" aria-selected`; ↑ ↓ Enter Esc. Vùng bản đồ `aria-label="Bản đồ, kéo để chỉnh ghim"` (không dùng `role="application"`: ô tìm đã là cách dùng bằng phím). Địa chỉ dưới chân `aria-live="polite"`. Banner "Đã điền…" là `role="status"`.
-10. **Câu chữ.** "Địa chỉ giao hàng", placeholder "Bấm để tìm trên bản đồ, hoặc gõ địa chỉ", "Bản đồ", "Thêm hẻm, tầng, toà nhà nếu có.", "Đã điền địa chỉ từ bản đồ.", "Chọn vị trí giao hàng", "Đóng, quay lại nhập tay", "Tìm địa chỉ", "Giao tới đây", "Vị trí của tôi", "Xác nhận vị trí này". C5: "Chưa lấy được vị trí của bạn" / "Hãy gõ địa chỉ để tìm, hoặc nhập tay." / "Gõ địa chỉ để tìm" / "Nhập tay".
-11. **Không được.** Tách địa chỉ thành nhiều ô (tỉnh, phường…) như C3/C4 còn sót (L-28). Nạp Maps ở mọi trang. Lưu hoặc gửi toạ độ. Xin quyền định vị khi chưa bấm. Ghi địa chỉ vào log/console. Chặn khách sửa tay sau khi điền từ bản đồ.
+10. **Câu chữ.** "Địa chỉ giao hàng", placeholder "Bấm để tìm trên bản đồ, hoặc gõ địa chỉ", "Bản đồ", "Thêm hẻm, tầng, toà nhà nếu có.", "Đã điền địa chỉ từ bản đồ.", "Chọn vị trí giao hàng", "Đóng, quay lại nhập tay", "Tìm địa chỉ", "Giao tới đây", "Xác nhận vị trí này", dòng thông báo Google (mục 7). C5 chỉ còn ca bản đồ nạp lỗi, nút "Nhập tay"; câu tiêu đề cũ "Chưa lấy được vị trí của bạn" không dùng nữa, câu mới chờ ux-designer sửa màn C5 `[copy]`.
+11. **Không được.** Tách địa chỉ thành nhiều ô (tỉnh, phường…) như C3/C4 còn sót (L-28). Nạp Maps ở mọi trang. Lưu hoặc gửi toạ độ. Xin quyền định vị (V1 không có nút vị trí). Nạp bản đồ trước khi hiện dòng thông báo Google. Ghi địa chỉ vào log/console. Chặn khách sửa tay sau khi điền từ bản đồ.
 12. **Code.** Mới `features/checkout/components/AddressField.tsx`, `features/checkout/components/AddressMapPicker.tsx` (tên theo `DOI-CHIEU-CODE.md` §5 lô 3).
 
 ## 9. Checkbox
@@ -880,7 +880,7 @@ interface ProductCardProps {
 4. **Kích thước và khoảng cách.** overlay `sm`: cao 22, đệm 0 6, cách góc ảnh 6 (máy tính 8), icon 12, gap 3. overlay `md`: cao 26, đệm 0 10, cách góc 10. inline: icon 14, gap 4, không nền.
 5. **Token.** Bo `--radius-sm`. overlay `low`: nền `--warn-soft`, chữ/icon `--warn`, `caption` 12/500. overlay `out`: nền `--surface-3` #EBEBEF, chữ `--ink-2` #4E4E58, không viền, không dùng `crit` (`md`: 13/600). inline `in`: `--good` `caption`; `low`: `--warn`; `out`: `--ink-2`.
 6. **Trạng thái.** Tĩnh. mặc định / hover / nhấn / focus / disabled / đang tải / lỗi / chọn: không áp dụng (không bấm được).
-7. **Hành vi.** Chỉ nhận `'in' | 'low' | 'out'` từ field `stock_level` (BE-1). Trước khi có BE-1, lớp map trong `lib/api.ts` (không phải component) chỉ được map tạm `sellable_qty ≥ min_qty → 'in'`, ngược lại `'out'`; **không** suy `'low'` ở FE (ngưỡng nằm ở settings BE). Ghi chú gỡ ở lô 7.
+7. **Hành vi.** Chỉ nhận `'in' | 'low' | 'out'` từ field `stock_level` (BE-1). **Không** suy `'low'` ở FE (ngưỡng nằm ở settings BE). `sellable_qty` bị gỡ khỏi Shop API ở lô 2 cùng lúc với BE-1 (chốt 10/10, S-09), nên không có lớp map tạm từ số kg.
 8. **Props.**
 
 ```ts
@@ -1103,7 +1103,7 @@ interface ImageFrameProps {
 | đang tải | Skeleton ô vuông + vạch chữ |
 | disabled / lỗi / chọn | không áp dụng |
 
-7. **Hành vi.** Link `/shop/?group=<slug>`; Combo → `/shop/?type=combo`. Số món đếm ở FE từ catalog (số mặt hàng trong nhóm). Nhóm không có món nào thì ẩn ô. Ô "Lô mới về" **không code** tới khi Q8 chốt.
+7. **Hành vi.** Link `/shop/?group=<slug>`; Combo → `/shop/?type=combo`. Số món đếm ở FE từ catalog (số mặt hàng trong nhóm). Nhóm không có món nào thì ẩn ô. Ô "Lô mới về" **bỏ** (D7, chốt 10/10), không code.
 8. **Props.**
 
 ```ts
@@ -1118,7 +1118,7 @@ interface CategoryTileProps {
 
 9. **Truy cập.** Một link, tên truy cập = tên nhóm (+ ", 5 món" ở `md`). Icon `aria-hidden`. Lưới bọc `<nav aria-label="Danh mục">`.
 10. **Câu chữ.** "Cá", "Tôm", "Mực", "Cua ghẹ", "Combo"; "5 món".
-11. **Không được.** Hiện số kg. Dùng ảnh nặng thay icon. Thêm ô "Lô mới về" trước khi chốt Q8.
+11. **Không được.** Hiện số kg. Dùng ảnh nặng thay icon. Thêm ô "Lô mới về" (đã bỏ, D7).
 12. **Code.** Mới `components/catalog/CategoryTile.tsx`.
 
 ---
@@ -1181,7 +1181,7 @@ interface CartLineProps {
 ## 20. CartSummary
 
 1. **Công dụng.** Khối tóm tắt tiền và nút đi tiếp ở giỏ, đặt hàng, thanh toán. **Dùng ở:** `Cart`, `B3-CartChanged`, `Checkout`, `C2-Invalid`, `Payment`, `D2-PayCancelled`, `DesktopCart`, `DesktopCheckout`, `DesktopPayment`.
-2. **Giải phẫu.** (a) tiêu đề (máy tính) · (b) danh sách món rút gọn (máy tính, bước đặt hàng) · (c) "Tạm tính" · (d) "Phí giao" · (e) kẻ · (f) dòng tổng · (g) CTA · (h) nút phụ tuỳ chọn ("Huỷ đơn", chờ Q9).
+2. **Giải phẫu.** (a) tiêu đề (máy tính) · (b) danh sách món rút gọn (máy tính, bước đặt hàng) · (c) "Tạm tính" · (d) dòng "Giảm giá (mã …) −…" khi có (UI-RULES §2b) · (e) kẻ · (f) dòng tổng + câu "Đã gồm giao hàng. Bạn trả một lần, không trả thêm khi nhận hàng." ngay dưới (BR-BH-30) · (g) CTA. **Không** có dòng "Phí giao" và **không** có nút "Huỷ đơn" (chốt 10/10, BR-BH-28).
 3. **Biến thể.** `context`: `cart` · `checkout` · `payment` · `payment-retry`. `layout`: `bar` (điện thoại, dính đáy) · `aside` (máy tính, cột phải dính).
 4. **Kích thước và khoảng cách.**
 
@@ -1205,7 +1205,7 @@ interface CartLineProps {
 | lỗi | lỗi gửi: Dialog C4 (giữ dữ liệu); hết hàng: Sheet C3 |
 | chọn | không áp dụng |
 
-7. **Hành vi.** `cart`: tổng = tổng món còn hàng; có món hết → nhãn "Tạm tính (2 món còn hàng)", CTA "Tiếp tục với 2 món còn hàng". `checkout`: CTA "Đặt hàng" submit form; gửi kèm `client_request_id` (sinh một lần khi mở form, giữ qua các lần "Thử lại") để không tạo đơn trùng (L-11). `payment`: tổng lấy **từ BE** (`total_amount`), không cộng lại ở FE. Phí giao **không có số**. Không có dòng giảm giá (L-26).
+7. **Hành vi.** `cart`: tổng = tổng món còn hàng; có món hết → nhãn "Tạm tính (2 món còn hàng)", CTA "Tiếp tục với 2 món còn hàng". `checkout`: CTA "Đặt hàng" submit form; gửi kèm `client_request_id` (sinh một lần khi mở form, giữ qua các lần "Thử lại") để không tạo đơn trùng (L-11). `payment`: tổng lấy **từ BE** (`total_amount`), không cộng lại ở FE. Không có dòng phí giao. Dòng giảm giá (nếu có) lấy số từ BE (BR-DM-19).
 8. **Props.**
 
 ```ts
@@ -1218,13 +1218,13 @@ interface CartSummaryProps {
   total: Money;                           // payment: từ BE
   lines?: { name: string; qtyText: string; amount: Money }[];   // aside ở checkout
   cta: { label: string; href?: string; onClick?: () => void; loading?: boolean; loadingText?: string; disabled?: boolean; form?: string };
-  secondaryAction?: { label: string; onClick: () => void };     // "Huỷ đơn" (chờ Q9)
+  discount?: { code: string; amount: Money };                   // dòng giảm giá, số từ BE
 }
 ```
 
 9. **Truy cập.** `aside` có `aria-labelledby` tiêu đề. Tổng đổi (khi sửa giỏ) đọc qua vùng live của trang, không đặt `aria-live` trên cả khối. CTA `type="submit" form="checkout-form"` khi nằm ngoài form.
-10. **Câu chữ.** "Tạm tính", "Phí giao", "Báo khi xác nhận đơn", "Tổng tiền hàng", "Tiếp tục: nhập thông tin nhận hàng" (điện thoại), "Tiếp tục" (máy tính), "Tóm tắt đơn", "Đơn hàng (3 món)", "3 món · tổng tiền hàng", "Đặt hàng", "Cần thanh toán", "Thanh toán", "Thanh toán lại", "Huỷ đơn" (chờ Q9). Câu phí giao chờ `legal-vn` (Q6).
-11. **Không được.** Hiện phí giao bằng số hoặc "Miễn phí". Tự tính tổng thanh toán ở FE. Hai CTA chính. Che nội dung trang (thiếu `padding-bottom`).
+10. **Câu chữ.** "Tạm tính", "Giảm giá (mã …)", "Tổng tiền hàng", "Đã gồm giao hàng. Bạn trả một lần, không trả thêm khi nhận hàng." (BR-BH-30; dòng khu vực giao Phan Thiết (D 11/10); ranh giới và đơn ngoài vùng tạm theo `doc/ops/hoi-loc.md` L1–L2), "Tiếp tục: nhập thông tin nhận hàng" (điện thoại), "Tiếp tục" (máy tính), "Tóm tắt đơn", "Đơn hàng (3 món)", "3 món · tổng tiền hàng", "Đặt hàng", "Cần thanh toán", "Thanh toán", "Thanh toán lại".
+11. **Không được.** Dòng "Phí giao", hiện phí giao bằng số hoặc "Miễn phí". Nút "Huỷ đơn". Tự tính tổng thanh toán ở FE. Hai CTA chính. Che nội dung trang (thiếu `padding-bottom`).
 12. **Code.** Mới `components/cart/CartSummary.tsx` ⚠.
 
 ## 21. CartBar
@@ -1467,7 +1467,7 @@ interface OrderStatusBadgeProps { status: OrderDisplayStatus }
 ## 28. OrderLines
 
 1. **Công dụng.** Danh sách món trong đơn kèm tiền, dùng ở trang thanh toán và trang đơn. **Dùng ở:** `Payment`, `D2-PayCancelled`, `D4-Expired`, `Success`, `E2-Cancelled`, `E3-Delivered`, `E4-DeliveryFailed`, `DesktopSuccess`, `DesktopOrderStates`.
-2. **Giải phẫu.** (a) tiêu đề ("Tóm tắt" hoặc "Món trong đơn") · (b) dòng: [ảnh 48 trên máy tính] tên · số lượng | tiền · (c) dòng phí giao (máy tính) · (d) dòng tổng.
+2. **Giải phẫu.** (a) tiêu đề ("Tóm tắt" hoặc "Món trong đơn") · (b) dòng: [ảnh 48 trên máy tính] tên · số lượng | tiền · (c) dòng "Giảm giá (mã …) −…" khi có · (d) dòng tổng. **Không** có dòng phí giao (chốt 10/10, BR-BH-30).
 3. **Biến thể.** `summary` (thanh toán: chữ `--ink-2`, không dòng tổng vì tổng ở CartSummary) · `order` (có tổng "Đã thanh toán") · `cancelled` (chữ `--ink-3`, không tổng).
 4. **Kích thước và khoảng cách.** Khối đệm 16 (máy tính 20 24), bo 12, gap 8. Dòng máy tính đệm 12 0, gap 14, kẻ dưới 1px. Tổng cách trên 8, kẻ trên 1px.
 5. **Token.** Tên 14/400 (máy tính 14/500); số lượng `--ink-3` 400 `tabular-nums`; tiền 14/400–500 `tabular-nums`. Tổng: nhãn 14/600, số `total` 24/600 `--accent-text` (máy tính) hoặc 14/600 `--ink` (điện thoại, theo màn E1; giữ nhất quán: dùng 14/600 trên điện thoại vì nằm trong khối, không phải tổng chính của màn).
@@ -1483,12 +1483,12 @@ interface OrderLinesProps {
   total?: Money;
   totalLabel?: string;                                // "Đã thanh toán"
   showThumbs?: boolean;                               // máy tính true
-  showDeliveryFeeNote?: boolean;                      // máy tính true
+  discount?: { code: string; amount: Money };         // dòng giảm giá, số từ BE
 }
 ```
 
 9. **Truy cập.** `<section aria-labelledby>` + `<ul>`. Có thể dùng `<dl>` cho dòng tổng.
-10. **Câu chữ.** "Tóm tắt", "Món trong đơn", "Đã thanh toán", "Phí giao", "Cá Về báo khi gọi xác nhận", "Tổng tiền hàng · đã thanh toán".
+10. **Câu chữ.** "Tóm tắt", "Món trong đơn", "Đã thanh toán", "Giảm giá (mã …)", "Tổng tiền hàng · đã thanh toán".
 11. **Không được.** Hiện người nhận (tên, SĐT, địa chỉ) — **bỏ hẳn khối "Giao tới"** (Q1 đã chốt). Hiện giá vốn, mã lô.
 12. **Code.** Mới `features/checkout/components/OrderLines.tsx`.
 
@@ -1518,7 +1518,7 @@ interface SuccessBannerProps { onDismiss: () => void; message?: string }
 ```
 
 9. **Truy cập.** `role="status"` (đọc một lần). Không lấy focus; focus đầu trang là H1 "Đơn hàng SO…". Nút đóng `aria-label="Đóng thông báo thanh toán thành công"`.
-10. **Câu chữ.** "Thanh toán thành công". Điện thoại: "Cá Về sẽ gọi xác nhận trước khi giao." Máy tính: "Cá Về sẽ gọi xác nhận và báo phí giao trước khi giao" — hai khổ phải **cùng một câu**; câu chốt chờ `legal-vn` (Q6) → `[copy]`.
+10. **Câu chữ.** "Thanh toán thành công". Điện thoại: "Cá Về sẽ gọi xác nhận trước khi giao." Máy tính dùng **cùng câu đó**; bỏ ý "báo phí giao" (chốt 10/10: không thu thêm khi nhận hàng, BR-BH-30).
 11. **Không được.** Hiện khi tiền chưa về. Thêm pháo hoa/confetti. Hiện người nhận.
 12. **Code.** Mới `features/checkout/components/SuccessBanner.tsx`; gỡ khối tương ứng trong `OrderPaymentPanel.tsx`.
 
@@ -1530,7 +1530,7 @@ interface SuccessBannerProps { onDismiss: () => void; message?: string }
 
 1. **Công dụng.** Header Shop theo ngữ cảnh: trang chủ, khi cuộn/danh mục, trang con, các bước đặt hàng; máy tính 2 tầng hoặc rút gọn. **Dùng ở:** `HeaderFooter-Mobile`, `HeaderFooter-Desktop`, mọi màn.
 2. **Giải phẫu.**
-   - H1 (điện thoại): LogoSlot + tagline · IconButton gọi · tra đơn · giỏ (badge) · SearchBox `brand` · hàng Chip "Tìm nhiều".
+   - H1 (điện thoại): LogoSlot + tagline · IconButton gọi · tra đơn · giỏ (badge) · SearchBox `brand`. **Không** có hàng Chip "Tìm nhiều" (chốt 10/10).
    - H2: LogoSlot · kính lúp (link `/shop/?focus=search`) · giỏ.
    - H3: quay lại · tiêu đề giữa · giỏ.
    - H4: quay lại · tiêu đề trái · nhãn "Bảo mật".
@@ -1541,7 +1541,7 @@ interface SuccessBannerProps { onDismiss: () => void; message?: string }
 
 | | Điện thoại | Máy tính |
 |---|---|---|
-| H1 | ≈140: đệm 8 16 14, gap 10; hàng logo 44; ô tìm 44; chip 32 | — |
+| H1 | đệm 8 16 14, gap 10; hàng logo 44; ô tìm 44 (thấp hơn ≈140 của màn vẽ vì bỏ hàng chip) | — |
 | H2/H3/H4 | cao 56, đệm 0 6 (H2: 0 6 0 16) | — |
 | `full` | — | dải trên 40 · tầng chính ≈76 (đệm 14 24, gap 24–28) · menu 48 |
 | `compact` | — | cao 76, đệm 0 24, gap 24 |
@@ -1580,7 +1580,6 @@ interface ShopHeaderProps {
   onBrandClick?: (e: React.MouseEvent) => void;
   cartCount: number;                               // số món
   hotline?: string;
-  searchChips?: { label: string; query: string }[];// tối đa 4
   groups?: NavGroup[];
   currentGroupSlug?: string;
   currentPath?: string;                            // để đặt aria-current
@@ -1610,7 +1609,7 @@ interface ShopHeaderProps {
 | chọn | `aria-current="page"` + màu nhấn |
 | disabled / đang tải / lỗi | không áp dụng |
 
-7. **Hành vi.** Hiện ở Trang chủ, Danh mục, Góc bếp (và Tra cứu đơn theo màn, chờ Q-UX-5). Ẩn ở Chi tiết, Giỏ, các bước đặt hàng, trang đơn sau thanh toán. Đích: `/`, `/shop/`, `/shop/cart/`, `/shop/orders/`. Badge giỏ = số món như header.
+7. **Hành vi.** Hiện ở Trang chủ, Danh mục, Góc bếp, Tra cứu đơn (D9, chốt 10/10). Ẩn ở Chi tiết, Giỏ, các bước đặt hàng, trang đơn sau thanh toán. Đích: `/`, `/shop/`, `/shop/cart/`, `/shop/orders/`. Badge giỏ = số món như header.
 8. **Props.**
 
 ```ts
@@ -1626,7 +1625,7 @@ interface BottomNavProps { current: 'home' | 'catalog' | 'cart' | 'orders' | nul
 
 1. **Công dụng.** Chân trang đầy đủ (F1) và rút gọn (F2), gộp dải pháp lý người bán. **Dùng ở:** `HeaderFooter-Mobile`, `HeaderFooter-Desktop`, `Home`, `DesktopCategory`, `DesktopSuccess`, `G1-KitchenList`, trang phụ.
 2. **Giải phẫu.**
-   - F1: (a) LogoSlot + một câu giới thiệu · (b) nút "Gọi [hotline]" + "Nhắn Zalo" (điện thoại) / danh sách Hotline · Zalo · Email (máy tính) · (c) nhóm "Mua hàng" · (d) nhóm "Chính sách" (5 link) · (e) nhóm "Về Cá Về" · (f) dải pháp lý: tên doanh nghiệp · MST · địa chỉ · GCN ĐKKD · email · logo Bộ Công Thương · ©.
+   - F1: (a) LogoSlot + một câu giới thiệu · (b) nút "Gọi [hotline]" + "Nhắn Zalo" (điện thoại) / danh sách Hotline · Zalo · Email (máy tính) · (c) nhóm "Mua hàng" · (d) nhóm "Chính sách" (link từ CMS; đủ 6 trang go-live thì có "Cơ chế giải quyết khiếu nại", BR-ND-20) · (e) nhóm "Về Cá Về" · (f) dải pháp lý: tên doanh nghiệp · MST · địa chỉ · GCN ĐKKD · email · biểu tượng đã thông báo Bộ Công Thương (chỉ khi có link, D12) · ©.
    - F2: dải một hàng: tên DN · MST · © + 3 link chính sách.
 3. **Biến thể.** `full` (F1) · `compact` (F2, Giỏ, Đặt hàng, Thanh toán).
 4. **Kích thước và khoảng cách.**
@@ -1669,8 +1668,8 @@ interface ShopFooterProps {
 ```
 
 9. **Truy cập.** `<footer>`; mỗi nhóm máy tính là `<nav aria-labelledby>` với tiêu đề h2. Điện thoại dùng `<details>/<summary>` gốc. Link tab mới có chữ ẩn "(mở tab mới)".
-10. **Câu chữ.** "Hải sản cấp đông theo lô, giá tính theo kg, giao tận nhà.", "Gọi [hotline]", "Nhắn Zalo", "Mua hàng": "Hàng đang có", "Combo nấu nhanh", "Cách mua hàng", "Tra cứu đơn"; "Chính sách": "Chính sách đổi trả", "Chính sách giao hàng", "Chính sách thanh toán", "Chính sách quyền riêng tư", "Điều khoản sử dụng"; "Về Cá Về": "Giới thiệu", "Góc bếp", "Liên hệ"; "MST", "Địa chỉ:", "GCN ĐKKD số … do … cấp ngày …", "Email:", "© 2026 Cá Về".
-11. **Không được.** Hard-code 5 link chính sách khi CMS đã có. Hiện chữ chờ `[…]` trên production. Widget chat bên thứ ba. Form liên hệ. Hard-code năm.
+10. **Câu chữ.** "Hải sản cấp đông theo lô, giá tính theo kg, giao tận nhà.", "Gọi [hotline]", "Nhắn Zalo", "Mua hàng": "Hàng đang có", "Combo nấu nhanh", "Cách mua hàng", "Tra cứu đơn"; "Chính sách": "Chính sách đổi trả và hoàn tiền", "Chính sách giao hàng", "Chính sách thanh toán", "Chính sách quyền riêng tư", "Điều kiện giao dịch chung" (trang `terms`, không ghi "Điều khoản sử dụng"; chốt 07/10, 10/10), "Cơ chế giải quyết khiếu nại" (tên link lấy từ CMS); "Về Cá Về": "Giới thiệu", "Góc bếp", "Liên hệ"; "MST", "Địa chỉ:", "GCN ĐKKD số … do … cấp ngày …", "Email:", "© 2026 Cá Về".
+11. **Không được.** Hard-code link chính sách khi CMS đã có. Hiện chữ chờ `[…]` trên production. Widget chat bên thứ ba. Form liên hệ. Hard-code năm.
 12. **Code.** Viết lại `components/ShopFooter.tsx`; gộp `features/site/components/SiteLegalFooter.tsx` (gỡ khỏi `app/layout.tsx:23`).
 
 ## 33. Breadcrumb
@@ -2211,7 +2210,7 @@ Khung chung (ShopHeader, ShopFooter, BottomNav, LogoSlot, Toast) không ghi lạ
 
 | Màn (điện thoại · máy tính) | Route | Component |
 |---|---|---|
-| `Home` · `DesktopHome` (A1) | `/` | ShopHeader `home`/`full` · SearchBox `trigger`/`brand` · Chip `on-brand` · Banner (khối khuyến mãi dùng Button `on-brand`; chữ "Lô mới vừa nhập kho" chờ Q8) · CategoryTile · ProductCard `rail` + `row` · PriceTag · ImageFrame · StockBadge · ShopFooter `full` · BottomNav |
+| `Home` · `DesktopHome` (A1) | `/` | ShopHeader `home`/`full` · SearchBox `trigger`/`brand` · Banner (khối khuyến mãi dùng Button `on-brand`; không dùng chữ "Lô mới vừa nhập kho", D7) · CategoryTile · ProductCard `rail` + `row` · PriceTag · ImageFrame · StockBadge · ShopFooter `full` · BottomNav |
 | `Main` · `DesktopCategory` (A2) | `/shop/` | ShopHeader `sticky`/`full` · Banner `strip` · SearchBox `page` · Chip `filter` · SortControl / SegmentedControl · SideFilter · Breadcrumb · ProductCard `grid` · AddToCart · QtyStepper · StockBadge · PriceTag · ImageFrame · CartBar · BottomNav · Dialog (bỏ món) |
 | `A4-Toast` · `DesktopToast` | `/shop/` | như A2 + Toast · MiniCart · Popover |
 | `A5-NotFound` · `DesktopNotFound` | `/shop/?q=` | như A2 + EmptyState `search` · Chip `link` · Button `secondary` |
@@ -2231,9 +2230,9 @@ Khung chung (ShopHeader, ShopFooter, BottomNav, LogoSlot, Toast) không ghi lạ
 | `C2-Invalid` · `DesktopInvalid` | `/shop/checkout/` | FormErrorSummary · TextField (lỗi) · AddressField (lỗi) · Checkbox (lỗi, Q-UX-4) |
 | `C3-SoldOut` · `DesktopModalSoldOut` | `/shop/checkout/` | BottomSheet `notice` (máy tính thành Dialog `md`) · ImageFrame |
 | `C4-NetworkError` · `DesktopNetworkError` | `/shop/checkout/` | Button `loading` · Spinner · Dialog `alert` `neutral` |
-| `C5-LocationDenied` | `/shop/checkout/` | Dialog `alert` `warn` |
+| `C5-LocationDenied` | `/shop/checkout/` | Dialog `alert` `warn` (chỉ còn ca bản đồ nạp lỗi; bỏ "Vị trí của tôi", chốt 10/10) |
 | `Payment` · `DesktopPayment` (D1) | `/shop/orders/?code=` | ShopHeader `checkout`/`compact` · CheckoutSteps · HoldCountdown `created` · PaymentMethod · OrderLines `summary` · CartSummary `payment` |
-| `D2-PayCancelled` · `DesktopPayCancelled` | `/shop/orders/?code=&result=cancel` | Banner `crit` · HoldCountdown `retry` · OrderLines · CartSummary `payment-retry` ("Huỷ đơn" chờ Q9) |
+| `D2-PayCancelled` · `DesktopPayCancelled` | `/shop/orders/?code=&result=cancel` | Banner `crit` · HoldCountdown `retry` · OrderLines · CartSummary `payment-retry` (không có nút "Huỷ đơn", BR-BH-28) |
 | `D3-PayPending` · `DesktopPayPending` | `/shop/orders/?code=&result=success` (còn chờ) | Spinner 36 · OrderStatusBadge `awaiting_bank` (nếu hiện nhãn) · OrderTimeline `payment` · Button `outline` |
 | `D4-Expired` · `DesktopModalExpired` | `/shop/orders/` | HoldCountdown (00:00) · Dialog `alert` `crit` |
 | `D5-Underpaid` · `DesktopUnderpaid` | `/shop/orders/` | OrderStatusBadge `awaiting_review` · bảng đối chiếu tiền · Banner `warn` |
@@ -2282,7 +2281,7 @@ Khung chung (ShopHeader, ShopFooter, BottomNav, LogoSlot, Toast) không ghi lạ
 4. **Kích thước**: ô nhập 44, chữ 16, bo 8; nút "Áp dụng" rộng cố định 104 (điện thoại, primary) / nút viền md 44 (máy tính, để không tranh với "Tiếp tục"); chip cao 32, bo 999; nút X trong chip vùng chạm 44.
 5. **Token**: ô `border-input`, focus `focus` + ring `accent-soft`; lỗi `crit` + `crit-soft`; chip `good-soft`/`good`; dòng giảm giá chữ `good`; thông tin "ưu đãi lợi hơn" `ink-2` + icon i (không dùng crit).
 6. **Trạng thái**: trống (nút tắt) · đang gõ (chữ tự in hoa, bỏ khoảng trắng; nút bật) · đang kiểm (spinner trong nút, `aria-busy`, ô khoá) · đã áp (chip + dòng giảm + tổng mới, toast "Đã áp mã …") · lỗi (viền crit, `aria-invalid`, dòng lỗi dưới ô) · ưu đãi đang áp lợi hơn (thông tin, không phải lỗi) · hết hiệu lực lúc đặt (Dialog B8).
-7. **Hành vi**: mỗi đơn tối đa 1 mã; áp mã mới thay mã cũ. Không cộng dồn với ưu đãi tự động (PricingRule), hệ thống lấy cái lợi hơn (mặc định, chờ Duy xác nhận). Kiểm mã qua API (BE-11), không tự tính ở FE. Enter trong ô = bấm "Áp dụng". Gõ lại sau lỗi thì ẩn lỗi. Bỏ mã → quay về trạng thái trống, tổng cũ. Mã lưu cùng giỏ (máy khách); khi đặt hàng gửi `voucher_code`, server kiểm lại.
+7. **Hành vi**: mỗi đơn tối đa 1 mã; áp mã mới thay mã cũ. Không cộng dồn với ưu đãi tự động (PricingRule), hệ thống lấy cái lợi hơn (Duy duyệt 10/10). Kiểm mã qua API (BE-11), không tự tính ở FE. Enter trong ô = bấm "Áp dụng". Gõ lại sau lỗi thì ẩn lỗi. Bỏ mã → quay về trạng thái trống, tổng cũ. Mã lưu cùng giỏ (máy khách); khi đặt hàng gửi `voucher_code`, server kiểm lại.
 8. **Props**:
 ```ts
 type VoucherError = 'INVALID' | 'EXPIRED' | 'MIN_ORDER' | 'USED_UP' | 'BETTER_PROMO' | 'NETWORK';

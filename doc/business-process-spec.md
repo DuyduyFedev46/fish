@@ -204,19 +204,28 @@ Phân quyền mà không có log thì chỉ chặn được nhầm lẫn, không
 | **Đóng gói sẵn** | Không cần cơ chế mới — `Item` thường có lô riêng | Chính lô của nó | Khay 500g đóng sẵn từ lúc nhập |
 | **Ưu đãi** (`PricingRule`) | Điều kiện 1 tầng → giảm tiền hoặc % | Từng mặt hàng riêng | "Mua ≥ 3kg tôm giảm 10%" |
 
-**Ranh giới cố ý (PA)** — PricingRule **chỉ 1 tầng điều kiện, không lồng nhau, không cộng dồn** (nhiều rule cùng khớp → chọn rule có lợi nhất cho khách), không mã giảm giá, không ngân sách khuyến mãi. Đây là chỗ dừng có chủ đích: rule engine tổng quát làm chi phí kiểm thử tăng theo cấp số nhân và là thứ giết dự án do một người maintain.
+**Ranh giới cố ý (PA)** — PricingRule **chỉ 1 tầng điều kiện, không lồng nhau, không cộng dồn** (nhiều rule cùng khớp → chọn rule có lợi nhất cho khách), không ngân sách khuyến mãi. **Có mã giảm giá dạng một tầng** (mã công khai, mỗi đơn tối đa một mã, không cộng dồn với PricingRule), quy tắc ở BR-DM-17…24. Không có mã riêng từng khách, không mã phát sau khi mua. *((D) 2026-10-10, xem decisions.md — lật ý "không mã giảm giá" của 2026-09-10)* Đây là chỗ dừng có chủ đích: rule engine tổng quát làm chi phí kiểm thử tăng theo cấp số nhân và là thứ giết dự án do một người maintain.
 
 ## 3.2 Business rules
 | Mã | Luật |
 |---|---|
-| BR-DM-01 | Mọi mặt hàng bán theo `Kg`. Không có quy đổi đa đơn vị. |
+| BR-DM-01 | **(D) 2026-10-10** — **Mặt hàng thường (SIMPLE) bán theo kg; combo (BUNDLE) bán theo combo, số lượng là số nguyên. Không quy đổi giữa hai đơn vị. Kho vẫn trừ theo kg ở mức thành phần (BR-DM-06, BR-BH-07).** *(sửa, (D) 2026-10-10, xem decisions.md; thay "Mọi mặt hàng bán theo `Kg`. Không có quy đổi đa đơn vị.")* |
 | BR-DM-02 | Giá bán **luôn** lấy từ Item Price hiệu lực tại thời điểm đặt hàng (`valid_from ≤ now ≤ valid_upto`). Không cho nhập giá tay trên đơn. |
 | BR-DM-03 | Hai Item Price cùng mặt hàng, cùng bảng giá, **không được chồng lấn** khoảng hiệu lực. |
 | BR-DM-04 | BUNDLE có giá niêm yết **độc lập**, không tự tính bằng tổng giá thành phần. |
 | BR-DM-05 | BUNDLE **không được chứa BUNDLE khác** (không lồng cấp). |
 | BR-DM-06 | Tồn khả dụng của BUNDLE là giá trị **tính ra, không lưu**: `min( floor(tồn khả dụng thành phần i / định mức i) )`. |
 | BR-DM-07 | Sửa `BundleLine` **không** hồi tố lên đơn đã đặt — đơn giữ ảnh chụp công thức tại thời điểm đặt. |
-| BR-DM-08 | Nhiều PricingRule cùng khớp → áp dụng **duy nhất một** rule có lợi nhất cho khách. Không cộng dồn. |
+| BR-DM-08 | Nhiều PricingRule cùng khớp → áp dụng **duy nhất một** rule có lợi nhất cho khách. Không cộng dồn giữa các PricingRule. Quan hệ giữa PricingRule và mã giảm giá theo BR-DM-18. *(sửa, (D) 2026-10-10, xem decisions.md; phần PricingRule giữ nguyên)* |
+| BR-DM-17 | **(D) 2026-10-10** — **Mã giảm giá** là mã công khai dùng chung, có: mã (duy nhất, không phân biệt hoa thường), tên chương trình, kiểu giảm (số tiền hoặc phần trăm), mức giảm, trần số tiền giảm (bắt buộc khi giảm theo phần trăm), giá trị đơn tối thiểu, thời điểm bắt đầu và kết thúc (ngày giờ, giờ Việt Nam), tổng số lượt, mô tả điều kiện hiển thị cho khách, trạng thái bật/tắt. V1 mã áp trên tổng giá trị hàng của đơn, không áp riêng từng mặt hàng. Giá trị đơn tối thiểu so với tổng giá trị hàng **trước** mọi giảm giá. Mã không bao giờ bị xoá, chỉ tắt. *(mới, (D) 2026-10-10, xem decisions.md)* |
+| BR-DM-18 | **(D) 2026-10-10** — Mỗi đơn dùng **tối đa một mã**. Mã **không cộng dồn** với PricingRule: hệ thống tính cả hai và áp **một** cái có số tiền giảm lớn hơn cho khách. Hoà thì áp PricingRule và không tính lượt mã. Khi mã không được áp vì ưu đãi tự động bằng hoặc lợi hơn, Shop báo rõ lý do. *(mới, (D) 2026-10-10, xem decisions.md)* |
+| BR-DM-19 | **(D) 2026-10-10** — Mã và số tiền giảm **đóng băng lúc tạo đơn**, như giá (BR-BH-08). Số tiền giảm phân bổ vào từng dòng đơn theo tỉ lệ giá trị dòng (như PricingRule theo đơn) để lãi lỗ theo lô đúng. Mã hết hiệu lực, hết lượt hoặc bị tắt giữa lúc xem giỏ và lúc đặt thì **không tạo đơn**; Shop hỏi khách có đặt tiếp không dùng mã. Hệ thống không tự đổi số tiền khách đã thấy. *(mới, (D) 2026-10-10, xem decisions.md)* |
+| BR-DM-20 | **(D) 2026-10-10** — **Lượt dùng mã**: giữ một lượt khi tạo đơn (cùng giao dịch với giữ chỗ); lượt thành "đã dùng" khi đơn được thanh toán; **nhả lượt** khi đơn tự huỷ vì hết giờ giữ chỗ (job idempotent, BR-BH-04). Đơn đã thanh toán rồi bị huỷ (toàn phần hay một phần) **không trả lượt**. Số lượt đang giữ + đã dùng **không bao giờ vượt** tổng lượt, kể cả khi nhiều khách đặt cùng lúc. *(mới, (D) 2026-10-10, xem decisions.md)* |
+| BR-DM-21 | **(D) 2026-10-10** — **Trần và sàn**: số tiền giảm của mã ≤ **50%** tổng giá trị hàng của đơn (tham số cấu hình) và ≤ trần tiền của mã. Tổng đơn sau giảm luôn > 0 đồng và là số nguyên đồng (BR-BH-15). ERP chặn tạo mã có mức phần trăm > 50%. *(mới, (D) 2026-10-10, xem decisions.md; trần 50% giữ tới khi luật sư xác minh bản gốc NĐ 239/2026)* |
+| BR-DM-22 | **(D) 2026-10-10** — Mã **đang chạy** chỉ được sửa theo hướng có lợi cho khách (gia hạn, tăng lượt, hạ đơn tối thiểu, tăng mức trong trần). Không được nâng đơn tối thiểu, giảm mức, rút ngắn hạn hay giảm tổng lượt. Muốn đổi bất lợi thì tắt mã và tạo mã mới. Tắt mã trước hạn phải chọn lý do (hết ngân sách, sự cố, khác). Bật lại mã đã tắt được nếu còn hạn và còn lượt. Mọi tạo, sửa, tắt, bật ghi AuditLog có giá trị trước → sau. *(mới, (D) 2026-10-10, xem decisions.md)* |
+| BR-DM-23 | **(D) 2026-10-10** — **Quyền**: tạo, sửa, tắt mã cần quyền Tầng 2 mới `manage_voucher`, **mặc định chỉ Chủ**; Chủ uỷ cho Quản lý ở màn Phân quyền (như "Sửa giá bán"). Màn xem lượt dùng chỉ hiện mã đơn, số tiền giảm, thời điểm, trạng thái lượt; **không** hiện tên, SĐT, địa chỉ khách; **không** hiện giá vốn hay lãi lỗ. *(mới, (D) 2026-10-10, xem decisions.md)* |
+| BR-DM-24 | **(D) 2026-10-10** — **Công khai điều kiện trước khi đặt**: khi mã hợp lệ, giỏ hiện mức giảm, đơn tối thiểu, hạn dùng, câu "Số lượt có hạn", câu "Không áp dụng cùng ưu đãi khác; Cá Về tự chọn mức có lợi hơn cho bạn". Khi mã không dùng được, Shop nêu **đúng một lý do**: mã không đúng, hết hạn, chưa đủ đơn tối thiểu (kèm số còn thiếu), hết lượt, ưu đãi khác lợi hơn. Shop không hiện số lượt còn lại. API kiểm mã công khai có giới hạn tần suất và chỉ trả kết quả kiểm, không trả danh sách mã hay dữ liệu đơn khác. *(mới, (D) 2026-10-10, xem decisions.md)* |
+| BR-DM-25 | **(D) 2026-10-10** — Trường thông tin mặt hàng hiện công khai trên Shop (ghi chú ngắn, quy cách, bảo quản, nguồn hàng, mô tả) **không** chứa giá, tên nhà cung cấp, tên tàu, ngày nhập lô, mã lô, số điện thoại. "Nguồn hàng" ghi vùng biển hoặc cảng. Câu khẳng định về sơ chế, cấp đông, đóng gói chỉ ghi khi Lộc xác nhận đúng sự thật tạm chưa ghi các câu này (D 11/10: hỏi Lộc L8–L9 ở `doc/ops/hoi-loc.md`). *(mới, (D) 2026-10-10, xem decisions.md)* |
 
 ---
 
@@ -307,7 +316,7 @@ stateDiagram-v2
 # 7. P-05 — Bán hàng trên Shop
 
 ## 7.1 Danh tính khách *(PA)*
-Guest checkout, không đăng nhập ở V1. `Customer` gộp theo **số điện thoại** làm khoá tự nhiên — đặt lần 2 cùng SĐT thì gắn vào cùng khách, tự có lịch sử mua. Tra đơn bằng **mã đơn + 4 số cuối SĐT**. Thêm đăng nhập OTP sau này không đổi schema.
+Guest checkout, không đăng nhập ở V1. `Customer` gộp theo **số điện thoại** làm khoá tự nhiên — đặt lần 2 cùng SĐT thì gắn vào cùng khách, tự có lịch sử mua. Tra đơn theo BR-BH-25 (**mã đơn + SĐT đầy đủ**, hoặc mã đơn + mã tra đơn tạm thời). *(sửa, (D) 2026-10-10, xem decisions.md; thay "mã đơn + 4 số cuối SĐT")* Thêm đăng nhập OTP sau này không đổi schema.
 
 Khách **không phải là `User`** trong hệ thống — không có tài khoản, không nằm trong ma trận Group ở mục 1.
 
@@ -335,7 +344,7 @@ Trạng thái `PAID` (Đã thanh toán) giữ trong DB nhưng không dùng ở V
 ## 7.3 Giữ chỗ, tồn hiển thị, tranh lô cuối *(PA)*
 | Mã | Luật |
 |---|---|
-| BR-BH-01 | **Tồn khả dụng hiển thị trên Shop = tồn sổ − đang giữ chỗ.** Không bao giờ bán vượt. |
+| BR-BH-01 | **(D) 2026-10-10** — **Tồn khả dụng = tồn sổ − đang giữ chỗ; hệ thống dùng số này để chặn bán vượt. Shop không hiển thị số này mà chỉ hiển thị mức tồn theo BR-BH-23. API công khai không trả số kg tồn.** *(sửa, (D) 2026-10-10, xem decisions.md; thay "Tồn khả dụng hiển thị trên Shop = …")* |
 | BR-BH-02 | Giữ chỗ ghi ở **mức lô**, khoá dòng lô khi tạo đơn. Hai khách tranh lô cuối: người tạo đơn trước thắng, người sau thấy hết hàng ngay tại bước đặt. |
 | BR-BH-03 | TTL giữ chỗ **30 phút** (D). Job nền quét và nhả. |
 | BR-BH-04 | Job nhả giữ chỗ phải **idempotent** và có giám sát — job này chết thì hàng bị khoá vô hình, không ai biết cho tới khi Shop báo hết hàng oan. |
@@ -346,6 +355,15 @@ Trạng thái `PAID` (Đã thanh toán) giữ trong DB nhưng không dùng ở V
 | BR-BH-09 | Địa chỉ giao **bắt buộc** ngay bước đặt (L — 100% giao tận nhà). |
 | BR-BH-10 | **Không có trường phí giao hàng** trên đơn (L — outscope hoàn toàn). |
 | BR-BH-11 | **(D) 2026-09-26** — Phân bổ lô được **chốt một lần lúc tạo đơn**. Khi thanh toán, hệ thống trừ kho đúng các lô đã giữ chỗ, **không chọn lại** lô (kể cả khi đã có lô mới hạn sớm hơn). Đơn đã phân bổ không bị phân bổ lại khi có lô mới hay khi đổi quy tắc chọn lô. *(sửa 2026-09-26, xem decisions.md)* |
+| BR-BH-22 | **(D) 2026-10-10** — **Số lượng đặt**: mặt hàng thường đặt **từ 1 kg** và là bội của **0,5 kg**; combo đặt **số nguyên từ 1**. Mức tối thiểu và bước là tham số cấu hình. Hệ thống kiểm ở máy chủ lúc tạo đơn; sai thì từ chối cả đơn, không giữ chỗ. *(mới, (D) 2026-10-10, xem decisions.md)* |
+| BR-BH-23 | **(D) 2026-10-10** — **Mức tồn trên Shop** chỉ có ba giá trị: Còn hàng, Sắp hết, Hết hàng. "Hết hàng" khi tồn khả dụng (BR-BH-01, BR-DM-06) **nhỏ hơn mức tối thiểu** của BR-BH-22; vì vậy đuôi lô dưới 1 kg không bán trên Shop, Lộc bán ngoài hoặc điều chỉnh tồn ở ERP. "Sắp hết" khi dưới ngưỡng cấu hình riêng cho kg và cho combo (mặc định dưới 3 kg, dưới 3 combo). Món hết vẫn hiện, xếp cuối, nút "Liên hệ chúng tôi". *(mới, (D) 2026-10-10, xem decisions.md)* |
+| BR-BH-24 | **(D) 2026-10-10** — Lỗi không đủ hàng trả về Shop (lúc đặt) là lỗi **theo từng dòng**, chỉ gồm mã hàng và mức "hết" hoặc "không đủ". **Không** chứa số kg còn, số kg thiếu, mã lô. *(mới, (D) 2026-10-10, xem decisions.md)* |
+| BR-BH-25 | **(D) 2026-10-10** — **Tra đơn công khai** cần một trong hai: (a) mã đơn + SĐT đặt hàng đầy đủ, gửi trong thân request, so khớp sau khi chuẩn hoá; (b) mã đơn + **mã tra đơn tạm thời** do hệ thống cấp lúc tạo đơn hoặc lúc tra đúng. Mã tra đơn chỉ chứa mã đơn và hạn dùng, không chứa dữ liệu cá nhân, không đặt trên URL. SĐT không bao giờ nằm trên URL hay lưu ở trình duyệt. Sai thì báo một câu chung, không nói phần nào sai. Có giới hạn tần suất theo IP và theo mã đơn. Đường tra bằng 4 số cuối bị gỡ. *(mới, (D) 2026-10-10, xem decisions.md; thay cách tra "mã đơn + 4 số cuối SĐT" ở §7.1)* |
+| BR-BH-26 | **(D) 2026-10-10** — **Trang đơn công khai** chỉ gồm: mã đơn, nhãn trạng thái, mốc giờ (đặt, trả tiền, giao xong), bước giao, dòng món (tên, đơn vị, số lượng, thành tiền), mã và số tiền giảm, tổng, giờ gọi xác nhận, nhãn lý do huỷ lấy từ **bảng nhãn cố định**. **Không** có tên, SĐT, địa chỉ người nhận, mã lô, ngày nhập, giá vốn, ghi chú tự do của nhân viên. *(mới, (D) 2026-10-10, xem decisions.md)* |
+| BR-BH-27 | **(D) 2026-10-10** — **Chống tạo đơn trùng**: mỗi lần khách mở bước đặt hàng có một mã yêu cầu; gửi lại cùng mã yêu cầu thì hệ thống trả lại đơn đã tạo, không tạo đơn mới, không giữ chỗ lần hai, không giữ thêm lượt mã. *(mới, (D) 2026-10-10, xem decisions.md)* |
+| BR-BH-28 | **(D) 2026-10-10** — Ở V1, khách **không tự huỷ** đơn trên Shop. Đơn giữ chỗ chỉ kết thúc bằng thanh toán hoặc tự huỷ khi hết thời gian giữ chỗ (BR-BH-03). Đơn đã thanh toán chỉ huỷ qua P-07 trong ERP. *(mới, (D) 2026-10-10, xem decisions.md)* |
+| BR-BH-29 | **(D) 2026-10-10** — **Địa chỉ giao** là một ô chữ (BR-BH-09). Khách có thể mở Google Maps để tìm hoặc ghim; chỉ chuỗi địa chỉ cuối cùng được gửi về Cá Về. **Không lưu toạ độ.** Script bản đồ chỉ nạp khi khách bấm "Bản đồ". Popup bản đồ hiện thông báo gửi dữ liệu tới Google **ngay khi mở**, trước khi bản đồ tải xong. V1 không có nút lấy vị trí hiện tại của thiết bị. *(mới, (D) 2026-10-10, xem decisions.md)* |
+| BR-BH-30 | **(D) 2026-10-10** — **Công bố giá cuối cùng**: dưới dòng Tổng ở giỏ, đặt hàng và thanh toán có câu "Đã gồm giao hàng. Bạn trả một lần, không trả thêm khi nhận hàng." Shop không có dòng "Phí giao", không hứa "miễn phí giao". Khi sau này có phí giao, phí cộng vào tổng tiền QR và phải có quyết định riêng (BR-BH-10 giữ). Khu vực giao được công bố và cách xử lý địa chỉ ngoài khu vực: Phan Thiết (D 11/10); ranh giới và đơn ngoài vùng tạm theo `doc/ops/hoi-loc.md` L1–L2. *(mới, (D) 2026-10-10, xem decisions.md)* |
 
 ## 7.4 Thanh toán
 | Mã | Luật |
@@ -358,6 +376,16 @@ Trạng thái `PAID` (Đã thanh toán) giữ trong DB nhưng không dùng ở V
 | BR-TT-06 | Ghi nhận doanh thu tại thời điểm **xác nhận thanh toán** (tiền đã về tài khoản thật), không phải lúc giao xong *(PA)*. |
 | BR-TT-07 | Xác nhận thanh toán thủ công (`confirm_payment_manual`) **chỉ Chủ** — thao tác này đòi đối chiếu sao kê, mà sao kê chỉ Lộc truy cập được. Uỷ quyền chỗ này là mở đường ghi doanh thu khống. |
 | BR-TT-18 | **Tiền về muộn mà webhook/IPN không báo** (E-05; đơn đã huỷ/tự huỷ hoặc chưa rõ đơn): Chủ (hoặc người có `confirm_payment_manual`) **ghi tay** khoản tiền ở Hàng chờ thanh toán. Hệ thống tạo giao dịch `MANUAL` đang Chờ xử lý: `ORPHAN` nếu gắn đơn Đã huỷ/Tự huỷ, `UNMATCHED` nếu không gắn đơn. **Không đổi đơn, kho, hoá đơn**; bước sau đi qua hàng chờ (gắn đơn / phiếu hoàn, P-07). Không ghi gắn đơn đang giữ chỗ (dùng xác nhận trên đơn, BR-TT-07) hoặc đã thanh toán (để trống mã đơn rồi hoàn); mã đơn sai thì báo lỗi, không tự đổi thành `UNMATCHED`. Chỉ nhập mã GD, số tiền, giờ nhận (có cả ngày và giờ, không ở tương lai, không cũ quá `LATE_PAYMENT_MAX_AGE_DAYS`), mã đơn; **không có ô ghi chú**. Mã GD chống trùng (BR-TT-03). Khoản cùng số tiền trong cửa sổ `LATE_PAYMENT_DUPLICATE_WINDOW_HOURS` bị coi là nghi trùng, xét **hai chiều**: ghi tay sau khoản đã có thì phải xác nhận mới ghi, khoản webhook/IPN về sau khoản ghi tay thì bị gắn nhãn. Phiếu hoàn trên giao dịch có nhãn nghi trùng phải xác nhận "đã đối chiếu sao kê" (áp cả nhãn BR-TT-15). Job tự khớp bỏ qua khoản ghi tay *(D, 03/10; ghi vào spec 08/10)*. |
+| BR-TT-19 | **(D) 2026-10-10** — Sau khi khách quay về từ cổng với kết quả thành công mà chưa có xác nhận tiền, Shop tự kiểm lại định kỳ. Quá **5 phút** (tham số cấu hình) thì đổi sang câu "Cá Về sẽ kiểm tra giao dịch và gọi cho bạn" kèm hotline; đơn vẫn giữ chỗ tới hết thời hạn, không đổi trạng thái. *(mới, (D) 2026-10-10, xem decisions.md)* |
+
+## 7.5 Nội dung công khai của Shop (BR-ND)
+Bảng BR-ND đầy đủ nằm ở hồ sơ `doc/features/2026-09-28-cms-viet-bai/` và `doc/features/2026-09-28-khung-go-live/`. Mục này chỉ ghi các rule BR-ND bị sửa hoặc thêm từ đợt Shop làm lại (hồ sơ `doc/features/2026-10-06-shop-giao-dien-moi/`).
+
+| Mã | Luật |
+|---|---|
+| BR-ND-18 | Thông tin người bán công khai (tên, loại hình, số GCN ĐKDN/MST, địa chỉ, SĐT, email) lấy từ cấu hình môi trường, trả qua một API công khai chỉ gồm các field đó. Không viết cứng trong mã nguồn, không commit giá trị thật vào repo. **Bổ sung vào cùng nguồn cấu hình và cùng API công khai: số Zalo, giờ làm việc, nơi cấp và ngày cấp GCN ĐKKD, số giờ khách được báo vấn đề sau khi nhận hàng, link và ảnh biểu tượng xác nhận đã thông báo website TMĐT. Trường nào trống thì Shop ẩn khối tương ứng, không hiện chữ "Đang chờ".** *(D 28/09; sửa, (D) 2026-10-10, xem decisions.md)* |
+| BR-ND-20 | **(D) 2026-10-10** — Ba trang **Chính sách giao hàng**, **Chính sách thanh toán**, **Cơ chế giải quyết khiếu nại** là trang bắt buộc trước khi bán thật, có vai trò riêng như các trang `privacy`, `terms`, `refund`, `seller_info`: không gỡ được khi đang là bản hiệu lực, có lịch sử phiên bản, hiện ở footer. *(mới, (D) 2026-10-10, xem decisions.md)* |
+| BR-ND-21 | **(D) 2026-10-10** — Chữ nội dung của Shop (trang chính sách, liên hệ, cách mua, giới thiệu, bài Góc bếp, các khối nội dung Lộc cần sửa) **lưu ở CMS**, Shop đọc qua API công khai. Chữ giao diện (nhãn nút, câu lỗi, tiêu đề màn, câu pháp lý cố định ở form) ở code. Trang chính sách chỉ đăng sau khi `legal-vn` duyệt (áp cho production; staging nạp và đăng luôn toàn bộ theo decisions 2026-10-10 tối). Câu khẳng định về hàng hoá hay dịch vụ chưa có nguồn (decisions, BR, hoặc Lộc xác nhận) không được đăng. *(mới, (D) 2026-10-10, xem decisions.md)* |
 
 ---
 
@@ -424,6 +452,7 @@ stateDiagram-v2
 | BR-HT-10 | *(mới, Duy duyệt 30/09)* Chứng từ đảo doanh thu là chứng từ riêng, append-only, do Hệ thống lập trong cùng giao dịch với huỷ đơn (kể cả job tự huỷ CSKH), gắn hoá đơn gốc; hoá đơn gốc giữ nguyên `ISSUED`. Mỗi dòng = lô + kg + đơn giá bán lấy từ phân bổ lô của hoá đơn (BR-BH-06). Mỗi hoá đơn tối đa một chứng từ huỷ. Chứng từ lập bù cho đơn huỷ trước P8 ghi vào kỳ chạy lập bù; lãi lỗ lô đã chốt không đổi (Duy quyết 30/09). |
 | BR-HT-07 | **Tách quyền**: `create_refund` mở cho Quản lý (khách chờ không được), `confirm_refund` chỉ Chủ (tiền thật rời tài khoản). |
 | BR-HT-08 | Mọi chuyển trạng thái Refund ghi AuditLog (BR-PQ-05). |
+| BR-HT-12 | **(D) 2026-10-10** — **Thông báo đơn huỷ trên Shop** (đơn đã trả tiền, huỷ toàn phần hoặc một phần, hoặc tiền về sau khi đơn tự huỷ): chỉ gồm nhãn lý do cố định, **số tiền của phần bị huỷ**, câu "Cá Về sẽ gọi vào số điện thoại đặt hàng trong [thời hạn] để [trả lại / xử lý] số tiền …" (bản A hoặc B và thời hạn: bản A, tạm gọi trong 1 ngày làm việc, trả tiền trong 3 ngày làm việc (D 11/10: câu tạm, hỏi Lộc L6–L7 ở `doc/ops/hoi-loc.md`)), hotline, link mục "Xử lý tiền đã chuyển khi đơn huỷ" của Chính sách đổi trả và hoàn tiền. **Không** hiện trạng thái, hạn, ngày chuyển của phiếu hoàn. Chữ "hoàn tiền" chỉ có trong tên trang chính sách. ERP giữ nguyên Refund. Thay nội dung CS-10 `cancel_notice` đã nghiệm thu (hồ sơ `2026-09-28-cskh-xac-nhan-in-tem`): không trả tiến độ phiếu hoàn (`refund{amount,status_label,deadline,refunded_at}`) ra API công khai, bỏ câu "sẽ được hoàn trong vòng N ngày". *(mới, (D) 2026-10-10, xem decisions.md; BR-HT-11 đã giữ cho hồ sơ huỷ đơn đang giao)* |
 
 ---
 
@@ -557,3 +586,4 @@ Trường **mới** đáng chú ý: `Item.item_type`, `Batch.status`, `Batch.lan
 
 **Nhật ký thay đổi**
 - 08/10/2026 — W37 S9 (Duy duyệt 07/10): thay sơ đồ §7.2 (bỏ `DaThanhToan`, Hoàn tất do Hệ thống chuyển khi phiếu cuối giao xong); thêm BR-BH-18..21 (§7.2), BR-BC-06 (§12.2), BR-GH-24 phần "không ghi đè" (§8). Hồ sơ: `doc/features/2026-10-06-don-hoan-tat/`.
+- 11/10/2026 — Shop làm lại theo thiết kế 06/10 (Duy chốt 10/10 tối, điểm dừng 1 nhóm A): sửa BR-DM-01, BR-DM-08, ranh giới §3.1 (có mã giảm giá một tầng), §7.1 (tra đơn), BR-BH-01; thêm BR-DM-17..25 (§3.2), BR-BH-22..30 (§7.3), BR-TT-19 (§7.4), BR-HT-12 (§9.3, thay nội dung CS-10 `cancel_notice`); thêm §7.5 với BR-ND-18 (sửa), BR-ND-20, 21. Chỗ còn S-08 / S-12 / S-18 (Duy trả lời 11/10, câu tạm theo `doc/ops/hoi-loc.md`) là câu nhóm B chưa chốt. Hồ sơ: `doc/features/2026-10-06-shop-giao-dien-moi/`.

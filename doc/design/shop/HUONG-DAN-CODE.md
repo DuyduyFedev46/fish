@@ -39,7 +39,7 @@ Không dùng route động `[x]`, dùng query string thay thế.
 | C1–C5 Đặt hàng | `/shop/checkout/` | `features/checkout/components/CheckoutScreen.tsx` (bỏ phần giỏ) |
 | D1–D6, E1–E4, F1–F2 Thanh toán, đơn hàng, tra cứu | `/shop/orders/?code=&result=` | `app/shop/orders/*`, `features/checkout/components/OrderPaymentPanel.tsx` |
 | Chính sách, cách mua | `/trang/?slug=` | `app/trang/*` |
-| Liên hệ | chờ Q7 (`/lien-he/` hoặc `/trang/?slug=lien-he`) | — |
+| Liên hệ | `/trang/?slug=lien-he` (trang CMS, chốt 10/10) | `app/trang/*` |
 | Góc bếp | `/bai-viet/` | `app/bai-viet/*` |
 
 ## 3. Component dùng chung (lô 1 dựng, các lô sau dùng lại)
@@ -56,7 +56,7 @@ Không dùng route động `[x]`, dùng query string thay thế.
 | `StockBadge` | `in` \| `low` \| `out`, không bao giờ nhận số kg | `A7`, `Main` |
 | `Sheet` / `Dialog` | Điện thoại là bottom sheet hoặc dialog, máy tính là hộp thoại giữa; giữ tiêu điểm, Esc | các màn `[Popup]` |
 | `Toast` | `role="status"`, tự ẩn 3 s, có nút "Xem giỏ" | `A4`, `DesktopToast` |
-| `AddressField` + `MapPicker` | textarea + nút Bản đồ; Maps nạp khi bấm; trả về chuỗi địa chỉ | `Checkout`, `C1b`, `C1c`, `C5` |
+| `AddressField` + `MapPicker` | textarea + nút Bản đồ; Maps nạp khi bấm; dòng thông báo Google hiện ngay khi mở; **không** nút "Vị trí của tôi"; trả về chuỗi địa chỉ (BR-BH-29) | `Checkout`, `C1b`, `C1c`, `C5` |
 | `OrderTimeline` | Đã đặt → Đã thanh toán → Đang chuẩn bị → Đang giao → Đã giao; nhánh lỗi màu hổ phách | `Success`, `E3`, `E4` |
 | `EmptyState`, `ErrorState`, `Skeleton` | Trạng thái bắt buộc (UI-RULES §7) | `A0`, `A5`, `A6` |
 | `HoldCountdown` | Đếm ngược giữ hàng (dùng lại `CountdownTimer.tsx`) | `Payment`, `D2` |
@@ -72,7 +72,7 @@ Không dùng route động `[x]`, dùng query string thay thế.
 ## 5. Dữ liệu và API
 - Mọi gọi API đi qua `lib/api.ts`. Mock ở `lib/mock.ts` phải khớp **đúng contract** trong `DOI-CHIEU-CODE.md` §4 (BE-1 … BE-7).
   FE có thể làm trước BE bằng mock, nhưng không tự đặt ra field mới.
-- Chưa có `stock_level` thì FE **không** suy mức tồn từ `sellable_qty` để hiện số. Chỉ được map tạm `sellable_qty` → `in/low/out`, kèm ghi chú gỡ ở lô 7.
+- FE chỉ đọc `stock_level` (`in/low/out`). `sellable_qty` bị gỡ khỏi Shop API ngay ở lô 2 (chốt 10/10), không map tạm từ số kg. GET tra đơn `phone_last4` bị gỡ ở lô 3; tra đơn dùng POST (BR-BH-25).
 - Tra đơn và trang đơn **không** đọc hay hiển thị tên, số điện thoại, địa chỉ người nhận.
 - Không đưa số điện thoại khách vào URL. Lưu `lookup_token` (BE-4/BE-5) trong `sessionStorage` với khoá tiếng Anh.
 - Lỗi hết hàng có cấu trúc (BE-3) thì mở popup C3. Không hiện chuỗi lỗi thô của server cho khách.
@@ -93,7 +93,10 @@ grep -rnE "#[0-9A-Fa-f]{6}" frontend/components frontend/app frontend/features |
 
 ## 7. Không được
 - Không sửa `doc/decisions.md`, BR hay contract trong lô dev. Lệch thì ghi "Lệch thiết kế" vào `03-dev-notes.md` rồi dừng lô.
-- Không hiện số kg tồn, ngày nhập lô, giá vốn, hay chữ "hoàn tiền" trên Shop.
+- Không hiện số kg tồn, ngày nhập lô, giá vốn, hay chữ "hoàn tiền" trên Shop (trừ tên trang "Chính sách đổi trả và hoàn tiền").
+- Không có dòng "Phí giao"; dưới Tổng ghi câu "Đã gồm giao hàng…" (BR-BH-30). Không có chip "Tìm nhiều", không nút "Vị trí của tôi", không nút "Huỷ đơn" (chốt 10/10).
+- Ô đồng ý chính sách **không bao giờ tick sẵn** (NĐ 356/2025, BR-BH-17). Mock và state khởi tạo `consent: false`.
+- Mã BR của Shop mới: BR-DM-17…25, BR-BH-22…30, BR-TT-19, BR-HT-12, BR-ND-20, 21 (`doc/business-process-spec.md`). BR-BH-18…21 là đơn Hoàn tất, không dùng cho Shop.
 - Không hiện dữ liệu cá nhân trên trang công khai. Không ghi dữ liệu cá nhân vào log hay test.
 - Không thêm thư viện UI nặng. Dùng React và CSS hiện có. Muốn thêm thư viện (kể cả loader Google Maps) thì hỏi điều phối viên.
 - Không thêm chữ chú thích ngoài thiết kế (UI-RULES §6).

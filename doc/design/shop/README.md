@@ -1,4 +1,4 @@
-# Thiết kế Shop Cá Về (bản thiết kế 06/10/2026, chờ Duy duyệt)
+# Thiết kế Shop Cá Về (bản thiết kế 06/10/2026, Duy chốt 10/10/2026)
 
 - **Canvas gốc** (xem trực quan, bấm thử được): https://claude.ai/artifact/SPSQLR5rMEtuBFreYbK96J
 - `screens/*.dc.html`: HTML tĩnh, style inline. Mở bằng trình duyệt để xem. Icon và font cần mạng. Thẻ `<sc-if>`, `<sc-for>`, `{{…}}` và khối `<script type="text/x-dc">` là cú pháp của canvas, khi code thì thay bằng state React. Dev đọc cấu trúc, khoảng cách, màu và chữ từ HTML.
@@ -26,6 +26,19 @@
 9. Phương thức thanh toán chỉ ghi phương thức (chuyển khoản quét mã QR), **không ghi tên nhà cung cấp cổng thanh toán**.
 10. **Có ô nhập mã giảm giá** ở giỏ hàng (Duy chốt 07/10), mỗi đơn tối đa 1 mã. **Lật quyết định cũ "không mã giảm giá"** (`decisions.md` dòng 98, BR-DM-08, URD) nên lô 0 phải ghi quyết định mới. Mặc định thiết kế: không cộng dồn với ưu đãi tự động, lấy cái lợi hơn cho khách (chờ Duy xác nhận).
 11. Trang đơn hàng công khai **không hiện người nhận** (tên, số điện thoại, địa chỉ), theo bất biến 9. Mã đơn giữ dạng `SO…` như code.
+
+## Chốt thêm ngày 10/10/2026 (đã ghi `doc/decisions.md` mục "2026-10-10 (tối)")
+Nguồn: `doc/features/2026-10-06-shop-giao-dien-moi/01-analysis.md` §11 (nhóm A + V-01…V-12, Duy duyệt). BR mới ở `doc/business-process-spec.md`.
+Khi màn `screens/*.dc.html` khác các điểm dưới đây thì **theo điểm dưới đây**; màn sẽ được ux-designer sửa (danh sách ở `01-analysis.md` mục "Màn cần ux-designer sửa").
+- Chốt 2 xác nhận **bước 0,5 kg** (BR-BH-22). Chốt 10 xác nhận **không cộng dồn**, lấy lợi hơn, hoà thì giữ ưu đãi tự động; mã công khai, giới hạn tổng lượt, 1 mã/đơn; quyền tạo mã `manage_voucher` chỉ Chủ, uỷ được (BR-DM-17…24).
+- Chốt 5 đọc là: Shop **không thu thông tin và không hiển thị** hoá đơn điện tử; nghĩa vụ lập hoá đơn ở hậu trường chốt cùng kế toán. Không ghi "Cá Về không xuất hoá đơn".
+- **Phí giao:** bỏ dòng "Phí giao: Báo khi xác nhận đơn". Dưới Tổng ghi "Đã gồm giao hàng. Bạn trả một lần, không trả thêm khi nhận hàng." (BR-BH-30). Khu vực giao: chờ Duy (S-08).
+- **Bỏ** dải chip "Tìm nhiều", nút "Vị trí của tôi", nút "Huỷ đơn" ở màn thanh toán, ô "Lô mới về".
+- Ô đồng ý **không tick sẵn**; popup bản đồ có dòng thông báo gửi dữ liệu tới Google ngay khi mở (BR-BH-29).
+- Tra đơn bằng mã + SĐT đầy đủ hoặc mã tra đơn tạm (BR-BH-25). BottomNav hiện ở Trang chủ, Danh mục, Góc bếp, Tra cứu đơn.
+- Trang `terms` tên **"Điều kiện giao dịch chung"** (không "Điều khoản sử dụng"). Biểu tượng thông báo Bộ Công Thương chỉ gắn khi có link.
+- Đơn huỷ sau khi đã trả: theo BR-HT-12 (câu A/B và thời hạn chờ Duy, S-12).
+- Không cấu trúc lại thư mục code đợt này.
 
 ## Danh mục màn (93 bảng: 86 màn + 7 bảng component)
 
