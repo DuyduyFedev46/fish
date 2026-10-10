@@ -446,7 +446,7 @@ trả 404 rồi gọi tải lại.
 - Component màn: `ScopeLostInApp({ listHref, extra })` đặt trong `features/auth/components/AppStates.tsx`, cạnh `NotFoundInApp`.
   Dùng lại class `page-state` / `state-title` / `page-state-actions` và `Icon`. **Không** sửa `shared/ui/**`. Nút "Về danh sách" trỏ về
   đường "quay lại" mà màn đang dùng (`/orders/`, `/orders/refunds/`, `/purchasing/`…). NV giao ở màn phiếu giao thì về `homePath(me)`.
-  Tiêu đề dùng `<h2>` và đặt `role="alert"` để trình đọc màn hình đọc lên.
+  Tiêu đề dùng `<h2>` và đặt `role="alert"` để trình đọc màn hình đọc lên. **Sửa 10/10 (review Lô 7, L1):** `role` đặt trên khối bọc (`div.page-state`), không đặt trên `<h2>`, vì `role="alert"` ghi đè vai heading. Thêm `tabIndex={-1}` cho `<h2>` và chuyển focus vào đó khi màn hiện, vì nút vừa bấm ("Tải lại") đã bị gỡ khỏi DOM.
 - AC2: thêm câu `scopeLostOwnReceiptEarlierDay` khi dữ liệu **vừa có** cho thấy `row.created_by === me.id` **và** ngày tạo theo giờ VN
   nhỏ hơn `todayInVietnam()`. Viết thành hàm thuần (vd `isOwnReceiptFromEarlierDay(row, meId, now)`) để test được mốc 23:50 / 00:10.
   Không cần đọc D6 từ `me`, vì `me` có thể cũ hơn cấu hình.

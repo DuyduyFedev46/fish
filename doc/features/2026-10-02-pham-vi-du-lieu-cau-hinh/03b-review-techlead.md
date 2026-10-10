@@ -951,3 +951,105 @@ thể xanh giả. Mỗi chỗ sửa vài dòng và chỉ trong file test. Sửa 
 2. Chạy lại `manage.py test apps.accounts.data_scopes.tests.test_release_gate` và thấy `Ran … OK`. Nếu M2 làm đỏ thì đó là rò thật:
    dừng lô và báo.
 3. Techlead xem lại diff của riêng file test, không cần review lại FE.
+
+---
+
+## Lô 7 — review (10/10, techlead)
+
+**Phạm vi:** PV-13 FE, PV-14 BE và FE, §2.7 FE. Nhánh `feat/pv7-cum`: `57641b1` + BE `757afc3` + FE `bf80eac`, merge `38e3781`.
+Diff `git diff 57641b1..HEAD` gồm 50 file (+1527/−71). Đối chiếu với 02b §6.1.
+
+**Kết luận: APPROVED.** Không có lỗi Critical, High hay Medium. Có 3 lỗi Low, nên sửa trong lượt dọn kế tiếp hoặc ngay trong lô nếu
+fe-dev còn thời gian. Các lỗi này không chặn QA.
+
+### Kiểm chứng techlead tự chạy
+- BE (worktree `pv7-cum`): `manage.py test apps.accounts.auth.tests.test_me_data_scopes test_s6_me test_s47_me_labels test_no_role_gate`
+  cho kết quả `OK`. Chạy `apps.accounts.auth apps.accounts.data_scopes` thì `Ran 374`, có 4 lỗi `Missing staticfiles manifest entry`
+  ở `test_qa2_fixes` (B3, R7). Lỗi đến từ môi trường: worktree chưa có `backend/staticfiles/`. Lô 7 không đụng các file đó, và toàn
+  suite của điều phối viên vẫn xanh. `makemigrations --check --dry-run` cho `No changes detected`.
+- FE (worktree `pv7-fe` @ `bf80eac`, phần `erp-console` giống hệt merge): vitest chạy 9 file liên quan (useDetail, customers, returns,
+  usePagedList, personalData, receiptScope, dataScopeView), **112/112 PASS**.
+- `python3 scripts/check_naming.py`: OK, không phát sinh vi phạm mới.
+
+### Trọng tâm điều phối viên hỏi
+
+**(a) `scope_lost` xoá dữ liệu khách khỏi state: ĐẠT.**
+- Ba hook `orders/useDetail.ts`, `customers/useCustomerDetail.ts`, `returns/useReturnDetail.ts` chỉ vào nhánh này khi đủ cả ba điều
+  kiện: `keep`, `ApiError.status === 404`, và `statusRef` đang là `ok`/`scope_lost`. Khi đó hook gọi `setData(null)`. Dùng `statusRef`
+  thay cho closure cũ là đúng. 403, 500 và lỗi mạng vẫn giữ hành vi cũ, đã có test.
+- Thân màn (`OrderDetailBody`, `CustomerDetailBody`, khối AI, Timeline) bị unmount vì `DetailGate` hoặc màn trả `ScopeLostInApp` sớm.
+  Nhờ vậy state con, gồm modal Đổi người nhận và guidance, cũng mất theo.
+- Ba màn tự tải:
+  - `DeliveryDetailScreen` và `ConfirmationDetailScreen` xoá `detail`, đặt `history` về `loading` và đóng modal.
+  - `ReceiptDetailScreen` thay `row` bằng `{k:"scope_lost", ownEarlierDay}`. Cờ AC2 được tính từ bản trước, rồi mới bỏ dữ liệu.
+- Không có cache: `http.ts` dùng `cache: "no-store"`. Không có `sessionStorage`/`localStorage` nào chứa dữ liệu chi tiết; grep chỉ ra
+  nháp nhập lô, mốc đăng nhập và đồng ý AI, đều có sẵn từ trước. Lô 7 không thêm `console.*`.
+- Lần tải đầu bị 404 vẫn ra `NotFoundScreen`, nên ED-19-AC6 giữ nguyên.
+
+**(b) `/me` `data_scopes`: ĐẠT.**
+- `describe_own_data_scopes` không chép luật. Hàm chỉ gọi `resolve_data_scopes`, riêng D4 thì gọi `confirmation_scope_value` (import
+  lười). Test `test_pv14_ac1_value_matches_the_scope_function_views_use` so trên 8 người, hơn 40 ô, với đúng hàm mà view dùng.
+- Thông tin nhóm chỉ là `via_group`, lấy từ resolver, mà resolver chỉ nạp nhóm của chính người đó. Không có `version`, số ngày cửa sổ,
+  giá vốn hay dữ liệu khách. Test `test_pv14_no_leak_...` có ca giá trị `created_by_me_today` của nhóm kho không lọt sang `/me` của
+  NV giao.
+- Số truy vấn: gốc 6, nay 9, tức đúng +3, là 3 truy vấn của resolver. `confirmation_scope_value` đọc lại resolver đã nhớ trên user nên
+  không thêm truy vấn.
+- Chủ đi qua `via_group == owner` để bỏ bước kiểm permission cổng. Cách này khớp quy tắc 2 của §6.1.3 và nhánh `_widest(OWNER)` của
+  resolver.
+
+**(c) Tham số `erp_access=` không đổi cổng D-3: ĐẠT.**
+- Nơi gọi duy nhất của `home_for` là `describe_user`. Hàm này tính `has_erp_access(user)` **một lần** rồi truyền cùng giá trị cho cả
+  `home_for` và `describe_own_data_scopes`.
+- Khi `erp_access=None`, cả hai hàm tự gọi `has_erp_access` như cũ.
+- Cổng xác thực (`authentication.py`) không bị đụng. Test AC2 dùng token thật và thấy cùng token đó bị 403 `AUTH_NO_ROLE` ở
+  `/api/sales/orders/`.
+
+**(d) `loadMore` gặp 404 thì tải lại trang 1, có lặp vô hạn không: KHÔNG.**
+- `loadMore` chỉ chạy khi người dùng bấm "Tải thêm". Grep không thấy `IntersectionObserver` hay effect nào tự gọi nó.
+- `loadFirst` không gọi `loadMore`. Trang 1 của DRF không trả 404 vì phạm vi: trang rỗng vẫn trả 200. Nếu trang 1 lỗi thì nó đi nhánh
+  `error` của `loadFirst`.
+- Nên mỗi lần bấm tối đa ra 2 request. Có test cho 404 (gọi `[1,2,1]`), cho 500 (`moreError` vẫn báo) và cho Làm mới.
+
+**(e) Chữ và a11y: ĐẠT, có L1.**
+- Chữ khớp nguyên văn §6.1.4: AC1 "Bạn không còn quyền xem mục này.", AC2 "Phiếu tạo từ hôm trước. Nhờ Quản lý xử lý tiếp.", và câu
+  "Đã ẩn (không có quyền xem thông tin khách)".
+- Khối PV-14 dùng `<section aria-labelledby>` với `<dl>` (mỗi `div` chứa `dt`/`dd`). Không có nút hay ô nhập. Mỗi dòng cao tối thiểu
+  44px. Màn dưới 520px xếp dọc, `overflow-wrap:anywhere`. Icon `lock` và `shield_person` đều có trong tập con font và có `aria-hidden`.
+
+### Quyết định lệch phạm vi FE (fe-dev tự khai)
+1. **`shared/lib/fakeReactHooks.ts`: chấp nhận cách làm**, nhưng phải chuyển chỗ (L3). Repo chưa có jsdom hay testing-library,
+   `package.json` thì bị cấm sửa, nên bộ hook giả là cách duy nhất để test máy trạng thái của hook. Bộ giả đủ trung thực cho mục đích
+   này: setState chạy lại render đồng bộ, deps so bằng `Object.is`. App không import file này (grep chỉ ra 4 file `*.test.ts`), nên nó
+   không vào bundle. Giới hạn cần biết: bộ giả không mô phỏng batching hay StrictMode, nên **không** dùng nó để test hành vi phụ thuộc
+   thứ tự render.
+2. **`features/auth/dataScopeView.ts` (+ test): chấp nhận.** File nằm trong module auth được phép sửa, và chính là "hàm dựng dòng" mà
+   §6.1.6 đòi test.
+3. **`CustomerCell` cục bộ: chấp nhận vì không đụng `shared/ui`**, nhưng hai bản giống hệt nhau trong cùng module → L2.
+4. **`DetailGate` thêm prop bắt buộc `listHref`: chấp nhận.** Prop bắt buộc buộc mọi màn sau này phải chọn đường về. Cả 3 nơi gọi đã
+   sửa (đơn `/orders/`, phiếu hoàn tiền `/orders/refunds/`, khoản tiền `/orders/payments/`), tsc sạch.
+5. **Mock thêm `sales.view_order_customer_info` cho 5 nhóm: chấp nhận.** Khớp `sales/migrations/0016_grant_view_order_customer_info.py`
+   (cấp cho cả 5 nhóm).
+6. **Mock chỉ dựng được `scope_lost` ở màn Đơn: chấp nhận, kèm điều kiện cho QA.** Ca 1, 2, 3, 5 của §6.1.6 (phiếu nhập, phiếu giao,
+   gọi xác nhận, hàng hoàn, phiếu hoàn tiền, khách) **bắt buộc chạy trên BE thật** với `seed_qa`. Không được PASS bằng vitest hay mock.
+
+### Lỗi
+
+| # | Mức | Chỗ | Ghi nhận | Cách sửa |
+|---|---|---|---|---|
+| L1 | Low (a11y) | `erp-console/features/auth/components/AppStates.tsx:33` | `<h2 role="alert">`: `role="alert"` ghi đè vai heading, nên người dùng trình đọc màn hình không tìm được tiêu đề bằng phím heading. Khi vào `scope_lost`, nút "Tải lại" vừa bấm bị gỡ khỏi DOM nên focus rơi về `body`. Lỗi bắt nguồn từ chỉ dẫn của chính 02b §6.1.4 (đã sửa dòng đó, ghi "Sửa 10/10") | Đặt `role="alert"` lên `div.page-state`. `<h2 tabIndex={-1}>` và focus nó trong `useEffect` lúc mount |
+| L2 | Low (lặp code) | `erp-console/features/orders/components/OrderDetailScreen.tsx:65-68` và `RefundDetailScreen.tsx:39-42` | Hai bản `CustomerCell` giống hệt nhau trong cùng module `orders` | Đưa vào `features/orders/components/CustomerCell.tsx` (cùng module, không đụng `shared/ui`). `OrdersScreen` và `SalesInvoiceListScreen` giữ dạng inline như hiện tại, vì là cột bảng và `accounting` không được import vào ruột `orders` |
+| L3 | Low (vị trí file) | `erp-console/shared/lib/fakeReactHooks.ts` | Repo đã có thư mục cho đồ dùng riêng của test, `shared/lib/testing/` (có `fakeBackendFetch.ts`). Để file test cạnh mã chạy thật thì dễ bị import nhầm | Chuyển sang `shared/lib/testing/fakeReactHooks.ts`, rồi sửa import ở 4 file test |
+| I1 | Info | `DeliveryDetailScreen.tsx:73-78`, `ConfirmationDetailScreen.tsx` `loadHistory` | `loadHistory` chạy song song với `loadDetail` khi tải lại, và không có bộ đếm lượt. Nếu guidance trả 200 *sau* `scope_lost` thì `history` lại có dòng thời gian trong state, dù không vẽ ra. Khả năng gần như bằng 0 vì `GuidanceView` (provider `delivery`) dùng cùng hàm phạm vi D3/D4 nên cũng 404 cùng lúc. Mẫu này có từ trước Lô 7 | Không bắt buộc. Lần sau đụng 2 màn này thì thêm bộ đếm lượt cho `loadHistory` |
+| I2 | Info (UX) | `backend/apps/accounts/data_scopes/catalog.py:85` | Khối PV-14 hiện nguyên chữ catalog "…tôi đã gọi trong N ngày". Chữ "N" để lộ nguyên chỗ giữ chỗ cho NV gọi xác nhận. Đây là chữ chung với màn Phân quyền và contract không cho trả số ngày | PO cân nhắc đổi thành "trong vài ngày gần đây" ở catalog, trong một lô sau |
+| I3 | Info (QA) | `ReceiptActionModals.tsx:35` | Ca 3 của §6.1.6: "Gửi ghi nhận" trả 404 thì hộp thoại hiện trạng thái cũ và nút "Tải lại". Bấm nút đó mới sang màn mất quyền. Như vậy là hai bước, đúng §6.1.4 ("thao tác trả 404 rồi gọi tải lại"). QA kiểm theo hai bước này, không coi là lỗi | — |
+
+### BE: không có lỗi
+- `describe_own_data_scopes` có đủ 8 dòng theo `catalog.OBJECTS`, mỗi dòng đúng 5 khoá. Dòng `none` thì xoá `via_group`. D2 dùng bảng
+  chữ riêng, `audit_log` dùng "Tất cả". Hàm nằm cuối `services.py`, không đụng `catalog.py` hay `resolver.py`.
+- 15 test dùng token thật, phủ đủ mục 1–12 của §6.1.6. Hai test set-equality chỉ thêm khoá `data_scopes`. Không có migration. Không
+  sửa file ngoài §6.1.5.
+
+### Điều kiện chuyển tiếp
+1. QA chạy §6.1.6 trên BE thật. Ca 1, 2, 3, 5 bắt buộc (mock không dựng được). Ca 4 nghe `console` và đọc `innerText`.
+2. L1–L3 nên sửa cùng lô nếu fe-dev còn thời gian. Nếu sửa thì chỉ cần chạy lại vitest, tsc và build, không cần review lại.
+   Nếu không sửa thì ghi vào nợ dọn.
