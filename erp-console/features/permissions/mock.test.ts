@@ -232,3 +232,36 @@ describe("D7 theo rank hiệu lực (review F1 M1, luật H1)", () => {
     expect(row.inactive_reason).toBeNull();
   });
 });
+
+describe("2 việc mới của Lô 3 (view_sales_invoices, view_order_customer_info)", () => {
+  it("registry có đủ hai việc, nhãn đúng từng chữ như BE", () => {
+    const reg = getGroup("manager").registry;
+    expect(reg.find((r) => r.key === "view_sales_invoices")?.label).toBe("Xem hoá đơn bán");
+    expect(reg.find((r) => r.key === "view_order_customer_info")?.label).toBe("Xem thông tin khách trên đơn, hoá đơn, phiếu hoàn tiền");
+    expect(reg).toHaveLength(28);
+  });
+  it("mặc định: V1 chỉ Quản lý và NV kho; V2 bật cho cả bốn nhóm", () => {
+    const states = (g: string) => getGroup(g).capabilities;
+    expect(states("manager").view_sales_invoices).toBe("on");
+    expect(states("warehouse_staff").view_sales_invoices).toBe("on");
+    expect(states("delivery_staff").view_sales_invoices).toBe("off");
+    expect(states("customer_service").view_sales_invoices).toBe("off");
+    for (const g of ["manager", "warehouse_staff", "delivery_staff", "customer_service"]) expect(states(g).view_order_customer_info).toBe("on");
+  });
+  it("dòng Hoá đơn bán mờ khi nhóm chưa bật V1, kèm tên việc", () => {
+    const row = getGroup("customer_service").data_scopes.find((r) => r.key === "invoices")!;
+    expect(row.gate_capability).toBe("view_sales_invoices");
+    expect(row.inactive_reason).toBe('Không xem — bật việc "Xem hoá đơn bán" trước');
+  });
+  it("bật V1 cho nhóm chưa có → mở rộng dữ liệu khách ở Hoá đơn bán, cần xác nhận", () => {
+    const r = put("customer_service", { version: "1", capabilities: { view_sales_invoices: true } });
+    expect(codeOf(r)).toBe("CUSTOMER_DATA_WIDENING_UNCONFIRMED");
+    expect((r.body as { impact: ScopePreview }).impact.widened.map((w) => w.key)).toEqual(["invoices"]);
+  });
+  it("tắt rồi bật lại V2 → widened có view_order_customer_info", () => {
+    expect(put("delivery_staff", { version: "1", capabilities: { view_order_customer_info: false } }).status).toBe(200);
+    const impact = preview("delivery_staff", { capabilities: { view_order_customer_info: true } }).body as ScopePreview;
+    expect(impact.widens_customer_data).toBe(true);
+    expect(impact.widened).toEqual([{ key: "view_order_customer_info", from: "off", to: "on" }]);
+  });
+});

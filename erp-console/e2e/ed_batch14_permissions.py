@@ -130,7 +130,9 @@ def owner(browser):
     heads = [h.strip().lower() for h in page.locator("table thead th").all_text_contents()]
     ok("ma trận: có cột Quản lý và Nhân viên giao, cột 'Chỉ Chủ'", "quản lý" in heads and "nhân viên giao" in heads and "chỉ chủ" in heads, str(heads))
     rows_text = page.locator("main table").nth(1).inner_text()
-    ok("ma trận: có việc Xem khách hàng, Ghi hàng hoàn", "Xem khách hàng" in rows_text and "Ghi hàng hoàn" in rows_text)
+    ok("ma trận: có việc Xem khách hàng, Ghi hàng hoàn (không còn nhãn cũ 'hoàn về kho')", "Xem khách hàng" in rows_text and "Ghi hàng hoàn" in rows_text and "hoàn về kho" not in rows_text.lower())
+    ok("ma trận: có 2 việc Xem hoá đơn bán và Xem thông tin khách trên đơn, hoá đơn, phiếu hoàn tiền",
+       "Xem hoá đơn bán" in rows_text and "Xem thông tin khách trên đơn, hoá đơn, phiếu hoàn tiền" in rows_text)
     ok("danh sách nhóm: 5 nhóm, bấm được", page.locator("main table").first.locator("tr.lt-click").count() == 5, str(page.locator("main table").first.locator("tr.lt-click").count()))
     ok("giá vốn không hiện ở cột nhóm trừ cờ Có/Không", "Xem giá vốn" in page.locator("main table").first.inner_text())
     page.screenshot(path=f"{SHOTS}/lo14-desktop-1280-matrix.png", full_page=True)
@@ -140,8 +142,9 @@ def owner(browser):
     ok("cột Chủ: không có công tắc", own_cell.get_by_role("switch").count() == 0)
     # tìm việc
     page.get_by_role("searchbox", name="Tìm việc trong ma trận").fill("khách")
-    ok("tìm 'khách': chỉ còn việc khớp", page.locator("main table").nth(1).locator("tbody tr th[scope=row]").count() == 1,
-       str(page.locator("main table").nth(1).locator("tbody tr th[scope=row]").all_inner_texts()))
+    found = [t.strip() for t in page.locator("main table").nth(1).locator("tbody tr th[scope=row]").all_inner_texts()]
+    ok("tìm 'khách': chỉ còn đúng 2 việc khớp (Xem khách hàng, Xem thông tin khách trên đơn…)",
+       len(found) == 2 and any(t.startswith("Xem khách hàng") for t in found) and any(t.startswith("Xem thông tin khách trên đơn") for t in found), str(found))
     page.get_by_role("searchbox", name="Tìm việc trong ma trận").fill("zzzz-khong-co")
     expect(page.get_by_text("Không có việc nào khớp")).to_be_visible()
     ok("tìm không ra: báo rõ, không bảng trống trơn", True)

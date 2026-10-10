@@ -53,7 +53,7 @@ export const SCOPE_OBJECTS: ScopeObjectDef[] = [
     label: "Hoá đơn bán",
     customer_data: true,
     options: [],
-    gate_capability: null, // V1 `view_sales_invoices` chưa có tới Lô 3 (BE trả null)
+    gate_capability: "view_sales_invoices",
     gate_label: "hoá đơn bán",
     defaults: {},
     read_only: true,
@@ -167,7 +167,6 @@ export function valuesOf(group: string, overrides: Record<string, string> | unde
 }
 
 /** Quyền Tầng 1 của nhóm mà mock chép từ migration BE (ngoài registry nên Chủ không đổi ở màn này). */
-const HAS_INVOICE_VIEW = [ROLE.manager, ROLE.warehouseStaff];
 const HAS_CUSTOMER_VIEW = [ROLE.manager, ROLE.deliveryStaff];
 const NO_DELIVERY_VIEW = [ROLE.customerService];
 
@@ -175,8 +174,6 @@ const NO_DELIVERY_VIEW = [ROLE.customerService];
 export function isEligible(obj: ScopeObjectDef, group: string, states: Record<string, CapabilityState>): boolean {
   if (group === ROLE.owner) return true;
   switch (obj.key) {
-    case "invoices":
-      return HAS_INVOICE_VIEW.includes(group as never);
     case "deliveries":
     case "returns":
       return !NO_DELIVERY_VIEW.includes(group as never);
@@ -234,6 +231,10 @@ export function isWidening(before: Reach, after: Reach): boolean {
   return after.rank > base;
 }
 
+const V2_KEY = "view_order_customer_info";
+const V2_LABEL = "Thông tin khách trên đơn";
+const V2_PHRASE = "trên đơn, hoá đơn và phiếu giao";
+
 export type PreviewGroup = {
   code: string;
   states: Record<string, CapabilityState>;
@@ -249,7 +250,7 @@ export type PreviewGroup = {
 export function buildPreview(before: PreviewGroup, after: PreviewGroup, others: PreviewGroup[]): ScopePreview {
   const widened: ScopePreview["widened"] = [];
   const narrowed: ScopePreview["narrowed"] = [];
-  const widenedObjects: ScopeObjectDef[] = [];
+  const widenedObjects: { label: string; phrase: string }[] = [];
   const changedKeys: string[] = [];
   for (const key of STORED_KEYS) {
     const obj = SCOPE_BY_KEY[key];
@@ -264,6 +265,20 @@ export function buildPreview(before: PreviewGroup, after: PreviewGroup, others: 
     if (changed && reachAfter.rank < reachBefore.rank) {
       narrowed.push({ key, from: before.values[key], to: after.values[key], rows_losing_access: after.members.length === 0 ? 0 : key === "receipts" ? 3 : 2 });
     }
+  }
+  // D2 Hoá đơn bán (chỉ đọc) lấy rank theo D1 Đơn hàng của chính nhóm; mở rộng khi cổng `view_sales_invoices` vừa mở (khớp BE `widened_objects`).
+  const invoices = SCOPE_BY_KEY.invoices;
+  const orders = SCOPE_BY_KEY.orders;
+  const invoicesBefore: Reach = { open: isEligible(invoices, before.code, before.states), rank: effectiveRank(orders, before.values.orders, before.states) };
+  const invoicesAfter: Reach = { open: isEligible(invoices, after.code, after.states), rank: effectiveRank(orders, after.values.orders, after.states) };
+  if (isWidening(invoicesBefore, invoicesAfter)) {
+    widened.push({ key: "invoices", from: before.values.orders, to: after.values.orders });
+    widenedObjects.push(invoices);
+  }
+  // V2 "Xem thông tin khách trên đơn…" vừa bật: tên khách hiện trên đơn, hoá đơn, phiếu giao.
+  if (before.states[V2_KEY] !== "on" && after.states[V2_KEY] === "on") {
+    widened.push({ key: V2_KEY, from: "off", to: "on" });
+    widenedObjects.push({ label: V2_LABEL, phrase: V2_PHRASE });
   }
   const widens = widened.length > 0;
   const n = after.members.length;

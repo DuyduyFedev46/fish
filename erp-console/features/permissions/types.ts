@@ -48,9 +48,6 @@ export type GroupMember = {
   added_at: string | null;
 };
 
-/** Chuỗi phạm vi cũ do BE dựng (BE giữ tới Lô 6, FE không dùng nữa; thay bằng `data_scopes`). */
-export type GroupScopes = { orders: string; deliveries: string; customers: string };
-
 /** Một lựa chọn của ô phạm vi; `rank` càng lớn càng rộng. */
 export type ScopeOption = { value: string; label: string; rank: number };
 
@@ -75,7 +72,6 @@ export type DataScopeRow = {
 export type GroupDetail = Omit<GroupSummary, "members"> & {
   members: GroupMember[];
   registry: RegistryItem[];
-  scopes?: GroupScopes;
   data_scopes: DataScopeRow[];
   timeline: GuidanceTimelineEntry[];
 };
