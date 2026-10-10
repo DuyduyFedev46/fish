@@ -1,11 +1,11 @@
 // PV-13-AC1/AC4/AC5 cho useCustomerDetail: tải lại bị 404 phải xoá tên/SĐT/địa chỉ khách khỏi state.
 import { describe, expect, it, vi } from "vitest";
 import { ApiError } from "@/shared/lib/http";
-import { flush, renderHook } from "@/shared/lib/fakeReactHooks";
+import { flush, renderHook } from "@/shared/lib/testing/fakeReactHooks";
 import type { CustomerDetail } from "./types";
 import { useCustomerDetail } from "./useCustomerDetail";
 
-vi.mock("react", async () => (await import("@/shared/lib/fakeReactHooks")).fakeReact);
+vi.mock("react", async () => (await import("@/shared/lib/testing/fakeReactHooks")).fakeReact);
 
 const results: Array<CustomerDetail | ApiError> = [];
 vi.mock("./api", () => ({

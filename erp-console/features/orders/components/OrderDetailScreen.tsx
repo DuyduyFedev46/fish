@@ -34,8 +34,6 @@ import type { SubmitConflict } from "@/shared/ui/form/useSubmit";
 import { Icon } from "@/shared/ui/Icon";
 import { DataTable, type Column } from "@/shared/ui/list/DataTable";
 import { useToast } from "@/shared/ui/overlay/Toast";
-import { personalText, type CustomerHiddenReason } from "@/shared/lib/personalData";
-import { PersonalText } from "@/shared/ui/PersonalText";
 import { ConflictBanner } from "@/shared/ui/states/ConflictBanner";
 import { getOrder } from "../api";
 import { DetailGate } from "../DetailGate";
@@ -57,15 +55,10 @@ import { useDetail, type DetailState } from "../useDetail";
 import { useIdParam } from "../useIdParam";
 import { holdLeftText, useHoldExpired, useNow } from "../useNow";
 import { CancelOrderModal } from "./CancelOrderModal";
+import { CustomerCell } from "./CustomerCell";
 import { ConfirmPaymentModal } from "./ConfirmPaymentModal";
 import { RefundModal } from "./RefundModal";
 import s from "../orders.module.css";
-
-/** §2.7: ô khách đã bị che (`null`) ghi lý do (quá 7 ngày / không có quyền xem thông tin khách); còn lại như PersonalText. */
-function CustomerCell({ value, reason }: { value: string | null | undefined; reason?: CustomerHiddenReason | null }) {
-  if (value === null) return <span className="muted">{personalText(null, "—", reason)}</span>;
-  return <PersonalText value={value} />;
-}
 
 type AiTarget = { id: number; code: string };
 

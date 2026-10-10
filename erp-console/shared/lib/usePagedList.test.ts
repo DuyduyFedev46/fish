@@ -1,10 +1,10 @@
 // PV-13-AC3: "Tải thêm" gặp 404 (phạm vi vừa hẹp lại) → tải lại trang 1, không báo lỗi; lỗi khác vẫn báo moreError.
 import { describe, expect, it, vi } from "vitest";
 import { ApiError, type Paginated } from "@/shared/lib/http";
-import { flush, renderHook } from "@/shared/lib/fakeReactHooks";
+import { flush, renderHook } from "@/shared/lib/testing/fakeReactHooks";
 import { usePagedList } from "./usePagedList";
 
-vi.mock("react", async () => (await import("@/shared/lib/fakeReactHooks")).fakeReact);
+vi.mock("react", async () => (await import("@/shared/lib/testing/fakeReactHooks")).fakeReact);
 vi.mock("@/shared/ui/states/offlineSource", () => ({ useOfflineRegistration: () => undefined }));
 
 type Row = { id: number };

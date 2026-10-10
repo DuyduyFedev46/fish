@@ -1,10 +1,10 @@
 // PV-13-AC1/AC4/AC5: chuyển trạng thái của useDetail khi tải lại bị 404 / 500 / 403 / tải lần đầu bị 404.
 import { describe, expect, it, vi } from "vitest";
 import { ApiError } from "@/shared/lib/http";
-import { flush, renderHook } from "@/shared/lib/fakeReactHooks";
+import { flush, renderHook } from "@/shared/lib/testing/fakeReactHooks";
 import { useDetail } from "./useDetail";
 
-vi.mock("react", async () => (await import("@/shared/lib/fakeReactHooks")).fakeReact);
+vi.mock("react", async () => (await import("@/shared/lib/testing/fakeReactHooks")).fakeReact);
 
 type Doc = { id: number; customer_name: string };
 const DOC: Doc = { id: 7, customer_name: "Khách giả A" };

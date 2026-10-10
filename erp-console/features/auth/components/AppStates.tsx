@@ -2,6 +2,7 @@
 
 // 404 và lỗi chung nằm trong khung app: nút "về trang chính" đi theo `homePath(me)` (người chỉ có vai giao hàng
 // về "Việc giao của tôi", không phải Tổng quan mà họ không có quyền xem — G9). Cần `me` nên nằm ở features/auth.
+import { useEffect, useRef } from "react";
 import Link from "next/link";
 import { MSG } from "@/shared/lib/messages";
 import { homePath } from "@/shared/lib/nav";
@@ -25,12 +26,17 @@ export function ErrorInApp({ onRetry }: { onRetry?: () => void }) {
  * `listHref` = đường quay lại danh sách của màn; `extra` = câu phụ (vd phiếu nhập tạo từ hôm trước, PV-13-AC2).
  */
 export function ScopeLostInApp({ listHref, extra }: { listHref: string; extra?: string | null }) {
+  // Nút "Tải lại" vừa bị gỡ nên focus rơi về body: đưa focus vào tiêu đề để trình đọc màn hình đọc ngay.
+  const titleRef = useRef<HTMLHeadingElement>(null);
+  useEffect(() => {
+    titleRef.current?.focus();
+  }, []);
   return (
-    <div className="page-state" data-testid="scope-lost">
+    <div className="page-state" role="alert" data-testid="scope-lost">
       <span className="state-ic">
         <Icon name="lock" />
       </span>
-      <h2 className="state-title" role="alert">
+      <h2 className="state-title" ref={titleRef} tabIndex={-1}>
         {MSG.scopeLostTitle}
       </h2>
       <p>{MSG.scopeLostHint}</p>

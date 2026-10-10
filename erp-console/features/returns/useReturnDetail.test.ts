@@ -1,11 +1,11 @@
 // PV-13-AC1/AC4/AC5 cho useReturnDetail: tải lại bị 404 phải xoá phiếu hàng hoàn khỏi state.
 import { describe, expect, it, vi } from "vitest";
 import { ApiError } from "@/shared/lib/http";
-import { flush, renderHook } from "@/shared/lib/fakeReactHooks";
+import { flush, renderHook } from "@/shared/lib/testing/fakeReactHooks";
 import type { ReturnItem } from "./types";
 import { useReturnDetail } from "./useReturnDetail";
 
-vi.mock("react", async () => (await import("@/shared/lib/fakeReactHooks")).fakeReact);
+vi.mock("react", async () => (await import("@/shared/lib/testing/fakeReactHooks")).fakeReact);
 
 const results: Array<ReturnItem | ApiError> = [];
 vi.mock("./api", () => ({

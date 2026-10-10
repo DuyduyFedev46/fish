@@ -554,3 +554,5 @@ E2E mới: `erp-console/e2e/data_scope_loss_account.py` (mock, 38 ca: khối PV-
 
 
 **Kiểm chứng Lô 7 FE (10/10):** `tsc --noEmit` sạch; `vitest` 111 file / 1322 test PASS (Lô 6 FE: 105 file / 1285); `python3 scripts/check_naming.py` OK (không phát sinh mới); build thật (`USE_MOCK=0`, API staging) sạch, `check-no-mock` XANH (32 file mock, 208 chuỗi seed, 257 file), `check-ai-chunks` XANH (48 màn + 2 layout). Build mock (AI tắt) + `data_scope_loss_account.py` 38/38 PASS, `ed_batch14_permissions.py` 158/158 PASS, `standard_names_all_routes.py` 11/11 PASS. Ghi chú: bản build mock chạy e2e được dựng trước khi đổi icon `verified_user` → `shield_person` (chỉ đổi tên icon, đã build thật lại sau đó).
+
+**Lô 7 FE — sửa review L1–L3 (10/10):** L1 `ScopeLostInApp` đặt `role="alert"` trên `div.page-state`, `h2` có `tabIndex={-1}` và nhận focus khi mount; L2 gộp `CustomerCell` vào `features/orders/components/CustomerCell.tsx`; L3 chuyển `fakeReactHooks.ts` sang `shared/lib/testing/`. Kiểm: tsc sạch, vitest 111 file / 1322 test PASS, build thật + check-no-mock + check-ai-chunks XANH.
