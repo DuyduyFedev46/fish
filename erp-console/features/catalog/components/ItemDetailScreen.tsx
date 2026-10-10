@@ -28,7 +28,7 @@ import { ErrorScreen } from "@/shared/ui/states/ErrorScreen";
 import { NoPermission } from "@/shared/ui/states/NoPermission";
 import { NotFoundScreen } from "@/shared/ui/states/NotFoundScreen";
 import { updateItem } from "../api";
-import { priceInfo, saveErrorMessage, shelfLifeText, ITEM_LIMITS } from "../catalogModel";
+import { fieldSaveErrorMessage, priceInfo, saveErrorMessage, shelfLifeText, ITEM_LIMITS, SHOP_TEXT_FIELDS, shopTextLimit, type ShopTextField } from "../catalogModel";
 import { CATALOG_MSG as M } from "../messages";
 import { catalogAbility } from "../permissions";
 import type { BundleLine, CatalogItem, ItemPrice } from "../types";
@@ -95,13 +95,13 @@ function ItemDetailBody({ item, detail, renderAi }: { item: CatalogItem; detail:
   };
 
   /** Lưu MỘT trường tại chỗ: chỉ gửi khi đổi; lỗi ném lên cho ô hiện dưới ô, giữ nguyên giá trị đang gõ. */
-  const saveField = (field: "name" | "description") => async (next: string) => {
+  const saveField = (field: "name" | "description" | ShopTextField) => async (next: string) => {
     const value = next.trim();
     if (value === item[field]) return;
     try {
       await updateItem(item.id, { [field]: value });
     } catch (err) {
-      throw new Error(saveErrorMessage(err));
+      throw new Error(fieldSaveErrorMessage(err, field));
     }
     afterChange(M.saved);
   };
@@ -152,6 +152,12 @@ function ItemDetailBody({ item, detail, renderAi }: { item: CatalogItem; detail:
     [],
   );
 
+  const SHOP_TEXT_LABEL: Record<ShopTextField, string> = {
+    short_note: M.fieldShortNote,
+    spec: M.fieldSpec,
+    storage: M.fieldStorage,
+    origin: M.fieldOrigin,
+  };
   const showPrice = item.current_price !== undefined;
   const current = priceInfo(item);
   const priceReady = priceLists.status === "ok";
@@ -215,7 +221,13 @@ function ItemDetailBody({ item, detail, renderAi }: { item: CatalogItem; detail:
         </div>
       }
     >
-      <InfoGrid title={M.sectionInfo}>
+      <InfoGrid
+        title={M.sectionInfo}
+        groups={[
+          {
+            title: M.sectionInfo,
+            children: (
+              <>
         {ability.changeItem ? (
           <InfoField
             kind="editable"
@@ -237,17 +249,6 @@ function ItemDetailBody({ item, detail, renderAi }: { item: CatalogItem; detail:
         <InfoField label={M.fieldUnit} value={item.item_type === "BUNDLE" ? "Combo" : item.stock_uom} />
         {showPrice && <InfoField label={M.fieldPrice} num value={current} />}
         {showPrice && <InfoField label={M.fieldPriceFrom} num value={item.current_price ? dateOnly(item.current_price.valid_from) : null} />}
-        {ability.changeItem ? (
-          <InfoField
-            kind="editable"
-            label={M.fieldDescription}
-            value={item.description}
-            validate={(v) => (v.length > ITEM_LIMITS.description ? M.descriptionTooLong : null)}
-            onSave={saveField("description")}
-          />
-        ) : (
-          <InfoField label={M.fieldDescription} value={item.description} />
-        )}
         <InfoField
           label={M.fieldImage}
           value={
@@ -264,7 +265,47 @@ function ItemDetailBody({ item, detail, renderAi }: { item: CatalogItem; detail:
             </span>
           }
         />
-      </InfoGrid>
+              </>
+            ),
+          },
+          {
+            title: M.sectionShopText,
+            children: (
+              <>
+                <InfoField label={M.fieldShopSees} value={M.shopTextHint} />
+        {ability.changeItem ? (
+          <InfoField
+            kind="editable"
+            label={M.fieldDescription}
+            value={item.description}
+            maxLength={ITEM_LIMITS.description}
+            validate={(v) => (v.length > ITEM_LIMITS.description ? M.descriptionTooLong : null)}
+            onSave={saveField("description")}
+          />
+        ) : (
+          <InfoField label={M.fieldDescription} value={item.description} />
+        )}
+        {SHOP_TEXT_FIELDS.map((field) => {
+          const label = SHOP_TEXT_LABEL[field];
+          return ability.changeItem ? (
+            <InfoField
+              key={field}
+              kind="editable"
+              maxLength={shopTextLimit(field)}
+              label={label}
+              value={item[field]}
+              validate={(v) => (v.trim().length > shopTextLimit(field) ? (field === "short_note" ? M.shortNoteTooLong : M.textTooLong) : null)}
+              onSave={saveField(field)}
+            />
+          ) : (
+            <InfoField key={field} label={label} value={item[field]} />
+          );
+        })}
+              </>
+            ),
+          },
+        ]}
+      />
 
       {item.item_type === "BUNDLE" && (
         <Section title={M.sectionBundle} count={M.bundleCount(item.bundle_lines.length)} aria-label={M.sectionBundle} flush>

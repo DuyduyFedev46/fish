@@ -4,7 +4,8 @@ import React from "react";
 import Link from "next/link";
 import { formatVnd } from "@/lib/format";
 import type { CatalogItem } from "@/lib/types";
-import ContactButton from "@/components/ContactButton";
+import { useHotline } from "@/components/useHotline";
+import { contactTarget } from "@/components/shopLinks";
 import s from "./ItemCard.module.css";
 
 interface ItemCardProps {
@@ -19,6 +20,7 @@ interface ItemCardProps {
 // Thẻ chỉ hiển thị, không tự gọi API: `ArticleBody` nạp catalog một lần cho cả bài rồi truyền
 // mặt hàng xuống (trước đây mỗi thẻ gọi `getCatalogItem` riêng -> bài 3 thẻ = 3 request).
 export default function ItemCard({ itemCode, postSlug, item, loading }: ItemCardProps) {
+  const { hotline } = useHotline();
   const campaign = postSlug ? encodeURIComponent(postSlug) : "";
   const shopItemUrl = `/shop/item/?code=${encodeURIComponent(itemCode)}&utm_source=caveve_web&utm_medium=bai_viet&utm_campaign=${campaign}`;
 
@@ -40,7 +42,9 @@ export default function ItemCard({ itemCode, postSlug, item, loading }: ItemCard
           <h4 className={s.name}>Mặt hàng #{itemCode}</h4>
           <span className={s.statusBadge}>Tạm hết · liên hệ để đặt</span>
         </div>
-        <ContactButton className={s.btnSecondary} />
+        <Link href={contactTarget(hotline)} className={s.btnSecondary} data-testid="contact-button">
+          Liên hệ chúng tôi
+        </Link>
       </div>
     );
   }

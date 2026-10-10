@@ -14,6 +14,16 @@
   bottom: calc(var(--h-bottom-nav) + var(--space-3) + env(safe-area-inset-bottom));
 }
 
+/* Trang chi tiết có thanh mua dính đáy (cao ~96) thì toast nổi phía trên nó */
+:global(body[data-buy-bar]) .region {
+  bottom: calc(96px + var(--space-3) + env(safe-area-inset-bottom));
+}
+
+/* Có CartBar (cao ~64) nằm trên thanh đáy thì toast nổi phía trên cả hai */
+:global(body[data-cart-bar]) .region {
+  bottom: calc(var(--h-bottom-nav) + 64px + var(--space-3) + env(safe-area-inset-bottom));
+}
+
 .toast {
   display: flex;
   align-items: center;
@@ -84,7 +94,9 @@
     bottom: auto;
     width: 360px;
   }
-  :global(body[data-bottom-nav]) .region {
+  :global(body[data-bottom-nav]) .region,
+  :global(body[data-buy-bar]) .region,
+  :global(body[data-cart-bar]) .region {
     bottom: auto;
   }
   .toast {

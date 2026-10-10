@@ -8,7 +8,7 @@ Chạy thật (không mock): backend Django tại :8104 (BE thật), frontend Sh
 QA tự tạo qua API với dữ liệu giả (tiêu đề "Bai kiem tra XSS lop 2 (du lieu gia)"), không phải
 dữ liệu thật của vựa.
 
-Dùng: .venv/bin/python frontend/e2e/ra_soat_cms13_public.py
+Dùng: .venv/bin/python frontend/e2e/content_public_pages.py
 (cần backend chạy ở :8104 và frontend Shop chạy ở :3104 trỏ NEXT_PUBLIC_API_BASE=http://localhost:8104)
 """
 import sys
@@ -36,7 +36,7 @@ def main() -> int:
         # trong bài 404/connection-refused ở máy QA — không phải lỗi JS sản phẩm. Chỉ chặn lỗi JS thật.
         IGNORE_CONSOLE_SUBSTRINGS = ("Failed to load resource", "net::ERR_")
 
-        page.goto(f"{BASE}/bai-viet/?slug={SLUG}")
+        page.goto(f"{BASE}/blog/?slug={SLUG}")
         page.wait_for_load_state("networkidle")
         page.wait_for_selector("article", timeout=10000)  # chờ nội dung bài render xong (client fetch)
         page.screenshot(path="/tmp/ra_soat_cms13_ac1.png", full_page=True)
@@ -122,7 +122,7 @@ def main() -> int:
         page2 = browser.new_page(viewport={"width": 390, "height": 844})
         console_msgs_err_page = []
         page2.on("console", lambda m: console_msgs_err_page.append(m.text))
-        page2.goto(f"{BASE}/bai-viet/?slug=slug-khong-ton-tai-ra-soat")
+        page2.goto(f"{BASE}/blog/?slug=slug-khong-ton-tai-ra-soat")
         page2.wait_for_load_state("networkidle")
         content2 = page2.content()
         if "Không tìm thấy bài" not in content2 and "Chưa tải được bài" not in content2:

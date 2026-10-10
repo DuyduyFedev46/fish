@@ -5,7 +5,7 @@ import { isExternalLink, isSafeHref } from "./safeHref";
 // Nếu sửa một bên phải sửa bên kia; không import chéo giữa hai app nên luật và test được chép song song.
 // Chuỗi tạo bằng escape (\u...) để file không chứa ký tự điều khiển thật.
 
-const LONG_OK = "/bai-viet?slug=" + "a".repeat(1900);
+const LONG_OK = "/blog?slug=" + "a".repeat(1900);
 const TOO_LONG = "https://caveve.vn/" + "a".repeat(2000);
 
 const SAFE_HREF_CASES: Array<[string, unknown, boolean]> = [
@@ -15,7 +15,7 @@ const SAFE_HREF_CASES: Array<[string, unknown, boolean]> = [
   ["mailto", "mailto:hotro@caveve.vn", true],
   ["tel", "tel:0900000000", true],
   ["đường dẫn nội bộ", "/shop", true],
-  ["đường dẫn nội bộ có query", "/bai-viet?slug=ca-thu", true],
+  ["đường dẫn nội bộ có query", "/blog?slug=ca-thu", true],
   ["neo trong trang", "#muc-2", true],
   ["https viết hoa + khoảng trắng đầu/cuối (được trim)", "  HTTPS://caveve.vn  ", true],
   ["nội bộ dưới 2000 ký tự", LONG_OK, true],

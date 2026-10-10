@@ -14,6 +14,7 @@ export const CATALOG_PERM = {
   changePricingRule: "catalog.change_pricingrule",
   viewItemGroup: "catalog.view_itemgroup",
   addItemGroup: "catalog.add_itemgroup",
+  changeItemGroup: "catalog.change_itemgroup",
   addBundleLine: "catalog.add_bundleline",
 } as const;
 
@@ -29,6 +30,7 @@ export type CatalogAbility = {
   addRule: boolean;
   changeRule: boolean;
   addGroup: boolean;
+  changeGroup: boolean;
 };
 
 export function catalogAbility(perms: readonly string[]): CatalogAbility {
@@ -44,5 +46,6 @@ export function catalogAbility(perms: readonly string[]): CatalogAbility {
     addRule: has(CATALOG_PERM.addPricingRule),
     changeRule: has(CATALOG_PERM.changePricingRule),
     addGroup: has(CATALOG_PERM.addItemGroup),
+    changeGroup: has(CATALOG_PERM.changeItemGroup),
   };
 }

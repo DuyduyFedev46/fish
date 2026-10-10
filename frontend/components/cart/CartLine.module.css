@@ -1,0 +1,164 @@
+.line {
+  display: grid;
+  grid-template-columns: 68px minmax(0, 1fr) auto;
+  grid-template-areas:
+    "img name remove"
+    "img price price"
+    "img qty total";
+  align-items: center;
+  column-gap: var(--space-3);
+  row-gap: 6px;
+  padding: 14px var(--space-4);
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  list-style: none;
+}
+
+.imageCell {
+  grid-area: img;
+  align-self: start;
+  display: block;
+}
+
+.image {
+  border-radius: var(--radius-md);
+}
+
+.nameArea {
+  grid-area: name;
+}
+
+.name {
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.35;
+  text-decoration: none;
+}
+
+.removeCell {
+  grid-area: remove;
+  /* Nút 44 kéo lên góc để không tốn chiều cao dòng */
+  margin: -12px -12px 0 0;
+}
+
+.priceCell {
+  grid-area: price;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-2);
+}
+
+.qtyCell {
+  grid-area: qty;
+}
+
+.totalCell {
+  grid-area: total;
+  text-align: right;
+}
+
+.tag {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--warn-soft);
+  color: var(--warn);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+/* ---- món đã hết ---- */
+.out {
+  grid-template-columns: 68px minmax(0, 1fr);
+  grid-template-areas:
+    "img text"
+    "img actions";
+  background: var(--canvas);
+}
+
+.outText {
+  grid-area: text;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.out .name {
+  color: var(--ink-2);
+}
+
+.outInfo {
+  color: var(--ink-3);
+  font-size: 12px;
+}
+
+.outFlag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ink-2);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.outActions {
+  grid-area: actions;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
+}
+
+@media (min-width: 768px) {
+  .line {
+    grid-template-columns: 64px minmax(0, 1fr) 160px 160px 120px 44px;
+    grid-template-areas: "img name price qty total remove";
+    column-gap: var(--space-3);
+    padding: var(--space-4) var(--space-3);
+  }
+
+  .imageCell {
+    align-self: center;
+  }
+
+  .removeCell {
+    margin: 0;
+  }
+
+  .priceCell {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .totalCell {
+    font-weight: 600;
+  }
+
+  .out {
+    grid-template-columns: 64px minmax(0, 1fr) auto;
+    grid-template-areas: "img text actions";
+    align-items: center;
+  }
+
+  .outActions {
+    margin-top: 0;
+    grid-template-columns: auto auto;
+  }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .name:hover {
+    color: var(--accent-text);
+  }
+}
+
+/* Cuộn tới nút "Bỏ khỏi giỏ" không để thanh tóm tắt dính đáy che mất */
+.outActions button,
+.outActions a {
+  scroll-margin-bottom: 300px;
+}

@@ -20,3 +20,12 @@ export function pickHotline(...candidates: Array<string | null | undefined>): st
   }
   return undefined;
 }
+
+/** Link Zalo từ trường `zalo` của site-info: nhận URL https hoặc số điện thoại; không có thì undefined. */
+export function zaloUrlOf(raw?: string | null): string | undefined {
+  const v = raw?.trim();
+  if (!v) return undefined;
+  if (/^https:\/\//i.test(v)) return v;
+  const digits = v.replace(/\D/g, "");
+  return digits ? `https://zalo.me/${digits}` : undefined;
+}

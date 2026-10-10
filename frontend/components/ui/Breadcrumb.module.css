@@ -1,0 +1,51 @@
+.nav {
+  min-width: 0;
+}
+
+.list {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--ink-2);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.item {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.sep {
+  color: var(--ink-3);
+}
+
+.link {
+  display: inline-block;
+  max-width: 100%;
+  padding: 2px 0;
+  color: var(--ink-2);
+  text-decoration: none;
+}
+
+.current {
+  display: inline-block;
+  max-width: 320px;
+  overflow: hidden;
+  color: var(--ink);
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .link:hover {
+    color: var(--accent-text);
+    text-decoration: underline;
+  }
+}

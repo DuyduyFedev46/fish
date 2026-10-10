@@ -65,6 +65,12 @@ class Item(models.Model):
     has_expiry_date = models.BooleanField("Có hạn dùng", default=True)
     is_active = models.BooleanField("Đang kinh doanh", default=True)
     description = models.TextField("Mô tả", blank=True)
+    # SHOP-2b-01 (BR-DM-25): chữ công khai trên Shop. Không giá, nhà cung cấp, tên tàu, ngày nhập, mã lô, SĐT
+    # (kiểm ở `items/public_text.py`, không kiểm ở model).
+    short_note = models.CharField("Ghi chú ngắn", max_length=60, blank=True, default="")
+    spec = models.CharField("Quy cách", max_length=500, blank=True, default="")
+    storage = models.CharField("Bảo quản", max_length=500, blank=True, default="")
+    origin = models.CharField("Nguồn hàng", max_length=500, blank=True, default="")
 
     class Meta:
         verbose_name = "Mặt hàng"

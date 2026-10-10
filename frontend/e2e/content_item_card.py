@@ -7,7 +7,7 @@ catalog, không lộ khoá cấm).
 
 LƯU Ý (phát hiện khi viết bằng chứng này): định dạng hiển thị giá ("165000.00đ" thay vì
 "165.000 đ") có lỗi ở `frontend/lib/format.ts::formatVnd` (chuỗi giá từ API không được ép kiểu
-Number trước khi gọi `toLocaleString`) — lỗi này áp dụng cho TOÀN BỘ Shop (CatalogGrid,
+Number trước khi gọi `toLocaleString`) — lỗi này áp dụng cho TOÀN BỘ Shop (lưới danh mục,
 /shop/item), không riêng CMS. Script này chỉ kiểm phần thuộc AC (link UTM, cơ chế cập nhật giá
 theo thời gian thực, fallback hết hàng, phạm vi gọi API) — KHÔNG assert đúng định dạng "x.xxx đ"
 vì hiện đang sai thật (xem repro riêng `doc/features/2026-09-30-ra-soat-agy/repro/A5-format-vnd-string-price.py`).
@@ -17,7 +17,7 @@ liệu thật của vựa). Cần chạy trước:
   cd backend && manage.py seed_demo   (tạo mặt hàng CA-THU, GHE-XANH có tồn)
   bài "bai-kiem-tra-the-mat-hang-ra-soat" có 2 khối item_card: CA-THU và GHE-XANH, đã đăng.
 
-Dùng: python3 frontend/e2e/ra_soat_cms06_item_card.py [baseline|after-price-change|after-deactivate]
+Dùng: python3 frontend/e2e/content_item_card.py [baseline|after-price-change|after-deactivate]
 """
 import sys
 from urllib.parse import urlparse
@@ -70,7 +70,7 @@ def main() -> int:
         page = browser.new_page(viewport={"width": 390, "height": 844})
         requests_seen = []
         page.on("request", lambda r: requests_seen.append(r.url))
-        page.goto(f"{BASE}/bai-viet/?slug={SLUG}")
+        page.goto(f"{BASE}/blog/?slug={SLUG}")
         page.wait_for_load_state("networkidle")
         page.wait_for_selector("article", timeout=10000)
         page.wait_for_timeout(800)  # chờ ItemCard fetch xong (client-side)

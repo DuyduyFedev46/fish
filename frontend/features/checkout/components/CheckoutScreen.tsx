@@ -6,10 +6,12 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useCart } from "../../../components/CartContext";
 import { createOrder, ApiError } from "../../../lib/api";
 import { formatVnd } from "../../../lib/format";
+import { formatQty } from "../../../lib/quantity";
+import { getCatalog } from "../../../lib/api";
 import type { CreateOrderPayload, CreateOrderResponse } from "../../../lib/types";
 import { getPrivacyPolicy, getSiteInfo } from "@/features/site/api";
 import type { PrivacyPolicyResponse, SiteInfoResponse } from "@/features/site/types";
@@ -29,7 +31,8 @@ const PHONE_RE = /^(0|\+84)\d{9,10}$/;
 
 export default function CheckoutScreen() {
   const searchParams = useSearchParams();
-  const { lines, updateQty, removeItem, totalAmount, clear } = useCart();
+  const router = useRouter();
+  const { lines, totalAmount, clear } = useCart();
 
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -77,6 +80,24 @@ export default function CheckoutScreen() {
     };
   }, []);
 
+  // Giỏ còn món đã hết (theo catalog mới tải) thì quay về giỏ để bỏ món trước (02b §6.1).
+  useEffect(() => {
+    if (lines.length === 0) return;
+    let active = true;
+    getCatalog()
+      .then((c) => {
+        if (!active) return;
+        const live = new Map(c.items.map((i) => [i.item_code, i.stock_level]));
+        if (lines.some((l) => (live.get(l.item_code) ?? "out") === "out")) router.replace("/shop/cart/");
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+    // Chỉ kiểm lần đầu vào trang.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Trang "cổng SePay" giả lập chỉ tồn tại ở chế độ mock (xem lib/mock.ts,
   // mockStartCheckoutSession) — build thật (USE_MOCK=false) loại hẳn nhánh này.
   if (MockGatewayPanel && searchParams.get("mock_gateway") === "1") {
@@ -88,10 +109,10 @@ export default function CheckoutScreen() {
       <div className="checkout-grid">
         <div className="panel" style={{ textAlign: "center", padding: "3rem 1.5rem" }}>
           <h2>Shop tạm chưa nhận đơn</h2>
-          <p style={{ color: "#6b7280", marginTop: "0.5rem", marginBottom: "1.5rem" }}>
+          <p style={{ color: "var(--ink-3)", marginTop: "0.5rem", marginBottom: "1.5rem" }}>
             Hệ thống đang hoàn thiện chuẩn bị điều kiện phục vụ tốt nhất. Quý khách vui lòng quay lại sau.
           </p>
-          <Link href="/shop" className="btn btn-secondary">
+          <Link href="/shop/" className="btn btn-secondary">
             Quay lại cửa hàng
           </Link>
         </div>
@@ -177,76 +198,25 @@ export default function CheckoutScreen() {
   return (
     <div className="checkout-grid">
       <div className="panel">
-        <h2>Giỏ hàng của bạn</h2>
+        <h2>Đơn hàng ({lines.length} món)</h2>
         {lines.length === 0 ? (
           <p className="cart-empty">
-            Giỏ hàng đang trống. <Link href="/shop">Xem bảng giá</Link>
+            Giỏ hàng đang trống. <Link href="/shop/">Xem hàng đang có</Link>
           </p>
         ) : (
-          <table className="cart-table">
-            <thead>
-              <tr>
-                <th>Mặt hàng</th>
-                <th>Số lượng</th>
-                <th>Đơn giá</th>
-                <th>Thành tiền</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
+          <>
+            <ul className="cart-summary-list">
               {lines.map((l) => (
-                <tr key={l.item_code}>
-                  <td>
-                    <strong>{l.name}</strong>
-                    <div className="item-unit">({l.unit})</div>
-                  </td>
-                  <td>
-                    <div className="qty-control">
-                      <button
-                        type="button"
-                        onClick={() => updateQty(l.item_code, l.qty - 1)}
-                        className="btn-qty"
-                      >
-                        -
-                      </button>
-                      <span className="qty-value">{l.qty}</span>
-                      <button
-                        type="button"
-                        onClick={() => updateQty(l.item_code, l.qty + 1)}
-                        className="btn-qty"
-                      >
-                        +
-                      </button>
-                    </div>
-                  </td>
-                  <td>{formatVnd(l.price)}</td>
-                  <td>
-                    <strong>{formatVnd(l.price * l.qty)}</strong>
-                  </td>
-                  <td>
-                    <button
-                      type="button"
-                      onClick={() => removeItem(l.item_code)}
-                      className="btn-remove"
-                      aria-label="Xoá khỏi giỏ"
-                    >
-                      ×
-                    </button>
-                  </td>
-                </tr>
+                <li key={l.item_code}>
+                  {l.name} · {formatQty(l.qty)} {l.unit}
+                </li>
               ))}
-            </tbody>
-            <tfoot>
-              <tr>
-                <td colSpan={3}>
-                  <strong>Tổng cộng</strong>
-                </td>
-                <td colSpan={2}>
-                  <strong className="cart-total">{formatVnd(totalAmount)}</strong>
-                </td>
-              </tr>
-            </tfoot>
-          </table>
+            </ul>
+            <p>
+              <strong className="cart-total">{formatVnd(totalAmount)}</strong>
+            </p>
+            <Link href="/shop/cart/">Sửa giỏ hàng</Link>
+          </>
         )}
       </div>
 
@@ -312,10 +282,10 @@ export default function CheckoutScreen() {
                   Tôi đồng ý để Cá Về dùng họ tên, số điện thoại và địa chỉ của tôi để giao hàng và liên hệ
                   xác nhận đơn, theo{" "}
                   <Link
-                    href={{ pathname: "/trang/", query: { slug: policyInfo.slug } }}
+                    href={{ pathname: "/pages/", query: { slug: policyInfo.slug } }}
                     target="_blank"
                     rel="noopener noreferrer"
-                    style={{ color: "#2563eb", textDecoration: "underline" }}
+                    style={{ color: "var(--accent-text)", textDecoration: "underline" }}
                   >
                     Chính sách bảo mật
                   </Link>

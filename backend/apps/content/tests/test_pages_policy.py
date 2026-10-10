@@ -42,7 +42,7 @@ class PagesPolicyTests(APITestCase):
         g_ql.permissions.add(p_pub)
 
     def test_cms_15_ac1_create_and_publish_page_without_category_and_cover(self):
-        """CMS-15-AC1: Tạo kind=page không chuyên mục, không ảnh bìa, Đăng -> 200, hiện ở /trang/?slug=..., không xuất hiện trong danh sách bài."""
+        """CMS-15-AC1: Tạo kind=page không chuyên mục, không ảnh bìa, Đăng -> 200, hiện ở /pages/?slug=..., không xuất hiện trong danh sách bài."""
         self.client.force_authenticate(user=self.quan_ly)
         res_create = self.client.post("/api/content/entries/", {
             "kind": "page",
@@ -62,7 +62,7 @@ class PagesPolicyTests(APITestCase):
             "checklist_confirmed": True,
         }, format="json")
         self.assertEqual(res_pub.status_code, status.HTTP_200_OK)
-        self.assertEqual(res_pub.data["public_path"], "/trang/?slug=chinh-sach-bao-mat")
+        self.assertEqual(res_pub.data["public_path"], "/pages/?slug=chinh-sach-bao-mat")
 
         self.client.logout()
         res_list = self.client.get("/api/public/content/entries/")
@@ -269,7 +269,11 @@ class PagesPolicyTests(APITestCase):
         self.client.force_authenticate(user=self.quan_ly)
         res = self.client.get("/api/content/golive-status/")
         self.assertEqual(res.status_code, status.HTTP_200_OK)
-        self.assertEqual(set(res.data["missing_roles"]), {"privacy", "terms", "refund", "seller_info"})
+        # SHOP-5-02 (BR-ND-20): thêm shipping, payment, complaints.
+        self.assertEqual(
+            set(res.data["missing_roles"]),
+            {"privacy", "terms", "refund", "seller_info", "shipping", "payment", "complaints"},
+        )
 
     def test_cms_15_ac8_user_with_only_nd01_patch_policy_fields_forbidden_403(self):
         """CMS-15-AC8: User chỉ ND-01 PATCH page_role hoặc show_in_footer -> 403 BR-PQ-12 và không field nào bị đổi."""

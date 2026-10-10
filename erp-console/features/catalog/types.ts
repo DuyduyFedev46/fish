@@ -45,6 +45,11 @@ export type CatalogItem = {
   has_expiry_date: boolean;
   is_active: boolean;
   description: string;
+  /** Thông tin hiển thị trên Shop (SHOP-2b-01). Chỉ Chủ ghi được; BE kiểm: không SĐT, giá, mã lô. */
+  short_note: string;
+  spec: string;
+  storage: string;
+  origin: string;
   bundle_lines: BundleLine[];
   image: CatalogItemImage | null;
   /** Không có key với người thiếu `catalog.view_itemprice`; `null` = chưa có giá hiệu lực. */
@@ -63,10 +68,14 @@ export type ItemInput = {
   has_expiry_date: boolean;
   is_active: boolean;
   description: string;
+  short_note?: string;
+  spec?: string;
+  storage?: string;
+  origin?: string;
 };
 
 /** PATCH một phần: chỉ trường đổi. Chủ mới được (catalog.change_item). */
-export type ItemPatch = Partial<Pick<ItemInput, "name" | "description" | "is_active">>;
+export type ItemPatch = Partial<Pick<ItemInput, "name" | "description" | "is_active" | "short_note" | "spec" | "storage" | "origin">>;
 
 export type BundleLineInput = { bundle: number; component: number; qty_per_bundle: string };
 
@@ -108,11 +117,16 @@ export type ItemGroup = {
   name: string;
   parent: number | null;
   parent_name: string | null;
+  /** Đường dẫn của nhóm trên Shop (`/shop/?group=<slug>`). */
+  slug: string;
   /** Số mặt hàng thuộc nhóm, kể cả đang ẩn. */
   item_count: number;
 };
 
-export type ItemGroupInput = { name: string; parent: number | null };
+export type ItemGroupInput = { name: string; parent: number | null; /** Bỏ trống khi tạo thì BE tự sinh từ tên. */ slug?: string };
+
+/** PATCH nhóm hàng: hiện chỉ đổi đường dẫn (slug). */
+export type ItemGroupPatch = { slug: string };
 
 export type PriceList = { id: number; name: string; currency: string; is_default: boolean };
 

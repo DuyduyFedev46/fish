@@ -26,6 +26,7 @@ export function ItemGroupList({ tabs }: { tabs: React.ReactNode }) {
   const [q, setQ] = useState("");
   const [parent, setParent] = useState("");
   const [adding, setAdding] = useState(false);
+  const [editing, setEditing] = useState<ItemGroup | null>(null);
   const list = useItemGroups(!!me && ability.viewGroups);
   const all = list.rows;
   const rows = useMemo(
@@ -39,7 +40,21 @@ export function ItemGroupList({ tabs }: { tabs: React.ReactNode }) {
   const columns: Column<ItemGroup>[] = [
     { key: "name", header: M.colGroupName, render: (g) => g.name },
     { key: "parent", header: M.colGroupParent, render: (g) => g.parent_name ?? <span className="muted">{M.none}</span> },
+    { key: "slug", header: M.colGroupSlug, mono: true, hideBelow: 720, render: (g) => g.slug },
     { key: "count", header: M.colGroupCount, num: true, render: (g) => g.item_count },
+    ...(ability.changeGroup
+      ? [
+          {
+            key: "edit",
+            header: M.editGroup,
+            render: (g: ItemGroup) => (
+              <button type="button" className="btn" onClick={() => setEditing(g)} aria-label={`${M.editGroup} ${g.name}`}>
+                {M.editGroup}
+              </button>
+            ),
+          } as Column<ItemGroup>,
+        ]
+      : []),
   ];
 
   const refreshFailed = all !== undefined && list.error != null && !list.loading;
@@ -125,6 +140,18 @@ export function ItemGroupList({ tabs }: { tabs: React.ReactNode }) {
         canViewCost={false}
         dense
       />
+      {editing && all && (
+        <ItemGroupModal
+          groups={all}
+          editing={editing}
+          onClose={() => setEditing(null)}
+          onSaved={() => {
+            setEditing(null);
+            toast.success(M.groupSaved);
+            void list.reload();
+          }}
+        />
+      )}
       {adding && all && (
         <ItemGroupModal
           groups={all}

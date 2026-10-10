@@ -14,11 +14,17 @@ from apps.catalog.models import Item
 from apps.catalog.pricing.services import effective_price
 from apps.sales.utils import money_str
 
+from .public_text import public_text_error
 from .services import qty_rule, sale_unit, stock_level
 
 ITEM_NOT_FOUND = {"code": "ITEM_NOT_FOUND", "detail": "Không tìm thấy món này."}
-# Lô 1–2: bốn trường chữ trả "" (lô 2b mở, có kiểm chữ BR-DM-25). Khoá luôn có mặt để FE ổn định.
+# SHOP-2b-01: bốn trường chữ đọc từ Item (đã kiểm BR-DM-25 lúc lưu ở ERP). Khoá luôn có mặt để FE ổn định.
 DETAIL_TEXT_KEYS = ("description", "spec", "storage", "origin")
+
+
+def _safe_text(value):
+    """Review lô 2 H1: chữ cũ chưa qua kiểm BR-DM-25 (ORM, admin) bị che khi đọc; khoá vẫn giữ."""
+    return "" if public_text_error(value) else (value or "")
 
 
 def _item_public(item, price):
@@ -33,7 +39,7 @@ def _item_public(item, price):
         "min_qty": money_str(min_qty),
         "qty_step": money_str(qty_step),
         "group": {"slug": item.item_group.slug, "name": item.item_group.name},
-        "short_note": "",
+        "short_note": _safe_text(item.short_note),
         # A4: ảnh không phải điều kiện hiển thị (BR-DM-09) -> null khi chưa có ảnh.
         # Serializer công khai KHÔNG trả id/người tải/đường dẫn tệp gốc (bất biến 1, BR-DM-15).
         "image": serialize_item_image_public(getattr(item, "image", None)),
@@ -82,7 +88,7 @@ class ShopItemDetailView(APIView):
             # Cùng một câu cho: không có mã, ngưng bán, không có giá hiệu lực (không lộ lý do nội bộ).
             return Response(ITEM_NOT_FOUND, status=404)
         data = _item_public(item, price)
-        data.update({key: "" for key in DETAIL_TEXT_KEYS})
+        data.update({key: _safe_text(getattr(item, key)) for key in DETAIL_TEXT_KEYS})
         if item.item_type == Item.ItemType.BUNDLE:
             data["bundle_components"] = [
                 {

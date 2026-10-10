@@ -47,7 +47,7 @@ with sync_playwright() as p:
                 return route.fulfill(status=200, content_type="application/json", headers=CORS, body=json.dumps({"seller_complete": False}))
             return route.fulfill(status=404, content_type="application/json", headers=CORS, body='{"detail":"Not found."}')
         page.route(f"{API}/**", api)
-        page.goto(f"{BASE}/bai-viet/?slug=bai-thu"); page.wait_for_load_state("networkidle"); page.wait_for_timeout(300)
+        page.goto(f"{BASE}/blog/?slug=bai-thu"); page.wait_for_load_state("networkidle"); page.wait_for_timeout(300)
         tag = f"[{vp[0]}px]"
         check(f"{tag} bài hiển thị", page.locator("article").count() == 1)
         origin = urlparse(BASE).netloc

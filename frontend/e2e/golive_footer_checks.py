@@ -10,7 +10,7 @@ rỗng) mà không cần backend thật — dữ liệu 100% giả định.
 Cách chạy:
     cd frontend && NEXT_PUBLIC_USE_MOCK=0 NEXT_PUBLIC_API_BASE=http://localhost:8199 \
         npx next dev -p 3101 &
-    python3 e2e/ra-soat-a2-golive.py
+    python3 e2e/golive_footer_checks.py
 
 Có thể phục vụ bản `out/` tĩnh (P8 Lô 6 làm vậy): QA_BASE=http://127.0.0.1:3106 QA_SHOT_DIR=<thư mục ảnh>.
 """
@@ -130,7 +130,7 @@ def main():
         for route_path, label in [
             ("/", "Trang chủ"),
             ("/shop/", "Shop"),
-            ("/trang/?slug=doi-tra", "Trang nội dung"),
+            ("/pages/?slug=doi-tra", "Trang nội dung"),
         ]:
             page.goto(f"{BASE}{route_path}")
             page.wait_for_load_state("networkidle")
@@ -190,7 +190,7 @@ def main():
               "Điều kiện giao dịch chung" in titles and "Điều khoản sử dụng" not in page.locator("footer").last.inner_text())
         check("GL-02-AC1 có 'Cơ chế giải quyết khiếu nại'", "Cơ chế giải quyết khiếu nại" in titles)
         hrefs = [links.nth(i).get_attribute("href") for i in range(links.count())]
-        check("GL-02-AC1 link trỏ /trang/?slug=...", all("/trang/" in h and "slug=" in h for h in hrefs))
+        check("GL-02-AC1 link trỏ /pages/?slug=...", all("/pages/" in h and "slug=" in h for h in hrefs))
         ctx.close()
 
         # ---------- GL-02-AC2/AC3: gỡ 1 trang khỏi footer, tải lại không cần build lại FE ----------
@@ -277,7 +277,7 @@ def main():
             "GL-03-AC2 nhãn nêu mục đích giao hàng/xác nhận đơn",
             "giao hàng" in label_text and "xác nhận đơn" in label_text,
         )
-        policy_link = page.locator('form a[href*="/trang/"]', has_text="Chính sách bảo mật")
+        policy_link = page.locator('form a[href*="/pages/"]', has_text="Chính sách bảo mật")
         check("GL-03-AC2 link chính sách mở tab mới (target=_blank)", policy_link.get_attribute("target") == "_blank")
         submit_btn = page.get_by_role("button", name="Đặt hàng", exact=False)
         check("GL-03-AC2 nút Đặt hàng bị khoá khi chưa tick", submit_btn.is_disabled())

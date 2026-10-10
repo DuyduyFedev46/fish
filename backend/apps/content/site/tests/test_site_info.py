@@ -27,8 +27,10 @@ class SiteInfoApiTests(TestCase):
         self.assertEqual(resp.status_code, 200)
         data = resp.json()
         self.assertTrue(data["seller_complete"])
+        # SHOP-5-01 thêm 6 khoá tuỳ chọn vào seller (kiểm ở test_site_info_shop.py); ở đây kiểm 7 khoá go-live.
         self.assertEqual(
-            data["seller"],
+            {k: v for k, v in data["seller"].items() if k in {
+                "name", "business_type", "registration_no", "tax_code", "address", "phone", "email"}},
             {
                 "name": "Vựa Thử Nghiệm",
                 "business_type": "Hộ kinh doanh",
@@ -106,6 +108,7 @@ class SiteInfoApiTests(TestCase):
             "confirm_call_notice",
             "confirm_call_hours",
             "confirmation_policy",
+            "policies",  # SHOP-5-01 (02b §3.6)
         }
         self.assertEqual(set(data.keys()), expected_root_keys)
 
@@ -117,6 +120,13 @@ class SiteInfoApiTests(TestCase):
             "address",
             "phone",
             "email",
+            # SHOP-5-01 (BR-ND-18 sửa 10/10)
+            "zalo",
+            "working_hours",
+            "registration_issued_by",
+            "registration_issued_on",
+            "website_notice_url",
+            "website_notice_image",
         }
         self.assertEqual(set(data["seller"].keys()), expected_seller_keys)
 

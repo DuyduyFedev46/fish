@@ -78,7 +78,7 @@ class LoadShopContentPublishTests(LoadShopContentBase):
             self.assertEqual(post.cover_image.entry_id, post.pk)
         self.assertEqual(
             set(Entry.objects.exclude(page_role=None).values_list("page_role", flat=True)),
-            {"privacy", "terms", "refund", "seller_info"},
+            {"privacy", "terms", "refund", "seller_info", "shipping", "payment", "complaints"},
         )
         self.assertEqual(Entry.objects.get(page_role="terms").title, "Điều kiện giao dịch chung")
 
@@ -319,3 +319,73 @@ class LoadShopContentCleanupTests(LoadShopContentBase):
         content_dir = Path(self.media) / "content"
         leftover = [p for p in content_dir.rglob("*") if p.is_file()] if content_dir.exists() else []
         self.assertEqual(leftover, [])
+
+
+class LoadShopContentPageRoleTests(LoadShopContentBase):
+    """SHOP-5-02 AC1: lệnh nạp gắn vai trò shipping/payment/complaints cho giao-hang, thanh-toan, khieu-nai (BR-ND-20)."""
+
+    EXPECTED = {"giao-hang": "shipping", "thanh-toan": "payment", "khieu-nai": "complaints"}
+
+    def roles_of(self):
+        return dict(Entry.objects.filter(slug__in=self.EXPECTED).values_list("slug", "page_role"))
+
+    def test_shop_5_02_ac1_fresh_load_sets_roles_and_footer(self):
+        self.run_cmd("--publish")
+        self.assertEqual(self.roles_of(), self.EXPECTED)
+        resp = APIClient().get("/api/public/content/footer-links/")
+        self.assertEqual(
+            [row["slug"] for row in resp.json()],
+            ["doi-tra", "giao-hang", "thanh-toan", "quyen-rieng-tu", "dieu-khoan", "khieu-nai"],
+        )
+
+    def _simulate_old_load(self):
+        """Trạng thái staging đã nạp ở lô 1: ba trang chưa có vai trò."""
+        self.run_cmd("--publish")
+        Entry.objects.filter(slug__in=self.EXPECTED).update(page_role=None)
+
+    def test_shop_5_02_rerun_assigns_roles_to_existing_pages_idempotently(self):
+        """Trang đã nạp trước (chưa vai trò): chạy lại gắn vai trò, không đăng thêm phiên bản; chạy lần nữa không đổi gì."""
+        self._simulate_old_load()
+        versions = EntryVersion.objects.count()
+        self.run_cmd("--publish")
+        self.assertEqual(self.roles_of(), self.EXPECTED)
+        self.assertEqual(EntryVersion.objects.count(), versions)
+        self.assertEqual(Entry.objects.filter(kind="page").count(), 10)
+        before = self.entry_state()
+        out = self.run_cmd("--publish")
+        self.assertEqual(self.entry_state(), before)
+        self.assertNotIn("gắn vai trò", out)
+
+    def test_shop_5_02_edited_page_gets_role_without_touching_content(self):
+        """Lộc đã sửa giao-hang: lệnh không ghi đè nội dung nhưng vẫn gắn vai trò (trang bắt buộc phải khoá gỡ)."""
+        self._simulate_old_load()
+        loc = User.objects.create_user("owner_edit", password="x")
+        loc.groups.add(Group.objects.get(name=roles.OWNER))
+        loc = User.objects.get(pk=loc.pk)
+        page = Entry.objects.get(slug="giao-hang")
+        edited = {"type": "doc", "blocks": [{"type": "paragraph", "children": [{"text": "Bản Lộc sửa."}]}]}
+        save_draft(entry=page, data={"body": edited}, actor=loc)
+
+        out = self.run_cmd()
+        page.refresh_from_db()
+        self.assertEqual(page.page_role, "shipping")
+        self.assertEqual(page.body["blocks"][0]["children"][0]["text"], "Bản Lộc sửa.")
+        self.assertIn("gắn vai trò shipping", out)
+        self.assertIn("bỏ qua: đã sửa", out)
+        # Lần sau vẫn coi là đã sửa (không nhầm là bản lệnh nạp) và không gắn lại.
+        out2 = self.run_cmd()
+        self.assertIn("bỏ qua: đã sửa", out2)
+        self.assertNotIn("gắn vai trò", out2)
+
+    def test_shop_5_02_role_held_by_other_page_is_not_moved(self):
+        """Vai trò shipping đã có trang khác giữ -> không chuyển vai trò, giao-hang giữ nguyên."""
+        self._simulate_old_load()
+        other = save_draft(
+            data={"kind": "page", "slug": "giao-hang-cu", "title": "Giao hàng (cũ)", "page_role": "shipping",
+                  "body": {"type": "doc", "blocks": []}},
+            actor=self.author,
+        )
+        out = self.run_cmd("--publish")
+        self.assertIn("vai trò shipping đã có trang khác giữ", out)
+        self.assertEqual(Entry.objects.get(page_role="shipping").pk, other.pk)
+        self.assertIsNone(Entry.objects.get(slug="giao-hang").page_role)

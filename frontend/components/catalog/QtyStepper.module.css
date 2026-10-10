@@ -1,0 +1,125 @@
+.stepper {
+  display: inline-flex;
+  align-items: center;
+  border-radius: var(--radius-md);
+}
+
+.md {
+  height: 44px;
+}
+.sm {
+  height: 40px;
+}
+
+.outline {
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.filled {
+  width: 100%;
+  background: var(--accent);
+  color: var(--on-accent);
+  animation: swap-in var(--dur-swap) var(--ease-out);
+}
+
+.btn {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    transform var(--dur-press) var(--ease-out),
+    background-color var(--dur-color) ease-out;
+}
+
+.sm .btn {
+  width: 40px;
+}
+
+.btn:active {
+  transform: scale(0.97);
+}
+
+.btn[aria-disabled="true"] {
+  color: var(--ink-3);
+  cursor: not-allowed;
+}
+.btn[aria-disabled="true"]:active {
+  transform: none;
+}
+
+.filled .btn:focus-visible {
+  outline-color: var(--on-accent);
+  outline-offset: -4px;
+}
+
+.icon {
+  display: inline-flex;
+  animation: fade-in var(--dur-color) ease-out;
+}
+
+.value {
+  flex: 1;
+  min-width: 64px;
+  padding: 0 var(--space-1);
+  font-size: 14px;
+  font-weight: 600;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.sm .value {
+  min-width: 60px;
+  font-size: 13px;
+}
+
+.outline .value {
+  flex: none;
+}
+
+@media (min-width: 768px) {
+  .value {
+    min-width: 72px;
+  }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .outline .btn:not([aria-disabled="true"]):hover {
+    background: var(--surface-2);
+  }
+  .filled .btn:hover {
+    background: var(--accent-hover);
+  }
+}
+
+@keyframes swap-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+}
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .filled {
+    animation: none;
+  }
+  .btn:active {
+    transform: none;
+  }
+}

@@ -37,7 +37,7 @@ export default function LatestPosts() {
   }
 
   return (
-    <section className="section" style={{ backgroundColor: "#f8fafc" }}>
+    <section className="section" style={{ backgroundColor: "var(--surface-2)" }}>
       <div className={s.container}>
         <div className={s.header}>
           <div>
@@ -48,7 +48,7 @@ export default function LatestPosts() {
               Kinh nghiệm chọn và chế biến hải sản tươi ngon đậm vị biển
             </p>
           </div>
-          <Link href="/bai-viet" className={s.seeAllLink}>
+          <Link href="/blog" className={s.seeAllLink}>
             Xem tất cả bài viết →
           </Link>
         </div>
@@ -61,7 +61,7 @@ export default function LatestPosts() {
             return (
               <Link
                 key={post.slug}
-                href={`/bai-viet?slug=${encodeURIComponent(post.slug)}`}
+                href={`/blog?slug=${encodeURIComponent(post.slug)}`}
                 className={s.card}
               >
                 {coverSrc && (

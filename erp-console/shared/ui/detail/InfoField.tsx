@@ -33,6 +33,8 @@ type EditableProps = Base & {
   /** Kiểm tại chỗ trước khi gửi; trả chuỗi lỗi hoặc null. */
   validate?: (next: string) => string | null;
   num?: boolean;
+  /** Có thì ô sửa là textarea kèm bộ đếm "n/max" (ô chữ dài hiển thị cho khách). */
+  maxLength?: number;
   /** Gọi khi lưu gặp xung đột phiên bản (người khác vừa sửa): màn bật ConflictBanner. Không truyền thì ô vẫn tự báo một câu ngắn (L5). */
   onConflict?: (conflict: SubmitConflict) => void;
 };
@@ -88,7 +90,7 @@ export function validateDraft(draft: string, opts: { required?: boolean; require
   return opts.validate ? opts.validate(draft) : null;
 }
 
-function Editable({ label, labelId, value, display, onSave, type = "text", unit, required, requiredMessage, validate, num, onConflict }: EditableProps & { labelId: string }) {
+function Editable({ label, labelId, value, display, onSave, type = "text", unit, required, requiredMessage, validate, num, maxLength, onConflict }: EditableProps & { labelId: string }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value);
   const [localError, setLocalError] = useState<string | null>(null);
@@ -172,7 +174,11 @@ function Editable({ label, labelId, value, display, onSave, type = "text", unit,
             submit();
           }}
         >
-          <Field label={label} value={draft} onChange={(v) => { setDraft(v); if (localError) setLocalError(null); }} type={type} unit={unit} required={required} error={error} autoFocus disabled={sub.submitting} />
+          {maxLength ? (
+            <Field as="textarea" label={label} value={draft} onChange={(v) => { setDraft(v); if (localError) setLocalError(null); }} rows={3} maxLength={maxLength} counter error={error} autoFocus disabled={sub.submitting} />
+          ) : (
+            <Field label={label} value={draft} onChange={(v) => { setDraft(v); if (localError) setLocalError(null); }} type={type} unit={unit} required={required} error={error} autoFocus disabled={sub.submitting} />
+          )}
           <div className={s.editActions}>
             <button type="button" className="btn" onClick={cancel} disabled={sub.submitting}>
               Huỷ

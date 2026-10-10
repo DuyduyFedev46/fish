@@ -143,6 +143,10 @@ function seed(): Store {
     image: CatalogItemImage | null,
     description = "",
   ): StoredItem => ({
+    short_note: "",
+    spec: "",
+    storage: "",
+    origin: "",
     id,
     code,
     name,
@@ -194,12 +198,12 @@ function seed(): Store {
     { id: 3, bundle: 6, component: 1, qty_per_bundle: "0.400" },
   ];
   const groups = [
-    { id: 1, name: "Hải sản tươi", parent: null },
-    { id: 3, name: "Cá", parent: 1 },
-    { id: 5, name: "Tôm", parent: 1 },
-    { id: 6, name: "Mực", parent: 1 },
-    { id: 7, name: "Cua ghẹ", parent: 1 },
-    { id: 9, name: "Combo", parent: null },
+    { id: 1, name: "Hải sản tươi", parent: null, slug: "hai-san-tuoi" },
+    { id: 3, name: "Cá", parent: 1, slug: "ca" },
+    { id: 5, name: "Tôm", parent: 1, slug: "tom" },
+    { id: 6, name: "Mực", parent: 1, slug: "muc" },
+    { id: 7, name: "Cua ghẹ", parent: 1, slug: "cua-ghe" },
+    { id: 9, name: "Combo", parent: null, slug: "combo" },
   ];
   const priceLists: PriceList[] = [{ id: 1, name: "Bảng giá bán lẻ", currency: "VND", is_default: true }];
   let priceId = 0;
@@ -356,6 +360,18 @@ function listItems(me: Me, query: URLSearchParams): MockResponse {
   return { status: 200, body };
 }
 
+function str(v: unknown): string {
+  return typeof v === "string" ? v.trim() : "";
+}
+
+/** Bản rút gọn của kiểm chữ phía BE (public_text_error): SĐT, giá, mã lô. */
+function publicTextError(v: string): string | null {
+  if (/[A-Z0-9][A-Z0-9-]*-\d{6}-[0-9A-F]{5}/.test(v)) return "Không ghi mã lô trong thông tin món.";
+  if ((v.match(/\d/g) ?? []).length >= 9) return "Không ghi số điện thoại trong thông tin món.";
+  if (/\d[\d.,\s]*\s*(đ|₫|vnđ|vnd|nghìn|ngàn|triệu)(?![\p{L}\d])/iu.test(v) || /\d+\s*k\b/i.test(v)) return "Không ghi giá trong thông tin món. Giá lấy từ bảng giá.";
+  return null;
+}
+
 function validateItem(body: Record<string, unknown>, partial: boolean, selfId: number | null): MockResponse | null {
   const f: Record<string, string[]> = {};
   if (!partial || "code" in body) {
@@ -378,6 +394,12 @@ function validateItem(body: Record<string, unknown>, partial: boolean, selfId: n
     if (n === null || n < 0 || !Number.isInteger(n)) f.shelf_life_in_days = ["Nhập số ngày là số nguyên không âm."];
   }
   if ("is_active" in body && typeof body.is_active !== "boolean") f.is_active = ["Giá trị không hợp lệ."];
+  for (const [field, max] of [["short_note", 60], ["spec", 500], ["storage", 500], ["origin", 500], ["description", 2000]] as const) {
+    if (!(field in body)) continue;
+    const v = str(body[field]);
+    const bad = v.length > max ? (max === 60 ? "Tối đa 60 ký tự." : `Đảm bảo trường này có không quá ${max} ký tự.`) : publicTextError(v);
+    if (bad) f[field] = [bad];
+  }
   return Object.keys(f).length ? { status: 400, body: f } : null;
 }
 
@@ -403,6 +425,10 @@ function itemsRoutes(me: Me, req: MockRequest, pathname: string, query: URLSearc
         has_expiry_date: body.has_expiry_date !== false,
         is_active: body.is_active !== false,
         description: typeof body.description === "string" ? body.description : "",
+        short_note: str(body.short_note),
+        spec: str(body.spec),
+        storage: str(body.storage),
+        origin: str(body.origin),
         image: null,
         audit: [],
       };
@@ -430,6 +456,12 @@ function itemsRoutes(me: Me, req: MockRequest, pathname: string, query: URLSearc
     if (typeof body.description === "string" && body.description !== it.description) {
       it.description = body.description;
       audit(it, "item_updated", "Sửa mô tả mặt hàng", me);
+    }
+    for (const field of ["short_note", "spec", "storage", "origin"] as const) {
+      if (field in body && str(body[field]) !== it[field]) {
+        it[field] = str(body[field]);
+        audit(it, "item_updated", "Sửa chữ hiển thị trên Shop", me);
+      }
     }
     if (typeof body.is_active === "boolean" && body.is_active !== it.is_active) {
       it.is_active = body.is_active;
@@ -489,7 +521,23 @@ function timelineRoute(id: number): MockResponse {
 
 // ---------------------------------------------------------------- nhóm hàng
 
-function groupRoutes(me: Me, req: MockRequest, query: URLSearchParams): MockResponse {
+function slugFrom(name: string): string {
+  return fold(name).replace(/đ/g, "d").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "nhom";
+}
+function uniqueSlug(base: string): string {
+  let slug = base;
+  for (let n = 2; store().groups.some((g) => g.slug === slug); n++) slug = `${base}-${n}`;
+  return slug;
+}
+/** Kiểm đường dẫn nhóm như BE: để trống hợp lệ (tự sinh) khi tạo; đúng dạng; không trùng nhóm khác. */
+function slugError(slug: string, selfId: number | null): string | null {
+  if (!slug) return null;
+  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) return "Chỉ dùng chữ thường không dấu, số và dấu gạch ngang.";
+  if (store().groups.some((g) => g.id !== selfId && g.slug === slug)) return "Đường dẫn đã dùng cho nhóm khác.";
+  return null;
+}
+
+function groupRoutes(me: Me, req: MockRequest, pathname: string, query: URLSearchParams): MockResponse {
   if (!has(me, P.viewItemGroup) || mode() === "forbidden") return FORBIDDEN;
   if (req.method === "POST") {
     if (!has(me, P.addItemGroup)) return FORBIDDEN;
@@ -503,9 +551,24 @@ function groupRoutes(me: Me, req: MockRequest, query: URLSearchParams): MockResp
     else if (store().groups.some((g) => fold(g.name) === fold(name))) f.name = ["Tên này đã có."];
     if (parent !== null && !store().groups.some((g) => g.id === parent)) f.parent = ["Nhóm cha không tồn tại."];
     if (Object.keys(f).length) return { status: 400, body: f };
-    const g = { id: Math.max(0, ...store().groups.map((x) => x.id)) + 1, name, parent };
+    const slugIn = typeof body.slug === "string" ? body.slug.trim() : "";
+    const badSlug = slugError(slugIn, null);
+    if (badSlug) return { status: 400, body: { slug: [badSlug] } };
+    const g = { id: Math.max(0, ...store().groups.map((x) => x.id)) + 1, name, parent, slug: slugIn || uniqueSlug(slugFrom(name)) };
     store().groups.push(g);
     return { status: 201, body: viewGroup(g) };
+  }
+  const one = /^\/api\/catalog\/item-groups\/(\d+)\/$/.exec(pathname);
+  if (one && req.method === "PATCH") {
+    if (!has(me, P.changeItemGroup)) return FORBIDDEN;
+    const g = store().groups.find((x) => x.id === Number(one[1]));
+    if (!g) return NOT_FOUND;
+    if (mode() === "savefail") return SERVER_ERROR;
+    const slug = typeof bodyOf(req).slug === "string" ? String(bodyOf(req).slug).trim() : "";
+    const bad = slugError(slug, g.id) ?? (slug ? null : "Không được để trống.");
+    if (bad) return { status: 400, body: { slug: [bad] } };
+    g.slug = slug;
+    return { status: 200, body: viewGroup(g) };
   }
   if (req.method !== "GET") return NOT_ALLOWED;
   if (mode() === "fail") return SERVER_ERROR;
@@ -679,7 +742,7 @@ export function mockCatalogApi(req: MockRequest): MockResponse {
   const guide = /^\/api\/guidance\/item\/(\d+)\/$/.exec(pathname);
   if (guide) return has(me, P.viewItem) ? timelineRoute(Number(guide[1])) : FORBIDDEN;
   if (pathname === "/api/catalog/bundle-lines/") return bundleLineRoute(me, req);
-  if (pathname === "/api/catalog/item-groups/") return groupRoutes(me, req, query);
+  if (pathname === "/api/catalog/item-groups/" || /^\/api\/catalog\/item-groups\/\d+\/$/.test(pathname)) return groupRoutes(me, req, pathname, query);
   if (pathname === "/api/catalog/price-lists/") return priceListRoutes(me, req);
   if (pathname === "/api/catalog/item-prices/") return priceRoutes(me, req, query);
   if (pathname === "/api/catalog/pricing-rules/" || /^\/api\/catalog\/pricing-rules\/\d+\/$/.test(pathname)) return ruleRoutes(me, req, pathname, query);

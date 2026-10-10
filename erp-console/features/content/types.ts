@@ -6,7 +6,15 @@ export type ContentKind = "post" | "page";
 
 export type ContentStatus = "draft" | "pending_review" | "published" | "unpublished";
 
-export type ContentPageRole = "privacy" | "terms" | "refund" | "seller_info" | null;
+export type ContentPageRole =
+  | "privacy"
+  | "terms"
+  | "refund"
+  | "seller_info"
+  | "shipping"
+  | "payment"
+  | "complaints"
+  | null;
 
 export interface ContentCategory {
   id: number;

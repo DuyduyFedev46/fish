@@ -113,7 +113,7 @@ export const MOCK_ENTRY_MAP: Record<string, PublicEntryDetail> = {
             {
               text: "Cá Về Blog",
               marks: ["bold"],
-              href: "/bai-viet",
+              href: "/blog",
             },
             {
               text: " hoặc liên hệ qua kênh hỗ trợ của chúng tôi.",
@@ -180,7 +180,7 @@ export const MOCK_ENTRY_MAP: Record<string, PublicEntryDetail> = {
  * Bài mẫu chứa payload XSS/link độc (SR-24 F9). CHỈ để Playwright kiểm bộ hiển thị thân bài
  * (`ArticleBody` + `safeHref`): không `dialog`, không `<script>`, không `javascript:`, link ngoài
  * có `rel`. Mọi payload đặt cờ `window.__xss` thay vì `alert` để bắt được cả khi dialog bị chặn.
- * Không xuất hiện trong danh sách bài (không nằm trong `MOCK_ENTRY_MAP`). Đường vào: /bai-viet/?slug=xss-mau
+ * Không xuất hiện trong danh sách bài (không nằm trong `MOCK_ENTRY_MAP`). Đường vào: /blog/?slug=xss-mau
  */
 export const XSS_SAMPLE_SLUG = "xss-mau";
 

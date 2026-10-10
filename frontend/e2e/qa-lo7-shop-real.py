@@ -32,9 +32,9 @@ POLICY = {"enabled": True, "working_hours": "07:00-21:00", "max_attempts": 3, "w
 SITE = {"seller": SELLER, "seller_complete": True, "privacy_consent_required": False, "confirm_call_notice": True,
         "confirm_call_hours": "7:00–20:00", "confirmation_policy": POLICY}
 CODES = ["CA-QA-01", "CA-QA-02", "CA-QA-03"]
-CATALOG = [{"item_code": c, "name": f"Cá QA giả định {i+1}", "group": "ca", "item_type": "SIMPLE", "unit": "Kg",
-            "price": "100000", "sellable_qty": "50", "image": None} for i, c in enumerate(CODES)]
-CATALOG[2]["sellable_qty"] = "0"  # thẻ thứ 3 hết hàng
+CATALOG = [{"item_code": c, "name": f"Cá QA giả định {i+1}", "item_type": "SIMPLE", "unit": "kg", "min_qty": "1", "qty_step": "0.5", "group": {"slug": "ca", "name": "Cá"}, "short_note": "", "stock_level": "in",
+            "price": "100000", "image": None} for i, c in enumerate(CODES)]
+CATALOG[2]["stock_level"] = "out"  # thẻ thứ 3 hết hàng
 LINKS = [{"title": "Chính sách bảo mật", "slug": "chinh-sach-bao-mat"}]
 
 
@@ -90,6 +90,8 @@ def setup(page, cfg=None):
             return resp(route, spec[1], spec[0]) if isinstance(spec, tuple) else resp(route, spec)
         if path == "/api/shop/catalog/":
             spec = cfg.get("catalog", CATALOG)
+            if isinstance(spec, list):
+                spec = {"groups": [{"slug": "ca", "name": "Cá", "item_count": len(spec)}], "items": spec}
             return resp(route, spec[1], spec[0]) if isinstance(spec, tuple) else resp(route, spec)
         if path == "/api/shop/orders/" and req.method == "POST":
             return resp(route, ORDER_201, 201)
@@ -117,14 +119,14 @@ def main():
         ctx = b.new_context(viewport={"width": 390, "height": 800})
         page = ctx.new_page()
         calls, errs = setup(page, {"entry": entry([PARA] + CARDS)})
-        goto(page, "/bai-viet/?slug=bai-thu")
+        goto(page, "/blog/?slug=bai-thu")
         cat = n(calls, "/api/shop/catalog/")
         detail = [pp for m, pp in calls if pp.startswith("/api/shop/catalog/") and pp != "/api/shop/catalog/"]
         check("F7 bài 3 thẻ mặt hàng -> đúng 1 request /api/shop/catalog/", cat == 1, str(calls))
         check("F7 bài 3 thẻ -> 0 request /api/shop/catalog/<mã>/", not detail, str(detail))
         body = page.inner_text("article") if page.locator("article").count() else page.inner_text("body")
         check("F7 thẻ 1 và 2 hiện tên + giá VNĐ (chuỗi giá từ API được đổi số)", "Cá QA giả định 1" in body and "Cá QA giả định 2" in body and "100.000" in body, body[:300])
-        check("F7 thẻ 3 (sellable_qty=0) báo hết hàng, không hiện nút mua", "hết hàng" in body.lower() or "tạm hết" in body.lower(), body[-300:])
+        check("F7 thẻ 3 (stock_level=out) báo hết hàng, không hiện nút mua", "hết hàng" in body.lower() or "tạm hết" in body.lower(), body[-300:])
         check("F7 không pageerror", not errs, str(errs))
         page.screenshot(path=f"{SHOT_DIR}/lo7-f7-bai-3-the-390.png", full_page=True)
         ctx.close()
@@ -132,14 +134,14 @@ def main():
         ctx = b.new_context()
         page = ctx.new_page()
         calls, errs = setup(page, {"entry": entry([PARA])})
-        goto(page, "/bai-viet/?slug=bai-thu")
+        goto(page, "/blog/?slug=bai-thu")
         check("F7 bài KHÔNG có thẻ -> 0 request catalog", n(calls, "/api/shop/catalog/") == 0, str(calls))
         ctx.close()
 
         ctx = b.new_context()
         page = ctx.new_page()
         calls, errs = setup(page, {"entry": entry([PARA] + CARDS), "catalog": (500, {"detail": "lỗi"})})
-        goto(page, "/bai-viet/?slug=bai-thu")
+        goto(page, "/blog/?slug=bai-thu")
         check("F7 catalog 500 -> vẫn 1 request (không thử lại từng thẻ), bài vẫn đọc được, không pageerror",
               n(calls, "/api/shop/catalog/") == 1 and "Đoạn văn giả." in page.inner_text("body") and not errs, str(calls) + str(errs))
         ctx.close()
@@ -233,7 +235,7 @@ def main():
             ctx = b.new_context()
             page = ctx.new_page()
             calls, errs = setup(page, {"entry": spec})
-            goto(page, "/bai-viet/?slug=khong-co")
+            goto(page, "/blog/?slug=khong-co")
             body = page.inner_text("body")
             check(f"F6 [{label}] trang bài không hiện chữ tiếng Anh 'Not found', không pageerror, không trắng",
                   "Not found" not in body and len(body.strip()) > 80 and not errs, body[:200] + str(errs))

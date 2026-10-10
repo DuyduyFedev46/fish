@@ -1,5 +1,5 @@
 """
-QA P8 Lô 6 — SR-21 (phần Shop): bằng chứng chạy thật BỔ SUNG cho `ra-soat-a2-golive.py`.
+QA P8 Lô 6 — SR-21 (phần Shop): bằng chứng chạy thật BỔ SUNG cho `golive_footer_checks.py`.
 
 Phủ các khe A2 chưa phủ / phủ yếu (đối chiếu trong 04-qa-report.md, mục "Lô 6 — SR-21"):
   GL-01-AC2/AC5/AC6  footer trên 8 route (A2 chỉ 3), API 500/abort/seller null, không chữ cứng trong bundle footer
@@ -56,8 +56,8 @@ LINKS_OK = [
     {"title": "Chính sách thanh toán", "slug": "chinh-sach-thanh-toan"},
 ]
 CATALOG = [{
-    "item_code": "CA-QA-01", "name": "Cá QA giả định", "group": "ca", "item_type": "SIMPLE", "unit": "Kg",
-    "price": 100000, "sellable_qty": 50, "image": None,
+    "item_code": "CA-QA-01", "name": "Cá QA giả định", "item_type": "SIMPLE", "unit": "kg", "min_qty": "1", "qty_step": "0.5", "group": {"slug": "ca", "name": "Cá"}, "short_note": "", "stock_level": "in",
+    "price": "100000", "image": None,
 }]
 ITEM_DETAIL = dict(CATALOG[0], bundle_components=[])
 POLICY_V1 = {"slug": "chinh-sach-bao-mat", "title": "Chính sách bảo mật thông tin", "version": 1,
@@ -75,7 +75,7 @@ ORDER_201 = {"order_code": "DH-QA-0001", "total_amount": "100000", "booked_expir
 ROUTES = [
     ("Landing", "/"), ("Shop", "/shop/"), ("Sản phẩm", "/shop/item/?code=CA-QA-01"),
     ("Checkout", "/shop/checkout/"), ("Tra đơn", "/shop/orders/"),
-    ("Trang", "/trang/?slug=chinh-sach-bao-mat"), ("Bài viết", "/bai-viet/"), ("Chi tiết bài", "/bai-viet/?slug=chinh-sach-bao-mat"),
+    ("Trang", "/pages/?slug=chinh-sach-bao-mat"), ("Bài viết", "/blog/"), ("Chi tiết bài", "/blog/?slug=chinh-sach-bao-mat"),
 ]
 
 LF = 'footer[aria-label^="Thông tin pháp lý"]'
@@ -164,7 +164,8 @@ def setup(page, cfg=None):
         if path == "/api/public/content/categories/":
             return resp(route, [])
         if path == "/api/shop/catalog/":
-            return answer(route, cfg.get("catalog", CATALOG))
+            spec = cfg.get("catalog", CATALOG)
+            return answer(route, {"groups": [{"slug": "ca", "name": "Cá", "item_count": len(spec)}], "items": spec} if isinstance(spec, list) else spec)
         if path.startswith("/api/shop/catalog/"):
             return answer(route, cfg.get("item", ITEM_DETAIL))
         if path == "/api/shop/orders/" and m == "POST":
@@ -265,7 +266,7 @@ def main():
             check(f"GL-01-AC2 [{label}] footer đủ 7 thông tin người bán",
                   all(s in ft for s in ["Vựa Thử Nghiệm QA", "Hộ kinh doanh", "0000000001", "0000000002", "1 Đường Giả", "0900000000", "lienhe@example.com"]))
             check(f"GL-01-AC2 [{label}] có link tel: và mailto:", page.locator(LF + ' a[href="tel:0900000000"]').count() == 1 and page.locator(LF + ' a[href="mailto:lienhe@example.com"]').count() == 1)
-            titles = [page.locator(LF + " a[href*='/trang/']").nth(i).inner_text() for i in range(page.locator(LF + " a[href*='/trang/']").count())]
+            titles = [page.locator(LF + " a[href*='/pages/']").nth(i).inner_text() for i in range(page.locator(LF + " a[href*='/pages/']").count())]
             check(f"GL-02-AC1 [{label}] 3 link chính sách đúng thứ tự cấu hình", titles == [l["title"] for l in LINKS_OK], str(titles))
             check(f"GL-02-AC1 [{label}] chỉ có 1 footer pháp lý (không nhân đôi)", page.locator(LF).count() == 1)
             check(f"GL-01-AC2 [{label}] không pageerror", not rec.pageerrors, str(rec.pageerrors))
@@ -279,8 +280,8 @@ def main():
         page.locator(LF + " a", has_text="Chính sách bảo mật").click()
         page.wait_for_load_state("networkidle")
         page.wait_for_timeout(300)
-        check("GL-02-AC1 bấm link footer -> /trang/?slug=chinh-sach-bao-mat và hiện nội dung trang",
-              "/trang/" in page.url and "slug=chinh-sach-bao-mat" in page.url and "Nội dung giả cho QA." in page.inner_text("body"), page.url)
+        check("GL-02-AC1 bấm link footer -> /pages/?slug=chinh-sach-bao-mat và hiện nội dung trang",
+              "/pages/" in page.url and "slug=chinh-sach-bao-mat" in page.url and "Nội dung giả cho QA." in page.inner_text("body"), page.url)
         ctx.close()
 
         # =====================================================================
@@ -297,7 +298,7 @@ def main():
                 check(f"GL-01-AC6 [{mode}] [{label}] khi API chết không còn MST/SĐT chữ cứng nào trong DOM",
                       not re.search(r"\b\d{9,13}\b", ft), ft[:120])
                 check(f"GL-02-AC4 [{mode}] [{label}] link chính sách KHÔNG bị ảnh hưởng khi site-info lỗi",
-                      page.locator(LF + " a[href*='/trang/']").count() == 3)
+                      page.locator(LF + " a[href*='/pages/']").count() == 3)
                 ctx.close()
 
         # seller có field null -> "Đang cập nhật", không vỡ
@@ -326,7 +327,7 @@ def main():
         state = {"links": LINKS_OK}
         ctx, page, rec = new_page(browser, {"links": lambda r: resp(r, state["links"])})
         goto(page, "/shop/")
-        t = lambda: [page.locator(LF + " a[href*='/trang/']").nth(i).inner_text() for i in range(page.locator(LF + " a[href*='/trang/']").count())]
+        t = lambda: [page.locator(LF + " a[href*='/pages/']").nth(i).inner_text() for i in range(page.locator(LF + " a[href*='/pages/']").count())]
         check("GL-02-AC2 trước: 3 link", len(t()) == 3)
         state["links"] = list(reversed(LINKS_OK))
         page.reload(); page.wait_for_load_state("networkidle"); page.wait_for_timeout(250)
@@ -367,8 +368,8 @@ def main():
                 sw = page.evaluate("document.documentElement.scrollWidth")
                 cw = page.evaluate("document.documentElement.clientWidth")
                 check(f"GL-02-AC5 [{vw}x{vh}] [{label}] không cuộn ngang với chữ dài (sw={sw}, cw={cw})", sw <= cw + 1)
-                if page.locator(LF + " a[href*='/trang/']").count():
-                    hs = [page.locator(LF + " a[href*='/trang/']").nth(i).bounding_box()["height"] for i in range(3)]
+                if page.locator(LF + " a[href*='/pages/']").count():
+                    hs = [page.locator(LF + " a[href*='/pages/']").nth(i).bounding_box()["height"] for i in range(3)]
                     check(f"GL-02-AC5 [{vw}x{vh}] [{label}] mọi link chính sách cao >= 44px ({min(hs):.0f})", min(hs) >= 44)
                     tel = page.locator(LF + ' a[href^="tel:"]').bounding_box()
                     check(f"GL-02-AC5 [{vw}x{vh}] [{label}] link tel: nằm trong khung nhìn ngang (x+w<={cw})", tel["x"] >= 0 and tel["x"] + tel["width"] <= cw + 1)
@@ -399,7 +400,7 @@ def main():
         check("GL-03-AC2 [375px] checkbox chưa tick, nút khoá, nhãn nêu họ tên/SĐT/địa chỉ/giao hàng/xác nhận đơn",
               cb.is_checked() is False and submit_btn(page).is_disabled() and all(s in form_txt for s in ["họ tên", "số điện thoại", "địa chỉ", "giao hàng", "xác nhận đơn"]))
         check("GL-03-AC2 [375px] không cuộn ngang ở checkout", page.evaluate("document.documentElement.scrollWidth") <= page.evaluate("document.documentElement.clientWidth") + 1)
-        pl = page.locator('form a[href*="/trang/"]', has_text="Chính sách bảo mật")
+        pl = page.locator('form a[href*="/pages/"]', has_text="Chính sách bảo mật")
         check("GL-03-AC2 link chính sách target=_blank + rel noopener", pl.get_attribute("target") == "_blank" and "noopener" in (pl.get_attribute("rel") or ""))
         page.screenshot(path=f"{SHOT_DIR}/sr21-gl03-ac2-checkout-375.png", full_page=True)
         # bấm link -> tab mới, form ở tab cũ còn nguyên
@@ -408,8 +409,8 @@ def main():
             pl.click()
         popup = popup_info.value
         popup.wait_for_load_state("networkidle")
-        check("GL-03-AC2 bấm link mở TAB MỚI tới /trang/?slug=chinh-sach-bao-mat, tab đặt hàng giữ nguyên tên đã nhập",
-              "/trang/" in popup.url and "slug=chinh-sach-bao-mat" in popup.url and page.input_value("#name") == PII_NAME, popup.url)
+        check("GL-03-AC2 bấm link mở TAB MỚI tới /pages/?slug=chinh-sach-bao-mat, tab đặt hàng giữ nguyên tên đã nhập",
+              "/pages/" in popup.url and "slug=chinh-sach-bao-mat" in popup.url and page.input_value("#name") == PII_NAME, popup.url)
         popup.close()
         # Enter khi chưa tick -> không gửi
         page.fill("#phone", PII_PHONE); page.fill("#address", PII_ADDR)
@@ -479,7 +480,7 @@ def main():
         check("GL-03-AC4 sau 409: báo lỗi, bỏ tick, nút khoá lại, giữ nguyên 3 field",
               "Chính sách vừa cập nhật" in page.inner_text("body") and cb.is_checked() is False and submit_btn(page).is_disabled()
               and page.input_value("#name") == PII_NAME and page.input_value("#phone") == PII_PHONE and page.input_value("#address") == PII_ADDR)
-        check("GL-03-AC4 link chính sách được cập nhật sang slug mới trong `current`", "slug=chinh-sach-bao-mat-moi" in (page.locator('form a[href*="/trang/"]').get_attribute("href") or ""))
+        check("GL-03-AC4 link chính sách được cập nhật sang slug mới trong `current`", "slug=chinh-sach-bao-mat-moi" in (page.locator('form a[href*="/pages/"]').get_attribute("href") or ""))
         check("GL-03-AC4 giỏ hàng KHÔNG bị xoá sau 409 (localStorage giỏ còn 1 dòng, bảng giỏ còn hiện)",
               len(json.loads(page.evaluate("window.localStorage.getItem('cangcaloc_cart_v1')"))) == 1 and page.locator("table.cart-table tbody tr").count() == 1)
         sweep_pii(page, rec, "GL-03-AC8 [sau 409]")

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import type { MouseEvent } from "react";
 import LogoSlot from "./LogoSlot";
+import { useSearchSuggest } from "@/features/catalog/useSearchSuggest";
 import SearchBox from "./search/SearchBox";
 import Icon from "./ui/Icon";
 import IconButton, { CartBadge } from "./ui/IconButton";
@@ -75,6 +76,12 @@ function useGoBack(backHref: string) {
   };
 }
 
+/** Ô tìm của header kèm gợi ý khi gõ (SHOP-2-04). Header được phép đọc catalog (cache sẵn). */
+function HeaderSearch({ placeholder }: { placeholder: string }) {
+  const search = useSearchSuggest();
+  return <SearchBox variant="brand" placeholder={placeholder} {...search} />;
+}
+
 function cartLabel(count: number) {
   return count > 0 ? `Giỏ hàng, ${count} món` : "Giỏ hàng";
 }
@@ -115,7 +122,7 @@ function MobileHome({ cartCount, hotline, onBrandClick, logoSrc }: ShopHeaderPro
             />
           </nav>
         </div>
-        <SearchBox variant="brand" placeholder={PLACEHOLDER_MOBILE} />
+        <HeaderSearch placeholder={PLACEHOLDER_MOBILE} />
         <div ref={sentinelRef} className={s.sentinel} aria-hidden="true" />
       </header>
       <header className={cx(s.mobile, s.bar, s.fixedBar, stuck && s.fixedBarShown)}>
@@ -190,7 +197,7 @@ function DesktopFull(props: ShopHeaderProps) {
     logoSrc,
   } = props;
   const onOrders = currentPath.startsWith("/shop/orders");
-  const onKitchen = currentPath.startsWith("/bai-viet");
+  const onKitchen = currentPath.startsWith("/blog");
 
   return (
     // display: contents: các tầng là con trực tiếp của khung trang, nên chỉ tầng chính dính được (position: sticky).
@@ -212,7 +219,7 @@ function DesktopFull(props: ShopHeaderProps) {
         <div className={cx("container", s.mainInner)}>
           <LogoSlot size={40} tone="brand" showTagline src={logoSrc} onClick={onBrandClick} />
           <div className={s.search}>
-            <SearchBox variant="brand" placeholder={PLACEHOLDER_DESKTOP} />
+            <HeaderSearch placeholder={PLACEHOLDER_DESKTOP} />
           </div>
           <nav className={s.mainNav} aria-label="Tài khoản và giỏ">
             {hotline ? (

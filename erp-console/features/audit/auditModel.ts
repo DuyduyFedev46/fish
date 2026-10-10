@@ -61,6 +61,9 @@ export const AUDIT_ACTION_LABELS: Readonly<Record<string, string>> = {
   recipient_changed: "Đổi thông tin nhận hàng",
   create_itemprice: "Đặt giá bán",
   update_itemprice: "Sửa giá bán",
+  update_item: "Sửa thông tin mặt hàng",
+  update_itemgroup: "Sửa đường dẫn nhóm hàng",
+  content_load: "Nạp nội dung soạn sẵn",
   close_itemprice: "Đóng giá bán",
   // giao hàng
   assign_deliverynote: "Chọn người giao",

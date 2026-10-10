@@ -39,7 +39,13 @@ def _mask_phone_in_text(text: str, allowlist: set[str]) -> str:
     return PHONE_RE.sub(repl, text)
 
 
+# Số liên hệ của người bán tự được phép trong thân bài CMS (SHOP-5-01 AC5, 06-marketing F4).
+SELLER_PHONE_SETTINGS = ("SHOP_HOTLINE", "SELLER_PHONE")
+MIN_SELLER_PHONE_DIGITS = 8  # "1900 xxxx" (giữ chỗ) chỉ còn 4 chữ số -> bỏ qua
+
+
 def get_phone_allowlist() -> set[str]:
+    """Số được phép: `CONTENT_PHONE_ALLOWLIST` cộng hotline và SĐT người bán đang cấu hình."""
     raw = getattr(settings, "CONTENT_PHONE_ALLOWLIST", ()) or ()
     items = raw.split(",") if isinstance(raw, str) else raw
     allowlist = set()
@@ -47,6 +53,10 @@ def get_phone_allowlist() -> set[str]:
         cleaned = normalize_phone_digits(str(item).strip())
         if cleaned:
             allowlist.add(cleaned)
+    for name in SELLER_PHONE_SETTINGS:
+        digits = normalize_phone_digits(str(getattr(settings, name, "") or ""))
+        if len(digits) >= MIN_SELLER_PHONE_DIGITS:
+            allowlist.add(digits)
     return allowlist
 
 

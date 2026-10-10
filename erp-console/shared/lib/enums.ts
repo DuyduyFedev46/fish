@@ -250,6 +250,9 @@ export const ENUMS = {
     terms: e("Điều kiện giao dịch chung"),
     refund: e("Chính sách đổi trả và hoàn tiền"),
     seller_info: e("Thông tin người bán"),
+    shipping: e("Chính sách giao hàng"),
+    payment: e("Chính sách thanh toán"),
+    complaints: e("Cơ chế giải quyết khiếu nại"),
   },
   entryReturnReason: {
     missing_info: e("Thiếu thông tin hoặc hình ảnh"),

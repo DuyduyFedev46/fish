@@ -33,6 +33,7 @@ import {
   statusOfTab,
 } from "../contentModel";
 import { CONTENT_MSG as M } from "../messages";
+import { pageRoleLabel } from "../pageRoles";
 import type { ContentEntryListItem } from "../types";
 
 type ListParams = { status: string; kind: string; category: number };
@@ -51,10 +52,6 @@ const TAB_LABELS: Record<StatusTab, string> = {
   unpublished: ENUMS.entryStatus.unpublished.label,
 };
 
-function roleLabel(role: string): string {
-  const row = (ENUMS.entryPageRole as Record<string, { label: string }>)[role];
-  return row ? row.label : role;
-}
 
 export function ContentListScreen() {
   const { me } = useAuth();
@@ -158,7 +155,7 @@ export function ContentListScreen() {
           {missingRoles.length > 0 && (
             <div className="alert-box warn" role="status">
               <Icon name="warning" />
-              <span>{M.goliveMissing(missingRoles.map(roleLabel))}</span>
+              <span>{M.goliveMissing(missingRoles.map(pageRoleLabel))}</span>
               {canAdd && (
                 <Link href="/content/edit/?new=page" className="inline-link">
                   {M.newPage}

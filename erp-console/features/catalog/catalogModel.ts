@@ -4,6 +4,7 @@
 import { ApiError } from "@/shared/lib/http";
 import { dateOnly, kg, vnd } from "@/shared/lib/format";
 import { errorText } from "@/shared/lib/messages";
+import { fieldErrorsOf } from "@/shared/ui/form/useSubmit";
 import { CATALOG_MSG as M } from "./messages";
 import type {
   BundleLineInput,
@@ -145,10 +146,23 @@ export type ItemDraft = {
   hasExpiry: boolean;
   isActive: boolean;
   description: string;
+  shortNote: string;
+  spec: string;
+  storage: string;
+  origin: string;
   lines: LineDraft[];
 };
 
-export const ITEM_LIMITS = { code: 40, name: 200, description: 1000 } as const;
+/** Giới hạn khớp BE (02b §3.10): ghi chú ngắn 60; quy cách, bảo quản, nguồn hàng 500; mô tả 2000. */
+export const ITEM_LIMITS = { code: 40, name: 200, shortNote: 60, text: 500, description: 2000 } as const;
+
+/** Bốn ô chữ hiển thị trên Shop, sửa tại chỗ ở trang chi tiết. */
+export const SHOP_TEXT_FIELDS = ["short_note", "spec", "storage", "origin"] as const;
+export type ShopTextField = (typeof SHOP_TEXT_FIELDS)[number];
+
+export function shopTextLimit(field: ShopTextField): number {
+  return field === "short_note" ? ITEM_LIMITS.shortNote : ITEM_LIMITS.text;
+}
 
 export function emptyItemDraft(type: ItemType): ItemDraft {
   return {
@@ -161,6 +175,10 @@ export function emptyItemDraft(type: ItemType): ItemDraft {
     hasExpiry: type !== "BUNDLE",
     isActive: true,
     description: "",
+    shortNote: "",
+    spec: "",
+    storage: "",
+    origin: "",
     lines: type === "BUNDLE" ? [{ key: 1, component: "", qty: "" }] : [],
   };
 }
@@ -171,6 +189,10 @@ export type ItemErrors = {
   itemGroup?: string;
   shelfLife?: string;
   description?: string;
+  shortNote?: string;
+  spec?: string;
+  storage?: string;
+  origin?: string;
   /** Lỗi chung của công thức (chưa có dòng nào). */
   lines?: string;
   /** Lỗi theo từng dòng, khoá = `key` của dòng. */
@@ -188,6 +210,10 @@ export function validateItem(draft: ItemDraft): ItemErrors {
   if (!draft.itemGroup) e.itemGroup = M.groupRequired;
   if (!/^\d{1,5}$/.test(draft.shelfLife.trim())) e.shelfLife = M.shelfLifeInvalid;
   if (draft.description.length > ITEM_LIMITS.description) e.description = M.descriptionTooLong;
+  if (draft.shortNote.trim().length > ITEM_LIMITS.shortNote) e.shortNote = M.shortNoteTooLong;
+  if (draft.spec.trim().length > ITEM_LIMITS.text) e.spec = M.textTooLong;
+  if (draft.storage.trim().length > ITEM_LIMITS.text) e.storage = M.textTooLong;
+  if (draft.origin.trim().length > ITEM_LIMITS.text) e.origin = M.textTooLong;
   if (draft.itemType === "BUNDLE") {
     // Dòng còn trống hoàn toàn (chưa chọn mặt hàng, chưa nhập kg) coi như chưa có dòng nào (ED-30-AC3, QA B13-1).
     const filledLines = draft.lines.filter((l) => l.component || l.qty.trim());
@@ -210,7 +236,7 @@ export function validateItem(draft: ItemDraft): ItemErrors {
 }
 
 export function hasItemErrors(e: ItemErrors): boolean {
-  return !!(e.code || e.name || e.itemGroup || e.shelfLife || e.description || e.lines || Object.keys(e.line).length);
+  return !!(e.code || e.name || e.itemGroup || e.shelfLife || e.description || e.shortNote || e.spec || e.storage || e.origin || e.lines || Object.keys(e.line).length);
 }
 
 export function itemInputOf(draft: ItemDraft): ItemInput {
@@ -225,6 +251,10 @@ export function itemInputOf(draft: ItemDraft): ItemInput {
     has_expiry_date: draft.hasExpiry,
     is_active: draft.isActive,
     description: draft.description.trim(),
+    short_note: draft.shortNote.trim(),
+    spec: draft.spec.trim(),
+    storage: draft.storage.trim(),
+    origin: draft.origin.trim(),
   };
 }
 
@@ -352,12 +382,30 @@ export function validateGroupName(raw: string): string | null {
   return null;
 }
 
+/** Đường dẫn nhóm: chữ thường không dấu, số, dấu gạch ngang (khớp BE). `required`: sửa nhóm có sẵn thì không được để trống. */
+export const GROUP_SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+export function validateGroupSlug(raw: string, required: boolean): string | null {
+  const slug = raw.trim();
+  if (!slug) return required ? M.slugRequired : null;
+  if (slug.length > 80) return M.slugTooLong;
+  if (!GROUP_SLUG_RE.test(slug)) return M.slugInvalid;
+  return null;
+}
+
 // ---------------------------------------------------------------- lỗi và URL
 
 /** Câu hiện cho người dùng khi lưu lỗi: nguyên văn `detail` của BE nếu có, không thì câu chung. */
 export function saveErrorMessage(err: unknown): string {
   if (err instanceof ApiError && err.status === 0) return err.message;
   return errorText(err);
+}
+
+/**
+ * Câu lỗi khi lưu MỘT ô tại chỗ: ưu tiên câu BE trả đúng cho ô đó (400 `{spec:["Không ghi giá…"]}`),
+ * không thì câu chung. Để Chủ biết vì sao bị từ chối.
+ */
+export function fieldSaveErrorMessage(err: unknown, field: string): string {
+  return fieldErrorsOf(err)[field] ?? saveErrorMessage(err);
 }
 
 /** `?id=12` → 12; thiếu hoặc không phải số nguyên dương → null. URL chỉ chứa id số. */

@@ -142,12 +142,8 @@ class Command(BaseCommand):
         }
 
     def _allowed_phones(self) -> set[str]:
-        allowed = set(get_phone_allowlist())
-        for name in ("SHOP_HOTLINE", "SELLER_PHONE"):
-            digits = normalize_phone_digits(str(getattr(settings, name, "") or ""))
-            if digits:
-                allowed.add(digits)
-        return allowed
+        # get_phone_allowlist đã gồm SHOP_HOTLINE và SELLER_PHONE (SHOP-5-01 AC5).
+        return set(get_phone_allowlist())
 
     def _fill(self, text) -> str:
         text = str(text or "")
@@ -316,6 +312,13 @@ class Command(BaseCommand):
                 or entry.draft_hash != last_hash
             )
             if edited and not self.overwrite:
+                role = data.get("page_role") if kind == "page" else None
+                if role and entry.page_role is None:
+                    # SHOP-5-02 (BR-ND-20): trang bắt buộc đã nạp từ trước và đã được sửa tay -> chỉ gắn vai trò,
+                    # giữ nguyên nội dung Lộc sửa. Không ghi AuditLog content_load để lần sau vẫn nhận ra "đã sửa".
+                    save_draft(entry=entry, data={"page_role": role}, actor=self.author)
+                    self.counts["skipped"] += 1
+                    return f"bỏ qua: đã sửa; gắn vai trò {role}, nội dung giữ nguyên"
                 raise EntrySkipped("đã sửa")
             flags_same = kind == "post" or (
                 entry.page_role == data["page_role"]
