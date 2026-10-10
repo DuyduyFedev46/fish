@@ -95,7 +95,7 @@ a:focus-visible,button:focus-visible,input:focus-visible{outline:2px solid #1F66
           <span class="pop" style="flex: none; width: 32px; height: 32px; border-radius: 16px; background: #157F3D; display: flex; align-items: center; justify-content: center">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"></path></svg>
           </span>
-          <span style="flex: 1; color: #157F3D"><span style="font-weight: 600">Thanh toán thành công</span> · Cá Về sẽ gọi xác nhận và báo phí giao trước khi giao</span>
+          <span style="flex: 1; color: #157F3D"><span style="font-weight: 600">Thanh toán thành công</span> · Cá Về sẽ gọi xác nhận đơn trước khi giao</span>
           <button onClick="{{closePaid}}" aria-label="Đóng thông báo thanh toán thành công" class="x">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#157F3D" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg>
           </button>
@@ -122,7 +122,7 @@ a:focus-visible,button:focus-visible,input:focus-visible{outline:2px solid #1F66
               </li>
               <li aria-current="step" style="display: flex; flex-direction: column; gap: 10px">
                 <span style="display: flex; align-items: center"><span style="flex: none; width: 24px; height: 24px; border-radius: 12px; border: 3px solid #1F66D1; box-sizing: border-box; background: #EBF2FE"></span><span style="flex: 1; height: 2px; background: #E4E4E9"></span></span>
-                <span style="padding-right: 8px"><span style="font-weight: 600; color: #1A5BC0">Đang chuẩn bị</span><br><span style="font-size: 12px; color: #686874">Kho đóng thùng giữ lạnh</span></span>
+                <span style="padding-right: 8px"><span style="font-weight: 600; color: #1A5BC0">Đang chuẩn bị</span><br><span style="font-size: 12px; color: #686874">Cá Về soạn hàng</span></span>
               </li>
               <li style="display: flex; flex-direction: column; gap: 10px">
                 <span style="display: flex; align-items: center"><span style="flex: none; width: 24px; height: 24px; border-radius: 12px; border: 2px solid #D4D4DB; box-sizing: border-box; background: #FFFFFF"></span><span style="flex: 1; height: 2px; background: #E4E4E9"></span></span>
@@ -154,11 +154,11 @@ a:focus-visible,button:focus-visible,input:focus-visible{outline:2px solid #1F66
                 <span class="num" style="font-weight: 500">259.000đ</span>
               </li>
             </ul>
-            <div style="display: flex; justify-content: space-between; gap: 12px; padding-top: 12px; color: #4E4E58"><span>Phí giao</span><span>Cá Về báo khi gọi xác nhận</span></div>
-            <div style="display: flex; justify-content: space-between; align-items: baseline; padding-top: 8px">
+            <div style="display: flex; justify-content: space-between; align-items: baseline; padding-top: 12px">
               <span style="font-weight: 600">Tổng tiền hàng · đã thanh toán</span>
               <span class="num" style="font-size: 22px; font-weight: 600; color: #1A5BC0">867.000đ</span>
             </div>
+            <p style="margin: 4px 0 0; font-size: 13px; color: #4E4E58">Đã gồm giao hàng. Bạn trả một lần, không trả thêm khi nhận hàng.</p>
           </section>
         </div>
 
@@ -203,7 +203,7 @@ a:focus-visible,button:focus-visible,input:focus-visible{outline:2px solid #1F66
         <li><a href="DesktopPolicy.dc.html">Chính sách giao hàng</a></li>
         <li><a href="DesktopPolicy.dc.html">Chính sách thanh toán</a></li>
         <li><a href="DesktopPolicy.dc.html">Chính sách quyền riêng tư</a></li>
-        <li><a href="DesktopPolicy.dc.html">Điều khoản sử dụng</a></li>
+        <li><a href="DesktopPolicy.dc.html">Điều kiện giao dịch chung</a></li>
         <li><a href="DesktopPolicy.dc.html">Cơ chế giải quyết khiếu nại</a></li>
       </ul></nav>
       <nav aria-labelledby="f-ve"><h3 id="f-ve">Về Cá Về</h3><ul>
@@ -218,7 +218,8 @@ a:focus-visible,button:focus-visible,input:focus-visible{outline:2px solid #1F66
           <span>[Tên doanh nghiệp] · MST [mã số thuế] · Địa chỉ: [địa chỉ kinh doanh]</span>
           <span>GCN ĐKKD số [số] do [nơi cấp] cấp ngày [ngày] · © 2026 Cá Về</span>
         </div>
-        <a href="#bo-cong-thuong" target="_blank" rel="noopener" style="flex: none; width: 132px; height: 48px; border: 1.5px dashed rgba(255,255,255,0.6); border-radius: 6px; color: #FFFFFF; font-size: 10px; font-weight: 600; text-decoration: none; display: flex; align-items: center; justify-content: center; text-align: center">Logo "Đã thông báo Bộ Công Thương"</a>
+        <!-- Logo "Đã thông báo website" (D12, BR-ND-18): chỉ render khi site-info có seller.website_notice_url; chưa có link thì ẩn hẳn, không để ô giữ chỗ. -->
+
       </div>
     </div>
   </footer>

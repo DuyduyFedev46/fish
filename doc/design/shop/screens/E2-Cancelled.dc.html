@@ -36,7 +36,8 @@ a:focus-visible,button:focus-visible{outline:2px solid #1F66D1;outline-offset:2p
     </div>
     <div style="border-top: 1px solid #E4E4E9; padding-top: 12px; display: flex; flex-direction: column; gap: 2px">
       <span style="font-size: 12px; font-weight: 500; color: #686874">Lý do</span>
-      <p style="margin: 0; color: #17171C">Lô hàng không đạt khi soạn, Cá Về huỷ đơn để đảm bảo chất lượng</p>
+      <!-- cancel_notice.reason_label từ bảng nhãn cố định (BR-HT-12); không hiện ghi chú tự do. -->
+      <p style="margin: 0; color: #17171C">Hàng không đạt khi soạn</p>
     </div>
   </section>
 
@@ -45,7 +46,9 @@ a:focus-visible,button:focus-visible{outline:2px solid #1F66D1;outline-offset:2p
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1A5BC0" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2"></path></svg>
       Cá Về sẽ gọi cho bạn
     </h2>
-    <p style="margin: 0; color: #4E4E58">Nhân viên sẽ gọi vào số điện thoại đặt hàng để xử lý số tiền <span class="num" style="font-weight: 600; color: #17171C">867.000đ</span> bạn đã thanh toán. Cần gấp, bạn gọi [hotline].</p>
+    <!-- BR-HT-12 bản A (câu tạm D 11/10; thời hạn đọc từ settings, hỏi Lộc L6–L7). Số tiền = cancel_notice.cancelled_amount. -->
+    <p style="margin: 0; color: #4E4E58">Cá Về sẽ gọi vào số điện thoại đặt hàng trong 1 ngày làm việc để trả lại <span class="num" style="font-weight: 600; color: #17171C">867.000đ</span> bạn đã thanh toán. Cần gấp, bạn gọi <a href="tel:[hotline]" style="font-weight: 600">[hotline]</a>.</p>
+    <a href="P1-Policy.dc.html#xu-ly-tien" style="align-self: flex-start; min-height: 44px; display: flex; align-items: center; font-weight: 500">Xem cách Cá Về trả lại tiền</a>
   </section>
 
   <section aria-labelledby="h-mon" style="margin: 8px 16px 0; background: #FFFFFF; border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 8px">
@@ -57,7 +60,7 @@ a:focus-visible,button:focus-visible{outline:2px solid #1F66D1;outline-offset:2p
 
   <div style="position: absolute; left: 0; right: 0; bottom: 0; padding: 12px 16px 16px; display: flex; flex-direction: column; gap: 8px; background: #FFFFFF; box-shadow: 0 -4px 16px rgba(23,23,28,0.08)">
     <a href="Main.dc.html" style="height: 48px; border-radius: 24px; background: {{brand}}; color: #FFFFFF; font-weight: 600; text-decoration: none; display: flex; align-items: center; justify-content: center">Đặt lại món tương tự</a>
-    <a href="#" style="height: 44px; border-radius: 22px; border: 1px solid #D4D4DB; color: #17171C; font-weight: 600; text-decoration: none; display: flex; align-items: center; justify-content: center">Liên hệ [hotline]</a>
+    <a href="tel:[hotline]" style="height: 44px; border-radius: 22px; border: 1px solid #D4D4DB; color: #17171C; font-weight: 600; text-decoration: none; display: flex; align-items: center; justify-content: center">Liên hệ [hotline]</a>
   </div>
 </div>
 </x-dc>

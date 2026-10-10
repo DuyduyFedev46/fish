@@ -58,7 +58,7 @@ button:focus-visible,a:focus-visible{outline:2px solid #1F66D1;outline-offset:2p
   <div style="display: flex; flex-direction: column; gap: 4px">
     <span class="lab">CMP-5 · Bảng đặc tả component</span>
     <h1 style="margin: 0; font-size: 24px; font-weight: 600; letter-spacing: -0.015em">Giỏ hàng, đặt hàng và đơn hàng</h1>
-    <p style="margin: 0; color: #4E4E58; max-width: 880px">Nhóm component từ lúc có món trong giỏ tới khi theo dõi đơn. Số liệu theo <span class="mono">SO-CHUAN.md</span>. Phí giao luôn ghi "Báo khi xác nhận đơn". Mã đơn dạng <span class="mono">SO…</span>. Trang đơn và thanh toán không hiện tên, số điện thoại hay địa chỉ người nhận.</p>
+    <p style="margin: 0; color: #4E4E58; max-width: 880px">Nhóm component từ lúc có món trong giỏ tới khi theo dõi đơn. Số liệu theo <span class="mono">SO-CHUAN.md</span>. Không có dòng "Phí giao"; dưới Tổng ghi "Đã gồm giao hàng. Bạn trả một lần, không trả thêm khi nhận hàng." (BR-BH-30). Mã đơn dạng <span class="mono">SO…</span>. Trang đơn và thanh toán không hiện tên, số điện thoại hay địa chỉ người nhận.</p>
   </div>
 
   <section class="sec" aria-labelledby="c-line">
@@ -166,8 +166,8 @@ button:focus-visible,a:focus-visible{outline:2px solid #1F66D1;outline-offset:2p
         <div style="width: 390px; height: 250px; position: relative; background: #F4F4F6; border-radius: 10px; overflow: hidden">
           <div style="position: absolute; left: 0; right: 0; bottom: 0; background: #FFFFFF; box-shadow: 0 -4px 16px rgba(23,23,28,0.08); padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 8px">
             <div class="sum"><span>Tạm tính · 3 món</span><span class="num">867.000đ</span></div>
-            <div class="sum"><span>Phí giao</span><span>Báo khi xác nhận đơn</span></div>
             <div style="display: flex; justify-content: space-between; align-items: baseline; padding-top: 6px; border-top: 1px solid #E4E4E9"><span style="font-weight: 600; padding-top: 6px">Tổng tiền hàng</span><span class="num" style="font-size: 20px; font-weight: 600; color: #1A5BC0; padding-top: 6px">867.000đ</span></div>
+            <p style="margin: 0; font-size: 13px; color: #4E4E58">Đã gồm giao hàng. Bạn trả một lần, không trả thêm khi nhận hàng.</p>
             <a class="cta" href="Checkout.dc.html" style="margin-top: 4px">Tiếp tục: nhập thông tin nhận hàng</a>
           </div>
         </div>
@@ -177,18 +177,18 @@ button:focus-visible,a:focus-visible{outline:2px solid #1F66D1;outline-offset:2p
         <div style="width: 360px; box-sizing: border-box; background: #FFFFFF; border: 1px solid #E4E4E9; border-radius: 12px; padding: 20px; display: flex; flex-direction: column; gap: 10px">
           <h3 style="margin: 0; font-size: 17px; font-weight: 600">Tóm tắt đơn</h3>
           <div class="sum"><span>Tạm tính · 3 món</span><span class="num">867.000đ</span></div>
-          <div class="sum"><span>Phí giao</span><span>Báo khi xác nhận đơn</span></div>
           <div style="display: flex; justify-content: space-between; align-items: baseline; padding-top: 10px; border-top: 1px solid #E4E4E9"><span style="font-weight: 600">Tổng tiền hàng</span><span class="num" style="font-size: 22px; font-weight: 600; color: #1A5BC0">867.000đ</span></div>
+          <p style="margin: 0; font-size: 13px; color: #4E4E58">Đã gồm giao hàng. Bạn trả một lần, không trả thêm khi nhận hàng.</p>
           <a class="cta" href="DesktopCheckout.dc.html" style="margin-top: 6px">Tiến hành đặt hàng</a>
           <span style="font-size: 12px; font-weight: 500; color: #686874; text-align: center">Mua tối thiểu 1 kg mỗi món</span>
         </div>
       </div>
       <div class="cell">
-        <span class="cap">Bị chặn · có món đã hết<small>CTA disabled + lý do</small></span>
+        <span class="cap">Bị chặn · có món đã hết<small>UX chốt 11/10: CTA vẫn bấm được (Q-UX-4); bấm thì hiện lý do, không sang bước sau</small></span>
         <div style="width: 300px; box-sizing: border-box; background: #FFFFFF; border: 1px solid #E4E4E9; border-radius: 12px; padding: 20px; display: flex; flex-direction: column; gap: 10px">
           <div style="display: flex; justify-content: space-between; align-items: baseline"><span style="font-weight: 600">Tổng tiền hàng</span><span class="num" style="font-size: 22px; font-weight: 600; color: #1A5BC0">577.000đ</span></div>
-          <span id="why" style="font-size: 12px; font-weight: 500; color: #A85A07">Bỏ 1 món đã hết để tiếp tục.</span>
-          <button disabled aria-describedby="why" style="height: 48px; border-radius: 24px; border: 0; background: #EBEBEF; color: #686874; font: inherit; font-weight: 600; cursor: not-allowed">Tiến hành đặt hàng</button>
+          <span id="why" role="alert" style="font-size: 13px; font-weight: 500; color: #C0312B">Bỏ món đã hết để đặt hàng.</span>
+          <button type="button" aria-describedby="why" style="height: 48px; border-radius: 24px; border: 0; background: #1F66D1; color: #FFFFFF; font: inherit; font-weight: 600">Tiến hành đặt hàng</button>
         </div>
       </div>
     </div>
@@ -197,9 +197,9 @@ button:focus-visible,a:focus-visible{outline:2px solid #1F66D1;outline-offset:2p
       <tbody>
         <tr><td>Vị trí</td><td><code>position: fixed; bottom: 0</code>, đệm 14 16 <code>16 + env(safe-area-inset-bottom)</code>. Nội dung cuộn có <code>padding-bottom</code> ≥ chiều cao thanh.</td><td><code>position: sticky; top: 24px</code> trong cột phải 360, cạnh bảng CartLine.</td></tr>
         <tr><td>Chữ</td><td>Dòng phụ 14 <code>ink-2</code>. "Tổng tiền hàng" 14/600. Tổng 20/600 <code>accent-text #1A5BC0</code>.</td><td>Tiêu đề 17/600. Tổng 22/600 <code>accent-text</code>.</td></tr>
-        <tr><td>Phí giao</td><td colspan="2">Luôn ghi "Báo khi xác nhận đơn", không ước tính, không cộng vào tổng. Nhãn tổng là "Tổng tiền hàng" để không hiểu nhầm đã gồm phí.</td></tr>
+        <tr><td>Giao hàng</td><td colspan="2">Không có dòng "Phí giao" (BR-BH-30). Ngay dưới Tổng: "Đã gồm giao hàng. Bạn trả một lần, không trả thêm khi nhận hàng." chữ 13 <code>ink-2</code>. Không ghi "miễn phí giao".</td></tr>
         <tr><td>CTA</td><td>Pill 48, bo 999, nền <code>accent #1F66D1</code>, chữ trắng 14/600.</td><td>Như điện thoại. Hover <code>accent-hover #1A57B5</code> 150ms.</td></tr>
-        <tr><td>Disabled</td><td colspan="2">Nền <code>surface-3 #EBEBEF</code>, chữ <code>ink-3</code>, lý do ở trên nút (<code>aria-describedby</code>), chữ <code>warn</code>.</td></tr>
+        <tr><td>Bị chặn</td><td colspan="2">Không tắt nút. Còn món hết mà bấm: hiện lý do trên nút (<code>role="alert"</code>, <code>aria-describedby</code>, chữ <code>crit</code>), dời tiêu điểm tới "Bỏ khỏi giỏ" của món hết đầu tiên.</td></tr>
         <tr><td>Bóng · bo</td><td>Bóng bar <code>0 -4px 16px rgba(23,23,28,.08)</code>. Không bo.</td><td>Không bóng. Bo 12, viền <code>border</code>.</td></tr>
         <tr><td>Chuyển động</td><td colspan="2">Đổi số tổng không animate. Thanh đáy vào: <code>translateY(100%)→0</code> 240ms <code>cubic-bezier(.32,.72,0,1)</code>.</td></tr>
       </tbody>
@@ -269,7 +269,7 @@ button:focus-visible,a:focus-visible{outline:2px solid #1F66D1;outline-offset:2p
               <li style="display: flex; gap: 10px; align-items: center"><span class="th" style="width: 48px; height: 48px"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#686874" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8l8-4 8 4v8l-8 4-8-4zM4 8l8 4 8-4M12 12v8"></path></svg></span><span style="flex: 1; min-width: 0; display: flex; flex-direction: column"><span style="font-weight: 500">Combo lẩu hải sản</span><span class="num" style="font-size: 12px; color: #686874">1 combo × 259.000đ</span></span><span class="num" style="font-weight: 600">259.000đ</span></li>
             </ul>
             <div style="display: flex; justify-content: space-between; align-items: baseline; padding-top: 10px; border-top: 1px solid #E4E4E9"><span style="font-weight: 600">Tổng tiền hàng</span><span class="num" style="font-size: 17px; font-weight: 600; color: #1A5BC0">867.000đ</span></div>
-            <span style="font-size: 12px; color: #686874">Phí giao: báo khi xác nhận đơn</span>
+            <span style="font-size: 12px; color: #686874">Đã gồm giao hàng.</span>
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px">
               <a class="cto" href="DesktopCart.dc.html">Xem giỏ</a>
               <a href="DesktopCheckout.dc.html" style="height: 44px; border-radius: 8px; background: #1F66D1; color: #FFFFFF; font-weight: 600; text-decoration: none; display: flex; align-items: center; justify-content: center">Đặt hàng</a>
@@ -418,14 +418,14 @@ button:focus-visible,a:focus-visible{outline:2px solid #1F66D1;outline-offset:2p
   <section class="sec" aria-labelledby="c-pay">
     <div>
       <h2 id="c-pay" class="cname">PaymentMethod</h2>
-      <p class="cdesc">Thẻ chọn phương thức thanh toán. Hiện chỉ có chuyển khoản VietQR qua cổng thanh toán, luôn ở trạng thái đang chọn.</p>
+      <p class="cdesc">Thẻ chọn phương thức thanh toán. Hiện chỉ có chuyển khoản ngân hàng quét mã QR, luôn ở trạng thái đang chọn. Không ghi tên cổng thanh toán (decisions 10/10).</p>
     </div>
     <div class="row">
       <div class="cell">
         <span class="cap">Đang chọn</span>
         <div role="radio" aria-checked="true" tabindex="0" style="width: 358px; box-sizing: border-box; display: flex; gap: 12px; align-items: center; padding: 12px; border: 2px solid #1F66D1; border-radius: 10px; background: #EBF2FE">
           <span style="flex: none; width: 40px; height: 40px; border-radius: 8px; background: #FFFFFF; display: flex; align-items: center; justify-content: center"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1A5BC0" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h2v2h-2zM18 18h2v2h-2zM18 14h2M14 18v2"></path></svg></span>
-          <span style="flex: 1; display: flex; flex-direction: column"><span style="font-weight: 600">Chuyển khoản qua VietQR</span><span style="font-size: 12px; font-weight: 500; color: #4E4E58">Quét mã QR bằng app ngân hàng bất kỳ, xác nhận tự động</span></span>
+          <span style="flex: 1; display: flex; flex-direction: column"><span style="font-weight: 600">Chuyển khoản ngân hàng (quét mã QR)</span><span style="font-size: 12px; font-weight: 500; color: #4E4E58">Quét bằng app ngân hàng. Tiền về đủ là đơn tự xác nhận.</span></span>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1A5BC0" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"></path></svg>
         </div>
       </div>
@@ -433,7 +433,7 @@ button:focus-visible,a:focus-visible{outline:2px solid #1F66D1;outline-offset:2p
         <span class="cap">Focus</span>
         <div style="width: 358px; box-sizing: border-box; display: flex; gap: 12px; align-items: center; padding: 12px; border: 2px solid #1F66D1; border-radius: 10px; background: #EBF2FE; outline: 2px solid #1F66D1; outline-offset: 2px">
           <span style="flex: none; width: 40px; height: 40px; border-radius: 8px; background: #FFFFFF; display: flex; align-items: center; justify-content: center"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1A5BC0" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h2v2h-2zM18 18h2v2h-2zM18 14h2M14 18v2"></path></svg></span>
-          <span style="flex: 1; display: flex; flex-direction: column"><span style="font-weight: 600">Chuyển khoản qua VietQR</span><span style="font-size: 12px; font-weight: 500; color: #4E4E58">Quét mã QR bằng app ngân hàng</span></span>
+          <span style="flex: 1; display: flex; flex-direction: column"><span style="font-weight: 600">Chuyển khoản ngân hàng (quét mã QR)</span><span style="font-size: 12px; font-weight: 500; color: #4E4E58">Quét bằng app ngân hàng</span></span>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1A5BC0" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"></path></svg>
         </div>
       </div>
@@ -566,7 +566,7 @@ button:focus-visible,a:focus-visible{outline:2px solid #1F66D1;outline-offset:2p
       <tbody>
         <tr><td>Chờ thanh toán</td><td>warn</td><td><code>warn-soft #FDF3E3</code> · <code>warn #A85A07</code>. Khách cần làm gì đó (trả tiền trước khi hết giờ giữ).</td></tr>
         <tr><td>Đang chờ xác nhận tiền</td><td>neutral</td><td><code>surface-3 #EBEBEF</code> · <code>ink-2 #4E4E58</code>. Đã chuyển, chờ ngân hàng báo về. Khách không cần làm gì.</td></tr>
-        <tr><td>Chờ cửa hàng xác nhận</td><td>neutral</td><td>Như trên. Đơn đã trả tiền, chờ Cá Về gọi xác nhận và báo phí giao.</td></tr>
+        <tr><td>Chờ cửa hàng xác nhận</td><td>neutral</td><td>Như trên. Đơn đã trả tiền, chờ Cá Về gọi xác nhận.</td></tr>
         <tr><td>Đang chuẩn bị · Đang giao</td><td>accent</td><td><code>accent-soft #EBF2FE</code> · <code>accent-text #1A5BC0</code>. Đơn đang chạy bình thường.</td></tr>
         <tr><td>Đã giao</td><td>good</td><td><code>good-soft #E9F7EE</code> · <code>good #157F3D</code>.</td></tr>
         <tr><td>Chưa giao được</td><td>warn</td><td><code>warn-soft</code> · <code>warn</code>. Có vấn đề nhưng còn xử lý được.</td></tr>
@@ -595,8 +595,8 @@ button:focus-visible,a:focus-visible{outline:2px solid #1F66D1;outline-offset:2p
           </ul>
           <div style="border-top: 1px solid #E4E4E9; padding-top: 10px; display: flex; flex-direction: column; gap: 6px">
             <div class="sum"><span>Tạm tính</span><span class="num">1.006.000đ</span></div>
-            <div class="sum"><span>Phí giao</span><span>Báo khi xác nhận đơn</span></div>
             <div style="display: flex; justify-content: space-between; align-items: baseline"><span style="font-weight: 600">Đã thanh toán</span><span class="num" style="font-size: 17px; font-weight: 600; color: #1A5BC0">1.006.000đ</span></div>
+            <p style="margin: 0; font-size: 13px; color: #4E4E58">Đã gồm giao hàng. Bạn trả một lần, không trả thêm khi nhận hàng.</p>
           </div>
         </section>
       </div>
@@ -612,8 +612,8 @@ button:focus-visible,a:focus-visible{outline:2px solid #1F66D1;outline-offset:2p
               <tr><td style="padding: 10px 0; border-bottom: 1px solid #E4E4E9">Combo lẩu hải sản</td><td style="text-align: right; border-bottom: 1px solid #E4E4E9">1 combo</td><td style="text-align: right; border-bottom: 1px solid #E4E4E9; color: #4E4E58">259.000đ</td><td style="text-align: right; border-bottom: 1px solid #E4E4E9; font-weight: 600">259.000đ</td></tr>
             </tbody>
             <tfoot>
-              <tr><td colspan="3" style="padding: 10px 0 2px; color: #4E4E58">Phí giao</td><td style="text-align: right; padding-top: 10px; color: #4E4E58">Báo khi xác nhận đơn</td></tr>
-              <tr><td colspan="3" style="padding: 6px 0 0; font-weight: 600">Tổng tiền hàng</td><td class="num" style="text-align: right; padding-top: 6px; font-size: 20px; font-weight: 600; color: #1A5BC0">1.006.000đ</td></tr>
+              <tr><td colspan="3" style="padding: 10px 0 0; font-weight: 600">Tổng tiền hàng</td><td class="num" style="text-align: right; padding-top: 10px; font-size: 20px; font-weight: 600; color: #1A5BC0">1.006.000đ</td></tr>
+              <tr><td colspan="4" style="padding-top: 4px; font-size: 13px; color: #4E4E58">Đã gồm giao hàng. Bạn trả một lần, không trả thêm khi nhận hàng.</td></tr>
             </tfoot>
           </table>
         </section>
@@ -623,7 +623,7 @@ button:focus-visible,a:focus-visible{outline:2px solid #1F66D1;outline-offset:2p
       <thead><tr><th style="width: 18%">Thuộc tính</th><th>Giá trị</th></tr></thead>
       <tbody>
         <tr><td>Dòng</td><td>Điện thoại: ảnh 44 · tên 14/500 · "1,5 kg × 278.000đ" 12 <code>ink-3</code> · thành tiền 14/600 căn phải. Máy tính: bảng 4 cột, số căn phải, tabular.</td></tr>
-        <tr><td>Tổng</td><td>Tạm tính, Phí giao ("Báo khi xác nhận đơn"), dòng chốt. Nhãn chốt theo trạng thái: "Cần thanh toán" (chờ thanh toán), "Đã thanh toán" (đã nhận tiền), "Tổng tiền hàng" (chung). Số chốt 17/600 (điện thoại) / 20/600 (máy tính) <code>accent-text</code>.</td></tr>
+        <tr><td>Tổng</td><td>Tạm tính, [Mã giảm giá (MÃ) −…], dòng chốt, rồi câu "Đã gồm giao hàng…" 13 <code>ink-2</code> (không dòng "Phí giao", BR-BH-30). Nhãn chốt theo trạng thái: "Cần thanh toán" (chờ thanh toán), "Đã thanh toán" (đã nhận tiền), "Tổng tiền hàng" (chung). Số chốt 17/600 (điện thoại) / 20/600 (máy tính) <code>accent-text</code>.</td></tr>
         <tr><td>Khung</td><td>Nền <code>surface</code>, viền <code>border</code>, bo 12, đệm 16 (điện thoại) / 20 24 (máy tính). Không bóng.</td></tr>
         <tr><td>Dữ liệu</td><td>Giá theo giá lúc đặt (snapshot trên đơn), không lấy giá hiện tại. Không có giá vốn, không có lô, không có ngày nhập. Không hiện người nhận.</td></tr>
         <tr><td>A11y</td><td>Máy tính dùng <code>&lt;table&gt;</code> thật có <code>&lt;th&gt;</code>. Điện thoại dùng <code>&lt;ul&gt;</code>.</td></tr>
@@ -650,7 +650,7 @@ button:focus-visible,a:focus-visible{outline:2px solid #1F66D1;outline-offset:2p
         <span class="cap">Máy tính · có viền</span>
         <div role="status" style="width: 640px; box-sizing: border-box; background: #E9F7EE; border: 1px solid #BFE5CC; border-radius: 12px; padding: 10px 8px 10px 16px; display: flex; align-items: center; gap: 12px">
           <span style="flex: none; width: 32px; height: 32px; border-radius: 16px; background: #157F3D; display: flex; align-items: center; justify-content: center"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"></path></svg></span>
-          <span style="flex: 1"><span style="font-weight: 600; color: #157F3D">Thanh toán thành công.</span> <span style="color: #17171C">Cá Về sẽ gọi xác nhận đơn <span class="num" style="font-weight: 600">SO[mã đơn]</span> và báo phí giao.</span></span>
+          <span style="flex: 1"><span style="font-weight: 600; color: #157F3D">Thanh toán thành công.</span> <span style="color: #17171C">Cá Về sẽ gọi xác nhận đơn <span class="num" style="font-weight: 600">SO[mã đơn]</span> trước khi giao.</span></span>
           <button class="ib" aria-label="Đóng thông báo" style="width: 40px; height: 40px; outline: 2px solid #1F66D1; outline-offset: 2px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#157F3D" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg></button>
         </div>
         <span style="font-size: 11px; color: #686874">Nút đóng đang focus</span>

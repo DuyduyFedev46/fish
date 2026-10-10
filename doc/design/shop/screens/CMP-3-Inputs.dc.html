@@ -172,6 +172,7 @@ a{color:#1A5BC0}
         <tr><td>Textarea</td><td>padding <code>10 12</code> · chữ <code>16/400</code> line-height 1.4 · <code>resize: none</code> (điện thoại) / <code>vertical</code> (máy tính) · <code>autocomplete="street-address"</code></td></tr>
         <tr><td>Nút Bản đồ (điện thoại)</td><td>rộng <code>64</code>, cao bằng khung · nền <code>accent-soft #EBF2FE</code> · viền trái <code>border #E4E4E9</code> · ghim 20 + chữ <code>12/600 accent-text</code> · <code>aria-label="Tìm và chọn địa chỉ trên bản đồ"</code></td></tr>
         <tr><td>Nút Bản đồ (máy tính)</td><td>nút neutral md 44 bo 8 nằm trong ô, cách mép 8 · hover viền <code>accent</code> nền <code>accent-soft</code></td></tr>
+        <tr><td>Popup bản đồ</td><td>Không có nút "Vị trí của tôi", không gọi Geolocation (BR-BH-29). Ngay dưới ô "Tìm địa chỉ", hiện từ lúc mở (trước khi script nạp): "Bản đồ do Google cung cấp. Chữ bạn gõ và vị trí bạn ghim sẽ được gửi tới Google. Không muốn dùng, bạn đóng lại và gõ địa chỉ trực tiếp." chữ 12 <code>ink-2</code>, ô tìm <code>aria-describedby</code> trỏ vào dòng này. Bản đồ nạp lỗi → Dialog C5.</td></tr>
         <tr><td>Đã điền từ bản đồ</td><td>khung viền <code>good #157F3D</code>, nền <code>#F5FAF6</code> · khối báo <code>role="status"</code> nền <code>good-soft</code> chữ <code>good</code> 13/500, bo 10. Trở về mặc định khi khách sửa tay.</td></tr>
         <tr><td>Lỗi</td><td>khung viền 1.5 <code>crit</code> · textarea <code>aria-invalid="true"</code> · dòng lỗi như TextField.</td></tr>
       </tbody>
@@ -182,17 +183,17 @@ a{color:#1A5BC0}
   <section class="sec" aria-labelledby="c-cb">
     <div style="display: flex; flex-direction: column; gap: 4px">
       <h2 id="c-cb" class="cname">Checkbox</h2>
-      <p class="desc">Đồng ý chính sách trước khi đặt hàng. Không đánh dấu sẵn; chưa đánh dấu thì nút Đặt hàng ở trạng thái disabled kèm dòng giải thích.</p>
+      <p class="desc">Đồng ý chính sách trước khi đặt hàng. Không bao giờ đánh dấu sẵn (BR-BH-17, NĐ 356/2025). Nút Đặt hàng luôn bấm được (Q-UX-4); bấm khi chưa đánh dấu thì báo lỗi dưới ô và trong khối "Còn N chỗ cần sửa".</p>
     </div>
     <div class="g3">
       <div class="st"><span class="na">Chưa chọn</span>
-        <div style="display: flex; gap: 12px; align-items: flex-start"><span class="cb" style="border: 1.5px solid #8C8C98; background: #FFFFFF"></span><span style="color: #4E4E58">Tôi đồng ý để Cá Về dùng họ tên, số điện thoại và địa chỉ này để giao đơn hàng, theo <span style="color: #1A5BC0; text-decoration: underline">chính sách quyền riêng tư</span>.</span></div>
+        <div style="display: flex; gap: 12px; align-items: flex-start"><span class="cb" style="border: 1.5px solid #8C8C98; background: #FFFFFF"></span><span style="color: #4E4E58">Tôi đồng ý để Cá Về dùng họ tên, số điện thoại và địa chỉ này để giao và hỗ trợ đơn hàng, theo <span style="color: #1A5BC0; text-decoration: underline">Chính sách quyền riêng tư</span>. Dữ liệu được lưu trên máy chủ đặt ở nước ngoài.</span></div>
       </div>
       <div class="st"><span class="na">Đã chọn</span>
-        <div style="display: flex; gap: 12px; align-items: flex-start"><span class="cb" style="background: #1F66D1"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"></path></svg></span><span style="color: #4E4E58">Tôi đồng ý để Cá Về dùng họ tên, số điện thoại và địa chỉ này để giao đơn hàng, theo <span style="color: #1A5BC0; text-decoration: underline">chính sách quyền riêng tư</span>.</span></div>
+        <div style="display: flex; gap: 12px; align-items: flex-start"><span class="cb" style="background: #1F66D1"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"></path></svg></span><span style="color: #4E4E58">Tôi đồng ý để Cá Về dùng họ tên, số điện thoại và địa chỉ này để giao và hỗ trợ đơn hàng, theo <span style="color: #1A5BC0; text-decoration: underline">Chính sách quyền riêng tư</span>. Dữ liệu được lưu trên máy chủ đặt ở nước ngoài.</span></div>
       </div>
       <div class="st"><span class="na">Focus</span>
-        <div style="display: flex; gap: 12px; align-items: flex-start"><span class="cb" style="border: 1.5px solid #8C8C98; background: #FFFFFF; outline: 2px solid #1F66D1; outline-offset: 2px"></span><span style="color: #4E4E58">Tôi đồng ý để Cá Về dùng họ tên, số điện thoại và địa chỉ này để giao đơn hàng, theo <span style="color: #1A5BC0; text-decoration: underline">chính sách quyền riêng tư</span>.</span></div>
+        <div style="display: flex; gap: 12px; align-items: flex-start"><span class="cb" style="border: 1.5px solid #8C8C98; background: #FFFFFF; outline: 2px solid #1F66D1; outline-offset: 2px"></span><span style="color: #4E4E58">Tôi đồng ý để Cá Về dùng họ tên, số điện thoại và địa chỉ này để giao và hỗ trợ đơn hàng, theo <span style="color: #1A5BC0; text-decoration: underline">Chính sách quyền riêng tư</span>. Dữ liệu được lưu trên máy chủ đặt ở nước ngoài.</span></div>
       </div>
     </div>
     <table class="spec">
@@ -201,7 +202,7 @@ a{color:#1A5BC0}
         <tr><td>Ô</td><td><code>&lt;input type="checkbox"&gt;</code> gốc, <code>20×20</code>, <code>accent-color: #1F66D1</code>, lệch xuống 2 để thẳng dòng đầu · chưa chọn viền <code>border-input</code> · đã chọn nền <code>accent</code> + tích trắng</td></tr>
         <tr><td>Nhãn</td><td>cả câu nằm trong <code>&lt;label&gt;</code> nên bấm chữ cũng chọn được · khe <code>12</code> · chữ <code>body 14 ink-2</code> · link chính sách mở tab mới</td></tr>
         <tr><td>Focus</td><td>outline 2 <code>#1F66D1</code> offset 2 trên ô</td></tr>
-        <tr><td>Liên kết nút</td><td>chưa chọn → nút Đặt hàng <code>aria-disabled</code> + "Đánh dấu đồng ý ở trên để đặt hàng." (máy tính: "… ở bên trái …")</td></tr>
+        <tr><td>Liên kết nút</td><td>Không tắt nút. Bấm "Đặt hàng" khi chưa chọn → ô <code>aria-invalid="true"</code> + dòng lỗi <code>crit</code> "Đánh dấu đồng ý ở trên để đặt hàng." (cả hai khổ) + mục "Đồng ý xử lý dữ liệu" trong FormErrorSummary.</td></tr>
       </tbody>
     </table>
     <p class="use"><strong>Dùng ở:</strong> <code>Checkout.dc.html</code> <code>C2-Invalid.dc.html</code> <code>DesktopCheckout.dc.html</code> <code>DesktopInvalid.dc.html</code></p>

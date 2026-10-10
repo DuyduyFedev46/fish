@@ -56,12 +56,6 @@ a{color:#1A5BC0}a:hover{color:#1A57B5}
               <input type="search" aria-label="Tìm sản phẩm" placeholder="Tìm cá, tôm, mực, combo…" style="flex: 1; min-width: 0; border: 0; outline: none; font: inherit; font-size: 16px">
             </label>
           </form>
-          <nav aria-label="Tìm nhiều" style="display: flex; gap: 6px; overflow: hidden">
-            <a href="Main.dc.html" style="flex: none; height: 32px; padding: 0 12px; border-radius: 16px; background: rgba(255,255,255,0.14); color: #FFFFFF; font-size: 13px; font-weight: 500; text-decoration: none; display: flex; align-items: center">Cá thu</a>
-            <a href="Main.dc.html" style="flex: none; height: 32px; padding: 0 12px; border-radius: 16px; background: rgba(255,255,255,0.14); color: #FFFFFF; font-size: 13px; font-weight: 500; text-decoration: none; display: flex; align-items: center">Mực ống</a>
-            <a href="Main.dc.html" style="flex: none; height: 32px; padding: 0 12px; border-radius: 16px; background: rgba(255,255,255,0.14); color: #FFFFFF; font-size: 13px; font-weight: 500; text-decoration: none; display: flex; align-items: center">Tôm sú</a>
-            <a href="Main.dc.html" style="flex: none; height: 32px; padding: 0 12px; border-radius: 16px; background: rgba(255,255,255,0.14); color: #FFFFFF; font-size: 13px; font-weight: 500; text-decoration: none; display: flex; align-items: center">Combo lẩu</a>
-          </nav>
         </header>
       </div>
     </div>
@@ -73,7 +67,7 @@ a{color:#1A5BC0}a:hover{color:#1A57B5}
         <tr><td>Icon tra cứu đơn</td><td><code>/shop/orders</code></td><td>Nhập mã đơn + SĐT để tra.</td></tr>
         <tr><td>Icon giỏ + badge</td><td><code>/shop/cart</code></td><td>Badge = số món (không phải số kg). Ẩn badge khi 0.</td></tr>
         <tr><td>Ô tìm (form role=search)</td><td><code>/shop?q=…</code></td><td>Enter để tìm. Font 16px tránh iOS phóng to.</td></tr>
-        <tr><td>Chip "Cá thu", "Mực ống"…</td><td><code>/shop?q=cá%20thu</code></td><td>Tối đa 4 chip, Lộc chọn trong ERP. Cuộn ngang.</td></tr>
+        <tr><td colspan="3" style="color: #4E4E58">Không có dải chip "Tìm nhiều" (decisions 10/10). Nút gọi ẩn khi site-info chưa có hotline.</td></tr>
       </tbody>
     </table>
   </section>
@@ -149,7 +143,7 @@ a{color:#1A5BC0}a:hover{color:#1A57B5}
         <tr><td>Danh mục</td><td><code>/shop</code></td><td></td></tr>
         <tr><td>Giỏ hàng</td><td><code>/shop/cart</code></td><td>Có badge số món như header.</td></tr>
         <tr><td>Đơn hàng</td><td><code>/shop/orders</code></td><td>Tra đơn bằng mã + SĐT (không có tài khoản).</td></tr>
-        <tr><td colspan="3" style="color: #4E4E58">Hiện ở Trang chủ, Danh mục, Góc bếp. Ẩn ở Chi tiết (đã có thanh mua), Giỏ và các bước đặt hàng.</td></tr>
+        <tr><td colspan="3" style="color: #4E4E58">Hiện ở Trang chủ, Danh mục, Góc bếp, Tra cứu đơn (D9). Ẩn ở Chi tiết (đã có thanh mua), Giỏ và các bước đặt hàng.</td></tr>
       </tbody>
     </table>
   </section>
@@ -172,7 +166,7 @@ a{color:#1A5BC0}a:hover{color:#1A57B5}
           </details>
           <details>
             <summary>Chính sách <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg></summary>
-            <ul><li><a href="P1-Policy.dc.html">Chính sách đổi trả và hoàn tiền</a></li><li><a href="P1-Policy.dc.html">Chính sách giao hàng</a></li><li><a href="P1-Policy.dc.html">Chính sách thanh toán</a></li><li><a href="P1-Policy.dc.html">Chính sách quyền riêng tư</a></li><li><a href="P1-Policy.dc.html">Điều khoản sử dụng</a></li><li><a href="P1-Policy.dc.html">Cơ chế giải quyết khiếu nại</a></li></ul>
+            <ul><li><a href="P1-Policy.dc.html">Chính sách đổi trả và hoàn tiền</a></li><li><a href="P1-Policy.dc.html">Chính sách giao hàng</a></li><li><a href="P1-Policy.dc.html">Chính sách thanh toán</a></li><li><a href="P1-Policy.dc.html">Chính sách quyền riêng tư</a></li><li><a href="P1-Policy.dc.html">Điều kiện giao dịch chung</a></li><li><a href="P1-Policy.dc.html">Cơ chế giải quyết khiếu nại</a></li></ul>
           </details>
           <details>
             <summary>Về Cá Về <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg></summary>
@@ -183,7 +177,7 @@ a{color:#1A5BC0}a:hover{color:#1A57B5}
             <span>Địa chỉ: [địa chỉ kinh doanh]</span>
             <span>GCN ĐKKD số [số] do [nơi cấp] cấp ngày [ngày]</span>
             <span>Email: <a href="mailto:[email]" style="color: #FFFFFF">[email]</a></span>
-            <a href="#bo-cong-thuong" style="align-self: flex-start; margin-top: 4px; width: 120px; height: 44px; border: 1.5px dashed rgba(255,255,255,0.6); border-radius: 6px; color: #FFFFFF; font-size: 10px; font-weight: 600; text-decoration: none; display: flex; align-items: center; justify-content: center; text-align: center">Logo "Đã thông báo Bộ Công Thương"</a>
+            <!-- Logo "Đã thông báo website" (D12, BR-ND-18): chỉ render khi site-info có seller.website_notice_url; chưa có link thì ẩn hẳn, không để ô giữ chỗ. -->
             <span style="color: #A9C4EE">© 2026 Cá Về</span>
           </div>
         </footer>
@@ -198,14 +192,14 @@ a{color:#1A5BC0}a:hover{color:#1A57B5}
         <tr><td colspan="3" style="font-weight: 600; background: #FBFBFC">Nhóm "Mua hàng" (mở sẵn)</td></tr>
         <tr><td>Hàng đang có</td><td><code>/shop</code></td><td></td></tr>
         <tr><td>Combo nấu nhanh</td><td><code>/shop?type=combo</code></td><td></td></tr>
-        <tr><td>Cách mua hàng</td><td><code>/trang/cach-mua-hang</code></td><td>Trang tĩnh: chọn kg → đặt → VietQR → giao.</td></tr>
+        <tr><td>Cách mua hàng</td><td><code>/trang/cach-mua-hang</code></td><td>Trang tĩnh: chọn kg → đặt → quét mã QR → giao.</td></tr>
         <tr><td>Tra cứu đơn</td><td><code>/shop/orders</code></td><td></td></tr>
         <tr><td colspan="3" style="font-weight: 600; background: #FBFBFC">Nhóm "Chính sách" (thu gọn, danh sách đầy đủ)</td></tr>
-        <tr><td>Chính sách đổi trả và hoàn tiền</td><td><code>/trang/doi-tra</code></td><td rowspan="6">Bắt buộc với website TMĐT bán hàng (go-live pháp lý mục 2, 3, 9). Chữ "hoàn tiền" chỉ dùng ở tên trang này. Nội dung chờ <code>legal-vn</code> duyệt (doc/ops/go-live-phap-ly.md).</td></tr>
+        <tr><td>Chính sách đổi trả và hoàn tiền</td><td><code>/trang/doi-tra</code></td><td rowspan="6">Danh sách và tên lấy từ <code>footer-links</code> (CMS). Bắt buộc với website TMĐT bán hàng (go-live pháp lý mục 2, 3, 9). Chữ "hoàn tiền" chỉ dùng ở tên trang này. Nội dung chờ <code>legal-vn</code> duyệt (doc/ops/go-live-phap-ly.md).</td></tr>
         <tr><td>Chính sách giao hàng</td><td><code>/trang/giao-hang</code></td></tr>
         <tr><td>Chính sách thanh toán</td><td><code>/trang/thanh-toan</code></td></tr>
         <tr><td>Chính sách quyền riêng tư</td><td><code>/trang/quyen-rieng-tu</code></td></tr>
-        <tr><td>Điều khoản sử dụng</td><td><code>/trang/dieu-khoan</code></td></tr>
+        <tr><td>Điều kiện giao dịch chung</td><td><code>/trang/dieu-khoan</code></td></tr>
         <tr><td>Cơ chế giải quyết khiếu nại</td><td><code>/trang/khieu-nai</code></td></tr>
         <tr><td colspan="3" style="font-weight: 600; background: #FBFBFC">Nhóm "Về Cá Về"</td></tr>
         <tr><td>Giới thiệu</td><td><code>/gioi-thieu</code></td><td>Landing page thương hiệu.</td></tr>
@@ -213,7 +207,7 @@ a{color:#1A5BC0}a:hover{color:#1A57B5}
         <tr><td>Liên hệ</td><td><code>/trang/lien-he</code></td><td></td></tr>
         <tr><td colspan="3" style="font-weight: 600; background: #FBFBFC">Dải pháp lý</td></tr>
         <tr><td>Email</td><td><code>mailto:[email]</code></td><td></td></tr>
-        <tr><td>Logo Bộ Công Thương</td><td><code>[link xác nhận online.gov.vn]</code></td><td>Chỉ gắn khi đã thông báo website. Mở tab mới, <code>rel="noopener"</code>.</td></tr>
+        <tr><td>Logo Bộ Công Thương</td><td><code>[link xác nhận online.gov.vn]</code></td><td>Chỉ gắn khi site-info có link xác nhận; chưa có thì ẩn hẳn khối (D12). Trường người bán trống thì ẩn dòng đó (BR-ND-18). Mở tab mới, <code>rel="noopener"</code>.</td></tr>
         <tr><td colspan="3" style="color: #4E4E58">Tên DN, MST, địa chỉ, GCN ĐKKD là chữ thường, không link. Điện thoại: footer ẩn ở Giỏ và các bước đặt hàng, thay bằng dải pháp lý gọn (F2 ở bản máy tính).</td></tr>
       </tbody>
     </table>

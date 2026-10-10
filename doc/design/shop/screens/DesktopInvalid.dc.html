@@ -86,11 +86,12 @@ a:focus-visible,button:focus-visible,input:focus-visible{outline:2px solid #1F66
           <div role="alert" tabindex="-1" aria-labelledby="err-sum" style="padding: 14px 18px; border-radius: 12px; background: #FCEDEC; border: 1px solid #F3CFCC; display: flex; gap: 12px; align-items: flex-start">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#C0312B" stroke-width="2" stroke-linecap="round" aria-hidden="true" style="flex: none; margin-top: 1px"><circle cx="12" cy="12" r="9"></circle><path d="M12 7.5v5.5M12 16.5h.01"></path></svg>
             <div style="display: flex; flex-direction: column; gap: 2px">
-              <span id="err-sum" style="font-weight: 600; color: #C0312B">Còn 3 chỗ cần sửa</span>
+              <span id="err-sum" style="font-weight: 600; color: #C0312B">Còn 4 chỗ cần sửa</span>
               <ul style="list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; column-gap: 20px">
                 <li><a href="#f-name" class="jump">Họ và tên</a></li>
                 <li><a href="#f-phone" class="jump">Số điện thoại</a></li>
                 <li><a href="#f-addr" class="jump">Địa chỉ giao hàng</a></li>
+                <li><a href="#f-consent" class="jump">Đồng ý xử lý dữ liệu</a></li>
               </ul>
             </div>
           </div>
@@ -122,15 +123,17 @@ a:focus-visible,button:focus-visible,input:focus-visible{outline:2px solid #1F66
                   Bản đồ
                 </a>
               </div>
-              <span id="e-addr" class="err"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#C0312B" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7.5v5.5M12 16.5h.01"></path></svg>Nhập địa chỉ hoặc chọn trên bản đồ</span>
+              <span id="e-addr" class="err"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#C0312B" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7.5v5.5M12 16.5h.01"></path></svg>Nhập địa chỉ giao hàng hoặc chọn trên bản đồ</span>
+              <span style="font-size: 12px; color: #686874">Cá Về giao trong khu vực Phan Thiết.</span>
             </div>
           </section>
 
-          <section style="background: #FFFFFF; border-radius: 16px; padding: 18px 24px">
+          <section style="background: #FFFFFF; border-radius: 16px; padding: 18px 24px; display: flex; flex-direction: column; gap: 6px">
             <label style="display: flex; gap: 12px; align-items: flex-start; cursor: pointer">
-              <input type="checkbox" checked="" style="flex: none; width: 20px; height: 20px; margin: 2px 0 0; accent-color: #1F66D1">
-              <span style="color: #4E4E58">Tôi đồng ý để Cá Về dùng họ tên, số điện thoại và địa chỉ này để giao đơn hàng, theo <a href="#chinh-sach-quyen-rieng-tu">chính sách quyền riêng tư</a>.</span>
+              <input id="f-consent" type="checkbox" aria-invalid="true" aria-describedby="e-consent" style="flex: none; width: 20px; height: 20px; margin: 2px 0 0; accent-color: #1F66D1">
+              <span style="color: #4E4E58">Tôi đồng ý để Cá Về dùng họ tên, số điện thoại và địa chỉ này để giao và hỗ trợ đơn hàng, theo <a href="DesktopPolicy.dc.html" target="_blank" rel="noopener">Chính sách quyền riêng tư<span class="sr"> (mở tab mới)</span></a>. Dữ liệu được lưu trên máy chủ đặt ở nước ngoài.</span>
             </label>
+            <span id="e-consent" class="err"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#C0312B" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7.5v5.5M12 16.5h.01"></path></svg>Đánh dấu đồng ý ở trên để đặt hàng.</span>
           </section>
         </form>
 
@@ -145,6 +148,7 @@ a:focus-visible,button:focus-visible,input:focus-visible{outline:2px solid #1F66
             <span style="font-weight: 600">Tổng tiền hàng</span>
             <span class="num" style="font-size: 24px; font-weight: 600; color: #1A5BC0; letter-spacing: -0.01em">867.000đ</span>
           </div>
+          <p style="margin: 0; font-size: 13px; color: #4E4E58">Đã gồm giao hàng. Bạn trả một lần, không trả thêm khi nhận hàng.</p>
           <button type="button" class="btn btn-p" style="margin-top: 4px">Đặt hàng</button>
         </aside>
       </div>

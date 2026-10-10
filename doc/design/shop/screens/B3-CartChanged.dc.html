@@ -111,12 +111,14 @@ a:focus-visible,button:focus-visible{outline:2px solid #1F66D1;outline-offset:2p
 
   <div style="position: absolute; left: 0; right: 0; bottom: 0; background: #FFFFFF; box-shadow: 0 -4px 16px rgba(23,23,28,0.08); padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 8px">
     <div style="display: flex; justify-content: space-between; color: #4E4E58"><span>Tạm tính (2 món còn hàng)</span><span class="num">608.000đ</span></div>
-    <div style="display: flex; justify-content: space-between; color: #4E4E58"><span>Phí giao</span><span>Báo khi xác nhận đơn</span></div>
     <div style="display: flex; justify-content: space-between; align-items: baseline; padding-top: 6px; border-top: 1px solid #E4E4E9">
       <span style="font-weight: 600; padding-top: 6px">Tổng tiền hàng</span>
       <span class="num" style="font-size: 20px; font-weight: 600; color: #1A5BC0; padding-top: 6px">608.000đ</span>
     </div>
-    <a href="Checkout.dc.html" style="margin-top: 4px; height: 48px; border-radius: 24px; background: #1F66D1; color: #FFFFFF; font-weight: 600; text-decoration: none; display: flex; align-items: center; justify-content: center">Tiếp tục với 2 món còn hàng</a>
+    <p style="margin: 0; font-size: 13px; color: #4E4E58">Đã gồm giao hàng. Bạn trả một lần, không trả thêm khi nhận hàng.</p>
+    <!-- UX chốt 11/10 (SHOP-2-06 AC4): còn món hết thì chưa sang bước nhận hàng. Nút vẫn bấm được (Q-UX-4); bấm thì hiện dòng dưới (role=alert) và dời tiêu điểm tới nút "Bỏ khỏi giỏ" của món hết đầu tiên. Bỏ hết món hết thì dòng này mất, bấm là sang Checkout. -->
+    <p id="cart-blocked" role="alert" style="margin: 0; font-size: 13px; font-weight: 500; color: #C0312B">Bỏ món đã hết để đặt hàng.</p>
+    <button type="button" aria-describedby="cart-blocked" style="margin-top: 4px; height: 48px; border: 0; border-radius: 24px; background: #1F66D1; color: #FFFFFF; font: inherit; font-weight: 600; display: flex; align-items: center; justify-content: center">Tiếp tục: nhập thông tin nhận hàng</button>
   </div>
 </div>
 </x-dc>

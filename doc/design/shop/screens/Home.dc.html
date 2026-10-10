@@ -32,7 +32,7 @@ a:focus-visible,button:focus-visible{outline:2px solid #1F66D1;outline-offset:2p
 
   <header class="on-brand" style="background: {{brand}}; padding: 8px 16px 14px; display: flex; flex-direction: column; gap: 10px">
     <div style="height: 44px; display: flex; align-items: center; justify-content: space-between">
-      <a href="Landing.dc.html" aria-label="Cá Về — giới thiệu" style="display: flex; align-items: center; gap: 8px; text-decoration: none; color: #FFFFFF">
+      <a href="Home.dc.html" aria-label="Cá Về — trang chủ" style="display: flex; align-items: center; gap: 8px; text-decoration: none; color: #FFFFFF">
         <span aria-hidden="true" style="width: 30px; height: 30px; border-radius: 7px; border: 1.5px dashed rgba(255,255,255,0.7); color: #FFFFFF; font-size: 8px; font-weight: 600; display: flex; align-items: center; justify-content: center">LOGO</span>
         <span style="display: flex; flex-direction: column; line-height: 1.15">
           <span style="font-size: 18px; font-weight: 600; letter-spacing: -0.01em">Cá Về</span>
@@ -54,19 +54,14 @@ a:focus-visible,button:focus-visible{outline:2px solid #1F66D1;outline-offset:2p
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#686874" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"></circle><path d="M20 20l-4.2-4.2"></path></svg>
       Tìm cá, tôm, mực, combo…
     </a>
-    <div class="row" style="display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none">
-      <a href="Main.dc.html" style="flex: none; height: 32px; padding: 0 12px; border-radius: 16px; background: rgba(255,255,255,0.14); color: #FFFFFF; font-size: 13px; font-weight: 500; text-decoration: none; display: flex; align-items: center">Cá thu</a>
-      <a href="Main.dc.html" style="flex: none; height: 32px; padding: 0 12px; border-radius: 16px; background: rgba(255,255,255,0.14); color: #FFFFFF; font-size: 13px; font-weight: 500; text-decoration: none; display: flex; align-items: center">Mực ống</a>
-      <a href="Main.dc.html" style="flex: none; height: 32px; padding: 0 12px; border-radius: 16px; background: rgba(255,255,255,0.14); color: #FFFFFF; font-size: 13px; font-weight: 500; text-decoration: none; display: flex; align-items: center">Tôm sú</a>
-      <a href="Main.dc.html" style="flex: none; height: 32px; padding: 0 12px; border-radius: 16px; background: rgba(255,255,255,0.14); color: #FFFFFF; font-size: 13px; font-weight: 500; text-decoration: none; display: flex; align-items: center">Combo lẩu</a>
-    </div>
+    <!-- Đã bỏ dải chip "Tìm nhiều" (decisions 10/10). Header H1 chỉ còn một ô tìm. -->
   </header>
 
   <section aria-label="Khuyến mãi" style="padding: 12px 16px 0">
     <div style="height: 150px; border-radius: 12px; background: #0E3A73; color: #FFFFFF; padding: 18px; box-sizing: border-box; display: flex; justify-content: space-between; align-items: stretch; overflow: hidden; position: relative">
       <div style="display: flex; flex-direction: column; gap: 6px; z-index: 1; max-width: 210px">
         <span style="font-size: 12px; font-weight: 500; color: #D6E4FA">Từ cảng về bếp nhà bạn</span>
-        <span style="font-size: 20px; font-weight: 600; line-height: 1.2; letter-spacing: -0.01em">Mua theo lô, biết rõ nguồn</span>
+        <span style="font-size: 20px; font-weight: 600; line-height: 1.2; letter-spacing: -0.01em">Mua theo lô tại cảng</span>
         <a href="Main.dc.html" style="margin-top: auto; align-self: flex-start; height: 36px; padding: 0 14px; border-radius: 8px; background: #FFFFFF; color: #0E3A73; font-size: 13px; font-weight: 600; text-decoration: none; display: flex; align-items: center">Xem hàng</a>
       </div>
       <svg width="150" height="150" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.22)" stroke-width="0.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="position: absolute; right: -24px; bottom: -28px"><path d="M5 12c2.6-3.6 6-5.5 9.5-5.5 2.7 0 4.7 1.9 6.5 5.5-1.8 3.6-3.8 5.5-6.5 5.5C11 17.5 7.6 15.6 5 12zM5 12L2 8.5M5 12l-3 3.5"></path></svg>
@@ -102,7 +97,7 @@ a:focus-visible,button:focus-visible{outline:2px solid #1F66D1;outline-offset:2p
     </div>
     <div style="background: #FFFFFF; border-radius: 10px; padding: 10px; display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 500; color: #4E4E58">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1A5BC0" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h2v2h-2zM18 18h2v2h-2z"></path></svg>
-      Thanh toán VietQR
+      Quét mã QR
     </div>
   </section>
 
@@ -186,7 +181,7 @@ a:focus-visible,button:focus-visible{outline:2px solid #1F66D1;outline-offset:2p
           </details>
           <details>
             <summary>Chính sách <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg></summary>
-            <ul><li><a href="P1-Policy.dc.html">Chính sách đổi trả và hoàn tiền</a></li><li><a href="P1-Policy.dc.html">Chính sách giao hàng</a></li><li><a href="P1-Policy.dc.html">Chính sách thanh toán</a></li><li><a href="P1-Policy.dc.html">Chính sách quyền riêng tư</a></li><li><a href="P1-Policy.dc.html">Điều khoản sử dụng</a></li><li><a href="P1-Policy.dc.html">Cơ chế giải quyết khiếu nại</a></li></ul>
+            <ul><li><a href="P1-Policy.dc.html">Chính sách đổi trả và hoàn tiền</a></li><li><a href="P1-Policy.dc.html">Chính sách giao hàng</a></li><li><a href="P1-Policy.dc.html">Chính sách thanh toán</a></li><li><a href="P1-Policy.dc.html">Chính sách quyền riêng tư</a></li><li><a href="P1-Policy.dc.html">Điều kiện giao dịch chung</a></li><li><a href="P1-Policy.dc.html">Cơ chế giải quyết khiếu nại</a></li></ul>
           </details>
           <details>
             <summary>Về Cá Về <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg></summary>
@@ -197,7 +192,7 @@ a:focus-visible,button:focus-visible{outline:2px solid #1F66D1;outline-offset:2p
             <span>Địa chỉ: [địa chỉ kinh doanh]</span>
             <span>GCN ĐKKD số [số] do [nơi cấp] cấp ngày [ngày]</span>
             <span>Email: <a href="mailto:[email]" style="color: #FFFFFF">[email]</a></span>
-            <a href="#bo-cong-thuong" style="align-self: flex-start; margin-top: 4px; width: 120px; height: 44px; border: 1.5px dashed rgba(255,255,255,0.6); border-radius: 6px; color: #FFFFFF; font-size: 10px; font-weight: 600; text-decoration: none; display: flex; align-items: center; justify-content: center; text-align: center">Logo "Đã thông báo Bộ Công Thương"</a>
+            <!-- Logo "Đã thông báo website" (D12, BR-ND-18): chỉ render khi site-info có seller.website_notice_url; chưa có link thì ẩn hẳn, không để ô giữ chỗ. -->
             <span style="color: #A9C4EE">© 2026 Cá Về</span>
           </div>
         </footer>

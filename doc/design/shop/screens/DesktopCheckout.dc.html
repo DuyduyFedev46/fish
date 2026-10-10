@@ -99,14 +99,14 @@ a:focus-visible,button:focus-visible,input:focus-visible{outline:2px solid #1F66
                   Bản đồ
                 </a>
               </div>
-              <span id="addr-hint" style="font-size: 12px; color: #686874">Thêm hẻm, tầng, toà nhà nếu có</span>
+              <span id="addr-hint" style="font-size: 12px; color: #686874">Thêm hẻm, tầng, toà nhà nếu có. Cá Về giao trong khu vực Phan Thiết.</span>
             </div>
           </section>
 
           <section style="background: #FFFFFF; border-radius: 16px; padding: 18px 24px">
             <label style="display: flex; gap: 12px; align-items: flex-start; cursor: pointer">
               <input type="checkbox" checked="{{consent}}" onChange="{{toggleConsent}}" style="flex: none; width: 20px; height: 20px; margin: 2px 0 0; accent-color: #1F66D1">
-              <span style="color: #4E4E58">Tôi đồng ý để Cá Về dùng họ tên, số điện thoại và địa chỉ này để giao đơn hàng, theo <a href="#chinh-sach-quyen-rieng-tu">chính sách quyền riêng tư</a>.</span>
+              <span style="color: #4E4E58">Tôi đồng ý để Cá Về dùng họ tên, số điện thoại và địa chỉ này để giao và hỗ trợ đơn hàng, theo <a href="DesktopPolicy.dc.html" target="_blank" rel="noopener">Chính sách quyền riêng tư<span class="sr"> (mở tab mới)</span></a>. Dữ liệu được lưu trên máy chủ đặt ở nước ngoài.</span>
             </label>
           </section>
         </form>
@@ -118,18 +118,13 @@ a:focus-visible,button:focus-visible,input:focus-visible{outline:2px solid #1F66
             <li style="display: flex; justify-content: space-between; gap: 12px"><span><span style="font-weight: 500">Cá thu cắt khúc</span><br><span class="num" style="font-size: 12px; color: #686874">1 kg × 330.000đ</span></span><span class="num">330.000đ</span></li>
             <li style="display: flex; justify-content: space-between; gap: 12px"><span><span style="font-weight: 500">Combo lẩu hải sản</span><br><span class="num" style="font-size: 12px; color: #686874">1 combo × 259.000đ</span></span><span class="num">259.000đ</span></li>
           </ul>
-          <div style="display: flex; justify-content: space-between; gap: 12px; color: #4E4E58; border-top: 1px solid #E4E4E9; padding-top: 12px"><span>Phí giao</span><span style="text-align: right">Báo khi xác nhận đơn</span></div>
-          <div style="display: flex; justify-content: space-between; align-items: baseline">
+          <div style="display: flex; justify-content: space-between; align-items: baseline; border-top: 1px solid #E4E4E9; padding-top: 12px">
             <span style="font-weight: 600">Tổng tiền hàng</span>
             <span class="num" style="font-size: 24px; font-weight: 600; color: #1A5BC0; letter-spacing: -0.01em">867.000đ</span>
           </div>
-          <sc-if value="{{consent}}" hint-placeholder-val="{{ true }}">
-            <a href="DesktopPayment.dc.html" class="btn btn-p" style="margin-top: 4px">Đặt hàng</a>
-          </sc-if>
-          <sc-if value="{{noConsent}}" hint-placeholder-val="{{ false }}">
-            <div aria-disabled="true" style="margin-top: 4px; height: 48px; border-radius: 24px; background: #EBEBEF; color: #686874; font-size: 15px; font-weight: 600; display: flex; align-items: center; justify-content: center">Đặt hàng</div>
-            <span style="font-size: 12px; font-weight: 500; color: #4E4E58; text-align: center">Đánh dấu đồng ý ở bên trái để đặt hàng.</span>
-          </sc-if>
+          <p style="margin: 0; font-size: 13px; color: #4E4E58">Đã gồm giao hàng. Bạn trả một lần, không trả thêm khi nhận hàng.</p>
+          <!-- Q-UX-4: nút luôn bấm được; chưa tick hoặc thiếu ô thì sang trạng thái DesktopInvalid, không gọi API. -->
+          <a href="{{orderHref}}" class="btn btn-p" style="margin-top: 4px">Đặt hàng</a>
         </aside>
       </div>
     </div>
@@ -151,13 +146,13 @@ a:focus-visible,button:focus-visible,input:focus-visible{outline:2px solid #1F66
 class Component extends DCLogic {
   constructor(props) {
     super(props);
-    this.state = { consent: true };
+    this.state = { consent: false };
   }
   renderVals() {
     const consent = this.state.consent;
     return {
       consent,
-      noConsent: !consent,
+      orderHref: consent ? 'DesktopPayment.dc.html' : 'DesktopInvalid.dc.html',
       toggleConsent: () => this.setState({ consent: !consent })
     };
   }

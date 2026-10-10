@@ -159,7 +159,7 @@ a:focus-visible,button:focus-visible{outline:2px solid #1F66D1;outline-offset:2p
           <li><a href="DesktopPolicy.dc.html">Chính sách giao hàng</a></li>
           <li><a href="DesktopPolicy.dc.html">Chính sách thanh toán</a></li>
           <li><a href="DesktopPolicy.dc.html">Chính sách quyền riêng tư</a></li>
-          <li><a href="DesktopPolicy.dc.html">Điều khoản sử dụng</a></li>
+          <li><a href="DesktopPolicy.dc.html">Điều kiện giao dịch chung</a></li>
           <li><a href="DesktopPolicy.dc.html">Cơ chế giải quyết khiếu nại</a></li>
         </ul></nav>
         <nav aria-labelledby="f-ve"><h3 id="f-ve">Về Cá Về</h3><ul>
@@ -174,7 +174,7 @@ a:focus-visible,button:focus-visible{outline:2px solid #1F66D1;outline-offset:2p
             <span>[Tên doanh nghiệp] · MST [mã số thuế] · Địa chỉ: [địa chỉ kinh doanh]</span>
             <span>GCN ĐKKD số [số] do [nơi cấp] cấp ngày [ngày] · © 2026 Cá Về</span>
           </div>
-          <a href="#bo-cong-thuong" style="flex: none; width: 132px; height: 48px; border: 1.5px dashed rgba(255,255,255,0.6); border-radius: 6px; color: #FFFFFF; font-size: 10px; font-weight: 600; text-decoration: none; display: flex; align-items: center; justify-content: center; text-align: center">Logo "Đã thông báo Bộ Công Thương"</a>
+          <!-- Logo "Đã thông báo website" (D12, BR-ND-18): chỉ render khi site-info có seller.website_notice_url; chưa có link thì ẩn hẳn, không để ô giữ chỗ. -->
         </div>
       </div>
     </footer>
@@ -186,9 +186,9 @@ a:focus-visible,button:focus-visible{outline:2px solid #1F66D1;outline-offset:2p
       <tr><td>Hotline · Zalo · Email</td><td><code>tel:[hotline]</code> · <code>https://zalo.me/[số]</code> · <code>mailto:[email]</code></td><td>Zalo mở tab mới, <code>rel="noopener"</code>.</td></tr>
       <tr><td>Hàng đang có · Combo nấu nhanh</td><td><code>/shop</code> · <code>/shop?type=combo</code></td><td></td></tr>
       <tr><td>Cách mua hàng · Tra cứu đơn</td><td><code>/trang/cach-mua-hang</code> · <code>/shop/orders</code></td><td></td></tr>
-      <tr><td>6 link chính sách</td><td><code>/trang/doi-tra</code> · <code>giao-hang</code> · <code>thanh-toan</code> · <code>quyen-rieng-tu</code> · <code>dieu-khoan</code> · <code>khieu-nai</code></td><td>Bắt buộc với website TMĐT bán hàng (go-live pháp lý mục 2, 3, 9). Tên "Chính sách đổi trả và hoàn tiền" là tên pháp lý bắt buộc: chữ "hoàn tiền" chỉ dùng ở tên trang này, không dùng ở màn đơn/thanh toán. "Cơ chế giải quyết khiếu nại" là kênh tiếp nhận khiếu nại công khai. Nội dung chờ <code>legal-vn</code>.</td></tr>
+      <tr><td>6 link chính sách</td><td><code>/trang/doi-tra</code> · <code>giao-hang</code> · <code>thanh-toan</code> · <code>quyen-rieng-tu</code> · <code>dieu-khoan</code> · <code>khieu-nai</code></td><td>Danh sách và tên lấy từ <code>GET /api/public/content/footer-links/</code>; trang <code>terms</code> tên "Điều kiện giao dịch chung" (không ghi "Điều khoản sử dụng"). Bắt buộc với website TMĐT bán hàng (go-live pháp lý mục 2, 3, 9). Tên "Chính sách đổi trả và hoàn tiền" là tên pháp lý bắt buộc: chữ "hoàn tiền" chỉ dùng ở tên trang này, không dùng ở màn đơn/thanh toán. "Cơ chế giải quyết khiếu nại" là kênh tiếp nhận khiếu nại công khai. Nội dung chờ <code>legal-vn</code>.</td></tr>
       <tr><td>Giới thiệu · Góc bếp · Liên hệ</td><td><code>/gioi-thieu</code> · <code>/bai-viet</code> · <code>/trang/lien-he</code></td><td></td></tr>
-      <tr><td>Logo Bộ Công Thương</td><td><code>[link xác nhận online.gov.vn]</code></td><td>Chỉ gắn sau khi đã thông báo website. Mở tab mới.</td></tr>
+      <tr><td>Logo Bộ Công Thương</td><td><code>[link xác nhận online.gov.vn]</code></td><td>Chỉ gắn khi site-info có link xác nhận; chưa có thì ẩn hẳn khối, không để ô giữ chỗ (D12). Mở tab mới.</td></tr>
       <tr><td>Tên DN, MST, địa chỉ, GCN</td><td>không link</td><td>Thông tin bắt buộc hiển thị ở chân trang.</td></tr>
     </tbody>
   </table>

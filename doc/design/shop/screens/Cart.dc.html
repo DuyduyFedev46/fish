@@ -81,7 +81,6 @@ a:focus-visible,button:focus-visible{outline:2px solid #1F66D1;outline-offset:2p
   <sc-if value="{{hasItems}}" hint-placeholder-val="{{ true }}">
     <div style="position: absolute; left: 0; right: 0; bottom: 0; background: #FFFFFF; box-shadow: 0 -4px 16px rgba(23,23,28,0.08); padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 8px">
       <div style="display: flex; justify-content: space-between; color: #4E4E58"><span>Tạm tính</span><span class="num">{{total}}</span></div>
-      <div style="display: flex; justify-content: space-between; color: #4E4E58"><span>Phí giao</span><span>Báo khi xác nhận đơn</span></div>
       <div style="display: flex; justify-content: space-between; align-items: center; height: 24px; color: #4E4E58">
         <span>Mã giảm giá</span>
         <a href="B5-VoucherSheet.dc.html" style="height: 44px; margin-right: -8px; padding: 0 8px; display: flex; align-items: center; gap: 2px; font-weight: 600; text-decoration: none">Nhập mã<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg></a>
@@ -90,6 +89,7 @@ a:focus-visible,button:focus-visible{outline:2px solid #1F66D1;outline-offset:2p
         <span style="font-weight: 600; padding-top: 6px">Tổng tiền hàng</span>
         <span class="num" style="font-size: 20px; font-weight: 600; color: #1A5BC0; padding-top: 6px">{{total}}</span>
       </div>
+      <p style="margin: 0; font-size: 13px; color: #4E4E58">Đã gồm giao hàng. Bạn trả một lần, không trả thêm khi nhận hàng.</p>
       <a href="Checkout.dc.html" style="margin-top: 4px; height: 48px; border-radius: 24px; background: {{brand}}; color: #FFFFFF; font-weight: 600; text-decoration: none; display: flex; align-items: center; justify-content: center">Tiếp tục: nhập thông tin nhận hàng</a>
     </div>
   </sc-if>

@@ -35,9 +35,11 @@ a:focus-visible,button:focus-visible{outline:2px solid #1F66D1;outline-offset:2p
     <div style="flex: none; padding: 12px 16px 8px; display: flex; flex-direction: column; gap: 8px; position: relative; z-index: 2; background: #FFFFFF">
       <label style="display: flex; align-items: center; gap: 8px; height: 44px; padding: 0 12px; border: 1px solid #1F66D1; box-shadow: 0 0 0 3px #EBF2FE; border-radius: 8px">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#686874" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"></circle><path d="M20 20l-4.2-4.2"></path></svg>
-        <input type="search" aria-label="Tìm địa chỉ" value="12 đường số 5" role="combobox" aria-expanded="true" aria-controls="goi-y" style="flex: 1; min-width: 0; border: 0; outline: none; font: inherit; font-size: 16px">
+        <input type="search" aria-label="Tìm địa chỉ" aria-describedby="map-notice" value="12 đường số 5" role="combobox" aria-expanded="true" aria-controls="goi-y" style="flex: 1; min-width: 0; border: 0; outline: none; font: inherit; font-size: 16px">
         <button type="button" aria-label="Xoá chữ" style="width: 32px; height: 32px; border: 0; background: transparent; display: flex; align-items: center; justify-content: center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#686874" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg></button>
       </label>
+      <!-- BR-BH-29, 05-phap-ly §1.2b: hiện ngay khi sheet mở, trước khi script Google nạp xong. -->
+      <p id="map-notice" style="margin: 0; font-size: 12px; color: #4E4E58">Bản đồ do Google cung cấp. Chữ bạn gõ và vị trí bạn ghim sẽ được gửi tới Google. Không muốn dùng, bạn đóng lại và gõ địa chỉ trực tiếp.</p>
       <ul id="goi-y" role="listbox" aria-label="Gợi ý địa chỉ" style="list-style: none; margin: 0; padding: 4px 0; border: 1px solid #E4E4E9; border-radius: 10px; box-shadow: 0 8px 24px rgba(23,23,28,0.12); background: #FFFFFF">
         <li role="option" aria-selected="true" style="display: flex; gap: 10px; padding: 10px 12px; background: #EBF2FE">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1A5BC0" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex: none; margin-top: 2px"><path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z"></path><circle cx="12" cy="10" r="2.5"></circle></svg>
@@ -50,7 +52,7 @@ a:focus-visible,button:focus-visible{outline:2px solid #1F66D1;outline-offset:2p
       </ul>
     </div>
 
-    <div aria-label="Bản đồ, kéo để chỉnh ghim" role="application" style="flex: 1; position: relative; background: #E6ECF2; overflow: hidden">
+    <div aria-label="Bản đồ, kéo để chỉnh ghim" style="flex: 1; position: relative; background: #E6ECF2; overflow: hidden">
       <div aria-hidden="true" style="position: absolute; left: -20px; right: -20px; top: 120px; height: 14px; background: #FFFFFF; transform: rotate(-8deg)"></div>
       <div aria-hidden="true" style="position: absolute; left: 150px; top: -20px; bottom: -20px; width: 12px; background: #FFFFFF; transform: rotate(6deg)"></div>
       <div aria-hidden="true" style="position: absolute; left: -20px; right: -20px; top: 230px; height: 8px; background: #FFFFFF"></div>
@@ -62,11 +64,7 @@ a:focus-visible,button:focus-visible{outline:2px solid #1F66D1;outline-offset:2p
         <span style="background: #17171C; color: #FFFFFF; font-size: 12px; font-weight: 500; padding: 4px 8px; border-radius: 6px; margin-bottom: 4px; white-space: nowrap">Giao tới đây</span>
         <svg width="36" height="44" viewBox="0 0 24 30" aria-hidden="true"><path d="M12 29s-10-9-10-16a10 10 0 0 1 20 0c0 7-10 16-10 16z" fill="#1F66D1"></path><circle cx="12" cy="12" r="4" fill="#FFFFFF"></circle></svg>
       </div>
-
-      <button type="button" style="position: absolute; right: 12px; top: 12px; height: 44px; padding: 0 12px; border: 0; border-radius: 22px; background: #FFFFFF; box-shadow: 0 2px 8px rgba(23,23,28,0.18); font: inherit; font-weight: 500; display: flex; align-items: center; gap: 6px; cursor: pointer">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1A5BC0" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="3"></circle><path d="M12 2v3M12 19v3M2 12h3M19 12h3"></path><circle cx="12" cy="12" r="7"></circle></svg>
-        Vị trí của tôi
-      </button>
+      <!-- Không có nút "Vị trí của tôi", không gọi Geolocation (S-07, BR-BH-29). -->
     </div>
 
     <div style="flex: none; padding: 14px 16px 16px; border-top: 1px solid #E4E4E9; display: flex; flex-direction: column; gap: 10px; background: #FFFFFF">

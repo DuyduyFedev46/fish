@@ -138,11 +138,15 @@ th{font-weight:500}
         <aside aria-labelledby="h-tom" style="flex: 1 1 300px; position: sticky; top: 24px; align-self: flex-start; background: #FFFFFF; border-radius: 16px; padding: 20px; display: flex; flex-direction: column; gap: 12px">
           <h2 id="h-tom" style="margin: 0; font-size: 17px; font-weight: 600">Tóm tắt đơn</h2>
           <div style="display: flex; justify-content: space-between; color: #4E4E58"><span>Tạm tính (2 món còn hàng)</span><span class="num">608.000đ</span></div>
-          <div style="display: flex; justify-content: space-between; gap: 12px; color: #4E4E58"><span>Phí giao</span><span style="text-align: right">Báo khi xác nhận đơn</span></div>
           <div style="display: flex; justify-content: space-between; align-items: baseline; border-top: 1px solid #E4E4E9; padding-top: 12px">
             <span style="font-weight: 600">Tổng tiền hàng</span>
             <span class="num" style="font-size: 24px; font-weight: 600; color: #1A5BC0; letter-spacing: -0.01em">608.000đ</span>
           </div>
+          <p style="margin: 0; font-size: 13px; color: #4E4E58">Đã gồm giao hàng. Bạn trả một lần, không trả thêm khi nhận hàng.</p>
+          <!-- UX chốt 11/10 (SHOP-2-06 AC4): còn món hết thì nút vẫn bấm được nhưng không sang Checkout; bấm thì hiện dòng dưới (role=alert) và dời tiêu điểm tới "Bỏ khỏi giỏ" của món hết đầu tiên. -->
+          <sc-if value="{{showOut}}" hint-placeholder-val="{{ true }}">
+            <p id="cart-blocked" role="alert" style="margin: 0; font-size: 13px; font-weight: 500; color: #C0312B">Bỏ món đã hết để đặt hàng.</p>
+          </sc-if>
           <a href="DesktopCheckout.dc.html" class="btn btn-p" style="margin-top: 4px">{{ctaText}}</a>
         </aside>
       </div>
@@ -172,7 +176,7 @@ class Component extends DCLogic {
     return {
       showOut: out,
       count: out ? 3 : 2,
-      ctaText: out ? 'Tiếp tục với 2 món còn hàng' : 'Tiếp tục',
+      ctaText: 'Tiếp tục',
       liveText: this.state.live,
       removeOut: () => this.setState({ showOut: false, live: 'Đã bỏ Cá bớp cắt lát khỏi giỏ' })
     };

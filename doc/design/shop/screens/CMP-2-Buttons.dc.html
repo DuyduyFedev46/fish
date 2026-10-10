@@ -285,13 +285,7 @@ a{color:#1A5BC0}
         </div>
       </div>
       <div style="display: flex; flex-direction: column; gap: 10px">
-        <span class="cap">Chip trên nền brand · cao 32</span>
-        <div class="row" style="padding: 16px; border-radius: 10px; background: #1F66D1">
-          <div class="cell"><span class="na" style="color: #D6E4FA">Mặc định</span><span class="bchip">Cá thu</span></div>
-          <div class="cell"><span class="na" style="color: #D6E4FA">Hover</span><span class="bchip" style="background: rgba(255,255,255,0.24)">Mực ống</span></div>
-          <div class="cell"><span class="na" style="color: #D6E4FA">Nhấn</span><span class="bchip" style="background: rgba(255,255,255,0.24); transform: scale(.97)">Tôm sú</span></div>
-          <div class="cell"><span class="na" style="color: #D6E4FA">Focus</span><span class="bchip fvw">Combo lẩu</span></div>
-        </div>
+        <!-- Đã bỏ biến thể "Chip trên nền brand" (dải "Tìm nhiều", decisions 10/10). Không code biến thể này. -->
         <span class="cap">Chip gợi ý · Tìm gần đây (cao 40, vùng chạm 44)</span>
         <div class="row">
           <div class="cell"><span class="na">Mặc định</span><span class="chip" style="color: #17171C"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#686874" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7M3 4v4h4M12 8v4l3 2"></path></svg>cá thu</span></div>
@@ -306,7 +300,7 @@ a{color:#1A5BC0}
         <tr><td>Chip lọc</td><td>cao <code>40</code> (điện thoại, thêm vùng chạm tới 44 bằng margin trong) · <code>36</code> (máy tính, chip sắp xếp) · padding <code>0 14</code> · bo <code>999</code> · chữ <code>label 13/500</code> · khe <code>8</code></td></tr>
         <tr><td>Chưa chọn</td><td>nền <code>#FFFFFF</code>, viền 1 <code>border-strong #D4D4DB</code>, chữ <code>ink-2 #4E4E58</code> · hover nền <code>surface-2 #F4F4F6</code>, viền <code>border-input #8C8C98</code>, chữ <code>ink</code></td></tr>
         <tr><td>Đang chọn</td><td>nền + viền <code>accent #1F66D1</code>, chữ <code>#FFFFFF</code>. Là <code>&lt;button aria-pressed="true"&gt;</code> trong <code>&lt;nav aria-label="Danh mục"&gt;</code>; chỉ một chip bật một lúc.</td></tr>
-        <tr><td>Chip trên brand</td><td>cao <code>32</code>, padding <code>0 12</code>, nền <code>rgba(255,255,255,.14)</code>, chữ trắng 13/500 · hover <code>.24</code> · focus outline trắng offset 2. Là link, không có aria-pressed.</td></tr>
+        <tr><td>Chip trên brand</td><td>Đã bỏ (không có dải "Tìm nhiều", decisions 10/10).</td></tr>
         <tr><td>Chip gợi ý</td><td>như chip chưa chọn nhưng chữ <code>ink</code>, icon đồng hồ 14 <code>ink-3</code>, khe 6. Là link tới <code>/shop?q=…</code>.</td></tr>
         <tr><td>Lọc dạng danh sách (máy tính)</td><td>dòng cao <code>44</code>, bo <code>8</code>, padding <code>0 10</code> · chọn: nền <code>accent-soft</code>, chữ <code>accent-text</code> 600, đếm nền <code>accent</code> · hover nền <code>surface-2</code></td></tr>
         <tr><td>Focus</td><td>outline 2 <code>#1F66D1</code> offset 2 (trên brand: trắng).</td></tr>
