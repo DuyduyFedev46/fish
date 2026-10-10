@@ -505,3 +505,16 @@ Theo `02c-quyet-dinh-08-10.md` §G.3 và điều kiện đóng F1 ở `03b-revie
 - Mock `gate_capability: "view_sales_invoices"` khiến dòng Hoá đơn bán mờ khi tắt V1 (khớp BE). Phiên đăng nhập mock không đổi quyền theo việc đã bật/tắt (ghi chú cũ của `mock.ts`).
 
 **Kiểm chứng Lô 6 FE:** `tsc --noEmit` sạch; `vitest` 105 file / 1285 test PASS; build thật (`USE_MOCK=0`) sạch, `check-no-mock` XANH (32 file mock, 208 chuỗi seed, 258 file), `check-ai-chunks` XANH (48 màn + 2 layout), grep `cave_erp_mock` trong `out/` rỗng; e2e mock `ed_batch14_permissions` 158/158 PASS (AI tắt và bật), `standard_names_all_routes` 11/11 PASS (AI tắt và bật); `check_naming.py` OK.
+
+## Lô 7 BE (10/10) — be-dev, nhánh `feat/pv7-be` (từ `feat/pv6-cum` 57641b1)
+
+**Đã làm (PV-14 BE, PV-14-AC5 chỉ cần test):**
+1. `data_scopes/services.py::describe_own_data_scopes(user, *, erp_access=None)` theo 02b §6.1.3: không vào được ERP (D-3) thì 8 dòng `none`; superuser/Chủ rộng nhất; đối tượng thiếu mọi permission cổng thì `none`; `confirmation` gọi thẳng `confirmation_scope_value`; `audit_log` là `all` khi có quyền; còn lại lấy `resolve_data_scopes`. D2 có bảng chữ riêng (`INVOICE_VALUE_LABELS`).
+2. `auth/services.py::describe_user` thêm khoá `data_scopes`. Để giữ giới hạn truy vấn, `describe_user` tính `has_erp_access` một lần và truyền vào `home_for(..., erp_access=)` (tham số mới, mặc định `None` giữ hành vi cũ) và vào hàm mới.
+3. Test mới `auth/tests/test_me_data_scopes.py` (15 ca, token thật); `test_s6_me.py`, `test_s47_me_labels.py` chỉ thêm `data_scopes` vào tập khoá.
+
+**Số truy vấn `/me` (NV kho, token thật):** gốc 6, sau Lô 7 là 9 (đúng +3, là 3 truy vấn của resolver). Hằng `BASELINE_QUERIES = 6` trong test.
+
+**Lệch contract:** không. **Migration:** không (`makemigrations --check` sạch). Không đụng file ngoài danh sách §6.1.5.
+**Nợ:** không. `/me` chỉ chứa mã và nhãn cố định, không dữ liệu khách, không giá vốn (test `test_pv14_no_leak_...`).
+

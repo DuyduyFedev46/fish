@@ -28,3 +28,4 @@
 - QA lần 2: mật khẩu mới trùng mật khẩu hiện tại → 400 `AUTH_WEAK_PASSWORD` "Mật khẩu mới phải khác mật khẩu hiện tại." (B4). `middleware.AdminMustChangePasswordMiddleware` chặn Django Admin (403 + hướng dẫn đặt mật khẩu qua ERP) khi còn cờ; login/logout Admin vẫn mở; superuser không bị ép (B3). Test: `tests/test_qa2_fixes.py`.
 - `tests/test_s6_me.py`, `tests/test_s46_logout_password.py`, `tests/test_s47_me_labels.py`,
   `tests/test_s48_must_change_password.py`.
+- Lô 7 (PV-14): `/api/auth/me/` thêm khoá `data_scopes` (8 dòng `key, label, value, value_label, via_group`, do `data_scopes.services.describe_own_data_scopes`); người không nhóm thấy `none` cả 8 dòng. Test: `tests/test_me_data_scopes.py`.

@@ -18,6 +18,8 @@ from apps.common.api import VIEW_COSTPRICE_PERM
 from apps.common.audit import record_audit
 from apps.common.exceptions import BusinessError
 
+from apps.accounts.data_scopes.services import describe_own_data_scopes
+
 from .authentication import has_erp_access, must_change_password
 
 VIEW_PROFITREPORT_PERM = "reports.view_profitreport"
@@ -89,11 +91,13 @@ def sorted_groups(names):
     return sorted(names, key=lambda n: (rank.get(n, len(ROLE_ORDER)), n))
 
 
-def home_for(user, groups) -> str:
+def home_for(user, groups, *, erp_access=None) -> str:
     """Trang mặc định: không có quyền vào ERP (cùng luật `has_erp_access` với cổng D-3) → no-role;
     superuser → dashboard (Duy 08/10 câu 1); chỉ delivery_staff → my-deliveries; chỉ customer_service →
     confirmation-queue; còn lại → dashboard."""
-    if not has_erp_access(user):
+    if erp_access is None:
+        erp_access = has_erp_access(user)
+    if not erp_access:
         return HOME_NO_ROLE
     if user.is_superuser:
         return HOME_DASHBOARD
@@ -110,6 +114,7 @@ def describe_user(user) -> dict:
     permissions = user.get_all_permissions()
     ai_on = ai_features_enabled()
     profile = getattr(user, "staff_profile", None)  # RelatedObjectDoesNotExist là AttributeError
+    erp_access = has_erp_access(user)
     return {
         "id": user.pk,
         "username": user.get_username(),
@@ -121,7 +126,7 @@ def describe_user(user) -> dict:
         "permissions": sorted(permissions),
         "can_view_cost": user.has_perm(VIEW_COSTPRICE_PERM),
         "can_view_profit": user.has_perm(VIEW_PROFITREPORT_PERM),
-        "home": home_for(user, groups),
+        "home": home_for(user, groups, erp_access=erp_access),
         # S47 — chỉ THÊM key, không đổi key S6.
         "group_labels": [{"code": g, "label": GROUP_LABELS.get(g, g)} for g in groups],
         "capabilities": [
@@ -135,6 +140,8 @@ def describe_user(user) -> dict:
         "must_change_password": must_change_password(user),
         # PV-14 (review 07/10) + Duy 08/10 câu 1: FE phân biệt superuser không nhóm.
         "is_superuser": bool(user.is_superuser),
+        # PV-14 (Lô 7): phạm vi dữ liệu của chính người này, 8 dòng; chỉ mã và nhãn cố định.
+        "data_scopes": describe_own_data_scopes(user, erp_access=erp_access),
     }
 
 

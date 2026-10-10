@@ -122,6 +122,70 @@ def describe_data_scopes(group, held, stored) -> list:
     return [_row(group, obj, held, stored) for obj in catalog.OBJECTS]
 
 
+# --- Lô 7 (PV-14): phạm vi của CHÍNH người đăng nhập, cho `GET /api/auth/me/` (02b §6.1.3) -----------------------------
+
+NO_VIEW = "none"
+NO_VIEW_LABEL = "Không xem"
+AUDIT_ALL_LABEL = "Tất cả"
+# D2 có bảng chữ riêng (nhãn catalog của D1 nói về "đơn", không nói về "hoá đơn").
+INVOICE_VALUE_LABELS = {
+    "all": "Hoá đơn của tất cả đơn",
+    "assigned_deliveries": "Hoá đơn của đơn có phiếu giao gán cho tôi",
+    "assigned_or_confirmation": "Hoá đơn của đơn có phiếu gán cho tôi hoặc trong phạm vi gọi xác nhận",
+}
+
+
+def _value_label(obj, value) -> str:
+    if value == NO_VIEW:
+        return NO_VIEW_LABEL
+    if obj.key == "invoices":
+        return INVOICE_VALUE_LABELS.get(value, value)
+    if obj.key == "audit_log":
+        return AUDIT_ALL_LABEL
+    for option in catalog.ranked_options(obj):
+        if option.value == value:
+            return option.label
+    return value
+
+
+def _own_row(obj, value, via_group) -> dict:
+    if value == NO_VIEW:
+        via_group = None
+    return {"key": obj.key, "label": obj.label, "value": value, "value_label": _value_label(obj, value),
+            "via_group": via_group}
+
+
+def describe_own_data_scopes(user, *, erp_access=None) -> list:
+    """8 dòng D1..D8 cho `user` (02b §6.1.3). Giá trị là đúng giá trị mà hàm phạm vi của từng view đọc:
+    không chép lại luật, chỉ gọi `resolve_data_scopes` và `confirmation_scope_value`.
+
+    Người không vào được ERP (D-3) thấy `none` ở cả 8 dòng, vì mọi API ERP đều trả 403 cho họ. Đối tượng mà người đó không có
+    permission cổng nào (kể cả quyền gán riêng) cũng `none`, khớp 403 ở Tầng 1. Chỉ mã và nhãn cố định, không dữ liệu khách.
+    `erp_access`: kết quả `has_erp_access(user)` nếu nơi gọi đã có, để khỏi hỏi DB lần nữa."""
+    from apps.accounts.auth.authentication import has_erp_access
+
+    if erp_access is None:
+        erp_access = has_erp_access(user)
+    if not erp_access:
+        return [_own_row(obj, NO_VIEW, None) for obj in catalog.OBJECTS]
+    resolved = resolve_data_scopes(user)
+    rows = []
+    for obj in catalog.OBJECTS:
+        via_group = resolved[obj.key].via_group
+        full_access = user.is_superuser or via_group == roles.OWNER
+        if not full_access and not any(user.has_perm(perm) for perm in obj.gate_perms):
+            rows.append(_own_row(obj, NO_VIEW, None))
+        elif obj.key == "confirmation":
+            from apps.delivery.confirmation.scope import confirmation_scope_value
+
+            rows.append(_own_row(obj, confirmation_scope_value(user), via_group))
+        elif obj.key == "audit_log":
+            rows.append(_own_row(obj, "all", via_group))
+        else:
+            rows.append(_own_row(obj, resolved[obj.key].value, via_group))
+    return rows
+
+
 # --- Lô 5: kiểm, mở rộng dữ liệu khách, xem trước, áp (PV-08, PV-09; 02b §2.3–§2.5) --------------------------------
 
 SCOPE_OBJECT_UNKNOWN = "SCOPE_OBJECT_UNKNOWN"

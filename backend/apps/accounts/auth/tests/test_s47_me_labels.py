@@ -166,7 +166,7 @@ class S47MeLabelsTests(TestCase):
     # --- contract: chỉ THÊM key -------------------------------------------------------
     def test_s47_giu_key_s6_them_group_labels_capabilities(self):
         body = client_for(make_user("loc", roles.OWNER)).get(URL).json()
-        self.assertEqual(set(body), S6_KEYS | {"group_labels", "capabilities", "must_change_password", "ai_features_enabled", "is_superuser"})  # + S48
+        self.assertEqual(set(body), S6_KEYS | {"group_labels", "capabilities", "must_change_password", "ai_features_enabled", "is_superuser", "data_scopes"})  # + S48
 
     def test_s47_chua_dang_nhap_401(self):
         self.assertEqual(APIClient().get(URL).status_code, 401)
