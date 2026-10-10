@@ -86,6 +86,7 @@ class AiRowsHiddenWhenAiOffTests(TestCase):
         record_audit("ai_config_update", actor=self.owner)  # Chủ đổi cấu hình
         record_audit("ai_config_kill", actor=self.owner)
         record_audit("ai_policy_update", actor=self.owner)
+        record_audit("downgrade_x", actor=self.owner)  # việc AI xếp lịch bị hạ về đề xuất
 
     def _get(self, **params):
         return client_for(self.owner).get(URL, params).json()
@@ -96,19 +97,22 @@ class AiRowsHiddenWhenAiOffTests(TestCase):
     @override_settings(AI_ENABLED=False)
     def test_ai_off_hides_only_rows_made_by_ai(self):
         body = self._get()
-        self.assertEqual(body["count"], 22 + 6)
+        # Duy 08/10 câu 2: ẩn cả ai_config_*, ai_policy_*, downgrade_*.
+        self.assertEqual(body["count"], 22 + 3)
         self.assertEqual(len(body["results"]), 20)
         second = self._get(page=2)
-        self.assertEqual(len(second["results"]), 8)
+        self.assertEqual(len(second["results"]), 5)
         shown = self._actions(body) + self._actions(second)
-        for hidden in ("propose_x", "execute_x", "escalate_overdue_x"):
+        for hidden in ("propose_x", "execute_x", "escalate_overdue_x",
+                       "ai_config_update", "ai_config_kill", "ai_policy_update", "downgrade_x"):
             self.assertNotIn(hidden, shown)
-        for kept in ("confirm_x", "reject_x", "ai_config_update", "ai_config_kill", "ai_policy_update"):
+        self.assertEqual(self._get(action="ai_config_update")["count"], 0)
+        for kept in ("confirm_x", "reject_x"):
             self.assertIn(kept, shown)
         self.assertIn("người duyệt thực thi", [r["note"] for r in body["results"] + second["results"]])
         self.assertEqual(self._get(actor_kind="ai")["count"], 0)
 
     @override_settings(AI_ENABLED=True)
     def test_ai_on_shows_all_rows(self):
-        self.assertEqual(self._get()["count"], 22 + 9)
+        self.assertEqual(self._get()["count"], 22 + 10)
         self.assertEqual(self._get(actor_kind="ai")["count"], 2)

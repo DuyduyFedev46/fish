@@ -12,17 +12,20 @@ export const GROUP_LABEL: Record<string, string> = {
   [ROLE.manager]: "Quản lý",
   [ROLE.warehouseStaff]: "Nhân viên kho",
   [ROLE.deliveryStaff]: "Nhân viên giao",
-  [ROLE.customerService]: "CSKH",
+  [ROLE.customerService]: "Nhân viên gọi xác nhận", // Duy 08/10 câu 13: bỏ chữ "CSKH" trên giao diện (mã nhóm giữ)
 };
 
 /** Một dòng mô tả việc chính của nhóm — chỉ để Chủ chọn nhóm cho đúng, không phải luật (luật ở BE). */
 export const GROUP_HINT: Record<string, string> = {
   [ROLE.owner]: "Toàn quyền: tiền, giá vốn, lãi lỗ, nhân viên",
-  [ROLE.manager]: "Duyệt vận hành: mở bán lô, huỷ đơn, tạo phiếu hoàn, kiểm kê",
+  [ROLE.manager]: "Duyệt vận hành: mở bán lô, huỷ đơn, tạo phiếu hoàn tiền, kiểm kê",
   [ROLE.warehouseStaff]: "Nhập lô, soạn hàng, kiểm kê",
   [ROLE.deliveryStaff]: "Nhận và giao phiếu được gán",
   [ROLE.customerService]: "Gọi xác nhận đơn, đổi thông tin nhận",
 };
+
+/** Nhãn của superuser không thuộc nhóm nào (Duy 08/10 câu 1): vào ERP như Chủ. */
+export const SUPERUSER_LABEL = "Quản trị hệ thống";
 
 export function groupLabel(code: string): string {
   return GROUP_LABEL[code] || code;

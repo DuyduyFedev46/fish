@@ -9,7 +9,7 @@ from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from apps.ai.declare import AiDeclarable
+from apps.ai.declare import AiDeclarable, AiMeta
 from apps.common.api import (
     VIEW_COSTPRICE_PERM, BusinessModelPermissions, NoStoreMixin, StandardPagination, require_perm,
 )
@@ -17,6 +17,7 @@ from apps.sales.models import PaymentTransaction, SalesInvoice
 from apps.sales.utils import money_str
 
 from . import services
+from .late_serializers import RecordLatePaymentInput
 from .invoice_list import build_totals, filter_invoices, scope_invoices_for, with_cogs
 from .serializers import PaymentTransactionSerializer, SalesInvoiceListSerializer, SalesInvoiceSerializer
 
@@ -28,7 +29,7 @@ class SalesInvoiceViewSet(NoStoreMixin, viewsets.ReadOnlyModelViewSet):
     R13: `GET /api/sales/invoices/?status=ISSUED[,CANCELLED]&date_from=&date_to=&q=&page=` (20 dòng/trang) trả
     `{"count","next","previous","results":[…],"totals":{"amount","gross_profit"}}`. `cogs`, `gross_profit` (dòng và
     tổng) chỉ khi có `view_costprice`. Có tên khách nên mọi response `no-store`; hoá đơn lọc theo phạm vi dòng.
-    `customer_name` chỉ có giá trị khi người gọi có `sales.view_customer_list` (M1); người khác nhận null.
+    `customer_name` chỉ có giá trị khi người gọi có V2 `sales.view_order_customer_info` (PV-07) và đơn còn trong cửa sổ; không thì null kèm `customer_hidden_reason`.
     `GET …/{id}/` giữ serializer cũ.
     """
 
@@ -108,3 +109,26 @@ class PaymentTransactionViewSet(AiDeclarable, viewsets.ReadOnlyModelViewSet):
             actor=request.user,
         )
         return Response(result)
+
+    @action(
+        detail=False, methods=["post"], url_path="record-late",
+        required_perms=("sales.confirm_payment_manual",),
+        input_serializer=RecordLatePaymentInput,
+        ai=AiMeta(keywords=("ghi tiền về muộn",), max_level="C"),
+    )
+    def record_late(self, request):
+        """
+        Ghi tay khoản tiền về muộn khi webhook/IPN không báo (BR-TT-18, #15): 201 dòng mới, 200 `duplicate: true`.
+        Không đổi đơn, kho hay hoá đơn; không có ô ghi chú.
+        """
+        payload = RecordLatePaymentInput(data=request.data if hasattr(request.data, "get") else {})
+        payload.is_valid(raise_exception=True)
+        data = payload.validated_data
+        payment, duplicate = services.record_late_payment(
+            bank_txn_id=data.get("bank_txn_id"), amount=data.get("amount"), received_at=data.get("received_at"),
+            order_code=data.get("order_code"), actor=request.user,
+            acknowledge_possible_duplicate=data.get("acknowledge_possible_duplicate", False),
+        )
+        payment = self.get_queryset().get(pk=payment.pk)
+        body = {"duplicate": duplicate, "payment": self.get_serializer(payment).data}
+        return Response(body, status=200 if duplicate else 201)

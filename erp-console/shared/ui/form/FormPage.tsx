@@ -1,7 +1,7 @@
 "use client";
 
 // Form dài / nhiều dòng = TRANG RIÊNG (UI-RULES §6.1): tiêu đề + alert đầu form + nội dung + thanh nút dính đáy
-// (cao `--action-bar-h`), nút canh PHẢI: [phụ] [chính] (board F1k), nhãn nói rõ việc ("Lập phiếu hoàn 380.000 đ").
+// (cao `--action-bar-h`), nút canh PHẢI: [phụ] [chính] (board F1k), nhãn nói rõ việc ("Lập phiếu hoàn tiền 380.000 đ").
 // Gửi lỗi (`failed`) → nút chính đổi thành "Thử lại" (UI-RULES §6.6); đang gửi → nút khoá + chữ "Đang gửi…".
 // Việc phá huỷ (huỷ đơn, gỡ bài) → `danger`: nút chính đỏ. Thanh nút dính trong vùng cuộn của khung app nên không che menu.
 
@@ -54,6 +54,17 @@ export function FormPage({ title, back, alert, onSubmit, primaryText, submitting
   useEffect(() => {
     if (failed && !submitting) focusFirstInvalid(formRef.current);
   }, [failed, submitting]);
+  // Xung đột phiên bản (409): banner "Tải lại" nằm đầu form, người dùng đang ở cuối trang dài nên không thấy gì xảy ra sau khi bấm Lưu.
+  // Banner vừa xuất hiện → cuộn vào khung nhìn và đưa focus vào đó (trình đọc màn hình cũng đọc ngay). Chỉ làm một lần cho mỗi lần xuất hiện.
+  const bannerShown = useRef(false);
+  useEffect(() => {
+    const banner = formRef.current?.querySelector<HTMLElement>("[data-conflict-banner]") ?? null;
+    if (banner && !bannerShown.current) {
+      banner.scrollIntoView({ block: "center" });
+      banner.focus({ preventScroll: true });
+    }
+    bannerShown.current = !!banner;
+  });
   return (
     <form
       ref={formRef}

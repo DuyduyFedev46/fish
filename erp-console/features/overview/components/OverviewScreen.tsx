@@ -42,7 +42,7 @@ function orderColumns(now: number): Column<RecentOrder>[] {
     {
       key: "reason",
       header: "Lý do",
-      render: (o) => orderLine(o.status, o.expires_at, now).reason ?? <span className="muted">—</span>,
+      render: (o) => orderLine(o.status, o.expires_at, now, o.reason).reason ?? <span className="muted">—</span>,
     },
     {
       key: "hold",
@@ -100,6 +100,7 @@ function Body({ data }: { data: OverviewData }) {
       <div className={s.cols}>
         <Section
           title="Cần chú ý"
+          headingLevel={2}
           count={data.kpis.near_expiry ? `${data.kpis.near_expiry} lô cận hạn` : undefined}
           flush
         >
@@ -117,6 +118,7 @@ function Body({ data }: { data: OverviewData }) {
           columns={orderColumns(now)}
           rows={data.recent_orders}
           rowKey={(o) => o.code}
+          rowHref={(o) => `/orders/detail/?id=${o.id}`}
           dense
           canViewCost={false}
           noun="đơn hàng"
@@ -136,6 +138,7 @@ function Body({ data }: { data: OverviewData }) {
         columns={batchColumns()}
         rows={batches}
         rowKey={(b) => b.batch_id}
+        rowHref={(b) => `/inventory/detail/?id=${b.id}`}
         dense
         canViewCost={canCost}
         noun="lô hàng"

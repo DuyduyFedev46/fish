@@ -2,7 +2,7 @@
 
 // Cánh cổng MỎNG của trợ lý (Phụ lục C.2 dòng 2) — file DUY NHẤT trong features/ai được import
 // tĩnh bởi layout. Chỉ gọi GET /api/ai/status/ + đọc cờ đồng ý; `ai_enabled=false` HOẶC lỗi → null
-// (RightRail hiện khung chờ "Trợ lý đang được nối, sắp có").
+// (không vẽ gì).
 // Tấm NẶNG (AiAssistantPanel: runtime, tải model, chat) chỉ nạp động khi `ai_enabled` VÀ đã đồng ý.
 // Chú ý C.4 #3: KHÔNG được để chuỗi wllama/vosk/whisper xuất hiện trong file này (chunk ban đầu phải sạch).
 

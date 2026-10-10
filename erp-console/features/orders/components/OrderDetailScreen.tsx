@@ -34,7 +34,6 @@ import type { SubmitConflict } from "@/shared/ui/form/useSubmit";
 import { Icon } from "@/shared/ui/Icon";
 import { DataTable, type Column } from "@/shared/ui/list/DataTable";
 import { useToast } from "@/shared/ui/overlay/Toast";
-import { PersonalText } from "@/shared/ui/PersonalText";
 import { ConflictBanner } from "@/shared/ui/states/ConflictBanner";
 import { getOrder } from "../api";
 import { DetailGate } from "../DetailGate";
@@ -47,6 +46,7 @@ import {
   holdInfo,
   orderActionPlan,
   orderPath,
+  refundSummaryLine,
   orderTimeline,
 } from "../orderDetailModel";
 import { refundableOfOrder } from "../refund";
@@ -55,6 +55,7 @@ import { useDetail, type DetailState } from "../useDetail";
 import { useIdParam } from "../useIdParam";
 import { holdLeftText, useHoldExpired, useNow } from "../useNow";
 import { CancelOrderModal } from "./CancelOrderModal";
+import { CustomerCell } from "./CustomerCell";
 import { ConfirmPaymentModal } from "./ConfirmPaymentModal";
 import { RefundModal } from "./RefundModal";
 import s from "../orders.module.css";
@@ -72,7 +73,7 @@ export function OrderDetailScreen({ renderAi }: Props) {
   const id = useIdParam();
   const detail = useDetail<OrderDetail>(id, getOrder);
   return (
-    <DetailGate id={id} detail={detail} noun={M.detailNoun}>
+    <DetailGate id={id} detail={detail} noun={M.detailNoun} listHref="/orders/">
       {(order) => <OrderDetailBody order={order} detail={detail} renderAi={renderAi} />}
     </DetailGate>
   );
@@ -123,8 +124,10 @@ function OrderDetailBody({ order: o, detail, renderAi }: { order: OrderDetail; d
       }),
     [status, o.delivery?.status, o.available_actions, me, stuckStep, escalatedKey],
   );
+  const beAiEnabled = me?.ai_features_enabled === true;
   const canOpenRefunds = canView(me, "refunds");
   const timeline = useMemo(() => orderTimeline(o, { canOpenRefund: canOpenRefunds }), [o, canOpenRefunds]);
+  const refundLine = refundSummaryLine(o.refund_summary);
   const path = orderPath({ status, deliveryStatus: o.delivery?.status ?? null, hasInvoice: !!o.invoice });
 
   // "Tiếp theo" của thanh trạng thái: lấy từ guidance, im lặng khi lỗi (thanh vẫn đủ nghĩa nếu thiếu dòng này).
@@ -135,16 +138,16 @@ function OrderDetailBody({ order: o, detail, renderAi }: { order: OrderDetail; d
       .then((g) => {
         const stale = !!g.doc?.status && g.doc.status !== o.status;
         setNext(stale ? null : nextStepLabel(g));
-        setStuckStep(stale ? null : escalatableStep(g));
+        setStuckStep(stale ? null : escalatableStep(g, { ai_features_enabled: beAiEnabled }));
       })
       .catch(() => {
         setNext(null);
         setStuckStep(null);
       });
     return () => c.abort();
-  }, [o.id, o.status, o.payments.length, o.refunds.length]);
+  }, [o.id, o.status, o.payments.length, o.refunds.length, beAiEnabled]);
 
-  // `?open=refund` (từ màn gọi xác nhận) mở sẵn hộp "Lập phiếu hoàn" — một lần; xong bỏ tham số khỏi thanh địa chỉ.
+  // `?open=refund` (từ màn gọi xác nhận) mở sẵn hộp "Lập phiếu hoàn tiền" — một lần; xong bỏ tham số khỏi thanh địa chỉ.
   useEffect(() => {
     if (openedRef.current) return;
     openedRef.current = true;
@@ -260,6 +263,11 @@ function OrderDetailBody({ order: o, detail, renderAi }: { order: OrderDetail; d
               </button>
             </div>
           )}
+          {refundLine && (
+            <p className={s.summaryLine} data-testid="order-refund-summary">
+              {refundLine}
+            </p>
+          )}
           {suggest && hasRefund && (
             <div className={`alert-box warn ${s.suggest}`} role="status">
               <Icon name="currency_exchange" />
@@ -301,6 +309,7 @@ function OrderDetailBody({ order: o, detail, renderAi }: { order: OrderDetail; d
                 <InfoField label={M.fieldInvoice} mono value={o.invoice?.code ?? null} />
                 <InfoField label={M.fieldMatched} value={o.payments.length ? M.countPayments(o.payments.length) : null} />
                 <InfoField label={M.fieldRefund} value={o.refunds.length ? M.countRefunds(o.refunds.length) : null} />
+                {(o.cancel_note ?? "").trim() !== "" && <InfoField label={M.fieldCancelNote} value={o.cancel_note} />}
               </>
             ),
           },
@@ -312,7 +321,7 @@ function OrderDetailBody({ order: o, detail, renderAi }: { order: OrderDetail; d
                   label={M.fieldCustomer}
                   value={
                     <>
-                      <PersonalText value={o.customer.name} />
+                      <CustomerCell value={o.customer.name} reason={o.customer_hidden_reason} />
                       {customerHref && (
                         <>
                           {" · "}
@@ -333,11 +342,11 @@ function OrderDetailBody({ order: o, detail, renderAi }: { order: OrderDetail; d
                         {o.customer.phone}
                       </a>
                     ) : (
-                      <PersonalText value={o.customer.phone} />
+                      <CustomerCell value={o.customer.phone} reason={o.customer_hidden_reason} />
                     )
                   }
                 />
-                <InfoField label={M.fieldAddress} value={<PersonalText value={o.customer.address} />} />
+                <InfoField label={M.fieldAddress} value={<CustomerCell value={o.customer.address} reason={o.customer_hidden_reason} />} />
                 {o.delivery &&
                   (canOpenDelivery ? (
                     <InfoField label={M.fieldDelivery} kind="link" mono value={o.delivery.code} onOpen={() => setLookupDelivery(true)} />

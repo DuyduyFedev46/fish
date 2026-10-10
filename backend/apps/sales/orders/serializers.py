@@ -8,10 +8,13 @@ L7 bổ sung (chỉ thêm key): `*_label` cạnh mã trạng thái lồng, `time
 Tiền/kg là chuỗi thập phân (bất biến #7). `allocations[].unit_cost` là GIÁ VỐN — không có
 key với người thiếu `inventory.view_costprice` (BR-PQ-15, CostFieldSerializerMixin).
 """
+from decimal import Decimal
+
 from rest_framework import serializers
 
 from apps.common.api import CostFieldSerializerMixin
-from apps.sales.models import SalesOrder
+from apps.sales.customers.permissions import customer_hidden_reason
+from apps.sales.models import Refund, SalesOrder
 from apps.sales.utils import kg_str, money_str
 
 from . import services
@@ -29,10 +32,15 @@ class KgField(serializers.Field):
         return kg_str(value)
 
 
-def pii_hidden(order) -> bool:
-    """SR-PII-02: True khi `get_queryset` đã gắn `pii_visible=False` (NV giao, phiếu đã quá cửa sổ).
-    Không có annotate (vai full scope) thì dữ liệu khách hiện đủ như cũ."""
-    return getattr(order, "pii_visible", True) is False
+def _request_user(serializer):
+    request = serializer.context.get("request")
+    return getattr(request, "user", None)
+
+
+def hidden_reason(serializer, order):
+    """PV-07: lý do che ô khách của `order` với người gọi: None | "not_permitted" (thiếu V2) | "expired" (quá cửa sổ
+    SR-PII-02, `get_queryset` đã gắn `pii_visible=False`). Không có annotate (phạm vi `all`) thì còn trong cửa sổ."""
+    return customer_hidden_reason(_request_user(serializer), order)
 
 
 class SalesOrderListSerializer(serializers.ModelSerializer):
@@ -46,13 +54,14 @@ class SalesOrderListSerializer(serializers.ModelSerializer):
     delivery_status = serializers.CharField(read_only=True, allow_null=True)
     needs_attention = serializers.BooleanField(read_only=True)
     reason = serializers.SerializerMethodField()
+    customer_hidden_reason = serializers.SerializerMethodField()
 
     class Meta:
         model = SalesOrder
         fields = [
             "id", "code", "status", "status_label", "customer_name", "customer_phone",
             "total_amount", "created_at", "reserved_until", "delivery_status", "needs_attention",
-            "reason",
+            "reason", "customer_hidden_reason",
         ]
         read_only_fields = fields
 
@@ -60,9 +69,12 @@ class SalesOrderListSerializer(serializers.ModelSerializer):
         """R3: `{"code","label"}` hoặc null. Chỉ nhãn cố định, không chữ tự do (xem reasons.py)."""
         return order_reason(order)
 
+    def get_customer_hidden_reason(self, order):
+        return hidden_reason(self, order)
+
     def to_representation(self, instance):
         ret = super().to_representation(instance)
-        if pii_hidden(instance):
+        if ret["customer_hidden_reason"] is not None:
             ret["customer_name"] = None
             ret["customer_phone"] = None
         return ret
@@ -103,14 +115,16 @@ class SalesOrderDetailSerializer(serializers.ModelSerializer):
     available_actions = serializers.SerializerMethodField()
     timeline = serializers.SerializerMethodField()
     privacy_consent = serializers.SerializerMethodField()
+    refund_summary = serializers.SerializerMethodField()
     cancel_note = serializers.SerializerMethodField()
+    customer_hidden_reason = serializers.SerializerMethodField()
 
     class Meta:
         model = SalesOrder
         fields = [
             "id", "code", "status", "status_label", "total_amount", "created_at",
-            "reserved_until", "customer", "lines", "allocations", "invoice", "payments",
-            "delivery", "refunds", "available_actions", "timeline", "privacy_consent",
+            "reserved_until", "customer", "customer_hidden_reason", "lines", "allocations", "invoice", "payments",
+            "delivery", "refunds", "refund_summary", "available_actions", "timeline", "privacy_consent",
             "cancel_note",
         ]
         read_only_fields = fields
@@ -125,8 +139,11 @@ class SalesOrderDetailSerializer(serializers.ModelSerializer):
         return list(enumerate(sorted(rows, key=lambda r: r.pk), start=1))
 
     # --- fields --------------------------------------------------------------
+    def get_customer_hidden_reason(self, order):
+        return hidden_reason(self, order)
+
     def get_customer(self, order):
-        if pii_hidden(order):
+        if hidden_reason(self, order) is not None:
             return {"name": None, "phone": None, "address": None}
         # `id` chỉ có ở nhánh không che dữ liệu cá nhân: để ERP mở trang khách (Lô 6). NV giao ngoài phạm vi không có.
         return {
@@ -202,6 +219,19 @@ class SalesOrderDetailSerializer(serializers.ModelSerializer):
             for r in sorted(invoice.refunds.all(), key=lambda r: r.pk)
         ]
 
+    def get_refund_summary(self, order):
+        """W37 S5/S7 (BR-BH-20): tổng phiếu REFUNDED và PENDING, phiếu FAILED không tính. Chỉ tiền, không dữ liệu khách.
+        Tính từ `invoice.refunds` đã prefetch nên không thêm query."""
+        totals = {Refund.Status.REFUNDED: Decimal("0"), Refund.Status.PENDING: Decimal("0")}
+        invoice = self._invoice(order)
+        for refund in (invoice.refunds.all() if invoice is not None else ()):
+            if refund.status in totals:
+                totals[refund.status] += refund.amount
+        return {
+            "refunded_amount": money_str(totals[Refund.Status.REFUNDED]),
+            "pending_amount": money_str(totals[Refund.Status.PENDING]),
+        }
+
     def get_available_actions(self, order):
         request = self.context.get("request")
         user = getattr(request, "user", None)
@@ -224,7 +254,7 @@ class SalesOrderDetailSerializer(serializers.ModelSerializer):
 
     def get_cancel_note(self, order):
         """Ghi chú huỷ có thể có tên khách: che cùng luật với `customer` (SR-PII-02)."""
-        return "" if pii_hidden(order) else order.cancel_note
+        return "" if hidden_reason(self, order) is not None else order.cancel_note
 
     def get_privacy_consent(self, order):
         """GL-05 / BR-PQ: Thông tin bằng chứng đồng ý. Chỉ tính khi user có quyền."""

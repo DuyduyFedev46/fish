@@ -29,11 +29,12 @@ import { FormAlert } from "@/shared/ui/form/FormAlert";
 import { conflictOf, isConflictError, type SubmitConflict } from "@/shared/ui/form/useSubmit";
 import { useToast } from "@/shared/ui/overlay/Toast";
 import { ConflictBanner } from "@/shared/ui/states/ConflictBanner";
+import { ScopeLostInApp } from "@/features/auth/components/AppStates";
 import { ErrorScreen } from "@/shared/ui/states/ErrorScreen";
 import { NoPermission } from "@/shared/ui/states/NoPermission";
 import { NotFoundScreen } from "@/shared/ui/states/NotFoundScreen";
 import { claimConfirmationTask, fetchConfirmationDetail } from "../api";
-import { PATH_STEPS, callResultsOf, callToast, claimActive, decisionsOf, doneSteps, dueAt, hasAction, idFromSearch, lastCallerName, nextStepText, pathOf, telHref } from "../confirmationUi";
+import { PATH_STEPS, callResultsOf, callToast, claimActive, decisionsOf, doneSteps, dueAt, escalationHint, hasAction, idFromSearch, lastCallerName, nextStepText, pathOf, telHref } from "../confirmationUi";
 import type { CallResult, ConfirmationQueueDetail } from "../types";
 import { ChangeRecipientModal } from "./ChangeRecipientModal";
 import { ConfirmationAiBlock } from "./ConfirmationAiBlock";
@@ -42,7 +43,7 @@ import { RecordCallModal } from "./RecordCallModal";
 import { UnconfirmModal } from "./UnconfirmModal";
 import s from "../confirmation.module.css";
 
-type Load = "loading" | "ready" | "error" | "notfound" | "forbidden";
+type Load = "loading" | "ready" | "error" | "notfound" | "forbidden" | "scope_lost";
 type Modals = null | "call" | "callback" | "recipient" | "decide" | "unconfirm";
 type History = { state: "loading" } | { state: "error" } | { state: "forbidden" } | { state: "notfound" } | { state: "ready"; entries: TimelineEntry[]; truncated: boolean };
 
@@ -66,6 +67,18 @@ export function ConfirmationDetailScreen() {
   const seq = useRef(0);
   // Đã có dữ liệu đơn chưa (ref để loadDetail không đọc state cũ): tải lại lỗi thì giữ dữ liệu cũ và báo, không thay bằng màn lỗi.
   const hasDetail = useRef(false);
+
+  // PV-13: đơn vừa ra ngoài phạm vi (đã có dữ liệu mà 404) → xoá hết dữ liệu khách đã tải. Chưa có dữ liệu thì vẫn là "Không tìm thấy".
+  const loseScope = useCallback(() => {
+    if (!hasDetail.current) {
+      setLoad("notfound");
+      return;
+    }
+    setDetail(null);
+    setHistory({ state: "loading" });
+    setModal(null);
+    setLoad("scope_lost");
+  }, []);
 
   const loadHistory = useCallback(() => {
     if (id === null) return;
@@ -95,15 +108,17 @@ export function ConfirmationDetailScreen() {
         setConflict(null);
       } catch (err) {
         if (mine !== seq.current) return;
-        if (err instanceof ApiError && err.status === 404) setLoad("notfound");
-        else if (err instanceof ApiError && err.status === 403) setLoad("forbidden");
+        if (err instanceof ApiError && err.status === 404) {
+          if (initial) setLoad("notfound");
+          else loseScope();
+        } else if (err instanceof ApiError && err.status === 403) setLoad("forbidden");
         else if (!hasDetail.current) setLoad("error");
         else setActionError("Chưa tải lại được đơn. Kiểm tra mạng rồi bấm Tải lại.");
       } finally {
         if (mine === seq.current) setReloading(false);
       }
     },
-    [id],
+    [id, loseScope],
   );
 
   useEffect(() => {
@@ -129,6 +144,7 @@ export function ConfirmationDetailScreen() {
         <div className={s.skelRow} />
       </SkeletonScreen>
     );
+  if (load === "scope_lost") return <ScopeLostInApp listHref={HOME} />;
   if (load === "notfound") return <NotFoundScreen homeHref={HOME} />;
   if (load === "forbidden") return <NoPermission homeHref={HOME} />;
   if (load === "error" || !detail) return <ErrorScreen homeHref={HOME} onRetry={() => void loadDetail(true)} />;
@@ -155,7 +171,7 @@ export function ConfirmationDetailScreen() {
       await claimConfirmationTask(item.note_id);
       next();
     } catch (err) {
-      if (err instanceof ApiError && err.status === 404) setLoad("notfound");
+      if (err instanceof ApiError && err.status === 404) loseScope();
       else if (isConflictError(err)) setConflict(conflictOf(err));
       else {
         setActionError(err instanceof Error && err.message ? err.message : "Chưa giữ được đơn để gọi. Bấm lại để thử lại.");
@@ -264,6 +280,18 @@ export function ConfirmationDetailScreen() {
           <span>{item.guidance}</span>
         </div>
       )}
+      {escalationHint(item.escalation_reason) && (
+        <div className={`alert-box warn ${s.guidance}`} role="status">
+          <Icon name="info" />
+          <span>{escalationHint(item.escalation_reason)}</span>
+        </div>
+      )}
+      {item.auto_cancel_blocked_label && (
+        <div className={`alert-box warn ${s.guidance}`} role="status">
+          <Icon name="info" />
+          <span>{item.auto_cancel_blocked_label}</span>
+        </div>
+      )}
       {item.confirm_state === "ESCALATED" && decisions.length === 0 && (
         <div className={`alert-box warn ${s.guidance}`} role="status">
           <Icon name="hourglass_top" />
@@ -312,6 +340,7 @@ export function ConfirmationDetailScreen() {
 
       <InfoGrid title="Gọi xác nhận">
         {item.escalation_label && <InfoField label="Lý do" value={item.escalation_label} />}
+        {(item.decision_note ?? "").trim() !== "" && <InfoField label="Lý do quyết định" value={item.decision_note} />}
         <InfoField label="Lần gọi" value={`${item.attempts}/${item.max_attempts}`} num />
         <InfoField label={item.confirm_state === "ESCALATED" ? "Hạn quyết định" : "Hạn gọi"} value={dateTime(due)} num />
         <InfoField label="Người gọi" value={lastCallerName(item.calls) ?? "—"} />
@@ -393,7 +422,7 @@ export function ConfirmationDetailScreen() {
           onClose={() => setModal(null)}
           onStale={refreshAll}
           onDone={() => {
-            toast.success("Đã huỷ xác nhận. Đơn về Chờ xác nhận để gọi lại khách.");
+            toast.success("Đã huỷ xác nhận. Phiếu giao về Chờ gọi xác nhận để gọi lại khách.");
             refreshAll();
           }}
         />
@@ -412,11 +441,11 @@ export function ConfirmationDetailScreen() {
             if (decision === "CANCEL") {
               toast.success("Đã huỷ đơn. Chuyển sang hoàn tiền cho khách.");
               setModal(null);
-              if (res.order_id) router.push(`/orders/?order=${res.order_id}&open=refund`);
+              if (res.order_id) router.push(`/orders/detail/?id=${res.order_id}&open=refund`);
               else refreshAll();
               return;
             }
-            toast.success(decision === "EXTEND" ? "Đã gia hạn. Đơn hẹn gọi lại khách." : "Đã cho giao không cần xác nhận. Đơn chuyển sang Soạn hàng.");
+            toast.success(decision === "EXTEND" ? "Đã gia hạn. Đơn hẹn gọi lại khách." : "Đã cho giao không cần xác nhận. Phiếu giao chuyển sang Đang soạn hàng.");
             refreshAll();
           }}
         />

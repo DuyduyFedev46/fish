@@ -32,7 +32,7 @@ def utc(year, month, day, hour=0, minute=0):
 # Nhãn tài khoản. Chủ, Quản lý, NV kho, NV giao, CSKH, người kiêm nhiệm kho+giao, người không nhóm, superuser.
 USER_LABELS = (
     "owner", "manager", "warehouse_staff", "courier", "courier_other", "customer_service", "customer_service_other",
-    "warehouse_courier", "direct_permissions", "superuser", "anonymous",
+    "warehouse_courier", "warehouse_service", "direct_permissions", "superuser", "anonymous",
 )
 
 # Người không nhóm nhưng được gán quyền trực tiếp (UC-6, R9): đủ quyền xem để bắt mọi đường đọc.
@@ -42,6 +42,8 @@ DIRECT_PERMISSIONS = (
     "delivery.view_deliverynote", "delivery.confirm_with_customer",
     "inventory.view_returntostock", "purchasing.view_purchasereceipt",
     "reports.view_dashboard",
+    # PV-07: V2 cấp cho 5 nhóm qua migration; người không nhóm phải được cấp tay mới thấy tên khách trên đơn (R9, D-3).
+    "sales.view_order_customer_info",
 )
 
 # Một đơn = một khách riêng. `note`: trạng thái phiếu giao sau khi chỉnh; `task`: tình trạng gọi; `courier`: nhãn người giao;
@@ -129,6 +131,8 @@ def build_users(scene):
         "customer_service": _make_user("pv_cs", roles.CUSTOMER_SERVICE),
         "customer_service_other": _make_user("pv_cs_other", roles.CUSTOMER_SERVICE),
         "warehouse_courier": _make_user("pv_warehouse_courier", roles.WAREHOUSE_STAFF, roles.DELIVERY_STAFF),
+        # O1 (QA Lô 4 + 5): người kiêm nhiệm NV kho + CSKH. Trước PV-05 `has_full_delivery_scope` cho họ thấy mọi phiếu chờ gọi.
+        "warehouse_service": _make_user("pv_warehouse_service", roles.WAREHOUSE_STAFF, roles.CUSTOMER_SERVICE),
         "direct_permissions": _make_user("pv_direct", perms=DIRECT_PERMISSIONS),
         "superuser": _make_user("pv_superuser", superuser=True),
         "anonymous": None,

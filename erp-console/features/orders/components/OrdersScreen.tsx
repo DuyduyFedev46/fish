@@ -3,7 +3,7 @@
 // Danh sách đơn hàng (ED-09, tab 1 của "Đơn & tiền"): khung ListPage + bảng DataTable, bấm dòng → /orders/detail/?id=.
 // Cột: Mã đơn · Khách hàng · Trạng thái · Giao hàng · Lý do · Tổng tiền · Thời gian. Đơn tự huỷ hiện chip "Đã huỷ" kèm
 // lý do "Hết giờ giữ chỗ". Bộ lọc/từ khoá chỉ nằm trong state (không URL, không localStorage). `?order=<id>&open=refund`
-// (link cũ từ màn gọi xác nhận) → chuyển sang trang chi tiết, mở sẵn hộp "Lập phiếu hoàn".
+// (link cũ từ màn gọi xác nhận) → chuyển sang trang chi tiết, mở sẵn hộp "Lập phiếu hoàn tiền".
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -17,6 +17,7 @@ import { DataTable, type Column } from "@/shared/ui/list/DataTable";
 import { FilterBar } from "@/shared/ui/list/FilterBar";
 import { ListPage } from "@/shared/ui/list/ListPage";
 import { NoPermission } from "@/shared/ui/states/NoPermission";
+import { personalText } from "@/shared/lib/personalData";
 import { PersonalText } from "@/shared/ui/PersonalText";
 import { DATE_FILTERS, STATUS_FILTERS, type DatePreset } from "../labels";
 import { effectiveOrderStatus } from "../orderDetailModel";
@@ -68,7 +69,7 @@ export function OrdersScreen() {
 
   const columns: Column<OrderListItem>[] = [
     { key: "code", header: M.colCode, mono: true, render: (o) => o.code },
-    { key: "customer", header: M.colCustomer, render: (o) => <PersonalText value={o.customer_name} /> },
+    { key: "customer", header: M.colCustomer, render: (o) => (o.customer_name === null ? <span className="muted">{personalText(null, "—", o.customer_hidden_reason)}</span> : <PersonalText value={o.customer_name} />) },
     { key: "status", header: M.colStatus, render: (o) => <Chip table={ENUMS.salesOrderStatus} value={effectiveOrderStatus(o.status, o.reserved_until, now)} /> },
     { key: "delivery", header: M.colDelivery, render: (o) => <Chip table={ENUMS.deliveryStatus} value={o.delivery_status} /> },
     {

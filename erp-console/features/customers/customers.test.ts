@@ -99,11 +99,19 @@ describe("mock danh bạ khách: danh sách", () => {
     const spent = (list("?ordering=-total_spent").body as Page).results.map((c) => Number(c.total_spent));
     expect([...spent].sort((a, b) => b - a)).toEqual(spent);
   });
-  it("q khớp tên bỏ dấu; SĐT cần ≥ 4 chữ số", () => {
-    expect((list("?q=khach%20thu%20a").body as Page).results.some((c) => c.name === "Khách Thử A")).toBe(true);
+  it("q khớp tên bỏ dấu; SĐT cần ≥ 4 chữ số (qua POST search/, Lô 17b-BE)", () => {
+    const search = (q: string) => call("loc", "POST", `${BASE}search/`, { q }).body as Page;
+    expect(search("khach thu a").results.some((c) => c.name === "Khách Thử A")).toBe(true);
     const phone = (list("").body as Page).results[0].phone;
-    expect((list(`?q=${phone.slice(-4)}`).body as Page).results.some((c) => c.phone === phone)).toBe(true);
-    expect((list("?q=090").body as Page).count).toBe(0); // 3 chữ số: không dò danh bạ
+    expect(search(phone.slice(-4)).results.some((c) => c.phone === phone)).toBe(true);
+    expect(search("090").count).toBe(0); // 3 chữ số: không dò danh bạ
+  });
+  it("GET có q không rỗng → 400 SEARCH_USE_POST, câu lỗi không lặp lại q; q rỗng vẫn liệt kê", () => {
+    const r = list("?q=0912345678");
+    expect(r.status).toBe(400);
+    expect(r.body).toMatchObject({ code: "SEARCH_USE_POST", detail: "Tìm khách dùng ô tìm trên màn Khách hàng." });
+    expect(JSON.stringify(r.body)).not.toContain("0912345678");
+    expect(list("?q=").status).toBe(200);
   });
   it("khoá của một dòng đúng contract (cancelled_count, không có default_address)", () => {
     const row = (list("").body as Page).results[0];

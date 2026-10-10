@@ -7,6 +7,7 @@ Bất biến:
 - Sửa L-4: actor AI hiện "AI của <tên>" kèm mức, không hiện "Hệ thống".
 """
 from apps.accounts.models import AuditLog
+from apps.common.ai_visibility import exclude_ai_audit_rows
 from apps.sales.models import PaymentTransaction
 from apps.sales.orders.timeline import TimelineEvent, actor_display
 from apps.common.formatting import format_vnd_ui
@@ -27,7 +28,7 @@ def build_payment_timeline(payment: PaymentTransaction) -> list[TimelineEvent]:
         TimelineEvent(
             at=received_time,
             kind="payment_received",
-            label=f"Nhận giao dịch thanh toán {format_vnd_ui(payment.amount)} (mã GD {payment.bank_txn_id})",
+            label=f"Nhận khoản tiền về {format_vnd_ui(payment.amount)} (mã GD {payment.bank_txn_id})",
             actor_display=SYSTEM,
             doc="payment",
             actor_kind="system",
@@ -36,7 +37,7 @@ def build_payment_timeline(payment: PaymentTransaction) -> list[TimelineEvent]:
 
     # 2. Sự kiện từ AuditLog
     audits = (
-        AuditLog.objects.filter(model_name=PAYMENT_MODEL, object_id=str(payment.pk))
+        exclude_ai_audit_rows(AuditLog.objects.filter(model_name=PAYMENT_MODEL, object_id=str(payment.pk)))
         .select_related("actor__staff_profile", "ai_actor__staff_profile")
         .order_by("created_at", "id")
     )
@@ -58,6 +59,20 @@ def build_payment_timeline(payment: PaymentTransaction) -> list[TimelineEvent]:
             ai_lvl = None
             ai_cfg = None
 
+        if a.action == "record_late_payment":
+            # BR-TT-18: nhãn chuẩn, chỉ mã GD + số tiền của chính giao dịch; không chép chữ tự do (#3).
+            events.append(
+                TimelineEvent(
+                    at=a.created_at,
+                    kind="payment_recorded_late",
+                    label=f"Ghi tay tiền về muộn {format_vnd_ui(payment.amount)} (mã GD {payment.bank_txn_id})",
+                    actor_display=who,
+                    doc="payment",
+                    actor_kind=kind_actor,
+                    ai_level=ai_lvl,
+                    ai_config_version=ai_cfg,
+                )
+            )
         if a.action == "resolve_payment":
             code = (a.changes or {}).get("resolution") or ""
             try:
@@ -68,7 +83,7 @@ def build_payment_timeline(payment: PaymentTransaction) -> list[TimelineEvent]:
                 TimelineEvent(
                     at=a.created_at,
                     kind="payment_resolved",
-                    label=f"Xử lý giao dịch ({res_val})",
+                    label=f"Xử lý khoản tiền về ({res_val})",
                     actor_display=who,
                     doc="payment",
                     actor_kind=kind_actor,
@@ -86,7 +101,7 @@ def build_payment_timeline(payment: PaymentTransaction) -> list[TimelineEvent]:
                 TimelineEvent(
                     at=payment.resolved_at,
                     kind="payment_resolved",
-                    label=f"Xử lý giao dịch ({res_label})",
+                    label=f"Xử lý khoản tiền về ({res_label})",
                     actor_display=actor_display(payment.resolved_by),
                     doc="payment",
                     actor_kind="user" if payment.resolved_by else "system",

@@ -1,7 +1,7 @@
 "use client";
 
-// F2f / F2g / chuyển lại — ba thao tác của Chủ trên phiếu hoàn (cần sales.confirm_refund; Quản lý không có nút, gọi BE → 403).
-// Phiếu hoàn không có bản "hoàn tác": mọi thao tác ở đây là một chiều, nên hộp nói rõ hậu quả trước khi gửi.
+// F2f / F2g / chuyển lại — ba thao tác của Chủ trên phiếu hoàn tiền (cần sales.confirm_refund; Quản lý không có nút, gọi BE → 403).
+// Phiếu hoàn tiền không có bản "hoàn tác": mọi thao tác ở đây là một chiều, nên hộp nói rõ hậu quả trước khi gửi.
 
 import { useState } from "react";
 import { vnd } from "@/shared/lib/format";

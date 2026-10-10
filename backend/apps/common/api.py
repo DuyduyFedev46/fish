@@ -7,7 +7,10 @@ cho bất kỳ ai gọi được endpoint. `CostFieldSerializerMixin` loại fie
 serializer khi user KHÔNG có `inventory.view_costprice` — kiểm bằng test gọi API
 bằng token nhân viên (BR-PQ-13).
 """
+import re
 from math import ceil
+
+from django.http import Http404
 
 from rest_framework import mixins, status, viewsets
 from rest_framework.exceptions import (
@@ -15,6 +18,7 @@ from rest_framework.exceptions import (
     AuthenticationFailed,
     MethodNotAllowed,
     NotAuthenticated,
+    NotFound,
     PermissionDenied,
     Throttled,
 )
@@ -24,7 +28,6 @@ from rest_framework.response import Response
 from rest_framework.views import exception_handler as drf_exception_handler
 
 from .exceptions import BusinessError
-from apps.accounts import roles
 from apps.ai.declare import AiDeclarable
 
 VIEW_COSTPRICE_PERM = "inventory.view_costprice"
@@ -107,28 +110,6 @@ class CostFieldSerializerMixin:
         return ret
 
 
-# Nhóm thấy mọi đơn / khách / phiếu giao. Ai chỉ thuộc nv_giao bị giới hạn theo phiếu
-# giao gán cho mình (Tầng 3 dòng, spec §1.6). Kiêm nhiệm = hợp quyền (BR-PQ-09).
-FULL_SCOPE_GROUPS = frozenset({roles.OWNER, roles.MANAGER, roles.WAREHOUSE_STAFF})
-
-
-def has_full_delivery_scope(user) -> bool:
-    return bool(
-        user.is_superuser or user.groups.filter(name__in=FULL_SCOPE_GROUPS).exists()
-    )
-
-
-# Chỉ Chủ, Quản lý (và superuser) thấy toàn bộ danh bạ khách. NV kho không dùng full scope giao hàng
-# để vòng qua: quyền xem khách của người kiêm nhiệm đến từ nv_giao (SR-PII-01).
-CUSTOMER_DIRECTORY_GROUPS = frozenset({roles.OWNER, roles.MANAGER})
-
-
-def sees_customer_directory(user) -> bool:
-    return bool(
-        user.is_superuser or user.groups.filter(name__in=CUSTOMER_DIRECTORY_GROUPS).exists()
-    )
-
-
 def require_perm(user, perm: str):
     """Chặn ở tầng service-call trong view cho custom action (Tầng 2)."""
     if not (user and user.has_perm(perm)):
@@ -141,6 +122,14 @@ class StandardPagination(PageNumberPagination):
     page_size = 20
 
 
+class SearchBodyPagination(StandardPagination):
+    """Cùng 20 dòng/trang, nhưng số trang lấy từ body JSON (`page`) thay vì query string.
+    Dùng cho các `POST .../search/` (từ khoá cá nhân không được nằm trong URL, bất biến 9)."""
+
+    def get_page_number(self, request, paginator):
+        return request.data.get("page", 1) if hasattr(request.data, "get") else 1
+
+
 class BusinessValidationError(APIException):
     status_code = status.HTTP_400_BAD_REQUEST
     default_detail = "Vi phạm quy tắc nghiệp vụ."
@@ -150,6 +139,16 @@ class BusinessValidationError(APIException):
 # S6: một thông điệp 401 cho mọi trường hợp (chưa đăng nhập, token hỏng/đã thu, tài khoản đã
 # nghỉ) — không tiết lộ lý do; bản dịch vi của DRF thiếu nên đặt tường minh.
 UNAUTHORIZED_DETAIL = "Thông tin xác thực không hợp lệ."
+
+# N-404 (Lô 17a): câu mặc định của Django khi `get_object_or_404` không thấy dòng ("No <Model> matches the given
+# query.") lộ tên model và là tiếng Anh → đổi thành câu chung. Câu tiếng Việt riêng của view giữ nguyên.
+NOT_FOUND_DETAIL = "Không tìm thấy."
+_DEFAULT_DJANGO_404 = re.compile(r"^No \w+ matches the given query\.$")
+
+
+def _is_default_404_message(exc: Http404) -> bool:
+    message = str(exc.args[0]) if exc.args else ""
+    return not message or bool(_DEFAULT_DJANGO_404.match(message))
 
 
 def exception_handler(exc, context):
@@ -180,6 +179,8 @@ def exception_handler(exc, context):
                         status=exc.status_code)
     if isinstance(exc, (NotAuthenticated, AuthenticationFailed)):
         exc.detail = UNAUTHORIZED_DETAIL
+    if isinstance(exc, Http404) and _is_default_404_message(exc):
+        exc = NotFound(NOT_FOUND_DETAIL)
     return drf_exception_handler(exc, context)
 
 

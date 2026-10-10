@@ -1,6 +1,6 @@
 "use client";
 
-// Trang chi tiết phiếu hoàn (ED-12): /orders/refunds/detail/?id=<pk>. Chủ: "Xác nhận đã hoàn tiền" (F2f) hoặc "Chuyển lại" khi
+// Trang chi tiết phiếu hoàn tiền (ED-12): /orders/refunds/detail/?id=<pk>. Chủ: "Xác nhận đã hoàn tiền" (F2f) hoặc "Chuyển lại" khi
 // Thất bại; "Báo chuyển thất bại" (F2g) nằm trong "…". Quản lý xem được nhưng `available_actions` rỗng → không có nút (BE 403
 // nếu gọi). Phiếu Thất bại hiện "Lý do thất bại" thành một trường riêng. SĐT hiện đủ; BE trả sẵn `order_code` nhưng không trả
 // id đơn nên link "Xem đơn" tra id theo mã đơn (đúng mã, không ghi vào URL).
@@ -23,7 +23,6 @@ import { Timeline } from "@/shared/ui/detail/Timeline";
 import type { SubmitConflict } from "@/shared/ui/form/useSubmit";
 import { Icon } from "@/shared/ui/Icon";
 import { useToast } from "@/shared/ui/overlay/Toast";
-import { PersonalText } from "@/shared/ui/PersonalText";
 import { ConflictBanner } from "@/shared/ui/states/ConflictBanner";
 import { getRefund, listOrders } from "../api";
 import { DetailGate } from "../DetailGate";
@@ -32,10 +31,11 @@ import { REFUND_STEPS, refundActionPlan, refundPath, refundTimeline } from "../o
 import type { RefundQueueItem } from "../types";
 import { useDetail, type DetailState } from "../useDetail";
 import { useIdParam } from "../useIdParam";
+import { CustomerCell } from "./CustomerCell";
 import { ConfirmRefundModal, MarkRefundFailedModal, RetryRefundModal } from "./RefundActionModals";
 
 type Props = {
-  /** Trang ghép khối Trợ lý AI vào đây (feature không import features/ai). `onApplied` = tải lại phiếu hoàn sau khi AI áp dụng đề xuất. */
+  /** Trang ghép khối Trợ lý AI vào đây (feature không import features/ai). `onApplied` = tải lại phiếu hoàn tiền sau khi AI áp dụng đề xuất. */
   renderAi?: (target: { id: number }, onApplied: () => void) => React.ReactNode;
 };
 
@@ -43,7 +43,7 @@ export function RefundDetailScreen({ renderAi }: Props) {
   const id = useIdParam();
   const detail = useDetail<RefundQueueItem>(id, getRefund);
   return (
-    <DetailGate id={id} detail={detail} noun={M.refundNoun}>
+    <DetailGate id={id} detail={detail} noun={M.refundNoun} listHref="/orders/refunds/">
       {(r) => <RefundDetailBody refund={r} detail={detail} renderAi={renderAi} />}
     </DetailGate>
   );
@@ -156,8 +156,8 @@ function RefundDetailBody({ refund: r, detail, renderAi }: { refund: RefundQueue
             )
           }
         />
-        <InfoField label={M.fieldRefundCustomer} value={<PersonalText value={r.customer_name} />} />
-        <InfoField label={M.fieldRefundPhone} num value={<PersonalText value={r.customer_phone} />} />
+        <InfoField label={M.fieldRefundCustomer} value={<CustomerCell value={r.customer_name} reason={r.customer_hidden_reason} />} />
+        <InfoField label={M.fieldRefundPhone} num value={<CustomerCell value={r.customer_phone} reason={r.customer_hidden_reason} />} />
         <InfoField label={M.fieldRefundSourceTxn} mono value={r.source_bank_txn_id || null} />
         <InfoField label={M.fieldRefundRef} mono value={r.bank_txn_ref || null} />
         {r.method && <InfoField label={M.fieldRefundMethod} value={<Chip table={ENUMS.refundMethod} value={r.method} />} />}

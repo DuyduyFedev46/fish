@@ -6,7 +6,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ApiError } from "@/shared/lib/http";
 
-export type DetailStatus = "loading" | "ok" | "forbidden" | "notfound" | "error";
+export type DetailStatus = "loading" | "ok" | "forbidden" | "notfound" | "error" | "scope_lost";
 
 export type DetailState<T> = {
   data: T | null;
@@ -29,6 +29,11 @@ export function statusOfError(err: unknown): DetailStatus {
 export function useDetail<T>(id: number | null | undefined, loader: (id: number, signal: AbortSignal) => Promise<T>): DetailState<T> {
   const [data, setData] = useState<T | null>(null);
   const [status, setStatus] = useState<DetailStatus>("loading");
+  const statusRef = useRef<DetailStatus>("loading");
+  const put = useCallback((st: DetailStatus) => {
+    statusRef.current = st;
+    setStatus(st);
+  }, []);
   const [error, setError] = useState<unknown>(null);
   const [reloading, setReloading] = useState(false);
   const seq = useRef(0);
@@ -48,14 +53,14 @@ export function useDetail<T>(id: number | null | undefined, loader: (id: number,
     if (keep) setReloading(true);
     else {
       setData(null);
-      setStatus("loading");
+      put("loading");
     }
     setError(null);
     try {
       const d = await loaderRef.current(cur, c.signal);
       if (n !== seq.current) return null;
       setData(d);
-      setStatus("ok");
+      put("ok");
       setReloading(false);
       return d;
     } catch (err) {
@@ -63,11 +68,18 @@ export function useDetail<T>(id: number | null | undefined, loader: (id: number,
       if (err instanceof ApiError && err.status === 401) return null; // đã về màn đăng nhập
       setError(err);
       setReloading(false);
-      // Tải lại lỗi mà vẫn còn dữ liệu cũ → giữ màn cũ (status ok), chỉ báo lỗi qua `error`.
-      setStatus((s) => (keep && s === "ok" ? "ok" : statusOfError(err)));
+      // PV-13: đã có dữ liệu mà tải lại bị 404 = mục đã ra ngoài phạm vi của người xem → XOÁ dữ liệu (không giữ tên/SĐT/địa chỉ
+      // khách đã tải), màn chuyển sang "mất quyền". Chỉ 404; 403/500/mạng giữ màn cũ và báo lỗi qua `error`.
+      if (keep && err instanceof ApiError && err.status === 404 && (statusRef.current === "ok" || statusRef.current === "scope_lost")) {
+        setData(null);
+        put("scope_lost");
+        return null;
+      }
+      // Tải lại lỗi mà còn dữ liệu cũ → giữ màn cũ (status ok), chỉ báo lỗi qua `error`.
+      put(keep && statusRef.current === "ok" ? "ok" : statusOfError(err));
       return null;
     }
-  }, []);
+  }, [put]);
 
   useEffect(() => {
     if (!id) return;

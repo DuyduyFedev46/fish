@@ -1,13 +1,13 @@
 """B4 · ED-39-AC2..AC5 — PUT /api/staff/groups/{code}/capabilities/ và chặn leo quyền (BR-PQ-32)."""
 from django.contrib.auth.models import Group, Permission
-from django.test import TestCase
+from django.test import TestCase, override_settings
 
 from apps.accounts import roles
 from apps.accounts.capabilities import registry
 from apps.accounts.models import AuditLog
 from apps.common.tests.fixtures import client_for, make_user
 
-from .base import detail_url, group_perms, make_staff, put_url, token_client
+from .base import detail_url, group_perms, make_staff, put_url, token_client, put_caps
 
 ACTION = "change_group_capabilities"
 
@@ -24,7 +24,7 @@ class SetCapabilitiesTests(TestCase):
         self.client = client_for(self.owner)
 
     def put(self, code, changes, client=None):
-        return (client or self.client).put(put_url(code), {"capabilities": changes}, format="json")
+        return put_caps(client or self.client, code, changes)
 
     def test_ed39_owner_turns_capability_on_and_gets_detail_body(self):
         self.assertNotIn("inventory.approve_returntostock", group_perms(roles.WAREHOUSE_STAFF))
@@ -51,7 +51,9 @@ class SetCapabilitiesTests(TestCase):
         self.assertNotIn(
             "sales.view_customer_list", manager_client.get("/api/auth/me/").json()["permissions"]
         )
-        self.put(roles.MANAGER, {"view_customers": True})
+        # Q-7: D7 vẫn lưu `all`, nên bật lại việc là mở rộng dữ liệu khách và phải xác nhận (02b §2.5).
+        self.assertEqual(self.put(roles.MANAGER, {"view_customers": True}).json()["code"], "CUSTOMER_DATA_WIDENING_UNCONFIRMED")
+        put_caps(self.client, roles.MANAGER, {"view_customers": True}, confirm_customer_data_widening=True)
         self.assertEqual(manager_client.get(directory).status_code, 200)
 
     def test_ed39_ac2_member_gains_permission_immediately(self):
@@ -129,6 +131,7 @@ class SetCapabilitiesTests(TestCase):
         self.assertIsNone(rows[roles.WAREHOUSE_STAFF]["last_changed_by"])
 
 
+@override_settings(AI_ENABLED=True)  # các ca này kiểm ma trận ĐỦ việc; nhánh tắt ở test_ai_hidden
 class PrivilegeEscalationTests(TestCase):
     def setUp(self):
         self.owner = make_staff("owner1", roles.OWNER)
@@ -139,7 +142,7 @@ class PrivilegeEscalationTests(TestCase):
         return {code: group_perms(code) for code in roles.ALL_ROLES}
 
     def put(self, code, changes, client=None):
-        return (client or self.client).put(put_url(code), {"capabilities": changes}, format="json")
+        return put_caps(client or self.client, code, changes)
 
     def assert_nothing_changed(self, before):
         self.assertEqual(self.snapshot(), before)
@@ -233,3 +236,31 @@ class PrivilegeEscalationTests(TestCase):
             response = getattr(self.client, method)(url, {"capabilities": {"view_orders": False}}, format="json")
             self.assertEqual(response.status_code, 405, method)
         self.assertEqual(self.client.delete(detail_url(roles.MANAGER)).status_code, 405)
+
+
+@override_settings(AI_ENABLED=False)
+class PrivilegeEscalationAiOffTests(TestCase):
+    """N3: AI tắt vẫn chặn leo quyền với mọi việc chỉ Chủ làm được (không phải AI) và khoá nhóm Chủ."""
+
+    def setUp(self):
+        self.owner = make_staff("owner1", roles.OWNER)
+        self.client = client_for(self.owner)
+
+    def put(self, code, changes):
+        return self.client.put(put_url(code), {"capabilities": changes}, format="json")
+
+    def test_owner_only_non_ai_capability_still_br_pq_32(self):
+        keys = [c.key for c in registry.CAPABILITIES if c.owner_only and c.key not in registry.AI_CAPABILITY_KEYS]
+        self.assertTrue(keys)
+        for code in (roles.MANAGER, roles.WAREHOUSE_STAFF, roles.DELIVERY_STAFF, roles.CUSTOMER_SERVICE):
+            for key in keys:
+                before = group_perms(code)
+                response = self.put(code, {key: True})
+                self.assertEqual(response.status_code, 400, (code, key))
+                self.assertEqual(response.json()["code"], "BR-PQ-32", (code, key))
+                self.assertEqual(group_perms(code), before, (code, key))
+
+    def test_owner_group_still_locked(self):
+        response = self.put(roles.OWNER, {"view_orders": False})
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()["code"], "GROUP_LOCKED")

@@ -10,16 +10,20 @@ import pathlib
 
 from playwright.sync_api import expect, sync_playwright
 
+from e2e_support import page_404_body
+
 BASE = os.environ.get("BASE", "http://127.0.0.1:3101")
 SHOTS = os.environ.get("SHOTS", "/tmp")
-OUT_404 = pathlib.Path(__file__).resolve().parent.parent / "out" / "404.html"
 results = []
+# Lô 17b (E2E-1): giao diện AI chỉ có khi build bật NEXT_PUBLIC_AI_FEATURES=1. Chạy với AI_FEATURES=1 nếu build có AI; mặc định build tắt AI.
+AI_ON = os.environ.get("AI_FEATURES") == "1"
+AI_LABELS = {"Chính sách AI", "Báo cáo AI", "AI của tôi"}
 
 # UI-RULES §2.1: thứ tự đầy đủ của menu trái (mục có thể ẩn theo quyền nhưng không đổi thứ tự).
 FULL_ORDER = [
     "Tổng quan",
     "Đơn & tiền", "Khách hàng", "Gọi xác nhận", "Giao hàng", "Việc giao của tôi",
-    "Mua hàng", "Nhà cung cấp", "Kho & lô", "Hàng hoàn về kho", "Kiểm kê", "Sổ nhập xuất", "Danh mục & giá",
+    "Mua hàng", "Nhà cung cấp", "Kho & lô", "Hàng hoàn", "Kiểm kê", "Sổ nhập xuất", "Danh mục & giá",
     "Báo cáo lãi lỗ", "Hoá đơn bán", "Hoá đơn mua & chi phí",
     "Nội dung",
     "Nhân sự", "Phân quyền", "Nhật ký hoạt động", "Chính sách AI", "Báo cáo AI",
@@ -27,14 +31,14 @@ FULL_ORDER = [
 SECTIONS = ["Bán hàng", "Hàng hoá & kho", "Kế toán", "Website", "Quản trị"]
 # Mock chưa có quyền mới (xem 03-dev-notes.md, Lô 1 — FE) nên mỗi vai chỉ thấy phần đã làm.
 ROLE_MENU = {
-    # Hợp Lô 7 (mock Chủ đủ quyền như BE: Gọi xác nhận, Chính sách AI, Báo cáo AI; Sổ nhập xuất) + Lô 9 (Hàng hoàn về kho).
-    "loc": (["Tổng quan", "Đơn & tiền", "Khách hàng", "Gọi xác nhận", "Giao hàng", "Mua hàng", "Nhà cung cấp", "Kho & lô", "Hàng hoàn về kho", "Kiểm kê", "Sổ nhập xuất", "Danh mục & giá", "Báo cáo lãi lỗ", "Hoá đơn bán", "Hoá đơn mua & chi phí", "Nội dung", "Nhân sự", "Phân quyền", "Nhật ký hoạt động", "Chính sách AI", "Báo cáo AI"],
+    # Hợp Lô 7 (mock Chủ đủ quyền như BE: Gọi xác nhận, Chính sách AI, Báo cáo AI; Sổ nhập xuất) + Lô 9 (Hàng hoàn).
+    "loc": (["Tổng quan", "Đơn & tiền", "Khách hàng", "Gọi xác nhận", "Giao hàng", "Mua hàng", "Nhà cung cấp", "Kho & lô", "Hàng hoàn", "Kiểm kê", "Sổ nhập xuất", "Danh mục & giá", "Báo cáo lãi lỗ", "Hoá đơn bán", "Hoá đơn mua & chi phí", "Nội dung", "Nhân sự", "Phân quyền", "Nhật ký hoạt động", "Chính sách AI", "Báo cáo AI"],
             ["Bán hàng", "Hàng hoá & kho", "Kế toán", "Website", "Quản trị"]),
-    "ql1": (["Tổng quan", "Đơn & tiền", "Khách hàng", "Gọi xác nhận", "Giao hàng", "Mua hàng", "Nhà cung cấp", "Kho & lô", "Hàng hoàn về kho", "Kiểm kê", "Sổ nhập xuất", "Danh mục & giá", "Hoá đơn bán", "Hoá đơn mua & chi phí", "Nội dung", "Nhật ký hoạt động"],
+    "ql1": (["Tổng quan", "Đơn & tiền", "Khách hàng", "Gọi xác nhận", "Giao hàng", "Mua hàng", "Nhà cung cấp", "Kho & lô", "Hàng hoàn", "Kiểm kê", "Sổ nhập xuất", "Danh mục & giá", "Hoá đơn bán", "Hoá đơn mua & chi phí", "Nội dung", "Nhật ký hoạt động"],
             ["Bán hàng", "Hàng hoá & kho", "Kế toán", "Website", "Quản trị"]),
-    "kho1": (["Tổng quan", "Đơn & tiền", "Giao hàng", "Việc giao của tôi", "Mua hàng", "Nhà cung cấp", "Kho & lô", "Hàng hoàn về kho", "Kiểm kê", "Sổ nhập xuất", "Danh mục & giá", "Hoá đơn bán"],
+    "kho1": (["Tổng quan", "Đơn & tiền", "Giao hàng", "Việc giao của tôi", "Mua hàng", "Nhà cung cấp", "Kho & lô", "Hàng hoàn", "Kiểm kê", "Sổ nhập xuất", "Danh mục & giá", "Hoá đơn bán"],
              ["Bán hàng", "Hàng hoá & kho", "Kế toán"]),
-    "giao1": (["Việc giao của tôi", "Hàng hoàn về kho"], ["Bán hàng", "Hàng hoá & kho"]),
+    "giao1": (["Việc giao của tôi", "Hàng hoàn"], ["Bán hàng", "Hàng hoá & kho"]),
 }
 
 
@@ -65,7 +69,7 @@ def fonts_ready(page):
 
 
 def fulfil_404(page, path_glob):
-    body = OUT_404.read_text(encoding="utf-8")
+    body = page_404_body(BASE)
     page.route(path_glob, lambda route: route.fulfill(status=404, content_type="text/html; charset=utf-8", body=body))
 
 
@@ -81,7 +85,8 @@ with sync_playwright() as p:
         login(page, user)
         labels = nav_labels(page)
         heads = [t.strip() for t in page.locator(".nav-h").all_inner_texts()]
-        ok(f"ED-01 menu {user} đúng danh sách", labels == labels_expected, str(labels))
+        want = [l for l in labels_expected if AI_ON or l not in AI_LABELS]
+        ok(f"ED-01 menu {user} đúng danh sách", labels == want, str(labels))
         ok(f"ED-01 menu {user} theo thứ tự UI-RULES §2.1", is_subsequence(labels, FULL_ORDER), str(labels))
         ok(f"ED-01 menu {user} chỉ hiện nhóm có mục", heads == sections_expected and is_subsequence(heads, SECTIONS), str(heads))
         ok(f"ED-01 {user} không còn cột phải", page.locator("#rail-right").count() == 0)
@@ -123,7 +128,8 @@ with sync_playwright() as p:
     ok("ED-01 đăng xuất không nằm rời ngoài menu avatar", page.get_by_role("button", name="Đăng xuất").count() == 0)
     page.locator(".avatar-btn").click()
     items = [t.split("\n")[-1].strip() for t in page.locator("[role=menuitem]").all_inner_texts()]
-    ok("ED-01 menu avatar đúng 3 mục", items == ["Tài khoản của tôi", "AI của tôi", "Đăng xuất"], str(items))
+    avatar_want = [x for x in ["Tài khoản của tôi", "AI của tôi", "Đăng xuất"] if AI_ON or x not in AI_LABELS]
+    ok(f"ED-01 menu avatar đúng {len(avatar_want)} mục", items == avatar_want, str(items))
     ok("ED-01 menu avatar không có 'Làm mới'", page.get_by_text("Làm mới").count() == 0)
     page.screenshot(path=f"{SHOTS}/ed-lo1-desktop-1280-avatar.png")
     page.keyboard.press("Escape")

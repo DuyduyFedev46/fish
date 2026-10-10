@@ -31,7 +31,7 @@ with sync_playwright() as p:
     expect(rows(page).first).to_be_visible()
     ok("S12: mở màn gọi GET /api/sales/payments/?resolution_status=OPEN", any(x.startswith(QLIST) for x in log(page)), str(log(page)))
     ok("S12: hàng chờ là tab của 'Đơn & tiền' (menu trái sáng đúng 1 mục)",
-       tab_labels(page) == ["Đơn hàng", "Hàng chờ thanh toán", "Phiếu hoàn"] and page.locator(".nav a.active").count() == 1, str(tab_labels(page)))
+       tab_labels(page) == ["Đơn hàng", "Hàng chờ thanh toán", "Phiếu hoàn tiền"] and page.locator(".nav a.active").count() == 1, str(tab_labels(page)))
     j = qjson(page)
     ok("S12-AC1 (mock theo BE): hàng chờ OPEN không có MATCHED, có đủ 4 loại lệch",
        all(r["match_status"] != "MATCHED" and r["resolution_status"] == "OPEN" for r in j["results"])
@@ -39,8 +39,8 @@ with sync_playwright() as p:
     ok("S12-AC1: số dòng = count BE (5)", rows(page).count() == j["count"] == 5, str(rows(page).count()))
     txt = rows(page).all_inner_texts()
     ok("S12-AC1: mỗi dòng có loại lệch + số tiền (đ) + mã GD",
-       all("đ" in t and "FT" in t for t in txt) and any("Thiếu tiền" in t for t in txt) and any("Không khớp đơn" in t for t in txt)
-       and any("Chuyển thừa" in t for t in txt) and any("Về sau khi đơn tự huỷ" in t for t in txt), str(txt[:2]))
+       all("đ" in t and "FT" in t for t in txt) and any("Chuyển thiếu" in t for t in txt) and any("Không khớp đơn" in t for t in txt)
+       and any("Chuyển thừa" in t for t in txt) and any("Về sau khi đơn đã huỷ" in t for t in txt), str(txt[:2]))
     ok("BR-PQ-15: JSON hàng chờ không có field giá vốn", "unit_cost" not in str(j) and "landed" not in str(j))
     # lọc loại lệch
     clear_log(page)
@@ -61,7 +61,7 @@ with sync_playwright() as p:
     ok("S12-AC4: CONFIRM_ORDER khi chưa đủ → 400 BR-TT-09 'Tổng tiền đã nhận … < tổng đơn …'", r["status"] == 400 and r["body"]["code"] == "BR-TT-09" and r["body"]["detail"] == exp, str(r))
     open_payment(page, under["id"])
     ok("S12: trang khoản thiếu hiện Còn thiếu + nút chính 'Lập phiếu hoàn' (không 'Xác nhận đơn đủ tiền')",
-       "Còn thiếu" in page.locator("main").inner_text() and header_buttons(page)[:1] == ["Lập phiếu hoàn"] and "Xác nhận đơn đủ tiền" not in page.locator("main").inner_text(), str(header_buttons(page)))
+       "Còn thiếu" in page.locator("main").inner_text() and header_buttons(page)[:1] == ["Lập phiếu hoàn tiền"] and "Xác nhận đơn đủ tiền" not in page.locator("main").inner_text(), str(header_buttons(page)))
 
     # ---- S12-AC2: gắn khoản không khớp 540.000 vào đơn 101 ----
     open_payment(page, 880)
@@ -73,12 +73,13 @@ with sync_playwright() as p:
     submit_btn(dlg).click()
     expect(dlg.get_by_text("Chọn một đơn trong danh sách để gắn.")).to_be_visible()
     ok("S12: chưa chọn đơn → báo tại chỗ, KHÔNG gọi API", posts(page) == [], str(log(page)))
+    page.evaluate("() => window.__caveMock.clearLog()")
     dlg.get_by_label("Tìm đơn").fill("chi hoa")
-    page.wait_for_function("() => window.__caveMock.log.some(x => x.includes('q=chi'))")
+    page.wait_for_function("() => window.__caveMock.log.some(x => x.includes('POST /api/sales/orders/search/'))")
     idle(page)
     pick = dlg.locator("label.check-row").first
     expect(pick).to_be_visible()
-    ok("S12: bước gắn đơn tìm đơn Giữ chỗ bằng API đơn (status=BOOKED)", any("status=BOOKED" in x for x in log(page)), str(log(page)))
+    ok("S12: bước gắn đơn tìm đơn bằng API tìm đơn (POST search/; từ khoá và trạng thái nằm trong thân, không nằm trong URL)", any("POST /api/sales/orders/search/" in x for x in log(page)) and not any("chi" in x.lower() and "q=" in x for x in log(page)), str(log(page)))
     ok("S12: đơn 101 (540.000 đ) được đánh dấu 'Bằng số tiền'", "Bằng số tiền" in pick.inner_text(), pick.inner_text())
     pick.click()
     dlg.get_by_label("Ghi chú").fill("Khách ghi sai nội dung CK")
@@ -108,8 +109,9 @@ with sync_playwright() as p:
     page.evaluate("() => window.__caveMock.expireOrder(102)")
     dlg.get_by_label("Tìm đơn").fill("")
     code102 = page.evaluate("() => window.__caveMock.orderJson('loc', 102).code")
+    page.evaluate("() => window.__caveMock.clearLog()")
     dlg.get_by_label("Tìm đơn").fill(code102)
-    page.wait_for_function("(c) => window.__caveMock.log.some(x => x.includes('q=' + encodeURIComponent(c)) || x.includes('q=' + c))", arg=code102)
+    page.wait_for_function("() => window.__caveMock.log.some(x => x.includes('POST /api/sales/orders/search/'))")
     idle(page)
     # đơn 102 đã tự huỷ nên không còn trong danh sách Giữ chỗ; gọi thẳng luật mock như BE (đơn chọn trước khi hết giờ)
     r = page.evaluate("() => window.__caveMock.resolveJson('loc', 881, {action: 'ATTACH_TO_ORDER', order_id: 102, note: ''})")
@@ -152,7 +154,7 @@ with sync_playwright() as p:
     orphan = next(x for x in qjson(page)["results"] if x["match_status"] == "ORPHAN")
     amt = int(orphan["amount"])
     open_payment(page, orphan["id"])
-    ok("S13: khoản ORPHAN chỉ có nút 'Lập phiếu hoàn'", header_buttons(page) == ["Lập phiếu hoàn"] and orphan["available_actions"] == ["refund"], str(header_buttons(page)))
+    ok("S13: khoản ORPHAN chỉ có nút 'Lập phiếu hoàn'", header_buttons(page) == ["Lập phiếu hoàn tiền"] and orphan["available_actions"] == ["refund"], str(header_buttons(page)))
     page.get_by_role("button", name="Lập phiếu hoàn").first.click()
     dlg = dialog(page, "Lập phiếu hoàn")
     ok("S13: số tiền mặc định = số còn được hoàn", dlg.get_by_label("Số tiền hoàn").input_value().replace(".", "") == str(amt), dlg.get_by_label("Số tiền hoàn").input_value())
@@ -203,7 +205,7 @@ with sync_playwright() as p:
     ok("P5/BR-TT-10: khoản chuyển thừa gắn đơn đã xong, chỉ còn 'refund'", over["order"] is not None and over["available_actions"] == ["refund"], str(over))
     open_payment(page, over["id"])
     ok("P5: trang chuyển thừa hiện loại 'Chuyển thừa' + đơn Hoàn tất + nút 'Lập phiếu hoàn'",
-       "Chuyển thừa" in page.locator("main").inner_text() and "Hoàn tất" in page.locator("main").inner_text() and header_buttons(page)[:1] == ["Lập phiếu hoàn"])
+       "Chuyển thừa" in page.locator("main").inner_text() and "Hoàn tất" in page.locator("main").inner_text() and header_buttons(page)[:1] == ["Lập phiếu hoàn tiền"])
     ctx.close()
 
     # ---- Bổ sung tiền (L8): chuyển thừa ngay lần đầu ----
@@ -264,7 +266,7 @@ with sync_playwright() as p:
         expect(rows(page).first).to_be_visible()
         tabs = tab_labels(page)
         if user == "ql1":
-            ok("S12/S16: ql1 thấy tab 'Đơn hàng' + 'Phiếu hoàn', không có 'Hàng chờ thanh toán'", tabs == ["Đơn hàng", "Phiếu hoàn"], str(tabs))
+            ok("S12/S16: ql1 thấy tab 'Đơn hàng' + 'Phiếu hoàn', không có 'Hàng chờ thanh toán'", tabs == ["Đơn hàng", "Phiếu hoàn tiền"], str(tabs))
         else:
             ok("S12: kho1 không có tab 'Hàng chờ thanh toán'", "Hàng chờ thanh toán" not in tabs, str(tabs))
         ctx.close()

@@ -36,8 +36,8 @@ class BatchSupplierReturn(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        verbose_name = "Trả NCC lô quá hạn"
-        verbose_name_plural = "Trả NCC lô quá hạn"
+        verbose_name = "Trả nhà cung cấp"
+        verbose_name_plural = "Trả nhà cung cấp"
         default_permissions = ("view",)
 
     def __str__(self):

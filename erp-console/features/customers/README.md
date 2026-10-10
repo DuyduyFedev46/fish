@@ -9,7 +9,7 @@ Danh bạ khách của vựa: xem, tìm, sắp xếp, mở hồ sơ, sửa tên,
 | `customersModel.ts` | Phần thuần (không React): các kiểu sắp xếp, giới hạn độ dài, kiểm tra ô nhập, tính gói PATCH chỉ gồm trường đổi, chọn câu lỗi. |
 | `messages.ts` | Câu chữ tiếng Việt do FE tự sinh. Lỗi nghiệp vụ của BE được hiện nguyên văn. |
 | `useCustomerList.ts` | Tải danh sách theo từ khoá và kiểu sắp xếp, có "Tải thêm". |
-| `useCustomerDetail.ts` | Đọc `?id=` (chỉ nhận số nguyên dương) và tải hồ sơ khách. |
+| `useCustomerDetail.ts` | Đọc `?id=` (chỉ nhận số nguyên dương) và tải hồ sơ khách; tải lại bị 404 sau khi đã xem → `scope_lost`, xoá dữ liệu (PV-13). |
 | `useCustomerTimeline.ts` | Tải dòng thời gian của khách, tải lại sau mỗi lần lưu. |
 | `components/CustomerListScreen.tsx` | Màn danh sách. |
 | `components/CustomerDetailScreen.tsx` | Màn chi tiết: sửa tại chỗ, bảng đơn, bảng phiếu hoàn, dòng thời gian. Không có khối AI. |

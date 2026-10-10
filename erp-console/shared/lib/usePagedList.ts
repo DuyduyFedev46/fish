@@ -1,7 +1,7 @@
 "use client";
 
 // Tải một danh sách phân trang DRF theo bộ lọc — dùng chung cho MỌI module có endpoint phân trang
-// (features/orders: S10 danh sách đơn, S12 hàng chờ thanh toán, S13 phiếu hoàn; features/catalog: A2 màn
+// (features/orders: S10 danh sách đơn, S12 hàng chờ thanh toán, S13 phiếu hoàn tiền; features/catalog: A2 màn
 // Danh mục). Đưa lên shared/ vì nextjs-shop-patterns cấm module đọc thẳng vào ruột module khác.
 // Trang 1 khi bộ lọc đổi, "Tải thêm" nối trang kế (DRF `next`), bỏ kết quả về trễ của bộ lọc cũ (đếm lượt),
 // không setState sau unmount. Làm mới lỗi → GIỮ danh sách cũ + báo lỗi. Sau một thao tác → `patch()` sửa đúng dòng tại chỗ.
@@ -90,9 +90,15 @@ export function usePagedList<T extends { id: number }, P>(
       });
     } catch (err) {
       if (id !== seq.current) return;
+      // PV-13-AC3: phạm vi vừa hẹp lại nên trang kế không còn (DRF trả 404) → tải lại trang 1, giữ dòng cũ tới khi có kết quả.
+      if (err instanceof ApiError && err.status === 404) {
+        setState((s) => ({ ...s, moreLoading: false }));
+        void loadFirst(true);
+        return;
+      }
       setState((s) => ({ ...s, moreLoading: false, moreError: err }));
     }
-  }, []);
+  }, [loadFirst]);
 
   const patch = useCallback((id: number, change: Partial<T>) => {
     setState((s) => (s.rows ? { ...s, rows: s.rows.map((o) => (o.id === id ? { ...o, ...change } : o)) } : s));

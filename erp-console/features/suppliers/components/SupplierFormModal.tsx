@@ -8,6 +8,7 @@
 // hiện đủ trong hộp, chỉ nằm trong state của hộp (không nháp, không storage, không URL, không log).
 
 import { useId, useState } from "react";
+import { ENUMS } from "@/shared/lib/enums";
 import { RadioGroup, Switch } from "@/shared/ui/form/Choice";
 import { Field } from "@/shared/ui/form/Field";
 import { FormAlert } from "@/shared/ui/form/FormAlert";
@@ -28,10 +29,7 @@ type Props = {
   onSaved: (saved: Supplier) => void;
 };
 
-const TYPE_FIELD_OPTIONS = [
-  { value: "INDIVIDUAL", label: "Cá nhân" },
-  { value: "COMPANY", label: "Doanh nghiệp" },
-];
+const TYPE_FIELD_OPTIONS = Object.entries(ENUMS.supplierType).map(([value, v]) => ({ value, label: v.label }));
 
 export function SupplierFormModal({ supplier, onClose, onSaved }: Props) {
   const formId = useId();

@@ -12,9 +12,14 @@ from rest_framework import serializers
 
 from apps.common.formatting import format_local_date
 from apps.common.pii import mask_phone
-from apps.delivery.confirmation.scope import note_in_customer_service_scope
+from apps.delivery.confirmation.scope import note_in_confirmation_scope
 from apps.delivery.models import ConfirmationTask, CustomerCall, DeliveryNote
 from apps.sales.models.invoices import SalesInvoiceLineBatch
+
+# T43: nhãn chữ cho mã chặn tự huỷ (hằng, không ghép dữ liệu khách). Khoá `auto_cancel_blocked` giữ mã thô.
+AUTO_CANCEL_BLOCKED_LABELS = {
+    "BR-LO-05": "Lô đã chốt, không tự huỷ được",
+}
 
 
 class CustomerCallSerializer(serializers.ModelSerializer):
@@ -93,7 +98,8 @@ class ConfirmationQueueItemSerializer(serializers.ModelSerializer):
         order = getattr(invoice, "sales_order", None) if invoice else None
         customer = getattr(order, "customer", None) if order else None
 
-        in_scope = note_in_customer_service_scope(user, note, now=now)
+        # D4 do view tính một lần cho cả trang (context `scope_value`); thiếu thì phân giải (nhớ trên user, không thêm truy vấn).
+        in_scope = note_in_confirmation_scope(user, note, now=now, value=self.context.get("scope_value"))
 
         # Trạng thái hiển thị
         confirm_state = None if obj.state == ConfirmationTask.State.DONE else obj.state
@@ -101,11 +107,8 @@ class ConfirmationQueueItemSerializer(serializers.ModelSerializer):
         # Escalation
         escalation_reason = obj.escalation_reason or None
         escalation_label = None
-        if obj.escalation_reason == ConfirmationTask.EscalationReason.WANT_CHANGE:
-            escalation_label = "Khách muốn đổi món – huỷ + hoàn + đặt lại"
-        elif obj.escalation_reason == ConfirmationTask.EscalationReason.WANT_CANCEL:
-            escalation_label = "Khách muốn huỷ"
-        elif obj.escalation_reason:
+        if obj.escalation_reason:
+            # T36/T37: một chữ cho mọi nơi; hướng dẫn xử lý nằm ở dòng gợi ý của màn, không trong nhãn.
             escalation_label = obj.get_escalation_reason_display()
 
         # Next call after
@@ -165,6 +168,7 @@ class ConfirmationQueueItemSerializer(serializers.ModelSerializer):
 
         data = {
             "note_id": note.pk,
+            "note_code": note.code,  # L5-code: mã phiếu giao (không phải dữ liệu cá nhân)
             "order_id": order.pk if order else None,
             "order_code": order.code if order else "",
             "note_status": note.status,
@@ -180,6 +184,7 @@ class ConfirmationQueueItemSerializer(serializers.ModelSerializer):
             "escalated_at": obj.escalated_at.isoformat() if obj.escalated_at else None,
             "decide_deadline": decide_deadline,
             "auto_cancel_blocked": obj.auto_cancel_blocked_code or None,
+            "auto_cancel_blocked_label": AUTO_CANCEL_BLOCKED_LABELS.get(obj.auto_cancel_blocked_code) or None,  # T43
             "claimed_by": claimed_by_data,
             "claimed_until": claimed_until_data,
             "lines_summary": self._calc_lines_summary(note),

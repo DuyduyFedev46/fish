@@ -2,13 +2,16 @@
 
 // Màn Phân quyền (ED-40 / W3h): /permissions/. Hai khối: (1) bảng các nhóm (Nhóm · Số người · Xem giá vốn · Đổi lần cuối), bấm → trang nhóm;
 // (2) ma trận việc x nhóm có ô tìm "Tìm việc…". Chủ bật/tắt ngay tại ô (công tắc); người khác có manage_staff chỉ xem.
+// Chủ HOẶC superuser bật/tắt được (BE cho cả hai). Mỗi PUT gửi `version` của nhóm; 409 → báo và tải lại; mở rộng dữ liệu khách → hộp cảnh báo (PV-09, PV-10).
 // Cột Chủ luôn đủ quyền và khoá; việc "Chỉ Chủ" ở nhóm khác là ô khoá. Việc "Xem khách hàng" đang bật ghi rõ "Tất cả khách"
 // (quyết định #13). Registry (danh sách việc) lấy từ chi tiết nhóm Chủ vì danh sách nhóm không kèm registry.
 // Mọi con số lấy từ BE; ô chỉ đổi sau khi BE nhận (không cập nhật lạc quan). Không ghi gì vào storage/URL/log.
 
+import { objectLabelOf } from "../objectLabel";
 import Link from "next/link";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/features/auth/components/AuthProvider";
+import { aiVisible } from "@/shared/lib/features";
 import { dateTime } from "@/shared/lib/format";
 import { loadErrorText } from "@/shared/lib/http";
 import { ROLE } from "@/shared/lib/roles";
@@ -26,14 +29,18 @@ import {
   cellMode,
   groupHref,
   isAssignedOnly,
+  isGroupWriter,
   isToggleable,
+  showsAllCustomers,
   matchesTask,
   sectionsOf,
 } from "../permissionsModel";
+import { visibleRegistry } from "../permissionsModel";
 import { cellKey, useCapabilityToggle, type ToggleGroup } from "../useCapabilityToggle";
 import { useGroupDetail, useGroupList } from "../useGroupData";
 import type { GroupDetail, GroupSummary, RegistryItem } from "../types";
 import { ConfirmOffModal } from "./ConfirmOffModal";
+import { ConfirmSaveModal } from "./ConfirmSaveModal";
 import { PermSwitch } from "./PermSwitch";
 import s from "../permissions.module.css";
 
@@ -43,8 +50,8 @@ export function PermissionMatrixScreen() {
   const reg = useGroupDetail(me ? ROLE.owner : null);
   const [q, setQ] = useState("");
   const home = me ? homePath(me) : undefined;
-  // Chỉ nhóm Chủ ghi được (BE chặn thật); superuser không thuộc nhóm Chủ thì màn chỉ xem để khỏi hiện nút bấm sẽ bị 403.
-  const canEdit = !!me?.groups.includes(ROLE.owner);
+  // Chủ hoặc superuser ghi được (BE chặn thật; Duy chốt 06/10 mở cho superuser). Người khác chỉ xem.
+  const canEdit = isGroupWriter(me);
 
   const listRef = useRef<GroupSummary[] | null>(null);
   listRef.current = list.data;
@@ -56,7 +63,15 @@ export function PermissionMatrixScreen() {
       replaceList(
         cur.map((g) =>
           g.code === next.code
-            ? { ...g, capabilities: next.capabilities, can_view_cost: next.can_view_cost, last_changed_at: next.last_changed_at, last_changed_by: next.last_changed_by }
+            ? {
+                ...g,
+                capabilities: next.capabilities,
+                can_view_cost: next.can_view_cost,
+                last_changed_at: next.last_changed_at,
+                last_changed_by: next.last_changed_by,
+                version: next.version,
+                data_scope_values: next.data_scope_values,
+              }
             : g,
         ),
       );
@@ -64,8 +79,17 @@ export function PermissionMatrixScreen() {
     [replaceList],
   );
 
-  const registry = useMemo(() => reg.data?.registry ?? [], [reg.data]);
-  const toggler = useCapabilityToggle({ registry, onSaved });
+  const aiOn = aiVisible(me);
+  const registry = useMemo(() => visibleRegistry(reg.data?.registry ?? [], aiOn), [reg.data, aiOn]);
+  const reloadList = list.reload;
+  const reloadRegistry = reg.reload;
+  // 409 (PV-10): người khác vừa đổi nhóm → lấy lại danh sách để có `version` và trạng thái mới; không tự gửi lại.
+  const onConflict = useCallback(() => {
+    void reloadList();
+    void reloadRegistry();
+  }, [reloadList, reloadRegistry]);
+  const toggler = useCapabilityToggle({ registry, onSaved, onConflict });
+  const objectLabel = useCallback((key: string) => objectLabelOf(key, reg.data?.data_scopes, reg.data?.registry), [reg.data]);
   const sections = useMemo(() => sectionsOf(registry), [registry]);
 
   const reloadAll = () => {
@@ -185,12 +209,21 @@ export function PermissionMatrixScreen() {
       {toggler.pendingOff && (
         <ConfirmOffModal pending={toggler.pendingOff} onConfirm={toggler.confirmOff} onClose={toggler.cancelOff} labelOf={toggler.labelOf} />
       )}
+      {toggler.pendingWiden && (
+        <ConfirmSaveModal
+          groupLabelText={toggler.pendingWiden.group.label}
+          preview={toggler.pendingWiden.impact}
+          objectLabel={objectLabel}
+          run={toggler.confirmWiden}
+          onClose={toggler.cancelWiden}
+        />
+      )}
     </ListPage>
   );
 }
 
 function asToggleGroup(g: GroupSummary): ToggleGroup {
-  return { code: g.code, label: g.label, states: g.capabilities, memberCount: g.member_count };
+  return { code: g.code, label: g.label, states: g.capabilities, memberCount: g.member_count, version: g.version, scopeValues: g.data_scope_values };
 }
 
 type MatrixProps = {
@@ -307,8 +340,8 @@ function SectionRows({
 function MatrixCell({ group, item, canEdit, busy, onToggle }: { group: GroupSummary; item: RegistryItem; canEdit: boolean; busy: boolean; onToggle: () => void }) {
   const mode = cellMode(item, group.code, group.capabilities[item.key]);
   const name = `${item.label} — ${group.label}`;
-  const allCustomers = item.key === CUSTOMERS_KEY && (mode === "on" || mode === "owner");
-  const assigned = (mode === "on" || mode === "partial") && isAssignedOnly(group.code, item.key);
+  const allCustomers = item.key === CUSTOMERS_KEY && showsAllCustomers(group.data_scope_values, mode === "on" || mode === "owner");
+  const assigned = (mode === "on" || mode === "partial") && isAssignedOnly(group.data_scope_values, item.key);
 
   let control: React.ReactNode;
   if (mode === "owner") {

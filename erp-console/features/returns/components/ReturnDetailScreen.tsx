@@ -1,16 +1,17 @@
 "use client";
 
-// Chi tiết hàng hoàn về kho (ED-26 / W5f): /returns/detail/?id=<pk>. Khung DetailPage: header (mã mono · chip · [Tái nhập vào lô] [Huỷ bỏ, ghi lỗ]),
+// Chi tiết hàng hoàn về kho (ED-26 / W5f): /returns/detail/?id=<pk>. Khung DetailPage: header (mã mono · chip · [Tái nhập vào lô] [Huỷ hàng, ghi lỗ]),
 // StatusPath (Chờ duyệt → Đã duyệt) kèm Tiếp theo / Đã làm, khối thông tin, cột phải = Trợ lý AI + dòng thời gian.
 // Hai nút duyệt chỉ hiện cho người có inventory.approve_returntostock khi phiếu còn Chờ duyệt; cả hai mở hộp F2n (chọn sẵn quyết định đã bấm).
-// "Huỷ phiếu hoàn" (Lô bổ sung A #8) nằm trong menu "…": phiếu còn Chờ duyệt, người có quyền duyệt/sửa hoặc người tạo phiếu; có hộp xác nhận
-// vì không khôi phục được. Phiếu đã huỷ: chip Đã huỷ, StatusPath kết thúc đỏ, hết mọi nút. Không có tiền hay giá vốn. Ghi chú là chữ tự do: chỉ hiện trong trang.
+// "Huỷ phiếu hàng hoàn" (Lô bổ sung A #8) nằm trong menu "…": phiếu còn Chờ duyệt, người có quyền duyệt/sửa hoặc người tạo phiếu; có hộp xác nhận
+// vì không khôi phục được. Phiếu đã huỷ: chip Đã huỷ, StatusPath kết thúc đỏ, hết nút duyệt và huỷ (Chủ còn mục "Xoá phiếu hàng hoàn" trong menu "…" khi BE cho `delete`). Không có tiền hay giá vốn. Ghi chú là chữ tự do: chỉ hiện trong trang.
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState, type ReactNode } from "react";
 import { useAuth } from "@/features/auth/components/AuthProvider";
 import { ENUMS } from "@/shared/lib/enums";
 import { dateTime, kg } from "@/shared/lib/format";
-import { loadErrorText } from "@/shared/lib/http";
+import { ApiError, loadErrorText } from "@/shared/lib/http";
 import { canView, homePath } from "@/shared/lib/nav";
 import { Chip } from "@/shared/ui/Chip";
 import { DetailHeader } from "@/shared/ui/detail/DetailHeader";
@@ -24,12 +25,13 @@ import { Icon } from "@/shared/ui/Icon";
 import { PersonalText } from "@/shared/ui/PersonalText";
 import { ConfirmModal } from "@/shared/ui/overlay/ConfirmModal";
 import { useToast } from "@/shared/ui/overlay/Toast";
+import { ScopeLostInApp } from "@/features/auth/components/AppStates";
 import { ErrorScreen } from "@/shared/ui/states/ErrorScreen";
 import { NoPermission } from "@/shared/ui/states/NoPermission";
 import { NotFoundScreen } from "@/shared/ui/states/NotFoundScreen";
 import { RETURNS_MSG as M } from "../messages";
-import { PATH_STEPS, canApprove, canCancel, doneSteps, isOutsideLong, nextStepText, outsideText } from "../returnsModel";
-import { cancelReturn } from "../api";
+import { PATH_STEPS, canApprove, canCancel, canDelete, doneSteps, isOutsideLong, nextStepText, outsideText } from "../returnsModel";
+import { cancelReturn, deleteReturn } from "../api";
 import type { ApproveDecision, ReturnItem } from "../types";
 import { useReturnOrderId } from "../useReturnOrderId";
 import { useReturnDetail, useReturnId, type ReturnDetailState } from "../useReturnDetail";
@@ -66,6 +68,7 @@ export function ReturnDetailScreen({ renderAi }: Props) {
   if (id === undefined) return <DetailSkeleton />;
   if (id === null) return <NotFoundScreen homeHref={home} />;
   if (detail.status === "forbidden") return <NoPermission homeHref={home} />;
+  if (detail.status === "scope_lost") return <ScopeLostInApp listHref="/returns/" />;
   if (detail.status === "notfound") return <NotFoundScreen homeHref={home} />;
   if (detail.status === "error") return <ErrorScreen homeHref={home} onRetry={() => void detail.reload()} />;
   if (detail.status === "loading" || !detail.data) return <DetailSkeleton />;
@@ -75,8 +78,11 @@ export function ReturnDetailScreen({ renderAi }: Props) {
 function ReturnDetailBody({ item: r, detail, renderAi }: { item: ReturnItem; detail: ReturnDetailState; renderAi?: Props["renderAi"] }) {
   const { me } = useAuth();
   const toast = useToast();
+  const router = useRouter();
   const [modal, setModal] = useState<{ decision: ApproveDecision } | null>(null);
   const [cancelling, setCancelling] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteGone, setDeleteGone] = useState(false);
   const [version, setVersion] = useState(0);
   const timeline = useReturnTimeline(r.id, version);
 
@@ -94,6 +100,7 @@ function ReturnDetailBody({ item: r, detail, renderAi }: { item: ReturnItem; det
 
   const more: MoreMenuItem[] = [];
   if (canCancel(me, r)) more.push({ key: "cancel", label: M.cancelMenu, danger: true, onSelect: () => setCancelling(true) });
+  if (canDelete(r)) more.push({ key: "delete", label: M.deleteMenu, danger: true, onSelect: () => { setDeleteGone(false); setDeleting(true); } });
 
   const primary = mayApprove ? (
     <>
@@ -228,6 +235,49 @@ function ReturnDetailBody({ item: r, detail, renderAi }: { item: ReturnItem; det
           }}
         >
           <p>{M.cancelBody(r.code)}</p>
+        </ConfirmModal>
+      )}
+      {deleting && deleteGone && (
+        <ConfirmModal
+          title={M.deleteTitle}
+          confirmLabel={M.deleteGoneConfirm}
+          noun="phiếu"
+          run={async () => undefined}
+          onDone={() => router.push("/returns/")}
+          onClose={() => router.push("/returns/")}
+          backLabel="Đóng"
+        >
+          <p className="alert-box err" role="alert" data-testid="delete-gone">
+            {M.deleteGone}
+          </p>
+        </ConfirmModal>
+      )}
+      {deleting && !deleteGone && (
+        <ConfirmModal
+          title={M.deleteTitle}
+          confirmLabel={M.deleteConfirm}
+          danger
+          noun="phiếu"
+          run={async () => {
+            try {
+              return await deleteReturn(r.id);
+            } catch (e) {
+              if (e instanceof ApiError && e.status === 404) setDeleteGone(true);
+              throw e;
+            }
+          }}
+          onDone={() => {
+            toast.success(M.deleted);
+            router.push("/returns/");
+          }}
+          onClose={() => setDeleting(false)}
+          onReload={() => {
+            setDeleting(false);
+            refresh();
+          }}
+        >
+          <p>{M.deleteBody(r.code)}</p>
+          {r.status === "DRAFT" && <p data-testid="delete-draft-note">{M.deleteDraftNote}</p>}
         </ConfirmModal>
       )}
       {modal && (

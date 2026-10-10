@@ -31,20 +31,16 @@ class DataScopesDescribeTests(TestCase):
             for option in row["options"]:
                 self.assertEqual(set(option), OPTION_KEYS)
 
-    def test_pv02_ac6_legacy_scopes_still_present_and_built_from_config(self):
+    def test_pv12_legacy_scopes_key_is_gone_and_values_follow_stored_config(self):
+        """Lô 6: bỏ khoá `scopes` cũ ở GET; phạm vi đọc ở `data_scope_values` dựng từ cấu hình đã lưu."""
         body, _ = self.rows(roles.DELIVERY_STAFF)
-        self.assertEqual(body["scopes"]["orders"], "Được gán")
-        self.assertEqual(body["scopes"]["deliveries"], "Được gán")
-        self.assertEqual(body["scopes"]["customers"], "Được gán")
-        # Chữ sai "Trong phạm vi gọi" không còn: CSKH thấy đơn của mình hoặc đang chờ gọi.
-        body, _ = self.rows(roles.CUSTOMER_SERVICE)
-        self.assertNotIn("Trong phạm vi gọi", body["scopes"].values())
-
-    def test_pv02_ac6_legacy_scopes_follow_stored_config(self):
+        self.assertNotIn("scopes", body)
+        self.assertEqual(body["data_scope_values"]["orders"], "assigned_deliveries")
+        self.assertEqual(body["data_scope_values"]["deliveries"], "assigned")
         GroupDataScope.objects.filter(group__name=roles.WAREHOUSE_STAFF, object_key="orders").update(
             value="assigned_deliveries")
         body, _ = self.rows(roles.WAREHOUSE_STAFF)
-        self.assertEqual(body["scopes"]["orders"], "Được gán")
+        self.assertEqual(body["data_scope_values"]["orders"], "assigned_deliveries")
 
     def test_pv02_ac6_row_values_follow_contract_for_editable_objects(self):
         _, rows = self.rows(roles.DELIVERY_STAFF)
@@ -123,7 +119,7 @@ class DataScopesDescribeTests(TestCase):
         """D3/D5 là quyền Tầng 1 ngoài registry: chữ là 'Nhóm không có quyền xem ...', Chủ không bật được ở đây."""
         _, rows = self.rows(roles.CUSTOMER_SERVICE)
         self.assertEqual(rows["deliveries"]["inactive_reason"], "Nhóm không có quyền xem phiếu giao")
-        self.assertEqual(rows["returns"]["inactive_reason"], "Nhóm không có quyền xem hàng hoàn về kho")
+        self.assertEqual(rows["returns"]["inactive_reason"], "Nhóm không có quyền xem hàng hoàn")
 
     def test_pv02_ac7_confirmation_inactive_for_group_without_confirm_calls(self):
         _, rows = self.rows(roles.DELIVERY_STAFF)

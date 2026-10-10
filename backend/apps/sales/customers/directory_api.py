@@ -5,13 +5,15 @@ API danh bạ khách cho ERP — Lô 6 / B2 (ED-13, BR-PQ-31, bất biến 9).
 `GET|PATCH /api/sales/customer-directory/{id}/`.
 
 - Quyền: Tầng 2 `sales.view_customer_list` (owner + manager, Chủ bật/tắt được); `PATCH` thêm `sales.change_customer`.
-  Không có phạm vi dòng: quyền này = xem mọi khách. NV kho, NV giao, CSKH nhận 403 (kể cả khi có `view_customer`
-  Tầng 1). NV giao vẫn xem khách của phiếu mình ở endpoint cũ `/api/sales/customers/` (không đổi).
+  NV kho, NV giao, CSKH nhận 403 khi chưa được bật việc "Xem khách hàng" (kể cả khi có `view_customer` Tầng 1).
+- Phạm vi dòng (PV-05): D7 của nhóm (`scope.scope_customers_for`), CÙNG hàm với endpoint cũ `/api/sales/customers/` nên hai API
+  trả cùng một tập khách. `all`: mọi khách, đủ field. `assigned_deliveries`: khách của phiếu gán cho mình còn trong cửa sổ
+  SR-PII-02, và không có `note`, `default_address` (chỉ field cần để giao, bất biến 9). `none`: rỗng. Ngoài phạm vi: 404.
 - Số liệu (đơn, tổng mua, đơn huỷ, đơn đầu/cuối) tính bằng `annotate` Subquery trong một câu SQL, không N+1.
   `total_spent` là doanh thu của khách (không phải giá vốn) và không dính lãi lỗ.
 - Không có `AiDeclarable`, và `/api/sales/customer-directory/` nằm trong `FORBIDDEN_PREFIXES` của chính sách AI.
 - `POST .../search/` (Lô bổ sung A #11, Duy chốt 02/10): body `{q, ordering?, page?}`, cùng quyền, cùng shape với danh sách,
-  vì từ khoá tìm (tên/SĐT khách) không được nằm trong URL/log truy cập. `GET ?q=` giữ để tương thích; FE sẽ chuyển sang POST.
+  vì từ khoá tìm (tên/SĐT khách) không được nằm trong URL/log truy cập. `GET ?q=` đã bỏ (Lô 17b-BE, TLA-L3): có `q` thì 400 `SEARCH_USE_POST`, câu lỗi không lặp lại `q`.
   `next`/`previous` trong kết quả chỉ để biết còn trang hay không; muốn sang trang khác thì gửi lại POST với `page`.
 - Response gắn `Cache-Control: no-store` (chứa tên, SĐT, địa chỉ).
 - `PATCH` nhận `name`, `phone`, `default_address`, `note`. `phone` chuẩn hoá bằng `normalize_phone`, trùng khách khác thì
@@ -25,16 +27,19 @@ from rest_framework import serializers, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from apps.common.api import BusinessModelPermissions, NoStoreMixin, StandardPagination
+from apps.common.api import BusinessModelPermissions, NoStoreMixin, SearchBodyPagination, StandardPagination
 from apps.common.exceptions import BusinessError
 from apps.sales.models import Customer, Refund, SalesInvoice, SalesOrder
 from apps.sales.utils import fold_text
 
 from . import services
 from .permissions import CHANGE_CUSTOMER_PERM, VIEW_CUSTOMER_LIST_PERM
+from .scope import scope_customers_for, sees_all_customers
 from .serializers import DirectoryDetailSerializer, DirectoryListSerializer, DirectoryUpdateSerializer
 
 CANCELLED_STATUSES = (SalesOrder.Status.CANCELLED, SalesOrder.Status.AUTO_CANCELLED)
+SEARCH_USE_POST = "SEARCH_USE_POST"
+SEARCH_USE_POST_MESSAGE = "Tìm khách dùng ô tìm trên màn Khách hàng."
 MIN_PHONE_DIGITS = 4  # tìm theo SĐT cần ít nhất 4 chữ số (không dò danh bạ bằng "0", "09")
 
 # Khoá `ordering` được phép -> biểu thức sắp xếp. Mặc định: đơn gần nhất mới trước, khách chưa mua xếp cuối.
@@ -100,13 +105,6 @@ def _name_matches(query):
     return [pk for pk, name in Customer.objects.values_list("pk", "name") if needle in fold_text(name)]
 
 
-class SearchBodyPagination(StandardPagination):
-    """Cùng 20 dòng/trang, nhưng số trang lấy từ body JSON (`page`) thay vì query string."""
-
-    def get_page_number(self, request, paginator):
-        return request.data.get("page", 1) if hasattr(request.data, "get") else 1
-
-
 class SearchBodySerializer(serializers.Serializer):
     q = serializers.CharField(max_length=200, allow_blank=True, required=False, default="")
     ordering = serializers.CharField(max_length=40, allow_blank=True, required=False, default="")
@@ -131,17 +129,20 @@ class CustomerDirectoryViewSet(NoStoreMixin, viewsets.GenericViewSet):
     def get_serializer_class(self):
         return DirectoryListSerializer if self.action == "list" else DirectoryDetailSerializer
 
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context["full_customer_data"] = sees_all_customers(self.request.user)  # D7 `all` mới có địa chỉ mặc định, ghi chú
+        return context
+
     def get_queryset(self):
-        qs = annotate_purchase_stats(Customer.objects.all())
+        qs = annotate_purchase_stats(scope_customers_for(self.request.user, Customer.objects.all()))
         if self.action != "list":
             return qs
-        return self.search_queryset(
-            qs, self.request.query_params.get("q", ""), self.request.query_params.get("ordering", ""),
-        )
+        return self.search_queryset(qs, "", self.request.query_params.get("ordering", ""))
 
     @staticmethod
     def search_queryset(qs, query, ordering_key):
-        """Lọc theo `q` (tên không dấu hoặc SĐT ≥ 4 số) và sắp xếp; dùng chung cho GET `?q=` và POST `search/`."""
+        """Lọc theo `q` (tên không dấu hoặc SĐT ≥ 4 số) và sắp xếp; GET (không `q`) và POST `search/` dùng chung."""
         query = (query or "").strip()
         if query:
             cond = Q(pk__in=_name_matches(query))
@@ -153,6 +154,9 @@ class CustomerDirectoryViewSet(NoStoreMixin, viewsets.GenericViewSet):
         return qs.order_by(ordering, "-id")
 
     def list(self, request, *args, **kwargs):
+        if request.query_params.get("q", "").strip():
+            # Từ khoá tên/SĐT không được nằm trong URL (bất biến 9). Không lặp lại giá trị `q`.
+            raise BusinessError(SEARCH_USE_POST_MESSAGE, code=SEARCH_USE_POST)
         page = self.paginate_queryset(self.get_queryset())
         return self.get_paginated_response(self.get_serializer(page, many=True).data)
 
@@ -162,11 +166,12 @@ class CustomerDirectoryViewSet(NoStoreMixin, viewsets.GenericViewSet):
         body = SearchBodySerializer(data=request.data if hasattr(request.data, "get") else {})
         body.is_valid(raise_exception=True)
         queryset = self.search_queryset(
-            annotate_purchase_stats(Customer.objects.all()), body.validated_data["q"], body.validated_data["ordering"],
+            annotate_purchase_stats(scope_customers_for(request.user, Customer.objects.all())),
+            body.validated_data["q"], body.validated_data["ordering"],
         )
         paginator = SearchBodyPagination()
         page = paginator.paginate_queryset(queryset, request, view=self)
-        return paginator.get_paginated_response(DirectoryListSerializer(page, many=True).data)
+        return paginator.get_paginated_response(DirectoryListSerializer(page, many=True, context=self.get_serializer_context()).data)
 
     def retrieve(self, request, *args, **kwargs):
         return Response(self.get_serializer(self.get_object()).data)

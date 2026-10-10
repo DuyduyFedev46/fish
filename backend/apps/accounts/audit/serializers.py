@@ -8,9 +8,7 @@ Lọc bỏ các khoá giá vốn trong `changes` nếu user không có quyền x
 """
 import re
 
-from django.conf import settings
-from django.db.models import Q
-
+from apps.common.ai_visibility import exclude_ai_audit_rows
 from apps.common.audit import NOTE_PRESENT_LABEL, NOTE_PRESENT_NEUTRAL_LABEL
 from apps.common.cost_keys import redact_cost
 
@@ -19,7 +17,7 @@ _FIXED_NOTES = ("", NOTE_PRESENT_LABEL, NOTE_PRESENT_NEUTRAL_LABEL)
 # khi khớp mẫu cố định do hệ thống sinh, không thì trả nhãn trung tính. Không sửa DB (bất biến 4).
 _GUARDED_ACTIONS = {
     "attach_payment": (),
-    "resolve_payment": (re.compile(r"Hoàn tiền theo phiếu hoàn #\d+"),),
+    "resolve_payment": (re.compile(r"Hoàn tiền theo phiếu hoàn( tiền)? #\d+"),),
     "mark_refund_failed": (),
     "cancel_paid_order": (),  # xử lý riêng: nhãn lý do + nhãn ghi chú
     "delivery_unconfirmed": (),
@@ -29,14 +27,20 @@ _GUARDED_ACTIONS = {
 _REJECT_NOTE = re.compile(r"Từ chối đề xuất AI [\w-]+")
 
 
+# Nhãn lý do huỷ TRƯỚC lô áp tên chuẩn: AuditLog cũ trong DB vẫn mang chữ này (không sửa DB, bất biến 4),
+# nên vẫn phải được coi là mẫu cố định do hệ thống sinh.
+_LEGACY_CANCEL_LABELS = ("Hư hỏng khi soạn hàng", "Bỏ giao sau khi thất bại", "Khác")
+
+
 def _cancel_note_ok(note):
     from apps.sales.orders.services import CANCEL_REASON_LABELS
 
-    labels = [*CANCEL_REASON_LABELS.values(), "Không rõ"]
+    labels = [*CANCEL_REASON_LABELS.values(), *_LEGACY_CANCEL_LABELS, "Không rõ"]
     for label in labels:
-        base = f"Lý do: {label}"
-        if note in (base, f"{base} · {NOTE_PRESENT_LABEL}", f"{base} · {NOTE_PRESENT_NEUTRAL_LABEL}"):
-            return True
+        for prefix in ("Huỷ đơn", "Lý do"):  # "Lý do:" là mẫu cũ đã ghi trong DB, giữ để không che nhầm
+            base = f"{prefix}: {label}"
+            if note in (base, f"{base} · {NOTE_PRESENT_LABEL}", f"{base} · {NOTE_PRESENT_NEUTRAL_LABEL}"):
+                return True
     return False
 
 
@@ -55,16 +59,7 @@ def safe_note(action, note):
     return NOTE_PRESENT_NEUTRAL_LABEL
 
 
-def exclude_ai_rows(qs):
-    """
-    Khi AI tắt (`AI_ENABLED=False`) ẩn các dòng DO AI làm: `actor_kind="ai"` và dòng Hệ thống thuộc vòng đời
-    đề xuất AI (`actor_kind="system"` có `proposal_ref`). GIỮ dòng do người làm: duyệt/từ chối đề xuất,
-    dòng nghiệp vụ do người duyệt thực thi (tự gắn `proposal_ref`), và `ai_config_*`/`ai_policy_*` do Chủ đổi
-    (kiểm toán BR-PQ-04/05).
-    """
-    if getattr(settings, "AI_ENABLED", False):
-        return qs
-    return qs.exclude(Q(actor_kind="ai") | (Q(actor_kind="system") & ~Q(proposal_ref="")))
+exclude_ai_rows = exclude_ai_audit_rows  # giữ tên cũ (TL-D3-L4); thân hàm ở apps/common/ai_visibility
 
 
 def audit_item(row, *, can_view_cost: bool = True) -> dict:

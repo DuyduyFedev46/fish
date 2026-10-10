@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { MOCK_DELIVERY_NOTES, mockGetDeliveryNoteDetail } from "./mock";
+import { mockDeliveryNotes, mockGetDeliveryNoteDetail } from "./mock";
 import { PICK_SHEET_HREF, canOpenPickSheet, pickSheetBlock, toPickSheet } from "./pickSheet";
 import type { DeliveryNoteDetail } from "./types";
 
 // CS-16: phiếu soạn nội bộ. Dữ liệu khách trong mock là chữ bịa.
 describe("CS-16: toPickSheet bỏ dữ liệu khách và giá (AC2, AC3)", () => {
-  const note = MOCK_DELIVERY_NOTES.find((n) => n.id === 31)!;
+  const note = mockDeliveryNotes().find((n) => n.id === 31)!;
   const sheet = toPickSheet(note);
 
   it("giữ mã phiếu, dòng hàng, kg, mã lô, hạn dùng", () => {
@@ -25,7 +25,7 @@ describe("CS-16: toPickSheet bỏ dữ liệu khách và giá (AC2, AC3)", () =>
     expect(text).not.toContain("Đường Thử");
     expect(text).not.toContain(detail.phone as string);
     expect(text).not.toContain("Giao trước 11h");
-    expect(text).not.toContain("DH-260928");
+    expect(text).not.toContain("SO260928");
     expect(Object.keys(sheet).sort()).toEqual(["lines", "note_code", "status", "total_kg"]);
     for (const l of sheet.lines) expect(Object.keys(l).sort()).toEqual(["batch_id", "expiry_date", "item_name", "qty_kg"]);
   });

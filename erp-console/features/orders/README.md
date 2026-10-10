@@ -29,7 +29,7 @@ Trang `app/(console)/orders/**/page.tsx` chỉ gắn `ViewGuard` và đặt `Scr
 | `orderDetailModel.ts` | thuần: bảng trạng thái → nút chính/"…"/lý do chặn, các bước StatusPath, timeline suy ra của khoản/phiếu |
 | `filters.ts` · `amount.ts` · `refund.ts` | khoảng ngày giờ Việt Nam, đọc ô số tiền (1 ₫ – 12 chữ số), số còn được hoàn |
 | `useOrderList.ts` · `usePagedList` (shared) | tải trang, "Tải thêm", bỏ kết quả trễ |
-| `useDetail.ts` · `useIdParam.ts` · `DetailGate.tsx` | tải chi tiết theo `?id=` (tải/lỗi/404/không quyền), tải lại sau thao tác |
+| `useDetail.ts` · `useIdParam.ts` · `DetailGate.tsx` | tải chi tiết theo `?id=` (tải/lỗi/404/không quyền), tải lại sau thao tác; đã có dữ liệu mà tải lại 404 → `scope_lost` (xoá dữ liệu, màn "Bạn không còn quyền xem mục này.", PV-13) |
 | `useNow.ts` | đồng hồ giữ chỗ (`mm:ss`, chip tự đổi Đã huỷ khi hết giờ). Danh sách chưa có thanh AI: làm chung ở Lô 17 bằng `AiBarGate` (AI tắt thì 0 request) |
 | `orders.module.css` | style riêng (chỉ token) |
 | `components/OrdersSectionTabs.tsx` | 3 tab theo route, ẩn tab người dùng không có quyền |

@@ -44,7 +44,7 @@ def submit_receipt(*, receipt, actor):
     batches = []
     with transaction.atomic():
         locked = lock_draft_receipt(receipt)
-        lines = list(locked.lines.select_for_update().select_related("item"))
+        lines = list(locked.lines.select_for_update().order_by("pk"))
         for line in lines:
             if line.batch_id is not None:
                 # dòng đã có lô (dữ liệu cũ) -> giữ nguyên, không sinh lô trùng
@@ -166,6 +166,20 @@ def create_and_submit_receipt(
     return receipt, batches
 
 
+def can_cancel_any_receipt(actor) -> bool:
+    """Quản lý/Chủ (hoặc người có `delete_purchasereceipt`, superuser) huỷ được phiếu của bất kỳ ai (V-DW2)."""
+    return bool(
+        actor.has_perm("purchasing.delete_purchasereceipt")
+        or actor.groups.filter(name__in=[roles.OWNER, roles.MANAGER]).exists()
+        or getattr(actor, "is_superuser", False)
+    )
+
+
+def can_cancel_receipt(actor, receipt) -> bool:
+    """Luật huỷ phiếu nhập V-DW2 (không đổi hành vi): người tạo phiếu, hoặc Quản lý/Chủ. D6 không tác động."""
+    return receipt.created_by_id == actor.id or can_cancel_any_receipt(actor)
+
+
 def cancel_receipt(*, receipt, actor):
     """
     Huỷ phiếu nhập kho khi mọi lô còn Nháp (DW-18, BR-MH-07, V-DW2).
@@ -185,13 +199,7 @@ def cancel_receipt(*, receipt, actor):
     from apps.inventory.stock import services as stock
     from apps.purchasing.models import PurchaseReceipt
 
-    is_creator = (receipt.created_by_id == actor.id)
-    is_manager_or_owner = (
-        actor.has_perm("purchasing.delete_purchasereceipt")
-        or actor.groups.filter(name__in=[roles.OWNER, roles.MANAGER]).exists()
-        or getattr(actor, "is_superuser", False)
-    )
-    if not (is_creator or is_manager_or_owner):
+    if not can_cancel_receipt(actor, receipt):
         raise PermissionDenied("Bạn không có quyền huỷ phiếu nhập này.")
 
     with transaction.atomic():
@@ -202,9 +210,9 @@ def cancel_receipt(*, receipt, actor):
         if receipt.invoices.exists():
             raise BusinessError("Không thể huỷ phiếu nhập đã gắn hoá đơn mua.", code="BR-MH-07")
 
-        lines = list(receipt.lines.select_for_update().select_related("batch"))
+        lines = list(receipt.lines.select_for_update().order_by("pk"))
         batch_ids = [line.batch_id for line in lines if line.batch_id]
-        batches = list(Batch.objects.select_for_update().filter(id__in=batch_ids))
+        batches = list(Batch.objects.select_for_update().filter(id__in=batch_ids).order_by("pk"))
 
         for batch in batches:
             if batch.cost_allocations.exists():

@@ -23,7 +23,7 @@ from apps.common.exceptions import BusinessError
 from apps.common.pii import mask_phone, normalize_phone
 from apps.common.throttling import CustomerSearchThrottle
 from apps.delivery.confirmation import services as confirmation_services
-from apps.delivery.confirmation.scope import note_in_customer_service_scope
+from apps.delivery.confirmation.scope import confirmation_scope_value, note_in_confirmation_scope
 from apps.delivery.confirmation.serializers import (
     ConfirmationQueueDetailSerializer,
     ConfirmationQueueItemSerializer,
@@ -63,7 +63,7 @@ class ConfirmationQueueViewSet(NoStoreMixin, viewsets.GenericViewSet):
         try:
             note_id = int(lookup_val)
         except (ValueError, TypeError):
-            raise Http404("Mục chờ gọi không hợp lệ.")
+            raise Http404("Việc gọi xác nhận không hợp lệ.")
 
         task = self.get_queryset().filter(note_id=note_id).first()
         if not task:
@@ -77,7 +77,7 @@ class ConfirmationQueueViewSet(NoStoreMixin, viewsets.GenericViewSet):
         - Nếu có ?state=: lọc theo state chỉ định.
         """
         if not request.user.has_perm("delivery.confirm_with_customer"):
-            raise PermissionDenied("Bạn không có quyền truy cập hàng chờ CSKH.")
+            raise PermissionDenied("Bạn không có quyền truy cập hàng chờ Gọi xác nhận.")
 
         now = timezone.now()
         state = request.query_params.get("state")
@@ -107,7 +107,7 @@ class ConfirmationQueueViewSet(NoStoreMixin, viewsets.GenericViewSet):
         serializer = ConfirmationQueueItemSerializer(
             page if page is not None else qs,
             many=True,
-            context={"request": request, "now": now},
+            context={"request": request, "now": now, "scope_value": confirmation_scope_value(request.user)},
         )
         if page is not None:
             return self.get_paginated_response(serializer.data)
@@ -118,17 +118,17 @@ class ConfirmationQueueViewSet(NoStoreMixin, viewsets.GenericViewSet):
         Chi tiết mục chờ gọi. Nếu CSKH ngoài phạm vi thì trả 404 (02b §3.2).
         """
         if not request.user.has_perm("delivery.confirm_with_customer"):
-            raise PermissionDenied("Bạn không có quyền xem chi tiết đơn CSKH.")
+            raise PermissionDenied("Bạn không có quyền xem chi tiết đơn Gọi xác nhận.")
 
         task = self.get_object()
         now = timezone.now()
 
         # Kiểm tra Tầng 3 phạm vi dữ liệu cá nhân
-        if not note_in_customer_service_scope(request.user, task.note, now=now):
+        if not note_in_confirmation_scope(request.user, task.note, now=now, value=confirmation_scope_value(request.user)):
             raise Http404("Không tìm thấy mục chờ gọi trong phạm vi của bạn.")
 
         serializer = ConfirmationQueueDetailSerializer(
-            task, context={"request": request, "now": now}
+            task, context={"request": request, "now": now, "scope_value": confirmation_scope_value(request.user)}
         )
         return Response(serializer.data)
 
@@ -138,11 +138,11 @@ class ConfirmationQueueViewSet(NoStoreMixin, viewsets.GenericViewSet):
         CSKH nhận đơn để xử lý gọi (khoá mềm).
         """
         if not request.user.has_perm("delivery.confirm_with_customer"):
-            raise PermissionDenied("Bạn không có quyền nhận xử lý đơn CSKH.")
+            raise PermissionDenied("Bạn không có quyền nhận xử lý đơn Gọi xác nhận.")
 
         task = self.get_object()
         now = timezone.now()
-        if not note_in_customer_service_scope(request.user, task.note, now=now):
+        if not note_in_confirmation_scope(request.user, task.note, now=now, value=confirmation_scope_value(request.user)):
             raise Http404("Không tìm thấy mục chờ gọi trong phạm vi của bạn.")
 
         updated_task = confirmation_services.claim_task(task.pk, request.user, now=now)
@@ -165,7 +165,7 @@ class ConfirmationQueueViewSet(NoStoreMixin, viewsets.GenericViewSet):
 
         task = self.get_object()
         now = timezone.now()
-        if not note_in_customer_service_scope(request.user, task.note, now=now):
+        if not note_in_confirmation_scope(request.user, task.note, now=now, value=confirmation_scope_value(request.user)):
             raise Http404("Không tìm thấy mục chờ gọi trong phạm vi của bạn.")
 
         data = request.data or {}
@@ -219,7 +219,7 @@ class ConfirmationQueueViewSet(NoStoreMixin, viewsets.GenericViewSet):
 
         task = self.get_object()
         now = timezone.now()
-        if not note_in_customer_service_scope(request.user, task.note, now=now):
+        if not note_in_confirmation_scope(request.user, task.note, now=now, value=confirmation_scope_value(request.user)):
             raise Http404("Không tìm thấy mục chờ gọi trong phạm vi của bạn.")
 
         # Chỉ người đã xác nhận hoặc có decide_unconfirmed mới được huỷ
@@ -249,7 +249,7 @@ class ConfirmationQueueViewSet(NoStoreMixin, viewsets.GenericViewSet):
 
         task = self.get_object()
         now = timezone.now()
-        if not note_in_customer_service_scope(request.user, task.note, now=now):
+        if not note_in_confirmation_scope(request.user, task.note, now=now, value=confirmation_scope_value(request.user)):
             raise Http404("Không tìm thấy mục chờ gọi trong phạm vi của bạn.")
 
         data = request.data or {}
@@ -280,7 +280,7 @@ class ConfirmationQueueViewSet(NoStoreMixin, viewsets.GenericViewSet):
 
         task = self.get_object()
         now = timezone.now()
-        if not note_in_customer_service_scope(request.user, task.note, now=now):
+        if not note_in_confirmation_scope(request.user, task.note, now=now, value=confirmation_scope_value(request.user)):
             raise Http404("Không tìm thấy mục chờ gọi trong phạm vi của bạn.")
 
         data = request.data or {}
@@ -328,7 +328,7 @@ class CustomerSearchView(NoStoreMixin, APIView):
 
     def post(self, request, *args, **kwargs):
         if not request.user.has_perm("delivery.confirm_with_customer"):
-            raise PermissionDenied("Bạn không có quyền tìm kiếm đơn CSKH.")
+            raise PermissionDenied("Bạn không có quyền tìm kiếm đơn Gọi xác nhận.")
 
         raw_q = (request.data.get("q") if request.data else "") or ""
         raw_q = str(raw_q).strip()
@@ -363,12 +363,13 @@ class CustomerSearchView(NoStoreMixin, APIView):
             )
 
         now = timezone.now()
+        scope_value = confirmation_scope_value(request.user)  # D4 một lần cho cả kết quả
         results = []
         for note in notes:
             order = getattr(note.sales_invoice, "sales_order", None)
             if not order:
                 continue
-            in_scope = note_in_customer_service_scope(request.user, note, now=now)
+            in_scope = note_in_confirmation_scope(request.user, note, now=now, value=scope_value)
             customer = getattr(order, "customer", None)
             order_phone = order.phone or (customer.phone if customer else "")
             actual_phone = note.recipient_phone or order_phone

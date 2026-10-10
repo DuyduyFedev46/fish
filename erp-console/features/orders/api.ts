@@ -1,7 +1,7 @@
 // API module orders — S10 (danh sách + chi tiết đơn) và S11 (Chủ xác nhận thanh toán tay), contract ở 02-stories.md.
 // Danh sách/chi tiết cần sales.view_salesorder (NV giao chỉ thấy đơn của phiếu mình, ngoài phạm vi → 404, S5).
 // Xác nhận tay cần sales.confirm_payment_manual; nút chỉ hiện khi `available_actions` có "confirm_payment".
-// S12 (hàng chờ thanh toán lệch) + S13 (phiếu hoàn cho khoản không có hoá đơn): chỉ Chủ (sales.confirm_payment_manual;
+// S12 (hàng chờ thanh toán lệch) + S13 (phiếu hoàn tiền cho khoản không có hoá đơn): chỉ Chủ (sales.confirm_payment_manual;
 // S13 thêm sales.create_refund). Nút trên từng khoản theo `available_actions` của khoản đó.
 
 import { apiFetch, type Paginated } from "@/shared/lib/http";
@@ -22,6 +22,8 @@ import type {
   OrderListParams,
   PaymentQueueItem,
   PaymentQueueParams,
+  RecordLatePaymentInput,
+  RecordLatePaymentResult,
   RefundListParams,
   RefundQueueItem,
   ResolveInput,
@@ -37,7 +39,8 @@ export function orderListQuery(params: OrderListParams, page: number): string {
   if (params.status) qs.set("status", params.status);
   if (params.date_from) qs.set("date_from", params.date_from);
   if (params.date_to) qs.set("date_to", params.date_to);
-  if (params.q.trim()) qs.set("q", params.q.trim());
+  // Lô 17b NEW-1: KHÔNG đưa `q` vào URL. Từ khoá có thể là SĐT/tên khách nên đi bằng POST search/ (xem searchOrders); `GET ?q=` chỉ dành cho
+  // tra theo mã đơn ở ⌘K (shared/lib/codeLookup.ts).
   if (params.customer) qs.set("customer", params.customer);
   if (params.batch) qs.set("batch", params.batch);
   if (page > 1) qs.set("page", String(page));
@@ -45,12 +48,29 @@ export function orderListQuery(params: OrderListParams, page: number): string {
   return s ? `?${s}` : "";
 }
 
-/** GET /api/sales/orders/?status=&date_from=&date_to=&q=&page= — 20 dòng/trang. */
+/** Thân POST /api/sales/orders/search/ (contract Lô 17b-BE): `status` là mảng chuỗi (không gửi số), `page` chỉ khi > 1. Bỏ khoá rỗng. */
+export function orderSearchBody(params: OrderListParams, page: number): Record<string, unknown> {
+  const body: Record<string, unknown> = { q: params.q.trim() };
+  const statuses = params.status.split(",").map((s) => s.trim()).filter(Boolean);
+  if (statuses.length) body.status = statuses;
+  if (params.date_from) body.date_from = params.date_from;
+  if (params.date_to) body.date_to = params.date_to;
+  if (params.customer) body.customer = params.customer;
+  if (params.batch) body.batch = params.batch;
+  if (page > 1) body.page = page;
+  return body;
+}
+
+/**
+ * Danh sách đơn, 20 dòng/trang. Có từ khoá → POST /api/sales/orders/search/ (từ khoá, kể cả khi gõ mã đơn, KHÔNG vào URL/access log, bất biến 9);
+ * không có → GET /api/sales/orders/?status=&date_from=&date_to=&customer=&batch=&page=. Cùng một dạng kết quả phân trang.
+ */
 export function listOrders(params: OrderListParams, page = 1, signal?: AbortSignal): Promise<Paginated<OrderListItem>> {
-  return apiFetch<Paginated<OrderListItem>>(BASE + orderListQuery(params, page), {
-    signal,
-    mock: process.env.NEXT_PUBLIC_USE_MOCK === "1" ? mockOrdersApi : undefined,
-  });
+  const mock = process.env.NEXT_PUBLIC_USE_MOCK === "1" ? mockOrdersApi : undefined;
+  if (params.q.trim()) {
+    return apiFetch<Paginated<OrderListItem>>(`${BASE}search/`, { method: "POST", body: orderSearchBody(params, page), signal, mock });
+  }
+  return apiFetch<Paginated<OrderListItem>>(BASE + orderListQuery(params, page), { signal, mock });
 }
 
 /** GET /api/sales/orders/{id}/ */
@@ -127,10 +147,24 @@ export function resolvePayment(id: number, input: ResolveInput): Promise<Resolve
   });
 }
 
-// ---------------------------------------------------------------------------------------------------------------------
-// S13 — phiếu hoàn cho khoản tiền không có hoá đơn
+/**
+ * POST /api/sales/payments/record-late/ (#15, BR-TT-18) — ghi tay khoản tiền đã vào tài khoản mà webhook không báo. Cần
+ * sales.confirm_payment_manual. 201 dòng mới · 200 `duplicate:true`. Lỗi 400 có khoá trùng tên ô; 409 LATE_PAYMENT_POSSIBLE_DUPLICATE
+ * → gửi lại kèm `acknowledge_possible_duplicate: true`. Không ghi thân yêu cầu vào log.
+ */
+export function recordLatePayment(input: RecordLatePaymentInput): Promise<RecordLatePaymentResult> {
+  return apiFetch<RecordLatePaymentResult>(`${PAYMENTS}record-late/`, {
+    method: "POST",
+    body: input,
+    mock: process.env.NEXT_PUBLIC_USE_MOCK === "1" ? mockPaymentsApi : undefined,
+  });
+}
 
-/** POST /api/sales/refunds/create/ {payment_transaction, amount, reason, request_id} → 201 phiếu PENDING (200 + duplicate khi trùng request_id). */
+// ---------------------------------------------------------------------------------------------------------------------
+// S13 — phiếu hoàn tiền cho khoản tiền không có hoá đơn
+
+/** POST /api/sales/refunds/create/ {payment_transaction, amount, reason, request_id, acknowledge_duplicate_warning?} → 201 phiếu PENDING (200 + duplicate khi trùng request_id).
+ * Khoản có nhãn nghi trùng mà thiếu cờ → 409 PAYMENT_DUPLICATE_WARNING (`detail` = nhãn). */
 export function createRefund(input: CreateRefundInput): Promise<CreateRefundResult> {
   return apiFetch<CreateRefundResult>("/api/sales/refunds/create/", {
     method: "POST",
@@ -140,11 +174,11 @@ export function createRefund(input: CreateRefundInput): Promise<CreateRefundResu
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
-// S16 — phiếu hoàn chờ chuyển: danh sách + xác nhận / báo thất bại / thử lại
+// S16 — phiếu hoàn tiền chờ chuyển: danh sách + xác nhận / báo thất bại / thử lại
 
 const REFUNDS = "/api/sales/refunds/";
 
-/** Chuỗi query phiếu hoàn: `status` (nhiều giá trị), `month=YYYY-MM` (Lô 3 R3), `page`. */
+/** Chuỗi query phiếu hoàn tiền: `status` (nhiều giá trị), `month=YYYY-MM` (Lô 3 R3), `page`. */
 export function refundListQuery(params: RefundListParams, page: number): string {
   const qs = new URLSearchParams();
   if (params.status) qs.set("status", params.status);
@@ -195,4 +229,17 @@ export function retryRefund(id: number): Promise<RetryRefundResult> {
     body: {},
     mock: process.env.NEXT_PUBLIC_USE_MOCK === "1" ? mockRefundQueueApi : undefined,
   });
+}
+
+/**
+ * ⌘K (Lô 17b H1): id đơn khớp ĐÚNG mã, hoặc null. Dùng `GET ?q=<mã>` (chỉ mã đơn, không SĐT/tên; BE trả 400 SEARCH_USE_POST với chuỗi lạ),
+ * nên chỉ gọi với chuỗi đã đúng mẫu mã đơn (shared/lib/codeLookup.ts).
+ */
+export async function findOrderIdByCode(code: string, signal?: AbortSignal): Promise<number | null> {
+  const qs = new URLSearchParams({ q: code });
+  const page = await apiFetch<Paginated<OrderListItem>>(`${BASE}?${qs.toString()}`, {
+    signal,
+    mock: process.env.NEXT_PUBLIC_USE_MOCK === "1" ? mockOrdersApi : undefined,
+  });
+  return page.results.find((o) => o.code.toLowerCase() === code.toLowerCase())?.id ?? null;
 }

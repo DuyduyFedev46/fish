@@ -4,7 +4,7 @@
 // Module mới chỉ thay nội dung trang, không sửa bảng này trừ khi đổi luật.
 
 import { HOME_CONFIRMATION_QUEUE, ROLE } from "./roles";
-import { AI_FEATURES_ENABLED } from "./features";
+import { aiVisible } from "./features";
 
 /** Phần của `me` mà menu cần. Khai ở đây để shared/ không phụ thuộc features/auth; `Me` khớp kiểu này. */
 export type Viewer = {
@@ -14,6 +14,10 @@ export type Viewer = {
   home: "dashboard" | "my-deliveries" | typeof HOME_CONFIRMATION_QUEUE | "no-role";
   /** S48: còn dùng mật khẩu tạm → chỉ được mở màn "Đặt mật khẩu mới". */
   must_change_password?: boolean;
+  /** Duy 08/10 câu 1: superuser không nhóm vẫn vào ERP (BE trả home = dashboard); menu lọc theo quyền như mọi người. */
+  is_superuser?: boolean;
+  /** W39: BE báo cờ AI. Cùng cờ build quyết định có hiện mục AI hay không (`aiVisible`). */
+  ai_features_enabled?: boolean;
 };
 type Me = Viewer;
 
@@ -87,7 +91,7 @@ export const PERM = {
   viewSalesOrder: "sales.view_salesorder",
   /** S11/S12: chỉ Chủ — xác nhận tiền tay, xử lý hàng chờ thanh toán lệch (BR-TT-07, BR-TT-09). */
   confirmPaymentManual: "sales.confirm_payment_manual",
-  /** S16: xem danh sách phiếu hoàn (Chủ, Quản lý có — warehouse_staff/delivery_staff không). Nút xác nhận/thất bại/thử lại theo
+  /** S16: xem danh sách phiếu hoàn tiền (Chủ, Quản lý có — warehouse_staff/delivery_staff không). Nút xác nhận/thất bại/thử lại theo
    * `available_actions` của từng phiếu (chỉ Chủ có sales.confirm_refund, S16-AC7). */
   viewRefund: "sales.view_refund",
   /** ED-09/ED-10: huỷ đơn đã thanh toán (Chủ, Quản lý). Nút thật theo `available_actions` của BE; quyền này chỉ để hiện mục "Huỷ đơn" mờ kèm lý do. */
@@ -151,6 +155,8 @@ export const PERM = {
   viewPrivacyConsent: "sales.view_privacy_consent",
   /** B2 (02b): xem danh bạ khách — quyền Tầng 2 mới, khác `sales.view_customer` (phạm vi dòng của nv_kho, nv_giao). */
   viewCustomerList: "sales.view_customer_list",
+  /** V2 — xem thông tin khách (tên, SĐT, địa chỉ) trên đơn, hoá đơn, phiếu hoàn tiền. */
+  viewOrderCustomerInfo: "sales.view_order_customer_info",
   /** B6 (02b): giao / đổi người giao phiếu. */
   assignDelivery: "delivery.assign_deliverynote",
   viewSupplier: "purchasing.view_supplier",
@@ -169,7 +175,7 @@ export const PERM = {
 const has = (me: Me, perm: string) => me.permissions.includes(perm);
 const inGroup = (me: Me, ...groups: string[]) => me.groups.some((g) => groups.includes(g));
 /** Chỉ thuộc delivery_staff (không kèm Group nào khác). */
-export const onlyDelivery = (me: Me) => me.groups.length > 0 && me.groups.every((g) => g === ROLE.deliveryStaff);
+export const onlyDelivery = (me: Me) => !me.is_superuser && me.groups.length > 0 && me.groups.every((g) => g === ROLE.deliveryStaff);
 
 /**
  * Thứ tự trong bảng = thứ tự ở menu trái (UI-RULES §2.1). Mỗi lô chỉ THÊM dòng/bỏ cờ `soon`, không đổi thứ tự nhóm.
@@ -204,7 +210,7 @@ export const NAV: NavItem[] = [
   },
   {
     key: "payments",
-    summary: "Khoản tiền về lệch: thiếu, thừa, về sau khi đơn tự huỷ, không khớp đơn.",
+    summary: "Khoản tiền về lệch: thiếu, thừa, về sau khi đơn đã huỷ, không khớp đơn.",
     plannedIn: "S12, S13",
     href: "/orders/payments/",
     label: "Hàng chờ thanh toán",
@@ -218,11 +224,11 @@ export const NAV: NavItem[] = [
   },
   {
     key: "refunds",
-    summary: "Phiếu hoàn đang chờ Chủ chuyển khoản: xác nhận, báo thất bại, thử lại.",
+    summary: "Phiếu hoàn tiền đang chờ Chủ chuyển khoản: xác nhận, báo thất bại, thử lại.",
     plannedIn: "S16",
     href: "/orders/refunds/",
-    label: "Phiếu hoàn chờ chuyển",
-    short: "Phiếu hoàn",
+    label: "Hoàn tiền chờ chuyển",
+    short: "Hoàn tiền",
     icon: "currency_exchange",
     section: "Bán hàng",
     parent: "orders",
@@ -343,8 +349,8 @@ export const NAV: NavItem[] = [
     summary: "Hàng khách trả về, chờ duyệt nhập lại kho hoặc huỷ.",
     plannedIn: "Lô 9",
     href: "/returns/",
-    label: "Hàng hoàn về kho",
-    short: "Hoàn kho",
+    label: "Hàng hoàn",
+    short: "Hàng hoàn",
     icon: "assignment_return",
     section: "Hàng hoá & kho",
     visible: (me) => has(me, PERM.viewReturn),
@@ -471,7 +477,7 @@ export const NAV: NavItem[] = [
   },
   {
     key: "audit-logs",
-    summary: "Mọi thay đổi trong hệ thống, kể cả việc do trợ lý AI đề xuất (ai:<tên>).",
+    summary: "Mọi thay đổi trong hệ thống.",
     plannedIn: "S03",
     href: "/audit-logs/",
     label: "Nhật ký hoạt động",
@@ -490,7 +496,7 @@ export const NAV: NavItem[] = [
     short: "Chính sách AI",
     icon: "policy",
     section: "Quản trị",
-    visible: (me) => AI_FEATURES_ENABLED && has(me, PERM.manageAiPolicy),
+    visible: (me) => aiVisible(me) && has(me, PERM.manageAiPolicy),
   },
   {
     key: "ai-report",
@@ -501,7 +507,7 @@ export const NAV: NavItem[] = [
     short: "Báo cáo AI",
     icon: "insights",
     section: "Quản trị",
-    visible: (me) => AI_FEATURES_ENABLED && has(me, PERM.manageAiPolicy),
+    visible: (me) => aiVisible(me) && has(me, PERM.manageAiPolicy),
   },
 
   // ---- Không có dòng ở menu trái ----
@@ -515,7 +521,7 @@ export const NAV: NavItem[] = [
     icon: "auto_awesome",
     section: "Quản trị",
     menu: false, // vào từ menu avatar (UI-RULES §2.2)
-    visible: (me) => AI_FEATURES_ENABLED && !onlyDelivery(me),
+    visible: (me) => aiVisible(me) && !onlyDelivery(me),
   },
   {
     key: "ai-actions",
@@ -527,7 +533,7 @@ export const NAV: NavItem[] = [
     icon: "smart_toy",
     section: "Quản trị",
     menu: false, // bỏ khỏi menu (02b mục 0 dòng 2); trang cũ còn tới Lô 17
-    visible: (me) => AI_FEATURES_ENABLED && !onlyDelivery(me),
+    visible: (me) => aiVisible(me) && !onlyDelivery(me),
   },
 ];
 

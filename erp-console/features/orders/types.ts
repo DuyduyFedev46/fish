@@ -2,6 +2,8 @@
 // S11 (POST /api/sales/orders/{id}/confirm-payment) trong 02-stories.md. Tiền/kg là CHUỖI thập phân (bất biến #7).
 // Field đánh dấu optional = contract không ghi rõ ở chi tiết; FE chịu được khi BE không trả (xem 03-dev-notes.md, L7 FE).
 
+import type { CustomerHiddenReason } from "@/shared/lib/personalData";
+
 export type OrderStatus = "BOOKED" | "PAID" | "PROCESSING" | "COMPLETED" | "CANCELLED" | "AUTO_CANCELLED";
 
 /** Một dòng của GET /api/sales/orders/ (phân trang DRF, 20 dòng/trang). */
@@ -13,6 +15,8 @@ export type OrderListItem = {
   /** `null` = đã ẩn theo thời hạn (NV giao, phiếu giao kết thúc quá 7 ngày — SR-PII-02); "" = chưa có. */
   customer_name: string | null;
   customer_phone: string | null;
+  /** §2.7 — lý do ô khách là `null`: "expired" (quá cửa sổ) | "not_permitted" (không có V2). null/thiếu = không bị che hoặc không kèm lý do. */
+  customer_hidden_reason?: CustomerHiddenReason | null;
   total_amount: string;
   created_at: string;
   /** Mốc hết giữ chỗ (BR-BH-03) — BE trả; FE chỉ đếm lùi, không tự tính. */
@@ -31,7 +35,7 @@ export type OrderListParams = {
   /** YYYY-MM-DD (ngày theo giờ Việt Nam). Rỗng = không giới hạn. */
   date_from: string;
   date_to: string;
-  /** Mã đơn hoặc SĐT, khớp một phần. */
+  /** Mã đơn, SĐT hoặc tên, khớp một phần. Đi bằng POST search/ (không vào URL). */
   q: string;
   /** Lô 3 R3: lọc theo khách (id) — BE trả 403 khi người xem không có quyền xem khách. Chỉ id, không bao giờ là SĐT/tên. */
   customer?: string;
@@ -107,7 +111,9 @@ export type TimelineKind =
   | "cancelled"
   | "refund_created"
   | "refund_confirmed"
-  | "credit_note_issued";
+  | "credit_note_issued"
+  | "order_completed"
+  | "payment_recorded_late";
 
 /** Một mốc trên dòng thời gian (BE L7 bổ sung: ghép chứng từ + AuditLog, `at` tăng dần). `actor_display` "Hệ thống" khi actor=None. */
 export type OrderTimelineEntry = {
@@ -137,17 +143,23 @@ export type OrderDetail = {
   /** Cả ba trường là `null` khi đã ẩn theo thời hạn (NV giao, phiếu giao kết thúc quá 7 ngày — SR-PII-02). */
   /** `id` là FE đề xuất (BE Lô 3 chưa trả) — có thì mới dựng được liên kết "Mở trang khách". */
   customer: { id?: number; name: string | null; phone: string | null; address: string | null };
+  /** §2.7 — lý do che `customer` (xem OrderListItem). */
+  customer_hidden_reason?: CustomerHiddenReason | null;
   lines: OrderLine[];
   allocations: OrderAllocation[];
   invoice: { id: number; code: string; issued_at: string | null } | null;
   payments: OrderPayment[];
   delivery: OrderDelivery | null;
   refunds: OrderRefund[];
+  /** W37 S5: tiền đã hoàn (REFUNDED) và đang chờ hoàn (PENDING). Phiếu FAILED không tính. Chuỗi Decimal. */
+  refund_summary?: { refunded_amount: string; pending_amount: string };
   /** Có ở BE L7 bổ sung. Thiếu (BE cũ) → FE ghép tạm từ các mốc giờ sẵn có. */
   timeline?: OrderTimelineEntry[];
   available_actions: OrderAction[];
   /** GL-05: bằng chứng đồng ý chính sách bảo mật (chỉ trả khi có sales.view_privacy_consent). null khi đơn cũ. */
   privacy_consent?: PrivacyConsentInfo | null;
+  /** Ghi chú huỷ đơn (BR-GH-19: đã bị chặn SĐT/số TK). BE trả "" khi không có hoặc khi che dữ liệu cá nhân. Thiếu (BE cũ) = không hiện. */
+  cancel_note?: string;
 };
 
 export type PrivacyConsentInfo = {
@@ -182,7 +194,7 @@ export type ConfirmPaymentResult = {
 export type QueueMatchStatus = "UNDERPAID" | "ORPHAN" | "UNMATCHED" | "OVERPAID" | "MATCHED";
 
 export type ResolutionStatus = "OPEN" | "RESOLVED";
-/** Cách đã đóng khoản lệch (BR-TT-09): gắn vào đơn · xác nhận đơn khi khách đã bù · hoàn tiền (S13, qua phiếu hoàn đã xác nhận). */
+/** Cách đã đóng khoản lệch (BR-TT-09): gắn vào đơn · xác nhận đơn khi khách đã bù · hoàn tiền (S13, qua phiếu hoàn tiền đã xác nhận). */
 export type Resolution = "ATTACHED" | "CONFIRMED" | "REFUNDED";
 
 /** Thao tác trên một khoản lệch — BE tính cả luật lẫn quyền; FE chỉ đọc để hiện nút. */
@@ -195,13 +207,13 @@ export type QueueOrderRef = {
   status: OrderStatus | string;
   status_label?: string;
   total_amount: string;
-  /** Tổng tiền đã nhận của đơn (MATCHED + UNDERPAID, trừ giao dịch đang có phiếu hoàn chưa Thất bại) — BE tính. */
+  /** Tổng tiền đã nhận của đơn (MATCHED + UNDERPAID, trừ giao dịch đang có phiếu hoàn tiền chưa Thất bại) — BE tính. */
   paid_total: string;
   /** FE đề xuất (BE L8 chưa trả) — có thì hiện tên khách cạnh mã đơn. */
   customer_name?: string;
 };
 
-/** Phiếu hoàn đã lập cho khoản lệch (S13) — FE ĐỀ XUẤT, BE L8 chưa trả trong dòng hàng chờ; có thì hiện. */
+/** Phiếu hoàn tiền đã lập cho khoản lệch (S13) — FE ĐỀ XUẤT, BE L8 chưa trả trong dòng hàng chờ; có thì hiện. */
 export type QueueRefund = {
   id: number;
   amount: string;
@@ -235,6 +247,8 @@ export type PaymentQueueItem = {
   refunds?: QueueRefund[];
   /** Số tiền còn được hoàn (BR-HT-04) — BE tính; thiếu thì FE mặc định = `amount`, BE vẫn chặn. */
   refundable_amount?: string;
+  /** Nhãn "nghi trùng" (BR-TT-15 / BR-TT-18): có chữ thì lập phiếu hoàn tiền phải tick xác nhận đã đối chiếu sao kê. Rỗng = không nghi. */
+  duplicate_warning?: string;
   available_actions: PaymentAction[];
 };
 
@@ -270,7 +284,7 @@ export type ResolveResult = {
  * không có hoá đơn); S15 gửi `sales_invoice` + `is_partial` (huỷ đơn / hoàn một phần đơn có hoá đơn).
  */
 export type CreateRefundInput =
-  | { payment_transaction: number; amount: string; reason: string; request_id: string }
+  | { payment_transaction: number; amount: string; reason: string; request_id: string; acknowledge_duplicate_warning?: boolean }
   | { sales_invoice: number; amount: string; is_partial: boolean; reason: string; request_id: string };
 
 /** 201 phiếu mới · 200 + `duplicate: true` khi cùng `request_id` (phiếu đã tạo trước đó). */
@@ -301,19 +315,19 @@ export type CancelOrderResult = {
   order_status: string;
   stock_restored: boolean;
   delivery_status: string | null;
-  /** Gợi ý số tiền hoàn toàn phần — điền sẵn cho nút "Tạo phiếu hoàn toàn phần" (S14-AC7, mở S15). */
+  /** Gợi ý số tiền hoàn toàn phần — điền sẵn cho nút "Lập phiếu hoàn tiền toàn phần" (S14-AC7, mở S15). */
   suggest_refund_amount: string;
   invoice_id: number | null;
 };
 
 // ---------------------------------------------------------------------------------------------------------------------
-// S16 — Phiếu hoàn chờ chuyển: xác nhận, báo thất bại, thử lại (GET /api/sales/refunds/?status=PENDING,FAILED,
+// S16 — Hoàn tiền chờ chuyển: xác nhận, báo thất bại, thử lại (GET /api/sales/refunds/?status=PENDING,FAILED,
 // POST …/{id}/confirm/ | mark-failed/ | retry/). Khớp contract THỰC TẾ ở 03-dev-notes.md "Lô L9 — S14, S15, S16 (BE)".
 
 export type RefundQueueStatus = "PENDING" | "REFUNDED" | "FAILED";
-/** Thao tác một phiếu hoàn làm được ở trạng thái hiện tại — BE tính cả luật lẫn quyền (chỉ Chủ có confirm_refund;
+/** Thao tác một phiếu hoàn tiền làm được ở trạng thái hiện tại — BE tính cả luật lẫn quyền (chỉ Chủ có confirm_refund;
  * Quản lý xem được danh sách nhưng `available_actions` luôn rỗng). */
-/** Bộ lọc danh sách phiếu hoàn (Lô 3 R3): `status` nhiều giá trị cách dấu phẩy; `month` = YYYY-MM theo giờ Việt Nam. */
+/** Bộ lọc danh sách phiếu hoàn tiền (Lô 3 R3): `status` nhiều giá trị cách dấu phẩy; `month` = YYYY-MM theo giờ Việt Nam. */
 export type RefundListParams = { status: string; month: string };
 
 export type RefundQueueAction = "confirm" | "mark_failed" | "retry" | string;
@@ -341,8 +355,11 @@ export type RefundQueueItem = {
   request_id?: string | null;
   /** Có khi phiếu gắn `sales_invoice`; null khi gắn thẳng giao dịch không hoá đơn (S13). */
   order_code?: string | null;
-  customer_name?: string;
-  customer_phone?: string;
+  /** `null` khi bị che theo V2 hoặc quá cửa sổ (kèm `customer_hidden_reason`). */
+  customer_name?: string | null;
+  customer_phone?: string | null;
+  /** §2.7 — lý do che tên/SĐT khách (xem OrderListItem). */
+  customer_hidden_reason?: CustomerHiddenReason | null;
   /** Mã GD của khoản tiền VÀO ban đầu (không phải mã GD hoàn) — để Lộc đối chiếu số tài khoản trên sao kê (Q13). */
   source_bank_txn_id?: string;
   /** Lý do lần báo thất bại gần nhất (BR-HT-09); `retry` xoá về "" (giả định dev BE #4). */
@@ -360,3 +377,20 @@ export type MarkRefundFailedResult = { status: string; status_label?: string; fa
 
 /** 200 của POST …/retry/ (thân rỗng). `failure_reason` về "". */
 export type RetryRefundResult = { status: string; status_label?: string; failure_reason?: string };
+
+/** Thân gửi POST /api/sales/payments/record-late/ (BR-TT-18). KHÔNG có ô ghi chú: BE bỏ qua mọi khoá lạ. */
+export type RecordLatePaymentInput = {
+  bank_txn_id: string;
+  amount: string;
+  /** ISO 8601 (đổi từ ô giờ Việt Nam bằng `vnInputToIso`). */
+  received_at: string;
+  /** Rỗng / bỏ = không gắn đơn (khoản UNMATCHED). */
+  order_code?: string;
+  acknowledge_possible_duplicate?: boolean;
+};
+
+/** 201 (dòng mới) / 200 + `duplicate: true` (gửi lại đúng khoản đã ghi). `payment` cùng hình một dòng hàng chờ. */
+export type RecordLatePaymentResult = { duplicate: boolean; payment: PaymentQueueItem };
+
+/** Thân lỗi 409 LATE_PAYMENT_POSSIBLE_DUPLICATE: khoản giống đã có (chỉ id, mã GD, giờ — không dữ liệu cá nhân). */
+export type SimilarPayment = { id: number; bank_txn_id: string; received_at: string };

@@ -25,7 +25,7 @@ PNG = bytes.fromhex(
 SMALL_TAPS_JS = """() => [...document.querySelectorAll('button, a, input, select')].filter(e => {
     const r = e.getBoundingClientRect(); const s = getComputedStyle(e);
     return r.width > 0 && r.height > 0 && s.visibility !== 'hidden' && r.x >= 0 && r.x < 360 && r.y >= 0 && r.y < innerHeight
-      && !e.classList.contains('sr-only') && !e.classList.contains('lt-link') && !e.matches('input[type=checkbox], input[type=file]') && (r.height < 44 || (!['INPUT', 'SELECT'].includes(e.tagName) && !e.classList.contains('tab') && r.width < 44));
+      && !e.classList.contains('sr-only') && !e.matches('input[type=checkbox], input[type=file]') && (r.height < 44 || (!['INPUT', 'SELECT'].includes(e.tagName) && r.width < 44));
   }).map(e => (e.getAttribute('aria-label') || e.innerText || e.tagName).trim().slice(0,30) + ' ' + Math.round(e.getBoundingClientRect().width) + 'x' + Math.round(e.getBoundingClientRect().height))"""
 
 NO_PERM = "không có quyền"

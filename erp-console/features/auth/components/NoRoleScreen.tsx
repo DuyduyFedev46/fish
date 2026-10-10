@@ -1,6 +1,7 @@
 "use client";
 
-// S7-AC5 / S47-AC5: tài khoản không thuộc Group nào → không có menu, không có trợ lý.
+// S7-AC5 / S47-AC5 + D-3 (Duy 08/10): tài khoản không thuộc Group nào và không phải superuser → không có menu, không có trợ lý;
+// BE cũng chặn mọi API ERP bằng 403 AUTH_NO_ROLE.
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/shared/ui/Icon";
@@ -41,9 +42,9 @@ export function NoRoleScreen() {
         <div className="auth-icon" aria-hidden="true">
           <Icon name="person_off" />
         </div>
-        <h1>Tài khoản chưa được phân quyền</h1>
+        <h1>Bạn không có quyền vào hệ thống vận hành</h1>
         <p>
-          Tài khoản <b>{me.username}</b> chưa thuộc nhóm nào. Nhờ Chủ vựa cấp quyền.
+          Tài khoản <b>{me.username}</b> chưa thuộc nhóm nào nên không vào được hệ thống vận hành. Nhờ Chủ vựa xếp nhóm cho tài khoản này.
         </p>
         <div className="auth-actions">
           <button

@@ -63,6 +63,11 @@ describe("orderLine", () => {
   it("đơn Giữ chỗ quá mốc → Đã huỷ ngay + lý do, hết đếm ngược", () => {
     expect(orderLine("BOOKED", "2026-10-01T02:50:00Z", now)).toEqual({ status: "AUTO_CANCELLED", reason: "Hết giờ giữ chỗ", holdUntil: null });
   });
+  it("Lô 17a: lý do của BE (đơn huỷ có mã, chuyển thiếu tiền, giao thất bại) được hiện đúng nhãn", () => {
+    expect(orderLine("CANCELLED", null, now, { label: "Khách đổi ý" }).reason).toBe("Khách đổi ý");
+    expect(orderLine("PAID", null, now, { label: "Chuyển thiếu tiền" }).reason).toBe("Chuyển thiếu tiền");
+    expect(orderLine("PROCESSING", null, now, null).reason).toBeNull();
+  });
   it("đơn đã huỷ sẵn từ BE cũng có lý do; đơn khác không có", () => {
     expect(orderLine("AUTO_CANCELLED", null, now).reason).toBe("Hết giờ giữ chỗ");
     expect(orderLine("PAID", null, now)).toEqual({ status: "PAID", reason: null, holdUntil: null });

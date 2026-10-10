@@ -30,11 +30,12 @@ import { FormAlert } from "@/shared/ui/form/FormAlert";
 import { conflictOf, isConflictError, type SubmitConflict } from "@/shared/ui/form/useSubmit";
 import { useToast } from "@/shared/ui/overlay/Toast";
 import { ConflictBanner } from "@/shared/ui/states/ConflictBanner";
+import { ScopeLostInApp } from "@/features/auth/components/AppStates";
 import { ErrorScreen } from "@/shared/ui/states/ErrorScreen";
 import { NoPermission } from "@/shared/ui/states/NoPermission";
 import { NotFoundScreen } from "@/shared/ui/states/NotFoundScreen";
 import { fetchDeliveryNoteDetail, packDeliveryNote, printDeliveryLabel, startDelivery, voidDeliveryLabel } from "../api";
-import { canAssign, doneSteps, hasAction, idFromSearch, nextStepText, pathOf, PATH_STEPS, telHref } from "../deliveryUi";
+import { canAssign, completeToast, doneSteps, isOrderCancelledError, hasAction, idFromSearch, nextStepText, pathOf, PATH_STEPS, telHref } from "../deliveryUi";
 import { PICK_SHEET_HREF, canOpenPickSheet } from "../pickSheet";
 import type { DeliveryNoteDetail, LabelPrintReason } from "../types";
 import { AssignCourierModal } from "./AssignCourierModal";
@@ -43,7 +44,7 @@ import { ReportFailureModal } from "./ReportFailureModal";
 import { ReprintLabelModal } from "./ReprintLabelModal";
 import s from "../deliveries.module.css";
 
-type Load = "loading" | "ready" | "error" | "notfound" | "forbidden";
+type Load = "loading" | "ready" | "error" | "notfound" | "forbidden" | "scope_lost";
 type Modals = null | "assign" | "reprint" | "failure" | "complete";
 type Timeline_ = { state: "loading" } | { state: "error" } | { state: "ready"; entries: TimelineEntry[]; truncated: boolean };
 
@@ -66,6 +67,8 @@ export function DeliveryDetailScreen() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [reloading, setReloading] = useState(false);
   const seq = useRef(0);
+  // Đã có dữ liệu phiếu chưa (ref để loadDetail không đọc state cũ): chỉ khi đã có mà tải lại 404 mới là "mất quyền" (PV-13).
+  const hasDetail = useRef(false);
 
   const loadHistory = useCallback(() => {
     if (id === null) return;
@@ -78,19 +81,29 @@ export function DeliveryDetailScreen() {
     async (initial: boolean) => {
       if (id === null) return;
       const mine = ++seq.current;
-      if (initial) setLoad("loading");
-      else setReloading(true);
+      if (initial) {
+        hasDetail.current = false;
+        setLoad("loading");
+      } else setReloading(true);
       try {
         const data = await fetchDeliveryNoteDetail(id);
         if (mine !== seq.current) return;
+        hasDetail.current = true;
         setDetail(data);
         setLoad("ready");
         setConflict(null);
       } catch (err) {
         if (mine !== seq.current) return;
-        if (err instanceof ApiError && err.status === 404) setLoad("notfound");
-        else if (err instanceof ApiError && err.status === 403) setLoad("forbidden");
-        else if (initial || !detail) setLoad("error");
+        if (err instanceof ApiError && err.status === 404) {
+          if (!initial && hasDetail.current) {
+            // PV-13: phiếu vừa ra ngoài phạm vi → xoá hết dữ liệu khách đã tải, không vẽ phần nào của phiếu cũ.
+            setDetail(null);
+            setHistory({ state: "loading" });
+            setModal(null);
+            setLoad("scope_lost");
+          } else setLoad("notfound");
+        } else if (err instanceof ApiError && err.status === 403) setLoad("forbidden");
+        else if (initial || !hasDetail.current) setLoad("error");
         else setActionError("Chưa tải lại được phiếu. Kiểm tra mạng rồi bấm Tải lại.");
       } finally {
         if (mine === seq.current) setReloading(false);
@@ -126,6 +139,7 @@ export function DeliveryDetailScreen() {
       return;
     }
     setActionError(err instanceof Error && err.message ? err.message : fallback);
+    if (isOrderCancelledError(err)) reloadKeepModal(); // BR-GH-24: tải lại để thấy phiếu đã huỷ
   };
 
   const run = async (key: string, task: () => Promise<void>, fallback: string) => {
@@ -155,6 +169,7 @@ export function DeliveryDetailScreen() {
         <div className={s.skelRow} />
       </SkeletonScreen>
     );
+  if (load === "scope_lost") return <ScopeLostInApp listHref={homeHref} />;
   if (load === "notfound") return <NotFoundScreen homeHref={homeHref} />;
   if (load === "forbidden") return <NoPermission homeHref={homeHref} />;
   if (load === "error" || !detail) return <ErrorScreen homeHref={homeHref} onRetry={() => void loadDetail(true)} />;
@@ -447,6 +462,7 @@ export function DeliveryDetailScreen() {
         <ReportFailureModal
           note={note}
           onClose={() => setModal(null)}
+          onReload={refreshAll}
           onReported={(res) => {
             toast.success(res.needs_decision ? "Đã báo giao thất bại. Phiếu này đã hỏng 2 lần, chờ Chủ hoặc Quản lý quyết định." : "Đã báo giao thất bại.");
             refreshAll();
@@ -458,8 +474,8 @@ export function DeliveryDetailScreen() {
           note={note}
           onClose={() => setModal(null)}
           onConflict={refreshAll}
-          onDone={() => {
-            toast.success("Đã giao xong. Phiếu chuyển sang Hoàn tất.");
+          onDone={(res) => {
+            toast.success(completeToast(res.order_status, "Đã giao xong. Phiếu chuyển sang Đã giao."));
             refreshAll();
           }}
         />

@@ -75,10 +75,10 @@ class Batch(models.Model):
         # `apps.inventory.batches.services.FEFO_ORDER` / `sellable_batches` (BR-BH-05).
         ordering = ["received_date", "id"]
         permissions = [
-            ("publish_batch", "Publish lô ra Shop"),
+            ("publish_batch", "Mở bán lô"),
             ("close_batch", "Chốt lô (đông cứng lãi/lỗ)"),
             ("view_costprice", "Xem giá vốn / đơn giá mua"),
-            ("cancel_expired_batch", "Huỷ lô quá hạn (hạch toán lỗ)"),
+            ("cancel_expired_batch", "Huỷ lô quá hạn (ghi lỗ)"),
         ]
 
     def __str__(self):

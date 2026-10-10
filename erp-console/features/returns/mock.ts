@@ -1,6 +1,6 @@
-// Mock module Hàng hoàn về kho (ED-26) — CHỈ dùng khi NEXT_PUBLIC_USE_MOCK=1 (bản build thật loại bỏ file này).
+// Mock module Hàng hoàn (ED-26) — CHỈ dùng khi NEXT_PUBLIC_USE_MOCK=1 (bản build thật loại bỏ file này).
 // Dựng JSON theo contract THỰC TẾ BE Lô 9 / R9 (backend/apps/inventory/returns):
-//   GET   /api/inventory/returns/?status=&month=&page=   GET /{id}/   POST /   POST /{id}/approve/   POST /{id}/cancel/
+//   GET   /api/inventory/returns/?status=&month=&page=   GET /{id}/   POST /   POST /{id}/approve/   POST /{id}/cancel/   POST /{id}/delete/
 //   GET   /api/guidance/return/{id}/
 //
 // Luật mock (mô phỏng BE, FE KHÔNG dùng lại các luật này):
@@ -12,6 +12,8 @@
 //    như BE (QA Lô 9 B1; chế độ "noterejected" giả lập BE từ chối mọi ghi chú để thử khi FE đã chặn trước).
 //  - cancel (#8): cần add_returntostock (cổng chung); rồi phải có approve/change_returntostock hoặc là người tạo phiếu, không thì 403 (câu của BE);
 //    chỉ phiếu Chờ duyệt, đã duyệt/đã huỷ → 409 STALE_STATE. Phiếu huỷ không tính vào số kg đã hoàn.
+//  - delete (#8): chỉ Chủ (khác → 403, kiểm trước phạm vi); Chờ duyệt/Đã huỷ → 200 {status:"deleted"} rồi 404; Đã duyệt → 400 RETURN_DELETE_NOT_ALLOWED;
+//    `available_actions` có "delete" cho Chủ. Công cụ thử: window.__caveMock.returnsStaleDelete(id) → lần xoá kế tiếp 409 STALE_STATE.
 //  - approve: thiếu decision → 400 RETURN_DECISION_REQUIRED; phiếu đã duyệt → 409 STALE_STATE (không có updated_at).
 //  - Dòng của chi tiết phiếu giao có `batch_pk` (id lô) và `returned_qty` (kg đã hoàn của lô trên phiếu, Chờ duyệt + Đã duyệt), đăng ký vào
 //    mock Giao hàng qua `registerDeliveryLineExtras` (đúng contract "BE cho Lô 9").
@@ -27,8 +29,10 @@ import { MOCK_UNAUTHORIZED, mockRequireUser } from "@/features/auth/mock";
 import type { Me } from "@/features/auth/types";
 import type { GuidanceData, GuidanceTimelineEntry } from "@/features/guidance/types";
 import type { MockRequest, MockResponse, Paginated } from "@/shared/lib/http";
+import { ENUMS, enumLabel } from "@/shared/lib/enums";
 import { kg } from "@/shared/lib/format";
 import { registerDeliveryLineExtras } from "@/features/deliveries/mock";
+import { ROLE } from "@/shared/lib/roles";
 import { hasLimitedCourierScope } from "@/shared/lib/personalData";
 import { hasLongDigitRun } from "./returnsModel";
 import type { ReturnItem } from "./types";
@@ -53,7 +57,7 @@ function mode(): Mode {
 const has = (me: Me | null, perm: string) => !!me && me.permissions.includes(perm);
 const err = (status: number, code: string, detail: string, extra: Record<string, unknown> = {}): MockResponse => ({ status, body: { detail, code, ...extra } });
 const FORBIDDEN = err(403, "FORBIDDEN", "Bạn không có quyền xem hàng hoàn về kho.");
-const NOT_FOUND = err(404, "NOT_FOUND", "Không tìm thấy phiếu hàng hoàn.");
+const NOT_FOUND = err(404, "NOT_FOUND", "Không tìm thấy.");
 
 /** Id lô giả theo mã lô (khớp `lines[].batch_id` của phiếu giao mock). */
 const BATCH_PK: Record<string, number> = {
@@ -75,17 +79,29 @@ const BATCH_CODE: Record<number, { code: string; item: string }> = {
 type NoteFact = { code: string; order: string; courierId: number; batch: number; delivered: number };
 /** Phiếu giao mock còn đi giao hoặc giao thất bại (id → dữ kiện). courierId khớp `assigned_to` của module Giao hàng. */
 const NOTES: Record<number, NoteFact> = {
-  33: { code: "GH-HD-0033-DELI", order: "DH-260928-0003", courierId: 14, batch: 201, delivered: 1 },
-  34: { code: "GH-HD-0034-FAIL", order: "DH-260928-0004", courierId: 14, batch: 202, delivered: 2 },
-  36: { code: "GH-HD-0036-DELI", order: "DH-260928-0006", courierId: 4, batch: 203, delivered: 2 },
-  38: { code: "GH-HD-0038-FAIL", order: "DH-260928-0008", courierId: 4, batch: 204, delivered: 1 },
-  39: { code: "GH-HD-0039-DELI", order: "DH-260928-0009", courierId: 7, batch: 201, delivered: 1.2 },
+  33: { code: "GH-HD-0033-DELI", order: "SO260928-A00003", courierId: 14, batch: 201, delivered: 1 },
+  34: { code: "GH-HD-0034-FAIL", order: "SO260928-A00004", courierId: 14, batch: 202, delivered: 2 },
+  36: { code: "GH-HD-0036-DELI", order: "SO260928-A00006", courierId: 4, batch: 203, delivered: 2 },
+  38: { code: "GH-HD-0038-FAIL", order: "SO260928-A00008", courierId: 4, batch: 204, delivered: 1 },
+  39: { code: "GH-HD-0039-DELI", order: "SO260928-A00009", courierId: 7, batch: 201, delivered: 1.2 },
 };
 
 const COURIER_NAME: Record<number, string> = { 4: "Anh Phúc", 7: "Anh Lâm", 14: "Anh Khoa" };
 
+/** 00:00 ngày mùng 1 của THÁNG HIỆN TẠI theo giờ Việt Nam (UTC+7), tính ra ms UTC. */
+function monthStartMs(): number {
+  const vn = new Date(Date.now() + 7 * 3600_000);
+  return Date.UTC(vn.getUTCFullYear(), vn.getUTCMonth(), 1) - 7 * 3600_000;
+}
+
+/**
+ * Mốc tạo phiếu mock. `minutesAgo > 0` = cách đây chừng đó phút nhưng KHÔNG lùi qua đầu tháng hiện tại (để ca "mặc định tháng hiện tại"
+ * không đổi kết quả vào những ngày đầu tháng). `minutesAgo < 0` = phiếu của THÁNG TRƯỚC: lùi `-minutesAgo` phút tính từ đầu tháng
+ * hiện tại, không phụ thuộc hôm nay là ngày nào.
+ */
 function monthAgoIso(minutesAgo: number): string {
-  return new Date(Date.now() - minutesAgo * 60_000).toISOString();
+  if (minutesAgo < 0) return new Date(monthStartMs() + minutesAgo * 60_000).toISOString();
+  return new Date(Math.max(Date.now() - minutesAgo * 60_000, monthStartMs())).toISOString();
 }
 
 function make(
@@ -125,11 +141,11 @@ function make(
 }
 
 function statusLabel(s: ReturnItem["status"]): string {
-  return s === "DRAFT" ? "Chờ duyệt" : s === "APPROVED" ? "Đã duyệt" : "Đã huỷ";
+  return enumLabel(ENUMS.returnToStockStatus, s);
 }
 
 function decisionLabel(d: string): string {
-  return d === "RESTOCK" ? "Tái nhập" : d === "WRITE_OFF" ? "Huỷ bỏ, ghi lỗ" : "Chờ quyết định";
+  return enumLabel(ENUMS.returnToStockDecision, d);
 }
 
 /** Kg "máy khác" đã hoàn thêm cho một phiếu giao mà danh sách này không có (chỉ để e2e thử lỗi vượt kg do người khác nhập trước). */
@@ -142,12 +158,35 @@ function db(): ReturnItem[] {
       make(1, 38, "0.500", { status: "DRAFT", decision: "PENDING", outside: 135, createdMinutesAgo: 90, by: 4, note: "Khách không nghe máy" }),
       make(2, 39, "0.700", { status: "DRAFT", decision: "PENDING", outside: 55, createdMinutesAgo: 200, by: 7, note: "Khách từ chối nhận" }),
       make(3, 33, "1.000", { status: "APPROVED", decision: "RESTOCK", outside: 70, createdMinutesAgo: 1500, by: 14, note: "Sai địa chỉ, giao lại", approvedBy: "Chị Hạnh" }),
-      make(4, 34, "0.800", { status: "APPROVED", decision: "WRITE_OFF", outside: 245, createdMinutesAgo: 2900, by: 14, note: "Xe hỏng giữa đường", approvedBy: "Chị Hạnh" }),
+      make(4, 34, "0.800", { status: "APPROVED", decision: "WRITE_OFF", outside: 245, createdMinutesAgo: -2160, by: 14, note: "Xe hỏng giữa đường", approvedBy: "Chị Hạnh" }),
       make(5, 36, "0.300", { status: "DRAFT", decision: "PENDING", outside: 40, createdMinutesAgo: 30, by: 4 }),
       make(6, 36, "0.200", { status: "CANCELLED", decision: "PENDING", outside: 45, createdMinutesAgo: 600, by: 4, note: "Nhập nhầm lô" }),
     ];
   }
   return DB;
+}
+
+/** `available_actions` như BE (#8): approve (quyền duyệt + Chờ duyệt), cancel (Chờ duyệt, theo luật huỷ), delete (chỉ Chủ, Chờ duyệt hoặc Đã huỷ). */
+function withActions(me: Me, r: ReturnItem): ReturnItem {
+  const actions: string[] = [];
+  if (r.status === "DRAFT" && has(me, PERM_APPROVE)) actions.push("approve");
+  if (r.status === "DRAFT" && has(me, PERM_ADD) && (has(me, PERM_APPROVE) || has(me, PERM_CHANGE) || r.created_by === me.id)) actions.push("cancel");
+  if (me.groups.includes(ROLE.owner) && (r.status === "DRAFT" || r.status === "CANCELLED")) actions.push("delete");
+  return { ...r, available_actions: actions };
+}
+
+/** Phiếu id đã được "máy khác" xoá/đổi trước: lần xoá kế tiếp trả 409 (chỉ để thử). */
+const STALE_DELETE = new Set<number>();
+
+function deleteResponse(me: Me, id: number): MockResponse {
+  if (!me.groups.includes(ROLE.owner)) return err(403, "FORBIDDEN", "Chỉ Chủ mới xoá được phiếu hàng hoàn.");
+  const r = db().find((x) => x.id === id);
+  // Từ Lô 17a BE trả 404 tiếng Việt chuẩn "Không tìm thấy." (không lộ tên model).
+  if (!r || !inScope(me, r)) return err(404, "NOT_FOUND", "Không tìm thấy.");
+  if (STALE_DELETE.has(id)) return err(409, "STALE_STATE", "Phiếu hàng hoàn vừa được người khác xử lý, hãy tải lại.");
+  if (r.status === "APPROVED") return err(400, "RETURN_DELETE_NOT_ALLOWED", "Phiếu hàng hoàn đã duyệt (đã nhập lại kho hoặc ghi lỗ) không xoá được (BR-PQ-10).");
+  DB = db().filter((x) => x.id !== id);
+  return { status: 200, body: { status: "deleted", id } };
 }
 
 /** Phiếu mà người dùng thấy: người giao hạn chế chỉ thấy phiếu của phiếu giao gán cho mình (BR-PQ-12). */
@@ -193,7 +232,7 @@ function listResponse(me: Me, query: URLSearchParams): MockResponse {
     count: rows.length,
     next: page * PAGE_SIZE < rows.length ? `?page=${page + 1}` : null,
     previous: page > 1 ? `?page=${page - 1}` : null,
-    results: slice,
+    results: slice.map((r) => withActions(me, r)),
   };
   return { status: 200, body };
 }
@@ -252,7 +291,7 @@ function createResponse(me: Me, req: MockRequest): MockResponse {
     note: typeof body.note === "string" ? body.note : "",
   };
   db().push(item);
-  return { status: 201, body: item };
+  return { status: 201, body: withActions(me, item) };
 }
 
 function approveResponse(me: Me, id: number, req: MockRequest): MockResponse {
@@ -260,7 +299,7 @@ function approveResponse(me: Me, id: number, req: MockRequest): MockResponse {
   const r = db().find((x) => x.id === id);
   if (!r || !inScope(me, r)) return NOT_FOUND;
   const decision = bodyOf(req).decision;
-  if (decision !== "RESTOCK" && decision !== "WRITE_OFF") return err(400, "RETURN_DECISION_REQUIRED", "Phải chọn Tái nhập hoặc Huỷ bỏ trước khi duyệt (BR-HV-02).");
+  if (decision !== "RESTOCK" && decision !== "WRITE_OFF") return err(400, "RETURN_DECISION_REQUIRED", "Phải chọn Tái nhập hoặc Huỷ hàng, ghi lỗ trước khi duyệt (BR-HV-02).");
   if (r.status !== "DRAFT") return err(409, "STALE_STATE", "Phiếu hàng hoàn đã được duyệt, hãy tải lại.");
   r.status = "APPROVED";
   r.status_label = "Đã duyệt";
@@ -268,7 +307,7 @@ function approveResponse(me: Me, id: number, req: MockRequest): MockResponse {
   r.decision_label = decisionLabel(decision);
   r.approved_by = me.id;
   r.approved_by_name = me.display_name;
-  return { status: 200, body: r };
+  return { status: 200, body: withActions(me, r) };
 }
 
 function cancelResponse(me: Me, id: number): MockResponse {
@@ -281,7 +320,7 @@ function cancelResponse(me: Me, id: number): MockResponse {
   r.status = "CANCELLED";
   r.status_label = statusLabel("CANCELLED");
   cancelledAt[r.id] = new Date().toISOString();
-  return { status: 200, body: r };
+  return { status: 200, body: withActions(me, r) };
 }
 
 /** Giờ huỷ của phiếu bị huỷ trong phiên (cho dòng thời gian). */
@@ -298,7 +337,7 @@ function timelineResponse(me: Me, id: number): MockResponse {
     entries.push({
       at: new Date(Date.parse(r.created_at) + 20 * 60_000).toISOString(),
       kind: "return_approved",
-      label: r.decision === "WRITE_OFF" ? "Duyệt huỷ bỏ, ghi lỗ" : "Duyệt tái nhập vào lô",
+      label: r.decision === "WRITE_OFF" ? "Duyệt huỷ hàng, ghi lỗ" : "Duyệt tái nhập vào lô",
       doc: "return",
       actor: { kind: "user", display: r.approved_by_name || "Quản lý" },
     });
@@ -327,16 +366,17 @@ export function mockReturnsApi(req: MockRequest): MockResponse {
     if (req.method === "POST") return createResponse(me, req);
     return listResponse(me, query);
   }
-  const one = /^\/api\/inventory\/returns\/(\d+)\/(approve\/|cancel\/)?$/.exec(pathname);
+  const one = /^\/api\/inventory\/returns\/(\d+)\/(approve\/|cancel\/|delete\/)?$/.exec(pathname);
   if (one) {
     const id = Number(one[1]);
     if (one[2]) {
       if (req.method !== "POST") return err(405, "METHOD_NOT_ALLOWED", "Không hỗ trợ.");
+      if (one[2] === "delete/") return deleteResponse(me, id);
       return one[2] === "cancel/" ? cancelResponse(me, id) : approveResponse(me, id, req);
     }
     if (mode() === "detailfail") return err(500, "SERVER_ERROR", "Máy chủ đang bận. Thử lại sau.");
     const r = db().find((x) => x.id === id);
-    return r && inScope(me, r) ? { status: 200, body: r } : NOT_FOUND;
+    return r && inScope(me, r) ? { status: 200, body: withActions(me, r) } : NOT_FOUND;
   }
   return err(404, "NOT_FOUND", "Không tìm thấy endpoint.");
 }
@@ -360,11 +400,19 @@ if (process.env.NEXT_PUBLIC_USE_MOCK === "1" && typeof window !== "undefined") {
     ...(w.__caveMock || {}),
     returns: (m: Mode) => {
       window.localStorage.setItem(MODE_KEY, m);
-      return `Hàng hoàn về kho (mock): chế độ ${m}`;
+      return `Hàng hoàn (mock): chế độ ${m}`;
     },
     returnsAddHidden: (noteId: number, qty: number) => {
       HIDDEN_RETURNED[noteId] = (HIDDEN_RETURNED[noteId] ?? 0) + qty;
       return `Phiếu giao ${noteId}: máy khác đã hoàn thêm ${qty} kg (mock)`;
+    },
+    returnsMarkDeleted: (id: number) => {
+      DB = db().filter((x) => x.id !== id);
+      return `RT-${id} đã bị xoá từ máy khác (mock)`;
+    },
+    returnsStaleDelete: (id: number) => {
+      STALE_DELETE.add(id);
+      return `RT-${id}: lần xoá kế tiếp sẽ trả 409 (mock)`;
     },
     returnsMarkApproved: (id: number) => {
       const r = db().find((x) => x.id === id);

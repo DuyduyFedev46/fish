@@ -122,7 +122,7 @@ class ReceiptStateGuardTests(ReceiptsApiBase):
     def invoice_payload(self, receipt):
         return {
             "supplier": receipt.supplier_id, "receipt": receipt.pk, "amount": "1000.00",
-            "invoice_date": "2026-09-28",
+            "invoice_date": "2026-09-28", "is_paid": False,  # Lô 17a: đã trả thì bắt buộc có paid_at
         }
 
     def test_b2_invoice_on_cancelled_receipt_returns_400(self):

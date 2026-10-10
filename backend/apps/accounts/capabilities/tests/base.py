@@ -30,3 +30,13 @@ def reload(user):
 
 
 ALL_CODES = list(roles.ALL_ROLES)
+
+
+def put_caps(client, code, changes=None, **body):
+    """PUT `/capabilities/` kèm `version` lấy từ GET gần nhất của nhóm (PV-10, 02b §2.3). `body` thêm vào thân (vd `scopes`)."""
+    if "version" not in body:
+        got = client.get(detail_url(code))
+        body["version"] = got.json().get("version", "1") if got.status_code == 200 else "1"
+    if changes is not None:
+        body["capabilities"] = changes
+    return client.put(put_url(code), body, format="json")

@@ -10,6 +10,7 @@ Mốc kết thúc: `completed_at`. Phiếu CANCELLED không có mốc riêng (h�
 làm mốc thay, nghĩa là có thể ẩn sớm hơn thực tế, hướng an toàn cho dữ liệu cá nhân.
 
 Một nguồn duy nhất cho cả ba endpoint (orders, customers, delivery notes).
+PV-03: điều kiện "thấy hết, không cửa sổ" của đơn nay là phạm vi D1/D2 = `all` (cấu hình), không còn là tên nhóm.
 """
 import datetime
 
@@ -57,19 +58,21 @@ def is_note_pii_expired(note, *, now=None) -> bool:
     return ended < pii_cutoff(now=now)
 
 
-def annotate_order_pii_visible(user, qs, *, now=None):
+def annotate_order_pii_visible(user, qs, *, value, now=None):
     """
-    Gắn `pii_visible` (bool) cho queryset `SalesOrder` mà `user` không có full scope: True khi đơn có
-    phiếu gán cho user còn trong cửa sổ, hoặc nằm trong phạm vi CSKH (BR-GH-18, như cũ).
+    Gắn `pii_visible` (bool) cho queryset `SalesOrder` mà phạm vi `value` của `user` KHÔNG phải `all`: True khi đơn có
+    phiếu gán cho user còn trong cửa sổ, hoặc (chỉ khi `value` = `assigned_or_confirmation`) nằm trong phạm vi gọi
+    xác nhận (BR-GH-18). `value` là giá trị D1 (đơn) hay D2 (hoá đơn) đã phân giải của người gọi, truyền tường minh để
+    một request chỉ phân giải một lần. Phạm vi `all` thì không gọi hàm này (không có cửa sổ, như Chủ/Quản lý/NV kho hôm nay).
     """
     visible_note = DeliveryNote.objects.filter(
         sales_invoice__sales_order=OuterRef("pk")
     ).filter(courier_visible_note_q(user, now=now))
     visible = Exists(visible_note)
 
-    from apps.delivery.confirmation.scope import customer_service_note_q, is_customer_service
+    if value == "assigned_or_confirmation":
+        from apps.delivery.confirmation.scope import customer_service_note_q
 
-    if is_customer_service(user):
         visible = visible | Exists(
             DeliveryNote.objects.filter(sales_invoice__sales_order=OuterRef("pk")).filter(
                 customer_service_note_q(user)

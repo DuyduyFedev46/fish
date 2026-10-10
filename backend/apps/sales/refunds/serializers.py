@@ -8,6 +8,7 @@ S16: thêm dữ liệu để dựng màn "Phiếu hoàn chờ chuyển" — `ord
 """
 from rest_framework import serializers
 
+from apps.sales.customers.permissions import customer_hidden_reason
 from apps.sales.models import Refund
 from apps.sales.utils import money_str
 
@@ -18,6 +19,7 @@ class RefundSerializer(serializers.ModelSerializer):
     order_code = serializers.SerializerMethodField()
     customer_name = serializers.SerializerMethodField()
     customer_phone = serializers.SerializerMethodField()
+    customer_hidden_reason = serializers.SerializerMethodField()
     source_bank_txn_id = serializers.SerializerMethodField()
     available_actions = serializers.SerializerMethodField()
 
@@ -27,7 +29,7 @@ class RefundSerializer(serializers.ModelSerializer):
             "id", "sales_invoice", "payment_transaction", "amount", "is_partial", "method",
             "status", "status_label", "bank_txn_ref", "reason", "created_by", "confirmed_by",
             "created_at", "confirmed_at", "request_id",
-            "order_code", "customer_name", "customer_phone", "source_bank_txn_id",
+            "order_code", "customer_name", "customer_phone", "customer_hidden_reason", "source_bank_txn_id",
             "failure_reason", "available_actions",
         ]
         read_only_fields = fields  # chỉ sinh / chuyển trạng thái qua service (BR-PQ-14/16)
@@ -46,11 +48,20 @@ class RefundSerializer(serializers.ModelSerializer):
         order = self._order(obj)
         return order.code if order else None
 
+    def get_customer_hidden_reason(self, obj):
+        """PV-07 (D-1): tên, SĐT khách trên phiếu hoàn theo V2 và cửa sổ (`pii_visible` do `get_queryset` gắn). 02b §2.7."""
+        request = self.context.get("request")
+        return customer_hidden_reason(getattr(request, "user", None), obj)
+
     def get_customer_name(self, obj):
+        if self.get_customer_hidden_reason(obj) is not None:
+            return None
         order = self._order(obj)
         return order.customer.name if order else ""
 
     def get_customer_phone(self, obj):
+        if self.get_customer_hidden_reason(obj) is not None:
+            return None
         order = self._order(obj)
         return order.phone if order else ""
 

@@ -1,7 +1,7 @@
 # Smoke trên BE THẬT (Lô 12 Kế toán, ED-32/33): BE chạy ở REAL_API (DB SQLite tạm đã `migrate`, `bootstrap_masterdata`, `seed_demo`,
 # có người dùng loc (Chủ) và ql1 (Quản lý) mật khẩu Songbien2026), console build NEXT_PUBLIC_USE_MOCK=0 NEXT_PUBLIC_API_BASE=<REAL_API>
 # phục vụ ở BASE. BE bật CORS_ALLOWED_ORIGINS=<BASE>. Hai endpoint /api/reports/period/ và /batches/ của BE thật trả tiền, kg dạng
-# JSON number (không phải chuỗi): kịch bản này chứng minh màn Báo cáo lãi lỗ không sập với shape đó (TL12-FE-H1).
+# chuỗi thập phân từ Lô 17a (trước đó là JSON number): kịch bản này chứng minh màn Báo cáo lãi lỗ chạy đúng với shape thật, và FE vẫn chuẩn hoá được cả number (TL12-FE-H1).
 #   BASE=http://127.0.0.1:3521 REAL_API=http://127.0.0.1:8621 SHOTS=<thư mục> python3 -u e2e/ed_batch12_real.py
 import json
 import os
@@ -45,7 +45,7 @@ def go(page, path):
 
 
 def wire_shape():
-    """Đọc thẳng JSON của BE để ghi lại shape thật (number hay string)."""
+    """Đọc thẳng JSON của BE để ghi lại shape thật: từ Lô 17a tiền và kg là chuỗi thập phân."""
     req = urllib.request.Request(API + "/api/auth/token/", data=json.dumps({"username": "loc", "password": "Songbien2026"}).encode(), headers={"Content-Type": "application/json"})
     token = json.load(urllib.request.urlopen(req))["token"]
     month = None
@@ -54,7 +54,7 @@ def wire_shape():
         data = json.load(urllib.request.urlopen(urllib.request.Request(url, headers={"Authorization": "Token " + token})))
         row = data if part == "period" else data["results"][0]
         month = type(row["revenue"]).__name__
-        ok(f"BE thật: /reports/{part}/ trả tiền dạng số (number), không phải chuỗi", month in ("int", "float"), month)
+        ok(f"BE thật: /reports/{part}/ trả tiền dạng chuỗi thập phân (Lô 17a, 2 số lẻ)", month == "str" and re.fullmatch(r"-?\d+\.\d{2}", row["revenue"]) is not None, repr(row["revenue"]))
 
 
 def main():

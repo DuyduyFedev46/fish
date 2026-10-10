@@ -1,20 +1,21 @@
 """B4 · ED-39-AC1 — GET /api/staff/groups/ và /api/staff/groups/{code}/ (chỉ Chủ đọc được)."""
-from django.test import TestCase
+from django.test import TestCase, override_settings
 
 from apps.accounts import roles
 from apps.accounts.capabilities import registry
 from apps.accounts.models import StaffProfile
 from apps.common.tests.fixtures import client_for, make_user
 
-from .base import ALL_CODES, LIST_URL, detail_url, make_staff, put_url, token_client
+from .base import ALL_CODES, LIST_URL, detail_url, make_staff, put_url, token_client, put_caps
 
 LIST_KEYS = {"id", "code", "label", "member_count", "members", "can_view_cost",
              "last_changed_at", "last_changed_by", "capabilities", "version", "data_scope_values"}  # PV-02 thêm 2 khoá
-DETAIL_EXTRA = {"registry", "scopes", "timeline", "data_scopes"}
+DETAIL_EXTRA = {"registry", "timeline", "data_scopes"}  # Lô 6: bỏ `scopes` cũ
 MEMBER_LIST_KEYS = {"id", "display_name"}
 MEMBER_DETAIL_KEYS = {"id", "display_name", "username", "other_groups", "is_active", "added_at"}
 
 
+@override_settings(AI_ENABLED=True)  # các ca này kiểm ma trận ĐỦ việc; nhánh tắt ở test_ai_hidden
 class GroupReadTests(TestCase):
     def setUp(self):
         self.owner = make_staff("owner1", roles.OWNER, display_name="Chủ Thử")
@@ -30,7 +31,7 @@ class GroupReadTests(TestCase):
         body = response.json()
         self.assertEqual([g["code"] for g in body], ALL_CODES)
         self.assertEqual([g["label"] for g in body],
-                         ["Chủ", "Quản lý", "Nhân viên kho", "Nhân viên giao", "CSKH"])
+                         ["Chủ", "Quản lý", "Nhân viên kho", "Nhân viên giao", "Nhân viên gọi xác nhận"])
         for row in body:
             self.assertEqual(set(row), LIST_KEYS)
             self.assertEqual(set(row["capabilities"]), {c.key for c in registry.CAPABILITIES})
@@ -99,13 +100,15 @@ class GroupReadTests(TestCase):
         self.assertEqual({r["key"] for r in body["registry"] if r["owner_only"]},
                          {c.key for c in registry.CAPABILITIES if c.owner_only})
 
-    def test_ed39_detail_scopes_are_fixed_read_only_text_per_group(self):
-        delivery = self.client.get(detail_url(roles.DELIVERY_STAFF)).json()["scopes"]
-        self.assertEqual(delivery["orders"], "Được gán")
-        warehouse = self.client.get(detail_url(roles.WAREHOUSE_STAFF)).json()["scopes"]
-        self.assertEqual(warehouse["customers"], "Không xem")
-        manager = self.client.get(detail_url(roles.MANAGER)).json()["scopes"]
-        self.assertEqual(manager["customers"], "Tất cả khách")
+    def test_ed39_detail_scope_values_per_group_and_no_legacy_scopes_key(self):
+        """Lô 6: khoá `scopes` cũ đã bỏ; phạm vi đọc ở `data_scope_values`."""
+        delivery = self.client.get(detail_url(roles.DELIVERY_STAFF)).json()
+        self.assertNotIn("scopes", delivery)
+        self.assertEqual(delivery["data_scope_values"]["orders"], "assigned_deliveries")
+        warehouse = self.client.get(detail_url(roles.WAREHOUSE_STAFF)).json()
+        self.assertEqual(warehouse["data_scope_values"]["customers"], "none")
+        manager = self.client.get(detail_url(roles.MANAGER)).json()
+        self.assertEqual(manager["data_scope_values"]["customers"], "all")
 
     def test_ed39_detail_unknown_group_is_404(self):
         for code in ("nope", "chu", "quan_ly", "9"):
@@ -138,37 +141,51 @@ class GroupReadPermissionTests(TestCase):
 
 
 class DynamicCustomerScopeTests(TestCase):
-    """M2 (techlead Lô 14) — `scopes.customers` theo quyền thực tế, không theo bảng cố định (bất biến 9)."""
+    """M2 (techlead Lô 14) — phạm vi Khách hàng (`data_scope_values.customers`) theo cấu hình thật, không theo bảng cố định (bất biến 9)."""
 
     def setUp(self):
         self.owner = make_staff("owner1", roles.OWNER)
         self.client = client_for(self.owner)
 
+    def customers_row(self, code):
+        rows = {row["key"]: row for row in self.client.get(detail_url(code)).json()["data_scopes"]}
+        return rows["customers"]
+
+    def customers_visible(self, code):
+        """Nhóm xem được TẤT CẢ khách: giá trị D7 là `all` và ô đang bật (không mờ, không bị chặn trần vì thiếu việc gốc)."""
+        row = self.customers_row(code)
+        return row["value"] == "all" and row["inactive_reason"] is None and row["note"] in (None, "Chủ luôn thấy tất cả")
+
     def customers_scope(self, code):
-        return self.client.get(detail_url(code)).json()["scopes"]["customers"]
+        return self.client.get(detail_url(code)).json()["data_scope_values"]["customers"]
 
     def test_ed39_scope_customers_all_when_group_has_view_customer_list(self):
         for code in (roles.OWNER, roles.MANAGER):
-            self.assertEqual(self.customers_scope(code), "Tất cả khách", code)
+            self.assertEqual(self.customers_scope(code), "all", code)
 
     def test_ed39_scope_customers_turns_all_after_owner_enables_view_customers(self):
-        self.assertEqual(self.customers_scope(roles.DELIVERY_STAFF), "Được gán")
-        self.assertEqual(self.customers_scope(roles.WAREHOUSE_STAFF), "Không xem")
+        self.assertEqual(self.customers_scope(roles.DELIVERY_STAFF), "assigned_deliveries")
+        self.assertEqual(self.customers_scope(roles.WAREHOUSE_STAFF), "none")
         for code in (roles.DELIVERY_STAFF, roles.WAREHOUSE_STAFF, roles.CUSTOMER_SERVICE):
-            response = self.client.put(put_url(code), {"capabilities": {"view_customers": True}}, format="json")
+            # PV-08 (PO-Q1): bật Xem khách hàng thì D7 khác "Không xem", gửi cùng lúc; mở thêm dữ liệu khách phải xác nhận.
+            response = put_caps(self.client, code, {"view_customers": True}, scopes={"customers": "all"},
+                                confirm_customer_data_widening=True)
             self.assertEqual(response.status_code, 200, code)
-            self.assertEqual(response.json()["scopes"]["customers"], "Tất cả khách", code)
-            self.assertEqual(self.customers_scope(code), "Tất cả khách", code)
+            self.assertEqual(response.json()["data_scope_values"]["customers"], "all", code)
+            self.assertEqual(self.customers_scope(code), "all", code)
 
     def test_ed39_scope_customers_reverts_after_owner_disables_view_customers(self):
-        self.client.put(put_url(roles.DELIVERY_STAFF), {"capabilities": {"view_customers": True}}, format="json")
-        self.client.put(put_url(roles.DELIVERY_STAFF), {"capabilities": {"view_customers": False}}, format="json")
-        self.assertEqual(self.customers_scope(roles.DELIVERY_STAFF), "Được gán")
+        put_caps(self.client, roles.DELIVERY_STAFF, {"view_customers": True}, scopes={"customers": "all"},
+                 confirm_customer_data_widening=True)
+        put_caps(self.client, roles.DELIVERY_STAFF, {"view_customers": False}, scopes={"customers": "assigned_deliveries"})
+        self.assertEqual(self.customers_scope(roles.DELIVERY_STAFF), "assigned_deliveries")
 
     def test_ed39_scope_customers_none_when_manager_loses_view_customers(self):
         # Bảng cố định cũ ghi "Tất cả" cho Quản lý kể cả khi đã tắt quyền: sai.
-        self.client.put(put_url(roles.MANAGER), {"capabilities": {"view_customers": False}}, format="json")
-        self.assertEqual(self.customers_scope(roles.MANAGER), "Không xem")
+        put_caps(self.client, roles.MANAGER, {"view_customers": False})
+        row = self.customers_row(roles.MANAGER)
+        self.assertEqual(row["note"], "Bật Xem khách hàng để thấy tất cả khách")  # chặn trần, không còn thấy "Tất cả khách"
+        self.assertFalse(self.customers_visible(roles.MANAGER))
 
     def test_ed39_scope_customers_matches_directory_access(self):
         # Chuỗi hiển thị khớp hành vi thật: nhóm "Tất cả khách" vào được danh bạ khách, nhóm khác thì không.
@@ -177,5 +194,5 @@ class DynamicCustomerScopeTests(TestCase):
             code = group["code"]
             member = make_staff(f"probe_{code}", code)
             status = token_client(member).get("/api/sales/customer-directory/").status_code
-            shown = self.customers_scope(code) == "Tất cả khách"
+            shown = self.customers_visible(code)
             self.assertEqual(status == 200, shown, code)

@@ -48,7 +48,8 @@ def process_exact_payment_matches() -> dict:
             resolution_status=PaymentTransaction.ResolutionStatus.OPEN,
             # SR-11-AC4: chỉ quét ca "không khớp đơn"; ORPHAN/OVERPAID/UNDERPAID đã nằm ở hàng chờ lệch
             match_status=PaymentTransaction.MatchStatus.UNMATCHED,
-        ).order_by("received_at", "id")
+        # BR-TT-18: khoản Chủ tự ghi tay là việc của Chủ rồi, không đẩy lên Chủ lần nữa.
+        ).exclude(source=PaymentTransaction.Source.MANUAL).order_by("received_at", "id")
     )
 
     confirmed_count = 0

@@ -9,7 +9,8 @@ import React, { useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { Icon } from "@/shared/ui/Icon";
-import { AI_FEATURES_ENABLED } from "@/shared/lib/features";
+import { aiVisible } from "@/shared/lib/features";
+import { useAuth } from "@/features/auth/components/AuthProvider";
 import { escalateStep } from "@/features/ai/actions/api";
 import type { GuidanceNextStep } from "../types";
 import s from "./guidance.module.css";
@@ -23,12 +24,14 @@ type Props = {
 };
 
 export default function GuidanceEscalate({ step, docType, docId, disabled, noticeHost }: Props) {
+  const { me } = useAuth();
+  const aiShown = aiVisible(me);
   const [escalating, setEscalating] = useState<boolean>(false);
   const [escalatedGroup, setEscalatedGroup] = useState<string | null>(null);
   const [escalateError, setEscalateError] = useState<string | null>(null);
 
   // DW-23-AC1: hiện khi bước chưa được phép thực hiện (allowed === false) và không phải bước hệ thống.
-  const show = AI_FEATURES_ENABLED && !step.allowed && step.actor !== "system" && Boolean(step.key);
+  const show = aiShown && !step.allowed && step.actor !== "system" && Boolean(step.key);
   if (!show) return null;
 
   const handleEscalate = async () => {
@@ -52,9 +55,9 @@ export default function GuidanceEscalate({ step, docType, docId, disabled, notic
           <div className={s.aiNoticeContent}>
             <span>
               Đã chuyển việc cho nhóm <strong>{escalatedGroup}</strong>.
-              {AI_FEATURES_ENABLED && <> Việc hiển thị trong tab &quot;Được chuyển&quot; của màn Việc AI.</>}
+              {aiShown && <> Việc hiển thị trong tab &quot;Được chuyển&quot; của màn Việc AI.</>}
             </span>
-            {AI_FEATURES_ENABLED && (
+            {aiShown && (
               <Link href="/ai/actions?status=ESCALATED" className={s.aiActionsLink}>
                 Đến tab Được chuyển
               </Link>

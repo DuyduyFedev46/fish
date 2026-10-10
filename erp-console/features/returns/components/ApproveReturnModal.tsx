@@ -1,6 +1,6 @@
 "use client";
 
-// F2n — Duyệt hàng hoàn (ED-26, BR-HV-02). Tóm tắt phiếu + chọn Quyết định bắt buộc: Tái nhập vào lô | Huỷ bỏ, ghi lỗ.
+// F2n — Duyệt hàng hoàn (ED-26, BR-HV-02). Tóm tắt phiếu + chọn Quyết định bắt buộc: Tái nhập vào lô | Huỷ hàng, ghi lỗ.
 // 409 (phiếu đã được duyệt ở nơi khác) hiện ConflictBanner kèm "Tải lại" thay vì lỗi đỏ. Lỗi khác: alert đầu hộp, nút chính đổi thành "Thử lại".
 import { useId, useState } from "react";
 import { kg } from "@/shared/lib/format";

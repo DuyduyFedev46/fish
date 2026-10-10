@@ -93,7 +93,7 @@ class PhoneInDetailTests(NoteScopeBase):
         self.assertEqual(resp.status_code, 200, resp.content)
         raw = resp.content.decode()
         self.assertNotIn("0900000401", raw)
-        self.assertIn("09xx xxx 401", raw)
+        self.assertIn("xxxxxx0401", raw)
 
     def test_r4_detail_is_no_store(self):
         resp = self._get(self.manager, f"/api/delivery/notes/{self.note_p.pk}/")

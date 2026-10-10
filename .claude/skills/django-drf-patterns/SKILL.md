@@ -59,6 +59,12 @@ def close_batch(*, batch, actor):
 - Tham số keyword-only, `actor=None` = Hệ thống.
 - Đụng tồn kho / tiền → `atomic` + `select_for_update`; tiền là `Decimal`.
 - Job nền (vd `cancel_expired_orders`) phải **idempotent** — chạy 2 lần không đổi kết quả.
+- **Khoá dòng không kèm join (Postgres, B1/B2 08/10).** Trong câu `select_for_update` không `select_related`,
+  nhất là qua quan hệ ngược hoặc nullable. Khi phải chờ khoá, Postgres (READ COMMITTED) chỉ đọc lại dòng bị khoá;
+  phía nối giữ bản cũ hoặc thành `None`. Quan hệ dùng để **quyết định** thì đọc bằng truy vấn mới SAU khoá; quan
+  hệ phải đứng yên thì khoá riêng theo thứ tự khoá chung (vd phiếu → dòng → lô). Khoá nhiều dòng thì `order_by("pk")`.
+  Test đua: `TransactionTestCase` + `skipUnless(connection.vendor == "postgresql")`, có ca người thứ hai **chờ khoá**
+  (giữ khoá trong luồng chính rồi mới commit) — SQLite không bắt được lỗi này.
 
 ## API + phân quyền 3 tầng
 

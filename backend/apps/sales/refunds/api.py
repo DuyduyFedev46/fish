@@ -7,6 +7,7 @@ confirm_refund (chỉ Chủ, tiền rời túi) — BR-HT-07.
 (S13-AC6, BR-TT-09). `request_id` (UUID) gửi lại → 200 `duplicate: true`, vẫn 1 phiếu (Q12).
 ERP theo design Lô 3 (R3): `GET /api/sales/refunds/?month=YYYY-MM` lọc theo ngày tạo (giờ VN), sai định dạng →
 400 `INVALID_FILTER`. Response có tên/SĐT khách nên gắn `Cache-Control: no-store` (bất biến 9).
+Phạm vi dòng theo D1 của người gọi (`scope.py`, C1): đơn ngoài D1 thì phiếu hoàn là 404.
 """
 from rest_framework import viewsets
 from rest_framework.decorators import action
@@ -19,6 +20,7 @@ from apps.common.params import month_bounds
 from apps.sales.models import PaymentTransaction, Refund, SalesInvoice
 
 from . import services
+from .scope import scope_refunds_for
 from .serializers import RefundSerializer
 
 
@@ -38,6 +40,10 @@ class RefundViewSet(NoStoreMixin, AiDeclarable, viewsets.ReadOnlyModelViewSet):
     serializer_class = RefundSerializer
     permission_classes = [BusinessModelPermissions]
     custom_perm_actions = ("create_refund", "confirm", "mark_failed", "retry")
+
+    def get_queryset(self):
+        # C1: phạm vi D1 của người gọi (scope.py); mặc định `all` nên không đổi với Chủ, Quản lý.
+        return scope_refunds_for(self.request.user, super().get_queryset())
 
     def filter_queryset(self, queryset):
         queryset = super().filter_queryset(queryset)
@@ -87,6 +93,7 @@ class RefundViewSet(NoStoreMixin, AiDeclarable, viewsets.ReadOnlyModelViewSet):
                 payment=payment, amount=amount, reason=reason, actor=request.user,
                 is_partial=None if is_partial is None else bool(is_partial),
                 request_id=request_id,
+                acknowledge_duplicate_warning=data.get("acknowledge_duplicate_warning") is True,
             )
         else:
             invoice = _get_or_400(SalesInvoice, data.get("sales_invoice"), "Hoá đơn")

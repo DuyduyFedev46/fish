@@ -131,16 +131,20 @@ class DirectoryListTests(DirectoryBase):
         self.assertEqual(rows["0900000124"]["total_spent"], "90000")
         self.assertEqual(rows["0900000124"]["order_count"], 1)
 
-    def test_ed13_list_search_by_name_without_accent_and_by_phone(self):
-        Customer.objects.create(phone="0900000124", name="Trần Văn Khác")
-        self.assertEqual(self.get("owner", q="khach thu").json()["count"], 1)
-        self.assertEqual(self.get("owner", q="0000123").json()["count"], 1)
-        self.assertEqual(self.get("owner", q="văn khác").json()["count"], 1)
-        self.assertEqual(self.get("owner", q="khong co").json()["count"], 0)
+    # Tìm theo tên/SĐT đã chuyển sang `POST search/` (test_directory_search_post.py); GET `q` bị từ chối (TLA-L3).
+    def test_tla_l3_get_with_q_is_rejected_without_echo(self):
+        for q in ("khach thu", FAKE_PHONE, "090"):
+            res = self.get("owner", q=q)
+            self.assertEqual(res.status_code, 400, q)
+            self.assertEqual(res.json()["code"], "SEARCH_USE_POST")
+            self.assertNotIn(q, res.content.decode())
 
-    def test_ed13_list_search_by_short_digits_does_not_match_phone(self):
-        # Dưới 4 chữ số: không dùng để dò SĐT (tránh liệt kê danh bạ bằng "0", "09"...).
-        self.assertEqual(self.get("owner", q="090").json()["count"], 0)
+    def test_tla_l3_get_with_empty_q_still_lists(self):
+        self.assertEqual(self.get("owner", q="").status_code, 200)
+        self.assertEqual(self.get("owner").json()["count"], 1)
+
+    def test_tla_l3_get_q_rejected_for_no_permission_group_as_403_first(self):
+        self.assertEqual(self.get("warehouse", q="khach").status_code, 403)
 
     def test_ed13_list_ordering_last_order_desc_default_and_paginated(self):
         older = Customer.objects.create(phone="0900000124", name="Khách Thử B")
@@ -213,7 +217,7 @@ class DirectoryDetailTests(DirectoryBase):
             set(refund), {"id", "order_code", "status", "status_label", "amount", "created_at"},
         )
         self.assertIn(refund["order_code"], {"SO-D2", "SO-D3"})
-        self.assertEqual(refund["status_label"], "Đã hoàn")
+        self.assertEqual(refund["status_label"], "Đã hoàn tiền")
 
     def test_ed13_detail_does_not_expose_refund_free_text(self):
         self.seed_history()
@@ -265,7 +269,14 @@ class DirectoryPermissionTests(DirectoryBase):
         self.assertEqual(granted, {roles.OWNER, roles.MANAGER})
 
     def test_ed13_user_with_only_the_extra_perm_can_read_but_not_write(self):
-        staff = make_user("dir_extra", perms=(PERM,))
+        # PV-05: phạm vi dòng do cấu hình NHÓM quyết (D7). Việc "Xem khách hàng" được Chủ bật cho nhóm NV kho kèm D7 = all
+        # (người chỉ được gán quyền trực tiếp, không nhóm, có D7 = none: xem test_deliveries_customers_receipts_scope).
+        from apps.accounts.models import GroupDataScope
+
+        warehouse_group = Group.objects.get(name=roles.WAREHOUSE_STAFF)
+        warehouse_group.permissions.add(Permission.objects.get(content_type__app_label="sales", codename="view_customer_list"))
+        GroupDataScope.objects.update_or_create(group=warehouse_group, object_key="customers", defaults={"value": "all"})
+        staff = make_user("dir_extra", roles.WAREHOUSE_STAFF)
         client = client_for(staff)
         self.assertEqual(client.get(LIST_URL).status_code, 200)
         self.assertEqual(client.get(self.detail_url()).status_code, 200)

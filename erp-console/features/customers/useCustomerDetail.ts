@@ -29,7 +29,7 @@ export function useCustomerId(): number | null | undefined {
   return id;
 }
 
-export type CustomerDetailStatus = "loading" | "ok" | "forbidden" | "notfound" | "error";
+export type CustomerDetailStatus = "loading" | "ok" | "forbidden" | "notfound" | "error" | "scope_lost";
 
 export function statusOfError(err: unknown): CustomerDetailStatus {
   if (err instanceof ApiError) {
@@ -51,6 +51,11 @@ export type CustomerDetailState = {
 export function useCustomerDetail(id: number | null | undefined): CustomerDetailState {
   const [data, setData] = useState<CustomerDetail | null>(null);
   const [status, setStatus] = useState<CustomerDetailStatus>("loading");
+  const statusRef = useRef<CustomerDetailStatus>("loading");
+  const put = useCallback((st: CustomerDetailStatus) => {
+    statusRef.current = st;
+    setStatus(st);
+  }, []);
   const [error, setError] = useState<unknown>(null);
   const [reloading, setReloading] = useState(false);
   const seq = useRef(0);
@@ -68,24 +73,31 @@ export function useCustomerDetail(id: number | null | undefined): CustomerDetail
     if (keep) setReloading(true);
     else {
       setData(null);
-      setStatus("loading");
+      put("loading");
     }
     setError(null);
     try {
       const d = await getCustomer(cur, c.signal);
       if (n !== seq.current) return;
       setData(d);
-      setStatus("ok");
+      put("ok");
       setReloading(false);
     } catch (err) {
       if (n !== seq.current || c.signal.aborted) return;
       if (err instanceof ApiError && err.status === 401) return; // đã về màn đăng nhập
       setError(err);
       setReloading(false);
-      // Tải lại lỗi mà còn dữ liệu cũ → giữ màn cũ, chỉ báo lỗi qua `error`.
-      setStatus((s) => (keep && s === "ok" ? "ok" : statusOfError(err)));
+      // PV-13: đã có dữ liệu mà tải lại bị 404 = mục đã ra ngoài phạm vi của người xem → XOÁ dữ liệu (không giữ tên/SĐT/địa chỉ
+      // khách đã tải), màn chuyển sang "mất quyền". Chỉ 404; 403/500/mạng giữ màn cũ và báo lỗi qua `error`.
+      if (keep && err instanceof ApiError && err.status === 404 && (statusRef.current === "ok" || statusRef.current === "scope_lost")) {
+        setData(null);
+        put("scope_lost");
+        return;
+      }
+      // Tải lại lỗi mà còn dữ liệu cũ → giữ màn cũ (status ok), chỉ báo lỗi qua `error`.
+      put(keep && statusRef.current === "ok" ? "ok" : statusOfError(err));
     }
-  }, []);
+  }, [put]);
 
   useEffect(() => {
     if (!id) return;

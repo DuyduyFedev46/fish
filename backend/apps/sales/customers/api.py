@@ -1,19 +1,19 @@
 """
-API nội bộ — khách hàng. Tầng 3 (BR-PQ-12, SR-PII-01/02, bất biến 9):
-- Chủ, Quản lý, superuser: toàn bộ danh bạ, đủ field.
-- NV kho không có `sales.view_customer` (data migration accounts/0012) nên bị 403. Người kiêm nhiệm
-  NV kho + NV giao có quyền xem khách qua nv_giao nên cũng chỉ thấy khách của phiếu giao gán cho mình.
-- NV giao: chỉ khách của phiếu gán cho mình còn trong cửa sổ `DELIVERY_PII_RECENT_DAYS` (pii_scope.py),
-  chỉ field cần để giao (`id`, `phone`, `name`, `created_at`), không có `note`, `default_address`.
+API nội bộ — khách hàng. Tầng 3 (BR-PQ-12/35, SR-PII-01/02, bất biến 9), phạm vi D7 từ cấu hình nhóm (PV-05, `scope.py`),
+cùng hàm với danh bạ khách mới (hai API trả cùng một tập khách):
+- D7 = `all` (Chủ, Quản lý mặc định, superuser): toàn bộ danh bạ, đủ field.
+- D7 = `assigned_deliveries` (NV giao mặc định): chỉ khách của phiếu gán cho mình còn trong cửa sổ `DELIVERY_PII_RECENT_DAYS`
+  (pii_scope.py), chỉ field cần để giao (`id`, `phone`, `name`, `created_at`), không có `note`, `default_address`.
+- D7 = `none`: danh sách rỗng, chi tiết 404.
+- NV kho không có `sales.view_customer` (data migration accounts/0012) nên bị 403 (cổng Tầng 1 đứng trước).
   Ngoài phạm vi → 404 (không lộ bản ghi có tồn tại).
 """
 from rest_framework import viewsets
 
-from apps.common.api import BusinessModelPermissions, NoStoreMixin, sees_customer_directory
-from apps.delivery.models import DeliveryNote
-from apps.delivery.pii_scope import courier_visible_note_q
+from apps.common.api import BusinessModelPermissions, NoStoreMixin
 from apps.sales.models import Customer
 
+from .scope import scope_customers_for, sees_all_customers
 from .serializers import CourierCustomerSerializer, CustomerSerializer
 
 
@@ -23,14 +23,9 @@ class CustomerViewSet(NoStoreMixin, viewsets.ModelViewSet):
     permission_classes = [BusinessModelPermissions]
 
     def get_serializer_class(self):
-        if sees_customer_directory(self.request.user):
+        if sees_all_customers(self.request.user):
             return CustomerSerializer
         return CourierCustomerSerializer
 
     def get_queryset(self):
-        qs = super().get_queryset()
-        user = self.request.user
-        if sees_customer_directory(user):
-            return qs
-        visible_notes = DeliveryNote.objects.filter(courier_visible_note_q(user))
-        return qs.filter(orders__invoice__delivery_notes__in=visible_notes).distinct()
+        return scope_customers_for(self.request.user, super().get_queryset())

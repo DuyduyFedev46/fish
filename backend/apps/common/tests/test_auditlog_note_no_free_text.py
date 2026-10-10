@@ -175,9 +175,14 @@ class PaymentsOrdersRefundsNoFreeTextTests(OrderApiBase):
         )
         self.assertEqual(resp.status_code, 200, resp.content)
         order.refresh_from_db()
-        self.assertEqual(SalesOrderDetailSerializer(order, context={}).data["cancel_note"], FREE)
+        from types import SimpleNamespace
+
+        context = {"request": SimpleNamespace(user=self.manager)}  # Quản lý có V2 (PV-07)
+        self.assertEqual(SalesOrderDetailSerializer(order, context=context).data["cancel_note"], FREE)
+        # Không có người gọi (không context) thì mặc định che: cancel_note có thể chứa tên khách.
+        self.assertEqual(SalesOrderDetailSerializer(order, context={}).data["cancel_note"], "")
         order.pii_visible = False
-        data = SalesOrderDetailSerializer(order, context={}).data
+        data = SalesOrderDetailSerializer(order, context=context).data
         self.assertEqual(data["cancel_note"], "")
         self.assertNotIn(SECRET_NAME, str(data))
 
@@ -200,7 +205,7 @@ class PaymentsOrdersRefundsNoFreeTextTests(OrderApiBase):
         )
         self.assertEqual(resp.status_code, 200, resp.content)
         log = AuditLog.objects.get(action="cancel_paid_order")
-        self.assertEqual(log.note, f"Lý do: Khác · {NOTE_PRESENT_LABEL}")
+        self.assertEqual(log.note, f"Huỷ đơn: Lý do khác · {NOTE_PRESENT_LABEL}")
         order.refresh_from_db()
         self.assertEqual(order.cancel_note, FREE)  # chữ gốc ở đơn
         detail = client_for(self.owner).get(f"/api/sales/orders/{order.pk}/").json()

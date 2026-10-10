@@ -118,6 +118,13 @@ describe("deliveringBlock (ED-38-AC3 / BR-GH-08)", () => {
     expect(text).toContain("GH-0001, GH-0002");
     expect(text).not.toContain("nữa");
   });
+  it("Lô 17b G7: tổng lấy theo count của API, không phải độ dài trang đầu", () => {
+    const firstPage = Array.from({ length: 20 }, (_, i) => note(`GH-${i + 1}`));
+    const text = deliveringBlock(firstPage, 23) as string;
+    expect(text).toContain("23 phiếu Đang giao");
+    expect(text).toContain("và 18 phiếu nữa");
+    expect(deliveringBlock([], 0)).toBeNull();
+  });
   it("nhiều phiếu thì cắt bớt mã, vẫn đúng tổng", () => {
     const many = Array.from({ length: 8 }, (_, i) => note(`GH-${i + 1}`));
     const text = deliveringBlock(many) as string;

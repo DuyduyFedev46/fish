@@ -20,7 +20,7 @@ expect.set_options(timeout=10_000)
 SMALL_TAPS_JS = """() => [...document.querySelectorAll('button, a, input, select')].filter(e => {
     const r = e.getBoundingClientRect(); const s = getComputedStyle(e);
     return r.width > 0 && r.height > 0 && s.visibility !== 'hidden' && r.x >= 0 && r.x < 360 && r.y < innerHeight
-      && !e.classList.contains('sr-only') && !e.classList.contains('lt-link') && !e.matches('input[type=checkbox]') && (r.height < 44 || (!['INPUT', 'SELECT'].includes(e.tagName) && r.width < 44));
+      && !e.classList.contains('sr-only') && !e.matches('input[type=checkbox]') && (r.height < 44 || (!['INPUT', 'SELECT'].includes(e.tagName) && r.width < 44));
   }).map(e => (e.getAttribute('aria-label') || e.innerText || e.tagName).trim().slice(0,30) + ' ' + Math.round(e.getBoundingClientRect().width) + 'x' + Math.round(e.getBoundingClientRect().height))"""
 
 PHONE = re.compile(r"\b0\d{9}\b")
@@ -110,7 +110,8 @@ def pick_more(page, label):
 
 
 def storage_dump(page):
-    return page.evaluate("() => JSON.stringify([Object.entries(localStorage), Object.entries(sessionStorage), location.href])")
+    # Bỏ kho mock của các module khác (khách, đơn, tài khoản GIẢ gieo sẵn khi Tổng quan tải; có thể trùng số điện thoại đang thử). Chỉ soi những gì màn Nhà cung cấp tự lưu.
+    return page.evaluate("() => JSON.stringify([Object.entries(localStorage).filter(([k]) => !k.startsWith('cave_erp_mock_')), Object.entries(sessionStorage).filter(([k]) => !k.startsWith('cave_erp_mock_')), location.href])")
 
 
 def personal_clean(page, extra=()):

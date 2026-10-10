@@ -7,6 +7,7 @@ Bất biến:
 - Không rò giá vốn.
 - T1 view_refund giống hệt RefundViewSet.
 """
+from apps.sales.refunds.scope import scope_refunds_for
 from decimal import Decimal
 from typing import Any, Optional
 
@@ -138,6 +139,8 @@ def get_refund_guidance(doc_id: str, user: Any, request: Optional[Any] = None) -
         "confirmed_by__staff_profile",
     )
 
+    qs = scope_refunds_for(user, qs)  # B1 (QA Lô 4+5): cùng phạm vi D1 với API phiếu hoàn; ngoài phạm vi là 404
+
     try:
         refund = qs.get(pk=int(doc_id))
     except (TypeError, ValueError, Refund.DoesNotExist):
@@ -164,7 +167,7 @@ def get_refund_guidance(doc_id: str, user: Any, request: Optional[Any] = None) -
         if delta_days >= warning_days:
             warnings.append({
                 "code": "GW-02",
-                "text": "Phiếu hoàn gần hạn 30 ngày (BR-AI-33)",
+                "text": "Phiếu hoàn tiền gần hạn 30 ngày",
             })
 
     related: list[dict[str, str]] = []

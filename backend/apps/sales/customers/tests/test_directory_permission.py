@@ -112,7 +112,13 @@ class CustomerTimelineWithNewPermissionTests(PermissionBase):
         self.assertEqual(self.clients["anonymous"].get(self.url()).status_code, 401)
 
     def test_timeline_user_with_only_the_new_permission_can_read(self):
-        extra = make_user("pm_tl_extra", perms=(PERM,))
+        # PV-05: dòng thời gian khách theo D7 của nhóm; Chủ bật "Xem khách hàng" cho nhóm NV kho kèm D7 = all.
+        from apps.accounts.models import GroupDataScope
+
+        warehouse_group = Group.objects.get(name=roles.WAREHOUSE_STAFF)
+        warehouse_group.permissions.add(Permission.objects.get(content_type__app_label="sales", codename="view_customer_list"))
+        GroupDataScope.objects.update_or_create(group=warehouse_group, object_key="customers", defaults={"value": "all"})
+        extra = make_user("pm_tl_extra", roles.WAREHOUSE_STAFF)
         self.assertEqual(client_for(extra).get(self.url()).status_code, 200)
 
     def test_timeline_follows_permission_switch_off_for_manager(self):

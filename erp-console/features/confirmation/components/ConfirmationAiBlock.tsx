@@ -4,7 +4,8 @@
 // (cuộc gọi, hẹn gọi lại, quyết định). Câu hỏi nhanh KHÔNG chứa tên, số điện thoại, địa chỉ: chỉ gửi mã chứng từ đích.
 // AI tắt hoặc lỗi → không vẽ gì (fail-closed). Không có chuỗi runtime nặng ở file này (check-ai-chunks).
 import { useEffect, useState } from "react";
-import { AI_FEATURES_ENABLED } from "@/shared/lib/features";
+import { aiVisible } from "@/shared/lib/features";
+import { useAuth } from "@/features/auth/components/AuthProvider";
 import { getAiStatus } from "@/features/ai/api";
 import { AiDocBlock } from "@/features/ai/components/AiDocBlock";
 import type { AiStatus } from "@/features/ai/types";
@@ -14,11 +15,13 @@ export const CONFIRMATION_AI_CHIPS = ["Tóm tắt các cuộc gọi của đơn 
 type Props = { noteId: number; onApplied?: () => void };
 
 export function ConfirmationAiBlock({ noteId, onApplied }: Props) {
+  const { me } = useAuth();
+  const visible = aiVisible(me);
   const [status, setStatus] = useState<AiStatus | null>(null);
 
   useEffect(() => {
     // Cờ AI tắt (SR-HIDE-AI-01): không gọi /api/ai/status/.
-    if (!AI_FEATURES_ENABLED) return;
+    if (!visible) return;
     const ctrl = new AbortController();
     getAiStatus(ctrl.signal)
       .then((st) => setStatus(st))
@@ -26,8 +29,8 @@ export function ConfirmationAiBlock({ noteId, onApplied }: Props) {
         if (!ctrl.signal.aborted) setStatus(null);
       });
     return () => ctrl.abort();
-  }, []);
+  }, [visible]);
 
-  if (!AI_FEATURES_ENABLED || !status?.ai_enabled) return null;
+  if (!visible || !status?.ai_enabled) return null;
   return <AiDocBlock status={status} targetModel="delivery.deliverynote" targetId={String(noteId)} onApplied={onApplied} chips={CONFIRMATION_AI_CHIPS} />;
 }

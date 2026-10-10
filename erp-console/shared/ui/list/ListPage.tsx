@@ -1,6 +1,6 @@
 // Khung màn danh sách (UI-RULES §4): tab · thanh lọc · thanh AI · bảng · chân. Nút chính đặt như board:
 // có tab thì nút nằm cùng hàng tab (bên phải); không tab thì nằm cuối hàng thanh lọc; không cả hai thì hàng riêng.
-// Chỉ là bố cục: dữ liệu, bộ lọc và bảng do màn truyền vào (FilterBar, AiBar, DataTable). Tên màn đã có ở topbar,
+// Chỉ là bố cục: dữ liệu, bộ lọc và bảng do màn truyền vào (FilterBar, DataTable). Tên màn đã có ở topbar,
 // nên `title` chỉ dùng khi màn cần tiêu đề phụ (vd tên tab); không bắt buộc.
 // Mất mạng: truyền `asOf` + `onRetry` để dải mất mạng chung ghi "Dữ liệu lúc …" và có nút Thử lại
 // (màn dùng `usePagedList` thì hook đã tự đăng ký, không cần truyền lại).
@@ -16,7 +16,7 @@ type Props = {
   banner?: React.ReactNode;
   /** <FilterBar …/>. */
   filters?: React.ReactNode;
-  /** <AiBar …/>. */
+  /** Khe cho thanh gợi ý phía trên bảng; hiện chưa màn nào dùng. */
   aiBar?: React.ReactNode;
   /** <DataTable …/>. */
   children: React.ReactNode;

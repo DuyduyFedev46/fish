@@ -165,7 +165,7 @@ function Loaded({ id, me, renderAi }: { id: number; me: Me; renderAi?: RenderAi 
   if (ability.close && !stepLacksPermission(closeStep)) {
     more.push({ key: "close", label: "Chốt lô", blockedReason: closeBlockReason(row, stepReason(closeStep)), onSelect: () => setModal("close") });
   }
-  const stuckStep = escalatableStep(guidance);
+  const stuckStep = escalatableStep(guidance, me);
   if (stuckStep && stuckStep.key !== escalatedKey) {
     more.push({ key: "escalate", label: ESCALATE_MSG.menuLabel, onSelect: () => setModal("escalate") });
   }

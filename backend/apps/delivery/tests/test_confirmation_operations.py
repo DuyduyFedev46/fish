@@ -246,7 +246,7 @@ class TestCS12ChangeRecipient(ConfirmationL4BaseTestCase):
         self.assertEqual(resp.status_code, 200)
         data = resp.json()
         self.assertEqual(data["recipient_name"], "Cô Ba Nhận Giúp")
-        self.assertEqual(data["recipient_phone_masked"], "09xx xxx 344")
+        self.assertEqual(data["recipient_phone_masked"], "xxxxxx3344")
 
     def test_cs12_ac9_permissions(self):
         """kho1, giao1 gọi POST recipient -> 403."""
@@ -280,7 +280,7 @@ class TestCS13CustomerCancellationAndChange(ConfirmationL4BaseTestCase):
         resp_q = client_cs1.get(f"/api/confirmation/queue/{note.pk}/")
         self.assertEqual(resp_q.status_code, 200)
         data = resp_q.json()
-        self.assertEqual(data["escalation_label"], "Khách muốn huỷ")
+        self.assertEqual(data["escalation_label"], "Khách muốn huỷ đơn")
         self.assertIsNone(data["decide_deadline"])
 
     def test_cs13_ac2_manager_cancels_want_cancel_order(self):
@@ -303,7 +303,7 @@ class TestCS13CustomerCancellationAndChange(ConfirmationL4BaseTestCase):
         self.assertEqual(order.status, SalesOrder.Status.CANCELLED)
 
     def test_cs13_ac3_want_change_escalates(self):
-        """cs1 ghi WANT_CHANGE -> ESCALATED, nhãn 'Khách muốn đổi món – huỷ + hoàn + đặt lại', decide_deadline=None."""
+        """cs1 ghi WANT_CHANGE -> ESCALATED, nhãn 'Khách muốn đổi món' (T37), decide_deadline=None."""
         order, note, task = self._create_order_with_confirmation()
         client_cs1 = client_for(self.cs1)
         resp = client_cs1.post(
@@ -318,7 +318,7 @@ class TestCS13CustomerCancellationAndChange(ConfirmationL4BaseTestCase):
 
         resp_q = client_cs1.get(f"/api/confirmation/queue/{note.pk}/")
         data = resp_q.json()
-        self.assertEqual(data["escalation_label"], "Khách muốn đổi món – huỷ + hoàn + đặt lại")
+        self.assertEqual(data["escalation_label"], "Khách muốn đổi món")
         self.assertIsNone(data["decide_deadline"])
 
     def test_cs13_ac4_cs1_cannot_cancel_sales_order(self):

@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { MSG } from "./messages";
 import { hasLimitedCourierScope, personalText } from "./personalData";
 import { ROLE } from "./roles";
 
@@ -34,5 +35,25 @@ describe("hasLimitedCourierScope", () => {
   it("không có nv_giao -> không hạn chế", () => {
     expect(hasLimitedCourierScope(g(ROLE.customerService))).toBe(false);
     expect(hasLimitedCourierScope(g())).toBe(false);
+  });
+});
+
+// §2.7: chữ ô khách theo lý do che (customer_hidden_reason).
+describe("personalText theo lý do che", () => {
+  it("null + not_permitted → không có quyền xem thông tin khách", () => {
+    expect(personalText(null, "—", "not_permitted")).toBe("Đã ẩn (không có quyền xem thông tin khách)");
+    expect(personalText(null, "—", "not_permitted")).toBe(MSG.personalDataNotPermitted);
+  });
+  it("null + expired → quá 7 ngày", () => {
+    expect(personalText(null, "—", "expired")).toBe("Đã ẩn (quá 7 ngày)");
+  });
+  it("null không kèm lý do (phiếu giao, khách, gọi xác nhận) → quá 7 ngày", () => {
+    expect(personalText(null)).toBe("Đã ẩn (quá 7 ngày)");
+    expect(personalText(null, "—", null)).toBe("Đã ẩn (quá 7 ngày)");
+  });
+  it("có giá trị hoặc rỗng → lý do không đổi chữ", () => {
+    expect(personalText("Khách giả", "—", "not_permitted")).toBe("Khách giả");
+    expect(personalText("", "—", "not_permitted")).toBe("—");
+    expect(personalText(undefined, "Chưa có", "expired")).toBe("Chưa có");
   });
 });

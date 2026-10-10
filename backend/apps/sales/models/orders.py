@@ -16,7 +16,7 @@ class SalesOrder(models.Model):
         PROCESSING = "PROCESSING", "Đang xử lý"  # đã trừ kho + ghi doanh thu
         COMPLETED = "COMPLETED", "Hoàn tất"
         CANCELLED = "CANCELLED", "Đã huỷ"        # cancel_paid_order (P-07)
-        AUTO_CANCELLED = "AUTO_CANCELLED", "Tự huỷ (quá TTL)"
+        AUTO_CANCELLED = "AUTO_CANCELLED", "Hết giờ giữ chỗ"
 
     code = models.CharField("Mã đơn", max_length=32, unique=True)
     customer = models.ForeignKey(
@@ -74,6 +74,8 @@ class SalesOrder(models.Model):
         permissions = [
             ("cancel_paid_order", "Huỷ đơn đã thanh toán"),
             ("view_privacy_consent", "Xem bằng chứng đồng ý xử lý dữ liệu của đơn"),
+            # PV-07 (BR-PQ-38): tên, SĐT, địa chỉ khách trên đơn, hoá đơn, phiếu hoàn tiền. Khác `view_customer_list`.
+            ("view_order_customer_info", "Xem thông tin khách trên đơn, hoá đơn, phiếu hoàn tiền"),
         ]
 
     def __str__(self):

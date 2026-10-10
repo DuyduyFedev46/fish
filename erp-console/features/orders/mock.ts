@@ -1,9 +1,10 @@
 // Mock module orders — CHỈ dùng khi NEXT_PUBLIC_USE_MOCK=1 (bản build thật loại bỏ file này).
 // Dựng JSON theo contract THỰC TẾ BE L7 (03-dev-notes.md "Lô L7 — S10, S11 (BE)"): mã SO…/INV…/GH-…, `payments[].source`,
 // thêm status_label/total_amount/created_at/reserved_until ở chi tiết; và "Lô L7 — bổ sung (BE)": `q` khớp cả tên khách (bỏ dấu),
-// `*_label` của giao dịch/phiếu giao/phiếu hoàn, `timeline [{at, kind, label, actor_display}]` tăng dần. Đổi ở BE thì chép lại ở đây.
+// `*_label` của giao dịch/phiếu giao/phiếu hoàn tiền, `timeline [{at, kind, label, actor_display}]` tăng dần. Đổi ở BE thì chép lại ở đây.
 //
-//   GET  /api/sales/orders/?status=A,B&date_from=YYYY-MM-DD&date_to=YYYY-MM-DD&q=&page=   (20 dòng/trang)
+//   GET  /api/sales/orders/?status=A,B&date_from=YYYY-MM-DD&date_to=YYYY-MM-DD&q=&page=   (20 dòng/trang; `q` CHỈ khớp mã đơn, Lô 17b-BE)
+//   POST /api/sales/orders/search/  {q?, status? (chuỗi "A,B" hoặc mảng chuỗi), date_from?, date_to?, customer?, batch?, page?}   (cùng dạng kết quả; tìm cả SĐT/tên)
 //   GET  /api/sales/orders/{id}/
 //   POST /api/sales/orders/{id}/confirm-payment[/]   {bank_txn_id, amount?}
 //
@@ -31,13 +32,14 @@
 //   GET  /api/sales/payments/?resolution_status=OPEN|RESOLVED&match_status=&page=     (20 dòng/trang, mới → cũ)
 //   GET  /api/sales/payments/{id}/
 //   POST /api/sales/payments/{id}/resolve[/]   {action: ATTACH_TO_ORDER, order_id, note} | {action: CONFIRM_ORDER, note}
-//   POST /api/sales/refunds/create[/]          {payment_transaction, amount, reason, request_id}
+//   POST /api/sales/refunds/create[/]          {payment_transaction, amount, reason, request_id, acknowledge_duplicate_warning?}
+//   POST /api/sales/payments/record-late/      {bank_txn_id, amount, received_at, order_code?, acknowledge_possible_duplicate?}  (#15, xem khối "#15" bên dưới)
 // Hàng chờ = mọi giao dịch có `resolution_status` (UNDERPAID/ORPHAN/UNMATCHED/OVERPAID lúc ghi). Webhook MATCHED không vào.
 // Luật mock (giả định FE, BE chốt thì chép lại):
 //  - Cần sales.confirm_payment_manual (thiếu → 403, kiểm TRƯỚC khi tra giao dịch) — Quản lý/NV kho 403 (S12-AC7).
 //  - available_actions (khoản OPEN): UNMATCHED → attach_to_order; UNDERPAID + đơn Giữ chỗ + tổng đã trả ĐỦ (giả định 1 BE)
 //    → confirm_order; mọi loại còn tiền hoàn được (BR-HT-04) + sales.create_refund → refund. Khoản RESOLVED → [].
-//    Tổng đã trả = MATCHED + UNDERPAID, TRỪ giao dịch đang có phiếu hoàn chưa Thất bại (Q9 BE).
+//    Tổng đã trả = MATCHED + UNDERPAID, TRỪ giao dịch đang có phiếu hoàn tiền chưa Thất bại (Q9 BE).
 //  - ATTACH_TO_ORDER: chỉ UNMATCHED; đơn Tự huỷ → BR-TT-05; đơn khác Giữ chỗ → 400 (tạm); đủ tiền (cộng các khoản đã nhận
 //    của đơn) → đơn PROCESSING như S11-AC1, khoản RESOLVED/ATTACHED (khoản thiếu cũ của đơn → CONFIRMED); chưa đủ → khoản
 //    thành UNDERPAID của đơn, VẪN OPEN.
@@ -52,13 +54,17 @@
 //   window.__caveMock.expireOrder(id)                 — đơn tự huỷ "trong lúc chờ" (S12-AC5)
 //   window.__caveMock.confirmRefund(refundId, ref)    — giả lập S16: phiếu REFUNDED → khoản RESOLVED/REFUNDED (S13-AC2)
 //   window.__caveMock.queueJson(username)             — JSON hàng chờ OPEN đúng như người đó nhận
+//   window.__caveMock.flagDuplicate(paymentId)        — #15: gắn nhãn nghi trùng cho khoản (như webhook về sau khi màn đã mở)
 
+import { ENUMS } from "@/shared/lib/enums";
 import type { MockRequest, MockResponse, Paginated } from "@/shared/lib/http";
 import { beError } from "@/shared/lib/beErrors.mock";
-import { hasLimitedCourierScope } from "@/shared/lib/personalData";
+import { hasLimitedCourierScope, type CustomerHiddenReason } from "@/shared/lib/personalData";
 import { MOCK_UNAUTHORIZED, mockRequireUser, mockUsers, mockPermsOf } from "@/features/auth/mock";
 import type { Me } from "@/features/auth/types";
 import { money as formatMoney } from "@/shared/lib/format";
+import { isDeliveryFinished } from "@/shared/lib/orderCompletion";
+import { drainDeliveryOutcomes, publishOrderCancelled } from "@/shared/lib/orderLink.mock";
 import type {
   ConfirmPaymentResult,
   OrderAllocation,
@@ -70,6 +76,7 @@ import type {
   OrderTimelineEntry,
   PaymentQueueItem,
   QueueRefund,
+  RecordLatePaymentResult,
   RefundQueueItem,
   ResolveResult,
 } from "./types";
@@ -89,6 +96,8 @@ const PERM_VIEW_REFUND = "sales.view_refund";
 const PERM_VIEW_CUSTOMER = "sales.view_customer_list";
 const PERM_CONFIRM_REFUND = "sales.confirm_refund";
 const REFUND_MODE_KEY = "cave_erp_mock_refunds_mode";
+/** "completion" = bộ 7 đơn mẫu của S6-AC1 (1 giữ chỗ · 2 đang xử lý · 3 hoàn tất · 1 huỷ). Đặt rồi xoá khoá kho mock để gieo lại. */
+const DATASET_KEY = "cave_erp_mock_orders_dataset";
 
 /** Giao dịch trong kho mock: field nội bộ (người xác nhận tay, xử lý hàng chờ, nội dung CK) — BE chỉ trả một phần. */
 type Pay = OrderPayment & {
@@ -100,9 +109,11 @@ type Pay = OrderPayment & {
   resolved_by?: string | null;
   resolved_at?: string | null;
   resolution_note?: string;
+  /** #15: nhãn nghi trùng (BR-TT-15 / BR-TT-18); rỗng/thiếu = không nghi. */
+  duplicate_warning?: string;
 };
 /**
- * Phiếu hoàn gắn `payment_transaction` (S13). S16 bổ sung: người lập/xác nhận (ID số — giả định dev BE #5, chưa đổi
+ * Phiếu hoàn tiền gắn `payment_transaction` (S13). S16 bổ sung: người lập/xác nhận (ID số — giả định dev BE #5, chưa đổi
  * thành username), lúc lập/xác nhận, lý do thất bại.
  */
 type MockRefund = QueueRefund & {
@@ -115,7 +126,7 @@ type MockRefund = QueueRefund & {
   confirmed_at: string | null;
   failure_reason: string;
 };
-/** Phiếu hoàn gắn `sales_invoice` (S15) — sống trong `Order.refunds`; field nội bộ, `detail()` chỉ lộ phần công khai. */
+/** Phiếu hoàn tiền gắn `sales_invoice` (S15) — sống trong `Order.refunds`; field nội bộ, `detail()` chỉ lộ phần công khai. */
 type MockOrderRefund = OrderRefund & {
   is_partial: boolean;
   reason: string;
@@ -156,6 +167,8 @@ type Order = {
   /** Mã lý do huỷ (BE `reasons.py`): nguồn của cột "Lý do" ở danh sách. */
   cancelReasonCode?: string;
   cancelledAt?: string;
+  /** Ghi chú huỷ đã qua kiểm BR-GH-19; `detail()` trả ra `cancel_note` (che theo `piiHidden`). */
+  cancelNote?: string;
   cancelStockRestored?: boolean;
   /** Phiếu giao đã Giao thất bại trước khi bị huỷ (GIVE_UP_AFTER_FAILED) — giữ lại vì `delivery.status` bị ghi đè thành CANCELLED. */
   cancelFromFailedDelivery?: boolean;
@@ -168,8 +181,10 @@ type Store = {
   seq: number;
   /** S12: tiền về không khớp đơn nào (chưa gắn). */
   unmatched: Pay[];
-  /** S13: phiếu hoàn gắn giao dịch (không hoá đơn). */
+  /** S13: phiếu hoàn tiền gắn giao dịch (không hoá đơn). */
   txnRefunds: MockRefund[];
+  /** Đã áp ít nhất một kết quả giao hàng từ mock Giao hàng (kho nối `orderLink.mock.ts`). */
+  linked?: boolean;
 };
 
 const ORDER_LABEL: Record<OrderStatus, string> = {
@@ -178,7 +193,7 @@ const ORDER_LABEL: Record<OrderStatus, string> = {
   PROCESSING: "Đang xử lý",
   COMPLETED: "Hoàn tất",
   CANCELLED: "Đã huỷ",
-  AUTO_CANCELLED: "Đã huỷ",
+  AUTO_CANCELLED: "Hết giờ giữ chỗ",
 };
 
 // [mã, tên, giá bán/kg, lô, giá vốn/kg]
@@ -209,17 +224,20 @@ const CUSTOMERS: [string, string, string][] = [
 ];
 
 // Kịch bản trạng thái theo thứ tự đơn MỚI → CŨ (45 đơn). Phần tử: [trạng thái, phút trước, ghi chú kịch bản]
-type Plan = [OrderStatus, number, string?];
+// Phần tử đầu: trạng thái đơn, hoặc "DELIVERY" = đơn đã có phiếu giao — khi đó trạng thái đơn KHÔNG khai ở đây mà suy từ trạng thái
+// phiếu theo luật dùng chung BR-BH-18 (`isDeliveryFinished`), phiếu do ghi chú kịch bản quyết định (S6-AC8, không gán cứng).
+type PlanKind = OrderStatus | "DELIVERY";
+type Plan = [PlanKind, number, string?];
 const PLAN: Plan[] = [
   ["BOOKED", 10, "hoa"], // id 101 — DH mẫu của contract
   ["BOOKED", 27, "soon"], // còn ~3 phút giữ chỗ
   ["AUTO_CANCELLED", 55],
-  ["PROCESSING", 80, "giao1"],
+  ["DELIVERY", 80, "preparing"],
   ["PAID", 95],
   ["BOOKED", 18, "under"],
-  ["PROCESSING", 150, "giao2"],
-  ["PROCESSING", 200, "failed"],
-  ["COMPLETED", 260],
+  ["DELIVERY", 150, "delivering"],
+  ["DELIVERY", 200, "failed"],
+  ["DELIVERY", 260],
   ["CANCELLED", 320, "refund-pending"],
 ];
 
@@ -227,9 +245,21 @@ const PLAN: Plan[] = [
 // đơn 143 gán cho giao1 (id 4, chỉ delivery_staff), đơn 142 gán cho cs2 (id 12, customer_service + delivery_staff).
 // Đặt vào chỗ hai đơn cũ COMPLETED (42, 41) để tổng số đơn (45) và các id khác không đổi.
 const OLD_COURIER_PLANS: Record<number, Plan> = {
-  42: ["COMPLETED", 10 * 24 * 60, "old-giao1"],
-  41: ["COMPLETED", 11 * 24 * 60, "old-cs2"],
+  42: ["DELIVERY", 10 * 24 * 60, "old-giao1"],
+  41: ["DELIVERY", 11 * 24 * 60, "old-cs2"],
 };
+/** Bộ đơn mẫu S6-AC1 (mới → cũ). Hai đơn Hoàn tất đầu có phiếu giao đã xong; đơn `refunded` có phiếu hoàn Đã hoàn 200.000 + Chờ hoàn 100.000 (S7-AC5). */
+const PLAN_COMPLETION: Plan[] = [
+  ["BOOKED", 10, "sample"],
+  ["DELIVERY", 80, "delivering"], // phiếu Đang giao
+  ["DELIVERY", 140, "failed"], // phiếu Giao thất bại
+  ["DELIVERY", 200, "refunded"],
+  ["DELIVERY", 260],
+  ["DELIVERY", 320],
+  ["CANCELLED", 400],
+];
+/** Trạng thái phiếu giao theo ghi chú kịch bản; không ghi chú nào khớp thì phiếu đã giao xong. */
+const DELIVERY_BY_TAG: Record<string, string> = { preparing: "PREPARING", delivering: "DELIVERING", failed: "FAILED" };
 const OLD_COURIER_BY_TAG: Record<string, number> = { "old-giao1": 4, "old-cs2": 12 };
 /** Số ngày NV giao còn xem được dữ liệu khách của phiếu đã kết thúc (BE `DELIVERY_PII_RECENT_DAYS`, mặc định 7). */
 const PII_RECENT_DAYS = 7;
@@ -291,21 +321,29 @@ function seed(): Store {
   let delId = 20;
   let refId = 3;
   const txns: Record<string, Txn> = {};
-  for (let i = 0; i < 45; i++) {
-    const plan: Plan =
-      PLAN[i] ||
+  const sample = dataset() === "completion";
+  const count = sample ? PLAN_COMPLETION.length : 45;
+  for (let i = 0; i < count; i++) {
+    const plan: Plan = sample
+      ? PLAN_COMPLETION[i]
+      : PLAN[i] ||
       (() => {
         // Đơn cũ hơn: rải 1–20 ngày trước, chủ yếu hoàn tất, xen huỷ / tự huỷ.
-        const st: OrderStatus = i % 9 === 0 ? "AUTO_CANCELLED" : i % 11 === 0 ? "CANCELLED" : "COMPLETED";
+        const st: PlanKind = i % 9 === 0 ? "AUTO_CANCELLED" : i % 11 === 0 ? "CANCELLED" : "DELIVERY";
         return [st, 360 + (i - PLAN.length) * 610 + (i % 5) * 37];
       })();
-    const [status, minutesAgo, tag] = OLD_COURIER_PLANS[i] ?? plan;
+    const [kind, minutesAgo, tag] = (!sample && OLD_COURIER_PLANS[i]) || plan;
+    // Trạng thái phiếu quyết định trạng thái đơn (BR-BH-18), không gán cứng.
+    const deliveryStatus = kind === "DELIVERY" ? DELIVERY_BY_TAG[tag ?? ""] ?? "COMPLETED" : null;
+    const status: OrderStatus = deliveryStatus ? (isDeliveryFinished([deliveryStatus]) ? "COMPLETED" : "PROCESSING") : (kind as OrderStatus);
     const id = 101 + i;
     const createdMs = now - minutesAgo * 60_000;
     const created = isoVN(createdMs);
     const cust = tag === "hoa" ? CUSTOMERS[0] : CUSTOMERS[1 + (i % (CUSTOMERS.length - 1))];
     const lines: Line[] =
-      tag === "hoa"
+      tag === "refunded"
+        ? [{ item_code: "TOM-SU-1", item_name: "Tôm sú loại 1", qty: 2, price: 270000, discount: 0, batches: [["TOM-SU-1-260920-AB12C", 2, 180000]] }]
+        : tag === "hoa"
         ? [{ item_code: "TOM-SU-1", item_name: "Tôm sú loại 1", qty: 2, price: 270000, discount: 0, batches: [["TOM-SU-1-260920-AB12C", 2, 180000]] }]
         : makeLines(i);
     const o: Order = {
@@ -331,9 +369,9 @@ function seed(): Store {
       // Đơn Đã thanh toán cũng có hoá đơn (BR-TT: hoá đơn phát hành ngay khi đủ tiền) để có thể huỷ / hoàn theo ED-09-AC3.
       o.invoice = { id: ++invId, code: `INV${yymmdd(created)}-${hex(invId * 7, 6)}`, issued_at: isoVN(createdMs + 6 * 60_000 + 20_000) };
     }
-    if (status === "PROCESSING" || status === "COMPLETED") {
-      const assigned = tag && OLD_COURIER_BY_TAG[tag] ? OLD_COURIER_BY_TAG[tag] : tag === "giao1" ? 4 : tag === "giao2" ? 7 : tag === "failed" ? 4 : status === "COMPLETED" ? [4, 7, 3][i % 3] : null;
-      const dStatus = status === "COMPLETED" ? "COMPLETED" : tag === "giao2" ? "DELIVERING" : tag === "failed" ? "FAILED" : "PREPARING";
+    if (deliveryStatus) {
+      const assigned = tag && OLD_COURIER_BY_TAG[tag] ? OLD_COURIER_BY_TAG[tag] : tag === "preparing" ? 4 : tag === "delivering" ? 7 : tag === "failed" ? 4 : status === "COMPLETED" ? [4, 7, 3][i % 3] : null;
+      const dStatus = deliveryStatus;
       o.delivery = {
         id: ++delId,
         code: `GH-${o.invoice!.code}-${hex(delId * 13, 5)}`,
@@ -343,6 +381,25 @@ function seed(): Store {
         ...(dStatus === "COMPLETED" ? { completed_at: isoVN(createdMs + 3 * 3600_000) } : {}),
       };
       if (tag === "failed") o.needs_attention = true;
+    }
+    if (tag === "refunded") {
+      // S7-AC5: đơn Hoàn tất đã có hai phiếu hoàn — Đã hoàn 200.000 và Chờ hoàn 100.000. Chip đơn vẫn là Hoàn tất (BR-BH-20).
+      for (const [amount, done] of [[200000, true], [100000, false]] as const) {
+        o.refunds.push({
+          id: ++refId,
+          amount: money(amount),
+          status: done ? "REFUNDED" : "PENDING",
+          bank_txn_ref: done ? `HT26267${pad(refId, 4)}` : "",
+          is_partial: true,
+          reason: "Khách trả bớt hàng",
+          request_id: `seed-order-refund-${refId}`,
+          created_by: 1,
+          confirmed_by: done ? 1 : null,
+          created_at: isoVN(createdMs + 5 * 3600_000),
+          confirmed_at: done ? isoVN(createdMs + 6 * 3600_000) : null,
+          failure_reason: "",
+        });
+      }
     }
     if (status === "CANCELLED") {
       const pending = tag === "refund-pending";
@@ -443,6 +500,14 @@ function seed(): Store {
   return { seededAt: now, orders, txns, seq: 60, unmatched, txnRefunds };
 }
 
+function dataset(): "default" | "completion" {
+  try {
+    return typeof window !== "undefined" && window.localStorage.getItem(DATASET_KEY) === "completion" ? "completion" : "default";
+  } catch {
+    return "default";
+  }
+}
+
 function ss(): Storage | null {
   try {
     return typeof window === "undefined" ? null : window.sessionStorage;
@@ -452,7 +517,33 @@ function ss(): Storage | null {
 }
 
 let memory: Store | null = null;
+
+/**
+ * S6-AC8: áp kết quả giao hàng từ mock Giao hàng (kho nối `shared/lib/orderLink.mock.ts`) vào đơn cùng `id`. Trạng thái đơn lấy
+ * từ kết quả đó (BR-BH-18, đã xét mọi phiếu cùng đơn ở bên Giao hàng); đơn chưa có phiếu hoặc đã huỷ thì bỏ qua.
+ */
+function applyDeliveryOutcomes(store: Store): boolean {
+  let changed = false;
+  for (const x of drainDeliveryOutcomes()) {
+    const o = store.orders.find((n) => n.id === x.orderId);
+    if (!o?.delivery || (o.status !== "PROCESSING" && o.status !== "COMPLETED") || x.deliveryStatus === "CANCELLED") continue;
+    if (x.deliveryStatus === "FAILED" && o.delivery.status !== "FAILED") o.delivery.failed_attempts += 1;
+    if (x.deliveryStatus === "COMPLETED" && o.delivery.status !== "COMPLETED") o.delivery.completed_at = isoVN(Date.now());
+    o.delivery.status = x.deliveryStatus;
+    o.status = x.orderStatus === "COMPLETED" ? "COMPLETED" : "PROCESSING";
+    store.linked = true;
+    changed = true;
+  }
+  return changed;
+}
+
 function load(): Store {
+  const store = loadSeeded();
+  if (applyDeliveryOutcomes(store)) save(store);
+  return store;
+}
+
+function loadSeeded(): Store {
   if (memory && Date.now() - memory.seededAt < RESEED_MS) return memory;
   const raw = ss()?.getItem(STORE_KEY);
   if (raw) {
@@ -491,23 +582,23 @@ function mode(): Mode {
 
 // ---------- Nhãn BE (TextChoices) + dòng thời gian ----------
 const DELIVERY_LABEL: Record<string, string> = {
-  PREPARING: "Soạn hàng",
+  PREPARING: "Đang soạn hàng",
   READY: "Chờ lấy hàng",
   DELIVERING: "Đang giao",
-  COMPLETED: "Hoàn tất",
+  COMPLETED: "Đã giao",
   FAILED: "Giao thất bại",
   CANCELLED: "Đã huỷ theo đơn",
 };
 const CANCEL_REASON_CODES = new Set(["CUSTOMER_CHANGED_MIND", "DAMAGED_WHEN_PACKING", "GIVE_UP_AFTER_FAILED", "OTHER"]);
 const MATCH_LABEL: Record<string, string> = {
-  MATCHED: "Khớp — đã xác nhận",
-  UNDERPAID: "Thiếu tiền — chờ Chủ",
-  ORPHAN: "Đến sau khi đơn đã huỷ — chờ Chủ",
-  UNMATCHED: "Không khớp đơn — chờ Chủ",
-  OVERPAID: "Chuyển thừa — đơn đã thanh toán, chờ Chủ",
+  MATCHED: "Khớp đơn",
+  UNDERPAID: "Chuyển thiếu",
+  ORPHAN: "Về sau khi đơn đã huỷ",
+  UNMATCHED: "Không khớp đơn",
+  OVERPAID: "Chuyển thừa",
 };
-const SOURCE_LABEL: Record<string, string> = { WEBHOOK: "Webhook SePay", MANUAL: "Xác nhận tay" };
-const REFUND_LABEL: Record<string, string> = { PENDING: "Chờ hoàn", REFUNDED: "Đã hoàn", FAILED: "Thất bại" };
+const SOURCE_LABEL: Record<string, string> = { WEBHOOK: "Ngân hàng báo", MANUAL: "Xác nhận tay" };
+const REFUND_LABEL: Record<string, string> = Object.fromEntries(Object.entries(ENUMS.refundStatus).map(([k, v]) => [k, v.label]));
 const SYSTEM = "Hệ thống";
 const CANCEL_REASON = "Khách đổi ý";
 
@@ -536,24 +627,29 @@ function timelineOf(o: Order): OrderTimelineEntry[] {
       actor_display: p.source === "MANUAL" ? p.actor || SYSTEM : SYSTEM,
     });
   });
+  // W39: dòng do AI làm (BE bật AI mới trả; giao diện tắt thì FE phải ẩn).
+  out.push({ at: at(o.created_at, 1), kind: "ai_proposal_confirmed", label: "Duyệt đề xuất của trợ lý", actor_display: "AI của owner1" });
   if (o.invoice) out.push({ at: o.invoice.issued_at, kind: "invoice_issued", label: `Xuất hoá đơn ${o.invoice.code}`, actor_display: SYSTEM });
   const d = o.delivery;
   if (d && o.invoice) {
     const base = o.invoice.issued_at;
-    out.push({ at: base, kind: "delivery_created", label: `Tạo phiếu giao ${d.code} (Soạn hàng)`, actor_display: SYSTEM });
+    out.push({ at: base, kind: "delivery_created", label: `Tạo phiếu giao ${d.code} (Đang soạn hàng)`, actor_display: SYSTEM });
     const who = courierName(d.assigned_to);
     // Chỉ những phiếu THỰC SỰ đi qua Đang giao mới có hai bước chuyển đầu (Giao thất bại/Hoàn tất luôn đi qua đó;
     // huỷ trực tiếp từ Soạn hàng/Chờ lấy — BR-GH-07 chặn huỷ khi Đang giao — thì KHÔNG, trừ khi huỷ sau khi đã thất bại).
     const wentThroughDelivering = d.status === "FAILED" || d.status === "COMPLETED" || o.cancelFromFailedDelivery;
     const steps: [number, OrderTimelineEntry["kind"], string][] = [];
     if (wentThroughDelivering) {
-      steps.push([8, "delivery_status", `Phiếu giao ${d.code}: Soạn hàng → Chờ lấy hàng`]);
+      steps.push([8, "delivery_status", `Phiếu giao ${d.code}: Đang soạn hàng → Chờ lấy hàng`]);
       steps.push([15, "delivery_status", `Phiếu giao ${d.code}: Chờ lấy hàng → Đang giao`]);
     }
     if (d.status === "FAILED" || o.cancelFromFailedDelivery) {
       steps.push([40, "delivery_failed", `Giao thất bại lần ${d.failed_attempts || 1} (${d.code})`]);
     }
-    if (d.status === "COMPLETED") steps.push([45, "delivered", `Giao hàng thành công (${d.code})`]);
+    if (d.status === "COMPLETED") {
+      const label = o.status === "COMPLETED" ? `Đã giao — đơn hoàn tất (${d.code})` : `Giao hàng thành công (${d.code})`;
+      steps.push([45, "delivered", label]);
+    }
     steps.forEach(([m, kind, label]) => out.push({ at: at(base, m), kind, label, actor_display: who }));
   }
   if (o.status === "AUTO_CANCELLED" && o.reserved_until) {
@@ -570,7 +666,7 @@ function timelineOf(o: Order): OrderTimelineEntry[] {
     out.push({
       at: when,
       kind: "credit_note_issued",
-      label: `Lập chứng từ đảo doanh thu DC-${o.invoice.code} (${beVnd(orderTotal(o))})`,
+      label: `Lập phiếu trừ doanh thu DC-${o.invoice.code} (${beVnd(orderTotal(o))})`,
       actor_display: "Lộc",
     });
   }
@@ -580,12 +676,12 @@ function timelineOf(o: Order): OrderTimelineEntry[] {
       at: r.created_at || o.created_at,
       kind: "refund_created",
       // Như BE Lô 3: không ghép `Refund.reason` (chữ tự do) vào nhãn dòng thời gian (bất biến 9).
-      label: `Tạo phiếu hoàn ${beVnd(r.amount)}`,
+      label: `Lập phiếu hoàn tiền ${beVnd(r.amount)}`,
       actor_display: who,
       doc: { type: "refund", id: r.id }, // BE Lô bổ sung A #2: mốc có chứng từ riêng
     });
     if (r.status === "REFUNDED") {
-      out.push({ at: r.confirmed_at || r.created_at || o.created_at, kind: "refund_confirmed", label: `Đã hoàn ${beVnd(r.amount)} (mã GD ${r.bank_txn_ref})`, actor_display: "Lộc" });
+      out.push({ at: r.confirmed_at || r.created_at || o.created_at, kind: "refund_confirmed", label: `Đã hoàn tiền ${beVnd(r.amount)} (mã GD ${r.bank_txn_ref})`, actor_display: "Lộc" });
     }
   });
   // Sắp tăng dần theo giờ, giữ thứ tự chèn (= thứ tự nghiệp vụ) khi cùng giờ.
@@ -612,12 +708,21 @@ function piiHidden(me: Me, o: Order): boolean {
   return endedDay < cutoffDay;
 }
 
+/**
+ * §2.7 `customer_hidden_reason` như BE (`sales/customers/permissions.py`): không có V2 → "not_permitted" (đứng trước);
+ * NV giao quá cửa sổ SR-PII-02 → "expired"; còn lại null.
+ */
+function hiddenReason(me: Me, o: Order): CustomerHiddenReason | null {
+  if (!has(me, "sales.view_order_customer_info")) return "not_permitted";
+  return piiHidden(me, o) ? "expired" : null;
+}
+
 /** Phiếu giao còn ở trạng thái huỷ được (Soạn hàng/Chờ lấy/Giao thất bại) — BE `_cancellable_delivery_status`. */
 function cancellableDeliveryStatus(d: Delivery | null): boolean {
   return !d || d.status === "PREPARING" || d.status === "READY" || d.status === "FAILED";
 }
 
-/** Số tiền còn được hoàn của một đơn (BR-HT-04): tổng đơn trừ các phiếu hoàn CHƯA Thất bại. */
+/** Số tiền còn được hoàn của một đơn (BR-HT-04): tổng đơn trừ các phiếu hoàn tiền CHƯA Thất bại. */
 function refundableOfOrderMock(o: Order): number {
   const refunded = o.refunds.filter((r) => r.status !== "FAILED").reduce((sum, r) => sum + Number(r.amount), 0);
   return Math.max(0, orderTotal(o) - refunded);
@@ -638,9 +743,9 @@ function actions(me: Me, o: Order): string[] {
 const REASON_LABEL: Record<string, string> = {
   AUTO_CANCELLED: "Hết giờ giữ chỗ",
   CUSTOMER_CHANGED_MIND: "Khách đổi ý",
-  DAMAGED_WHEN_PACKING: "Hư hỏng khi soạn hàng",
-  GIVE_UP_AFTER_FAILED: "Bỏ giao sau khi thất bại",
-  OTHER: "Khác",
+  DAMAGED_WHEN_PACKING: "Hàng hư lúc soạn hàng",
+  GIVE_UP_AFTER_FAILED: "Giao thất bại, không giao lại",
+  OTHER: "Lý do khác",
   UNDERPAID: "Chuyển thiếu tiền",
   DELIVERY_FAILED: "Giao thất bại",
 };
@@ -660,7 +765,8 @@ function customerIdOf(o: Order): number {
 }
 
 function listItem(me: Me, o: Order): OrderListItem {
-  const hidden = piiHidden(me, o);
+  const reason = hiddenReason(me, o);
+  const hidden = reason !== null;
   return {
     id: o.id,
     code: o.code,
@@ -668,6 +774,7 @@ function listItem(me: Me, o: Order): OrderListItem {
     status_label: ORDER_LABEL[o.status],
     customer_name: hidden ? null : o.customer.name,
     customer_phone: hidden ? null : o.customer.phone,
+    customer_hidden_reason: reason,
     total_amount: money(orderTotal(o)),
     created_at: o.created_at,
     reserved_until: o.reserved_until,
@@ -698,7 +805,9 @@ function detail(me: Me, o: Order): OrderDetail {
     total_amount: money(orderTotal(o)),
     created_at: o.created_at,
     reserved_until: o.reserved_until,
-    customer: piiHidden(me, o) ? { name: null, phone: null, address: null } : { ...o.customer },
+    customer: hiddenReason(me, o) ? { name: null, phone: null, address: null } : { ...o.customer },
+    customer_hidden_reason: hiddenReason(me, o),
+    cancel_note: hiddenReason(me, o) ? "" : o.cancelNote ?? "",
     lines: o.lines.map((l, idx) => ({
       no: idx + 1,
       item_code: l.item_code,
@@ -734,6 +843,10 @@ function detail(me: Me, o: Order): OrderDetail {
     // Chỉ lộ field công khai (contract S10) — reason/request_id/created_by/created_at/confirmed_at/failure_reason
     // là bookkeeping nội bộ cho S16, không nằm trong OrderRefund.
     refunds: o.refunds.map((r) => ({ id: r.id, amount: r.amount, status: r.status, status_label: REFUND_LABEL[r.status], bank_txn_ref: r.bank_txn_ref })),
+    refund_summary: {
+      refunded_amount: money(o.refunds.filter((r) => r.status === "REFUNDED").reduce((s, r) => s + Number(r.amount), 0)),
+      pending_amount: money(o.refunds.filter((r) => r.status === "PENDING").reduce((s, r) => s + Number(r.amount), 0)),
+    },
     timeline: timelineOf(o),
     available_actions: actions(me, o),
     ...(has(me, "sales.view_privacy_consent")
@@ -759,7 +872,39 @@ function parsePath(path: string): { id: number | null; action: string | null; qu
   return { id: m && m[1] ? Number(m[1]) : null, action: m && m[2] ? m[2] : null, query: new URLSearchParams(q) };
 }
 
-function listResponse(me: Me, query: URLSearchParams): MockResponse {
+/** Chuỗi GET `?q=` chỉ được là đoạn mã: có dãy từ 9 chữ số, khoảng trắng hoặc ký tự ngoài ASCII (giống tên người) → 400 SEARCH_USE_POST (BE Lô 17b). */
+function getSearchRejected(q: string): boolean {
+  return /\d{9,}/.test(q) || /\s/.test(q) || /[^\x00-\x7F]/.test(q);
+}
+
+/** POST search/: đổi thân JSON sang cùng bộ tham số của listResponse. Sai kiểu (q không phải chuỗi, status là số…) → 400 INVALID_FILTER. */
+function searchQueryOf(body: unknown): { query: URLSearchParams } | { error: MockResponse } {
+  const b = (body && typeof body === "object" && !Array.isArray(body) ? body : {}) as Record<string, unknown>;
+  const bad = (param: string) => ({ error: beError("INVALID_FILTER", { param }) });
+  const qs = new URLSearchParams();
+  if (b.q !== undefined && b.q !== null) {
+    if (typeof b.q !== "string") return bad("q");
+    qs.set("q", b.q);
+  }
+  if (b.status !== undefined && b.status !== null) {
+    const list = Array.isArray(b.status) ? b.status : [b.status];
+    if (!list.every((s) => typeof s === "string")) return bad("status");
+    qs.set("status", (list as string[]).join(","));
+  }
+  for (const key of ["date_from", "date_to", "customer", "batch"] as const) {
+    const v = b[key];
+    if (v === undefined || v === null || v === "") continue;
+    if (typeof v !== "string") return bad(key);
+    qs.set(key, v);
+  }
+  if (b.page !== undefined && b.page !== null) {
+    if (!Number.isInteger(b.page) || (b.page as number) < 1) return bad("page");
+    qs.set("page", String(b.page));
+  }
+  return { query: qs };
+}
+
+function listResponse(me: Me, query: URLSearchParams, opts: { search?: boolean } = {}): MockResponse {
   const statuses = (query.get("status") || "").split(",").map((s) => s.trim()).filter(Boolean);
   const from = query.get("date_from") || "";
   const to = query.get("date_to") || "";
@@ -785,18 +930,19 @@ function listResponse(me: Me, query: URLSearchParams): MockResponse {
     .filter((o) => !customer || customerIdOf(o) === Number(customer))
     // Mock không có pk lô: `batch=<n>` khớp lô thứ n của bảng ITEMS (đủ để thử bộ lọc).
     .filter((o) => !batch || o.lines.some((l) => l.batches.some(([code]) => code === ITEMS[(Number(batch) - 1) % ITEMS.length]?.[3])))
-    // Đơn đã ẩn dữ liệu khách chỉ tìm được theo mã đơn (BE chống dò SĐT/tên).
+    // Đơn đã ẩn dữ liệu khách chỉ tìm được theo mã đơn (BE chống dò SĐT/tên). GET `?q=` (không phải search) chỉ khớp MÃ đơn.
     .filter(
       (o) =>
         !q ||
         o.code.toLowerCase().includes(q) ||
-        (!piiHidden(me, o) && (o.customer.phone.includes(q) || fold(o.customer.name).includes(fold(q)))),
+        (opts.search && !hiddenReason(me, o) && (o.customer.phone.includes(q) || fold(o.customer.name).includes(fold(q)))),
     )
     .sort((a, b) => (a.created_at < b.created_at ? 1 : a.created_at > b.created_at ? -1 : b.id - a.id));
   const pages = Math.max(1, Math.ceil(hit.length / PAGE_SIZE));
   if (page > pages) return { status: 404, body: { detail: "Trang không hợp lệ." } };
   const link = (n: number) => {
     const qs = new URLSearchParams(query);
+    qs.delete("q"); // `next` không chứa từ khoá (BE: gửi lại POST với `page`)
     qs.set("page", String(n));
     return `http://localhost:8000/api/sales/orders/?${qs.toString()}`;
   };
@@ -891,9 +1037,9 @@ function confirm(me: Me, o: Order, body: unknown): MockResponse {
 /** Nhãn lý do huỷ dùng cho dòng thời gian (BE có `CANCEL_REASON_LABELS` tương đương, không lộ ra JSON). */
 const CANCEL_REASON_LABEL: Record<string, string> = {
   CUSTOMER_CHANGED_MIND: "Khách đổi ý",
-  DAMAGED_WHEN_PACKING: "Hư khi đóng hàng",
-  GIVE_UP_AFTER_FAILED: "Bỏ sau khi giao thất bại",
-  OTHER: "Khác",
+  DAMAGED_WHEN_PACKING: "Hàng hư lúc soạn hàng",
+  GIVE_UP_AFTER_FAILED: "Giao thất bại, không giao lại",
+  OTHER: "Lý do khác",
 };
 
 /**
@@ -904,6 +1050,11 @@ function cancel(o: Order, body: unknown): MockResponse {
   const b = (body && typeof body === "object" ? body : {}) as Record<string, unknown>;
   const reasonCode = typeof b.reason_code === "string" ? b.reason_code : "";
   const note = typeof b.note === "string" ? b.note.trim() : "";
+  // BR-GH-19: ghi chú ≤ 200 ký tự, không chứa chuỗi ≥ 9 chữ số (SĐT, số tài khoản).
+  if (note.length > 200) return { status: 400, body: { code: "BR-GH-19", detail: "Ghi chú không quá 200 ký tự." } };
+  if (/\d{9,}/.test(note.replace(/[\s.\-_/]/g, ""))) {
+    return { status: 400, body: { code: "BR-GH-19", detail: "Không ghi SĐT hay số tài khoản vào ghi chú." } };
+  }
   if (!CANCEL_REASON_CODES.has(reasonCode)) return beError("HT_CANCEL_REASON_INVALID");
   if (reasonCode === "OTHER" && !note) return beError("HT_CANCEL_NOTE_REQUIRED");
   if (!((o.status === "PAID" || o.status === "PROCESSING") && o.invoice)) return beError("HT_CANCEL_INVALID_STATUS");
@@ -918,9 +1069,11 @@ function cancel(o: Order, body: unknown): MockResponse {
   o.cancelReasonCode = reasonCode;
   o.cancelReasonLabel = CANCEL_REASON_LABEL[reasonCode] + (note ? ` — ${note}` : "");
   o.cancelledAt = isoVN(Date.now());
+  o.cancelNote = note;
   o.cancelStockRestored = restored;
   const total = orderTotal(o);
   save(store);
+  publishOrderCancelled(o.id);
   return {
     status: 200,
     body: {
@@ -934,7 +1087,7 @@ function cancel(o: Order, body: unknown): MockResponse {
 }
 
 
-// E2E: window.__caveMock.conflictNext() — thao tác POST kế tiếp (đơn / khoản tiền / phiếu hoàn) trả 409 STALE_STATE như khi
+// E2E: window.__caveMock.conflictNext() — thao tác POST kế tiếp (đơn / khoản tiền / phiếu hoàn tiền) trả 409 STALE_STATE như khi
 // người khác vừa xử lý xong (ED-11/ED-12: banner xung đột, không xử lý lần hai). Chỉ một lần.
 let conflictOnce = false;
 function takeConflict(req: MockRequest): MockResponse | null {
@@ -956,9 +1109,17 @@ export function mockOrdersApi(req: MockRequest): MockResponse {
   if (action === "confirm-payment" && req.method === "POST" && !has(me, PERM_CONFIRM)) return beError("DRF_FORBIDDEN");
   // S14: thiếu sales.cancel_paid_order → 403 TRƯỚC khi tra đơn, cùng cách với confirm-payment.
   if (action === "cancel" && req.method === "POST" && !has(me, PERM_CANCEL)) return beError("DRF_FORBIDDEN");
+  if (req.path.split("?")[0] === "/api/sales/orders/search/") {
+    if (req.method !== "POST") return beError("METHOD_NOT_ALLOWED", { method: req.method });
+    if (mode() === "fail") return { status: 500, body: null };
+    const parsed = searchQueryOf(req.body);
+    if ("error" in parsed) return parsed.error;
+    return listResponse(me, parsed.query, { search: true });
+  }
   if (id === null) {
     if (req.method !== "GET") return beError("METHOD_NOT_ALLOWED", { method: req.method });
     if (mode() === "fail") return { status: 500, body: null };
+    if (getSearchRejected((query.get("q") || "").trim())) return beError("SEARCH_USE_POST");
     return listResponse(me, query);
   }
   const store = load();
@@ -980,7 +1141,7 @@ export function mockOrdersApi(req: MockRequest): MockResponse {
   return beError("NOT_FOUND");
 }
 
-// ---------- S12: hàng chờ thanh toán lệch · S13: phiếu hoàn cho khoản không có hoá đơn ----------
+// ---------- S12: hàng chờ thanh toán lệch · S13: phiếu hoàn tiền cho khoản không có hoá đơn ----------
 const QUEUE_RESOLUTION_LABEL: Record<string, string> = {
   ATTACHED: "Đã gắn vào đơn",
   CONFIRMED: "Đã xác nhận đơn",
@@ -1017,7 +1178,7 @@ function queueEntries(store: Store): { p: Pay; o: Order | null }[] {
 function findEntry(store: Store, id: number): { p: Pay; o: Order | null } | null {
   return queueEntries(store).find((e) => e.p.id === id) || null;
 }
-/** Tổng đã trả của đơn (BE `order_paid_total`): MATCHED + UNDERPAID, trừ giao dịch đang có phiếu hoàn chưa Thất bại. */
+/** Tổng đã trả của đơn (BE `order_paid_total`): MATCHED + UNDERPAID, trừ giao dịch đang có phiếu hoàn tiền chưa Thất bại. */
 function paidOf(o: Order, store: Store = load()): number {
   return o.payments
     .filter((p) => p.match_status === "MATCHED" || p.match_status === "UNDERPAID")
@@ -1071,6 +1232,7 @@ function queueItem(me: Me, store: Store, p: Pay, o: Order | null): PaymentQueueI
     resolved_at: p.resolved_at ?? null,
     resolution_note: p.resolution_note || "",
     refundable_amount: money(refundableOf(store, p)),
+    duplicate_warning: p.duplicate_warning || "",
     available_actions: queueActions(me, store, p, o),
   };
 }
@@ -1192,6 +1354,107 @@ function resolve(me: Me, id: number, body: unknown): MockResponse {
   };
 }
 
+
+// ---------- #15: ghi tiền về muộn (BR-TT-18) ----------
+// Luật mock theo contract BE (03-dev-notes.md "#15 ghi tiền về muộn (BE)"): thiếu quyền → 403 (đã chặn ở đầu mockPaymentsApi, kể cả
+// Quản lý); mã GD chuẩn hoá (bỏ khoảng trắng, in hoa) ≤ 100 ký tự, chỉ A-Z 0-9 . _ - /; số tiền > 0, ≤ 999.999.999.999,99; giờ nhận
+// không muộn quá now+5 phút; mã đơn không phân biệt hoa thường: không thấy → 400, Giữ chỗ → 400 kèm order_id, đã thanh toán → 400;
+// mã GD đã có: đúng khoản MANUAL ORPHAN/UNMATCHED cũ (cùng tiền, cùng đơn) → 200 duplicate:true, còn lại → 400 BR-TT-03;
+// khoản giống (cùng tiền; có đơn: mọi giao dịch của đơn, bỏ dòng -THUA, hoặc UNMATCHED không đơn trong 72 giờ; không đơn: UNMATCHED
+// không đơn hoặc ORPHAN trong 72 giờ) mà chưa ack → 409; ack → gắn nhãn nghi trùng. Không ghi chú, khoá lạ bị bỏ qua. Không đổi đơn/kho.
+const LATE_WINDOW_MS = 72 * 3600_000;
+const LATE_WARNING = "Nghi trùng khoản ghi tay tiền về muộn, đối chiếu sao kê trước khi hoàn";
+
+function allPays(store: Store): { p: Pay; o: Order | null }[] {
+  const out: { p: Pay; o: Order | null }[] = [];
+  store.orders.forEach((o) => o.payments.forEach((p) => out.push({ p, o })));
+  store.unmatched.forEach((p) => out.push({ p, o: null }));
+  return out;
+}
+
+function lateAmount(raw: unknown): { value: number } | { err: MockResponse } {
+  const bad = (key: "LATE_AMOUNT_INVALID" | "LATE_AMOUNT_MIN" | "LATE_AMOUNT_TOO_LARGE") => ({ err: beError(key, undefined, { amount: "$detail" }) });
+  if (raw === null || raw === undefined || typeof raw === "boolean" || typeof raw === "object") return bad("LATE_AMOUNT_INVALID");
+  const n = Number(String(raw).trim());
+  if (String(raw).trim() === "" || !Number.isFinite(n) || n <= 0) return bad("LATE_AMOUNT_INVALID");
+  if (n > 999_999_999_999.99) return bad("LATE_AMOUNT_TOO_LARGE");
+  const v = Math.round(n * 100) / 100;
+  if (v <= 0) return bad("LATE_AMOUNT_INVALID");
+  if (v < 1) return bad("LATE_AMOUNT_MIN");
+  return { value: v };
+}
+
+/** Như `settings.LATE_PAYMENT_MAX_AGE_DAYS` của BE (mặc định 400). */
+const LATE_MAX_AGE_DAYS = 400;
+
+function recordLate(me: Me, body: unknown): MockResponse {
+  const b = (body && typeof body === "object" ? body : {}) as Record<string, unknown>; // khoá lạ (note, source…) bị bỏ qua
+  const txn = String(b.bank_txn_id ?? "").replace(/\s+/g, "").toUpperCase();
+  if (!txn) return beError("LATE_TXN_MISSING", undefined, { bank_txn_id: "$detail" });
+  if (txn.length > 100) return beError("LATE_TXN_TOO_LONG", undefined, { bank_txn_id: "$detail" });
+  if (!/^[A-Z0-9._/-]+$/.test(txn)) return beError("LATE_TXN_CHARS", undefined, { bank_txn_id: "$detail" });
+  const amt = lateAmount(b.amount);
+  if ("err" in amt) return amt.err;
+  // Lô 17b-BE (TL15-L2): bắt buộc có phần giờ (chỉ có ngày thì BE từ chối, không ngầm thành 00:00) và không cũ quá 400 ngày.
+  const rawAt = typeof b.received_at === "string" ? b.received_at.trim() : "";
+  const at = /[T ]\d{1,2}:\d{2}/.test(rawAt) ? new Date(rawAt) : null;
+  if (!at || Number.isNaN(at.getTime())) return beError("LATE_AT_INVALID", undefined, { received_at: "$detail" });
+  if (at.getTime() > Date.now() + 5 * 60_000) return beError("LATE_AT_FUTURE", undefined, { received_at: "$detail" });
+  if (at.getTime() < Date.now() - LATE_MAX_AGE_DAYS * 86_400_000) return beError("LATE_AT_TOO_OLD", { days: LATE_MAX_AGE_DAYS }, { received_at: "$detail" });
+
+  const store = load();
+  const code = typeof b.order_code === "string" ? b.order_code.trim() : "";
+  let order: Order | null = null;
+  if (code) {
+    order = store.orders.find((x) => x.code.toLowerCase() === code.toLowerCase()) ?? null;
+    if (!order) return beError("LATE_ORDER_NOT_FOUND", undefined, { order_code: "$detail" });
+    if (order.status === "BOOKED") return beError("LATE_ORDER_BOOKED", undefined, { order_code: "$detail", order_id: order.id });
+    if (order.status !== "CANCELLED" && order.status !== "AUTO_CANCELLED") return beError("LATE_ORDER_PAID", undefined, { order_code: "$detail" });
+  }
+
+  const amount = money(amt.value);
+  const existing = allPays(store).find((e) => e.p.bank_txn_id === txn);
+  if (existing) {
+    const same =
+      existing.p.source === "MANUAL" &&
+      (existing.p.match_status === "ORPHAN" || existing.p.match_status === "UNMATCHED") &&
+      existing.p.amount === amount &&
+      (existing.o?.id ?? null) === (order?.id ?? null);
+    if (same) return { status: 200, body: { duplicate: true, payment: queueItem(me, store, existing.p, existing.o) } satisfies RecordLatePaymentResult };
+    return beError("LATE_TXN_EXISTS", { id: existing.p.id }, { bank_txn_id: "$detail", existing_payment_id: existing.p.id });
+  }
+
+  const near = (p: Pay) => Math.abs(new Date(p.received_at || 0).getTime() - at.getTime()) <= LATE_WINDOW_MS;
+  const sameAmount = allPays(store).filter((e) => Number(e.p.amount) === amt.value);
+  const similar = order
+    ? (sameAmount.find((e) => e.o?.id === order!.id && !e.p.bank_txn_id.endsWith("-THUA")) ?? sameAmount.find((e) => !e.o && e.p.match_status === "UNMATCHED" && near(e.p)))
+    : sameAmount.find((e) => near(e.p) && ((!e.o && e.p.match_status === "UNMATCHED") || e.p.match_status === "ORPHAN"));
+  if (similar && b.acknowledge_possible_duplicate !== true) {
+    return beError("LATE_POSSIBLE_DUPLICATE", undefined, {
+      similar_payment_id: similar.p.id,
+      similar_bank_txn_id: similar.p.bank_txn_id,
+      similar_received_at: similar.p.received_at,
+    });
+  }
+
+  const pay: Pay = {
+    id: ++store.seq + 900,
+    bank_txn_id: txn,
+    amount,
+    match_status: order ? "ORPHAN" : "UNMATCHED",
+    received_at: isoVN(at.getTime()),
+    source: "MANUAL",
+    actor: me.display_name || me.username,
+    resolution_status: "OPEN",
+    duplicate_warning: similar ? LATE_WARNING : "",
+  };
+  if (order) order.payments.push(pay);
+  else store.unmatched.push(pay);
+  store.txns[txn] = { orderId: order?.id ?? 0, result: { result: pay.match_status, duplicate: false, order_status: order?.status ?? "" } };
+  save(store);
+  return { status: 201, body: { duplicate: false, payment: queueItem(me, store, pay, order) } satisfies RecordLatePaymentResult };
+}
+
 export function mockPaymentsApi(req: MockRequest): MockResponse {
   const me = mockRequireUser(req);
   if (!me) return MOCK_UNAUTHORIZED;
@@ -1203,6 +1466,10 @@ export function mockPaymentsApi(req: MockRequest): MockResponse {
     if (req.method !== "GET") return beError("METHOD_NOT_ALLOWED", { method: req.method });
     if (queueMode() === "fail") return { status: 500, body: null };
     return queueList(me, new URLSearchParams(q));
+  }
+  if (path === "/api/sales/payments/record-late/") {
+    if (req.method !== "POST") return beError("METHOD_NOT_ALLOWED", { method: req.method });
+    return recordLate(me, req.body);
   }
   const one = /^\/api\/sales\/payments\/(\d+)\/$/.exec(path);
   if (one) {
@@ -1219,7 +1486,7 @@ export function mockPaymentsApi(req: MockRequest): MockResponse {
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-/** Tìm phiếu hoàn theo `request_id` — CẢ hai nguồn (payment_transaction lẫn sales_invoice), vì một Refund duy nhất
+/** Tìm phiếu hoàn tiền theo `request_id` — CẢ hai nguồn (payment_transaction lẫn sales_invoice), vì một Refund duy nhất
  * ở BE dùng chung cột `request_id` bất kể nguồn (Q12: chống trùng khi bấm đúp / gửi lại). */
 function findRefundByRequestId(
   store: Store,
@@ -1250,7 +1517,7 @@ function invoiceRefundShape(o: Order, r: MockOrderRefund, isPartial: boolean) {
   };
 }
 
-/** S13 — phiếu hoàn gắn `payment_transaction` (khoản không có hoá đơn). */
+/** S13 — phiếu hoàn tiền gắn `payment_transaction` (khoản không có hoá đơn). */
 function createPaymentRefund(me: Me, store: Store, b: Record<string, unknown>, requestId: string): MockResponse {
   const e = findEntry(store, Number(b.payment_transaction));
   const inQueue = e && e.p.resolution_status;
@@ -1263,6 +1530,11 @@ function createPaymentRefund(me: Me, store: Store, b: Record<string, unknown>, r
     return { status: 200, body: { ...paymentRefundShape(dup.r), duplicate: true } }; // cùng request_id → không tạo phiếu thứ hai
   }
   if (e.p.resolution_status === "RESOLVED") return beError("HT_TXN_RESOLVED");
+  // #15: khoản có nhãn nghi trùng mà thiếu cờ xác nhận → 409, `detail` = chính nhãn (BE kiểm trước số tiền).
+  if (e.p.duplicate_warning && b.acknowledge_duplicate_warning !== true) {
+    const r = beError("PAYMENT_DUPLICATE_WARNING");
+    return { status: r.status, body: { ...(r.body as object), detail: e.p.duplicate_warning } };
+  }
   const amount = Math.round(Number(b.amount) * 100) / 100;
   if (b.amount === null || b.amount === "" || !Number.isFinite(amount) || amount <= 0) return beError("HT_AMOUNT_INVALID");
   if (amount < 1) return beError("HT_AMOUNT_MIN"); // L8 bổ sung tiền: tối thiểu 1 ₫
@@ -1287,7 +1559,7 @@ function createPaymentRefund(me: Me, store: Store, b: Record<string, unknown>, r
   return { status: 201, body: paymentRefundShape(r) };
 }
 
-/** S15 — phiếu hoàn gắn `sales_invoice` (huỷ đơn / hoàn một phần đơn có hoá đơn). `sales_invoice` là id HOÁ ĐƠN, không
+/** S15 — phiếu hoàn tiền gắn `sales_invoice` (huỷ đơn / hoàn một phần đơn có hoá đơn). `sales_invoice` là id HOÁ ĐƠN, không
  * phải id đơn — tìm đơn qua `order.invoice.id`. */
 function createInvoiceRefund(me: Me, store: Store, b: Record<string, unknown>, requestId: string): MockResponse {
   const invoiceId = Number(b.sales_invoice);
@@ -1349,7 +1621,7 @@ export function mockRefundsApi(req: MockRequest): MockResponse {
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
-// S16 — phiếu hoàn chờ chuyển: danh sách hợp nhất (payment_transaction + sales_invoice) + confirm/mark-failed/retry.
+// S16 — phiếu hoàn tiền chờ chuyển: danh sách hợp nhất (payment_transaction + sales_invoice) + confirm/mark-failed/retry.
 // Contract THỰC TẾ ở 03-dev-notes.md "Lô L9 — S14, S15, S16 (BE)". GET đòi sales.view_refund (Chủ, Quản lý); ba action
 // đòi sales.confirm_refund (chỉ Chủ) — Quản lý vẫn xem được danh sách, `available_actions` luôn rỗng.
 
@@ -1372,6 +1644,15 @@ function refundQueueActions(me: Me, status: string): string[] {
   return [];
 }
 
+/** Tên/SĐT khách của phiếu hoàn tiền: `null` kèm lý do khi bị che (V2 hoặc quá cửa sổ); không có đơn thì bỏ khoá. */
+function refundCustomer(me: Me, o: Order | null): Pick<RefundQueueItem, "customer_name" | "customer_phone" | "customer_hidden_reason"> {
+  if (!o) return { customer_name: undefined, customer_phone: undefined };
+  const reason = hiddenReason(me, o);
+  return reason
+    ? { customer_name: null, customer_phone: null, customer_hidden_reason: reason }
+    : { customer_name: o.customer.name, customer_phone: o.customer.phone, customer_hidden_reason: null };
+}
+
 function refundQueueItem(me: Me, store: Store, e: RefundEntry): RefundQueueItem {
   const actionsFor = refundQueueActions(me, e.r.status);
   if (e.kind === "payment") {
@@ -1380,8 +1661,7 @@ function refundQueueItem(me: Me, store: Store, e: RefundEntry): RefundQueueItem 
     return {
       ...paymentRefundShape(e.r),
       order_code: o ? o.code : null,
-      customer_name: o ? o.customer.name : undefined,
-      customer_phone: o ? o.customer.phone : undefined,
+      ...refundCustomer(me, o),
       source_bank_txn_id: entry?.p.bank_txn_id,
       failure_reason: e.r.failure_reason,
       available_actions: actionsFor,
@@ -1392,8 +1672,7 @@ function refundQueueItem(me: Me, store: Store, e: RefundEntry): RefundQueueItem 
   return {
     ...invoiceRefundShape(o, r, r.is_partial),
     order_code: o.code,
-    customer_name: o.customer.name,
-    customer_phone: o.customer.phone,
+    ...refundCustomer(me, o),
     source_bank_txn_id: source,
     failure_reason: r.failure_reason,
     available_actions: actionsFor,
@@ -1568,6 +1847,15 @@ if (process.env.NEXT_PUBLIC_USE_MOCK === "1" && typeof window !== "undefined") {
       const res = confirmRefundMock(loc, refundId, { bank_txn_ref: ref });
       return res.status === 200 ? (res.body as { status: string }).status : null;
     },
+    /** #15 (E2E): webhook về muộn khác mã làm khoản có nhãn nghi trùng SAU khi màn đã tải (409 PAYMENT_DUPLICATE_WARNING lúc lập phiếu hoàn tiền). */
+    flagDuplicate: (paymentId: number) => {
+      const store = load();
+      const e = findEntry(store, paymentId);
+      if (!e) return null;
+      e.p.duplicate_warning = LATE_WARNING;
+      save(store);
+      return e.p.duplicate_warning;
+    },
     /** E2E: gọi thẳng luật resolve như gọi API (kiểm lớp chặn "BE": S12-AC4/AC6). */
     resolveJson: (username: string, id: number, body: unknown) => {
       const me = meOf(username);
@@ -1575,7 +1863,7 @@ if (process.env.NEXT_PUBLIC_USE_MOCK === "1" && typeof window !== "undefined") {
       if (!me.permissions.includes(PERM_CONFIRM)) return { status: 403 };
       return resolve(me, id, body);
     },
-    /** Phiếu hoàn đã lập cho một giao dịch (để e2e lấy id giả lập S16). */
+    /** Phiếu hoàn tiền đã lập cho một giao dịch (để e2e lấy id giả lập S16). */
     txnRefundsOf: (txnId: number) => refundsOf(load(), txnId).map((r) => ({ ...r })),
     queueJson: (username: string, status = "OPEN") => {
       const me = meOf(username);
@@ -1588,10 +1876,10 @@ if (process.env.NEXT_PUBLIC_USE_MOCK === "1" && typeof window !== "undefined") {
       if (!me.permissions.includes(PERM_REFUND)) return { status: 403 };
       return createRefundMock(me, body);
     },
-    // ---- S16: phiếu hoàn chờ chuyển ----
+    // ---- S16: phiếu hoàn tiền chờ chuyển ----
     refunds: (m: RefundQMode) => {
       window.localStorage.setItem(REFUND_MODE_KEY, m);
-      return `Chế độ mock phiếu hoàn: ${m}`;
+      return `Chế độ mock phiếu hoàn tiền: ${m}`;
     },
     /** JSON danh sách `status=PENDING,FAILED` đúng như người đó nhận (e2e kiểm cột + available_actions). */
     refundQueueJson: (username: string) => {
@@ -1635,5 +1923,32 @@ if (process.env.NEXT_PUBLIC_USE_MOCK === "1" && typeof window !== "undefined") {
       const me = { id: u.id, username: u.username, display_name: u.username, groups: u.groups, permissions: mockPermsOf(u) } as unknown as Me;
       return confirm(me, o, body);
     },
+  };
+}
+
+/**
+ * Lát cắt cho Tổng quan mock (S6-AC5/AC6): số đơn chưa xong (BOOKED + PAID + PROCESSING) và 8 đơn mới nhất, tính từ chính kho đơn
+ * này để khớp với bộ lọc "Chưa xong". Chỉ trả khi kho đơn đang dùng bộ mẫu `completion` hoặc đã nhận kết quả từ mock Giao hàng;
+ * ngoài hai trường hợp đó Tổng quan giữ seed riêng của nó (các e2e cũ bám seed đó).
+ */
+export function mockOrdersOverviewSlice(): {
+  pending: number;
+  recent: { id: number; code: string; amount: number; status: OrderStatus; status_label: string; expires_at: string | null; reason: { code: string; label: string } | null }[];
+} | null {
+  if (mode() === "empty") return null;
+  const store = load();
+  if (dataset() !== "completion" && !store.linked) return null;
+  const sorted = [...store.orders].sort((a, b) => (a.created_at < b.created_at ? 1 : a.created_at > b.created_at ? -1 : b.id - a.id));
+  return {
+    pending: store.orders.filter((o) => o.status === "BOOKED" || o.status === "PAID" || o.status === "PROCESSING").length,
+    recent: sorted.slice(0, 8).map((o) => ({
+      id: o.id,
+      code: o.code,
+      amount: orderTotal(o),
+      status: o.status,
+      status_label: ORDER_LABEL[o.status],
+      expires_at: o.status === "BOOKED" ? o.reserved_until : null,
+      reason: reasonOf(o),
+    })),
   };
 }

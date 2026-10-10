@@ -1,6 +1,6 @@
 "use client";
 
-// Khung chung của mọi hộp thoại thao tác trên đơn / khoản tiền / phiếu hoàn (F2a–F2g): Modal + <form> (Enter gửi) + alert đỏ
+// Khung chung của mọi hộp thoại thao tác trên đơn / khoản tiền / phiếu hoàn tiền (F2a–F2g): Modal + <form> (Enter gửi) + alert đỏ
 // khi gửi lỗi (giữ nguyên giá trị đã nhập, nút chính đổi "Thử lại" — UI-RULES §6.6) + thanh nút [phụ … chính], nút chính
 // nói rõ việc và số tiền. Xung đột phiên bản (409) KHÔNG hiện ở đây: màn mở hộp bật ConflictBanner qua `onConflict`.
 

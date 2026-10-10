@@ -139,7 +139,7 @@ def get_order_next_steps(order: SalesOrder, user: Any) -> list[NextStep]:
         steps.append(
             NextStep(
                 key="create_refund",
-                label="Tạo phiếu hoàn",
+                label="Lập phiếu hoàn tiền",
                 actor="user",
                 allowed=can_refund,
                 who=["Quản lý", "Chủ"],

@@ -52,8 +52,11 @@ class DeliveryNoteSerializer(serializers.ModelSerializer):
         ]
 
     def _customer_data_hidden(self, obj) -> bool:
-        """SR-PII-02: NV giao (view đặt `pii_restricted`) không thấy dữ liệu khách của phiếu đã quá cửa sổ.
-        Ẩn bằng giá trị `null`, giữ nguyên khoá JSON."""
+        """Ẩn dữ liệu khách của phiếu (tên, SĐT, địa chỉ, ghi chú) bằng giá trị `null`, giữ nguyên khoá JSON.
+
+        V2 không áp cho phiếu giao (Duy 08/10 câu 7): ai được D3 cho xem phiếu thì thấy đủ tên, SĐT, địa chỉ. Một luật cho
+        danh sách, chi tiết, "Việc giao của tôi" và phản hồi của đổi trạng thái, giao người (QA W37 N2):
+        phạm vi D3 khác `all` (view đặt `pii_restricted`, PV-04) và phiếu đã quá cửa sổ SR-PII-02 thì ẩn."""
         return bool(self.context.get("pii_restricted")) and is_note_pii_expired(obj)
 
     def to_representation(self, instance):

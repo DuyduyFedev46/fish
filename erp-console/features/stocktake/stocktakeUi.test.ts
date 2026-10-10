@@ -1,6 +1,6 @@
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
-import { describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { ApiError } from "@/shared/lib/http";
 import { mockStocktakeApi } from "./mock";
 import {
@@ -10,6 +10,7 @@ import {
   detailHref,
   diffTone,
   editHref,
+  formFingerprint,
   idFromSearch,
   lineErrorOf,
   nextStepText,
@@ -244,5 +245,44 @@ describe("module Kiểm kê: không giá vốn, không dữ liệu khách trong 
     for (const f of files) {
       expect(readFileSync(f, "utf8"), f).not.toMatch(/theo số (thực )?đếm/);
     }
+  });
+});
+
+describe("PATCH phiếu kiểm kê với expected_updated_at (Lô 17a A7, Lô 17b G4)", () => {
+  // Mock giữ phiếu ở localStorage; môi trường node không có nên dựng kho giả (chỉ trong khối này).
+  beforeAll(() => {
+    const m = new Map<string, string>();
+    vi.stubGlobal("window", { localStorage: { getItem: (k: string) => m.get(k) ?? null, setItem: (k: string, v: string) => void m.set(k, v), removeItem: (k: string) => void m.delete(k) } });
+  });
+  afterAll(() => vi.unstubAllGlobals());
+  const patch = (body: object) => mockStocktakeApi({ method: "PATCH", path: "/api/inventory/reconciliations/17/", body, token: token("loc") });
+  it("đúng mốc → 200 và mốc mới; lệch → 409 STALE_STATE kèm updated_at; không gửi → 200 như cũ", () => {
+    const at = det("loc", 17).updated_at;
+    const a = patch({ note: "A", expected_updated_at: at });
+    expect(a.status).toBe(200);
+    const stale = patch({ note: "B", expected_updated_at: at });
+    expect(stale.status).toBe(409);
+    expect(stale.body).toMatchObject({ code: "STALE_STATE" });
+    expect((stale.body as { updated_at?: string }).updated_at).toBeTruthy();
+    expect(det("loc", 17).note).toBe("A");
+    expect(patch({ note: "C" }).status).toBe(200);
+  });
+  it("mốc sai dạng → 400 EXPECTED_UPDATED_AT_INVALID", () => {
+    expect(patch({ note: "x", expected_updated_at: "hôm qua" }).body).toMatchObject({ code: "EXPECTED_UPDATED_AT_INVALID" });
+  });
+});
+
+describe("formFingerprint: sửa chưa lưu", () => {
+  const row = (counted: string, reason = ""): Pick<FormRow, "batch" | "counted" | "reason"> => ({ batch: 1, counted, reason });
+  it("dòng chỉ nạp từ kho (chưa gõ) không làm form thành chưa lưu", () => {
+    const base = formFingerprint({ countDate: "2026-10-07", note: "", rows: [] });
+    expect(formFingerprint({ countDate: "2026-10-07", note: " ", rows: [row("")] })).toBe(base);
+  });
+  it("gõ số đếm, lý do, ghi chú hoặc đổi ngày thì khác", () => {
+    const base = formFingerprint({ countDate: "2026-10-07", note: "", rows: [row("1")] });
+    expect(formFingerprint({ countDate: "2026-10-07", note: "", rows: [row("2")] })).not.toBe(base);
+    expect(formFingerprint({ countDate: "2026-10-07", note: "", rows: [row("1", "hỏng")] })).not.toBe(base);
+    expect(formFingerprint({ countDate: "2026-10-07", note: "x", rows: [row("1")] })).not.toBe(base);
+    expect(formFingerprint({ countDate: "2026-10-06", note: "", rows: [row("1")] })).not.toBe(base);
   });
 });

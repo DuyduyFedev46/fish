@@ -9,6 +9,19 @@ export type MeHome = "dashboard" | "my-deliveries" | typeof HOME_CONFIRMATION_QU
 
 export type CodeLabel = { code: string; label: string };
 
+/**
+ * PV-14 — một dòng của "Dữ liệu bạn xem được" trong `GET /api/auth/me/` (`data_scopes`, luôn đủ 8 dòng theo thứ tự đối tượng).
+ * `value` là mã phạm vi; `value_label` là chữ BE đã dịch; `via_group` = mã nhóm của chính người đó đã cho giá trị này
+ * (null: superuser, dòng "none", hoặc quyền gán riêng).
+ */
+export type DataScopeRow = {
+  key: string;
+  label: string;
+  value: string;
+  value_label: string;
+  via_group: string | null;
+};
+
 /** GET /api/auth/me/ */
 export type Me = {
   id: number;
@@ -31,10 +44,19 @@ export type Me = {
    * Optional: BE chưa có S48 thì coi như false.
    */
   must_change_password?: boolean;
+  /** Duy 08/10 câu 1 — superuser (kể cả không nhóm) vào ERP như Chủ: BE trả `home = "dashboard"`. `groups` vẫn là nhóm thật. */
+  is_superuser?: boolean;
+  /** W39 — BE báo cờ AI (`settings.AI_ENABLED`). Giao diện AI chỉ hiện khi cờ build bật VÀ giá trị này true (`aiVisible`). */
+  ai_features_enabled?: boolean;
+  /** PV-14 — phạm vi dữ liệu của chính người này. Optional: BE cũ chưa trả thì màn Tài khoản báo "chưa có thông tin". */
+  data_scopes?: DataScopeRow[];
 };
 
 /** S48 — `code` của 403 khi còn mật khẩu tạm (logic dựa vào code, không dựa vào câu `detail`). */
 export const MUST_CHANGE_PASSWORD_CODE = "AUTH_MUST_CHANGE_PASSWORD";
+
+/** D-3 (Duy 08/10) — `code` của 403 khi tài khoản không thuộc nhóm nào và không phải superuser: ERP chặn hẳn ở BE. */
+export const NO_ROLE_CODE = "AUTH_NO_ROLE";
 
 /** POST /api/auth/token/ (DRF obtain_auth_token) */
 export type TokenResponse = { token: string };

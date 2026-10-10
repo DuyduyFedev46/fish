@@ -13,18 +13,21 @@ type Props = Omit<React.ComponentPropsWithoutRef<"section">, "title"> & {
   action?: React.ReactNode;
   /** Thân thẻ không lề trong: dành cho bảng. */
   flush?: boolean;
+  /** Bậc thẻ tiêu đề (WCAG 1.3.1: không nhảy bậc). Mặc định 3 (trang chi tiết có h1 + h2 là khối cha); màn danh sách/Tổng quan truyền 2. */
+  headingLevel?: 2 | 3;
 };
 
-export function Section({ title, count, action, flush = false, className, children, ...rest }: Props) {
+export function Section({ title, count, action, flush = false, headingLevel = 3, className, children, ...rest }: Props) {
+  const Heading = headingLevel === 2 ? "h2" : "h3";
   const hasHead = title !== undefined && title !== null && title !== "";
   return (
     <section {...rest} className={`${s.card}${className ? ` ${className}` : ""}`}>
       {hasHead && (
         <div className={s.head}>
-          <h3 className={s.title}>
+          <Heading className={s.title}>
             {title}
             {count !== undefined && count !== null && <span className={`${s.count} num`}>{count}</span>}
-          </h3>
+          </Heading>
           {action && <div className={s.action}>{action}</div>}
         </div>
       )}

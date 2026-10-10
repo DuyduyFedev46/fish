@@ -2,6 +2,8 @@ import { mockRequireUser } from "@/features/auth/mock";
 import type { MockRequest } from "@/shared/lib/http";
 import { PERM } from "@/shared/lib/nav";
 import { hasLimitedCourierScope } from "@/shared/lib/personalData";
+import { isDeliveryFinished } from "@/shared/lib/orderCompletion";
+import { isOrderCancelledInMock, publishDeliveryOutcome } from "@/shared/lib/orderLink.mock";
 import { hasLongDigitRun } from "./deliveryUi";
 import type {
   Deliverer,
@@ -24,15 +26,20 @@ function vnIsoDaysAgo(daysAgo: number, hour: number): string {
 /** Số ngày NV giao còn xem được dữ liệu khách của phiếu đã kết thúc (BE `DELIVERY_PII_RECENT_DAYS`, mặc định 7). */
 const PII_RECENT_DAYS = 7;
 
-export const MOCK_DELIVERY_NOTES: DeliveryNoteDetail[] = [
+/**
+ * Seed phiếu giao: dựng LƯỜI lúc mock được gọi lần đầu (`mockDeliveryNotes()`), không chạy ở cấp module. Cấp module mà gọi `Date.now()`
+ * thì bundler coi là có tác dụng phụ và giữ cả module (cùng tên người giao giả) trong bản build thật (W37 L3 FE, review M1).
+ */
+function buildSeed(): DeliveryNoteDetail[] {
+  return [
   {
     id: 30,
     code: "GH-HD-0030-CONF",
     status: "CONFIRMING",
-    status_label: "Chờ xác nhận",
+    status_label: "Chờ gọi xác nhận",
     sales_invoice: 10,
     invoice_code: "HD-0030",
-    order: { id: 130, code: "DH-260928-0030" },
+    order: { id: 130, code: "SO260928-A00030" },
     paid_at: "2026-09-28T09:10:00+07:00",
     confirmed_at: null,
     confirm_skipped: false,
@@ -61,10 +68,10 @@ export const MOCK_DELIVERY_NOTES: DeliveryNoteDetail[] = [
     id: 31,
     code: "GH-HD-0031-PREP",
     status: "PREPARING",
-    status_label: "Soạn hàng",
+    status_label: "Đang soạn hàng",
     sales_invoice: 7,
     invoice_code: "HD-0031",
-    order: { id: 101, code: "DH-260928-0001" },
+    order: { id: 101, code: "SO260928-A00001" },
     paid_at: "2026-09-28T08:05:00+07:00",
     confirmed_at: "2026-09-28T08:20:00+07:00",
     confirm_skipped: false,
@@ -102,7 +109,7 @@ export const MOCK_DELIVERY_NOTES: DeliveryNoteDetail[] = [
     status_label: "Chờ lấy",
     sales_invoice: 8,
     invoice_code: "HD-0032",
-    order: { id: 102, code: "DH-260928-0002" },
+    order: { id: 102, code: "SO260928-A00002" },
     paid_at: "2026-09-28T07:45:00+07:00",
     confirmed_at: "2026-09-28T08:00:00+07:00",
     confirm_skipped: false,
@@ -134,7 +141,7 @@ export const MOCK_DELIVERY_NOTES: DeliveryNoteDetail[] = [
     status_label: "Đang giao",
     sales_invoice: 9,
     invoice_code: "HD-0033",
-    order: { id: 103, code: "DH-260928-0003" },
+    order: { id: 103, code: "SO260928-A00003" },
     paid_at: "2026-09-28T07:30:00+07:00",
     confirmed_at: "2026-09-28T07:40:00+07:00",
     confirm_skipped: false,
@@ -166,7 +173,7 @@ export const MOCK_DELIVERY_NOTES: DeliveryNoteDetail[] = [
     status_label: "Giao thất bại",
     sales_invoice: 11,
     invoice_code: "HD-0034",
-    order: { id: 104, code: "DH-260928-0004" },
+    order: { id: 104, code: "SO260928-A00004" },
     paid_at: "2026-09-28T07:00:00+07:00",
     confirmed_at: "2026-09-28T07:15:00+07:00",
     confirm_skipped: false,
@@ -195,10 +202,10 @@ export const MOCK_DELIVERY_NOTES: DeliveryNoteDetail[] = [
     id: 35,
     code: "GH-HD-0035-DONE",
     status: "COMPLETED",
-    status_label: "Hoàn tất",
+    status_label: "Đã giao",
     sales_invoice: 12,
     invoice_code: "HD-0035",
-    order: { id: 105, code: "DH-260928-0005" },
+    order: { id: 105, code: "SO260928-A00005" },
     paid_at: "2026-09-28T06:30:00+07:00",
     confirmed_at: "2026-09-28T06:45:00+07:00",
     confirm_skipped: false,
@@ -223,16 +230,16 @@ export const MOCK_DELIVERY_NOTES: DeliveryNoteDetail[] = [
       },
     ],
   },
-  // SR-PII-02: hai phiếu hoàn tất của giao1 (id 4). Phiếu 40 kết thúc 10 ngày trước → giao1 thấy tên/địa chỉ/ghi chú = null;
+  // SR-PII-02: hai phiếu giao đã giao xong của giao1 (id 4). Phiếu 40 kết thúc 10 ngày trước → giao1 thấy tên/địa chỉ/ghi chú = null;
   // phiếu 41 kết thúc hôm qua → giao1 vẫn thấy đủ. Vai khác thấy đủ cả hai.
   {
     id: 40,
     code: "GH-HD-0040-OLD",
     status: "COMPLETED",
-    status_label: "Hoàn tất",
+    status_label: "Đã giao",
     sales_invoice: 20,
     invoice_code: "HD-0040",
-    order: { id: 143, code: "DH-OLD-0143" },
+    order: { id: 143, code: "SO260901-A00143" },
     paid_at: vnIsoDaysAgo(10, 8),
     confirmed_at: vnIsoDaysAgo(10, 8),
     confirm_skipped: false,
@@ -254,10 +261,10 @@ export const MOCK_DELIVERY_NOTES: DeliveryNoteDetail[] = [
     id: 41,
     code: "GH-HD-0041-NEW",
     status: "COMPLETED",
-    status_label: "Hoàn tất",
+    status_label: "Đã giao",
     sales_invoice: 21,
     invoice_code: "HD-0041",
-    order: { id: 144, code: "DH-NEW-0144" },
+    order: { id: 144, code: "SO260928-A00144" },
     paid_at: vnIsoDaysAgo(1, 8),
     confirmed_at: vnIsoDaysAgo(1, 8),
     confirm_skipped: false,
@@ -279,10 +286,10 @@ export const MOCK_DELIVERY_NOTES: DeliveryNoteDetail[] = [
     id: 42,
     code: "GH-HD-0042-OLD",
     status: "COMPLETED",
-    status_label: "Hoàn tất",
+    status_label: "Đã giao",
     sales_invoice: 22,
     invoice_code: "HD-0042",
-    order: { id: 142, code: "DH-OLD-0142" },
+    order: { id: 142, code: "SO260901-A00142" },
     paid_at: vnIsoDaysAgo(11, 8),
     confirmed_at: vnIsoDaysAgo(11, 8),
     confirm_skipped: false,
@@ -304,10 +311,10 @@ export const MOCK_DELIVERY_NOTES: DeliveryNoteDetail[] = [
     id: 43,
     code: "GH-HD-0043-NEW",
     status: "COMPLETED",
-    status_label: "Hoàn tất",
+    status_label: "Đã giao",
     sales_invoice: 23,
     invoice_code: "HD-0043",
-    order: { id: 145, code: "DH-NEW-0145" },
+    order: { id: 145, code: "SO260928-A00145" },
     paid_at: vnIsoDaysAgo(1, 8),
     confirmed_at: vnIsoDaysAgo(1, 8),
     confirm_skipped: false,
@@ -333,7 +340,7 @@ export const MOCK_DELIVERY_NOTES: DeliveryNoteDetail[] = [
     status_label: "Đang giao",
     sales_invoice: 13,
     invoice_code: "HD-0036",
-    order: { id: 106, code: "DH-260928-0006" },
+    order: { id: 106, code: "SO260928-A00006" },
     paid_at: "2026-09-28T07:10:00+07:00",
     confirmed_at: "2026-09-28T07:20:00+07:00",
     confirm_skipped: false,
@@ -358,7 +365,7 @@ export const MOCK_DELIVERY_NOTES: DeliveryNoteDetail[] = [
     status_label: "Chờ lấy hàng",
     sales_invoice: 14,
     invoice_code: "HD-0037",
-    order: { id: 107, code: "DH-260928-0007" },
+    order: { id: 107, code: "SO260928-A00007" },
     paid_at: "2026-09-28T07:50:00+07:00",
     confirmed_at: "2026-09-28T08:00:00+07:00",
     confirm_skipped: false,
@@ -383,7 +390,7 @@ export const MOCK_DELIVERY_NOTES: DeliveryNoteDetail[] = [
     status_label: "Giao thất bại",
     sales_invoice: 15,
     invoice_code: "HD-0038",
-    order: { id: 108, code: "DH-260928-0008" },
+    order: { id: 108, code: "SO260928-A00008" },
     paid_at: "2026-09-28T06:50:00+07:00",
     confirmed_at: "2026-09-28T07:00:00+07:00",
     confirm_skipped: false,
@@ -411,7 +418,7 @@ export const MOCK_DELIVERY_NOTES: DeliveryNoteDetail[] = [
     status_label: "Đang giao",
     sales_invoice: 16,
     invoice_code: "HD-0039",
-    order: { id: 109, code: "DH-260928-0009" },
+    order: { id: 109, code: "SO260928-A00009" },
     paid_at: "2026-09-28T07:20:00+07:00",
     confirmed_at: "2026-09-28T07:30:00+07:00",
     confirm_skipped: false,
@@ -437,7 +444,7 @@ export const MOCK_DELIVERY_NOTES: DeliveryNoteDetail[] = [
     status_label: "Chờ lấy hàng",
     sales_invoice: 24,
     invoice_code: "HD-0045",
-    order: { id: 146, code: "DH-260928-0046" },
+    order: { id: 146, code: "SO260928-A00046" },
     paid_at: "2026-09-28T08:30:00+07:00",
     confirmed_at: "2026-09-28T08:40:00+07:00",
     confirm_skipped: false,
@@ -460,10 +467,10 @@ export const MOCK_DELIVERY_NOTES: DeliveryNoteDetail[] = [
     id: 46,
     code: "GH-HD-0046-REPR",
     status: "PREPARING",
-    status_label: "Soạn hàng",
+    status_label: "Đang soạn hàng",
     sales_invoice: 25,
     invoice_code: "HD-0046",
-    order: { id: 147, code: "DH-260928-0047" },
+    order: { id: 147, code: "SO260928-A00047" },
     paid_at: "2026-09-28T08:40:00+07:00",
     confirmed_at: "2026-09-28T08:50:00+07:00",
     confirm_skipped: false,
@@ -488,7 +495,7 @@ export const MOCK_DELIVERY_NOTES: DeliveryNoteDetail[] = [
     status_label: "Đã huỷ",
     sales_invoice: 26,
     invoice_code: "HD-0047",
-    order: { id: 148, code: "DH-260928-0048" },
+    order: { id: 148, code: "SO260928-A00048" },
     paid_at: "2026-09-28T08:45:00+07:00",
     confirmed_at: "2026-09-28T08:55:00+07:00",
     confirm_skipped: false,
@@ -506,7 +513,15 @@ export const MOCK_DELIVERY_NOTES: DeliveryNoteDetail[] = [
     recipient_name: null,
     lines: [{ item_name: "Cá thu Côn Đảo", qty_kg: "1.000", batch_id: "CA-THU-260918-VT02", expiry_date: "2027-09-18" }],
   },
-];
+  ];
+}
+
+let seeded: DeliveryNoteDetail[] | null = null;
+/** Kho phiếu giao mock (một mảng duy nhất, đổi tại chỗ qua các thao tác). */
+export function mockDeliveryNotes(): DeliveryNoteDetail[] {
+  if (!seeded) seeded = buildSeed();
+  return seeded;
+}
 
 type MockMe = ReturnType<typeof mockRequireUser>;
 
@@ -650,7 +665,7 @@ export function getMockDeliveryNotes(params?: {
   completed_from?: string;
   page?: number;
 }): DeliveryListResponse {
-  let filtered = [...MOCK_DELIVERY_NOTES];
+  let filtered = [...mockDeliveryNotes()];
   if (params?.status) {
     const statuses = params.status.split(",").map((s) => s.trim());
     filtered = filtered.filter((n) => statuses.includes(n.status));
@@ -664,7 +679,7 @@ export function getMockDeliveryNotes(params?: {
 }
 
 export function getMockDeliveryNoteDetail(id: number): DeliveryNoteDetail {
-  const item = MOCK_DELIVERY_NOTES.find((n) => n.id === id);
+  const item = mockDeliveryNotes().find((n) => n.id === id);
   if (!item) {
     throw new Error("Không tìm thấy phiếu giao hàng");
   }
@@ -675,7 +690,7 @@ export function mockPackDeliveryNote(
   id: number,
   fromStatus?: string
 ): { note: DeliveryNoteDetail; already: boolean } {
-  const item = MOCK_DELIVERY_NOTES.find((n) => n.id === id);
+  const item = mockDeliveryNotes().find((n) => n.id === id);
   if (!item) {
     throw new Error("Không tìm thấy phiếu giao hàng");
   }
@@ -709,6 +724,8 @@ export function mockListDeliveryNotes(req: MockRequest | { url?: string; token?:
   }
   const base = getMockDeliveryNotes({ status, completed_from: completedFrom });
   let rows = base.results.filter((n) => inCourierScope(me, n));
+  const codeParam = (q.get("code") || "").trim().toLowerCase();
+  if (codeParam) rows = rows.filter((n) => n.code.toLowerCase() === codeParam); // Lô 17a A9: khớp đúng mã, sau khi lọc theo phạm vi
   if (assignedTo === "me") rows = rows.filter((n) => me && n.assigned_to === me.id);
   else if (assignedTo) rows = rows.filter((n) => n.assigned_to === Number(assignedTo));
   if (completedFrom) rows = rows.filter((n) => n.status !== "COMPLETED" || (n.completed_at ?? "").slice(0, 10) >= completedFrom);
@@ -723,7 +740,7 @@ export function mockListDeliveryNotes(req: MockRequest | { url?: string; token?:
 
 export function mockGetDeliveryNoteDetail(req: MockRequest | { url?: string; token?: string | null }): { status: number; body: DeliveryNoteDetail | { detail: string } } {
   const id = noteIdOf(pathOf(req), "") ?? 31;
-  const item = MOCK_DELIVERY_NOTES.find((n) => n.id === id);
+  const item = mockDeliveryNotes().find((n) => n.id === id);
   const me = mockRequireUser(req as MockRequest);
   if (!item || !inCourierScope(me, item)) {
     return { status: 404, body: { detail: "Không tìm thấy phiếu giao hàng" } };
@@ -755,7 +772,7 @@ function validateFailure(reason: unknown, rawNote: unknown): MockFailure | null 
 const STATUS_LABELS: Record<string, string> = {
   READY: "Chờ lấy hàng",
   DELIVERING: "Đang giao",
-  COMPLETED: "Hoàn tất",
+  COMPLETED: "Đã giao",
   FAILED: "Giao thất bại",
 };
 const NEXT_FROM: Record<string, string[]> = {
@@ -765,14 +782,35 @@ const NEXT_FROM: Record<string, string[]> = {
   FAILED: ["DELIVERING"],
 };
 
+/**
+ * W37 S1: trạng thái đơn sau lần chuyển này, theo luật dùng chung BR-BH-18 (`isDeliveryFinished`). Mọi phiếu cùng đơn được xét.
+ * S6-AC8: kết quả được gửi vào kho nối `shared/lib/orderLink.mock.ts` để mock Đơn đổi theo (cùng `id` đơn), không import chéo
+ * feature. Bản build thật không giữ file này chỉ vì seed ở trên dựng lười; `check-no-mock` quét `*.mock.ts` để bắt nếu có ai
+ * đưa code chạy ở cấp module trở lại.
+ */
+function orderStatusAfter(item: DeliveryNoteDetail, statuses: string[]): string | null {
+  if (!item.order?.code) return null;
+  const orderStatus = item.status === "CANCELLED" ? "CANCELLED" : isDeliveryFinished(statuses) ? "COMPLETED" : "PROCESSING";
+  if (item.order.id != null) publishDeliveryOutcome({ orderId: item.order.id, deliveryStatus: item.status, orderStatus });
+  return orderStatus;
+}
+
 /** `POST /api/delivery/notes/{id}/status/` — đóng gói, nhận hàng đi giao, hoàn tất, báo thất bại (B5). */
 export function mockPostDeliveryNoteStatus(req: MockRequest | { url?: string; body?: unknown; token?: string | null }): { status: number; body: unknown } {
   const id = noteIdOf(pathOf(req), "status/") ?? 31;
   const body = bodyOf(req) as { to_status?: string; from_status?: string; failure_reason?: string; failure_note?: string };
   const me = mockRequireUser(req as MockRequest);
-  const item = MOCK_DELIVERY_NOTES.find((n) => n.id === id);
+  const item = mockDeliveryNotes().find((n) => n.id === id);
   if (!item || !inCourierScope(me, item)) return { status: 404, body: { detail: "Không tìm thấy phiếu giao hàng" } };
   const to = body.to_status;
+  // Trạng thái mọi phiếu cùng đơn (đặt trong hàm này, không tách hàm riêng: tách ra thì bản build thật giữ lại seed mock).
+  const siblingStatuses = (n: DeliveryNoteDetail) => mockDeliveryNotes().filter((x) => x.order?.code === n.order?.code).map((x) => x.status as string);
+
+  // BR-GH-24: phiếu hoặc đơn đã huỷ → không nhận hàng đi giao, không giao xong, không báo thất bại. 400 kèm `code` (02b §2.3).
+  // Đơn đã huỷ ở mock Đơn mà phiếu cũ chưa huỷ (ca nhiều phiếu, BE §1.2) cũng bị chặn như phiếu đã huỷ.
+  if ((to === "DELIVERING" || to === "COMPLETED" || to === "FAILED") && (item.status === "CANCELLED" || isOrderCancelledInMock(item.order?.id))) {
+    return { status: 400, body: { detail: "Đơn đã huỷ — mang hàng về kho.", code: "BR-GH-24", current_status: "CANCELLED" } };
+  }
 
   if (to === "FAILED") {
     if (item.status !== "DELIVERING") {
@@ -786,13 +824,13 @@ export function mockPostDeliveryNoteStatus(req: MockRequest | { url?: string; bo
     item.failure_reason = body.failure_reason;
     item.failure_note = (body.failure_note ?? "").trim();
     item.failed_at = new Date().toISOString();
-    return { status: 200, body: { ...viewFor(me, item), already: false, needs_decision: item.failed_attempts >= 2 } };
+    return { status: 200, body: { ...viewFor(me, item), already: false, needs_decision: item.failed_attempts >= 2, order_status: orderStatusAfter(item, siblingStatuses(item)) } };
   }
 
   if (to === "READY" && (item.status === "PREPARING" || item.status === "READY" || item.status === "CONFIRMING" || item.status === "CANCELLED")) {
     try {
       const res = mockPackDeliveryNote(id, body.from_status);
-      return { status: 200, body: { ...viewFor(me, res.note), already: res.already } };
+      return { status: 200, body: { ...viewFor(me, res.note), already: res.already, order_status: orderStatusAfter(res.note, siblingStatuses(res.note)) } };
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Lỗi";
       return { status: 400, body: { detail: msg, code: msg.split(":")[0] } };
@@ -800,7 +838,7 @@ export function mockPostDeliveryNoteStatus(req: MockRequest | { url?: string; bo
   }
 
   if (to && STATUS_LABELS[to]) {
-    if (item.status === to) return { status: 200, body: { ...viewFor(me, item), already: true } };
+    if (item.status === to) return { status: 200, body: { ...viewFor(me, item), already: true, order_status: orderStatusAfter(item, siblingStatuses(item)) } };
     if (!(NEXT_FROM[to] ?? []).includes(item.status)) {
       return failure(409, "STALE_STATE", `Phiếu đang ở ${item.status_label}, tải lại để xem.`);
     }
@@ -808,7 +846,7 @@ export function mockPostDeliveryNoteStatus(req: MockRequest | { url?: string; bo
     item.status_label = STATUS_LABELS[to];
     if (to === "COMPLETED") item.completed_at = new Date().toISOString();
     if (to === "DELIVERING") item.delivery_started_at = new Date().toISOString();
-    return { status: 200, body: { ...viewFor(me, item), already: false } };
+    return { status: 200, body: { ...viewFor(me, item), already: false, order_status: orderStatusAfter(item, siblingStatuses(item)) } };
   }
   return failure(400, "DELIVERY_STATUS_INVALID", "Trạng thái không hợp lệ.");
 }
@@ -822,8 +860,8 @@ export function mockGetDeliverers(req: MockRequest): { status: number; body: Del
     body: MOCK_DELIVERERS.map((u) => ({
       id: u.id,
       display_name: u.display_name,
-      delivering_count: MOCK_DELIVERY_NOTES.filter((n) => n.assigned_to === u.id && n.status === "DELIVERING").length,
-      ready_count: MOCK_DELIVERY_NOTES.filter((n) => n.assigned_to === u.id && n.status === "READY").length,
+      delivering_count: mockDeliveryNotes().filter((n) => n.assigned_to === u.id && n.status === "DELIVERING").length,
+      ready_count: mockDeliveryNotes().filter((n) => n.assigned_to === u.id && n.status === "READY").length,
     })),
   };
 }
@@ -840,7 +878,7 @@ export function mockPostDeliveryAssign(req: MockRequest): { status: number; body
   const me = mockRequireUser(req);
   if (!me || !hasPerm(me, PERM.assignDelivery)) return { status: 403, body: { detail: "Bạn không có quyền giao phiếu." } };
   const id = noteIdOf(pathOf(req), "assign/");
-  const item = MOCK_DELIVERY_NOTES.find((n) => n.id === id);
+  const item = mockDeliveryNotes().find((n) => n.id === id);
   if (!item) return { status: 404, body: { detail: "Không tìm thấy phiếu giao hàng" } };
   const body = bodyOf(req);
   const to = Number(body.assigned_to);
@@ -868,7 +906,7 @@ export function mockGetDeliveryLabel(
   id: number,
   printNo?: number
 ): { status: number; body: LabelData | { detail: string; code?: string } } {
-  const item = MOCK_DELIVERY_NOTES.find((n) => n.id === id);
+  const item = mockDeliveryNotes().find((n) => n.id === id);
   if (!item) {
     return { status: 404, body: { detail: "Không tìm thấy phiếu giao hàng" } };
   }
@@ -890,14 +928,14 @@ export function mockGetDeliveryLabel(
 
   const data: LabelData = {
     note_code: item.code,
-    order_code: item.order?.code || "DH-260928-0001",
+    order_code: item.order?.code || "SO260928-A00001",
     print_no: pNo,
     next_print_no: (item.label.valid_print_no || 1) + 1,
     is_reprint: isReprint,
     reprint_reason: isReprint ? "REPRINT" : null,
     barcode_value: `${item.code}.${pNo}`,
     recipient_name: item.recipient_name || item.customer_name || "",
-    recipient_phone_masked: "09xx xxx 123",
+    recipient_phone_masked: "xxxxxx4567",
     address: item.address || "",
     packages: "1/1",
     total_kg: item.total_kg,
@@ -911,7 +949,7 @@ export function mockPostDeliveryLabelPrint(
   req: any,
   id: number
 ): { status: number; body: PrintDeliveryLabelResponse | { detail: string; code?: string } } {
-  const item = MOCK_DELIVERY_NOTES.find((n) => n.id === id);
+  const item = mockDeliveryNotes().find((n) => n.id === id);
   if (!item) {
     return { status: 404, body: { detail: "Không tìm thấy phiếu giao hàng" } };
   }
@@ -956,7 +994,7 @@ export function mockPostDeliveryLabelVoid(
   req: any,
   id: number
 ): { status: number; body: VoidLabelResponse | { detail: string; code?: string } } {
-  const item = MOCK_DELIVERY_NOTES.find((n) => n.id === id);
+  const item = mockDeliveryNotes().find((n) => n.id === id);
   if (!item) {
     return { status: 404, body: { detail: "Không tìm thấy phiếu giao hàng" } };
   }
@@ -1009,7 +1047,7 @@ export function mockLookupDeliveryTag(req: MockRequest): { status: number; body:
   const m = /^(GH-[A-Z0-9-]{3,40})\.(\d{1,3})$/.exec(code);
   if (!m) return { status: 400, body: { detail: "Mã tem không đúng định dạng.", code: "INVALID_INPUT" } };
   const printNo = parseInt(m[2], 10);
-  const note = MOCK_DELIVERY_NOTES.find((n) => n.code === m[1]);
+  const note = mockDeliveryNotes().find((n) => n.code === m[1]);
   const lastPrinted = note ? Math.max(note.label.valid_print_no ?? 0, ...note.label.to_void) : 0;
   if (!note || !inCourierScope(me, note) || !note.label.printed || printNo < 1 || printNo > lastPrinted) {
     return { status: 404, body: { detail: "Không tìm thấy phiếu.", code: "NOT_FOUND" } };

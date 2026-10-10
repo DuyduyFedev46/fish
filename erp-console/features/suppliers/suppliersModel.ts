@@ -1,14 +1,14 @@
 // Phần thuần của màn Nhà cung cấp (không React, không gọi API): lựa chọn lọc, kiểm tra ô nhập, gói PATCH chỉ gồm trường đổi,
 // câu lỗi lưu. Không giữ số điện thoại ở đâu ngoài tham số hàm (không log, không storage, không URL).
 
+import { ENUMS } from "@/shared/lib/enums";
 import { ApiError } from "@/shared/lib/http";
 import { SUPPLIERS_MSG as M } from "./messages";
 import type { Supplier, SupplierInput, SupplierPatch, SupplierType } from "./types";
 
 export const TYPE_OPTIONS: { value: string; label: string }[] = [
   { value: "", label: M.typeAll },
-  { value: "INDIVIDUAL", label: "Cá nhân" },
-  { value: "COMPANY", label: "Doanh nghiệp" },
+  ...Object.entries(ENUMS.supplierType).map(([value, v]) => ({ value, label: v.label })),
 ];
 
 export const ACTIVE_OPTIONS: { value: string; label: string }[] = [

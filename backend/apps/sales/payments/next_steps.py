@@ -97,7 +97,7 @@ def get_payment_next_steps(payment: PaymentTransaction, user: Any) -> list[NextS
         steps.append(
             NextStep(
                 key="refund",
-                label="Tạo phiếu hoàn",
+                label="Lập phiếu hoàn tiền",
                 actor="user",
                 allowed=can_refund,
                 who=["Chủ"],
@@ -116,11 +116,11 @@ def get_payment_guidance(doc_id: str, user: Any, request: Optional[Any] = None) 
     """
     Guidance provider cho loại chứng từ "payment".
     """
-    from apps.sales.payments.services import DUPLICATE_MANUAL_WARNING, RESOLVE_PERM
+    from apps.sales.payments.services import RESOLVE_PERM
 
     # Cùng mã lỗi 403 với PaymentTransactionViewSet (DW-04-AC5)
     if not (user.has_perm("sales.view_paymenttransaction") and user.has_perm(RESOLVE_PERM)):
-        raise PermissionDenied("Bạn không có quyền xem giao dịch thanh toán.")
+        raise PermissionDenied("Bạn không có quyền xem khoản tiền về.")
 
     qs = PaymentTransaction.objects.select_related(
         "sales_order",
@@ -130,7 +130,7 @@ def get_payment_guidance(doc_id: str, user: Any, request: Optional[Any] = None) 
     try:
         payment = qs.get(pk=int(doc_id))
     except (TypeError, ValueError, PaymentTransaction.DoesNotExist):
-        raise Http404("Không tìm thấy giao dịch thanh toán.")
+        raise Http404("Không tìm thấy khoản tiền về.")
 
     # doc: TUYỆT ĐỐI không đưa raw_payload, description, counter_account_name (DW-04-AC4)
     doc_summary = {
@@ -148,12 +148,11 @@ def get_payment_guidance(doc_id: str, user: Any, request: Optional[Any] = None) 
     timeline_data = format_guidance_timeline(timeline_events, viewer=user)
 
     warnings: list[dict[str, Any]] = []
-    if payment.match_status == PaymentTransaction.MatchStatus.OVERPAID:
-        if DUPLICATE_MANUAL_WARNING in (payment.resolution_note or ""):
-            warnings.append({
-                "code": "GW-03",
-                "text": DUPLICATE_MANUAL_WARNING,
-            })
+    if payment.duplicate_warning:  # BR-TT-15 / BR-TT-18: nhãn nằm ở `duplicate_warning`, áp cho mọi loại khoản
+        warnings.append({
+            "code": "GW-03",
+            "text": payment.duplicate_warning,
+        })
 
     related: list[dict[str, str]] = []
     if payment.sales_order:

@@ -1,6 +1,6 @@
 // API module inventory (Lô 7). Danh sách lô đọc từ R5 (GET /api/inventory/batches/), không còn đọc tạm dashboard/summary.
 // Thao tác lô: mở bán (F1e), trả nhà cung cấp (F1g), huỷ phần tồn ghi lỗ (F1h), chốt lô (F1i).
-import { apiFetch, type Paginated } from "@/shared/lib/http";
+import { ApiError, apiFetch, type Paginated } from "@/shared/lib/http";
 import {
   mockAddWarehouse,
   mockBatchAction,
@@ -162,4 +162,14 @@ export function fetchStockEntries(params: StockEntryParams, page: number, signal
     signal,
     mock: process.env.NEXT_PUBLIC_USE_MOCK === "1" ? mockStockEntries : undefined,
   });
+}
+
+/** ⌘K (Lô 17b H1): id lô theo mã lô, hoặc null khi 404. Lỗi khác (403, mạng) được ném lên. */
+export async function findBatchIdByCode(code: string, signal?: AbortSignal): Promise<number | null> {
+  try {
+    return (await fetchBatch(code, signal)).id;
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 404) return null;
+    throw err;
+  }
 }

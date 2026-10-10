@@ -50,7 +50,10 @@ class S6MeTests(TestCase):
             {"id", "username", "display_name", "phone", "groups", "permissions",
              "can_view_cost", "can_view_profit", "home",
              "group_labels", "capabilities",  # S47 chỉ thêm 2 key
-             "must_change_password"},  # S48 thêm 1 key
+             "must_change_password",  # S48 thêm 1 key
+             "is_superuser",  # Duy 08/10 câu 1
+             "data_scopes",  # PV-14 (Lô 7)
+             "ai_features_enabled"},  # lô dọn chữ AI thêm 1 key
         )
 
     def test_s6_ac1_khong_co_ho_so_thi_display_name_la_username_phone_rong(self):
@@ -89,12 +92,25 @@ class S6MeTests(TestCase):
         self.assertEqual(body["permissions"], [])
         self.assertEqual(body["home"], "no-role")
 
-    def test_s6_ac4_superuser_khong_group_van_no_role(self):
-        # S47-AC5: admin (superuser, không Group) vào console → màn "chưa được phân quyền".
+    def test_s6_ac4_superuser_without_group_goes_to_dashboard(self):
+        # Duy 08/10 câu 1 (lật S6-AC4 cũ): superuser không nhóm vào ERP như Chủ.
         admin = User.objects.create_superuser("admin", password="x")
         body = client_for(admin).get(URL).json()
         self.assertEqual(body["groups"], [])
-        self.assertEqual(body["home"], "no-role")
+        self.assertEqual(body["home"], "dashboard")
+        self.assertIs(body["is_superuser"], True)
+
+    def test_s6_ac4_superuser_only_delivery_staff_goes_to_dashboard(self):
+        # Duy 08/10 câu 1: superuser thắng luật "chỉ delivery_staff thì my-deliveries".
+        admin = User.objects.create_superuser("admin2", password="x")
+        admin.groups.add(Group.objects.get(name=roles.DELIVERY_STAFF))
+        body = client_for(admin).get(URL).json()
+        self.assertEqual(body["home"], "dashboard")
+        self.assertEqual(body["groups"], [roles.DELIVERY_STAFF])
+
+    def test_s6_ac4_normal_user_is_not_superuser_flag(self):
+        body = client_for(make_user("loc", roles.OWNER)).get(URL).json()
+        self.assertIs(body["is_superuser"], False)
 
     def test_s6_ac5_token_cua_nguoi_da_nghi_bi_401_moi_api(self):
         giao1 = make_user("giao1", roles.DELIVERY_STAFF)

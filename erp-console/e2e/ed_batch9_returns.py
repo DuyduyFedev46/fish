@@ -1,4 +1,4 @@
-# E2E ERP theo design, Lô 9 (Hàng hoàn về kho ED-26): chạy trên bản build MOCK phục vụ tĩnh.
+# E2E ERP theo design, Lô 9 (Hàng hoàn ED-26): chạy trên bản build MOCK phục vụ tĩnh.
 #   cd erp-console && NEXT_PUBLIC_USE_MOCK=1 npm run build && (cd out && python3 -m http.server 3101 &)
 #   SHOTS=<thư mục ảnh> python3 e2e/ed_batch9_returns.py      # tắt server sau khi xong
 # Kiểm: giao1 chỉ thấy phiếu của mình, mở phiếu người khác -> "Không tìm thấy" · kho1, ql1, loc thấy tất cả ·
@@ -86,7 +86,7 @@ def dialog(page):
 def roles(browser):
     # cs1: CSKH thuần, không có quyền xem hàng hoàn
     ctx, page, errors = new_page(browser, "cs1")
-    ok("cs1: menu không có Hàng hoàn về kho", not any("Hàng hoàn về kho" in t for t in nav_labels(page)), str(nav_labels(page)))
+    ok("cs1: menu không có Hàng hoàn", not any("Hàng hoàn" in t for t in nav_labels(page)), str(nav_labels(page)))
     go(page, "/returns/")
     ok("cs1: /returns/ hiện 'Không có quyền'", page.get_by_role("heading", name="Không có quyền").count() >= 1)
     go(page, "/returns/detail/?id=1")
@@ -104,7 +104,7 @@ def roles(browser):
 
     # giao1: chỉ phiếu của mình
     ctx, page, errors = new_page(browser, "giao1")
-    ok("giao1: menu có Hàng hoàn về kho", any("Hàng hoàn về kho" in t for t in nav_labels(page)))
+    ok("giao1: menu có Hàng hoàn", any("Hàng hoàn" in t for t in nav_labels(page)))
     go(page, "/returns/")
     got = codes(page)
     ok("giao1: chỉ thấy RT-1, RT-5 và RT-6 (phiếu giao của mình)", sorted(got) == ["RT-1", "RT-5", "RT-6"], str(got))
@@ -113,14 +113,14 @@ def roles(browser):
     ok("giao1: mở RT-2 của giao2 -> Không tìm thấy, không lộ ghi chú", page.get_by_role("heading", name="Không tìm thấy").count() >= 1 and "từ chối" not in page.inner_text("main"))
     go(page, "/returns/detail/?id=1")
     ok("giao1: mở RT-1 của mình được", "RT-1" in page.inner_text("main"))
-    ok("giao1: không có nút Tái nhập / Huỷ bỏ (không có quyền duyệt)", page.get_by_role("button", name="Tái nhập vào lô").count() == 0 and page.get_by_role("button", name="Huỷ bỏ, ghi lỗ").count() == 0)
+    ok("giao1: không có nút Tái nhập / Huỷ bỏ (không có quyền duyệt)", page.get_by_role("button", name="Tái nhập vào lô").count() == 0 and page.get_by_role("button", name="Huỷ hàng, ghi lỗ").count() == 0)
     ok("giao1: không console.error", errors == [], str(errors))
     ctx.close()
 
     for user in ("kho1", "ql1", "loc"):
         ctx, page, errors = new_page(browser, user)
-        ok(f"{user}: menu có Hàng hoàn về kho, bấm được", any("Hàng hoàn về kho" in t for t in nav_labels(page)))
-        page.locator(".nav a", has_text="Hàng hoàn về kho").first.click()
+        ok(f"{user}: menu có Hàng hoàn, bấm được", any("Hàng hoàn" in t for t in nav_labels(page)))
+        page.locator(".nav a", has_text="Hàng hoàn").first.click()
         page.wait_for_url(re.compile(r"/returns/?$"))
         settle(page)
         body = page.inner_text("main")
@@ -132,7 +132,7 @@ def roles(browser):
         page.locator("main table tbody tr", has_text="RT-1").click()
         page.wait_for_url(re.compile(r"/returns/detail/\?id=1"))
         settle(page)
-        approve = page.get_by_role("button", name="Tái nhập vào lô").count() == 1 and page.get_by_role("button", name="Huỷ bỏ, ghi lỗ").count() == 1
+        approve = page.get_by_role("button", name="Tái nhập vào lô").count() == 1 and page.get_by_role("button", name="Huỷ hàng, ghi lỗ").count() == 1
         ok(f"{user}: nút Tái nhập / Huỷ bỏ " + ("có" if user != "kho1" else "KHÔNG có") + " ở phiếu Chờ duyệt", approve == (user != "kho1"))
         ok(f"{user}: không console.error", errors == [], str(errors))
         ctx.close()
@@ -240,7 +240,7 @@ def layout_links_errors(browser):
     note_link = page.locator("main dd a", has_text="GH-HD-0038-FAIL")
     ok("B3 chi tiết: Phiếu giao là liên kết /deliveries/detail/?id=38", note_link.count() == 1 and note_link.get_attribute("href") == "/deliveries/detail/?id=38", str(note_link.count()))
     page.wait_for_function("() => [...document.querySelectorAll('main dd a')].some(a => a.getAttribute('href').startsWith('/orders/detail/'))")
-    order_link = page.locator("main dd a", has_text="DH-260928-0008")
+    order_link = page.locator("main dd a", has_text="SO260928-A00008")
     ok("B3 chi tiết: Đơn là liên kết /orders/detail/?id=<id đơn>", order_link.count() == 1 and re.fullmatch(r"/orders/detail/\?id=\d+", order_link.get_attribute("href") or "") is not None, order_link.get_attribute("href") if order_link.count() else "không có")
     ok("B3 chi tiết: Lô vẫn là chữ thường (Lô 7 chưa có màn)", page.locator("main dd a", has_text="TOM-SU-1").count() == 0 and "TOM-SU-1-260920-AB12C" in page.inner_text("main"))
     page.screenshot(path=f"{SHOTS}/lo9-b3-detail-1280.png")
@@ -259,12 +259,12 @@ def layout_links_errors(browser):
     ok("B3 kho1: Phiếu giao là liên kết", page.locator("main dd a", has_text="GH-HD-0038-FAIL").count() == 1)
     has_orders = any("Đơn & tiền" in t for t in nav_labels(page))
     page.wait_for_timeout(600)
-    ok("B3 kho1: Đơn là liên kết đúng khi người xem có màn Đơn", (page.locator("main dd a", has_text="DH-260928-0008").count() == 1) == has_orders, str(has_orders))
+    ok("B3 kho1: Đơn là liên kết đúng khi người xem có màn Đơn", (page.locator("main dd a", has_text="SO260928-A00008").count() == 1) == has_orders, str(has_orders))
     ctx.close()
     # giao1: phiếu của mình, link Phiếu giao
     ctx, page, errors = new_page(browser, "giao1")
     go(page, "/returns/detail/?id=1")
-    ok("B3 giao1: Phiếu giao là liên kết, mã đơn chữ thường", page.locator("main dd a", has_text="GH-HD-0038-FAIL").count() == 1 and page.locator("main dd a", has_text="DH-260928-0008").count() == 0)
+    ok("B3 giao1: Phiếu giao là liên kết, mã đơn chữ thường", page.locator("main dd a", has_text="GH-HD-0038-FAIL").count() == 1 and page.locator("main dd a", has_text="SO260928-A00008").count() == 0)
     ctx.close()
 
     # RETURN_BATCH_CLOSED -> dưới ô Lô; 400 ô ghi chú từ BE -> dưới ô Ghi chú
@@ -341,10 +341,10 @@ def create_flow(browser):
     ok("F2m: sau lỗi BE số liệu cập nhật 'đã hoàn 0,6 kg, còn hoàn được 0,4 kg'", "đã hoàn 0,6 kg" in dlg.locator("[data-qty-facts]").inner_text() and "còn hoàn được 0,4 kg" in dlg.locator("[data-qty-facts]").inner_text())
     # ghi chú có số điện thoại bị chặn
     dlg.get_by_label("Số kg hoàn").fill("0.2")
-    dlg.get_by_label(re.compile("Ghi chú")).fill("gọi 0912345678 giúp")
+    dlg.get_by_label(re.compile("Ghi chú")).fill("gọi 0987000123 giúp")
     dlg.get_by_role("button", name=re.compile("Gửi duyệt|Thử lại")).click()
     ok("F2m: ghi chú có số điện thoại bị chặn", "không được chứa số điện thoại" in dlg.inner_text())
-    ok("F2m: số điện thoại không nằm trong storage / URL", "0912345678" not in storage_dump(page) and "0912345678" not in page.url)
+    ok("F2m: số điện thoại không nằm trong storage / URL", "0987000123" not in storage_dump(page) and "0987000123" not in page.url)
     dlg.get_by_label(re.compile("Ghi chú")).fill("khách hẹn lại ngày mai")
     dlg.get_by_role("button", name=re.compile("Gửi duyệt|Thử lại")).click()
     page.wait_for_function("() => !document.querySelector('[role=dialog]')")
@@ -359,7 +359,7 @@ def create_flow(browser):
 
 
 def approve_flow(browser):
-    for label, btn, done_text in (("Tái nhập", "Tái nhập vào lô", "Đã duyệt. Hàng đã nhập lại vào lô."), ("Huỷ bỏ", "Huỷ bỏ, ghi lỗ", "Đã duyệt. Hàng đã huỷ bỏ, ghi lỗ.")):
+    for label, btn, done_text in (("Tái nhập", "Tái nhập vào lô", "Đã duyệt. Hàng đã nhập lại vào lô."), ("Huỷ bỏ", "Huỷ hàng, ghi lỗ", "Đã duyệt. Hàng đã huỷ hàng, ghi lỗ.")):
         ctx, page, errors = new_page(browser, "ql1")
         go(page, "/returns/")
         page.locator("main table tbody tr", has_text="RT-1").click()
@@ -390,7 +390,7 @@ def approve_flow(browser):
 
     # 409: máy khác duyệt trước
     page.evaluate("() => window.__caveMock.returnsMarkApproved(2)")
-    page.get_by_role("button", name="Huỷ bỏ, ghi lỗ").click()
+    page.get_by_role("button", name="Huỷ hàng, ghi lỗ").click()
     dlg = dialog(page)
     dlg.get_by_role("button", name="Duyệt", exact=True).click()
     page.wait_for_function("() => document.querySelector('[role=dialog]') && document.querySelector('[role=dialog]').innerText.includes('Tải lại')")
@@ -399,7 +399,7 @@ def approve_flow(browser):
     dlg.get_by_role("button", name="Tải lại").first.click()
     page.wait_for_function("() => !document.querySelector('[role=dialog]')")
     settle(page)
-    ok("Tải lại sau 409: phiếu Đã duyệt, hết nút duyệt", page.get_by_role("button", name="Huỷ bỏ, ghi lỗ").count() == 0 and "Đã duyệt" in page.inner_text("main"))
+    ok("Tải lại sau 409: phiếu Đã duyệt, hết nút duyệt", page.get_by_role("button", name="Huỷ hàng, ghi lỗ").count() == 0 and "Đã duyệt" in page.inner_text("main"))
     ok("Không console.error", errors == [], str(errors))
     ctx.close()
 

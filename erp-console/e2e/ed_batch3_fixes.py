@@ -83,8 +83,13 @@ def h1_target_model(browser, errors):
         ok(f"H1 {path}: không báo 'Loại chứng từ không hợp lệ'", page.get_by_text("Loại chứng từ không hợp lệ").count() == 0 and page.locator("[data-ai-block] [role=alert]").count() == 0)
     # Đề xuất AI cho đơn hiện đúng trong khối (đi bằng liên kết trong app để giữ bộ nhớ mock)
     go(page, "/overview/")
+    # Lô 17b (E2E-1): `aiOrderProposal` chỉ có khi build bật AI (NEXT_PUBLIC_AI_FEATURES=1). Build tắt AI: bỏ qua hai ca này, in lý do.
+    if not page.evaluate("() => !!(window.__caveMock && typeof window.__caveMock.aiOrderProposal === 'function')"):
+        print("SKIP H1 đơn có đề xuất AI (2 ca): build tắt AI nên mock không có aiOrderProposal")
+        ctx.close()
+        return
     page.evaluate("(c) => window.__caveMock.aiOrderProposal(c)", code)
-    page.get_by_role("link", name="Đơn hàng").first.click()
+    page.locator(".nav a", has_text="Đơn & tiền").first.click()  # tên menu chuẩn (không còn "Đơn hàng")
     page.wait_for_url(re.compile(r"/orders/?$"))
     page.locator("tbody tr", has_text=code).first.click()
     page.wait_for_url(re.compile(r"/orders/detail/\?id=101$"))
@@ -368,7 +373,7 @@ def ai_block_payment_refund(browser, errors):
     for noun, list_path, path, kind, model, title in cases:
         go(page, "/overview/")
         page.evaluate("() => { for (let i = 1; i <= 60; i++) window.__caveMock.aiRefundProposal(String(i)); for (let i = 870; i <= 890; i++) window.__caveMock.aiPaymentProposal(String(i)); }")
-        page.get_by_role("link", name="Đơn hàng").first.click()
+        page.locator(".nav a", has_text="Đơn & tiền").first.click()  # tên menu chuẩn (không còn "Đơn hàng")
         page.wait_for_url(re.compile(r"/orders/?$"))
         link = "Hàng chờ thanh toán" if kind == "payment" else "Phiếu hoàn"
         page.get_by_role("tab", name=re.compile(link)).first.click() if page.get_by_role("tab", name=re.compile(link)).count() else page.get_by_role("link", name=re.compile(link)).first.click()

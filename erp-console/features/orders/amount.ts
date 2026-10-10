@@ -1,4 +1,4 @@
-// Đọc ô số tiền VND dùng chung trong module Đơn & tiền: S11 (xác nhận đã nhận tiền) và S13 (tạo phiếu hoàn từ hàng chờ).
+// Đọc ô số tiền VND dùng chung trong module Đơn & tiền: S11 (xác nhận đã nhận tiền) và S13 (tạo phiếu hoàn tiền từ hàng chờ).
 // Tách ra từ ConfirmPaymentForm (B13, QA L7) để hai form chặn trước tại ô cùng một cách. BE vẫn là lớp chặn chính.
 
 import { formatMoneyInput, splitFraction } from "@/shared/lib/moneyInput";

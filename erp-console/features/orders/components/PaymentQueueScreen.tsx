@@ -6,6 +6,7 @@
 // tham số tìm cho hàng chờ). "Tình trạng xử lý" lưu ở ?state= (chỉ khoá, không dữ liệu cá nhân).
 
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/features/auth/components/AuthProvider";
 import { ApiError, loadErrorText } from "@/shared/lib/http";
 import { dateTime, vnd } from "@/shared/lib/format";
@@ -16,13 +17,18 @@ import { Icon } from "@/shared/ui/Icon";
 import { DataTable, type Column } from "@/shared/ui/list/DataTable";
 import { FilterBar } from "@/shared/ui/list/FilterBar";
 import { ListPage } from "@/shared/ui/list/ListPage";
+import { PERM } from "@/shared/lib/nav";
+import { useToast } from "@/shared/ui/overlay/Toast";
 import { NoPermission } from "@/shared/ui/states/NoPermission";
 import { useTabParam } from "@/shared/ui/Tabs";
 import { listPaymentQueue } from "../api";
+import { hasDuplicateWarning } from "../latePayment";
 import { QUEUE_TYPE_FILTERS } from "../labels";
 import { ORDERS_MSG as M } from "../messages";
 import type { PaymentQueueItem, PaymentQueueParams, ResolutionStatus } from "../types";
+import s from "../orders.module.css";
 import { OrdersSectionTabs } from "./OrdersSectionTabs";
+import { RecordLatePaymentModal } from "./RecordLatePaymentModal";
 
 const STATE_KEYS = ["open", "resolved"] as const;
 
@@ -35,6 +41,9 @@ export function filterPayments(rows: PaymentQueueItem[], q: string): PaymentQueu
 
 export function PaymentQueueScreen() {
   const { me } = useAuth();
+  const toast = useToast();
+  const router = useRouter();
+  const [lateOpen, setLateOpen] = useState(false);
   const [state, setState] = useTabParam(STATE_KEYS, "open", "state");
   const [type, setType] = useState("");
   const [q, setQ] = useState("");
@@ -48,16 +57,41 @@ export function PaymentQueueScreen() {
   const columns: Column<PaymentQueueItem>[] = [
     { key: "txn", header: M.colTxn, mono: true, render: (p) => p.bank_txn_id },
     { key: "amount", header: M.colAmount, num: true, render: (p) => vnd(p.amount) },
-    { key: "match", header: M.colMatch, render: (p) => <Chip table={ENUMS.paymentMatchStatus} value={p.match_status} /> },
+    {
+      key: "match",
+      header: M.colMatch,
+      render: (p) => (
+        <>
+          <Chip table={ENUMS.paymentMatchStatus} value={p.match_status} />
+          {hasDuplicateWarning(p) && (
+            <span className={s.dupFlag} title={p.duplicate_warning} data-duplicate-warning>
+              <Icon name="warning" />
+              <span className="sr-only">{M.dupBadge}: </span>
+              <span className="sr-only">{p.duplicate_warning}</span>
+            </span>
+          )}
+        </>
+      ),
+    },
     { key: "state", header: M.colResolution, render: (p) => <Chip table={ENUMS.paymentResolutionStatus} value={p.resolution_status} /> },
     { key: "order", header: M.colOrder, mono: true, render: (p) => p.order?.code ?? <span className="muted">{M.noOrder}</span> },
     { key: "at", header: M.colReceivedAt, tabular: true, render: (p) => dateTime(p.received_at) },
   ];
+  // Chỉ người có "Xác nhận đã nhận tiền" thấy nút; BE vẫn chặn 403 (BR-TT-18).
+  const canRecordLate = !!me?.permissions.includes(PERM.confirmPaymentManual);
   const refreshFailed = list.rows !== undefined && list.error != null && !list.loading;
 
   return (
     <ListPage
       tabs={<OrdersSectionTabs current="payments" />}
+      actions={
+        canRecordLate ? (
+          <button type="button" className="btn primary" onClick={() => setLateOpen(true)} data-testid="record-late-open">
+            <Icon name="add" />
+            <span>{M.lateOpen}</span>
+          </button>
+        ) : null
+      }
       filters={
         <FilterBar
           query={q}
@@ -124,6 +158,17 @@ export function PaymentQueueScreen() {
         }
         canViewCost={false}
       />
+      {lateOpen && (
+        <RecordLatePaymentModal
+          onClose={() => setLateOpen(false)}
+          onDone={(r) => {
+            setLateOpen(false);
+            if (r.duplicate) toast.warn(M.lateDoneDup(r.payment.bank_txn_id));
+            else toast.success(M.lateDone(r.payment.bank_txn_id));
+            router.push(`/orders/payments/detail/?id=${r.payment.id}`);
+          }}
+        />
+      )}
     </ListPage>
   );
 }

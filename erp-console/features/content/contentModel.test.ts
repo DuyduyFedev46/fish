@@ -155,10 +155,11 @@ describe("danh sách", () => {
     expect(filterEntries([row({ title: "<img src=x onerror=alert(1)>" })], "onerror")).toHaveLength(1);
   });
   it("ghi chú suy từ dữ liệu có sẵn", () => {
-    expect(entryNote(row({ has_unpublished_changes: true, status: "published" }))).toMatch(/thay đổi chưa đăng/);
-    expect(entryNote(row({ source: "ai" }))).toMatch(/AI/);
-    expect(entryNote(row({ page_role: "privacy" }))).toMatch(/bắt buộc/);
-    expect(entryNote(row({}))).toBe("");
+    expect(entryNote(row({ has_unpublished_changes: true, status: "published" }), true)).toMatch(/thay đổi chưa đăng/);
+    expect(entryNote(row({ source: "ai" }), true)).toMatch(/AI/);
+    expect(entryNote(row({ source: "ai" }), false)).toBe(""); // W39: AI tắt không lộ chữ AI
+    expect(entryNote(row({ page_role: "privacy" }), true)).toMatch(/bắt buộc/);
+    expect(entryNote(row({}), true)).toBe("");
   });
   it("tham số số nguyên dương", () => {
     expect(positiveIntParam("12")).toBe(12);

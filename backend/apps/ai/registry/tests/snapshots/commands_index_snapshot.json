@@ -102,6 +102,7 @@
   "reports.dashboard_summary",
   "reports.period_pnl",
   "sales.paymenttransaction.list",
+  "sales.paymenttransaction.record_late",
   "sales.paymenttransaction.resolve",
   "sales.paymenttransaction.retrieve",
   "sales.refund.confirm",

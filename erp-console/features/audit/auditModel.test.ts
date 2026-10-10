@@ -1,5 +1,6 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { actionLabel, actorInitial, actorName, approverOf, buildApproverMap, changeSummary, matchesLocal, UNKNOWN_ACTION } from "./auditModel";
+import { AI_ONLY_ACTIONS, AUDIT_FILTER_ACTIONS, actionLabel, actorInitial, actorName, approverOf, buildApproverMap, changeSummary, matchesLocal, UNKNOWN_ACTION } from "./auditModel";
 import type { AuditLogRow } from "./types";
 
 const row = (over: Partial<AuditLogRow>): AuditLogRow => ({
@@ -56,10 +57,29 @@ describe("người duyệt", () => {
   });
 });
 
+describe("changeSummary: W11 dịch trạng thái theo model_name (T23, T29, T47)", () => {
+  it("FAILED của phiếu giao là Giao thất bại, của phiếu hoàn tiền là Hoàn thất bại", () => {
+    expect(changeSummary({ status: ["DELIVERING", "FAILED"] }, "delivery.DeliveryNote")).toEqual(["Trạng thái: Đang giao → Giao thất bại"]);
+    expect(changeSummary({ status: ["PENDING", "FAILED"] }, "sales.Refund")).toEqual(["Trạng thái: Chờ hoàn tiền → Hoàn thất bại"]);
+  });
+  it("DRAFT của phiếu hàng hoàn là Chờ duyệt, của lô là Nháp", () => {
+    expect(changeSummary({ status: ["DRAFT", "APPROVED"] }, "inventory.ReturnToStock")).toEqual(["Trạng thái: Chờ duyệt → Đã duyệt"]);
+    expect(changeSummary({ status: ["DRAFT", "SELLING"] }, "inventory.Batch")).toEqual(["Trạng thái: Nháp → Đang bán"]);
+  });
+  it("COMPLETED của phiếu giao là Đã giao, của đơn là Hoàn tất", () => {
+    expect(changeSummary({ status: ["DELIVERING", "COMPLETED"] }, "delivery.DeliveryNote")).toEqual(["Trạng thái: Đang giao → Đã giao"]);
+    expect(changeSummary({ status: ["PROCESSING", "COMPLETED"] }, "sales.SalesOrder")).toEqual(["Trạng thái: Đang xử lý → Hoàn tất"]);
+  });
+  it("model lạ hoặc thiếu: không đoán, không in trạng thái", () => {
+    expect(changeSummary({ status: ["BOOKED", "PAID"] })).toEqual([]);
+    expect(changeSummary({ status: ["BOOKED", "PAID"] }, "x.Unknown")).toEqual([]);
+  });
+});
+
 describe("changeSummary (danh sách trắng)", () => {
   it("trạng thái dạng cặp và dạng from/to", () => {
-    expect(changeSummary({ status: ["BOOKED", "PAID"] })).toEqual(["Trạng thái: Giữ chỗ → Đã thanh toán"]);
-    expect(changeSummary({ status: { from: "PENDING", to: "REFUNDED" } })).toEqual(["Trạng thái: Chờ hoàn → Đã hoàn"]);
+    expect(changeSummary({ status: ["BOOKED", "PAID"] }, "sales.SalesOrder")).toEqual(["Trạng thái: Giữ chỗ → Đã thanh toán"]);
+    expect(changeSummary({ status: { from: "PENDING", to: "REFUNDED" } }, "sales.Refund")).toEqual(["Trạng thái: Chờ hoàn tiền → Đã hoàn tiền"]);
   });
   it("số tiền và giá bán có đơn vị đ", () => {
     expect(changeSummary({ amount: { to: 125000 } })).toEqual(["Số tiền: → 125.000 đ"]);
@@ -103,5 +123,34 @@ describe("matchesLocal", () => {
     expect(matchesLocal(r, { query: "", from: "2026-09-27", to: "2026-09-27" })).toBe(true);
     expect(matchesLocal(r, { query: "", from: "2026-09-28", to: "" })).toBe(false);
     expect(matchesLocal(r, { query: "", from: "", to: "2026-09-26" })).toBe(false);
+  });
+});
+
+describe("AI_ONLY_ACTIONS (R1)", () => {
+  it("gồm cả ai_config_kill để tắt AI thì ô lọc không còn Tắt trợ lý AI", () => {
+    expect(AI_ONLY_ACTIONS).toContain("ai_config_kill");
+    expect(AUDIT_FILTER_ACTIONS.filter((a) => !AI_ONLY_ACTIONS.includes(a))).not.toContain("ai_config_kill");
+  });
+});
+
+describe("nhãn cho mọi action phạm vi/phân quyền mà BE ghi", () => {
+  // Danh sách ghi tay từ backend/apps/accounts/capabilities/services.py (ACTION_*). BE thêm action mới → thêm vào đây và vào bảng nhãn.
+  const BE_CAPABILITY_ACTIONS = ["change_group_capabilities", "change_group_data_scopes", "staff_groups_change"];
+  it.each(BE_CAPABILITY_ACTIONS)("%s có nhãn tiếng Việt", (a) => {
+    expect(actionLabel(a)).not.toBe(UNKNOWN_ACTION);
+  });
+  it("đổi phạm vi dữ liệu nhóm có nhãn rõ nghĩa", () => {
+    expect(actionLabel("change_group_data_scopes")).toBe("Đổi phạm vi dữ liệu của nhóm");
+  });
+  it("khớp hằng ACTION_* trong BE (khi có mã nguồn BE)", () => {
+    let src = "";
+    try {
+      src = readFileSync(new URL("../../../backend/apps/accounts/capabilities/services.py", import.meta.url), "utf8");
+    } catch {
+      return;
+    }
+    const found = [...src.matchAll(/^ACTION_[A-Z_]+ = "([a-z_]+)"/gm)].map((m) => m[1]);
+    expect(found.length).toBeGreaterThan(0);
+    for (const a of found) expect(actionLabel(a)).not.toBe(UNKNOWN_ACTION);
   });
 });

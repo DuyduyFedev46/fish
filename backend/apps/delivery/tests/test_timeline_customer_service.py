@@ -2,7 +2,7 @@
 QA5-B2 (02b §3.8 R2): quyền xem dòng thời gian phiếu giao = quyền xem chi tiết.
 
 CSKH (`customer_service`) xem chi tiết phiếu trong phạm vi gọi xác nhận
-(`note_in_customer_service_scope`), nên `GET /api/guidance/delivery/<note_id>/` phải trả 200 với phiếu trong
+(`note_in_confirmation_scope`, D4), nên `GET /api/guidance/delivery/<note_id>/` phải trả 200 với phiếu trong
 phạm vi và 404 với phiếu ngoài phạm vi. Dòng thời gian không chứa dữ liệu khách (bất biến 9). SĐT và tên là giả.
 """
 from django.test import TestCase

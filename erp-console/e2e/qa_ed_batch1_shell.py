@@ -11,7 +11,7 @@ import sys
 
 from playwright.sync_api import expect, sync_playwright
 
-from qa_ed_batch1_common import (BASE, EXPECTED_MENU, FULL_ORDER, SHOTS, fonts_ready, fulfil_404, login, nav_labels, ok, relevant_errors,
+from qa_ed_batch1_common import (BASE, EXPECTED_MENU, FULL_ORDER, SHOTS, fonts_ready, core_nav_labels, fulfil_404, login, nav_labels, ok, relevant_errors,
                                  summary)
 
 errors = []
@@ -81,7 +81,7 @@ with sync_playwright() as p:
         page.reload()
         page.wait_for_selector("#rail-left .nav a", state="attached")
         settle(page)
-        good = page.locator("#rail-left.collapsed").count() == 0 and abs(rail.bounding_box()["width"] - 240) <= 1 and nav_labels(page) == EXPECTED_MENU["loc"]
+        good = page.locator("#rail-left.collapsed").count() == 0 and abs(rail.bounding_box()["width"] - 240) <= 1 and core_nav_labels(page) == EXPECTED_MENU["loc"]
         ok(f"ED-01-AC2 localStorage rác ({junk[:14]!r}) -> mở rộng, menu đủ, không vỡ", good)
     page.evaluate("() => localStorage.setItem('cave_ui_sidebar', 'collapsed')")
     page.reload()
@@ -117,10 +117,12 @@ with sync_playwright() as p:
     focused = lambda: page.evaluate("() => document.activeElement && document.activeElement.innerText.trim().split('\\n').pop().trim()")
     page.wait_for_function("() => document.activeElement && document.activeElement.getAttribute('role') === 'menuitem'")
     ok("ED-01-AC3 Enter mở menu và focus vào mục đầu 'Tài khoản của tôi'", focused() == "Tài khoản của tôi", focused())
-    page.keyboard.press("ArrowDown")
-    ok("avatar: mũi tên xuống -> 'AI của tôi'", focused() == "AI của tôi", focused())
-    page.keyboard.press("ArrowDown")
-    ok("avatar: mũi tên xuống -> 'Đăng xuất'", focused() == "Đăng xuất", focused())
+    # Mục "AI của tôi" chỉ có khi build bật AI (NEXT_PUBLIC_AI_FEATURES=1): thứ tự mong đợi suy ra từ việc mục này có hay không.
+    has_ai = page.get_by_role("menuitem", name="AI của tôi").count() == 1
+    items = ["Tài khoản của tôi"] + (["AI của tôi"] if has_ai else []) + ["Đăng xuất"]
+    for nxt in items[1:]:
+        page.keyboard.press("ArrowDown")
+        ok(f"avatar: mũi tên xuống -> '{nxt}'", focused() == nxt, focused())
     page.keyboard.press("ArrowDown")
     ok("avatar: mũi tên xuống ở cuối quay vòng về mục đầu", focused() == "Tài khoản của tôi", focused())
     page.keyboard.press("ArrowUp")
@@ -147,15 +149,18 @@ with sync_playwright() as p:
     # bấm ra ngoài
     page.mouse.click(600, 500)
     ok("avatar: bấm ra ngoài đóng menu", page.locator("[role=menu]").count() == 0)
-    # Enter trên 'AI của tôi'
-    avatar.focus()
-    page.keyboard.press("Enter")
-    page.wait_for_function("() => document.activeElement && document.activeElement.getAttribute('role') === 'menuitem'")
-    page.keyboard.press("ArrowDown")
-    page.keyboard.press("Enter")
-    page.wait_for_url("**/ai/settings/")
-    ok("ED-01-AC3 Enter trên 'AI của tôi' mở màn AI của tôi, menu đóng", page.locator("[role=menu]").count() == 0 and page.locator("header.topbar h1").inner_text() == "AI của tôi",
-       page.locator("header.topbar h1").inner_text())
+    if has_ai:
+        # Enter trên 'AI của tôi'
+        avatar.focus()
+        page.keyboard.press("Enter")
+        page.wait_for_function("() => document.activeElement && document.activeElement.getAttribute('role') === 'menuitem'")
+        page.keyboard.press("ArrowDown")
+        page.keyboard.press("Enter")
+        page.wait_for_url("**/ai/settings/")
+        ok("ED-01-AC3 Enter trên 'AI của tôi' mở màn AI của tôi, menu đóng", page.locator("[role=menu]").count() == 0 and page.locator("header.topbar h1").inner_text() == "AI của tôi",
+           page.locator("header.topbar h1").inner_text())
+    else:
+        print("SKIP Enter trên 'AI của tôi': build tắt AI, không có mục này")
     avatar.click()
     page.get_by_role("menuitem", name="Tài khoản của tôi").click()
     page.wait_for_url("**/account/")
@@ -200,10 +205,17 @@ with sync_playwright() as p:
         expect(dlg).to_be_visible()
         page.get_by_role("combobox", name="Tìm màn hình").fill(q)
         opts = [t.strip() for t in page.locator(".cmd").get_by_role("option").all_inner_texts()]
+        # Được phép: (a) tên màn hình trong menu của vai (vd gõ "Khách hàng" ra màn Khách hàng); (b) với mã đơn đúng mẫu (ED-07, 17a)
+        # đúng một lối "Mở chứng từ <mã>" (không hiện tên/SĐT của khách). Mọi thứ khác là rò dữ liệu khách.
+        def allowed(o):
+            parts = [x.strip() for x in o.split("\n")]
+            label = parts[1] if len(parts) > 1 else parts[0]
+            return label in EXPECTED_MENU["loc"] or (q in codes and label == q and parts[-1] == "Mở chứng từ")
+        opts = [o for o in opts if not allowed(o)]
         if opts:
             leaked.append((q, opts))
         page.keyboard.press("Escape")
-    ok("ED-01 ⌘K không tìm ra mục nào khi gõ tên/SĐT/mã đơn khách (T5, G10)", not leaked, leaked)
+    ok("ED-01 ⌘K không tìm ra dữ liệu khách khi gõ tên/SĐT/mã đơn (T5, G10): chỉ tên màn hình hoặc lối 'Mở chứng từ' theo mã", not leaked, leaked)
     ok("ED-01 ⌘K không gọi API nào khi gõ", page.evaluate("() => window.__caveMock.log.length") == log_before)
     # bỏ các khoá 'cave_erp_mock_*' (kho dữ liệu giả của chính bản mock, không có ở bản thật)
     stored = page.evaluate("() => JSON.stringify(Object.entries(localStorage).filter(([k]) => !k.startsWith('cave_erp_mock_')).concat(Object.entries(sessionStorage).filter(([k]) => !k.startsWith('cave_erp_mock_'))))")
@@ -244,7 +256,7 @@ with sync_playwright() as p:
     settle(page)
     page.keyboard.press("Control+k")
     labels_in_cmd = page.locator(".cmd [role=option] > span").all_inner_texts()
-    ok("⌘K vai giao1: chỉ có 'Việc giao của tôi'", labels_in_cmd == ["Việc giao của tôi"], labels_in_cmd)
+    ok("⌘K vai giao1: chỉ có đúng mục menu của vai (Việc giao của tôi, Hàng hoàn)", labels_in_cmd == EXPECTED_MENU["giao1"], labels_in_cmd)
     page.get_by_role("combobox", name="Tìm màn hình").fill("don")
     ok("⌘K vai giao1: gõ 'don' không ra mục Đơn & tiền", page.locator(".cmd").get_by_role("option").count() == 0)
     page.keyboard.press("Escape")
@@ -322,8 +334,10 @@ with sync_playwright() as p:
     page.evaluate("() => { window.__qaBreak = false }")
     settle(page)
     ok("ED-03-AC6 sang màn khác bằng menu khi màn trước đang lỗi: vẽ bình thường", "Có lỗi xảy ra" not in page.locator("#main").inner_text())
-    leak = [c for c in console_all if "SECRET-NAME" in c]
-    ok("Bất biến 9: nội dung lỗi (giả lập có tên) không bị đẩy ra console bởi khung", not leak, leak[:2])
+    # React tự ghi chính đối tượng Error đã ném ra console (đã biết, ghi ở app/(console)/error.tsx); mã của khung thì không ghi gì thêm.
+    # Nên chỉ loại đúng dòng "Error: <thông điệp gốc>" của React; mọi dòng khác có tên (log/warn/error do khung ghi) là rò.
+    leak = [c for c in console_all if "SECRET-NAME" in c and not c.startswith("Error: qa-induced render error")]
+    ok("Bất biến 9: nội dung lỗi (giả lập có tên) không bị đẩy ra console bởi khung (trừ dòng lỗi gốc do React tự ghi)", not leak, leak[:2])
     ctx.close()
     # giao1 gặp lỗi: nút 'Về Tổng quan'
     ctx, page = new_page(browser, "giao1")
@@ -360,18 +374,18 @@ with sync_playwright() as p:
     ctx, page = new_page(browser, "loc")
     page.goto(BASE + "/orders/")
     settle(page)
-    tabs = page.locator("nav.orders-tabs a")
+    tabs = page.get_by_role("tab")
     names = [t.strip() for t in tabs.all_inner_texts()]
-    ok("Hồi quy ED-01 (dev-notes #7): trên 1440px /orders/ thấy 3 tab Đơn hàng / Hàng chờ thanh toán / Phiếu hoàn chờ chuyển",
-       any("Hàng chờ thanh toán" in n for n in names) and any("Phiếu hoàn" in n for n in names) and all(tabs.nth(i).is_visible() for i in range(tabs.count())), names)
-    page.locator("nav.orders-tabs a", has_text="Hàng chờ thanh toán").click()
+    ok("Hồi quy ED-01 (dev-notes #7): trên 1440px /orders/ thấy 3 tab Đơn hàng / Hàng chờ thanh toán / Phiếu hoàn tiền (tên chuẩn)",
+       names == ["Đơn hàng", "Hàng chờ thanh toán", "Phiếu hoàn tiền"] and all(tabs.nth(i).is_visible() for i in range(tabs.count())), names)
+    page.get_by_role("tab", name="Hàng chờ thanh toán").click()
     page.wait_for_url("**/orders/payments/")
     page.wait_for_function("() => document.querySelector('#main') && document.querySelector('#main').innerText.length > 20")
     ok("Hồi quy: bấm tab 'Hàng chờ thanh toán' mở màn thanh toán (không trắng, không lỗi)", "Có lỗi xảy ra" not in page.locator("#main").inner_text() and page.locator("#main").inner_text().strip() != "")
-    page.locator("nav.orders-tabs a", has_text="Phiếu hoàn").click()
+    page.get_by_role("tab", name="Phiếu hoàn tiền").click()
     page.wait_for_url("**/orders/refunds/")
     page.wait_for_function("() => document.querySelector('#main') && document.querySelector('#main').innerText.length > 20")
-    ok("Hồi quy: bấm tab 'Phiếu hoàn chờ chuyển' mở màn phiếu hoàn", "Có lỗi xảy ra" not in page.locator("#main").inner_text())
+    ok("Hồi quy: bấm tab 'Phiếu hoàn tiền' mở màn phiếu hoàn", "Có lỗi xảy ra" not in page.locator("#main").inner_text())
     page.screenshot(path=f"{SHOTS}/orders-tabs-desktop-1440.png")
     bad_fmt = []
     for r in ["/overview/", "/orders/", "/orders/payments/", "/orders/refunds/", "/deliveries/", "/purchasing/", "/inventory/", "/stocktake/", "/catalog/", "/reports/", "/staff/", "/audit-logs/", "/content/"]:
@@ -436,7 +450,12 @@ with sync_playwright() as p:
                 page.screenshot(path=f"{SHOTS}/drawer-360.png")
             page.keyboard.press("Escape")
         else:
-            ok("T4 360px [giao1]: chỉ có 1 mục thì không có menu đáy", page.locator(".bottom-nav").count() == 0 or not page.locator(".bottom-nav").is_visible())
+            # Menu đáy chỉ hiện khi vai có từ 2 mục (Shell: showBottom). giao1 nay có 2 mục (Việc giao của tôi, Hàng hoàn) nên có menu đáy
+            # đúng 2 nút, không có nút "Thêm" (chỉ tràn khi > 5 mục).
+            n_items = len(EXPECTED_MENU["giao1"])
+            bottom = page.locator(".bottom-nav")
+            ok(f"T4 360px [giao1]: {n_items} mục thì có menu đáy đúng {n_items} nút, không có nút 'Thêm'",
+               bottom.is_visible() == (n_items >= 2) and (n_items < 2 or bottom.locator("a").count() == n_items) and bottom.get_by_role("button", name="Thêm").count() == 0)
         ctx.close()
     # 768 và 1024 (thông tin thêm, ngoài phạm vi duyệt)
     for width in (768, 1024):

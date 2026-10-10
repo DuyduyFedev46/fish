@@ -43,6 +43,23 @@
 .ynRow dt{font-size:var(--text-base);color:var(--ink)}
 .ynRow dd{margin:0;display:inline-flex;align-items:center}
 
+/* Dữ liệu bạn xem được (PV-14): mỗi dòng nhãn đối tượng + giá trị, chữ phụ nói nhóm cho giá trị đó. Điện thoại xếp dọc, từ 520px chia hai cột. */
+.scopeAll{margin:0;display:flex;align-items:center;gap:var(--space-2);padding:var(--space-3) var(--space-4);font-size:var(--text-sm);color:var(--ink-2);border-bottom:1px solid var(--border)}
+.scopeAll :global(.mi){font-size:18px;color:var(--ink-3)}
+.scopes{margin:0}
+.scopeRow{display:flex;flex-direction:column;gap:var(--space-0-5);min-height:44px;padding:var(--space-2) var(--space-4)}
+.scopeRow + .scopeRow{border-top:1px solid var(--border)}
+.scopeRow dt{font-size:var(--text-sm);color:var(--ink-3)}
+.scopeRow dd{margin:0;display:flex;flex-direction:column;gap:var(--space-0-5);min-width:0;font-size:var(--text-base);color:var(--ink)}
+.scopeValue{overflow-wrap:anywhere;text-wrap:pretty}
+.scopeNote{font-size:var(--text-sm);color:var(--ink-3)}
+.scopeNone dd{color:var(--ink-3)}
+@media (min-width:520px){
+  .scopeRow{flex-direction:row;align-items:baseline;gap:var(--space-4)}
+  .scopeRow dt{flex:0 0 160px;font-size:var(--text-base);color:var(--ink)}
+  .scopeRow dd{flex:1 1 0}
+}
+
 /* Mục menu */
 .menu{list-style:none;margin:0;padding:var(--space-1) 0;display:grid;grid-template-columns:minmax(0,1fr)}
 .menu li{display:flex;align-items:center;gap:var(--space-3);min-height:40px;padding:0 var(--space-4);font-size:var(--text-base);color:var(--ink)}

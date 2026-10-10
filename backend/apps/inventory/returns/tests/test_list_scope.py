@@ -99,7 +99,7 @@ class ReturnListScopeTests(ReturnsApiBase):
         ReturnToStock.objects.filter(pk=self.mine.pk).update(decision="WRITE_OFF")
         ReturnToStock.objects.filter(pk=self.theirs.pk).update(decision="RESTOCK")
         rows = {r["id"]: r for r in client_for(self.owner).get(URL).json()["results"]}
-        self.assertEqual(rows[self.mine.pk]["decision_label"], "Huỷ bỏ, ghi lỗ")
+        self.assertEqual(rows[self.mine.pk]["decision_label"], "Huỷ hàng, ghi lỗ")
         self.assertEqual(rows[self.theirs.pk]["decision_label"], "Tái nhập")
 
     # --- lọc ---------------------------------------------------------------------------------------------------

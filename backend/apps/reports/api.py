@@ -1,4 +1,6 @@
-"""API báo cáo — lãi lỗ theo lô (nguồn sự thật) & theo kỳ. Chỉ view_profitreport (1.7)."""
+"""API báo cáo — lãi lỗ theo lô (nguồn sự thật) & theo kỳ. Chỉ view_profitreport (1.7).
+
+TL12-num (Lô 17a): tiền và kg trả dạng chuỗi Decimal (xem `decimal_strings.py`), số đếm giữ number."""
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -9,6 +11,7 @@ from apps.inventory.models import Batch
 
 from . import services
 from .batch_list import batches_for_report
+from .decimal_strings import stringify_decimals
 from .period_counts import period_counts
 
 PERM = "reports.view_profitreport"
@@ -25,7 +28,7 @@ class BatchPnlView(APIView):
             batch = Batch.objects.get(batch_id=batch_id)
         except Batch.DoesNotExist:
             return Response({"detail": "Không tìm thấy lô."}, status=404)
-        return Response(services.batch_pnl(batch=batch))
+        return Response(stringify_decimals(services.batch_pnl(batch=batch)))
 
 
 class BatchPnlListView(APIView):
@@ -53,7 +56,7 @@ class BatchPnlListView(APIView):
             }
             for batch in page
         ]
-        return paginator.get_paginated_response(rows)
+        return paginator.get_paginated_response(stringify_decimals(rows))
 
 
 class PeriodPnlView(APIView):
@@ -69,5 +72,5 @@ class PeriodPnlView(APIView):
         except (KeyError, ValueError):
             return Response({"detail": "Cần tham số year & month."}, status=400)
         # R15: kèm số hoá đơn / số phiếu hoàn của kỳ (cùng căn cứ với số tiền, xem period_counts.py).
-        return Response({**services.period_pnl(year=year, month=month), **period_counts(year=year, month=month)})
+        return Response(stringify_decimals({**services.period_pnl(year=year, month=month), **period_counts(year=year, month=month)}))
 

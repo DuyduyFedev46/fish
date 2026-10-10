@@ -11,7 +11,8 @@
 //   giao2 = delivery_staff             → còn 2 phiếu Đang giao → Chủ cho nghỉ bị BR-GH-08 (S42-AC4)
 //   ql9   = manager + quyền lẻ accounts.manage_staff (không thuộc owner) → thử BR-PQ-17 403 (S41-AC6, S42-AC7)
 //   sa1   = superuser + manager → thử BR-PQ-18 (bỏ nhóm Chủ của loc — Chủ cuối cùng, S41-AC7)
-//   admin = superuser, không Group → home "no-role" (S6-AC4, S47-AC5)
+//   admin = superuser, không Group → home "dashboard", is_superuser (Duy 08/10 câu 1: vào ERP như Chủ; lật S6-AC4, S47-AC5)
+//   nogroup1 = không Group, không superuser → home "no-role"; mọi API ERP 403 AUTH_NO_ROLE (D-3, Duy 08/10)
 //   nghi1 = is_active=False     → đăng nhập 400 (S7-AC4)
 //   kho5  = warehouse_staff, còn mật khẩu tạm (must_change_password) → chỉ mở được màn "Đặt mật khẩu mới" (S48-AC1)
 //
@@ -35,7 +36,7 @@ import { LOGIN_BAD, PW_PROBLEMS, beError } from "@/shared/lib/beErrors.mock";
 import { GROUP_CODES, GROUP_LABEL } from "@/shared/lib/groups";
 import { setMockGate, type MockRequest, type MockResponse } from "@/shared/lib/http";
 import { ROLE } from "@/shared/lib/roles";
-import type { Me } from "./types";
+import type { DataScopeRow, Me } from "./types";
 
 const PASSWORD = "demo1234";
 const REVOKED_KEY = "cave_erp_mock_revoked";
@@ -98,6 +99,7 @@ const GROUP_PERMS: Record<string, string[]> = {
     "accounts.view_demorecord", "catalog.add_itemimage", "catalog.change_itemimage", "catalog.delete_itemimage",
     "catalog.view_itemimage", "delivery.change_recipient", "delivery.confirm_with_customer", "delivery.decide_unconfirmed",
     "sales.view_customer_list", "sales.view_salescreditnote", "sales.view_salescreditnoteline",
+    "sales.view_order_customer_info",
   ],
   [ROLE.manager]: [
     "accounts.view_auditlog", "accounts.view_staffprofile", "auth.view_user", "catalog.change_item_image",
@@ -122,6 +124,7 @@ const GROUP_PERMS: Record<string, string[]> = {
     // CMS: BE migration content/0002 gán 8 quyền này cho owner và manager (warehouse_staff/delivery_staff không có).
     "content.add_category", "content.change_category", "content.view_category", "content.add_entry",
     "content.change_entry", "content.delete_entry", "content.view_entry", "content.publish_entry",
+    "sales.view_order_customer_info",
   ],
   [ROLE.warehouseStaff]: [
     "accounts.view_staffprofile", "auth.view_user", "catalog.view_bundleline", "catalog.view_item",
@@ -135,16 +138,17 @@ const GROUP_PERMS: Record<string, string[]> = {
     "purchasing.change_purchasereceiptline", "purchasing.view_purchasereceipt",
     "purchasing.view_purchasereceiptline", "purchasing.view_supplier", "reports.view_dashboard",
     "sales.view_customer", "sales.view_salesinvoice", "sales.view_salesinvoiceline", "sales.view_salesorder",
-    "sales.view_salesorderline",
+    "sales.view_salesorderline", "sales.view_order_customer_info",
   ],
   [ROLE.deliveryStaff]: [
     "accounts.view_staffprofile", "auth.view_user", "delivery.change_deliverynote", "delivery.view_deliverynote",
     "inventory.add_returntostock", "inventory.view_returntostock", "sales.view_customer", "sales.view_salesorder",
-    "sales.view_salesorderline",
+    "sales.view_salesorderline", "sales.view_order_customer_info",
   ],
   [ROLE.customerService]: [
     "accounts.view_staffprofile", "auth.view_user", "sales.view_salesorder", "sales.view_salesorderline",
     "delivery.view_deliverynote", "delivery.confirm_with_customer", "delivery.change_recipient", "delivery.view_callscript",
+    "sales.view_order_customer_info",
   ],
 };
 
@@ -207,6 +211,8 @@ function seed(): MockUser[] {
     u(10, "kho5", "Chị Sáu", "0909000888", [ROLE.warehouseStaff], { must_change_password: true }),
     u(11, "cs1", "Chị Cúc", "0909000999", [ROLE.customerService], { last_login: "2026-09-28T08:00:00+07:00" }),
     u(12, "cs2", "Chị Đào", "0909001000", [ROLE.customerService, ROLE.deliveryStaff], { last_login: "2026-10-01T08:00:00+07:00" }),
+    // D-3: không nhóm, không superuser, có quyền gán lẻ → vẫn bị chặn (quyền gán trực tiếp không tính).
+    u(13, "nogroup1", "Tài khoản chưa xếp nhóm", "", [], { extra_perms: ["sales.view_salesorder", "sales.view_refund"] }),
   ];
 }
 
@@ -245,17 +251,18 @@ const ALL_PERMS = Array.from(new Set(Object.values(GROUP_PERMS).flat())).sort();
 const CAPABILITIES: [string, string][] = [
   ["inventory.publish_batch", "Mở bán lô"],
   ["sales.cancel_paid_order", "Huỷ đơn đã thanh toán"],
-  ["sales.create_refund", "Tạo phiếu hoàn"],
+  ["sales.create_refund", "Lập phiếu hoàn tiền"],
   ["inventory.approve_returntostock", "Duyệt hàng hoàn"],
   ["inventory.approve_stockreconciliation", "Duyệt kiểm kê"],
   ["inventory.close_batch", "Chốt lô"],
   ["purchasing.add_purchasecost", "Nhập chi phí mua"],
   ["sales.confirm_refund", "Xác nhận đã hoàn tiền"],
-  ["sales.confirm_payment_manual", "Xác nhận thanh toán thủ công"],
+  ["sales.confirm_payment_manual", "Xác nhận đã nhận tiền"],
   ["accounts.manage_staff", "Quản lý nhân viên"],
   ["inventory.view_costprice", "Xem giá vốn"],
   ["reports.view_profitreport", "Xem báo cáo lãi lỗ"],
   ["reports.view_dashboard", "Xem Tổng quan"],
+  ["ai.manage_ai_policy", "Quản lý chính sách AI"],
 ];
 
 const GROUP_ORDER: readonly string[] = GROUP_CODES;
@@ -273,11 +280,58 @@ export function mockPermsOf(u: MockUser): string[] {
     .sort();
 }
 
+// ---- PV-14: `data_scopes` của /api/auth/me/. Bảng mặc định 5 nhóm chép từ 02b §6.1.3 (BE đã chạy thật trên DB tạm, 10/10);
+// KHÔNG import features/permissions. Người kiêm nhiệm: mỗi đối tượng lấy giá trị rộng nhất (hoà thì nhóm đứng trước theo thứ tự vai). ----
+type ScopeObjectDef = { key: string; label: string; gate: string[]; values: Array<[string, string]> /* thấp → cao */ };
+const NONE_LABEL = "Không xem";
+const SCOPE_OBJECTS: ScopeObjectDef[] = [
+  { key: "orders", label: "Đơn hàng", gate: ["sales.view_salesorder"], values: [["assigned_deliveries", "Đơn có phiếu giao gán cho tôi"], ["assigned_or_confirmation", "Đơn có phiếu gán cho tôi hoặc trong phạm vi gọi xác nhận"], ["all", "Tất cả đơn"]] },
+  { key: "invoices", label: "Hoá đơn bán", gate: ["sales.view_salesinvoice"], values: [["assigned_deliveries", "Hoá đơn của đơn có phiếu giao gán cho tôi"], ["assigned_or_confirmation", "Hoá đơn của đơn có phiếu gán cho tôi hoặc trong phạm vi gọi xác nhận"], ["all", "Hoá đơn của tất cả đơn"]] },
+  { key: "deliveries", label: "Phiếu giao", gate: ["delivery.view_deliverynote"], values: [["assigned", "Phiếu gán cho tôi"], ["all", "Tất cả phiếu"]] },
+  { key: "confirmation", label: "Gọi xác nhận", gate: ["delivery.confirm_with_customer"], values: [["pending_or_called_recently", "Phiếu đang chờ gọi hoặc tôi đã gọi trong N ngày"], ["all_pending", "Mọi phiếu chờ gọi"]] },
+  { key: "returns", label: "Hàng hoàn", gate: ["inventory.view_returntostock"], values: [["assigned_deliveries", "Phiếu của phiếu giao gán cho tôi"], ["all", "Tất cả phiếu"]] },
+  { key: "receipts", label: "Phiếu nhập", gate: ["purchasing.view_purchasereceipt", "purchasing.add_purchasereceipt"], values: [["created_by_me_today", "Do tôi tạo trong ngày"], ["created_by_me", "Do tôi tạo"], ["all", "Tất cả phiếu"]] },
+  { key: "customers", label: "Khách hàng", gate: ["sales.view_customer_list", "sales.view_customer"], values: [["assigned_deliveries", "Khách của phiếu giao gán cho tôi (trong cửa sổ)"], ["all", "Tất cả khách"]] },
+  { key: "audit_log", label: "Nhật ký hoạt động", gate: ["accounts.view_auditlog"], values: [["all", "Tất cả"]] },
+];
+
+/** Giá trị mặc định theo nhóm (02b §6.1.3). Thiếu đối tượng = "none". */
+const SCOPE_DEFAULTS: Record<string, Record<string, string>> = {
+  [ROLE.owner]: { orders: "all", invoices: "all", deliveries: "all", confirmation: "all_pending", returns: "all", receipts: "all", customers: "all", audit_log: "all" },
+  [ROLE.manager]: { orders: "all", invoices: "all", deliveries: "all", confirmation: "all_pending", returns: "all", receipts: "all", customers: "all", audit_log: "all" },
+  [ROLE.warehouseStaff]: { orders: "all", invoices: "all", deliveries: "all", returns: "all", receipts: "all" },
+  [ROLE.deliveryStaff]: { orders: "assigned_deliveries", deliveries: "assigned", returns: "assigned_deliveries", customers: "assigned_deliveries" },
+  [ROLE.customerService]: { orders: "assigned_or_confirmation", confirmation: "pending_or_called_recently" },
+};
+
+export function buildMockDataScopes(u: Pick<MockUser, "groups" | "is_superuser">, perms: string[]): DataScopeRow[] {
+  const none = (o: ScopeObjectDef): DataScopeRow => ({ key: o.key, label: o.label, value: "none", value_label: NONE_LABEL, via_group: null });
+  const groups = sortGroups(u.groups);
+  // D-3: không nhóm và không phải superuser → BE chặn mọi API ERP, nên cả 8 dòng là "Không xem".
+  if (!u.is_superuser && groups.length === 0) return SCOPE_OBJECTS.map(none);
+  return SCOPE_OBJECTS.map((o) => {
+    const top = o.values[o.values.length - 1];
+    if (u.is_superuser) return { key: o.key, label: o.label, value: top[0], value_label: top[1], via_group: null };
+    if (!o.gate.some((p) => perms.includes(p))) return none(o);
+    let best = -1;
+    let via: string | null = null;
+    for (const g of groups) {
+      const rank = o.values.findIndex(([v]) => v === SCOPE_DEFAULTS[g]?.[o.key]);
+      if (rank > best) {
+        best = rank;
+        via = g;
+      }
+    }
+    if (best < 0) return none(o);
+    return { key: o.key, label: o.label, value: o.values[best][0], value_label: o.values[best][1], via_group: via };
+  });
+}
+
 function buildMe(u: MockUser): Me {
   const perms = mockPermsOf(u);
   const groups = sortGroups(u.groups);
   const home: Me["home"] =
-    groups.length === 0 ? "no-role" : groups.length === 1 && groups[0] === ROLE.deliveryStaff ? "my-deliveries" : "dashboard";
+    u.is_superuser ? "dashboard" : groups.length === 0 ? "no-role" : groups.length === 1 && groups[0] === ROLE.deliveryStaff ? "my-deliveries" : "dashboard";
   return {
     id: u.id,
     username: u.username,
@@ -293,7 +347,22 @@ function buildMe(u: MockUser): Me {
     capabilities: CAPABILITIES.filter(([code]) => perms.includes(code)).map(([code, label]) => ({ code, label })),
     // S48:
     must_change_password: mustChange(u),
+    is_superuser: u.is_superuser,
+    // W39: mặc định true để bản mock chỉ phụ thuộc cờ build như trước. QA giả lập "BE tắt AI" bằng
+    // `sessionStorage.setItem("caveve_mock_be_ai", "off")` rồi tải lại (cờ cấu hình, không phải dữ liệu cá nhân).
+    ai_features_enabled: mockBackendAiEnabled(),
+    // PV-14:
+    data_scopes: buildMockDataScopes(u, perms),
   };
+}
+
+/** W39: giả lập `settings.AI_ENABLED` của BE. Chỉ mock; bản thật đọc từ `/api/auth/me/`. */
+function mockBackendAiEnabled(): boolean {
+  try {
+    return typeof window === "undefined" || window.sessionStorage.getItem("caveve_mock_be_ai") !== "off";
+  } catch {
+    return true;
+  }
 }
 
 /** S48: superuser không bị ép đổi mật khẩu (S48-AC6). */
@@ -372,7 +441,10 @@ if (process.env.NEXT_PUBLIC_USE_MOCK === "1") {
   setMockGate((req) => {
     if (MUST_CHANGE_ALLOWED.some((p) => req.path.startsWith(p))) return null;
     const u = userFromToken(req.token);
-    return u && mustChange(u) ? beError("AUTH_MUST_CHANGE_PASSWORD") : null;
+    if (!u) return null;
+    if (mustChange(u)) return beError("AUTH_MUST_CHANGE_PASSWORD");
+    // D-3: sau kiểm mật khẩu tạm; chỉ chặn đường ERP (mock chưa có đường công khai trong gate này).
+    return !u.is_superuser && u.groups.length === 0 ? beError("AUTH_NO_ROLE") : null;
   });
 }
 
