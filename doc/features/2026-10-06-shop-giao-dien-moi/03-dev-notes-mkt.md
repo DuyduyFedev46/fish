@@ -208,3 +208,105 @@ Ran 167 tests in 12.603s
 OK
 $ cd frontend && npx tsc --noEmit        -> exit 0 (không build, điều phối build)
 ```
+
+## Lô 2 — SHOP-2-00 (đổi URL Shop sang tiếng Anh, decisions 11/10)
+
+**Đã làm (vùng mkt-brand)**
+- `git mv`: `frontend/app/gioi-thieu` → `app/about`, `app/trang` → `app/pages` (`trang.module.css` → `pages.module.css`), `app/bai-viet` → `app/blog` (`bai-viet.module.css` → `blog.module.css`).
+- E2E: `ra_soat_cms06_item_card.py` → `content_item_card.py`, `ra_soat_cms13_public.py` → `content_public_pages.py`, `ra_soat_cms14_landing.py` → `about_page.py`; URL bên trong đổi sang `/blog/`, `/about/`.
+- Link trong code: `frontend/app/{about,blog,pages}`, `features/content/{mock.ts, components/LatestPosts.tsx, components/ArticleBody.tsx (comment)}`.
+- BE: `public_path` trong `entries/serializers.py` và `entries/services.py` → `/blog/?slug=` / `/pages/?slug=`; link nội bộ trong `shop_content/pages.json` (`/pages/?slug=…`, `/blog/?slug=…`); test `test_pages_policy`, `test_sanitize`; slug test `bai-viet-NN` → `post-NN`.
+- ERP: `features/content/mock.ts`, `content.test.ts`, `editor/safeHref.test.ts` → `/blog?slug=`, `/pages?slug=`.
+- **Ngoài 3 URL đã chốt:** tham số lọc `/blog?chuyen-muc=` → `/blog?category=` (trang đã đọc sẵn `category`; bỏ đọc `chuyen-muc`). Lý do: thư mục cũ được `check_naming.py` miễn, sang `app/blog/` thì `chuyen-muc` bị chặn (exit 1). Không nơi nào khác trong repo phát link `?chuyen-muc=`. 02b §(dòng 190) còn ghi `chuyen-muc` — techlead cập nhật.
+- Giữ nguyên (dữ liệu): slug CMS `gioi-thieu` (`PAGE_SLUG`, `pages.json`, `test_load_shop_content`), các slug `cach-mua-hang`, `doi-tra`…
+
+**Việc cho điều phối viên**
+- `scripts/check_naming.py` `EXEMPT_PATH_PREFIXES` còn 3 dòng trỏ thư mục cũ (`frontend/app/bai-viet/`, `trang/`, `gioi-thieu/`) — vô hại, nên xoá; chưa đụng vì là script dùng chung. Bảng "Giữ nguyên" trong các skill (`/bai-viet/` `/trang/` `?chuyen-muc=`) đã lỗi thời.
+- DB staging đã nạp `pages.json` cũ còn link `/trang/?slug=`: chạy lại lệnh nạp nội dung (hoặc sửa tay ở màn Nội dung) sau khi gộp.
+- Đã xoá `frontend/.next/types/app/{bai-viet,gioi-thieu,trang}` (file sinh cũ làm `tsc` báo thiếu module).
+
+**Kiểm chứng (11/10)**
+```
+grep -rn "gioi-thieu\|/trang/\|bai-viet" backend/apps/content erp-console/features/content frontend/app frontend/features/content frontend/features/site
+  -> chỉ còn slug dữ liệu `gioi-thieu` (pages.json, test_load_shop_content, AboutScreen PAGE_SLUG + comment); 0 URL cũ
+backend: manage.py test apps.content -> Ran 167 tests in 11.571s  OK
+erp-console: tsc --noEmit OK; vitest run features/content -> Test Files 5 passed (5), Tests 92 passed (92)
+frontend: npx tsc --noEmit OK (không build theo phân công)
+python3 scripts/check_naming.py -> OK - 6444 vi phạm cũ trong 179 file, không phát sinh mới.
+```
+
+## Lô 5a (5a-MKT): SHOP-5-01, SHOP-5-02
+
+> `mkt-brand` · 11/10/2026 · nhánh `shop/lo-2-catalog-cart` · Trạng thái: **CHỜ REVIEW** (techlead + QA). Không commit.
+
+### File đổi
+
+| File | Việc |
+|---|---|
+| `backend/apps/content/site/services.py` | 5-01: `seller` thêm `zalo`, `working_hours`, `registration_issued_by`, `registration_issued_on`, `website_notice_url`, `website_notice_image` (trống → `null`; link/ảnh chỉ nhận `http(s)`, chặn `javascript:`/`data:`); khối `policies` {`return_report_hours` (số nguyên dương, sai/rỗng → `null`), `min_qty_kg`, `qty_step_kg` (chuỗi gọn "1", "0.5"), `hold_minutes`}. `seller_complete` giữ nghĩa 7 trường cũ. Không `search_chips`. |
+| `backend/apps/content/body/scan.py` | 5-01 AC5: `get_phone_allowlist()` tự gồm `SHOP_HOTLINE`, `SELLER_PHONE` (≥ 8 chữ số; "1900 xxxx" giữ chỗ bị bỏ qua) |
+| `backend/apps/content/models/entries.py`, `migrations/0004_alter_entry_page_role.py` | 5-02: choices `shipping` "Chính sách giao hàng", `payment` "Chính sách thanh toán", `complaints` "Cơ chế giải quyết khiếu nại" (chỉ đổi choices, không đổi cột) |
+| `backend/apps/content/entries/services.py` | `GOLIVE_PAGE_ROLES` thêm 3 vai trò → khoá gỡ khi đang đăng, không bỏ/đổi vai trò khi đang đăng, có phiên bản, hiện ở golive-status |
+| `backend/apps/content/management/shop_content/pages.json` | gắn `page_role` cho `giao-hang` (shipping), `thanh-toan` (payment), `khieu-nai` (complaints) |
+| `backend/apps/content/management/commands/load_shop_content.py` | dùng `get_phone_allowlist()` (đã gồm hotline). Trang đã nạp trước **và đã bị sửa tay** mà chưa có vai trò → chỉ gắn vai trò, giữ nguyên nội dung, in `bỏ qua: đã sửa; gắn vai trò <role>, nội dung giữ nguyên` (không ghi AuditLog `content_load` để lần sau vẫn nhận "đã sửa"). Trang chưa sửa → đi đường cập nhật cũ (cờ khác → `save_draft`, nội dung trùng nên không đăng thêm phiên bản). Vai trò đã có trang khác giữ → bỏ qua, không chuyển. |
+| Test mới | `site/tests/test_site_info_shop.py` (10 test: AC1–AC5, null, http-only, số kg gọn, không dữ liệu khách), `tests/test_required_page_roles.py` (7 test: choices, unique, AC2 gỡ bị chặn 400 BR-ND-16, bỏ vai trò bị chặn, AC3 2 phiên bản, AC4 NV kho 403, golive-status), `test_load_shop_content.py` lớp `LoadShopContentPageRoleTests` (4 test: nạp mới, chạy lại gắn vai trò idempotent, trang đã sửa chỉ gắn vai trò, vai trò bị trang khác giữ) |
+| Test sửa theo contract mới | `site/tests/test_site_info.py` (tập khoá), `tests/test_pages_policy.py` (missing_roles 7 vai trò), `test_load_shop_content.py` AC1 (7 vai trò) |
+| `backend/apps/common/tests/test_standard_names.py` | **ngoài vùng mkt-brand, sửa 1 assert**: `test_bt2_page_role_values_are_frozen` khoá 4 giá trị cũ; nay thêm 3 giá trị mới ở cuối (4 giá trị cũ giữ nguyên). Nhờ techlead duyệt. |
+| `erp-console/features/content/pageRoles.ts` (mới) + `pageRoles.test.ts` | nhãn 7 vai trò, `REQUIRED_PAGE_ROLES`, `PAGE_ROLE_OPTIONS`, `pageRoleLabel()`; 4 nhãn cũ lấy từ `ENUMS.entryPageRole` |
+| `erp-console/features/content/{types.ts, mock.ts, components/EntrySettings.tsx, components/ContentListScreen.tsx, content.test.ts}` | `ContentPageRole` thêm 3 giá trị; ô chọn vai trò và dải "Thiếu trang bắt buộc" dùng `pageRoles.ts`; mock golive-status theo 7 vai trò |
+
+`frontend/features/site/{types,mock}.ts`: không phải sửa — khoá tuỳ chọn §3.6 đã thêm ở lô 1, khớp đúng JSON BE trả nay.
+Biến cấu hình: đủ trong `config/settings.py` (be-dev khai ở lô 1: `SELLER_ZALO`, `SELLER_WORKING_HOURS`, `SELLER_REG_ISSUED_BY/ON`, `SELLER_WEBSITE_NOTICE_URL/IMAGE`, `SHOP_RETURN_REPORT_HOURS`, `SHOP_MIN_QTY_KG`, `SHOP_QTY_STEP_KG`, `SALES_ORDER_TTL_MINUTES`). Không thiếu biến nào.
+
+### Đề xuất / việc cho người khác
+1. **fe-dev:** chuyển 3 nhãn mới vào `erp-console/shared/lib/enums.ts` (`entryPageRole`) + `enums.standardNames.test.ts`, rồi `pageRoles.ts` đọc hết từ ENUMS. Cập nhật `doc/thuat-ngu-va-trang-thai.md` (3 nhãn mới).
+2. **Staging:** sau khi gộp, chạy `migrate` rồi `load_shop_content --author <Chủ> --publish` để gắn vai trò cho 3 trang đã nạp ở lô 1.
+3. Link/ảnh thông báo website (`SELLER_WEBSITE_NOTICE_*`) để trống tới khi có S-14.
+4. Cụm khẳng định cấm trong `scan.py` (02b §3.7.5, cảnh báo ở màn ERP) **chưa làm** ở lô này (không thuộc AC 5-01/5-02; lệnh nạp đã chặn). Đề xuất gộp vào 5c.
+
+### Kiểm chứng (11/10, chạy trong lượt này)
+```
+$ cd backend && .venv/bin/python manage.py test apps.content.site apps.content.tests.test_required_page_roles apps.content.tests.test_load_shop_content
+(trước khi code: Ran 47 tests — FAILED (failures=8, errors=15) — RED đúng lý do: thiếu khoá policies/zalo, vai trò mới bị từ chối)
+Ran 47 tests in 11.916s
+OK
+
+$ cd backend && .venv/bin/python manage.py test apps.content apps.common
+FAIL: test_every_note_or_reason_field_is_scrubbed_or_allowlisted (apps.common.tests.test_auditlog_note_no_free_text…)
+  AssertionError: ['catalog.Item.short_note'] != []   <- field mới của be-dev lô 2b (catalog/0008), không thuộc lô 5a
+Ran 474 tests in 23.578s
+FAILED (failures=1)
+
+$ cd backend && .venv/bin/python manage.py test apps.delivery.tests.test_confirmation_env_commands apps.delivery.tests.test_confirmation_escalation apps.accounts.data_scopes apps.sales.orders.tests.test_privacy_consent
+Ran 315 tests in 32.237s
+OK (skipped=1)
+
+$ cd backend && .venv/bin/python manage.py makemigrations --check --dry-run
+No changes detected
+
+$ cd erp-console && ./node_modules/.bin/tsc --noEmit   -> exit 0
+$ npx vitest run features/content                       -> Test Files 6 passed (6) · Tests 96 passed (96)
+  (pageRoles.test.ts đỏ trước khi có pageRoles.ts)
+
+$ cd frontend && npx tsc --noEmit   -> exit 2; mọi lỗi do lô 2 của fe-dev đang làm (ProductCardItem thêm minQty/qtyStep,
+  CartContext.updateQty): AddToCartControl.tsx, CheckoutScreen.tsx, ui-preview/previewFixtures.ts, và app/about/AboutScreen.tsx(53)
+  (dựng ProductCardItem thiếu minQty, qtyStep — file của mkt-brand nhưng ngoài danh sách lô 5a; sửa khi fe-dev chốt kiểu, hoặc fe-dev sửa cùng lượt).
+  Không lỗi nào ở features/site.
+
+$ python3 scripts/check_naming.py -> exit 1, chỉ frontend/components/search/SearchSuggest.tsx:85 (file fe-dev lô 2); file lô 5a sạch.
+```
+Không build frontend (fe-dev đang build).
+
+## Sửa theo QA lô 2 (`04-qa-report-lo2.md`) + G7
+
+- **G7 (mã màu rời):** `features/content/components/LatestPosts.tsx:40` `#f8fafc` → `var(--surface-2)`; đổi nốt hex trong `LatestPosts.module.css`,
+  `ArticleBody.module.css`, `ItemCard.module.css` sang token `globals.css` (surface/surface-2/surface-3, border/border-strong, ink/ink-2/ink-3,
+  accent/accent-text/accent-hover/on-accent, warn/warn-soft). Quét `features/{content,site}`, `app/{about,pages,blog}`: 0 hex.
+- **L3 (title sai + 2 thẻ robots):**
+  - mới `features/content/pageMeta.ts`: `setPageMeta({title, noindex})` đặt tiêu đề tab và giữ **đúng một** `<meta name="robots" content="noindex">` (gỡ thẻ thừa;
+    trang có nội dung thì gỡ thẻ do module thêm); `withBrand()` ghép "| Cá Về" không lặp.
+  - `app/pages/page.tsx`, `app/blog/page.tsx`: 404 → "Không tìm thấy trang | Cá Về", 410 → "Trang này không còn trên web | Cá Về", lỗi khác →
+    "Chưa tải được trang | Cá Về", cả ba kèm noindex. `/blog/?slug=` hết lặp "| Cá Về" (nợ QA lô 1 ghi cho 5b).
+  - `app/not-found.tsx`: bỏ `robots` trong `metadata` vì Next.js tự chèn `noindex` cho trang 404 → còn một thẻ.
+
+Kiểm chứng (11/10): `cd frontend && npx tsc --noEmit` → exit 0 · `python3 scripts/check_naming.py` → OK. Không build (theo phân công).

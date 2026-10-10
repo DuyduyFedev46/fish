@@ -1,0 +1,131 @@
+.panel {
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  box-shadow: var(--shadow-pop);
+  color: var(--ink);
+  animation: panel-in var(--dur-swap) var(--ease-out);
+}
+
+.heading {
+  margin: 0;
+  padding: var(--space-3) var(--space-4) var(--space-1);
+  color: var(--ink-3);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.option {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 60px;
+  padding: var(--space-2) var(--space-4);
+  cursor: pointer;
+  transition: background-color var(--dur-color) ease-out;
+}
+
+.name {
+  flex: 1;
+  min-width: 0;
+  font-size: 14px;
+  font-weight: 400;
+}
+
+.match {
+  font-weight: 600;
+}
+
+.price {
+  flex: none;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.unit {
+  color: var(--ink-2);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.viewAll {
+  display: flex;
+  align-items: center;
+  min-height: 48px;
+  padding: 0 var(--space-4);
+  border-top: 1px solid var(--border);
+  color: var(--accent-text);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.active {
+  background: var(--accent-soft);
+}
+
+.recent {
+  padding-bottom: var(--space-3);
+  border-top: 1px solid var(--border);
+}
+
+.recentHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-right: var(--space-2);
+}
+
+.clear {
+  min-width: 44px;
+  min-height: 44px;
+  border: 0;
+  background: transparent;
+  color: var(--accent-text);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0 var(--space-4);
+  list-style: none;
+}
+
+@media (min-width: 768px) {
+  .option {
+    min-height: 56px;
+  }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .option:hover,
+  .viewAll:hover {
+    background: var(--surface-2);
+  }
+}
+
+@keyframes panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .panel {
+    animation: none;
+  }
+}

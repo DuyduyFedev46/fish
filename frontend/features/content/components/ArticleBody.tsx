@@ -27,7 +27,7 @@ const NOMINAL_WIDTHS: Array<[keyof PublicImageUrls, number]> = [
   ["md", 960],
   ["lg", 1600],
 ];
-// Cột nội dung bài rộng tối đa 840px (bai-viet.module.css) -> ảnh không cần rộng hơn.
+// Cột nội dung bài rộng tối đa 840px (app/blog/blog.module.css) -> ảnh không cần rộng hơn.
 const IMAGE_SIZES = "(max-width: 840px) 100vw, 840px";
 
 /** `srcset` 480w/960w/1600w (F8). Ảnh gốc hẹp hơn thì hạ bề rộng khai báo và bỏ cỡ trùng. */

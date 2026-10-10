@@ -573,7 +573,8 @@ GET   /api/catalog/vouchers/<id>/redemptions/?page=1 → 200 {"count",…,"resul
 - `ItemSerializer.fields` thêm `short_note`, `spec`, `storage`, `origin` (đã có `description`). Quyền giữ nguyên: sửa = `catalog.change_item` (Tầng 1, hiện **chỉ** `owner`; V-05: không mở thêm). PATCH:
   `{"short_note": "Cắt khúc dày 2–3 cm", "spec": "…", "storage": "…", "origin": "…", "description": "…"}` → 200 object mặt hàng | 400 `{"short_note": ["Tối đa 60 ký tự."]}` (lỗi theo trường như ERP hiện có).
 - Kiểm (`public_text_error`) cho 5 trường: SĐT (`has_long_digit_run` ≥ 9) → "Không ghi số điện thoại trong thông tin món."; giá (`\d[\d.,\s]*\s*(đ|₫|vnđ|vnd|nghìn|ngàn|triệu)\b` hoặc `\d+\s*k\b`, không phân biệt hoa thường) → "Không ghi giá trong thông tin món. Giá lấy từ bảng giá.";
-  mã lô (`[A-Z0-9][A-Z0-9-]*-\d{6}-[0-9A-F]{5}`) → "Không ghi mã lô trong thông tin món.". Độ dài: `short_note` ≤ 60, `spec`/`storage`/`origin` ≤ 500, `description` ≤ 2000.
+  mã lô (`[A-Z0-9][A-Z0-9-]*-\d{6}-[0-9A-F]{5}`, không phân biệt hoa thường) → "Không ghi mã lô trong thông tin món."; cụm nguồn nhập ("nhà cung cấp", "tên tàu", "ngày nhập", "nhập lô") → "Không ghi nhà cung cấp, tên tàu hay ngày nhập lô trong thông tin món." (review lô 2 chấp nhận). Độ dài: `short_note` ≤ 60, `spec`/`storage`/`origin` ≤ 500, `description` ≤ 2000.
+- **Lọc lúc đọc (review lô 2, H1):** `shop_api` chạy lại `public_text_error` cho `short_note` và 4 trường chi tiết; trường vi phạm trả `""` (khoá vẫn có mặt). Lý do: `description` cũ nhập trước BR-DM-25 và đường Django admin không qua serializer.
 - `ItemViewSet.perform_update`: `record_audit("update_item", changes={"fields": [tên trường đã đổi]})` (chỉ tên trường, không chép chữ).
 - `ItemGroupSerializer.fields` thêm `slug` (tạo mới: bỏ trống thì tự sinh `unique_slug(slugify_vi(name))`). Kiểm `^[a-z0-9]+(?:-[a-z0-9]+)*$`, ≤ 80, không trùng → 400 `{"slug": ["Đường dẫn đã dùng cho nhóm khác."|"Chỉ dùng chữ thường không dấu, số và dấu gạch ngang."|"Không được để trống."]}`.
   `perform_update` ghi `record_audit("update_itemgroup", changes={"slug": {"from","to"}})` khi slug đổi. Quyền: `catalog.change_itemgroup` (hiện chỉ `owner`).
@@ -728,7 +729,7 @@ OrderTimeline 5 bước: Đặt hàng (`placed_at`) → Thanh toán (`paid_at`) 
 - Mua lại / Đặt lại: dựng giỏ từ `lines` (mã + số lượng + tên + giá hiện tại từ catalog), **không** mã giảm giá, sang `/shop/cart/`.
 - C6 với `BETTER_PROMO` lúc đặt: Dialog dùng câu "Ưu đãi khác đang lợi hơn mã {MÃ}." + nút "Đặt hàng không dùng mã" (gửi lại không `voucher_code`, `client_request_id` mới).
 - `SHOP_CLOSED` (503) và trang privacy chưa đăng → X2.
-- Nút "Liên hệ chúng tôi" ở thẻ hết hàng: `tel:` hotline từ site-info (`confirmation_policy.hotline` hoặc `seller.phone`, ưu tiên `seller.phone`); không có số → ẩn nút.
+- Nút "Liên hệ chúng tôi" ở thẻ hết hàng: `tel:` hotline từ site-info (`confirmation_policy.hotline` hoặc `seller.phone`, ưu tiên `seller.phone`); không có số → nút dẫn tới `/pages/?slug=lien-he` (`contactTarget`, review lô 2 chấp nhận thay "ẩn nút").
 
 ---
 
@@ -905,3 +906,6 @@ sequenceDiagram
 - (QA lô 1) Trang 404 theo màn X1-NotFound404: `ShopFrame header="sticky" bottomNav` — thay dòng 404 ở bảng §1.4 (`sub`, không BottomNav). Màn thắng.
 - (QA lô 1) `app/bai-viet/page.tsx:59` ghép "| Cá Về" gây lặp tiêu đề — mkt-brand sửa ở lô 5b.
 - (QA lô 1) Thẻ hết hàng khi chưa có hotline hợp lệ: nút "Liên hệ chúng tôi" dẫn tới trang Liên hệ (CMS) thay vì ẩn — fe-dev ở lô 2 (ProductCard/AddToCart).
+- (review lô 2) Cảnh báo cụm khẳng định cấm trong `apps/content/body/scan.py` (§3.7.5) dời sang lô 5c — mkt-brand.
+- (QA lô 2) e2e cũ `qa-lo6-sr21-shop.py`, `qa-lo7-shop-real.py`, `qa-lo8-shop-format.py`, `content_item_card.py` còn bám UI cũ (footer cũ, nút thẻ bài, "0 request catalog") — viết lại ở lô 7 (qa-tester).
+- (QA lô 2) Ô tìm có gợi ý nạp catalog ở mọi trang — techlead xem lại (nạp khi focus ô tìm, hoặc cache) ở lô 3+4.

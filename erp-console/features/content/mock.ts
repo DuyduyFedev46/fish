@@ -1,4 +1,5 @@
 import type { ShopCatalogResponse } from "./shopCatalog";
+import { REQUIRED_PAGE_ROLES } from "./pageRoles";
 import {
   CategoryCreatePayload,
   CategoryUpdatePayload,
@@ -133,7 +134,7 @@ let MOCK_ENTRY_DETAILS = new Map<number, ContentEntryDetail>([
       required_for_golive: true,
       show_in_footer: true,
       footer_order: 1,
-      public_url: "/trang?slug=chinh-sach-quyen-rieng-tu",
+      public_url: "/pages?slug=chinh-sach-quyen-rieng-tu",
       source: "human",
       row_version: 3,
       updated_at: POLICY_V2_AT,
@@ -277,7 +278,7 @@ function addSeed(x: SeedInput): void {
     required_for_golive: !!x.pageRole,
     show_in_footer: x.kind === "page",
     footer_order: x.kind === "page" ? x.id : 0,
-    public_url: published ? (x.kind === "post" ? `/bai-viet?slug=${x.slug}` : `/trang?slug=${x.slug}`) : null,
+    public_url: published ? (x.kind === "post" ? `/blog?slug=${x.slug}` : `/pages?slug=${x.slug}`) : null,
     source: x.source ?? "human",
     row_version: published ? 2 : 1,
     updated_at: at,
@@ -735,7 +736,7 @@ export function mockPublishEntry(
     listItem.updated_at = now;
   }
 
-  const publicUrl = entry.kind === "post" ? `/bai-viet?slug=${entry.slug}` : `/trang?slug=${entry.slug}`;
+  const publicUrl = entry.kind === "post" ? `/blog?slug=${entry.slug}` : `/pages?slug=${entry.slug}`;
   entry.public_url = publicUrl;
 
   (entry as any)._published_snapshot = {
@@ -885,8 +886,7 @@ export function mockGetGoliveStatus(): GoliveStatusResponse {
   const publishedRoles = new Set(
     MOCK_ENTRIES.filter((e) => e.status === "published" && e.page_role).map((e) => e.page_role as string)
   );
-  const requiredRoles = ["privacy", "terms", "refund", "seller_info"];
-  const missing = requiredRoles.filter((r) => !publishedRoles.has(r));
+  const missing = REQUIRED_PAGE_ROLES.filter((r) => !publishedRoles.has(r));
   return { missing_roles: missing };
 }
 

@@ -272,7 +272,7 @@ describe("CMS-01 & CMS-02 Console Tests", () => {
 
       expect(pubRes.status).toBe("published");
       expect(pubRes.version).toBe(1);
-      expect(pubRes.public_url).toContain("/bai-viet?slug=");
+      expect(pubRes.public_url).toContain("/blog?slug=");
 
       const finalEntry = mockGetEntry(entry.id);
       expect(finalEntry.status).toBe("published");
@@ -445,7 +445,7 @@ describe("CMS-01 & CMS-02 Console Tests", () => {
     it("CMS-15-AC7: mockGetGoliveStatus trả đúng danh sách vai trò bắt buộc go-live chưa có bài đăng", () => {
       const status = mockGetGoliveStatus();
       expect(Array.isArray(status.missing_roles)).toBe(true);
-      const required = ["privacy", "terms", "refund", "seller_info"];
+      const required = ["privacy", "terms", "refund", "seller_info", "shipping", "payment", "complaints"];
       for (const r of status.missing_roles) {
         expect(required).toContain(r);
       }

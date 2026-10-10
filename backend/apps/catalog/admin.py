@@ -1,7 +1,9 @@
+from django import forms
 from django.contrib import admin
 from django.utils.html import format_html
 
 from .images.serializers import image_urls
+from .items.public_text import PUBLIC_TEXT_LIMITS, public_text_error
 from .models import BundleLine, Item, ItemGroup, ItemPrice, PriceList, PricingRule
 
 
@@ -18,8 +20,42 @@ class ItemGroupAdmin(admin.ModelAdmin):
     search_fields = ("name",)
 
 
+class ItemAdminForm(forms.ModelForm):
+    """Review lô 2 L1: 5 ô chữ công khai qua cùng kiểm BR-DM-25 như API."""
+
+    class Meta:
+        model = Item
+        fields = "__all__"  # naming: allow - ModelForm admin nội bộ, không phải serializer API
+
+    def _clean_public(self, name):
+        value = self.cleaned_data.get(name, "")
+        limit = PUBLIC_TEXT_LIMITS[name]
+        if len(value) > limit:
+            raise forms.ValidationError(f"Tối đa {limit} ký tự.")
+        error = public_text_error(value)
+        if error:
+            raise forms.ValidationError(error)
+        return value
+
+    def clean_short_note(self):
+        return self._clean_public("short_note")
+
+    def clean_spec(self):
+        return self._clean_public("spec")
+
+    def clean_storage(self):
+        return self._clean_public("storage")
+
+    def clean_origin(self):
+        return self._clean_public("origin")
+
+    def clean_description(self):
+        return self._clean_public("description")
+
+
 @admin.register(Item)
 class ItemAdmin(admin.ModelAdmin):
+    form = ItemAdminForm
     list_display = ("code", "name", "item_group", "item_type", "stock_uom", "is_active")
     list_filter = ("item_type", "item_group", "is_active")
     search_fields = ("code", "name")

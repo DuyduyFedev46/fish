@@ -1,6 +1,6 @@
 "use client";
 
-// SHOP-1-08: trang giới thiệu `/gioi-thieu/` đọc trang CMS `gioi-thieu` (02b §3.7.3, 06-marketing C2.3 cách (a)).
+// SHOP-1-08: trang giới thiệu `/about/` đọc trang CMS `gioi-thieu` (02b §3.7.3, 06-marketing C2.3 cách (a)).
 // Chữ nội dung lấy từ CMS (không viết cứng); chỉ chữ giao diện (nhãn, H1 khẩu hiệu K1, nút) nằm ở đây.
 // Bố cục theo màn Landing / LandingMobile: hero → các mục theo H2 → mục cuối có nút mở bảng hàng.
 // Khối `item_card` vẽ bằng ProductCard `row`, giá thật từ catalog (G1: không số kg tồn).
@@ -11,9 +11,9 @@ import Button from "@/components/ui/Button";
 import EmptyState from "@/components/ui/EmptyState";
 import ErrorState from "@/components/ui/ErrorState";
 import TextLink from "@/components/ui/TextLink";
-import ProductCard, { type ProductCardItem } from "@/components/catalog/ProductCard";
+import ProductCard from "@/components/catalog/ProductCard";
 import Skeleton from "@/components/ui/Skeleton";
-import { groupIconOf } from "@/features/catalog/groupIcon";
+import { toCardItem } from "@/features/catalog/cardItem";
 import { fetchPublicEntry } from "@/features/content/api";
 import { isSafeHref } from "@/features/content/safeHref";
 import type { InlineNode, PublicBlock, PublicEntryDetail } from "@/features/content/types";
@@ -21,7 +21,7 @@ import { getCatalog } from "@/lib/api";
 import { ApiError, type CatalogItem } from "@/lib/types";
 import s from "./AboutScreen.module.css";
 
-const PAGE_SLUG = "gioi-thieu"; // naming: allow - slug trang CMS và URL công khai /gioi-thieu/ (decisions 2026-10-10)
+const PAGE_SLUG = "gioi-thieu"; // naming: allow - slug trang CMS là dữ liệu, giữ nguyên (decisions 2026-10-11, SHOP-2-00)
 const SHOP_HREF = "/shop/";
 
 type LoadState =
@@ -47,20 +47,6 @@ function splitSections(blocks: PublicBlock[]): { intro: PublicBlock[]; sections:
     }
   }
   return { intro, sections };
-}
-
-function toCardItem(item: CatalogItem): ProductCardItem {
-  return {
-    itemCode: item.item_code,
-    name: item.name,
-    unit: item.unit,
-    price: item.price,
-    stockLevel: item.stock_level,
-    shortNote: item.short_note || undefined,
-    image: item.image,
-    group: groupIconOf(item.group.slug, item.item_type),
-    isCombo: item.item_type === "BUNDLE",
-  };
 }
 
 function Inline({ nodes }: { nodes: InlineNode[] }) {
@@ -249,7 +235,7 @@ export default function AboutScreen() {
           icon="fish"
           title="Bài này không còn trên web"
           description="Cá Về đã gỡ bài này. Bạn xem các bài khác ở Góc bếp."
-          primaryAction={{ label: "Xem Góc bếp", href: "/bai-viet/" }}
+          primaryAction={{ label: "Xem Góc bếp", href: "/blog/" }}
         />
       </div>
     );

@@ -9,7 +9,8 @@ import { fetchPublicEntry } from "@/features/content/api";
 import ShopFrame from "@/components/ShopFrame";
 import ArticleBody from "@/features/content/components/ArticleBody";
 import type { PublicEntryDetail } from "@/features/content/types";
-import s from "./trang.module.css";
+import { GONE_TITLE, LOAD_ERROR_TITLE, NOT_FOUND_TITLE, setPageMeta, withBrand } from "@/features/content/pageMeta";
+import s from "./pages.module.css";
 
 
 function TrangContent() {
@@ -26,6 +27,7 @@ function TrangContent() {
       setLoading(false);
       setErrorStatus(404);
       setErrorMessage("Không tìm thấy trang.");
+      setPageMeta({ title: NOT_FOUND_TITLE, noindex: true });
       return;
     }
 
@@ -36,11 +38,8 @@ function TrangContent() {
     fetchPublicEntry(slug)
       .then((data) => {
         setEntry(data);
-        const pageTitle = (data.seo_title || data.title || "").trim();
-        if (pageTitle) {
-          // seo_title trong CMS đã có "— Cá Về" thì không thêm hậu tố lần nữa (QA lô 1 L2: tiêu đề lặp "| Cá Về").
-          document.title = pageTitle.includes("Cá Về") ? pageTitle : `${pageTitle} | Cá Về`;
-        }
+        // seo_title trong CMS đã có "— Cá Về" thì không thêm hậu tố lần nữa (QA lô 1 L2).
+        setPageMeta({ title: withBrand(data.seo_title || data.title || ""), noindex: false });
         if (data.description) {
           const metaDesc = document.querySelector('meta[name="description"]');
           if (metaDesc) {
@@ -56,6 +55,11 @@ function TrangContent() {
           setErrorStatus(500);
           setErrorMessage("Chưa tải được trang.");
         }
+        // QA lô 2 L3: trang không có / đã gỡ -> tiêu đề đúng + một thẻ robots noindex.
+        const status = err instanceof ApiError ? err.status : 500;
+        if (status === 404) setPageMeta({ title: NOT_FOUND_TITLE, noindex: true });
+        else if (status === 410) setPageMeta({ title: GONE_TITLE, noindex: true });
+        else setPageMeta({ title: LOAD_ERROR_TITLE, noindex: true });
       })
       .finally(() => {
         setLoading(false);

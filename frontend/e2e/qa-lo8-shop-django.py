@@ -58,7 +58,7 @@ def vnd(n):
     return f"{n:,}".replace(",", ".") + " ₫"
 
 
-catalog = {c["item_code"]: c for c in get_json("/api/shop/catalog/")}
+catalog = {c["item_code"]: c for c in get_json("/api/shop/catalog/")["items"]}
 ok("API thật trả price dạng CHUỖI Decimal (RA-01 có thật)", isinstance(catalog["BACH-TUOC"]["price"], str) and catalog["BACH-TUOC"]["price"].endswith(".00"), catalog["BACH-TUOC"])
 
 with sync_playwright() as p:
@@ -80,10 +80,10 @@ with sync_playwright() as p:
         cnt, bad = money_bad(body)
         exp = {c["item_code"]: vnd(int(float(c["price"]))) for c in catalog.values()}
         ok(f"[{tag}] /shop/ mọi giá là x.xxx ₫ và khớp API ({len(exp)} món)", cnt >= len(exp) and not bad and all(v in body for v in exp.values()), (bad, [v for v in exp.values() if v not in body]))
-        cur = {c["item_code"]: c for c in get_json("/api/shop/catalog/")}
-        q = float(cur["BACH-TUOC"]["sellable_qty"])
-        qtxt = f"Còn {int(q) if q == int(q) else str(q).replace('.', ',')} kg"
-        ok(f"[{tag}] /shop/ tồn '{cur['BACH-TUOC']['sellable_qty']}' -> '{qtxt}' (không '.000 kg')", qtxt in body and ".000 kg" not in body, body[:400])
+        cur = {c["item_code"]: c for c in get_json("/api/shop/catalog/")["items"]}
+        level = cur["BACH-TUOC"]["stock_level"]
+        label = {"low": "Sắp hết", "out": "Hết hàng"}.get(level)
+        ok(f"[{tag}] /shop/ tồn mức '{level}' -> nhãn '{label}', không hiện số kg tồn", (label is None or label in body) and ".000 kg" not in body, body[:400])
         page.screenshot(path=f"{SHOT}/dj-{tag}-shop.png", full_page=True)
 
         # --- giỏ + checkout: tổng khớp BE

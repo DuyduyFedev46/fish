@@ -1,3 +1,19 @@
+/* ---- grid: thẻ trong lưới danh mục ---- */
+.grid {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+  padding: var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  transition:
+    border-color var(--dur-color) ease-out,
+    box-shadow var(--dur-color) ease-out;
+}
+
 /* ---- rail: thẻ trang chủ ---- */
 .rail {
   position: relative;
@@ -119,6 +135,10 @@
 }
 
 @media (min-width: 768px) {
+  .grid {
+    padding: var(--space-3);
+    border-radius: var(--radius-card);
+  }
   /* Máy tính: hàng cuộn thành lưới, thẻ giãn theo ô và có viền */
   .rail {
     width: auto;
@@ -139,6 +159,7 @@
 }
 
 @media (hover: hover) and (pointer: fine) and (min-width: 768px) {
+  .grid:hover,
   .rail:hover {
     border-color: var(--border-strong);
     box-shadow: var(--shadow-card-hover);

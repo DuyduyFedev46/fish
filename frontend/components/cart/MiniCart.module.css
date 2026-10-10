@@ -1,0 +1,110 @@
+/* Chỉ có từ máy tính; nổi dưới Toast, cùng cột (Toast top 88, cao ~56) */
+.mini {
+  display: none;
+}
+
+@media (min-width: 768px) {
+  .mini {
+    position: fixed;
+    top: 156px;
+    right: var(--space-6);
+    z-index: var(--z-toast);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    width: 360px;
+    max-width: calc(100% - 48px);
+    padding: var(--space-4);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-card);
+    background: var(--surface);
+    box-shadow: var(--shadow-pop);
+    animation: mini-in var(--dur-swap) var(--ease-out);
+  }
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.count {
+  color: var(--ink-3);
+  font-weight: 500;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.line {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 10px 0;
+  border-top: 1px solid var(--border);
+}
+
+.text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.name {
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 500;
+  text-decoration: none;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.qty {
+  color: var(--ink-3);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.amount {
+  flex: none;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.subtotal {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding-top: var(--space-1);
+  border-top: 1px solid var(--border);
+  color: var(--ink-2);
+}
+
+@keyframes mini-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mini {
+    animation: none;
+  }
+}

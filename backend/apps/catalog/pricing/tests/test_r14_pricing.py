@@ -286,7 +286,7 @@ class ItemGroupTests(CatalogApiBase):
 
     def test_r14_parent_name_and_item_count(self):
         rows = self.rows()
-        self.assertEqual(set(rows["Cá"]), {"id", "name", "parent", "parent_name", "item_count"})
+        self.assertEqual(set(rows["Cá"]), {"id", "name", "slug", "parent", "parent_name", "item_count"})
         self.assertEqual(rows["Cá"]["item_count"], 2)  # Cá thu + Combo thử
         self.assertEqual(rows["Tôm"]["item_count"], 1)  # kể cả mặt hàng đang ẩn
         self.assertEqual(rows["Cá biển"]["item_count"], 0)

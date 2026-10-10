@@ -1,14 +1,14 @@
 /**
  * Đích điều hướng dùng chung của khung Shop (header, thanh đáy, footer).
- * Lô 1: giỏ chưa có trang riêng nên nút giỏ đi tới /shop/checkout/ (SHOP-1-03 AC8); lô 2 đổi thành /shop/cart/.
+ * Nút giỏ (header, thanh đáy, CartBar, MiniCart) đi tới trang giỏ hàng riêng (SHOP-2-06 AC9).
  */
-export const CART_HREF = "/shop/checkout/";
+export const CART_HREF = "/shop/cart/";
 export const CATALOG_HREF = "/shop/";
 export const ORDERS_HREF = "/shop/orders/";
-export const KITCHEN_HREF = "/bai-viet/";
-export const ABOUT_HREF = "/gioi-thieu/"; // naming: allow - URL công khai của Shop
-export const HOW_TO_BUY_HREF = "/trang/?slug=cach-mua-hang";
-export const CONTACT_HREF = "/trang/?slug=lien-he";
+export const KITCHEN_HREF = "/blog/";
+export const ABOUT_HREF = "/about/";
+export const HOW_TO_BUY_HREF = "/pages/?slug=cach-mua-hang";
+export const CONTACT_HREF = "/pages/?slug=lien-he";
 
 /** Đường dẫn trang nhóm hàng: combo lọc theo loại, còn lại theo slug nhóm. */
 export function groupHref(slug: string): string {
@@ -18,4 +18,9 @@ export function groupHref(slug: string): string {
 /** Chuẩn hoá số điện thoại cho href="tel:" (chỉ giữ chữ số và dấu +). */
 export function telHref(phone: string): string {
   return `tel:${phone.replace(/[^\d+]/g, "")}`;
+}
+
+/** Đích nút "Liên hệ chúng tôi": gọi hotline nếu có số hợp lệ, không thì trang Liên hệ (không bao giờ ẩn nút). */
+export function contactTarget(hotline?: string | null): string {
+  return hotline ? telHref(hotline) : CONTACT_HREF;
 }

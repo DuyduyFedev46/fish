@@ -124,3 +124,32 @@
     transform: none;
   }
 }
+
+/* ---- gợi ý khi gõ ---- */
+.root {
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+}
+
+.panelWrap {
+  position: absolute;
+  top: calc(100% + var(--space-2));
+  right: 0;
+  left: 0;
+  z-index: var(--z-popover);
+}
+
+/* Điện thoại: nền mờ phía sau panel */
+.scrim {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background: var(--overlay-light);
+}
+
+@media (min-width: 768px) {
+  .scrim {
+    display: none;
+  }
+}

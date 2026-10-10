@@ -180,7 +180,7 @@ class ItemCardAndPublicListTests(APITestCase):
             entry = Entry.objects.create(
                 kind="post",
                 title=f"Bài viết đã đăng {i:02d}",
-                slug=f"bai-viet-{i:02d}",
+                slug=f"post-{i:02d}",
                 category=self.cat_cong_thuc,
                 status="published",
                 first_published_at=now - timedelta(hours=30 - i),
@@ -243,8 +243,8 @@ class ItemCardAndPublicListTests(APITestCase):
         self.assertIsNone(res1.data["previous"])
 
         # Bài mới nhất (25) đứng trước bài 24
-        self.assertEqual(res1.data["results"][0]["slug"], "bai-viet-25")
-        self.assertEqual(res1.data["results"][1]["slug"], "bai-viet-24")
+        self.assertEqual(res1.data["results"][0]["slug"], "post-25")
+        self.assertEqual(res1.data["results"][1]["slug"], "post-24")
 
         # Đảm bảo không có bài nháp và trang tĩnh trong kết quả
         all_slugs_p1 = [r["slug"] for r in res1.data["results"]]

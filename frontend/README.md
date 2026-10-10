@@ -61,8 +61,7 @@ frontend/
 Component trong `components/ui|catalog|cart|search` chỉ **trình bày**: props vào, callback ra, không gọi API, không
 đọc storage. Chỉ `*Screen.tsx`, `ShopHeader` và `ShopFooter` được gọi API. Token màu và chữ lấy từ `DESIGN.md` ở gốc repo.
 
-Còn tồn tại nhưng sẽ xoá theo 02b §1.11: `CatalogGrid`, `AddToCartControl`, `ContactButton` (lô 2);
-`CountdownTimer`, `app/shop/orders/OrderLookup.tsx`, `features/checkout/storage.ts`, `PaymentPanel`,
+Còn tồn tại nhưng sẽ xoá theo 02b §1.11: `CountdownTimer`, `app/shop/orders/OrderLookup.tsx`, `features/checkout/storage.ts`, `PaymentPanel`,
 `OrderPaymentPanel` (lô 3+4); `legacy.css`, `features/home/content.ts` (lô 5).
 
 ## API chính

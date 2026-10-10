@@ -20,6 +20,10 @@ class Entry(models.Model):
         ("terms", "Điều kiện giao dịch chung"),
         ("refund", "Chính sách đổi trả và hoàn tiền"),
         ("seller_info", "Thông tin người bán"),
+        # SHOP-5-02, BR-ND-20: ba trang bắt buộc trước khi bán thật (migration 0004).
+        ("shipping", "Chính sách giao hàng"),
+        ("payment", "Chính sách thanh toán"),
+        ("complaints", "Cơ chế giải quyết khiếu nại"),
     ]
     SOURCE_CHOICES = [("human", "Người dùng"), ("ai", "AI")]
 

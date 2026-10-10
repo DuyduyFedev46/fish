@@ -12,7 +12,7 @@
 }
 
 .seeAllLink {
-  color: #0284c7;
+  color: var(--accent-text);
   font-size: 14px;
   font-weight: 600;
   text-decoration: none;
@@ -32,8 +32,8 @@
 .card {
   display: flex;
   flex-direction: column;
-  background-color: #ffffff;
-  border: 1px solid #e2e8f0;
+  background-color: var(--surface);
+  border: 1px solid var(--border);
   border-radius: 12px;
   overflow: hidden;
   text-decoration: none;
@@ -48,7 +48,7 @@
 .cardImgWrapper {
   width: 100%;
   height: 180px;
-  background-color: #f1f5f9;
+  background-color: var(--surface-3);
   overflow: hidden;
 }
 
@@ -68,7 +68,7 @@
 .cardCategory {
   font-size: 12px;
   font-weight: 600;
-  color: #0284c7;
+  color: var(--accent-text);
   margin-bottom: 6px;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -78,7 +78,7 @@
   margin: 0 0 8px 0;
   font-size: 16px;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--ink);
   line-height: 1.4;
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -89,7 +89,7 @@
 .cardExcerpt {
   margin: 0 0 12px 0;
   font-size: 13px;
-  color: #64748b;
+  color: var(--ink-3);
   line-height: 1.5;
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -100,7 +100,7 @@
 
 .cardDate {
   font-size: 12px;
-  color: #94a3b8;
+  color: var(--ink-3);
 }
 
 @media (max-width: 768px) {

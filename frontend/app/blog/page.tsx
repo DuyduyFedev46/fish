@@ -17,7 +17,8 @@ import type {
   PublicEntryDetail,
   PublicEntryListItem,
 } from "@/features/content/types";
-import s from "./bai-viet.module.css";
+import { GONE_TITLE, LOAD_ERROR_TITLE, NOT_FOUND_TITLE, setPageMeta, withBrand } from "@/features/content/pageMeta";
+import s from "./blog.module.css";
 
 const PAGE_SIZE = 12;
 
@@ -25,7 +26,7 @@ const PAGE_SIZE = 12;
 function BaiVietContent() {
   const searchParams = useSearchParams();
   const slug = searchParams.get("slug");
-  const categoryParam = searchParams.get("chuyen-muc") || searchParams.get("category");
+  const categoryParam = searchParams.get("category");
   const pageParam = parseInt(searchParams.get("trang") || searchParams.get("page") || "1", 10);
   const currentPage = isNaN(pageParam) || pageParam < 1 ? 1 : pageParam;
 
@@ -55,9 +56,8 @@ function BaiVietContent() {
       fetchPublicEntry(slug)
         .then((data) => {
           setEntry(data);
-          if (data.seo_title || data.title) {
-            document.title = `${data.seo_title || data.title} | Cá Về`;
-          }
+          // Không lặp "| Cá Về" khi seo_title đã có thương hiệu (QA lô 1, ghi nợ lô 5b).
+          setPageMeta({ title: withBrand(data.seo_title || data.title || ""), noindex: false });
         })
         .catch((err: any) => {
           if (err instanceof ApiError) {
@@ -67,6 +67,11 @@ function BaiVietContent() {
             setErrorStatus(500);
             setErrorMessage("Chưa tải được bài.");
           }
+          // QA lô 2 L3: bài không có / đã gỡ -> tiêu đề đúng + một thẻ robots noindex.
+          const status = err instanceof ApiError ? err.status : 500;
+          if (status === 404) setPageMeta({ title: NOT_FOUND_TITLE, noindex: true });
+          else if (status === 410) setPageMeta({ title: GONE_TITLE, noindex: true });
+          else setPageMeta({ title: LOAD_ERROR_TITLE, noindex: true });
         })
         .finally(() => {
           setLoading(false);
@@ -79,7 +84,7 @@ function BaiVietContent() {
         .then((res) => {
           setList(res.results || []);
           setTotalCount(res.count ?? res.total ?? 0);
-          document.title = "Bài viết & Cẩm nang cá biển | Cá Về";
+          setPageMeta({ title: "Bài viết & Cẩm nang cá biển | Cá Về", noindex: false });
         })
         .catch((err: any) => {
           if (err instanceof ApiError && err.status === 404) {
@@ -136,7 +141,7 @@ function BaiVietContent() {
             Đường dẫn bài viết không tồn tại hoặc đã bị thay đổi.
           </p>
           <div style={{ display: "flex", gap: "12px", justifyContent: "center" }}>
-            <Link href="/bai-viet" className={s.actionBtn} style={{ backgroundColor: "var(--ink-3)" }}>
+            <Link href="/blog" className={s.actionBtn} style={{ backgroundColor: "var(--ink-3)" }}>
               Xem bài viết khác
             </Link>
             <Link href="/shop" className={s.actionBtn}>
@@ -177,11 +182,11 @@ function BaiVietContent() {
         <nav className={s.breadcrumb} aria-label="Đường dẫn">
           <Link href="/">Trang chủ</Link>
           <span>/</span>
-          <Link href="/bai-viet">Bài viết</Link>
+          <Link href="/blog">Bài viết</Link>
           {entry.category && (
             <>
               <span>/</span>
-              <Link href={`/bai-viet?chuyen-muc=${encodeURIComponent(entry.category.slug)}`}>
+              <Link href={`/blog?category=${encodeURIComponent(entry.category.slug)}`}>
                 {entry.category.name}
               </Link>
             </>
@@ -192,7 +197,7 @@ function BaiVietContent() {
         <header className={s.header}>
           {entry.category && (
             <Link
-              href={`/bai-viet?chuyen-muc=${encodeURIComponent(entry.category.slug)}`}
+              href={`/blog?category=${encodeURIComponent(entry.category.slug)}`}
               className={s.categoryTag}
             >
               {entry.category.name}
@@ -248,7 +253,7 @@ function BaiVietContent() {
       {/* Tabs lọc chuyên mục (CMS-14-AC2) */}
       <nav className={s.categoryTabs} aria-label="Chuyên mục bài viết">
         <Link
-          href="/bai-viet"
+          href="/blog"
           className={`${s.tabItem} ${!categoryParam ? s.tabActive : ""}`}
         >
           Tất cả
@@ -258,7 +263,7 @@ function BaiVietContent() {
           return (
             <Link
               key={cat.slug}
-              href={`/bai-viet?chuyen-muc=${encodeURIComponent(cat.slug)}`}
+              href={`/blog?category=${encodeURIComponent(cat.slug)}`}
               className={`${s.tabItem} ${isActive ? s.tabActive : ""}`}
             >
               {cat.name}
@@ -282,7 +287,7 @@ function BaiVietContent() {
               return (
                 <Link
                   key={item.slug}
-                  href={`/bai-viet?slug=${encodeURIComponent(item.slug)}`}
+                  href={`/blog?slug=${encodeURIComponent(item.slug)}`}
                   className={s.card}
                 >
                   {coverSrc && (
@@ -322,9 +327,9 @@ function BaiVietContent() {
             <div className={s.pagination}>
               <Link
                 href={{
-                  pathname: "/bai-viet",
+                  pathname: "/blog",
                   query: {
-                    ...(categoryParam ? { "chuyen-muc": categoryParam } : {}),
+                    ...(categoryParam ? { category: categoryParam } : {}),
                     trang: currentPage - 1,
                   },
                 }}
@@ -340,9 +345,9 @@ function BaiVietContent() {
 
               <Link
                 href={{
-                  pathname: "/bai-viet",
+                  pathname: "/blog",
                   query: {
-                    ...(categoryParam ? { "chuyen-muc": categoryParam } : {}),
+                    ...(categoryParam ? { category: categoryParam } : {}),
                     trang: currentPage + 1,
                   },
                 }}
@@ -368,7 +373,7 @@ function BaiVietFrame() {
       title={slug ? "Góc bếp" : undefined}
       footer="full"
       bottomNav={!slug}
-      backHref="/bai-viet/"
+      backHref="/blog/"
     >
       <BaiVietContent />
     </ShopFrame>

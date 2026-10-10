@@ -248,12 +248,12 @@ class CatalogShapeTests(ShopCatalogBase):
         )
         self.assertEqual((combo["unit"], combo["min_qty"], combo["qty_step"]), ("combo", "1", "1"))
 
-    def test_detail_keeps_legacy_description_private_until_story_2b(self):
-        """`Item.description` có sẵn trong DB nhưng lô 1 vẫn trả "" (lô 2b mới mở, có kiểm chữ BR-DM-25)."""
+    def test_detail_returns_item_description_since_story_2b(self):
+        """SHOP-2b-01: từ lô 2b `Item.description` hiện công khai (chữ đã kiểm BR-DM-25 lúc lưu ở ERP)."""
         it = self.item("DESC", kg="5")
         it.description = "Ghi chú nội bộ"
         it.save()
-        self.assertEqual(self.client.get("/api/shop/catalog/DESC/").json()["description"], "")
+        self.assertEqual(self.client.get("/api/shop/catalog/DESC/").json()["description"], "Ghi chú nội bộ")
 
 
 class NotFoundTests(ShopCatalogBase):

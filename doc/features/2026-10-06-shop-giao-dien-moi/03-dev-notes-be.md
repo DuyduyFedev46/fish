@@ -49,3 +49,28 @@ $ python3 scripts/check_naming.py   # backend sạch; còn lỗi ở frontend/ (
 ### Sửa sau review lô 1
 - M1: `validate_line_qty` bắt `InvalidOperation` và chặn qty > 1.000.000 (`MAX_LINE_QTY`); "1e30", "1e999999999", số 80 chữ số, "-0", "1e-30", nhiều chữ số thập phân đều trả 400 (INVALID_QTY/OUT_OF_STOCK), không 500. Test: `InvalidQtyTests.test_review_m1_huge_or_odd_numbers_never_500`, mở rộng `test_validate_line_qty_rules_ac2_of_story_2_02`.
 - Low: README `apps/catalog/items` sửa `sellable_qty` là nội bộ, Shop dùng `stock_level`.
+
+## Lô 2b (BE) — SHOP-2b-01, SHOP-2b-02 (BR-DM-25, BR-PQ-04)
+
+**File sửa:** `backend/apps/catalog/models/items.py`, `migrations/0008_item_shop_info.py` (thêm `short_note`/`spec`/`storage`/`origin`), `items/public_text.py` (mới), `items/serializers.py`, `items/api.py`, `items/shop_api.py`, test mới `items/tests/test_shop_info.py` (27 ca); sửa 2 test cũ: `test_shop_catalog.py` (description nay công khai), `pricing/tests/test_r14_pricing.py` (thêm `slug` vào tập field nhóm).
+
+**Contract ERP (đúng 02b §3.10):**
+- `GET/POST/PATCH /api/catalog/items/` thêm `short_note`(≤60) `spec`/`storage`/`origin`(≤500) `description`(≤2000). Chỉ `owner` ghi (manager/warehouse_staff/delivery_staff/customer_service 403). Lỗi 400 theo trường: `{"spec": ["Không ghi giá trong thông tin món. Giá lấy từ bảng giá."]}`, SĐT "Không ghi số điện thoại trong thông tin món.", mã lô "Không ghi mã lô trong thông tin món.", độ dài "Tối đa 60 ký tự.".
+- `GET/POST/PATCH /api/catalog/item-groups/` thêm `slug`. Lỗi: "Đường dẫn đã dùng cho nhóm khác." / "Chỉ dùng chữ thường không dấu, số và dấu gạch ngang." / "Không được để trống." (PATCH). POST bỏ trống slug thì tự sinh.
+- Shop công khai: `GET /api/shop/catalog/` có `short_note` thật; `GET /api/shop/catalog/<code>/` có `short_note`, `description`, `spec`, `storage`, `origin` thật.
+- AuditLog: `update_item` `changes={"fields":[tên trường]}` (không chép chữ; không ghi khi không đổi); `update_itemgroup` `changes={"slug":{"from","to"}}`. FE cần nhãn `update_item`, `update_itemgroup` ở `auditModel.ts`.
+
+**Lệch thiết kế:** (1) thêm kiểm cụm "nhà cung cấp / tên tàu / ngày nhập / nhập lô" (BR-DM-25 cấm, 02b chỉ liệt kê 3 kiểm) với lỗi "Không ghi nhà cung cấp, tên tàu hay ngày nhập lô trong thông tin món."; (2) regex mã lô không phân biệt hoa thường.
+
+**Nợ / rủi ro:** `Item.description` cũ trong DB (kể cả production) nay hiện công khai trên Shop; cần Lộc/Duy rà ghi chú nội bộ trước khi deploy (bản ghi cũ không bị kiểm lại tới khi sửa). 
+
+**Kiểm chứng:** `manage.py test apps.catalog apps.sales apps.accounts` -> Ran 1695 tests OK (skipped=3); `makemigrations --check --dry-run` -> No changes detected; `check_naming.py` OK.
+
+### Lô 2b (BE) — bổ sung allowlist
+`apps/common/tests/test_auditlog_note_no_free_text.py::AiScrubCoversFreeTextFieldsTests` đòi mọi field tên `note/reason/description` hoặc chứa các từ đó phải nằm trong danh sách lọc AI hoặc allowlist có lý do. `catalog.Item.short_note` (0008) được thêm vào `ALLOWED_UNSCRUBBED` như `Item.description`: chữ công khai về món, không dữ liệu khách; audit `update_item` chỉ ghi tên trường (đã có test `test_2b01_ac6_audit_update_item_records_field_names_only`).
+
+### Sửa sau review lô 2 (BE)
+- H1: `items/shop_api.py` `_safe_text` chạy `public_text_error` LÚC ĐỌC cho `short_note` (list + detail) và `description/spec/storage/origin` (detail); ô vi phạm trả `""`, khoá giữ, ô sạch không bị ảnh hưởng. Test `PublicReadTimeFilterTests` (ghi qua ORM "Giá vốn 180 nghìn, gọi 0901234567", mã lô, tàu, nhà cung cấp; kiểm toàn chuỗi JSON).
+- L1: `catalog/admin.py` `ItemAdminForm` kiểm độ dài + `public_text_error` cho 5 ô.
+- L2: `public_text.py` thêm số hiệu tàu `XX-12345` (2 chữ hoa + 4-6 số, lỗi nhóm "nhà cung cấp/tàu/ngày nhập") và cụm "giá vốn" (lỗi giá). Chữ "tàu" đứng riêng vẫn được phép (tránh báo nhầm).
+- Chưa làm (tuỳ chọn): lệnh `check_public_item_text` để Lộc rà dữ liệu cũ.

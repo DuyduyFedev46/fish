@@ -60,7 +60,7 @@
       "show_in_footer": false,
       "footer_order": 0,
       "body": [
-        "⟨ghi chú⟩ [hero] H1 và nút nằm trong code (/gioi-thieu/); đoạn đầu tiên là câu mở của hero.",
+        "⟨ghi chú⟩ [hero] H1 và nút nằm trong code (/about/); đoạn đầu tiên là câu mở của hero.",
         "Cá Về mua hải sản theo từng lô tại cảng, bán hàng cấp đông theo kg và giao tận nhà bạn.",
         "## Chúng tôi mua tại cảng, theo từng lô",
         "Nguồn hàng theo mùa đánh bắt. Cá Về mua theo từng lô tại cảng. Mỗi lô có mã và hạn dùng riêng, nên chúng tôi biết món bạn mua thuộc lô nào.",
@@ -77,11 +77,11 @@
         "### Khi nhận hàng",
         "Cất ngay vào ngăn đá nếu chưa nấu. Hạn dùng ghi theo từng lô.",
         "### Rã đông đúng",
-        "Chuyển xuống ngăn mát tủ lạnh trước khi nấu khoảng 8–12 giờ. Không ngâm nước nóng. Xem thêm ở [Rã đông cá đúng cách](/bai-viet/?slug=ra-dong-ca-dung-cach).",
+        "Chuyển xuống ngăn mát tủ lạnh trước khi nấu khoảng 8–12 giờ. Không ngâm nước nóng. Xem thêm ở [Rã đông cá đúng cách](/blog/?slug=ra-dong-ca-dung-cach).",
         "## Giao tận nhà ở Phan Thiết",
-        "Đặt online, trả một lần bằng chuyển khoản quét mã QR. Giá đã gồm giao hàng, bạn không trả thêm khi nhận hàng. Xem [Chính sách giao hàng](/trang/?slug=giao-hang).",
+        "Đặt online, trả một lần bằng chuyển khoản quét mã QR. Giá đã gồm giao hàng, bạn không trả thêm khi nhận hàng. Xem [Chính sách giao hàng](/pages/?slug=giao-hang).",
         "## Hàng có vấn đề, báo Cá Về",
-        "Nhận hàng có vấn đề, bạn gọi hoặc nhắn Zalo cho Cá Về, kèm mã đơn và ảnh hàng nhận được. Cách xử lý theo [Chính sách đổi trả và hoàn tiền](/trang/?slug=doi-tra).",
+        "Nhận hàng có vấn đề, bạn gọi hoặc nhắn Zalo cho Cá Về, kèm mã đơn và ảnh hàng nhận được. Cách xử lý theo [Chính sách đổi trả và hoàn tiền](/pages/?slug=doi-tra).",
         "⟨ghi chú⟩ [cta] mục cuối; nút \"Mở bảng hàng\" nằm trong code.",
         "## Xem hàng đang có",
         "Giá ghi theo kg. Món tạm hết vẫn hiện để bạn gọi hỏi."
@@ -102,7 +102,7 @@
         "## 2. Thời hạn báo",
         "Báo Cá Về trong [số] giờ sau khi nhận hàng.",
         "## 3. Cách liên hệ",
-        "Gọi hotline hoặc nhắn Zalo cho Cá Về, kèm mã đơn (bắt đầu bằng SO) và ảnh hàng nhận được. Thông tin liên hệ ở trang [Liên hệ](/trang/?slug=lien-he).",
+        "Gọi hotline hoặc nhắn Zalo cho Cá Về, kèm mã đơn (bắt đầu bằng SO) và ảnh hàng nhận được. Thông tin liên hệ ở trang [Liên hệ](/pages/?slug=lien-he).",
         "## 4. Xử lý tiền đã chuyển khi đơn huỷ",
         "Áp dụng khi đơn bị huỷ sau khi bạn đã chuyển khoản, gồm: Cá Về huỷ vì hàng không đạt chất lượng khi soạn, hết hàng hoặc không giao được; bạn đề nghị huỷ trước khi Cá Về bắt đầu soạn hàng; hoặc tiền của bạn về sau khi đơn đã tự huỷ vì quá thời gian giữ hàng.",
         "- **Số tiền:** Cá Về trả lại toàn bộ số tiền của phần hàng không giao. Nếu chỉ một phần đơn bị huỷ, Cá Về trả lại đúng phần đó và vẫn giao phần còn lại. Bạn không mất phí cho việc trả lại.",
@@ -120,7 +120,7 @@
       "excerpt": "Giao tận nhà trong khu vực Phan Thiết. Giá đã gồm giao hàng, bạn trả một lần khi quét mã QR, không trả thêm khi nhận hàng.",
       "seo_title": "Chính sách giao hàng — Cá Về",
       "seo_description": "Khu vực giao, thời gian giao, giá đã gồm giao hàng và cách xử lý khi giao không thành công.",
-      "page_role": null,
+      "page_role": "shipping",
       "show_in_footer": true,
       "footer_order": 2,
       "body": [
@@ -133,7 +133,7 @@
         "## 4. Khi giao không thành công",
         "Nếu không gặp được bạn, Cá Về sẽ gọi để hẹn lại. [Số lần giao lại và cách xử lý khi không giao được. Do legal-vn soạn.]",
         "## 5. Khi nhận hàng",
-        "Bạn kiểm tra hàng lúc nhận. Hàng có vấn đề, xem [Chính sách đổi trả và hoàn tiền](/trang/?slug=doi-tra)."
+        "Bạn kiểm tra hàng lúc nhận. Hàng có vấn đề, xem [Chính sách đổi trả và hoàn tiền](/pages/?slug=doi-tra)."
       ]
     },
     {
@@ -142,7 +142,7 @@
       "excerpt": "Thanh toán một lần bằng chuyển khoản ngân hàng quét mã QR. Cá Về giữ hàng cho bạn {hold_minutes} phút.",
       "seo_title": "Chính sách thanh toán — Cá Về",
       "seo_description": "Cá Về nhận chuyển khoản ngân hàng quét mã QR, giữ hàng {hold_minutes} phút, xác nhận khi tiền về đủ. Mỗi đơn dùng tối đa 1 mã giảm giá.",
-      "page_role": null,
+      "page_role": "payment",
       "show_in_footer": true,
       "footer_order": 3,
       "body": [
@@ -153,7 +153,7 @@
         "## 3. Xác nhận thanh toán",
         "Khi tiền về đủ, đơn được xác nhận tự động. Bạn xem trạng thái ở trang đơn hàng.",
         "## 4. Số tiền chưa khớp",
-        "Nếu số tiền chuyển ít hơn giá trị đơn, đơn chưa được xác nhận tự động. Cá Về sẽ gọi cho bạn để xử lý. Nếu tiền về sau khi đơn đã huỷ, Cá Về cũng sẽ gọi cho bạn. Cách trả lại số tiền đã chuyển xem mục 4 của [Chính sách đổi trả và hoàn tiền](/trang/?slug=doi-tra).",
+        "Nếu số tiền chuyển ít hơn giá trị đơn, đơn chưa được xác nhận tự động. Cá Về sẽ gọi cho bạn để xử lý. Nếu tiền về sau khi đơn đã huỷ, Cá Về cũng sẽ gọi cho bạn. Cách trả lại số tiền đã chuyển xem mục 4 của [Chính sách đổi trả và hoàn tiền](/pages/?slug=doi-tra).",
         "## 5. Mã giảm giá",
         "- Mỗi đơn dùng tối đa 1 mã giảm giá. Mã không cộng dồn với ưu đãi khác; Cá Về tự chọn mức có lợi hơn cho bạn.",
         "- Mã chỉ dùng trong thời gian và với điều kiện ghi kèm mã. Mã có giới hạn tổng số lượt; hết lượt thì mã ngừng nhận dù chưa hết hạn. Mã không đổi ra tiền.",
@@ -192,7 +192,7 @@
         "Đơn hàng và chứng từ thanh toán được lưu theo thời hạn pháp luật về thương mại điện tử và kế toán yêu cầu ([thời hạn lưu: Duy điền sau khi kế toán chốt]). Hết thời hạn, Cá Về xoá hoặc ẩn danh họ tên, số điện thoại, địa chỉ.",
         "## 7. Quyền của bạn",
         "Muốn xem, sửa, xoá hoặc ngừng xử lý dữ liệu, bạn gọi {hotline} hoặc gửi email [email], kèm mã đơn (bắt đầu bằng SO) và số điện thoại đặt hàng để Cá Về xác minh. Cá Về xác nhận đã nhận yêu cầu trong [1 ngày làm việc] và trả lời trong [số ngày].",
-        "Với đơn đã thanh toán, Cá Về giữ chứng từ theo quy định nhưng ẩn danh họ tên, số điện thoại, địa chỉ. Khiếu nại về dữ liệu cá nhân xử lý theo [Cơ chế giải quyết khiếu nại](/trang/?slug=khieu-nai)."
+        "Với đơn đã thanh toán, Cá Về giữ chứng từ theo quy định nhưng ẩn danh họ tên, số điện thoại, địa chỉ. Khiếu nại về dữ liệu cá nhân xử lý theo [Cơ chế giải quyết khiếu nại](/pages/?slug=khieu-nai)."
       ]
     },
     {
@@ -210,13 +210,13 @@
         "## 2. Đặt hàng và giá",
         "Giá niêm yết theo kg, combo niêm yết theo combo. Mỗi món mua từ {min_qty_kg} kg, thêm từng {qty_step_kg} kg. Giá đã gồm giao hàng trong khu vực Phan Thiết. Nếu giá hoặc tình trạng hàng trong giỏ thay đổi, Shop báo cho bạn trước khi đặt. [Câu chữ cuối do legal-vn soạn.]",
         "## 3. Thanh toán",
-        "Xem [Chính sách thanh toán](/trang/?slug=thanh-toan).",
+        "Xem [Chính sách thanh toán](/pages/?slug=thanh-toan).",
         "## 4. Giao hàng",
-        "Xem [Chính sách giao hàng](/trang/?slug=giao-hang).",
+        "Xem [Chính sách giao hàng](/pages/?slug=giao-hang).",
         "## 5. Đổi trả",
-        "Xem [Chính sách đổi trả và hoàn tiền](/trang/?slug=doi-tra).",
+        "Xem [Chính sách đổi trả và hoàn tiền](/pages/?slug=doi-tra).",
         "## 6. Khiếu nại và tranh chấp",
-        "Xem [Cơ chế giải quyết khiếu nại](/trang/?slug=khieu-nai). [Phần tranh chấp do legal-vn soạn.]"
+        "Xem [Cơ chế giải quyết khiếu nại](/pages/?slug=khieu-nai). [Phần tranh chấp do legal-vn soạn.]"
       ]
     },
     {
@@ -225,20 +225,20 @@
       "excerpt": "Cách gửi phản ánh, khiếu nại cho Cá Về, thời hạn phản hồi và các bước giải quyết.",
       "seo_title": "Cơ chế giải quyết khiếu nại — Cá Về",
       "seo_description": "Kênh gửi phản ánh, khiếu nại cho Cá Về, thời hạn phản hồi, các bước giải quyết và cách làm khi chưa thống nhất.",
-      "page_role": null,
+      "page_role": "complaints",
       "show_in_footer": true,
       "footer_order": 6,
       "body": [
         "## 1. Gửi phản ánh, khiếu nại",
-        "Bạn chọn một trong các cách: gọi {hotline}, nhắn Zalo [số Zalo] hoặc gửi email [email]. Thông tin ở trang [Liên hệ](/trang/?slug=lien-he). Ghi mã đơn (bắt đầu bằng SO), số điện thoại đặt hàng, nội dung, kèm ảnh hoặc video nếu có.",
+        "Bạn chọn một trong các cách: gọi {hotline}, nhắn Zalo [số Zalo] hoặc gửi email [email]. Thông tin ở trang [Liên hệ](/pages/?slug=lien-he). Ghi mã đơn (bắt đầu bằng SO), số điện thoại đặt hàng, nội dung, kèm ảnh hoặc video nếu có.",
         "## 2. Thời hạn",
         "Cá Về phản hồi lần đầu trong vòng 2 giờ kể từ khi nhận phản ánh [trong giờ làm việc: chờ Duy xác nhận].",
         "Thời hạn dự kiến giải quyết:",
         "- Hàng không đúng món, thiếu hoặc không đạt chất lượng khi nhận: [2 ngày làm việc].",
-        "- Trả lại tiền khi đơn huỷ: theo mục 4 của [Chính sách đổi trả và hoàn tiền](/trang/?slug=doi-tra).",
+        "- Trả lại tiền khi đơn huỷ: theo mục 4 của [Chính sách đổi trả và hoàn tiền](/pages/?slug=doi-tra).",
         "- Giao trễ, không liên lạc được người giao: [1 ngày làm việc].",
         "- Đã chuyển khoản nhưng đơn chưa xác nhận: [1 ngày làm việc].",
-        "- Dữ liệu cá nhân (xem, sửa, xoá): theo [Chính sách quyền riêng tư](/trang/?slug=quyen-rieng-tu).",
+        "- Dữ liệu cá nhân (xem, sửa, xoá): theo [Chính sách quyền riêng tư](/pages/?slug=quyen-rieng-tu).",
         "- Việc khác: [5 ngày làm việc].",
         "## 3. Trình tự",
         "1. Cá Về ghi nhận yêu cầu.",

@@ -111,3 +111,10 @@
     animation: none;
   }
 }
+
+@media (hover: hover) and (pointer: fine) {
+  .dangerGhost:hover {
+    background: var(--crit-soft);
+    color: var(--crit);
+  }
+}

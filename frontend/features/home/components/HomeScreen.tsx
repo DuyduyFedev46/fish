@@ -9,10 +9,11 @@ import type { CatalogItem, CatalogResponse } from "@/lib/types";
 import { getSiteInfo } from "@/features/site/api";
 import { fetchPublicEntries } from "@/features/content/api";
 import type { PublicEntryListItem } from "@/features/content/types";
+import { itemHref, toCardItem } from "@/features/catalog/cardItem";
 import { groupIconOf } from "@/features/catalog/groupIcon";
 import ShopFrame from "@/components/ShopFrame";
 import CategoryTile from "@/components/catalog/CategoryTile";
-import ProductCard, { type ProductCardItem } from "@/components/catalog/ProductCard";
+import ProductCard from "@/components/catalog/ProductCard";
 import Button from "@/components/ui/Button";
 import EmptyState from "@/components/ui/EmptyState";
 import ErrorState from "@/components/ui/ErrorState";
@@ -27,21 +28,6 @@ const RAIL_LIMIT = 8;
 const COMBO_LIMIT = 3;
 const POST_LIMIT = 3;
 
-function toCardItem(it: CatalogItem): ProductCardItem {
-  return {
-    itemCode: it.item_code,
-    name: it.name,
-    unit: it.unit,
-    price: it.price,
-    stockLevel: it.stock_level,
-    shortNote: it.short_note,
-    image: it.image,
-    group: groupIconOf(it.group.slug, it.item_type),
-    isCombo: it.item_type === "BUNDLE",
-  };
-}
-
-const itemHref = (code: string) => `/shop/item/?code=${encodeURIComponent(code)}`;
 
 /** Món hết xếp cuối, còn lại giữ thứ tự catalog. */
 function outLast(items: CatalogItem[]): CatalogItem[] {
@@ -273,14 +259,14 @@ function KitchenCorner({ posts, standalone = false }: { posts: PublicEntryListIt
     <section className={cx(s.kitchen, standalone && s.kitchenAlone)} aria-labelledby="home-kitchen">
       <div className={s.blockHead}>
         <h2 id="home-kitchen" className={s.blockTitle}>Góc bếp</h2>
-        <Link href="/bai-viet/" className={s.more}>Xem bài viết</Link>
+        <Link href="/blog/" className={s.more}>Xem bài viết</Link>
       </div>
       <ul className={s.posts}>
         {posts.map((p) => {
           const cover = p.cover_image ? p.cover_image.urls.md || p.cover_image.urls.sm : null;
           return (
             <li key={p.slug}>
-              <Link href={`/bai-viet/?slug=${encodeURIComponent(p.slug)}`} className={s.post}>
+              <Link href={`/blog/?slug=${encodeURIComponent(p.slug)}`} className={s.post}>
                 <span className={s.postCover}>
                   <PostCover src={cover} />
                 </span>

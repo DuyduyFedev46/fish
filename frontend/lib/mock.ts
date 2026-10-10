@@ -71,6 +71,19 @@ function stockLevelOf(stock: number): StockLevel {
   return "in";
 }
 
+// Ghi chú ngắn và thông tin chi tiết giả để chụp màn (02b §3.1–3.2); món không có trong bảng thì để trống.
+const MOCK_TEXT: Record<string, { short_note: string; spec: string; storage: string; origin: string; description: string }> = {
+  "MUC-ONG": {
+    short_note: "Đã bỏ nội tạng",
+    spec: "Đã làm sạch, bỏ nội tạng",
+    storage: "Cấp đông, giữ ngăn đá",
+    origin: "",
+    description: "Mực ống thân dày, đã làm sạch sẵn, rã đông là nấu được.",
+  },
+  "CA-THU-KHUC": { short_note: "Cắt khúc dày 2–3 cm", spec: "", storage: "Cấp đông, giữ ngăn đá", origin: "", description: "" },
+  "TOM-SU-TUOI": { short_note: "Size 30–35 con/kg", spec: "", storage: "", origin: "", description: "" },
+};
+
 function toWireItem(seed: MockSeedItem): CatalogItem {
   const isBundle = seed.item_type === "BUNDLE";
   return {
@@ -83,7 +96,7 @@ function toWireItem(seed: MockSeedItem): CatalogItem {
     min_qty: "1",
     qty_step: isBundle ? "1" : "0.5",
     group: seed.group,
-    short_note: "",
+    short_note: MOCK_TEXT[seed.item_code]?.short_note ?? "",
     image: seed.image,
   };
 }
@@ -91,10 +104,10 @@ function toWireItem(seed: MockSeedItem): CatalogItem {
 function toWireDetail(seed: MockSeedItem): CatalogItemDetail {
   return {
     ...toWireItem(seed),
-    description: "",
-    spec: "",
-    storage: "",
-    origin: "",
+    description: MOCK_TEXT[seed.item_code]?.description ?? "",
+    spec: MOCK_TEXT[seed.item_code]?.spec ?? "",
+    storage: MOCK_TEXT[seed.item_code]?.storage ?? "",
+    origin: MOCK_TEXT[seed.item_code]?.origin ?? "",
     ...(seed.bundle_components ? { bundle_components: seed.bundle_components } : {}),
   };
 }

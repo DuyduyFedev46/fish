@@ -228,7 +228,11 @@ class DbValuesUnchangedTests(TestCase):
                 self.assertEqual(list(enum.values), values)
 
     def test_bt2_page_role_values_are_frozen(self):
-        self.assertEqual([v for v, _ in Entry.PAGE_ROLE_CHOICES], ["privacy", "terms", "refund", "seller_info"])
+        # 4 giá trị đã chạy giữ nguyên; SHOP-5-02 (BR-ND-20, migration content/0004) chỉ THÊM 3 giá trị mới ở cuối.
+        self.assertEqual(
+            [v for v, _ in Entry.PAGE_ROLE_CHOICES],
+            ["privacy", "terms", "refund", "seller_info", "shipping", "payment", "complaints"],
+        )
 
     def test_bt2_source_choices_untouched(self):
         # Phần AI không thuộc lô này (02b mục 0).

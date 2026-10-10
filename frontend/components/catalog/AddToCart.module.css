@@ -1,0 +1,96 @@
+.card {
+  margin-top: 6px;
+}
+
+/* ---- trang chi tiết: khối chọn số lượng ---- */
+.select {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.selectTitle {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.presets {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-2);
+}
+
+.stepperRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.hint {
+  color: var(--ink-2);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.subtotal {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  color: var(--ink-2);
+}
+
+.subtotalValue {
+  color: var(--ink);
+  font-size: 17px;
+  font-weight: 600;
+}
+
+/* ---- thanh mua: dính đáy trên điện thoại, nằm trong cột phải trên máy tính ---- */
+.bar {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: var(--z-bottom-bar);
+  padding: 10px var(--space-4) calc(var(--space-4) + env(safe-area-inset-bottom));
+  background: var(--surface);
+  box-shadow: var(--shadow-bar);
+}
+
+.barInner {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3);
+  max-width: 560px;
+  margin: 0 auto;
+}
+
+/* Chỉ một nút (không có Zalo): rộng đầy */
+.barInner > :only-child {
+  grid-column: 1 / -1;
+}
+
+@media (min-width: 768px) {
+  .presets {
+    gap: var(--space-3);
+  }
+  .subtotal {
+    padding: 14px var(--space-4);
+    border-radius: var(--radius-card);
+    background: var(--surface-2);
+  }
+  .bar {
+    position: static;
+    padding: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+  .barInner {
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    max-width: none;
+    margin: 0;
+  }
+}

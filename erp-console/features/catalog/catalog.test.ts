@@ -21,11 +21,14 @@ import {
   ruleInputOf,
   shelfLifeText,
   tomorrowOf,
+  fieldSaveErrorMessage,
   validateGroupName,
+  validateGroupSlug,
   validateItem,
   validatePrice,
   validateRule,
 } from "./catalogModel";
+import { ApiError } from "@/shared/lib/http";
 import { mockCatalogApi } from "./mock";
 import { catalogAbility, CATALOG_PERM } from "./permissions";
 import { EMPTY_ITEM_PARAMS } from "./types";
@@ -320,5 +323,59 @@ describe("Lô 17b G5: số không bị cắt hay làm tròn ngầm", () => {
   it("gửi BE giữ nguyên chữ số, đệm đủ số lẻ", () => {
     expect(ruleInputOf({ ...emptyRuleDraft(), name: "A", item: "3", minQty: "5,25", discountValue: "7,5" })).toMatchObject({ min_qty: "5.250", discount_value: "7.50" });
     expect(ruleInputOf({ ...emptyRuleDraft(), name: "B", applyOn: "ORDER", minAmount: "999.999.999.999", discountType: "AMOUNT", discountValue: "5.000" })).toMatchObject({ min_amount: "999999999999.00", discount_value: "5000.00" });
+  });
+});
+
+describe("2b: chữ hiển thị trên Shop và đường dẫn nhóm", () => {
+  const ITEMS = "/api/catalog/items/";
+  const GROUPS = "/api/catalog/item-groups/";
+
+  it("giới hạn khớp BE và bốn ô mới đi vào thân gửi", () => {
+    const d = { ...emptyItemDraft("SIMPLE"), code: "A", name: "A", itemGroup: "3", shortNote: "x".repeat(61), spec: "y".repeat(501) };
+    const e = validateItem(d);
+    expect(e.shortNote).toBeTruthy();
+    expect(e.spec).toBeTruthy();
+    expect(validateItem({ ...d, shortNote: "x".repeat(60), spec: "y".repeat(500) }).shortNote).toBeUndefined();
+    expect(itemInputOf({ ...d, shortNote: " Cắt khúc ", spec: "", storage: "Cấp đông", origin: "" })).toMatchObject({ short_note: "Cắt khúc", storage: "Cấp đông" });
+  });
+  it("chỉ Chủ ghi được; Quản lý 403", () => {
+    expect(call("ql1", "PATCH", `${ITEMS}1/`, { spec: "Cắt lát" }).status).toBe(403);
+    const ok = call("loc", "PATCH", `${ITEMS}1/`, { spec: "Cắt lát", short_note: "Dày 2 cm" });
+    expect(ok.status).toBe(200);
+    expect(ok.body).toMatchObject({ spec: "Cắt lát", short_note: "Dày 2 cm" });
+  });
+  it("lỗi 400 theo từng trường: SĐT, giá, mã lô, quá dài", () => {
+    const bad = (body: Record<string, unknown>) => call("loc", "PATCH", `${ITEMS}1/`, body).body as Record<string, string[]>;
+    expect(bad({ spec: "Gọi 0900000001" }).spec[0]).toContain("số điện thoại");
+    expect(bad({ storage: "Giá 278.000đ" }).storage[0]).toContain("Không ghi giá");
+    expect(bad({ origin: "Lô CA-THU-261011-0A1B2" }).origin[0]).toContain("mã lô");
+    expect(bad({ short_note: "x".repeat(61) }).short_note).toEqual(["Tối đa 60 ký tự."]);
+  });
+  it("đường dẫn nhóm: kiểm dạng, trùng, tự sinh, chỉ Chủ sửa", () => {
+    expect(validateGroupSlug("Mực", true)).toBeTruthy();
+    expect(validateGroupSlug("", true)).toBeTruthy();
+    expect(validateGroupSlug("", false)).toBeNull();
+    expect(validateGroupSlug("muc-ong", true)).toBeNull();
+    expect(call("ql1", "PATCH", `${GROUPS}6/`, { slug: "muc-moi" }).status).toBe(403);
+    expect((call("loc", "PATCH", `${GROUPS}6/`, { slug: "ca" }).body as { slug: string[] }).slug).toEqual(["Đường dẫn đã dùng cho nhóm khác."]);
+    expect(call("loc", "PATCH", `${GROUPS}6/`, { slug: "muc-moi" }).body).toMatchObject({ slug: "muc-moi" });
+    expect(call("loc", "POST", GROUPS, { name: "Ốc nghêu sò", parent: null }).body).toMatchObject({ slug: "oc-nghe-u-so".replace("nghe-u", "ngheu") });
+  });
+});
+
+describe("B1: lỗi 400 theo ô hiện đúng câu BE khi sửa tại chỗ", () => {
+  it("lấy câu của đúng trường, không rơi về câu chung", () => {
+    const err = new ApiError("Dữ liệu gửi lên chưa hợp lệ.", 400, undefined, { spec: ["Không ghi giá trong thông tin món. Giá lấy từ bảng giá."] });
+    expect(fieldSaveErrorMessage(err, "spec")).toBe("Không ghi giá trong thông tin món. Giá lấy từ bảng giá.");
+    expect(fieldSaveErrorMessage(err, "storage")).toBe("Dữ liệu gửi lên chưa hợp lệ.");
+  });
+  it("đủ bốn câu của BE cho description, spec, storage, origin", () => {
+    for (const [field, msg] of [
+      ["description", "Không ghi số điện thoại trong thông tin món."],
+      ["storage", "Không ghi nhà cung cấp, tên tàu hay ngày nhập lô trong thông tin món."],
+      ["origin", "Không ghi mã lô trong thông tin món."],
+    ] as const) {
+      expect(fieldSaveErrorMessage(new ApiError("x", 400, undefined, { [field]: [msg] }), field)).toBe(msg);
+    }
   });
 });

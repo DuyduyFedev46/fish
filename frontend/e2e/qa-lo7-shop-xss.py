@@ -36,7 +36,7 @@ def run(b, width, height, tag):
     dialogs, errs = [], []
     page.on("dialog", lambda d: (dialogs.append(d.message), d.dismiss()))
     page.on("pageerror", lambda e: errs.append(str(e)))
-    page.goto(f"{BASE}/bai-viet/?slug=xss-mau")
+    page.goto(f"{BASE}/blog/?slug=xss-mau")
     page.wait_for_load_state("networkidle")
     page.wait_for_timeout(600)
 

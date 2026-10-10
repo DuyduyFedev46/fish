@@ -23,6 +23,7 @@ import {
   type ImageFilter,
   type ItemGroup,
   type ItemGroupInput,
+  type ItemGroupPatch,
   type ItemInput,
   type ItemListParams,
   type ItemPatch,
@@ -123,6 +124,11 @@ export function listItemGroups(page = 1, signal?: AbortSignal): Promise<Paginate
 /** POST /api/catalog/item-groups/ → 201. Tên trùng: 400 `{name:[…]}`. */
 export function createItemGroup(input: ItemGroupInput): Promise<ItemGroup> {
   return apiFetch<ItemGroup>("/api/catalog/item-groups/", { method: "POST", body: input, mock: mock() });
+}
+
+/** PATCH /api/catalog/item-groups/{id}/ — đổi đường dẫn nhóm; chỉ Chủ. Lỗi 400 `{slug:[…]}`. */
+export function updateItemGroup(id: number, patch: ItemGroupPatch): Promise<ItemGroup> {
+  return apiFetch<ItemGroup>(`/api/catalog/item-groups/${id}/`, { method: "PATCH", body: patch, mock: mock() });
 }
 
 /** GET /api/catalog/price-lists/ — thường chỉ có một bảng giá mặc định. Cần catalog.view_pricelist. */

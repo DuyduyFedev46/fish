@@ -1,0 +1,108 @@
+.summary {
+  position: sticky;
+  bottom: 0;
+  z-index: var(--z-bottom-bar);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: 14px var(--space-4) calc(var(--space-4) + env(safe-area-inset-bottom));
+  background: var(--surface);
+  box-shadow: var(--shadow-bar);
+}
+
+/* Tiêu đề chỉ có ở hộp máy tính; điện thoại đọc bằng nhãn riêng */
+.title {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.rows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+}
+
+.row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  color: var(--ink-2);
+  font-size: 14px;
+}
+
+.row dd {
+  margin: 0;
+}
+
+.discount {
+  color: var(--good);
+}
+
+.totalRow {
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--border);
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.note {
+  margin: 0;
+  color: var(--ink-2);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.notice {
+  margin: 0;
+  color: var(--crit);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.onlyDesktop {
+  display: none;
+}
+
+@media (min-width: 768px) {
+  .summary {
+    position: sticky;
+    top: var(--space-6);
+    bottom: auto;
+    gap: var(--space-3);
+    padding: var(--space-5);
+    border-radius: var(--radius-card);
+    box-shadow: none;
+    z-index: auto;
+  }
+
+  .title {
+    position: static;
+    width: auto;
+    height: auto;
+    margin: 0;
+    overflow: visible;
+    clip: auto;
+    white-space: normal;
+    font-size: 17px;
+    font-weight: 600;
+  }
+
+  .rows {
+    gap: var(--space-3);
+  }
+
+  .onlyMobile {
+    display: none;
+  }
+  .onlyDesktop {
+    display: inline;
+  }
+}

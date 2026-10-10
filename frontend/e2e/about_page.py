@@ -1,11 +1,11 @@
 """
-Bằng chứng chạy thật (Playwright) cho trang giới thiệu `/gioi-thieu/` (SHOP-1-08) và trang 404 (SHOP-1-09).
-Landing cũ ở `/` đã chuyển sang `/gioi-thieu/` (decisions 2026-10-10, SHOP-1-08 AC4), nên kịch bản CMS-14 cũ trỏ sang đây.
+Bằng chứng chạy thật (Playwright) cho trang giới thiệu `/about/` (SHOP-1-08) và trang 404 (SHOP-1-09).
+Landing cũ ở `/` đã chuyển sang `/about/` (decisions 2026-10-10, SHOP-1-08 AC4), nên kịch bản CMS-14 cũ trỏ sang đây.
 
 Chạy thật: backend tại :8104 đã chạy `manage.py load_shop_content --author <chủ> --publish` (dữ liệu giả),
 frontend build tĩnh (NEXT_PUBLIC_USE_MOCK=0, NEXT_PUBLIC_API_BASE trỏ :8104) phục vụ tại :3104.
 
-Dùng: python3 frontend/e2e/ra_soat_cms14_landing.py [normal|api-down|not-found]
+Dùng: python3 frontend/e2e/about_page.py [normal|api-down|not-found]
 - normal    : chữ nội dung lấy từ CMS, H1 + nút "Xem hàng đang có" -> /shop/, không cụm khẳng định bị chặn (AC1, AC5).
 - api-down  : API nội dung bị chặn -> trạng thái lỗi có nút "Thử lại", không trắng trang (06-marketing C7).
 - not-found : /khong-co-trang-nay/ -> trang 404 có hai nút, title đúng, có noindex (SHOP-1-09 AC1).
@@ -19,7 +19,7 @@ BLOCKED = ("hút chân không", "Cân đúng", "ngay tại cảng", "tươi số
 
 
 def check_normal(page, failures):
-    page.goto(f"{BASE}/gioi-thieu/")
+    page.goto(f"{BASE}/about/")
     page.wait_for_load_state("networkidle")
     page.wait_for_timeout(500)
     html = page.content()
@@ -39,7 +39,7 @@ def check_normal(page, failures):
 
 def check_api_down(page, failures):
     page.route("**/api/public/content/**", lambda route: route.abort())
-    page.goto(f"{BASE}/gioi-thieu/")
+    page.goto(f"{BASE}/about/")
     page.wait_for_load_state("networkidle")
     page.wait_for_timeout(500)
     html = page.content()
@@ -87,7 +87,7 @@ def main() -> int:
         for f in failures:
             print(" -", f)
         return 1
-    print(f"PASS ({mode}): /gioi-thieu/ và 404 đạt.")
+    print(f"PASS ({mode}): /about/ và 404 đạt.")
     return 0
 
 

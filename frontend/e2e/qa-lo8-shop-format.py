@@ -37,10 +37,10 @@ SITE = {"seller": {"name": "Vựa Thử Nghiệm QA", "business_type": "Hộ kin
                    "email": "lienhe@example.com"},
         "seller_complete": True, "privacy_consent_required": False, "confirm_call_notice": True,
         "confirm_call_hours": "7:00–20:00"}
-CATALOG = [{"item_code": "CA-QA-01", "name": "Cá QA giả định 1", "group": "ca", "item_type": "SIMPLE", "unit": "Kg",
-            "price": "260000.00", "sellable_qty": "50.000", "image": None},
-           {"item_code": "CA-QA-02", "name": "Cá QA giả định 2", "group": "ca", "item_type": "SIMPLE", "unit": "Kg",
-            "price": "1250000.00", "sellable_qty": "2.500", "image": None}]
+CATALOG = [{"item_code": "CA-QA-01", "name": "Cá QA giả định 1", "item_type": "SIMPLE", "unit": "kg", "min_qty": "1", "qty_step": "0.5", "group": {"slug": "ca", "name": "Cá"}, "short_note": "", "stock_level": "in",
+            "price": "260000", "image": None},
+           {"item_code": "CA-QA-02", "name": "Cá QA giả định 2", "item_type": "SIMPLE", "unit": "kg", "min_qty": "1", "qty_step": "0.5", "group": {"slug": "ca", "name": "Cá"}, "short_note": "", "stock_level": "low",
+            "price": "1250000", "image": None}]
 ENTRY = {"kind": "post", "slug": "bai-thu", "title": "Bài thử QA", "seo_title": "", "description": "", "excerpt": "",
          "category": None, "cover_image": None,
          "body": {"type": "doc", "blocks": [{"type": "paragraph", "children": [{"text": "Đoạn văn giả."}]},
@@ -93,7 +93,7 @@ def fake_api(page):
         if path == "/api/public/content/footer-links/":
             return resp(route, [])
         if path == "/api/shop/catalog/":
-            return resp(route, CATALOG)
+            return resp(route, {"groups": [{"slug": "ca", "name": "Cá", "item_count": len(CATALOG)}], "items": CATALOG})
         if re.match(r"^/api/shop/catalog/[^/]+/$", path):
             code = path.strip("/").split("/")[-1]
             hit = [c for c in CATALOG if c["item_code"] == code]
@@ -139,7 +139,7 @@ def main():
             body = page.inner_text("body")
             cnt, bad = money_ok(body)
             check(f"[{tag}][mock] /shop/ có giá và mọi giá dạng '65.000 ₫' (không '65000.00đ')", cnt >= 5 and not bad, f"{cnt} {bad}")
-            check(f"[{tag}][mock] /shop/ có '65.000 ₫' và tồn kho '120 kg' (chuỗi '120.000' đã chuẩn hoá)", "65.000 ₫" in body and "Còn 120 kg" in body, body[:300])
+            check(f"[{tag}][mock] /shop/ có '65.000đ' và không hiện số kg tồn", "65.000đ" in body and not re.search(r"Còn \d", body), body[:300])
             page.screenshot(path=f"{SHOT_DIR}/lo8-shop-{tag}-390.png", full_page=True)
 
             goto(page, MOCK, "/shop/item/?code=TOM-SU-TUOI")
@@ -182,10 +182,10 @@ def main():
             check(f"[{tag}][mock] tra đơn: hạn hoàn '28/10/2026' (không '2026-10-28')", "28/10/2026" in body and "2026-10-28" not in body, body[:400])
             page.screenshot(path=f"{SHOT_DIR}/lo8-tra-don-{tag}-390.png", full_page=True)
 
-            goto(page, MOCK, "/bai-viet/")
+            goto(page, MOCK, "/blog/")
             body = page.inner_text("body")
-            check(f"[{tag}][mock] /bai-viet ngày dạng dd/mm/yyyy", re.search(r"\b\d{2}/\d{2}/\d{4}\b", body) is not None, body[:200])
-            goto(page, MOCK, "/trang/?slug=chinh-sach-bao-mat")
+            check(f"[{tag}][mock] /blog ngày dạng dd/mm/yyyy", re.search(r"\b\d{2}/\d{2}/\d{4}\b", body) is not None, body[:200])
+            goto(page, MOCK, "/pages/?slug=chinh-sach-bao-mat")
             check(f"[{tag}][mock] /trang 'Có hiệu lực từ 28/09/2026'", "Có hiệu lực từ 28/09/2026" in page.inner_text("body"), page.inner_text("body")[:300])
             goto(page, MOCK, "/")
             body = page.inner_text("body")
@@ -205,7 +205,7 @@ def main():
             cnt, bad = money_ok(body)
             check(f"[{tag}][real] /shop/ giá chuỗi Decimal '260000.00' -> '260.000 ₫', '1250000.00' -> '1.250.000 ₫'",
                   "260.000 ₫" in body and "1.250.000 ₫" in body and cnt >= 2 and not bad, f"{cnt} {bad} {body[:300]}")
-            check(f"[{tag}][real] /shop/ tồn '2.500' -> 'Còn 2,5 kg', '50.000' -> 'Còn 50 kg'", "Còn 2,5 kg" in body and "Còn 50 kg" in body, body[:400])
+            check(f"[{tag}][real] /shop/ món sắp hết có nhãn 'Sắp hết', không hiện số kg tồn", "Sắp hết" in body and not re.search(r"Còn \d", body), body[:400])
             page.screenshot(path=f"{SHOT_DIR}/lo8-real-shop-{tag}-390.png", full_page=True)
 
             goto(page, REAL, "/shop/item/?code=CA-QA-01")
@@ -236,18 +236,18 @@ def main():
             body = page.inner_text("body")
             check(f"[{tag}][real] màn thanh toán: total_amount '260000.00' -> '260.000 ₫'", "260.000 ₫" in body and not money_ok(body)[1], body[:300])
 
-            goto(page, REAL, "/bai-viet/?slug=bai-thu")
+            goto(page, REAL, "/blog/?slug=bai-thu")
             body = page.inner_text("body")
             check(f"[{tag}][real] bài viết: 'Đăng ngày: 01/10/2026' (giờ VN, không 30/09)", "Đăng ngày: 01/10/2026" in body and "30/09/2026" not in body, body[:300])
             check(f"[{tag}][real] thẻ mặt hàng trong bài hiện '260.000 ₫'", "260.000 ₫" in body and not money_ok(body)[1], body[:400])
             page.screenshot(path=f"{SHOT_DIR}/lo8-real-baiviet-{tag}-390.png", full_page=True)
-            goto(page, REAL, "/bai-viet/")
+            goto(page, REAL, "/blog/")
             body = page.inner_text("body")
             check(f"[{tag}][real] danh sách bài: ngày '01/10/2026'", "01/10/2026" in body and "30/09/2026" not in body, body[:300])
             goto(page, REAL, "/")
             body = page.inner_text("body")
             check(f"[{tag}][real] bài mới trang chủ: ngày '01/10/2026'", "01/10/2026" in body and "30/09/2026" not in body, body[-500:])
-            goto(page, REAL, "/trang/?slug=chinh-sach-bao-mat")
+            goto(page, REAL, "/pages/?slug=chinh-sach-bao-mat")
             body = page.inner_text("body")
             check(f"[{tag}][real] trang chính sách: 'Có hiệu lực từ 01/10/2026' (published_at sát ranh giới)", "01/10/2026" in body and "30/09/2026" not in body, body[:300])
 

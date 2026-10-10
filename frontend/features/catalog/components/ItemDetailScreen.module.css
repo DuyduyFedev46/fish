@@ -1,0 +1,164 @@
+.page {
+  padding-bottom: calc(96px + env(safe-area-inset-bottom));
+}
+
+.crumbs {
+  display: none;
+}
+
+.layout {
+  display: flex;
+  flex-direction: column;
+}
+
+.media {
+  background: var(--surface);
+}
+
+.info {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+}
+
+.meta {
+  margin: 0;
+  color: var(--ink-3);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.name {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+}
+
+.note {
+  margin: 0;
+  color: var(--ink-2);
+}
+
+.comboTag {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--ink-2);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding-top: var(--space-2);
+}
+
+.blockTitle {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+.table th {
+  padding: 6px 0;
+  color: var(--ink-3);
+  font-size: 13px;
+  font-weight: 500;
+  text-align: left;
+}
+.table td {
+  padding: 10px 0;
+  border-top: 1px solid var(--border);
+}
+.table th:last-child,
+.table td:last-child {
+  text-align: right;
+}
+
+.caption {
+  margin: 0;
+  color: var(--ink-2);
+  font-size: 13px;
+}
+
+.dl {
+  margin: 0;
+}
+.dlRow {
+  display: flex;
+  gap: var(--space-3);
+  padding: 10px 0;
+  border-top: 1px solid var(--border);
+  font-size: 14px;
+}
+.dlRow dt {
+  flex: 0 0 104px;
+  color: var(--ink-3);
+}
+.dlRow dd {
+  margin: 0;
+  color: var(--ink);
+}
+
+.description {
+  margin: 0;
+  color: var(--ink-2);
+  text-wrap: pretty;
+}
+
+.skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+}
+
+@media (min-width: 768px) {
+  .page {
+    max-width: var(--container-max);
+    margin: 0 auto;
+    padding: var(--space-4) var(--space-6) var(--space-12);
+  }
+
+  .crumbs {
+    display: block;
+    margin-bottom: var(--space-4);
+  }
+
+  .layout {
+    flex-direction: row;
+    align-items: flex-start;
+    gap: var(--space-8);
+  }
+
+  .media {
+    flex: 0 0 min(480px, 45%);
+    border-radius: var(--radius-card);
+    overflow: hidden;
+  }
+
+  .info {
+    flex: 1;
+    min-width: 0;
+    padding: 0;
+  }
+
+  .name {
+    font-size: 24px;
+  }
+}

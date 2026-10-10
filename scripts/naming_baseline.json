@@ -178,7 +178,7 @@
  "frontend/e2e/qa-lo7-shop-xss.py": 1,
  "frontend/e2e/qa-lo8-shop-django.py": 1,
  "frontend/e2e/qa-lo8-shop-format.py": 1,
- "frontend/e2e/ra-soat-a2-golive.py": 1,
+ "frontend/e2e/golive_footer_checks.py": 1,
  "frontend/e2e/ra_soat_cms06_item_card.py": 1,
  "frontend/e2e/ra_soat_cms13_public.py": 1,
  "frontend/e2e/ra_soat_cms14_landing.py": 1

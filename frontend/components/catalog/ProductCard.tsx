@@ -3,6 +3,8 @@ import type { GroupIcon, ItemImage, Money, SaleUnit, StockLevel } from "@/lib/ty
 import Button from "../ui/Button";
 import Icon from "../ui/Icon";
 import { cx } from "../ui/cx";
+import { contactTarget } from "../shopLinks";
+import AddToCart from "./AddToCart";
 import ImageFrame from "./ImageFrame";
 import PriceTag from "./PriceTag";
 import StockBadge from "./StockBadge";
@@ -19,6 +21,10 @@ export interface ProductCardItem {
   image?: ItemImage | null;
   group: GroupIcon;
   isCombo: boolean;
+  /** `min_qty` từ API (kg: 1, combo: 1). */
+  minQty: number;
+  /** `qty_step` từ API (kg: 0,5, combo: 1). */
+  qtyStep: number;
 }
 
 export interface ProductCardProps {
@@ -26,12 +32,17 @@ export interface ProductCardProps {
   /**
    * rail: thẻ trang chủ, cuộn ngang trên điện thoại, nút "Chọn mua" dẫn sang trang chi tiết (không thêm giỏ).
    * row: một dòng ngang, cả dòng là link, không có nút.
-   * (Biến thể `grid` với nút thêm vào giỏ thuộc lô 2.)
+   * grid: thẻ trong lưới danh mục, nút "Thêm 1 kg" biến thành bộ tăng giảm.
    */
-  variant?: "rail" | "row";
+  variant?: "grid" | "rail" | "row";
   href: string;
-  /** Số hotline để nút "Liên hệ chúng tôi" của món hết; không có thì ẩn nút. */
+  /** Số hotline hợp lệ cho nút "Liên hệ chúng tôi" của món hết; không có thì nút dẫn tới trang Liên hệ. */
   hotline?: string;
+  /** grid: số lượng khách chọn đang có trong giỏ (không phải tồn kho). 0: chưa có. */
+  quantityInCart?: number;
+  onAdd?: (qty: number) => void;
+  onChangeQty?: (qty: number) => void;
+  onRequestRemove?: () => void;
 }
 
 function ComboTag() {
@@ -39,23 +50,31 @@ function ComboTag() {
 }
 
 /** Thẻ một mặt hàng. Thẻ là trình bày: không gọi API, không đọc giỏ. Không bao giờ hiện số kg tồn. */
-export default function ProductCard({ item, variant = "rail", href, hotline }: ProductCardProps) {
+export default function ProductCard({
+  item,
+  variant = "grid",
+  href,
+  hotline,
+  quantityInCart = 0,
+  onAdd,
+  onChangeQty,
+  onRequestRemove,
+}: ProductCardProps) {
   const out = item.stockLevel === "out";
   const titleId = `pc-${variant}-${item.itemCode}`;
-  const phone = hotline?.replace(/[^\d+]/g, "") ?? "";
 
   const image = (
     <ImageFrame
       image={item.image}
       alt=""
       group={item.group}
-      ratio="1/1"
+      ratio={variant === "grid" ? "3/2" : "1/1"}
       squareSize={variant === "row" ? 72 : undefined}
       dimmed={out}
       className={variant === "rail" ? s.railImage : undefined}
-      topLeft={variant === "rail" && item.isCombo ? <ComboTag /> : undefined}
+      topLeft={variant !== "row" && item.isCombo ? <ComboTag /> : undefined}
       topRight={
-        variant === "rail" && item.stockLevel !== "in" ? <StockBadge level={item.stockLevel} /> : undefined
+        variant !== "row" && item.stockLevel !== "in" ? <StockBadge level={item.stockLevel} /> : undefined
       }
     />
   );
@@ -81,6 +100,33 @@ export default function ProductCard({ item, variant = "rail", href, hotline }: P
     );
   }
 
+  if (variant === "grid") {
+    return (
+      <article className={s.grid} aria-labelledby={titleId}>
+        {/* Link ảnh chỉ để bấm, bỏ khỏi thứ tự Tab: mỗi thẻ một điểm dừng là tên. */}
+        <Link href={href} className={s.mediaLink} tabIndex={-1} aria-hidden="true">
+          {image}
+        </Link>
+        <h3 className={s.name}>
+          <Link id={titleId} href={href} className={cx(s.nameLink, out && s.muted)}>
+            {item.name}
+          </Link>
+        </h3>
+        <PriceTag amount={item.price} unit={item.unit} size="card" tone={out ? "muted" : "default"} />
+        <p className={s.note}>{item.shortNote ?? ""}</p>
+        <AddToCart
+          item={item}
+          variant="card"
+          quantityInCart={quantityInCart}
+          hotline={hotline}
+          onAdd={(q) => onAdd?.(q)}
+          onChangeQty={(q) => onChangeQty?.(q)}
+          onRequestRemove={() => onRequestRemove?.()}
+        />
+      </article>
+    );
+  }
+
   return (
     <article className={s.rail} aria-labelledby={titleId}>
       {/* Link ảnh chỉ để bấm, bỏ khỏi thứ tự Tab: mỗi thẻ một điểm dừng là tên. */}
@@ -95,17 +141,16 @@ export default function ProductCard({ item, variant = "rail", href, hotline }: P
       <PriceTag amount={item.price} unit={item.unit} size="rail" tone={out ? "muted" : "default"} />
       <p className={s.note}>{item.shortNote ?? ""}</p>
       {out ? (
-        phone ? (
-          <Button
-            href={`tel:${phone}`}
-            variant="secondary"
-            fullWidth
-            className={s.buy}
-            iconStart={<Icon name="phone" size={18} />}
-          >
-            Liên hệ chúng tôi
-          </Button>
-        ) : null
+        <Button
+          href={contactTarget(hotline)}
+          variant="secondary"
+          fullWidth
+          className={s.buy}
+          iconStart={<Icon name="phone" size={18} />}
+          aria-label={`Liên hệ Cá Về hỏi hàng ${item.name}`}
+        >
+          Liên hệ chúng tôi
+        </Button>
       ) : (
         <Button
           href={href}

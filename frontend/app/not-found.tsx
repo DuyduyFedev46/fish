@@ -9,7 +9,7 @@ import s from "./not-found.module.css";
 // Lệch bảng 02b §1.4 (ghi 404 dùng `sub`, không BottomNav): làm theo màn theo yêu cầu điều phối, ghi ở 03-dev-notes-mkt.md.
 export const metadata: Metadata = {
   title: { absolute: "Không tìm thấy trang — Cá Về" },
-  robots: { index: false, follow: true },
+  // Không khai robots: Next.js tự chèn <meta name="robots" content="noindex"> cho trang 404; khai thêm thành 2 thẻ (QA lô 2 L3).
 };
 
 export default function NotFound() {

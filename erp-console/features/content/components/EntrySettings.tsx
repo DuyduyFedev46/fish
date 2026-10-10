@@ -4,18 +4,14 @@
 // Bài nháp: "Lưu nháp" + "Gửi duyệt". Bài đã gửi duyệt/đã đăng: "Lưu thay đổi" + "Quay lại".
 // Loại nội dung chỉ chọn được khi bài chưa lưu. Vai trò trang bắt buộc bị khoá khi trang đang đăng.
 
-import { ENUMS } from "@/shared/lib/enums";
 import { Field } from "@/shared/ui/form/Field";
 import { FormPage } from "@/shared/ui/form/FormPage";
 import { coverImageOf, type EntryForm } from "../contentModel";
+import { PAGE_ROLE_OPTIONS } from "../pageRoles";
 import { CONTENT_MSG as M } from "../messages";
 import type { ContentCategory, ContentImage, ContentKind, ContentPageRole } from "../types";
 import s from "../content.module.css";
 
-const PAGE_ROLE_OPTIONS: { value: string; label: string }[] = [
-  { value: "", label: M.fieldPageRoleNone },
-  ...Object.entries(ENUMS.entryPageRole).map(([value, v]) => ({ value, label: v.label })),
-];
 
 type Props = {
   form: EntryForm;

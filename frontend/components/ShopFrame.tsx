@@ -4,7 +4,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import type { MouseEvent, ReactNode } from "react";
 import { getCatalog } from "@/lib/api";
-import { pickHotline } from "@/lib/phone";
+import { pickHotline, zaloUrlOf } from "@/lib/phone";
 import { getFooterLinks, getSiteInfo } from "@/features/site/api";
 import type { FooterLinkItem, SiteInfoResponse } from "@/features/site/types";
 import BottomNav, { type BottomNavTab } from "./BottomNav";
@@ -41,14 +41,6 @@ export interface ShopFrameProps {
 
 // Dải chữ đầu trang máy tính (06-marketing K2, ĐÃ ĐỐI CHIẾU). Chờ CMS hỗ trợ (SHOP-5-03).
 const INTRO_TEXT = "Hải sản cấp đông theo lô · mua từ 1 kg · giao tận nhà";
-
-function zaloUrlOf(raw?: string | null): string | undefined {
-  const v = raw?.trim();
-  if (!v) return undefined;
-  if (/^https:\/\//i.test(v)) return v;
-  const digits = v.replace(/\D/g, "");
-  return digits ? `https://zalo.me/${digits}` : undefined;
-}
 
 /** Khung trang Shop: header, nội dung, footer, thanh đáy. Mỗi màn tự bọc (02b §1.4). */
 export default function ShopFrame({
@@ -111,7 +103,7 @@ export default function ShopFrame({
       footerLinks.map((l) => ({
         // Tên link lấy đúng tiêu đề CMS (lệnh nạp đặt trang `terms` là "Điều kiện giao dịch chung").
         label: l.title,
-        href: `/trang/?slug=${encodeURIComponent(l.slug)}`,
+        href: `/pages/?slug=${encodeURIComponent(l.slug)}`,
       })),
     [footerLinks]
   );

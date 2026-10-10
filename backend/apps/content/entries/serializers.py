@@ -91,7 +91,7 @@ class EntryDetailSerializer(serializers.ModelSerializer):
         if obj.first_published_at is None:
             return None
         base_url = getattr(settings, "SHOP_BASE_URL", "").rstrip("/")
-        path = f"/bai-viet/?slug={obj.slug}" if obj.kind == "post" else f"/trang/?slug={obj.slug}"
+        path = f"/blog/?slug={obj.slug}" if obj.kind == "post" else f"/pages/?slug={obj.slug}"
         return f"{base_url}{path}"
 
     def get_first_published_at(self, obj: Entry) -> str | None:

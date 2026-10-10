@@ -13,7 +13,9 @@ from apps.content.body.scan import scan_entry_warnings
 from apps.content.models.entries import Entry, EntryVersion
 from apps.content.models.images import ContentImage
 
-GOLIVE_PAGE_ROLES = ("privacy", "terms", "refund", "seller_info")
+# Vai trò trang bắt buộc go-live: mỗi vai trò một trang, không gỡ được khi đang hiệu lực, có lịch sử phiên bản
+# (BR-ND-16). SHOP-5-02 thêm shipping/payment/complaints (BR-ND-20).
+GOLIVE_PAGE_ROLES = ("privacy", "terms", "refund", "seller_info", "shipping", "payment", "complaints")
 
 PROTECTED_FIELDS = {
     "status",
@@ -546,7 +548,7 @@ def publish_entry(
             note="",
         )
 
-        public_path = f"/bai-viet/?slug={entry.slug}" if entry.kind == "post" else f"/trang/?slug={entry.slug}"
+        public_path = f"/blog/?slug={entry.slug}" if entry.kind == "post" else f"/pages/?slug={entry.slug}"
         shop_base = getattr(settings, "SHOP_BASE_URL", "http://localhost:3000").rstrip("/")
         return {
             "status": "published",
@@ -955,7 +957,7 @@ def current_policy_version(role: str) -> EntryVersion | None:
 
 def golive_missing_roles() -> list[str]:
     """
-    Danh sách vai trò trong 4 vai trò bắt buộc go-live chưa có trang published (CMS-15-AC7).
+    Danh sách vai trò trong các vai trò bắt buộc go-live (GOLIVE_PAGE_ROLES) chưa có trang published (CMS-15-AC7).
     """
     published_roles = set(
         Entry.objects.filter(page_role__in=GOLIVE_PAGE_ROLES, status="published")

@@ -136,7 +136,7 @@ class PublicContentApiTests(TestCase):
         self.entry_unpub = Entry.objects.create(
             kind="post",
             title="Bài viết đã gỡ",
-            slug="bai-viet-da-go",
+            slug="post-da-go",
             category=self.category,
             status="unpublished",
             row_version=3,

@@ -181,6 +181,18 @@ function ItemFormBody({ type }: { type: "SIMPLE" | "BUNDLE" }) {
           )}
           <Switch label={M.fieldItemActive} checked={draft.isActive} onChange={set("isActive")} disabled={locked} />
         </FormGrid>
+      </FormSection>
+
+      <FormSection title={M.sectionShopText}>
+        <p className="muted">{M.shopTextHint}</p>
+        <FormGrid>
+          <Field label={M.fieldShortNote} name="short_note" value={draft.shortNote} onChange={set("shortNote")} maxLength={ITEM_LIMITS.shortNote} counter error={errs.shortNote ?? sub.fieldErrors.short_note} disabled={locked} />
+          <Field label={M.fieldOrigin} name="origin" value={draft.origin} onChange={set("origin")} maxLength={ITEM_LIMITS.text} error={errs.origin ?? sub.fieldErrors.origin} disabled={locked} />
+        </FormGrid>
+        <FormGrid>
+          <Field as="textarea" label={M.fieldSpec} name="spec" value={draft.spec} onChange={set("spec")} rows={2} maxLength={ITEM_LIMITS.text} counter error={errs.spec ?? sub.fieldErrors.spec} disabled={locked} />
+          <Field as="textarea" label={M.fieldStorage} name="storage" value={draft.storage} onChange={set("storage")} rows={2} maxLength={ITEM_LIMITS.text} counter error={errs.storage ?? sub.fieldErrors.storage} disabled={locked} />
+        </FormGrid>
         <Field as="textarea" label={M.fieldItemDescription} name="description" value={draft.description} onChange={set("description")} rows={2} maxLength={ITEM_LIMITS.description} counter error={errs.description ?? sub.fieldErrors.description} disabled={locked} />
       </FormSection>
 

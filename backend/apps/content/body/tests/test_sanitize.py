@@ -138,7 +138,7 @@ class SanitizeBodyTests(TestCase):
                     "ordered": True,
                     "items": [
                         [{"text": "Mục 1", "marks": ["bold"]}],
-                        [{"text": "Mục 2", "href": "/bai-viet"}],
+                        [{"text": "Mục 2", "href": "/blog"}],
                     ],
                 },
                 {"type": "item_card", "item_code": "CA-THU-1KG"},

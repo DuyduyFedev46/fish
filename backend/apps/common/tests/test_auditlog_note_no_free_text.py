@@ -397,6 +397,8 @@ class AiScrubCoversFreeTextFieldsTests(TestCase):
     # Field cố ý KHÔNG nằm trong danh sách lọc AI, kèm lý do.
     ALLOWED_UNSCRUBBED = {
         ("catalog.Item", "description"): "mô tả hàng hoá công khai, không có dữ liệu khách",
+        ("catalog.Item", "short_note"): "ghi chú ngắn công khai của món (SHOP-2b-01, BR-DM-25 cấm SĐT/giá/mã lô); "
+                                        "AuditLog update_item chỉ ghi tên trường",
         ("content.Category", "description"): "mô tả chuyên mục công khai",
         ("content.Entry", "seo_description"): "mô tả SEO công khai",
         ("content.EntryVersion", "seo_description"): "mô tả SEO công khai",
