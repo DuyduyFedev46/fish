@@ -11,6 +11,7 @@ import { useAuth } from "@/features/auth/components/AuthProvider";
 import { ApiError, loadErrorText } from "@/shared/lib/http";
 import { ENUMS } from "@/shared/lib/enums";
 import { dateTime, vnd } from "@/shared/lib/format";
+import { personalText } from "@/shared/lib/personalData";
 import { PERM, onlyDelivery } from "@/shared/lib/nav";
 import { usePagedList } from "@/shared/lib/usePagedList";
 import { Chip } from "@/shared/ui/Chip";
@@ -75,7 +76,8 @@ export function SalesInvoiceListScreen() {
   if (list.error instanceof ApiError && list.error.status === 403) return <NoPermission />;
 
   const showCost = me.can_view_cost;
-  const showCustomer = me.permissions.includes(PERM.viewCustomerList);
+  // Cột Khách theo V2 `sales.view_order_customer_info` (PV-07, Q-4): BE trả tên theo V2, không theo `view_customer_list`.
+  const showCustomer = me.permissions.includes(PERM.viewOrderCustomerInfo);
   const canOpenOrder = me.permissions.includes(PERM.viewSalesOrder) && !onlyDelivery(me);
   const totals = totalsBox && totalsBox.key === JSON.stringify(params) && list.rows ? totalsBox.totals : null;
   const filtering = !!(query.trim() || status || from || to);
@@ -102,7 +104,7 @@ export function SalesInvoiceListScreen() {
           cancelledText(r, r.order_code)
         ),
     },
-    ...(showCustomer ? [{ key: "customer", header: "Khách hàng", hideBelow: 800 as const, render: (r: SalesInvoiceRow) => r.customer_name || <span className="muted">—</span> }] : []),
+    ...(showCustomer ? [{ key: "customer", header: "Khách hàng", hideBelow: 800 as const, render: (r: SalesInvoiceRow) => (r.customer_name === null ? <span className="muted">{personalText(null, "—", r.customer_hidden_reason)}</span> : r.customer_name || <span className="muted">—</span>) }] : []),
     { key: "issued", header: "Ngày xuất", tabular: true, width: "140px", render: (r) => dateTime(r.issued_at) },
     { key: "amount", header: "Số tiền", num: true, render: (r) => cancelledText(r, vnd(r.amount)) },
     { key: "cogs", header: "Giá vốn", num: true, locked: true, hideBelow: 800, render: (r) => (r.cogs === undefined ? "—" : vnd(r.cogs)) },

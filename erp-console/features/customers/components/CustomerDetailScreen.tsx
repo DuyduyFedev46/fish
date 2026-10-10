@@ -23,6 +23,7 @@ import { Icon } from "@/shared/ui/Icon";
 import { DataTable, type Column } from "@/shared/ui/list/DataTable";
 import { useToast } from "@/shared/ui/overlay/Toast";
 import { PersonalText } from "@/shared/ui/PersonalText";
+import { ScopeLostInApp } from "@/features/auth/components/AppStates";
 import { ErrorScreen } from "@/shared/ui/states/ErrorScreen";
 import { NoPermission } from "@/shared/ui/states/NoPermission";
 import { NotFoundScreen } from "@/shared/ui/states/NotFoundScreen";
@@ -61,6 +62,7 @@ export function CustomerDetailScreen() {
   if (id === undefined) return <DetailSkeleton />;
   if (id === null) return <NotFoundScreen homeHref={home} />;
   if (detail.status === "forbidden") return <NoPermission homeHref={home} />;
+  if (detail.status === "scope_lost") return <ScopeLostInApp listHref="/customers/" />;
   if (detail.status === "notfound") return <NotFoundScreen homeHref={home} />;
   if (detail.status === "error") return <ErrorScreen homeHref={home} onRetry={() => void detail.reload()} />;
   if (detail.status === "loading" || !detail.data) return <DetailSkeleton />;

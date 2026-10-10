@@ -155,6 +155,8 @@ export const PERM = {
   viewPrivacyConsent: "sales.view_privacy_consent",
   /** B2 (02b): xem danh bạ khách — quyền Tầng 2 mới, khác `sales.view_customer` (phạm vi dòng của nv_kho, nv_giao). */
   viewCustomerList: "sales.view_customer_list",
+  /** V2 — xem thông tin khách (tên, SĐT, địa chỉ) trên đơn, hoá đơn, phiếu hoàn tiền. */
+  viewOrderCustomerInfo: "sales.view_order_customer_info",
   /** B6 (02b): giao / đổi người giao phiếu. */
   assignDelivery: "delivery.assign_deliverynote",
   viewSupplier: "purchasing.view_supplier",

@@ -505,3 +505,39 @@ Theo `02c-quyet-dinh-08-10.md` §G.3 và điều kiện đóng F1 ở `03b-revie
 - Mock `gate_capability: "view_sales_invoices"` khiến dòng Hoá đơn bán mờ khi tắt V1 (khớp BE). Phiên đăng nhập mock không đổi quyền theo việc đã bật/tắt (ghi chú cũ của `mock.ts`).
 
 **Kiểm chứng Lô 6 FE:** `tsc --noEmit` sạch; `vitest` 105 file / 1285 test PASS; build thật (`USE_MOCK=0`) sạch, `check-no-mock` XANH (32 file mock, 208 chuỗi seed, 258 file), `check-ai-chunks` XANH (48 màn + 2 layout), grep `cave_erp_mock` trong `out/` rỗng; e2e mock `ed_batch14_permissions` 158/158 PASS (AI tắt và bật), `standard_names_all_routes` 11/11 PASS (AI tắt và bật); `check_naming.py` OK.
+
+## Lô 7 FE (10/10) — fe-dev, nhánh `feat/pv7-fe` (từ `feat/pv6-cum` 57641b1)
+
+Theo `02b` §6.1 (PV-13 FE, PV-14 FE, §2.7 chữ ô khách, 2 lệch FE). Chỉ sửa `erp-console/` trong danh sách §6.1.5. Không đụng `backend/`, `shared/ui/**`, `features/{ai,permissions,overview,audit}`, `app/**`, e2e cũ, `package*.json`.
+
+**Tái hiện lỗi trước khi sửa:** 3 hook `orders/useDetail.ts`, `customers/useCustomerDetail.ts`, `returns/useReturnDetail.ts` giữ dữ liệu cũ (status `ok`) khi tải lại bị 404, nên màn vẫn vẽ tên/SĐT/địa chỉ khách sau khi mất quyền. Viết test trước (`*.test.ts` cạnh hook), chạy ra 4 ca đỏ (đang ok → tải lại 404 phải thành `scope_lost` và `data === null`; ca "tải lại thành công sau scope_lost" cũng đỏ vì không có trạng thái này), sửa, rồi xanh.
+
+**Đã làm:**
+1. **PV-13 hook.** `DetailStatus` thêm `"scope_lost"` (3 hook). Điều kiện duy nhất: `keep` (tải lại) + `ApiError.status === 404` + trước đó đã `ok`. Khi đó `setData(null)`. 403/500/mạng giữ hành vi cũ. Tải lần đầu 404 vẫn `notfound` (ED-19-AC6). Trạng thái hiện hành lưu thêm trong `statusRef` để `catch` không phụ thuộc closure cũ.
+2. **PV-13 màn.** `ScopeLostInApp({ listHref, extra })` ở `features/auth/components/AppStates.tsx` (h2 `role="alert"`, nút "Về danh sách"). `DetailGate` nhận prop bắt buộc `listHref` (đơn `/orders/`, phiếu hoàn tiền `/orders/refunds/`, khoản tiền `/orders/payments/`). Khách, hàng hoàn dùng thẳng. Phiếu giao: `listHref = homeHref` (NV giao về `homePath(me)`). Gọi xác nhận, phiếu giao, phiếu nhập tự tải nên thêm `scope_lost` vào kiểu `Load`; khi vào trạng thái này xoá `detail`, `history` (và guidance ở phiếu nhập), đóng modal.
+3. **PV-13-AC2.** `features/purchasing/receiptScope.ts::isOwnReceiptFromEarlierDay(row, meId, now)` (giờ VN qua `dateKeyInVietnam`/`todayInVietnam`) + câu `scopeLostOwnReceiptEarlierDay`. Phiếu nhập tính cờ từ bản `ready` trước khi xoá dữ liệu.
+4. **PV-13-AC3.** `usePagedList.loadMore` gặp 404 → `loadFirst(true)` (giữ dòng cũ tới khi có kết quả), không đặt `moreError`; lỗi khác vẫn báo.
+5. **Thao tác trả 404 (không qua nút Tải lại).** Gọi xác nhận: `claimThen` gặp 404 trước đây đặt `notfound`; nay gọi cùng `loseScope()` (đã có dữ liệu → `scope_lost`, chưa có → `notfound`). Các màn khác: thao tác lỗi 404/409 hiện hộp "Tải lại", bấm thì đi qua đường tải lại ở trên.
+6. **§2.7.** `personalText(value, whenEmpty, reason?)` + `CustomerHiddenReason`; `MSG.personalDataNotPermitted`. Kiểu: `customer_hidden_reason?` ở `OrderListItem`, `OrderDetail` (khoá cấp trên của `customer`, đúng BE `orders/serializers.py`), `RefundQueueItem` (tên/SĐT thành `string | null`), `SalesInvoiceRow`. 4 chỗ vẽ `<span className="muted">{personalText(null, "—", reason)}</span>` khi `null`: `OrdersScreen`, `OrderDetailScreen` (tên, SĐT, địa chỉ), `RefundDetailScreen` (tên, SĐT), `SalesInvoiceListScreen`. `PersonalText` giữ nguyên.
+7. **Lệch FE hoá đơn bán.** Cột Khách mở theo `PERM.viewOrderCustomerInfo = "sales.view_order_customer_info"` (thêm vào `nav.ts`), thay `viewCustomerList`.
+8. **PV-14.** `Me.data_scopes?: DataScopeRow[]`. Khối "Dữ liệu bạn xem được" đặt sau "Việc bạn được làm" trong `AccountScreen` (danh sách định nghĩa, 360px xếp dọc, từ 520px hai cột). Logic dựng dòng ở `features/auth/dataScopeView.ts` (hàm thuần): chữ phụ theo nhóm, "theo quyền gán riêng", dòng `none` mờ; superuser có dòng "Toàn bộ (quản trị hệ thống)"; thiếu `data_scopes` → "Chưa có thông tin phạm vi dữ liệu.". Không nút, không ô nhập. Icon `shield_person` đã có trong tập con font.
+9. **Mock.** `auth/mock.ts`: `buildMockDataScopes` theo bảng 02b §6.1.3 (rộng nhất, hoà thì nhóm đứng trước; không nhóm toàn `none`; superuser rộng nhất, `via_group` null; kiểm cổng quyền như BE), chép bảng vào file, không import `features/permissions`. Thêm `sales.view_order_customer_info` vào quyền mock của cả 5 nhóm (khớp migration BE 0016). `orders/mock.ts`: `hiddenReason(me, o)` (thiếu V2 → `not_permitted` đứng trước; NV giao quá cửa sổ → `expired`) cho danh sách, chi tiết, phiếu hoàn tiền. `accounting/mock.ts`: tên khách hoá đơn theo V2.
+
+**Lệch / điểm cần biết:**
+- **Hàm hỗ trợ test hook:** thêm `shared/lib/fakeReactHooks.ts` (bộ hook giả `useState/useRef/useCallback/useMemo/useEffect` + `renderHook`), dùng qua `vi.mock("react", …)`, vì repo chưa có jsdom hay testing-library và `package.json` bị cấm sửa. Không có trong danh sách §6.1.5, ghi lại để Tech Lead duyệt. File thuần test, không được app import.
+- **`features/auth/dataScopeView.ts` (+ test)** cũng là file mới ngoài danh sách (nằm trong thư mục auth được phép), để test được "hàm dựng dòng" theo §6.1.6.
+- **`CustomerCell`** viết cục bộ (4 dòng) trong `OrderDetailScreen` và `RefundDetailScreen` thay vì file dùng chung, vì `shared/ui/**` bị cấm.
+- `DetailGate` thêm prop **bắt buộc** `listHref` (3 nơi gọi đã sửa).
+- Mock chỉ thu hẹp phạm vi thật ở màn Đơn (phạm vi theo nhóm). Mock phiếu nhập, phiếu giao, khách, gọi xác nhận, hàng hoàn, phiếu hoàn tiền không lọc theo phạm vi nên e2e mock không dựng được `scope_lost` ở các màn đó; hook của khách và hàng hoàn có vitest riêng, các màn còn lại QA kiểm trên BE thật (ca 1, 2, 3, 5 của §6.1.6) vì mock không có.
+- Chưa có chuỗi được lưu vào URL, storage hay console; kiểm bằng e2e (ca "PV-13-AC5").
+- Câu hỏi 🟡 của 02b §6.1.7 (F5 vẫn là "Không tìm thấy trang này") giữ nguyên theo thiết kế.
+
+**Test mới:** `useDetail.test.ts` (6), `useCustomerDetail.test.ts` (4), `useReturnDetail.test.ts` (4), `usePagedList.test.ts` (3, gồm loadMore 404/500 và "Làm mới"), `receiptScope.test.ts` (6, mốc 23:50 / 00:10 giờ VN), `personalData.test.ts` (thêm 4), `dataScopeView.test.ts` (10, gồm bảng mock §6.1.3).
+E2E mới: `erp-console/e2e/data_scope_loss_account.py` (mock, 38 ca: khối PV-14 bốn vai ở 360/1280 sáng-tối, mất quyền qua banner 409 trên đơn, DOM không còn tên/SĐT, không lộ ở console/URL/storage, lần đầu 404, tải lại 500, thiếu V2 ở danh sách đơn, chi tiết đơn, cột hoá đơn bán).
+
+**Ảnh (scratchpad, không commit):** `…/scratchpad/shots/pv14-{giao1-360-light,giao1-360-dark,kho1-1280-light,admin-360-light}.png`, `pv13-scope-lost-{1280-light,360-dark}.png`, `pv13-not-permitted-1280-light.png`.
+
+**Còn nợ:** chạy `data_scope_loss_account.py` và ca §6.1.6 trên BE thật (`seed_qa`) do QA; ca AC2 trên BE thật cần đặt `created_at` lùi một ngày như hướng dẫn §6.1.6.
+
+
+**Kiểm chứng Lô 7 FE (10/10):** `tsc --noEmit` sạch; `vitest` 111 file / 1322 test PASS (Lô 6 FE: 105 file / 1285); `python3 scripts/check_naming.py` OK (không phát sinh mới); build thật (`USE_MOCK=0`, API staging) sạch, `check-no-mock` XANH (32 file mock, 208 chuỗi seed, 257 file), `check-ai-chunks` XANH (48 màn + 2 layout). Build mock (AI tắt) + `data_scope_loss_account.py` 38/38 PASS, `ed_batch14_permissions.py` 158/158 PASS, `standard_names_all_routes.py` 11/11 PASS. Ghi chú: bản build mock chạy e2e được dựng trước khi đổi icon `verified_user` → `shield_person` (chỉ đổi tên icon, đã build thật lại sau đó).

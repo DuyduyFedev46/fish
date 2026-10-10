@@ -5,9 +5,15 @@ import type { Me } from "@/features/auth/types";
 import { MSG } from "./messages";
 import { ROLE } from "./roles";
 
-/** Chữ hiển thị cho một trường dữ liệu khách: null → "Đã ẩn (quá 7 ngày)", rỗng/thiếu → `whenEmpty`. */
-export function personalText(value: string | null | undefined, whenEmpty = "—"): string {
-  if (value === null) return MSG.personalDataHidden;
+/** Lý do BE ẩn ô khách (`customer_hidden_reason`, §2.7): quá cửa sổ xem, hoặc người xem không có quyền V2. */
+export type CustomerHiddenReason = "expired" | "not_permitted";
+
+/**
+ * Chữ hiển thị cho một trường dữ liệu khách: null → "Đã ẩn (quá 7 ngày)" (hoặc "Đã ẩn (không có quyền xem thông tin khách)"
+ * khi `reason` = "not_permitted"), rỗng/thiếu → `whenEmpty`. Không có `reason` thì giữ chữ cũ.
+ */
+export function personalText(value: string | null | undefined, whenEmpty = "—", reason?: CustomerHiddenReason | null): string {
+  if (value === null) return reason === "not_permitted" ? MSG.personalDataNotPermitted : MSG.personalDataHidden;
   return value || whenEmpty;
 }
 

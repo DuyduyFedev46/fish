@@ -10,10 +10,12 @@ import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/features/auth/components/AuthProvider";
 import type { Me } from "@/features/auth/types";
+import { ScopeLostInApp } from "@/features/auth/components/AppStates";
 import { PurchaseInvoiceForm } from "@/features/accounting/components/PurchaseInvoiceForm";
 import { toTimelineEntries } from "@/features/guidance/detailAdapters";
 import type { GuidanceData } from "@/features/guidance/types";
 import { ApiError } from "@/shared/lib/http";
+import { MSG } from "@/shared/lib/messages";
 import { ENUMS } from "@/shared/lib/enums";
 import { dateOnly, kg, vnd } from "@/shared/lib/format";
 import { PERM } from "@/shared/lib/nav";
@@ -32,13 +34,14 @@ import { NoPermission } from "@/shared/ui/states/NoPermission";
 import { NotFoundScreen } from "@/shared/ui/states/NotFoundScreen";
 import { useOfflineRegistration } from "@/shared/ui/states/offlineSource";
 import { fetchReceipt, fetchReceiptGuidance } from "../api";
+import { isOwnReceiptFromEarlierDay } from "../receiptScope";
 import { RECEIPT_STEPS, cancelBlockReason, canCancelReceipt, idFromSearch, nextReceiptStep, receiptAbility, receiptDoneLabels, receiptPathOf } from "../receiptView";
 import type { ReceiptDetail } from "../types";
 import { CancelReceiptModal, SubmitReceiptModal } from "./ReceiptActionModals";
 import { ReceiptCostsSection, ReceiptInvoicesSection, ReceiptLinesSection } from "./ReceiptSections";
 import s from "../purchasing.module.css";
 
-type Load = { k: "loading" } | { k: "ready"; row: ReceiptDetail; asOf: string } | { k: "error" } | { k: "notfound" } | { k: "forbidden" };
+type Load = { k: "loading" } | { k: "ready"; row: ReceiptDetail; asOf: string } | { k: "error" } | { k: "notfound" } | { k: "forbidden" } | { k: "scope_lost"; ownEarlierDay: boolean };
 type ModalKind = "submit" | "cancel" | "invoice" | null;
 
 /** Mục tiêu cho khối Trợ lý AI: page ghép khối này (feature màn hình không import features/ai, 02b §2.3). */
@@ -78,7 +81,18 @@ function Loaded({ id, me, renderAi }: { id: number; me: Me; renderAi?: RenderAi 
       .then((row) => live() && setLoad({ k: "ready", row, asOf: new Date().toISOString() }))
       .catch((err: unknown) => {
         if (!live()) return;
-        if (err instanceof ApiError && err.status === 404) setLoad({ k: "notfound" });
+        if (err instanceof ApiError && err.status === 404) {
+          // PV-13: đã có dữ liệu phiếu mà tải lại 404 → mất quyền; xoá dữ liệu cũ, chỉ giữ cờ AC2 (tính từ bản trước khi xoá).
+          // Tải lần đầu 404 vẫn là "Không tìm thấy" (ED-19-AC6).
+          setLoad((cur) =>
+            cur.k === "ready"
+              ? { k: "scope_lost", ownEarlierDay: isOwnReceiptFromEarlierDay(cur.row, me.id) }
+              : cur.k === "scope_lost"
+                ? cur
+                : { k: "notfound" },
+          );
+          setGuidance(null);
+        }
         else if (err instanceof ApiError && err.status === 403) setLoad({ k: "forbidden" });
         else setLoad((cur) => (cur.k === "ready" ? cur : { k: "error" })); // đã có số liệu thì giữ, dải mất mạng lo phần còn lại
       });
@@ -91,7 +105,7 @@ function Loaded({ id, me, renderAi }: { id: number; me: Me; renderAi?: RenderAi 
       })
       .catch(() => live() && setGuidanceError(true));
     return () => ac.abort();
-  }, [id, version]);
+  }, [id, version, me.id]);
 
   useOfflineRegistration(load.k === "ready" ? { asOf: load.asOf, onRetry: reload } : null);
 
@@ -102,6 +116,7 @@ function Loaded({ id, me, renderAi }: { id: number; me: Me; renderAi?: RenderAi 
       </SkeletonScreen>
     );
   }
+  if (load.k === "scope_lost") return <ScopeLostInApp listHref="/purchasing/" extra={load.ownEarlierDay ? MSG.scopeLostOwnReceiptEarlierDay : null} />;
   if (load.k === "notfound") return <NotFoundScreen homeHref="/purchasing/" />;
   if (load.k === "forbidden") return <NoPermission homeHref="/purchasing/" />;
   if (load.k === "error") return <ErrorScreen onRetry={reload} homeHref="/purchasing/" />;
