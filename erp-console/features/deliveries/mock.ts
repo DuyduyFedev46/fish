@@ -935,7 +935,7 @@ export function mockGetDeliveryLabel(
     reprint_reason: isReprint ? "REPRINT" : null,
     barcode_value: `${item.code}.${pNo}`,
     recipient_name: item.recipient_name || item.customer_name || "",
-    recipient_phone_masked: "09xx xxx 123",
+    recipient_phone_masked: "xxxxxx4567",
     address: item.address || "",
     packages: "1/1",
     total_kg: item.total_kg,
