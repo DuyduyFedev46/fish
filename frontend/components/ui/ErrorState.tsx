@@ -1,4 +1,5 @@
 import Button from "./Button";
+import { telHref } from "../shopLinks";
 import Icon from "./Icon";
 import { ProductCardSkeleton } from "./Skeleton";
 import s from "./ErrorState.module.css";
@@ -11,6 +12,8 @@ export interface ErrorStateProps {
   retrying?: boolean;
   /** Khung xương mờ đứng yên phía dưới, gợi chỗ hàng sẽ hiện. */
   showGhostGrid?: boolean;
+  /** Có số hotline hợp lệ thì hiện thêm nút "Gọi …" cạnh "Thử lại" (A6, DE9). */
+  hotline?: string;
 }
 
 /**
@@ -23,6 +26,7 @@ export default function ErrorState({
   onRetry,
   retrying = false,
   showGhostGrid = true,
+  hotline,
 }: ErrorStateProps) {
   return (
     <div className={s.wrap}>
@@ -41,6 +45,11 @@ export default function ErrorState({
         >
           Thử lại
         </Button>
+        {hotline ? (
+          <Button variant="outline" shape="pill" href={telHref(hotline)}>
+            Gọi {hotline}
+          </Button>
+        ) : null}
       </section>
       {showGhostGrid ? (
         <div className={s.ghost} aria-hidden="true">

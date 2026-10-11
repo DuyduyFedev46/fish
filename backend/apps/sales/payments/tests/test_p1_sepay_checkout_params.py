@@ -59,6 +59,11 @@ class CheckoutParamsBase(TestCase):
 
 
 class P1AC1HappyPathTests(CheckoutParamsBase):
+    def test_qa_l11_public_response_does_not_name_the_payment_gateway(self):
+        data = self._checkout().json()
+        self.assertNotIn("gateway", data)
+        self.assertNotIn("SEPAY", [str(v).upper() for v in data.values() if isinstance(v, str)])
+
     def test_p1_ac1_returns_signed_checkout_params(self):
         resp = self._checkout()
         self.assertEqual(resp.status_code, 200, resp.content)

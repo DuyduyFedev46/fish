@@ -31,7 +31,7 @@ export interface CartSummaryProps {
   /** Nhãn dòng tổng. Mặc định "Tổng tiền hàng"; thanh toán ghi "Cần thanh toán". */
   totalLabel?: string;
   /** Danh sách món rút gọn, chỉ hiện từ máy tính (bước đặt hàng và thanh toán). */
-  lines?: { name: string; qtyText: string; amount: Money }[];
+  lines?: { name: string; qtyText: string; amount: Money; /** "1 kg × 278.000đ" dưới tên món (máy tính). */ unitText?: string }[];
   /** Dòng cảnh báo `role="alert"` ngay trên nút (vd. "Bỏ món đã hết để đặt hàng."). */
   notice?: { id: string; text: string };
   cta: {
@@ -91,7 +91,11 @@ export default function CartSummary({
             <li key={`${l.name}-${l.qtyText}`} className={s.line}>
               <span className={s.lineName}>
                 {l.name}
-                <span className={s.lineQty}> · {l.qtyText}</span>
+                {l.unitText ? (
+                  <span className={s.lineUnit}>{l.unitText}</span>
+                ) : (
+                  <span className={s.lineQty}> · {l.qtyText}</span>
+                )}
               </span>
               <span className="num">{formatPriceVnd(l.amount)}</span>
             </li>

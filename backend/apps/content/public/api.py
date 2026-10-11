@@ -1,7 +1,7 @@
 """
 API công khai nội dung (§8.6 02b-tech-design).
 - Quyền: AllowAny (chỉ GET, HEAD, OPTIONS). Mọi method khác tự động trả 405.
-- Throttle: PublicContentThrottle (scope: public_content, mặc định 120/min).
+- Throttle: PublicContentThrottle (scope: public_content, mặc định 600/min).
 - Cache-Control: public, max-age=CONTENT_PUBLIC_CACHE_SECONDS.
 - Tuyệt đối không rò rỉ giá vốn hay dữ liệu khách (Bất biến 1, 9).
 """

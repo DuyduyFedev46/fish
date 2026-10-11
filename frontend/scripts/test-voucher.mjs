@@ -64,6 +64,12 @@ eq("giỏ rỗng chưa nạp -> chưa xoá", m.shouldClearVoucher(false, 0), fal
 eq("giỏ có món -> giữ", m.shouldClearVoucher(true, 2), false);
 eq("BETTER_PROMO kèm số", m.voucherMessage("BETTER_PROMO", null, "60000"), "Ưu đãi đang áp (−60.000đ) đã có lợi hơn mã này.");
 
+// B2 QA lô 7: luôn gửi mã đã áp, kể cả khi chưa kiểm lại xong
+eq("gửi mã của hook", m.voucherCodeToSend("CAVE10", "CAVE10", false), "CAVE10");
+eq("hook chưa nạp thì lấy mã đã lưu", m.voucherCodeToSend(null, "CAVE10", false), "CAVE10");
+eq("không có mã", m.voucherCodeToSend(null, null, false), undefined);
+eq("đặt không dùng mã", m.voucherCodeToSend("CAVE10", "CAVE10", true), undefined);
+
 // Vân tay dòng: không phụ thuộc thứ tự
 eq("itemsKey", m.itemsKey([{ item_code: "B", qty: "1" }, { item_code: "A", qty: "1.5" }]), m.itemsKey([{ item_code: "A", qty: "1.5" }, { item_code: "B", qty: "1" }]));
 

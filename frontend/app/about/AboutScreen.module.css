@@ -24,6 +24,20 @@
   font-weight: 600;
 }
 
+/* Cột chữ của hero; thẻ món nổi nằm dưới (điện thoại) hoặc bên phải (máy tính). */
+.heroMain {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.heroCard {
+  width: 100%;
+  max-width: 280px;
+  color: var(--ink);
+}
+
 .heroTitle {
   max-width: 12ch;
   margin: 0;
@@ -171,6 +185,17 @@
 
   .heroTitle {
     font-size: 52px;
+  }
+
+  .heroWithCard {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-8);
+  }
+
+  .heroCard {
+    flex: 0 0 260px;
   }
 
   .heroActions,

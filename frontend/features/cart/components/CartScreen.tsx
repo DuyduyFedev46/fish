@@ -1,8 +1,10 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getCatalog } from "@/lib/api";
+import { getSiteInfo } from "@/features/site/api";
 import { formatPriceVnd } from "@/lib/format";
 import { formatQty, qtyToApiString } from "@/lib/quantity";
 import type { CatalogItem } from "@/lib/types";
@@ -40,7 +42,8 @@ export default function CartScreen() {
   const [loadState, setLoadState] = useState<"loading" | "ready" | "error">("loading");
   const [retrying, setRetrying] = useState(false);
   const [adjustedNotice, setAdjustedNotice] = useState(false);
-  const [blocked, setBlocked] = useState(false);
+  const [, setBlocked] = useState(false);
+  const [holdMinutes, setHoldMinutes] = useState<number | null>(null);
   const [pending, setPending] = useState<string | null>(null);
   const [live, setLive] = useState("");
   const headingRef = useRef<HTMLHeadingElement>(null);
@@ -59,6 +62,20 @@ export default function CartScreen() {
   useEffect(() => {
     load(true);
   }, [load]);
+
+  // Số phút giữ hàng đọc từ cấu hình máy chủ, không viết cứng (DK4).
+  useEffect(() => {
+    let active = true;
+    getSiteInfo()
+      .then((info) => {
+        const m = info?.policies?.hold_minutes;
+        if (active && typeof m === "number" && m > 0) setHoldMinutes(m);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const result = useMemo(
     () => reconcileCart(cart.lines, loadState === "ready" ? catalog : null),
@@ -312,6 +329,10 @@ export default function CartScreen() {
             })}
           </ul>
           <p className={s.rule}>Mua tối thiểu 1 kg mỗi món.</p>
+          <div className={s.deskNote}>
+            {holdMinutes ? <p>Hàng được giữ {holdMinutes} phút sau khi đặt. Khi còn nằm trong giỏ, hàng chưa được giữ.</p> : null}
+            <Link href="/shop/">Mua thêm hàng khác</Link>
+          </div>
         </div>
         <div className={s.summaryCol}>
           <CartSummary
@@ -322,7 +343,7 @@ export default function CartScreen() {
             total={total}
             discount={quote && voucher.code ? { code: voucher.code, amount: quote.discount_amount } : undefined}
             voucher={{ field: voucherFields, note: voucherNote }}
-            notice={blocked && result.outCount > 0 ? { id: NOTICE_ID, text: "Bỏ món đã hết để đặt hàng." } : undefined}
+            notice={result.outCount > 0 ? { id: NOTICE_ID, text: "Bỏ món đã hết để đặt hàng." } : undefined}
             cta={{
               label: "Tiếp tục: nhập thông tin nhận hàng",
               labelDesktop: "Tiếp tục",
@@ -335,7 +356,7 @@ export default function CartScreen() {
   }
 
   return (
-    <ShopFrame header="sub" title="Giỏ hàng" showCart={false} desktopHeader="compact" footer="compact" bottomNav={false} backHref="/shop/">
+    <ShopFrame header="sub" title={cart.ready ? `Giỏ hàng (${cart.lines.length})` : "Giỏ hàng"} showCart={false} desktopHeader="compact" footer="compact" bottomNav={false} backHref="/shop/">
       <div className={s.page}>
         <div className={s.head}>
           <h1 ref={headingRef} tabIndex={-1} className={s.title}>

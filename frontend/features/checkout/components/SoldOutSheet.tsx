@@ -72,7 +72,7 @@ export default function SoldOutSheet({
               <div className={s.text}>
                 <span className={s.name}>{l.name}</span>
                 {l.level === "out" || (l.level === "short" && atMin) ? (
-                  <span className={s.note}>{l.level === "out" ? "Đã hết" : "Không đủ hàng"} · sẽ bỏ khỏi đơn</span>
+                  <span className={s.note}>{l.level === "out" ? "Đã hết" : "Không đủ hàng"} · sẽ bỏ khỏi giỏ</span>
                 ) : l.changed ? (
                   <span className={s.noteGood}>
                     Đã đổi thành {formatQty(l.minQty)} {l.unit}
@@ -90,7 +90,7 @@ export default function SoldOutSheet({
               ) : null}
               {l.level === "out" ? (
                 <Button
-                  variant="secondary"
+                  variant="ghost"
                   size="sm"
                   href={contactTarget(hotline)}
                   aria-label={`Liên hệ Cá Về hỏi hàng ${l.name}`}

@@ -178,7 +178,6 @@ def build_checkout_params(*, order, now=None):
     fields.append({"name": "signature", "value": signature})
 
     return {
-        "gateway": "SEPAY",
         "environment": environment,
         "checkout_url": checkout_url,
         "fields": fields,

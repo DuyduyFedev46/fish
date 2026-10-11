@@ -146,6 +146,7 @@ export default function HomeScreen() {
           {state === "error" ? (
             <div className={s.errorBox}>
               <ErrorState
+                hotline={hotline}
                 title="Chưa tải được hàng"
                 description="Kiểm tra kết nối mạng rồi thử lại"
                 onRetry={retry}

@@ -30,8 +30,8 @@ import Skeleton from "@/components/ui/Skeleton";
 import TextField from "@/components/ui/TextField";
 import { focusSoon } from "@/components/ui/focusSoon";
 import { useVoucher } from "@/features/cart/useVoucher";
-import { clearVoucherCode } from "@/features/cart/voucherStorage";
-import { minOrderOf, voucherMessage } from "@/features/cart/voucherView";
+import { clearVoucherCode, readVoucherCode } from "@/features/cart/voucherStorage";
+import { minOrderOf, voucherCodeToSend, voucherMessage } from "@/features/cart/voucherView";
 import { cartFingerprint, clearRequestId, getRequestId, renewRequestId } from "../requestId";
 import { saveLookupToken } from "../lookupToken";
 import { shouldOpenFallbackDirectly } from "../googleMaps";
@@ -186,6 +186,7 @@ function CheckoutForm() {
       cart.lines.map((l) => ({
         name: l.name,
         qtyText: `${formatQty(l.qty)} ${l.unit}`,
+        unitText: `${formatQty(l.qty)} ${l.unit} × ${formatPriceVnd(l.price)}`,
         amount: String(Math.round(l.qty * (Number(l.price) || 0))),
       })),
     [cart.lines]
@@ -234,7 +235,8 @@ function CheckoutForm() {
       if (consentRequired && policy) {
         payload.privacy_consent = { accepted: consent, policy_version_id: policy.version_id };
       }
-      if (!opts?.withoutVoucher && voucher.code && voucher.quote) payload.voucher_code = voucher.code;
+      const codeToSend = voucherCodeToSend(voucher.code, readVoucherCode(), !!opts?.withoutVoucher);
+      if (codeToSend) payload.voucher_code = codeToSend;
 
       submittingRef.current = true;
       setSubmitting(true);
@@ -272,7 +274,7 @@ function CheckoutForm() {
     if (code === "VOUCHER_INVALID") {
       // Mã hết hiệu lực giữa lúc điền form (B8): hỏi khách. Mã bị bỏ khỏi giỏ để lần sau không gửi lại.
       setVoucherGone({
-        code: voucher.code ?? "",
+        code: voucher.code ?? readVoucherCode() ?? "",
         fullPrice: localTotal,
         discountedPrice: voucher.quote?.total_after ?? localTotal,
       });
@@ -674,6 +676,11 @@ function CheckoutForm() {
             <Button size="lg" fullWidth loading={submitting} loadingText="Đang đặt…" data-autofocus onClick={() => void send()}>
               Thử lại
             </Button>
+            {hotline ? (
+              <Button variant="outline" size="lg" fullWidth href={contactTarget(hotline)}>
+                Gọi {hotline}
+              </Button>
+            ) : null}
             <Button variant="secondary" size="lg" fullWidth disabled={submitting} onClick={() => setNetworkOpen(false)}>
               Để sau
             </Button>
