@@ -21,6 +21,10 @@ footer_links = api("GET", "/api/public/content/footer-links/")[1]
 def new(browser, width):
     ctx = browser.new_context(viewport={"width": width, "height": 844 if width < 600 else 800})
     page = ctx.new_page()
+    # SHOP-FIX-01: đặt xong tự sang cổng thanh toán; chặn cổng ngoài, ghi lại form POST
+    page.gateway_posts = []
+    page.route(re.compile(r"https://(?!localhost).*sepay.*"), lambda r: (page.gateway_posts.append(r.request.post_data),
+               r.fulfill(status=200, content_type="text/html", body="<html><body>gateway giả lập</body></html>")))
     return ctx, page, PageWatch(page)
 
 
@@ -105,7 +109,7 @@ with sync_playwright() as p:
         page.locator("#f-consent").check()
         cnt = order_count()
         page.get_by_role("button", name="Đặt hàng").click()
-        page.wait_for_url(re.compile(r"/shop/orders/\?code="), timeout=15000)
+        page.wait_for_url(re.compile(r"sepay"), timeout=15000)   # SHOP-FIX-01: vào thẳng cổng
         body = json.loads(posts[0])
         R.ok(f"{tag} tick rồi đặt → payload có privacy_consent {{accepted: true, policy_version_id: số nguyên}}, đơn tạo đúng 1", body["privacy_consent"]["accepted"] is True
              and isinstance(body["privacy_consent"]["policy_version_id"], int) and order_count() == cnt + 1, body.get("privacy_consent"))
@@ -141,14 +145,14 @@ with sync_playwright() as p:
     if btn.count():
         btn.first.click()
         page.wait_for_timeout(1500)
-    if "/shop/orders/" not in page.url:
+    if "sepay" not in page.url:
         page.keyboard.press("Escape")
         page.wait_for_timeout(300)
         if page.locator("#f-consent").count() and not page.locator("#f-consent").is_checked():
             page.locator("#f-consent").check()
         page.get_by_role("button", name="Đặt hàng").click()
         page.wait_for_timeout(2000)
-    R.ok("[360] sau khi đồng ý lại: gửi lại với version mới, đơn tạo đúng 1, không trùng", "/shop/orders/" in page.url and order_count() == cnt + 1, (page.url, order_count() - cnt))
+    R.ok("[360] sau khi đồng ý lại: gửi lại với version mới, đơn tạo đúng 1, không trùng", "sepay" in page.url and order_count() == cnt + 1, (page.url, order_count() - cnt))
     ctx.close()
 
     # ---- 503 Shop đóng (thiếu chính sách đã đăng): thử thật bằng cách gỡ đăng trang chính sách riêng tư

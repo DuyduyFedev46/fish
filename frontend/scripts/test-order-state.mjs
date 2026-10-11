@@ -180,5 +180,10 @@ eq(
 );
 eq("mua lại: món không còn trong catalog", reorder.mergeOrderIntoCart([], [{ ...orderLines[0], item_code: "Q" }], catalog), []);
 
+const after = await load("features/checkout/afterCreate.ts");
+eq("sau đặt: mở cổng được thì không kèm cờ", after.orderUrl("SO1-AB", false), "/shop/orders/?code=SO1-AB");
+eq("sau đặt: mở cổng lỗi kèm pay=failed", after.orderUrl("SO1-AB", true), "/shop/orders/?code=SO1-AB&pay=failed");
+eq("sau đặt: câu lỗi mở cổng", after.OPEN_FAILED_MESSAGE, "Chưa mở được trang thanh toán. Thử lại.");
+
 console.log(`test-order-state: ${n - fail}/${n} đạt`);
 process.exit(fail ? 1 : 0);

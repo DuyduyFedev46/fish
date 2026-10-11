@@ -20,6 +20,7 @@ import Dialog from "@/components/ui/Dialog";
 import Skeleton from "@/components/ui/Skeleton";
 import { contactTarget } from "@/components/shopLinks";
 import { goToMockGateway, redirectToGateway } from "../gateway";
+import { OPEN_FAILED_MESSAGE } from "../afterCreate";
 import { clearLegacyContact, readLookupToken, removeLookupToken, saveLookupToken } from "../lookupToken";
 import { normalizeVnPhone } from "../formRules";
 import {
@@ -118,7 +119,7 @@ export default function OrderScreen() {
   const loadedCode = useRef<string | null>(null);
 
   const [paying, setPaying] = useState(false);
-  const [payError, setPayError] = useState<string | null>(null);
+  const [payError, setPayError] = useState<string | null>(params.get("pay") === "failed" ? OPEN_FAILED_MESSAGE : null);
   const [reordering, setReordering] = useState(false);
   const [leave, setLeave] = useState<"back" | "brand" | null>(null);
   const [expiredDialog, setExpiredDialog] = useState(true);
@@ -290,7 +291,7 @@ export default function OrderScreen() {
       setPayError(
         err instanceof ApiError && err.status === 429
           ? "Bạn thao tác hơi nhanh. Đợi 1 phút rồi thử lại."
-          : "Chưa mở được trang thanh toán. Thử lại."
+          : OPEN_FAILED_MESSAGE
       );
       setPaying(false);
       void refresh(); // đơn có thể đã hết giờ hoặc đã trả: máy chủ thắng

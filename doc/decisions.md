@@ -275,3 +275,4 @@ Nguồn: `doc/design/shop/README.md` (chốt 06–07/10) và trả lời của D
 ## 2026-10-11 (chiều) — Test Postgres và lãi lỗ theo lô khi có mã giảm giá — [DUY CHỐT]
 - **Test PostgreSQL chạy trên GitHub Actions** (thực hiện chốt 10/10 "chạy trên cloud, DB test riêng"): mỗi lần push, GitHub dựng Postgres tạm, chạy toàn bộ test backend, không cần bí mật, không đụng staging/production, không deploy.
 - **Lãi lỗ theo lô trừ phần giảm giá mã đã phân bổ vào từng dòng đơn**, áp cho đơn từ nay; kỳ/lô đã chốt không đổi số (giữ luật "không sửa số kỳ cũ"). Làm thành lô nhỏ riêng sau lô 3b, có test.
+- **Chọn phương thức thanh toán ngay ở form đặt hàng** (Duy 11/10): khối "Phương thức thanh toán" dưới ô địa chỉ; bấm "Đặt hàng" là vào thẳng cổng quét mã, bỏ bước bấm "Thanh toán" ở trang đơn (trang đơn giữ nút dự phòng khi mở cổng lỗi hoặc khách quay lại). Thay luồng C1 → D1 trong thiết kế 06/10.
