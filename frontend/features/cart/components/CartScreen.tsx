@@ -3,7 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getCatalog } from "@/lib/api";
-import { formatQty } from "@/lib/quantity";
+import { formatPriceVnd } from "@/lib/format";
+import { formatQty, qtyToApiString } from "@/lib/quantity";
 import type { CatalogItem } from "@/lib/types";
 import ShopFrame from "@/components/ShopFrame";
 import { useHotline } from "@/components/useHotline";
@@ -11,6 +12,8 @@ import ProductCard from "@/components/catalog/ProductCard";
 import CartLine, { CartLineSkeleton } from "@/components/cart/CartLine";
 import CartSummary from "@/components/cart/CartSummary";
 import CheckoutSteps from "@/components/cart/CheckoutSteps";
+import VoucherField from "@/components/cart/VoucherField";
+import { BottomSheet } from "@/components/ui/Sheet";
 import RemoveItemDialog from "@/components/cart/RemoveItemDialog";
 import Banner from "@/components/ui/Banner";
 import Button from "@/components/ui/Button";
@@ -21,6 +24,8 @@ import { useCart } from "@/components/CartContext";
 import { itemHref, toCardItem } from "@/features/catalog/cardItem";
 import { groupIconOf } from "@/features/catalog/groupIcon";
 import { reconcileCart } from "../reconcile";
+import { useVoucher } from "../useVoucher";
+import { describeTermsFull, minOrderOf } from "../voucherView";
 import s from "./CartScreen.module.css";
 
 const NOTICE_ID = "cart-out-notice";
@@ -40,6 +45,7 @@ export default function CartScreen() {
   const [live, setLive] = useState("");
   const headingRef = useRef<HTMLHeadingElement>(null);
   const focusNext = useRef<string | null | undefined>(undefined);
+  const [voucherSheet, setVoucherSheet] = useState(false);
 
   const load = useCallback((fresh: boolean) => {
     return getCatalog({ fresh })
@@ -92,11 +98,45 @@ export default function CartScreen() {
     [cart]
   );
 
+  // Mã giảm giá (3b): kiểm với các dòng còn hàng; số giảm và tổng lấy từ máy chủ.
+  const voucherItems = useMemo(
+    () => result.lines.filter((l) => l.status !== "out").map((l) => ({ item_code: l.entry.item_code, qty: qtyToApiString(l.qty) })),
+    [result.lines]
+  );
+  const voucher = useVoucher(voucherItems, cart.ready && loadState !== "loading");
+
   const byCode = useMemo(() => new Map((catalog ?? []).map((i) => [i.item_code, i])), [catalog]);
-  const total = String(result.subtotal);
+  const quote = voucher.quote;
+  const subtotal = quote ? quote.subtotal : String(result.subtotal);
+  const total = quote ? quote.total_after : String(result.subtotal);
   const itemCount = result.lines.length;
   const available = itemCount - result.outCount;
   const pendingLine = pending ? result.lines.find((l) => l.entry.item_code === pending) : undefined;
+
+  function focusVoucherRemove() {
+    const buttons = Array.from(document.querySelectorAll<HTMLElement>("[data-voucher-remove]"));
+    focusSoon(buttons.find((b) => b.offsetParent !== null) ?? null);
+  }
+
+  async function applyVoucher(code: string) {
+    const res = await voucher.apply(code);
+    if (!res) return;
+    setVoucherSheet(false);
+    toast.show({ message: `Đã áp mã ${res.code ?? code}`, tone: "success" });
+    setLive(`Đã áp mã ${res.code ?? code}. Giảm ${formatPriceVnd(res.discount_amount)}.`);
+    window.setTimeout(focusVoucherRemove, 260);
+  }
+
+  function removeVoucher() {
+    const was = voucher.code;
+    voucher.remove();
+    setLive(`Đã bỏ mã ${was ?? ""}`.trim());
+  }
+
+  function closeVoucherSheet() {
+    setVoucherSheet(false);
+    voucher.clearError();
+  }
 
   function proceed() {
     if (result.outCount > 0) {
@@ -122,6 +162,41 @@ export default function CartScreen() {
   }, [catalog]);
 
   const ready = cart.ready;
+  const voucherFailure = voucher.error ?? (voucher.dropped ? { kind: voucher.dropped.kind, result: voucher.dropped.result } : null);
+  const minOrderAmount = minOrderOf(voucherFailure?.result);
+  const voucherFieldProps = {
+    appliedCode: voucher.code ?? undefined,
+    checking: voucher.checking,
+    // Sheet đang mở thì lỗi chỉ hiện trong sheet (B7), không lặp ở dòng bên dưới.
+    error: voucherSheet ? undefined : voucherFailure?.kind,
+    minOrderAmount,
+    promoAmount: voucherFailure?.result?.auto_discount_amount ?? null,
+    onApply: applyVoucher,
+    onRemove: removeVoucher,
+    onEdit: () => {
+      voucher.clearError();
+      voucher.clearDropped();
+    },
+    onRetry: () => void voucher.retry(),
+  };
+  const voucherFields = (
+    <>
+      <VoucherField
+        variant="trigger-row"
+        {...voucherFieldProps}
+        onOpenSheet={() => {
+          voucher.clearError();
+          voucher.clearDropped();
+          setVoucherSheet(true);
+        }}
+      />
+      <VoucherField variant="inline" {...voucherFieldProps} />
+    </>
+  );
+  const voucherTerms = quote?.terms ?? null;
+  const voucherNote = voucherTerms ? (
+    <p className={s.voucherTerms}>{describeTermsFull(voucherTerms)}</p>
+  ) : undefined;
   let main;
   if (!ready || (loadState === "loading" && cart.lines.length > 0)) {
     main = (
@@ -243,8 +318,10 @@ export default function CartScreen() {
             context="cart"
             itemCount={itemCount}
             availableCount={available}
-            subtotal={total}
+            subtotal={subtotal}
             total={total}
+            discount={quote && voucher.code ? { code: voucher.code, amount: quote.discount_amount } : undefined}
+            voucher={{ field: voucherFields, note: voucherNote }}
             notice={blocked && result.outCount > 0 ? { id: NOTICE_ID, text: "Bỏ món đã hết để đặt hàng." } : undefined}
             cta={{
               label: "Tiếp tục: nhập thông tin nhận hàng",
@@ -271,6 +348,14 @@ export default function CartScreen() {
       <div className="visually-hidden" role="status" aria-live="polite">
         {live}
       </div>
+      <BottomSheet open={voucherSheet} onClose={closeVoucherSheet} title="Mã giảm giá" initialFocus="first-action" closeLabel="Đóng ô nhập mã">
+        <VoucherField
+          variant="sheet"
+          {...voucherFieldProps}
+          error={voucher.error?.kind}
+          minOrderAmount={minOrderOf(voucher.error?.result)}
+        />
+      </BottomSheet>
       <RemoveItemDialog
         item={
           pendingLine

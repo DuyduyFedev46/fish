@@ -14,6 +14,7 @@ import uuid
 from decimal import Decimal, InvalidOperation
 
 from django.conf import settings
+from django.utils import timezone
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -35,6 +36,7 @@ from .customer_notices import build_cancel_notice
 from .shop_errors import validation_error
 
 logger = logging.getLogger(__name__)
+_LOGGABLE_CODE_CHARS = re.compile(r"[^A-Z0-9-]")
 
 ORDER_NOT_FOUND = {
     "code": "ORDER_NOT_FOUND",
@@ -50,7 +52,9 @@ NAME_MAX = 100
 ADDRESS_MAX = 500
 
 
-_body = body_dict
+def _loggable_code(code: str) -> str:
+    """Mã đơn lấy từ thân request (không tin được): chỉ giữ chữ in hoa, số, gạch ngang, tối đa 32 ký tự (không xuống dòng)."""
+    return _LOGGABLE_CODE_CHARS.sub("", str(code))[:32]
 
 
 def _text(value) -> str:
@@ -59,7 +63,7 @@ def _text(value) -> str:
 
 # --- Tạo đơn ------------------------------------------------------------------------------------
 
-def _parse_lines(items, fields: dict):
+def parse_lines(items, fields: dict):
     """items -> [{item_code, qty: Decimal}]; ghi lỗi vào `fields["items"]` (02b §3.3 #2), không ném."""
     if not isinstance(items, list) or not items:
         fields["items"] = "Giỏ hàng đang trống."
@@ -112,16 +116,21 @@ def _parse_create_body(d: dict) -> dict:
     if not address or len(address) > ADDRESS_MAX:
         fields["delivery_address"] = f"Nhập địa chỉ giao hàng (tối đa {ADDRESS_MAX} ký tự)."
 
-    lines = _parse_lines(d.get("items"), fields)
+    lines = parse_lines(d.get("items"), fields)
 
     consent_payload = d.get("privacy_consent")
     message = consent.consent_field_error(consent_payload)
     if message:
         fields["consent"] = message
 
+    voucher_code = d.get("voucher_code")
+    if voucher_code is not None and not isinstance(voucher_code, str):
+        fields["voucher_code"] = "Mã giảm giá chưa hợp lệ."
+
     if fields:
         raise validation_error(**fields)
     return {
+        "voucher_code": voucher_code or None,
         "client_request_id": request_id,
         "name": name,
         "phone": phone,
@@ -136,7 +145,7 @@ class ShopOrderCreateView(NoStoreMixin, APIView):
     throttle_classes = [ShopOrderCreateThrottle]
 
     def post(self, request):
-        d = _body(request)
+        d = body_dict(request)
         consent.ensure_shop_open()  # 1. SHOP_CLOSED
         parsed = _parse_create_body(d)  # 2. VALIDATION (không log dữ liệu khách, SHOP-2-02 AC6)
 
@@ -148,9 +157,10 @@ class ShopOrderCreateView(NoStoreMixin, APIView):
             phone=parsed["phone"],
             lines=parsed["lines"],
             privacy_consent=parsed["privacy_consent"],
+            voucher_code=parsed["voucher_code"],
         )
         logger.info("shop order %s created=%s", order.code, created)
-        body = shop_payload.create_payload(order, now=services._now())
+        body = shop_payload.create_payload(order, now=timezone.now())
         return Response(body, status=201 if created else 200)
 
 
@@ -170,7 +180,7 @@ class ShopOrderLookupView(NoStoreMixin, APIView):
         return [ShopLookupIpThrottle(), ShopLookupOrderThrottle()]
 
     def post(self, request):
-        d = _body(request)
+        d = body_dict(request)
         code = _text(d.get("order_code")).upper()
         phone_raw = d.get("phone") if isinstance(d.get("phone"), str) else ""
         token = _text(d.get("token"))
@@ -202,15 +212,17 @@ class ShopOrderLookupView(NoStoreMixin, APIView):
             authorized = bool(order is not None and actual and same)
 
         if not authorized:
-            logger.info("shop lookup miss code=%s phone=%s", code, mask_phone(phone_raw) if phone_raw else "-")
+            logger.info(
+                "shop lookup miss code=%s phone=%s", _loggable_code(code), mask_phone(phone_raw) if phone_raw else "-"
+            )
             return Response(ORDER_NOT_FOUND, status=404)
 
-        logger.info("shop lookup ok code=%s", code)
+        logger.info("shop lookup ok code=%s", _loggable_code(code))
         return Response(_lookup_payload(order))
 
 
 def _lookup_payload(order: SalesOrder) -> dict:
-    now = services._now()
+    now = timezone.now()
     note = shop_state.latest_delivery_note(order)
     has_payment = order.status == SalesOrder.Status.AUTO_CANCELLED and shop_state.has_payment_transaction(order)
     state = shop_state.order_state(order, now=now, note=note, has_payment=has_payment)
@@ -229,6 +241,10 @@ def _lookup_payload(order: SalesOrder) -> dict:
         "server_now": iso_utc(now),
         "hold_minutes": settings.SALES_ORDER_TTL_MINUTES,
         "payment_pending_minutes": settings.SHOP_PAYMENT_PENDING_MINUTES,
+        # Mốc server khách được đưa sang cổng thanh toán lần gần nhất (chỉ khi còn BOOKED); FE đếm "Đã chờ" từ đây.
+        "payment_pending_since": (
+            iso_utc(order.payment_started_at) if order.status == SalesOrder.Status.BOOKED else None
+        ),
         "delivery": shop_state.delivery_block(note),
         "lines": shop_payload.lines_payload(order),
         **shop_payload.money_block(order),

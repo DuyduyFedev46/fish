@@ -16,6 +16,8 @@ export const CATALOG_PERM = {
   addItemGroup: "catalog.add_itemgroup",
   changeItemGroup: "catalog.change_itemgroup",
   addBundleLine: "catalog.add_bundleline",
+  /** SHOP-3b-02: Tầng 2, chỉ Chủ (uỷ được). Cần cho mọi thao tác ở màn Mã giảm giá, kể cả xem. */
+  manageVoucher: "catalog.manage_voucher",
 } as const;
 
 /** Quyền người đang xem có, gom theo việc màn cần quyết định. */
@@ -31,6 +33,7 @@ export type CatalogAbility = {
   changeRule: boolean;
   addGroup: boolean;
   changeGroup: boolean;
+  manageVoucher: boolean;
 };
 
 export function catalogAbility(perms: readonly string[]): CatalogAbility {
@@ -47,5 +50,6 @@ export function catalogAbility(perms: readonly string[]): CatalogAbility {
     changeRule: has(CATALOG_PERM.changePricingRule),
     addGroup: has(CATALOG_PERM.addItemGroup),
     changeGroup: has(CATALOG_PERM.changeItemGroup),
+    manageVoucher: has(CATALOG_PERM.manageVoucher),
   };
 }

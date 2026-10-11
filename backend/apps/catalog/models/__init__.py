@@ -14,6 +14,7 @@ và Django (app_label=catalog) vẫn thấy đủ model — không sinh migratio
 from .items import KG, ItemGroup, Item, BundleLine  # noqa: F401
 from .pricing import PriceList, ItemPrice, PricingRule  # noqa: F401
 from .images import ItemImage  # noqa: F401
+from .vouchers import Voucher  # noqa: F401
 
 __all__ = [
     "KG",
@@ -24,4 +25,5 @@ __all__ = [
     "ItemPrice",
     "PricingRule",
     "ItemImage",
+    "Voucher",
 ]

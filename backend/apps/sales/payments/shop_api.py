@@ -15,7 +15,7 @@ from apps.common.exceptions import BusinessError
 from apps.common.throttling import ShopCheckoutThrottle
 from apps.sales.models import SalesOrder
 
-from . import checkout
+from . import services
 
 ORDER_NOT_FOUND = {"code": "ORDER_NOT_FOUND", "detail": "Không tìm thấy đơn."}
 CHECKOUT_UNAVAILABLE_DETAIL = "Chưa mở được trang thanh toán. Thử lại."
@@ -30,7 +30,7 @@ class ShopOrderCheckoutView(APIView):
         if order is None:
             return Response(ORDER_NOT_FOUND, status=404)
         try:
-            params = checkout.build_checkout_params(order=order)
+            params = services.start_checkout(order=order)
         except BusinessError as exc:
             return Response(
                 {"code": "CHECKOUT_UNAVAILABLE", "detail": CHECKOUT_UNAVAILABLE_DETAIL, "reason": exc.code},

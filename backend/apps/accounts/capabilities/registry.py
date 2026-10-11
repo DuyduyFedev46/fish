@@ -65,6 +65,8 @@ CAPABILITIES = (
     ),
     Capability("assign_delivery", "Chọn người giao", SECTION_SALES, ("delivery.assign_deliverynote",)),
     Capability("deliver", "Giao hàng, báo kết quả giao", SECTION_SALES, ("delivery.change_deliverynote",)),
+    # SHOP-3b-01 / BR-DM-23: mặc định chỉ Chủ có, uỷ được (không `owner_only`).
+    Capability("manage_voucher", "Quản lý mã giảm giá", SECTION_SALES, ("catalog.manage_voucher",)),
     # Hàng hoá & kho
     Capability(
         "receive", "Nhập lô tại cảng", SECTION_STOCK,

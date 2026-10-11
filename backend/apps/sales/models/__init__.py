@@ -23,6 +23,7 @@ from .invoices import SalesInvoice, SalesInvoiceLine, SalesInvoiceLineBatch  # n
 from .payments import PaymentTransaction  # noqa: F401
 from .refunds import Refund  # noqa: F401
 from .credit_notes import SalesCreditNote, SalesCreditNoteLine  # noqa: F401
+from .vouchers import VoucherRedemption  # noqa: F401
 
 __all__ = [
     "Customer",
@@ -36,4 +37,5 @@ __all__ = [
     "Refund",
     "SalesCreditNote",
     "SalesCreditNoteLine",
+    "VoucherRedemption",
 ]

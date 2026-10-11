@@ -6,10 +6,12 @@ Bất biến: payload KHÔNG chứa số kg tồn, số kg thiếu, mã lô, ng�
 (BR-BH-24, bất biến 1 và 9). `lines` chỉ có mã hàng và mức ("out" | "short").
 """
 from apps.common.exceptions import BusinessError
+from apps.sales.utils import money_str
 
 INVALID_QTY = "INVALID_QTY"
 OUT_OF_STOCK = "OUT_OF_STOCK"
 VALIDATION = "VALIDATION"
+VOUCHER_INVALID = "VOUCHER_INVALID"
 
 LEVEL_OUT = "out"      # hết hàng, hoặc món không còn bán
 LEVEL_SHORT = "short"  # còn hàng nhưng không đủ số khách đặt
@@ -44,6 +46,22 @@ class OutOfStockError(ShopValidationError):
 
     def __init__(self, lines):
         super().__init__(extra={"lines": list(lines)})
+
+
+class VoucherInvalidError(ShopValidationError):
+    """
+    BR-DM-19: mã không còn dùng được lúc đặt. `reason_code`: INVALID | EXPIRED | MIN_ORDER | USED_UP | BETTER_PROMO;
+    `missing_amount` (chuỗi nguyên đồng) CHỈ có khi MIN_ORDER. Không số lượt còn lại, không dữ liệu đơn khác.
+    """
+
+    default_code = VOUCHER_INVALID
+    default_detail = "Mã giảm giá không còn dùng được."
+
+    def __init__(self, reason_code, missing_amount=None):
+        extra = {"reason_code": reason_code}
+        if missing_amount is not None:
+            extra["missing_amount"] = money_str(missing_amount)
+        super().__init__(extra=extra)
 
 
 def validation_error(**fields):

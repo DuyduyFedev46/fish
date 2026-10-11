@@ -1,0 +1,101 @@
+# Test backend trên GitHub Actions (Duy chốt 11/10, doc/decisions.md). Cách đọc kết quả: doc/ops/moi-truong.md,
+# mục "Test PostgreSQL trên GitHub Actions". Không deploy, không secret thật, chỉ quyền đọc.
+name: backend-tests
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backend-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Giá trị giả, chỉ dùng trong job này.
+  DJANGO_DEBUG: "1"
+  DJANGO_SECRET_KEY: "ci-only-not-a-secret-ci-only-not-a-secret"
+  SEPAY_ENV: "SANDBOX"
+  SEPAY_MERCHANT_ID: "ci-merchant"
+  SEPAY_SECRET_KEY: "ci-not-a-secret"
+  INTERNAL_SERVICE_TOKEN: "ci-internal-token"
+  AI_ENABLED: "0"
+
+jobs:
+  test-postgres:
+    name: Test backend (PostgreSQL 16)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: ci_user
+          POSTGRES_PASSWORD: ci_password_only_for_this_job
+          POSTGRES_DB: cangca_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ci_user -d cangca_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      DATABASE_URL: postgres://ci_user:ci_password_only_for_this_job@localhost:5432/cangca_ci
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"   # khớp backend/Dockerfile (python:3.12-slim)
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - run: pip install -r requirements.txt
+      - name: Gom file tĩnh (admin cần manifest, như Dockerfile)
+        run: python manage.py collectstatic --noinput
+      - name: Kiểm migration không sinh thêm
+        run: python manage.py makemigrations --check --dry-run
+      - name: Chạy toàn bộ test (tuần tự, test đua Postgres không bị skip)
+        run: python manage.py test --noinput 2>&1 | tee test-output.txt
+        shell: bash
+      - name: Tóm tắt kết quả
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "### Test backend trên PostgreSQL 16"
+            grep -E "^(Ran [0-9]+ tests|OK|FAILED)" test-output.txt || echo "Không thấy dòng 'Ran N tests' (test sập giữa chừng)"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  test-sqlite:
+    name: Test backend (SQLite, như máy dev)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - run: pip install -r requirements.txt
+      - name: Gom file tĩnh (admin cần manifest, như Dockerfile)
+        run: python manage.py collectstatic --noinput
+      - name: Chạy toàn bộ test (tuần tự)
+        run: python manage.py test --noinput 2>&1 | tee test-output.txt
+        shell: bash
+      - name: Tóm tắt kết quả
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "### Test backend trên SQLite"
+            grep -E "^(Ran [0-9]+ tests|OK|FAILED)" test-output.txt || echo "Không thấy dòng 'Ran N tests' (test sập giữa chừng)"
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -291,7 +291,7 @@ Kiểu dùng chung trong `lib/types.ts`: `StockLevel = "in"|"low"|"out"`, `SaleU
 | Tạo đơn / kiểm số lượng / chống trùng / lỗi có cấu trúc | `apps/sales/orders/services.py` (`create_order` thêm tham số) + `apps/sales/orders/shop_errors.py` (mới: `ShopValidationError`, `InvalidQtyError`, `OutOfStockError`, `VoucherInvalidError`, mã lỗi) |
 | Tra đơn, mã tra đơn, `state`, nhãn | `apps/sales/orders/shop_api.py`, `apps/sales/orders/lookup_token.py` (mới), `apps/sales/orders/shop_state.py` (mới: tính `state`, `delivery.step`, mốc giờ), `shop_labels.py` (mở rộng), `customer_notices.py` (viết lại theo BR-HT-12) |
 | Mã giảm giá | `apps/catalog/models/vouchers.py`, `apps/catalog/vouchers/` (`services.py` tạo/sửa/tắt/bật + `evaluate_voucher` + `allocate_whole_vnd`; `api.py` ERP; `shop_api.py` kiểm mã; `serializers.py`; `tests/`; `README.md`). Lượt dùng: `apps/sales/models/vouchers.py` + `apps/sales/orders/voucher_redemptions.py` (`hold`, `mark_used`, `release`) |
-| Chỗ móc lượt | `create_order` (giữ), `payments/services.py::_record_payment` nhánh MATCHED (dùng), `orders/services.py::cancel_unpaid_expired` (nhả) |
+| Chỗ móc lượt | `create_order` (giữ), `payments/services.py::issue_invoice` (dùng; chung cho IPN khớp và Chủ xác nhận khoản thiếu, sửa theo review lô 3b), `orders/services.py::cancel_unpaid_expired` (nhả) |
 | Throttle | `apps/common/throttling.py` (thêm lớp, sửa `ShopLookupOrderThrottle` đọc mã đơn từ body) |
 | Quyền | `apps/accounts/capabilities/registry.py` thêm việc `manage_voucher` |
 | CMS | `apps/content/**` (mkt-brand): lệnh `load_shop_content`, `page_role` mới, site-info mở rộng, quét SĐT cho phép hotline |
@@ -654,7 +654,7 @@ class VoucherRedemption(models.Model):
 **Áp mã khi tạo đơn (3b-04):** sau khi tính `lines_data` + `best_pricing_rule`: nếu có `voucher_code` → khoá `Voucher` → `evaluate_voucher(...)` (cùng hàm với §3.8, đếm lượt bằng `VoucherRedemption.objects.filter(voucher=v, state__in=[HELD, USED]).count()` sau khoá) → không hợp lệ thì `VoucherInvalidError` (rollback).
 Hợp lệ: `per_line_discount = allocate_whole_vnd(discount, lines_data)` (tỉ lệ gộp, mỗi dòng làm tròn xuống nguyên đồng, phần dư dồn dòng cuối, không vượt gộp dòng: 300000/556000 × 50000 → 26978 + 23022), `pricing_rule=None` trên dòng; tạo `VoucherRedemption(state=HELD, discount_amount=discount)`.
 Nguồn giảm của dòng **suy ra** (Techlead chốt, không thêm cột dòng): `pricing_rule` khác null → `promo`; đơn có `voucher_redemption` → `voucher` (BR-DM-18 bảo đảm một nguồn/đơn).
-`_record_payment` nhánh MATCHED: `voucher_redemptions.mark_used(order=o)` (HELD → USED, `used_at`). `cancel_unpaid_expired`: trong cùng `atomic` của đơn, `release(order=o)` (HELD → RELEASED; chạy lại không đổi gì). Huỷ đơn đã trả: không đụng lượt (BR-DM-20).
+`issue_invoice` (review lô 3b: thay nhánh MATCHED, để cả đường Chủ xác nhận khoản thiếu cũng đánh dấu dùng): `voucher_redemptions.mark_used(order=o)` (HELD → USED, `used_at`). `cancel_unpaid_expired`: trong cùng `atomic` của đơn, `release(order=o)` (HELD → RELEASED; chạy lại không đổi gì). Huỷ đơn đã trả: không đụng lượt (BR-DM-20).
 
 **SalesOrderLine.qty**: không đổi schema; nghĩa "số combo" với BUNDLE ghi ở docstring (không đổi `verbose_name` để khỏi sinh migration). Shop trả `unit` suy từ `item_type`.
 
@@ -897,6 +897,7 @@ sequenceDiagram
 
 ## 11. Review
 (Để trống — techlead ghi REVIEW PASS / REVIEW FAIL theo từng lô.)
+- Lô 3b (11/10): **REVIEW PASS** (APPROVED, điều kiện M1: chạy 6 ca đua Postgres trên DB test cloud trước merge), chi tiết ở `03b-review-lo3b.md`. Duyệt thêm migration `sales/0022_salesorder_payment_started_at` (mốc server cho `payment_pending_since`, nợ D3). L1 đến L5 làm ở lô sau.
 - Lô 3+4 + 5b (11/10): **REVIEW PASS** (APPROVED), chi tiết ở `03b-review-lo34.md`. Còn M1 đến M3 và L1, L2 làm ở lô 3b, L3 và L4 làm ở lô 5c. Cổng `grep phone_last4` ở §7.1 không tính `apps/ai/policy/rules.py` (danh sách chặn khoá cá nhân của AI, giữ lại), test AI và các test chỉ dùng chuỗi này để khẳng định khoá không xuất hiện.
 
 ## 12. Việc ghi nợ phát sinh khi làm (điều phối)

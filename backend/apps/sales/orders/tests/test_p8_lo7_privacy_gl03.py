@@ -24,7 +24,7 @@ User = get_user_model()
 
 PUBLIC_LOOKUP_KEYS = {
     "order_code", "status", "state", "status_label", "placed_at", "paid_at", "delivered_at", "booked_expires_at",
-    "server_now", "hold_minutes", "payment_pending_minutes", "delivery", "lines", "subtotal", "discount",
+    "server_now", "hold_minutes", "payment_pending_minutes", "payment_pending_since", "delivery", "lines", "subtotal", "discount",
     "total_amount", "cancel_notice", "late_payment", "lookup_token",
 }
 

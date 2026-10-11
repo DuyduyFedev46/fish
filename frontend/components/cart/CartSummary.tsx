@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { formatPriceVnd } from "@/lib/format";
 import type { Money } from "@/lib/types";
 import PriceTag from "../catalog/PriceTag";
@@ -20,6 +21,11 @@ export interface CartSummaryProps {
   total: Money;
   /** Dòng giảm giá, số lấy từ máy chủ (mã giảm giá, lô 3b). */
   discount?: { code: string; amount: Money };
+  /**
+   * Ô mã giảm giá ở giỏ (3b): `field` nằm ngay dưới "Tạm tính", `note` (điều kiện của mã) nằm dưới dòng "Giảm giá".
+   * Chỉ giỏ dùng; đặt hàng và thanh toán chỉ có dòng giảm giá.
+   */
+  voucher?: { field: ReactNode; note?: ReactNode };
   /** Tiêu đề hộp máy tính. Mặc định "Tóm tắt đơn"; đặt hàng ghi "Đơn hàng (3 món)". */
   title?: string;
   /** Nhãn dòng tổng. Mặc định "Tổng tiền hàng"; thanh toán ghi "Cần thanh toán". */
@@ -54,6 +60,7 @@ export default function CartSummary({
   subtotal,
   total,
   discount,
+  voucher,
   notice,
   cta,
   title = "Tóm tắt đơn",
@@ -91,19 +98,25 @@ export default function CartSummary({
           ))}
         </ul>
       ) : null}
-      <dl className={s.rows}>
-        {subtotal !== undefined ? (
+      {subtotal !== undefined ? (
+        <dl className={s.rows}>
           <div className={s.row}>
             <dt>{subtotalLabel}</dt>
             <dd className="num">{formatPriceVnd(subtotal)}</dd>
           </div>
-        ) : null}
-        {discount ? (
+        </dl>
+      ) : null}
+      {voucher ? voucher.field : null}
+      {discount ? (
+        <dl className={s.rows}>
           <div className={cx(s.row, s.discount)}>
-            <dt>Giảm giá ({discount.code})</dt>
+            <dt>{context === "cart" ? "Giảm giá" : `Mã giảm giá (${discount.code})`}</dt>
             <dd className="num">−{formatPriceVnd(discount.amount)}</dd>
           </div>
-        ) : null}
+        </dl>
+      ) : null}
+      {discount && voucher?.note ? <div className={s.voucherNote}>{voucher.note}</div> : null}
+      <dl className={s.rows}>
         <div className={cx(s.row, s.totalRow)}>
           <dt>{totalLabel}</dt>
           <dd>

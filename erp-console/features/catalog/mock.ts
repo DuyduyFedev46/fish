@@ -38,6 +38,7 @@ import { dateKeyInVietnam, todayInVietnam, vnd } from "@/shared/lib/format";
 import type { MockRequest, MockResponse, Paginated } from "@/shared/lib/http";
 import { fold } from "@/shared/lib/search";
 import { addDays } from "./catalogModel";
+import { mockVoucherRoutes, resetVouchers } from "./voucherMock";
 import { CATALOG_PERM as P } from "./permissions";
 import type {
   BundleLine,
@@ -745,6 +746,7 @@ export function mockCatalogApi(req: MockRequest): MockResponse {
   if (pathname === "/api/catalog/item-groups/" || /^\/api\/catalog\/item-groups\/\d+\/$/.test(pathname)) return groupRoutes(me, req, pathname, query);
   if (pathname === "/api/catalog/price-lists/") return priceListRoutes(me, req);
   if (pathname === "/api/catalog/item-prices/") return priceRoutes(me, req, query);
+  if (pathname.startsWith("/api/catalog/vouchers/")) return mockVoucherRoutes(me, req, pathname, query, mode());
   if (pathname === "/api/catalog/pricing-rules/" || /^\/api\/catalog\/pricing-rules\/\d+\/$/.test(pathname)) return ruleRoutes(me, req, pathname, query);
   const hit = itemsRoutes(me, req, pathname, query);
   return hit ?? err(404, "NOT_FOUND", "Không tìm thấy endpoint.");
@@ -858,6 +860,7 @@ if (process.env.NEXT_PUBLIC_USE_MOCK === "1" && typeof window !== "undefined") {
     },
     resetCatalog: () => {
       STORE = null;
+      resetVouchers();
       window.localStorage.removeItem(MODE_KEY);
       return "Đã về danh mục seed.";
     },

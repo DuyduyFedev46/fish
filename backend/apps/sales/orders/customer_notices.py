@@ -58,7 +58,7 @@ def _is_auto_cancelled_by_system(invoice, note) -> bool:
 
 
 def late_payment_total(order) -> Decimal:
-    """Σ tiền về của đơn tự huỷ, bỏ dòng nghi trùng (02b §3.4.3)."""
+    """Σ tiền về của đơn tự huỷ, bỏ dòng nghi trùng (02b §3.4.3). Nguồn DUY NHẤT cho `late_payment` và `cancel_notice`."""
     return sum((p.amount for p in order.payments.filter(duplicate_warning="")), Decimal("0"))
 
 
@@ -79,9 +79,10 @@ def build_cancel_notice(order: SalesOrder, *, note=None) -> dict | None:
         return _notice(scope="full", reason_code=reason, amount=amount)
 
     if status == SalesOrder.Status.AUTO_CANCELLED:
-        if not order.payments.exists():
-            return None
-        return _notice(scope="full", reason_code="PAID_AFTER_EXPIRY", amount=late_payment_total(order))
+        late_total = late_payment_total(order)
+        if late_total <= 0:
+            return None  # không có tiền nào để trả lại (mọi giao dịch đều nghi trùng): coi như hết giờ, không có tiền về
+        return _notice(scope="full", reason_code="PAID_AFTER_EXPIRY", amount=late_total)
 
     if status == SalesOrder.Status.PROCESSING and invoice is not None:
         partial = [

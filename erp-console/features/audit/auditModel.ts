@@ -108,6 +108,11 @@ export const AUDIT_ACTION_LABELS: Readonly<Record<string, string>> = {
   propose: "AI đề xuất",
   confirm_proposal: "Duyệt đề xuất AI",
   reject_proposal: "Từ chối đề xuất AI",
+  // mã giảm giá (SHOP-3b-02)
+  create_voucher: "Tạo mã giảm giá",
+  update_voucher: "Sửa mã giảm giá",
+  disable_voucher: "Tắt mã giảm giá",
+  enable_voucher: "Bật lại mã giảm giá",
   // động từ chung
   create: "Tạo mới",
   update: "Sửa",

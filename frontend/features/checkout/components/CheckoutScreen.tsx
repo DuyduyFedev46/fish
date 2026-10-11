@@ -8,8 +8,9 @@ import dynamic from "next/dynamic";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent } from "react";
-import { ApiError, createOrder, getCatalog } from "@/lib/api";
-import { qtyToApiString, formatQty } from "@/lib/quantity";
+import { ApiError, checkVoucher, createOrder, getCatalog } from "@/lib/api";
+import { formatPriceVnd } from "@/lib/format";
+import { parseQtyRule, qtyToApiString, formatQty } from "@/lib/quantity";
 import { contactTarget } from "@/components/shopLinks";
 import type { CreateOrderPayload, OutOfStockLine } from "@/lib/types";
 import { getPrivacyPolicy, getSiteInfo } from "@/features/site/api";
@@ -28,7 +29,10 @@ import FormErrorSummary from "@/components/ui/FormErrorSummary";
 import Skeleton from "@/components/ui/Skeleton";
 import TextField from "@/components/ui/TextField";
 import { focusSoon } from "@/components/ui/focusSoon";
-import { cartFingerprint, clearRequestId, getRequestId } from "../requestId";
+import { useVoucher } from "@/features/cart/useVoucher";
+import { clearVoucherCode } from "@/features/cart/voucherStorage";
+import { minOrderOf, voucherMessage } from "@/features/cart/voucherView";
+import { cartFingerprint, clearRequestId, getRequestId, renewRequestId } from "../requestId";
 import { saveLookupToken } from "../lookupToken";
 import { shouldOpenFallbackDirectly } from "../googleMaps";
 import { errorSummary, MESSAGES, normalizeVnPhone, validateForm, type FormErrors, type FormField } from "../formRules";
@@ -100,6 +104,8 @@ function CheckoutForm() {
   const [submitting, setSubmitting] = useState(false);
   const submittingRef = useRef(false);
   const placedRef = useRef(false);
+  // Mức tối thiểu của từng món theo catalog (C3 đổi về mức này). Chưa tải được thì dùng 1 (min_qty hiện hành).
+  const minQtyRef = useRef<Map<string, number>>(new Map());
 
   const [siteInfo, setSiteInfo] = useState<SiteInfoResponse | null>(null);
   const [policy, setPolicy] = useState<PrivacyPolicyResponse | null>(null);
@@ -114,6 +120,8 @@ function CheckoutForm() {
   const [networkOpen, setNetworkOpen] = useState(false);
   const [throttledOpen, setThrottledOpen] = useState(false);
   const [policyOpen, setPolicyOpen] = useState(false);
+  // B8: mã hết hiệu lực đúng lúc đặt. Hỏi khách, không tự đặt với giá khác giá họ đã thấy.
+  const [voucherGone, setVoucherGone] = useState<{ code: string; fullPrice: string; discountedPrice: string } | null>(null);
 
   const hotline = useMemo(
     () => pickHotline(siteInfo?.seller?.phone, siteInfo?.confirmation_policy?.hotline),
@@ -151,6 +159,7 @@ function CheckoutForm() {
     getCatalog()
       .then((c) => {
         if (!active || placedRef.current) return;
+        minQtyRef.current = new Map(c.items.map((i) => [i.item_code, parseQtyRule(i.min_qty, i.qty_step, i.unit).minQty]));
         const live = new Map(c.items.map((i) => [i.item_code, i.stock_level]));
         if (cart.lines.some((l) => (live.get(l.item_code) ?? "out") === "out")) router.replace("/shop/cart/");
       })
@@ -162,7 +171,15 @@ function CheckoutForm() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cart.ready]);
 
-  const total = String(Math.round(cart.totalAmount));
+  // Mã giảm giá (3b): số giảm và tổng lấy từ máy chủ; thiếu kết quả kiểm thì hiện giá chưa giảm và không gửi mã.
+  const voucherItems = useMemo(
+    () => cart.lines.map((l) => ({ item_code: l.item_code, qty: qtyToApiString(l.qty) })),
+    [cart.lines]
+  );
+  const voucher = useVoucher(voucherItems, cart.ready);
+  const quote = voucher.quote;
+  const localTotal = String(Math.round(cart.totalAmount));
+  const total = quote ? quote.total_after : localTotal;
   const itemCount = cart.lines.length;
   const summaryLines = useMemo(
     () =>
@@ -197,15 +214,19 @@ function CheckoutForm() {
     setFieldError(field, all[field]);
   }
 
-  /** Gửi đơn. `linesOverride` dùng khi vừa sửa giỏ ở C3 (state giỏ chưa kịp cập nhật). */
+  /**
+   * Gửi đơn. `lines` dùng khi vừa sửa giỏ ở C3 (state giỏ chưa kịp cập nhật). `withoutVoucher` là "Đặt hàng không dùng mã"
+   * (B8): bỏ mã và dùng `client_request_id` mới.
+   */
   const send = useCallback(
-    async (linesOverride?: typeof cart.lines) => {
+    async (opts?: { lines?: typeof cart.lines; withoutVoucher?: boolean }) => {
       if (submittingRef.current) return; // chống bấm đúp
-      const lines = linesOverride ?? cart.lines;
+      const lines = opts?.lines ?? cart.lines;
       if (lines.length === 0) return;
       const items = lines.map((l) => ({ item_code: l.item_code, qty: qtyToApiString(l.qty) }));
+      const fingerprint = cartFingerprint(items);
       const payload: CreateOrderPayload = {
-        client_request_id: getRequestId(cartFingerprint(items)),
+        client_request_id: opts?.withoutVoucher ? renewRequestId(fingerprint) : getRequestId(fingerprint),
         customer: { name: name.trim(), phone: normalizeVnPhone(phone) },
         delivery_address: address.trim(),
         items,
@@ -213,6 +234,7 @@ function CheckoutForm() {
       if (consentRequired && policy) {
         payload.privacy_consent = { accepted: consent, policy_version_id: policy.version_id };
       }
+      if (!opts?.withoutVoucher && voucher.code && voucher.quote) payload.voucher_code = voucher.code;
 
       submittingRef.current = true;
       setSubmitting(true);
@@ -221,12 +243,14 @@ function CheckoutForm() {
         const res = await createOrder(payload);
         // Thành công (201 hoặc 200 khi gửi lại): nhớ mã tra đơn trong phiên, xoá giỏ, sang trang đơn.
         placedRef.current = true;
+        clearVoucherCode(); // đơn xong: giỏ mới không tự áp lại mã cũ
         saveLookupToken(res.order_code, res.lookup_token);
         clearRequestId();
         cart.clear();
         router.replace(`/shop/orders/?code=${encodeURIComponent(res.order_code)}`);
         return;
       } catch (err) {
+        if (opts?.withoutVoucher) setVoucherGone(null);
         handleSendError(err, lines);
       } finally {
         submittingRef.current = false;
@@ -234,7 +258,7 @@ function CheckoutForm() {
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [cart, name, phone, address, consent, consentRequired, policy, router]
+    [cart, name, phone, address, consent, consentRequired, policy, router, voucher.code, voucher.quote]
   );
 
   function handleSendError(err: unknown, lines: typeof cart.lines) {
@@ -245,6 +269,20 @@ function CheckoutForm() {
       return;
     }
     const code = err.code ?? "";
+    if (code === "VOUCHER_INVALID") {
+      // Mã hết hiệu lực giữa lúc điền form (B8): hỏi khách. Mã bị bỏ khỏi giỏ để lần sau không gửi lại.
+      setVoucherGone({
+        code: voucher.code ?? "",
+        fullPrice: localTotal,
+        discountedPrice: voucher.quote?.total_after ?? localTotal,
+      });
+      voucher.remove();
+      // "Giá chưa giảm" lấy từ máy chủ (kiểm không mã); lỗi mạng thì giữ số tạm tính của giỏ đang hiện.
+      checkVoucher({ items: lines.map((l) => ({ item_code: l.item_code, qty: qtyToApiString(l.qty) })) })
+        .then((r) => setVoucherGone((g) => (g ? { ...g, fullPrice: r.total_after } : g)))
+        .catch(() => {});
+      return;
+    }
     if (code === "OUT_OF_STOCK" && Array.isArray(err.data?.lines)) {
       const byCode = new Map(lines.map((l) => [l.item_code, l]));
       const rows: SoldOutLine[] = [];
@@ -256,7 +294,7 @@ function CheckoutForm() {
           name: l.name,
           unit: l.unit,
           qty: l.qty,
-          minQty: 1,
+          minQty: minQtyRef.current.get(l.item_code) ?? 1,
           level: row.stock_level === "out" ? "out" : "short",
           changed: false,
         });
@@ -352,7 +390,7 @@ function CheckoutForm() {
 
   // ---- C3: cập nhật giỏ rồi đặt lại ----
   function changeToMin(code: string) {
-    cart.setQty(code, 1);
+    cart.setQty(code, minQtyRef.current.get(code) ?? 1);
     setSoldOut((prev) => prev && prev.map((l) => (l.itemCode === code ? { ...l, changed: true } : l)));
   }
 
@@ -374,7 +412,7 @@ function CheckoutForm() {
       router.replace("/shop/cart/");
       return;
     }
-    void send(next);
+    void send({ lines: next });
   }
 
   const ready = cart.ready && consentRequired !== null;
@@ -419,6 +457,13 @@ function CheckoutForm() {
               <div className={s.block}>
                 <Banner tone="crit" live="assertive">
                   {banner}
+                </Banner>
+              </div>
+            ) : null}
+            {voucher.dropped ? (
+              <div className={s.block}>
+                <Banner tone="info" live="polite">
+                  Mã {voucher.dropped.code} không còn dùng được. {voucherMessage(voucher.dropped.kind, minOrderOf(voucher.dropped.result), voucher.dropped.result?.auto_discount_amount)} Đơn tính theo giá chưa giảm.
                 </Banner>
               </div>
             ) : null}
@@ -518,13 +563,14 @@ function CheckoutForm() {
               context="checkout"
               itemCount={itemCount}
               total={total}
+              discount={quote && voucher.code ? { code: voucher.code, amount: quote.discount_amount } : undefined}
               title={`Đơn hàng (${itemCount} món)`}
               totalLabel={`${itemCount} món · tổng tiền hàng`}
               lines={summaryLines}
               cta={{
                 label: "Đặt hàng",
                 form: "checkout-form",
-                loading: submitting || !ready,
+                loading: submitting || !ready || voucher.checking,
                 loadingText: submitting ? "Đang đặt…" : "Đang tải…",
               }}
             />
@@ -562,6 +608,56 @@ function CheckoutForm() {
           router.push("/shop/cart/");
         }}
       />
+
+      {/* B8 (C6): mã giảm giá không còn dùng được lúc đặt. Mặc định tiêu điểm ở "Quay lại giỏ" (hành động an toàn). */}
+      <Dialog
+        open={voucherGone !== null}
+        onClose={() => {
+          setVoucherGone(null);
+          focusSoon(document.querySelector<HTMLElement>('button[form="checkout-form"]'));
+        }}
+        title={`Mã ${voucherGone?.code ?? ""} không còn dùng được`}
+        description="Đơn sẽ tính theo giá chưa giảm."
+        kind="alert"
+        icon={{ name: "warning", tone: "warn" }}
+        busy={submitting}
+        closeLabel="Đóng thông báo mã giảm giá"
+        actions={
+          <>
+            <Button
+              size="lg"
+              fullWidth
+              loading={submitting}
+              loadingText="Đang đặt…"
+              onClick={() => void send({ withoutVoucher: true })}
+            >
+              Đặt hàng không dùng mã
+            </Button>
+            <Button
+              variant="secondary"
+              size="lg"
+              fullWidth
+              data-autofocus
+              disabled={submitting}
+              onClick={() => {
+                setVoucherGone(null);
+                router.push("/shop/cart/");
+              }}
+            >
+              Quay lại giỏ
+            </Button>
+          </>
+        }
+      >
+        {voucherGone ? (
+          <p className={s.goneTotal}>
+            <span>Tổng tiền hàng</span>
+            <span className="num">
+              <del className={s.goneOld}>{formatPriceVnd(voucherGone.discountedPrice)}</del> <strong>{formatPriceVnd(voucherGone.fullPrice)}</strong>
+            </span>
+          </p>
+        ) : null}
+      </Dialog>
 
       {/* C4: mất mạng khi đặt. "Thử lại" gửi cùng client_request_id; đang gửi lại thì không đóng được. */}
       <Dialog

@@ -39,6 +39,7 @@ export type ViewKey =
   | "stocktake"
   | "ledger"
   | "catalog"
+  | "vouchers"
   | "reports"
   | "sales-invoices"
   | "purchase-invoices"
@@ -167,6 +168,8 @@ export const PERM = {
   /** Chi phí phụ của lô: chỉ Chủ (cả chứng từ là giá vốn). */
   viewPurchaseCost: "purchasing.view_purchasecost",
   viewItemPrice: "catalog.view_itemprice",
+  /** SHOP-3b-02: quản lý mã giảm giá (Tầng 2) — chỉ Chủ, uỷ được ở màn Phân quyền. Cần cho mọi endpoint /api/catalog/vouchers/. */
+  manageVoucher: "catalog.manage_voucher",
   /** Xem giá vốn (bất biến 1): chỉ Chủ. */
   viewCostPrice: "inventory.view_costprice",
   viewProfitReport: "reports.view_profitreport",
@@ -389,6 +392,18 @@ export const NAV: NavItem[] = [
     // Điều phối chốt 2026-09-24: menu hiện khi có catalog.view_item (warehouse_staff cũng có); phần GIÁ bên trong màn
     // chỉ hiện khi có catalog.view_itemprice.
     visible: (me) => has(me, PERM.viewItem),
+  },
+  {
+    key: "vouchers",
+    summary: "Mã giảm giá cho khách nhập ở giỏ hàng: tạo, sửa, tắt và xem lượt dùng.",
+    plannedIn: "SHOP-3b-02",
+    href: "/vouchers/",
+    label: "Mã giảm giá",
+    short: "Mã giảm",
+    icon: "price_check",
+    section: "Hàng hoá & kho",
+    // Chỉ người có catalog.manage_voucher mới thấy menu (không có quyền xem riêng: quyền này gồm cả xem lẫn sửa).
+    visible: (me) => has(me, PERM.manageVoucher),
   },
 
   // ---- Kế toán ----

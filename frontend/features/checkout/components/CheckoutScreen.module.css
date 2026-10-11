@@ -148,3 +148,26 @@
     margin: 0 auto;
   }
 }
+
+/* B8: so sánh tổng có mã (gạch) và tổng chưa giảm. */
+.goneTotal {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin: var(--space-1) 0 0;
+  padding: 10px var(--space-3);
+  border-radius: var(--radius-lg);
+  background: var(--surface-2);
+  color: var(--ink-2);
+}
+
+.goneOld {
+  color: var(--ink-3);
+  font-size: 13px;
+}
+
+.goneTotal > span:first-child {
+  flex: none;
+  white-space: nowrap;
+}

@@ -204,6 +204,23 @@ không có lệnh `gcloud` chuẩn cho budget theo project + label).
 - Supabase Free không tự sao lưu. Job `pg_dump` hằng đêm: **còn nợ**.
 - Cloud SQL `cangca-loc-db` **đã xoá** ngày 2026-09-27 (Duy duyệt). Dữ liệu cũ vẫn giữ ở các file `.sql` trong bucket nói trên.
 
+## Test PostgreSQL trên GitHub Actions
+
+```mermaid
+flowchart TD
+  P["Đẩy code hoặc mở pull request"] --> G["GitHub dựng Postgres tạm"]
+  G --> T["Chạy toàn bộ test backend"]
+  T --> K{"Có dòng Ran N tests và OK?"}
+  K -- "có" --> X["Xanh: test đua Postgres đã chạy thật"]
+  K -- "không" --> D["Đỏ: mở log xem test nào hỏng"]
+```
+
+Duy chốt 11/10 (`doc/decisions.md`). Workflow `.github/workflows/backend-tests.yml` chạy mỗi lần push (mọi nhánh) và pull request. Không deploy, không secret thật, chỉ quyền đọc repo; Postgres 16 chỉ sống trong job, tên người dùng và mật khẩu là giá trị giả viết thẳng trong file; SePay để SANDBOX, AI tắt.
+- Hai job: **Test backend (PostgreSQL 16)** chạy cả test đua (không bị skip) và `makemigrations --check`; **Test backend (SQLite)** giống máy dev.
+- Cách đọc: vào tab Actions của repo, mở lần chạy, xem phần Summary của từng job. Cần thấy dòng `Ran N tests` rồi `OK`. Có `skipped=` ở job Postgres thì chỉ nên là vài test không liên quan Postgres; test đua bị skip nghĩa là `DATABASE_URL` không tới Postgres.
+- Không có dòng `Ran N tests` (job sập giữa chừng) thì coi là chưa xanh, kể cả khi job báo hoàn tất.
+- Chạy cục bộ không cần Postgres: lệnh SQLite ở `backend/README.md`. Không trỏ `DATABASE_URL` vào staging hay production.
+
 ## Nhật ký deploy staging
 - **2026-09-30 — P1–P8 lên staging** (commit `6da8dd7`): image `api:v6`, revision `cangca-api-staging-00003-7sv` (rollback: `00002-4nl`, image `api:v5`). Chạy 21 migration trên `cangca_staging` bằng job **`cangca-migrate-staging`** (mới, đọc secret staging; đổi lệnh bằng `--args`, mặc định `manage.py,migrate,--noinput`). Thêm env `ITEM_IMAGE_STORAGE=gcs`, `ITEM_IMAGE_BUCKET=cangca-item-images-keolai-staging`. AI vẫn tắt (`AI_ENABLED` chưa đặt). `backfill_credit_notes` dry-run: 0 đơn cần lập bù. Shop/ERP staging build trỏ API staging, `check-no-mock` xanh, header noindex có. Adapter không đổi. Bucket ảnh cả hai môi trường: liệt kê công khai trả 403 (đã kiểm).
 - **2026-10-01 — Duy yêu cầu gỡ chặn BR-BH-17 trên staging:** `PRIVACY_CONSENT_REQUIRED=0` (revision `cangca-api-staging-00004-xqj`). Shop staging nhận đơn khi chưa có trang chính sách; có trang thì ô đồng ý là tuỳ chọn. **Production chưa đổi** (vẫn mặc định `1`) — quyết định riêng khi mở production (xem `go-live-phap-ly.md`).

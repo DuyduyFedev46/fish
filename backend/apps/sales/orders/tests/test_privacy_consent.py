@@ -215,6 +215,8 @@ class PrivacyConsentTests(TestCase):
             # P8 Lô 4 (BR-HT-10): chứng từ đảo doanh thu — không chứa dữ liệu cá nhân của khách.
             "SalesCreditNote",
             "SalesCreditNoteLine",
+            # Lô 3b (BR-DM-19, 20): lượt dùng mã giảm giá, KHÔNG có tên, SĐT, địa chỉ (xem test_voucher_redemption_pii).
+            "VoucherRedemption",
         }
         self.assertEqual(model_names, expected_models)
 

@@ -31,9 +31,10 @@ class AuditLogMigrationTests(TransactionTestCase):
         # nó ở đích thì accounts bị kéo tới 0013 chứ không lùi về 0006). Loại cả `delivery` (Lô 4:
         # `delivery/0006` cấp quyền cho Group tên tiếng Anh nên phụ thuộc `accounts/0013`, cùng lý do). Loại cả
         # `sales` (Lô 6: `sales/0013` cấp quyền Xem khách hàng cho Group tên tiếng Anh, cùng lý do). Loại cả `inventory` (Lô bổ sung A:
-        # `inventory/0008` cấp quyền tạo hàng hoàn cho Group `manager`, cùng lý do).
+        # `inventory/0008` cấp quyền tạo hàng hoàn cho Group `manager`, cùng lý do). Loại cả `catalog` (Shop lô 3b:
+        # `catalog/0010` cấp `manage_voucher` cho Group `owner`, cùng lý do).
         targets = [
-            t for t in executor.loader.graph.leaf_nodes() if t[0] not in ("accounts", "ai", "delivery", "sales", "inventory")
+            t for t in executor.loader.graph.leaf_nodes() if t[0] not in ("accounts", "ai", "delivery", "sales", "inventory", "catalog")
         ] + self.migrate_from
         executor.migrate(targets)
         self.old_apps = executor.loader.project_state(targets).apps

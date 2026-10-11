@@ -52,7 +52,8 @@ export default function OrderView({
   const cancelled = CANCEL_SCREENS.includes(screen);
   const steps = buildOrderTimeline(order);
   const discount = order.discount.source && order.discount.code ? { code: order.discount.code, amount: order.discount.amount } : undefined;
-  const confirming = order.state === "preparing" && /xác nhận/i.test(order.delivery?.step_label ?? "");
+  // Cờ do máy chủ báo (02b §3.4.2), không dò chữ trong nhãn.
+  const confirming = order.state === "preparing" && order.delivery?.awaiting_confirmation === true;
   const call = contactTarget(hotline);
 
   async function copyCode() {

@@ -77,6 +77,12 @@ class ShopLookupTokenThrottle(SettingsRateThrottle):
     scope = "shop_lookup_token"
 
 
+class ShopVoucherCheckThrottle(SettingsRateThrottle):
+    """Kiểm mã giảm giá công khai: 20/phút/IP, chặn dò mã (BR-DM-24, 02b §3.11)."""
+
+    scope = "shop_voucher_check"
+
+
 class ShopOrderCreateThrottle(SettingsRateThrottle):
     scope = "shop_order_create"
 
